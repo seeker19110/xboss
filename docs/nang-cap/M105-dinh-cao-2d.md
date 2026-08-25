@@ -23,7 +23,18 @@
 
 AC-A: (1) engineer gửi block từ AutoCAD → version mới ngay, không tạo dòng proposals; (2) ghi đè → version mới thay entry, GET history trả ≤5 bản đúng thứ tự; (3) rollback → version mới với sha256 đúng bản cũ; (4) subcon/viewer → 403; (5) test hồi quy M103/M104 xanh (đường proposals + web thêm thẳng không đổi hành vi).
 
-## Cụm B — Bộ vẽ nâng cao (PR-C, PR-D, PR-E — plugin, rule pack v9)
+## Cụm B — Bộ vẽ nâng cao (PR-C, PR-D, PR-E, PR-H — plugin, rule pack v9)
+
+### B0. Auto-routing 2D tuyến (PR-H)
+
+`XBOSS_VE_AUTO`: chọn hệ + size → bấm điểm đầu, các điểm ghim (tuỳ chọn), điểm cuối → plugin
+tự vẽ tuyến **orthogonal** (chỉ 0/90°, bám hướng đoạn dài nhất giữa 2 điểm liên tiếp), tự chèn
+co 90° tại mọi góc rẽ, tê tại điểm đấu vào tuyến sẵn có (bắt điểm trên tuyến cùng hệ), giảm khi
+người dùng đổi size giữa chừng (prompt size từng chặng), tự đặt nhãn size theo `XBOSS_VE_NHAN`.
+Tránh chướng ngại ở mức đơn giản: nếu đoạn thẳng cắt qua block/tuyến KHÁC hệ, đề nghị điểm ghim
+bổ sung chứ KHÔNG tự dò đường vòng (A* để phiên bản sau — ghi rõ để không kỳ vọng nhầm). Toàn bộ
+qua đường vẽ hiện có của `XBOSS_VE` (cùng layer/style/XData bóc tách), 1 UNDO, idempotent theo
+nghĩa: chạy lại không sinh thực thể trùng vị trí.
 
 ### B1. Ngắt nét giao chéo (PR-C)
 
@@ -52,6 +63,15 @@ AC-B: mỗi lệnh idempotent (chạy lại không nhân đôi), 1 UNDO, mọi t
 - `XBOSS_BATCH` thêm chế độ `InPdf`: mọi layout có khung tên chuẩn trong từng tệp của thư mục → PDF (plot theo khổ giấy đọc từ block khung tên; device `AutoCAD PDF (High Quality).pc3`), tên tệp `<mã bản vẽ>-<rev>.pdf`, gộp tuỳ chọn thành 1 PDF cả bộ (Core ghép bằng thư viện thuần đã có trong repo web? — KHÔNG: plugin C# tự ghép qua PdfSharp là dependency mới → KHÔNG thêm dependency; chỉ xuất từng tệp + tệp chỉ mục `xboss-in-pdf.txt`). Nhật ký như batch hiện có.
 
 AC-C: dim/tag không đè lên thực thể sẵn có (kiểm bbox), batch PDF bỏ qua tệp lỗi và log rõ, mọi thông số qua rule pack.
+
+## Điểm đã rà bổ sung (chốt cùng đặc tả, tránh hở khi thi hành)
+
+1. **Hàng chờ proposals tồn đọng khi bỏ duyệt (Cụm A):** đề xuất `pending` còn lại vẫn duyệt/từ chối được trên web như cũ; không tạo mới từ plugin nữa. Đánh dấu deprecated trong tài liệu, KHÔNG xoá route/bảng.
+2. **"5 bản" là giới hạn HIỂN THỊ/rollback, không xoá dữ liệu:** mọi bản cũ vẫn nằm trong manifest các version trước (append-only); API history chỉ trả 5 bản gần nhất.
+3. **Thông báo khi block bị ghi đè:** upsert notification web loại `comment`-style cho người phát hành bản trước đó ("Block X của bạn vừa bị <ai> ghi đè, xem lịch sử") — dùng hệ notifications sẵn có, không loại mới nếu phải thêm schema; nếu cần cột mới thì bỏ qua (ghi nợ), KHÔNG tự chế migration ngoài đặc tả.
+4. **So sánh 2 revision cần đường tải tệp revision:** nếu chưa có route GET tệp DWG của `drawing_revisions` cho token `cad`, PR-D bổ sung `GET /api/engineering/cad/plugin-upload?revision=<id>` (chỉ đọc, cùng auth/ratelimit như block-lib) — kiểm tra tồn tại trước, tái dùng nếu đã có.
+5. **Batch in PDF:** tên plot device đặt trong rule pack `sheetSetup.pdfDevice` (mặc định "AutoCAD PDF (High Quality).pc3"), không hard-code — máy thiếu device thì báo tiếng Việt kèm hướng dẫn, bỏ qua tệp đó.
+6. **Layer mới `XBOSS-REV`/`XBOSS-SOSANH-*` phải được XBOSS_KIEMTRA bỏ qua** (khai vào allowlist layer của rule pack v9) — nếu không mọi bản vẽ có cloud/so sánh sẽ bị báo "layer lạ".
 
 ## Kế hoạch PR
 
