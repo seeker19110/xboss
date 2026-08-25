@@ -19,6 +19,11 @@ namespace XBoss.Cad.Acad.Services;
 /// là từ chối thẳng, không "dùng tạm").</item>
 /// <item><b>Tải từ server</b> qua <c>GET /api/engineering/cad/block-lib</c> bằng đúng token thiết
 /// bị của <c>XBOSS_LOGIN</c> (Credential Manager) + ETag — 304 thì giữ nguyên cache (AC8).</item>
+/// <item><b>Thư viện ĐA TỆP</b> (M104 §1): block thêm thẳng từ web nằm ở tệp .dwg RIÊNG — máy chủ
+/// không chạy AutoCAD nên không gộp được chúng vào <c>blocks.dwg</c> nền. Entry manifest có
+/// <c>fileKey</c> ⇒ tải tệp lẻ qua <c>?file=</c>, cache tại <c>block-lib\files\&lt;fileKey&gt;</c>,
+/// kiểm sha256 TỪNG tệp y hệt tệp nền. Entry không có <c>fileKey</c> = block nằm trong tệp nền như
+/// cũ (mọi thư viện phát hành trước M104 không đổi hành vi).</item>
 /// <item><b>Nhập định nghĩa block vào DWG một lần</b> (WblockClone từ tệp cache): bản vẽ tự chứa
 /// định nghĩa, mở trên máy chưa cài plugin vẫn đúng hình. Định nghĩa nhập vào được đánh dấu XData
 /// <c>XBOSS_VE</c> (vai trò <see cref="VaiTroVe.DinhNghiaBlock"/> + version thư viện) để lần chèn
@@ -35,6 +40,12 @@ internal static class BlockLibraryService
     internal static string DwgPath => Path.Combine(ThuMucCache, "blocks.dwg");
     internal static string EtagPath => Path.Combine(ThuMucCache, "blocks.etag");
 
+    /// <summary>Thư mục chứa tệp .dwg LẺ của các block thêm từ web (M104 §1), tên tệp = fileKey.</summary>
+    internal static string ThuMucTepLe => Path.Combine(ThuMucCache, "files");
+
+    /// <summary>Đuôi tệp ghi ETag của một tệp lẻ, đặt cạnh chính tệp đó.</summary>
+    private const string DuoiEtag = ".etag";
+
     private static BlockManifest? _cache;
     private static DateTime _thoiDiemCache;
 
@@ -46,8 +57,9 @@ internal static class BlockLibraryService
     // ===== Cache cục bộ =====
 
     /// <summary>
-    /// Thư viện đang dùng được: manifest đã kiểm + hash tệp .dwg khớp. Trả (null, lý do tiếng Việt)
-    /// khi chưa có/hỏng. Đọc lại khi tệp manifest đổi (vừa tải/nạp tay xong).
+    /// Thư viện đang dùng được: manifest đã kiểm + hash tệp .dwg nền khớp + ĐỦ tệp .dwg lẻ của
+    /// mọi block thêm từ web, hash từng tệp khớp (M104 §1). Trả (null, lý do tiếng Việt) khi chưa
+    /// có/hỏng. Đọc lại khi tệp manifest đổi (vừa tải/nạp tay xong).
     /// </summary>
     internal static (BlockManifest? Manifest, string? Loi) HienHanh()
     {
@@ -59,6 +71,7 @@ internal static class BlockLibraryService
 
             var manifest = BlockManifestLoader.Load(File.ReadAllText(ManifestPath));
             BlockManifestLoader.KiemTraHashTep(manifest, DwgPath); // ném khi lệch — không dùng tạm
+            KiemTraTepLe(manifest); // nt cho từng tệp lẻ (M104)
             _cache = manifest;
             _thoiDiemCache = thoiDiem;
             return (manifest, null);
@@ -102,9 +115,103 @@ internal static class BlockLibraryService
         if (etag is null) DonEtag();
         else File.WriteAllText(EtagPath, etag);
 
-        _cache = manifest;
-        _thoiDiemCache = File.GetLastWriteTimeUtc(ManifestPath);
+        // KHÔNG đặt _cache ở đây: manifest mới có thể còn thiếu tệp .dwg lẻ chưa tải (M104 §1),
+        // đặt sẵn là biến "chưa dùng được" thành "dùng được" trong mắt HienHanh(). Xoá cache nhớ
+        // để lần HienHanh() kế tiếp kiểm lại từ đầu (gồm cả tệp lẻ).
+        _cache = null;
         return manifest;
+    }
+
+    // ===== Tệp .dwg lẻ của block thêm từ web (M104 §1) =====
+
+    /// <summary>Đường dẫn tệp lẻ trong cache. Ném khi khoá không dùng làm tên tệp được.</summary>
+    internal static string DuongDanTepLe(string fileKey)
+    {
+        // Manifest đã kiểm khoá lúc Load; kiểm lại ngay trước khi ghép đường dẫn vì đây là chỗ
+        // DUY NHẤT dữ liệu từ mạng biến thành tên tệp trên đĩa (phòng đường gọi mới quên kiểm).
+        if (!BlockManifestLoader.LaKhoaTepHopLe(fileKey))
+        {
+            throw new BlockManifestException(
+                $"Khoá tệp block \"{fileKey}\" không hợp lệ — thư viện hỏng, tải lại bằng XBOSS_LOGIN.");
+        }
+        return Path.Combine(ThuMucTepLe, fileKey);
+    }
+
+    /// <summary>Tệp lẻ của block đã có trong cache và hash khớp manifest (không cần tải lại).</summary>
+    private static bool TepLeConTot(BlockDef def)
+    {
+        try
+        {
+            var duong = DuongDanTepLe(def.FileKey!);
+            if (!File.Exists(duong)) return false;
+            BlockManifestLoader.KiemTraHashTepLe(def, File.ReadAllBytes(duong));
+            return true;
+        }
+        catch (BlockManifestException)
+        {
+            return false; // thiếu/lệch hash — coi như chưa có, sẽ tải lại
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Mọi block có <c>fileKey</c> đều phải có tệp lẻ trong cache với hash khớp — thiếu/lệch thì
+    /// NÉM kèm tên các block đó và cách lấy lại. Không có tệp lẻ mà vẫn cho vẽ thì lệnh chèn sẽ
+    /// chết giữa chừng với thông điệp khó hiểu, hoặc tệ hơn là chèn nhầm định nghĩa cùng tên.
+    /// </summary>
+    private static void KiemTraTepLe(BlockManifest manifest)
+    {
+        var thieu = new List<string>();
+        foreach (var def in manifest.TepRieng())
+        {
+            if (!TepLeConTot(def)) thieu.Add($"\"{def.BlockName}\"");
+        }
+        if (thieu.Count == 0) return;
+        throw new BlockManifestException(
+            $"Thiếu tệp .dwg của {thieu.Count} block thêm từ web ({string.Join(", ", thieu)}) trong cache " +
+            $"({ThuMucTepLe}) hoặc tệp không khớp hash — chạy XBOSS_LOGIN (hoặc XBOSS_VE_THUVIEN → Server) " +
+            "để tải lại thư viện.");
+    }
+
+    /// <summary>Ghi tệp lẻ vào cache — CHỈ gọi sau khi hash đã khớp manifest.</summary>
+    private static void GhiTepLe(string fileKey, byte[] dwg, string? etag)
+    {
+        var duong = DuongDanTepLe(fileKey);
+        Directory.CreateDirectory(ThuMucTepLe);
+        File.WriteAllBytes(duong, dwg);
+        if (etag is null)
+        {
+            try
+            {
+                if (File.Exists(duong + DuoiEtag)) File.Delete(duong + DuoiEtag);
+            }
+            catch (IOException) { /* etag mất chỉ tốn 1 lần tải lại */ }
+        }
+        else
+        {
+            File.WriteAllText(duong + DuoiEtag, etag);
+        }
+        _cache = null; // buộc HienHanh() kiểm lại thư viện sau khi cache đổi
+    }
+
+    private static string? EtagTepLeCu(string fileKey)
+    {
+        try
+        {
+            var duong = DuongDanTepLe(fileKey) + DuoiEtag;
+            return File.Exists(duong) ? File.ReadAllText(duong) : null;
+        }
+        catch (BlockManifestException)
+        {
+            return null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
     }
 
     private static void DonEtag()
@@ -154,6 +261,15 @@ internal static class BlockLibraryService
             if (json is null && File.Exists(ManifestPath) && File.Exists(DwgPath))
             {
                 var (cu, loi) = HienHanh();
+                if (cu is null && ManifestCache() is { } tam)
+                {
+                    // 304 KHÔNG mang manifest mới về, nên tệp lẻ còn thiếu (lần tải trước đứt giữa
+                    // chừng, hoặc bản M104 đầu tiên cài lên máy đã có cache cũ) phải bù từ chính
+                    // manifest đang nằm trong cache, rồi kiểm lại.
+                    var loiLe = await TaiTepLeAsync(client, token, tam);
+                    (cu, loi) = HienHanh();
+                    if (cu is null && loiLe is not null) return (false, loiLe);
+                }
                 return cu is not null
                     ? (true, $"Thư viện block không đổi so với cache (version {cu.Version}, {cu.Blocks.Count} block).")
                     : (false, $"Thư viện block không đổi trên server nhưng cache hỏng: {loi}");
@@ -171,7 +287,13 @@ internal static class BlockLibraryService
             if (dwg is null || dwg.Length == 0) return (false, "Server không trả được tệp .dwg thư viện block.");
 
             var manifest = GhiCache(json, dwg, etagMoi);
-            return (true, $"Đã tải thư viện block {manifest.Version} ({manifest.Blocks.Count} block) → {ThuMucCache}");
+            var loiTepLe = await TaiTepLeAsync(client, token, manifest);
+            if (loiTepLe is not null) return (false, loiTepLe);
+
+            var soLe = manifest.TepRieng().Count();
+            return (true,
+                $"Đã tải thư viện block {manifest.Version} ({manifest.Blocks.Count} block" +
+                $"{(soLe > 0 ? $", {soLe} block thêm từ web ở tệp riêng" : "")}) → {ThuMucCache}");
         }
         catch (BlockManifestException e)
         {
@@ -197,6 +319,65 @@ internal static class BlockLibraryService
     }
 
     /// <summary>
+    /// Tải các tệp .dwg LẺ (block thêm từ web — M104 §1) còn thiếu/lệch hash về cache, bằng cùng
+    /// token thiết bị + ETag như tệp nền. Tệp đã có và đúng hash thì BỎ QUA (không tốn lượt tải).
+    /// Hash kiểm TRƯỚC khi ghi: server trả tệp lệch hash thì không có gì rơi vào cache.
+    /// Trả null khi đủ, hoặc thông điệp tiếng Việt liệt kê những block chưa lấy được.
+    /// </summary>
+    private static async Task<string?> TaiTepLeAsync(XBossApiClient client, string token, BlockManifest manifest)
+    {
+        var hong = new List<string>();
+        foreach (var def in manifest.TepRieng())
+        {
+            if (TepLeConTot(def)) continue;
+            try
+            {
+                var fileKey = def.FileKey!;
+                var (dwg, etagMoi) = await client.FetchBlockLibTepLeAsync(token, fileKey, EtagTepLeCu(fileKey));
+                // 304 mà tệp trong cache không dùng được (đã kiểm ở trên) ⇒ hỏi lại không kèm ETag.
+                if (dwg is null || dwg.Length == 0)
+                    (dwg, etagMoi) = await client.FetchBlockLibTepLeAsync(token, fileKey);
+                if (dwg is null || dwg.Length == 0)
+                {
+                    hong.Add($"\"{def.BlockName}\": server không trả được tệp");
+                    continue;
+                }
+                BlockManifestLoader.KiemTraHashTepLe(def, dwg);
+                GhiTepLe(fileKey, dwg, etagMoi);
+            }
+            catch (BlockManifestException e)
+            {
+                hong.Add($"\"{def.BlockName}\": {e.Message}");
+            }
+            catch (XBossApiException e)
+            {
+                hong.Add($"\"{def.BlockName}\": {e.Message}");
+            }
+        }
+        if (hong.Count == 0) return null;
+        return $"Thiếu {hong.Count} tệp block thêm từ web nên thư viện CHƯA dùng được — " +
+               string.Join("; ", hong) +
+               ". Nhờ Admin/PM kiểm lại trên web rồi chạy lại XBOSS_LOGIN.";
+    }
+
+    /// <summary>Manifest trong cache, KHÔNG kiểm hash tệp — chỉ để biết cần bù tệp lẻ nào.</summary>
+    private static BlockManifest? ManifestCache()
+    {
+        try
+        {
+            return BlockManifestLoader.Load(File.ReadAllText(ManifestPath));
+        }
+        catch (BlockManifestException)
+        {
+            return null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Nạp thư viện từ tệp tay (XBOSS_VE_THUVIEN — đường dự phòng khi offline, như XBOSS_RULEPACK).
     /// Kiểm manifest + hash tệp .dwg TRƯỚC, đạt mới ghi đè cache. Trả thông điệp tiếng Việt.
     /// </summary>
@@ -205,6 +386,11 @@ internal static class BlockLibraryService
         try
         {
             var manifest = GhiCache(File.ReadAllText(manifestPath), File.ReadAllBytes(dwgPath), etag: null);
+            // Nạp tay chỉ mang về tệp NỀN. Thư viện có block thêm từ web (M104 §1) còn cần tệp lẻ,
+            // mà chúng chỉ tải được từ server ⇒ nói thẳng thay vì báo "đã nạp" rồi để lệnh vẽ chết.
+            var (dungDuoc, loi) = HienHanh();
+            if (dungDuoc is null)
+                return (null, $"Đã ghi cache nhưng thư viện CHƯA dùng được: {loi}");
             return (manifest,
                 $"Đã nạp thư viện block {manifest.Version} ({manifest.Blocks.Count} block) từ tệp tay → {ThuMucCache}");
         }
@@ -283,14 +469,39 @@ internal static class BlockLibraryService
     /// Gọi NGOÀI transaction của bản vẽ đích (WblockCloneObjects làm việc trực tiếp trên database);
     /// vẫn nằm trong CÙNG một lệnh nên UNDO một lần xóa cả định nghĩa lẫn khối vừa chèn.
     /// <paramref name="ghiDe"/> = true khi kỹ sư chọn cập nhật định nghĩa cũ (AC7).
+    ///
+    /// Thư viện ĐA TỆP (M104 §1): block không có <c>fileKey</c> lấy từ <c>blocks.dwg</c> nền như cũ,
+    /// block có <c>fileKey</c> lấy từ ĐÚNG tệp lẻ của nó trong cache. Mỗi tệp nguồn mở một lần,
+    /// clone theo lô — vẫn một lệnh, một lần UNDO.
     /// </summary>
-    internal static void NhapDinhNghia(Database db, IReadOnlyList<string> tenBlock, bool ghiDe)
+    internal static void NhapDinhNghia(Database db, IReadOnlyList<BlockDef> def, bool ghiDe)
     {
-        if (tenBlock.Count == 0) return;
+        if (def.Count == 0) return;
 
+        // Gom theo TỆP NGUỒN: tệp nền (khoá rỗng) + từng tệp lẻ.
+        foreach (var nhom in def.GroupBy(d => d.FileKey ?? "", StringComparer.Ordinal))
+        {
+            var laTepLe = nhom.Key.Length > 0;
+            var duongDan = laTepLe ? DuongDanTepLe(nhom.Key) : DwgPath;
+            if (laTepLe)
+            {
+                // Kiểm hash NGAY TRƯỚC KHI DÙNG, không chỉ lúc nạp cache: tệp trong %APPDATA% có
+                // thể bị tráo giữa hai thời điểm đó. Lệch = từ chối thẳng (M100 §12).
+                // Kiểm theo TỪNG entry chứ không chỉ entry đầu: hai block cùng fileKey mà khai hash
+                // khác nhau là manifest hỏng, không được cho qua bằng cách chỉ soi cái đầu tiên.
+                foreach (var d in nhom) BlockManifestLoader.KiemTraHashTepLe(d, duongDan);
+            }
+            NhapTuTep(db, duongDan, nhom.Select(d => d.BlockName).ToList(), ghiDe, laTepLe);
+        }
+    }
+
+    /// <summary>WblockClone một lô định nghĩa block từ MỘT tệp .dwg trong cache sang bản vẽ đích.</summary>
+    private static void NhapTuTep(
+        Database db, string duongDanNguon, IReadOnlyList<string> tenBlock, bool ghiDe, bool laTepLe)
+    {
         // Side database chỉ để đọc định nghĩa — cùng cách BatchProcessor (M99) mở tệp DWG ngoài.
         using var nguon = new Database(buildDefaultDrawing: false, noDocument: true);
-        nguon.ReadDwgFile(DwgPath, FileOpenMode.OpenForReadAndAllShare, allowCPConversion: true, password: null);
+        nguon.ReadDwgFile(duongDanNguon, FileOpenMode.OpenForReadAndAllShare, allowCPConversion: true, password: null);
         nguon.CloseInput(true); // nhả tệp thư viện ngay, không giữ khóa suốt phiên vẽ
 
         using var ids = new ObjectIdCollection();
@@ -303,8 +514,10 @@ internal static class BlockLibraryService
                 {
                     tr.Abort();
                     throw new BlockManifestException(
-                        $"Tệp thư viện block không chứa định nghĩa \"{ten}\" tuy manifest có khai — " +
-                        "thư viện hỏng, tải lại bằng XBOSS_LOGIN hoặc phát hành lại trên web.");
+                        (laTepLe
+                            ? $"Tệp block thêm từ web không chứa định nghĩa \"{ten}\" tuy manifest có khai"
+                            : $"Tệp thư viện block không chứa định nghĩa \"{ten}\" tuy manifest có khai") +
+                        " — thư viện hỏng, tải lại bằng XBOSS_LOGIN hoặc phát hành lại trên web.");
                 }
                 ids.Add(bt[ten]);
             }
@@ -462,7 +675,7 @@ internal static class BlockLibraryService
             //     chạy ngoài transaction; vẫn cùng một lệnh ⇒ vẫn một lần UNDO. Nếu bước (c) hỏng
             //     thì bản vẽ chỉ còn thừa một ĐỊNH NGHĨA block chưa dùng (vô hại, UNDO xóa nốt) —
             //     không có khối/nhãn mồ côi nào (§6.11).
-            if (canNhap) NhapDinhNghia(db, [def.BlockName], ghiDe);
+            if (canNhap) NhapDinhNghia(db, [def], ghiDe);
         }
         catch (BlockManifestException e)
         {

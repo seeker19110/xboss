@@ -166,6 +166,23 @@ public sealed class XBossApiClient
         return (await res.Content.ReadAsByteArrayAsync(ct), res.Headers.ETag?.ToString());
     }
 
+    /// <summary>
+    /// GET /api/engineering/cad/block-lib?file=&lt;fileKey&gt; — tệp .dwg LẺ của một block thêm
+    /// thẳng từ web (thư viện đa tệp, M104 §1/§2). Cùng token thiết bị + ETag như tệp nền;
+    /// trả (null, etag) khi 304. Toàn vẹn tệp do caller đối chiếu <c>fileSha256</c> của entry
+    /// manifest — client KHÔNG tự tin vào server (M100 §12).
+    /// 404 = khoá không thuộc manifest version nào → ném kèm nguyên văn thông điệp server.
+    /// </summary>
+    public async Task<(byte[]? Dwg, string? Etag)> FetchBlockLibTepLeAsync(
+        string token, string fileKey, string? etag = null, CancellationToken ct = default)
+    {
+        var duongDan = "api/engineering/cad/block-lib?file=" + Uri.EscapeDataString(fileKey);
+        using var res = await GuiKemToken(duongDan, token, etag, ct);
+        if (res.StatusCode == HttpStatusCode.NotModified) return (null, etag);
+        await NemNeuLoi(res, ct);
+        return (await res.Content.ReadAsByteArrayAsync(ct), res.Headers.ETag?.ToString());
+    }
+
     // ===== Đề xuất block vào thư viện (M103 §3/§4) =====
 
     /// <summary>Vì sao server trả 409 cho một đề xuất block.</summary>

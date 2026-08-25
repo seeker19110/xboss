@@ -27,7 +27,7 @@ Mở rộng mô hình thư viện từ M103: entry manifest thêm 2 trường tu
 
 - **Server (đã xong):** route `POST /api/engineering/cad/block-lib/blocks` (phiên web, admin/pm/engineer, kèm advisory lock chống đua); mở rộng `GET /api/engineering/cad/block-lib?file=<fileKey>` lấy tệp lẻ (kiểm fileKey thuộc manifest); khớp metadata/trùng tên với M103 validator; 15 ca test `tests/cad-block-lib-blocks.test.ts` + hồi quy thư viện cũ. Audit `published_by`.
 - **Web (đã xong):** nút "Thêm Block Từ Web" trong `ThuVienBlockPanel`, form kéo-thả DWG+DXF, metadata như M103, version sinh NGAY.
-- **Plugin (đang làm nốt cùng ngày):** cache `block-lib\files\<fileKey>`, kiểm sha256, `WblockClone` từng tệp; đề xuất AutoCAD (M103) dựng ứng viên trên nền đa tệp.
+- **Plugin (đã xong cùng ngày):** cache `block-lib\files\<fileKey>` + ETag từng tệp, kiểm sha256 HAI lần (lúc nạp và ngay trước `WblockClone`), `HienHanh()` đòi đủ tệp lẻ; 547 test dotnet xanh, client đối chứng với response thật của route.
 
 ## Audit "kịch trần CAD 2D" + đóng doc drift M101 PR5 (2026-08-25)
 

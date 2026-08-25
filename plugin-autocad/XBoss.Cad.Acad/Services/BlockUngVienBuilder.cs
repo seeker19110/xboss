@@ -11,6 +11,13 @@ namespace XBoss.Cad.Acad.Services;
 /// (nguồn của <c>WblockCloneObjects</c>). Tệp tạm dọn trong <c>finally</c> — kể cả khi lỗi.
 ///
 /// Phần thuần (manifest ứng viên, quy tắc metadata) nằm ở <see cref="BlockUngVien"/> bên Core.
+///
+/// Thư viện ĐA TỆP (M104 §1): ứng viên CHỈ gộp block mới vào bản sao <c>blocks.dwg</c> nền — các
+/// block thêm từ web (entry có <c>fileKey</c>) KHÔNG được nuốt vào tệp nền, chúng ở nguyên tệp .dwg
+/// riêng của mình. Manifest ứng viên dựng thẳng trên chuỗi JSON manifest hiện hành nên giữ nguyên
+/// mọi <c>fileKey</c>/<c>fileSha256</c>; máy chủ chặn đúng lỗi này
+/// (<c>soSanhManifestUngVien</c> trong <c>lib/ky-thuat/cad/block-proposals.ts</c>: mất/đổi
+/// <c>fileKey</c> là từ chối đề xuất).
 /// </summary>
 internal static class BlockUngVienBuilder
 {

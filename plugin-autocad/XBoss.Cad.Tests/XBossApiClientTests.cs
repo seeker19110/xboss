@@ -204,4 +204,54 @@ public class XBossApiClientTests
         var loi = await Assert.ThrowsAsync<XBossApiException>(() => client.FetchBlockLibDwgAsync("xbk_thu-hoi"));
         Assert.Contains("XBOSS_LOGIN", loi.Message);
     }
+
+    // ===== Thư viện ĐA TỆP — tải tệp .dwg lẻ theo fileKey (M104 §1/§2) =====
+
+    [Fact]
+    public async Task FetchBlockLibTepLe_gui_dung_duong_file_va_bearer()
+    {
+        var noiDung = new byte[] { 0x41, 0x43, 0x31, 0x30, 0x33, 0x32 }; // "AC1032"
+        var handler = new FakeHandler(_ =>
+        {
+            var res = new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(noiDung) };
+            res.Headers.ETag = new System.Net.Http.Headers.EntityTagHeaderValue("\"abc123\"");
+            return res;
+        });
+        var client = new XBossApiClient("https://xboss.local", handler);
+
+        var (dwg, etag) = await client.FetchBlockLibTepLeAsync("xbk_t", "blocklib-van-1756-ab.dwg");
+        Assert.Equal(noiDung, dwg);
+        Assert.Equal("\"abc123\"", etag);
+        Assert.Equal(
+            "https://xboss.local/api/engineering/cad/block-lib?file=blocklib-van-1756-ab.dwg",
+            handler.DaNhan[0].RequestUri!.ToString());
+        Assert.Equal("Bearer xbk_t", handler.DaNhan[0].Headers.Authorization!.ToString());
+    }
+
+    [Fact]
+    public async Task FetchBlockLibTepLe_304_giu_tep_trong_cache()
+    {
+        var handler = new FakeHandler(req =>
+            req.Headers.IfNoneMatch.ToString().Contains("abc123")
+                ? new HttpResponseMessage(HttpStatusCode.NotModified)
+                : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([1, 2, 3]) });
+        var client = new XBossApiClient("https://xboss.local", handler);
+
+        var (dwg, etag) = await client.FetchBlockLibTepLeAsync("xbk_t", "blocklib-van-1756-ab.dwg", "\"abc123\"");
+        Assert.Null(dwg);
+        Assert.Equal("\"abc123\"", etag);
+    }
+
+    [Fact]
+    public async Task FetchBlockLibTepLe_404_giu_nguyen_thong_diep_server()
+    {
+        var handler = new FakeHandler(_ => Json(HttpStatusCode.NotFound, new
+        {
+            error = "Không có tệp block nào mang khoá này trong thư viện",
+        }));
+        var client = new XBossApiClient("https://xboss.local", handler);
+        var loi = await Assert.ThrowsAsync<XBossApiException>(
+            () => client.FetchBlockLibTepLeAsync("xbk_t", "blocklib-la-hoac-da-thay-the.dwg"));
+        Assert.Contains("Không có tệp block nào mang khoá này", loi.Message);
+    }
 }
