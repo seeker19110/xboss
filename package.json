@@ -40,6 +40,7 @@
     "check:route-perms": "tsx scripts/check-route-perms.ts",
     "check:project-scope": "tsx scripts/check-project-scope.ts",
     "check:db-params": "tsx scripts/check-db-params.ts",
+    "check:plugin-bundle": "tsx scripts/check-plugin-bundle.ts",
     "setup:drawing-tree": "tsx scripts/ensure-drawing-tree.ts"
   },
   "dependencies": {
