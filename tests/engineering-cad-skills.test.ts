@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   computeCadVectorDiff,
-  generateAutoLispDetailScript,
   convertTcvn3ToUnicode,
   normalizeCadLayers,
   extrude2dPolylineTo3d,
@@ -70,27 +69,6 @@ test("M65: computeCadVectorDiff phát hiện chính xác các thực thể thêm
   assert.equal(result.summary.modified, 1);
   assert.equal(result.summary.unchanged, 1);
   assert.ok(result.potentialVoImpact.estimatedCostVnd > 0);
-});
-
-test("M65: generateAutoLispDetailScript sinh mã AutoLISP hợp lệ theo tham số", () => {
-  const hangerLisp = generateAutoLispDetailScript("hanger", {
-    widthMm: 800,
-    heightMm: 500,
-    rodDiameterMm: 12,
-    layerName: "M-HANGER-TYP",
-  });
-
-  assert.ok(hangerLisp.includes("defun c:DRAW_TRAPEZE_HANGER"));
-  assert.ok(hangerLisp.includes("800"));
-  assert.ok(hangerLisp.includes("M-HANGER-TYP"));
-
-  const sleeveLisp = generateAutoLispDetailScript("sleeve", {
-    diameterMm: 200,
-    tagLabel: "SLEEVE-FP-D200",
-  });
-
-  assert.ok(sleeveLisp.includes("defun c:DRAW_SLEEVE_OPENING"));
-  assert.ok(sleeveLisp.includes("SLEEVE-FP-D200"));
 });
 
 test("M65: convertTcvn3ToUnicode giải mã chính xác chuỗi ký tự font TCVN3/ABC sang Unicode", () => {

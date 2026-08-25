@@ -492,6 +492,32 @@ dùng duyệt hướng xử lý.
 - **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
   M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
 
+## M99 PR6 — Bảng điều khiển plugin trên web + bỏ tầng 1 (.SCR/AutoLISP) (2026-08-25)
+
+Người dùng "tiếp tục pr6" sau khi PR5 merge (#392). Nhánh `claude/pr6-tiep-tuc-y9689t`. Phần plugin
+của PR6 (`XBOSS_BATCH`, journey 7) đã làm ở PR-B (#389) — đợt này làm nốt **phần web**.
+
+- **Bỏ tầng 1 (FR11, ADR-0006):** xoá `generateStandardizedAutocadScript` (`lib/ky-thuat/cad/dxf-parser.ts`)
+  và `generateAutoLispDetailScript` (`lib/ky-thuat/engineering-cad-skills.ts`) cùng route
+  `/api/engineering/cad/lisp`, trường `scrScript` trong `/api/engineering/cad/parse-dxf`, hook
+  `useAutoLispGenerator`, nút "Xuất Kịch Bản .SCR" ở 2 panel và khối AutoLISP trong panel bước 1.4
+  (`XrefDiffLispPanel` → `XrefDiffPanel`, sub-tab `xref_diff_lisp` → `xref_diff`). Việc sinh hình học
+  chi tiết thuộc plugin chạy trong AutoCAD, không phải server đoán từ DXF.
+- **Bảng điều khiển plugin (M99 §13)** trên đầu `/engineering/chuan-hoa-ban-ve`
+  (`components/PluginControlPanel.tsx`): rule pack đang phát hành (version + số nhóm layer + số hạng
+  mục bóc tách) kèm **nút tải JSON cho `XBOSS_RULEPACK`**, **nút tải gói cài plugin** (đường dẫn do
+  quản trị khai qua `XBOSS_PLUGIN_URL`; thiếu biến → hiện hướng dẫn tự dựng theo
+  `plugin-autocad/README.md` — gói nhị phân không nằm trong repo vì plugin không build trong CI, §9.1),
+  bảng **bản vẽ plugin đã gửi về + kết quả kiểm định server**, lối sang `/engineering/thiet-bi-cad`.
+- **`lib/ky-thuat/cad/bang-dieu-khien.ts` + `GET /api/engineering/cad/dashboard`:** `tomTatRulePack`
+  (thuần) + `layLichSuPluginUpload(projectId)` (chỉ `source_tool='plugin'`, scope theo
+  `getCurrentProjectId`) + `docKiemDinhTuBaoCao` bóc `standardize_report.serverValidation`.
+- **Kiểm chứng:** `tests/cad-bang-dieu-khien.test.ts` (2 ca thuần); lint/typecheck/build xanh; toàn
+  suite **223 file / 807 ca pass, 0 đỏ** (399 ca skip vì không có `TEST_DATABASE_URL` cục bộ — CI có
+  Postgres 16 chạy thật); `check:lib-layers` + `check:dead-code` xanh.
+- **Chưa làm:** PR7 (test đối chứng 2 tầng + tài liệu cài đặt — chặn bởi runner Windows có license);
+  gộp hẳn trang `/engineering/thiet-bi-cad` vào bảng điều khiển (giữ tách cho gọn diff).
+
 ## M99 PR5 — plugin-upload + kiểm định server + `XBOSS_UPLOAD` (2026-08-25)
 
 Người dùng "tiếp tục" sau khi #389 merge — PR2 (#386) đã mở khoá PR5. Nhánh `claude/plugin-upgrade-m8z0hx` (khởi động lại từ main sau squash-merge).

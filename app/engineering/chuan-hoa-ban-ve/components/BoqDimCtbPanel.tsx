@@ -262,13 +262,13 @@ export default function BoqDimCtbPanel({
       <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
         <div className="text-xs text-zinc-300">
           <span className="font-bold text-amber-300">Bước tiếp theo:</span> Quản lý cây liên kết
-          XREF, so sánh chênh lệch phiên bản (CAD 2D Diff) và trình sinh mã AutoLISP 2D.
+          XREF và so sánh chênh lệch phiên bản (CAD 2D Diff).
         </div>
         <button
-          onClick={() => setStep1SubTab("xref_diff_lisp")}
+          onClick={() => setStep1SubTab("xref_diff")}
           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs transition"
         >
-          <span>Chuyển Sang Mục 4: Cây XREF, Diff & AutoLISP 2D</span>
+          <span>Chuyển Sang Mục 4: Cây XREF & Diff</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>

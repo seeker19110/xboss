@@ -7,7 +7,6 @@ import {
   parseDxf,
   DwgUnsupportedError,
   DWG_UNSUPPORTED_MESSAGE,
-  generateStandardizedAutocadScript,
   giaiMaByteDxf,
   DxfParseResult,
   DxfLayerInfo,
@@ -81,7 +80,6 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
 
   // ── Model DXF đã parse ──
   const [dxfData, setDxfData] = useState<DxfParseResult | null>(null);
-  const [scrScript, setScrScript] = useState<string>("");
   const [conversionInfo, setConversionInfo] = useState<ConversionInfo | null>(null);
 
   // ── Lỗi phân tích bản vẽ hiển thị bền (không chỉ toast thoáng qua) ──
@@ -175,7 +173,6 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
           setAmbiguousCandidates([]);
           if (json.data) {
             setDxfData(json.data);
-            setScrScript(json.scrScript || "");
 
             // Khởi tạo trạng thái hiển thị layer dựa trên layer thật trong bản vẽ
             if (json.data.layers && json.data.layers.length > 0) {
@@ -335,8 +332,6 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
       //   · `conversionInfo.dxfContent` chỉ là ĐƯỜNG LUI khi `dxfData` rỗng — cả
       //     `useCadExporters.ts:62` lẫn `useSmartNaming.ts:74` đều ưu tiên `exportDxf(dxfData)`.
       //     Nạp cục bộ thì `dxfData` luôn có, nên chuỗi tính sẵn chưa từng được dùng tới.
-      //   · `scrScript` do máy chủ trả về chỉ là `generateStandardizedAutocadScript(layers)` —
-      //     hàm thuần, chạy thẳng ở client được.
       //   · `isRealDrawing` / `fileSizeBytes` (hiện ở CadViewportStudio và useCadStandardization)
       //     đặt tại chỗ, cùng công thức máy chủ dùng.
       const reader = new FileReader();
@@ -353,7 +348,6 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
           parsed.sourcePath = dxfName;
           parsed.fileSizeBytes = file.size;
           setDxfData(parsed);
-          setScrScript(generateStandardizedAutocadScript(parsed.layers));
           if (parsed.layers.length > 0) onLayersParsed(parsed.layers as DxfLayerInfo[]);
 
           const now = new Date();
@@ -517,18 +511,6 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
     }
   };
 
-  const handleDownloadScr = () => {
-    if (!scrScript) return;
-    const element = document.createElement("a");
-    const file = new Blob([scrScript], { type: "text/plain" });
-    element.href = URL.createObjectURL(file);
-    element.download = `xboss_layer_standardize.scr`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-    showToast("Đã tải kịch bản AutoCAD Script (.scr)!");
-  };
-
   return {
     sourceMode,
     setSourceMode,
@@ -554,7 +536,6 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
     loading,
     dxfData,
     setDxfData,
-    scrScript,
     conversionInfo,
     analysisError,
     ambiguousCandidates,
@@ -567,6 +548,5 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
     handleFolderUpload,
     handleSelectFolderDrawing,
     handleToggleXrefBind,
-    handleDownloadScr,
   };
 }

@@ -2944,36 +2944,6 @@ export function convertDxfToSpatialRoutes(
   return routes;
 }
 
-/**
- * Xuất kịch bản AutoCAD Script (.SCR) để tự động đổi tên layer, gán màu và purge layer rác trong AutoCAD.
- */
-export function generateStandardizedAutocadScript(layers: DxfLayerInfo[]): string {
-  let script = `;; =====================================================================\n`;
-  script += `;; XBoss CAD Standardization Batch Script (.SCR)\n`;
-  script += `;; Tiêu chuẩn: AIA / BS1192 / TT 12/2021/TT-BXD\n`;
-  script += `;; =====================================================================\n`;
-  script += `CMDECHO 0\n`;
-  script += `EXPERT 5\n\n`;
-
-  // Rename & standardize layers
-  for (const l of layers) {
-    if (l.name !== l.standardName) {
-      script += `-RENAME LA "${l.name}" "${l.standardName}"\n`;
-      script += `-LAYER C ${l.colorNumber} "${l.standardName}" L "${l.lineType}" "${l.standardName}" \n`;
-    }
-  }
-
-  // Purge unused layers
-  script += `-PURGE LA * N\n`;
-  script += `-PURGE B * N\n`;
-  script += `AUDIT Y\n`;
-  script += `QSAVE\n`;
-  script += `CMDECHO 1\n`;
-  script += `(princ "\\n[XBoss] Hoan tat chuan hoa ban ve CAD theo tieu chuan AIA/BS1192.")\n`;
-
-  return script;
-}
-
 /** Số thực an toàn cho tệp DXF (NaN/Infinity ghi ra sẽ làm AutoCAD báo lỗi đọc tệp). */
 function dxfNum(v: number | undefined, fallback = 0): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;

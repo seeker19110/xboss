@@ -25,7 +25,6 @@ interface CadModelCounts {
 interface UseCadExportersOptions {
   dxfData: DxfParseResult | null;
   conversionInfo: ConversionInfo | null;
-  scrScript: string;
   saveConfig: SaveConfig;
   generatedFileName: string;
   wcsConfig: WcsConfig;
@@ -50,7 +49,6 @@ function downloadTextFile(content: string, fileName: string, mimeType: string) {
 export function useCadExporters({
   dxfData,
   conversionInfo,
-  scrScript,
   saveConfig,
   generatedFileName,
   wcsConfig,
@@ -96,13 +94,9 @@ export function useCadExporters({
     bundle += `;; Health Index: ${scores.totalHealthScore}/100 (ISO 19650)\n`;
     bundle += `;; ==========================================================================\n\n`;
 
-    bundle += `;; 1. AUTOCAD LAYER SCRIPT (.SCR)\n`;
-    bundle += scrScript || ";; Layer standardize script\n";
-    bundle += `\n;; 2. AUTOLISP TOOLS 2D (.LSP)\n`;
-    bundle += `(defun c:XBOSS_2D () (princ "\\nXBOSS CAD 2D Automation Active.") (princ))\n`;
-    bundle += `\n;; 3. PLOT STYLE TABLE (.CTB)\n`;
+    bundle += `;; 1. PLOT STYLE TABLE (.CTB)\n`;
     bundle += `Color_1: 0.50mm Color_2: 0.35mm Color_3: 0.25mm Color_4: 0.18mm Color_7: 0.18mm Color_8: 0.09mm\n`;
-    bundle += `\n;; 4. BÁO CÁO CHẨN ĐOÁN & THÔNG SỐ CHUẨN HÓA 2D (JSON)\n`;
+    bundle += `\n;; 2. BÁO CÁO CHẨN ĐOÁN & THÔNG SỐ CHUẨN HÓA 2D (JSON)\n`;
     bundle += JSON.stringify(
       {
         standardFileName: generatedFileName,

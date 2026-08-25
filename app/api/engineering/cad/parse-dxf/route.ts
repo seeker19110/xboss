@@ -2,12 +2,7 @@ import { NextResponse } from "next/server";
 import { readdirSync, statSync, readFileSync, existsSync } from "node:fs";
 import { join, basename, extname, normalize, sep, resolve } from "node:path";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import {
-  parseDxf,
-  parseDwgBinary,
-  generateStandardizedAutocadScript,
-  DwgUnsupportedError,
-} from "@/lib/ky-thuat/cad/dxf-parser";
+import { parseDxf, parseDwgBinary, DwgUnsupportedError } from "@/lib/ky-thuat/cad/dxf-parser";
 import { queryOne } from "@/lib/db";
 import { storageGet } from "@/lib/nen/storage";
 import { GIOI_HAN_TEP_CAD, uocLuongByteTuBase64 } from "@/lib/ky-thuat/cad/gioi-han";
@@ -214,12 +209,9 @@ export async function POST(req: Request) {
       result.fileSizeBytes = dxfContent.length;
     }
 
-    const scrScript = generateStandardizedAutocadScript(result.layers);
-
     return NextResponse.json({
       success: true,
       data: result,
-      scrScript,
       realFileFound,
       sourcePath,
     });

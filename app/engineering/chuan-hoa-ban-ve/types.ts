@@ -68,11 +68,9 @@ export type SourceMode = "design" | "upload" | "folder";
 
 export type FolderFilter = "all" | "cad" | "xref" | "ctb";
 
-export type Step1SubTab = "diagnostic_purge" | "layers_font" | "boq_dim_ctb" | "xref_diff_lisp";
+export type Step1SubTab = "diagnostic_purge" | "layers_font" | "boq_dim_ctb" | "xref_diff";
 
 export type Cad2dApprovalStatus = "in_progress" | "pending_approval" | "approved" | "rejected";
-
-export type LispTemplateType = "hanger" | "sleeve" | "duct_transition";
 
 // ── Thông tin chuyển đổi tệp tải lên sang .DXF ──
 

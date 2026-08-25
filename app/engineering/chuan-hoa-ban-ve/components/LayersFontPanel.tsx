@@ -29,7 +29,6 @@ interface LayersFontPanelProps {
   convertedText: string;
   sampleFontSnippets: FontSnippet[];
   handleConvertFont: (customText?: string) => void | Promise<void>;
-  handleDownloadScr: () => void;
   filteredLayers: DxfLayerInfo[];
 }
 
@@ -44,12 +43,11 @@ export default function LayersFontPanel({
   convertedText,
   sampleFontSnippets,
   handleConvertFont,
-  handleDownloadScr,
   filteredLayers,
 }: LayersFontPanelProps) {
   return (
     <div className="space-y-5">
-      {/* Phân đoạn 2.1: Chuẩn hóa Layer AIA & Kịch bản .SCR */}
+      {/* Phân đoạn 2.1: Chuẩn hóa Layer AIA */}
       <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1">
@@ -75,14 +73,6 @@ export default function LayersFontPanel({
                 className="pl-8 pr-3 py-1.5 text-xs bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-500 w-40 sm:w-52"
               />
             </div>
-
-            <button
-              onClick={handleDownloadScr}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs shadow-sm transition"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Xuất Kịch Bản .SCR</span>
-            </button>
           </div>
         </div>
 
