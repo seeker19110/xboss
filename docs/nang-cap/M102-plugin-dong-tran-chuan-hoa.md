@@ -4,7 +4,7 @@
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal | Đóng 4 khoảng trống cuối của pipeline chuẩn hóa sau M99/M100/M101: (1) KIEMTRA phát hiện polyline gần kín nhưng CHUANHOA không sửa; (2) block nặc danh/lạc chuẩn chỉ bị BÁO, chưa quy về thư viện block 0139; (3) 2 phép kiểm chéo đã hẹn ở M100 §20/M101 §19 (tag trùng, mã BOQ mồ côi) chưa cài; (4) idempotency layerMap **đã vá ở M101 PR2 cả 2 tầng** nhưng `knownIssues` của rule pack vẫn mô tả nợ cũ và chưa có test canh bất biến ở mức pipeline |
 | Owner        | Kỹ sư trưởng CAD + phiên chính                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| State        | **Approved for implementation** — người dùng duyệt 2026-08-25 ("duyệt hết, viết đặc tả trước rồi triển khai")                                                                                                                                                                                                                                                                                                                                             |
+| State        | **Approved — ĐÃ THI HÀNH XONG cả 2 PR** (gộp một PR #398, squash `427bf5f`, merge 2026-08-25). Rule pack phát hành **v8**, mọi khóa mới mặc định tắt/`reportOnly`. Phần Adapter còn **chờ verify tay trên máy có AutoCAD 2026** (không có runner Windows — M99 §18)                                                                                                                                                                                       |
 | Nguồn        | M99 §6.4 (phép kiểm 3 polyline hở), M100 §20 (đối chiếu chéo), M101 §19 kết luận, rule pack v1 `layerMap.knownIssues[0]`, quy trình chuẩn hóa 6 giai đoạn (thảo luận 2026-08-25)                                                                                                                                                                                                                                                                          |
 
 ## 1. Problem
@@ -123,4 +123,11 @@ Không migration, không API mới, không UI web mới (bảng điều khiển 
 - [x] Architecture/data — không DDL, không API mới; rule pack mở rộng thuần
 - [ ] Test/rollout — checklist verify tay Adapter theo release
 
-**Kết luận:** Approved for implementation. **Người/ngày duyệt:** Seeker — 2026-08-25.
+**Kết luận:** Approved for implementation — **đã thi hành xong 2026-08-25** (PR #398).
+**Người/ngày duyệt:** Seeker — 2026-08-25.
+
+**Điểm lệch so với đặc tả khi thi hành** (ghi lại để không trôi):
+
+1. **Bước 13 nối đuôi sau bước 11**, không chèn giữa bước 6 và 7 như §6.2 bản nháp — lý do đã ghi tại chính §6.2.
+2. **Idempotency `layerMap` (§6.3) bỏ khỏi phạm vi**: rà code thật thấy M101 PR2 đã vá; PR này chỉ gỡ dòng `knownIssues` mô tả nợ đã đóng và thêm test canh bất biến ở mức pipeline.
+3. **Hai PR gộp làm một** (#398): PR1 là Core thuần, PR2 là Adapter nối dây — tách đôi không kiểm chứng thêm được gì khi cả hai đều không chạy được cục bộ (không có .NET SDK).

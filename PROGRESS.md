@@ -4,6 +4,33 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M102 ĐÓNG ĐỢT — merge PR #398, khép đợt plugin AutoCAD giai đoạn 2 (2026-08-25)
+
+`docs/nang-cap/M102-plugin-dong-tran-chuan-hoa.md` **xong cả 2 PR**, gộp một PR duy nhất
+(**#398**, squash `427bf5f`) vì PR1 chỉ là Core thuần còn PR2 là phần Adapter nối dây — tách đôi
+không kiểm chứng được gì thêm khi cả hai đều chưa chạy được cục bộ (không có .NET SDK).
+
+- **Trạng thái sau merge:** rule pack phát hành là **v8**, mọi khóa mới (`polylineClosePolicy`,
+  `blockMap`, phép kiểm 17/18) **mặc định tắt/`reportOnly`** ⇒ máy kỹ sư không đổi hành vi cho tới
+  khi bật từng khóa theo dự án. Không migration, không API mới, không đụng đường ghi sổ khối lượng.
+- **CI đỏ lượt đầu rồi xanh lượt hai** (14/14, gồm `plugin (dotnet Core/Tests)` và `plugin-shim`) —
+  nguyên nhân + cách sửa tận gốc ghi ở mục "M102 PR2" ngay dưới.
+- **Auto-merge không bật được, phải merge thẳng:** GitHub chỉ nhận `enable_pr_auto_merge` khi checks
+  còn _pending_; gọi lúc chưa check nào đăng ký thì trả "clean → merge thẳng đi", gọi lúc đã xanh
+  hết cũng vậy. Quy ước dự án (auto-merge cho mọi PR) nhắm tới kết quả "tự merge khi checks xanh"
+  nên merge squash trực tiếp là đúng ý định. **Lần sau muốn đi qua auto-merge thật thì phải bật
+  đúng cửa sổ checks đang chạy**, không phải ngay sau khi mở PR.
+
+**Đợt plugin AutoCAD giai đoạn 2 (M99 → M100 → M101 → M102) đã đóng toàn bộ về mặt code.** Việc còn
+lại của cả đợt là **một cổng duy nhất: verify tay trên máy có AutoCAD 2026** (không có runner
+Windows — M99 §18), gồm 8 lệnh M99 + 14 lệnh `XBOSS_VE_*` của M100 + các bước/phép kiểm mới của
+M101/M102 khi bật.
+
+**Tiếp theo (chưa có đặc tả, không tự làm khi chưa duyệt):** gán ngữ nghĩa sâu hơn (đồ thị kết nối
+tuyến–thiết bị) là bậc có đòn bẩy lớn nhất; sau đó phối hợp xung đột 2D liên hệ (combined services,
+cần cao độ đã khai trên đối tượng); các mục để lại ở M100 §20 (ngắt nét giao chéo, revision cloud,
+nhân bản tầng điển hình, riser). Mỗi mục phải mở `M<xx>` mới có duyệt trước khi code.
+
 ## M102 PR2 — Adapter AutoCAD: bước chuẩn hóa 12/13 + quét tag cho phép kiểm 17 (2026-08-25)
 
 Thi hành `docs/nang-cap/M102-plugin-dong-tran-chuan-hoa.md` PR2 phần **Adapter** — nối dây Core PR1
