@@ -60,11 +60,19 @@ với đề xuất ban đầu vì rà kỹ thấy dữ kiện khác — lý do g
 ngược). Đo trên Chromium thật (`deviceScaleFactor=2`): 3 canvas khớp DPR, toạ độ ghim đúng
 kỳ vọng, `/api/engineering/bim-routing` trả `[]` thay vì 500.
 
-**Nợ còn lại (chưa làm được)**: chưa đếm được dòng thật của các bảng `engineering_*` trên
-production (dữ kiện quyết định 6 cặp còn lại ở ADR-0011 là "gộp" hay "xoá"); chưa rà quyền
-theo nhóm vòng đời; chưa rà trùng lặp trong `lib/ky-thuat/` (31.426 dòng). **Migration 0137 và
-0138 có UPDATE backfill → bắt buộc qua staging trước production** (DoD, `npm run db:migrate --
---dry-run`).
+**Hai việc cần chạm production — đã chuẩn bị sẵn công cụ**
+
+- `npm run dem:engineering` (CHỈ ĐỌC, an toàn chạy thẳng production): in số dòng thật của từng
+  cặp bảng nghiệp vụ ↔ lớp engineering kèm kết luận gợi ý (rỗng → **xoá**; <1/10 → nghiêng về
+  xoá; cả hai có dữ liệu → **phải gộp thật**). Đây là dữ kiện DUY NHẤT còn thiếu để quyết 6 cặp
+  treo trong ADR-0011 — bảng quy tắc đọc kết quả ghi trong chính ADR đó.
+- **Migration 0137 và 0138 có UPDATE backfill → bắt buộc qua staging trước production** (DoD;
+  `npm run db:migrate -- --dry-run` kiểm trước). `tests/backfill-0137-0138.test.ts` đọc thẳng
+  file `.sql` rồi chạy lại đúng câu UPDATE sẽ chạy thật, chứng minh: khớp DUY NHẤT thì gắn,
+  trùng tên thì để NULL, không khớp thì để NULL, chạy lại lần hai không đổi gì.
+
+**Nợ còn lại**: chưa rà quyền theo nhóm vòng đời; chưa rà trùng lặp trong `lib/ky-thuat/`
+(31.426 dòng, 82 file).
 
 ## Audit tính năng — gộp theo vòng đời dự án (2026-08-25)
 
