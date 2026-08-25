@@ -4,10 +4,12 @@ using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
 using XBoss.Cad.Core.Excel;
+using XBoss.Cad.Core.Geometry;
 using XBoss.Cad.Core.Inspection;
 using XBoss.Cad.Core.Reporting;
 using XBoss.Cad.Core.RulePack;
 using XBoss.Cad.Core.Takeoff;
+using XBoss.Cad.Core.Zoning;
 using AcadApp = Autodesk.AutoCAD.ApplicationServices.Application;
 
 namespace XBoss.Cad.Acad.Commands;
@@ -235,6 +237,14 @@ public sealed class XBossCommands
         var traLoi = ed.GetKeywords(hoi);
         if (traLoi.Status != PromptStatus.OK) return;
 
+        // M101 §6.3: tùy chọn bóc theo vùng (tầng/zone) — mặc định KHÔNG, giữ nguyên thói quen M99.
+        var hoiVung = new PromptKeywordOptions("\n[XBoss] Bóc theo vùng (tầng/zone)?") { AllowNone = false };
+        hoiVung.Keywords.Add("Khong", "Khong", "Không chia vùng");
+        hoiVung.Keywords.Add("ChonRanhGioi", "ChonRanhGioi", "Chọn polyline ranh giới rồi đặt tên vùng");
+        hoiVung.Keywords.Default = "Khong";
+        var traLoiVung = ed.GetKeywords(hoiVung);
+        if (traLoiVung.Status != PromptStatus.OK) return;
+
         using var khoa = doc.LockDocument();
         TakeoffResult ketQua;
         using (var tr = db.TransactionManager.StartTransaction())
@@ -251,7 +261,12 @@ public sealed class XBossCommands
                 ids = TakeoffScanner.ModelSpaceIds(db, tr).ToList();
             }
 
-            var (doiTuong, xrefSkipped) = TakeoffScanner.Scan(tr, ids, pack.Takeoff.XdataAppName);
+            var chonVung = traLoiVung.StringResult == "ChonRanhGioi"
+                ? VungChonService.Hoi(ed, tr)
+                : new VungChonService.KetQuaChonVung([], []);
+            var boiCanh = BoiCanhBoc(db, tr, pack, chonVung);
+
+            var (doiTuong, xrefSkipped) = TakeoffScanner.Scan(tr, ids, pack.Takeoff.XdataAppName, boiCanh);
             var may = new TakeoffCalculator(pack.Takeoff, pack.Version);
             ketQua = may.Compute(doiTuong, (int)db.Insunits, xrefSkipped);
             tr.Commit();
@@ -268,7 +283,7 @@ public sealed class XBossCommands
         }
 
         var xacNhan = new PromptKeywordOptions(
-            $"\n[XBoss] Đánh dấu {ketQua.Lines.Sum(l => l.ObjectCount)} đối tượng đã bóc (tô màu ACI {pack.Takeoff.MarkColorAci} + XData)?")
+            $"\n[XBoss] Đánh dấu {SoDoiTuongDaBoc(ketQua)} đối tượng đã bóc (tô màu ACI {pack.Takeoff.MarkColorAci} + XData)?")
         { AllowNone = false };
         xacNhan.Keywords.Add("DongY", "DongY", "Đồng ý");
         xacNhan.Keywords.Add("Khong", "Khong", "Không");
@@ -285,13 +300,18 @@ public sealed class XBossCommands
         {
             MarkService.EnsureRegApp(db, tr, pack.Takeoff.XdataAppName);
             var ngay = HomNayIso();
+            // Tên vùng ghi kèm XData (M101 §6.3) để XBOSS_BOCKL_XUAT dựng lại bảng theo vùng.
+            var vungTheoHandle = TakeoffZoning.VungTheoHandle(ketQua);
             foreach (var line in ketQua.Lines)
             {
+                if (line.LaDanXuat) continue; // dòng cách nhiệt được TÍNH RA, không có đối tượng riêng để đánh dấu
                 foreach (var handle in line.Handles)
                 {
                     if (!db.TryGetObjectId(new Handle(Convert.ToInt64(handle, 16)), out var id)) continue;
                     if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ent) continue;
-                    MarkService.Mark(ent, pack.Takeoff.XdataAppName, line.Item.Id, pack.Version, ngay, pack.Takeoff.MarkColorAci);
+                    MarkService.Mark(
+                        ent, pack.Takeoff.XdataAppName, line.Item.Id, pack.Version, ngay,
+                        pack.Takeoff.MarkColorAci, vungTheoHandle.GetValueOrDefault(handle, ""));
                 }
             }
             tr.Commit();
@@ -356,7 +376,8 @@ public sealed class XBossCommands
         using (var tr = db.TransactionManager.StartTransaction())
         {
             var (doiTuong, _) = TakeoffScanner.Scan(
-                tr, TakeoffScanner.ModelSpaceIds(db, tr).ToList(), pack.Takeoff.XdataAppName);
+                tr, TakeoffScanner.ModelSpaceIds(db, tr).ToList(), pack.Takeoff.XdataAppName,
+                BoiCanhBoc(db, tr, pack, new VungChonService.KetQuaChonVung([], [])));
             var theoHandle = doiTuong.Where(o => o.AlreadyMarked).ToDictionary(o => o.Handle);
             var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
             foreach (ObjectId id in ms)
@@ -364,7 +385,10 @@ public sealed class XBossCommands
                 if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
                 if (MarkService.ReadMark(ent, pack.Takeoff.XdataAppName) is not { } mark) continue;
                 if (theoHandle.TryGetValue(ent.Handle.ToString(), out var obj))
-                    daGan.Add((obj, mark.ItemId));
+                {
+                    // Vùng lấy lại từ XData lúc bóc (ranh giới có thể đã bị xoá khỏi bản vẽ).
+                    daGan.Add((obj with { Vung = mark.Vung }, mark.ItemId));
+                }
             }
             tr.Commit();
         }
@@ -480,6 +504,11 @@ public sealed class XBossCommands
 
     // ===== Trợ giúp hiển thị =====
 
+    /// <summary>Số đối tượng THẬT đã bóc: một tuyến cắt qua nhiều vùng nằm ở nhiều dòng nhưng chỉ
+    /// là một đối tượng; dòng dẫn xuất (cách nhiệt) không có đối tượng riêng.</summary>
+    private static int SoDoiTuongDaBoc(TakeoffResult kq) =>
+        kq.Lines.Where(l => !l.LaDanXuat).SelectMany(l => l.Handles).Distinct(StringComparer.Ordinal).Count();
+
     private static void InBangKetQua(Editor ed, TakeoffResult kq)
     {
         ed.WriteMessage($"\n[XBoss] ===== KẾT QUẢ BÓC KHỐI LƯỢNG — rule pack {kq.RulePackVersion} =====\n");
@@ -497,6 +526,21 @@ public sealed class XBossCommands
             ed.WriteMessage($"[XBoss] Đã bỏ qua {kq.SkippedMarkedCount} đối tượng bóc trước đó.\n");
         if (kq.XrefSkippedCount > 0)
             ed.WriteMessage($"[XBoss] Bỏ qua {kq.XrefSkippedCount} đối tượng trong xref (không bóc xref).\n");
+    }
+
+    /// <summary>
+    /// Bối cảnh bóc nâng cao (M101 §6.3): vùng đã chọn + nhãn text quanh tuyến. Nhãn CHỈ quét khi
+    /// rule pack có item bật <c>sizeFromNearbyText</c> — bản vẽ lớn khỏi tốn thời gian vô ích.
+    /// </summary>
+    private static TakeoffScanner.BoiCanhBoc BoiCanhBoc(
+        Database db, Transaction tr, CadRulePack pack, VungChonService.KetQuaChonVung chonVung)
+    {
+        var nguongMm = TakeoffZoning.NguongNhanLonNhatMm(pack.Takeoff);
+        if (nguongMm <= 0)
+            return new TakeoffScanner.BoiCanhBoc(chonVung.Vung, [], 0, chonVung.HandleRanhGioi);
+        var (toMm, _, _) = DrawingUnits.TuInsUnits((int)db.Insunits);
+        return new TakeoffScanner.BoiCanhBoc(
+            chonVung.Vung, TakeoffScanner.QuetNhan(db, tr), nguongMm / toMm, chonVung.HandleRanhGioi);
     }
 
     private static string? HoiChuoi(Editor ed, string nhan, string macDinh)

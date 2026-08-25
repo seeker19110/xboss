@@ -4,6 +4,49 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M101 PR3 — Rule pack v6 + bóc theo size / theo vùng / cách nhiệt / hệ số quy đổi (2026-08-25)
+
+Nâng `XBOSS_BOCKL` theo M101 §6.3 (4 mục đầu của bảng 6 nâng cấp; `boqCode` per-project + sheet
+`Doi-chieu` để PR4). Toàn bộ phần tính nằm ở Core thuần có test trên CI Linux; Adapter chỉ đo và
+truyền dữ liệu vào.
+
+**Đã làm**
+
+- `lib/ky-thuat/cad/rule-packs/v6.json` (append-only, v1–v5 KHÔNG đổi 1 byte): v6 = v5 + khối mô tả
+  `takeoff.itemOptionsV6` cho 6 khóa TÙY CHỌN mới của mỗi item (`groupBySize`, `sizeFromNearbyText`,
+  `wastagePct`, `perCountAdd`, `derivedFrom`, `formula`). **Không item nào trong tệp khai khóa mới**
+  → bóc bằng v6 cho kết quả y HỆT v5 (ca test so từng dòng trên cùng bộ đối tượng). `rule-pack.ts`
+  phát hành v6; corpus đối chứng 2 tầng + `RepoPaths` chuyển sang v6.
+- **Core `Zoning/VungClipper.cs` (mới, thuần):** cắt tuyến theo polyline ranh giới kín — cắt đúng tại
+  giao điểm, cung tính theo CHIỀU DÀI CUNG THẬT (bước tuyến tính hóa 5°), vùng chồng nhau lấy vùng
+  đầu tiên, phần ngoài mọi vùng vẫn được báo (tổng các phần luôn = chiều dài tuyến, không mất mét nào).
+- **Core `Takeoff/`:** `TakeoffSize` (chuẩn hóa size `300X200`→`300x200`, ưu tiên XData `XBOSS_VE`,
+  dự phòng đọc nhãn gần nhất trong ngưỡng theo `sizePatterns` — regex có timeout 100ms, không khớp
+  thì ĐỂ TRỐNG chứ không đoán; diện tích cách nhiệt `2×(W+H)×dài` / `π×DN×dài`), `TakeoffZoning`
+  (cầu nối Adapter↔Core), `TakeoffCalculator` gộp theo khóa (item, size, vùng) + item dẫn xuất +
+  hệ số quy đổi. **Minh bạch số liệu:** `Quantity` luôn là KL ĐO; hao hụt/phụ kiện nằm ở
+  `KlQuyDoi`/`HeSoQuyDoi`/`MoTaQuyDoi` riêng. Đoạn thiếu size → dòng "(chưa có size)" + cảnh báo
+  "còn X m chưa tính" cho phần cách nhiệt.
+- **Excel (hợp đồng mẫu công ty §13.2 nguyên vẹn):** khi kết quả có size/vùng/hệ số mới CỘNG THÊM cột
+  L–Q (Vùng, Size, Nguồn size, Mã item, Hệ số quy đổi, KL quy đổi `=G×hệ số` sống) + sheet phụ
+  `Tong-hop-vung` (SUMIFS sống về `Data-BOQ`); cột A–K, công thức H/J/K, SUBTOTAL nhóm/TỔNG CỘNG
+  không đổi một ô. Sidecar JSON thêm `size`/`nguonSize`/`vung`/`klQuyDoi`/`danXuat`.
+- **Adapter (tối thiểu, đã biên dịch thử qua stub API AutoCAD ngoài repo):** `VungChonService` hỏi
+  polyline ranh giới + tên vùng (loại chính đường ranh giới khỏi khối lượng), `TakeoffScanner` đọc
+  size từ XData `XBOSS_VE` (chỉ ĐỌC, không đụng appname đó), quét nhãn DBText/MText khi rule pack có
+  bật đọc nhãn, cắt tuyến qua Core; `XBOSS_BOCKL` thêm 1 câu hỏi (mặc định "Không" — thói quen M99
+  không đổi), XData đánh dấu ghi thêm tên vùng (chuỗi thứ 5, bản vẽ cũ 4 chuỗi vẫn đọc được).
+- Test: dotnet **233 ca xanh** (187 cũ + 46 mới: zoning 9, takeoff v6 21, Excel v6 6, validator v6 10);
+  node: `engineering-cad-rule-pack` 26 ca + các test CAD chạm DB đều xanh trên Postgres tạm.
+
+**Chưa làm / cần biết**
+
+- Chưa verify trên máy có AutoCAD (ràng buộc M99 §18): luồng lệnh `XBOSS_BOCKL` theo vùng và việc đọc
+  nhãn phải chạy tay theo AC (c)/(d) trên bản vẽ thật trước khi phát hành.
+- `XBOSS_BOCKL_XUAT` dựng lại bảng từ XData nên đối tượng bị ranh giới cắt được ghi là
+  "(cắt nhiều vùng)" — muốn bảng theo vùng chính xác thì chạy `XBOSS_BOCKL` với ranh giới rồi xuất.
+- PR4 (`boqCode` per-project, `boq-snapshot`, sheet `Doi-chieu`) và PR2/PR5 chưa làm.
+
 ## M100 PR3 — Bộ lệnh vẽ nền + tuyến + nhãn: `XBOSS_VE_NEN` / `XBOSS_VE` / `XBOSS_VE_NHAN` (2026-08-25)
 
 - **Core `XBoss.Cad.Core/Draw/` (thuần, test CI Linux — toàn bộ phần "tính được" của lệnh vẽ):** `EdgeOffset` (polyline tim + bề rộng → 2 nét biên; đoạn thẳng mitre chính xác, cung offset đồng tâm giữ nguyên bulge; TỪ CHỐI offset kèm lý do tiếng Việt khi tuyến tự cắt / cung bán kính ≤ nửa bề rộng / đỉnh gấp ~180° / đoạn ngắn hơn bề rộng — khi đó lệnh chỉ vẽ tim + cảnh báo, không bao giờ vẽ biên sai), `BulgeMath` (tâm/bán kính/tiếp tuyến từ bulge, bulge của cung tiếp tuyến kiểu PLINE chế độ Arc), `DrawSize` (đọc `300x200`/`DN50`/số trần → mm, nội dung nhãn `size i=2%`), `VeXData` (codec XData `khóa=giá trị`, appname `XBOSS_VE`, khóa lạ của PR sau bị bỏ qua chứ không làm hỏng), `VeLayerStyle` (ACI + lineweight lấy từ `lineweightMap`, tên layer biên ghép từ `drawTools.edgeLayerSuffix` — không hard-code).

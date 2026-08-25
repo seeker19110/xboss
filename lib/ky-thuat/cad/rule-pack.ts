@@ -8,12 +8,12 @@
  * phát hành (cùng triết lý append-only của migration).
  */
 import { createHash } from "node:crypto";
-import rulePackV5 from "@/lib/ky-thuat/cad/rule-packs/v5.json";
+import rulePackV6 from "@/lib/ky-thuat/cad/rule-packs/v6.json";
 
-export type CadRulePack = typeof rulePackV5;
+export type CadRulePack = typeof rulePackV6;
 
 /** Version đang phát hành cho plugin. */
-export const CURRENT_RULE_PACK_VERSION = rulePackV5.version;
+export const CURRENT_RULE_PACK_VERSION = rulePackV6.version;
 
 /**
  * Rule pack đang phát hành:
@@ -24,10 +24,13 @@ export const CURRENT_RULE_PACK_VERSION = rulePackV5.version;
  * plugin M99 đọc v4 chạy y hệt v3);
  * v5 = v4 + 7 phép kiểm mới của XBOSS_KIEMTRA (M101 §6.1, số 10–16) + khối styleMap dùng chung với
  * bước chuẩn hóa 8 (M101 §6.2). Mọi phép kiểm mới mặc định `enabled: false` nên plugin cũ lẫn mới
- * nạp v5 đều cho kết quả kiểm y hệt v4 (M101 §7 FR1).
+ * nạp v5 đều cho kết quả kiểm y hệt v4 (M101 §7 FR1);
+ * v6 = v5 + các khóa TÙY CHỌN của bóc tách nâng cao XBOSS_BOCKL (M101 §6.3: groupBySize,
+ * sizeFromNearbyText, wastagePct, perCountAdd, derivedFrom+formula). Không item nào trong v6 khai
+ * khóa mới nên bóc bằng v6 cho kết quả y hệt v5 — công ty bật hệ số theo dự án bằng version kế tiếp.
  */
 export function getCurrentRulePack(): CadRulePack {
-  return rulePackV5;
+  return rulePackV6;
 }
 
 /** ETag mạnh theo hash nội dung — plugin cache cục bộ và hỏi lại bằng `If-None-Match`. */

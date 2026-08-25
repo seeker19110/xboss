@@ -59,7 +59,7 @@ public class InspectorV5Tests
 
         // Chỉ khác đúng nhãn version; toàn bộ findings/cảnh báo/tổng số lỗi giống hệt.
         Assert.Equal(
-            bcV4.ToJson().Replace("\"rulePackVersion\": \"v4\"", "\"rulePackVersion\": \"v5\""),
+            bcV4.ToJson().Replace("\"rulePackVersion\": \"v4\"", $"\"rulePackVersion\": \"{V5.Version}\""),
             bcV5.ToJson());
         Assert.DoesNotContain(bcV5.Findings, f => f.Id is "chong-lan-cung-he" or "giao-cat-khac-he"
             or "khung-ten-thieu-truong" or "viewport-le-chuan" or "style-lech-chuan"

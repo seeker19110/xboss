@@ -163,6 +163,39 @@ public sealed class TakeoffItem
     [JsonPropertyName("factor")] public double Factor { get; init; }
     [JsonPropertyName("boqCode")] public string BoqCode { get; init; } = "";
 
+    // ===== v6 (M101 §6.3) — mọi khóa dưới đây TÙY CHỌN, vắng mặt = tắt/0 = bóc y hệt v5 =====
+
+    /// <summary>Tách kết quả thành nhiều dòng theo size từng đoạn (nguồn: XData XBOSS_VE hoặc nhãn gần tuyến).</summary>
+    [JsonPropertyName("groupBySize")] public bool GroupBySize { get; init; }
+
+    /// <summary>Đọc size từ nhãn text gần tuyến khi đoạn không có XData size — bán tự động, có ghi nguồn.</summary>
+    [JsonPropertyName("sizeFromNearbyText")] public SizeFromTextPolicy? SizeFromNearbyText { get; init; }
+
+    /// <summary>% hao hụt thi công (item đo dài/diện tích) — chỉ ra cột KL QUY ĐỔI, không trộn vào KL đo.</summary>
+    [JsonPropertyName("wastagePct")] public double WastagePct { get; init; }
+
+    /// <summary>Số mét tương đương cộng thêm mỗi đơn vị đếm (item measure=count) — cũng chỉ ra cột KL QUY ĐỔI.</summary>
+    [JsonPropertyName("perCountAdd")] public double PerCountAdd { get; init; }
+
+    /// <summary>Id item nguồn — item này được TÍNH RA từ item đó (cách nhiệt), không khớp đối tượng nào.</summary>
+    [JsonPropertyName("derivedFrom")] public string DerivedFrom { get; init; } = "";
+
+    /// <summary>Công thức dẫn xuất: <c>perimeter*length</c> (ống gió chữ nhật) hoặc <c>pi*dn*length</c> (ống tròn).</summary>
+    [JsonPropertyName("formula")] public string Formula { get; init; } = "";
+
+    /// <summary>Item được tính ra từ item khác (không quét bản vẽ).</summary>
+    [JsonIgnore]
+    public bool LaDanXuat => !string.IsNullOrWhiteSpace(DerivedFrom);
+
+    [JsonIgnore]
+    public CongThucDanXuat FormulaKind => Formula switch
+    {
+        "perimeter*length" => CongThucDanXuat.ChuViNhanDai,
+        "pi*dn*length" => CongThucDanXuat.PiDnNhanDai,
+        _ => throw new RulePackException(
+            $"takeoff item \"{Id}\": formula lạ \"{Formula}\" (chỉ nhận perimeter*length / pi*dn*length)"),
+    };
+
     [JsonIgnore]
     public TakeoffMeasure MeasureKind => Measure switch
     {
@@ -171,6 +204,25 @@ public sealed class TakeoffItem
         "count" => TakeoffMeasure.Count,
         _ => throw new RulePackException($"takeoff item \"{Id}\": measure lạ \"{Measure}\" (chỉ nhận length/area/count)"),
     };
+}
+
+/// <summary>Công thức của item dẫn xuất (cách nhiệt) — M101 §6.3.</summary>
+public enum CongThucDanXuat
+{
+    /// <summary>Ống gió chữ nhật: 2×(W+H) × chiều dài.</summary>
+    ChuViNhanDai,
+    /// <summary>Ống tròn: π × DN × chiều dài.</summary>
+    PiDnNhanDai,
+}
+
+/// <summary>Đọc size từ nhãn text gần tuyến (v6) — bán tự động, ngưỡng khoảng cách chặt.</summary>
+public sealed class SizeFromTextPolicy
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+    /// <summary>Bán kính tìm nhãn (mm thật của bản vẽ, đã quy đổi từ INSUNITS).</summary>
+    [JsonPropertyName("maxDistanceMm")] public double MaxDistanceMm { get; init; }
+    /// <summary>Regex .NET; có nhóm bắt thì lấy nhóm 1, không thì lấy cả chuỗi khớp.</summary>
+    [JsonPropertyName("sizePatterns")] public IReadOnlyList<string> SizePatterns { get; init; } = [];
 }
 
 public sealed class InspectionPolicySection
