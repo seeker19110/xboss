@@ -2,6 +2,7 @@
 // validate thuần (unit test được) + query danh sách/chi tiết + logic supersede
 // revision khi duyệt. Xem docs/nang-cap/G06-ban-ve-ho-so.md.
 import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { docKiemDinhTuBaoCao } from "@/lib/ky-thuat/cad/bang-dieu-khien";
 
 // Thứ tự khớp thứ tự mục trong cụm sidebar "Thiết kế & BPTC" (dashboardTree.ts).
 export const DRAWING_KINDS = ["design", "bim", "shop", "method", "asbuilt"] as const;
@@ -215,20 +216,37 @@ export type DrawingRevisionRow = {
   uploadedBy: number | null;
   uploaderName: string | null;
   createdAt: string;
+  // M99 PR5 — ngữ cảnh chuẩn hóa khi revision do plugin AutoCAD đẩy lên (nguồn = 'plugin'):
+  // rulePackVersion đối chiếu bộ luật lúc kiểm, kiemDinh tóm tắt lỗi/cảnh báo server đã chấm,
+  // contentSha256 để đối chiếu tệp. Revision tải tay từ web mang các trường này = null.
+  sourceTool: string | null;
+  rulePackVersion: string | null;
+  kiemDinh: { ok: boolean; soLoi: number; soCanhBao: number; canhBao: string[] } | null;
+  contentSha256: string | null;
+};
+
+type DrawingRevisionDbRow = Omit<DrawingRevisionRow, "kiemDinh"> & {
+  standardizeReport: Record<string, unknown> | null;
 };
 
 export async function listRevisions(drawingId: number): Promise<DrawingRevisionRow[]> {
-  return query<DrawingRevisionRow>(
+  const rows = await query<DrawingRevisionDbRow>(
     `SELECT r.id, r.rev, r.file_name AS "fileName", r.original_name AS "originalName",
             r.mime_type AS "mimeType", r.size_bytes AS "sizeBytes", r.status,
             r.submitted_at AS "submittedAt", r.decided_at AS "decidedAt",
             r.decision_note AS "decisionNote", r.uploaded_by AS "uploadedBy",
-            u.name AS "uploaderName", r.created_at AS "createdAt"
+            u.name AS "uploaderName", r.created_at AS "createdAt",
+            r.source_tool AS "sourceTool", r.rule_pack_version AS "rulePackVersion",
+            r.standardize_report AS "standardizeReport", r.content_sha256 AS "contentSha256"
        FROM drawing_revisions r LEFT JOIN users u ON u.id = r.uploaded_by
       WHERE r.drawing_id = ?
       ORDER BY r.id DESC`,
     drawingId,
   );
+  return rows.map(({ standardizeReport, ...r }) => ({
+    ...r,
+    kiemDinh: docKiemDinhTuBaoCao(standardizeReport),
+  }));
 }
 
 // Revision con không tự mang project_id — suy qua drawing cha (M22), dùng để kiểm
