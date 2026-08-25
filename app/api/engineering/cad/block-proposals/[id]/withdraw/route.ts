@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 import { thuHoiDeXuat } from "@/lib/ky-thuat/cad/block-proposals";
 
@@ -11,6 +11,12 @@ export const dynamic = "force-dynamic";
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+
+  // Cùng quyền với lúc gửi đề xuất (POST /block-proposals): vai trò đã mất quyền quản lý bản vẽ
+  // thì không được đụng hàng chờ nữa, kể cả đề xuất do chính mình gửi trước đó.
+  if (!CAN.manageDrawings(user.role)) {
+    return NextResponse.json({ error: "Không có quyền thu hồi đề xuất block" }, { status: 403 });
+  }
 
   if (await hitRateLimit(`cad-block-proposal-withdraw:${user.id}`, 20, 15)) {
     return NextResponse.json(
