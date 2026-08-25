@@ -322,6 +322,8 @@ public class TakeoffV6Tests
         var v5 = RulePackLoader.Load(File.ReadAllText(RepoPaths.RulePackPathCua("v5.json")));
         // v6 nạp theo TÊN TỆP (không qua RepoPaths.LoadRulePack) vì bản đang phát hành đã là v7 —
         // ca này vẫn phải chứng minh đúng điều nó nói: v6 so với v5.
+        // Ghim thẳng vào v6.json: bản đang phát hành đã sang version sau (v7 — M101 PR2) nhưng AC
+        // này nói về v6, phải so đúng hai version đó.
         var v6 = RulePackLoader.Load(File.ReadAllText(RepoPaths.RulePackPathCua("v6.json")));
         Assert.Equal("v6", v6.Version);
 

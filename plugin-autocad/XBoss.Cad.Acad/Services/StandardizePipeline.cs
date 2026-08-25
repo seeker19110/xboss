@@ -6,15 +6,23 @@ using XBoss.Cad.Core.Inspection;
 using XBoss.Cad.Core.Layers;
 using XBoss.Cad.Core.Reporting;
 using XBoss.Cad.Core.RulePack;
+using XBoss.Cad.Core.Standardize;
 
 namespace XBoss.Cad.Acad.Services;
 
 /// <summary>
-/// Pipeline chuẩn hóa thứ tự cố định (M99 §6.6):
-/// 1 AUDIT → 2 layer mapping → 3 font → 4 flatten → 5 overkill → 6 purge → 7 lineweight/CTB + dim override.
-/// Bước 1 là LỆNH AutoCAD nên chạy riêng trước (<see cref="Buoc1Audit"/>); bước 2–7 chạy TRONG
-/// MỘT transaction của một lệnh duy nhất nên toàn bộ hoàn tác bằng 1 lần UNDO (FR7).
-/// Mỗi bước ghi StepDiff vào báo cáo (FR8).
+/// Pipeline chuẩn hóa thứ tự cố định (M99 §6.6 + M101 §6.2):
+/// 1 AUDIT → 2 layer mapping → 3 font → 4 flatten → 5 overkill → 6 purge → 7 lineweight/CTB + dim
+/// override → 8 style map → 9 xref → 10 hatch → 11 layout. Bốn bước cuối là của rule pack v7 và
+/// đều MẶC ĐỊNH TẮT — rule pack ≤ v6 (hoặc v7 chưa bật) cho kết quả y hệt trước đây.
+///
+/// <para>Bước 1 là LỆNH AutoCAD nên chạy riêng trước (<see cref="Buoc1Audit"/>); bước 2–11 lập kế
+/// hoạch/áp thay đổi TRONG MỘT transaction của một lệnh duy nhất. Riêng phần BIND xref (bước 9) và
+/// xóa/đổi tên layout (bước 11) dùng API cấp TÀI LIỆU (<c>Database.BindXrefs</c>/<c>LayoutManager</c>)
+/// nên phải chạy sau khi transaction commit — <see cref="ApDungCapTaiLieu"/>, vẫn trong cùng một
+/// lệnh nên UNDO một lần vẫn trả bản vẽ về nguyên trạng (đúng cơ chế đã dùng cho bước 1 AUDIT, FR7).</para>
+///
+/// Mỗi bước ghi StepDiff vào báo cáo (FR8) — khung báo cáo JSON giữ nguyên như M99.
 /// </summary>
 internal sealed class StandardizePipeline(CadRulePack pack)
 {
@@ -24,6 +32,10 @@ internal sealed class StandardizePipeline(CadRulePack pack)
     private readonly List<string> _canhBao = [];
     /// <summary>Kiểu chữ mà bước 3 nhận ra đang dùng mã TCVN3/VNI — cần đổi font sang Unicode.</summary>
     private readonly HashSet<ObjectId> _styleMaCu = [];
+    /// <summary>Xref bước 9 quyết định bind — bind chỉ chạy được ngoài transaction.</summary>
+    private readonly List<ObjectId> _xrefCanBind = [];
+    /// <summary>Kế hoạch bước 11 lập trong transaction, áp sau khi commit.</summary>
+    private KeHoachLayout _keHoachLayout = new();
 
     internal IReadOnlyList<StepDiff> Steps => _steps;
     internal IReadOnlyList<string> CanhBao => _canhBao;
@@ -58,6 +70,11 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         Buoc5Overkill(db, tr, snapshot);
         Buoc6Purge(db, tr);
         Buoc7LineweightVaDimOverride(db, tr);
+        // v7 (M101 §6.2) — 4 bước mới, thứ tự cố định SAU lineweight/CTB, đều mặc định tắt.
+        Buoc8StyleMap(db, tr);
+        Buoc9Xref(db, tr);
+        Buoc10Hatch(db, tr);
+        Buoc11LapKeHoachLayout(db, tr);
     }
 
     private void Buoc2LayerMapping(Database db, Transaction tr)
@@ -72,9 +89,12 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         foreach (var (cu, moi) in plan)
         {
             var ltrCu = (LayerTableRecord)tr.GetObject(lt[cu], OpenMode.ForWrite);
-            if (!lt.Has(moi))
+            // Đổi tên hay gộp là QUYẾT ĐỊNH của Core: LayerTable.Has không phân biệt hoa/thường nên
+            // layer chỉ lệch hoa/thường với tên đích (m-duct-supp vs M-DUCT-SUPP) sẽ rơi vào nhánh
+            // gộp rồi xóa mất chính nó nếu tin thẳng vào Has (xem LayerMapper.QuyetDinh).
+            if (LayerMapper.QuyetDinh(cu, moi, lt.Has(moi)) == HanhDongLayer.DoiTen)
             {
-                ltrCu.Name = moi; // target chưa có → đổi tên là đủ, thực thể ByLayer đi theo
+                ltrCu.Name = moi; // target chưa có (hoặc chỉ lệch hoa/thường) → đổi tên, thực thể ByLayer đi theo
                 _steps.Add(new StepDiff { Buoc = "2. Layer", HangMuc = "Đổi tên layer", Truoc = cu, Sau = moi, SoLuong = 1 });
                 continue;
             }
@@ -376,5 +396,421 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         }
         if (soDim > 0)
             _steps.Add(new StepDiff { Buoc = "7. CTB", HangMuc = "Gỡ dimension override", Truoc = $"{soDim} dim override", Sau = "số đo thật", SoLuong = soDim });
+    }
+
+    // ===== v7 (M101 §6.2) — bước 8..11. Adapter chỉ ĐO hiện trạng và ÁP kế hoạch;
+    // mọi quyết định "đổi cái gì" nằm ở XBoss.Cad.Core.Standardize.ChuanHoaMoRong (có test). =====
+
+    /// <summary>
+    /// Bước 8 — đưa text/dimension về bộ style chuẩn <c>styleMap</c> (khối dùng chung với phép kiểm 14).
+    /// CHỈ gán lại style của dimension, KHÔNG dựng lại dimension nên liên kết đo (associativity) giữ
+    /// nguyên — bất biến M99 O3.
+    /// </summary>
+    private void Buoc8StyleMap(Database db, Transaction tr)
+    {
+        // Công tắc dùng chung với phép kiểm 14 (styleMap là dữ liệu, không có cờ riêng) — mặc định tắt.
+        if (!pack.InspectionPolicy.StyleDeviation.Enabled) return;
+        var tenChuanChu = pack.StyleMap.TextStyle.Name.Trim();
+        var tenChuanDim = pack.StyleMap.DimStyle.Name.Trim();
+        if (tenChuanChu.Length == 0 && tenChuanDim.Length == 0) return; // chưa chốt bộ chuẩn
+
+        // --- Hiện trạng bảng style ---
+        var idKieuChu = new Dictionary<string, ObjectId>(StringComparer.OrdinalIgnoreCase);
+        var kieuChu = new List<KieuChuHienCo>();
+        var tst = (TextStyleTable)tr.GetObject(db.TextStyleTableId, OpenMode.ForRead);
+        foreach (ObjectId id in tst)
+        {
+            var ts = (TextStyleTableRecord)tr.GetObject(id, OpenMode.ForRead);
+            idKieuChu[ts.Name] = id;
+            kieuChu.Add(new KieuChuHienCo
+            {
+                Ten = ts.Name,
+                Font = string.IsNullOrEmpty(ts.Font.TypeFace) ? ts.FileName : ts.Font.TypeFace,
+                ChieuCaoCoDinh = ts.TextSize,
+                HeSoRong = ts.XScale,
+            });
+        }
+
+        var idKieuDim = new Dictionary<string, ObjectId>(StringComparer.OrdinalIgnoreCase);
+        var kieuDim = new List<KieuKichThuocHienCo>();
+        var dst = (DimStyleTable)tr.GetObject(db.DimStyleTableId, OpenMode.ForRead);
+        foreach (ObjectId id in dst)
+        {
+            var ds = (DimStyleTableRecord)tr.GetObject(id, OpenMode.ForRead);
+            idKieuDim[ds.Name] = id;
+            kieuDim.Add(new KieuKichThuocHienCo
+            {
+                Ten = ds.Name,
+                TenKieuChu = ds.Dimtxsty.IsNull ? "" : TenBanGhi(tr, ds.Dimtxsty),
+            });
+        }
+
+        // --- Hiện trạng thực thể (mọi block table record, trừ nội dung xref) ---
+        var thucThe = new List<ThucTheDungStyle>();
+        var idThucThe = new Dictionary<string, ObjectId>(StringComparer.Ordinal);
+        var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+        foreach (ObjectId btrId in bt)
+        {
+            var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
+            if (btr.IsFromExternalReference) continue;
+            foreach (ObjectId entId in btr)
+            {
+                var obj = tr.GetObject(entId, OpenMode.ForRead);
+                switch (obj)
+                {
+                    case DBText t:
+                        Ghi(t.Handle.ToString(), entId, LoaiStyle.KieuChu, TenBanGhi(tr, t.TextStyleId));
+                        break;
+                    case MText m:
+                        Ghi(m.Handle.ToString(), entId, LoaiStyle.KieuChu, TenBanGhi(tr, m.TextStyleId));
+                        break;
+                    case Dimension dim:
+                        Ghi(dim.Handle.ToString(), entId, LoaiStyle.KieuKichThuoc, TenBanGhi(tr, dim.DimensionStyle));
+                        break;
+                    case BlockReference br:
+                        foreach (ObjectId attId in br.AttributeCollection)
+                        {
+                            if (tr.GetObject(attId, OpenMode.ForRead) is not AttributeReference ar) continue;
+                            Ghi(ar.Handle.ToString(), attId, LoaiStyle.KieuChu, TenBanGhi(tr, ar.TextStyleId));
+                        }
+                        break;
+                }
+            }
+        }
+
+        void Ghi(string handle, ObjectId id, LoaiStyle loai, string tenStyle)
+        {
+            if (tenStyle.Length == 0) return;
+            thucThe.Add(new ThucTheDungStyle { Handle = handle, Loai = loai, TenStyle = tenStyle });
+            idThucThe[handle] = id;
+        }
+
+        var toMm = XBoss.Cad.Core.Geometry.DrawingUnits.TuInsUnits((int)db.Insunits).ToMm;
+        var keHoach = ChuanHoaMoRong.LapKeHoachStyle(
+            pack.InspectionPolicy.StyleDeviation, pack.StyleMap, kieuChu, kieuDim, thucThe, toMm);
+        _canhBao.AddRange(keHoach.CanhBao);
+        if (keHoach.Rong) return;
+
+        // --- Áp: bảng style trước (thực thể phải có style để trỏ tới) ---
+        var heSoRong = pack.StyleMap.TextStyle.WidthFactor;
+        if (keHoach.TaoKieuChuChuan)
+        {
+            var moi = new TextStyleTableRecord
+            {
+                Name = tenChuanChu,
+                FileName = pack.StyleMap.TextStyle.FontFile,
+                TextSize = keHoach.ChieuCaoChuanDonViBanVe,
+            };
+            if (heSoRong > 0) moi.XScale = heSoRong;
+            tst.UpgradeOpen();
+            idKieuChu[tenChuanChu] = tst.Add(moi);
+            tr.AddNewlyCreatedDBObject(moi, true);
+            _steps.Add(new StepDiff
+            {
+                Buoc = ChuanHoaMoRong.Buoc8, HangMuc = "Tạo kiểu chữ chuẩn",
+                Truoc = "chưa có", Sau = tenChuanChu, SoLuong = 1,
+            });
+        }
+        else if (keHoach.SuaKieuChuChuan && idKieuChu.TryGetValue(tenChuanChu, out var idChuan))
+        {
+            var ts = (TextStyleTableRecord)tr.GetObject(idChuan, OpenMode.ForWrite);
+            if (pack.StyleMap.TextStyle.FontFile.Length > 0) ts.FileName = pack.StyleMap.TextStyle.FontFile;
+            ts.TextSize = keHoach.ChieuCaoChuanDonViBanVe;
+            if (heSoRong > 0) ts.XScale = heSoRong;
+            _steps.Add(new StepDiff
+            {
+                Buoc = ChuanHoaMoRong.Buoc8, HangMuc = "Sửa kiểu chữ chuẩn theo rule pack",
+                Truoc = "lệch styleMap", Sau = tenChuanChu, SoLuong = 1,
+            });
+        }
+
+        if (keHoach.TaoKieuKichThuocChuan)
+        {
+            var moi = new DimStyleTableRecord { Name = tenChuanDim };
+            if (idKieuChu.TryGetValue(pack.StyleMap.DimStyle.TextStyleName, out var idChu)) moi.Dimtxsty = idChu;
+            dst.UpgradeOpen();
+            idKieuDim[tenChuanDim] = dst.Add(moi);
+            tr.AddNewlyCreatedDBObject(moi, true);
+            _steps.Add(new StepDiff
+            {
+                Buoc = ChuanHoaMoRong.Buoc8, HangMuc = "Tạo kiểu kích thước chuẩn",
+                Truoc = "chưa có", Sau = tenChuanDim, SoLuong = 1,
+            });
+        }
+
+        // --- Áp: gán style cho từng thực thể ---
+        var soChu = 0;
+        var soDim = 0;
+        foreach (var td in keHoach.DoiStyle)
+        {
+            if (!idThucThe.TryGetValue(td.Handle, out var entId)) continue;
+            if (td.Loai == LoaiStyle.KieuChu)
+            {
+                if (!idKieuChu.TryGetValue(td.StyleMoi, out var idStyle)) continue;
+                switch (tr.GetObject(entId, OpenMode.ForRead))
+                {
+                    case DBText t: t.UpgradeOpen(); t.TextStyleId = idStyle; soChu++; break;
+                    case MText m: m.UpgradeOpen(); m.TextStyleId = idStyle; soChu++; break;
+                    case AttributeReference ar: ar.UpgradeOpen(); ar.TextStyleId = idStyle; soChu++; break;
+                }
+            }
+            else
+            {
+                if (!idKieuDim.TryGetValue(td.StyleMoi, out var idStyle)) continue;
+                if (tr.GetObject(entId, OpenMode.ForRead) is not Dimension dim) continue;
+                dim.UpgradeOpen();
+                dim.DimensionStyle = idStyle; // chỉ đổi KIỂU, dimension vẫn là dimension liên kết (O3)
+                soDim++;
+            }
+        }
+        if (soChu > 0)
+        {
+            _steps.Add(new StepDiff
+            {
+                Buoc = ChuanHoaMoRong.Buoc8, HangMuc = "Text về kiểu chữ chuẩn",
+                Truoc = "style lạ", Sau = tenChuanChu, SoLuong = soChu,
+            });
+        }
+        if (soDim > 0)
+        {
+            _steps.Add(new StepDiff
+            {
+                Buoc = ChuanHoaMoRong.Buoc8, HangMuc = "Dimension về kiểu kích thước chuẩn (giữ liên kết đo)",
+                Truoc = "style lạ", Sau = tenChuanDim, SoLuong = soDim,
+            });
+        }
+    }
+
+    /// <summary>Tên bản ghi bảng ký hiệu của một ObjectId; rỗng khi không đọc được (không đoán).</summary>
+    private static string TenBanGhi(Transaction tr, ObjectId id)
+    {
+        if (id.IsNull) return "";
+        return tr.GetObject(id, OpenMode.ForRead) is SymbolTableRecord r ? r.Name : "";
+    }
+
+    /// <summary>
+    /// Bước 9 — xref: tương đối hóa đường dẫn tuyệt đối, BÁO xref đứt đường dẫn. Phần bind (chỉ với
+    /// xref khớp <c>bindMatchAny</c>, mặc định rỗng) để lại cho <see cref="ApDungCapTaiLieu"/>.
+    /// </summary>
+    private void Buoc9Xref(Database db, Transaction tr)
+    {
+        if (!pack.XrefPolicy.Enabled) return;
+
+        var xrefs = new List<XrefHienCo>();
+        var idTheoTen = new Dictionary<string, ObjectId>(StringComparer.OrdinalIgnoreCase);
+        var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+        foreach (ObjectId id in bt)
+        {
+            var btr = (BlockTableRecord)tr.GetObject(id, OpenMode.ForRead);
+            if (!btr.IsFromExternalReference) continue;
+            idTheoTen[btr.Name] = id;
+            xrefs.Add(new XrefHienCo
+            {
+                Ten = btr.Name,
+                DuongDanLuu = btr.PathName ?? "",
+                DutDuongDan = btr.XrefStatus != XrefStatus.Resolved,
+                LaOverlay = btr.IsFromOverlayReference,
+            });
+        }
+        if (xrefs.Count == 0) return;
+
+        var thuMuc = string.IsNullOrEmpty(db.Filename) ? "" : Path.GetDirectoryName(db.Filename) ?? "";
+        var keHoach = ChuanHoaMoRong.LapKeHoachXref(pack.XrefPolicy, xrefs, thuMuc);
+        _canhBao.AddRange(keHoach.CanhBao);
+
+        var soDoiDuongDan = 0;
+        foreach (var td in keHoach.ThayDoi)
+        {
+            if (!idTheoTen.TryGetValue(td.Ten, out var id)) continue;
+            if (td.DuongDanMoi is { } duongDanMoi)
+            {
+                var btr = (BlockTableRecord)tr.GetObject(id, OpenMode.ForWrite);
+                btr.PathName = duongDanMoi;
+                soDoiDuongDan++;
+            }
+            if (td.Bind) _xrefCanBind.Add(id);
+        }
+        if (soDoiDuongDan > 0)
+        {
+            _steps.Add(new StepDiff
+            {
+                Buoc = ChuanHoaMoRong.Buoc9, HangMuc = "Tương đối hóa đường dẫn xref",
+                Truoc = "đường dẫn tuyệt đối", Sau = "tương đối theo thư mục bản vẽ", SoLuong = soDoiDuongDan,
+            });
+        }
+    }
+
+    /// <summary>Bước 10 — mẫu hatch + tỉ lệ về chuẩn theo layer; hatch tô đặc/gradient giữ nguyên.</summary>
+    private void Buoc10Hatch(Database db, Transaction tr)
+    {
+        if (!pack.HatchMap.Enabled) return;
+
+        var hatches = new List<HatchHienCo>();
+        var idTheoHandle = new Dictionary<string, ObjectId>(StringComparer.Ordinal);
+        var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+        foreach (ObjectId btrId in bt)
+        {
+            var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
+            if (btr.IsFromExternalReference) continue;
+            foreach (ObjectId entId in btr)
+            {
+                if (tr.GetObject(entId, OpenMode.ForRead) is not Hatch h) continue;
+                var handle = h.Handle.ToString();
+                idTheoHandle[handle] = entId;
+                hatches.Add(new HatchHienCo
+                {
+                    Handle = handle,
+                    Layer = h.Layer,
+                    TenMau = h.PatternName,
+                    TiLe = h.PatternScale,
+                    // Không dùng thuộc tính "solid fill": tên mẫu SOLID + cờ gradient đã phủ đủ và
+                    // là hai thứ chắc chắn đọc được trên mọi phiên bản.
+                    LaSolid = h.IsGradient || string.Equals(h.PatternName, "SOLID", StringComparison.OrdinalIgnoreCase),
+                });
+            }
+        }
+        if (hatches.Count == 0) return;
+
+        var keHoach = ChuanHoaMoRong.LapKeHoachHatch(pack.HatchMap, hatches);
+        _canhBao.AddRange(keHoach.CanhBao);
+
+        var soDoi = 0;
+        var mauHong = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var td in keHoach.ThayDoi)
+        {
+            if (!idTheoHandle.TryGetValue(td.Handle, out var entId)) continue;
+            if (tr.GetObject(entId, OpenMode.ForRead) is not Hatch h) continue;
+            try
+            {
+                h.UpgradeOpen();
+                // Thứ tự bắt buộc: đặt tỉ lệ TRƯỚC rồi mới nạp mẫu, vì SetHatchPattern dựng lại
+                // hình học hatch theo tỉ lệ đang có.
+                h.PatternScale = td.TiLeMoi;
+                h.SetHatchPattern(HatchPatternType.PreDefined, td.MauMoi);
+                h.EvaluateHatch(true);
+                soDoi++;
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception)
+            {
+                // Mẫu không có trong tệp .pat của máy, hoặc biên hatch hỏng — bỏ qua hatch đó.
+                mauHong.Add(td.MauMoi);
+            }
+        }
+        if (soDoi > 0)
+        {
+            _steps.Add(new StepDiff
+            {
+                Buoc = ChuanHoaMoRong.Buoc10, HangMuc = "Mẫu hatch + tỉ lệ theo layer",
+                Truoc = "lệch hatchMap", Sau = "theo rule pack", SoLuong = soDoi,
+            });
+        }
+        if (mauHong.Count > 0)
+        {
+            _canhBao.Add(
+                $"Không nạp được mẫu hatch: {string.Join(", ", mauHong)} — máy thiếu tệp .pat tương ứng " +
+                "hoặc biên hatch hỏng. Các hatch đó giữ nguyên.");
+        }
+    }
+
+    /// <summary>
+    /// Bước 11 — LẬP kế hoạch dọn layout (đọc trong transaction). Việc xóa/đổi tên layout dùng
+    /// <c>LayoutManager</c> (API cấp tài liệu) nên chạy ở <see cref="ApDungCapTaiLieu"/> sau commit.
+    /// </summary>
+    private void Buoc11LapKeHoachLayout(Database db, Transaction tr)
+    {
+        if (!pack.LayoutPolicy.Enabled) return;
+
+        var theoThuTu = new List<(int ThuTu, LayoutChuanHoa Layout)>();
+        var dict = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead);
+        foreach (var muc in dict)
+        {
+            if (tr.GetObject(muc.Value, OpenMode.ForRead) is not Layout layout) continue;
+            if (string.Equals(layout.LayoutName, "Model", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var soViewport = 0;
+            var soDoiTuong = 0;
+            if (tr.GetObject(layout.BlockTableRecordId, OpenMode.ForRead) is BlockTableRecord btr)
+            {
+                foreach (ObjectId entId in btr)
+                {
+                    if (tr.GetObject(entId, OpenMode.ForRead) is not Entity ent) continue;
+                    // Viewport số 1 là khung giấy của chính paper space, luôn có → không tính.
+                    if (ent is Viewport vp) { if (vp.Number >= 2) soViewport++; }
+                    else soDoiTuong++;
+                }
+            }
+            theoThuTu.Add((layout.TabOrder, new LayoutChuanHoa
+            {
+                Ten = layout.LayoutName,
+                SoViewport = soViewport,
+                SoDoiTuong = soDoiTuong,
+            }));
+        }
+
+        var layouts = theoThuTu.OrderBy(x => x.ThuTu).Select(x => x.Layout).ToList();
+        _keHoachLayout = ChuanHoaMoRong.LapKeHoachLayout(pack.LayoutPolicy, layouts);
+        _canhBao.AddRange(_keHoachLayout.CanhBao);
+    }
+
+    /// <summary>
+    /// Phần bước 9/11 phải chạy NGOÀI transaction: bind xref (<c>Database.BindXrefs</c>) và dọn
+    /// layout (<c>LayoutManager</c>). Gọi ngay sau khi transaction của <see cref="Run"/> commit,
+    /// trong CÙNG một lệnh nên vẫn 1 lần UNDO.
+    /// </summary>
+    /// <param name="coTaiLieu">
+    /// false = đang chạy trên side database (XBOSS_BATCH) — không có tài liệu mở nên bỏ qua hai
+    /// việc này kèm cảnh báo, thay vì gọi API cấp tài liệu lên nhầm bản vẽ khác.
+    /// </param>
+    internal void ApDungCapTaiLieu(Database db, bool coTaiLieu)
+    {
+        if (_xrefCanBind.Count == 0 && _keHoachLayout.Rong) return;
+        if (!coTaiLieu)
+        {
+            _canhBao.Add(
+                "Xử lý hàng loạt đọc bản vẽ qua side database (không có tài liệu mở) — bỏ qua phần bind xref " +
+                "(bước 9) và dọn layout (bước 11). Mở tệp kết quả rồi chạy XBOSS_CHUANHOA nếu cần hai việc này.");
+            return;
+        }
+
+        if (_xrefCanBind.Count > 0)
+        {
+            var so = _xrefCanBind.Count;
+            using var ids = new ObjectIdCollection();
+            foreach (var id in _xrefCanBind) ids.Add(id);
+            db.BindXrefs(ids, false);
+            _steps.Add(new StepDiff
+            {
+                Buoc = ChuanHoaMoRong.Buoc9, HangMuc = "Bind xref khớp bindMatchAny",
+                Truoc = $"{so} xref tham chiếu", Sau = "đã nhập vào bản vẽ", SoLuong = so,
+            });
+        }
+
+        if (_keHoachLayout.Rong) return;
+        var lm = LayoutManager.Current;
+        foreach (var ten in _keHoachLayout.XoaLayout) lm.DeleteLayout(ten);
+        if (_keHoachLayout.XoaLayout.Count > 0)
+        {
+            _steps.Add(new StepDiff
+            {
+                Buoc = ChuanHoaMoRong.Buoc11, HangMuc = "Xóa layout rỗng",
+                Truoc = string.Join(", ", _keHoachLayout.XoaLayout), Sau = "đã xóa",
+                SoLuong = _keHoachLayout.XoaLayout.Count,
+            });
+        }
+
+        if (_keHoachLayout.DoiTen.Count == 0) return;
+        // Đổi tên 2 lượt qua tên tạm: đổi thẳng có thể đụng tên của layout chưa tới lượt
+        // (TRANG-02 hiện có ↔ TRANG-01 mới) và AutoCAD sẽ từ chối vì trùng tên.
+        for (var i = 0; i < _keHoachLayout.DoiTen.Count; i++)
+            lm.RenameLayout(_keHoachLayout.DoiTen[i].TenCu, ChuanHoaMoRong.TienToTenTam + i);
+        for (var i = 0; i < _keHoachLayout.DoiTen.Count; i++)
+            lm.RenameLayout(ChuanHoaMoRong.TienToTenTam + i, _keHoachLayout.DoiTen[i].TenMoi);
+        _steps.Add(new StepDiff
+        {
+            Buoc = ChuanHoaMoRong.Buoc11, HangMuc = "Đặt lại tên layout theo namePattern",
+            Truoc = string.Join(", ", _keHoachLayout.DoiTen.Select(d => d.TenCu)),
+            Sau = string.Join(", ", _keHoachLayout.DoiTen.Select(d => d.TenMoi)),
+            SoLuong = _keHoachLayout.DoiTen.Count,
+        });
     }
 }

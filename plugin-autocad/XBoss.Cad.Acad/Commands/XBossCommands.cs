@@ -181,18 +181,31 @@ public sealed class XBossCommands
         // AUDIT chạy trước, ngoài transaction (là lệnh AutoCAD, không phải API Database).
         pipeline.Buoc1Audit(ed);
         using (var khoa = doc.LockDocument())
-        using (var tr = db.TransactionManager.StartTransaction())
         {
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                try
+                {
+                    pipeline.Run(db, tr);
+                    tr.Commit();
+                }
+                catch (Autodesk.AutoCAD.Runtime.Exception e)
+                {
+                    tr.Abort(); // rollback sạch — guardrail M99 §2
+                    ed.WriteMessage($"\n[XBoss] LỖI giữa chừng — đã rollback toàn bộ, bản vẽ nguyên trạng: {e.Message}\n");
+                    return;
+                }
+            }
+            // Phần bind xref (bước 9) + dọn layout (bước 11) dùng API cấp TÀI LIỆU nên không chạy
+            // được trong transaction — làm ngay sau khi commit, vẫn trong cùng lệnh này nên UNDO
+            // một lần vẫn trả bản vẽ về nguyên trạng (đúng cơ chế của bước 1 AUDIT).
             try
             {
-                pipeline.Run(db, tr);
-                tr.Commit();
+                pipeline.ApDungCapTaiLieu(db, coTaiLieu: true);
             }
             catch (Autodesk.AutoCAD.Runtime.Exception e)
             {
-                tr.Abort(); // rollback sạch — guardrail M99 §2
-                ed.WriteMessage($"\n[XBoss] LỖI giữa chừng — đã rollback toàn bộ, bản vẽ nguyên trạng: {e.Message}\n");
-                return;
+                ed.WriteMessage($"\n[XBoss] ⚠ Bước 9/11 (bind xref, dọn layout) lỗi: {e.Message} — các bước trước đã áp xong.\n");
             }
         }
 
@@ -372,10 +385,11 @@ public sealed class XBossCommands
         var db = doc.Database;
 
         // FR16: dựng lại kết quả từ XData đang sống trong DWG — không phụ thuộc RAM phiên trước.
-        List<(MeasuredObject DoiTuong, string ItemId)> daGan;
+        // Đọc TẠI CHỖ (không qua TakeoffScanner.DocDaGan) vì ở đây còn cần lấy TÊN VÙNG ghi trong
+        // XData lúc bóc — DocDaGan chỉ trả đối tượng + itemId, dùng cho XBOSS_VE_THONGKE.
+        var daGan = new List<(MeasuredObject DoiTuong, string ItemId)>();
         using (var tr = db.TransactionManager.StartTransaction())
         {
-            daGan = TakeoffScanner.DocDaGan(db, tr, pack.Takeoff.XdataAppName);
             var (doiTuong, _) = TakeoffScanner.Scan(
                 tr, TakeoffScanner.ModelSpaceIds(db, tr).ToList(), pack.Takeoff.XdataAppName,
                 BoiCanhBoc(db, tr, pack, new VungChonService.KetQuaChonVung([], [])));

@@ -25,6 +25,20 @@ public sealed class CadRulePack
     /// tự tắt (hành vi y hệt v4).
     /// </summary>
     [JsonPropertyName("styleMap")] public StyleMapSection StyleMap { get; init; } = new();
+
+    // ===== v7 (M101 §6.2) — chính sách 3 bước chuẩn hóa mới 9/10/11. Bước 8 KHÔNG có khối riêng:
+    // nó dùng lại chính StyleMap ở trên (khai một lần, kiểm và sửa không thể trôi khỏi nhau).
+    // Rule pack ≤ v6 không có các khối này → mọi Enabled = false → pipeline chạy y hệt v6.
+
+    /// <summary>Bước 9 — chính sách xref (mặc định chỉ BÁO, không bind).</summary>
+    [JsonPropertyName("xrefPolicy")] public XrefPolicySection XrefPolicy { get; init; } = new();
+
+    /// <summary>Bước 10 — mẫu hatch + tỉ lệ theo layer.</summary>
+    [JsonPropertyName("hatchMap")] public HatchMapSection HatchMap { get; init; } = new();
+
+    /// <summary>Bước 11 — dọn layout rỗng / đặt lại tên layout.</summary>
+    [JsonPropertyName("layoutPolicy")] public LayoutPolicySection LayoutPolicy { get; init; } = new();
+
     /// Phần <c>drawTools</c> (v4+) mà lớp ánh xạ layer cần biết. <c>null</c> với rule pack v1–v3.
     /// Model ĐẦY ĐỦ của khối này nằm ở <c>Draw/DrawToolsConfig.cs</c> (bộ lệnh vẽ M100) — ở đây
     /// chỉ đọc đúng field mà <see cref="Layers.LayerMapper"/> dùng, để nạp rule pack cũ không vỡ.
@@ -328,6 +342,48 @@ public sealed class DimStyleStandard
     /// <summary>Kiểu chữ mà dimstyle chuẩn dùng — phải nằm trong textStyle.name/acceptAlso.</summary>
     [JsonPropertyName("textStyleName")] public string TextStyleName { get; init; } = "";
     [JsonPropertyName("acceptAlso")] public IReadOnlyList<string> AcceptAlso { get; init; } = [];
+}
+
+/// <summary>Bước chuẩn hóa 9 (v7) — tham chiếu ngoài. Mặc định tắt; bật lên vẫn KHÔNG bind
+/// trừ khi <see cref="BindMatchAny"/> khai tên xref cụ thể (M101 §6.2).</summary>
+public sealed class XrefPolicySection
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+    /// <summary><c>relative</c> = tương đối hóa đường dẫn tuyệt đối; <c>keep</c> = giữ nguyên, chỉ báo.</summary>
+    [JsonPropertyName("pathPolicy")] public string PathPolicy { get; init; } = "";
+    /// <summary>Từ khóa tên xref được phép bind (ranh giới token). Rỗng = không bind xref nào.</summary>
+    [JsonPropertyName("bindMatchAny")] public IReadOnlyList<string> BindMatchAny { get; init; } = [];
+
+    /// <summary>Có tương đối hóa đường dẫn không (chính sách đã bật và pathPolicy = relative).</summary>
+    [JsonIgnore]
+    public bool TuongDoiHoa => Enabled && string.Equals(PathPolicy, "relative", StringComparison.Ordinal);
+}
+
+/// <summary>Bước chuẩn hóa 10 (v7) — mẫu hatch + tỉ lệ theo layer.</summary>
+public sealed class HatchMapSection
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+    /// <summary>First-match theo thứ tự khai (cùng triết lý layerMap/takeoff).</summary>
+    [JsonPropertyName("byLayer")] public IReadOnlyList<HatchRule> ByLayer { get; init; } = [];
+}
+
+public sealed class HatchRule
+{
+    [JsonPropertyName("layerMatchAny")] public IReadOnlyList<string> LayerMatchAny { get; init; } = [];
+    [JsonPropertyName("pattern")] public string Pattern { get; init; } = "";
+    [JsonPropertyName("scale")] public double Scale { get; init; }
+}
+
+/// <summary>Bước chuẩn hóa 11 (v7) — dọn layout.</summary>
+public sealed class LayoutPolicySection
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+    /// <summary>Xóa layout không viewport thật và không đối tượng nào.</summary>
+    [JsonPropertyName("removeEmpty")] public bool RemoveEmpty { get; init; }
+    /// <summary>Đặt lại tên layout theo <see cref="NamePattern"/> — mặc định TẮT (tên layout đi vào hồ sơ đã nộp).</summary>
+    [JsonPropertyName("renameLayouts")] public bool RenameLayouts { get; init; }
+    /// <summary>Bắt buộc chứa <c>{seq}</c> (đánh 2 chữ số) khi <see cref="RenameLayouts"/> bật.</summary>
+    [JsonPropertyName("namePattern")] public string NamePattern { get; init; } = "";
 }
 
 public sealed class OpenPolylinePolicy

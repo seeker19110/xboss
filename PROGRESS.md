@@ -99,6 +99,51 @@ _(Ghi bổ sung khi đóng đợt ở PR5 — commit fece8fa8 đã vào nhánh n
 - **Adapter lệnh:** `XBOSS_VE_PHUKIEN`, `XBOSS_VE_THIETBI` (TAG bắt buộc), `XBOSS_VE_THUVIEN` (nạp
   tệp tay hoặc tải lại từ server); `XBOSS_LOGIN` tự tải thư viện sau rule pack (AC8).
 
+## M101 PR2 — Rule pack v7 + 4 bước chuẩn hóa mới: style / xref / hatch / layout (2026-08-25)
+
+Nâng `XBOSS_CHUANHOA` từ 7 lên **11 bước** theo M101 §6.2 (chèn SAU bước 7 lineweight/CTB, thứ tự cố
+định). Toàn bộ logic "đổi cái gì" nằm ở Core thuần có test; Adapter chỉ đo hiện trạng và áp kế hoạch.
+
+- **Rule pack `v7.json`** (append-only, v1–v6 **không đổi 1 byte** — kiểm bằng test node deepEqual 10 khối):
+  thêm đúng 3 khối `xrefPolicy` / `hatchMap` / `layoutPolicy`, cả 3 `enabled: false`.
+  `hatchMap.byLayer` để **rỗng** (bộ mẫu hatch là quy ước riêng từng công ty — không đoán hộ; bật mà
+  rỗng thì validator từ chối nạp). `xrefPolicy.bindMatchAny` rỗng ⇒ **không bind xref nào**.
+- **Bước 8 dùng chung công tắc với phép kiểm 14** (`inspectionPolicy.styleDeviation.enabled`, vẫn `false`)
+  thay vì khai cờ mới: khối `styleMap` (v5) là DỮ LIỆU không có `enabled`, mà M101 đòi bước mới phải
+  mặc định tắt và "không khai trùng styleMap". Hệ quả có chủ ý: công ty bật kiểm style thì chuẩn hóa
+  sửa đúng thứ vừa bị báo — kiểm và sửa không thể trôi khỏi nhau.
+- **Core `XBoss.Cad.Core/Standardize/`** (mới, thuần, test CI Linux): `ChuanHoaModels.cs` (DTO hiện
+  trạng + kế hoạch) và `ChuanHoaMoRong.cs` — 4 hàm lập kế hoạch: style (tạo/sửa style chuẩn + gán lại
+  style cho text/dim, tôn trọng `acceptAlso`, quy đổi `fixedHeightMm` sang đơn vị bản vẽ), xref
+  (tương đối hóa đường dẫn — hàm thuần `DuongDanTuongDoi` sinh đúng dạng `.\…`/`..\…` của AutoCAD,
+  test được trên Linux; xref đứt đường dẫn **chỉ báo**), hatch (first-match theo ranh giới token,
+  **hatch solid/gradient luôn giữ nguyên**), layout (xóa layout rỗng — viewport nền số 1 không tính,
+  luôn giữ lại ≥1 layout; đổi tên theo `{seq}` 2 chữ số).
+- **Adapter `StandardizePipeline`:** 4 bước mới + tách `ApDungCapTaiLieu(db, coTaiLieu)` cho phần phải
+  chạy NGOÀI transaction (`Database.BindXrefs`, `LayoutManager.DeleteLayout/RenameLayout`) — gọi ngay
+  sau commit trong **cùng một lệnh** nên vẫn **1 lần UNDO** (đúng cơ chế đã dùng cho bước 1 AUDIT).
+  `XBOSS_BATCH` (side database, `noDocument`) gọi với `coTaiLieu: false` → bỏ qua 2 việc đó kèm cảnh
+  báo trong báo cáo. Đổi tên layout đi **2 lượt qua tên tạm** để không đụng tên layout chưa tới lượt.
+  **Dimension không mất associativity (M99 O3):** chỉ đặt lại `DimensionStyle`, không dựng lại dimension.
+- **Đóng nợ hazard gộp layer lệch hoa/thường** (ghi ở mục FIX ánh xạ layer bên dưới): quyết định
+  "đổi tên hay gộp" chuyển xuống Core `LayerMapper.QuyetDinh(cũ, mới, dichDaTonTai)` — cũ/mới chỉ khác
+  hoa/thường ⇒ **luôn đổi tên**, không bao giờ gộp rồi `Erase()` chính layer đang chứa thực thể.
+- **Sửa 2 vết hỏng do merge nhánh V6 ↔ W3** (phát hiện khi biên dịch Adapter qua stub — `dotnet test`
+  không bắt được vì `XBoss.Cad.Acad` không build trên Linux): `TakeoffScanner.DocDaGan` mất 3 dòng đóng
+  hàm ⇒ **tệp không biên dịch được**; `XBossCommands.XuatExcel` giữ CẢ hai bản (gọi `DocDaGan` rồi lại
+  quét thêm vòng lặp của W3) ⇒ **mỗi đối tượng đã bóc bị đếm 2 lần** trong Excel. Đã dựng lại theo bản
+  W3 (bản có tên vùng).
+- **Test:** dotnet **406 ca xanh** (365 cũ + 41 mới: `ChuanHoaMoRongTests` 24, `RulePackV7Tests` 11,
+  hazard hoa/thường 3, phần còn lại là cập nhật version). Bằng chứng "v7 mặc định = v6": chạy cả 4 hàm
+  lập kế hoạch trên cùng một hiện trạng "bẩn" với v6 và v7 → kết quả bằng nhau và đều **rỗng**.
+  Node: `tests/engineering-cad-rule-pack.test.ts` 28 ca xanh (thêm ca "v7 mở rộng thuần của v6" + ca
+  "cả 4 bước mới tắt mặc định"); `npm run cad:doi-chung -- --kiem` khớp (diff đối chứng chỉ đổi dòng version).
+- **Chưa verify được trên Linux — phải thử tay trên máy có AutoCAD:** `Hatch.SetHatchPattern`/
+  `PatternScale`/`EvaluateHatch`/`IsGradient`, `BlockTableRecord.PathName`/`XrefStatus`,
+  `Database.BindXrefs`, `LayoutManager.RenameLayout`, `TextStyleTableRecord.TextSize/XScale/FileName`,
+  `DimStyleTableRecord.Dimtxsty`, `Dimension.DimensionStyle` (setter). Stub chỉ chứng minh chữ ký khớp
+  giả định, không chứng minh hành vi — cả 4 bước đang TẮT nên rủi ro chưa chạm người dùng.
+
 ## M100 PR6 — Trang in + mặt cắt: `XBOSS_VE_TRANGIN` / `XBOSS_VE_MATCAT` (2026-08-25)
 
 - **Core `XBoss.Cad.Core/Draw/` (thuần, test CI Linux):** `SectionBuilder` (giao tuyến cắt × tim — đoạn thẳng lẫn cung bulge; xếp thứ tự chiếu lên tuyến cắt; **giữ đúng khoảng cách ngang thật** giữa các ký hiệu; loại ký hiệu suy từ size/itemId: chữ nhật W×H / tròn DN / máng cáp có nét đáy; tuyến **song song** tuyến cắt hoặc size không đọc được → BỎ QUA kèm cảnh báo, không bịa kích thước), `SheetSetup` (quy đổi tỉ lệ viewport `mm/đơn-vị ÷ tỉ lệ` — AC10 1:50 ⇒ 1000mm mô hình = 20mm giấy; đặt tên layout theo `layoutNamePattern` lấy số kế tiếp; đặt tên mặt cắt A-A/B-B… bỏ qua chữ đã dùng; chọn canonical media name của máy in theo token khổ giấy — "A1" không dính "A10"; tra khung tên `kind=titleblock` trong manifest thư viện).
@@ -149,7 +194,7 @@ Kiểm route thật (dev server + Postgres ephemeral): `POST /api/engineering/ca
 `POST /api/engineering/cad/parse-dxf` trả layer đã chuẩn giữ nguyên tên, `discipline` đúng hệ
 (`F-SPRN-PIPE` → F, trước khi vá là P).
 
-**Còn nợ (KHÔNG sửa ở đây — ngoài phạm vi, cần phiên chính quyết):** `StandardizePipeline.Buoc2LayerMapping`
+**Còn nợ — ĐÃ ĐÓNG ở M101 PR2 (2026-08-25):** `StandardizePipeline.Buoc2LayerMapping`
 gộp layer khi `LayerTable.Has(tên đích)` đúng, mà `Has` **không phân biệt hoa thường** — layer chỉ
 lệch hoa/thường với tên đích (vd `m-duct-supp`) sẽ đi vào nhánh "gộp" rồi `Erase()` chính layer đang
 chứa thực thể. Rủi ro có sẵn từ M99 (bản cũ cũng sinh đổi tên chỉ-khác-hoa-thường), không phải do vá này.

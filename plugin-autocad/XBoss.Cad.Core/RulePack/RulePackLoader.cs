@@ -110,6 +110,63 @@ public static class RulePackLoader
             throw new RulePackException("inspectionPolicy.openPolyline.nearGapToleranceMm phải dương.");
 
         ValidatePhepKiemV5(pack);
+        ValidateChuanHoaV7(pack);
+    }
+
+    /// <summary>
+    /// Kiểm 3 khối chính sách của 4 bước chuẩn hóa mới (M101 §6.2 — v7). Rule pack ≤ v6 không khai
+    /// khối nào → mọi giá trị mặc định (tắt/rỗng) → không ném gì (tương thích ngược, "v7 mặc định =
+    /// v6"). Nguyên tắc giống v5: bước ĐANG BẬT mà khai thiếu/vô nghĩa thì chặn ngay lúc nạp — một
+    /// bước chuẩn hóa chạy im lặng mà không sửa gì (hoặc sửa sai) nguy hiểm hơn nhiều so với việc
+    /// rule pack không nạp được. Dữ liệu khai sai (bảng hatch, pattern tên layout) thì kiểm CẢ KHI
+    /// TẮT, để sai sót lộ ra ngay chứ không đợi tới ngày công ty bật bước đó lên.
+    /// </summary>
+    private static void ValidateChuanHoaV7(CadRulePack pack)
+    {
+        // ----- Bước 9: xref -----
+        var xp = pack.XrefPolicy;
+        if (xp.PathPolicy.Length > 0 && xp.PathPolicy is not ("relative" or "keep"))
+        {
+            throw new RulePackException(
+                $"xrefPolicy.pathPolicy lạ \"{xp.PathPolicy}\" — plugin chỉ hỗ trợ \"relative\" (tương đối hóa) hoặc \"keep\" (giữ nguyên, chỉ báo).");
+        }
+        if (xp.Enabled && xp.PathPolicy.Length == 0)
+            throw new RulePackException("xrefPolicy đang bật nhưng thiếu pathPolicy (\"relative\" hoặc \"keep\").");
+        foreach (var tu in xp.BindMatchAny)
+        {
+            if (string.IsNullOrWhiteSpace(tu))
+                throw new RulePackException("xrefPolicy.bindMatchAny có từ khóa rỗng — bind nhầm cả bản vẽ là không hoàn tác nổi.");
+        }
+
+        // ----- Bước 10: hatch -----
+        var hm = pack.HatchMap;
+        if (hm.Enabled && hm.ByLayer.Count == 0)
+        {
+            throw new RulePackException(
+                "hatchMap đang bật nhưng byLayer rỗng — bước 10 sẽ chạy mà không sửa gì. Khai bộ mẫu hatch của công ty rồi phát hành lại.");
+        }
+        foreach (var quyDinh in hm.ByLayer)
+        {
+            if (quyDinh.LayerMatchAny.Count == 0)
+                throw new RulePackException("hatchMap.byLayer có quy định thiếu layerMatchAny.");
+            if (string.IsNullOrWhiteSpace(quyDinh.Pattern))
+                throw new RulePackException("hatchMap.byLayer có quy định thiếu pattern (tên mẫu hatch).");
+            if (quyDinh.Scale <= 0)
+                throw new RulePackException($"hatchMap.byLayer quy định \"{quyDinh.Pattern}\": scale phải dương.");
+        }
+
+        // ----- Bước 11: layout -----
+        var lp = pack.LayoutPolicy;
+        if (lp.Enabled && !lp.RemoveEmpty && !lp.RenameLayouts)
+        {
+            throw new RulePackException(
+                "layoutPolicy đang bật nhưng cả removeEmpty lẫn renameLayouts đều tắt — bước 11 không làm gì.");
+        }
+        if (lp.RenameLayouts && !lp.NamePattern.Contains("{seq}", StringComparison.Ordinal))
+        {
+            throw new RulePackException(
+                "layoutPolicy.renameLayouts đang bật nhưng namePattern thiếu {seq} — mọi layout sẽ trùng tên.");
+        }
     }
 
     /// <summary>

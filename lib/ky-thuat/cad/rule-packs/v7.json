@@ -1,6 +1,6 @@
 {
   "version": "v7",
-  "description": "Rule pack v7 = v6 + 2 item ĐẾM cho giá đỡ/lỗ chờ (takeoff.items: \"support-hanger\", \"sleeve-opening\" — xem takeoff.itemsCountV7) + khóa drawTools.heavyFittingIds khai PHỤ KIỆN NẶNG cần giá đỡ tại chỗ (M100 §6.7/§6.8, AC12). Đây KHÔNG phải mở rộng trung tính tuyệt đối như v5/v6: bản vẽ có block giá đỡ/sleeve do XBOSS_VE_GIADO/XBOSS_VE_LOCHO chèn sẽ có THÊM 2 dòng khối lượng khi bóc bằng v7 — đó chính là mục đích (M100 AC12 đòi XBOSS_BOCKL đếm được giá đỡ; trước v7 hạng mục này ước tay). Bản vẽ KHÔNG có block nào khớp thì bóc bằng v7 ra kết quả y hệt v6 (2 item mới đặt CUỐI danh sách, khớp first-match nên không giành mất đối tượng của item cũ). 12 khối cũ giữ nguyên từng byte; khối takeoff chỉ ĐƯỢC THÊM ghi chú itemsCountV7 + 2 phần tử cuối \"items\"; khối drawTools chỉ ĐƯỢC THÊM heavyFittingIds (+ ghi chú). Plugin đọc rule pack cũ (v4–v6) không có heavyFittingIds thì giữ nguyên đường HỎI kỹ sư — hành vi cũ không đổi.\n\nGốc mô tả v6: Rule pack v6 = v5 + các khóa TÙY CHỌN cho bóc tách nâng cao của XBOSS_BOCKL (M101 §6.3): tách dòng theo size (\"groupBySize\" + \"sizeFromNearbyText\"), hệ số quy đổi hao hụt/phụ kiện (\"wastagePct\", \"perCountAdd\") và item dẫn xuất cách nhiệt (\"derivedFrom\" + \"formula\"). Mở rộng THUẦN: 11 khối cũ giữ nguyên từng byte, khối takeoff chỉ ĐƯỢC THÊM ghi chú mô tả khóa mới, và KHÔNG item nào trong tệp này khai khóa mới — mọi khóa mới mặc định vắng/0 nên bóc bằng v6 cho kết quả y HỆT v5 trên cùng bản vẽ (M101 §7 FR4, AC \"v6 mặc định = v5\"). Công ty/QS bật từng khóa theo dự án bằng cách phát hành version kế tiếp (hoặc rule pack per-project ở PR4), KHÔNG sửa tệp đã phát hành.\n\nGốc mô tả v5: v5 = v4 + 7 phép kiểm mới của XBOSS_KIEMTRA (M101 §6.1, số 10–16) + khối styleMap dùng chung (M101 §6.2 bước 8). Mở rộng THUẦN: 9 khối cũ giữ nguyên từng byte, khối inspectionPolicy chỉ ĐƯỢC THÊM khóa (zToleranceMm/openPolyline giữ nguyên), và MỌI phép kiểm mới mặc định \"enabled\": false — nạp v5 vào plugin M99/M100 cũ (hoặc plugin mới chưa bật phép nào) cho kết quả kiểm y HỆT v4 trên cùng bản vẽ (M101 §7 FR1). Bật dần từng phép sau pilot bằng cách phát hành version kế tiếp, KHÔNG sửa tệp đã phát hành.\n\nGốc mô tả v4: v4 = v3 + drawTools + sheetSetup (M100 §11). Mở rộng THUẦN (chỉ thêm 2 khối mới, 8 khối cũ giữ nguyên từng byte) nên plugin M99 đọc v2/v3 vẫn chạy y hệt với tệp này (M100 AC9). Lý do phát hành v4: bộ lệnh vẽ XBOSS_VE_* cần biết mỗi hệ vẽ được những loại tuyến nào, tuyến rơi vào layer nào (lấy đúng từ layerMap, không khai trùng), danh mục size, phụ kiện/thiết bị nào chèn được, và tham số trang in/mặt cắt. Đổi quy tắc = phát hành version mới, KHÔNG sửa version cũ.\n\nLƯU Ý edgeLayerSuffix: M100 §11 phác thảo hậu tố \"-EDGE\", nhưng takeoff khớp layer theo RANH GIỚI TOKEN (layerMap.matchingNote) nên \"M-DUCT-SUPP-EDGE\" VẪN khớp token \"M-DUCT-SUPP\" (dấu '-' là ranh giới token) — nét biên sẽ bị bóc trùng, vỡ FR4/AC3. Vì vậy hậu tố phát hành là \"EDGE\" (nối liền, bắt đầu bằng chữ cái): \"M-DUCT-SUPPEDGE\" không khớp bất kỳ takeoff.layerMatchAny nào. Validator DrawToolsConfig kiểm đúng điều kiện này khi nạp.\n\nGốc mô tả v3: v3 = v2 + fontMap.targetFont. Mở rộng THUẦN (chỉ thêm field) nên plugin đọc v2 vẫn chạy được với tệp này. Lý do phát hành v3: sửa chữ TCVN3/VNI sang Unicode mới chỉ đổi NỘI DUNG chuỗi, kiểu chữ vẫn trỏ font cũ (.VnTime/VNI-*) nên AutoCAD hiển thị vẫn sai — AC2 không đạt dù dữ liệu đúng (phát hiện khi chạy thật trên máy có AutoCAD 2026, 2026-08-25). targetFont khai font Unicode đích để plugin đổi luôn kiểu chữ. Đổi quy tắc = phát hành version mới, KHÔNG sửa version cũ.",
+  "description": "Rule pack v7 = v6 + (a) 2 item đếm `support-hanger`/`sleeve-opening` cho giá đỡ và lỗ chờ (M100 AC12/§6.8 — trước v7 XBOSS_BOCKL không đếm được hai hạng mục này) + `drawTools.heavyFittingIds` khai phụ kiện nặng cần giá đỡ tại chỗ (M100 §6.7 — trước v7 XBOSS_VE_GIADO phải hỏi kỹ sư mỗi lần chạy); (b) 3 khối chính sách cho 4 bước chuẩn hóa mới của XBOSS_CHUANHOA (M101 §6.2 bước 8–11): `xrefPolicy`, `hatchMap`, `layoutPolicy` — cả 3 `enabled:false` nên chuẩn hóa bằng v7 cho kết quả y hệt v6; bước 8 dùng lại khối `styleMap` có từ v5, không khai trùng. Append-only: v1–v6 không đổi. Lưu ý v7 KHÔNG trung tính tuyệt đối như v5/v6 — bản vẽ có block giá đỡ/sleeve nay có thêm 2 dòng khối lượng, đó chính là mục đích của (a).",
   "layerMap": {
     "source": "lib/cad/dxf-parser.ts :: normalizeCadLayers()",
     "standard": "AIA / BS1192 / ISO 13567",
@@ -926,5 +926,28 @@
       "textHeightMm": 2.5
     },
     "slopes": ["1%", "2%", "3%"]
+  },
+  "xrefPolicy": {
+    "source": "M101 §6.2 bước chuẩn hóa 9 — chính sách tham chiếu ngoài (xref).",
+    "enabled": false,
+    "pathPolicy": "relative",
+    "bindMatchAny": [],
+    "note": "enabled=false (mặc định) → bước 9 KHÔNG chạy, chuẩn hóa bằng v7 cho kết quả y HỆT v6. Bật lên thì bước 9 chỉ làm hai việc: (1) BÁO xref đứt đường dẫn — không tự dò tìm, không tự gán lại tệp (chọn tệp thay thế là quyết định của kỹ sư, đoán sai là chèn nhầm bản vẽ khác vào hồ sơ); (2) tương đối hóa đường dẫn đang lưu theo ổ đĩa khi pathPolicy = \"relative\", vì đường dẫn tuyệt đối chết ngay khi chép thư mục dự án sang máy khác. pathPolicy nhận \"relative\" hoặc \"keep\" (giữ nguyên đường dẫn, chỉ báo).",
+    "bindMatchAnyNote": "Từ khóa tên xref ĐƯỢC PHÉP bind (khớp theo RANH GIỚI TOKEN, cùng bộ matcher với layerMap/takeoff). RỖNG = KHÔNG bind xref nào — mặc định an toàn theo M101 §6.2: bind là thao tác một chiều, nhập toàn bộ layer của xref vào bản vẽ dưới tên \"<tên xref>$0$<layer>\" nên phải chuẩn hóa layer lại từ đầu. Chỉ khai khi thật sự cần nộp bản vẽ rời, bằng cách phát hành version rule pack mới."
+  },
+  "hatchMap": {
+    "source": "M101 §6.2 bước chuẩn hóa 10 — mẫu hatch + tỉ lệ theo layer.",
+    "enabled": false,
+    "byLayer": [],
+    "note": "enabled=false (mặc định) → bước 10 KHÔNG chạy. Mỗi phần tử byLayer: { \"layerMatchAny\": [từ khóa layer], \"pattern\": \"ANSI31\", \"scale\": 25 } — first-match theo thứ tự khai, khớp layer theo RANH GIỚI TOKEN (cùng bộ matcher với layerMap/takeoff). Hatch SOLID và hatch gradient LUÔN giữ nguyên: đổi mẫu của chúng là phá ký hiệu tô đặc/bản vẽ nền, không phải chuẩn hóa.",
+    "byLayerNote": "Để RỖNG ở bản phát hành này vì bộ mẫu hatch chuẩn là quy ước riêng của từng công ty — XBoss không đoán hộ (đoán sai thì cả bản vẽ đổi ký hiệu mặt cắt). Bật enabled mà byLayer rỗng thì rule pack bị TỪ CHỐI ngay lúc nạp: chạy im lặng không sửa gì còn tệ hơn không nạp được. Khai bộ mẫu của công ty rồi phát hành version kế tiếp."
+  },
+  "layoutPolicy": {
+    "source": "M101 §6.2 bước chuẩn hóa 11 — dọn layout.",
+    "enabled": false,
+    "removeEmpty": true,
+    "renameLayouts": false,
+    "namePattern": "TRANG-{seq}",
+    "note": "enabled=false (mặc định) → bước 11 KHÔNG chạy. removeEmpty: xóa layout không có viewport THẬT (viewport nền số 1 của paper space không tính) và cũng không có đối tượng nào; luôn giữ lại ít nhất 1 layout vì AutoCAD đòi vậy. renameLayouts mặc định TẮT: tên layout đi vào hồ sơ đã nộp/sheet set nên đổi hàng loạt phải là quyết định của cả tổ. namePattern bắt buộc chứa {seq} (đánh 2 chữ số, cùng quy ước với sheetSetup.layoutNamePattern) để tab layout xếp đúng thứ tự."
   }
 }

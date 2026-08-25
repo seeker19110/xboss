@@ -45,6 +45,10 @@ export async function GET(req: Request) {
       // v5 (M101 §6.1/§6.2): bộ style chuẩn dùng chung cho phép kiểm 14 và bước chuẩn hóa 8.
       // 7 phép kiểm mới đi kèm trong inspectionPolicy ở trên (mặc định tắt).
       styleMap: pack.styleMap,
+      // v7 (M101 §6.2): chính sách 3 bước chuẩn hóa mới 9/10/11 — đều mặc định tắt.
+      xrefPolicy: pack.xrefPolicy,
+      hatchMap: pack.hatchMap,
+      layoutPolicy: pack.layoutPolicy,
     },
     { headers: { ETag: etag } },
   );

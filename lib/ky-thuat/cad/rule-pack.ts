@@ -31,6 +31,9 @@ export const CURRENT_RULE_PACK_VERSION = RULE_PACK_HIEN_HANH.version;
  * v7 = v6 + 2 item đếm `support-hanger`/`sleeve-opening` (giá đỡ, lỗ chờ — M100 AC12/§6.8: trước v7
  * XBOSS_BOCKL không đếm được hai hạng mục này) + `drawTools.heavyFittingIds` khai phụ kiện nặng cần
  * giá đỡ tại chỗ (M100 §6.7 — trước v7 XBOSS_VE_GIADO phải hỏi kỹ sư mỗi lần chạy).
+ * v7 = v6 + 3 khối chính sách cho 4 bước chuẩn hóa mới của XBOSS_CHUANHOA (M101 §6.2 bước 8–11):
+ * xrefPolicy, hatchMap, layoutPolicy. Bước 8 (style map) dùng lại khối styleMap đã có từ v5 nên
+ * KHÔNG khai trùng. Cả 3 khối mới `enabled: false` → chuẩn hóa bằng v7 cho kết quả y hệt v6.
  */
 export function getCurrentRulePack(): CadRulePack {
   return RULE_PACK_HIEN_HANH;

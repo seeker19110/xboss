@@ -25,7 +25,7 @@ import {
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5, version = v7", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7, version = v7", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -43,6 +43,9 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleM
     assert.ok(field in pack, `Thiếu field v4 ${field}`);
   }
   assert.ok("styleMap" in pack, "Thiếu field v5 styleMap");
+  for (const field of ["xrefPolicy", "hatchMap", "layoutPolicy"]) {
+    assert.ok(field in pack, `Thiếu field v7 ${field}`);
+  }
   assert.equal(pack.version, "v7");
   assert.equal(CURRENT_RULE_PACK_VERSION, "v7");
 });
@@ -154,8 +157,6 @@ test("rule pack v5 là mở rộng thuần của v4: chỉ thêm styleMap + khó
 
 test("rule pack v6 là mở rộng thuần của v5: chỉ thêm ghi chú khóa mới trong takeoff (M101 §6.3 FR4)", async () => {
   const v5 = (await import("@/lib/ky-thuat/cad/rule-packs/v5.json")).default;
-  // Đọc v6 theo TÊN TỆP (không qua getCurrentRulePack) vì bản đang phát hành đã là v7 — ca này
-  // vẫn phải chứng minh đúng điều nó nói: v6 so với v5.
   const v6 = (await import("@/lib/ky-thuat/cad/rule-packs/v6.json")).default;
 
   for (const field of [
@@ -189,11 +190,14 @@ test("rule pack v6 là mở rộng thuần của v5: chỉ thêm ghi chú khóa 
   assert.deepEqual(v6.takeoff.items, v5.takeoff.items, "items của v6 lệch v5 — bóc sẽ ra số khác");
 });
 
-test("rule pack v7 = v6 + 2 item đếm giá đỡ/lỗ chờ + heavyFittingIds (M100 AC12/§6.7)", async () => {
+test("rule pack v7 là mở rộng thuần của v6: 3 khối chính sách chuẩn hóa (M101 §6.2 FR3)", async () => {
+  // v7 gộp bổ sung của HAI đợt làm song song: M101 PR2 (3 khối chính sách bước 9/10/11) và
+  // M100 PR5 (2 item đếm giá đỡ/lỗ chờ + drawTools.heavyFittingIds). Test này canh phần M101;
+  // phần M100 do test "v7 = v6 + 2 item đếm…" ở cuối file canh — nên `takeoff`/`drawTools`
+  // KHÔNG nằm trong vòng deepEqual dưới đây.
   const v6 = (await import("@/lib/ky-thuat/cad/rule-packs/v6.json")).default;
   const v7 = getCurrentRulePack();
 
-  // v7 KHÔNG đụng 11 khối còn lại — chỉ takeoff + drawTools được phép đổi.
   for (const field of [
     "layerMap",
     "fontMap",
@@ -207,75 +211,52 @@ test("rule pack v7 = v6 + 2 item đếm giá đỡ/lỗ chờ + heavyFittingIds 
     assert.deepEqual(
       v7[field],
       v6[field],
-      `Field ${field} của v7 lệch v6 — v7 chỉ được đụng takeoff/drawTools`,
+      `Field ${field} của v7 lệch v6 — v7 phải là mở rộng thuần (chuẩn hóa bằng v7 không đổi hành vi)`,
     );
   }
   assert.deepEqual(
     Object.keys(v7).filter((k) => !(k in v6)),
-    [],
-    "v7 không được thêm khối mới ở cấp gốc",
-  );
-
-  // takeoff: giữ nguyên toàn bộ item cũ (đúng thứ tự) + CỘNG THÊM đúng 2 item đếm ở CUỐI
-  // (first-match: item cũ vẫn giành trước ⇒ bản vẽ không có giá đỡ/sleeve bóc y hệt v6).
-  assert.deepEqual(
-    Object.keys(v7.takeoff).filter((k) => !(k in v6.takeoff)),
-    ["itemsCountV7"],
-    "v7 thêm nhiều hơn đúng 1 khóa mô tả itemsCountV7 trong takeoff",
-  );
-  const items7 = v7.takeoff.items as unknown as Record<string, unknown>[];
-  const items6 = v6.takeoff.items as unknown as Record<string, unknown>[];
-  assert.deepEqual(
-    items7.slice(0, items6.length),
-    items6,
-    "v7 đã sửa item cũ — khối lượng bóc sẽ đổi",
-  );
-  assert.deepEqual(
-    items7.slice(items6.length).map((i) => i.id),
-    ["support-hanger", "sleeve-opening"],
-    "v7 phải thêm ĐÚNG 2 item đếm ở cuối danh sách",
-  );
-  for (const item of items7.slice(items6.length)) {
-    assert.equal(
-      item.measure,
-      "count",
-      `item ${String(item.id)} phải là measure=count mới đếm block được`,
-    );
-    assert.deepEqual(
-      item.layerMatchAny,
-      [],
-      `item ${String(item.id)} phải để layerMatchAny rỗng — giá đỡ/sleeve nằm trên chính layer tuyến`,
-    );
-    assert.ok(
-      (item.blockNameMatchAny as string[]).length > 0,
-      `item ${String(item.id)} thiếu blockNameMatchAny — XBOSS_BOCKL không biết đếm block tên gì`,
-    );
-  }
-
-  // drawTools: chỉ thêm heavyFittingIds (+ ghi chú), id phải có thật trong fittings của một hệ.
-  assert.deepEqual(
-    Object.keys(v7.drawTools).filter((k) => !(k in v6.drawTools)),
-    ["heavyFittingIds", "heavyFittingIdsNote"],
-    "v7 thêm khóa lạ vào drawTools",
-  );
-  const moiPhuKien = new Set(v7.drawTools.systems.flatMap((s) => s.fittings));
-  assert.ok(
-    v7.drawTools.heavyFittingIds.length > 0,
-    "heavyFittingIds rỗng — XBOSS_VE_GIADO lại phải hỏi kỹ sư",
-  );
-  for (const id of v7.drawTools.heavyFittingIds) {
-    assert.ok(
-      moiPhuKien.has(id),
-      `heavyFittingIds["${id}"] đã trôi khỏi drawTools.systems[].fittings`,
-    );
-  }
-  assert.ok(
-    (v7.drawTools.heavyFittingIdsNote ?? "").length > 0,
-    "heavyFittingIds thiếu mô tả tiếng Việt",
+    ["xrefPolicy", "hatchMap", "layoutPolicy"],
+    "v7 thêm nhiều hơn đúng 3 khối chính sách của bước chuẩn hóa 9/10/11",
   );
 });
 
-test("v7 (kế thừa v6): không item nào bật khóa bóc nâng cao (hệ số quy đổi do dự án chốt)", () => {
+test("v7: cả 4 bước chuẩn hóa mới đều TẮT mặc định (M101 §6.2 — v7 mặc định = v6)", () => {
+  const pack = getCurrentRulePack();
+  assert.equal(pack.xrefPolicy.enabled, false, "bước 9 phải mặc định tắt");
+  assert.equal(pack.hatchMap.enabled, false, "bước 10 phải mặc định tắt");
+  assert.equal(pack.layoutPolicy.enabled, false, "bước 11 phải mặc định tắt");
+  // Bước 8 KHÔNG có cờ riêng (styleMap là dữ liệu, dùng chung với phép kiểm 14) — công tắc của nó
+  // là inspectionPolicy.styleDeviation.enabled, cũng đang tắt.
+  assert.equal(pack.inspectionPolicy.styleDeviation.enabled, false, "bước 8 phải mặc định tắt");
+
+  // Tham số then chốt: bật lên là dùng được ngay, không phải phát hành lại.
+  assert.equal(pack.xrefPolicy.pathPolicy, "relative");
+  assert.deepEqual(
+    pack.xrefPolicy.bindMatchAny,
+    [],
+    "bindMatchAny phải rỗng mặc định (không bind xref nào)",
+  );
+  assert.deepEqual(
+    pack.hatchMap.byLayer,
+    [],
+    "byLayer để rỗng: bộ mẫu hatch là quy ước riêng từng công ty",
+  );
+  assert.equal(pack.layoutPolicy.removeEmpty, true);
+  assert.equal(
+    pack.layoutPolicy.renameLayouts,
+    false,
+    "đổi tên layout hàng loạt phải là quyết định của cả tổ",
+  );
+  assert.match(pack.layoutPolicy.namePattern, /\{seq\}/);
+
+  // Mỗi khối mới phải tự tài liệu hóa bằng tiếng Việt ngay trong rule pack (M101 §18).
+  for (const khoi of [pack.xrefPolicy, pack.hatchMap, pack.layoutPolicy] as { note: string }[]) {
+    assert.ok(khoi.note.length > 0, "khối chính sách mới thiếu mô tả tiếng Việt");
+  }
+});
+
+test("v7 (kế thừa v6): không item nào bật khóa bóc nâng cao (bóc bằng v7 = bóc bằng v5)", () => {
   const items = getCurrentRulePack().takeoff.items as unknown as Record<string, unknown>[];
   for (const item of items) {
     for (const khoa of [
@@ -289,7 +270,7 @@ test("v7 (kế thừa v6): không item nào bật khóa bóc nâng cao (hệ s�
       assert.equal(
         khoa in item,
         false,
-        `item ${String(item.id)} khai sẵn "${khoa}" — v6 phải trung tính, hệ số do dự án chốt ở version sau`,
+        `item ${String(item.id)} khai sẵn "${khoa}" — v7 phải trung tính, hệ số do dự án chốt ở version sau`,
       );
     }
   }
@@ -307,7 +288,7 @@ test("v7 (kế thừa v6): không item nào bật khóa bóc nâng cao (hệ s�
   }
 });
 
-test("v6 (kế thừa v5): 7 phép kiểm mới đều có enabled và đều TẮT mặc định (M101 AC(a))", () => {
+test("v7 (kế thừa v5): 7 phép kiểm mới đều có enabled và đều TẮT mặc định (M101 AC(a))", () => {
   const ip = getCurrentRulePack().inspectionPolicy;
   const phepKiemMoi = [
     "overlapSameSystem",
@@ -333,7 +314,7 @@ test("v6 (kế thừa v5): 7 phép kiểm mới đều có enabled và đều T�
   assert.ok(ip.strayObjects.minEntitiesForExtents >= 4);
 });
 
-test("v6 (kế thừa v5): viewportScale.scales khớp sheetSetup.scales (một bộ tỉ lệ duy nhất, chống trôi)", () => {
+test("v7 (kế thừa v5): viewportScale.scales khớp sheetSetup.scales (một bộ tỉ lệ duy nhất, chống trôi)", () => {
   const pack = getCurrentRulePack();
   assert.deepEqual(
     [...pack.inspectionPolicy.viewportScale.scales].sort((a, b) => a - b),
@@ -342,7 +323,7 @@ test("v6 (kế thừa v5): viewportScale.scales khớp sheetSetup.scales (một 
   );
 });
 
-test("v6 (kế thừa v5): styleMap khai bộ style chuẩn dùng chung cho phép kiểm 14 và bước chuẩn hóa 8", () => {
+test("v7 (kế thừa v5): styleMap khai bộ style chuẩn dùng chung cho phép kiểm 14 và bước chuẩn hóa 8", () => {
   const sm = getCurrentRulePack().styleMap;
   assert.ok(sm.textStyle.name.length > 0 && sm.textStyle.fontFile.length > 0);
   assert.ok(sm.dimStyle.name.length > 0);
@@ -468,6 +449,9 @@ test("route rule-pack: có force-dynamic, chặn 401/403 và trả 304 theo If-N
     "drawTools:",
     "sheetSetup:",
     "styleMap:",
+    "xrefPolicy:",
+    "hatchMap:",
+    "layoutPolicy:",
   ]) {
     assert.ok(src.includes(field), `Response thiếu ${field}`);
   }
@@ -681,4 +665,92 @@ test("flattenPolicy: ép Z về 0 trong WCS, giữ nguyên hình chiếu XY (AC3
   assert.equal(f.coordinateSystem, "WCS");
   // Ghi rõ đây là chuẩn đích cho plugin, chưa có triển khai ép Z phía server.
   assert.match(f.note, /CHƯA CHẮC/);
+});
+
+test("rule pack v7 = v6 + 2 item đếm giá đỡ/lỗ chờ + heavyFittingIds (M100 AC12/§6.7)", async () => {
+  const v6 = (await import("@/lib/ky-thuat/cad/rule-packs/v6.json")).default;
+  const v7 = getCurrentRulePack();
+
+  // v7 KHÔNG đụng 11 khối còn lại — chỉ takeoff + drawTools được phép đổi.
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "inspectionPolicy",
+    "styleMap",
+    "sheetSetup",
+  ] as const) {
+    assert.deepEqual(
+      v7[field],
+      v6[field],
+      `Field ${field} của v7 lệch v6 — v7 chỉ được đụng takeoff/drawTools`,
+    );
+  }
+  // 3 khối gốc mới là phần của M101 PR2 (bước chuẩn hóa 9/10/11), đã có test riêng ở trên;
+  // ở đây chỉ khẳng định đợt M100 PR5 KHÔNG thêm khối gốc nào ngoài 3 khối đó.
+  assert.deepEqual(
+    Object.keys(v7).filter((k) => !(k in v6)),
+    ["xrefPolicy", "hatchMap", "layoutPolicy"],
+    "v7 chỉ được thêm 3 khối chính sách chuẩn hóa ở cấp gốc",
+  );
+
+  // takeoff: giữ nguyên toàn bộ item cũ (đúng thứ tự) + CỘNG THÊM đúng 2 item đếm ở CUỐI
+  // (first-match: item cũ vẫn giành trước ⇒ bản vẽ không có giá đỡ/sleeve bóc y hệt v6).
+  assert.deepEqual(
+    Object.keys(v7.takeoff).filter((k) => !(k in v6.takeoff)),
+    ["itemsCountV7"],
+    "v7 thêm nhiều hơn đúng 1 khóa mô tả itemsCountV7 trong takeoff",
+  );
+  const items7 = v7.takeoff.items as unknown as Record<string, unknown>[];
+  const items6 = v6.takeoff.items as unknown as Record<string, unknown>[];
+  assert.deepEqual(
+    items7.slice(0, items6.length),
+    items6,
+    "v7 đã sửa item cũ — khối lượng bóc sẽ đổi",
+  );
+  assert.deepEqual(
+    items7.slice(items6.length).map((i) => i.id),
+    ["support-hanger", "sleeve-opening"],
+    "v7 phải thêm ĐÚNG 2 item đếm ở cuối danh sách",
+  );
+  for (const item of items7.slice(items6.length)) {
+    assert.equal(
+      item.measure,
+      "count",
+      `item ${String(item.id)} phải là measure=count mới đếm block được`,
+    );
+    assert.deepEqual(
+      item.layerMatchAny,
+      [],
+      `item ${String(item.id)} phải để layerMatchAny rỗng — giá đỡ/sleeve nằm trên chính layer tuyến`,
+    );
+    assert.ok(
+      (item.blockNameMatchAny as string[]).length > 0,
+      `item ${String(item.id)} thiếu blockNameMatchAny — XBOSS_BOCKL không biết đếm block tên gì`,
+    );
+  }
+
+  // drawTools: chỉ thêm heavyFittingIds (+ ghi chú), id phải có thật trong fittings của một hệ.
+  assert.deepEqual(
+    Object.keys(v7.drawTools).filter((k) => !(k in v6.drawTools)),
+    ["heavyFittingIds", "heavyFittingIdsNote"],
+    "v7 thêm khóa lạ vào drawTools",
+  );
+  const moiPhuKien = new Set(v7.drawTools.systems.flatMap((s) => s.fittings));
+  assert.ok(
+    v7.drawTools.heavyFittingIds.length > 0,
+    "heavyFittingIds rỗng — XBOSS_VE_GIADO lại phải hỏi kỹ sư",
+  );
+  for (const id of v7.drawTools.heavyFittingIds) {
+    assert.ok(
+      moiPhuKien.has(id),
+      `heavyFittingIds["${id}"] đã trôi khỏi drawTools.systems[].fittings`,
+    );
+  }
+  assert.ok(
+    (v7.drawTools.heavyFittingIdsNote ?? "").length > 0,
+    "heavyFittingIds thiếu mô tả tiếng Việt",
+  );
 });
