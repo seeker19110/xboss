@@ -253,6 +253,16 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('plugin-autocad/**/*.csproj') }}
 
+      - name: Kiểm .NET SDK trên runner (chống trôi theo image runner)
+        run: |
+          set -e
+          VER=$(dotnet --version)
+          echo "dotnet SDK: $VER"
+          case "$VER" in
+            8.*) ;;
+            *) echo "::error::Cần .NET SDK 8.x (Core/Tests là net8.0) — runner đang có $VER. Ghim actions/setup-dotnet hoặc cập nhật TargetFramework."; exit 1 ;;
+          esac
+
       - name: Test XBoss.Cad.Core (xunit)
         run: dotnet test plugin-autocad/XBoss.Cad.Tests/XBoss.Cad.Tests.csproj -c Release
 
@@ -289,6 +299,16 @@ jobs:
 
       # Log in ra số tệp Adapter đã biên dịch (target KiemGlobAdapterKhongRong) — glob không
       # khớp tệp nào thì đỏ, không "xanh trên hư không".
+      - name: Kiểm .NET SDK trên runner (chống trôi theo image runner)
+        run: |
+          set -e
+          VER=$(dotnet --version)
+          echo "dotnet SDK: $VER"
+          case "$VER" in
+            8.*) ;;
+            *) echo "::error::Cần .NET SDK 8.x (Core/Tests là net8.0) — runner đang có $VER. Ghim actions/setup-dotnet hoặc cập nhật TargetFramework."; exit 1 ;;
+          esac
+
       - name: Biên dịch thử toàn bộ XBoss.Cad.Acad bằng stub
         run: dotnet build plugin-autocad/XBoss.Cad.AcadShim/XBoss.Cad.AcadShim.csproj -c Release
 
