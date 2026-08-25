@@ -257,7 +257,11 @@ internal static class BlockLibraryService
         try
         {
             var etag = EtagCu();
-            var (json, etagMoi) = await client.FetchBlockLibManifestAsync(token, etag);
+            // ?v=<version đang cache> đi KÈM ETag chứ không thay ETag (M104 §2): ETag lo việc
+            // "không đổi thì đừng gửi lại", còn v lo việc nói thẳng "bản trên máy đã cũ" — server
+            // trả 404 kèm version hiện hành thay vì im lặng đưa bản khác. Client tự hỏi lại lần
+            // hai không kèm v, nên luồng vẫn là "cũ thì tự lấy bản mới".
+            var (json, etagMoi) = await client.FetchBlockLibManifestAsync(token, etag, VersionCache());
             if (json is null && File.Exists(ManifestPath) && File.Exists(DwgPath))
             {
                 var (cu, loi) = HienHanh();
@@ -283,7 +287,12 @@ internal static class BlockLibraryService
                     return (false, "Server báo thư viện block không đổi nhưng máy chưa có cache — thử lại sau.");
             }
 
-            var (dwg, _) = await client.FetchBlockLibDwgAsync(token);
+            // Chốt tệp .dwg theo ĐÚNG version của manifest vừa nhận: máy chủ phát hành bản mới xen
+            // giữa hai lời gọi thì server báo lệch version thay vì đưa tệp của bản kia — ghép nhầm
+            // cặp chỉ lộ ra sau đó dưới dạng "hash lệch" khó truy nguyên. Load ở đây rẻ (JSON nhỏ)
+            // và không ghi gì vào cache; GhiCache vẫn kiểm lại đầy đủ như cũ.
+            var versionMoi = BlockManifestLoader.Load(json).Version;
+            var (dwg, _) = await client.FetchBlockLibDwgAsync(token, null, versionMoi);
             if (dwg is null || dwg.Length == 0) return (false, "Server không trả được tệp .dwg thư viện block.");
 
             var manifest = GhiCache(json, dwg, etagMoi);
@@ -359,6 +368,12 @@ internal static class BlockLibraryService
                string.Join("; ", hong) +
                ". Nhờ Admin/PM kiểm lại trên web rồi chạy lại XBOSS_LOGIN.";
     }
+
+    /// <summary>
+    /// Version thư viện đang nằm trong cache để gắn <c>?v=</c> khi hỏi server; null khi máy chưa
+    /// có cache hoặc manifest cache hỏng (lúc đó không gửi <c>v</c>, hỏi như lần đầu).
+    /// </summary>
+    private static string? VersionCache() => ManifestCache()?.Version;
 
     /// <summary>Manifest trong cache, KHÔNG kiểm hash tệp — chỉ để biết cần bù tệp lẻ nào.</summary>
     private static BlockManifest? ManifestCache()
