@@ -3310,6 +3310,38 @@
 - `cad_block_libs_version_key`: UNIQUE INDEX cad_block_libs_version_key ON public.cad_block_libs USING btree (version)
 - `idx_cad_block_libs_moi_nhat`: INDEX idx_cad_block_libs_moi_nhat ON public.cad_block_libs USING btree (id DESC)
 
+### cad_block_proposals
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('cad_block_proposals_id_seq'::regclass)` |
+| block_name | text |  |  |
+| kind | text |  |  |
+| system_id | text | ✓ |  |
+| takeoff_item_id | text | ✓ |  |
+| paper_size | text | ✓ |  |
+| note | text | ✓ |  |
+| base_lib_version | text |  |  |
+| candidate_manifest | jsonb |  |  |
+| candidate_storage_key | text |  |  |
+| candidate_dwg_sha256 | text |  |  |
+| preview_svg | text | ✓ |  |
+| status | text |  | `'pending'::text` |
+| reject_reason | text | ✓ |  |
+| published_version | text | ✓ |  |
+| proposed_by | integer |  |  |
+| decided_by | integer | ✓ |  |
+| decided_at | timestamptz | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `decided_by` → `users(id)`
+- `proposed_by` → `users(id)`
+
+**Index:**
+- `cad_block_proposals_pkey`: UNIQUE INDEX cad_block_proposals_pkey ON public.cad_block_proposals USING btree (id)
+- `idx_cad_block_proposals_status`: INDEX idx_cad_block_proposals_status ON public.cad_block_proposals USING btree (status)
+
 ### cad_device_pairings
 
 | Cột | Kiểu | Null | Default |

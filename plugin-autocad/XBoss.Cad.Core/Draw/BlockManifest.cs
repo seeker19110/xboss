@@ -45,6 +45,28 @@ public sealed class BlockDef
     /// <summary>Khổ giấy của khung tên (chỉ kind = titleblock).</summary>
     [JsonPropertyName("paper")] public string? Paper { get; init; }
 
+    /// <summary>
+    /// M104 §1 — khoá tệp .dwg RIÊNG của block trong kho lưu trữ máy chủ. Block thêm thẳng từ web
+    /// nằm ở tệp lẻ vì máy chủ không chạy AutoCAD nên không gộp được định nghĩa vào tệp nền.
+    /// VẮNG trường này = block nằm trong <c>blocks.dwg</c> nền như cũ ⇒ mọi manifest phát hành
+    /// trước M104 chạy y nguyên, không đổi một hành vi nào.
+    /// Plugin tải tệp lẻ qua <c>GET /api/engineering/cad/block-lib?file=&lt;fileKey&gt;</c> và cache
+    /// tại <c>%APPDATA%\XBoss\block-lib\files\&lt;fileKey&gt;</c>.
+    /// </summary>
+    [JsonPropertyName("fileKey")] public string? FileKey { get; init; }
+
+    /// <summary>
+    /// sha256 (hex thường) của tệp lẻ ở <see cref="FileKey"/> — kiểm y hệt tệp nền, lệch là từ chối
+    /// thẳng (M100 §12). Đi CẶP với <see cref="FileKey"/>: có khoá thì phải có hash và ngược lại.
+    /// </summary>
+    [JsonPropertyName("fileSha256")] public string? FileSha256 { get; init; }
+
+    // Khóa "previewSvg" (ảnh xem trước cho web, M104 §2) CỐ Ý không model ở đây: plugin không cần
+    // ảnh, mà loader bỏ qua field lạ nên nó vẫn đi qua nguyên vẹn khi dựng manifest ứng viên.
+
+    /// <summary>Block nằm ở tệp .dwg RIÊNG (thêm từ web), không nằm trong tệp nền.</summary>
+    [JsonIgnore] public bool CoTepRieng => !string.IsNullOrWhiteSpace(FileKey);
+
     [JsonIgnore]
     public BlockKind KindEnum => Kind switch
     {
@@ -84,6 +106,12 @@ public sealed class BlockManifest
 
     /// <summary>Các block cùng một loại — vd mọi khung tên để chọn theo khổ giấy.</summary>
     public IEnumerable<BlockDef> TheoLoai(BlockKind kind) => Blocks.Where(b => b.KindEnum == kind);
+
+    /// <summary>
+    /// Các block nằm ở tệp .dwg riêng (M104 §1) — plugin phải tải + kiểm hash từng tệp trước khi
+    /// coi thư viện là dùng được. Rỗng với mọi thư viện phát hành trước M104.
+    /// </summary>
+    public IEnumerable<BlockDef> TepRieng() => Blocks.Where(b => b.CoTepRieng);
 
     /// <summary>
     /// Block thiết bị ứng với một id khai trong <c>drawTools.systems[].equipment[]</c> (id đó là
@@ -187,6 +215,29 @@ public static class BlockManifestLoader
                 if (string.IsNullOrWhiteSpace(a))
                     throw new BlockManifestException($"Block \"{b.Id}\" có thuộc tính rỗng trong \"attributes\".");
             }
+
+            // M104 §1 — cặp fileKey/fileSha256 của block thêm từ web. Cả hai đều TÙY CHỌN (manifest
+            // cũ không có gì phải kiểm), nhưng đã khai thì phải khai đủ và đúng khuôn: khoá được
+            // dùng làm TÊN TỆP trong cache nên manifest hỏng/bị tráo không được trỏ ra ngoài
+            // thư mục cache; hash thiếu thì không có gì để đối chiếu ⇒ mất luôn lớp chống tráo tệp.
+            if (b.CoTepRieng)
+            {
+                if (!LaKhoaTepHopLe(b.FileKey))
+                {
+                    throw new BlockManifestException(
+                        $"Block \"{b.Id}\": \"fileKey\" không hợp lệ (chỉ nhận chữ/số/. _ - , không chứa đường dẫn).");
+                }
+                if (!LaSha256Hex(b.FileSha256 ?? ""))
+                {
+                    throw new BlockManifestException(
+                        $"Block \"{b.Id}\": có \"fileKey\" thì phải kèm \"fileSha256\" (64 ký tự hex của tệp lẻ).");
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(b.FileSha256))
+            {
+                throw new BlockManifestException(
+                    $"Block \"{b.Id}\": khai \"fileSha256\" nhưng thiếu \"fileKey\" — hash không trỏ tới tệp nào.");
+            }
         }
     }
 
@@ -215,6 +266,49 @@ public static class BlockManifestLoader
         if (!File.Exists(duongDanDwg))
             throw new BlockManifestException($"Không thấy tệp thư viện block: {duongDanDwg}");
         KiemTraHashTep(manifest, File.ReadAllBytes(duongDanDwg));
+    }
+
+    /// <summary>
+    /// Đối chiếu hash tệp .dwg LẺ của một block thêm từ web (M104 §1) với <c>fileSha256</c> khai
+    /// trong manifest. Lệch → ném lỗi: y hệt tệp nền, KHÔNG "dùng tạm" (M100 §12) — một định nghĩa
+    /// block sai đẻ ra hàng loạt bản vẽ shop sai mà chỉ lộ ra lúc bóc khối lượng.
+    /// </summary>
+    public static void KiemTraHashTepLe(BlockDef def, byte[] noiDung)
+    {
+        if (!def.CoTepRieng)
+            throw new BlockManifestException($"Block \"{def.Id}\" không khai \"fileKey\" nên không có tệp lẻ để kiểm.");
+        var that = TinhSha256(noiDung);
+        if (!string.Equals(that, def.FileSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new BlockManifestException(
+                $"Tệp block \"{def.BlockName}\" không khớp manifest (manifest {Rut(def.FileSha256 ?? "")}, tệp {Rut(that)}) — " +
+                "tải lại thư viện bằng XBOSS_LOGIN hoặc nạp tay bằng XBOSS_VE_THUVIEN.");
+        }
+    }
+
+    /// <summary>Bản đọc từ đĩa của <see cref="KiemTraHashTepLe(BlockDef, byte[])"/> (tệp cache cục bộ).</summary>
+    public static void KiemTraHashTepLe(BlockDef def, string duongDanDwg)
+    {
+        if (!File.Exists(duongDanDwg))
+            throw new BlockManifestException($"Không thấy tệp block \"{def.BlockName}\" trong cache: {duongDanDwg}");
+        KiemTraHashTepLe(def, File.ReadAllBytes(duongDanDwg));
+    }
+
+    /// <summary>
+    /// <c>fileKey</c> có dùng làm TÊN TỆP trong cache được không (M104 §1): chỉ chữ/số và
+    /// <c>. _ -</c>, không rỗng, không phải <c>.</c>/<c>..</c>, không quá 200 ký tự. Manifest là
+    /// dữ liệu tải từ mạng về, nên khoá phải bị ràng — không có đường nào ghi/đọc ra ngoài
+    /// <c>%APPDATA%\XBoss\block-lib\files\</c>.
+    ///
+    /// CỐ Ý không ràng đúng tiền tố <c>blocklib-</c> mà máy chủ đang sinh: đổi cách đặt tên bên máy
+    /// chủ sẽ khiến mọi plugin đã cài từ chối NGUYÊN thư viện, trong khi không chặn thêm được gì —
+    /// lớp an toàn thật nằm ở "không có ký tự đường dẫn" cộng với đối chiếu sha256.
+    /// </summary>
+    public static bool LaKhoaTepHopLe(string? fileKey)
+    {
+        if (string.IsNullOrWhiteSpace(fileKey) || fileKey.Length > 200) return false;
+        if (fileKey is "." or "..") return false;
+        return fileKey.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-');
     }
 
     private static string Rut(string hash) => hash.Length <= 12 ? hash : hash[..12] + "…";

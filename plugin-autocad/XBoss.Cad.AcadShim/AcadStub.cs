@@ -822,6 +822,7 @@ namespace Autodesk.AutoCAD.ApplicationServices
         public Editor Editor => new Editor();
         public Database Database => new Database();
         public DocumentLock LockDocument() => new DocumentLock();
+        public void SendStringToExecute(string command, bool activate, bool wrapUpInactiveDoc, bool echoCommand) { }
     }
 
     public class DocumentCollection : IEnumerable
@@ -834,6 +835,13 @@ namespace Autodesk.AutoCAD.ApplicationServices
     {
         public static DocumentCollection DocumentManager => new DocumentCollection();
         public static object GetSystemVariable(string name) => "25.1";
+
+        /// <summary>
+        /// acmgd: <c>public static DialogResult ShowModalDialog(Form formToShow)</c> — mở hộp thoại
+        /// WinForms modal do AutoCAD làm chủ cửa sổ cha (M103: hộp thoại đề xuất block).
+        /// </summary>
+        public static System.Windows.Forms.DialogResult ShowModalDialog(System.Windows.Forms.Form formToShow) =>
+            System.Windows.Forms.DialogResult.Cancel;
     }
 
     namespace Core
@@ -872,6 +880,86 @@ namespace Autodesk.AutoCAD.Windows2
 {
 }
 
+// PaletteSet (bảng điều khiển M102) — nằm trong acmgd.dll, namespace Autodesk.AutoCAD.Windows.
+namespace Autodesk.AutoCAD.Windows
+{
+    [Flags]
+    public enum PaletteSetStyles
+    {
+        NameEditable = 1, ShowPropertiesMenu = 2, ShowAutoHideButton = 4, ShowCloseButton = 8,
+        Snappable = 16, SingleColDock = 32, SingleRowDock = 64, NoTitleBar = 128, UsePaletteNameAsTitleForSingle = 256,
+    }
+
+    public class PaletteSet
+    {
+        public PaletteSet(string name) { }
+        public PaletteSet(string name, Guid toolId) { }
+        public PaletteSetStyles Style { get; set; }
+        public System.Drawing.Size MinimumSize { get; set; }
+        public System.Drawing.Size Size { get; set; }
+        public bool Visible { get; set; }
+        public int Add(string name, System.Windows.Forms.Control control) => 0;
+    }
+}
+
+// Ribbon API (M102) — AdWindows.dll, namespace Autodesk.Windows (xây trên WPF).
+namespace Autodesk.Windows
+{
+    using System.Collections.ObjectModel;
+
+    public enum RibbonItemSize { Standard, Large }
+
+    public class RibbonItemEventArgs : EventArgs
+    {
+        public RibbonItem Item => null;
+    }
+
+    public class RibbonItem
+    {
+        public string Id { get; set; }
+        public string Text { get; set; }
+        public bool ShowText { get; set; }
+        public bool ShowImage { get; set; }
+        public RibbonItemSize Size { get; set; }
+        public object ToolTip { get; set; }
+        public System.Windows.Input.ICommand CommandHandler { get; set; }
+        public object CommandParameter { get; set; }
+    }
+
+    public class RibbonButton : RibbonItem { }
+
+    public class RibbonPanelSource
+    {
+        public string Title { get; set; }
+        public Collection<RibbonItem> Items { get; } = new Collection<RibbonItem>();
+    }
+
+    public class RibbonPanel
+    {
+        public RibbonPanelSource Source { get; set; }
+    }
+
+    public class RibbonTab
+    {
+        public string Id { get; set; }
+        public string Title { get; set; }
+        public bool IsVisible { get; set; }
+        public Collection<RibbonPanel> Panels { get; } = new Collection<RibbonPanel>();
+    }
+
+    public class RibbonControl
+    {
+        public Collection<RibbonTab> Tabs { get; } = new Collection<RibbonTab>();
+        public RibbonTab FindTab(string id) => null;
+    }
+
+    public static class ComponentManager
+    {
+        public static RibbonControl Ribbon => null;
+        public static event EventHandler<RibbonItemEventArgs> ItemInitialized { add { } remove { } }
+    }
+}
+
 // Adapter thật build với <UseWindowsForms>true</UseWindowsForms> nên có sẵn WinForms; project
 // stub chạy trên Linux (net8.0, không WinForms) nên phải tự khai đúng phần Adapter chạm tới.
 namespace System.Windows.Forms
@@ -885,5 +973,147 @@ namespace System.Windows.Forms
         public string SelectedPath => "";
         public DialogResult ShowDialog() => DialogResult.Cancel;
         public void Dispose() { }
+    }
+
+    // ── Control cho bảng điều khiển M102 (BangDieuKhienControl) ──
+    // Chỉ khai đúng phần Adapter chạm tới; Color/Size/Point lấy từ System.Drawing.Primitives
+    // (có sẵn trong net8), riêng Font/FontStyle stub ở namespace System.Drawing bên dưới.
+
+    public enum DockStyle { None, Top, Bottom, Left, Right, Fill }
+    public enum FlowDirection { LeftToRight, TopDown, RightToLeft, BottomUp }
+    public enum FlatStyle { Flat, Popup, Standard, System }
+
+    public struct Padding
+    {
+        public Padding(int all) { }
+        public Padding(int left, int top, int right, int bottom) { }
+    }
+
+    public class Control : IDisposable
+    {
+        public class ControlCollection
+        {
+            public void Add(Control value) { }
+            public void Clear() { }
+        }
+
+        public ControlCollection Controls { get; } = new ControlCollection();
+        public System.Drawing.Color BackColor { get; set; }
+        public System.Drawing.Color ForeColor { get; set; }
+        public DockStyle Dock { get; set; }
+        public string Text { get; set; }
+        public System.Drawing.Font Font { get; set; }
+        public bool AutoSize { get; set; }
+        public bool Enabled { get; set; }
+        public bool Visible { get; set; }
+        public System.Drawing.Point Location { get; set; }
+        public System.Drawing.Size Size { get; set; }
+        public Padding Margin { get; set; }
+        public Padding Padding { get; set; }
+        public System.Drawing.Size MaximumSize { get; set; }
+        public event EventHandler Click { add { } remove { } }
+        public event EventHandler TextChanged { add { } remove { } }
+        public void SuspendLayout() { }
+        public void ResumeLayout() { }
+        public void Dispose() { }
+    }
+
+    public class ScrollableControl : Control
+    {
+        public bool AutoScroll { get; set; }
+    }
+
+    /// <summary>WinForms thật: <c>ContainerControl : ScrollableControl</c>, cha của Form/UserControl.</summary>
+    public class ContainerControl : ScrollableControl { }
+
+    public class UserControl : ContainerControl { }
+    public class Label : Control { }
+
+    /// <summary>WinForms thật: nút hành động của Form (AcceptButton/CancelButton nhận kiểu này).</summary>
+    public interface IButtonControl
+    {
+        DialogResult DialogResult { get; set; }
+        void NotifyDefault(bool value);
+        void PerformClick();
+    }
+
+    public class Button : Control, IButtonControl
+    {
+        public FlatStyle FlatStyle { get; set; }
+        public DialogResult DialogResult { get; set; }
+        public void NotifyDefault(bool value) { }
+        public void PerformClick() { }
+    }
+
+    public class Panel : ScrollableControl { }
+
+    public class FlowLayoutPanel : Panel
+    {
+        public FlowDirection FlowDirection { get; set; }
+        public bool WrapContents { get; set; }
+    }
+
+    // ── Hộp thoại đề xuất block (M103): Form + ô nhập ──
+
+    public enum FormBorderStyle { None, FixedSingle, Fixed3D, FixedDialog, Sizable, FixedToolWindow, SizableToolWindow }
+
+    public enum FormStartPosition { Manual, CenterScreen, WindowsDefaultLocation, WindowsDefaultBounds, CenterParent }
+
+    public enum ComboBoxStyle { Simple, DropDown, DropDownList }
+
+    public class Form : ContainerControl
+    {
+        public FormBorderStyle FormBorderStyle { get; set; }
+        public FormStartPosition StartPosition { get; set; }
+        public bool MaximizeBox { get; set; }
+        public bool MinimizeBox { get; set; }
+        public System.Drawing.Size ClientSize { get; set; }
+        public IButtonControl AcceptButton { get; set; }
+        public IButtonControl CancelButton { get; set; }
+        public DialogResult DialogResult { get; set; }
+        public DialogResult ShowDialog() => DialogResult.Cancel;
+        public void Close() { }
+    }
+
+    public class TextBoxBase : Control
+    {
+        public bool Multiline { get; set; }
+        public bool ReadOnly { get; set; }
+    }
+
+    public class TextBox : TextBoxBase { }
+
+    public class ListControl : Control { }
+
+    public class ComboBox : ListControl
+    {
+        /// <summary>WinForms thật: <c>ComboBox.ObjectCollection</c> — Add trả về chỉ số của mục.</summary>
+        public class ObjectCollection : IEnumerable<object>
+        {
+            public int Count => 0;
+            public object this[int i] => null;
+            public int Add(object item) => 0;
+            public void Clear() { }
+            public IEnumerator<object> GetEnumerator() => new List<object>().GetEnumerator();
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        }
+
+        public ObjectCollection Items { get; } = new ObjectCollection();
+        public ComboBoxStyle DropDownStyle { get; set; }
+        public int SelectedIndex { get; set; }
+        public object SelectedItem { get; set; }
+        public event EventHandler SelectedIndexChanged { add { } remove { } }
+    }
+}
+
+// Font không nằm trong System.Drawing.Primitives (net8 Linux) — stub riêng cho bảng M102.
+namespace System.Drawing
+{
+    public enum FontStyle { Regular = 0, Bold = 1, Italic = 2, Underline = 4, Strikeout = 8 }
+
+    public class Font
+    {
+        public Font(string familyName, float emSize) { }
+        public Font(string familyName, float emSize, FontStyle style) { }
     }
 }

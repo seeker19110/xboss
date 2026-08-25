@@ -11,12 +11,14 @@ import {
   etagBlockLib,
   phatHanhBlockLib,
 } from "@/lib/ky-thuat/cad/block-lib";
+import { timBlockLeTheoKhoa, docTepBlockLe } from "@/lib/ky-thuat/cad/block-them-web";
 
 export const dynamic = "force-dynamic";
 
 // /api/engineering/cad/block-lib — Thư viện block chuẩn của bộ lệnh vẽ XBOSS_VE_* (M100 PR2, §10).
 //
-// GET  tải thư viện đang phát hành: mặc định trả tệp `.dwg`, `?manifest=1` trả JSON manifest.
+// GET  tải thư viện đang phát hành: mặc định trả tệp `.dwg`, `?manifest=1` trả JSON manifest,
+//      `?file=<fileKey>` trả tệp `.dwg` lẻ của block thêm từ web (thư viện đa tệp — M104 §1/§2).
 //      Auth như GET /api/engineering/cad/rule-pack — Bearer token scope 'cad' của plugin
 //      (XBOSS_LOGIN) hoặc phiên web, quyền qua CAN.viewEngineeringGraph. ETag theo version + hash
 //      tệp để plugin cache cục bộ (M100 AC8).
@@ -36,6 +38,43 @@ export async function GET(req: NextRequest) {
   }
   if (!CAN.viewEngineeringGraph(user.role)) {
     return NextResponse.json({ error: "Không có quyền tải thư viện block CAD" }, { status: 403 });
+  }
+
+  // M104 §2 — `?file=<fileKey>`: tải tệp .dwg LẺ của một block thêm từ web (thư viện đa tệp).
+  // Chỉ phục vụ khoá có mặt trong manifest của một version (lib tự kiểm), nên không đọc được tệp
+  // tuỳ ý trong kho lưu trữ.
+  const fileKey = req.nextUrl.searchParams.get("file");
+  if (fileKey) {
+    const le = await timBlockLeTheoKhoa(fileKey);
+    if (!le) {
+      return NextResponse.json(
+        { error: "Không có tệp block nào mang khoá này trong thư viện" },
+        { status: 404 },
+      );
+    }
+    const etagLe = `"${le.entry.fileSha256?.slice(0, 32) ?? le.version}"`;
+    if (matchesEtag(req.headers.get("if-none-match"), etagLe)) {
+      return new NextResponse(null, { status: 304, headers: { ETag: etagLe } });
+    }
+    const tepLe = await docTepBlockLe(fileKey);
+    if (!tepLe) {
+      return NextResponse.json(
+        { error: `Tệp block "${le.entry.blockName}" không còn trên kho lưu trữ` },
+        { status: 404 },
+      );
+    }
+    return new NextResponse(new Uint8Array(tepLe), {
+      headers: {
+        ETag: etagLe,
+        "X-Block-Lib-Version": le.version,
+        "X-Block-File-Sha256": le.entry.fileSha256 ?? "",
+        "Content-Type": "application/acad",
+        "Content-Length": String(tepLe.length),
+        // Tên tệp gợi ý lấy từ id manifest — lọc về [A-Za-z0-9._-] để không chèn được ký tự lạ
+        // vào header (id là dữ liệu người phát hành đặt).
+        "Content-Disposition": `attachment; filename="${le.entry.id.replace(/[^A-Za-z0-9._-]/g, "-")}.dwg"`,
+      },
+    });
   }
 
   const row = await layBlockLibHienHanh();

@@ -4,6 +4,76 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M103 — Đề xuất block vào thư viện từ AutoCAD (hàng chờ + duyệt) (2026-08-25)
+
+Người dùng chốt 4 quyết định (đường thêm = từ AutoCAD; hàng chờ + duyệt; engineer trở lên đề
+xuất, Admin/PM duyệt; metadata bắt buộc đủ, trùng tên từ chối). Đặc tả:
+`docs/nang-cap/M103-de-xuat-block-thu-vien.md`. Kiến trúc "thư viện ứng viên": plugin dựng sẵn
+blocks.dwg + manifest hoàn chỉnh, duyệt trên web chỉ là thao tác dữ liệu thuần.
+
+- **Server (đã xong):** migration `0141_cad_block_proposals.sql`; `lib/ky-thuat/cad/block-proposals.ts`
+  - `block-preview-svg.ts` (preview SVG thuần từ sidecar DXF); 3 route
+    `/api/engineering/cad/block-proposals` (+ `/approve`, `/reject`); chống đua version bằng
+    `base_lib_version` + `pg_advisory_xact_lock`; 16 ca test `tests/cad-block-proposals.test.ts`
+    (verify trên Postgres 16 thật). Đã qua reviewer, vá 2 phát hiện (khoá advisory khi duyệt song
+    song, đo meta theo byte UTF-8).
+- **Web (đã xong):** mục "Đề Xuất Chờ Duyệt" trong `ThuVienBlockPanel` — preview SVG nhúng an
+  toàn qua data URI, nút Duyệt/Từ chối theo `laNguoiDuyet` server trả về.
+- **Plugin (đã xong):** lệnh `XBOSS_VE_DEXUAT` (Commands/VeDeXuatCommands.cs), dialog `Ui/DeXuatBlockDialog.cs`, builder `Services/BlockUngVienBuilder.cs`; khối "Thư viện block" mới trên `XBOSS_BANG`, 491→524 test dotnet xanh; vá multipart WHATWG cho cả `UploadAsync` (M99).
+
+## M104 — Thêm block trực tiếp từ web (2026-08-25)
+
+Mở rộng mô hình thư viện từ M103: entry manifest thêm 2 trường tuỳ chọn `fileKey`/`fileSha256` lưu tệp DWG lẻ trong `data/uploads/` (tương thích ngược 100%: entry cũ không `fileKey` vẫn khớp nằm trong `blocks.dwg` nền). Đặc tả: `docs/nang-cap/M104-them-block-truc-tiep-tu-web.md`.
+
+- **Server (đã xong):** route `POST /api/engineering/cad/block-lib/blocks` (phiên web, admin/pm/engineer, kèm advisory lock chống đua); mở rộng `GET /api/engineering/cad/block-lib?file=<fileKey>` lấy tệp lẻ (kiểm fileKey thuộc manifest); khớp metadata/trùng tên với M103 validator; 15 ca test `tests/cad-block-lib-blocks.test.ts` + hồi quy thư viện cũ. Audit `published_by`.
+- **Web (đã xong):** nút "Thêm Block Từ Web" trong `ThuVienBlockPanel`, form kéo-thả DWG+DXF, metadata như M103, version sinh NGAY.
+- **Plugin (đã xong cùng ngày):** cache `block-lib\files\<fileKey>` + ETag từng tệp, kiểm sha256 HAI lần (lúc nạp và ngay trước `WblockClone`), `HienHanh()` đòi đủ tệp lẻ; 547 test dotnet xanh, client đối chứng với response thật của route.
+
+## Audit "kịch trần CAD 2D" + đóng doc drift M101 PR5 (2026-08-25)
+
+Rà lại toàn bộ đợt plugin theo yêu cầu người dùng ("kiểm tra lại mọi tính năng đã kịch trần chưa"):
+
+- **Phát hiện doc drift:** M101 PR5 (`XBOSS_BATCH` chế độ `BocKL` → 1 Excel tổng cột "Tệp";
+  `XBOSS_UPLOAD` gửi kèm sidecar KL; server lưu `standardize_report.takeoff` + web hiện KL theo
+  revision + `GET /api/engineering/cad/takeoff-export`) **đã code đầy đủ cả 2 tầng kèm test**
+  (`BoqExcelWriterBatchTests`, `XBossUploadClientTests`, `tests/cad-plugin-upload.test.ts`,
+  `tests/cad-bang-dieu-khien.test.ts`) nhưng tài liệu vẫn ghi "PR5 chưa" — đã sửa
+  `docs/nang-cap/README.md` + State `M101-plugin-nang-tran.md` (M101 XONG cả 5 PR).
+- **Kết luận trần hiện tại:** M99 (9→16 phép kiểm, 7→11 bước chuẩn hóa) + M100 (14 lệnh vẽ) +
+  M101 (5/5 PR) + M102 (Ribbon + `XBOSS_BANG`, PR #399) = đã chạm trần khả thi của nền 2D
+  Managed API theo ranh giới M101 §1 (tuyệt đối không vượt: 3D/BIM, AutoCAD trên server, sửa
+  proxy entity, "đoán" dữ liệu bản vẽ không chứa). Vòng đời bản vẽ phía web đã kín: plugin upload
+  → `drawing_revisions` `submitted` → duyệt/từ chối (M8 drawing register, đủ 5 loại design/bim/
+  shop/method/**asbuilt** — bản vẽ hoàn công) → KL bóc hiện theo revision.
+- **Nợ còn lại (ngoài khả năng CI):** verify tay trên máy Windows có AutoCAD 2026 (M99–M102,
+  gồm đối chiếu chữ ký `AdWindows.dll` với stub); tính năng M100 §20 để lại phiên bản sau
+  (chủ đích, chờ nhu cầu thật).
+
+## M102 — Giao diện UI plugin AutoCAD: tab Ribbon + bảng điều khiển `XBOSS_BANG` (2026-08-25)
+
+Plugin M99/M100/M101 đủ 23 lệnh nhưng thuần command line — M102 thêm lớp VỎ giao diện trong
+AutoCAD (đặc tả `docs/nang-cap/M102-plugin-ui.md`, người dùng yêu cầu "nâng cao kịch trần toàn bộ"):
+
+- **Tab Ribbon "XBoss"** (`XBoss.Cad.Acad/Ui/RibbonBuilder.cs`, Autodesk.Windows/AdWindows.dll):
+  5 panel theo nhóm nghiệp vụ, 24 nút (lệnh chính = nút to), tooltip tiếng Việt; bấm nút =
+  `SendStringToExecute` đúng lệnh — điều kiện chặn (đời AutoCAD/rule pack) vẫn do từng lệnh tự
+  kiểm, UI không nhân đôi nghiệp vụ. Ribbon chưa sẵn sàng lúc nạp thì chờ `ItemInitialized`;
+  Id tab cố định nên NETLOAD lại không sinh tab trùng; ribbon lỗi không hỏng lệnh gõ tay.
+- **Lệnh mới `XBOSS_BANG`** (`Commands/UiCommands.cs`, CommandFlags.Session): bật/tắt bảng điều
+  khiển PaletteSet (Guid cố định — AutoCAD nhớ vị trí neo) hiện trạng thái server/thiết bị đã
+  ghép, rule pack (version/số quy tắc/cache hỏng hiện đúng lý do), bản vẽ hiện hành + tóm tắt 4
+  sidecar JSON cạnh DWG, nút khắc phục nhanh + Làm mới. Chỉ đọc, không mạng, không đụng bản vẽ.
+- **Chống trôi UI ↔ lệnh:** danh mục `XBoss.Cad.Core/Ui/LenhCatalog.cs` là nguồn sự thật duy
+  nhất; `tests LenhCatalogTests` đối chiếu với mọi `[CommandMethod]` trong mã Adapter (parse
+  source) — thêm/xóa lệnh mà quên UI là CI đỏ. Logic dựng bảng nằm ở Core
+  (`Ui/BangDieuKhien.cs` — `BangDieuKhienModel` + `SidecarSummary` parse phòng thủ, sidecar hỏng
+  trả null không sập) test bằng JSON sinh từ CHÍNH các lớp báo cáo thật (`BangDieuKhienTests`).
+- **Build/shim:** `XBoss.Cad.Acad.csproj` thêm tham chiếu `AdWindows.dll` + `UseWPF`;
+  `AcadStub.cs` thêm stub Ribbon/PaletteSet/bộ control WinForms/`Font`/`SendStringToExecute` —
+  job `plugin-shim` biên dịch sạch 36 tệp Adapter, `dotnet test` 457/457 xanh (14 test mới).
+- **Còn nợ (chung M99–M101, cần máy Windows có AutoCAD 2026):** verify tay Ribbon/palette trên
+  máy thật + đối chiếu chữ ký `AdWindows.dll` thật với stub.
+
 ## Sửa quy ước auto-merge trong CLAUDE.md cho khớp thực tế (2026-08-25)
 
 Quy ước cũ ("mở PR xong bật auto-merge ngay") **không thi hành được**: GitHub từ chối

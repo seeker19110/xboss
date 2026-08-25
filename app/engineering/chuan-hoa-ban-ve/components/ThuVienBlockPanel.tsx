@@ -1,10 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Blocks, Download, Upload, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
-import { Button, ButtonLink } from "@/app/components/ui";
+import {
+  Blocks,
+  Download,
+  Upload,
+  AlertTriangle,
+  CheckCircle2,
+  RefreshCw,
+  ClipboardList,
+  ImageOff,
+  Check,
+  X,
+  Plus,
+} from "lucide-react";
+import { Button, ButtonLink, Chip } from "@/app/components/ui";
+import type { ChipTone } from "@/app/components/ui/Chip";
 import { Skeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
+import { useBlockProposals } from "../hooks/useBlockProposals";
+import ThemBlockTuWebForm from "./ThemBlockTuWebForm";
+import type { BlockProposal, BlockProposalKind, BlockProposalStatus } from "../types";
 
 // M100 PR2 (§13) — mục "Thư viện block" của bảng điều khiển plugin: version đang phát hành,
 // lịch sử phát hành, nút tải, và form phát hành version mới (Admin/PM).
@@ -34,6 +50,116 @@ function ngay(iso: string | null): string {
   return new Date(iso).toLocaleDateString("vi-VN");
 }
 
+// M103 — nhãn tiếng Việt cho loại block & trạng thái đề xuất.
+const NHAN_LOAI: Record<BlockProposalKind, string> = {
+  fitting: "Phụ kiện",
+  equipment: "Thiết bị",
+  titleblock: "Khung tên",
+  support: "Giá đỡ",
+  sleeve: "Lỗ chờ ống",
+};
+
+const NHAN_TRANG_THAI: Record<BlockProposalStatus, { nhan: string; tone: ChipTone }> = {
+  pending: { nhan: "Chờ duyệt", tone: "info" },
+  approved: { nhan: "Đã duyệt", tone: "success" },
+  rejected: { nhan: "Từ chối", tone: "danger" },
+  stale: { nhan: "Lỗi thời — cần làm lại", tone: "warning" },
+};
+
+// Nhúng SVG qua thẻ <img src="data:..."> (không dùng dangerouslySetInnerHTML) — trình duyệt
+// không thực thi script/handler bên trong SVG khi tải theo đường này, an toàn dù nội dung do
+// người đề xuất tạo ra từ bản vẽ của họ.
+function anhXemTruoc(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function BlockProposalRow({
+  item,
+  coQuyenDuyet,
+  dangXuLy,
+  onDuyet,
+  onTuChoi,
+}: {
+  item: BlockProposal;
+  coQuyenDuyet: boolean;
+  dangXuLy: boolean;
+  onDuyet: (item: BlockProposal) => void;
+  onTuChoi: (item: BlockProposal) => void;
+}) {
+  const trangThai = NHAN_TRANG_THAI[item.status];
+  return (
+    <li className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row gap-3">
+      <div className="shrink-0 w-16 h-16 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden">
+        {item.previewSvg ? (
+          // eslint-disable-next-line @next/next/no-img-element -- data URL cục bộ, không phải ảnh từ xa
+          <img
+            src={anhXemTruoc(item.previewSvg)}
+            alt={`Xem trước block ${item.blockName}`}
+            className="w-full h-full object-contain"
+          />
+        ) : (
+          <ImageOff className="w-6 h-6 text-zinc-600" strokeWidth={1.5} aria-hidden="true" />
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono font-bold text-sm text-zinc-100 truncate">
+            {item.blockName}
+          </span>
+          <Chip tone="accent">{NHAN_LOAI[item.kind]}</Chip>
+          <Chip tone={trangThai.tone}>{trangThai.nhan}</Chip>
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-zinc-400">
+          {item.systemId && <span>Hệ: {item.systemId}</span>}
+          {item.takeoffItemId && <span>Hạng mục bóc tách: {item.takeoffItemId}</span>}
+          {item.paperSize && <span>Khổ giấy: {item.paperSize}</span>}
+          <span>Base version: {item.baseLibVersion}</span>
+        </div>
+        {item.note && <p className="text-xs text-zinc-400">{item.note}</p>}
+        <p className="text-[11px] text-zinc-500">
+          Đề xuất bởi <span className="text-zinc-300">{item.nguoiDeXuat}</span> —{" "}
+          {ngay(item.createdAt)}
+        </p>
+        {item.status === "rejected" && item.rejectReason && (
+          <p className="text-xs text-red-300">Lý do từ chối: {item.rejectReason}</p>
+        )}
+        {item.status === "approved" && (
+          <p className="text-xs text-emerald-300">
+            Đã phát hành version {item.publishedVersion ?? "—"}
+            {item.nguoiQuyetDinh ? ` — duyệt bởi ${item.nguoiQuyetDinh}` : ""}
+          </p>
+        )}
+      </div>
+
+      {coQuyenDuyet && item.status === "pending" && (
+        <div className="flex sm:flex-col gap-2 shrink-0">
+          <Button
+            size="sm"
+            variant="primary"
+            icon={Check}
+            disabled={dangXuLy}
+            onClick={() => onDuyet(item)}
+            aria-label={`Duyệt và phát hành block ${item.blockName}`}
+          >
+            Duyệt & Phát Hành
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            icon={X}
+            disabled={dangXuLy}
+            onClick={() => onTuChoi(item)}
+            aria-label={`Từ chối đề xuất block ${item.blockName}`}
+          >
+            Từ Chối
+          </Button>
+        </div>
+      )}
+    </li>
+  );
+}
+
 export default function ThuVienBlockPanel() {
   const [duLieu, setDuLieu] = useState<DuLieuBlockLib | null>(null);
   const [loi, setLoi] = useState<string | null>(null);
@@ -41,6 +167,24 @@ export default function ThuVienBlockPanel() {
   const [kiemDinh, setKiemDinh] = useState<KetQuaKiemDinh | null>(null);
   const [thanhCong, setThanhCong] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
+  // M103 — Đề xuất block chờ duyệt: quyền duyệt do server trả về (laNguoiDuyet = Admin/PM).
+  const [loiHanhDongDeXuat, setLoiHanhDongDeXuat] = useState<string | null>(null);
+  const {
+    deXuat,
+    laNguoiDuyet,
+    duocThemTrucTiep,
+    loiDeXuat,
+    dangXuLyId,
+    taiDeXuat,
+    duyet,
+    tuChoi,
+    themBlockTrucTiep,
+  } = useBlockProposals();
+  const coQuyenDuyet = laNguoiDuyet;
+
+  // M104 — form thêm block thẳng từ web (admin/pm/engineer), mặc định đóng cho gọn panel.
+  const [moFormThem, setMoFormThem] = useState(false);
 
   const tai = useCallback(async () => {
     try {
@@ -60,7 +204,41 @@ export default function ThuVienBlockPanel() {
 
   useEffect(() => {
     void tai();
-  }, [tai]);
+    void taiDeXuat();
+  }, [tai, taiDeXuat]);
+
+  async function xuLyDuyet(item: BlockProposal) {
+    setLoiHanhDongDeXuat(null);
+    if (
+      !window.confirm(
+        `Duyệt và phát hành block "${item.blockName}"? Thư viện block hiện hành sẽ có version mới ngay lập tức (không thể hoàn tác).`,
+      )
+    ) {
+      return;
+    }
+    const kq = await duyet(item.id);
+    if (!kq.ok) {
+      setLoiHanhDongDeXuat(kq.error ?? "Duyệt đề xuất thất bại.");
+      return;
+    }
+    // Sau duyệt: refresh mục "Version Đang Phát Hành" để phản ánh version mới ngay.
+    await tai();
+  }
+
+  async function xuLyTuChoi(item: BlockProposal) {
+    setLoiHanhDongDeXuat(null);
+    const ly_do = window.prompt(`Nhập lý do từ chối đề xuất "${item.blockName}":`, "");
+    if (ly_do === null) return; // huỷ
+    const lyDo = ly_do.trim();
+    if (!lyDo) {
+      setLoiHanhDongDeXuat("Phải nhập lý do từ chối.");
+      return;
+    }
+    const kq = await tuChoi(item.id, lyDo);
+    if (!kq.ok) {
+      setLoiHanhDongDeXuat(kq.error ?? "Từ chối đề xuất thất bại.");
+    }
+  }
 
   async function phatHanh(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -310,6 +488,105 @@ export default function ThuVienBlockPanel() {
           )}
         </form>
       )}
+
+      {/* ═══ M104 — Thêm block THẲNG từ web (không qua hàng chờ duyệt) ═══ */}
+      {duocThemTrucTiep && (
+        <div className="pt-4 border-t border-zinc-800 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-zinc-200 flex items-center gap-2">
+              <Plus className="w-4 h-4 text-emerald-400" strokeWidth={1.75} />
+              Thêm Block Từ Web
+            </h3>
+            {!moFormThem && (
+              <Button
+                size="sm"
+                variant="primary"
+                icon={Plus}
+                onClick={() => setMoFormThem(true)}
+                aria-label="Mở form thêm block vào thư viện từ web"
+              >
+                Thêm Block Từ Web
+              </Button>
+            )}
+          </div>
+          {moFormThem ? (
+            <ThemBlockTuWebForm
+              onDong={() => setMoFormThem(false)}
+              onGui={async (fd) => {
+                const kq = await themBlockTrucTiep(fd);
+                // Thành công: thư viện đã sang version mới → làm mới mục "Version Đang Phát Hành".
+                if (kq.ok) await tai();
+                return kq;
+              }}
+            />
+          ) : (
+            <p className="text-xs text-zinc-400">
+              Không có AutoCAD vẫn thêm được block: nộp tệp .dwg của block kèm bản .dxf cùng nội
+              dung, block vào thư viện ngay và thư viện lên version mới (tệp nền không đổi).
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ═══ M103 — Đề xuất block vào thư viện từ AutoCAD (hàng chờ + duyệt) ═══ */}
+      <div className="pt-4 border-t border-zinc-800 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-zinc-200 flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-sky-400" strokeWidth={1.75} />
+            Đề Xuất Chờ Duyệt ({deXuat ? deXuat.filter((d) => d.status === "pending").length : 0})
+          </h3>
+          <Button
+            size="sm"
+            icon={RefreshCw}
+            onClick={() => void taiDeXuat()}
+            aria-label="Tải lại danh sách đề xuất block"
+          >
+            Tải Lại
+          </Button>
+        </div>
+
+        <p className="text-xs text-zinc-400">
+          {coQuyenDuyet
+            ? "Đề xuất block gửi từ lệnh XBOSS_VE_DEXUAT trong AutoCAD — duyệt sẽ phát hành ngay version mới của thư viện, không sửa được sau khi duyệt."
+            : "Đề xuất block bạn đã gửi từ lệnh XBOSS_VE_DEXUAT trong AutoCAD, kèm trạng thái duyệt."}
+        </p>
+
+        {loiDeXuat && (
+          <p className="flex items-center gap-1.5 text-xs text-amber-300">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            {loiDeXuat}
+          </p>
+        )}
+        {loiHanhDongDeXuat && (
+          <p className="flex items-center gap-1.5 text-xs text-red-300">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            {loiHanhDongDeXuat}
+          </p>
+        )}
+
+        {deXuat === null ? (
+          <Skeleton className="h-20 w-full" />
+        ) : deXuat.length === 0 ? (
+          <p className="text-xs text-zinc-400">
+            {coQuyenDuyet
+              ? "Chưa có đề xuất block nào chờ duyệt."
+              : "Bạn chưa gửi đề xuất block nào."}
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {deXuat.map((dx) => (
+              <BlockProposalRow
+                key={dx.id}
+                item={dx}
+                coQuyenDuyet={coQuyenDuyet}
+                dangXuLy={dangXuLyId === dx.id}
+                onDuyet={xuLyDuyet}
+                onTuChoi={xuLyTuChoi}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

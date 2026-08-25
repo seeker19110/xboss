@@ -163,6 +163,139 @@ public class BlockManifestTests
         Assert.Null(m.TimThietBiTheoItem("titleblock-a1"));
     }
 
+    // ===== M104 §1 — thư viện ĐA TỆP: entry có tệp .dwg riêng (block thêm thẳng từ web) =====
+
+    /// <summary>Nội dung tệp .dwg lẻ giả lập của một block thêm từ web.</summary>
+    private static byte[] TepLeMau() => "AC1032-tep-block-them-tu-web"u8.ToArray();
+
+    /// <summary>
+    /// Manifest đa tệp: 1 block ở tệp nền (không fileKey) + 1 block ở tệp riêng (có fileKey,
+    /// fileSha256 và previewSvg — khóa mà plugin CỐ Ý không model).
+    /// </summary>
+    private static string ManifestDaTep(
+        string? fileKey = "blocklib-van-web-1756000000-ab12cd.dwg", string? fileSha256 = null) =>
+        $$"""
+        {
+          "version": "b9-datep",
+          "dwgSha256": "{{new string('a', 64)}}",
+          "blocks": [
+            { "id": "elbow-duct", "blockName": "XB-DUCT-ELBOW", "kind": "fitting", "system": "duct" },
+            { "id": "van-web", "blockName": "XB-VAN-WEB", "kind": "fitting", "system": "pipe",
+              {{(fileKey is null ? "" : $"\"fileKey\": \"{fileKey}\",")}}
+              "fileSha256": "{{fileSha256 ?? BlockManifestLoader.TinhSha256(TepLeMau())}}",
+              "previewSvg": "<svg viewBox=\"0 0 10 10\"><path d=\"M0 0\"/></svg>" }
+          ]
+        }
+        """;
+
+    [Fact]
+    public void Nap_duoc_manifest_co_fileKey_va_bo_qua_previewSvg()
+    {
+        var m = BlockManifestLoader.Load(ManifestDaTep());
+
+        var nen = m.TimTheoId("elbow-duct")!;
+        Assert.False(nen.CoTepRieng);
+        Assert.Null(nen.FileKey);
+
+        var web = m.TimTheoId("van-web")!;
+        Assert.True(web.CoTepRieng);
+        Assert.Equal("blocklib-van-web-1756000000-ab12cd.dwg", web.FileKey);
+        Assert.Equal(BlockManifestLoader.TinhSha256(TepLeMau()), web.FileSha256);
+        Assert.Equal(["van-web"], m.TepRieng().Select(b => b.Id));
+    }
+
+    /// <summary>Tương thích ngược: manifest phát hành trước M104 không có block nào ở tệp riêng.</summary>
+    [Fact]
+    public void Manifest_cu_khong_khai_fileKey_thi_khong_co_tep_rieng_nao()
+    {
+        var m = NapMau();
+        Assert.Empty(m.TepRieng());
+        Assert.All(m.Blocks, b =>
+        {
+            Assert.False(b.CoTepRieng);
+            Assert.Null(b.FileKey);
+            Assert.Null(b.FileSha256);
+        });
+    }
+
+    [Fact]
+    public void Tu_choi_fileKey_thieu_fileSha256()
+    {
+        var json = ManifestDaTep().Replace($"\"fileSha256\": \"{BlockManifestLoader.TinhSha256(TepLeMau())}\",", "");
+        var loi = Assert.Throws<BlockManifestException>(() => BlockManifestLoader.Load(json));
+        Assert.Contains("fileSha256", loi.Message);
+    }
+
+    [Fact]
+    public void Tu_choi_fileSha256_thieu_fileKey()
+    {
+        var loi = Assert.Throws<BlockManifestException>(
+            () => BlockManifestLoader.Load(ManifestDaTep(fileKey: null)));
+        Assert.Contains("fileKey", loi.Message);
+    }
+
+    /// <summary>
+    /// fileKey biến thành TÊN TỆP trong cache — khoá mang đường dẫn phải bị chặn ngay lúc nạp
+    /// manifest, không đợi tới lúc ghi tệp.
+    /// </summary>
+    [Theory]
+    [InlineData("../../blocks.dwg")]
+    [InlineData("..\\\\..\\\\blocks.dwg")]
+    [InlineData("thu muc/blocklib-x.dwg")]
+    [InlineData("..")]
+    public void Tu_choi_fileKey_mang_duong_dan(string khoaXau)
+    {
+        var loi = Assert.Throws<BlockManifestException>(
+            () => BlockManifestLoader.Load(ManifestDaTep(fileKey: khoaXau)));
+        Assert.Contains("fileKey", loi.Message);
+    }
+
+    [Theory]
+    [InlineData("blocklib-van-1756-ab.dwg", true)]
+    [InlineData("bat-ky-ten-nao.dwg", true)] // không ràng tiền tố của máy chủ hôm nay
+    [InlineData("", false)]
+    [InlineData(".", false)]
+    [InlineData("..", false)]
+    [InlineData("a/b.dwg", false)]
+    [InlineData("a\\b.dwg", false)]
+    [InlineData("tep lạ.dwg", false)]
+    public void Khoa_tep_chi_nhan_ten_tep_thuan(string khoa, bool hopLe) =>
+        Assert.Equal(hopLe, BlockManifestLoader.LaKhoaTepHopLe(khoa));
+
+    [Fact]
+    public void Hash_tep_le_khop_thi_nhan()
+    {
+        var web = BlockManifestLoader.Load(ManifestDaTep()).TimTheoId("van-web")!;
+        BlockManifestLoader.KiemTraHashTepLe(web, TepLeMau()); // không ném là đạt
+    }
+
+    [Fact]
+    public void Tu_choi_khi_hash_tep_le_lech()
+    {
+        var web = BlockManifestLoader.Load(ManifestDaTep()).TimTheoId("van-web")!;
+        var loi = Assert.Throws<BlockManifestException>(
+            () => BlockManifestLoader.KiemTraHashTepLe(web, "tệp lẻ đã bị tráo"u8.ToArray()));
+        Assert.Contains("XB-VAN-WEB", loi.Message);
+        Assert.Contains("không khớp manifest", loi.Message);
+    }
+
+    [Fact]
+    public void Tu_choi_khi_thieu_tep_le_trong_cache()
+    {
+        var web = BlockManifestLoader.Load(ManifestDaTep()).TimTheoId("van-web")!;
+        var loi = Assert.Throws<BlockManifestException>(
+            () => BlockManifestLoader.KiemTraHashTepLe(web, Path.Combine(Path.GetTempPath(), "khong-co-xboss-le.dwg")));
+        Assert.Contains("Không thấy tệp block", loi.Message);
+    }
+
+    /// <summary>Block ở tệp nền không có gì để đối chiếu — gọi nhầm phải ném, không "đạt" im lặng.</summary>
+    [Fact]
+    public void Kiem_hash_tep_le_tren_block_o_tep_nen_thi_nem()
+    {
+        var nen = BlockManifestLoader.Load(ManifestDaTep()).TimTheoId("elbow-duct")!;
+        Assert.Throws<BlockManifestException>(() => BlockManifestLoader.KiemTraHashTepLe(nen, TepLeMau()));
+    }
+
     [Fact]
     public void Tim_thiet_bi_uu_tien_takeoffItemId_hon_id_manifest()
     {

@@ -26,7 +26,7 @@ import { getCurrentRulePack } from "@/lib/ky-thuat/cad/rule-pack";
  * cho cả ghi lẫn đọc, nếu không máy đọc thuộc org khác sẽ trỏ sai key. Đổi sang thư viện theo
  * dự án/tổ chức (M100 §20) thì thêm cột org_id và bỏ hằng số này.
  */
-const ORG_THU_VIEN_BLOCK = 1;
+export const ORG_THU_VIEN_BLOCK = 1;
 
 /** Loại block trong thư viện (M100 §11 + §6.7–6.9 bổ sung `support`/`sleeve`). */
 export const LOAI_BLOCK = ["fitting", "equipment", "titleblock", "support", "sleeve"] as const;
@@ -48,6 +48,17 @@ export type BlockManifestEntry = {
   takeoffItemId?: string;
   /** Khổ giấy của khung tên (chỉ `kind: titleblock`). */
   paper?: string;
+  /**
+   * M104 §1 — khoá tệp `.dwg` RIÊNG của block trong kho lưu trữ (block thêm thẳng từ web:
+   * máy chủ không chạy AutoCAD nên không gộp được vào `blocks.dwg` nền). Vắng trường này =
+   * block nằm trong `blocks.dwg` như cũ (mọi manifest đã phát hành trước M104 không đổi).
+   * Plugin tải tệp lẻ qua `GET /api/engineering/cad/block-lib?file=<fileKey>`.
+   */
+  fileKey?: string;
+  /** Hash sha256 của tệp lẻ ở `fileKey` — plugin kiểm y như kiểm tệp nền. Đi cặp với `fileKey`. */
+  fileSha256?: string;
+  /** Ảnh xem trước (SVG thuần, dựng từ DXF lúc thêm) để web hiển thị — không ảnh hưởng plugin. */
+  previewSvg?: string;
 };
 
 export type BlockLibManifest = {
@@ -82,6 +93,23 @@ export type BlockLibRow = {
 };
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/**
+ * Dạng hợp lệ của `fileKey` (M104 §1) — đúng khuôn tên do `newBlockLibFileName` sinh
+ * (`blocklib-<nhãn>-<ts>-<hex>.dwg`). Ràng khuôn chặt vì `GET ?file=` sẽ đọc đúng khoá này khỏi
+ * kho lưu trữ: manifest là dữ liệu người phát hành nộp, không được để nó trỏ tới tệp bất kỳ
+ * trong `data/uploads/` (lớp chống path traversal của `lib/nen/storage.ts` chặn `/` `..` nhưng
+ * không chặn "đọc nhầm tệp phẳng khác").
+ */
+const KHOA_TEP_BLOCK = /^blocklib-[A-Za-z0-9._-]{1,160}\.dwg$/;
+
+/** Trần độ dài chuỗi SVG xem trước lưu trong manifest (JSONB) — ảnh nhận diện, không phải bản vẽ. */
+const TRAN_PREVIEW_SVG = 200_000;
+
+/** `fileKey` có đúng khuôn tên tệp do máy chủ sinh không (dùng cho cả route `GET ?file=`). */
+export function laKhoaTepBlockHopLe(fileKey: string): boolean {
+  return KHOA_TEP_BLOCK.test(fileKey);
+}
 
 // ── Kiểm định (thuần, không chạm DB — test đơn vị được) ──────────────────────
 
@@ -145,6 +173,32 @@ export function docManifest(tho: unknown): { manifest: BlockLibManifest | null; 
     const attributes = Array.isArray(b.attributes)
       ? b.attributes.filter((a): a is string => typeof a === "string").map((a) => a.trim())
       : undefined;
+
+    // M104 §1 — bộ ba tuỳ chọn của block nằm ở tệp .dwg RIÊNG. Vắng cả ba = block trong tệp nền
+    // (tương thích ngược: manifest phát hành trước M104 không có trường nào trong nhóm này).
+    const fileKey = typeof b.fileKey === "string" ? b.fileKey.trim() : "";
+    const fileSha256 = typeof b.fileSha256 === "string" ? b.fileSha256.trim().toLowerCase() : "";
+    const previewSvg = typeof b.previewSvg === "string" ? b.previewSvg.trim() : "";
+    const nhanB = `${nhan}${id ? ` ("${id}")` : ""}`;
+    if (fileKey && !KHOA_TEP_BLOCK.test(fileKey)) {
+      errors.push(
+        `${nhanB}: "fileKey" không đúng khuôn tên tệp do máy chủ sinh (blocklib-….dwg) — không nhận khoá tự đặt.`,
+      );
+    }
+    if (fileKey && !SHA256_HEX.test(fileSha256)) {
+      errors.push(`${nhanB}: có "fileKey" thì phải kèm "fileSha256" (64 ký tự hex của tệp lẻ).`);
+    }
+    if (!fileKey && fileSha256) {
+      errors.push(
+        `${nhanB}: khai "fileSha256" nhưng thiếu "fileKey" — hash không trỏ tới tệp nào.`,
+      );
+    }
+    if (previewSvg && (!previewSvg.startsWith("<svg") || previewSvg.length > TRAN_PREVIEW_SVG)) {
+      errors.push(
+        `${nhanB}: "previewSvg" phải là chuỗi SVG (bắt đầu bằng <svg) và ngắn hơn ${TRAN_PREVIEW_SVG} ký tự.`,
+      );
+    }
+
     blocks.push({
       id,
       blockName,
@@ -155,6 +209,9 @@ export function docManifest(tho: unknown): { manifest: BlockLibManifest | null; 
       attributes,
       takeoffItemId: typeof b.takeoffItemId === "string" ? b.takeoffItemId.trim() : undefined,
       paper: typeof b.paper === "string" ? b.paper.trim() : undefined,
+      fileKey: fileKey || undefined,
+      fileSha256: fileSha256 || undefined,
+      previewSvg: previewSvg || undefined,
     });
   });
 
@@ -162,8 +219,11 @@ export function docManifest(tho: unknown): { manifest: BlockLibManifest | null; 
   return { manifest: { version, dwgSha256, blocks }, errors };
 }
 
-/** Yêu cầu thuộc tính tối thiểu theo loại block (M100 §11 + FR6/FR9a). */
-function kiemThuocTinhTheoLoai(b: BlockManifestEntry, errors: string[]): void {
+/**
+ * Yêu cầu thuộc tính tối thiểu theo loại block (M100 §11 + FR6/FR9a). Export để đường thêm block
+ * từ web (M104) áp đúng một luật này cho entry mới thay vì chép lại.
+ */
+export function kiemThuocTinhTheoLoai(b: BlockManifestEntry, errors: string[]): void {
   if (b.kind === "equipment" && !(b.attributes ?? []).includes("TAG")) {
     errors.push(
       `Block "${b.id}" (thiết bị) phải khai thuộc tính "TAG" — XBOSS_VE_THIETBI bắt nhập tag lúc chèn (FR6).`,
@@ -236,6 +296,10 @@ export function kiemDinhManifest(
     for (const b of manifest.blocks) {
       const trongDxf = coTrongDxf.get(b.blockName.toUpperCase());
       if (!trongDxf) {
+        // M104 §1: block có `fileKey` nằm ở tệp .dwg RIÊNG, không nằm trong tệp nền — sidecar này
+        // mô tả tệp nền nên không thể (và không cần) chứa nó. Tính toàn vẹn của tệp lẻ được canh
+        // bằng `fileSha256`, và định nghĩa block được kiểm ngay lúc thêm (block-them-web.ts).
+        if (b.fileKey) continue;
         // M100 §6.10: manifest khai block không có thật → CHẶN ngay lúc phát hành, vì client
         // coi thư viện như vậy là hỏng và từ chối dùng toàn bộ.
         errors.push(
@@ -409,16 +473,66 @@ export async function phatHanhBlockLib(input: {
     Buffer.from(input.dxfText, "utf8"),
   );
 
-  const id = await insertId(
+  const id = await ghiSoBlockLib({
+    version: manifest.version,
+    manifest,
+    storageKey,
+    dwgSha256: hash,
+    userId: input.userId,
+  });
+  return { status: "created", kiemDinh, id, version: manifest.version };
+}
+
+/**
+ * Bước GHI SỔ của đường phát hành — tách riêng khỏi `phatHanhBlockLib` để M103 (duyệt đề xuất
+ * block) tái dùng nguyên vẹn: gói ứng viên đã được kiểm định + lưu trữ từ lúc NHẬN đề xuất, lúc
+ * duyệt chỉ còn việc ghi thành version mới. Không kiểm định lại ở đây — người gọi chịu trách
+ * nhiệm (phatHanhBlockLib kiểm ngay trên, block-proposals kiểm lúc nhận).
+ */
+export async function ghiSoBlockLib(input: {
+  version: string;
+  manifest: BlockLibManifest;
+  storageKey: string;
+  dwgSha256: string;
+  userId: number;
+}): Promise<number> {
+  return insertId(
     `INSERT INTO cad_block_libs (version, manifest, storage_key, dwg_sha256, published_by)
      VALUES (?, ?::jsonb, ?, ?, ?)`,
-    manifest.version,
+    input.version,
     // Manifest lưu NGUYÊN dạng đã chuẩn hoá (không nhét kết quả kiểm định vào) — cột này chính là
     // thứ plugin tải về qua `?manifest=1`, phải đúng hợp đồng M100 §11.
-    JSON.stringify(manifest),
-    storageKey,
-    hash,
+    JSON.stringify(input.manifest),
+    input.storageKey,
+    input.dwgSha256,
     input.userId,
   );
-  return { status: "created", kiemDinh, id, version: manifest.version };
+}
+
+/**
+ * Quy ước tăng version thư viện: tăng **cụm chữ số cuối cùng** trong nhãn, giữ nguyên phần chữ
+ * (`b1` → `b2`, `b9` → `b10`, `b0-mau` → `b1-mau`). Nhãn không có chữ số nào thì nối `-2`
+ * (`beta` → `beta-2`) — vẫn là một nhãn mới, không bao giờ đè version đã phát hành (M100 §17).
+ */
+export function versionKeTiep(version: string): string {
+  const m = /^(.*?)(\d+)(\D*)$/.exec(version);
+  if (!m) return `${version}-2`;
+  return `${m[1]}${String(Number(m[2]) + 1)}${m[3]}`;
+}
+
+/**
+ * Version kế tiếp **chắc chắn chưa dùng**: `version` là UNIQUE nên nếu ai đó đã phát hành tay
+ * đúng nhãn kế tiếp, INSERT sẽ nổ giữa transaction duyệt. Nhảy tiếp tới nhãn còn trống.
+ */
+export async function versionPhatHanhKeTiep(hienHanh: string): Promise<string> {
+  let ung = versionKeTiep(hienHanh);
+  for (let i = 0; i < 50; i++) {
+    const da = await queryOne<{ id: number }>(
+      `SELECT id FROM cad_block_libs WHERE version = ?`,
+      ung,
+    );
+    if (!da) return ung;
+    ung = versionKeTiep(ung);
+  }
+  throw new Error(`Không tìm được nhãn version trống sau "${hienHanh}"`);
 }
