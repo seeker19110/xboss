@@ -2,6 +2,7 @@
 // ba, tai nạn LĐ) + bảo lãnh (thực hiện HĐ, tạm ứng, bảo hành), gắn hợp đồng (nullable)
 // + cảnh báo sắp hết hiệu lực. Xem docs/nang-cap/M28-bao-hiem-bao-lanh.md.
 import { query, queryOne } from "@/lib/db";
+import { EXPIRY_WARN_DAYS } from "@/lib/nen/han-hieu-luc";
 import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
 
 export const INSURANCE_KINDS = [
@@ -40,8 +41,10 @@ export const INSURANCE_STATUS_LABEL: Record<InsuranceStatus, string> = {
   released: "Đã tất toán/thu hồi",
 };
 
-// Ngưỡng cảnh báo sắp hết hiệu lực (ngày) — hằng số, giống pattern EXPIRY_WARN_DAYS của HĐ.
-export const INSURANCE_EXPIRY_WARN_DAYS = 30;
+// Ngưỡng cảnh báo sắp hết hạn của BẢO LÃNH/BẢO HIỂM (ngày). Lấy từ mặc định chung ở
+// lib/nen/han-hieu-luc.ts thay vì chép lại số 30; giữ tên riêng theo miền để
+// sau này đổi ngưỡng cho riêng loại hồ sơ này mà không ảnh hưởng loại khác.
+export const INSURANCE_EXPIRY_WARN_DAYS = EXPIRY_WARN_DAYS;
 
 export type InsuranceBondRow = {
   id: number;

@@ -2,6 +2,7 @@
 // chính...) + checklist huy động công trường (bàn giao mặt bằng, khảo sát, trắc đạc,
 // huy động). Xem docs/nang-cap/M23-khoi-dong-phap-ly.md.
 import { query, queryOne } from "@/lib/db";
+import { EXPIRY_WARN_DAYS } from "@/lib/nen/han-hieu-luc";
 import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
 
 export const LEGAL_KINDS = [
@@ -29,8 +30,10 @@ export const LEGAL_STATUS_LABEL: Record<LegalStatus, string> = {
   superseded: "Đã thay thế",
 };
 
-// Ngưỡng cảnh báo sắp hết hạn (ngày) — hằng số, giống pattern EXPIRY_WARN_DAYS của HĐ.
-export const LEGAL_EXPIRY_WARN_DAYS = 30;
+// Ngưỡng cảnh báo sắp hết hạn của HỒ SƠ PHÁP LÝ (ngày). Lấy từ mặc định chung ở
+// lib/nen/han-hieu-luc.ts thay vì chép lại số 30; giữ tên riêng theo miền để
+// sau này đổi ngưỡng cho riêng loại hồ sơ này mà không ảnh hưởng loại khác.
+export const LEGAL_EXPIRY_WARN_DAYS = EXPIRY_WARN_DAYS;
 
 export const MOBILIZATION_CATEGORIES = [
   "mat_bang",

@@ -10,11 +10,9 @@ export type RoutingSystemType =
   | "FIRE_SPRINKLER"
   | "ELECTRICAL_CABLE_TRAY";
 
-export interface Point3D {
-  x: number; // mm
-  y: number; // mm
-  z: number; // mm
-}
+// Point3D dùng chung từ lib/nen/bim-3d.ts (tầng 0) — trước đây khai trùng ở nhiều module.
+export type { Point3D } from "@/lib/nen/bim-3d";
+import type { Point3D } from "@/lib/nen/bim-3d";
 
 export interface ObstacleBox3D {
   id: string;

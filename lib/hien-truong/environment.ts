@@ -2,6 +2,7 @@
 // quan trắc môi trường theo kỳ (ngưỡng, đạt/không), quản lý chất thải. Xem
 // docs/nang-cap/M25-moi-truong-giay-phep.md.
 import { query } from "@/lib/db";
+import { EXPIRY_WARN_DAYS } from "@/lib/nen/han-hieu-luc";
 import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
 
 export const ENV_PERMIT_KINDS = ["dtm", "giay_phep_mt", "giay_phep_xa_thai", "khac"] as const;
@@ -21,8 +22,10 @@ export const ENV_PERMIT_STATUS_LABEL: Record<EnvPermitStatus, string> = {
   superseded: "Đã thay thế",
 };
 
-// Ngưỡng cảnh báo sắp hết hạn (ngày) — đồng bộ pattern LEGAL_EXPIRY_WARN_DAYS (M23).
-export const ENV_PERMIT_EXPIRY_WARN_DAYS = 30;
+// Ngưỡng cảnh báo sắp hết hạn của GIẤY PHÉP MÔI TRƯỜNG (ngày). Lấy từ mặc định chung ở
+// lib/nen/han-hieu-luc.ts thay vì chép lại số 30; giữ tên riêng theo miền để
+// sau này đổi ngưỡng cho riêng loại hồ sơ này mà không ảnh hưởng loại khác.
+export const ENV_PERMIT_EXPIRY_WARN_DAYS = EXPIRY_WARN_DAYS;
 
 export const ENV_MONITORING_CATEGORIES = ["nuoc_thai", "khi_bui", "on_rung", "khac"] as const;
 export type EnvMonitoringCategory = (typeof ENV_MONITORING_CATEGORIES)[number];

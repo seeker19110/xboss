@@ -120,6 +120,76 @@ thẳng giờ UTC → lệch 7 tiếng, tối muộn sai cả ngày; nay dùng `
 Sau vòng 2, `grep 'new Date().toISOString()'` toàn repo chỉ còn các dấu thời gian đầy đủ (đúng)
 và `localISO` của import Excel (cố ý).
 
+## Đợt gộp trùng lặp vòng 3 (2026-08-25)
+
+Quét lại toàn bộ trên `main` sau khi PR #393 vào (1.196 file), 3 trục: clone cửa sổ 30 dòng
+chuẩn hoá, trùng tên export trong `lib/`, và đếm chuỗi class lặp. **6 cụm đã gộp, −70 dòng.**
+
+### 1. Kiểu BIM/3D khai lại ở client — CÓ PHÂN KỲ THẬT
+
+`app/engineering/bim-viewer/page.tsx` tự khai lại 7 interface + 2 bảng màu đã có trong
+`lib/ky-thuat/engineering-bim-viewer.ts`. **Hai bản đã lệch nhau:** bản trong trang rụng mất
+`path?: Point3D[]` của `MeshGeometry3D`, dùng kiểu `boundingBox` nội tuyến thay cho
+`BoundingBox3D`, và mất toàn bộ chú thích liệt kê giá trị hợp lệ của `elementType`/`systemType`
+(là tài liệu thật, không phải chú thích trang trí).
+
+Không import thẳng từ `lib/ky-thuat/` được: module đó `import { query } from "@/lib/db"` nên
+import **giá trị** sẽ kéo `pg` vào bundle trình duyệt. Nên gom xuống **`lib/nen/bim-3d.ts`**
+(tầng 0, thuần) — cả server lẫn client dùng chung một bản. `engineering-bim-viewer.ts`
+re-export để mọi chỗ đang import từ đó vẫn chạy.
+
+Gom luôn `Point3D` (khai trùng ở 3 module: bim-viewer, generative-routing, spatial-wasm) và
+`BoundingBox3D` (2 module: bim-cad, bim-viewer).
+
+### 2. Kiểu graph khai lại ở client
+
+`app/engineering/graph/page.tsx` chép 5 kiểu của `lib/ky-thuat/engineering-graph.ts`, chỉ đổi
+tên (`TraversalResult` ↔ `GraphTraversalResult`…). Đây chỉ là **kiểu**, mà `import type` bị xoá
+lúc biên dịch nên import thẳng từ `lib/` an toàn, không cần module trung gian.
+
+### 3. `certInProject` — hàng rào phân phạm vi dự án có 2 bản
+
+Chép nguyên si ở `/api/payment-certs/[id]` và `/api/payment-certs/[id]/excel`. Là hàng rào
+chặn xem đợt thanh toán của dự án khác (M22) nên **phải có đúng một bản** — hai bản là chờ ngày
+sửa một quên một. Đưa về `lib/tai-chinh/paymentcerts.ts`.
+
+### 4. Ngưỡng cảnh báo hết hạn — 6 bản cùng số 30, 2 bản TRÙNG TÊN
+
+`EXPIRY_WARN_DAYS`, `ENV_PERMIT_EXPIRY_WARN_DAYS`, `CERT_EXPIRY_WARN_DAYS`,
+`LEGAL_EXPIRY_WARN_DAYS`, `INSURANCE_EXPIRY_WARN_DAYS` — mỗi cái tự khai `= 30`, và chú thích
+của chính chúng ghi "giống pattern EXPIRY_WARN_DAYS của HĐ" (tác giả biết mình đang chép).
+
+Nặng hơn: `lib/nen/han-hieu-luc.ts` và `lib/tai-chinh/contracts.ts` **xuất cùng tên**
+`EXPIRY_WARN_DAYS` — **nợ do chính PR #393 của tôi tạo ra**: tôi thêm hằng số tầng 0 mà không
+kiểm tên đã tồn tại chưa. Đúng lớp lỗi vừa mất một commit để dọn ở `calcHazenWilliams`, và ở đây
+còn khó phát hiện hơn vì hai bên cùng giá trị 30 nên import nhầm KHÔNG gây lỗi nào cả.
+
+Xử lý: `lib/nen/han-hieu-luc.ts` là nguồn duy nhất; 5 hằng số miền **giữ tên riêng** (để sau này
+đổi ngưỡng cho riêng một loại hồ sơ mà không kéo theo loại khác) nhưng **lấy giá trị** từ nguồn
+chung. Bản của hợp đồng đổi tên thành `CONTRACT_EXPIRY_WARN_DAYS` cho hết trùng.
+
+### 5–6. Hai component UI lặp
+
+- **`ParetoLyDoTre`** — biểu đồ Pareto nguyên nhân trễ, chép y nguyên ở `/progress/[system]` và
+  `/schedule-control` (kèm 2 bản `maxParetoCount` tính giống hệt, nay tính trong component).
+  Thêm `aria-pressed` cho nút lọc — bản cũ không truyền trạng thái bật/tắt cho trình đọc màn hình.
+- **`ChonPhamViDuAn`** — bộ chọn "Phạm vi áp dụng" (mọi dự án / dự án cụ thể), chép ở
+  `/admin/alert-rules` và `/admin/approval-flows`. Thêm `aria-label` cho `<select>`.
+
+### KHÔNG gộp vòng này — và vì sao
+
+- **`listClaims`/`getClaim`/`parseClaimBody`/`validateClaimInput`** cùng tên ở
+  `lib/hien-truong/warranty.ts` và `lib/tai-chinh/claims.ts`: **khác miền thật** — khiếu nại bảo
+  hành vs khiếu nại hợp đồng FIDIC, khác bảng, khác bộ lọc. Chỉ trùng tên, không trùng logic.
+- **`autoSizePipeDiameter`** ở `engineering-cad-hydraulic-network.ts`: là **adapter mỏng cố ý**,
+  import bản engine (alias `sizeByVelocity`) rồi bọc lại. Không phải bản sao.
+- **Pareto ở `app/schedule/page.tsx`**: bản KHÁC — chỉ hiển thị, không bấm lọc được, bố cục dọc.
+  Ép chung một component sẽ phải thêm cờ bật/tắt tương tác, làm xấu cả hai.
+- **257 bản sao chuỗi class `bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm
+text-white` trên 45 file** — trùng lặp nhiều nhất repo tính theo số lần. Vẫn thuộc đợt "khung
+  form" đã ghi bên dưới; gộp bằng hằng số dùng chung thì an toàn (không đổi hành vi) nhưng chạm
+  45 file, nên tách thành đợt riêng để review được.
+
 ### Còn lại (chưa làm)
 
 - **Họ ~8 route `<thực thể>-documents/[id]`** giống 55–71% (`claim`/`contract`/`vo`/`subcon`/

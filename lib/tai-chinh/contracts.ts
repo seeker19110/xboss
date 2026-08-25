@@ -2,6 +2,7 @@
 // query tổng hợp giá trị + đã thanh toán theo HĐ, và danh sách HĐ sắp hết hiệu lực
 // (nguồn cho notification contract_expiry ở PR 3). Xem docs/nang-cap/M16-hop-dong.md.
 import { query, queryOne } from "@/lib/db";
+import { EXPIRY_WARN_DAYS } from "@/lib/nen/han-hieu-luc";
 import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
 
 export const CONTRACT_KINDS = ["nhan_thau", "giao_thau", "ncc"] as const;
@@ -21,8 +22,12 @@ export const CONTRACT_STATUS_LABEL: Record<ContractStatus, string> = {
   terminated: "Chấm dứt",
 };
 
-// Ngưỡng cảnh báo sắp hết hiệu lực (ngày) — hằng số, chưa cần settings riêng (YAGNI).
-export const EXPIRY_WARN_DAYS = 30;
+// Ngưỡng cảnh báo sắp hết hiệu lực của HỢP ĐỒNG (ngày). Lấy từ mặc định chung ở
+// lib/nen/han-hieu-luc.ts thay vì chép lại số 30 — giữ tên riêng theo miền để sau này
+// hợp đồng đổi ngưỡng mà không kéo theo giấy phép/bảo hiểm/chứng chỉ.
+// Đổi tên từ EXPIRY_WARN_DAYS: trùng đúng tên với hằng số ở lib/nen/han-hieu-luc.ts,
+// import nhầm là không ai phát hiện được vì hai bên cùng giá trị.
+export const CONTRACT_EXPIRY_WARN_DAYS = EXPIRY_WARN_DAYS;
 
 export type ContractInput = {
   code: string;
@@ -224,7 +229,7 @@ export type ExpiringContract = {
 // đổi trạng thái) — so sánh chuỗi ngày theo quy ước lớp DB (DATE giữ nguyên string).
 // projectId (M22): undefined = không lọc.
 export async function expiringContracts(
-  days = EXPIRY_WARN_DAYS,
+  days = CONTRACT_EXPIRY_WARN_DAYS,
   projectId?: number,
 ): Promise<ExpiringContract[]> {
   const limit = daysFromTodayISO(days);

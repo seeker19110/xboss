@@ -364,3 +364,21 @@ export async function pendingCerts(
     ...args,
   );
 }
+
+// Xác nhận đợt thuộc hợp đồng của dự án đang chọn (M22) — chặn xem/sửa đợt của hợp
+// đồng thuộc dự án khác qua đoán/liệt kê id. Trước đây chép nguyên si ở cả
+// `/api/payment-certs/[id]` lẫn `/api/payment-certs/[id]/excel`; là hàng rào phân
+// phạm vi dự án nên phải có ĐÚNG MỘT bản để hai đường không lệch nhau về sau.
+export async function certInProject(
+  id: number,
+  projectId: number | null,
+): Promise<{ status: string; contractId: number } | undefined> {
+  if (projectId == null) return undefined;
+  return queryOne<{ status: string; contractId: number }>(
+    `SELECT c.status, c.contract_id AS "contractId"
+       FROM payment_certs c JOIN contracts ct ON ct.id = c.contract_id
+      WHERE c.id = ? AND ct.project_id = ?`,
+    id,
+    projectId,
+  );
+}

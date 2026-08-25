@@ -29,103 +29,30 @@ import {
   X,
 } from "lucide-react";
 
-export type Element4DVisualStatus =
-  "not_started" | "in_progress" | "completed" | "approved" | "delayed";
-
-export interface MeshGeometry3D {
-  vertices: number[];
-  indices: number[];
-  normals?: number[];
-  color?: string;
-  dimensions: {
-    width?: number;
-    height?: number;
-    length?: number;
-    diameter?: number;
-  };
-}
-
-export interface BimElementProperties {
-  pset?: {
-    airflow?: number;
-    velocity?: number;
-    pressureDrop?: number;
-    material?: string;
-    insulation?: string;
-    elevation?: number;
-    supplier?: string;
-    specification?: string;
-  };
-  customFields?: Record<string, unknown>;
-}
-
-export interface BimElement {
-  id: string;
-  modelId: string;
-  projectId: number;
-  guid: string;
-  elementType: string;
-  systemType: string;
-  name: string;
-  geometryData: MeshGeometry3D;
-  properties: BimElementProperties;
-  wbsTaskId?: number | null;
-  createdAt?: string;
-}
-
-export interface BimModel {
-  id: string;
-  projectId: number;
-  name: string;
-  discipline: "hvac" | "plumbing" | "electrical" | "firefighting" | "structure" | "combined";
-  floorId?: number | null;
-  format: "ifc" | "gltf" | "json_mesh";
-  fileUrl?: string | null;
-  fileHash?: string | null;
-  elementCount: number;
-  boundingBox: { min: [number, number, number]; max: [number, number, number] };
-  metadata: Record<string, unknown>;
-  createdBy?: number | null;
-  createdAt?: string;
-}
-
-export interface Element4DState {
-  elementId: string;
-  guid: string;
-  wbsTaskId?: number | null;
-  status: Element4DVisualStatus;
-  progressPercent: number;
-  colorHex: string;
-  opacity: number;
-  visible: boolean;
-  highlightAlert?: boolean;
-}
-
-export interface SimulationTimeStepResult {
-  targetDate: string;
-  totalElements: number;
-  countsByStatus: Record<Element4DVisualStatus, number>;
-  overallProgressPercent: number;
-  elements: Element4DState[];
-}
-
-const SYSTEM_DEFAULT_COLORS: Record<string, string> = {
-  HVAC_SUPPLY: "#0284c7",
-  HVAC_RETURN: "#f59e0b",
-  PLUMBING_WATER: "#06b6d4",
-  PLUMBING_DRAINAGE: "#84cc16",
-  ELECTRICAL_POWER: "#eab308",
-  FIRE_SPRINKLER: "#ef4444",
-  STRUCTURE: "#64748b",
-};
-
-const STATUS_4D_COLORS: Record<Element4DVisualStatus, string> = {
-  not_started: "#3f3f46",
-  in_progress: "#38bdf8",
-  completed: "#34d399",
-  approved: "#10b981",
-  delayed: "#f43f5e",
-};
+// Kiểu và bảng màu lấy từ lib/nen/bim-3d.ts (tầng 0, THUẦN) — trước đây trang tự khai
+// lại toàn bộ và hai bản đã phân kỳ: bản ở đây rụng mất `path` của MeshGeometry3D, dùng
+// kiểu boundingBox nội tuyến thay cho BoundingBox3D, và mất hết chú thích liệt kê giá trị
+// hợp lệ của elementType/systemType. Không import từ lib/ky-thuat/engineering-bim-viewer.ts
+// được: module đó chạm @/lib/db nên sẽ kéo pg vào bundle trình duyệt.
+export type {
+  Point3D,
+  BoundingBox3D,
+  MeshGeometry3D,
+  BimElementProperties,
+  BimElement,
+  BimModel,
+  Element4DVisualStatus,
+  Element4DState,
+  SimulationTimeStepResult,
+} from "@/lib/nen/bim-3d";
+import type {
+  BimElement,
+  BimModel,
+  Element4DVisualStatus,
+  Element4DState,
+  SimulationTimeStepResult,
+} from "@/lib/nen/bim-3d";
+import { SYSTEM_DEFAULT_COLORS, STATUS_4D_COLORS } from "@/lib/nen/bim-3d";
 
 interface BcfIssueSummary {
   id: string;

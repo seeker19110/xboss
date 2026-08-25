@@ -10,10 +10,9 @@ export type ClashType = "hard_clash" | "soft_clearance" | "workflow_order";
 export type ClashSeverity = "low" | "medium" | "high" | "critical";
 export type ClashStatus = "detected" | "resolved" | "ignored" | "rfi_created";
 
-export interface BoundingBox3D {
-  min: [number, number, number]; // [x, y, z] mm
-  max: [number, number, number]; // [x, y, z] mm
-}
+// BoundingBox3D dùng chung từ lib/nen/bim-3d.ts (tầng 0) — trước đây khai trùng ở nhiều module.
+export type { BoundingBox3D } from "@/lib/nen/bim-3d";
+import type { BoundingBox3D } from "@/lib/nen/bim-3d";
 
 export interface BimElementRecord {
   id: string;

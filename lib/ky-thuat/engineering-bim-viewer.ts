@@ -4,116 +4,34 @@
  * M89: Thêm DB Persistence (save/load 4D simulation, list models/elements).
  */
 import { query, queryOne, run } from "@/lib/db";
+import {
+  type Point3D,
+  type BoundingBox3D,
+  type MeshGeometry3D,
+  type BimElement,
+  type BimModel,
+  type Element4DVisualStatus,
+  type Element4DState,
+  type SimulationTimeStepResult,
+  SYSTEM_DEFAULT_COLORS,
+  STATUS_4D_COLORS,
+} from "@/lib/nen/bim-3d";
 
-export interface Point3D {
-  x: number;
-  y: number;
-  z: number;
-}
-
-export interface BoundingBox3D {
-  min: [number, number, number];
-  max: [number, number, number];
-}
-
-export interface MeshGeometry3D {
-  vertices: number[]; // Flattened [x1, y1, z1, x2, y2, z2, ...]
-  indices: number[]; // Triangle indices
-  normals?: number[]; // Surface normal vectors
-  color?: string; // Hex default
-  dimensions: {
-    width?: number; // mm
-    height?: number; // mm
-    length?: number; // mm
-    diameter?: number; // mm
-  };
-  path?: Point3D[]; // Centerline route
-}
-
-export interface BimElementProperties {
-  pset?: {
-    airflow?: number; // m3/h
-    velocity?: number; // m/s
-    pressureDrop?: number; // Pa
-    material?: string; // Tôn mạ kẽm Z80, Inox 304, PVC-U, PPR, Thép đen
-    insulation?: string; // Aeroflex 19mm, Bông thủy tinh 50mm
-    elevation?: number; // mm so với FFL sàn
-    supplier?: string;
-    specification?: string;
-  };
-  customFields?: Record<string, unknown>;
-}
-
-export interface BimElement {
-  id: string;
-  modelId: string;
-  projectId: number;
-  guid: string;
-  elementType: string; // DUCT_STRAIGHT | DUCT_ELBOW | DUCT_TEE | PIPE_STRAIGHT | PIPE_VALVE | CABLE_TRAY | AIR_TERMINAL | EQUIPMENT | SLAB | BEAM
-  systemType: string; // HVAC_SUPPLY | HVAC_RETURN | PLUMBING_WATER | PLUMBING_DRAINAGE | ELECTRICAL_POWER | FIRE_SPRINKLER
-  name: string;
-  geometryData: MeshGeometry3D;
-  properties: BimElementProperties;
-  wbsTaskId?: number | null;
-  createdAt?: string;
-}
-
-export interface BimModel {
-  id: string;
-  projectId: number;
-  name: string;
-  discipline: "hvac" | "plumbing" | "electrical" | "firefighting" | "structure" | "combined";
-  floorId?: number | null;
-  format: "ifc" | "gltf" | "json_mesh";
-  fileUrl?: string | null;
-  fileHash?: string | null;
-  elementCount: number;
-  boundingBox: BoundingBox3D;
-  metadata: Record<string, unknown>;
-  createdBy?: number | null;
-  createdAt?: string;
-}
-
-export type Element4DVisualStatus =
-  "not_started" | "in_progress" | "completed" | "approved" | "delayed";
-
-export interface Element4DState {
-  elementId: string;
-  guid: string;
-  wbsTaskId?: number | null;
-  status: Element4DVisualStatus;
-  progressPercent: number;
-  colorHex: string;
-  opacity: number;
-  visible: boolean;
-  highlightAlert?: boolean;
-}
-
-export interface SimulationTimeStepResult {
-  targetDate: string;
-  totalElements: number;
-  countsByStatus: Record<Element4DVisualStatus, number>;
-  overallProgressPercent: number;
-  elements: Element4DState[];
-}
-
-export const SYSTEM_DEFAULT_COLORS: Record<string, string> = {
-  HVAC_SUPPLY: "#0284c7", // Sky blue
-  HVAC_RETURN: "#f59e0b", // Amber
-  PLUMBING_WATER: "#06b6d4", // Cyan
-  PLUMBING_DRAINAGE: "#84cc16", // Lime green
-  ELECTRICAL_POWER: "#eab308", // Yellow
-  FIRE_SPRINKLER: "#ef4444", // Red
-  STRUCTURE: "#64748b", // Slate gray
-};
-
-export const STATUS_4D_COLORS: Record<Element4DVisualStatus, string> = {
-  not_started: "#3f3f46", // Dark Zinc ghost
-  in_progress: "#38bdf8", // Glowing Sky Blue
-  completed: "#34d399", // Solid Emerald Green
-  approved: "#10b981", // Deep Verified Green
-  delayed: "#f43f5e", // Flashing Rose/Red Alert
-};
+// Kiểu dữ liệu + bảng màu dùng chung với client đã chuyển xuống lib/nen/bim-3d.ts
+// (tầng 0, thuần) — trang bim-viewer là client component nên không import được từ đây:
+// module này chạm @/lib/db. Re-export để mọi nơi đang import từ file này vẫn chạy.
+export type {
+  Point3D,
+  BoundingBox3D,
+  MeshGeometry3D,
+  BimElementProperties,
+  BimElement,
+  BimModel,
+  Element4DVisualStatus,
+  Element4DState,
+  SimulationTimeStepResult,
+} from "@/lib/nen/bim-3d";
+export { SYSTEM_DEFAULT_COLORS, STATUS_4D_COLORS } from "@/lib/nen/bim-3d";
 
 // ============================================================================
 // 1. THUẬT TOÁN SINH HÌNH HỌC THAM SỐ 3D MEPF (PARAMETRIC MESH GENERATOR)

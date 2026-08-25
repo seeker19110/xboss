@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run, withProjectScope } from "@/lib/db";
+import { run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   getCert,
   certTotals,
+  certInProject,
   validateCertItems,
   checkCertLinesBelongToContract,
   saveCertItems,
@@ -14,22 +15,6 @@ import { getEntityApprovalStatus } from "@/lib/tien-do/approvals";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 
 export const dynamic = "force-dynamic";
-
-// Xác nhận đợt thuộc hợp đồng của dự án đang chọn (M22) — chặn xem/sửa đợt của
-// hợp đồng thuộc dự án khác qua đoán/liệt kê id.
-async function certInProject(
-  id: number,
-  projectId: number | null,
-): Promise<{ status: string; contractId: number } | undefined> {
-  if (projectId == null) return undefined;
-  return queryOne<{ status: string; contractId: number }>(
-    `SELECT c.status, c.contract_id AS "contractId"
-       FROM payment_certs c JOIN contracts ct ON ct.id = c.contract_id
-      WHERE c.id = ? AND ct.project_id = ?`,
-    id,
-    projectId,
-  );
-}
 
 // GET /api/payment-certs/:id — chi tiết đợt kèm dòng KL + tổng hợp giá trị,
 // scoped theo dự án đang chọn (M22).

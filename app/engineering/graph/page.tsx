@@ -22,73 +22,16 @@ import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
 
-type GraphNode = {
-  id: string;
-  externalKey: string;
-  objectType: string;
-  name: string | null;
-  discipline: string | null;
-  status: string;
-  projectId: number;
-};
-
-type GraphEdge = {
-  id: string;
-  fromObjectId: string;
-  toObjectId: string;
-  relationType: string;
-  projectId: number;
-};
-
-type TraversalResult = {
-  rootId: string;
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  depthReached: number;
-  truncated: boolean;
-};
-
-type LineageResult = {
-  object: GraphNode | null;
-  source: {
-    id: string;
-    sourceType: string;
-    externalKey: string;
-    revisionName: string | null;
-    createdAt: string;
-  } | null;
-  revisions: Array<{
-    id: string;
-    revisionNumber: number;
-    changeSummary: string | null;
-    createdAt: string;
-  }>;
-  relations: {
-    outgoing: Array<{ relationType: string; target: GraphNode }>;
-    incoming: Array<{ relationType: string; source: GraphNode }>;
-  };
-  suggestions: Array<{
-    id: string;
-    title: string;
-    status: string;
-    riskLevel: string;
-  }>;
-  workflows: Array<{
-    id: string;
-    title: string;
-    state: string;
-    riskClass: string;
-  }>;
-};
-
-type ImpactResult = {
-  targetObject: GraphNode;
-  upstreamCount: number;
-  downstreamCount: number;
-  upstreamNodes: GraphNode[];
-  downstreamNodes: GraphNode[];
-  criticalPathAlerts: string[];
-};
+// Kiểu lấy thẳng từ lib/ky-thuat/engineering-graph.ts thay vì khai lại — `import type`
+// bị xoá lúc biên dịch nên không kéo @/lib/db (và pg) vào bundle trình duyệt.
+// Trước đây trang chép lại 5 kiểu này, chỉ đổi tên: TraversalResult/LineageResult/
+// ImpactResult so với GraphTraversalResult/ObjectLineageResult/ImpactAnalysisResult.
+import type {
+  GraphNode,
+  GraphTraversalResult as TraversalResult,
+  ObjectLineageResult as LineageResult,
+  ImpactAnalysisResult as ImpactResult,
+} from "@/lib/ky-thuat/engineering-graph";
 
 export default function EngineeringGraphPage() {
   const [searchKey, setSearchKey] = useState("");

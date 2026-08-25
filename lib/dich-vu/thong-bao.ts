@@ -31,7 +31,7 @@ import { overduePunch } from "@/lib/hien-truong/handover";
 import { expiringWarranties, overdueClaims } from "@/lib/hien-truong/warranty";
 import { advanceOverdueList, ADVANCE_OVERDUE_DAYS } from "@/lib/tai-chinh/finance";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { EXPIRY_WARN_DAYS } from "@/lib/tai-chinh/contracts";
+import { CONTRACT_EXPIRY_WARN_DAYS } from "@/lib/tai-chinh/contracts";
 import { CERT_PENDING_DAYS } from "@/lib/tai-chinh/paymentcerts";
 import { VO_PENDING_DAYS } from "@/lib/tai-chinh/vo";
 import { CALIBRATION_WARN_DAYS } from "@/lib/vat-tu/equipment";
@@ -316,7 +316,7 @@ export async function syncAndListNotifications(
     );
 
     // Hợp đồng sắp hết hiệu lực hoặc đã quá hạn mà chưa đổi trạng thái → cảnh báo (M16).
-    const expiring = await expiringContracts(EXPIRY_WARN_DAYS, projectId ?? undefined);
+    const expiring = await expiringContracts(CONTRACT_EXPIRY_WARN_DAYS, projectId ?? undefined);
     if (expiring.length > 0) {
       const values = expiring.map(() => `(?, ?, 'contract_expiry', ?)`).join(", ");
       const params = expiring.flatMap((c) => [

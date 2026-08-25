@@ -7,6 +7,7 @@
 // đó kéo theo lib/db (chỉ chạy server, dùng package `pg`), giống pattern
 // app/admin/approval-flows/page.tsx.
 import { useCallback, useEffect, useState } from "react";
+import ChonPhamViDuAn from "@/app/components/ChonPhamViDuAn";
 import { Plus, Trash2, X, BellRing } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
@@ -326,43 +327,13 @@ function RuleFormModal({
           {meta.unit ? ` ${meta.unit}` : ""} — lưu ngưỡng mới cho cùng phạm vi sẽ ghi đè ngưỡng cũ.
         </p>
 
-        <div className="space-y-2">
-          <p className="text-xs text-zinc-400">Phạm vi áp dụng</p>
-          <div className="flex flex-wrap gap-3 text-sm">
-            <label className="flex items-center gap-1.5">
-              <input
-                type="radio"
-                checked={scope === "all"}
-                onChange={() => setScope("all")}
-                className="accent-emerald-500"
-              />
-              Mọi dự án
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input
-                type="radio"
-                checked={scope === "project"}
-                onChange={() => setScope("project")}
-                className="accent-emerald-500"
-              />
-              Dự án cụ thể
-            </label>
-          </div>
-          {scope === "project" && (
-            <select
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-            >
-              <option value="">— Chọn dự án —</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
+        <ChonPhamViDuAn
+          scope={scope}
+          setScope={setScope}
+          projectId={projectId}
+          setProjectId={setProjectId}
+          projects={projects}
+        />
 
         <label className="text-xs text-zinc-400 block">
           Ngưỡng {meta.unit ? `(${meta.unit})` : ""}

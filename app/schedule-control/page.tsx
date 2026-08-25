@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import ParetoLyDoTre from "@/app/components/ParetoLyDoTre";
 import { AlertTriangle, Clock, Printer } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import ScheduleControlPanel from "@/app/components/ScheduleControlPanel";
@@ -56,10 +57,6 @@ export default function ScheduleControlPage() {
     });
   }, [system, systemReady]);
 
-  const maxParetoCount = useMemo(
-    () => Math.max(1, ...(data?.delayPareto ?? []).map((r) => r.count)),
-    [data],
-  );
   const totalDelayed = data?.delayed.length ?? 0;
 
   const filteredDelayed = useMemo(() => {
@@ -95,48 +92,14 @@ export default function ScheduleControlPage() {
         {/* ── Đường găng (component dùng chung với Dashboard tổng) ── */}
         <ScheduleControlPanel critical={data.critical} />
 
-        {/* ── Pareto nguyên nhân trễ ── */}
-        {data.delayPareto.length > 0 && (
-          <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-1">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-              <h2 className="text-sm font-semibold text-zinc-200">Nguyên nhân trễ (Pareto)</h2>
-            </div>
-            <p className="text-xs text-zinc-400 mb-4">Bấm thanh để lọc bảng trễ theo lý do</p>
-            <div className="space-y-2">
-              {data.delayPareto.map((r) => {
-                const slugKey = r.slug ?? "__none";
-                const active = reasonFilter === slugKey;
-                return (
-                  <button
-                    key={slugKey}
-                    onClick={() => setReasonFilter((f) => (f === slugKey ? "" : slugKey))}
-                    className={`w-full flex items-center gap-3 group transition ${active ? "opacity-100" : reasonFilter ? "opacity-40" : ""}`}
-                  >
-                    <span
-                      className="text-xs text-zinc-400 w-24 sm:w-32 text-right shrink-0 truncate"
-                      title={r.label}
-                    >
-                      {r.label}
-                    </span>
-                    <div className="flex-1 bg-zinc-800 rounded-full h-2 overflow-hidden">
-                      <div
-                        className={`h-2 rounded-full transition-all ${r.slug ? "bg-amber-500/70 group-hover:bg-amber-400" : "bg-zinc-600 group-hover:bg-zinc-500"}`}
-                        style={{ width: `${(r.count / maxParetoCount) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-zinc-300 w-20 text-left shrink-0 tabular-nums">
-                      {r.count}{" "}
-                      <span className="text-zinc-400">
-                        ({totalDelayed > 0 ? Math.round((r.count / totalDelayed) * 100) : 0}%)
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        )}
+        {/* ── Pareto nguyên nhân trễ (component dùng chung với /progress/[system]) ── */}
+        <ParetoLyDoTre
+          rows={data.delayPareto}
+          soViecTre={totalDelayed}
+          reasonFilter={reasonFilter}
+          setReasonFilter={setReasonFilter}
+          tieuDe="Nguyên nhân trễ (Pareto)"
+        />
 
         {/* ── Bảng trễ ── */}
         <section className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">

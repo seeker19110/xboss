@@ -1,11 +1,9 @@
 import crypto from "node:crypto";
 import { query, queryOne, run } from "@/lib/db";
 
-export interface Point3D {
-  x: number;
-  y: number;
-  z: number;
-}
+// Point3D dùng chung từ lib/nen/bim-3d.ts (tầng 0) — trước đây khai trùng ở nhiều module.
+export type { Point3D } from "@/lib/nen/bim-3d";
+import type { Point3D } from "@/lib/nen/bim-3d";
 
 export interface CrossSection {
   shape: "rectangular" | "circular";

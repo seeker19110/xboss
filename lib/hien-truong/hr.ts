@@ -3,6 +3,7 @@
 // & chứng chỉ (certifications, cảnh báo hết hạn) + ma trận RACI. Xem
 // docs/nang-cap/M24-nhan-su-to-chuc.md.
 import { query, queryOne } from "@/lib/db";
+import { EXPIRY_WARN_DAYS } from "@/lib/nen/han-hieu-luc";
 import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
 
 export const PERSONNEL_STATUSES = ["active", "inactive"] as const;
@@ -12,8 +13,10 @@ export const PERSONNEL_STATUS_LABEL: Record<PersonnelStatus, string> = {
   inactive: "Ngừng làm việc",
 };
 
-// Ngưỡng cảnh báo chứng chỉ sắp hết hạn (ngày).
-export const CERT_EXPIRY_WARN_DAYS = 30;
+// Ngưỡng cảnh báo sắp hết hạn của CHỨNG CHỈ NHÂN SỰ (ngày). Lấy từ mặc định chung ở
+// lib/nen/han-hieu-luc.ts thay vì chép lại số 30; giữ tên riêng theo miền để
+// sau này đổi ngưỡng cho riêng loại hồ sơ này mà không ảnh hưởng loại khác.
+export const CERT_EXPIRY_WARN_DAYS = EXPIRY_WARN_DAYS;
 
 export type PersonnelRow = {
   id: number;
