@@ -3308,10 +3308,9 @@
 **Index:**
 - `cad_block_libs_pkey`: UNIQUE INDEX cad_block_libs_pkey ON public.cad_block_libs USING btree (id)
 - `cad_block_libs_version_key`: UNIQUE INDEX cad_block_libs_version_key ON public.cad_block_libs USING btree (version)
+- `idx_cad_block_libs_moi_nhat`: INDEX idx_cad_block_libs_moi_nhat ON public.cad_block_libs USING btree (id DESC)
 
 ### cad_block_proposals
-
-Hàng chờ đề xuất block vào thư viện (M103) — plugin gửi "thư viện ứng viên" hoàn chỉnh, Admin/PM duyệt → sinh version mới trong `cad_block_libs`.
 
 | Cột | Kiểu | Null | Default |
 | --- | --- | --- | --- |
@@ -3327,7 +3326,7 @@ Hàng chờ đề xuất block vào thư viện (M103) — plugin gửi "thư vi
 | candidate_storage_key | text |  |  |
 | candidate_dwg_sha256 | text |  |  |
 | preview_svg | text | ✓ |  |
-| status | text |  | `'pending'` |
+| status | text |  | `'pending'::text` |
 | reject_reason | text | ✓ |  |
 | published_version | text | ✓ |  |
 | proposed_by | integer |  |  |
@@ -3336,12 +3335,12 @@ Hàng chờ đề xuất block vào thư viện (M103) — plugin gửi "thư vi
 | created_at | timestamptz |  | `now()` |
 
 **Khóa ngoại:**
-- `proposed_by` → `users(id)`
 - `decided_by` → `users(id)`
+- `proposed_by` → `users(id)`
 
 **Index:**
-- `idx_cad_block_proposals_status`: INDEX ON public.cad_block_proposals USING btree (status)
-- `idx_cad_block_libs_moi_nhat`: INDEX idx_cad_block_libs_moi_nhat ON public.cad_block_libs USING btree (id DESC)
+- `cad_block_proposals_pkey`: UNIQUE INDEX cad_block_proposals_pkey ON public.cad_block_proposals USING btree (id)
+- `idx_cad_block_proposals_status`: INDEX idx_cad_block_proposals_status ON public.cad_block_proposals USING btree (status)
 
 ### cad_device_pairings
 
