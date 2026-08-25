@@ -19,7 +19,8 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN, todayISO } from "@/lib/nen/date";
+import { formatDateVN } from "@/lib/nen/date";
+import { isExpired, isExpiringSoon } from "@/lib/nen/han-hieu-luc";
 
 type InsuranceKind =
   | "car"
@@ -53,8 +54,6 @@ const STATUS_BADGE: Record<InsuranceStatus, string> = {
   released: "bg-zinc-800 text-zinc-400",
 };
 
-const EXPIRY_WARN_DAYS = 30;
-
 type InsuranceBond = {
   id: number;
   contractId: number | null;
@@ -79,15 +78,6 @@ type Contract = { id: number; code: string; title: string };
 function fmtVND(n: number | null) {
   if (!n) return "—";
   return Math.round(n).toLocaleString("vi-VN") + " đ";
-}
-
-function isExpiringSoon(b: InsuranceBond): boolean {
-  if (b.status !== "valid" || !b.expiryDate) return false;
-  const limit = new Date(Date.now() + EXPIRY_WARN_DAYS * 86400_000).toISOString().slice(0, 10);
-  return b.expiryDate <= limit;
-}
-function isExpired(b: InsuranceBond): boolean {
-  return b.status === "valid" && !!b.expiryDate && b.expiryDate < todayISO();
 }
 
 export default function InsurancePage() {
@@ -194,7 +184,7 @@ export default function InsurancePage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm bảo hiểm/bảo lãnh"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" />{" "}
               <span className="hidden sm:inline">Thêm bảo hiểm/bảo lãnh</span>
@@ -699,7 +689,7 @@ function InsuranceModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>

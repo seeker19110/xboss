@@ -15,6 +15,27 @@ export {
   generateSpoolQrPayload,
 } from "@/lib/ky-thuat/engineering-dfma-spooling";
 
+/**
+ * Hazen-Williams — QUY ƯỚC M89: lưu lượng **L/s**, thứ tự `(lưu lượng, ĐƯỜNG KÍNH, CHIỀU DÀI)`.
+ *
+ * Đây là bản `calcHazenWilliams` DUY NHẤT được export trong dự án. Bản còn lại ở
+ * `engineering-hydraulic-engine.ts` dùng quy ước khác và đã đổi tên thành `calcHazenWilliamsM3h`
+ * (private, chỉ `calculateHydraulicLoss` gọi) — quyết định của chủ dự án (2026-08-25): giữ cả hai
+ * quy ước đơn vị, nhưng không để hai hàm trùng tên nữa:
+ *
+ * | | vị trí 1 | vị trí 2 | vị trí 3 |
+ * | --- | --- | --- | --- |
+ * | `calcHazenWilliams` (M89, bản này) | lưu lượng **L/s** | **đường kính** mm | **chiều dài** m |
+ * | `calcHazenWilliamsM3h` (M68) | lưu lượng **m³/h** | **chiều dài** m | **đường kính** mm |
+ *
+ * Đơn vị lưu lượng khác nhau nên **1 L/s = 3,6 m³/h** — truyền thẳng số của bản kia vào đây sẽ
+ * sai 3,6 lần ở lưu lượng, cộng thêm hoán vị đường kính/chiều dài. Cả hai đều nhận toàn `number`
+ * nên TypeScript không bắt được; hàng rào duy nhất là TÊN KHÁC NHAU — đừng đặt lại trùng tên.
+ * Hai bản vẫn cho cùng kết quả vật lý khi quy đổi đúng đơn vị (`tests/hazen-williams-donvi.test.ts`
+ * canh việc này).
+ *
+ * Hằng số cột nước ở bản này là 9806,65 Pa/m (bản M68 dùng 9810) — chênh 0,03%, là chủ ý.
+ */
 export function calcHazenWilliams(
   flowRateLps: number,
   pipeDiameterMm: number,

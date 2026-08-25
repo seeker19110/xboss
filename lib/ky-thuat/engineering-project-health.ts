@@ -1,5 +1,6 @@
 // lib/engineering-project-health.ts — Engineering Health Index (EHI) & Monte Carlo Forecaster (M72)
 import { query, queryOne } from "@/lib/db";
+import { todayISO } from "@/lib/nen/date";
 
 export interface ProjectHealthMetricsInput {
   spiIndex: number; // Schedule Performance Index (EV / PV, ví dụ: 1.02)
@@ -79,7 +80,7 @@ export function calculateEngineeringHealthIndex(
   p95Date.setDate(p95Date.getDate() + 15); // Thêm 15 ngày đệm stress-test
 
   return {
-    snapshotDate: new Date().toISOString().slice(0, 10),
+    snapshotDate: todayISO(),
     healthIndexPercent,
     healthTier,
     spiIndex: input.spiIndex,

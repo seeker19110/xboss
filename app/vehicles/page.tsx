@@ -314,7 +314,7 @@ export default function VehiclesPage() {
                   {["registered", "approved"].includes(v.status) && (
                     <button
                       onClick={() => doAction(v, "enter")}
-                      className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 rounded-lg py-3 text-sm font-semibold text-on-accent"
+                      className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg py-3 text-sm font-semibold text-on-accent"
                     >
                       <LogIn className="w-4 h-4" /> Đã vào
                     </button>

@@ -93,7 +93,7 @@ export default function DiagnosticPurgePanel({
               onClick={() => serverVerifyInputRef.current?.click()}
               disabled={verifyPhase === "uploading" || verifyPhase === "processing"}
               title="Gửi file lên mepf-worker, tính điểm sức khỏe bằng ezdxf thật — đối chiếu độc lập với điểm tính ngay trên trình duyệt"
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-600 disabled:opacity-60 disabled:cursor-not-allowed text-on-accent font-bold text-xs shadow-sm transition"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 disabled:opacity-60 disabled:cursor-not-allowed text-on-accent font-bold text-xs shadow-sm transition"
             >
               {verifyPhase === "uploading" || verifyPhase === "processing" ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -422,7 +422,7 @@ export default function DiagnosticPurgePanel({
 
           <button
             onClick={handleAlignWcsOrigin}
-            className="w-full py-2.5 rounded-xl bg-sky-700 hover:bg-sky-600 text-on-accent font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
+            className="w-full py-2.5 rounded-xl bg-sky-700 hover:bg-sky-800 text-on-accent font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
           >
             <Crosshair className="w-3.5 h-3.5" />
             <span>Khóa Tọa Độ Chuẩn WCS 2D (X:0, Y:0) Cho Bản Vẽ</span>

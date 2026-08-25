@@ -217,7 +217,7 @@ export default function BoqDimCtbPanel({
 
           <button
             onClick={handleDownloadCtb}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-600 text-on-accent font-bold text-xs shadow-sm transition shrink-0"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-on-accent font-bold text-xs shadow-sm transition shrink-0"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Xuất File Cấu Hình In xboss_standard.ctb</span>

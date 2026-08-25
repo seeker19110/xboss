@@ -64,7 +64,7 @@ export default function FinanceCashflowTab() {
           <div className="pt-2">
             <Link
               href="/engineering/cashflow"
-              className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-on-accent font-semibold text-xs transition inline-flex items-center gap-1.5 shadow"
+              className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-on-accent font-semibold text-xs transition inline-flex items-center gap-1.5 shadow"
             >
               <TrendingUp className="w-3.5 h-3.5" /> Mở Dynamic Cashflow Cockpit{" "}
               <ArrowUpRight className="w-3.5 h-3.5" />

@@ -406,7 +406,7 @@ export default function PaymentsPage() {
         {editMode && Object.keys(edits).length > 0 && !saving && (
           <button
             onClick={() => data && saveEdits(edits, data.rows)}
-            className="flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 text-on-accent px-3 py-1.5 rounded-lg transition shrink-0"
+            className="flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-800 text-on-accent px-3 py-1.5 rounded-lg transition shrink-0"
           >
             <Save className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Lưu ngay</span>
@@ -904,7 +904,7 @@ function BillsSection({
                 <button
                   onClick={submitAll}
                   disabled={busy}
-                  className="ml-auto flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent px-3 py-1.5 rounded-lg transition shrink-0"
+                  className="ml-auto flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent px-3 py-1.5 rounded-lg transition shrink-0"
                 >
                   {busy ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

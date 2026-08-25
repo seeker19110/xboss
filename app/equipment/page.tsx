@@ -7,7 +7,8 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN, formatDateTimeVN } from "@/lib/nen/date";
+import { formatDateVN, formatDateTimeVN, todayISO, daysFromTodayISO } from "@/lib/nen/date";
+import { EXPIRY_WARN_DAYS } from "@/lib/nen/han-hieu-luc";
 
 type EquipmentCondition = "good" | "maintenance" | "broken" | "retired";
 const EQUIPMENT_CONDITION_LABEL: Record<EquipmentCondition, string> = {
@@ -46,10 +47,6 @@ type Equipment = {
   currentCrew: string | null;
   note: string | null;
 };
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export default function EquipmentPage() {
   const [me, setMe] = useState<Me | null>(null);
@@ -143,7 +140,7 @@ export default function EquipmentPage() {
               <button
                 onClick={() => setAddOpen(true)}
                 aria-label="Thêm thiết bị"
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
               >
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm thiết bị</span>
               </button>
@@ -214,8 +211,7 @@ export default function EquipmentPage() {
                     const soon =
                       !overdue &&
                       e.calibrationDue != null &&
-                      e.calibrationDue <=
-                        new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10);
+                      e.calibrationDue <= daysFromTodayISO(EXPIRY_WARN_DAYS);
                     return (
                       <tr
                         key={e.id}
@@ -388,7 +384,7 @@ function AddEquipmentModal({ onClose, onCreated }: { onClose: () => void; onCrea
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo thiết bị"}
         </button>
@@ -610,7 +606,7 @@ function EquipmentDetailModal({
               <button
                 onClick={submitLog}
                 disabled={busy}
-                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
+                className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
               >
                 Ghi nhận
               </button>

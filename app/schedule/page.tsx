@@ -29,7 +29,7 @@ import SCurveChart from "@/app/components/SCurveChart";
 import ProgressMap from "@/app/components/ProgressMap";
 import { LookaheadTable } from "@/app/components/LookaheadTable";
 import SystemFilter from "@/app/components/SystemFilter";
-import { formatDateVN } from "@/lib/nen/date";
+import { formatDateVN, todayISO } from "@/lib/nen/date";
 import type { CriticalRow } from "@/lib/tien-do/schedule-control";
 
 export default function ScheduleControlHubPage() {
@@ -471,7 +471,7 @@ function ScheduleControlContent() {
             </button>
             <button
               onClick={() => alert("Đang xuất file Excel báo cáo tiến độ...")}
-              className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-on-accent text-xs font-semibold shadow transition flex items-center gap-1.5"
+              className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-on-accent text-xs font-semibold shadow transition flex items-center gap-1.5"
             >
               <Download className="w-3.5 h-3.5" /> Xuất Excel Đa Tab
             </button>
@@ -488,8 +488,7 @@ function ScheduleControlContent() {
               BÁO CÁO TIẾN ĐỘ THI CÔNG & KIỂM SOÁT ĐƯỜNG GĂNG
             </h2>
             <div className="text-xs text-zinc-400 font-mono">
-              Kỳ báo cáo: Tuần 34/2026 • Ngày lập:{" "}
-              {formatDateVN(new Date().toISOString().slice(0, 10))}
+              Kỳ báo cáo: Tuần 34/2026 • Ngày lập: {formatDateVN(todayISO())}
             </div>
           </div>
 

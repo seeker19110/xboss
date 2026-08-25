@@ -415,7 +415,7 @@ export default function WorkflowsPage() {
                           type="button"
                           disabled={submitting}
                           onClick={() => signGate(wf.id, nextGate.seq, "approved")}
-                          className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm text-on-accent hover:bg-emerald-600 disabled:opacity-50"
+                          className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm text-on-accent hover:bg-emerald-800 disabled:opacity-50"
                         >
                           {submitting ? "Đang lưu..." : `Duyệt cửa ${nextGate.seq}`}
                         </button>

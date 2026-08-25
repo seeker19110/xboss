@@ -199,7 +199,7 @@ export default function UsersPage() {
             <button
               onClick={createUser}
               disabled={busy || !form.name || !form.email || !form.password}
-              className="bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] disabled:bg-zinc-800 disabled:text-zinc-500 disabled:opacity-50 text-on-accent rounded-xl px-4 py-2 text-xs sm:text-sm font-semibold transition shadow-sm h-10 md:h-auto"
+              className="bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] disabled:bg-zinc-800 disabled:text-zinc-500 disabled:opacity-50 text-on-accent rounded-xl px-4 py-2 text-xs sm:text-sm font-semibold transition shadow-sm h-10 md:h-auto"
             >
               {busy ? "Đang tạo..." : "Thêm mới"}
             </button>

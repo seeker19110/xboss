@@ -374,7 +374,7 @@ export default function ImportMaterialsPage() {
             <button
               onClick={doImport}
               disabled={!file || !systemId || busy}
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-on-accent rounded-xl px-6 py-2.5 text-sm font-semibold transition shadow-md shadow-emerald-950"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-800 disabled:text-zinc-500 text-on-accent rounded-xl px-6 py-2.5 text-sm font-semibold transition shadow-md shadow-emerald-950"
             >
               <Upload className="w-4 h-4" />
               {busy ? "Đang xử lý import..." : "Bắt đầu import"}

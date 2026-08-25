@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { todayISO } from "@/lib/nen/date";
 import { query, queryOne, withProjectScope, withTransaction } from "@/lib/db";
 
 export interface MaterialQrPayload {
@@ -119,7 +120,7 @@ export function reconcileShipmentReceiving(
     missingItems.length === 0 && surplusItems.length === 0 && totalScanned === totalDelivered;
   const hasDiscrepancy = missingItems.length > 0 || surplusItems.length > 0;
 
-  const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const todayStr = todayISO().replace(/-/g, "");
   const randomSuffix = Math.floor(1000 + Math.random() * 9000);
   const grnNumber = `GRN-${todayStr}-${randomSuffix}`;
 

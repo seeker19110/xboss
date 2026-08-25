@@ -661,7 +661,7 @@ export default function NextGenApexEngineeringPage() {
               <button
                 onClick={handleProcessIpc}
                 disabled={isProcessingIpc}
-                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-500 text-on-accent font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all disabled:opacity-50"
+                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-on-accent font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all disabled:opacity-50"
               >
                 {isProcessingIpc ? (
                   <RotateCcw className="w-4 h-4 animate-spin" />
@@ -829,7 +829,7 @@ export default function NextGenApexEngineeringPage() {
               <button
                 onClick={handleAnalyzeTia}
                 disabled={isAnalyzingTia}
-                className="w-full py-2.5 bg-amber-700 hover:bg-amber-500 text-on-accent font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-600/30 transition-all disabled:opacity-50"
+                className="w-full py-2.5 bg-amber-700 hover:bg-amber-800 text-on-accent font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-600/30 transition-all disabled:opacity-50"
               >
                 {isAnalyzingTia ? (
                   <RotateCcw className="w-4 h-4 animate-spin" />

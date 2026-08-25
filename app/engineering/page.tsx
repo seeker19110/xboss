@@ -262,7 +262,7 @@ export default function EngineeringApexCockpitPage() {
               <button
                 onClick={triggerPulseScan}
                 disabled={refreshing}
-                className="flex min-h-[44px] items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-semibold text-on-accent transition hover:bg-emerald-600 active:scale-[0.98] shadow-sm disabled:opacity-50"
+                className="flex min-h-[44px] items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-semibold text-on-accent transition hover:bg-emerald-800 active:scale-[0.98] shadow-sm disabled:opacity-50"
               >
                 <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
                 <span>{refreshing ? "Đang quét toàn hệ..." : "Quét Đồng Bộ 5 Trục"}</span>
@@ -893,7 +893,7 @@ export default function EngineeringApexCockpitPage() {
                         disabled={submitting}
                         onClick={() => review("approved")}
                         aria-label="Duyệt đối tượng kỹ thuật"
-                        className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm text-on-accent hover:bg-emerald-600 disabled:opacity-50"
+                        className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm text-on-accent hover:bg-emerald-800 disabled:opacity-50"
                       >
                         <Check size={14} /> {submitting ? "Đang lưu..." : "Duyệt"}
                       </button>

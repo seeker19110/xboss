@@ -379,7 +379,7 @@ function ChecklistsTab({
       {canManage && (
         <button
           onClick={onAdd}
-          className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
+          className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
         >
           <Plus className="w-4 h-4" /> Thêm checklist
         </button>
@@ -627,7 +627,7 @@ function ChecklistFormModal({
         <button
           onClick={save}
           disabled={saving}
-          className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent px-3 py-2 rounded-lg transition"
+          className="text-xs bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent px-3 py-2 rounded-lg transition"
         >
           {saving ? "Đang lưu..." : "Lưu"}
         </button>
@@ -684,7 +684,7 @@ function InspectionsTab({
       <button
         onClick={onAdd}
         disabled={checklists.length === 0}
-        className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 px-3 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
+        className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 px-3 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
       >
         <Plus className="w-4 h-4" /> Kiểm tra mới
       </button>
@@ -972,7 +972,7 @@ function InspectionFormModal({
         <button
           onClick={() => save("submitted")}
           disabled={saving}
-          className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent px-3 py-2 rounded-lg transition"
+          className="text-xs bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent px-3 py-2 rounded-lg transition"
         >
           {saving ? "Đang lưu..." : "Gửi duyệt"}
         </button>
@@ -1023,7 +1023,7 @@ function NcrsTab({
     <div className="space-y-3">
       <button
         onClick={onAdd}
-        className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
+        className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
       >
         <Plus className="w-4 h-4" /> NCR mới
       </button>
@@ -1256,7 +1256,7 @@ function NcrFormModal({
         <button
           onClick={save}
           disabled={saving}
-          className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent px-3 py-2 rounded-lg transition"
+          className="text-xs bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent px-3 py-2 rounded-lg transition"
         >
           {saving ? "Đang lưu..." : "Tạo NCR"}
         </button>
@@ -1299,7 +1299,7 @@ function RequestsTab({
       {canCreate && (
         <button
           onClick={onAdd}
-          className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
+          className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
         >
           <Plus className="w-4 h-4" /> Phiếu YCNT mới
         </button>
@@ -1525,7 +1525,7 @@ function RequestFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
         <button
           onClick={save}
           disabled={saving}
-          className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent px-3 py-2 rounded-lg transition"
+          className="text-xs bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent px-3 py-2 rounded-lg transition"
         >
           {saving ? "Đang gửi..." : "Gửi YCNT"}
         </button>
@@ -1628,7 +1628,7 @@ function DocumentsTab({
         </label>
         <button
           onClick={() => setUploadOpen(true)}
-          className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
+          className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
         >
           <Upload className="w-4 h-4" /> Nộp hồ sơ
         </button>
@@ -1871,7 +1871,7 @@ function DocUploadModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
         <button
           onClick={save}
           disabled={saving}
-          className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent px-3 py-2 rounded-lg transition"
+          className="text-xs bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent px-3 py-2 rounded-lg transition"
         >
           {saving ? "Đang nộp..." : "Nộp hồ sơ"}
         </button>

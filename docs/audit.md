@@ -170,13 +170,13 @@ KẾT LUẬN: Sẵn sàng / Cần xử lý: [..]
 
 ## 13. Phụ lục A — Tương phản màu WCAG (gộp từ audit a11y)
 
-> Gộp từ `docs/a11y/contrast-audit.md` (đã xoá) — giữ **phương pháp ground-truth + bảng tương phản tính sẵn** làm chuẩn tra cứu khi thêm/sửa màu. Backlog remediation theo trang (đã dọn gần hết) không giữ ở đây; nợ a11y còn lại (nếu có) theo dõi ở `PROGRESS.md` › Nợ kỹ thuật. Script tính: `npx tsx scripts/contrast-check.ts`.
+> Gộp từ `docs/a11y/contrast-audit.md` (đã xoá) — giữ **phương pháp ground-truth + bảng tương phản tính sẵn** làm chuẩn tra cứu khi thêm/sửa màu. Backlog remediation theo trang (đã dọn gần hết) không giữ ở đây; nợ a11y còn lại (nếu có) theo dõi ở `PROGRESS.md` › Nợ kỹ thuật. Script tính nay là **cổng CI**: `npm run check:contrast` (`scripts/check-contrast.ts`) — đọc thẳng bảng token trong `app/globals.css` (không chép tay như `scripts/contrast-check.ts` cũ, bản đó đã lệch khỏi globals.css nên bỏ), chặn khi mức chữ 300/400/500 (zinc + accent) không đạt AA trên `--background`/`zinc-950`/`zinc-900` của bất kỳ theme nào.
 
 ### 13.1 Phương pháp — vì sao "grep" chỉ là ứng viên
 
 `grep "text-zinc-500\|text-zinc-600"` (~399 occurrences) và `bg-{accent}-500/600` (~109) chỉ là **ứng viên**, không phải lỗi. Hai tầng kiểm chứng:
 
-1. **Tính tỉ lệ tương phản WCAG** (`scripts/contrast-check.ts`) trên hex đã giải của thang `zinc` ở **cả 6 theme** (`dark/light/kingblue/darkblue/navy` + gốc) → biến "ứng viên" thành "khả năng lỗi cao" và cho ra **quy tắc thay thế đúng mọi theme** (đổi `zinc-500`→`zinc-400` chỉ đúng nếu pass ở _tất cả_ theme).
+1. **Tính tỉ lệ tương phản WCAG** (`npm run check:contrast`) trên hex đã giải của thang `zinc` ở **cả 6 theme** (`dark/light/kingblue/darkblue/navy` + gốc) → biến "ứng viên" thành "khả năng lỗi cao" và cho ra **quy tắc thay thế đúng mọi theme** (đổi `zinc-500`→`zinc-400` chỉ đúng nếu pass ở _tất cả_ theme).
 2. **axe-core trên trình duyệt (ground-truth cuối)** — Playwright E2E trên **bản production** (`npm run start`). Chỉ axe thấy màu render thật (Tailwind v4 `oklch`), DOM xếp chồng, opacity, và phân biệt text thật vs icon/đồ hoạ.
 
 **Grep over-count vì 4 lý do** (không chạy `sed` thay thế hàng loạt): body-text tĩnh (✅ lỗi thật nếu < 4.5) vs hover/idle của icon (❌ thường không) vs code chỉ chạy dev — `NODE_ENV==='development'` (❌ production không render) vs accent đã đủ tương phản (❌, vd `text-white bg-red-600` = 4.83:1). ⇒ Mỗi trang: sửa ứng viên _body-text tĩnh_ theo §13.2/§13.3 rồi **bật axe cho trang đó** để chốt (§13.4).

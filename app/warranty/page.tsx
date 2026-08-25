@@ -18,7 +18,8 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN, todayISO } from "@/lib/nen/date";
+import { formatDateVN, todayISO, daysFromTodayISO } from "@/lib/nen/date";
+import { EXPIRY_WARN_DAYS } from "@/lib/nen/han-hieu-luc";
 
 // ===== Kiểu dữ liệu (client) — mirror lib/warranty.ts =====
 
@@ -188,7 +189,7 @@ export default function WarrantyPage() {
   // kickoffReadiness/handoverProgress: không thêm route riêng).
   const kpi = useMemo(() => {
     const today = todayISO();
-    const limit = new Date(Date.now() + 7 * 3600_000 + 30 * 86400_000).toISOString().slice(0, 10);
+    const limit = daysFromTodayISO(EXPIRY_WARN_DAYS);
     const expiringSoon = items.filter((it) => {
       if (it.status !== "active") return false;
       const expiry = warrantyExpiryClient(it);
@@ -245,7 +246,7 @@ export default function WarrantyPage() {
                 <button
                   onClick={() => setAddItemOpen(true)}
                   aria-label="Thêm hạng mục bảo hành"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm hạng mục</span>
@@ -255,7 +256,7 @@ export default function WarrantyPage() {
                 <button
                   onClick={() => setAddClaimOpen(true)}
                   aria-label="Thêm claim bảo hành"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm claim</span>
                 </button>
@@ -264,7 +265,7 @@ export default function WarrantyPage() {
                 <button
                   onClick={() => setAddOmOpen(true)}
                   aria-label="Thêm tài liệu O&M"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm tài liệu</span>
@@ -441,8 +442,7 @@ function WarrantyTab({
                 it.status === "active" &&
                 !overdue &&
                 expiry != null &&
-                expiry <=
-                  new Date(Date.now() + 7 * 3600_000 + 30 * 86400_000).toISOString().slice(0, 10);
+                expiry <= daysFromTodayISO(EXPIRY_WARN_DAYS);
               return (
                 <tr key={it.id} className="border-b border-zinc-800/60 last:border-0">
                   <td className="p-3">
@@ -870,7 +870,7 @@ function WarrantyItemModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1070,7 +1070,7 @@ function ClaimModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1170,7 +1170,7 @@ function OmModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>

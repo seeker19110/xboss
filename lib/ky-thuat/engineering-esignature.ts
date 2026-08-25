@@ -1,4 +1,5 @@
 import { query, queryOne, withProjectScope, withTransaction } from "@/lib/db";
+import { todayISO } from "@/lib/nen/date";
 import crypto from "crypto";
 
 export type EsignDocumentType =
@@ -51,7 +52,7 @@ export function createDocumentEnvelopeHash(payload: Record<string, unknown>): st
 }
 
 export function generateCertificateCode(documentType: string): string {
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const dateStr = todayISO().replace(/-/g, "");
   const randomSuffix = crypto.randomBytes(3).toString("hex").toUpperCase();
   return `CERT-${documentType}-${dateStr}-${randomSuffix}`;
 }

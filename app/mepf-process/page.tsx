@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { formatDateTimeVN } from "@/lib/nen/date";
 import Link from "next/link";
 import {
   Sparkles,
@@ -1177,7 +1178,9 @@ export default function CleanMepfProcessPage() {
   async function handleApprove(stepId: string) {
     setIsSubmitting(true);
     const approver = me?.name ? `${me.name} (Kỹ sư TVGS)` : "Kỹ sư Giám Sát TVGS";
-    const approvedAt = new Date().toISOString().replace("T", " ").slice(0, 16);
+    // Dấu thời gian duyệt HIỂN THỊ cho kỹ sư VN — phải theo giờ VN, không phải UTC
+    // (trước đây in thẳng ISO nên lệch 7 tiếng, tối muộn còn hiện sai cả ngày).
+    const approvedAt = formatDateTimeVN(new Date());
 
     let hashSignature = `SHA256:AUTHENTICATED`;
     if (typeof window !== "undefined" && window.crypto?.subtle) {
@@ -1708,7 +1711,7 @@ export default function CleanMepfProcessPage() {
                           type="button"
                           onClick={() => handleApprove(activeStep.id)}
                           disabled={isSubmitting}
-                          className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-on-accent text-xs font-bold shadow-md flex items-center gap-1.5 transition disabled:opacity-50"
+                          className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-on-accent text-xs font-bold shadow-md flex items-center gap-1.5 transition disabled:opacity-50"
                         >
                           <Check className="w-4 h-4" /> Kỹ Sư Ký Duyệt Chuyển Bước
                         </button>

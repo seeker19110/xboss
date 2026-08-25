@@ -78,6 +78,9 @@ jobs:
       - name: Kiểm màu accent (text-white trên nền sáng)
         run: npm run check:mau-accent
 
+      - name: Kiểm tương phản hệ màu theo theme (WCAG AA)
+        run: npm run check:contrast
+
       # W2.1 (đợt "nâng tầm dự án" GĐ2): chặn route ghi (POST/PATCH/PUT/DELETE) quên kiểm
       # quyền — lớp lỗi đã lặp ≥3 đợt audit. Static, không cần DB.
       - name: Kiểm route ghi có kiểm quyền

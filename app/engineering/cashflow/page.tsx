@@ -175,7 +175,7 @@ export default function CashflowCockpitPage() {
               <button
                 type="submit"
                 disabled={simulating}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-on-accent transition-colors hover:bg-amber-500 disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-on-accent transition-colors hover:bg-amber-800 disabled:opacity-50"
               >
                 {simulating ? (
                   <RefreshCw className="animate-spin" size={16} />

@@ -519,7 +519,7 @@ function DependencyModal({
           <button
             onClick={add}
             disabled={!pick || busy}
-            className="px-3 py-1.5 text-sm bg-sky-600 hover:bg-sky-500 disabled:opacity-40 rounded-lg text-on-accent"
+            className="px-3 py-1.5 text-sm bg-sky-700 hover:bg-sky-800 disabled:opacity-40 rounded-lg text-on-accent"
           >
             Thêm
           </button>

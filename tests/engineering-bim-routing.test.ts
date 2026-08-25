@@ -5,68 +5,10 @@ import {
   detectClashesWithSpatialGrid,
   findRoutePath3D,
 } from "@/lib/ky-thuat/engineering-bim-routing";
-import { BimElementRecord } from "@/lib/ky-thuat/engineering-bim-cad";
+import { taoBimElementsVaCham } from "./fixtures-bim";
 
 test("M89: detectClashesWithSpatialGrid phát hiện va chạm cứng O(n log n)", () => {
-  const elements: BimElementRecord[] = [
-    {
-      id: "ELEM-01",
-      project_id: 1,
-      ifc_guid: "GUID-DUCT-01",
-      element_type: "DUCT_STRAIGHT",
-      discipline: "hvac",
-      system_name: "M-DUCT-SUPP",
-      storey_level: "Level 1",
-      zone_name: "Zone A",
-      properties: {},
-      spatial_bounding_box: {
-        min: [1000, 2000, 2800],
-        max: [5000, 2600, 3200],
-      },
-      task_id: null,
-      boq_code: null,
-      actual_status: "installed",
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "ELEM-02",
-      project_id: 1,
-      ifc_guid: "GUID-PIPE-01",
-      element_type: "PIPE_STRAIGHT",
-      discipline: "plumbing",
-      system_name: "P-PIPE-SANR",
-      storey_level: "Level 1",
-      zone_name: "Zone A",
-      properties: {},
-      spatial_bounding_box: {
-        min: [2500, 1000, 2900],
-        max: [2700, 4000, 3100], // Giao cắt với ELEM-01
-      },
-      task_id: null,
-      boq_code: null,
-      actual_status: "installed",
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "ELEM-03-FAR",
-      project_id: 1,
-      ifc_guid: "GUID-PIPE-FAR",
-      element_type: "PIPE_STRAIGHT",
-      discipline: "plumbing",
-      system_name: "P-PIPE-SANR",
-      storey_level: "Level 1",
-      zone_name: "Zone B",
-      properties: {},
-      spatial_bounding_box: {
-        min: [10000, 10000, 2900],
-        max: [10200, 14000, 3100], // Cách xa, không va chạm
-      },
-      task_id: null,
-      boq_code: null,
-      actual_status: "installed",
-      created_at: new Date().toISOString(),
-    },
-  ];
+  const elements = taoBimElementsVaCham();
 
   const clashes = detectClashesWithSpatialGrid(elements, 50, 2000);
   assert.equal(clashes.length, 1);

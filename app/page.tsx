@@ -20,6 +20,8 @@ import {
   Brain,
   Landmark,
   ArrowUpRight,
+  Gauge,
+  type LucideIcon,
 } from "lucide-react";
 import { slugFromCode, toSlug } from "@/lib/nen/sheets";
 import AppHeader from "@/app/components/AppHeader";
@@ -29,6 +31,7 @@ import EditableText from "@/app/components/EditableText";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { sortFloorsDesc } from "@/lib/tien-do/floors";
 import DelayedGroupsTable from "@/app/components/DelayedGroupsTable";
+import { Button, Card, CardLink, Chip, Section, StatCard } from "@/app/components/ui";
 import { systemColorClasses } from "@/lib/nen/systemColors";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/tien-do/status";
 import type {
@@ -113,6 +116,109 @@ type SystemCard = {
   delayed: number;
 };
 
+// 7 phân hệ hợp nhất + 6 giai đoạn vòng đời: dữ liệu điều hướng thuần (không phải số liệu
+// dự án) nên tách khỏi JSX cho gọn. Trước đây khai ngay trong render kèm các chip trạng thái
+// cắm cứng ("100% Khớp", "LOD 400", "Quyết toán kỳ 6") — số liệu giả, không đọc từ DB, dễ
+// khiến người xem tin nhầm là tình trạng thật; đã bỏ hẳn, chỉ giữ phần điều hướng.
+const HUBS: {
+  title: string;
+  desc: string;
+  href: string;
+  icon: LucideIcon;
+  color: string;
+  colSpan?: string;
+}[] = [
+  {
+    title: "1. MEPF CAD/BIM Studio",
+    desc: "3D/4D BIM WebGPU, LiDAR Scan-to-BIM, BCF 3.0, CNC G-Code & Auto-Routing",
+    href: "/engineering/god-tier-studio",
+    icon: Sparkles,
+    color: "text-amber-300",
+  },
+  {
+    title: "2. Chỉ huy hiện trường & An toàn",
+    desc: "Việc của tôi, Nhật ký TT06, Nghiệm thu, Mặt bằng & AI HSE",
+    href: "/site",
+    icon: HardHat,
+    color: "text-emerald-300",
+  },
+  {
+    title: "3. Kế hoạch & Tiến độ WBS",
+    desc: "Lưới 6 hệ, CPM Gantt, Lookahead, EVM SPI/CPI & Báo cáo A4",
+    href: "/schedule",
+    icon: CalendarCheck,
+    color: "text-sky-300",
+  },
+  {
+    title: "4. Chuỗi cung ứng & Vật tư",
+    desc: "Định mức BOQ, Đấu thầu Vendor, Đơn hàng PO & QR GRN",
+    href: "/procurement",
+    icon: Package,
+    color: "text-blue-300",
+  },
+  {
+    title: "5. Hợp đồng, Chi phí & FIDIC",
+    desc: "Hợp đồng A-B, Chứng chỉ IPC, Phát sinh VO, Claims & Dòng tiền",
+    href: "/commercial",
+    icon: Coins,
+    color: "text-violet-300",
+  },
+  {
+    title: "6. Trí tuệ AI & Digital Twin",
+    desc: "Zalo/Voice Copilot, Gate 0, AI Swarm Debates & IoT Telemetry",
+    href: "/engineering-intelligence",
+    icon: Brain,
+    color: "text-rose-300",
+  },
+  {
+    title: "7. Quản trị dự án & Hệ thống",
+    desc: "Khởi công Đ107, Bàn giao Đ24, CDE Hồ sơ, Nhân sự & Audit Log",
+    href: "/governance",
+    icon: Landmark,
+    color: "text-zinc-300",
+    colSpan: "sm:col-span-2",
+  },
+];
+
+const LIFECYCLE = [
+  {
+    stage: "GĐ 0",
+    title: "Khởi động & Pháp lý",
+    desc: "Điều 107 · ĐTM · BOQ TT12",
+    href: "/governance?tab=lifecycle",
+  },
+  {
+    stage: "GĐ 1",
+    title: "Kỹ thuật không gian",
+    desc: "3D BIM · Routing · Nesting",
+    href: "/engineering/god-tier-studio",
+  },
+  {
+    stage: "GĐ 2",
+    title: "Cung ứng & Vật tư",
+    desc: "PO 6 bước · QR GRN cổng",
+    href: "/procurement",
+  },
+  {
+    stage: "GĐ 3",
+    title: "Hiện trường & HSE",
+    desc: "Nhật ký TT06 · AI Vision",
+    href: "/site",
+  },
+  {
+    stage: "GĐ 4",
+    title: "Nghiệm thu & IPC",
+    desc: "Ký số e-Sign · TT96 · FIDIC",
+    href: "/commercial",
+  },
+  {
+    stage: "GĐ 5",
+    title: "Hoàn công & Bàn giao",
+    desc: "T&C · Điều 24 · Digital Twin",
+    href: "/governance?tab=lifecycle",
+  },
+];
+
 export default function Dashboard() {
   const [data, setData] = useState<{
     delayedTasks: DelayedTask[];
@@ -180,6 +286,18 @@ export default function Dashboard() {
       })),
     [data],
   );
+  // Tổng quan đầu trang: % tiến độ bình quân CÓ TRỌNG SỐ theo số công việc mỗi trang
+  // (trung bình cộng thuần sẽ để trang 5 việc nặng ngang trang 500 việc).
+  const overview = useMemo(() => {
+    const kpi = data?.kpi ?? [];
+    const totalTasks = kpi.reduce((sum, k) => sum + k.total, 0);
+    const done = kpi.reduce((sum, k) => sum + (k.avgProgress ?? 0) * k.total, 0);
+    return {
+      totalTasks,
+      pct: totalTasks > 0 ? Math.round((done / totalTasks) * 100) : 0,
+      delayed: data?.totalDelayed ?? 0,
+    };
+  }, [data]);
   const floors = useMemo(
     () =>
       [...new Set((data?.delayedTasks ?? []).map((t) => t.floorLabel).filter(Boolean))].sort(
@@ -345,7 +463,7 @@ export default function Dashboard() {
               <a
                 href="/import"
                 aria-label="Import Excel"
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
               >
                 <Upload className="w-4 h-4" />{" "}
                 <span className="hidden sm:inline">Import Excel</span>
@@ -356,297 +474,16 @@ export default function Dashboard() {
       />
 
       {/* pb-24 chừa chỗ cho thanh cố định dưới đáy (tìm kiếm/Nghiệm thu/Excel/PDF/Import) */}
-      <main className="px-4 sm:px-6 py-6 pb-24 space-y-6 max-w-screen-xl mx-auto">
-        {/* ── Vòng Đời Dự Án 6 Giai Đoạn (6-Stage Construction Lifecycle Progression) ── */}
-        <section className="p-4 sm:p-5 rounded-2xl bg-zinc-950/90 border border-zinc-800 shadow-sm space-y-3.5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800/80 pb-3">
-            <div className="flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <div>
-                <a
-                  href="/mepf-process"
-                  className="group inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors"
-                >
-                  <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-zinc-200 group-hover:text-amber-300">
-                    Chuỗi Quy Trình Vòng Đời Dự Án Xây Dựng MEPF (6 Giai Đoạn)
-                  </h2>
-                  <ArrowUpRight className="w-3.5 h-3.5 text-zinc-500 group-hover:text-amber-400" />
-                </a>
-                <p className="text-[11px] text-zinc-400">
-                  Tiến trình khép kín từ Khởi động, BIM/CAD, Cung ứng, Thi công, Nghiệm thu đến Bàn
-                  giao số
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 font-bold">
-                TT AVIO — Tháp A
-              </span>
-            </div>
-          </div>
-
-          {/* 6 Stage Lifecycle Steps Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-            {[
-              {
-                stage: "GĐ 0",
-                title: "Khởi Động & Pháp Lý",
-                desc: "Điều 107 • ĐTM • BOQ TT12",
-                href: "/governance?tab=lifecycle",
-                status: "Đạt chuẩn",
-                color: "text-emerald-400",
-                bg: "bg-emerald-500/10",
-                border: "border-emerald-500/30",
-              },
-              {
-                stage: "GĐ 1",
-                title: "Kỹ Thuật Không Gian",
-                desc: "3D BIM • Routing • Nesting",
-                href: "/engineering/god-tier-studio",
-                status: "LOD 400",
-                color: "text-amber-400",
-                bg: "bg-amber-500/10",
-                border: "border-amber-500/30",
-              },
-              {
-                stage: "GĐ 2",
-                title: "Cung Ứng & Vật Tư",
-                desc: "PO 6 bước • QR GRN Cổng",
-                href: "/procurement",
-                status: "100% Khớp",
-                color: "text-blue-300",
-                bg: "bg-blue-500/10",
-                border: "border-blue-500/30",
-              },
-              {
-                stage: "GĐ 3",
-                title: "Hiện Trường & HSE",
-                desc: "Nhật ký TT06 • AI Vision",
-                href: "/site",
-                status: "Đang thi công",
-                color: "text-emerald-400",
-                bg: "bg-emerald-500/10",
-                border: "border-emerald-500/30",
-              },
-              {
-                stage: "GĐ 4",
-                title: "Nghiệm Thu & IPC",
-                desc: "Ký số e-Sign • TT96 • FIDIC",
-                href: "/commercial",
-                status: "Quyết toán kỳ 6",
-                color: "text-violet-400",
-                bg: "bg-violet-500/10",
-                border: "border-violet-500/30",
-              },
-              {
-                stage: "GĐ 5",
-                title: "Hoàn Công & Bàn Giao",
-                desc: "T&C • Điều 24 • Digital Twin",
-                href: "/governance?tab=lifecycle",
-                status: "Chuẩn bị",
-                color: "text-zinc-300",
-                bg: "bg-zinc-900",
-                border: "border-zinc-700",
-              },
-            ].map((stg, idx) => (
-              <a
-                key={idx}
-                href={stg.href}
-                className={`p-3 rounded-xl border ${stg.border} bg-zinc-900/60 hover:bg-zinc-900 transition-all flex flex-col justify-between group shadow-2xs hover:shadow-sm`}
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase">
-                      {stg.stage}
-                    </span>
-                    <span
-                      className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-semibold ${stg.bg} ${stg.color}`}
-                    >
-                      {stg.status}
-                    </span>
-                  </div>
-                  <h4 className="text-xs font-semibold text-zinc-200 group-hover:text-amber-300 transition-colors leading-snug">
-                    {stg.title}
-                  </h4>
-                </div>
-                <p className="text-[10px] text-zinc-400 mt-2 font-mono truncate">{stg.desc}</p>
-              </a>
-            ))}
-          </div>
-        </section>
-
-        {/* ── 7 Đại Trung Tâm Điều Hành Hợp Nhất (The 7 Master Hubs) ── */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                7 Đại Trung Tâm Điều Hành XBoss (Unified Cockpits)
-              </h2>
-            </div>
-            <span className="text-[11px] font-mono text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-              Hệ Thống Tinh Gọn v1.0
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              {
-                title: "1. MEPF CAD/BIM Studio",
-                desc: "3D/4D BIM WebGPU, LiDAR Scan-to-BIM, BCF 3.0, CNC G-Code & Auto-Routing",
-                href: "/engineering/god-tier-studio",
-                icon: Sparkles,
-                badge: "MEPF Core",
-                color: "text-amber-400",
-                border: "border-amber-500/40",
-              },
-              {
-                title: "2. Chỉ Huy Hiện Trường & An Toàn",
-                desc: "Việc của tôi, Nhật ký TT06, Nghiệm thu, Mặt bằng & AI HSE",
-                href: "/site",
-                icon: HardHat,
-                badge: "5 Trạm",
-                color: "text-emerald-400",
-                border: "border-emerald-500/30",
-              },
-              {
-                title: "3. Kế Hoạch & Tiến Độ WBS",
-                desc: "Lưới 6 hệ, CPM Gantt, Lookahead, EVM SPI/CPI & Báo cáo A4",
-                href: "/schedule",
-                icon: CalendarCheck,
-                badge: "4 Trụ Cột",
-                color: "text-sky-400",
-                border: "border-sky-500/30",
-              },
-              {
-                title: "4. Chuỗi Cung Ứng & Vật Tư",
-                desc: "Định mức BOQ, Đấu thầu Vendor, Đơn hàng PO & QR GRN",
-                href: "/procurement",
-                icon: Package,
-                badge: "4 Khâu",
-                color: "text-blue-400",
-                border: "border-blue-500/30",
-              },
-              {
-                title: "5. Hợp Đồng, Chi Phí & FIDIC",
-                desc: "Hợp đồng A-B, Chứng chỉ IPC, Phát sinh VO, Claims & Dòng tiền",
-                href: "/commercial",
-                icon: Coins,
-                badge: "4 Khối",
-                color: "text-violet-400",
-                border: "border-violet-500/30",
-              },
-              {
-                title: "6. Trí Tuệ AI & Digital Twin",
-                desc: "Zalo/Voice Copilot, Gate 0, AI Swarm Debates & IoT Telemetry",
-                href: "/engineering-intelligence",
-                icon: Brain,
-                badge: "AI Apex",
-                color: "text-rose-400",
-                border: "border-rose-500/30",
-              },
-              {
-                title: "7. Quản Trị Dự Án & Hệ Thống",
-                desc: "Khởi công Đ107, Bàn giao Đ24, CDE Hồ sơ, Nhân sự & Audit Log",
-                href: "/governance",
-                icon: Landmark,
-                badge: "Governance",
-                color: "text-zinc-200",
-                border: "border-zinc-700",
-                colSpan: "sm:col-span-2 lg:col-span-2",
-              },
-            ].map((hub, idx) => {
-              const HubIcon = hub.icon;
-              return (
-                <a
-                  key={idx}
-                  href={hub.href}
-                  className={`p-4 rounded-2xl bg-zinc-950/80 hover:bg-zinc-900/90 border ${hub.border} transition-all space-y-2.5 flex flex-col justify-between group shadow-sm hover:shadow-md hover:border-amber-500/50 ${
-                    hub.colSpan || ""
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 group-hover:scale-105 transition-transform">
-                        <HubIcon className={`w-4 h-4 ${hub.color}`} />
-                      </div>
-                      <div>
-                        <h3 className="text-xs font-semibold text-zinc-100 group-hover:text-amber-300 transition-colors">
-                          {hub.title}
-                        </h3>
-                        <span className="text-[10px] font-mono text-zinc-400">{hub.badge}</span>
-                      </div>
-                    </div>
-                    <ArrowUpRight className="w-4 h-4 text-zinc-600 group-hover:text-amber-400 transition-colors shrink-0" />
-                  </div>
-                  <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
-                    {hub.desc}
-                  </p>
-                </a>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* ── Card hệ (M15) — nhìn nhanh từng hệ, bấm vào trang hub riêng ── */}
-        {systems.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                Theo hệ thi công
-              </h2>
-              <span className="text-xs text-zinc-500 font-medium">{systems.length} hệ</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {systems.map((d) => {
-                const c = systemColorClasses(d.color);
-                const dpct = Math.round((d.avgProgress ?? 0) * 100);
-                return (
-                  <a
-                    key={d.code}
-                    href={`/system/${d.code}`}
-                    className={`bento-card p-3.5 flex flex-col justify-between hover:border-zinc-700 transition-all border-l-4 ${c.border} group`}
-                  >
-                    <div className="flex items-center justify-between gap-1 min-w-0">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span
-                          className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`}
-                          aria-hidden="true"
-                        />
-                        <p className="text-xs font-semibold truncate text-zinc-200 group-hover:text-white transition-colors">
-                          {d.name}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-3">
-                      <p className={`text-2xl font-bold font-mono tabular-nums ${c.text}`}>
-                        {dpct}%
-                      </p>
-                      <div className="flex items-center justify-between mt-1 text-[11px]">
-                        <span className="text-zinc-500">{d.sheetCount} bảng</span>
-                        {d.delayed > 0 ? (
-                          <span className="font-semibold text-rose-400">{d.delayed} trễ</span>
-                        ) : (
-                          <span className="text-emerald-500 font-medium">Đúng hạn</span>
-                        )}
-                      </div>
-                    </div>
-                  </a>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* ── KPI ── */}
-        <section>
-          {/* Header tiến độ & Thêm trang */}
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-              Tổng quan tiến độ
-            </h2>
-            {canImport && (
-              <button
+      <main className="px-4 sm:px-6 py-6 pb-24 space-y-8 max-w-screen-xl mx-auto">
+        {/* ── Tổng quan nhanh — số liệu thật lên đầu trang, trước mọi khối điều hướng ── */}
+        <Section
+          title="Tổng quan dự án"
+          description="Số liệu tổng hợp toàn bộ trang tracking đang theo dõi"
+          actions={
+            canImport && (
+              <Button
+                size="sm"
+                icon={Plus}
                 onClick={() => {
                   setNewSheetErr("");
                   setNewSheet({
@@ -656,83 +493,66 @@ export default function Dashboard() {
                     copyFromId: sheets[sheets.length - 1]?.id ?? "",
                   });
                 }}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-medium text-zinc-300 hover:text-white hover:border-zinc-700 transition shadow-xs"
               >
-                <Plus className="w-3.5 h-3.5 text-emerald-400" /> Thêm trang
-              </button>
-            )}
+                Thêm trang
+              </Button>
+            )
+          }
+        >
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard
+              label="Tiến độ tổng"
+              value={overview.pct}
+              unit="%"
+              progress={overview.pct / 100}
+              tone={overview.pct >= 80 ? "success" : overview.pct >= 50 ? "info" : "warning"}
+              hint={`${overview.totalTasks.toLocaleString("vi-VN")} công việc · ${kpiOrder.length} trang`}
+              icon={Gauge}
+            />
+            <StatCard
+              label="Đang trễ hạn"
+              value={overview.delayed}
+              unit="việc"
+              tone={overview.delayed > 0 ? "danger" : "success"}
+              hint={overview.delayed > 0 ? "Bấm để xem danh sách" : "Toàn bộ đúng hạn"}
+              icon={TrendingDown}
+              href={overview.delayed > 0 ? "#delayed-table" : undefined}
+            />
+            <StatCard
+              label="NCR đang mở"
+              value={data?.quality.ncrOpen ?? 0}
+              tone={(data?.quality.ncrOverdue ?? 0) > 0 ? "warning" : "neutral"}
+              hint={
+                (data?.quality.ncrOverdue ?? 0) > 0
+                  ? `${data?.quality.ncrOverdue} phiếu quá hạn xử lý`
+                  : "Không có phiếu quá hạn"
+              }
+              icon={AlertTriangle}
+              href="/quality"
+            />
+            <StatCard
+              label="Chờ duyệt của tôi"
+              value={
+                (data?.approvals?.pendingProposals ?? 0) +
+                (data?.approvals?.pendingPurchaseRequests ?? 0)
+              }
+              tone="neutral"
+              hint={`${data?.approvals?.pendingProposals ?? 0} đề xuất · ${data?.approvals?.pendingPurchaseRequests ?? 0} yêu cầu mua`}
+              icon={CalendarCheck}
+              href="/approvals"
+            />
           </div>
+        </Section>
 
-          {/* Banner trễ */}
-          {(data?.totalDelayed ?? 0) > 0 && (
-            <a
-              href="#delayed-table"
-              className="flex items-center gap-4 bg-orange-500/10 border border-orange-500/30 rounded-2xl px-5 py-4 mb-4 hover:bg-orange-500/15 hover:border-orange-500/50 transition-all shadow-sm group"
-            >
-              <div className="p-3 bg-orange-500/15 border border-orange-500/30 rounded-xl shrink-0 text-orange-300 group-hover:scale-105 transition-transform">
-                <TrendingDown className="w-6 h-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-zinc-400 uppercase tracking-wider font-semibold mb-0.5">
-                  Tổng số hạng mục đang trễ hạn
-                </p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold font-mono tabular-nums leading-none text-zinc-100">
-                    {data?.totalDelayed ?? 0}
-                  </p>
-                  <span className="text-xs text-orange-300 font-medium">cần xử lý ngay</span>
-                </div>
-              </div>
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/15 border border-orange-500/30 text-xs font-semibold text-orange-300 group-hover:bg-orange-500/25 transition shrink-0">
-                Xem phân tích trễ <ChevronRight className="w-3.5 h-3.5" />
-              </span>
-            </a>
-          )}
-
-          {/* Grid sheet cards — draggable để sắp xếp (Admin/PM) */}
+        {/* ── Tiến độ từng trang tracking — kéo thả để sắp xếp (Admin/PM) ── */}
+        <Section
+          title="Tiến độ theo trang tracking"
+          description={canImport ? "Kéo thả thẻ để đổi thứ tự hiển thị" : undefined}
+        >
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {kpiOrder.map((k, i) => {
               const slug = k.sheetSlug ?? slugFromCode(k.sheetType);
               const pct = Math.round((k.avgProgress ?? 0) * 100);
-              const hasDelay = k.delayed > 0;
-              const cardContent = (
-                <div className="flex flex-col h-full justify-between gap-3">
-                  <div className="flex items-start justify-between gap-1">
-                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wide leading-snug group-hover/card:text-white transition-colors">
-                      {k.sheetType}
-                    </span>
-                    {hasDelay && (
-                      <span
-                        title={`${k.delayed} hạng mục đang trễ`}
-                        className="flex items-center gap-1 text-[10px] text-orange-300 bg-orange-500/15 border border-orange-500/30 px-2 py-0.5 rounded-full shrink-0 font-semibold"
-                      >
-                        <AlertTriangle className="w-2.5 h-2.5 text-orange-400" /> {k.delayed}
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold font-mono tabular-nums leading-none text-zinc-100">
-                      {pct}%
-                    </p>
-                    <p className="text-[11px] text-zinc-400 mt-1">{k.total} công việc</p>
-                  </div>
-                  <div className="mt-auto">
-                    <div className="bg-zinc-900 rounded-full h-2 overflow-hidden border border-zinc-800/80">
-                      <div
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                          pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-sky-500" : "bg-amber-500"
-                        }`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-
-              const cardCls = `bento-card relative group/card p-4 flex flex-col transition-all min-h-[128px] ${
-                slug ? "hover:border-emerald-700/60 cursor-pointer" : ""
-              }`;
-
               return (
                 <div
                   key={k.sheetId}
@@ -742,17 +562,33 @@ export default function Dashboard() {
                   onDragOver={(e) => onDragOver(e, i)}
                   onDrop={onDrop}
                 >
-                  {slug ? (
-                    <a href={`/tracking/${slug}`} className={cardCls}>
-                      {cardContent}
-                    </a>
-                  ) : (
-                    <div className={cardCls}>{cardContent}</div>
-                  )}
+                  <StatCard
+                    label={k.sheetType}
+                    value={pct}
+                    unit="%"
+                    progress={pct / 100}
+                    tone={pct >= 80 ? "success" : pct >= 50 ? "info" : "warning"}
+                    hint={`${k.total} công việc`}
+                    href={slug ? `/tracking/${slug}` : undefined}
+                    badge={
+                      k.delayed > 0 ? (
+                        // Chừa chỗ cho nút xoá nổi ở góc phải khi được sửa (Admin/PM)
+                        <Chip
+                          tone="danger"
+                          icon={AlertTriangle}
+                          className={canImport ? "mr-8" : ""}
+                        >
+                          <span className="tabular-nums">{k.delayed}</span>
+                          <span className="sr-only"> hạng mục đang trễ</span>
+                        </Chip>
+                      ) : undefined
+                    }
+                    className={canImport ? "pl-6" : undefined}
+                  />
                   {canImport && (
                     <>
                       {/* Tay cầm kéo */}
-                      <div className="absolute top-2 left-2 p-0.5 text-zinc-700 group-hover/wrap:text-zinc-500 cursor-grab active:cursor-grabbing transition z-10 pointer-events-none">
+                      <div className="absolute top-4 left-2 text-zinc-700 group-hover/wrap:text-zinc-500 cursor-grab active:cursor-grabbing transition z-10 pointer-events-none">
                         <GripVertical className="w-3.5 h-3.5" />
                       </div>
                       <button
@@ -761,7 +597,8 @@ export default function Dashboard() {
                           deleteSheet(k.sheetId, k.sheetType);
                         }}
                         title="Xoá trang tracking"
-                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-zinc-900/90 border border-zinc-800 text-zinc-500 hover:text-red-300 hover:bg-red-950/50 hover:border-red-800/60 opacity-100 sm:opacity-0 sm:group-hover/wrap:opacity-100 transition z-10"
+                        aria-label={`Xoá trang ${k.sheetType}`}
+                        className="absolute top-3 right-2 p-1.5 rounded-lg bg-zinc-900/90 border border-zinc-800 text-zinc-500 hover:text-red-300 hover:bg-red-950/50 hover:border-red-800/60 opacity-100 sm:opacity-0 sm:group-hover/wrap:opacity-100 transition z-10"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -771,7 +608,126 @@ export default function Dashboard() {
               );
             })}
           </div>
-        </section>
+        </Section>
+
+        {/* ── Card hệ (M15) — nhìn nhanh từng hệ, bấm vào trang hub riêng ── */}
+        {systems.length > 0 && (
+          <Section title="Theo hệ thi công" description={`${systems.length} hệ đang theo dõi`}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {systems.map((d) => {
+                const c = systemColorClasses(d.color);
+                const dpct = Math.round((d.avgProgress ?? 0) * 100);
+                return (
+                  <CardLink
+                    key={d.code}
+                    href={`/system/${d.code}`}
+                    tone="sunken"
+                    pad="sm"
+                    className={`flex flex-col justify-between border-l-4 ${c.border} group`}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`}
+                        aria-hidden="true"
+                      />
+                      <p className="text-xs font-semibold truncate text-zinc-200 group-hover:text-zinc-50 transition-colors">
+                        {d.name}
+                      </p>
+                    </div>
+                    <div className="mt-3">
+                      <p
+                        className={`text-2xl font-bold font-mono tabular-nums leading-none ${c.text}`}
+                      >
+                        {dpct}%
+                      </p>
+                      <div className="flex items-center justify-between mt-1.5 text-[11px]">
+                        <span className="text-zinc-400">{d.sheetCount} bảng</span>
+                        {d.delayed > 0 ? (
+                          <span className="font-semibold text-red-300">{d.delayed} trễ</span>
+                        ) : (
+                          <span className="text-emerald-300 font-medium">Đúng hạn</span>
+                        )}
+                      </div>
+                    </div>
+                  </CardLink>
+                );
+              })}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Trung tâm điều hành: lối tắt tới 7 phân hệ hợp nhất + dải 6 giai đoạn vòng đời.
+            Đặt SAU các khối số liệu thật (điều hướng đầy đủ đã có ở sidebar) để trang chủ
+            mở ra là thấy ngay tiến độ/việc trễ thay vì hai khối điều hướng cỡ lớn. ── */}
+        <Section
+          title="Trung tâm điều hành"
+          description="7 phân hệ hợp nhất của XBoss — bấm để mở đúng cockpit"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {HUBS.map((hub) => {
+              const HubIcon = hub.icon;
+              return (
+                <CardLink
+                  key={hub.href}
+                  href={hub.href}
+                  tone="sunken"
+                  pad="sm"
+                  className={`group flex items-start gap-3 ${hub.colSpan ?? ""}`}
+                >
+                  <span className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 shrink-0">
+                    <HubIcon
+                      className={`w-4 h-4 ${hub.color}`}
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                    />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-zinc-100 truncate">
+                        {hub.title}
+                      </span>
+                      <ArrowUpRight
+                        className="w-3.5 h-3.5 shrink-0 text-zinc-600 group-hover:text-emerald-400 transition-colors"
+                        aria-hidden="true"
+                      />
+                    </span>
+                    <span className="mt-0.5 block text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
+                      {hub.desc}
+                    </span>
+                  </span>
+                </CardLink>
+              );
+            })}
+          </div>
+
+          {/* Dải 6 giai đoạn vòng đời — thuần điều hướng theo quy trình, cuộn ngang trên mobile */}
+          <div className="overflow-x-auto scrollbar-none">
+            <ol className="flex items-stretch gap-2 min-w-max sm:min-w-0">
+              {LIFECYCLE.map((stg, idx) => (
+                <li key={stg.stage} className="flex items-center gap-2 flex-1">
+                  <a
+                    href={stg.href}
+                    className="flex-1 min-w-[150px] rounded-lg border border-zinc-800 bg-zinc-950/70 px-3 py-2 hover:border-zinc-700 hover:bg-zinc-900/80 transition interactive-press"
+                  >
+                    <span className="block text-[10px] font-mono font-bold uppercase text-zinc-400">
+                      {stg.stage}
+                    </span>
+                    <span className="block text-xs font-semibold text-zinc-200 truncate">
+                      {stg.title}
+                    </span>
+                    <span className="block text-[11px] text-zinc-400 truncate">{stg.desc}</span>
+                  </a>
+                  {idx < LIFECYCLE.length - 1 && (
+                    <ChevronRight
+                      className="w-3.5 h-3.5 shrink-0 text-zinc-700 hidden sm:block"
+                      aria-hidden="true"
+                    />
+                  )}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </Section>
 
         {/* ── Bản đồ tiến độ Tháp A (tầng × hệ + lịch sử) ── */}
         <ProgressMap />
@@ -813,15 +769,14 @@ export default function Dashboard() {
 
         {/* ── Pareto nguyên nhân trễ ── */}
         {allDelayed.length > 0 && (reasonCounts.length > 0 || noReason > 0) && (
-          <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-1">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-              <h2 className="text-base font-semibold text-zinc-100">
-                <EditableText tkey="dashboard.pareto.title">Nguyên nhân trễ (Pareto)</EditableText>
-              </h2>
-            </div>
-            <p className="text-xs text-zinc-400 mb-4">Bấm thanh để lọc bảng trễ theo lý do</p>
-            <div className="space-y-2">
+          <Section
+            icon={AlertTriangle}
+            title={
+              <EditableText tkey="dashboard.pareto.title">Nguyên nhân trễ (Pareto)</EditableText>
+            }
+            description="Bấm thanh để lọc bảng trễ theo lý do"
+          >
+            <Card pad="lg" className="space-y-2">
               {reasonCounts.map((r) => (
                 <button
                   key={r.slug}
@@ -870,25 +825,18 @@ export default function Dashboard() {
                   </span>
                 </button>
               )}
-            </div>
-          </section>
+            </Card>
+          </Section>
         )}
 
         {/* ── Bảng trễ ── */}
-        <section
+        <Section
           id="delayed-table"
-          className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden"
-        >
-          {/* Header + filter */}
-          <div className="px-5 py-4 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-3">
-            <h2 className="flex items-center gap-2 font-semibold text-base text-zinc-100 shrink-0">
-              <Clock className="w-4 h-4 text-red-400" />
-              <EditableText tkey="dashboard.delayed.title">Danh sách hạng mục trễ</EditableText>
-              <span className="ml-1 text-xs font-normal text-zinc-400">
-                ({delayedGroupCount} hạng mục · {delayed.length} công tác)
-              </span>
-            </h2>
-            <div className="flex flex-wrap gap-2 sm:ml-auto">
+          icon={Clock}
+          title={<EditableText tkey="dashboard.delayed.title">Danh sách hạng mục trễ</EditableText>}
+          description={`${delayedGroupCount} hạng mục · ${delayed.length} công tác`}
+          actions={
+            <div className="flex flex-wrap gap-2">
               {[
                 {
                   value: sheetFilter,
@@ -925,30 +873,32 @@ export default function Dashboard() {
                 </select>
               ))}
             </div>
-          </div>
-
+          }
+        >
           {/* Danh sách hạng mục trễ (cặp sheet + tầng) — bấm 1 hạng mục để mở ra các công
               tác trễ bên trong. Cuộn ngang trên mobile. */}
-          <DelayedGroupsTable
-            tasks={delayed}
-            sheetLabel={(s) => sheetNameByCode.get(s) ?? s}
-            taskHref={trackingUrl}
-            editReason={{ canEdit: !!me && me.role !== "subcon", onChange: setReason }}
-            delayReasons={delayReasons}
-            groupProgress={groupProgressMap}
-            emptyMessage={
-              <>
-                Không có công việc trễ.{" "}
-                {canImport && (
-                  <a href="/import" className="text-emerald-400 hover:underline">
-                    Import file Excel
-                  </a>
-                )}
-                {!canImport && "Hãy liên hệ Admin/PM để cập nhật dữ liệu."}
-              </>
-            }
-          />
-        </section>
+          <Card pad="none" className="overflow-hidden">
+            <DelayedGroupsTable
+              tasks={delayed}
+              sheetLabel={(s) => sheetNameByCode.get(s) ?? s}
+              taskHref={trackingUrl}
+              editReason={{ canEdit: !!me && me.role !== "subcon", onChange: setReason }}
+              delayReasons={delayReasons}
+              groupProgress={groupProgressMap}
+              emptyMessage={
+                <>
+                  Không có công việc trễ.{" "}
+                  {canImport && (
+                    <a href="/import" className="text-emerald-400 hover:underline">
+                      Import file Excel
+                    </a>
+                  )}
+                  {!canImport && "Hãy liên hệ Admin/PM để cập nhật dữ liệu."}
+                </>
+              }
+            />
+          </Card>
+        </Section>
       </main>
 
       {/* Modal tạo trang tracking mới */}
@@ -1038,7 +988,7 @@ export default function Dashboard() {
               <button
                 onClick={createSheet}
                 disabled={!newSheet.name.trim()}
-                className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 rounded-lg font-semibold transition text-on-accent"
+                className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 rounded-lg font-semibold transition text-on-accent"
               >
                 Tạo trang
               </button>

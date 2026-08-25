@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchPackage } from "@/lib/bao-mat/auth";
-import {
-  newDrawingFileName,
-  MAX_DOC_BYTES,
-  extForDocMime,
-  verifyFileMime,
-  isContentTooLarge,
-} from "@/lib/nen/photos";
+import { newDrawingFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
 import { storagePut, storageGet, storageDelete } from "@/lib/nen/storage";
 
 export const dynamic = "force-dynamic";
@@ -98,33 +92,11 @@ export async function POST(
       { status: 403 },
     );
 
-  if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
-    return NextResponse.json(
-      { error: `File vượt quá ${MAX_DOC_BYTES / 1024 / 1024}MB` },
-      { status: 413 },
-    );
-
-  const formData = await req.formData().catch(() => null);
-  const file = formData?.get("file") as File | null;
-  if (!file) return NextResponse.json({ error: "Thiếu file" }, { status: 400 });
-  if (file.size > MAX_DOC_BYTES)
-    return NextResponse.json(
-      { error: `File vượt quá ${MAX_DOC_BYTES / 1024 / 1024}MB` },
-      { status: 413 },
-    );
-
+  const up = await parseUploadedFile(req, { accept: "document", maxBytes: MAX_DOC_BYTES });
+  if (!up.ok) return NextResponse.json({ error: up.error }, { status: up.status });
+  const { file, buf: fileBuf } = up;
   const mime = file.type;
-  if (!extForDocMime(mime))
-    return NextResponse.json({ error: "Chỉ nhận PDF hoặc ảnh" }, { status: 415 });
-
   const fileName = newDrawingFileName(id, mime);
-  const bytes = await file.arrayBuffer();
-  const fileBuf = Buffer.from(bytes);
-  if (!verifyFileMime(fileBuf, mime))
-    return NextResponse.json(
-      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
-      { status: 415 },
-    );
   await storagePut(user.orgId, fileName, fileBuf);
 
   // Xoá file cũ sau khi ghi file mới thành công

@@ -721,7 +721,7 @@ export default function BimViewerPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setIsPlaying(!isPlaying)}
-                      className="rounded-lg bg-sky-700 p-2 font-medium text-on-accent shadow-sm transition hover:bg-sky-500"
+                      className="rounded-lg bg-sky-700 p-2 font-medium text-on-accent shadow-sm transition hover:bg-sky-800"
                     >
                       {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                     </button>
@@ -920,7 +920,7 @@ export default function BimViewerPage() {
                       <div className="mt-4 flex flex-col gap-2 border-t border-zinc-800 pt-3">
                         <a
                           href={`/approvals?elementGuid=${selectedElement.guid}`}
-                          className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-700 px-3 py-2 text-center text-xs font-medium text-on-accent transition hover:bg-sky-600"
+                          className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-700 px-3 py-2 text-center text-xs font-medium text-on-accent transition hover:bg-sky-800"
                         >
                           <FileCheck className="h-3.5 w-3.5" /> Tạo Phiếu Nghiệm Thu (BBNT)
                         </a>
@@ -948,7 +948,7 @@ export default function BimViewerPage() {
                 <div className="flex flex-1 flex-col gap-3 overflow-y-auto pr-1 text-xs">
                   <button
                     onClick={() => setShowNewBcfModal(true)}
-                    className="flex items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-on-accent transition hover:bg-emerald-500 shadow-sm"
+                    className="flex items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-on-accent transition hover:bg-emerald-800 shadow-sm"
                   >
                     <Sparkles size={13} />
                     <span>Ghi Nhận Vấn Đề BCF Từ Viewpoint</span>
@@ -1082,7 +1082,7 @@ export default function BimViewerPage() {
                   type="button"
                   disabled={creatingBcf || !newBcfTitle.trim()}
                   onClick={handleCreateBcf}
-                  className="rounded-lg bg-emerald-700 px-4 py-1.5 text-xs font-semibold text-on-accent hover:bg-emerald-500 disabled:opacity-50"
+                  className="rounded-lg bg-emerald-700 px-4 py-1.5 text-xs font-semibold text-on-accent hover:bg-emerald-800 disabled:opacity-50"
                 >
                   {creatingBcf ? "Đang lưu..." : "Xác nhận & Lưu BCF"}
                 </button>

@@ -4,6 +4,261 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Đóng nợ tương phản màu — sửa ở token + 2 cổng CI (2026-08-25)
+
+Người dùng: "làm luôn đợt sửa nợ tương phản zinc-500". Đo bằng axe trên bản production có dữ
+liệu thật (2.543 task) rồi sửa tới khi sạch; ghi quyết định trong **ADR-0010**.
+
+**Đã sửa (5 nhóm, tất cả đều đo lại bằng axe sau khi sửa)**
+
+1. **`text-zinc-500` không đạt AA ở cả 4 theme tối** (3,5-4,1:1; riêng Dashboard ~95 nút DOM).
+   Sửa ở **token** trong `app/globals.css` chứ không đổi tay ~700 chỗ dùng: `--color-zinc-500`
+   sáng lên cho `dark` (#8e8e98), `kingblue` (#7eb7ff, kèm `-400` → #a8ccff), `darkblue`
+   (#7da1d3), `navy` (#7f94b1) — giữ nguyên thứ bậc 3 mức chữ 300 > 400 > 500.
+2. **Màu nhấn mức -400 trên mặt thẻ sáng của King Blue/Dark Blue** (3,1-4,4:1): lấy giá trị
+   `-300` cho 8 họ ở kingblue (red/rose/orange/sky/blue/indigo/violet/purple) và 5 họ ở
+   darkblue. Ghi hex chốt, không dùng `var(--color-*-300)` (biến đó biến mất nếu mã hết chỗ
+   dùng shade -300 → class -400 vỡ im lặng).
+3. **Bản đồ nhiệt** (`ProgressMap`): ô 100% dùng chữ trắng trên `bg-emerald-600` (3,65:1) →
+   `text-on-accent-dark` (5,45:1), đúng luật "chọn chữ theo độ sáng của nền" ở globals.css.
+4. **Nút nền màu đặc sáng dần khi rê chuột** — mẫu `bg-emerald-700 hover:bg-emerald-600
+text-on-accent` dùng ở **215 chỗ**: 5,36:1 lúc nghỉ nhưng **3,65:1 khi rê chuột**. Đổi quy
+   ước sang **đậm dần** (`-700 → -800`), sửa cả 215 chỗ bằng codemod chạy trên đúng các dòng
+   cổng CI báo (94 file), cộng 3 chỗ trong chuỗi biến thể (`ui/Button.tsx`, spatial-viewer,
+   suggestions) mà cổng cũ không nhìn thấy.
+5. **Chưa có `app/not-found.tsx`** nên trang 404 dùng bản mặc định của Next: nền trắng cắm
+   cứng + footer theo theme tối = 1,6-2,6:1. Thêm trang 404 riêng dùng token theme.
+   Cùng đợt: `--color-red-400` của theme sáng đậm thêm một bậc (#dc2626 → #c81e1e) vì trên
+   **dòng sọc xen kẽ** của bảng (#f1f3f6) chỉ đạt 4,34:1 — mà chữ đỏ hầu như luôn nằm trong bảng.
+
+**Hai cổng CI mới/mở rộng** (chặn tái phát, chạy vài giây, không cần trình duyệt):
+
+- `npm run check:contrast` (`scripts/check-contrast.ts`, **mới**, đã cắm vào `ci.yml`): đọc
+  **thẳng** bảng token trong `globals.css` (không chép tay), chặn khi mức chữ 300/400/500 của
+  zinc lẫn accent không đạt AA trên `--background`/`zinc-950`/`zinc-900` của bất kỳ theme nào;
+  `zinc-800` (nền control) chỉ cảnh báo. Thay `scripts/contrast-check.ts` cũ (bảng chép tay đã
+  lệch khỏi globals.css, đã xoá). Đã thử nghiệm ngược: trả token cũ về → cổng đỏ đúng chỗ.
+- `npm run check:mau-accent` (**mở rộng**): coi `text-on-accent` như `text-white`, xét cả
+  `hover:`/`focus:`/`active:`, thêm mức -400, và quét **mọi chuỗi class** chứ không chỉ
+  `className="…"` — nhờ vậy mới thấy bảng VARIANT của `app/components/ui/Button.tsx`.
+
+**Verify**: axe trên bản production (Postgres seed Excel gốc) — **8 trang × 5 theme desktop +
+5 trang × 3 theme mobile → 0 vi phạm serious/critical** (trước đợt này: 129 chỉ riêng
+Dashboard+tracking ở theme tối, 583 ở 3 theme xanh). `lint`/`typecheck`/`build` xanh;
+`npm test` 224 file / 1.221 ca pass (có DB thật); **e2e Playwright toàn bộ `e2e/authed`:
+481 pass / 0 fail** (gồm mọi ca axe); 8 cổng kiểm nội bộ xanh.
+
+## Làm mới UI/UX — bộ component nền + khung app + Dashboard + tracking (2026-08-25)
+
+Người dùng: "thiết kế lại ui/ux hiện đại". Chốt phạm vi đợt 1 qua `AskUserQuestion`: **khung
+app + trang chính (Dashboard, lưới tracking)**, hướng **tinh gọn hiện trạng** (giữ nguyên cơ
+chế dark-first/đảo biến CSS), được phép thêm component nền mới và đổi bố cục điều hướng.
+
+**Đã làm**
+
+1. **`app/components/ui/` — bộ component nền** (`Button`/`ButtonLink`, `Card`/`CardLink`,
+   `Chip`, `Section`, `StatCard`) + **ADR-0009** chốt quy ước hình thức: bo góc `rounded-xl`
+   cho thẻ / `rounded-lg` cho control, mặt thẻ đúng 2 tông (`raised`/`sunken`), **emerald =
+   đang chọn / hành động chính** (amber-đỏ chỉ còn là màu cảnh báo), nút cao ≥40px kể cả cỡ
+   `sm`. Ghi thêm mục quy ước vào `CLAUDE.md` (phần Thiết kế giao diện).
+2. **Khung app (`AppHeader`)**: một màu nhấn duy nhất cho mục sidebar đang chọn; topbar kính
+   mờ; **ô tìm kiếm lên thẳng topbar trên desktop** — trước đây chỉ có ở thanh đáy trang chủ
+   nên mọi trang khác không có lối tìm kiếm nhìn thấy được (Ctrl+K vẫn chạy nhưng không ai
+   biết); thanh đáy chỉ-tìm-kiếm tự ẩn trên desktop.
+3. **`HubShell`**: tab đang chọn đổi từ amber sang emerald cho khớp sidebar; dải KPI dùng
+   `StatCard` chung; sửa `sticky top-14` → `top-12` (lệch 8px so với topbar `h-12`, nội dung
+   lộ ra ở khe hở khi cuộn).
+4. **Dashboard (`app/page.tsx`)**: đảo thứ tự — **số liệu thật lên đầu** (tổng quan 4 ô, tiến
+   độ theo trang, theo hệ), hai khối điều hướng cỡ lớn ("6 giai đoạn" + "7 đại trung tâm") gộp
+   thành một mục "Trung tâm điều hành" gọn hơn, đặt sau. **Bỏ các chip trạng thái cắm cứng**
+   ("100% Khớp", "LOD 400", "Quyết toán kỳ 6") và tên dự án hard-code trong JSX — số liệu giả
+   không đọc từ DB, dễ bị hiểu nhầm là tình trạng thật (đúng quy ước "không hard-code tên dự
+   án trong UI"). Thêm ô "Tiến độ tổng" tính **bình quân có trọng số** theo số công việc.
+5. **Trang tracking**: thanh lọc **dính dưới topbar** (bảng dài hàng trăm dòng, trước cuộn
+   xuống là mất bộ lọc); dùng `Button`/`Card`/`EmptyState` chung; nút bật/tắt cột khi in nâng
+   vùng chạm `py-0.5` → `py-1.5`.
+6. **`:target { scroll-margin-top: 4.5rem }`** trong `globals.css` — link neo trong trang
+   (vd `#delayed-table`) trước đây nhảy tới nơi thì tiêu đề nằm khuất dưới topbar dính.
+
+**Verify thật** (không chỉ đọc code): dựng Postgres 16 cục bộ + `.env.local`, `db:migrate` áp
+sạch 136 migration, `db:seed` import Excel gốc (2.543 tasks, 50.465 ô dimension), `npm start`
+bản production rồi chụp màn hình bằng Playwright/Chromium ở 3 cấu hình (desktop 1440 theme
+tối, desktop theme sáng, mobile 390) cho cả Dashboard lẫn `/tracking/ogtd`, đối chiếu từng
+mục. Bắt và sửa 2 lỗi chỉ lộ khi chạy thật: nút xoá trang đè lên thanh tiến độ trên mobile
+(luôn hiện, không cần hover) và nhãn "GĐ n" `text-zinc-500` không đủ tương phản ở theme tối.
+**axe-core** trên Dashboard + tracking (3 cấu hình): 6 vi phạm `color-contrast` do đợt này
+sinh ra đã hết; phần còn lại là **nợ cũ** (xem "Nợ kỹ thuật" bên dưới). `lint`/`typecheck`/
+`build` xanh, `npm test` 224 file / 0 fail, và 6 cổng kiểm nội bộ xanh (`check:mau-accent`,
+`check:lib-layers`, `check:sw-exclude`, `check:migrations`, `check:route-perms`,
+`check:db-params`, `check:dead-code`).
+
+**Tiếp theo (chưa làm)**: áp bộ component cho các nhóm trang nghiệp vụ còn lại theo từng đợt
+(tài chính, hiện trường, kỹ thuật) — đợt này cố ý không đổi hàng loạt để diff còn review được.
+
+**Nợ kỹ thuật phát hiện** — ~~`text-zinc-500` dùng làm **màu chữ** vi phạm tương phản WCAG AA
+ở theme tối~~ → **đã đóng ngay sau đó, xem mục kế tiếp bên dưới (2026-08-25)**. Nội dung gốc: axe đếm ~95 nút DOM trên riêng Dashboard (nhiều
+nhất ở `ProgressMap`, `DashboardExtCards` và các panel số liệu), cộng ~17 nút trong nhãn ô
+heatmap `ProgressMap` (`text-[9px]`) ở **cả hai** theme. Không phải do đợt này sinh ra (các
+trang đó không nằm trong diff) nhưng nên gom một đợt riêng: đổi chữ phụ sang `zinc-400` và
+nâng cỡ nhãn heatmap, hoặc chỉnh lại `--color-zinc-500` cho các theme tối.
+
+## Quét trùng lặp lần 2 — sau khi #389/#392 vào main (2026-08-24)
+
+Người dùng: "quét tất cả". Quét lại **1.298 file** (`lib` 192, `app` 738, `tests` 223, `e2e` 74,
+`scripts` 36, `plugin-autocad` 37) qua 5 trục: bộ dò clone cửa sổ 30 dòng chuẩn hoá, trùng tên
+export, hash file, phương thức C#, và so khung route sau khi trừu tượng hoá tên bảng.
+
+**Kết quả so với lần quét đầu:** cụm clone lớn nhất 51 → 25 khối; tên export trùng trong `lib/`
+11 → 8; route upload tự viết pipeline 25 → 2 → **0**; file trùng y hệt: 0. Code C# 36 file sạch,
+không phương thức trùng tên, không khối clone.
+
+### Đã gộp đợt này
+
+| Cụm                 | Trùng gì                                                                                                                                | Cách gộp                                                                                                            |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 2 route upload cuối | `workpackages/:id/bbnt` và `:id/drawing` còn tự viết pipeline kiểm tệp (Content-Length → multipart → mime → size → magic byte)          | Dùng `parseUploadedFile()` như 23 route kia. **25/25 route upload nay dùng chung một pipeline.** −65 dòng           |
+| Fixture BIM         | `bim-unified-facade.test.ts` và `engineering-bim-routing.test.ts` dựng cùng mảng `BimElementRecord[]` 3 phần tử, chép nguyên si 32 dòng | Tách `tests/fixtures-bim.ts` (không đuôi `.test.ts` nên runner không chạy như bộ test, cùng khuôn `tests/setup.ts`) |
+
+**Đổi hành vi (cố ý, nhỏ):** hai route trên nay trả thông báo lỗi chuẩn giống 23 route kia
+(`"File quá lớn (tối đa 20MB)"` thay vì `"File vượt quá 20MB"`; 415 có kê định dạng). Cùng mã
+trạng thái; đã kiểm không test/e2e nào bám chuỗi cũ.
+
+### KHÔNG gộp — và vì sao (quan trọng)
+
+**`work-front-documents/[id]` ↔ `floor-stage-front-documents/[id]` trùng 100%** (68 dòng, chỉ
+khác đúng tên bảng). Đã thử gộp và **hoàn nguyên** — cả hai đường đều tệ hơn:
+
+- _Tách phần chạm DB xuống `lib/` (đúng ADR-0008):_ chỉ chuyển được 2 câu SQL, phần trùng thật là
+  khung HTTP. Kết quả 62+62+39 = **163 dòng, NHIỀU HƠN 136 dòng ban đầu**.
+- _Factory trả `{GET, DELETE}`:_ gọn thật, nhưng `scripts/lib/route-perms-scan.ts` tìm **khai báo**
+  `export async function DELETE(` rồi soi thân hàm. Với `export const DELETE = handlers.DELETE`
+  regex không khớp → route **biến mất khỏi tầm quét của cổng `check:route-perms`**, không phải báo
+  đỏ mà là bỏ qua âm thầm. Đục thủng đúng cái cổng GĐ2 dựng ra để thay checklist người.
+
+Kết luận: phần trùng ở đây là khung HTTP mà **ADR-0008 muốn nằm trong route** và **cổng bảo mật đòi
+nhìn thấy trong file route**. Hai luật của chính dự án đều đẩy về phía giữ nguyên. Ghi lại để lần
+sau không ai tốn công gộp lại.
+
+### Đợt tiếp — gộp logic "hạn hiệu lực" và LỘ RA LỖI MÚI GIỜ THẬT
+
+`isExpiringSoon`/`isExpired` chép giống hệt nhau ở `app/environment`, `app/kickoff`,
+`app/insurance`; `app/personnel` có `certBadge` cùng ngưỡng. Gom về `lib/nen/han-hieu-luc.ts`
+(tầng 0, thuần, dùng lại `daysFromTodayISO` đã có sẵn thay vì tự tính).
+
+**Lỗi thật lộ ra khi gộp:** cả 4 bản đều tính mốc cảnh báo bằng
+`new Date(Date.now() + N * 86400_000)` — **UTC thuần** — rồi so với `todayISO()` vốn theo giờ VN
+(UTC+7). Đúng cái bẫy mà chú thích của `daysFromTodayISO` trong `lib/nen/date.ts` đã dặn trước:
+_"mọi phép cộng/trừ ngày phải đi qua đây, tự tính bằng UTC sẽ lệch 1 ngày lúc 0h–7h sáng"_.
+
+Chứng minh bằng số (mô phỏng 02:00 sáng 25/08 giờ VN = 19:00 UTC 24/08):
+
+| Đại lượng          | Giá trị      |
+| ------------------ | ------------ |
+| `todayISO()`       | `2026-08-25` |
+| mốc CŨ (UTC thuần) | `2026-09-23` |
+| mốc ĐÚNG (UTC+7)   | `2026-09-24` |
+
+→ Hồ sơ hết hạn đúng ngày thứ 30 (`2026-09-24`) **KHÔNG được cảnh báo** ở bản cũ trong khung
+0h–7h sáng. Ảnh hưởng cả 4 trang: giấy phép môi trường, hồ sơ pháp lý, bảo lãnh/bảo hiểm,
+chứng chỉ nhân sự.
+
+Kèm `tests/han-hieu-luc.test.ts` — **5 ca, trước đây logic này KHÔNG có test nào** vì nằm rải
+trong file `.tsx`. Có ca biên canh đúng lỗi trên.
+
+### Quét múi giờ toàn repo — 5 bản `todayISO()` chép sai + 8 chỗ khác
+
+Người dùng chốt: **"theo múi giờ +7"**. Quét toàn bộ `lib/`, `app/`, `scripts/` tìm mọi chỗ tính
+ngày bằng UTC thuần thay vì đi qua helper `lib/nen/date.ts`.
+
+**Phát hiện nặng nhất: 5 trang tự định nghĩa `todayISO()` riêng**, che mất bản đúng trong
+`lib/nen/date.ts` và đều thiếu offset +7 — `correspondences`, `tenders`, `equipment`, `hse`,
+`contracts`. Không phải chỗ hiển thị suông mà là **so sánh và mặc định thật**:
+
+| Trang                  | Dùng làm gì                                                                                   | Hậu quả trong khung 0h–7h sáng                          |
+| ---------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `hse` (7 chỗ)          | số ngày từ sự cố gần nhất, hành động quá hạn, `?month=` của báo cáo tháng, ngày mặc định form | đếm lệch 1 ngày; ngày 1 hàng tháng lấy nhầm tháng trước |
+| `correspondences`      | công văn quá hạn, ngày gửi/hồi đáp mặc định                                                   | quá hạn nhận diện sai 1 ngày                            |
+| `equipment`            | hạn kiểm định                                                                                 | như trên                                                |
+| `tenders`, `contracts` | mốc so ngày                                                                                   | như trên                                                |
+
+Đã gỡ cả 5, dùng `todayISO` từ `lib/nen/date.ts`.
+
+**Các chỗ khác đã quy về helper:** `equipment` (hạn kiểm định 30 ngày tính bằng UTC thuần → dùng
+`daysFromTodayISO(EXPIRY_WARN_DAYS)`); `warranty` (đã đúng +7 nhưng lặp biểu thức 2 lần → dùng
+helper); `schedule` + `payments/print` (ngày lập/ngày bill hiển thị); `engineering-project-health`
+(`snapshotDate`), `digital-handover` + `fidic-tia` (ngày mặc định **ghi vào DB**); và 4 chỗ sinh
+tem ngày trong mã/tên tệp (`qr-logistics`, `esignature`, `cad/save-drawing` ×2, `useSmartNaming`).
+
+**Vòng 2 — người dùng chốt "dùng `todayISO()` chuẩn", quét lại và SỬA NỐT hai chỗ tôi đã chừa,
+cộng 6 chỗ regex vòng đầu bỏ sót.**
+
+Hai chỗ tôi từng cho là ngoại lệ, xem kỹ lại thì **kết luận vòng đầu của tôi là vội**:
+
+- `bim-models/[id]/simulate-4d`: tôi nói đó là "cửa sổ trượt, không so với `todayISO()`" — SAI.
+  Vòng lặp sinh `dateISO` rồi đưa thẳng vào `compute4DSimulationState`, **so với ngày bắt đầu/kết
+  thúc của task**. Nên biên phải là ngày lịch VN. Đã chuyển toàn bộ sang chuỗi ISO
+  (`daysFromTodayISO` cho biên, `addDaysISO` cho bước nhảy) — bỏ luôn `Date.setDate/getDate` vốn
+  theo giờ ĐỊA PHƯƠNG của tiến trình, lệch tiếp nếu máy chủ không chạy UTC.
+- `scripts/check-coverage.ts` (`measuredAt`): đổi theo cho nhất quán.
+
+**Regex vòng đầu chỉ bắt `.slice(0, 10)`, bỏ sót biến thể `.split("T")[0]`** — 6 chỗ nữa:
+`engineering-god-tier` (`approvalDate` mặc định), `SpreadsheetGrid` ×2 (tem ngày trên tên tệp
+CSV/XLSX người dùng tải về), `god-tier/simulate-4d` (`targetDate` mặc định),
+`api/diaries` (**chuỗi THÁNG mặc định** — ngày 1 hàng tháng lấy nhầm tháng trước, cùng lớp lỗi
+với `?month=` của HSE), và `mepf-process` (dấu thời gian duyệt **hiển thị cho kỹ sư VN** mà in
+thẳng giờ UTC → lệch 7 tiếng, tối muộn sai cả ngày; nay dùng `formatDateTimeVN`).
+
+**Vẫn cố ý KHÔNG đổi, có lý do:**
+
+- **Dấu thời gian đầy đủ** (`sentAt`, `createdAt`, `auditedAt`, `log.t`…): `new Date().toISOString()`
+  là ĐÚNG — mốc thời gian tuyệt đối phải lưu UTC. Chỉ **giá trị lịch** (ngày/tháng) mới cần +7.
+- `lib/tien-do/import.ts` `localISO`: cố ý theo lịch địa phương của tiến trình khi đổi serial
+  Excel, có chú thích riêng giải thích bẫy múi giờ. Không đụng.
+
+Sau vòng 2, `grep 'new Date().toISOString()'` toàn repo chỉ còn các dấu thời gian đầy đủ (đúng)
+và `localISO` của import Excel (cố ý).
+
+### Còn lại (chưa làm)
+
+- **Họ ~8 route `<thực thể>-documents/[id]`** giống 55–71% (`claim`/`contract`/`vo`/`subcon`/
+  `project`/`correspondence-files`). Cùng khuôn nhưng khác thật về quyền và phạm vi dự án — ép một
+  trừu tượng chung lên chỗ luật quyền khác nhau đúng là rủi ro `docs/audit.md` cảnh báo. Để nguyên.
+- **Khung form lặp 271 lần ở 32 file `.tsx`** (rõ nhất `app/environment/page.tsx` ↔
+  `app/kickoff/page.tsx`). Đợt này đã lấy phần LOGIC (hạn hiệu lực) ra; phần còn lại là markup
+  form/bảng — boilerplate UI thuần, nên là đợt tách component dùng chung riêng, có e2e a11y đi kèm.
+- ~~**`calcHazenWilliams` còn 2 bản**~~ → **ĐÃ CHỐT (2026-08-25): giữ cả hai QUY ƯỚC ĐƠN VỊ, nhưng hết trùng tên** —
+  quyết định của chủ dự án. Xem mục riêng ngay dưới.
+
+### `calcHazenWilliams` — CHỐT GIỮ CẢ HAI QUY ƯỚC (2026-08-25)
+
+Chủ dự án chốt: **giữ cả hai, không gộp.** Ghi lại để lần sau không ai "dọn" nhầm.
+
+| Bản                                     | vị trí 1           | vị trí 2          | vị trí 3          | hằng số cột nước |
+| --------------------------------------- | ------------------ | ----------------- | ----------------- | ---------------- |
+| `engineering-cad-nesting.ts` (M89)      | lưu lượng **L/s**  | **đường kính** mm | **chiều dài** m   | 9806,65 Pa/m     |
+| `engineering-hydraulic-engine.ts` (M68) | lưu lượng **m³/h** | **chiều dài** m   | **đường kính** mm | 9810 Pa/m        |
+
+**Vấn đề đơn vị và cách đã xử lý (2026-08-25, vòng 2).** Chủ dự án lưu ý đúng: **L/s và m³/h là
+hai đơn vị khác nhau** (1 L/s = 3,6 m³/h). Đã rà lại toàn bộ chuỗi gọi — **không có chỗ nào đang
+sai**, vì hai nhánh tách bạch và tên biến mang đơn vị suốt chuỗi:
+
+- Nhánh M89 (L/s): `app/api/engineering/cad-nesting/route.ts` đọc `body.flowRateLps` → `qLps` →
+  `calcHazenWilliams`, cùng đơn vị với `calcDarcyWeisbach` ngay cạnh.
+- Nhánh M68 (m³/h): `runMepfHydraulicAnalysis(flowRateM3h)` → `autoSizePipeDiameter` +
+  `calculateHydraulicLoss(flowRateM3h, ...)`.
+
+Rủi ro là **tương lai** chứ không phải hiện tại, nên chặn tận gốc thay vì chỉ ghi chú:
+
+1. **Hết trùng tên.** Bản M68 vốn không export ra ngoài file nên đổi tên là miễn phí:
+   `calcHazenWilliams` → `calcHazenWilliamsM3h` (private, chỉ `calculateHydraulicLoss` gọi). Cả dự
+   án nay chỉ còn **một** `calcHazenWilliams` — không còn hai hàm cùng tên khác quy ước để gọi nhầm.
+2. **Test canh tính đúng đắn:** `tests/hazen-williams-donvi.test.ts` — quy đổi ×3,6 rồi so hai bản
+   trên 3 bộ (Q, D, L); vận tốc lệch < 1e-3, tổn thất lệch < 0,5% (chênh còn lại chính là hằng số
+   cột nước 9806,65 vs 9810, tức 0,03%). Tức **hai quy ước cho cùng kết quả vật lý** — giữ cả hai
+   là an toàn. Kèm 1 ca ghi lại hậu quả nếu nhầm đơn vị (tổn thất tụt hơn 5 lần).
+3. Chú thích ở cả hai hàm viết lại cho khớp, nêu rõ hàng rào duy nhất là **tên khác nhau** và dặn
+   giữ bản M68 không export.
+
 ## Đợt gộp tính năng trùng lặp (2026-08-24)
 
 Người dùng: "quét tính năng trùng lặp gộp chúng lại cho gọn — trùng lặp hoặc thuộc về 1 bộ tính

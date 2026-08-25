@@ -18,6 +18,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { todayISO } from "../lib/nen/date";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const BASELINE_PATH = join(root, "coverage-baseline.json");
@@ -144,7 +145,7 @@ if (improvements.length) {
       ` để tránh commit tự động ngoài ý muốn):\n` +
       JSON.stringify(
         {
-          measuredAt: new Date().toISOString().slice(0, 10),
+          measuredAt: todayISO(),
           files: measured.files,
           lines: measured.lines,
           branches: measured.branches,
