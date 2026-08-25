@@ -1,14 +1,14 @@
 # M100 — Đặc tả: `XBOSS_VE_*` — vẽ shop drawing chuẩn hóa sẵn đè lên thiết kế (plugin AutoCAD, tầng 2)
 
-| Thuộc tính       | Giá trị                                                                                                                                                                                              |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Thuộc tính       | Giá trị                                                                                                                                                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Bộ lệnh vẽ trong AutoCAD: kỹ sư vẽ shop drawing MEPF **đè lên bản thiết kế đã chuẩn hóa** — mọi nét/block sinh ra **đã đúng chuẩn ngay từ đầu** (layer, block, style theo rule pack), khép kín vòng chuẩn hóa → vẽ → bóc khối lượng |
-| Spec owner       | (chờ gán)                                                                                                                                                                                             |
-| State            | **Draft — chờ duyệt** (theo luật "Không code khi chưa Approved for implementation")                                                                                                                    |
-| Người/ngày duyệt | (chờ)                                                                                                                                                                                                 |
-| Cập nhật         | 2026-08-25 — bản đầu + bổ sung cùng ngày: trang in/mặt cắt (giữa chừng) + 5 tính năng rà sót (giá đỡ, lỗ chờ, tag, bảng thống kê, độ dốc) + mục "Phiên bản sau" §20 |
-| Quyết định nền   | `docs/adr/0006-plugin-autocad-va-pipeline-server.md` + M99 §9.1 (AutoCAD 2026, 1 bản build) — **kế thừa nguyên vẹn, không mở lại**                                                                    |
-| Phụ thuộc        | M99 PR-A/PR-B/PR2/PR5/PR6 (đã merge) — plugin, rule pack v3, `XBOSS_LOGIN`, upload, bảng điều khiển web                                                                                              |
+| Spec owner       | (chờ gán)                                                                                                                                                                                                                           |
+| State            | **Draft — chờ duyệt** (theo luật "Không code khi chưa Approved for implementation")                                                                                                                                                 |
+| Người/ngày duyệt | (chờ)                                                                                                                                                                                                                               |
+| Cập nhật         | 2026-08-25 — bản đầu + bổ sung cùng ngày: trang in/mặt cắt (giữa chừng) + 5 tính năng rà sót (giá đỡ, lỗ chờ, tag, bảng thống kê, độ dốc) + mục "Phiên bản sau" §20                                                                 |
+| Quyết định nền   | `docs/adr/0006-plugin-autocad-va-pipeline-server.md` + M99 §9.1 (AutoCAD 2026, 1 bản build) — **kế thừa nguyên vẹn, không mở lại**                                                                                                  |
+| Phụ thuộc        | M99 PR-A/PR-B/PR2/PR5/PR6 (đã merge) — plugin, rule pack v3, `XBOSS_LOGIN`, upload, bảng điều khiển web                                                                                                                             |
 
 > Không code khi chưa **Approved for implementation**.
 
@@ -16,7 +16,7 @@
 
 M99 đã đóng nửa sau của quy trình: nhận bản vẽ bẩn → `XBOSS_CHUANHOA` → `XBOSS_BOCKL` → Excel. Nhưng bước ở giữa — **kỹ sư vẽ shop drawing** — vẫn thủ công hoàn toàn: tự nhớ layer chuẩn, tự tìm block, tự đặt style. Hệ quả thật (chính là lý do M99 phải tồn tại): bản vẽ shop tự vẽ cũng lệch chuẩn như bản nhận từ TVTK, phải chuẩn hóa lại chính sản phẩm của mình, và `XBOSS_BOCKL` bóc thiếu/sai khi nét rơi nhầm layer.
 
-M100 đảo chiều: thay vì *sửa sai sau khi vẽ*, plugin làm **công cụ vẽ** — kỹ sư chọn hệ (HVAC/PIPING/FIREFIGHTING/ELECTRICAL/ELV), mọi tuyến ống/máng và phụ kiện/thiết bị chèn ra **tự rơi vào đúng layer, đúng block chuẩn, mang sẵn size trong XData** — `XBOSS_KIEMTRA` pass ngay, `XBOSS_BOCKL` bóc chính xác tuyệt đối vì chính plugin kiểm soát dữ liệu sinh ra.
+M100 đảo chiều: thay vì _sửa sai sau khi vẽ_, plugin làm **công cụ vẽ** — kỹ sư chọn hệ (HVAC/PIPING/FIREFIGHTING/ELECTRICAL/ELV), mọi tuyến ống/máng và phụ kiện/thiết bị chèn ra **tự rơi vào đúng layer, đúng block chuẩn, mang sẵn size trong XData** — `XBOSS_KIEMTRA` pass ngay, `XBOSS_BOCKL` bóc chính xác tuyệt đối vì chính plugin kiểm soát dữ liệu sinh ra.
 
 Vai trò: kỹ sư MEPF (AutoCAD 2026 full, plugin M99 đã cài). Người vẫn là người thiết kế tuyến — plugin **không tự nghĩ ra thiết kế** (xem non-goals).
 
@@ -24,39 +24,39 @@ Vai trò: kỹ sư MEPF (AutoCAD 2026 full, plugin M99 đã cài). Người vẫ
 
 - **O1** Bản vẽ shop vẽ bằng `XBOSS_VE_*` chạy `XBOSS_KIEMTRA` ra **0 lỗi** thuộc các nhóm layer sai chuẩn / lệch Z / lineweight lệch CTB (các nhóm plugin kiểm soát được khi vẽ).
 - **O2** `XBOSS_BOCKL` trên bản vẽ shop vẽ bằng `XBOSS_VE_*` **không sót, không bóc nhầm hệ**: 100% tuyến tim khớp đúng item takeoff của hệ đã chọn.
-- **O3** Tốc độ: vẽ 1 tuyến + chèn phụ kiện nhanh **không chậm hơn** vẽ tay bằng PLINE + INSERT (mục tiêu là *đúng chuẩn miễn phí*, không phải thêm bước).
+- **O3** Tốc độ: vẽ 1 tuyến + chèn phụ kiện nhanh **không chậm hơn** vẽ tay bằng PLINE + INSERT (mục tiêu là _đúng chuẩn miễn phí_, không phải thêm bước).
 - **O4** Thư viện block dùng thống nhất toàn công ty, có version — 2 kỹ sư khác máy chèn cùng 1 block ra cùng 1 định nghĩa.
 - **Guardrail:** mỗi lệnh vẽ = 1 nhóm UNDO (như M99 FR7); lệnh vẽ **không đụng** đối tượng của bản thiết kế nền; không có rule pack + thư viện block thì lệnh vẽ từ chối chạy (như `XBOSS_RULEPACK` hiện tại).
 - **Stop:** phát hiện lệnh vẽ sửa/xóa nhầm đối tượng nền → thu hồi bản phát hành ngay.
 
 ## 3. Nghiên cứu hiện trạng
 
-| Thành phần                                             | Vai trò trong M100                                                                                                              |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| `lib/ky-thuat/cad/rule-packs/v3.json`                  | Nền — **mở rộng v4**: thêm `drawTools` (§11). `layerMap.groups[].branches[].target` là nguồn tên layer đích duy nhất, không khai trùng |
-| `lib/ky-thuat/cad/rule-pack.ts` + `GET /api/engineering/cad/rule-pack` | Giữ nguyên cơ chế version/ETag — v4 đi cùng đường                                                                |
-| `XBoss.Cad.Core` (`Matching/TokenMatcher`, `Takeoff/`) | Tái dùng: item takeoff + matcher là nguồn khớp hệ↔layer↔block; **thêm `Draw/`** cho hình học thuần (offset nét đôi, xoay phụ kiện) |
-| `XBoss.Cad.Acad` (`Commands/`, `Services/`)            | Thêm nhóm lệnh `XBOSS_VE_*` + service quản lý thư viện block (tải, cache, chèn định nghĩa vào DWG)                              |
-| `XBOSS_LOGIN` / token scope `cad` (M99 PR2)            | Tái dùng nguyên vẹn cho việc tải thư viện block                                                                                  |
-| Bảng điều khiển `/engineering/chuan-hoa-ban-ve` (M99 PR6) | Thêm mục "Thư viện block": phát hành/xem version, tải xuống                                                                   |
-| `takeoff.items[]` (rule pack)                          | `blockNameMatchAny` của item count (FCU/AHU/SPK…) phải khớp tên block trong thư viện — **một nguồn tên duy nhất** (§12 rủi ro trôi) |
+| Thành phần                                                             | Vai trò trong M100                                                                                                                     |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/ky-thuat/cad/rule-packs/v3.json`                                  | Nền — **mở rộng v4**: thêm `drawTools` (§11). `layerMap.groups[].branches[].target` là nguồn tên layer đích duy nhất, không khai trùng |
+| `lib/ky-thuat/cad/rule-pack.ts` + `GET /api/engineering/cad/rule-pack` | Giữ nguyên cơ chế version/ETag — v4 đi cùng đường                                                                                      |
+| `XBoss.Cad.Core` (`Matching/TokenMatcher`, `Takeoff/`)                 | Tái dùng: item takeoff + matcher là nguồn khớp hệ↔layer↔block; **thêm `Draw/`** cho hình học thuần (offset nét đôi, xoay phụ kiện)     |
+| `XBoss.Cad.Acad` (`Commands/`, `Services/`)                            | Thêm nhóm lệnh `XBOSS_VE_*` + service quản lý thư viện block (tải, cache, chèn định nghĩa vào DWG)                                     |
+| `XBOSS_LOGIN` / token scope `cad` (M99 PR2)                            | Tái dùng nguyên vẹn cho việc tải thư viện block                                                                                        |
+| Bảng điều khiển `/engineering/chuan-hoa-ban-ve` (M99 PR6)              | Thêm mục "Thư viện block": phát hành/xem version, tải xuống                                                                            |
+| `takeoff.items[]` (rule pack)                                          | `blockNameMatchAny` của item count (FCU/AHU/SPK…) phải khớp tên block trong thư viện — **một nguồn tên duy nhất** (§12 rủi ro trôi)    |
 
 ## 4. Phương án
 
-| Điểm                       | Phương án                                                                    | Kết luận                                                                                                                                                                                                                                                              |
-| -------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Thư viện block đóng gói    | Nhúng trong `.bundle` plugin vs **tệp `.dwg` + manifest tải từ server**      | **Tải từ server** — cùng nguyên tắc rule pack (ADR-0006 nguyên tắc 1): thêm/sửa block = phát hành version mới, không build lại plugin. Manifest JSON (tên block ↔ hệ ↔ item takeoff ↔ tham số chèn) nằm trong repo append-only; tệp `.dwg` nhị phân lưu qua `lib/nen/storage.ts` (không vào git — như gói plugin M99) |
-| Cách chèn block            | `INSERT` từ tệp ngoài mỗi lần vs **nhập định nghĩa vào BlockTable của DWG 1 lần** | **Nhập 1 lần** (`Database.Insert`/`WblockCloneObjects` từ tệp thư viện đã cache) — bản vẽ tự chứa định nghĩa, mở trên máy chưa cài plugin vẫn hiển thị đúng; chèn lần sau tái dùng định nghĩa sẵn có (so tên + so hash để phát hiện lệch version)                     |
-| Biểu diễn tuyến            | 1 nét tim vs 2 nét biên vs **tim + biên tách layer**                          | **Tim là nguồn sự thật**: polyline tim trên layer đo của hệ (đúng layer `takeoff.layerMatchAny` — BOCKL đo tim tuyến, nhất quán M99 §6.5). Ống gió/máng cáp cần thể hiện bề rộng → plugin sinh thêm nét biên trên **layer phụ `<layer>-EDGE`** (mới, KHÔNG nằm trong `layerMatchAny` nào) — không bao giờ bóc trùng |
-| Liên kết tim ↔ biên        | Group AutoCAD vs block ẩn danh vs **XData 2 chiều**                           | **XData**: nét biên mang handle của tim, tim mang danh sách handle biên — xóa/sửa tim thì lệnh `XBOSS_VE_DOI` dựng lại biên; không dùng block ẩn danh (M99 đang kiểm "block nặc danh" là lỗi)                                                                          |
-| Size tuyến                 | Text tự do vs **danh mục size trong rule pack**                               | **Danh mục** `drawTools.systems[].sizes[]` — chọn từ danh sách, ghi vào XData tim (`XBOSS_VE` appname) + nhãn. Size ngoài danh mục: cho nhập tay kèm cờ `custom` trong XData + cảnh báo trong báo cáo                                                                 |
-| Nền thiết kế               | Xref vs copy vào bản vẽ                                                       | **Không ép** — kỹ sư đang có sẵn quy trình (đa số copy/xref tùy dự án). Lệnh `XBOSS_VE_NEN` chỉ *hỗ trợ*: khóa + làm mờ (fade) các layer không thuộc hệ đang vẽ, đổi màu screening. Hoàn tác được                                                                     |
+| Điểm                    | Phương án                                                                         | Kết luận                                                                                                                                                                                                                                                                                                              |
+| ----------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Thư viện block đóng gói | Nhúng trong `.bundle` plugin vs **tệp `.dwg` + manifest tải từ server**           | **Tải từ server** — cùng nguyên tắc rule pack (ADR-0006 nguyên tắc 1): thêm/sửa block = phát hành version mới, không build lại plugin. Manifest JSON (tên block ↔ hệ ↔ item takeoff ↔ tham số chèn) nằm trong repo append-only; tệp `.dwg` nhị phân lưu qua `lib/nen/storage.ts` (không vào git — như gói plugin M99) |
+| Cách chèn block         | `INSERT` từ tệp ngoài mỗi lần vs **nhập định nghĩa vào BlockTable của DWG 1 lần** | **Nhập 1 lần** (`Database.Insert`/`WblockCloneObjects` từ tệp thư viện đã cache) — bản vẽ tự chứa định nghĩa, mở trên máy chưa cài plugin vẫn hiển thị đúng; chèn lần sau tái dùng định nghĩa sẵn có (so tên + so hash để phát hiện lệch version)                                                                     |
+| Biểu diễn tuyến         | 1 nét tim vs 2 nét biên vs **tim + biên tách layer**                              | **Tim là nguồn sự thật**: polyline tim trên layer đo của hệ (đúng layer `takeoff.layerMatchAny` — BOCKL đo tim tuyến, nhất quán M99 §6.5). Ống gió/máng cáp cần thể hiện bề rộng → plugin sinh thêm nét biên trên **layer phụ `<layer>EDGE`** (mới, KHÔNG nằm trong `layerMatchAny` nào) — không bao giờ bóc trùng    |
+| Liên kết tim ↔ biên     | Group AutoCAD vs block ẩn danh vs **XData 2 chiều**                               | **XData**: nét biên mang handle của tim, tim mang danh sách handle biên — xóa/sửa tim thì lệnh `XBOSS_VE_DOI` dựng lại biên; không dùng block ẩn danh (M99 đang kiểm "block nặc danh" là lỗi)                                                                                                                         |
+| Size tuyến              | Text tự do vs **danh mục size trong rule pack**                                   | **Danh mục** `drawTools.systems[].sizes[]` — chọn từ danh sách, ghi vào XData tim (`XBOSS_VE` appname) + nhãn. Size ngoài danh mục: cho nhập tay kèm cờ `custom` trong XData + cảnh báo trong báo cáo                                                                                                                 |
+| Nền thiết kế            | Xref vs copy vào bản vẽ                                                           | **Không ép** — kỹ sư đang có sẵn quy trình (đa số copy/xref tùy dự án). Lệnh `XBOSS_VE_NEN` chỉ _hỗ trợ_: khóa + làm mờ (fade) các layer không thuộc hệ đang vẽ, đổi màu screening. Hoàn tác được                                                                                                                     |
 
 ## 5. Scope / non-goals
 
 **Trong phạm vi:** rule pack v4 (`drawTools` + `sheetSetup`); thư viện block chuẩn có version (manifest + tệp `.dwg`, phát hành trên web, tải qua API có token); bộ lệnh vẽ: chuẩn bị nền, vẽ tuyến (tim ± nét biên), chèn phụ kiện tự xoay theo tuyến, chèn thiết bị có attribute, ghi nhãn size, đổi hệ/size đoạn đã vẽ; **trang in** (layout + viewport đúng tỉ lệ + khung tên chuẩn công ty, `XBOSS_VE_TRANGIN`); **mặt cắt bán tự động** (`XBOSS_VE_MATCAT` — dựng khung mặt cắt từ dữ liệu size trong XData trên tuyến cắt do kỹ sư kẻ); **giá đỡ tự động dọc tuyến** (`XBOSS_VE_GIADO`); **sleeve/lỗ chờ + bảng builder's work** (`XBOSS_VE_LOCHO`); **đánh tag tuần tự + kiểm trùng** (`XBOSS_VE_TAG`); **bảng thống kê trong bản vẽ** (`XBOSS_VE_THONGKE`); **độ dốc ống thoát** (tham số slope trong `XBOSS_VE`/`VE_NHAN`); mục "Thư viện block" trên bảng điều khiển web.
 
-**Non-goals:** **tự động thiết kế tuyến** (auto-routing, tránh va chạm, chọn size theo tính toán thủy lực/gió — người quyết, plugin chỉ đảm bảo *vẽ gì cũng chuẩn*); 3D/BIM; **mặt cắt tự động hoàn toàn** (bản vẽ 2D không chứa cao độ lắp đặt thật — plugin dựng *khung* mặt cắt đúng size/khoảng cách ngang từ XData, cao độ và chi tiết treo đỡ kỹ sư hoàn thiện; tự động 100% cần 3D/BIM — trần công nghệ); vẽ trên server (license Autodesk — ADR-0006); sửa đổi bản thiết kế nền (chỉ khóa/mờ, không đổi nội dung); tính lại khối lượng ngay khi vẽ (vẫn qua `XBOSS_BOCKL` — một đường bóc duy nhất); hỗ trợ AutoCAD ≠ 2026 (M99 §9.1).
+**Non-goals:** **tự động thiết kế tuyến** (auto-routing, tránh va chạm, chọn size theo tính toán thủy lực/gió — người quyết, plugin chỉ đảm bảo _vẽ gì cũng chuẩn_); 3D/BIM; **mặt cắt tự động hoàn toàn** (bản vẽ 2D không chứa cao độ lắp đặt thật — plugin dựng _khung_ mặt cắt đúng size/khoảng cách ngang từ XData, cao độ và chi tiết treo đỡ kỹ sư hoàn thiện; tự động 100% cần 3D/BIM — trần công nghệ); vẽ trên server (license Autodesk — ADR-0006); sửa đổi bản thiết kế nền (chỉ khóa/mờ, không đổi nội dung); tính lại khối lượng ngay khi vẽ (vẫn qua `XBOSS_BOCKL` — một đường bóc duy nhất); hỗ trợ AutoCAD ≠ 2026 (M99 §9.1).
 
 ## 6. User journeys và mọi trạng thái
 
@@ -104,13 +104,13 @@ Bấm điểm tuyến xuyên kết cấu (hoặc để plugin dò giao tim × đ
 
 ### 6.10 Trạng thái thư viện block
 
-| Trạng thái                                        | Hành vi                                                                                                                              |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Chưa có thư viện (chưa LOGIN, chưa nạp tay)       | `XBOSS_VE_PHUKIEN`/`XBOSS_VE_THIETBI` từ chối chạy, báo tiếng Việt chỉ cách lấy; `XBOSS_VE` (tuyến) vẫn chạy được — chỉ cần rule pack |
-| Có cache, server có version mới hơn (so ETag)     | Tự tải bản mới khi `XBOSS_LOGIN`/khởi động có mạng; đang vẽ giữa chừng KHÔNG tự đổi version (đổi khi mở bản vẽ mới)                  |
-| Offline                                           | Dùng cache `%APPDATA%\XBoss\block-lib\` (tệp `.dwg` + manifest); lệnh `XBOSS_VE_THUVIEN` nạp tệp tay (đường dự phòng như `XBOSS_RULEPACK`) |
-| Bản vẽ chứa block trùng tên nhưng khác định nghĩa (hash lệch) | KHÔNG ghi đè âm thầm: hỏi kỹ sư — giữ định nghĩa trong bản vẽ / cập nhật theo thư viện (redefine, có UNDO); ghi lựa chọn vào báo cáo |
-| Manifest khai block không tồn tại trong tệp `.dwg` | Server chặn ngay lúc phát hành (kiểm bằng parser DXF tầng 3 trên bản DXF sidecar của thư viện — §10); client coi là thư viện hỏng, từ chối dùng |
+| Trạng thái                                                    | Hành vi                                                                                                                                         |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chưa có thư viện (chưa LOGIN, chưa nạp tay)                   | `XBOSS_VE_PHUKIEN`/`XBOSS_VE_THIETBI` từ chối chạy, báo tiếng Việt chỉ cách lấy; `XBOSS_VE` (tuyến) vẫn chạy được — chỉ cần rule pack           |
+| Có cache, server có version mới hơn (so ETag)                 | Tự tải bản mới khi `XBOSS_LOGIN`/khởi động có mạng; đang vẽ giữa chừng KHÔNG tự đổi version (đổi khi mở bản vẽ mới)                             |
+| Offline                                                       | Dùng cache `%APPDATA%\XBoss\block-lib\` (tệp `.dwg` + manifest); lệnh `XBOSS_VE_THUVIEN` nạp tệp tay (đường dự phòng như `XBOSS_RULEPACK`)      |
+| Bản vẽ chứa block trùng tên nhưng khác định nghĩa (hash lệch) | KHÔNG ghi đè âm thầm: hỏi kỹ sư — giữ định nghĩa trong bản vẽ / cập nhật theo thư viện (redefine, có UNDO); ghi lựa chọn vào báo cáo            |
+| Manifest khai block không tồn tại trong tệp `.dwg`            | Server chặn ngay lúc phát hành (kiểm bằng parser DXF tầng 3 trên bản DXF sidecar của thư viện — §10); client coi là thư viện hỏng, từ chối dùng |
 
 ### 6.11 Trạng thái vẽ
 
@@ -185,11 +185,11 @@ migrations/0NNN_block_library.sql          ← MỚI (bảng `cad_block_libs`: v
 
 ## 10. API contract
 
-| Endpoint                              | Method | Auth                          | Hành vi                                                                                                                                                        |
-| ------------------------------------- | ------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/api/engineering/cad/block-lib`      | GET    | token scope `cad` hoặc session | Trả tệp `.dwg` version hiện hành + header `X-Manifest` (hoặc `?manifest=1` trả JSON manifest); ETag theo version — 304 khi cache còn mới                       |
-| `/api/engineering/cad/block-lib`      | POST   | session Admin/PM + CSRF        | Phát hành version mới: nhận `.dwg` + manifest JSON; server kiểm — manifest hash khớp tệp, mọi block khai có thật (đối chiếu qua DXF sidecar do người phát hành nộp kèm, parser tầng 3 hiện có), tên block khớp `takeoff.blockNameMatchAny` (cảnh báo nếu lệch); đạt → lưu qua `storagePut` + dòng `cad_block_libs`; sai → 422 kèm danh sách lỗi |
-| `/api/engineering/cad/rule-pack`      | GET    | (đã có — M99)                  | Không đổi; v4 phát hành cùng cơ chế                                                                                                                             |
+| Endpoint                         | Method | Auth                           | Hành vi                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------- | ------ | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/engineering/cad/block-lib` | GET    | token scope `cad` hoặc session | Trả tệp `.dwg` version hiện hành + header `X-Manifest` (hoặc `?manifest=1` trả JSON manifest); ETag theo version — 304 khi cache còn mới                                                                                                                                                                                                        |
+| `/api/engineering/cad/block-lib` | POST   | session Admin/PM + CSRF        | Phát hành version mới: nhận `.dwg` + manifest JSON; server kiểm — manifest hash khớp tệp, mọi block khai có thật (đối chiếu qua DXF sidecar do người phát hành nộp kèm, parser tầng 3 hiện có), tên block khớp `takeoff.blockNameMatchAny` (cảnh báo nếu lệch); đạt → lưu qua `storagePut` + dòng `cad_block_libs`; sai → 422 kèm danh sách lỗi |
+| `/api/engineering/cad/rule-pack` | GET    | (đã có — M99)                  | Không đổi; v4 phát hành cùng cơ chế                                                                                                                                                                                                                                                                                                             |
 
 Route handler chỉ là ranh giới HTTP (ADR-0008) — kiểm định nằm trong `lib/ky-thuat/cad/block-lib.ts`.
 
@@ -200,7 +200,7 @@ Route handler chỉ là ranh giới HTTP (ADR-0008) — kiểm định nằm tro
 ```jsonc
 "drawTools": {
   "baseFadePct": 70,                    // độ mờ layer nền khi XBOSS_VE_NEN
-  "edgeLayerSuffix": "-EDGE",           // hậu tố layer nét biên — cấm khớp mọi takeoff.layerMatchAny
+  "edgeLayerSuffix": "EDGE",            // hậu tố layer nét biên (M-DUCT-SUPPEDGE) — PHẢI bắt đầu bằng [A-Z0-9]: hậu tố "-EDGE" bị token-matcher tách token nên vẫn khớp layerMatchAny gốc → bóc trùng (phát hiện khi code PR1, phiên chính duyệt đổi 2026-08-25); validator chặn mọi hậu tố khiến layer biên khớp takeoff
   "labelStyle": { "textHeightMm": 2.5, "layer": "G-ANNO-TEXT" },
   "systems": [
     {
@@ -209,6 +209,7 @@ Route handler chỉ là ranh giới HTTP (ADR-0008) — kiểm định nằm tro
       "lines": [
         { "itemId": "duct-supp", "name": "Ống gió cấp",  "layer": "M-DUCT-SUPP", // khớp branch target — validator bắt lệch
           "edgeStyle": "double", "sizes": ["200x150","300x200","400x250","500x300","..."], "sizeKind": "WxH" },
+        // chw-pipe khai ở systems[PIPING] (M-CHW-PIPE là target của nhóm PIPING trong layerMap — luật (b); ví dụ cũ đặt ở HVAC là sai, sửa khi code PR1):
         { "itemId": "chw-pipe",  "name": "Ống CHW", "layer": "M-CHW-PIPE",
           "edgeStyle": "none", "sizes": ["DN25","DN32","DN40","DN50","DN65","DN80","DN100","..."], "sizeKind": "DN" }
       ],
@@ -241,13 +242,30 @@ Route handler chỉ là ranh giới HTTP (ADR-0008) — kiểm định nằm tro
   "version": "b1",
   "dwgSha256": "…",
   "blocks": [
-    { "id": "elbow-duct", "blockName": "XB-DUCT-ELBOW", "system": "HVAC", "kind": "fitting",
-      "scaleBySize": true, "rotateToPath": true },
-    { "id": "fcu-unit", "blockName": "FCU", "system": "HVAC", "kind": "equipment",
-      "attributes": ["TAG", "MODEL", "SIZE"], "takeoffItemId": "fcu-unit" },
-    { "id": "titleblock-a1", "blockName": "XB-TB-A1", "kind": "titleblock", "paper": "A1",
-      "attributes": ["DU_AN", "HANG_MUC", "TI_LE", "NGAY", "NGUOI_VE", "SO_BAN_VE"] }
-  ]
+    {
+      "id": "elbow-duct",
+      "blockName": "XB-DUCT-ELBOW",
+      "system": "HVAC",
+      "kind": "fitting",
+      "scaleBySize": true,
+      "rotateToPath": true,
+    },
+    {
+      "id": "fcu-unit",
+      "blockName": "FCU",
+      "system": "HVAC",
+      "kind": "equipment",
+      "attributes": ["TAG", "MODEL", "SIZE"],
+      "takeoffItemId": "fcu-unit",
+    },
+    {
+      "id": "titleblock-a1",
+      "blockName": "XB-TB-A1",
+      "kind": "titleblock",
+      "paper": "A1",
+      "attributes": ["DU_AN", "HANG_MUC", "TI_LE", "NGAY", "NGUOI_VE", "SO_BAN_VE"],
+    },
+  ],
 }
 ```
 
@@ -282,15 +300,15 @@ Route handler chỉ là ranh giới HTTP (ADR-0008) — kiểm định nằm tro
 
 ## 16. Kế hoạch slice/PR
 
-| PR  | Nội dung                                                                                                                              | route:    | Điều kiện                         |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------- | --------- | ---------------------------------- |
-| PR1 | Rule pack v4 (`drawTools`) + validator Core (`DrawToolsConfig`, `TakeoffCrossCheck`) + test; server phục vụ v4 (không code mới ngoài data) | `spec`    | —                                  |
-| PR2 | Thư viện block: DDL `cad_block_libs` + `lib/ky-thuat/cad/block-lib.ts` + API GET/POST + mục web + `BlockManifest` Core + test           | `complex` | PR1                                |
-| PR3 | Adapter: `XBOSS_VE_NEN` + `XBOSS_VE` (tuyến tim + biên, `EdgeOffset` Core) + `XBOSS_VE_NHAN`                                            | `complex` | PR1; build/verify tay máy Windows |
-| PR4 | Adapter: `XBOSS_VE_PHUKIEN` + `XBOSS_VE_THIETBI` + `XBOSS_VE_THUVIEN` (`BlockLibraryService`, `FittingPlacement`)                       | `complex` | PR2+PR3                            |
-| PR5 | `XBOSS_VE_DOI` + báo cáo phiên vẽ + tài liệu (README plugin, CAI-DAT.md) + checklist AC tích hợp                                        | `standard`| PR3+PR4                            |
-| PR6 | `XBOSS_VE_TRANGIN` (layout/viewport/khung tên, `SheetSetupConfig`) + `XBOSS_VE_MATCAT` (`SectionBuilder`) + AC10/AC11                    | `complex` | PR2+PR3 (cần titleblock trong thư viện) |
-| PR7 | `XBOSS_VE_GIADO` + `XBOSS_VE_LOCHO` (kèm bảng builder's work) + `XBOSS_VE_TAG` + `XBOSS_VE_THONGKE` + slope (Core: spacing/clip thuần)  | `complex` | PR2+PR3; item takeoff giá đỡ/sleeve vào rule pack cùng PR |
+| PR  | Nội dung                                                                                                                                   | route:     | Điều kiện                                                 |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------- |
+| PR1 | Rule pack v4 (`drawTools`) + validator Core (`DrawToolsConfig`, `TakeoffCrossCheck`) + test; server phục vụ v4 (không code mới ngoài data) | `spec`     | —                                                         |
+| PR2 | Thư viện block: DDL `cad_block_libs` + `lib/ky-thuat/cad/block-lib.ts` + API GET/POST + mục web + `BlockManifest` Core + test              | `complex`  | PR1                                                       |
+| PR3 | Adapter: `XBOSS_VE_NEN` + `XBOSS_VE` (tuyến tim + biên, `EdgeOffset` Core) + `XBOSS_VE_NHAN`                                               | `complex`  | PR1; build/verify tay máy Windows                         |
+| PR4 | Adapter: `XBOSS_VE_PHUKIEN` + `XBOSS_VE_THIETBI` + `XBOSS_VE_THUVIEN` (`BlockLibraryService`, `FittingPlacement`)                          | `complex`  | PR2+PR3                                                   |
+| PR5 | `XBOSS_VE_DOI` + báo cáo phiên vẽ + tài liệu (README plugin, CAI-DAT.md) + checklist AC tích hợp                                           | `standard` | PR3+PR4                                                   |
+| PR6 | `XBOSS_VE_TRANGIN` (layout/viewport/khung tên, `SheetSetupConfig`) + `XBOSS_VE_MATCAT` (`SectionBuilder`) + AC10/AC11                      | `complex`  | PR2+PR3 (cần titleblock trong thư viện)                   |
+| PR7 | `XBOSS_VE_GIADO` + `XBOSS_VE_LOCHO` (kèm bảng builder's work) + `XBOSS_VE_TAG` + `XBOSS_VE_THONGKE` + slope (Core: spacing/clip thuần)     | `complex`  | PR2+PR3; item takeoff giá đỡ/sleeve vào rule pack cùng PR |
 
 Nội dung thư viện block đầu tiên (vẽ các block `XB-*` chuẩn công ty trong tệp `.dwg`) là việc của kỹ sư trưởng/CAD manager — **không phải việc code**; PR2 giao kèm tệp mẫu tối thiểu (1 block/loại) để test.
 
@@ -302,18 +320,18 @@ Nội dung thư viện block đầu tiên (vẽ các block `XB-*` chuẩn công 
 
 ## 18. Risk/assumption/open decisions
 
-| Mục                                                                       | Xác minh/giảm thiểu                                                                                                                                          | Quyết định            |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| **Trôi tên giữa 4 nguồn** (layerMap/drawTools/manifest/takeoff)           | Validator 2 chỗ + `TakeoffCrossCheck` chạy CI trên dữ liệu thật của repo (§15) — rủi ro số 1, kế thừa bài học M99                                             | Giảm thiểu            |
-| Kỹ sư không dùng lệnh mới (vẽ tay quen hơn)                               | O3 tốc độ ngang PLINE; pilot hẹp lấy phản hồi; giá trị bán kèm: khỏi gõ nhãn, bóc không sót                                                                   | Theo dõi sau pilot    |
-| Nét biên lệch khi tuyến có cung/spline phức tạp                           | `EdgeOffset` test kỹ trên Core; đoạn không offset được (spline tự cắt) → chỉ vẽ tim + cảnh báo, không vẽ biên sai                                             | Giảm thiểu            |
-| Bản vẽ nền chưa chuẩn hóa → layer đích trùng tên nội dung bẩn             | `XBOSS_VE_NEN` cảnh báo khi layer đích đã có đối tượng cũ; khuyến nghị CHUANHOA trước (không ép)                                                              | Chấp nhận có chủ đích |
-| Danh mục size/danh sách phụ kiện tùy công ty, rule pack toàn cục          | Như `boqCode` M99: v4 mang bộ mặc định, cần theo dự án → phát hành version mới                                                                                 | Chấp nhận, xem lại sau UAT |
-| Không có runner Windows có license                                        | Kế thừa nguyên trạng M99 §18 — phần Adapter verify tay theo release, checklist AC trong PR5                                                                    | Chấp nhận (đã có tiền lệ) |
-| Mặt cắt bán tự động bị hiểu nhầm là "đúng cao độ thật"                    | Nhãn hình cắt in rõ "cao độ nhập tay, kiểm tra tại hiện trường"; cao độ luôn prompt, không có giá trị ngầm                                                     | Giảm thiểu            |
-| Nền .NET AutoCAD đổi giữa bản cập nhật                                     | Kế thừa quy trình kiểm M99 §9.1 (đã xảy ra 2026-08-25)                                                                                                         | Quy trình sẵn có      |
-| ~~Open~~ thư viện toàn cục hay theo dự án                                  | **ĐÃ CHỐT 2026-08-25 (duyệt trọn gói): toàn cục** — đa dự án xem lại sau UAT                                                                                    | Đã chốt               |
-| ~~Open~~ transparency vs screening                                          | **ĐÃ CHỐT: transparency**; tinh chỉnh cảm quan là ranh giới quyết của PR3                                                                                        | Đã chốt               |
+| Mục                                                              | Xác minh/giảm thiểu                                                                                               | Quyết định                 |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| **Trôi tên giữa 4 nguồn** (layerMap/drawTools/manifest/takeoff)  | Validator 2 chỗ + `TakeoffCrossCheck` chạy CI trên dữ liệu thật của repo (§15) — rủi ro số 1, kế thừa bài học M99 | Giảm thiểu                 |
+| Kỹ sư không dùng lệnh mới (vẽ tay quen hơn)                      | O3 tốc độ ngang PLINE; pilot hẹp lấy phản hồi; giá trị bán kèm: khỏi gõ nhãn, bóc không sót                       | Theo dõi sau pilot         |
+| Nét biên lệch khi tuyến có cung/spline phức tạp                  | `EdgeOffset` test kỹ trên Core; đoạn không offset được (spline tự cắt) → chỉ vẽ tim + cảnh báo, không vẽ biên sai | Giảm thiểu                 |
+| Bản vẽ nền chưa chuẩn hóa → layer đích trùng tên nội dung bẩn    | `XBOSS_VE_NEN` cảnh báo khi layer đích đã có đối tượng cũ; khuyến nghị CHUANHOA trước (không ép)                  | Chấp nhận có chủ đích      |
+| Danh mục size/danh sách phụ kiện tùy công ty, rule pack toàn cục | Như `boqCode` M99: v4 mang bộ mặc định, cần theo dự án → phát hành version mới                                    | Chấp nhận, xem lại sau UAT |
+| Không có runner Windows có license                               | Kế thừa nguyên trạng M99 §18 — phần Adapter verify tay theo release, checklist AC trong PR5                       | Chấp nhận (đã có tiền lệ)  |
+| Mặt cắt bán tự động bị hiểu nhầm là "đúng cao độ thật"           | Nhãn hình cắt in rõ "cao độ nhập tay, kiểm tra tại hiện trường"; cao độ luôn prompt, không có giá trị ngầm        | Giảm thiểu                 |
+| Nền .NET AutoCAD đổi giữa bản cập nhật                           | Kế thừa quy trình kiểm M99 §9.1 (đã xảy ra 2026-08-25)                                                            | Quy trình sẵn có           |
+| ~~Open~~ thư viện toàn cục hay theo dự án                        | **ĐÃ CHỐT 2026-08-25 (duyệt trọn gói): toàn cục** — đa dự án xem lại sau UAT                                      | Đã chốt                    |
+| ~~Open~~ transparency vs screening                               | **ĐÃ CHỐT: transparency**; tinh chỉnh cảm quan là ranh giới quyết của PR3                                         | Đã chốt                    |
 
 ## 19. Approval
 
@@ -331,11 +349,11 @@ Nội dung thư viện block đầu tiên (vẽ các block `XB-*` chuẩn công 
 
 Ghi theo yêu cầu người dùng 2026-08-25 ("ghi chú thêm những tính năng đáng giá cần nâng cấp cho phiên bản sau"). Chưa có đặc tả — mỗi mục khi làm phải mở M mới hoặc bổ sung M100 có duyệt lại:
 
-| Tính năng                                   | Giá trị                                                                                                          | Lý do để lại                                                                                                                             |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `XBOSS_VE_NGATNET` — ngắt nét giao chéo     | Quy ước trình bày 2D "ống dưới ngắt nét" — bản vẽ nộp đẹp chuẩn                                                   | Đụng hình học hiển thị quanh tim — phải thiết kế để gap CHỈ ở nét biên/hiển thị, tim giữ nguyên (không được lệch BOCKL); cần nghĩ kỹ      |
-| `XBOSS_VE_REV` — revision cloud + tam giác  | Đánh dấu vùng sửa giữa các revision, liên kết `drawing_revisions` trên server — truy vết CĐT yêu cầu sửa gì       | Nên đi cùng chu trình duyệt bản vẽ trên web (trạng thái revision, so sánh 2 bản) — một đợt riêng trọn vẹn hơn                             |
-| Nhân bản tầng điển hình                     | Copy cả hệ sang N tầng (tháp căn hộ AVIO tầng điển hình nhiều), giữ XData, tự đổi tag `{floor}` + tên vùng        | Giá trị lớn nhưng rủi ro nhân bản lỗi hàng loạt — chờ M100 lõi chạy ổn qua pilot                                                          |
-| Sơ đồ đứng (riser) bán tự động              | Dựng riser từ dữ liệu tuyến các tầng                                                                               | Cần dữ liệu liên tầng có cấu trúc (bản vẽ nào = tầng nào, điểm trục đứng) — gần bài toán BIM; chỉ khả thi sau khi nhân bản tầng + vùng/tầng của M101 chạy thật |
-| Thư viện block theo dự án (`org_id`)        | Mỗi dự án/CĐT một bộ block riêng                                                                                   | Đã chốt bản đầu toàn cục; xem lại sau UAT                                                                                                 |
-| Đối chiếu chéo M101                         | Tag trùng vào `XBOSS_KIEMTRA` (phép 17), giá đỡ/sleeve vào bóc theo vùng                                          | Tự động có khi M101 triển khai — ghi để không quên nối 2 đặc tả                                                                            |
+| Tính năng                                  | Giá trị                                                                                                     | Lý do để lại                                                                                                                                                   |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `XBOSS_VE_NGATNET` — ngắt nét giao chéo    | Quy ước trình bày 2D "ống dưới ngắt nét" — bản vẽ nộp đẹp chuẩn                                             | Đụng hình học hiển thị quanh tim — phải thiết kế để gap CHỈ ở nét biên/hiển thị, tim giữ nguyên (không được lệch BOCKL); cần nghĩ kỹ                           |
+| `XBOSS_VE_REV` — revision cloud + tam giác | Đánh dấu vùng sửa giữa các revision, liên kết `drawing_revisions` trên server — truy vết CĐT yêu cầu sửa gì | Nên đi cùng chu trình duyệt bản vẽ trên web (trạng thái revision, so sánh 2 bản) — một đợt riêng trọn vẹn hơn                                                  |
+| Nhân bản tầng điển hình                    | Copy cả hệ sang N tầng (tháp căn hộ AVIO tầng điển hình nhiều), giữ XData, tự đổi tag `{floor}` + tên vùng  | Giá trị lớn nhưng rủi ro nhân bản lỗi hàng loạt — chờ M100 lõi chạy ổn qua pilot                                                                               |
+| Sơ đồ đứng (riser) bán tự động             | Dựng riser từ dữ liệu tuyến các tầng                                                                        | Cần dữ liệu liên tầng có cấu trúc (bản vẽ nào = tầng nào, điểm trục đứng) — gần bài toán BIM; chỉ khả thi sau khi nhân bản tầng + vùng/tầng của M101 chạy thật |
+| Thư viện block theo dự án (`org_id`)       | Mỗi dự án/CĐT một bộ block riêng                                                                            | Đã chốt bản đầu toàn cục; xem lại sau UAT                                                                                                                      |
+| Đối chiếu chéo M101                        | Tag trùng vào `XBOSS_KIEMTRA` (phép 17), giá đỡ/sleeve vào bóc theo vùng                                    | Tự động có khi M101 triển khai — ghi để không quên nối 2 đặc tả                                                                                                |
