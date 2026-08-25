@@ -1,3 +1,4 @@
+using System.Globalization;
 using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.EditorInput;
 using XBoss.Cad.Core.Draw;
@@ -24,8 +25,15 @@ internal static class VeContext
     internal static bool SizeTuNhap { get; set; }
     internal static string? DoDoc { get; set; }
 
-    /// <summary>Tỉ lệ in dự kiến, dùng quy đổi chiều cao chữ nhãn từ mm giấy sang mm mô hình.</summary>
+    /// <summary>
+    /// Tỉ lệ in dự kiến (1:x). Dùng CHUNG cho chiều cao chữ nhãn (XBOSS_VE_NHAN), tỉ lệ viewport
+    /// (XBOSS_VE_TRANGIN) và chữ hình cắt (XBOSS_VE_MATCAT) — một giá trị duy nhất để nhãn trên
+    /// mặt bằng và trang in không bao giờ lệch nhau.
+    /// </summary>
     internal static double? TiLeIn { get; set; }
+
+    /// <summary>Khổ giấy chọn lần trước trong phiên (XBOSS_VE_TRANGIN).</summary>
+    internal static string? KhoGiay { get; set; }
 
     // ===== Hạ tầng chung của nhóm lệnh vẽ =====
 
@@ -145,6 +153,31 @@ internal static class VeContext
         }
         Tuyen = chon;
         return (chon, false);
+    }
+
+    /// <summary>
+    /// Tỉ lệ in 1:x lấy từ danh mục <c>sheetSetup.scales</c>, nhớ lại cho các lệnh sau trong phiên
+    /// (<see cref="TiLeIn"/>). Một cửa duy nhất cho MỌI lệnh cần tỉ lệ — chiều cao chữ nhãn trên
+    /// mặt bằng và tỉ lệ viewport của trang in phải bằng nhau, không được hỏi hai nơi hai kiểu.
+    /// Null = kỹ sư hủy hoặc nhập số không hợp lệ (đã báo lý do).
+    /// </summary>
+    internal static double? HoiTiLeIn(Editor ed, DrawToolsPack pack, bool batBuocHoiLai = false)
+    {
+        if (!batBuocHoiLai && TiLeIn is { } daChon) return daChon;
+
+        var danhMuc = pack.SheetSetup.Scales
+            .Select(s => s.ToString("0.##", CultureInfo.InvariantCulture))
+            .ToList();
+        var macDinh = TiLeIn?.ToString("0.##", CultureInfo.InvariantCulture);
+        var chon = HoiDanhMuc(ed, "Tỉ lệ in 1:x", danhMuc, macDinh, choTuNhap: true);
+        if (chon is not { } tl) return null;
+        if (!double.TryParse(tl.GiaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var so) || so <= 0)
+        {
+            ed.WriteMessage("\n[XBoss] Tỉ lệ không hợp lệ — nhập số dương (vd 50 cho tỉ lệ 1:50).\n");
+            return null;
+        }
+        TiLeIn = so;
+        return so;
     }
 
     /// <summary>Keyword AutoCAD phải là chữ/số liền nhau: "duct-supp" → "DUCTSUPP".</summary>

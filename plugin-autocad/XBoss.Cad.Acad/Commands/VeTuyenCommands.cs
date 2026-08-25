@@ -1,4 +1,3 @@
-using System.Globalization;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
@@ -228,30 +227,9 @@ public sealed class VeTuyenCommands
         }
 
         // (2) Tỉ lệ in để quy đổi chiều cao chữ: labelStyle.textHeightMm là mm TRÊN GIẤY.
-        //     Hỏi một lần mỗi phiên, nhớ lại cho các nhãn sau (PR6 XBOSS_VE_TRANGIN dùng chung
-        //     danh mục sheetSetup.scales nên hai bên không lệch tỉ lệ).
-        double tiLe;
-        if (VeContext.TiLeIn is { } daChon)
-        {
-            tiLe = daChon;
-        }
-        else
-        {
-            var danhMuc = pack.SheetSetup.Scales
-                .Select(s => s.ToString("0.##", CultureInfo.InvariantCulture))
-                .ToList();
-            var chonTiLe = VeContext.HoiDanhMuc(
-                ed, "Tỉ lệ in dự kiến 1:x (dùng để tính chiều cao chữ nhãn)", danhMuc, null, choTuNhap: true);
-            if (chonTiLe is not { } tl) return;
-            if (!double.TryParse(tl.GiaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var soTiLe) ||
-                soTiLe <= 0)
-            {
-                ed.WriteMessage("\n[XBoss] Tỉ lệ không hợp lệ — nhập số dương (vd 50 cho tỉ lệ 1:50).\n");
-                return;
-            }
-            tiLe = soTiLe;
-            VeContext.TiLeIn = tiLe;
-        }
+        //     Hỏi một lần mỗi phiên, nhớ lại cho các nhãn sau — cùng cửa với XBOSS_VE_TRANGIN /
+        //     XBOSS_VE_MATCAT (PR6) nên nhãn mặt bằng và tỉ lệ viewport không bao giờ lệch nhau.
+        if (VeContext.HoiTiLeIn(ed, pack) is not { } tiLe) return;
 
         var (toMm, _, _) = DrawingUnits.TuInsUnits((int)db.Insunits);
         var cao = pack.DrawTools.LabelStyle.TextHeightMm * tiLe / toMm;
