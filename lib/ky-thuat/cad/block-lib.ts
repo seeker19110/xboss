@@ -26,7 +26,7 @@ import { getCurrentRulePack } from "@/lib/ky-thuat/cad/rule-pack";
  * cho cả ghi lẫn đọc, nếu không máy đọc thuộc org khác sẽ trỏ sai key. Đổi sang thư viện theo
  * dự án/tổ chức (M100 §20) thì thêm cột org_id và bỏ hằng số này.
  */
-const ORG_THU_VIEN_BLOCK = 1;
+export const ORG_THU_VIEN_BLOCK = 1;
 
 /** Loại block trong thư viện (M100 §11 + §6.7–6.9 bổ sung `support`/`sleeve`). */
 export const LOAI_BLOCK = ["fitting", "equipment", "titleblock", "support", "sleeve"] as const;
@@ -409,16 +409,66 @@ export async function phatHanhBlockLib(input: {
     Buffer.from(input.dxfText, "utf8"),
   );
 
-  const id = await insertId(
+  const id = await ghiSoBlockLib({
+    version: manifest.version,
+    manifest,
+    storageKey,
+    dwgSha256: hash,
+    userId: input.userId,
+  });
+  return { status: "created", kiemDinh, id, version: manifest.version };
+}
+
+/**
+ * Bước GHI SỔ của đường phát hành — tách riêng khỏi `phatHanhBlockLib` để M103 (duyệt đề xuất
+ * block) tái dùng nguyên vẹn: gói ứng viên đã được kiểm định + lưu trữ từ lúc NHẬN đề xuất, lúc
+ * duyệt chỉ còn việc ghi thành version mới. Không kiểm định lại ở đây — người gọi chịu trách
+ * nhiệm (phatHanhBlockLib kiểm ngay trên, block-proposals kiểm lúc nhận).
+ */
+export async function ghiSoBlockLib(input: {
+  version: string;
+  manifest: BlockLibManifest;
+  storageKey: string;
+  dwgSha256: string;
+  userId: number;
+}): Promise<number> {
+  return insertId(
     `INSERT INTO cad_block_libs (version, manifest, storage_key, dwg_sha256, published_by)
      VALUES (?, ?::jsonb, ?, ?, ?)`,
-    manifest.version,
+    input.version,
     // Manifest lưu NGUYÊN dạng đã chuẩn hoá (không nhét kết quả kiểm định vào) — cột này chính là
     // thứ plugin tải về qua `?manifest=1`, phải đúng hợp đồng M100 §11.
-    JSON.stringify(manifest),
-    storageKey,
-    hash,
+    JSON.stringify(input.manifest),
+    input.storageKey,
+    input.dwgSha256,
     input.userId,
   );
-  return { status: "created", kiemDinh, id, version: manifest.version };
+}
+
+/**
+ * Quy ước tăng version thư viện: tăng **cụm chữ số cuối cùng** trong nhãn, giữ nguyên phần chữ
+ * (`b1` → `b2`, `b9` → `b10`, `b0-mau` → `b1-mau`). Nhãn không có chữ số nào thì nối `-2`
+ * (`beta` → `beta-2`) — vẫn là một nhãn mới, không bao giờ đè version đã phát hành (M100 §17).
+ */
+export function versionKeTiep(version: string): string {
+  const m = /^(.*?)(\d+)(\D*)$/.exec(version);
+  if (!m) return `${version}-2`;
+  return `${m[1]}${String(Number(m[2]) + 1)}${m[3]}`;
+}
+
+/**
+ * Version kế tiếp **chắc chắn chưa dùng**: `version` là UNIQUE nên nếu ai đó đã phát hành tay
+ * đúng nhãn kế tiếp, INSERT sẽ nổ giữa transaction duyệt. Nhảy tiếp tới nhãn còn trống.
+ */
+export async function versionPhatHanhKeTiep(hienHanh: string): Promise<string> {
+  let ung = versionKeTiep(hienHanh);
+  for (let i = 0; i < 50; i++) {
+    const da = await queryOne<{ id: number }>(
+      `SELECT id FROM cad_block_libs WHERE version = ?`,
+      ung,
+    );
+    if (!da) return ung;
+    ung = versionKeTiep(ung);
+  }
+  throw new Error(`Không tìm được nhãn version trống sau "${hienHanh}"`);
 }
