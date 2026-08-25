@@ -18,17 +18,20 @@ public enum VaiTroViTriGiaDo
 public enum CheDoChiaGiaDo
 {
     /// <summary>
-    /// Số khoảng = làm tròn GẦN NHẤT (mặc định — AC12: tuyến 10m, chuẩn 2400 → 4 khoảng 2500,
-    /// tức 5 giá đỡ). Bước thật có thể vượt chuẩn vài phần trăm ⇒ luôn kèm cảnh báo khi vượt.
-    /// </summary>
-    GanNhat,
-
-    /// <summary>
     /// Số khoảng = làm tròn LÊN ⇒ bước thật KHÔNG BAO GIỜ vượt khoảng cách chuẩn
-    /// (tuyến 10m, chuẩn 2400 → 5 khoảng 2000, tức 6 giá đỡ). Chọn khi tiêu chuẩn treo đỡ
-    /// của dự án là ngưỡng cứng.
+    /// (MẶC ĐỊNH kể từ 2026-08-25 — <c>supportSpacingMm</c> là ngưỡng TỐI ĐA của tiêu chuẩn
+    /// treo đỡ, vượt là rủi ro võng/gãy ống nên không được phép làm mặc định). AC12: tuyến 10m,
+    /// chuẩn 2400 → 5 khoảng 2000, tức 6 giá đỡ, bước 2000 ≤ 2400, KHÔNG cảnh báo.
     /// </summary>
     KhongVuot,
+
+    /// <summary>
+    /// Số khoảng = làm tròn GẦN NHẤT (AC12: tuyến 10m, chuẩn 2400 → 4 khoảng 2500, tức 5 giá đỡ).
+    /// Bước thật có thể vượt chuẩn vài phần trăm ⇒ luôn kèm cảnh báo khi vượt. Tuỳ chọn cho kỹ sư
+    /// khi CHẤP NHẬN vượt chuẩn (ít giá đỡ hơn, đổi lấy bước không đều với chuẩn) — không phải
+    /// mặc định.
+    /// </summary>
+    GanNhat,
 }
 
 /// <summary>Một vị trí giá đỡ đã tính xong (toạ độ + hướng đặt block).</summary>
@@ -66,11 +69,12 @@ public sealed record KetQuaGiaDo(
 /// Chạy lại trên tuyến đã có giá đỡ thì chỉ trả về các vị trí CÒN THIẾU — vị trí nào đã có giá đỡ
 /// trong bán kính <c>dungSai</c> thì bỏ qua (chống đặt chồng).
 ///
-/// <b>Ghi chú về AC12</b> (tuyến 10m, chuẩn 2400 → "5 giá đỡ"): 5 giá đỡ ở 2 đầu nghĩa là 4 khoảng
-/// × 2500 — tức bước thật VƯỢT chuẩn 2400 khoảng 4%. Không có cách nào vừa ra đúng 5 vừa giữ mọi
-/// bước ≤ 2400 (4 khoảng ≤ 2400 chỉ phủ được 9600 &lt; 10000). Lớp này chọn mặc định
-/// <see cref="CheDoChiaGiaDo.GanNhat"/> để khớp AC12, và luôn CẢNH BÁO khi bước thật vượt chuẩn;
-/// ai cần ngưỡng cứng thì chạy chế độ <see cref="CheDoChiaGiaDo.KhongVuot"/> (ra 6 giá đỡ × 2000).
+/// <b>Ghi chú về AC12</b> (tuyến 10m, chuẩn 2400): <c>supportSpacingMm</c> là ngưỡng TỐI ĐA của
+/// tiêu chuẩn treo đỡ — vượt là rủi ro võng/gãy ống nên KHÔNG được phép làm mặc định. Mặc định
+/// <see cref="CheDoChiaGiaDo.KhongVuot"/> ra đúng 6 giá đỡ (5 khoảng × 2000 ≤ 2400), 0 cảnh báo.
+/// Bản đặc tả M100 gốc ghi "5 giá đỡ" cho ca này là sai số học (5 giá đỡ = 4 khoảng × 2500, VƯỢT
+/// 2400 ~4%) — đã sửa lại đặc tả và test 2026-08-25. Chế độ <see cref="CheDoChiaGiaDo.GanNhat"/>
+/// (ra 5 giá đỡ × 2500, có cảnh báo vượt chuẩn) vẫn giữ làm TUỲ CHỌN cho kỹ sư chấp nhận vượt.
 /// </summary>
 public static class SupportSpacing
 {
@@ -153,7 +157,7 @@ public static class SupportSpacing
         bool kin = false,
         IReadOnlyList<double>? daCoDoc = null,
         IReadOnlyList<double>? phuKienDoc = null,
-        CheDoChiaGiaDo cheDo = CheDoChiaGiaDo.GanNhat,
+        CheDoChiaGiaDo cheDo = CheDoChiaGiaDo.KhongVuot,
         double? dungSai = null)
     {
         var canhBao = new List<string>();

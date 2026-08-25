@@ -206,7 +206,7 @@ public sealed class VeGiadoCommands
         var hoi = new PromptKeywordOptions("\n[XBoss] Chọn cách chia") { AllowNone = false };
         hoi.Keywords.Add("GANNHAT", "GANNHAT", "GANNHAT");
         hoi.Keywords.Add("KHONGVUOT", "KHONGVUOT", "KHONGVUOT");
-        hoi.Keywords.Default = "GANNHAT";
+        hoi.Keywords.Default = "KHONGVUOT";
         var kq = ed.GetKeywords(hoi);
         if (kq.Status != PromptStatus.OK) return null;
         return kq.StringResult == "KHONGVUOT" ? CheDoChiaGiaDo.KhongVuot : CheDoChiaGiaDo.GanNhat;
