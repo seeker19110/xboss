@@ -6,6 +6,7 @@ import {
   tomTatRulePack,
   docKiemDinhTuBaoCao,
   docKlBocTuBaoCao,
+  docBuocTuBaoCao,
 } from "@/lib/ky-thuat/cad/bang-dieu-khien";
 import { CURRENT_RULE_PACK_VERSION } from "@/lib/ky-thuat/cad/rule-pack";
 
@@ -63,4 +64,37 @@ test("docKlBocTuBaoCao gộp theo hệ/vùng kèm đơn vị, khuyết khối ta
     { nhan: "Tầng 5 (m)", khoiLuong: 16 },
     { nhan: "Tầng 6 (m)", khoiLuong: 4 },
   ]);
+});
+
+test("docBuocTuBaoCao đọc danh sách bước chuẩn hoá (standardize_report.steps), phòng thủ mọi kiểu thiếu/sai dạng", () => {
+  // Khuyết report / khuyết khối steps / không phải mảng → mảng rỗng, không sập.
+  assert.deepEqual(docBuocTuBaoCao(null), []);
+  assert.deepEqual(docBuocTuBaoCao({ cheDo: "chuan-hoa" }), []);
+  assert.deepEqual(docBuocTuBaoCao({ steps: "không phải mảng" }), []);
+  assert.deepEqual(docBuocTuBaoCao({ steps: [] }), []);
+
+  const dungDang = docBuocTuBaoCao({
+    steps: [
+      { buoc: "Layer", hangMuc: "01_ONG_GIO_CAP", truoc: "01-ONG-GIO", sau: "01_ONG_GIO_CAP", soLuong: 5 },
+      { buoc: "Layer", hangMuc: "02_ONG_NUOC", truoc: "02-ONG-NUOC", sau: "02_ONG_NUOC", soLuong: 2 },
+      { buoc: "Block", hangMuc: "VAN-COVA", truoc: "VanCoVa_old", sau: "VanCoVa", soLuong: 1 },
+    ],
+  });
+  assert.deepEqual(dungDang, [
+    { buoc: "Layer", hangMuc: "01_ONG_GIO_CAP", truoc: "01-ONG-GIO", sau: "01_ONG_GIO_CAP", soLuong: 5 },
+    { buoc: "Layer", hangMuc: "02_ONG_NUOC", truoc: "02-ONG-NUOC", sau: "02_ONG_NUOC", soLuong: 2 },
+    { buoc: "Block", hangMuc: "VAN-COVA", truoc: "VanCoVa_old", sau: "VanCoVa", soLuong: 1 },
+  ]);
+
+  // Dòng thiếu/sai kiểu field bắt buộc bị BỎ QUA, các dòng hợp lệ khác vẫn đọc bình thường.
+  const conLan = docBuocTuBaoCao({
+    steps: [
+      { buoc: "Layer", hangMuc: "OK", truoc: "a", sau: "b", soLuong: 1 },
+      { buoc: "Layer", hangMuc: "Thiếu soLuong", truoc: "a", sau: "b" },
+      { buoc: "Layer", hangMuc: "soLuong sai kiểu", truoc: "a", sau: "b", soLuong: "3" },
+      null,
+      "không phải object",
+    ],
+  });
+  assert.deepEqual(conLan, [{ buoc: "Layer", hangMuc: "OK", truoc: "a", sau: "b", soLuong: 1 }]);
 });

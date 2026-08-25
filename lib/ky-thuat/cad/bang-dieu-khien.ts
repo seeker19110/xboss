@@ -27,6 +27,18 @@ export type LuotPluginUpload = {
   kiemDinh: { ok: boolean; soLoi: number; soCanhBao: number; canhBao: string[] } | null;
   /** KL đã bóc gửi kèm khi upload (M101 §6.4, PR5) — null khi tệp gửi không kèm sidecar. */
   klBoc: TomTatKlBoc | null;
+  /** Các bước chuẩn hoá đã chạy (standardize_report.steps, sinh bởi StandardizeReport.cs) —
+   * rỗng khi báo cáo không kèm hoặc không đúng dạng. */
+  buoc: BuocChuanHoa[];
+};
+
+/** Một dòng diff chuẩn hoá — khớp StepDiff bên plugin (buoc/hangMuc/truoc/sau/soLuong). */
+export type BuocChuanHoa = {
+  buoc: string;
+  hangMuc: string;
+  truoc: string;
+  sau: string;
+  soLuong: number;
 };
 
 /** Tóm tắt KL bóc của 1 revision — nhóm theo hệ/vùng (kèm đơn vị vì rule pack có nhiều item
@@ -150,7 +162,38 @@ export async function layLichSuPluginUpload(
     nguoiTaiLen: r.nguoi,
     kiemDinh: docKiemDinhTuBaoCao(r.standardize_report),
     klBoc: docKlBocTuBaoCao(r.standardize_report),
+    buoc: docBuocTuBaoCao(r.standardize_report),
   }));
+}
+
+type StepDiffRaw = {
+  buoc?: unknown;
+  hangMuc?: unknown;
+  truoc?: unknown;
+  sau?: unknown;
+  soLuong?: unknown;
+};
+
+/** Bóc danh sách bước chuẩn hoá ra khỏi standardize_report.steps (StandardizeReport.cs) — đọc
+ * phòng thủ (duck-typing), thiếu/sai dạng thì bỏ qua từng dòng thay vì sập cả trang (thuần —
+ * test đơn vị được). */
+export function docBuocTuBaoCao(report: Record<string, unknown> | null): BuocChuanHoa[] {
+  const steps = report?.steps;
+  if (!Array.isArray(steps)) return [];
+  const ra: BuocChuanHoa[] = [];
+  for (const raw of steps as StepDiffRaw[]) {
+    if (
+      typeof raw?.buoc !== "string" ||
+      typeof raw.hangMuc !== "string" ||
+      typeof raw.truoc !== "string" ||
+      typeof raw.sau !== "string" ||
+      typeof raw.soLuong !== "number"
+    ) {
+      continue;
+    }
+    ra.push({ buoc: raw.buoc, hangMuc: raw.hangMuc, truoc: raw.truoc, sau: raw.sau, soLuong: raw.soLuong });
+  }
+  return ra;
 }
 
 /** Bóc kết quả kiểm định server ra khỏi standardize_report (thuần — test đơn vị được). */
@@ -180,8 +223,17 @@ export type DongTakeoffExport = {
   size: string;
   vung: string;
   donVi: string;
+  /** KL ĐO — số đo trực tiếp trên bản vẽ, CHƯA quy đổi (TakeoffLine.Quantity). */
   khoiLuong: number;
   boqCode: string;
+  /** Hệ số quy đổi đã dùng (KL quy đổi = KL đo × hệ số) — null khi rule pack không khai hệ số
+   * cho dòng này (KHÔNG suy đoán, KHÔNG mặc định 1 — xem TakeoffLine.HeSoQuyDoi). */
+  heSoQuyDoi: number | null;
+  /** Mô tả hệ số quy đổi bằng tiếng Việt (vd "hao hụt 5%") — rỗng khi không có hệ số. */
+  moTaQuyDoi: string;
+  /** KL QUY ĐỔI — cột RIÊNG, không trộn vào khoiLuong (TakeoffLine.KlQuyDoi); null khi không có
+   * hệ số quy đổi cho dòng này. */
+  klQuyDoi: number | null;
 };
 
 type DongTakeoffRaw = {
@@ -193,6 +245,9 @@ type DongTakeoffRaw = {
   khoiLuong?: unknown;
   size?: unknown;
   vung?: unknown;
+  heSoQuyDoi?: unknown;
+  moTaQuyDoi?: unknown;
+  klQuyDoi?: unknown;
 };
 
 /**
@@ -221,6 +276,10 @@ export async function layDongTakeoffChoExport(projectId: number): Promise<DongTa
     const lines = tk && typeof tk === "object" ? (tk as { lines?: unknown }).lines : undefined;
     if (!Array.isArray(lines)) continue;
     for (const raw of lines as DongTakeoffRaw[]) {
+      // 0 = rule pack không khai hệ số quy đổi cho dòng này (TakeoffLine.HeSoQuyDoi) — để trống,
+      // KHÔNG suy đoán/mặc định 1. Chỉ hiện hệ số/mô tả/KL quy đổi khi plugin gửi hệ số > 0.
+      const heSoQuyDoi =
+        typeof raw.heSoQuyDoi === "number" && raw.heSoQuyDoi > 0 ? raw.heSoQuyDoi : null;
       ra.push({
         drawingCode: r.code,
         drawingName: r.name,
@@ -232,6 +291,10 @@ export async function layDongTakeoffChoExport(projectId: number): Promise<DongTa
         donVi: typeof raw.donVi === "string" ? raw.donVi : "",
         khoiLuong: typeof raw.khoiLuong === "number" ? raw.khoiLuong : 0,
         boqCode: typeof raw.boqCode === "string" ? raw.boqCode : "",
+        heSoQuyDoi,
+        moTaQuyDoi: heSoQuyDoi !== null && typeof raw.moTaQuyDoi === "string" ? raw.moTaQuyDoi : "",
+        klQuyDoi:
+          heSoQuyDoi !== null && typeof raw.klQuyDoi === "number" ? raw.klQuyDoi : null,
       });
     }
   }

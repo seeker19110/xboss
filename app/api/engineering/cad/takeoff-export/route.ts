@@ -39,8 +39,11 @@ export async function GET() {
     "Size",
     "Vùng",
     "Đơn vị",
-    "Khối lượng",
+    "Khối lượng (đo)",
     "Mã BOQ",
+    "Hệ số quy đổi",
+    "Mô tả quy đổi",
+    "KL quy đổi",
   ]);
   header.eachCell((cell) => {
     cell.font = { bold: true };
@@ -59,6 +62,10 @@ export async function GET() {
       d.donVi,
       d.khoiLuong,
       d.boqCode,
+      // Hệ số/KL quy đổi để TRỐNG khi rule pack không khai (null) — không suy đoán, không mặc định 1.
+      d.heSoQuyDoi ?? "",
+      d.moTaQuyDoi,
+      d.klQuyDoi ?? "",
     ]);
   }
 

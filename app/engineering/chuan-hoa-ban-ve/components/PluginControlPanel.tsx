@@ -35,6 +35,14 @@ type TomTatKlBoc = {
   theoVung: { nhan: string; khoiLuong: number }[];
 };
 
+type BuocChuanHoa = {
+  buoc: string;
+  hangMuc: string;
+  truoc: string;
+  sau: string;
+  soLuong: number;
+};
+
 type LuotUpload = {
   revisionId: number;
   drawingCode: string;
@@ -46,6 +54,7 @@ type LuotUpload = {
   nguoiTaiLen: string | null;
   kiemDinh: { ok: boolean; soLoi: number; soCanhBao: number; canhBao: string[] } | null;
   klBoc: TomTatKlBoc | null;
+  buoc: BuocChuanHoa[];
 };
 
 /** Biểu đồ thanh ngang tối giản (zinc/emerald, ADR-0009) — không kéo thêm recharts cho một
@@ -69,6 +78,34 @@ function BieuDoThanhNgang({ muc }: { muc: { nhan: string; khoiLuong: number }[] 
           <span className="w-16 text-right font-mono text-zinc-300">
             {m.khoiLuong.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}
           </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Danh sách bước chuẩn hoá đã chạy, gộp theo tên bước (khớp cách hiện trong AutoCAD —
+ * StandardizeReport.ToVietnameseText). Thuần hiển thị, không tải thêm dữ liệu. */
+function DanhSachBuocChuanHoa({ buoc }: { buoc: BuocChuanHoa[] }) {
+  if (buoc.length === 0) return null;
+  const nhomTheoBuoc = new Map<string, BuocChuanHoa[]>();
+  for (const b of buoc) {
+    const nhom = nhomTheoBuoc.get(b.buoc) ?? [];
+    nhom.push(b);
+    nhomTheoBuoc.set(b.buoc, nhom);
+  }
+  return (
+    <div className="space-y-2">
+      {[...nhomTheoBuoc.entries()].map(([ten, dong]) => (
+        <div key={ten} className="space-y-1">
+          <div className="text-[11px] font-bold text-zinc-300">{ten}</div>
+          <ul className="space-y-0.5">
+            {dong.map((b, i) => (
+              <li key={i} className="text-[11px] text-zinc-400">
+                {b.hangMuc}: {b.truoc} → {b.sau} ({b.soLuong})
+              </li>
+            ))}
+          </ul>
         </div>
       ))}
     </div>
@@ -304,18 +341,21 @@ export default function PluginControlPanel() {
               <tbody className="text-zinc-300">
                 {lichSu.map((r) => {
                   const dangMo = moRong === r.revisionId;
+                  const canhBao = r.kiemDinh?.canhBao ?? [];
+                  // Chỉ mở rộng được khi có ít nhất một trong: KL bóc, bước chuẩn hoá, cảnh báo.
+                  const coTheMoRong = r.klBoc !== null || r.buoc.length > 0 || canhBao.length > 0;
                   return (
                     <Fragment key={r.revisionId}>
                       <tr
-                        className={`border-b border-zinc-900 ${r.klBoc ? "cursor-pointer hover:bg-zinc-800/40" : ""}`}
-                        onClick={() => r.klBoc && setMoRong(dangMo ? null : r.revisionId)}
+                        className={`border-b border-zinc-900 ${coTheMoRong ? "cursor-pointer hover:bg-zinc-800/40" : ""}`}
+                        onClick={() => coTheMoRong && setMoRong(dangMo ? null : r.revisionId)}
                       >
                         <td className="py-2 pl-1 text-zinc-500">
-                          {r.klBoc &&
+                          {coTheMoRong &&
                             (dangMo ? (
-                              <ChevronDown className="w-3.5 h-3.5" />
+                              <ChevronDown className="w-3.5 h-3.5" aria-label="Thu gọn chi tiết" />
                             ) : (
-                              <ChevronRight className="w-3.5 h-3.5" />
+                              <ChevronRight className="w-3.5 h-3.5" aria-label="Xem chi tiết" />
                             ))}
                         </td>
                         <td className="py-2 pr-3">
@@ -355,28 +395,53 @@ export default function PluginControlPanel() {
                           )}
                         </td>
                       </tr>
-                      {dangMo && r.klBoc && (
+                      {dangMo && coTheMoRong && (
                         <tr className="border-b border-zinc-900 bg-zinc-950/60">
                           <td />
-                          <td colSpan={8} className="py-3 pr-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              {r.klBoc.theoHe.length > 0 && (
-                                <div className="space-y-1.5">
-                                  <div className="text-[11px] font-bold text-zinc-400 uppercase">
-                                    KL theo hệ
+                          <td colSpan={8} className="py-3 pr-3 space-y-4">
+                            {r.klBoc && (r.klBoc.theoHe.length > 0 || r.klBoc.theoVung.length > 0) && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {r.klBoc.theoHe.length > 0 && (
+                                  <div className="space-y-1.5">
+                                    <div className="text-[11px] font-bold text-zinc-400 uppercase">
+                                      KL theo hệ
+                                    </div>
+                                    <BieuDoThanhNgang muc={r.klBoc.theoHe} />
                                   </div>
-                                  <BieuDoThanhNgang muc={r.klBoc.theoHe} />
-                                </div>
-                              )}
-                              {r.klBoc.theoVung.length > 0 && (
-                                <div className="space-y-1.5">
-                                  <div className="text-[11px] font-bold text-zinc-400 uppercase">
-                                    KL theo vùng
+                                )}
+                                {r.klBoc.theoVung.length > 0 && (
+                                  <div className="space-y-1.5">
+                                    <div className="text-[11px] font-bold text-zinc-400 uppercase">
+                                      KL theo vùng
+                                    </div>
+                                    <BieuDoThanhNgang muc={r.klBoc.theoVung} />
                                   </div>
-                                  <BieuDoThanhNgang muc={r.klBoc.theoVung} />
+                                )}
+                              </div>
+                            )}
+                            {r.buoc.length > 0 && (
+                              <div className="space-y-1.5">
+                                <div className="text-[11px] font-bold text-zinc-400 uppercase">
+                                  Các bước chuẩn hoá
                                 </div>
-                              )}
-                            </div>
+                                <DanhSachBuocChuanHoa buoc={r.buoc} />
+                              </div>
+                            )}
+                            {canhBao.length > 0 && (
+                              <div className="space-y-1.5">
+                                <div className="text-[11px] font-bold text-amber-300 uppercase flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3 shrink-0" />
+                                  Cảnh báo kiểm định
+                                </div>
+                                <ul className="space-y-0.5">
+                                  {canhBao.map((c, i) => (
+                                    <li key={i} className="text-[11px] text-amber-200/90">
+                                      {c}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       )}
