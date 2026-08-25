@@ -15,7 +15,7 @@
 //   npm run cad:mau-ban-ve -- --kiem  # chỉ kiểm nội dung tệp còn khớp script (dùng trong CI)
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { validateDxf, parseDxf } from "@/lib/ky-thuat/cad/dxf-parser";
+import { validateDxf, parseDxf, exportDxf } from "@/lib/ky-thuat/cad/dxf-parser";
 
 const THU_MUC = join(process.cwd(), "plugin-autocad", "mau-ban-ve");
 
@@ -103,7 +103,7 @@ function chu(layer: string, p: Diem, cao: number, noiDung: string, chia: number)
   );
 }
 
-function dungDxf(insUnits: number): string {
+function dungDxfTho(insUnits: number): string {
   const chia = insUnits === 6 ? 1000 : 1;
 
   let s = "";
@@ -141,6 +141,30 @@ function dungDxf(insUnits: number): string {
   return s;
 }
 
+/**
+ * DXF viết tay ở trên chỉ đủ cho parser của XBoss, **AutoCAD từ chối mở** (thiếu bảng LTYPE
+ * ByBlock/ByLayer, STYLE, VPORT, handle...). Đây đúng lớp sự cố "hợp lệ theo parser ≠ AutoCAD mở
+ * được" đã ghi trong PROGRESS.md (2026-08-24) và người dùng vấp lại khi mở bộ mẫu bản đầu
+ * (2026-08-25). Nên: parse bản thô rồi ghi lại bằng chính `exportDxf` của repo — bộ ghi đã tôi
+ * luyện qua nhiều vòng đối chiếu AutoCAD thật (đủ bảng, đủ handle, khung nhìn ôm hình).
+ *
+ * `applyStandardLayers: false` là BẮT BUỘC: bộ mẫu phải giữ tên layer SAI CHUẨN thì AC1 mới có
+ * cái để kiểm.
+ */
+function dungDxf(ten: string, insUnits: number): string {
+  const parsed = parseDxf(dungDxfTho(insUnits), ten);
+
+  // `parseDxf` tự giải mã chữ TCVN3 sang Unicode (`decodedText`) và `exportDxf` ưu tiên bản đã
+  // giải mã — đúng cho luồng chuẩn hóa, nhưng SAI cho bộ mẫu: AC2 cần bản vẽ CÒN nguyên mã TCVN3
+  // để plugin có cái mà sửa. Bỏ bản giải mã đi thì `exportDxf` ghi lại đúng chuỗi gốc.
+  for (const e of parsed.entities) e.decodedText = undefined;
+
+  return exportDxf(parsed, { applyStandardLayers: false });
+}
+
+/** 3 LINE ống + 2 LWPOLYLINE (kín/hở) + 2 TEXT — xem bảng dị tật trong mau-ban-ve/README.md. */
+const SO_THUC_THE = 7;
+
 const TEP: Array<{ ten: string; insUnits: number }> = [
   { ten: "mau-01-mep-mm.dxf", insUnits: 4 },
   { ten: "mau-02-mep-met.dxf", insUnits: 6 },
@@ -149,17 +173,22 @@ const TEP: Array<{ ten: string; insUnits: number }> = [
 function main() {
   const kiem = process.argv.includes("--kiem");
   for (const { ten, insUnits } of TEP) {
-    const noiDung = dungDxf(insUnits);
+    const noiDung = dungDxf(ten, insUnits);
 
     const hopLe = validateDxf(noiDung);
     if (!hopLe.valid) {
       console.error(`[LỖI] ${ten} không hợp lệ: ${hopLe.errors.join(" · ")}`);
       process.exit(1);
     }
+    // `exportDxf` luôn khai thêm layer "0" (layer mặc định mọi tệp DXF phải có) nên đối chiếu
+    // theo TÊN layer, không theo số lượng.
     const parsed = parseDxf(noiDung, ten);
-    if (parsed.entities.length === 0 || parsed.layers.length !== LAYERS.length) {
+    const tenLayer = new Set(parsed.layers.map((l) => l.name));
+    const thieu = LAYERS.map((l) => l.ten).filter((t) => !tenLayer.has(t));
+    if (parsed.entities.length !== SO_THUC_THE || thieu.length > 0) {
       console.error(
-        `[LỖI] ${ten} parse ra ${parsed.entities.length} thực thể / ${parsed.layers.length} layer`,
+        `[LỖI] ${ten}: ${parsed.entities.length}/${SO_THUC_THE} thực thể` +
+          (thieu.length ? `, thiếu layer ${thieu.join(", ")}` : ""),
       );
       process.exit(1);
     }

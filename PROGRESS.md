@@ -492,6 +492,25 @@ dùng duyệt hướng xử lý.
 - **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
   M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
 
+## Bộ bản vẽ mẫu bản đầu AutoCAD KHÔNG MỞ ĐƯỢC — lặp lại lớp sự cố "hợp lệ ≠ mở được" (2026-08-25)
+
+Người dùng mở `plugin-autocad/mau-ban-ve/mau-01-mep-mm.dxf` trong AutoCAD 2026 → lỗi. Nguyên nhân:
+script PR7a **tự viết DXF tối thiểu** (HEADER + TABLES/LAYER + BLOCKS rỗng + ENTITIES + OBJECTS),
+đủ cho `validateDxf`/`parseDxf` của XBoss nhưng thiếu thứ AutoCAD đòi: bảng LTYPE với 2 bản ghi
+bắt buộc `ByBlock`/`ByLayer`, bảng STYLE, VPORT `*ACTIVE`, handle cho mọi bản ghi.
+
+**Đây là lần thứ hai cùng một lớp lỗi** (lần đầu: `exportDxf` thiếu STYLE/LTYPE/DIMSTYLE bên trong
+BLOCK, 2026-08-24) — và lần này tôi tự gây ra vì viết bộ ghi DXF thứ hai thay vì dùng bộ ghi đã có.
+
+**Sửa:** script dựng hình học thô rồi **ghi lại bằng chính `exportDxf`** của repo, với
+`applyStandardLayers: false` (bộ mẫu phải giữ tên layer sai chuẩn thì AC1 mới có cái để kiểm) và
+xoá `decodedText` trước khi ghi (parseDxf tự giải mã TCVN3 sang Unicode, exportDxf ưu tiên bản đã
+giải mã — mà AC2 cần bản vẽ CÒN mã TCVN3). Tệp nay có thêm layer `0` mặc định → 5 layer; test và
+cổng `cad:mau-ban-ve --kiem` cập nhật theo, đối chiếu theo TÊN layer thay vì đếm.
+
+**Bài học đưa vào tài liệu bộ mẫu:** không viết bộ ghi DXF thứ hai. Muốn sinh tệp cho AutoCAD thì
+đi qua `exportDxf` — mọi hiểu biết đắt giá về bảng/handle/khung nhìn nằm ở đó.
+
 ## M99 — Adapter AutoCAD biên dịch được lần đầu trên máy thật: 8 lỗi CI không thể bắt (2026-08-25)
 
 `XBoss.Cad.Acad` **chưa từng được biên dịch** từ lúc viết ở PR-A: CI chỉ build/test `XBoss.Cad.Core`

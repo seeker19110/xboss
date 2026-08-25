@@ -13,14 +13,15 @@ const doc = (ten: string) => readFileSync(join(THU_MUC, ten), "utf8");
 const MM = "mau-01-mep-mm.dxf";
 const MET = "mau-02-mep-met.dxf";
 
-test("bản vẽ mẫu: cả 2 tệp hợp lệ và parse ra đúng 4 layer / 7 thực thể", () => {
+test("bản vẽ mẫu: cả 2 tệp hợp lệ và parse ra đúng 5 layer / 7 thực thể", () => {
   for (const ten of [MM, MET]) {
     const noiDung = doc(ten);
     const hopLe = validateDxf(noiDung);
     assert.ok(hopLe.valid, `${ten} không hợp lệ: ${hopLe.errors.join(" · ")}`);
 
     const p = parseDxf(noiDung, ten);
-    assert.equal(p.layers.length, 4);
+    // 4 layer của bộ mẫu + layer "0" mặc định mà mọi tệp DXF đều phải khai.
+    assert.equal(p.layers.length, 5);
     assert.equal(p.entities.length, 7);
   }
 });
