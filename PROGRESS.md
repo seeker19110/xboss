@@ -492,6 +492,38 @@ dùng duyệt hướng xử lý.
 - **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
   M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
 
+## M99 PR7a — Đối chứng 2 tầng (AC6, phần không cần AutoCAD) + bộ bản vẽ mẫu + tài liệu cài đặt (2026-08-25)
+
+Người dùng "ok làm luôn" sau khi chốt tách PR7 làm hai: **PR7a** chạy được trên CI Linux, **PR7b**
+chờ máy Windows có license AutoCAD 2026 (người dùng xác nhận có, làm sau). Cùng nhánh
+`claude/pr6-tiep-tuc-y9689t`.
+
+- **Đối chứng 2 tầng phần QUY TẮC (AC6a)** — chặn rủi ro số 1 của M99 (trôi quy tắc giữa plugin C#
+  và server TS): thư mục `plugin-autocad/doi-chung/` gồm `corpus.json` (dữ liệu VÀO viết tay: 30 tên
+  layer phủ hết nhóm hệ + fallback + tên đã chuẩn, 4 chuỗi TCVN3 và 4 chuỗi VNI cùng nội dung) và
+  `ket-qua-mong-doi.json` (kết quả RA **sinh tự động** từ tầng 3 qua `npm run cad:doi-chung`).
+  Hai tầng đối chiếu đúng hai tệp đó: `tests/cad-doi-chung-2-tang.test.ts` (4 ca) và
+  `plugin-autocad/XBoss.Cad.Tests/DoiChungHaiTangTests.cs` (3 ca). Trước đây corpus bị **chép tay hai
+  bản** (InlineData trong `LayerMapperTests.cs` vs mảng trong `engineering-cad-rule-pack.test.ts`) —
+  chính cái đó mới là nguồn trôi; nay một nguồn duy nhất, đổi quy tắc thì tệp kết quả đổi theo và
+  hiện rõ trong diff.
+- **Bộ bản vẽ mẫu (§15):** `plugin-autocad/mau-ban-ve/` — `mau-01-mep-mm.dxf` ($INSUNITS=4) và
+  `mau-02-mep-met.dxf` ($INSUNITS=6, toạ độ chia 1000, dùng cho AC13). Sinh bằng
+  `npm run cad:mau-ban-ve` (không sửa tay), mang đủ dị tật để PR7b bám vào: layer sai chuẩn + layer
+  lạ giữ nguyên (AC1), TEXT mã TCVN3 (AC2), thực thể Z=2800 (AC3), 3 đoạn ống (AC10), 1 polyline kín
+  - 1 polyline hở 3mm (AC9). `tests/cad-mau-ban-ve.test.ts` (3 ca) giữ cho bộ mẫu không mục.
+- **2 cổng CI mới** trong job `lint`: `npm run cad:doi-chung -- --kiem` và
+  `npm run cad:mau-ban-ve -- --kiem` — tệp sinh lệch script/quy tắc là đỏ.
+- **Tài liệu cài đặt cho kỹ sư:** `plugin-autocad/CAI-DAT.md` (tiếng Việt, từ lệnh xác minh runtime
+  `acmgd.dll` §9.1 → lấy gói từ bảng điều khiển → cài `.bundle` → ghép thiết bị `XBOSS_LOGIN` →
+  8 lệnh dùng hằng ngày → bảng 8 trục trặc thường gặp), README plugin trỏ sang.
+- **Kiểm chứng:** lint/typecheck/build + 8 cổng static xanh; `npm test` **225 file, 0 fail**.
+  **Chưa chạy được `dotnet test`** — container này không có .NET SDK và proxy chặn tải
+  (`dot.net` trả 403); phần C# do job `plugin` của CI xác minh.
+- **Chưa làm — PR7b (cần máy Windows có license):** chạy bộ mẫu qua `accoreconsole.exe` kiểm AC1–AC4
+  và AC9–AC13 (UNDO round-trip, XData sống qua đóng/mở tệp, Excel công thức sống), xác minh
+  `ImageRuntimeVersion` của `acmgd.dll`, đối chứng AC6 phần hình học, UAT với QS.
+
 ## M99 PR6 — Bảng điều khiển plugin trên web + bỏ tầng 1 (.SCR/AutoLISP) (2026-08-25)
 
 Người dùng "tiếp tục pr6" sau khi PR5 merge (#392). Nhánh `claude/pr6-tiep-tuc-y9689t`. Phần plugin

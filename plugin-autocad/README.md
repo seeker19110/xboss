@@ -59,6 +59,9 @@ Test nạp rule pack thật từ repo nên phải chạy bên trong repo XBoss.
 
 ## Đóng gói `.bundle` và cài đặt
 
+> Hướng dẫn cho **người dùng cuối** (cài, ghép thiết bị, trục trặc thường gặp) nằm ở
+> [`CAI-DAT.md`](CAI-DAT.md). Phần dưới đây dành cho người phát hành gói cài.
+
 Tạo thư mục `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle\` với cấu trúc:
 
 ```
