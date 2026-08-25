@@ -5,8 +5,6 @@ using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
 using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Geometry;
-using XBoss.Cad.Core.Matching;
-using XBoss.Cad.Core.RulePack;
 
 using ChoChen = XBoss.Cad.Acad.Services.BlockLibraryService.KhoiChoChen;
 
@@ -56,11 +54,29 @@ public sealed class VeGiadoCommands
         var def0 = BlockLibraryService.HoiBlock(ed, $"Giá đỡ của hệ {he.Id}", danhSach, null);
         if (def0 is null) return;
 
-        // (2) Cách chia + có đặt giá đỡ tại phụ kiện đã chèn trên tuyến không.
+        // (2) Cách chia + phụ kiện nào cần giá đỡ tại chỗ.
+        //     Rule pack từ v7 khai thẳng danh sách phụ kiện NẶNG (drawTools.heavyFittingIds) nên
+        //     không phải hỏi nữa, và chỉ van/damper mới được một giá đỡ riêng — hỏi kiểu cũ thì
+        //     trả lời "Có" là đặt cả ở co/tê nhẹ, sai chuẩn treo đỡ. Rule pack cũ (v4–v6) không có
+        //     khóa này ⇒ giữ nguyên đường hỏi kỹ sư.
         var cheDo = HoiCheDoChia(ed);
         if (cheDo is null) return;
-        var taiPhuKien = HoiTaiPhuKien(ed);
-        if (taiPhuKien is null) return;
+
+        var phuKienNang = pack.DrawTools.HeavyFittingIds;
+        bool taiMoiPhuKien;
+        if (pack.DrawTools.CoKhaiPhuKienNang)
+        {
+            taiMoiPhuKien = false;
+            ed.WriteMessage(
+                $"\n[XBoss] Phụ kiện NẶNG theo rule pack {pack.RulePack.Version} (luôn có giá đỡ tại chỗ): " +
+                $"{string.Join(", ", phuKienNang)}.\n");
+        }
+        else
+        {
+            var hoiTaiPhuKien = HoiTaiPhuKien(ed, pack.RulePack.Version);
+            if (hoiTaiPhuKien is null) return;
+            taiMoiPhuKien = hoiTaiPhuKien.Value;
+        }
 
         // (3) Chọn tuyến (ngoài transaction — ESC là bản vẽ nguyên trạng).
         ed.WriteMessage(
@@ -87,7 +103,7 @@ public sealed class VeGiadoCommands
         var boQua = 0;
         using (var tr = db.TransactionManager.StartTransaction())
         {
-            var khoiTheoTim = KhoiTheoTim(db, tr);
+            var khoiTheoTim = VeThucThe.KhoiTheoTim(db, tr);
             foreach (var id in chon.Value.GetObjectIds())
             {
                 if (tr.GetObject(id, OpenMode.ForRead) is not Polyline pl) continue;
@@ -128,8 +144,11 @@ public sealed class VeGiadoCommands
                 var handleTim = pl.Handle.ToString();
                 khoiTheoTim.TryGetValue(handleTim, out var khoiCu);
 
-                var daCo = QuyVeDoc(dinh, kin, khoiCu, VaiTroVe.GiaDo);
-                var phuKien = taiPhuKien.Value ? QuyVeDoc(dinh, kin, khoiCu, VaiTroVe.PhuKien) : [];
+                var daCo = QuyVeDoc(dinh, kin, khoiCu, k => k.VaiTro == VaiTroVe.GiaDo);
+                var phuKien = QuyVeDoc(
+                    dinh, kin, khoiCu,
+                    k => k.VaiTro == VaiTroVe.PhuKien &&
+                         (taiMoiPhuKien || pack.DrawTools.LaPhuKienNang(k.BlockId)));
 
                 var kq = SupportSpacing.Tinh(
                     dinh, spacingMm / toMm, kin, daCo, phuKien, cheDo.Value);
@@ -191,7 +210,7 @@ public sealed class VeGiadoCommands
         ed.WriteMessage(
             $"\n[XBoss] Đã đặt {muc.Count} giá đỡ {def0.Id} ({def0.BlockName}) trên {soTuyen} tuyến " +
             $"({soDaCo} vị trí đã có sẵn, không đặt trùng).\n");
-        CanhBaoBocKhoiLuong(ed, pack.RulePack, def0);
+        BlockLibraryService.BaoItemDem(ed, pack.RulePack, def0, "giá đỡ");
         ed.WriteMessage("[XBoss] Hoàn tác cả lệnh: UNDO 1 lần.\n");
     }
 
@@ -213,11 +232,15 @@ public sealed class VeGiadoCommands
     }
 
     /// <summary>
-    /// Rule pack chưa có cách khai "phụ kiện nào là NẶNG" (van, thiết bị) nên plugin không tự
-    /// đoán: hỏi một lần mỗi lần chạy — có thì mọi phụ kiện đã chèn trên tuyến đều được một giá đỡ.
+    /// Đường DỰ PHÒNG cho rule pack cũ (v4–v6) chưa khai <c>drawTools.heavyFittingIds</c>: plugin
+    /// không tự đoán phụ kiện nào nặng nên hỏi kỹ sư — trả lời Có thì MỌI phụ kiện trên tuyến đều
+    /// được một giá đỡ. Nâng rule pack lên v7 là hết phải hỏi (và chỉ van/damper mới có giá đỡ riêng).
     /// </summary>
-    private static bool? HoiTaiPhuKien(Editor ed)
+    private static bool? HoiTaiPhuKien(Editor ed, string rulePackVersion)
     {
+        ed.WriteMessage(
+            $"\n[XBoss] Rule pack {rulePackVersion} chưa khai drawTools.heavyFittingIds (có từ v7) nên " +
+            "plugin không biết phụ kiện nào là NẶNG — hỏi kỹ sư một lần cho cả lệnh.\n");
         var hoi = new PromptKeywordOptions(
             "\n[XBoss] Đặt thêm giá đỡ tại các phụ kiện đã chèn trên tuyến (van, phụ kiện nặng)?")
         {
@@ -239,59 +262,19 @@ public sealed class VeGiadoCommands
             .FirstOrDefault(s => string.Equals(s.Id, xd.HeId, StringComparison.Ordinal))
             ?.Lines.FirstOrDefault(l => string.Equals(l.ItemId, xd.ItemId, StringComparison.Ordinal));
 
-    /// <summary>
-    /// Mọi khối do bộ lệnh vẽ chèn, nhóm theo handle của tim mà nó bám vào (giá đỡ, phụ kiện,
-    /// lỗ chờ). Quét MỘT lần cho cả lệnh — bản vẽ shop có hàng nghìn khối, quét lại theo từng
-    /// tuyến là chậm thấy rõ.
-    /// </summary>
-    internal static Dictionary<string, List<(VaiTroVe VaiTro, Diem2 Diem)>> KhoiTheoTim(
-        Database db, Transaction tr)
-    {
-        var ra = new Dictionary<string, List<(VaiTroVe, Diem2)>>(StringComparer.OrdinalIgnoreCase);
-        var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
-        foreach (ObjectId id in ms)
-        {
-            if (tr.GetObject(id, OpenMode.ForRead) is not BlockReference br) continue;
-            var xd = VeXDataStore.Doc(br);
-            if (xd?.HandleTim is not { Length: > 0 } tim) continue;
-            if (!ra.TryGetValue(tim, out var ds)) ra[tim] = ds = [];
-            ds.Add((xd.VaiTro, new Diem2(br.Position.X, br.Position.Y)));
-        }
-        return ra;
-    }
-
-    /// <summary>Quy các khối một vai trò về khoảng cách dọc tuyến (bỏ khối chiếu hụt).</summary>
+    /// <summary>Quy các khối thỏa <paramref name="loc"/> về khoảng cách dọc tuyến (bỏ khối chiếu hụt).</summary>
     private static List<double> QuyVeDoc(
         IReadOnlyList<DinhPolyline> dinh, bool kin,
-        List<(VaiTroVe VaiTro, Diem2 Diem)>? khoi, VaiTroVe vaiTro)
+        List<VeThucThe.KhoiBamTim>? khoi, Func<VeThucThe.KhoiBamTim, bool> loc)
     {
         var ra = new List<double>();
         if (khoi is null) return ra;
-        foreach (var (vt, diem) in khoi)
+        foreach (var k in khoi)
         {
-            if (vt != vaiTro) continue;
-            if (SupportSpacing.KhoangCachDocCua(dinh, diem, kin) is { } doc) ra.Add(doc);
+            if (!loc(k)) continue;
+            if (SupportSpacing.KhoangCachDocCua(dinh, k.Diem, kin) is { } doc) ra.Add(doc);
         }
         return ra;
     }
 
-    /// <summary>
-    /// AC12 đòi <c>XBOSS_BOCKL</c> đếm được số giá đỡ. Rule pack phải có item <c>measure=count</c>
-    /// khớp tên block giá đỡ — chưa có thì báo NGAY tại chỗ (chèn vẫn xong, nhưng bóc sẽ hụt).
-    /// </summary>
-    private static void CanhBaoBocKhoiLuong(Editor ed, CadRulePack pack, BlockDef def)
-    {
-        var item = pack.Takeoff.Items.FirstOrDefault(
-            i => i.MeasureKind == TakeoffMeasure.Count &&
-                 i.BlockNameMatchAny is { Count: > 0 } &&
-                 TokenMatcher.MatchesAny(def.BlockName, i.BlockNameMatchAny));
-        if (item is not null)
-        {
-            ed.WriteMessage($"[XBoss] XBOSS_BOCKL sẽ đếm số giá đỡ vào item \"{item.Id}\".\n");
-            return;
-        }
-        ed.WriteMessage(
-            $"[XBoss] ⚠ Rule pack {pack.Version} chưa có item takeoff measure=count khớp block \"{def.BlockName}\" — " +
-            "XBOSS_BOCKL sẽ KHÔNG đếm giá đỡ. Bổ sung item ở rule pack version sau (M100 AC12).\n");
-    }
 }

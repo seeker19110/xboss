@@ -163,6 +163,23 @@ internal static class VeLayerService
         return id;
     }
 
+    /// <summary>
+    /// Mở khóa + bật + bỏ đóng băng một layer ĐANG CÓ, để sửa được đối tượng nằm trên nó
+    /// (<c>XBOSS_VE_DOI</c> phải sửa tim/nét biên/nhãn trên layer NGUỒN, mà sau <c>XBOSS_VE_NEN</c>
+    /// thì mọi layer đều đang khóa). Khác <see cref="DamBaoLayer"/> ở chỗ KHÔNG tạo layer mới:
+    /// tuyến không có nét biên thì không được đẻ ra layer <c>…EDGE</c> rỗng; và KHÔNG đụng độ mờ —
+    /// làm mờ là trạng thái nền do <c>XBOSS_VE_NEN</c> quản, không phải việc của lệnh đổi tuyến.
+    /// </summary>
+    internal static void MoKhoaNeuCo(Database db, Transaction tr, string ten)
+    {
+        var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+        if (!lt.Has(ten)) return;
+        var ltr = (LayerTableRecord)tr.GetObject(lt[ten], OpenMode.ForWrite);
+        if (ltr.IsLocked) ltr.IsLocked = false;
+        if (ltr.IsOff) ltr.IsOff = false;
+        if (ltr.IsFrozen) ltr.IsFrozen = false;
+    }
+
     /// <summary>Layer đã có đối tượng trong model space chưa (M100 §18: cảnh báo layer đích có nội dung cũ).</summary>
     internal static bool CoThucThe(Database db, Transaction tr, string tenLayer)
     {

@@ -4,6 +4,8 @@ using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using XBoss.Cad.Core.Api;
 using XBoss.Cad.Core.Draw;
+using XBoss.Cad.Core.Matching;
+using XBoss.Cad.Core.RulePack;
 
 namespace XBoss.Cad.Acad.Services;
 
@@ -357,6 +359,29 @@ internal static class BlockLibraryService
         var kq = ed.GetKeywords(hoi);
         if (kq.Status != PromptStatus.OK) return null;
         return tuKhoa.TryGetValue(kq.StringResult, out var chon) ? chon : null;
+    }
+
+    /// <summary>
+    /// Báo ngay tại chỗ việc <c>XBOSS_BOCKL</c> có đếm được loại block vừa chèn hay không
+    /// (M100 AC12/§6.8): rule pack phải có item <c>measure=count</c> khớp TÊN BLOCK. Rule pack v7
+    /// khai sẵn <c>support-hanger</c>/<c>sleeve-opening</c>; pack cũ thì chèn vẫn xong nhưng khối
+    /// lượng hụt hẳn hạng mục đó — kỹ sư phải biết ngay, không để phát hiện lúc trình QS.
+    /// Dùng chung cho giá đỡ (<c>XBOSS_VE_GIADO</c>) và lỗ chờ (<c>XBOSS_VE_LOCHO</c>).
+    /// </summary>
+    internal static void BaoItemDem(Editor ed, CadRulePack pack, BlockDef def, string tenViec)
+    {
+        var item = pack.Takeoff.Items.FirstOrDefault(
+            i => i.MeasureKind == TakeoffMeasure.Count &&
+                 i.BlockNameMatchAny is { Count: > 0 } &&
+                 TokenMatcher.MatchesAny(def.BlockName, i.BlockNameMatchAny));
+        if (item is not null)
+        {
+            ed.WriteMessage($"[XBoss] XBOSS_BOCKL sẽ đếm số {tenViec} vào item \"{item.Id}\".\n");
+            return;
+        }
+        ed.WriteMessage(
+            $"[XBoss] ⚠ Rule pack {pack.Version} chưa có item takeoff measure=count khớp block \"{def.BlockName}\" — " +
+            $"XBOSS_BOCKL sẽ KHÔNG đếm {tenViec}. Nâng lên rule pack v7 trở lên (M100 AC12/§6.8).\n");
     }
 
     /// <summary>Một khối chờ chèn: đã chốt vị trí/góc/tỉ lệ/layer/XData, chưa đụng bản vẽ.</summary>

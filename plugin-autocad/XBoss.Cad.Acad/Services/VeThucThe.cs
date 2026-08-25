@@ -1,5 +1,7 @@
 using Autodesk.AutoCAD.DatabaseServices;
+using Autodesk.AutoCAD.Geometry;
 using XBoss.Cad.Core.Draw;
+using XBoss.Cad.Core.Geometry;
 
 namespace XBoss.Cad.Acad.Services;
 
@@ -30,5 +32,65 @@ internal static class VeThucThe
         noiChua.AppendEntity(ent);
         tr.AddNewlyCreatedDBObject(ent, true);
         ent.Layer = layer;
+    }
+
+    /// <summary>
+    /// Dựng LWPOLYLINE 2D (Z=0) từ danh sách đỉnh + bulge của Core — dùng chung cho tuyến tim
+    /// (<c>XBOSS_VE</c>) và nét biên dựng lại (<c>XBOSS_VE_DOI</c>).
+    /// KHÔNG đặt layer ở đây: tên layer chỉ tra cứu được khi thực thể ĐÃ thuộc một database
+    /// (đặt trước khi AppendEntity là nguồn lỗi eNoDatabase kinh điển) — caller đặt sau khi thêm
+    /// (xem <see cref="Them"/>). Cũng KHÔNG gọi SetDatabaseDefaults: thực thể mới mặc định ByLayer,
+    /// đúng chuẩn dự án (màu/nét lấy theo layer đích, không dính CECOLOR hiện hành của kỹ sư).
+    /// </summary>
+    internal static Polyline TaoPolyline(IReadOnlyList<DinhPolyline> dinh, bool kin)
+    {
+        var pl = new Polyline();
+        for (var i = 0; i < dinh.Count; i++)
+            pl.AddVertexAt(i, new Point2d(dinh[i].X, dinh[i].Y), dinh[i].Bulge, 0, 0);
+        pl.Closed = kin;
+        pl.Elevation = 0;
+        pl.Normal = Vector3d.ZAxis;
+        return pl;
+    }
+
+    /// <summary>ObjectId từ chuỗi handle trong XData; null khi handle đã mục (đối tượng bị xóa).</summary>
+    internal static ObjectId? TimTheoHandle(Database db, string? handle)
+    {
+        if (string.IsNullOrWhiteSpace(handle)) return null;
+        try
+        {
+            return db.TryGetObjectId(new Handle(Convert.ToInt64(handle, 16)), out var id) ? id : null;
+        }
+        catch (FormatException)
+        {
+            return null; // XData bị sửa tay thành chuỗi không phải handle
+        }
+        catch (OverflowException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Một khối do bộ lệnh vẽ chèn và đang bám vào một tuyến tim.</summary>
+    internal readonly record struct KhoiBamTim(VaiTroVe VaiTro, Diem2 Diem, string? BlockId);
+
+    /// <summary>
+    /// Mọi khối do bộ lệnh vẽ chèn, nhóm theo handle của tim mà nó bám vào (phụ kiện, thiết bị,
+    /// giá đỡ, lỗ chờ, mũi tên hướng dốc). Quét MỘT lần cho cả lệnh — bản vẽ shop có hàng nghìn
+    /// khối, quét lại theo từng tuyến là chậm thấy rõ.
+    /// </summary>
+    internal static Dictionary<string, List<KhoiBamTim>> KhoiTheoTim(Database db, Transaction tr)
+    {
+        var ra = new Dictionary<string, List<KhoiBamTim>>(StringComparer.OrdinalIgnoreCase);
+        var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
+        foreach (ObjectId id in ms)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not BlockReference br) continue;
+            var xd = VeXDataStore.Doc(br);
+            if (xd?.HandleTim is not { Length: > 0 } tim) continue;
+            if (!ra.TryGetValue(tim, out var ds)) ra[tim] = ds = [];
+            ds.Add(new KhoiBamTim(xd.VaiTro, new Diem2(br.Position.X, br.Position.Y), xd.BlockId));
+        }
+        return ra;
     }
 }

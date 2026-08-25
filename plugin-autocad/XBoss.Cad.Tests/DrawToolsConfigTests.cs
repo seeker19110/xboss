@@ -1,4 +1,5 @@
 using XBoss.Cad.Core.Draw;
+using XBoss.Cad.Core.Matching;
 using XBoss.Cad.Core.RulePack;
 using Xunit;
 
@@ -16,7 +17,7 @@ public class DrawToolsConfigTests
     public void Nap_duoc_drawTools_cua_rule_pack_dang_phat_hanh()
     {
         var pack = DrawToolsConfig.Load(JsonHienHanh());
-        Assert.Equal("v6", pack.RulePack.Version);
+        Assert.Equal("v7", pack.RulePack.Version);
         Assert.Equal(5, pack.DrawTools.Systems.Count); // HVAC/PIPING/FIREFIGHTING/ELECTRICAL/ELV
         Assert.Equal("G-ANNO-TEXT", pack.DrawTools.LabelStyle.Layer);
         Assert.Equal("titleblock-a1", pack.SheetSetup.TitleblockId);
@@ -148,6 +149,76 @@ public class DrawToolsConfigTests
             .Replace(",\n            \"supportSpacingMm\": 2400,\n            \"sleeveClearanceMm\": 50", "");
         var pack = DrawToolsConfig.Load(json);
         Assert.NotNull(pack);
+        Assert.Equal("v7", pack.RulePack.Version);
+    }
+
+    // ===== v7 (M100 PR5): phụ kiện nặng khai trong rule pack thay cho hỏi kỹ sư =====
+
+    [Fact]
+    public void V7_khai_phu_kien_nang_va_doc_duoc()
+    {
+        var pack = DrawToolsConfig.Load(JsonHienHanh());
+        Assert.True(pack.DrawTools.CoKhaiPhuKienNang);
+        Assert.True(pack.DrawTools.LaPhuKienNang("valve-gate"));
+        Assert.True(pack.DrawTools.LaPhuKienNang("damper-vcd"));
+        // Co/tê là phụ kiện nhẹ — không được đòi giá đỡ riêng.
+        Assert.False(pack.DrawTools.LaPhuKienNang("elbow-duct"));
+        Assert.False(pack.DrawTools.LaPhuKienNang(null));
+    }
+
+    [Fact]
+    public void Rule_pack_cu_khong_khai_phu_kien_nang_van_nap_duoc()
+    {
+        // v6 (và v4/v5) không có heavyFittingIds ⇒ danh sách rỗng, lệnh giữ đường hỏi kỹ sư.
+        var pack = DrawToolsConfig.Load(File.ReadAllText(RepoPaths.RulePackPathCua("v6.json")));
         Assert.Equal("v6", pack.RulePack.Version);
+        Assert.False(pack.DrawTools.CoKhaiPhuKienNang);
+        Assert.False(pack.DrawTools.LaPhuKienNang("valve-gate"));
+    }
+
+    [Fact]
+    public void He_co_tuyen_bat_buoc_do_doc_phai_khai_block_mui_ten_huong_doc()
+    {
+        // FR9g: XBOSS_VE_NHAN chèn block slope-arrow kèm nhãn "i=…%" — hệ có tuyến slopeRequired
+        // mà không khai id đó trong fittings thì mũi tên KHÔNG BAO GIỜ chèn được (trôi tên lặng lẽ).
+        var pack = DrawToolsConfig.Load(JsonHienHanh());
+        foreach (var he in pack.DrawTools.Systems.Where(s => s.Lines.Any(l => l.SlopeRequired)))
+            Assert.Contains(BlockManifest.IdMuiTenDoDoc, he.Fittings);
+    }
+
+    [Fact]
+    public void Bat_loi_phu_kien_nang_troi_khoi_fittings()
+    {
+        var json = JsonHienHanh().Replace("\"heavyFittingIds\": [\"valve-gate\"", "\"heavyFittingIds\": [\"van-ma\"");
+        var loi = Assert.Throws<RulePackException>(() => DrawToolsConfig.Load(json));
+        Assert.Contains("van-ma", loi.Message);
+        Assert.Contains("fittings", loi.Message);
+    }
+
+    [Fact]
+    public void V7_khai_item_dem_giado_va_locho_khop_ten_block_thu_vien()
+    {
+        var pack = DrawToolsConfig.Load(JsonHienHanh());
+        var takeoff = pack.RulePack.Takeoff;
+
+        var giaDo = takeoff.Items.Single(i => i.Id == "support-hanger");
+        var loCho = takeoff.Items.Single(i => i.Id == "sleeve-opening");
+        Assert.Equal(TakeoffMeasure.Count, giaDo.MeasureKind);
+        Assert.Equal(TakeoffMeasure.Count, loCho.MeasureKind);
+        // layerMatchAny PHẢI rỗng: giá đỡ nằm trên chính layer tuyến, khai layer sẽ đếm nhầm cả tuyến.
+        Assert.Empty(giaDo.LayerMatchAny);
+        Assert.Empty(loCho.LayerMatchAny);
+
+        // Khớp đúng tên block của manifest mẫu (M100 AC12/§6.8) — đây là chốt chặn chống trôi tên.
+        Assert.True(TokenMatcher.MatchesAny("XB-SUP-DUCT", giaDo.BlockNameMatchAny!));
+        Assert.True(TokenMatcher.MatchesAny("XB-SLEEVE-W", loCho.BlockNameMatchAny!));
+        // …và KHÔNG khớp oan tên phụ kiện khác (token "SUP" cụt sẽ khớp "XB-GRL-SUP").
+        Assert.False(TokenMatcher.MatchesAny("XB-GRL-SUP", giaDo.BlockNameMatchAny!));
+        Assert.False(TokenMatcher.MatchesAny("XB-DUCT-ELBOW", giaDo.BlockNameMatchAny!));
+        Assert.False(TokenMatcher.MatchesAny("FCU", loCho.BlockNameMatchAny!));
+
+        // Đặt CUỐI danh sách ⇒ first-match không giành mất đối tượng của item cũ.
+        Assert.Equal("sleeve-opening", takeoff.Items[^1].Id);
+        Assert.Equal("support-hanger", takeoff.Items[^2].Id);
     }
 }

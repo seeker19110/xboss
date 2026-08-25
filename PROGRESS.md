@@ -4,6 +4,101 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M100 PR5 — `XBOSS_VE_DOI` + báo cáo phiên vẽ + rule pack v7 + tài liệu — ĐÓNG ĐỢT M100 (2026-08-25)
+
+Việc CUỐI của M100 (§6.2, FR8, §14). Sau PR này bộ lệnh vẽ có đủ **14 lệnh** (`XBOSS_VE` + 13 lệnh
+`XBOSS_VE_*`) và M100 khép kín vòng chuẩn hóa → vẽ → bóc khối lượng.
+
+- **Adapter `XBOSS_VE_DOI`** (`Commands/VeDoiCommands.cs`): chọn nhiều tim → chọn hệ/loại/size (+ độ
+  dốc nếu loại tuyến mới bắt buộc) → **một transaction** làm trọn: đổi layer, **xóa nét biên cũ và
+  dựng lại theo bề rộng mới** (`EdgeOffset`), cập nhật nhãn từ XData (MTEXT ghi lại nội dung; **mũi
+  tên hướng dốc bị xóa** khi tuyến mới không có độ dốc — mũi tên dốc trên ống cấp nước là thông tin
+  sai), ghi XData mới, và **gỡ đánh dấu bóc của ĐÚNG các tuyến đó** bằng chính `MarkService` của
+  `XBOSS_BOCKL_XOA` kèm cảnh báo "đổi xong phải bóc lại". Lý do bắt buộc gỡ: `XBOSS_BOCKL` bỏ qua mọi
+  đối tượng đã đánh dấu, không gỡ thì đoạn vừa đổi **lặng lẽ không bao giờ được bóc lại**.
+  Xóa nét biên/nhãn chỉ khi đối tượng thật sự mang XData vai trò tương ứng + handle tim khớp (handle
+  trong XData có thể đã mục — xóa mù theo handle là cách chắc chắn nhất để mất một đối tượng vô can).
+  Trước khi sửa, lệnh **mở khóa layer nguồn + layer nhãn** (`VeLayerService.MoKhoaNeuCo`, không tạo
+  layer mới): sau `XBOSS_VE_NEN` mọi layer đang khóa, không mở thì lệnh chết ở đối tượng đầu tiên.
+- **Báo cáo phiên vẽ** (§14): Core `Reporting/VeSessionReport.cs` (thuần, 7 ca test) dựng nội dung từ
+  XData `XBOSS_VE` đang **sống trong bản vẽ** — số tuyến/nét biên/nhãn/phụ kiện/thiết bị/giá đỡ/lỗ
+  chờ/mặt cắt **theo từng hệ**, size ngoài danh mục đã dùng, version rule pack + thư viện, và cảnh
+  báo khi bản vẽ **trộn nhiều version** rule pack/thư viện. Adapter `XBOSS_VE_BAOCAO` (chỉ đọc) quét
+  model space + BlockTable, in bản tiếng Việt và ghi `<tệp>.dwg.xboss-ve.json` cạnh DWG đúng khung
+  báo cáo M99. Nhật ký đụng độ định nghĩa block (AC7) lấy từ `VeContext.NhatKyPhien` — chỉ có trong
+  phiên AutoCAD hiện tại, báo cáo nói rõ điều đó thay vì giả vờ đầy đủ.
+- **Rule pack v7** (append-only, v1–v6 không đổi 1 byte) — đóng 2 lỗ hổng dữ liệu mà PR7 đã báo:
+  (1) 2 item takeoff `measure=count` **`support-hanger`** + **`sleeve-opening`** khớp theo TÊN BLOCK
+  (`XB-SUP`/`SUPPORT`/`HANGER`/`GIADO`, `XB-SLEEVE`/`SLEEVE`/`SLV`/`LOCHO`; `layerMatchAny` để RỖNG
+  vì giá đỡ nằm trên chính layer tuyến) ⇒ **`XBOSS_BOCKL` đếm được giá đỡ/lỗ chờ** — đóng nốt AC12 và
+  §6.8, trước đó hai hạng mục này ước tay; (2) khóa **`drawTools.heavyFittingIds`** khai phụ kiện nào
+  là NẶNG (`valve-gate`, `damper-vcd`) ⇒ `XBOSS_VE_GIADO` hết phải hỏi kỹ sư mỗi lần chạy, và chỉ
+  van/damper mới được giá đỡ riêng (trả lời "Có" kiểu cũ là đặt giá đỡ cả ở co/tê nhẹ, sai chuẩn
+  treo đỡ). Cố ý **không** dùng token cụt `SUP` (tên như `XB-GRL-SUP` sẽ khớp oan — có ca test).
+  2 item mới đặt CUỐI danh sách nên first-match không giành mất đối tượng của item cũ: bản vẽ không
+  có block giá đỡ/sleeve bóc bằng v7 ra **y hệt v6** (ca test đối chứng). Rule pack cũ không có
+  `heavyFittingIds` ⇒ lệnh giữ nguyên đường hỏi kỹ sư (hành vi cũ không đổi).
+- **Đóng 2 nợ do việc song song để lại:** (a) `XBOSS_VE_NHAN` nay **chèn thật** block `slope-arrow`
+  qua `BlockLibraryService` (FR9g) — quay theo CHIỀU VẼ tuyến và nói rõ điều đó trên dòng lệnh (bản
+  vẽ 2D không chứa hướng dốc thật); thư viện không có block đó thì **chỉ ghi chữ**, plugin không tự
+  vẽ ký hiệu thay thế. (b) `XBOSS_VE_TRANGIN` nhận vùng in bằng **2 điểm HOẶC polyline ranh giới
+  kín** (§6.3 bước 1, lấy hình bao); ranh giới HỞ bị từ chối kèm hướng dẫn, không lặng lẽ lấy hình
+  bao của đường hở.
+- **LỖI TÍCH HỢP đã vá:** `Services/TakeoffScanner.cs` **mất 3 dòng đóng khối** (`}` + `return ra;` +
+  `}`) của `DocDaGan` trong lần merge `w3-bockl-nang-cap` (c41c911d) — tệp không biên dịch được,
+  nghĩa là **cả plugin không build được trên Windows**. CI Linux không thể bắt (Adapter không nằm
+  trong bộ build CI); phát hiện nhờ cổng "biên dịch Adapter bằng stub API AutoCAD". Đã khôi phục
+  đúng nguyên bản của 822661ac.
+- **Dọn trùng lặp:** `TaoPolyline` (tim/nét biên) và `KhoiTheoTim` (quét block bám tim) gom về
+  `Services/VeThucThe.cs` dùng chung cho `XBOSS_VE`/`XBOSS_VE_DOI`/`XBOSS_VE_GIADO`; cảnh báo "BOCKL
+  có đếm được block này không" gom về `BlockLibraryService.BaoItemDem` dùng chung cho giá đỡ + lỗ chờ.
+- **Tài liệu:** `plugin-autocad/README.md` thêm bảng đủ 14 lệnh vẽ + luồng làm việc mới;
+  `plugin-autocad/CAI-DAT.md` thêm mục 4b "Vẽ shop drawing bằng bộ lệnh `XBOSS_VE_*`" cho người dùng
+  cuối (trình tự 8 bước, 3 việc hay phải làm lại, bảng khi lệnh từ chối chạy); M100 State +
+  `docs/nang-cap/README.md` cập nhật "xong cả 7 PR".
+- **Cổng:** dotnet **382 ca xanh** (365 → 382: `VeSessionReport` 7 ca, `TakeoffV7` 5 ca,
+  `DrawToolsConfig` +5 ca; 2 ca cũ sửa để bám đúng version — `TakeoffV6Tests` nạp v6 theo TÊN TỆP,
+  corpus đối chứng theo v7); `npm run typecheck`/`lint` xanh; `tests/engineering-cad-rule-pack.test.ts`
+  27 ca xanh (thêm ca "v7 = v6 + đúng 2 item đếm + heavyFittingIds"); `npm run cad:doi-chung -- --kiem`
+  OK (đối chứng 2 tầng chỉ đổi dòng version — quy tắc layer không suy suyển). Adapter **biên dịch
+  thử toàn bộ 12 tệp lệnh vẽ + service** bằng stub API AutoCAD trên Linux.
+- **Còn nợ (cần máy có AutoCAD 2026 — M100 §18):** verify tay AC1–AC14 end-to-end; đặc biệt AC6
+  (`XBOSS_VE_DOI` dựng lại biên + gỡ dấu bóc), AC12 vế "BOCKL đếm ra đúng số giá đỡ" và block
+  `slope-arrow` thật trong thư viện công ty (manifest mẫu trong repo chưa có block đó).
+
+## M100 PR7 — Giá đỡ + lỗ chờ + tag + bảng thống kê (2026-08-25)
+
+_(Ghi bổ sung khi đóng đợt ở PR5 — commit 822661ac + 56f71e5d đã vào nhánh nhưng chưa ghi PROGRESS.)_
+
+- **Core (thuần, test CI Linux):** `SupportSpacing` (chiều dài tuyến thẳng+cung, điểm/tiếp tuyến tại
+  một khoảng cách dọc tuyến, chiếu ngược điểm về khoảng cách dọc, rải giá đỡ đầu/cuối + phụ kiện nặng
+  - chia đều; chạy lại chỉ trả vị trí CÒN THIẾU nên không đặt trùng), `SleeveSchedule` (size lỗ chờ =
+    size ống + `sleeveClearanceMm`, vị trí theo trục gần nhất — không có nhãn trục thì để TRỐNG chứ
+    không bịa), `TagSchedule` (dựng/tách tag theo `tagPattern`, quét trùng + nhảy số, đánh lại giữ tag
+    đã khóa), `ThongKeTable`, `Excel/LoChoExcelWriter` (tệp riêng, KHÔNG đụng mẫu BOQ công ty).
+- **AC12 sửa cho đúng số học (56f71e5d):** `supportSpacingMm` là ngưỡng **TỐI ĐA** của tiêu chuẩn treo
+  đỡ nên mặc định là `KHONGVUOT` (tuyến 10m/chuẩn 2400 → **6** giá đỡ, bước 2000). Bản đặc tả gốc ghi
+  "5 giá đỡ" tự mâu thuẫn (5 giá đỡ = 4 khoảng × 2500, vượt 2400) — đã sửa M100 §6.7/AC12.
+- **Adapter:** `XBOSS_VE_GIADO`, `XBOSS_VE_LOCHO` (chế độ CHEN/dò giao layer kết cấu + XUATBANG),
+  `XBOSS_VE_TAG` (QUET/DANHLAI/KHOA), `XBOSS_VE_THONGKE`; dọn bản sao thứ hai của thư viện block
+  trong `VeTranginCommands` về `BlockLibraryService` (một cửa duy nhất).
+- **Đã báo và ĐÃ ĐÓNG ở PR5:** rule pack thiếu item đếm giá đỡ/sleeve và thiếu khai "phụ kiện nào
+  nặng" → phát hành **v7**.
+
+## M100 PR4 — Phụ kiện + thiết bị + thư viện block trong bản vẽ (2026-08-25)
+
+_(Ghi bổ sung khi đóng đợt ở PR5 — commit fece8fa8 đã vào nhánh nhưng chưa ghi PROGRESS.)_
+
+- **Core:** `FittingPlacement` (hít điểm bấm vào tim + góc tiếp tuyến trên đoạn thẳng lẫn cung, sai số
+  ≤0.1° — AC5; tỉ lệ chèn theo size; layer đặt thiết bị sao cho `XBOSS_BOCKL` vẫn đếm được — AC4),
+  `XBossApiClient` thêm 2 lời gọi tải thư viện block.
+- **Adapter `BlockLibraryService`:** cache `%APPDATA%\XBoss\block-lib\` + kiểm `sha256` manifest↔tệp
+  TRƯỚC khi dùng (hash lệch = từ chối, không "dùng tạm"), tải theo ETag, **nhập định nghĩa block vào
+  DWG một lần** (WblockClone) và đánh dấu XData version thư viện — trùng tên khác nguồn thì **HỎI**,
+  không ghi đè âm thầm (AC7), lựa chọn của kỹ sư ghi vào `VeContext.NhatKyPhien` (vào báo cáo PR5).
+- **Adapter lệnh:** `XBOSS_VE_PHUKIEN`, `XBOSS_VE_THIETBI` (TAG bắt buộc), `XBOSS_VE_THUVIEN` (nạp
+  tệp tay hoặc tải lại từ server); `XBOSS_LOGIN` tự tải thư viện sau rule pack (AC8).
+
 ## M100 PR6 — Trang in + mặt cắt: `XBOSS_VE_TRANGIN` / `XBOSS_VE_MATCAT` (2026-08-25)
 
 - **Core `XBoss.Cad.Core/Draw/` (thuần, test CI Linux):** `SectionBuilder` (giao tuyến cắt × tim — đoạn thẳng lẫn cung bulge; xếp thứ tự chiếu lên tuyến cắt; **giữ đúng khoảng cách ngang thật** giữa các ký hiệu; loại ký hiệu suy từ size/itemId: chữ nhật W×H / tròn DN / máng cáp có nét đáy; tuyến **song song** tuyến cắt hoặc size không đọc được → BỎ QUA kèm cảnh báo, không bịa kích thước), `SheetSetup` (quy đổi tỉ lệ viewport `mm/đơn-vị ÷ tỉ lệ` — AC10 1:50 ⇒ 1000mm mô hình = 20mm giấy; đặt tên layout theo `layoutNamePattern` lấy số kế tiếp; đặt tên mặt cắt A-A/B-B… bỏ qua chữ đã dùng; chọn canonical media name của máy in theo token khổ giấy — "A1" không dính "A10"; tra khung tên `kind=titleblock` trong manifest thư viện).
