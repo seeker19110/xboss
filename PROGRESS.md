@@ -4,6 +4,53 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Audit tính năng — gộp theo vòng đời dự án (2026-08-25)
+
+Người dùng: "audit tính năng và gộp lại theo nhóm". Chốt qua `AskUserQuestion`: **ra báo cáo
+trước, chưa sửa code**, trục nhóm là **vòng đời dự án**. Kết quả:
+`docs/audit-2026-08-25-tinh-nang-theo-vong-doi.md`.
+
+**Đã làm** — rà 122 trang / 505 route API / 269 bảng DB trên `main` (commit `5a7617b`), xếp
+**mọi trang đúng một lần** vào 6 giai đoạn vòng đời + 2 nhóm cắt ngang (kiểm bằng script:
+122 map / 122 trang, không sót, không trùng).
+
+**Phát hiện chính** (chi tiết + cách tái lập từng số trong tài liệu):
+
+1. **5 trang không có lối vào nào** — `/risks` (sổ rủi ro 587 dòng), `/materials/reports`,
+   `/schedule-control`, `/scurve`, `/timeline`: không trong sidebar **và** không trang nào
+   link tới. Đều nằm trong 20 trang khôi phục ở `docs/audit-hop-nhat-hub.md` — bước "trỏ lại
+   nav" sót đúng 5 trang. Kèm lỗi nav: mục "HSE" và mục "Rủi ro" **cùng trỏ `/hse`**, mà
+   `/hse` không có chữ "rủi ro" nào.
+2. **Số liệu bịa trên hub** — `/governance` và `/engineering-intelligence` **không fetch bao
+   giờ** nên KPI ("486 Tài liệu", "11 Agents"…) luôn là số bịa; 4 hub còn lại khởi tạo bằng
+   số cứng rồi mới fetch đè, `/commercial` bịa **giá trị tiền tỷ** khi API lỗi/dự án rỗng.
+3. **Hai stack song song cho 7 nghiệp vụ** (claim/EOT, thầu phụ, đấu thầu, dòng tiền, HSE,
+   BIM, rủi ro) — bảng DB riêng, route riêng, không tham chiếu nhau. Nặng nhất:
+   `engineering_subcon_profiles` tự giữ `company_name`/`tax_code` với FK `supplier_id` chỉ
+   **tuỳ chọn**, trong khi `subcontractor_profiles` khoá chính là `supplier_id` → cùng một
+   thầu phụ có thể tồn tại hai bản ghi lệch nhau, không cơ chế nào bắt.
+4. **4 vỏ mỏng của tab `/schedule`** (`/scurve` 29 dòng, `/timeline` 27, `/lookahead` 187,
+   `/schedule-control` 182) — bọc đúng các component mà hub đã import, −425 dòng nếu gộp
+   theo khuôn `/notifications` ở PR #390.
+5. **19 route API không ai gọi** (14 trong đó là `/api/engineering/*`); `/api/cron/*` và
+   `/api/v1/*` **không** tính là chết — không có caller trong repo là đúng thiết kế.
+6. **`/mepf-process` (2.011 dòng) + `/combine` (995 dòng)**: 0 `fetch`, 0 `localStorage` —
+   nội dung quy trình cắm cứng trong JSX, tick xong tải lại là mất.
+7. **Cân đối khối lượng**: 39/122 trang (34% dòng mã trang), 143/505 route API, **119/269
+   bảng DB (44%)** và **57% dòng của `lib/`** thuộc lớp `/engineering` — trong khi 12/25
+   module registry đang `thuNghiem: true` (tắt mặc định) đều nằm ở lớp này.
+
+**Tiếp theo** — §5 tài liệu xếp 8 đề xuất gộp theo tỷ lệ lợi ích/rủi ro. Khuyến nghị làm
+trước 4 việc thấp rủi ro, không đụng dữ liệu: (1) trỏ lại nav 5 trang mồ côi + sửa mục
+"Rủi ro"; (2) bỏ số liệu bịa ở 7 hub; (3) gộp 4 vỏ mỏng vào `/schedule?tab=`; (4) xoá 19
+route chết. Bốn việc còn lại (gộp bảng thầu phụ, chốt hướng 7 cặp stack song song, đưa nội
+dung tĩnh vào DB, tách component canvas dùng chung) **đụng schema/kiến trúc — chờ người chốt
+hướng**.
+
+**Chưa đo được**: mức dùng thật của các bảng `engineering_*` trên production (rỗng hay có dữ
+liệu quyết định "gộp" hay "xoá" ở đề xuất #6), rà quyền theo nhóm vòng đời, và rà trùng lặp
+còn lại trong `lib/ky-thuat/` (31.426 dòng, 82 file — chưa rà lại sau PR #390).
+
 ## Đóng nợ tương phản màu — sửa ở token + 2 cổng CI (2026-08-25)
 
 Người dùng: "làm luôn đợt sửa nợ tương phản zinc-500". Đo bằng axe trên bản production có dữ
