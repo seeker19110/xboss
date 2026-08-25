@@ -4,6 +4,16 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M100 + M101 — Đặc tả giai đoạn 2 plugin AutoCAD: bộ lệnh vẽ `XBOSS_VE_*` + nâng trần 3 khối M99 (2026-08-25)
+
+Người dùng yêu cầu (2026-08-25, qua thảo luận trần năng lực plugin): (1) "viết đặc tả M mới cho lệnh vẽ XBOSS_VE — có block, layer chuẩn hoá sẵn cho từng hệ MEPF và plugin vẽ đè lên thiết kế đã chuẩn hoá"; bổ sung giữa chừng "tạo trang in, mặt cắt" và (2) "nâng cấp tất cả tính năng lên mức trần cao nhất". Nhánh `claude/plugin-capabilities-limits-rrd2gp`. **Chỉ viết đặc tả — CHƯA CODE** (luật "Không code khi chưa Approved").
+
+- **`docs/nang-cap/M100-xboss-ve-shop-drawing.md` (Draft):** bộ lệnh vẽ đảo chiều quy trình — thay vì sửa sai sau khi vẽ, kỹ sư vẽ bằng plugin nên **sinh ra đã chuẩn** (tim tuyến đúng layer đo + XData `[hệ, item, size]` → KIEMTRA pass ngay, BOCKL bóc chính xác tuyệt đối). Rule pack v4 thêm `drawTools` + `sheetSetup`; **thư viện block chuẩn có version** (manifest JSON append-only + tệp `.dwg` qua storage, phát hành trên web, tải qua token scope `cad`, kiểm sha256); lệnh: `XBOSS_VE_NEN/VE/VE_PHUKIEN/VE_THIETBI/VE_NHAN/VE_DOI/VE_THUVIEN` + **`XBOSS_VE_TRANGIN`** (layout + viewport khóa tỉ lệ + khung tên attribute) + **`XBOSS_VE_MATCAT`** (mặt cắt bán tự động từ XData size — cao độ nhập tay, không bịa; tự động 100% cần 3D/BIM = trần công nghệ, ghi ở non-goals). Ống gió/máng: tim là nguồn sự thật cho BOCKL, nét biên trên layer `-EDGE` không nằm trong takeoff → không bóc trùng. DDL `cad_block_libs` + API `block-lib`. 6 PR; open: thư viện toàn cục vs theo dự án, transparency vs screening.
+- **`docs/nang-cap/M101-plugin-nang-tran.md` (Draft):** đẩy 3 khối M99 lên trần khả thi của nền 2D (rule pack v5, mọi mục mới mặc định tắt/hệ số 0 — nạp plugin cũ không đổi hành vi): KIEMTRA 9→16 phép (chồng lấn cùng hệ, clash 2D kèm cảnh báo cố định, khung tên thiếu trường, viewport không khóa, style lệch, nhãn lệch XData, đối tượng ngoài khung); CHUANHOA 7→11 bước (styleMap dim/text, xrefPolicy, hatchMap, layoutPolicy); BOCKL bóc **theo size** (XData M100 hoặc nhãn gần tuyến), **theo vùng** (clip polyline ranh giới — Core `Zoning/` thuần), cách nhiệt dẫn xuất, hệ số quy đổi minh bạch tách cột, `boqCode` per-project + sheet đối chiếu BOQ **chỉ-đọc** (`boq-snapshot`, không mở đường ghi tắt); BATCH chế độ bóc hàng loạt; upload kèm KL vào `standardize_report`. 5 PR; PR4 chạm `lib/khoi-luong/boq.ts` = vùng rủi ro cao, rà `docs/audit.md` khi làm.
+- **Trần tuyệt đối ghi rõ trong cả 2 đặc tả, không vượt:** 3D/BIM, AutoCAD trên server (license), proxy entity hãng thứ ba, thông tin bản vẽ không chứa (cao độ thật, hao hụt thi công).
+- `docs/nang-cap/README.md`: thêm mục "Đặc tả chờ duyệt — đợt plugin AutoCAD giai đoạn 2".
+- **Tiếp theo:** người dùng duyệt 2 đặc tả + chốt các open decisions (§18 mỗi file) → lập PLAN.md giao coordinator theo bảng route.
+
 ## Đóng nợ tương phản màu — sửa ở token + 2 cổng CI (2026-08-25)
 
 Người dùng: "làm luôn đợt sửa nợ tương phản zinc-500". Đo bằng axe trên bản production có dữ

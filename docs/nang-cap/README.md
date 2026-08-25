@@ -108,6 +108,11 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 | `M51-da-du-an-rls.md`        | RLS phòng tuyến 2 (kèm ADR-0005), template dự án, organizations          | ⚠️ **GĐ0 xong (PR1/PR2/PR4, #256), nợ "khoá cửa"**     | `0069_rls.sql`/`0070_organizations.sql`, `docs/adr/0005-rls.md`, `lib/db/index.ts::withProjectScope` |
 | `M52-mo-rong-cau-hinh.md`    | code_lists, custom fields, module registry, feature flags, tách tracking | ✅ xong                                                | `0060_code_lists`/`0062_custom_fields`/`0063_feature_flags`                                          |
 
+## Đặc tả chờ duyệt — đợt plugin AutoCAD giai đoạn 2 (viết 2026-08-25)
+
+> **M100 (`M100-xboss-ve-shop-drawing.md`)** — bộ lệnh vẽ `XBOSS_VE_*`: vẽ shop drawing MEPF đè lên thiết kế đã chuẩn hóa, sinh tuyến/phụ kiện/thiết bị **đã đúng chuẩn ngay từ đầu** (layer + block + size XData theo rule pack v4 `drawTools` + thư viện block có version), kèm trang in (`XBOSS_VE_TRANGIN`) + mặt cắt bán tự động (`XBOSS_VE_MATCAT`). 6 PR. **Draft — chờ duyệt** (còn 2 open decisions §18).
+> **M101 (`M101-plugin-nang-tran.md`)** — nâng trần 3 khối M99: `XBOSS_KIEMTRA` 9→16 phép kiểm (kèm clash 2D có cảnh báo), `XBOSS_CHUANHOA` 7→11 bước (style/xref/hatch/layout), `XBOSS_BOCKL` bóc theo size/vùng/cách nhiệt + `boqCode` per-project + đối chiếu BOQ chỉ-đọc; rule pack v5. 5 PR. **Draft — chờ duyệt.**
+
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 
 > **M62 (`M62-rls-khoa-cua.md`)** — đóng nốt RLS: `withProjectScope` đọc-ghi + bọc 3 route còn lại (`notifications`, `payments/bills`, `payments/floors`) rồi migration "khoá cửa" bỏ nhánh thiếu-ngữ-cảnh (2 PR, `route: spec`; PR2 có điều kiện tiên quyết vận hành). **Đã xong hoàn toàn 2026-07-20** — PR1 (nhánh `claude/plan-m62-m63-7osrkh`, 2026-07-19) và PR2 (`migrations/0077_rls_lock.sql`, PR #300) đều đã merge `main`; người dùng xác nhận cả 2 điều kiện tiên quyết vận hành đủ trước khi merge PR2. Xem `PROGRESS.md`. **M63 (`M63-webhook-ssrf-dns-pinning.md`)** — chống SSRF DNS rebinding cho webhook: resolve + pin IP qua undici `connect.lookup`, mở rộng `isPrivateIp` (1 PR, `route: spec`). **Đã xong 2026-07-19** (nhánh `claude/plan-m62-m63-7osrkh`). Cả 2 sinh từ đợt đánh giá chi tiết lần 8 (`PROGRESS.md`).
