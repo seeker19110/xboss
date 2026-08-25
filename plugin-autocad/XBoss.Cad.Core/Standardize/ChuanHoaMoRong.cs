@@ -24,6 +24,8 @@ public static class ChuanHoaMoRong
     public const string Buoc9 = "9. Xref";
     public const string Buoc10 = "10. Hatch";
     public const string Buoc11 = "11. Layout";
+    public const string Buoc12 = "12. Polyline";
+    public const string Buoc13 = "13. Block";
 
     /// <summary>Tên tạm khi đổi tên layout 2 lượt (chống đụng tên layout chưa kịp đổi).</summary>
     public const string TienToTenTam = "~XBOSS~";
@@ -322,6 +324,140 @@ public static class ChuanHoaMoRong
         }
 
         return new KeHoachLayout { XoaLayout = xoa, DoiTen = doiTen, CanhBao = canhBao };
+    }
+
+    // ===== (12) Đóng polyline gần kín — M102 §6.1 =====
+
+    /// <summary>
+    /// Polyline HỞ có khe đầu–cuối <c>0 &lt; gap ≤ gapCloseToleranceMm</c> → đóng. Khe LỚN hơn ngưỡng
+    /// cố ý giữ nguyên: đó thường là thiếu hẳn một đoạn tuyến chứ không phải thiếu một cú click, tự
+    /// nối là bịa hình học (phép kiểm 3 vẫn báo để kỹ sư tự xử).
+    ///
+    /// <para>Khe đúng bằng 0 cũng bỏ qua: hai đầu đã trùng, việc còn lại (bật cờ Closed cho hatch/đo
+    /// diện tích ăn đúng) thuộc quyết định của kỹ sư chứ không phải chuẩn hóa im lặng — và Adapter đã
+    /// lọc polyline có cờ Closed ra khỏi danh sách này rồi.</para>
+    /// </summary>
+    /// <param name="toMm">Hệ số quy đổi đơn vị bản vẽ → mm (ngưỡng rule pack khai bằng mm).</param>
+    public static KeHoachDongPolyline LapKeHoachDongPolyline(
+        PolylineClosePolicySection chinhSach, IReadOnlyList<PolylineHienCo> polylines, double toMm)
+    {
+        if (!chinhSach.Enabled || polylines.Count == 0) return new KeHoachDongPolyline();
+
+        var thayDoi = new List<ThayDoiPolyline>();
+        var canhBao = new List<string>();
+        var soBoQuaVuotNguong = 0;
+        var soBoQuaItDinh = 0;
+        var soDaTrungKhit = 0;
+        // Dưới ngưỡng này coi như hai đầu đã trùng nhau (sai số dựng hình), chỉ cần bật cờ Closed.
+        const double TrungNhauMm = 0.001;
+
+        foreach (var pl in polylines)
+        {
+            if (chinhSach.OnlyOnLayersMatchAny.Count > 0
+                && !TokenMatcher.MatchesAny(pl.Layer, chinhSach.OnlyOnLayersMatchAny))
+            {
+                continue;
+            }
+
+            var gapMm = pl.KhoangCachDauCuoi * toMm;
+            if (gapMm <= 0)
+            {
+                // Adapter chỉ đưa vào đây polyline HỞ, nên khe ≤ 0 nghĩa là hai đầu đã trùng khít:
+                // đếm riêng để phân biệt với "dữ liệu hình học lỗi", đừng bỏ qua im lặng.
+                soDaTrungKhit++;
+                continue;
+            }
+            if (gapMm > chinhSach.GapCloseToleranceMm)
+            {
+                soBoQuaVuotNguong++;
+                continue;
+            }
+            if (pl.SoDinh < 3)
+            {
+                // 2 đỉnh mà "đóng" thì đoạn nối chồng lên chính nó — vô nghĩa, và làm hỏng phép đo dài.
+                soBoQuaItDinh++;
+                continue;
+            }
+
+            var cach = gapMm <= TrungNhauMm ? CachDong.BatCoClosed : CachDong.NoiThemDoan;
+            thayDoi.Add(new ThayDoiPolyline(pl.Handle, cach, Math.Round(gapMm, 3)));
+        }
+
+        if (soBoQuaVuotNguong > 0)
+        {
+            canhBao.Add(
+                $"Giữ nguyên {soBoQuaVuotNguong} polyline có khe lớn hơn {chinhSach.GapCloseToleranceMm}mm — " +
+                "khe lớn thường là thiếu hẳn một đoạn tuyến, tự nối là bịa hình học (phép kiểm 3 vẫn báo).");
+        }
+        if (soBoQuaItDinh > 0)
+        {
+            canhBao.Add(
+                $"Giữ nguyên {soBoQuaItDinh} polyline dưới 3 đỉnh — đóng lại chỉ tạo đoạn chồng lên chính nó.");
+        }
+        if (soDaTrungKhit > 0)
+        {
+            canhBao.Add(
+                $"Bỏ qua {soDaTrungKhit} polyline có hai đầu trùng khít nhưng chưa bật cờ Closed — " +
+                "bật cờ là quyết định của kỹ sư (ảnh hưởng hatch và phép đo diện tích), không chuẩn hóa im lặng.");
+        }
+
+        return new KeHoachDongPolyline
+        {
+            ThayDoi = thayDoi,
+            CanhBao = canhBao,
+            ChiBaoCao = chinhSach.ReportOnly,
+        };
+    }
+
+    // ===== (13) Quy block lạc chuẩn về thư viện — M102 §6.2 =====
+
+    /// <summary>
+    /// BlockReference mang tên khớp <c>aliasMatchAny</c> của một quy định → nên trỏ về block
+    /// <c>target</c> của thư viện. Bản đầu mặc định <c>reportOnly</c>: kế hoạch vẫn liệt kê đầy đủ
+    /// nhưng Adapter chỉ ghi báo cáo, KHÔNG thay (thay định nghĩa block là thao tác phá hủy).
+    ///
+    /// <para>Block nặc danh (<c>*U…</c>) không bao giờ có mặt trong kế hoạch — không có tên thật để
+    /// khớp alias; chúng vẫn được <c>purgePolicy.deepPurge.reportAnonymousBlocks</c> báo như cũ.</para>
+    /// </summary>
+    public static KeHoachBlock LapKeHoachBlock(BlockMapSection chinhSach, IReadOnlyList<BlockRefHienCo> blockRefs)
+    {
+        if (!chinhSach.Enabled || chinhSach.Rules.Count == 0) return new KeHoachBlock();
+
+        var thayDoi = new List<ThayDoiBlock>();
+        var canhBao = new List<string>();
+        var soNacDanh = 0;
+
+        foreach (var br in blockRefs)
+        {
+            if (br.LaNacDanh)
+            {
+                soNacDanh++;
+                continue;
+            }
+            var quyDinh = chinhSach.Rules.FirstOrDefault(q => TokenMatcher.MatchesAny(br.TenBlock, q.AliasMatchAny));
+            if (quyDinh is null) continue;
+            if (Bang(br.TenBlock, quyDinh.Target)) continue; // đã đúng chuẩn
+            thayDoi.Add(new ThayDoiBlock(br.Handle, br.TenBlock, quyDinh.Target));
+        }
+
+        if (soNacDanh > 0)
+        {
+            canhBao.Add(
+                $"Bỏ qua {soNacDanh} block nặc danh — không có tên để khớp quy định; xem phép kiểm block nặc danh.");
+        }
+        if (chinhSach.ReportOnly && thayDoi.Count > 0)
+        {
+            canhBao.Add(
+                $"Chỉ BÁO {thayDoi.Count} block lạc chuẩn, không thay: thay định nghĩa block làm mất attribute lệch tag " +
+                "và có thể lệch hình học — kỹ sư quyết từng trường hợp (blockMap.reportOnly).");
+        }
+
+        return new KeHoachBlock
+        {
+            ThayDoi = thayDoi,
+            CanhBao = canhBao,
+            ChiBaoCao = chinhSach.ReportOnly,
+        };
     }
 
     private static bool Bang(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);

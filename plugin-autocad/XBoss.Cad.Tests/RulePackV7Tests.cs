@@ -28,7 +28,8 @@ public class RulePackV7Tests
     public void V7_nap_duoc_va_khai_du_tham_so_de_bat_len_la_dung_ngay()
     {
         var pack = RepoPaths.LoadRulePack();
-        Assert.Equal("v7", pack.Version);
+        // Pack hiện hành kế thừa nguyên 3 khối của v7 (mọi version sau là mở rộng thuần).
+        Assert.Equal(RepoPaths.VersionHienHanh, pack.Version);
         Assert.Equal("relative", pack.XrefPolicy.PathPolicy);
         Assert.Empty(pack.XrefPolicy.BindMatchAny); // mặc định an toàn: không bind xref nào
         Assert.True(pack.LayoutPolicy.RemoveEmpty);

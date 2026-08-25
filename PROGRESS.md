@@ -67,6 +67,149 @@ AutoCAD (đặc tả `docs/nang-cap/M102-plugin-ui.md`, người dùng yêu cầ
 - **Còn nợ (chung M99–M101, cần máy Windows có AutoCAD 2026):** verify tay Ribbon/palette trên
   máy thật + đối chiếu chữ ký `AdWindows.dll` thật với stub.
 
+## Sửa quy ước auto-merge trong CLAUDE.md cho khớp thực tế (2026-08-25)
+
+Quy ước cũ ("mở PR xong bật auto-merge ngay") **không thi hành được**: GitHub từ chối
+`enable_pr_auto_merge` ở cả PR #398 lẫn #400, thử đủ 3 thời điểm (chưa có check → `clean`;
+checks đang chạy → `unstable`; đã xanh hết → `clean`). Nguyên nhân: repo **chưa đặt required
+status checks** cho `main` trong branch protection, mà auto-merge chỉ mở khi PR thực sự bị chặn
+bởi required checks. Tài liệu và hành vi thật lệch nhau → sửa tài liệu theo yêu cầu người dùng.
+
+- **Quy ước mới:** thử `enable_pr_auto_merge` trước, bị từ chối thì **merge `SQUASH` thẳng ngay
+  khi 100% checks xanh** — không coi việc bị từ chối là lỗi, không chờ hỏi lại. Tinh thần giữ
+  nguyên: trách nhiệm chất lượng dồn vào CI + tự kiểm trước push.
+- **Hai cái bẫy đã ghi vào CLAUDE.md để phiên sau không mất thời gian:** (1) `unstable` KHÔNG
+  phải "có check đỏ" dù thông báo lỗi ghi "required checks are failing" — nó chỉ nghĩa là "chưa
+  xanh hết", phải kiểm `get_check_runs` để phân biệt _đang chạy_ với _đỏ thật_, suýt đi sửa một
+  lỗi không tồn tại; (2) sự kiện webhook `check_suite.completed` có thể mang `head_sha` của
+  **commit cũ** — ở PR #398 có 3 sự kiện như vậy trên commit trước bản sửa, phải đối chiếu
+  `git rev-parse HEAD` trước khi kết luận CI đã xong.
+- **Đường lùi nếu muốn auto-merge thật:** bật required status checks cho `main` (Settings →
+  Branches) — thao tác trên GitHub, không làm được từ phiên này.
+
+## M102 ĐÓNG ĐỢT — merge PR #398, khép đợt plugin AutoCAD giai đoạn 2 (2026-08-25)
+
+`docs/nang-cap/M102-plugin-dong-tran-chuan-hoa.md` **xong cả 2 PR**, gộp một PR duy nhất
+(**#398**, squash `427bf5f`) vì PR1 chỉ là Core thuần còn PR2 là phần Adapter nối dây — tách đôi
+không kiểm chứng được gì thêm khi cả hai đều chưa chạy được cục bộ (không có .NET SDK).
+
+- **Trạng thái sau merge:** rule pack phát hành là **v8**, mọi khóa mới (`polylineClosePolicy`,
+  `blockMap`, phép kiểm 17/18) **mặc định tắt/`reportOnly`** ⇒ máy kỹ sư không đổi hành vi cho tới
+  khi bật từng khóa theo dự án. Không migration, không API mới, không đụng đường ghi sổ khối lượng.
+- **CI đỏ lượt đầu rồi xanh lượt hai** (14/14, gồm `plugin (dotnet Core/Tests)` và `plugin-shim`) —
+  nguyên nhân + cách sửa tận gốc ghi ở mục "M102 PR2" ngay dưới.
+- **Auto-merge không bật được, phải merge thẳng:** GitHub chỉ nhận `enable_pr_auto_merge` khi checks
+  còn _pending_; gọi lúc chưa check nào đăng ký thì trả "clean → merge thẳng đi", gọi lúc đã xanh
+  hết cũng vậy. Quy ước dự án (auto-merge cho mọi PR) nhắm tới kết quả "tự merge khi checks xanh"
+  nên merge squash trực tiếp là đúng ý định. **Lần sau muốn đi qua auto-merge thật thì phải bật
+  đúng cửa sổ checks đang chạy**, không phải ngay sau khi mở PR.
+
+**Đợt plugin AutoCAD giai đoạn 2 (M99 → M100 → M101 → M102) đã đóng toàn bộ về mặt code.** Việc còn
+lại của cả đợt là **một cổng duy nhất: verify tay trên máy có AutoCAD 2026** (không có runner
+Windows — M99 §18), gồm 8 lệnh M99 + 14 lệnh `XBOSS_VE_*` của M100 + các bước/phép kiểm mới của
+M101/M102 khi bật.
+
+**Tiếp theo (chưa có đặc tả, không tự làm khi chưa duyệt):** gán ngữ nghĩa sâu hơn (đồ thị kết nối
+tuyến–thiết bị) là bậc có đòn bẩy lớn nhất; sau đó phối hợp xung đột 2D liên hệ (combined services,
+cần cao độ đã khai trên đối tượng); các mục để lại ở M100 §20 (ngắt nét giao chéo, revision cloud,
+nhân bản tầng điển hình, riser). Mỗi mục phải mở `M<xx>` mới có duyệt trước khi code.
+
+## M102 PR2 — Adapter AutoCAD: bước chuẩn hóa 12/13 + quét tag cho phép kiểm 17 (2026-08-25)
+
+Thi hành `docs/nang-cap/M102-plugin-dong-tran-chuan-hoa.md` PR2 phần **Adapter** — nối dây Core PR1
+vào bản vẽ thật. Không đụng logic Core (chỉ thêm 2 hằng nhãn bước), **không đổi hành vi mặc định**:
+rule pack v8 phát hành có `polylineClosePolicy.enabled=false` và `blockMap.enabled=false` nên cả hai
+bước mới return sớm — chuẩn hóa cho kết quả y hệt v7.
+
+- **`plugin-autocad/XBoss.Cad.Acad/Services/StandardizePipeline.cs`**: thêm `Buoc12DongPolyline` +
+  `Buoc13BlockMap`, gọi ngay sau bước 11 trong `Run()` (thứ tự pipeline cố định, vẫn nằm trong 1
+  transaction ⇒ **1 lần UNDO** hoàn tác toàn bộ — FR3). Bước 12 chỉ gom polyline **hở**
+  (`Polyline`/`Polyline2d` chưa `Closed`), đo khe đầu–cuối theo đơn vị bản vẽ rồi để Core quy sang mm
+  bằng `DrawingUnits.TuInsUnits` như các bước trước; áp bằng đúng một thao tác `Closed = true` cho cả
+  `BatCoClosed` lẫn `NoiThemDoan` (AutoCAD tự nối đỉnh cuối về đỉnh đầu — hai giá trị enum chỉ khác
+  nhau ở phần báo cáo). Bước 13 đọc **định nghĩa gốc** qua `DynamicBlockTableRecord` để block động
+  không bị coi nhầm là nặc danh, và khi được phép sửa thật chỉ trỏ `BlockReference` sang ObjectId
+  block đích (vị trí/xoay/tỉ lệ giữ nguyên); block đích chưa có trong bản vẽ → bỏ qua + cảnh báo nêu
+  tên, **không tự tạo block rỗng**. `ChiBaoCao` (reportOnly) ⇒ tuyệt đối không sửa entity nào, chỉ
+  ghi `StepDiff` dạng "chỉ báo cáo" — áp cho cả hai bước.
+- **`plugin-autocad/XBoss.Cad.Acad/Services/DrawingSnapshotBuilder.cs`**: điền `DrawingSnapshot.Tags`
+  cho phép kiểm 17 — quét model space, chỉ nhận khối **có XData `XBOSS_VE`** (đọc qua
+  `VeXDataStore.Doc`, đúng cơ chế của `XBOSS_VE_TAG`) và có thẻ attribute `TAG` khác rỗng; "hệ" để so
+  trùng lấy layer của **tim liên kết** theo `HandleTim` trong XData, khối không gắn tim thì lấy layer
+  của chính khối. Không có tag nào → `Tags = null` ⇒ phép kiểm 17 tự tắt (không báo oan bản vẽ vẽ tay).
+- **`plugin-autocad/XBoss.Cad.AcadShim/AcadStub.cs`** (cổng CI biên dịch Adapter trên Linux): bổ sung
+  API mà bước 12/13 dùng nhưng stub còn thiếu — `Polyline2d` duyệt được + `Vertex2d` (đếm đỉnh), và
+  `BlockReference.BlockTableRecord` **có setter** như API thật. Thiếu ba thứ này thì CI đỏ ngay ở
+  bước biên dịch mà máy dev không có dotnet sẽ không thấy trước.
+- **Gộp trùng lặp phát hiện lúc review:** hằng thẻ `TAG` và vòng tìm attribute tag bị viết hai bản
+  (`VeTagCommands` và bản mới trong `DrawingSnapshotBuilder`) — đưa về `VeXDataStore.TheTag` /
+  `VeXDataStore.TagCua` dùng chung, để lệnh đánh tag và phép kiểm tag không thể trôi khỏi nhau.
+- **Chốt một điểm lệch đặc tả:** §6.2 bản nháp ghi bước 13 chạy "sau purge, trước lineweight/CTB",
+  nhưng thi hành đặt **nối đuôi sau bước 11** — chèn vào giữa buộc đánh lại số hiệu bước 7–11 đã đi
+  vào báo cáo JSON và tài liệu. Đổi lại: định nghĩa block cũ vừa mất tham chiếu sẽ còn nằm lại tới
+  lần chạy sau, nên báo cáo bước 13 nhắc chạy lại `XBOSS_CHUANHOA` (pipeline idempotent) để purge dọn
+  nốt. Đặc tả §6.2 đã sửa cho khớp code.
+- `plugin-autocad/README.md`: bảng lệnh ghi lại `XBOSS_CHUANHOA` **13 bước** và nêu phép kiểm 17/18.
+
+**CI đỏ ngay lượt đầu (PR #398) — bài học lặp lại:** 3 test C# hard-code `Assert.Equal("v7", ...)`
+trên rule pack ĐANG PHÁT HÀNH nên phát hành v8 làm chúng đỏ vì lý do không liên quan gì tới thứ
+chúng đang kiểm (`DrawToolsConfigTests` ×2, `InspectorTests`). Sửa tận gốc thay vì đổi số: thêm
+`RepoPaths.VersionHienHanh` (đọc version từ chính tệp rule pack) và thay mọi assert version của pack
+hiện hành sang hằng đó — kể cả 3 chỗ vừa viết `"v8"` trong PR1 (`RulePackLoaderTests` ×2,
+`RulePackV7Tests`) vốn sẽ đỏ y hệt khi lên v9. Giữ hard-code ở đúng hai loại test: nạp version CŨ để
+kiểm tương thích ngược (`RulePackV8Tests` nạp `v7.json`), và test đặc thù của chính version đang
+phát hành. **Container không có .NET SDK nên lớp lỗi này chỉ lộ ra ở CI** — với thay đổi C#, coi CI
+là cổng đầu tiên chứ không phải cổng cuối.
+
+**Chưa làm (đúng ràng buộc môi trường):** container không có dotnet nên phần C# chưa build/test cục
+bộ — dựa vào CI và checklist verify tay trên máy AutoCAD 2026 theo release (M99 §18).
+
+## M102 PR1 — Rule pack v8: đóng polyline gần kín, quy block lạc chuẩn, phép kiểm 17/18 (2026-08-25)
+
+Thi hành `docs/nang-cap/M102-plugin-dong-tran-chuan-hoa.md` PR1 — đóng 4 khoảng trống cuối của
+pipeline chuẩn hóa sau M99/M100/M101. **Không migration, không API mới, không UI mới**: toàn bộ nằm
+trong rule pack + Core thuần (test chạy được trên CI Linux).
+
+- **`lib/ky-thuat/cad/rule-packs/v8.json`** (mở rộng THUẦN từ v7 — phát hành = đổi đúng một dòng
+  import trong `rule-pack-hien-hanh.ts`): 2 khối chính sách mới `polylineClosePolicy` (bước 12) +
+  `blockMap` (bước 13), 2 phép kiểm mới `inspectionPolicy.tagDuplicate`/`boqCodeMissing` (số 17/18).
+  **Mọi khóa mới mặc định TẮT** (blockMap thêm `reportOnly: true` kể cả khi bật) → kiểm/chuẩn
+  hóa/bóc bằng v8 cho kết quả **y hệt v7** (AC7, có test cả 2 tầng).
+- **Sửa `layerMap.knownIssues`**: bỏ dòng "Không idempotent…" — nợ này **đã đóng ở M101 PR2** cả 2
+  tầng (`LayerMapper._daChuan`, `normalizeCadLayers`) nhưng tài liệu rule pack vẫn ghi là nợ chưa
+  đóng, đúng lớp lỗi "tài liệu lệch code" mà CLAUDE.md cảnh báo. Dòng knownIssues còn lại (khớp sai
+  hệ do thứ tự nhóm) giữ nguyên vì vẫn đúng hiện trạng. Kèm test canh bất biến ở **mức pipeline**
+  (trước chỉ có ở mức `LayerMapper`).
+- **Bước 12 — đóng polyline gần kín** (`ChuanHoaMoRong.LapKeHoachDongPolyline`, thuần): khe đầu–cuối
+  `0 < gap ≤ gapCloseToleranceMm` → đóng (2 đầu gần trùng thì chỉ bật cờ Closed, còn khe thấy được
+  thì nối thêm đúng một đoạn). **Khe LỚN hơn ngưỡng cố ý giữ nguyên** — đó thường là thiếu hẳn một
+  đoạn tuyến chứ không phải thiếu một cú click, tự nối là bịa hình học (phép kiểm 3 vẫn báo như cũ).
+  Polyline dưới 3 đỉnh cũng bỏ qua (đoạn nối chồng lên chính nó, làm hỏng phép đo dài). Ngưỡng khai
+  bằng mm nên quy đổi theo INSUNITS — có test bản vẽ vẽ bằng mét.
+- **Bước 13 — quy block lạc chuẩn về thư viện** (`LapKeHoachBlock`): tên block khớp `aliasMatchAny`
+  (ranh giới token, KHÔNG substring thô — cùng matcher với layerMap) → nên trỏ về block `target` của
+  thư viện 0139/M100. Bản đầu **chỉ BÁO**: thay định nghĩa block làm mất attribute lệch tag và có
+  thể lệch hình học, kỹ sư quyết từng trường hợp. Block nặc danh (`*U…`) không bao giờ có mặt trong
+  kế hoạch (không có tên thật để khớp) — vẫn do `deepPurge.reportAnonymousBlocks` báo.
+- **Phép kiểm 17 (tag trùng)**: hai tag `XBOSS_VE_TAG` cùng chuỗi trong **cùng hệ** (mỗi hệ đánh số
+  riêng từ 1 là quy ước bình thường, so trùng cả bản vẽ sẽ báo oan). Bản vẽ không có tag XData → tự
+  tắt. **Phép kiểm 18 (mã BOQ mồ côi)**: hạng mục takeoff có đối tượng trên bản vẽ mà `boqCode` rỗng
+  → báo ở **cấp hạng mục** (không marker từng đối tượng, lỗi nằm ở rule pack chứ không ở entity);
+  rule pack toàn cục (chưa gán mã theo dự án — M101 PR4) → tự tắt, không nhiễu.
+- **Validator 2 tầng chặt** (`RulePackLoader.ValidateChuanHoaV8`): bật bước mà khai thiếu → chặn
+  ngay lúc nạp; dữ liệu khai sai kiểm **cả khi tắt** (alias rỗng, alias trùng chính tên đích — sẽ
+  làm block đã chuẩn bị báo là lạc chuẩn, target khai trùng).
+- **Test**: 3 file xunit mới (`RulePackV8Tests`, `InspectorV8Tests`, `ChuanHoaV8Tests` — ca dương/âm/
+  tự-tắt cho từng phép, ca "v8 mặc định = v7"), 5 test node:test mới trong
+  `tests/engineering-cad-rule-pack.test.ts`. Bộ đối chứng 2 tầng sinh lại bằng
+  `npm run cad:doi-chung` — **chỉ đổi đúng dòng version, kết quả kỳ vọng không đổi**, tức bằng chứng
+  v8 không làm trôi quy tắc. Vá thêm một test vô hiệu: ca "bỏ qua field không biết" tìm chuỗi
+  `"version": "v6"` trên tệp v7 nên không chèn được field lạ nào mà vẫn xanh.
+- **Cổng đã chạy**: lint, typecheck, `npm test` (864 pass / 0 fail), `check:lib-layers`,
+  `check:dead-code`, `npm run build` — đều xanh. `dotnet test` chạy trên CI (container không có SDK).
+- **Chưa làm (PR2)**: Adapter thi hành bước 12/13 trong `StandardizePipeline.cs` + quét tag XData cho
+  phép kiểm 17 — Core đã trả kế hoạch sẵn, Adapter chỉ còn việc áp và đếm diff.
+
 ## M101 PR4 — `boqCode` theo dự án + đối chiếu BOQ chỉ-đọc (2026-08-25)
 
 Đóng 2 dòng cuối bảng `docs/nang-cap/M101-plugin-nang-tran.md` §6.3: QS không phải gõ tay cột A của

@@ -111,6 +111,78 @@ public static class RulePackLoader
 
         ValidatePhepKiemV5(pack);
         ValidateChuanHoaV7(pack);
+        ValidateChuanHoaV8(pack);
+    }
+
+    /// <summary>
+    /// Kiểm 2 khối chính sách của bước chuẩn hóa 12/13 (M102 §6.1/§6.2 — v8). Cùng nguyên tắc với
+    /// <see cref="ValidateChuanHoaV7"/>: rule pack ≤ v7 không khai khối nào → mặc định tắt → không
+    /// ném gì; bước đang bật mà khai thiếu thì chặn ngay lúc nạp; dữ liệu khai sai (quy định
+    /// blockMap) kiểm CẢ KHI TẮT để sai sót lộ ra trước ngày công ty bật lên.
+    /// </summary>
+    private static void ValidateChuanHoaV8(CadRulePack pack)
+    {
+        // ----- Bước 12: đóng polyline gần kín -----
+        var pc = pack.PolylineClosePolicy;
+        if (pc.GapCloseToleranceMm < 0)
+            throw new RulePackException("polylineClosePolicy.gapCloseToleranceMm không được âm.");
+        if (pc.Enabled && pc.GapCloseToleranceMm <= 0)
+        {
+            throw new RulePackException(
+                "polylineClosePolicy đang bật nhưng gapCloseToleranceMm = 0 — bước 12 sẽ chạy mà không đóng được polyline nào.");
+        }
+        foreach (var tu in pc.OnlyOnLayersMatchAny)
+        {
+            if (string.IsNullOrWhiteSpace(tu))
+                throw new RulePackException("polylineClosePolicy.onlyOnLayersMatchAny có từ khóa rỗng — sẽ khớp mọi layer ngoài ý muốn.");
+        }
+
+        // ----- Bước 13: quy block lạc chuẩn về thư viện -----
+        var bm = pack.BlockMap;
+        if (bm.Enabled && bm.Rules.Count == 0)
+        {
+            throw new RulePackException(
+                "blockMap đang bật nhưng rules rỗng — bước 13 sẽ chạy mà không quy được block nào. Khai bộ block chuẩn của công ty rồi phát hành lại.");
+        }
+        var dichDaKhai = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var quyDinh in bm.Rules)
+        {
+            if (string.IsNullOrWhiteSpace(quyDinh.Target))
+                throw new RulePackException("blockMap.rules có quy định thiếu target (tên block trong thư viện).");
+            if (quyDinh.AliasMatchAny.Count == 0)
+                throw new RulePackException($"blockMap.rules quy định \"{quyDinh.Target}\" thiếu aliasMatchAny.");
+            foreach (var alias in quyDinh.AliasMatchAny)
+            {
+                if (string.IsNullOrWhiteSpace(alias))
+                    throw new RulePackException($"blockMap.rules quy định \"{quyDinh.Target}\" có alias rỗng — sẽ khớp mọi block.");
+                // Alias trùng chính tên đích thì mọi block đã chuẩn cũng bị coi là lạc chuẩn (báo oan
+                // vô tận, và khi bật sửa thật là tự thay chính nó) — chặn ngay ở đây.
+                if (string.Equals(alias, quyDinh.Target, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new RulePackException(
+                        $"blockMap.rules quy định \"{quyDinh.Target}\": alias trùng chính tên đích — block đã chuẩn sẽ bị báo là lạc chuẩn.");
+                }
+            }
+            if (!dichDaKhai.Add(quyDinh.Target))
+                throw new RulePackException($"blockMap.rules khai trùng target \"{quyDinh.Target}\".");
+        }
+
+        // Alias trùng nhau GIỮA hai quy định: LapKeHoachBlock lấy quy định khớp ĐẦU TIÊN, nên block
+        // sẽ về đích nào là do thứ tự khai quyết định — im lặng và rất khó truy. Chặn ngay ở đây.
+        var aliasDaKhai = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var quyDinh in bm.Rules)
+        {
+            foreach (var alias in quyDinh.AliasMatchAny)
+            {
+                if (aliasDaKhai.TryGetValue(alias, out var dichTruoc))
+                {
+                    throw new RulePackException(
+                        $"blockMap.rules khai alias \"{alias}\" ở cả \"{dichTruoc}\" lẫn \"{quyDinh.Target}\" — " +
+                        "block khớp cả hai sẽ về đích nào là do thứ tự khai, không tường minh.");
+                }
+                aliasDaKhai[alias] = quyDinh.Target;
+            }
+        }
     }
 
     /// <summary>

@@ -33,7 +33,12 @@ export const CURRENT_RULE_PACK_VERSION = RULE_PACK_HIEN_HANH.version;
  * giá đỡ tại chỗ (M100 §6.7 — trước v7 XBOSS_VE_GIADO phải hỏi kỹ sư mỗi lần chạy).
  * v7 = v6 + 3 khối chính sách cho 4 bước chuẩn hóa mới của XBOSS_CHUANHOA (M101 §6.2 bước 8–11):
  * xrefPolicy, hatchMap, layoutPolicy. Bước 8 (style map) dùng lại khối styleMap đã có từ v5 nên
- * KHÔNG khai trùng. Cả 3 khối mới `enabled: false` → chuẩn hóa bằng v7 cho kết quả y hệt v6.
+ * KHÔNG khai trùng. Cả 3 khối mới `enabled: false` → chuẩn hóa bằng v7 cho kết quả y hệt v6;
+ * v8 = v7 + 2 phép kiểm mới của XBOSS_KIEMTRA (M102 §6.4/§6.5: `tagDuplicate` số 17, `boqCodeMissing`
+ * số 18 — cả hai còn TỰ TẮT khi thiếu dữ liệu, không chỉ theo cờ `enabled`) + 2 khối chính sách cho
+ * bước chuẩn hóa 12/13 (`polylineClosePolicy` đóng polyline gần kín, `blockMap` quy block lạc chuẩn
+ * về thư viện block 0139). Mọi khóa mới mặc định tắt → v8 cho kết quả y hệt v7. Kèm sửa
+ * `layerMap.knownIssues`: nợ "không idempotent" đã đóng ở M101 PR2 nhưng mô tả cũ còn ghi là nợ.
  */
 export function getCurrentRulePack(): CadRulePack {
   return RULE_PACK_HIEN_HANH;

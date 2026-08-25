@@ -217,12 +217,16 @@ Parse file tracking gốc (sheet OGTĐ/OGHL/OGCH/ODNN) thành WBS — chứa log
 - Khi thêm API route mới: luôn có check auth + `export const dynamic = "force-dynamic"`.
 - TypeScript strict, import nội bộ qua alias `@/*`, tránh `any` tuỳ tiện.
 - SQL luôn dùng helper `lib/db` với placeholder `?` — **không nối chuỗi để chèn giá trị**.
-- **Auto-merge: BẬT cho MỌI PR** (quyết định 2026-08-25 của người dùng — "quy ước sẽ luôn bật auto merge cho mọi pr"). Mở PR xong là bật auto-merge ngay (`enable_pr_auto_merge`, merge method `SQUASH`), không chờ hỏi lại. PR sẽ tự merge khi required checks xanh — nghĩa là **trách nhiệm chất lượng dồn hết vào CI + phần tự kiểm trước khi push**: chạy đủ cổng ở mục "Definition of Done" bên dưới TRƯỚC khi mở PR, đừng dựa vào "để review bắt". Nếu lúc bật gặp trạng thái `unstable` (checks còn đang chạy) thì đợi checks xong rồi bật lại, đừng bỏ qua.
+- **Merge NGAY khi CI xanh, không chờ hỏi lại** (quyết định 2026-08-25: "quy ước sẽ luôn bật auto merge cho mọi pr", sửa lại cùng ngày cho khớp thực tế — xem ghi chú dưới). Mở PR xong thì theo dõi checks; **đủ 100% checks `success` là merge `SQUASH` ngay**, không đợi người duyệt. Ý nghĩa không đổi so với bản cũ: **trách nhiệm chất lượng dồn hết vào CI + phần tự kiểm trước khi push** — chạy đủ cổng ở mục "Definition of Done" bên dưới TRƯỚC khi mở PR, đừng dựa vào "để review bắt".
+  - **Thử `enable_pr_auto_merge` trước; bị từ chối thì merge thẳng, KHÔNG coi là lỗi.** Repo hiện **chưa đặt required status checks** cho `main` trong branch protection, nên GitHub không mở đường auto-merge ở bất kỳ thời điểm nào: gọi lúc chưa check nào đăng ký → `clean` ("merge thẳng đi"), gọi lúc checks đang chạy → `unstable`, gọi lúc đã xanh hết → lại `clean`. Đã thử đủ 3 thời điểm ở PR #398 và #400.
+  - **`unstable` KHÔNG có nghĩa là có check đỏ**, dù thông báo lỗi của công cụ ghi "required checks are failing" — nó chỉ có nghĩa "chưa xanh hết". Luôn kiểm `get_check_runs` để phân biệt _đang chạy_ với _đỏ thật_, đừng đi sửa một lỗi không tồn tại.
+  - **Chờ đủ mọi check, đừng merge sớm.** `test (Postgres)` và 3 nhánh `e2e` là các job lâu nhất (~6–8 phút); rollup `ci`/`e2e` chỉ xanh sau khi các job con xong. Sự kiện webhook `check_suite.completed` có thể mang `head_sha` của **commit cũ** — đối chiếu với `git rev-parse HEAD` trước khi kết luận.
+  - Muốn auto-merge chạy thật đúng nghĩa thì phải bật **required status checks** cho `main` (Settings → Branches). Chừng nào chưa bật, quy ước là merge tay khi CI xanh như trên.
 - **Tiền tệ (M45 PR1):** parser oid 1700 (`lib/db/index.ts`) chuyển NUMERIC → `parseFloat` nên **cấm cộng/nhân tiền trên float JS**. Mọi tổng/tích tiền (`SUM`, `* rate`) làm **trong SQL**; JS chỉ hiển thị. Khi buộc phải tính tiếp ở JS (vd tỷ lệ VAT/tạm ứng/giữ lại), cast cột tiền `::text` trong SELECT rồi đưa qua `lib/nen/money.ts` (`parseMoney`/`addMoney`/`mulRate`/`formatVnd` — làm việc trên bigint đơn vị nhỏ = đồng×100).
 
 ## Quy trình & Definition of Done
 
-Luồng chuẩn: hiểu yêu cầu → khám phá & tái dùng → code → cập nhật test khi đổi logic → `npm run lint` + `npm run typecheck` (+ `npm test` khi có thể) → **cập nhật `PROGRESS.md` (và `docs/nang-cap/README.md` nếu đóng/mở 1 mục `M<xx>`)** → commit → push branch → mở **PR** → **bật auto-merge ngay** (xem Quy ước).
+Luồng chuẩn: hiểu yêu cầu → khám phá & tái dùng → code → cập nhật test khi đổi logic → `npm run lint` + `npm run typecheck` (+ `npm test` khi có thể) → **cập nhật `PROGRESS.md` (và `docs/nang-cap/README.md` nếu đóng/mở 1 mục `M<xx>`)** → commit → push branch → mở **PR** → **merge ngay khi CI xanh** (xem Quy ước).
 
 Trước khi push, đảm bảo:
 

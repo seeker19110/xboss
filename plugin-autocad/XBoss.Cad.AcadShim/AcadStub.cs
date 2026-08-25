@@ -300,7 +300,10 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public Scale3d ScaleFactors { get; set; }
         public Matrix3d BlockTransform => new Matrix3d();
         public ObjectId DynamicBlockTableRecord => new ObjectId();
-        public ObjectId BlockTableRecord => new ObjectId();
+
+        /// <summary>Có setter đúng như API thật: bước chuẩn hóa 13 trỏ khối chèn sang định nghĩa
+        /// block chuẩn mà giữ nguyên vị trí/xoay/tỉ lệ (M102 §6.2).</summary>
+        public ObjectId BlockTableRecord { get; set; }
         public AttributeCollection AttributeCollection => new AttributeCollection();
     }
 
@@ -510,8 +513,15 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public double Length => 0;
     }
 
-    /// <summary>Polyline "nặng" 2D (kiểu cũ) — Adapter chỉ dùng để nhận dạng qua pattern match.</summary>
-    public class Polyline2d : Curve { }
+    /// <summary>
+    /// Polyline "nặng" 2D (kiểu cũ) — duyệt được để đếm đỉnh (<see cref="Vertex2d"/>), bước chuẩn
+    /// hóa 12 dùng để biết polyline có đủ 3 đỉnh mà đóng không (M102 §6.1).
+    /// </summary>
+    public class Polyline2d : Curve, IEnumerable<ObjectId>
+    {
+        public IEnumerator<ObjectId> GetEnumerator() => new List<ObjectId>().GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
 
     /// <summary>Polyline 3D — duyệt được để lấy ObjectId của từng đỉnh (PolylineVertex3d).</summary>
     public class Polyline3d : Curve, IEnumerable<ObjectId>
@@ -523,6 +533,12 @@ namespace Autodesk.AutoCAD.DatabaseServices
     public class Vertex : Entity { }
 
     public class PolylineVertex3d : Vertex
+    {
+        public Point3d Position { get; set; }
+    }
+
+    /// <summary>Đỉnh của <see cref="Polyline2d"/> — Adapter chỉ dùng để nhận dạng khi đếm đỉnh.</summary>
+    public class Vertex2d : Vertex
     {
         public Point3d Position { get; set; }
     }
