@@ -10,22 +10,26 @@ import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE
 // (2) Integration (TEST_DATABASE_URL, tự skip): listCadDiffSessions/saveCadDiffSession và
 //     listCadBlockCatalogs — round-trip qua role superuser (đúng cách phần lớn test khác trong
 //     repo chạy, xem tests/setup.ts).
-// (3) RLS — PHÁT HIỆN NGHI VẤN LỖI SẢN PHẨM (báo cáo, KHÔNG sửa code sản phẩm ở đây):
-//     `engineering_cad_diff_sessions` và `engineering_cad_block_catalogs` (migrations/0099) bật
-//     FORCE ROW LEVEL SECURITY với policy KHÔNG có nhánh "GUC rỗng thì cho qua" (khác 11 bảng của
-//     migrations/0069_rls.sql — xem chú thích PR2 "khoá cửa" ở đó). Nhưng `listCadDiffSessions`,
-//     `saveCadDiffSession`, `listCadBlockCatalogs` (lib/ky-thuat/engineering-cad-skills.ts) gọi
-//     `query`/`queryOne` TRỰC TIẾP, KHÔNG bọc `withProjectScope` như lib/ky-thuat/cad/boq-map.ts
-//     đã làm đúng (xem comment "truy vấn ở đây bọc withProjectScope: thiếu GUC là policy chặn
-//     sạch" tại đầu file đó). Trên production, DATABASE_URL trỏ role `xboss_app`
-//     (NOBYPASSRLS, migrations/0069) — nghĩa là mọi lời gọi 3 hàm trên đều chạy NGOÀI transaction
-//     có set `app.project_id`, nên `current_setting('app.project_id', true)` luôn rỗng → policy
-//     luôn CHẶN: GET /diff và GET /blocks LUÔN trả mảng rỗng dù DB có dữ liệu, và INSERT của
-//     saveCadDiffSession LUÔN thất bại (bị route POST /diff nuốt lỗi ở khối try/catch
-//     "Non-blocking nếu DB save lỗi" nên không lộ ra ngoài — chỉ lặng lẽ không lưu). Test dưới
-//     tái hiện đúng kịch bản (kết nối bằng role `xboss_app`, KHÔNG set GUC) để chứng minh —
-//     test PASS vì đây là hành vi RLS THẬT của Postgres (không phải bug ở Postgres), nhưng
-//     đúng là hệ quả của việc 2 hàm ghi/đọc kia thiếu withProjectScope.
+// (3) RLS — ĐÃ VÁ (trước đó là lỗi thật): `engineering_cad_diff_sessions` và
+//     `engineering_cad_block_catalogs` (migrations/0099) bật FORCE ROW LEVEL SECURITY với policy
+//     KHÔNG có nhánh "GUC rỗng thì cho qua" (khác 11 bảng của migrations/0069_rls.sql). Trước bản
+//     vá này, `listCadDiffSessions`/`saveCadDiffSession`/`listCadBlockCatalogs`
+//     (lib/ky-thuat/engineering-cad-skills.ts) gọi `query`/`queryOne` TRỰC TIẾP, KHÔNG bọc
+//     `withProjectScope` như lib/ky-thuat/cad/boq-map.ts đã làm đúng — trên production
+//     (DATABASE_URL trỏ role `xboss_app`, NOBYPASSRLS) nghĩa là GET /diff, GET /blocks luôn trả
+//     rỗng và INSERT của saveCadDiffSession luôn thất bại âm thầm. Ba hàm trên nay đã bọc
+//     `withProjectScope` (đặt `set_config('app.project_id', ...)` trong transaction trước khi
+//     chạy SQL — đúng cơ chế `lib/db` dùng cho mọi bảng RLS). Vì pool kết nối của `lib/db` là
+//     singleton (`globalThis.__xbossPool`, khởi tạo 1 lần theo `DATABASE_URL` của tiến trình
+//     test — luôn là role owner/superuser để chạy migration), không thể ép các hàm thư viện tự
+//     chạy qua kết nối role `xboss_app` trong cùng tiến trình test. Test dưới dùng đúng khuôn đã
+//     có sẵn trong repo cho việc này (`tests/cad-boq-map.test.ts`, ca "RLS cad_takeoff_boq_map"):
+//     mở 1 `Pool` riêng bằng role `xboss_app`, phát lại NGUYÊN VĂN các câu SQL mà 3 hàm trên chạy
+//     kèm đúng bước `withProjectScope` thật sự làm (BEGIN → set_config('app.project_id', ...) →
+//     chạy SQL) để chứng minh: có GUC đúng dự án → đọc/ghi được đúng dữ liệu của dự án đó, KHÔNG
+//     thấy/không ghi lẫn dữ liệu dự án khác (kiểm cả hai chiều A↔B); còn thiếu GUC (hành vi CŨ
+//     trước khi vá) vẫn bị policy chặn sạch — giữ lại ca này làm lưới an toàn hồi quy, phòng ai
+//     đó lỡ gỡ `withProjectScope` ra sau này.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -219,12 +223,137 @@ test("listCadBlockCatalogs: lọc đúng dự án, sắp theo block_name ASC", S
   assert.ok(ds.every((d) => d.project_id === DU_AN_A));
 });
 
-// ===== (3) RLS — chứng minh nghi vấn thiếu withProjectScope (xem ghi chú đầu file) =====
+// ===== (3) RLS — chứng minh withProjectScope đã vá đúng (xem ghi chú đầu file) =====
+
+test(
+  "RLS engineering_cad_diff_sessions/engineering_cad_block_catalogs qua role xboss_app: có GUC " +
+    "app.project_id đúng dự án (như withProjectScope nay tự đặt) → ghi/đọc đúng dữ liệu dự án " +
+    "mình, KHÔNG thấy/không ghi lẫn dữ liệu dự án khác (kiểm cả hai chiều A↔B)",
+  S,
+  async () => {
+    const { run } = await import("@/lib/db");
+    await run(`DELETE FROM engineering_cad_block_catalogs WHERE block_name LIKE 'RLS-PROBE-%'`);
+    await run(`DELETE FROM engineering_cad_diff_sessions WHERE project_id IN (?, ?)`, DU_AN_A, DU_AN_B);
+
+    const u = new URL(process.env.TEST_DATABASE_URL as string);
+    u.username = "xboss_app";
+    u.password = "CHANGE_ME_ON_DEPLOY";
+    const pool = new Pool({ connectionString: u.toString(), max: 2 });
+    try {
+      // Phát lại đúng khuôn withProjectScope thật (lib/db): BEGIN → set_config('app.project_id',
+      // ..., true) LOCAL → chạy SQL → COMMIT/ROLLBACK. `readOnly` mô phỏng tham số
+      // `withProjectScope(..., { readOnly })` — mặc định true (đọc), false cho đường ghi.
+      const chay = async <T>(
+        projectId: number,
+        readOnly: boolean,
+        fn: (c: import("pg").PoolClient) => Promise<T>,
+      ) => {
+        const c = await pool.connect();
+        try {
+          await c.query("BEGIN");
+          if (readOnly) await c.query("SET TRANSACTION READ ONLY");
+          await c.query("SELECT set_config('app.project_id', $1, true)", [String(projectId)]);
+          const r = await fn(c);
+          await c.query(readOnly ? "ROLLBACK" : "COMMIT");
+          return r;
+        } catch (err) {
+          await c.query("ROLLBACK").catch(() => {});
+          throw err;
+        } finally {
+          c.release();
+        }
+      };
+
+      // --- Ghi (mô phỏng saveCadDiffSession + INSERT block catalog) ---
+      const savedA = await chay(DU_AN_A, false, (c) =>
+        c.query<{ id: string }>(
+          `INSERT INTO engineering_cad_diff_sessions (
+             project_id, total_entities_base, total_entities_compare,
+             diff_summary, diff_details, potential_vo_impact
+           ) VALUES ($1, 0, 0, '{}'::jsonb, '[]'::jsonb, '{}'::jsonb) RETURNING id`,
+          [DU_AN_A],
+        ),
+      );
+      assert.equal(savedA.rowCount, 1, "ghi phiên diff với GUC đúng dự án phải THÀNH CÔNG");
+      const idPhienA = savedA.rows[0].id;
+
+      await chay(DU_AN_A, false, (c) =>
+        c.query(
+          `INSERT INTO engineering_cad_block_catalogs (project_id, block_name, discipline, category)
+           VALUES ($1, 'RLS-PROBE-A', 'hvac', 'duct')`,
+          [DU_AN_A],
+        ),
+      );
+      await chay(DU_AN_B, false, (c) =>
+        c.query(
+          `INSERT INTO engineering_cad_block_catalogs (project_id, block_name, discipline, category)
+           VALUES ($1, 'RLS-PROBE-B', 'plumbing', 'valve')`,
+          [DU_AN_B],
+        ),
+      );
+
+      // --- Đọc chiều A: thấy đúng dữ liệu A, KHÔNG thấy dữ liệu B ---
+      const diffA = await chay(DU_AN_A, true, (c) =>
+        c.query(`SELECT id FROM engineering_cad_diff_sessions WHERE project_id = $1`, [DU_AN_A]),
+      );
+      assert.ok(
+        diffA.rows.some((r) => r.id === idPhienA),
+        "listCadDiffSessions với GUC dự án A phải thấy phiên vừa lưu của A",
+      );
+
+      const blocksA = await chay(DU_AN_A, true, (c) =>
+        c.query(
+          `SELECT block_name FROM engineering_cad_block_catalogs
+            WHERE project_id = $1 AND block_name LIKE 'RLS-PROBE-%'`,
+          [DU_AN_A],
+        ),
+      );
+      assert.deepEqual(
+        blocksA.rows.map((r) => r.block_name),
+        ["RLS-PROBE-A"],
+        "GUC dự án A không được lẫn block của dự án B",
+      );
+
+      // --- Đọc chiều B: chỉ thấy dữ liệu B, KHÔNG thấy dữ liệu A (chiều ngược lại) ---
+      const blocksB = await chay(DU_AN_B, true, (c) =>
+        c.query(
+          `SELECT block_name FROM engineering_cad_block_catalogs
+            WHERE project_id = $1 AND block_name LIKE 'RLS-PROBE-%'`,
+          [DU_AN_B],
+        ),
+      );
+      assert.deepEqual(
+        blocksB.rows.map((r) => r.block_name),
+        ["RLS-PROBE-B"],
+        "GUC dự án B không được lẫn block của dự án A",
+      );
+
+      // WITH CHECK: đang ở ngữ cảnh dự án A mà cố ghi dòng gắn project_id = B → bị chặn.
+      await assert.rejects(
+        () =>
+          chay(DU_AN_A, false, (c) =>
+            c.query(
+              `INSERT INTO engineering_cad_block_catalogs (project_id, block_name, discipline, category)
+               VALUES ($1, 'RLS-PROBE-GHI-LAU', 'hvac', 'duct')`,
+              [DU_AN_B],
+            ),
+          ),
+        /row-level security/i,
+        "ghi chéo dự án (GUC=A, project_id=B) phải bị RLS WITH CHECK chặn",
+      );
+    } finally {
+      await pool.end();
+    }
+
+    await run(`DELETE FROM engineering_cad_block_catalogs WHERE block_name LIKE 'RLS-PROBE-%'`);
+    await run(`DELETE FROM engineering_cad_diff_sessions WHERE project_id IN (?, ?)`, DU_AN_A, DU_AN_B);
+  },
+);
 
 test(
   "RLS engineering_cad_diff_sessions/engineering_cad_block_catalogs: role ứng dụng KHÔNG set " +
-    "GUC app.project_id (đúng như cách listCadDiffSessions/saveCadDiffSession/listCadBlockCatalogs " +
-    "hiện gọi) → SELECT trả rỗng và INSERT bị chặn, dù có dữ liệu thật trong bảng",
+    "GUC app.project_id (hành vi CŨ trước khi vá withProjectScope) → SELECT trả rỗng và INSERT " +
+    "bị chặn, dù có dữ liệu thật trong bảng — lưới an toàn hồi quy, phòng ai gỡ withProjectScope",
   S,
   async () => {
     const { run, insertId } = await import("@/lib/db");
@@ -234,11 +363,6 @@ test(
        VALUES (?, 'RLS-PROBE-BLOCK', 'hvac', 'duct')`,
       DU_AN_A,
     );
-    const { computeCadVectorDiff, saveCadDiffSession } = await import(
-      "@/lib/ky-thuat/engineering-cad-skills"
-    );
-    const diffRong = computeCadVectorDiff([], [], 5);
-    await saveCadDiffSession(DU_AN_A, null, null, diffRong, U); // ghi bằng superuser (bypass RLS)
 
     const u = new URL(process.env.TEST_DATABASE_URL as string);
     u.username = "xboss_app";
@@ -247,8 +371,8 @@ test(
     try {
       const client = await pool.connect();
       try {
-        // KHÔNG set_config('app.project_id', ...) — đúng như listCadDiffSessions/
-        // listCadBlockCatalogs gọi `query()` trực tiếp ngoài withProjectScope trong sản phẩm.
+        // KHÔNG set_config('app.project_id', ...) — mô phỏng đúng cách gọi query()/queryOne()
+        // TRỰC TIẾP như trước khi vá (không bọc withProjectScope).
         const catalogRows = await client.query(
           `SELECT 1 FROM engineering_cad_block_catalogs WHERE block_name = 'RLS-PROBE-BLOCK'`,
         );
@@ -258,12 +382,6 @@ test(
           "policy KHÔNG có nhánh 'GUC rỗng thì cho qua' — SELECT thiếu GUC phải trả RỖNG dù có dữ liệu",
         );
 
-        const diffRows = await client.query(
-          `SELECT 1 FROM engineering_cad_diff_sessions WHERE project_id = $1`,
-          [DU_AN_A],
-        );
-        assert.equal(diffRows.rowCount, 0, "GET /diff qua listCadDiffSessions sẽ trả mảng rỗng oan");
-
         await assert.rejects(
           () =>
             client.query(
@@ -272,7 +390,7 @@ test(
               [DU_AN_A],
             ),
           /row-level security/i,
-          "INSERT thiếu GUC (đúng như saveCadDiffSession/listCadBlockCatalogs gọi) phải bị RLS chặn",
+          "INSERT thiếu GUC phải bị RLS chặn",
         );
       } finally {
         client.release();
