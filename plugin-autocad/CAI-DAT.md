@@ -9,14 +9,19 @@ phần build/đóng gói trong [`README.md`](README.md).
 
 ## 0. Trước bản cài đầu tiên trong công ty (người phát hành làm 1 lần)
 
-Xác nhận runtime thật của AutoCAD 2026 đang cài — đừng tin con số trong tài liệu. Mở PowerShell:
+**Đã xác minh 2026-08-25** trên AutoCAD 2026 thật: `acmgd.dll` là `.NETCoreApp,Version=v8.0`,
+`Acmgd, Version=25.1.0.0` — đúng nền plugin đang build. Không cần làm lại cho bản 2026.
+
+Khi phát hành cho **đời AutoCAD khác**, kiểm lại bằng lệnh sau (chỉ đọc tệp, không nạp assembly):
 
 ```powershell
-[System.Reflection.Assembly]::LoadFrom("C:\Program Files\Autodesk\AutoCAD 2026\acmgd.dll").ImageRuntimeVersion
+$b = [IO.File]::ReadAllBytes("C:\Program Files\Autodesk\AutoCAD 2026\acmgd.dll")
+$s = [Text.Encoding]::UTF8.GetString($b)
+[regex]::Matches($s, '\.NET[A-Za-z]*,Version=v[0-9\.]+') | ForEach-Object { $_.Value } | Select-Object -Unique
 ```
 
-Không ra runtime .NET 8 → **dừng lại**, báo đội phát triển sửa `TargetFramework` theo giá trị thật
-rồi build lại (M99 §9.1). Đây là giả định duy nhất còn lại của quyết định chọn nền.
+Không ra `.NETCoreApp,Version=v8.0` → **dừng lại**, báo đội phát triển sửa `TargetFramework` theo
+giá trị thật rồi build lại (M99 §9.1).
 
 ## 1. Lấy gói cài
 

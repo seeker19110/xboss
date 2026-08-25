@@ -492,6 +492,24 @@ dùng duyệt hướng xử lý.
 - **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
   M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
 
+## M99 §9.1 — xác minh runtime AutoCAD 2026 trên máy thật: assumption cuối cùng ĐÃ ĐÓNG (2026-08-25)
+
+Người dùng chạy trên máy Windows có license AutoCAD 2026 (theo hướng dẫn phần Windows của PR7):
+
+- `dotnet test XBoss.Cad.Tests` → **92/92 pass** (89 ca cũ + 3 ca `DoiChungHaiTangTests` của PR7a) —
+  xác nhận lại phần C# mà phiên làm PR7a không biên dịch được cục bộ (container không có .NET SDK).
+- `acmgd.dll` của AutoCAD 2026 = **`.NETCoreApp,Version=v8.0`**, assembly **`Acmgd 25.1.0.0`** →
+  đúng nền `net8.0` mà `XBoss.Cad.Acad` đang build, và đúng hằng `PluginExtension.AcadVer2026 = "25.1"`.
+  **Assumption duy nhất còn lại của quyết định §9.1 đã đóng**, không phải sửa `TargetFramework`.
+- **Bài học ghi lại trong 3 tài liệu:** lệnh `[Reflection.Assembly]::LoadFrom(...).ImageRuntimeVersion`
+  trong bản đặc tả cũ **không chạy được trên Windows PowerShell 5.1** — 5.1 nền .NET Framework 4.8 nên
+  ném `BadImageFormatException` khi nạp assembly .NET 8 (bản thân lỗi đó cũng là dấu hiệu nền .NET 8,
+  nhưng không đọc ra con số). Thay bằng lệnh đọc thẳng chuỗi TargetFramework trong tệp, không nạp
+  assembly — chạy được trên cả 5.1 lẫn PowerShell 7. Đã cập nhật M99 §9.1/§18/§19,
+  `plugin-autocad/README.md`, `plugin-autocad/CAI-DAT.md`.
+- **Còn lại của PR7b:** chạy bộ bản vẽ mẫu qua `accoreconsole` kiểm AC1–AC4, AC9–AC13; đối chứng AC6
+  phần hình học; UAT với QS.
+
 ## M99 PR7a — Đối chứng 2 tầng (AC6, phần không cần AutoCAD) + bộ bản vẽ mẫu + tài liệu cài đặt (2026-08-25)
 
 Người dùng "ok làm luôn" sau khi chốt tách PR7 làm hai: **PR7a** chạy được trên CI Linux, **PR7b**

@@ -212,13 +212,24 @@ Lý do chọn 2026:
 
 **Nguyên tắc build:** tham chiếu SDK đúng đời 2026. Managed API tương thích tiến, không tương thích lùi — build trên SDK mới rồi chạy trên AutoCAD cũ hơn sẽ hỏng.
 
-> **Việc phải làm trước khi phát hành bản cài đầu tiên (1 lệnh):** xác nhận runtime thật của bản AutoCAD 2026 đang cài, đừng tin con số trong tài liệu này. Trên máy có AutoCAD:
+> **✅ ĐÃ XÁC MINH TRÊN MÁY THẬT (2026-08-25):** AutoCAD 2026 cài trên máy người dùng cho
+> `acmgd.dll` mang `.NETCoreApp,Version=v8.0` và `Acmgd, Version=25.1.0.0` — **đúng .NET 8 và đúng
+> ACADVER 25.1** như quyết định §9.1 giả định. `TargetFramework net8.0*` giữ nguyên, hằng
+> `PluginExtension.AcadVer2026 = "25.1"` đúng. Assumption cuối cùng của quyết định này **đã đóng**.
+>
+> Lệnh dùng để xác minh (đọc thẳng chuỗi TargetFramework trong tệp, không nạp assembly — cách này
+> chạy được cả trên Windows PowerShell 5.1):
 >
 > ```powershell
-> [System.Reflection.Assembly]::LoadFrom("C:\Program Files\Autodesk\AutoCAD 2026\acmgd.dll").ImageRuntimeVersion
+> $b = [IO.File]::ReadAllBytes("C:\Program Files\Autodesk\AutoCAD 2026\acmgd.dll")
+> $s = [Text.Encoding]::UTF8.GetString($b)
+> [regex]::Matches($s, '\.NET[A-Za-z]*,Version=v[0-9\.]+') | ForEach-Object { $_.Value } | Select-Object -Unique
 > ```
 >
-> Nếu kết quả không phải runtime .NET 8, cập nhật `TargetFramework` theo giá trị thật và sửa mục này. Đây là **assumption duy nhất còn lại** của quyết định.
+> Lưu ý cho lần kiểm sau trên máy khác: `[Reflection.Assembly]::LoadFrom(...).ImageRuntimeVersion`
+> **ném `BadImageFormatException` trên Windows PowerShell 5.1** vì 5.1 chạy .NET Framework 4.8,
+> không nạp nổi assembly .NET 8 — bản thân lỗi đó đã là dấu hiệu nền .NET 8, nhưng dùng lệnh trên
+> mới đọc được con số. Máy AutoCAD đời khác vẫn phải kiểm lại trước khi phát hành cho đời đó.
 
 ## 10. API contract
 
@@ -348,7 +359,7 @@ Pilot 1–2 kỹ sư trên bản vẽ thật trước khi mở rộng. Luồng w
 | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | **Trôi quy tắc giữa 2 tầng**                                                                                  | Rule pack một nguồn + test đối chứng AC6 chạy trong CI phần server + Core test dùng cùng corpus với test TS                                                            | Giảm thiểu — rủi ro số 1           |
 | Không có runner Windows có license cho CI                                                                     | PR7a đã tách phần đối chứng **quy tắc** (AC6 layer/font) chạy được trên CI Linux; phần hình học + AC9–AC13 chạy tay theo release trên máy có license, ghi rõ trong DoD | **Giảm thiểu — chỉ còn chặn PR7b** |
-| Đời AutoCAD cụ thể đang dùng                                                                                  | **ĐÃ CHỐT: AutoCAD 2026, 1 bản .NET 8** (§9.1). Còn 1 assumption: xác nhận runtime thật của `acmgd.dll` trước bản cài đầu tiên                                         | **Đã chốt**                        |
+| Đời AutoCAD cụ thể đang dùng                                                                                  | **ĐÃ CHỐT: AutoCAD 2026, 1 bản .NET 8** (§9.1). Assumption runtime **đã đóng 2026-08-25**: `acmgd.dll` trên máy thật = `.NETCoreApp,Version=v8.0`, `Acmgd 25.1.0.0`    | **Đã chốt**                        |
 | Token desktop mở rộng bề mặt tấn công                                                                         | Scope hẹp, có hạn, thu hồi được, chỉ lưu hash, rate limit; rà `docs/audit.md`                                                                                          | Giảm thiểu (PR2)                   |
 | Plugin làm hỏng bản vẽ thật                                                                                   | Chỉ-kiểm là mặc định; 1 nhóm UNDO; giữ bản gốc; pilot hẹp                                                                                                              | Giảm thiểu                         |
 | **Bóc sai vì đơn vị bản vẽ ≠ mm**                                                                             | Đọc `INSUNITS` + quy đổi tự động + cảnh báo cố định trong báo cáo/Excel (§6.7, AC13)                                                                                   | Giảm thiểu                         |
@@ -365,7 +376,7 @@ Pilot 1–2 kỹ sư trên bản vẽ thật trước khi mở rộng. Luồng w
 - [x] Architecture/API/data — ADR-0006 + §9.1 đã chốt; rule pack v2 mở rộng thuần
 - [ ] Security/RBAC/SoD/audit — phần PR2 còn chờ
 - [ ] Test/telemetry/rollout/rollback — phần tích hợp chờ runner
-- [ ] Không còn blocking question cho PR2/PR5/PR7 (còn: runner Windows, xác minh runtime)
+- [ ] Không còn blocking question cho PR7b (xác minh runtime **đã xong 2026-08-25**; còn: chạy kiểm tích hợp `accoreconsole` trên máy có license)
 
 **Kết luận:** Approved for implementation — phạm vi PR-A thi hành ngay; PR2/PR5/PR6/PR7 giữ trình tự chờ điều kiện ngoài.
 **Người/ngày duyệt:** Seeker — 2026-08-23 (3 PR đầu), 2026-08-24 (mở rộng BOCKL + Excel, "ưu tiên chất lượng cao nhất")
