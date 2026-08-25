@@ -439,7 +439,7 @@ function EngineeringIntelligenceContent() {
       id: "swarm",
       label: "AI Swarm & Merkle",
       icon: Network,
-      badge: "11 Agents",
+      badge: "Swarm",
       description:
         "Tranh luận đa tác tử, hàng đợi xử lý MEPF Worker và sổ cái mật mã Merkle Tree bất biến.",
       content: swarmTab,

@@ -441,7 +441,7 @@ function GovernanceContent() {
       id: "cde-meetings",
       label: "Hồ Sơ CDE & Công Văn",
       icon: FolderOpen,
-      badge: "486 Docs",
+      badge: "CDE",
       description:
         "Kho dữ liệu CDE, quản lý công văn đi/đến và biên bản cuộc họp giao ban công trường.",
       content: cdeTab,

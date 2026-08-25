@@ -50,7 +50,7 @@ export async function GET(req: Request) {
     sql += ` ORDER BY l.measured_at DESC LIMIT $${params.length + 1}`;
     params.push(limit);
 
-    const rows = await query(sql, params);
+    const rows = await query(sql, ...params);
 
     return NextResponse.json({
       success: true,

@@ -120,7 +120,7 @@ function SiteCommandContent() {
       id: "work-fronts",
       label: "Mặt Bằng & Phân Khu",
       icon: LandPlot,
-      badge: "8 Sàn",
+      badge: "Phân khu",
       description: "Điều phối giao diện thi công theo tầng/zone và theo dõi giải phóng mặt bằng.",
       content: <WorkFrontsTab />,
     },

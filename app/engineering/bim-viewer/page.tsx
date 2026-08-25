@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import AppHeader from "@/app/components/AppHeader";
+import { useCanvasHiDPI } from "@/app/components/useCanvasHiDPI";
 import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import {
@@ -188,6 +189,9 @@ export default function BimViewerPage() {
   const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Canvas theo devicePixelRatio + co giãn theo container (audit 2026-08-25 §3.7): trước
+  // đây khai cứng 800×550 rồi để CSS kéo giãn nên hình mờ trên mọi màn hình HiDPI.
+  const { size: canvasSize } = useCanvasHiDPI(canvasRef, { width: 800, height: 550 });
 
   // Nạp danh sách models
   useEffect(() => {
@@ -355,8 +359,8 @@ export default function BimViewerPage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const width = canvas.width;
-    const height = canvas.height;
+    const width = canvasSize.width;
+    const height = canvasSize.height;
     ctx.clearRect(0, 0, width, height);
 
     // Lưới nền 3D Ground Grid
@@ -471,7 +475,17 @@ export default function BimViewerPage() {
       }
       ctx.restore();
     }
-  }, [rotX, rotY, zoom, elements, activeLayers, viewMode, currentStep, selectedElement]);
+  }, [
+    rotX,
+    rotY,
+    zoom,
+    elements,
+    activeLayers,
+    viewMode,
+    currentStep,
+    selectedElement,
+    canvasSize,
+  ]);
 
   useEffect(() => {
     draw3DScene();
@@ -655,8 +669,6 @@ export default function BimViewerPage() {
             <div className="bento-card relative h-[550px] w-full overflow-hidden p-0">
               <canvas
                 ref={canvasRef}
-                width={800}
-                height={550}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
