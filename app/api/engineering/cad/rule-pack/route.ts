@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCadTokenUser } from "@/lib/bao-mat/cad-devices";
+import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 import { chotProjectIdChoDoc } from "@/lib/ha-tang/projects";
 import {
   getCurrentRulePack,
@@ -36,6 +37,15 @@ export async function GET(req: Request) {
     return NextResponse.json(
       { error: "Không có quyền xem quy tắc chuẩn hóa CAD" },
       { status: 403 },
+    );
+  }
+
+  // Cùng khuôn /api/engineering/cad/boq-snapshot: plugin tải rule pack vài lần mỗi phiên làm
+  // việc — 60 lượt/15 phút thừa cho việc dùng thật, nhưng chặn vòng lặp dò bằng token thiết bị.
+  if (await hitRateLimit(`cad-rule-pack:${user.id}`, 60, 15)) {
+    return NextResponse.json(
+      { error: "Vượt giới hạn tải bộ quy tắc (60 lượt/15 phút)" },
+      { status: 429, headers: { "Retry-After": "60" } },
     );
   }
 

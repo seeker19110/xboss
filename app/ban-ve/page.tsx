@@ -26,6 +26,7 @@ import {
   ChevronUp,
   AlertCircle,
   ShieldCheck,
+  Cpu,
   type LucideIcon,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
@@ -124,6 +125,12 @@ export type DrawingRevisionRow = {
   uploadedBy: number | null;
   uploaderName: string | null;
   createdAt: string;
+  // M99 PR5 — revision do plugin AutoCAD đẩy lên mang kèm ngữ cảnh chuẩn hóa; tải tay từ web
+  // (sourceTool = null) thì các trường này rỗng, chip "Từ plugin" tự ẩn.
+  sourceTool: string | null;
+  rulePackVersion: string | null;
+  kiemDinh: { ok: boolean; soLoi: number; soCanhBao: number; canhBao: string[] } | null;
+  contentSha256: string | null;
 };
 
 const fmtSize = (b: number) =>
@@ -1207,6 +1214,28 @@ function DrawingWorkspaceDetail({
                     <b className="text-zinc-300">{r.decidedAt ?? "—"}</b> • Kỹ sư tải:{" "}
                     <b className="text-zinc-300">{r.uploaderName ?? "—"}</b>
                   </p>
+
+                  {/* M99 PR5 — nguồn plugin AutoCAD: rulepack + kết quả kiểm định server (chip có
+                      nhãn chữ, không truyền thông tin chỉ qua màu). */}
+                  {r.sourceTool === "plugin" && (
+                    <div className="mt-1.5">
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border bg-violet-950/60 border-violet-800 text-violet-300"
+                        title={
+                          r.contentSha256
+                            ? `Đẩy lên từ plugin AutoCAD — sha256 ${r.contentSha256.slice(0, 16)}…`
+                            : "Đẩy lên từ plugin AutoCAD"
+                        }
+                      >
+                        <Cpu className="w-3 h-3" />
+                        Từ plugin
+                        {r.rulePackVersion ? ` · rulepack ${r.rulePackVersion}` : ""}
+                        {r.kiemDinh
+                          ? ` · ${r.kiemDinh.soLoi} lỗi / ${r.kiemDinh.soCanhBao} cảnh báo`
+                          : ""}
+                      </span>
+                    </div>
+                  )}
 
                   {r.decisionNote && (
                     <p className="text-xs text-zinc-300 italic mt-1.5 p-2 rounded-lg bg-zinc-950 border border-zinc-800">

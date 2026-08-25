@@ -93,6 +93,32 @@ export async function claimNextAsyncTask(
 }
 
 /**
+ * Đánh dấu tác vụ sang 'processing' cho luồng xử lý ĐỒNG BỘ (route tự chạy ngay trong request,
+ * không có worker nền claim). Không có bước này thì `completeAsyncTask`/`failAsyncTask` không
+ * bao giờ khớp (chúng đòi trạng thái 'processing'), tác vụ kẹt 'pending' vĩnh viễn.
+ * Chỉ nhận tác vụ đang 'pending' nên gọi lặp không cướp việc của worker khác.
+ */
+export async function danhDauDangXuLy(
+  taskId: string,
+  workerId: string,
+  leaseMinutes: number = 5,
+): Promise<boolean> {
+  const leaseInterval = `${Math.max(1, leaseMinutes)} minutes`;
+  const res = await run(
+    `UPDATE engineering_async_tasks
+     SET status = 'processing',
+         worker_id = ?,
+         lease_expires_at = CURRENT_TIMESTAMP + ?::interval,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND status = 'pending'`,
+    workerId,
+    leaseInterval,
+    taskId,
+  );
+  return res.changes > 0;
+}
+
+/**
  * Cập nhật tiến độ % của tác vụ đang chạy và gia hạn lease
  */
 export async function updateTaskProgress(

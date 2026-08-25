@@ -3,14 +3,19 @@
   Manifest autoloader của AutoCAD (M99 §4): thư mục XBoss.bundle đặt tại
   %APPDATA%\Autodesk\ApplicationPlugins\ sẽ tự nạp plugin, không cần quyền admin.
   SeriesMin/Max = R25.1 (AutoCAD 2026) - đúng quyết định 1 nền duy nhất (M99 §9.1).
+
+  Tệp này chỉ là MẪU trong repo - AppVersion bên dưới bị dong-goi.ps1 GHI ĐÈ lúc đóng gói
+  bằng giá trị đọc từ Directory.Build.props (nguồn sự thật duy nhất). Danh sách lệnh XBOSS_*
+  đang tăng dần theo từng đợt (M99-M104+) nên KHÔNG liệt kê cứng ở Description để tránh trôi -
+  nguồn sự thật là plugin-autocad/XBoss.Cad.Core/Ui/LenhCatalog.cs, xem thêm README.md.
 -->
 <ApplicationPackage
     SchemaVersion="1.0"
     AutodeskProduct="AutoCAD"
     ProductType="Application"
     Name="XBoss CAD"
-    AppVersion="0.1.0"
-    Description="XBoss - chuan hoa ban ve va boc tach khoi luong MEP (TT AVIO). Lenh: XBOSS_RULEPACK, XBOSS_KIEMTRA, XBOSS_CHUANHOA, XBOSS_BOCKL, XBOSS_BOCKL_XOA, XBOSS_BOCKL_XUAT."
+    AppVersion="1.0.0"
+    Description="XBoss - chuan hoa ban ve va boc tach khoi luong MEP (TT AVIO). Xem danh sach lenh XBOSS_* day du trong plugin-autocad/README.md."
     Author="XBoss">
   <CompanyDetails Name="XBoss" />
   <Components>

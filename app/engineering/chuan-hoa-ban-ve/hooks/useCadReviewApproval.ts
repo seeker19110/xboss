@@ -4,8 +4,12 @@ import { useCallback, useState } from "react";
 import { showToast } from "@/app/components/Toast";
 import type { Cad2dApprovalStatus } from "../types";
 
-// Cổng chất lượng & ký duyệt bản vẽ CAD 2D: trạng thái phê duyệt, người duyệt
-// và ghi chú rà soát của kỹ sư.
+// Ghi chú rà soát cục bộ cho bản vẽ CAD 2D — trạng thái, người rà soát và ghi chú CHỈ
+// tồn tại trong state trình duyệt (không gọi API, không ghi DB) nên reload trang là mất.
+// ĐÂY KHÔNG PHẢI PHÊ DUYỆT CHÍNH THỨC: chữ ký duyệt/nghiệm thu thật của hồ sơ bản vẽ
+// (có audit trail, tồn tại sau reload) thực hiện ở sổ bản vẽ `/ban-ve` (revision status
+// qua `PATCH /api/drawings/revisions/:id`). Đổi tên/nhãn theo hướng trung thực này để
+// tránh gây hiểu nhầm đã ký duyệt chính thức khi thực chất chỉ là ghi chú tạm thời.
 export function useCadReviewApproval() {
   const [cad2dApprovalStatus, setCad2dApprovalStatus] =
     useState<Cad2dApprovalStatus>("in_progress");
@@ -18,12 +22,14 @@ export function useCadReviewApproval() {
   const handleSaveManualReview = useCallback(() => {
     setIsReviewDone(true);
     setCad2dApprovalStatus("pending_approval");
-    showToast("✓ Đã lưu toàn bộ nội dung sửa tay và chuyển sang trạng thái CHỜ DUYỆT!");
+    showToast("✓ Đã lưu ghi chú sửa tay (cục bộ) và chuyển sang trạng thái CHỜ RÀ SOÁT!");
   }, []);
 
   const handleSendForApproval = useCallback(() => {
     setCad2dApprovalStatus("pending_approval");
-    showToast("Đã gửi toàn bộ hồ sơ chuẩn hóa 2D cho Kỹ Sư Trưởng / BIM Lead chờ phê duyệt!");
+    showToast(
+      "Đã đánh dấu hồ sơ chuẩn hóa 2D chờ Kỹ Sư Trưởng / BIM Lead rà soát (ghi chú cục bộ — ký duyệt chính thức thực hiện tại sổ bản vẽ /ban-ve).",
+    );
   }, []);
 
   const handleApprove2d = useCallback(() => {
@@ -32,7 +38,9 @@ export function useCadReviewApproval() {
     setApprovedAt(
       `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
     );
-    showToast("✓ Đã PHÊ DUYỆT chuẩn hóa bản vẽ CAD 2D theo tiêu chuẩn ISO 19650!");
+    showToast(
+      "✓ Đã ghi chú rà soát cục bộ cho bản vẽ CAD 2D (CHƯA phải ký duyệt chính thức — thực hiện tại sổ bản vẽ /ban-ve).",
+    );
   }, []);
 
   const handleReject2d = useCallback(() => {

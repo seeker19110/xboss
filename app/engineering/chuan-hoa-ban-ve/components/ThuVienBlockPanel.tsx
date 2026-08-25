@@ -13,11 +13,12 @@ import {
   Check,
   X,
   Plus,
+  Undo2,
 } from "lucide-react";
 import { Button, ButtonLink, Chip } from "@/app/components/ui";
 import type { ChipTone } from "@/app/components/ui/Chip";
 import { Skeleton } from "@/app/components/Skeleton";
-import { redirectToLogin } from "@/app/lib/me";
+import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { useBlockProposals } from "../hooks/useBlockProposals";
 import ThemBlockTuWebForm from "./ThemBlockTuWebForm";
 import type { BlockProposal, BlockProposalKind, BlockProposalStatus } from "../types";
@@ -59,11 +60,20 @@ const NHAN_LOAI: Record<BlockProposalKind, string> = {
   sleeve: "Lỗ chờ ống",
 };
 
+// M103 (khoản thu hồi, việc bổ sung sau) — server có thể trả thêm trạng thái "withdrawn" (đề
+// xuất bị chính người gửi rút lại) mà `BlockProposalStatus` ở types.ts chưa khai — widen tại chỗ
+// thay vì sửa union dùng chung, tránh đụng file ngoài phạm vi đang có agent khác thao tác.
+
+// API `/api/engineering/cad/block-proposals` đã trả `nguoiDeXuatId` (xem `DeXuatBlock` trong
+// lib/ky-thuat/cad/block-proposals.ts) nhưng `BlockProposal` ở types.ts chưa khai trường này —
+// widen tại chỗ, cùng lý do trên (không đụng types.ts đang có agent khác thao tác).
+
 const NHAN_TRANG_THAI: Record<BlockProposalStatus, { nhan: string; tone: ChipTone }> = {
   pending: { nhan: "Chờ duyệt", tone: "info" },
   approved: { nhan: "Đã duyệt", tone: "success" },
   rejected: { nhan: "Từ chối", tone: "danger" },
   stale: { nhan: "Lỗi thời — cần làm lại", tone: "warning" },
+  withdrawn: { nhan: "Đã thu hồi", tone: "warning" },
 };
 
 // Nhúng SVG qua thẻ <img src="data:..."> (không dùng dangerouslySetInnerHTML) — trình duyệt
@@ -76,17 +86,22 @@ function anhXemTruoc(svg: string): string {
 function BlockProposalRow({
   item,
   coQuyenDuyet,
+  laChuDeXuat,
   dangXuLy,
   onDuyet,
   onTuChoi,
+  onThuHoi,
 }: {
   item: BlockProposal;
   coQuyenDuyet: boolean;
+  laChuDeXuat: boolean;
   dangXuLy: boolean;
   onDuyet: (item: BlockProposal) => void;
   onTuChoi: (item: BlockProposal) => void;
+  onThuHoi: (item: BlockProposal) => void;
 }) {
   const trangThai = NHAN_TRANG_THAI[item.status];
+  const dangCho = item.status === "pending";
   return (
     <li className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row gap-3">
       <div className="shrink-0 w-16 h-16 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden">
@@ -130,30 +145,48 @@ function BlockProposalRow({
             {item.nguoiQuyetDinh ? ` — duyệt bởi ${item.nguoiQuyetDinh}` : ""}
           </p>
         )}
+        {item.status === "withdrawn" && (
+          <p className="text-xs text-zinc-500">Đề xuất đã được người gửi thu hồi.</p>
+        )}
       </div>
 
-      {coQuyenDuyet && item.status === "pending" && (
+      {dangCho && (
         <div className="flex sm:flex-col gap-2 shrink-0">
-          <Button
-            size="sm"
-            variant="primary"
-            icon={Check}
-            disabled={dangXuLy}
-            onClick={() => onDuyet(item)}
-            aria-label={`Duyệt và phát hành block ${item.blockName}`}
-          >
-            Duyệt & Phát Hành
-          </Button>
-          <Button
-            size="sm"
-            variant="danger"
-            icon={X}
-            disabled={dangXuLy}
-            onClick={() => onTuChoi(item)}
-            aria-label={`Từ chối đề xuất block ${item.blockName}`}
-          >
-            Từ Chối
-          </Button>
+          {coQuyenDuyet && (
+            <>
+              <Button
+                size="sm"
+                variant="primary"
+                icon={Check}
+                disabled={dangXuLy}
+                onClick={() => onDuyet(item)}
+                aria-label={`Duyệt và phát hành block ${item.blockName}`}
+              >
+                Duyệt & Phát Hành
+              </Button>
+              <Button
+                size="sm"
+                variant="danger"
+                icon={X}
+                disabled={dangXuLy}
+                onClick={() => onTuChoi(item)}
+                aria-label={`Từ chối đề xuất block ${item.blockName}`}
+              >
+                Từ Chối
+              </Button>
+            </>
+          )}
+          {laChuDeXuat && (
+            <Button
+              size="sm"
+              icon={Undo2}
+              disabled={dangXuLy}
+              onClick={() => onThuHoi(item)}
+              aria-label={`Thu hồi đề xuất block ${item.blockName}`}
+            >
+              Thu Hồi
+            </Button>
+          )}
         </div>
       )}
     </li>
@@ -182,6 +215,15 @@ export default function ThuVienBlockPanel() {
     themBlockTrucTiep,
   } = useBlockProposals();
   const coQuyenDuyet = laNguoiDuyet;
+
+  // Thu hồi đề xuất — nút chỉ hiện cho đề xuất của CHÍNH mình (so `nguoiDeXuatId` server trả
+  // với id người dùng đang đăng nhập, lấy từ /api/auth/me chứ không tin giá trị client tự gõ).
+  // Bảo mật thật vẫn nằm ở route: chỉ UPDATE khi `proposed_by = userId` phiên hiện tại.
+  const [meId, setMeId] = useState<number | null>(null);
+  const [dangThuHoiId, setDangThuHoiId] = useState<number | null>(null);
+  useEffect(() => {
+    void fetchMe().then((u) => setMeId(u?.id ?? null));
+  }, []);
 
   // M104 — form thêm block thẳng từ web (admin/pm/engineer), mặc định đóng cho gọn panel.
   const [moFormThem, setMoFormThem] = useState(false);
@@ -237,6 +279,30 @@ export default function ThuVienBlockPanel() {
     const kq = await tuChoi(item.id, lyDo);
     if (!kq.ok) {
       setLoiHanhDongDeXuat(kq.error ?? "Từ chối đề xuất thất bại.");
+    }
+  }
+
+  async function xuLyThuHoi(item: BlockProposal) {
+    setLoiHanhDongDeXuat(null);
+    if (!window.confirm(`Thu hồi đề xuất block "${item.blockName}"? Có thể gửi lại sau.`)) {
+      return;
+    }
+    setDangThuHoiId(item.id);
+    try {
+      const res = await fetch(`/api/engineering/cad/block-proposals/${item.id}/withdraw`, {
+        method: "POST",
+      });
+      if (res.status === 401) return redirectToLogin();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLoiHanhDongDeXuat(data.error || "Thu hồi đề xuất thất bại.");
+        return;
+      }
+      await taiDeXuat();
+    } catch {
+      setLoiHanhDongDeXuat("Lỗi mạng — không thu hồi được đề xuất.");
+    } finally {
+      setDangThuHoiId(null);
     }
   }
 
@@ -579,9 +645,11 @@ export default function ThuVienBlockPanel() {
                 key={dx.id}
                 item={dx}
                 coQuyenDuyet={coQuyenDuyet}
-                dangXuLy={dangXuLyId === dx.id}
+                laChuDeXuat={meId != null && dx.nguoiDeXuatId === meId}
+                dangXuLy={dangXuLyId === dx.id || dangThuHoiId === dx.id}
                 onDuyet={xuLyDuyet}
                 onTuChoi={xuLyTuChoi}
+                onThuHoi={xuLyThuHoi}
               />
             ))}
           </ul>

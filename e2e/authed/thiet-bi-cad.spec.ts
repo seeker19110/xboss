@@ -24,6 +24,31 @@ test.describe("Thiết bị AutoCAD (sau đăng nhập)", () => {
     await expect(page.getByText("Không tìm thấy mã ghép")).toBeVisible();
   });
 
+  test("lỗi tải danh sách thiết bị hiện thông điệp + nút Thử lại thay vì treo skeleton", async ({
+    page,
+  }) => {
+    // Mô phỏng lỗi mạng khi tải /api/tokens lần đầu — page.tsx phải thoát khỏi skeleton
+    // và hiện ErrorState thay vì `tokens === null` treo mãi.
+    let goiDau = true;
+    await page.route("**/api/tokens", async (route) => {
+      if (goiDau && route.request().method() === "GET") {
+        goiDau = false;
+        await route.abort("failed");
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.goto("/engineering/thiet-bi-cad");
+    await expect(page.getByText("Đã xảy ra lỗi tải dữ liệu")).toBeVisible({ timeout: 15_000 });
+    const nutThuLai = page.getByRole("button", { name: "Thử lại" });
+    await expect(nutThuLai).toBeVisible();
+
+    // Bấm Thử lại → lần gọi thứ 2 đi qua bình thường (route.continue) → về trang bình thường.
+    await nutThuLai.click();
+    await expect(page.getByText("Duyệt mã ghép từ AutoCAD")).toBeVisible({ timeout: 15_000 });
+  });
+
   test("không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
     await gotoThietBi(page);
 
