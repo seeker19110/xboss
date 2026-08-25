@@ -390,7 +390,10 @@ public sealed class XBossCommands
         var goiY = Path.ChangeExtension(tenBanVe, null) + "-boc-khoi-luong.xlsx";
         var dlg = new Autodesk.AutoCAD.Windows.SaveFileDialog(
             "Lưu bảng bóc khối lượng (mẫu công ty)", goiY, "xlsx", "XBossBocKL",
-            Autodesk.AutoCAD.Windows.SaveFileDialog.SaveFileDialogFlags.NoFlags);
+            // Enum cờ của hộp thoại lưu tệp KHÔNG có thành viên tên "không cờ nào"
+            // (cả `Default` lẫn `NoFlags` đều không tồn tại trong ObjectARX 2026 — đã thử khi
+            // build thật). Giá trị 0 = không bật cờ đặc biệt nào, đúng thứ ta cần.
+            default(Autodesk.AutoCAD.Windows.SaveFileDialog.SaveFileDialogFlags));
         if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
 
         var meta = new BoqExcelMeta
