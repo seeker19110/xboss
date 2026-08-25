@@ -81,15 +81,16 @@ public sealed class VeTranginCommands
         var ghiNho = GhiNhoTrangIn.Doc();
         var ctb = HoiCtb(ed, ghiNho.Ctb);
 
-        // Khung tên: tra manifest thư viện block (kind=titleblock theo khổ giấy).
-        var (thuVien, duongDanDwg, loiThuVien) = BlockLibCache.Doc();
+        // Khung tên: tra manifest thư viện block (kind=titleblock theo khổ giấy) — dùng CHUNG một
+        // cửa thư viện với XBOSS_VE_PHUKIEN/_THIETBI (BlockLibraryService: cache + kiểm sha256).
+        var (thuVien, loiThuVien) = BlockLibraryService.HienHanh();
         BlockDef? khungTen = null;
         var giaTriThe = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (thuVien is null)
         {
             ed.WriteMessage(
-                $"\n[XBoss] ⚠ Chưa dùng được thư viện block ({loiThuVien}) — vẫn tạo layout + viewport, " +
-                "khung tên chèn sau bằng XBOSS_VE_THUVIEN/INSERT.\n");
+                $"\n[XBoss] ⚠ {loiThuVien}\n" +
+                "[XBoss]   Vẫn tạo layout + viewport, khung tên chèn sau bằng XBOSS_VE_THUVIEN/INSERT.\n");
         }
         else
         {
@@ -110,21 +111,13 @@ public sealed class VeTranginCommands
         var canhBao = new List<string>();
         using var khoaTaiLieu = doc.LockDocument();
 
-        // Nhập ĐỊNH NGHĨA block trước khi mở transaction: Database.Insert nhân bản sâu ở tầng dưới,
-        // gọi giữa một transaction đang mở là nguồn lỗi khó lần.
+        // Nhập ĐỊNH NGHĨA block trước khi mở transaction: nhân bản block là thao tác sâu ở tầng
+        // dưới, gọi giữa một transaction đang mở là nguồn lỗi khó lần.
         if (khungTen is not null && !CoDinhNghiaBlock(db, khungTen.BlockName))
         {
-            if (duongDanDwg is null)
+            if (!NhapKhungTen(db, khungTen.BlockName, canhBao) || !CoDinhNghiaBlock(db, khungTen.BlockName))
             {
-                canhBao.Add(
-                    $"Bản vẽ chưa có định nghĩa block khung tên \"{khungTen.BlockName}\" và cache thư viện không " +
-                    "dùng được — chèn khung tên sau bằng XBOSS_VE_THUVIEN.");
-                khungTen = null;
-            }
-            else if (!NhapDinhNghiaBlock(db, khungTen.BlockName, duongDanDwg, canhBao) ||
-                     !CoDinhNghiaBlock(db, khungTen.BlockName))
-            {
-                canhBao.Add($"Tệp thư viện không chứa block \"{khungTen.BlockName}\" — thư viện hỏng, phát hành lại.");
+                canhBao.Add($"Chưa nhập được block khung tên \"{khungTen.BlockName}\" — chèn khung tên sau bằng INSERT.");
                 khungTen = null;
             }
         }
@@ -517,19 +510,22 @@ public sealed class VeTranginCommands
     }
 
     /// <summary>
-    /// Nhập ĐỊNH NGHĨA block từ tệp thư viện đã cache vào bản vẽ (một lần — M100 §4 "nhập định
-    /// nghĩa vào BlockTable của DWG"). Bản rút gọn chỉ phục vụ khung tên của trang in; PR4
-    /// (<c>BlockLibraryService</c>) làm bản đầy đủ cho phụ kiện/thiết bị, khi tích hợp thì thay
-    /// đúng chỗ này.
+    /// Nhập ĐỊNH NGHĨA block khung tên từ thư viện đã cache vào bản vẽ (một lần — M100 §4 "nhập
+    /// định nghĩa vào BlockTable của DWG"). Việc nhập do <see cref="BlockLibraryService"/> làm —
+    /// ở đây chỉ chuyển lỗi thành cảnh báo, vì thiếu khung tên KHÔNG được chặn cả trang in
+    /// (layout + viewport vẫn có giá trị, khung tên chèn sau).
     /// </summary>
-    private static bool NhapDinhNghiaBlock(Database db, string tenBlock, string duongDanDwg, List<string> canhBao)
+    private static bool NhapKhungTen(Database db, string tenBlock, List<string> canhBao)
     {
         try
         {
-            using var nguon = new Database(false, true);
-            nguon.ReadDwgFile(duongDanDwg, FileOpenMode.OpenForReadAndAllShare, allowCPConversion: true, password: null);
-            db.Insert(tenBlock, tenBlock, nguon, preserveSourceDatabase: true);
+            BlockLibraryService.NhapDinhNghia(db, [tenBlock], ghiDe: false);
             return true;
+        }
+        catch (BlockManifestException e)
+        {
+            canhBao.Add(e.Message);
+            return false;
         }
         catch (Autodesk.AutoCAD.Runtime.Exception e)
         {
@@ -552,60 +548,6 @@ public sealed class VeTranginCommands
         catch (Autodesk.AutoCAD.Runtime.Exception)
         {
             // Layout không xóa được thì UNDO của AutoCAD vẫn dọn nốt — không che lỗi gốc.
-        }
-    }
-}
-
-/// <summary>
-/// Cache thư viện block cục bộ (%APPDATA%\XBoss\block-lib\ — M100 §6.10) nhìn từ trang in:
-/// chỉ ĐỌC manifest + định vị tệp .dwg đúng hash. Không tải mạng, không ghi gì —
-/// việc tải/phát hành là của <c>BlockLibraryService</c> (M100 PR4).
-/// Dò tệp theo NỘI DUNG (hash trong manifest) chứ không theo tên cố định, nên không phụ thuộc
-/// cách PR4 đặt tên tệp cache.
-/// </summary>
-internal static class BlockLibCache
-{
-    internal static string ThuMuc => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XBoss", "block-lib");
-
-    /// <summary>Manifest + đường dẫn tệp .dwg khớp hash; lỗi trả lý do tiếng Việt.</summary>
-    internal static (BlockManifest? Manifest, string? DuongDanDwg, string? Loi) Doc()
-    {
-        try
-        {
-            if (!Directory.Exists(ThuMuc))
-                return (null, null, $"chưa có thư viện block trong {ThuMuc} — chạy XBOSS_LOGIN hoặc XBOSS_VE_THUVIEN");
-
-            var tepManifest = Directory.GetFiles(ThuMuc, "*.json")
-                .OrderBy(t => string.Equals(Path.GetFileName(t), "manifest.json", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-                .ThenBy(t => t, StringComparer.OrdinalIgnoreCase)
-                .FirstOrDefault();
-            if (tepManifest is null) return (null, null, $"không thấy manifest JSON trong {ThuMuc}");
-
-            var manifest = BlockManifestLoader.Load(File.ReadAllText(tepManifest));
-
-            string? dwg = null;
-            foreach (var tep in Directory.GetFiles(ThuMuc, "*.dwg"))
-            {
-                if (!string.Equals(
-                        BlockManifestLoader.TinhSha256(File.ReadAllBytes(tep)),
-                        manifest.DwgSha256,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-                dwg = tep;
-                break;
-            }
-            return (manifest, dwg, null);
-        }
-        catch (BlockManifestException e)
-        {
-            return (null, null, e.Message);
-        }
-        catch (IOException e)
-        {
-            return (null, null, $"không đọc được cache thư viện block: {e.Message}");
         }
     }
 }

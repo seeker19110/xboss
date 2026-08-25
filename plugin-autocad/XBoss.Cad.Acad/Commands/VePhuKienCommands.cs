@@ -8,6 +8,10 @@ using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Geometry;
 using XBoss.Cad.Core.Matching;
 
+// Khối chờ chèn dùng CHUNG với các lệnh chèn block khác (giá đỡ, lỗ chờ — M100 PR7): định nghĩa
+// nằm ở BlockLibraryService, ở đây chỉ đặt bí danh cho ngắn.
+using ChoChen = XBoss.Cad.Acad.Services.BlockLibraryService.KhoiChoChen;
+
 [assembly: CommandClass(typeof(XBoss.Cad.Acad.Commands.VePhuKienCommands))]
 
 namespace XBoss.Cad.Acad.Commands;
@@ -28,15 +32,6 @@ namespace XBoss.Cad.Acad.Commands;
 /// </summary>
 public sealed class VePhuKienCommands
 {
-    /// <summary>Một khối chờ chèn: đã chốt vị trí/góc/tỉ lệ/layer, chưa đụng bản vẽ.</summary>
-    private sealed record ChoChen(
-        Point3d Diem,
-        double Goc,
-        double TyLe,
-        string Layer,
-        VeXDataInfo XData,
-        Dictionary<string, string> ThuocTinh);
-
     /// <summary>Giá trị attribute nhớ giữa các lần chèn trong cùng phiên (O3 — đỡ gõ lại).</summary>
     private static readonly Dictionary<string, string> ThuocTinhLanTruoc = new(StringComparer.OrdinalIgnoreCase);
 
@@ -79,7 +74,7 @@ public sealed class VePhuKienCommands
             return;
         }
 
-        var def0 = HoiBlock(ed, $"Phụ kiện của hệ {he.Id}", danhSach, VeContext.PhuKienId);
+        var def0 = BlockLibraryService.HoiBlock(ed, $"Phụ kiện của hệ {he.Id}", danhSach, VeContext.PhuKienId);
         if (def0 is null) return;
         VeContext.PhuKienId = def0.Id;
 
@@ -129,7 +124,7 @@ public sealed class VePhuKienCommands
                     ed.WriteMessage("\n[XBoss] Đối tượng chọn không phải polyline tuyến — bấm lại.\n");
                     continue;
                 }
-                dinh = DinhCua(pl);
+                dinh = VeThucThe.DinhCua(pl);
                 kin = pl.Closed;
                 layerTim = pl.Layer;
                 xd = VeXDataStore.Doc(pl);
@@ -194,7 +189,7 @@ public sealed class VePhuKienCommands
             ed.WriteMessage("\n[XBoss] Chưa chèn phụ kiện nào.\n");
             return;
         }
-        if (!ChenHangLoat(doc, ed, db, def0, thuVien, muc)) return;
+        if (!BlockLibraryService.ChenHangLoat(doc, ed, db, def0, thuVien, muc)) return;
 
         ed.WriteMessage(
             $"\n[XBoss] Đã chèn {muc.Count} phụ kiện {def0.Id} ({def0.BlockName}) từ thư viện {thuVien.Version}.\n" +
@@ -237,7 +232,7 @@ public sealed class VePhuKienCommands
             return;
         }
 
-        var def0 = HoiBlock(ed, $"Thiết bị của hệ {he.Id}", danhSach, VeContext.ThietBiId);
+        var def0 = BlockLibraryService.HoiBlock(ed, $"Thiết bị của hệ {he.Id}", danhSach, VeContext.ThietBiId);
         if (def0 is null) return;
         VeContext.ThietBiId = def0.Id;
 
@@ -379,7 +374,7 @@ public sealed class VePhuKienCommands
             ed.WriteMessage("\n[XBoss] Chưa chèn thiết bị nào.\n");
             return;
         }
-        if (!ChenHangLoat(doc, ed, db, def0, thuVien, muc)) return;
+        if (!BlockLibraryService.ChenHangLoat(doc, ed, db, def0, thuVien, muc)) return;
 
         ed.WriteMessage(
             $"\n[XBoss] Đã chèn {muc.Count} thiết bị {def0.Id} ({def0.BlockName}) từ thư viện {thuVien.Version}.\n" +
@@ -476,139 +471,6 @@ public sealed class VePhuKienCommands
 
     // ===== Trợ giúp =====
 
-    /// <summary>
-    /// Nhập định nghĩa block (hỏi khi trùng tên — AC7) rồi chèn toàn bộ khối đã chốt trong MỘT
-    /// transaction. Trả false khi kỹ sư hủy hoặc có lỗi (đã in thông báo, bản vẽ nguyên trạng).
-    /// </summary>
-    private static bool ChenHangLoat(
-        Autodesk.AutoCAD.ApplicationServices.Document doc,
-        Editor ed,
-        Database db,
-        BlockDef def,
-        BlockManifest thuVien,
-        List<ChoChen> muc)
-    {
-        // (a) Định nghĩa block trong bản vẽ đến từ đâu — hỏi NGOÀI transaction.
-        BlockLibraryService.NguonDinhNghia nguon;
-        string? versionTrongBanVe;
-        using (var tr = db.TransactionManager.StartTransaction())
-        {
-            (nguon, versionTrongBanVe) =
-                BlockLibraryService.KiemTraDinhNghia(db, tr, def.BlockName, thuVien.Version);
-            tr.Commit();
-        }
-
-        var ghiDe = false;
-        if (nguon is BlockLibraryService.NguonDinhNghia.ThuVienKhacVersion
-                  or BlockLibraryService.NguonDinhNghia.KhongRoNguon)
-        {
-            var traLoi = BlockLibraryService.HoiKhiTrungTen(ed, def, nguon, versionTrongBanVe, thuVien.Version);
-            if (traLoi is null)
-            {
-                ed.WriteMessage("\n[XBoss] Đã hủy — bản vẽ không thay đổi.\n");
-                return false;
-            }
-            ghiDe = traLoi.Value;
-            var lyDo = nguon == BlockLibraryService.NguonDinhNghia.ThuVienKhacVersion
-                ? $"đã nhập từ thư viện version {versionTrongBanVe}"
-                : "có sẵn trong bản vẽ, không rõ nguồn";
-            VeContext.NhatKyPhien.Add(
-                $"Block \"{def.BlockName}\" trùng tên ({lyDo}) — kỹ sư chọn " +
-                $"{(ghiDe ? $"CẬP NHẬT theo thư viện {thuVien.Version}" : "GIỮ định nghĩa trong bản vẽ")}.");
-        }
-        var canNhap = nguon == BlockLibraryService.NguonDinhNghia.ChuaCo || ghiDe;
-
-        using var khoa = doc.LockDocument();
-        try
-        {
-            // (b) Nhập định nghĩa từ tệp thư viện — WblockClone làm việc thẳng trên database nên
-            //     chạy ngoài transaction; vẫn cùng một lệnh ⇒ vẫn một lần UNDO. Nếu bước (c) hỏng
-            //     thì bản vẽ chỉ còn thừa một ĐỊNH NGHĨA block chưa dùng (vô hại, UNDO xóa nốt) —
-            //     không có khối/nhãn mồ côi nào (§6.11).
-            if (canNhap) BlockLibraryService.NhapDinhNghia(db, [def.BlockName], ghiDe);
-        }
-        catch (BlockManifestException e)
-        {
-            ed.WriteMessage($"\n[XBoss] {e.Message}\n");
-            return false;
-        }
-        catch (Autodesk.AutoCAD.Runtime.Exception e)
-        {
-            ed.WriteMessage($"\n[XBoss] Không nhập được định nghĩa block \"{def.BlockName}\": {e.Message}\n");
-            return false;
-        }
-        catch (IOException e)
-        {
-            ed.WriteMessage($"\n[XBoss] Không đọc được tệp thư viện block: {e.Message}\n");
-            return false;
-        }
-
-        // (c) Chèn khối: một transaction cho cả lô.
-        using var tr2 = db.TransactionManager.StartTransaction();
-        try
-        {
-            VeXDataStore.DangKyApp(db, tr2);
-            var dinhNghia = canNhap
-                ? BlockLibraryService.DanhDauDinhNghia(db, tr2, def, thuVien.Version)
-                : BlockLibraryService.MoDinhNghia(db, tr2, def.BlockName);
-            var ms = (BlockTableRecord)tr2.GetObject(
-                SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-
-            foreach (var m in muc)
-            {
-                var khoi = new BlockReference(m.Diem, dinhNghia.ObjectId)
-                {
-                    Rotation = m.Goc,
-                    ScaleFactors = new Scale3d(m.TyLe),
-                };
-                ms.AppendEntity(khoi);
-                tr2.AddNewlyCreatedDBObject(khoi, true);
-                khoi.Layer = m.Layer; // đặt SAU khi vào database (như XBOSS_VE)
-                BlockLibraryService.ThemThuocTinh(tr2, khoi, dinhNghia, m.ThuocTinh);
-                VeXDataStore.Ghi(khoi, m.XData);
-            }
-            tr2.Commit();
-            return true;
-        }
-        catch (BlockManifestException e)
-        {
-            tr2.Abort();
-            ed.WriteMessage($"\n[XBoss] {e.Message}\n");
-            return false;
-        }
-        catch (Autodesk.AutoCAD.Runtime.Exception e)
-        {
-            tr2.Abort();
-            ed.WriteMessage(
-                $"\n[XBoss] LỖI khi chèn block — đã rollback, bản vẽ nguyên trạng: {e.Message}\n" +
-                "[XBoss] Nếu layer đích đang khóa: chạy XBOSS_VE_NEN (hoặc mở khóa layer) rồi thử lại.\n");
-            return false;
-        }
-    }
-
-    /// <summary>Chọn một block trong danh mục bằng keyword (id viết liền, như chọn loại tuyến).</summary>
-    private static BlockDef? HoiBlock(Editor ed, string nhan, List<BlockDef> danhSach, string? macDinhId)
-    {
-        var tuKhoa = new Dictionary<string, BlockDef>(StringComparer.OrdinalIgnoreCase);
-        foreach (var d in danhSach) tuKhoa.TryAdd(VeContext.TuKhoaCua(d.Id), d);
-
-        ed.WriteMessage($"\n[XBoss] {nhan}:\n");
-        foreach (var d in danhSach)
-            ed.WriteMessage($"[XBoss]   {VeContext.TuKhoaCua(d.Id)} = {d.Id} (block {d.BlockName})\n");
-
-        var hienCo = danhSach.FirstOrDefault(d => string.Equals(d.Id, macDinhId, StringComparison.Ordinal));
-        var hoi = new PromptKeywordOptions($"\n[XBoss] Chọn {nhan.ToLowerInvariant()}") { AllowNone = false };
-        foreach (var d in danhSach)
-        {
-            var tk = VeContext.TuKhoaCua(d.Id);
-            hoi.Keywords.Add(tk, tk, tk);
-        }
-        hoi.Keywords.Default = VeContext.TuKhoaCua((hienCo ?? danhSach[0]).Id);
-        var kq = ed.GetKeywords(hoi);
-        if (kq.Status != PromptStatus.OK) return null;
-        return tuKhoa.TryGetValue(kq.StringResult, out var chon) ? chon : null;
-    }
-
     /// <summary>TAG bắt buộc (FR6): hỏi lại khi bỏ trống; null = kỹ sư hủy lệnh.</summary>
     private static string? HoiTag(Editor ed)
     {
@@ -623,17 +485,5 @@ public sealed class VePhuKienCommands
             if (v.Length > 0) return v;
             ed.WriteMessage("\n[XBoss] TAG không được để trống — nhập lại hoặc ESC để hủy.\n");
         }
-    }
-
-    /// <summary>Đỉnh + bulge của polyline dưới dạng mô hình thuần của Core.</summary>
-    private static List<DinhPolyline> DinhCua(Polyline pl)
-    {
-        var dinh = new List<DinhPolyline>(pl.NumberOfVertices);
-        for (var i = 0; i < pl.NumberOfVertices; i++)
-        {
-            var p = pl.GetPoint2dAt(i);
-            dinh.Add(new DinhPolyline(p.X, p.Y, pl.GetBulgeAt(i)));
-        }
-        return dinh;
     }
 }
