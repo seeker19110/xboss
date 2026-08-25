@@ -28,6 +28,12 @@ if (-not (Test-Path (Join-Path $AcadDir "acdbmgd.dll"))) {
     throw "Không thấy acdbmgd.dll trong '$AcadDir'. Truyền -AcadDir đúng thư mục cài AutoCAD 2026."
 }
 
+# Adapter build cho net10.0-windows (bám nền Managed API của AutoCAD 2026). Thiếu SDK 10 thì
+# `dotnet build` báo lỗi khó hiểu về NETSDK, nên chặn sớm bằng thông điệp tiếng Việt.
+if (-not (dotnet --list-sdks | Select-String -SimpleMatch "10.")) {
+    throw "Thiếu .NET 10 SDK (Adapter build cho net10.0-windows). Cài: winget install Microsoft.DotNet.SDK.10"
+}
+
 Write-Host "[XBoss] Build Adapter (Release)..." -ForegroundColor Cyan
 dotnet build $duAn -c Release -p:AcadSdkDir="$AcadDir"
 if ($LASTEXITCODE -ne 0) { throw "Build thất bại." }

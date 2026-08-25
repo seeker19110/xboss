@@ -37,13 +37,14 @@ dotnet test plugin-autocad/XBoss.Cad.Tests/XBoss.Cad.Tests.csproj
 
 Test nạp rule pack thật từ repo nên phải chạy bên trong repo XBoss.
 
-### Adapter (Windows + ObjectARX SDK 2026)
+### Adapter (Windows + ObjectARX SDK 2026 + .NET 10 SDK)
 
 1. Cài ObjectARX SDK 2026 (hoặc dùng thẳng thư mục cài AutoCAD 2026 — nơi có
    `acdbmgd.dll`, `acmgd.dll`, `accoremgd.dll`).
-2. **Xác minh runtime** — đã làm 2026-08-25 trên AutoCAD 2026 thật: `.NETCoreApp,Version=v8.0` +
-   `Acmgd, Version=25.1.0.0`, đúng nền `net8.0` và đúng hằng `PluginExtension.AcadVer2026 = "25.1"`
-   (M99 §9.1, assumption đã đóng). Kiểm lại khi phát hành cho đời AutoCAD khác:
+2. **Xác minh nền .NET — làm lại sau MỖI bản cập nhật AutoCAD, không chỉ khi đổi đời.** Ngày
+   2026-08-25 chính máy người dùng đổi từ `.NETCoreApp,Version=v8.0` sang `v10.0` chỉ sau vài tiếng
+   (AutoCAD tự cập nhật), làm build đổ với `CS1705`. Nền hiện tại của Adapter: **`net10.0-windows`**
+   (cần .NET 10 SDK — `winget install Microsoft.DotNet.SDK.10`). Lệnh kiểm:
 
    ```powershell
    $b = [IO.File]::ReadAllBytes("C:\Program Files\Autodesk\AutoCAD 2026\acmgd.dll")
@@ -51,8 +52,8 @@ Test nạp rule pack thật từ repo nên phải chạy bên trong repo XBoss.
    [regex]::Matches($s, '\.NET[A-Za-z]*,Version=v[0-9\.]+') | ForEach-Object { $_.Value } | Select-Object -Unique
    ```
 
-   Không ra `.NETCoreApp,Version=v8.0` → sửa `TargetFramework` của `XBoss.Cad.Acad` theo giá trị
-   thật và cập nhật M99 §9.1. (Đừng dùng `LoadFrom(...).ImageRuntimeVersion` trên PowerShell 5.1 —
+   Lệch với `TargetFramework` của `XBoss.Cad.Acad` → sửa csproj + cổng CI "Kiểm TargetFramework
+   từng project" theo giá trị thật, và cập nhật M99 §9.1. (Đừng dùng `LoadFrom(...).ImageRuntimeVersion` trên PowerShell 5.1 —
    nền .NET Framework 4.8 không nạp nổi assembly .NET 8, chỉ ném `BadImageFormatException`.)
 
 3. Build:

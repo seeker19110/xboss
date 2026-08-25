@@ -202,34 +202,45 @@ Lý do chọn 2026:
 
 **Hệ quả kiến trúc:**
 
-| Hạng mục                    | Chốt                                                                                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `XBoss.Cad.Core`            | Target **`net8.0`** — dùng được API .NET hiện đại trong chính lớp quy tắc; phụ thuộc NuGet duy nhất: `ClosedXML`                                 |
-| `XBoss.Cad.Acad`            | Target `net8.0-windows`, tham chiếu `acmgd.dll` / `acdbmgd.dll` / `accoremgd.dll` của **ObjectARX SDK 2026** qua `AcadSdkDir`, `CopyLocal=false` |
-| Số bản build                | **1** — 1 pipeline, 1 bộ test tích hợp, 1 gói phát hành                                                                                          |
-| Kiểm tra phiên bản lúc chạy | Plugin đọc biến `ACADVER` khi nạp; **không phải 2026 → báo tiếng Việt và không nạp lệnh**, thay vì lỗi khó hiểu giữa chừng                       |
-| Cổng CI                     | Kiểm `TargetFramework` đúng `net8.0*` để không ai vô tình hạ nền; CI build + test **Core/Tests** (Linux), không build Adapter                    |
+| Hạng mục                    | Chốt                                                                                                                                                                                                                                                       |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `XBoss.Cad.Core`            | Target **`net8.0`** — dùng được API .NET hiện đại trong chính lớp quy tắc; phụ thuộc NuGet duy nhất: `ClosedXML`                                                                                                                                           |
+| `XBoss.Cad.Acad`            | Target **`net10.0-windows`** (bản cập nhật AutoCAD 2026 ngày 2026-08-25 chuyển Managed API sang .NET 10 — xem cảnh báo dưới bảng), tham chiếu `acmgd.dll` / `acdbmgd.dll` / `accoremgd.dll` của **ObjectARX SDK 2026** qua `AcadSdkDir`, `CopyLocal=false` |
+| Số bản build                | **1** — 1 pipeline, 1 bộ test tích hợp, 1 gói phát hành                                                                                                                                                                                                    |
+| Kiểm tra phiên bản lúc chạy | Plugin đọc biến `ACADVER` khi nạp; **không phải 2026 → báo tiếng Việt và không nạp lệnh**, thay vì lỗi khó hiểu giữa chừng                                                                                                                                 |
+| Cổng CI                     | Kiểm `TargetFramework` **từng project** (Core/Tests = `net8.0`, Acad = `net10.0-windows`) để không ai hạ/nâng nhầm; CI build + test **Core/Tests** (Linux), không build Adapter                                                                            |
 
 **Nguyên tắc build:** tham chiếu SDK đúng đời 2026. Managed API tương thích tiến, không tương thích lùi — build trên SDK mới rồi chạy trên AutoCAD cũ hơn sẽ hỏng.
 
-> **✅ ĐÃ XÁC MINH TRÊN MÁY THẬT (2026-08-25):** AutoCAD 2026 cài trên máy người dùng cho
-> `acmgd.dll` mang `.NETCoreApp,Version=v8.0` và `Acmgd, Version=25.1.0.0` — **đúng .NET 8 và đúng
-> ACADVER 25.1** như quyết định §9.1 giả định. `TargetFramework net8.0*` giữ nguyên, hằng
-> `PluginExtension.AcadVer2026 = "25.1"` đúng. Assumption cuối cùng của quyết định này **đã đóng**.
+> **⚠️ NỀN .NET CỦA AUTOCAD ĐỔI ĐƯỢC GIỮA CÁC BẢN CẬP NHẬT — ĐÃ XẢY RA THẬT (2026-08-25).**
+> Sáng 25/8, `acmgd.dll` của AutoCAD 2026 trên máy người dùng khai `.NETCoreApp,Version=v8.0` và
+> Adapter build `net8.0-windows` chạy tốt. Vài tiếng sau, **cùng lệnh kiểm, cùng tệp** trả
+> `.NETCoreApp,Version=v10.0` — AutoCAD đã tự cập nhật — và build đổ ngay:
 >
-> Lệnh dùng để xác minh (đọc thẳng chuỗi TargetFramework trong tệp, không nạp assembly — cách này
-> chạy được cả trên Windows PowerShell 5.1):
+> ```
+> CSC : error CS1705: Assembly 'Acmgd' ... uses 'System.Runtime, Version=10.0.0.0'
+>       which has a higher version than referenced assembly 'System.Runtime, Version=8.0.0.0'
+> ```
+>
+> **Chốt hiện tại:** `XBoss.Cad.Acad` = `net10.0-windows` (cần .NET 10 SDK để build);
+> `XBoss.Cad.Core`/`Tests` giữ `net8.0` — Core không chạm assembly AutoCAD nên CI Linux vẫn
+> build/test được, và app net10 tham chiếu thư viện net8 bình thường. `ACADVER` vẫn `25.1`.
+>
+> **Cách kiểm trước mỗi lần phát hành** (chạy trên máy có AutoCAD, sau MỖI bản cập nhật AutoCAD):
 >
 > ```powershell
 > $b = [IO.File]::ReadAllBytes("C:\Program Files\Autodesk\AutoCAD 2026\acmgd.dll")
-> $s = [Text.Encoding]::UTF8.GetString($b)
-> [regex]::Matches($s, '\.NET[A-Za-z]*,Version=v[0-9\.]+') | ForEach-Object { $_.Value } | Select-Object -Unique
+> [regex]::Matches([Text.Encoding]::UTF8.GetString($b), '\.NET[A-Za-z]*,Version=v[0-9\.]+') |
+>   ForEach-Object { $_.Value } | Select-Object -Unique
 > ```
 >
-> Lưu ý cho lần kiểm sau trên máy khác: `[Reflection.Assembly]::LoadFrom(...).ImageRuntimeVersion`
-> **ném `BadImageFormatException` trên Windows PowerShell 5.1** vì 5.1 chạy .NET Framework 4.8,
-> không nạp nổi assembly .NET 8 — bản thân lỗi đó đã là dấu hiệu nền .NET 8, nhưng dùng lệnh trên
-> mới đọc được con số. Máy AutoCAD đời khác vẫn phải kiểm lại trước khi phát hành cho đời đó.
+> Lệch với `TargetFramework` của Adapter → sửa `TargetFramework` (và cổng CI "Kiểm TargetFramework
+> từng project") theo giá trị thật. **Trọng tài cuối cùng là trình biên dịch**: CS1705 nói thẳng
+> nền thật, còn chuỗi trong tệp chỉ đúng tại thời điểm đọc. Đừng coi kết quả kiểm là vĩnh viễn —
+> đây không còn là "assumption đã đóng" mà là **mục phải kiểm lại định kỳ**.
+>
+> Không dùng `[Reflection.Assembly]::LoadFrom(...).ImageRuntimeVersion` trên Windows PowerShell 5.1:
+> 5.1 chạy .NET Framework 4.8 nên chỉ ném `BadImageFormatException`, không đọc ra con số.
 
 ## 10. API contract
 
@@ -364,19 +375,19 @@ Pilot 1–2 kỹ sư trên bản vẽ thật trước khi mở rộng. Luồng w
 
 ## 18. Risk/assumption/open decisions
 
-| Mục                                                                                                           | Xác minh/giảm thiểu                                                                                                                                                    | Quyết định                         |
-| ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| **Trôi quy tắc giữa 2 tầng**                                                                                  | Rule pack một nguồn + test đối chứng AC6 chạy trong CI phần server + Core test dùng cùng corpus với test TS                                                            | Giảm thiểu — rủi ro số 1           |
-| Không có runner Windows có license cho CI                                                                     | PR7a đã tách phần đối chứng **quy tắc** (AC6 layer/font) chạy được trên CI Linux; phần hình học + AC9–AC13 chạy tay theo release trên máy có license, ghi rõ trong DoD | **Giảm thiểu — chỉ còn chặn PR7b** |
-| Đời AutoCAD cụ thể đang dùng                                                                                  | **ĐÃ CHỐT: AutoCAD 2026, 1 bản .NET 8** (§9.1). Assumption runtime **đã đóng 2026-08-25**: `acmgd.dll` trên máy thật = `.NETCoreApp,Version=v8.0`, `Acmgd 25.1.0.0`    | **Đã chốt**                        |
-| Token desktop mở rộng bề mặt tấn công                                                                         | Scope hẹp, có hạn, thu hồi được, chỉ lưu hash, rate limit; rà `docs/audit.md`                                                                                          | Giảm thiểu (PR2)                   |
-| Plugin làm hỏng bản vẽ thật                                                                                   | Chỉ-kiểm là mặc định; 1 nhóm UNDO; giữ bản gốc; pilot hẹp                                                                                                              | Giảm thiểu                         |
-| **Bóc sai vì đơn vị bản vẽ ≠ mm**                                                                             | Đọc `INSUNITS` + quy đổi tự động + cảnh báo cố định trong báo cáo/Excel (§6.7, AC13)                                                                                   | Giảm thiểu                         |
-| **Bóc trùng / bỏ sót khi chạy nhiều lần**                                                                     | XData đánh dấu sống trong DWG (FR14/FR16), mặc định bỏ qua đã bóc, có lệnh gỡ + báo số bị bỏ qua                                                                       | Giảm thiểu                         |
-| **Khối lượng đo được ≠ khối lượng thật thi công** (ống vẽ tim tuyến vs chiều dài lắp thật, chưa trừ phụ kiện) | Ghi rõ trong Excel cột I "đo theo tim tuyến trên bản vẽ"; hệ số hao hụt/phụ kiện là việc của QS trên cột F/định mức — plugin không tự cộng                             | Chấp nhận có chủ đích              |
-| `boqCode` tùy dự án, rule pack là toàn cục                                                                    | v2 để trống `boqCode` mặc định, QS gán trong Excel; khi cần cố định theo dự án → phát hành rule pack version mới có mã                                                 | Chấp nhận, xem lại sau UAT         |
-| Chi phí duy trì stack C#                                                                                      | Chấp nhận có chủ đích (ADR-0006)                                                                                                                                       | Đã chấp nhận                       |
-| License thư viện Excel                                                                                        | ClosedXML = MIT (kèm phụ thuộc DocumentFormat.OpenXml của Microsoft, MIT) — dùng thương mại tự do                                                                      | Đã chốt                            |
+| Mục                                                                                                           | Xác minh/giảm thiểu                                                                                                                                                                                                   | Quyết định                         |
+| ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| **Trôi quy tắc giữa 2 tầng**                                                                                  | Rule pack một nguồn + test đối chứng AC6 chạy trong CI phần server + Core test dùng cùng corpus với test TS                                                                                                           | Giảm thiểu — rủi ro số 1           |
+| Không có runner Windows có license cho CI                                                                     | PR7a đã tách phần đối chứng **quy tắc** (AC6 layer/font) chạy được trên CI Linux; phần hình học + AC9–AC13 chạy tay theo release trên máy có license, ghi rõ trong DoD                                                | **Giảm thiểu — chỉ còn chặn PR7b** |
+| Đời AutoCAD cụ thể đang dùng                                                                                  | **ĐÃ CHỐT: AutoCAD 2026, 1 bản build** (§9.1). Nền .NET **KHÔNG cố định**: bản cập nhật 2026-08-25 đổi Managed API từ .NET 8 sang .NET 10 → Adapter nay `net10.0-windows`. Phải kiểm lại sau mỗi bản cập nhật AutoCAD | **Đã chốt**                        |
+| Token desktop mở rộng bề mặt tấn công                                                                         | Scope hẹp, có hạn, thu hồi được, chỉ lưu hash, rate limit; rà `docs/audit.md`                                                                                                                                         | Giảm thiểu (PR2)                   |
+| Plugin làm hỏng bản vẽ thật                                                                                   | Chỉ-kiểm là mặc định; 1 nhóm UNDO; giữ bản gốc; pilot hẹp                                                                                                                                                             | Giảm thiểu                         |
+| **Bóc sai vì đơn vị bản vẽ ≠ mm**                                                                             | Đọc `INSUNITS` + quy đổi tự động + cảnh báo cố định trong báo cáo/Excel (§6.7, AC13)                                                                                                                                  | Giảm thiểu                         |
+| **Bóc trùng / bỏ sót khi chạy nhiều lần**                                                                     | XData đánh dấu sống trong DWG (FR14/FR16), mặc định bỏ qua đã bóc, có lệnh gỡ + báo số bị bỏ qua                                                                                                                      | Giảm thiểu                         |
+| **Khối lượng đo được ≠ khối lượng thật thi công** (ống vẽ tim tuyến vs chiều dài lắp thật, chưa trừ phụ kiện) | Ghi rõ trong Excel cột I "đo theo tim tuyến trên bản vẽ"; hệ số hao hụt/phụ kiện là việc của QS trên cột F/định mức — plugin không tự cộng                                                                            | Chấp nhận có chủ đích              |
+| `boqCode` tùy dự án, rule pack là toàn cục                                                                    | v2 để trống `boqCode` mặc định, QS gán trong Excel; khi cần cố định theo dự án → phát hành rule pack version mới có mã                                                                                                | Chấp nhận, xem lại sau UAT         |
+| Chi phí duy trì stack C#                                                                                      | Chấp nhận có chủ đích (ADR-0006)                                                                                                                                                                                      | Đã chấp nhận                       |
+| License thư viện Excel                                                                                        | ClosedXML = MIT (kèm phụ thuộc DocumentFormat.OpenXml của Microsoft, MIT) — dùng thương mại tự do                                                                                                                     | Đã chốt                            |
 
 ## 19. Approval
 

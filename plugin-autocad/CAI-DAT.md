@@ -9,10 +9,9 @@ phần build/đóng gói trong [`README.md`](README.md).
 
 ## 0. Trước bản cài đầu tiên trong công ty (người phát hành làm 1 lần)
 
-**Đã xác minh 2026-08-25** trên AutoCAD 2026 thật: `acmgd.dll` là `.NETCoreApp,Version=v8.0`,
-`Acmgd, Version=25.1.0.0` — đúng nền plugin đang build. Không cần làm lại cho bản 2026.
-
-Khi phát hành cho **đời AutoCAD khác**, kiểm lại bằng lệnh sau (chỉ đọc tệp, không nạp assembly):
+**Kiểm lại sau MỖI bản cập nhật AutoCAD** (không chỉ khi đổi đời): ngày 2026-08-25, một bản cập
+nhật AutoCAD 2026 đã đổi Managed API từ .NET 8 sang **.NET 10** chỉ trong vài tiếng, khiến plugin
+build cho nền cũ không biên dịch lại được. Nền hiện tại: **.NET 10**. Lệnh kiểm (chỉ đọc tệp):
 
 ```powershell
 $b = [IO.File]::ReadAllBytes("C:\Program Files\Autodesk\AutoCAD 2026\acmgd.dll")
@@ -20,7 +19,7 @@ $s = [Text.Encoding]::UTF8.GetString($b)
 [regex]::Matches($s, '\.NET[A-Za-z]*,Version=v[0-9\.]+') | ForEach-Object { $_.Value } | Select-Object -Unique
 ```
 
-Không ra `.NETCoreApp,Version=v8.0` → **dừng lại**, báo đội phát triển sửa `TargetFramework` theo
+Không ra `.NETCoreApp,Version=v10.0` → **dừng lại**, báo đội phát triển sửa `TargetFramework` theo
 giá trị thật rồi build lại (M99 §9.1).
 
 ## 1. Lấy gói cài

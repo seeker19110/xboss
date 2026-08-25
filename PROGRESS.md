@@ -492,6 +492,30 @@ dùng duyệt hướng xử lý.
 - **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
   M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
 
+## AutoCAD 2026 tự cập nhật đổi nền .NET 8 → .NET 10 GIỮA HAI LẦN BUILD (2026-08-25)
+
+Buổi sáng: `acmgd.dll` khai `.NETCoreApp,Version=v8.0`, Adapter build `net8.0-windows` chạy tốt,
+tôi ghi vào M99 §9.1 rằng "assumption runtime đã đóng". **Vài tiếng sau, cùng lệnh kiểm, cùng tệp,
+trả `.NETCoreApp,Version=v10.0`** — AutoCAD đã tự cập nhật — và build đổ ngay:
+
+```
+CSC : error CS1705: Assembly 'Acmgd' ... uses 'System.Runtime, Version=10.0.0.0'
+      which has a higher version than referenced assembly 'System.Runtime, Version=8.0.0.0'
+```
+
+- **Sửa:** `XBoss.Cad.Acad` → `net10.0-windows` (máy build cần .NET 10 SDK; `dong-goi.ps1` kiểm
+  sớm và báo tiếng Việt nếu thiếu). `XBoss.Cad.Core`/`Tests` **giữ `net8.0`** — không chạm assembly
+  AutoCAD nên CI Linux vẫn build/test được, app net10 tham chiếu thư viện net8 bình thường.
+- **Cổng CI** đổi từ "mọi csproj phải là net8.0" sang kiểm **từng project một nền rõ ràng** — cổng
+  cũ sẽ báo đỏ chính bản vá này.
+- **Kết luận sai đã đính chính trong tài liệu:** nền .NET của AutoCAD **không phải hằng số** để
+  "chốt một lần", mà là **mục phải kiểm lại sau mỗi bản cập nhật AutoCAD**. Trọng tài cuối cùng là
+  trình biên dịch (CS1705 nói thẳng nền thật); chuỗi TargetFramework trong tệp chỉ đúng tại thời
+  điểm đọc. M99 §9.1/§18, README plugin và CAI-DAT.md sửa theo.
+- **Rủi ro rút ra cho vận hành:** máy trạm nào cập nhật AutoCAD trước khi có bản plugin build lại
+  sẽ **không nạp được plugin**. Trước khi phát hành rộng, cần chốt chính sách hoãn cập nhật AutoCAD
+  hoặc phát hành plugin bám sát bản cập nhật.
+
 ## M99 — Rule pack v3: `fontMap.targetFont` + plugin đổi font kiểu chữ (2026-08-25)
 
 Người dùng chốt **phương án (a)** cho khoảng trống phát hiện hôm nay (chuẩn hóa đổi nội dung chữ
