@@ -75,6 +75,13 @@ internal static class BlockLibraryService
         }
     }
 
+    /// <summary>
+    /// JSON manifest trong cache, NGUYÊN VĂN như server gửi — kể cả những khóa plugin chưa model
+    /// (vd <c>fileKey</c> của M104). Manifest ứng viên (M103) phải dựng trên chuỗi này, không dựng
+    /// lại từ model, nếu không các khóa đó rụng và server từ chối ứng viên.
+    /// </summary>
+    internal static string ManifestJson() => File.ReadAllText(ManifestPath);
+
     /// <summary>Thư viện hiện hành hoặc null kèm thông báo đã in ra dòng lệnh (dùng đầu mỗi lệnh).</summary>
     internal static BlockManifest? CanThuVien(Editor ed)
     {
@@ -128,7 +135,17 @@ internal static class BlockLibraryService
     /// ra ngoài các lỗi "mềm" (chưa phát hành, mất mạng): thiếu thư viện chỉ chặn lệnh chèn block,
     /// không được làm hỏng luồng XBOSS_LOGIN.
     /// </summary>
-    internal static async Task<string> TaiVeAsync(XBossApiClient client, string token)
+    internal static async Task<string> TaiVeAsync(XBossApiClient client, string token) =>
+        (await TaiVeChiTietAsync(client, token)).ThongDiep;
+
+    /// <summary>
+    /// Như <see cref="TaiVeAsync"/> nhưng nói rõ ĐÃ CHẮC CHẮN cache = bản đang phát hành hay chưa.
+    /// <c>ThanhCong = true</c> chỉ khi cache khớp server (tải mới xong, hoặc 304 và cache còn lành).
+    /// Cần cho <c>XBOSS_VE_DEXUAT</c> (M103 §1): đề xuất dựng trên thư viện cũ sẽ bị server trả
+    /// 409 stale, nên thà dừng ngay còn hơn để kỹ sư dựng ứng viên xong mới biết.
+    /// </summary>
+    internal static async Task<(bool ThanhCong, string ThongDiep)> TaiVeChiTietAsync(
+        XBossApiClient client, string token)
     {
         try
         {
@@ -138,43 +155,44 @@ internal static class BlockLibraryService
             {
                 var (cu, loi) = HienHanh();
                 return cu is not null
-                    ? $"Thư viện block không đổi so với cache (version {cu.Version}, {cu.Blocks.Count} block)."
-                    : $"Thư viện block không đổi trên server nhưng cache hỏng: {loi}";
+                    ? (true, $"Thư viện block không đổi so với cache (version {cu.Version}, {cu.Blocks.Count} block).")
+                    : (false, $"Thư viện block không đổi trên server nhưng cache hỏng: {loi}");
             }
 
             // 304 mà cache khuyết tệp ⇒ hỏi lại từ đầu, không giữ etag rỗng nghĩa.
             if (json is null)
             {
                 (json, etagMoi) = await client.FetchBlockLibManifestAsync(token);
-                if (json is null) return "Server báo thư viện block không đổi nhưng máy chưa có cache — thử lại sau.";
+                if (json is null)
+                    return (false, "Server báo thư viện block không đổi nhưng máy chưa có cache — thử lại sau.");
             }
 
             var (dwg, _) = await client.FetchBlockLibDwgAsync(token);
-            if (dwg is null || dwg.Length == 0) return "Server không trả được tệp .dwg thư viện block.";
+            if (dwg is null || dwg.Length == 0) return (false, "Server không trả được tệp .dwg thư viện block.");
 
             var manifest = GhiCache(json, dwg, etagMoi);
-            return $"Đã tải thư viện block {manifest.Version} ({manifest.Blocks.Count} block) → {ThuMucCache}";
+            return (true, $"Đã tải thư viện block {manifest.Version} ({manifest.Blocks.Count} block) → {ThuMucCache}");
         }
         catch (BlockManifestException e)
         {
-            return $"Thư viện block server trả về KHÔNG hợp lệ — giữ cache cũ: {e.Message}";
+            return (false, $"Thư viện block server trả về KHÔNG hợp lệ — giữ cache cũ: {e.Message}");
         }
         catch (XBossApiException e)
         {
-            return $"Không tải được thư viện block: {e.Message}";
+            return (false, $"Không tải được thư viện block: {e.Message}");
         }
         catch (HttpRequestException e)
         {
-            return $"Không kết nối được server để tải thư viện block ({e.Message}) — dùng cache cục bộ nếu có.";
+            return (false, $"Không kết nối được server để tải thư viện block ({e.Message}) — dùng cache cục bộ nếu có.");
         }
         catch (IOException e)
         {
-            return $"Không ghi được thư viện block vào cache: {e.Message}";
+            return (false, $"Không ghi được thư viện block vào cache: {e.Message}");
         }
         catch (UnauthorizedAccessException e)
         {
             // Lệnh gọi là async void (XBOSS_LOGIN) — ngoại lệ lọt ra sẽ hạ cả AutoCAD, nên bắt luôn.
-            return $"Không có quyền ghi vào {ThuMucCache}: {e.Message}";
+            return (false, $"Không có quyền ghi vào {ThuMucCache}: {e.Message}");
         }
     }
 

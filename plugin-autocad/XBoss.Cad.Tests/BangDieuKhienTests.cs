@@ -1,3 +1,4 @@
+using XBoss.Cad.Core.Api;
 using XBoss.Cad.Core.Inspection;
 using XBoss.Cad.Core.Reporting;
 using XBoss.Cad.Core.Ui;
@@ -21,15 +22,22 @@ public sealed class BangDieuKhienTests
         SoQuyTacBoc = 12,
         SoNhomLayer = 5,
         TenBanVe = "M-DUCT-T05.dwg",
+        ThuVienVersion = "b3",
+        SoBlockThuVien = 9,
     };
 
     [Fact]
-    public void PhienDayDu_BaKhoi_KhongCoNutGoiY()
+    public void PhienDayDu_BonKhoi_ChiConNutDeXuatBlock()
     {
         var khoi = BangDieuKhienModel.Dung(TrangThaiDu());
-        Assert.Equal(3, khoi.Count);
-        Assert.All(khoi, k => Assert.Null(k.LenhGoiY));
+        Assert.Equal(4, khoi.Count);
         Assert.Contains(khoi[1].Dong, d => d.NoiDung.Contains("v7") && d.NoiDung.Contains("12 quy tắc") && d.MucDo == MucDo.Tot);
+        // Kết nối/rule pack/bản vẽ đều đủ ⇒ không gợi ý gì; khối thư viện luôn có lối đề xuất block.
+        Assert.Null(khoi[0].LenhGoiY);
+        Assert.Null(khoi[1].LenhGoiY);
+        Assert.Null(khoi[3].LenhGoiY);
+        Assert.Equal("XBOSS_VE_DEXUAT", khoi[2].LenhGoiY);
+        Assert.Equal("Đề xuất block…", khoi[2].NhanLenh);
     }
 
     [Fact]
@@ -60,8 +68,63 @@ public sealed class BangDieuKhienTests
     public void ChuaCoBanVe_VaChuaCoBaoCao_HienThongDiepRo()
     {
         var khoi = BangDieuKhienModel.Dung(TrangThaiDu() with { TenBanVe = null });
-        Assert.Contains(khoi[2].Dong, d => d.NoiDung.Contains("Chưa lưu/chưa mở"));
-        Assert.Contains(khoi[2].Dong, d => d.NoiDung.Contains("Chưa có báo cáo"));
+        Assert.Contains(khoi[3].Dong, d => d.NoiDung.Contains("Chưa lưu/chưa mở"));
+        Assert.Contains(khoi[3].Dong, d => d.NoiDung.Contains("Chưa có báo cáo"));
+    }
+
+    // ── Khối "Thư viện block" + đề xuất (M103 §4) ──
+
+    [Fact]
+    public void ChuaCoThuVienBlock_GoiYNapThuVienChuKhongPhaiDeXuat()
+    {
+        // Không có thư viện thì không dựng được ứng viên ⇒ nút phải đưa về đường nạp thư viện.
+        var khoi = BangDieuKhienModel.Dung(TrangThaiDu() with { ThuVienVersion = null, SoBlockThuVien = 0 });
+        Assert.Equal("XBOSS_VE_THUVIEN", khoi[2].LenhGoiY);
+        Assert.Contains(khoi[2].Dong, d => d.MucDo == MucDo.CanhBao);
+    }
+
+    [Fact]
+    public void ThuVienHong_HienDungLyDo()
+    {
+        var khoi = BangDieuKhienModel.Dung(TrangThaiDu() with
+        { ThuVienVersion = null, LoiThuVien = "Thư viện block trong cache KHÔNG dùng được: hash lệch" });
+        Assert.Contains(khoi[2].Dong, d => d.NoiDung.Contains("hash lệch") && d.MucDo == MucDo.CanhBao);
+    }
+
+    [Fact]
+    public void DeXuatChoDuyet_HienTenBlockVaDemDung()
+    {
+        var khoi = BangDieuKhienModel.Dung(TrangThaiDu() with
+        {
+            DeXuat =
+            [
+                new() { BlockName = "XB-VAN-BI", Status = "pending", StatusNhan = "Chờ duyệt" },
+                new() { BlockName = "XB-FCU-2", Status = "approved", StatusNhan = "Đã duyệt", PublishedVersion = "b4" },
+            ],
+        });
+        Assert.Contains(khoi[2].Dong, d => d.Muc == "Đề xuất của tôi" && d.NoiDung.Contains("1 chờ duyệt") && d.NoiDung.Contains("XB-VAN-BI"));
+        Assert.Contains(khoi[2].Dong, d => d.Muc == "Gần nhất" && d.NoiDung.Contains("thư viện b4") && d.MucDo == MucDo.Tot);
+    }
+
+    [Fact]
+    public void DeXuatBiTuChoi_HienLyDoTuChoi()
+    {
+        var khoi = BangDieuKhienModel.Dung(TrangThaiDu() with
+        {
+            LaNguoiDuyet = true,
+            DeXuat = [new() { BlockName = "XB-CO-90", Status = "rejected", StatusNhan = "Từ chối", RejectReason = "Trùng với co có sẵn" }],
+        });
+        // Admin/PM thấy đề xuất của cả đội ⇒ nhãn phải khác "của tôi".
+        Assert.Contains(khoi[2].Dong, d => d.Muc == "Đề xuất (cả đội)");
+        Assert.Contains(khoi[2].Dong, d => d.NoiDung.Contains("Trùng với co có sẵn") && d.MucDo == MucDo.CanhBao);
+    }
+
+    [Fact]
+    public void KhongHoiDuocServer_HienLyDoChuKhongCoiLaKhongCoDeXuat()
+    {
+        var khoi = BangDieuKhienModel.Dung(TrangThaiDu() with { LoiDeXuat = "Không kết nối được server (timeout)" });
+        Assert.Contains(khoi[2].Dong, d => d.NoiDung.Contains("Không kết nối được server"));
+        Assert.DoesNotContain(khoi[2].Dong, d => d.NoiDung.Contains("Không có đề xuất nào"));
     }
 
     // ── SidecarSummary trên JSON từ các lớp báo cáo THẬT ──

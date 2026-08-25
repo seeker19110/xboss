@@ -1,4 +1,5 @@
 using System.Text.Json;
+using XBoss.Cad.Core.Api;
 
 namespace XBoss.Cad.Core.Ui;
 
@@ -8,8 +9,15 @@ public enum MucDo { BinhThuong, Tot, CanhBao }
 /// <summary>Một dòng trên bảng điều khiển: nhãn mục + nội dung + mức độ.</summary>
 public sealed record DongTrangThai(string Muc, string NoiDung, MucDo MucDo);
 
-/// <summary>Một khối (section) trên bảng điều khiển, kèm lệnh gợi ý (nút hành động nhanh).</summary>
-public sealed record KhoiTrangThai(string TieuDe, IReadOnlyList<DongTrangThai> Dong, string? LenhGoiY);
+/// <summary>
+/// Một khối (section) trên bảng điều khiển, kèm lệnh gợi ý (nút hành động nhanh).
+/// <paramref name="NhanLenh"/> = chữ trên nút; null thì Adapter tự đặt "Chạy &lt;lệnh&gt;".
+/// </summary>
+public sealed record KhoiTrangThai(
+    string TieuDe,
+    IReadOnlyList<DongTrangThai> Dong,
+    string? LenhGoiY,
+    string? NhanLenh = null);
 
 /// <summary>
 /// Trạng thái phiên plugin — dữ liệu THÔ do Adapter gom (đọc CredentialStore/RulePackStore/
@@ -27,6 +35,21 @@ public sealed record TrangThaiPhien
     public string? TenBanVe { get; init; }
     /// <summary>Tóm tắt các sidecar JSON cạnh DWG (kiểm tra/chuẩn hóa/bóc tách/phiên vẽ).</summary>
     public IReadOnlyList<DongTrangThai> KetQuaGanNhat { get; init; } = [];
+
+    // ===== Thư viện block + đề xuất (M103 §4) =====
+
+    /// <summary>Version thư viện block trong cache; null = chưa có/không dùng được.</summary>
+    public string? ThuVienVersion { get; init; }
+    public int SoBlockThuVien { get; init; }
+    /// <summary>Lý do thư viện block không dùng được (cache hỏng/chưa tải).</summary>
+    public string? LoiThuVien { get; init; }
+
+    /// <summary>Đề xuất block lấy từ server (Admin/PM: của cả đội) — rỗng khi chưa gọi được.</summary>
+    public IReadOnlyList<XBossApiClient.DeXuatTomTat> DeXuat { get; init; } = [];
+    /// <summary>Người đang xem là Admin/PM (thấy đề xuất của cả đội, duyệt trên web).</summary>
+    public bool LaNguoiDuyet { get; init; }
+    /// <summary>Vì sao chưa lấy được danh sách đề xuất (mất mạng/chưa ghép thiết bị).</summary>
+    public string? LoiDeXuat { get; init; }
 }
 
 /// <summary>
@@ -71,8 +94,61 @@ public static class BangDieuKhienModel
         [
             new("Kết nối XBoss", ketNoi, t.DaGhepThietBi ? null : "XBOSS_LOGIN"),
             new("Rule pack", rulePack, t.RulePackVersion is null ? "XBOSS_RULEPACK" : null),
+            KhoiThuVienBlock(t),
             new("Bản vẽ hiện hành", banVe, null),
         ];
+    }
+
+    /// <summary>
+    /// Khối "Thư viện block" (M103 §4): version thư viện đang dùng + trạng thái đề xuất
+    /// (chờ duyệt + kết quả gần nhất). Chưa có thư viện thì nút đổi thành nạp thư viện — đề xuất
+    /// bắt buộc dựng trên thư viện hiện hành nên không có thư viện là không đề xuất được.
+    /// </summary>
+    private static KhoiTrangThai KhoiThuVienBlock(TrangThaiPhien t)
+    {
+        var dong = new List<DongTrangThai>
+        {
+            t.ThuVienVersion is null
+                ? new("Thư viện", t.LoiThuVien ?? "Chưa có trên máy — chạy XBOSS_LOGIN hoặc XBOSS_VE_THUVIEN", MucDo.CanhBao)
+                : new("Thư viện", $"{t.ThuVienVersion} — {t.SoBlockThuVien} block", MucDo.Tot),
+        };
+
+        var nhanDeXuat = t.LaNguoiDuyet ? "Đề xuất (cả đội)" : "Đề xuất của tôi";
+        if (t.LoiDeXuat is not null)
+        {
+            dong.Add(new(nhanDeXuat, t.LoiDeXuat, MucDo.BinhThuong));
+        }
+        else
+        {
+            var cho = t.DeXuat.Where(d => d.Status == "pending").ToList();
+            dong.Add(cho.Count == 0
+                ? new DongTrangThai(nhanDeXuat, "Không có đề xuất nào chờ duyệt", MucDo.BinhThuong)
+                : new DongTrangThai(
+                    nhanDeXuat,
+                    $"{cho.Count} chờ duyệt: {string.Join(", ", cho.Select(d => d.BlockName))}",
+                    MucDo.CanhBao));
+
+            // Kết quả gần nhất (server trả mới nhất trước) — người đề xuất phải thấy được vì sao
+            // bị từ chối, và block đã lên thư viện version nào khi được duyệt.
+            if (t.DeXuat.FirstOrDefault(d => d.Status != "pending") is { } ganNhat)
+            {
+                var chiTiet = ganNhat.Status switch
+                {
+                    "approved" => ganNhat.PublishedVersion is { Length: > 0 } v
+                        ? $"đã duyệt → thư viện {v}"
+                        : "đã duyệt",
+                    "rejected" => $"bị từ chối — {ganNhat.RejectReason ?? "không ghi lý do"}",
+                    "stale" => "thư viện đã đổi version — dựng lại bằng XBOSS_VE_DEXUAT",
+                    _ => ganNhat.StatusNhan,
+                };
+                dong.Add(new("Gần nhất", $"{ganNhat.BlockName}: {chiTiet}",
+                    ganNhat.Status == "approved" ? MucDo.Tot : MucDo.CanhBao));
+            }
+        }
+
+        return t.ThuVienVersion is null
+            ? new KhoiTrangThai("Thư viện block", dong, "XBOSS_VE_THUVIEN", "Nạp thư viện block")
+            : new KhoiTrangThai("Thư viện block", dong, "XBOSS_VE_DEXUAT", "Đề xuất block…");
     }
 }
 

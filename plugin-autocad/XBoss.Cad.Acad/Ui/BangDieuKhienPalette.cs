@@ -33,7 +33,7 @@ internal static class BangDieuKhienPalette
             _paletteSet.Visible = false;
             return;
         }
-        _control!.HienThi(TrangThaiGom.LayTrangThai());
+        _control!.LamMoi();
         _paletteSet.Visible = true;
     }
 }
