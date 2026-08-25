@@ -11,6 +11,45 @@
 - **Phát hiện khi thi hành:** hậu tố nét biên `-EDGE` phác trong M100 §11 **vẫn khớp** token layer tim (`M-DUCT-SUPP-EDGE` chứa token `M-DUCT-SUPP`, dấu `-` là ranh giới token) → nét biên bị bóc trùng, vỡ FR4/AC3. v4 phát hành hậu tố `EDGE` (nối liền); validator có ca test chứng minh `-EDGE` bị chặn.
 - Test: dotnet 105 ca xanh (94 cũ + 11 mới, corpus đối chứng chuyển sang v4 chứng minh AC9 mở rộng thuần); test node 1237 ca xanh.
 
+## M100 PR2 — Thư viện block chuẩn có version (server + web + Core) (2026-08-25)
+
+Nền móng thứ hai của bộ lệnh vẽ `XBOSS_VE_*` (M100 §6.10/§7 FR2/§10/§11/§12). Chưa có lệnh vẽ nào
+dùng tới — PR4/PR6 mới tiêu thụ.
+
+**Đã làm**
+
+- `migrations/0139_cad_block_libs.sql` — bảng `cad_block_libs` (version UNIQUE, manifest JSONB,
+  storage_key, dwg_sha256, published_by, created_at) + audit trigger. Thêm thuần, toàn cục (không
+  org_id/project_id — §18 đã chốt thư viện toàn cục, theo dự án để §20).
+- `lib/ky-thuat/cad/block-lib.ts` — kiểm định + phát hành + đọc. Máy chủ **không đọc DWG**: chỉ băm
+  sha256 + soi 4 byte chữ ký, còn "block khai trong manifest có thật không" kiểm qua **bản DXF
+  sidecar** người phát hành nộp kèm bằng đúng parser tầng 3 (`validateDxf`/`parseDxf`, như
+  `plugin-upload.ts`). Chặn: hash lệch, block khai không có trong DXF, kind lạ/id trùng, thiết bị
+  thiếu `TAG`, khung tên thiếu `paper`/`attributes`. Cảnh báo (không chặn): tên block lệch
+  `takeoff.blockNameMatchAny` của rule pack hiện hành, thiếu/sai `takeoffItemId`, ATTDEF thiếu.
+  Idempotent theo (version, hash); cùng version khác nội dung → xung đột, bắt tăng version.
+- `app/api/engineering/cad/block-lib/route.ts` — GET tải `.dwg` (hoặc `?manifest=1`) cho phiên web
+  **và** token scope `cad` của plugin, ETag → 304; POST phát hành chỉ phiên Admin/PM (không nhận
+  token thiết bị), rate limit, 422 kèm danh sách lỗi tiếng Việt.
+- Web: mục "Thư Viện Block" trên `/engineering/chuan-hoa-ban-ve` — version hiện hành, lịch sử, nút
+  tải `.dwg`/manifest, form phát hành (Admin/PM) hiện lỗi + cảnh báo ngay dưới form.
+- `XBoss.Cad.Core/Draw/BlockManifest.cs` — parse + validate manifest phía plugin (kind, attribute
+  bắt buộc theo kind, tên block trùng chỉ khác hoa thường) và **đối chiếu sha256 tệp cache**, lệch
+  là từ chối dùng.
+- Bộ mẫu dùng chung 2 tầng trong `plugin-autocad/doi-chung/`
+  (`block-lib-manifest-mau.json` + `block-lib-mau.dxf` + `block-lib-mau.dwg.txt`) — cùng một tệp
+  cho `tests/cad-block-lib.test.ts` (tầng 3) lẫn `BlockManifestTests.cs` (tầng 2), chống trôi.
+- `hasToken`/`hasAnyToken` của `dxf-parser.ts` xuất ra ngoài để việc khớp
+  `takeoff.blockNameMatchAny` dùng **đúng một** bộ matcher (khớp bản C# `TokenMatcher`).
+
+**Nợ kỹ thuật / theo dõi**
+
+- Service worker cache API GET kiểu stale-while-revalidate nên `/api/engineering/cad/block-lib`
+  cũng bị cache như `/api/engineering/cad/rule-pack`. Link tải trên web đã gắn `?v=<version>` nên
+  không phục vụ nhầm bản cũ; nếu về sau muốn loại hẳn khỏi cache thì thêm vào `swExclude`
+  (`lib/nen/modules.ts`) + `public/sw.js` và tăng `CACHE` — chưa làm vì đụng vùng rủi ro cao
+  ngoài phạm vi PR.
+
 ## M100 + M101 — Đặc tả giai đoạn 2 plugin AutoCAD: bộ lệnh vẽ `XBOSS_VE_*` + nâng trần 3 khối M99 — ĐÃ DUYỆT (2026-08-25)
 
 Người dùng yêu cầu (2026-08-25, qua thảo luận trần năng lực plugin): (1) "viết đặc tả M mới cho lệnh vẽ XBOSS_VE — có block, layer chuẩn hoá sẵn cho từng hệ MEPF và plugin vẽ đè lên thiết kế đã chuẩn hoá"; bổ sung giữa chừng "tạo trang in, mặt cắt" và (2) "nâng cấp tất cả tính năng lên mức trần cao nhất". Sau đó rà sót tính năng vẽ → người dùng **duyệt trọn gói cùng ngày** ("ok duyệt tất cả") kèm yêu cầu ghi chú tính năng đáng giá cho phiên bản sau. Nhánh `claude/plugin-capabilities-limits-rrd2gp`. **Chỉ đặc tả — CHƯA CODE.**

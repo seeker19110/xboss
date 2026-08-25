@@ -3,6 +3,7 @@
 // Thuần miền kỹ thuật, không biết gì về HTTP (ADR-0008) — route chỉ bọc NextResponse.
 import { query } from "@/lib/db";
 import { getCurrentRulePack } from "@/lib/ky-thuat/cad/rule-pack";
+import { layLichSuBlockLib } from "@/lib/ky-thuat/cad/block-lib";
 
 export type TomTatRulePack = {
   version: string;
@@ -34,6 +35,33 @@ export function tomTatRulePack(): TomTatRulePack {
     soNhomLayer: pack.layerMap.groups.length,
     soHangMucBocTach: pack.takeoff.items.length,
   };
+}
+
+/** Một bản phát hành thư viện block, rút gọn cho bảng điều khiển (M100 PR2 §13). */
+export type TomTatBlockLib = {
+  version: string;
+  soBlock: number;
+  dwgSha256: string;
+  nguoiPhatHanh: string | null;
+  ngayPhatHanh: string | null;
+};
+
+/**
+ * Thư viện block: bản hiện hành + lịch sử phát hành. Thư viện là append-only nên bản mới nhất
+ * chính là bản hiện hành — lấy một lượt rồi tách, không truy vấn hai lần.
+ */
+export async function layTomTatBlockLib(
+  limit = 10,
+): Promise<{ hienHanh: TomTatBlockLib | null; lichSu: TomTatBlockLib[] }> {
+  const rows = await layLichSuBlockLib(limit);
+  const lichSu = rows.map((r) => ({
+    version: r.version,
+    soBlock: r.manifest?.blocks?.length ?? 0,
+    dwgSha256: r.dwgSha256,
+    nguoiPhatHanh: r.nguoiPhatHanh,
+    ngayPhatHanh: r.createdAt,
+  }));
+  return { hienHanh: lichSu[0] ?? null, lichSu };
 }
 
 type Dong = {

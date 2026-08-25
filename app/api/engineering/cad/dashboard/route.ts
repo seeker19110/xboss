@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { layLichSuPluginUpload, tomTatRulePack } from "@/lib/ky-thuat/cad/bang-dieu-khien";
+import {
+  layLichSuPluginUpload,
+  layTomTatBlockLib,
+  tomTatRulePack,
+} from "@/lib/ky-thuat/cad/bang-dieu-khien";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +24,9 @@ export async function GET() {
   // trong CI, xem §9.1). Thiếu biến → UI hiện hướng dẫn build từ plugin-autocad/README.md.
   const pluginUrl = process.env.XBOSS_PLUGIN_URL || null;
   const lichSu = projectId == null ? [] : await layLichSuPluginUpload(projectId);
+  // Thư viện block (M100 PR2) là tài nguyên TOÀN CỤC — không lọc theo dự án như lịch sử upload.
+  // `choPhatHanh` để UI biết có hiện form phát hành không; quyền thật vẫn kiểm ở POST block-lib.
+  const blockLib = { ...(await layTomTatBlockLib()), choPhatHanh: isAdminOrPm(user.role) };
 
-  return NextResponse.json({ rulePack, pluginUrl, lichSu });
+  return NextResponse.json({ rulePack, pluginUrl, lichSu, blockLib });
 }
