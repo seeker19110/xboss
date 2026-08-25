@@ -80,7 +80,7 @@ public static class LenhCatalog
             "Xuất khối lượng đã bóc ra Excel đúng mẫu công ty, kèm sheet đối chiếu BOQ hợp đồng (tùy chọn).",
             NhomLenh.BocKhoiLuong, CanRulePack: true),
 
-        // ── Vẽ shop drawing (M100 — 14 lệnh) ──
+        // ── Vẽ shop drawing (M100 — 15 lệnh) ──
         new("XBOSS_VE_NEN", "Chuẩn bị nền",
             "Dựng đủ layer/style theo rule pack để bắt đầu vẽ shop drawing.",
             NhomLenh.VeShopDrawing, CanRulePack: true),
