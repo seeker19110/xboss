@@ -140,6 +140,31 @@ export function timLoiGoiSaiKieu(
           ham: m[2],
         });
       }
+
+      // ── Lượt 2: tham số CUỐI là BIẾN mảng ─────────────────────────────────────────────
+      // Lượt 1 chỉ bắt mảng LITERAL và chỉ khi tham số đầu là chuỗi SQL literal. Mẫu rất phổ
+      // biến `let sql = ...; const params: unknown[] = [...]; query(sql, params)` lọt qua CẢ
+      // HAI điều kiện đó — 5 chỗ như vậy đã chết 500 lúc chạy thật, phát hiện khi kiểm
+      // /engineering/bim-viewer trên trình duyệt (audit 2026-08-25 §3.7).
+      MAU_GOI.lastIndex = 0;
+      while ((m = MAU_GOI.exec(src)) !== null) {
+        const mo = m.index + m[0].length - 1;
+        const dong = timDauDong(src, mo);
+        if (dong < 0) continue;
+        const doiSo = src.slice(mo + 1, dong);
+        // Tham số cuối là một định danh trần (không phải `...params`, không phải lời gọi).
+        const cuoi = /,\s*([A-Za-z_$][\w$]*)\s*,?\s*$/.exec(doiSo);
+        if (!cuoi) continue;
+        const ten = cuoi[1];
+        // Chỉ tính là lỗi khi CHÍNH file này khai định danh đó là mảng.
+        const khaiMang = new RegExp(`(const|let|var)\\s+${ten}\\s*(:[^=;]*\\[\\]\\s*)?=\\s*\\[`);
+        if (!khaiMang.test(src)) continue;
+        viPham.push({
+          tep: relative(goc, tep),
+          dong: src.slice(0, m.index).split("\n").length,
+          ham: m[2],
+        });
+      }
     }
   }
   return viPham;

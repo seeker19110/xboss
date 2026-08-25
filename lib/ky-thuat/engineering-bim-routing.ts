@@ -140,7 +140,7 @@ export async function listBcfIssues(
   }
 
   sql += ` ORDER BY created_at DESC LIMIT 100`;
-  return await query<BcfIssueRecord>(sql, params);
+  return await query<BcfIssueRecord>(sql, ...params);
 }
 
 export async function resolveBcfIssue(

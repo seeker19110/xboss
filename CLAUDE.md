@@ -217,11 +217,12 @@ Parse file tracking gốc (sheet OGTĐ/OGHL/OGCH/ODNN) thành WBS — chứa log
 - Khi thêm API route mới: luôn có check auth + `export const dynamic = "force-dynamic"`.
 - TypeScript strict, import nội bộ qua alias `@/*`, tránh `any` tuỳ tiện.
 - SQL luôn dùng helper `lib/db` với placeholder `?` — **không nối chuỗi để chèn giá trị**.
+- **Auto-merge: BẬT cho MỌI PR** (quyết định 2026-08-25 của người dùng — "quy ước sẽ luôn bật auto merge cho mọi pr"). Mở PR xong là bật auto-merge ngay (`enable_pr_auto_merge`, merge method `SQUASH`), không chờ hỏi lại. PR sẽ tự merge khi required checks xanh — nghĩa là **trách nhiệm chất lượng dồn hết vào CI + phần tự kiểm trước khi push**: chạy đủ cổng ở mục "Definition of Done" bên dưới TRƯỚC khi mở PR, đừng dựa vào "để review bắt". Nếu lúc bật gặp trạng thái `unstable` (checks còn đang chạy) thì đợi checks xong rồi bật lại, đừng bỏ qua.
 - **Tiền tệ (M45 PR1):** parser oid 1700 (`lib/db/index.ts`) chuyển NUMERIC → `parseFloat` nên **cấm cộng/nhân tiền trên float JS**. Mọi tổng/tích tiền (`SUM`, `* rate`) làm **trong SQL**; JS chỉ hiển thị. Khi buộc phải tính tiếp ở JS (vd tỷ lệ VAT/tạm ứng/giữ lại), cast cột tiền `::text` trong SELECT rồi đưa qua `lib/nen/money.ts` (`parseMoney`/`addMoney`/`mulRate`/`formatVnd` — làm việc trên bigint đơn vị nhỏ = đồng×100).
 
 ## Quy trình & Definition of Done
 
-Luồng chuẩn: hiểu yêu cầu → khám phá & tái dùng → code → cập nhật test khi đổi logic → `npm run lint` + `npm run typecheck` (+ `npm test` khi có thể) → **cập nhật `PROGRESS.md` (và `docs/nang-cap/README.md` nếu đóng/mở 1 mục `M<xx>`)** → commit → push branch → mở **PR draft**.
+Luồng chuẩn: hiểu yêu cầu → khám phá & tái dùng → code → cập nhật test khi đổi logic → `npm run lint` + `npm run typecheck` (+ `npm test` khi có thể) → **cập nhật `PROGRESS.md` (và `docs/nang-cap/README.md` nếu đóng/mở 1 mục `M<xx>`)** → commit → push branch → mở **PR** → **bật auto-merge ngay** (xem Quy ước).
 
 Trước khi push, đảm bảo:
 

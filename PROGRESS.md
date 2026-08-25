@@ -14,6 +14,123 @@ Người dùng yêu cầu (2026-08-25, qua thảo luận trần năng lực plug
 - `docs/nang-cap/README.md`: thêm mục "Đặc tả chờ duyệt — đợt plugin AutoCAD giai đoạn 2".
 - **Cả hai đặc tả Approved for implementation 2026-08-25.** **Tiếp theo:** lập PLAN.md (M100 PR1 khởi đầu — rule pack v4 + validator) giao coordinator theo bảng route; nội dung block `.dwg` đầu tiên là việc của kỹ sư trưởng/CAD manager (M100 §16).
 
+## Thi hành toàn bộ 8 đề xuất của audit tính năng (2026-08-25)
+
+Người dùng: "làm toàn bộ theo hướng tốt nhất". Cả 8 đề xuất trong
+`docs/audit-2026-08-25-tinh-nang-theo-vong-doi.md` §5 đã xong (4 commit). Ba mục đổi hướng so
+với đề xuất ban đầu vì rà kỹ thấy dữ kiện khác — lý do ghi ở §9 của tài liệu đó.
+
+**Đã làm**
+
+1. **Nav (#1)** — mục "Rủi ro" đang trỏ `/hse` (trang không có nội dung rủi ro) → trỏ về
+   `/risks`; thêm nav cho `/schedule-control`, `/lookahead`, `/materials/reports`.
+2. **Số liệu bịa (#2)** — `/governance` và `/engineering-intelligence` chưa từng gọi API nay
+   fetch thật; 4 hub còn lại khởi tạo `"—"` thay số cứng, bỏ fallback `|| 6`/`|| 28`/`|| 142`;
+   `/schedule` tính tiến độ tổng + SPI thật từ `/api/dashboard` và `/api/dashboard/evm`; bỏ 2
+   nút giả (alert "Đang xuất Excel", "Xuất BCF-ZIP" không có endpoint), 3 badge số bịa, 6 chỗ
+   hard-code tên dự án. `/commercial` lộ thêm 3 lỗi đọc sai dữ liệu (khoá `items`, trường
+   `totalApproved` không tồn tại, cộng tiền trên float JS) — đã sửa theo quy ước M45 PR1.
+3. **Gộp vỏ mỏng (#3)** — chỉ `/scurve` (29 dòng) + `/timeline` (27 dòng) là vỏ mỏng thật →
+   chuyển hướng sang `/schedule?tab=`, e2e canh chuyển hướng. `/lookahead` và
+   `/schedule-control` GIỮ NGUYÊN: chúng có phần hub không có (bố cục in A4; Pareto bấm-để-lọc
+   - link sâu sang `/tracking`) — báo cáo ghi nhầm, đã đính chính.
+4. **Route không ai gọi (#4)** — con số đúng là **46/505** (báo cáo ghi 19 do script tạm lọc
+   sai file tự thân với route động). KHÔNG xoá: đều có kiểm quyền, nhiều route có test, và
+   `/api/devices/pair/claim` **do plugin AutoCAD gọi bằng C#** (suýt xoá nhầm vì grep chỉ quét
+   `.ts`). Thay bằng cổng `check:dead-routes` + allowlist 46 mục kèm lý do.
+5. **Danh tính thầu phụ (#5)** — migration **0137** (backfill `supplier_id` theo tên chuẩn hoá,
+   chỉ gắn khi khớp DUY NHẤT + unique index một phần) và `taoHoSoThauPhu()` bắt buộc
+   `supplierId`, chép tên từ `suppliers`. Thêm `POST /api/engineering/subcon-ai/scores` —
+   trước đó module M82 **không có đường tạo hồ sơ nào**, đó chính là lý do GET phải seed bịa.
+6. **Hai lớp song song (#6)** — **ADR-0011**: giữ hai lớp nhưng danh tính chỉ một nguồn; GET
+   không bao giờ ghi dữ liệu nghiệp vụ. Migration **0138** thêm FK `supplier_id` cho 3 bảng
+   còn giữ tên đối tác bằng chữ tự do. Cổng `check:engineering-danh-tinh`. Sáu cặp còn lại
+   chưa gộp — điều kiện để quyết ghi trong ADR.
+7. **Trang tĩnh (#7)** — `/mepf-process` có **75 dòng phê duyệt bịa** gán cho người có tên
+   thật và cả cơ quan nhà nước, kèm chữ ký SHA-256 sinh tại chỗ; tab "Sổ Cái Merkle" là chuỗi
+   cắm cứng. Đã xoá sạch, trỏ về `/approvals` + `/admin/audit-log`, tick lưu localStorage.
+   `/combine` bỏ nút xuất/duyệt giả, đăng ký `thuNghiem: true` + `ThuNghiemBanner`.
+8. **Canvas (#8)** — không gộp component (ba trang vẽ ba thứ khác hẳn), mà tách hook
+   `useCanvasHiDPI` xử lý đúng phần trùng-và-hỏng: DPR + co giãn theo container +
+   `toCanvasCoords`. Sửa lỗi **ghim hiện trường cắm sai chỗ** ở `/engineering/spatial-viewer`.
+
+**Ba lớp lỗi chỉ lộ ra khi thi hành** (không có trong báo cáo gốc):
+
+- **Hai endpoint GET tự ghi dữ liệu bịa vào DB thật**: `subcon-ai/scores` chèn 4 hồ sơ thầu
+  phụ kèm mã số thuế giả; `iot/devices` chèn 5 cảm biến kèm ngưỡng cảnh báo bịa. Đã gỡ +
+  `scripts/don-du-lieu-seed-bia.ts` dọn phần đã lỡ ghi (mặc định chỉ báo cáo).
+- **5 lời gọi `lib/db` truyền mảng** → `/api/engineering/bim-routing` đang trả **500 thật**
+  (`invalid input syntax for type bigint: "{"1"}"`). Cổng `check:db-params` bỏ sót vì chỉ bắt
+  mảng literal và bỏ qua lời gọi có tham số đầu là biến — đã sửa 5 chỗ + mở rộng cổng.
+- `/api/engineering/qs-bom-explosion` mặc định mọi tham số bằng giá trị bịa rồi **GHI** vào dự
+  án → nay thiếu tham số là 422.
+
+**Kiểm chứng**: `npm test` 225 file / **1.223 ca pass / 0 đỏ** trên Postgres 16 thật;
+`lint`/`typecheck`/`build` xanh; **11 cổng CI** xanh (3 cổng mới/mở rộng đều đã thử nghiệm
+ngược). Đo trên Chromium thật (`deviceScaleFactor=2`): 3 canvas khớp DPR, toạ độ ghim đúng
+kỳ vọng, `/api/engineering/bim-routing` trả `[]` thay vì 500.
+
+**Hai việc cần chạm production — đã chuẩn bị sẵn công cụ**
+
+- `npm run dem:engineering` (CHỈ ĐỌC, an toàn chạy thẳng production): in số dòng thật của từng
+  cặp bảng nghiệp vụ ↔ lớp engineering kèm kết luận gợi ý (rỗng → **xoá**; <1/10 → nghiêng về
+  xoá; cả hai có dữ liệu → **phải gộp thật**). Đây là dữ kiện DUY NHẤT còn thiếu để quyết 6 cặp
+  treo trong ADR-0011 — bảng quy tắc đọc kết quả ghi trong chính ADR đó.
+- **Migration 0137 và 0138 có UPDATE backfill → bắt buộc qua staging trước production** (DoD;
+  `npm run db:migrate -- --dry-run` kiểm trước). `tests/backfill-0137-0138.test.ts` đọc thẳng
+  file `.sql` rồi chạy lại đúng câu UPDATE sẽ chạy thật, chứng minh: khớp DUY NHẤT thì gắn,
+  trùng tên thì để NULL, không khớp thì để NULL, chạy lại lần hai không đổi gì.
+
+**Nợ còn lại**: chưa rà quyền theo nhóm vòng đời; chưa rà trùng lặp trong `lib/ky-thuat/`
+(31.426 dòng, 82 file).
+
+## Audit tính năng — gộp theo vòng đời dự án (2026-08-25)
+
+Người dùng: "audit tính năng và gộp lại theo nhóm". Chốt qua `AskUserQuestion`: **ra báo cáo
+trước, chưa sửa code**, trục nhóm là **vòng đời dự án**. Kết quả:
+`docs/audit-2026-08-25-tinh-nang-theo-vong-doi.md`.
+
+**Đã làm** — rà 122 trang / 505 route API / 269 bảng DB trên `main` (commit `5a7617b`), xếp
+**mọi trang đúng một lần** vào 6 giai đoạn vòng đời + 2 nhóm cắt ngang (kiểm bằng script:
+122 map / 122 trang, không sót, không trùng).
+
+**Phát hiện chính** (chi tiết + cách tái lập từng số trong tài liệu):
+
+1. **5 trang không có lối vào nào** — `/risks` (sổ rủi ro 587 dòng), `/materials/reports`,
+   `/schedule-control`, `/scurve`, `/timeline`: không trong sidebar **và** không trang nào
+   link tới. Đều nằm trong 20 trang khôi phục ở `docs/audit-hop-nhat-hub.md` — bước "trỏ lại
+   nav" sót đúng 5 trang. Kèm lỗi nav: mục "HSE" và mục "Rủi ro" **cùng trỏ `/hse`**, mà
+   `/hse` không có chữ "rủi ro" nào.
+2. **Số liệu bịa trên hub** — `/governance` và `/engineering-intelligence` **không fetch bao
+   giờ** nên KPI ("486 Tài liệu", "11 Agents"…) luôn là số bịa; 4 hub còn lại khởi tạo bằng
+   số cứng rồi mới fetch đè, `/commercial` bịa **giá trị tiền tỷ** khi API lỗi/dự án rỗng.
+3. **Hai stack song song cho 7 nghiệp vụ** (claim/EOT, thầu phụ, đấu thầu, dòng tiền, HSE,
+   BIM, rủi ro) — bảng DB riêng, route riêng, không tham chiếu nhau. Nặng nhất:
+   `engineering_subcon_profiles` tự giữ `company_name`/`tax_code` với FK `supplier_id` chỉ
+   **tuỳ chọn**, trong khi `subcontractor_profiles` khoá chính là `supplier_id` → cùng một
+   thầu phụ có thể tồn tại hai bản ghi lệch nhau, không cơ chế nào bắt.
+4. **4 vỏ mỏng của tab `/schedule`** (`/scurve` 29 dòng, `/timeline` 27, `/lookahead` 187,
+   `/schedule-control` 182) — bọc đúng các component mà hub đã import, −425 dòng nếu gộp
+   theo khuôn `/notifications` ở PR #390.
+5. **19 route API không ai gọi** (14 trong đó là `/api/engineering/*`); `/api/cron/*` và
+   `/api/v1/*` **không** tính là chết — không có caller trong repo là đúng thiết kế.
+6. **`/mepf-process` (2.011 dòng) + `/combine` (995 dòng)**: 0 `fetch`, 0 `localStorage` —
+   nội dung quy trình cắm cứng trong JSX, tick xong tải lại là mất.
+7. **Cân đối khối lượng**: 39/122 trang (34% dòng mã trang), 143/505 route API, **119/269
+   bảng DB (44%)** và **57% dòng của `lib/`** thuộc lớp `/engineering` — trong khi 12/25
+   module registry đang `thuNghiem: true` (tắt mặc định) đều nằm ở lớp này.
+
+**Tiếp theo** — §5 tài liệu xếp 8 đề xuất gộp theo tỷ lệ lợi ích/rủi ro. Khuyến nghị làm
+trước 4 việc thấp rủi ro, không đụng dữ liệu: (1) trỏ lại nav 5 trang mồ côi + sửa mục
+"Rủi ro"; (2) bỏ số liệu bịa ở 7 hub; (3) gộp 4 vỏ mỏng vào `/schedule?tab=`; (4) xoá 19
+route chết. Bốn việc còn lại (gộp bảng thầu phụ, chốt hướng 7 cặp stack song song, đưa nội
+dung tĩnh vào DB, tách component canvas dùng chung) **đụng schema/kiến trúc — chờ người chốt
+hướng**.
+
+**Chưa đo được**: mức dùng thật của các bảng `engineering_*` trên production (rỗng hay có dữ
+liệu quyết định "gộp" hay "xoá" ở đề xuất #6), rà quyền theo nhóm vòng đời, và rà trùng lặp
+còn lại trong `lib/ky-thuat/` (31.426 dòng, 82 file — chưa rà lại sau PR #390).
+
 ## Đóng nợ tương phản màu — sửa ở token + 2 cổng CI (2026-08-25)
 
 Người dùng: "làm luôn đợt sửa nợ tương phản zinc-500". Đo bằng axe trên bản production có dữ

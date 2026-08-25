@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import AppHeader from "@/app/components/AppHeader";
+import { useCanvasHiDPI } from "@/app/components/useCanvasHiDPI";
 import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import {
   Layers,
@@ -52,6 +53,8 @@ export default function GodTierStudioPage() {
 
   // 3D Canvas Camera State
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Canvas theo devicePixelRatio + co giãn theo container (audit 2026-08-25 §3.7).
+  const { size: canvasSize } = useCanvasHiDPI(canvasRef, { width: 800, height: 480 });
   const [cameraAngle, setCameraAngle] = useState<{ yaw: number; pitch: number; zoom: number }>({
     yaw: 45,
     pitch: 30,
@@ -147,8 +150,8 @@ export default function GodTierStudioPage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const width = canvas.width;
-    const height = canvas.height;
+    const width = canvasSize.width;
+    const height = canvasSize.height;
     ctx.clearRect(0, 0, width, height);
 
     // Vẽ lưới tọa độ không gian 3D nền
@@ -247,7 +250,7 @@ export default function GodTierStudioPage() {
       ctx.font = "10px Inter, sans-serif";
       ctx.fillText(`● ${statusLabel}`, px - sizeW / 2, py + sizeH / 2 + 14);
     });
-  }, [cameraAngle, timelineStep, modelElements, activeTab, pointCloudResult]);
+  }, [cameraAngle, timelineStep, modelElements, activeTab, pointCloudResult, canvasSize]);
 
   useEffect(() => {
     draw3DScene();
@@ -581,8 +584,6 @@ export default function GodTierStudioPage() {
               <div className="relative bg-zinc-900/90 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl h-[480px]">
                 <canvas
                   ref={canvasRef}
-                  width={800}
-                  height={480}
                   onMouseDown={handleMouseDown}
                   onMouseMove={handleMouseMove}
                   onMouseUp={handleMouseUp}
@@ -738,8 +739,6 @@ export default function GodTierStudioPage() {
                 <div className="relative bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden h-[340px]">
                   <canvas
                     ref={canvasRef}
-                    width={700}
-                    height={340}
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
@@ -910,12 +909,6 @@ export default function GodTierStudioPage() {
                   BlenderBIM.
                 </p>
               </div>
-              <button
-                onClick={() => alert("Đang xuất gói BCF-XML ZIP chuẩn buildingSMART...")}
-                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1.5"
-              >
-                <Download className="w-4 h-4" /> Xuất File BCF-ZIP
-              </button>
             </div>
 
             <div className="space-y-3">

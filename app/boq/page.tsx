@@ -686,8 +686,8 @@ function ImportBoqModal({
                   Biểu mẫu BOQ & Kiểm soát Đặt hàng chuẩn xBOSS
                 </p>
                 <p className="text-zinc-400 mt-0.5">
-                  Bao gồm hướng dẫn 4 nguyên tắc cốt lõi, bảng điều khiển định mức, mẫu trống và dữ
-                  liệu mẫu TT AVIO.
+                  Bao gồm hướng dẫn 4 nguyên tắc cốt lõi, bảng điều khiển định mức, mẫu trống và một
+                  bộ dữ liệu mẫu.
                 </p>
               </div>
               <a

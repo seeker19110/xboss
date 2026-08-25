@@ -41,74 +41,56 @@ function SiteSkeleton() {
 }
 
 function SiteCommandContent() {
+  // Dải KPI: khởi tạo "—", chỉ đổi khi API trả thật. Trước đây khởi tạo bằng số cắm cứng
+  // ("14 Task", "8 Sàn", "96/100") và fallback `|| 6` / `|| 8` / `|| 12` biến API lỗi hoặc
+  // dự án rỗng thành số bịa trông như thật (audit 2026-08-25 §3.2).
   const [stats, setStats] = useState<HubStat[]>([
-    {
-      label: "Việc Chờ Xử Lý",
-      value: "14 Task",
-      change: "Hạn hôm nay: 3",
-      isPositive: false,
-      icon: ClipboardList,
-    },
-    {
-      label: "Nghiệm Thu Chờ Duyệt",
-      value: "6 Phiếu",
-      change: "2 BBNT e-Sign",
-      isPositive: true,
-      icon: CheckSquare,
-    },
-    {
-      label: "Mặt Bằng Đang Thi Công",
-      value: "8 Sàn",
-      change: "FL06 - FL13",
-      isPositive: true,
-      icon: LandPlot,
-    },
-    {
-      label: "Chỉ Số An Toàn HSE",
-      value: "96/100",
-      change: "0 Tai nạn",
-      isPositive: true,
-      icon: ShieldCheck,
-    },
+    { label: "Nghiệm Thu Chờ Duyệt", value: "—", icon: CheckSquare },
+    { label: "Mặt Bằng Đang Thi Công", value: "—", icon: LandPlot },
+    { label: "Thiết Bị Cơ Giới", value: "—", icon: Wrench },
+    { label: "Ghi Nhận HSE Chưa Đóng", value: "—", icon: ShieldCheck },
   ]);
 
   useEffect(() => {
+    const get = (url: string) =>
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+
     Promise.all([
-      fetch("/api/approvals").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/work-fronts").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/equipment").then((r) => (r.ok ? r.json() : null)),
-    ]).then(([appData, wfData, eqData]) => {
-      const appCount = appData?.pending?.length || 6;
-      const wfCount = wfData?.fronts?.filter((f: any) => f.status === "active")?.length || 8;
-      const eqCount = eqData?.items?.length || 12;
+      get("/api/approvals"),
+      get("/api/work-fronts"),
+      get("/api/equipment"),
+      get("/api/hse"),
+    ]).then(([appData, wfData, eqData, hseData]) => {
+      const appCount: number | null = appData?.pending?.length ?? null;
+      const fronts: { status?: string }[] | null = wfData?.fronts ?? null;
+      const eqCount: number | null = eqData?.items?.length ?? null;
+      const hseOpen: number | null =
+        hseData?.records?.filter((r: { actionStatus?: string }) => r.actionStatus === "open")
+          .length ?? null;
 
       setStats([
         {
           label: "Nghiệm Thu Chờ Duyệt",
-          value: `${appCount} Phiếu`,
-          change: "Cần ký duyệt",
-          isPositive: appCount < 10,
+          value: appCount == null ? "—" : `${appCount} Phiếu`,
+          isPositive: appCount == null ? undefined : appCount < 10,
           icon: CheckSquare,
         },
         {
           label: "Mặt Bằng Đang Thi Công",
-          value: `${wfCount} Sàn`,
-          change: "FL06 - FL13",
-          isPositive: true,
+          value: fronts == null ? "—" : `${fronts.filter((f) => f.status === "active").length} Sàn`,
           icon: LandPlot,
         },
         {
           label: "Thiết Bị Cơ Giới",
-          value: `${eqCount} Máy móc`,
-          change: "Kiểm định TT36 OK",
-          isPositive: true,
+          value: eqCount == null ? "—" : `${eqCount} Máy móc`,
           icon: Wrench,
         },
         {
-          label: "Chỉ Số An Toàn HSE",
-          value: "96/100",
-          change: "0 Tai nạn",
-          isPositive: true,
+          label: "Ghi Nhận HSE Chưa Đóng",
+          value: hseOpen == null ? "—" : `${hseOpen} Ghi nhận`,
+          isPositive: hseOpen == null ? undefined : hseOpen === 0,
           icon: ShieldCheck,
         },
       ]);
@@ -138,7 +120,7 @@ function SiteCommandContent() {
       id: "work-fronts",
       label: "Mặt Bằng & Phân Khu",
       icon: LandPlot,
-      badge: "8 Sàn",
+      badge: "Phân khu",
       description: "Điều phối giao diện thi công theo tầng/zone và theo dõi giải phóng mặt bằng.",
       content: <WorkFrontsTab />,
     },

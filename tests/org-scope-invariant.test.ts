@@ -41,6 +41,9 @@ const WHITELIST: Record<string, string> = {
   // --- JOIN hiển thị tên / kiểm tra tồn tại (thực thể chính đã scope theo dự án) ---
   "admin/assignments": "admin xem phân công xuyên dự án; JOIN users chỉ để hiển thị tên",
   crews: "kiểm tra tồn tại NCC khi tạo tổ đội (SELECT id FROM suppliers WHERE id=?)",
+  "engineering/qs-bom-explosion":
+    "đọc TÊN dự án đang chọn để điền vào hồ sơ FIDIC (SELECT name FROM projects WHERE id=?)" +
+    " — id lấy từ getCurrentProjectId(user) nên đã scope theo quyền; không liệt kê master data",
   mobilization: "kiểm tra tồn tại người được giao (SELECT id FROM users WHERE id=?)",
   "nav-settings": "tra danh sách PM để cấu hình nav theo vai trò, không trả master data org",
   personnel: "kiểm tra tồn tại NCC khi gán nhân sự; personnel scope theo dự án",

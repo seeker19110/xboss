@@ -66,10 +66,7 @@ export interface StepItem {
   };
   criteria: string[];
   gateStatus: GateStatus;
-  approvedBy?: string;
-  approvedAt?: string;
   rejectionReason?: string;
-  hashSignature?: string;
 }
 
 export interface StageData {
@@ -171,6 +168,9 @@ const STAGES: StageData[] = [
 
 // ── MASTER 36 BƯỚC THI CÔNG CHI TIẾT ──
 
+/** Khoá localStorage cho tick tiêu chí (ghi chú cá nhân theo thiết bị). */
+const KHOA_LUU_TICK = "xboss_mepf_process_tick";
+
 const MASTER_STEPS: StepItem[] = [
   // ── GIAI ĐOẠN 0: KHỞI ĐỘNG & PHÁP LÝ (6 BƯỚC) ──
   {
@@ -195,9 +195,6 @@ const MASTER_STEPS: StepItem[] = [
       "Hồ sơ thiết kế bản vẽ thi công đã được thẩm duyệt",
     ],
     gateStatus: "approved",
-    approvedBy: "Lê Văn Tuấn (Kỹ sư Trưởng TVGS)",
-    approvedAt: "2026-03-10 09:00",
-    hashSignature: "SHA256:8f2a9c1e7d4b0051b88e1a7",
   },
   {
     id: "step-0-2",
@@ -220,9 +217,6 @@ const MASTER_STEPS: StepItem[] = [
       "Các giải pháp ngăn cháy, thoát nạn khớp phương án kiến trúc",
     ],
     gateStatus: "approved",
-    approvedBy: "Cục Cảnh Sát PCCC & CNCH",
-    approvedAt: "2026-03-15 14:30",
-    hashSignature: "SHA256:4c9b2f1a8e036d77299a3c1",
   },
   {
     id: "step-0-3",
@@ -245,9 +239,6 @@ const MASTER_STEPS: StepItem[] = [
       "Định mức hao hụt vật tư tuân thủ đúng quy định nhà nước",
     ],
     gateStatus: "approved",
-    approvedBy: "Nguyễn Thị Mai (Lead QS TVGS)",
-    approvedAt: "2026-03-20 16:45",
-    hashSignature: "SHA256:1a8f902e4d5c7b39a8e019f",
   },
   {
     id: "step-0-4",
@@ -270,9 +261,6 @@ const MASTER_STEPS: StepItem[] = [
       "Danh mục 12 điểm dừng Hold-Points bắt buộc không có ngoại lệ",
     ],
     gateStatus: "approved",
-    approvedBy: "Trần Đình Trọng (Chỉ Huy Trưởng TVGS)",
-    approvedAt: "2026-03-25 10:15",
-    hashSignature: "SHA256:7b3a9e102f4d8c55e99a441",
   },
   {
     id: "step-0-5",
@@ -295,9 +283,6 @@ const MASTER_STEPS: StepItem[] = [
       "Thợ vận hành có đầy đủ chứng chỉ chuyên môn và thẻ an toàn",
     ],
     gateStatus: "approved",
-    approvedBy: "Phạm Quốc Hùng (Chuyên viên HSE)",
-    approvedAt: "2026-03-28 11:30",
-    hashSignature: "SHA256:99a8b7c6d5e4f3a2b1c0e98",
   },
   {
     id: "step-0-6",
@@ -320,9 +305,6 @@ const MASTER_STEPS: StepItem[] = [
       "Xác định rõ các công việc nằm trên đường găng Critical Path",
     ],
     gateStatus: "approved",
-    approvedBy: "Lê Văn Tuấn (Kỹ sư Trưởng TVGS)",
-    approvedAt: "2026-04-01 15:00",
-    hashSignature: "SHA256:3d4e5f6a7b8c9d0e1f2a3b4",
   },
 
   // ── GIAI ĐOẠN 1: KỸ THUẬT KHÔNG GIAN & SHOP DRAWING (6 BƯỚC) ──
@@ -347,9 +329,6 @@ const MASTER_STEPS: StepItem[] = [
       "Vận tốc dòng chảy và tổn thất áp lực trong dải cho phép",
     ],
     gateStatus: "approved",
-    approvedBy: "Hoàng Minh Tâm (Lead MEP Engineer)",
-    approvedAt: "2026-04-08 09:30",
-    hashSignature: "SHA256:aa11bb22cc33dd44ee55ff6",
   },
   {
     id: "step-1-2",
@@ -372,9 +351,6 @@ const MASTER_STEPS: StepItem[] = [
       "Hệ áp lực uốn né 45 độ quanh hệ thoát nước dốc trọng lực",
     ],
     gateStatus: "approved",
-    approvedBy: "Đỗ Mạnh Hùng (BIM Lead TVGS)",
-    approvedAt: "2026-04-18 17:00",
-    hashSignature: "SHA256:ff99ee88dd77cc66bb55aa4",
   },
   {
     id: "step-1-3",
@@ -397,9 +373,6 @@ const MASTER_STEPS: StepItem[] = [
       "Khoảng cách ly cách nhiệt máng cáp và ống Chiller ≥ 150mm",
     ],
     gateStatus: "approved",
-    approvedBy: "Hoàng Minh Tâm (Lead MEP Engineer)",
-    approvedAt: "2026-04-24 14:15",
-    hashSignature: "SHA256:11223344556677889900aabb",
   },
   {
     id: "step-1-4",
@@ -422,9 +395,6 @@ const MASTER_STEPS: StepItem[] = [
       "Thể hiện đầy đủ cao độ đỉnh/đáy ống, tim đèn, vị trí van",
     ],
     gateStatus: "approved",
-    approvedBy: "Lê Văn Tuấn (Kỹ sư Trưởng TVGS)",
-    approvedAt: "2026-04-30 11:00",
-    hashSignature: "SHA256:5566778899aabbccddeeff0",
   },
   {
     id: "step-1-5",
@@ -447,9 +417,6 @@ const MASTER_STEPS: StepItem[] = [
       "Gắn mã QR Spool ID trên từng đốt ống gia công tại xưởng",
     ],
     gateStatus: "approved",
-    approvedBy: "Vũ Hải Đăng (Giám Đốc Sản Xuất DfMA)",
-    approvedAt: "2026-05-05 16:30",
-    hashSignature: "SHA256:99887766554433221100fedc",
   },
   {
     id: "step-1-6",
@@ -472,9 +439,6 @@ const MASTER_STEPS: StepItem[] = [
       "Kế hoạch ứng phó sự cố khẩn cấp và sơ cấp cứu hiện trường",
     ],
     gateStatus: "approved",
-    approvedBy: "Lê Văn Tuấn (Kỹ sư Trưởng TVGS)",
-    approvedAt: "2026-05-10 10:00",
-    hashSignature: "SHA256:aabbccddeeff001122334455",
   },
 
   // ── GIAI ĐOẠN 2: CUNG ỨNG, MUA SẮM & NGHIỆM THU VẬT TƯ (5 BƯỚC) ──
@@ -499,9 +463,6 @@ const MASTER_STEPS: StepItem[] = [
       "Thông số công suất, hiệu suất năng lượng COP khớp Spec",
     ],
     gateStatus: "approved",
-    approvedBy: "Nguyễn Văn Hùng (Đại diện CĐT)",
-    approvedAt: "2026-05-18 14:00",
-    hashSignature: "SHA256:7766554433221100aabbccdd",
   },
   {
     id: "step-2-2",
@@ -524,9 +485,6 @@ const MASTER_STEPS: StepItem[] = [
       "Điều khoản thanh toán gắn liền với biên bản nghiệm thu MIR",
     ],
     gateStatus: "approved",
-    approvedBy: "Lê Minh Quân (Trưởng Ban Cung Ứng)",
-    approvedAt: "2026-05-25 09:30",
-    hashSignature: "SHA256:4433221100ffeeddccbbaa99",
   },
   {
     id: "step-2-3",
@@ -549,9 +507,6 @@ const MASTER_STEPS: StepItem[] = [
       "Kết quả kéo nén thép, thử đốt chậm cáp đạt chuẩn",
     ],
     gateStatus: "approved",
-    approvedBy: "Lê Văn Tuấn (Kỹ sư Trưởng TVGS)",
-    approvedAt: "2026-06-02 16:00",
-    hashSignature: "SHA256:00112233445566778899aabb",
   },
   {
     id: "step-2-4",
@@ -574,9 +529,6 @@ const MASTER_STEPS: StepItem[] = [
       "Cấp phát đúng chủng loại và đúng mã Spool ID được duyệt",
     ],
     gateStatus: "approved",
-    approvedBy: "Nguyễn Văn Đạt (Quản lý Kho)",
-    approvedAt: "2026-06-08 11:30",
-    hashSignature: "SHA256:bbccddeeff00112233445566",
   },
   {
     id: "step-2-5",
@@ -599,9 +551,6 @@ const MASTER_STEPS: StepItem[] = [
       "Chứng từ thông quan và CO phòng thương mại đầy đủ",
     ],
     gateStatus: "approved",
-    approvedBy: "Nguyễn Văn Hùng (Đại diện CĐT)",
-    approvedAt: "2026-06-15 15:30",
-    hashSignature: "SHA256:eeddccbbaa99887766554433",
   },
 
   // ── GIAI ĐOẠN 3: THI CÔNG GIAI ĐOẠN 1 - ÂM SÀN, SLEEVES & NGẦM (8 BƯỚC) ──
@@ -626,9 +575,6 @@ const MASTER_STEPS: StepItem[] = [
       "Cánh chống thấm hàn kín 100% không rỗ xỉ",
     ],
     gateStatus: "approved",
-    approvedBy: "Lê Văn Tuấn (Kỹ sư Trưởng TVGS)",
-    approvedAt: "2026-06-22 17:00",
-    hashSignature: "SHA256:33445566778899aabbccddee",
   },
   {
     id: "step-3-2",
@@ -651,9 +597,6 @@ const MASTER_STEPS: StepItem[] = [
       "Tổng góc uốn cong không vượt quá 360 độ trên một đoạn kéo dây",
     ],
     gateStatus: "approved",
-    approvedBy: "Trần Văn Nam (Kỹ sư Điện TVGS)",
-    approvedAt: "2026-06-25 11:00",
-    hashSignature: "SHA256:778899aabbccddeeff001122",
   },
   {
     id: "step-3-3",
@@ -676,9 +619,6 @@ const MASTER_STEPS: StepItem[] = [
       "Mối hàn hóa nhiệt ngấu chắc không rỗ bọt khí",
     ],
     gateStatus: "approved",
-    approvedBy: "Trần Văn Nam (Kỹ sư Điện TVGS)",
-    approvedAt: "2026-06-28 16:30",
-    hashSignature: "SHA256:110022998877665544332211",
   },
   {
     id: "step-3-4",
@@ -701,9 +641,6 @@ const MASTER_STEPS: StepItem[] = [
       "Thử áp suất thủy tĩnh giữ áp 1.0 MPa trong 2 giờ không rò rỉ",
     ],
     gateStatus: "approved",
-    approvedBy: "Lê Văn Tuấn (Kỹ sư Trưởng TVGS)",
-    approvedAt: "2026-07-05 14:00",
-    hashSignature: "SHA256:66554433221100ffeeddccbb",
   },
   {
     id: "step-3-5",
@@ -726,9 +663,6 @@ const MASTER_STEPS: StepItem[] = [
       "Không còn bất kỳ vướng mắc kỹ thuật hoặc xung đột nào",
     ],
     gateStatus: "approved",
-    approvedBy: "Lê Văn Tuấn (Kỹ sư Trưởng TVGS)",
-    approvedAt: "2026-07-10 18:00",
-    hashSignature: "SHA256:9900aabbccddeeff11223344",
   },
   {
     id: "step-3-6",
@@ -819,9 +753,6 @@ const MASTER_STEPS: StepItem[] = [
       "Độ sụt áp tối đa ΔP ≤ 0.2 bar do cân bằng nhiệt độ",
     ],
     gateStatus: "approved",
-    approvedBy: "Lê Văn Tuấn (Kỹ sư Trưởng TVGS)",
-    approvedAt: "2026-07-20 16:00",
-    hashSignature: "SHA256:44556677889900aabbccddee",
   },
   {
     id: "step-4-2",
@@ -844,9 +775,6 @@ const MASTER_STEPS: StepItem[] = [
       "Không còn cát, xỉ hàn hoặc dị vật trong lưới lọc Y",
     ],
     gateStatus: "approved",
-    approvedBy: "Hoàng Minh Tâm (Lead MEP Engineer)",
-    approvedAt: "2026-07-25 15:30",
-    hashSignature: "SHA256:8899aabbccddeeff00112233",
   },
   {
     id: "step-4-3",
@@ -869,9 +797,6 @@ const MASTER_STEPS: StepItem[] = [
       "Đường ống ga không sụt áp trong 24 giờ thử nghiệm",
     ],
     gateStatus: "approved",
-    approvedBy: "Hoàng Minh Tâm (Lead MEP Engineer)",
-    approvedAt: "2026-08-02 11:00",
-    hashSignature: "SHA256:ccddeeff0011223344556677",
   },
   {
     id: "step-4-4",
@@ -1126,7 +1051,27 @@ export default function CleanMepfProcessPage() {
   );
 
   // Checklist Item interactive state
+  // Tick tiêu chí là GHI CHÚ CÁ NHÂN trên đúng thiết bị này (localStorage) — trước đây chỉ
+  // nằm trong state nên tải lại trang là mất sạch (audit 2026-08-25 §3.6). Không phải hồ sơ
+  // dự án: nghiệm thu thật đi qua /approvals.
   const [checkedCriteria, setCheckedCriteria] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    try {
+      const luu = window.localStorage.getItem(KHOA_LUU_TICK);
+      if (luu) setCheckedCriteria(JSON.parse(luu) as Record<string, boolean>);
+    } catch {
+      // localStorage bị chặn (chế độ riêng tư/thiết lập trình duyệt) — bỏ qua, chạy như cũ.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(KHOA_LUU_TICK, JSON.stringify(checkedCriteria));
+    } catch {
+      // như trên
+    }
+  }, [checkedCriteria]);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1175,50 +1120,23 @@ export default function CleanMepfProcessPage() {
   }, [steps]);
 
   // Sign-off Gate Handler
-  async function handleApprove(stepId: string) {
-    setIsSubmitting(true);
-    const approver = me?.name ? `${me.name} (Kỹ sư TVGS)` : "Kỹ sư Giám Sát TVGS";
-    // Dấu thời gian duyệt HIỂN THỊ cho kỹ sư VN — phải theo giờ VN, không phải UTC
-    // (trước đây in thẳng ISO nên lệch 7 tiếng, tối muộn còn hiện sai cả ngày).
-    const approvedAt = formatDateTimeVN(new Date());
-
-    let hashSignature = `SHA256:AUTHENTICATED`;
-    if (typeof window !== "undefined" && window.crypto?.subtle) {
-      try {
-        const payload = `GATE:${stepId}:${approver}:${approvedAt}:${me?.id ?? 0}`;
-        const msgBuffer = new TextEncoder().encode(payload);
-        const hashBuffer = await window.crypto.subtle.digest("SHA-256", msgBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-        hashSignature = `SHA256:${hex.slice(0, 16).toUpperCase()}`;
-      } catch {
-        // Fallback standard marker
-      }
-    }
-
+  // Đánh dấu bước đã qua — CHỈ trong phiên xem này, không ghi vào hồ sơ dự án.
+  // Trước đây hàm này còn sinh một "Chữ Ký Số" SHA-256 kèm tên người duyệt và dấu thời
+  // gian, hiển thị y như một bản ký duyệt thật trong khi không lưu ở đâu cả
+  // (audit 2026-08-25 §3.6). Nghiệm thu thật đi qua /approvals — có ghi task_history,
+  // kiểm quyền CAN.approve và biên bản đính kèm.
+  function handleApprove(stepId: string) {
     setSteps((prev) => {
       const next = [...prev];
       const idx = next.findIndex((s) => s.id === stepId);
       if (idx !== -1) {
-        next[idx] = {
-          ...next[idx],
-          gateStatus: "approved",
-          approvedBy: approver,
-          approvedAt,
-          hashSignature,
-        };
-
-        // Unlock next step
+        next[idx] = { ...next[idx], gateStatus: "approved" };
         if (idx + 1 < next.length && next[idx + 1].gateStatus === "locked") {
-          next[idx + 1] = {
-            ...next[idx + 1],
-            gateStatus: "pending",
-          };
+          next[idx + 1] = { ...next[idx + 1], gateStatus: "pending" };
         }
       }
       return next;
     });
-    setIsSubmitting(false);
   }
 
   // Reject / NCR Handler
@@ -1254,6 +1172,16 @@ export default function CleanMepfProcessPage() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5 pb-24">
+        {/* Nói rõ ngay đầu trang: đây là bản tra cứu quy trình, thao tác ở đây không ghi
+            vào hồ sơ dự án (audit 2026-08-25 §3.6). */}
+        <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-300">
+          <b>Bản tra cứu quy trình.</b> Đánh dấu và tick tiêu chí ở đây chỉ lưu trên thiết bị này,{" "}
+          <b>không ghi vào hồ sơ dự án</b>. Nghiệm thu và phê duyệt thật thực hiện ở{" "}
+          <a href="/approvals" className="underline underline-offset-2">
+            trang Nghiệm thu
+          </a>
+          .
+        </p>
         {/* Navigation Breadcrumb */}
         <EngineeringNav />
 
@@ -1323,7 +1251,7 @@ export default function CleanMepfProcessPage() {
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              Sổ Cái Ký Số
+              Vết Kiểm Toán
             </button>
           </div>
         </div>
@@ -1686,7 +1614,7 @@ export default function CleanMepfProcessPage() {
                     </h3>
                     <p className="text-xs text-zinc-400 mt-0.5">
                       {activeStep.gateStatus === "approved"
-                        ? `Đã được phê duyệt bởi: ${activeStep.approvedBy} lúc ${activeStep.approvedAt}`
+                        ? "Đã đánh dấu qua bước trong phiên xem này (không ghi vào hồ sơ dự án)"
                         : activeStep.gateStatus === "pending"
                           ? "Kỹ sư TVGS kiểm tra thực tế đạt các tiêu chuẩn trên để mở khóa bước tiếp theo."
                           : activeStep.gateStatus === "rejected"
@@ -1713,16 +1641,9 @@ export default function CleanMepfProcessPage() {
                           disabled={isSubmitting}
                           className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-on-accent text-xs font-bold shadow-md flex items-center gap-1.5 transition disabled:opacity-50"
                         >
-                          <Check className="w-4 h-4" /> Kỹ Sư Ký Duyệt Chuyển Bước
+                          <Check className="w-4 h-4" /> Đánh Dấu Đã Qua Bước
                         </button>
                       </>
-                    )}
-
-                    {activeStep.gateStatus === "approved" && activeStep.hashSignature && (
-                      <div className="flex items-center gap-2 bg-emerald-950/40 border border-emerald-800/60 px-3 py-1.5 rounded-xl text-xs font-mono text-emerald-300">
-                        <BadgeCheck className="w-4 h-4 text-emerald-400" />
-                        <span>Chữ Ký Số: {activeStep.hashSignature.substring(0, 16)}...</span>
-                      </div>
                     )}
 
                     {activeStep.gateStatus === "locked" && (
@@ -1900,49 +1821,34 @@ export default function CleanMepfProcessPage() {
           </div>
         )}
 
-        {/* ── TAB 4: SỔ CÁI KÝ SỐ MẬT MÃ ── */}
+        {/* ── TAB 4: VẾT KIỂM TOÁN ── */}
+        {/* Trước đây khối này vẽ một "sổ cái Merkle" với Block Height #142, chữ ký băm và
+            nhãn "GPS Verified" — toàn bộ là chuỗi cắm cứng, không niêm phong gì cả
+            (audit 2026-08-25 §3.6). Nay trỏ vào hai nơi ghi vết THẬT của hệ. */}
         {activeView === "audit" && (
-          <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  SỔ CÁI MẬT MÃ BẤT BIẾN MERKLE TREE (M73 AUDIT TRAIL)
-                </h3>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  Niêm phong băm SHA-256 các biên bản nghiệm thu và quyết định duyệt cổng của Kỹ sư
-                </p>
-              </div>
-              <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                Block Height #142
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              {steps
-                .filter((s) => s.gateStatus === "approved" && s.hashSignature)
-                .map((s) => (
-                  <div
-                    key={s.id}
-                    className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-amber-400 font-bold">{s.code}</span>
-                        <span className="text-zinc-200">{s.title}</span>
-                      </div>
-                      <span className="text-[11px] text-zinc-500">
-                        Ký duyệt bởi: <b>{s.approvedBy}</b> • {s.approvedAt}
-                      </span>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-emerald-400 font-bold text-[11px]">
-                        {s.hashSignature}
-                      </div>
-                      <div className="text-[10px] text-zinc-600">GPS Verified (r ≤ 25m)</div>
-                    </div>
-                  </div>
-                ))}
+          <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-3">
+            <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              Vết kiểm toán thật của hệ
+            </h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Trang này là <b>bản tra cứu quy trình</b> — đánh dấu ở đây không ghi vào hồ sơ dự án.
+              Nghiệm thu và phê duyệt thật được ghi ở hai nơi sau, kèm người thực hiện, thời điểm và
+              biên bản đính kèm.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="/approvals"
+                className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-on-accent text-xs font-bold transition"
+              >
+                Nghiệm thu & phê duyệt
+              </a>
+              <a
+                href="/admin/audit-log"
+                className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
+              >
+                Audit trail
+              </a>
             </div>
           </div>
         )}

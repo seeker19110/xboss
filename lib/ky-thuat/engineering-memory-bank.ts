@@ -104,7 +104,7 @@ export async function listKnowledgePatterns(
 
   sql += ` ORDER BY confidence_score DESC, updated_at DESC LIMIT 100`;
 
-  const rows = await query<KnowledgePatternRecord>(sql, params);
+  const rows = await query<KnowledgePatternRecord>(sql, ...params);
   return rows;
 }
 
@@ -164,7 +164,7 @@ export async function listCrossProjectLessons(
 
   sql += ` ORDER BY l.effectiveness_score DESC, l.created_at DESC LIMIT 100`;
 
-  const rows = await query<CrossProjectLessonRecord>(sql, params);
+  const rows = await query<CrossProjectLessonRecord>(sql, ...params);
   return rows;
 }
 

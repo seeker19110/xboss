@@ -64,6 +64,7 @@ import {
   Cog,
   Cpu,
   CalendarCheck,
+  CalendarClock,
   UserCog,
   Network,
   History,
@@ -277,6 +278,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Quy trình thi công MEPF",
         icon: Workflow,
       },
+      {
+        id: "dash.duong-gang",
+        href: "/schedule-control",
+        label: "Đường găng & Chậm trễ",
+        icon: AlertTriangle,
+      },
+      { id: "dash.lookahead", href: "/lookahead", label: "Kế hoạch ngắn hạn", icon: CalendarClock },
       { id: "dash.bao-cao", href: "/report", label: "Báo cáo", icon: FileText },
       { id: "dash.bao-cao-luu", href: "/reports", label: "Báo cáo lưu", icon: BookMarked },
       { id: "dash.tien-do-acmv", href: "/progress/acmv", label: "ACMV", icon: Wind },
@@ -336,7 +344,10 @@ export const DASHBOARD_TREE: DashCluster[] = [
             roles: ["admin", "pm", "engineer", "subcon"],
           },
           {
-            href: "/hse",
+            // Sổ rủi ro là trang RIÊNG (/risks — ma trận 5×5, ghi nhận, lọc trạng thái).
+            // Trước đây mục này trỏ nhầm /hse, mà /hse không có nội dung rủi ro nào nên
+            // các vai trò chỉ-xem không còn lối nào tới sổ rủi ro (audit 2026-08-25 §3.1).
+            href: "/risks",
             label: "Rủi ro",
             icon: AlertTriangle,
             roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
@@ -439,6 +450,12 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Đấu thầu",
         icon: Gavel,
         roles: ["admin", "pm", "engineer", "bch"],
+      },
+      {
+        id: "dash.bao-cao-vat-tu",
+        href: "/materials/reports",
+        label: "Báo cáo vật tư",
+        icon: FileText,
       },
       { id: "dash.nha-thau-phu", href: "/subcontractors", label: "Nhà thầu phụ", icon: HardHat },
     ],
