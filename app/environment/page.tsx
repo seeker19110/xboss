@@ -22,6 +22,7 @@ import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { formatDateVN, todayISO } from "@/lib/nen/date";
+import { isExpired, isExpiringSoon } from "@/lib/nen/han-hieu-luc";
 
 // ===== Giấy phép môi trường =====
 
@@ -45,8 +46,6 @@ const PERMIT_STATUS_BADGE: Record<PermitStatus, string> = {
   superseded: "bg-zinc-800 text-zinc-500",
 };
 
-const EXPIRY_WARN_DAYS = 30;
-
 type Permit = {
   id: number;
   kind: PermitKind;
@@ -59,15 +58,6 @@ type Permit = {
   fileName: string | null;
   originalName: string | null;
 };
-
-function isExpiringSoon(d: Permit): boolean {
-  if (d.status !== "valid" || !d.expiryDate) return false;
-  const limit = new Date(Date.now() + EXPIRY_WARN_DAYS * 86400_000).toISOString().slice(0, 10);
-  return d.expiryDate <= limit;
-}
-function isExpired(d: Permit): boolean {
-  return d.status === "valid" && !!d.expiryDate && d.expiryDate < todayISO();
-}
 
 // ===== Quan trắc môi trường =====
 

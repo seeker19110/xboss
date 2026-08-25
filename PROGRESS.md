@@ -41,14 +41,40 @@ Kết luận: phần trùng ở đây là khung HTTP mà **ADR-0008 muốn nằm
 nhìn thấy trong file route**. Hai luật của chính dự án đều đẩy về phía giữ nguyên. Ghi lại để lần
 sau không ai tốn công gộp lại.
 
+### Đợt tiếp — gộp logic "hạn hiệu lực" và LỘ RA LỖI MÚI GIỜ THẬT
+
+`isExpiringSoon`/`isExpired` chép giống hệt nhau ở `app/environment`, `app/kickoff`,
+`app/insurance`; `app/personnel` có `certBadge` cùng ngưỡng. Gom về `lib/nen/han-hieu-luc.ts`
+(tầng 0, thuần, dùng lại `daysFromTodayISO` đã có sẵn thay vì tự tính).
+
+**Lỗi thật lộ ra khi gộp:** cả 4 bản đều tính mốc cảnh báo bằng
+`new Date(Date.now() + N * 86400_000)` — **UTC thuần** — rồi so với `todayISO()` vốn theo giờ VN
+(UTC+7). Đúng cái bẫy mà chú thích của `daysFromTodayISO` trong `lib/nen/date.ts` đã dặn trước:
+_"mọi phép cộng/trừ ngày phải đi qua đây, tự tính bằng UTC sẽ lệch 1 ngày lúc 0h–7h sáng"_.
+
+Chứng minh bằng số (mô phỏng 02:00 sáng 25/08 giờ VN = 19:00 UTC 24/08):
+
+| Đại lượng          | Giá trị      |
+| ------------------ | ------------ |
+| `todayISO()`       | `2026-08-25` |
+| mốc CŨ (UTC thuần) | `2026-09-23` |
+| mốc ĐÚNG (UTC+7)   | `2026-09-24` |
+
+→ Hồ sơ hết hạn đúng ngày thứ 30 (`2026-09-24`) **KHÔNG được cảnh báo** ở bản cũ trong khung
+0h–7h sáng. Ảnh hưởng cả 4 trang: giấy phép môi trường, hồ sơ pháp lý, bảo lãnh/bảo hiểm,
+chứng chỉ nhân sự.
+
+Kèm `tests/han-hieu-luc.test.ts` — **5 ca, trước đây logic này KHÔNG có test nào** vì nằm rải
+trong file `.tsx`. Có ca biên canh đúng lỗi trên.
+
 ### Còn lại (chưa làm)
 
 - **Họ ~8 route `<thực thể>-documents/[id]`** giống 55–71% (`claim`/`contract`/`vo`/`subcon`/
   `project`/`correspondence-files`). Cùng khuôn nhưng khác thật về quyền và phạm vi dự án — ép một
   trừu tượng chung lên chỗ luật quyền khác nhau đúng là rủi ro `docs/audit.md` cảnh báo. Để nguyên.
 - **Khung form lặp 271 lần ở 32 file `.tsx`** (rõ nhất `app/environment/page.tsx` ↔
-  `app/kickoff/page.tsx`, 25 khối). Boilerplate UI, không phải tính năng trùng — nên là đợt tách
-  component form dùng chung riêng.
+  `app/kickoff/page.tsx`). Đợt này đã lấy phần LOGIC (hạn hiệu lực) ra; phần còn lại là markup
+  form/bảng — boilerplate UI thuần, nên là đợt tách component dùng chung riêng, có e2e a11y đi kèm.
 - **`calcHazenWilliams` còn 2 bản** khác quy ước đơn vị (L/s vs m³/h) và hằng số cột nước
   (9806,65 vs 9810 Pa/m). Gộp được nhưng **đổi số liệu kỹ thuật** → cần người dùng chốt bản chuẩn.
 
