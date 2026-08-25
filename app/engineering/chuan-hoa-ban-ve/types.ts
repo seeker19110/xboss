@@ -194,7 +194,7 @@ export interface FontSnippet {
 
 export type BlockProposalKind = "fitting" | "equipment" | "titleblock" | "support" | "sleeve";
 
-export type BlockProposalStatus = "pending" | "approved" | "rejected" | "stale";
+export type BlockProposalStatus = "pending" | "approved" | "rejected" | "stale" | "withdrawn";
 
 export interface BlockProposal {
   id: number;
@@ -212,6 +212,8 @@ export interface BlockProposal {
   rejectReason: string | null;
   publishedVersion: string | null;
   nguoiDeXuat: string;
+  /** id người gửi đề xuất — để panel biết đề xuất nào là của chính mình (server vẫn kiểm lại). */
+  nguoiDeXuatId?: number;
   nguoiQuyetDinh: string | null;
   decidedAt: string | null;
   createdAt: string;

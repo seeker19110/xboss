@@ -4,6 +4,51 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Bổ sung tích hợp toàn cụm plugin AutoCAD M99–M104 (2026-08-25)
+
+Người dùng: "bổ sung tích hợp toàn bộ plugin M99–M104 · kiểm tra lại chưa có thì viết". Ba luồng
+audit (plugin↔API, web/UI, CI-đóng gói-tài liệu) tìm ra các khoảng trống tích hợp, thi hành song
+song 8 gói việc trên 8 worktree rồi tích hợp về một nhánh.
+
+**Đã làm**
+
+1. **Hàng đợi upload plugin (chặn thật):** `POST /api/engineering/cad/plugin-upload` tạo tác vụ ở
+   `pending` rồi gọi `completeAsyncTask` (đòi `processing`) ⇒ no-op, `GET .../[jobId]` trả `pending`
+   vĩnh viễn và `XBOSS_UPLOAD` báo "vẫn đang xử lý" DÙ revision đã tạo. Thêm
+   `danhDauDangXuLy()` trong `lib/ky-thuat/engineering-task-queue.ts` (chỉ nhận tác vụ `pending`,
+   không cướp việc worker) + `maxRetries: 1` cho luồng đồng bộ (mặc định 3 khiến nhánh kiểm định
+   fail quay về `pending` treo mãi). Test route thật `tests/cad-plugin-upload-route.test.ts` (đã
+   chứng minh đỏ khi gỡ từng vá).
+2. **Bảo mật/chuẩn route:** rate-limit cho `/api/engineering/cad/rule-pack` (trước đó là route CAD
+   đọc duy nhất không có), route mới `POST /api/engineering/cad/block-proposals/[id]/withdraw`
+   (kiểm `CAN.manageDrawings` + chính chủ + chỉ khi `pending`, CAS 1 câu UPDATE).
+3. **Đăng ký module & PWA:** thêm entry `cad-plugin` vào `MODULES`; loại trừ toàn cụm
+   `/api/engineering/cad/` khỏi cache SW (rule pack/DWG/xlsx từng bị phục vụ bản cũ), `CACHE` →
+   `xboss-v15`; thêm nav `/engineering/thiet-bi-cad`.
+4. **Web dùng được cho kỹ sư thật:** trang `/engineering/cai-dat-plugin` (hướng dẫn cài, 25 lệnh
+   lấy theo `LenhCatalog`) — trước đây thiếu `XBOSS_PLUGIN_URL` thì chỉ trỏ tới README trong mã
+   nguồn; bảng điều khiển plugin chuyển sang `app/components/ui/*` (chạm ≥40px), thêm aria-label,
+   nút Thử lại; trang thiết bị CAD hết treo skeleton khi lỗi mạng; nhãn "PHÊ DUYỆT theo ISO 19650"
+   ở bước rà soát 2D đổi thành "ghi chú rà soát cục bộ (chưa ký duyệt)" vì không hề ghi DB.
+5. **Sổ bản vẽ:** `listRevisions` trả `source_tool/rule_pack_version/standardize_report/
+content_sha256`; hàng revision hiện chip "Từ plugin · rulepack vX · N lỗi/N cảnh báo".
+6. **Đóng gói & phát hành:** `dong-goi.ps1` xuất `dist/XBoss.bundle-<version>.zip` + `.sha256`,
+   version duy nhất ở `plugin-autocad/Directory.Build.props` (1.0.0) ghi vào `PackageContents.xml`
+   lúc đóng gói; job `dong-goi-plugin` (workflow_dispatch) đính gói vào Release; cổng CI
+   `npm run check:plugin-bundle`. **Vẫn nợ:** cần runner Windows có AutoCAD 2026 + ObjectARX
+   bản quyền mới build được Adapter ⇒ chưa phát hành gói thật đầu-cuối.
+7. **Plugin gọi rule pack theo dự án (khép M101 PR4):** `FetchRulePackAsync` gắn `?project=`,
+   tái dùng cơ chế 409 "chọn dự án" của boq-snapshot, nhớ lựa chọn trong `ExcelMetaStore`, cache
+   tách theo dự án (`rule-pack.du-an-<id>.json`) và chỉ gửi ETag khi phạm vi đã xác định.
+8. **Test tích hợp còn thiếu:** vòng đời upload→duyệt→KL theo revision; khép vòng đề xuất block →
+   duyệt → plugin tải manifest mới đúng sha256; đối chứng 2 tầng cho sidecar `takeoff.json`
+   (`plugin-autocad/doi-chung/takeoff-sidecar-mau.json`); test route `takeoff-export`.
+9. **Tài liệu:** đóng doc drift .NET 8→10 (README/CAI-DAT/M99), 24→25 lệnh (M102, README nâng cấp),
+   trạng thái M99 PR2/PR5 "chờ" → "xong".
+
+**Nợ còn lại:** verify tay trên máy Windows có AutoCAD 2026 (M99–M104) và runner phát hành gói;
+tầng C# chưa nạp lại `takeoff-sidecar-mau.json` (mới có đối chứng phía node).
+
 ## M103 — Đề xuất block vào thư viện từ AutoCAD (hàng chờ + duyệt) (2026-08-25)
 
 Người dùng chốt 4 quyết định (đường thêm = từ AutoCAD; hàng chờ + duyệt; engineer trở lên đề

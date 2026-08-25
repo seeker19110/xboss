@@ -63,14 +63,12 @@ const NHAN_LOAI: Record<BlockProposalKind, string> = {
 // M103 (khoản thu hồi, việc bổ sung sau) — server có thể trả thêm trạng thái "withdrawn" (đề
 // xuất bị chính người gửi rút lại) mà `BlockProposalStatus` ở types.ts chưa khai — widen tại chỗ
 // thay vì sửa union dùng chung, tránh đụng file ngoài phạm vi đang có agent khác thao tác.
-type TrangThaiHienThi = BlockProposalStatus | "withdrawn";
 
 // API `/api/engineering/cad/block-proposals` đã trả `nguoiDeXuatId` (xem `DeXuatBlock` trong
 // lib/ky-thuat/cad/block-proposals.ts) nhưng `BlockProposal` ở types.ts chưa khai trường này —
 // widen tại chỗ, cùng lý do trên (không đụng types.ts đang có agent khác thao tác).
-type DeXuatCoNguoiGui = BlockProposal & { nguoiDeXuatId?: number };
 
-const NHAN_TRANG_THAI: Record<TrangThaiHienThi, { nhan: string; tone: ChipTone }> = {
+const NHAN_TRANG_THAI: Record<BlockProposalStatus, { nhan: string; tone: ChipTone }> = {
   pending: { nhan: "Chờ duyệt", tone: "info" },
   approved: { nhan: "Đã duyệt", tone: "success" },
   rejected: { nhan: "Từ chối", tone: "danger" },
@@ -102,8 +100,8 @@ function BlockProposalRow({
   onTuChoi: (item: BlockProposal) => void;
   onThuHoi: (item: BlockProposal) => void;
 }) {
-  const trangThai = NHAN_TRANG_THAI[item.status as TrangThaiHienThi];
-  const dangCho = (item.status as TrangThaiHienThi) === "pending";
+  const trangThai = NHAN_TRANG_THAI[item.status];
+  const dangCho = item.status === "pending";
   return (
     <li className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row gap-3">
       <div className="shrink-0 w-16 h-16 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden">
@@ -147,7 +145,7 @@ function BlockProposalRow({
             {item.nguoiQuyetDinh ? ` — duyệt bởi ${item.nguoiQuyetDinh}` : ""}
           </p>
         )}
-        {(item.status as TrangThaiHienThi) === "withdrawn" && (
+        {item.status === "withdrawn" && (
           <p className="text-xs text-zinc-500">Đề xuất đã được người gửi thu hồi.</p>
         )}
       </div>
@@ -647,7 +645,7 @@ export default function ThuVienBlockPanel() {
                 key={dx.id}
                 item={dx}
                 coQuyenDuyet={coQuyenDuyet}
-                laChuDeXuat={meId != null && (dx as DeXuatCoNguoiGui).nguoiDeXuatId === meId}
+                laChuDeXuat={meId != null && dx.nguoiDeXuatId === meId}
                 dangXuLy={dangXuLyId === dx.id || dangThuHoiId === dx.id}
                 onDuyet={xuLyDuyet}
                 onTuChoi={xuLyTuChoi}

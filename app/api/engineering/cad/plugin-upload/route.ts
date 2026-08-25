@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { log } from "@/lib/nen/log";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCadTokenUser } from "@/lib/bao-mat/cad-devices";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
@@ -140,7 +141,13 @@ export async function POST(req: NextRequest) {
   // Không có worker nào claim loại 'cad.plugin-upload' — route TỰ chuyển sang 'processing'
   // trước khi xử lý, nếu không thì completeAsyncTask/failAsyncTask (đòi status='processing')
   // là no-op và plugin poll mãi thấy 'pending'.
-  await danhDauDangXuLy(job.id, `route:plugin-upload:${user.id}`);
+  const daNhanTacVu = await danhDauDangXuLy(job.id, `route:plugin-upload:${user.id}`);
+  if (!daNhanTacVu) {
+    // Không giành được tác vụ (worker nền tổng quát đã claim, hoặc trạng thái đã đổi). Vẫn xử lý
+    // tiếp — complete/fail sau đó khớp khi tác vụ đang 'processing'; ghi log để lần plugin poll
+    // mãi không thấy 'completed' còn truy được nguyên nhân.
+    log.warn("plugin-upload: không giành được tác vụ hàng đợi", { jobId: job.id, userId: user.id });
+  }
 
   try {
     const kq = await xuLyPluginUpload({
