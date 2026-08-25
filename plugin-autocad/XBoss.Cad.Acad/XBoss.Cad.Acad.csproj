@@ -24,6 +24,9 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <!-- Hộp thoại chọn/lưu tệp của Autodesk.AutoCAD.Windows trả DialogResult của WinForms. -->
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- Ribbon (Autodesk.Windows trong AdWindows.dll — M102) xây trên WPF: RibbonButton
+         cần System.Windows.Input.ICommand + hạ tầng WPF lúc biên dịch. -->
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
 
   <Target Name="KiemAcadSdkDir" BeforeTargets="ResolveAssemblyReferences">
@@ -43,6 +46,12 @@
     </Reference>
     <Reference Include="accoremgd">
       <HintPath>$(AcadSdkDir)\accoremgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Ribbon API (namespace Autodesk.Windows — M102). AdWindows.dll nằm cùng thư mục
+         acmgd.dll trong cả ObjectARX SDK (inc-x64) lẫn thư mục cài AutoCAD 2026. -->
+    <Reference Include="AdWindows">
+      <HintPath>$(AcadSdkDir)\AdWindows.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

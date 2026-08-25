@@ -4,6 +4,31 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M102 — Giao diện UI plugin AutoCAD: tab Ribbon + bảng điều khiển `XBOSS_BANG` (2026-08-25)
+
+Plugin M99/M100/M101 đủ 23 lệnh nhưng thuần command line — M102 thêm lớp VỎ giao diện trong
+AutoCAD (đặc tả `docs/nang-cap/M102-plugin-ui.md`, người dùng yêu cầu "nâng cao kịch trần toàn bộ"):
+
+- **Tab Ribbon "XBoss"** (`XBoss.Cad.Acad/Ui/RibbonBuilder.cs`, Autodesk.Windows/AdWindows.dll):
+  5 panel theo nhóm nghiệp vụ, 24 nút (lệnh chính = nút to), tooltip tiếng Việt; bấm nút =
+  `SendStringToExecute` đúng lệnh — điều kiện chặn (đời AutoCAD/rule pack) vẫn do từng lệnh tự
+  kiểm, UI không nhân đôi nghiệp vụ. Ribbon chưa sẵn sàng lúc nạp thì chờ `ItemInitialized`;
+  Id tab cố định nên NETLOAD lại không sinh tab trùng; ribbon lỗi không hỏng lệnh gõ tay.
+- **Lệnh mới `XBOSS_BANG`** (`Commands/UiCommands.cs`, CommandFlags.Session): bật/tắt bảng điều
+  khiển PaletteSet (Guid cố định — AutoCAD nhớ vị trí neo) hiện trạng thái server/thiết bị đã
+  ghép, rule pack (version/số quy tắc/cache hỏng hiện đúng lý do), bản vẽ hiện hành + tóm tắt 4
+  sidecar JSON cạnh DWG, nút khắc phục nhanh + Làm mới. Chỉ đọc, không mạng, không đụng bản vẽ.
+- **Chống trôi UI ↔ lệnh:** danh mục `XBoss.Cad.Core/Ui/LenhCatalog.cs` là nguồn sự thật duy
+  nhất; `tests LenhCatalogTests` đối chiếu với mọi `[CommandMethod]` trong mã Adapter (parse
+  source) — thêm/xóa lệnh mà quên UI là CI đỏ. Logic dựng bảng nằm ở Core
+  (`Ui/BangDieuKhien.cs` — `BangDieuKhienModel` + `SidecarSummary` parse phòng thủ, sidecar hỏng
+  trả null không sập) test bằng JSON sinh từ CHÍNH các lớp báo cáo thật (`BangDieuKhienTests`).
+- **Build/shim:** `XBoss.Cad.Acad.csproj` thêm tham chiếu `AdWindows.dll` + `UseWPF`;
+  `AcadStub.cs` thêm stub Ribbon/PaletteSet/bộ control WinForms/`Font`/`SendStringToExecute` —
+  job `plugin-shim` biên dịch sạch 36 tệp Adapter, `dotnet test` 457/457 xanh (14 test mới).
+- **Còn nợ (chung M99–M101, cần máy Windows có AutoCAD 2026):** verify tay Ribbon/palette trên
+  máy thật + đối chiếu chữ ký `AdWindows.dll` thật với stub.
+
 ## M101 PR4 — `boqCode` theo dự án + đối chiếu BOQ chỉ-đọc (2026-08-25)
 
 Đóng 2 dòng cuối bảng `docs/nang-cap/M101-plugin-nang-tran.md` §6.3: QS không phải gõ tay cột A của

@@ -806,6 +806,7 @@ namespace Autodesk.AutoCAD.ApplicationServices
         public Editor Editor => new Editor();
         public Database Database => new Database();
         public DocumentLock LockDocument() => new DocumentLock();
+        public void SendStringToExecute(string command, bool activate, bool wrapUpInactiveDoc, bool echoCommand) { }
     }
 
     public class DocumentCollection : IEnumerable
@@ -856,6 +857,86 @@ namespace Autodesk.AutoCAD.Windows2
 {
 }
 
+// PaletteSet (bảng điều khiển M102) — nằm trong acmgd.dll, namespace Autodesk.AutoCAD.Windows.
+namespace Autodesk.AutoCAD.Windows
+{
+    [Flags]
+    public enum PaletteSetStyles
+    {
+        NameEditable = 1, ShowPropertiesMenu = 2, ShowAutoHideButton = 4, ShowCloseButton = 8,
+        Snappable = 16, SingleColDock = 32, SingleRowDock = 64, NoTitleBar = 128, UsePaletteNameAsTitleForSingle = 256,
+    }
+
+    public class PaletteSet
+    {
+        public PaletteSet(string name) { }
+        public PaletteSet(string name, Guid toolId) { }
+        public PaletteSetStyles Style { get; set; }
+        public System.Drawing.Size MinimumSize { get; set; }
+        public System.Drawing.Size Size { get; set; }
+        public bool Visible { get; set; }
+        public int Add(string name, System.Windows.Forms.Control control) => 0;
+    }
+}
+
+// Ribbon API (M102) — AdWindows.dll, namespace Autodesk.Windows (xây trên WPF).
+namespace Autodesk.Windows
+{
+    using System.Collections.ObjectModel;
+
+    public enum RibbonItemSize { Standard, Large }
+
+    public class RibbonItemEventArgs : EventArgs
+    {
+        public RibbonItem Item => null;
+    }
+
+    public class RibbonItem
+    {
+        public string Id { get; set; }
+        public string Text { get; set; }
+        public bool ShowText { get; set; }
+        public bool ShowImage { get; set; }
+        public RibbonItemSize Size { get; set; }
+        public object ToolTip { get; set; }
+        public System.Windows.Input.ICommand CommandHandler { get; set; }
+        public object CommandParameter { get; set; }
+    }
+
+    public class RibbonButton : RibbonItem { }
+
+    public class RibbonPanelSource
+    {
+        public string Title { get; set; }
+        public Collection<RibbonItem> Items { get; } = new Collection<RibbonItem>();
+    }
+
+    public class RibbonPanel
+    {
+        public RibbonPanelSource Source { get; set; }
+    }
+
+    public class RibbonTab
+    {
+        public string Id { get; set; }
+        public string Title { get; set; }
+        public bool IsVisible { get; set; }
+        public Collection<RibbonPanel> Panels { get; } = new Collection<RibbonPanel>();
+    }
+
+    public class RibbonControl
+    {
+        public Collection<RibbonTab> Tabs { get; } = new Collection<RibbonTab>();
+        public RibbonTab FindTab(string id) => null;
+    }
+
+    public static class ComponentManager
+    {
+        public static RibbonControl Ribbon => null;
+        public static event EventHandler<RibbonItemEventArgs> ItemInitialized { add { } remove { } }
+    }
+}
+
 // Adapter thật build với <UseWindowsForms>true</UseWindowsForms> nên có sẵn WinForms; project
 // stub chạy trên Linux (net8.0, không WinForms) nên phải tự khai đúng phần Adapter chạm tới.
 namespace System.Windows.Forms
@@ -869,5 +950,74 @@ namespace System.Windows.Forms
         public string SelectedPath => "";
         public DialogResult ShowDialog() => DialogResult.Cancel;
         public void Dispose() { }
+    }
+
+    // ── Control cho bảng điều khiển M102 (BangDieuKhienControl) ──
+    // Chỉ khai đúng phần Adapter chạm tới; Color/Size/Point lấy từ System.Drawing.Primitives
+    // (có sẵn trong net8), riêng Font/FontStyle stub ở namespace System.Drawing bên dưới.
+
+    public enum DockStyle { None, Top, Bottom, Left, Right, Fill }
+    public enum FlowDirection { LeftToRight, TopDown, RightToLeft, BottomUp }
+    public enum FlatStyle { Flat, Popup, Standard, System }
+
+    public struct Padding
+    {
+        public Padding(int all) { }
+        public Padding(int left, int top, int right, int bottom) { }
+    }
+
+    public class Control
+    {
+        public class ControlCollection
+        {
+            public void Add(Control value) { }
+            public void Clear() { }
+        }
+
+        public ControlCollection Controls { get; } = new ControlCollection();
+        public System.Drawing.Color BackColor { get; set; }
+        public System.Drawing.Color ForeColor { get; set; }
+        public DockStyle Dock { get; set; }
+        public string Text { get; set; }
+        public System.Drawing.Font Font { get; set; }
+        public bool AutoSize { get; set; }
+        public Padding Margin { get; set; }
+        public Padding Padding { get; set; }
+        public System.Drawing.Size MaximumSize { get; set; }
+        public event EventHandler Click { add { } remove { } }
+        public void SuspendLayout() { }
+        public void ResumeLayout() { }
+    }
+
+    public class ScrollableControl : Control
+    {
+        public bool AutoScroll { get; set; }
+    }
+
+    public class UserControl : ScrollableControl { }
+    public class Label : Control { }
+    public class Button : Control
+    {
+        public FlatStyle FlatStyle { get; set; }
+    }
+
+    public class Panel : ScrollableControl { }
+
+    public class FlowLayoutPanel : Panel
+    {
+        public FlowDirection FlowDirection { get; set; }
+        public bool WrapContents { get; set; }
+    }
+}
+
+// Font không nằm trong System.Drawing.Primitives (net8 Linux) — stub riêng cho bảng M102.
+namespace System.Drawing
+{
+    public enum FontStyle { Regular = 0, Bold = 1, Italic = 2, Underline = 4, Strikeout = 8 }
+
+    public class Font
+    {
+        public Font(string familyName, float emSize) { }
+        public Font(string familyName, float emSize, FontStyle style) { }
     }
 }

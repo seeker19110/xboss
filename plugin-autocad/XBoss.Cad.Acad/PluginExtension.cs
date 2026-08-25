@@ -37,7 +37,19 @@ public sealed class PluginExtension : IExtensionApplication
         doc?.Editor.WriteMessage(
             "\n[XBoss] Plugin chuẩn hóa, bóc tách khối lượng & vẽ shop drawing đã nạp." +
             "\n[XBoss] Chuẩn hóa/bóc tách: XBOSS_LOGIN, XBOSS_RULEPACK, XBOSS_KIEMTRA, XBOSS_CHUANHOA, XBOSS_BOCKL, XBOSS_BOCKL_XOA, XBOSS_BOCKL_XUAT, XBOSS_BATCH, XBOSS_UPLOAD" +
-            "\n[XBoss] Vẽ (cần rule pack v4): XBOSS_VE_NEN, XBOSS_VE, XBOSS_VE_NHAN, XBOSS_VE_TRANGIN, XBOSS_VE_MATCAT\n");
+            "\n[XBoss] Vẽ (cần rule pack v4): XBOSS_VE_NEN, XBOSS_VE, XBOSS_VE_NHAN, XBOSS_VE_TRANGIN, XBOSS_VE_MATCAT" +
+            "\n[XBoss] Giao diện (M102): tab Ribbon \"XBoss\" + bảng điều khiển XBOSS_BANG\n");
+
+        // Tab Ribbon "XBoss" (M102) — chỉ dựng khi đúng đời AutoCAD; ribbon chưa sẵn sàng
+        // thì RibbonBuilder tự chờ. Ribbon lỗi không được làm hỏng phần lệnh gõ tay.
+        try
+        {
+            Ui.RibbonBuilder.DangKy();
+        }
+        catch (System.Exception e)
+        {
+            doc?.Editor.WriteMessage($"\n[XBoss] ⚠ Không dựng được tab Ribbon ({e.Message}) — mọi lệnh vẫn gõ tay được.\n");
+        }
     }
 
     public void Terminate()

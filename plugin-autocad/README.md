@@ -13,6 +13,21 @@ quy tắc tải từ XBoss dưới dạng **rule pack** có version (không nhú
 | `XBoss.Cad.Acad`     | `net10.0-windows` | Adapter AutoCAD: lệnh `XBOSS_*`, đo hình học, áp thay đổi trong 1 nhóm UNDO — **chỉ build trên Windows có ObjectARX SDK 2026**                                                                                           |
 | `XBoss.Cad.AcadShim` | `net8.0`          | **Cổng CI**: biên dịch thử toàn bộ mã `XBoss.Cad.Acad` trên Linux bằng stub API AutoCAD — bắt lỗi cú pháp/sai chữ ký ngay ở PR. KHÔNG phải AutoCAD, KHÔNG thay verify tay ([README riêng](XBoss.Cad.AcadShim/README.md)) |
 
+## Giao diện trong AutoCAD (M102)
+
+Plugin có 2 lớp giao diện, đều chỉ là VỎ trên bộ lệnh (bấm nút = gõ lệnh, nghiệp vụ không nhân đôi):
+
+- **Tab Ribbon "XBoss"** — 5 panel: Kết nối / Chuẩn hóa / Bóc khối lượng / Vẽ shop drawing /
+  Bảng điều khiển; lệnh chính mỗi nhóm là nút to, mọi nút có tooltip tiếng Việt. Dựng từ danh mục
+  `XBoss.Cad.Core/Ui/LenhCatalog.cs` (nguồn sự thật duy nhất — test `LenhCatalogTests` đối chiếu
+  với mọi `[CommandMethod]`, thêm lệnh mà quên danh mục là CI đỏ). Ribbon lỗi/tắt không ảnh hưởng
+  lệnh gõ tay.
+- **Bảng điều khiển `XBOSS_BANG`** — PaletteSet neo được: trạng thái server/thiết bị, rule pack
+  đang nạp, bản vẽ hiện hành + tóm tắt các báo cáo JSON cạnh DWG, kèm nút khắc phục nhanh
+  (Đăng nhập/Nạp rule pack). Chỉ đọc, không đụng bản vẽ, không gọi mạng.
+
+Xem đặc tả `docs/nang-cap/M102-plugin-ui.md`.
+
 ## Lệnh trong AutoCAD
 
 | Lệnh               | Chức năng                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
