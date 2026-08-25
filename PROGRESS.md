@@ -4,6 +4,26 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Sửa quy ước auto-merge trong CLAUDE.md cho khớp thực tế (2026-08-25)
+
+Quy ước cũ ("mở PR xong bật auto-merge ngay") **không thi hành được**: GitHub từ chối
+`enable_pr_auto_merge` ở cả PR #398 lẫn #400, thử đủ 3 thời điểm (chưa có check → `clean`;
+checks đang chạy → `unstable`; đã xanh hết → `clean`). Nguyên nhân: repo **chưa đặt required
+status checks** cho `main` trong branch protection, mà auto-merge chỉ mở khi PR thực sự bị chặn
+bởi required checks. Tài liệu và hành vi thật lệch nhau → sửa tài liệu theo yêu cầu người dùng.
+
+- **Quy ước mới:** thử `enable_pr_auto_merge` trước, bị từ chối thì **merge `SQUASH` thẳng ngay
+  khi 100% checks xanh** — không coi việc bị từ chối là lỗi, không chờ hỏi lại. Tinh thần giữ
+  nguyên: trách nhiệm chất lượng dồn vào CI + tự kiểm trước push.
+- **Hai cái bẫy đã ghi vào CLAUDE.md để phiên sau không mất thời gian:** (1) `unstable` KHÔNG
+  phải "có check đỏ" dù thông báo lỗi ghi "required checks are failing" — nó chỉ nghĩa là "chưa
+  xanh hết", phải kiểm `get_check_runs` để phân biệt _đang chạy_ với _đỏ thật_, suýt đi sửa một
+  lỗi không tồn tại; (2) sự kiện webhook `check_suite.completed` có thể mang `head_sha` của
+  **commit cũ** — ở PR #398 có 3 sự kiện như vậy trên commit trước bản sửa, phải đối chiếu
+  `git rev-parse HEAD` trước khi kết luận CI đã xong.
+- **Đường lùi nếu muốn auto-merge thật:** bật required status checks cho `main` (Settings →
+  Branches) — thao tác trên GitHub, không làm được từ phiên này.
+
 ## M102 ĐÓNG ĐỢT — merge PR #398, khép đợt plugin AutoCAD giai đoạn 2 (2026-08-25)
 
 `docs/nang-cap/M102-plugin-dong-tran-chuan-hoa.md` **xong cả 2 PR**, gộp một PR duy nhất
