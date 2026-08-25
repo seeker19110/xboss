@@ -205,12 +205,42 @@ public sealed class Inspector
         ThemNeuCo(PhepKiemMoRong.NhanLechXData(snapshot, ip.LabelSizeMismatch));
         ThemNeuCo(PhepKiemMoRong.DoiTuongNgoaiKhung(snapshot, ip.StrayObjects, toMm));
 
+        // (17..18) Phép kiểm mở rộng v8 (M102 §6.4/§6.5) — cùng hai tầng bảo vệ: cờ enabled + tự tắt
+        // khi thiếu dữ liệu (tag XData M100 / rule pack chưa gán mã BOQ theo dự án).
+        ThemNeuCo(PhepKiemMoRong.TagTrung(snapshot, ip.TagDuplicate));
+        ThemNeuCo(PhepKiemMoRong.MaBoqMoCoi(_pack.Takeoff.Items, IdHangMucCoDoiTuong(snapshot), ip.BoqCodeMissing));
+
         return new InspectionReport { RulePackVersion = _pack.Version, Findings = findings, CanhBao = canhBao };
 
         void ThemNeuCo(InspectionFinding? f)
         {
             if (f is not null) findings.Add(f);
         }
+    }
+
+    /// <summary>
+    /// Id các hạng mục bóc tách có đối tượng trên bản vẽ — đầu vào phép kiểm 18 (M102 §6.5).
+    ///
+    /// <para>Chỉ xét <c>layerMatchAny</c>, cố ý KHÔNG dựng lại toàn bộ phép khớp của
+    /// <c>TakeoffCalculator</c>: snapshot của XBOSS_KIEMTRA không mang tên block theo từng thực thể
+    /// nên không lọc nổi <c>blockNameMatchAny</c>. Xấp xỉ theo layer là phía an toàn cho một phép
+    /// kiểm — cùng lắm nhắc kỹ sư gán mã cho hạng mục mà bản vẽ có layer tương ứng, chứ không bỏ sót
+    /// hạng mục đang thật sự bóc ra dòng Excel trống mã. Hạng mục dẫn xuất (cách nhiệt) không quét
+    /// bản vẽ nên không tính.</para>
+    /// </summary>
+    private IReadOnlyCollection<string> IdHangMucCoDoiTuong(DrawingSnapshot snapshot)
+    {
+        var layers = snapshot.Entities
+            .Select(e => e.Layer)
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (layers.Count == 0) return [];
+
+        return _pack.Takeoff.Items
+            .Where(i => !i.LaDanXuat && i.LayerMatchAny.Count > 0)
+            .Where(i => layers.Any(l => TokenMatcher.MatchesAny(l, i.LayerMatchAny)))
+            .Select(i => i.Id)
+            .ToList();
     }
 
     /// <summary>Đối tượng trùng chồng: cùng khóa (đầu, cuối) làm tròn về mm nguyên, so cả

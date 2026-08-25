@@ -64,6 +64,16 @@ lệnh chèn block — thư viện block đã tải (`XBOSS_LOGIN` hoặc `XBOSS
 > chưa cung cấp dữ liệu đầu vào cho chúng, nên hành vi lệnh hiện vẫn đúng 9 phép kiểm ở trên; PR sau
 > của M101 mới nối dữ liệu và bật dần theo dự án.
 
+> **Rule pack v8 (M102 PR1)** khai thêm 2 phép kiểm cho `XBOSS_KIEMTRA` — **17** tag trùng số trong
+> cùng hệ (dữ liệu XData của `XBOSS_VE_TAG`) và **18** hạng mục bóc tách chưa gán mã BOQ (cột A của
+> Excel sẽ trống) — cùng 2 khối chính sách cho **bước chuẩn hóa 12/13** của `XBOSS_CHUANHOA`:
+> `polylineClosePolicy` (đóng polyline có khe đầu–cuối ≤ ngưỡng; khe lớn hơn ngưỡng **giữ nguyên** vì
+> đó thường là thiếu hẳn một đoạn tuyến, phép kiểm 3 vẫn báo) và `blockMap` (quy block lạc chuẩn về
+> block thư viện — **bản đầu chỉ BÁO**, thay định nghĩa block là thao tác phá hủy nên kỹ sư quyết
+> từng trường hợp; block nặc danh không bao giờ bị tự thay). Toàn bộ **mặc định TẮT** → kiểm/chuẩn
+> hóa/bóc bằng v8 cho kết quả **y hệt v7**; phần Core đã xong, Adapter thi hành ở PR2. v8 cũng sửa
+> `layerMap.knownIssues`: nợ "không idempotent" đã đóng từ M101 PR2 nhưng tài liệu còn ghi là nợ.
+
 > **Rule pack v6 (M101 PR3)** khai thêm cho mỗi `takeoff.items[]` 6 khóa TÙY CHỌN của bóc tách nâng
 > cao: `groupBySize` (tách dòng theo size — nguồn ưu tiên XData `XBOSS_VE` của bộ lệnh vẽ, dự phòng
 > là nhãn gần tuyến qua `sizeFromNearbyText`), `wastagePct`/`perCountAdd` (hệ số quy đổi hao hụt/phụ

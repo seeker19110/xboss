@@ -135,3 +135,66 @@ public sealed record KeHoachLayout
 
     public bool Rong => XoaLayout.Count == 0 && DoiTen.Count == 0;
 }
+
+// ===== v8 (M102 §6.1) — bước 12: đóng polyline gần kín =====
+
+/// <summary>Một polyline HỞ do Adapter đo — đầu vào bước 12.</summary>
+public sealed record PolylineHienCo
+{
+    public required string Handle { get; init; }
+    public required string Layer { get; init; }
+
+    /// <summary>Khoảng cách điểm đầu → điểm cuối, theo ĐƠN VỊ BẢN VẼ (Core quy đổi sang mm khi so ngưỡng).</summary>
+    public double KhoangCachDauCuoi { get; init; }
+
+    /// <summary>Số đỉnh — polyline dưới 3 đỉnh không có gì để đóng (đóng lại thành một đoạn thẳng chồng chính nó).</summary>
+    public int SoDinh { get; init; }
+}
+
+/// <summary>Cách đóng một polyline gần kín.</summary>
+public enum CachDong
+{
+    /// <summary>Hai đầu gần trùng nhau → chỉ bật cờ Closed, không thêm hình học.</summary>
+    BatCoClosed,
+
+    /// <summary>Còn khe thấy được → bật cờ Closed (AutoCAD tự nối đoạn cuối về đỉnh đầu).</summary>
+    NoiThemDoan,
+}
+
+public sealed record ThayDoiPolyline(string Handle, CachDong Cach, double KhoangCachMm);
+
+public sealed record KeHoachDongPolyline
+{
+    public IReadOnlyList<ThayDoiPolyline> ThayDoi { get; init; } = [];
+    public IReadOnlyList<string> CanhBao { get; init; } = [];
+
+    /// <summary>Chỉ báo cáo, Adapter KHÔNG được sửa gì (rule pack <c>reportOnly</c>).</summary>
+    public bool ChiBaoCao { get; init; }
+
+    public bool Rong => ThayDoi.Count == 0;
+}
+
+// ===== v8 (M102 §6.2) — bước 13: quy block lạc chuẩn về thư viện =====
+
+/// <summary>Một BlockReference trên bản vẽ — đầu vào bước 13.</summary>
+public sealed record BlockRefHienCo
+{
+    public required string Handle { get; init; }
+    public required string TenBlock { get; init; }
+
+    /// <summary>Block nặc danh (<c>*U…</c>) — không bao giờ tự thay (không có tên để khớp alias).</summary>
+    public bool LaNacDanh { get; init; }
+}
+
+public sealed record ThayDoiBlock(string Handle, string TenCu, string TenMoi);
+
+public sealed record KeHoachBlock
+{
+    public IReadOnlyList<ThayDoiBlock> ThayDoi { get; init; } = [];
+    public IReadOnlyList<string> CanhBao { get; init; } = [];
+
+    /// <summary>Chỉ báo cáo, Adapter KHÔNG được thay block nào (mặc định của bản đầu — M102 §6.2).</summary>
+    public bool ChiBaoCao { get; init; }
+
+    public bool Rong => ThayDoi.Count == 0;
+}

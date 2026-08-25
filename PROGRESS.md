@@ -4,6 +4,52 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M102 PR1 — Rule pack v8: đóng polyline gần kín, quy block lạc chuẩn, phép kiểm 17/18 (2026-08-25)
+
+Thi hành `docs/nang-cap/M102-plugin-dong-tran-chuan-hoa.md` PR1 — đóng 4 khoảng trống cuối của
+pipeline chuẩn hóa sau M99/M100/M101. **Không migration, không API mới, không UI mới**: toàn bộ nằm
+trong rule pack + Core thuần (test chạy được trên CI Linux).
+
+- **`lib/ky-thuat/cad/rule-packs/v8.json`** (mở rộng THUẦN từ v7 — phát hành = đổi đúng một dòng
+  import trong `rule-pack-hien-hanh.ts`): 2 khối chính sách mới `polylineClosePolicy` (bước 12) +
+  `blockMap` (bước 13), 2 phép kiểm mới `inspectionPolicy.tagDuplicate`/`boqCodeMissing` (số 17/18).
+  **Mọi khóa mới mặc định TẮT** (blockMap thêm `reportOnly: true` kể cả khi bật) → kiểm/chuẩn
+  hóa/bóc bằng v8 cho kết quả **y hệt v7** (AC7, có test cả 2 tầng).
+- **Sửa `layerMap.knownIssues`**: bỏ dòng "Không idempotent…" — nợ này **đã đóng ở M101 PR2** cả 2
+  tầng (`LayerMapper._daChuan`, `normalizeCadLayers`) nhưng tài liệu rule pack vẫn ghi là nợ chưa
+  đóng, đúng lớp lỗi "tài liệu lệch code" mà CLAUDE.md cảnh báo. Dòng knownIssues còn lại (khớp sai
+  hệ do thứ tự nhóm) giữ nguyên vì vẫn đúng hiện trạng. Kèm test canh bất biến ở **mức pipeline**
+  (trước chỉ có ở mức `LayerMapper`).
+- **Bước 12 — đóng polyline gần kín** (`ChuanHoaMoRong.LapKeHoachDongPolyline`, thuần): khe đầu–cuối
+  `0 < gap ≤ gapCloseToleranceMm` → đóng (2 đầu gần trùng thì chỉ bật cờ Closed, còn khe thấy được
+  thì nối thêm đúng một đoạn). **Khe LỚN hơn ngưỡng cố ý giữ nguyên** — đó thường là thiếu hẳn một
+  đoạn tuyến chứ không phải thiếu một cú click, tự nối là bịa hình học (phép kiểm 3 vẫn báo như cũ).
+  Polyline dưới 3 đỉnh cũng bỏ qua (đoạn nối chồng lên chính nó, làm hỏng phép đo dài). Ngưỡng khai
+  bằng mm nên quy đổi theo INSUNITS — có test bản vẽ vẽ bằng mét.
+- **Bước 13 — quy block lạc chuẩn về thư viện** (`LapKeHoachBlock`): tên block khớp `aliasMatchAny`
+  (ranh giới token, KHÔNG substring thô — cùng matcher với layerMap) → nên trỏ về block `target` của
+  thư viện 0139/M100. Bản đầu **chỉ BÁO**: thay định nghĩa block làm mất attribute lệch tag và có
+  thể lệch hình học, kỹ sư quyết từng trường hợp. Block nặc danh (`*U…`) không bao giờ có mặt trong
+  kế hoạch (không có tên thật để khớp) — vẫn do `deepPurge.reportAnonymousBlocks` báo.
+- **Phép kiểm 17 (tag trùng)**: hai tag `XBOSS_VE_TAG` cùng chuỗi trong **cùng hệ** (mỗi hệ đánh số
+  riêng từ 1 là quy ước bình thường, so trùng cả bản vẽ sẽ báo oan). Bản vẽ không có tag XData → tự
+  tắt. **Phép kiểm 18 (mã BOQ mồ côi)**: hạng mục takeoff có đối tượng trên bản vẽ mà `boqCode` rỗng
+  → báo ở **cấp hạng mục** (không marker từng đối tượng, lỗi nằm ở rule pack chứ không ở entity);
+  rule pack toàn cục (chưa gán mã theo dự án — M101 PR4) → tự tắt, không nhiễu.
+- **Validator 2 tầng chặt** (`RulePackLoader.ValidateChuanHoaV8`): bật bước mà khai thiếu → chặn
+  ngay lúc nạp; dữ liệu khai sai kiểm **cả khi tắt** (alias rỗng, alias trùng chính tên đích — sẽ
+  làm block đã chuẩn bị báo là lạc chuẩn, target khai trùng).
+- **Test**: 3 file xunit mới (`RulePackV8Tests`, `InspectorV8Tests`, `ChuanHoaV8Tests` — ca dương/âm/
+  tự-tắt cho từng phép, ca "v8 mặc định = v7"), 5 test node:test mới trong
+  `tests/engineering-cad-rule-pack.test.ts`. Bộ đối chứng 2 tầng sinh lại bằng
+  `npm run cad:doi-chung` — **chỉ đổi đúng dòng version, kết quả kỳ vọng không đổi**, tức bằng chứng
+  v8 không làm trôi quy tắc. Vá thêm một test vô hiệu: ca "bỏ qua field không biết" tìm chuỗi
+  `"version": "v6"` trên tệp v7 nên không chèn được field lạ nào mà vẫn xanh.
+- **Cổng đã chạy**: lint, typecheck, `npm test` (864 pass / 0 fail), `check:lib-layers`,
+  `check:dead-code`, `npm run build` — đều xanh. `dotnet test` chạy trên CI (container không có SDK).
+- **Chưa làm (PR2)**: Adapter thi hành bước 12/13 trong `StandardizePipeline.cs` + quét tag XData cho
+  phép kiểm 17 — Core đã trả kế hoạch sẵn, Adapter chỉ còn việc áp và đếm diff.
+
 ## M101 PR4 — `boqCode` theo dự án + đối chiếu BOQ chỉ-đọc (2026-08-25)
 
 Đóng 2 dòng cuối bảng `docs/nang-cap/M101-plugin-nang-tran.md` §6.3: QS không phải gõ tay cột A của
