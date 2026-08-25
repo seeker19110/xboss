@@ -238,6 +238,9 @@ jobs:
           kiem plugin-autocad/XBoss.Cad.Core/XBoss.Cad.Core.csproj net8.0
           kiem plugin-autocad/XBoss.Cad.Tests/XBoss.Cad.Tests.csproj net8.0
           kiem plugin-autocad/XBoss.Cad.Acad/XBoss.Cad.Acad.csproj net10.0-windows
+          #   AcadShim  = net8.0 — stub thay hẳn assembly AutoCAD nên không bám nền Adapter;
+          #               phải chạy được trên SDK có sẵn của ubuntu-latest (job `plugin_shim`).
+          kiem plugin-autocad/XBoss.Cad.AcadShim/XBoss.Cad.AcadShim.csproj net8.0
 
       - name: Cache gói NuGet
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -247,6 +250,42 @@ jobs:
 
       - name: Test XBoss.Cad.Core (xunit)
         run: dotnet test plugin-autocad/XBoss.Cad.Tests/XBoss.Cad.Tests.csproj -c Release
+
+  # ── Biên dịch thử Adapter AutoCAD bằng stub API (chạy trên Linux) ──
+  #
+  # VÌ SAO: XBoss.Cad.Acad là net10.0-windows + tham chiếu acmgd/acdbmgd/accoremgd nên job
+  # `plugin` ở trên KHÔNG build nó — lỗi cú pháp/sai chữ ký API trong Adapter trước đây chỉ lộ
+  # ra khi ra máy Windows có license. Lỗ hổng đó đã cháy 2 lần thật (xem PROGRESS.md):
+  #   • lần đầu biên dịch Adapter trên máy thật: 8 lỗi CI không thể bắt;
+  #   • đợt M100: gộp xung đột tay làm mất 3 dòng đóng khối trong Services/TakeoffScanner.cs —
+  #     cả plugin không build được trên Windows mà TOÀN BỘ CI vẫn xanh.
+  #
+  # XBoss.Cad.AcadShim biên dịch TOÀN BỘ mã Adapter (glob, không liệt kê tay) bằng bộ khai báo
+  # giả API AutoCAD trong AcadStub.cs → hai lớp lỗi trên đỏ ngay ở PR.
+  # Nó chỉ tham chiếu XBoss.Cad.Core, KHÔNG tham chiếu XBoss.Cad.Acad.csproj (project thật vẫn
+  # nằm ngoài mọi lệnh build của CI; kéo nhầm vào sẽ đỏ ngay ở target KiemAcadSdkDir).
+  #
+  # ⚠ Cổng này KHÔNG thay được verify tay trên máy có AutoCAD — nó chỉ kiểm cú pháp + chữ ký,
+  # không kiểm hành vi. Xem plugin-autocad/XBoss.Cad.AcadShim/README.md.
+  #
+  # Job RIÊNG (không gộp vào `plugin`) để chạy song song — không thêm thời gian vào đường găng,
+  # và tín hiệu đỏ chỉ đúng vào Adapter thay vì lẫn với test Core.
+  plugin_shim:
+    name: plugin-shim (biên dịch thử Adapter bằng stub AutoCAD)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Cache gói NuGet
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('plugin-autocad/**/*.csproj') }}
+
+      # Log in ra số tệp Adapter đã biên dịch (target KiemGlobAdapterKhongRong) — glob không
+      # khớp tệp nào thì đỏ, không "xanh trên hư không".
+      - name: Biên dịch thử toàn bộ XBoss.Cad.Acad bằng stub
+        run: dotnet build plugin-autocad/XBoss.Cad.AcadShim/XBoss.Cad.AcadShim.csproj -c Release
 
   # ── E2E, chia 3 shard chạy song song ──
   #
@@ -350,16 +389,17 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-latest
-    needs: [static, test, build, plugin]
+    needs: [static, test, build, plugin, plugin_shim]
     if: always()
     steps:
       - name: Tổng hợp kết quả
         run: |
-          echo "static=${{ needs.static.result }} test=${{ needs.test.result }} build=${{ needs.build.result }} plugin=${{ needs.plugin.result }}"
+          echo "static=${{ needs.static.result }} test=${{ needs.test.result }} build=${{ needs.build.result }} plugin=${{ needs.plugin.result }} plugin_shim=${{ needs.plugin_shim.result }}"
           [ "${{ needs.static.result }}" = "success" ] || exit 1
           [ "${{ needs.test.result }}" = "success" ] || exit 1
           [ "${{ needs.build.result }}" = "success" ] || exit 1
           [ "${{ needs.plugin.result }}" = "success" ] || exit 1
+          [ "${{ needs.plugin_shim.result }}" = "success" ] || exit 1
 
   e2e:
     name: e2e

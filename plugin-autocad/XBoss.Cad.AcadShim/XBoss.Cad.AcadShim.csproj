@@ -1,0 +1,75 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    XBoss.Cad.AcadShim — CỔNG CI: biên dịch thử TOÀN BỘ mã Adapter (XBoss.Cad.Acad) trên Linux
+    bằng bộ stub API AutoCAD trong AcadStub.cs, KHÔNG cần ObjectARX SDK và KHÔNG cần Windows.
+
+    Vì sao tồn tại: XBoss.Cad.Acad là net10.0-windows + tham chiếu acmgd/acdbmgd/accoremgd nên CI
+    không build được — lỗi cú pháp/sai chữ ký API trong Adapter chỉ lộ ra khi ra máy có license.
+    Đã cháy 2 lần thật (xem README.md cạnh tệp này). Project này bịt đúng lỗ đó.
+
+    Đây KHÔNG phải AutoCAD thật và KHÔNG thay được verify tay trên máy có AutoCAD — xem README.md.
+  -->
+
+  <PropertyGroup>
+    <!--
+      net8.0 (không phải net10.0-windows của Adapter thật): stub thay hoàn toàn assembly AutoCAD
+      nên không có ràng buộc nền nào, và net8 là SDK có sẵn trên ubuntu-latest của CI.
+      Nền khác nhau KHÔNG làm giảm giá trị cổng: thứ ta kiểm là cú pháp + chữ ký lời gọi API.
+    -->
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>XBoss.Cad.Acad</RootNamespace>
+    <AssemblyName>XBoss.Cad.AcadShim</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <!-- Sản phẩm phụ của cổng CI, không phải thư viện để tham chiếu. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!--
+      Nullable/TreatWarningsAsErrors/LangVersion/ImplicitUsings kế thừa từ
+      plugin-autocad/Directory.Build.props — CỐ Ý không khai lại ở đây để cổng luôn dùng
+      ĐÚNG bộ cờ của bản build thật; ai siết cờ ở Directory.Build.props thì cổng siết theo.
+
+      UseWindowsForms=false: Adapter thật bật WinForms cho hộp thoại chọn tệp của
+      Autodesk.AutoCAD.Windows. Trên Linux không có WinForms nên stub tự khai
+      System.Windows.Forms.DialogResult (xem cuối AcadStub.cs).
+    -->
+    <UseWindowsForms>false</UseWindowsForms>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Stub API AutoCAD (chỉ khai kiểu + chữ ký, thân hàm rỗng). -->
+    <Compile Include="AcadStub.cs" />
+
+    <!--
+      GLOB, cố ý KHÔNG liệt kê tay từng tệp: liệt kê tay thì mỗi lệnh vẽ mới thêm vào Adapter
+      sẽ lọt lưới cổng này — đúng lớp lỗi đang bịt. Thêm tệp .cs vào XBoss.Cad.Acad là tự
+      động được kiểm, không phải nhớ sửa csproj.
+      Loại trừ bin/obj: máy Windows từng build Adapter thật sẽ để lại AssemblyInfo.cs /
+      GlobalUsings.g.cs trong obj/, kéo vào đây sẽ trùng khai báo.
+    -->
+    <Compile Include="../XBoss.Cad.Acad/**/*.cs"
+             Exclude="../XBoss.Cad.Acad/bin/**/*.cs;../XBoss.Cad.Acad/obj/**/*.cs"
+             LinkBase="Adapter" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Core là net8.0 thuần, không chạm AutoCAD — dùng chính project thật, không stub. -->
+    <ProjectReference Include="../XBoss.Cad.Core/XBoss.Cad.Core.csproj" />
+  </ItemGroup>
+
+  <!--
+    Chống "cổng xanh giả": glob không khớp tệp nào (đổi tên/di chuyển thư mục Adapter, sửa
+    nhầm đường dẫn) thì project vẫn build XANH mà chẳng kiểm gì — nguy hiểm hơn là không có
+    cổng, vì nó tạo cảm giác an toàn sai. Đếm lại và đỏ ngay nếu rỗng.
+  -->
+  <Target Name="KiemGlobAdapterKhongRong" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <_TepAdapter Include="../XBoss.Cad.Acad/**/*.cs"
+                   Exclude="../XBoss.Cad.Acad/bin/**/*.cs;../XBoss.Cad.Acad/obj/**/*.cs" />
+    </ItemGroup>
+    <Error Condition="'@(_TepAdapter)' == ''"
+      Text="Cổng hỏng: glob ../XBoss.Cad.Acad/**/*.cs không khớp tệp nào — thư mục Adapter đã đổi tên/di chuyển? Sửa đường dẫn trong XBoss.Cad.AcadShim.csproj, đừng bỏ qua." />
+    <Message Importance="high" Text="[AcadShim] Đang biên dịch thử @(_TepAdapter->Count()) tệp Adapter bằng stub API AutoCAD." />
+  </Target>
+
+</Project>
