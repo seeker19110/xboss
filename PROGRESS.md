@@ -410,6 +410,17 @@ dùng tới — PR4/PR6 mới tiêu thụ.
   (`lib/nen/modules.ts`) + `public/sw.js` và tăng `CACHE` — chưa làm vì đụng vùng rủi ro cao
   ngoài phạm vi PR.
 
+## Checklist verify tay trên máy có AutoCAD 2026 (2026-08-25)
+
+`docs/ops/verify-tay-plugin-autocad-M100-M101.md` — điều kiện tiên quyết để phát hành M100/M101 cho
+kỹ sư dùng thật. Gom AC1–AC14 của M100 + phần M101 cần AutoCAD thật thành các bước bấm được: lệnh
+gõ gì, nhập số nào, đo bằng `DIST`/Properties ra con số nào là đạt. Kèm mục "điểm đã biết là còn hở"
+(API chưa có tiền lệ trong repo — Layout/PlotSettings/Table/IntersectWith/Hatch/BindXrefs — đổ ở đó
+là bình thường, chụp lỗi rồi báo) và mẫu ghi nhận khi một ca không đạt.
+
+**Sửa kèm:** AC1 trong `docs/nang-cap/M100-*.md` còn ghi layer biên `M-DUCT-SUPP-EDGE` (tên cũ trước
+khi đổi hậu tố sang `EDGE` liền) — nếu để nguyên thì người verify sẽ báo lỗi oan.
+
 ## M100 + M101 — Đặc tả giai đoạn 2 plugin AutoCAD: bộ lệnh vẽ `XBOSS_VE_*` + nâng trần 3 khối M99 — ĐÃ DUYỆT (2026-08-25)
 
 Người dùng yêu cầu (2026-08-25, qua thảo luận trần năng lực plugin): (1) "viết đặc tả M mới cho lệnh vẽ XBOSS_VE — có block, layer chuẩn hoá sẵn cho từng hệ MEPF và plugin vẽ đè lên thiết kế đã chuẩn hoá"; bổ sung giữa chừng "tạo trang in, mặt cắt" và (2) "nâng cấp tất cả tính năng lên mức trần cao nhất". Sau đó rà sót tính năng vẽ → người dùng **duyệt trọn gói cùng ngày** ("ok duyệt tất cả") kèm yêu cầu ghi chú tính năng đáng giá cho phiên bản sau. Nhánh `claude/plugin-capabilities-limits-rrd2gp`. **Chỉ đặc tả — CHƯA CODE.**

@@ -145,7 +145,7 @@ Bấm điểm tuyến xuyên kết cấu (hoặc để plugin dò giao tim × đ
 
 ## 8. Acceptance criteria
 
-- **AC1** _Given_ hệ HVAC + size 300x200, _when_ `XBOSS_VE` vẽ 1 tuyến, _then_ tim nằm layer `M-DUCT-SUPP` + 2 nét biên cách tim 150 mỗi bên trên `M-DUCT-SUPP-EDGE`, và **1 UNDO** xóa cả bộ.
+- **AC1** _Given_ hệ HVAC + size 300x200, _when_ `XBOSS_VE` vẽ 1 tuyến, _then_ tim nằm layer `M-DUCT-SUPP` + 2 nét biên cách tim 150 mỗi bên trên `M-DUCT-SUPPEDGE` (hậu tố liền — xem §11), và **1 UNDO** xóa cả bộ.
 - **AC2** _Given_ bản vẽ shop vẽ hoàn toàn bằng `XBOSS_VE_*`, _when_ `XBOSS_KIEMTRA`, _then_ 0 lỗi nhóm layer/Z/lineweight.
 - **AC3** _Given_ tuyến tim 10m hệ CHW vẽ bằng `XBOSS_VE`, _when_ `XBOSS_BOCKL`, _then_ item `chw-pipe` ra đúng 10.00 m; nét biên **không** đóng góp khối lượng.
 - **AC4** _Given_ block `FCU` chèn bằng `XBOSS_VE_THIETBI`, _when_ `XBOSS_BOCKL`, _then_ item `fcu-unit` đếm đúng số block đã chèn.
