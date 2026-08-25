@@ -4,6 +4,68 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Thi hành toàn bộ 8 đề xuất của audit tính năng (2026-08-25)
+
+Người dùng: "làm toàn bộ theo hướng tốt nhất". Cả 8 đề xuất trong
+`docs/audit-2026-08-25-tinh-nang-theo-vong-doi.md` §5 đã xong (4 commit). Ba mục đổi hướng so
+với đề xuất ban đầu vì rà kỹ thấy dữ kiện khác — lý do ghi ở §9 của tài liệu đó.
+
+**Đã làm**
+
+1. **Nav (#1)** — mục "Rủi ro" đang trỏ `/hse` (trang không có nội dung rủi ro) → trỏ về
+   `/risks`; thêm nav cho `/schedule-control`, `/lookahead`, `/materials/reports`.
+2. **Số liệu bịa (#2)** — `/governance` và `/engineering-intelligence` chưa từng gọi API nay
+   fetch thật; 4 hub còn lại khởi tạo `"—"` thay số cứng, bỏ fallback `|| 6`/`|| 28`/`|| 142`;
+   `/schedule` tính tiến độ tổng + SPI thật từ `/api/dashboard` và `/api/dashboard/evm`; bỏ 2
+   nút giả (alert "Đang xuất Excel", "Xuất BCF-ZIP" không có endpoint), 3 badge số bịa, 6 chỗ
+   hard-code tên dự án. `/commercial` lộ thêm 3 lỗi đọc sai dữ liệu (khoá `items`, trường
+   `totalApproved` không tồn tại, cộng tiền trên float JS) — đã sửa theo quy ước M45 PR1.
+3. **Gộp vỏ mỏng (#3)** — chỉ `/scurve` (29 dòng) + `/timeline` (27 dòng) là vỏ mỏng thật →
+   chuyển hướng sang `/schedule?tab=`, e2e canh chuyển hướng. `/lookahead` và
+   `/schedule-control` GIỮ NGUYÊN: chúng có phần hub không có (bố cục in A4; Pareto bấm-để-lọc
+   - link sâu sang `/tracking`) — báo cáo ghi nhầm, đã đính chính.
+4. **Route không ai gọi (#4)** — con số đúng là **46/505** (báo cáo ghi 19 do script tạm lọc
+   sai file tự thân với route động). KHÔNG xoá: đều có kiểm quyền, nhiều route có test, và
+   `/api/devices/pair/claim` **do plugin AutoCAD gọi bằng C#** (suýt xoá nhầm vì grep chỉ quét
+   `.ts`). Thay bằng cổng `check:dead-routes` + allowlist 46 mục kèm lý do.
+5. **Danh tính thầu phụ (#5)** — migration **0137** (backfill `supplier_id` theo tên chuẩn hoá,
+   chỉ gắn khi khớp DUY NHẤT + unique index một phần) và `taoHoSoThauPhu()` bắt buộc
+   `supplierId`, chép tên từ `suppliers`. Thêm `POST /api/engineering/subcon-ai/scores` —
+   trước đó module M82 **không có đường tạo hồ sơ nào**, đó chính là lý do GET phải seed bịa.
+6. **Hai lớp song song (#6)** — **ADR-0011**: giữ hai lớp nhưng danh tính chỉ một nguồn; GET
+   không bao giờ ghi dữ liệu nghiệp vụ. Migration **0138** thêm FK `supplier_id` cho 3 bảng
+   còn giữ tên đối tác bằng chữ tự do. Cổng `check:engineering-danh-tinh`. Sáu cặp còn lại
+   chưa gộp — điều kiện để quyết ghi trong ADR.
+7. **Trang tĩnh (#7)** — `/mepf-process` có **75 dòng phê duyệt bịa** gán cho người có tên
+   thật và cả cơ quan nhà nước, kèm chữ ký SHA-256 sinh tại chỗ; tab "Sổ Cái Merkle" là chuỗi
+   cắm cứng. Đã xoá sạch, trỏ về `/approvals` + `/admin/audit-log`, tick lưu localStorage.
+   `/combine` bỏ nút xuất/duyệt giả, đăng ký `thuNghiem: true` + `ThuNghiemBanner`.
+8. **Canvas (#8)** — không gộp component (ba trang vẽ ba thứ khác hẳn), mà tách hook
+   `useCanvasHiDPI` xử lý đúng phần trùng-và-hỏng: DPR + co giãn theo container +
+   `toCanvasCoords`. Sửa lỗi **ghim hiện trường cắm sai chỗ** ở `/engineering/spatial-viewer`.
+
+**Ba lớp lỗi chỉ lộ ra khi thi hành** (không có trong báo cáo gốc):
+
+- **Hai endpoint GET tự ghi dữ liệu bịa vào DB thật**: `subcon-ai/scores` chèn 4 hồ sơ thầu
+  phụ kèm mã số thuế giả; `iot/devices` chèn 5 cảm biến kèm ngưỡng cảnh báo bịa. Đã gỡ +
+  `scripts/don-du-lieu-seed-bia.ts` dọn phần đã lỡ ghi (mặc định chỉ báo cáo).
+- **5 lời gọi `lib/db` truyền mảng** → `/api/engineering/bim-routing` đang trả **500 thật**
+  (`invalid input syntax for type bigint: "{"1"}"`). Cổng `check:db-params` bỏ sót vì chỉ bắt
+  mảng literal và bỏ qua lời gọi có tham số đầu là biến — đã sửa 5 chỗ + mở rộng cổng.
+- `/api/engineering/qs-bom-explosion` mặc định mọi tham số bằng giá trị bịa rồi **GHI** vào dự
+  án → nay thiếu tham số là 422.
+
+**Kiểm chứng**: `npm test` 225 file / **1.223 ca pass / 0 đỏ** trên Postgres 16 thật;
+`lint`/`typecheck`/`build` xanh; **11 cổng CI** xanh (3 cổng mới/mở rộng đều đã thử nghiệm
+ngược). Đo trên Chromium thật (`deviceScaleFactor=2`): 3 canvas khớp DPR, toạ độ ghim đúng
+kỳ vọng, `/api/engineering/bim-routing` trả `[]` thay vì 500.
+
+**Nợ còn lại (chưa làm được)**: chưa đếm được dòng thật của các bảng `engineering_*` trên
+production (dữ kiện quyết định 6 cặp còn lại ở ADR-0011 là "gộp" hay "xoá"); chưa rà quyền
+theo nhóm vòng đời; chưa rà trùng lặp trong `lib/ky-thuat/` (31.426 dòng). **Migration 0137 và
+0138 có UPDATE backfill → bắt buộc qua staging trước production** (DoD, `npm run db:migrate --
+--dry-run`).
+
 ## Audit tính năng — gộp theo vòng đời dự án (2026-08-25)
 
 Người dùng: "audit tính năng và gộp lại theo nhóm". Chốt qua `AskUserQuestion`: **ra báo cáo
