@@ -43,83 +43,65 @@ function ProcurementSkeleton() {
 }
 
 function ProcurementContent() {
+  // Dải KPI: khởi tạo "—", chỉ đổi khi API trả thật. Trước đây khởi tạo bằng số cắm cứng
+  // ("320 Mục", "28 Đơn", "142 Phiếu") và fallback `|| 320` / `|| 28` / `|| 142` biến dự
+  // án rỗng (đếm 0) thành số bịa — đúng lớp lỗi ở audit 2026-08-25 §3.2.
   const [stats, setStats] = useState<HubStat[]>([
-    {
-      label: "Tổng Danh Mục BOQ",
-      value: "320 Mục",
-      change: "100% Khớp WBS",
-      isPositive: true,
-      icon: Calculator,
-    },
-    {
-      label: "Đơn Đặt Hàng (PO)",
-      value: "28 Đơn",
-      change: "4 Đơn đang giao",
-      isPositive: true,
-      icon: Truck,
-    },
-    {
-      label: "Lô Hàng Đã Nhập Kho (GRN)",
-      value: "142 Phiếu",
-      change: "QR Scan 100%",
-      isPositive: true,
-      icon: QrCode,
-    },
-    {
-      label: "Cảnh Báo Vượt Định Mức",
-      value: "0 Vật tư",
-      change: "Kiểm soát an toàn",
-      isPositive: true,
-      icon: CheckCircle2,
-    },
+    { label: "Tổng Danh Mục Vật Tư", value: "—", icon: Calculator },
+    { label: "Đơn Đặt Hàng (PO)", value: "—", icon: Truck },
+    { label: "Lô Hàng Tiếp Nhận (GRN)", value: "—", icon: QrCode },
+    { label: "Cảnh Báo Vượt Định Mức", value: "—", icon: CheckCircle2 },
   ]);
 
   useEffect(() => {
-    // Tải thống kê thực tế từ API
+    const get = (url: string) =>
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+
     Promise.all([
-      fetch("/api/materials").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/purchase-orders").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/engineering/logistics/shipments").then((r) => (r.ok ? r.json() : null)),
+      get("/api/materials"),
+      get("/api/purchase-orders"),
+      get("/api/engineering/logistics/shipments"),
     ]).then(([matData, poData, shpData]) => {
-      const matList = matData?.materials || [];
-      const poList = poData?.orders || [];
-      const shpList = shpData?.data || [];
+      const matList: { qtyPlanned?: number; qtyUsed?: number }[] | null =
+        matData?.materials ?? null;
+      const poList: { status?: string }[] | null = poData?.orders ?? null;
+      const shpList: unknown[] | null = shpData?.data ?? null;
 
-      const overBudget = matList.filter(
-        (m: any) => m.qtyPlanned > 0 && m.qtyUsed > m.qtyPlanned,
-      ).length;
-
-      const deliveringCount = poList.filter(
-        (p: any) => p.status === "delivering" || p.status === "partial",
-      ).length;
+      const overBudget =
+        matList == null
+          ? null
+          : matList.filter((m) => (m.qtyPlanned ?? 0) > 0 && (m.qtyUsed ?? 0) > (m.qtyPlanned ?? 0))
+              .length;
+      const deliveringCount =
+        poList == null
+          ? null
+          : poList.filter((p) => p.status === "delivering" || p.status === "partial").length;
 
       setStats([
         {
           label: "Tổng Danh Mục Vật Tư",
-          value: `${matList.length || 320} Mục`,
-          change: "Khớp 100% WBS",
-          isPositive: true,
+          value: matList == null ? "—" : `${matList.length} Mục`,
           icon: Calculator,
         },
         {
           label: "Đơn Đặt Hàng (PO)",
-          value: `${poList.length || 28} Đơn`,
-          change: `${deliveringCount} Đơn đang vận chuyển`,
-          isPositive: true,
+          value: poList == null ? "—" : `${poList.length} Đơn`,
+          change: deliveringCount == null ? undefined : `${deliveringCount} Đơn đang vận chuyển`,
           icon: Truck,
         },
         {
           label: "Lô Hàng Tiếp Nhận (GRN)",
-          value: `${shpList.length || 142} Lô`,
-          change: "Đối soát 3 chiều",
-          isPositive: true,
+          value: shpList == null ? "—" : `${shpList.length} Lô`,
           icon: QrCode,
         },
         {
           label: "Cảnh Báo Vượt Định Mức",
-          value: `${overBudget} Vật tư`,
-          change: overBudget === 0 ? "Kiểm soát an toàn" : "Cần rà soát",
-          isPositive: overBudget === 0,
+          value: overBudget == null ? "—" : `${overBudget} Vật tư`,
+          change:
+            overBudget == null ? undefined : overBudget === 0 ? "Kiểm soát an toàn" : "Cần rà soát",
+          isPositive: overBudget == null ? undefined : overBudget === 0,
           icon: overBudget === 0 ? CheckCircle2 : AlertTriangle,
         },
       ]);

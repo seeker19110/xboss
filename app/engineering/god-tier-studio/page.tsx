@@ -910,12 +910,6 @@ export default function GodTierStudioPage() {
                   BlenderBIM.
                 </p>
               </div>
-              <button
-                onClick={() => alert("Đang xuất gói BCF-XML ZIP chuẩn buildingSMART...")}
-                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1.5"
-              >
-                <Download className="w-4 h-4" /> Xuất File BCF-ZIP
-              </button>
             </div>
 
             <div className="space-y-3">
