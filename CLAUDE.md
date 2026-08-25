@@ -55,6 +55,8 @@ npm test             # node:test qua tsx — hơn 100 file trong tests/ (không 
 npm test -- --release-gate   # như trên, nhưng ca bị SKIP = LỖI (trừ file có lý do trong scripts/test-skip-allowlist.json). CI dùng cờ này.
 npm run test:mutation        # C4 §4 — cố ý phá 9 bất biến (progress/delayed/nghiệm thu/RBAC/risk/gates/idempotency/RLS/tiền) rồi ĐÒI test phải đỏ. Cần TEST_DATABASE_URL.
 npx tsx --test tests/status.test.ts   # chạy 1 file test
+npm run check:contrast       # ADR-0010 — tương phản WCAG AA của bảng token màu (mọi theme)
+npm run check:mau-accent     # ADR-0010 — chữ trắng trên nền accent sáng (kể cả trạng thái hover)
 npm run check:lib-layers     # ADR-0007 — ranh giới miền lib/: chặn import ngược tầng + chu trình mới
 npm run check:dead-code      # dò module không ai với tới được (đồ thị import toàn repo)
 npm run db:seed      # import Excel gốc trong attachments/ vào DB
@@ -199,6 +201,7 @@ Làm việc với vai trò **chuyên gia thiết kế** — giao diện phải �
 
 **Khả năng tiếp cận & in ấn:**
 
+- **Nút nền màu đặc đậm dần khi rê chuột** (`bg-{c}-700 hover:bg-{c}-800`), không sáng dần — nền nhạt hơn kéo tương phản với chữ trắng xuống dưới AA (ADR-0010). Lỗi tương phản ở mức TOKEN thì sửa trong `globals.css` cho theme đó, **không** đổi tay từng class ở trang.
 - Đảm bảo tương phản đủ ở **cả hai theme**; có trạng thái focus rõ cho bàn phím; dùng `aria-label`/alt hợp lý; không truyền tải thông tin **chỉ** bằng màu (kèm icon/nhãn).
 - Trang in (`/report`) phải sạch khi `window.print()` → PDF (ẩn nav/nút, layout vừa khổ giấy).
 - Mọi nhãn, thông báo, tooltip bằng **tiếng Việt**.

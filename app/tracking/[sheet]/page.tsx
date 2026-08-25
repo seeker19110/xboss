@@ -403,7 +403,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
               <button
                 onClick={saveAddPkg}
                 disabled={!addPkgModal.code.trim() || !addPkgModal.name.trim() || addPkgSaving}
-                className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg font-medium text-on-accent"
+                className="px-3 py-1.5 text-sm bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 rounded-lg font-medium text-on-accent"
               >
                 {addPkgSaving ? "Đang lưu..." : "Tạo hạng mục"}
               </button>
@@ -709,7 +709,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
                 <button
                   onClick={saveSheet}
                   disabled={!sheetModal.name.trim() || !sheetModal.code.trim()}
-                  className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg font-medium text-on-accent"
+                  className="px-3 py-1.5 text-sm bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 rounded-lg font-medium text-on-accent"
                 >
                   Lưu
                 </button>

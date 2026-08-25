@@ -423,7 +423,7 @@ export default function SpatialViewerPage() {
               }}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                 isAddingPin
-                  ? "bg-amber-700 text-on-accent hover:bg-amber-500"
+                  ? "bg-amber-700 text-on-accent hover:bg-amber-800"
                   : "bg-violet-600 text-white hover:bg-violet-500"
               }`}
             >

@@ -408,7 +408,7 @@ function StageCard({
             <button
               onClick={save}
               disabled={busy}
-              className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold px-4 py-2 rounded-lg text-sm"
+              className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold px-4 py-2 rounded-lg text-sm"
             >
               {busy ? "Đang lưu…" : "Lưu"}
             </button>

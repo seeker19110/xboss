@@ -4,12 +4,16 @@ import type { LucideIcon } from "lucide-react";
 // Nút dùng chung — gom về một chỗ các biến thể đang bị chép tay rải rác khắp trang
 // (bg-emerald-700 hover:bg-emerald-600…, bg-zinc-800 hover:bg-zinc-700…). Mọi màu đều
 // dùng token tự đảo theo theme; nền màu đặc ghép chữ `text-on-accent` (xem globals.css).
+//
+// Nút nền màu đặc ĐẬM DẦN khi rê chuột (-700 → -800), không sáng dần như mẫu cũ: nền
+// nhạt hơn kéo tương phản với chữ trắng xuống 3,3-3,7:1 ngay lúc rê chuột (mẫu cũ
+// `hover:bg-emerald-600` = 3,65:1). Cổng CI `npm run check:mau-accent` canh luật này.
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "warning";
 export type ButtonSize = "sm" | "md" | "icon";
 
 const VARIANT: Record<ButtonVariant, string> = {
   primary:
-    "bg-emerald-700 hover:bg-emerald-600 text-on-accent font-semibold border border-transparent",
+    "bg-emerald-700 hover:bg-emerald-800 text-on-accent font-semibold border border-transparent",
   secondary:
     "bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 hover:border-zinc-600 font-medium",
   ghost:

@@ -91,7 +91,7 @@ Stack: ${error.stack || "N/A"}`;
         <div className="flex items-center gap-2">
           <button
             onClick={reset}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-600 text-xs font-medium text-on-accent transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-800 text-xs font-medium text-on-accent transition"
           >
             <RotateCcw className="w-3.5 h-3.5" /> Thử lại
           </button>

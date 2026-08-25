@@ -132,7 +132,7 @@ export default function MaterialReportsPage() {
                     </span>
                   )}
                   {t.key === "lowStock" && report.lowStock.length > 0 && (
-                    <span className="bg-amber-600 text-on-accent px-1.5 py-0.5 rounded-full text-xs">
+                    <span className="bg-amber-700 text-on-accent px-1.5 py-0.5 rounded-full text-xs">
                       {report.lowStock.length}
                     </span>
                   )}

@@ -217,7 +217,7 @@ export default function EsignStudioPage() {
                 </div>
                 <button
                   type="submit"
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-emerald-500"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-emerald-800"
                 >
                   <Send size={16} />
                   Phát hành Hồ sơ Trình ký
@@ -409,7 +409,7 @@ export default function EsignStudioPage() {
                             </div>
                             <button
                               onClick={() => handleSign(s)}
-                              className="w-full rounded bg-emerald-700 py-2 text-xs font-bold text-on-accent hover:bg-emerald-500 transition-colors"
+                              className="w-full rounded bg-emerald-700 py-2 text-xs font-bold text-on-accent hover:bg-emerald-800 transition-colors"
                             >
                               Ký Số & Đóng Dấu Điện Tử
                             </button>

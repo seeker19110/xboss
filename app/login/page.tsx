@@ -140,7 +140,7 @@ export default function LoginPage() {
             <button
               disabled={busy}
               type="submit"
-              className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-50 py-3 rounded-xl font-semibold text-sm transition text-on-accent min-h-[44px] shadow-sm"
+              className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] disabled:opacity-50 py-3 rounded-xl font-semibold text-sm transition text-on-accent min-h-[44px] shadow-sm"
             >
               <LogIn className="w-4 h-4" /> {busy ? "Đang xác thực..." : "Xác nhận & Đăng nhập"}
             </button>
@@ -197,7 +197,7 @@ export default function LoginPage() {
             <button
               disabled={busy}
               type="submit"
-              className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-50 py-3 rounded-xl font-semibold text-sm transition text-on-accent min-h-[44px] shadow-sm"
+              className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] disabled:opacity-50 py-3 rounded-xl font-semibold text-sm transition text-on-accent min-h-[44px] shadow-sm"
             >
               <LogIn className="w-4 h-4" /> {busy ? "Đang đăng nhập..." : "Đăng nhập hệ thống"}
             </button>

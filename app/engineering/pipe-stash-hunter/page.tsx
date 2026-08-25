@@ -350,7 +350,7 @@ export default function PipeStashHunterPage() {
               <button
                 onClick={handleRunMassBalance}
                 disabled={isAuditing}
-                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-500 text-on-accent font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all disabled:opacity-50"
+                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-on-accent font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all disabled:opacity-50"
               >
                 {isAuditing ? (
                   <RotateCcw className="w-4 h-4 animate-spin" />
@@ -516,7 +516,7 @@ export default function PipeStashHunterPage() {
                     trở lối thoát hiểm hoặc giấu hàng.
                   </p>
                   <div className="pt-2 flex gap-2">
-                    <button className="px-3 py-1.5 bg-amber-700 hover:bg-amber-500 text-on-accent rounded text-xs font-semibold">
+                    <button className="px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-on-accent rounded text-xs font-semibold">
                       Phát Lệnh Kiểm Kê
                     </button>
                     <button className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs">

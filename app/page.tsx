@@ -463,7 +463,7 @@ export default function Dashboard() {
               <a
                 href="/import"
                 aria-label="Import Excel"
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
               >
                 <Upload className="w-4 h-4" />{" "}
                 <span className="hidden sm:inline">Import Excel</span>
@@ -988,7 +988,7 @@ export default function Dashboard() {
               <button
                 onClick={createSheet}
                 disabled={!newSheet.name.trim()}
-                className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 rounded-lg font-semibold transition text-on-accent"
+                className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 rounded-lg font-semibold transition text-on-accent"
               >
                 Tạo trang
               </button>

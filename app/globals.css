@@ -28,6 +28,14 @@
 /* Chế độ tối (mặc định) — script trong layout gắn class theo localStorage('xboss_theme') */
 html.dark {
   color-scheme: dark;
+  /* zinc-500 gốc Tailwind (#71717a) dùng làm MÀU CHỮ trên mặt thẻ tối chỉ đạt 3,6-4,1:1
+     — dưới ngưỡng WCAG AA 4,5:1 (axe bắt hàng loạt "serious" khi trang có nhiều dữ liệu).
+     Cả 4 theme tối đều mắc, và `text-zinc-500` là màu chữ phụ dùng ở gần 700 chỗ nên sửa
+     ở TOKEN thay vì đổi tay từng class: giữ nguyên thứ bậc 3 mức chữ (300 > 400 > 500) mà
+     vẫn đạt AA. Giá trị chọn sao cho đạt ≥4,5:1 trên cả nền đậm nhất mà chữ phụ thực sự
+     nằm lên (zinc-800): 4,59:1 / zinc-900 5,46:1 / zinc-950 6,13:1.
+     `.sheet-stable` (vùng "giấy trắng") tự ghim lại #71717a nên không bị ảnh hưởng. */
+  --color-zinc-500: #8e8e98;
 }
 
 /* ─── Theme xanh dương (King Blue / Dark Blue / Navy) ───────────────────────
@@ -45,12 +53,32 @@ html.kingblue {
   --color-zinc-800: #1a3f94;
   --color-zinc-700: #2451b5;
   --color-zinc-600: #3a6bd0;
-  --color-zinc-500: #5d87de;
-  --color-zinc-400: #8aabec;
+  /* -500/-400 sáng hơn bảng gốc của theme: mặt thẻ King Blue (#123075/#1a3f94) sáng hơn
+     hẳn các theme tối khác nên hai mức chữ phụ cũ chỉ đạt 3,3-4,2:1. Giá trị mới đạt
+     ≥4,6:1 trên cả zinc-800/900/950 mà vẫn giữ thứ bậc 300 > 400 > 500. */
+  --color-zinc-500: #7eb7ff;
+  --color-zinc-400: #a8ccff;
   --color-zinc-300: #b3c9f4;
   --color-zinc-200: #d4e2fa;
   --color-zinc-100: #e8f0fd;
   --color-zinc-50: #f4f8fe;
+  /* Mặt thẻ King Blue sáng hơn hẳn các theme tối khác nên 8 màu nhấn dưới đây dùng làm
+     CHỮ chỉ đạt 3,1-4,4:1 ở mức -400. Đổi -400 sang đúng giá trị -400 của thang là không
+     đủ, nên lấy giá trị -300 (sáng hơn một bậc, đạt 4,8-5,8:1) — cùng cách html.light xử
+     lý theo hướng ngược lại. Ghi bằng hex CHỐT, không dùng var(--color-*-300): biến đó do
+     Tailwind chỉ phát sinh khi trong mã còn chỗ dùng shade -300, gỡ hết chỗ dùng là biến
+     biến mất và class -400 vỡ theo (im lặng). Các màu không liệt kê (amber/emerald/green/
+     teal/cyan/yellow) đã đạt AA sẵn nên GIỮ NGUYÊN -400 để không làm nhạt màu vô cớ.
+     Mức -400 chỉ dùng làm nền ở các chấm/thanh trang trí (không có chữ đặt lên) nên đổi
+     giá trị không ảnh hưởng tương phản ở đó. */
+  --color-red-400: #ffa2a2;
+  --color-rose-400: #ffa1ad;
+  --color-orange-400: #ffb86a;
+  --color-sky-400: #74d4ff;
+  --color-blue-400: #8ec5ff;
+  --color-indigo-400: #a3b3ff;
+  --color-violet-400: #c4b4ff;
+  --color-purple-400: #dab2ff;
 }
 
 /* Dark Blue — xanh dương slate dịu mắt, nhạt và mờ êm dịu */
@@ -63,12 +91,20 @@ html.darkblue {
   --color-zinc-800: #223554;
   --color-zinc-700: #2f466c;
   --color-zinc-600: #445e89;
-  --color-zinc-500: #6582ab;
+  /* Sáng hơn bảng gốc (#6582ab chỉ đạt 3,7-4,2:1 khi làm màu chữ) — xem ghi chú ở html.dark. */
+  --color-zinc-500: #7da1d3;
   --color-zinc-400: #92a9cb;
   --color-zinc-300: #bcd0e8;
   --color-zinc-200: #dae6f4;
   --color-zinc-100: #ecf2fa;
   --color-zinc-50: #f6f9fd;
+  /* Cùng lý do như King Blue (xem ghi chú ở trên) nhưng mặt thẻ đỡ sáng hơn nên chỉ 5 màu
+     tím-đỏ hụt ngưỡng ở mức -400 (3,9-4,4:1); lấy giá trị -300 đưa lên 6,1-6,9:1. */
+  --color-red-400: #ffa2a2;
+  --color-rose-400: #ffa1ad;
+  --color-indigo-400: #a3b3ff;
+  --color-violet-400: #c4b4ff;
+  --color-purple-400: #dab2ff;
 }
 
 /* Navy — xanh hải quân thâm trầm nhất, tông slate xanh-xám */
@@ -81,7 +117,8 @@ html.navy {
   --color-zinc-800: #1c2a44;
   --color-zinc-700: #2c3e5e;
   --color-zinc-600: #475569;
-  --color-zinc-500: #64748b;
+  /* Sáng hơn bảng gốc (#64748b chỉ đạt 3,5-3,9:1 khi làm màu chữ) — xem ghi chú ở html.dark. */
+  --color-zinc-500: #7f94b1;
   --color-zinc-400: #94a3b8;
   --color-zinc-300: #cbd5e1;
   --color-zinc-200: #e2e8f0;
@@ -130,7 +167,10 @@ html.light {
   --color-teal-300: #0f766e;
   --color-teal-400: #0f766e;
   --color-red-300: #b91c1c;
-  --color-red-400: #dc2626;
+  /* #dc2626 đạt 4,83:1 trên mặt thẻ trắng nhưng chỉ 4,34:1 trên DÒNG SỌC XEN KẼ của bảng
+     (nền zebra zinc-800/20 phủ lên thẻ ra #f1f3f6) — mà chữ đỏ hầu như luôn nằm trong bảng
+     (cột "trễ (ngày)"). Đậm thêm một bậc: 5,16:1 trên dòng sọc, 5,74:1 trên thẻ trắng. */
+  --color-red-400: #c81e1e;
   --color-blue-300: #1d4ed8;
   --color-blue-400: #2563eb;
   /* orange-800 thay vì -700: trên nền mờ cùng tông (bg-orange-500/10) shade -700 chỉ đạt

@@ -140,7 +140,7 @@ export default function EquipmentPage() {
               <button
                 onClick={() => setAddOpen(true)}
                 aria-label="Thêm thiết bị"
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
               >
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm thiết bị</span>
               </button>
@@ -384,7 +384,7 @@ function AddEquipmentModal({ onClose, onCreated }: { onClose: () => void; onCrea
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo thiết bị"}
         </button>
@@ -606,7 +606,7 @@ function EquipmentDetailModal({
               <button
                 onClick={submitLog}
                 disabled={busy}
-                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
+                className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
               >
                 Ghi nhận
               </button>

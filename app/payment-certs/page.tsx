@@ -206,7 +206,7 @@ function PaymentCertsInner() {
                 <button
                   onClick={createCert}
                   disabled={creating || !contractId}
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-50 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] disabled:opacity-50 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
                 >
                   <Plus className="w-4 h-4" /> {creating ? "Đang lập…" : "Lập đợt mới"}
                 </button>
@@ -591,7 +591,7 @@ function CertDetailModal({
             <button
               onClick={submitCert}
               disabled={busy}
-              className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
+              className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
             >
               Trình lên CĐT/TVGS
             </button>
@@ -601,7 +601,7 @@ function CertDetailModal({
               <button
                 onClick={() => decide("approved")}
                 disabled={busy}
-                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
+                className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
               >
                 Duyệt
               </button>

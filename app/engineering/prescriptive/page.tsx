@@ -446,7 +446,7 @@ export default function PrescriptiveAndCompliancePage() {
                         <button
                           disabled={approvingId === selectedScenario.id}
                           onClick={() => handleApprove(selectedScenario.id)}
-                          className="flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-semibold text-on-accent hover:bg-emerald-500"
+                          className="flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-semibold text-on-accent hover:bg-emerald-800"
                         >
                           <CheckCircle2 size={16} />
                           Phê duyệt phương án đề xuất

@@ -184,7 +184,7 @@ export default function BoqPage() {
               <button
                 onClick={() => setAddOpen(true)}
                 aria-label="Thêm dòng BOQ"
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
               >
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm dòng BOQ</span>
               </button>
@@ -555,7 +555,7 @@ function AddBoqModal({
         <button
           onClick={submit}
           disabled={saving || !code.trim() || !name.trim() || !unit.trim()}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo dòng BOQ"}
         </button>
@@ -673,7 +673,7 @@ function ImportBoqModal({
             )}
             <button
               onClick={onImported}
-              className="w-full bg-emerald-700 hover:bg-emerald-600 text-on-accent font-semibold py-2 rounded-lg text-sm"
+              className="w-full bg-emerald-700 hover:bg-emerald-800 text-on-accent font-semibold py-2 rounded-lg text-sm"
             >
               Xong
             </button>
@@ -693,7 +693,7 @@ function ImportBoqModal({
               <a
                 href="/api/boq/template"
                 download="MAU-KHOI-LUONG-BOQ.xlsx"
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-600 text-on-accent rounded-lg text-xs font-semibold shrink-0 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-on-accent rounded-lg text-xs font-semibold shrink-0 transition"
               >
                 <Download className="w-4 h-4" />
                 Tải file mẫu
@@ -817,7 +817,7 @@ function ImportBoqModal({
                 <button
                   onClick={commit}
                   disabled={busy || addCount === 0}
-                  className="flex-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-on-accent font-semibold py-2 rounded-lg text-sm"
+                  className="flex-1 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-on-accent font-semibold py-2 rounded-lg text-sm"
                 >
                   {busy ? "Đang ghi…" : `Xác nhận ghi ${addCount} dòng`}
                 </button>
@@ -1132,7 +1132,7 @@ function BoqDetailModal({
               <button
                 onClick={saveMap}
                 disabled={savingMap}
-                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-sm font-medium px-4 py-2 rounded-lg"
+                className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-sm font-medium px-4 py-2 rounded-lg"
               >
                 {savingMap ? "Đang lưu…" : "Lưu map"}
               </button>
@@ -1360,7 +1360,7 @@ function NormsSection({ boqItemId, canManage }: { boqItemId: number; canManage: 
           <button
             onClick={addNorm}
             disabled={saving || !qtyPerUnit || !unitLabel.trim()}
-            className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
+            className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
           >
             Thêm định mức
           </button>

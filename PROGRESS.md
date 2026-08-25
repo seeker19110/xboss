@@ -4,6 +4,50 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Đóng nợ tương phản màu — sửa ở token + 2 cổng CI (2026-08-25)
+
+Người dùng: "làm luôn đợt sửa nợ tương phản zinc-500". Đo bằng axe trên bản production có dữ
+liệu thật (2.543 task) rồi sửa tới khi sạch; ghi quyết định trong **ADR-0010**.
+
+**Đã sửa (5 nhóm, tất cả đều đo lại bằng axe sau khi sửa)**
+
+1. **`text-zinc-500` không đạt AA ở cả 4 theme tối** (3,5-4,1:1; riêng Dashboard ~95 nút DOM).
+   Sửa ở **token** trong `app/globals.css` chứ không đổi tay ~700 chỗ dùng: `--color-zinc-500`
+   sáng lên cho `dark` (#8e8e98), `kingblue` (#7eb7ff, kèm `-400` → #a8ccff), `darkblue`
+   (#7da1d3), `navy` (#7f94b1) — giữ nguyên thứ bậc 3 mức chữ 300 > 400 > 500.
+2. **Màu nhấn mức -400 trên mặt thẻ sáng của King Blue/Dark Blue** (3,1-4,4:1): lấy giá trị
+   `-300` cho 8 họ ở kingblue (red/rose/orange/sky/blue/indigo/violet/purple) và 5 họ ở
+   darkblue. Ghi hex chốt, không dùng `var(--color-*-300)` (biến đó biến mất nếu mã hết chỗ
+   dùng shade -300 → class -400 vỡ im lặng).
+3. **Bản đồ nhiệt** (`ProgressMap`): ô 100% dùng chữ trắng trên `bg-emerald-600` (3,65:1) →
+   `text-on-accent-dark` (5,45:1), đúng luật "chọn chữ theo độ sáng của nền" ở globals.css.
+4. **Nút nền màu đặc sáng dần khi rê chuột** — mẫu `bg-emerald-700 hover:bg-emerald-600
+text-on-accent` dùng ở **215 chỗ**: 5,36:1 lúc nghỉ nhưng **3,65:1 khi rê chuột**. Đổi quy
+   ước sang **đậm dần** (`-700 → -800`), sửa cả 215 chỗ bằng codemod chạy trên đúng các dòng
+   cổng CI báo (94 file), cộng 3 chỗ trong chuỗi biến thể (`ui/Button.tsx`, spatial-viewer,
+   suggestions) mà cổng cũ không nhìn thấy.
+5. **Chưa có `app/not-found.tsx`** nên trang 404 dùng bản mặc định của Next: nền trắng cắm
+   cứng + footer theo theme tối = 1,6-2,6:1. Thêm trang 404 riêng dùng token theme.
+   Cùng đợt: `--color-red-400` của theme sáng đậm thêm một bậc (#dc2626 → #c81e1e) vì trên
+   **dòng sọc xen kẽ** của bảng (#f1f3f6) chỉ đạt 4,34:1 — mà chữ đỏ hầu như luôn nằm trong bảng.
+
+**Hai cổng CI mới/mở rộng** (chặn tái phát, chạy vài giây, không cần trình duyệt):
+
+- `npm run check:contrast` (`scripts/check-contrast.ts`, **mới**, đã cắm vào `ci.yml`): đọc
+  **thẳng** bảng token trong `globals.css` (không chép tay), chặn khi mức chữ 300/400/500 của
+  zinc lẫn accent không đạt AA trên `--background`/`zinc-950`/`zinc-900` của bất kỳ theme nào;
+  `zinc-800` (nền control) chỉ cảnh báo. Thay `scripts/contrast-check.ts` cũ (bảng chép tay đã
+  lệch khỏi globals.css, đã xoá). Đã thử nghiệm ngược: trả token cũ về → cổng đỏ đúng chỗ.
+- `npm run check:mau-accent` (**mở rộng**): coi `text-on-accent` như `text-white`, xét cả
+  `hover:`/`focus:`/`active:`, thêm mức -400, và quét **mọi chuỗi class** chứ không chỉ
+  `className="…"` — nhờ vậy mới thấy bảng VARIANT của `app/components/ui/Button.tsx`.
+
+**Verify**: axe trên bản production (Postgres seed Excel gốc) — **8 trang × 5 theme desktop +
+5 trang × 3 theme mobile → 0 vi phạm serious/critical** (trước đợt này: 129 chỉ riêng
+Dashboard+tracking ở theme tối, 583 ở 3 theme xanh). `lint`/`typecheck`/`build` xanh;
+`npm test` 224 file / 1.221 ca pass (có DB thật); **e2e Playwright toàn bộ `e2e/authed`:
+481 pass / 0 fail** (gồm mọi ca axe); 8 cổng kiểm nội bộ xanh.
+
 ## Làm mới UI/UX — bộ component nền + khung app + Dashboard + tracking (2026-08-25)
 
 Người dùng: "thiết kế lại ui/ux hiện đại". Chốt phạm vi đợt 1 qua `AskUserQuestion`: **khung
@@ -51,8 +95,8 @@ sinh ra đã hết; phần còn lại là **nợ cũ** (xem "Nợ kỹ thuật" 
 **Tiếp theo (chưa làm)**: áp bộ component cho các nhóm trang nghiệp vụ còn lại theo từng đợt
 (tài chính, hiện trường, kỹ thuật) — đợt này cố ý không đổi hàng loạt để diff còn review được.
 
-**Nợ kỹ thuật phát hiện (chưa sửa, ngoài phạm vi đợt này)** — `text-zinc-500` dùng làm **màu
-chữ** vi phạm tương phản WCAG AA ở theme tối: axe đếm ~95 nút DOM trên riêng Dashboard (nhiều
+**Nợ kỹ thuật phát hiện** — ~~`text-zinc-500` dùng làm **màu chữ** vi phạm tương phản WCAG AA
+ở theme tối~~ → **đã đóng ngay sau đó, xem mục kế tiếp bên dưới (2026-08-25)**. Nội dung gốc: axe đếm ~95 nút DOM trên riêng Dashboard (nhiều
 nhất ở `ProgressMap`, `DashboardExtCards` và các panel số liệu), cộng ~17 nút trong nhãn ô
 heatmap `ProgressMap` (`text-[9px]`) ở **cả hai** theme. Không phải do đợt này sinh ra (các
 trang đó không nằm trong diff) nhưng nên gom một đợt riêng: đổi chữ phụ sang `zinc-400` và
