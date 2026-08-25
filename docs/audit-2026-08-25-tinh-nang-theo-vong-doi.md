@@ -1,8 +1,9 @@
 # Audit tính năng XBoss — gộp theo vòng đời dự án (2026-08-25)
 
-> **Phạm vi đã chốt với người dùng:** rà toàn bộ tính năng đang có, **gộp lại theo trục vòng
-> đời dự án**, ra **báo cáo trước** — đợt này **không sửa code**. Việc gộp thật (xoá/hợp nhất
-> trang, route, bảng) chỉ làm sau khi người dùng duyệt danh sách ở §5.
+> **Phạm vi:** rà toàn bộ tính năng đang có, **gộp lại theo trục vòng đời dự án**. Bản đầu ra
+> báo cáo (không sửa code); sau đó người dùng giao "làm toàn bộ theo hướng tốt nhất" nên **cả
+> 8 đề xuất ở §5 đã được thi hành** — trạng thái từng mục ghi ở §5, và những chỗ báo cáo ban
+> đầu ghi SAI được đính chính ở **§9**.
 >
 > Đo trên `origin/main` tại commit `5a7617b` (sau PR #395). Mọi con số dưới đây đều đo bằng
 > lệnh, cách tái lập ghi ở §7 — không ước lượng.
@@ -235,9 +236,27 @@ Xếp theo vòng đời cho ba thứ mà cách xếp hiện tại không cho:
    tính năng khác nhau.
 3. **Thấy chỗ đứt:** 5 trang mồ côi ở §3.1 đều thuộc GĐ3/GĐ4 — đúng giai đoạn dùng hằng ngày.
 
-## 5. Đề xuất gộp — cần người duyệt trước khi làm
+## 5. Tám đề xuất gộp — trạng thái thi hành
 
-Xếp theo tỷ lệ (lợi ích / rủi ro). **Chưa thi hành gì cả.**
+Xếp theo tỷ lệ (lợi ích / rủi ro) như lúc lập báo cáo. **Cả 8 đã thi hành**; ba mục đổi hướng
+so với đề xuất ban đầu vì rà kỹ thấy dữ kiện khác — lý do ở §9.
+
+| #   | Việc                                                 | Trạng thái                                                                                                     |
+| --- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 1   | Trỏ lại nav 5 trang mồ côi + sửa mục "Rủi ro"        | **Xong** — "Rủi ro" trỏ `/risks`; thêm nav `/schedule-control`, `/lookahead`, `/materials/reports`             |
+| 2   | Bỏ số liệu bịa ở 7 hub                               | **Xong** — 2 hub nay fetch thật, 4 hub khởi tạo "—", bỏ 2 nút giả + 3 badge số bịa + 6 chỗ hard-code tên dự án |
+| 3   | Gộp vỏ mỏng vào `/schedule?tab=`                     | **Xong, thu hẹp còn 2 trang** (§9.1)                                                                           |
+| 4   | Xử lý route API không ai gọi                         | **Xong, đổi hướng: không xoá mà thêm cổng CI** (§9.2)                                                          |
+| 5   | Nối `engineering_subcon_profiles` về nguồn danh tính | **Xong** — migration 0137 + đường ghi bắt buộc `supplierId` + 2 test trên Postgres thật                        |
+| 6   | Chốt hướng cho các cặp stack song song               | **Xong** — ADR-0011 + migration 0138 + cổng `check:engineering-danh-tinh`; 6 cặp còn lại chờ đo production     |
+| 7   | Xử lý `/mepf-process` + `/combine`                   | **Xong, phạm vi rộng hơn dự kiến** (§9.3)                                                                      |
+| 8   | Tách component canvas dùng chung                     | **Xong, đổi hướng: hook thay vì gộp component** (§9.4)                                                         |
+
+**Hai migration đụng dữ liệu (0137, 0138) phải chạy staging trước production** theo DoD trong
+`CLAUDE.md` — kiểm trước bằng `npm run db:migrate -- --dry-run`. Các thay đổi còn lại không
+đụng dữ liệu hiện có.
+
+### Bảng đề xuất gốc (giữ nguyên để đối chiếu)
 
 | #   | Việc                                                                                                                                               | Nhóm     | Ước lượng | Rủi ro   | Vì sao                                                                                   |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------- | -------- | ---------------------------------------------------------------------------------------- |
@@ -250,9 +269,8 @@ Xếp theo tỷ lệ (lợi ích / rủi ro). **Chưa thi hành gì cả.**
 | 7   | **Đưa nội dung `/mepf-process` + `/combine` vào DB** (hoặc chốt rõ đây là trang tài liệu tĩnh, bỏ tương tác giả)                                   | GĐ2/4    | lớn       | vừa      | 3.006 dòng nội dung cắm cứng, tick không lưu (§3.6)                                      |
 | 8   | **Tách component canvas dùng chung cho 3 trình xem**                                                                                               | GĐ2      | lớn       | vừa      | 3.139 dòng vẽ canvas không chia sẻ gì (§3.7)                                             |
 
-**Khuyến nghị làm trước:** #1 → #2 → #3 → #4. Bốn việc này đều **thấp rủi ro, không đụng dữ
-liệu**, và xử lý đúng hai lớp lỗi mà người dùng thật nhìn thấy hằng ngày (tính năng không vào
-được, số liệu sai). #5–#8 cần người chốt hướng trước vì đụng schema và kiến trúc.
+_(Khuyến nghị thứ tự lúc lập báo cáo: #1 → #2 → #3 → #4 trước vì thấp rủi ro; #5–#8 sau vì
+đụng schema/kiến trúc. Thực tế đã làm đủ cả 8 theo thứ tự đó.)_
 
 ## 6. Cố ý KHÔNG đề xuất gộp
 
@@ -289,12 +307,114 @@ grep -n 'value: "' app/{site,commercial,procurement,schedule,governance,engineer
 Bảng phân nhóm 122 trang được kiểm bằng script (mỗi trang đúng một nhóm, không sót/không
 trùng); bảng nguồn nằm trong §2 của chính tài liệu này.
 
-## 8. Việc chưa làm được trong đợt này
+## 8. Việc chưa làm được trong đợt này (cập nhật sau khi thi hành)
 
-- **Không đo được mức dùng thật.** Các bảng `engineering_*` có dữ liệu thật hay rỗng thì phải
+- **Vẫn chưa đo được mức dùng thật.** Các bảng `engineering_*` có dữ liệu thật hay rỗng thì phải
   đếm trên production; audit này chỉ đọc mã nguồn. Đây là dữ kiện quyết định cho đề xuất #6 —
   nếu bảng rỗng thì "gộp" thành "xoá", rẻ hơn nhiều.
-- **Không rà quyền theo nhóm.** Ai được vào tính năng nào ở từng giai đoạn vòng đời chưa đối
+- **Vẫn chưa rà quyền theo nhóm.** Ai được vào tính năng nào ở từng giai đoạn vòng đời chưa đối
   chiếu với ma trận `CAN` — nên làm thành đợt riêng, bám `docs/audit.md` §bảo mật.
-- **Không rà trùng ở tầng `lib/`.** PR #390 đã làm một đợt; `lib/ky-thuat/` (31.426 dòng, 82
+- **Vẫn chưa rà trùng ở tầng `lib/`.** PR #390 đã làm một đợt; `lib/ky-thuat/` (31.426 dòng, 82
   file) chưa được rà lại sau đợt đó.
+
+## 9. Đính chính báo cáo + những gì chỉ lộ ra khi thi hành
+
+Phần này ghi lại chỗ bản báo cáo ban đầu **ghi sai hoặc ghi thiếu**, phát hiện trong lúc làm.
+Giữ nguyên nội dung gốc ở trên và đính chính tại đây, không sửa lịch sử.
+
+### 9.1 · §3.4 sai — chỉ 2 trong 4 trang là "vỏ mỏng"
+
+Báo cáo xếp `/lookahead` và `/schedule-control` là vỏ mỏng của tab `/schedule`. Đọc kỹ thì
+**không phải**, và gộp chúng sẽ mất tính năng:
+
+- `/lookahead` (187 dòng) là **bản in A4** — nền trắng, `@media print`, ngắt trang, nhóm theo
+  hệ, tiêu đề/chân trang cho họp giao ban. Tab hub dùng `LookaheadTable` nhưng **không in
+  được**. Cùng loại với `/report`, `/payments/print`.
+- `/schedule-control` (182 dòng) **giàu hơn** tab hub: Pareto **bấm-để-lọc** bảng trễ theo lý
+  do, `DelayedGroupsTable` có `showTaskCode` + **link sâu sang `/tracking/:sheet?floor=`** +
+  `groupProgress`, kèm CSS in riêng. Tab hub chỉ có Pareto tĩnh và bảng trễ trần.
+
+→ Đã gộp **`/scurve` (29 dòng)** và **`/timeline` (27 dòng)** (đúng là vỏ mỏng: bọc thẳng
+`SCurveChart` / `ProgressMap`), giữ `/lookahead` + `/schedule-control` làm trang riêng và
+**thêm nav** cho chúng — tức mục #1 và #3 gặp nhau ở đây.
+
+### 9.2 · §3.5 đếm THIẾU — 46 route chứ không phải 19, và không nên xoá
+
+Script tạm lúc audit lọc file tự thân bằng `grep -v "^app/api/x/[id]/route.ts$"` — chuỗi đó
+là **regex**, `[id]` khớp ký tự `i`/`d` chứ không khớp `[id]` nguyên văn, nên mọi route động
+tự đếm mình là "có người gọi". Con số đúng: **46/505**.
+
+Và **không nên xoá** như đề xuất ban đầu:
+
+- `/api/devices/pair/claim` **được plugin AutoCAD gọi bằng C#** (`XBossApiClient.cs`) — suýt
+  bị xoá vì grep lúc audit chỉ quét `.ts`.
+- Cả 46 route **đều có kiểm quyền**; nhiều route có test (`tests/import-batches.test.ts`).
+- Nguyên tắc dự án đã ghi sẵn ở `check:dead-code`: "xoá đi là mất tính năng, phải người quyết
+  chứ không để CI ép".
+
+→ Giữ nguyên 46 route, thêm cổng `npm run check:dead-routes` + allowlist **kèm lý do từng
+route**, cắm vào CI. Tập chỉ có thể co lại, không phình thêm trong im lặng.
+
+### 9.3 · §3.6 nhẹ hơn thực tế — hai trang không chỉ "không lưu được"
+
+Báo cáo ghi `/mepf-process` và `/combine` là "nội dung tĩnh, tick không lưu". Thực tế nặng hơn:
+
+- `/mepf-process` chứa **75 dòng bản ghi phê duyệt BỊA** trong dữ liệu tĩnh, gán cho **người
+  có tên thật** ("… (Kỹ sư Trưởng TVGS)") và cả **cơ quan nhà nước** ("Cục Cảnh Sát PCCC &
+  CNCH"), kèm dấu thời gian và "chữ ký số" SHA-256 nghĩ ra. Nút "Kỹ Sư Ký Duyệt Chuyển Bước"
+  còn **sinh chữ ký SHA-256 tại chỗ** từ tên người đang đăng nhập rồi hiển thị y như bản ký
+  duyệt thật — không lưu ở đâu cả. Tab "Sổ Cái Merkle (Block Height #142, GPS Verified)" là
+  chuỗi cắm cứng.
+- `/combine`: "Xuất BCF 3.0" chỉ hiện toast "Đã xuất tệp .bcfzip!" mà không xuất gì; "Duyệt
+  Phương Án Tối Ưu" + toast "Đã phê duyệt … thành công!" chỉ đổi state trên danh sách va chạm
+  cắm cứng.
+
+→ Xoá sạch bản ghi bịa và phần sinh chữ ký; đổi nhãn nút cho đúng bản chất; thay tab sổ cái
+giả bằng lối vào `/approvals` + `/admin/audit-log`; thêm nhãn đầu trang nói rõ đây là bản tra
+cứu quy trình; tick tiêu chí lưu `localStorage` (ghi chú cá nhân theo thiết bị). `/combine`
+đăng ký là module `thuNghiem: true` (mặc định tắt cho mọi dự án) + `ThuNghiemBanner`.
+
+### 9.4 · §3.7 sai trọng tâm — cái trùng thì mỏng, cái hỏng thì thật
+
+Ba trình xem canvas vẽ ba thứ khác hẳn nhau; gộp thành một component là trừu tượng hoá gượng
+ép. Phần **thật sự trùng** chỉ là mấy dòng thiết lập canvas — và chính mấy dòng đó **sai
+giống nhau ở cả ba**: khai kích thước cứng rồi để CSS kéo giãn, không nhân `devicePixelRatio`.
+Ở `/engineering/spatial-viewer`, toạ độ chuột lấy từ `getBoundingClientRect()` (đơn vị CSS)
+dùng thẳng làm toạ độ canvas → **ghim hiện trường cắm sai chỗ** mỗi khi bề rộng hiển thị khác
+900px, lệch nhất trên điện thoại.
+
+→ Tách hook chung `app/components/useCanvasHiDPI.ts` (DPR + `ResizeObserver` + `toCanvasCoords`)
+thay vì gộp component. Đo trên Chromium thật ở `deviceScaleFactor=2`: cả 3 canvas khớp DPR,
+toạ độ đọc được ở tâm canvas đúng bằng giá trị kỳ vọng.
+
+### 9.5 · Ba lớp lỗi KHÔNG có trong báo cáo, chỉ lộ ra khi sửa
+
+1. **Hai endpoint GET tự ghi dữ liệu bịa vào DB thật.**
+   `GET /api/engineering/subcon-ai/scores` chèn 4 hồ sơ thầu phụ với **tên công ty và mã số
+   thuế nghĩ ra** + bộ chỉ số năng lực bịa, ngay lần mở trang đầu tiên.
+   `GET /api/engineering/iot/devices` chèn 5 cảm biến bịa **kèm ngưỡng cảnh báo** — ngưỡng bịa
+   thì cảnh báo sinh ra cũng bịa. Đã gỡ cả hai; thêm `scripts/don-du-lieu-seed-bia.ts` để dò
+   và (khi có cờ `--xoa`) dọn phần đã lỡ ghi. Nguyên nhân gốc: module M82 **không có đường
+   tạo hồ sơ hợp lệ nào** — nay có `POST /api/engineering/subcon-ai/scores`.
+
+2. **Năm lời gọi `lib/db` truyền mảng → 500 đang chạy thật.** Kiểm `/engineering/bim-viewer`
+   trên trình duyệt thấy `500` ở `/api/engineering/bim-routing?type=bcf` với đúng chữ ký
+   `invalid input syntax for type bigint: "{"1"}"`. Cổng `check:db-params` bỏ sót vì nó chỉ
+   bắt mảng **literal** và bỏ qua mọi lời gọi có tham số đầu là **biến** chứa SQL — mà mẫu
+   `let sql = …; const params = […]; query(sql, params)` lọt cả hai. Đã sửa 5 chỗ và thêm
+   lượt quét thứ hai vào cổng.
+
+3. **Ba lỗi đọc sai dữ liệu ở `/commercial`**: đọc khoá `variations`/`claims` trong khi API
+   trả `items` (hai ô KPI luôn rỗng), đọc `totalApproved` là trường **không tồn tại** (luôn
+   0), và cộng tiền trên float JS trái quy ước M45 PR1 (nay cộng qua `lib/nen/money.ts` trên
+   cột `valueText`).
+
+### 9.6 · Cổng CI thêm mới trong đợt này
+
+| Cổng                                  | Chặn gì                                                                     |
+| ------------------------------------- | --------------------------------------------------------------------------- |
+| `npm run check:dead-routes`           | Route API mới không ai gọi mà chưa khai lý do trong allowlist               |
+| `npm run check:engineering-danh-tinh` | Bảng `engineering_*` giữ danh tính bằng chữ tự do, không FK về bảng gốc     |
+| `check:db-params` (mở rộng)           | Thêm: tham số cuối là **biến mảng**, kể cả khi tham số đầu là biến chứa SQL |
+
+Cả ba đều đã **thử nghiệm ngược** (cố ý tạo vi phạm → cổng đỏ đúng chỗ) và cắm vào `ci.yml`.
