@@ -13,8 +13,10 @@ import {
   ChevronDown,
   ChevronRight,
   Ruler,
+  BookOpen,
 } from "lucide-react";
 import { Skeleton } from "@/app/components/Skeleton";
+import { Button, ButtonLink } from "@/app/components/ui";
 import { redirectToLogin } from "@/app/lib/me";
 
 // M99 PR6 — Bảng điều khiển plugin AutoCAD (§13): rule pack đang phát hành (kèm nút tải JSON
@@ -132,29 +134,46 @@ export default function PluginControlPanel() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={RefreshCw}
             onClick={() => void tai()}
             aria-label="Tải lại bảng điều khiển plugin"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Tải Lại</span>
-          </button>
-          <Link
+            Tải Lại
+          </Button>
+          <ButtonLink
+            href="/engineering/cai-dat-plugin"
+            variant="secondary"
+            size="sm"
+            icon={BookOpen}
+            aria-label="Xem hướng dẫn cài đặt plugin AutoCAD"
+          >
+            Hướng Dẫn Cài Đặt
+          </ButtonLink>
+          <ButtonLink
             href="/engineering/thiet-bi-cad"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
+            variant="secondary"
+            size="sm"
+            icon={MonitorSmartphone}
+            aria-label="Quản lý thiết bị và token AutoCAD"
           >
-            <MonitorSmartphone className="w-3.5 h-3.5 text-sky-400" />
-            <span>Thiết Bị &amp; Token</span>
-          </Link>
+            Thiết Bị &amp; Token
+          </ButtonLink>
         </div>
       </div>
 
       {loi && (
-        <p className="flex items-center gap-1.5 text-xs text-amber-300">
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-          {loi}
-        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="flex items-center gap-1.5 text-xs text-amber-300">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            {loi}
+          </p>
+          <Button variant="secondary" size="sm" icon={RefreshCw} onClick={() => void tai()}>
+            Thử Lại
+          </Button>
+        </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -173,14 +192,17 @@ export default function PluginControlPanel() {
                 <span aria-hidden="true">·</span>
                 <span>{rulePack.soHangMucBocTach} hạng mục bóc tách</span>
               </div>
-              <a
+              <ButtonLink
                 href="/api/engineering/cad/rule-pack"
                 download={`xboss-rule-pack-${rulePack.version}.json`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500 hover:bg-violet-600 text-on-accent-dark font-bold text-xs shadow-sm transition"
+                rel="noopener"
+                variant="secondary"
+                size="sm"
+                icon={Download}
+                aria-label={`Tải bộ quy tắc JSON phiên bản ${rulePack.version} cho lệnh XBOSS_RULEPACK`}
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Tải JSON (cho XBOSS_RULEPACK)</span>
-              </a>
+                Tải JSON (cho XBOSS_RULEPACK)
+              </ButtonLink>
               <p className="text-[11px] text-zinc-500">
                 Plugin tự cập nhật bộ quy tắc khi chạy XBOSS_LOGIN; tệp JSON chỉ cần khi máy trạm
                 không ra được mạng nội bộ.
@@ -197,22 +219,41 @@ export default function PluginControlPanel() {
             Gói Cài Plugin (AutoCAD 2026)
           </div>
           {pluginUrl ? (
-            <a
+            <ButtonLink
               href={pluginUrl}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-on-accent-dark font-bold text-xs shadow-sm transition"
+              download
+              rel="noopener"
+              variant="primary"
+              size="sm"
+              icon={Download}
+              aria-label="Tải gói cài plugin AutoCAD"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Tải Gói Cài Plugin</span>
-            </a>
+              Tải Gói Cài Plugin
+            </ButtonLink>
           ) : (
             <p className="text-xs text-zinc-400">
-              Quản trị chưa khai đường tải gói cài (biến <code>XBOSS_PLUGIN_URL</code>). Tự dựng gói
-              theo hướng dẫn trong <code>plugin-autocad/README.md</code> của mã nguồn.
+              Quản trị chưa khai đường tải gói cài (biến <code>XBOSS_PLUGIN_URL</code>). Xem{" "}
+              <ButtonLink
+                href="/engineering/cai-dat-plugin"
+                variant="secondary"
+                size="sm"
+                icon={BookOpen}
+                aria-label="Xem hướng dẫn cài đặt plugin AutoCAD"
+              >
+                Hướng Dẫn Cài Đặt
+              </ButtonLink>{" "}
+              để biết cách tự dựng gói hoặc hỏi quản trị hệ thống.
             </p>
           )}
           <p className="text-[11px] text-zinc-500">
-            Plugin chỉ chạy trên AutoCAD 2026 (.NET 8). Lệnh: XBOSS_LOGIN · XBOSS_KIEMTRA ·
-            XBOSS_CHUANHOA · XBOSS_BOCKL · XBOSS_UPLOAD · XBOSS_BATCH.
+            Plugin chỉ chạy trên AutoCAD 2026 (.NET 10). Xem{" "}
+            <Link
+              href="/engineering/cai-dat-plugin"
+              className="text-zinc-300 hover:text-zinc-100 underline underline-offset-2"
+            >
+              bảng lệnh đầy đủ
+            </Link>{" "}
+            trong trang hướng dẫn cài đặt.
           </p>
         </div>
       </div>
@@ -225,14 +266,17 @@ export default function PluginControlPanel() {
             Bản Vẽ Plugin Đã Gửi Về &amp; Kết Quả Kiểm Định
           </div>
           {lichSu !== null && lichSu.some((r) => r.klBoc !== null) && (
-            <a
+            <ButtonLink
               href="/api/engineering/cad/takeoff-export"
               download="xboss-kl-boc-gop.xlsx"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-on-accent-dark font-bold text-xs shadow-sm transition"
+              rel="noopener"
+              variant="primary"
+              size="sm"
+              icon={Ruler}
+              aria-label="Tải file Excel gộp khối lượng đã bóc từ các bản vẽ plugin"
             >
-              <Ruler className="w-3.5 h-3.5" />
-              <span>Tải Excel Gộp KL Đã Bóc</span>
-            </a>
+              Tải Excel Gộp KL Đã Bóc
+            </ButtonLink>
           )}
         </div>
         {lichSu === null ? (

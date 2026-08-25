@@ -65,4 +65,64 @@ test.describe("Chuẩn hóa bản vẽ CAD 2D (sau đăng nhập)", () => {
     );
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
+
+  // M99 §13 — Bảng Điều Khiển Plugin AutoCAD render ở đầu trang, ngoài 2 bước quy trình. Kiểm
+  // cả 2 nhánh của khối "Gói Cài Plugin": không có XBOSS_PLUGIN_URL (môi trường test) → hiện
+  // hướng dẫn + nút "Hướng Dẫn Cài Đặt"; lối vào trang hướng dẫn luôn có mặt ở thanh công cụ trên.
+  test("bảng điều khiển plugin — nhánh chưa khai XBOSS_PLUGIN_URL hiện lối sang hướng dẫn cài đặt", async ({
+    page,
+  }) => {
+    await gotoChuanHoa(page);
+
+    await expect(page.getByText("Bảng Điều Khiển Plugin AutoCAD")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Xem hướng dẫn cài đặt plugin AutoCAD" }).first(),
+    ).toHaveAttribute("href", "/engineering/cai-dat-plugin");
+
+    // Môi trường e2e không khai XBOSS_PLUGIN_URL → khối "Gói Cài Plugin" hiện hướng dẫn thay vì
+    // nút tải, kèm lối sang trang hướng dẫn cài đặt ngay trong đoạn văn.
+    await expect(page.getByText("Gói Cài Plugin (AutoCAD 2026)")).toBeVisible();
+    await expect(page.getByText("Quản trị chưa khai đường tải gói cài", { exact: false })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Quản lý thiết bị và token AutoCAD" }),
+    ).toHaveAttribute("href", "/engineering/thiet-bi-cad");
+  });
+
+  test("mở trang Hướng Dẫn Cài Đặt Plugin từ bảng điều khiển", async ({ page }) => {
+    await gotoChuanHoa(page);
+
+    await page.getByRole("link", { name: "Xem hướng dẫn cài đặt plugin AutoCAD" }).first().click();
+    await expect(page).toHaveURL(/\/engineering\/cai-dat-plugin$/);
+    await expect(page.getByText("Cài Đặt Plugin AutoCAD", { exact: false }).first()).toBeVisible();
+    await expect(page.getByText("AutoCAD 2026", { exact: false }).first()).toBeVisible();
+    await expect(page.getByText("XBOSS_LOGIN", { exact: false }).first()).toBeVisible();
+  });
+});
+
+test.describe("Hướng dẫn cài đặt plugin AutoCAD (sau đăng nhập)", () => {
+  test("render đủ 5 mục hướng dẫn + bảng lệnh chính", async ({ page }) => {
+    await page.goto("/engineering/cai-dat-plugin");
+
+    await expect(page.getByText("1. Lấy gói cài")).toBeVisible();
+    await expect(page.getByText("2. Cài đặt")).toBeVisible();
+    await expect(page.getByText("3. Đăng nhập lần đầu (ghép thiết bị)")).toBeVisible();
+    await expect(page.getByText("4. Bảng lệnh chính")).toBeVisible();
+    await expect(page.getByText("5. Trục trặc thường gặp")).toBeVisible();
+    await expect(page.getByRole("cell", { name: "XBOSS_UPLOAD" })).toBeVisible();
+  });
+
+  test("không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
+    await page.goto("/engineering/cai-dat-plugin");
+    await expect(page.getByText("1. Lấy gói cài")).toBeVisible();
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .disableRules(["color-contrast"])
+      .analyze();
+
+    const serious = results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    );
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
 });
