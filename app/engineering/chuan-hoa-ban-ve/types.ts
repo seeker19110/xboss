@@ -190,6 +190,31 @@ export interface FontSnippet {
 
 // ── Bộ nạp/parse bản vẽ dùng chung ──
 
+// ── Đề xuất block vào thư viện từ AutoCAD (M103 — hàng chờ + duyệt) ──
+
+export type BlockProposalKind = "fitting" | "equipment" | "titleblock" | "support" | "sleeve";
+
+export type BlockProposalStatus = "pending" | "approved" | "rejected" | "stale";
+
+export interface BlockProposal {
+  id: number;
+  block_name: string;
+  kind: BlockProposalKind;
+  system_id: string | null;
+  takeoff_item_id: string | null;
+  paper_size: string | null;
+  note: string | null;
+  base_lib_version: string;
+  preview_svg: string | null;
+  status: BlockProposalStatus;
+  reject_reason: string | null;
+  published_version: string | null;
+  proposed_by_name: string;
+  decided_by_name: string | null;
+  decided_at: string | null;
+  created_at: string;
+}
+
 export interface RunDxfAnalysisOptions {
   drawingId?: number | null;
   customDxfContent?: string;
