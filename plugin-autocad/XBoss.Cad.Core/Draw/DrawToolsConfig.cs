@@ -218,13 +218,30 @@ public static class DrawToolsConfig
                     throw new RulePackException(
                         $"drawTools.systems[\"{sys.Id}\"].lines[\"{line.ItemId}\"]: sleeveClearanceMm phải dương.");
                 }
-                foreach (var size in line.Sizes)
+
+                // Nếu khai supportSpacingMm thì kiểm: số chung phải > 0; map phải có entry > 0 cho mỗi size
+                if (line.SupportSpacingMm is { } el)
                 {
-                    if (line.SupportSpacingMmCho(size) is <= 0)
+                    switch (el.ValueKind)
                     {
-                        throw new RulePackException(
-                            $"drawTools.systems[\"{sys.Id}\"].lines[\"{line.ItemId}\"]: supportSpacingMm của size " +
-                            $"\"{size}\" phải dương.");
+                        case JsonValueKind.Number:
+                            var commonValue = el.GetDouble();
+                            if (commonValue <= 0)
+                            {
+                                throw new RulePackException(
+                                    $"drawTools.systems[\"{sys.Id}\"].lines[\"{line.ItemId}\"]: supportSpacingMm (số chung) phải dương.");
+                            }
+                            break;
+                        case JsonValueKind.Object:
+                            foreach (var size in line.Sizes)
+                            {
+                                if (!el.TryGetProperty(size, out var val) || val.ValueKind != JsonValueKind.Number || val.GetDouble() <= 0)
+                                {
+                                    throw new RulePackException(
+                                        $"drawTools.systems[\"{sys.Id}\"].lines[\"{line.ItemId}\"]: supportSpacingMm thiếu hoặc ≤ 0 với size \"{size}\".");
+                                }
+                            }
+                            break;
                     }
                 }
 

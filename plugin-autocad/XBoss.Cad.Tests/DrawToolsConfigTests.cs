@@ -126,4 +126,28 @@ public class DrawToolsConfigTests
         Assert.Contains("drawTools", loi.Message);
         Assert.Contains("v4", loi.Message);
     }
+
+    [Fact]
+    public void Bat_loi_supportSpacingMm_map_thieu_size()
+    {
+        // chw-pipe khai supportSpacingMm dạng map cho DN20..DN200, nhưng xoá entry DN50
+        // → sizes[] chứa DN50 nhưng map thiếu entry → validator phải ném RulePackException
+        var json = JsonV4().Replace("\"DN50\": 2000,", "");
+        var loi = Assert.Throws<RulePackException>(() => DrawToolsConfig.Load(json));
+        Assert.Contains("supportSpacingMm", loi.Message);
+        Assert.Contains("DN50", loi.Message);
+        Assert.Contains("chw-pipe", loi.Message);
+    }
+
+    [Fact]
+    public void Pass_khi_khong_khai_supportSpacingMm_va_sleeveClearanceMm()
+    {
+        // Line không khai supportSpacingMm cũng không khai sleeveClearanceMm → hợp lệ
+        // (validator chỉ kiểm nếu khai)
+        var json = JsonV4()
+            .Replace(",\n            \"supportSpacingMm\": 2400,\n            \"sleeveClearanceMm\": 50", "");
+        var pack = DrawToolsConfig.Load(json);
+        Assert.NotNull(pack);
+        Assert.Equal("v4", pack.RulePack.Version);
+    }
 }
