@@ -29,6 +29,7 @@
     "test:mutation": "node scripts/mutation-check.mjs",
     "check:dead-code": "tsx scripts/check-dead-code.ts",
     "check:dead-routes": "tsx scripts/check-dead-routes.ts",
+    "check:engineering-danh-tinh": "tsx scripts/check-engineering-danh-tinh.ts",
     "check:lib-layers": "tsx scripts/check-lib-layers.ts",
     "check:mau-accent": "tsx scripts/check-mau-accent.ts",
     "check:contrast": "tsx scripts/check-contrast.ts",

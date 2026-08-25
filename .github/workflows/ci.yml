@@ -73,6 +73,10 @@ jobs:
       - name: Kiểm route API không ai gọi
         run: npm run check:dead-routes
 
+      # Danh tính trong lớp engineering_* phải nối về bảng gốc (ADR-0011). Static.
+      - name: Kiểm danh tính lớp engineering
+        run: npm run check:engineering-danh-tinh
+
       # Ranh giới miền trong lib/ (ADR-0009): tầng thấp không được import lên tầng cao,
       # và không có chu trình MỚI giữa các miền nghiệp vụ. Static, không cần DB.
       - name: Kiểm ranh giới miền lib/
