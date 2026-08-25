@@ -111,8 +111,8 @@ export default function Step2NamingPanel({
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm sm:text-base font-bold uppercase tracking-wide text-zinc-100">
                     {is2dApproved
-                      ? "Hồ Sơ Đã Được Phê Duyệt (Lưu Vào Vị Trí Chính Thức)"
-                      : "Trạng Thái: Lưu Tạm Thời Chờ Kỹ Sư Trưởng Phê Duyệt"}
+                      ? "Đã Ghi Nhận Rà Soát Cục Bộ (Lưu Vào Vị Trí Chính Thức)"
+                      : "Trạng Thái: Lưu Tạm Thời Chờ Kỹ Sư Trưởng Rà Soát"}
                   </h2>
                   <span
                     className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
@@ -121,13 +121,13 @@ export default function Step2NamingPanel({
                         : "bg-amber-500/20 text-amber-400 border-amber-500/30 animate-pulse"
                     }`}
                   >
-                    {is2dApproved ? "✓ APPROVED (GATE 0)" : "⏳ DRAFT / TEMP STAGING"}
+                    {is2dApproved ? "✓ ĐÃ RÀ SOÁT (CHƯA KÝ DUYỆT)" : "⏳ DRAFT / TEMP STAGING"}
                   </span>
                 </div>
                 <p className="text-xs text-zinc-400 mt-0.5">
                   {is2dApproved
-                    ? `Đã ký duyệt bởi ${approverName} (${approvedAt}). Bản vẽ sẽ lưu trực tiếp vào thư mục chính thức.`
-                    : `File sau khi chuẩn hóa sẽ lưu tại thư mục tạm drawings/${saveConfig.systems}/temp/. Sau khi Ký Duyệt Gate 0, hệ thống sẽ lưu vào đúng vị trí và dọn sạch file tạm.`}
+                    ? `Đã ghi nhận rà soát cục bộ bởi ${approverName} (${approvedAt}) — CHƯA phải chữ ký duyệt chính thức (ký duyệt/nghiệm thu hồ sơ bản vẽ thực hiện tại sổ bản vẽ /ban-ve). Bản vẽ sẽ lưu vào thư mục chính thức.`
+                    : `File sau khi chuẩn hóa sẽ lưu tại thư mục tạm drawings/${saveConfig.systems}/temp/. Sau khi ghi nhận rà soát, hệ thống sẽ lưu vào đúng vị trí và dọn sạch file tạm.`}
                 </p>
               </div>
             </div>
@@ -143,7 +143,7 @@ export default function Step2NamingPanel({
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-on-accent-dark font-bold text-xs shadow-md transition"
               >
                 <BadgeCheck className="w-4 h-4" />
-                <span>Ký Duyệt & Lưu Chính Thức Ngay</span>
+                <span>Ghi Nhận Rà Soát & Lưu Chính Thức Ngay</span>
               </button>
             ) : (
               <button
@@ -160,7 +160,7 @@ export default function Step2NamingPanel({
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
           <div className="sm:col-span-4 space-y-1">
             <label className="text-[11px] font-semibold text-zinc-400 block">
-              Kỹ Sư Trưởng / Người Phê Duyệt:
+              Kỹ Sư Trưởng / Người Rà Soát (cục bộ):
             </label>
             <input
               type="text"
@@ -172,7 +172,7 @@ export default function Step2NamingPanel({
 
           <div className="sm:col-span-8 space-y-1">
             <label className="text-[11px] font-semibold text-zinc-400 block">
-              Nhận Xét Thẩm Tra Kỹ Thuật (Gate 0 Audit Log):
+              Nhận Xét Thẩm Tra Kỹ Thuật (ghi chú cục bộ, chưa lưu DB):
             </label>
             <input
               type="text"
@@ -430,7 +430,7 @@ export default function Step2NamingPanel({
                   ? "Đang Lưu..."
                   : is2dApproved
                     ? "Lưu Vào Thư Mục Máy Chủ"
-                    : "Ký Duyệt & Lưu Chính Thức"}
+                    : "Ghi Nhận Rà Soát & Lưu Chính Thức"}
               </span>
             </button>
           </div>

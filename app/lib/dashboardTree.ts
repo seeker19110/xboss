@@ -88,6 +88,7 @@ import {
   Bot,
   TrendingUp,
   Layers,
+  MonitorSmartphone,
 } from "lucide-react";
 import type { Role } from "@/lib/nen/roles";
 
@@ -380,6 +381,14 @@ export const DASHBOARD_TREE: DashCluster[] = [
         href: "/engineering/chuan-hoa-ban-ve",
         label: "Chuẩn hóa bản vẽ",
         icon: PencilRuler,
+      },
+      {
+        // Ghép/quản lý token thiết bị plugin AutoCAD (M99 PR2) — trang riêng, có lối
+        // sang từ bảng điều khiển plugin trên /engineering/chuan-hoa-ban-ve.
+        id: "dash.thiet-bi-cad",
+        href: "/engineering/thiet-bi-cad",
+        label: "Thiết bị AutoCAD",
+        icon: MonitorSmartphone,
       },
       { id: "dash.bim", href: "/mo-hinh-bim", label: "Mô hình BIM", icon: Box },
       { id: "dash.combine", href: "/combine", label: "Combine", icon: Split },
