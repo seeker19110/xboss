@@ -57,7 +57,8 @@ public class XBossUploadClientTests
         var body = h.BodyDaNhan[0];
         // .NET có thể ghi name có hoặc không có nháy kép tuỳ token hợp lệ — khớp cả hai.
         foreach (var field in new[] { "dwg", "dxf", "report", "drawingCode", "rev", "rulePackVersion" })
-            Assert.True(body.Contains($"name={field}") || body.Contains($"name=\"{field}\""), $"thiếu field {field}");
+            // Chuẩn WHATWG (req.formData()/undici): name PHẢI trong nháy kép, cấm filename*.
+            Assert.Contains($"name=\"{field}\"", body);
         Assert.Contains("ACMV-SD-T05-001", body);
         Assert.Contains("2.0.0", body);
     }
@@ -88,7 +89,7 @@ public class XBossUploadClientTests
             handler, reportJson: "{\"cheDo\":\"chuan-hoa\"}", takeoffJson: "{\"rulePackVersion\":\"2.0.0\"}");
         Assert.True(kq.DuocNhan);
         var body = h.BodyDaNhan[0];
-        Assert.True(body.Contains("name=takeoff") || body.Contains("name=\"takeoff\""));
+        Assert.Contains("name=\"takeoff\"", body);
         Assert.Contains("takeoff.json", body);
     }
 

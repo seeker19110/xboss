@@ -502,16 +502,18 @@ public sealed class XBossApiClient
         string dwgFileName, byte[] dwgBytes, byte[] dxfBytes, string? reportJson,
         CancellationToken ct = default, string? takeoffJson = null)
     {
+        // Cùng lỗi hợp đồng với GuiDeXuatBlockAsync: req.formData() (undici) đòi name/filename
+        // trong nháy kép và từ chối filename* — phải qua ThemPhan, không dùng form.Add mặc định.
         using var form = new MultipartFormDataContent();
-        form.Add(new ByteArrayContent(dwgBytes), "dwg", dwgFileName);
-        form.Add(new ByteArrayContent(dxfBytes), "dxf", Path.ChangeExtension(dwgFileName, ".dxf"));
+        ThemPhan(form, new ByteArrayContent(dwgBytes), "dwg", dwgFileName);
+        ThemPhan(form, new ByteArrayContent(dxfBytes), "dxf", Path.ChangeExtension(dwgFileName, ".dxf"));
         if (reportJson is not null)
-            form.Add(new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(reportJson)), "report", "report.json");
+            ThemPhan(form, new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(reportJson)), "report", "report.json");
         if (takeoffJson is not null)
-            form.Add(new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(takeoffJson)), "takeoff", "takeoff.json");
-        form.Add(new StringContent(drawingCode), "drawingCode");
-        form.Add(new StringContent(rev), "rev");
-        form.Add(new StringContent(rulePackVersion), "rulePackVersion");
+            ThemPhan(form, new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(takeoffJson)), "takeoff", "takeoff.json");
+        ThemPhan(form, new StringContent(drawingCode), "drawingCode");
+        ThemPhan(form, new StringContent(rev), "rev");
+        ThemPhan(form, new StringContent(rulePackVersion), "rulePackVersion");
 
         using var req = new HttpRequestMessage(HttpMethod.Post, "api/engineering/cad/plugin-upload")
         {
