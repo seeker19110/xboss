@@ -44,6 +44,75 @@ public sealed record EntityInfo
     /// <summary>Đầu-cuối (X,Y đơn vị bản vẽ) của đường thẳng/polyline — phép kiểm 7 (trùng chồng).</summary>
     public (double X, double Y)? Start { get; init; }
     public (double X, double Y)? End { get; init; }
+
+    /// <summary>Tên TEXTSTYLE của text/mtext (v5, phép kiểm 14). Null = không phải text / Adapter chưa cung cấp.</summary>
+    public string? TextStyleName { get; init; }
+
+    /// <summary>Tên DIMSTYLE của dimension (v5, phép kiểm 14). Null = không phải dim / chưa cung cấp.</summary>
+    public string? DimStyleName { get; init; }
+
+    /// <summary>Hình bao thực thể (đơn vị bản vẽ) — v5, phép kiểm 16. Null = Adapter không lấy được
+    /// extents (thực thể suy biến, block rỗng…) → bỏ qua thực thể đó thay vì đoán vị trí.</summary>
+    public (double X, double Y)? BoundsMin { get; init; }
+    public (double X, double Y)? BoundsMax { get; init; }
+}
+
+/// <summary>
+/// Tim tuyến đã DUỖI thành chuỗi đỉnh (cung tròn do Adapter chia nhỏ trước) — nguồn dữ liệu
+/// của phép kiểm 10 (chồng lấn cùng hệ) và 11 (giao cắt khác hệ). Tách khỏi <see cref="EntityInfo"/>
+/// vì hai phép kiểm này cần TỪNG ĐOẠN, trong khi EntityInfo chỉ mang 2 đầu mút (v5, M101 §6.1).
+/// </summary>
+public sealed record CenterlineInfo
+{
+    public required string Handle { get; init; }
+    public required string Layer { get; init; }
+    /// <summary>≥ 2 đỉnh; ít hơn thì Core bỏ qua (không có đoạn nào để so).</summary>
+    public required IReadOnlyList<(double X, double Y)> Vertices { get; init; }
+}
+
+/// <summary>Một viewport trên layout (v5, phép kiểm 13).</summary>
+public sealed record ViewportInfo
+{
+    public required string Handle { get; init; }
+    /// <summary>Mẫu số tỉ lệ 1:X (vd 100 cho 1:100). Null = không đọc được → bỏ qua, không đoán.</summary>
+    public double? ScaleDenominator { get; init; }
+    public bool IsLocked { get; init; }
+}
+
+/// <summary>Một block reference trên layout (v5, phép kiểm 12 — khung tên).</summary>
+public sealed record BlockRefInfo
+{
+    public required string Handle { get; init; }
+    public required string BlockName { get; init; }
+    /// <summary>True/false = manifest thư viện M100 khẳng định đây có/không phải kind=titleblock.
+    /// Null = chưa có dữ liệu M100 → Core khớp tên theo titleblockNameMatchAny.</summary>
+    public bool? IsTitleblock { get; init; }
+    /// <summary>Attribute của block: TAG → giá trị (giá trị rỗng = chưa điền).</summary>
+    public IReadOnlyDictionary<string, string> Attributes { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+}
+
+/// <summary>Một layout (paper space) — v5, phép kiểm 12 và 13.</summary>
+public sealed record LayoutInfo
+{
+    public required string Name { get; init; }
+    public IReadOnlyList<ViewportInfo> Viewports { get; init; } = [];
+    public IReadOnlyList<BlockRefInfo> BlockRefs { get; init; } = [];
+}
+
+/// <summary>
+/// Nhãn size do XBOSS_VE_NHAN (M100) sinh, kèm size đọc từ XData của tim liên kết —
+/// v5, phép kiểm 15. Chỉ Adapter có M100 mới dựng được danh sách này.
+/// </summary>
+public sealed record LabelLinkInfo
+{
+    public required string Handle { get; init; }
+    /// <summary>Nội dung nhãn hiển thị (vd "300x200" hoặc "Ø300 i=1%").</summary>
+    public required string NoiDung { get; init; }
+    /// <summary>Handle của tim mà nhãn trỏ tới (XData XBOSS_VE).</summary>
+    public required string TimHandle { get; init; }
+    /// <summary>Size ghi trong XData của tim; rỗng = tim mất XData → bỏ qua nhãn đó, không đoán.</summary>
+    public required string SizeTheoXData { get; init; }
 }
 
 /// <summary>Snapshot bản vẽ để kiểm — Adapter chỉ dựng dữ liệu, không phán xét.</summary>
@@ -62,4 +131,17 @@ public sealed class DrawingSnapshot
     /// <summary>Tên các block NẶC DANH (anonymous, "*U…"/"*D…") không phải layout/xref —
     /// phép kiểm 9 (purgePolicy.deepPurge.reportAnonymousBlocks). Rỗng = không có/không quét.</summary>
     public IReadOnlyList<string> AnonymousBlockNames { get; init; } = [];
+
+    /// <summary>Tim tuyến đã duỗi đỉnh — phép kiểm 10/11 (v5). Null = Adapter không quét
+    /// → hai phép kiểm đó TỰ TẮT (không suy từ Entities: EntityInfo chỉ có 2 đầu mút,
+    /// polyline gãy khúc sẽ bị hiểu sai thành đoạn thẳng và báo oan).</summary>
+    public IReadOnlyList<CenterlineInfo>? Centerlines { get; init; }
+
+    /// <summary>Danh sách layout (paper space) — phép kiểm 12/13 (v5). Null = Adapter không quét
+    /// → hai phép kiểm đó tự tắt.</summary>
+    public IReadOnlyList<LayoutInfo>? Layouts { get; init; }
+
+    /// <summary>Nhãn size có XData M100 kèm size của tim — phép kiểm 15 (v5).
+    /// Null = bản vẽ/plugin KHÔNG có dữ liệu M100 → phép kiểm 15 tự tắt (M101 §6.1).</summary>
+    public IReadOnlyList<LabelLinkInfo>? NhanLienKet { get; init; }
 }

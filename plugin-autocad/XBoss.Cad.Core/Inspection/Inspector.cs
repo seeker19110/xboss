@@ -8,11 +8,13 @@ using XBoss.Cad.Core.RulePack;
 
 namespace XBoss.Cad.Core.Inspection;
 
-/// <summary>Một nhóm phát hiện của XBOSS_KIEMTRA (M99 §6.4 — 7 phép kiểm).</summary>
+/// <summary>Một nhóm phát hiện của XBOSS_KIEMTRA (M99 §6.4 — 9 phép kiểm; M101 §6.1 thêm 7).</summary>
 public sealed record InspectionFinding
 {
-    /// <summary>Slug ổn định cho báo cáo JSON: layer-sai / lech-z / polyline-ho / polyline-gan-kin /
-    /// font-cu / lineweight-lech / dim-override / rac-hinh-hoc / layer-rong / block-nac-danh.</summary>
+    /// <summary>Slug ổn định cho báo cáo JSON — M99: layer-sai / lech-z / polyline-ho / polyline-gan-kin /
+    /// font-cu / lineweight-lech / dim-override / rac-hinh-hoc / layer-rong / block-nac-danh;
+    /// M101 (v5, mặc định tắt): chong-lan-cung-he / giao-cat-khac-he / khung-ten-thieu-truong /
+    /// viewport-le-chuan / style-lech-chuan / nhan-lech-xdata / doi-tuong-ngoai-khung.</summary>
     [JsonPropertyName("id")] public required string Id { get; init; }
     [JsonPropertyName("ten")] public required string Ten { get; init; }
     [JsonPropertyName("handles")] public required IReadOnlyList<string> Handles { get; init; }
@@ -184,7 +186,31 @@ public sealed class Inspector
             });
         }
 
+        // (10..16) Phép kiểm mở rộng v5 (M101 §6.1) — MỖI phép tự tắt khi rule pack không bật
+        // hoặc khi Adapter chưa cung cấp dữ liệu tương ứng, nên rule pack ≤ v4 chạy y hệt trước đây.
+        var ip = _pack.InspectionPolicy;
+        ThemNeuCo(PhepKiemMoRong.ChongLanCungHe(snapshot, ip.OverlapSameSystem, toMm));
+
+        var clash = PhepKiemMoRong.GiaoCatKhacHe(snapshot, ip.Clash2d, _pack.LayerMap);
+        if (clash is not null)
+        {
+            findings.Add(clash);
+            // Nhãn cảnh báo cố định: clash 2D KHÔNG thay được clash 3D (M101 §18).
+            canhBao.Add(PhepKiemMoRong.CanhBaoClash2d);
+        }
+
+        ThemNeuCo(PhepKiemMoRong.KhungTenThieuTruong(snapshot, ip.TitleblockFields));
+        ThemNeuCo(PhepKiemMoRong.ViewportLeChuan(snapshot, ip.ViewportScale));
+        ThemNeuCo(PhepKiemMoRong.StyleLechChuan(snapshot, ip.StyleDeviation, _pack.StyleMap));
+        ThemNeuCo(PhepKiemMoRong.NhanLechXData(snapshot, ip.LabelSizeMismatch));
+        ThemNeuCo(PhepKiemMoRong.DoiTuongNgoaiKhung(snapshot, ip.StrayObjects, toMm));
+
         return new InspectionReport { RulePackVersion = _pack.Version, Findings = findings, CanhBao = canhBao };
+
+        void ThemNeuCo(InspectionFinding? f)
+        {
+            if (f is not null) findings.Add(f);
+        }
     }
 
     /// <summary>Đối tượng trùng chồng: cùng khóa (đầu, cuối) làm tròn về mm nguyên, so cả

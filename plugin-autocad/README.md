@@ -27,6 +27,12 @@ quy tắc tải từ XBoss dưới dạng **rule pack** có version (không nhú
 
 | `XBOSS_UPLOAD` | Gửi DWG đã lưu + DXF sidecar + báo cáo chuẩn hóa + version rule pack lên server (M99 PR5): server kiểm định lại DXF + rule pack — đạt thì tạo `drawing_revision` trạng thái `submitted`, fail thì hiện đủ lỗi trong AutoCAD, KHÔNG tạo revision. Idempotent theo hash DWG (gửi lại cùng tệp không tạo bản đôi) |
 
+> **Rule pack v5 (M101 PR1)** khai thêm 7 phép kiểm cho `XBOSS_KIEMTRA` (chồng lấn cùng hệ, giao cắt
+> khác hệ trên mặt bằng, khung tên thiếu trường, viewport chưa khóa/tỉ lệ lạ, text-dim style lệch,
+> nhãn size lệch XData, đối tượng ngoài khung) + khối `styleMap`. Toàn bộ **mặc định TẮT** và Adapter
+> chưa cung cấp dữ liệu đầu vào cho chúng, nên hành vi lệnh hiện vẫn đúng 9 phép kiểm ở trên; PR sau
+> của M101 mới nối dữ liệu và bật dần theo dự án.
+
 ## Build
 
 ### Core + Tests (mọi HĐH — đây là phần CI chạy)

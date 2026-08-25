@@ -8,12 +8,12 @@
  * phát hành (cùng triết lý append-only của migration).
  */
 import { createHash } from "node:crypto";
-import rulePackV4 from "@/lib/ky-thuat/cad/rule-packs/v4.json";
+import rulePackV5 from "@/lib/ky-thuat/cad/rule-packs/v5.json";
 
-export type CadRulePack = typeof rulePackV4;
+export type CadRulePack = typeof rulePackV5;
 
 /** Version đang phát hành cho plugin. */
-export const CURRENT_RULE_PACK_VERSION = rulePackV4.version;
+export const CURRENT_RULE_PACK_VERSION = rulePackV5.version;
 
 /**
  * Rule pack đang phát hành:
@@ -21,10 +21,13 @@ export const CURRENT_RULE_PACK_VERSION = rulePackV4.version;
  * v3 = v2 + fontMap.targetFont (font Unicode đích cho kiểu chữ đã giải mã TCVN3/VNI — không có
  * nó thì plugin sửa nội dung chữ xong AutoCAD vẫn hiển thị sai, xem PROGRESS.md 2026-08-25);
  * v4 = v3 + drawTools + sheetSetup (tham số bộ lệnh vẽ XBOSS_VE_* — M100 §11, mở rộng thuần nên
- * plugin M99 đọc v4 chạy y hệt v3).
+ * plugin M99 đọc v4 chạy y hệt v3);
+ * v5 = v4 + 7 phép kiểm mới của XBOSS_KIEMTRA (M101 §6.1, số 10–16) + khối styleMap dùng chung với
+ * bước chuẩn hóa 8 (M101 §6.2). Mọi phép kiểm mới mặc định `enabled: false` nên plugin cũ lẫn mới
+ * nạp v5 đều cho kết quả kiểm y hệt v4 (M101 §7 FR1).
  */
 export function getCurrentRulePack(): CadRulePack {
-  return rulePackV4;
+  return rulePackV5;
 }
 
 /** ETag mạnh theo hash nội dung — plugin cache cục bộ và hỏi lại bằng `If-None-Match`. */
