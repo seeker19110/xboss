@@ -12,12 +12,14 @@ import {
   ImageOff,
   Check,
   X,
+  Plus,
 } from "lucide-react";
 import { Button, ButtonLink, Chip } from "@/app/components/ui";
 import type { ChipTone } from "@/app/components/ui/Chip";
 import { Skeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
 import { useBlockProposals } from "../hooks/useBlockProposals";
+import ThemBlockTuWebForm from "./ThemBlockTuWebForm";
 import type { BlockProposal, BlockProposalKind, BlockProposalStatus } from "../types";
 
 // M100 PR2 (§13) — mục "Thư viện block" của bảng điều khiển plugin: version đang phát hành,
@@ -168,9 +170,21 @@ export default function ThuVienBlockPanel() {
 
   // M103 — Đề xuất block chờ duyệt: quyền duyệt do server trả về (laNguoiDuyet = Admin/PM).
   const [loiHanhDongDeXuat, setLoiHanhDongDeXuat] = useState<string | null>(null);
-  const { deXuat, laNguoiDuyet, loiDeXuat, dangXuLyId, taiDeXuat, duyet, tuChoi } =
-    useBlockProposals();
+  const {
+    deXuat,
+    laNguoiDuyet,
+    duocThemTrucTiep,
+    loiDeXuat,
+    dangXuLyId,
+    taiDeXuat,
+    duyet,
+    tuChoi,
+    themBlockTrucTiep,
+  } = useBlockProposals();
   const coQuyenDuyet = laNguoiDuyet;
+
+  // M104 — form thêm block thẳng từ web (admin/pm/engineer), mặc định đóng cho gọn panel.
+  const [moFormThem, setMoFormThem] = useState(false);
 
   const tai = useCallback(async () => {
     try {
@@ -473,6 +487,45 @@ export default function ThuVienBlockPanel() {
             </div>
           )}
         </form>
+      )}
+
+      {/* ═══ M104 — Thêm block THẲNG từ web (không qua hàng chờ duyệt) ═══ */}
+      {duocThemTrucTiep && (
+        <div className="pt-4 border-t border-zinc-800 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-zinc-200 flex items-center gap-2">
+              <Plus className="w-4 h-4 text-emerald-400" strokeWidth={1.75} />
+              Thêm Block Từ Web
+            </h3>
+            {!moFormThem && (
+              <Button
+                size="sm"
+                variant="primary"
+                icon={Plus}
+                onClick={() => setMoFormThem(true)}
+                aria-label="Mở form thêm block vào thư viện từ web"
+              >
+                Thêm Block Từ Web
+              </Button>
+            )}
+          </div>
+          {moFormThem ? (
+            <ThemBlockTuWebForm
+              onDong={() => setMoFormThem(false)}
+              onGui={async (fd) => {
+                const kq = await themBlockTrucTiep(fd);
+                // Thành công: thư viện đã sang version mới → làm mới mục "Version Đang Phát Hành".
+                if (kq.ok) await tai();
+                return kq;
+              }}
+            />
+          ) : (
+            <p className="text-xs text-zinc-400">
+              Không có AutoCAD vẫn thêm được block: nộp tệp .dwg của block kèm bản .dxf cùng nội
+              dung, block vào thư viện ngay và thư viện lên version mới (tệp nền không đổi).
+            </p>
+          )}
+        </div>
       )}
 
       {/* ═══ M103 — Đề xuất block vào thư viện từ AutoCAD (hàng chờ + duyệt) ═══ */}

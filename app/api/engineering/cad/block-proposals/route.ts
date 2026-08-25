@@ -36,7 +36,14 @@ export async function GET(req: NextRequest) {
     // Engineer chỉ thấy đề xuất của chính mình; Admin/PM thấy toàn bộ hàng chờ.
     chiNguoiDeXuat: isAdminOrPm(user.role) ? undefined : user.id,
   });
-  return NextResponse.json({ deXuat, laNguoiDuyet: isAdminOrPm(user.role) });
+  // `duocThemTrucTiep` (M104 §3): vai trò có quyền thêm block THẲNG vào thư viện từ web (không
+  // qua hàng chờ) — cùng CAN.manageDrawings với POST /block-lib/blocks. Vai trò không có quyền
+  // đã bị 403 ngay ở trên nên panel web tự ẩn nút khi tải danh sách hỏng.
+  return NextResponse.json({
+    deXuat,
+    laNguoiDuyet: isAdminOrPm(user.role),
+    duocThemTrucTiep: CAN.manageDrawings(user.role),
+  });
 }
 
 export async function POST(req: NextRequest) {

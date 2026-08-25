@@ -332,7 +332,7 @@ test("route approve/reject: CHỈ phiên web Admin/PM — không nhận token th
     const src = nguon(...p);
     assert.match(src, /export const dynamic = "force-dynamic"/);
     assert.match(src, /getCurrentUser\(\)/);
-    assert.match(src, /isAdminOrPm\(user\.role\)/);
+    assert.match(src, /CAN\.approve\(user\.role\)/);
     assert.match(src, /status: 401/);
     assert.match(src, /status: 403/);
     assert.ok(!src.includes("getCadTokenUser"), `${p.join("/")} không được nhận token thiết bị`);

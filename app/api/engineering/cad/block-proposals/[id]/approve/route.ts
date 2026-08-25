@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { CAN, getCurrentUser } from "@/lib/bao-mat/auth";
 import { duyetDeXuat } from "@/lib/ky-thuat/cad/block-proposals";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!isAdminOrPm(user.role)) {
+  if (!CAN.approve(user.role)) {
     return NextResponse.json({ error: "Chỉ Admin/PM được duyệt đề xuất block" }, { status: 403 });
   }
 

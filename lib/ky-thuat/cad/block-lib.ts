@@ -48,6 +48,17 @@ export type BlockManifestEntry = {
   takeoffItemId?: string;
   /** Khổ giấy của khung tên (chỉ `kind: titleblock`). */
   paper?: string;
+  /**
+   * M104 §1 — khoá tệp `.dwg` RIÊNG của block trong kho lưu trữ (block thêm thẳng từ web:
+   * máy chủ không chạy AutoCAD nên không gộp được vào `blocks.dwg` nền). Vắng trường này =
+   * block nằm trong `blocks.dwg` như cũ (mọi manifest đã phát hành trước M104 không đổi).
+   * Plugin tải tệp lẻ qua `GET /api/engineering/cad/block-lib?file=<fileKey>`.
+   */
+  fileKey?: string;
+  /** Hash sha256 của tệp lẻ ở `fileKey` — plugin kiểm y như kiểm tệp nền. Đi cặp với `fileKey`. */
+  fileSha256?: string;
+  /** Ảnh xem trước (SVG thuần, dựng từ DXF lúc thêm) để web hiển thị — không ảnh hưởng plugin. */
+  previewSvg?: string;
 };
 
 export type BlockLibManifest = {
@@ -82,6 +93,23 @@ export type BlockLibRow = {
 };
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/**
+ * Dạng hợp lệ của `fileKey` (M104 §1) — đúng khuôn tên do `newBlockLibFileName` sinh
+ * (`blocklib-<nhãn>-<ts>-<hex>.dwg`). Ràng khuôn chặt vì `GET ?file=` sẽ đọc đúng khoá này khỏi
+ * kho lưu trữ: manifest là dữ liệu người phát hành nộp, không được để nó trỏ tới tệp bất kỳ
+ * trong `data/uploads/` (lớp chống path traversal của `lib/nen/storage.ts` chặn `/` `..` nhưng
+ * không chặn "đọc nhầm tệp phẳng khác").
+ */
+const KHOA_TEP_BLOCK = /^blocklib-[A-Za-z0-9._-]{1,160}\.dwg$/;
+
+/** Trần độ dài chuỗi SVG xem trước lưu trong manifest (JSONB) — ảnh nhận diện, không phải bản vẽ. */
+const TRAN_PREVIEW_SVG = 200_000;
+
+/** `fileKey` có đúng khuôn tên tệp do máy chủ sinh không (dùng cho cả route `GET ?file=`). */
+export function laKhoaTepBlockHopLe(fileKey: string): boolean {
+  return KHOA_TEP_BLOCK.test(fileKey);
+}
 
 // ── Kiểm định (thuần, không chạm DB — test đơn vị được) ──────────────────────
 
@@ -145,6 +173,32 @@ export function docManifest(tho: unknown): { manifest: BlockLibManifest | null; 
     const attributes = Array.isArray(b.attributes)
       ? b.attributes.filter((a): a is string => typeof a === "string").map((a) => a.trim())
       : undefined;
+
+    // M104 §1 — bộ ba tuỳ chọn của block nằm ở tệp .dwg RIÊNG. Vắng cả ba = block trong tệp nền
+    // (tương thích ngược: manifest phát hành trước M104 không có trường nào trong nhóm này).
+    const fileKey = typeof b.fileKey === "string" ? b.fileKey.trim() : "";
+    const fileSha256 = typeof b.fileSha256 === "string" ? b.fileSha256.trim().toLowerCase() : "";
+    const previewSvg = typeof b.previewSvg === "string" ? b.previewSvg.trim() : "";
+    const nhanB = `${nhan}${id ? ` ("${id}")` : ""}`;
+    if (fileKey && !KHOA_TEP_BLOCK.test(fileKey)) {
+      errors.push(
+        `${nhanB}: "fileKey" không đúng khuôn tên tệp do máy chủ sinh (blocklib-….dwg) — không nhận khoá tự đặt.`,
+      );
+    }
+    if (fileKey && !SHA256_HEX.test(fileSha256)) {
+      errors.push(`${nhanB}: có "fileKey" thì phải kèm "fileSha256" (64 ký tự hex của tệp lẻ).`);
+    }
+    if (!fileKey && fileSha256) {
+      errors.push(
+        `${nhanB}: khai "fileSha256" nhưng thiếu "fileKey" — hash không trỏ tới tệp nào.`,
+      );
+    }
+    if (previewSvg && (!previewSvg.startsWith("<svg") || previewSvg.length > TRAN_PREVIEW_SVG)) {
+      errors.push(
+        `${nhanB}: "previewSvg" phải là chuỗi SVG (bắt đầu bằng <svg) và ngắn hơn ${TRAN_PREVIEW_SVG} ký tự.`,
+      );
+    }
+
     blocks.push({
       id,
       blockName,
@@ -155,6 +209,9 @@ export function docManifest(tho: unknown): { manifest: BlockLibManifest | null; 
       attributes,
       takeoffItemId: typeof b.takeoffItemId === "string" ? b.takeoffItemId.trim() : undefined,
       paper: typeof b.paper === "string" ? b.paper.trim() : undefined,
+      fileKey: fileKey || undefined,
+      fileSha256: fileSha256 || undefined,
+      previewSvg: previewSvg || undefined,
     });
   });
 
@@ -162,8 +219,11 @@ export function docManifest(tho: unknown): { manifest: BlockLibManifest | null; 
   return { manifest: { version, dwgSha256, blocks }, errors };
 }
 
-/** Yêu cầu thuộc tính tối thiểu theo loại block (M100 §11 + FR6/FR9a). */
-function kiemThuocTinhTheoLoai(b: BlockManifestEntry, errors: string[]): void {
+/**
+ * Yêu cầu thuộc tính tối thiểu theo loại block (M100 §11 + FR6/FR9a). Export để đường thêm block
+ * từ web (M104) áp đúng một luật này cho entry mới thay vì chép lại.
+ */
+export function kiemThuocTinhTheoLoai(b: BlockManifestEntry, errors: string[]): void {
   if (b.kind === "equipment" && !(b.attributes ?? []).includes("TAG")) {
     errors.push(
       `Block "${b.id}" (thiết bị) phải khai thuộc tính "TAG" — XBOSS_VE_THIETBI bắt nhập tag lúc chèn (FR6).`,
@@ -236,6 +296,10 @@ export function kiemDinhManifest(
     for (const b of manifest.blocks) {
       const trongDxf = coTrongDxf.get(b.blockName.toUpperCase());
       if (!trongDxf) {
+        // M104 §1: block có `fileKey` nằm ở tệp .dwg RIÊNG, không nằm trong tệp nền — sidecar này
+        // mô tả tệp nền nên không thể (và không cần) chứa nó. Tính toàn vẹn của tệp lẻ được canh
+        // bằng `fileSha256`, và định nghĩa block được kiểm ngay lúc thêm (block-them-web.ts).
+        if (b.fileKey) continue;
         // M100 §6.10: manifest khai block không có thật → CHẶN ngay lúc phát hành, vì client
         // coi thư viện như vậy là hỏng và từ chối dùng toàn bộ.
         errors.push(
