@@ -15,8 +15,12 @@ internal static class VeXDataStore
     internal static void DangKyApp(Database db, Transaction tr) =>
         MarkService.EnsureRegApp(db, tr, VeXData.AppName);
 
-    /// <summary>Ghi XData của bộ lệnh vẽ. Thực thể phải mở ForWrite.</summary>
-    internal static void Ghi(Entity ent, VeXDataInfo tt)
+    /// <summary>
+    /// Ghi XData của bộ lệnh vẽ. Đối tượng phải mở ForWrite.
+    /// Nhận <see cref="DBObject"/> (không chỉ <see cref="Entity"/>) vì M100 PR4 còn đánh dấu cả
+    /// ĐỊNH NGHĨA block (<see cref="BlockTableRecord"/>) bằng version thư viện — §6.10/AC7.
+    /// </summary>
+    internal static void Ghi(DBObject ent, VeXDataInfo tt)
     {
         var gt = new List<TypedValue>
         {
@@ -28,7 +32,7 @@ internal static class VeXDataStore
     }
 
     /// <summary>Đọc XData của bộ lệnh vẽ; null khi đối tượng không do bộ lệnh vẽ sinh ra.</summary>
-    internal static VeXDataInfo? Doc(Entity ent)
+    internal static VeXDataInfo? Doc(DBObject ent)
     {
         using var xdata = ent.GetXDataForApplication(VeXData.AppName);
         if (xdata is null) return null;

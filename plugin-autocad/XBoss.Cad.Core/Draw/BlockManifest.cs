@@ -77,6 +77,20 @@ public sealed class BlockManifest
 
     /// <summary>Các block cùng một loại — vd mọi khung tên để chọn theo khổ giấy.</summary>
     public IEnumerable<BlockDef> TheoLoai(BlockKind kind) => Blocks.Where(b => b.KindEnum == kind);
+
+    /// <summary>
+    /// Block thiết bị ứng với một id khai trong <c>drawTools.systems[].equipment[]</c> (id đó là
+    /// **id item takeoff** <c>measure=count</c> — xem <see cref="TakeoffCrossCheck"/>):
+    /// ưu tiên block trỏ đúng item bằng <c>takeoffItemId</c>, sau đó mới tới block trùng id
+    /// manifest. Khớp cả hai chiều để cách khai lệch nhau giữa manifest và rule pack không làm
+    /// "mất" thiết bị khi chèn (M100 §18 — rủi ro trôi tên số 1). Null = thư viện chưa có block.
+    /// </summary>
+    public BlockDef? TimThietBiTheoItem(string itemId)
+    {
+        var thietBi = TheoLoai(BlockKind.Equipment).ToList();
+        return thietBi.FirstOrDefault(b => string.Equals(b.TakeoffItemId, itemId, StringComparison.Ordinal))
+            ?? thietBi.FirstOrDefault(b => string.Equals(b.Id, itemId, StringComparison.Ordinal));
+    }
 }
 
 /// <summary>

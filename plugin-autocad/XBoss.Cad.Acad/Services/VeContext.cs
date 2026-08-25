@@ -27,6 +27,17 @@ internal static class VeContext
     /// <summary>Tỉ lệ in dự kiến, dùng quy đổi chiều cao chữ nhãn từ mm giấy sang mm mô hình.</summary>
     internal static double? TiLeIn { get; set; }
 
+    /// <summary>Id block phụ kiện/thiết bị chọn lần trước (mặc định cho lần sau — M100 PR4).</summary>
+    internal static string? PhuKienId { get; set; }
+    internal static string? ThietBiId { get; set; }
+
+    /// <summary>
+    /// Nhật ký phiên vẽ (tiếng Việt): các tình huống cần ghi vào BÁO CÁO PHIÊN VẼ của M100 §14 —
+    /// hiện dùng cho lựa chọn khi block trùng tên khác định nghĩa (§6.10/AC7). PR5 (XBOSS_VE_DOI +
+    /// báo cáo) đọc danh sách này khi xuất JSON cạnh DWG.
+    /// </summary>
+    internal static List<string> NhatKyPhien { get; } = [];
+
     // ===== Hạ tầng chung của nhóm lệnh vẽ =====
 
     /// <summary>Bản sao có chủ đích của <c>XBossCommands.SanSang</c> (M99) — không đụng tệp lệnh cũ.</summary>

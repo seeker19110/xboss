@@ -193,6 +193,48 @@ public class DrawGeometryTests
     }
 
     [Fact]
+    public void XData_phu_kien_giu_block_id_va_tim(/* M100 PR4 — FR5 */)
+    {
+        var lai = VeXData.GiaiMa(VeXData.MaHoa(new VeXDataInfo
+        {
+            VaiTro = VaiTroVe.PhuKien,
+            HeId = "HVAC",
+            ItemId = "duct-supp",
+            Size = "300x200",
+            BlockId = "elbow-duct",
+            ThuVienVersion = "b1",
+            HandleTim = "1F3",
+        }));
+
+        Assert.NotNull(lai);
+        Assert.Equal(VaiTroVe.PhuKien, lai!.VaiTro);
+        Assert.Equal("elbow-duct", lai.BlockId);
+        Assert.Equal("b1", lai.ThuVienVersion);
+        Assert.Equal("1F3", lai.HandleTim);
+    }
+
+    [Fact]
+    public void XData_thiet_bi_va_dinh_nghia_block_khong_lan_vai_tro(/* M100 PR4 — FR6/AC7 */)
+    {
+        var thietBi = VeXData.GiaiMa(VeXData.MaHoa(new VeXDataInfo
+        {
+            VaiTro = VaiTroVe.ThietBi,
+            BlockId = "fcu-unit",
+            ThuVienVersion = "b1",
+        }));
+        var dinhNghia = VeXData.GiaiMa(VeXData.MaHoa(new VeXDataInfo
+        {
+            VaiTro = VaiTroVe.DinhNghiaBlock,
+            BlockId = "fcu-unit",
+            ThuVienVersion = "b1",
+        }));
+
+        Assert.Equal(VaiTroVe.ThietBi, thietBi!.VaiTro);
+        Assert.Equal(VaiTroVe.DinhNghiaBlock, dinhNghia!.VaiTro);
+        Assert.Equal("b1", dinhNghia.ThuVienVersion);
+    }
+
+    [Fact]
     public void XData_appname_khong_dung_appname_cua_M99()
     {
         Assert.Equal("XBOSS_VE", VeXData.AppName);
