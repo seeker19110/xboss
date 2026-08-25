@@ -4,6 +4,26 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Audit "kịch trần CAD 2D" + đóng doc drift M101 PR5 (2026-08-25)
+
+Rà lại toàn bộ đợt plugin theo yêu cầu người dùng ("kiểm tra lại mọi tính năng đã kịch trần chưa"):
+
+- **Phát hiện doc drift:** M101 PR5 (`XBOSS_BATCH` chế độ `BocKL` → 1 Excel tổng cột "Tệp";
+  `XBOSS_UPLOAD` gửi kèm sidecar KL; server lưu `standardize_report.takeoff` + web hiện KL theo
+  revision + `GET /api/engineering/cad/takeoff-export`) **đã code đầy đủ cả 2 tầng kèm test**
+  (`BoqExcelWriterBatchTests`, `XBossUploadClientTests`, `tests/cad-plugin-upload.test.ts`,
+  `tests/cad-bang-dieu-khien.test.ts`) nhưng tài liệu vẫn ghi "PR5 chưa" — đã sửa
+  `docs/nang-cap/README.md` + State `M101-plugin-nang-tran.md` (M101 XONG cả 5 PR).
+- **Kết luận trần hiện tại:** M99 (9→16 phép kiểm, 7→11 bước chuẩn hóa) + M100 (14 lệnh vẽ) +
+  M101 (5/5 PR) + M102 (Ribbon + `XBOSS_BANG`, PR #399) = đã chạm trần khả thi của nền 2D
+  Managed API theo ranh giới M101 §1 (tuyệt đối không vượt: 3D/BIM, AutoCAD trên server, sửa
+  proxy entity, "đoán" dữ liệu bản vẽ không chứa). Vòng đời bản vẽ phía web đã kín: plugin upload
+  → `drawing_revisions` `submitted` → duyệt/từ chối (M8 drawing register, đủ 5 loại design/bim/
+  shop/method/**asbuilt** — bản vẽ hoàn công) → KL bóc hiện theo revision.
+- **Nợ còn lại (ngoài khả năng CI):** verify tay trên máy Windows có AutoCAD 2026 (M99–M102,
+  gồm đối chiếu chữ ký `AdWindows.dll` với stub); tính năng M100 §20 để lại phiên bản sau
+  (chủ đích, chờ nhu cầu thật).
+
 ## M102 — Giao diện UI plugin AutoCAD: tab Ribbon + bảng điều khiển `XBOSS_BANG` (2026-08-25)
 
 Plugin M99/M100/M101 đủ 23 lệnh nhưng thuần command line — M102 thêm lớp VỎ giao diện trong
