@@ -3290,6 +3290,26 @@
 - `api_keys_key_hash_key`: UNIQUE INDEX api_keys_key_hash_key ON public.api_keys USING btree (key_hash)
 - `api_keys_pkey`: UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)
 
+### cad_block_libs
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | bigint |  | `nextval('cad_block_libs_id_seq'::regclass)` |
+| version | text |  |  |
+| manifest | jsonb |  |  |
+| storage_key | text |  |  |
+| dwg_sha256 | text |  |  |
+| published_by | bigint | ✓ |  |
+| created_at | timestamptz | ✓ | `now()` |
+
+**Khóa ngoại:**
+- `published_by` → `users(id)`
+
+**Index:**
+- `cad_block_libs_pkey`: UNIQUE INDEX cad_block_libs_pkey ON public.cad_block_libs USING btree (id)
+- `cad_block_libs_version_key`: UNIQUE INDEX cad_block_libs_version_key ON public.cad_block_libs USING btree (version)
+- `idx_cad_block_libs_moi_nhat`: INDEX idx_cad_block_libs_moi_nhat ON public.cad_block_libs USING btree (id DESC)
+
 ### cad_device_pairings
 
 | Cột | Kiểu | Null | Default |
