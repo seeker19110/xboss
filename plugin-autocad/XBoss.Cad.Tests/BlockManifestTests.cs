@@ -142,4 +142,43 @@ public class BlockManifestTests
                 $"Tên block {b.BlockName} không khớp blockNameMatchAny của item {item.Id}");
         }
     }
+
+    // ===== M100 PR4 — tra block thiết bị từ id rule pack (XBOSS_VE_THIETBI) =====
+
+    [Fact]
+    public void Tim_thiet_bi_theo_id_item_takeoff_cua_rule_pack()
+    {
+        var m = NapMau();
+
+        // v4 khai equipment: ["fcu-unit", …]; manifest mẫu trỏ ngược lại bằng takeoffItemId.
+        var fcu = m.TimThietBiTheoItem("fcu-unit");
+        Assert.NotNull(fcu);
+        Assert.Equal("FCU", fcu!.BlockName);
+        Assert.Equal(BlockKind.Equipment, fcu.KindEnum);
+
+        // Thiết bị chưa có trong thư viện → null (lệnh vẽ báo "thư viện chưa có", không chèn bừa).
+        Assert.Null(m.TimThietBiTheoItem("ahu-unit"));
+        // Không nhận nhầm block khác loại dù trùng id.
+        Assert.Null(m.TimThietBiTheoItem("elbow-duct"));
+        Assert.Null(m.TimThietBiTheoItem("titleblock-a1"));
+    }
+
+    [Fact]
+    public void Tim_thiet_bi_uu_tien_takeoffItemId_hon_id_manifest()
+    {
+        var m = BlockManifestLoader.Load("""
+            {
+              "version": "b-thu",
+              "dwgSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+              "blocks": [
+                { "id": "fcu-unit", "blockName": "FCU-CU", "kind": "equipment", "attributes": ["TAG"] },
+                { "id": "fcu-moi", "blockName": "FCU", "kind": "equipment", "attributes": ["TAG"],
+                  "takeoffItemId": "fcu-unit" }
+              ]
+            }
+            """);
+
+        // Trùng id manifest thua block trỏ đúng item takeoff — đó mới là block XBOSS_BOCKL đếm.
+        Assert.Equal("fcu-moi", m.TimThietBiTheoItem("fcu-unit")!.Id);
+    }
 }

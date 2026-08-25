@@ -19,6 +19,15 @@ public enum VaiTroVe
     /// <c>XBOSS_KIEMTRA</c> cảnh báo "mặt cắt cũ hơn tuyến" (M100 §6.4 bước 4).
     /// </summary>
     MatCat,
+    /// <summary>Block phụ kiện chèn trên tuyến tim (co, tê, van, miệng gió… — M100 FR5).</summary>
+    PhuKien,
+    /// <summary>Block thiết bị có attribute (FCU/AHU/đầu phun — M100 FR6).</summary>
+    ThietBi,
+    /// <summary>
+    /// ĐỊNH NGHĨA block (BlockTableRecord) do plugin nhập từ thư viện — mang version thư viện để
+    /// lần chèn sau biết định nghĩa trong bản vẽ đến từ đâu (M100 §6.10/AC7).
+    /// </summary>
+    DinhNghiaBlock,
 }
 
 /// <summary>Nội dung XData <c>XBOSS_VE</c> của một đối tượng do bộ lệnh vẽ sinh ra (M100 §11).</summary>
@@ -53,6 +62,10 @@ public sealed record VeXDataInfo
 
     /// <summary>Cao độ tim tuyến kỹ sư NHẬP TAY khi dựng mặt cắt, đơn vị bản vẽ (M100 §6.4).</summary>
     public double? CaoDo { get; init; }
+    /// <summary>Id block trong manifest thư viện (phụ kiện/thiết bị/định nghĩa block).</summary>
+    public string? BlockId { get; init; }
+    /// <summary>Version thư viện block mà định nghĩa/khối chèn ra lấy từ đó (M100 §6.10).</summary>
+    public string? ThuVienVersion { get; init; }
 }
 
 /// <summary>
@@ -77,7 +90,7 @@ public static class VeXData
         var ra = new List<string>
         {
             $"{KhoaPhienBan}={PhienBan}",
-            $"vaitro={TenVaiTro(tt.VaiTro)}",
+            $"vaitro={MaVaiTro(tt.VaiTro)}",
         };
         Them(ra, "he", tt.HeId);
         Them(ra, "item", tt.ItemId);
@@ -86,6 +99,8 @@ public static class VeXData
         if (tt.SizeTuNhap) ra.Add("custom=1");
         Them(ra, "dodoc", tt.DoDoc);
         Them(ra, "tim", tt.HandleTim);
+        Them(ra, "blockid", tt.BlockId);
+        Them(ra, "tv", tt.ThuVienVersion);
         foreach (var h in tt.HandleBien) Them(ra, "bien", h);
         foreach (var h in tt.HandleNhan) Them(ra, "nhan", h);
         Them(ra, "tuyencat", tt.HandleTuyenCat);
@@ -95,13 +110,17 @@ public static class VeXData
         return ra;
     }
 
-    private static string TenVaiTro(VaiTroVe vaiTro) => vaiTro switch
+    // Mã vai trò phải khớp 1-1 với nhánh giải mã trong GiaiMa — thêm vai trò mới thì sửa CẢ HAI.
+    private static string MaVaiTro(VaiTroVe vaiTro) => vaiTro switch
     {
         VaiTroVe.Tim => "tim",
         VaiTroVe.Bien => "bien",
         VaiTroVe.Nhan => "nhan",
         VaiTroVe.TuyenCat => "tuyencat",
-        _ => "matcat",
+        VaiTroVe.MatCat => "matcat",
+        VaiTroVe.PhuKien => "phukien",
+        VaiTroVe.ThietBi => "thietbi",
+        _ => "blockdef",
     };
 
     private static void Them(List<string> ra, string khoa, string? giaTri)
@@ -117,6 +136,7 @@ public static class VeXData
         string he = "", item = "", size = "", rp = "";
         var custom = false;
         string? doDoc = null, tim = null, tuyenCat = null, ngay = null, tenMc = null;
+        string? blockId = null, thuVien = null;
         double? caoDo = null;
         var bien = new List<string>();
         var nhan = new List<string>();
@@ -137,6 +157,9 @@ public static class VeXData
                         "nhan" => VaiTroVe.Nhan,
                         "tuyencat" => VaiTroVe.TuyenCat,
                         "matcat" => VaiTroVe.MatCat,
+                        "phukien" => VaiTroVe.PhuKien,
+                        "thietbi" => VaiTroVe.ThietBi,
+                        "blockdef" => VaiTroVe.DinhNghiaBlock,
                         _ => VaiTroVe.Tim,
                     };
                     break;
@@ -147,6 +170,8 @@ public static class VeXData
                 case "custom": custom = giaTri == "1"; break;
                 case "dodoc": doDoc = giaTri; break;
                 case "tim": tim = giaTri; break;
+                case "blockid": blockId = giaTri; break;
+                case "tv": thuVien = giaTri; break;
                 case "bien": bien.Add(giaTri); break;
                 case "nhan": nhan.Add(giaTri); break;
                 case "tuyencat": tuyenCat = giaTri; break;
@@ -176,6 +201,8 @@ public static class VeXData
             NgayTao = ngay,
             TenMatCat = tenMc,
             CaoDo = caoDo,
+            BlockId = blockId,
+            ThuVienVersion = thuVien,
         };
     }
 }

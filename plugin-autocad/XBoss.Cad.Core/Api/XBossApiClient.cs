@@ -123,6 +123,64 @@ public sealed class XBossApiClient
         return (json, res.Headers.ETag?.ToString());
     }
 
+    // ===== Thư viện block (M100 PR4 — FR2/AC8) =====
+
+    /// <summary>
+    /// GET /api/engineering/cad/block-lib?manifest=1 — manifest thư viện block đang phát hành.
+    /// Trả (json manifest, etag), hoặc (null, etag) khi 304 — caller giữ bản cache.
+    /// Server bọc manifest trong <c>{version, dwgSha256, manifest}</c>; ở đây bóc đúng phần
+    /// <c>manifest</c> để đưa thẳng cho <c>BlockManifestLoader</c> (một hình dạng dữ liệu duy nhất).
+    /// </summary>
+    public async Task<(string? Json, string? Etag)> FetchBlockLibManifestAsync(
+        string token, string? etag = null, CancellationToken ct = default)
+    {
+        using var res = await GuiKemToken("api/engineering/cad/block-lib?manifest=1", token, etag, ct);
+        if (res.StatusCode == HttpStatusCode.NotModified) return (null, etag);
+        await NemNeuLoi(res, ct);
+
+        var body = await res.Content.ReadAsStringAsync(ct);
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("manifest", out var manifest))
+                throw new XBossApiException("Server trả response thiếu \"manifest\" của thư viện block.");
+            return (manifest.GetRawText(), res.Headers.ETag?.ToString());
+        }
+        catch (System.Text.Json.JsonException e)
+        {
+            throw new XBossApiException($"Manifest thư viện block server trả về không phải JSON hợp lệ: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// GET /api/engineering/cad/block-lib — tệp .dwg thư viện đang phát hành (nhị phân).
+    /// Trả (null, etag) khi 304. Toàn vẹn tệp do caller kiểm bằng sha256 trong manifest (FR2).
+    /// </summary>
+    public async Task<(byte[]? Dwg, string? Etag)> FetchBlockLibDwgAsync(
+        string token, string? etag = null, CancellationToken ct = default)
+    {
+        using var res = await GuiKemToken("api/engineering/cad/block-lib", token, etag, ct);
+        if (res.StatusCode == HttpStatusCode.NotModified) return (null, etag);
+        await NemNeuLoi(res, ct);
+        return (await res.Content.ReadAsByteArrayAsync(ct), res.Headers.ETag?.ToString());
+    }
+
+    private async Task<HttpResponseMessage> GuiKemToken(
+        string duongDan, string token, string? etag, CancellationToken ct)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get, duongDan);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (etag is not null) req.Headers.TryAddWithoutValidation("If-None-Match", etag);
+        return await _http.SendAsync(req, ct);
+    }
+
+    private static async Task NemNeuLoi(HttpResponseMessage res, CancellationToken ct)
+    {
+        if (res.StatusCode == HttpStatusCode.Unauthorized)
+            throw new XBossApiException("Token đã bị thu hồi hoặc hết hạn — chạy lại XBOSS_LOGIN (AC7).");
+        if (!res.IsSuccessStatusCode) throw await LoiTuServer(res, ct);
+    }
+
     // ===== XBOSS_UPLOAD (M99 PR5) =====
 
     public sealed record UploadKetQua

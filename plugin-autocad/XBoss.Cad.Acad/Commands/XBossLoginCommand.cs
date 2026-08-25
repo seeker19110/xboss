@@ -104,6 +104,10 @@ public sealed class XBossLoginCommand
 
             // 5) Tải rule pack mới nhất bằng token (ETag — không đổi thì giữ cache).
             await TaiRulePack(ed, client, ok.Key);
+
+            // 6) Tải thư viện block của bộ lệnh vẽ (M100 AC8) — lỗi ở đây KHÔNG làm hỏng việc ghép
+            //    thiết bị: chỉ báo, các lệnh M99 vẫn chạy bình thường khi chưa có thư viện.
+            ed.WriteMessage($"\n[XBoss] {await BlockLibraryService.TaiVeAsync(client, ok.Key)}\n");
         }
         catch (XBossApiException e)
         {
