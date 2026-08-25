@@ -91,15 +91,34 @@ helper); `schedule` + `payments/print` (ngày lập/ngày bill hiển thị); `e
 (`snapshotDate`), `digital-handover` + `fidic-tia` (ngày mặc định **ghi vào DB**); và 4 chỗ sinh
 tem ngày trong mã/tên tệp (`qr-logistics`, `esignature`, `cad/save-drawing` ×2, `useSmartNaming`).
 
-**Cố ý KHÔNG đổi, có lý do:**
+**Vòng 2 — người dùng chốt "dùng `todayISO()` chuẩn", quét lại và SỬA NỐT hai chỗ tôi đã chừa,
+cộng 6 chỗ regex vòng đầu bỏ sót.**
 
-- `bim-models/[id]/simulate-4d`: `Date.now() ± 30 ngày` là **cửa sổ trượt** cho mô phỏng
-  time-lapse, không so với `todayISO()` — lệch vài giờ ở biên không đổi ý nghĩa.
-- `scripts/check-coverage.ts` (`measuredAt`): metadata của công cụ dev, chạy trên runner CI theo
-  UTC, không ai so nó với ngày VN.
+Hai chỗ tôi từng cho là ngoại lệ, xem kỹ lại thì **kết luận vòng đầu của tôi là vội**:
 
-Sau đợt này, `grep` toàn repo không còn `new Date().toISOString().slice(0,10)` hay
-`Date.now() + N*86400_000` nào trong `app/` — trừ hai ngoại lệ có lý do ở trên.
+- `bim-models/[id]/simulate-4d`: tôi nói đó là "cửa sổ trượt, không so với `todayISO()`" — SAI.
+  Vòng lặp sinh `dateISO` rồi đưa thẳng vào `compute4DSimulationState`, **so với ngày bắt đầu/kết
+  thúc của task**. Nên biên phải là ngày lịch VN. Đã chuyển toàn bộ sang chuỗi ISO
+  (`daysFromTodayISO` cho biên, `addDaysISO` cho bước nhảy) — bỏ luôn `Date.setDate/getDate` vốn
+  theo giờ ĐỊA PHƯƠNG của tiến trình, lệch tiếp nếu máy chủ không chạy UTC.
+- `scripts/check-coverage.ts` (`measuredAt`): đổi theo cho nhất quán.
+
+**Regex vòng đầu chỉ bắt `.slice(0, 10)`, bỏ sót biến thể `.split("T")[0]`** — 6 chỗ nữa:
+`engineering-god-tier` (`approvalDate` mặc định), `SpreadsheetGrid` ×2 (tem ngày trên tên tệp
+CSV/XLSX người dùng tải về), `god-tier/simulate-4d` (`targetDate` mặc định),
+`api/diaries` (**chuỗi THÁNG mặc định** — ngày 1 hàng tháng lấy nhầm tháng trước, cùng lớp lỗi
+với `?month=` của HSE), và `mepf-process` (dấu thời gian duyệt **hiển thị cho kỹ sư VN** mà in
+thẳng giờ UTC → lệch 7 tiếng, tối muộn sai cả ngày; nay dùng `formatDateTimeVN`).
+
+**Vẫn cố ý KHÔNG đổi, có lý do:**
+
+- **Dấu thời gian đầy đủ** (`sentAt`, `createdAt`, `auditedAt`, `log.t`…): `new Date().toISOString()`
+  là ĐÚNG — mốc thời gian tuyệt đối phải lưu UTC. Chỉ **giá trị lịch** (ngày/tháng) mới cần +7.
+- `lib/tien-do/import.ts` `localISO`: cố ý theo lịch địa phương của tiến trình khi đổi serial
+  Excel, có chú thích riêng giải thích bẫy múi giờ. Không đụng.
+
+Sau vòng 2, `grep 'new Date().toISOString()'` toàn repo chỉ còn các dấu thời gian đầy đủ (đúng)
+và `localISO` của import Excel (cố ý).
 
 ### Còn lại (chưa làm)
 

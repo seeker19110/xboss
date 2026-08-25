@@ -10,6 +10,7 @@
 // Theme: chỉ dùng token Tailwind (zinc + nhấn -400), không hex, không `dark:`
 // để giữ cơ chế đảo màu sáng/tối trong globals.css.
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { todayISO } from "@/lib/nen/date";
 import { Loader2, ChevronUp, ChevronDown, ListFilter } from "lucide-react";
 import { serializeTSV, parseTSV, normalizeRect, spreadPaste, type Rect } from "@/lib/tien-do/grid";
 import { Modal } from "@/app/components/dialogs";
@@ -619,7 +620,7 @@ export default function SpreadsheetGrid<Row>({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `export-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `export-${todayISO()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }, [columns, sortedAndFiltered]);
@@ -672,7 +673,7 @@ export default function SpreadsheetGrid<Row>({
     );
     const a = document.createElement("a");
     a.href = url;
-    a.download = `bang-tinh-${new Date().toISOString().split("T")[0]}.xlsx`;
+    a.download = `bang-tinh-${todayISO()}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   }, [columns, sortedAndFiltered, freezeCols]);
