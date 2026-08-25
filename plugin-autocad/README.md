@@ -1,6 +1,6 @@
 # Plugin AutoCAD XBoss — chuẩn hóa bản vẽ & bóc tách khối lượng (M99, tầng 2)
 
-Plugin .NET 8 cho **AutoCAD 2026** (một nền duy nhất — M99 §9.1), thi hành ADR-0006:
+Plugin cho **AutoCAD 2026** (một nền duy nhất — M99 §9.1: Core .NET 8, Adapter .NET 10 cập nhật 2026-08-25), thi hành ADR-0006:
 chuẩn hóa bản vẽ và bóc tách khối lượng chạy bằng chính API AutoCAD trên máy kỹ sư;
 quy tắc tải từ XBoss dưới dạng **rule pack** có version (không nhúng cứng).
 
@@ -143,7 +143,7 @@ kiểm logic/hình học/lỗi lúc chạy. Adapter dùng API mới mà stub ch�
 
    Lệch với `TargetFramework` của `XBoss.Cad.Acad` → sửa csproj + cổng CI "Kiểm TargetFramework
    từng project" theo giá trị thật, và cập nhật M99 §9.1. (Đừng dùng `LoadFrom(...).ImageRuntimeVersion` trên PowerShell 5.1 —
-   nền .NET Framework 4.8 không nạp nổi assembly .NET 8, chỉ ném `BadImageFormatException`.)
+   nền .NET Framework 4.8 không nạp nổi assembly .NET 8/10, chỉ ném `BadImageFormatException`.)
 
 3. Build:
 

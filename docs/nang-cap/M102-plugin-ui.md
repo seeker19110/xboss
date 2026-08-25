@@ -28,7 +28,7 @@ context menu chuột phải.
 
 | Tầng    | Tệp                                         | Vai trò                                                                                                      |
 | ------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Core    | `XBoss.Cad.Core/Ui/LenhCatalog.cs`          | Danh mục 24 lệnh (tên/nhãn/tooltip/nhóm/lệnh chính) — nguồn sự thật của Ribbon                               |
+| Core    | `XBoss.Cad.Core/Ui/LenhCatalog.cs`          | Danh mục 25 lệnh (M103 thêm XBOSS_VE_DEXUAT) (tên/nhãn/tooltip/nhóm/lệnh chính) — nguồn sự thật của Ribbon   |
 | Core    | `XBoss.Cad.Core/Ui/BangDieuKhien.cs`        | `BangDieuKhienModel` dựng khối trạng thái (thuần, test được) + `SidecarSummary` parse phòng thủ              |
 | Adapter | `XBoss.Cad.Acad/Ui/RibbonBuilder.cs`        | Dựng tab từ catalog; ribbon chưa sẵn sàng thì chờ `ComponentManager.ItemInitialized`; idempotent theo Id tab |
 | Adapter | `XBoss.Cad.Acad/Ui/TrangThaiGom.cs`         | Gom trạng thái thô (CredentialStore/RulePackStore/sidecar) — chỉ đọc                                         |
@@ -43,7 +43,7 @@ context menu chuột phải.
 
 ## 3. Tiêu chí chấp nhận
 
-- **AC1** Ribbon có tab "XBoss" đủ 5 panel/24 nút; NETLOAD lại không sinh tab trùng. ✅ (cơ chế; verify tay trên máy AutoCAD còn nợ như M100 §18)
+- **AC1** Ribbon có tab "XBoss" đủ 5 panel/25 nút; NETLOAD lại không sinh tab trùng. ✅ (cơ chế; verify tay trên máy AutoCAD còn nợ như M100 §18)
 - **AC2** Bấm nút chạy đúng lệnh, điều kiện chặn (đời AutoCAD/rule pack) vẫn do lệnh tự kiểm — UI không nhân đôi logic. ✅
 - **AC3** `XBOSS_BANG` bật/tắt bảng; bảng hiện đúng 3 khối + cảnh báo màu cam khi thiếu đăng nhập/rule pack, kèm nút chạy lệnh khắc phục. ✅ (test model)
 - **AC4** Sidecar hỏng/format lạ → bảng bỏ qua tệp đó, không sập. ✅ (test)

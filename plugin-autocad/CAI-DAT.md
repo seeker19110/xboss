@@ -3,7 +3,7 @@
 Tài liệu này dành cho **người dùng cuối** (kỹ sư MEP/QS trên máy trạm). Người phát hành gói cài xem
 phần build/đóng gói trong [`README.md`](README.md).
 
-> **Điều kiện bắt buộc: AutoCAD 2026** (một nền duy nhất, .NET 8 — M99 §9.1). Bản 2021–2024 chạy
+> **Điều kiện bắt buộc: AutoCAD 2026** (một nền duy nhất, **.NET 10** — M99 §9.1 cập nhật 2026-08-25). Bản 2021–2024 chạy
 > runtime khác nên **không nạp được** plugin; plugin đọc `ACADVER` lúc nạp và báo tiếng Việt rồi
 > dừng, thay vì lỗi khó hiểu giữa chừng. AutoCAD LT không hỗ trợ.
 
@@ -62,6 +62,7 @@ sang máy trạm rồi gõ `XBOSS_RULEPACK` chọn tệp. Chuẩn hóa vẫn ch�
 | `XBOSS_BOCKL_XOA`  | Gỡ đánh dấu, trả màu từng đối tượng về đúng màu trước khi bóc                                                                        |
 | `XBOSS_BOCKL_XUAT` | Xuất Excel đúng mẫu công ty (công thức sống) để gửi QS; tuỳ chọn kéo KL BOQ hợp đồng từ máy chủ → sheet `Doi-chieu`                  |
 | `XBOSS_UPLOAD`     | Gửi bản vẽ đã chuẩn hóa về XBoss (server kiểm định lại rồi mới ghi sổ)                                                               |
+| `XBOSS_RULEPACK`   | Nạp tệp rule pack JSON bằng tay (khi chưa ghép thiết bị hoặc máy không ra được mạng nội bộ — làm 1 lần, cache ở máy)                 |
 | `XBOSS_BATCH`      | Xử lý hàng loạt cả thư mục; **bản gốc giữ nguyên**, kết quả vào `da-chuan-hoa/`                                                      |
 | `XBOSS_VE_DEXUAT`  | Đề xuất block vào thư viện: chọn block trên bản vẽ → dialog metadata → gửi hàng chờ (Admin/PM duyệt trên web); yêu cầu `XBOSS_LOGIN` |
 | `XBOSS_VE…`        | Bộ lệnh **vẽ shop drawing** đúng chuẩn ngay từ đầu — xem mục 4b bên dưới                                                             |
