@@ -193,6 +193,59 @@ public class DrawGeometryTests
     }
 
     [Fact]
+    public void XData_mat_cat_giu_snapshot_tuyen_cat_ngay_ten_va_cao_do_nhap_tay()
+    {
+        var tt = new VeXDataInfo
+        {
+            VaiTro = VaiTroVe.MatCat,
+            HeId = "HVAC",
+            ItemId = "duct-supp",
+            Size = "300x200",
+            RulePackVersion = "v4",
+            HandleTim = "1F3",
+            HandleTuyenCat = "2C9",
+            NgayTao = "2026-08-25",
+            TenMatCat = "A-A",
+            CaoDo = 2700.5,
+        };
+
+        var lai = VeXData.GiaiMa(VeXData.MaHoa(tt));
+
+        Assert.NotNull(lai);
+        Assert.Equal(VaiTroVe.MatCat, lai!.VaiTro);
+        Assert.Equal("2C9", lai.HandleTuyenCat);
+        Assert.Equal("2026-08-25", lai.NgayTao);
+        Assert.Equal("A-A", lai.TenMatCat);
+        Assert.Equal(2700.5, lai.CaoDo!.Value, 6);
+    }
+
+    [Fact]
+    public void XData_tuyen_cat_giu_ten_mat_cat_va_khong_lan_sang_vai_tro_khac()
+    {
+        var lai = VeXData.GiaiMa(
+            VeXData.MaHoa(new VeXDataInfo { VaiTro = VaiTroVe.TuyenCat, TenMatCat = "B-B", NgayTao = "2026-08-25" }));
+
+        Assert.NotNull(lai);
+        Assert.Equal(VaiTroVe.TuyenCat, lai!.VaiTro);
+        Assert.Equal("B-B", lai.TenMatCat);
+        Assert.Null(lai.CaoDo);
+    }
+
+    [Fact]
+    public void XData_ban_cu_khong_co_truong_mat_cat_van_doc_duoc()
+    {
+        // Tuyến vẽ bằng bản PR3 (chưa có khóa mặt cắt) phải đọc y nguyên, không hỏng.
+        var lai = VeXData.GiaiMa(["ve=1", "vaitro=tim", "he=HVAC", "size=300x200"]);
+
+        Assert.NotNull(lai);
+        Assert.Equal(VaiTroVe.Tim, lai!.VaiTro);
+        Assert.Null(lai.HandleTuyenCat);
+        Assert.Null(lai.NgayTao);
+        Assert.Null(lai.TenMatCat);
+        Assert.Null(lai.CaoDo);
+    }
+
+    [Fact]
     public void XData_appname_khong_dung_appname_cua_M99()
     {
         Assert.Equal("XBOSS_VE", VeXData.AppName);

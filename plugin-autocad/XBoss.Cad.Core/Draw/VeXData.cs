@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace XBoss.Cad.Core.Draw;
 
 /// <summary>Vai trò của đối tượng do bộ lệnh vẽ sinh ra.</summary>
@@ -9,6 +11,14 @@ public enum VaiTroVe
     Bien,
     /// <summary>Nhãn size/độ dốc trên layer annotation.</summary>
     Nhan,
+    /// <summary>Tuyến cắt kỹ sư kẻ trong mặt bằng (XBOSS_VE_MATCAT) — nguồn của một hình cắt.</summary>
+    TuyenCat,
+    /// <summary>
+    /// Đối tượng thuộc hình cắt (ký hiệu, nhãn, tên A-A). Hình cắt là SNAPSHOT: không tự cập
+    /// nhật khi tuyến nguồn đổi, nên mang theo handle tuyến cắt + ngày dựng để
+    /// <c>XBOSS_KIEMTRA</c> cảnh báo "mặt cắt cũ hơn tuyến" (M100 §6.4 bước 4).
+    /// </summary>
+    MatCat,
 }
 
 /// <summary>Nội dung XData <c>XBOSS_VE</c> của một đối tượng do bộ lệnh vẽ sinh ra (M100 §11).</summary>
@@ -31,6 +41,18 @@ public sealed record VeXDataInfo
     public IReadOnlyList<string> HandleBien { get; init; } = [];
     /// <summary>Handle các nhãn gắn với tim — để <c>XBOSS_VE_DOI</c> cập nhật nhãn (FR8).</summary>
     public IReadOnlyList<string> HandleNhan { get; init; } = [];
+
+    /// <summary>Handle tuyến cắt sinh ra hình cắt này (chỉ vai trò <see cref="VaiTroVe.MatCat"/>).</summary>
+    public string? HandleTuyenCat { get; init; }
+
+    /// <summary>Ngày dựng hình cắt (ISO <c>yyyy-MM-dd</c>) — mốc so "mặt cắt cũ hơn tuyến".</summary>
+    public string? NgayTao { get; init; }
+
+    /// <summary>Tên mặt cắt (<c>A-A</c>) — có trên tuyến cắt lẫn các đối tượng của hình cắt.</summary>
+    public string? TenMatCat { get; init; }
+
+    /// <summary>Cao độ tim tuyến kỹ sư NHẬP TAY khi dựng mặt cắt, đơn vị bản vẽ (M100 §6.4).</summary>
+    public double? CaoDo { get; init; }
 }
 
 /// <summary>
@@ -55,7 +77,7 @@ public static class VeXData
         var ra = new List<string>
         {
             $"{KhoaPhienBan}={PhienBan}",
-            $"vaitro={tt.VaiTro switch { VaiTroVe.Tim => "tim", VaiTroVe.Bien => "bien", _ => "nhan" }}",
+            $"vaitro={TenVaiTro(tt.VaiTro)}",
         };
         Them(ra, "he", tt.HeId);
         Them(ra, "item", tt.ItemId);
@@ -66,8 +88,21 @@ public static class VeXData
         Them(ra, "tim", tt.HandleTim);
         foreach (var h in tt.HandleBien) Them(ra, "bien", h);
         foreach (var h in tt.HandleNhan) Them(ra, "nhan", h);
+        Them(ra, "tuyencat", tt.HandleTuyenCat);
+        Them(ra, "ngay", tt.NgayTao);
+        Them(ra, "tenmc", tt.TenMatCat);
+        if (tt.CaoDo is { } cd) ra.Add($"caodo={cd.ToString("0.######", CultureInfo.InvariantCulture)}");
         return ra;
     }
+
+    private static string TenVaiTro(VaiTroVe vaiTro) => vaiTro switch
+    {
+        VaiTroVe.Tim => "tim",
+        VaiTroVe.Bien => "bien",
+        VaiTroVe.Nhan => "nhan",
+        VaiTroVe.TuyenCat => "tuyencat",
+        _ => "matcat",
+    };
 
     private static void Them(List<string> ra, string khoa, string? giaTri)
     {
@@ -81,7 +116,8 @@ public static class VeXData
         VaiTroVe vaiTro = VaiTroVe.Tim;
         string he = "", item = "", size = "", rp = "";
         var custom = false;
-        string? doDoc = null, tim = null;
+        string? doDoc = null, tim = null, tuyenCat = null, ngay = null, tenMc = null;
+        double? caoDo = null;
         var bien = new List<string>();
         var nhan = new List<string>();
 
@@ -95,7 +131,14 @@ public static class VeXData
             {
                 case KhoaPhienBan: co = true; break;
                 case "vaitro":
-                    vaiTro = giaTri switch { "bien" => VaiTroVe.Bien, "nhan" => VaiTroVe.Nhan, _ => VaiTroVe.Tim };
+                    vaiTro = giaTri switch
+                    {
+                        "bien" => VaiTroVe.Bien,
+                        "nhan" => VaiTroVe.Nhan,
+                        "tuyencat" => VaiTroVe.TuyenCat,
+                        "matcat" => VaiTroVe.MatCat,
+                        _ => VaiTroVe.Tim,
+                    };
                     break;
                 case "he": he = giaTri; break;
                 case "item": item = giaTri; break;
@@ -106,6 +149,13 @@ public static class VeXData
                 case "tim": tim = giaTri; break;
                 case "bien": bien.Add(giaTri); break;
                 case "nhan": nhan.Add(giaTri); break;
+                case "tuyencat": tuyenCat = giaTri; break;
+                case "ngay": ngay = giaTri; break;
+                case "tenmc": tenMc = giaTri; break;
+                case "caodo":
+                    if (double.TryParse(giaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var cd))
+                        caoDo = cd;
+                    break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -122,6 +172,10 @@ public static class VeXData
             HandleTim = tim,
             HandleBien = bien,
             HandleNhan = nhan,
+            HandleTuyenCat = tuyenCat,
+            NgayTao = ngay,
+            TenMatCat = tenMc,
+            CaoDo = caoDo,
         };
     }
 }
