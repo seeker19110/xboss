@@ -87,3 +87,14 @@ V3 → (V4 ∥ V5) → V6 → V7. Mỗi việc worktree riêng; các file Comman
 5. **Adapter**: chỉ phần tối thiểu để truyền vùng chọn + nhãn gần tuyến vào Core (dùng stub `/tmp/claude-0/-home-user-xboss/3f35183b-b0e6-57b0-a97e-118b57e3f070/scratchpad/acad-shim/` để biên dịch thử). Nếu phần Adapter quá rủi ro khi code mù → làm Core + test trọn vẹn, để Adapter tối thiểu và GHI RÕ trong báo cáo.
 
 **Tiêu chí chấp nhận:** AC (c) tuyến 10m cắt ranh giới 6/4 → vùng A 6.00m, vùng B 4.00m; AC (d) cách nhiệt ống gió 300x200 dài 10m → 10×(0.3+0.2)×2 = 10.00 m²; v6 mặc định = v5; Excel mở được, mẫu cũ không vỡ (test round-trip ClosedXML như M99 đã có).
+
+## Việc W2 — 4 bước chuẩn hóa mới: style/xref/hatch/layout (M101 PR2) — `route: complex`
+
+Đặc tả M101 §6.2 (bảng 4 bước, chèn SAU bước lineweight/CTB hiện tại — thứ tự cố định mới 8/9/10/11), §7 FR3.
+
+- Rule pack **v7** (append-only; v1–v6 KHÔNG đổi 1 byte): thêm `xrefPolicy` (`{enabled:false, pathPolicy:"relative", bindMatchAny:[]}`), `hatchMap` (`{enabled:false, byLayer:[…]}`), `layoutPolicy` (`{enabled:false, removeEmpty:true, renameLayouts:false, namePattern}`). **`styleMap` đã có sẵn từ v5** — bước 8 dùng lại chính nó, KHÔNG khai trùng. Mọi bước mới **mặc định tắt** ⇒ ca test bắt buộc "v7 mặc định = v6".
+- `XBoss.Cad.Core`: logic thuần cho 4 bước (quyết định đổi gì → trả danh sách thay đổi + báo cáo), theo đúng khung `StandardizePipeline` hiện có (ĐỌC trước). Adapter áp thay đổi — **chỉ sửa `StandardizePipeline`/lệnh CHUANHOA ở mức tối thiểu**, dùng stub `/tmp/claude-0/-home-user-xboss/3f35183b-b0e6-57b0-a97e-118b57e3f070/scratchpad/acad-shim/app-w3/` để biên dịch thử (W3 đã mở rộng stub đủ cho `XBossCommands.cs`).
+- Ràng buộc: dimension không mất associativity (M99 O3); xref mặc định CHỈ BÁO, không bind; 1 UNDO cho cả pipeline; diff preview + báo cáo JSON giữ khung cũ.
+- **Nợ phải đóng luôn trong việc này** (hazard có sẵn, ghi ở `PROGRESS.md`): `StandardizePipeline.Buoc2LayerMapping` gộp layer bằng `LayerTable.Has(tên đích)` — `Has` KHÔNG phân biệt hoa/thường, nên layer chỉ lệch hoa/thường với tên đích (vd `m-duct-supp`) rơi vào nhánh "gộp" rồi `Erase()` chính layer đang chứa thực thể. Sửa: bỏ qua khi `string.Equals(cũ, mới, OrdinalIgnoreCase)`. Kèm test.
+
+**Tiêu chí chấp nhận:** dotnet test xanh toàn bộ (hiện 365 ca); v7 mặc định = v6 (ca test); hazard hoa/thường có test chứng minh bắt được.
