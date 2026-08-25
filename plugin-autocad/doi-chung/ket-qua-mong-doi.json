@@ -1,6 +1,6 @@
 {
   "moTa": "SINH TỰ ĐỘNG bởi scripts/sinh-doi-chung-cad.ts — đừng sửa tay. Chạy `npm run cad:doi-chung` sau khi đổi quy tắc chuẩn hóa hoặc corpus.",
-  "rulePackVersion": "v3",
+  "rulePackVersion": "v7",
   "layers": {
     "0": "0",
     "01_M_ONG_GIO_CAP_CHINH": "M-DUCT-SUPP",
@@ -26,12 +26,22 @@
     "ZZZ_KHONG_KHOP_GI": "ZZZ_KHONG_KHOP_GI",
     "M-DUCT-SUPP": "M-DUCT-SUPP",
     "M-DUCT-RETN": "M-DUCT-RETN",
+    "M-DUCT-EXHT": "M-DUCT-EXHT",
     "M-CHW-PIPE": "M-CHW-PIPE",
-    "P-PIPE-SANR": "P-PIPE-DOMW",
+    "P-PIPE-SANR": "P-PIPE-SANR",
+    "P-PIPE-DOMW": "P-PIPE-DOMW",
     "E-TRAY-PWRR": "E-TRAY-PWRR",
-    "F-SPRN-PIPE": "P-PIPE-DOMW",
+    "E-LTNG-CKTS": "E-LTNG-CKTS",
+    "ELV-CABL-TRAY": "ELV-CABL-TRAY",
+    "F-SPRN-PIPE": "F-SPRN-PIPE",
     "S-GRID-COLS": "S-GRID-COLS",
-    "G-ANNO-TEXT": "G-ANNO-TEXT"
+    "G-ANNO-TEXT": "G-ANNO-TEXT",
+    "m-duct-exht": "M-DUCT-EXHT",
+    "M-DUCT-SUPPEDGE": "M-DUCT-SUPPEDGE",
+    "M-DUCT-EXHTEDGE": "M-DUCT-EXHTEDGE",
+    "P-PIPE-SANREDGE": "P-PIPE-SANREDGE",
+    "E-TRAY-PWRREDGE": "E-TRAY-PWRREDGE",
+    "ELV-CABL-TRAYEDGE": "ELV-CABL-TRAYEDGE"
   },
   "tcvn3": {
     "èng giã cÊp": "ống gió cấp",

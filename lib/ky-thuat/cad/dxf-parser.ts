@@ -9,6 +9,7 @@
  * - 2D-to-3D Spatial Route generation with Multi-Tier Corridor allocation.
  * - Standardized DXF exporter & AutoCAD .SCR script generation.
  */
+import { RULE_PACK_HIEN_HANH } from "@/lib/ky-thuat/cad/rule-pack-hien-hanh";
 
 // Complete Vietnamese TCVN3 / ABC to Unicode character mapping (Upper & Lowercase)
 const TCVN3_MAP: Record<string, string> = {
@@ -284,7 +285,7 @@ const LAYER_WORD_CHAR = /[A-Z0-9]/;
  * vd `"OA"` (outside air) là chuỗi con của `"THOAT"` (ống thoát).
  * Tên layer truyền vào phải đã upper-case.
  */
-function hasToken(l: string, token: string): boolean {
+export function hasToken(l: string, token: string): boolean {
   let from = 0;
   for (;;) {
     const at = l.indexOf(token, from);
@@ -296,10 +297,48 @@ function hasToken(l: string, token: string): boolean {
   }
 }
 
-/** Đúng khi tên layer chứa ít nhất một trong các từ khóa (theo ranh giới token). */
-function hasAnyToken(l: string, tokens: readonly string[]): boolean {
+/**
+ * Đúng khi tên layer chứa ít nhất một trong các từ khóa (theo ranh giới token).
+ *
+ * Xuất ra ngoài để **mọi** chỗ khớp theo quy tắc rule pack (`layerMap`, `takeoff.layerMatchAny`,
+ * `takeoff.blockNameMatchAny`) dùng chung MỘT bộ khớp — đúng cam kết trong
+ * `layerMap.matchingNote` và bản C# `XBoss.Cad.Core/Matching/TokenMatcher.cs`. Chuỗi và từ khóa
+ * truyền vào phải đã chữ hoa.
+ */
+export function hasAnyToken(l: string, tokens: readonly string[]): boolean {
   return tokens.some((token) => hasToken(l, token));
 }
+
+/** Hình dạng tối thiểu của rule pack mà lớp ánh xạ layer cần đọc. `drawTools` chỉ có từ v4 —
+ *  v1/v2/v3 không khai khối này nên phải là tuỳ chọn. */
+export interface RulePackAnhXaLayer {
+  layerMap: { groups: readonly { branches: readonly { target: string }[] }[] };
+  drawTools?: { edgeLayerSuffix?: string };
+}
+
+/**
+ * Tập tên layer ĐÃ đúng chuẩn, lấy thẳng từ rule pack (không hard-code danh sách tên trong code):
+ * mọi `layerMap.groups[].branches[].target`, cộng biến thể nét biên
+ * `<target><drawTools.edgeLayerSuffix>` (M100 FR4 — nét biên là layer riêng, KHÔNG được gộp về
+ * layer tim vì sẽ bóc trùng khối lượng).
+ *
+ * Tên trả về đã chữ hoa để so khớp không phân biệt hoa thường.
+ */
+export function tapLayerDaChuan(pack: RulePackAnhXaLayer): ReadonlySet<string> {
+  const ten = new Set<string>();
+  const hauTo = (pack.drawTools?.edgeLayerSuffix ?? "").toUpperCase();
+  for (const group of pack.layerMap.groups) {
+    for (const branch of group.branches) {
+      const target = branch.target.toUpperCase();
+      ten.add(target);
+      if (hauTo) ten.add(target + hauTo);
+    }
+  }
+  return ten;
+}
+
+/** Tính một lần cho rule pack đang phát hành — bảng chỉ vài chục tên, không đổi lúc chạy. */
+const LAYER_DA_CHUAN = tapLayerDaChuan(RULE_PACK_HIEN_HANH);
 
 /**
  * Chuẩn hóa tên layer AutoCAD về chuẩn AIA / BS1192 / ISO 13567 cho 5 phân hệ MEPF.
@@ -307,13 +346,22 @@ function hasAnyToken(l: string, tokens: readonly string[]): boolean {
  * Thứ tự nhánh: gió → điện nặng → ELV → ống nước → PCCC → kết cấu → ghi chú. Điện/ELV phải kiểm
  * TRƯỚC ống nước vì `"CAP"` (ý định: nước cấp) cũng là một token hợp lệ trong `"MANG_CAP_DIEN"` /
  * `"MANG_CAP_ELV"`, nơi nó mang nghĩa "cáp" chứ không phải "cấp".
+ *
+ * **Bất biến idempotent** (vá 2026-08-25): tên đã là một layer đích của rule pack — hoặc layer nét
+ * biên của nó — thì giữ nguyên, không đem đi khớp token lại. Thiếu chốt này, chạy chuẩn hóa lần 2
+ * trên bản vẽ đã chuẩn hóa sẽ gộp nhầm hệ (`M-DUCT-EXHT`→`M-DUCT-SUPP`, `F-SPRN-PIPE`→
+ * `P-PIPE-DOMW`, `M-DUCT-SUPPEDGE`→`M-DUCT-SUPP`) vì token của tên đích không nằm trong `matchAny`
+ * của chính nhóm nó (`EXHT` ≠ `EA`, `SANR` ≠ `THOAT`…) nên rơi vào nhánh `default` của nhóm khác.
  */
 export function normalizeCadLayers(layers: string[]): Record<string, string> {
   const mapping: Record<string, string> = {};
 
   for (const layer of layers) {
     const l = layer.toUpperCase();
-    if (hasAnyToken(l, ["DUCT", "GIO", "AHU", "FCU", "SA", "RA", "EA", "OA"])) {
+    if (LAYER_DA_CHUAN.has(l)) {
+      // Đã đúng chuẩn — chỉ chuẩn hoá hoa/thường về đúng dạng khai trong rule pack.
+      mapping[layer] = l;
+    } else if (hasAnyToken(l, ["DUCT", "GIO", "AHU", "FCU", "SA", "RA", "EA", "OA"])) {
       if (hasAnyToken(l, ["RETN", "HOI", "RA"])) {
         mapping[layer] = "M-DUCT-RETN";
       } else if (hasAnyToken(l, ["EXHAUST", "THAI", "EA"])) {

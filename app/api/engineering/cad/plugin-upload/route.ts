@@ -110,6 +110,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // M101 §6.4 (PR5): sidecar KL bóc — TÙY CHỌN, không gửi vẫn upload y hệt trước PR5.
+  const takeoffRaw = form.get("takeoff");
+  let takeoff: Record<string, unknown> | null = null;
+  if (takeoffRaw instanceof File) {
+    try {
+      takeoff = JSON.parse(await takeoffRaw.text());
+    } catch {
+      return NextResponse.json({ error: "takeoff.json không phải JSON hợp lệ" }, { status: 400 });
+    }
+  }
+
   const job = await enqueueAsyncTask({
     projectId,
     taskType: "cad.plugin-upload",
@@ -134,6 +145,7 @@ export async function POST(req: NextRequest) {
       dwgName: dwg.name,
       dxfText: await dxf.text(),
       report,
+      takeoff,
     });
 
     if (kq.status === "invalid") {

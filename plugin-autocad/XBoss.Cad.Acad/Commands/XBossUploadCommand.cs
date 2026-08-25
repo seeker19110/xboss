@@ -95,13 +95,21 @@ public sealed class XBossUploadCommand
         if (File.Exists(duongBaoCao)) reportJson = File.ReadAllText(duongBaoCao);
         else ed.WriteMessage("\n[XBoss] ⚠ Chưa thấy báo cáo chuẩn hóa cạnh DWG — cân nhắc chạy XBOSS_CHUANHOA trước.\n");
 
+        // Kết quả bóc khối lượng (nếu XBOSS_BOCKL_XUAT đã chạy) — M101 §6.4 (PR5): server lưu vào
+        // standardize_report khối "takeoff", KHÔNG ghi vào bảng BOQ (đường ghi sổ duy nhất giữ nguyên).
+        // Thiếu sidecar → upload vẫn chạy y nguyên như trước PR5, không chặn (chỉ là "kèm thêm nếu có").
+        string? takeoffJson = null;
+        var duongTakeoff = db.Filename + XBossCommands.TenSidecarBocKL;
+        if (File.Exists(duongTakeoff)) takeoffJson = File.ReadAllText(duongTakeoff);
+
         ed.WriteMessage($"\n[XBoss] Đang tải {tenDwg} ({new FileInfo(db.Filename).Length / 1024} KB) lên {baseUrl}…\n");
         try
         {
             var client = new XBossApiClient(baseUrl);
             var kq = await client.UploadAsync(
                 token, maBanVe, rev, pack.Version,
-                tenDwg, File.ReadAllBytes(db.Filename), dxfBytes, reportJson);
+                tenDwg, File.ReadAllBytes(db.Filename), dxfBytes, reportJson,
+                takeoffJson: takeoffJson);
 
             if (!kq.DuocNhan)
             {

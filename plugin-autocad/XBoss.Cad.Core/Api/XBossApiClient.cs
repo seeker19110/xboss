@@ -123,6 +123,118 @@ public sealed class XBossApiClient
         return (json, res.Headers.ETag?.ToString());
     }
 
+    // ===== Thư viện block (M100 PR4 — FR2/AC8) =====
+
+    /// <summary>
+    /// GET /api/engineering/cad/block-lib?manifest=1 — manifest thư viện block đang phát hành.
+    /// Trả (json manifest, etag), hoặc (null, etag) khi 304 — caller giữ bản cache.
+    /// Server bọc manifest trong <c>{version, dwgSha256, manifest}</c>; ở đây bóc đúng phần
+    /// <c>manifest</c> để đưa thẳng cho <c>BlockManifestLoader</c> (một hình dạng dữ liệu duy nhất).
+    /// </summary>
+    public async Task<(string? Json, string? Etag)> FetchBlockLibManifestAsync(
+        string token, string? etag = null, CancellationToken ct = default)
+    {
+        using var res = await GuiKemToken("api/engineering/cad/block-lib?manifest=1", token, etag, ct);
+        if (res.StatusCode == HttpStatusCode.NotModified) return (null, etag);
+        await NemNeuLoi(res, ct);
+
+        var body = await res.Content.ReadAsStringAsync(ct);
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("manifest", out var manifest))
+                throw new XBossApiException("Server trả response thiếu \"manifest\" của thư viện block.");
+            return (manifest.GetRawText(), res.Headers.ETag?.ToString());
+        }
+        catch (System.Text.Json.JsonException e)
+        {
+            throw new XBossApiException($"Manifest thư viện block server trả về không phải JSON hợp lệ: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// GET /api/engineering/cad/block-lib — tệp .dwg thư viện đang phát hành (nhị phân).
+    /// Trả (null, etag) khi 304. Toàn vẹn tệp do caller kiểm bằng sha256 trong manifest (FR2).
+    /// </summary>
+    public async Task<(byte[]? Dwg, string? Etag)> FetchBlockLibDwgAsync(
+        string token, string? etag = null, CancellationToken ct = default)
+    {
+        using var res = await GuiKemToken("api/engineering/cad/block-lib", token, etag, ct);
+        if (res.StatusCode == HttpStatusCode.NotModified) return (null, etag);
+        await NemNeuLoi(res, ct);
+        return (await res.Content.ReadAsByteArrayAsync(ct), res.Headers.ETag?.ToString());
+    }
+
+    // ===== Đối chiếu BOQ (M101 PR4 — §6.3, chỉ ĐỌC) =====
+
+    /// <summary>
+    /// GET /api/engineering/cad/boq-snapshot[?project=] — KL BOQ hợp đồng theo hạng mục bóc tách,
+    /// để dựng sheet phụ <c>Doi-chieu</c>. KHÔNG có đường ghi ngược: số liệu bóc chỉ về máy chủ
+    /// qua XBOSS_UPLOAD có kiểm định (M101 §6.4).
+    ///
+    /// <paramref name="projectId"/> null = để máy chủ tự suy (người dùng chỉ thuộc 1 dự án); thuộc
+    /// nhiều dự án thì máy chủ trả 409 kèm danh sách → ném <see cref="XBossCanChonDuAnException"/>
+    /// để lệnh hỏi kỹ sư chọn, KHÔNG tự đoán một dự án (đoán = đưa nhầm KL hợp đồng của dự án khác).
+    /// </summary>
+    public async Task<BoqSnapshot> FetchBoqSnapshotAsync(
+        string token, long? projectId = null, CancellationToken ct = default)
+    {
+        var duongDan = "api/engineering/cad/boq-snapshot"
+                       + (projectId is null ? "" : $"?project={projectId.Value}");
+        using var res = await GuiKemToken(duongDan, token, null, ct);
+        if (res.StatusCode == HttpStatusCode.Conflict)
+        {
+            var body = await res.Content.ReadAsStringAsync(ct);
+            throw new XBossCanChonDuAnException(
+                DocLoiTuChuoi(body) ?? "Cần chỉ định dự án.", DocDanhSachDuAn(body));
+        }
+        await NemNeuLoi(res, ct);
+        return BoqSnapshot.TuJson(await res.Content.ReadAsStringAsync(ct));
+    }
+
+    private static IReadOnlyList<DuAnTomTat> DocDanhSachDuAn(string body)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("duAn", out var ds)) return [];
+            return System.Text.Json.JsonSerializer.Deserialize<List<DuAnTomTat>>(ds.GetRawText()) ?? [];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static string? DocLoiTuChuoi(string body)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            return doc.RootElement.TryGetProperty("error", out var e) ? e.GetString() : null;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<HttpResponseMessage> GuiKemToken(
+        string duongDan, string token, string? etag, CancellationToken ct)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get, duongDan);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (etag is not null) req.Headers.TryAddWithoutValidation("If-None-Match", etag);
+        return await _http.SendAsync(req, ct);
+    }
+
+    private static async Task NemNeuLoi(HttpResponseMessage res, CancellationToken ct)
+    {
+        if (res.StatusCode == HttpStatusCode.Unauthorized)
+            throw new XBossApiException("Token đã bị thu hồi hoặc hết hạn — chạy lại XBOSS_LOGIN (AC7).");
+        if (!res.IsSuccessStatusCode) throw await LoiTuServer(res, ct);
+    }
+
     // ===== XBOSS_UPLOAD (M99 PR5) =====
 
     public sealed record UploadKetQua
@@ -155,17 +267,22 @@ public sealed class XBossApiClient
 
     /// <summary>POST /api/engineering/cad/plugin-upload — DWG + DXF sidecar + báo cáo +
     /// rulePackVersion (FR9). 202 = server nhận, poll job; 422 = kiểm định fail (AC5) —
-    /// trả danh sách lỗi thay vì ném để command hiện đủ cho kỹ sư.</summary>
+    /// trả danh sách lỗi thay vì ném để command hiện đủ cho kỹ sư.
+    /// <paramref name="takeoffJson"/> (M101 §6.4, PR5): sidecar JSON kết quả bóc khối lượng
+    /// (<c>TakeoffJsonReport</c>, cạnh Excel từ <c>XBOSS_BOCKL_XUAT</c>) — TÙY CHỌN, không gửi
+    /// vẫn upload y hệt trước (đường ghi sổ BOQ không đổi, server chỉ lưu để đối chiếu).</summary>
     public async Task<UploadKetQua> UploadAsync(
         string token, string drawingCode, string rev, string rulePackVersion,
         string dwgFileName, byte[] dwgBytes, byte[] dxfBytes, string? reportJson,
-        CancellationToken ct = default)
+        CancellationToken ct = default, string? takeoffJson = null)
     {
         using var form = new MultipartFormDataContent();
         form.Add(new ByteArrayContent(dwgBytes), "dwg", dwgFileName);
         form.Add(new ByteArrayContent(dxfBytes), "dxf", Path.ChangeExtension(dwgFileName, ".dxf"));
         if (reportJson is not null)
             form.Add(new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(reportJson)), "report", "report.json");
+        if (takeoffJson is not null)
+            form.Add(new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(takeoffJson)), "takeoff", "takeoff.json");
         form.Add(new StringContent(drawingCode), "drawingCode");
         form.Add(new StringContent(rev), "rev");
         form.Add(new StringContent(rulePackVersion), "rulePackVersion");

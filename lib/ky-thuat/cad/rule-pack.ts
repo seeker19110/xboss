@@ -8,27 +8,61 @@
  * phát hành (cùng triết lý append-only của migration).
  */
 import { createHash } from "node:crypto";
-import rulePackV3 from "@/lib/ky-thuat/cad/rule-packs/v3.json";
+import { RULE_PACK_HIEN_HANH, type CadRulePack } from "@/lib/ky-thuat/cad/rule-pack-hien-hanh";
 
-export type CadRulePack = typeof rulePackV3;
+export type { CadRulePack };
 
 /** Version đang phát hành cho plugin. */
-export const CURRENT_RULE_PACK_VERSION = rulePackV3.version;
+export const CURRENT_RULE_PACK_VERSION = RULE_PACK_HIEN_HANH.version;
 
 /**
  * Rule pack đang phát hành:
  * v2 = v1 + takeoff + inspectionPolicy (M99 PR-A);
  * v3 = v2 + fontMap.targetFont (font Unicode đích cho kiểu chữ đã giải mã TCVN3/VNI — không có
- * nó thì plugin sửa nội dung chữ xong AutoCAD vẫn hiển thị sai, xem PROGRESS.md 2026-08-25).
+ * nó thì plugin sửa nội dung chữ xong AutoCAD vẫn hiển thị sai, xem PROGRESS.md 2026-08-25);
+ * v4 = v3 + drawTools + sheetSetup (tham số bộ lệnh vẽ XBOSS_VE_* — M100 §11, mở rộng thuần nên
+ * plugin M99 đọc v4 chạy y hệt v3);
+ * v5 = v4 + 7 phép kiểm mới của XBOSS_KIEMTRA (M101 §6.1, số 10–16) + khối styleMap dùng chung với
+ * bước chuẩn hóa 8 (M101 §6.2). Mọi phép kiểm mới mặc định `enabled: false` nên plugin cũ lẫn mới
+ * nạp v5 đều cho kết quả kiểm y hệt v4 (M101 §7 FR1);
+ * v6 = v5 + các khóa TÙY CHỌN của bóc tách nâng cao XBOSS_BOCKL (M101 §6.3: groupBySize,
+ * sizeFromNearbyText, wastagePct, perCountAdd, derivedFrom+formula). Không item nào trong v6 khai
+ * khóa mới nên bóc bằng v6 cho kết quả y hệt v5 — công ty bật hệ số theo dự án bằng version kế tiếp;
+ * v7 = v6 + 2 item đếm `support-hanger`/`sleeve-opening` (giá đỡ, lỗ chờ — M100 AC12/§6.8: trước v7
+ * XBOSS_BOCKL không đếm được hai hạng mục này) + `drawTools.heavyFittingIds` khai phụ kiện nặng cần
+ * giá đỡ tại chỗ (M100 §6.7 — trước v7 XBOSS_VE_GIADO phải hỏi kỹ sư mỗi lần chạy).
+ * v7 = v6 + 3 khối chính sách cho 4 bước chuẩn hóa mới của XBOSS_CHUANHOA (M101 §6.2 bước 8–11):
+ * xrefPolicy, hatchMap, layoutPolicy. Bước 8 (style map) dùng lại khối styleMap đã có từ v5 nên
+ * KHÔNG khai trùng. Cả 3 khối mới `enabled: false` → chuẩn hóa bằng v7 cho kết quả y hệt v6.
  */
 export function getCurrentRulePack(): CadRulePack {
-  return rulePackV3;
+  return RULE_PACK_HIEN_HANH;
 }
 
 /** ETag mạnh theo hash nội dung — plugin cache cục bộ và hỏi lại bằng `If-None-Match`. */
 export function getRulePackEtag(pack: CadRulePack = getCurrentRulePack()): string {
   const hash = createHash("sha256").update(JSON.stringify(pack)).digest("hex").slice(0, 32);
   return `"${pack.version}-${hash}"`;
+}
+
+/**
+ * ETag cho bản rule pack đã gán mã BOQ THEO DỰ ÁN (M101 PR4).
+ *
+ * Tách khỏi `getRulePackEtag` thay vì băm luôn đối tượng đã gán: giữ nguyên từng byte ETag của
+ * đường toàn cục (plugin đang cache theo nó — đổi là cả công ty tải lại vô cớ), đồng thời nhét
+ * `projectId` vào để hai dự án tình cờ có map giống nhau vẫn không dùng lẫn bản cache của nhau.
+ * `map` phải được sắp thứ tự ổn định (`layMapBoqTheoDuAn` sắp theo `takeoff_item_id`).
+ */
+export function getRulePackEtagChoDuAn(
+  pack: { version: string },
+  projectId: number,
+  map: readonly { takeoffItemId: string; boqCode: string }[],
+): string {
+  const hash = createHash("sha256")
+    .update(JSON.stringify([pack.version, projectId, map]))
+    .digest("hex")
+    .slice(0, 32);
+  return `"${pack.version}-p${projectId}-${hash}"`;
 }
 
 /** So `If-None-Match` (có thể là danh sách, có thể có tiền tố W/) với ETag hiện tại. */

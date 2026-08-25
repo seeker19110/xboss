@@ -224,8 +224,25 @@ test("rule-pack nhận Bearer cad thật qua route handler (200 + đủ 8 field)
     "flattenPolicy",
     "takeoff",
     "inspectionPolicy",
+    // v4 (M100 §11) + v5 (M101 §6.1/§6.2) — plugin phải nhận được cả tham số vẽ lẫn bộ style chuẩn.
+    "drawTools",
+    "sheetSetup",
+    "styleMap",
   ]) {
     assert.ok(field in body, `Thiếu field ${field}`);
+  }
+  // Phép kiểm mới của v5 đi qua đường dây thật và vẫn TẮT (M101 AC(a)).
+  const ip = body.inspectionPolicy as Record<string, { enabled: boolean }>;
+  for (const phep of [
+    "overlapSameSystem",
+    "clash2d",
+    "titleblockFields",
+    "viewportScale",
+    "styleDeviation",
+    "labelSizeMismatch",
+    "strayObjects",
+  ]) {
+    assert.equal(ip[phep]?.enabled, false, `Phép kiểm ${phep} phải tới plugin ở trạng thái tắt`);
   }
   // 401 với token rác/thu hồi đã phủ ở mức lib (getCadTokenUser → null, ca AC7 phía trên) —
   // không gọi handler với header sai vì nhánh đó rơi về getCurrentUser() (cookies() ngoài

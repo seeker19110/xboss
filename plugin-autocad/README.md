@@ -6,26 +6,72 @@ quy tắc tải từ XBoss dưới dạng **rule pack** có version (không nhú
 
 ## Cấu trúc
 
-| Project           | Nền              | Vai trò                                                                                                                                                                                 |
-| ----------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `XBoss.Cad.Core`  | `net8.0`         | Toàn bộ quy tắc THUẦN: matcher token-boundary, ánh xạ layer, giải mã font TCVN3/VNI, kiểm tra, gộp khối lượng, ghi Excel (ClosedXML) — **không tham chiếu AutoCAD**, test trên CI Linux |
-| `XBoss.Cad.Tests` | `net8.0`         | xunit — nạp rule pack THẬT từ `lib/ky-thuat/cad/rule-packs/v2.json` của repo (chống trôi 2 tầng)                                                                                        |
-| `XBoss.Cad.Acad`  | `net8.0-windows` | Adapter AutoCAD: lệnh `XBOSS_*`, đo hình học, áp thay đổi trong 1 nhóm UNDO — **chỉ build trên Windows có ObjectARX SDK 2026**                                                          |
+| Project              | Nền               | Vai trò                                                                                                                                                                                                                  |
+| -------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `XBoss.Cad.Core`     | `net8.0`          | Toàn bộ quy tắc THUẦN: matcher token-boundary, ánh xạ layer, giải mã font TCVN3/VNI, kiểm tra, gộp khối lượng, ghi Excel (ClosedXML) — **không tham chiếu AutoCAD**, test trên CI Linux                                  |
+| `XBoss.Cad.Tests`    | `net8.0`          | xunit — nạp rule pack THẬT từ `lib/ky-thuat/cad/rule-packs/v2.json` của repo (chống trôi 2 tầng)                                                                                                                         |
+| `XBoss.Cad.Acad`     | `net10.0-windows` | Adapter AutoCAD: lệnh `XBOSS_*`, đo hình học, áp thay đổi trong 1 nhóm UNDO — **chỉ build trên Windows có ObjectARX SDK 2026**                                                                                           |
+| `XBoss.Cad.AcadShim` | `net8.0`          | **Cổng CI**: biên dịch thử toàn bộ mã `XBoss.Cad.Acad` trên Linux bằng stub API AutoCAD — bắt lỗi cú pháp/sai chữ ký ngay ở PR. KHÔNG phải AutoCAD, KHÔNG thay verify tay ([README riêng](XBoss.Cad.AcadShim/README.md)) |
 
 ## Lệnh trong AutoCAD
 
-| Lệnh               | Chức năng                                                                                                                                                                                                                                                                                                           |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `XBOSS_LOGIN`      | Ghép thiết bị với server XBoss (M99 PR2): xin mã → duyệt trên trang web `/engineering/thiet-bi-cad` → nhận token (cất **Windows Credential Manager**, hạn 90 ngày, thu hồi được trên web) → tự tải rule pack mới nhất (ETag)                                                                                        |
-| `XBOSS_RULEPACK`   | Nạp tệp rule pack JSON bằng tay (đường dự phòng offline) — cache `%APPDATA%\XBoss\rule-pack.json`. Chưa có rule pack (qua LOGIN hoặc lệnh này) thì mọi lệnh khác từ chối chạy                                                                                                                                       |
-| `XBOSS_KIEMTRA`    | Chỉ kiểm, không sửa — 9 phép kiểm: layer sai chuẩn, lệch Z, polyline hở/gần kín, font TCVN3/VNI, lineweight lệch CTB, dim override, rác hình học, layer rỗng, block nặc danh — khoanh tròn vị trí lỗi trên layer tạm `XBOSS_KIEMTRA_MARK` (không in, tự dọn) + báo cáo JSON `<tệp>.dwg.xboss-kiemtra.json` cạnh DWG |
-| `XBOSS_CHUANHOA`   | Pipeline thứ tự cố định: Audit → layer mapping → font (giải mã TCVN3/VNI **và đổi font kiểu chữ sang `fontMap.targetFont`** — rule pack v3) → flatten Z=0 → overkill → purge → lineweight/CTB + gỡ dim override. Xem trước diff, xác nhận, **1 lần UNDO hoàn tác toàn bộ**; báo cáo JSON ghi cạnh DWG               |
-| `XBOSS_BOCKL`      | Bóc khối lượng theo rule pack (`takeoff`): đo chiều dài/diện tích/đếm block theo layer mapping, quy đổi INSUNITS, tô màu vùng đã bóc + XData chống bóc trùng                                                                                                                                                        |
-| `XBOSS_BOCKL_XOA`  | Gỡ đánh dấu bóc (trả đúng màu trước khi bóc, xoá XData) — toàn bộ hoặc theo vùng chọn                                                                                                                                                                                                                               |
-| `XBOSS_BOCKL_XUAT` | Xuất Excel **đúng mẫu công ty** (`attachments/MAU-KHOI-LUONG-BOQ.xlsx`, sheet `Data-BOQ`, cột A–K + công thức H/J/K sống, tổng nhóm hệ + TỔNG CỘNG bằng `SUBTOTAL` sống) từ trạng thái bóc đang lưu trong DWG — đóng/mở lại bản vẽ vẫn xuất được; kèm sidecar JSON máy-đọc-được cạnh tệp Excel                      |
-| `XBOSS_BATCH`      | Xử lý hàng loạt cả thư mục `.dwg` qua side database (không mở lên editor): chế độ chỉ-kiểm (mặc định) hoặc chuẩn hóa — **bản gốc giữ nguyên**, kết quả vào thư mục con `da-chuan-hoa/`, tệp lỗi bỏ qua, nhật ký `xboss-batch-log.txt` + báo cáo JSON từng tệp                                                       |
+| Lệnh               | Chức năng                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `XBOSS_LOGIN`      | Ghép thiết bị với server XBoss (M99 PR2): xin mã → duyệt trên trang web `/engineering/thiet-bi-cad` → nhận token (cất **Windows Credential Manager**, hạn 90 ngày, thu hồi được trên web) → tự tải rule pack mới nhất (ETag)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `XBOSS_RULEPACK`   | Nạp tệp rule pack JSON bằng tay (đường dự phòng offline) — cache `%APPDATA%\XBoss\rule-pack.json`. Chưa có rule pack (qua LOGIN hoặc lệnh này) thì mọi lệnh khác từ chối chạy                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `XBOSS_KIEMTRA`    | Chỉ kiểm, không sửa — 9 phép kiểm: layer sai chuẩn, lệch Z, polyline hở/gần kín, font TCVN3/VNI, lineweight lệch CTB, dim override, rác hình học, layer rỗng, block nặc danh — khoanh tròn vị trí lỗi trên layer tạm `XBOSS_KIEMTRA_MARK` (không in, tự dọn) + báo cáo JSON `<tệp>.dwg.xboss-kiemtra.json` cạnh DWG                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `XBOSS_CHUANHOA`   | Pipeline thứ tự cố định 11 bước: Audit → layer mapping → font (giải mã TCVN3/VNI **và đổi font kiểu chữ sang `fontMap.targetFont`** — rule pack v3) → flatten Z=0 → overkill → purge → lineweight/CTB + gỡ dim override → **style map (text/dim về bộ chuẩn `styleMap`, KHÔNG phá liên kết đo của dimension) → xref (báo đứt đường dẫn, tương đối hóa; chỉ bind xref khai trong `bindMatchAny`) → hatch (mẫu + tỉ lệ theo layer, hatch solid giữ nguyên) → layout (xóa layout rỗng, đổi tên theo `namePattern`)** — 4 bước cuối là rule pack v7 và **đều mặc định TẮT**. Xem trước diff, xác nhận, **1 lần UNDO hoàn tác toàn bộ**; báo cáo JSON ghi cạnh DWG                                                                                      |
+| `XBOSS_BOCKL`      | Bóc khối lượng theo rule pack (`takeoff`): đo chiều dài/diện tích/đếm block theo layer mapping, quy đổi INSUNITS, tô màu vùng đã bóc + XData chống bóc trùng. **v6 (M101 PR3):** hỏi thêm "bóc theo vùng?" — chọn polyline ranh giới + đặt tên vùng thì tuyến cắt ranh giới được cắt đúng tại giao điểm (bản thân đường ranh giới không bị tính)                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `XBOSS_BOCKL_XOA`  | Gỡ đánh dấu bóc (trả đúng màu trước khi bóc, xoá XData) — toàn bộ hoặc theo vùng chọn                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `XBOSS_BOCKL_XUAT` | Xuất Excel **đúng mẫu công ty** (`attachments/MAU-KHOI-LUONG-BOQ.xlsx`, sheet `Data-BOQ`, cột A–K + công thức H/J/K sống, tổng nhóm hệ + TỔNG CỘNG bằng `SUBTOTAL` sống) từ trạng thái bóc đang lưu trong DWG — đóng/mở lại bản vẽ vẫn xuất được; kèm sidecar JSON máy-đọc-được cạnh tệp Excel. **v6:** khi kết quả có size/vùng/hệ số quy đổi thì cộng thêm cột L–Q (Vùng, Size, Nguồn size, Mã item, Hệ số quy đổi, KL quy đổi) + sheet `Tong-hop-vung` — cột A–K không đổi một ô nào. **M101 PR4:** hỏi thêm "kéo KL BOQ hợp đồng từ máy chủ?" (mặc định Không) — chọn Có thì dựng sheet phụ `Doi-chieu` đặt KL hợp đồng cạnh KL bóc, chênh lệch/% là công thức sống; chưa `XBOSS_LOGIN`/mất mạng chỉ cảnh báo rồi xuất bình thường, KHÔNG chặn |
+| `XBOSS_BATCH`      | Xử lý hàng loạt cả thư mục `.dwg` qua side database (không mở lên editor): chế độ chỉ-kiểm (mặc định) hoặc chuẩn hóa — **bản gốc giữ nguyên**, kết quả vào thư mục con `da-chuan-hoa/`, tệp lỗi bỏ qua, nhật ký `xboss-batch-log.txt` + báo cáo JSON từng tệp                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 | `XBOSS_UPLOAD` | Gửi DWG đã lưu + DXF sidecar + báo cáo chuẩn hóa + version rule pack lên server (M99 PR5): server kiểm định lại DXF + rule pack — đạt thì tạo `drawing_revision` trạng thái `submitted`, fail thì hiện đủ lỗi trong AutoCAD, KHÔNG tạo revision. Idempotent theo hash DWG (gửi lại cùng tệp không tạo bản đôi) |
+
+### Bộ lệnh VẼ shop drawing (M100 — 14 lệnh)
+
+Vẽ đè lên bản thiết kế đã chuẩn hóa; mọi nét/block sinh ra **đã đúng chuẩn ngay từ đầu** (layer theo
+`layerMap`, block theo thư viện có version, size nằm sẵn trong XData `XBOSS_VE`) nên `XBOSS_KIEMTRA`
+pass ngay và `XBOSS_BOCKL` bóc không sót. Cần **rule pack từ v4** (khối `drawTools`) và — với các
+lệnh chèn block — thư viện block đã tải (`XBOSS_LOGIN` hoặc `XBOSS_VE_THUVIEN`).
+
+| Lệnh               | Chức năng                                                                                                                                                                                                                                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `XBOSS_VE_NEN`     | Chuẩn bị nền: khóa + làm mờ (`drawTools.baseFadePct`) mọi layer hiện có, tạo sẵn layer đích của hệ (+ layer nét biên) đúng màu/lineweight; chạy lại để **hoàn nguyên** (trạng thái cũ cất trong chính bản vẽ). Không sửa/xóa đối tượng nền                                                                                           |
+| `XBOSS_VE`         | Vẽ **tuyến tim** như PLINE (có Cung/HoànTác/Đóng): chọn hệ → loại tuyến → size trong danh mục (nhập ngoài danh mục được, đánh dấu `custom`) → độ dốc nếu tuyến bắt buộc; kết thúc: tim đúng layer + XData `[hệ, item, size, version, custom?, slope?]`, `edgeStyle=double` sinh 2 nét biên trên layer `…EDGE` (không bao giờ bị bóc) |
+| `XBOSS_VE_NHAN`    | Bấm tuyến → ghi nhãn size (+ `i=…%`) **lấy từ XData, không gõ tay**, cao chữ quy theo tỉ lệ in; tuyến có độ dốc thì chèn kèm block mũi tên `slope-arrow` theo chiều vẽ tuyến — thư viện chưa có block đó thì **chỉ ghi chữ** (không tự vẽ ký hiệu thay thế)                                                                          |
+| `XBOSS_VE_PHUKIEN` | Chèn phụ kiện (co, tê, giảm, van, miệng gió…) bám tuyến tim: tự xoay theo tiếp tuyến, scale theo size khi manifest khai `scaleBySize`, đúng layer tuyến                                                                                                                                                                              |
+| `XBOSS_VE_THIETBI` | Chèn thiết bị có attribute (`TAG` bắt buộc + `MODEL`/`SIZE`), layer chọn sao cho `XBOSS_BOCKL` đếm được; cảnh báo ngay khi tên block lệch `blockNameMatchAny` của rule pack                                                                                                                                                          |
+| `XBOSS_VE_THUVIEN` | Nạp thư viện block: tải lại từ server hoặc nạp tệp tay (`manifest.json` + `.dwg` cạnh nhau) — đường dự phòng offline như `XBOSS_RULEPACK`; luôn kiểm `sha256` trước khi dùng                                                                                                                                                         |
+| `XBOSS_VE_DOI`     | **Đổi hệ/loại/size** đoạn đã vẽ: đổi layer + XData, **xóa và dựng lại nét biên** theo bề rộng mới, cập nhật nhãn (xóa mũi tên dốc nếu tuyến mới không có độ dốc), và **gỡ đánh dấu bóc** của đúng các đoạn đó kèm cảnh báo "đổi xong phải bóc lại". 1 UNDO trả nguyên trạng                                                          |
+| `XBOSS_VE_TRANGIN` | Trang in chuẩn công ty: layout + page setup (`sheetSetup.plotter`, khổ, CTB) + viewport **đúng tỉ lệ và khóa** + VP-freeze layer ngoài hệ + khung tên từ thư viện đã điền attribute. Vùng in nhận **2 điểm hoặc một polyline ranh giới kín** (lấy hình bao)                                                                          |
+| `XBOSS_VE_MATCAT`  | Mặt cắt bán tự động: kẻ tuyến cắt → dựng ký hiệu đúng loại/size từ XData, đúng khoảng cách ngang thật, tên A-A tự đánh; **cao độ nhập tay** (bản vẽ 2D không chứa cao độ thật — plugin không bịa)                                                                                                                                    |
+| `XBOSS_VE_GIADO`   | Rải giá đỡ dọc tuyến theo `supportSpacingMm` (mặc định **không bước nào vượt chuẩn**), xoay vuông góc tuyến, luôn có ở đầu/cuối và tại **phụ kiện nặng khai trong `drawTools.heavyFittingIds`** (rule pack v7; pack cũ thì lệnh hỏi kỹ sư). Chạy lại chỉ bổ sung chỗ thiếu                                                           |
+| `XBOSS_VE_LOCHO`   | Sleeve/lỗ chờ xuyên kết cấu: size = size ống + `sleeveClearanceMm`, bấm điểm hoặc dò giao tuyến × layer kết cấu; chế độ `XUATBANG` xuất **bảng builder's work** (Table trong bản vẽ + Excel riêng, không đụng mẫu BOQ)                                                                                                               |
+| `XBOSS_VE_TAG`     | Đánh tag tuần tự theo `tagPattern`, quét **trùng/nhảy số**, đánh lại giữ nguyên tag đã khóa; tầng hỏi một lần và nhớ trong chính bản vẽ                                                                                                                                                                                              |
+| `XBOSS_VE_THONGKE` | Table trong bản vẽ: bảng thiết bị (từ attribute) hoặc bảng khối lượng theo hệ (từ trạng thái bóc `XBOSS_BOCKL`, chỉ ĐỌC); chạy lại **cập nhật bảng cũ tại chỗ**, không sinh bảng đôi                                                                                                                                                 |
+| `XBOSS_VE_BAOCAO`  | **Báo cáo phiên vẽ** (M100 §14, chỉ đọc): số tuyến/block theo hệ, size ngoài danh mục đã dùng, các lần đụng độ định nghĩa block + lựa chọn của kỹ sư, version rule pack và thư viện; in ra dòng lệnh + ghi `<tệp>.dwg.xboss-ve.json` cạnh DWG                                                                                        |
+
+> **Rule pack v7 (M100 PR5)** thêm 2 item takeoff đếm được — `support-hanger` (giá đỡ) và
+> `sleeve-opening` (lỗ chờ) khớp theo TÊN BLOCK — nên `XBOSS_BOCKL` đếm được hai hạng mục trước đây
+> phải ước tay (AC12/§6.8); và khóa `drawTools.heavyFittingIds` khai **phụ kiện nào là nặng** để
+> `XBOSS_VE_GIADO` khỏi hỏi kỹ sư mỗi lần chạy. Bản vẽ không có block giá đỡ/sleeve thì bóc bằng v7
+> ra kết quả **y hệt v6** (2 item mới nằm cuối danh sách, khớp first-match).
+
+> **Rule pack v5 (M101 PR1)** khai thêm 7 phép kiểm cho `XBOSS_KIEMTRA` (chồng lấn cùng hệ, giao cắt
+> khác hệ trên mặt bằng, khung tên thiếu trường, viewport chưa khóa/tỉ lệ lạ, text-dim style lệch,
+> nhãn size lệch XData, đối tượng ngoài khung) + khối `styleMap`. Toàn bộ **mặc định TẮT** và Adapter
+> chưa cung cấp dữ liệu đầu vào cho chúng, nên hành vi lệnh hiện vẫn đúng 9 phép kiểm ở trên; PR sau
+> của M101 mới nối dữ liệu và bật dần theo dự án.
+
+> **Rule pack v6 (M101 PR3)** khai thêm cho mỗi `takeoff.items[]` 6 khóa TÙY CHỌN của bóc tách nâng
+> cao: `groupBySize` (tách dòng theo size — nguồn ưu tiên XData `XBOSS_VE` của bộ lệnh vẽ, dự phòng
+> là nhãn gần tuyến qua `sizeFromNearbyText`), `wastagePct`/`perCountAdd` (hệ số quy đổi hao hụt/phụ
+> kiện — hiện ở **cột KL QUY ĐỔI riêng**, không bao giờ cộng vào KL đo), `derivedFrom` + `formula`
+> (item cách nhiệt tính từ size đã tách). **Tệp v6 không bật khóa nào** nên bóc bằng v6 ra kết quả y
+> hệt v5; QS/kỹ sư trưởng chốt hệ số theo dự án bằng cách phát hành version kế tiếp. Đoạn tuyến chưa
+> xác định được size **không bị đoán**: nó nằm ở dòng "(chưa có size)" và phần cách nhiệt tương ứng
+> được báo là "còn X m chưa tính".
 
 ## Build
 
@@ -36,6 +82,23 @@ dotnet test plugin-autocad/XBoss.Cad.Tests/XBoss.Cad.Tests.csproj
 ```
 
 Test nạp rule pack thật từ repo nên phải chạy bên trong repo XBoss.
+
+### Biên dịch thử Adapter bằng stub API (mọi HĐH — CI cũng chạy)
+
+```bash
+dotnet build plugin-autocad/XBoss.Cad.AcadShim/XBoss.Cad.AcadShim.csproj -c Release
+```
+
+Biên dịch **toàn bộ** mã `XBoss.Cad.Acad` bằng bộ khai báo giả API AutoCAD, **không** cần
+Windows/ObjectARX. Chạy lệnh này **trước khi push** mọi thay đổi chạm Adapter — nó bắt được lỗi
+cú pháp và sai chữ ký API, hai lớp lỗi trước đây chỉ lộ ra khi đã ra tới máy Windows có license
+(đã cháy 2 lần thật — xem `PROGRESS.md`).
+
+⚠ **Không thay được verify tay trên máy có AutoCAD**: stub không có hành vi, nên cổng này không
+kiểm logic/hình học/lỗi lúc chạy. Adapter dùng API mới mà stub chưa khai → bổ sung vào
+`XBoss.Cad.AcadShim/AcadStub.cs` theo hướng dẫn trong
+[`XBoss.Cad.AcadShim/README.md`](XBoss.Cad.AcadShim/README.md) (đối chiếu tài liệu ObjectARX,
+đừng đoán theo lỗi biên dịch — stub sai chữ ký thì cổng xanh giả).
 
 ### Adapter (Windows + ObjectARX SDK 2026 + .NET 10 SDK)
 
@@ -94,10 +157,13 @@ Gỡ cài đặt = xoá thư mục `XBoss.bundle` (M99 §17).
 
 ## Luồng làm việc chuẩn của kỹ sư
 
-1. `XBOSS_LOGIN` (lần đầu / khi token hết hạn) — ghép thiết bị + tự tải rule pack. Không có mạng thì dùng `XBOSS_RULEPACK` nạp tệp tay.
+1. `XBOSS_LOGIN` (lần đầu / khi token hết hạn) — ghép thiết bị + tự tải rule pack **và thư viện block**. Không có mạng thì dùng `XBOSS_RULEPACK` / `XBOSS_VE_THUVIEN` nạp tệp tay.
 2. Mở bản vẽ nhận từ CĐT/TVTK → `XBOSS_KIEMTRA` xem mức lệch chuẩn.
 3. `XBOSS_CHUANHOA` → kiểm tra kết quả (sai thì UNDO 1 lần) → QSAVE.
-4. Làm shop drawing như bình thường.
+4. Làm shop drawing bằng bộ lệnh vẽ: `XBOSS_VE_NEN` → `XBOSS_VE` → `XBOSS_VE_PHUKIEN` /
+   `XBOSS_VE_THIETBI` → `XBOSS_VE_NHAN` → (`XBOSS_VE_GIADO`, `XBOSS_VE_LOCHO`, `XBOSS_VE_TAG`,
+   `XBOSS_VE_THONGKE` khi cần) → `XBOSS_VE_MATCAT` / `XBOSS_VE_TRANGIN` → `XBOSS_VE_NEN` lần nữa để
+   hoàn nguyên nền. Sửa hệ/size đoạn đã vẽ bằng `XBOSS_VE_DOI` (không sửa tay), soát bằng `XBOSS_VE_BAOCAO`.
 5. `XBOSS_BOCKL` trên bản vẽ shop đã duyệt → `XBOSS_BOCKL_XUAT` → gửi tệp Excel cho QS
    (QS điền cột F — KL BOQ hợp đồng; cột H/J/K tự tính trạng thái CHẶN/OK theo mẫu công ty).
 

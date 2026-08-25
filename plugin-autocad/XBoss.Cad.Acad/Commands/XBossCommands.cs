@@ -3,11 +3,14 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Core.Api;
 using XBoss.Cad.Core.Excel;
+using XBoss.Cad.Core.Geometry;
 using XBoss.Cad.Core.Inspection;
 using XBoss.Cad.Core.Reporting;
 using XBoss.Cad.Core.RulePack;
 using XBoss.Cad.Core.Takeoff;
+using XBoss.Cad.Core.Zoning;
 using AcadApp = Autodesk.AutoCAD.ApplicationServices.Application;
 
 namespace XBoss.Cad.Acad.Commands;
@@ -179,18 +182,31 @@ public sealed class XBossCommands
         // AUDIT chạy trước, ngoài transaction (là lệnh AutoCAD, không phải API Database).
         pipeline.Buoc1Audit(ed);
         using (var khoa = doc.LockDocument())
-        using (var tr = db.TransactionManager.StartTransaction())
         {
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                try
+                {
+                    pipeline.Run(db, tr);
+                    tr.Commit();
+                }
+                catch (Autodesk.AutoCAD.Runtime.Exception e)
+                {
+                    tr.Abort(); // rollback sạch — guardrail M99 §2
+                    ed.WriteMessage($"\n[XBoss] LỖI giữa chừng — đã rollback toàn bộ, bản vẽ nguyên trạng: {e.Message}\n");
+                    return;
+                }
+            }
+            // Phần bind xref (bước 9) + dọn layout (bước 11) dùng API cấp TÀI LIỆU nên không chạy
+            // được trong transaction — làm ngay sau khi commit, vẫn trong cùng lệnh này nên UNDO
+            // một lần vẫn trả bản vẽ về nguyên trạng (đúng cơ chế của bước 1 AUDIT).
             try
             {
-                pipeline.Run(db, tr);
-                tr.Commit();
+                pipeline.ApDungCapTaiLieu(db, coTaiLieu: true);
             }
             catch (Autodesk.AutoCAD.Runtime.Exception e)
             {
-                tr.Abort(); // rollback sạch — guardrail M99 §2
-                ed.WriteMessage($"\n[XBoss] LỖI giữa chừng — đã rollback toàn bộ, bản vẽ nguyên trạng: {e.Message}\n");
-                return;
+                ed.WriteMessage($"\n[XBoss] ⚠ Bước 9/11 (bind xref, dọn layout) lỗi: {e.Message} — các bước trước đã áp xong.\n");
             }
         }
 
@@ -235,6 +251,14 @@ public sealed class XBossCommands
         var traLoi = ed.GetKeywords(hoi);
         if (traLoi.Status != PromptStatus.OK) return;
 
+        // M101 §6.3: tùy chọn bóc theo vùng (tầng/zone) — mặc định KHÔNG, giữ nguyên thói quen M99.
+        var hoiVung = new PromptKeywordOptions("\n[XBoss] Bóc theo vùng (tầng/zone)?") { AllowNone = false };
+        hoiVung.Keywords.Add("Khong", "Khong", "Không chia vùng");
+        hoiVung.Keywords.Add("ChonRanhGioi", "ChonRanhGioi", "Chọn polyline ranh giới rồi đặt tên vùng");
+        hoiVung.Keywords.Default = "Khong";
+        var traLoiVung = ed.GetKeywords(hoiVung);
+        if (traLoiVung.Status != PromptStatus.OK) return;
+
         using var khoa = doc.LockDocument();
         TakeoffResult ketQua;
         using (var tr = db.TransactionManager.StartTransaction())
@@ -251,7 +275,12 @@ public sealed class XBossCommands
                 ids = TakeoffScanner.ModelSpaceIds(db, tr).ToList();
             }
 
-            var (doiTuong, xrefSkipped) = TakeoffScanner.Scan(tr, ids, pack.Takeoff.XdataAppName);
+            var chonVung = traLoiVung.StringResult == "ChonRanhGioi"
+                ? VungChonService.Hoi(ed, tr)
+                : new VungChonService.KetQuaChonVung([], []);
+            var boiCanh = TakeoffScanner.XayBoiCanh(db, tr, pack, chonVung);
+
+            var (doiTuong, xrefSkipped) = TakeoffScanner.Scan(tr, ids, pack.Takeoff.XdataAppName, boiCanh);
             var may = new TakeoffCalculator(pack.Takeoff, pack.Version);
             ketQua = may.Compute(doiTuong, (int)db.Insunits, xrefSkipped);
             tr.Commit();
@@ -268,7 +297,7 @@ public sealed class XBossCommands
         }
 
         var xacNhan = new PromptKeywordOptions(
-            $"\n[XBoss] Đánh dấu {ketQua.Lines.Sum(l => l.ObjectCount)} đối tượng đã bóc (tô màu ACI {pack.Takeoff.MarkColorAci} + XData)?")
+            $"\n[XBoss] Đánh dấu {SoDoiTuongDaBoc(ketQua)} đối tượng đã bóc (tô màu ACI {pack.Takeoff.MarkColorAci} + XData)?")
         { AllowNone = false };
         xacNhan.Keywords.Add("DongY", "DongY", "Đồng ý");
         xacNhan.Keywords.Add("Khong", "Khong", "Không");
@@ -285,13 +314,18 @@ public sealed class XBossCommands
         {
             MarkService.EnsureRegApp(db, tr, pack.Takeoff.XdataAppName);
             var ngay = HomNayIso();
+            // Tên vùng ghi kèm XData (M101 §6.3) để XBOSS_BOCKL_XUAT dựng lại bảng theo vùng.
+            var vungTheoHandle = TakeoffZoning.VungTheoHandle(ketQua);
             foreach (var line in ketQua.Lines)
             {
+                if (line.LaDanXuat) continue; // dòng cách nhiệt được TÍNH RA, không có đối tượng riêng để đánh dấu
                 foreach (var handle in line.Handles)
                 {
                     if (!db.TryGetObjectId(new Handle(Convert.ToInt64(handle, 16)), out var id)) continue;
                     if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ent) continue;
-                    MarkService.Mark(ent, pack.Takeoff.XdataAppName, line.Item.Id, pack.Version, ngay, pack.Takeoff.MarkColorAci);
+                    MarkService.Mark(
+                        ent, pack.Takeoff.XdataAppName, line.Item.Id, pack.Version, ngay,
+                        pack.Takeoff.MarkColorAci, vungTheoHandle.GetValueOrDefault(handle, ""));
                 }
             }
             tr.Commit();
@@ -352,11 +386,14 @@ public sealed class XBossCommands
         var db = doc.Database;
 
         // FR16: dựng lại kết quả từ XData đang sống trong DWG — không phụ thuộc RAM phiên trước.
-        var daGan = new List<(MeasuredObject, string)>();
+        // Đọc TẠI CHỖ (không qua TakeoffScanner.DocDaGan) vì ở đây còn cần lấy TÊN VÙNG ghi trong
+        // XData lúc bóc — DocDaGan chỉ trả đối tượng + itemId, dùng cho XBOSS_VE_THONGKE.
+        var daGan = new List<(MeasuredObject DoiTuong, string ItemId)>();
         using (var tr = db.TransactionManager.StartTransaction())
         {
             var (doiTuong, _) = TakeoffScanner.Scan(
-                tr, TakeoffScanner.ModelSpaceIds(db, tr).ToList(), pack.Takeoff.XdataAppName);
+                tr, TakeoffScanner.ModelSpaceIds(db, tr).ToList(), pack.Takeoff.XdataAppName,
+                TakeoffScanner.XayBoiCanh(db, tr, pack, new VungChonService.KetQuaChonVung([], [])));
             var theoHandle = doiTuong.Where(o => o.AlreadyMarked).ToDictionary(o => o.Handle);
             var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
             foreach (ObjectId id in ms)
@@ -364,7 +401,10 @@ public sealed class XBossCommands
                 if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
                 if (MarkService.ReadMark(ent, pack.Takeoff.XdataAppName) is not { } mark) continue;
                 if (theoHandle.TryGetValue(ent.Handle.ToString(), out var obj))
-                    daGan.Add((obj, mark.ItemId));
+                {
+                    // Vùng lấy lại từ XData lúc bóc (ranh giới có thể đã bị xoá khỏi bản vẽ).
+                    daGan.Add((obj with { Vung = mark.Vung }, mark.ItemId));
+                }
             }
             tr.Commit();
         }
@@ -384,7 +424,14 @@ public sealed class XBossCommands
         if (tenDuAn is null) return;
         var goiThau = HoiChuoi(ed, "Gói thầu", luu.GoiThau);
         if (goiThau is null) return;
-        ExcelMetaStore.Ghi(new ExcelMetaStore.MetaLuu(tenDuAn, goiThau));
+
+        // M101 PR4 — tùy chọn kéo KL BOQ hợp đồng từ máy chủ để dựng sheet phụ "Doi-chieu".
+        // Mặc định KHÔNG kéo: chỉ Enter là hành vi y hệt trước PR4. Mọi trục trặc (chưa LOGIN,
+        // mất mạng, token hết hạn, máy chủ lỗi) chỉ CẢNH BÁO rồi xuất Excel như thường — không
+        // bao giờ chặn việc xuất bảng bóc.
+        var duAnId = luu.DuAnId;
+        var doiChieu = HoiDoiChieuBoq(ed, ref duAnId);
+        ExcelMetaStore.Ghi(new ExcelMetaStore.MetaLuu(tenDuAn, goiThau, duAnId));
 
         var tenBanVe = Path.GetFileName(db.Filename);
         var goiY = Path.ChangeExtension(tenBanVe, null) + "-boc-khoi-luong.xlsx";
@@ -408,7 +455,7 @@ public sealed class XBossCommands
         try
         {
             using var f = File.Create(dlg.Filename);
-            BoqExcelWriter.Write(ketQua, meta, f);
+            BoqExcelWriter.Write(ketQua, meta, f, doiChieu);
         }
         catch (IOException e)
         {
@@ -417,19 +464,39 @@ public sealed class XBossCommands
         }
         ed.WriteMessage($"\n[XBoss] Đã xuất Excel đúng mẫu công ty: {dlg.Filename}\n");
         ed.WriteMessage("[XBoss] Cột G = khối lượng bóc từ bản vẽ; QS điền cột F (KL BOQ hợp đồng) — cột H/J/K tự tính.\n");
+        if (doiChieu is { Dong.Count: > 0 })
+            ed.WriteMessage(
+                $"[XBoss] Sheet \"{BoqExcelWriter.SheetDoiChieu}\": {doiChieu.Dong.Count} hạng mục có KL BOQ hợp đồng " +
+                $"(dự án #{doiChieu.ProjectId}, chụp lúc {doiChieu.ChupLuc}) — chênh lệch là công thức sống.\n");
 
-        // Sidecar JSON máy-đọc-được cạnh tệp Excel — PR5 gửi kèm khi upload, kiểm chéo được với Excel.
+        // Sidecar JSON máy-đọc-được cạnh tệp Excel — kiểm chéo được với Excel bằng mắt/công cụ khác.
+        var jsonNoiDung = TakeoffJsonReport.TuKetQua(ketQua, meta).ToJson();
         var duongDanJson = Path.ChangeExtension(dlg.Filename, ".json");
         try
         {
-            File.WriteAllText(duongDanJson, TakeoffJsonReport.TuKetQua(ketQua, meta).ToJson());
+            File.WriteAllText(duongDanJson, jsonNoiDung);
             ed.WriteMessage($"[XBoss] Sidecar JSON: {duongDanJson}\n");
         }
         catch (IOException e)
         {
             ed.WriteMessage($"[XBoss] ⚠ Không ghi được sidecar JSON: {e.Message}\n");
         }
+
+        // M101 §6.4 (PR5): CÙNG NỘI DUNG ghi thêm cạnh chính DWG với tên cố định — XBOSS_UPLOAD
+        // tự tìm theo tên này (Excel có thể lưu ở bất kỳ đâu do kỹ sư chọn, không đoán được).
+        try
+        {
+            File.WriteAllText(db.Filename + TenSidecarBocKL, jsonNoiDung);
+        }
+        catch (IOException e)
+        {
+            ed.WriteMessage($"[XBoss] ⚠ Không ghi được sidecar KL cạnh DWG (XBOSS_UPLOAD sẽ không gửi kèm): {e.Message}\n");
+        }
     }
+
+    /// <summary>Tên hậu tố sidecar KL cạnh DWG (M101 §6.4) — XBOSS_UPLOAD đọc theo tên cố định
+    /// này, độc lập với nơi kỹ sư lưu Excel/JSON qua hộp thoại của XBOSS_BOCKL_XUAT.</summary>
+    internal const string TenSidecarBocKL = ".xboss-takeoff.json";
 
     // ===== XBOSS_BATCH =====
 
@@ -442,10 +509,12 @@ public sealed class XBossCommands
         var hoi = new PromptKeywordOptions("\n[XBoss] Xử lý hàng loạt cả thư mục — chế độ nào?") { AllowNone = false };
         hoi.Keywords.Add("KiemTra", "KiemTra", "Chỉ kiểm (an toàn, không sửa)");
         hoi.Keywords.Add("ChuanHoa", "ChuanHoa", "Chuẩn hóa (bản gốc giữ nguyên, kết quả vào thư mục con)");
+        hoi.Keywords.Add("BocKL", "BocKL", "Bóc khối lượng hàng loạt (1 Excel tổng, bản gốc giữ nguyên)");
         hoi.Keywords.Default = "KiemTra";
         var traLoi = ed.GetKeywords(hoi);
         if (traLoi.Status != PromptStatus.OK) return;
         var chuanHoa = traLoi.StringResult == "ChuanHoa";
+        var bocKl = traLoi.StringResult == "BocKL";
 
         using var chonThuMuc = new System.Windows.Forms.FolderBrowserDialog
         {
@@ -466,6 +535,12 @@ public sealed class XBossCommands
         if (trungTepMo > 0)
             ed.WriteMessage($"\n[XBoss] ⚠ {trungTepMo} tệp trong thư mục đang mở trong AutoCAD — các tệp đó sẽ báo lỗi và bị bỏ qua (đóng tệp rồi chạy lại nếu cần).\n");
 
+        if (bocKl)
+        {
+            XuLyBocTachHangLoat(ed, pack, thuMuc);
+            return;
+        }
+
         ed.WriteMessage($"\n[XBoss] ===== BATCH {(chuanHoa ? "CHUẨN HÓA" : "KIỂM TRA")} — rule pack {pack.Version} — {thuMuc} =====\n");
         if (chuanHoa)
             ed.WriteMessage($"[XBoss] Bản gốc GIỮ NGUYÊN — kết quả lưu vào thư mục con \"{BatchProcessor.ThuMucKetQua}\".\n");
@@ -478,7 +553,38 @@ public sealed class XBossCommands
         ed.WriteMessage($"[XBoss] Xong: {ketQua.Tep.Count} tệp — {ketQua.SoThanhCong} thành công, {ketQua.SoLoi} lỗi. Nhật ký: {ketQua.DuongDanNhatKy}\n");
     }
 
+    /// <summary>Chế độ <c>BocKL</c> của XBOSS_BATCH (M101 §6.4): bóc cả thư mục qua side database,
+    /// gộp 1 Excel tổng (khuôn <see cref="BatchProcessor"/> — bản gốc giữ nguyên, tệp lỗi bỏ qua).</summary>
+    private void XuLyBocTachHangLoat(Editor ed, CadRulePack pack, string thuMuc)
+    {
+        // Meta đầu trang Excel dùng chung với XBOSS_BOCKL_XUAT — nhớ giữa các lần xuất.
+        var luu = ExcelMetaStore.Doc();
+        var tenDuAn = HoiChuoi(ed, "Tên dự án", luu.TenDuAn);
+        if (tenDuAn is null) return;
+        var goiThau = HoiChuoi(ed, "Gói thầu", luu.GoiThau);
+        if (goiThau is null) return;
+        ExcelMetaStore.Ghi(new ExcelMetaStore.MetaLuu(tenDuAn, goiThau));
+
+        ed.WriteMessage($"\n[XBoss] ===== BATCH BÓC KHỐI LƯỢNG — rule pack {pack.Version} — {thuMuc} =====\n");
+        ed.WriteMessage("[XBoss] Bản gốc GIỮ NGUYÊN — chỉ đọc XData đã đánh dấu bóc (XBOSS_BOCKL) trong từng tệp.\n");
+
+        var ketQua = BatchProcessor.ChayBocTach(thuMuc, pack, tenDuAn, goiThau, Environment.UserName, HomNayIso(),
+            ten => ed.WriteMessage($"[XBoss] … {ten}\n"));
+
+        foreach (var t in ketQua.Tep)
+            ed.WriteMessage($"[XBoss] {(t.ThanhCong ? "✔" : "✘")} {t.TenTep}: {t.TomTat}\n");
+        ed.WriteMessage($"[XBoss] Xong: {ketQua.Tep.Count} tệp. Nhật ký: {ketQua.DuongDanNhatKy}\n");
+        ed.WriteMessage(ketQua.DuongDanExcel is null
+            ? "[XBoss] Không có bản vẽ nào đã đánh dấu bóc trong thư mục — chưa xuất được Excel tổng.\n"
+            : $"[XBoss] ✔ Đã xuất Excel tổng ({ketQua.TongDongBoc} dòng): {ketQua.DuongDanExcel}\n");
+    }
+
     // ===== Trợ giúp hiển thị =====
+
+    /// <summary>Số đối tượng THẬT đã bóc: một tuyến cắt qua nhiều vùng nằm ở nhiều dòng nhưng chỉ
+    /// là một đối tượng; dòng dẫn xuất (cách nhiệt) không có đối tượng riêng.</summary>
+    private static int SoDoiTuongDaBoc(TakeoffResult kq) =>
+        kq.Lines.Where(l => !l.LaDanXuat).SelectMany(l => l.Handles).Distinct(StringComparer.Ordinal).Count();
 
     private static void InBangKetQua(Editor ed, TakeoffResult kq)
     {
@@ -497,6 +603,109 @@ public sealed class XBossCommands
             ed.WriteMessage($"[XBoss] Đã bỏ qua {kq.SkippedMarkedCount} đối tượng bóc trước đó.\n");
         if (kq.XrefSkippedCount > 0)
             ed.WriteMessage($"[XBoss] Bỏ qua {kq.XrefSkippedCount} đối tượng trong xref (không bóc xref).\n");
+    }
+
+    /// <summary>
+    /// Bối cảnh bóc nâng cao (M101 §6.3): vùng đã chọn + nhãn text quanh tuyến. Nhãn CHỈ quét khi
+    /// rule pack có item bật <c>sizeFromNearbyText</c> — bản vẽ lớn khỏi tốn thời gian vô ích.
+    /// </summary>
+    private static TakeoffScanner.BoiCanhBoc BoiCanhBoc(
+        Database db, Transaction tr, CadRulePack pack, VungChonService.KetQuaChonVung chonVung)
+    {
+        var nguongMm = TakeoffZoning.NguongNhanLonNhatMm(pack.Takeoff);
+        if (nguongMm <= 0)
+            return new TakeoffScanner.BoiCanhBoc(chonVung.Vung, [], 0, chonVung.HandleRanhGioi);
+        var (toMm, _, _) = DrawingUnits.TuInsUnits((int)db.Insunits);
+        return new TakeoffScanner.BoiCanhBoc(
+            chonVung.Vung, TakeoffScanner.QuetNhan(db, tr), nguongMm / toMm, chonVung.HandleRanhGioi);
+    }
+
+    // ===== Đối chiếu BOQ (M101 PR4) =====
+
+    /// <summary>
+    /// Hỏi có kéo KL BOQ hợp đồng từ máy chủ không, rồi tải về (chỉ ĐỌC). Trả null = không dựng
+    /// sheet <c>Doi-chieu</c> — dùng cho cả "kỹ sư chọn Không" lẫn mọi trục trặc mạng/token: lệnh
+    /// vẫn xuất Excel bình thường (M101 §6.3 — không mạng thì bỏ qua kèm thông báo, KHÔNG chặn).
+    /// <paramref name="duAnId"/> vào là dự án đã chọn lần trước, ra là dự án thực sự dùng (nhớ cho
+    /// lần sau).
+    /// </summary>
+    private static BoqSnapshot? HoiDoiChieuBoq(Editor ed, ref long? duAnId)
+    {
+        var hoi = new PromptKeywordOptions(
+            "\n[XBoss] Kéo KL BOQ hợp đồng từ máy chủ để dựng sheet \"Doi-chieu\"?")
+        { AllowNone = false };
+        hoi.Keywords.Add("Khong", "Khong", "Không (chỉ bảng bóc như cũ)");
+        hoi.Keywords.Add("Co", "Co", "Có (cần mạng + đã chạy XBOSS_LOGIN)");
+        hoi.Keywords.Default = "Khong";
+        var traLoi = ed.GetKeywords(hoi);
+        if (traLoi.Status != PromptStatus.OK || traLoi.StringResult != "Co") return null;
+
+        var baseUrl = XBossLoginCommand.DocServerUrl();
+        if (baseUrl is null)
+        {
+            ed.WriteMessage("\n[XBoss] ⚠ Chưa cấu hình server XBoss — bỏ qua sheet đối chiếu (chạy XBOSS_LOGIN nếu cần).\n");
+            return null;
+        }
+        if (CredentialStore.DocToken(baseUrl) is not { } token)
+        {
+            ed.WriteMessage($"\n[XBoss] ⚠ Máy chưa ghép thiết bị với {baseUrl} — bỏ qua sheet đối chiếu (chạy XBOSS_LOGIN).\n");
+            return null;
+        }
+
+        var client = new XBossApiClient(baseUrl);
+        ed.WriteMessage($"\n[XBoss] Đang lấy KL BOQ hợp đồng từ {baseUrl}…\n");
+        try
+        {
+            try
+            {
+                return TaiSnapshotBoq(client, token, duAnId);
+            }
+            catch (XBossCanChonDuAnException e)
+            {
+                // Người dùng thuộc nhiều dự án: danh sách do MÁY CHỦ cấp, chọn xong máy chủ vẫn
+                // kiểm lại quyền ở lần gọi sau — plugin không tự đoán dự án nào.
+                if (e.DuAn.Count == 0)
+                {
+                    ed.WriteMessage($"[XBoss] ⚠ {e.Message} — bỏ qua sheet đối chiếu.\n");
+                    return null;
+                }
+                ed.WriteMessage("[XBoss] Tài khoản thuộc nhiều dự án — chọn dự án lấy KL BOQ:\n");
+                foreach (var d in e.DuAn) ed.WriteMessage($"[XBoss]   {d.Id} — {d.Name}\n");
+                var nhap = HoiChuoi(ed, "Mã số dự án", e.DuAn[0].Id.ToString());
+                if (nhap is null || !long.TryParse(nhap.Trim(), out var chon))
+                {
+                    ed.WriteMessage("[XBoss] ⚠ Không nhận được mã số dự án — bỏ qua sheet đối chiếu.\n");
+                    return null;
+                }
+                duAnId = chon;
+                return TaiSnapshotBoq(client, token, duAnId);
+            }
+        }
+        catch (XBossApiException e)
+        {
+            ed.WriteMessage($"[XBoss] ⚠ {e.Message} — bỏ qua sheet đối chiếu, vẫn xuất bảng bóc.\n");
+        }
+        catch (HttpRequestException e)
+        {
+            ed.WriteMessage($"[XBoss] ⚠ Không nối được máy chủ ({e.Message}) — bỏ qua sheet đối chiếu.\n");
+        }
+        catch (TaskCanceledException)
+        {
+            ed.WriteMessage("[XBoss] ⚠ Máy chủ không trả lời kịp — bỏ qua sheet đối chiếu.\n");
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Gọi API bất đồng bộ từ một lệnh AutoCAD ĐỒNG BỘ. Bọc <c>Task.Run</c> rồi chờ để không
+    /// deadlock nếu ngữ cảnh lệnh có SynchronizationContext; giới hạn 20 giây để mạng công trường
+    /// chập chờn không treo AutoCAD (HttpClient còn timeout 30s của riêng nó).
+    /// </summary>
+    private static BoqSnapshot TaiSnapshotBoq(XBossApiClient client, string token, long? duAnId)
+    {
+        using var huy = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        return Task.Run(() => client.FetchBoqSnapshotAsync(token, duAnId, huy.Token), huy.Token)
+            .GetAwaiter().GetResult();
     }
 
     private static string? HoiChuoi(Editor ed, string nhan, string macDinh)

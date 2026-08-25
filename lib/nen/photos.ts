@@ -163,6 +163,18 @@ export function newStandardizedDrawingFileName(ext = "dxf"): string {
   return `cad-${Date.now()}-${randomBytes(4).toString("hex")}.${safeExt}`;
 }
 
+// Thư viện block chuẩn của bộ lệnh vẽ (M100 PR2, bảng `cad_block_libs`): tệp `.dwg` nhị phân do
+// người phát hành nộp — máy chủ chỉ lưu, không đọc (M100 §12). Version nằm trong tên tệp để đối
+// chiếu nhanh khi soi thư mục lưu trữ, phần ngẫu nhiên giữ nguyên quy ước chống đoán tên.
+export function newBlockLibFileName(version: string): string {
+  const safeVersion =
+    version
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .toLowerCase()
+      .slice(0, 16) || "x";
+  return `blocklib-${safeVersion}-${Date.now()}-${randomBytes(4).toString("hex")}.dwg`;
+}
+
 export function newProjectDocFileName(mime: string): string {
   return newUploadFileName("pd", mime);
 }

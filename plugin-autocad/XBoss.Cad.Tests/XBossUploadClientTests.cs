@@ -34,12 +34,13 @@ public class XBossUploadClientTests
 
     private sealed record UploadKq(XBossApiClient.UploadKetQua Kq, FakeHandler Handler);
 
-    private static async Task<UploadKq> UploadVoi(FakeHandler handler, string? reportJson)
+    private static async Task<UploadKq> UploadVoi(FakeHandler handler, string? reportJson, string? takeoffJson = null)
     {
         var client = new XBossApiClient("https://xboss.local", handler);
         var kq = await client.UploadAsync(
             "xbt_token", "ACMV-SD-T05-001", "B", "2.0.0",
-            "T05.dwg", [1, 2, 3], Encoding.UTF8.GetBytes("0\nSECTION"), reportJson);
+            "T05.dwg", [1, 2, 3], Encoding.UTF8.GetBytes("0\nSECTION"), reportJson,
+            takeoffJson: takeoffJson);
         return new UploadKq(kq, handler);
     }
 
@@ -68,6 +69,27 @@ public class XBossUploadClientTests
         var (kq, h) = await UploadVoi(handler, reportJson: null);
         Assert.True(kq.DuocNhan);
         Assert.DoesNotContain("report.json", h.BodyDaNhan[0]);
+    }
+
+    [Fact]
+    public async Task Upload_khong_takeoff_thi_khong_gui_field_takeoff_upload_cu_chay_y_nguyen()
+    {
+        var handler = new FakeHandler(_ => Task.FromResult(Json(HttpStatusCode.Accepted, new { jobId = "j-2b" })));
+        var (kq, h) = await UploadVoi(handler, reportJson: "{\"cheDo\":\"chuan-hoa\"}", takeoffJson: null);
+        Assert.True(kq.DuocNhan);
+        Assert.DoesNotContain("takeoff.json", h.BodyDaNhan[0]);
+    }
+
+    [Fact]
+    public async Task Upload_kem_takeoff_json_gui_them_field_takeoff_M101_PR5()
+    {
+        var handler = new FakeHandler(_ => Task.FromResult(Json(HttpStatusCode.Accepted, new { jobId = "j-2c" })));
+        var (kq, h) = await UploadVoi(
+            handler, reportJson: "{\"cheDo\":\"chuan-hoa\"}", takeoffJson: "{\"rulePackVersion\":\"2.0.0\"}");
+        Assert.True(kq.DuocNhan);
+        var body = h.BodyDaNhan[0];
+        Assert.True(body.Contains("name=takeoff") || body.Contains("name=\"takeoff\""));
+        Assert.Contains("takeoff.json", body);
     }
 
     [Fact]

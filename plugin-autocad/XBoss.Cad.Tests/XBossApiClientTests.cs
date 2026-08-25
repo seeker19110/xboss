@@ -126,4 +126,82 @@ public class XBossApiClientTests
         var loi = await Assert.ThrowsAsync<XBossApiException>(() => client.FetchRulePackAsync("xbk_thu-hoi"));
         Assert.Contains("XBOSS_LOGIN", loi.Message);
     }
+
+    // ===== Thư viện block (M100 PR4 — AC8) =====
+
+    [Fact]
+    public async Task FetchBlockLibManifest_boc_dung_phan_manifest_va_gui_manifest_1()
+    {
+        var handler = new FakeHandler(_ => Json(HttpStatusCode.OK, new
+        {
+            version = "b1",
+            dwgSha256 = new string('a', 64),
+            manifest = new { version = "b1", dwgSha256 = new string('a', 64), blocks = new[] { new { id = "elbow-duct" } } },
+        }));
+        var client = new XBossApiClient("https://xboss.local", handler);
+
+        var (json, _) = await client.FetchBlockLibManifestAsync("xbk_t");
+        Assert.Contains("\"blocks\"", json);
+        Assert.Contains("elbow-duct", json);
+        Assert.Equal(
+            "https://xboss.local/api/engineering/cad/block-lib?manifest=1",
+            handler.DaNhan[0].RequestUri!.ToString());
+        Assert.Equal("Bearer xbk_t", handler.DaNhan[0].Headers.Authorization!.ToString());
+    }
+
+    [Fact]
+    public async Task FetchBlockLib_304_giu_cache_cuc_bo()
+    {
+        var handler = new FakeHandler(req =>
+            req.Headers.IfNoneMatch.ToString().Contains("b1-abc")
+                ? new HttpResponseMessage(HttpStatusCode.NotModified)
+                : Json(HttpStatusCode.OK, new { version = "b1", manifest = new { blocks = Array.Empty<object>() } }));
+        var client = new XBossApiClient("https://xboss.local", handler);
+
+        var (json, etag) = await client.FetchBlockLibManifestAsync("xbk_t", "\"b1-abc\"");
+        Assert.Null(json);
+        Assert.Equal("\"b1-abc\"", etag);
+
+        var (dwg, _) = await client.FetchBlockLibDwgAsync("xbk_t", "\"b1-abc\"");
+        Assert.Null(dwg);
+    }
+
+    [Fact]
+    public async Task FetchBlockLibDwg_tra_dung_byte_va_etag()
+    {
+        var noiDung = new byte[] { 0x41, 0x43, 0x31, 0x30 }; // "AC10" — vài byte đầu của tệp DWG thật
+        var handler = new FakeHandler(_ =>
+        {
+            var res = new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(noiDung) };
+            res.Headers.ETag = new System.Net.Http.Headers.EntityTagHeaderValue("\"b1-abc\"");
+            return res;
+        });
+        var client = new XBossApiClient("https://xboss.local", handler);
+
+        var (dwg, etag) = await client.FetchBlockLibDwgAsync("xbk_t");
+        Assert.Equal(noiDung, dwg);
+        Assert.Equal("\"b1-abc\"", etag);
+        Assert.Equal("https://xboss.local/api/engineering/cad/block-lib", handler.DaNhan[0].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task FetchBlockLib_404_giu_nguyen_thong_diep_huong_dan_cua_server()
+    {
+        var handler = new FakeHandler(_ => Json(HttpStatusCode.NotFound, new
+        {
+            error = "Chưa phát hành thư viện block nào — vào /engineering/chuan-hoa-ban-ve.",
+        }));
+        var client = new XBossApiClient("https://xboss.local", handler);
+        var loi = await Assert.ThrowsAsync<XBossApiException>(() => client.FetchBlockLibManifestAsync("xbk_t"));
+        Assert.Contains("Chưa phát hành thư viện block", loi.Message);
+    }
+
+    [Fact]
+    public async Task FetchBlockLib_401_nem_huong_dan_login_lai()
+    {
+        var handler = new FakeHandler(_ => Json(HttpStatusCode.Unauthorized, new { error = "x" }));
+        var client = new XBossApiClient("https://xboss.local", handler);
+        var loi = await Assert.ThrowsAsync<XBossApiException>(() => client.FetchBlockLibDwgAsync("xbk_thu-hoi"));
+        Assert.Contains("XBOSS_LOGIN", loi.Message);
+    }
 }

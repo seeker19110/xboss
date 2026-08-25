@@ -25,8 +25,12 @@ internal static class MarkService
         tr.AddNewlyCreatedDBObject(ratr, true);
     }
 
-    /// <summary>Đánh dấu 1 thực thể. Thực thể phải mở ForWrite.</summary>
-    internal static void Mark(Entity ent, string appName, string itemId, string rulePackVersion, string ngayIso, int aci)
+    /// <summary>
+    /// Đánh dấu 1 thực thể. Thực thể phải mở ForWrite. Chuỗi thứ 5 (tên vùng, M101 §6.3) là
+    /// PHẦN THÊM: bản vẽ đánh dấu bằng plugin cũ chỉ có 4 chuỗi vẫn đọc được bình thường.
+    /// </summary>
+    internal static void Mark(
+        Entity ent, string appName, string itemId, string rulePackVersion, string ngayIso, int aci, string vung = "")
     {
         var mauCu = EncodeColor(ent.Color);
         ent.XData = new ResultBuffer(
@@ -34,12 +38,14 @@ internal static class MarkService
             new TypedValue((int)DxfCode.ExtendedDataAsciiString, itemId),
             new TypedValue((int)DxfCode.ExtendedDataAsciiString, rulePackVersion),
             new TypedValue((int)DxfCode.ExtendedDataAsciiString, ngayIso),
-            new TypedValue((int)DxfCode.ExtendedDataAsciiString, mauCu));
+            new TypedValue((int)DxfCode.ExtendedDataAsciiString, mauCu),
+            new TypedValue((int)DxfCode.ExtendedDataAsciiString, vung));
         ent.Color = AcadColor.FromColorIndex(ColorMethod.ByAci, (short)aci);
     }
 
-    /// <summary>Đọc đánh dấu; null nếu thực thể chưa bóc.</summary>
-    internal static (string ItemId, string Version, string NgayIso, string MauCu)? ReadMark(Entity ent, string appName)
+    /// <summary>Đọc đánh dấu; null nếu thực thể chưa bóc. Vùng rỗng với bản vẽ bóc trước M101.</summary>
+    internal static (string ItemId, string Version, string NgayIso, string MauCu, string Vung)? ReadMark(
+        Entity ent, string appName)
     {
         using var xdata = ent.GetXDataForApplication(appName);
         if (xdata is null) return null;
@@ -48,7 +54,7 @@ internal static class MarkService
             .Select(tv => tv.Value?.ToString() ?? "")
             .ToArray();
         if (chuoi.Length < 4) return null;
-        return (chuoi[0], chuoi[1], chuoi[2], chuoi[3]);
+        return (chuoi[0], chuoi[1], chuoi[2], chuoi[3], chuoi.Length > 4 ? chuoi[4] : "");
     }
 
     /// <summary>Gỡ đánh dấu: trả đúng màu cũ + xoá XData của app. Thực thể phải mở ForWrite.</summary>

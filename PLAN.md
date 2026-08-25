@@ -1,353 +1,124 @@
-# PLAN.md — Đợt "nâng tầm dự án" GĐ2: cổng máy thay checklist người
+# PLAN.md — Đợt M100+M101 Pha 2: bộ lệnh vẽ Adapter (M100 PR3 → PR4/PR6 → PR7)
 
-**Cập nhật:** 2026-08-24
-**Nguồn:** `docs/audit-2026-08-24-nang-tam.md` + kết quả GĐ1 (xem `PROGRESS.md` mục đầu)
-**Nhánh nền:** `claude/nang-tam-du-an-5yexhe` (GĐ1 đã tích hợp, cổng xanh với Postgres thật)
+**Cập nhật:** 2026-08-25 · **Nguồn:** `docs/nang-cap/M100-xboss-ve-shop-drawing.md` (Approved)
+**Nhánh nền:** `claude/plugin-capabilities-limits-rrd2gp` — base mọi worktree trên nhánh này (KHÔNG origin/main). Pha 1 đã tích hợp: rule pack v4 + `Core/Draw/{DrawToolsConfig,TakeoffCrossCheck,BlockManifest}` + server block-lib.
 
-## Bối cảnh — vì sao đợt này
+## Bối cảnh & ràng buộc CỨNG cho mọi việc
 
-GĐ1 đã bịt 4 lỗ hổng Cao và trung thực hoá dữ liệu. Nhưng bài học lớn nhất của GĐ1 là:
-**checklist con người không theo kịp tốc độ thêm module của dự án này.**
+- Worker không thấy hội thoại. Đọc: `CLAUDE.md`, TOÀN BỘ đặc tả M100, `plugin-autocad/README.md` (mục Ràng buộc thiết kế), code hiện trạng `XBoss.Cad.Acad/Commands/` + `Services/` (bám đúng phong cách lệnh M99: transaction, UNDO group, prompt tiếng Việt, xử lý lỗi).
+- **`XBoss.Cad.Acad` KHÔNG build được trên Linux** (net10.0-windows + ObjectARX). Code Adapter viết "mù" — vì vậy: (1) mọi logic tính toán được phải đẩy xuống `XBoss.Cad.Core` (net8.0, thuần, CÓ test — `export SSL_CERT_FILE=/root/.ccr/ca-bundle.crt` trước khi chạy `dotnet test`); (2) Adapter chỉ còn lớp mỏng gọi API AutoCAD; (3) đối chiếu kỹ tên API với code Adapter hiện có (`PluginExtension.cs`, các lệnh `XBOSS_*` sẵn có) — dùng đúng các using/pattern đã compile được trên máy thật (bài học "8 lỗi CI không thể bắt" trong PROGRESS.md); (4) mô phỏng tay từng luồng lệnh trong đầu trước khi báo xong.
+- Core CẤM tham chiếu assembly AutoCAD. Mỗi lệnh = 1 transaction = 1 UNDO group. Không đụng hành vi lệnh M99.
+- XData appname `XBOSS_VE` theo M100 §11; KHÔNG đụng appname `XBOSS_BOCKL`.
+- Tiếng Việt toàn bộ prompt/thông báo/comment/commit. Không push — commit trong worktree.
+- Node chỉ cần nếu việc chạm TS (Pha 2 không chạm TS trừ khi đặc tả bắt).
+- Cổng mỗi việc: `dotnet test plugin-autocad/XBoss.Cad.Tests/XBoss.Cad.Tests.csproj` xanh toàn bộ (không làm đỏ ca cũ).
 
-- Lớp lỗi "route mới quên kiểm quyền" đã lặp ≥3 đợt audit, lần này lặp thêm **14 file**.
-- Lớp lỗi "tin `projectId` client gửi" lặp ở **17 route**, và chính đặc tả GĐ1 của phiên chính
-  cũng viết hẹp (quên kênh query string) → reviewer phải bắt lại.
-- Lớp lỗi "chữ trắng trên nền accent sáng" lặp lần ≥3 (54b3e03 → ee8fce1 → 57 file).
-- Và nặng nhất: **11 file route chết ngay ở câu SQL đầu tiên** suốt nhiều tháng mà không ai biết.
+## Việc V3 — Nền vẽ + tuyến + nhãn (M100 PR3) — `route: complex`
 
-GĐ2 biến các checklist đó thành **cổng máy chạy trong CI**, cộng vá nốt lỗi SQL đã phát hiện.
+Đặc tả: §6.1 (journey 1–3, 6), §6.11, §7 FR3/FR4/FR7(nhãn)/FR9/FR10, §8 AC1/AC2(phần layer)/AC3.
 
-**Phạm vi:** W1–W6 dưới đây. **Ngoài phạm vi (đã kiểm, không phải việc):** idempotency ảnh offline —
-`migrations/0075_task_photos_hash.sql` + `POST /api/tasks/:id/photos` **đã dedup theo hash nội dung
-trong 24h**; phát hiện của agent audit về mục này là **sai**, gửi lại cùng ảnh không tạo bản trùng.
+1. Core `Draw/EdgeOffset.cs`: polyline tim (danh sách đỉnh + bulge) + width → 2 polyline biên offset ±w/2; đoạn thẳng + cung tròn (bulge); spline/tự cắt → trả "không offset được" (Adapter chỉ vẽ tim + cảnh báo). Test kỹ (thẳng/gãy khúc/cung/width lẻ).
+2. Adapter `Services/VeContext.cs`: trạng thái phiên vẽ (hệ đang chọn, line đang chọn, size, slope) + đọc `drawTools` qua `DrawToolsConfig` từ rule pack cache hiện có (xem service rule pack của M99).
+3. Adapter `Commands/VeNenCommands.cs`: `XBOSS_VE_NEN` — chọn hệ; khóa + transparency (`baseFadePct`) mọi layer hiện có; tạo layer đích của hệ + `-EDGE` (màu/lineweight theo `lineweightMap`); chạy lại → hoàn nguyên (lưu trạng thái trước vào XData NOD hoặc dictionary bản vẽ). KHÔNG sửa/xóa đối tượng nền.
+4. Adapter `Commands/VeTuyenCommands.cs`: `XBOSS_VE` — chọn loại tuyến/size (keyword prompt; `slopeRequired` → hỏi slope từ `slopes`); vẽ polyline như PLINE; kết thúc: đặt layer, ghi XData `[systemId, itemId, size, rulePackVersion, custom?, slope?]`; `edgeStyle=double` → `EdgeOffset` sinh biên trên `-EDGE`, XData 2 chiều (biên giữ handle tim, tim giữ handles biên). ESC → abort sạch. `XBOSS_VE_NHAN` — bấm tuyến → MTEXT nhãn size (+`i=…%` kèm block `slope-arrow` nếu có slope; thiếu block trong thư viện → chỉ text) trên layer `G-ANNO-TEXT`, `labelStyle`, XData liên kết tim.
+   Ranh giới được quyết: chi tiết prompt/keyword; cách lưu trạng thái VE_NEN; jig hay PLINE wrap.
 
-## Quy ước bắt buộc cho MỌI việc (worker không thấy hội thoại trước — mọi thứ cần biết ở đây)
+## Việc V4 — Phụ kiện + thiết bị + thư viện (M100 PR4) — `route: complex` (SAU V3)
 
-- **Đọc trước khi sửa:** `CLAUDE.md` (Auth, ADR-0007 ranh giới `lib/`, Quy ước) và `docs/audit.md`.
-- **Ranh giới kiến trúc (ADR-0007/0008):** route chỉ là ranh giới HTTP; logic nghiệp vụ ở
-  `lib/<miền>/`; import nội bộ dùng alias `@/lib/<miền>/<module>`. Chạy `npm run check:lib-layers`.
-- **SQL:** qua helper `lib/db`, placeholder `?`, **không nối chuỗi chèn giá trị**.
-- **Tiếng Việt:** toàn bộ UI, comment, commit message. Commit conventional prefix + mô tả tiếng Việt.
-- **Migration:** GĐ2 **dự kiến không cần migration nào**. Nếu việc của bạn thật sự cần, chạy
-  `ls migrations | sort -V | tail -3` lấy số thật (đừng tin số trong kế hoạch) và **báo lại** —
-  đừng lặng lẽ thêm.
-- **Test:** file chạm DB `import "@/tests/setup"` ở **dòng đầu tiên**.
-- **Postgres CÓ SẴN trong môi trường** (bài học GĐ1: nhiều worker tưởng không có rồi để 386 ca skip).
-  Binary ở `/usr/lib/postgresql/16/bin/`, **không chạy được dưới root** — dựng bằng user không đặc
-  quyền, ví dụ:
-  ```bash
-  useradd -m pgtest 2>/dev/null; PGD=/home/pgtest/pgdata_<ten-viec>
-  su pgtest -c "/usr/lib/postgresql/16/bin/initdb -D $PGD -U postgres --auth=trust -E UTF8"
-  su pgtest -c "/usr/lib/postgresql/16/bin/pg_ctl -D $PGD -o '-p <cong-rieng> -k /tmp' -l $PGD/log start"
-  psql "postgresql://postgres@127.0.0.1:<cong-rieng>/postgres" -c "CREATE DATABASE xboss_test;"
-  export TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:<cong-rieng>/xboss_test"
-  ```
-  **Dùng cổng riêng cho mỗi việc** (W1=55501, W2=55502, ... W6=55506) vì các việc chạy song song.
-  ⚠️ `TEST_DATABASE_URL` **phải là URL TCP** — dạng Unix-socket (`?host=/tmp`) làm
-  `scripts/run-tests-parallel.mjs` crash ở `new URL()` (đã dính thật ở GĐ1). Tắt cluster khi xong.
-- **Cổng trước khi báo xong:** `npm run lint && npm run typecheck && npm test && npm run check:lib-layers
-&& npm run build` xanh, **với `TEST_DATABASE_URL` đã đặt**. Ca skip KHÔNG tính là pass.
-- **Chứng minh cổng/test bắt được lỗi:** mỗi cổng CI mới phải chứng minh **báo đỏ** khi cố tình
-  đưa vào một vi phạm, rồi **xanh** khi gỡ ra. Ghi kết quả vào báo cáo. Đây là yêu cầu cứng —
-  GĐ1 đã có ca một test bất biến trông có vẻ đúng nhưng **mù hoàn toàn** với lỗi nó phải bắt.
-- **Không mở rộng phạm vi:** không refactor ngoài vùng được giao, không nâng dependency.
+Đặc tả: §6.1 bước 4–5, §6.10, §7 FR5/FR6, §8 AC4/AC5/AC7/AC8.
 
----
+1. Core `Draw/FittingPlacement.cs`: điểm chèn trên polyline → góc tiếp tuyến (đoạn thẳng + cung) + scale theo size (manifest `scaleBySize`); test (giữa đoạn/tại đỉnh/trên cung, sai số ≤0.1°).
+2. Adapter `Services/BlockLibraryService.cs`: tải qua `GET /api/engineering/cad/block-lib` (token M99, ETag, cache `%APPDATA%\XBoss\block-lib\`), kiểm sha256 (`BlockManifest`); nhập định nghĩa block vào DWG 1 lần (`Database.Insert` từ tệp cache), trùng tên khác định nghĩa → hỏi (AC7).
+3. Adapter `Commands/VePhuKienCommands.cs`: `XBOSS_VE_PHUKIEN` (chọn theo `fittings` của hệ, bấm điểm trên tim → xoay `rotateToPath`, layer hệ), `XBOSS_VE_THIETBI` (equipment, attribute TAG bắt buộc + MODEL/SIZE, prompt nhập), `XBOSS_VE_THUVIEN` (nạp tệp thư viện tay: .dwg + manifest.json cạnh nhau).
 
-## Việc W1 — Vá 27 lời gọi SQL sai kiểu (`route: spec`)
+## Việc V5 — Trang in + mặt cắt (M100 PR6) — `route: complex` (SAU V3, ∥ V4)
 
-**Nợ kỹ thuật nghiêm trọng nhất phát hiện ở GĐ1. Các tính năng này chưa từng chạy được lần nào.**
+Đặc tả: §6.3, §6.4, §7 FR9a/FR9b, §8 AC10/AC11, `sheetSetup` §11.
 
-### Vấn đề thật (đã kiểm chứng trên Postgres thật ở GĐ1)
+1. Core `Draw/SectionBuilder.cs`: tuyến cắt (2 điểm) + danh sách tim (đỉnh + XData size + loại) → giao điểm, thứ tự chiếu lên tuyến cắt, toạ độ ký hiệu (chữ nhật WxH / tròn DN / máng) theo khoảng cách ngang thật; tuyến song song tuyến cắt → bỏ qua kèm cảnh báo. Test kỹ.
+2. Adapter `Commands/VeTranginCommands.cs`: `XBOSS_VE_TRANGIN` — layout mới + page setup (`sheetSetup.plotter`, khổ, CTB theo `lineweightMap`), viewport đúng tỉ lệ + LOCK, VP-freeze layer ngoài hệ, chèn titleblock (manifest kind `titleblock` theo khổ) + điền attribute (DU_AN từ cache LOGIN nếu có, còn lại prompt + nhớ lần trước), tên layout theo `layoutNamePattern`; 1 UNDO xóa trọn.
+3. Adapter `Commands/VeMatcatCommands.cs`: `XBOSS_VE_MATCAT` — kẻ tuyến cắt, tìm giao qua `SectionBuilder`, cao độ prompt từng tuyến (mặc định `defaultElevations`/lần trước), dựng hình + nhãn + tên A-A tự đánh (`sectionNamePattern`), XData snapshot `[tuyến-cắt-handle, ngày]`.
 
-`lib/db` khai `query(sql, ...params)` / `queryOne` / `run` nhận tham số **biến thiên**. Nhưng 11 file
-route gọi kiểu `query(sql, [projectId])` — truyền một **mảng** làm tham số duy nhất. Hệ quả:
-`pg.query(pgSql, [[projectId]])` → Postgres nhận `{"1"}` thay vì `1` →
-`invalid input syntax for type integer: "{"1"}"` **ngay câu truy vấn đầu tiên**.
+## Việc V6 — Giá đỡ + lỗ chờ + tag + thống kê (M100 PR7) — `route: complex` (SAU V3+V4)
 
-**11 file, 27 lời gọi:**
+Đặc tả: §6.7/§6.8/§6.9, FR9c–9g, AC12/AC13/AC14.
 
-```
-app/api/engineering/bim-models/route.ts                      (3)
-app/api/engineering/bim-models/[id]/elements/route.ts        (1)
-app/api/engineering/bim-models/[id]/link-wbs/route.ts        (2)
-app/api/engineering/bim-models/[id]/simulate-4d/route.ts     (2)
-app/api/engineering/iot/devices/route.ts                     (3)
-app/api/engineering/iot/alerts/route.ts                      (2)
-app/api/engineering/iot/telemetry/route.ts                   (3)
-app/api/engineering/subcon-ai/scores/route.ts                (5)
-app/api/engineering/subcon-ai/evaluate/route.ts              (1)
-app/api/engineering/subcon-ai/recommend-shortlist/route.ts   (3)
-app/api/engineering/cad/parse-dxf/route.ts                   (2)
-```
+1. Core `Draw/SupportSpacing.cs`: chiều dài tuyến + spacing + vị trí phụ kiện nặng → danh sách vị trí giá đỡ (đầu/cuối luôn có, chia đều ≤ spacing); bổ sung đoạn thiếu khi đã có giá đỡ cũ. Test AC12 (10m/2400 → 5 vị trí).
+2. Core: bảng lỗ chờ Excel (`Excel/` — ClosedXML, bảng đơn giản STT/vị trí trục/cao độ/size/hệ, KHÔNG đụng mẫu BOQ).
+3. Adapter `Commands/VeGiadoCommands.cs` (`XBOSS_VE_GIADO` — block kind `support`, vuông góc tuyến, XData tim↔giá đỡ chống trùng), `Commands/VeLochoCommands.cs` (`XBOSS_VE_LOCHO` — chèn sleeve size ống + `sleeveClearanceMm` tại điểm bấm/giao layer `S-GRID-COLS` có xác nhận; chế độ xuất: Table trong bản vẽ + Excel), `Commands/VeTagCommands.cs` (`XBOSS_VE_TAG` — đánh/đánh lại theo `tagPattern`, tầng nhớ per bản vẽ, quét trùng/nhảy số, option khóa tag), `Commands/VeThongkeCommands.cs` (`XBOSS_VE_THONGKE` — Table thiết bị từ attribute hoặc KL từ XData `XBOSS_BOCKL` (chỉ ĐỌC appname đó), style `tableStyle`, chạy lại cập nhật tại chỗ qua XData đánh dấu bảng).
+4. Rule pack: nếu v4 thiếu khóa nào §6.7–6.9 cần → BÁO, không tự sửa v4 (append-only; phiên chính quyết).
 
-Tự chạy lệnh sau để lấy danh sách thật, đừng tin danh sách trên là đủ:
+## Việc V7 — VE_DOI + báo cáo phiên vẽ + tài liệu (M100 PR5) — `route: standard` (CUỐI)
 
-```bash
-grep -rPzo '(?s)await (query|queryOne|run)(<[^>]*>)?\(\s*`[^`]*`,\s*\[' app/api/ --include=*.ts
-```
+Đặc tả: §6.2, FR8, §14. `XBOSS_VE_DOI` trong `Commands/VeDoiCommands.cs`: đổi layer/XData/dựng lại biên (EdgeOffset)/cập nhật nhãn; đoạn đã bóc → gỡ đánh dấu (tái dùng logic BOCKL_XOA theo selection) + cảnh báo. Báo cáo phiên vẽ JSON cạnh DWG (khung báo cáo M99). Cập nhật `plugin-autocad/README.md` (bảng lệnh) + `CAI-DAT.md` (mục dùng lệnh vẽ) + M100 State.
 
-(hoặc dùng công cụ tìm kiếm multiline của bạn — **rà cả `app/api/` chứ không chỉ `engineering/`**.)
+## Thứ tự & phụ thuộc
 
-### Cách vá — đọc kỹ, có một cái bẫy
-
-**Vá tối thiểu: bỏ dấu ngoặc vuông, truyền tham số rời** — `query(sql, a, b)` thay vì
-`query(sql, [a, b])`. **GIỮ NGUYÊN placeholder `$1`/`$2` trong chuỗi SQL.**
-
-**Vì sao KHÔNG chuyển `$n` sang `?`** (dù `?` là quy ước dự án): `toPg` (`lib/db/index.ts:114`) chỉ
-thay `?` → `$n` theo thứ tự xuất hiện, nên SQL viết sẵn `$n` vẫn chạy đúng khi tham số truyền rời.
-Quan trọng hơn: **có chỗ dùng lại cùng một `$1` nhiều lần** — ví dụ
-`app/api/engineering/iot/devices/route.ts` INSERT 5 dòng VALUES đều tham chiếu `$1`. Chuyển sang `?`
-sẽ cần **5 tham số lặp** thay vì 1, tức phải viết lại lời gọi — rủi ro sai cao mà không được gì.
-Nếu bạn thấy chỗ nào bắt buộc phải đổi placeholder, **báo lại thay vì tự đổi**.
-
-### Kiểm chứng bắt buộc
-
-Vá xong mà không chạy thật thì không biết có đúng không — chính vì không ai chạy thử mà lỗi này
-sống sót nhiều tháng. Bắt buộc:
-
-1. Dựng Postgres theo hướng dẫn ở mục Quy ước (cổng **55501**), chạy `npm run db:migrate`.
-2. Với **mỗi** trong 11 file, gọi thật hàm/route đó (hoặc tối thiểu chạy đúng câu SQL đã vá với tham
-   số thật qua `lib/db`) và xác nhận **không** còn `invalid input syntax`. Ghi vào báo cáo file nào
-   đã chứng minh chạy được bằng cách nào.
-3. Viết `tests/db-params-invariant.test.ts` — test **thuần fs** quét toàn bộ `app/api/**` và `lib/**`
-   tìm mẫu truyền mảng cho `query`/`queryOne`/`run`, danh sách vi phạm phải **rỗng**.
-4. **Chứng minh test bắt được lỗi:** trả 1 file về mẫu cũ → test **ĐỎ** chỉ đích danh file đó;
-   khôi phục → **XANH**. Dán kết quả vào báo cáo.
-
-**Lưu ý:** một số route trong danh sách vừa được GĐ1 sửa (thêm `CAN.`, `chotProjectIdChoGhi`) — đọc
-code hiện tại trên nhánh, đừng giả định nội dung cũ.
+V3 → (V4 ∥ V5) → V6 → V7. Mỗi việc worktree riêng; các file Commands/Core đặt tên như trên để không đụng nhau; `XBoss.Cad.Acad.csproj` dùng glob compile mặc định SDK-style nên thêm file không sửa csproj. Reviewer soát từng việc; tích hợp tuần tự vào nhánh nền, KHÔNG push.
 
 ---
 
-## Việc W2 — Ba cổng CI chặn lớp lỗi route tái phát (`route: standard`)
+# Pha 3 — M101 (nâng trần KIEMTRA/CHUANHOA/BOCKL)
 
-**Biến 3 checklist đã lặp nhiều đợt thành cổng máy.** Bám đúng khuôn các cổng sẵn có
-(`scripts/check-lib-layers.ts`, `check-sw-exclude.ts`, `check-migration-numbers.ts`): script `tsx`
-độc lập, in vi phạm bằng tiếng Việt, `process.exit(1)` khi có vi phạm.
+**Đặc tả:** `docs/nang-cap/M101-plugin-nang-tran.md` (Approved). Ràng buộc chung giống Pha 2 (Core thuần test được, Adapter không build trên Linux, tiếng Việt, 1 UNDO, không đụng hành vi M99).
 
-### W2.1 — `scripts/check-route-perms.ts` → `npm run check:route-perms`
+## Việc W1 — Rule pack v5 + 7 phép kiểm mới (M101 PR1) — `route: complex`
 
-Quét mọi `app/api/**/route.ts` có `export async function POST|PATCH|PUT|DELETE`. Mỗi handler ghi
-**phải** tham chiếu ít nhất một trong: `CAN.`, `canTouchTask`, `canTouchPackage`, `requireApiKey`.
-Vi phạm → liệt kê file + method.
+Đặc tả M101 §6.1 (bảng 7 phép kiểm 10–16), §7 FR1/FR2, §15, §18.
 
-**WHITELIST bắt buộc kèm lý do từng mục** (theo tiền lệ `tests/org-scope-invariant.test.ts`): các
-route auth (`app/api/auth/**` — chính là nơi cấp quyền), webhook có xác thực riêng
-(`app/api/telegram/webhook`, `app/api/zalo/webhook` — đã kiểm secret/chữ ký ở GĐ1), cron
-(`app/api/cron/**` — bảo vệ bằng `CRON_SECRET`). Tự rà và bổ sung mục thật sự cần, **mỗi mục một lý
-do cụ thể**, không whitelist cho tiện.
+- `lib/ky-thuat/cad/rule-packs/v5.json` — append-only từ v4 (v1–v4 KHÔNG đổi 1 byte). Mở rộng khối `inspectionPolicy` (xem v2/v3 hiện có): mỗi phép kiểm mới 1 mục có `enabled` riêng, **mặc định `false`** (M101 §6.2/§7 FR1: nạp plugin cũ không đổi hành vi), kèm tham số: `overlapToleranceMm`/`overlapMinLengthMm` (phép 10), `clashPairs` (phép 11, mảng cặp hệ, mặc định rỗng), `titleblockNameMatchAny` (phép 12 — dùng khi manifest M100 chưa có), `scales` cho phép 13 (tái dùng `sheetSetup.scales` nếu có, khai fallback), `styleMap` (phép 14: textstyle/dimstyle chuẩn — đây cũng là dữ liệu bước chuẩn hóa 8 của PR2, khai một lần dùng chung), `strayDistanceFactor` (phép 16). Mô tả tiếng Việt từng khóa như phong cách v3/v4.
+- `XBoss.Cad.Core/Inspection/` — thêm 7 phép kiểm THUẦN theo đúng khung `Inspector` hiện có (ĐỌC code hiện trạng trước, giữ nguyên kiểu dữ liệu báo cáo/marker): 10 chồng lấn cùng hệ, 11 clash 2D (nhãn cảnh báo cố định "(mặt bằng) — không thay được clash 3D"), 12 khung tên thiếu trường, 13 viewport không khóa/tỉ lệ lạ, 14 text/dim style lệch, 15 nhãn size lệch XData (thiếu dữ liệu M100 → **tự tắt**, không báo oan), 16 đối tượng ngoài khung. Dữ liệu hình học/viewport/attribute do Adapter cung cấp — **định nghĩa DTO đầu vào trong Core**, Adapter điền ở PR sau (PR này KHÔNG sửa `XBoss.Cad.Acad`).
+- Báo cáo JSON: thêm các phép mới vào cùng cấu trúc `checks[]` hiện có, không phá khung cũ.
+- Test: mỗi phép 1 ca dương + 1 ca âm (không báo oan), + ca "v5 mặc định tắt hết phép mới → kết quả y hệt v4", + ca "v4 vẫn nạp được sau khi phát hành v5".
+- `lib/ky-thuat/cad/rule-pack.ts` + route: phát hành v5 là bản hiện hành (như V1 đã làm với v4).
 
-### W2.2 — `scripts/check-project-scope.ts` → `npm run check:project-scope`
+**Tiêu chí chấp nhận:** dotnet test xanh toàn bộ (119 hiện tại + mới); test node liên quan xanh; v1–v4 không đổi; chứng minh mutation (bật 1 phép + dữ liệu vi phạm → đỏ; gỡ → xanh).
 
-Nâng `tests/engineering-project-scope-invariant.test.ts` (GĐ1 viết, hiện chỉ quét
-`app/api/engineering/**`) thành cổng quét **toàn bộ `app/api/**`**. Cấm mẫu `body.projectId`,
-`formData.get("projectId")`, `searchParams.get("projectId")` **dùng trần** — phải là tham số của
-`chotProjectIdChoGhi`.
+## Việc W3 — Bóc theo size + theo vùng + cách nhiệt + hệ số quy đổi (M101 PR3) — `route: complex`
 
-**Quan trọng — tái dùng đúng heuristic đã được kiểm chứng:** bản đầu của test GĐ1 **mù** vì chỉ cần
-một dòng `import` còn sót là nó coi file hợp lệ. Bản hiện tại cắt bỏ nguyên câu lệnh
-`chotProjectIdChoGhi(...)` rồi mới soi phần còn lại. **Giữ nguyên cách đó**, đừng viết lại từ đầu.
-Mở rộng ra toàn `app/api/` gần như chắc chắn lộ thêm route vi phạm ngoài `engineering/` — **liệt kê
-chúng vào báo cáo**; sửa những route bạn chắc chắn và đơn giản, còn lại whitelist kèm lý do + đề
-xuất việc riêng. **Không tự sửa diện rộng** ngoài tầm kiểm soát.
+Đặc tả M101 §6.3 (bảng 6 nâng cấp — làm 4 mục đầu ở PR này, `boqCode` per-project + đối chiếu BOQ để PR4), §7 FR4/FR6, §8 (c)(d), §15, §18.
 
-Sau khi cổng này chạy toàn repo, cân nhắc gộp/bỏ test cũ để không kiểm trùng hai nơi (nếu bỏ, ghi rõ
-lý do trong báo cáo).
+**Nền có sẵn:** rule pack v5 (hiện hành), `XBoss.Cad.Core/Takeoff/` (bóc hiện tại), `Excel/` (ClosedXML, mẫu công ty §13.2 M99 — **hợp đồng layout, cột/sheet mới chỉ được CỘNG THÊM**), `Draw/VeXData.cs` (đọc XData `XBOSS_VE` do M100 ghi: hệ/item/size/slope), `Matching/TokenMatcher.cs`.
 
-### W2.3 — `scripts/check-db-params.ts` → `npm run check:db-params`
+1. **Rule pack v6** (append-only, v1–v5 không đổi 1 byte): `takeoff.items[]` thêm khóa tùy chọn `groupBySize` (bool), `sizeFromNearbyText` (`{enabled, maxDistanceMm, sizePatterns[]}`), `wastagePct` (số, mặc định 0), `perCountAdd` (số, mặc định 0), và item dẫn xuất `derivedFrom` + `formula` (`"perimeter*length"` | `"pi*dn*length"`). Mọi khóa mới **mặc định vắng/0** → v6 cho kết quả y hệt v5 (ca test bắt buộc).
+2. **Core `Takeoff/`**: bóc tách dòng theo size khi `groupBySize` — nguồn size ưu tiên XData `XBOSS_VE`, thiếu thì đọc nhãn gần tuyến theo `sizePatterns` (ghi rõ **nguồn** "XData" / "đọc từ nhãn" vào kết quả từng dòng); item dẫn xuất tính từ size đã tách (thiếu size → bỏ qua + đếm mét chưa tính, KHÔNG đoán); `wastagePct`/`perCountAdd` tính thành cột RIÊNG, không trộn vào KL đo.
+3. **Core `Zoning/` (MỚI, thuần)**: clip polyline theo ranh giới (polyline kín) — trả phần nằm trong + chiều dài từng phần, cắt đúng tại giao điểm; đoạn cung xử lý đúng. Kết quả bóc gắn tên vùng.
+4. **Excel**: thêm cột "Vùng", tách cột "KL đo" / "KL quy đổi" (công thức sống), subtotal theo vùng; giữ nguyên cột A–K + công thức H/J/K + SUBTOTAL tổng của mẫu công ty. Sidecar JSON thêm size/vùng/nguồn size.
+5. **Adapter**: chỉ phần tối thiểu để truyền vùng chọn + nhãn gần tuyến vào Core (dùng stub `/tmp/claude-0/-home-user-xboss/3f35183b-b0e6-57b0-a97e-118b57e3f070/scratchpad/acad-shim/` để biên dịch thử). Nếu phần Adapter quá rủi ro khi code mù → làm Core + test trọn vẹn, để Adapter tối thiểu và GHI RÕ trong báo cáo.
 
-Chặn tái phát chính lỗi W1: cấm truyền **mảng** cho `query`/`queryOne`/`run`/`insertId` của
-`lib/db`. Quét `app/api/**` + `lib/**`. **Phối hợp với W1:** W1 viết
-`tests/db-params-invariant.test.ts`; nếu logic quét trùng nhau thì cổng này **import lại** hàm quét
-đó thay vì chép code (DRY) — hoặc nếu W1 chưa tích hợp thì viết độc lập và ghi chú để gộp sau.
+**Tiêu chí chấp nhận:** AC (c) tuyến 10m cắt ranh giới 6/4 → vùng A 6.00m, vùng B 4.00m; AC (d) cách nhiệt ống gió 300x200 dài 10m → 10×(0.3+0.2)×2 = 10.00 m²; v6 mặc định = v5; Excel mở được, mẫu cũ không vỡ (test round-trip ClosedXML như M99 đã có).
 
-### Nối vào CI
+## Việc W2 — 4 bước chuẩn hóa mới: style/xref/hatch/layout (M101 PR2) — `route: complex`
 
-Thêm cả 3 vào job `static` của `.github/workflows/ci.yml`, đặt cạnh các bước `check:*` hiện có (dòng
-~60-74), đúng định dạng bước sẵn có. **Không** đụng job khác.
+Đặc tả M101 §6.2 (bảng 4 bước, chèn SAU bước lineweight/CTB hiện tại — thứ tự cố định mới 8/9/10/11), §7 FR3.
 
-### Tiêu chí chấp nhận
+- Rule pack **v7** (append-only; v1–v6 KHÔNG đổi 1 byte): thêm `xrefPolicy` (`{enabled:false, pathPolicy:"relative", bindMatchAny:[]}`), `hatchMap` (`{enabled:false, byLayer:[…]}`), `layoutPolicy` (`{enabled:false, removeEmpty:true, renameLayouts:false, namePattern}`). **`styleMap` đã có sẵn từ v5** — bước 8 dùng lại chính nó, KHÔNG khai trùng. Mọi bước mới **mặc định tắt** ⇒ ca test bắt buộc "v7 mặc định = v6".
+- `XBoss.Cad.Core`: logic thuần cho 4 bước (quyết định đổi gì → trả danh sách thay đổi + báo cáo), theo đúng khung `StandardizePipeline` hiện có (ĐỌC trước). Adapter áp thay đổi — **chỉ sửa `StandardizePipeline`/lệnh CHUANHOA ở mức tối thiểu**, dùng stub `/tmp/claude-0/-home-user-xboss/3f35183b-b0e6-57b0-a97e-118b57e3f070/scratchpad/acad-shim/app-w3/` để biên dịch thử (W3 đã mở rộng stub đủ cho `XBossCommands.cs`).
+- Ràng buộc: dimension không mất associativity (M99 O3); xref mặc định CHỈ BÁO, không bind; 1 UNDO cho cả pipeline; diff preview + báo cáo JSON giữ khung cũ.
+- **Nợ phải đóng luôn trong việc này** (hazard có sẵn, ghi ở `PROGRESS.md`): `StandardizePipeline.Buoc2LayerMapping` gộp layer bằng `LayerTable.Has(tên đích)` — `Has` KHÔNG phân biệt hoa/thường, nên layer chỉ lệch hoa/thường với tên đích (vd `m-duct-supp`) rơi vào nhánh "gộp" rồi `Erase()` chính layer đang chứa thực thể. Sửa: bỏ qua khi `string.Equals(cũ, mới, OrdinalIgnoreCase)`. Kèm test.
 
-- 3 lệnh `npm run check:*` chạy xanh trên nhánh hiện tại.
-- **Mỗi cổng chứng minh báo đỏ**: cố tình thêm 1 vi phạm (route ghi bỏ `CAN.`, route đọc
-  `body.projectId` trần, lời gọi `query(sql, [x])`) → cổng đỏ **chỉ đích danh** chỗ đó; gỡ ra → xanh.
-  Dán output cả 3 vào báo cáo.
-- CI có đủ 3 bước mới trong job `static`.
+**Tiêu chí chấp nhận:** dotnet test xanh toàn bộ (hiện 365 ca); v7 mặc định = v6 (ca test); hazard hoa/thường có test chứng minh bắt được.
 
----
+## Việc W4 — `boqCode` per-project + đối chiếu BOQ chỉ-đọc (M101 PR4) — `route: complex`
 
-## Việc W3 — Đóng băng module vượt gate bằng feature flag (`route: standard`)
+⚠️ **Vùng rủi ro cao** (`lib/khoi-luong/boq.ts`) — bắt buộc rà `docs/audit.md` mục "Vùng rủi ro cao" và mục bảo mật/phân quyền trước khi code.
 
-**Quyết định của người dùng (2026-08-24): đóng băng, KHÔNG gỡ code — đảo ngược được.**
+Đặc tả M101 §6.3 (2 dòng cuối bảng: `boqCode` theo dự án, đối chiếu BOQ trong Excel), §7 FR5/FR6, §9, §16 (PR4), §18.
 
-### Vấn đề
+1. **Map `boqCode` theo dự án**: DDL thêm thuần (lấy số migration thật bằng `ls migrations | sort -V | tail -3`) — bảng map `(project_id, takeoff_item_id) → boq_code`; **có `project_id` ⇒ phải vào RLS theo đúng khuôn các bảng theo dự án hiện có** (ĐỌC migration RLS gần nhất + `lib/bao-mat/` trước). Admin/PM nhập trên web (thêm mục vào bảng điều khiển plugin `/engineering/chuan-hoa-ban-ve`).
+2. **`GET /api/engineering/cad/rule-pack?project=<id>`**: trả rule pack hiện hành có `takeoff.items[].boqCode` đã gán theo map của dự án; không có `?project=` → giữ nguyên hành vi cũ (toàn cục). Auth như route rule-pack hiện tại; **project scope phải kiểm bằng ngữ cảnh phiên/token, KHÔNG tin id client gửi** (bài học lặp lại nhiều đợt — xem `docs/audit.md`).
+3. **`GET /api/engineering/cad/boq-snapshot?project=<id>`** (MỚI, **chỉ đọc**): trả KL BOQ hợp đồng theo item để plugin đặt cạnh KL bóc. Token scope `cad` hoặc phiên; **không mở bất kỳ đường ghi nào** (đường ghi sổ duy nhất vẫn là upload có kiểm định). Cột tiền: M101 PR4 **không đụng tiền** — chỉ khối lượng; nếu buộc phải chạm cột tiền thì cast `::text` theo quy ước M45 (`lib/nen/money.ts`).
+4. **Excel**: sheet phụ `Doi-chieu` (tùy chọn khi phát lệnh) — KL BOQ hợp đồng cạnh KL bóc, chênh lệch % bằng **công thức sống**. Không đụng `Data-BOQ` (mẫu công ty) và không đụng sheet `Tong-hop-vung` của PR3.
+5. **Adapter**: `XBOSS_BOCKL_XUAT` thêm tùy chọn kéo snapshot (có mạng + token) → dựng sheet đối chiếu; không mạng → bỏ qua kèm thông báo, KHÔNG chặn xuất Excel.
 
-Đợt audit kết luận nhiều module `engineering/*` được xây **vượt cổng của chính roadmap**
-(`ENG-0` nguyên tắc #10: giai đoạn `OS-<n>` chỉ được code sau khi ENG-1..4 có traffic thật từ
-MEPF-Agents — hiện **chưa có request nào**), và W1 chứng minh một số trong đó **chưa từng chạy được**.
-Chúng đang đứng cạnh dữ liệu production như tính năng thật.
+**Tiêu chí chấp nhận:** AC (e) — đổi KL BOQ trên server thì sheet `Doi-chieu` lần xuất sau đổi theo, bản vẽ không đổi; route mới có `getCurrentUser()` + 401 + kiểm quyền; test node phủ auth 401/403 + RLS chéo dự án; dotnet test xanh toàn bộ.
 
-### Cái bẫy phải xử lý trước
+## Việc W5 — `XBOSS_BATCH` bóc hàng loạt + upload kèm KL + web (M101 PR5) — `route: standard`
 
-`isModuleEnabled` (`lib/ha-tang/feature-flags.ts:41`) trả `overrides.get(moduleKey) ?? **true**` —
-**mặc định BẬT**. Nên chèn dòng DB tắt cho từng dự án là mong manh: **dự án mới tạo sẽ tự bật lại**.
+Đặc tả M101 §6.4.
 
-**Cách đúng:** thêm cờ mặc-định-tắt ở tầng **registry code**, không phải dữ liệu.
+1. `XBOSS_BATCH` thêm chế độ `bocl`: bóc cả thư mục `.dwg` qua side database → **1 Excel tổng** nhiều bản vẽ (thêm cột "Tệp"), bản gốc giữ nguyên, tệp lỗi bỏ qua + ghi nhật ký (bám đúng khuôn `BatchProcessor` hiện có).
+2. `XBOSS_UPLOAD` gửi kèm **sidecar JSON kết quả bóc** (đã có sẵn từ PR-B) → server lưu vào `drawing_revisions.standardize_report` khối `takeoff`. **KHÔNG ghi vào bảng BOQ** (giữ nguyên đường ghi sổ duy nhất).
+3. Web: bảng điều khiển hiện KL đã bóc theo revision (biểu đồ theo hệ/vùng) + nút tải Excel gộp.
 
-1. `lib/nen/modules.ts` — `ModuleDef` thêm trường optional `thuNghiem?: boolean` (kèm comment giải
-   thích: module chưa đạt cổng kiểm chứng, mặc định TẮT cho mọi dự án, Admin bật thủ công được).
-2. `isModuleEnabled` đổi thành `overrides.get(moduleKey) ?? (def?.thuNghiem ? false : true)`.
-   `getModuleFlags` sửa tương ứng. **Giữ nguyên** khả năng Admin bật/tắt per-project qua `setFlag` —
-   override tường minh trong DB luôn thắng mặc định.
-3. Đánh dấu `thuNghiem: true` cho các module thoả **một trong hai** tiêu chí, ghi rõ tiêu chí nào
-   cho từng module trong comment:
-   - **(a) Vượt cổng roadmap** — nhóm OS-phase: autonomy, twin, predictions, graph, prescriptive.
-     Riêng **autonomy** bắt buộc phải có (OS-4 đòi phê duyệt riêng từng workflow A3+ từ người dùng).
-   - **(b) Chưa từng chạy được** (lỗi SQL W1) hoặc là mô phỏng rõ rệt: bim-models/bim-viewer,
-     iot-telemetry, subcon-ai, god-tier-studio, quantum-hub, swarm, nextgen-apex.
-     Module nào bạn **không chắc** thuộc tiêu chí nào → **để nguyên (không đánh dấu)** và ghi vào báo
-     cáo để phiên chính quyết. Thà bỏ sót còn hơn tắt nhầm tính năng đang dùng thật.
-4. **Tuyệt đối KHÔNG đánh dấu** các module nghiệp vụ lõi đang dùng thật: tracking, dashboard,
-   materials, approvals, payments, contracts, boq, hse, diary, reports, notifications, admin...
-5. UI: trang/nav của module `thuNghiem` khi **được bật thủ công** nên có nhãn cảnh báo
-   "⚠️ Thử nghiệm — chưa kiểm chứng trên dữ liệu thật" (tái dùng component sẵn có, theo chuẩn UI
-   dark-first, không `dark:`, không hex).
-
-### Tiêu chí chấp nhận
-
-- Dự án **mới tạo** (không có dòng override nào) → module `thuNghiem` trả `isModuleEnabled = false`;
-  module lõi trả `true`. Có test chứng minh (cần DB — dùng cổng **55503**).
-- Admin `setFlag(key, projectId, true, ...)` vẫn bật được module `thuNghiem` → `true` (override thắng).
-- `npm run check:sw-exclude` vẫn xanh (registry là nguồn của cổng này).
-- Báo cáo liệt kê **đầy đủ** module đã đánh dấu + tiêu chí (a)/(b) cho từng cái, và danh sách module
-  bạn không chắc.
-
----
-
-## Việc W4 — Lưới quét axe cho các trang chưa phủ (`route: standard`)
-
-### Vấn đề
-
-`docs/audit.md` §5 tuyên bố spec axe là **cổng merge**, nhưng ~35 trang `app/engineering/*` cùng hub
-`site`/`commercial` và vài trang khác **không có spec axe nào**. Đây đúng là nơi tập trung nhiều
-nhất vi phạm màu mà GĐ1 phải sửa (57 file) — không ngẫu nhiên: chưa có trọng tài.
-
-Viết 45 spec thủ công là không khả thi. Làm **1 spec tham số hoá** quét theo danh sách route.
-
-### Việc phải làm
-
-1. `e2e/authed/luoi-quet-axe.spec.ts` — mảng route (mỗi mục: đường dẫn + tên tiếng Việt), loop:
-   `goto` → chờ nội dung chính render (đừng chỉ chờ `networkidle` — trang rỗng cũng "idle") →
-   `AxeBuilder().withTags([...]).analyze()` → assert **không** vi phạm `serious`/`critical`.
-   Bám đúng pattern spec sẵn có (`e2e/authed/my-tasks.spec.ts`, `admin.spec.ts`) — cùng cách lấy
-   `storageState`, cùng bộ tag WCAG.
-2. Lấy danh sách route bằng cách đối chiếu thư mục `app/**/page.tsx` với các `goto()` đã có trong
-   `e2e/**`. Route động (`[id]`, `[sheet]`...) cần dữ liệu seed — nếu seed hiện có không đủ thì
-   **bỏ qua route đó và ghi vào báo cáo**, đừng bịa id.
-3. Chạy thật `npm run test:e2e` (hoặc lệnh e2e của dự án) cho spec mới. **Vi phạm axe tìm được thì
-   ghi vào báo cáo, KHÔNG tự sửa diện rộng** — sửa a11y ở ~45 trang là việc riêng, ngoài phạm vi.
-   Nếu quá nhiều trang đỏ khiến spec không thể xanh, đánh dấu các trang đó `test.fixme()` kèm lý do
-   - danh sách vi phạm, để spec vẫn vào được CI và làm mốc so sánh.
-
-### Tiêu chí chấp nhận
-
-- Spec mới chạy được thật (không phải chỉ đúng cú pháp), phủ **cả desktop + mobile** theo cấu hình
-  `playwright.config.ts` sẵn có.
-- Báo cáo liệt kê: số trang phủ thêm, trang nào xanh, trang nào đỏ (kèm vi phạm cụ thể), trang nào
-  bỏ qua và vì sao.
-
----
-
-## Việc W5 — Ba việc cơ học độc lập (`route: mechanical`)
-
-### W5.1 — Rule lint chặn chữ trắng trên nền accent sáng
-
-Lớp lỗi này lặp lần ≥3 (54b3e03 → ee8fce1 → 57 file ở GĐ1). Làm script
-`scripts/check-mau-accent.ts` → `npm run check:mau-accent` (khuôn giống các `check:*` khác, KHÔNG
-cần viết ESLint plugin — script đơn giản hơn và đủ dùng):
-
-- **Cấm:** `text-white` cùng `bg-{emerald|sky|amber|green|teal|cyan}-500|600` trên cùng một chuỗi class.
-- **Cấm:** hover no-op — `bg-{c}-N` đi cùng `hover:bg-{c}-N` **cùng số N**. ⚠️ Loại dương tính giả:
-  `bg-emerald-600/20` vs `hover:bg-emerald-600/30` khác **opacity** nên KHÔNG phải no-op.
-- **KHÔNG cấm** nhóm accent PASS (`blue`/`violet`/`rose`/`red`/`indigo`) — chữ trắng trên `-600` của
-  nhóm này đạt ≥4,7:1, xem bảng `docs/audit.md` §13.3. **Đừng tính lại tương phản**, bảng có sẵn.
-- Thêm vào job `static` của CI.
-- **Chứng minh cổng đỏ** khi thêm 1 vi phạm mỗi loại, rồi xanh khi gỡ.
-
-### W5.2 — Loại `/api/tasks/version` khỏi cache service worker
-
-`public/sw.js` (khoảng dòng 107-115) stale-while-revalidate phủ luôn endpoint watermark
-`/api/tasks/version`. Khi SSE rớt và trang tracking rơi về poll 10s, mỗi lượt poll nhận **bản cũ từ
-cache** → độ trễ đồng bộ thực tế 10–20s thay vì 10s. Thêm `/api/tasks/version` (và
-`/api/engineering/queue/tasks/` nếu cùng cơ chế poll tiến độ) vào danh sách loại trừ cạnh
-`/api/events`, `/api/photos/`.
-
-**Bắt buộc:** tăng version hằng `CACHE` trong `sw.js` — không tăng thì thiết bị cũ kẹt cache cũ vĩnh
-viễn. Khai `swExclude` tương ứng trong registry `lib/nen/modules.ts` nếu cần và chạy
-`npm run check:sw-exclude` (cổng CI kiểm khớp hai nơi).
-
-### W5.3 — `recommend-shortlist` còn default `?? 80`
-
-`app/api/engineering/subcon-ai/recommend-shortlist/route.ts` đọc metrics **từ DB** nhưng còn mặc
-định `?? 80` khi thiếu. Cùng lớp "số mặc định đẹp" mà GĐ1 đã bỏ ở `evaluate`. Thiếu dữ liệu →
-**`null` + lý do**, không thay bằng số. Bám đúng cách `lib/hien-truong/subcon-metrics.ts` (do GĐ1
-tạo) đã làm; tái dùng hàm đó nếu phù hợp thay vì viết lại.
-
-⚠️ File này nằm trong danh sách W1 — **W5.3 chỉ đụng phần giá trị mặc định**, không đụng cách truyền
-tham số SQL (đó là W1). Nếu thấy trùng dòng, ưu tiên giữ nguyên phần W1 và báo lại.
-
----
-
-## Việc W6 — Retention cho log webhook + coverage ratchet thành cổng CI (`route: standard`)
-
-### W6.1 — Retention 2 bảng log webhook
-
-`zalo_site_message_logs` và `telegram_bot_message_logs` nhận ghi từ **nguồn công khai** (webhook) và
-hiện **không có giới hạn tuổi** → phình vô hạn. Thêm 2 mục vào `RETENTION_TARGETS`
-(`lib/ha-tang/retention.ts:70`) theo đúng khuôn các mục sẵn có, **kèm lý do bằng tiếng Việt** như
-file đó yêu cầu. Thời hạn đề xuất **180 ngày** (log vận hành bot, không phải chứng cứ nghiệp vụ) —
-nếu bạn thấy khuôn hiện tại đòi owner chốt thời hạn thì ghi rõ và để phiên chính quyết.
-**Không** đụng `AUDIT_LOG_KHONG_XOA`.
-
-### W6.2 — Coverage ratchet thành cổng CI
-
-`npm run test:coverage` đã có; mốc gần nhất ghi trong `PROGRESS.md` (lines 87,12% / branches 84,11%
-/ funcs 79,46%). Nhưng ratchet hiện dựa vào **người nhớ cập nhật tài liệu**.
-
-- Lưu mốc vào file JSON nhỏ (đề xuất `coverage-baseline.json` ở gốc repo) — chỉ 4 số + ngày đo.
-- `scripts/check-coverage.ts` → `npm run check:coverage`: chạy đo, so với mốc, **fail khi tụt quá
-  ngưỡng đệm 1%** (đệm để nhiễu đo không làm đỏ oan). Vượt mốc thì in gợi ý cập nhật mốc, **không**
-  tự ghi đè file (tránh commit tự động ngoài ý muốn).
-- Nối vào CI ở job **`test`** (không phải `static` — cần Postgres service container).
-- Đo mốc thật **trên nhánh hiện tại với Postgres thật** (cổng **55506**) và ghi số đó vào
-  `coverage-baseline.json`; **đừng chép số cũ từ `PROGRESS.md`** vì GĐ1 đã thêm nhiều test.
-
-### Tiêu chí chấp nhận
-
-- `npm run check:coverage` xanh trên nhánh hiện tại với mốc vừa đo.
-- **Chứng minh đỏ:** hạ tay mốc trong JSON lên cao hơn thực tế >1% → cổng đỏ; trả lại → xanh.
-- 2 mục retention mới xuất hiện đúng trong `RETENTION_TARGETS`, có lý do tiếng Việt; test/cron
-  retention sẵn có vẫn xanh.
-
----
-
-## Thứ tự thi hành & phụ thuộc
-
-- **Song song được ngay:** W1, W3, W4, W5, W6.
-- **W2 sau W1** — W2.3 (`check:db-params`) muốn tái dùng hàm quét của W1; W2.2 tái dùng heuristic
-  của test GĐ1 đã có sẵn trên nhánh. Nếu chạy song song thì W2 viết độc lập và ghi chú để gộp.
-- **W5.3 và W1 cùng chạm** `subcon-ai/recommend-shortlist/route.ts` — ranh giới đã ghi rõ trong brief
-  từng việc (W1: cách truyền tham số SQL; W5.3: giá trị mặc định).
-- **Không việc nào được sửa file của việc khác.** Vướng thì dừng và báo.
-
-## Việc reviewer
-
-Sau khi worker báo xong, gọi `reviewer` soát diff. Ưu tiên W1 (chạm 11 route, dễ sai lệch tham số),
-W2 và W5.1 (cổng CI viết sai thì **mù** — GĐ1 đã có tiền lệ test bất biến trông đúng mà mù hoàn
-toàn), W3 (tắt nhầm module đang dùng thật là hồi quy nặng).
-
-## Báo cáo về phiên chính
-
-Việc nào xong/không xong, tiêu chí nào đạt/không đạt, **output thật của phần chứng minh cổng-báo-đỏ**,
-lỗi reviewer bắt được, và mọi chỗ đặc tả sai/thiếu (dừng việc đó, không tự chế đặc tả).
+**Tiêu chí chấp nhận:** dotnet test + test node liên quan xanh; upload cũ (không kèm KL) vẫn chạy y nguyên; không có đường ghi mới nào vào bảng BOQ.
