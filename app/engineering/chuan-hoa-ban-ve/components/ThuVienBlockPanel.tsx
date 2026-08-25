@@ -104,17 +104,31 @@ function BlockProposalRow({
   const dangCho = item.status === "pending";
   return (
     <li className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row gap-3">
-      <div className="shrink-0 w-16 h-16 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden">
-        {item.previewSvg ? (
-          // eslint-disable-next-line @next/next/no-img-element -- data URL cục bộ, không phải ảnh từ xa
-          <img
-            src={anhXemTruoc(item.previewSvg)}
-            alt={`Xem trước block ${item.blockName}`}
-            className="w-full h-full object-contain"
-          />
-        ) : (
-          <ImageOff className="w-6 h-6 text-zinc-600" strokeWidth={1.5} aria-hidden="true" />
-        )}
+      <div className="shrink-0 flex flex-row sm:flex-col items-center gap-2 w-full sm:w-16">
+        <div className="w-16 h-16 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden">
+          {item.previewSvg ? (
+            // eslint-disable-next-line @next/next/no-img-element -- data URL cục bộ, không phải ảnh từ xa
+            <img
+              src={anhXemTruoc(item.previewSvg)}
+              alt={`Xem trước block ${item.blockName}`}
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <ImageOff className="w-6 h-6 text-zinc-600" strokeWidth={1.5} aria-hidden="true" />
+          )}
+        </div>
+        {/* Ảnh xem trước là best-effort (có thể rỗng/sai lệch) — nút này tải TỆP THẬT để người
+            duyệt đối chiếu, kèm sha256 rút gọn (tooltip hiện đầy đủ 64 ký tự hex). */}
+        <ButtonLink
+          size="sm"
+          icon={Download}
+          href={`/api/engineering/cad/block-proposals/${item.id}/candidate`}
+          download={`${item.blockName}-ung-vien.dwg`}
+          aria-label={`Tải tệp DWG ứng viên của block ${item.blockName}`}
+          title={`sha256: ${item.dwgSha256}`}
+        >
+          <span className="font-mono text-[10px]">{item.dwgSha256.slice(0, 8)}…</span>
+        </ButtonLink>
       </div>
 
       <div className="flex-1 min-w-0 space-y-1.5">
