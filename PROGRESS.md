@@ -4,6 +4,54 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Quét trùng lặp lần 2 — sau khi #389/#392 vào main (2026-08-24)
+
+Người dùng: "quét tất cả". Quét lại **1.298 file** (`lib` 192, `app` 738, `tests` 223, `e2e` 74,
+`scripts` 36, `plugin-autocad` 37) qua 5 trục: bộ dò clone cửa sổ 30 dòng chuẩn hoá, trùng tên
+export, hash file, phương thức C#, và so khung route sau khi trừu tượng hoá tên bảng.
+
+**Kết quả so với lần quét đầu:** cụm clone lớn nhất 51 → 25 khối; tên export trùng trong `lib/`
+11 → 8; route upload tự viết pipeline 25 → 2 → **0**; file trùng y hệt: 0. Code C# 36 file sạch,
+không phương thức trùng tên, không khối clone.
+
+### Đã gộp đợt này
+
+| Cụm                 | Trùng gì                                                                                                                                | Cách gộp                                                                                                            |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 2 route upload cuối | `workpackages/:id/bbnt` và `:id/drawing` còn tự viết pipeline kiểm tệp (Content-Length → multipart → mime → size → magic byte)          | Dùng `parseUploadedFile()` như 23 route kia. **25/25 route upload nay dùng chung một pipeline.** −65 dòng           |
+| Fixture BIM         | `bim-unified-facade.test.ts` và `engineering-bim-routing.test.ts` dựng cùng mảng `BimElementRecord[]` 3 phần tử, chép nguyên si 32 dòng | Tách `tests/fixtures-bim.ts` (không đuôi `.test.ts` nên runner không chạy như bộ test, cùng khuôn `tests/setup.ts`) |
+
+**Đổi hành vi (cố ý, nhỏ):** hai route trên nay trả thông báo lỗi chuẩn giống 23 route kia
+(`"File quá lớn (tối đa 20MB)"` thay vì `"File vượt quá 20MB"`; 415 có kê định dạng). Cùng mã
+trạng thái; đã kiểm không test/e2e nào bám chuỗi cũ.
+
+### KHÔNG gộp — và vì sao (quan trọng)
+
+**`work-front-documents/[id]` ↔ `floor-stage-front-documents/[id]` trùng 100%** (68 dòng, chỉ
+khác đúng tên bảng). Đã thử gộp và **hoàn nguyên** — cả hai đường đều tệ hơn:
+
+- _Tách phần chạm DB xuống `lib/` (đúng ADR-0008):_ chỉ chuyển được 2 câu SQL, phần trùng thật là
+  khung HTTP. Kết quả 62+62+39 = **163 dòng, NHIỀU HƠN 136 dòng ban đầu**.
+- _Factory trả `{GET, DELETE}`:_ gọn thật, nhưng `scripts/lib/route-perms-scan.ts` tìm **khai báo**
+  `export async function DELETE(` rồi soi thân hàm. Với `export const DELETE = handlers.DELETE`
+  regex không khớp → route **biến mất khỏi tầm quét của cổng `check:route-perms`**, không phải báo
+  đỏ mà là bỏ qua âm thầm. Đục thủng đúng cái cổng GĐ2 dựng ra để thay checklist người.
+
+Kết luận: phần trùng ở đây là khung HTTP mà **ADR-0008 muốn nằm trong route** và **cổng bảo mật đòi
+nhìn thấy trong file route**. Hai luật của chính dự án đều đẩy về phía giữ nguyên. Ghi lại để lần
+sau không ai tốn công gộp lại.
+
+### Còn lại (chưa làm)
+
+- **Họ ~8 route `<thực thể>-documents/[id]`** giống 55–71% (`claim`/`contract`/`vo`/`subcon`/
+  `project`/`correspondence-files`). Cùng khuôn nhưng khác thật về quyền và phạm vi dự án — ép một
+  trừu tượng chung lên chỗ luật quyền khác nhau đúng là rủi ro `docs/audit.md` cảnh báo. Để nguyên.
+- **Khung form lặp 271 lần ở 32 file `.tsx`** (rõ nhất `app/environment/page.tsx` ↔
+  `app/kickoff/page.tsx`, 25 khối). Boilerplate UI, không phải tính năng trùng — nên là đợt tách
+  component form dùng chung riêng.
+- **`calcHazenWilliams` còn 2 bản** khác quy ước đơn vị (L/s vs m³/h) và hằng số cột nước
+  (9806,65 vs 9810 Pa/m). Gộp được nhưng **đổi số liệu kỹ thuật** → cần người dùng chốt bản chuẩn.
+
 ## Đợt gộp tính năng trùng lặp (2026-08-24)
 
 Người dùng: "quét tính năng trùng lặp gộp chúng lại cho gọn — trùng lặp hoặc thuộc về 1 bộ tính
