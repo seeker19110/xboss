@@ -1,5 +1,6 @@
 using System.Globalization;
 using ClosedXML.Excel;
+using XBoss.Cad.Core.Api;
 using XBoss.Cad.Core.Takeoff;
 
 namespace XBoss.Cad.Core.Excel;
@@ -80,7 +81,19 @@ public static class BoqExcelWriter
     /// kèm tên tệp nguồn — dùng để đổ vào cột "Tệp" của Excel tổng.</summary>
     public sealed record BatchTakeoffEntry(string TenTep, TakeoffResult KetQua);
 
-    public static void Write(TakeoffResult ketQua, BoqExcelMeta meta, Stream output)
+    /// <summary>Tên sheet phụ đối chiếu KL bóc ↔ KL BOQ hợp đồng (M101 PR4) — CỘNG THÊM, tùy chọn.</summary>
+    public const string SheetDoiChieu = "Doi-chieu";
+
+    /// <summary>
+    /// <paramref name="doiChieu"/> (M101 PR4, tùy chọn): KL BOQ hợp đồng kéo từ máy chủ. null hoặc
+    /// rỗng → tệp ra y hệt trước, KHÔNG sinh sheet <c>Doi-chieu</c> (không mạng/không token thì
+    /// lệnh vẫn xuất Excel bình thường).
+    /// </summary>
+    public static void Write(
+        TakeoffResult ketQua,
+        BoqExcelMeta meta,
+        Stream output,
+        BoqSnapshot? doiChieu = null)
     {
         // Cột v6 chỉ xuất hiện khi có dữ liệu tương ứng — rule pack chưa bật khóa nào thì tệp
         // ra y hệt bản M99 (không thêm cột trống làm QS hoang mang).
@@ -245,8 +258,98 @@ public static class BoqExcelWriter
         ws.SheetView.FreezeRows(HangHeader);
 
         if (coVung) GhiSheetVung(wb, ketQua);
+        if (doiChieu is { Dong.Count: > 0 }) GhiSheetDoiChieu(wb, doiChieu, moRong);
 
         wb.SaveAs(output);
+    }
+
+    /// <summary>
+    /// Sheet phụ <c>Doi-chieu</c> (M101 §6.3 PR4) — KL BOQ hợp đồng (máy chủ) đặt cạnh KL bóc, chênh
+    /// lệch tuyệt đối và % đều là CÔNG THỨC SỐNG. Chỉ CỘNG THÊM: không đụng một ô nào của
+    /// <c>Data-BOQ</c> (mẫu công ty) lẫn <c>Tong-hop-vung</c> (PR3).
+    ///
+    /// KL bóc lấy bằng SUMIF về <c>Data-BOQ</c> chứ không chép số chết, nên QS sửa KL đo bên đó thì
+    /// chênh lệch tự đổi theo. Khóa cộng gộp:
+    ///   • có cột "Mã item" (khối v6, cột O) → SUMIF theo MÃ ITEM — chính xác nhất, không phụ thuộc
+    ///     việc cột A đã điền mã BOQ hay chưa, và gom đủ mọi dòng tách theo size/vùng của item đó;
+    ///   • chưa có cột đó (bóc không bật khóa v6 nào) → SUMIF theo MÃ BOQ ở cột A.
+    /// </summary>
+    private static void GhiSheetDoiChieu(XLWorkbook wb, BoqSnapshot snapshot, bool coCotMaItem)
+    {
+        var ws = wb.AddWorksheet(SheetDoiChieu);
+        string[] header =
+        [
+            "Mã BOQ", "Mã item\n(rule pack)", "MÔ TẢ CÔNG TÁC (theo BOQ)", "Đơn vị",
+            "KL BOQ HỢP ĐỒNG\n(từ máy chủ XBoss)", "KL BÓC\n(từ bản vẽ)",
+            "CHÊNH LỆCH\n(= BOQ - bóc)", "CHÊNH LỆCH %",
+        ];
+        double[] beRong = [18, 20, 46, 10, 20, 18, 18, 14];
+
+        ws.Cell(1, 1).Value = "ĐỐI CHIẾU KHỐI LƯỢNG BÓC TÁCH ↔ KHỐI LƯỢNG BOQ HỢP ĐỒNG";
+        ws.Cell(1, 1).Style.Font.SetBold();
+        ws.Cell(2, 1).Value =
+            $"Nguồn: máy chủ XBoss, dự án #{snapshot.ProjectId}, chụp lúc {snapshot.ChupLuc} " +
+            $"(rule pack {snapshot.RulePackVersion}). Chỉ ĐỌC — sheet này không ghi gì ngược về máy chủ.";
+        ws.Cell(2, 1).Style.Font.SetItalic().Font.SetFontColor(XLColor.FromHtml("#71717A"));
+
+        const int hangHeader = 4;
+        for (var i = 0; i < header.Length; i++)
+        {
+            ws.Cell(hangHeader, i + 1).Value = header[i];
+            ws.Cell(hangHeader, i + 1).Style
+                .Font.SetBold()
+                .Alignment.SetWrapText(true)
+                .Alignment.SetVertical(XLAlignmentVerticalValues.Center)
+                .Fill.SetBackgroundColor(XLColor.FromHtml("#D9E2F3"));
+            ws.Column(i + 1).Width = beRong[i];
+        }
+        ws.Row(hangHeader).Height = 34;
+
+        var hang = hangHeader + 1;
+        foreach (var d in snapshot.Dong)
+        {
+            ws.Cell(hang, 1).Value = d.BoqCode;
+            ws.Cell(hang, 2).Value = d.TakeoffItemId;
+            // Chưa có dòng BOQ nào mang mã này → nói thẳng, không để trống cho QS đoán.
+            ws.Cell(hang, 3).Value = d.Ten ?? "(chưa có dòng BOQ nào mang mã này trên hệ thống)";
+            ws.Cell(hang, 4).Value = d.DonVi ?? "";
+            // KL hợp đồng: null = chưa khớp → để TRỐNG (khác 0), công thức % tự bỏ qua.
+            if (d.QtyContract is { } kl) ws.Cell(hang, 5).Value = kl;
+            ws.Cell(hang, 6).FormulaA1 = coCotMaItem
+                ? $"SUMIF('Data-BOQ'!{CotChu(CotMaItem)}:{CotChu(CotMaItem)},$B{hang},'Data-BOQ'!G:G)"
+                : $"SUMIF('Data-BOQ'!A:A,$A{hang},'Data-BOQ'!G:G)";
+            ws.Cell(hang, 7).FormulaA1 = $"IF(ISNUMBER(E{hang}),E{hang}-F{hang},\"\")";
+            ws.Cell(hang, 8).FormulaA1 = $"IF(AND(ISNUMBER(E{hang}),E{hang}<>0),G{hang}/E{hang},\"\")";
+            hang++;
+        }
+
+        // Tổng cộng (SUM thường: sheet này không có hàng nhóm nên không sợ đếm trùng).
+        ws.Cell(hang, 3).Value = "TỔNG CỘNG";
+        ws.Cell(hang, 5).FormulaA1 = $"SUM(E{hangHeader + 1}:E{hang - 1})";
+        ws.Cell(hang, 6).FormulaA1 = $"SUM(F{hangHeader + 1}:F{hang - 1})";
+        ws.Cell(hang, 7).FormulaA1 = $"E{hang}-F{hang}";
+        ws.Range(hang, 1, hang, header.Length).Style
+            .Font.SetBold()
+            .Fill.SetBackgroundColor(XLColor.FromHtml("#D9E2F3"));
+
+        ws.Range(hangHeader, 1, hang, header.Length).Style.Border.SetInsideBorder(XLBorderStyleValues.Thin);
+        ws.Range(hangHeader + 1, 5, hang, 7).Style.NumberFormat.Format = "#,##0.00";
+        ws.Range(hangHeader + 1, 8, hang, 8).Style.NumberFormat.Format = "0.0%";
+        ws.SheetView.FreezeRows(hangHeader);
+
+        hang += 2;
+        ws.Cell(hang, 1).Value =
+            "KL BÓC là công thức SUMIF về sheet Data-BOQ — sửa KL đo bên đó thì chênh lệch ở đây tự đổi. " +
+            "KL BOQ HỢP ĐỒNG là số máy chủ trả về lúc xuất tệp: đổi BOQ trên hệ thống thì lần xuất sau mới đổi.";
+        ws.Cell(hang, 1).Style.Font.SetItalic();
+        if (!coCotMaItem)
+        {
+            hang++;
+            ws.Cell(hang, 1).Value =
+                "KL BÓC dò theo cột A (Mã BOQ) của Data-BOQ — cột A trống thì kết quả ra 0. " +
+                "Tải rule pack THEO DỰ ÁN trên web (mục \"Mã BOQ theo dự án\") rồi nạp bằng XBOSS_RULEPACK để cột A tự điền mã.";
+            ws.Cell(hang, 1).Style.Font.SetItalic().Font.SetFontColor(XLColor.FromHtml("#B45309"));
+        }
     }
 
     /// <summary>

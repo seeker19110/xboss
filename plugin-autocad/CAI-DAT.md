@@ -54,16 +54,16 @@ sang máy trạm rồi gõ `XBOSS_RULEPACK` chọn tệp. Chuẩn hóa vẫn ch�
 
 ## 4. Dùng hằng ngày
 
-| Lệnh               | Làm gì                                                                          |
-| ------------------ | ------------------------------------------------------------------------------- |
-| `XBOSS_KIEMTRA`    | Chỉ kiểm, **không đụng bản vẽ**; xuất báo cáo JSON cạnh tệp DWG                 |
-| `XBOSS_CHUANHOA`   | Chuẩn hóa theo bộ quy tắc; sai thì **1 lần UNDO** về nguyên trạng               |
-| `XBOSS_BOCKL`      | Bóc khối lượng theo layer, tô màu + đánh dấu vùng đã bóc (chạy lại không trùng) |
-| `XBOSS_BOCKL_XOA`  | Gỡ đánh dấu, trả màu từng đối tượng về đúng màu trước khi bóc                   |
-| `XBOSS_BOCKL_XUAT` | Xuất Excel đúng mẫu công ty (công thức sống) để gửi QS                          |
-| `XBOSS_UPLOAD`     | Gửi bản vẽ đã chuẩn hóa về XBoss (server kiểm định lại rồi mới ghi sổ)          |
-| `XBOSS_BATCH`      | Xử lý hàng loạt cả thư mục; **bản gốc giữ nguyên**, kết quả vào `da-chuan-hoa/` |
-| `XBOSS_VE…`        | Bộ lệnh **vẽ shop drawing** đúng chuẩn ngay từ đầu — xem mục 4b bên dưới        |
+| Lệnh               | Làm gì                                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `XBOSS_KIEMTRA`    | Chỉ kiểm, **không đụng bản vẽ**; xuất báo cáo JSON cạnh tệp DWG                                                     |
+| `XBOSS_CHUANHOA`   | Chuẩn hóa theo bộ quy tắc; sai thì **1 lần UNDO** về nguyên trạng                                                   |
+| `XBOSS_BOCKL`      | Bóc khối lượng theo layer, tô màu + đánh dấu vùng đã bóc (chạy lại không trùng)                                     |
+| `XBOSS_BOCKL_XOA`  | Gỡ đánh dấu, trả màu từng đối tượng về đúng màu trước khi bóc                                                       |
+| `XBOSS_BOCKL_XUAT` | Xuất Excel đúng mẫu công ty (công thức sống) để gửi QS; tuỳ chọn kéo KL BOQ hợp đồng từ máy chủ → sheet `Doi-chieu` |
+| `XBOSS_UPLOAD`     | Gửi bản vẽ đã chuẩn hóa về XBoss (server kiểm định lại rồi mới ghi sổ)                                              |
+| `XBOSS_BATCH`      | Xử lý hàng loạt cả thư mục; **bản gốc giữ nguyên**, kết quả vào `da-chuan-hoa/`                                     |
+| `XBOSS_VE…`        | Bộ lệnh **vẽ shop drawing** đúng chuẩn ngay từ đầu — xem mục 4b bên dưới                                            |
 
 Trình tự khuyên dùng: `XBOSS_KIEMTRA` → `XBOSS_CHUANHOA` → kiểm mắt → `QSAVE` → `XBOSS_UPLOAD`.
 

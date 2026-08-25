@@ -3333,6 +3333,27 @@
 - `cad_device_pairings_pkey`: UNIQUE INDEX cad_device_pairings_pkey ON public.cad_device_pairings USING btree (id)
 - `cad_device_pairings_user_code_key`: UNIQUE INDEX cad_device_pairings_user_code_key ON public.cad_device_pairings USING btree (user_code)
 
+### cad_takeoff_boq_map
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('cad_takeoff_boq_map_id_seq'::regclass)` |
+| project_id | integer |  |  |
+| takeoff_item_id | text |  |  |
+| boq_code | text |  |  |
+| updated_by | integer | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+| updated_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `project_id` → `projects(id)`
+- `updated_by` → `users(id)`
+
+**Index:**
+- `cad_takeoff_boq_map_pkey`: UNIQUE INDEX cad_takeoff_boq_map_pkey ON public.cad_takeoff_boq_map USING btree (id)
+- `idx_cad_takeoff_boq_map_project`: INDEX idx_cad_takeoff_boq_map_project ON public.cad_takeoff_boq_map USING btree (project_id)
+- `uniq_cad_takeoff_boq_map`: UNIQUE INDEX uniq_cad_takeoff_boq_map ON public.cad_takeoff_boq_map USING btree (project_id, takeoff_item_id)
+
 ### custom_field_defs
 
 | Cột | Kiểu | Null | Default |

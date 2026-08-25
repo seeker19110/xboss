@@ -45,6 +45,26 @@ export function getRulePackEtag(pack: CadRulePack = getCurrentRulePack()): strin
   return `"${pack.version}-${hash}"`;
 }
 
+/**
+ * ETag cho bản rule pack đã gán mã BOQ THEO DỰ ÁN (M101 PR4).
+ *
+ * Tách khỏi `getRulePackEtag` thay vì băm luôn đối tượng đã gán: giữ nguyên từng byte ETag của
+ * đường toàn cục (plugin đang cache theo nó — đổi là cả công ty tải lại vô cớ), đồng thời nhét
+ * `projectId` vào để hai dự án tình cờ có map giống nhau vẫn không dùng lẫn bản cache của nhau.
+ * `map` phải được sắp thứ tự ổn định (`layMapBoqTheoDuAn` sắp theo `takeoff_item_id`).
+ */
+export function getRulePackEtagChoDuAn(
+  pack: { version: string },
+  projectId: number,
+  map: readonly { takeoffItemId: string; boqCode: string }[],
+): string {
+  const hash = createHash("sha256")
+    .update(JSON.stringify([pack.version, projectId, map]))
+    .digest("hex")
+    .slice(0, 32);
+  return `"${pack.version}-p${projectId}-${hash}"`;
+}
+
 /** So `If-None-Match` (có thể là danh sách, có thể có tiền tố W/) với ETag hiện tại. */
 export function matchesEtag(ifNoneMatch: string | null, etag: string): boolean {
   if (!ifNoneMatch) return false;

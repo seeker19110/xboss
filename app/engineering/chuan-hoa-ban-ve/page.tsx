@@ -6,6 +6,7 @@ import { Layers, Download, FileSpreadsheet } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import PluginControlPanel from "./components/PluginControlPanel";
 import ThuVienBlockPanel from "./components/ThuVienBlockPanel";
+import MaBoqDuAnPanel from "./components/MaBoqDuAnPanel";
 import UploadAndBrowsePanel from "./components/UploadAndBrowsePanel";
 import CadViewportStudio from "./components/CadViewportStudio";
 import StepTabsNav from "./components/StepTabsNav";
@@ -165,6 +166,11 @@ export default function ChuanHoaBanVePage() {
             THƯ VIỆN BLOCK CHUẨN (M100 PR2) — version hiện hành, lịch sử, phát hành
         ══════════════════════════════════════════════════════════════════════ */}
         <ThuVienBlockPanel />
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            MÃ BOQ THEO DỰ ÁN (M101 PR4) — gán mã cho hạng mục bóc tách XBOSS_BOCKL
+        ══════════════════════════════════════════════════════════════════════ */}
+        <MaBoqDuAnPanel />
 
         {/* ══════════════════════════════════════════════════════════════════════
             TOP BAR: CHỌN NGUỒN CAD (TỪ THIẾT KẾ HOẶC TẢI LÊN FILE .DXF)
