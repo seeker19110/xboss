@@ -49,6 +49,19 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // `?v=<version>` là tham số cache-busting của UI, KHÔNG phải chọn bản để tải — thư viện chỉ giữ
+  // bản đang phát hành (không lưu lịch sử tải lại). Gửi `v` khác bản hiện hành → báo rõ thay vì
+  // âm thầm trả bản khác với thứ client tưởng đang xin.
+  const vThamSo = req.nextUrl.searchParams.get("v");
+  if (vThamSo && vThamSo !== row.version) {
+    return NextResponse.json(
+      {
+        error: `Phiên bản thư viện không còn là bản hiện hành (đang yêu cầu ${vThamSo}, bản hiện hành là ${row.version}) — tải lại trang để lấy bản mới nhất.`,
+      },
+      { status: 404 },
+    );
+  }
+
   const etag = etagBlockLib(row);
   if (matchesEtag(req.headers.get("if-none-match"), etag)) {
     return new NextResponse(null, { status: 304, headers: { ETag: etag } });
@@ -124,6 +137,21 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+  // Header content-length (check ở trên) có thể vắng mặt khi body gửi chunked — kiểm lại kích
+  // thước THẬT ngay khi đã biết đây là File, TRƯỚC khi buffer nội dung vào RAM (arrayBuffer/text),
+  // để không nạp không giới hạn khi client né được header.
+  const manifestSize = manifestTho instanceof File ? manifestTho.size : manifestTho.length;
+  if (
+    dwg.size > GIOI_HAN_TEP_CAD ||
+    dxf.size > GIOI_HAN_TEP_CAD ||
+    manifestSize > GIOI_HAN_TEP_CAD
+  ) {
+    return NextResponse.json(
+      { error: `Tệp vượt trần ${Math.floor(GIOI_HAN_TEP_CAD / (1024 * 1024))}MB` },
+      { status: 413 },
+    );
+  }
+
   // Manifest nhận cả dạng tệp .json lẫn ô văn bản — trình duyệt gửi tệp, script/plugin gửi chuỗi.
   const manifestText = manifestTho instanceof File ? await manifestTho.text() : String(manifestTho);
   let manifestJson: unknown;

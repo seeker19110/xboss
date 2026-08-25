@@ -145,6 +145,21 @@ test("cảnh báo: manifest khai thuộc tính mà DXF không có ATTDEF tương
   assert.ok(kq.warnings.some((w) => w.includes("LUU_LUONG")));
 });
 
+test('chặn: "attributes" sai kiểu (không phải mảng) chỉ sinh ĐÚNG 1 lỗi — không chồng thêm "thiếu TAG"', async () => {
+  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const m = manifest();
+  const tb = blocks(m).find((b) => b.kind === "equipment")!;
+  tb.attributes = "khong-phai-mang"; // sai kiểu — phải là mảng chuỗi
+  const kq = kiemDinhManifest(m, DWG_MAU, DXF_MAU);
+  assert.equal(kq.ok, false);
+  assert.equal(kq.errors.length, 1, JSON.stringify(kq.errors));
+  assert.match(kq.errors[0], /"attributes" phải là danh sách chuỗi/);
+  assert.ok(
+    !kq.errors.some((e) => e.includes("TAG")),
+    "không được sinh thêm lỗi 'thiếu TAG' chồng lên lỗi kiểu dữ liệu gốc",
+  );
+});
+
 // ===== (2) Route-source =====
 
 test("route block-lib: force-dynamic, 401 khi chưa đăng nhập, 403 theo quyền, 422 kèm lỗi", () => {
@@ -166,6 +181,37 @@ test("route block-lib: force-dynamic, 401 khi chưa đăng nhập, 403 theo quy�
   assert.match(src, /getCadTokenUser/);
   const post = src.slice(src.indexOf("export async function POST"));
   assert.ok(!post.includes("getCadTokenUser"), "POST không được nhận token thiết bị");
+});
+
+test("route block-lib POST: kiểm content-length SỚM, kiểm lại kích thước thật (dwg/dxf/manifest) TRƯỚC khi arrayBuffer()/text() — chặn body chunked không header vượt trần", () => {
+  const src = readFileSync(
+    join(process.cwd(), "app", "api", "engineering", "cad", "block-lib", "route.ts"),
+    "utf8",
+  );
+  const post = src.slice(src.indexOf("export async function POST"));
+
+  // Vẫn còn lưới chặn sớm theo header content-length (rẻ, không đọc form).
+  assert.match(
+    post,
+    /isContentTooLarge\(req\.headers\.get\("content-length"\), GIOI_HAN_TEP_CAD\)/,
+  );
+
+  // Lưới thứ hai: kiểm size thật của dwg/dxf/manifest — bắt được cả body chunked (không có
+  // header content-length nên lưới thứ nhất bị bỏ qua).
+  const idxFormParsed = post.indexOf("await req.formData()");
+  const idxSizeCheck = post.indexOf("dwg.size > GIOI_HAN_TEP_CAD");
+  const idxDwgArrayBuffer = post.indexOf("dwg.arrayBuffer()");
+  const idxDxfText = post.indexOf("dxfText: await dxf.text()");
+  assert.ok(idxFormParsed >= 0 && idxSizeCheck >= 0 && idxDwgArrayBuffer >= 0 && idxDxfText >= 0);
+  // Kiểm size thật phải nằm SAU khi parse form (đã có dwg/dxf là File) và TRƯỚC khi buffer nội
+  // dung (arrayBuffer/text) — đúng thứ tự "biết size không cần đọc hết nội dung".
+  assert.ok(idxFormParsed < idxSizeCheck, "kiểm size thật phải sau khi đã parse formData");
+  assert.ok(
+    idxSizeCheck < idxDwgArrayBuffer && idxSizeCheck < idxDxfText,
+    "kiểm size thật phải trước khi arrayBuffer()/text() — tránh nạp buffer vượt trần vào RAM",
+  );
+  assert.match(post, /dxf\.size > GIOI_HAN_TEP_CAD/);
+  assert.match(post, /status: 413/);
 });
 
 // ===== (3) Integration (Postgres) =====
@@ -326,6 +372,44 @@ test(
       authorization: `Bearer ${tokenSubcon.key}`,
     });
     assert.equal(res403.status, 403);
+  },
+);
+
+test(
+  "GET với ?v= khác version hiện hành → 404 (không âm thầm trả bản khác thứ client xin)",
+  S,
+  async () => {
+    const { createCadToken } = await import("@/lib/bao-mat/cad-devices");
+    const { GET } = await import("@/app/api/engineering/cad/block-lib/route");
+    const { layBlockLibHienHanh, phatHanhBlockLib } = await import("@/lib/ky-thuat/cad/block-lib");
+
+    let hienHanh = await layBlockLibHienHanh();
+    if (!hienHanh) {
+      await phatHanhBlockLib({ userId, manifestTho: manifest(), dwg: DWG_MAU, dxfText: DXF_MAU });
+      hienHanh = await layBlockLibHienHanh();
+      if (hienHanh) daLuu.push(hienHanh.storageKey);
+    }
+    assert.ok(hienHanh);
+
+    const token = await createCadToken(userId, 1, "May test tham so v", null);
+
+    // v khớp version hiện hành → vẫn trả bình thường (200).
+    const resKhop = await GET(
+      new NextRequest(`http://x/api/engineering/cad/block-lib?v=${hienHanh.version}`, {
+        headers: { authorization: `Bearer ${token.key}` },
+      }),
+    );
+    assert.equal(resKhop.status, 200);
+
+    // v khác version hiện hành → 404 kèm thông điệp tiếng Việt, không lặng lẽ trả bản khác.
+    const resLech = await GET(
+      new NextRequest("http://x/api/engineering/cad/block-lib?v=phien-ban-khong-ton-tai", {
+        headers: { authorization: `Bearer ${token.key}` },
+      }),
+    );
+    assert.equal(resLech.status, 404);
+    const body = (await resLech.json()) as { error: string };
+    assert.match(body.error, /không còn là bản hiện hành/);
   },
 );
 

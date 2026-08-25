@@ -135,12 +135,16 @@ export function docManifest(tho: unknown): { manifest: BlockLibManifest | null; 
         `${nhan}${id ? ` ("${id}")` : ""}: kind "${kind}" lạ — chỉ nhận ${LOAI_BLOCK.join(" | ")}.`,
       );
     }
+    if (b.attributes !== undefined && !Array.isArray(b.attributes)) {
+      errors.push(`${nhan}${id ? ` ("${id}")` : ""}: "attributes" phải là danh sách chuỗi.`);
+      // Bỏ qua block này ở các bước kiểm sau (kiemThuocTinhTheoLoai) — nếu vẫn đẩy vào `blocks`
+      // với attributes rỗng, bước 3 sẽ tưởng block không khai thuộc tính và sinh thêm lỗi "thiếu
+      // TAG"/"thiếu attributes" chồng lên đúng 1 lỗi gốc về kiểu dữ liệu ở trên.
+      return;
+    }
     const attributes = Array.isArray(b.attributes)
       ? b.attributes.filter((a): a is string => typeof a === "string").map((a) => a.trim())
       : undefined;
-    if (b.attributes !== undefined && !Array.isArray(b.attributes)) {
-      errors.push(`${nhan}${id ? ` ("${id}")` : ""}: "attributes" phải là danh sách chuỗi.`);
-    }
     blocks.push({
       id,
       blockName,
