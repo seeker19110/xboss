@@ -60,9 +60,19 @@ public sealed class XBossCommands
         try
         {
             var pack = RulePackStore.Import(dlg.Filename);
+            // Cache theo phạm vi (M101 PR4): tệp tải kèm ?project= mang dấu projectId nên nằm ở ô
+            // cache của dự án đó, tệp toàn cục nằm ở rule-pack.json — in ĐÚNG đường dẫn đã ghi.
             ed.WriteMessage(
                 $"\n[XBoss] Đã nạp rule pack {pack.Version} ({pack.Takeoff.Items.Count} quy tắc bóc tách," +
-                $" {pack.LayerMap.Groups.Count} nhóm layer). Cache: {RulePackStore.CachePath}\n");
+                $" {pack.LayerMap.Groups.Count} nhóm layer). Cache: {RulePackStore.DuongDanCua(pack)}\n");
+            if (RulePackStore.DuongDanCua(pack) != RulePackStore.DuongDanHienHanh)
+            {
+                // Chỉ xảy ra khi nạp tay bản TOÀN CỤC trong lúc máy đang nhớ một dự án có cache
+                // riêng — nói thẳng bản nào đang có hiệu lực thay vì để kỹ sư tưởng đã đổi.
+                ed.WriteMessage(
+                    "[XBoss] ⚠ Bản vừa nạp KHÔNG phải bản các lệnh đang dùng " +
+                    $"({RulePackStore.DuongDanHienHanh}) — chạy XBOSS_LOGIN để lấy bản của dự án đang làm.\n");
+            }
         }
         catch (RulePackException e)
         {
@@ -433,6 +443,17 @@ public sealed class XBossCommands
         var doiChieu = HoiDoiChieuBoq(ed, ref duAnId);
         ExcelMetaStore.Ghi(new ExcelMetaStore.MetaLuu(tenDuAn, goiThau, duAnId));
 
+        // Mã BOQ ở cột A đến từ RULE PACK, không phải từ KL đối chiếu: rule pack đang dùng thuộc
+        // dự án khác (hoặc là bản toàn cục) thì cột mã không khớp dự án vừa chọn. Chỉ CẢNH BÁO —
+        // Excel vẫn xuất bình thường, kỹ sư chạy XBOSS_LOGIN là khớp lại (M101 PR4).
+        if (duAnId is { } duAnDoiChieu && pack.ProjectId != duAnDoiChieu)
+        {
+            var dangDung = pack.ProjectId is { } idPack ? $"thuộc dự án #{idPack}" : "là bản toàn cục";
+            ed.WriteMessage(
+                $"\n[XBoss] ⚠ Rule pack đang dùng {dangDung} — cột mã BOQ có thể chưa khớp dự án " +
+                $"#{duAnDoiChieu}. Chạy XBOSS_LOGIN để tải rule pack của dự án này.\n");
+        }
+
         var tenBanVe = Path.GetFileName(db.Filename);
         var goiY = Path.ChangeExtension(tenBanVe, null) + "-boc-khoi-luong.xlsx";
         var dlg = new Autodesk.AutoCAD.Windows.SaveFileDialog(
@@ -662,19 +683,12 @@ public sealed class XBossCommands
             }
             catch (XBossCanChonDuAnException e)
             {
-                // Người dùng thuộc nhiều dự án: danh sách do MÁY CHỦ cấp, chọn xong máy chủ vẫn
-                // kiểm lại quyền ở lần gọi sau — plugin không tự đoán dự án nào.
-                if (e.DuAn.Count == 0)
+                // Người dùng thuộc nhiều dự án: hỏi bằng ĐÚNG lối chung với XBOSS_LOGIN
+                // (ChonDuAn — danh sách do MÁY CHỦ cấp, chọn xong nhớ một chỗ duy nhất) để dự án
+                // của KL đối chiếu và của rule pack không thể trôi khỏi nhau.
+                if (ChonDuAn.Hoi(ed, e.Message, e.DuAn) is not { } chon)
                 {
-                    ed.WriteMessage($"[XBoss] ⚠ {e.Message} — bỏ qua sheet đối chiếu.\n");
-                    return null;
-                }
-                ed.WriteMessage("[XBoss] Tài khoản thuộc nhiều dự án — chọn dự án lấy KL BOQ:\n");
-                foreach (var d in e.DuAn) ed.WriteMessage($"[XBoss]   {d.Id} — {d.Name}\n");
-                var nhap = HoiChuoi(ed, "Mã số dự án", e.DuAn[0].Id.ToString());
-                if (nhap is null || !long.TryParse(nhap.Trim(), out var chon))
-                {
-                    ed.WriteMessage("[XBoss] ⚠ Không nhận được mã số dự án — bỏ qua sheet đối chiếu.\n");
+                    ed.WriteMessage("[XBoss] ⚠ Chưa chọn dự án — bỏ qua sheet đối chiếu.\n");
                     return null;
                 }
                 duAnId = chon;

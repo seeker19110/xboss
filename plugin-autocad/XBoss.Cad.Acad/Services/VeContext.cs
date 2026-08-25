@@ -61,6 +61,7 @@ internal static class VeContext
     }
 
     private static DrawToolsPack? _cache;
+    private static string? _duongDanCache;
     private static DateTime _thoiDiemCache;
 
     /// <summary>
@@ -72,17 +73,22 @@ internal static class VeContext
     {
         try
         {
-            if (!File.Exists(RulePackStore.CachePath))
+            // Tệp rule pack ĐANG có hiệu lực (M101 PR4: có thể là bản của dự án đang làm, không
+            // còn cố định là rule-pack.json) — đọc một lần vào biến để cả 3 lần chạm tệp dưới đây
+            // cùng nói về một đường dẫn.
+            var duongDan = RulePackStore.DuongDanHienHanh;
+            if (!File.Exists(duongDan))
             {
                 ed.WriteMessage(
                     "\n[XBoss] Chưa nạp rule pack. Tải tệp JSON từ trang XBoss /engineering/chuan-hoa-ban-ve " +
                     "rồi chạy XBOSS_RULEPACK (hoặc XBOSS_LOGIN để tải tự động).\n");
                 return null;
             }
-            var thoiDiem = File.GetLastWriteTimeUtc(RulePackStore.CachePath);
-            if (_cache is not null && thoiDiem == _thoiDiemCache) return _cache;
+            var thoiDiem = File.GetLastWriteTimeUtc(duongDan);
+            if (_cache is not null && duongDan == _duongDanCache && thoiDiem == _thoiDiemCache) return _cache;
 
-            _cache = DrawToolsConfig.Load(File.ReadAllText(RulePackStore.CachePath));
+            _cache = DrawToolsConfig.Load(File.ReadAllText(duongDan));
+            _duongDanCache = duongDan;
             _thoiDiemCache = thoiDiem;
             return _cache;
         }

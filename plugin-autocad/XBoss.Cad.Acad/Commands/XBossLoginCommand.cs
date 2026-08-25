@@ -119,26 +119,77 @@ public sealed class XBossLoginCommand
         }
     }
 
+    /// <summary>
+    /// Tải rule pack THEO DỰ ÁN (M101 PR4): bản của dự án mang sẵn mã BOQ trong
+    /// <c>takeoff.items[].boqCode</c> nên cột mã của bảng bóc khối lượng tự điền thay vì
+    /// "(chưa gán mã)". Đã nhớ dự án thì hỏi thẳng dự án đó; chưa nhớ thì để máy chủ tự suy
+    /// (tài khoản 1 dự án khỏi bị hỏi câu nào), thuộc nhiều dự án thì máy chủ trả 409 → hỏi kỹ sư.
+    ///
+    /// ĐƯỜNG LUI luôn là bản toàn cục: không chọn được dự án / không có quyền / máy chủ cũ đều chỉ
+    /// CẢNH BÁO rồi tải bản toàn cục — việc ghép thiết bị không bao giờ bị chặn vì chuyện mã BOQ.
+    /// </summary>
     private static async Task TaiRulePack(Editor ed, XBossApiClient client, string token)
     {
-        string? etagCu = null;
+        var pham = RulePackCache.PhamViDeHoi(ExcelMetaStore.DuAnHienHanh);
         try
         {
-            if (File.Exists(RulePackStore.EtagPath)) etagCu = File.ReadAllText(RulePackStore.EtagPath);
+            await TaiTheoPhamVi(ed, client, token, pham);
         }
-        catch (IOException) { /* thiếu etag chỉ tốn 1 lần tải lại */ }
+        catch (XBossCanChonDuAnException e)
+        {
+            var chon = ChonDuAn.Hoi(ed, e.Message, e.DuAn);
+            if (chon is { } id)
+            {
+                await TaiTheoPhamVi(ed, client, token, PhamViDuAn.Cua(id));
+            }
+            else
+            {
+                ed.WriteMessage(
+                    "\n[XBoss] ⚠ Chưa chọn dự án — tải rule pack bản toàn cục (cột mã BOQ để trống). " +
+                    "Chạy lại XBOSS_LOGIN khi muốn gán mã theo dự án.\n");
+                await TaiTheoPhamVi(ed, client, token, PhamViDuAn.ToanCuc);
+            }
+        }
+        catch (XBossApiException e) when (pham.TheoDuAn)
+        {
+            // Dự án nhớ trong máy không còn dùng được (bị gỡ khỏi dự án, đổi máy chủ...) — lui về
+            // bản toàn cục.
+            ed.WriteMessage($"\n[XBoss] ⚠ Không lấy được rule pack theo dự án ({e.Message}) — dùng bản toàn cục.\n");
+            await TaiTheoPhamVi(ed, client, token, PhamViDuAn.ToanCuc);
+            // Quên dự án SAU KHI đã có bản lui trong tay: để nguyên thì cache của dự án cũ vẫn
+            // được các lệnh dùng (in mã BOQ của dự án kỹ sư không còn làm). Lỗi chung như token
+            // hết hạn thì dòng trên đã ném tiếp — không xoá nhầm lựa chọn còn đúng.
+            if (pham.Id is not null) ExcelMetaStore.GhiDuAn(null);
+        }
+    }
 
-        var (json, etag) = await client.FetchRulePackAsync(token, etagCu);
+    private static async Task TaiTheoPhamVi(
+        Editor ed, XBossApiClient client, string token, PhamViDuAn pham)
+    {
+        // ETag CHỈ gửi khi đã biết chắc phạm vi, và lấy từ tệp .etag RIÊNG của phạm vi đó: gửi
+        // ETag của dự án khác là tự xin một cú 304 rồi dùng cache của dự án khác — sai mã BOQ mà
+        // không có dấu hiệu nào trên màn hình.
+        var etagCu = RulePackStore.DocEtag(pham);
+        var (json, etag) = await client.FetchRulePackAsync(token, etagCu, pham);
         if (json is null)
         {
-            ed.WriteMessage("\n[XBoss] Rule pack không đổi so với bản cache — dùng bản hiện có.\n");
+            ed.WriteMessage($"\n[XBoss] Rule pack ({pham}) không đổi so với bản cache — dùng bản hiện có.\n");
             return;
         }
         try
         {
+            // Cất vào ô cache theo DẤU projectId máy chủ đóng trong pack (máy chủ cũ bỏ qua
+            // ?project= và trả bản toàn cục — lúc đó vẫn cất đúng vào ô toàn cục).
             var pack = RulePackStore.ImportJson(json);
-            if (etag is not null) File.WriteAllText(RulePackStore.EtagPath, etag);
-            ed.WriteMessage($"\n[XBoss] Đã tải rule pack {pack.Version} ({pack.Takeoff.Items.Count} quy tắc bóc tách).\n");
+            if (etag is not null) RulePackStore.GhiEtag(pack, etag);
+            // ImportJson đã nhớ luôn dự án của pack (nếu có dấu): máy chủ tự suy ra dự án nào thì
+            // lần sau plugin hỏi thẳng theo id đó và dùng lại được ETag (phạm vi "tự suy" không có
+            // ô cache riêng nên không gửi ETag được).
+            var moTa = pack.ProjectId is { } idDuAn
+                ? $"dự án #{idDuAn} — cột mã BOQ tự điền"
+                : "bản toàn cục — cột mã BOQ để trống";
+            ed.WriteMessage(
+                $"\n[XBoss] Đã tải rule pack {pack.Version} ({pack.Takeoff.Items.Count} quy tắc bóc tách, {moTa}).\n");
         }
         catch (RulePackException e)
         {
