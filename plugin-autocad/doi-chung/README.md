@@ -30,13 +30,17 @@ ba tệp** trên — sửa manifest mẫu mà quên bên nào là bên đó đ�
 Đổi quy tắc chuẩn hóa → `ket-qua-mong-doi.json` đổi theo và **hiện rõ trong diff**; nếu plugin không
 đổi cùng nhịp, `dotnet test` đỏ ngay.
 
-**`takeoff-sidecar-mau.json`** (M101 PR5): khác 3 tệp trên — CHỈ được nạp bởi tầng 3
-(`tests/cad-vong-doi-ban-ve-takeoff.test.ts` hoặc test riêng đọc trực tiếp tệp này để khẳng định
-`lib/ky-thuat/cad/bang-dieu-khien.ts` phân giải đúng mọi field). Nội dung khớp tay theo đúng tên
-field `[JsonPropertyName]` sinh ra bởi `XBoss.Cad.Core/Reporting/TakeoffJsonReport.cs` — plugin
-C# hiện **không** nạp lại tệp này (không có test C# nào đối chiếu). Đề xuất (chưa làm): thêm test
-tương tự `BlockManifestTests.cs` ở tầng C# để `TakeoffJsonReportTests.cs` cũng nạp tệp mẫu này,
-khép kín đối chứng 2 tầng như bộ manifest thư viện block.
+**`takeoff-sidecar-mau.json`** (M101 PR5): nội dung khớp tay theo đúng tên field
+`[JsonPropertyName]` sinh ra bởi `XBoss.Cad.Core/Reporting/TakeoffJsonReport.cs`, đối chứng khép
+kín cả hai tầng như bộ manifest thư viện block:
+
+- Tầng 3: `tests/cad-takeoff-sidecar-doi-chung-2-tang.test.ts` — khẳng định
+  `lib/ky-thuat/cad/bang-dieu-khien.ts` (`docKlBocTuBaoCao`) phân giải đúng mọi field từ tệp mẫu.
+- Tầng 2: `XBoss.Cad.Tests/TakeoffSidecarMauDoiChungTests.cs` (`dotnet test`, job `plugin` trong
+  CI) — nạp cùng tệp mẫu vào `TakeoffJsonReport`/`TakeoffJsonLine` (khẳng định deserialize đủ mọi
+  khoá bắt buộc) rồi `ToJson()` lại, khẳng định kết quả serialize vẫn có đủ mọi khoá mà tệp mẫu
+  có. Đổi tên `[JsonPropertyName]` phía C# mà quên đổi tệp mẫu là đỏ ngay ở đây, không phải đợi
+  tầng TS phát hiện sau.
 
 **Phạm vi:** ánh xạ layer + giải mã font TCVN3/VNI. Phần AC6 về **hình học** (toạ độ, số thực thể
 theo loại) cần AutoCAD thật → nằm ở kiểm tích hợp `accoreconsole` trên runner có license (PR7b),
