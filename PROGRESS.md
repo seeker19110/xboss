@@ -4,6 +4,24 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M103 — Đề xuất block vào thư viện từ AutoCAD (hàng chờ + duyệt) (2026-08-25)
+
+Người dùng chốt 4 quyết định (đường thêm = từ AutoCAD; hàng chờ + duyệt; engineer trở lên đề
+xuất, Admin/PM duyệt; metadata bắt buộc đủ, trùng tên từ chối). Đặc tả:
+`docs/nang-cap/M103-de-xuat-block-thu-vien.md`. Kiến trúc "thư viện ứng viên": plugin dựng sẵn
+blocks.dwg + manifest hoàn chỉnh, duyệt trên web chỉ là thao tác dữ liệu thuần.
+
+- **Server (đã xong):** migration `0141_cad_block_proposals.sql`; `lib/ky-thuat/cad/block-proposals.ts`
+  - `block-preview-svg.ts` (preview SVG thuần từ sidecar DXF); 3 route
+    `/api/engineering/cad/block-proposals` (+ `/approve`, `/reject`); chống đua version bằng
+    `base_lib_version` + `pg_advisory_xact_lock`; 16 ca test `tests/cad-block-proposals.test.ts`
+    (verify trên Postgres 16 thật). Đã qua reviewer, vá 2 phát hiện (khoá advisory khi duyệt song
+    song, đo meta theo byte UTF-8).
+- **Web (đã xong):** mục "Đề Xuất Chờ Duyệt" trong `ThuVienBlockPanel` — preview SVG nhúng an
+  toàn qua data URI, nút Duyệt/Từ chối theo `laNguoiDuyet` server trả về.
+- **Plugin (đang làm):** lệnh `XBOSS_VE_DEXUAT` + dialog + nút trên `XBOSS_BANG` — cập nhật mục
+  này khi đóng.
+
 ## Audit "kịch trần CAD 2D" + đóng doc drift M101 PR5 (2026-08-25)
 
 Rà lại toàn bộ đợt plugin theo yêu cầu người dùng ("kiểm tra lại mọi tính năng đã kịch trần chưa"):
