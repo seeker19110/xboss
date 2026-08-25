@@ -7,6 +7,8 @@
 >
 > Vì vậy mọi thứ dưới đây chỉ có thể xác nhận trên AutoCAD thật. **Chưa chạy xong checklist này thì chưa phát hành cho kỹ sư dùng.**
 
+> **Chưa có server XBoss?** Vẫn kiểm được **13/14 ca** (tất cả trừ AC8) trên một máy AutoCAD đứng một mình — nạp bộ quy tắc và thư viện block bằng tệp thay cho `XBOSS_LOGIN`. Xem `docs/ops/kiem-thu-plugin-khong-can-server.md`.
+
 **Thời lượng ước tính:** 60–90 phút cho toàn bộ. Cần 1 người biết dùng AutoCAD.
 **Người chạy / ngày:** ................................................
 
