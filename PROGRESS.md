@@ -492,6 +492,33 @@ dùng duyệt hướng xử lý.
 - **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
   M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
 
+## M99 — Adapter AutoCAD biên dịch được lần đầu trên máy thật: 8 lỗi CI không thể bắt (2026-08-25)
+
+`XBoss.Cad.Acad` **chưa từng được biên dịch** từ lúc viết ở PR-A: CI chỉ build/test `XBoss.Cad.Core`
+(cần ObjectARX SDK + Windows nên không build Adapter — đúng thiết kế §9.1). Người dùng build trên
+máy có AutoCAD 2026, lỗi lộ ra theo 4 lô:
+
+- **Lô 1–2 — trùng tên do implicit using:** `csproj` bật `UseWindowsForms` (cần cho hộp thoại chọn
+  tệp của `Autodesk.AutoCAD.Windows`), kéo theo implicit using `System.Drawing`/`System.Windows.Forms`
+  → `Color`, `Region`, `Application` nhập nhằng với kiểu của AutoCAD. Sửa bằng bí danh
+  `AcadColor`/`AcadRegion`/`AcadApp` trong 4 tệp, không tắt `ImplicitUsings` (tắt sẽ phải thêm hàng
+  loạt `using` tay).
+- **Lô 3 — `Database.Audit` / `new AuditInfo()` KHÔNG TỒN TẠI trong managed API.** AUDIT là _lệnh_
+  của AutoCAD. Bước 1 pipeline tách khỏi `Run()` thành `Buoc1Audit(Editor?)`, chạy `_.AUDIT _Y`
+  trên dòng lệnh **trước** khi mở transaction. Hệ quả thật: `XBOSS_BATCH` đọc qua side database nên
+  không có dòng lệnh → ghi **cảnh báo vào báo cáo** ("mở tệp kết quả rồi chạy AUDIT/RECOVER") thay
+  vì lặng lẽ bỏ bước.
+- **Lô 4 — `SaveFileDialogFlags` không có thành viên "không cờ nào"** (thử cả `Default` lẫn
+  `NoFlags` đều không có) → dùng `default(...)` = giá trị 0, luôn biên dịch được bất kể ObjectARX
+  đặt tên cờ thế nào; ghi lý do ngay tại chỗ để không ai đổi lại thành tên đoán mò.
+- **Kết quả:** `Build succeeded`, ra `bin\Release\XBoss.Cad.Acad.dll`. Thêm
+  `plugin-autocad/dong-goi.ps1` — build + dựng `XBoss.bundle` + cài vào `%APPDATA%` (hoặc `-ChiDongGoi`
+  để phát hành), tự loại các assembly do AutoCAD cung cấp lúc chạy.
+- **Cảnh báo còn lại (không chặn):** `MSB3277 WindowsBase 4.0 vs 8.0` — AutoCAD tham chiếu
+  `WindowsBase 8.0`, .NET 8 ref pack là `4.0`, MSBuild chọn `4.0`. Theo dõi khi nạp thật trong AutoCAD.
+- **Bài học:** phần plugin nào CI không build được thì **không có bảo đảm nào** cho tới khi build
+  trên máy có license — 89→92 ca test Core xanh suốt vẫn không nói gì về Adapter.
+
 ## M99 §9.1 — xác minh runtime AutoCAD 2026 trên máy thật: assumption cuối cùng ĐÃ ĐÓNG (2026-08-25)
 
 Người dùng chạy trên máy Windows có license AutoCAD 2026 (theo hướng dẫn phần Windows của PR7):

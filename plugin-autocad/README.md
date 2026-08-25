@@ -63,6 +63,16 @@ Test nạp rule pack thật từ repo nên phải chạy bên trong repo XBoss.
 
 ## Đóng gói `.bundle` và cài đặt
 
+**Cách nhanh — script tự làm hết** (build + tạo bundle + cài):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File plugin-autocad\dong-goi.ps1
+powershell -ExecutionPolicy Bypass -File plugin-autocad\dong-goi.ps1 -ChiDongGoi   # chỉ tạo .\dist để phát hành
+```
+
+Đóng AutoCAD trước khi chạy (DLL đang nạp thì không ghi đè được). Phần dưới mô tả cấu trúc gói
+để đối chiếu khi cần làm tay.
+
 > Hướng dẫn cho **người dùng cuối** (cài, ghép thiết bị, trục trặc thường gặp) nằm ở
 > [`CAI-DAT.md`](CAI-DAT.md). Phần dưới đây dành cho người phát hành gói cài.
 
