@@ -4,6 +4,13 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M100 PR1 — Rule pack v4 (`drawTools` + `sheetSetup`) + validator Core (2026-08-25)
+
+- **`lib/ky-thuat/cad/rule-packs/v4.json`** (append-only, v3 không đổi 1 byte): v4 = v3 + `drawTools` (5 hệ thao tác HVAC/PIPING/FIREFIGHTING/ELECTRICAL/ELV — mỗi tuyến khai `itemId`/`layer`/`edgeStyle`/`sizes` + `supportSpacingMm`/`sleeveClearanceMm`/`slopeRequired`) + `sheetSetup` (khổ giấy, tỉ lệ, khung tên, tag, bảng, slope). `lib/ky-thuat/cad/rule-pack.ts` + route `GET /api/engineering/cad/rule-pack` phục vụ v4 (thêm 2 field mới vào response).
+- **`XBoss.Cad.Core/Draw/`** (thuần, không chạm AutoCAD): `DrawToolsConfig` (nạp + kiểm chéo: hệ ↔ `layerMap.groups[].id`, layer ↔ `branches[].target` ĐÚNG nhóm, `itemId` ↔ `takeoff.items[].id`, layer nét biên KHÔNG khớp `takeoff.layerMatchAny` nào, `titleblockId` khai thì khác rỗng) + `TakeoffCrossCheck` (thiết bị phải là item `count` có `blockNameMatchAny` — cảnh báo, không ném).
+- **Phát hiện khi thi hành:** hậu tố nét biên `-EDGE` phác trong M100 §11 **vẫn khớp** token layer tim (`M-DUCT-SUPP-EDGE` chứa token `M-DUCT-SUPP`, dấu `-` là ranh giới token) → nét biên bị bóc trùng, vỡ FR4/AC3. v4 phát hành hậu tố `EDGE` (nối liền); validator có ca test chứng minh `-EDGE` bị chặn.
+- Test: dotnet 105 ca xanh (94 cũ + 11 mới, corpus đối chứng chuyển sang v4 chứng minh AC9 mở rộng thuần); test node 1237 ca xanh.
+
 ## M100 + M101 — Đặc tả giai đoạn 2 plugin AutoCAD: bộ lệnh vẽ `XBOSS_VE_*` + nâng trần 3 khối M99 — ĐÃ DUYỆT (2026-08-25)
 
 Người dùng yêu cầu (2026-08-25, qua thảo luận trần năng lực plugin): (1) "viết đặc tả M mới cho lệnh vẽ XBOSS_VE — có block, layer chuẩn hoá sẵn cho từng hệ MEPF và plugin vẽ đè lên thiết kế đã chuẩn hoá"; bổ sung giữa chừng "tạo trang in, mặt cắt" và (2) "nâng cấp tất cả tính năng lên mức trần cao nhất". Sau đó rà sót tính năng vẽ → người dùng **duyệt trọn gói cùng ngày** ("ok duyệt tất cả") kèm yêu cầu ghi chú tính năng đáng giá cho phiên bản sau. Nhánh `claude/plugin-capabilities-limits-rrd2gp`. **Chỉ đặc tả — CHƯA CODE.**

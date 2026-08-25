@@ -7,7 +7,11 @@ namespace XBoss.Cad.Tests;
 public static class RepoPaths
 {
     /// <summary>Tên tệp rule pack đang phát hành — đổi ở ĐÚNG MỘT chỗ khi phát hành version mới.</summary>
-    public const string TenTepHienHanh = "v3.json";
+    public const string TenTepHienHanh = "v4.json";
+
+    /// <summary>Đường dẫn một version rule pack cũ trong repo (kiểm tương thích ngược).</summary>
+    public static string RulePackPathCua(string tenTep) =>
+        Path.Combine(Path.GetDirectoryName(RulePackPath)!, tenTep);
 
     public static string RulePackPath
     {

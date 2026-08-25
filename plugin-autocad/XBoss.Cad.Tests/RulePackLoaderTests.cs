@@ -9,7 +9,7 @@ public class RulePackLoaderTests
     public void Nap_duoc_rule_pack_dang_phat_hanh_tu_repo()
     {
         var pack = RepoPaths.LoadRulePack();
-        Assert.Equal("v3", pack.Version);
+        Assert.Equal("v4", pack.Version);
         Assert.Equal(7, pack.LayerMap.Groups.Count);
         Assert.Equal("XBOSS_BOCKL", pack.Takeoff.XdataAppName);
         Assert.True(pack.Takeoff.Items.Count > 0);
@@ -23,8 +23,7 @@ public class RulePackLoaderTests
     public void Rule_pack_v2_khong_co_targetFont_van_nap_duoc()
     {
         // Mở rộng thuần: plugin phải chạy được với pack cũ, chỉ là bỏ qua bước đổi font.
-        var v2 = Path.Combine(Path.GetDirectoryName(RepoPaths.RulePackPath)!, "v2.json");
-        var pack = RulePackLoader.Load(File.ReadAllText(v2));
+        var pack = RulePackLoader.Load(File.ReadAllText(RepoPaths.RulePackPathCua("v2.json")));
         Assert.Equal("v2", pack.Version);
         Assert.Equal("", pack.FontMap.TargetFont.TypeFace);
     }
@@ -35,6 +34,14 @@ public class RulePackLoaderTests
         var json = File.ReadAllText(RepoPaths.RulePackPath).Replace("\"typeFace\": \"Arial\"", "\"typeFace\": \"\"");
         var loi = Assert.Throws<RulePackException>(() => RulePackLoader.Load(json));
         Assert.Contains("targetFont", loi.Message);
+    }
+
+    [Fact]
+    public void Rule_pack_v3_van_nap_duoc_sau_khi_phat_hanh_v4()
+    {
+        // AC9 — v4 là mở rộng thuần: bản cũ vẫn hợp lệ, plugin không bị khoá vào đúng một version.
+        var pack = RulePackLoader.Load(File.ReadAllText(RepoPaths.RulePackPathCua("v3.json")));
+        Assert.Equal("v3", pack.Version);
     }
 
     [Fact]
@@ -67,11 +74,11 @@ public class RulePackLoaderTests
     }
 
     [Fact]
-    public void Bo_qua_field_khong_biet_de_v3_mo_rong_thuan_khong_lam_vo_plugin()
+    public void Bo_qua_field_khong_biet_de_ban_moi_mo_rong_thuan_khong_lam_vo_plugin()
     {
         var json = File.ReadAllText(RepoPaths.RulePackPath)
-            .Replace("\"version\": \"v3\",", "\"version\": \"v3\", \"fieldTuongLai\": { \"x\": 1 },");
+            .Replace("\"version\": \"v4\",", "\"version\": \"v4\", \"fieldTuongLai\": { \"x\": 1 },");
         var pack = RulePackLoader.Load(json);
-        Assert.Equal("v3", pack.Version);
+        Assert.Equal("v4", pack.Version);
     }
 }

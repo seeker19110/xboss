@@ -8,21 +8,23 @@
  * phát hành (cùng triết lý append-only của migration).
  */
 import { createHash } from "node:crypto";
-import rulePackV3 from "@/lib/ky-thuat/cad/rule-packs/v3.json";
+import rulePackV4 from "@/lib/ky-thuat/cad/rule-packs/v4.json";
 
-export type CadRulePack = typeof rulePackV3;
+export type CadRulePack = typeof rulePackV4;
 
 /** Version đang phát hành cho plugin. */
-export const CURRENT_RULE_PACK_VERSION = rulePackV3.version;
+export const CURRENT_RULE_PACK_VERSION = rulePackV4.version;
 
 /**
  * Rule pack đang phát hành:
  * v2 = v1 + takeoff + inspectionPolicy (M99 PR-A);
  * v3 = v2 + fontMap.targetFont (font Unicode đích cho kiểu chữ đã giải mã TCVN3/VNI — không có
- * nó thì plugin sửa nội dung chữ xong AutoCAD vẫn hiển thị sai, xem PROGRESS.md 2026-08-25).
+ * nó thì plugin sửa nội dung chữ xong AutoCAD vẫn hiển thị sai, xem PROGRESS.md 2026-08-25);
+ * v4 = v3 + drawTools + sheetSetup (tham số bộ lệnh vẽ XBOSS_VE_* — M100 §11, mở rộng thuần nên
+ * plugin M99 đọc v4 chạy y hệt v3).
  */
 export function getCurrentRulePack(): CadRulePack {
-  return rulePackV3;
+  return rulePackV4;
 }
 
 /** ETag mạnh theo hash nội dung — plugin cache cục bộ và hỏi lại bằng `If-None-Match`. */
