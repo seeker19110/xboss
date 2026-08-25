@@ -9,7 +9,7 @@ public class RulePackLoaderTests
     public void Nap_duoc_rule_pack_dang_phat_hanh_tu_repo()
     {
         var pack = RepoPaths.LoadRulePack();
-        Assert.Equal("v8", pack.Version);
+        Assert.Equal(RepoPaths.VersionHienHanh, pack.Version);
         Assert.Equal(7, pack.LayerMap.Groups.Count);
         Assert.Equal("XBOSS_BOCKL", pack.Takeoff.XdataAppName);
         Assert.True(pack.Takeoff.Items.Count > 0);
@@ -143,6 +143,6 @@ public class RulePackLoaderTests
         // không chèn được field lạ nào mà vẫn xanh).
         Assert.Contains("fieldTuongLai", json, StringComparison.Ordinal);
         var pack = RulePackLoader.Load(json);
-        Assert.Equal("v8", pack.Version);
+        Assert.Equal(RepoPaths.VersionHienHanh, pack.Version);
     }
 }

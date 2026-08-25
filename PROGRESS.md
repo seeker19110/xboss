@@ -41,6 +41,16 @@ bước mới return sớm — chuẩn hóa cho kết quả y hệt v7.
   nốt. Đặc tả §6.2 đã sửa cho khớp code.
 - `plugin-autocad/README.md`: bảng lệnh ghi lại `XBOSS_CHUANHOA` **13 bước** và nêu phép kiểm 17/18.
 
+**CI đỏ ngay lượt đầu (PR #398) — bài học lặp lại:** 3 test C# hard-code `Assert.Equal("v7", ...)`
+trên rule pack ĐANG PHÁT HÀNH nên phát hành v8 làm chúng đỏ vì lý do không liên quan gì tới thứ
+chúng đang kiểm (`DrawToolsConfigTests` ×2, `InspectorTests`). Sửa tận gốc thay vì đổi số: thêm
+`RepoPaths.VersionHienHanh` (đọc version từ chính tệp rule pack) và thay mọi assert version của pack
+hiện hành sang hằng đó — kể cả 3 chỗ vừa viết `"v8"` trong PR1 (`RulePackLoaderTests` ×2,
+`RulePackV7Tests`) vốn sẽ đỏ y hệt khi lên v9. Giữ hard-code ở đúng hai loại test: nạp version CŨ để
+kiểm tương thích ngược (`RulePackV8Tests` nạp `v7.json`), và test đặc thù của chính version đang
+phát hành. **Container không có .NET SDK nên lớp lỗi này chỉ lộ ra ở CI** — với thay đổi C#, coi CI
+là cổng đầu tiên chứ không phải cổng cuối.
+
 **Chưa làm (đúng ràng buộc môi trường):** container không có dotnet nên phần C# chưa build/test cục
 bộ — dựa vào CI và checklist verify tay trên máy AutoCAD 2026 theo release (M99 §18).
 
