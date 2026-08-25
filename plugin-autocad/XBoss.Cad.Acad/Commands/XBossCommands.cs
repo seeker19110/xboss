@@ -352,20 +352,10 @@ public sealed class XBossCommands
         var db = doc.Database;
 
         // FR16: dựng lại kết quả từ XData đang sống trong DWG — không phụ thuộc RAM phiên trước.
-        var daGan = new List<(MeasuredObject, string)>();
+        List<(MeasuredObject DoiTuong, string ItemId)> daGan;
         using (var tr = db.TransactionManager.StartTransaction())
         {
-            var (doiTuong, _) = TakeoffScanner.Scan(
-                tr, TakeoffScanner.ModelSpaceIds(db, tr).ToList(), pack.Takeoff.XdataAppName);
-            var theoHandle = doiTuong.Where(o => o.AlreadyMarked).ToDictionary(o => o.Handle);
-            var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
-            foreach (ObjectId id in ms)
-            {
-                if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
-                if (MarkService.ReadMark(ent, pack.Takeoff.XdataAppName) is not { } mark) continue;
-                if (theoHandle.TryGetValue(ent.Handle.ToString(), out var obj))
-                    daGan.Add((obj, mark.ItemId));
-            }
+            daGan = TakeoffScanner.DocDaGan(db, tr, pack.Takeoff.XdataAppName);
             tr.Commit();
         }
         if (daGan.Count == 0)

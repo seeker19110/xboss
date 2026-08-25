@@ -28,6 +28,24 @@ public enum VaiTroVe
     /// lần chèn sau biết định nghĩa trong bản vẽ đến từ đâu (M100 §6.10/AC7).
     /// </summary>
     DinhNghiaBlock,
+
+    /// <summary>
+    /// Block giá đỡ/treo đỡ đặt dọc tuyến (<c>XBOSS_VE_GIADO</c> — M100 §6.7). Mang
+    /// <see cref="VeXDataInfo.HandleTim"/> của tuyến nó đỡ: chạy lại lệnh chỉ bổ sung đoạn thiếu.
+    /// </summary>
+    GiaDo,
+
+    /// <summary>
+    /// Block sleeve/lỗ chờ xuyên kết cấu (<c>XBOSS_VE_LOCHO</c> — M100 §6.8). Mang đủ dữ liệu để
+    /// xuất bảng builder's work mà không phải hỏi lại: size ống, size lỗ chờ, cao độ, kết cấu, trục.
+    /// </summary>
+    LoCho,
+
+    /// <summary>
+    /// Bảng thống kê do plugin sinh (<c>XBOSS_VE_THONGKE</c> — M100 §6.9): chạy lại thì cập nhật
+    /// ĐÚNG bảng này tại chỗ, không sinh bảng đôi (FR9f).
+    /// </summary>
+    BangThongKe,
 }
 
 /// <summary>Nội dung XData <c>XBOSS_VE</c> của một đối tượng do bộ lệnh vẽ sinh ra (M100 §11).</summary>
@@ -66,6 +84,27 @@ public sealed record VeXDataInfo
     public string? BlockId { get; init; }
     /// <summary>Version thư viện block mà định nghĩa/khối chèn ra lấy từ đó (M100 §6.10).</summary>
     public string? ThuVienVersion { get; init; }
+
+    /// <summary>Size lỗ chờ đã cộng khe hở (vai trò <see cref="VaiTroVe.LoCho"/>) — vd <c>DN75</c>.</summary>
+    public string? SizeLoCho { get; init; }
+
+    /// <summary>Loại kết cấu xuyên qua: Tường/Sàn/Dầm (vai trò <see cref="VaiTroVe.LoCho"/>).</summary>
+    public string? KetCau { get; init; }
+
+    /// <summary>Vị trí theo trục gần nhất (vd <c>A/3</c>) — tính lúc chèn lỗ chờ, dùng khi xuất bảng.</summary>
+    public string? ViTriTruc { get; init; }
+
+    /// <summary>
+    /// Cao độ lỗ chờ do kỹ sư NHẬP TAY, đơn vị <b>mm</b> (khác <see cref="CaoDo"/> của mặt cắt —
+    /// cái đó theo đơn vị bản vẽ; bảng builder's work luôn ghi mm nên tách khóa riêng cho khỏi lẫn).
+    /// </summary>
+    public double? CaoDoMm { get; init; }
+
+    /// <summary>Tag của khối đã được kỹ sư KHÓA — <c>XBOSS_VE_TAG</c> đánh lại phải giữ nguyên.</summary>
+    public bool TagKhoa { get; init; }
+
+    /// <summary>Mã loại bảng thống kê (<c>thietbi</c>/<c>khoiluong</c> — xem <c>ThongKeTable.Ma</c>).</summary>
+    public string? LoaiBang { get; init; }
 }
 
 /// <summary>
@@ -107,6 +146,12 @@ public static class VeXData
         Them(ra, "ngay", tt.NgayTao);
         Them(ra, "tenmc", tt.TenMatCat);
         if (tt.CaoDo is { } cd) ra.Add($"caodo={cd.ToString("0.######", CultureInfo.InvariantCulture)}");
+        Them(ra, "sizelc", tt.SizeLoCho);
+        Them(ra, "ketcau", tt.KetCau);
+        Them(ra, "truc", tt.ViTriTruc);
+        if (tt.CaoDoMm is { } cdm) ra.Add($"caodomm={cdm.ToString("0.######", CultureInfo.InvariantCulture)}");
+        if (tt.TagKhoa) ra.Add("tagkhoa=1");
+        Them(ra, "bang", tt.LoaiBang);
         return ra;
     }
 
@@ -120,6 +165,9 @@ public static class VeXData
         VaiTroVe.MatCat => "matcat",
         VaiTroVe.PhuKien => "phukien",
         VaiTroVe.ThietBi => "thietbi",
+        VaiTroVe.GiaDo => "giado",
+        VaiTroVe.LoCho => "locho",
+        VaiTroVe.BangThongKe => "bang",
         _ => "blockdef",
     };
 
@@ -137,7 +185,9 @@ public static class VeXData
         var custom = false;
         string? doDoc = null, tim = null, tuyenCat = null, ngay = null, tenMc = null;
         string? blockId = null, thuVien = null;
-        double? caoDo = null;
+        string? sizeLoCho = null, ketCau = null, viTriTruc = null, loaiBang = null;
+        double? caoDo = null, caoDoMm = null;
+        var tagKhoa = false;
         var bien = new List<string>();
         var nhan = new List<string>();
 
@@ -159,6 +209,9 @@ public static class VeXData
                         "matcat" => VaiTroVe.MatCat,
                         "phukien" => VaiTroVe.PhuKien,
                         "thietbi" => VaiTroVe.ThietBi,
+                        "giado" => VaiTroVe.GiaDo,
+                        "locho" => VaiTroVe.LoCho,
+                        "bang" => VaiTroVe.BangThongKe,
                         "blockdef" => VaiTroVe.DinhNghiaBlock,
                         _ => VaiTroVe.Tim,
                     };
@@ -181,6 +234,15 @@ public static class VeXData
                     if (double.TryParse(giaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var cd))
                         caoDo = cd;
                     break;
+                case "sizelc": sizeLoCho = giaTri; break;
+                case "ketcau": ketCau = giaTri; break;
+                case "truc": viTriTruc = giaTri; break;
+                case "caodomm":
+                    if (double.TryParse(giaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var cdm))
+                        caoDoMm = cdm;
+                    break;
+                case "tagkhoa": tagKhoa = giaTri == "1"; break;
+                case "bang": loaiBang = giaTri; break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -203,6 +265,12 @@ public static class VeXData
             CaoDo = caoDo,
             BlockId = blockId,
             ThuVienVersion = thuVien,
+            SizeLoCho = sizeLoCho,
+            KetCau = ketCau,
+            ViTriTruc = viTriTruc,
+            CaoDoMm = caoDoMm,
+            TagKhoa = tagKhoa,
+            LoaiBang = loaiBang,
         };
     }
 }

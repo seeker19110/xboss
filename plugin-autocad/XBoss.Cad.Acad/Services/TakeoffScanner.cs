@@ -101,6 +101,28 @@ internal static class TakeoffScanner
         return (ketQua, xrefSkipped);
     }
 
+    /// <summary>
+    /// Các đối tượng ĐÃ đánh dấu bóc kèm itemId đã gán — dựng lại kết quả bóc từ XData đang sống
+    /// trong DWG (M99 FR16). Dùng chung cho <c>XBOSS_BOCKL_XUAT</c> và bảng khối lượng của
+    /// <c>XBOSS_VE_THONGKE</c> (M100 §6.9) — một đường đọc duy nhất, hai lệnh không thể lệch nhau.
+    /// </summary>
+    internal static List<(MeasuredObject DoiTuong, string ItemId)> DocDaGan(
+        Database db, Transaction tr, string xdataAppName)
+    {
+        var (doiTuong, _) = Scan(tr, ModelSpaceIds(db, tr).ToList(), xdataAppName);
+        var theoHandle = doiTuong.Where(o => o.AlreadyMarked).ToDictionary(o => o.Handle);
+
+        var ra = new List<(MeasuredObject, string)>();
+        var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
+        foreach (ObjectId id in ms)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
+            if (MarkService.ReadMark(ent, xdataAppName) is not { } mark) continue;
+            if (theoHandle.TryGetValue(ent.Handle.ToString(), out var obj)) ra.Add((obj, mark.ItemId));
+        }
+        return ra;
+    }
+
     /// <summary>Toàn bộ ObjectId trong model space.</summary>
     internal static IEnumerable<ObjectId> ModelSpaceIds(Database db, Transaction tr)
     {

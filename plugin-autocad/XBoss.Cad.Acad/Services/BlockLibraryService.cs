@@ -1,5 +1,7 @@
+using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
+using Autodesk.AutoCAD.Geometry;
 using XBoss.Cad.Core.Api;
 using XBoss.Cad.Core.Draw;
 
@@ -328,6 +330,155 @@ internal static class BlockLibraryService
     }
 
     // ===== Chèn khối =====
+
+    /// <summary>
+    /// Chọn một block trong danh mục bằng keyword dòng lệnh (id viết liền, như chọn loại tuyến) —
+    /// dùng chung cho phụ kiện/thiết bị/giá đỡ/lỗ chờ.
+    /// </summary>
+    internal static BlockDef? HoiBlock(Editor ed, string nhan, IReadOnlyList<BlockDef> danhSach, string? macDinhId)
+    {
+        if (danhSach.Count == 0) return null;
+
+        var tuKhoa = new Dictionary<string, BlockDef>(StringComparer.OrdinalIgnoreCase);
+        foreach (var d in danhSach) tuKhoa.TryAdd(VeContext.TuKhoaCua(d.Id), d);
+
+        ed.WriteMessage($"\n[XBoss] {nhan}:\n");
+        foreach (var d in danhSach)
+            ed.WriteMessage($"[XBoss]   {VeContext.TuKhoaCua(d.Id)} = {d.Id} (block {d.BlockName})\n");
+
+        var hienCo = danhSach.FirstOrDefault(d => string.Equals(d.Id, macDinhId, StringComparison.Ordinal));
+        var hoi = new PromptKeywordOptions($"\n[XBoss] Chọn {nhan.ToLowerInvariant()}") { AllowNone = false };
+        foreach (var d in danhSach)
+        {
+            var tk = VeContext.TuKhoaCua(d.Id);
+            hoi.Keywords.Add(tk, tk, tk);
+        }
+        hoi.Keywords.Default = VeContext.TuKhoaCua((hienCo ?? danhSach[0]).Id);
+        var kq = ed.GetKeywords(hoi);
+        if (kq.Status != PromptStatus.OK) return null;
+        return tuKhoa.TryGetValue(kq.StringResult, out var chon) ? chon : null;
+    }
+
+    /// <summary>Một khối chờ chèn: đã chốt vị trí/góc/tỉ lệ/layer/XData, chưa đụng bản vẽ.</summary>
+    internal sealed record KhoiChoChen(
+        Point3d Diem,
+        double Goc,
+        double TyLe,
+        string Layer,
+        VeXDataInfo XData,
+        Dictionary<string, string> ThuocTinh);
+
+    /// <summary>
+    /// Nhập định nghĩa block (hỏi khi trùng tên — AC7) rồi chèn toàn bộ khối đã chốt trong MỘT
+    /// transaction ⇒ một lần UNDO xóa sạch cả định nghĩa lẫn khối. Trả false khi kỹ sư hủy hoặc có
+    /// lỗi (đã in thông báo, bản vẽ nguyên trạng).
+    ///
+    /// Dùng CHUNG cho mọi lệnh chèn block của bộ lệnh vẽ (phụ kiện, thiết bị, giá đỡ, lỗ chờ) —
+    /// một đường chèn duy nhất, không sao chép lại ở từng lệnh.
+    /// </summary>
+    internal static bool ChenHangLoat(
+        Document doc,
+        Editor ed,
+        Database db,
+        BlockDef def,
+        BlockManifest thuVien,
+        IReadOnlyList<KhoiChoChen> muc)
+    {
+        // (a) Định nghĩa block trong bản vẽ đến từ đâu — hỏi NGOÀI transaction.
+        NguonDinhNghia nguon;
+        string? versionTrongBanVe;
+        using (var tr = db.TransactionManager.StartTransaction())
+        {
+            (nguon, versionTrongBanVe) = KiemTraDinhNghia(db, tr, def.BlockName, thuVien.Version);
+            tr.Commit();
+        }
+
+        var ghiDe = false;
+        if (nguon is NguonDinhNghia.ThuVienKhacVersion or NguonDinhNghia.KhongRoNguon)
+        {
+            var traLoi = HoiKhiTrungTen(ed, def, nguon, versionTrongBanVe, thuVien.Version);
+            if (traLoi is null)
+            {
+                ed.WriteMessage("\n[XBoss] Đã hủy — bản vẽ không thay đổi.\n");
+                return false;
+            }
+            ghiDe = traLoi.Value;
+            var lyDo = nguon == NguonDinhNghia.ThuVienKhacVersion
+                ? $"đã nhập từ thư viện version {versionTrongBanVe}"
+                : "có sẵn trong bản vẽ, không rõ nguồn";
+            VeContext.NhatKyPhien.Add(
+                $"Block \"{def.BlockName}\" trùng tên ({lyDo}) — kỹ sư chọn " +
+                $"{(ghiDe ? $"CẬP NHẬT theo thư viện {thuVien.Version}" : "GIỮ định nghĩa trong bản vẽ")}.");
+        }
+        var canNhap = nguon == NguonDinhNghia.ChuaCo || ghiDe;
+
+        using var khoa = doc.LockDocument();
+        try
+        {
+            // (b) Nhập định nghĩa từ tệp thư viện — WblockClone làm việc thẳng trên database nên
+            //     chạy ngoài transaction; vẫn cùng một lệnh ⇒ vẫn một lần UNDO. Nếu bước (c) hỏng
+            //     thì bản vẽ chỉ còn thừa một ĐỊNH NGHĨA block chưa dùng (vô hại, UNDO xóa nốt) —
+            //     không có khối/nhãn mồ côi nào (§6.11).
+            if (canNhap) NhapDinhNghia(db, [def.BlockName], ghiDe);
+        }
+        catch (BlockManifestException e)
+        {
+            ed.WriteMessage($"\n[XBoss] {e.Message}\n");
+            return false;
+        }
+        catch (Autodesk.AutoCAD.Runtime.Exception e)
+        {
+            ed.WriteMessage($"\n[XBoss] Không nhập được định nghĩa block \"{def.BlockName}\": {e.Message}\n");
+            return false;
+        }
+        catch (IOException e)
+        {
+            ed.WriteMessage($"\n[XBoss] Không đọc được tệp thư viện block: {e.Message}\n");
+            return false;
+        }
+
+        // (c) Chèn khối: một transaction cho cả lô.
+        using var tr2 = db.TransactionManager.StartTransaction();
+        try
+        {
+            VeXDataStore.DangKyApp(db, tr2);
+            var dinhNghia = canNhap
+                ? DanhDauDinhNghia(db, tr2, def, thuVien.Version)
+                : MoDinhNghia(db, tr2, def.BlockName);
+            var ms = (BlockTableRecord)tr2.GetObject(
+                SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+
+            foreach (var m in muc)
+            {
+                var khoi = new BlockReference(m.Diem, dinhNghia.ObjectId)
+                {
+                    Rotation = m.Goc,
+                    ScaleFactors = new Scale3d(m.TyLe),
+                };
+                ms.AppendEntity(khoi);
+                tr2.AddNewlyCreatedDBObject(khoi, true);
+                khoi.Layer = m.Layer; // đặt SAU khi vào database (như XBOSS_VE)
+                ThemThuocTinh(tr2, khoi, dinhNghia, m.ThuocTinh);
+                VeXDataStore.Ghi(khoi, m.XData);
+            }
+            tr2.Commit();
+            return true;
+        }
+        catch (BlockManifestException e)
+        {
+            tr2.Abort();
+            ed.WriteMessage($"\n[XBoss] {e.Message}\n");
+            return false;
+        }
+        catch (Autodesk.AutoCAD.Runtime.Exception e)
+        {
+            tr2.Abort();
+            ed.WriteMessage(
+                $"\n[XBoss] LỖI khi chèn block — đã rollback, bản vẽ nguyên trạng: {e.Message}\n" +
+                "[XBoss] Nếu layer đích đang khóa: chạy XBOSS_VE_NEN (hoặc mở khóa layer) rồi thử lại.\n");
+            return false;
+        }
+    }
 
     /// <summary>
     /// Gắn các thuộc tính (attribute) của định nghĩa block vào khối vừa chèn: giá trị lấy từ

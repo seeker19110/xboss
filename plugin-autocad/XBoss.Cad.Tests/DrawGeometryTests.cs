@@ -288,6 +288,71 @@ public class DrawGeometryTests
     }
 
     [Fact]
+    public void XData_gia_do_giu_lien_ket_toi_tim(/* M100 PR7 — FR9c */)
+    {
+        var lai = VeXData.GiaiMa(VeXData.MaHoa(new VeXDataInfo
+        {
+            VaiTro = VaiTroVe.GiaDo,
+            HeId = "HVAC",
+            ItemId = "duct-supp",
+            Size = "300x200",
+            BlockId = "support-duct",
+            HandleTim = "1F3",
+        }));
+
+        Assert.NotNull(lai);
+        Assert.Equal(VaiTroVe.GiaDo, lai!.VaiTro);
+        Assert.Equal("1F3", lai.HandleTim);
+        Assert.Equal("support-duct", lai.BlockId);
+    }
+
+    [Fact]
+    public void XData_lo_cho_du_du_lieu_xuat_bang_builders_work(/* M100 PR7 — FR9d */)
+    {
+        var lai = VeXData.GiaiMa(VeXData.MaHoa(new VeXDataInfo
+        {
+            VaiTro = VaiTroVe.LoCho,
+            HeId = "PIPING",
+            ItemId = "pipe-domw",
+            Size = "DN50",
+            SizeLoCho = "DN75",
+            KetCau = "Tường",
+            ViTriTruc = "A/3",
+            CaoDoMm = 2700,
+            HandleTim = "1F3",
+        }));
+
+        Assert.NotNull(lai);
+        Assert.Equal(VaiTroVe.LoCho, lai!.VaiTro);
+        Assert.Equal("DN75", lai.SizeLoCho);
+        Assert.Equal("Tường", lai.KetCau);
+        Assert.Equal("A/3", lai.ViTriTruc);
+        Assert.Equal(2700, lai.CaoDoMm!.Value, 6);
+        Assert.Null(lai.CaoDo); // cao độ mặt cắt (đơn vị bản vẽ) là khóa KHÁC — không lẫn
+    }
+
+    [Fact]
+    public void XData_bang_thong_ke_va_tag_khoa(/* M100 PR7 — FR9e/FR9f */)
+    {
+        var bang = VeXData.GiaiMa(VeXData.MaHoa(new VeXDataInfo
+        {
+            VaiTro = VaiTroVe.BangThongKe,
+            LoaiBang = "thietbi",
+        }));
+        var khoa = VeXData.GiaiMa(VeXData.MaHoa(new VeXDataInfo
+        {
+            VaiTro = VaiTroVe.ThietBi,
+            BlockId = "fcu-unit",
+            TagKhoa = true,
+        }));
+
+        Assert.Equal(VaiTroVe.BangThongKe, bang!.VaiTro);
+        Assert.Equal("thietbi", bang.LoaiBang);
+        Assert.True(khoa!.TagKhoa);
+        Assert.False(bang.TagKhoa);
+    }
+
+    [Fact]
     public void XData_appname_khong_dung_appname_cua_M99()
     {
         Assert.Equal("XBOSS_VE", VeXData.AppName);

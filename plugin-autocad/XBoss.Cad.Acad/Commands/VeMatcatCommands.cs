@@ -192,13 +192,6 @@ public sealed class VeMatcatCommands
             if (xdata is null || xdata.VaiTro != VaiTroVe.Tim) continue;
             if (pl.NumberOfVertices < 2) continue;
 
-            var dinh = new List<DinhPolyline>(pl.NumberOfVertices);
-            for (var i = 0; i < pl.NumberOfVertices; i++)
-            {
-                var p = pl.GetPoint2dAt(i);
-                dinh.Add(new DinhPolyline(p.X, p.Y, pl.GetBulgeAt(i)));
-            }
-
             ra.Add(new TimMatCat
             {
                 Handle = pl.Handle.ToString(),
@@ -208,7 +201,7 @@ public sealed class VeMatcatCommands
                 SizeKind = sizeKind.GetValueOrDefault(xdata.ItemId, ""),
                 Layer = pl.Layer,
                 DoDoc = xdata.DoDoc,
-                Dinh = dinh,
+                Dinh = VeThucThe.DinhCua(pl),
                 Kin = pl.Closed,
             });
         }
