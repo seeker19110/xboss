@@ -108,10 +108,10 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 | `M51-da-du-an-rls.md`        | RLS phòng tuyến 2 (kèm ADR-0005), template dự án, organizations          | ⚠️ **GĐ0 xong (PR1/PR2/PR4, #256), nợ "khoá cửa"**     | `0069_rls.sql`/`0070_organizations.sql`, `docs/adr/0005-rls.md`, `lib/db/index.ts::withProjectScope` |
 | `M52-mo-rong-cau-hinh.md`    | code_lists, custom fields, module registry, feature flags, tách tracking | ✅ xong                                                | `0060_code_lists`/`0062_custom_fields`/`0063_feature_flags`                                          |
 
-## Đặc tả chờ duyệt — đợt plugin AutoCAD giai đoạn 2 (viết 2026-08-25)
+## Đặc tả ĐÃ DUYỆT chờ triển khai — đợt plugin AutoCAD giai đoạn 2 (viết + duyệt 2026-08-25)
 
-> **M100 (`M100-xboss-ve-shop-drawing.md`)** — bộ lệnh vẽ `XBOSS_VE_*`: vẽ shop drawing MEPF đè lên thiết kế đã chuẩn hóa, sinh tuyến/phụ kiện/thiết bị **đã đúng chuẩn ngay từ đầu** (layer + block + size XData theo rule pack v4 `drawTools` + thư viện block có version), kèm trang in (`XBOSS_VE_TRANGIN`) + mặt cắt bán tự động (`XBOSS_VE_MATCAT`). 6 PR. **Draft — chờ duyệt** (còn 2 open decisions §18).
-> **M101 (`M101-plugin-nang-tran.md`)** — nâng trần 3 khối M99: `XBOSS_KIEMTRA` 9→16 phép kiểm (kèm clash 2D có cảnh báo), `XBOSS_CHUANHOA` 7→11 bước (style/xref/hatch/layout), `XBOSS_BOCKL` bóc theo size/vùng/cách nhiệt + `boqCode` per-project + đối chiếu BOQ chỉ-đọc; rule pack v5. 5 PR. **Draft — chờ duyệt.**
+> **M100 (`M100-xboss-ve-shop-drawing.md`)** — bộ lệnh vẽ `XBOSS_VE_*`: vẽ shop drawing MEPF đè lên thiết kế đã chuẩn hóa, sinh tuyến/phụ kiện/thiết bị **đã đúng chuẩn ngay từ đầu** (layer + block + size XData theo rule pack v4 `drawTools` + thư viện block có version), kèm trang in (`XBOSS_VE_TRANGIN`) + mặt cắt bán tự động (`XBOSS_VE_MATCAT`) + giá đỡ tự động (`XBOSS_VE_GIADO`) + sleeve/lỗ chờ (`XBOSS_VE_LOCHO`) + tag tuần tự + bảng thống kê + độ dốc. 7 PR. **Approved for implementation 2026-08-25**; tính năng để lại phiên bản sau ghi ở §20 (ngắt nét giao chéo, revision cloud, nhân bản tầng điển hình, riser…).
+> **M101 (`M101-plugin-nang-tran.md`)** — nâng trần 3 khối M99: `XBOSS_KIEMTRA` 9→16 phép kiểm (kèm clash 2D có cảnh báo), `XBOSS_CHUANHOA` 7→11 bước (style/xref/hatch/layout), `XBOSS_BOCKL` bóc theo size/vùng/cách nhiệt + `boqCode` per-project + đối chiếu BOQ chỉ-đọc; rule pack v5. 5 PR. **Approved for implementation 2026-08-25** (open §18 chốt trong State).
 
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 

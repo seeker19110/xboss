@@ -4,7 +4,7 @@
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Đẩy 3 khối tính năng M99 (`XBOSS_KIEMTRA`/`XBOSS_CHUANHOA`/`XBOSS_BOCKL`) lên **trần khả thi của kiến trúc hiện tại** — mọi thứ Managed API 2D + rule pack làm được mà chưa làm |
 | Spec owner       | (chờ gán)                                                                                                                                                                    |
-| State            | **Draft — chờ duyệt**                                                                                                                                                        |
+| State            | **Approved for implementation** — người dùng duyệt 2026-08-25 ("ok duyệt tất cả"); open §18 chốt: thứ tự PR giữ như bảng §16 (PR3 được phép làm trước PR2 nếu coordinator thấy lợi), per-project rule pack làm ngay trong PR4 không đợi UAT M100 |
 | Cập nhật         | 2026-08-25 — bản đầu, theo yêu cầu người dùng "nâng cấp tất cả tính năng lên mức trần cao nhất"                                                                              |
 | Quyết định nền   | ADR-0006 + M99 §9.1 — kế thừa nguyên vẹn. Phụ thuộc M99 (đã merge); độc lập với M100 (`XBOSS_VE_*`) trừ ghi chú §16                                                          |
 
@@ -100,6 +100,10 @@ Core thuần mở rộng (`Inspection/`, `Takeoff/`, mới `Zoning/` cho cắt-t
 
 ## 19. Approval
 
-- [ ] Product/scope — [ ] Architecture/data — [ ] Security (boq-snapshot, per-project) — [ ] Test/rollout — [ ] Chốt open §18
+- [x] Product/scope — Seeker 2026-08-25 ("ok duyệt tất cả")
+- [x] Architecture/data — [x] Open §18 đã chốt (xem State)
+- [ ] Security (boq-snapshot, per-project — rà `docs/audit.md` vùng rủi ro cao khi code PR4)
+- [ ] Test/rollout (checklist tích hợp theo release)
 
-**Kết luận:** Draft — chờ duyệt. Chưa code.
+**Kết luận:** **Approved for implementation.** Khi triển khai, nối với M100 §20 (tag trùng = phép kiểm 17; giá đỡ/sleeve vào bóc theo vùng).
+**Người/ngày duyệt:** Seeker — 2026-08-25.
