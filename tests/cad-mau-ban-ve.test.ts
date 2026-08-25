@@ -37,6 +37,11 @@ test("bản vẽ mẫu mm: đủ dị tật cho AC1/AC2/AC3/AC9/AC10", () => {
   assert.equal(anhXa["08_G_GHI_CHU_DIM_TEXT"], "G-ANNO-TEXT");
   assert.equal(anhXa["ZZZ_KHONG_KHOP_GI"], "ZZZ_KHONG_KHOP_GI");
 
+  // AC2 — điều kiện CẦN: kiểu chữ phải khai font họ `.Vn*`. Plugin quyết định giải mã TCVN3 hay
+  // không theo TÊN FONT (`DetectFontKind`), nên font `txt` mặc định của exportDxf sẽ làm bước sửa
+  // font im lặng không chạy và AC2 mất ý nghĩa (đã vấp thật 2026-08-25).
+  assert.match(doc(MM), /\r?\n3\r?\n\.VnTime\.ttf\r?\n/, "Bảng STYLE không khai font TCVN3");
+
   // AC2: có TEXT mã TCVN3 giải ra chữ có dấu.
   const chuTcvn3 = p.entities.find((e) => e.textValue?.includes("Phßng"));
   assert.ok(chuTcvn3, "Thiếu TEXT mã TCVN3 trong bản mẫu");

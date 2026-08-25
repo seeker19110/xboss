@@ -492,6 +492,28 @@ dùng duyệt hướng xử lý.
 - **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
   M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
 
+## Hai phát hiện thật từ ảnh chụp "lỗi font" của người dùng (2026-08-25)
+
+Người dùng mở bộ mẫu trong AutoCAD, gửi ảnh chữ vỡ (`m?y`, ô vuông). Truy ra 2 chuyện khác nhau:
+
+**(1) Bộ mẫu sai ĐIỀU KIỆN CẦN của AC2 — lỗi của bộ mẫu, đã sửa.** `exportDxf` gán **cứng** font
+`txt` cho mọi bản ghi STYLE (dòng `3\r\ntxt`), không giữ font của bản vẽ nguồn. Mà plugin quyết
+định có giải mã TCVN3 hay không **theo TÊN FONT** (`VietnameseTextConverter.DetectFontKind`: chỉ
+`.Vn*` → TCVN3, `VNI*` → VNI, còn lại → `None` = giữ nguyên). Font `txt` → `None` → chạy
+`XBOSS_CHUANHOA` trên bộ mẫu **không sửa chữ TCVN3**, AC2 mất sạch ý nghĩa mà không báo lỗi gì.
+Sửa: script ép bảng STYLE của bộ mẫu khai `.VnTime.ttf` (như bản vẽ TCVN3 thật), kèm test canh
+đúng dòng khai font đó — thiếu là đỏ. Chữ vỡ trên màn hình cũng từ đây: `txt.shx` không có glyph
+cho `¸`/`ß`.
+
+**(2) CHƯA XỬ LÝ — plugin đổi NỘI DUNG chữ nhưng KHÔNG đổi FONT của kiểu chữ.** `Buoc3Font` chỉ
+ghi `TextString`/`Contents` mới; `TextStyleTableRecord.FileName` vẫn là `.VnTime`. Rule pack
+`fontMap` cũng **không khai font đích** (chỉ có `tcvn3`/`vni`/`cadSymbols`/`normalization`). Hệ
+quả trên bản vẽ THẬT: sau `XBOSS_CHUANHOA`, chuỗi đã là Unicode đúng nhưng kiểu chữ vẫn trỏ font
+TCVN3 → **AutoCAD vẫn hiển thị sai**, tức **AC2 ("chuỗi hiển thị đúng dấu tiếng Việt") KHÔNG đạt**
+dù dữ liệu đúng. Đây là khoảng trống giữa spec và cài đặt, không phải lỗi cú pháp — cần người dùng
+chốt hướng (thêm `fontMap.targetFont` vào rule pack **v3** + đổi font trong pipeline; rule pack là
+append-only nên phải phát hành version mới).
+
 ## Bộ bản vẽ mẫu bản đầu AutoCAD KHÔNG MỞ ĐƯỢC — lặp lại lớp sự cố "hợp lệ ≠ mở được" (2026-08-25)
 
 Người dùng mở `plugin-autocad/mau-ban-ve/mau-01-mep-mm.dxf` trong AutoCAD 2026 → lỗi. Nguyên nhân:

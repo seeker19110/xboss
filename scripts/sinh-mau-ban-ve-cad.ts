@@ -159,7 +159,21 @@ function dungDxf(ten: string, insUnits: number): string {
   // để plugin có cái mà sửa. Bỏ bản giải mã đi thì `exportDxf` ghi lại đúng chuỗi gốc.
   for (const e of parsed.entities) e.decodedText = undefined;
 
-  return exportDxf(parsed, { applyStandardLayers: false });
+  const xuat = exportDxf(parsed, { applyStandardLayers: false });
+
+  // `exportDxf` gán CỨNG font `txt` cho mọi kiểu chữ (nó không giữ font của bản vẽ nguồn — hạn
+  // chế đã biết của bộ ghi, xem PROGRESS.md 2026-08-25). Với bộ mẫu thì đó là lỗi CHẶN: plugin
+  // quyết định có giải mã TCVN3 hay không **theo TÊN FONT** (`VietnameseTextConverter
+  // .DetectFontKind`), nên font `txt` → `None` → chữ TCVN3 không bao giờ được sửa và AC2 mất
+  // sạch ý nghĩa. Bản vẽ TCVN3 thật dùng họ font `.Vn*`, nên bộ mẫu khai đúng như vậy.
+  const CHUA_FONT = "\r\n3\r\ntxt\r\n";
+  if (!xuat.includes(CHUA_FONT)) {
+    throw new Error(
+      "Không thấy khai font `txt` trong bảng STYLE do exportDxf sinh — bộ ghi đã đổi, " +
+        "xem lại chỗ ép font TCVN3 cho bộ mẫu (AC2 phụ thuộc vào tên font).",
+    );
+  }
+  return xuat.replaceAll(CHUA_FONT, "\r\n3\r\n.VnTime.ttf\r\n");
 }
 
 /** 3 LINE ống + 2 LWPOLYLINE (kín/hở) + 2 TEXT — xem bảng dị tật trong mau-ban-ve/README.md. */
