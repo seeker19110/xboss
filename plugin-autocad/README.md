@@ -6,11 +6,12 @@ quy tắc tải từ XBoss dưới dạng **rule pack** có version (không nhú
 
 ## Cấu trúc
 
-| Project           | Nền              | Vai trò                                                                                                                                                                                 |
-| ----------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `XBoss.Cad.Core`  | `net8.0`         | Toàn bộ quy tắc THUẦN: matcher token-boundary, ánh xạ layer, giải mã font TCVN3/VNI, kiểm tra, gộp khối lượng, ghi Excel (ClosedXML) — **không tham chiếu AutoCAD**, test trên CI Linux |
-| `XBoss.Cad.Tests` | `net8.0`         | xunit — nạp rule pack THẬT từ `lib/ky-thuat/cad/rule-packs/v2.json` của repo (chống trôi 2 tầng)                                                                                        |
-| `XBoss.Cad.Acad`  | `net8.0-windows` | Adapter AutoCAD: lệnh `XBOSS_*`, đo hình học, áp thay đổi trong 1 nhóm UNDO — **chỉ build trên Windows có ObjectARX SDK 2026**                                                          |
+| Project              | Nền               | Vai trò                                                                                                                                                                                                                  |
+| -------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `XBoss.Cad.Core`     | `net8.0`          | Toàn bộ quy tắc THUẦN: matcher token-boundary, ánh xạ layer, giải mã font TCVN3/VNI, kiểm tra, gộp khối lượng, ghi Excel (ClosedXML) — **không tham chiếu AutoCAD**, test trên CI Linux                                  |
+| `XBoss.Cad.Tests`    | `net8.0`          | xunit — nạp rule pack THẬT từ `lib/ky-thuat/cad/rule-packs/v2.json` của repo (chống trôi 2 tầng)                                                                                                                         |
+| `XBoss.Cad.Acad`     | `net10.0-windows` | Adapter AutoCAD: lệnh `XBOSS_*`, đo hình học, áp thay đổi trong 1 nhóm UNDO — **chỉ build trên Windows có ObjectARX SDK 2026**                                                                                           |
+| `XBoss.Cad.AcadShim` | `net8.0`          | **Cổng CI**: biên dịch thử toàn bộ mã `XBoss.Cad.Acad` trên Linux bằng stub API AutoCAD — bắt lỗi cú pháp/sai chữ ký ngay ở PR. KHÔNG phải AutoCAD, KHÔNG thay verify tay ([README riêng](XBoss.Cad.AcadShim/README.md)) |
 
 ## Lệnh trong AutoCAD
 
@@ -81,6 +82,23 @@ dotnet test plugin-autocad/XBoss.Cad.Tests/XBoss.Cad.Tests.csproj
 ```
 
 Test nạp rule pack thật từ repo nên phải chạy bên trong repo XBoss.
+
+### Biên dịch thử Adapter bằng stub API (mọi HĐH — CI cũng chạy)
+
+```bash
+dotnet build plugin-autocad/XBoss.Cad.AcadShim/XBoss.Cad.AcadShim.csproj -c Release
+```
+
+Biên dịch **toàn bộ** mã `XBoss.Cad.Acad` bằng bộ khai báo giả API AutoCAD, **không** cần
+Windows/ObjectARX. Chạy lệnh này **trước khi push** mọi thay đổi chạm Adapter — nó bắt được lỗi
+cú pháp và sai chữ ký API, hai lớp lỗi trước đây chỉ lộ ra khi đã ra tới máy Windows có license
+(đã cháy 2 lần thật — xem `PROGRESS.md`).
+
+⚠ **Không thay được verify tay trên máy có AutoCAD**: stub không có hành vi, nên cổng này không
+kiểm logic/hình học/lỗi lúc chạy. Adapter dùng API mới mà stub chưa khai → bổ sung vào
+`XBoss.Cad.AcadShim/AcadStub.cs` theo hướng dẫn trong
+[`XBoss.Cad.AcadShim/README.md`](XBoss.Cad.AcadShim/README.md) (đối chiếu tài liệu ObjectARX,
+đừng đoán theo lỗi biên dịch — stub sai chữ ký thì cổng xanh giả).
 
 ### Adapter (Windows + ObjectARX SDK 2026 + .NET 10 SDK)
 

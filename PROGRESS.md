@@ -4,6 +4,49 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Cổng CI mới — biên dịch thử Adapter AutoCAD bằng stub API, chạy trên Linux (2026-08-25)
+
+Đưa bộ stub API AutoCAD (trước đây dựng tạm **ngoài repo**) vào repo và biến thành **cổng CI thật**.
+
+- **Lỗ hổng được bịt:** `XBoss.Cad.Acad` là `net10.0-windows` + tham chiếu
+  `acmgd/acdbmgd/accoremgd` nên **CI chưa bao giờ build Adapter** — mọi lỗi cú pháp / sai chữ ký API
+  trong 31 tệp Adapter chỉ lộ ra khi đã ra tới máy Windows có license. Đã cháy 2 lần thật:
+  (1) lần đầu Adapter biên dịch được trên máy thật — **8 lỗi CI không thể bắt** (mục M99 phía dưới);
+  (2) đợt M100 — gộp xung đột tay làm **mất 3 dòng đóng khối** trong `Services/TakeoffScanner.cs`,
+  cả plugin không build được trên Windows mà **toàn bộ CI vẫn xanh** (mục M100 PR5 phía dưới).
+- **`plugin-autocad/XBoss.Cad.AcadShim/`** (`net8.0`): `AcadStub.cs` khai kiểu + chữ ký API AutoCAD
+  (thân hàm rỗng), csproj biên dịch **toàn bộ** `../XBoss.Cad.Acad/**/*.cs` bằng **glob** — thêm lệnh
+  mới là tự động vào cổng, không phải nhớ sửa csproj (liệt kê tay chính là lớp lỗi đang bịt).
+  Tham chiếu `XBoss.Cad.Core` thật; **không** đụng `XBoss.Cad.Acad.csproj` (project thật vẫn nằm
+  ngoài mọi lệnh build của CI). `Nullable`/`TreatWarningsAsErrors` kế thừa từ `Directory.Build.props`
+  nên cổng luôn dùng đúng bộ cờ của bản build thật; suppress cảnh báo của stub đặt **trong**
+  `AcadStub.cs` chứ không vào `<NoWarn>`, để mã Adapter vẫn bị soi đủ cảnh báo.
+- **Chống "cổng xanh giả":** target `KiemGlobAdapterKhongRong` bắt đỏ nếu glob không khớp tệp nào
+  (đổi tên/di chuyển thư mục Adapter) và in số tệp đã biên dịch ra log CI.
+- **Job CI `plugin-shim`** (`.github/workflows/ci.yml`, ubuntu-latest, song song với `plugin` nên
+  không thêm vào đường găng) + đã gộp vào check tổng **`ci`**; bổ sung `AcadShim` = `net8.0` vào cổng
+  "Kiểm TargetFramework từng project".
+- **Bằng chứng cổng bắt được lỗi (đỏ → xanh, 3 ca):** (a) tái hiện đúng sự cố M100 — xoá 3 dòng đóng
+  khối cuối `TakeoffScanner.cs` ⇒ `CS1513: } expected`, exit 1; (b) gọi sai chữ ký API —
+  `new Circle(tam, banKinh)` thiếu tham số `normal` ⇒ `CS7036`, exit 1; (c) thêm tệp lệnh MỚI có lỗi
+  cú pháp vào `Commands/` ⇒ đỏ mà **không** phải sửa csproj (31 → 32 tệp). Cả 3 ca gỡ ra thì xanh lại.
+- **Cố ý KHÔNG thêm vào `XBoss.Cad.sln`:** solution là góc nhìn sản phẩm, project này là công cụ CI —
+  để ngoài thì `dotnet build/test` trên solution giữ hành vi y hệt trước.
+- **Giới hạn đã ghi rõ trong `XBoss.Cad.AcadShim/README.md` + `plugin-autocad/README.md`:** stub
+  KHÔNG có hành vi ⇒ cổng chỉ kiểm **cú pháp + chữ ký**, **không thay được** verify tay trên máy có
+  AutoCAD + license. Adapter dùng API mới mà stub chưa khai → bổ sung vào stub, **đối chiếu tài liệu
+  ObjectARX** (stub sai chữ ký thì cổng xanh giả, tệ hơn là không có cổng).
+- **API bổ sung vào stub** so với bản dựng tạm (do nay biên dịch cả 6 tệp trước đây bị bỏ ngoài —
+  `XBossCommands`, `XBossUploadCommand`, `BatchProcessor`, `DrawingSnapshotBuilder`, `KiemTraMarker`,
+  `StandardizePipeline`): `Dimension`, `TextStyleTableRecord`, `DimStyleTableRecord`, `Polyline2d`,
+  `Polyline3d`, `Vertex`/`PolylineVertex3d`, `HostApplicationServices.WorkingDatabase`, `DwgVersion`,
+  `GraphicsInterface.FontDescriptor`, `System.Windows.Forms.FolderBrowserDialog`, `ObjectId.Null`,
+  `Database.SaveAs/DxfOut/OriginalFileVersion/Purge/Extmin/Extmax`, `*.TextStyleId`, `Arc.Center`,
+  `Line.Length`, `Polyline.Length`, `Hatch.Elevation`, `BlockTableRecord.IsAnonymous`,
+  `AttributeReference.Position`, `Point2d.GetDistanceTo`.
+- **Cổng:** build stub xanh (**31 tệp Adapter, 0 cảnh báo**); `dotnet test XBoss.Cad.Tests`
+  **382 ca xanh, 0 skip** (không đổi hành vi); `npm run lint` + `npm run typecheck` xanh.
+
 ## M100 PR5 — `XBOSS_VE_DOI` + báo cáo phiên vẽ + rule pack v7 + tài liệu — ĐÓNG ĐỢT M100 (2026-08-25)
 
 Việc CUỐI của M100 (§6.2, FR8, §14). Sau PR này bộ lệnh vẽ có đủ **14 lệnh** (`XBOSS_VE` + 13 lệnh
