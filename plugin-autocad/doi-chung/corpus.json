@@ -1,0 +1,48 @@
+{
+  "moTa": "Corpus đối chứng 2 tầng (M99 AC6) — MỘT nguồn dữ liệu vào duy nhất cho cả tầng 2 (plugin C#, XBoss.Cad.Core) lẫn tầng 3 (server TS, lib/ky-thuat/cad/dxf-parser). Corpus là dữ liệu VÀO viết tay, sửa có chủ đích; kết quả RA nằm ở ket-qua-mong-doi.json và sinh lại bằng `npm run cad:doi-chung`. Hai tầng cho kết quả khác nhau = plugin đã trôi khỏi rule pack (ADR-0006 nguyên tắc 1).",
+  "rulePackVersion": "v3",
+  "layers": [
+    "01_M_ONG_GIO_CAP_CHINH",
+    "02_M_ONG_GIO_HOI_AHU",
+    "03_P_ONG_NUOC_LANH_CHW",
+    "04_P_CAP_THOAT_NUOC_THAI",
+    "05_E_DIEN_MANG_CAP_PWR",
+    "06_F_PCCC_SPRINKLER",
+    "07_S_TRUC_COT_KET_CAU",
+    "08_G_GHI_CHU_DIM_TEXT",
+    "M_DUCT_SUPPLY",
+    "P_WATER_PIPE",
+    "ONG_GIO_THAI_EA",
+    "ONG_GIO_TUOI_OA",
+    "THOAT",
+    "THAI",
+    "CAP_NUOC_LANH",
+    "MANG_CAP_DIEN",
+    "DIEN_NHE_ELV_CAMERA",
+    "PCCC_HONG_NUOC_VACH_TUONG",
+    "KET_CAU_DAM_SAN",
+    "GHI_CHU_KHUNG_TEN",
+    "0",
+    "ZZZ_KHONG_KHOP_GI",
+    "M-DUCT-SUPP",
+    "M-DUCT-RETN",
+    "M-CHW-PIPE",
+    "P-PIPE-SANR",
+    "E-TRAY-PWRR",
+    "F-SPRN-PIPE",
+    "S-GRID-COLS",
+    "G-ANNO-TEXT"
+  ],
+  "tcvn3": [
+    "èng giã cÊp",
+    "Ghi chó: kiÓm tra tr­íc khi thi c«ng",
+    "TÇng 5 - Phßng m¸y l¹nh",
+    "XBoss ®ång c¬"
+  ],
+  "vni": [
+    "o61ng gio1 ca61p",
+    "Ghi chu1: kie63m tra tru7o71c khi thi co6ng",
+    "Ta62ng 5 - Pho2ng ma1y la5nh",
+    "XBoss d9o62ng co7"
+  ]
+}

@@ -10,7 +10,7 @@ namespace XBoss.Cad.Tests;
 /// </summary>
 public class LayerMapperTests
 {
-    private static readonly LayerMapper Mapper = new(RepoPaths.LoadRulePackV2().LayerMap);
+    private static readonly LayerMapper Mapper = new(RepoPaths.LoadRulePack().LayerMap);
 
     [Theory]
     [InlineData("01_M_ONG_GIO_CAP_CHINH", "M-DUCT-SUPP")]

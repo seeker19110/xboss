@@ -83,6 +83,7 @@ internal static class BatchProcessor
         using var db = MoSideDatabase(tepVao);
         using var _ = new DoiWorkingDatabase(db);
         var pipeline = new StandardizePipeline(pack);
+        pipeline.Buoc1Audit(null); // side database: không có dòng lệnh → ghi cảnh báo, không AUDIT
         using (var tr = db.TransactionManager.StartTransaction())
         {
             pipeline.Run(db, tr);

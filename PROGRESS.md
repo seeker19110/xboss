@@ -747,6 +747,198 @@ dùng duyệt hướng xử lý.
 - **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
   M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
 
+## AutoCAD 2026 tự cập nhật đổi nền .NET 8 → .NET 10 GIỮA HAI LẦN BUILD (2026-08-25)
+
+Buổi sáng: `acmgd.dll` khai `.NETCoreApp,Version=v8.0`, Adapter build `net8.0-windows` chạy tốt,
+tôi ghi vào M99 §9.1 rằng "assumption runtime đã đóng". **Vài tiếng sau, cùng lệnh kiểm, cùng tệp,
+trả `.NETCoreApp,Version=v10.0`** — AutoCAD đã tự cập nhật — và build đổ ngay:
+
+```
+CSC : error CS1705: Assembly 'Acmgd' ... uses 'System.Runtime, Version=10.0.0.0'
+      which has a higher version than referenced assembly 'System.Runtime, Version=8.0.0.0'
+```
+
+- **Sửa:** `XBoss.Cad.Acad` → `net10.0-windows` (máy build cần .NET 10 SDK; `dong-goi.ps1` kiểm
+  sớm và báo tiếng Việt nếu thiếu). `XBoss.Cad.Core`/`Tests` **giữ `net8.0`** — không chạm assembly
+  AutoCAD nên CI Linux vẫn build/test được, app net10 tham chiếu thư viện net8 bình thường.
+- **Cổng CI** đổi từ "mọi csproj phải là net8.0" sang kiểm **từng project một nền rõ ràng** — cổng
+  cũ sẽ báo đỏ chính bản vá này.
+- **Kết luận sai đã đính chính trong tài liệu:** nền .NET của AutoCAD **không phải hằng số** để
+  "chốt một lần", mà là **mục phải kiểm lại sau mỗi bản cập nhật AutoCAD**. Trọng tài cuối cùng là
+  trình biên dịch (CS1705 nói thẳng nền thật); chuỗi TargetFramework trong tệp chỉ đúng tại thời
+  điểm đọc. M99 §9.1/§18, README plugin và CAI-DAT.md sửa theo.
+- **Rủi ro rút ra cho vận hành:** máy trạm nào cập nhật AutoCAD trước khi có bản plugin build lại
+  sẽ **không nạp được plugin**. Trước khi phát hành rộng, cần chốt chính sách hoãn cập nhật AutoCAD
+  hoặc phát hành plugin bám sát bản cập nhật.
+
+## M99 — Rule pack v3: `fontMap.targetFont` + plugin đổi font kiểu chữ (2026-08-25)
+
+Người dùng chốt **phương án (a)** cho khoảng trống phát hiện hôm nay (chuẩn hóa đổi nội dung chữ
+nhưng không đổi font kiểu chữ → AutoCAD hiển thị vẫn sai, AC2 không đạt trên bản vẽ thật).
+
+- **`lib/ky-thuat/cad/rule-packs/v3.json`** = v2 + `fontMap.targetFont` `{ typeFace: "Arial", note }`.
+  **Mở rộng thuần đã kiểm bằng test**: 6 section còn lại và phần còn lại của `fontMap` giống v2
+  từng byte (`tests/engineering-cad-rule-pack.test.ts`). Không sửa v1/v2 (append-only).
+- **Tầng 3:** `lib/ky-thuat/cad/rule-pack.ts` trỏ v3 → `CURRENT_RULE_PACK_VERSION = "v3"`, kéo theo
+  ETag, `plugin-upload` (chặn client dùng pack cũ — AC8) và corpus đối chứng.
+- **Tầng 2:** model `TargetFontSection` + kiểm "khai rồi thì không được rỗng"; `RepoPaths` nay có
+  hằng `TenTepHienHanh` để đổi version ở ĐÚNG một chỗ. `StandardizePipeline`: bước 3 gom các
+  `TextStyle` mà nó **thực sự nhận ra là mã cũ** (`DetectFontKind != None`) rồi đổi
+  `ts.Font = FontDescriptor(targetFont)` — kiểu chữ vốn đã Unicode **không đụng tới**. Rule pack
+  không khai `targetFont` (v2) → bỏ qua kèm **cảnh báo vào báo cáo**, không tự chế font.
+- **Test:** C# thêm 2 ca (v2 không có targetFont vẫn nạp được = mở rộng thuần thật; `typeFace` rỗng
+  bị từ chối); TS thêm ca "v3 là mở rộng thuần của v2, chỉ thêm targetFont". Toàn suite TS
+  **225 file / 815 ca pass**; lint + typecheck + 2 cổng `cad:*` xanh.
+- **Cần biết khi triển khai:** máy trạm đang cache rule pack v2 sẽ **bị chặn `XBOSS_UPLOAD`** cho
+  tới khi chạy `XBOSS_LOGIN` (hoặc `XBOSS_RULEPACK`) để lấy v3 — đúng thiết kế AC8.
+- **Chưa kiểm được ở đây:** `dotnet build/test` cần Windows + ObjectARX; đặc biệt
+  `Autodesk.AutoCAD.GraphicsInterface.FontDescriptor` (ghi đủ tên vì `using` cả namespace đó sẽ làm
+  `Polyline` nhập nhằng với `DatabaseServices`).
+
+## Hai phát hiện thật từ ảnh chụp "lỗi font" của người dùng (2026-08-25)
+
+Người dùng mở bộ mẫu trong AutoCAD, gửi ảnh chữ vỡ (`m?y`, ô vuông). Truy ra 2 chuyện khác nhau:
+
+**(1) Bộ mẫu sai ĐIỀU KIỆN CẦN của AC2 — lỗi của bộ mẫu, đã sửa.** `exportDxf` gán **cứng** font
+`txt` cho mọi bản ghi STYLE (dòng `3\r\ntxt`), không giữ font của bản vẽ nguồn. Mà plugin quyết
+định có giải mã TCVN3 hay không **theo TÊN FONT** (`VietnameseTextConverter.DetectFontKind`: chỉ
+`.Vn*` → TCVN3, `VNI*` → VNI, còn lại → `None` = giữ nguyên). Font `txt` → `None` → chạy
+`XBOSS_CHUANHOA` trên bộ mẫu **không sửa chữ TCVN3**, AC2 mất sạch ý nghĩa mà không báo lỗi gì.
+Sửa: script ép bảng STYLE của bộ mẫu khai `.VnTime.ttf` (như bản vẽ TCVN3 thật), kèm test canh
+đúng dòng khai font đó — thiếu là đỏ. Chữ vỡ trên màn hình cũng từ đây: `txt.shx` không có glyph
+cho `¸`/`ß`.
+
+**(2) CHƯA XỬ LÝ — plugin đổi NỘI DUNG chữ nhưng KHÔNG đổi FONT của kiểu chữ.** `Buoc3Font` chỉ
+ghi `TextString`/`Contents` mới; `TextStyleTableRecord.FileName` vẫn là `.VnTime`. Rule pack
+`fontMap` cũng **không khai font đích** (chỉ có `tcvn3`/`vni`/`cadSymbols`/`normalization`). Hệ
+quả trên bản vẽ THẬT: sau `XBOSS_CHUANHOA`, chuỗi đã là Unicode đúng nhưng kiểu chữ vẫn trỏ font
+TCVN3 → **AutoCAD vẫn hiển thị sai**, tức **AC2 ("chuỗi hiển thị đúng dấu tiếng Việt") KHÔNG đạt**
+dù dữ liệu đúng. Đây là khoảng trống giữa spec và cài đặt, không phải lỗi cú pháp — cần người dùng
+chốt hướng (thêm `fontMap.targetFont` vào rule pack **v3** + đổi font trong pipeline; rule pack là
+append-only nên phải phát hành version mới).
+
+## Bộ bản vẽ mẫu bản đầu AutoCAD KHÔNG MỞ ĐƯỢC — lặp lại lớp sự cố "hợp lệ ≠ mở được" (2026-08-25)
+
+Người dùng mở `plugin-autocad/mau-ban-ve/mau-01-mep-mm.dxf` trong AutoCAD 2026 → lỗi. Nguyên nhân:
+script PR7a **tự viết DXF tối thiểu** (HEADER + TABLES/LAYER + BLOCKS rỗng + ENTITIES + OBJECTS),
+đủ cho `validateDxf`/`parseDxf` của XBoss nhưng thiếu thứ AutoCAD đòi: bảng LTYPE với 2 bản ghi
+bắt buộc `ByBlock`/`ByLayer`, bảng STYLE, VPORT `*ACTIVE`, handle cho mọi bản ghi.
+
+**Đây là lần thứ hai cùng một lớp lỗi** (lần đầu: `exportDxf` thiếu STYLE/LTYPE/DIMSTYLE bên trong
+BLOCK, 2026-08-24) — và lần này tôi tự gây ra vì viết bộ ghi DXF thứ hai thay vì dùng bộ ghi đã có.
+
+**Sửa:** script dựng hình học thô rồi **ghi lại bằng chính `exportDxf`** của repo, với
+`applyStandardLayers: false` (bộ mẫu phải giữ tên layer sai chuẩn thì AC1 mới có cái để kiểm) và
+xoá `decodedText` trước khi ghi (parseDxf tự giải mã TCVN3 sang Unicode, exportDxf ưu tiên bản đã
+giải mã — mà AC2 cần bản vẽ CÒN mã TCVN3). Tệp nay có thêm layer `0` mặc định → 5 layer; test và
+cổng `cad:mau-ban-ve --kiem` cập nhật theo, đối chiếu theo TÊN layer thay vì đếm.
+
+**Bài học đưa vào tài liệu bộ mẫu:** không viết bộ ghi DXF thứ hai. Muốn sinh tệp cho AutoCAD thì
+đi qua `exportDxf` — mọi hiểu biết đắt giá về bảng/handle/khung nhìn nằm ở đó.
+
+## M99 — Adapter AutoCAD biên dịch được lần đầu trên máy thật: 8 lỗi CI không thể bắt (2026-08-25)
+
+`XBoss.Cad.Acad` **chưa từng được biên dịch** từ lúc viết ở PR-A: CI chỉ build/test `XBoss.Cad.Core`
+(cần ObjectARX SDK + Windows nên không build Adapter — đúng thiết kế §9.1). Người dùng build trên
+máy có AutoCAD 2026, lỗi lộ ra theo 4 lô:
+
+- **Lô 1–2 — trùng tên do implicit using:** `csproj` bật `UseWindowsForms` (cần cho hộp thoại chọn
+  tệp của `Autodesk.AutoCAD.Windows`), kéo theo implicit using `System.Drawing`/`System.Windows.Forms`
+  → `Color`, `Region`, `Application` nhập nhằng với kiểu của AutoCAD. Sửa bằng bí danh
+  `AcadColor`/`AcadRegion`/`AcadApp` trong 4 tệp, không tắt `ImplicitUsings` (tắt sẽ phải thêm hàng
+  loạt `using` tay).
+- **Lô 3 — `Database.Audit` / `new AuditInfo()` KHÔNG TỒN TẠI trong managed API.** AUDIT là _lệnh_
+  của AutoCAD. Bước 1 pipeline tách khỏi `Run()` thành `Buoc1Audit(Editor?)`, chạy `_.AUDIT _Y`
+  trên dòng lệnh **trước** khi mở transaction. Hệ quả thật: `XBOSS_BATCH` đọc qua side database nên
+  không có dòng lệnh → ghi **cảnh báo vào báo cáo** ("mở tệp kết quả rồi chạy AUDIT/RECOVER") thay
+  vì lặng lẽ bỏ bước.
+- **Lô 4 — `SaveFileDialogFlags` không có thành viên "không cờ nào"** (thử cả `Default` lẫn
+  `NoFlags` đều không có) → dùng `default(...)` = giá trị 0, luôn biên dịch được bất kể ObjectARX
+  đặt tên cờ thế nào; ghi lý do ngay tại chỗ để không ai đổi lại thành tên đoán mò.
+- **Kết quả:** `Build succeeded`, ra `bin\Release\XBoss.Cad.Acad.dll`. Thêm
+  `plugin-autocad/dong-goi.ps1` — build + dựng `XBoss.bundle` + cài vào `%APPDATA%` (hoặc `-ChiDongGoi`
+  để phát hành), tự loại các assembly do AutoCAD cung cấp lúc chạy.
+- **Cảnh báo còn lại (không chặn):** `MSB3277 WindowsBase 4.0 vs 8.0` — AutoCAD tham chiếu
+  `WindowsBase 8.0`, .NET 8 ref pack là `4.0`, MSBuild chọn `4.0`. Theo dõi khi nạp thật trong AutoCAD.
+- **Bài học:** phần plugin nào CI không build được thì **không có bảo đảm nào** cho tới khi build
+  trên máy có license — 89→92 ca test Core xanh suốt vẫn không nói gì về Adapter.
+
+## M99 §9.1 — xác minh runtime AutoCAD 2026 trên máy thật: assumption cuối cùng ĐÃ ĐÓNG (2026-08-25)
+
+Người dùng chạy trên máy Windows có license AutoCAD 2026 (theo hướng dẫn phần Windows của PR7):
+
+- `dotnet test XBoss.Cad.Tests` → **92/92 pass** (89 ca cũ + 3 ca `DoiChungHaiTangTests` của PR7a) —
+  xác nhận lại phần C# mà phiên làm PR7a không biên dịch được cục bộ (container không có .NET SDK).
+- `acmgd.dll` của AutoCAD 2026 = **`.NETCoreApp,Version=v8.0`**, assembly **`Acmgd 25.1.0.0`** →
+  đúng nền `net8.0` mà `XBoss.Cad.Acad` đang build, và đúng hằng `PluginExtension.AcadVer2026 = "25.1"`.
+  **Assumption duy nhất còn lại của quyết định §9.1 đã đóng**, không phải sửa `TargetFramework`.
+- **Bài học ghi lại trong 3 tài liệu:** lệnh `[Reflection.Assembly]::LoadFrom(...).ImageRuntimeVersion`
+  trong bản đặc tả cũ **không chạy được trên Windows PowerShell 5.1** — 5.1 nền .NET Framework 4.8 nên
+  ném `BadImageFormatException` khi nạp assembly .NET 8 (bản thân lỗi đó cũng là dấu hiệu nền .NET 8,
+  nhưng không đọc ra con số). Thay bằng lệnh đọc thẳng chuỗi TargetFramework trong tệp, không nạp
+  assembly — chạy được trên cả 5.1 lẫn PowerShell 7. Đã cập nhật M99 §9.1/§18/§19,
+  `plugin-autocad/README.md`, `plugin-autocad/CAI-DAT.md`.
+- **Còn lại của PR7b:** chạy bộ bản vẽ mẫu qua `accoreconsole` kiểm AC1–AC4, AC9–AC13; đối chứng AC6
+  phần hình học; UAT với QS.
+
+## M99 PR7a — Đối chứng 2 tầng (AC6, phần không cần AutoCAD) + bộ bản vẽ mẫu + tài liệu cài đặt (2026-08-25)
+
+Người dùng "ok làm luôn" sau khi chốt tách PR7 làm hai: **PR7a** chạy được trên CI Linux, **PR7b**
+chờ máy Windows có license AutoCAD 2026 (người dùng xác nhận có, làm sau). Cùng nhánh
+`claude/pr6-tiep-tuc-y9689t`.
+
+- **Đối chứng 2 tầng phần QUY TẮC (AC6a)** — chặn rủi ro số 1 của M99 (trôi quy tắc giữa plugin C#
+  và server TS): thư mục `plugin-autocad/doi-chung/` gồm `corpus.json` (dữ liệu VÀO viết tay: 30 tên
+  layer phủ hết nhóm hệ + fallback + tên đã chuẩn, 4 chuỗi TCVN3 và 4 chuỗi VNI cùng nội dung) và
+  `ket-qua-mong-doi.json` (kết quả RA **sinh tự động** từ tầng 3 qua `npm run cad:doi-chung`).
+  Hai tầng đối chiếu đúng hai tệp đó: `tests/cad-doi-chung-2-tang.test.ts` (4 ca) và
+  `plugin-autocad/XBoss.Cad.Tests/DoiChungHaiTangTests.cs` (3 ca). Trước đây corpus bị **chép tay hai
+  bản** (InlineData trong `LayerMapperTests.cs` vs mảng trong `engineering-cad-rule-pack.test.ts`) —
+  chính cái đó mới là nguồn trôi; nay một nguồn duy nhất, đổi quy tắc thì tệp kết quả đổi theo và
+  hiện rõ trong diff.
+- **Bộ bản vẽ mẫu (§15):** `plugin-autocad/mau-ban-ve/` — `mau-01-mep-mm.dxf` ($INSUNITS=4) và
+  `mau-02-mep-met.dxf` ($INSUNITS=6, toạ độ chia 1000, dùng cho AC13). Sinh bằng
+  `npm run cad:mau-ban-ve` (không sửa tay), mang đủ dị tật để PR7b bám vào: layer sai chuẩn + layer
+  lạ giữ nguyên (AC1), TEXT mã TCVN3 (AC2), thực thể Z=2800 (AC3), 3 đoạn ống (AC10), 1 polyline kín
+  - 1 polyline hở 3mm (AC9). `tests/cad-mau-ban-ve.test.ts` (3 ca) giữ cho bộ mẫu không mục.
+- **2 cổng CI mới** trong job `lint`: `npm run cad:doi-chung -- --kiem` và
+  `npm run cad:mau-ban-ve -- --kiem` — tệp sinh lệch script/quy tắc là đỏ.
+- **Tài liệu cài đặt cho kỹ sư:** `plugin-autocad/CAI-DAT.md` (tiếng Việt, từ lệnh xác minh runtime
+  `acmgd.dll` §9.1 → lấy gói từ bảng điều khiển → cài `.bundle` → ghép thiết bị `XBOSS_LOGIN` →
+  8 lệnh dùng hằng ngày → bảng 8 trục trặc thường gặp), README plugin trỏ sang.
+- **Kiểm chứng:** lint/typecheck/build + 8 cổng static xanh; `npm test` **225 file, 0 fail**.
+  **Chưa chạy được `dotnet test`** — container này không có .NET SDK và proxy chặn tải
+  (`dot.net` trả 403); phần C# do job `plugin` của CI xác minh.
+- **Chưa làm — PR7b (cần máy Windows có license):** chạy bộ mẫu qua `accoreconsole.exe` kiểm AC1–AC4
+  và AC9–AC13 (UNDO round-trip, XData sống qua đóng/mở tệp, Excel công thức sống), xác minh
+  `ImageRuntimeVersion` của `acmgd.dll`, đối chứng AC6 phần hình học, UAT với QS.
+
+## M99 PR6 — Bảng điều khiển plugin trên web + bỏ tầng 1 (.SCR/AutoLISP) (2026-08-25)
+
+Người dùng "tiếp tục pr6" sau khi PR5 merge (#392). Nhánh `claude/pr6-tiep-tuc-y9689t`. Phần plugin
+của PR6 (`XBOSS_BATCH`, journey 7) đã làm ở PR-B (#389) — đợt này làm nốt **phần web**.
+
+- **Bỏ tầng 1 (FR11, ADR-0006):** xoá `generateStandardizedAutocadScript` (`lib/ky-thuat/cad/dxf-parser.ts`)
+  và `generateAutoLispDetailScript` (`lib/ky-thuat/engineering-cad-skills.ts`) cùng route
+  `/api/engineering/cad/lisp`, trường `scrScript` trong `/api/engineering/cad/parse-dxf`, hook
+  `useAutoLispGenerator`, nút "Xuất Kịch Bản .SCR" ở 2 panel và khối AutoLISP trong panel bước 1.4
+  (`XrefDiffLispPanel` → `XrefDiffPanel`, sub-tab `xref_diff_lisp` → `xref_diff`). Việc sinh hình học
+  chi tiết thuộc plugin chạy trong AutoCAD, không phải server đoán từ DXF.
+- **Bảng điều khiển plugin (M99 §13)** trên đầu `/engineering/chuan-hoa-ban-ve`
+  (`components/PluginControlPanel.tsx`): rule pack đang phát hành (version + số nhóm layer + số hạng
+  mục bóc tách) kèm **nút tải JSON cho `XBOSS_RULEPACK`**, **nút tải gói cài plugin** (đường dẫn do
+  quản trị khai qua `XBOSS_PLUGIN_URL`; thiếu biến → hiện hướng dẫn tự dựng theo
+  `plugin-autocad/README.md` — gói nhị phân không nằm trong repo vì plugin không build trong CI, §9.1),
+  bảng **bản vẽ plugin đã gửi về + kết quả kiểm định server**, lối sang `/engineering/thiet-bi-cad`.
+- **`lib/ky-thuat/cad/bang-dieu-khien.ts` + `GET /api/engineering/cad/dashboard`:** `tomTatRulePack`
+  (thuần) + `layLichSuPluginUpload(projectId)` (chỉ `source_tool='plugin'`, scope theo
+  `getCurrentProjectId`) + `docKiemDinhTuBaoCao` bóc `standardize_report.serverValidation`.
+- **Kiểm chứng:** `tests/cad-bang-dieu-khien.test.ts` (2 ca thuần); lint/typecheck/build xanh; toàn
+  suite **223 file / 807 ca pass, 0 đỏ** (399 ca skip vì không có `TEST_DATABASE_URL` cục bộ — CI có
+  Postgres 16 chạy thật); `check:lib-layers` + `check:dead-code` xanh.
+- **Chưa làm:** PR7 (test đối chứng 2 tầng + tài liệu cài đặt — chặn bởi runner Windows có license);
+  gộp hẳn trang `/engineering/thiet-bi-cad` vào bảng điều khiển (giữ tách cho gọn diff).
+
 ## M99 PR5 — plugin-upload + kiểm định server + `XBOSS_UPLOAD` (2026-08-25)
 
 Người dùng "tiếp tục" sau khi #389 merge — PR2 (#386) đã mở khoá PR5. Nhánh `claude/plugin-upgrade-m8z0hx` (khởi động lại từ main sau squash-merge).

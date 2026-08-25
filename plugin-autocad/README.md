@@ -19,7 +19,7 @@ quy tắc tải từ XBoss dưới dạng **rule pack** có version (không nhú
 | `XBOSS_LOGIN`      | Ghép thiết bị với server XBoss (M99 PR2): xin mã → duyệt trên trang web `/engineering/thiet-bi-cad` → nhận token (cất **Windows Credential Manager**, hạn 90 ngày, thu hồi được trên web) → tự tải rule pack mới nhất (ETag)                                                                                        |
 | `XBOSS_RULEPACK`   | Nạp tệp rule pack JSON bằng tay (đường dự phòng offline) — cache `%APPDATA%\XBoss\rule-pack.json`. Chưa có rule pack (qua LOGIN hoặc lệnh này) thì mọi lệnh khác từ chối chạy                                                                                                                                       |
 | `XBOSS_KIEMTRA`    | Chỉ kiểm, không sửa — 9 phép kiểm: layer sai chuẩn, lệch Z, polyline hở/gần kín, font TCVN3/VNI, lineweight lệch CTB, dim override, rác hình học, layer rỗng, block nặc danh — khoanh tròn vị trí lỗi trên layer tạm `XBOSS_KIEMTRA_MARK` (không in, tự dọn) + báo cáo JSON `<tệp>.dwg.xboss-kiemtra.json` cạnh DWG |
-| `XBOSS_CHUANHOA`   | Pipeline thứ tự cố định: Audit → layer mapping → font → flatten Z=0 → overkill → purge → lineweight/CTB + gỡ dim override. Xem trước diff, xác nhận, **1 lần UNDO hoàn tác toàn bộ**; báo cáo JSON ghi cạnh DWG                                                                                                     |
+| `XBOSS_CHUANHOA`   | Pipeline thứ tự cố định: Audit → layer mapping → font (giải mã TCVN3/VNI **và đổi font kiểu chữ sang `fontMap.targetFont`** — rule pack v3) → flatten Z=0 → overkill → purge → lineweight/CTB + gỡ dim override. Xem trước diff, xác nhận, **1 lần UNDO hoàn tác toàn bộ**; báo cáo JSON ghi cạnh DWG               |
 | `XBOSS_BOCKL`      | Bóc khối lượng theo rule pack (`takeoff`): đo chiều dài/diện tích/đếm block theo layer mapping, quy đổi INSUNITS, tô màu vùng đã bóc + XData chống bóc trùng                                                                                                                                                        |
 | `XBOSS_BOCKL_XOA`  | Gỡ đánh dấu bóc (trả đúng màu trước khi bóc, xoá XData) — toàn bộ hoặc theo vùng chọn                                                                                                                                                                                                                               |
 | `XBOSS_BOCKL_XUAT` | Xuất Excel **đúng mẫu công ty** (`attachments/MAU-KHOI-LUONG-BOQ.xlsx`, sheet `Data-BOQ`, cột A–K + công thức H/J/K sống, tổng nhóm hệ + TỔNG CỘNG bằng `SUBTOTAL` sống) từ trạng thái bóc đang lưu trong DWG — đóng/mở lại bản vẽ vẫn xuất được; kèm sidecar JSON máy-đọc-được cạnh tệp Excel                      |
@@ -37,19 +37,24 @@ dotnet test plugin-autocad/XBoss.Cad.Tests/XBoss.Cad.Tests.csproj
 
 Test nạp rule pack thật từ repo nên phải chạy bên trong repo XBoss.
 
-### Adapter (Windows + ObjectARX SDK 2026)
+### Adapter (Windows + ObjectARX SDK 2026 + .NET 10 SDK)
 
 1. Cài ObjectARX SDK 2026 (hoặc dùng thẳng thư mục cài AutoCAD 2026 — nơi có
    `acdbmgd.dll`, `acmgd.dll`, `accoremgd.dll`).
-2. **Xác minh runtime trước bản phát hành đầu tiên** (M99 §9.1 — assumption duy nhất còn lại):
+2. **Xác minh nền .NET — làm lại sau MỖI bản cập nhật AutoCAD, không chỉ khi đổi đời.** Ngày
+   2026-08-25 chính máy người dùng đổi từ `.NETCoreApp,Version=v8.0` sang `v10.0` chỉ sau vài tiếng
+   (AutoCAD tự cập nhật), làm build đổ với `CS1705`. Nền hiện tại của Adapter: **`net10.0-windows`**
+   (cần .NET 10 SDK — `winget install Microsoft.DotNet.SDK.10`). Lệnh kiểm:
 
    ```powershell
-   [System.Reflection.Assembly]::LoadFrom("C:\Program Files\Autodesk\AutoCAD 2026\acmgd.dll").ImageRuntimeVersion
+   $b = [IO.File]::ReadAllBytes("C:\Program Files\Autodesk\AutoCAD 2026\acmgd.dll")
+   $s = [Text.Encoding]::UTF8.GetString($b)
+   [regex]::Matches($s, '\.NET[A-Za-z]*,Version=v[0-9\.]+') | ForEach-Object { $_.Value } | Select-Object -Unique
    ```
 
-   Không phải runtime .NET 8 → sửa `TargetFramework` của `XBoss.Cad.Acad` theo giá trị thật
-   và cập nhật M99 §9.1. Đồng thời xác minh `ACADVER` của 2026 (hằng `PluginExtension.AcadVer2026`
-   đang là `25.1`).
+   Lệch với `TargetFramework` của `XBoss.Cad.Acad` → sửa csproj + cổng CI "Kiểm TargetFramework
+   từng project" theo giá trị thật, và cập nhật M99 §9.1. (Đừng dùng `LoadFrom(...).ImageRuntimeVersion` trên PowerShell 5.1 —
+   nền .NET Framework 4.8 không nạp nổi assembly .NET 8, chỉ ném `BadImageFormatException`.)
 
 3. Build:
 
@@ -58,6 +63,19 @@ Test nạp rule pack thật từ repo nên phải chạy bên trong repo XBoss.
    ```
 
 ## Đóng gói `.bundle` và cài đặt
+
+**Cách nhanh — script tự làm hết** (build + tạo bundle + cài):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File plugin-autocad\dong-goi.ps1
+powershell -ExecutionPolicy Bypass -File plugin-autocad\dong-goi.ps1 -ChiDongGoi   # chỉ tạo .\dist để phát hành
+```
+
+Đóng AutoCAD trước khi chạy (DLL đang nạp thì không ghi đè được). Phần dưới mô tả cấu trúc gói
+để đối chiếu khi cần làm tay.
+
+> Hướng dẫn cho **người dùng cuối** (cài, ghép thiết bị, trục trặc thường gặp) nằm ở
+> [`CAI-DAT.md`](CAI-DAT.md). Phần dưới đây dành cho người phát hành gói cài.
 
 Tạo thư mục `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle\` với cấu trúc:
 

@@ -2,13 +2,22 @@
 
   <!--
     XBoss.Cad.Acad — Adapter AutoCAD (M99 §9): dịch giữa API AutoCAD và XBoss.Cad.Core.
-    Chỉ build được trên Windows có ObjectARX SDK 2026 (không build trong CI — CI chỉ
-    build/test Core). Truyền đường dẫn SDK qua:
+    Chỉ build được trên Windows có ObjectARX SDK 2026 + **.NET 10 SDK** (không build trong CI —
+    CI chỉ build/test Core). Truyền đường dẫn SDK qua:
       dotnet build -p:AcadSdkDir="C:\ObjectARX2026\inc-x64"
     hoặc đặt biến môi trường AcadSdkDir. Xem plugin-autocad/README.md.
   -->
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <!--
+      net10.0-windows: AutoCAD 2026 sau bản cập nhật 2026-08-25 dùng Managed API build cho .NET 10
+      (`acmgd.dll` = `.NETCoreApp,Version=v10.0`; trước bản cập nhật là v8.0 — cùng một lệnh kiểm,
+      cùng một tệp, hai kết quả khác nhau trong một buổi sáng). Managed API KHÔNG tương thích lùi:
+      build cho net8.0 mà tham chiếu assembly net10 thì trình biên dịch chặn thẳng bằng CS1705
+      ("uses System.Runtime 10.0.0.0 which has a higher version"). Xem M99 §9.1.
+      XBoss.Cad.Core vẫn giữ net8.0 — nó không tham chiếu assembly AutoCAD, giữ nền thấp để CI
+      Linux build/test được, và app net10 vẫn tham chiếu thư viện net8 bình thường.
+    -->
+    <TargetFramework>net10.0-windows</TargetFramework>
     <RootNamespace>XBoss.Cad.Acad</RootNamespace>
     <!-- Nạp trong process AutoCAD — không copy runtime assembly của AutoCAD đi kèm. -->
     <EnableDynamicLoading>true</EnableDynamicLoading>

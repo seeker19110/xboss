@@ -28,7 +28,6 @@ interface DiagnosticPurgePanelProps {
   handleAlignWcsOrigin: () => void;
   hasRealData: boolean;
   totalHealthScore: number;
-  handleDownloadScr: () => void;
 }
 
 export default function DiagnosticPurgePanel({
@@ -42,7 +41,6 @@ export default function DiagnosticPurgePanel({
   handleAlignWcsOrigin,
   hasRealData,
   totalHealthScore,
-  handleDownloadScr,
 }: DiagnosticPurgePanelProps) {
   const serverVerifyInputRef = useRef<HTMLInputElement | null>(null);
   const {
@@ -109,13 +107,6 @@ export default function DiagnosticPurgePanel({
                     ? "Server đang chẩn đoán (ezdxf)..."
                     : "Xác Thực Bằng ezdxf (Server)"}
               </span>
-            </button>
-            <button
-              onClick={handleDownloadScr}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs shadow-sm transition"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Xuất Kịch Bản .SCR</span>
             </button>
           </div>
         </div>

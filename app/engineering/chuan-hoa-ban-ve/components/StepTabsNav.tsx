@@ -232,15 +232,15 @@ export default function StepTabsNav({
             </button>
 
             <button
-              onClick={() => setStep1SubTab("xref_diff_lisp")}
+              onClick={() => setStep1SubTab("xref_diff")}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
-                step1SubTab === "xref_diff_lisp"
+                step1SubTab === "xref_diff"
                   ? "bg-sky-500 text-on-accent-dark font-bold shadow-xs"
                   : "bg-zinc-800/70 text-zinc-300 hover:text-white"
               }`}
             >
               <Split className="w-3.5 h-3.5 text-sky-400" />
-              <span>4. Cây XREF, So Sánh Diff & AutoLISP 2D</span>
+              <span>4. Cây XREF & So Sánh Diff</span>
             </button>
           </div>
         </div>

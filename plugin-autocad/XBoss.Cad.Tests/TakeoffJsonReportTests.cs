@@ -14,7 +14,7 @@ public class TakeoffJsonReportTests
     [Fact]
     public void Sidecar_JSON_phan_anh_dung_ket_qua_boc()
     {
-        var pack = RepoPaths.LoadRulePackV2();
+        var pack = RepoPaths.LoadRulePack();
         var may = new TakeoffCalculator(pack.Takeoff, pack.Version);
         var kq = may.Compute(
         [

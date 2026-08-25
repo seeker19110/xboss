@@ -1,14 +1,14 @@
 # M99 — Đặc tả: Plugin AutoCAD chuẩn hóa bản vẽ & bóc tách khối lượng (tầng 2)
 
-| Thuộc tính       | Giá trị                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Issue / Goal     | Chuẩn hóa bản vẽ + bóc tách khối lượng bằng chính API AutoCAD trên máy kỹ sư, thay cho việc tự đọc/ghi DXF bằng TypeScript                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Spec owner       | (chờ gán)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| State            | **Approved for implementation** — PR0 (đã merge) + PR1 (rule pack v1, đã merge); PR-A (rule pack v2 + khung plugin + KIEMTRA/CHUANHOA/BOCKL/Excel — nhánh `claude/autocad-csharp-plugin-ypi9nb`); PR2 (ghép thiết bị + token scope cad + `XBOSS_LOGIN` — **đã merge #386**, tái dùng `api_keys`, xem §10/§11); PR-B (đã merge #389); **PR5 (plugin-upload + kiểm định server + `XBOSS_UPLOAD` — nhánh `claude/plugin-upgrade-m8z0hx`)**; PR6/PR7 chờ (§18)                                                                                                            |
-| Người/ngày duyệt | Seeker (liendv@live.com), 2026-08-23 ("duyệt luôn cả 3, làm tiếp"); 2026-08-24 yêu cầu bổ sung BOCKL + xuất Excel ClosedXML và triển khai ngay ("mọi quyết định đều ưu tiên chất lượng cao nhất")                                                                                                                                                                                                                                                                                                                                                                     |
-| Cập nhật         | 2026-08-24 — bản mở rộng: thêm bóc tách khối lượng (`XBOSS_BOCKL`) + xuất Excel theo mẫu công ty (ClosedXML); siết đặc tả chuẩn hóa (pipeline thứ tự cố định, kiểm tra highlight, đơn vị bản vẽ)                                                                                                                                                                                                                                                                                                                                                                      |
-| Cập nhật (PR-B)  | 2026-08-24 — nâng cấp trọn khối: 2 phép kiểm mới theo `purgePolicy.deepPurge` (layer rỗng `reportEmptyLayers`, block nặc danh `reportAnonymousBlocks` — v2 khai sẵn nhưng PR-A chưa cài); `XBOSS_KIEMTRA` xuất báo cáo JSON cạnh DWG (đủ FR8 cho cả 2 chế độ); Excel bóc tách thêm tổng nhóm hệ + TỔNG CỘNG bằng công thức `SUBTOTAL` sống; sidecar JSON kết quả bóc cạnh Excel (chuẩn bị PR5); `XBOSS_BATCH` (journey 7 — phần plugin của PR6): xử lý hàng loạt thư mục qua side database, bản gốc giữ nguyên, kết quả vào `da-chuan-hoa/`, nhật ký + bỏ qua tệp lỗi |
-| Quyết định nền   | `docs/adr/0006-plugin-autocad-va-pipeline-server.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Thuộc tính       | Giá trị                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Issue / Goal     | Chuẩn hóa bản vẽ + bóc tách khối lượng bằng chính API AutoCAD trên máy kỹ sư, thay cho việc tự đọc/ghi DXF bằng TypeScript                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Spec owner       | (chờ gán)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| State            | **Approved for implementation** — PR0 (đã merge) + PR1 (rule pack v1, đã merge); PR-A (rule pack v2 + khung plugin + KIEMTRA/CHUANHOA/BOCKL/Excel — nhánh `claude/autocad-csharp-plugin-ypi9nb`); PR2 (ghép thiết bị + token scope cad + `XBOSS_LOGIN` — **đã merge #386**, tái dùng `api_keys`, xem §10/§11); PR-B (đã merge #389); PR5 (plugin-upload + kiểm định server + `XBOSS_UPLOAD` — **đã merge #392**); **PR6 (bảng điều khiển web + bỏ tầng 1) + PR7a (đối chứng AC6 + bộ mẫu + tài liệu cài đặt) — nhánh `claude/pr6-tiep-tuc-y9689t`**; PR7b chờ máy Windows có license (§18) |
+| Người/ngày duyệt | Seeker (liendv@live.com), 2026-08-23 ("duyệt luôn cả 3, làm tiếp"); 2026-08-24 yêu cầu bổ sung BOCKL + xuất Excel ClosedXML và triển khai ngay ("mọi quyết định đều ưu tiên chất lượng cao nhất")                                                                                                                                                                                                                                                                                                                                                                                          |
+| Cập nhật         | 2026-08-24 — bản mở rộng: thêm bóc tách khối lượng (`XBOSS_BOCKL`) + xuất Excel theo mẫu công ty (ClosedXML); siết đặc tả chuẩn hóa (pipeline thứ tự cố định, kiểm tra highlight, đơn vị bản vẽ)                                                                                                                                                                                                                                                                                                                                                                                           |
+| Cập nhật (PR-B)  | 2026-08-24 — nâng cấp trọn khối: 2 phép kiểm mới theo `purgePolicy.deepPurge` (layer rỗng `reportEmptyLayers`, block nặc danh `reportAnonymousBlocks` — v2 khai sẵn nhưng PR-A chưa cài); `XBOSS_KIEMTRA` xuất báo cáo JSON cạnh DWG (đủ FR8 cho cả 2 chế độ); Excel bóc tách thêm tổng nhóm hệ + TỔNG CỘNG bằng công thức `SUBTOTAL` sống; sidecar JSON kết quả bóc cạnh Excel (chuẩn bị PR5); `XBOSS_BATCH` (journey 7 — phần plugin của PR6): xử lý hàng loạt thư mục qua side database, bản gốc giữ nguyên, kết quả vào `da-chuan-hoa/`, nhật ký + bỏ qua tệp lỗi                      |
+| Quyết định nền   | `docs/adr/0006-plugin-autocad-va-pipeline-server.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 > Không code khi chưa **Approved for implementation**.
 
@@ -35,7 +35,7 @@ Sau khi chuẩn hóa, cùng kỹ sư đó phải **bóc tách khối lượng** 
 | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `lib/ky-thuat/cad/dxf-writer.ts` (R12 + `validateDxf`)              | Giữ — tầng 3 và cổng kiểm tệp nhận vào                                                             |
 | `lib/ky-thuat/cad/dxf-parser.ts`                                    | Giữ phần đọc DXF; **bỏ** nhánh bịa hình học của `parseDwgBinary` (PR0 — đã làm)                    |
-| `generateStandardizedAutocadScript`, `generateAutoLispDetailScript` | **Bỏ** (tầng 1 đã loại — ADR-0006; thi hành ở PR6)                                                 |
+| `generateStandardizedAutocadScript`, `generateAutoLispDetailScript` | **Đã bỏ** (tầng 1 đã loại — ADR-0006; thi hành ở PR6)                                              |
 | `app/engineering/chuan-hoa-ban-ve`                                  | Chuyển vai: từ "công cụ chuẩn hóa" → **bảng điều khiển** (rule pack, lịch sử, kết quả, tải plugin) |
 | `Dockerfile.mepf-worker` (`ezdxf`)                                  | Tầng 3: kiểm định + xuất R2000                                                                     |
 | `lib/bao-mat/auth.ts`, `lib/ky-thuat/drawings.ts`                   | Thêm token API cho desktop; nhận revision từ plugin (PR2/PR5)                                      |
@@ -140,7 +140,7 @@ Plugin đọc `INSUNITS` khi mở phiên làm việc. Chuẩn dự án là **mm*
 - **FR8** Báo cáo diff có cấu trúc (JSON) + bản đọc được bằng tiếng Việt.
 - **FR9** Tải lên DWG + **DXF sidecar** để server kiểm mà không cần đọc DWG (PR5).
 - **FR10** Server **kiểm định lại** trước khi ghi sổ: `ezdxf` audit + đối chiếu rule pack; sai → 422, không tạo revision (PR5).
-- **FR11** Bỏ `generateStandardizedAutocadScript`, `generateAutoLispDetailScript` và nhánh bịa hình học trong `parseDwgBinary` (PR0 đã làm phần parse; phần generator ở PR6).
+- **FR11** Bỏ `generateStandardizedAutocadScript`, `generateAutoLispDetailScript` và nhánh bịa hình học trong `parseDwgBinary` (PR0 đã làm phần parse; phần generator **đã bỏ ở PR6**).
 - **FR12** `XBOSS_KIEMTRA` phát hiện và highlight đủ 7 nhóm ở §6.4, **không thay đổi bản vẽ** (marker trên layer tạm, dọn sạch khi kết thúc).
 - **FR13** `XBOSS_BOCKL` bóc theo `takeoff` của rule pack: đo length/area/count đúng loại đối tượng, quy đổi `INSUNITS` + `factor`, làm tròn chỉ ở tổng, first-match có cảnh báo khi một đối tượng khớp nhiều item.
 - **FR14** Đánh dấu vùng đã bóc bằng màu `markColorAci` + XData (item id, rule pack version, ngày, màu cũ); chạy lại không bóc trùng; `XBOSS_BOCKL_XOA` trả lại đúng màu cũ.
@@ -153,7 +153,7 @@ Plugin đọc `INSUNITS` khi mở phiên làm việc. Chuẩn dự án là **mm*
 ## 8. Acceptance criteria
 
 - **AC1** _Given_ bản vẽ layer sai chuẩn, _when_ `XBOSS_CHUANHOA`, _then_ layer đổi đúng ánh xạ rule pack và **1 lần UNDO** khôi phục nguyên trạng.
-- **AC2** _Given_ bản vẽ text TCVN3, _when_ chuẩn hóa, _then_ chuỗi hiển thị đúng dấu tiếng Việt; dimension liên kết vẫn là dimension.
+- **AC2** _Given_ bản vẽ text TCVN3, _when_ chuẩn hóa, _then_ chuỗi hiển thị đúng dấu tiếng Việt **(gồm cả việc đổi font của KIỂU CHỮ sang `fontMap.targetFont` — đổi nội dung chuỗi thôi thì AutoCAD vẫn hiển thị sai, xác nhận thật 2026-08-25)**; dimension liên kết vẫn là dimension.
 - **AC3** _Given_ bản vẽ có Z≠0, _when_ chuẩn hóa, _then_ mọi thực thể có Z=0 và hình chiếu XY không đổi.
 - **AC4** _Given_ chế độ chỉ-kiểm, _when_ chạy, _then_ bản vẽ **không thay đổi** (so sánh trước/sau) và vẫn có báo cáo.
 - **AC5** _Given_ plugin tải lên tệp không đạt chuẩn, _when_ server kiểm định, _then_ trả 422 và **không** tạo `drawing_revision` (PR5).
@@ -202,23 +202,45 @@ Lý do chọn 2026:
 
 **Hệ quả kiến trúc:**
 
-| Hạng mục                    | Chốt                                                                                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `XBoss.Cad.Core`            | Target **`net8.0`** — dùng được API .NET hiện đại trong chính lớp quy tắc; phụ thuộc NuGet duy nhất: `ClosedXML`                                 |
-| `XBoss.Cad.Acad`            | Target `net8.0-windows`, tham chiếu `acmgd.dll` / `acdbmgd.dll` / `accoremgd.dll` của **ObjectARX SDK 2026** qua `AcadSdkDir`, `CopyLocal=false` |
-| Số bản build                | **1** — 1 pipeline, 1 bộ test tích hợp, 1 gói phát hành                                                                                          |
-| Kiểm tra phiên bản lúc chạy | Plugin đọc biến `ACADVER` khi nạp; **không phải 2026 → báo tiếng Việt và không nạp lệnh**, thay vì lỗi khó hiểu giữa chừng                       |
-| Cổng CI                     | Kiểm `TargetFramework` đúng `net8.0*` để không ai vô tình hạ nền; CI build + test **Core/Tests** (Linux), không build Adapter                    |
+| Hạng mục                    | Chốt                                                                                                                                                                                                                                                       |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `XBoss.Cad.Core`            | Target **`net8.0`** — dùng được API .NET hiện đại trong chính lớp quy tắc; phụ thuộc NuGet duy nhất: `ClosedXML`                                                                                                                                           |
+| `XBoss.Cad.Acad`            | Target **`net10.0-windows`** (bản cập nhật AutoCAD 2026 ngày 2026-08-25 chuyển Managed API sang .NET 10 — xem cảnh báo dưới bảng), tham chiếu `acmgd.dll` / `acdbmgd.dll` / `accoremgd.dll` của **ObjectARX SDK 2026** qua `AcadSdkDir`, `CopyLocal=false` |
+| Số bản build                | **1** — 1 pipeline, 1 bộ test tích hợp, 1 gói phát hành                                                                                                                                                                                                    |
+| Kiểm tra phiên bản lúc chạy | Plugin đọc biến `ACADVER` khi nạp; **không phải 2026 → báo tiếng Việt và không nạp lệnh**, thay vì lỗi khó hiểu giữa chừng                                                                                                                                 |
+| Cổng CI                     | Kiểm `TargetFramework` **từng project** (Core/Tests = `net8.0`, Acad = `net10.0-windows`) để không ai hạ/nâng nhầm; CI build + test **Core/Tests** (Linux), không build Adapter                                                                            |
 
 **Nguyên tắc build:** tham chiếu SDK đúng đời 2026. Managed API tương thích tiến, không tương thích lùi — build trên SDK mới rồi chạy trên AutoCAD cũ hơn sẽ hỏng.
 
-> **Việc phải làm trước khi phát hành bản cài đầu tiên (1 lệnh):** xác nhận runtime thật của bản AutoCAD 2026 đang cài, đừng tin con số trong tài liệu này. Trên máy có AutoCAD:
+> **⚠️ NỀN .NET CỦA AUTOCAD ĐỔI ĐƯỢC GIỮA CÁC BẢN CẬP NHẬT — ĐÃ XẢY RA THẬT (2026-08-25).**
+> Sáng 25/8, `acmgd.dll` của AutoCAD 2026 trên máy người dùng khai `.NETCoreApp,Version=v8.0` và
+> Adapter build `net8.0-windows` chạy tốt. Vài tiếng sau, **cùng lệnh kiểm, cùng tệp** trả
+> `.NETCoreApp,Version=v10.0` — AutoCAD đã tự cập nhật — và build đổ ngay:
 >
-> ```powershell
-> [System.Reflection.Assembly]::LoadFrom("C:\Program Files\Autodesk\AutoCAD 2026\acmgd.dll").ImageRuntimeVersion
+> ```
+> CSC : error CS1705: Assembly 'Acmgd' ... uses 'System.Runtime, Version=10.0.0.0'
+>       which has a higher version than referenced assembly 'System.Runtime, Version=8.0.0.0'
 > ```
 >
-> Nếu kết quả không phải runtime .NET 8, cập nhật `TargetFramework` theo giá trị thật và sửa mục này. Đây là **assumption duy nhất còn lại** của quyết định.
+> **Chốt hiện tại:** `XBoss.Cad.Acad` = `net10.0-windows` (cần .NET 10 SDK để build);
+> `XBoss.Cad.Core`/`Tests` giữ `net8.0` — Core không chạm assembly AutoCAD nên CI Linux vẫn
+> build/test được, và app net10 tham chiếu thư viện net8 bình thường. `ACADVER` vẫn `25.1`.
+>
+> **Cách kiểm trước mỗi lần phát hành** (chạy trên máy có AutoCAD, sau MỖI bản cập nhật AutoCAD):
+>
+> ```powershell
+> $b = [IO.File]::ReadAllBytes("C:\Program Files\Autodesk\AutoCAD 2026\acmgd.dll")
+> [regex]::Matches([Text.Encoding]::UTF8.GetString($b), '\.NET[A-Za-z]*,Version=v[0-9\.]+') |
+>   ForEach-Object { $_.Value } | Select-Object -Unique
+> ```
+>
+> Lệch với `TargetFramework` của Adapter → sửa `TargetFramework` (và cổng CI "Kiểm TargetFramework
+> từng project") theo giá trị thật. **Trọng tài cuối cùng là trình biên dịch**: CS1705 nói thẳng
+> nền thật, còn chuỗi trong tệp chỉ đúng tại thời điểm đọc. Đừng coi kết quả kiểm là vĩnh viễn —
+> đây không còn là "assumption đã đóng" mà là **mục phải kiểm lại định kỳ**.
+>
+> Không dùng `[Reflection.Assembly]::LoadFrom(...).ImageRuntimeVersion` trên Windows PowerShell 5.1:
+> 5.1 chạy .NET Framework 4.8 nên chỉ ném `BadImageFormatException`, không đọc ra con số.
 
 ## 10. API contract
 
@@ -279,6 +301,15 @@ Rule pack lưu dạng tệp có version trong repo (`lib/ky-thuat/cad/rule-packs
 - **`takeoff`** — quy tắc bóc tách: `drawingUnitAssumption` (mm), `markColorAci`, `xdataAppName`, `rounding { length, area, count }` (số chữ số thập phân), `items[]`: `{ id, group, name, spec, unit, measure: "length"|"area"|"count", layerMatchAny[], blockNameMatchAny?[], factor, boqCode }`. `layerMatchAny` khớp **token-boundary** cùng thuật toán `layerMap.matchingNote`; item bám các **layer đích đã chuẩn hóa** (M-DUCT-SUPP…) — bóc tách chạy SAU chuẩn hóa là luồng chuẩn; `boqCode` để trống khi mã tùy dự án (QS gán trong Excel).
 - **`inspectionPolicy`** — chính sách kiểm tra: `zToleranceMm`, `openPolyline { checkLayersFromAreaTakeoff, extraLayersMatchAny[], nearGapToleranceMm }`.
 
+**v3 = v2 + `fontMap.targetFont`** (phát hành 2026-08-25, mở rộng thuần — plugin đọc v2 vẫn nạp được v3):
+
+- **`targetFont`** — `{ typeFace, note }`: font Unicode đích cho **kiểu chữ** đã giải mã TCVN3/VNI.
+  Lý do phát hành: bước sửa font trước đây chỉ đổi **nội dung** chuỗi, `TextStyle` vẫn trỏ `.VnTime`
+  nên AutoCAD **hiển thị vẫn sai** dù dữ liệu đúng — AC2 không đạt trên bản vẽ thật. Plugin chỉ đổi
+  font của kiểu chữ mà nó thực sự nhận ra là mã cũ (`DetectFontKind != None`); kiểu chữ vốn đã
+  Unicode giữ nguyên. Rule pack không khai `targetFont` (v2) → plugin bỏ qua bước này và **ghi cảnh
+  báo vào báo cáo**, không tự chế font.
+
 XData trên đối tượng đã bóc (app `XBOSS_BOCKL`): `[itemId, rulePackVersion, ngày ISO, màu-trước-khi-bóc]` — hợp đồng đọc/ghi duy nhất nằm trong Adapter, format ghi rõ trong README plugin.
 
 ## 12. Security/privacy/abuse
@@ -318,7 +349,7 @@ Metric: số lần chuẩn hóa theo rule pack version, tỉ lệ upload bị t�
 
 - **Unit (C#, CI Linux không cần AutoCAD):** toàn bộ `XBoss.Cad.Core` — matcher token-boundary (kể cả ca `THOAT`↛`OA`, thứ tự nhóm `CAP` điện-trước-nước), ánh xạ layer (đối chiếu cùng corpus với test TS ở `tests/engineering-cad-rule-pack.test.ts`), giải mã TCVN3/VNI/cadSymbols + NFC, gộp khối lượng (quy đổi INSUNITS, factor, first-match, làm tròn chỉ-ở-tổng, chống trùng theo tập handle), phát hiện polyline hở/gần kín từ snapshot, **BoqExcelWriter round-trip** (ghi → đọc lại bằng ClosedXML → đối chiếu header, dữ liệu, công thức H/J/K, tên sheet `Data-BOQ`), parse rule pack v2 strict.
 - **Integration (cần AutoCAD):** chạy qua `accoreconsole.exe` trên **runner tự host có license**; bộ bản vẽ mẫu cam kết trong repo; kiểm AC1–AC4, AC9–AC13 gồm round-trip UNDO và persist XData qua đóng/mở tệp.
-- **Đối chứng 2 tầng (AC6):** cùng bản vẽ mẫu chạy tầng 2 và tầng 3 → so **tập tên layer, nội dung text sau giải mã, toạ độ XY trong sai số 1e-6, số thực thể theo loại**. Không so byte.
+- **Đối chứng 2 tầng (AC6):** hai phần. (a) **Quy tắc — chạy trên CI Linux (PR7a, đã làm):** corpus dùng chung `plugin-autocad/doi-chung/corpus.json` + kết quả kỳ vọng do tầng 3 sinh (`npm run cad:doi-chung`), cả hai tầng đối chiếu đúng hai tệp đó (`tests/cad-doi-chung-2-tang.test.ts` + `DoiChungHaiTangTests.cs`) → so tập tên layer sau ánh xạ và nội dung text sau giải mã TCVN3/VNI. (b) **Hình học — cần AutoCAD (PR7b):** cùng bản vẽ mẫu chạy tầng 2 và tầng 3 → so toạ độ XY trong sai số 1e-6 và số thực thể theo loại. Không so byte.
 - **Server (TS):** rule pack v2 contract (đủ 8 field, takeoff/inspectionPolicy đúng cấu trúc, ETag đổi theo version); `plugin-upload` từ chối tệp sai; token hết hạn/thu hồi; project scope; idempotency (PR2/PR5).
 - **E2E:** ghép thiết bị → duyệt trên web → tải lên → thấy revision mới trong sổ bản vẽ (PR5).
 - **UAT:** kỹ sư chạy trên bản vẽ dự án thật; QS mở Excel xuất ra đối chiếu với 1 hệ đã đo tay.
@@ -332,8 +363,9 @@ Metric: số lần chuẩn hóa theo rule pack version, tỉ lệ upload bị t�
 | **PR-A** | **Rule pack v2 (takeoff + inspectionPolicy) + toàn bộ mã nguồn plugin**: `XBoss.Cad.Core` (matcher, font, kiểm tra, gộp KL, Excel ClosedXML, báo cáo) + `XBoss.Cad.Tests` (CI Linux) + `XBoss.Cad.Acad` (XBOSS_RULEPACK/KIEMTRA/CHUANHOA/BOCKL/BOCKL_XOA/BOCKL_XUAT) + `.bundle` + CI job dotnet | `complex`  | nhánh `claude/autocad-csharp-plugin-ypi9nb` — gộp phạm vi PR3+PR4 cũ (trừ LOGIN) + BOCKL/Excel mới |
 | PR2      | `api_tokens` + ghép thiết bị + quản lý/thu hồi trên web + `XBOSS_LOGIN` (**vùng rủi ro cao — rà `docs/audit.md`**)                                                                                                                                                                               | `complex`  | chờ; sau PR-A                                                                                      |
 | PR5      | `plugin-upload` + kiểm định `ezdxf` trong worker + tạo revision + `XBOSS_UPLOAD`                                                                                                                                                                                                                 | `spec`     | chờ PR2                                                                                            |
-| PR6      | `XBOSS_BATCH` + bảng điều khiển web (kèm nút tải rule pack JSON + tải plugin) + **bỏ tầng 1** (generator .SCR/LISP)                                                                                                                                                                              | `standard` | chờ PR5                                                                                            |
-| PR7      | Test đối chứng 2 tầng (AC6) + bộ bản vẽ mẫu + tài liệu cài đặt; kiểm tích hợp AC9–AC13 trên runner có license                                                                                                                                                                                    | `standard` | chờ PR5, M98, runner Windows                                                                       |
+| PR6      | `XBOSS_BATCH` (plugin — làm ở PR-B) + bảng điều khiển web (nút tải rule pack JSON + tải plugin qua `XBOSS_PLUGIN_URL` + lịch sử upload/kiểm định) + **bỏ tầng 1** (generator .SCR/LISP) — **xong**                                                                                               | `standard` | xong                                                                                               |
+| PR7a     | **Xong** — đối chứng 2 tầng phần quy tắc (AC6: layer + font, corpus dùng chung `plugin-autocad/doi-chung/`, canh cả 2 tầng + 2 cổng CI) + bộ bản vẽ mẫu `plugin-autocad/mau-ban-ve/` + tài liệu cài đặt `plugin-autocad/CAI-DAT.md`                                                              | `standard` | xong                                                                                               |
+| PR7b     | Kiểm tích hợp AC1–AC4, AC9–AC13 qua `accoreconsole` trên bộ mẫu + xác minh runtime `acmgd.dll` (§9.1) + UAT                                                                                                                                                                                      | `standard` | **chờ máy Windows có license** (người dùng xác nhận có, làm sau)                                   |
 
 (PR3/PR4 của bản đặc tả trước được gộp vào PR-A — lý do: người dùng yêu cầu 2026-08-24 triển khai trọn khối chuẩn hóa + bóc tách; phần phụ thuộc điều kiện ngoài (token/upload/runner) vẫn tách PR riêng.)
 
@@ -343,19 +375,19 @@ Pilot 1–2 kỹ sư trên bản vẽ thật trước khi mở rộng. Luồng w
 
 ## 18. Risk/assumption/open decisions
 
-| Mục                                                                                                           | Xác minh/giảm thiểu                                                                                                                        | Quyết định                 |
-| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- |
-| **Trôi quy tắc giữa 2 tầng**                                                                                  | Rule pack một nguồn + test đối chứng AC6 chạy trong CI phần server + Core test dùng cùng corpus với test TS                                | Giảm thiểu — rủi ro số 1   |
-| Không có runner Windows có license cho CI                                                                     | Xác nhận có máy chạy được `accoreconsole`; nếu không, test tích hợp chạy tay theo release và ghi rõ trong DoD                              | **Mở — chặn PR7**          |
-| Đời AutoCAD cụ thể đang dùng                                                                                  | **ĐÃ CHỐT: AutoCAD 2026, 1 bản .NET 8** (§9.1). Còn 1 assumption: xác nhận runtime thật của `acmgd.dll` trước bản cài đầu tiên             | **Đã chốt**                |
-| Token desktop mở rộng bề mặt tấn công                                                                         | Scope hẹp, có hạn, thu hồi được, chỉ lưu hash, rate limit; rà `docs/audit.md`                                                              | Giảm thiểu (PR2)           |
-| Plugin làm hỏng bản vẽ thật                                                                                   | Chỉ-kiểm là mặc định; 1 nhóm UNDO; giữ bản gốc; pilot hẹp                                                                                  | Giảm thiểu                 |
-| **Bóc sai vì đơn vị bản vẽ ≠ mm**                                                                             | Đọc `INSUNITS` + quy đổi tự động + cảnh báo cố định trong báo cáo/Excel (§6.7, AC13)                                                       | Giảm thiểu                 |
-| **Bóc trùng / bỏ sót khi chạy nhiều lần**                                                                     | XData đánh dấu sống trong DWG (FR14/FR16), mặc định bỏ qua đã bóc, có lệnh gỡ + báo số bị bỏ qua                                           | Giảm thiểu                 |
-| **Khối lượng đo được ≠ khối lượng thật thi công** (ống vẽ tim tuyến vs chiều dài lắp thật, chưa trừ phụ kiện) | Ghi rõ trong Excel cột I "đo theo tim tuyến trên bản vẽ"; hệ số hao hụt/phụ kiện là việc của QS trên cột F/định mức — plugin không tự cộng | Chấp nhận có chủ đích      |
-| `boqCode` tùy dự án, rule pack là toàn cục                                                                    | v2 để trống `boqCode` mặc định, QS gán trong Excel; khi cần cố định theo dự án → phát hành rule pack version mới có mã                     | Chấp nhận, xem lại sau UAT |
-| Chi phí duy trì stack C#                                                                                      | Chấp nhận có chủ đích (ADR-0006)                                                                                                           | Đã chấp nhận               |
-| License thư viện Excel                                                                                        | ClosedXML = MIT (kèm phụ thuộc DocumentFormat.OpenXml của Microsoft, MIT) — dùng thương mại tự do                                          | Đã chốt                    |
+| Mục                                                                                                           | Xác minh/giảm thiểu                                                                                                                                                                                                   | Quyết định                         |
+| ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| **Trôi quy tắc giữa 2 tầng**                                                                                  | Rule pack một nguồn + test đối chứng AC6 chạy trong CI phần server + Core test dùng cùng corpus với test TS                                                                                                           | Giảm thiểu — rủi ro số 1           |
+| Không có runner Windows có license cho CI                                                                     | PR7a đã tách phần đối chứng **quy tắc** (AC6 layer/font) chạy được trên CI Linux; phần hình học + AC9–AC13 chạy tay theo release trên máy có license, ghi rõ trong DoD                                                | **Giảm thiểu — chỉ còn chặn PR7b** |
+| Đời AutoCAD cụ thể đang dùng                                                                                  | **ĐÃ CHỐT: AutoCAD 2026, 1 bản build** (§9.1). Nền .NET **KHÔNG cố định**: bản cập nhật 2026-08-25 đổi Managed API từ .NET 8 sang .NET 10 → Adapter nay `net10.0-windows`. Phải kiểm lại sau mỗi bản cập nhật AutoCAD | **Đã chốt**                        |
+| Token desktop mở rộng bề mặt tấn công                                                                         | Scope hẹp, có hạn, thu hồi được, chỉ lưu hash, rate limit; rà `docs/audit.md`                                                                                                                                         | Giảm thiểu (PR2)                   |
+| Plugin làm hỏng bản vẽ thật                                                                                   | Chỉ-kiểm là mặc định; 1 nhóm UNDO; giữ bản gốc; pilot hẹp                                                                                                                                                             | Giảm thiểu                         |
+| **Bóc sai vì đơn vị bản vẽ ≠ mm**                                                                             | Đọc `INSUNITS` + quy đổi tự động + cảnh báo cố định trong báo cáo/Excel (§6.7, AC13)                                                                                                                                  | Giảm thiểu                         |
+| **Bóc trùng / bỏ sót khi chạy nhiều lần**                                                                     | XData đánh dấu sống trong DWG (FR14/FR16), mặc định bỏ qua đã bóc, có lệnh gỡ + báo số bị bỏ qua                                                                                                                      | Giảm thiểu                         |
+| **Khối lượng đo được ≠ khối lượng thật thi công** (ống vẽ tim tuyến vs chiều dài lắp thật, chưa trừ phụ kiện) | Ghi rõ trong Excel cột I "đo theo tim tuyến trên bản vẽ"; hệ số hao hụt/phụ kiện là việc của QS trên cột F/định mức — plugin không tự cộng                                                                            | Chấp nhận có chủ đích              |
+| `boqCode` tùy dự án, rule pack là toàn cục                                                                    | v2 để trống `boqCode` mặc định, QS gán trong Excel; khi cần cố định theo dự án → phát hành rule pack version mới có mã                                                                                                | Chấp nhận, xem lại sau UAT         |
+| Chi phí duy trì stack C#                                                                                      | Chấp nhận có chủ đích (ADR-0006)                                                                                                                                                                                      | Đã chấp nhận                       |
+| License thư viện Excel                                                                                        | ClosedXML = MIT (kèm phụ thuộc DocumentFormat.OpenXml của Microsoft, MIT) — dùng thương mại tự do                                                                                                                     | Đã chốt                            |
 
 ## 19. Approval
 
@@ -364,7 +396,7 @@ Pilot 1–2 kỹ sư trên bản vẽ thật trước khi mở rộng. Luồng w
 - [x] Architecture/API/data — ADR-0006 + §9.1 đã chốt; rule pack v2 mở rộng thuần
 - [ ] Security/RBAC/SoD/audit — phần PR2 còn chờ
 - [ ] Test/telemetry/rollout/rollback — phần tích hợp chờ runner
-- [ ] Không còn blocking question cho PR2/PR5/PR7 (còn: runner Windows, xác minh runtime)
+- [ ] Không còn blocking question cho PR7b (xác minh runtime **đã xong 2026-08-25**; còn: chạy kiểm tích hợp `accoreconsole` trên máy có license)
 
 **Kết luận:** Approved for implementation — phạm vi PR-A thi hành ngay; PR2/PR5/PR6/PR7 giữ trình tự chờ điều kiện ngoài.
 **Người/ngày duyệt:** Seeker — 2026-08-23 (3 PR đầu), 2026-08-24 (mở rộng BOCKL + Excel, "ưu tiên chất lượng cao nhất")

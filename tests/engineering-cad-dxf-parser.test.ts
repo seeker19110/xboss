@@ -4,7 +4,6 @@ import {
   parseDxf,
   decodeCadText,
   convertDxfToSpatialRoutes,
-  generateStandardizedAutocadScript,
   DxfEntityRaw,
   resolveXrefDependencies,
   bindXrefToMaster,
@@ -197,16 +196,6 @@ EOF`;
     assert.ok(pipeRoute);
     assert.equal(pipeRoute.corridorTier, "Tier 3 (Nước)");
     assert.equal(pipeRoute.elevationBopMm, 2368);
-  });
-
-  it("4. generateStandardizedAutocadScript sinh kịch bản .SCR hợp lệ để chuẩn hóa layer và purge", () => {
-    const parsed = parseDxf(sampleDxfContent);
-    const scr = generateStandardizedAutocadScript(parsed.layers);
-
-    assert.ok(scr.includes("-RENAME LA"));
-    assert.ok(scr.includes("M-DUCT-SUPP"));
-    assert.ok(scr.includes("-PURGE LA * N"));
-    assert.ok(scr.includes("AUDIT Y"));
   });
 
   it("5. parseDxf từ chối tệp DWG nhị phân thay vì bịa layer/metadata (M99 PR0)", () => {

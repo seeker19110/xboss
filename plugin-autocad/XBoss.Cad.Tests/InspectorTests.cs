@@ -5,7 +5,7 @@ namespace XBoss.Cad.Tests;
 
 public class InspectorTests
 {
-    private static readonly Inspector Bo = new(RepoPaths.LoadRulePackV2());
+    private static readonly Inspector Bo = new(RepoPaths.LoadRulePack());
 
     private static DrawingSnapshot Snapshot(
         IReadOnlyList<EntityInfo>? entities = null,
@@ -164,7 +164,7 @@ public class InspectorTests
         var bc = Bo.Run(Snapshot([lech])).DongDau("MB-TANG-05.dwg", "2026-08-24");
         var json = System.Text.Json.JsonDocument.Parse(bc.ToJson());
         var root = json.RootElement;
-        Assert.Equal("v2", root.GetProperty("rulePackVersion").GetString());
+        Assert.Equal("v3", root.GetProperty("rulePackVersion").GetString());
         Assert.Equal("MB-TANG-05.dwg", root.GetProperty("tenBanVe").GetString());
         Assert.Equal("2026-08-24", root.GetProperty("ngayIso").GetString());
         Assert.Equal("chi-kiem", root.GetProperty("cheDo").GetString());

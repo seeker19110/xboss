@@ -49,6 +49,19 @@ public sealed class FontMapSection
     [JsonPropertyName("vni")] public VniSection Vni { get; init; } = new();
     [JsonPropertyName("cadSymbols")] public IReadOnlyList<IReadOnlyList<string>> CadSymbols { get; init; } = [];
     [JsonPropertyName("normalization")] public string Normalization { get; init; } = "NFC";
+
+    /// <summary>
+    /// v3: font Unicode đích cho kiểu chữ ĐÃ giải mã. Rule pack v2 không có field này —
+    /// khi đó <see cref="TargetFontSection.TypeFace"/> rỗng và plugin bỏ qua bước đổi font
+    /// (giữ nguyên hành vi cũ, không tự chế font).
+    /// </summary>
+    [JsonPropertyName("targetFont")] public TargetFontSection TargetFont { get; init; } = new();
+}
+
+public sealed class TargetFontSection
+{
+    [JsonPropertyName("typeFace")] public string TypeFace { get; init; } = "";
+    [JsonPropertyName("note")] public string Note { get; init; } = "";
 }
 
 public sealed class Tcvn3Section

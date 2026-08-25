@@ -33,8 +33,9 @@ test.describe("Chuẩn hóa bản vẽ CAD 2D (sau đăng nhập)", () => {
     await page.getByRole("button", { name: "3. Block BOQ, Sửa Dim & Nét In" }).click();
     await expect(page.getByRole("button", { name: /Nét In|CTB/ }).first()).toBeVisible();
 
-    await page.getByRole("button", { name: "4. Cây XREF, So Sánh Diff & AutoLISP 2D" }).click();
-    await expect(page.getByText("AutoLISP", { exact: false }).first()).toBeVisible();
+    // M99 PR6: bỏ tầng 1 (.SCR/AutoLISP) — tab 4 nay chỉ còn cây XREF + so sánh Diff.
+    await page.getByRole("button", { name: "4. Cây XREF & So Sánh Diff" }).click();
+    await expect(page.getByText("External Reference Doctor", { exact: false })).toBeVisible();
 
     await page.getByRole("button", { name: "1. Chẩn Đoán & WCS 2D (X, Y)" }).click();
     await expect(page.getByText("WCS", { exact: false }).first()).toBeVisible();

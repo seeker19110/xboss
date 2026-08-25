@@ -1,6 +1,7 @@
 "use client";
 // Thiết bị AutoCAD (M99 PR2) — duyệt mã ghép từ XBOSS_LOGIN + quản lý/thu hồi token thiết bị.
-// PR6 sẽ gộp trang này vào bảng điều khiển chuẩn hóa bản vẽ; hiện tách riêng cho gọn diff.
+// PR6 đã dựng bảng điều khiển plugin trên /engineering/chuan-hoa-ban-ve (có lối sang trang này);
+// trang token/thiết bị vẫn giữ riêng cho gọn diff.
 import { useCallback, useEffect, useState } from "react";
 import { MonitorSmartphone, KeyRound, ShieldCheck, ShieldOff, Copy } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";

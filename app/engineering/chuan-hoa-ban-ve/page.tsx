@@ -4,16 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Layers, Download, FileSpreadsheet } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import PluginControlPanel from "./components/PluginControlPanel";
 import UploadAndBrowsePanel from "./components/UploadAndBrowsePanel";
 import CadViewportStudio from "./components/CadViewportStudio";
 import StepTabsNav from "./components/StepTabsNav";
 import DiagnosticPurgePanel from "./components/DiagnosticPurgePanel";
 import LayersFontPanel from "./components/LayersFontPanel";
 import BoqDimCtbPanel from "./components/BoqDimCtbPanel";
-import XrefDiffLispPanel from "./components/XrefDiffLispPanel";
+import XrefDiffPanel from "./components/XrefDiffPanel";
 import Step2NamingPanel from "./components/Step2NamingPanel";
 import { useAutoHealEngine } from "./hooks/useAutoHealEngine";
-import { useAutoLispGenerator } from "./hooks/useAutoLispGenerator";
 import { useBlockCatalog } from "./hooks/useBlockCatalog";
 import { useCadDiff } from "./hooks/useCadDiff";
 import { useCadExporters } from "./hooks/useCadExporters";
@@ -38,7 +38,6 @@ export default function ChuanHoaBanVePage() {
   const review = useCadReviewApproval();
   const diff = useCadDiff();
   const blockCatalog = useBlockCatalog();
-  const lisp = useAutoLispGenerator();
 
   const source = useCadSource({ onLayersParsed: viewport.initVisibleLayersFromDxf });
 
@@ -80,7 +79,6 @@ export default function ChuanHoaBanVePage() {
   const exporters = useCadExporters({
     dxfData: source.dxfData,
     conversionInfo: source.conversionInfo,
-    scrScript: source.scrScript,
     saveConfig: naming.saveConfig,
     generatedFileName: naming.generatedFileName,
     wcsConfig: standardization.wcsConfig,
@@ -103,22 +101,14 @@ export default function ChuanHoaBanVePage() {
 
   const { fetchDesignDrawings, runDxfAnalysis } = source;
   const { runDiffAnalysis } = diff;
-  const { handleGenerateLisp } = lisp;
   const { fetchBlockCatalogs } = blockCatalog;
 
   useEffect(() => {
     fetchDesignDrawings();
     runDxfAnalysis();
     runDiffAnalysis();
-    handleGenerateLisp();
     fetchBlockCatalogs();
-  }, [
-    fetchDesignDrawings,
-    runDxfAnalysis,
-    runDiffAnalysis,
-    handleGenerateLisp,
-    fetchBlockCatalogs,
-  ]);
+  }, [fetchDesignDrawings, runDxfAnalysis, runDiffAnalysis, fetchBlockCatalogs]);
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -165,6 +155,11 @@ export default function ChuanHoaBanVePage() {
       />
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-4">
+        {/* ══════════════════════════════════════════════════════════════════════
+            BẢNG ĐIỀU KHIỂN PLUGIN AUTOCAD (M99 PR6) — rule pack, gói cài, lịch sử upload
+        ══════════════════════════════════════════════════════════════════════ */}
+        <PluginControlPanel />
+
         {/* ══════════════════════════════════════════════════════════════════════
             TOP BAR: CHỌN NGUỒN CAD (TỪ THIẾT KẾ HOẶC TẢI LÊN FILE .DXF)
         ══════════════════════════════════════════════════════════════════════ */}
@@ -266,7 +261,6 @@ export default function ChuanHoaBanVePage() {
             handleAlignWcsOrigin={standardization.handleAlignWcsOrigin}
             hasRealData={health.hasRealData}
             totalHealthScore={health.totalHealthScore}
-            handleDownloadScr={source.handleDownloadScr}
           />
         )}
 
@@ -285,7 +279,6 @@ export default function ChuanHoaBanVePage() {
             convertedText={fontDoctor.convertedText}
             sampleFontSnippets={fontDoctor.sampleFontSnippets}
             handleConvertFont={fontDoctor.handleConvertFont}
-            handleDownloadScr={source.handleDownloadScr}
             filteredLayers={standardization.filteredLayers}
           />
         )}
@@ -308,43 +301,16 @@ export default function ChuanHoaBanVePage() {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════
-            BƯỚC 1.4: CÂY LIÊN KẾT XREF, SO SÁNH PHIÊN BẢN DIFF & AUTOLISP 2D
+            BƯỚC 1.4: CÂY LIÊN KẾT XREF & SO SÁNH PHIÊN BẢN DIFF
         ══════════════════════════════════════════════════════════════════════ */}
-        {activeStep === 1 && step1SubTab === "xref_diff_lisp" && (
-          <XrefDiffLispPanel
+        {activeStep === 1 && step1SubTab === "xref_diff" && (
+          <XrefDiffPanel
             setActiveStep={setActiveStep}
-            copied={lisp.copied}
             dxfData={source.dxfData}
             diffResult={diff.diffResult}
-            lispType={lisp.lispType}
-            setLispType={lisp.setLispType}
-            hangerWidth={lisp.hangerWidth}
-            setHangerWidth={lisp.setHangerWidth}
-            hangerHeight={lisp.hangerHeight}
-            setHangerHeight={lisp.setHangerHeight}
-            rodDiameter={lisp.rodDiameter}
-            setRodDiameter={lisp.setRodDiameter}
-            sleeveDiameter={lisp.sleeveDiameter}
-            setSleeveDiameter={lisp.setSleeveDiameter}
-            sleeveTag={lisp.sleeveTag}
-            setSleeveTag={lisp.setSleeveTag}
-            inletWidth={lisp.inletWidth}
-            setInletWidth={lisp.setInletWidth}
-            inletHeight={lisp.inletHeight}
-            setInletHeight={lisp.setInletHeight}
-            outletWidth={lisp.outletWidth}
-            setOutletWidth={lisp.setOutletWidth}
-            outletHeight={lisp.outletHeight}
-            setOutletHeight={lisp.setOutletHeight}
-            transitionLength={lisp.transitionLength}
-            setTransitionLength={lisp.setTransitionLength}
-            generatedLispCode={lisp.generatedLispCode}
             hasRealData={health.hasRealData}
             handleToggleXrefBind={source.handleToggleXrefBind}
             runDiffAnalysis={diff.runDiffAnalysis}
-            handleGenerateLisp={lisp.handleGenerateLisp}
-            handleCopyCode={lisp.handleCopyCode}
-            handleDownloadLisp={lisp.handleDownloadLisp}
           />
         )}
 

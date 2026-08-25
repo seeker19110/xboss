@@ -67,6 +67,10 @@ public static class RulePackLoader
         {
             if (p.Count != 2) throw new RulePackException("fontMap.vni.pairs phải là danh sách cặp [cũ, mới].");
         }
+        // fontMap.targetFont (v3): KHÔNG bắt buộc — rule pack v2 không có, plugin bỏ qua bước đổi
+        // font. Nhưng khai rồi mà để rỗng thì là sai sót, chặn ngay thay vì im lặng không đổi font.
+        if (pack.FontMap.TargetFont.Note.Length > 0 && string.IsNullOrWhiteSpace(pack.FontMap.TargetFont.TypeFace))
+            throw new RulePackException("fontMap.targetFont khai rồi nhưng thiếu typeFace.");
 
         // takeoff (v2)
         var t = pack.Takeoff;

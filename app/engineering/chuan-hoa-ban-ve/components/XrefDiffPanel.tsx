@@ -18,81 +18,28 @@ import {
   Minus,
 } from "lucide-react";
 import { DxfParseResult } from "@/lib/ky-thuat/cad/dxf-parser";
-import type { CadDiffResult, LispTemplateType } from "../types";
+import type { CadDiffResult } from "../types";
 
-// BƯỚC 1.4 — Cây liên kết XREF, so sánh phiên bản Diff & sinh mã AutoLISP 2D.
+// BƯỚC 1.4 — Cây liên kết XREF & so sánh phiên bản Diff.
+// (M99 PR6: bỏ trình sinh AutoLISP — tầng 1 đã loại, việc vẽ chi tiết thuộc plugin AutoCAD.)
 
-interface XrefDiffLispPanelProps {
+interface XrefDiffPanelProps {
   setActiveStep: Dispatch<SetStateAction<1 | 2>>;
-  copied: boolean;
   dxfData: DxfParseResult | null;
   diffResult: CadDiffResult | null;
-  lispType: LispTemplateType;
-  setLispType: Dispatch<SetStateAction<LispTemplateType>>;
-  hangerWidth: number;
-  setHangerWidth: Dispatch<SetStateAction<number>>;
-  hangerHeight: number;
-  setHangerHeight: Dispatch<SetStateAction<number>>;
-  rodDiameter: number;
-  setRodDiameter: Dispatch<SetStateAction<number>>;
-  sleeveDiameter: number;
-  setSleeveDiameter: Dispatch<SetStateAction<number>>;
-  sleeveTag: string;
-  setSleeveTag: Dispatch<SetStateAction<string>>;
-  inletWidth: number;
-  setInletWidth: Dispatch<SetStateAction<number>>;
-  inletHeight: number;
-  setInletHeight: Dispatch<SetStateAction<number>>;
-  outletWidth: number;
-  setOutletWidth: Dispatch<SetStateAction<number>>;
-  outletHeight: number;
-  setOutletHeight: Dispatch<SetStateAction<number>>;
-  transitionLength: number;
-  setTransitionLength: Dispatch<SetStateAction<number>>;
-  generatedLispCode: string;
   hasRealData: boolean;
   handleToggleXrefBind: (xrefId: string) => void;
   runDiffAnalysis: () => void | Promise<void>;
-  handleGenerateLisp: () => void | Promise<void>;
-  handleCopyCode: () => void;
-  handleDownloadLisp: () => void;
 }
 
-export default function XrefDiffLispPanel({
+export default function XrefDiffPanel({
   setActiveStep,
-  copied,
   dxfData,
   diffResult,
-  lispType,
-  setLispType,
-  hangerWidth,
-  setHangerWidth,
-  hangerHeight,
-  setHangerHeight,
-  rodDiameter,
-  setRodDiameter,
-  sleeveDiameter,
-  setSleeveDiameter,
-  sleeveTag,
-  setSleeveTag,
-  inletWidth,
-  setInletWidth,
-  inletHeight,
-  setInletHeight,
-  outletWidth,
-  setOutletWidth,
-  outletHeight,
-  setOutletHeight,
-  transitionLength,
-  setTransitionLength,
-  generatedLispCode,
   hasRealData,
   handleToggleXrefBind,
   runDiffAnalysis,
-  handleGenerateLisp,
-  handleCopyCode,
-  handleDownloadLisp,
-}: XrefDiffLispPanelProps) {
+}: XrefDiffPanelProps) {
   return (
     <div className="space-y-5">
       {/* Phân đoạn 4.1: Cây Liên Kết XREF & Phục Hồi Đường Dẫn Gãy */}
@@ -305,199 +252,6 @@ export default function XrefDiffLispPanel({
               )}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Phân đoạn 4.3: AutoLISP Sinh Chi Tiết Thi Công */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Cột Trái: Thông số đầu vào */}
-        <div className="lg:col-span-5 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
-          <div className="space-y-1 border-b border-zinc-800 pb-3">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
-              <Code className="w-4 h-4 text-amber-400" />
-              Trình Sinh Mã AutoLISP Chi Tiết Mặt Bằng 2D
-            </h2>
-            <p className="text-xs text-zinc-400">
-              Tự động tạo lệnh LISP tham số hóa để vẽ nhanh mặt bằng giá treo Trapeze, lỗ mở xuyên
-              dầm và côn thu ống gió 2D ngay trong AutoCAD.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
-                Loại Chi Tiết Cần Sinh Script:
-              </label>
-              <select
-                value={lispType}
-                onChange={(e) => setLispType(e.target.value as any)}
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
-              >
-                <option value="hanger">Giá Treo Đa Tầng Trapeze Hanger (Unistrut)</option>
-                <option value="sleeve">Lỗ Mở Xuyên Dầm (Sleeve/Opening Builder)</option>
-                <option value="duct_transition">Côn Chuyển Ống Gió (Eccentric Reducer)</option>
-              </select>
-            </div>
-
-            {lispType === "hanger" && (
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <label className="text-[11px] text-zinc-400 block mb-1">
-                    Bề Rộng Giá Treo (mm)
-                  </label>
-                  <input
-                    type="number"
-                    value={hangerWidth}
-                    onChange={(e) => setHangerWidth(Number(e.target.value))}
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-zinc-400 block mb-1">
-                    Chiều Cao Ty Treo (mm)
-                  </label>
-                  <input
-                    type="number"
-                    value={hangerHeight}
-                    onChange={(e) => setHangerHeight(Number(e.target.value))}
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-[11px] text-zinc-400 block mb-1">
-                    Đường Kính Ty Treo (mm)
-                  </label>
-                  <select
-                    value={rodDiameter}
-                    onChange={(e) => setRodDiameter(Number(e.target.value))}
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
-                  >
-                    <option value={10}>Ty Treo M10 (10mm)</option>
-                    <option value={12}>Ty Treo M12 (12mm)</option>
-                    <option value={16}>Ty Treo M16 (16mm)</option>
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {lispType === "sleeve" && (
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <label className="text-[11px] text-zinc-400 block mb-1">
-                    Đường Kính Lỗ Mở (mm)
-                  </label>
-                  <input
-                    type="number"
-                    value={sleeveDiameter}
-                    onChange={(e) => setSleeveDiameter(Number(e.target.value))}
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-zinc-400 block mb-1">Mã Ký Hiệu Lỗ</label>
-                  <input
-                    type="text"
-                    value={sleeveTag}
-                    onChange={(e) => setSleeveTag(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
-                  />
-                </div>
-              </div>
-            )}
-
-            {lispType === "duct_transition" && (
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <label className="text-[11px] text-zinc-400 block mb-1">Miệng Vào (WxH mm)</label>
-                  <div className="flex gap-1">
-                    <input
-                      type="number"
-                      value={inletWidth}
-                      onChange={(e) => setInletWidth(Number(e.target.value))}
-                      className="w-1/2 px-2 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
-                    />
-                    <input
-                      type="number"
-                      value={inletHeight}
-                      onChange={(e) => setInletHeight(Number(e.target.value))}
-                      className="w-1/2 px-2 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[11px] text-zinc-400 block mb-1">Miệng Ra (WxH mm)</label>
-                  <div className="flex gap-1">
-                    <input
-                      type="number"
-                      value={outletWidth}
-                      onChange={(e) => setOutletWidth(Number(e.target.value))}
-                      className="w-1/2 px-2 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
-                    />
-                    <input
-                      type="number"
-                      value={outletHeight}
-                      onChange={(e) => setOutletHeight(Number(e.target.value))}
-                      className="w-1/2 px-2 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
-                    />
-                  </div>
-                </div>
-                <div className="col-span-2">
-                  <label className="text-[11px] text-zinc-400 block mb-1">
-                    Chiều Dài Côn Thu (Length mm)
-                  </label>
-                  <input
-                    type="number"
-                    value={transitionLength}
-                    onChange={(e) => setTransitionLength(Number(e.target.value))}
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
-                  />
-                </div>
-              </div>
-            )}
-
-            <button
-              onClick={handleGenerateLisp}
-              className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Tạo Kịch Bản AutoLISP Mới</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Cột Phải: Xem và Tải Script */}
-        <div className="lg:col-span-7 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
-            <span className="text-xs font-mono text-amber-400 font-bold">
-              xboss_{lispType}.lsp (AutoCAD LISP Program)
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleCopyCode}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition"
-              >
-                {copied ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-                <span>{copied ? "Đã copy" : "Sao chép"}</span>
-              </button>
-              <button
-                onClick={handleDownloadLisp}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-on-accent text-xs font-semibold transition"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Tải về .LSP</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="relative">
-            <pre className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-xs text-amber-300/90 overflow-x-auto max-h-[420px] leading-relaxed">
-              {generatedLispCode || ";; Đang sinh mã LISP..."}
-            </pre>
-          </div>
         </div>
       </div>
 

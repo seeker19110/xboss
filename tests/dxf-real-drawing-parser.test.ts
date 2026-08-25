@@ -5,7 +5,6 @@ import {
   parseDwgBinary,
   DwgUnsupportedError,
   exportDxf,
-  generateStandardizedAutocadScript,
   validateDxf,
   decodeCadText,
   giaiMaByteDxf,
@@ -67,26 +66,6 @@ test("parseDwgBinary: Từ chối cả DWG thật trên đĩa nếu có (không 
     const buf = readFileSync(realDwgPath);
     assert.throws(() => parseDwgBinary(buf, "23056-VHT-CD-A-M-205.dwg"), DwgUnsupportedError);
   }
-});
-
-test("generateStandardizedAutocadScript: Sinh script AutoCAD .SCR chuẩn hóa", () => {
-  const sampleLayers = [
-    {
-      name: "01_ONG_GIO_CAP",
-      standardName: "M-HVAC-DUCT-SUPP",
-      colorNumber: 140,
-      colorHex: "#ef4444",
-      lineType: "CONTINUOUS",
-      entityCount: 15,
-      isStandardized: false,
-      discipline: "M" as const,
-    },
-  ];
-
-  const scr = generateStandardizedAutocadScript(sampleLayers);
-  assert.ok(scr.includes("-LAYER"));
-  assert.ok(scr.includes("M-HVAC-DUCT-SUPP"));
-  assert.ok(scr.includes("PURGE"));
 });
 
 test("Drawing Synchronizer: Nhận diện cấu trúc phân hệ MEPF và tầng từ mã hiệu bản vẽ", () => {

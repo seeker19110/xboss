@@ -1,4 +1,5 @@
 using Autodesk.AutoCAD.DatabaseServices;
+using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using XBoss.Cad.Core.Fonts;
 using XBoss.Cad.Core.Inspection;
@@ -9,9 +10,10 @@ using XBoss.Cad.Core.RulePack;
 namespace XBoss.Cad.Acad.Services;
 
 /// <summary>
-/// Pipeline chuẩn hóa thứ tự cố định (M99 §6.6) — chạy TRONG MỘT transaction của
-/// một lệnh duy nhất nên toàn bộ hoàn tác bằng 1 lần UNDO (FR7):
+/// Pipeline chuẩn hóa thứ tự cố định (M99 §6.6):
 /// 1 AUDIT → 2 layer mapping → 3 font → 4 flatten → 5 overkill → 6 purge → 7 lineweight/CTB + dim override.
+/// Bước 1 là LỆNH AutoCAD nên chạy riêng trước (<see cref="Buoc1Audit"/>); bước 2–7 chạy TRONG
+/// MỘT transaction của một lệnh duy nhất nên toàn bộ hoàn tác bằng 1 lần UNDO (FR7).
 /// Mỗi bước ghi StepDiff vào báo cáo (FR8).
 /// </summary>
 internal sealed class StandardizePipeline(CadRulePack pack)
@@ -20,13 +22,35 @@ internal sealed class StandardizePipeline(CadRulePack pack)
     private readonly VietnameseTextConverter _fonts = new(pack.FontMap);
     private readonly List<StepDiff> _steps = [];
     private readonly List<string> _canhBao = [];
+    /// <summary>Kiểu chữ mà bước 3 nhận ra đang dùng mã TCVN3/VNI — cần đổi font sang Unicode.</summary>
+    private readonly HashSet<ObjectId> _styleMaCu = [];
 
     internal IReadOnlyList<StepDiff> Steps => _steps;
     internal IReadOnlyList<string> CanhBao => _canhBao;
 
+    /// <summary>
+    /// Bước 1 — AUDIT. Tách khỏi <see cref="Run"/> vì AUDIT là LỆNH của AutoCAD, không phải API
+    /// của <see cref="Database"/> (managed API không mở <c>Database.Audit</c>): phải chạy trên
+    /// dòng lệnh của bản vẽ đang mở, TRƯỚC khi mở transaction. Gọi ngay trước <see cref="Run"/>.
+    /// </summary>
+    internal void Buoc1Audit(Editor? ed)
+    {
+        if (!pack.PurgePolicy.Audit) return;
+        if (ed is null)
+        {
+            // Chế độ hàng loạt dùng side database — không có dòng lệnh để chạy AUDIT.
+            _canhBao.Add(
+                "Bỏ qua bước AUDIT: xử lý hàng loạt đọc bản vẽ qua side database, không có dòng lệnh " +
+                "AutoCAD. Mở tệp kết quả rồi chạy AUDIT (hoặc RECOVER) nếu nghi lỗi cấu trúc.");
+            return;
+        }
+        // "_Y" = trả lời "Fix any errors detected?" → sửa lỗi cấu trúc trước khi đụng nội dung.
+        ed.Command("_.AUDIT", "_Y");
+        _steps.Add(new StepDiff { Buoc = "1. Audit", HangMuc = "Cấu trúc bản vẽ", Truoc = "-", Sau = "đã audit", SoLuong = 1 });
+    }
+
     internal void Run(Database db, Transaction tr)
     {
-        Buoc1Audit(db);
         Buoc2LayerMapping(db, tr);
         Buoc3Font(db, tr);
         var snapshot = DrawingSnapshotBuilder.Build(db, tr); // sau layer/font để số liệu Z/rác phản ánh hiện trạng
@@ -34,18 +58,6 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         Buoc5Overkill(db, tr, snapshot);
         Buoc6Purge(db, tr);
         Buoc7LineweightVaDimOverride(db, tr);
-    }
-
-    private void Buoc1Audit(Database db)
-    {
-        if (!pack.PurgePolicy.Audit) return;
-        // Sửa lỗi cấu trúc trước khi đụng nội dung (tương đương lệnh AUDIT Y).
-        using (var auditInfo = new AuditInfo())
-        {
-            auditInfo.FixErrors = true;
-            db.Audit(auditInfo);
-        }
-        _steps.Add(new StepDiff { Buoc = "1. Audit", HangMuc = "Cấu trúc bản vẽ", Truoc = "-", Sau = "đã audit", SoLuong = 1 });
     }
 
     private void Buoc2LayerMapping(Database db, Transaction tr)
@@ -127,6 +139,8 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         }
         if (soDoi > 0)
             _steps.Add(new StepDiff { Buoc = "3. Font", HangMuc = "Text TCVN3/VNI → Unicode", Truoc = "font cũ", Sau = "Unicode NFC", SoLuong = soDoi });
+
+        DoiFontKieuChu(tr);
     }
 
     private int DoiText(DBObject chuNhan, string hienTai, Action<string> ghi, ObjectId styleId, Transaction tr)
@@ -136,10 +150,57 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         if (!styleId.IsNull && tr.GetObject(styleId, OpenMode.ForRead) is TextStyleTableRecord ts)
             font = string.IsNullOrEmpty(ts.Font.TypeFace) ? ts.FileName : ts.Font.TypeFace;
         var kind = VietnameseTextConverter.DetectFontKind(font);
+        // Kiểu chữ nào ĐANG mang mã cũ thì phải đổi font sang Unicode ở cuối bước 3 — nếu không,
+        // nội dung đã đúng mà AutoCAD vẫn hiển thị sai (AC2 không đạt dù dữ liệu đúng).
+        if (kind != LegacyFontKind.None && !styleId.IsNull) _styleMaCu.Add(styleId);
         var moi = _fonts.Convert(hienTai, kind);
         if (string.Equals(moi, hienTai, StringComparison.Ordinal)) return 0;
         ghi(moi);
         return 1;
+    }
+
+    /// <summary>
+    /// Đổi font của các kiểu chữ vừa giải mã sang font Unicode khai trong rule pack
+    /// (`fontMap.targetFont`, v3). CHỈ đụng kiểu chữ mà bước 3 thực sự nhận ra là mã cũ —
+    /// kiểu chữ vốn đã Unicode giữ nguyên. Rule pack v2 (không có targetFont) → bỏ qua kèm
+    /// cảnh báo, không tự chế font.
+    /// </summary>
+    private void DoiFontKieuChu(Transaction tr)
+    {
+        if (_styleMaCu.Count == 0) return;
+
+        var fontDich = pack.FontMap.TargetFont.TypeFace;
+        if (string.IsNullOrWhiteSpace(fontDich))
+        {
+            _canhBao.Add(
+                $"Đã giải mã chữ của {_styleMaCu.Count} kiểu chữ nhưng rule pack {pack.Version} không khai " +
+                "fontMap.targetFont — kiểu chữ vẫn trỏ font mã cũ nên AutoCAD hiển thị vẫn sai. " +
+                "Cập nhật rule pack (v3 trở lên) rồi chuẩn hóa lại, hoặc tự đổi font kiểu chữ.");
+            return;
+        }
+
+        var soDoi = 0;
+        foreach (var id in _styleMaCu)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not TextStyleTableRecord ts) continue;
+            ts.UpgradeOpen();
+            // TrueType: đặt qua FontDescriptor (TypeFace), không phải FileName của SHX.
+            // Ghi đủ tên: `using Autodesk.AutoCAD.GraphicsInterface` sẽ làm `Polyline` (và vài
+            // kiểu khác) nhập nhằng với `DatabaseServices` mà tệp này đang dùng.
+            ts.Font = new Autodesk.AutoCAD.GraphicsInterface.FontDescriptor(fontDich, false, false, 0, 0);
+            soDoi++;
+        }
+        if (soDoi > 0)
+        {
+            _steps.Add(new StepDiff
+            {
+                Buoc = "3. Font",
+                HangMuc = "Font kiểu chữ mã cũ → Unicode",
+                Truoc = "TCVN3/VNI",
+                Sau = fontDich,
+                SoLuong = soDoi,
+            });
+        }
     }
 
     private void Buoc4Flatten(Database db, Transaction tr, DrawingSnapshot snapshot)

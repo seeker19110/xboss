@@ -61,17 +61,6 @@ export interface CadBlockCatalogRecord {
   created_at: string;
 }
 
-export interface CadLispTemplateRecord {
-  id: string;
-  template_code: string;
-  title: string;
-  detail_category: string;
-  lisp_code_template: string;
-  parameter_schema: Record<string, unknown>;
-  is_active: boolean;
-  created_at: string;
-}
-
 // ============================================================================
 // 1. THUẬT TOÁN SO SÁNH PHIÊN BẢN BẢN VẼ (VISUAL CAD VECTOR DIFFING)
 // ============================================================================
@@ -200,167 +189,6 @@ export function computeCadVectorDiff(
 function baseTextOf(e: CadEntity): string {
   return e.textValue || (e.attributes ? JSON.stringify(e.attributes) : "");
 }
-
-// ============================================================================
-// 2. BỘ SINH MÃ AUTOLISP & AUTOCAD SCRIPT (AUTONOMOUS DRAFTING)
-// ============================================================================
-
-export function generateAutoLispDetailScript(
-  templateType: "hanger" | "sleeve" | "duct_transition",
-  params: {
-    widthMm?: number;
-    heightMm?: number;
-    diameterMm?: number;
-    rodDiameterMm?: number;
-    layerName?: string;
-    tagLabel?: string;
-    inletWidthMm?: number;
-    inletHeightMm?: number;
-    outletWidthMm?: number;
-    outletHeightMm?: number;
-    transitionLengthMm?: number;
-  },
-): string {
-  const layer = params.layerName || "M-DETAIL-SHOP";
-  const tag = params.tagLabel || "TYP-DETAIL";
-
-  if (templateType === "hanger") {
-    const w = params.widthMm || 600;
-    const h = params.heightMm || 400;
-    const rod = params.rodDiameterMm || 10;
-
-    return `;; =====================================================================
-;; AutoLISP Generator — XBoss Engineering CAD Engine
-;; Chi tiết: Giá đỡ ty treo chữ U (Trapeze Hanger Detail)
-;; Kích thước: ${w}x${h}mm | Ty giằng: D${rod}mm
-;; =====================================================================
-(defun c:DRAW_TRAPEZE_HANGER ( / pt p1 p2 p3 p4 oldLayer oldOsm)
-  (setq oldLayer (getvar "CLAYER"))
-  (setq oldOsm (getvar "OSMODE"))
-  (setvar "CMDECHO" 0)
-  (setvar "OSMODE" 0)
-
-  ;; Tao layer neu chua co
-  (if (not (tblsearch "LAYER" "${layer}"))
-    (command "_.LAYER" "_M" "${layer}" "_C" "4" "${layer}" "")
-  )
-  (setvar "CLAYER" "${layer}")
-
-  (setq pt (getpoint "\\nChon diem tam tran treo: "))
-  (if pt
-    (progn
-      (setq p1 (list (- (car pt) ${w / 2}) (cadr pt)))
-      (setq p2 (list (- (car pt) ${w / 2}) (- (cadr pt) ${h})))
-      (setq p3 (list (+ (car pt) ${w / 2}) (- (cadr pt) ${h})))
-      (setq p4 (list (+ (car pt) ${w / 2}) (cadr pt)))
-
-      ;; Ve 2 thanh ty ren doc
-      (command "_.LINE" p1 p2 "")
-      (command "_.LINE" p4 p3 "")
-      ;; Ve thanh xa ngang Unistrut
-      (command "_.LINE" (list (- (car p2) 50) (cadr p2)) (list (+ (car p3) 50) (cadr p3)) "")
-      ;; Ghi chu
-      (command "_.TEXT" "_J" "_MC" (list (car pt) (- (cadr pt) ${h + 80})) 50 0 "TY TREO U ${w}x${h} - TY D${rod}")
-      (princ "\\n[XBoss] Ve gia do ty treo thanh cong.")
-    )
-  )
-  (setvar "CLAYER" oldLayer)
-  (setvar "OSMODE" oldOsm)
-  (setvar "CMDECHO" 1)
-  (princ)
-)
-(princ "\\nLenh ve gia do: DRAW_TRAPEZE_HANGER")
-(princ)`;
-  }
-
-  if (templateType === "sleeve") {
-    const d = params.diameterMm || 150;
-    return `;; =====================================================================
-;; AutoLISP Generator — XBoss Engineering CAD Engine
-;; Chi tiết: Lỗ mở sleeve xuyên sàn/dầm (Sleeve Opening Detail)
-;; Đường kính: D${d}mm | Nhãn: ${tag}
-;; =====================================================================
-(defun c:DRAW_SLEEVE_OPENING ( / pt oldLayer oldOsm)
-  (setq oldLayer (getvar "CLAYER"))
-  (setq oldOsm (getvar "OSMODE"))
-  (setvar "CMDECHO" 0)
-  (setvar "OSMODE" 0)
-
-  (if (not (tblsearch "LAYER" "${layer}"))
-    (command "_.LAYER" "_M" "${layer}" "_C" "1" "${layer}" "")
-  )
-  (setvar "CLAYER" "${layer}")
-
-  (setq pt (getpoint "\\nChon toa do tim lo mo sleeve: "))
-  (if pt
-    (progn
-      (command "_.CIRCLE" pt ${d / 2})
-      (command "_.TEXT" "_J" "_MC" pt 60 0 "${tag} (D${d})")
-      (princ "\\n[XBoss] Dat sleeve thanh cong.")
-    )
-  )
-  (setvar "CLAYER" oldLayer)
-  (setvar "OSMODE" oldOsm)
-  (setvar "CMDECHO" 1)
-  (princ)
-)
-(princ "\\nLenh ve sleeve: DRAW_SLEEVE_OPENING")
-(princ)`;
-  }
-
-  if (templateType === "duct_transition") {
-    const inW = params.inletWidthMm || params.widthMm || 800;
-    const inH = params.inletHeightMm || params.heightMm || 400;
-    const outW = params.outletWidthMm || Math.round(inW * 0.75);
-    const outH = params.outletHeightMm || inH;
-    const transL = params.transitionLengthMm || 600;
-
-    return `;; =====================================================================
-;; AutoLISP Generator — XBoss Engineering CAD Engine
-;; Chi tiết: Côn chuyển tiết diện ống gió (Duct Transition Detail)
-;; Kích thước: ${inW}x${inH}mm -> ${outW}x${outH}mm | Chiều dài: ${transL}mm
-;; =====================================================================
-(defun c:DRAW_DUCT_TRANSITION ( / pt p1 p2 p3 p4 oldLayer oldOsm)
-  (setq oldLayer (getvar "CLAYER"))
-  (setq oldOsm (getvar "OSMODE"))
-  (setvar "CMDECHO" 0)
-  (setvar "OSMODE" 0)
-
-  (if (not (tblsearch "LAYER" "${layer}"))
-    (command "_.LAYER" "_M" "${layer}" "_C" "3" "${layer}" "")
-  )
-  (setvar "CLAYER" "${layer}")
-
-  (setq pt (getpoint "\\nChon diem tim dau vao con chuyen: "))
-  (if pt
-    (progn
-      (setq p1 (list (car pt) (+ (cadr pt) ${inW / 2})))
-      (setq p2 (list (car pt) (- (cadr pt) ${inW / 2})))
-      (setq p3 (list (+ (car pt) ${transL}) (- (cadr pt) ${outW / 2})))
-      (setq p4 (list (+ (car pt) ${transL}) (+ (cadr pt) ${outW / 2})))
-
-      (command "_.LINE" p1 p2 "")
-      (command "_.LINE" p2 p3 "")
-      (command "_.LINE" p3 p4 "")
-      (command "_.LINE" p4 p1 "")
-      (command "_.LINE" p1 p3 "")
-      (command "_.LINE" p2 p4 "")
-      (command "_.TEXT" "_J" "_MC" (list (+ (car pt) ${transL / 2}) (cadr pt)) 40 0 "CON ${inW}x${inH}->${outW}x${outH} L=${transL}")
-      (princ "\\n[XBoss] Ve con chuyen ong gio thanh cong.")
-    )
-  )
-  (setvar "CLAYER" oldLayer)
-  (setvar "OSMODE" oldOsm)
-  (setvar "CMDECHO" 1)
-  (princ)
-)
-(princ "\\nLenh ve con chuyen: DRAW_DUCT_TRANSITION")
-(princ)`;
-  }
-
-  return `;; Default script\n(princ "\\n[XBoss CAD Script]")`;
-}
-
 // ============================================================================
 // 3-4. FONT TIẾNG VIỆT & CHUẨN HÓA LAYER — nguồn chuẩn: lib/cad/dxf-parser.ts
 // ============================================================================
@@ -451,11 +279,5 @@ export async function listCadBlockCatalogs(projectId: number) {
   return await query<CadBlockCatalogRecord>(
     `SELECT * FROM engineering_cad_block_catalogs WHERE project_id = ? ORDER BY block_name ASC`,
     projectId,
-  );
-}
-
-export async function listCadLispTemplates() {
-  return await query<CadLispTemplateRecord>(
-    `SELECT * FROM engineering_cad_lisp_templates WHERE is_active = true ORDER BY template_code ASC`,
   );
 }

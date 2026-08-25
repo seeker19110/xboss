@@ -2,6 +2,9 @@ using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
 
+// Bí danh vì `UseWindowsForms` kéo theo implicit using `System.Drawing` (xem MarkService.cs).
+using AcadColor = Autodesk.AutoCAD.Colors.Color;
+
 namespace XBoss.Cad.Acad.Services;
 
 /// <summary>
@@ -46,7 +49,7 @@ internal static class KiemTraMarker
             var ltr = new LayerTableRecord
             {
                 Name = TenLayer,
-                Color = Color.FromColorIndex(ColorMethod.ByAci, (short)aci),
+                Color = AcadColor.FromColorIndex(ColorMethod.ByAci, (short)aci),
                 IsPlottable = false, // marker không bao giờ được in
             };
             layerId = lt.Add(ltr);

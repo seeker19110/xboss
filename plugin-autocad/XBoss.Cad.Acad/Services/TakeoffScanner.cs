@@ -1,6 +1,10 @@
 using Autodesk.AutoCAD.DatabaseServices;
 using XBoss.Cad.Core.Takeoff;
 
+// Bí danh vì `UseWindowsForms` kéo theo implicit using `System.Drawing` (System.Drawing.Region
+// trùng tên với thực thể Region của AutoCAD) — xem MarkService.cs.
+using AcadRegion = Autodesk.AutoCAD.DatabaseServices.Region;
+
 namespace XBoss.Cad.Acad.Services;
 
 /// <summary>
@@ -81,7 +85,7 @@ internal static class TakeoffScanner
                     });
                     break;
                 }
-                case Region rg:
+                case AcadRegion rg:
                     ketQua.Add(new MeasuredObject
                     {
                         Handle = rg.Handle.ToString(),

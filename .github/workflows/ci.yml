@@ -96,6 +96,15 @@ jobs:
       - name: Kiểm tham số lib/db (chặn query(sql, [a, b]))
         run: npm run check:db-params
 
+      # M99 AC6: kết quả đối chứng 2 tầng phải được sinh lại sau mỗi lần đổi quy tắc chuẩn hóa —
+      # tệp lệch nghĩa là quy tắc tầng 3 đã đổi mà chưa đối chiếu lại với plugin (job `plugin`).
+      - name: Kiểm kết quả đối chứng 2 tầng CAD
+        run: npm run cad:doi-chung -- --kiem
+
+      # Bộ bản vẽ mẫu (§15) sinh bằng script, không sửa tay — kiểm tệp còn khớp script.
+      - name: Kiểm bộ bản vẽ mẫu CAD
+        run: npm run cad:mau-ban-ve -- --kiem
+
   # ── Test đơn vị + tích hợp trên Postgres thật ──
   test:
     name: test (Postgres)
@@ -207,13 +216,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Cổng M99 §9.1: chặn ai đó vô tình hạ nền khỏi net8.0*.
-      - name: Kiểm TargetFramework net8.0*
+      # Cổng M99 §9.1: mỗi project một nền RÕ RÀNG, không ai hạ/nâng nhầm.
+      #   Core/Tests = net8.0     — không chạm assembly AutoCAD, CI Linux build/test được.
+      #   Acad       = net10.0-windows — bám nền Managed API của AutoCAD 2026 (bản cập nhật
+      #                2026-08-25 chuyển sang .NET 10). Lệch nền → trình biên dịch chặn (CS1705).
+      - name: Kiểm TargetFramework từng project
         run: |
-          sai=$(grep -rLE '<TargetFramework>net8\.0' plugin-autocad --include='*.csproj' || true)
-          if [ -n "$sai" ]; then
-            echo "::error::csproj không phải nền net8.0 (M99 §9.1): $sai"
-            exit 1
-          fi
+          kiem() {
+            grep -q "<TargetFramework>$2</TargetFramework>" "$1" ||
+              { echo "::error::$1 phải là nền $2 (M99 §9.1)"; exit 1; }
+          }
+          kiem plugin-autocad/XBoss.Cad.Core/XBoss.Cad.Core.csproj net8.0
+          kiem plugin-autocad/XBoss.Cad.Tests/XBoss.Cad.Tests.csproj net8.0
+          kiem plugin-autocad/XBoss.Cad.Acad/XBoss.Cad.Acad.csproj net10.0-windows
 
       - name: Cache gói NuGet
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0

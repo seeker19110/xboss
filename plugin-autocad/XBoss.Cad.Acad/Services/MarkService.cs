@@ -1,6 +1,11 @@
 using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
 
+// `UseWindowsForms` (cần cho hộp thoại chọn tệp của Autodesk.AutoCAD.Windows) kéo theo implicit
+// using `System.Drawing`, làm tên `Color` nhập nhằng với `Autodesk.AutoCAD.Colors.Color`.
+// Đặt bí danh rõ ràng thay vì tắt implicit using — chỉ tệp này dùng tới kiểu màu của AutoCAD.
+using AcadColor = Autodesk.AutoCAD.Colors.Color;
+
 namespace XBoss.Cad.Acad.Services;
 
 /// <summary>
@@ -30,7 +35,7 @@ internal static class MarkService
             new TypedValue((int)DxfCode.ExtendedDataAsciiString, rulePackVersion),
             new TypedValue((int)DxfCode.ExtendedDataAsciiString, ngayIso),
             new TypedValue((int)DxfCode.ExtendedDataAsciiString, mauCu));
-        ent.Color = Color.FromColorIndex(ColorMethod.ByAci, (short)aci);
+        ent.Color = AcadColor.FromColorIndex(ColorMethod.ByAci, (short)aci);
     }
 
     /// <summary>Đọc đánh dấu; null nếu thực thể chưa bóc.</summary>
@@ -58,7 +63,7 @@ internal static class MarkService
     }
 
     /// <summary>Mã hóa màu hiện tại thành chuỗi ổn định để lưu trong XData.</summary>
-    internal static string EncodeColor(Color mau)
+    internal static string EncodeColor(AcadColor mau)
     {
         if (mau.IsByLayer) return "bylayer";
         if (mau.IsByBlock) return "byblock";
@@ -66,14 +71,14 @@ internal static class MarkService
         return $"rgb:{mau.ColorValue.R},{mau.ColorValue.G},{mau.ColorValue.B}";
     }
 
-    internal static Color DecodeColor(string maMau)
+    internal static AcadColor DecodeColor(string maMau)
     {
-        if (maMau == "bylayer") return Color.FromColorIndex(ColorMethod.ByLayer, 256);
-        if (maMau == "byblock") return Color.FromColorIndex(ColorMethod.ByBlock, 0);
+        if (maMau == "bylayer") return AcadColor.FromColorIndex(ColorMethod.ByLayer, 256);
+        if (maMau == "byblock") return AcadColor.FromColorIndex(ColorMethod.ByBlock, 0);
         if (maMau.StartsWith("aci:", StringComparison.Ordinal) &&
             short.TryParse(maMau.AsSpan(4), out var aci))
         {
-            return Color.FromColorIndex(ColorMethod.ByAci, aci);
+            return AcadColor.FromColorIndex(ColorMethod.ByAci, aci);
         }
         if (maMau.StartsWith("rgb:", StringComparison.Ordinal))
         {
@@ -81,10 +86,10 @@ internal static class MarkService
             if (phan.Length == 3 && byte.TryParse(phan[0], out var r) &&
                 byte.TryParse(phan[1], out var g) && byte.TryParse(phan[2], out var b))
             {
-                return Color.FromRgb(r, g, b);
+                return AcadColor.FromRgb(r, g, b);
             }
         }
         // Chuỗi lạ (XData bị sửa tay) — an toàn nhất là ByLayer.
-        return Color.FromColorIndex(ColorMethod.ByLayer, 256);
+        return AcadColor.FromColorIndex(ColorMethod.ByLayer, 256);
     }
 }

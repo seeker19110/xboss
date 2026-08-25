@@ -1,5 +1,8 @@
-using Autodesk.AutoCAD.ApplicationServices.Core;
 using Autodesk.AutoCAD.Runtime;
+
+// Bí danh vì `UseWindowsForms` kéo theo implicit using `System.Windows.Forms`, làm tên
+// `Application` nhập nhằng với `System.Windows.Forms.Application` (xem MarkService.cs).
+using AcadApp = Autodesk.AutoCAD.ApplicationServices.Core.Application;
 
 [assembly: ExtensionApplication(typeof(XBoss.Cad.Acad.PluginExtension))]
 [assembly: CommandClass(typeof(XBoss.Cad.Acad.Commands.XBossCommands))]
@@ -21,7 +24,7 @@ public sealed class PluginExtension : IExtensionApplication
 
     public void Initialize()
     {
-        var acadVer = Application.GetSystemVariable("ACADVER")?.ToString() ?? "";
+        var acadVer = AcadApp.GetSystemVariable("ACADVER")?.ToString() ?? "";
         DungDoiAutoCad = acadVer.StartsWith(AcadVer2026, StringComparison.Ordinal);
         var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
         if (!DungDoiAutoCad)
