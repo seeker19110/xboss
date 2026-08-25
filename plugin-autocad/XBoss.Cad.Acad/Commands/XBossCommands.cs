@@ -372,10 +372,11 @@ public sealed class XBossCommands
         var db = doc.Database;
 
         // FR16: dựng lại kết quả từ XData đang sống trong DWG — không phụ thuộc RAM phiên trước.
-        List<(MeasuredObject DoiTuong, string ItemId)> daGan;
+        // Đọc TẠI CHỖ (không qua TakeoffScanner.DocDaGan) vì ở đây còn cần lấy TÊN VÙNG ghi trong
+        // XData lúc bóc — DocDaGan chỉ trả đối tượng + itemId, dùng cho XBOSS_VE_THONGKE.
+        var daGan = new List<(MeasuredObject DoiTuong, string ItemId)>();
         using (var tr = db.TransactionManager.StartTransaction())
         {
-            daGan = TakeoffScanner.DocDaGan(db, tr, pack.Takeoff.XdataAppName);
             var (doiTuong, _) = TakeoffScanner.Scan(
                 tr, TakeoffScanner.ModelSpaceIds(db, tr).ToList(), pack.Takeoff.XdataAppName,
                 BoiCanhBoc(db, tr, pack, new VungChonService.KetQuaChonVung([], [])));
