@@ -82,7 +82,7 @@
 - Nguồn chuẩn: tên block trong thư viện 0139 (manifest M100). Rule khai `aliasMatchAny` (token-boundary như layerMap — tái dùng `TokenMatcher`, KHÔNG substring thô).
 - `reportOnly: true` (mặc định bản đầu): báo danh sách BlockReference có tên khớp alias nhưng ≠ target, kèm số lượng — kỹ sư thay tay hoặc chờ bật sửa thật.
 - Khi bật sửa thật (`reportOnly: false`, phiên bản sau pilot): đổi BlockReference sang định nghĩa target **giữ nguyên** transform (vị trí/xoay/scale) + attribute trùng tag; block nặc danh (`*U...`) KHÔNG bao giờ tự thay — chỉ báo (không có tên để khớp alias).
-- Thứ tự trong pipeline: bước 13 chạy SAU purge (block rác đã dọn) và TRƯỚC lineweight/CTB.
+- **Thứ tự trong pipeline: bước 13 nối đuôi SAU bước 11**, không chèn vào giữa (bản nháp đặc tả ghi "sau purge, trước lineweight/CTB" — đã sửa 2026-08-25 khi thi hành PR2). Lý do: chèn vào giữa buộc phải đánh lại số hiệu các bước 7–11 đã đi vào báo cáo JSON và tài liệu; còn lợi ích của "purge sau khi thay block" chỉ là dọn định nghĩa block cũ nay không ai tham chiếu — mà bản đầu `reportOnly` không thay gì cả, và khi bật sửa thật thì chạy `XBOSS_CHUANHOA` lần hai sẽ purge nốt (pipeline idempotent nên chạy lại là an toàn). Báo cáo của bước 13 ghi rõ điều này khi có thay đổi thật.
 
 ### 6.3 Idempotency `layerMap` — đóng phần còn lại
 

@@ -4,6 +4,46 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M102 PR2 — Adapter AutoCAD: bước chuẩn hóa 12/13 + quét tag cho phép kiểm 17 (2026-08-25)
+
+Thi hành `docs/nang-cap/M102-plugin-dong-tran-chuan-hoa.md` PR2 phần **Adapter** — nối dây Core PR1
+vào bản vẽ thật. Không đụng logic Core (chỉ thêm 2 hằng nhãn bước), **không đổi hành vi mặc định**:
+rule pack v8 phát hành có `polylineClosePolicy.enabled=false` và `blockMap.enabled=false` nên cả hai
+bước mới return sớm — chuẩn hóa cho kết quả y hệt v7.
+
+- **`plugin-autocad/XBoss.Cad.Acad/Services/StandardizePipeline.cs`**: thêm `Buoc12DongPolyline` +
+  `Buoc13BlockMap`, gọi ngay sau bước 11 trong `Run()` (thứ tự pipeline cố định, vẫn nằm trong 1
+  transaction ⇒ **1 lần UNDO** hoàn tác toàn bộ — FR3). Bước 12 chỉ gom polyline **hở**
+  (`Polyline`/`Polyline2d` chưa `Closed`), đo khe đầu–cuối theo đơn vị bản vẽ rồi để Core quy sang mm
+  bằng `DrawingUnits.TuInsUnits` như các bước trước; áp bằng đúng một thao tác `Closed = true` cho cả
+  `BatCoClosed` lẫn `NoiThemDoan` (AutoCAD tự nối đỉnh cuối về đỉnh đầu — hai giá trị enum chỉ khác
+  nhau ở phần báo cáo). Bước 13 đọc **định nghĩa gốc** qua `DynamicBlockTableRecord` để block động
+  không bị coi nhầm là nặc danh, và khi được phép sửa thật chỉ trỏ `BlockReference` sang ObjectId
+  block đích (vị trí/xoay/tỉ lệ giữ nguyên); block đích chưa có trong bản vẽ → bỏ qua + cảnh báo nêu
+  tên, **không tự tạo block rỗng**. `ChiBaoCao` (reportOnly) ⇒ tuyệt đối không sửa entity nào, chỉ
+  ghi `StepDiff` dạng "chỉ báo cáo" — áp cho cả hai bước.
+- **`plugin-autocad/XBoss.Cad.Acad/Services/DrawingSnapshotBuilder.cs`**: điền `DrawingSnapshot.Tags`
+  cho phép kiểm 17 — quét model space, chỉ nhận khối **có XData `XBOSS_VE`** (đọc qua
+  `VeXDataStore.Doc`, đúng cơ chế của `XBOSS_VE_TAG`) và có thẻ attribute `TAG` khác rỗng; "hệ" để so
+  trùng lấy layer của **tim liên kết** theo `HandleTim` trong XData, khối không gắn tim thì lấy layer
+  của chính khối. Không có tag nào → `Tags = null` ⇒ phép kiểm 17 tự tắt (không báo oan bản vẽ vẽ tay).
+- **`plugin-autocad/XBoss.Cad.AcadShim/AcadStub.cs`** (cổng CI biên dịch Adapter trên Linux): bổ sung
+  API mà bước 12/13 dùng nhưng stub còn thiếu — `Polyline2d` duyệt được + `Vertex2d` (đếm đỉnh), và
+  `BlockReference.BlockTableRecord` **có setter** như API thật. Thiếu ba thứ này thì CI đỏ ngay ở
+  bước biên dịch mà máy dev không có dotnet sẽ không thấy trước.
+- **Gộp trùng lặp phát hiện lúc review:** hằng thẻ `TAG` và vòng tìm attribute tag bị viết hai bản
+  (`VeTagCommands` và bản mới trong `DrawingSnapshotBuilder`) — đưa về `VeXDataStore.TheTag` /
+  `VeXDataStore.TagCua` dùng chung, để lệnh đánh tag và phép kiểm tag không thể trôi khỏi nhau.
+- **Chốt một điểm lệch đặc tả:** §6.2 bản nháp ghi bước 13 chạy "sau purge, trước lineweight/CTB",
+  nhưng thi hành đặt **nối đuôi sau bước 11** — chèn vào giữa buộc đánh lại số hiệu bước 7–11 đã đi
+  vào báo cáo JSON và tài liệu. Đổi lại: định nghĩa block cũ vừa mất tham chiếu sẽ còn nằm lại tới
+  lần chạy sau, nên báo cáo bước 13 nhắc chạy lại `XBOSS_CHUANHOA` (pipeline idempotent) để purge dọn
+  nốt. Đặc tả §6.2 đã sửa cho khớp code.
+- `plugin-autocad/README.md`: bảng lệnh ghi lại `XBOSS_CHUANHOA` **13 bước** và nêu phép kiểm 17/18.
+
+**Chưa làm (đúng ràng buộc môi trường):** container không có dotnet nên phần C# chưa build/test cục
+bộ — dựa vào CI và checklist verify tay trên máy AutoCAD 2026 theo release (M99 §18).
+
 ## M102 PR1 — Rule pack v8: đóng polyline gần kín, quy block lạc chuẩn, phép kiểm 17/18 (2026-08-25)
 
 Thi hành `docs/nang-cap/M102-plugin-dong-tran-chuan-hoa.md` PR1 — đóng 4 khoảng trống cuối của

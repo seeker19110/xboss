@@ -52,6 +52,8 @@ internal static class DrawingSnapshotBuilder
             }
         }
 
+        var tags = QuetTag(db, tr);
+
         return new DrawingSnapshot
         {
             Layers = layers,
@@ -59,7 +61,52 @@ internal static class DrawingSnapshotBuilder
             InsUnits = (int)db.Insunits,
             UsedLayerNames = layerDangDung,
             AnonymousBlockNames = blockNacDanh,
+            Tags = tags.Count > 0 ? tags : null,
         };
+    }
+
+    /// <summary>
+    /// Tag của các khối do bộ lệnh vẽ M100 sinh ra — nguồn của phép kiểm 17 (M102 §6.4). CHỈ nhận
+    /// khối có XData <c>XBOSS_VE</c>: khối vẽ tay không có dữ liệu hệ nên báo trùng sẽ là báo oan.
+    /// Không có khối nào như vậy → danh sách rỗng, phép kiểm 17 tự tắt.
+    /// </summary>
+    private static List<TagInfo> QuetTag(Database db, Transaction tr)
+    {
+        var ra = new List<TagInfo>();
+        foreach (var id in TakeoffScanner.ModelSpaceIds(db, tr))
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not BlockReference br) continue;
+            if (VeXDataStore.Doc(br) is not { } xd) continue;
+
+            // Cùng một cửa đọc thẻ TAG với XBOSS_VE_TAG (VeXDataStore.TagCua) — không viết lại vòng thứ hai.
+            if (VeXDataStore.TagCua(tr, br) is not { } att) continue;
+            var tag = att.TextString;
+            if (string.IsNullOrWhiteSpace(tag)) continue; // khối chưa đánh tag — XBOSS_VE_TAG lo việc đó
+
+            ra.Add(new TagInfo
+            {
+                Handle = br.Handle.ToString(),
+                Tag = tag,
+                // "Hệ" để so trùng = layer của TIM mà khối gắn vào (XData liên kết ngược); khối
+                // không gắn tim nào (thiết bị đứng riêng) thì lấy chính layer của khối.
+                HeLayer = LayerCuaTim(db, tr, xd.HandleTim) ?? br.Layer,
+            });
+        }
+        return ra;
+    }
+
+    /// <summary>Layer của tim theo handle lưu trong XData; null khi handle hỏng/tim đã bị xóa.</summary>
+    private static string? LayerCuaTim(Database db, Transaction tr, string? handleTim)
+    {
+        if (string.IsNullOrWhiteSpace(handleTim)) return null;
+        long so;
+        try { so = Convert.ToInt64(handleTim, 16); }
+        catch (Exception e) when (e is FormatException or ArgumentException or OverflowException)
+        {
+            return null; // XData hỏng — không đoán, chỉ bỏ qua liên kết tim
+        }
+        if (!db.TryGetObjectId(new Handle(so), out var id)) return null;
+        return tr.GetObject(id, OpenMode.ForRead) is Entity ent ? ent.Layer : null;
     }
 
     private static void ThuThap(Transaction tr, Entity ent, List<EntityInfo> entities)

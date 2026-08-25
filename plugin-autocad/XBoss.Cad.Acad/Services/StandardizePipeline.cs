@@ -13,10 +13,11 @@ namespace XBoss.Cad.Acad.Services;
 /// <summary>
 /// Pipeline chuẩn hóa thứ tự cố định (M99 §6.6 + M101 §6.2):
 /// 1 AUDIT → 2 layer mapping → 3 font → 4 flatten → 5 overkill → 6 purge → 7 lineweight/CTB + dim
-/// override → 8 style map → 9 xref → 10 hatch → 11 layout. Bốn bước cuối là của rule pack v7 và
-/// đều MẶC ĐỊNH TẮT — rule pack ≤ v6 (hoặc v7 chưa bật) cho kết quả y hệt trước đây.
+/// override → 8 style map → 9 xref → 10 hatch → 11 layout → 12 đóng polyline gần kín → 13 block map.
+/// Sáu bước cuối là của rule pack v7 (8–11) và v8 (12–13, M102 §6.1/§6.2), đều MẶC ĐỊNH TẮT —
+/// rule pack ≤ v6 (hoặc v7/v8 chưa bật) cho kết quả y hệt trước đây.
 ///
-/// <para>Bước 1 là LỆNH AutoCAD nên chạy riêng trước (<see cref="Buoc1Audit"/>); bước 2–11 lập kế
+/// <para>Bước 1 là LỆNH AutoCAD nên chạy riêng trước (<see cref="Buoc1Audit"/>); bước 2–13 lập kế
 /// hoạch/áp thay đổi TRONG MỘT transaction của một lệnh duy nhất. Riêng phần BIND xref (bước 9) và
 /// xóa/đổi tên layout (bước 11) dùng API cấp TÀI LIỆU (<c>Database.BindXrefs</c>/<c>LayoutManager</c>)
 /// nên phải chạy sau khi transaction commit — <see cref="ApDungCapTaiLieu"/>, vẫn trong cùng một
@@ -75,6 +76,9 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         Buoc9Xref(db, tr);
         Buoc10Hatch(db, tr);
         Buoc11LapKeHoachLayout(db, tr);
+        // v8 (M102 §6.1/§6.2) — 2 bước mới, thứ tự cố định SAU layout, đều mặc định tắt.
+        Buoc12DongPolyline(db, tr);
+        Buoc13BlockMap(db, tr);
     }
 
     private void Buoc2LayerMapping(Database db, Transaction tr)
@@ -750,6 +754,227 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         var layouts = theoThuTu.OrderBy(x => x.ThuTu).Select(x => x.Layout).ToList();
         _keHoachLayout = ChuanHoaMoRong.LapKeHoachLayout(pack.LayoutPolicy, layouts);
         _canhBao.AddRange(_keHoachLayout.CanhBao);
+    }
+
+    // ===== v8 (M102 §6.1/§6.2) — bước 12..13. Vẫn đúng khuôn cũ: Adapter chỉ ĐO và ÁP,
+    // quyết định "đóng cái nào / đổi block nào" nằm ở Core.Standardize.ChuanHoaMoRong. =====
+
+    /// <summary>
+    /// Bước 12 — đóng polyline gần kín (khe đầu–cuối ≤ <c>gapCloseToleranceMm</c>). Chỉ gom polyline
+    /// HỞ (LWPOLYLINE/POLYLINE 2D chưa bật cờ Closed); mọi ngưỡng/lọc layer do Core quyết.
+    /// </summary>
+    private void Buoc12DongPolyline(Database db, Transaction tr)
+    {
+        if (!pack.PolylineClosePolicy.Enabled) return;
+
+        var hienCo = new List<PolylineHienCo>();
+        var idTheoHandle = new Dictionary<string, ObjectId>(StringComparer.Ordinal);
+        var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+        foreach (ObjectId btrId in bt)
+        {
+            var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
+            if (btr.IsFromExternalReference) continue; // không sửa nội dung xref
+            foreach (ObjectId entId in btr)
+            {
+                switch (tr.GetObject(entId, OpenMode.ForRead))
+                {
+                    case Polyline pl when !pl.Closed && pl.NumberOfVertices >= 2:
+                    {
+                        var dau = pl.GetPoint2dAt(0);
+                        var cuoi = pl.GetPoint2dAt(pl.NumberOfVertices - 1);
+                        Ghi(pl.Handle.ToString(), entId, pl.Layer, dau.GetDistanceTo(cuoi), pl.NumberOfVertices);
+                        break;
+                    }
+                    case Polyline2d p2 when !p2.Closed:
+                    {
+                        var soDinh = 0;
+                        foreach (ObjectId vId in p2)
+                        {
+                            if (tr.GetObject(vId, OpenMode.ForRead) is Vertex2d) soDinh++;
+                        }
+                        if (soDinh < 2) break;
+                        Ghi(p2.Handle.ToString(), entId, p2.Layer,
+                            p2.StartPoint.DistanceTo(p2.EndPoint), soDinh);
+                        break;
+                    }
+                }
+            }
+        }
+        if (hienCo.Count == 0) return;
+
+        void Ghi(string handle, ObjectId id, string layer, double khe, int soDinh)
+        {
+            idTheoHandle[handle] = id;
+            hienCo.Add(new PolylineHienCo
+            {
+                Handle = handle,
+                Layer = layer,
+                KhoangCachDauCuoi = khe, // theo ĐƠN VỊ BẢN VẼ — Core quy sang mm bằng toMm
+                SoDinh = soDinh,
+            });
+        }
+
+        var toMm = XBoss.Cad.Core.Geometry.DrawingUnits.TuInsUnits((int)db.Insunits).ToMm;
+        var keHoach = ChuanHoaMoRong.LapKeHoachDongPolyline(pack.PolylineClosePolicy, hienCo, toMm);
+        _canhBao.AddRange(keHoach.CanhBao);
+        if (keHoach.Rong) return;
+
+        if (keHoach.ChiBaoCao)
+        {
+            // reportOnly: TUYỆT ĐỐI không đụng entity nào, chỉ ghi vào báo cáo diff.
+            _canhBao.Add(
+                $"Chỉ BÁO {keHoach.ThayDoi.Count} polyline gần kín, không đóng " +
+                "(polylineClosePolicy.reportOnly) — bỏ cờ đó rồi chạy lại nếu muốn sửa thật.");
+            _steps.Add(new StepDiff
+            {
+                Buoc = ChuanHoaMoRong.Buoc12, HangMuc = "Polyline gần kín (chỉ báo cáo)",
+                Truoc = "hở", Sau = "giữ nguyên (reportOnly)", SoLuong = keHoach.ThayDoi.Count,
+            });
+            return;
+        }
+
+        var soDong = 0;
+        var soHong = 0;
+        foreach (var td in keHoach.ThayDoi)
+        {
+            if (!idTheoHandle.TryGetValue(td.Handle, out var entId)) continue;
+            try
+            {
+                // CachDong.BatCoClosed và NoiThemDoan đều thi hành bằng đúng một thao tác: bật cờ
+                // Closed (AutoCAD tự nối đỉnh cuối về đỉnh đầu, không thêm đỉnh mới). Hai giá trị
+                // enum chỉ khác nhau ở phần BÁO CÁO — phân biệt "hai đầu đã trùng khít" với
+                // "còn khe thấy được đã được nối lại".
+                switch (tr.GetObject(entId, OpenMode.ForRead))
+                {
+                    case Polyline pl: pl.UpgradeOpen(); pl.Closed = true; soDong++; break;
+                    case Polyline2d p2: p2.UpgradeOpen(); p2.Closed = true; soDong++; break;
+                }
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception)
+            {
+                soHong++; // polyline khóa/hỏng — giữ nguyên, không làm gãy cả bước
+            }
+        }
+        if (soDong > 0)
+        {
+            _steps.Add(new StepDiff
+            {
+                Buoc = ChuanHoaMoRong.Buoc12,
+                HangMuc = $"Đóng polyline gần kín (khe ≤ {pack.PolylineClosePolicy.GapCloseToleranceMm}mm)",
+                Truoc = "hở", Sau = "kín", SoLuong = soDong,
+            });
+        }
+        if (soHong > 0)
+            _canhBao.Add($"Không đóng được {soHong} polyline (đối tượng bị khóa hoặc hình học hỏng) — giữ nguyên.");
+    }
+
+    /// <summary>
+    /// Bước 13 — quy BlockReference lạc chuẩn về block thư viện (<c>blockMap</c>). Mặc định
+    /// <c>reportOnly</c> nên chỉ ghi báo cáo; khi bật sửa thật thì đổi định nghĩa mà GIỮ NGUYÊN
+    /// vị trí/xoay/tỉ lệ của từng khối chèn.
+    /// </summary>
+    private void Buoc13BlockMap(Database db, Transaction tr)
+    {
+        if (!pack.BlockMap.Enabled) return;
+
+        var hienCo = new List<BlockRefHienCo>();
+        var idTheoHandle = new Dictionary<string, ObjectId>(StringComparer.Ordinal);
+        var idDinhNghia = new Dictionary<string, ObjectId>(StringComparer.OrdinalIgnoreCase);
+        var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+        foreach (ObjectId btrId in bt)
+        {
+            var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
+            if (btr.IsFromExternalReference) continue;
+            idDinhNghia[btr.Name] = btrId;
+        }
+        foreach (ObjectId btrId in bt)
+        {
+            var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
+            if (btr.IsFromExternalReference) continue;
+            foreach (ObjectId entId in btr)
+            {
+                if (tr.GetObject(entId, OpenMode.ForRead) is not BlockReference br) continue;
+                // Với block ĐỘNG, br.BlockTableRecord trỏ định nghĩa nặc danh sinh ra theo tham số;
+                // định nghĩa GỐC nằm ở DynamicBlockTableRecord — đọc nhầm chỗ thì mọi block động
+                // đều bị coi là nặc danh (đúng cách VeTagCommands.DocTag đang đọc).
+                if (tr.GetObject(br.DynamicBlockTableRecord, OpenMode.ForRead) is not BlockTableRecord dn) continue;
+                if (string.IsNullOrWhiteSpace(dn.Name)) continue;
+                var handle = br.Handle.ToString();
+                idTheoHandle[handle] = entId;
+                hienCo.Add(new BlockRefHienCo
+                {
+                    Handle = handle,
+                    TenBlock = dn.Name,
+                    LaNacDanh = dn.IsAnonymous,
+                });
+            }
+        }
+        if (hienCo.Count == 0) return;
+
+        var keHoach = ChuanHoaMoRong.LapKeHoachBlock(pack.BlockMap, hienCo);
+        _canhBao.AddRange(keHoach.CanhBao);
+        if (keHoach.Rong) return;
+
+        if (keHoach.ChiBaoCao)
+        {
+            // reportOnly (mặc định bản đầu): KHÔNG thay block nào, chỉ đưa vào báo cáo diff.
+            _steps.Add(new StepDiff
+            {
+                Buoc = ChuanHoaMoRong.Buoc13, HangMuc = "Block lạc chuẩn (chỉ báo cáo)",
+                Truoc = string.Join(", ", keHoach.ThayDoi.Select(t => t.TenCu).Distinct()),
+                Sau = "giữ nguyên (reportOnly)", SoLuong = keHoach.ThayDoi.Count,
+            });
+            return;
+        }
+
+        var soDoi = 0;
+        var thieuBlock = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var soHong = 0;
+        foreach (var td in keHoach.ThayDoi)
+        {
+            if (!idTheoHandle.TryGetValue(td.Handle, out var entId)) continue;
+            if (!idDinhNghia.TryGetValue(td.TenMoi, out var idDich))
+            {
+                // Không tự tạo block rỗng: chèn định nghĩa từ thư viện là việc của bộ lệnh vẽ M100.
+                thieuBlock.Add(td.TenMoi);
+                continue;
+            }
+            if (tr.GetObject(entId, OpenMode.ForRead) is not BlockReference br) continue;
+            try
+            {
+                br.UpgradeOpen();
+                // Chỉ trỏ sang định nghĩa khác — Position/Rotation/ScaleFactors là thuộc tính của
+                // chính khối chèn nên giữ nguyên, không đụng tới.
+                br.BlockTableRecord = idDich;
+                soDoi++;
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception)
+            {
+                soHong++;
+            }
+        }
+        if (soDoi > 0)
+        {
+            _steps.Add(new StepDiff
+            {
+                Buoc = ChuanHoaMoRong.Buoc13, HangMuc = "Block lạc chuẩn → block thư viện",
+                Truoc = "tên cũ", Sau = "theo blockMap", SoLuong = soDoi,
+            });
+            // Bước 13 nối đuôi sau bước 11 nên PURGE (bước 6) đã chạy xong trước khi block đổi định
+            // nghĩa — các định nghĩa cũ vừa mất tham chiếu vẫn còn nằm trong bản vẽ. Pipeline
+            // idempotent nên chạy lại lệnh là dọn nốt (M102 §6.2).
+            _canhBao.Add(
+                $"Đã trỏ {soDoi} khối chèn sang block chuẩn — định nghĩa block cũ nay không còn ai dùng " +
+                "nhưng vẫn nằm trong bản vẽ. Chạy lại XBOSS_CHUANHOA (hoặc PURGE) để dọn.");
+        }
+        if (thieuBlock.Count > 0)
+        {
+            _canhBao.Add(
+                $"Bản vẽ chưa có block đích: {string.Join(", ", thieuBlock)} — giữ nguyên các khối chèn liên quan. " +
+                "Chèn block từ thư viện chuẩn vào bản vẽ rồi chạy lại XBOSS_CHUANHOA (chuẩn hóa không tự tạo block rỗng).");
+        }
+        if (soHong > 0)
+            _canhBao.Add($"Không đổi được {soHong} khối chèn (đối tượng bị khóa hoặc định nghĩa không hợp lệ) — giữ nguyên.");
     }
 
     /// <summary>

@@ -11,6 +11,23 @@ namespace XBoss.Cad.Acad.Services;
 /// </summary>
 internal static class VeXDataStore
 {
+    /// <summary>
+    /// Thẻ attribute mang tag thiết bị — quy ước chung của <c>XBOSS_VE_TAG</c> (M100 §11) và phép
+    /// kiểm 17 (M102 §6.4). Khai một chỗ để hai bên không thể trôi khỏi nhau.
+    /// </summary>
+    internal const string TheTag = "TAG";
+
+    /// <summary>Attribute mang tag của một khối chèn; null khi khối chưa được đánh tag.</summary>
+    internal static AttributeReference? TagCua(Transaction tr, BlockReference br)
+    {
+        foreach (ObjectId id in br.AttributeCollection)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not AttributeReference att) continue;
+            if (string.Equals(att.Tag, TheTag, StringComparison.OrdinalIgnoreCase)) return att;
+        }
+        return null;
+    }
+
     /// <summary>Đăng ký appname (bắt buộc trước lần ghi XData đầu tiên).</summary>
     internal static void DangKyApp(Database db, Transaction tr) =>
         MarkService.EnsureRegApp(db, tr, VeXData.AppName);

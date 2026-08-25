@@ -20,7 +20,7 @@ namespace XBoss.Cad.Acad.Commands;
 public sealed class VeTagCommands
 {
     /// <summary>Thẻ attribute mang tag thiết bị (M100 §11 — manifest bắt block thiết bị phải có).</summary>
-    private const string TheTag = "TAG";
+    private const string TheTag = VeXDataStore.TheTag;
 
     /// <summary>Khóa mục trong Named Objects Dictionary giữ tầng của bản vẽ.</summary>
     private const string KhoaNodTang = "XBOSS_VE_TANG";
@@ -208,7 +208,7 @@ public sealed class VeTagCommands
                 foreach (var id in chon.Value.GetObjectIds())
                 {
                     if (tr.GetObject(id, OpenMode.ForRead) is not BlockReference br) continue;
-                    if (TagCua(tr, br) is null) continue;
+                    if (VeXDataStore.TagCua(tr, br) is null) continue;
 
                     // Giữ NGUYÊN mọi trường XData khác (block id, hệ, liên kết tim…) — chỉ đổi cờ khóa.
                     var xd = VeXDataStore.Doc(br) ?? new VeXDataInfo { VaiTro = VaiTroVe.ThietBi };
@@ -244,7 +244,7 @@ public sealed class VeTagCommands
         foreach (var id in nguon)
         {
             if (tr.GetObject(id, OpenMode.ForRead) is not BlockReference br) continue;
-            if (TagCua(tr, br) is not { } att) continue;
+            if (VeXDataStore.TagCua(tr, br) is not { } att) continue;
 
             var xd = VeXDataStore.Doc(br);
             var btr = (BlockTableRecord)tr.GetObject(br.DynamicBlockTableRecord, OpenMode.ForRead);
@@ -257,15 +257,6 @@ public sealed class VeTagCommands
     }
 
     /// <summary>Attribute mang thẻ TAG của một khối; null khi khối không có thẻ đó.</summary>
-    private static AttributeReference? TagCua(Transaction tr, BlockReference br)
-    {
-        foreach (ObjectId id in br.AttributeCollection)
-        {
-            if (tr.GetObject(id, OpenMode.ForRead) is not AttributeReference att) continue;
-            if (string.Equals(att.Tag, TheTag, StringComparison.OrdinalIgnoreCase)) return att;
-        }
-        return null;
-    }
 
     /// <summary>Tầng của bản vẽ: hỏi một lần, nhớ trong chính bản vẽ (§6.9).</summary>
     private static string? HoiTang(Editor ed, Database db)

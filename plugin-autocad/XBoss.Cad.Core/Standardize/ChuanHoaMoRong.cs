@@ -24,6 +24,8 @@ public static class ChuanHoaMoRong
     public const string Buoc9 = "9. Xref";
     public const string Buoc10 = "10. Hatch";
     public const string Buoc11 = "11. Layout";
+    public const string Buoc12 = "12. Polyline";
+    public const string Buoc13 = "13. Block";
 
     /// <summary>Tên tạm khi đổi tên layout 2 lượt (chống đụng tên layout chưa kịp đổi).</summary>
     public const string TienToTenTam = "~XBOSS~";
