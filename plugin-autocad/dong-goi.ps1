@@ -1,4 +1,8 @@
-<#
+﻿<#
+  LƯU Ý CHO NGƯỜI SỬA TỆP NÀY: phải giữ BOM UTF-8 ở đầu tệp. Windows PowerShell 5.1 (bản mặc
+  định của Windows) đọc .ps1 theo bảng mã ANSI khi KHÔNG có BOM — chữ tiếng Việt vỡ và script
+  lỗi cú pháp ngay khi chạy. Đã vấp thật 2026-08-25.
+
   M99 — Đóng gói và cài plugin XBoss cho AutoCAD 2026 (thay cho việc chép tay từng DLL).
 
   Chạy trên máy Windows có AutoCAD 2026, từ thư mục gốc repo:
