@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 import { MonitorSmartphone, KeyRound, ShieldCheck, ShieldOff, Copy } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
+import { ErrorState } from "@/app/components/ErrorState";
+import { showToast } from "@/app/components/Toast";
 import { redirectToLogin } from "@/app/lib/me";
 
 type Token = {
@@ -29,17 +31,28 @@ export default function ThietBiCadPage() {
   const [thongBao, setThongBao] = useState<{ loai: "ok" | "loi"; text: string } | null>(null);
   const [dangGui, setDangGui] = useState(false);
   const [keyMoi, setKeyMoi] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const taiTokens = useCallback(async () => {
-    const res = await fetch("/api/tokens");
-    if (res.status === 401) return redirectToLogin();
-    if (res.status === 403) {
-      setTokens([]);
-      setThongBao({ loai: "loi", text: "Vai trò của bạn không quản lý được thiết bị AutoCAD." });
-      return;
+    setLoadError(null);
+    try {
+      const res = await fetch("/api/tokens");
+      if (res.status === 401) return redirectToLogin();
+      if (res.status === 403) {
+        setTokens([]);
+        setThongBao({ loai: "loi", text: "Vai trò của bạn không quản lý được thiết bị AutoCAD." });
+        return;
+      }
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        setLoadError(j?.error ?? `Không tải được danh sách thiết bị (lỗi ${res.status})`);
+        return;
+      }
+      const data = await res.json();
+      setTokens(data.tokens ?? []);
+    } catch {
+      setLoadError("Mất kết nối — kiểm tra mạng rồi thử lại");
     }
-    const data = await res.json();
-    setTokens(data.tokens ?? []);
   }, []);
 
   useEffect(() => {
@@ -72,28 +85,40 @@ export default function ThietBiCadPage() {
 
   async function thuHoi(id: number) {
     if (!confirm("Thu hồi token này? Plugin trên thiết bị đó sẽ phải ghép lại.")) return;
-    const res = await fetch(`/api/tokens/${id}`, { method: "DELETE" });
-    if (res.status === 401) return redirectToLogin();
-    const data = await res.json();
-    setThongBao(res.ok ? { loai: "ok", text: data.message } : { loai: "loi", text: data.error });
-    await taiTokens();
+    try {
+      const res = await fetch(`/api/tokens/${id}`, { method: "DELETE" });
+      if (res.status === 401) return redirectToLogin();
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        setThongBao({ loai: "ok", text: data?.message ?? "Đã thu hồi token." });
+      } else {
+        showToast(data?.error ?? "Không thu hồi được token", "error");
+      }
+      await taiTokens();
+    } catch {
+      showToast("Mất kết nối — kiểm tra mạng rồi thử lại", "error");
+    }
   }
 
   async function taoThuCong() {
     const name = prompt("Tên token (vd: Máy trạm văn phòng):");
     if (!name?.trim()) return;
-    const res = await fetch("/api/tokens", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim() }),
-    });
-    if (res.status === 401) return redirectToLogin();
-    const data = await res.json();
-    if (res.ok) {
-      setKeyMoi(data.key);
-      await taiTokens();
-    } else {
-      setThongBao({ loai: "loi", text: data.error ?? "Không tạo được token" });
+    try {
+      const res = await fetch("/api/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      if (res.status === 401) return redirectToLogin();
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        setKeyMoi(data.key);
+        await taiTokens();
+      } else {
+        showToast(data?.error ?? "Không tạo được token", "error");
+      }
+    } catch {
+      showToast("Mất kết nối — kiểm tra mạng rồi thử lại", "error");
     }
   }
 
@@ -108,7 +133,9 @@ export default function ThietBiCadPage() {
         search={false}
       />
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {tokens === null ? (
+        {tokens === null && loadError ? (
+          <ErrorState message={loadError} onRetry={() => void taiTokens()} />
+        ) : tokens === null ? (
           <PageSkeleton />
         ) : (
           <>

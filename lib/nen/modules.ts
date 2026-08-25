@@ -44,13 +44,14 @@ export type ModuleDef = {
   thuNghiem?: boolean;
 };
 
-// Ghi chú độ phủ (tính đến M52 PR3):
+// Ghi chú độ phủ (tính đến M52 PR3, cập nhật thêm cad-plugin ở đợt "nâng tầm dự án" GĐ2):
 //  - ĐÃ đưa vào registry: 4 module cắt ngang (tracking, field, materials, documents) +
 //    module vận hành (ops, M44) + 5 module quản trị mới nhất M43–M50 (audit, approval-flows,
-//    alert-rules, integrations, permissions). Nhóm này phủ ĐỦ cả 4 loại notification thật
-//    (delayed/due_soon/comment/material_over) lẫn 4 path loại trừ cache thật của sw.js
-//    (/api/photos/, /api/events, /api/documents/, /api/health) — đủ để cơ chế + cổng CI
-//    chạy thật, không rỗng.
+//    alert-rules, integrations, permissions) + module `cad-plugin` (M99–M104, bảng điều
+//    khiển chuẩn hóa bản vẽ + thiết bị AutoCAD). Nhóm này phủ ĐỦ cả 4 loại notification thật
+//    (delayed/due_soon/comment/material_over) lẫn các path loại trừ cache thật của sw.js
+//    (/api/photos/, /api/events, /api/documents/, /api/health, /api/engineering/cad/*) — đủ
+//    để cơ chế + cổng CI chạy thật, không rỗng.
 //  - CHƯA đưa vào: phần lớn module nghiệp vụ đời đầu M01–M42 (chi phí/hợp đồng, chất lượng,
 //    HSE, thiết bị, đấu thầu, môi trường, họp/công văn, bàn giao, nhân sự, khởi động, bản
 //    vẽ, tài chính...). Bổ sung dần theo các PR sau — dashboardTree/CAN vẫn là nguồn chạy
@@ -453,6 +454,36 @@ export const MODULES: ModuleDef[] = [
       "/api/engineering/fidic-tia",
     ],
     thuNghiem: true,
+  },
+  {
+    // Plugin AutoCAD (M99–M104) — bảng điều khiển chuẩn hóa bản vẽ 2D + rule pack/thư
+    // viện block phục vụ Adapter, và trang ghép/quản lý token thiết bị (XBOSS_LOGIN).
+    // `routePrefix` DÀI HƠN "engineering" (routePrefix ["/api/engineering", ...]) nên
+    // `findModuleByRoute` (khớp tiền tố dài nhất) ưu tiên chọn module này cho các route
+    // /api/engineering/cad/** — không ảnh hưởng phần còn lại của module "engineering".
+    key: "cad-plugin",
+    nav: [
+      {
+        group: "Thiết Kế-BIM-Shopdrawings",
+        label: "Chuẩn hóa bản vẽ",
+        href: "/engineering/chuan-hoa-ban-ve",
+        icon: "PencilRuler",
+      },
+      {
+        group: "Thiết Kế-BIM-Shopdrawings",
+        label: "Thiết bị AutoCAD",
+        href: "/engineering/thiet-bi-cad",
+        icon: "MonitorSmartphone",
+      },
+    ],
+    permKeys: ["viewEngineeringGraph", "manageDrawings", "manageIntegrations"],
+    notificationTypes: [],
+    // 1 prefix chung loại trừ cả cụm — khớp CHÍNH XÁC literal trong public/sw.js (cổng CI
+    // scripts/check-sw-exclude.ts so khớp nguyên văn, không phải chỉ prefix-of-prefix).
+    // Trước đây thiếu → rule pack/thư viện block/kết quả bóc khối lượng (nhị phân/động,
+    // đổi theo mỗi lần chuẩn hóa) bị stale-while-revalidate cache như API tĩnh khác.
+    swExclude: ["/api/engineering/cad/"],
+    routePrefix: ["/api/engineering/cad", "/api/devices/pair", "/api/tokens"],
   },
   {
     // (audit 2026-08-25 §3.6) Trang "Combine" là BẢN MÔ PHỎNG: danh sách va chạm, phương án
