@@ -8,12 +8,12 @@
  * phát hành (cùng triết lý append-only của migration).
  */
 import { createHash } from "node:crypto";
-import rulePackV5 from "@/lib/ky-thuat/cad/rule-packs/v5.json";
+import { RULE_PACK_HIEN_HANH, type CadRulePack } from "@/lib/ky-thuat/cad/rule-pack-hien-hanh";
 
-export type CadRulePack = typeof rulePackV5;
+export type { CadRulePack };
 
 /** Version đang phát hành cho plugin. */
-export const CURRENT_RULE_PACK_VERSION = rulePackV5.version;
+export const CURRENT_RULE_PACK_VERSION = RULE_PACK_HIEN_HANH.version;
 
 /**
  * Rule pack đang phát hành:
@@ -27,7 +27,7 @@ export const CURRENT_RULE_PACK_VERSION = rulePackV5.version;
  * nạp v5 đều cho kết quả kiểm y hệt v4 (M101 §7 FR1).
  */
 export function getCurrentRulePack(): CadRulePack {
-  return rulePackV5;
+  return RULE_PACK_HIEN_HANH;
 }
 
 /** ETag mạnh theo hash nội dung — plugin cache cục bộ và hỏi lại bằng `If-None-Match`. */

@@ -71,7 +71,7 @@ public class DoiChungHaiTangTests
     [Fact]
     public void Tang_2_anh_xa_layer_y_het_ket_qua_doi_chung()
     {
-        var mapper = new LayerMapper(RepoPaths.LoadRulePack().LayerMap);
+        var mapper = new LayerMapper(RepoPaths.LoadRulePack());
         foreach (var ten in TapVao.Layers)
         {
             Assert.Equal(MongDoi.Layers[ten], mapper.Map(ten));

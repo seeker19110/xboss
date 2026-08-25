@@ -25,6 +25,18 @@ public sealed class CadRulePack
     /// tự tắt (hành vi y hệt v4).
     /// </summary>
     [JsonPropertyName("styleMap")] public StyleMapSection StyleMap { get; init; } = new();
+    /// Phần <c>drawTools</c> (v4+) mà lớp ánh xạ layer cần biết. <c>null</c> với rule pack v1–v3.
+    /// Model ĐẦY ĐỦ của khối này nằm ở <c>Draw/DrawToolsConfig.cs</c> (bộ lệnh vẽ M100) — ở đây
+    /// chỉ đọc đúng field mà <see cref="Layers.LayerMapper"/> dùng, để nạp rule pack cũ không vỡ.
+    /// </summary>
+    [JsonPropertyName("drawTools")] public DrawToolsLayerNaming? DrawTools { get; init; }
+}
+
+/// <summary>Tên layer sinh ra từ bộ lệnh vẽ (M100 §11) — phần liên quan tới ánh xạ layer.</summary>
+public sealed class DrawToolsLayerNaming
+{
+    /// <summary>Hậu tố layer nét biên: layer biên = layer tim + hậu tố này (M100 FR4).</summary>
+    [JsonPropertyName("edgeLayerSuffix")] public string? EdgeLayerSuffix { get; init; }
 }
 
 public sealed class LayerMapSection

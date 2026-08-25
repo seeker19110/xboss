@@ -8,7 +8,10 @@ import {
   resolveXrefDependencies,
   bindXrefToMaster,
   DwgUnsupportedError,
+  normalizeCadLayers,
+  tapLayerDaChuan,
 } from "@/lib/ky-thuat/cad/dxf-parser";
+import { getCurrentRulePack } from "@/lib/ky-thuat/cad/rule-pack";
 
 describe("CAD DXF Parser & 2D-to-3D Spatial Extrusion Suite", () => {
   const sampleDxfContent = `0
@@ -244,5 +247,103 @@ EOF`;
     assert.ok(boundXref);
     assert.equal(boundXref.isBound, true);
     assert.equal(boundXref.type, "Attach");
+  });
+});
+
+/**
+ * Vá 2026-08-25 — ánh xạ layer phải IDEMPOTENT: chạy XBOSS_CHUANHOA lần hai trên bản vẽ đã chuẩn
+ * hóa không được đổi layer đúng chuẩn sang hệ khác (trước khi vá: M-DUCT-EXHT → M-DUCT-SUPP,
+ * F-SPRN-PIPE → P-PIPE-DOMW, M-DUCT-SUPPEDGE → M-DUCT-SUPP = gộp nhầm hệ + bóc trùng khối lượng).
+ */
+describe("normalizeCadLayers: bất biến idempotent", () => {
+  const pack = getCurrentRulePack();
+  const targets = [
+    ...new Set(pack.layerMap.groups.flatMap((g) => g.branches.map((b) => b.target))),
+  ];
+  const hauToBien = pack.drawTools.edgeLayerSuffix;
+
+  it("giữ nguyên tên các layer đã đúng chuẩn (kể cả layer nét biên M100)", () => {
+    const daChuan = [
+      "M-DUCT-SUPP",
+      "M-DUCT-EXHT",
+      "P-PIPE-SANR",
+      "F-SPRN-PIPE",
+      "ELV-CABL-TRAY",
+      "M-DUCT-SUPPEDGE",
+    ];
+    const anhXa = normalizeCadLayers(daChuan);
+    for (const ten of daChuan) {
+      assert.equal(anhXa[ten], ten, `Layer "${ten}" đã đúng chuẩn mà vẫn bị đổi tên`);
+    }
+  });
+
+  it("map(x) === x với MỌI layer đích khai trong rule pack + biến thể nét biên", () => {
+    assert.ok(targets.length >= 8, "Rule pack phải khai đủ layer đích cho 5 phân hệ MEPF");
+    assert.ok(hauToBien.length > 0, "Rule pack hiện hành phải khai drawTools.edgeLayerSuffix");
+
+    const ten = [...targets, ...targets.map((t) => t + hauToBien)];
+    const anhXa = normalizeCadLayers(ten);
+    for (const t of ten) assert.equal(anhXa[t], t, `Layer chuẩn "${t}" bị đổi tên`);
+  });
+
+  it("map(map(x)) === map(x) trên cả tên layer bẩn lẫn tên đã chuẩn", () => {
+    const mau = [
+      "01_M_ONG_GIO_CAP_CHINH",
+      "ONG GIO THAI EA",
+      "04_P_CAP_THOAT_NUOC_THAI",
+      "M_DUCT_SUPPLY",
+      "E-CABLE-TRAY",
+      "DIEN_NHE_ELV_CAMERA",
+      "06_F_PCCC_SPRINKLER",
+      "0",
+      "ZZZ_KHONG_KHOP_GI",
+      ...targets,
+    ];
+    const lan1 = normalizeCadLayers(mau);
+    const lan2 = normalizeCadLayers(mau.map((t) => lan1[t]));
+    for (const t of mau) {
+      assert.equal(lan2[lan1[t]], lan1[t], `Layer "${t}" đổi tiếp ở lần chuẩn hóa thứ hai`);
+    }
+  });
+
+  it("hồi quy: layer bẩn vẫn ánh xạ y như trước khi vá", () => {
+    const anhXa = normalizeCadLayers([
+      "01_M_ONG_GIO_CAP_CHINH",
+      "M_DUCT_SUPPLY",
+      "ONG_GIO_THAI_EA",
+      "04_P_CAP_THOAT_NUOC_THAI",
+      "E-CABLE-TRAY",
+      "MANG_CAP_DIEN",
+      "DIEN_NHE_ELV_CAMERA",
+      "06_F_PCCC_SPRINKLER",
+      "P_WATER_PIPE",
+      "ZZZ_KHONG_KHOP_GI",
+      // Tên đã chuẩn nhưng viết thường: chỉ chuẩn hoá hoa/thường, KHÔNG đổi sang hệ khác.
+      "f-sprn-pipe",
+    ]);
+    assert.deepEqual(anhXa, {
+      "01_M_ONG_GIO_CAP_CHINH": "M-DUCT-SUPP",
+      M_DUCT_SUPPLY: "M-DUCT-SUPP",
+      ONG_GIO_THAI_EA: "M-DUCT-EXHT",
+      "04_P_CAP_THOAT_NUOC_THAI": "P-PIPE-SANR",
+      "E-CABLE-TRAY": "E-TRAY-PWRR",
+      MANG_CAP_DIEN: "E-TRAY-PWRR",
+      DIEN_NHE_ELV_CAMERA: "E-TRAY-PWRR",
+      "06_F_PCCC_SPRINKLER": "F-SPRN-PIPE",
+      P_WATER_PIPE: "P-PIPE-DOMW",
+      ZZZ_KHONG_KHOP_GI: "ZZZ_KHONG_KHOP_GI",
+      "f-sprn-pipe": "F-SPRN-PIPE",
+    });
+  });
+
+  it("chịu được rule pack không có khối drawTools (v1–v3): vẫn miễn trừ layer đích", () => {
+    const packV3 = { layerMap: pack.layerMap };
+    const daChuan = tapLayerDaChuan(packV3);
+    for (const t of targets) assert.ok(daChuan.has(t), `Thiếu layer đích "${t}"`);
+    assert.equal(
+      daChuan.has(`M-DUCT-SUPP${hauToBien}`),
+      false,
+      "Không có drawTools thì không suy ra layer biên",
+    );
   });
 });
