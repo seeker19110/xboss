@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { todayISO } from "@/lib/nen/date";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { listDiaryCalendar } from "@/lib/hien-truong/diary";
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const month = req.nextUrl.searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
+  const month = req.nextUrl.searchParams.get("month") ?? todayISO().slice(0, 7);
   if (!/^\d{4}-\d{2}$/.test(month))
     return NextResponse.json({ error: "Tháng không hợp lệ (YYYY-MM)" }, { status: 422 });
 

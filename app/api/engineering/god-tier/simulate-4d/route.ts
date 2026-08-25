@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { todayISO } from "@/lib/nen/date";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const targetDate = body.targetDate || new Date().toISOString().split("T")[0];
+    const targetDate = body.targetDate || todayISO();
 
     const elements: GodTierElementData[] = Array.isArray(body.elements) ? body.elements : [];
     if (elements.length === 0) {

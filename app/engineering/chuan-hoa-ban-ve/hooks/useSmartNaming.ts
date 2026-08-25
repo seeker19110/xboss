@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { todayISO } from "@/lib/nen/date";
 import { showToast } from "@/app/components/Toast";
 import { exportDxf, DxfParseResult } from "@/lib/ky-thuat/cad/dxf-parser";
 import type { ConversionInfo, SaveConfig, SavedResult } from "../types";
@@ -38,7 +39,7 @@ export function useSmartNaming({
     kind: "design",
     subFolder: "iso",
     name: "Mat_Bang_Cap_Gio_Tang_4",
-    date: new Date().toISOString().slice(0, 10).replace(/-/g, ""),
+    date: todayISO().replace(/-/g, ""),
     drawingVersions: "Rev01",
   });
   const [savingToServer, setSavingToServer] = useState(false);

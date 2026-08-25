@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
-import { formatDateDMY } from "@/lib/nen/date";
+import { formatDateDMY, todayISO } from "@/lib/nen/date";
 import { showToast } from "@/app/components/Toast";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -108,7 +108,7 @@ export default function PrintPage() {
   const advances = bills.filter((b) => b.type === "advance");
 
   // Lấy ngày bill đầu tiên (hoặc hôm nay)
-  const billDate = bills[0]?.paidDate ?? new Date().toISOString().slice(0, 10);
+  const billDate = bills[0]?.paidDate ?? todayISO();
 
   // Tính toán
   const sumA = billRows.reduce((s, b) => s + b.amount, 0); // Section A

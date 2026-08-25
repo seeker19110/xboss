@@ -19,6 +19,7 @@ import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { formatDateVN, todayISO } from "@/lib/nen/date";
+import { isExpired, isExpiringSoon } from "@/lib/nen/han-hieu-luc";
 
 type LegalKind = "giay_phep_xd" | "phe_duyet_qh" | "phe_duyet_tk" | "hd_chinh" | "khac";
 const LEGAL_KIND_LABEL: Record<LegalKind, string> = {
@@ -42,8 +43,6 @@ const LEGAL_STATUS_BADGE: Record<LegalStatus, string> = {
   expired: "bg-rose-900 text-rose-200",
   superseded: "bg-zinc-800 text-zinc-500",
 };
-
-const EXPIRY_WARN_DAYS = 30;
 
 type LegalDocument = {
   id: number;
@@ -100,15 +99,6 @@ const TABS: { key: Tab; label: string; icon: typeof Landmark }[] = [
   { key: "trac_dac", label: "Trắc đạc", icon: Landmark },
   { key: "huy_dong", label: "Huy động", icon: Landmark },
 ];
-
-function isExpiringSoon(d: LegalDocument): boolean {
-  if (d.status !== "valid" || !d.expiryDate) return false;
-  const limit = new Date(Date.now() + EXPIRY_WARN_DAYS * 86400_000).toISOString().slice(0, 10);
-  return d.expiryDate <= limit;
-}
-function isExpired(d: LegalDocument): boolean {
-  return d.status === "valid" && !!d.expiryDate && d.expiryDate < todayISO();
-}
 
 export default function KickoffPage() {
   const [me, setMe] = useState<Me | null>(null);

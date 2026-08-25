@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { todayISO } from "@/lib/nen/date";
 import {
   Plus,
   X,
@@ -56,10 +57,6 @@ type Correspondence = {
   note: string | null;
   createdAt: string;
 };
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export default function CorrespondencesPage() {
   const [me, setMe] = useState<Me | null>(null);

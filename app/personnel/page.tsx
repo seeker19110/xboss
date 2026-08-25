@@ -8,7 +8,8 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
-import { formatDateVN, todayISO } from "@/lib/nen/date";
+import { formatDateVN } from "@/lib/nen/date";
+import { trangThaiHanTheoNgay, type TrangThaiHan } from "@/lib/nen/han-hieu-luc";
 
 type Personnel = {
   id: number;
@@ -36,16 +37,17 @@ type Certification = {
   originalName: string | null;
 };
 
-const EXPIRY_WARN_DAYS = 30;
+// Nhãn hạn của chứng chỉ. Ngưỡng + phép so ngày dùng chung ở lib/nen/han-hieu-luc.ts
+// (trước đây tính mốc bằng UTC thuần nên lệch 1 ngày lúc 0h–7h sáng giờ VN).
+const CERT_BADGE: Record<TrangThaiHan, { label: string; className: string } | null> = {
+  khong_han: null,
+  qua_han: { label: "Quá hạn", className: "bg-rose-900 text-rose-200" },
+  sap_het_han: { label: "Sắp hết hạn", className: "bg-amber-900 text-amber-200" },
+  con_han: { label: "Còn hạn", className: "bg-emerald-900 text-emerald-200" },
+};
 
 function certBadge(c: Certification): { label: string; className: string } | null {
-  if (!c.expiryDate) return null;
-  const limit = new Date(Date.now() + EXPIRY_WARN_DAYS * 86400_000).toISOString().slice(0, 10);
-  if (c.expiryDate < todayISO())
-    return { label: "Quá hạn", className: "bg-rose-900 text-rose-200" };
-  if (c.expiryDate <= limit)
-    return { label: "Sắp hết hạn", className: "bg-amber-900 text-amber-200" };
-  return { label: "Còn hạn", className: "bg-emerald-900 text-emerald-200" };
+  return CERT_BADGE[trangThaiHanTheoNgay(c.expiryDate)];
 }
 
 export default function PersonnelPage() {

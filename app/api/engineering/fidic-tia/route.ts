@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { todayISO } from "@/lib/nen/date";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
       claimCode: body.claimCode || `CLAIM-TIA-${Date.now().toString(36).toUpperCase()}`,
       delayEventTitle: body.delayEventTitle || "Chậm bàn giao mặt bằng Tầng 12 từ CĐT",
       eventCategory: body.eventCategory || "EMPLOYER_DELAY",
-      delayStartDate: body.delayStartDate || new Date().toISOString().slice(0, 10),
+      delayStartDate: body.delayStartDate || todayISO(),
       delayEndDate:
         body.delayEndDate ||
         new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),

@@ -4,6 +4,163 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Quét trùng lặp lần 2 — sau khi #389/#392 vào main (2026-08-24)
+
+Người dùng: "quét tất cả". Quét lại **1.298 file** (`lib` 192, `app` 738, `tests` 223, `e2e` 74,
+`scripts` 36, `plugin-autocad` 37) qua 5 trục: bộ dò clone cửa sổ 30 dòng chuẩn hoá, trùng tên
+export, hash file, phương thức C#, và so khung route sau khi trừu tượng hoá tên bảng.
+
+**Kết quả so với lần quét đầu:** cụm clone lớn nhất 51 → 25 khối; tên export trùng trong `lib/`
+11 → 8; route upload tự viết pipeline 25 → 2 → **0**; file trùng y hệt: 0. Code C# 36 file sạch,
+không phương thức trùng tên, không khối clone.
+
+### Đã gộp đợt này
+
+| Cụm                 | Trùng gì                                                                                                                                | Cách gộp                                                                                                            |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 2 route upload cuối | `workpackages/:id/bbnt` và `:id/drawing` còn tự viết pipeline kiểm tệp (Content-Length → multipart → mime → size → magic byte)          | Dùng `parseUploadedFile()` như 23 route kia. **25/25 route upload nay dùng chung một pipeline.** −65 dòng           |
+| Fixture BIM         | `bim-unified-facade.test.ts` và `engineering-bim-routing.test.ts` dựng cùng mảng `BimElementRecord[]` 3 phần tử, chép nguyên si 32 dòng | Tách `tests/fixtures-bim.ts` (không đuôi `.test.ts` nên runner không chạy như bộ test, cùng khuôn `tests/setup.ts`) |
+
+**Đổi hành vi (cố ý, nhỏ):** hai route trên nay trả thông báo lỗi chuẩn giống 23 route kia
+(`"File quá lớn (tối đa 20MB)"` thay vì `"File vượt quá 20MB"`; 415 có kê định dạng). Cùng mã
+trạng thái; đã kiểm không test/e2e nào bám chuỗi cũ.
+
+### KHÔNG gộp — và vì sao (quan trọng)
+
+**`work-front-documents/[id]` ↔ `floor-stage-front-documents/[id]` trùng 100%** (68 dòng, chỉ
+khác đúng tên bảng). Đã thử gộp và **hoàn nguyên** — cả hai đường đều tệ hơn:
+
+- _Tách phần chạm DB xuống `lib/` (đúng ADR-0008):_ chỉ chuyển được 2 câu SQL, phần trùng thật là
+  khung HTTP. Kết quả 62+62+39 = **163 dòng, NHIỀU HƠN 136 dòng ban đầu**.
+- _Factory trả `{GET, DELETE}`:_ gọn thật, nhưng `scripts/lib/route-perms-scan.ts` tìm **khai báo**
+  `export async function DELETE(` rồi soi thân hàm. Với `export const DELETE = handlers.DELETE`
+  regex không khớp → route **biến mất khỏi tầm quét của cổng `check:route-perms`**, không phải báo
+  đỏ mà là bỏ qua âm thầm. Đục thủng đúng cái cổng GĐ2 dựng ra để thay checklist người.
+
+Kết luận: phần trùng ở đây là khung HTTP mà **ADR-0008 muốn nằm trong route** và **cổng bảo mật đòi
+nhìn thấy trong file route**. Hai luật của chính dự án đều đẩy về phía giữ nguyên. Ghi lại để lần
+sau không ai tốn công gộp lại.
+
+### Đợt tiếp — gộp logic "hạn hiệu lực" và LỘ RA LỖI MÚI GIỜ THẬT
+
+`isExpiringSoon`/`isExpired` chép giống hệt nhau ở `app/environment`, `app/kickoff`,
+`app/insurance`; `app/personnel` có `certBadge` cùng ngưỡng. Gom về `lib/nen/han-hieu-luc.ts`
+(tầng 0, thuần, dùng lại `daysFromTodayISO` đã có sẵn thay vì tự tính).
+
+**Lỗi thật lộ ra khi gộp:** cả 4 bản đều tính mốc cảnh báo bằng
+`new Date(Date.now() + N * 86400_000)` — **UTC thuần** — rồi so với `todayISO()` vốn theo giờ VN
+(UTC+7). Đúng cái bẫy mà chú thích của `daysFromTodayISO` trong `lib/nen/date.ts` đã dặn trước:
+_"mọi phép cộng/trừ ngày phải đi qua đây, tự tính bằng UTC sẽ lệch 1 ngày lúc 0h–7h sáng"_.
+
+Chứng minh bằng số (mô phỏng 02:00 sáng 25/08 giờ VN = 19:00 UTC 24/08):
+
+| Đại lượng          | Giá trị      |
+| ------------------ | ------------ |
+| `todayISO()`       | `2026-08-25` |
+| mốc CŨ (UTC thuần) | `2026-09-23` |
+| mốc ĐÚNG (UTC+7)   | `2026-09-24` |
+
+→ Hồ sơ hết hạn đúng ngày thứ 30 (`2026-09-24`) **KHÔNG được cảnh báo** ở bản cũ trong khung
+0h–7h sáng. Ảnh hưởng cả 4 trang: giấy phép môi trường, hồ sơ pháp lý, bảo lãnh/bảo hiểm,
+chứng chỉ nhân sự.
+
+Kèm `tests/han-hieu-luc.test.ts` — **5 ca, trước đây logic này KHÔNG có test nào** vì nằm rải
+trong file `.tsx`. Có ca biên canh đúng lỗi trên.
+
+### Quét múi giờ toàn repo — 5 bản `todayISO()` chép sai + 8 chỗ khác
+
+Người dùng chốt: **"theo múi giờ +7"**. Quét toàn bộ `lib/`, `app/`, `scripts/` tìm mọi chỗ tính
+ngày bằng UTC thuần thay vì đi qua helper `lib/nen/date.ts`.
+
+**Phát hiện nặng nhất: 5 trang tự định nghĩa `todayISO()` riêng**, che mất bản đúng trong
+`lib/nen/date.ts` và đều thiếu offset +7 — `correspondences`, `tenders`, `equipment`, `hse`,
+`contracts`. Không phải chỗ hiển thị suông mà là **so sánh và mặc định thật**:
+
+| Trang                  | Dùng làm gì                                                                                   | Hậu quả trong khung 0h–7h sáng                          |
+| ---------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `hse` (7 chỗ)          | số ngày từ sự cố gần nhất, hành động quá hạn, `?month=` của báo cáo tháng, ngày mặc định form | đếm lệch 1 ngày; ngày 1 hàng tháng lấy nhầm tháng trước |
+| `correspondences`      | công văn quá hạn, ngày gửi/hồi đáp mặc định                                                   | quá hạn nhận diện sai 1 ngày                            |
+| `equipment`            | hạn kiểm định                                                                                 | như trên                                                |
+| `tenders`, `contracts` | mốc so ngày                                                                                   | như trên                                                |
+
+Đã gỡ cả 5, dùng `todayISO` từ `lib/nen/date.ts`.
+
+**Các chỗ khác đã quy về helper:** `equipment` (hạn kiểm định 30 ngày tính bằng UTC thuần → dùng
+`daysFromTodayISO(EXPIRY_WARN_DAYS)`); `warranty` (đã đúng +7 nhưng lặp biểu thức 2 lần → dùng
+helper); `schedule` + `payments/print` (ngày lập/ngày bill hiển thị); `engineering-project-health`
+(`snapshotDate`), `digital-handover` + `fidic-tia` (ngày mặc định **ghi vào DB**); và 4 chỗ sinh
+tem ngày trong mã/tên tệp (`qr-logistics`, `esignature`, `cad/save-drawing` ×2, `useSmartNaming`).
+
+**Vòng 2 — người dùng chốt "dùng `todayISO()` chuẩn", quét lại và SỬA NỐT hai chỗ tôi đã chừa,
+cộng 6 chỗ regex vòng đầu bỏ sót.**
+
+Hai chỗ tôi từng cho là ngoại lệ, xem kỹ lại thì **kết luận vòng đầu của tôi là vội**:
+
+- `bim-models/[id]/simulate-4d`: tôi nói đó là "cửa sổ trượt, không so với `todayISO()`" — SAI.
+  Vòng lặp sinh `dateISO` rồi đưa thẳng vào `compute4DSimulationState`, **so với ngày bắt đầu/kết
+  thúc của task**. Nên biên phải là ngày lịch VN. Đã chuyển toàn bộ sang chuỗi ISO
+  (`daysFromTodayISO` cho biên, `addDaysISO` cho bước nhảy) — bỏ luôn `Date.setDate/getDate` vốn
+  theo giờ ĐỊA PHƯƠNG của tiến trình, lệch tiếp nếu máy chủ không chạy UTC.
+- `scripts/check-coverage.ts` (`measuredAt`): đổi theo cho nhất quán.
+
+**Regex vòng đầu chỉ bắt `.slice(0, 10)`, bỏ sót biến thể `.split("T")[0]`** — 6 chỗ nữa:
+`engineering-god-tier` (`approvalDate` mặc định), `SpreadsheetGrid` ×2 (tem ngày trên tên tệp
+CSV/XLSX người dùng tải về), `god-tier/simulate-4d` (`targetDate` mặc định),
+`api/diaries` (**chuỗi THÁNG mặc định** — ngày 1 hàng tháng lấy nhầm tháng trước, cùng lớp lỗi
+với `?month=` của HSE), và `mepf-process` (dấu thời gian duyệt **hiển thị cho kỹ sư VN** mà in
+thẳng giờ UTC → lệch 7 tiếng, tối muộn sai cả ngày; nay dùng `formatDateTimeVN`).
+
+**Vẫn cố ý KHÔNG đổi, có lý do:**
+
+- **Dấu thời gian đầy đủ** (`sentAt`, `createdAt`, `auditedAt`, `log.t`…): `new Date().toISOString()`
+  là ĐÚNG — mốc thời gian tuyệt đối phải lưu UTC. Chỉ **giá trị lịch** (ngày/tháng) mới cần +7.
+- `lib/tien-do/import.ts` `localISO`: cố ý theo lịch địa phương của tiến trình khi đổi serial
+  Excel, có chú thích riêng giải thích bẫy múi giờ. Không đụng.
+
+Sau vòng 2, `grep 'new Date().toISOString()'` toàn repo chỉ còn các dấu thời gian đầy đủ (đúng)
+và `localISO` của import Excel (cố ý).
+
+### Còn lại (chưa làm)
+
+- **Họ ~8 route `<thực thể>-documents/[id]`** giống 55–71% (`claim`/`contract`/`vo`/`subcon`/
+  `project`/`correspondence-files`). Cùng khuôn nhưng khác thật về quyền và phạm vi dự án — ép một
+  trừu tượng chung lên chỗ luật quyền khác nhau đúng là rủi ro `docs/audit.md` cảnh báo. Để nguyên.
+- **Khung form lặp 271 lần ở 32 file `.tsx`** (rõ nhất `app/environment/page.tsx` ↔
+  `app/kickoff/page.tsx`). Đợt này đã lấy phần LOGIC (hạn hiệu lực) ra; phần còn lại là markup
+  form/bảng — boilerplate UI thuần, nên là đợt tách component dùng chung riêng, có e2e a11y đi kèm.
+- ~~**`calcHazenWilliams` còn 2 bản**~~ → **ĐÃ CHỐT (2026-08-25): giữ cả hai QUY ƯỚC ĐƠN VỊ, nhưng hết trùng tên** —
+  quyết định của chủ dự án. Xem mục riêng ngay dưới.
+
+### `calcHazenWilliams` — CHỐT GIỮ CẢ HAI QUY ƯỚC (2026-08-25)
+
+Chủ dự án chốt: **giữ cả hai, không gộp.** Ghi lại để lần sau không ai "dọn" nhầm.
+
+| Bản                                     | vị trí 1           | vị trí 2          | vị trí 3          | hằng số cột nước |
+| --------------------------------------- | ------------------ | ----------------- | ----------------- | ---------------- |
+| `engineering-cad-nesting.ts` (M89)      | lưu lượng **L/s**  | **đường kính** mm | **chiều dài** m   | 9806,65 Pa/m     |
+| `engineering-hydraulic-engine.ts` (M68) | lưu lượng **m³/h** | **chiều dài** m   | **đường kính** mm | 9810 Pa/m        |
+
+**Vấn đề đơn vị và cách đã xử lý (2026-08-25, vòng 2).** Chủ dự án lưu ý đúng: **L/s và m³/h là
+hai đơn vị khác nhau** (1 L/s = 3,6 m³/h). Đã rà lại toàn bộ chuỗi gọi — **không có chỗ nào đang
+sai**, vì hai nhánh tách bạch và tên biến mang đơn vị suốt chuỗi:
+
+- Nhánh M89 (L/s): `app/api/engineering/cad-nesting/route.ts` đọc `body.flowRateLps` → `qLps` →
+  `calcHazenWilliams`, cùng đơn vị với `calcDarcyWeisbach` ngay cạnh.
+- Nhánh M68 (m³/h): `runMepfHydraulicAnalysis(flowRateM3h)` → `autoSizePipeDiameter` +
+  `calculateHydraulicLoss(flowRateM3h, ...)`.
+
+Rủi ro là **tương lai** chứ không phải hiện tại, nên chặn tận gốc thay vì chỉ ghi chú:
+
+1. **Hết trùng tên.** Bản M68 vốn không export ra ngoài file nên đổi tên là miễn phí:
+   `calcHazenWilliams` → `calcHazenWilliamsM3h` (private, chỉ `calculateHydraulicLoss` gọi). Cả dự
+   án nay chỉ còn **một** `calcHazenWilliams` — không còn hai hàm cùng tên khác quy ước để gọi nhầm.
+2. **Test canh tính đúng đắn:** `tests/hazen-williams-donvi.test.ts` — quy đổi ×3,6 rồi so hai bản
+   trên 3 bộ (Q, D, L); vận tốc lệch < 1e-3, tổn thất lệch < 0,5% (chênh còn lại chính là hằng số
+   cột nước 9806,65 vs 9810, tức 0,03%). Tức **hai quy ước cho cùng kết quả vật lý** — giữ cả hai
+   là an toàn. Kèm 1 ca ghi lại hậu quả nếu nhầm đơn vị (tổn thất tụt hơn 5 lần).
+3. Chú thích ở cả hai hàm viết lại cho khớp, nêu rõ hàng rào duy nhất là **tên khác nhau** và dặn
+   giữ bản M68 không export.
+
 ## Đợt gộp tính năng trùng lặp (2026-08-24)
 
 Người dùng: "quét tính năng trùng lặp gộp chúng lại cho gọn — trùng lặp hoặc thuộc về 1 bộ tính

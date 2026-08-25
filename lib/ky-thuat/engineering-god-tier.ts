@@ -8,6 +8,7 @@
  */
 
 import { BoundingBox3D, Point3D } from "@/lib/ky-thuat/engineering-bim-viewer";
+import { todayISO } from "@/lib/nen/date";
 export type { BoundingBox3D, Point3D };
 
 export function sha256Pure(str: string): string {
@@ -421,7 +422,7 @@ export function generateAsBuiltStamp(
   contractorName: string,
   supervisorLead: string,
   siteCommander: string,
-  approvalDate: string = new Date().toISOString().split("T")[0],
+  approvalDate: string = todayISO(),
 ): {
   stampType: "MAU_01" | "MAU_02";
   dimensions: { widthMm: number; heightMm: number };

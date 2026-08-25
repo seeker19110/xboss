@@ -29,7 +29,7 @@ import SCurveChart from "@/app/components/SCurveChart";
 import ProgressMap from "@/app/components/ProgressMap";
 import { LookaheadTable } from "@/app/components/LookaheadTable";
 import SystemFilter from "@/app/components/SystemFilter";
-import { formatDateVN } from "@/lib/nen/date";
+import { formatDateVN, todayISO } from "@/lib/nen/date";
 import type { CriticalRow } from "@/lib/tien-do/schedule-control";
 
 export default function ScheduleControlHubPage() {
@@ -488,8 +488,7 @@ function ScheduleControlContent() {
               BÁO CÁO TIẾN ĐỘ THI CÔNG & KIỂM SOÁT ĐƯỜNG GĂNG
             </h2>
             <div className="text-xs text-zinc-400 font-mono">
-              Kỳ báo cáo: Tuần 34/2026 • Ngày lập:{" "}
-              {formatDateVN(new Date().toISOString().slice(0, 10))}
+              Kỳ báo cáo: Tuần 34/2026 • Ngày lập: {formatDateVN(todayISO())}
             </div>
           </div>
 

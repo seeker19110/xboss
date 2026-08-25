@@ -139,7 +139,19 @@ export const STANDARD_STEEL_PIPES: PipeStandardSize[] = [
 // calcDarcyWeisbach đã gộp về engineering-cad-nesting.ts (bản M89 có bù nhiệt độ chất lỏng)
 // — bản cố định 20°C ở đây không nơi nào import, đã bỏ để tránh hai công thức song song.
 
-export function calcHazenWilliams(
+/**
+ * Hazen-Williams — QUY ƯỚC M68: lưu lượng **m³/h**, thứ tự `(lưu lượng, CHIỀU DÀI, ĐƯỜNG KÍNH)`.
+ *
+ * Khác quy ước với `calcHazenWilliams` trong `engineering-cad-nesting.ts` (lưu lượng **L/s**,
+ * vị trí 2 và 3 hoán đổi). Chủ dự án chốt (2026-08-25) giữ cả hai quy ước đơn vị; để không gọi
+ * nhầm, hàm này mang tên riêng có đơn vị và **cố ý không export** — chỉ `calculateHydraulicLoss`
+ * dùng. Giữ nguyên hai điều đó khi sửa file này.
+ *
+ * 1 L/s = 3,6 m³/h: đưa số L/s vào đây sẽ ra tổn thất thấp hơn thực tế rất nhiều.
+ *
+ * Hằng số cột nước ở bản này là 9810 Pa/m (bản M89 dùng 9806,65) — chênh 0,03%, là chủ ý.
+ */
+function calcHazenWilliamsM3h(
   flowRateM3h: number,
   lengthM: number,
   innerDiameterMm: number,
@@ -229,7 +241,7 @@ export function calculateHydraulicLoss(
   innerDiameterMm: number,
   cFactor: number = 120,
 ) {
-  return calcHazenWilliams(flowRateM3h, pipeLengthM, innerDiameterMm, cFactor);
+  return calcHazenWilliamsM3h(flowRateM3h, pipeLengthM, innerDiameterMm, cFactor);
 }
 
 export function calculateHangerLoadAndSpacing(

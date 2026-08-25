@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { daysFromTodayISO, addDaysISO } from "@/lib/nen/date";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query } from "@/lib/db";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -109,19 +110,24 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       });
     }
 
-    // Tính cho cả chuỗi thời gian (Time-Lapse Series)
-    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 86400000);
-    const end = endDate ? new Date(endDate) : new Date(Date.now() + 30 * 86400000);
+    // Tính cho cả chuỗi thời gian (Time-Lapse Series).
+    // Toàn bộ mốc là CHUỖI ISO 'YYYY-MM-DD' theo giờ VN, không qua đối tượng Date:
+    // - biên mặc định ±30 ngày lấy từ daysFromTodayISO (UTC+7) — trước đây tính bằng
+    //   `Date.now() ± N*86400000` (UTC thuần) nên khoảng 0h–7h sáng cả chuỗi lệch 1 ngày
+    //   so với ngày bắt đầu/kết thúc của task mà compute4DSimulationState đem ra so;
+    // - bước nhảy dùng addDaysISO (cộng lịch thuần) thay cho Date.setDate/getDate vốn
+    //   theo giờ ĐỊA PHƯƠNG của tiến trình, lệch tiếp nếu máy chủ không chạy UTC.
+    const startISO = startDate ? String(startDate).slice(0, 10) : daysFromTodayISO(-30);
+    const endISO = endDate ? String(endDate).slice(0, 10) : daysFromTodayISO(30);
     const series: SimulationTimeStepResult[] = [];
 
-    const curr = new Date(start);
-    while (curr <= end) {
-      const dateISO = curr.toISOString().split("T")[0];
-      const stepRes = compute4DSimulationState(elements, dateISO, wbsMap, {
+    let curr = startISO;
+    while (curr <= endISO) {
+      const stepRes = compute4DSimulationState(elements, curr, wbsMap, {
         showGhostNotStarted: showGhost,
       });
       series.push(stepRes);
-      curr.setDate(curr.getDate() + Math.max(1, stepDays));
+      curr = addDaysISO(curr, Math.max(1, stepDays));
     }
 
     return NextResponse.json({
