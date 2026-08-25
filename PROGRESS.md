@@ -4,6 +4,37 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M101 PR1 — Rule pack v5 + 7 phép kiểm mới của `XBOSS_KIEMTRA` (2026-08-25)
+
+Nâng `XBOSS_KIEMTRA` từ 9 lên 16 phép kiểm (M101 §6.1). PR này chỉ có **rule pack + Core thuần +
+test** — `XBoss.Cad.Acad` KHÔNG đổi (Adapter điền dữ liệu thật ở PR sau), nên chưa phép kiểm nào
+chạy trên bản vẽ.
+
+**Đã làm**
+
+- `lib/ky-thuat/cad/rule-packs/v5.json` (append-only, v1–v4 không đổi 1 byte): v5 = v4 + 7 khối phép
+  kiểm mới trong `inspectionPolicy` (`overlapSameSystem`, `clash2d`, `titleblockFields`,
+  `viewportScale`, `styleDeviation`, `labelSizeMismatch`, `strayObjects`) + khối gốc `styleMap`
+  (bộ textstyle/dimstyle chuẩn, dùng chung với bước chuẩn hóa 8 của PR2). **Mọi phép kiểm mới mặc
+  định `enabled: false`** → nạp v5 vào plugin cũ/mới đều cho kết quả y hệt v4 (FR1/AC(a), có ca test
+  so từng byte JSON báo cáo). `lib/ky-thuat/cad/rule-pack.ts` + route rule-pack phát hành v5 (thêm
+  `styleMap` vào response), corpus đối chứng 2 tầng chuyển sang v5.
+- `XBoss.Cad.Core/Inspection/PhepKiemMoRong.cs` + `Geometry/Segment2D.cs` — 7 phép kiểm THUẦN theo
+  đúng khung `Inspector`/`InspectionFinding` cũ (id: `chong-lan-cung-he`, `giao-cat-khac-he`,
+  `khung-ten-thieu-truong`, `viewport-le-chuan`, `style-lech-chuan`, `nhan-lech-xdata`,
+  `doi-tuong-ngoai-khung`); DTO đầu vào mới trong `SnapshotModels.cs` (`CenterlineInfo`, `LayoutInfo`
+  - `ViewportInfo`/`BlockRefInfo`, `LabelLinkInfo`, `BoundsMin/Max`, `TextStyleName`/`DimStyleName`).
+- **Hai tầng chống báo oan** ở mọi phép mới: cờ `enabled` + tự tắt khi Adapter chưa cung cấp dữ liệu
+  (`Centerlines`/`Layouts`/`NhanLienKet` null). Phép 15 vì thế không bao giờ đụng nhãn vẽ tay của bản
+  vẽ không có M100; phép 11 luôn kèm nhãn cảnh báo cố định "chỉ là giao trên mặt bằng — không thay
+  được clash 3D" trong cả tên phép kiểm lẫn `canhBao` của báo cáo.
+- Validator `RulePackLoader`: phép đang bật mà thiếu tham số → chặn ngay; `clashPairs` kiểm cả khi
+  tắt (tên hệ phải có trong `layerMap.groups[].id`); `styleMap.dimStyle.textStyleName` phải nằm
+  trong bộ textstyle.
+- Test: dotnet **139 ca xanh** (119 cũ + 20 mới — mỗi phép 1 ca dương + 1 ca âm, ca "v5 mặc định =
+  v4", ca "v4 vẫn nạp được sau khi phát hành v5"); test node 1258 ca xanh (Postgres thật), gồm ca
+  gọi route `/api/engineering/cad/rule-pack` bằng Bearer token `cad` kiểm `styleMap` + 7 cờ tắt.
+
 ## M100 PR1 — Rule pack v4 (`drawTools` + `sheetSetup`) + validator Core (2026-08-25)
 
 - **`lib/ky-thuat/cad/rule-packs/v4.json`** (append-only, v3 không đổi 1 byte): v4 = v3 + `drawTools` (5 hệ thao tác HVAC/PIPING/FIREFIGHTING/ELECTRICAL/ELV — mỗi tuyến khai `itemId`/`layer`/`edgeStyle`/`sizes` + `supportSpacingMm`/`sleeveClearanceMm`/`slopeRequired`) + `sheetSetup` (khổ giấy, tỉ lệ, khung tên, tag, bảng, slope). `lib/ky-thuat/cad/rule-pack.ts` + route `GET /api/engineering/cad/rule-pack` phục vụ v4 (thêm 2 field mới vào response).

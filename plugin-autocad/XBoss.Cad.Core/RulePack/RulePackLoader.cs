@@ -105,5 +105,86 @@ public static class RulePackLoader
             throw new RulePackException("inspectionPolicy.zToleranceMm phải dương.");
         if (pack.InspectionPolicy.OpenPolyline.NearGapToleranceMm <= 0)
             throw new RulePackException("inspectionPolicy.openPolyline.nearGapToleranceMm phải dương.");
+
+        ValidatePhepKiemV5(pack);
+    }
+
+    /// <summary>
+    /// Kiểm 7 phép kiểm mới của v5 (M101 §6.1). Rule pack ≤ v4 không khai khối nào → mọi giá trị là
+    /// mặc định (tắt/rỗng) → không ném gì (tương thích ngược). Nguyên tắc: phép ĐANG BẬT mà thiếu
+    /// tham số thì chặn ngay, thà không nạp được còn hơn chạy im lặng không kiểm gì.
+    /// </summary>
+    private static void ValidatePhepKiemV5(CadRulePack pack)
+    {
+        var ip = pack.InspectionPolicy;
+
+        if (ip.OverlapSameSystem.Enabled &&
+            (ip.OverlapSameSystem.OverlapToleranceMm <= 0 || ip.OverlapSameSystem.OverlapMinLengthMm <= 0))
+        {
+            throw new RulePackException(
+                "inspectionPolicy.overlapSameSystem đang bật nhưng overlapToleranceMm/overlapMinLengthMm không dương.");
+        }
+
+        // clashPairs kiểm cả khi tắt: dữ liệu khai sai (tên hệ trôi khỏi layerMap) phải lộ ngay,
+        // chứ không đợi tới ngày công ty bật phép kiểm lên mới phát hiện.
+        var groupIds = new HashSet<string>(pack.LayerMap.Groups.Select(g => g.Id), StringComparer.Ordinal);
+        foreach (var cap in ip.Clash2d.ClashPairs)
+        {
+            if (cap.Count != 2)
+                throw new RulePackException("inspectionPolicy.clash2d.clashPairs phải là danh sách cặp [hệ A, hệ B].");
+            foreach (var he in cap)
+            {
+                if (!groupIds.Contains(he))
+                {
+                    throw new RulePackException(
+                        $"inspectionPolicy.clash2d.clashPairs tham chiếu hệ \"{he}\" không có trong layerMap.groups[].id.");
+                }
+            }
+            if (string.Equals(cap[0], cap[1], StringComparison.Ordinal))
+                throw new RulePackException($"inspectionPolicy.clash2d.clashPairs có cặp trùng hệ \"{cap[0]}\" — phép kiểm 11 dành cho KHÁC hệ.");
+        }
+
+        if (ip.TitleblockFields.Enabled && ip.TitleblockFields.RequiredAttributes.Count == 0)
+        {
+            throw new RulePackException(
+                "inspectionPolicy.titleblockFields đang bật nhưng requiredAttributes rỗng — không có trường nào để kiểm.");
+        }
+
+        foreach (var s in ip.ViewportScale.Scales)
+        {
+            if (s <= 0) throw new RulePackException("inspectionPolicy.viewportScale.scales có mẫu số tỉ lệ không dương.");
+        }
+        if (ip.ViewportScale.Enabled && ip.ViewportScale.Scales.Count == 0 && !ip.ViewportScale.RequireLocked)
+        {
+            throw new RulePackException(
+                "inspectionPolicy.viewportScale đang bật nhưng không kiểm gì (scales rỗng và requireLocked=false).");
+        }
+
+        if (ip.StyleDeviation.Enabled &&
+            string.IsNullOrWhiteSpace(pack.StyleMap.TextStyle.Name) &&
+            string.IsNullOrWhiteSpace(pack.StyleMap.DimStyle.Name))
+        {
+            throw new RulePackException(
+                "inspectionPolicy.styleDeviation đang bật nhưng styleMap chưa khai tên style chuẩn nào.");
+        }
+
+        if (ip.StrayObjects.Enabled && (ip.StrayObjects.StrayDistanceFactor <= 0 || ip.StrayObjects.MinEntitiesForExtents < 4))
+        {
+            throw new RulePackException(
+                "inspectionPolicy.strayObjects đang bật nhưng strayDistanceFactor không dương hoặc minEntitiesForExtents < 4.");
+        }
+
+        // styleMap: dimstyle chuẩn trỏ kiểu chữ lạ → chuẩn hóa xong chữ kích thước vẫn sai font.
+        var dimTextStyle = pack.StyleMap.DimStyle.TextStyleName;
+        if (!string.IsNullOrWhiteSpace(dimTextStyle))
+        {
+            var hopLe = string.Equals(dimTextStyle, pack.StyleMap.TextStyle.Name, StringComparison.OrdinalIgnoreCase)
+                        || pack.StyleMap.TextStyle.AcceptAlso.Any(n => string.Equals(n, dimTextStyle, StringComparison.OrdinalIgnoreCase));
+            if (!hopLe)
+            {
+                throw new RulePackException(
+                    $"styleMap.dimStyle.textStyleName \"{dimTextStyle}\" không nằm trong styleMap.textStyle (name/acceptAlso).");
+            }
+        }
     }
 }

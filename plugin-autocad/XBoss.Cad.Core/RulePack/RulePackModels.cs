@@ -18,6 +18,13 @@ public sealed class CadRulePack
     [JsonPropertyName("flattenPolicy")] public FlattenPolicySection FlattenPolicy { get; init; } = new();
     [JsonPropertyName("takeoff")] public TakeoffSection Takeoff { get; init; } = new();
     [JsonPropertyName("inspectionPolicy")] public InspectionPolicySection InspectionPolicy { get; init; } = new();
+
+    /// <summary>
+    /// v5: bộ style chuẩn (M101 §6.1 phép kiểm 14 + §6.2 bước chuẩn hóa 8) — khai một lần, dùng
+    /// chung cho kiểm lẫn sửa. Rule pack ≤ v4 không có khối này → tên chuẩn rỗng → phép kiểm 14
+    /// tự tắt (hành vi y hệt v4).
+    /// </summary>
+    [JsonPropertyName("styleMap")] public StyleMapSection StyleMap { get; init; } = new();
 }
 
 public sealed class LayerMapSection
@@ -170,6 +177,93 @@ public sealed class InspectionPolicySection
 {
     [JsonPropertyName("zToleranceMm")] public double ZToleranceMm { get; init; }
     [JsonPropertyName("openPolyline")] public OpenPolylinePolicy OpenPolyline { get; init; } = new();
+
+    // v5 (M101 §6.1) — 7 phép kiểm mới, MỖI phép một khối có cờ enabled riêng, mặc định false.
+    // Rule pack ≤ v4 không có các khối này → mọi Enabled = false → Inspector chạy y hệt v4.
+    [JsonPropertyName("overlapSameSystem")] public OverlapCheckPolicy OverlapSameSystem { get; init; } = new();
+    [JsonPropertyName("clash2d")] public Clash2dCheckPolicy Clash2d { get; init; } = new();
+    [JsonPropertyName("titleblockFields")] public TitleblockCheckPolicy TitleblockFields { get; init; } = new();
+    [JsonPropertyName("viewportScale")] public ViewportCheckPolicy ViewportScale { get; init; } = new();
+    [JsonPropertyName("styleDeviation")] public ToggleCheckPolicy StyleDeviation { get; init; } = new();
+    [JsonPropertyName("labelSizeMismatch")] public ToggleCheckPolicy LabelSizeMismatch { get; init; } = new();
+    [JsonPropertyName("strayObjects")] public StrayCheckPolicy StrayObjects { get; init; } = new();
+}
+
+/// <summary>Phép kiểm chỉ có cờ bật/tắt (tham số nằm ở khối khác — vd styleMap).</summary>
+public class ToggleCheckPolicy
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+}
+
+/// <summary>Phép kiểm 10 — chồng lấn tuyến cùng hệ.</summary>
+public sealed class OverlapCheckPolicy : ToggleCheckPolicy
+{
+    /// <summary>Bề rộng dải coi là "song song trùng nhau" (mm).</summary>
+    [JsonPropertyName("overlapToleranceMm")] public double OverlapToleranceMm { get; init; }
+    /// <summary>Chiều dài chồng lấn tối thiểu mới báo (mm) — chống báo oan chỗ hai tuyến chỉ chạm nhau.</summary>
+    [JsonPropertyName("overlapMinLengthMm")] public double OverlapMinLengthMm { get; init; }
+}
+
+/// <summary>Phép kiểm 11 — giao cắt khác hệ trên mặt bằng (KHÔNG thay được clash 3D).</summary>
+public sealed class Clash2dCheckPolicy : ToggleCheckPolicy
+{
+    /// <summary>Các cặp id hệ (layerMap.groups[].id) cần soi giao cắt; rỗng = không kiểm cặp nào.</summary>
+    [JsonPropertyName("clashPairs")] public IReadOnlyList<IReadOnlyList<string>> ClashPairs { get; init; } = [];
+}
+
+/// <summary>Phép kiểm 12 — khung tên thiếu/sai trường.</summary>
+public sealed class TitleblockCheckPolicy : ToggleCheckPolicy
+{
+    /// <summary>Nhận diện khung tên theo tên block khi chưa có manifest M100 (khớp ranh giới token).</summary>
+    [JsonPropertyName("titleblockNameMatchAny")] public IReadOnlyList<string> TitleblockNameMatchAny { get; init; } = [];
+    /// <summary>Tag attribute bắt buộc phải có và khác rỗng.</summary>
+    [JsonPropertyName("requiredAttributes")] public IReadOnlyList<string> RequiredAttributes { get; init; } = [];
+}
+
+/// <summary>Phép kiểm 13 — viewport không khóa / tỉ lệ lạ.</summary>
+public sealed class ViewportCheckPolicy : ToggleCheckPolicy
+{
+    [JsonPropertyName("requireLocked")] public bool RequireLocked { get; init; }
+    /// <summary>Mẫu số tỉ lệ 1:X hợp lệ; rỗng = không kiểm tỉ lệ (chỉ kiểm khóa).</summary>
+    [JsonPropertyName("scales")] public IReadOnlyList<double> Scales { get; init; } = [];
+}
+
+/// <summary>Phép kiểm 16 — đối tượng ngoài khung.</summary>
+public sealed class StrayCheckPolicy : ToggleCheckPolicy
+{
+    /// <summary>Ngưỡng = hệ số này × đường chéo bao chính.</summary>
+    [JsonPropertyName("strayDistanceFactor")] public double StrayDistanceFactor { get; init; }
+    /// <summary>Ít hơn ngần này thực thể có hình bao thì bỏ qua (không đủ dữ liệu để dựng bao chính).</summary>
+    [JsonPropertyName("minEntitiesForExtents")] public int MinEntitiesForExtents { get; init; }
+}
+
+/// <summary>
+/// Bộ style chuẩn (v5) — dùng chung giữa phép kiểm 14 và bước chuẩn hóa 8 (PR2).
+/// Tên chuẩn rỗng = chưa chốt bộ chuẩn → cả hai bên bỏ qua.
+/// </summary>
+public sealed class StyleMapSection
+{
+    [JsonPropertyName("textStyle")] public TextStyleStandard TextStyle { get; init; } = new();
+    [JsonPropertyName("dimStyle")] public DimStyleStandard DimStyle { get; init; } = new();
+}
+
+public sealed class TextStyleStandard
+{
+    [JsonPropertyName("name")] public string Name { get; init; } = "";
+    [JsonPropertyName("fontFile")] public string FontFile { get; init; } = "";
+    /// <summary>0 = kiểu chữ không cố định chiều cao (chiều cao đặt trên từng đối tượng).</summary>
+    [JsonPropertyName("fixedHeightMm")] public double FixedHeightMm { get; init; }
+    [JsonPropertyName("widthFactor")] public double WidthFactor { get; init; }
+    /// <summary>Style chấp nhận được ngoài style chuẩn — không báo lệch, không đổi khi chuẩn hóa.</summary>
+    [JsonPropertyName("acceptAlso")] public IReadOnlyList<string> AcceptAlso { get; init; } = [];
+}
+
+public sealed class DimStyleStandard
+{
+    [JsonPropertyName("name")] public string Name { get; init; } = "";
+    /// <summary>Kiểu chữ mà dimstyle chuẩn dùng — phải nằm trong textStyle.name/acceptAlso.</summary>
+    [JsonPropertyName("textStyleName")] public string TextStyleName { get; init; } = "";
+    [JsonPropertyName("acceptAlso")] public IReadOnlyList<string> AcceptAlso { get; init; } = [];
 }
 
 public sealed class OpenPolylinePolicy

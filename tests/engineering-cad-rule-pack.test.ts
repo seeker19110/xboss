@@ -25,7 +25,7 @@ import {
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4, version = v4", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5, version = v5", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -42,8 +42,9 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4, version
   for (const field of ["drawTools", "sheetSetup"]) {
     assert.ok(field in pack, `Thiếu field v4 ${field}`);
   }
-  assert.equal(pack.version, "v4");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v4");
+  assert.ok("styleMap" in pack, "Thiếu field v5 styleMap");
+  assert.equal(pack.version, "v5");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v5");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -92,7 +93,7 @@ test("rule pack v3 là mở rộng thuần của v2: chỉ thêm fontMap.targetF
 
 test("rule pack v4 là mở rộng thuần của v3: chỉ thêm drawTools + sheetSetup (M100 AC9)", async () => {
   const v3 = (await import("@/lib/ky-thuat/cad/rule-packs/v3.json")).default;
-  const v4 = getCurrentRulePack();
+  const v4 = (await import("@/lib/ky-thuat/cad/rule-packs/v4.json")).default;
 
   for (const field of [
     "layerMap",
@@ -113,6 +114,88 @@ test("rule pack v4 là mở rộng thuần của v3: chỉ thêm drawTools + she
     Object.keys(v4).filter((k) => !(k in v3)),
     ["drawTools", "sheetSetup"],
     "v4 thêm nhiều hơn đúng 2 khối drawTools + sheetSetup",
+  );
+});
+
+test("rule pack v5 là mở rộng thuần của v4: chỉ thêm styleMap + khóa mới trong inspectionPolicy (M101 FR1)", async () => {
+  const v4 = (await import("@/lib/ky-thuat/cad/rule-packs/v4.json")).default;
+  const v5 = getCurrentRulePack();
+
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "drawTools",
+    "sheetSetup",
+  ] as const) {
+    assert.deepEqual(
+      v5[field],
+      v4[field],
+      `Field ${field} của v5 lệch v4 — v5 phải là mở rộng thuần (lệnh M99/M100 chạy với v5 không đổi hành vi)`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v5).filter((k) => !(k in v4)),
+    ["styleMap"],
+    "v5 thêm nhiều hơn đúng 1 khối styleMap ở cấp gốc",
+  );
+  // inspectionPolicy: mọi khóa cũ giữ nguyên từng chữ, chỉ ĐƯỢC THÊM khóa mới.
+  for (const [key, value] of Object.entries(v4.inspectionPolicy)) {
+    assert.deepEqual(
+      (v5.inspectionPolicy as Record<string, unknown>)[key],
+      value,
+      `inspectionPolicy.${key} của v5 lệch v4`,
+    );
+  }
+});
+
+test("v5: 7 phép kiểm mới đều có enabled và đều TẮT mặc định (M101 AC(a))", () => {
+  const ip = getCurrentRulePack().inspectionPolicy;
+  const phepKiemMoi = [
+    "overlapSameSystem",
+    "clash2d",
+    "titleblockFields",
+    "viewportScale",
+    "styleDeviation",
+    "labelSizeMismatch",
+    "strayObjects",
+  ] as const;
+  for (const ten of phepKiemMoi) {
+    const khoi = ip[ten] as { enabled: boolean; note?: string };
+    assert.equal(khoi.enabled, false, `Phép kiểm ${ten} phải mặc định tắt`);
+    assert.ok((khoi.note ?? "").length > 0, `Phép kiểm ${ten} thiếu mô tả tiếng Việt`);
+  }
+  // Tham số then chốt của từng phép (bật lên là dùng được ngay, không phải phát hành lại).
+  assert.ok(ip.overlapSameSystem.overlapToleranceMm > 0);
+  assert.ok(ip.overlapSameSystem.overlapMinLengthMm > ip.overlapSameSystem.overlapToleranceMm);
+  assert.deepEqual(ip.clash2d.clashPairs, [], "clashPairs phải rỗng mặc định (an toàn)");
+  assert.ok(ip.titleblockFields.requiredAttributes.length > 0);
+  assert.ok(ip.titleblockFields.titleblockNameMatchAny.length > 0);
+  assert.ok(ip.strayObjects.strayDistanceFactor > 0);
+  assert.ok(ip.strayObjects.minEntitiesForExtents >= 4);
+});
+
+test("v5: viewportScale.scales khớp sheetSetup.scales (một bộ tỉ lệ duy nhất, chống trôi)", () => {
+  const pack = getCurrentRulePack();
+  assert.deepEqual(
+    [...pack.inspectionPolicy.viewportScale.scales].sort((a, b) => a - b),
+    [...pack.sheetSetup.scales].sort((a, b) => a - b),
+    "Danh mục tỉ lệ của phép kiểm 13 đã trôi khỏi sheetSetup.scales",
+  );
+});
+
+test("v5: styleMap khai bộ style chuẩn dùng chung cho phép kiểm 14 và bước chuẩn hóa 8", () => {
+  const sm = getCurrentRulePack().styleMap;
+  assert.ok(sm.textStyle.name.length > 0 && sm.textStyle.fontFile.length > 0);
+  assert.ok(sm.dimStyle.name.length > 0);
+  // dimstyle chuẩn phải trỏ tới một textstyle được chấp nhận, không thì chuẩn hóa xong chữ
+  // kích thước vẫn sai font.
+  assert.ok(
+    [sm.textStyle.name, ...sm.textStyle.acceptAlso].includes(sm.dimStyle.textStyleName),
+    "styleMap.dimStyle.textStyleName không nằm trong bộ textStyle",
   );
 });
 
@@ -227,6 +310,9 @@ test("route rule-pack: có force-dynamic, chặn 401/403 và trả 304 theo If-N
     "flattenPolicy:",
     "takeoff:",
     "inspectionPolicy:",
+    "drawTools:",
+    "sheetSetup:",
+    "styleMap:",
   ]) {
     assert.ok(src.includes(field), `Response thiếu ${field}`);
   }

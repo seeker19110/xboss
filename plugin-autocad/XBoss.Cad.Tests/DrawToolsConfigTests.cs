@@ -5,18 +5,18 @@ using Xunit;
 namespace XBoss.Cad.Tests;
 
 /// <summary>
-/// M100 PR1 — nạp rule pack v4 THẬT trong repo (cùng nguồn với test TS, chống trôi 2 tầng)
+/// M100 PR1 — nạp rule pack ĐANG PHÁT HÀNH (v5) THẬT trong repo (cùng nguồn với test TS, chống trôi 2 tầng)
 /// và chứng minh validator bắt được các lớp lỗi khai báo (M100 §15, §18 rủi ro số 1).
 /// </summary>
 public class DrawToolsConfigTests
 {
-    private static string JsonV4() => File.ReadAllText(RepoPaths.RulePackPath);
+    private static string JsonHienHanh() => File.ReadAllText(RepoPaths.RulePackPath);
 
     [Fact]
-    public void Nap_duoc_drawTools_cua_rule_pack_v4_dang_phat_hanh()
+    public void Nap_duoc_drawTools_cua_rule_pack_dang_phat_hanh()
     {
-        var pack = DrawToolsConfig.Load(JsonV4());
-        Assert.Equal("v4", pack.RulePack.Version);
+        var pack = DrawToolsConfig.Load(JsonHienHanh());
+        Assert.Equal("v5", pack.RulePack.Version);
         Assert.Equal(5, pack.DrawTools.Systems.Count); // HVAC/PIPING/FIREFIGHTING/ELECTRICAL/ELV
         Assert.Equal("G-ANNO-TEXT", pack.DrawTools.LabelStyle.Layer);
         Assert.Equal("titleblock-a1", pack.SheetSetup.TitleblockId);
@@ -28,7 +28,7 @@ public class DrawToolsConfigTests
     [Fact]
     public void Khoa_phuc_vu_GIADO_LOCHO_slope_khai_du_va_doc_duoc()
     {
-        var pack = DrawToolsConfig.Load(JsonV4());
+        var pack = DrawToolsConfig.Load(JsonHienHanh());
         var hvac = pack.DrawTools.Systems.Single(s => s.Id == "HVAC");
         var ductSupp = hvac.Lines.Single(l => l.ItemId == "duct-supp");
         Assert.Equal("double", ductSupp.EdgeStyle);
@@ -49,14 +49,14 @@ public class DrawToolsConfigTests
     [Fact]
     public void Cross_check_takeoff_khong_canh_bao_tren_rule_pack_that()
     {
-        var pack = DrawToolsConfig.Load(JsonV4());
+        var pack = DrawToolsConfig.Load(JsonHienHanh());
         Assert.Empty(TakeoffCrossCheck.Kiem(pack.DrawTools, pack.RulePack.Takeoff));
     }
 
     [Fact]
     public void Cross_check_bat_thiet_bi_khong_dem_duoc()
     {
-        var pack = DrawToolsConfig.Load(JsonV4());
+        var pack = DrawToolsConfig.Load(JsonHienHanh());
         // "duct-supp" là item measure=length → không thể đếm theo block; "ma-quy" không tồn tại.
         var hong = new DrawToolsSection
         {
@@ -74,7 +74,7 @@ public class DrawToolsConfigTests
     public void Bat_loi_layer_khong_thuoc_nhom_cua_he()
     {
         // M-CHW-PIPE là target của nhóm PIPING, không phải HVAC → khai nhầm hệ phải bị chặn.
-        var json = JsonV4().Replace("\"layer\": \"M-DUCT-SUPP\"", "\"layer\": \"M-CHW-PIPE\"");
+        var json = JsonHienHanh().Replace("\"layer\": \"M-DUCT-SUPP\"", "\"layer\": \"M-CHW-PIPE\"");
         var loi = Assert.Throws<RulePackException>(() => DrawToolsConfig.Load(json));
         Assert.Contains("M-CHW-PIPE", loi.Message);
         Assert.Contains("HVAC", loi.Message);
@@ -85,7 +85,7 @@ public class DrawToolsConfigTests
     {
         // Hậu tố "-EDGE" (phác thảo M100 §11) làm "M-DUCT-SUPP-EDGE" VẪN khớp token "M-DUCT-SUPP"
         // → nét biên bị bóc trùng khối lượng (vỡ FR4/AC3). Validator phải chặn.
-        var json = JsonV4().Replace("\"edgeLayerSuffix\": \"EDGE\"", "\"edgeLayerSuffix\": \"-EDGE\"");
+        var json = JsonHienHanh().Replace("\"edgeLayerSuffix\": \"EDGE\"", "\"edgeLayerSuffix\": \"-EDGE\"");
         var loi = Assert.Throws<RulePackException>(() => DrawToolsConfig.Load(json));
         Assert.Contains("M-DUCT-SUPP-EDGE", loi.Message);
         Assert.Contains("duct-supp", loi.Message);
@@ -94,7 +94,7 @@ public class DrawToolsConfigTests
     [Fact]
     public void Bat_loi_itemId_ma()
     {
-        var json = JsonV4().Replace("\"itemId\": \"duct-retn\"", "\"itemId\": \"duct-ma\"");
+        var json = JsonHienHanh().Replace("\"itemId\": \"duct-retn\"", "\"itemId\": \"duct-ma\"");
         var loi = Assert.Throws<RulePackException>(() => DrawToolsConfig.Load(json));
         Assert.Contains("duct-ma", loi.Message);
         Assert.Contains("takeoff.items", loi.Message);
@@ -103,7 +103,7 @@ public class DrawToolsConfigTests
     [Fact]
     public void Bat_loi_he_khong_co_trong_layerMap()
     {
-        var json = JsonV4().Replace("\"id\": \"HVAC\",\n        \"name\": \"Điều hòa thông gió\"",
+        var json = JsonHienHanh().Replace("\"id\": \"HVAC\",\n        \"name\": \"Điều hòa thông gió\"",
             "\"id\": \"HVAC-CU\",\n        \"name\": \"Điều hòa thông gió\"");
         var loi = Assert.Throws<RulePackException>(() => DrawToolsConfig.Load(json));
         Assert.Contains("HVAC-CU", loi.Message);
@@ -113,7 +113,7 @@ public class DrawToolsConfigTests
     [Fact]
     public void Bat_loi_titleblockId_khai_nua_voi()
     {
-        var json = JsonV4().Replace("\"titleblockId\": \"titleblock-a1\"", "\"titleblockId\": \"  \"");
+        var json = JsonHienHanh().Replace("\"titleblockId\": \"titleblock-a1\"", "\"titleblockId\": \"  \"");
         var loi = Assert.Throws<RulePackException>(() => DrawToolsConfig.Load(json));
         Assert.Contains("titleblockId", loi.Message);
     }
@@ -132,7 +132,7 @@ public class DrawToolsConfigTests
     {
         // chw-pipe khai supportSpacingMm dạng map cho DN20..DN200, nhưng xoá entry DN50
         // → sizes[] chứa DN50 nhưng map thiếu entry → validator phải ném RulePackException
-        var json = JsonV4().Replace("\"DN50\": 2000,", "");
+        var json = JsonHienHanh().Replace("\"DN50\": 2000,", "");
         var loi = Assert.Throws<RulePackException>(() => DrawToolsConfig.Load(json));
         Assert.Contains("supportSpacingMm", loi.Message);
         Assert.Contains("DN50", loi.Message);
@@ -144,10 +144,10 @@ public class DrawToolsConfigTests
     {
         // Line không khai supportSpacingMm cũng không khai sleeveClearanceMm → hợp lệ
         // (validator chỉ kiểm nếu khai)
-        var json = JsonV4()
+        var json = JsonHienHanh()
             .Replace(",\n            \"supportSpacingMm\": 2400,\n            \"sleeveClearanceMm\": 50", "");
         var pack = DrawToolsConfig.Load(json);
         Assert.NotNull(pack);
-        Assert.Equal("v4", pack.RulePack.Version);
+        Assert.Equal("v5", pack.RulePack.Version);
     }
 }

@@ -42,6 +42,9 @@ export async function GET(req: Request) {
       // v4 (M100 §11): tham số bộ lệnh vẽ XBOSS_VE_* — plugin M99 cũ bỏ qua field không biết.
       drawTools: pack.drawTools,
       sheetSetup: pack.sheetSetup,
+      // v5 (M101 §6.1/§6.2): bộ style chuẩn dùng chung cho phép kiểm 14 và bước chuẩn hóa 8.
+      // 7 phép kiểm mới đi kèm trong inspectionPolicy ở trên (mặc định tắt).
+      styleMap: pack.styleMap,
     },
     { headers: { ETag: etag } },
   );
