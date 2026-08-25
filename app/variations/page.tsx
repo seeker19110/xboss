@@ -159,7 +159,7 @@ export default function VariationsPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm phát sinh"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm phát sinh</span>
             </button>
@@ -484,7 +484,7 @@ function AddVoModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo phát sinh"}
         </button>
@@ -703,7 +703,7 @@ function VoDetailModal({
               <button
                 onClick={submitVo}
                 disabled={busy}
-                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-sm font-medium px-4 py-2 rounded-lg"
+                className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-sm font-medium px-4 py-2 rounded-lg"
               >
                 Trình lên CĐT/TVGS
               </button>
@@ -793,14 +793,14 @@ function VoDetailModal({
                 <button
                   onClick={() => decide("approved")}
                   disabled={busy}
-                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
+                  className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
                 >
                   Duyệt toàn bộ
                 </button>
                 <button
                   onClick={() => decide("partially_approved")}
                   disabled={busy}
-                  className="bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
+                  className="bg-sky-700 hover:bg-sky-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
                 >
                   Duyệt một phần
                 </button>

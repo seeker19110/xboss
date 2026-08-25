@@ -4,6 +4,104 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Đóng nợ tương phản màu — sửa ở token + 2 cổng CI (2026-08-25)
+
+Người dùng: "làm luôn đợt sửa nợ tương phản zinc-500". Đo bằng axe trên bản production có dữ
+liệu thật (2.543 task) rồi sửa tới khi sạch; ghi quyết định trong **ADR-0010**.
+
+**Đã sửa (5 nhóm, tất cả đều đo lại bằng axe sau khi sửa)**
+
+1. **`text-zinc-500` không đạt AA ở cả 4 theme tối** (3,5-4,1:1; riêng Dashboard ~95 nút DOM).
+   Sửa ở **token** trong `app/globals.css` chứ không đổi tay ~700 chỗ dùng: `--color-zinc-500`
+   sáng lên cho `dark` (#8e8e98), `kingblue` (#7eb7ff, kèm `-400` → #a8ccff), `darkblue`
+   (#7da1d3), `navy` (#7f94b1) — giữ nguyên thứ bậc 3 mức chữ 300 > 400 > 500.
+2. **Màu nhấn mức -400 trên mặt thẻ sáng của King Blue/Dark Blue** (3,1-4,4:1): lấy giá trị
+   `-300` cho 8 họ ở kingblue (red/rose/orange/sky/blue/indigo/violet/purple) và 5 họ ở
+   darkblue. Ghi hex chốt, không dùng `var(--color-*-300)` (biến đó biến mất nếu mã hết chỗ
+   dùng shade -300 → class -400 vỡ im lặng).
+3. **Bản đồ nhiệt** (`ProgressMap`): ô 100% dùng chữ trắng trên `bg-emerald-600` (3,65:1) →
+   `text-on-accent-dark` (5,45:1), đúng luật "chọn chữ theo độ sáng của nền" ở globals.css.
+4. **Nút nền màu đặc sáng dần khi rê chuột** — mẫu `bg-emerald-700 hover:bg-emerald-600
+text-on-accent` dùng ở **215 chỗ**: 5,36:1 lúc nghỉ nhưng **3,65:1 khi rê chuột**. Đổi quy
+   ước sang **đậm dần** (`-700 → -800`), sửa cả 215 chỗ bằng codemod chạy trên đúng các dòng
+   cổng CI báo (94 file), cộng 3 chỗ trong chuỗi biến thể (`ui/Button.tsx`, spatial-viewer,
+   suggestions) mà cổng cũ không nhìn thấy.
+5. **Chưa có `app/not-found.tsx`** nên trang 404 dùng bản mặc định của Next: nền trắng cắm
+   cứng + footer theo theme tối = 1,6-2,6:1. Thêm trang 404 riêng dùng token theme.
+   Cùng đợt: `--color-red-400` của theme sáng đậm thêm một bậc (#dc2626 → #c81e1e) vì trên
+   **dòng sọc xen kẽ** của bảng (#f1f3f6) chỉ đạt 4,34:1 — mà chữ đỏ hầu như luôn nằm trong bảng.
+
+**Hai cổng CI mới/mở rộng** (chặn tái phát, chạy vài giây, không cần trình duyệt):
+
+- `npm run check:contrast` (`scripts/check-contrast.ts`, **mới**, đã cắm vào `ci.yml`): đọc
+  **thẳng** bảng token trong `globals.css` (không chép tay), chặn khi mức chữ 300/400/500 của
+  zinc lẫn accent không đạt AA trên `--background`/`zinc-950`/`zinc-900` của bất kỳ theme nào;
+  `zinc-800` (nền control) chỉ cảnh báo. Thay `scripts/contrast-check.ts` cũ (bảng chép tay đã
+  lệch khỏi globals.css, đã xoá). Đã thử nghiệm ngược: trả token cũ về → cổng đỏ đúng chỗ.
+- `npm run check:mau-accent` (**mở rộng**): coi `text-on-accent` như `text-white`, xét cả
+  `hover:`/`focus:`/`active:`, thêm mức -400, và quét **mọi chuỗi class** chứ không chỉ
+  `className="…"` — nhờ vậy mới thấy bảng VARIANT của `app/components/ui/Button.tsx`.
+
+**Verify**: axe trên bản production (Postgres seed Excel gốc) — **8 trang × 5 theme desktop +
+5 trang × 3 theme mobile → 0 vi phạm serious/critical** (trước đợt này: 129 chỉ riêng
+Dashboard+tracking ở theme tối, 583 ở 3 theme xanh). `lint`/`typecheck`/`build` xanh;
+`npm test` 224 file / 1.221 ca pass (có DB thật); **e2e Playwright toàn bộ `e2e/authed`:
+481 pass / 0 fail** (gồm mọi ca axe); 8 cổng kiểm nội bộ xanh.
+
+## Làm mới UI/UX — bộ component nền + khung app + Dashboard + tracking (2026-08-25)
+
+Người dùng: "thiết kế lại ui/ux hiện đại". Chốt phạm vi đợt 1 qua `AskUserQuestion`: **khung
+app + trang chính (Dashboard, lưới tracking)**, hướng **tinh gọn hiện trạng** (giữ nguyên cơ
+chế dark-first/đảo biến CSS), được phép thêm component nền mới và đổi bố cục điều hướng.
+
+**Đã làm**
+
+1. **`app/components/ui/` — bộ component nền** (`Button`/`ButtonLink`, `Card`/`CardLink`,
+   `Chip`, `Section`, `StatCard`) + **ADR-0009** chốt quy ước hình thức: bo góc `rounded-xl`
+   cho thẻ / `rounded-lg` cho control, mặt thẻ đúng 2 tông (`raised`/`sunken`), **emerald =
+   đang chọn / hành động chính** (amber-đỏ chỉ còn là màu cảnh báo), nút cao ≥40px kể cả cỡ
+   `sm`. Ghi thêm mục quy ước vào `CLAUDE.md` (phần Thiết kế giao diện).
+2. **Khung app (`AppHeader`)**: một màu nhấn duy nhất cho mục sidebar đang chọn; topbar kính
+   mờ; **ô tìm kiếm lên thẳng topbar trên desktop** — trước đây chỉ có ở thanh đáy trang chủ
+   nên mọi trang khác không có lối tìm kiếm nhìn thấy được (Ctrl+K vẫn chạy nhưng không ai
+   biết); thanh đáy chỉ-tìm-kiếm tự ẩn trên desktop.
+3. **`HubShell`**: tab đang chọn đổi từ amber sang emerald cho khớp sidebar; dải KPI dùng
+   `StatCard` chung; sửa `sticky top-14` → `top-12` (lệch 8px so với topbar `h-12`, nội dung
+   lộ ra ở khe hở khi cuộn).
+4. **Dashboard (`app/page.tsx`)**: đảo thứ tự — **số liệu thật lên đầu** (tổng quan 4 ô, tiến
+   độ theo trang, theo hệ), hai khối điều hướng cỡ lớn ("6 giai đoạn" + "7 đại trung tâm") gộp
+   thành một mục "Trung tâm điều hành" gọn hơn, đặt sau. **Bỏ các chip trạng thái cắm cứng**
+   ("100% Khớp", "LOD 400", "Quyết toán kỳ 6") và tên dự án hard-code trong JSX — số liệu giả
+   không đọc từ DB, dễ bị hiểu nhầm là tình trạng thật (đúng quy ước "không hard-code tên dự
+   án trong UI"). Thêm ô "Tiến độ tổng" tính **bình quân có trọng số** theo số công việc.
+5. **Trang tracking**: thanh lọc **dính dưới topbar** (bảng dài hàng trăm dòng, trước cuộn
+   xuống là mất bộ lọc); dùng `Button`/`Card`/`EmptyState` chung; nút bật/tắt cột khi in nâng
+   vùng chạm `py-0.5` → `py-1.5`.
+6. **`:target { scroll-margin-top: 4.5rem }`** trong `globals.css` — link neo trong trang
+   (vd `#delayed-table`) trước đây nhảy tới nơi thì tiêu đề nằm khuất dưới topbar dính.
+
+**Verify thật** (không chỉ đọc code): dựng Postgres 16 cục bộ + `.env.local`, `db:migrate` áp
+sạch 136 migration, `db:seed` import Excel gốc (2.543 tasks, 50.465 ô dimension), `npm start`
+bản production rồi chụp màn hình bằng Playwright/Chromium ở 3 cấu hình (desktop 1440 theme
+tối, desktop theme sáng, mobile 390) cho cả Dashboard lẫn `/tracking/ogtd`, đối chiếu từng
+mục. Bắt và sửa 2 lỗi chỉ lộ khi chạy thật: nút xoá trang đè lên thanh tiến độ trên mobile
+(luôn hiện, không cần hover) và nhãn "GĐ n" `text-zinc-500` không đủ tương phản ở theme tối.
+**axe-core** trên Dashboard + tracking (3 cấu hình): 6 vi phạm `color-contrast` do đợt này
+sinh ra đã hết; phần còn lại là **nợ cũ** (xem "Nợ kỹ thuật" bên dưới). `lint`/`typecheck`/
+`build` xanh, `npm test` 224 file / 0 fail, và 6 cổng kiểm nội bộ xanh (`check:mau-accent`,
+`check:lib-layers`, `check:sw-exclude`, `check:migrations`, `check:route-perms`,
+`check:db-params`, `check:dead-code`).
+
+**Tiếp theo (chưa làm)**: áp bộ component cho các nhóm trang nghiệp vụ còn lại theo từng đợt
+(tài chính, hiện trường, kỹ thuật) — đợt này cố ý không đổi hàng loạt để diff còn review được.
+
+**Nợ kỹ thuật phát hiện** — ~~`text-zinc-500` dùng làm **màu chữ** vi phạm tương phản WCAG AA
+ở theme tối~~ → **đã đóng ngay sau đó, xem mục kế tiếp bên dưới (2026-08-25)**. Nội dung gốc: axe đếm ~95 nút DOM trên riêng Dashboard (nhiều
+nhất ở `ProgressMap`, `DashboardExtCards` và các panel số liệu), cộng ~17 nút trong nhãn ô
+heatmap `ProgressMap` (`text-[9px]`) ở **cả hai** theme. Không phải do đợt này sinh ra (các
+trang đó không nằm trong diff) nhưng nên gom một đợt riêng: đổi chữ phụ sang `zinc-400` và
+nâng cỡ nhãn heatmap, hoặc chỉnh lại `--color-zinc-500` cho các theme tối.
+
 ## Quét trùng lặp lần 2 — sau khi #389/#392 vào main (2026-08-24)
 
 Người dùng: "quét tất cả". Quét lại **1.298 file** (`lib` 192, `app` 738, `tests` 223, `e2e` 74,

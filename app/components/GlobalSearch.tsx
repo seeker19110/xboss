@@ -338,7 +338,9 @@ export default function GlobalSearch({
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
-          placeholder="Tìm kiếm hoặc gõ lệnh... (Ctrl+K)"
+          // Không lặp "(Ctrl+K)" trong placeholder — đã có phím tắt hiển thị bằng <kbd>
+          // bên phải ô; trên topbar (ô hẹp) lặp lại chỉ làm chữ bị cắt giữa chừng.
+          placeholder="Tìm kiếm hoặc gõ lệnh..."
           className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-14 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 h-10 transition"
         />
         <div className="absolute right-2.5 flex items-center gap-0.5 pointer-events-none">

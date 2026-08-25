@@ -465,7 +465,7 @@ function SettingsModal({
         <button
           onClick={save}
           disabled={saving}
-          className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent px-3 py-2 rounded-lg transition"
+          className="text-xs bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent px-3 py-2 rounded-lg transition"
         >
           {saving ? "Đang lưu..." : "Lưu"}
         </button>

@@ -597,7 +597,7 @@ export default function CadQtoTrackingPage() {
                 <button
                   onClick={handleCreateSpoolsFromReview}
                   disabled={creatingSpools || reviewRows.length === 0}
-                  className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3.5 py-2 text-xs font-bold text-on-accent transition-colors hover:bg-emerald-500 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3.5 py-2 text-xs font-bold text-on-accent transition-colors hover:bg-emerald-800 disabled:opacity-50"
                 >
                   <CheckCircle2 size={14} />
                   {creatingSpools ? "Đang tạo..." : "Tạo Spool CAD"}
@@ -1035,7 +1035,7 @@ export default function CadQtoTrackingPage() {
                 <button
                   onClick={handleGenerateBbnt}
                   disabled={selectedForBbnt.size === 0}
-                  className="flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-on-accent transition-colors hover:bg-emerald-500 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-on-accent transition-colors hover:bg-emerald-800 disabled:opacity-50"
                 >
                   <FileText size={14} />
                   1-Click Tạo Phiếu Nghiệm Thu ({selectedForBbnt.size} Spools)

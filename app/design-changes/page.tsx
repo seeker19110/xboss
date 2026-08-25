@@ -386,7 +386,7 @@ function DesignChangeFormModal({
           <button
             onClick={submit}
             disabled={!canSubmit || saving}
-            className="px-3 py-2 text-sm rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 font-semibold text-on-accent"
+            className="px-3 py-2 text-sm rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 font-semibold text-on-accent"
           >
             {saving ? "Đang lưu..." : "Lưu"}
           </button>
@@ -570,7 +570,7 @@ function DesignChangeDetailModal({
               <button
                 onClick={() => decide("approved")}
                 disabled={busy}
-                className="px-3 py-2 text-sm rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 font-semibold text-on-accent"
+                className="px-3 py-2 text-sm rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 font-semibold text-on-accent"
               >
                 Duyệt
               </button>
@@ -618,7 +618,7 @@ export default function DesignChangesPage() {
           <button
             onClick={() => setAddOpen(true)}
             aria-label="Thêm thay đổi thiết kế"
-            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent h-10 min-h-[44px]"
+            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent h-10 min-h-[44px]"
           >
             <Pencil className="w-4 h-4" /> <span>Thêm thay đổi thiết kế</span>
           </button>

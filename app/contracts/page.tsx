@@ -188,7 +188,7 @@ export default function ContractsPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm hợp đồng"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm hợp đồng</span>
             </button>
@@ -610,7 +610,7 @@ function AddContractModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo hợp đồng"}
         </button>
@@ -1023,7 +1023,7 @@ function ContractDetailModal({
                 <button
                   onClick={addAddendum}
                   disabled={savingAddendum || !addCode.trim()}
-                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-sm font-medium px-3 py-2 rounded-lg shrink-0"
+                  className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-sm font-medium px-3 py-2 rounded-lg shrink-0"
                 >
                   Thêm
                 </button>

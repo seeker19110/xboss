@@ -933,7 +933,7 @@ export default function AdminPage() {
                 </select>
                 <button
                   onClick={createProject}
-                  className="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm text-on-accent"
+                  className="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-800 text-sm text-on-accent"
                 >
                   {newProject.cloneFrom ? "Sao chép & tạo" : "Tạo dự án"}
                 </button>
@@ -1016,7 +1016,7 @@ export default function AdminPage() {
                   </div>
                   <button
                     onClick={saveUserProjects}
-                    className="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm text-on-accent"
+                    className="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-800 text-sm text-on-accent"
                   >
                     Lưu dự án được gán
                   </button>

@@ -485,7 +485,7 @@ export default function XrefDiffLispPanel({
               </button>
               <button
                 onClick={handleDownloadLisp}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-on-accent text-xs font-semibold transition"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-on-accent text-xs font-semibold transition"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Tải về .LSP</span>

@@ -21,7 +21,7 @@ export function ErrorState({
       {onRetry && (
         <button
           onClick={onRetry}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] text-on-accent text-sm font-medium transition min-h-[44px] min-w-[120px] shadow-sm focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-on-accent text-sm font-medium transition min-h-[44px] min-w-[120px] shadow-sm focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
         >
           <RefreshCw className="w-4 h-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
           <span>Thử lại</span>

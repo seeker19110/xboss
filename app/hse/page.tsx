@@ -155,7 +155,7 @@ export default function HsePage() {
               <button
                 onClick={() => setAddOpen(true)}
                 aria-label="Ghi nhận HSE"
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
               >
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Ghi nhận mới</span>
               </button>
@@ -564,7 +564,7 @@ function AddHseModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Ghi nhận"}
         </button>

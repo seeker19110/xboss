@@ -596,7 +596,7 @@ export default function CadCorridorApexStudioPage() {
                   </div>
                   <button
                     onClick={runCorridorPlan}
-                    className="w-full py-2 bg-amber-700 hover:bg-amber-500 text-on-accent rounded-lg text-sm font-semibold transition"
+                    className="w-full py-2 bg-amber-700 hover:bg-amber-800 text-on-accent rounded-lg text-sm font-semibold transition"
                   >
                     Tối ưu Quy hoạch Đa tầng
                   </button>
@@ -808,7 +808,7 @@ export default function CadCorridorApexStudioPage() {
 
                 <button
                   onClick={runTrapezeCalculation}
-                  className="w-full py-2 bg-amber-700 hover:bg-amber-500 text-on-accent rounded-lg text-sm font-semibold transition"
+                  className="w-full py-2 bg-amber-700 hover:bg-amber-800 text-on-accent rounded-lg text-sm font-semibold transition"
                 >
                   Kiểm tra Kết cấu & Sinh LISP
                 </button>

@@ -1711,7 +1711,7 @@ export default function CleanMepfProcessPage() {
                           type="button"
                           onClick={() => handleApprove(activeStep.id)}
                           disabled={isSubmitting}
-                          className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-on-accent text-xs font-bold shadow-md flex items-center gap-1.5 transition disabled:opacity-50"
+                          className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-on-accent text-xs font-bold shadow-md flex items-center gap-1.5 transition disabled:opacity-50"
                         >
                           <Check className="w-4 h-4" /> Kỹ Sư Ký Duyệt Chuyển Bước
                         </button>

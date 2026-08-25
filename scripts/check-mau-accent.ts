@@ -4,7 +4,15 @@
 // tương phản, dễ đọc trên nền sáng (lỗi a11y). Lỗi này lặp lần ≥3 (54b3e03 → ee8fce1 → 57 file ở GĐ1).
 //
 // KIỂM:
-//  1. Cấm: text-white cùng bg-{emerald|sky|amber|green|teal|cyan}-500|600
+//  1. Cấm: chữ trắng (`text-white` HOẶC `text-on-accent` — cùng là #ffffff, xem globals.css)
+//     cùng nền accent sáng ĐẶC `bg-{emerald|sky|amber|green|teal|cyan|lime|yellow}-400|500|600`,
+//     ở BẤT KỲ trạng thái nào: nền gốc, `hover:`, `focus:` hay `active:`.
+//     Vì sao xét cả trạng thái hover: mẫu nút chính cũ `bg-emerald-700 hover:bg-emerald-600
+//     text-on-accent` đạt 5,36:1 lúc nghỉ nhưng tụt còn 3,65:1 ngay khi rê chuột — axe chỉ
+//     bắt được nếu đúng lúc quét con trỏ đang nằm trên nút, nên gần như luôn lọt lưới.
+//     Quy ước thay thế: nút chính đậm dần khi rê chuột (`bg-emerald-700 hover:bg-emerald-800`).
+//     Chỉ xét nền ĐẶC (không có `/opacity`): nền mờ `bg-{c}-500/10` là lớp phủ nhạt trên mặt
+//     thẻ tối, không phải nền sáng thật.
 //  2. Cấm: hover no-op — bg-{c}-N đi cùng hover:bg-{c}-N (cùng số N).
 //     ⚠️ Dương tính giả: bg-emerald-600/20 vs hover:bg-emerald-600/30 khác opacity → OK.
 //     ⚠️ Bỏ qua: disabled:hover: hoặc focus:hover: (prefix complex trước hover).
@@ -51,8 +59,12 @@ for (const f of files) {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      // Tìm mọi className (cả dạng `className="..."` lẫn template literal đơn giản).
-      const classNameMatches = line.matchAll(/className=["']([^"']*?)["']/g);
+      // Quét MỌI chuỗi ký tự trên dòng (nháy đơn/kép/backtick), không chỉ `className="..."`:
+      // bảng biến thể của bộ component nền (`app/components/ui/Button.tsx` — VARIANT/SIZE)
+      // là các chuỗi rời nằm ngoài JSX, trước đây lọt lưới nên nút chính dùng chung vẫn
+      // giữ nguyên mẫu hover sáng dần. Chuỗi không chứa class `bg-`/`text-` thì tự bị loại
+      // ở các bước kiểm bên dưới nên không sinh dương tính giả.
+      const classNameMatches = line.matchAll(/["'`]([^"'`\n]*?)["'`]/g);
 
       for (const match of classNameMatches) {
         const classStr = match[1];
@@ -61,20 +73,20 @@ for (const f of files) {
         // Split class string thành từng class, bỏ qua rỗng.
         const classList = classStr.split(/\s+/).filter(Boolean);
 
-        // Kiểm điều 1: text-white + bg-{bad-accent}-{bad-level}
-        const hasTextWhite = classList.some((c) => c === "text-white");
+        // Kiểm điều 1: chữ trắng + nền accent sáng đặc (kể cả ở trạng thái hover/focus/active)
+        const hasTextWhite = classList.some((c) => c === "text-white" || c === "text-on-accent");
         if (hasTextWhite) {
-          const hasBadAccent = classList.some((c) => {
-            // Match bg-{color}-{level} hoặc bg-{color}-{level}/{opacity}.
-            const m = c.match(/^bg-(emerald|sky|amber|green|teal|cyan)-(500|600)(?:\/\d+)?$/);
-            return m !== null;
-          });
+          const badAccent = classList.find((c) =>
+            /^(?:hover:|focus:|active:)?bg-(emerald|sky|amber|green|teal|cyan|lime|yellow)-(400|500|600)$/.test(
+              c,
+            ),
+          );
 
-          if (hasBadAccent) {
+          if (badAccent) {
             violations.push({
               file: f,
               line: lineNum,
-              issue: "text-white cùng bg-{accent sáng}-500/600 (tương phản thấp)",
+              issue: `chữ trắng cùng nền accent sáng \`${badAccent}\` (tương phản < 4,5:1 — dùng nền -700/-800, hoặc đổi chữ sang text-on-accent-dark)`,
               className: classStr,
             });
           }

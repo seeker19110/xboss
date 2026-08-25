@@ -119,7 +119,7 @@ export default function ReportPage() {
               href="/api/export/pdf"
               download
               aria-label="Tải PDF"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-on-accent px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-on-accent px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
             >
               <Download className="w-4 h-4" /> <span className="hidden sm:inline">Tải PDF</span>
             </a>

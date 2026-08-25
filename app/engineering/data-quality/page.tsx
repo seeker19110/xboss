@@ -325,7 +325,7 @@ export default function DataQualityPage() {
                   type="button"
                   disabled={resolving || !resolveNote.trim()}
                   onClick={handleResolve}
-                  className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-on-accent hover:bg-emerald-600 disabled:opacity-50"
+                  className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-on-accent hover:bg-emerald-800 disabled:opacity-50"
                 >
                   <Check size={14} />
                   <span>{resolving ? "Đang lưu..." : "Xác nhận đã giải quyết"}</span>

@@ -53,6 +53,9 @@ type TowerRow = { id: number; name: string };
 // tông -950 (đủ tương phản, cố định không theo theme) — riêng BG_VLOW đo bằng axe không
 // đạt 4.5:1 với text-red-950 (đỏ-950 đã là tông đỏ tối nhất) nên đổi sang text-neutral-950
 // (gần đen, không nằm trong danh sách bị ghi đè theo theme, tương phản dư ngưỡng).
+// BG_DONE (emerald-600) cũng là nền SÁNG nên phải dùng chữ gần đen `text-on-accent-dark`
+// giống 4 mức kia: chữ trắng trên emerald-600 chỉ đạt 3,65:1 (axe "serious"), chữ gần đen
+// đạt 5,45:1 — đúng luật "chọn chữ theo độ sáng của nền" ghi ở đầu globals.css.
 const BG_DONE = "bg-emerald-600"; // 100%
 const BG_HIGH = "bg-green-500"; // 80–99%
 const BG_MID = "bg-amber-500"; // 50–80%
@@ -61,7 +64,7 @@ const BG_VLOW = "bg-red-500"; // <20%
 const BG_ZERO = "bg-zinc-800"; // 0%
 
 function bucketClass(p: number): string {
-  if (p >= 0.999) return `${BG_DONE} text-on-accent`;
+  if (p >= 0.999) return `${BG_DONE} text-on-accent-dark`;
   if (p >= 0.8) return `${BG_HIGH} text-green-950`;
   if (p >= 0.5) return `${BG_MID} text-amber-950`;
   if (p >= 0.2) return `${BG_LOW} text-orange-950`;
