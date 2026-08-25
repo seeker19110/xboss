@@ -35,8 +35,9 @@ public sealed class PluginExtension : IExtensionApplication
             return;
         }
         doc?.Editor.WriteMessage(
-            "\n[XBoss] Plugin chuẩn hóa & bóc tách khối lượng đã nạp." +
-            "\n[XBoss] Lệnh: XBOSS_LOGIN, XBOSS_RULEPACK, XBOSS_KIEMTRA, XBOSS_CHUANHOA, XBOSS_BOCKL, XBOSS_BOCKL_XOA, XBOSS_BOCKL_XUAT, XBOSS_BATCH, XBOSS_UPLOAD\n");
+            "\n[XBoss] Plugin chuẩn hóa, bóc tách khối lượng & vẽ shop drawing đã nạp." +
+            "\n[XBoss] Chuẩn hóa/bóc tách: XBOSS_LOGIN, XBOSS_RULEPACK, XBOSS_KIEMTRA, XBOSS_CHUANHOA, XBOSS_BOCKL, XBOSS_BOCKL_XOA, XBOSS_BOCKL_XUAT, XBOSS_BATCH, XBOSS_UPLOAD" +
+            "\n[XBoss] Vẽ (cần rule pack v4): XBOSS_VE_NEN, XBOSS_VE, XBOSS_VE_NHAN\n");
     }
 
     public void Terminate()
