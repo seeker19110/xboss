@@ -84,7 +84,8 @@ export async function POST(req: NextRequest) {
   }
   // Header content-length có thể vắng khi body gửi chunked — kiểm lại kích thước THẬT ngay khi đã
   // biết đây là File, TRƯỚC khi buffer nội dung vào RAM (arrayBuffer/text).
-  const metaSize = metaTho instanceof File ? metaTho.size : metaTho.length;
+  const metaSize =
+    metaTho instanceof File ? metaTho.size : Buffer.byteLength(String(metaTho), "utf8");
   if (dwg.size > GIOI_HAN_TEP_CAD || dxf.size > GIOI_HAN_TEP_CAD || metaSize > GIOI_HAN_TEP_CAD) {
     return NextResponse.json(
       { error: `Tệp vượt trần ${Math.floor(GIOI_HAN_TEP_CAD / (1024 * 1024))}MB` },
