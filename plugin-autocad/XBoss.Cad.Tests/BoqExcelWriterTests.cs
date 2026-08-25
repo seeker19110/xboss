@@ -13,7 +13,7 @@ namespace XBoss.Cad.Tests;
 /// </summary>
 public class BoqExcelWriterTests
 {
-    private static readonly CadRulePack Pack = RepoPaths.LoadRulePackV2();
+    private static readonly CadRulePack Pack = RepoPaths.LoadRulePack();
 
     private static readonly BoqExcelMeta Meta = new()
     {
@@ -55,7 +55,7 @@ public class BoqExcelWriterTests
             // Đầu trang
             Assert.Equal("DỰ ÁN: BD1.6 - TT AVIO", ws.Cell("B1").GetString());
             Assert.Equal("BẢN VẼ: MB-TANG-05.dwg", ws.Cell("B2").GetString());
-            Assert.Contains("rule pack v2", ws.Cell("B5").GetString());
+            Assert.Contains($"rule pack {Pack.Version}", ws.Cell("B5").GetString());
             Assert.Contains("Kỹ sư A", ws.Cell("B5").GetString());
 
             // Header hàng 6 nguyên văn mẫu

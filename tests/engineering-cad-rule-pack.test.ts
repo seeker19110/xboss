@@ -25,7 +25,7 @@ import {
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10, version = v2", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10, version = v3", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -39,13 +39,13 @@ test("rule pack: đủ 8 field theo API contract M99 §10, version = v2", () => 
   ]) {
     assert.ok(field in pack, `Thiếu field ${field}`);
   }
-  assert.equal(pack.version, "v2");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v2");
+  assert.equal(pack.version, "v3");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v3");
 });
 
-test("rule pack v2 là mở rộng thuần của v1: 6 field cũ giữ nguyên nội dung", async () => {
+test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
   const v1 = (await import("@/lib/ky-thuat/cad/rule-packs/v1.json")).default;
-  const v2 = getCurrentRulePack();
+  const v2 = (await import("@/lib/ky-thuat/cad/rule-packs/v2.json")).default;
   for (const field of [
     "layerMap",
     "fontMap",
@@ -61,11 +61,37 @@ test("rule pack v2 là mở rộng thuần của v1: 6 field cũ giữ nguyên n
   }
 });
 
+test("rule pack v3 là mở rộng thuần của v2: chỉ thêm fontMap.targetFont", async () => {
+  const v2 = (await import("@/lib/ky-thuat/cad/rule-packs/v2.json")).default;
+  const v3 = getCurrentRulePack();
+
+  for (const field of [
+    "layerMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "inspectionPolicy",
+  ] as const) {
+    assert.deepEqual(
+      v3[field],
+      v2[field],
+      `Field ${field} của v3 lệch v2 — v3 phải là mở rộng thuần`,
+    );
+  }
+
+  // fontMap: giống hệt v2 ngoại trừ đúng một field mới.
+  const { targetFont, ...conLai } = v3.fontMap;
+  assert.deepEqual(conLai, v2.fontMap, "fontMap của v3 đổi nhiều hơn mỗi targetFont");
+  assert.equal(targetFont.typeFace, "Arial");
+  assert.ok(targetFont.note.length > 0, "targetFont phải có ghi chú giải thích vì sao tồn tại");
+});
+
 test("getRulePackEtag: ổn định giữa 2 lần gọi và có chứa version", () => {
   const a = getRulePackEtag();
   const b = getRulePackEtag();
   assert.equal(a, b);
-  assert.match(a, /^"v2-[0-9a-f]{32}"$/);
+  assert.match(a, new RegExp(`^"${CURRENT_RULE_PACK_VERSION}-[0-9a-f]{32}"$`));
 });
 
 test("matchesEtag: khớp đúng ETag, chấp nhận W/ và *, từ chối ETag lạ/rỗng", () => {

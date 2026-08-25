@@ -22,6 +22,8 @@ internal sealed class StandardizePipeline(CadRulePack pack)
     private readonly VietnameseTextConverter _fonts = new(pack.FontMap);
     private readonly List<StepDiff> _steps = [];
     private readonly List<string> _canhBao = [];
+    /// <summary>Kiểu chữ mà bước 3 nhận ra đang dùng mã TCVN3/VNI — cần đổi font sang Unicode.</summary>
+    private readonly HashSet<ObjectId> _styleMaCu = [];
 
     internal IReadOnlyList<StepDiff> Steps => _steps;
     internal IReadOnlyList<string> CanhBao => _canhBao;
@@ -137,6 +139,8 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         }
         if (soDoi > 0)
             _steps.Add(new StepDiff { Buoc = "3. Font", HangMuc = "Text TCVN3/VNI → Unicode", Truoc = "font cũ", Sau = "Unicode NFC", SoLuong = soDoi });
+
+        DoiFontKieuChu(tr);
     }
 
     private int DoiText(DBObject chuNhan, string hienTai, Action<string> ghi, ObjectId styleId, Transaction tr)
@@ -146,10 +150,57 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         if (!styleId.IsNull && tr.GetObject(styleId, OpenMode.ForRead) is TextStyleTableRecord ts)
             font = string.IsNullOrEmpty(ts.Font.TypeFace) ? ts.FileName : ts.Font.TypeFace;
         var kind = VietnameseTextConverter.DetectFontKind(font);
+        // Kiểu chữ nào ĐANG mang mã cũ thì phải đổi font sang Unicode ở cuối bước 3 — nếu không,
+        // nội dung đã đúng mà AutoCAD vẫn hiển thị sai (AC2 không đạt dù dữ liệu đúng).
+        if (kind != LegacyFontKind.None && !styleId.IsNull) _styleMaCu.Add(styleId);
         var moi = _fonts.Convert(hienTai, kind);
         if (string.Equals(moi, hienTai, StringComparison.Ordinal)) return 0;
         ghi(moi);
         return 1;
+    }
+
+    /// <summary>
+    /// Đổi font của các kiểu chữ vừa giải mã sang font Unicode khai trong rule pack
+    /// (`fontMap.targetFont`, v3). CHỈ đụng kiểu chữ mà bước 3 thực sự nhận ra là mã cũ —
+    /// kiểu chữ vốn đã Unicode giữ nguyên. Rule pack v2 (không có targetFont) → bỏ qua kèm
+    /// cảnh báo, không tự chế font.
+    /// </summary>
+    private void DoiFontKieuChu(Transaction tr)
+    {
+        if (_styleMaCu.Count == 0) return;
+
+        var fontDich = pack.FontMap.TargetFont.TypeFace;
+        if (string.IsNullOrWhiteSpace(fontDich))
+        {
+            _canhBao.Add(
+                $"Đã giải mã chữ của {_styleMaCu.Count} kiểu chữ nhưng rule pack {pack.Version} không khai " +
+                "fontMap.targetFont — kiểu chữ vẫn trỏ font mã cũ nên AutoCAD hiển thị vẫn sai. " +
+                "Cập nhật rule pack (v3 trở lên) rồi chuẩn hóa lại, hoặc tự đổi font kiểu chữ.");
+            return;
+        }
+
+        var soDoi = 0;
+        foreach (var id in _styleMaCu)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not TextStyleTableRecord ts) continue;
+            ts.UpgradeOpen();
+            // TrueType: đặt qua FontDescriptor (TypeFace), không phải FileName của SHX.
+            // Ghi đủ tên: `using Autodesk.AutoCAD.GraphicsInterface` sẽ làm `Polyline` (và vài
+            // kiểu khác) nhập nhằng với `DatabaseServices` mà tệp này đang dùng.
+            ts.Font = new Autodesk.AutoCAD.GraphicsInterface.FontDescriptor(fontDich, false, false, 0, 0);
+            soDoi++;
+        }
+        if (soDoi > 0)
+        {
+            _steps.Add(new StepDiff
+            {
+                Buoc = "3. Font",
+                HangMuc = "Font kiểu chữ mã cũ → Unicode",
+                Truoc = "TCVN3/VNI",
+                Sau = fontDich,
+                SoLuong = soDoi,
+            });
+        }
     }
 
     private void Buoc4Flatten(Database db, Transaction tr, DrawingSnapshot snapshot)

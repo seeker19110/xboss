@@ -6,7 +6,7 @@ namespace XBoss.Cad.Tests;
 
 public class TakeoffCalculatorTests
 {
-    private static readonly CadRulePack Pack = RepoPaths.LoadRulePackV2();
+    private static readonly CadRulePack Pack = RepoPaths.LoadRulePack();
     private static readonly TakeoffCalculator May = new(Pack.Takeoff, Pack.Version);
 
     private static MeasuredObject Ong(string handle, double daiMm, string layer = "M-DUCT-SUPP", bool daBoc = false) =>

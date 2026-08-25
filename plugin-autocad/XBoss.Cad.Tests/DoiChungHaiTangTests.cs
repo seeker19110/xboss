@@ -62,7 +62,7 @@ public class DoiChungHaiTangTests
     [Fact]
     public void Corpus_bam_dung_rule_pack_dang_phat_hanh()
     {
-        var pack = RepoPaths.LoadRulePackV2();
+        var pack = RepoPaths.LoadRulePack();
         Assert.Equal(pack.Version, TapVao.RulePackVersion);
         Assert.Equal(pack.Version, MongDoi.RulePackVersion);
         Assert.Equal(TapVao.Layers.Count, MongDoi.Layers.Count);
@@ -71,7 +71,7 @@ public class DoiChungHaiTangTests
     [Fact]
     public void Tang_2_anh_xa_layer_y_het_ket_qua_doi_chung()
     {
-        var mapper = new LayerMapper(RepoPaths.LoadRulePackV2().LayerMap);
+        var mapper = new LayerMapper(RepoPaths.LoadRulePack().LayerMap);
         foreach (var ten in TapVao.Layers)
         {
             Assert.Equal(MongDoi.Layers[ten], mapper.Map(ten));
@@ -81,7 +81,7 @@ public class DoiChungHaiTangTests
     [Fact]
     public void Tang_2_giai_ma_TCVN3_va_VNI_y_het_ket_qua_doi_chung()
     {
-        var converter = new VietnameseTextConverter(RepoPaths.LoadRulePackV2().FontMap);
+        var converter = new VietnameseTextConverter(RepoPaths.LoadRulePack().FontMap);
         foreach (var s in TapVao.Tcvn3)
         {
             Assert.Equal(

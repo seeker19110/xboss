@@ -492,6 +492,30 @@ dùng duyệt hướng xử lý.
 - **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
   M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
 
+## M99 — Rule pack v3: `fontMap.targetFont` + plugin đổi font kiểu chữ (2026-08-25)
+
+Người dùng chốt **phương án (a)** cho khoảng trống phát hiện hôm nay (chuẩn hóa đổi nội dung chữ
+nhưng không đổi font kiểu chữ → AutoCAD hiển thị vẫn sai, AC2 không đạt trên bản vẽ thật).
+
+- **`lib/ky-thuat/cad/rule-packs/v3.json`** = v2 + `fontMap.targetFont` `{ typeFace: "Arial", note }`.
+  **Mở rộng thuần đã kiểm bằng test**: 6 section còn lại và phần còn lại của `fontMap` giống v2
+  từng byte (`tests/engineering-cad-rule-pack.test.ts`). Không sửa v1/v2 (append-only).
+- **Tầng 3:** `lib/ky-thuat/cad/rule-pack.ts` trỏ v3 → `CURRENT_RULE_PACK_VERSION = "v3"`, kéo theo
+  ETag, `plugin-upload` (chặn client dùng pack cũ — AC8) và corpus đối chứng.
+- **Tầng 2:** model `TargetFontSection` + kiểm "khai rồi thì không được rỗng"; `RepoPaths` nay có
+  hằng `TenTepHienHanh` để đổi version ở ĐÚNG một chỗ. `StandardizePipeline`: bước 3 gom các
+  `TextStyle` mà nó **thực sự nhận ra là mã cũ** (`DetectFontKind != None`) rồi đổi
+  `ts.Font = FontDescriptor(targetFont)` — kiểu chữ vốn đã Unicode **không đụng tới**. Rule pack
+  không khai `targetFont` (v2) → bỏ qua kèm **cảnh báo vào báo cáo**, không tự chế font.
+- **Test:** C# thêm 2 ca (v2 không có targetFont vẫn nạp được = mở rộng thuần thật; `typeFace` rỗng
+  bị từ chối); TS thêm ca "v3 là mở rộng thuần của v2, chỉ thêm targetFont". Toàn suite TS
+  **225 file / 815 ca pass**; lint + typecheck + 2 cổng `cad:*` xanh.
+- **Cần biết khi triển khai:** máy trạm đang cache rule pack v2 sẽ **bị chặn `XBOSS_UPLOAD`** cho
+  tới khi chạy `XBOSS_LOGIN` (hoặc `XBOSS_RULEPACK`) để lấy v3 — đúng thiết kế AC8.
+- **Chưa kiểm được ở đây:** `dotnet build/test` cần Windows + ObjectARX; đặc biệt
+  `Autodesk.AutoCAD.GraphicsInterface.FontDescriptor` (ghi đủ tên vì `using` cả namespace đó sẽ làm
+  `Polyline` nhập nhằng với `DatabaseServices`).
+
 ## Hai phát hiện thật từ ảnh chụp "lỗi font" của người dùng (2026-08-25)
 
 Người dùng mở bộ mẫu trong AutoCAD, gửi ảnh chữ vỡ (`m?y`, ô vuông). Truy ra 2 chuyện khác nhau:

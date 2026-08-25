@@ -6,12 +6,12 @@ namespace XBoss.Cad.Tests;
 
 public class VietnameseTextConverterTests
 {
-    private static readonly VietnameseTextConverter Converter = new(RepoPaths.LoadRulePackV2().FontMap);
+    private static readonly VietnameseTextConverter Converter = new(RepoPaths.LoadRulePack().FontMap);
 
     [Fact]
     public void Tcvn3_moi_ky_tu_trong_rule_pack_deu_giai_dung()
     {
-        var chars = RepoPaths.LoadRulePackV2().FontMap.Tcvn3.Chars;
+        var chars = RepoPaths.LoadRulePack().FontMap.Tcvn3.Chars;
         Assert.True(chars.Count > 60, "Bảng TCVN3 quá ít mục — nghi nạp thiếu");
         foreach (var (cu, moi) in chars)
         {
@@ -22,7 +22,7 @@ public class VietnameseTextConverterTests
     [Fact]
     public void Vni_moi_cap_trong_rule_pack_deu_giai_dung()
     {
-        var pairs = RepoPaths.LoadRulePackV2().FontMap.Vni.Pairs;
+        var pairs = RepoPaths.LoadRulePack().FontMap.Vni.Pairs;
         Assert.True(pairs.Count > 100, "Bảng VNI quá ít mục — nghi nạp thiếu");
         foreach (var p in pairs)
         {

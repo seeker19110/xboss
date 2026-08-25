@@ -153,7 +153,7 @@ Plugin đọc `INSUNITS` khi mở phiên làm việc. Chuẩn dự án là **mm*
 ## 8. Acceptance criteria
 
 - **AC1** _Given_ bản vẽ layer sai chuẩn, _when_ `XBOSS_CHUANHOA`, _then_ layer đổi đúng ánh xạ rule pack và **1 lần UNDO** khôi phục nguyên trạng.
-- **AC2** _Given_ bản vẽ text TCVN3, _when_ chuẩn hóa, _then_ chuỗi hiển thị đúng dấu tiếng Việt; dimension liên kết vẫn là dimension.
+- **AC2** _Given_ bản vẽ text TCVN3, _when_ chuẩn hóa, _then_ chuỗi hiển thị đúng dấu tiếng Việt **(gồm cả việc đổi font của KIỂU CHỮ sang `fontMap.targetFont` — đổi nội dung chuỗi thôi thì AutoCAD vẫn hiển thị sai, xác nhận thật 2026-08-25)**; dimension liên kết vẫn là dimension.
 - **AC3** _Given_ bản vẽ có Z≠0, _when_ chuẩn hóa, _then_ mọi thực thể có Z=0 và hình chiếu XY không đổi.
 - **AC4** _Given_ chế độ chỉ-kiểm, _when_ chạy, _then_ bản vẽ **không thay đổi** (so sánh trước/sau) và vẫn có báo cáo.
 - **AC5** _Given_ plugin tải lên tệp không đạt chuẩn, _when_ server kiểm định, _then_ trả 422 và **không** tạo `drawing_revision` (PR5).
@@ -289,6 +289,15 @@ Rule pack lưu dạng tệp có version trong repo (`lib/ky-thuat/cad/rule-packs
 
 - **`takeoff`** — quy tắc bóc tách: `drawingUnitAssumption` (mm), `markColorAci`, `xdataAppName`, `rounding { length, area, count }` (số chữ số thập phân), `items[]`: `{ id, group, name, spec, unit, measure: "length"|"area"|"count", layerMatchAny[], blockNameMatchAny?[], factor, boqCode }`. `layerMatchAny` khớp **token-boundary** cùng thuật toán `layerMap.matchingNote`; item bám các **layer đích đã chuẩn hóa** (M-DUCT-SUPP…) — bóc tách chạy SAU chuẩn hóa là luồng chuẩn; `boqCode` để trống khi mã tùy dự án (QS gán trong Excel).
 - **`inspectionPolicy`** — chính sách kiểm tra: `zToleranceMm`, `openPolyline { checkLayersFromAreaTakeoff, extraLayersMatchAny[], nearGapToleranceMm }`.
+
+**v3 = v2 + `fontMap.targetFont`** (phát hành 2026-08-25, mở rộng thuần — plugin đọc v2 vẫn nạp được v3):
+
+- **`targetFont`** — `{ typeFace, note }`: font Unicode đích cho **kiểu chữ** đã giải mã TCVN3/VNI.
+  Lý do phát hành: bước sửa font trước đây chỉ đổi **nội dung** chuỗi, `TextStyle` vẫn trỏ `.VnTime`
+  nên AutoCAD **hiển thị vẫn sai** dù dữ liệu đúng — AC2 không đạt trên bản vẽ thật. Plugin chỉ đổi
+  font của kiểu chữ mà nó thực sự nhận ra là mã cũ (`DetectFontKind != None`); kiểu chữ vốn đã
+  Unicode giữ nguyên. Rule pack không khai `targetFont` (v2) → plugin bỏ qua bước này và **ghi cảnh
+  báo vào báo cáo**, không tự chế font.
 
 XData trên đối tượng đã bóc (app `XBOSS_BOCKL`): `[itemId, rulePackVersion, ngày ISO, màu-trước-khi-bóc]` — hợp đồng đọc/ghi duy nhất nằm trong Adapter, format ghi rõ trong README plugin.
 
