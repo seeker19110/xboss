@@ -64,7 +64,7 @@ public sealed class Inspector
     public Inspector(CadRulePack pack)
     {
         _pack = pack;
-        _mapper = new LayerMapper(pack.LayerMap);
+        _mapper = new LayerMapper(pack);
         _fonts = new VietnameseTextConverter(pack.FontMap);
     }
 

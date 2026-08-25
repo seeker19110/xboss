@@ -1,5 +1,5 @@
 {
-  "moTa": "Corpus đối chứng 2 tầng (M99 AC6) — MỘT nguồn dữ liệu vào duy nhất cho cả tầng 2 (plugin C#, XBoss.Cad.Core) lẫn tầng 3 (server TS, lib/ky-thuat/cad/dxf-parser). Corpus là dữ liệu VÀO viết tay, sửa có chủ đích; kết quả RA nằm ở ket-qua-mong-doi.json và sinh lại bằng `npm run cad:doi-chung`. Hai tầng cho kết quả khác nhau = plugin đã trôi khỏi rule pack (ADR-0006 nguyên tắc 1).",
+  "moTa": "Corpus đối chứng 2 tầng (M99 AC6) — MỘT nguồn dữ liệu vào duy nhất cho cả tầng 2 (plugin C#, XBoss.Cad.Core) lẫn tầng 3 (server TS, lib/ky-thuat/cad/dxf-parser). Corpus là dữ liệu VÀO viết tay, sửa có chủ đích; kết quả RA nằm ở ket-qua-mong-doi.json và sinh lại bằng `npm run cad:doi-chung`. Hai tầng cho kết quả khác nhau = plugin đã trôi khỏi rule pack (ADR-0006 nguyên tắc 1). Corpus CỐ Ý chứa cả tên layer ĐÃ đúng chuẩn (mọi branches[].target) lẫn biến thể nét biên <target>+edgeLayerSuffix: chuẩn hóa lần hai phải giữ nguyên chúng (bất biến idempotent, vá 2026-08-25).",
   "rulePackVersion": "v4",
   "layers": [
     "01_M_ONG_GIO_CAP_CHINH",
@@ -26,12 +26,22 @@
     "ZZZ_KHONG_KHOP_GI",
     "M-DUCT-SUPP",
     "M-DUCT-RETN",
+    "M-DUCT-EXHT",
     "M-CHW-PIPE",
     "P-PIPE-SANR",
+    "P-PIPE-DOMW",
     "E-TRAY-PWRR",
+    "E-LTNG-CKTS",
+    "ELV-CABL-TRAY",
     "F-SPRN-PIPE",
     "S-GRID-COLS",
-    "G-ANNO-TEXT"
+    "G-ANNO-TEXT",
+    "m-duct-exht",
+    "M-DUCT-SUPPEDGE",
+    "M-DUCT-EXHTEDGE",
+    "P-PIPE-SANREDGE",
+    "E-TRAY-PWRREDGE",
+    "ELV-CABL-TRAYEDGE"
   ],
   "tcvn3": [
     "èng giã cÊp",

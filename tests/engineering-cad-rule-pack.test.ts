@@ -266,10 +266,22 @@ function hasToken(l: string, token: string): boolean {
 /**
  * Bộ diễn giải tham chiếu của layerMap — chính là thứ plugin AutoCAD .NET sẽ cài lại.
  * Nếu nó lệch normalizeCadLayers() thì rule pack đã trôi khỏi code thật.
+ *
+ * Bước miễn trừ đầu tiên là **bất biến idempotent** (vá 2026-08-25): tên đã là một
+ * `branches[].target` — hoặc layer nét biên `<target>+drawTools.edgeLayerSuffix` (M100 FR4) —
+ * thì giữ nguyên. Danh sách lấy từ chính rule pack, không hard-code.
  */
 function applyLayerMap(layer: string): string {
-  const { groups, fallback } = getCurrentRulePack().layerMap;
+  const pack = getCurrentRulePack();
+  const { groups, fallback } = pack.layerMap;
   const l = layer.toUpperCase();
+  const hauToBien = pack.drawTools.edgeLayerSuffix.toUpperCase();
+  const daChuan = new Set(
+    groups.flatMap((g) =>
+      g.branches.flatMap((b) => [b.target.toUpperCase(), b.target.toUpperCase() + hauToBien]),
+    ),
+  );
+  if (daChuan.has(l)) return l;
   const hit = (keys: readonly string[]) => keys.some((k) => hasToken(l, k));
   for (const g of groups) {
     if (!hit(g.matchAny)) continue;
@@ -301,6 +313,14 @@ test("layerMap: diễn giải rule pack cho kết quả y hệt normalizeCadLaye
     "08_G_GHI_CHU_DIM_TEXT",
     "0",
     "ZZZ_KHONG_KHOP_GI",
+    // Tên ĐÃ chuẩn + layer nét biên: phải giữ nguyên ở cả 2 bộ (bất biến idempotent).
+    ...groups.flatMap((g) =>
+      g.branches.flatMap((b) => [
+        b.target,
+        b.target.toLowerCase(),
+        b.target + getCurrentRulePack().drawTools.edgeLayerSuffix,
+      ]),
+    ),
   ]);
   // Mỗi từ khóa đứng một mình + ghép đôi để phủ cả thứ tự nhóm lẫn thứ tự nhánh.
   for (const a of keywords) {

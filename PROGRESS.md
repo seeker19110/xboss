@@ -4,6 +4,50 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## FIX — Ánh xạ layer KHÔNG idempotent (lỗi có sẵn từ M99, cả 2 tầng) (2026-08-25)
+
+**Lỗi (nghiêm trọng, đã có trong production M99):** chạy `XBOSS_CHUANHOA` lần thứ HAI trên bản vẽ
+đã chuẩn hóa thì layer đúng chuẩn bị đổi sang hệ khác. Đo thật trên rule pack v4:
+`M-DUCT-EXHT`→`M-DUCT-SUPP` (gió thải gộp vào gió cấp), `P-PIPE-SANR`→`P-PIPE-DOMW` (thoát gộp vào
+cấp), `F-SPRN-PIPE`→`P-PIPE-DOMW` (**PCCC gộp vào cấp nước**), `ELV-CABL-TRAY`→`E-TRAY-PWRR` (ELV
+gộp vào điện lực), `M-DUCT-SUPPEDGE`→`M-DUCT-SUPP` (nét biên M100 gộp vào layer tim → **bóc trùng
+khối lượng**). Cùng lúc `XBOSS_KIEMTRA` báo oan "layer sai chuẩn" trên bản vẽ đã chuẩn (vỡ M100 AC2).
+
+**Nguyên nhân:** tên đã là `branches[].target` vẫn được đem đi khớp token lại, mà token của tên đích
+không nằm trong `matchAny` của chính nhóm nó (`EXHT` ≠ `EA`, `SANR` ≠ `THOAT/DRAIN`, `SPRN` không có
+trong `matchAny` của FIREFIGHTING…) nên rơi vào nhánh `default` của **nhóm khác** khớp trước.
+
+**Cách vá — thêm bước miễn trừ trước khi khớp nhóm, ở CẢ 2 TẦNG, danh sách đọc từ rule pack
+(không hard-code tên layer):**
+
+- Tầng 3 TS `lib/ky-thuat/cad/dxf-parser.ts`: `tapLayerDaChuan(pack)` gom mọi
+  `layerMap.groups[].branches[].target` + biến thể nét biên `<target><drawTools.edgeLayerSuffix>`;
+  `normalizeCadLayers` gặp tên trong tập này thì giữ nguyên (chỉ chuẩn hoá hoa/thường).
+  `drawTools` là **tuỳ chọn** — rule pack v1–v3 không có khối này vẫn chạy.
+- Tầng 2 C# `XBoss.Cad.Core/Layers/LayerMapper.cs`: cùng một quy tắc, tập tên dựng trong constructor.
+  `LayerMapper` nay nhận `CadRulePack` (thay vì chỉ `LayerMapSection`) để đọc được
+  `drawTools.edgeLayerSuffix`; `CadRulePack` thêm `DrawTools` (chỉ model đúng field cần, `null` với
+  v1–v3 — model đầy đủ vẫn ở `Draw/DrawToolsConfig.cs`).
+- **Không đổi 1 byte rule pack nào** (append-only): quy tắc miễn trừ nằm ở code 2 tầng, dữ liệu vẫn
+  lấy từ pack. Lưu ý `layerMap.knownIssues[0]` của v4 vẫn ghi "không idempotent" — mô tả này đã lỗi
+  thời nhưng KHÔNG sửa được vì v4 đã phát hành; nên khai lại trong v5 (M101 W1) kèm khoá tường minh
+  cho quy tắc miễn trừ.
+
+**Kiểm chứng:** corpus đối chứng 2 tầng (`plugin-autocad/doi-chung/corpus.json`) bổ sung mọi layer
+đích còn thiếu + 5 biến thể `…EDGE` + 1 tên viết thường; `ket-qua-mong-doi.json` sinh lại — diff cho
+thấy đúng 2 dòng sai trước đây (`P-PIPE-SANR`, `F-SPRN-PIPE`) nay trả về chính nó. Test: TS thêm
+5 ca (bảng 5 layer, idempotent tổng quát trên MỌI target của rule pack, `map(map(x))=map(x)`, hồi quy
+layer bẩn, ca pack thiếu `drawTools`); C# thêm 14 ca tương ứng → dotnet 181 ca xanh (167 → 181),
+node 1259 ca xanh. Mutation: gỡ bước miễn trừ → 6 ca TS + 11 ca C# đỏ ngay.
+Kiểm route thật (dev server + Postgres ephemeral): `POST /api/engineering/cad/normalize` và
+`POST /api/engineering/cad/parse-dxf` trả layer đã chuẩn giữ nguyên tên, `discipline` đúng hệ
+(`F-SPRN-PIPE` → F, trước khi vá là P).
+
+**Còn nợ (KHÔNG sửa ở đây — ngoài phạm vi, cần phiên chính quyết):** `StandardizePipeline.Buoc2LayerMapping`
+gộp layer khi `LayerTable.Has(tên đích)` đúng, mà `Has` **không phân biệt hoa thường** — layer chỉ
+lệch hoa/thường với tên đích (vd `m-duct-supp`) sẽ đi vào nhánh "gộp" rồi `Erase()` chính layer đang
+chứa thực thể. Rủi ro có sẵn từ M99 (bản cũ cũng sinh đổi tên chỉ-khác-hoa-thường), không phải do vá này.
+
 ## M100 PR3 — Bộ lệnh vẽ nền + tuyến + nhãn: `XBOSS_VE_NEN` / `XBOSS_VE` / `XBOSS_VE_NHAN` (2026-08-25)
 
 - **Core `XBoss.Cad.Core/Draw/` (thuần, test CI Linux — toàn bộ phần "tính được" của lệnh vẽ):** `EdgeOffset` (polyline tim + bề rộng → 2 nét biên; đoạn thẳng mitre chính xác, cung offset đồng tâm giữ nguyên bulge; TỪ CHỐI offset kèm lý do tiếng Việt khi tuyến tự cắt / cung bán kính ≤ nửa bề rộng / đỉnh gấp ~180° / đoạn ngắn hơn bề rộng — khi đó lệnh chỉ vẽ tim + cảnh báo, không bao giờ vẽ biên sai), `BulgeMath` (tâm/bán kính/tiếp tuyến từ bulge, bulge của cung tiếp tuyến kiểu PLINE chế độ Arc), `DrawSize` (đọc `300x200`/`DN50`/số trần → mm, nội dung nhãn `size i=2%`), `VeXData` (codec XData `khóa=giá trị`, appname `XBOSS_VE`, khóa lạ của PR sau bị bỏ qua chứ không làm hỏng), `VeLayerStyle` (ACI + lineweight lấy từ `lineweightMap`, tên layer biên ghép từ `drawTools.edgeLayerSuffix` — không hard-code).

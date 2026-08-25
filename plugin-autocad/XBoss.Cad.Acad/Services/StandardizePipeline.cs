@@ -18,7 +18,7 @@ namespace XBoss.Cad.Acad.Services;
 /// </summary>
 internal sealed class StandardizePipeline(CadRulePack pack)
 {
-    private readonly LayerMapper _mapper = new(pack.LayerMap);
+    private readonly LayerMapper _mapper = new(pack);
     private readonly VietnameseTextConverter _fonts = new(pack.FontMap);
     private readonly List<StepDiff> _steps = [];
     private readonly List<string> _canhBao = [];
