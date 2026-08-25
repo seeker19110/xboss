@@ -11,6 +11,7 @@ không hay. Thư mục này là cổng chặn việc đó, chạy được trên
 | `block-lib-manifest-mau.json` | (M100 PR2) Manifest thư viện block mẫu — 1 block mỗi loại, dùng chung 2 tầng          |
 | `block-lib-mau.dxf`           | (M100 PR2) DXF sidecar của thư viện mẫu — chứa đúng 5 định nghĩa block manifest khai  |
 | `block-lib-mau.dwg.txt`       | (M100 PR2) Nội dung giả lập tệp `.dwg` thư viện; `dwgSha256` trong manifest băm từ nó |
+| `takeoff-sidecar-mau.json`    | (M101 PR5) Mẫu sidecar `takeoff.json` — đối chứng hợp đồng field giữa `TakeoffJsonReport.cs` (plugin, sinh ra) và `lib/ky-thuat/cad/bang-dieu-khien.ts` (server, đọc kiểu duck-typing) |
 
 ```bash
 npm run cad:doi-chung            # sinh lại ket-qua-mong-doi.json sau khi đổi quy tắc/corpus
@@ -28,6 +29,14 @@ ba tệp** trên — sửa manifest mẫu mà quên bên nào là bên đó đ�
 
 Đổi quy tắc chuẩn hóa → `ket-qua-mong-doi.json` đổi theo và **hiện rõ trong diff**; nếu plugin không
 đổi cùng nhịp, `dotnet test` đỏ ngay.
+
+**`takeoff-sidecar-mau.json`** (M101 PR5): khác 3 tệp trên — CHỈ được nạp bởi tầng 3
+(`tests/cad-vong-doi-ban-ve-takeoff.test.ts` hoặc test riêng đọc trực tiếp tệp này để khẳng định
+`lib/ky-thuat/cad/bang-dieu-khien.ts` phân giải đúng mọi field). Nội dung khớp tay theo đúng tên
+field `[JsonPropertyName]` sinh ra bởi `XBoss.Cad.Core/Reporting/TakeoffJsonReport.cs` — plugin
+C# hiện **không** nạp lại tệp này (không có test C# nào đối chiếu). Đề xuất (chưa làm): thêm test
+tương tự `BlockManifestTests.cs` ở tầng C# để `TakeoffJsonReportTests.cs` cũng nạp tệp mẫu này,
+khép kín đối chứng 2 tầng như bộ manifest thư viện block.
 
 **Phạm vi:** ánh xạ layer + giải mã font TCVN3/VNI. Phần AC6 về **hình học** (toạ độ, số thực thể
 theo loại) cần AutoCAD thật → nằm ở kiểm tích hợp `accoreconsole` trên runner có license (PR7b),

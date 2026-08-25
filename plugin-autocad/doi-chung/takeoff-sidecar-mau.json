@@ -1,0 +1,47 @@
+{
+  "rulePackVersion": "2.0.0",
+  "tenDuAn": "BD1.6 - TT AVIO",
+  "goiThau": "ACMV",
+  "tenBanVe": "MB-TANG-05.dwg",
+  "nguoiBoc": "Kỹ sư A",
+  "ngayIso": "2026-08-24",
+  "lines": [
+    {
+      "itemId": "duct-supp",
+      "boqCode": "M.01.01",
+      "group": "HVAC",
+      "ten": "Ống gió cấp",
+      "quyCach": "300x200",
+      "donVi": "m",
+      "soDoiTuong": 1,
+      "khoiLuong": 20.0,
+      "handles": ["D1"],
+      "size": "300x200",
+      "nguonSize": "XData",
+      "vung": "Tầng 5",
+      "heSoQuyDoi": 0,
+      "moTaQuyDoi": "",
+      "klQuyDoi": 0,
+      "danXuat": false
+    },
+    {
+      "itemId": "duct-cachnhiet",
+      "boqCode": "M.01.02",
+      "group": "HVAC",
+      "ten": "Cách nhiệt ống gió",
+      "quyCach": "300x200",
+      "donVi": "m2",
+      "soDoiTuong": 1,
+      "khoiLuong": 20.0,
+      "handles": ["D1"],
+      "size": "300x200",
+      "nguonSize": "đọc từ nhãn",
+      "vung": "Tầng 5",
+      "heSoQuyDoi": 1.6,
+      "moTaQuyDoi": "Diện tích cách nhiệt = chu vi x chiều dài x hệ số",
+      "klQuyDoi": 32.0,
+      "danXuat": true
+    }
+  ],
+  "canhBao": ["Thiếu XData size trên 2 đối tượng — đã đọc size từ nhãn (cần soát lại)"]
+}
