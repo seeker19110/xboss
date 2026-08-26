@@ -33,6 +33,7 @@ public sealed class VeThongkeCommands
         var hoi = new PromptKeywordOptions("\n[XBoss] Bảng thống kê — lấy dữ liệu từ đâu?") { AllowNone = false };
         hoi.Keywords.Add("THIETBI", "THIETBI", "Bảng thiết bị (từ attribute)");
         hoi.Keywords.Add("KHOILUONG", "KHOILUONG", "Bảng khối lượng theo hệ (từ trạng thái bóc XBOSS_BOCKL)");
+        hoi.Keywords.Add("CHIADOT", "CHIADOT", "Bảng đốt theo kiểu nối (từ dấu chia đốt của XBOSS_VE_CHIADOT)");
         hoi.Keywords.Default = "THIETBI";
         var kq = ed.GetKeywords(hoi);
         if (kq.Status != PromptStatus.OK) return;
@@ -40,7 +41,12 @@ public sealed class VeThongkeCommands
         BangThongKe? bang;
         using (var tr = db.TransactionManager.StartTransaction())
         {
-            bang = kq.StringResult == "KHOILUONG" ? BangKhoiLuong(ed, db, tr, pack) : BangThietBi(ed, db, tr);
+            bang = kq.StringResult switch
+            {
+                "KHOILUONG" => BangKhoiLuong(ed, db, tr, pack),
+                "CHIADOT" => BangChiaDot(ed, db, tr),
+                _ => BangThietBi(ed, db, tr),
+            };
             tr.Commit();
         }
         if (bang is null) return;
@@ -102,6 +108,33 @@ public sealed class VeThongkeCommands
             .ComputeAssigned(daGan, (int)db.Insunits);
         foreach (var w in ketQua.Warnings) ed.WriteMessage($"\n[XBoss] ⚠ {w.ThongDiep}\n");
         return ThongKeTable.KhoiLuong(ketQua);
+    }
+
+    /// <summary>
+    /// Bảng đốt (M105): đọc DẤU CHIA ĐỐT trên XData của tim — không tính lại, không hỏi gì thêm.
+    /// Tim nào chưa chạy <c>XBOSS_VE_CHIADOT</c> thì không có dấu, tự nằm ngoài bảng.
+    /// </summary>
+    private static BangThongKe? BangChiaDot(Editor ed, Database db, Transaction tr)
+    {
+        var danhSach = new List<DotThongKe>();
+        var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
+        foreach (ObjectId id in ms)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not Polyline pl) continue;
+            var xd = VeXDataStore.Doc(pl);
+            if (xd is null || xd.VaiTro != VaiTroVe.Tim) continue;
+            if (xd.KieuNoi is not { Length: > 0 } kieuNoi || xd.SoDot is not { } soDot) continue;
+            danhSach.Add(new DotThongKe(
+                xd.HeId, xd.ItemId, xd.Size, kieuNoi, soDot, xd.SoMoiNoi ?? 0, xd.TongDaiDotMm ?? 0));
+        }
+
+        if (danhSach.Count == 0)
+        {
+            ed.WriteMessage(
+                "\n[XBoss] Chưa có tuyến nào được chia đốt trong bản vẽ — chạy XBOSS_VE_CHIADOT trước rồi lập bảng.\n");
+            return null;
+        }
+        return ThongKeTable.ChiaDot(danhSach);
     }
 
     // ===== Vẽ bảng =====

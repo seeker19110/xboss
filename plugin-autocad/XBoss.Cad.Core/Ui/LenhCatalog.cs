@@ -80,7 +80,7 @@ public static class LenhCatalog
             "Xuất khối lượng đã bóc ra Excel đúng mẫu công ty, kèm sheet đối chiếu BOQ hợp đồng (tùy chọn).",
             NhomLenh.BocKhoiLuong, CanRulePack: true),
 
-        // ── Vẽ shop drawing (M100 — 15 lệnh) ──
+        // ── Vẽ shop drawing (M100 — 15 lệnh + M105 — 1 lệnh chia đốt) ──
         new("XBOSS_VE_NEN", "Chuẩn bị nền",
             "Dựng đủ layer/style theo rule pack để bắt đầu vẽ shop drawing.",
             NhomLenh.VeShopDrawing, CanRulePack: true),
@@ -104,6 +104,9 @@ public static class LenhCatalog
             NhomLenh.VeShopDrawing, CanRulePack: true),
         new("XBOSS_VE_DEXUAT", "Đề xuất block",
             "Gửi một block trong bản vẽ lên hàng chờ duyệt để thêm vào thư viện chuẩn (Admin/PM duyệt trên web).",
+            NhomLenh.VeShopDrawing, CanRulePack: true),
+        new("XBOSS_VE_CHIADOT", "Chia đốt",
+            "Chia tuyến đã vẽ thành đốt chế tạo theo kiểu nối của rule pack: vạch chia + tag đốt trên layer riêng.",
             NhomLenh.VeShopDrawing, CanRulePack: true),
         new("XBOSS_VE_GIADO", "Giá đỡ",
             "Rải giá đỡ tự động dọc tuyến theo khoảng cách rule pack.",

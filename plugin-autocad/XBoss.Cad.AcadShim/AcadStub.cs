@@ -414,7 +414,12 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public bool IsPlottable { get; set; }
         public Transparency Transparency { get; set; }
         public LineWeight LineWeight { get; set; }
+        /// <summary>Kiểu nét của layer (M105: layer vạch chia đốt lấy linetype từ rule pack).</summary>
+        public ObjectId LinetypeObjectId { get; set; }
     }
+
+    /// <summary>Một kiểu nét đã nạp trong bản vẽ (acdbmgd: LinetypeTableRecord).</summary>
+    public class LinetypeTableRecord : SymbolTableRecord { }
 
     public class RegAppTableRecord : SymbolTableRecord { }
 
@@ -468,6 +473,8 @@ namespace Autodesk.AutoCAD.DatabaseServices
     }
 
     public class LayerTable : SymbolTable { }
+
+    public class LinetypeTable : SymbolTable { }
 
     public class RegAppTable : SymbolTable { }
 
@@ -649,6 +656,7 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public void Dispose() { }
         public TransactionManager TransactionManager => new TransactionManager();
         public ObjectId LayerTableId => new ObjectId();
+        public ObjectId LinetypeTableId => new ObjectId();
         public ObjectId BlockTableId => new ObjectId();
         public ObjectId RegAppTableId => new ObjectId();
         public ObjectId NamedObjectsDictionaryId => new ObjectId();

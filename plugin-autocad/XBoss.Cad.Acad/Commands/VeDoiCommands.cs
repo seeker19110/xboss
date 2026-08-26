@@ -218,6 +218,7 @@ public sealed class VeDoiCommands
         var soNhanCapNhat = 0;
         var soMuiTenXoa = 0;
         var soGoDauBoc = 0;
+        var soChiaDotXoa = 0;
         var canhBao = new List<string>();
 
         using (var khoa = doc.LockDocument())
@@ -254,6 +255,9 @@ public sealed class VeDoiCommands
                     ms = (BlockTableRecord)tr.GetObject(
                         SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
                 }
+
+                // Vạch chia đốt của các tuyến sắp đổi (M105) — quét một lần cho cả lệnh.
+                var chiaDotTheoTim = VeThucThe.ChiaDotTheoTim(db, tr);
 
                 foreach (var t in danhSach)
                 {
@@ -302,7 +306,12 @@ public sealed class VeDoiCommands
                     soNhanCapNhat += capNhat;
                     soMuiTenXoa += muiTenXoa;
 
-                    // (e) XData mới của tim.
+                    // (e) Vạch chia đốt cũ (M105): số đốt/kiểu nối phụ thuộc CỠ tuyến, đổi cỡ xong
+                    //     thì vạch cũ là thông tin sai đưa thẳng ra xưởng — xóa kèm dấu chia đốt
+                    //     trên tim, kỹ sư chạy lại XBOSS_VE_CHIADOT (cùng lý do phải gỡ dấu bóc).
+                    soChiaDotXoa += VeThucThe.XoaChiaDotCua(db, tr, chiaDotTheoTim, t.Handle);
+
+                    // (f) XData mới của tim.
                     VeXDataStore.Ghi(tim, t.XData with
                     {
                         HeId = he.Id,
@@ -313,9 +322,14 @@ public sealed class VeDoiCommands
                         DoDoc = doDoc,
                         HandleBien = handleBien,
                         HandleNhan = handleNhan,
+                        KieuNoi = null,
+                        KieuNoiGhiDe = false,
+                        SoDot = null,
+                        SoMoiNoi = null,
+                        TongDaiDotMm = null,
                     });
 
-                    // (f) Gỡ đánh dấu bóc của ĐÚNG tuyến này (logic XBOSS_BOCKL_XOA theo vùng chọn).
+                    // (g) Gỡ đánh dấu bóc của ĐÚNG tuyến này (logic XBOSS_BOCKL_XOA theo vùng chọn).
                     if (t.DaBoc && MarkService.Unmark(tim, appBoc)) soGoDauBoc++;
 
                     soTuyenDoi++;
@@ -346,6 +360,12 @@ public sealed class VeDoiCommands
             ed.WriteMessage(
                 $"[XBoss] ⚠ Đã gỡ đánh dấu bóc của {soGoDauBoc} tuyến — CHẠY LẠI XBOSS_BOCKL để khối lượng " +
                 "khớp bản vẽ (số cũ đã sai vì hệ/size đổi).\n");
+        }
+        if (soChiaDotXoa > 0)
+        {
+            ed.WriteMessage(
+                $"[XBoss] ⚠ Đã xóa {soChiaDotXoa} vạch/tag chia đốt của các tuyến vừa đổi — CHẠY LẠI " +
+                "XBOSS_VE_CHIADOT (chiều dài đốt và kiểu nối phụ thuộc cỡ tuyến).\n");
         }
         foreach (var c in canhBao) ed.WriteMessage($"[XBoss] ⚠ {c}\n");
         ed.WriteMessage("[XBoss] Hoàn tác cả lệnh: UNDO 1 lần.\n");

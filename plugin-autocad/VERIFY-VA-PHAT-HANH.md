@@ -44,7 +44,7 @@ Gỡ cài: xoá thư mục `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle`.
 
 ---
 
-## C. Verify tay — 25 lệnh, đi theo đúng thứ tự này
+## C. Verify tay — 26 lệnh, đi theo đúng thứ tự này
 
 Mỗi mục ghi: **làm gì** → **đúng thì thấy gì**. Gặp lệch thì ghi lại lệnh + thông điệp + tệp
 báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho qua".
@@ -54,7 +54,7 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
 1. `XBOSS_BANG` → hiện bảng điều khiển neo được, 4 khối: trạng thái server/thiết bị, rule pack
    (version + số quy tắc), bản vẽ hiện hành, tóm tắt sidecar JSON. Gõ lại → đóng.
    _Chỉ đọc — không được đụng bản vẽ, không gọi mạng._
-2. Tab Ribbon **XBoss**: 5 panel, 25 nút, mọi nút có tooltip tiếng Việt. Bấm 1 nút bất kỳ →
+2. Tab Ribbon **XBoss**: 5 panel, 26 nút, mọi nút có tooltip tiếng Việt. Bấm 1 nút bất kỳ →
    đúng lệnh chạy (bấm nút = gõ lệnh, nghiệp vụ không nhân đôi).
 3. `NETLOAD` lại lần nữa → **không** sinh tab XBoss thứ hai.
 
@@ -91,7 +91,7 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
 17. Chọn "kéo KL BOQ hợp đồng từ máy chủ" → sheet `Doi-chieu` có chênh lệch % là công thức sống.
     Rút mạng rồi làm lại → chỉ cảnh báo, **vẫn xuất bình thường**.
 
-### C4. Bộ lệnh vẽ shop drawing (M100 — 14 lệnh)
+### C4. Bộ lệnh vẽ shop drawing (M100 — 14 lệnh, M105 — 1 lệnh)
 
 18. `XBOSS_VE_NEN` → nền khoá + làm mờ, tạo layer đích; chạy lại → **hoàn nguyên**.
 19. `XBOSS_VE` → vẽ tuyến như PLINE (có Cung/HoànTác/Đóng); `edgeStyle=double` sinh 2 nét biên.
@@ -104,8 +104,14 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
     (quét trùng/nhảy số), `XBOSS_VE_THONGKE` (chạy lại → cập nhật tại chỗ, không đẻ bảng mới).
 23. `XBOSS_VE_MATCAT` (tên A-A tự đánh) và `XBOSS_VE_TRANGIN` (layout + page setup + viewport
     **khoá** + titleblock) → mỗi lệnh 1 lần undo xoá trọn.
-24. `XBOSS_VE_BAOCAO` → sinh báo cáo phiên vẽ JSON cạnh DWG.
-25. Vẽ xong chạy `XBOSS_KIEMTRA` → **pass ngay** (đây chính là mục đích của bộ lệnh vẽ) và
+24. `XBOSS_VE_CHIADOT` (M105) → chọn tuyến (hoặc CAHE quét cả hệ) → vạch chia vuông góc tim +
+    tag đốt trên layer `<layer tim>JOINT`; tuyến `edgeStyle=double` vạch chạm 2 nét biên, ống nước
+    là tick ngắn. Chạy **lại** cùng tuyến → số vạch/tag **không đổi** (idempotent), `U` một lần
+    xoá trọn kết quả một lần chạy. Tuyến mà rule pack không khai `jointRules` → **bỏ qua kèm lý
+    do**, không tự đoán tham số. Sau đó `XBOSS_VE_THONGKE` → `CHIADOT` ra bảng đốt.
+25. `XBOSS_VE_BAOCAO` → sinh báo cáo phiên vẽ JSON cạnh DWG (có mục chia đốt: tuyến đã chia /
+    chưa chia, và lý do bỏ qua của phiên vừa chạy).
+26. Vẽ xong chạy `XBOSS_KIEMTRA` → **pass ngay** (đây chính là mục đích của bộ lệnh vẽ) và
     `XBOSS_BOCKL` bóc không sót nét mới vẽ.
 
 ### C5. Vòng đời với web (M99 PR5 + M103 + M104)

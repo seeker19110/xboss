@@ -212,7 +212,7 @@ nhân bản tầng điển hình, riser). Mỗi mục phải mở `M<xx>` mới 
 
 **M105 — Tự động phân chia đốt toàn hệ MEPF theo kiểu kết nối:** ✅ **Approved 2026-08-26, PR1 XONG
 
-- PR2 phần Core XONG** (`docs/nang-cap/M105-chia-dot-mepf-theo-kieu-noi.md`). Chia đốt MỌI tuyến MEPF
+- PR2 (Core + Adapter) XONG** (`docs/nang-cap/M105-chia-dot-mepf-theo-kieu-noi.md`). Chia đốt MỌI tuyến MEPF
   vẽ bằng `XBOSS_VE`: ống gió theo kiểu nối (nẹp C max 1180 / TDC max 1110 / mặt bích V max 1180 — số
   người dùng chốt), ống nước/PCCC theo cây thương phẩm 5800 (ren/grooved/măng xông), máng cáp thanh
   2500 + tấm nối. MỘT engine tổng quát tham số hóa qua rule pack — thêm hệ/kiểu nối mới về sau chỉ là
@@ -229,8 +229,16 @@ nhân bản tầng điển hình, riser). Mỗi mục phải mở `M<xx>` mới 
   cho ra **đúng từng số** như bản TS, chứng minh bằng 56 ca đọc thẳng 9 test vector đó. 644/644 ca
   .NET xanh. **Bẫy đã né:** làm tròn 0,1 mm phải là `MidpointRounding.AwayFromZero` — mặc định .NET
   là làm tròn ngân hàng nên lệch bản TS ở các ca `,x5` (đã kiểm bằng mutation: đổi về mặc định → 3 ca đỏ).
-* **PR2 phần Adapter (đang làm):** lệnh `XBOSS_VE_CHIADOT` (vẽ vạch chia + tag + XData 2 chiều,
-  idempotent, 1 nhóm UNDO), bảng đốt trong `XBOSS_VE_THONGKE`, mục chia đốt trong báo cáo phiên vẽ.
+* **PR2 phần Adapter (xong):** lệnh `XBOSS_VE_CHIADOT` (`XBoss.Cad.Acad/Commands/VeChiaDotCommands.cs`)
+  — chọn tuyến hoặc quét cả hệ, hỏi đáp ngoài transaction, vẽ vạch chia + tag đốt trong **1
+  transaction = 1 nhóm UNDO**, XData 2 chiều (vạch/tag mang handle tim + chỉ số đốt; tim mang dấu
+  chia đốt) nên chạy lại là **idempotent**; tuyến không khai `jointRules` bị **bỏ qua kèm lý do**
+  (AC10). Hình học đẩy xuống Core `Draw/JointMarkPlacement.cs` (cắt đoạn theo vertex, vị trí vạch
+  cộng dồn **có cộng khe mối nối**, chiều dài vạch theo `edgeStyle`) để test được trên CI Linux.
+  Kèm bảng đốt trong `XBOSS_VE_THONGKE` (bảng RIÊNG, mã `chiadot`) và mục chia đốt trong báo cáo
+  phiên vẽ (`ChiaDot`/`ChiaDotBoQua` + cảnh báo ghi đè kiểu nối). `XBOSS_VE_DOI` đổi cỡ tuyến thì
+  **xóa vạch chia cũ + dấu chia đốt** kèm nhắc chạy lại (cùng lý do phải gỡ dấu bóc). 661/661 ca
+  .NET xanh (644 + 17 ca mới), cổng biên dịch Adapter `XBoss.Cad.AcadShim` xanh.
 * **Bẫy layer đã né:** hậu tố layer vạch chia là `JOINT` **không có gạch nối đầu** — `layerMatchAny`
   của takeoff khớp theo ranh giới token nên `M-DUCT-SUPP-JOINT` vẫn khớp mục bóc `M-DUCT-SUPP` và
   vạch chia sẽ bị bóc trùng thành chiều dài ống. Cùng lớp lỗi mà `edgeLayerSuffix` đã né bằng `EDGE`

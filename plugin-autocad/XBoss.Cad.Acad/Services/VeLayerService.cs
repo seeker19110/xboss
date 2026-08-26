@@ -164,6 +164,23 @@ internal static class VeLayerService
     }
 
     /// <summary>
+    /// Đặt kiểu nét cho một layer VỪA TẠO, chỉ khi kiểu nét đó đã có sẵn trong bản vẽ (M105 FR5 —
+    /// <c>jointRules.layerStyle.linetype</c>). CỐ Ý không tự nạp từ tệp .lin: tệp kiểu nét là quy
+    /// ước của từng công ty/máy (acad.lin, acadiso.lin, tệp riêng), đoán sai đường dẫn thì lệnh vẽ
+    /// chết giữa chừng vì một thứ chỉ là thể hiện. Trả false = bản vẽ chưa nạp kiểu nét đó
+    /// (caller báo kỹ sư chạy LINETYPE một lần), layer vẫn dùng nét liền.
+    /// </summary>
+    internal static bool DatKieuNetNeuCo(Database db, Transaction tr, ObjectId layerId, string tenKieuNet)
+    {
+        if (string.IsNullOrWhiteSpace(tenKieuNet)) return false;
+        var bang = (LinetypeTable)tr.GetObject(db.LinetypeTableId, OpenMode.ForRead);
+        if (!bang.Has(tenKieuNet)) return false;
+        if (tr.GetObject(layerId, OpenMode.ForWrite) is not LayerTableRecord ltr) return false;
+        ltr.LinetypeObjectId = bang[tenKieuNet];
+        return true;
+    }
+
+    /// <summary>
     /// Mở khóa + bật + bỏ đóng băng một layer ĐANG CÓ, để sửa được đối tượng nằm trên nó
     /// (<c>XBOSS_VE_DOI</c> phải sửa tim/nét biên/nhãn trên layer NGUỒN, mà sau <c>XBOSS_VE_NEN</c>
     /// thì mọi layer đều đang khóa). Khác <see cref="DamBaoLayer"/> ở chỗ KHÔNG tạo layer mới:

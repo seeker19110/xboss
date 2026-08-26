@@ -46,6 +46,16 @@ public enum VaiTroVe
     /// ĐÚNG bảng này tại chỗ, không sinh bảng đôi (FR9f).
     /// </summary>
     BangThongKe,
+
+    /// <summary>
+    /// Vạch chia đốt vuông góc tim (<c>XBOSS_VE_CHIADOT</c> — M105 FR5). Mang
+    /// <see cref="VeXDataInfo.HandleTim"/> + <see cref="VeXDataInfo.ChiSoDot"/> để chạy lại lệnh
+    /// xóa đúng vạch cũ CỦA TUYẾN ĐÓ rồi vẽ lại (idempotent — FR6/AC9).
+    /// </summary>
+    VachChia,
+
+    /// <summary>Tag đốt đặt cạnh trung điểm đốt (<c>XBOSS_VE_CHIADOT</c> — M105 FR5).</summary>
+    NhanDot,
 }
 
 /// <summary>Nội dung XData <c>XBOSS_VE</c> của một đối tượng do bộ lệnh vẽ sinh ra (M100 §11).</summary>
@@ -105,6 +115,29 @@ public sealed record VeXDataInfo
 
     /// <summary>Mã loại bảng thống kê (<c>thietbi</c>/<c>khoiluong</c> — xem <c>ThongKeTable.Ma</c>).</summary>
     public string? LoaiBang { get; init; }
+
+    // ===== Chia đốt (M105 FR6) =====
+    // Trên TIM: 4 khóa tóm tắt dưới đây là "dấu đã chia đốt" — nguồn của bảng đốt trong bản vẽ và
+    // của mục chia đốt trong báo cáo phiên vẽ, đọc lại được sau khi đóng/mở bản vẽ.
+    // Trên VẠCH/TAG: HandleTim + ChiSoDot đủ để chạy lại lệnh dọn đúng đối tượng cũ.
+
+    /// <summary>Kiểu nối đã dùng để chia đốt (slug rule pack, vd <c>tdc</c>); null = tuyến chưa chia.</summary>
+    public string? KieuNoi { get; init; }
+
+    /// <summary>Kỹ sư ghi đè kiểu nối tự chọn (FR1) — vào báo cáo để soát lại.</summary>
+    public bool KieuNoiGhiDe { get; init; }
+
+    /// <summary>Số đốt của tuyến sau khi chia (chỉ trên tim).</summary>
+    public int? SoDot { get; init; }
+
+    /// <summary>Số mối nối của tuyến (Σ(nᵢ−1) theo đoạn — chỉ trên tim).</summary>
+    public int? SoMoiNoi { get; init; }
+
+    /// <summary>Tổng chiều dài tuyến đã chia (mm — chỉ trên tim).</summary>
+    public double? TongDaiDotMm { get; init; }
+
+    /// <summary>Số thứ tự đốt trong tuyến (trên tag đốt, và đốt ĐỨNG TRƯỚC trên vạch chia).</summary>
+    public int? ChiSoDot { get; init; }
 }
 
 /// <summary>
@@ -152,6 +185,13 @@ public static class VeXData
         if (tt.CaoDoMm is { } cdm) ra.Add($"caodomm={cdm.ToString("0.######", CultureInfo.InvariantCulture)}");
         if (tt.TagKhoa) ra.Add("tagkhoa=1");
         Them(ra, "bang", tt.LoaiBang);
+        Them(ra, "kieunoi", tt.KieuNoi);
+        if (tt.KieuNoiGhiDe) ra.Add("kieunoighide=1");
+        if (tt.SoDot is { } sd) ra.Add($"sodot={sd.ToString(CultureInfo.InvariantCulture)}");
+        if (tt.SoMoiNoi is { } sm) ra.Add($"somoi={sm.ToString(CultureInfo.InvariantCulture)}");
+        if (tt.TongDaiDotMm is { } td)
+            ra.Add($"tongdaidot={td.ToString("0.######", CultureInfo.InvariantCulture)}");
+        if (tt.ChiSoDot is { } cs) ra.Add($"chisodot={cs.ToString(CultureInfo.InvariantCulture)}");
         return ra;
     }
 
@@ -168,6 +208,8 @@ public static class VeXData
         VaiTroVe.GiaDo => "giado",
         VaiTroVe.LoCho => "locho",
         VaiTroVe.BangThongKe => "bang",
+        VaiTroVe.VachChia => "vachchia",
+        VaiTroVe.NhanDot => "nhandot",
         _ => "blockdef",
     };
 
@@ -187,6 +229,10 @@ public static class VeXData
         string? blockId = null, thuVien = null;
         string? sizeLoCho = null, ketCau = null, viTriTruc = null, loaiBang = null;
         double? caoDo = null, caoDoMm = null;
+        string? kieuNoi = null;
+        var kieuNoiGhiDe = false;
+        int? soDot = null, soMoiNoi = null, chiSoDot = null;
+        double? tongDaiDotMm = null;
         var tagKhoa = false;
         var bien = new List<string>();
         var nhan = new List<string>();
@@ -212,6 +258,8 @@ public static class VeXData
                         "giado" => VaiTroVe.GiaDo,
                         "locho" => VaiTroVe.LoCho,
                         "bang" => VaiTroVe.BangThongKe,
+                        "vachchia" => VaiTroVe.VachChia,
+                        "nhandot" => VaiTroVe.NhanDot,
                         "blockdef" => VaiTroVe.DinhNghiaBlock,
                         _ => VaiTroVe.Tim,
                     };
@@ -243,6 +291,24 @@ public static class VeXData
                     break;
                 case "tagkhoa": tagKhoa = giaTri == "1"; break;
                 case "bang": loaiBang = giaTri; break;
+                case "kieunoi": kieuNoi = giaTri; break;
+                case "kieunoighide": kieuNoiGhiDe = giaTri == "1"; break;
+                case "sodot":
+                    if (int.TryParse(giaTri, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sd))
+                        soDot = sd;
+                    break;
+                case "somoi":
+                    if (int.TryParse(giaTri, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sm))
+                        soMoiNoi = sm;
+                    break;
+                case "tongdaidot":
+                    if (double.TryParse(giaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var td))
+                        tongDaiDotMm = td;
+                    break;
+                case "chisodot":
+                    if (int.TryParse(giaTri, NumberStyles.Integer, CultureInfo.InvariantCulture, out var cs))
+                        chiSoDot = cs;
+                    break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -271,6 +337,12 @@ public static class VeXData
             CaoDoMm = caoDoMm,
             TagKhoa = tagKhoa,
             LoaiBang = loaiBang,
+            KieuNoi = kieuNoi,
+            KieuNoiGhiDe = kieuNoiGhiDe,
+            SoDot = soDot,
+            SoMoiNoi = soMoiNoi,
+            TongDaiDotMm = tongDaiDotMm,
+            ChiSoDot = chiSoDot,
         };
     }
 }
