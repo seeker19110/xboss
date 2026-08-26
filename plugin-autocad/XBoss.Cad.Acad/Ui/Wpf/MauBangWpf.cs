@@ -1,4 +1,13 @@
-using System.Windows.Media;
+// Alias TƯỜNG MINH, KHÔNG dùng `using System.Windows.Media;`: project Adapter bật CẢ
+// UseWindowsForms LẪN UseWPF, nên ImplicitUsings kéo vào cùng lúc `System.Drawing` (của WinForms)
+// và `System.Windows.Media` (của WPF) — hai namespace này đều có `Brush`, `Color`, `Pen`… nên tên
+// trần là mơ hồ và build thật trên Windows đỏ CS0104. Cổng CI AcadShim KHÔNG bắt được lớp lỗi này
+// (nó tắt WinForms để chạy trên Linux nên chỉ thấy một nửa bộ implicit using) — đã vấp thật
+// 2026-08-26, lộ ra lúc build trên máy có AutoCAD. Quy tắc cho mọi tệp trong thư mục này: dùng
+// alias hoặc tên đầy đủ cho các kiểu trùng tên giữa hai bộ.
+using Brush = System.Windows.Media.Brush;
+using Color = System.Windows.Media.Color;
+using SolidColorBrush = System.Windows.Media.SolidColorBrush;
 
 namespace XBoss.Cad.Acad.Ui.Wpf;
 

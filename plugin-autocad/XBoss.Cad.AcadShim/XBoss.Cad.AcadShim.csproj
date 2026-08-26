@@ -37,6 +37,23 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      Tái hiện implicit using mà `UseWindowsForms` thêm vào bản build THẬT (cổng phải tắt WinForms
+      để chạy trên Linux nên không tự có). Thiếu dòng này, mọi tên trùng giữa System.Drawing và
+      System.Windows.Media (Brush, Color, Pen…) trông như đơn nghĩa với cổng, và CS0104 lọt xuống
+      máy có AutoCAD — đã xảy ra thật 2026-08-26 với `Ui/Wpf/MauBangWpf.cs`.
+
+      CHỈ `System.Drawing`, KHÔNG thêm `System.Windows.Media`: `UseWPF` không đưa namespace đó vào
+      implicit using (bằng chứng: bản build thật trên Windows chỉ đỏ tệp có `using
+      System.Windows.Media;` tường minh, còn `Ui/MauBang.cs` dùng `Color` trần với `using
+      System.Drawing;` thì xanh). Thêm vào là cổng bịa ra lỗi mà bản thật không có.
+
+      Cặp tên trùng được stub ở cuối AcadStub.cs; sửa ở đây thì đọc luôn ghi chú tại đó.
+    -->
+    <Using Include="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Stub API AutoCAD (chỉ khai kiểu + chữ ký, thân hàm rỗng). -->
     <Compile Include="AcadStub.cs" />
 

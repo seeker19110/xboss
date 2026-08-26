@@ -81,3 +81,16 @@ chiếu tài liệu chứ không đoán theo lỗi biên dịch.
 - **Cố ý KHÔNG nằm trong `XBoss.Cad.sln`.** Solution là góc nhìn sản phẩm (Core + Tests +
   Adapter thật); project này là công cụ CI. Để ngoài giữ `dotnet build/test` trên solution có
   hành vi y hệt trước, và tránh biên dịch mã Adapter hai lần trong IDE trên Windows.
+
+## Giới hạn đã biết của cổng (và cách đã vá)
+
+Cổng biên dịch mã Adapter trên Linux nên **không thể bật `UseWindowsForms`/`UseWPF`** — mà chính
+hai cờ đó quyết định bộ `ImplicitUsings` của bản build thật. Hệ quả từng làm lọt lỗi:
+
+| Ngày       | Lọt gì                                                                                     | Vá thế nào                                                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-08-26 | `CS0104 'Brush' ambiguous` ở `Ui/Wpf/MauBangWpf.cs` — chỉ lộ khi build trên máy có AutoCAD | `<Using Include="System.Drawing" />` trong csproj cổng + stub `System.Drawing.Brush`/`Pen` cuối `AcadStub.cs`, tái hiện đúng cặp tên trùng |
+
+Quy tắc rút ra: **thêm cờ nào vào `XBoss.Cad.Acad.csproj` thì phải hỏi ngay "cờ này đổi
+ImplicitUsings không?"** — nếu có, tái hiện lại trong csproj của cổng, kèm stub cho các kiểu trùng
+tên. Cổng không mô phỏng được thì ghi rõ vào bảng trên thay vì để im.

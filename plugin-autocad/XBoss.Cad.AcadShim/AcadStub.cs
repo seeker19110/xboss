@@ -1145,4 +1145,12 @@ namespace System.Drawing
         public Font(string familyName, float emSize) { }
         public Font(string familyName, float emSize, FontStyle style) { }
     }
+
+    // Brush/Pen KHÔNG được mã Adapter dùng tới — stub ở đây chỉ để TÁI HIỆN CẶP TÊN TRÙNG giữa
+    // System.Drawing (WinForms) và System.Windows.Media (WPF). Không có chúng, cổng CI chỉ thấy
+    // một nửa bộ implicit using của bản build thật và bỏ lọt CS0104 "ambiguous reference" — đúng
+    // lỗi đã lọt xuống máy có AutoCAD ngày 2026-08-26 (MauBangWpf.cs). Xóa 2 lớp này = mở lại lỗ.
+    public abstract class Brush { }
+
+    public class Pen { }
 }
