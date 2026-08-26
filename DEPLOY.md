@@ -8,6 +8,62 @@ khởi động lần đầu**, hoặc chủ động chạy `npm run db:migrate` 
 
 ---
 
+## Yêu cầu phần cứng
+
+**Node ≥ 24** (đúng version CI dùng, `.github/workflows/ci.yml`) và tối thiểu **1 CPU**. Đỉnh
+tải RAM không nằm ở lúc app chạy mà ở lúc **build**: `deploy.sh` chạy thẳng `npm run build`
+NGAY TRÊN máy production (build vào thư mục tạm `.next-build` rồi `mv` atomic vào `.next`, xem
+bước 5/7 trong [`deploy.sh`](./deploy.sh)) — `next build` là tiến trình Node ngốn RAM nhất
+trong toàn bộ vòng đời deploy, nặng hơn hẳn lúc `next start` phục vụ request.
+
+| Cấu hình                    | RAM                 | Ổ đĩa | Ghi chú                                                                                                                                                                                                                                                                                                                         |
+| --------------------------- | ------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tối thiểu**               | 2 GB                | 20 GB | **Bắt buộc bật swap** (xem dưới) — 2 GB RAM thuần rất dễ **OOM-kill ngay giữa `next build`** trên VPS 1-2 vCPU, vì lúc đó RAM phải gánh cả tiến trình build lẫn app `xboss` (và `mepf-worker` nếu có) đang chạy song song. Nếu build vẫn OOM dù đã bật swap, build ở nơi khác rồi rsync sang (xem mục "Build ở máy khác" dưới). |
+| **Khuyến nghị**             | 4 GB                | 40 GB | Đủ chỗ cho build lẫn app chạy êm, không cần bật swap trong điều kiện bình thường (swap vẫn nên bật như lưới an toàn).                                                                                                                                                                                                           |
+| **+ MEPF worker**           | +1 GB               | —     | `ecosystem.config.js` đặt `max_memory_restart: "1G"` riêng cho tiến trình `mepf-worker` (ngoài 1G của app `xboss`) — cộng thêm nếu bật tính năng tác vụ AI kỹ thuật.                                                                                                                                                            |
+| **Postgres tách máy riêng** | tuỳ số dòng dữ liệu | tuỳ   | Xem [`docs/ops/backup.md`](./docs/ops/backup.md) — dù DB nằm máy nào, mất máy chạy app vẫn cần backup đẩy ra ngoài VPS mới phục hồi được.                                                                                                                                                                                       |
+
+Con số 2 GB/4 GB ở trên là **ước lượng dựa trên ràng buộc đã biết trong repo** (kích thước
+`node_modules`/`.next`, ngưỡng `max_memory_restart` của PM2), **không phải benchmark đo thật**
+— repo hiện chưa có số liệu RAM đỉnh thực đo được lúc `next build` chạy trên VPS. Nếu build
+vẫn OOM ở mức RAM khuyến nghị, hạ xuống phương án build-ở-nơi-khác bên dưới.
+
+**Ổ đĩa — vì sao cần dư ra:**
+
+- `node_modules` (~1.3 GB) + `.next` (~0.9 GB) đã chiếm ~2.2 GB chỉ riêng code build; `deploy.sh`
+  còn giữ **2 bản `.next`** cùng lúc trong lúc swap (`.next` cũ đổi tên thành `.next-old` cho tới
+  khi health-check qua — xem bước 6/7 và 7/7 trong `deploy.sh`), nên cần dư ít nhất bằng một bản
+  `.next` nữa so với mức tối thiểu.
+- **`data/uploads/` là thứ hết chỗ trước tiên**, không phải code: ảnh hiện trường tối đa 10MB/ảnh
+  và biên bản nghiệm thu tối đa 20MB/tệp (`lib/nen/photos.ts`), cộng thêm bản vẽ DWG/DXF do
+  plugin AutoCAD tải lên — thư mục này **phình dần theo thời gian sử dụng**, không cố định như
+  code. Cần theo dõi dung lượng định kỳ (`du -sh data/uploads`) và tính vào kế hoạch mở rộng ổ
+  đĩa, không chỉ tính theo dung lượng lúc mới cài.
+
+**Bật swap trên Ubuntu** (khuyến nghị mọi mức RAM, bắt buộc nếu RAM tối thiểu 2 GB):
+
+```bash
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab   # giữ swap sau khi reboot
+```
+
+**Build ở máy khác thay vì trên production (RAM thấp hoặc muốn tránh đỉnh tải build hẳn):**
+Chạy `npm ci && npm run build` trên máy có nhiều RAM hơn (máy dev, CI runner, VPS khác), rồi
+`rsync -avz .next/ user@production:/đường-dẫn/xboss/.next/` sang máy thật — miễn cùng phiên
+bản Node (≥ 24) và cùng `package-lock.json` để tránh lệch native module. Đánh đổi: mất tính
+atomic-swap + health-check + auto-rollback mà `deploy.sh` cung cấp sẵn, nên chỉ dùng khi máy
+production thực sự không kham nổi `next build`.
+
+**Chạy nhiều instance / tách Postgres / backup:** xem mục
+["Chạy nhiều instance"](#chạy-nhiều-instance-cluster-tuỳ-chọn--m53-pr4) bên dưới (quan hệ
+`N × XBOSS_PG_POOL_MAX < max_connections`) và [`docs/ops/backup.md`](./docs/ops/backup.md) —
+không lặp lại nội dung ở đây.
+
+---
+
 ## Cài đặt lần đầu (Node ≥ 24 + PM2 + Postgres tự host hoặc Supabase)
 
 > **XBoss chạy bằng PM2, không dùng Docker.** Trước đây tài liệu này có song song hai đường
