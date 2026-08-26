@@ -100,13 +100,13 @@
 - **FR7** QTO phụ kiện mối nối: mỗi mối (n−1 mối/đoạn; mối tại vertex/phụ kiện đếm 1 lần) sinh định mức theo `jointType` từ `jointRules.hardware` — biểu thức theo biến `W`,`H` (mm) hoặc `DN`: duct TDC = 4 ke + 8 bulông M8 + gioăng `2*(W+H)`; nẹp C = 2 thanh nẹp `W` + ⚠ 2 thanh S `H`; bích V = thép góc `2*(W+H)` + bulông `ceil(2*(W+H)/100)`; pipe grooved = 1 coupling + 1 gioăng đúng DN; ren = 1 măng xông ren; hàn = quy đổi que hàn theo DN (⚠ bảng xưởng); tray = 2 tấm nối + 8 bulông M6. Toàn bộ hệ số trong rule pack, engine chỉ tính biểu thức (parser mini: số, `W/H/DN`, `+ - * /`, `ceil()` — không eval tự do).
 - **FR8** Server: `lib/ky-thuat/engineering-joint-segmentation.ts` (tầng 4 `ky-thuat`) — engine thuần `segmentRunIntoPieces()` + `explodeJointHardware()` mirror bản C#, service ghi DB; API §10; nhận dữ liệu khi plugin `XBOSS_BOCKL` đẩy lên hoặc gọi trực tiếp.
 - **FR9** Cảnh báo nghiệp vụ (không chặn): duct vượt ngưỡng cạnh lớn của kiểu đang chọn; pipe có `slope` trong XData → ghi chú đốt theo hướng dốc (đầu cao → thấp) để xưởng đánh số lắp; line `slopeRequired` mà thiếu slope thì warning như hiện trạng M100.
-- **NFR1** Engine C# và TS **cùng input ra cùng output** — bộ test vector JSON chung (`plugin-autocad/testdata/joint-segmentation/*.json`, đọc bởi cả `tests/engineering-joint-segmentation.test.ts` lẫn unit test C#), phủ đủ 3 nhóm hệ × 2 divideMode.
+- **NFR1** Engine C# và TS **cùng input ra cùng output** — làm tròn 0,1 mm phải là _half away from zero_ ở CẢ HAI bản: `Math.Round(x, 1)` mặc định của .NET là làm tròn ngân hàng nên PR2 phải truyền `MidpointRounding.AwayFromZero`, nếu không sẽ lệch đúng ở các ca `,x5`. — bộ test vector JSON chung (`plugin-autocad/testdata/joint-segmentation/*.json`, đọc bởi cả `tests/engineering-joint-segmentation.test.ts` lẫn unit test C#), phủ đủ 3 nhóm hệ × 2 divideMode.
 - **NFR2** Chia 500 đoạn < 1 s trong CAD; API < 500 ms/bản vẽ.
 - **NFR3** A11y/i18n: nhãn tiếng Việt; trang web theme dark-first, dùng `app/components/ui/`.
 
 ## 8. Acceptance criteria (Given/When/Then — mỗi AC map tới test)
 
-- **AC1** Duct 7200, TDC (1110/khe 5, `deu`): n = ceil(7200/1115) = 7; pieceLen = (7200 − 30)/7 = 1024,3; Σ đúng bất biến. → vector `duct-tdc-7200.json`.
+- **AC1** Duct 7200, TDC (1110/khe 5, `deu`): n = ceil(7200/1115) = 7; (7200 − 30)/7 = 1024,2857 → **6 đốt 1024,3 + đốt cuối 1024,2** (đốt cuối gánh phần dư làm tròn để Σ đốt + 6×5 = 7200 đúng bất biến). → vector `duct-tdc-7200.json`.
 - **AC2** Duct 1180 nẹp C: 1 đốt, 0 mối. **AC3** Duct 1181 nẹp C (khe 0): 2 đốt 590,5.
 - **AC4** Đoạn 150 < min: 1 đốt + warning `dot_ngan_hon_toi_thieu`.
 - **AC5** Duct 800×400 → tự chọn TDC; ghi đè `mat_bich_v` → dùng tham số bích V, tag ghi cờ ghi đè.

@@ -25,7 +25,7 @@ import {
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8, version = v8", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8, version = v9", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -49,8 +49,8 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleM
   for (const field of ["polylineClosePolicy", "blockMap"]) {
     assert.ok(field in pack, `Thiếu field v8 ${field}`);
   }
-  assert.equal(pack.version, "v8");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v8");
+  assert.equal(pack.version, "v9");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v9");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -764,7 +764,9 @@ test("rule pack v7 = v6 + 2 item đếm giá đỡ/lỗ chờ + heavyFittingIds 
 
 test("rule pack v8 là mở rộng thuần của v7: chỉ thêm polylineClosePolicy + blockMap (M102 §4)", async () => {
   const v7 = (await import("@/lib/ky-thuat/cad/rule-packs/v7.json")).default;
-  const v8 = getCurrentRulePack();
+  // So THẲNG tệp v8.json, không qua getCurrentRulePack() — rule pack hiện hành đã là v9
+  // (M105), so nhầm sẽ bắt v9 phải giống v7 ở khối drawTools vốn đã có thêm jointRules.
+  const v8 = (await import("@/lib/ky-thuat/cad/rule-packs/v8.json")).default;
 
   // Mọi khối cũ giữ nguyên TRỪ layerMap (v8 sửa knownIssues — nợ đã đóng ở M101 PR2, xem test dưới)
   // và inspectionPolicy (thêm 2 phép kiểm mới, đều tắt).
@@ -850,5 +852,100 @@ test("v8: ánh xạ layer idempotent — áp lại lên tên đã chuẩn không
       dich,
       `layer đã chuẩn "${dich}" bị ánh xạ tiếp thành "${lan2[dich]}" — chuẩn hóa lần 2 làm gộp nhầm hệ`,
     );
+  }
+});
+
+// ===== v9 (M105) — jointRules: tham số chia đốt MEPF theo kiểu kết nối =====
+
+test("rule pack v9 là mở rộng thuần của v8: chỉ thêm jointRules + jointRulesNote (M105 §12)", async () => {
+  const v8 = (await import("@/lib/ky-thuat/cad/rule-packs/v8.json")).default;
+  const v9 = getCurrentRulePack();
+
+  // Mọi khối ngoài drawTools phải y nguyên — kiểm/chuẩn hóa/bóc bằng v9 không đổi hành vi.
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "inspectionPolicy",
+    "styleMap",
+    "sheetSetup",
+    "xrefPolicy",
+    "hatchMap",
+    "layoutPolicy",
+    "polylineClosePolicy",
+    "blockMap",
+  ] as const) {
+    assert.deepEqual(
+      v9[field],
+      v8[field],
+      `Field ${field} của v9 lệch v8 — v9 phải là mở rộng thuần (M105 chỉ thêm tham số chia đốt)`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v9).filter((k) => !(k in v8)),
+    [],
+    "v9 không được thêm khối cấp cao nào — jointRules nằm trong drawTools",
+  );
+
+  // drawTools: chỉ được thêm jointRulesNote ở cấp khối và jointRules trong từng tuyến.
+  const { jointRulesNote: _bo, systems: heV9, ...drawToolsV9 } = v9.drawTools;
+  const { systems: heV8, ...drawToolsV8 } = v8.drawTools;
+  assert.deepEqual(drawToolsV9, drawToolsV8, "v9 đụng tham số drawTools ngoài jointRules");
+  assert.equal(heV9.length, heV8.length, "v9 thêm/bớt hệ so với v8");
+  for (let i = 0; i < heV9.length; i++) {
+    const tuyenV9 = heV9[i].lines.map(({ jointRules: _jr, ...con }) => con);
+    assert.deepEqual(
+      { ...heV9[i], lines: tuyenV9 },
+      heV8[i],
+      `Hệ ${heV9[i].id} của v9 đụng khóa cũ chứ không chỉ thêm jointRules`,
+    );
+  }
+});
+
+test("v9: MỌI tuyến đều khai jointRules đủ dùng, dải chọn kiểu nối phủ kín (M105 FR1/§12)", () => {
+  const pack = getCurrentRulePack();
+  assert.ok(
+    (pack.drawTools.jointRulesNote ?? "").length > 0,
+    "jointRules thiếu mô tả tiếng Việt cho người phát hành rule pack sau",
+  );
+
+  for (const he of pack.drawTools.systems) {
+    for (const tuyen of he.lines) {
+      const jr = tuyen.jointRules;
+      assert.ok(jr, `Tuyến ${tuyen.itemId} thiếu jointRules — lệnh chia đốt sẽ bỏ qua tuyến này`);
+      assert.ok(jr.selection.length > 0, `Tuyến ${tuyen.itemId} có bảng chọn kiểu nối rỗng`);
+      assert.ok(
+        ["deu", "cay_nguyen"].includes(jr.divideMode),
+        `Tuyến ${tuyen.itemId} khai divideMode lạ "${jr.divideMode}"`,
+      );
+
+      // Mục cuối phải bắt hết phần còn lại, nếu không có cỡ rơi ra ngoài mọi dải.
+      const cuoi = jr.selection[jr.selection.length - 1] as {
+        maxSideMm?: number | null;
+        maxDn?: number | null;
+      };
+      assert.ok(
+        (cuoi.maxSideMm ?? null) === null && (cuoi.maxDn ?? null) === null,
+        `Tuyến ${tuyen.itemId}: mục cuối của selection phải bắt hết (maxSideMm/maxDn = null)`,
+      );
+
+      for (const muc of jr.selection) {
+        assert.ok(
+          muc.maxLenMm > jr.minPieceLenMm,
+          `Tuyến ${tuyen.itemId} kiểu ${muc.jointType}: maxLenMm phải lớn hơn minPieceLenMm`,
+        );
+        assert.ok(
+          muc.jointGapMm >= 0,
+          `Tuyến ${tuyen.itemId} kiểu ${muc.jointType}: khe mối nối không được âm`,
+        );
+        assert.ok(
+          muc.jointType in jr.hardware,
+          `Tuyến ${tuyen.itemId}: kiểu nối ${muc.jointType} thiếu định mức phụ kiện`,
+        );
+      }
+    }
   }
 });

@@ -1,0 +1,127 @@
+{
+  "id": "duct-nepc-1181",
+  "ac": "AC3",
+  "note": "Ống gió hồi 300x200 nẹp C, đoạn 1181 mm → vừa vượt đốt tối đa nên tách 2 đốt bằng nhau 590,5 mm; 1 mối nối.",
+  "input": {
+    "systemId": "HVAC",
+    "itemId": "duct-retn",
+    "size": "300x200",
+    "sizeKind": "WxH",
+    "runIndex": 1,
+    "rules": {
+      "selection": [
+        {
+          "jointType": "nep_c",
+          "maxSideMm": 450,
+          "maxLenMm": 1180,
+          "jointGapMm": 0
+        },
+        {
+          "jointType": "tdc",
+          "maxSideMm": 1500,
+          "maxLenMm": 1110,
+          "jointGapMm": 5
+        },
+        {
+          "jointType": "mat_bich_v",
+          "maxSideMm": null,
+          "maxLenMm": 1180,
+          "jointGapMm": 5
+        }
+      ],
+      "divideMode": "deu",
+      "minPieceLenMm": 200,
+      "layerStyle": {
+        "suffix": "JOINT",
+        "color": 8,
+        "linetype": "DASHED"
+      },
+      "hardware": {
+        "nep_c": [
+          {
+            "item": "thanh-nep-c",
+            "perJoint": "2*W",
+            "unit": "m"
+          },
+          {
+            "item": "thanh-s-slip",
+            "perJoint": "2*H",
+            "unit": "m"
+          }
+        ],
+        "tdc": [
+          {
+            "item": "ke-goc-tdc",
+            "perJoint": 4,
+            "unit": "cái"
+          },
+          {
+            "item": "bulong-m8",
+            "perJoint": 8,
+            "unit": "cái"
+          },
+          {
+            "item": "gioang-tdc-m",
+            "perJoint": "2*(W+H)",
+            "unit": "m"
+          }
+        ],
+        "mat_bich_v": [
+          {
+            "item": "thep-goc-v-m",
+            "perJoint": "2*(W+H)",
+            "unit": "m"
+          },
+          {
+            "item": "bulong-m8",
+            "perJoint": "ceil(2*(W+H)/100)",
+            "unit": "cái"
+          }
+        ]
+      }
+    },
+    "segments": [
+      {
+        "lengthMm": 1181
+      }
+    ]
+  },
+  "expected": {
+    "jointType": "nep_c",
+    "overridden": false,
+    "divideMode": "deu",
+    "maxLenMm": 1180,
+    "jointGapMm": 0,
+    "minPieceLenMm": 200,
+    "totalLengthMm": 1181,
+    "pieceCount": 2,
+    "jointCount": 1,
+    "pieces": [
+      {
+        "segmentIndex": 0,
+        "pieceIndex": 1,
+        "lengthMm": 590.5,
+        "tag": "D-duct-retn-001-01"
+      },
+      {
+        "segmentIndex": 0,
+        "pieceIndex": 2,
+        "lengthMm": 590.5,
+        "tag": "D-duct-retn-001-02"
+      }
+    ],
+    "warnings": [],
+    "hardware": [
+      {
+        "item": "thanh-nep-c",
+        "unit": "m",
+        "quantity": 0.6
+      },
+      {
+        "item": "thanh-s-slip",
+        "unit": "m",
+        "quantity": 0.4
+      }
+    ]
+  }
+}
