@@ -210,6 +210,12 @@ tuyến–thiết bị) là bậc có đòn bẩy lớn nhất; sau đó phối 
 cần cao độ đã khai trên đối tượng); các mục để lại ở M100 §20 (ngắt nét giao chéo, revision cloud,
 nhân bản tầng điển hình, riser). Mỗi mục phải mở `M<xx>` mới có duyệt trước khi code.
 
+**M105 — Tự động phân chia đốt ống gió theo kiểu kết nối:** 📝 đặc tả **Draft chờ duyệt**
+(`docs/nang-cap/M105-chia-dot-ong-gio-theo-kieu-noi.md`, 2026-08-26) — chia đốt tuyến ống gió
+`XBOSS_VE` theo kiểu nối (nẹp C max 1180 / TDC max 1110 / mặt bích V max 1180, số người dùng chốt);
+engine C#+TS dùng chung test vector, lệnh `XBOSS_VE_CHIADOT`, migration `0143`, API + bảng đốt web,
+QTO phụ kiện mối nối. Chờ người dùng chốt các ⚠GIẢ ĐỊNH ở §13 rồi mới Approved/chia PR.
+
 ## M102 PR2 — Adapter AutoCAD: bước chuẩn hóa 12/13 + quét tag cho phép kiểm 17 (2026-08-25)
 
 Thi hành `docs/nang-cap/M102-plugin-dong-tran-chuan-hoa.md` PR2 phần **Adapter** — nối dây Core PR1
