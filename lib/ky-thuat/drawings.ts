@@ -22,6 +22,7 @@ export const REVISION_STATUSES = [
   "approved_with_comments",
   "rejected",
   "superseded",
+  "withdrawn",
 ] as const;
 export type RevisionStatus = (typeof REVISION_STATUSES)[number];
 export const REVISION_STATUS_LABEL: Record<RevisionStatus, string> = {
@@ -31,7 +32,11 @@ export const REVISION_STATUS_LABEL: Record<RevisionStatus, string> = {
   approved_with_comments: "Duyệt kèm ý kiến",
   rejected: "Từ chối",
   superseded: "Đã thay thế",
+  withdrawn: "Đã thu hồi",
 };
+
+// Trạng thái còn "chưa quyết" — chính người tải lên còn tự thu hồi (rút lại) được.
+const WITHDRAWABLE_STATUSES: RevisionStatus[] = ["submitted", "commented"];
 
 // Trạng thái coi là "đang hiệu lực" — rev mới đạt 1 trong 2 trạng thái này sẽ tự
 // thay thế (superseded) rev cũ cũng đang ở 1 trong 2 trạng thái này của cùng drawing.
@@ -296,4 +301,45 @@ export async function setRevisionStatus(
 
     return { drawingId: rev.drawingId };
   });
+}
+
+export type WithdrawRevisionResult =
+  | { status: "not-found" }
+  | { status: "forbidden" }
+  | { status: "conflict"; message: string }
+  | { status: "withdrawn"; drawingId: number };
+
+// Chính người đã tải lên tự rút lại (thu hồi) revision của mình khi còn "submitted"/
+// "commented" — tức Admin/PM chưa quyết định. Không đụng CURRENT_STATUSES/supersede vì
+// revision withdrawn chưa từng "đang hiệu lực". CAS 1 câu UPDATE có điều kiện chủ sở hữu +
+// trạng thái để phân biệt not-found/forbidden/conflict (bám mẫu thuHoiDeXuat).
+export async function withdrawRevision(
+  revisionId: number,
+  userId: number,
+): Promise<WithdrawRevisionResult> {
+  const kq = await run(
+    `UPDATE drawing_revisions SET status = 'withdrawn', decided_at = CURRENT_DATE
+      WHERE id = ? AND uploaded_by = ? AND status IN (${WITHDRAWABLE_STATUSES.map(() => "?").join(",")})`,
+    revisionId,
+    userId,
+    ...WITHDRAWABLE_STATUSES,
+  );
+  if (kq.changes > 0) {
+    const rev = await queryOne<{ drawingId: number }>(
+      `SELECT drawing_id AS "drawingId" FROM drawing_revisions WHERE id = ?`,
+      revisionId,
+    );
+    return { status: "withdrawn", drawingId: rev!.drawingId };
+  }
+
+  const rev = await queryOne<{ status: RevisionStatus; uploadedBy: number | null }>(
+    `SELECT status, uploaded_by AS "uploadedBy" FROM drawing_revisions WHERE id = ?`,
+    revisionId,
+  );
+  if (!rev) return { status: "not-found" };
+  if (rev.uploadedBy !== userId) return { status: "forbidden" };
+  return {
+    status: "conflict",
+    message: `Revision đang ở trạng thái "${REVISION_STATUS_LABEL[rev.status]}" — không thu hồi được.`,
+  };
 }

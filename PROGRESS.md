@@ -4,6 +4,50 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Đóng tồn đọng tích hợp plugin AutoCAD (đợt 2, 2026-08-25)
+
+Sau khi PR #402 merge, rà lại toàn cụm trên `main` để trả lời "còn gì chưa tích hợp": 8/8 mục của
+PR #402 xác minh có thật trong code; phần tồn đọng còn lại thi hành song song 10 gói.
+
+**Đã làm**
+
+1. **KL lệch giữa 2 tầng (chặn):** Excel gộp KL trên web thiếu cột quy đổi trong khi Excel plugin
+   có ⇒ cùng bản vẽ ra 2 con số. Thêm cột "Hệ số quy đổi"/"Mô tả quy đổi"/"KL quy đổi", đổi tên
+   cột cũ thành "Khối lượng (đo)"; chỉ coi là có quy đổi khi `heSoQuyDoi > 0` (khớp ngữ nghĩa
+   `TakeoffLine.HeSoQuyDoi` bên C#), thiếu thì để trống — không suy đoán.
+2. **Lỗi RLS thật (phát hiện khi viết test):** `saveCadDiffSession`/`listCadDiffSessions`/
+   `listCadBlockCatalogs` trong `lib/ky-thuat/engineering-cad-skills.ts` không bọc
+   `withProjectScope`, mà 2 bảng của migration 0099 bật `FORCE ROW LEVEL SECURITY` không có nhánh
+   "GUC rỗng thì cho qua" ⇒ trên production (role `xboss_app`, NOBYPASSRLS) `GET /api/engineering/
+cad/diff` và `/blocks` **luôn trả rỗng**, lưu phiên diff **thất bại âm thầm**. Đã vá + test hai
+   chiều (đúng dự án thì thấy, dự án khác thì không, ghi chéo bị `WITH CHECK` chặn).
+3. **Thu hồi revision bản vẽ:** `POST /api/drawings/revisions/[id]/withdraw` (chính chủ +
+   `CAN.manageDrawings`, chỉ khi `submitted`/`commented`), trạng thái mới `withdrawn` —
+   migration `0142` chỉ **nới** CHECK constraint (không đụng dữ liệu, idempotent); nút "Thu Hồi"
+   trên `/ban-ve` hiện theo cờ `canWithdraw` server tính.
+4. **Duyệt block hết "mù":** `GET /api/engineering/cad/block-proposals/[id]/candidate` trả DWG
+   ứng viên (key đọc từ DB, không ghép path từ client) + hiện `sha256` để đối chiếu.
+5. **Bước chuẩn hoá & cảnh báo** từ `standardize_report` nay hiện trong bảng điều khiển plugin.
+6. **Plugin (C#):** gửi kèm `drawingId` khi biết (server ưu tiên id), `?v=` cache-busting cho
+   manifest/DWG nền thư viện block (404 → hỏi lại 1 lần bỏ `v`, giữ ETag), đọc `duocThemTrucTiep`
+   để chỉ đường sang web khi người dùng có quyền thêm thẳng.
+7. **Xác minh gói cài:** `GET /api/engineering/cad/plugin-package` đọc `<Version>` từ
+   `plugin-autocad/Directory.Build.props`; biến mới `XBOSS_PLUGIN_SHA256` (tuỳ chọn) hiện checksum
+   để kỹ sư đối chiếu tệp tải về; thiếu nguồn → ẩn, không bịa số.
+8. **Chống trôi & phủ test:** test C# nạp `doi-chung/takeoff-sidecar-mau.json` (đối chứng 2 tầng
+   nay khép cả phía plugin); test cho 8 route CAD trước đây không có test nào; test nhánh
+   `drawingId`; bước CI kiểm `dotnet --version` phải là 8.x (repo ghim action theo SHA nhưng phiên
+   không tra được SHA của `actions/setup-dotnet` — dùng bước kiểm để CI đỏ có thông báo rõ).
+9. **Dọn nợ UI:** 29 hex cứng trong `CadViewportStudio` — màu giao diện về token (đảo theme đúng),
+   màu vẽ CAD gom vào `cad-layer-colors.ts` kèm chú thích "cố ý không theo theme".
+
+**Giữ nguyên có chủ đích:** `maxRetries: 1` ở `plugin-upload` (luồng đồng bộ không có worker chạy
+lại, retry mặc định 3 sẽ đưa tác vụ lỗi về `pending` treo mãi).
+
+**Nợ còn lại:** phát hành gói cài đầu-cuối cần runner Windows có AutoCAD 2026 + ObjectARX bản
+quyền; verify tay plugin trên máy thật; `drawings.code` hiện UNIQUE toàn cục nên ca "trùng mã giữa
+2 dự án" chưa dựng được (giá trị của `drawingId` là đúng địa chỉ + sẵn sàng khi ràng buộc đổi).
+
 ## Bổ sung tích hợp toàn cụm plugin AutoCAD M99–M104 (2026-08-25)
 
 Người dùng: "bổ sung tích hợp toàn bộ plugin M99–M104 · kiểm tra lại chưa có thì viết". Ba luồng

@@ -64,9 +64,17 @@ public sealed class XBossUploadCommand
             return;
         }
 
-        // Số bản vẽ trong sổ (drawings.code) + rev.
-        var maBanVe = HoiChuoi(ed, "Số bản vẽ trong sổ XBoss (drawings.code, vd ACMV-SD-T05-001)");
-        if (maBanVe is null or "") return;
+        // Bản vẽ đích: số bản vẽ trong sổ (drawings.code) hoặc mã số bản vẽ "#<id>" khi kỹ sư biết.
+        // Mã bản vẽ chỉ duy nhất TRONG một dự án — hai dự án trùng mã thì chỉ #id mới trỏ đúng
+        // bản ghi (route ưu tiên drawingId). Gõ như cũ thì mọi thứ chạy y như cũ.
+        var traLoi = HoiChuoi(ed, "Số bản vẽ trong sổ XBoss (drawings.code, vd ACMV-SD-T05-001; hoặc #<mã số> khi biết)");
+        if (traLoi is null or "") return;
+        var banVe = MaBanVeDich.PhanTich(traLoi);
+        if (!banVe.HopLe)
+        {
+            ed.WriteMessage($"\n[XBoss] {banVe.Loi}\n");
+            return;
+        }
         var rev = HoiChuoi(ed, "Rev (vd A, B, C)");
         if (rev is null or "") return;
 
@@ -107,9 +115,9 @@ public sealed class XBossUploadCommand
         {
             var client = new XBossApiClient(baseUrl);
             var kq = await client.UploadAsync(
-                token, maBanVe, rev, pack.Version,
+                token, banVe.Code ?? "", rev, pack.Version,
                 tenDwg, File.ReadAllBytes(db.Filename), dxfBytes, reportJson,
-                takeoffJson: takeoffJson);
+                takeoffJson: takeoffJson, drawingId: banVe.Id);
 
             if (!kq.DuocNhan)
             {
@@ -127,7 +135,7 @@ public sealed class XBossUploadCommand
                 {
                     ed.WriteMessage(job.Idempotent
                         ? $"\n[XBoss] ✔ Tệp này đã tải trước đó — revision #{job.RevisionId} (không tạo bản đôi).\n"
-                        : $"\n[XBoss] ✔ Đã tạo revision #{job.RevisionId} (trạng thái submitted) cho bản vẽ {maBanVe}, rev {rev}.\n");
+                        : $"\n[XBoss] ✔ Đã tạo revision #{job.RevisionId} (trạng thái submitted) cho bản vẽ {banVe.MoTa}, rev {rev}.\n");
                     return;
                 }
                 if (job.Status == "failed")

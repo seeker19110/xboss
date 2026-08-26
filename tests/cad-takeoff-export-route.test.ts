@@ -46,6 +46,16 @@ test("route takeoff-export: không đụng bảng BOQ, chỉ đọc lại dữ l
   );
 });
 
+test("route takeoff-export: header Excel có đủ cột KL đo lẫn cột quy đổi (hệ số/mô tả/KL quy đổi)", () => {
+  const src = nguon();
+  for (const cot of ["Khối lượng (đo)", "Hệ số quy đổi", "Mô tả quy đổi", "KL quy đổi"]) {
+    assert.ok(src.includes(cot), `thiếu cột header "${cot}"`);
+  }
+  // Cột quy đổi để trống khi null — không tự ý gán 0 (tránh đọc nhầm "không quy đổi" thành 0).
+  assert.match(src, /d\.heSoQuyDoi \?\? ""/);
+  assert.match(src, /d\.klQuyDoi \?\? ""/);
+});
+
 // ===== (2) Integration =====
 
 const DXF_HOP_LE = [
@@ -142,6 +152,21 @@ test(
             khoiLuong: 12,
             size: "300x200",
             vung: "Tầng 3",
+            // Không có hệ số quy đổi (rule pack không khai) — kiểm tra cột quy đổi để TRỐNG.
+          },
+          {
+            itemId: "duct-cachnhiet",
+            boqCode: "M.01.02",
+            group: "HVAC",
+            ten: "Cách nhiệt ống gió",
+            donVi: "m2",
+            khoiLuong: 20,
+            size: "300x200",
+            vung: "Tầng 3",
+            // Có hệ số quy đổi — item dẫn xuất (cách nhiệt), khớp ví dụ trong sidecar mẫu.
+            heSoQuyDoi: 1.6,
+            moTaQuyDoi: "Diện tích cách nhiệt = chu vi x chiều dài x hệ số",
+            klQuyDoi: 32,
           },
         ],
       },
@@ -192,7 +217,7 @@ test(
 
     const dong1 = await layDongTakeoffChoExport(PROJECT_1);
     const cuaP1 = dong1.filter((d) => d.drawingCode === "TXE-P1-001");
-    assert.equal(cuaP1.length, 1, "rev B không kèm takeoff phải bị bỏ qua");
+    assert.equal(cuaP1.length, 2, "rev B không kèm takeoff phải bị bỏ qua, rev A có 2 dòng");
     assert.deepEqual(cuaP1[0], {
       drawingCode: "TXE-P1-001",
       drawingName: "Bản vẽ dự án 1",
@@ -204,6 +229,26 @@ test(
       donVi: "m",
       khoiLuong: 12,
       boqCode: "M.01.01",
+      // Dòng không kèm dữ liệu quy đổi trong sidecar → phải để TRỐNG (null), không suy đoán/mặc định 1.
+      heSoQuyDoi: null,
+      moTaQuyDoi: "",
+      klQuyDoi: null,
+    });
+    assert.deepEqual(cuaP1[1], {
+      drawingCode: "TXE-P1-001",
+      drawingName: "Bản vẽ dự án 1",
+      rev: "A",
+      he: "HVAC",
+      ten: "Cách nhiệt ống gió",
+      size: "300x200",
+      vung: "Tầng 3",
+      donVi: "m2",
+      khoiLuong: 20,
+      boqCode: "M.01.02",
+      // Dòng có hệ số quy đổi (item dẫn xuất) → phải xuất đúng cả 3 trường quy đổi từ sidecar.
+      heSoQuyDoi: 1.6,
+      moTaQuyDoi: "Diện tích cách nhiệt = chu vi x chiều dài x hệ số",
+      klQuyDoi: 32,
     });
 
     assert.ok(

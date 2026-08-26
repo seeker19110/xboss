@@ -117,17 +117,29 @@ test(
       khoiLuong?: unknown;
       size?: unknown;
       vung?: unknown;
+      heSoQuyDoi?: unknown;
+      moTaQuyDoi?: unknown;
+      klQuyDoi?: unknown;
     };
-    const doc = (raw: DongTakeoffRaw) => ({
-      itemId: typeof raw.itemId === "string" ? raw.itemId : "",
-      boqCode: typeof raw.boqCode === "string" ? raw.boqCode : "",
-      group: typeof raw.group === "string" ? raw.group : "",
-      ten: typeof raw.ten === "string" ? raw.ten : "",
-      donVi: typeof raw.donVi === "string" ? raw.donVi : "",
-      khoiLuong: typeof raw.khoiLuong === "number" ? raw.khoiLuong : 0,
-      size: typeof raw.size === "string" ? raw.size : "",
-      vung: typeof raw.vung === "string" ? raw.vung : "",
-    });
+    const doc = (raw: DongTakeoffRaw) => {
+      // 0 = rule pack không khai hệ số quy đổi → coi như không có, để trống (khớp
+      // lib/ky-thuat/cad/bang-dieu-khien.ts: layDongTakeoffChoExport).
+      const heSoQuyDoi =
+        typeof raw.heSoQuyDoi === "number" && raw.heSoQuyDoi > 0 ? raw.heSoQuyDoi : null;
+      return {
+        itemId: typeof raw.itemId === "string" ? raw.itemId : "",
+        boqCode: typeof raw.boqCode === "string" ? raw.boqCode : "",
+        group: typeof raw.group === "string" ? raw.group : "",
+        ten: typeof raw.ten === "string" ? raw.ten : "",
+        donVi: typeof raw.donVi === "string" ? raw.donVi : "",
+        khoiLuong: typeof raw.khoiLuong === "number" ? raw.khoiLuong : 0,
+        size: typeof raw.size === "string" ? raw.size : "",
+        vung: typeof raw.vung === "string" ? raw.vung : "",
+        heSoQuyDoi,
+        moTaQuyDoi: heSoQuyDoi !== null && typeof raw.moTaQuyDoi === "string" ? raw.moTaQuyDoi : "",
+        klQuyDoi: heSoQuyDoi !== null && typeof raw.klQuyDoi === "number" ? raw.klQuyDoi : null,
+      };
+    };
 
     const lines = TAKEOFF_MAU.lines as DongTakeoffRaw[];
     assert.deepEqual(doc(lines[0]), {
@@ -139,6 +151,10 @@ test(
       khoiLuong: 20,
       size: "300x200",
       vung: "Tầng 5",
+      // heSoQuyDoi=0 trong tệp mẫu → rule pack không khai hệ số cho dòng này, phải để TRỐNG.
+      heSoQuyDoi: null,
+      moTaQuyDoi: "",
+      klQuyDoi: null,
     });
     assert.deepEqual(doc(lines[1]), {
       itemId: "duct-cachnhiet",
@@ -149,6 +165,10 @@ test(
       khoiLuong: 20,
       size: "300x200",
       vung: "Tầng 5",
+      // Item dẫn xuất (cách nhiệt) — có hệ số quy đổi thật trong tệp mẫu.
+      heSoQuyDoi: 1.6,
+      moTaQuyDoi: "Diện tích cách nhiệt = chu vi x chiều dài x hệ số",
+      klQuyDoi: 32,
     });
   },
 );

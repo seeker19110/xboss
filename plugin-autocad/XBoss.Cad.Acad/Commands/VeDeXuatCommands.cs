@@ -188,6 +188,13 @@ public sealed class VeDeXuatCommands
             ed.WriteMessage(
                 "[XBoss] Thư viện CHƯA đổi: chỉ khi được duyệt mới sinh version mới, lúc đó chạy XBOSS_LOGIN " +
                 "(hoặc XBOSS_VE_THUVIEN) để tải về. Theo dõi trạng thái ở bảng XBOSS_BANG.\n");
+            if (await DuocThemTrucTiepAsync(client, token))
+            {
+                ed.WriteMessage(
+                    "[XBoss] Tài khoản của bạn CÒN được thêm block thẳng vào thư viện trên WEB (không qua hàng " +
+                    "chờ duyệt): /engineering/chuan-hoa-ban-ve → Thư Viện Block. Cần gấp thì đi đường đó — " +
+                    "AutoCAD chỉ có đường đề xuất.\n");
+            }
         }
         catch (XBossApiException e)
         {
@@ -196,6 +203,36 @@ public sealed class VeDeXuatCommands
         catch (HttpRequestException e)
         {
             ed.WriteMessage($"\n[XBoss] Lỗi mạng khi gửi đề xuất: {e.Message}\n");
+        }
+    }
+
+    /// <summary>
+    /// Vai trò này có được thêm block THẲNG vào thư viện trên web không — hỏi SERVER (cờ
+    /// <c>duocThemTrucTiep</c> của <c>GET /block-proposals</c>, M104 §3), KHÔNG suy từ vai trò
+    /// nhớ trong máy: quyền là việc của server, đoán ở client là chỉ đường sai cho kỹ sư.
+    ///
+    /// Chỉ để ĐỔI THÔNG ĐIỆP sau khi đề xuất đã gửi xong — hỏi được thì nói thêm một câu, hỏi
+    /// không được (mất mạng, server cũ chưa có cờ, token vừa bị thu hồi) thì im lặng giữ nguyên
+    /// thông điệp cũ. Không bao giờ ném: đề xuất đã gửi thành công rồi, một cú GET phụ không được
+    /// phép biến kết quả đó thành dòng lỗi đỏ.
+    /// </summary>
+    private static async Task<bool> DuocThemTrucTiepAsync(XBossApiClient client, string token)
+    {
+        try
+        {
+            return (await client.LayDeXuatBlockAsync(token)).DuocThemTrucTiep;
+        }
+        catch (XBossApiException)
+        {
+            return false;
+        }
+        catch (HttpRequestException)
+        {
+            return false;
+        }
+        catch (TaskCanceledException)
+        {
+            return false;
         }
     }
 

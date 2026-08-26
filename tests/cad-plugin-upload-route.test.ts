@@ -73,6 +73,7 @@ const DXF_HOP_LE = [
 let U = 0;
 let DU_AN = 0;
 let DRAWING = 0;
+let DRAWING2 = 0;
 let TOKEN = "";
 
 before(async () => {
@@ -102,8 +103,21 @@ before(async () => {
       U,
     ));
   await run(`UPDATE drawings SET project_id = ? WHERE id = ?`, DU_AN, DRAWING);
+
+  // Bản vẽ thứ hai — dùng cho ca kiểm tra ưu tiên drawingId vs drawingCode lệch nhau.
+  const daCo2 = await queryOne<{ id: number }>(`SELECT id FROM drawings WHERE code = 'PUR-TEST-002'`);
+  DRAWING2 =
+    daCo2?.id ??
+    (await insertId(
+      `INSERT INTO drawings (code, name, kind, project_id, created_by)
+       VALUES ('PUR-TEST-002','Bản vẽ test route PR5 #2','shop',?,?)`,
+      DU_AN,
+      U,
+    ));
+  await run(`UPDATE drawings SET project_id = ? WHERE id = ?`, DU_AN, DRAWING2);
+
   // Dọn dữ liệu lần chạy trước — ca idempotent phải bắt đầu sạch.
-  await run(`DELETE FROM drawing_revisions WHERE drawing_id = ?`, DRAWING);
+  await run(`DELETE FROM drawing_revisions WHERE drawing_id IN (?, ?)`, DRAWING, DRAWING2);
   await run(`DELETE FROM engineering_async_tasks WHERE created_by = ?`, U);
   await run(`DELETE FROM login_rate_limits WHERE key LIKE ?`, `cad-upload:${U}`);
 
@@ -111,14 +125,27 @@ before(async () => {
   TOKEN = (await createCadToken(U, 1, "May test plugin-upload route", null)).key;
 });
 
-/** Dựng multipart y như plugin gửi (dwg + dxf sidecar + rulePackVersion + rev + drawingCode). */
-function taoForm(noiDungDwg: string, rev: string, phienBanRulePack: string): FormData {
+/**
+ * Dựng multipart y như plugin gửi (dwg + dxf sidecar + rulePackVersion + rev + drawingCode).
+ * `tuyChon` cho phép ghi đè/bỏ drawingCode và/hoặc thêm drawingId — dùng để canh nhánh
+ * plugin mới gửi kèm drawingId (M99 PR6+: plugin gửi cả hai khi biết, route ưu tiên id).
+ */
+function taoForm(
+  noiDungDwg: string,
+  rev: string,
+  phienBanRulePack: string,
+  tuyChon?: { drawingCode?: string | null; drawingId?: number | string | null },
+): FormData {
   const form = new FormData();
   form.set("dwg", new File([noiDungDwg], "PUR.dwg", { type: "application/acad" }));
   form.set("dxf", new File([DXF_HOP_LE], "PUR.dxf", { type: "text/plain" }));
   form.set("rulePackVersion", phienBanRulePack);
   form.set("rev", rev);
-  form.set("drawingCode", "PUR-TEST-001");
+  const drawingCode = tuyChon && "drawingCode" in tuyChon ? tuyChon.drawingCode : "PUR-TEST-001";
+  if (drawingCode !== null && drawingCode !== undefined) form.set("drawingCode", drawingCode);
+  if (tuyChon?.drawingId !== null && tuyChon?.drawingId !== undefined) {
+    form.set("drawingId", String(tuyChon.drawingId));
+  }
   return form;
 }
 
@@ -229,4 +256,104 @@ test("không có phiên/token hợp lệ → 401, không tạo job lẫn revisio
     `SELECT COUNT(*)::int AS n FROM engineering_async_tasks WHERE task_type = 'cad.plugin-upload'`,
   );
   assert.equal(sau?.n, truoc?.n);
+});
+
+test("chỉ gửi drawingId (không drawingCode) → 202, revision rơi đúng bản vẽ theo id", S, async () => {
+  const { getCurrentRulePack } = await import("@/lib/ky-thuat/cad/rule-pack");
+  const { queryOne } = await import("@/lib/db");
+  const v = getCurrentRulePack().version;
+
+  const res = await goiUpload(
+    taoForm("noi-dung-dwg-route-only-id", "B", v, { drawingCode: null, drawingId: DRAWING }),
+    TOKEN,
+  );
+  assert.equal(res.status, 202);
+  const { jobId } = (await res.json()) as { jobId: string };
+
+  const tt = (await (await goiTrangThai(jobId)).json()) as {
+    status: string;
+    revisionId: number | null;
+  };
+  assert.equal(tt.status, "completed");
+  assert.ok(tt.revisionId, "phải trả revisionId khi chỉ gửi drawingId");
+
+  const rev = await queryOne<{ drawing_id: number }>(
+    `SELECT drawing_id FROM drawing_revisions WHERE id = ?`,
+    tt.revisionId,
+  );
+  assert.equal(rev?.drawing_id, DRAWING, "revision phải gắn đúng bản vẽ theo drawingId gửi lên");
+});
+
+test(
+  "gửi lệch drawingId (bản vẽ #2) và drawingCode (bản vẽ #1) → route ưu tiên drawingId, revision rơi vào bản vẽ #2",
+  S,
+  async () => {
+    // Đọc code route (app/api/engineering/cad/plugin-upload/route.ts): biến `drawing` được
+    // chọn bằng `drawingIdTho ? SELECT ... WHERE id = ? : SELECT ... WHERE code = ?` — nghĩa
+    // là hễ có drawingId (dù drawingCode cũng có) thì drawingId LUÔN thắng, drawingCode bị
+    // bỏ qua hoàn toàn. Ca này khẳng định đúng hành vi thật đó (không phải giả định thông
+    // thường "code đáng tin hơn id" hay ngược lại).
+    const { getCurrentRulePack } = await import("@/lib/ky-thuat/cad/rule-pack");
+    const { queryOne } = await import("@/lib/db");
+    const v = getCurrentRulePack().version;
+
+    const res = await goiUpload(
+      taoForm("noi-dung-dwg-route-lech", "A", v, {
+        drawingCode: "PUR-TEST-001", // bản vẽ #1 (DRAWING)
+        drawingId: DRAWING2, // bản vẽ #2 — phải thắng
+      }),
+      TOKEN,
+    );
+    assert.equal(res.status, 202);
+    const { jobId } = (await res.json()) as { jobId: string };
+
+    const tt = (await (await goiTrangThai(jobId)).json()) as {
+      status: string;
+      revisionId: number | null;
+    };
+    assert.equal(tt.status, "completed");
+    assert.ok(tt.revisionId);
+
+    const rev = await queryOne<{ drawing_id: number }>(
+      `SELECT drawing_id FROM drawing_revisions WHERE id = ?`,
+      tt.revisionId,
+    );
+    assert.equal(
+      rev?.drawing_id,
+      DRAWING2,
+      "drawingId phải thắng drawingCode khi cả hai cùng gửi và lệch nhau",
+    );
+  },
+);
+
+test("drawingId không tồn tại → 404, không tạo revision nào", S, async () => {
+  const { getCurrentRulePack } = await import("@/lib/ky-thuat/cad/rule-pack");
+  const { queryOne } = await import("@/lib/db");
+  const v = getCurrentRulePack().version;
+
+  const idKhongTonTai = 999_999_999;
+  const truoc = await queryOne<{ n: number }>(
+    `SELECT COUNT(*)::int AS n FROM drawing_revisions WHERE drawing_id IN (?, ?)`,
+    DRAWING,
+    DRAWING2,
+  );
+
+  const res = await goiUpload(
+    taoForm("noi-dung-dwg-route-id-sai", "A", v, {
+      drawingCode: null,
+      drawingId: idKhongTonTai,
+    }),
+    TOKEN,
+  );
+  // Route trả 404 khi không tìm thấy bản vẽ theo id (giống trường hợp không tìm thấy theo code).
+  assert.equal(res.status, 404);
+  const body = (await res.json()) as { error: string };
+  assert.match(body.error, /Không tìm thấy bản vẽ/);
+
+  const sau = await queryOne<{ n: number }>(
+    `SELECT COUNT(*)::int AS n FROM drawing_revisions WHERE drawing_id IN (?, ?)`,
+    DRAWING,
+    DRAWING2,
+  );
+  assert.equal(sau?.n, truoc?.n, "drawingId sai không được tạo revision nào");
 });
