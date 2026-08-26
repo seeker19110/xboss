@@ -51,11 +51,12 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
 
 ### C0. Vỏ giao diện (M102)
 
-1. `XBOSS_BANG` → hiện bảng điều khiển neo được, 4 khối: trạng thái server/thiết bị, rule pack
-   (version + số quy tắc), bản vẽ hiện hành, tóm tắt sidecar JSON. Gõ lại → đóng.
-   _Chỉ đọc — không được đụng bản vẽ, không gọi mạng._
-2. Tab Ribbon **XBoss**: 5 panel, 26 nút, mọi nút có tooltip tiếng Việt. Bấm 1 nút bất kỳ →
-   đúng lệnh chạy (bấm nút = gõ lệnh, nghiệp vụ không nhân đôi).
+1. `XBOSS_BANG` → hiện bảng neo được với **2 tab**: **Quy trình** (trình dẫn — verify ở C7) và
+   **Trạng thái** với 4 khối: server/thiết bị, rule pack (version + số quy tắc), thư viện block,
+   bản vẽ hiện hành + tóm tắt sidecar JSON. Gõ lại → đóng.
+   _Tab Trạng thái chỉ đọc — không được đụng bản vẽ._
+2. Tab Ribbon **XBoss**: 5 panel (**Quy trình** đứng đầu), 26 nút, mọi nút có tooltip tiếng Việt.
+   Bấm 1 nút bất kỳ → đúng lệnh chạy (bấm nút = gõ lệnh, nghiệp vụ không nhân đôi).
 3. `NETLOAD` lại lần nữa → **không** sinh tab XBoss thứ hai.
 
 ### C1. Kết nối server (M99 PR2)
@@ -166,6 +167,45 @@ lệnh…` rồi chạy **đúng chuỗi hỏi đáp keyword như trước M106*
     - Xóa biến (`setx XBOSS_UI_DIALOG ""`) → hộp thoại trở lại.
 36. **DPI cao + màn hình phụ.** Đặt Windows scale 150 % (hoặc kéo AutoCAD sang màn hình 4K) → chữ
     và ô trong hộp thoại nét, không bị cắt, nút OK/Hủy không tràn khung.
+
+### C7. Trình dẫn quy trình + Ribbon theo quy trình (M106 PR2)
+
+> **Bắt buộc verify tay.** CI kẹp được luật suy trạng thái (`QuyTrinhTests` — Core) và cú pháp
+> palette (AcadShim), **không** kẹp được: bảng có vẽ ra không, nút có gọi đúng lệnh không, chữ có
+> bị cắt trong palette hẹp không. Chỉ máy có AutoCAD 2026 trả lời được.
+
+37. **6 giai đoạn, đúng thứ tự.** `XBOSS_BANG` → tab **Quy trình** hiện lần lượt
+    `1. KẾT NỐI` → `2. CHUẨN HÓA NỀN` → `3. VẼ SHOP DRAWING` → `4. CHI TIẾT CHẾ TẠO` →
+    `5. HỒ SƠ BẢN VẼ` → `6. BÓC & NỘP`, mỗi bước một dòng trạng thái (`✓ Đã xong` /
+    `○ Chưa làm` / `– Không áp dụng`) + hàng nút của bước.
+    - Nút của bước đúng bằng số lệnh của bước đó, **đúng thứ tự dùng thật** (vd bước 3:
+      Chuẩn bị nền → Vẽ tuyến → Nhãn size → Phụ kiện → Thiết bị → Đổi size/hệ).
+    - Kéo hẹp palette → chữ xuống dòng, nút xuống hàng; không có chữ nào bị cắt cụt.
+38. **Nút mờ nhưng VẪN bấm được (AC5 — quan trọng nhất).** Mở AutoCAD chưa đăng nhập, chưa nạp
+    rule pack, mở một bản vẽ trắng:
+    - Bước 2–6 hiện dòng `⚠` kèm lý do tiếng Việt (`Chưa nạp rule pack…`, `Bản vẽ chưa có tuyến
+nào…`), nút chuyển nền chìm + chữ mờ.
+    - **Bấm thử một nút mờ** (vd "Kiểm tra") → lệnh vẫn chạy và tự báo lý do từ chối ở dòng lệnh.
+      Nút mờ mà **không bấm được** là SAI đặc tả (đây là hướng dẫn, không phải cổng chặn).
+39. **Chưa mở bản vẽ nào.** Đóng hết bản vẽ (chỉ còn màn hình Start) → bước 1 vẫn hiện bình
+    thường, bước 2–6 chuyển `– Không áp dụng` kèm lý do "Chưa mở bản vẽ nào…".
+40. **Mở lại bản vẽ của phiên trước thì KHÔNG bắt làm lại.** Đăng nhập + nạp rule pack, chạy trọn
+    `XBOSS_KIEMTRA` (đến khi 0 lỗi) → `XBOSS_VE` → `XBOSS_VE_CHIADOT` → `XBOSS_VE_THONGKE` →
+    `XBOSS_VE_TRANGIN` → `XBOSS_BOCKL` → `XBOSS_BOCKL_XUAT`, lưu bản vẽ, **đóng AutoCAD, mở lại**
+    và mở đúng bản vẽ đó → cả 6 bước phải là `✓ Đã xong`, không còn dòng `⚠` nào.
+    - Chạy `XBOSS_BOCKL_XOA` → bước 6 quay lại `○ Chưa làm` (dấu bóc là dấu hiệu thật, không phải
+      cờ nhớ trong phiên).
+41. **Tự tính lại khi đổi bản vẽ.** Mở 2 bản vẽ (một đã làm xong như mục 40, một trắng tinh), để
+    bảng đang hiện rồi `Ctrl+Tab` qua lại → trạng thái 6 bước **và** tab Trạng thái đổi theo bản vẽ
+    đang hiện hành, không cần bấm "Làm mới". Đổi bản vẽ **không** được in thêm dòng nào ra dòng
+    lệnh và không được gọi mạng.
+42. **Ribbon theo quy trình (AC7).** Tab **XBoss**:
+    - Panel **Quy trình** đứng **đầu tiên**, một nút to mở `XBOSS_BANG`; **không** còn panel
+      "Bảng điều khiển" riêng (không có hai nút cùng chạy một lệnh).
+    - Panel "Vẽ shop drawing" xếp nút đúng dòng chảy: nền → tuyến → nhãn → phụ kiện → thiết bị →
+      đổi size, rồi chia đốt → giá đỡ → lỗ chờ → tag, rồi mặt cắt → thống kê → trang in → báo cáo,
+      cuối cùng là 2 lệnh thư viện/đề xuất.
+    - Panel "Kết nối": Đăng nhập → Nạp rule pack → **Upload hồ sơ đứng cuối** (thuộc bước 6).
 
 ---
 

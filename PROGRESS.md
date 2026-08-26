@@ -247,8 +247,40 @@ nhân bản tầng điển hình, riser). Mỗi mục phải mở `M<xx>` mới 
   runner Windows).
 
 **M106 — Hộp thoại WPF cho lệnh plugin + trình dẫn quy trình:** ✅ **Approved 2026-08-26 — PR1
-(nền + 2 lệnh mẫu) XONG** (`docs/nang-cap/M106-hop-thoai-wpf-va-quy-trinh.md`). Kỹ sư chạy lệnh
-bằng **chuột** thay cho chuỗi hỏi đáp keyword ở dòng lệnh.
+(nền + 2 lệnh mẫu) và PR2 (trình dẫn quy trình) XONG**
+(`docs/nang-cap/M106-hop-thoai-wpf-va-quy-trinh.md`). Kỹ sư chạy lệnh bằng **chuột** thay cho chuỗi
+hỏi đáp keyword ở dòng lệnh, và thấy rõ đang ở bước nào của quy trình.
+
+**PR2 — trình dẫn quy trình (FR7/FR8/FR10, AC5/AC7):**
+
+- **Luật ở Core, có test:** `Core/Ui/QuyTrinh.cs` thêm `DauHieuQuyTrinh` (dữ liệu **đã đọc sẵn**:
+  token, rule pack, sidecar cạnh DWG, XData trên bản vẽ) + `TinhTrang`/`TinhTrangTatCa` trả
+  `Xong`/`Chua`/`KhongApDung` kèm **lý do tiếng Việt** khi chưa đủ điều kiện vào bước. Core không
+  mở `Database`, không đọc tệp — Adapter đọc rồi truyền vào, nên **toàn bộ quy tắc test được trên
+  CI Linux** và UI không có nhánh nghiệp vụ nào của riêng nó.
+- **Dấu hiệu "xong" đều SỐNG trong bản vẽ/tệp cạnh nó** (XData `XBOSS_VE`, dấu bóc, sidecar), không
+  phải cờ nhớ trong phiên: mở lại bản vẽ đã làm dở từ hôm trước là 6 bước nhận đúng ngay, không bắt
+  làm lại (có ca test riêng). Bước 5 nhận layout trang in **theo mẫu tên rule pack**
+  (`SheetSetup.LaTenLayoutTrangIn`) — đếm suông "có layout" sẽ báo xong ngay trên bản vẽ trắng vì
+  AutoCAD sẵn có Layout1.
+- **`XBOSS_BANG` thành 2 tab:** **Quy trình** (`Ui/TrinhDanControl.cs` — 6 giai đoạn đúng thứ tự §6,
+  mỗi bước: trạng thái ✓/○/– + lý do + nút chạy từng lệnh lấy từ `QuyTrinh.LenhCua`) và **Trạng
+  thái** (bảng M102 giữ nguyên). Nút của bước chưa đủ điều kiện chỉ **làm mờ kèm lý do, vẫn bấm
+  được** — §6 chốt đây là hướng dẫn, không phải cổng chặn (ca hợp lệ: mở lại bản vẽ đã chuẩn hóa từ
+  phiên trước). Bấm nút = `SendStringToExecute` đúng lệnh, y hệt Ribbon.
+- **Tự tính lại khi đổi bản vẽ:** `DocumentManager.DocumentActivated` → vẽ lại cả hai tab bằng dữ
+  liệu cục bộ (cố ý **không** kèm lượt hỏi server danh sách đề xuất block — mạng công trường yếu).
+- **Ribbon theo quy trình:** panel **"Quy trình"** đứng đầu tab XBoss (nút to mở `XBOSS_BANG`; nhóm
+  "Bảng điều khiển" chỉ có đúng lệnh này nên hiện ở đây, không có hai nút cùng chạy một lệnh); nút
+  trong mỗi panel xếp theo `(Buoc, ThuTuTrongBuoc)` — sắp theo mỗi `ThuTuTrongBuoc` thì các bước
+  đan xen nhau vì bước nào cũng đánh số từ 1.
+- **Cổng CI:** 735/735 ca .NET xanh (707 + 28 ca mới), `XBoss.Cad.AcadShim` 0 warning.
+- **Còn lại:** verify tay §C7 (mục 37–42) của `plugin-autocad/VERIFY-VA-PHAT-HANH.md` — palette
+  không có test tự động. PR3 (16 lệnh còn lại + chuyển `DeXuatBlockDialog` sang WPF) chưa làm; AC8
+  ("không còn tệp WinForms nào trong `Ui/`") vẫn hở vì palette M102 + trình dẫn mới đang là WinForms
+  — chuyển cả palette sang WPF là quyết định riêng của PR3, không gộp vào PR2.
+
+**PR1 — nền hộp thoại WPF:**
 
 - **Nền quy trình (Core):** `XBoss.Cad.Core/Ui/QuyTrinh.cs` khai 6 giai đoạn vòng đời bản vẽ
   (Kết nối → Chuẩn hóa nền → Vẽ shop drawing → Chi tiết chế tạo → Hồ sơ bản vẽ → Bóc & nộp) +
@@ -270,8 +302,8 @@ bằng **chuột** thay cho chuỗi hỏi đáp keyword ở dòng lệnh.
 - **Cổng CI:** 706/706 ca .NET xanh (661 + 45 ca mới); `XBoss.Cad.AcadShim` xanh 0 warning nhờ
   `WpfStub.cs` khai giả WPF + phần `InitializeComponent` sinh từ XAML.
 - **Còn lại:** verify tay 2 hộp thoại + đường lui FR9 trên máy có AutoCAD 2026 —
-  `plugin-autocad/VERIFY-VA-PHAT-HANH.md` §C6 (mục 33–36). PR2 (trình dẫn `XBOSS_BANG` 6 giai đoạn +
-  panel Ribbon) và PR3 (16 lệnh còn lại + chuyển `DeXuatBlockDialog` sang WPF) chưa làm. Một điểm
+  `plugin-autocad/VERIFY-VA-PHAT-HANH.md` §C6 (mục 33–36). PR3 (16 lệnh còn lại + chuyển
+  `DeXuatBlockDialog` sang WPF) chưa làm. Một điểm
   chưa phủ trong PR1: câu hỏi **tỉ lệ in 1:x** của `XBOSS_VE_CHIADOT` vẫn ở dòng lệnh (§7.2 không
   liệt kê nó cho lệnh này; hỏi một lần mỗi phiên qua `VeContext.TiLeIn`).
 

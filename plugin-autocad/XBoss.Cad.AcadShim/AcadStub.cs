@@ -833,10 +833,24 @@ namespace Autodesk.AutoCAD.ApplicationServices
         public void SendStringToExecute(string command, bool activate, bool wrapUpInactiveDoc, bool echoCommand) { }
     }
 
+    /// <summary>acmgd: đối số của các sự kiện cấp tài liệu (DocumentCreated/Activated/…).</summary>
+    public class DocumentCollectionEventArgs : EventArgs
+    {
+        public Document Document => new Document();
+    }
+
+    public delegate void DocumentCollectionEventHandler(object sender, DocumentCollectionEventArgs e);
+
     public class DocumentCollection : IEnumerable
     {
         public Document MdiActiveDocument => new Document();
         public IEnumerator GetEnumerator() => new List<Document>().GetEnumerator();
+
+        /// <summary>
+        /// acmgd: <c>public event DocumentCollectionEventHandler DocumentActivated</c> — bắn trên
+        /// luồng chính khi kỹ sư chuyển sang tab bản vẽ khác (M106: bảng điều khiển tính lại).
+        /// </summary>
+        public event DocumentCollectionEventHandler DocumentActivated { add { } remove { } }
     }
 
     public static class Application

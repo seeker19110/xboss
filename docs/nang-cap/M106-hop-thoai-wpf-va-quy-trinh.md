@@ -193,8 +193,12 @@ Lệnh **không tham số** chạy thẳng, không hộp thoại: `XBOSS_VE_BAOC
 - **AC6** `XBOSS_UI_DIALOG=0` → mọi lệnh chạy đường dòng lệnh cũ, không lỗi.
 - **AC7** `LenhCatalog`: mọi lệnh đều có `Buoc`; thứ tự nút trên Ribbon khớp `ThuTuTrongBuoc`; test
   canh CI đỏ nếu thêm lệnh mà quên xếp bước.
-- **AC8** `DeXuatBlockDialog` chạy bằng WPF, giữ nguyên mọi trường và quy tắc `BlockDeXuatRules`;
-  không còn tệp WinForms nào trong `Ui/`.
+- **AC8** `DeXuatBlockDialog` chạy bằng WPF, giữ nguyên mọi trường và quy tắc `BlockDeXuatRules`.
+  **Ranh giới công nghệ (chốt 2026-08-26 sau PR2):** WPF cho **hộp thoại modal**; **palette
+  `XBOSS_BANG` giữ WinForms**. Lý do không phải ngại việc: mã WinForms được cổng AcadShim **biên
+  dịch thật trên CI Linux**, còn XAML thì không kiểm được gì cho tới khi có AutoCAD trong tay —
+  trình dẫn là màn hình kỹ sư nhìn nhiều nhất, đổi nó lấy một lớp không ai canh được là lỗ hổng,
+  không phải nhất quán. Bản gốc của AC8 đòi "không còn tệp WinForms nào trong `Ui/`" — bỏ vế đó.
 - **AC9** Toàn bộ ViewModel ở Core có test: danh sách lựa chọn dựng đúng từ rule pack, quy tắc khóa
   OK, giá trị mặc định, và ca "rule pack thiếu khai" phải cho lý do rõ chứ không văng lỗi.
 - **AC10** `dotnet test` xanh toàn bộ (nền hiện tại 661 ca, số mới phải ≥ 661, Failed = 0).

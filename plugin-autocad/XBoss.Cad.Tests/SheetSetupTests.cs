@@ -68,6 +68,46 @@ public class SheetSetupTests
         Assert.Equal("SHOP-HVAC-2", SheetSetup.TenLayoutKeTiep("SHOP-{system}", "HVAC", ["shop-hvac"]));
     }
 
+    // ===== Nhận diện layout trang in (M106 FR8 — dấu hiệu "đã có trang in") =====
+
+    [Fact]
+    public void Layout_do_TRANGIN_dung_thi_nhan_ra_theo_mau_ten()
+    {
+        Assert.True(SheetSetup.LaTenLayoutTrangIn("SHOP-{system}-{seq}", "SHOP-HVAC-01"));
+        Assert.True(SheetSetup.LaTenLayoutTrangIn("SHOP-{system}-{seq}", "shop-piping-12")); // không phân biệt hoa thường
+        Assert.True(SheetSetup.LaTenLayoutTrangIn("SHOP-{system}", "SHOP-HVAC"));
+        Assert.True(SheetSetup.LaTenLayoutTrangIn("SHOP-{system}", "SHOP-HVAC-2")); // hậu tố chống trùng tên
+    }
+
+    [Fact]
+    public void Layout_mac_dinh_cua_AutoCAD_khong_bi_coi_la_trang_in()
+    {
+        // Bản vẽ mới toanh đã sẵn Model/Layout1/Layout2 — đếm suông "có layout" là báo xong khi
+        // chưa làm gì, sai lệch nguy hiểm nhất của một trình dẫn.
+        Assert.False(SheetSetup.LaTenLayoutTrangIn("SHOP-{system}-{seq}", "Model"));
+        Assert.False(SheetSetup.LaTenLayoutTrangIn("SHOP-{system}-{seq}", "Layout1"));
+        Assert.False(SheetSetup.LaTenLayoutTrangIn("SHOP-{system}-{seq}", ""));
+        Assert.False(SheetSetup.LaTenLayoutTrangIn("SHOP-{system}-{seq}", "SHOP-HVAC")); // thiếu {seq}
+    }
+
+    [Fact]
+    public void Rule_pack_chua_khai_mau_ten_thi_dung_mau_mac_dinh()
+    {
+        Assert.True(SheetSetup.LaTenLayoutTrangIn("", "SHOP-HVAC-01"));
+        Assert.False(SheetSetup.LaTenLayoutTrangIn("", "Layout1"));
+    }
+
+    [Fact]
+    public void Ten_layout_TenLayoutKeTiep_sinh_ra_luon_duoc_nhan_lai()
+    {
+        // Đối chứng 2 chiều: thứ lệnh TRANGIN đặt tên phải là thứ trình dẫn nhận ra, mãi mãi.
+        foreach (var mau in new[] { "SHOP-{system}-{seq}", "{system}-SHOP-{seq}", "SHOP-{system}" })
+        {
+            var ten = SheetSetup.TenLayoutKeTiep(mau, "HVAC", ["Model", "Layout1"]);
+            Assert.True(SheetSetup.LaTenLayoutTrangIn(mau, ten), $"{mau} sinh \"{ten}\" mà không nhận lại được");
+        }
+    }
+
     // ===== Tên mặt cắt =====
 
     [Fact]

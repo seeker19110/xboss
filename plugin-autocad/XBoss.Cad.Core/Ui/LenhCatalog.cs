@@ -141,7 +141,8 @@ public static class LenhCatalog
 
         // ── Bảng điều khiển (M102) ──
         new("XBOSS_BANG", "Bảng điều khiển",
-            "Bật/tắt bảng điều khiển XBoss: trạng thái đăng nhập, rule pack, kết quả kiểm tra/bóc tách/vẽ gần nhất.",
+            "Bật/tắt bảng XBoss: tab Quy trình (6 giai đoạn — đang ở bước nào, tiếp theo làm gì) " +
+            "và tab Trạng thái (đăng nhập, rule pack, kết quả kiểm tra/bóc tách/vẽ gần nhất).",
             NhomLenh.BangDieuKhien, BuocQuyTrinh.PhuTro, 4, LenhChinh: true),
     ];
 
