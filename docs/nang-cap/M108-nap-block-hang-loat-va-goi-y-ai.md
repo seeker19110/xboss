@@ -1,11 +1,11 @@
 # M108 — Đặc tả: nạp block hàng loạt từ file tổng hợp + gợi ý phân loại bằng AI
 
-| Thuộc tính       | Giá trị                                                                                                                                                                                                                                 |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Thuộc tính       | Giá trị                                                                                                                                                                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Đưa MỘT tệp DWG tổng hợp chứa hàng chục/hàng trăm block vào thư viện trong một lượt, có **đề xuất phân loại tự động** (luật tất định → khớp ngữ nghĩa → vision), người duyệt theo lô                                                  |
 | Spec owner       | Phiên chính (tầng 1)                                                                                                                                                                                                                  |
-| State            | ✅ **Approved for implementation** — duyệt 2026-08-26. Thi hành theo §16 (PR1 mở đầu)                                                                                                                                                  |
-| Người/ngày duyệt | Seeker (donghanhcungban.org@gmail.com), 2026-08-26 — "Approved for implementation". 4 quyết định nền chốt cùng ngày qua `AskUserQuestion`, ghi ở §4                                                                                  |
+| State            | ✅ **Approved for implementation** — duyệt 2026-08-26. Thi hành theo §16 (PR1 mở đầu)                                                                                                                                                 |
+| Người/ngày duyệt | Seeker (donghanhcungban.org@gmail.com), 2026-08-26 — "Approved for implementation". 4 quyết định nền chốt cùng ngày qua `AskUserQuestion`, ghi ở §4                                                                                   |
 | Quyết định nền   | `docs/adr/0006-plugin-autocad-va-pipeline-server.md` (bản vẽ là nguồn sự thật, quy tắc tải từ XBoss), `docs/nang-cap/ENG-0-roadmap-tich-hop-engineering-os.md` (boundary chống AI tự cấp quyền), M103 (hàng chờ duyệt), M104 (đa tệp) |
 | Tiền đề          | M99–M107 đã đóng về code. M108 **không** đụng pipeline chuẩn hóa/bóc tách, chỉ đụng đường **nạp** thư viện block + 2 chỗ gợi ý ánh xạ dùng chung cỗ máy đó                                                                            |
 
@@ -17,13 +17,13 @@ Thư viện block (`cad_block_libs`, M100 PR2) là nguồn sự thật cho `draw
 `takeoff.blockNameMatchAny` (bóc khối lượng). Hiện có **đúng 2 đường nạp, cả hai đều một-block-một-lần
 và người tự khai phân loại**:
 
-| Đường            | Điểm vào                                                                          | Ràng buộc thật đo được trong code                                                                                                |
-| ---------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| M103 — AutoCAD   | `XBOSS_VE_DEXUAT` → `VeDeXuatCommands.cs:85` `ed.GetEntity(...)`                  | Chọn **1** khối trên màn hình mỗi lần; `BlockUngVienBuilder.DocDinhNghia(db, idKhoi)` nhận đúng 1 `ObjectId`                     |
-| M104 — web       | `POST /api/engineering/cad/block-lib/blocks` → `lib/ky-thuat/cad/block-them-web.ts` | `block-them-web.ts:45` tìm **đúng một** định nghĩa trùng `meta.blockName` người gõ trong form; block còn lại trong tệp bị bỏ qua |
+| Đường          | Điểm vào                                                                            | Ràng buộc thật đo được trong code                                                                                                |
+| -------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| M103 — AutoCAD | `XBOSS_VE_DEXUAT` → `VeDeXuatCommands.cs:85` `ed.GetEntity(...)`                    | Chọn **1** khối trên màn hình mỗi lần; `BlockUngVienBuilder.DocDinhNghia(db, idKhoi)` nhận đúng 1 `ObjectId`                     |
+| M104 — web     | `POST /api/engineering/cad/block-lib/blocks` → `lib/ky-thuat/cad/block-them-web.ts` | `block-them-web.ts:45` tìm **đúng một** định nghĩa trùng `meta.blockName` người gõ trong form; block còn lại trong tệp bị bỏ qua |
 
 Hệ quả thật: một tệp thư viện nhà cung cấp 200 block cần 200 lượt thao tác + 200 lần gõ metadata, và
-**`kind` luôn do người gõ** — `docMetaBlockCoBan` chỉ *kiểm* tính nhất quán (vd `kind: equipment` bắt
+**`kind` luôn do người gõ** — `docMetaBlockCoBan` chỉ _kiểm_ tính nhất quán (vd `kind: equipment` bắt
 buộc có attribute `TAG`, `kind: titleblock` bắt buộc `paperSize`), **không có một dòng nào suy ra `kind`**.
 
 Cùng lớp vấn đề "khớp hai bảng tên do người khác đặt" còn xuất hiện ở 2 chỗ nữa, đang làm tay:
@@ -49,20 +49,20 @@ Cùng lớp vấn đề "khớp hai bảng tên do người khác đặt" còn x
 
 ## 3. Nghiên cứu hiện trạng
 
-| Thành phần                                              | Vai trò sau thay đổi                                                                                                 |
-| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `lib/ky-thuat/cad/block-lib.ts`                         | **Giữ nguyên** — `docManifest`/`kiemDinhManifest`/`kiemThuocTinhTheoLoai`/`ghiSoBlockLib`/`versionPhatHanhKeTiep`     |
-| `lib/ky-thuat/cad/block-proposals.ts`                   | **Giữ** hàng chờ + `docMetaBlockCoBan` + `soSanhManifestUngVien`; thêm đường nhận **đề xuất lô**                     |
-| `lib/ky-thuat/cad/block-them-web.ts`                    | **Giữ** đường 1-block; M108 thêm module lô cạnh nó, tái dùng `idTuTenBlock`/luồng advisory lock                       |
-| `lib/ky-thuat/cad/block-preview-svg.ts` (`dungPreviewSvg`) | **Tái dùng làm mắt của tầng 3** — render từng ứng viên thành SVG rồi rasterize làm input vision                     |
-| `lib/ky-thuat/cad/dxf-parser.ts` (`parseDxf`)           | Nguồn đọc block table của tệp tổng hợp phía web                                                                      |
-| `lib/ky-thuat/cad/boq-map.ts` (M101 PR4)                | Nhận thêm đường **gợi ý** `boqCode`; đường ghi `ghiMapBoqTheoDuAn` không đổi                                          |
-| `lib/ky-thuat/cad/rule-pack.ts` + `rule-packs/*.json`   | Nhận thêm đường **gợi ý** `layerMap`; rule pack vẫn do người phát hành, AI không tự ghi                              |
-| `plugin-autocad/.../BlockUngVienBuilder.cs`             | Mở rộng: nhận **danh sách** `ObjectId` thay vì 1                                                                     |
-| `plugin-autocad/.../VeDeXuatCommands.cs`                | Thêm lệnh lô `XBOSS_VE_DEXUAT_LO`; lệnh cũ giữ nguyên hành vi                                                        |
-| `app/engineering/chuan-hoa-ban-ve/components/ThemBlockTuWebForm.tsx` | Giữ form 1 block; thêm form lô cạnh nó                                                                   |
-| **Mới** `lib/dich-vu/cad-block-phan-loai.ts`            | Cỗ máy 3 tầng, **ở tầng 5** vì phối hợp `ky-thuat` (block/rule pack) + `khoi-luong` (BOQ) — ADR-0007/0008           |
-| **Mới** `lib/nen/ai.ts`                                 | Client Anthropic dùng chung, tầng 0, **thuần cấu hình + gọi mạng**, không biết gì về block/CAD                       |
+| Thành phần                                                           | Vai trò sau thay đổi                                                                                              |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `lib/ky-thuat/cad/block-lib.ts`                                      | **Giữ nguyên** — `docManifest`/`kiemDinhManifest`/`kiemThuocTinhTheoLoai`/`ghiSoBlockLib`/`versionPhatHanhKeTiep` |
+| `lib/ky-thuat/cad/block-proposals.ts`                                | **Giữ** hàng chờ + `docMetaBlockCoBan` + `soSanhManifestUngVien`; thêm đường nhận **đề xuất lô**                  |
+| `lib/ky-thuat/cad/block-them-web.ts`                                 | **Giữ** đường 1-block; M108 thêm module lô cạnh nó, tái dùng `idTuTenBlock`/luồng advisory lock                   |
+| `lib/ky-thuat/cad/block-preview-svg.ts` (`dungPreviewSvg`)           | **Tái dùng làm mắt của tầng 3** — render từng ứng viên thành SVG rồi rasterize làm input vision                   |
+| `lib/ky-thuat/cad/dxf-parser.ts` (`parseDxf`)                        | Nguồn đọc block table của tệp tổng hợp phía web                                                                   |
+| `lib/ky-thuat/cad/boq-map.ts` (M101 PR4)                             | Nhận thêm đường **gợi ý** `boqCode`; đường ghi `ghiMapBoqTheoDuAn` không đổi                                      |
+| `lib/ky-thuat/cad/rule-pack.ts` + `rule-packs/*.json`                | Nhận thêm đường **gợi ý** `layerMap`; rule pack vẫn do người phát hành, AI không tự ghi                           |
+| `plugin-autocad/.../BlockUngVienBuilder.cs`                          | Mở rộng: nhận **danh sách** `ObjectId` thay vì 1                                                                  |
+| `plugin-autocad/.../VeDeXuatCommands.cs`                             | Thêm lệnh lô `XBOSS_VE_DEXUAT_LO`; lệnh cũ giữ nguyên hành vi                                                     |
+| `app/engineering/chuan-hoa-ban-ve/components/ThemBlockTuWebForm.tsx` | Giữ form 1 block; thêm form lô cạnh nó                                                                            |
+| **Mới** `lib/dich-vu/cad-block-phan-loai.ts`                         | Cỗ máy 3 tầng, **ở tầng 5** vì phối hợp `ky-thuat` (block/rule pack) + `khoi-luong` (BOQ) — ADR-0007/0008         |
+| **Mới** `lib/nen/ai.ts`                                              | Client Anthropic dùng chung, tầng 0, **thuần cấu hình + gọi mạng**, không biết gì về block/CAD                    |
 
 **Hạ tầng LLM hiện có: KHÔNG.** `grep -rn "anthropic\|openai\|langchain\|..."` trên `lib/ app/ package.json`
 trả về rỗng — M108 là chỗ **đầu tiên** đưa SDK LLM vào codebase XBoss. Boundary đã chốt ở `ENG-0/ENG-1`
@@ -71,23 +71,23 @@ trạng thái chờ duyệt**) áp dụng nguyên vẹn: M108 gọi model **từ
 
 ## 4. Phương án — 4 quyết định đã chốt với người dùng (2026-08-26)
 
-| Điểm                | Đã chốt                                                              | Hệ quả thi hành                                                                                          |
-| ------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Đường nạp           | **Cả hai** — AutoCAD (lệnh lô) *và* web (kéo-thả DWG nhiều block)   | 2 điểm vào, **một** cỗ máy phân loại + **một** hàng chờ duyệt dùng chung                                  |
-| Mức tự động         | **4 tầng, người duyệt lô**                                          | Tầng 2/3 tuỳ chọn, thiếu khoá → tự tắt, rơi về tầng 1                                                     |
-| Trùng tên           | **Bỏ qua, báo rõ**                                                   | Giữ nguyên bản trong thư viện, liệt kê danh sách bỏ qua kèm lý do — cùng ngữ nghĩa `conflict` của M104   |
-| Mở rộng dùng chung  | **Gợi ý `layerMap`** + **gợi ý `boqCode` per-project**              | Cả hai tái dùng đúng cỗ máy khớp ngữ nghĩa của tầng 2, đều bắt buộc người duyệt                          |
+| Điểm               | Đã chốt                                                           | Hệ quả thi hành                                                                                        |
+| ------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Đường nạp          | **Cả hai** — AutoCAD (lệnh lô) _và_ web (kéo-thả DWG nhiều block) | 2 điểm vào, **một** cỗ máy phân loại + **một** hàng chờ duyệt dùng chung                               |
+| Mức tự động        | **4 tầng, người duyệt lô**                                        | Tầng 2/3 tuỳ chọn, thiếu khoá → tự tắt, rơi về tầng 1                                                  |
+| Trùng tên          | **Bỏ qua, báo rõ**                                                | Giữ nguyên bản trong thư viện, liệt kê danh sách bỏ qua kèm lý do — cùng ngữ nghĩa `conflict` của M104 |
+| Mở rộng dùng chung | **Gợi ý `layerMap`** + **gợi ý `boqCode` per-project**            | Cả hai tái dùng đúng cỗ máy khớp ngữ nghĩa của tầng 2, đều bắt buộc người duyệt                        |
 
 Lựa chọn nội bộ còn lại:
 
-| Điểm                   | Phương án                                                       | Kết luận                                                                                                                                                                                                        |
-| ---------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Model                  | `claude-opus-5` vs Sonnet/Haiku                                  | **`claude-opus-5`** ($5/$25 per MTok, context 1M). Không hạ cấp model để tiết kiệm — quyết định đó là của người dùng, không phải của code                                                                        |
-| Ép định dạng đầu ra    | Prompt tự do vs **structured output**                            | **`client.messages.parse()` + `output_config.format`** (zod schema): `kind` ép về đúng enum `LOAI_BLOCK`, không parse chuỗi tay, không hallucinate giá trị lạ                                                    |
-| Đồng bộ vs bất đồng bộ | Gọi thẳng trong request vs **Batches API**                       | **Batches API** (`client.messages.batches`) — nạp lô là việc không nhạy latency, **giảm 50% giá**, tối đa 100k request/lô. Lô nhỏ (≤20 block) đi đường đồng bộ cho phản hồi tức thì                             |
-| Vision                 | Dựng ảnh riêng vs **rasterize `dungPreviewSvg`**                 | **Tái dùng `dungPreviewSvg`** — đã có, đã test, chạy trên DXF thuần; rasterize sang PNG rồi gửi base64 (`type: "image"`). Không thêm phụ thuộc render nặng nếu tránh được (§18 open)                              |
-| Thứ tự tầng            | Gọi AI cho mọi block vs **chỉ phần tầng 1 không quyết được**     | **Chỉ phần dư** — tầng 1 chắc thì dừng luôn, vừa rẻ vừa loại hẳn rủi ro AI lật kết quả đúng                                                                                                                     |
-| Prompt caching         | Không vs **có**                                                  | **Có** — phần mô tả luật phân loại + danh mục item bóc tách là **prefix ổn định**, đặt trước, `cache_control: {type:"ephemeral"}`; phần biến thiên (danh sách block của lô) đặt **sau** breakpoint cuối          |
+| Điểm                   | Phương án                                                    | Kết luận                                                                                                                                                                                                |
+| ---------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model                  | `claude-opus-5` vs Sonnet/Haiku                              | **`claude-opus-5`** ($5/$25 per MTok, context 1M). Không hạ cấp model để tiết kiệm — quyết định đó là của người dùng, không phải của code                                                               |
+| Ép định dạng đầu ra    | Prompt tự do vs **structured output**                        | **`client.messages.parse()` + `output_config.format`** (zod schema): `kind` ép về đúng enum `LOAI_BLOCK`, không parse chuỗi tay, không hallucinate giá trị lạ                                           |
+| Đồng bộ vs bất đồng bộ | Gọi thẳng trong request vs **Batches API**                   | **Batches API** (`client.messages.batches`) — nạp lô là việc không nhạy latency, **giảm 50% giá**, tối đa 100k request/lô. Lô nhỏ (≤20 block) đi đường đồng bộ cho phản hồi tức thì                     |
+| Vision                 | Dựng ảnh riêng vs **rasterize `dungPreviewSvg`**             | **Tái dùng `dungPreviewSvg`** — đã có, đã test, chạy trên DXF thuần; rasterize sang PNG rồi gửi base64 (`type: "image"`). Không thêm phụ thuộc render nặng nếu tránh được (§18 open)                    |
+| Thứ tự tầng            | Gọi AI cho mọi block vs **chỉ phần tầng 1 không quyết được** | **Chỉ phần dư** — tầng 1 chắc thì dừng luôn, vừa rẻ vừa loại hẳn rủi ro AI lật kết quả đúng                                                                                                             |
+| Prompt caching         | Không vs **có**                                              | **Có** — phần mô tả luật phân loại + danh mục item bóc tách là **prefix ổn định**, đặt trước, `cache_control: {type:"ephemeral"}`; phần biến thiên (danh sách block của lô) đặt **sau** breakpoint cuối |
 
 ## 5. Scope / non-goals
 
@@ -228,32 +228,40 @@ Panel "Mã BOQ theo dự án" (`MaBoqDuAnPanel.tsx`) → nút "Gợi ý từ dan
                         ghiSoBlockLib → version thư viện mới
 ```
 
-| Việc                            | Tệp                                                                  |
-| ------------------------------- | -------------------------------------------------------------------- |
-| Client model dùng chung         | **mới** `lib/nen/ai.ts`                                              |
-| Cỗ máy phân loại 4 tầng         | **mới** `lib/dich-vu/cad-block-phan-loai.ts`                         |
-| Nhận + phát hành lô             | **mới** `lib/ky-thuat/cad/block-lo.ts`                               |
-| Hàng chờ (thêm khái niệm lô)    | `lib/ky-thuat/cad/block-proposals.ts`                                |
-| Route nhận lô / duyệt lô        | **mới** `app/api/engineering/cad/block-proposals/batch/route.ts` + `[id]/approve` (mở rộng) |
-| Gợi ý layerMap                  | **mới** `app/api/engineering/cad/layer-map-suggest/route.ts`         |
-| Gợi ý boqCode                   | **mới** `app/api/engineering/cad/boq-map/suggest/route.ts`           |
-| Form nạp lô + bảng duyệt lô     | **mới** `app/engineering/chuan-hoa-ban-ve/components/NapLoBlockPanel.tsx` |
-| Panel gợi ý mã BOQ              | `app/engineering/chuan-hoa-ban-ve/components/MaBoqDuAnPanel.tsx`     |
-| Lệnh lô trong plugin            | `plugin-autocad/XBoss.Cad.Acad/Commands/VeDeXuatCommands.cs`         |
-| Dựng gói ứng viên N block       | `plugin-autocad/XBoss.Cad.Acad/Services/BlockUngVienBuilder.cs`      |
-| Hộp thoại lệnh lô               | `XBoss.Cad.Core/Ui/ViewModels/` + `DataTemplate` trong `XBossDialog.xaml` (khung M106) |
-| Đăng ký lệnh vào Ribbon         | `XBoss.Cad.Core/Ui/LenhCatalog.cs` (**bắt buộc** khai `Buoc`/`ThuTuTrongBuoc`, quên là không biên dịch) |
+| Việc                           | Tệp                                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Client model dùng chung        | **mới** `lib/nen/ai.ts`                                                                                 |
+| Tầng 1 (thuần, không mạng)     | **mới** `lib/ky-thuat/cad/block-phan-loai-luat.ts` — xem ghi chú tầng dưới                              |
+| Cỗ máy 4 tầng (khi có AI, PR2) | **mới** `lib/dich-vu/cad-block-phan-loai.ts`                                                            |
+| Nhận + phát hành lô            | **mới** `lib/ky-thuat/cad/block-lo.ts`                                                                  |
+| Hàng chờ (thêm khái niệm lô)   | `lib/ky-thuat/cad/block-proposals.ts`                                                                   |
+| Route nhận lô / duyệt lô       | **mới** `app/api/engineering/cad/block-proposals/batch/route.ts` + `[id]/approve` (mở rộng)             |
+| Gợi ý layerMap                 | **mới** `app/api/engineering/cad/layer-map-suggest/route.ts`                                            |
+| Gợi ý boqCode                  | **mới** `app/api/engineering/cad/boq-map/suggest/route.ts`                                              |
+| Form nạp lô + bảng duyệt lô    | **mới** `app/engineering/chuan-hoa-ban-ve/components/NapLoBlockPanel.tsx`                               |
+| Panel gợi ý mã BOQ             | `app/engineering/chuan-hoa-ban-ve/components/MaBoqDuAnPanel.tsx`                                        |
+| Lệnh lô trong plugin           | `plugin-autocad/XBoss.Cad.Acad/Commands/VeDeXuatCommands.cs`                                            |
+| Dựng gói ứng viên N block      | `plugin-autocad/XBoss.Cad.Acad/Services/BlockUngVienBuilder.cs`                                         |
+| Hộp thoại lệnh lô              | `XBoss.Cad.Core/Ui/ViewModels/` + `DataTemplate` trong `XBossDialog.xaml` (khung M106)                  |
+| Đăng ký lệnh vào Ribbon        | `XBoss.Cad.Core/Ui/LenhCatalog.cs` (**bắt buộc** khai `Buoc`/`ThuTuTrongBuoc`, quên là không biên dịch) |
+
+**Sửa đặc tả khi thi hành PR1 — tầng 1 nằm ở `ky-thuat`, không phải `dich-vu`.** Bản nháp xếp cả cỗ máy
+vào `lib/dich-vu/cad-block-phan-loai.ts`, nhưng **tầng 1 chỉ đọc rule pack** — một miền duy nhất (`ky-thuat`).
+ADR-0008 nói rõ `dich-vu/` dành cho logic phối hợp **từ 2 miền trở lên** và "không phải sọt rác cho code khó
+xếp", nên đặt một module thuần một-miền vào đó là vi phạm. PR1 vì vậy đặt tầng 1 ở
+`lib/ky-thuat/cad/block-phan-loai-luat.ts`; `lib/dich-vu/cad-block-phan-loai.ts` chỉ ra đời ở **PR2**, khi
+cỗ máy thật sự phối `ky-thuat` (block/rule pack) với `khoi-luong` (BOQ) và `nen/ai`. `npm run check:lib-layers` xanh.
 
 ## 10. API contract
 
-| Method | Đường dẫn                                          | Quyền           | Vào                                                                | Ra                                                                              |
-| ------ | -------------------------------------------------- | --------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `POST` | `/api/engineering/cad/block-proposals/batch`       | Admin/PM/engineer | multipart: `dwg`, `dxf`, `baseLibVersion`, `nguon: "plugin"\|"web"` | `{ loId, tong, deXuat[], boQua[{blockName, lyDo}] }`                             |
-| `GET`  | `/api/engineering/cad/block-proposals/batch/:id`   | Admin/PM/engineer | —                                                                   | trạng thái lô + danh sách dòng (kèm `nguonQuyetDinh`, `doTinCay`, `lyDo`)        |
-| `POST` | `/api/engineering/cad/block-proposals/batch/:id/approve` | Admin/PM   | `{ dong: [{ id, kind, systemId, takeoffItemId, paperSize, chon }] }` | `{ version, soBlockThem }` \| 409 `stale`                                       |
-| `POST` | `/api/engineering/cad/block-proposals/batch/:id/reject`   | Admin/PM   | `{ lyDo }`                                                          | `{ ok: true }`                                                                   |
-| `POST` | `/api/engineering/cad/layer-map-suggest`           | Admin/PM        | `{ layersLa: string[], rulePackVersion }`                           | `{ goiY: [{ layerLa, layerChuan, doTinCay, lyDo }], jsonDeDan }`                 |
-| `POST` | `/api/engineering/cad/boq-map/suggest`             | Admin/PM        | `{ projectId }`                                                     | `{ goiY: [{ takeoffItemId, boqCode, doTinCay, lyDo }] }`                         |
+| Method | Đường dẫn                                                | Quyền             | Vào                                                                  | Ra                                                                        |
+| ------ | -------------------------------------------------------- | ----------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `POST` | `/api/engineering/cad/block-proposals/batch`             | Admin/PM/engineer | multipart: `dwg`, `dxf`, `baseLibVersion`, `nguon: "plugin"\|"web"`  | `{ loId, tong, deXuat[], boQua[{blockName, lyDo}] }`                      |
+| `GET`  | `/api/engineering/cad/block-proposals/batch/:id`         | Admin/PM/engineer | —                                                                    | trạng thái lô + danh sách dòng (kèm `nguonQuyetDinh`, `doTinCay`, `lyDo`) |
+| `POST` | `/api/engineering/cad/block-proposals/batch/:id/approve` | Admin/PM          | `{ dong: [{ id, kind, systemId, takeoffItemId, paperSize, chon }] }` | `{ version, soBlockThem }` \| 409 `stale`                                 |
+| `POST` | `/api/engineering/cad/block-proposals/batch/:id/reject`  | Admin/PM          | `{ lyDo }`                                                           | `{ ok: true }`                                                            |
+| `POST` | `/api/engineering/cad/layer-map-suggest`                 | Admin/PM          | `{ layersLa: string[], rulePackVersion }`                            | `{ goiY: [{ layerLa, layerChuan, doTinCay, lyDo }], jsonDeDan }`          |
+| `POST` | `/api/engineering/cad/boq-map/suggest`                   | Admin/PM          | `{ projectId }`                                                      | `{ goiY: [{ takeoffItemId, boqCode, doTinCay, lyDo }] }`                  |
 
 Mọi route: `getCurrentUser()` → 401 khi chưa đăng nhập; kiểm quyền qua `CAN`;
 `export const dynamic = "force-dynamic"`; validate input; đường plugin đi qua token scope `cad` sẵn có.
@@ -304,7 +312,12 @@ CREATE TABLE IF NOT EXISTS cad_block_batch_items (
 CREATE INDEX IF NOT EXISTS idx_cad_block_batch_items_batch ON cad_block_batch_items(batch_id);
 ```
 
-RLS: theo đúng khuôn 2 nhánh đang dùng cho bảng CAD (xem `migrations/0143_mepf_joint_segmentation.sql`).
+**Sửa đặc tả khi thi hành PR1 — KHÔNG có RLS.** Bản nháp ghi "RLS theo khuôn `0143`" là sai: hai bảng
+anh em `cad_block_libs` (`0139`) và `cad_block_proposals` (`0141`) **cố ý** không có RLS vì thư viện block
+là dữ liệu phát hành **toàn cục**, không mang `org_id`/`project_id` (lý do ghi thẳng trong đầu file `0139`).
+Thêm RLS riêng cho 2 bảng lô sẽ làm lô lệch phạm vi với chính thư viện mà nó ghi vào. `0144` vì vậy không
+có RLS, và ghi rõ lý do trong đầu file.
+
 `do_tin_cay` là `NUMERIC` → **không** cộng/nhân ở JS ngoài mục hiển thị (quy ước M45; đây không phải tiền
 nên không cần `lib/nen/money.ts`, nhưng vẫn không làm số học tích lũy trên float).
 
@@ -357,13 +370,13 @@ Cổng: `npm run lint`, `npm run typecheck`, `npm test -- --release-gate`, `npm 
 
 ## 16. Kế hoạch slice/PR
 
-| PR  | Nội dung                                                                                              | route đề nghị |
-| --- | ------------------------------------------------------------------------------------------------------ | ------------- |
+| PR  | Nội dung                                                                                                   | route đề nghị |
+| --- | ---------------------------------------------------------------------------------------------------------- | ------------- |
 | PR1 | Migration `0144` + `lib/ky-thuat/cad/block-lo.ts` + tầng 1 thuần + test (1)(2). **Chưa có AI, chưa có UI** | `spec`        |
-| PR2 | `lib/nen/ai.ts` + tầng 2/3 + đường lui khi thiếu khoá + bộ đối chứng §15.4 + đo AC3                    | `complex`     |
-| PR3 | Route batch + form nạp lô + bảng duyệt lô + e2e                                                        | `standard`    |
-| PR4 | Plugin: `XBOSS_VE_DEXUAT_LO` + `BlockUngVienBuilder` 1→N + hộp thoại M106 + `LenhCatalog`              | `spec`        |
-| PR5 | Gợi ý `layerMap` + gợi ý `boqCode` (tái dùng tầng 2) + 2 panel web                                     | `standard`    |
+| PR2 | `lib/nen/ai.ts` + tầng 2/3 + đường lui khi thiếu khoá + bộ đối chứng §15.4 + đo AC3                        | `complex`     |
+| PR3 | Route batch + form nạp lô + bảng duyệt lô + e2e                                                            | `standard`    |
+| PR4 | Plugin: `XBOSS_VE_DEXUAT_LO` + `BlockUngVienBuilder` 1→N + hộp thoại M106 + `LenhCatalog`                  | `spec`        |
+| PR5 | Gợi ý `layerMap` + gợi ý `boqCode` (tái dùng tầng 2) + 2 panel web                                         | `standard`    |
 
 PR1 đứng một mình có ích (nạp lô bằng tay, không AI) — nếu §18 mở ra vấn đề thì dừng sau PR1 vẫn có giá trị.
 
@@ -376,15 +389,15 @@ block vốn có version nên phát hành nhầm thì phát hành lại version s
 
 ## 18. Risk / assumption / open decisions
 
-| #   | Rủi ro / giả định                                                                                            | Xử lý                                                                                                                |
-| --- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| R1  | AI đề xuất `kind` sai, người duyệt bấm qua nhanh                                                              | Bảng duyệt lọc riêng được dòng do AI; độ tin cậy thấp phải sửa tay mới chọn được; audit đủ để truy ngược              |
-| R2  | Chi phí gọi model vượt dự kiến                                                                                 | Chỉ gọi cho phần dư của tầng 1; Batches API giảm 50%; prompt caching; trần 200 ảnh/lô                                 |
-| R3  | Đây là chỗ **đầu tiên** đưa SDK LLM vào codebase XBoss                                                         | Cô lập trong `lib/nen/ai.ts`; mọi tầng trên gọi qua một cửa; tắt được bằng biến môi trường                            |
-| R4  | Bộ đối chứng §15.4 do chính người làm gán nhãn → đo AC3 dễ thiên vị                                           | Nhãn chuẩn do **kỹ sư trưởng/CAD manager** gán, không phải người viết code (đúng như M100 §16 đã chốt cho nội dung block) |
-| **O1** | **Rasterize SVG→PNG trên server**: chọn thư viện nào, hay gửi thẳng SVG?                                    | **Cần chốt ở PR2.** Ưu tiên phương án **không thêm phụ thuộc render nặng**; nếu buộc phải thêm thì nêu rõ lý do trong PR |
-| **O2** | Ngưỡng độ tin cậy để một dòng được **chọn sẵn** trong bảng duyệt                                            | **Cần chốt** — đề nghị mặc định 0.80, đo lại trên bộ đối chứng ở PR2 rồi điều chỉnh                                   |
-| **O3** | Có gửi tên dự án/tên tệp kèm theo prompt để tăng độ chính xác không?                                        | **Đề nghị KHÔNG** ở đợt này (§12 giữ dữ liệu gửi ra ngoài ở mức tối thiểu); mở lại nếu AC3 không đạt                  |
+| #      | Rủi ro / giả định                                                        | Xử lý                                                                                                                     |
+| ------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| R1     | AI đề xuất `kind` sai, người duyệt bấm qua nhanh                         | Bảng duyệt lọc riêng được dòng do AI; độ tin cậy thấp phải sửa tay mới chọn được; audit đủ để truy ngược                  |
+| R2     | Chi phí gọi model vượt dự kiến                                           | Chỉ gọi cho phần dư của tầng 1; Batches API giảm 50%; prompt caching; trần 200 ảnh/lô                                     |
+| R3     | Đây là chỗ **đầu tiên** đưa SDK LLM vào codebase XBoss                   | Cô lập trong `lib/nen/ai.ts`; mọi tầng trên gọi qua một cửa; tắt được bằng biến môi trường                                |
+| R4     | Bộ đối chứng §15.4 do chính người làm gán nhãn → đo AC3 dễ thiên vị      | Nhãn chuẩn do **kỹ sư trưởng/CAD manager** gán, không phải người viết code (đúng như M100 §16 đã chốt cho nội dung block) |
+| **O1** | **Rasterize SVG→PNG trên server**: chọn thư viện nào, hay gửi thẳng SVG? | **Cần chốt ở PR2.** Ưu tiên phương án **không thêm phụ thuộc render nặng**; nếu buộc phải thêm thì nêu rõ lý do trong PR  |
+| **O2** | Ngưỡng độ tin cậy để một dòng được **chọn sẵn** trong bảng duyệt         | **Cần chốt** — đề nghị mặc định 0.80, đo lại trên bộ đối chứng ở PR2 rồi điều chỉnh                                       |
+| **O3** | Có gửi tên dự án/tên tệp kèm theo prompt để tăng độ chính xác không?     | **Đề nghị KHÔNG** ở đợt này (§12 giữ dữ liệu gửi ra ngoài ở mức tối thiểu); mở lại nếu AC3 không đạt                      |
 
 ## 19. Approval
 
