@@ -87,10 +87,13 @@ chiếu tài liệu chứ không đoán theo lỗi biên dịch.
 Cổng biên dịch mã Adapter trên Linux nên **không thể bật `UseWindowsForms`/`UseWPF`** — mà chính
 hai cờ đó quyết định bộ `ImplicitUsings` của bản build thật. Hệ quả từng làm lọt lỗi:
 
-| Ngày       | Lọt gì                                                                                     | Vá thế nào                                                                                                                                 |
-| ---------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-08-26 | `CS0104 'Brush' ambiguous` ở `Ui/Wpf/MauBangWpf.cs` — chỉ lộ khi build trên máy có AutoCAD | `<Using Include="System.Drawing" />` trong csproj cổng + stub `System.Drawing.Brush`/`Pen` cuối `AcadStub.cs`, tái hiện đúng cặp tên trùng |
+| Ngày       | Lọt gì                                                                                     | Vá thế nào                                                                                                                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-26 | `CS0104 'Brush' ambiguous` ở `Ui/Wpf/MauBangWpf.cs` — chỉ lộ khi build trên máy có AutoCAD | Stub `System.Drawing.Brush`/`Pen` cuối `AcadStub.cs` (tái hiện cặp tên trùng) + `System.Drawing` nay nằm trong `XBoss.Cad.Acad/GlobalUsings.cs` nên cổng thấy đúng bộ using của bản thật                            |
+| 2026-08-26 | 181 lỗi `CS0103 Path/File/Directory` ở pha biên dịch markup XAML — cổng xanh, bản thật đỏ  | `ImplicitUsings` bị TẮT ở cả Adapter lẫn cổng, thay bằng `XBoss.Cad.Acad/GlobalUsings.cs` tường minh: project tạm `*_wpftmp` mà `UseWPF` sinh ra không kế thừa property `ImplicitUsings`, nhưng luôn nhận tệp `.cs` |
 
-Quy tắc rút ra: **thêm cờ nào vào `XBoss.Cad.Acad.csproj` thì phải hỏi ngay "cờ này đổi
-ImplicitUsings không?"** — nếu có, tái hiện lại trong csproj của cổng, kèm stub cho các kiểu trùng
-tên. Cổng không mô phỏng được thì ghi rõ vào bảng trên thay vì để im.
+Quy tắc rút ra: **cổng chỉ trung thực khi bộ `using` của nó giống hệt bản thật.** Vì vậy Adapter
+không dùng `ImplicitUsings` nữa — mọi `global using` nằm trong `XBoss.Cad.Acad/GlobalUsings.cs`,
+một tệp `.cs` mà cả ba đường build (bản thật, pha markup `_wpftmp`, cổng CI) đều nhận. Thêm cờ nào
+vào `XBoss.Cad.Acad.csproj` thì hỏi ngay: **cờ này có sinh project tạm hoặc đổi bộ using không?**
+Cổng không mô phỏng được thì ghi vào bảng trên thay vì để im.
