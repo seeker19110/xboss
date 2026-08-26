@@ -257,11 +257,15 @@ jobs:
         run: |
           set -e
           VER=$(dotnet --version)
+          MAJOR=${VER%%.*}
           echo "dotnet SDK: $VER"
-          case "$VER" in
-            8.*) ;;
-            *) echo "::error::Cần .NET SDK 8.x (Core/Tests là net8.0) — runner đang có $VER. Ghim actions/setup-dotnet hoặc cập nhật TargetFramework."; exit 1 ;;
-          esac
+          # SDK mới build được target cũ (net8.0 của Core/Tests), nên chỉ chặn khi SDK CŨ HƠN 8 —
+          # đó mới là ca không dựng nổi project. Mục đích: image runner trôi ngược thì đỏ kèm lý do
+          # rõ, thay vì lỗi biên dịch khó hiểu ở bước sau.
+          if [ "$MAJOR" -lt 8 ]; then
+            echo "::error::Cần .NET SDK từ 8 trở lên (Core/Tests là net8.0) — runner đang có $VER."
+            exit 1
+          fi
 
       - name: Test XBoss.Cad.Core (xunit)
         run: dotnet test plugin-autocad/XBoss.Cad.Tests/XBoss.Cad.Tests.csproj -c Release
@@ -303,11 +307,15 @@ jobs:
         run: |
           set -e
           VER=$(dotnet --version)
+          MAJOR=${VER%%.*}
           echo "dotnet SDK: $VER"
-          case "$VER" in
-            8.*) ;;
-            *) echo "::error::Cần .NET SDK 8.x (Core/Tests là net8.0) — runner đang có $VER. Ghim actions/setup-dotnet hoặc cập nhật TargetFramework."; exit 1 ;;
-          esac
+          # SDK mới build được target cũ (net8.0 của Core/Tests), nên chỉ chặn khi SDK CŨ HƠN 8 —
+          # đó mới là ca không dựng nổi project. Mục đích: image runner trôi ngược thì đỏ kèm lý do
+          # rõ, thay vì lỗi biên dịch khó hiểu ở bước sau.
+          if [ "$MAJOR" -lt 8 ]; then
+            echo "::error::Cần .NET SDK từ 8 trở lên (Core/Tests là net8.0) — runner đang có $VER."
+            exit 1
+          fi
 
       - name: Biên dịch thử toàn bộ XBoss.Cad.Acad bằng stub
         run: dotnet build plugin-autocad/XBoss.Cad.AcadShim/XBoss.Cad.AcadShim.csproj -c Release
