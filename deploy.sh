@@ -2,11 +2,21 @@
 #
 # Script deploy lên VPS cho app "xboss".
 # Cách dùng trên VPS (trong thư mục project):
-#   bash deploy.sh              # deploy production (mặc định, hành vi y hệt trước khi có --staging)
-#   bash deploy.sh --staging    # deploy staging — pm2 process/thư mục build/file env riêng (M44 PR4)
+#   bash deploy.sh                # deploy production, dùng bản build CI đã gửi sang (mặc định)
+#   bash deploy.sh --build-local  # deploy production, tự build ngay trên VPS (đường dự phòng)
+#   bash deploy.sh --staging      # deploy staging — pm2 process/thư mục build/file env riêng (M44 PR4)
 #
 # Việc nó làm: lấy code mới nhất từ Git -> cài thư viện -> áp migration DB còn thiếu ->
-# build vào thư mục tạm -> swap atomic vào ".next" thật -> khởi động lại app.
+# lấy bản build (giải nén gói từ CI, hoặc tự build vào thư mục tạm) -> swap atomic vào
+# ".next" thật -> khởi động lại app.
+#
+# Vì sao mặc định KHÔNG build trên VPS nữa (2026-08-26): `next build` trên máy này chạy
+# 20-23 phút vì RAM thiếu phải bù bằng swap đĩa — từng bị OOM-kill (exit 137) và từng vượt
+# command_timeout của ssh-action, cắt ngang deploy đúng lúc build vừa xong khiến commit mới
+# nhất KHÔNG lên được production (xem PROGRESS.md mục blocker 2026-07-19). Nay workflow
+# .github/workflows/deploy.yml build trên runner GitHub rồi rsync gói ".next-ci.tar.gz" sang
+# đây trước khi gọi script này. Cờ --build-local giữ nguyên đường cũ để còn deploy được khi
+# GitHub Actions không dùng được.
 #
 # Vì sao build vào thư mục tạm rồi swap: app đang chạy (pm2) đọc trực tiếp ".next"
 # hiện tại trong lúc "npm run build" chạy — nếu build ghi đè thẳng lên ".next" đang
@@ -32,11 +42,26 @@ set -e   # Gặp lỗi ở bất kỳ bước nào là dừng ngay, không deplo
 BRANCH="main"
 
 STAGING=false
+BUILD_LOCAL=false
 for arg in "$@"; do
   case "$arg" in
     --staging) STAGING=true ;;
+    --build-local) BUILD_LOCAL=true ;;
+    *) echo "Tham số không nhận ra: $arg (chỉ có --staging, --build-local)" >&2; exit 2 ;;
   esac
 done
+
+# Gói build từ CI chỉ dành cho production: staging được deploy bằng tay trên VPS (tập dượt
+# migration, xem docs/ops/staging.md) và không có workflow nào gửi gói sang, nên staging luôn
+# tự build tại chỗ như trước.
+if [ "$STAGING" = true ]; then
+  BUILD_LOCAL=true
+fi
+
+# Gói do .github/workflows/deploy.yml gửi sang (tar chứa thư mục ".next-ci" + phiếu ".next-ci.info").
+CI_TARBALL=".next-ci.tar.gz"
+CI_DIR=".next-ci"
+CI_INFO=".next-ci.info"
 
 if [ "$STAGING" = true ]; then
   PM2_NAME="xboss-staging"
@@ -60,7 +85,10 @@ echo "==> 2/7 Ép code về đúng origin/$BRANCH — 100% code từ GitHub"
 # BUILD_DIR/OLD_DIR (-e) để không xoá nhầm bản build tạm nếu lần chạy trước bị ngắt giữa chừng,
 # và trừ *.local/.env.staging (-e) để không xoá mất file bí mật chưa (và sẽ không) commit.
 git reset --hard "origin/$BRANCH"
-git clean -fd -e "$BUILD_DIR" -e "$OLD_DIR" -e ".env.local" -e ".env.staging"
+# Trừ thêm gói build từ CI (-e): nó được rsync sang TRƯỚC khi script này chạy, "git clean"
+# không biết nó là file hợp lệ nên sẽ xoá mất, khiến bước 5/7 không còn gì để giải nén.
+git clean -fd -e "$BUILD_DIR" -e "$OLD_DIR" -e ".env.local" -e ".env.staging" \
+  -e "$CI_TARBALL" -e "$CI_TARBALL.part" -e "$CI_DIR" -e "$CI_INFO"
 
 echo "==> 3/7 Cài thư viện theo package-lock.json"
 npm ci
@@ -88,9 +116,52 @@ echo "==> 4.7/7 Dựng cây thư mục bản vẽ quy chuẩn ISO 19650 (idempot
 # vốn đã 20-23 phút. Xem scripts/ensure-drawing-tree.ts.
 npm run setup:drawing-tree
 
-echo "==> 5/7 Build app vào thư mục tạm ($BUILD_DIR) — không đụng \".next\" đang phục vụ"
-rm -rf "$BUILD_DIR"
-NEXT_DIST_DIR="$BUILD_DIR" npm run build
+if [ "$BUILD_LOCAL" = true ]; then
+  echo "==> 5/7 Build app tại chỗ vào thư mục tạm ($BUILD_DIR) — không đụng \".next\" đang phục vụ"
+  rm -rf "$BUILD_DIR"
+  NEXT_DIST_DIR="$BUILD_DIR" npm run build
+else
+  echo "==> 5/7 Nhận bản build từ CI ($CI_TARBALL) — không build trên VPS"
+  if [ ! -f "$CI_TARBALL" ]; then
+    echo "    ❌ Không thấy $CI_TARBALL trong $(pwd)." >&2
+    echo "       Gói này do .github/workflows/deploy.yml rsync sang ngay trước khi gọi script." >&2
+    echo "       Deploy tay từ VPS thì dùng: bash deploy.sh --build-local" >&2
+    exit 1
+  fi
+
+  rm -rf "$BUILD_DIR" "$CI_DIR" "$CI_INFO"
+  tar -xzf "$CI_TARBALL"
+
+  if [ ! -d "$CI_DIR" ] || [ ! -f "$CI_INFO" ]; then
+    echo "    ❌ Gói $CI_TARBALL thiếu \"$CI_DIR\" hoặc \"$CI_INFO\" — không dám swap." >&2
+    exit 1
+  fi
+
+  # Cổng 1 — ĐÚNG COMMIT: bước 2/7 vừa ép code về origin/main, nếu có push mới chen vào giữa
+  # thì gói build (của commit cũ) không còn khớp mã nguồn/migration vừa áp. Chạy lệch cặp này
+  # là kiểu lỗi rất khó truy: app phục vụ bundle của bản khác với code trên đĩa.
+  CI_SHA=$(grep -E '^sha=' "$CI_INFO" | tail -n1 | cut -d= -f2-)
+  HEAD_SHA=$(git rev-parse HEAD)
+  if [ "$CI_SHA" != "$HEAD_SHA" ]; then
+    echo "    ❌ Gói build là của commit $CI_SHA nhưng mã nguồn đang ở $HEAD_SHA." >&2
+    echo "       Thường do có push mới chen vào — lần chạy CI kế tiếp sẽ gửi gói đúng." >&2
+    exit 1
+  fi
+
+  # Cổng 2 — ĐÚNG NODE MAJOR: điều kiện đã ghi ở DEPLOY.md mục "Build ở máy khác" (cùng bản
+  # Node để tránh lệch native module/runtime).
+  CI_NODE=$(grep -E '^node=' "$CI_INFO" | tail -n1 | cut -d= -f2-)
+  VPS_NODE=$(node -p 'process.versions.node.split(".")[0]')
+  if [ "$CI_NODE" != "$VPS_NODE" ]; then
+    echo "    ❌ Gói build bằng Node $CI_NODE nhưng VPS đang chạy Node $VPS_NODE." >&2
+    echo "       Đồng bộ node-version trong .github/workflows/deploy.yml với VPS rồi deploy lại." >&2
+    exit 1
+  fi
+
+  mv "$CI_DIR" "$BUILD_DIR"
+  rm -f "$CI_INFO"
+  echo "    ✅ Bản build khớp commit $HEAD_SHA (Node $CI_NODE)"
+fi
 
 echo "==> 6/7 Swap atomic \"$BUILD_DIR\" vào \".next\""
 rm -rf "$OLD_DIR"
@@ -134,6 +205,9 @@ done
 
 if [ "$HEALTHY" = true ]; then
   rm -rf "$OLD_DIR"
+  # Chỉ xoá gói CI khi đã chắc chắn bản mới sống: hỏng giữa chừng thì gói còn đó để chạy lại
+  # `bash deploy.sh` mà không phải chờ CI build lại.
+  rm -f "$CI_TARBALL"
   echo "==> Xong! Deploy hoàn tất ($([ "$STAGING" = true ] && echo staging || echo production))."
 else
   echo "==> Health-check thất bại sau 5 lần thử ($HEALTH_URL) — rollback về bản build trước"

@@ -4,6 +4,11 @@ node_modules/
 .next-old/
 .next-build-staging/
 .next-old-staging/
+# Gói build do GitHub Actions gửi sang VPS (.github/workflows/deploy.yml) + thư mục giải nén
+.next-ci/
+.next-ci.tar.gz
+.next-ci.tar.gz.part
+.next-ci.info
 .env
 .env.local
 .env.staging

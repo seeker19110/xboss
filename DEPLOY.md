@@ -10,11 +10,15 @@ khởi động lần đầu**, hoặc chủ động chạy `npm run db:migrate` 
 
 ## Yêu cầu phần cứng
 
-**Node ≥ 24** (đúng version CI dùng, `.github/workflows/ci.yml`) và tối thiểu **1 CPU**. Đỉnh
-tải RAM không nằm ở lúc app chạy mà ở lúc **build**: `deploy.sh` chạy thẳng `npm run build`
-NGAY TRÊN máy production (build vào thư mục tạm `.next-build` rồi `mv` atomic vào `.next`, xem
-bước 5/7 trong [`deploy.sh`](./deploy.sh)) — `next build` là tiến trình Node ngốn RAM nhất
-trong toàn bộ vòng đời deploy, nặng hơn hẳn lúc `next start` phục vụ request.
+**Node ≥ 24** (đúng version CI dùng, `.github/workflows/ci.yml`) và tối thiểu **1 CPU**.
+
+> **Cập nhật 2026-08-26 — deploy tự động KHÔNG còn build trên VPS.**
+> [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml) build trên runner GitHub
+> rồi `rsync` gói `.next-ci.tar.gz` sang VPS; `deploy.sh` chỉ giải nén, áp migration, swap
+> atomic và reload. Đỉnh tải RAM khi deploy vì thế **biến mất** ở cấu hình mặc định. Bảng
+> RAM dưới đây vẫn đúng cho đường dự phòng `bash deploy.sh --build-local` (build tại chỗ) —
+> `next build` là tiến trình Node ngốn RAM nhất trong vòng đời deploy, nặng hơn hẳn lúc
+> `next start` phục vụ request.
 
 | Cấu hình                    | RAM                 | Ổ đĩa | Ghi chú                                                                                                                                                                                                                                                                                                                         |
 | --------------------------- | ------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -50,12 +54,19 @@ sudo swapon /swapfile
 echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab   # giữ swap sau khi reboot
 ```
 
-**Build ở máy khác thay vì trên production (RAM thấp hoặc muốn tránh đỉnh tải build hẳn):**
-Chạy `npm ci && npm run build` trên máy có nhiều RAM hơn (máy dev, CI runner, VPS khác), rồi
-`rsync -avz .next/ user@production:/đường-dẫn/xboss/.next/` sang máy thật — miễn cùng phiên
-bản Node (≥ 24) và cùng `package-lock.json` để tránh lệch native module. Đánh đổi: mất tính
-atomic-swap + health-check + auto-rollback mà `deploy.sh` cung cấp sẵn, nên chỉ dùng khi máy
-production thực sự không kham nổi `next build`.
+**Build ở máy khác thay vì trên production:** đây nay là **hành vi mặc định**, đã tự động hoá
+trong `.github/workflows/deploy.yml` và **không** mất atomic-swap/health-check/auto-rollback
+(khác với cách rsync tay trước đây) — xem mục
+["Script một lệnh cho các lần cập nhật sau"](#script-một-lệnh-cho-các-lần-cập-nhật-sau-deploysh).
+Hai điều kiện cùng-phiên-bản vẫn còn nguyên giá trị và nay được **kiểm tự động**: cùng Node
+major và cùng `package-lock.json` (runner build từ đúng commit VPS reset về; runner còn build
+tại đúng đường dẫn `/var/www/xboss` vì `.next` có nhúng đường dẫn tuyệt đối lúc build).
+
+**Secrets repo mà workflow deploy cần:** `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (đã có từ
+trước), `VPS_SSH_KNOWN_HOSTS` (tuỳ chọn — ghim host key thay vì `ssh-keyscan` tin lần đầu),
+và `NEXT_PUBLIC_SENTRY_DSN` (**tuỳ chọn nhưng bắt buộc nếu đang dùng Sentry phía trình
+duyệt**: biến `NEXT_PUBLIC_*` được nhúng vào bundle LÚC BUILD, trước đây lấy từ `.env.local`
+trên VPS; build ở runner mà thiếu nó thì Sentry client tự tắt, không có lỗi nào báo ra).
 
 **Chạy nhiều instance / tách Postgres / backup:** xem mục
 ["Chạy nhiều instance"](#chạy-nhiều-instance-cluster-tuỳ-chọn--m53-pr4) bên dưới (quan hệ
@@ -162,8 +173,10 @@ bash deploy.sh
 
 Script tự làm: `git fetch` + `reset --hard origin/main` (VPS luôn chạy nhánh
 `main`) → `npm ci` → `npm run db:migrate` (áp migration DB còn thiếu, dừng
-deploy nếu lỗi) → build vào thư mục tạm `.next-build` (không đụng `.next`
-đang được app chạy thật đọc) → swap atomic `.next-build` vào `.next` → `pm2
+deploy nếu lỗi) → **lấy bản build** vào thư mục tạm `.next-build` (mặc định:
+giải nén gói `.next-ci.tar.gz` do GitHub Actions gửi sang; với cờ
+`--build-local`: tự chạy `npm run build` tại chỗ như trước) → swap atomic
+`.next-build` vào `.next` → `pm2
 reload xboss --update-env` → **health-check** `GET /api/health` (retry tối đa
 5 lần, cách nhau 3 giây). Build vào thư mục tạm rồi swap thay vì ghi đè
 thẳng lên `.next` đang chạy giúp tránh 2 rủi ro: client đã tải HTML cũ xin lại
@@ -173,6 +186,20 @@ qua), và build lỗi giữa chừng làm `.next` bị bỏ dở không rollback
 health-check vẫn thất bại sau 5 lần thử, script **tự rollback** về bản build
 trước (`.next-old`) và `pm2 reload` lại rồi thoát với mã lỗi — bản cũ đang
 chạy chỉ bị dọn (`rm -rf .next-old`) khi health-check pass.
+
+**Hai chế độ lấy bản build:**
+
+| Lệnh                          | Bản build lấy từ đâu                    | Dùng khi                                                      |
+| ----------------------------- | --------------------------------------- | ------------------------------------------------------------- |
+| `bash deploy.sh`              | Gói `.next-ci.tar.gz` GitHub Actions gửi | Mặc định — chính là đường auto-deploy chạy sau mỗi lần CI xanh |
+| `bash deploy.sh --build-local` | Tự `npm run build` trên VPS              | Dự phòng: GitHub Actions không dùng được, hoặc deploy khẩn cấp |
+| `bash deploy.sh --staging`     | Tự build tại chỗ (luôn luôn)             | Staging deploy tay — không có workflow nào gửi gói sang        |
+
+Trước khi swap, `deploy.sh` kiểm hai cổng trên gói nhận được và **dừng deploy** nếu lệch:
+SHA trong gói phải khớp `git rev-parse HEAD` (chống chạy bundle của commit khác với mã nguồn/
+migration vừa áp — thường do có push chen vào giữa; lần CI kế tiếp sẽ gửi gói đúng), và Node
+major lúc build phải khớp Node trên VPS. Gói chỉ bị xoá sau khi health-check pass, nên deploy
+hỏng giữa chừng vẫn chạy lại được `bash deploy.sh` ngay mà không phải chờ CI build lại.
 
 > ⚠️ `reset --hard` sẽ **xoá mọi sửa đổi cục bộ** trên VPS để khớp đúng
 > `origin/main` — đừng sửa file trực tiếp trên server, hãy đổi cấu hình qua

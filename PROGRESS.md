@@ -4,6 +4,59 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Đưa `next build` ra khỏi VPS — đóng blocker deploy 2026-07-19 (2026-08-26)
+
+Người dùng chọn "theo khuyến nghị" sau đợt rà ý tưởng tích hợp: làm mục ưu tiên 1 — gỡ blocker
+deploy đang chặn production, trước mọi tính năng mới.
+
+**Vấn đề (đã ghi ở mục blocker 2026-07-19 phía dưới):** `next build` chạy trên VPS mất 20-23
+phút vì RAM thiếu phải bù bằng swap đĩa; từng bị OOM-kill (exit 137), từng vượt
+`command_timeout` của `appleboy/ssh-action` và bị cắt ngang **đúng lúc build vừa xong** (chưa
+kịp swap `.next`/`pm2 reload`) ⇒ commit mới nhất trên `main` không lên được production. Cách vá
+cũ chỉ là nới timeout 25m → 40m, không đụng gốc rễ.
+
+**Quyết định người dùng chốt (3 câu hỏi):** rsync thẳng từ Actions (không thêm PAT trên VPS) ·
+giữ `next start` + chỉ chuyển `.next` (không đổi sang `output: "standalone"` trong đợt gỡ
+blocker) · giữ đường build tại chỗ sau cờ `--build-local`.
+
+**Đã làm**
+
+1. **`.github/workflows/deploy.yml` build trên runner:** checkout đúng `workflow_run.head_sha`
+   (không phải HEAD của `main` lúc job khởi động), `npm ci` + `NEXT_DIST_DIR=.next-ci npm run
+   build`, đóng gói `.next-ci.tar.gz` kèm phiếu `.next-ci.info` (`sha=`/`node=`), rsync sang
+   VPS rồi mới gọi `bash deploy.sh`. `command_timeout` 40m thay bằng `timeout 15m` cho bước SSH
+   còn lại (không còn build nên vài phút là xong).
+2. **Runner build tại đúng `/var/www/xboss`:** `.next` có nhúng **đường dẫn tuyệt đối** lúc
+   build (`required-server-files.json`, trace `*.nft.json`) — build ở `/home/runner/...` rồi
+   chạy ở `/var/www/xboss` là lớp lệch âm thầm không đáng gánh.
+3. **`NEXT_PUBLIC_SENTRY_DSN` (bẫy hỏng-âm-thầm, phát hiện khi rà):** biến `NEXT_PUBLIC_*`
+   được **nhúng vào bundle lúc build**, trước đây lấy từ `.env.local` trên VPS. Chuyển build
+   sang runner mà không truyền vào thì Sentry phía trình duyệt tự tắt, không lỗi nào báo ra.
+   Đã truyền qua secret cùng tên (tuỳ chọn — bỏ trống thì hành vi y như VPS không đặt biến).
+4. **`deploy.sh` hai chế độ:** mặc định giải nén gói từ CI; `--build-local` giữ nguyên đường
+   cũ; `--staging` luôn tự build tại chỗ (không workflow nào gửi gói cho staging). Giữ nguyên
+   toàn bộ swap atomic + health-check + auto-rollback. Thêm `-e` cho gói CI trong `git clean`
+   (không thì bước 2/7 xoá mất gói vừa rsync sang), cờ lạ → `exit 2`.
+5. **Hai cổng chặn trước khi swap:** SHA trong gói phải khớp `git rev-parse HEAD` (chống chạy
+   bundle của commit khác với mã nguồn/migration vừa áp khi có push chen vào giữa) và Node
+   major lúc build phải khớp Node trên VPS. Gói chỉ bị xoá sau khi health-check pass ⇒ deploy
+   hỏng giữa chừng chạy lại `bash deploy.sh` được ngay, không phải chờ CI build lại.
+6. **Host key SSH:** thêm secret tuỳ chọn `VPS_SSH_KNOWN_HOSTS` để ghim; không có thì
+   `ssh-keyscan` (đúng thứ `ssh-action` vẫn làm ngầm trước đây) và **in cảnh báo** — chấp nhận
+   TOFU một cách tường minh thay vì tưởng đã ghim.
+7. **Tài liệu:** `DEPLOY.md` mục yêu cầu phần cứng (đỉnh RAM khi deploy biến mất ở cấu hình
+   mặc định), bảng 3 chế độ deploy, danh sách secrets workflow cần; `.gitignore` cho `.next-ci*`.
+
+**Verify:** `deploy.sh` chạy thật trong sandbox (git giả + stub `npm`/`pm2`/`curl`) đủ 7 ca —
+gói đúng (deploy xong, gói được dọn), sai SHA (exit 1), sai Node major (exit 1), thiếu gói
+(exit 1, chỉ đường `--build-local`), `--build-local`, `--staging`, cờ lạ (exit 2). `bash -n`
+xanh. Không đụng file TypeScript nào nên lint/typecheck không liên quan.
+
+**Còn nợ:** lần deploy thật đầu tiên phải theo dõi tận nơi (đây là đường deploy production).
+Nếu đang dùng Sentry client thì **khai secret `NEXT_PUBLIC_SENTRY_DSN` trước** khi merge, nếu
+không bản deploy kế tiếp sẽ mất Sentry phía trình duyệt. `output: "standalone"` để dành cho đợt
+sau nếu muốn bỏ luôn `npm ci` trên VPS.
+
 ## Đóng tồn đọng tích hợp plugin AutoCAD (đợt 2, 2026-08-25)
 
 Sau khi PR #402 merge, rà lại toàn cụm trên `main` để trả lời "còn gì chưa tích hợp": 8/8 mục của
