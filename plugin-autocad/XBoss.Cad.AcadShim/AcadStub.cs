@@ -195,6 +195,9 @@ namespace Autodesk.AutoCAD.DatabaseServices
         // chỗ dùng duy nhất là truyền `ObjectId.Null` làm đối số (StandardizePipeline).
         public static ObjectId Null => new ObjectId();
         public bool IsNull => false;
+        /// <summary>ObjectARX thật: đối tượng đã bị xóa — phải kiểm trước khi mở, mở ForWrite một
+        /// id đã xóa là ném lỗi. Dùng khi khôi phục trạng thái khóa layer sau chuẩn hóa.</summary>
+        public bool IsErased => false;
         public Handle Handle => new Handle(1);
         public DBObject GetObject(OpenMode mode) => null;
         public static bool operator ==(ObjectId a, ObjectId b) => true;

@@ -147,8 +147,10 @@ internal static class VeLayerService
     /// là làm hiện lên nét kỹ sư cố ý giấu. Layer vốn đã mở khóa thì không ghi vào danh sách —
     /// không có gì để hoàn nguyên.</para>
     ///
-    /// <para>Layer phụ thuộc xref bị BỎ QUA (xem <see cref="KhoaVaLamMo"/>: mở ForWrite ném
-    /// <c>eInvalidKey</c>), ghi tên vào <paramref name="boQua"/> để lệnh báo lại cho kỹ sư.</para>
+    /// <para>Layer phụ thuộc xref bị BỎ QUA HẲN (xem <see cref="KhoaVaLamMo"/>: mở ForWrite ném
+    /// <c>eInvalidKey</c>) và KHÔNG tính vào <paramref name="boQua"/>: bản vẽ chủ không đặt được
+    /// thực thể lên layer của xref, nên mở khóa chúng chẳng để làm gì. <paramref name="boQua"/> chỉ
+    /// nhận layer thật sự CẦN mở mà không mở được — thứ duy nhất đáng báo cho kỹ sư.</para>
     /// </summary>
     internal static List<LayerDaMoKhoa> MoKhoaTam(Database db, Transaction tr, List<string>? boQua = null)
     {
@@ -157,11 +159,7 @@ internal static class VeLayerService
         foreach (ObjectId id in lt)
         {
             var ltr = (LayerTableRecord)tr.GetObject(id, OpenMode.ForRead);
-            if (ltr.IsDependent)
-            {
-                if (ltr.IsLocked) boQua?.Add(ltr.Name);
-                continue;
-            }
+            if (ltr.IsDependent) continue;
             if (!ltr.IsLocked) continue;
             try
             {
