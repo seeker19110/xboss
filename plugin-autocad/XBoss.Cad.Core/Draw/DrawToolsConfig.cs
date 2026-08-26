@@ -82,6 +82,12 @@ public sealed class DrawLine
     /// <summary>Tuyến bắt buộc hỏi độ dốc khi vẽ (M100 §6.9) — mặc định false.</summary>
     [JsonPropertyName("slopeRequired")] public bool SlopeRequired { get; init; }
 
+    /// <summary>
+    /// Tham số chia đốt theo kiểu kết nối (M105 §12, rule pack v9 trở đi). null = tuyến chưa khai ⇒
+    /// <c>XBOSS_VE_CHIADOT</c> BỎ QUA tuyến kèm thông báo, không đoán mặc định ngầm (M105 AC10).
+    /// </summary>
+    [JsonPropertyName("jointRules")] public JointRules? JointRules { get; init; }
+
     /// <summary>Khoảng cách giá đỡ cho một size cụ thể; null = không khai (lệnh vẽ phải hỏi/ bỏ qua).</summary>
     public double? SupportSpacingMmCho(string size)
     {
@@ -259,6 +265,15 @@ public static class DrawToolsConfig
                             }
                             break;
                     }
+                }
+
+                // (c2) khối chia đốt (v9) khai rồi thì phải hợp lệ — kể cả layer vạch chia không
+                // đụng takeoff (M105 §12/FR5, cùng lớp lỗi với layer nét biên ở (d) bên dưới).
+                if (line.JointRules is { } jointRules)
+                {
+                    var moTa = $"drawTools.systems[\"{sys.Id}\"].lines[\"{line.ItemId}\"].jointRules";
+                    JointRulesConfig.Validate(jointRules, JointRulesConfig.DocKieuCo(line.SizeKind), moTa);
+                    JointRulesConfig.KiemLayerVachChia(line.Layer, jointRules, pack.Takeoff.Items, moTa);
                 }
 
                 // (d) layer biên KHÔNG được khớp bất kỳ takeoff.layerMatchAny nào (FR4) — nếu khớp thì
