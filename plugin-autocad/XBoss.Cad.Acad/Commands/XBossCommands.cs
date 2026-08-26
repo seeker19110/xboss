@@ -47,6 +47,54 @@ public sealed class XBossCommands
 
     private static string HomNayIso() => DateTime.Now.ToString("yyyy-MM-dd");
 
+    // ===== Mở khóa TẠM để ghi lên thực thể (đường bóc khối lượng) =====
+    //
+    // Bản vẽ MEP thật luôn có layer khóa (nền kiến trúc, hệ khác, layer của công ty), mà đánh dấu
+    // hay gỡ dấu đều phải mở thực thể ForWrite ⇒ AutoCAD ném eOnLockedLayer và cả lệnh rollback.
+    // Người dùng đã chốt (2026-08-26): plugin ĐƯỢC PHÉP tự mở khóa để ghi, miễn trả nguyên trạng.
+    // Dùng đúng cặp VeLayerService.MoKhoaTam/KhoaLai của pipeline chuẩn hóa — không cơ chế thứ hai.
+
+    /// <summary>
+    /// Tập layer đang giữ những thực thể sắp ghi — để <c>MoKhoaTam</c> mở khóa ĐÚNG chừng đó thay
+    /// vì mở toang cả bản vẽ. Mở ForRead: layer khóa vẫn đọc được bình thường.
+    /// </summary>
+    private static HashSet<ObjectId> LayerCua(Transaction tr, IEnumerable<ObjectId> ids)
+    {
+        var layer = new HashSet<ObjectId>();
+        foreach (var id in ids)
+            if (tr.GetObject(id, OpenMode.ForRead) is Entity ent) layer.Add(ent.LayerId);
+        return layer;
+    }
+
+    /// <summary>
+    /// Thực thể còn nằm trên layer khóa sau khi đã mở khóa tạm? (layer bị AEC/ứng dụng thứ ba giữ).
+    /// Hỏi TRƯỚC khi ghi thay vì để AutoCAD ném eOnLockedLayer — một layer khó tính không được phép
+    /// giết cả lệnh; caller đếm số bỏ qua và báo cho kỹ sư.
+    /// </summary>
+    private static bool ConKhoa(Transaction tr, Entity ent) =>
+        tr.GetObject(ent.LayerId, OpenMode.ForRead) is LayerTableRecord ltr && ltr.IsLocked;
+
+    /// <summary>Báo cho kỹ sư đúng những gì lệnh đã đụng vào cờ khóa layer — không im lặng.</summary>
+    private static void InTinhTrangKhoaLayer(
+        Editor ed, string viec, int soMoKhoa, IReadOnlyList<string> khongMoDuoc,
+        IReadOnlyList<string> khoaLaiHut, int soBoQua)
+    {
+        if (soMoKhoa > 0)
+            ed.WriteMessage($"[XBoss] Đã tạm mở khóa {soMoKhoa} layer để {viec} và khóa lại như cũ.\n");
+        if (khongMoDuoc.Count > 0)
+        {
+            ed.WriteMessage(
+                $"[XBoss] ⚠ {khongMoDuoc.Count} layer đang KHÓA mà không mở khóa được: " +
+                $"{string.Join(", ", khongMoDuoc)} — bỏ qua {soBoQua} đối tượng trên các layer đó.\n");
+        }
+        if (khoaLaiHut.Count > 0)
+        {
+            ed.WriteMessage(
+                $"[XBoss] ⚠ Không khóa lại được {khoaLaiHut.Count} layer đã mở tạm: " +
+                $"{string.Join(", ", khoaLaiHut)} — khóa tay lại (lệnh LAYER) trước khi lưu.\n");
+        }
+    }
+
     // ===== XBOSS_RULEPACK =====
 
     [CommandMethod("XBOSS_RULEPACK")]
@@ -306,27 +354,58 @@ public sealed class XBossCommands
         }
 
         // Đánh dấu trong 1 transaction = 1 nhóm UNDO (FR14).
+        var soMoKhoa = 0;
+        var soBoQuaKhoa = 0;
+        var khongMoDuoc = new List<string>();
+        var khoaLaiHut = new List<string>();
         using (var tr = db.TransactionManager.StartTransaction())
         {
             MarkService.EnsureRegApp(db, tr, pack.Takeoff.XdataAppName);
             var ngay = HomNayIso();
             // Tên vùng ghi kèm XData (M101 §6.3) để XBOSS_BOCKL_XUAT dựng lại bảng theo vùng.
             var vungTheoHandle = TakeoffZoning.VungTheoHandle(ketQua);
+
+            // Gom danh sách sẽ đánh dấu TRƯỚC (chỉ đọc) để biết cần mở khóa những layer nào. Không
+            // đụng gì tới số liệu: khối lượng đã tính xong ở transaction trên, đây chỉ là bước ghi
+            // dấu lên đúng những handle mà TakeoffScanner đã chọn (khối xref vốn đã bị loại từ M99).
+            var canDanhDau = new List<(ObjectId Id, string ItemId, string Vung)>();
             foreach (var line in ketQua.Lines)
             {
                 if (line.LaDanXuat) continue; // dòng cách nhiệt được TÍNH RA, không có đối tượng riêng để đánh dấu
                 foreach (var handle in line.Handles)
                 {
                     if (!db.TryGetObjectId(new Handle(Convert.ToInt64(handle, 16)), out var id)) continue;
+                    canDanhDau.Add((id, line.Item.Id, vungTheoHandle.GetValueOrDefault(handle, "")));
+                }
+            }
+
+            var daMoKhoa = VeLayerService.MoKhoaTam(
+                db, tr, khongMoDuoc, LayerCua(tr, canDanhDau.Select(x => x.Id)));
+            soMoKhoa = daMoKhoa.Count;
+            try
+            {
+                foreach (var (id, itemId, vung) in canDanhDau)
+                {
+                    if (tr.GetObject(id, OpenMode.ForRead) is not Entity entDoc) continue;
+                    if (ConKhoa(tr, entDoc)) { soBoQuaKhoa++; continue; }
+                    // Mở lại ForWrite (không UpgradeOpen): một handle lọt vào hai dòng kết quả thì
+                    // UpgradeOpen lần hai ném eWasOpenForWrite, còn GetObject ForWrite thì không.
                     if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ent) continue;
                     MarkService.Mark(
-                        ent, pack.Takeoff.XdataAppName, line.Item.Id, pack.Version, ngay,
-                        pack.Takeoff.MarkColorAci, vungTheoHandle.GetValueOrDefault(handle, ""));
+                        ent, pack.Takeoff.XdataAppName, itemId, pack.Version, ngay,
+                        pack.Takeoff.MarkColorAci, vung);
                 }
+            }
+            finally
+            {
+                // Khóa lại kể cả khi ghi ném giữa chừng — bản vẽ của kỹ sư phải rời lệnh với đúng
+                // cờ khóa như lúc vào (lối thất bại còn rollback theo Transaction.Abort).
+                VeLayerService.KhoaLai(tr, daMoKhoa, khoaLaiHut);
             }
             tr.Commit();
         }
         ed.WriteMessage("\n[XBoss] Đã đánh dấu vùng bóc. Xuất Excel: XBOSS_BOCKL_XUAT · Gỡ đánh dấu: XBOSS_BOCKL_XOA · Hoàn tác: UNDO.\n");
+        InTinhTrangKhoaLayer(ed, "đánh dấu", soMoKhoa, khongMoDuoc, khoaLaiHut, soBoQuaKhoa);
     }
 
     // ===== XBOSS_BOCKL_XOA =====
@@ -343,6 +422,10 @@ public sealed class XBossCommands
 
         using var khoa = doc.LockDocument();
         var soGo = 0;
+        var soMoKhoa = 0;
+        var soBoQuaKhoa = 0;
+        var khongMoDuoc = new List<string>();
+        var khoaLaiHut = new List<string>();
         using (var tr = db.TransactionManager.StartTransaction())
         {
             IEnumerable<ObjectId> ids;
@@ -356,16 +439,37 @@ public sealed class XBossCommands
             {
                 ids = TakeoffScanner.ModelSpaceIds(db, tr).ToList();
             }
+
+            // Lọc trước (chỉ đọc) những thực thể thật sự có dấu bóc, rồi mở khóa TẠM đúng layer của
+            // chúng: gỡ dấu là GHI (trả màu cũ + xoá XData) nên layer khóa là eOnLockedLayer.
+            var canGo = new List<ObjectId>();
             foreach (var id in ids)
             {
                 if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
                 if (MarkService.ReadMark(ent, pack.Takeoff.XdataAppName) is null) continue;
-                ent.UpgradeOpen();
-                if (MarkService.Unmark(ent, pack.Takeoff.XdataAppName)) soGo++;
+                canGo.Add(id);
+            }
+
+            var daMoKhoa = VeLayerService.MoKhoaTam(db, tr, khongMoDuoc, LayerCua(tr, canGo));
+            soMoKhoa = daMoKhoa.Count;
+            try
+            {
+                foreach (var id in canGo)
+                {
+                    if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
+                    if (ConKhoa(tr, ent)) { soBoQuaKhoa++; continue; }
+                    ent.UpgradeOpen();
+                    if (MarkService.Unmark(ent, pack.Takeoff.XdataAppName)) soGo++;
+                }
+            }
+            finally
+            {
+                VeLayerService.KhoaLai(tr, daMoKhoa, khoaLaiHut);
             }
             tr.Commit();
         }
         ed.WriteMessage($"\n[XBoss] Đã gỡ đánh dấu {soGo} đối tượng (trả đúng màu trước khi bóc). Hoàn tác: UNDO.\n");
+        InTinhTrangKhoaLayer(ed, "gỡ dấu", soMoKhoa, khongMoDuoc, khoaLaiHut, soBoQuaKhoa);
     }
 
     // ===== XBOSS_BOCKL_XUAT =====

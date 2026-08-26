@@ -151,8 +151,14 @@ internal static class VeLayerService
     /// <c>eInvalidKey</c>) và KHÔNG tính vào <paramref name="boQua"/>: bản vẽ chủ không đặt được
     /// thực thể lên layer của xref, nên mở khóa chúng chẳng để làm gì. <paramref name="boQua"/> chỉ
     /// nhận layer thật sự CẦN mở mà không mở được — thứ duy nhất đáng báo cho kỹ sư.</para>
+    ///
+    /// <para><paramref name="chiLayer"/> (tùy chọn) thu hẹp về ĐÚNG những layer cần mở: lệnh chỉ
+    /// ghi lên một nhúm thực thể (bóc/gỡ dấu khối lượng) thì không có lý do mở khóa cả bản vẽ —
+    /// càng ít layer đụng tới, càng ít thứ để trả sai nếu lệnh chết giữa chừng. Bỏ trống = mọi
+    /// layer đang khóa (pipeline chuẩn hóa sửa khắp bản vẽ nên cần đúng nghĩa đó).</para>
     /// </summary>
-    internal static List<LayerDaMoKhoa> MoKhoaTam(Database db, Transaction tr, List<string>? boQua = null)
+    internal static List<LayerDaMoKhoa> MoKhoaTam(
+        Database db, Transaction tr, List<string>? boQua = null, IReadOnlySet<ObjectId>? chiLayer = null)
     {
         var daMo = new List<LayerDaMoKhoa>();
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
@@ -161,6 +167,7 @@ internal static class VeLayerService
             var ltr = (LayerTableRecord)tr.GetObject(id, OpenMode.ForRead);
             if (ltr.IsDependent) continue;
             if (!ltr.IsLocked) continue;
+            if (chiLayer is not null && !chiLayer.Contains(id)) continue;
             try
             {
                 ltr.UpgradeOpen();

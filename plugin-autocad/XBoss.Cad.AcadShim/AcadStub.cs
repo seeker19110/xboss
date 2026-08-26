@@ -243,6 +243,9 @@ namespace Autodesk.AutoCAD.DatabaseServices
     public class Entity : DBObject
     {
         public string Layer { get; set; }
+        // ObjectARX thật có CẢ hai: Layer (tên) và LayerId (ObjectId của LayerTableRecord). Mã
+        // Adapter lọc layer theo ObjectId (tên có thể bị bước chuẩn hóa đổi giữa chừng).
+        public ObjectId LayerId => new ObjectId();
         public Color Color { get; set; }
         public Extents3d GeometricExtents => new Extents3d(new Point3d(0, 0, 0), new Point3d(0, 0, 0));
         public void IntersectWith(Entity ent, Intersect type, Point3dCollection points, IntPtr thisGsMarker, IntPtr otherGsMarker) { }

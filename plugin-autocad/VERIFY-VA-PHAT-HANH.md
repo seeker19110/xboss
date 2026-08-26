@@ -84,7 +84,7 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
 Hai lỗi chết lệnh ngoài công trường đều chỉ lộ trên bản vẽ MEP thật, không lộ trên bản vẽ mẫu
 sạch: `XBOSS_VE_NEN` chết `eInvalidKey` (layer của xref không sửa được) và `XBOSS_BATCH` chết
 `eOnLockedLayer` (không mở khoá layer trước khi sửa). Cổng CI chỉ biên dịch, **không chạy được
-bản vẽ**, nên bốn ca dưới đây phải làm tay mỗi lần phát hành. Đánh số chữ để khỏi dồn số cả danh
+bản vẽ**, nên bảy ca dưới đây phải làm tay mỗi lần phát hành. Đánh số chữ để khỏi dồn số cả danh
 sách.
 
 Chuẩn bị **một** bản vẽ (dùng bản vẽ dự án thật, vd `SDG.MEP.FPS.002.R3….dwg`) có đủ:
@@ -106,6 +106,18 @@ với phần "xem trước" của `XBOSS_CHUANHOA` ở 11a — kiểm và chuẩ
 11d. `XBOSS_VE_NEN` trên chính bản vẽ đó → chạy trót lọt, **không** `eInvalidKey`; báo `⚠ N layer
      KHÔNG khoá/làm mờ được (layer của xref…)`. Chạy lại lần hai → hoàn nguyên, cột khoá của mọi
 layer bản vẽ chủ trở về đúng ảnh chụp ban đầu.
+11e. `XBOSS_BOCKL` (phạm vi cả bản vẽ, có đối tượng nằm trên layer ĐANG KHOÁ) → đồng ý đánh dấu:
+chạy trót lọt, **không** `eOnLockedLayer`; đối tượng trên layer khoá **vẫn đổi màu** như đối
+tượng trên layer mở; dòng cuối báo `Đã tạm mở khoá N layer để đánh dấu và khoá lại như cũ.`
+Mở lại bảng LAYER: **cột khoá y hệt ảnh chụp trước lệnh**. `U` một lần → màu về nguyên trạng,
+cột khoá vẫn đúng.
+11f. `XBOSS_BOCKL_XOA` (cả bản vẽ) ngay sau 11e → gỡ đủ số đối tượng đã đánh dấu, kể cả đối tượng
+trên layer khoá; báo `Đã tạm mở khoá N layer để gỡ dấu và khoá lại như cũ.`; cột khoá lại **y
+hệt ảnh chụp**. Nếu có dòng `⚠ Không khoá lại được … layer` thì khoá tay bằng lệnh LAYER
+**trước khi lưu** và ghi lại tên layer đó vào báo cáo phát hành.
+11g. Chốt số liệu không đổi: chạy `XBOSS_BOCKL_XUAT` sau 11e, đối chiếu bảng khối lượng với lần
+bóc trên cùng bản vẽ khi **mở khoá tay hết layer từ trước** — hai bảng phải khớp từng dòng
+(việc tự mở khoá chỉ để GHI dấu, không được đụng con số nào).
 
 ### C3. Bóc khối lượng (M99 + M101)
 

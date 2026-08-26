@@ -174,4 +174,44 @@ public sealed class XrefVaKhoaLayerTests
             "trả bản vẽ của kỹ sư về với layer mở toang.");
         Assert.Contains("KhoaLai", than[finallyIdx..], StringComparison.Ordinal);
     }
+
+    /// <summary>Thân của một phương thức lệnh (từ chữ ký tới dấu <c>}</c> thụt 4 dấu cách đầu tiên —
+    /// mọi khối lồng bên trong đều thụt sâu hơn).</summary>
+    private static string ThanHam(string ma, string ten)
+    {
+        var m = Regex.Match(ma, @"public void " + ten + @"\(\)(.*?)\n    \}", RegexOptions.Singleline);
+        Assert.True(m.Success, $"Không tìm thấy {ten} trong XBossCommands.cs — đổi tên thì cập nhật bất biến này.");
+        return m.Groups[1].Value;
+    }
+
+    /// <summary>
+    /// Đường bóc khối lượng ghi lên thực thể (đánh dấu = đổi màu + XData, gỡ dấu = trả màu + xoá
+    /// XData) nên gặp layer khóa là <c>eOnLockedLayer</c> — sự cố thật 2026-08-26. Người dùng chốt
+    /// cho phép plugin tự mở khóa, nên bất biến ở đây là: mở khóa TẠM (đúng cặp hàm của pipeline,
+    /// không cơ chế thứ hai), CHỈ những layer của các đối tượng sắp ghi, và LUÔN khóa lại trong
+    /// <c>finally</c> — bỏ <c>finally</c> đi là trả bản vẽ của kỹ sư về với layer mở toang.
+    /// </summary>
+    [Theory]
+    [InlineData("BocKhoiLuong", "MarkService.Mark(")]
+    [InlineData("GoDanhDau", "MarkService.Unmark(")]
+    public void DuongBocKhoiLuongMoKhoaTamVaLuonKhoaLaiTrongFinally(string ten, string loiGoiGhi)
+    {
+        var than = ThanHam(File.ReadAllText(Path.Combine(AdapterDir, "Commands", "XBossCommands.cs")), ten);
+
+        var moKhoa = than.IndexOf("VeLayerService.MoKhoaTam", StringComparison.Ordinal);
+        Assert.True(moKhoa > 0,
+            $"{ten} phải mở khóa TẠM bằng VeLayerService.MoKhoaTam trước khi ghi — layer khóa là eOnLockedLayer.");
+        // Chỉ mở đúng layer của các đối tượng sắp ghi, không mở toang cả bản vẽ.
+        Assert.Contains("LayerCua(", than[moKhoa..], StringComparison.Ordinal);
+
+        var ghi = than.IndexOf(loiGoiGhi, StringComparison.Ordinal);
+        Assert.True(ghi > moKhoa, $"{ten} phải ghi ({loiGoiGhi}) SAU khi mở khóa tạm, không phải trước.");
+
+        // Khớp khối `finally {` thật, không phải chữ "finally" trong một dòng chú thích.
+        var khoiFinally = Regex.Match(than, @"\bfinally\s*\{");
+        Assert.True(khoiFinally.Success && khoiFinally.Index > moKhoa,
+            $"{ten} phải khóa lại trong finally — ghi ném giữa chừng mà không khóa lại là trả bản vẽ " +
+            "của kỹ sư về với layer mở toang.");
+        Assert.Contains("VeLayerService.KhoaLai", than[khoiFinally.Index..], StringComparison.Ordinal);
+    }
 }
