@@ -86,8 +86,19 @@ internal static class VeLayerService
     /// Khóa và làm mờ MỌI layer hiện có; trả trạng thái cũ để cất vào NOD. Layer đích của hệ
     /// được mở khóa lại ngay sau đó bằng <see cref="DamBaoLayer"/> — vẫn nằm trong bản ghi trạng
     /// thái nên hoàn nguyên trả đúng khóa/độ mờ ban đầu của chúng.
+    ///
+    /// BỎ QUA layer phụ thuộc xref (<c>IsDependent</c>): AutoCAD KHÔNG cho sửa symbol table record
+    /// của xref, mở ForWrite là ném <c>eInvalidKey</c> và cả lệnh rollback — bản vẽ MEP thật gần
+    /// như luôn có xref kiến trúc/kết cấu, nên không bỏ qua là lệnh chết trên đúng loại bản vẽ nó
+    /// sinh ra để phục vụ (thấy trên bản vẽ AEC thật ngày 2026-08-26). Layer xref vốn đã là nền
+    /// tham chiếu, không phải thứ kỹ sư vẽ đè lên, nên bỏ qua cũng đúng nghiệp vụ.
+    ///
+    /// Mỗi layer bọc try/catch riêng vì cùng lý do: một layer khó tính (bị AEC/ứng dụng thứ ba
+    /// giữ) không được phép làm hỏng cả lệnh — layer nào không khóa được thì để nguyên, ghi vào
+    /// <paramref name="boQua"/> để lệnh báo lại cho kỹ sư biết vùng nào chưa được bảo vệ.
     /// </summary>
-    internal static List<LayerCu> KhoaVaLamMo(Database db, Transaction tr, int doMoPhanTram)
+    internal static List<LayerCu> KhoaVaLamMo(
+        Database db, Transaction tr, int doMoPhanTram, List<string>? boQua = null)
     {
         var alpha = (byte)Math.Clamp(Math.Round(255.0 * (100 - doMoPhanTram) / 100.0), 0, 255);
         var cu = new List<LayerCu>();
@@ -95,10 +106,27 @@ internal static class VeLayerService
         foreach (ObjectId id in lt)
         {
             var ltr = (LayerTableRecord)tr.GetObject(id, OpenMode.ForRead);
-            cu.Add(new LayerCu(ltr.Name, ltr.IsLocked, ltr.Transparency.Alpha));
-            ltr.UpgradeOpen();
-            ltr.IsLocked = true;
-            ltr.Transparency = new AcadTransparency(alpha);
+            if (ltr.IsDependent)
+            {
+                boQua?.Add(ltr.Name);
+                continue;
+            }
+            // ĐỌC trạng thái cũ TRƯỚC khi đổi (đọc sau là ghi lại chính giá trị vừa đặt ⇒ hoàn
+            // nguyên sẽ khóa vĩnh viễn nền của kỹ sư), nhưng chỉ GHI vào danh sách sau khi đổi
+            // thành công — layer nào không đụng được thì không có gì để hoàn nguyên.
+            var khoaCu = ltr.IsLocked;
+            var alphaCu = ltr.Transparency.Alpha;
+            try
+            {
+                ltr.UpgradeOpen();
+                ltr.IsLocked = true;
+                ltr.Transparency = new AcadTransparency(alpha);
+                cu.Add(new LayerCu(ltr.Name, khoaCu, alphaCu));
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception)
+            {
+                boQua?.Add(ltr.Name);
+            }
         }
         return cu;
     }

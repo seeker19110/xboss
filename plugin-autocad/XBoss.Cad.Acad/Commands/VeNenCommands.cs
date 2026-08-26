@@ -53,6 +53,7 @@ public sealed class VeNenCommands
         // (3) Áp nền: 1 transaction = 1 nhóm UNDO.
         var daTao = new List<string>();
         var coSanNoiDung = new List<string>();
+        var boQuaLayer = new List<string>();
         var soLayerNen = 0;
         using (var khoa = doc.LockDocument())
         using (var tr = db.TransactionManager.StartTransaction())
@@ -60,7 +61,8 @@ public sealed class VeNenCommands
             try
             {
                 var clayerCu = ((LayerTableRecord)tr.GetObject(db.Clayer, OpenMode.ForRead)).Name;
-                var trangThaiCu = VeLayerService.KhoaVaLamMo(db, tr, pack.DrawTools.BaseFadePct);
+                var trangThaiCu = VeLayerService.KhoaVaLamMo(
+                    db, tr, pack.DrawTools.BaseFadePct, boQuaLayer);
                 soLayerNen = trangThaiCu.Count;
 
                 ObjectId? layerVeDauTien = null;
@@ -103,6 +105,15 @@ public sealed class VeNenCommands
             : "[XBoss] Layer đích đã có sẵn đủ.\n");
         foreach (var l in coSanNoiDung)
             ed.WriteMessage($"[XBoss] ⚠ Layer đích \"{l}\" đã có đối tượng cũ — nên chạy XBOSS_CHUANHOA trước khi vẽ.\n");
+        if (boQuaLayer.Count > 0)
+        {
+            // Nói thật là chưa bảo vệ hết: layer xref không khóa/làm mờ được, nên nét nền trên đó
+            // vẫn đậm và vẫn chọn trúng khi kỹ sư quét chọn. Im lặng ở đây là để kỹ sư tưởng cả
+            // bản vẽ đã được che.
+            ed.WriteMessage(
+                $"[XBoss] ⚠ {boQuaLayer.Count} layer KHÔNG khóa/làm mờ được (layer của xref — AutoCAD " +
+                "không cho sửa): nét nền trên đó vẫn đậm. Cần che hẳn thì tắt/unload xref khi vẽ.\n");
+        }
         ed.WriteMessage(
             "[XBoss] Vẽ tuyến: XBOSS_VE · Ghi nhãn: XBOSS_VE_NHAN · Xong hệ: chạy lại XBOSS_VE_NEN để hoàn nguyên.\n");
     }

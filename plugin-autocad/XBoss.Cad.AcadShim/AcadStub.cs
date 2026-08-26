@@ -409,6 +409,9 @@ namespace Autodesk.AutoCAD.DatabaseServices
 
     public class LayerTableRecord : SymbolTableRecord
     {
+        /// <summary>ObjectARX thật: layer đến từ xref — KHÔNG sửa được, mở ForWrite ném eInvalidKey.</summary>
+        public bool IsDependent { get; set; }
+
         public Color Color { get; set; }
         public bool IsLocked { get; set; }
         public bool IsOff { get; set; }
