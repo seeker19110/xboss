@@ -124,9 +124,99 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
 
 ---
 
-## D. Phát hành gói cho cả đội
+## D. Kiểm thử có server — dựng tại chỗ trên máy mình
 
-### D1. Đóng gói trên máy có AutoCAD
+Ba ca ở mục C5 (`XBOSS_UPLOAD`, sheet `Doi-chieu` của `XBOSS_BOCKL_XUAT`) và cặp thiết bị ở C1
+**bắt buộc phải có server XBoss đang chạy** — không tự kiểm được nếu chỉ có AutoCAD trơ trọi.
+Chưa có VPS, chưa phát hành cho đội thì dựng thẳng server trên **cùng máy Windows** đang chạy
+AutoCAD (hoặc máy khác cùng mạng LAN) — không cần VPS, không cần cấu hình phần cứng đặc biệt,
+máy chạy nổi AutoCAD 2026 là dư sức chạy dev server.
+
+### D1. Cài Node + PostgreSQL
+
+CI ghim `node-version: 24` (`.github/workflows/ci.yml`) và `DEPLOY.md` yêu cầu Node ≥ 24 —
+dùng đúng bản này để khỏi lệch môi trường:
+
+```powershell
+winget install --id OpenJS.NodeJS.LTS -e     # tại thời điểm viết, LTS = nhánh 24.x
+node -v                                       # phải ra v24.x — không đúng thì winget đã trỏ
+                                               # sang LTS mới hơn, xem "winget search OpenJS.NodeJS"
+                                               # hoặc tải thẳng bản 24.x tại https://nodejs.org/en/download
+```
+
+PostgreSQL 16 (đúng bản Postgres 16 dùng trong CI, xem `.github/workflows/ci.yml`):
+
+```powershell
+winget install --id PostgreSQL.PostgreSQL.16 -e
+psql --version                                # kiểm cài xong
+```
+
+Không chắc id gói còn đúng (winget hay đổi id theo thời gian) → `winget search PostgreSQL` để
+tra lại, hoặc tải trình cài trực tiếp tại https://www.postgresql.org/download/windows/ (chọn
+version 16).
+
+### D2. Tạo DB + `.env.local`
+
+```powershell
+# Trong psql (mật khẩu tự đặt lúc cài PostgreSQL):
+CREATE USER xboss WITH PASSWORD 'mật-khẩu-tuỳ-chọn';
+CREATE DATABASE xboss OWNER xboss;
+```
+
+`.env.local` ở gốc repo — chỉ **`DATABASE_URL` là bắt buộc** để chạy dev
+(`lib/nen/env.ts` + `DEPLOY.md`). `XBOSS_SECRET` chỉ bắt buộc ở **production** — thiếu ở dev,
+`lib/bao-mat/session-token.ts` tự dùng secret fallback kèm cảnh báo console, vẫn đăng nhập
+được bình thường (không cần khai cho kiểm thử tại chỗ này):
+
+```
+DATABASE_URL="postgresql://xboss:mật-khẩu-tuỳ-chọn@localhost:5432/xboss"
+```
+
+Không cần `XBOSS_ADMIN_PASSWORD` cho dev: DB trống thì lần đăng nhập đầu tiên tự seed **4 tài
+khoản demo** (`ensureDefaultUsers`, `lib/bao-mat/auth.ts`) — `admin@xboss.vn` / `admin123`,
+`pm@xboss.vn` / `pm123`, `engineer@xboss.vn` / `eng123`, `subcon@xboss.vn` / `sub123` (đăng
+nhập bằng admin để vào được `/engineering/thiet-bi-cad` và `/engineering/chuan-hoa-ban-ve`).
+
+### D3. Chạy server
+
+```powershell
+npm install
+npm run dev
+```
+
+Không cần chạy `npm run db:migrate` tay — request đầu tiên tự áp hết migration
+(ADR-0003, `ensureSchema()`). `npm run dev` đã bind `-H 0.0.0.0` sẵn trong `package.json` nên
+nghe được cả từ máy khác trong mạng, không cần thêm cờ.
+
+### D4. Ghép AutoCAD với server tại chỗ
+
+`XBOSS_LOGIN` hỏi địa chỉ server trước khi xin mã ghép
+(`XBossLoginCommand.cs` ~dòng 57–60, lưu lại ở `%APPDATA%\XBoss\server.json` cho lần sau) —
+nhập `http://localhost:3000` (loopback được chấp nhận dù không phải HTTPS) → lấy mã ghép → mở
+`http://localhost:3000/engineering/thiet-bi-cad`, đăng nhập admin, duyệt mã → AutoCAD báo ghép
+thành công, token 90 ngày cất trong Windows Credential Manager.
+
+**AutoCAD chạy ở máy khác với máy chạy server:** dùng địa chỉ IP LAN của máy chạy server thay
+vì `localhost` (vd `http://192.168.1.20:3000`) — nhớ mở Windows Firewall cho cổng 3000 (inbound,
+TCP) trên máy chạy server, không thì máy kia gõ `XBOSS_LOGIN` sẽ time-out.
+
+### D5. Các ca chỉ kiểm được khi có server
+
+| Làm gì                                                                            | Đúng thì thấy gì                                                                                                                                        |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `XBOSS_UPLOAD`                                                                    | AutoCAD báo **xong hẳn** (lỗi vừa vá của đợt này — trước đây kẹt "vẫn đang xử lý" dù revision đã tạo)                                                   |
+| Gửi lại đúng tệp đó lần nữa                                                       | Không tạo revision đôi (idempotent theo hash DWG)                                                                                                       |
+| Mở `/ban-ve` sau khi upload                                                       | Hàng revision hiện chip **"Từ plugin · rulepack vX · N lỗi/N cảnh báo"**; người gửi thấy nút **"Thu Hồi"**, người khác đăng nhập vào không thấy nút này |
+| `XBOSS_VE_DEXUAT` rồi vào `/engineering/chuan-hoa-ban-ve` mục "Đề Xuất Chờ Duyệt" | Xem được preview, **tải DWG ứng viên**, đối chiếu sha256, Duyệt xong sinh version thư viện mới                                                          |
+| Quay lại AutoCAD, chèn block vừa duyệt                                            | Plugin tự tải thư viện version mới, sha256 khớp                                                                                                         |
+| `XBOSS_BOCKL_XUAT` → chọn "kéo KL BOQ hợp đồng từ máy chủ"                        | Sheet `Doi-chieu` xuất hiện với chênh lệch % là công thức sống (rút mạng làm lại thì chỉ cảnh báo, vẫn xuất bình thường)                                |
+| Đăng nhập bằng tài khoản (tự tạo, gán) thuộc >1 dự án rồi `XBOSS_LOGIN`           | LOGIN hỏi chọn dự án; rule pack tải về có mã BOQ đúng dự án đã chọn; chạy lại LOGIN nhớ lựa chọn cũ                                                     |
+
+---
+
+## E. Phát hành gói cho cả đội
+
+### E1. Đóng gói trên máy có AutoCAD
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File plugin-autocad\dong-goi.ps1 -ChiDongGoi
@@ -136,7 +226,7 @@ Ra `dist\XBoss.bundle-<version>.zip` + `.zip.sha256`, in SHA-256 ra màn hình.
 Tăng version: sửa `<Version>` trong `plugin-autocad/Directory.Build.props` (nguồn duy nhất —
 script tự ghi vào `PackageContents.xml`).
 
-### D2. Đưa lên GitHub Release
+### E2. Đưa lên GitHub Release
 
 Cách A (đơn giản, làm tay ngay trên máy vừa đóng gói):
 
@@ -150,7 +240,7 @@ rồi `actions/upload-artifact@v4` thư mục `plugin-autocad/XBoss.Cad.Acad/bin
 `xboss-cad-acad-release`, ghi lại **run id**; tạo tag Release; chạy workflow `release.yml` bằng
 `workflow_dispatch` điền `tag` + `build_run_id`.
 
-### D3. Bật nút tải trên web
+### E3. Bật nút tải trên web
 
 Đặt trong `.env.local` / biến môi trường server rồi khởi động lại:
 
@@ -162,7 +252,7 @@ XBOSS_PLUGIN_SHA256=<64 hex, lấy từ tệp .sha256>
 Kiểm: `/engineering/chuan-hoa-ban-ve` hiện nút "Tải Gói Cài Plugin";
 `/engineering/cai-dat-plugin` hiện phiên bản + sha256 để kỹ sư đối chiếu.
 
-### D4. Kỹ sư trong đội cài
+### E4. Kỹ sư trong đội cài
 
 Tải `.zip` → **kiểm checksum**: `Get-FileHash -Algorithm SHA256 .\XBoss.bundle-<version>.zip`
 → giải nén → chép thư mục `XBoss.bundle` vào `%APPDATA%\Autodesk\ApplicationPlugins\` → mở
@@ -170,7 +260,7 @@ AutoCAD → `XBOSS_LOGIN`. Không cần cài .NET SDK, không cần repo.
 
 ---
 
-## E. Sự cố thường gặp
+## F. Sự cố thường gặp
 
 | Hiện tượng                                 | Nguyên nhân                                                 | Cách xử lý                                                                                          |
 | ------------------------------------------ | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
