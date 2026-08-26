@@ -408,13 +408,19 @@ namespace Autodesk.AutoCAD.DatabaseServices
     public class SymbolTableRecord : DBObject
     {
         public string Name { get; set; }
+
+        /// <summary>
+        /// ObjectARX thật: bản ghi đến từ XREF (layer/kiểu chữ/kiểu kích thước/block "TEP|TEN") —
+        /// KHÔNG sửa được, mở ForWrite ném eInvalidKey. Khai ở LỚP CHA vì API thật đặt ở
+        /// <c>AcDbSymbolTableRecord::isDependent()</c>: khai riêng cho LayerTableRecord thì mã bỏ
+        /// qua xref cho kiểu chữ/kiểu kích thước/block sẽ không biên dịch được trên cổng dù bản
+        /// thật chạy tốt (cây kế thừa của stub là một phần hợp đồng của cổng).
+        /// </summary>
+        public bool IsDependent { get; set; }
     }
 
     public class LayerTableRecord : SymbolTableRecord
     {
-        /// <summary>ObjectARX thật: layer đến từ xref — KHÔNG sửa được, mở ForWrite ném eInvalidKey.</summary>
-        public bool IsDependent { get; set; }
-
         public Color Color { get; set; }
         public bool IsLocked { get; set; }
         public bool IsOff { get; set; }

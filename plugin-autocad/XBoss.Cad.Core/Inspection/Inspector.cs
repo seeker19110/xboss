@@ -77,6 +77,16 @@ public sealed class Inspector
         var canhBao = new List<string>();
         if (canCanhBaoDonVi)
             canhBao.Add($"Đơn vị bản vẽ: {tenDonVi} (INSUNITS={snapshot.InsUnits}) — dung sai đã quy đổi tương ứng, chuẩn dự án là mm.");
+        if (snapshot.XrefDaBoQua is { Tong: > 0 } xref)
+        {
+            // Nói rõ phạm vi kiểm: im lặng ở đây là để kỹ sư tưởng bản vẽ đã được kiểm hết.
+            var phan = new List<string>();
+            if (xref.SoLayer > 0) phan.Add($"{xref.SoLayer} layer của xref");
+            if (xref.SoKhoiChen > 0) phan.Add($"{xref.SoKhoiChen} khối chèn xref");
+            canhBao.Add(
+                $"KHÔNG kiểm phần thuộc xref (quy ước dự án): bỏ qua {string.Join(" và ", phan)}. " +
+                "Nội dung xref phải kiểm/sửa trong chính tệp tham chiếu rồi reload.");
+        }
 
         // (1) Layer sai chuẩn — tên sẽ bị đổi khi chuẩn hóa.
         var layerSai = snapshot.Layers

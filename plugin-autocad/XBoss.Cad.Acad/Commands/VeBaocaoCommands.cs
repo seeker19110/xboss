@@ -46,6 +46,8 @@ public sealed class VeBaocaoCommands
             var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
             foreach (ObjectId id in bt)
             {
+                // xref-ok: vòng này chỉ ĐỌC XData XBOSS_VE (chỉ định nghĩa do plugin nhập mới có),
+                // không mở ForWrite thứ gì — định nghĩa của xref rơi vào đây thì cũng trả null.
                 if (tr.GetObject(id, OpenMode.ForRead) is not BlockTableRecord btr) continue;
                 if (VeXDataStore.Doc(btr) is { } xd) xdata.Add(xd);
             }

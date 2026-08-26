@@ -79,6 +79,34 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
 11. `XBOSS_BATCH` trên một thư mục `.dwg` → bản gốc **giữ nguyên**, kết quả vào `da-chuan-hoa\`,
     có `xboss-batch-log.txt`. Thử cả chế độ chỉ-kiểm và chế độ bóc KL (1 Excel tổng, có cột "Tệp").
 
+### C2b. Bản vẽ THẬT có xref + layer khoá (bắt buộc — sự cố 2026-08-26)
+
+Hai lỗi chết lệnh ngoài công trường đều chỉ lộ trên bản vẽ MEP thật, không lộ trên bản vẽ mẫu
+sạch: `XBOSS_VE_NEN` chết `eInvalidKey` (layer của xref không sửa được) và `XBOSS_BATCH` chết
+`eOnLockedLayer` (không mở khoá layer trước khi sửa). Cổng CI chỉ biên dịch, **không chạy được
+bản vẽ**, nên bốn ca dưới đây phải làm tay mỗi lần phát hành. Đánh số chữ để khỏi dồn số cả danh
+sách.
+
+Chuẩn bị **một** bản vẽ (dùng bản vẽ dự án thật, vd `SDG.MEP.FPS.002.R3….dwg`) có đủ:
+xref kiến trúc/kết cấu đang attach, **≥ 2 layer của bản vẽ chủ đang KHOÁ**, và vài lỗi cố ý
+(layer sai chuẩn, chữ TCVN3, đối tượng Z≠0). Trước khi chạy, mở bảng LAYER và **chụp lại cột
+khoá** — đó là bản đối chiếu.
+
+11a. `XBOSS_CHUANHOA` → chạy trót lọt, **không** có dòng `LỖI giữa chừng … eOnLockedLayer`; báo
+cáo có dòng `⚠ KHÔNG đụng gì thuộc xref … bỏ qua N layer của xref…`. Xong lệnh, mở lại bảng
+LAYER: **cột khoá y hệt ảnh chụp trước đó** (kể cả layer vừa bị pipeline đổi tên). `U` một
+lần → bản vẽ về nguyên trạng, cột khoá vẫn đúng.
+11b. `XBOSS_BATCH` chế độ chuẩn hoá trên thư mục chứa chính bản vẽ đó → nhật ký
+`xboss-batch-log.txt` ghi `OK`, **không** còn `LỖI — bỏ qua: eOnLockedLayer`. Mở tệp trong
+`da-chuan-hoa\` → xref vẫn còn (không bị bind/đổi block), cột khoá layer giữ nguyên như bản
+gốc. Bản gốc **không đổi một byte**.
+11c. `XBOSS_KIEMTRA` trên chính bản vẽ đó → **không** liệt kê layer của xref trong nhóm "Layer sai
+chuẩn" (layer `TÊNXREF|…`), có dòng `⚠ KHÔNG kiểm phần thuộc xref …`. Số lỗi ở đây phải khớp
+với phần "xem trước" của `XBOSS_CHUANHOA` ở 11a — kiểm và chuẩn hoá cùng phạm vi.
+11d. `XBOSS_VE_NEN` trên chính bản vẽ đó → chạy trót lọt, **không** `eInvalidKey`; báo `⚠ N layer
+     KHÔNG khoá/làm mờ được (layer của xref…)`. Chạy lại lần hai → hoàn nguyên, cột khoá của mọi
+layer bản vẽ chủ trở về đúng ảnh chụp ban đầu.
+
 ### C3. Bóc khối lượng (M99 + M101)
 
 12. `XBOSS_BOCKL` → vùng đã bóc đổi màu + ghi XData; bóc lại vùng đó → **không cộng trùng**.
@@ -437,14 +465,16 @@ AutoCAD → `XBOSS_LOGIN`. Không cần cài .NET SDK, không cần repo.
 
 ## F. Sự cố thường gặp
 
-| Hiện tượng                                  | Nguyên nhân                                                                                       | Cách xử lý                                                                                          |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `Không thấy acdbmgd.dll trong '...'`        | AutoCAD cài chỗ khác                                                                              | `-AcadDir "<đường dẫn>"`                                                                            |
-| `Thiếu .NET 10 SDK`                         | AutoCAD 2026 dùng Managed API .NET 10                                                             | `winget install Microsoft.DotNet.SDK.10`                                                            |
-| Build lỗi `CS1705 ... higher version`       | Đang build cho net8.0                                                                             | Adapter phải là `net10.0-windows` (đã đúng trong repo)                                              |
-| Ghi đè DLL thất bại                         | AutoCAD đang mở                                                                                   | Đóng AutoCAD rồi chạy lại                                                                           |
-| Mở AutoCAD không thấy `[XBoss] ... đã nạp`  | Bundle sai chỗ / thiếu tệp                                                                        | Kiểm `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle\PackageContents.xml` và thư mục `Contents` |
-| Có lệnh nhưng **không** có tab Ribbon       | Ribbon chưa sẵn sàng lúc nạp (plugin chờ `ItemInitialized`)                                       | Đóng/mở lại AutoCAD; lệnh gõ tay vẫn chạy bình thường                                               |
-| Lệnh báo "chưa có rule pack"                | Chưa `XBOSS_LOGIN`/`XBOSS_RULEPACK`                                                               | Ghép thiết bị hoặc nạp rule pack tay                                                                |
-| Chữ tiếng Việt trong script vỡ              | `dong-goi.ps1` mất BOM UTF-8                                                                      | Khôi phục BOM (bắt buộc cho PowerShell 5.1)                                                         |
-| Bảng `XBOSS_BANG` nền TRẮNG, chữ mờ khó đọc | Control con trong PaletteSet không kế thừa `BackColor` của UserControl, rơi về nền trắng hệ thống | Đặt `BackColor = MauBang.Nen` TƯỜNG MINH cho từng panel/nhãn, không dựa vào kế thừa (vá 2026-08-26) |
+| Hiện tượng                                  | Nguyên nhân                                                                                       | Cách xử lý                                                                                                                                |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `Không thấy acdbmgd.dll trong '...'`        | AutoCAD cài chỗ khác                                                                              | `-AcadDir "<đường dẫn>"`                                                                                                                  |
+| `Thiếu .NET 10 SDK`                         | AutoCAD 2026 dùng Managed API .NET 10                                                             | `winget install Microsoft.DotNet.SDK.10`                                                                                                  |
+| Build lỗi `CS1705 ... higher version`       | Đang build cho net8.0                                                                             | Adapter phải là `net10.0-windows` (đã đúng trong repo)                                                                                    |
+| Ghi đè DLL thất bại                         | AutoCAD đang mở                                                                                   | Đóng AutoCAD rồi chạy lại                                                                                                                 |
+| Mở AutoCAD không thấy `[XBoss] ... đã nạp`  | Bundle sai chỗ / thiếu tệp                                                                        | Kiểm `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle\PackageContents.xml` và thư mục `Contents`                                       |
+| Có lệnh nhưng **không** có tab Ribbon       | Ribbon chưa sẵn sàng lúc nạp (plugin chờ `ItemInitialized`)                                       | Đóng/mở lại AutoCAD; lệnh gõ tay vẫn chạy bình thường                                                                                     |
+| Lệnh báo "chưa có rule pack"                | Chưa `XBOSS_LOGIN`/`XBOSS_RULEPACK`                                                               | Ghép thiết bị hoặc nạp rule pack tay                                                                                                      |
+| Chữ tiếng Việt trong script vỡ              | `dong-goi.ps1` mất BOM UTF-8                                                                      | Khôi phục BOM (bắt buộc cho PowerShell 5.1)                                                                                               |
+| Bảng `XBOSS_BANG` nền TRẮNG, chữ mờ khó đọc | Control con trong PaletteSet không kế thừa `BackColor` của UserControl, rơi về nền trắng hệ thống | Đặt `BackColor = MauBang.Nen` TƯỜNG MINH cho từng panel/nhãn, không dựa vào kế thừa (vá 2026-08-26)                                       |
+| Lệnh chết `eOnLockedLayer` / bỏ qua cả tệp  | Bản vẽ có layer đang khoá; sửa thực thể trên layer khoá là bị AutoCAD chặn                        | Pipeline chuẩn hoá tự mở khoá tạm rồi khoá lại trong `finally` (vá 2026-08-26). Còn gặp → xem dòng ⚠ "Không khoá lại được…" trong báo cáo |
+| Lệnh chết `eInvalidKey` trên bản vẽ có xref | Mở bản ghi bảng ký hiệu của xref (`IsDependent`) ở chế độ ghi — AutoCAD cấm                       | Mọi vòng duyệt bảng phải bỏ qua xref (vá 2026-08-26; test `XrefVaKhoaLayerTests` canh trên mã nguồn)                                      |

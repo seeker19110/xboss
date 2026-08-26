@@ -611,6 +611,11 @@ public sealed class VeTranginCommands
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         foreach (ObjectId id in lt)
         {
+            // xref-ok: layer của xref VẪN được đóng băng theo viewport ở đây. Quy tắc "bỏ qua xref"
+            // cấm SỬA thứ thuộc xref, còn đóng băng-theo-viewport là thuộc tính của chính VIEWPORT
+            // trong bản vẽ chủ (như lệnh VPLAYER) — bản ghi layer và tệp tham chiếu không bị đụng.
+            // Bỏ qua ở đây thì nền kiến trúc/kết cấu của xref vẫn hiện trên trang in "chỉ hệ này",
+            // tức là hỏng đúng thứ lệnh sinh ra để làm.
             var ltr = (LayerTableRecord)tr.GetObject(id, OpenMode.ForRead);
             if (giu.Contains(ltr.Name)) continue;
             var can = cheDo == CheDoAnLayerTrangIn.NgoaiHe || heKhac.Contains(ltr.Name);
