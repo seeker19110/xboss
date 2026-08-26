@@ -96,6 +96,7 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
 18. `XBOSS_VE_NEN` → nền khoá + làm mờ, tạo layer đích; chạy lại → **hoàn nguyên**.
 19. `XBOSS_VE` → vẽ tuyến như PLINE (có Cung/HoànTác/Đóng); `edgeStyle=double` sinh 2 nét biên.
     Nhấn ESC giữa chừng → abort sạch, không để lại rác.
+    _Từ M106: tham số thu qua **hộp thoại** — xem mục 33; kết quả vẽ ra phải không đổi một nét._
 20. `XBOSS_VE_NHAN` → nhãn lấy size **từ XData**, không gõ tay. `XBOSS_VE_DOI` → đổi size/hệ thì
     layer + XData + biên + nhãn cập nhật theo.
 21. `XBOSS_VE_PHUKIEN` / `XBOSS_VE_THIETBI` → block bám tuyến, tự xoay theo tiếp tuyến; thiết bị
@@ -109,6 +110,7 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
     là tick ngắn. Chạy **lại** cùng tuyến → số vạch/tag **không đổi** (idempotent), `U` một lần
     xoá trọn kết quả một lần chạy. Tuyến mà rule pack không khai `jointRules` → **bỏ qua kèm lý
     do**, không tự đoán tham số. Sau đó `XBOSS_VE_THONGKE` → `CHIADOT` ra bảng đốt.
+    _Từ M106: phạm vi/kiểu nối thu qua **hộp thoại có xem trước số đốt** — xem mục 34._
 25. `XBOSS_VE_BAOCAO` → sinh báo cáo phiên vẽ JSON cạnh DWG (có mục chia đốt: tuyến đã chia /
     chưa chia, và lý do bỏ qua của phiên vừa chạy).
 26. Vẽ xong chạy `XBOSS_KIEMTRA` → **pass ngay** (đây chính là mục đích của bộ lệnh vẽ) và
@@ -127,6 +129,43 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
     đối chiếu sha256, rồi Duyệt → sinh version thư viện mới.
 31. Quay lại AutoCAD, chèn block vừa duyệt → plugin tự tải thư viện version mới, sha256 khớp.
 32. Tài khoản có quyền thêm thẳng → sau khi đề xuất, AutoCAD in thêm dòng chỉ đường sang web.
+
+### C6. Hộp thoại WPF + đường lui dòng lệnh (M106 PR1 — 2 lệnh mẫu)
+
+> **Bắt buộc verify tay: XAML KHÔNG có test tự động.** CI chỉ kiểm được ViewModel ở Core
+> (`VeTuyenDialogViewModelTests`, `ChiaDotDialogViewModelTests`) và cú pháp code-behind (AcadShim).
+> Mọi thứ thuộc về markup — cửa sổ có hiện ra không, bind đúng ô không, màu/DPI có đọc được không —
+> chỉ máy có AutoCAD 2026 mới trả lời được.
+
+33. **`XBOSS_VE` — hộp thoại một form.** Gõ lệnh → hiện cửa sổ **"XBOSS_VE — Vẽ tuyến"** nằm trên
+    AutoCAD (không lạc ra sau bản vẽ), nền tối cùng tông bảng điều khiển `XBOSS_BANG`.
+    - Đủ 4 ô: Hệ, Loại tuyến, Size (gõ tay được), Độ dốc — **ô Độ dốc chỉ hiện** khi chọn tuyến
+      `pipe-sanr` (ống thoát), ẩn với các tuyến khác.
+    - **Sửa qua lại tự do**: đổi Hệ → danh mục Loại tuyến và Size đổi theo ngay; đổi Size →
+      dòng "Nét biên: 2 nét cách tim … " đổi ngay theo size (tuyến `edgeStyle=double`).
+    - Gõ size ngoài danh mục (vd `777x333`) → dòng dưới form chuyển **vàng** kèm chữ `custom`,
+      nút OK **vẫn bấm được**. Xóa trắng ô Size → nút OK **mờ** kèm lý do tiếng Việt.
+    - **Enter** = OK khi hợp lệ, **Esc** = Hủy. Hủy → lệnh dừng hẳn, **không** hỏi lại ở dòng lệnh.
+    - Bấm OK → bắt điểm như PLINE, tuyến vẽ ra **giống hệt** bản trước M106 (đối chiếu mục 19).
+    - Chạy lại lệnh → hộp thoại nhớ đúng hệ/loại tuyến/size vừa dùng.
+34. **`XBOSS_VE_CHIADOT` — xem trước số đốt.** Vẽ vài tuyến rồi gõ lệnh:
+    - Hộp thoại hiện Phạm vi (2 nút chọn), combo Hệ (chỉ liệt hệ **có** tuyến, kèm số tuyến),
+      combo Kiểu nối (mục đầu **TỰ ĐỘNG**), và khung **Xem trước** liệt kê từng tuyến:
+      `<item> <size> (handle …): <kiểu nối> · N đốt / M mối · dài đốt1 / đốt2 / … mm`.
+    - **Đổi Kiểu nối → số đốt và chiều dài đổi NGAY** (không phải đóng mở lại). Chọn kiểu vượt
+      ngưỡng cỡ (vd `nep_c` cho ống 800x400) → dòng cảnh báo vàng, nút OK vẫn bấm được.
+    - Bản vẽ trộn nhiều loại tuyến → combo Kiểu nối **mờ** kèm câu giải thích.
+    - Bấm OK ở phạm vi "Chọn tay" → AutoCAD hỏi chọn tuyến trên bản vẽ như cũ; kết quả vẽ ra phải
+      **khớp đúng** các con số đã xem trước cho những tuyến đã chọn.
+    - `U` một lần vẫn xóa trọn kết quả (hộp thoại nằm NGOÀI transaction — mục 24 vẫn đúng).
+    - Lưu ý còn lại của PR1: câu hỏi **tỉ lệ in 1:x** vẫn ở dòng lệnh (hỏi một lần mỗi phiên).
+35. **Đường lui FR9 — không lệnh nào được chết vì UI.** Đóng AutoCAD, đặt biến môi trường
+    `setx XBOSS_UI_DIALOG 0`, mở lại AutoCAD:
+    - `XBOSS_VE` và `XBOSS_VE_CHIADOT` in một dòng `[XBoss] XBOSS_UI_DIALOG=0 — dùng hỏi đáp dòng
+lệnh…` rồi chạy **đúng chuỗi hỏi đáp keyword như trước M106**, kết quả vẽ không đổi.
+    - Xóa biến (`setx XBOSS_UI_DIALOG ""`) → hộp thoại trở lại.
+36. **DPI cao + màn hình phụ.** Đặt Windows scale 150 % (hoặc kéo AutoCAD sang màn hình 4K) → chữ
+    và ô trong hộp thoại nét, không bị cắt, nút OK/Hủy không tràn khung.
 
 ---
 

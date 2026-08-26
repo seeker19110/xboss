@@ -850,6 +850,13 @@ namespace Autodesk.AutoCAD.ApplicationServices
         /// </summary>
         public static System.Windows.Forms.DialogResult ShowModalDialog(System.Windows.Forms.Form formToShow) =>
             System.Windows.Forms.DialogResult.Cancel;
+
+        /// <summary>
+        /// acmgd: <c>public static bool? ShowModalWindow(System.Windows.Window window)</c> — bản WPF
+        /// của ShowModalDialog, AutoCAD tự đặt cửa sổ chính làm chủ (M106 FR3). Trả
+        /// <c>Window.DialogResult</c>, nên <c>null</c> = cửa sổ bị đóng mà không đặt kết quả.
+        /// </summary>
+        public static bool? ShowModalWindow(System.Windows.Window window) => null;
     }
 
     namespace Core

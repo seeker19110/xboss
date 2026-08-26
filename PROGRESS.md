@@ -246,6 +246,35 @@ nhân bản tầng điển hình, riser). Mỗi mục phải mở `M<xx>` mới 
 * **Còn lại:** verify tay lệnh mới trên máy có AutoCAD 2026 (cùng cổng với M99/M100/M102 — không có
   runner Windows).
 
+**M106 — Hộp thoại WPF cho lệnh plugin + trình dẫn quy trình:** ✅ **Approved 2026-08-26 — PR1
+(nền + 2 lệnh mẫu) XONG** (`docs/nang-cap/M106-hop-thoai-wpf-va-quy-trinh.md`). Kỹ sư chạy lệnh
+bằng **chuột** thay cho chuỗi hỏi đáp keyword ở dòng lệnh.
+
+- **Nền quy trình (Core):** `XBoss.Cad.Core/Ui/QuyTrinh.cs` khai 6 giai đoạn vòng đời bản vẽ
+  (Kết nối → Chuẩn hóa nền → Vẽ shop drawing → Chi tiết chế tạo → Hồ sơ bản vẽ → Bóc & nộp) +
+  nhóm phụ trợ; `LenhCatalog.LenhInfo` thêm `Buoc`/`ThuTuTrongBuoc` **không có giá trị mặc định**
+  nên thêm lệnh mà quên xếp bước là **không biên dịch nổi** (FR10/AC7). Hàm suy trạng thái từng
+  bước để cho PR2 (chỗ cắm đã khai: `TrangThaiBuoc`/`TinhTrangBuoc`).
+- **Khung hộp thoại:** `Core/Ui/ViewModels/DialogViewModelBase.cs` — **thuần .NET**, chỉ
+  `INotifyPropertyChanged`, không tham chiếu WPF/AutoCAD, nên **toàn bộ hành vi hộp thoại test được
+  trên CI Linux**; Adapter `Ui/Wpf/XBossDialog.xaml(.cs)` là cửa sổ WPF mỏng (nội dung từng lệnh là
+  `DataTemplate`, không code-behind riêng), mở bằng `Application.ShowModalWindow`, Enter = OK,
+  Esc = Hủy, màu bọc lại `MauBang` của bảng điều khiển M102 qua `MauBangWpf`.
+- **2 lệnh mẫu:** `XBOSS_VE` gộp 5 câu hỏi nối tiếp vào **một form** sửa qua lại tự do (bề rộng nét
+  biên hiện theo size, size ngoài danh mục → cảnh báo `custom` ngay tại hộp thoại);
+  `XBOSS_VE_CHIADOT` có **xem trước số đốt + chiều dài từng đốt** gọi thẳng `JointSegmenter.ChiaTuyen`
+  — đổi kiểu nối là con số đổi ngay (AC4).
+- **FR9 — không lệnh nào chết vì UI:** `Ui/Wpf/HopThoaiXBoss.Thu` bắt mọi lỗi dựng UI và đọc biến
+  `XBOSS_UI_DIALOG=0` → rơi về **đúng** chuỗi hỏi đáp dòng lệnh cũ (các hàm `Hoi*` giữ nguyên).
+  Hộp thoại nằm NGOÀI transaction, 1 lệnh = 1 nhóm UNDO, kết quả vẽ ra bản vẽ **không đổi**.
+- **Cổng CI:** 706/706 ca .NET xanh (661 + 45 ca mới); `XBoss.Cad.AcadShim` xanh 0 warning nhờ
+  `WpfStub.cs` khai giả WPF + phần `InitializeComponent` sinh từ XAML.
+- **Còn lại:** verify tay 2 hộp thoại + đường lui FR9 trên máy có AutoCAD 2026 —
+  `plugin-autocad/VERIFY-VA-PHAT-HANH.md` §C6 (mục 33–36). PR2 (trình dẫn `XBOSS_BANG` 6 giai đoạn +
+  panel Ribbon) và PR3 (16 lệnh còn lại + chuyển `DeXuatBlockDialog` sang WPF) chưa làm. Một điểm
+  chưa phủ trong PR1: câu hỏi **tỉ lệ in 1:x** của `XBOSS_VE_CHIADOT` vẫn ở dòng lệnh (§7.2 không
+  liệt kê nó cho lệnh này; hỏi một lần mỗi phiên qua `VeContext.TiLeIn`).
+
 ## M102 PR2 — Adapter AutoCAD: bước chuẩn hóa 12/13 + quét tag cho phép kiểm 17 (2026-08-25)
 
 Thi hành `docs/nang-cap/M102-plugin-dong-tran-chuan-hoa.md` PR2 phần **Adapter** — nối dây Core PR1

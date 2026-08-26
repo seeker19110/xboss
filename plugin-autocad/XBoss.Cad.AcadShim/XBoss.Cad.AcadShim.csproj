@@ -40,6 +40,9 @@
     <!-- Stub API AutoCAD (chỉ khai kiểu + chữ ký, thân hàm rỗng). -->
     <Compile Include="AcadStub.cs" />
 
+    <!-- Stub WPF + phần mã sinh từ .xaml (M106) — WPF chỉ có trên Windows, xem WpfStub.cs. -->
+    <Compile Include="WpfStub.cs" />
+
     <!--
       GLOB, cố ý KHÔNG liệt kê tay từng tệp: liệt kê tay thì mỗi lệnh vẽ mới thêm vào Adapter
       sẽ lọt lưới cổng này — đúng lớp lỗi đang bịt. Thêm tệp .cs vào XBoss.Cad.Acad là tự

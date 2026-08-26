@@ -127,10 +127,11 @@ chặn** — chặn cứng thuộc về bản thân lệnh.
 - **FR5** Danh mục hiển thị **đúng những gì rule pack khai** (size, kiểu nối, hệ, loại tuyến, khổ
   giấy…), kèm ô "nhập tay" ở nơi rule pack cho phép giá trị ngoài danh mục (`custom`) — hiện cảnh
   báo vàng ngay tại hộp thoại, không đợi đến báo cáo.
-- **FR6** Hộp thoại phải hiện **thông tin quyết định**: với `XBOSS_VE_CHIADOT` là chiều dài đốt tối
-  đa/khe/chế độ chia của kiểu nối đang chọn và **số đốt dự kiến**; với `XBOSS_VE` là bề rộng biên
-  suy ra từ size; với `XBOSS_VE_GIADO` là khoảng cách giá đỡ. Tính bằng hàm Core sẵn có, không tính
-  lại trong UI.
+- **FR6** Hộp thoại phải hiện **thông tin quyết định** ở dạng CHỈ ĐỌC: với `XBOSS_VE_CHIADOT` là chiều
+  dài đốt tối đa/khe/chế độ chia của kiểu nối đang chọn và **số đốt dự kiến**; với `XBOSS_VE` là bề
+  rộng biên suy ra từ size; với `XBOSS_VE_GIADO` là khoảng cách giá đỡ. Tính bằng hàm Core sẵn có,
+  không tính lại trong UI. **Không biến thông tin suy ra thành ô nhập** — hộp thoại không được mở
+  thêm bậc tự do mà đường dòng lệnh không có (§2.4).
 
 ### 7.2 Bảng hộp thoại theo lệnh (18 lệnh có tham số)
 

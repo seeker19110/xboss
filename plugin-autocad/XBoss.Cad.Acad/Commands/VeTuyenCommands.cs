@@ -4,8 +4,10 @@ using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Geometry;
+using XBoss.Cad.Core.Ui.ViewModels;
 
 [assembly: CommandClass(typeof(XBoss.Cad.Acad.Commands.VeTuyenCommands))]
 
@@ -35,49 +37,7 @@ public sealed class VeTuyenCommands
         if (VeContext.CanDrawTools(ed) is not { } pack) return;
         var db = doc.Database;
 
-        // (1) Hệ (giữ hệ đang vẽ; chưa có thì hỏi — §6.11 "không có trạng thái ngầm bắt buộc")
-        //     + loại tuyến, kèm lối DOIHE đổi hệ ngay trong lệnh.
-        var he = VeContext.HoiHe(ed, pack);
-        if (he is null) return;
-        DrawLine? tuyen = null;
-        while (tuyen is null)
-        {
-            var (chon, doiHe) = VeContext.HoiLoaiTuyen(ed, he);
-            if (doiHe)
-            {
-                var heMoi = VeContext.HoiHe(ed, pack, batBuocHoiLai: true);
-                if (heMoi is null) return;
-                he = heMoi;
-                continue;
-            }
-            if (chon is null) return;
-            tuyen = chon;
-        }
-
-        // (2) Size từ danh mục (cho nhập ngoài danh mục kèm cờ custom — M100 §4).
-        var chonSize = VeContext.HoiDanhMuc(
-            ed, $"Size {tuyen.Name} ({tuyen.SizeKind})", tuyen.Sizes, VeContext.Size, choTuNhap: true);
-        if (chonSize is not { } size) return;
-        VeContext.Size = size.GiaTri;
-        VeContext.SizeTuNhap = size.TuNhap;
-        if (size.TuNhap)
-        {
-            ed.WriteMessage(
-                $"\n[XBoss] ⚠ Size \"{size.GiaTri}\" ngoài danh mục rule pack — vẫn vẽ, XData đánh dấu \"custom\".\n");
-        }
-
-        // (3) Độ dốc với tuyến bắt buộc (FR9g).
-        string? doDoc = null;
-        if (tuyen.SlopeRequired)
-        {
-            var chonDoc = VeContext.HoiDanhMuc(
-                ed, $"Độ dốc tuyến {tuyen.Name}", pack.SheetSetup.Slopes, VeContext.DoDoc, choTuNhap: true);
-            if (chonDoc is not { } dd) return;
-            doDoc = dd.GiaTri;
-            VeContext.DoDoc = doDoc;
-        }
-
-        // (4) Bề rộng nét biên (đơn vị bản vẽ) — chỉ với loại tuyến edgeStyle=double.
+        // (1) Đơn vị bản vẽ — đọc TRƯỚC khi hỏi tham số vì hộp thoại hiện bề rộng nét biên theo nó.
         var (toMm, canCanhBaoDonVi, tenDonVi) = DrawingUnits.TuInsUnits((int)db.Insunits);
         if (canCanhBaoDonVi)
         {
@@ -85,20 +45,32 @@ public sealed class VeTuyenCommands
                 $"\n[XBoss] ⚠ Đơn vị bản vẽ: {tenDonVi} (INSUNITS={(int)db.Insunits}) — bề rộng/chiều cao chữ " +
                 "đã quy đổi theo đơn vị này, chuẩn dự án là mm.\n");
         }
+
+        // (2) Hệ + loại tuyến + size + độ dốc: hộp thoại một form (M106 AC3), rơi về chuỗi hỏi đáp
+        //     dòng lệnh cũ khi UI không dựng được (FR9). Cả hai đường trả CÙNG một bản ghi tham số.
+        if (HoiThamSo(ed, pack, toMm) is not { } ts) return;
+        var (he, tuyen, doDoc) = (ts.He, ts.Tuyen, ts.DoDoc);
+        if (ts.SizeTuNhap)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] ⚠ Size \"{ts.Size}\" ngoài danh mục rule pack — vẫn vẽ, XData đánh dấu \"custom\".\n");
+        }
+
+        // (3) Bề rộng nét biên (đơn vị bản vẽ) — chỉ với loại tuyến edgeStyle=double.
         double? beRong = null;
         if (tuyen.EdgeStyle == "double")
         {
-            if (DrawSize.PhanTich(size.GiaTri) is { } kt) beRong = kt.RongMm / toMm;
+            if (DrawSize.PhanTich(ts.Size) is { } kt) beRong = kt.RongMm / toMm;
             else
                 ed.WriteMessage(
-                    $"\n[XBoss] ⚠ Không đọc được bề rộng từ size \"{size.GiaTri}\" — chỉ vẽ tim, không sinh nét biên.\n");
+                    $"\n[XBoss] ⚠ Không đọc được bề rộng từ size \"{ts.Size}\" — chỉ vẽ tim, không sinh nét biên.\n");
         }
 
-        // (5) Bấm điểm như PLINE (ngoài transaction — ESC là không có gì được tạo).
+        // (4) Bấm điểm như PLINE (ngoài transaction — ESC là không có gì được tạo).
         var duong = BatDiem(ed);
         if (duong is not { } net) return;
 
-        // (6) Tạo tim + biên + XData trong MỘT transaction = MỘT nhóm UNDO.
+        // (5) Tạo tim + biên + XData trong MỘT transaction = MỘT nhóm UNDO.
         var soBien = 0;
         string? canhBaoBien = null;
         using (var khoa = doc.LockDocument())
@@ -137,7 +109,7 @@ public sealed class VeTuyenCommands
                                 VaiTro = VaiTroVe.Bien,
                                 HeId = he.Id,
                                 ItemId = tuyen.ItemId,
-                                Size = size.GiaTri,
+                                Size = ts.Size,
                                 RulePackVersion = pack.RulePack.Version,
                                 HandleTim = tim.Handle.ToString(),
                             });
@@ -152,9 +124,9 @@ public sealed class VeTuyenCommands
                     VaiTro = VaiTroVe.Tim,
                     HeId = he.Id,
                     ItemId = tuyen.ItemId,
-                    Size = size.GiaTri,
+                    Size = ts.Size,
                     RulePackVersion = pack.RulePack.Version,
-                    SizeTuNhap = size.TuNhap,
+                    SizeTuNhap = ts.SizeTuNhap,
                     DoDoc = doDoc,
                     HandleBien = handleBien,
                 });
@@ -171,7 +143,7 @@ public sealed class VeTuyenCommands
         }
 
         ed.WriteMessage(
-            $"\n[XBoss] Đã vẽ tuyến {tuyen.Name} {size.GiaTri}{(doDoc is null ? "" : $" i={doDoc}")} " +
+            $"\n[XBoss] Đã vẽ tuyến {tuyen.Name} {ts.Size}{(doDoc is null ? "" : $" i={doDoc}")} " +
             $"trên layer {tuyen.Layer} ({net.Dinh.Count} đỉnh{(net.Kin ? ", kín" : "")}).\n");
         if (canhBaoBien is not null)
             ed.WriteMessage($"[XBoss] ⚠ Không sinh được nét biên: {canhBaoBien} Tim vẫn đúng chuẩn và bóc được.\n");
@@ -302,6 +274,82 @@ public sealed class VeTuyenCommands
         ed.WriteMessage(
             $"\n[XBoss] Đã ghi nhãn \"{noiDung}\" trên layer {pack.DrawTools.LabelStyle.Layer} " +
             $"(cao {pack.DrawTools.LabelStyle.TextHeightMm}mm giấy ở tỉ lệ 1:{tiLe:0.##}).\n");
+    }
+
+    // ===== Thu tham số: hộp thoại (mặc định) hoặc dòng lệnh (FR9) =====
+
+    /// <summary>
+    /// Hệ/loại tuyến/size/độ dốc cho một lần vẽ. Thử hộp thoại một form trước (M106 AC3); UI không
+    /// dựng được hoặc bị tắt bằng <c>XBOSS_UI_DIALOG=0</c> thì rơi về ĐÚNG chuỗi hỏi đáp dòng lệnh
+    /// cũ (FR9). Hủy ở hộp thoại = dừng lệnh, KHÔNG hỏi lại bằng dòng lệnh.
+    /// Cả hai đường đều ghi nhớ lựa chọn vào <see cref="VeContext"/> (FR4 — một cơ chế nhớ duy nhất).
+    /// </summary>
+    private static KetQuaVeTuyen? HoiThamSo(Editor ed, DrawToolsPack pack, double toMm)
+    {
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new VeTuyenDialogViewModel(
+                pack, toMm, VeContext.He?.Id, VeContext.Tuyen?.ItemId, VeContext.Size, VeContext.DoDoc);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi)
+        {
+            if (kq is not null) GhiNhoPhien(kq);
+            return kq;
+        }
+        return HoiThamSoDongLenh(ed, pack);
+    }
+
+    /// <summary>Chuỗi 4 câu hỏi keyword của bản trước M106 — giữ nguyên cho script/batch và FR9.</summary>
+    private static KetQuaVeTuyen? HoiThamSoDongLenh(Editor ed, DrawToolsPack pack)
+    {
+        // Hệ (giữ hệ đang vẽ; chưa có thì hỏi — §6.11 "không có trạng thái ngầm bắt buộc")
+        // + loại tuyến, kèm lối DOIHE đổi hệ ngay trong lệnh.
+        var he = VeContext.HoiHe(ed, pack);
+        if (he is null) return null;
+        DrawLine? tuyen = null;
+        while (tuyen is null)
+        {
+            var (chon, doiHe) = VeContext.HoiLoaiTuyen(ed, he);
+            if (doiHe)
+            {
+                var heMoi = VeContext.HoiHe(ed, pack, batBuocHoiLai: true);
+                if (heMoi is null) return null;
+                he = heMoi;
+                continue;
+            }
+            if (chon is null) return null;
+            tuyen = chon;
+        }
+
+        // Size từ danh mục (cho nhập ngoài danh mục kèm cờ custom — M100 §4).
+        var chonSize = VeContext.HoiDanhMuc(
+            ed, $"Size {tuyen.Name} ({tuyen.SizeKind})", tuyen.Sizes, VeContext.Size, choTuNhap: true);
+        if (chonSize is not { } size) return null;
+
+        // Độ dốc với tuyến bắt buộc (FR9g).
+        string? doDoc = null;
+        if (tuyen.SlopeRequired)
+        {
+            var chonDoc = VeContext.HoiDanhMuc(
+                ed, $"Độ dốc tuyến {tuyen.Name}", pack.SheetSetup.Slopes, VeContext.DoDoc, choTuNhap: true);
+            if (chonDoc is not { } dd) return null;
+            doDoc = dd.GiaTri;
+        }
+
+        var kq = new KetQuaVeTuyen(he, tuyen, size.GiaTri, size.TuNhap, doDoc);
+        GhiNhoPhien(kq);
+        return kq;
+    }
+
+    /// <summary>Nhớ lựa chọn cho lần vẽ sau trong phiên (M100 §6.11 / M106 FR4).</summary>
+    private static void GhiNhoPhien(KetQuaVeTuyen kq)
+    {
+        VeContext.He = kq.He;
+        VeContext.Tuyen = kq.Tuyen;
+        VeContext.Size = kq.Size;
+        VeContext.SizeTuNhap = kq.SizeTuNhap;
+        if (kq.DoDoc is not null) VeContext.DoDoc = kq.DoDoc;
     }
 
     // ===== Trợ giúp =====

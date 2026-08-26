@@ -4,9 +4,11 @@ using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Geometry;
 using XBoss.Cad.Core.RulePack;
+using XBoss.Cad.Core.Ui.ViewModels;
 
 [assembly: CommandClass(typeof(XBoss.Cad.Acad.Commands.VeChiaDotCommands))]
 
@@ -34,15 +36,6 @@ namespace XBoss.Cad.Acad.Commands;
 /// </summary>
 public sealed class VeChiaDotCommands
 {
-    private enum PhamViChiaDot
-    {
-        /// <summary>Kỹ sư tự chọn các tuyến cần chia.</summary>
-        Chon,
-
-        /// <summary>Quét mọi tuyến của một hệ trong bản vẽ (journey 4).</summary>
-        CaHe,
-    }
-
     /// <summary>Từ khóa "để engine tự chọn kiểu nối theo cỡ" trong prompt ghi đè (FR1).</summary>
     private const string TuKhoaTuDong = "TUDONG";
 
@@ -70,12 +63,70 @@ public sealed class VeChiaDotCommands
         if (VeContext.CanDrawTools(ed) is not { } pack) return;
         var db = doc.Database;
 
-        // ===== (1) Phạm vi — hỏi NGOÀI transaction (ESC là bản vẽ nguyên trạng) =====
-        if (HoiPhamVi(ed) is not { } phamVi) return;
+        var (toMm, canCanhBaoDonVi, tenDonVi) = DrawingUnits.TuInsUnits((int)db.Insunits);
+        if (canCanhBaoDonVi)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] ⚠ Đơn vị bản vẽ: {tenDonVi} (INSUNITS={(int)db.Insunits}) — chiều dài đốt đã quy đổi " +
+                "theo đơn vị này, chuẩn dự án là mm.\n");
+        }
+
+        // ===== (1) Phạm vi + kiểu nối — hộp thoại có XEM TRƯỚC số đốt (M106 AC4) =====
+        // Hộp thoại cần biết trước các tuyến để tính xem trước, nên bản vẽ được quét MỘT lượt CHỈ
+        // ĐỌC ở đây; việc lọc theo phạm vi vẫn do DocUngVien làm ở (2) như đường dòng lệnh, để hai
+        // đường cho ra đúng cùng một tập tuyến và cùng một bộ thông báo bỏ qua.
+        var daDungUi = false;
+        KetQuaHoiChiaDot? chonHopThoai = null;
+        if (!HopThoaiXBoss.BiTat)
+        {
+            List<UngVien> tatCaTuyen;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                tatCaTuyen = DocUngVien(db, tr, pack, null, null, toMm, []);
+                tr.Commit();
+            }
+            (daDungUi, chonHopThoai) = HopThoaiXBoss.Thu(ed, () =>
+            {
+                var vm = new ChiaDotDialogViewModel(
+                    tatCaTuyen.Select(ChoHopThoai).ToList(), pack.DrawTools.Systems);
+                return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+            });
+            if (daDungUi && chonHopThoai is null) return; // kỹ sư bấm Hủy — bản vẽ nguyên trạng
+        }
+
+        PhamViChiaDot phamVi;
+        DrawSystem? he = null;
+        string? ghiDeKieuNoi = null;
+        if (chonHopThoai is { } chonUi)
+        {
+            phamVi = chonUi.PhamVi;
+            he = chonUi.HeId is null
+                ? null
+                : pack.DrawTools.Systems.FirstOrDefault(s => string.Equals(s.Id, chonUi.HeId, StringComparison.Ordinal));
+            ghiDeKieuNoi = chonUi.KieuNoi;
+        }
+        else
+        {
+            // FR9 — đường hỏi đáp dòng lệnh cũ, giữ nguyên từng câu hỏi.
+            if (HoiPhamVi(ed) is not { } pv) return;
+            phamVi = pv;
+            if (phamVi == PhamViChiaDot.CaHe)
+            {
+                he = VeContext.HoiHe(ed, pack);
+                if (he is null) return;
+            }
+        }
+
+        if (phamVi == PhamViChiaDot.CaHe && he is null)
+        {
+            // Không bao giờ nên xảy ra (danh mục hệ của hộp thoại dựng từ chính tuyến trong bản
+            // vẽ), nhưng thà dừng còn hơn để he = null trôi xuống DocUngVien và quét CẢ bản vẽ.
+            ed.WriteMessage("\n[XBoss] Không xác định được hệ cần chia đốt — bản vẽ không thay đổi.\n");
+            return;
+        }
 
         List<ObjectId>? daChon = null;
-        DrawSystem? he = null;
-        if (phamVi == PhamViChiaDot.Chon)
+        if (phamVi == PhamViChiaDot.ChonTay)
         {
             ed.WriteMessage(
                 "\n[XBoss] Chọn các tuyến TIM cần chia đốt (quét cả vùng cũng được — đối tượng khác tự bỏ qua).\n");
@@ -87,21 +138,8 @@ public sealed class VeChiaDotCommands
             }
             daChon = chon.Value.GetObjectIds().ToList();
         }
-        else
-        {
-            he = VeContext.HoiHe(ed, pack);
-            if (he is null) return;
-        }
 
-        var (toMm, canCanhBaoDonVi, tenDonVi) = DrawingUnits.TuInsUnits((int)db.Insunits);
-        if (canCanhBaoDonVi)
-        {
-            ed.WriteMessage(
-                $"\n[XBoss] ⚠ Đơn vị bản vẽ: {tenDonVi} (INSUNITS={(int)db.Insunits}) — chiều dài đốt đã quy đổi " +
-                "theo đơn vị này, chuẩn dự án là mm.\n");
-        }
-
-        // ===== (2) Đọc bản vẽ (transaction CHỈ ĐỌC) =====
+        // ===== (2) Đọc bản vẽ theo đúng phạm vi (transaction CHỈ ĐỌC) =====
         var boQua = new List<string>();
         List<UngVien> ungVien;
         using (var tr = db.TransactionManager.StartTransaction())
@@ -120,8 +158,12 @@ public sealed class VeChiaDotCommands
         }
 
         // ===== (3) Ghi đè kiểu nối + tỉ lệ in (vẫn NGOÀI transaction ghi) =====
-        var ghiDe = HoiGhiDeKieuNoi(ed, ungVien);
-        if (ghiDe.Huy) return;
+        if (chonHopThoai is null)
+        {
+            var ghiDe = HoiGhiDeKieuNoi(ed, ungVien);
+            if (ghiDe.Huy) return;
+            ghiDeKieuNoi = ghiDe.KieuNoi;
+        }
         if (VeContext.HoiTiLeIn(ed, pack) is not { } tiLe) return;
         var caoChu = pack.DrawTools.LabelStyle.TextHeightMm * tiLe / toMm;
 
@@ -138,7 +180,7 @@ public sealed class VeChiaDotCommands
                     Size = u.XData.Size,
                     SizeKind = u.Tuyen.SizeKind,
                     RunIndex = u.RunIndex,
-                    OverrideJointType = ghiDe.KieuNoi,
+                    OverrideJointType = ghiDeKieuNoi,
                     Rules = u.Rules,
                     Segments = u.Doan.Select(d => d.Doan).ToList(),
                 });
@@ -257,8 +299,24 @@ public sealed class VeChiaDotCommands
         hoi.Keywords.Default = "CHON";
         var kq = ed.GetKeywords(hoi);
         if (kq.Status != PromptStatus.OK) return null;
-        return kq.StringResult == "CAHE" ? PhamViChiaDot.CaHe : PhamViChiaDot.Chon;
+        return kq.StringResult == "CAHE" ? PhamViChiaDot.CaHe : PhamViChiaDot.ChonTay;
     }
+
+    /// <summary>
+    /// Một ứng viên đã đọc khỏi bản vẽ → bản ghi THUẦN cho ViewModel xem trước (Core không được
+    /// biết gì về ObjectId/Polyline). Chỉ chuyển dữ liệu, không tính toán gì thêm.
+    /// </summary>
+    private static TuyenChiaDot ChoHopThoai(UngVien u) =>
+        new(u.Handle,
+            u.XData.HeId,
+            u.XData.ItemId,
+            u.Tuyen.Name,
+            u.XData.Size,
+            u.XData.SizeTuNhap,
+            u.Tuyen.SizeKind,
+            u.RunIndex,
+            u.Rules,
+            u.Doan.Select(d => d.Doan).ToList());
 
     /// <summary>
     /// Ghi đè kiểu nối (FR1). Chỉ hỏi khi mọi tuyến đang chia thuộc CÙNG một loại tuyến — mỗi loại

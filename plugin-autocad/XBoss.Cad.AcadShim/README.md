@@ -70,6 +70,14 @@ chiếu tài liệu chứ không đoán theo lỗi biên dịch.
   ràng buộc nền; net8 là SDK có sẵn trên `ubuntu-latest`. Thứ đang kiểm là cú pháp + chữ ký,
   không phụ thuộc nền. `System.Windows.Forms.DialogResult`/`FolderBrowserDialog` được stub tự
   khai (cuối `AcadStub.cs`) vì Linux không có WinForms.
+- **`WpfStub.cs` — stub WPF + mã sinh từ XAML (M106).** Hộp thoại của plugin viết bằng WPF, mà WPF
+  chỉ có trên Windows nên Linux không biên dịch được `System.Windows.*`; `WpfStub.cs` khai giả đúng
+  phần Adapter chạm tới (`Window`, `RoutedEventArgs`, `Color`/`Brush`) **và** phần
+  `InitializeComponent()` mà MSBuild sinh từ `.xaml` khi build thật. Tách khỏi `AcadStub.cs` vì đây
+  không phải API AutoCAD. **Cổng này không kiểm được nội dung XAML** (markup, binding, tên style) —
+  mỗi hộp thoại phải có dòng verify tay trong `plugin-autocad/VERIFY-VA-PHAT-HANH.md`.
+  Code-behind của cửa sổ cố ý không chạm phần tử `x:Name` (mọi thứ đi qua binding vào ViewModel ở
+  Core), nên thêm hộp thoại mới là thêm `DataTemplate` trong XAML chứ không phải thêm stub.
 - **Cố ý KHÔNG nằm trong `XBoss.Cad.sln`.** Solution là góc nhìn sản phẩm (Core + Tests +
   Adapter thật); project này là công cụ CI. Để ngoài giữ `dotnet build/test` trên solution có
   hành vi y hệt trước, và tránh biên dịch mã Adapter hai lần trong IDE trên Windows.

@@ -1,0 +1,226 @@
+<!--
+  XBossDialog.xaml — KHUNG hộp thoại chung của mọi lệnh XBOSS_* (M106 FR1).
+
+  Cấu trúc: câu dẫn → VÙNG NỘI DUNG (ContentControl bind thẳng vào ViewModel) → vùng lý do →
+  dải nút OK/Hủy. Nội dung từng lệnh là một <DataTemplate DataType="{x:Type vm:...ViewModel}">
+  trong Window.Resources — CỐ Ý không tạo UserControl + code-behind riêng cho mỗi lệnh:
+  DataTemplate không có code-behind, nên thêm hộp thoại ở PR3 là thêm XAML thuần, không sinh thêm
+  lớp nào phải stub cho cổng CI (xem plugin-autocad/XBoss.Cad.AcadShim/WpfStub.cs).
+
+  Phím tắt: Enter = OK (nút IsDefault, tự mờ khi CoTheOk = false), Esc = Hủy (nút IsCancel) —
+  hành vi sẵn có của WPF, không cần bắt phím trong code-behind.
+
+  Màu lấy từ MauBangWpf (bọc lại MauBang của bảng điều khiển M102) — không hardcode mã màu ở đây.
+  Kích thước dùng đơn vị độc lập thiết bị + SizeToContent nên tự đúng ở DPI cao.
+-->
+<Window x:Class="XBoss.Cad.Acad.Ui.Wpf.XBossDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wpf="clr-namespace:XBoss.Cad.Acad.Ui.Wpf"
+        xmlns:vm="clr-namespace:XBoss.Cad.Core.Ui.ViewModels;assembly=XBoss.Cad.Core"
+        Title="{Binding TieuDe}"
+        Width="660"
+        SizeToContent="Height"
+        MinHeight="260"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Segoe UI"
+        FontSize="13"
+        UseLayoutRounding="True"
+        Background="{x:Static wpf:MauBangWpf.Nen}"
+        Foreground="{x:Static wpf:MauBangWpf.Chu}">
+
+  <Window.Resources>
+
+    <!-- ===== Kiểu dùng chung ===== -->
+
+    <Style x:Key="Nhan" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.ChuMo}" />
+      <Setter Property="Margin" Value="0,10,0,3" />
+    </Style>
+
+    <Style x:Key="GhiChu" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.ChuMo}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+    </Style>
+
+    <Style TargetType="ComboBox">
+      <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenO}" />
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
+      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NenKhoi}" />
+      <Setter Property="Padding" Value="6,4" />
+      <Setter Property="MinHeight" Value="30" />
+    </Style>
+
+    <Style TargetType="ComboBoxItem">
+      <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenO}" />
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
+      <Setter Property="Padding" Value="6,4" />
+    </Style>
+
+    <Style TargetType="RadioButton">
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+      <Setter Property="MinHeight" Value="24" />
+    </Style>
+
+    <!-- Nút: nền đặc, cao tối thiểu 32 để bấm được chắc tay trên màn hình DPI cao. -->
+    <Style x:Key="NutPhu" TargetType="Button">
+      <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenKhoi}" />
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
+      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NenKhoi}" />
+      <Setter Property="MinWidth" Value="96" />
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="Margin" Value="8,0,0,0" />
+      <Setter Property="Padding" Value="12,4" />
+    </Style>
+
+    <Style x:Key="NutChinh" TargetType="Button" BasedOn="{StaticResource NutPhu}">
+      <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NutChinh}" />
+      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NutChinh}" />
+    </Style>
+
+    <!-- Khối một trường nhập: nhãn + ô, có thể ẩn cả khối bằng DataTrigger. -->
+    <Style x:Key="Khoi" TargetType="StackPanel">
+      <Setter Property="Margin" Value="0,0,0,2" />
+    </Style>
+
+    <!-- ===== Nội dung theo lệnh (M106 §7.2) ===== -->
+
+    <!-- XBOSS_VE: 5 câu hỏi nối tiếp của dòng lệnh gộp vào một form (AC3). -->
+    <DataTemplate DataType="{x:Type vm:VeTuyenDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Hệ vẽ" />
+        <ComboBox ItemsSource="{Binding CacHe}"
+                  SelectedItem="{Binding He, Mode=TwoWay}"
+                  DisplayMemberPath="Name" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Loại tuyến" />
+        <ComboBox ItemsSource="{Binding CacLoaiTuyen}"
+                  SelectedItem="{Binding Tuyen, Mode=TwoWay}"
+                  DisplayMemberPath="Name" />
+
+        <TextBlock Style="{StaticResource Nhan}"
+                   Text="Size (chọn trong danh mục rule pack, hoặc gõ size khác)" />
+        <ComboBox IsEditable="True"
+                  ItemsSource="{Binding CacSize}"
+                  Text="{Binding Size, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaBeRongBien}" />
+
+        <!-- Độ dốc chỉ hiện với tuyến rule pack khai slopeRequired (M100 FR9g). -->
+        <StackPanel>
+          <StackPanel.Style>
+            <Style TargetType="StackPanel" BasedOn="{StaticResource Khoi}">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding CanDoDoc}" Value="True">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </StackPanel.Style>
+          <TextBlock Style="{StaticResource Nhan}" Text="Độ dốc (bắt buộc với tuyến này)" />
+          <ComboBox IsEditable="True"
+                    ItemsSource="{Binding CacDoDoc}"
+                    Text="{Binding DoDoc, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_CHIADOT: phạm vi + kiểu nối + xem trước số đốt (AC4). -->
+    <DataTemplate DataType="{x:Type vm:ChiaDotDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Phạm vi chia đốt" />
+        <RadioButton GroupName="PhamVi"
+                     IsChecked="{Binding ChonTay, Mode=TwoWay}"
+                     Content="Chọn tay các tuyến trên bản vẽ (sau khi bấm OK)" />
+        <RadioButton GroupName="PhamVi"
+                     IsChecked="{Binding ChonCaHe, Mode=TwoWay}"
+                     Content="Quét mọi tuyến của một hệ" />
+        <ComboBox Margin="24,6,0,0"
+                  ItemsSource="{Binding CacHe}"
+                  SelectedItem="{Binding MucHeChon, Mode=TwoWay}"
+                  DisplayMemberPath="Nhan"
+                  IsEnabled="{Binding ChonCaHe}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Kiểu nối" />
+        <ComboBox ItemsSource="{Binding CacKieuNoi}"
+                  SelectedItem="{Binding MucKieuNoiChon, Mode=TwoWay}"
+                  DisplayMemberPath="Nhan"
+                  IsEnabled="{Binding ChoGhiDeKieuNoi}" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaKieuNoi}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Xem trước (engine sẽ vẽ đúng các con số này)" />
+        <TextBlock Foreground="{x:Static wpf:MauBangWpf.Chu}" Text="{Binding TomTatXemTruoc}" />
+        <Border Margin="0,6,0,0"
+                Padding="8"
+                Background="{x:Static wpf:MauBangWpf.NenO}"
+                BorderBrush="{x:Static wpf:MauBangWpf.NenKhoi}"
+                BorderThickness="1">
+          <ScrollViewer MaxHeight="170" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding DongXemTruoc}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding GhiChuPhamVi}" />
+      </StackPanel>
+    </DataTemplate>
+
+  </Window.Resources>
+
+  <Grid Margin="18,16,18,16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0"
+               Style="{StaticResource GhiChu}"
+               Margin="0,0,0,6"
+               Text="{Binding MoTa}" />
+
+    <ContentControl Grid.Row="1" Content="{Binding}" />
+
+    <!-- Vùng lý do: nút OK khóa thì đây nói RÕ vì sao (FR2). -->
+    <Border Grid.Row="2"
+            Margin="0,14,0,0"
+            Padding="10,8"
+            Background="{x:Static wpf:MauBangWpf.NenKhoi}">
+      <TextBlock Text="{Binding ThongDiep}" TextWrapping="Wrap">
+        <TextBlock.Style>
+          <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.CanhBao}" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding MucDo}" Value="{x:Static vm:MucThongDiep.Tot}">
+                <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Tot}" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </TextBlock.Style>
+      </TextBlock>
+    </Border>
+
+    <StackPanel Grid.Row="3"
+                Margin="0,14,0,0"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right">
+      <Button Style="{StaticResource NutChinh}"
+              Content="OK"
+              IsDefault="True"
+              IsEnabled="{Binding CoTheOk}"
+              Click="BamOk" />
+      <Button Style="{StaticResource NutPhu}"
+              Content="Hủy"
+              IsCancel="True" />
+    </StackPanel>
+  </Grid>
+</Window>
