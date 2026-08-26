@@ -30,6 +30,17 @@ public static class MauBangWpf
     public static readonly Brush CanhBao = Tu(MauBang.CanhBao);
     public static readonly Brush NutChinh = Tu(MauBang.NutChinh);
 
+    // Tông trạng thái của control — ControlTemplate trong XBossDialog.xaml dùng để vẽ đủ
+    // thường / rê chuột / có focus / đang mở / bị khóa. Xem ghi chú trong MauBang.cs.
+    public static readonly Brush Vien = Tu(MauBang.Vien);
+    public static readonly Brush VienSang = Tu(MauBang.VienSang);
+    public static readonly Brush VienKhoa = Tu(MauBang.VienKhoa);
+    public static readonly Brush NenRe = Tu(MauBang.NenRe);
+    public static readonly Brush NenKhoa = Tu(MauBang.NenKhoa);
+    public static readonly Brush ChuKhoa = Tu(MauBang.ChuKhoa);
+    public static readonly Brush NutChinhRe = Tu(MauBang.NutChinhRe);
+    public static readonly Brush NutChinhNhan = Tu(MauBang.NutChinhNhan);
+
     private static Brush Tu(System.Drawing.Color mau)
     {
         var brush = new SolidColorBrush(Color.FromRgb(mau.R, mau.G, mau.B));

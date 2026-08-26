@@ -33,10 +33,31 @@
 
   <Window.Resources>
 
-    <!-- ===== Kiểu dùng chung ===== -->
+    <!-- =========================================================================================
+      Kiểu dùng chung.
 
+      ⚠ VÌ SAO PHẢI VIẾT ControlTemplate, KHÔNG ĐẶT SETTER SUÔNG (sự cố 2026-08-26, AutoCAD 2026):
+      ControlTemplate MẶC ĐỊNH của WPF (theme Aero2 của Windows) vẽ chrome bằng brush HARD-CODE
+      theo theme hệ điều hành và KHÔNG hề đọc Background của control. Đặt
+      `<Setter Property="Background">` cho ComboBox/CheckBox/RadioButton/ScrollBar là đặt vào hư
+      không: ô vẫn nền SÁNG theo Windows, trong khi Setter Foreground (chữ) thì lại ăn — thành ra
+      chữ gần trắng nằm trên nền sáng, đọc như đang bị khóa. Đúng thứ hộp thoại XBOSS_VE đã dính.
+      Sửa đúng cách là THAY HẲN template và tự vẽ mọi trạng thái: thường / rê chuột / có focus /
+      đang mở / nhập được (IsEditable) / BỊ KHÓA.
+
+      Bảng nào ăn Background của control, bảng nào không (Aero2):
+        • ComboBox, ComboBoxItem, CheckBox, RadioButton, ScrollBar, Thumb → KHÔNG (chrome riêng).
+        • Button, TextBox → có đọc Background, NHƯNG trigger IsMouseOver/IsPressed/IsEnabled=False
+          của template mặc định lại ghi đè bằng màu SÁNG của Windows ⇒ vẫn phải thay template,
+          nếu không thì rê chuột / khóa nút OK là lòi mảng sáng ra giữa hộp thoại tối.
+
+      Màu lấy từ MauBangWpf (không hardcode mã màu ở đây — xem MauBang.cs).
+    ========================================================================================== -->
+
+    <!-- Nhãn của trường nhập: dùng Chu (không phải ChuMo) — đây là chữ CHÍNH, kỹ sư đọc trên máy
+         công trường. ChuMo chỉ dành cho câu giải thích phụ (GhiChu). -->
     <Style x:Key="Nhan" TargetType="TextBlock">
-      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.ChuMo}" />
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
       <Setter Property="Margin" Value="0,10,0,3" />
     </Style>
 
@@ -46,67 +67,560 @@
       <Setter Property="Margin" Value="0,4,0,0" />
     </Style>
 
-    <Style TargetType="ComboBox">
+    <!-- ===== Thanh cuộn ===== -->
+    <!-- Mọi ScrollViewer trong tệp này (khối xem trước, khối chỉ-đọc, danh sách xổ của ComboBox,
+         ô ghi chú nhiều dòng) đều mượn ScrollBar của theme Windows → mặc định là thanh SÁNG.
+         Style ngầm dưới đây bắt hết. -->
+
+    <!-- Khoảng trống trên/dưới con trượt: trong suốt nhưng vẫn phải bắt được chuột (nhảy trang). -->
+    <Style x:Key="OTrangCuon" TargetType="RepeatButton">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="IsTabStop" Value="False" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RepeatButton">
+            <Border Background="Transparent" />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="ConTruotCuon" TargetType="Thumb">
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Thumb">
+            <Border x:Name="Than"
+                    Margin="2"
+                    CornerRadius="3"
+                    Background="{x:Static wpf:MauBangWpf.Vien}" />
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Than" Property="Background" Value="{x:Static wpf:MauBangWpf.VienSang}" />
+              </Trigger>
+              <Trigger Property="IsDragging" Value="True">
+                <Setter TargetName="Than" Property="Background" Value="{x:Static wpf:MauBangWpf.VienSang}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="ScrollBar">
       <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenO}" />
-      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
-      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NenKhoi}" />
-      <Setter Property="Padding" Value="6,4" />
-      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Width" Value="12" />
+      <Setter Property="SnapsToDevicePixels" Value="True" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ScrollBar">
+            <Border Background="{TemplateBinding Background}">
+              <Track x:Name="PART_Track" IsDirectionReversed="True">
+                <Track.DecreaseRepeatButton>
+                  <RepeatButton x:Name="NutLui"
+                                Style="{StaticResource OTrangCuon}"
+                                Command="ScrollBar.PageUpCommand" />
+                </Track.DecreaseRepeatButton>
+                <Track.Thumb>
+                  <Thumb Style="{StaticResource ConTruotCuon}" />
+                </Track.Thumb>
+                <Track.IncreaseRepeatButton>
+                  <RepeatButton x:Name="NutToi"
+                                Style="{StaticResource OTrangCuon}"
+                                Command="ScrollBar.PageDownCommand" />
+                </Track.IncreaseRepeatButton>
+              </Track>
+            </Border>
+            <ControlTemplate.Triggers>
+              <!-- Thanh ngang: Track phải đổi hướng và đổi lệnh, nếu không con trượt chạy ngược. -->
+              <Trigger Property="Orientation" Value="Horizontal">
+                <Setter TargetName="PART_Track" Property="Orientation" Value="Horizontal" />
+                <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False" />
+                <Setter TargetName="NutLui" Property="Command" Value="ScrollBar.PageLeftCommand" />
+                <Setter TargetName="NutToi" Property="Command" Value="ScrollBar.PageRightCommand" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Style.Triggers>
+        <Trigger Property="Orientation" Value="Horizontal">
+          <Setter Property="Width" Value="Auto" />
+          <Setter Property="Height" Value="12" />
+        </Trigger>
+      </Style.Triggers>
     </Style>
 
-    <Style TargetType="ComboBoxItem">
-      <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenO}" />
-      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
-      <Setter Property="Padding" Value="6,4" />
-    </Style>
-
-    <Style TargetType="RadioButton">
-      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
-      <Setter Property="Margin" Value="0,4,0,0" />
-      <Setter Property="MinHeight" Value="24" />
-    </Style>
-
-    <Style TargetType="CheckBox">
-      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
-      <Setter Property="Margin" Value="0,6,0,0" />
-      <Setter Property="MinHeight" Value="24" />
-    </Style>
-
+    <!-- ===== Ô nhập ===== -->
+    <!-- Template mặc định của TextBox có đọc Background, nhưng trigger IsEnabled=False của nó ghi
+         đè thành nền sáng + chữ xám của Windows ⇒ ô khóa lòi mảng sáng. Thay hẳn. -->
     <Style TargetType="TextBox">
       <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenO}" />
       <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
       <Setter Property="CaretBrush" Value="{x:Static wpf:MauBangWpf.Chu}" />
-      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NenKhoi}" />
+      <Setter Property="SelectionBrush" Value="{x:Static wpf:MauBangWpf.NutChinh}" />
+      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Vien}" />
+      <Setter Property="BorderThickness" Value="1" />
       <Setter Property="Padding" Value="6,4" />
       <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TextBox">
+            <Border x:Name="Vo"
+                    CornerRadius="3"
+                    SnapsToDevicePixels="True"
+                    Padding="{TemplateBinding Padding}"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}">
+              <!-- Nối thẳng hai cờ thanh cuộn của chính TextBox xuống đây: ScrollViewer trần
+                   mặc định là VerticalScrollBarVisibility=Visible, để nguyên thì MỌI ô một dòng
+                   mọc thêm thanh cuộn; còn ô ghi chú nhiều dòng của XBOSS_VE_DEXUAT
+                   (VerticalScrollBarVisibility="Auto") phải giữ nguyên tác dụng. -->
+              <ScrollViewer x:Name="PART_ContentHost"
+                            Focusable="False"
+                            HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
+                            VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.VienSang}" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Tot}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Vo" Property="Background" Value="{x:Static wpf:MauBangWpf.NenKhoa}" />
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.VienKhoa}" />
+                <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.ChuKhoa}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Ô nhập NẰM TRONG ComboBox (IsEditable=True). Phải khai Style tường minh: style ngầm ở trên
+         cũng chui vào trong ControlTemplate, và nếu để nó ăn thì ô sẽ có thêm một lớp viền + nền
+         thứ hai lồng trong viền của combo. Ở đây chỉ cần phần chữ, chrome do combo vẽ. -->
+    <Style x:Key="ONhapTrongCombo" TargetType="TextBox">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
+      <Setter Property="CaretBrush" Value="{x:Static wpf:MauBangWpf.Chu}" />
+      <Setter Property="SelectionBrush" Value="{x:Static wpf:MauBangWpf.NutChinh}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TextBox">
+            <ScrollViewer x:Name="PART_ContentHost"
+                          Focusable="False"
+                          Background="Transparent"
+                          HorizontalScrollBarVisibility="Hidden"
+                          VerticalScrollBarVisibility="Hidden" />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Style.Triggers>
+        <Trigger Property="IsEnabled" Value="False">
+          <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.ChuKhoa}" />
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+
+    <!-- ===== Combo ===== -->
+    <!-- Nút xổ: CHỈ là vùng bắt chuột trong suốt phủ kín combo. Viền/nền/mũi tên do template của
+         chính ComboBox vẽ, để mọi trạng thái (kể cả rê chuột trên phần gõ tay của combo
+         IsEditable) đọc được từ đúng một chỗ. -->
+    <Style x:Key="NutXoCombo" TargetType="ToggleButton">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="IsTabStop" Value="False" />
+      <Setter Property="ClickMode" Value="Press" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border Background="Transparent" />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="ComboBoxItem">
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="8,5" />
+      <Setter Property="MinHeight" Value="26" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBoxItem">
+            <Border x:Name="Vo"
+                    SnapsToDevicePixels="True"
+                    Padding="{TemplateBinding Padding}"
+                    Background="{TemplateBinding Background}">
+              <ContentPresenter VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <!-- Thứ tự có ý nghĩa: trigger sau thắng trigger trước khi cùng đúng. -->
+              <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="Vo" Property="Background" Value="{x:Static wpf:MauBangWpf.NenRe}" />
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="Vo" Property="Background" Value="{x:Static wpf:MauBangWpf.NutChinh}" />
+              </Trigger>
+              <MultiTrigger>
+                <MultiTrigger.Conditions>
+                  <Condition Property="IsSelected" Value="True" />
+                  <Condition Property="IsHighlighted" Value="True" />
+                </MultiTrigger.Conditions>
+                <Setter TargetName="Vo" Property="Background" Value="{x:Static wpf:MauBangWpf.NutChinhRe}" />
+              </MultiTrigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.ChuKhoa}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="ComboBox">
+      <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenO}" />
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
+      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Vien}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="6,4" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBox">
+            <Grid x:Name="Goc" SnapsToDevicePixels="True">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="24" />
+              </Grid.ColumnDefinitions>
+
+              <!-- Lớp dưới cùng: khung của combo (mọi trạng thái đổi màu ở đây). -->
+              <Border x:Name="Vo"
+                      Grid.ColumnSpan="2"
+                      CornerRadius="3"
+                      Background="{TemplateBinding Background}"
+                      BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}" />
+
+              <!-- Vùng bắt chuột phủ kín; ở chế độ gõ tay thì ô nhập nằm ĐÈ LÊN cột 0 nên chỉ còn
+                   cột mũi tên xổ danh sách — đúng hành vi combo editable của Windows. -->
+              <ToggleButton x:Name="NutXo"
+                            Grid.ColumnSpan="2"
+                            Style="{StaticResource NutXoCombo}"
+                            IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" />
+
+              <ContentPresenter x:Name="NoiDung"
+                                Grid.Column="0"
+                                Margin="{TemplateBinding Padding}"
+                                VerticalAlignment="Center"
+                                IsHitTestVisible="False"
+                                Content="{TemplateBinding SelectionBoxItem}"
+                                ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}" />
+
+              <TextBox x:Name="PART_EditableTextBox"
+                       Grid.Column="0"
+                       Margin="{TemplateBinding Padding}"
+                       VerticalAlignment="Center"
+                       Visibility="Collapsed"
+                       Style="{StaticResource ONhapTrongCombo}" />
+
+              <Path x:Name="MuiTen"
+                    Grid.Column="1"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsHitTestVisible="False"
+                    Data="M 0,0 L 8,0 L 4,4.5 Z"
+                    Fill="{x:Static wpf:MauBangWpf.Chu}" />
+
+              <!-- Danh sách xổ: Popup nằm ngoài cây visual của cửa sổ nên KHÔNG thừa hưởng nền tối
+                   — phải tự khai nền/viền, nếu không danh sách vẫn trắng dù combo đã tối. -->
+              <Popup x:Name="PART_Popup"
+                     Grid.ColumnSpan="2"
+                     Placement="Bottom"
+                     AllowsTransparency="True"
+                     Focusable="False"
+                     IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                <Border x:Name="VoXo"
+                        SnapsToDevicePixels="True"
+                        MinWidth="{Binding ActualWidth, ElementName=Goc}"
+                        MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                        Background="{x:Static wpf:MauBangWpf.NenO}"
+                        BorderBrush="{x:Static wpf:MauBangWpf.Vien}"
+                        BorderThickness="1">
+                  <!-- Khai thẳng "Auto": ScrollViewer trần mặc định là thanh dọc LUÔN hiện,
+                       danh sách 3 mục cũng mọc thanh cuộn. -->
+                  <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                VerticalScrollBarVisibility="Auto">
+                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
+                  </ScrollViewer>
+                </Border>
+              </Popup>
+            </Grid>
+
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsEditable" Value="True">
+                <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible" />
+                <Setter TargetName="NoiDung" Property="Visibility" Value="Collapsed" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.VienSang}" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Tot}" />
+              </Trigger>
+              <Trigger Property="IsDropDownOpen" Value="True">
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Tot}" />
+              </Trigger>
+              <!-- Để CUỐI: trạng thái khóa phải thắng mọi trạng thái trên. Đây chính là ca đã hỏng
+                   — combo bình thường mà trông như khóa; giờ hai trạng thái cách nhau rất xa. -->
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Vo" Property="Background" Value="{x:Static wpf:MauBangWpf.NenKhoa}" />
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.VienKhoa}" />
+                <Setter TargetName="MuiTen" Property="Fill" Value="{x:Static wpf:MauBangWpf.ChuKhoa}" />
+                <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.ChuKhoa}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- ===== Ô chọn ===== -->
+    <!-- Ô vuông/tròn của CheckBox và RadioButton là "BulletChrome" của theme Windows: nền sáng,
+         dấu tick tối, rê chuột thì ánh xanh Aero. Không có cách nào chỉnh bằng Setter — vẽ lại. -->
+    <Style TargetType="CheckBox">
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
+      <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenO}" />
+      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Vien}" />
+      <Setter Property="Margin" Value="0,6,0,0" />
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <!-- Nền Transparent để bấm được cả dòng chữ, không chỉ mỗi ô vuông (ngón tay trên
+                 máy công trường). -->
+            <Grid Background="Transparent" SnapsToDevicePixels="True">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Border x:Name="O"
+                      Width="16"
+                      Height="16"
+                      CornerRadius="3"
+                      VerticalAlignment="Center"
+                      Background="{TemplateBinding Background}"
+                      BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="1">
+                <Path x:Name="Dau"
+                      Visibility="Collapsed"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center"
+                      Data="M 0,3.5 L 3.5,7 L 9.5,0.5"
+                      Stroke="{x:Static wpf:MauBangWpf.Chu}"
+                      StrokeThickness="2"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round" />
+              </Border>
+              <ContentPresenter Grid.Column="1"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True" />
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="O" Property="Background" Value="{x:Static wpf:MauBangWpf.NutChinh}" />
+                <Setter TargetName="O" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NutChinh}" />
+                <Setter TargetName="Dau" Property="Visibility" Value="Visible" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="O" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.VienSang}" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="O" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Tot}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="O" Property="Background" Value="{x:Static wpf:MauBangWpf.NenKhoa}" />
+                <Setter TargetName="O" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.VienKhoa}" />
+                <Setter TargetName="Dau" Property="Stroke" Value="{x:Static wpf:MauBangWpf.ChuKhoa}" />
+                <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.ChuKhoa}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="RadioButton">
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
+      <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenO}" />
+      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Vien}" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Grid Background="Transparent" SnapsToDevicePixels="True">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Border x:Name="O"
+                      Width="16"
+                      Height="16"
+                      CornerRadius="8"
+                      VerticalAlignment="Center"
+                      Background="{TemplateBinding Background}"
+                      BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="1">
+                <Ellipse x:Name="Cham"
+                         Width="8"
+                         Height="8"
+                         Visibility="Collapsed"
+                         Fill="{x:Static wpf:MauBangWpf.Chu}" />
+              </Border>
+              <ContentPresenter Grid.Column="1"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True" />
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="O" Property="Background" Value="{x:Static wpf:MauBangWpf.NutChinh}" />
+                <Setter TargetName="O" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NutChinh}" />
+                <Setter TargetName="Cham" Property="Visibility" Value="Visible" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="O" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.VienSang}" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="O" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Tot}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="O" Property="Background" Value="{x:Static wpf:MauBangWpf.NenKhoa}" />
+                <Setter TargetName="O" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.VienKhoa}" />
+                <Setter TargetName="Cham" Property="Fill" Value="{x:Static wpf:MauBangWpf.ChuKhoa}" />
+                <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.ChuKhoa}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
 
     <!-- Ẩn/hiện cả khối theo một cờ bool của ViewModel (vd CanTang, CanKhoGiay). -->
     <BooleanToVisibilityConverter x:Key="CoThiHien" />
 
-    <!-- Khối chỉ-đọc liệt kê nhiều dòng (xem trước, hệ quả, cảnh báo) — FR6. -->
+    <!-- Khối chỉ-đọc liệt kê nhiều dòng (xem trước, hệ quả, cảnh báo) — FR6.
+         Viền dùng Vien (không phải NenKhoi): NenKhoi chỉ hơn nền cửa sổ vài mức xám nên trên màn
+         hình công trường coi như không có viền, khối trôi vào nền. -->
     <Style x:Key="KhoiChiDoc" TargetType="Border">
       <Setter Property="Margin" Value="0,6,0,0" />
       <Setter Property="Padding" Value="8" />
       <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenO}" />
-      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NenKhoi}" />
+      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Vien}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
 
-    <!-- Nút: nền đặc, cao tối thiểu 32 để bấm được chắc tay trên màn hình DPI cao. -->
+    <!-- Nút: nền đặc, cao tối thiểu 32 để bấm được chắc tay trên màn hình DPI cao.
+         Hai kiểu nút có HAI template riêng vì hướng đổi màu khi rê chuột NGƯỢC nhau (xem dưới) —
+         cố gộp một template thì phải nhét màu qua Tag, khó đọc hơn là chép 12 dòng. -->
     <Style x:Key="NutPhu" TargetType="Button">
       <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenKhoi}" />
       <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
-      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NenKhoi}" />
+      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Vien}" />
+      <Setter Property="BorderThickness" Value="1" />
       <Setter Property="MinWidth" Value="96" />
       <Setter Property="MinHeight" Value="32" />
       <Setter Property="Margin" Value="8,0,0,0" />
       <Setter Property="Padding" Value="12,4" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Vo"
+                    CornerRadius="4"
+                    SnapsToDevicePixels="True"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}">
+              <ContentPresenter Margin="{TemplateBinding Padding}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <!-- Nút XÁM: rê chuột thì SÁNG lên. Làm đậm thêm sẽ chìm vào nền cửa sổ (cũng xám
+                   tối) — khác với nút màu bên dưới. Chữ Chu trên NenRe vẫn 7.3:1. -->
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Vo" Property="Background" Value="{x:Static wpf:MauBangWpf.NenRe}" />
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.VienSang}" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="Vo" Property="Background" Value="{x:Static wpf:MauBangWpf.NenO}" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Tot}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Vo" Property="Background" Value="{x:Static wpf:MauBangWpf.NenKhoa}" />
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.VienKhoa}" />
+                <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.ChuKhoa}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
 
     <Style x:Key="NutChinh" TargetType="Button" BasedOn="{StaticResource NutPhu}">
       <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NutChinh}" />
       <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NutChinh}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Vo"
+                    CornerRadius="4"
+                    SnapsToDevicePixels="True"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}">
+              <ContentPresenter Margin="{TemplateBinding Padding}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <!-- Nút MÀU: rê chuột thì ĐẬM dần, đúng ADR-0010 — nền accent sáng dần sẽ kéo tương
+                   phản với chữ trắng xuống dưới AA (ở đây 5.2:1 → 7.2:1 → 9.7:1 khi nhấn). -->
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Vo" Property="Background" Value="{x:Static wpf:MauBangWpf.NutChinhRe}" />
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NutChinhRe}" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="Vo" Property="Background" Value="{x:Static wpf:MauBangWpf.NutChinhNhan}" />
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NutChinhNhan}" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Tot}" />
+              </Trigger>
+              <!-- Nút OK khóa khi CoTheOk=false: template mặc định tô nền SÁNG của Windows ở đây,
+                   giữa hộp thoại tối — nay là nền tối phẳng + chữ mờ. -->
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Vo" Property="Background" Value="{x:Static wpf:MauBangWpf.NenKhoa}" />
+                <Setter TargetName="Vo" Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.VienKhoa}" />
+                <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.ChuKhoa}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
 
     <!-- Khối một trường nhập: nhãn + ô, có thể ẩn cả khối bằng DataTrigger. -->
@@ -181,11 +695,9 @@
 
         <TextBlock Style="{StaticResource Nhan}" Text="Xem trước (engine sẽ vẽ đúng các con số này)" />
         <TextBlock Foreground="{x:Static wpf:MauBangWpf.Chu}" Text="{Binding TomTatXemTruoc}" />
-        <Border Margin="0,6,0,0"
-                Padding="8"
-                Background="{x:Static wpf:MauBangWpf.NenO}"
-                BorderBrush="{x:Static wpf:MauBangWpf.NenKhoi}"
-                BorderThickness="1">
+        <!-- Cùng hình thức với mọi khối chỉ-đọc khác: dùng chung Style thay vì chép lại 4 thuộc
+             tính (chép tay chính là chỗ viền khối này lệch màu với các khối kia). -->
+        <Border Style="{StaticResource KhoiChiDoc}">
           <ScrollViewer MaxHeight="170" VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding DongXemTruoc}">
               <ItemsControl.ItemTemplate>
@@ -592,8 +1104,10 @@
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
+    <!-- Câu dẫn là thứ ĐẦU TIÊN kỹ sư đọc → Chu, không để mờ như ghi chú phụ. -->
     <TextBlock Grid.Row="0"
                Style="{StaticResource GhiChu}"
+               Foreground="{x:Static wpf:MauBangWpf.Chu}"
                Margin="0,0,0,6"
                Text="{Binding MoTa}" />
 
@@ -603,11 +1117,14 @@
       <ContentControl Content="{Binding}" />
     </ScrollViewer>
 
-    <!-- Vùng lý do: nút OK khóa thì đây nói RÕ vì sao (FR2). -->
+    <!-- Vùng lý do: nút OK khóa thì đây nói RÕ vì sao (FR2). Có viền để tách hẳn khỏi nền cửa sổ —
+         NenKhoi chỉ hơn Nen vài mức xám, không viền thì vùng này gần như vô hình. -->
     <Border Grid.Row="2"
             Margin="0,14,0,0"
             Padding="10,8"
-            Background="{x:Static wpf:MauBangWpf.NenKhoi}">
+            Background="{x:Static wpf:MauBangWpf.NenKhoi}"
+            BorderBrush="{x:Static wpf:MauBangWpf.Vien}"
+            BorderThickness="1">
       <TextBlock Text="{Binding ThongDiep}" TextWrapping="Wrap">
         <TextBlock.Style>
           <Style TargetType="TextBlock">
