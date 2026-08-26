@@ -210,14 +210,33 @@ tuyến–thiết bị) là bậc có đòn bẩy lớn nhất; sau đó phối 
 cần cao độ đã khai trên đối tượng); các mục để lại ở M100 §20 (ngắt nét giao chéo, revision cloud,
 nhân bản tầng điển hình, riser). Mỗi mục phải mở `M<xx>` mới có duyệt trước khi code.
 
-**M105 — Tự động phân chia đốt toàn hệ MEPF theo kiểu kết nối:** 📝 đặc tả **Draft chờ duyệt**
-(`docs/nang-cap/M105-chia-dot-mepf-theo-kieu-noi.md`, 2026-08-26) — chia đốt MỌI tuyến MEPF
-vẽ bằng `XBOSS_VE`: ống gió theo kiểu nối (nẹp C max 1180 / TDC max 1110 / mặt bích V max 1180, số
-người dùng chốt), ống nước/PCCC theo cây thương phẩm (ren/grooved/hàn/măng xông), máng cáp thanh +
-tấm nối — 1 engine tổng quát tham số hóa qua rule pack v9 `jointRules` (thêm hệ mới = sửa rule pack,
-không sửa code); engine C#+TS dùng chung test vector, lệnh `XBOSS_VE_CHIADOT`, migration `0143`,
-API + bảng đốt web, QTO phụ kiện mối nối. Chờ người dùng chốt các ⚠GIẢ ĐỊNH ở §13 rồi mới
-Approved/chia PR.
+**M105 — Tự động phân chia đốt toàn hệ MEPF theo kiểu kết nối:** ✅ **Approved 2026-08-26, PR1 XONG
+
+- PR2 phần Core XONG** (`docs/nang-cap/M105-chia-dot-mepf-theo-kieu-noi.md`). Chia đốt MỌI tuyến MEPF
+  vẽ bằng `XBOSS_VE`: ống gió theo kiểu nối (nẹp C max 1180 / TDC max 1110 / mặt bích V max 1180 — số
+  người dùng chốt), ống nước/PCCC theo cây thương phẩm 5800 (ren/grooved/măng xông), máng cáp thanh
+  2500 + tấm nối. MỘT engine tổng quát tham số hóa qua rule pack — thêm hệ/kiểu nối mới về sau chỉ là
+  sửa rule pack, không sửa code.
+
+* **PR1 (xong):** rule pack **v9** (`jointRules` cho đủ 9 tuyến, mở rộng thuần trên v8 — có test canh);
+  engine TS `lib/ky-thuat/engineering-joint-segmentation.ts` (2 chế độ chia `deu`/`cay_nguyen`, chọn
+  kiểu nối theo cạnh lớn hoặc DN, parser biểu thức định mức phụ kiện — không dùng eval); 9 **test
+  vector JSON dùng chung** ở `plugin-autocad/testdata/joint-segmentation/`; `migrations/0143` (2 bảng
+  - RLS 2 nhánh theo mẫu 0092) + store upsert idempotent + `POST/GET /api/engineering/joint-segmentation`
+    (kiểm LẠI bất biến "tổng đốt + khe = chiều dài đoạn" ở server, 422 khi lệch) + trang
+    `/engineering/joint-segmentation`. 29 ca test engine + 36 ca rule pack xanh.
+* **PR2 phần Core (xong):** `XBoss.Cad.Core/Draw/JointRulesConfig.cs` + `JointSegmenter.cs` — bản C#
+  cho ra **đúng từng số** như bản TS, chứng minh bằng 56 ca đọc thẳng 9 test vector đó. 644/644 ca
+  .NET xanh. **Bẫy đã né:** làm tròn 0,1 mm phải là `MidpointRounding.AwayFromZero` — mặc định .NET
+  là làm tròn ngân hàng nên lệch bản TS ở các ca `,x5` (đã kiểm bằng mutation: đổi về mặc định → 3 ca đỏ).
+* **PR2 phần Adapter (đang làm):** lệnh `XBOSS_VE_CHIADOT` (vẽ vạch chia + tag + XData 2 chiều,
+  idempotent, 1 nhóm UNDO), bảng đốt trong `XBOSS_VE_THONGKE`, mục chia đốt trong báo cáo phiên vẽ.
+* **Bẫy layer đã né:** hậu tố layer vạch chia là `JOINT` **không có gạch nối đầu** — `layerMatchAny`
+  của takeoff khớp theo ranh giới token nên `M-DUCT-SUPP-JOINT` vẫn khớp mục bóc `M-DUCT-SUPP` và
+  vạch chia sẽ bị bóc trùng thành chiều dài ống. Cùng lớp lỗi mà `edgeLayerSuffix` đã né bằng `EDGE`
+  (M100 FR4); có test canh ở cả 2 tầng.
+* **Còn lại:** verify tay lệnh mới trên máy có AutoCAD 2026 (cùng cổng với M99/M100/M102 — không có
+  runner Windows).
 
 ## M102 PR2 — Adapter AutoCAD: bước chuẩn hóa 12/13 + quét tag cho phép kiểm 17 (2026-08-25)
 
