@@ -42,6 +42,11 @@ internal sealed class TrinhDanControl : UserControl
             WrapContents = false,
             AutoScroll = true,
             Padding = new Padding(8),
+            // Đặt nền TƯỜNG MINH cho từng control, KHÔNG dựa vào việc kế thừa màu từ control cha:
+            // trong PaletteSet của AutoCAD, control con không nhận BackColor của UserControl mà rơi
+            // về nền trắng hệ thống — chữ xám của theme tối trên nền trắng gần như không đọc được.
+            // Đã thấy tận mắt trên AutoCAD 2026 ngày 2026-08-26. Áp cùng luật cho mọi nhãn/hàng nút.
+            BackColor = MauBang.Nen,
         };
         Controls.Add(_flow);
     }
@@ -102,6 +107,7 @@ internal sealed class TrinhDanControl : UserControl
             AutoSize = true,
             MaximumSize = new Size(RongToiDa, 0),
             Margin = new Padding(0, 2, 0, 2),
+            BackColor = MauBang.Nen,
         };
         foreach (var lenh in cacLenh)
         {
@@ -137,6 +143,7 @@ internal sealed class TrinhDanControl : UserControl
     {
         Text = chu,
         ForeColor = mau,
+        BackColor = MauBang.Nen,
         Font = new Font("Segoe UI", coChu, kieu),
         AutoSize = true,
         MaximumSize = new Size(RongToiDa, 0),

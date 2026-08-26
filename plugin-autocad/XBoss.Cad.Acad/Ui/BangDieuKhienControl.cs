@@ -28,6 +28,10 @@ internal sealed class BangDieuKhienControl : UserControl
             WrapContents = false,
             AutoScroll = true,
             Padding = new Padding(8),
+            // Nền TƯỜNG MINH — trong PaletteSet, control con không kế thừa BackColor của
+            // UserControl mà rơi về nền trắng hệ thống (thấy tận mắt trên AutoCAD 2026 ngày
+            // 2026-08-26 ở tab Quy trình). Chữ theme tối trên nền trắng gần như không đọc được.
+            BackColor = MauBang.Nen,
         };
         Controls.Add(_flow);
     }
@@ -73,6 +77,7 @@ internal sealed class BangDieuKhienControl : UserControl
             {
                 Text = khoi.TieuDe.ToUpperInvariant(),
                 ForeColor = MauBang.ChuMo,
+                BackColor = MauBang.Nen,
                 Font = new Font("Segoe UI", 8f, FontStyle.Bold),
                 AutoSize = true,
                 Margin = new Padding(2, 12, 2, 2),
@@ -88,6 +93,7 @@ internal sealed class BangDieuKhienControl : UserControl
                         MucDo.CanhBao => MauBang.CanhBao,
                         _ => MauBang.Chu,
                     },
+                    BackColor = MauBang.Nen,
                     Font = new Font("Segoe UI", 9f),
                     AutoSize = true,
                     MaximumSize = new Size(300, 0), // xuống dòng thay vì tràn ngang palette
