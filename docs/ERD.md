@@ -5042,6 +5042,56 @@
 - `engineering_iot_threshold_alerts_pkey`: UNIQUE INDEX engineering_iot_threshold_alerts_pkey ON public.engineering_iot_threshold_alerts USING btree (id)
 - `uq_iot_alert_dang_mo`: UNIQUE INDEX uq_iot_alert_dang_mo ON public.engineering_iot_threshold_alerts USING btree (device_id) WHERE (is_resolved = false)
 
+### engineering_joint_pieces
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| run_id | uuid |  |  |
+| piece_index | integer |  |  |
+| length_mm | numeric(12,1) |  |  |
+| tag | text |  |  |
+
+**Khóa ngoại:**
+- `project_id` → `projects(id)`
+- `run_id` → `engineering_joint_runs(id)`
+
+**Index:**
+- `engineering_joint_pieces_pkey`: UNIQUE INDEX engineering_joint_pieces_pkey ON public.engineering_joint_pieces USING btree (id)
+- `engineering_joint_pieces_run_id_piece_index_key`: UNIQUE INDEX engineering_joint_pieces_run_id_piece_index_key ON public.engineering_joint_pieces USING btree (run_id, piece_index)
+
+### engineering_joint_runs
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| drawing_id | integer |  |  |
+| run_key | text |  |  |
+| system_id | text |  |  |
+| item_id | text |  |  |
+| size | text |  |  |
+| joint_type | text |  |  |
+| divide_mode | text |  |  |
+| overridden | boolean |  | `false` |
+| rule_pack_version | text |  |  |
+| total_length_mm | numeric(12,1) |  |  |
+| piece_count | integer |  |  |
+| joint_count | integer |  |  |
+| created_by | integer | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `drawing_id` → `drawings(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `engineering_joint_runs_drawing_id_run_key_key`: UNIQUE INDEX engineering_joint_runs_drawing_id_run_key_key ON public.engineering_joint_runs USING btree (drawing_id, run_key)
+- `engineering_joint_runs_pkey`: UNIQUE INDEX engineering_joint_runs_pkey ON public.engineering_joint_runs USING btree (id)
+- `idx_joint_runs_drawing`: INDEX idx_joint_runs_drawing ON public.engineering_joint_runs USING btree (drawing_id)
+
 ### engineering_knowledge_patterns
 
 | Cột | Kiểu | Null | Default |
