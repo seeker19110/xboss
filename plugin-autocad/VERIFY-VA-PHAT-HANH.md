@@ -337,6 +337,53 @@ nào…`), nút chuyển nền chìm + chữ mờ.
     và `XBOSS_VE_MATCAT` với tuyến cắt qua ≥ 8 tuyến → vùng nội dung **cuộn được**, dải nút OK/Hủy
     và vùng lý do luôn nhìn thấy, không trường nào bị đẩy khuất.
 
+### C8b. Theme tối của TỪNG control trong hộp thoại (M106 PR4 — sự cố ComboBox nền sáng)
+
+> **Bắt buộc verify tay, và là mục dễ lọt nhất của cả runbook.** Sự cố 2026-08-26: ComboBox của
+> `XBOSS_VE` hiện **nền sáng + chữ xám mờ**, trông y như đang bị khóa, trong khi tiêu đề/nhãn/nút
+> đều tối đúng. Nguyên nhân: ControlTemplate mặc định của WPF vẽ chrome bằng màu hard-code của
+> Windows và **bỏ qua `Background`** — đặt Setter màu suông là đặt vào hư không. Đã thay hẳn
+> ControlTemplate cho ComboBox/ComboBoxItem/TextBox/CheckBox/RadioButton/ScrollBar/Button.
+>
+> CI kẹp được gì: `ThemeHopThoaiTests` (Core/Tests) đọc chính tệp `XBossDialog.xaml` và bắt đỏ nếu
+> style màu không kèm `Template`, thiếu trạng thái khóa, `TargetName` trỏ hư không, tên brush gõ
+> sai, hoặc hardcode mã màu. **Không** kẹp được: cửa sổ trông thế nào. Mắt người vẫn là cổng cuối.
+
+64. **ComboBox — đi đủ 5 trạng thái.** Mở `XBOSS_VE` (3 combo: Hệ, Loại tuyến, Size):
+    - **Thường**: nền TỐI lõm, viền xám nhìn rõ, chữ sáng — đọc dễ như phần còn lại của cửa sổ.
+      Không được có bất kỳ mảng sáng nào.
+    - **Rê chuột**: viền sáng lên (chỉ viền, nền giữ nguyên).
+    - **Đang mở**: viền chuyển xanh lá; **danh sách xổ nền tối** (không phải nền trắng), mục đang
+      trỏ chuột nền xám sáng, **mục đang chọn nền xanh lá** — ba mức phân biệt được rõ.
+    - **Gõ tay được** (`IsEditable`, ô Size / Độ dốc / Tỉ lệ in): con trỏ nhấp nháy sáng, gõ
+      `777x333` thấy chữ rõ, bôi đen chữ thấy nền chọn xanh lá; bấm vào **mũi tên** vẫn xổ danh
+      sách, bấm vào **phần chữ** thì KHÔNG xổ (đúng như combo editable của Windows).
+    - **Bị khóa**: mở `XBOSS_VE_CHIADOT` với phạm vi "Chọn tay" → combo Hệ mờ đi; và trên bản vẽ
+      trộn nhiều loại tuyến → combo Kiểu nối mờ. Trạng thái mờ phải **khác hẳn** trạng thái thường
+      (nền phẳng hơn, viền gần như biến mất, chữ xám) — đây chính là chỗ đã hỏng.
+65. **Các control còn lại — cùng 5 trạng thái đó.**
+    - **Ô nhập** (`XBOSS_LOGIN`, `XBOSS_UPLOAD`, `XBOSS_VE_TAG` ô Tầng, ô Ghi chú nhiều dòng của
+      `XBOSS_VE_DEXUAT`): nền tối, viền rõ; rê chuột viền sáng, gõ chữ viền xanh lá. Ô một dòng
+      **không được** mọc thanh cuộn; ô Ghi chú gõ quá 3 dòng thì **phải** có thanh cuộn, và thanh
+      đó **tối** chứ không sáng.
+    - **Nút chọn tròn / ô tick** (`XBOSS_BATCH` 3 radio, `XBOSS_BOCKL` checkbox): ô rỗng nền tối
+      viền xám; **đã chọn thì nền xanh lá + dấu tick/chấm trắng**; bấm vào **chữ** cũng chọn được
+      (không chỉ mỗi ô nhỏ).
+    - **Thanh cuộn** (khối Xem trước của `XBOSS_VE_CHIADOT`, khung tên `XBOSS_VE_TRANGIN`): rãnh
+      tối, con trượt xám, rê chuột sáng lên. Không được còn thanh cuộn trắng kiểu Windows.
+    - **Nút OK/Hủy**: rê chuột — nút OK xanh **đậm** hơn, nút Hủy xám **sáng** hơn (đúng thiết kế,
+      không phải lỗi: xám đậm thêm sẽ chìm vào nền cửa sổ). Xóa trắng ô Size để nút OK khóa → nút
+      OK phải là **nền tối phẳng + chữ mờ**, không phải mảng sáng giữa hộp thoại tối.
+    - **Đi bằng bàn phím**: `Tab` qua từng ô — ô đang có focus phải nhìn ra ngay (viền xanh lá);
+      `Space`/mũi tên đổi được radio và xổ được combo.
+66. **Đọc được ở cả 100 % và 150 % DPI.** Lặp mục 64–65 ở Windows scale 100 % rồi 150 % (đăng xuất
+    đăng nhập lại cho ăn scale): viền 1 px không được biến mất, dấu tick/chấm không méo, mũi tên
+    combo không lệch khỏi ô, chữ trong ô không bị cắt chân. Nếu có màn hình phụ khác DPI, kéo cửa
+    sổ qua lại giữa hai màn.
+67. **Kết quả ra bản vẽ KHÔNG đổi.** PR4 chỉ đụng phần trình bày — chạy lại mục 33 (`XBOSS_VE`) và
+    mục 34 (`XBOSS_VE_CHIADOT`), đối chiếu `doi-chung/`: tuyến vẽ ra, số đốt, sidecar phải trùng
+    khít bản trước. Lệch một nét là có thứ ngoài trình bày đã bị đụng.
+
 ---
 
 ## D. Kiểm thử có server — dựng tại chỗ trên máy mình

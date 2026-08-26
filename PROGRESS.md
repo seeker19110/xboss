@@ -251,6 +251,32 @@ PR1 (nền + 2 lệnh mẫu), PR2 (trình dẫn quy trình) và PR3 (phủ nốt
 (`docs/nang-cap/M106-hop-thoai-wpf-va-quy-trinh.md`). Kỹ sư chạy lệnh bằng **chuột** thay cho chuỗi
 hỏi đáp keyword ở dòng lệnh, và thấy rõ đang ở bước nào của quy trình.
 
+**PR4 — theme tối cho từng control trong hộp thoại (sửa lỗi thật từ ảnh AutoCAD 2026, 2026-08-26):**
+
+- **Bệnh:** `ComboBox` của `XBOSS_VE` (Hệ / Loại tuyến / Size) hiện **nền sáng + chữ gần trắng**,
+  trông như đang bị khóa, lệch hẳn phần còn lại của cửa sổ. Nguyên nhân: ControlTemplate **mặc định**
+  của WPF vẽ chrome bằng brush hard-code của Windows và **bỏ qua `Background`** — Setter màu suông
+  không ăn, trong khi Setter `Foreground` thì ăn, nên ra đúng cảnh chữ sáng trên nền sáng.
+- **Sửa:** thay hẳn ControlTemplate trong `Ui/Wpf/XBossDialog.xaml` cho mọi control **đang dùng** mà
+  WPF tự vẽ chrome hoặc ghi đè màu ở trigger của theme: `ComboBox` (kể cả `IsEditable` + `Popup` xổ
+  xuống), `ComboBoxItem`, `TextBox`, `CheckBox`, `RadioButton`, `ScrollBar`, và 2 kiểu `Button`
+  (OK/Hủy). Mỗi template vẽ đủ **thường / rê chuột / có focus / đang mở / bị khóa** — trạng thái khóa
+  phải cách trạng thái thường thật xa, vì lỗi gốc chính là ô bình thường trông như khóa.
+- **8 tông trạng thái mới trong `Ui/MauBang.cs`** (Vien/VienSang/VienKhoa/NenRe/NenKhoa/ChuKhoa/
+  NutChinhRe/NutChinhNhan) — vẫn **một nguồn màu duy nhất** cho cả WinForms lẫn WPF, không hardcode
+  mã màu trong XAML. Viền đạt 3:1 với nền (ngưỡng WCAG cho ranh giới control); nút màu **đậm dần**
+  khi rê chuột đúng ADR-0010, nút xám thì sáng dần (đậm thêm sẽ chìm vào nền cửa sổ).
+- **Tương phản chữ:** nhãn trường và câu dẫn chuyển từ `ChuMo` sang `Chu`; khối chỉ-đọc và vùng lý do
+  có viền `Vien` thay vì `NenKhoi` (chỉ hơn nền vài mức xám, coi như không có viền trên máy công trường).
+- **Vá lỗ cổng CI:** XAML không được biên dịch ở CI (WPF chỉ có trên Windows) nên thêm bất biến đọc
+  thẳng tệp XAML — `XBoss.Cad.Tests/ThemeHopThoaiTests.cs`: style màu **phải** kèm `Template`, phải có
+  trạng thái `IsEnabled=False`, `TargetName` phải tồn tại trong chính template đó, brush phải có thật
+  trong `MauBangWpf`, cấm hardcode mã màu, và control cùng bệnh **mới thêm** vào XAML mà thiếu template
+  thì test tự đỏ. **865/865 ca .NET xanh** (nền trước khi sửa là 841 → +24 ca mới),
+  AcadShim 0 warning.
+- **Còn lại:** verify tay §C8b (mục 64–67) — 5 trạng thái của từng control, ở cả DPI 100 % và 150 %.
+  Không đụng ViewModel/binding/hành vi lệnh nên kết quả ra bản vẽ phải y hệt (mục 67 đối chiếu).
+
 **PR3 — phủ hộp thoại cho các lệnh còn lại của §7.2:**
 
 - **19 ViewModel mới ở Core** (`Core/Ui/ViewModels/{KetNoi,ChuanHoa,Ve,ChiTiet,HoSo,BocKl}DialogViewModels.cs`
