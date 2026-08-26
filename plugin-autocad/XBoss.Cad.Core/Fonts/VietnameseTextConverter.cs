@@ -88,6 +88,30 @@ public sealed class VietnameseTextConverter
     /// vd '¶' '«' '§') — vì TCVN3 tái dùng cả ký tự Latin-1 có dấu ('ó' TCVN3 nghĩa là 'ú'),
     /// so bản giải mã mù sẽ nhận nhầm text Unicode chuẩn là font cũ. KHÔNG dò VNI mù
     /// ("A1"/"E5"… là chuỗi hợp lệ trong mã hàng/tên trục).</summary>
+    /// <summary>
+    /// Bảng mã DÙNG ĐỂ SỬA một chuỗi: giống hệt tiêu chí của <see cref="ContainsLegacyEncoding"/>
+    /// nên phép kiểm và bước chuẩn hóa không bao giờ lệch nhau.
+    ///
+    /// Vì sao phải có: bản vẽ thật hay khai text style bằng font Unicode (hoặc bỏ trống) trong khi
+    /// nội dung vẫn là mã TCVN3. Trước đây phép kiểm dò theo NỘI DUNG nên báo "141 text font cũ",
+    /// còn bước 3 chỉ nhìn TÊN FONT nên không sửa gì — kỹ sư chạy XBOSS_CHUANHOA xong, chạy lại
+    /// XBOSS_KIEMTRA vẫn thấy đúng 141 lỗi đó, một vòng lặp không lối ra (bản vẽ thật, 2026-08-26).
+    ///
+    /// Chỉ suy ra TCVN3 từ nội dung, KHÔNG suy ra VNI: ký tự đặc trưng TCVN3 là mã ≥ 0x80 mà bản
+    /// thân không phải chữ Việt hợp lệ nên gần như chắc chắn là mã cũ, còn VNI ghép từ ký tự ASCII
+    /// ("A1", "E5") — đoán mù sẽ phá mã hàng và tên trục.
+    /// </summary>
+    public LegacyFontKind KindDeSua(string text, string? fontName = null)
+    {
+        var kind = DetectFontKind(fontName);
+        if (kind != LegacyFontKind.None) return kind;
+        foreach (var c in text)
+        {
+            if (_tcvn3DacTrung.Contains(c)) return LegacyFontKind.Tcvn3;
+        }
+        return LegacyFontKind.None;
+    }
+
     public bool ContainsLegacyEncoding(string text, string? fontName = null)
     {
         var kind = DetectFontKind(fontName);

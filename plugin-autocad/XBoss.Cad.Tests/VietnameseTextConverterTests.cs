@@ -90,4 +90,38 @@ public class VietnameseTextConverterTests
         Assert.False(Converter.ContainsLegacyEncoding("èng giã cÊp"));
         Assert.True(Converter.ContainsLegacyEncoding("èng giã cÊp", ".VnTime"));
     }
+
+    [Fact]
+    public void KindDeSua_dung_CHUNG_tieu_chi_voi_phep_kiem_bao_gi_thi_sua_duoc_nay()
+    {
+        // Bất biến chống lặp vô tận cho kỹ sư: phép kiểm 4 BÁO chuỗi nào thì bước 3 phải SỬA được
+        // chuỗi đó. Trước 2026-08-26 hai bên lệch nhau (kiểm dò nội dung, sửa chỉ nhìn tên font)
+        // nên bản vẽ thật báo 141 text mà chuẩn hóa sửa 0.
+        string[] mauCanSua = ["B¶n vÏ sè 1", "èng giã cÊp"];
+        string?[] font = [null, ".VnTime"];
+        foreach (var chu in mauCanSua)
+        {
+            foreach (var f in font)
+            {
+                var bao = Converter.ContainsLegacyEncoding(chu, f);
+                var suaDuoc = Converter.KindDeSua(chu, f) != LegacyFontKind.None &&
+                              !string.Equals(
+                                  Converter.Convert(chu, Converter.KindDeSua(chu, f)),
+                                  chu,
+                                  StringComparison.Ordinal);
+                Assert.Equal(bao, suaDuoc);
+            }
+        }
+    }
+
+    [Fact]
+    public void KindDeSua_khong_doan_VNI_mu_de_khong_pha_ma_hang()
+    {
+        // "A1"/"E5" là mã hàng/tên trục hợp lệ — đoán VNI khi không biết font sẽ phá chúng.
+        Assert.Equal(LegacyFontKind.None, Converter.KindDeSua("A1 E5 D60"));
+        // Có tên font VNI thì mới áp bảng VNI.
+        Assert.Equal(LegacyFontKind.Vni, Converter.KindDeSua("A1 E5 D60", "VNI-Times"));
+        // Text Unicode chuẩn: không đụng tới.
+        Assert.Equal(LegacyFontKind.None, Converter.KindDeSua("Ống gió cấp"));
+    }
 }

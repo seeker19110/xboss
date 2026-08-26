@@ -255,7 +255,11 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         string? font = null;
         if (!styleId.IsNull && tr.GetObject(styleId, OpenMode.ForRead) is TextStyleTableRecord ts)
             font = string.IsNullOrEmpty(ts.Font.TypeFace) ? ts.FileName : ts.Font.TypeFace;
-        var kind = VietnameseTextConverter.DetectFontKind(font);
+        // DÙNG CHUNG tiêu chí với phép kiểm 4 (`ContainsLegacyEncoding`): nhìn cả tên font LẪN nội
+        // dung. Chỉ nhìn tên font thì bản vẽ khai text style bằng font Unicode mà nội dung vẫn là
+        // mã TCVN3 sẽ bị phép kiểm BÁO nhưng bước 3 KHÔNG SỬA — kỹ sư chuẩn hóa xong kiểm lại vẫn
+        // thấy y nguyên số lỗi cũ (gặp thật 2026-08-26: báo 141 text, sửa 0).
+        var kind = _fonts.KindDeSua(hienTai, font);
         // Kiểu chữ nào ĐANG mang mã cũ thì phải đổi font sang Unicode ở cuối bước 3 — nếu không,
         // nội dung đã đúng mà AutoCAD vẫn hiển thị sai (AC2 không đạt dù dữ liệu đúng).
         if (kind != LegacyFontKind.None && !styleId.IsNull) _styleMaCu.Add(styleId);
