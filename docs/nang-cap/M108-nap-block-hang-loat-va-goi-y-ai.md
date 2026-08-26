@@ -4,12 +4,12 @@
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Đưa MỘT tệp DWG tổng hợp chứa hàng chục/hàng trăm block vào thư viện trong một lượt, có **đề xuất phân loại tự động** (luật tất định → khớp ngữ nghĩa → vision), người duyệt theo lô                                                  |
 | Spec owner       | Phiên chính (tầng 1)                                                                                                                                                                                                                  |
-| State            | **Draft — chờ duyệt.** Không code khi chưa `Approved for implementation`                                                                                                                                                              |
-| Người/ngày duyệt | (chờ) — 4 quyết định nền đã chốt với người dùng qua `AskUserQuestion` 2026-08-26, ghi ở §4                                                                                                                                            |
+| State            | ✅ **Approved for implementation** — duyệt 2026-08-26. Thi hành theo §16 (PR1 mở đầu)                                                                                                                                                  |
+| Người/ngày duyệt | Seeker (donghanhcungban.org@gmail.com), 2026-08-26 — "Approved for implementation". 4 quyết định nền chốt cùng ngày qua `AskUserQuestion`, ghi ở §4                                                                                  |
 | Quyết định nền   | `docs/adr/0006-plugin-autocad-va-pipeline-server.md` (bản vẽ là nguồn sự thật, quy tắc tải từ XBoss), `docs/nang-cap/ENG-0-roadmap-tich-hop-engineering-os.md` (boundary chống AI tự cấp quyền), M103 (hàng chờ duyệt), M104 (đa tệp) |
 | Tiền đề          | M99–M107 đã đóng về code. M108 **không** đụng pipeline chuẩn hóa/bóc tách, chỉ đụng đường **nạp** thư viện block + 2 chỗ gợi ý ánh xạ dùng chung cỗ máy đó                                                                            |
 
-> Không code khi chưa **Approved for implementation**.
+> ✅ Đã duyệt — được code. 3 open decision ở §18 (O1–O3) chốt trong PR2, **không chặn** PR1.
 
 ## 1. Problem, vai trò và bằng chứng
 
@@ -388,5 +388,5 @@ block vốn có version nên phát hành nhầm thì phát hành lại version s
 
 ## 19. Approval
 
-- [ ] Người duyệt: ……… — ngày ………
-- [ ] Chuyển State thành `Approved for implementation` trước khi code (PR1 mở đầu).
+- [x] Người duyệt: **Seeker** — ngày **2026-08-26** ("Approved for implementation").
+- [x] State đã chuyển `Approved for implementation` — PR1 được phép bắt đầu.
