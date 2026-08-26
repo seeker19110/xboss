@@ -437,13 +437,14 @@ AutoCAD → `XBOSS_LOGIN`. Không cần cài .NET SDK, không cần repo.
 
 ## F. Sự cố thường gặp
 
-| Hiện tượng                                 | Nguyên nhân                                                 | Cách xử lý                                                                                          |
-| ------------------------------------------ | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `Không thấy acdbmgd.dll trong '...'`       | AutoCAD cài chỗ khác                                        | `-AcadDir "<đường dẫn>"`                                                                            |
-| `Thiếu .NET 10 SDK`                        | AutoCAD 2026 dùng Managed API .NET 10                       | `winget install Microsoft.DotNet.SDK.10`                                                            |
-| Build lỗi `CS1705 ... higher version`      | Đang build cho net8.0                                       | Adapter phải là `net10.0-windows` (đã đúng trong repo)                                              |
-| Ghi đè DLL thất bại                        | AutoCAD đang mở                                             | Đóng AutoCAD rồi chạy lại                                                                           |
-| Mở AutoCAD không thấy `[XBoss] ... đã nạp` | Bundle sai chỗ / thiếu tệp                                  | Kiểm `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle\PackageContents.xml` và thư mục `Contents` |
-| Có lệnh nhưng **không** có tab Ribbon      | Ribbon chưa sẵn sàng lúc nạp (plugin chờ `ItemInitialized`) | Đóng/mở lại AutoCAD; lệnh gõ tay vẫn chạy bình thường                                               |
-| Lệnh báo "chưa có rule pack"               | Chưa `XBOSS_LOGIN`/`XBOSS_RULEPACK`                         | Ghép thiết bị hoặc nạp rule pack tay                                                                |
-| Chữ tiếng Việt trong script vỡ             | `dong-goi.ps1` mất BOM UTF-8                                | Khôi phục BOM (bắt buộc cho PowerShell 5.1)                                                         |
+| Hiện tượng                                  | Nguyên nhân                                                                                       | Cách xử lý                                                                                          |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `Không thấy acdbmgd.dll trong '...'`        | AutoCAD cài chỗ khác                                                                              | `-AcadDir "<đường dẫn>"`                                                                            |
+| `Thiếu .NET 10 SDK`                         | AutoCAD 2026 dùng Managed API .NET 10                                                             | `winget install Microsoft.DotNet.SDK.10`                                                            |
+| Build lỗi `CS1705 ... higher version`       | Đang build cho net8.0                                                                             | Adapter phải là `net10.0-windows` (đã đúng trong repo)                                              |
+| Ghi đè DLL thất bại                         | AutoCAD đang mở                                                                                   | Đóng AutoCAD rồi chạy lại                                                                           |
+| Mở AutoCAD không thấy `[XBoss] ... đã nạp`  | Bundle sai chỗ / thiếu tệp                                                                        | Kiểm `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle\PackageContents.xml` và thư mục `Contents` |
+| Có lệnh nhưng **không** có tab Ribbon       | Ribbon chưa sẵn sàng lúc nạp (plugin chờ `ItemInitialized`)                                       | Đóng/mở lại AutoCAD; lệnh gõ tay vẫn chạy bình thường                                               |
+| Lệnh báo "chưa có rule pack"                | Chưa `XBOSS_LOGIN`/`XBOSS_RULEPACK`                                                               | Ghép thiết bị hoặc nạp rule pack tay                                                                |
+| Chữ tiếng Việt trong script vỡ              | `dong-goi.ps1` mất BOM UTF-8                                                                      | Khôi phục BOM (bắt buộc cho PowerShell 5.1)                                                         |
+| Bảng `XBOSS_BANG` nền TRẮNG, chữ mờ khó đọc | Control con trong PaletteSet không kế thừa `BackColor` của UserControl, rơi về nền trắng hệ thống | Đặt `BackColor = MauBang.Nen` TƯỜNG MINH cho từng panel/nhãn, không dựa vào kế thừa (vá 2026-08-26) |
