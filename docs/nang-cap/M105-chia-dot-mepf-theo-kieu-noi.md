@@ -4,8 +4,8 @@
 | :--------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Issue / Goal     | Mọi tuyến MEPF vẽ bằng `XBOSS_VE` (M100) — ống gió, ống nước/PCCC, máng cáp — tự động được chia thành các **đốt chế tạo/lắp đặt** theo kiểu kết nối của từng hệ, sinh bảng đốt + phụ kiện mối nối cho xưởng và QTO |
 | Spec owner       | Seeker / Chief Engineering Architect                                                                                                                                                                           |
-| State            | **Draft — chờ duyệt** (các giá trị đánh dấu ⚠GIẢ ĐỊNH cần người dùng chốt trước khi Approved for implementation)                                                                                                |
-| Người/ngày duyệt | (chưa)                                                                                                                                                                                                         |
+| State            | **Approved for implementation** (người dùng chốt 2026-08-26: chấp nhận toàn bộ giá trị ⚠GIẢ ĐỊNH ở §13 làm default rule pack, làm đủ mọi hệ MEPF)                                                              |
+| Người/ngày duyệt | Seeker / 2026-08-26                                                                                                                                                                                                         |
 | Cập nhật         | 2026-08-26 — bản đầu (chỉ ống gió) mở rộng cùng ngày ra **toàn hệ MEPF** theo yêu cầu người dùng, để tích hợp vào plugin                                                                                       |
 | Phụ thuộc        | M100 (XBOSS_VE + XData tim tuyến + rule pack v8), M74 (fitting deduction / spool ống nước — nguồn tham chiếu số liệu mối nối), M99 (hạ tầng plugin)                                                            |
 
@@ -143,7 +143,7 @@
 CREATE TABLE IF NOT EXISTS engineering_joint_runs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id BIGINT NOT NULL REFERENCES projects(id),
-  drawing_id UUID NOT NULL,           -- FK tới bảng bản vẽ hiện hành (khớp lúc thi hành)
+  drawing_id INTEGER NOT NULL REFERENCES drawings(id) ON DELETE CASCADE,  -- bảng drawings (0016, SERIAL)
   run_key TEXT NOT NULL,              -- handle tim + itemId — idempotency
   system_id TEXT NOT NULL,
   item_id TEXT NOT NULL,
@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS engineering_joint_pieces (
 CREATE INDEX IF NOT EXISTS idx_joint_runs_drawing ON engineering_joint_runs(drawing_id);
 ```
 
-Hardware QTO **không lưu bảng riêng** — suy từ runs × định mức rule pack lúc đọc (một nguồn sự thật, đổi định mức không backfill). Migration thuần cộng thêm → đi thẳng production theo DoD. RLS/policy theo mẫu `0092` cho bảng `engineering_*`.
+Hardware QTO **không lưu bảng riêng** — suy từ runs × định mức rule pack lúc đọc (một nguồn sự thật, đổi định mức không backfill). Migration thuần cộng thêm → đi thẳng production theo DoD. RLS/policy 2 nhánh theo đúng mẫu `0092` cho 2 bảng `engineering_*` mới (FORCE RLS, so sánh TEXT, không nhánh missing-context→allow).
 
 ## 12. Rule pack (v9) — phần khai mới (đủ 3 nhóm hệ)
 
@@ -229,6 +229,8 @@ Validate lúc phát hành rule pack: dải `selection` phủ kín & không chồ
 7. Có cần thêm kiểu nối khác ngay đợt này (TDF tự gấp, bích tròn, tray nối khớp nhanh…)? (Thêm sau chỉ là sửa rule pack — không sửa code.)
 
 ## 14. Chia PR (sau khi Approved)
+
+> Ghi chú thi hành 2026-08-26: phiên remote làm trên MỘT nhánh được chỉ định (`claude/auto-route-2d-duct-division-h105c6`) — 2 "PR" dưới đây thi hành thành 2 commit tuần tự trên nhánh đó, mở 1 PR chung.
 
 1. **PR1 — nền số liệu (server + rule pack):** rule pack v9 `jointRules` cho 8 line + validator; engine TS + test vector đủ 3 nhóm hệ (AC1–AC8, AC13); migration `0143`; API; trang web. `route: complex` (engine tổng quát + bất biến số học + parser biểu thức) — chạm `lib/ky-thuat`, không chạm vùng rủi ro cao audit.
 2. **PR2 — plugin CAD:** `JointRulesConfig`/`JointSegmenter` (Core, dùng chung test vector — AC12) + `XBOSS_VE_CHIADOT` + thống kê/báo cáo phiên vẽ. `route: complex`; verify tay AutoCAD 2026 như M100 §18.
