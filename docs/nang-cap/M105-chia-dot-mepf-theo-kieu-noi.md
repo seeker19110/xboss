@@ -1,13 +1,13 @@
 # M105 — Đặc tả Tự động phân chia đốt toàn hệ MEPF theo kiểu kết nối (MEPF Joint Segmentation)
 
-| Thuộc tính       | Giá trị                                                                                                                                                                                                       |
-| :--------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Thuộc tính       | Giá trị                                                                                                                                                                                                            |
+| :--------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Mọi tuyến MEPF vẽ bằng `XBOSS_VE` (M100) — ống gió, ống nước/PCCC, máng cáp — tự động được chia thành các **đốt chế tạo/lắp đặt** theo kiểu kết nối của từng hệ, sinh bảng đốt + phụ kiện mối nối cho xưởng và QTO |
-| Spec owner       | Seeker / Chief Engineering Architect                                                                                                                                                                           |
-| State            | **Approved for implementation** (người dùng chốt 2026-08-26: chấp nhận toàn bộ giá trị ⚠GIẢ ĐỊNH ở §13 làm default rule pack, làm đủ mọi hệ MEPF)                                                              |
-| Người/ngày duyệt | Seeker / 2026-08-26                                                                                                                                                                                                         |
-| Cập nhật         | 2026-08-26 — bản đầu (chỉ ống gió) mở rộng cùng ngày ra **toàn hệ MEPF** theo yêu cầu người dùng, để tích hợp vào plugin                                                                                       |
-| Phụ thuộc        | M100 (XBOSS_VE + XData tim tuyến + rule pack v8), M74 (fitting deduction / spool ống nước — nguồn tham chiếu số liệu mối nối), M99 (hạ tầng plugin)                                                            |
+| Spec owner       | Seeker / Chief Engineering Architect                                                                                                                                                                               |
+| State            | **Approved for implementation** (người dùng chốt 2026-08-26: chấp nhận toàn bộ giá trị ⚠GIẢ ĐỊNH ở §13 làm default rule pack, làm đủ mọi hệ MEPF)                                                                  |
+| Người/ngày duyệt | Seeker / 2026-08-26                                                                                                                                                                                                |
+| Cập nhật         | 2026-08-26 — bản đầu (chỉ ống gió) mở rộng cùng ngày ra **toàn hệ MEPF** theo yêu cầu người dùng, để tích hợp vào plugin                                                                                           |
+| Phụ thuộc        | M100 (XBOSS_VE + XData tim tuyến + rule pack v8), M74 (fitting deduction / spool ống nước — nguồn tham chiếu số liệu mối nối), M99 (hạ tầng plugin)                                                                |
 
 > Không code khi chưa **Approved for implementation**.
 
@@ -39,12 +39,12 @@
 
 ## 4. Phương án
 
-| Phương án                                                                 | Lợi ích                                              | Chi phí/rủi ro                                                        | Kết luận |
-| ------------------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------- | -------- |
-| Không làm                                                                  | 0                                                    | Tiếp tục chia tay cả 3 nhóm hệ, sai số mối nối                        | Loại     |
-| A. Chia đốt chỉ trong plugin (không server)                                | Nhanh, offline                                       | Không có bảng đốt tập trung cho QS/xưởng, không QTO                   | Loại     |
-| B. Chỉ ống gió trước, hệ khác đợt sau                                      | Phạm vi nhỏ                                          | Phải mở lại đặc tả/PR ngay (người dùng đã yêu cầu toàn hệ); engine chung viết 2 lần | Loại     |
-| **C. Một engine chia đốt tổng quát (maxLen + khe + chia đều) dùng chung cho mọi hệ, khác nhau chỉ ở BẢNG THAM SỐ `jointRules` per line trong rule pack; C# (plugin) + TS (web) mirror, khóa bằng test vector chung** | Một lệnh, một nguồn tham số, thêm hệ mới = sửa rule pack không sửa code | Giữ 2 bản engine C#/TS khớp nhau — khóa bằng test vector (§8 AC10)     | **Chọn** |
+| Phương án                                                                                                                                                                                                            | Lợi ích                                                                 | Chi phí/rủi ro                                                                      | Kết luận |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------- |
+| Không làm                                                                                                                                                                                                            | 0                                                                       | Tiếp tục chia tay cả 3 nhóm hệ, sai số mối nối                                      | Loại     |
+| A. Chia đốt chỉ trong plugin (không server)                                                                                                                                                                          | Nhanh, offline                                                          | Không có bảng đốt tập trung cho QS/xưởng, không QTO                                 | Loại     |
+| B. Chỉ ống gió trước, hệ khác đợt sau                                                                                                                                                                                | Phạm vi nhỏ                                                             | Phải mở lại đặc tả/PR ngay (người dùng đã yêu cầu toàn hệ); engine chung viết 2 lần | Loại     |
+| **C. Một engine chia đốt tổng quát (maxLen + khe + chia đều) dùng chung cho mọi hệ, khác nhau chỉ ở BẢNG THAM SỐ `jointRules` per line trong rule pack; C# (plugin) + TS (web) mirror, khóa bằng test vector chung** | Một lệnh, một nguồn tham số, thêm hệ mới = sửa rule pack không sửa code | Giữ 2 bản engine C#/TS khớp nhau — khóa bằng test vector (§8 AC10)                  | **Chọn** |
 
 ## 5. Scope / non-goals
 
@@ -54,7 +54,7 @@
 
 ## 6. User journeys và mọi trạng thái
 
-1. **Happy — ống gió:** vẽ tuyến gió cấp 800×400 dài 7,2 m → `XBOSS_VE_CHIADOT` → chọn tuyến (hoặc quét cả hệ) → plugin đọc size từ XData, tra `jointRules` → TDC (cạnh lớn 800 thuộc dải TDC) → chia 7 đốt (theo công thức FR2), vẽ vạch chia vuông góc tim trên layer `<layer>-JOINT`, tag `D-duct-supp-001-01…07`, in tóm tắt. ESC giữa chừng → không để lại gì (hỏi đáp ngoài transaction — M100 §6.11).
+1. **Happy — ống gió:** vẽ tuyến gió cấp 800×400 dài 7,2 m → `XBOSS_VE_CHIADOT` → chọn tuyến (hoặc quét cả hệ) → plugin đọc size từ XData, tra `jointRules` → TDC (cạnh lớn 800 thuộc dải TDC) → chia 7 đốt (theo công thức FR2), vẽ vạch chia vuông góc tim trên layer vạch chia của hệ (hậu tố `JOINT`), tag `D-duct-supp-001-01…07`, in tóm tắt. ESC giữa chừng → không để lại gì (hỏi đáp ngoài transaction — M100 §6.11).
 2. **Happy — ống nước:** tuyến CHW DN80 dài 14 m → tra `jointRules` theo DN → cây 5,8 m nối grooved coupling → 3 đốt (2×5 800 − khe + đốt dư), vạch chia = tick ngắn cắt tim (ống không có biên), tag `D-chw-pipe-…`.
 3. **Happy — máng cáp:** tray-pwr 200×100 dài 9 m → thanh 2,5 m + tấm nối → 4 đốt; vạch chia chạm 2 nét biên như ống gió.
 4. **Quét cả hệ:** chọn chế độ "cả hệ" → lặp qua mọi tuyến của hệ đang chọn, line thiếu `jointRules` bị bỏ qua + liệt kê trong tóm tắt.
@@ -69,33 +69,33 @@
 
 **Nhóm ống gió chữ nhật** (`duct-supp/retn/exht`, chọn theo **cạnh lớn** max(W,H)):
 
-| `jointType`  | Tên hiển thị                     | **Đốt tối đa** (mm) | Khe `jointGapMm`     | Dải cạnh lớn (mm)    |
-| ------------ | -------------------------------- | ------------------- | -------------------- | -------------------- |
-| `nep_c`      | Nẹp C (S-slip & C-cleat)         | **1180**            | ⚠GIẢ ĐỊNH 0          | ⚠GIẢ ĐỊNH ≤ 450      |
-| `tdc`        | TDC (Transverse Duct Connector)  | **1110**            | ⚠GIẢ ĐỊNH 5 (gioăng) | ⚠GIẢ ĐỊNH 451 – 1500 |
-| `mat_bich_v` | Mặt bích V (thép góc)            | **1180**            | ⚠GIẢ ĐỊNH 5 (gioăng) | ⚠GIẢ ĐỊNH > 1500     |
+| `jointType`  | Tên hiển thị                    | **Đốt tối đa** (mm) | Khe `jointGapMm`     | Dải cạnh lớn (mm)    |
+| ------------ | ------------------------------- | ------------------- | -------------------- | -------------------- |
+| `nep_c`      | Nẹp C (S-slip & C-cleat)        | **1180**            | ⚠GIẢ ĐỊNH 0          | ⚠GIẢ ĐỊNH ≤ 450      |
+| `tdc`        | TDC (Transverse Duct Connector) | **1110**            | ⚠GIẢ ĐỊNH 5 (gioăng) | ⚠GIẢ ĐỊNH 451 – 1500 |
+| `mat_bich_v` | Mặt bích V (thép góc)           | **1180**            | ⚠GIẢ ĐỊNH 5 (gioăng) | ⚠GIẢ ĐỊNH > 1500     |
 
 **Nhóm ống nước/PCCC** (`chw-pipe`, `pipe-domw`, `pipe-sanr`, `sprn-pipe`, chọn theo **DN**) — ⚠GIẢ ĐỊNH toàn bộ, số liệu bám vật liệu đã chuẩn hóa ở M74:
 
-| `jointType`     | Tên hiển thị              | Đốt tối đa (mm)          | Khe `jointGapMm`        | Áp dụng (mặc định)                        |
-| --------------- | ------------------------- | ------------------------ | ----------------------- | ----------------------------------------- |
-| `grooved`       | Coupling rãnh (Victaulic) | 5800 (cây thép 6 m trừ gia công) | 3 (khe rãnh)     | `chw-pipe`, `sprn-pipe` DN ≥ 65           |
-| `ren`           | Ren (NPT/BSPT)            | 5800                     | 0 (thread makeup đã ăn vào ống — không cộng khe) | `sprn-pipe`, `pipe-domw` DN ≤ 50 |
-| `han`           | Hàn đối đầu               | 5800                     | 2 (khe đáy hàn)         | `chw-pipe` DN ≥ 100 (tùy dự án)           |
-| `mang_xong`     | Măng xông dán/nong (uPVC) | 5800                     | 0 (ngập âm — không cộng) | `pipe-sanr`                              |
+| `jointType` | Tên hiển thị              | Đốt tối đa (mm)                  | Khe `jointGapMm`                                 | Áp dụng (mặc định)               |
+| ----------- | ------------------------- | -------------------------------- | ------------------------------------------------ | -------------------------------- |
+| `grooved`   | Coupling rãnh (Victaulic) | 5800 (cây thép 6 m trừ gia công) | 3 (khe rãnh)                                     | `chw-pipe`, `sprn-pipe` DN ≥ 65  |
+| `ren`       | Ren (NPT/BSPT)            | 5800                             | 0 (thread makeup đã ăn vào ống — không cộng khe) | `sprn-pipe`, `pipe-domw` DN ≤ 50 |
+| `han`       | Hàn đối đầu               | 5800                             | 2 (khe đáy hàn)                                  | `chw-pipe` DN ≥ 100 (tùy dự án)  |
+| `mang_xong` | Măng xông dán/nong (uPVC) | 5800                             | 0 (ngập âm — không cộng)                         | `pipe-sanr`                      |
 
 **Nhóm máng cáp** (`tray-pwr`, `tray-elv`) — ⚠GIẢ ĐỊNH:
 
-| `jointType` | Tên hiển thị            | Đốt tối đa (mm) | Khe | Áp dụng |
-| ----------- | ----------------------- | --------------- | --- | ------- |
-| `tam_noi`   | Tấm nối + bulông        | 2500            | 0   | mọi size |
+| `jointType` | Tên hiển thị     | Đốt tối đa (mm) | Khe | Áp dụng  |
+| ----------- | ---------------- | --------------- | --- | -------- |
+| `tam_noi`   | Tấm nối + bulông | 2500            | 0   | mọi size |
 
 - **FR1** Kiểu nối chọn **tự động** theo khóa của nhóm hệ: duct → cạnh lớn; pipe → DN (`sizeRange` dạng `DN`); tray → 1 kiểu mặc định. Kỹ sư được **ghi đè tay** khi chạy lệnh (prompt mặc định = kiểu tự chọn, danh sách = mọi `jointType` line đó khai). Toàn bộ bảng trên là **default do rule pack phát hành quyết định** — engine không hard-code bất kỳ số nào.
 - **FR2** Công thức chia 1 đoạn thẳng dài `L` (giữa 2 điểm gãy polyline, hoặc giữa mép phụ kiện nếu tuyến có block phụ kiện chèn — M100 PR4), **chung cho mọi hệ**:
   `n = ceil(L / (maxLenMm + jointGapMm))`; chia **đều** `pieceLen = (L − (n−1)·jointGapMm) / n` (làm tròn 0,1 mm; đốt cuối nhận phần dư làm tròn). Bất biến: `Σ pieceLen + (n−1)·jointGapMm = L` (±0,5 mm tích lũy). ⚠GIẢ ĐỊNH: chia đều áp cho cả pipe/tray — nếu xưởng muốn "tối đa hóa cây nguyên + 1 đốt lẻ" (5800+5800+2400 thay vì 3×4666) thì chốt ở §13 câu 3; rule pack khai `divideMode: "deu" | "cay_nguyen"` per line, engine hỗ trợ cả hai, default ⚠ `deu` cho duct và `cay_nguyen` cho pipe/tray.
 - **FR3** `minPieceLenMm` per line (⚠GIẢ ĐỊNH duct 200, pipe 300, tray 300): đoạn `L < min` → 1 đốt + warning; chế độ `cay_nguyen` nếu đốt lẻ < min thì dồn ngược vào đốt trước (2 đốt cuối chia đều nhau).
 - **FR4** Mỗi điểm gãy (vertex) của polyline tim là **ranh giới đốt bắt buộc**; bulge/cung tròn → từ chối chia đoạn đó kèm cảnh báo.
-- **FR5** Vẽ theo nhóm hệ: line có nét biên (`edgeStyle: "double"` — duct/tray) → vạch chia = line vuông góc tim dài đúng bề rộng W (chạm 2 biên); line không biên (pipe) → tick vuông góc dài ⚠GIẢ ĐỊNH 2× bán kính danh nghĩa, tối thiểu 100 mm bản vẽ. Layer `<layerTim>-JOINT` (style khai trong `jointRules.layerStyle`); tag đốt = text `D-<itemId>-<sốTuyến>-<sốĐốt>` cạnh trung điểm đốt. Layer `-JOINT` **không được khớp** bất kỳ `takeoff.layerMatchAny` nào (kiểm khi phát hành rule pack — cùng cơ chế M100 FR4 với `-EDGE`).
+- **FR5** Vẽ theo nhóm hệ: line có nét biên (`edgeStyle: "double"` — duct/tray) → vạch chia = line vuông góc tim dài đúng bề rộng W (chạm 2 biên); line không biên (pipe) → tick vuông góc dài ⚠GIẢ ĐỊNH 2× bán kính danh nghĩa, tối thiểu 100 mm bản vẽ. Layer `<layerTim>-<suffix>` với suffix **`JOINT` (KHÔNG có gạch nối đứng đầu)** — `layerMatchAny` của takeoff khớp theo ranh giới token nên hậu tố dạng `-JOINT` vẫn khiến `M-DUCT-SUPP-JOINT` khớp mục bóc `M-DUCT-SUPP` và vạch chia bị bóc trùng thành chiều dài ống; đây đúng là lớp lỗi mà `drawTools.edgeLayerSuffix` đã né bằng `EDGE` (M100 FR4). Style khai trong `jointRules.layerStyle`; tag đốt = text `D-<itemId>-<sốTuyến>-<sốĐốt>` cạnh trung điểm đốt. Layer vạch chia **không được khớp** bất kỳ `takeoff.layerMatchAny` nào (kiểm khi phát hành rule pack — cùng cơ chế M100 FR4 với `-EDGE`).
 - **FR6** XData 2 chiều: vạch/tag mang handle tim + chỉ số đốt; tim mang version chia đốt — chạy lại idempotent (journey 5), `XBOSS_BOCKL` đọc được bảng đốt để đẩy lên server.
 - **FR7** QTO phụ kiện mối nối: mỗi mối (n−1 mối/đoạn; mối tại vertex/phụ kiện đếm 1 lần) sinh định mức theo `jointType` từ `jointRules.hardware` — biểu thức theo biến `W`,`H` (mm) hoặc `DN`: duct TDC = 4 ke + 8 bulông M8 + gioăng `2*(W+H)`; nẹp C = 2 thanh nẹp `W` + ⚠ 2 thanh S `H`; bích V = thép góc `2*(W+H)` + bulông `ceil(2*(W+H)/100)`; pipe grooved = 1 coupling + 1 gioăng đúng DN; ren = 1 măng xông ren; hàn = quy đổi que hàn theo DN (⚠ bảng xưởng); tray = 2 tấm nối + 8 bulông M6. Toàn bộ hệ số trong rule pack, engine chỉ tính biểu thức (parser mini: số, `W/H/DN`, `+ - * /`, `ceil()` — không eval tự do).
 - **FR8** Server: `lib/ky-thuat/engineering-joint-segmentation.ts` (tầng 4 `ky-thuat`) — engine thuần `segmentRunIntoPieces()` + `explodeJointHardware()` mirror bản C#, service ghi DB; API §10; nhận dữ liệu khi plugin `XBOSS_BOCKL` đẩy lên hoặc gọi trực tiếp.
@@ -121,16 +121,16 @@
 
 ## 9. Kiến trúc và điểm chạm code
 
-| Tầng    | File (dự kiến)                                                              | Nội dung                                                                                    |
-| ------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Core C# | `plugin-autocad/XBoss.Cad.Core/Draw/JointRulesConfig.cs`                     | Parse + validate `jointRules` (theo mẫu `DrawToolsConfig.cs`), parser biểu thức hardware    |
-| Core C# | `plugin-autocad/XBoss.Cad.Core/Draw/JointSegmenter.cs`                       | Engine hình học thuần FR1–FR4, FR7 — không tham chiếu AutoCAD API                           |
-| Acad C# | `plugin-autocad/XBoss.Cad.Acad/Commands/VeChiaDotCommands.cs`                | Lệnh `XBOSS_VE_CHIADOT`: chọn tuyến/cả hệ → gọi Core → vẽ vạch/tag/XData (FR5–FR6), 1 UNDO  |
-| Acad C# | `ThongKeTable.cs` + `VeSessionReport.cs` (sửa)                               | `XBOSS_VE_THONGKE` thêm bảng đốt; báo cáo phiên vẽ ghi tuyến đã chia/bỏ qua                 |
-| lib TS  | `lib/ky-thuat/engineering-joint-segmentation.ts`                             | Engine mirror + hardware + hàm ghi/đọc DB                                                   |
-| Route   | `app/api/engineering/joint-segmentation/route.ts`                            | §10 — auth + gọi lib, `export const dynamic = "force-dynamic"`                              |
-| UI      | `app/engineering/joint-segmentation/page.tsx` (hoặc tab trang bản vẽ)        | Bảng đốt theo hệ + tổng phụ kiện + export                                                   |
-| Test    | `tests/engineering-joint-segmentation.test.ts` + test vector JSON chung      | AC1–AC8, AC12, AC13 (import `tests/setup.ts` đầu tiên nếu chạm DB)                          |
+| Tầng    | File (dự kiến)                                                          | Nội dung                                                                                   |
+| ------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Core C# | `plugin-autocad/XBoss.Cad.Core/Draw/JointRulesConfig.cs`                | Parse + validate `jointRules` (theo mẫu `DrawToolsConfig.cs`), parser biểu thức hardware   |
+| Core C# | `plugin-autocad/XBoss.Cad.Core/Draw/JointSegmenter.cs`                  | Engine hình học thuần FR1–FR4, FR7 — không tham chiếu AutoCAD API                          |
+| Acad C# | `plugin-autocad/XBoss.Cad.Acad/Commands/VeChiaDotCommands.cs`           | Lệnh `XBOSS_VE_CHIADOT`: chọn tuyến/cả hệ → gọi Core → vẽ vạch/tag/XData (FR5–FR6), 1 UNDO |
+| Acad C# | `ThongKeTable.cs` + `VeSessionReport.cs` (sửa)                          | `XBOSS_VE_THONGKE` thêm bảng đốt; báo cáo phiên vẽ ghi tuyến đã chia/bỏ qua                |
+| lib TS  | `lib/ky-thuat/engineering-joint-segmentation.ts`                        | Engine mirror + hardware + hàm ghi/đọc DB                                                  |
+| Route   | `app/api/engineering/joint-segmentation/route.ts`                       | §10 — auth + gọi lib, `export const dynamic = "force-dynamic"`                             |
+| UI      | `app/engineering/joint-segmentation/page.tsx` (hoặc tab trang bản vẽ)   | Bảng đốt theo hệ + tổng phụ kiện + export                                                  |
+| Test    | `tests/engineering-joint-segmentation.test.ts` + test vector JSON chung | AC1–AC8, AC12, AC13 (import `tests/setup.ts` đầu tiên nếu chạm DB)                         |
 
 ## 10. API contract
 
@@ -185,7 +185,7 @@ Hardware QTO **không lưu bảng riêng** — suy từ runs × định mức ru
     { "jointType": "mat_bich_v", "maxSideMm": null, "maxLenMm": 1180, "jointGapMm": 5 }
   ],
   "divideMode": "deu", "minPieceLenMm": 200,
-  "layerStyle": { "suffix": "-JOINT", "color": 8, "linetype": "DASHED" },
+  "layerStyle": { "suffix": "JOINT", "color": 8, "linetype": "DASHED" },
   "hardware": {
     "nep_c":      [{ "item": "thanh-nep-c", "perJoint": "2*W" }, { "item": "thanh-s-slip", "perJoint": "2*H" }],
     "tdc":        [{ "item": "ke-goc-tdc", "perJoint": 4 }, { "item": "bulong-m8", "perJoint": 8 }, { "item": "gioang-tdc-m", "perJoint": "2*(W+H)" }],
@@ -200,7 +200,7 @@ Hardware QTO **không lưu bảng riêng** — suy từ runs × định mức ru
     { "jointType": "grooved", "maxDn": null, "maxLenMm": 5800, "jointGapMm": 3 }
   ],
   "divideMode": "cay_nguyen", "minPieceLenMm": 300,
-  "layerStyle": { "suffix": "-JOINT", "color": 8, "linetype": "DASHED" },
+  "layerStyle": { "suffix": "JOINT", "color": 8, "linetype": "DASHED" },
   "hardware": {
     "ren":     [{ "item": "mang-xong-ren", "perJoint": 1 }],
     "grooved": [{ "item": "coupling-grooved", "perJoint": 1 }, { "item": "gioang-grooved", "perJoint": 1 }]
@@ -211,12 +211,12 @@ Hardware QTO **không lưu bảng riêng** — suy từ runs × định mức ru
 "jointRules": {
   "selection": [{ "jointType": "tam_noi", "maxSideMm": null, "maxLenMm": 2500, "jointGapMm": 0 }],
   "divideMode": "cay_nguyen", "minPieceLenMm": 300,
-  "layerStyle": { "suffix": "-JOINT", "color": 8, "linetype": "DASHED" },
+  "layerStyle": { "suffix": "JOINT", "color": 8, "linetype": "DASHED" },
   "hardware": { "tam_noi": [{ "item": "tam-noi-tray", "perJoint": 2 }, { "item": "bulong-m6", "perJoint": 8 }] }
 }
 ```
 
-Validate lúc phát hành rule pack: dải `selection` phủ kín & không chồng (theo `maxSideMm` hoặc `maxDn` tùy `sizeKind` của line); `maxLenMm > minPieceLenMm`; mọi `jointType` trong `selection` có mục `hardware`; layer `-JOINT` không đụng takeoff (FR5); biểu thức hardware parse được (FR7).
+Validate lúc phát hành rule pack: dải `selection` phủ kín & không chồng (theo `maxSideMm` hoặc `maxDn` tùy `sizeKind` của line); `maxLenMm > minPieceLenMm`; mọi `jointType` trong `selection` có mục `hardware`; layer vạch chia không đụng takeoff (FR5, có test canh); biểu thức hardware parse được (FR7).
 
 ## 13. Câu hỏi chờ người dùng chốt (⚠GIẢ ĐỊNH ở trên)
 
