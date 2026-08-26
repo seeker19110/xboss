@@ -164,7 +164,9 @@ powershell -ExecutionPolicy Bypass -File plugin-autocad\dong-goi.ps1 -ChiDongGoi
 để đối chiếu khi cần làm tay.
 
 > Hướng dẫn cho **người dùng cuối** (cài, ghép thiết bị, trục trặc thường gặp) nằm ở
-> [`CAI-DAT.md`](CAI-DAT.md). Phần dưới đây dành cho người phát hành gói cài.
+> [`CAI-DAT.md`](CAI-DAT.md). Quy trình đầy đủ **build → verify tay 25 lệnh trên AutoCAD thật →
+> đóng gói → phát hành → bật nút tải trên web** nằm ở
+> [`VERIFY-VA-PHAT-HANH.md`](VERIFY-VA-PHAT-HANH.md). Phần dưới đây dành cho người phát hành gói cài.
 
 Tạo thư mục `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle\` với cấu trúc:
 
