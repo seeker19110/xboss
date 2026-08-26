@@ -1022,13 +1022,19 @@ namespace System.Windows.Forms
 
     public class Control : IDisposable
     {
-        public class ControlCollection
+        // Duyệt được: mã Adapter lặp `foreach (Control con in cha.Controls)` để ngắt dòng lại theo
+        // bề rộng palette. Stub không duyệt được thì cổng đỏ giả ở một tính năng chạy đúng.
+        public class ControlCollection : IEnumerable<Control>
         {
             public void Add(Control value) { }
             public void Clear() { }
+            public IEnumerator<Control> GetEnumerator() => new List<Control>().GetEnumerator();
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
 
         public ControlCollection Controls { get; } = new ControlCollection();
+        public System.Drawing.Size ClientSize { get; set; }
+        public bool HasChildren => false;
         public System.Drawing.Color BackColor { get; set; }
         public System.Drawing.Color ForeColor { get; set; }
         public DockStyle Dock { get; set; }
@@ -1047,6 +1053,10 @@ namespace System.Windows.Forms
         public void SuspendLayout() { }
         public void ResumeLayout() { }
         public void Dispose() { }
+
+        /// <summary>WinForms thật: <c>protected virtual void OnResize(EventArgs)</c> — Adapter
+        /// override để ngắt dòng lại khi kỹ sư kéo rộng/hẹp palette.</summary>
+        protected virtual void OnResize(EventArgs e) { }
     }
 
     public class ScrollableControl : Control
@@ -1098,7 +1108,6 @@ namespace System.Windows.Forms
         public FormStartPosition StartPosition { get; set; }
         public bool MaximizeBox { get; set; }
         public bool MinimizeBox { get; set; }
-        public System.Drawing.Size ClientSize { get; set; }
         public IButtonControl AcceptButton { get; set; }
         public IButtonControl CancelButton { get; set; }
         public DialogResult DialogResult { get; set; }

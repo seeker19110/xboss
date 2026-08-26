@@ -36,6 +36,27 @@ internal sealed class BangDieuKhienControl : UserControl
         Controls.Add(_flow);
     }
 
+    /// <summary>Bề rộng ngắt dòng — bám palette, có sàn để palette bị bóp hẹp không vỡ chữ.</summary>
+    private int BeRongNoiDung => Math.Max(240, ClientSize.Width - 40);
+
+    /// <summary>Kéo rộng/hẹp palette thì chỉ ngắt dòng lại, KHÔNG dựng lại bảng (dựng lại kéo theo
+    /// một lượt hỏi server danh sách đề xuất block — xem <see cref="LamMoi"/>).</summary>
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        NgatDongLai(_flow);
+    }
+
+    private void NgatDongLai(Control cha)
+    {
+        var rong = BeRongNoiDung;
+        foreach (Control con in cha.Controls)
+        {
+            if (con.MaximumSize.Width > 0) con.MaximumSize = new Size(rong, 0);
+            if (con.HasChildren) NgatDongLai(con);
+        }
+    }
+
     /// <summary>
     /// Làm mới toàn bộ bảng: vẽ ngay bằng dữ liệu cục bộ (không chờ mạng), rồi hỏi server danh
     /// sách đề xuất block và vẽ lại khi có kết quả (M103 §4 — "refresh cùng nhịp panel").
@@ -96,7 +117,9 @@ internal sealed class BangDieuKhienControl : UserControl
                     BackColor = MauBang.Nen,
                     Font = new Font("Segoe UI", 9f),
                     AutoSize = true,
-                    MaximumSize = new Size(300, 0), // xuống dòng thay vì tràn ngang palette
+                    // Ngắt dòng theo BỀ RỘNG THẬT của palette, không phải hằng số cứng: kéo
+                    // palette rộng ra mà vẫn ngắt ở 300px thì chữ vỡ dòng vô lý giữa vùng trống.
+                    MaximumSize = new Size(BeRongNoiDung, 0),
                     Margin = new Padding(2, 2, 2, 2),
                 });
             }

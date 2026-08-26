@@ -26,8 +26,16 @@ namespace XBoss.Cad.Acad.Ui;
 /// </summary>
 internal sealed class TrinhDanControl : UserControl
 {
-    /// <summary>Bề rộng tối đa của nhãn/hàng nút — palette hẹp, phải xuống dòng thay vì tràn ngang.</summary>
-    private const int RongToiDa = 300;
+    /// <summary>
+    /// Bề rộng ngắt dòng TỐI THIỂU. Bề rộng thật bám theo palette (xem <see cref="BeRongNoiDung"/>):
+    /// hằng số cứng 300px làm chữ ngắt dòng vô lý khi kỹ sư kéo palette rộng ra — "2. CHUẨN HÓA /
+    /// NỀN" tách hai dòng trong khi bên phải bỏ trống cả nghìn pixel (thấy trên AutoCAD 2026 ngày
+    /// 2026-08-26). Neo dưới để palette bị bóp quá hẹp thì cuộn ngang, không vỡ chữ.
+    /// </summary>
+    private const int RongToiThieu = 240;
+
+    /// <summary>Chừa cho thanh cuộn dọc + padding của <see cref="_flow"/>.</summary>
+    private const int ChuaChoCuon = 40;
 
     private readonly FlowLayoutPanel _flow;
 
@@ -49,6 +57,30 @@ internal sealed class TrinhDanControl : UserControl
             BackColor = MauBang.Nen,
         };
         Controls.Add(_flow);
+    }
+
+    /// <summary>Bề rộng ngắt dòng hiện tại — bám theo palette, không nhỏ hơn <see cref="RongToiThieu"/>.</summary>
+    private int BeRongNoiDung => Math.Max(RongToiThieu, ClientSize.Width - ChuaChoCuon);
+
+    /// <summary>
+    /// Kéo rộng/hẹp palette thì ngắt dòng lại theo bề rộng mới. Chỉ sửa <c>MaximumSize</c> của các
+    /// control đã dựng — KHÔNG dựng lại toàn bộ: dựng lại sẽ đọc lại bản vẽ (quét model space) mỗi
+    /// lần kéo chuột, đúng thứ phải tránh ở công trường.
+    /// </summary>
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        NgatDongLai(_flow);
+    }
+
+    private void NgatDongLai(Control cha)
+    {
+        var rong = BeRongNoiDung;
+        foreach (Control con in cha.Controls)
+        {
+            if (con.MaximumSize.Width > 0) con.MaximumSize = new Size(rong, 0);
+            if (con.HasChildren) NgatDongLai(con);
+        }
     }
 
     /// <summary>Đọc lại dấu hiệu từ phiên + bản vẽ hiện hành rồi vẽ lại (mở bảng, đổi bản vẽ, bấm Làm mới).</summary>
@@ -98,14 +130,14 @@ internal sealed class TrinhDanControl : UserControl
     }
 
     /// <summary>Một hàng nút của bước: mỗi lệnh một nút, đúng thứ tự dùng thật.</summary>
-    private static FlowLayoutPanel HangNut(IReadOnlyList<LenhInfo> cacLenh, bool mo)
+    private FlowLayoutPanel HangNut(IReadOnlyList<LenhInfo> cacLenh, bool mo)
     {
         var hang = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = true,
             AutoSize = true,
-            MaximumSize = new Size(RongToiDa, 0),
+            MaximumSize = new Size(BeRongNoiDung, 0),
             Margin = new Padding(0, 2, 0, 2),
             BackColor = MauBang.Nen,
         };
@@ -138,7 +170,7 @@ internal sealed class TrinhDanControl : UserControl
         _ => MauBang.Chu,
     };
 
-    private static Label TaoNhan(
+    private Label TaoNhan(
         string chu, Color mau, float coChu, FontStyle kieu = FontStyle.Regular, Padding? le = null) => new()
     {
         Text = chu,
@@ -146,7 +178,7 @@ internal sealed class TrinhDanControl : UserControl
         BackColor = MauBang.Nen,
         Font = new Font("Segoe UI", coChu, kieu),
         AutoSize = true,
-        MaximumSize = new Size(RongToiDa, 0),
+        MaximumSize = new Size(BeRongNoiDung, 0),
         Margin = le ?? new Padding(2, 2, 2, 2),
     };
 
