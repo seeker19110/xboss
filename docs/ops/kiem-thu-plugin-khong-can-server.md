@@ -1,6 +1,6 @@
 # Kiểm thử plugin AutoCAD khi CHƯA có server XBoss
 
-Không cần dựng web/DB. Plugin có sẵn **đường dự phòng offline** cho cả hai thứ nó phụ thuộc — bộ quy tắc (rule pack) và thư viện block — nên **11/14 ca AC chạy được ngay trên một máy AutoCAD đứng một mình**.
+Không cần dựng web/DB. Plugin có sẵn **đường dự phòng offline** cho cả hai thứ nó phụ thuộc — bộ quy tắc (rule pack) và thư viện block — nên **13/14 ca AC chạy được ngay trên một máy AutoCAD đứng một mình** (chỉ AC8 — thư viện tự cập nhật theo ETag khi `XBOSS_LOGIN` — là phải có server).
 
 ---
 
