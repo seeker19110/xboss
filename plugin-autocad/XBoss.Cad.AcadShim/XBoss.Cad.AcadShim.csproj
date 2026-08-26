@@ -33,12 +33,23 @@
       System.Windows.Forms.DialogResult (xem cuối AcadStub.cs).
     -->
     <UseWindowsForms>false</UseWindowsForms>
+    <!--
+      Tắt ImplicitUsings ĐÚNG NHƯ Adapter thật: cổng biên dịch chính các tệp .cs của Adapter, mà
+      Adapter nay lấy using từ `XBoss.Cad.Acad/GlobalUsings.cs` (glob bên dưới kéo vào). Bật lại ở
+      đây là trùng khai báo; đồng thời cổng sẽ mất khả năng bắt CS0104 do tên trùng giữa
+      System.Drawing (WinForms, khai trong GlobalUsings.cs) và System.Windows.Media (WPF) — đúng
+      lỗi đã lọt xuống máy có AutoCAD ngày 2026-08-26. Cặp tên trùng được stub cuối AcadStub.cs.
+    -->
+    <ImplicitUsings>disable</ImplicitUsings>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- Stub API AutoCAD (chỉ khai kiểu + chữ ký, thân hàm rỗng). -->
     <Compile Include="AcadStub.cs" />
+
+    <!-- Stub WPF + phần mã sinh từ .xaml (M106) — WPF chỉ có trên Windows, xem WpfStub.cs. -->
+    <Compile Include="WpfStub.cs" />
 
     <!--
       GLOB, cố ý KHÔNG liệt kê tay từng tệp: liệt kê tay thì mỗi lệnh vẽ mới thêm vào Adapter

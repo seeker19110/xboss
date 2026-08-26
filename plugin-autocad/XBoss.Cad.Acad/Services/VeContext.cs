@@ -71,6 +71,18 @@ internal static class VeContext
     /// </summary>
     internal static DrawToolsPack? CanDrawTools(Editor ed)
     {
+        var (pack, loi) = DrawToolsHienHanh();
+        if (loi is not null) ed.WriteMessage($"\n[XBoss] {loi}\n");
+        return pack;
+    }
+
+    /// <summary>
+    /// Như <see cref="CanDrawTools"/> nhưng IM LẶNG: trả kèm lý do thay vì in ra dòng lệnh. Dành
+    /// cho màn hình chỉ-đọc (trình dẫn quy trình M106 — làm mới mỗi lần đổi bản vẽ, không được
+    /// rải thông báo lên dòng lệnh kỹ sư đang làm việc).
+    /// </summary>
+    internal static (DrawToolsPack? Pack, string? LoiTiengViet) DrawToolsHienHanh()
+    {
         try
         {
             // Tệp rule pack ĐANG có hiệu lực (M101 PR4: có thể là bản của dự án đang làm, không
@@ -79,28 +91,25 @@ internal static class VeContext
             var duongDan = RulePackStore.DuongDanHienHanh;
             if (!File.Exists(duongDan))
             {
-                ed.WriteMessage(
-                    "\n[XBoss] Chưa nạp rule pack. Tải tệp JSON từ trang XBoss /engineering/chuan-hoa-ban-ve " +
-                    "rồi chạy XBOSS_RULEPACK (hoặc XBOSS_LOGIN để tải tự động).\n");
-                return null;
+                return (null,
+                    "Chưa nạp rule pack. Tải tệp JSON từ trang XBoss /engineering/chuan-hoa-ban-ve " +
+                    "rồi chạy XBOSS_RULEPACK (hoặc XBOSS_LOGIN để tải tự động).");
             }
             var thoiDiem = File.GetLastWriteTimeUtc(duongDan);
-            if (_cache is not null && duongDan == _duongDanCache && thoiDiem == _thoiDiemCache) return _cache;
+            if (_cache is not null && duongDan == _duongDanCache && thoiDiem == _thoiDiemCache) return (_cache, null);
 
             _cache = DrawToolsConfig.Load(File.ReadAllText(duongDan));
             _duongDanCache = duongDan;
             _thoiDiemCache = thoiDiem;
-            return _cache;
+            return (_cache, null);
         }
         catch (RulePackException e)
         {
-            ed.WriteMessage($"\n[XBoss] Rule pack không dùng được cho bộ lệnh vẽ: {e.Message}\n");
-            return null;
+            return (null, $"Rule pack không dùng được cho bộ lệnh vẽ: {e.Message}");
         }
         catch (IOException e)
         {
-            ed.WriteMessage($"\n[XBoss] Không đọc được rule pack cache: {e.Message}\n");
-            return null;
+            return (null, $"Không đọc được rule pack cache: {e.Message}");
         }
     }
 

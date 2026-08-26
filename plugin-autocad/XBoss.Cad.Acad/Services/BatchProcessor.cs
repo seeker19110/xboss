@@ -226,10 +226,14 @@ internal static class BatchProcessor
             CanhBao = pipeline.CanhBao,
         };
         File.WriteAllText(tepRa + ".xboss-report.json", baoCao.ToJson());
-        return new KetQuaTep(ten, true,
-            pipeline.Steps.Count == 0
-                ? "✔ đã đạt chuẩn — chép nguyên trạng"
-                : $"đã sửa {pipeline.Steps.Sum(s => s.SoLuong)} hạng mục ({pipeline.Steps.Count} bước có thay đổi)");
+        var tomTat = pipeline.Steps.Count == 0
+            ? "✔ đã đạt chuẩn — chép nguyên trạng"
+            : $"đã sửa {pipeline.Steps.Sum(s => s.SoLuong)} hạng mục ({pipeline.Steps.Count} bước có thay đổi)";
+        // Phần BỎ QUA (xref, layer khóa không mở được) chỉ nằm trong báo cáo JSON — nhật ký lô mà im
+        // lặng là kỹ sư đọc "đã sửa N hạng mục" rồi tưởng cả tệp đã được chuẩn hóa hết.
+        if (pipeline.CanhBao.Count > 0)
+            tomTat += $"; ⚠ {pipeline.CanhBao.Count} cảnh báo — xem {Path.GetFileName(tepRa)}.xboss-report.json";
+        return new KetQuaTep(ten, true, tomTat);
     }
 
     /// <summary>Trỏ HostApplicationServices.WorkingDatabase vào side db trong lúc xử lý

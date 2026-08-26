@@ -27,6 +27,16 @@
     <!-- Ribbon (Autodesk.Windows trong AdWindows.dll — M102) xây trên WPF: RibbonButton
          cần System.Windows.Input.ICommand + hạ tầng WPF lúc biên dịch. -->
     <UseWPF>true</UseWPF>
+    <!--
+      TẮT ImplicitUsings, thay bằng GlobalUsings.cs tường minh — BẮT BUỘC vì UseWPF ở trên.
+      Có tệp .xaml thì MSBuild sinh project tạm `*_wpftmp.csproj` cho pha biên dịch markup, và
+      project tạm KHÔNG kế thừa property này từ Directory.Build.props: pha markup mất System.IO /
+      System.Net.Http và đỏ hàng loạt CS0103 `Path`/`File`, trong khi pha build thường vẫn xanh.
+      Tệp .cs thì luôn được truyền sang project tạm. Chi tiết trong GlobalUsings.cs — bật lại
+      property này mà không xóa tệp đó là trùng khai báo; xóa tệp đó mà không bật lại là mất sạch
+      using. Sửa một trong hai thì sửa cả hai.
+    -->
+    <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>
 
   <Target Name="KiemAcadSdkDir" BeforeTargets="ResolveAssemblyReferences">

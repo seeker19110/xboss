@@ -214,6 +214,34 @@ public sealed class BangDieuKhienTests
         Assert.Null(SidecarSummary.TomTat("nhãn-lạ", json));
     }
 
+    // ── SoLoiKiemTra: dấu hiệu "nền đã sạch" của trình dẫn quy trình (M106 FR8) ──
+
+    [Fact]
+    public void SoLoiKiemTra_DocDungTuBaoCaoThat()
+    {
+        var sach = new InspectionReport { RulePackVersion = "v7", Findings = [], CanhBao = [] }.ToJson();
+        var coLoi = new InspectionReport
+        {
+            RulePackVersion = "v7",
+            Findings = [new InspectionFinding { Id = "lech-z", Ten = "Lệch Z", Handles = ["A1", "A2"], ChiTiet = [] }],
+            CanhBao = [],
+        }.ToJson();
+
+        Assert.Equal(0, SidecarSummary.SoLoiKiemTra(sach));
+        Assert.Equal(2, SidecarSummary.SoLoiKiemTra(coLoi));
+    }
+
+    [Theory]
+    [InlineData("{ hỏng")]
+    [InlineData("[1,2,3]")]
+    [InlineData("{\"la\":\"gì\"}")]
+    public void SoLoiKiemTra_SidecarHong_TraNull_ChuKhongPhai0(string json)
+    {
+        // null = "chưa biết nền có sạch không" — trình dẫn phải để bước 2 là CHƯA, chứ trả 0 là
+        // dẫn kỹ sư đi tiếp trên một cái nền không ai kiểm.
+        Assert.Null(SidecarSummary.SoLoiKiemTra(json));
+    }
+
     [Fact]
     public void CacLoaiSidecar_KhopDuoiTepMaAdapterGhi()
     {

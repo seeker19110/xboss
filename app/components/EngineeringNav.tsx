@@ -27,6 +27,7 @@ import {
   Sparkles,
   Scan,
   Scissors,
+  Ruler,
   Coins,
   ChevronDown,
   ChevronUp,
@@ -146,6 +147,13 @@ const NAV_ITEMS: NavItem[] = [
     category: "spatial",
     icon: Layers,
     roles: ["admin", "pm", "engineer"],
+  },
+  {
+    href: "/engineering/joint-segmentation",
+    label: "Chia đốt MEPF",
+    category: "spatial",
+    icon: Ruler,
+    roles: ["admin", "pm", "engineer", "subcon"],
   },
   {
     href: "/engineering/cad-nesting",

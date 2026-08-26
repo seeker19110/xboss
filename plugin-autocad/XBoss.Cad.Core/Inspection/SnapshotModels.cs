@@ -115,6 +115,24 @@ public sealed record LabelLinkInfo
     public required string SizeTheoXData { get; init; }
 }
 
+/// <summary>
+/// Phần thuộc XREF mà Adapter CỐ Ý không đưa vào snapshot (quy tắc dự án 2026-08-26: "xref thì bỏ
+/// qua hết"). Kiểm nội dung xref là báo lỗi trên thứ kỹ sư KHÔNG sửa được ở bản vẽ chủ, mà lệnh
+/// chuẩn hóa cũng bỏ qua đúng tập này — hai tầng phải cùng phạm vi, nếu không thì "xem trước
+/// chuẩn hóa" báo N lỗi rồi sửa được 0 và bản vẽ không bao giờ về trạng thái đạt chuẩn.
+/// Core chỉ BÁO số lượng để kỹ sư biết phạm vi kiểm, không phán xét gì thêm.
+/// </summary>
+public sealed record XrefBoQua
+{
+    /// <summary>Layer phụ thuộc xref (<c>SymbolTableRecord.IsDependent</c>) không đưa vào kiểm.</summary>
+    public int SoLayer { get; init; }
+
+    /// <summary>Khối chèn xref trong model space không đưa vào kiểm.</summary>
+    public int SoKhoiChen { get; init; }
+
+    public int Tong => SoLayer + SoKhoiChen;
+}
+
 /// <summary>Snapshot bản vẽ để kiểm — Adapter chỉ dựng dữ liệu, không phán xét.</summary>
 public sealed class DrawingSnapshot
 {
@@ -150,6 +168,10 @@ public sealed class DrawingSnapshot
     /// không có XData tag nào → phép tự tắt (không báo oan nhãn vẽ tay).
     /// </summary>
     public IReadOnlyList<TagInfo>? Tags { get; init; }
+
+    /// <summary>Phần thuộc xref Adapter đã bỏ qua khi dựng snapshot — null = Adapter không đếm
+    /// (bản vẽ không có xref, hoặc đường dựng snapshot cũ) ⇒ không báo gì.</summary>
+    public XrefBoQua? XrefDaBoQua { get; init; }
 }
 
 /// <summary>Một tag XBOSS_VE_TAG đọc từ XData — phép kiểm 17 (tag trùng).</summary>

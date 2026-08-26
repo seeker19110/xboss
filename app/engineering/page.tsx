@@ -558,6 +558,13 @@ export default function EngineeringApexCockpitPage() {
                     <span>Chuẩn Hóa Bản Vẽ CAD 2D (ISO 19650)</span>
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
+                  <Link
+                    href="/engineering/joint-segmentation"
+                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+                  >
+                    <span>Chia Đốt MEPF Theo Kiểu Kết Nối (M105)</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
+                  </Link>
                 </div>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-800/80 text-[11px] text-zinc-400">

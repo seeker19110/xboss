@@ -210,6 +210,191 @@ tuyến–thiết bị) là bậc có đòn bẩy lớn nhất; sau đó phối 
 cần cao độ đã khai trên đối tượng); các mục để lại ở M100 §20 (ngắt nét giao chéo, revision cloud,
 nhân bản tầng điển hình, riser). Mỗi mục phải mở `M<xx>` mới có duyệt trước khi code.
 
+**M105 — Tự động phân chia đốt toàn hệ MEPF theo kiểu kết nối:** ✅ **Approved 2026-08-26, PR1 XONG
+
+- PR2 (Core + Adapter) XONG** (`docs/nang-cap/M105-chia-dot-mepf-theo-kieu-noi.md`). Chia đốt MỌI tuyến MEPF
+  vẽ bằng `XBOSS_VE`: ống gió theo kiểu nối (nẹp C max 1180 / TDC max 1110 / mặt bích V max 1180 — số
+  người dùng chốt), ống nước/PCCC theo cây thương phẩm 5800 (ren/grooved/măng xông), máng cáp thanh
+  2500 + tấm nối. MỘT engine tổng quát tham số hóa qua rule pack — thêm hệ/kiểu nối mới về sau chỉ là
+  sửa rule pack, không sửa code.
+
+* **PR1 (xong):** rule pack **v9** (`jointRules` cho đủ 9 tuyến, mở rộng thuần trên v8 — có test canh);
+  engine TS `lib/ky-thuat/engineering-joint-segmentation.ts` (2 chế độ chia `deu`/`cay_nguyen`, chọn
+  kiểu nối theo cạnh lớn hoặc DN, parser biểu thức định mức phụ kiện — không dùng eval); 9 **test
+  vector JSON dùng chung** ở `plugin-autocad/testdata/joint-segmentation/`; `migrations/0143` (2 bảng
+  - RLS 2 nhánh theo mẫu 0092) + store upsert idempotent + `POST/GET /api/engineering/joint-segmentation`
+    (kiểm LẠI bất biến "tổng đốt + khe = chiều dài đoạn" ở server, 422 khi lệch) + trang
+    `/engineering/joint-segmentation`. 29 ca test engine + 36 ca rule pack xanh.
+* **PR2 phần Core (xong):** `XBoss.Cad.Core/Draw/JointRulesConfig.cs` + `JointSegmenter.cs` — bản C#
+  cho ra **đúng từng số** như bản TS, chứng minh bằng 56 ca đọc thẳng 9 test vector đó. 644/644 ca
+  .NET xanh. **Bẫy đã né:** làm tròn 0,1 mm phải là `MidpointRounding.AwayFromZero` — mặc định .NET
+  là làm tròn ngân hàng nên lệch bản TS ở các ca `,x5` (đã kiểm bằng mutation: đổi về mặc định → 3 ca đỏ).
+* **PR2 phần Adapter (xong):** lệnh `XBOSS_VE_CHIADOT` (`XBoss.Cad.Acad/Commands/VeChiaDotCommands.cs`)
+  — chọn tuyến hoặc quét cả hệ, hỏi đáp ngoài transaction, vẽ vạch chia + tag đốt trong **1
+  transaction = 1 nhóm UNDO**, XData 2 chiều (vạch/tag mang handle tim + chỉ số đốt; tim mang dấu
+  chia đốt) nên chạy lại là **idempotent**; tuyến không khai `jointRules` bị **bỏ qua kèm lý do**
+  (AC10). Hình học đẩy xuống Core `Draw/JointMarkPlacement.cs` (cắt đoạn theo vertex, vị trí vạch
+  cộng dồn **có cộng khe mối nối**, chiều dài vạch theo `edgeStyle`) để test được trên CI Linux.
+  Kèm bảng đốt trong `XBOSS_VE_THONGKE` (bảng RIÊNG, mã `chiadot`) và mục chia đốt trong báo cáo
+  phiên vẽ (`ChiaDot`/`ChiaDotBoQua` + cảnh báo ghi đè kiểu nối). `XBOSS_VE_DOI` đổi cỡ tuyến thì
+  **xóa vạch chia cũ + dấu chia đốt** kèm nhắc chạy lại (cùng lý do phải gỡ dấu bóc). 661/661 ca
+  .NET xanh (644 + 17 ca mới), cổng biên dịch Adapter `XBoss.Cad.AcadShim` xanh.
+* **Bẫy layer đã né:** hậu tố layer vạch chia là `JOINT` **không có gạch nối đầu** — `layerMatchAny`
+  của takeoff khớp theo ranh giới token nên `M-DUCT-SUPP-JOINT` vẫn khớp mục bóc `M-DUCT-SUPP` và
+  vạch chia sẽ bị bóc trùng thành chiều dài ống. Cùng lớp lỗi mà `edgeLayerSuffix` đã né bằng `EDGE`
+  (M100 FR4); có test canh ở cả 2 tầng.
+* **Còn lại:** verify tay lệnh mới trên máy có AutoCAD 2026 (cùng cổng với M99/M100/M102 — không có
+  runner Windows).
+
+**M106 — Hộp thoại WPF cho lệnh plugin + trình dẫn quy trình:** ✅ **ĐÓNG về mặt code 2026-08-26 —
+PR1 (nền + 2 lệnh mẫu), PR2 (trình dẫn quy trình) và PR3 (phủ nốt các lệnh còn lại) XONG**
+(`docs/nang-cap/M106-hop-thoai-wpf-va-quy-trinh.md`). Kỹ sư chạy lệnh bằng **chuột** thay cho chuỗi
+hỏi đáp keyword ở dòng lệnh, và thấy rõ đang ở bước nào của quy trình.
+
+**PR4 — theme tối cho từng control trong hộp thoại (sửa lỗi thật từ ảnh AutoCAD 2026, 2026-08-26):**
+
+- **Bệnh:** `ComboBox` của `XBOSS_VE` (Hệ / Loại tuyến / Size) hiện **nền sáng + chữ gần trắng**,
+  trông như đang bị khóa, lệch hẳn phần còn lại của cửa sổ. Nguyên nhân: ControlTemplate **mặc định**
+  của WPF vẽ chrome bằng brush hard-code của Windows và **bỏ qua `Background`** — Setter màu suông
+  không ăn, trong khi Setter `Foreground` thì ăn, nên ra đúng cảnh chữ sáng trên nền sáng.
+- **Sửa:** thay hẳn ControlTemplate trong `Ui/Wpf/XBossDialog.xaml` cho mọi control **đang dùng** mà
+  WPF tự vẽ chrome hoặc ghi đè màu ở trigger của theme: `ComboBox` (kể cả `IsEditable` + `Popup` xổ
+  xuống), `ComboBoxItem`, `TextBox`, `CheckBox`, `RadioButton`, `ScrollBar`, và 2 kiểu `Button`
+  (OK/Hủy). Mỗi template vẽ đủ **thường / rê chuột / có focus / đang mở / bị khóa** — trạng thái khóa
+  phải cách trạng thái thường thật xa, vì lỗi gốc chính là ô bình thường trông như khóa.
+- **8 tông trạng thái mới trong `Ui/MauBang.cs`** (Vien/VienSang/VienKhoa/NenRe/NenKhoa/ChuKhoa/
+  NutChinhRe/NutChinhNhan) — vẫn **một nguồn màu duy nhất** cho cả WinForms lẫn WPF, không hardcode
+  mã màu trong XAML. Viền đạt 3:1 với nền (ngưỡng WCAG cho ranh giới control); nút màu **đậm dần**
+  khi rê chuột đúng ADR-0010, nút xám thì sáng dần (đậm thêm sẽ chìm vào nền cửa sổ).
+- **Tương phản chữ:** nhãn trường và câu dẫn chuyển từ `ChuMo` sang `Chu`; khối chỉ-đọc và vùng lý do
+  có viền `Vien` thay vì `NenKhoi` (chỉ hơn nền vài mức xám, coi như không có viền trên máy công trường).
+- **Vá lỗ cổng CI:** XAML không được biên dịch ở CI (WPF chỉ có trên Windows) nên thêm bất biến đọc
+  thẳng tệp XAML — `XBoss.Cad.Tests/ThemeHopThoaiTests.cs`: style màu **phải** kèm `Template`, phải có
+  trạng thái `IsEnabled=False`, `TargetName` phải tồn tại trong chính template đó, brush phải có thật
+  trong `MauBangWpf`, cấm hardcode mã màu, và control cùng bệnh **mới thêm** vào XAML mà thiếu template
+  thì test tự đỏ. **865/865 ca .NET xanh** (nền trước khi sửa là 841 → +24 ca mới),
+  AcadShim 0 warning.
+- **Còn lại:** verify tay §C8b (mục 64–67) — 5 trạng thái của từng control, ở cả DPI 100 % và 150 %.
+  Không đụng ViewModel/binding/hành vi lệnh nên kết quả ra bản vẽ phải y hệt (mục 67 đối chiếu).
+
+**PR3 — phủ hộp thoại cho các lệnh còn lại của §7.2:**
+
+- **19 ViewModel mới ở Core** (`Core/Ui/ViewModels/{KetNoi,ChuanHoa,Ve,ChiTiet,HoSo,BocKl}DialogViewModels.cs`
+  - `DeXuatBlockDialogViewModel.cs` + `DungChungDialog.cs`) phủ 20 lệnh: `XBOSS_LOGIN`,
+    `XBOSS_UPLOAD`, `XBOSS_CHUANHOA`, `XBOSS_BATCH`, `XBOSS_BOCKL(_XOA/_XUAT)`, `XBOSS_VE_NEN`,
+    `XBOSS_VE_NHAN`, `XBOSS_VE_DOI`, `XBOSS_VE_PHUKIEN`, `XBOSS_VE_THIETBI`, `XBOSS_VE_GIADO`,
+    `XBOSS_VE_LOCHO`, `XBOSS_VE_TAG`, `XBOSS_VE_THONGKE`, `XBOSS_VE_MATCAT`, `XBOSS_VE_TRANGIN`,
+    `XBOSS_VE_DEXUAT`. XAML là **DataTemplate thuần** trong `XBossDialog.xaml` (vẫn đúng MỘT
+    `InitializeComponent()` trong cả plugin — cổng AcadShim không phải stub thêm gì).
+- **Nội dung hộp thoại = ĐÚNG câu hỏi mà lệnh đang hỏi.** Nơi bảng §7.2 mô tả lệch với code thật thì
+  lấy **code thật** làm chuẩn và ghi rõ trong doc-comment của từng ViewModel (vd `XBOSS_LOGIN` là
+  device pairing nên không có email/mật khẩu; `XBOSS_VE_GIADO` không hỏi khoảng cách vì
+  `supportSpacingMm` tra theo từng size; `XBOSS_VE_TAG` không hỏi tiền tố/số bắt đầu vì khuôn tag
+  nằm ở rule pack). Thông tin suy ra hiện **CHỈ ĐỌC** (FR6), không mở bậc tự do mới (§2.4).
+- **Tỉ lệ in 1:x vào hộp thoại** (việc hẹn ở PR1) cho `XBOSS_VE_NHAN`, `XBOSS_VE_THONGKE`,
+  `XBOSS_VE_MATCAT`, `XBOSS_VE_TRANGIN` — vẫn nhớ ở đúng `VeContext.TiLeIn`, **không có cơ chế nhớ
+  thứ hai**; lệnh vẽ đầu tiên của phiên nay cũng chạy trọn bằng chuột.
+- **AC8:** `Ui/DeXuatBlockDialog.cs` (WinForms) đã **xóa**, thay bằng ViewModel + DataTemplate WPF
+  giữ nguyên 6 trường và `BlockDeXuatRules`; palette `XBOSS_BANG` **giữ WinForms** đúng ranh giới đã
+  chốt. Fallback FR9 giữ nguyên cho mọi lệnh (hàm `Hoi*` cũ không xóa); riêng `XBOSS_VE_DEXUAT` vốn
+  không có đường hỏi đáp keyword nên UI hỏng = dừng kèm lý do.
+- **831/831 ca .NET xanh** (nền PR2 là 735 → +96 ca ViewModel), AcadShim 0 warning.
+- **Còn lại:** verify tay §C8 (mục 43–63) của `plugin-autocad/VERIFY-VA-PHAT-HANH.md` trên máy có
+  AutoCAD 2026 — XAML không có test tự động.
+
+**PR2 — trình dẫn quy trình (FR7/FR8/FR10, AC5/AC7):**
+
+- **Luật ở Core, có test:** `Core/Ui/QuyTrinh.cs` thêm `DauHieuQuyTrinh` (dữ liệu **đã đọc sẵn**:
+  token, rule pack, sidecar cạnh DWG, XData trên bản vẽ) + `TinhTrang`/`TinhTrangTatCa` trả
+  `Xong`/`Chua`/`KhongApDung` kèm **lý do tiếng Việt** khi chưa đủ điều kiện vào bước. Core không
+  mở `Database`, không đọc tệp — Adapter đọc rồi truyền vào, nên **toàn bộ quy tắc test được trên
+  CI Linux** và UI không có nhánh nghiệp vụ nào của riêng nó.
+- **Dấu hiệu "xong" đều SỐNG trong bản vẽ/tệp cạnh nó** (XData `XBOSS_VE`, dấu bóc, sidecar), không
+  phải cờ nhớ trong phiên: mở lại bản vẽ đã làm dở từ hôm trước là 6 bước nhận đúng ngay, không bắt
+  làm lại (có ca test riêng). Bước 5 nhận layout trang in **theo mẫu tên rule pack**
+  (`SheetSetup.LaTenLayoutTrangIn`) — đếm suông "có layout" sẽ báo xong ngay trên bản vẽ trắng vì
+  AutoCAD sẵn có Layout1.
+- **`XBOSS_BANG` thành 2 tab:** **Quy trình** (`Ui/TrinhDanControl.cs` — 6 giai đoạn đúng thứ tự §6,
+  mỗi bước: trạng thái ✓/○/– + lý do + nút chạy từng lệnh lấy từ `QuyTrinh.LenhCua`) và **Trạng
+  thái** (bảng M102 giữ nguyên). Nút của bước chưa đủ điều kiện chỉ **làm mờ kèm lý do, vẫn bấm
+  được** — §6 chốt đây là hướng dẫn, không phải cổng chặn (ca hợp lệ: mở lại bản vẽ đã chuẩn hóa từ
+  phiên trước). Bấm nút = `SendStringToExecute` đúng lệnh, y hệt Ribbon.
+- **Tự tính lại khi đổi bản vẽ:** `DocumentManager.DocumentActivated` → vẽ lại cả hai tab bằng dữ
+  liệu cục bộ (cố ý **không** kèm lượt hỏi server danh sách đề xuất block — mạng công trường yếu).
+- **Ribbon theo quy trình:** panel **"Quy trình"** đứng đầu tab XBoss (nút to mở `XBOSS_BANG`; nhóm
+  "Bảng điều khiển" chỉ có đúng lệnh này nên hiện ở đây, không có hai nút cùng chạy một lệnh); nút
+  trong mỗi panel xếp theo `(Buoc, ThuTuTrongBuoc)` — sắp theo mỗi `ThuTuTrongBuoc` thì các bước
+  đan xen nhau vì bước nào cũng đánh số từ 1.
+- **Cổng CI:** 735/735 ca .NET xanh (707 + 28 ca mới), `XBoss.Cad.AcadShim` 0 warning.
+- **Còn lại:** verify tay §C7 (mục 37–42) của `plugin-autocad/VERIFY-VA-PHAT-HANH.md` — palette
+  không có test tự động. PR3 (16 lệnh còn lại + chuyển `DeXuatBlockDialog` sang WPF) chưa làm; AC8
+  ("không còn tệp WinForms nào trong `Ui/`") vẫn hở vì palette M102 + trình dẫn mới đang là WinForms
+  — chuyển cả palette sang WPF là quyết định riêng của PR3, không gộp vào PR2.
+
+**PR1 — nền hộp thoại WPF:**
+
+- **Nền quy trình (Core):** `XBoss.Cad.Core/Ui/QuyTrinh.cs` khai 6 giai đoạn vòng đời bản vẽ
+  (Kết nối → Chuẩn hóa nền → Vẽ shop drawing → Chi tiết chế tạo → Hồ sơ bản vẽ → Bóc & nộp) +
+  nhóm phụ trợ; `LenhCatalog.LenhInfo` thêm `Buoc`/`ThuTuTrongBuoc` **không có giá trị mặc định**
+  nên thêm lệnh mà quên xếp bước là **không biên dịch nổi** (FR10/AC7). Hàm suy trạng thái từng
+  bước để cho PR2 (chỗ cắm đã khai: `TrangThaiBuoc`/`TinhTrangBuoc`).
+- **Khung hộp thoại:** `Core/Ui/ViewModels/DialogViewModelBase.cs` — **thuần .NET**, chỉ
+  `INotifyPropertyChanged`, không tham chiếu WPF/AutoCAD, nên **toàn bộ hành vi hộp thoại test được
+  trên CI Linux**; Adapter `Ui/Wpf/XBossDialog.xaml(.cs)` là cửa sổ WPF mỏng (nội dung từng lệnh là
+  `DataTemplate`, không code-behind riêng), mở bằng `Application.ShowModalWindow`, Enter = OK,
+  Esc = Hủy, màu bọc lại `MauBang` của bảng điều khiển M102 qua `MauBangWpf`.
+- **2 lệnh mẫu:** `XBOSS_VE` gộp 5 câu hỏi nối tiếp vào **một form** sửa qua lại tự do (bề rộng nét
+  biên hiện theo size, size ngoài danh mục → cảnh báo `custom` ngay tại hộp thoại);
+  `XBOSS_VE_CHIADOT` có **xem trước số đốt + chiều dài từng đốt** gọi thẳng `JointSegmenter.ChiaTuyen`
+  — đổi kiểu nối là con số đổi ngay (AC4).
+- **FR9 — không lệnh nào chết vì UI:** `Ui/Wpf/HopThoaiXBoss.Thu` bắt mọi lỗi dựng UI và đọc biến
+  `XBOSS_UI_DIALOG=0` → rơi về **đúng** chuỗi hỏi đáp dòng lệnh cũ (các hàm `Hoi*` giữ nguyên).
+  Hộp thoại nằm NGOÀI transaction, 1 lệnh = 1 nhóm UNDO, kết quả vẽ ra bản vẽ **không đổi**.
+- **Cổng CI:** 706/706 ca .NET xanh (661 + 45 ca mới); `XBoss.Cad.AcadShim` xanh 0 warning nhờ
+  `WpfStub.cs` khai giả WPF + phần `InitializeComponent` sinh từ XAML.
+- **Còn lại:** verify tay 2 hộp thoại + đường lui FR9 trên máy có AutoCAD 2026 —
+  `plugin-autocad/VERIFY-VA-PHAT-HANH.md` §C6 (mục 33–36). PR3 (16 lệnh còn lại + chuyển
+  `DeXuatBlockDialog` sang WPF) chưa làm. Một điểm
+  chưa phủ trong PR1: câu hỏi **tỉ lệ in 1:x** của `XBOSS_VE_CHIADOT` vẫn ở dòng lệnh (§7.2 không
+  liệt kê nó cho lệnh này; hỏi một lần mỗi phiên qua `VeContext.TiLeIn`).
+
+**M107 — Nhận tuyến có sẵn thành tuyến XBoss (`XBOSS_VE_NHANTUYEN`):** ✅ **XONG về mặt code
+2026-08-26** (`docs/nang-cap/M107-nhan-tuyen-co-san.md`). Bối cảnh dùng phổ biến nhất — nhận bản
+thiết kế của người khác rồi bổ sung chi tiết thi công — nay dùng được cả bộ lệnh XBoss mà **không
+phải vẽ đè lại tuyến**.
+
+- **Lệnh mới `XBoss.Cad.Acad/Commands/VeNhanTuyenCommands.cs`:** quét chọn nhiều đối tượng → khai
+  **một** hệ/loại/cỡ cho cả loạt → mỗi tuyến được đổi `Layer` về layer chuẩn của loại tuyến
+  (`VeLayerService.DamBaoLayer`), ghi XData `XBOSS_VE` vai trò `Tim` **đúng cấu trúc tuyến do
+  `XBOSS_VE` vẽ** (mọi lệnh sau — phụ kiện, nhãn, chia đốt, giá đỡ, sleeve, tag, bóc khối lượng —
+  không phân biệt được nguồn gốc), và sinh 2 nét biên qua `EdgeOffset.Tinh` cho `edgeStyle:
+"double"` với XData liên kết 2 chiều.
+- **Guardrail số 1 — không đụng hình học tim:** chỉ đổi layer, gán XData và THÊM nét biên; đỉnh
+  polyline giữ nguyên từng tọa độ + bulge. Đây là bản vẽ của người khác, kỹ sư nhận tuyến để dùng
+  tiếp chứ không phải để plugin nắn lại (AC6 là ca verify tay quan trọng nhất).
+- **`Line` được nhận** thì chuyển thành polyline 2 đỉnh **cùng tọa độ** (mọi lệnh sau đều giả định
+  tim là polyline) và nói rõ trong tóm tắt là đã chuyển kiểu.
+- **Chạy lại = nhận lại, không nhân đôi biên:** nét biên cũ **của đúng tuyến đó** bị xóa rồi dựng
+  lại theo cỡ mới; dấu bóc bị gỡ (`MarkService.Unmark`) và vạch chia đốt bị xóa
+  (`VeThucThe.XoaChiaDotCua`) kèm nhắc chạy lại — **cùng lý do** với `XBOSS_VE_DOI` (cỡ đổi thì số
+  đốt và khối lượng đều sai). Hàm xóa nét biên cũ được **đưa lên `VeThucThe.XoaNetBienCua`** dùng
+  chung cho cả 2 lệnh thay vì viết cơ chế thứ hai.
+- **Xref bỏ qua hết** (quy tắc chốt 2026-08-26) — qua `ThuocXref.KhoiChen` + chặn thêm thực thể nằm
+  trên layer phụ thuộc xref; text/block/arc/spline và nét biên/nhãn của chính XBoss cũng bị bỏ qua,
+  **đếm và nêu lý do** ở cả hộp thoại lẫn tóm tắt cuối lệnh.
+- **Offset thất bại → CHỈ nhận tim + cảnh báo nêu handle tuyến**, tuyệt đối không vẽ biên sai (luật
+  M100 §18). 1 lệnh = 1 transaction = 1 nhóm UNDO; mọi hỏi đáp nằm ngoài transaction.
+- **Hộp thoại theo khung M106:** `Core/Ui/ViewModels/NhanTuyenDialogViewModel.cs` (thuần .NET, test
+  được trên CI Linux) + `DataTemplate` trong `Ui/Wpf/XBossDialog.xaml` dùng đúng style theme tối có
+  sẵn; phần chỉ-đọc hiện số tuyến sẽ nhận, layer đích, bề rộng nét biên suy từ cỡ, các dòng bỏ qua.
+  Đường lui `XBOSS_UI_DIALOG=0` / UI hỏng → hỏi đáp dòng lệnh cho **cùng** bộ tham số (AC7). Lệnh
+  khai trong `LenhCatalog` ở bước 3 (Vẽ shop drawing) nên Ribbon và trình dẫn tự có nút.
+- **886/886 ca .NET xanh** (nền 865 → +21 ca: `NhanTuyenDialogViewModelTests.cs` + phần thuần
+  `TomTatChonNhanTuyen`), `XBoss.Cad.AcadShim` 0 warning.
+- **Còn lại:** verify tay §C4b của `plugin-autocad/VERIFY-VA-PHAT-HANH.md` trên máy có AutoCAD 2026
+  — nhấn **AC6** (so tọa độ từng đỉnh trước/sau bằng `LIST`) và **AC4** (chạy lại với cỡ khác:
+  không còn nét biên cũ sót trên layer `<layer tim>EDGE`).
+
 ## M102 PR2 — Adapter AutoCAD: bước chuẩn hóa 12/13 + quét tag cho phép kiểm 17 (2026-08-25)
 
 Thi hành `docs/nang-cap/M102-plugin-dong-tran-chuan-hoa.md` PR2 phần **Adapter** — nối dây Core PR1

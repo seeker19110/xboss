@@ -44,18 +44,19 @@ Gỡ cài: xoá thư mục `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle`.
 
 ---
 
-## C. Verify tay — 25 lệnh, đi theo đúng thứ tự này
+## C. Verify tay — 27 lệnh, đi theo đúng thứ tự này
 
 Mỗi mục ghi: **làm gì** → **đúng thì thấy gì**. Gặp lệch thì ghi lại lệnh + thông điệp + tệp
 báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho qua".
 
 ### C0. Vỏ giao diện (M102)
 
-1. `XBOSS_BANG` → hiện bảng điều khiển neo được, 4 khối: trạng thái server/thiết bị, rule pack
-   (version + số quy tắc), bản vẽ hiện hành, tóm tắt sidecar JSON. Gõ lại → đóng.
-   _Chỉ đọc — không được đụng bản vẽ, không gọi mạng._
-2. Tab Ribbon **XBoss**: 5 panel, 25 nút, mọi nút có tooltip tiếng Việt. Bấm 1 nút bất kỳ →
-   đúng lệnh chạy (bấm nút = gõ lệnh, nghiệp vụ không nhân đôi).
+1. `XBOSS_BANG` → hiện bảng neo được với **2 tab**: **Quy trình** (trình dẫn — verify ở C7) và
+   **Trạng thái** với 4 khối: server/thiết bị, rule pack (version + số quy tắc), thư viện block,
+   bản vẽ hiện hành + tóm tắt sidecar JSON. Gõ lại → đóng.
+   _Tab Trạng thái chỉ đọc — không được đụng bản vẽ._
+2. Tab Ribbon **XBoss**: 5 panel (**Quy trình** đứng đầu), 26 nút, mọi nút có tooltip tiếng Việt.
+   Bấm 1 nút bất kỳ → đúng lệnh chạy (bấm nút = gõ lệnh, nghiệp vụ không nhân đôi).
 3. `NETLOAD` lại lần nữa → **không** sinh tab XBoss thứ hai.
 
 ### C1. Kết nối server (M99 PR2)
@@ -78,6 +79,46 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
 11. `XBOSS_BATCH` trên một thư mục `.dwg` → bản gốc **giữ nguyên**, kết quả vào `da-chuan-hoa\`,
     có `xboss-batch-log.txt`. Thử cả chế độ chỉ-kiểm và chế độ bóc KL (1 Excel tổng, có cột "Tệp").
 
+### C2b. Bản vẽ THẬT có xref + layer khoá (bắt buộc — sự cố 2026-08-26)
+
+Hai lỗi chết lệnh ngoài công trường đều chỉ lộ trên bản vẽ MEP thật, không lộ trên bản vẽ mẫu
+sạch: `XBOSS_VE_NEN` chết `eInvalidKey` (layer của xref không sửa được) và `XBOSS_BATCH` chết
+`eOnLockedLayer` (không mở khoá layer trước khi sửa). Cổng CI chỉ biên dịch, **không chạy được
+bản vẽ**, nên bảy ca dưới đây phải làm tay mỗi lần phát hành. Đánh số chữ để khỏi dồn số cả danh
+sách.
+
+Chuẩn bị **một** bản vẽ (dùng bản vẽ dự án thật, vd `SDG.MEP.FPS.002.R3….dwg`) có đủ:
+xref kiến trúc/kết cấu đang attach, **≥ 2 layer của bản vẽ chủ đang KHOÁ**, và vài lỗi cố ý
+(layer sai chuẩn, chữ TCVN3, đối tượng Z≠0). Trước khi chạy, mở bảng LAYER và **chụp lại cột
+khoá** — đó là bản đối chiếu.
+
+11a. `XBOSS_CHUANHOA` → chạy trót lọt, **không** có dòng `LỖI giữa chừng … eOnLockedLayer`; báo
+cáo có dòng `⚠ KHÔNG đụng gì thuộc xref … bỏ qua N layer của xref…`. Xong lệnh, mở lại bảng
+LAYER: **cột khoá y hệt ảnh chụp trước đó** (kể cả layer vừa bị pipeline đổi tên). `U` một
+lần → bản vẽ về nguyên trạng, cột khoá vẫn đúng.
+11b. `XBOSS_BATCH` chế độ chuẩn hoá trên thư mục chứa chính bản vẽ đó → nhật ký
+`xboss-batch-log.txt` ghi `OK`, **không** còn `LỖI — bỏ qua: eOnLockedLayer`. Mở tệp trong
+`da-chuan-hoa\` → xref vẫn còn (không bị bind/đổi block), cột khoá layer giữ nguyên như bản
+gốc. Bản gốc **không đổi một byte**.
+11c. `XBOSS_KIEMTRA` trên chính bản vẽ đó → **không** liệt kê layer của xref trong nhóm "Layer sai
+chuẩn" (layer `TÊNXREF|…`), có dòng `⚠ KHÔNG kiểm phần thuộc xref …`. Số lỗi ở đây phải khớp
+với phần "xem trước" của `XBOSS_CHUANHOA` ở 11a — kiểm và chuẩn hoá cùng phạm vi.
+11d. `XBOSS_VE_NEN` trên chính bản vẽ đó → chạy trót lọt, **không** `eInvalidKey`; báo `⚠ N layer
+     KHÔNG khoá/làm mờ được (layer của xref…)`. Chạy lại lần hai → hoàn nguyên, cột khoá của mọi
+layer bản vẽ chủ trở về đúng ảnh chụp ban đầu.
+11e. `XBOSS_BOCKL` (phạm vi cả bản vẽ, có đối tượng nằm trên layer ĐANG KHOÁ) → đồng ý đánh dấu:
+chạy trót lọt, **không** `eOnLockedLayer`; đối tượng trên layer khoá **vẫn đổi màu** như đối
+tượng trên layer mở; dòng cuối báo `Đã tạm mở khoá N layer để đánh dấu và khoá lại như cũ.`
+Mở lại bảng LAYER: **cột khoá y hệt ảnh chụp trước lệnh**. `U` một lần → màu về nguyên trạng,
+cột khoá vẫn đúng.
+11f. `XBOSS_BOCKL_XOA` (cả bản vẽ) ngay sau 11e → gỡ đủ số đối tượng đã đánh dấu, kể cả đối tượng
+trên layer khoá; báo `Đã tạm mở khoá N layer để gỡ dấu và khoá lại như cũ.`; cột khoá lại **y
+hệt ảnh chụp**. Nếu có dòng `⚠ Không khoá lại được … layer` thì khoá tay bằng lệnh LAYER
+**trước khi lưu** và ghi lại tên layer đó vào báo cáo phát hành.
+11g. Chốt số liệu không đổi: chạy `XBOSS_BOCKL_XUAT` sau 11e, đối chiếu bảng khối lượng với lần
+bóc trên cùng bản vẽ khi **mở khoá tay hết layer từ trước** — hai bảng phải khớp từng dòng
+(việc tự mở khoá chỉ để GHI dấu, không được đụng con số nào).
+
 ### C3. Bóc khối lượng (M99 + M101)
 
 12. `XBOSS_BOCKL` → vùng đã bóc đổi màu + ghi XData; bóc lại vùng đó → **không cộng trùng**.
@@ -91,11 +132,12 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
 17. Chọn "kéo KL BOQ hợp đồng từ máy chủ" → sheet `Doi-chieu` có chênh lệch % là công thức sống.
     Rút mạng rồi làm lại → chỉ cảnh báo, **vẫn xuất bình thường**.
 
-### C4. Bộ lệnh vẽ shop drawing (M100 — 14 lệnh)
+### C4. Bộ lệnh vẽ shop drawing (M100 — 14 lệnh, M105 — 1 lệnh, M107 — 1 lệnh ở C4b)
 
 18. `XBOSS_VE_NEN` → nền khoá + làm mờ, tạo layer đích; chạy lại → **hoàn nguyên**.
 19. `XBOSS_VE` → vẽ tuyến như PLINE (có Cung/HoànTác/Đóng); `edgeStyle=double` sinh 2 nét biên.
     Nhấn ESC giữa chừng → abort sạch, không để lại rác.
+    _Từ M106: tham số thu qua **hộp thoại** — xem mục 33; kết quả vẽ ra phải không đổi một nét._
 20. `XBOSS_VE_NHAN` → nhãn lấy size **từ XData**, không gõ tay. `XBOSS_VE_DOI` → đổi size/hệ thì
     layer + XData + biên + nhãn cập nhật theo.
 21. `XBOSS_VE_PHUKIEN` / `XBOSS_VE_THIETBI` → block bám tuyến, tự xoay theo tiếp tuyến; thiết bị
@@ -104,9 +146,50 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
     (quét trùng/nhảy số), `XBOSS_VE_THONGKE` (chạy lại → cập nhật tại chỗ, không đẻ bảng mới).
 23. `XBOSS_VE_MATCAT` (tên A-A tự đánh) và `XBOSS_VE_TRANGIN` (layout + page setup + viewport
     **khoá** + titleblock) → mỗi lệnh 1 lần undo xoá trọn.
-24. `XBOSS_VE_BAOCAO` → sinh báo cáo phiên vẽ JSON cạnh DWG.
-25. Vẽ xong chạy `XBOSS_KIEMTRA` → **pass ngay** (đây chính là mục đích của bộ lệnh vẽ) và
+24. `XBOSS_VE_CHIADOT` (M105) → chọn tuyến (hoặc CAHE quét cả hệ) → vạch chia vuông góc tim +
+    tag đốt trên layer `<layer tim>JOINT`; tuyến `edgeStyle=double` vạch chạm 2 nét biên, ống nước
+    là tick ngắn. Chạy **lại** cùng tuyến → số vạch/tag **không đổi** (idempotent), `U` một lần
+    xoá trọn kết quả một lần chạy. Tuyến mà rule pack không khai `jointRules` → **bỏ qua kèm lý
+    do**, không tự đoán tham số. Sau đó `XBOSS_VE_THONGKE` → `CHIADOT` ra bảng đốt.
+    _Từ M106: phạm vi/kiểu nối thu qua **hộp thoại có xem trước số đốt** — xem mục 34._
+25. `XBOSS_VE_BAOCAO` → sinh báo cáo phiên vẽ JSON cạnh DWG (có mục chia đốt: tuyến đã chia /
+    chưa chia, và lý do bỏ qua của phiên vừa chạy).
+26. Vẽ xong chạy `XBOSS_KIEMTRA` → **pass ngay** (đây chính là mục đích của bộ lệnh vẽ) và
     `XBOSS_BOCKL` bóc không sót nét mới vẽ.
+
+### C4b. Nhận tuyến có sẵn — `XBOSS_VE_NHANTUYEN` (M107, bắt buộc)
+
+Làm trên **bản vẽ thiết kế của người khác** (không phải bản do `XBOSS_VE` vẽ), có sẵn xref kiến
+trúc và vài layer khoá. Đây là lệnh đụng vào bản vẽ người khác nên hai ca AC6/AC4 dưới đây là bắt
+buộc, không được bỏ.
+
+- **AC1 — nhận cả loạt:** chọn 5 polyline ống gió của bản gốc → hệ HVAC, cỡ `800x400` → cả 5 đổi
+  sang layer chuẩn của loại tuyến, mang XData, mỗi tuyến có **2 nét biên cách nhau 800** (đo bằng
+  DIST) trên layer `<layer tim>EDGE`.
+- **AC2 — dùng được ngay mọi lệnh:** ngay sau AC1, `XBOSS_VE_PHUKIEN` bấm lên các tuyến đó
+  **không còn báo "không phải TUYẾN TIM do XBOSS_VE vẽ"**; `XBOSS_VE_NHAN` ghi đúng cỡ `800x400`;
+  `XBOSS_VE_CHIADOT` chọn được kiểu nối theo cỡ; `XBOSS_BOCKL` bóc được (biên **không** bị bóc).
+- **AC3 — lọc vùng chọn:** quét cả vùng có lẫn text/block/arc/spline **và một xref** → chỉ nhận
+  polyline/line ngoài xref; dòng tóm tắt đếm đủ phần bỏ qua **theo từng lý do** (không phải
+  polyline/line · thuộc xref · nét biên/nhãn của XBoss).
+- **AC4 — chạy lại không nhân đôi biên:** chạy lại trên đúng các tuyến đó với cỡ khác (vd
+  `400x200`) → nét biên dựng lại theo cỡ mới; **chọn lại toàn vùng và đếm: KHÔNG còn nét biên cũ
+  sót lại** (đếm số đối tượng trên layer `<layer tim>EDGE` phải đúng 2 × số tuyến). Tuyến đã bóc
+  khối lượng bị **gỡ dấu bóc** kèm cảnh báo chạy lại `XBOSS_BOCKL`; vạch chia đốt cũ bị xóa kèm
+  cảnh báo chạy lại `XBOSS_VE_CHIADOT`.
+- **AC5 — một lần undo:** `U` một lần → layer, XData, nét biên đều trở lại nguyên trạng.
+- **AC6 — hình học tim KHÔNG đổi (ca quan trọng nhất):** trước khi nhận, chọn một tuyến và ghi
+  tọa độ **từng đỉnh** (`LIST`, hoặc `_.PEDIT` → xem đỉnh). Sau khi nhận, `LIST` lại đúng tuyến
+  đó → **từng tọa độ đỉnh và bulge phải trùng khít**, số đỉnh không đổi, `Closed` không đổi. Lệch
+  dù một số lẻ cũng là lỗi chặn phát hành.
+- **AC7 — đường lui dòng lệnh:** đặt `XBOSS_UI_DIALOG=0` rồi chạy lại AC1 bằng hỏi đáp dòng lệnh →
+  kết quả trên bản vẽ **trùng khít** đường hộp thoại (cùng layer, cùng XData, cùng số nét biên).
+- **Ca Line (FR4):** chọn một `LINE` của bản gốc → nhận → thành **polyline 2 đỉnh cùng tọa độ**
+  với line cũ (`LIST` đối chiếu đầu/cuối), tóm tắt cuối lệnh nói rõ "đã chuyển kiểu".
+- **Ca offset hỏng (M100 §18):** nhận một polyline **tự cắt** → chỉ nhận tim + cảnh báo nêu handle
+  tuyến, **không** có nét biên nào được vẽ.
+- **Hộp thoại:** soi theo checklist C8b (nền tối, combo gõ tay được, nút OK khóa kèm lý do khi
+  vùng chọn không có tuyến nào).
 
 ### C5. Vòng đời với web (M99 PR5 + M103 + M104)
 
@@ -121,6 +204,219 @@ báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho 
     đối chiếu sha256, rồi Duyệt → sinh version thư viện mới.
 31. Quay lại AutoCAD, chèn block vừa duyệt → plugin tự tải thư viện version mới, sha256 khớp.
 32. Tài khoản có quyền thêm thẳng → sau khi đề xuất, AutoCAD in thêm dòng chỉ đường sang web.
+
+### C6. Hộp thoại WPF + đường lui dòng lệnh (M106 PR1 — 2 lệnh mẫu)
+
+> **Bắt buộc verify tay: XAML KHÔNG có test tự động.** CI chỉ kiểm được ViewModel ở Core
+> (`VeTuyenDialogViewModelTests`, `ChiaDotDialogViewModelTests`) và cú pháp code-behind (AcadShim).
+> Mọi thứ thuộc về markup — cửa sổ có hiện ra không, bind đúng ô không, màu/DPI có đọc được không —
+> chỉ máy có AutoCAD 2026 mới trả lời được.
+
+33. **`XBOSS_VE` — hộp thoại một form.** Gõ lệnh → hiện cửa sổ **"XBOSS_VE — Vẽ tuyến"** nằm trên
+    AutoCAD (không lạc ra sau bản vẽ), nền tối cùng tông bảng điều khiển `XBOSS_BANG`.
+    - Đủ 4 ô: Hệ, Loại tuyến, Size (gõ tay được), Độ dốc — **ô Độ dốc chỉ hiện** khi chọn tuyến
+      `pipe-sanr` (ống thoát), ẩn với các tuyến khác.
+    - **Sửa qua lại tự do**: đổi Hệ → danh mục Loại tuyến và Size đổi theo ngay; đổi Size →
+      dòng "Nét biên: 2 nét cách tim … " đổi ngay theo size (tuyến `edgeStyle=double`).
+    - Gõ size ngoài danh mục (vd `777x333`) → dòng dưới form chuyển **vàng** kèm chữ `custom`,
+      nút OK **vẫn bấm được**. Xóa trắng ô Size → nút OK **mờ** kèm lý do tiếng Việt.
+    - **Enter** = OK khi hợp lệ, **Esc** = Hủy. Hủy → lệnh dừng hẳn, **không** hỏi lại ở dòng lệnh.
+    - Bấm OK → bắt điểm như PLINE, tuyến vẽ ra **giống hệt** bản trước M106 (đối chiếu mục 19).
+    - Chạy lại lệnh → hộp thoại nhớ đúng hệ/loại tuyến/size vừa dùng.
+34. **`XBOSS_VE_CHIADOT` — xem trước số đốt.** Vẽ vài tuyến rồi gõ lệnh:
+    - Hộp thoại hiện Phạm vi (2 nút chọn), combo Hệ (chỉ liệt hệ **có** tuyến, kèm số tuyến),
+      combo Kiểu nối (mục đầu **TỰ ĐỘNG**), và khung **Xem trước** liệt kê từng tuyến:
+      `<item> <size> (handle …): <kiểu nối> · N đốt / M mối · dài đốt1 / đốt2 / … mm`.
+    - **Đổi Kiểu nối → số đốt và chiều dài đổi NGAY** (không phải đóng mở lại). Chọn kiểu vượt
+      ngưỡng cỡ (vd `nep_c` cho ống 800x400) → dòng cảnh báo vàng, nút OK vẫn bấm được.
+    - Bản vẽ trộn nhiều loại tuyến → combo Kiểu nối **mờ** kèm câu giải thích.
+    - Bấm OK ở phạm vi "Chọn tay" → AutoCAD hỏi chọn tuyến trên bản vẽ như cũ; kết quả vẽ ra phải
+      **khớp đúng** các con số đã xem trước cho những tuyến đã chọn.
+    - `U` một lần vẫn xóa trọn kết quả (hộp thoại nằm NGOÀI transaction — mục 24 vẫn đúng).
+    - Lưu ý còn lại của PR1: câu hỏi **tỉ lệ in 1:x** vẫn ở dòng lệnh (hỏi một lần mỗi phiên).
+35. **Đường lui FR9 — không lệnh nào được chết vì UI.** Đóng AutoCAD, đặt biến môi trường
+    `setx XBOSS_UI_DIALOG 0`, mở lại AutoCAD:
+    - `XBOSS_VE` và `XBOSS_VE_CHIADOT` in một dòng `[XBoss] XBOSS_UI_DIALOG=0 — dùng hỏi đáp dòng
+lệnh…` rồi chạy **đúng chuỗi hỏi đáp keyword như trước M106**, kết quả vẽ không đổi.
+    - Xóa biến (`setx XBOSS_UI_DIALOG ""`) → hộp thoại trở lại.
+36. **DPI cao + màn hình phụ.** Đặt Windows scale 150 % (hoặc kéo AutoCAD sang màn hình 4K) → chữ
+    và ô trong hộp thoại nét, không bị cắt, nút OK/Hủy không tràn khung.
+
+### C7. Trình dẫn quy trình + Ribbon theo quy trình (M106 PR2)
+
+> **Bắt buộc verify tay.** CI kẹp được luật suy trạng thái (`QuyTrinhTests` — Core) và cú pháp
+> palette (AcadShim), **không** kẹp được: bảng có vẽ ra không, nút có gọi đúng lệnh không, chữ có
+> bị cắt trong palette hẹp không. Chỉ máy có AutoCAD 2026 trả lời được.
+
+37. **6 giai đoạn, đúng thứ tự.** `XBOSS_BANG` → tab **Quy trình** hiện lần lượt
+    `1. KẾT NỐI` → `2. CHUẨN HÓA NỀN` → `3. VẼ SHOP DRAWING` → `4. CHI TIẾT CHẾ TẠO` →
+    `5. HỒ SƠ BẢN VẼ` → `6. BÓC & NỘP`, mỗi bước một dòng trạng thái (`✓ Đã xong` /
+    `○ Chưa làm` / `– Không áp dụng`) + hàng nút của bước.
+    - Nút của bước đúng bằng số lệnh của bước đó, **đúng thứ tự dùng thật** (vd bước 3:
+      Chuẩn bị nền → Vẽ tuyến → Nhãn size → Phụ kiện → Thiết bị → Đổi size/hệ).
+    - Kéo hẹp palette → chữ xuống dòng, nút xuống hàng; không có chữ nào bị cắt cụt.
+38. **Nút mờ nhưng VẪN bấm được (AC5 — quan trọng nhất).** Mở AutoCAD chưa đăng nhập, chưa nạp
+    rule pack, mở một bản vẽ trắng:
+    - Bước 2–6 hiện dòng `⚠` kèm lý do tiếng Việt (`Chưa nạp rule pack…`, `Bản vẽ chưa có tuyến
+nào…`), nút chuyển nền chìm + chữ mờ.
+    - **Bấm thử một nút mờ** (vd "Kiểm tra") → lệnh vẫn chạy và tự báo lý do từ chối ở dòng lệnh.
+      Nút mờ mà **không bấm được** là SAI đặc tả (đây là hướng dẫn, không phải cổng chặn).
+39. **Chưa mở bản vẽ nào.** Đóng hết bản vẽ (chỉ còn màn hình Start) → bước 1 vẫn hiện bình
+    thường, bước 2–6 chuyển `– Không áp dụng` kèm lý do "Chưa mở bản vẽ nào…".
+40. **Mở lại bản vẽ của phiên trước thì KHÔNG bắt làm lại.** Đăng nhập + nạp rule pack, chạy trọn
+    `XBOSS_KIEMTRA` (đến khi 0 lỗi) → `XBOSS_VE` → `XBOSS_VE_CHIADOT` → `XBOSS_VE_THONGKE` →
+    `XBOSS_VE_TRANGIN` → `XBOSS_BOCKL` → `XBOSS_BOCKL_XUAT`, lưu bản vẽ, **đóng AutoCAD, mở lại**
+    và mở đúng bản vẽ đó → cả 6 bước phải là `✓ Đã xong`, không còn dòng `⚠` nào.
+    - Chạy `XBOSS_BOCKL_XOA` → bước 6 quay lại `○ Chưa làm` (dấu bóc là dấu hiệu thật, không phải
+      cờ nhớ trong phiên).
+41. **Tự tính lại khi đổi bản vẽ.** Mở 2 bản vẽ (một đã làm xong như mục 40, một trắng tinh), để
+    bảng đang hiện rồi `Ctrl+Tab` qua lại → trạng thái 6 bước **và** tab Trạng thái đổi theo bản vẽ
+    đang hiện hành, không cần bấm "Làm mới". Đổi bản vẽ **không** được in thêm dòng nào ra dòng
+    lệnh và không được gọi mạng.
+42. **Ribbon theo quy trình (AC7).** Tab **XBoss**:
+    - Panel **Quy trình** đứng **đầu tiên**, một nút to mở `XBOSS_BANG`; **không** còn panel
+      "Bảng điều khiển" riêng (không có hai nút cùng chạy một lệnh).
+    - Panel "Vẽ shop drawing" xếp nút đúng dòng chảy: nền → tuyến → nhãn → phụ kiện → thiết bị →
+      đổi size, rồi chia đốt → giá đỡ → lỗ chờ → tag, rồi mặt cắt → thống kê → trang in → báo cáo,
+      cuối cùng là 2 lệnh thư viện/đề xuất.
+    - Panel "Kết nối": Đăng nhập → Nạp rule pack → **Upload hồ sơ đứng cuối** (thuộc bước 6).
+
+### C8. Hộp thoại WPF cho các lệnh còn lại (M106 PR3)
+
+> **Bắt buộc verify tay.** ViewModel đã có test ở Core (`*DialogViewModelTests`) nên CI kẹp được
+> danh mục, giá trị mặc định và luật khóa nút OK. **Không** kẹp được: XAML có dựng ra không, binding
+> có gõ đúng tên thuộc tính không, ô có bị cắt không, và **kết quả ra bản vẽ/tệp có y hệt đường dòng
+> lệnh không**. Với mỗi mục dưới đây: chạy một lần bằng hộp thoại, một lần bằng
+> `XBOSS_UI_DIALOG=0`, rồi **so kết quả** (đối tượng vẽ ra, tệp xuất ra, sidecar) — phải trùng khít.
+
+43. **`XBOSS_LOGIN`.** Hiện đúng một ô "Địa chỉ server XBoss". Gõ `http://…` (không phải localhost)
+    → nút OK **khóa** kèm lý do "phải là https". Gõ đúng địa chỉ → OK → chạy tiếp đúng luồng ghép
+    thiết bị cũ (mã ghép + poll + tải rule pack + thư viện block).
+44. **`XBOSS_UPLOAD`.** Hộp thoại hiện tên DWG, 2 ô (số bản vẽ, rev) và dòng "Gửi kèm … sidecar".
+    - Chưa chạy `XBOSS_CHUANHOA`/`XBOSS_BOCKL_XUAT` → dòng đó nói "Không có sidecar nào" và có
+      **cảnh báo vàng**, nhưng OK **vẫn bấm được**.
+    - Sau khi chạy 2 lệnh đó → dòng liệt kê đủ 2 sidecar, không còn cảnh báo. Revision tạo ra trên
+      web giống hệt bản trước M106.
+45. **`XBOSS_CHUANHOA`.** Hộp thoại hiện danh sách nhóm lệch chuẩn (đúng các dòng vừa in ra dòng
+    lệnh) + cảnh báo "bản vẽ sẽ bị SỬA". Bản vẽ đã đạt chuẩn → lệnh dừng trước khi mở hộp thoại.
+    Bấm Hủy → bản vẽ **không đổi một nét**; bấm OK → `U` một lần trả nguyên trạng.
+46. **`XBOSS_BATCH`.** Hộp thoại 3 radio; đổi radio thì dòng mô tả đổi theo. Bấm OK → hiện
+    `FolderBrowserDialog` chọn thư mục **như cũ**, tiến trình vẫn in ra dòng lệnh như trước.
+47. **`XBOSS_BOCKL`.** Hộp thoại: 2 radio phạm vi + checkbox "Bóc theo vùng". Bật checkbox + chọn
+    "Chọn vùng" → sau OK phải hỏi **quét chọn** rồi mới hỏi **polyline ranh giới + tên vùng**, đúng
+    thứ tự cũ. Câu xác nhận "đánh dấu n đối tượng" vẫn ở dòng lệnh (số chỉ có sau khi bóc).
+48. **`XBOSS_BOCKL_XOA`.** 2 radio; chọn "Chọn vùng" → sau OK mới quét chọn. Số đối tượng gỡ dấu
+    trùng với đường dòng lệnh.
+49. **`XBOSS_BOCKL_XUAT`.** Hộp thoại: tên dự án + gói thầu (mồi sẵn giá trị lần trước) + checkbox
+    đối chiếu BOQ. Xoá trống một ô → OK khóa kèm lý do. Bật đối chiếu khi máy **chưa** `XBOSS_LOGIN`
+    → cảnh báo vàng nhưng vẫn xuất được Excel (không có sheet `Doi-chieu`). Bấm OK → `SaveFileDialog`
+    như cũ; **Excel + sidecar JSON phải trùng khít bản chạy bằng dòng lệnh**.
+50. **`XBOSS_VE_NEN`.** Combo hệ + dòng chỉ đọc "Khóa + làm mờ N% … tạo sẵn K layer đích của hệ X";
+    đổi hệ thì con số K đổi theo. Bấm OK → nền khóa/mờ đúng như trước. Chạy lệnh lần nữa → **hoàn
+    nguyên ngay, không mở hộp thoại** (đúng hành vi cũ).
+51. **`XBOSS_VE_NHAN` — tỉ lệ in vào hộp thoại (việc hẹn ở PR1).** Mở AutoCAD mới, chọn tuyến →
+    hộp thoại hiện combo "Tỉ lệ in 1:x" + dòng "Chữ nhãn cao a mm trên giấy ⇒ b mm trong mô hình";
+    đổi tỉ lệ thì b đổi ngay. **Lệnh vẽ đầu tiên của phiên chạy trọn bằng chuột.**
+    - Chạy tiếp `XBOSS_VE_TRANGIN` → ô tỉ lệ **mồi sẵn đúng giá trị vừa chọn** (một cơ chế nhớ duy
+      nhất — không được hỏi lại từ đầu, cũng không được lệch giá trị).
+52. **`XBOSS_VE_DOI`.** Chọn vài tuyến (trong đó có tuyến **đã bóc** và tuyến **đã chia đốt**) →
+    hộp thoại hiện: danh sách đang chọn, combo hệ/loại/size/độ dốc, và khối "Bấm OK sẽ:" liệt kê
+    gỡ dấu bóc / xóa vạch chia đốt / block đang bám. **Không còn câu hỏi `DongY/Huy` ở dòng lệnh.**
+    Bấm Hủy → bản vẽ không đổi. Bấm OK → kết quả trùng bản chạy bằng `XBOSS_UI_DIALOG=0`.
+53. **`XBOSS_VE_PHUKIEN` / `XBOSS_VE_THIETBI`.** Hộp thoại: combo hệ + combo block + dòng chỉ đọc
+    (tỉ lệ theo size / xoay theo tuyến / danh sách attribute). Đổi hệ → danh mục block đổi theo.
+    Bấm OK → vòng bấm điểm (và với thiết bị: góc → TAG → attribute từng cái) **giữ nguyên như cũ**.
+    - Hệ mà rule pack khai id thư viện chưa có → cảnh báo vàng liệt kê id thiếu, OK vẫn bấm được.
+54. **`XBOSS_VE_GIADO`.** Combo hệ + combo block giá đỡ + 2 radio cách chia + dòng chỉ đọc về
+    `supportSpacingMm`. Rule pack **v9** (đã khai `heavyFittingIds`) → **không** hiện checkbox phụ
+    kiện nặng, thay bằng dòng liệt kê id nặng. Thử với rule pack v6 → checkbox xuất hiện, mặc định
+    bật (đúng mặc định `Co` của dòng lệnh cũ).
+55. **`XBOSS_VE_LOCHO`.** 2 radio. Bản vẽ chưa có lỗ chờ nào mà chọn "Xuất bảng" → OK **khóa** kèm
+    lý do. Chọn "Chèn" → sau OK, chuỗi chọn tuyến → block sleeve → điểm xuyên → cao độ/kết cấu từng
+    lỗ **giữ nguyên như cũ**.
+56. **`XBOSS_VE_TAG`.** 4 radio; chọn "Đánh lại" thì khối phạm vi + ô Tầng **hiện ra**, các chế độ
+    khác thì ẩn. Ô Tầng mồi sẵn tầng đã nhớ trong bản vẽ; để trống → OK khóa. Bấm OK → danh sách
+    tag mới vẫn in ra dòng lệnh để xác nhận trước khi ghi. Đổi tầng rồi đóng/mở lại bản vẽ → tầng
+    mới được nhớ (ghi vào NOD như cũ, không sinh cơ chế nhớ thứ hai).
+57. **`XBOSS_VE_THONGKE`.** 3 radio + combo tỉ lệ; đổi radio thì dòng "nguồn dữ liệu" đổi theo.
+    Bảng cùng loại đã có sẵn → sau OK **không hỏi điểm đặt**, cập nhật bảng cũ tại chỗ.
+58. **`XBOSS_VE_MATCAT`.** Kẻ tuyến cắt qua 3–4 tuyến → hộp thoại hiện combo tỉ lệ + **một dòng cao
+    độ cho mỗi tuyến** (đúng thứ tự trái→phải, mồi sẵn giá trị lần trước), và tên mặt cắt tự đánh ở
+    dạng chỉ đọc. Gõ chữ vào một ô cao độ → OK khóa kèm tên đúng tuyến đó. Bấm OK → mới hỏi điểm
+    đặt hình cắt; hình cắt ra **trùng khít** bản chạy bằng dòng lệnh.
+59. **`XBOSS_VE_TRANGIN`.** Hộp thoại đủ: hệ, khổ giấy, tỉ lệ, 3 radio VP-freeze, combo CTB (mồi
+    sẵn bản đã nhớ, có mục "(giữ mặc định)"), và **các ô thông tin khung tên đổi theo khổ giấy**.
+    - Gõ giá trị vào ô khung tên rồi đổi khổ giấy → giá trị đã gõ **không bị mất**.
+    - Thư viện chưa có khung tên cho khổ đó → cảnh báo vàng, OK vẫn bấm được, layout + viewport vẫn
+      tạo.
+    - Bấm OK → mới hỏi vùng in (2 góc hoặc `RanhGioi`). Layout ra phải giống hệt bản dòng lệnh:
+      viewport khóa đúng tỉ lệ, `TI_LE`/`NGAY` do plugin tự điền, số layer VP-freeze bằng nhau.
+60. **`XBOSS_VE_DEXUAT` — bản WPF (AC8).** Hộp thoại mới **có đủ 6 trường** như bản WinForms: tên
+    block, loại, hệ, item bóc tách, khổ giấy, ghi chú.
+    - Đổi loại sang **Khung tên** → ô hệ và item **biến mất**, ô khổ giấy hiện ra; đổi ngược lại thì
+      ô khổ giấy biến mất. Giá trị của ô vừa ẩn phải bị **xóa** (không lén gửi lên server).
+    - Đặt tên trùng một block đã có trong thư viện (kể cả khác hoa/thường) → OK khóa kèm lý do.
+    - Gửi thành công → server tạo đúng một đề xuất, nội dung metadata giống hệt bản M103.
+    - **Không còn tệp `Ui/DeXuatBlockDialog.cs`** trong repo; palette `XBOSS_BANG` **vẫn là
+      WinForms** (đúng ranh giới công nghệ chốt ở AC8).
+61. **Đường lui FR9 cho cả loạt.** Đặt `setx XBOSS_UI_DIALOG 0`, mở lại AutoCAD, chạy lần lượt 20
+    lệnh ở mục 43–59: mỗi lệnh in một dòng `XBOSS_UI_DIALOG=0 — dùng hỏi đáp dòng lệnh…` rồi chạy
+    **đúng chuỗi hỏi đáp keyword như trước M106**.
+    - Riêng `XBOSS_VE_DEXUAT` (mục 60) **không có** đường dòng lệnh: nó in thông báo bảo bỏ biến
+      môi trường rồi dừng — đúng thiết kế, vì lệnh này chưa bao giờ có chế độ hỏi đáp keyword.
+    - Xóa biến (`setx XBOSS_UI_DIALOG ""`) → hộp thoại trở lại.
+62. **Hủy = dừng lệnh, không hỏi lại.** Với mỗi hộp thoại ở mục 43–60: bấm **Hủy** (hoặc `Esc`) →
+    lệnh dừng ngay, **không** rơi xuống hỏi lại bằng dòng lệnh, và bản vẽ/tệp không đổi gì.
+63. **Form dài vẫn dùng được.** Trên màn hình 1366×768, mở `XBOSS_VE_TRANGIN` (khung tên nhiều thẻ)
+    và `XBOSS_VE_MATCAT` với tuyến cắt qua ≥ 8 tuyến → vùng nội dung **cuộn được**, dải nút OK/Hủy
+    và vùng lý do luôn nhìn thấy, không trường nào bị đẩy khuất.
+
+### C8b. Theme tối của TỪNG control trong hộp thoại (M106 PR4 — sự cố ComboBox nền sáng)
+
+> **Bắt buộc verify tay, và là mục dễ lọt nhất của cả runbook.** Sự cố 2026-08-26: ComboBox của
+> `XBOSS_VE` hiện **nền sáng + chữ xám mờ**, trông y như đang bị khóa, trong khi tiêu đề/nhãn/nút
+> đều tối đúng. Nguyên nhân: ControlTemplate mặc định của WPF vẽ chrome bằng màu hard-code của
+> Windows và **bỏ qua `Background`** — đặt Setter màu suông là đặt vào hư không. Đã thay hẳn
+> ControlTemplate cho ComboBox/ComboBoxItem/TextBox/CheckBox/RadioButton/ScrollBar/Button.
+>
+> CI kẹp được gì: `ThemeHopThoaiTests` (Core/Tests) đọc chính tệp `XBossDialog.xaml` và bắt đỏ nếu
+> style màu không kèm `Template`, thiếu trạng thái khóa, `TargetName` trỏ hư không, tên brush gõ
+> sai, hoặc hardcode mã màu. **Không** kẹp được: cửa sổ trông thế nào. Mắt người vẫn là cổng cuối.
+
+64. **ComboBox — đi đủ 5 trạng thái.** Mở `XBOSS_VE` (3 combo: Hệ, Loại tuyến, Size):
+    - **Thường**: nền TỐI lõm, viền xám nhìn rõ, chữ sáng — đọc dễ như phần còn lại của cửa sổ.
+      Không được có bất kỳ mảng sáng nào.
+    - **Rê chuột**: viền sáng lên (chỉ viền, nền giữ nguyên).
+    - **Đang mở**: viền chuyển xanh lá; **danh sách xổ nền tối** (không phải nền trắng), mục đang
+      trỏ chuột nền xám sáng, **mục đang chọn nền xanh lá** — ba mức phân biệt được rõ.
+    - **Gõ tay được** (`IsEditable`, ô Size / Độ dốc / Tỉ lệ in): con trỏ nhấp nháy sáng, gõ
+      `777x333` thấy chữ rõ, bôi đen chữ thấy nền chọn xanh lá; bấm vào **mũi tên** vẫn xổ danh
+      sách, bấm vào **phần chữ** thì KHÔNG xổ (đúng như combo editable của Windows).
+    - **Bị khóa**: mở `XBOSS_VE_CHIADOT` với phạm vi "Chọn tay" → combo Hệ mờ đi; và trên bản vẽ
+      trộn nhiều loại tuyến → combo Kiểu nối mờ. Trạng thái mờ phải **khác hẳn** trạng thái thường
+      (nền phẳng hơn, viền gần như biến mất, chữ xám) — đây chính là chỗ đã hỏng.
+65. **Các control còn lại — cùng 5 trạng thái đó.**
+    - **Ô nhập** (`XBOSS_LOGIN`, `XBOSS_UPLOAD`, `XBOSS_VE_TAG` ô Tầng, ô Ghi chú nhiều dòng của
+      `XBOSS_VE_DEXUAT`): nền tối, viền rõ; rê chuột viền sáng, gõ chữ viền xanh lá. Ô một dòng
+      **không được** mọc thanh cuộn; ô Ghi chú gõ quá 3 dòng thì **phải** có thanh cuộn, và thanh
+      đó **tối** chứ không sáng.
+    - **Nút chọn tròn / ô tick** (`XBOSS_BATCH` 3 radio, `XBOSS_BOCKL` checkbox): ô rỗng nền tối
+      viền xám; **đã chọn thì nền xanh lá + dấu tick/chấm trắng**; bấm vào **chữ** cũng chọn được
+      (không chỉ mỗi ô nhỏ).
+    - **Thanh cuộn** (khối Xem trước của `XBOSS_VE_CHIADOT`, khung tên `XBOSS_VE_TRANGIN`): rãnh
+      tối, con trượt xám, rê chuột sáng lên. Không được còn thanh cuộn trắng kiểu Windows.
+    - **Nút OK/Hủy**: rê chuột — nút OK xanh **đậm** hơn, nút Hủy xám **sáng** hơn (đúng thiết kế,
+      không phải lỗi: xám đậm thêm sẽ chìm vào nền cửa sổ). Xóa trắng ô Size để nút OK khóa → nút
+      OK phải là **nền tối phẳng + chữ mờ**, không phải mảng sáng giữa hộp thoại tối.
+    - **Đi bằng bàn phím**: `Tab` qua từng ô — ô đang có focus phải nhìn ra ngay (viền xanh lá);
+      `Space`/mũi tên đổi được radio và xổ được combo.
+66. **Đọc được ở cả 100 % và 150 % DPI.** Lặp mục 64–65 ở Windows scale 100 % rồi 150 % (đăng xuất
+    đăng nhập lại cho ăn scale): viền 1 px không được biến mất, dấu tick/chấm không méo, mũi tên
+    combo không lệch khỏi ô, chữ trong ô không bị cắt chân. Nếu có màn hình phụ khác DPI, kéo cửa
+    sổ qua lại giữa hai màn.
+67. **Kết quả ra bản vẽ KHÔNG đổi.** PR4 chỉ đụng phần trình bày — chạy lại mục 33 (`XBOSS_VE`) và
+    mục 34 (`XBOSS_VE_CHIADOT`), đối chiếu `doi-chung/`: tuyến vẽ ra, số đốt, sidecar phải trùng
+    khít bản trước. Lệch một nét là có thứ ngoài trình bày đã bị đụng.
 
 ---
 
@@ -262,13 +558,16 @@ AutoCAD → `XBOSS_LOGIN`. Không cần cài .NET SDK, không cần repo.
 
 ## F. Sự cố thường gặp
 
-| Hiện tượng                                 | Nguyên nhân                                                 | Cách xử lý                                                                                          |
-| ------------------------------------------ | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `Không thấy acdbmgd.dll trong '...'`       | AutoCAD cài chỗ khác                                        | `-AcadDir "<đường dẫn>"`                                                                            |
-| `Thiếu .NET 10 SDK`                        | AutoCAD 2026 dùng Managed API .NET 10                       | `winget install Microsoft.DotNet.SDK.10`                                                            |
-| Build lỗi `CS1705 ... higher version`      | Đang build cho net8.0                                       | Adapter phải là `net10.0-windows` (đã đúng trong repo)                                              |
-| Ghi đè DLL thất bại                        | AutoCAD đang mở                                             | Đóng AutoCAD rồi chạy lại                                                                           |
-| Mở AutoCAD không thấy `[XBoss] ... đã nạp` | Bundle sai chỗ / thiếu tệp                                  | Kiểm `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle\PackageContents.xml` và thư mục `Contents` |
-| Có lệnh nhưng **không** có tab Ribbon      | Ribbon chưa sẵn sàng lúc nạp (plugin chờ `ItemInitialized`) | Đóng/mở lại AutoCAD; lệnh gõ tay vẫn chạy bình thường                                               |
-| Lệnh báo "chưa có rule pack"               | Chưa `XBOSS_LOGIN`/`XBOSS_RULEPACK`                         | Ghép thiết bị hoặc nạp rule pack tay                                                                |
-| Chữ tiếng Việt trong script vỡ             | `dong-goi.ps1` mất BOM UTF-8                                | Khôi phục BOM (bắt buộc cho PowerShell 5.1)                                                         |
+| Hiện tượng                                  | Nguyên nhân                                                                                       | Cách xử lý                                                                                                                                |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `Không thấy acdbmgd.dll trong '...'`        | AutoCAD cài chỗ khác                                                                              | `-AcadDir "<đường dẫn>"`                                                                                                                  |
+| `Thiếu .NET 10 SDK`                         | AutoCAD 2026 dùng Managed API .NET 10                                                             | `winget install Microsoft.DotNet.SDK.10`                                                                                                  |
+| Build lỗi `CS1705 ... higher version`       | Đang build cho net8.0                                                                             | Adapter phải là `net10.0-windows` (đã đúng trong repo)                                                                                    |
+| Ghi đè DLL thất bại                         | AutoCAD đang mở                                                                                   | Đóng AutoCAD rồi chạy lại                                                                                                                 |
+| Mở AutoCAD không thấy `[XBoss] ... đã nạp`  | Bundle sai chỗ / thiếu tệp                                                                        | Kiểm `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle\PackageContents.xml` và thư mục `Contents`                                       |
+| Có lệnh nhưng **không** có tab Ribbon       | Ribbon chưa sẵn sàng lúc nạp (plugin chờ `ItemInitialized`)                                       | Đóng/mở lại AutoCAD; lệnh gõ tay vẫn chạy bình thường                                                                                     |
+| Lệnh báo "chưa có rule pack"                | Chưa `XBOSS_LOGIN`/`XBOSS_RULEPACK`                                                               | Ghép thiết bị hoặc nạp rule pack tay                                                                                                      |
+| Chữ tiếng Việt trong script vỡ              | `dong-goi.ps1` mất BOM UTF-8                                                                      | Khôi phục BOM (bắt buộc cho PowerShell 5.1)                                                                                               |
+| Bảng `XBOSS_BANG` nền TRẮNG, chữ mờ khó đọc | Control con trong PaletteSet không kế thừa `BackColor` của UserControl, rơi về nền trắng hệ thống | Đặt `BackColor = MauBang.Nen` TƯỜNG MINH cho từng panel/nhãn, không dựa vào kế thừa (vá 2026-08-26)                                       |
+| Lệnh chết `eOnLockedLayer` / bỏ qua cả tệp  | Bản vẽ có layer đang khoá; sửa thực thể trên layer khoá là bị AutoCAD chặn                        | Pipeline chuẩn hoá tự mở khoá tạm rồi khoá lại trong `finally` (vá 2026-08-26). Còn gặp → xem dòng ⚠ "Không khoá lại được…" trong báo cáo |
+| Lệnh chết `eInvalidKey` trên bản vẽ có xref | Mở bản ghi bảng ký hiệu của xref (`IsDependent`) ở chế độ ghi — AutoCAD cấm                       | Mọi vòng duyệt bảng phải bỏ qua xref (vá 2026-08-26; test `XrefVaKhoaLayerTests` canh trên mã nguồn)                                      |

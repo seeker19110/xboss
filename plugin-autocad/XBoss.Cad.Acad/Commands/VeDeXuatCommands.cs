@@ -3,10 +3,11 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
-using XBoss.Cad.Acad.Ui;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Api;
 using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.RulePack;
+using XBoss.Cad.Core.Ui.ViewModels;
 
 [assembly: CommandClass(typeof(XBoss.Cad.Acad.Commands.VeDeXuatCommands))]
 
@@ -109,15 +110,26 @@ public sealed class VeDeXuatCommands
             $"\n[XBoss] Block: {info.TenBlock} · layer {info.Layer}" +
             $"{(info.ThuocTinh.Count > 0 ? $" · thuộc tính: {string.Join(", ", info.ThuocTinh)}" : " · không có thuộc tính")}\n");
 
-        // (4) Hộp thoại metadata (đoán sẵn hệ theo layer, item theo tên block).
-        var meta = DeXuatBlockDialog.Hoi(
+        // (4) Hộp thoại metadata WPF (M106 AC8 — bản chuyển của DeXuatBlockDialog WinForms M103):
+        //     giữ nguyên mọi trường và BlockDeXuatRules, đoán sẵn hệ theo layer, item theo tên block.
+        //     Đây là lệnh KHÔNG có đường hỏi đáp dòng lệnh từ M103 (metadata quá nhiều trường để
+        //     hỏi bằng keyword), nên UI hỏng = dừng lệnh kèm lý do, không có đường lui khác.
+        var vm = new DeXuatBlockDialogViewModel(
             info.TenBlock,
             thuVien.Blocks.Select(b => b.BlockName).ToList(),
-            pack.RulePack.LayerMap.Groups.Select(g => (Id: g.Id, Nhan: NhanHe(pack, g.Id))).ToList(),
+            pack.RulePack.LayerMap.Groups.Select(g => new MucChon<string>(g.Id, $"{g.Id} — {NhanHe(pack, g.Id)}")).ToList(),
             BlockUngVien.DoanHeTheoLayer(pack.RulePack.LayerMap, info.Layer),
             ItemDem(pack.RulePack.Takeoff),
             BlockUngVien.DoanItemTheoTenBlock(pack.RulePack.Takeoff, info.TenBlock),
             pack.SheetSetup.PaperSizes);
+        var (daDungUi, meta) = HopThoaiXBoss.Thu(ed, () => XBossDialog.Hoi(vm) ? vm.KetQua() : null);
+        if (!daDungUi)
+        {
+            ed.WriteMessage(
+                "\n[XBoss] XBOSS_VE_DEXUAT cần hộp thoại để nhập metadata — không có đường dòng lệnh thay thế. " +
+                "Bỏ XBOSS_UI_DIALOG=0 (hoặc dùng trang web /engineering/chuan-hoa-ban-ve) rồi chạy lại.\n");
+            return;
+        }
         if (meta is null)
         {
             ed.WriteMessage("\n[XBoss] Đã hủy hộp thoại — chưa gửi đề xuất nào.\n");
@@ -241,9 +253,9 @@ public sealed class VeDeXuatCommands
         pack.DrawTools.Systems.FirstOrDefault(s => string.Equals(s.Id, heId, StringComparison.Ordinal))?.Name ?? heId;
 
     /// <summary>Item bóc tách ĐẾM ĐƯỢC (measure=count) — chỉ loại này mới gắn với một block.</summary>
-    private static IReadOnlyList<(string Id, string Nhan)> ItemDem(TakeoffSection takeoff) =>
+    private static IReadOnlyList<MucChon<string>> ItemDem(TakeoffSection takeoff) =>
         takeoff.Items
             .Where(i => i.MeasureKind == TakeoffMeasure.Count)
-            .Select(i => (Id: i.Id, Nhan: $"{i.Name} ({i.Unit})"))
+            .Select(i => new MucChon<string>(i.Id, $"{i.Id} — {i.Name} ({i.Unit})"))
             .ToList();
 }

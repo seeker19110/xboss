@@ -7,16 +7,24 @@ namespace XBoss.Cad.Acad.Services;
 /// Dựng DrawingSnapshot thuần cho XBoss.Cad.Core từ bản vẽ thật (M99 §6.4):
 /// Adapter chỉ ĐỌC dữ liệu, mọi phán xét nằm ở Core.Inspector. Chỉ quét model space
 /// (paper space và nội dung xref ngoài phạm vi kiểm/chuẩn hóa — ADR-0006).
+///
+/// <para>MỌI thứ thuộc xref đều nằm ngoài snapshot (quy tắc dự án 2026-08-26, xem
+/// <see cref="ThuocXref"/>): layer phụ thuộc xref và khối chèn xref. Báo lỗi trên chúng là báo thứ
+/// kỹ sư không sửa được ở bản vẽ chủ, mà pipeline chuẩn hóa cũng bỏ qua đúng tập này — hai tầng
+/// lệch phạm vi thì "xem trước chuẩn hóa" báo lỗi mãi không hết. Số lượng bỏ qua đi kèm snapshot
+/// (<see cref="XrefBoQua"/>) để Inspector nói rõ phạm vi thay vì im lặng.</para>
 /// </summary>
 internal static class DrawingSnapshotBuilder
 {
     internal static DrawingSnapshot Build(Database db, Transaction tr)
     {
         var layers = new List<LayerInfo>();
+        var soLayerXref = 0;
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         foreach (ObjectId id in lt)
         {
             var ltr = (LayerTableRecord)tr.GetObject(id, OpenMode.ForRead);
+            if (ltr.IsDependent) { soLayerXref++; continue; }
             layers.Add(new LayerInfo
             {
                 Name = ltr.Name,
@@ -27,11 +35,13 @@ internal static class DrawingSnapshotBuilder
         }
 
         var entities = new List<EntityInfo>();
+        var soKhoiXref = 0;
         var ms = (BlockTableRecord)tr.GetObject(
             SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
         foreach (ObjectId id in ms)
         {
             if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
+            if (ThuocXref.KhoiChen(tr, ent)) { soKhoiXref++; continue; }
             ThuThap(tr, ent, entities);
         }
 
@@ -48,6 +58,9 @@ internal static class DrawingSnapshotBuilder
             if (btr.IsAnonymous && !btr.IsLayout) blockNacDanh.Add(btr.Name);
             foreach (ObjectId entId in btr)
             {
+                // CỐ Ý không lọc khối chèn xref ở đây: bản thân khối chèn là đối tượng của BẢN VẼ
+                // CHỦ nằm trên layer của bản vẽ chủ — bỏ nó đi thì layer đó bị báo "rỗng" và bước
+                // purge xóa mất layer đang thật sự có đối tượng.
                 if (tr.GetObject(entId, OpenMode.ForRead) is Entity ent) layerDangDung.Add(ent.Layer);
             }
         }
@@ -62,6 +75,9 @@ internal static class DrawingSnapshotBuilder
             UsedLayerNames = layerDangDung,
             AnonymousBlockNames = blockNacDanh,
             Tags = tags.Count > 0 ? tags : null,
+            XrefDaBoQua = soLayerXref + soKhoiXref > 0
+                ? new XrefBoQua { SoLayer = soLayerXref, SoKhoiChen = soKhoiXref }
+                : null,
         };
     }
 

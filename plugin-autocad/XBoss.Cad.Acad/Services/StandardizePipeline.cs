@@ -37,6 +37,11 @@ internal sealed class StandardizePipeline(CadRulePack pack)
     private readonly List<ObjectId> _xrefCanBind = [];
     /// <summary>Kế hoạch bước 11 lập trong transaction, áp sau khi commit.</summary>
     private KeHoachLayout _keHoachLayout = new();
+    /// <summary>Layer phụ thuộc xref đã bỏ qua (đếm MỘT lần ở bước 2 — mọi bước đụng bảng layer
+    /// đều bỏ qua đúng tập này), và khối chèn xref bỏ qua trong model space (đếm ở bước 4).
+    /// Báo gộp một dòng ở cuối <see cref="Run"/> thay vì mỗi bước một dòng.</summary>
+    private int _soLayerXref;
+    private int _soKhoiXref;
 
     internal IReadOnlyList<StepDiff> Steps => _steps;
     internal IReadOnlyList<string> CanhBao => _canhBao;
@@ -64,29 +69,106 @@ internal sealed class StandardizePipeline(CadRulePack pack)
 
     internal void Run(Database db, Transaction tr)
     {
-        Buoc2LayerMapping(db, tr);
-        Buoc3Font(db, tr);
-        var snapshot = DrawingSnapshotBuilder.Build(db, tr); // sau layer/font để số liệu Z/rác phản ánh hiện trạng
-        Buoc4Flatten(db, tr, snapshot);
-        Buoc5Overkill(db, tr, snapshot);
-        Buoc6Purge(db, tr);
-        Buoc7LineweightVaDimOverride(db, tr);
-        // v7 (M101 §6.2) — 4 bước mới, thứ tự cố định SAU lineweight/CTB, đều mặc định tắt.
-        Buoc8StyleMap(db, tr);
-        Buoc9Xref(db, tr);
-        Buoc10Hatch(db, tr);
-        Buoc11LapKeHoachLayout(db, tr);
-        // v8 (M102 §6.1/§6.2) — 2 bước mới, thứ tự cố định SAU layout, đều mặc định tắt.
-        Buoc12DongPolyline(db, tr);
-        Buoc13BlockMap(db, tr);
+        // Mở khóa TẠM trước khi áp bất cứ thay đổi nào: bản vẽ MEP thật luôn có layer khóa, mà mở
+        // một thực thể trên layer khóa ForWrite là ném eOnLockedLayer ⇒ chết cả tệp (thấy thật
+        // trên XBOSS_BATCH ngày 2026-08-26). finally KHÓA LẠI đúng những layer đã mở, kể cả khi
+        // một bước ném giữa chừng — đây là bản vẽ của kỹ sư, để lại layer mở khóa là lặng lẽ đổi
+        // trạng thái bản vẽ ngoài ý muốn.
+        var khongMoDuoc = new List<string>();
+        var daMoKhoa = VeLayerService.MoKhoaTam(db, tr, khongMoDuoc);
+        try
+        {
+            Buoc2LayerMapping(db, tr);
+            Buoc3Font(db, tr);
+            var snapshot = DrawingSnapshotBuilder.Build(db, tr); // sau layer/font để số liệu Z/rác phản ánh hiện trạng
+            Buoc4Flatten(db, tr, snapshot);
+            Buoc5Overkill(db, tr, snapshot);
+            Buoc6Purge(db, tr);
+            Buoc7LineweightVaDimOverride(db, tr);
+            // v7 (M101 §6.2) — 4 bước mới, thứ tự cố định SAU lineweight/CTB, đều mặc định tắt.
+            Buoc8StyleMap(db, tr);
+            Buoc9Xref(db, tr);
+            Buoc10Hatch(db, tr);
+            Buoc11LapKeHoachLayout(db, tr);
+            // v8 (M102 §6.1/§6.2) — 2 bước mới, thứ tự cố định SAU layout, đều mặc định tắt.
+            Buoc12DongPolyline(db, tr);
+            Buoc13BlockMap(db, tr);
+        }
+        finally
+        {
+            KhoaLaiSauKhiSua(tr, daMoKhoa, khongMoDuoc);
+            BaoPhanXrefDaBoQua();
+        }
+    }
+
+    /// <summary>
+    /// Trả cờ khóa của mọi layer đã mở tạm về nguyên trạng và BÁO phần chưa mở được. Nuốt lỗi
+    /// AutoCAD ở đây là cố ý: hàm chạy trong <c>finally</c>, ném thêm lỗi thứ hai sẽ che mất lỗi
+    /// thật đã làm hỏng pipeline (và lối thất bại luôn kết thúc bằng <c>Transaction.Abort</c> nên
+    /// cờ khóa cũng được rollback theo).
+    /// </summary>
+    private void KhoaLaiSauKhiSua(
+        Transaction tr, IReadOnlyList<VeLayerService.LayerDaMoKhoa> daMoKhoa, IReadOnlyList<string> khongMoDuoc)
+    {
+        if (khongMoDuoc.Count > 0)
+        {
+            // Layer xref KHÔNG rơi vào đây (bỏ qua có chủ đích, báo ở dòng tổng kết xref) — đây là
+            // layer của chính bản vẽ bị ứng dụng thứ ba giữ, tức là có đối tượng KHÔNG được chuẩn hóa.
+            _canhBao.Add(
+                $"{khongMoDuoc.Count} layer đang KHÓA mà không mở khóa được: {string.Join(", ", khongMoDuoc)} — " +
+                "đối tượng trên các layer đó giữ nguyên, chưa được chuẩn hóa.");
+        }
+        if (daMoKhoa.Count == 0) return;
+
+        var thatBai = new List<string>();
+        try
+        {
+            VeLayerService.KhoaLai(tr, daMoKhoa, thatBai);
+        }
+        catch (Autodesk.AutoCAD.Runtime.Exception e)
+        {
+            _canhBao.Add(
+                $"Không khóa lại được layer sau khi chuẩn hóa ({e.Message}) — kiểm lại cờ khóa layer trước khi lưu.");
+            return;
+        }
+        if (thatBai.Count > 0)
+        {
+            _canhBao.Add(
+                $"Không khóa lại được {thatBai.Count} layer đã mở tạm để sửa: {string.Join(", ", thatBai)} — " +
+                "khóa tay lại (lệnh LAYER) trước khi lưu.");
+        }
+    }
+
+    /// <summary>
+    /// Một dòng tổng kết phần thuộc xref mà pipeline CỐ Ý không đụng (quy tắc dự án 2026-08-26:
+    /// "xref thì bỏ qua hết"). Im lặng ở đây là để kỹ sư tưởng cả bản vẽ đã được chuẩn hóa.
+    /// </summary>
+    private void BaoPhanXrefDaBoQua()
+    {
+        if (_soLayerXref == 0 && _soKhoiXref == 0) return;
+        var phan = new List<string>();
+        if (_soLayerXref > 0) phan.Add($"{_soLayerXref} layer của xref");
+        if (_soKhoiXref > 0) phan.Add($"{_soKhoiXref} khối chèn xref");
+        _canhBao.Add(
+            $"KHÔNG đụng gì thuộc xref (quy ước dự án): bỏ qua {string.Join(" và ", phan)}. " +
+            "Nội dung xref phải chuẩn hóa trong chính tệp tham chiếu rồi reload.");
     }
 
     private void Buoc2LayerMapping(Database db, Transaction tr)
     {
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         var tenHienCo = new List<string>();
+        var soXref = 0;
         foreach (ObjectId id in lt)
-            tenHienCo.Add(((LayerTableRecord)tr.GetObject(id, OpenMode.ForRead)).Name);
+        {
+            var ltr = (LayerTableRecord)tr.GetObject(id, OpenMode.ForRead);
+            // Layer của xref (vd "KT-NEN|A-WALL") KHÔNG đổi tên/gộp được: mở ForWrite là eInvalidKey
+            // và cả lệnh rollback. Cũng không nên đổi — tên layer là quy ước của tệp xref, sửa ở bản
+            // vẽ chủ thì lần reload xref là mất (quy tắc "xref thì bỏ qua hết", 2026-08-26).
+            if (ltr.IsDependent) { soXref++; continue; }
+            tenHienCo.Add(ltr.Name);
+        }
+        _soLayerXref = soXref;
         var plan = _mapper.MapAll(tenHienCo);
         if (plan.Count == 0) return;
 
@@ -173,7 +255,11 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         string? font = null;
         if (!styleId.IsNull && tr.GetObject(styleId, OpenMode.ForRead) is TextStyleTableRecord ts)
             font = string.IsNullOrEmpty(ts.Font.TypeFace) ? ts.FileName : ts.Font.TypeFace;
-        var kind = VietnameseTextConverter.DetectFontKind(font);
+        // DÙNG CHUNG tiêu chí với phép kiểm 4 (`ContainsLegacyEncoding`): nhìn cả tên font LẪN nội
+        // dung. Chỉ nhìn tên font thì bản vẽ khai text style bằng font Unicode mà nội dung vẫn là
+        // mã TCVN3 sẽ bị phép kiểm BÁO nhưng bước 3 KHÔNG SỬA — kỹ sư chuẩn hóa xong kiểm lại vẫn
+        // thấy y nguyên số lỗi cũ (gặp thật 2026-08-26: báo 141 text, sửa 0).
+        var kind = _fonts.KindDeSua(hienTai, font);
         // Kiểu chữ nào ĐANG mang mã cũ thì phải đổi font sang Unicode ở cuối bước 3 — nếu không,
         // nội dung đã đúng mà AutoCAD vẫn hiển thị sai (AC2 không đạt dù dữ liệu đúng).
         if (kind != LegacyFontKind.None && !styleId.IsNull) _styleMaCu.Add(styleId);
@@ -207,6 +293,7 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         foreach (var id in _styleMaCu)
         {
             if (tr.GetObject(id, OpenMode.ForRead) is not TextStyleTableRecord ts) continue;
+            if (ts.IsDependent) continue; // kiểu chữ đến từ xref — mở ForWrite là eInvalidKey
             ts.UpgradeOpen();
             // TrueType: đặt qua FontDescriptor (TypeFace), không phải FileName của SHX.
             // Ghi đủ tên: `using Autodesk.AutoCAD.GraphicsInterface` sẽ làm `Polyline` (và vài
@@ -232,13 +319,18 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         var toMm = XBoss.Cad.Core.Geometry.DrawingUnits.TuInsUnits(snapshot.InsUnits).ToMm;
         var zTol = pack.InspectionPolicy.ZToleranceMm / toMm;
         var soEp = 0;
+        var soKhoiXref = 0;
         var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
         foreach (ObjectId id in ms)
         {
             if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
+            // Khối chèn xref: ép Z của nó là DỜI cả bản vẽ tham chiếu so với nét kỹ sư đã căn
+            // theo — chỗ đặt xref là quyết định của người dựng bản vẽ, không phải rác hình học.
+            if (ThuocXref.KhoiChen(tr, ent)) { soKhoiXref++; continue; }
             if (!EpPhang(ent, zTol)) continue;
             soEp++;
         }
+        _soKhoiXref = soKhoiXref;
         if (soEp > 0)
             _steps.Add(new StepDiff { Buoc = "4. Flatten", HangMuc = "Ép Z về 0 (WCS)", Truoc = "Z≠0", Sau = "Z=0", SoLuong = soEp });
     }
@@ -341,6 +433,9 @@ internal sealed class StandardizePipeline(CadRulePack pack)
                 foreach (ObjectId id in lt)
                 {
                     var ltr = (LayerTableRecord)tr.GetObject(id, OpenMode.ForRead);
+                    // Layer của xref không phải rác của bản vẽ này: nó biến mất khi detach xref,
+                    // còn Erase thẳng thì AutoCAD từ chối (eInvalidKey) và hỏng cả lệnh.
+                    if (ltr.IsDependent) continue;
                     if (ltr.Name is "0" or "Defpoints" || id == db.Clayer) continue;
                     ungVien.Add(id);
                 }
@@ -351,7 +446,10 @@ internal sealed class StandardizePipeline(CadRulePack pack)
                 foreach (ObjectId id in bt)
                 {
                     var btr = (BlockTableRecord)tr.GetObject(id, OpenMode.ForRead);
-                    if (btr.IsLayout || btr.IsFromExternalReference || btr.IsFromOverlayReference) continue;
+                    // IsDependent = định nghĩa block ĐI KÈM xref ("KT-NEN|CUA-DI") — cùng lý do
+                    // với layer xref ở trên: không phải rác của bản vẽ chủ, và không xóa được.
+                    if (btr.IsLayout || btr.IsFromExternalReference || btr.IsFromOverlayReference ||
+                        btr.IsDependent) continue;
                     ungVien.Add(id);
                 }
             }
@@ -377,6 +475,9 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         foreach (ObjectId id in lt)
         {
             var ltr = (LayerTableRecord)tr.GetObject(id, OpenMode.ForRead);
+            // Layer xref: đặt lineweight là mở symbol table record của xref ForWrite ⇒ eInvalidKey,
+            // rollback cả lệnh. Nét của xref là chuẩn của tệp tham chiếu, không phải của bản vẽ này.
+            if (ltr.IsDependent) continue;
             var quyDinh = pack.LineweightMap.ByAci.FirstOrDefault(c => c.Aci == ltr.Color.ColorIndex);
             if (quyDinh is null) continue; // ACI không có quy định — không bịa (rule pack note)
             var lwMoi = (LineWeight)(int)Math.Round(quyDinh.LineweightMm * 100);
@@ -425,6 +526,7 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         foreach (ObjectId id in tst)
         {
             var ts = (TextStyleTableRecord)tr.GetObject(id, OpenMode.ForRead);
+            if (ts.IsDependent) continue; // kiểu chữ của xref: không sửa được, cũng không phải chuẩn của bản vẽ này
             idKieuChu[ts.Name] = id;
             kieuChu.Add(new KieuChuHienCo
             {
@@ -441,6 +543,7 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         foreach (ObjectId id in dst)
         {
             var ds = (DimStyleTableRecord)tr.GetObject(id, OpenMode.ForRead);
+            if (ds.IsDependent) continue; // như kiểu chữ xref ở trên
             idKieuDim[ds.Name] = id;
             kieuDim.Add(new KieuKichThuocHienCo
             {
@@ -551,11 +654,15 @@ internal sealed class StandardizePipeline(CadRulePack pack)
             if (td.Loai == LoaiStyle.KieuChu)
             {
                 if (!idKieuChu.TryGetValue(td.StyleMoi, out var idStyle)) continue;
+                // AttributeReference KẾ THỪA DBText trong ObjectARX, nên phải xét TRƯỚC — đặt sau
+                // thì nhánh của nó là mã chết (CS8120 chặn build thật, chứ không im lặng bỏ qua).
+                // Cả ba nhánh làm cùng một việc nên hành vi không đổi; giữ tường minh để lần sau
+                // muốn xử lý attribute khác text thường thì có sẵn chỗ.
                 switch (tr.GetObject(entId, OpenMode.ForRead))
                 {
+                    case AttributeReference ar: ar.UpgradeOpen(); ar.TextStyleId = idStyle; soChu++; break;
                     case DBText t: t.UpgradeOpen(); t.TextStyleId = idStyle; soChu++; break;
                     case MText m: m.UpgradeOpen(); m.TextStyleId = idStyle; soChu++; break;
-                    case AttributeReference ar: ar.UpgradeOpen(); ar.TextStyleId = idStyle; soChu++; break;
                 }
             }
             else
@@ -628,9 +735,20 @@ internal sealed class StandardizePipeline(CadRulePack pack)
             if (!idTheoTen.TryGetValue(td.Ten, out var id)) continue;
             if (td.DuongDanMoi is { } duongDanMoi)
             {
-                var btr = (BlockTableRecord)tr.GetObject(id, OpenMode.ForWrite);
-                btr.PathName = duongDanMoi;
-                soDoiDuongDan++;
+                // ĐÂY là ngoại lệ có chủ đích của quy tắc "bỏ qua xref": bản ghi đang sửa nằm trong
+                // BẢN VẼ CHỦ (đường dẫn tham chiếu), nội dung tệp xref không bị đụng — mà tương đối
+                // hóa đường dẫn chính là việc bước 9 sinh ra để làm. Từng xref bọc riêng: một xref
+                // khó tính (đang mở/không cho sửa) không được kéo cả lệnh chuẩn hóa xuống.
+                try
+                {
+                    var btr = (BlockTableRecord)tr.GetObject(id, OpenMode.ForWrite);
+                    btr.PathName = duongDanMoi;
+                    soDoiDuongDan++;
+                }
+                catch (Autodesk.AutoCAD.Runtime.Exception e)
+                {
+                    _canhBao.Add($"Không đổi được đường dẫn xref \"{td.Ten}\" ({e.Message}) — giữ nguyên đường dẫn cũ.");
+                }
             }
             if (td.Bind) _xrefCanBind.Add(id);
         }
@@ -884,7 +1002,9 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         foreach (ObjectId btrId in bt)
         {
             var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
-            if (btr.IsFromExternalReference) continue;
+            // Định nghĩa của xref (kể cả block con đi kèm xref) không được làm block ĐÍCH: khối chèn
+            // trỏ sang đó là nhân bản nội dung tham chiếu vào bản vẽ chủ.
+            if (btr.IsFromExternalReference || btr.IsDependent) continue;
             idDinhNghia[btr.Name] = btrId;
         }
         foreach (ObjectId btrId in bt)
@@ -898,6 +1018,9 @@ internal sealed class StandardizePipeline(CadRulePack pack)
                 // định nghĩa GỐC nằm ở DynamicBlockTableRecord — đọc nhầm chỗ thì mọi block động
                 // đều bị coi là nặc danh (đúng cách VeTagCommands.DocTag đang đọc).
                 if (tr.GetObject(br.DynamicBlockTableRecord, OpenMode.ForRead) is not BlockTableRecord dn) continue;
+                // Khối chèn XREF: trỏ nó sang block thư viện là thay cả bản vẽ tham chiếu bằng một
+                // ký hiệu — mất nền kiến trúc/kết cấu. Đã đếm ở bước 4, báo gộp cuối lệnh.
+                if (dn.IsFromExternalReference || dn.IsFromOverlayReference) continue;
                 if (string.IsNullOrWhiteSpace(dn.Name)) continue;
                 var handle = br.Handle.ToString();
                 idTheoHandle[handle] = entId;

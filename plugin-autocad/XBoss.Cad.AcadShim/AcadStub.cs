@@ -195,6 +195,9 @@ namespace Autodesk.AutoCAD.DatabaseServices
         // chỗ dùng duy nhất là truyền `ObjectId.Null` làm đối số (StandardizePipeline).
         public static ObjectId Null => new ObjectId();
         public bool IsNull => false;
+        /// <summary>ObjectARX thật: đối tượng đã bị xóa — phải kiểm trước khi mở, mở ForWrite một
+        /// id đã xóa là ném lỗi. Dùng khi khôi phục trạng thái khóa layer sau chuẩn hóa.</summary>
+        public bool IsErased => false;
         public Handle Handle => new Handle(1);
         public DBObject GetObject(OpenMode mode) => null;
         public static bool operator ==(ObjectId a, ObjectId b) => true;
@@ -240,6 +243,9 @@ namespace Autodesk.AutoCAD.DatabaseServices
     public class Entity : DBObject
     {
         public string Layer { get; set; }
+        // ObjectARX thật có CẢ hai: Layer (tên) và LayerId (ObjectId của LayerTableRecord). Mã
+        // Adapter lọc layer theo ObjectId (tên có thể bị bước chuẩn hóa đổi giữa chừng).
+        public ObjectId LayerId => new ObjectId();
         public Color Color { get; set; }
         public Extents3d GeometricExtents => new Extents3d(new Point3d(0, 0, 0), new Point3d(0, 0, 0));
         public void IntersectWith(Entity ent, Intersect type, Point3dCollection points, IntPtr thisGsMarker, IntPtr otherGsMarker) { }
@@ -275,12 +281,14 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public bool Constant => false;
     }
 
-    public class AttributeReference : Entity
+    // ObjectARX thật: AttributeReference KẾ THỪA DBText (không phải Entity trực tiếp). Giữ đúng
+    // quan hệ này là bắt buộc, không phải chi tiết trang trí: `switch` có `case DBText` đứng trước
+    // `case AttributeReference` là nhánh CHẾT (CS8120) trên bản build thật, mà stub khai sai cây
+    // kế thừa thì cổng CI thấy hai nhánh rời nhau và cho qua — đã lọt thật xuống máy có AutoCAD
+    // ngày 2026-08-26 (StandardizePipeline.cs). Thêm kiểu stub nào cũng phải tra đúng lớp cha.
+    public class AttributeReference : DBText
     {
         public string Tag { get; set; }
-        public string TextString { get; set; }
-        public Point3d Position { get; set; }
-        public ObjectId TextStyleId { get; set; }
         public void SetAttributeFromBlock(AttributeDefinition ad, Matrix3d blockTransform) { }
     }
 
@@ -403,6 +411,15 @@ namespace Autodesk.AutoCAD.DatabaseServices
     public class SymbolTableRecord : DBObject
     {
         public string Name { get; set; }
+
+        /// <summary>
+        /// ObjectARX thật: bản ghi đến từ XREF (layer/kiểu chữ/kiểu kích thước/block "TEP|TEN") —
+        /// KHÔNG sửa được, mở ForWrite ném eInvalidKey. Khai ở LỚP CHA vì API thật đặt ở
+        /// <c>AcDbSymbolTableRecord::isDependent()</c>: khai riêng cho LayerTableRecord thì mã bỏ
+        /// qua xref cho kiểu chữ/kiểu kích thước/block sẽ không biên dịch được trên cổng dù bản
+        /// thật chạy tốt (cây kế thừa của stub là một phần hợp đồng của cổng).
+        /// </summary>
+        public bool IsDependent { get; set; }
     }
 
     public class LayerTableRecord : SymbolTableRecord
@@ -414,7 +431,12 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public bool IsPlottable { get; set; }
         public Transparency Transparency { get; set; }
         public LineWeight LineWeight { get; set; }
+        /// <summary>Kiểu nét của layer (M105: layer vạch chia đốt lấy linetype từ rule pack).</summary>
+        public ObjectId LinetypeObjectId { get; set; }
     }
+
+    /// <summary>Một kiểu nét đã nạp trong bản vẽ (acdbmgd: LinetypeTableRecord).</summary>
+    public class LinetypeTableRecord : SymbolTableRecord { }
 
     public class RegAppTableRecord : SymbolTableRecord { }
 
@@ -468,6 +490,8 @@ namespace Autodesk.AutoCAD.DatabaseServices
     }
 
     public class LayerTable : SymbolTable { }
+
+    public class LinetypeTable : SymbolTable { }
 
     public class RegAppTable : SymbolTable { }
 
@@ -649,6 +673,7 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public void Dispose() { }
         public TransactionManager TransactionManager => new TransactionManager();
         public ObjectId LayerTableId => new ObjectId();
+        public ObjectId LinetypeTableId => new ObjectId();
         public ObjectId BlockTableId => new ObjectId();
         public ObjectId RegAppTableId => new ObjectId();
         public ObjectId NamedObjectsDictionaryId => new ObjectId();
@@ -825,10 +850,24 @@ namespace Autodesk.AutoCAD.ApplicationServices
         public void SendStringToExecute(string command, bool activate, bool wrapUpInactiveDoc, bool echoCommand) { }
     }
 
+    /// <summary>acmgd: đối số của các sự kiện cấp tài liệu (DocumentCreated/Activated/…).</summary>
+    public class DocumentCollectionEventArgs : EventArgs
+    {
+        public Document Document => new Document();
+    }
+
+    public delegate void DocumentCollectionEventHandler(object sender, DocumentCollectionEventArgs e);
+
     public class DocumentCollection : IEnumerable
     {
         public Document MdiActiveDocument => new Document();
         public IEnumerator GetEnumerator() => new List<Document>().GetEnumerator();
+
+        /// <summary>
+        /// acmgd: <c>public event DocumentCollectionEventHandler DocumentActivated</c> — bắn trên
+        /// luồng chính khi kỹ sư chuyển sang tab bản vẽ khác (M106: bảng điều khiển tính lại).
+        /// </summary>
+        public event DocumentCollectionEventHandler DocumentActivated { add { } remove { } }
     }
 
     public static class Application
@@ -842,6 +881,13 @@ namespace Autodesk.AutoCAD.ApplicationServices
         /// </summary>
         public static System.Windows.Forms.DialogResult ShowModalDialog(System.Windows.Forms.Form formToShow) =>
             System.Windows.Forms.DialogResult.Cancel;
+
+        /// <summary>
+        /// acmgd: <c>public static bool? ShowModalWindow(System.Windows.Window window)</c> — bản WPF
+        /// của ShowModalDialog, AutoCAD tự đặt cửa sổ chính làm chủ (M106 FR3). Trả
+        /// <c>Window.DialogResult</c>, nên <c>null</c> = cửa sổ bị đóng mà không đặt kết quả.
+        /// </summary>
+        public static bool? ShowModalWindow(System.Windows.Window window) => null;
     }
 
     namespace Core
@@ -991,13 +1037,19 @@ namespace System.Windows.Forms
 
     public class Control : IDisposable
     {
-        public class ControlCollection
+        // Duyệt được: mã Adapter lặp `foreach (Control con in cha.Controls)` để ngắt dòng lại theo
+        // bề rộng palette. Stub không duyệt được thì cổng đỏ giả ở một tính năng chạy đúng.
+        public class ControlCollection : IEnumerable<Control>
         {
             public void Add(Control value) { }
             public void Clear() { }
+            public IEnumerator<Control> GetEnumerator() => new List<Control>().GetEnumerator();
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
 
         public ControlCollection Controls { get; } = new ControlCollection();
+        public System.Drawing.Size ClientSize { get; set; }
+        public bool HasChildren => false;
         public System.Drawing.Color BackColor { get; set; }
         public System.Drawing.Color ForeColor { get; set; }
         public DockStyle Dock { get; set; }
@@ -1016,6 +1068,10 @@ namespace System.Windows.Forms
         public void SuspendLayout() { }
         public void ResumeLayout() { }
         public void Dispose() { }
+
+        /// <summary>WinForms thật: <c>protected virtual void OnResize(EventArgs)</c> — Adapter
+        /// override để ngắt dòng lại khi kỹ sư kéo rộng/hẹp palette.</summary>
+        protected virtual void OnResize(EventArgs e) { }
     }
 
     public class ScrollableControl : Control
@@ -1067,7 +1123,6 @@ namespace System.Windows.Forms
         public FormStartPosition StartPosition { get; set; }
         public bool MaximizeBox { get; set; }
         public bool MinimizeBox { get; set; }
-        public System.Drawing.Size ClientSize { get; set; }
         public IButtonControl AcceptButton { get; set; }
         public IButtonControl CancelButton { get; set; }
         public DialogResult DialogResult { get; set; }
@@ -1116,4 +1171,12 @@ namespace System.Drawing
         public Font(string familyName, float emSize) { }
         public Font(string familyName, float emSize, FontStyle style) { }
     }
+
+    // Brush/Pen KHÔNG được mã Adapter dùng tới — stub ở đây chỉ để TÁI HIỆN CẶP TÊN TRÙNG giữa
+    // System.Drawing (WinForms) và System.Windows.Media (WPF). Không có chúng, cổng CI chỉ thấy
+    // một nửa bộ implicit using của bản build thật và bỏ lọt CS0104 "ambiguous reference" — đúng
+    // lỗi đã lọt xuống máy có AutoCAD ngày 2026-08-26 (MauBangWpf.cs). Xóa 2 lớp này = mở lại lỗ.
+    public abstract class Brush { }
+
+    public class Pen { }
 }

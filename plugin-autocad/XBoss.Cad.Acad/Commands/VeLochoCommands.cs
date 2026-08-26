@@ -4,9 +4,11 @@ using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Excel;
 using XBoss.Cad.Core.Geometry;
+using XBoss.Cad.Core.Ui.ViewModels;
 
 using ChoChen = XBoss.Cad.Acad.Services.BlockLibraryService.KhoiChoChen;
 
@@ -35,15 +37,40 @@ public sealed class VeLochoCommands
         if (VeContext.SanSang() is not (var doc, var ed)) return;
         if (VeContext.CanDrawTools(ed) is not { } pack) return;
 
+        // Chọn chế độ bằng hộp thoại (M106 §7.2); UI hỏng / XBOSS_UI_DIALOG=0 → keyword cũ (FR9).
+        if (HoiCheDo(doc.Database, ed) is not { } cheDo) return;
+
+        if (cheDo == CheDoLoCho.XuatBang) XuatBang(doc, ed, pack);
+        else Chen(doc, ed, pack);
+    }
+
+    /// <summary>
+    /// Chèn hay xuất bảng. Số lỗ chờ đã có được đếm TRƯỚC (transaction chỉ đọc) để hộp thoại khóa
+    /// được nút OK khi chưa có lỗ chờ nào mà kỹ sư chọn "xuất bảng" (FR2).
+    /// </summary>
+    private static CheDoLoCho? HoiCheDo(Database db, Editor ed)
+    {
+        int soLoCho;
+        using (var tr = db.TransactionManager.StartTransaction())
+        {
+            soLoCho = DocLoCho(db, tr).Count;
+            tr.Commit();
+        }
+
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new LoChoDialogViewModel(soLoCho);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi) return kq?.CheDo;
+
         var hoi = new PromptKeywordOptions("\n[XBoss] Lỗ chờ/sleeve — làm gì?") { AllowNone = false };
         hoi.Keywords.Add("CHEN", "CHEN", "Chèn sleeve tại chỗ xuyên kết cấu");
         hoi.Keywords.Add("XUATBANG", "XUATBANG", "Xuất bảng lỗ chờ (Table + Excel)");
         hoi.Keywords.Default = "CHEN";
-        var kq = ed.GetKeywords(hoi);
-        if (kq.Status != PromptStatus.OK) return;
-
-        if (kq.StringResult == "XUATBANG") XuatBang(doc, ed, pack);
-        else Chen(doc, ed, pack);
+        var traLoi = ed.GetKeywords(hoi);
+        if (traLoi.Status != PromptStatus.OK) return null;
+        return traLoi.StringResult == "XUATBANG" ? CheDoLoCho.XuatBang : CheDoLoCho.Chen;
     }
 
     // ===== Chế độ CHÈN =====

@@ -1,7 +1,9 @@
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Draw;
+using XBoss.Cad.Core.Ui.ViewModels;
 
 [assembly: CommandClass(typeof(XBoss.Cad.Acad.Commands.VeNenCommands))]
 
@@ -39,8 +41,9 @@ public sealed class VeNenCommands
             return;
         }
 
-        // (2) Hỏi hệ NGOÀI transaction (không giữ transaction mở trong lúc chờ người dùng).
-        var he = VeContext.HoiHe(ed, pack, batBuocHoiLai: true);
+        // (2) Hỏi hệ NGOÀI transaction (không giữ transaction mở trong lúc chờ người dùng):
+        //     hộp thoại trước (M106 §7.2), rơi về câu hỏi keyword cũ khi UI hỏng/bị tắt (FR9).
+        var he = HoiHe(ed, pack);
         if (he is null)
         {
             ed.WriteMessage("\n[XBoss] Đã hủy — bản vẽ không thay đổi.\n");
@@ -50,6 +53,7 @@ public sealed class VeNenCommands
         // (3) Áp nền: 1 transaction = 1 nhóm UNDO.
         var daTao = new List<string>();
         var coSanNoiDung = new List<string>();
+        var boQuaLayer = new List<string>();
         var soLayerNen = 0;
         using (var khoa = doc.LockDocument())
         using (var tr = db.TransactionManager.StartTransaction())
@@ -57,7 +61,8 @@ public sealed class VeNenCommands
             try
             {
                 var clayerCu = ((LayerTableRecord)tr.GetObject(db.Clayer, OpenMode.ForRead)).Name;
-                var trangThaiCu = VeLayerService.KhoaVaLamMo(db, tr, pack.DrawTools.BaseFadePct);
+                var trangThaiCu = VeLayerService.KhoaVaLamMo(
+                    db, tr, pack.DrawTools.BaseFadePct, boQuaLayer);
                 soLayerNen = trangThaiCu.Count;
 
                 ObjectId? layerVeDauTien = null;
@@ -100,8 +105,44 @@ public sealed class VeNenCommands
             : "[XBoss] Layer đích đã có sẵn đủ.\n");
         foreach (var l in coSanNoiDung)
             ed.WriteMessage($"[XBoss] ⚠ Layer đích \"{l}\" đã có đối tượng cũ — nên chạy XBOSS_CHUANHOA trước khi vẽ.\n");
+        if (boQuaLayer.Count > 0)
+        {
+            // Nói thật là chưa bảo vệ hết: layer xref không khóa/làm mờ được, nên nét nền trên đó
+            // vẫn đậm và vẫn chọn trúng khi kỹ sư quét chọn. Im lặng ở đây là để kỹ sư tưởng cả
+            // bản vẽ đã được che.
+            ed.WriteMessage(
+                $"[XBoss] ⚠ {boQuaLayer.Count} layer KHÔNG khóa/làm mờ được (layer của xref — AutoCAD " +
+                "không cho sửa): nét nền trên đó vẫn đậm. Cần che hẳn thì tắt/unload xref khi vẽ.\n");
+        }
         ed.WriteMessage(
             "[XBoss] Vẽ tuyến: XBOSS_VE · Ghi nhãn: XBOSS_VE_NHAN · Xong hệ: chạy lại XBOSS_VE_NEN để hoàn nguyên.\n");
+    }
+
+    /// <summary>
+    /// Hệ sắp vẽ. Hộp thoại (M106 §7.2) hiện luôn mức làm mờ + số layer đích ở dạng CHỈ ĐỌC; UI
+    /// không dựng được hoặc <c>XBOSS_UI_DIALOG=0</c> thì về ĐÚNG câu hỏi keyword cũ (FR9). Cả hai
+    /// đường đều ghi nhớ hệ vào <see cref="VeContext"/> (FR4).
+    /// </summary>
+    private static DrawSystem? HoiHe(Autodesk.AutoCAD.EditorInput.Editor ed, DrawToolsPack pack)
+    {
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new VeNenDialogViewModel(
+                pack.DrawTools.Systems, pack.DrawTools.BaseFadePct, VeContext.He?.Id);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (!daDungUi) return VeContext.HoiHe(ed, pack, batBuocHoiLai: true);
+        if (kq is null) return null;
+        // Đổi hệ ⇒ loại tuyến/size/độ dốc cũ không còn ý nghĩa (đúng luật của VeContext.HoiHe).
+        if (VeContext.He?.Id != kq.He.Id)
+        {
+            VeContext.Tuyen = null;
+            VeContext.Size = null;
+            VeContext.SizeTuNhap = false;
+            VeContext.DoDoc = null;
+        }
+        VeContext.He = kq.He;
+        return kq.He;
     }
 
     private static void HoanNguyen(

@@ -1,6 +1,7 @@
 using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Matching;
 using XBoss.Cad.Core.RulePack;
+using System.Text.Json.Nodes;
 using Xunit;
 
 namespace XBoss.Cad.Tests;
@@ -189,7 +190,11 @@ public class DrawToolsConfigTests
     [Fact]
     public void Bat_loi_phu_kien_nang_troi_khoi_fittings()
     {
-        var json = JsonHienHanh().Replace("\"heavyFittingIds\": [\"valve-gate\"", "\"heavyFittingIds\": [\"van-ma\"");
+        // Sửa qua JsonNode, KHÔNG Replace chuỗi thô (prettier format lại tệp là chuỗi tìm gãy im
+        // lặng — v9 đã làm gãy đúng như vậy, test tưởng xanh mà không đổi được gì).
+        var goc = JsonNode.Parse(JsonHienHanh())!.AsObject();
+        goc["drawTools"]!["heavyFittingIds"] = new JsonArray("van-ma");
+        var json = goc.ToJsonString();
         var loi = Assert.Throws<RulePackException>(() => DrawToolsConfig.Load(json));
         Assert.Contains("van-ma", loi.Message);
         Assert.Contains("fittings", loi.Message);

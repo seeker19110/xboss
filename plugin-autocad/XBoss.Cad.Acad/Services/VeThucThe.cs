@@ -71,6 +71,77 @@ internal static class VeThucThe
         }
     }
 
+    /// <summary>
+    /// Vạch chia + tag đốt (<c>XBOSS_VE_CHIADOT</c> — M105) nhóm theo handle tuyến tim mà chúng
+    /// bám vào. Quét MỘT lần cho cả lệnh: <c>XBOSS_VE_CHIADOT</c> dùng để chạy lại không nhân đôi,
+    /// <c>XBOSS_VE_DOI</c> dùng để dọn vạch cũ khi cỡ tuyến đổi (số đốt phụ thuộc cỡ).
+    /// </summary>
+    internal static Dictionary<string, List<ObjectId>> ChiaDotTheoTim(Database db, Transaction tr)
+    {
+        var ra = new Dictionary<string, List<ObjectId>>(StringComparer.OrdinalIgnoreCase);
+        var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
+        foreach (ObjectId id in ms)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
+            var xd = VeXDataStore.Doc(ent);
+            if (xd is null || xd.VaiTro is not (VaiTroVe.VachChia or VaiTroVe.NhanDot)) continue;
+            if (xd.HandleTim is not { Length: > 0 } tim) continue;
+            if (!ra.TryGetValue(tim, out var ds)) ra[tim] = ds = [];
+            ds.Add(id);
+        }
+        return ra;
+    }
+
+    /// <summary>
+    /// Xóa vạch chia + tag đốt của MỘT tuyến (dùng chung cho "chạy lại chia đốt" và "đổi cỡ tuyến").
+    /// Tự mở khóa layer của chính đối tượng sắp xóa — sau <c>XBOSS_VE_NEN</c> mọi layer đang khóa,
+    /// mở theo layer thật của đối tượng thì không phải tra ngược hậu tố layer trong rule pack.
+    /// </summary>
+    internal static int XoaChiaDotCua(
+        Database db, Transaction tr, IReadOnlyDictionary<string, List<ObjectId>> theoTim, string handleTim)
+    {
+        if (!theoTim.TryGetValue(handleTim, out var ids)) return 0;
+        var soXoa = 0;
+        foreach (var id in ids)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not Entity doc) continue;
+            VeLayerService.MoKhoaNeuCo(db, tr, doc.Layer);
+            if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ghi) continue;
+            ghi.Erase();
+            soXoa++;
+        }
+        return soXoa;
+    }
+
+    /// <summary>
+    /// Xóa các nét biên cũ của MỘT tim (dùng chung cho <c>XBOSS_VE_DOI</c> và
+    /// <c>XBOSS_VE_NHANTUYEN</c> — cỡ đổi thì nét biên cũ sai bề rộng, giữ lại là để nét sai nằm
+    /// trên bản vẽ nộp).
+    ///
+    /// CHỈ xóa đối tượng thật sự là nét biên CỦA CHÍNH tim đó (XData vai trò
+    /// <see cref="VaiTroVe.Bien"/> + handle tim khớp): handle trong XData có thể đã mục (kỹ sư xóa
+    /// tay, hoặc AutoCAD cấp lại handle cho đối tượng khác) — xóa mù theo handle là cách chắc chắn
+    /// nhất để mất một đối tượng vô can.
+    /// </summary>
+    internal static int XoaNetBienCua(
+        Database db, Transaction tr, IReadOnlyList<string> handleBien, string handleTim)
+    {
+        var soXoa = 0;
+        foreach (var handle in handleBien)
+        {
+            if (TimTheoHandle(db, handle) is not { } id) continue;
+            if (tr.GetObject(id, OpenMode.ForRead) is not Entity doc) continue;
+            var xd = VeXDataStore.Doc(doc);
+            if (xd is null || xd.VaiTro != VaiTroVe.Bien) continue;
+            if (!string.Equals(xd.HandleTim, handleTim, StringComparison.Ordinal)) continue;
+            VeLayerService.MoKhoaNeuCo(db, tr, doc.Layer);
+            if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ghi) continue;
+            ghi.Erase();
+            soXoa++;
+        }
+        return soXoa;
+    }
+
     /// <summary>Một khối do bộ lệnh vẽ chèn và đang bám vào một tuyến tim.</summary>
     internal readonly record struct KhoiBamTim(VaiTroVe VaiTro, Diem2 Diem, string? BlockId);
 

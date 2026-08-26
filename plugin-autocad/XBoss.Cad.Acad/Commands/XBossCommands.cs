@@ -3,7 +3,9 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Api;
+using XBoss.Cad.Core.Ui.ViewModels;
 using XBoss.Cad.Core.Excel;
 using XBoss.Cad.Core.Geometry;
 using XBoss.Cad.Core.Inspection;
@@ -44,6 +46,54 @@ public sealed class XBossCommands
     }
 
     private static string HomNayIso() => DateTime.Now.ToString("yyyy-MM-dd");
+
+    // ===== Mở khóa TẠM để ghi lên thực thể (đường bóc khối lượng) =====
+    //
+    // Bản vẽ MEP thật luôn có layer khóa (nền kiến trúc, hệ khác, layer của công ty), mà đánh dấu
+    // hay gỡ dấu đều phải mở thực thể ForWrite ⇒ AutoCAD ném eOnLockedLayer và cả lệnh rollback.
+    // Người dùng đã chốt (2026-08-26): plugin ĐƯỢC PHÉP tự mở khóa để ghi, miễn trả nguyên trạng.
+    // Dùng đúng cặp VeLayerService.MoKhoaTam/KhoaLai của pipeline chuẩn hóa — không cơ chế thứ hai.
+
+    /// <summary>
+    /// Tập layer đang giữ những thực thể sắp ghi — để <c>MoKhoaTam</c> mở khóa ĐÚNG chừng đó thay
+    /// vì mở toang cả bản vẽ. Mở ForRead: layer khóa vẫn đọc được bình thường.
+    /// </summary>
+    private static HashSet<ObjectId> LayerCua(Transaction tr, IEnumerable<ObjectId> ids)
+    {
+        var layer = new HashSet<ObjectId>();
+        foreach (var id in ids)
+            if (tr.GetObject(id, OpenMode.ForRead) is Entity ent) layer.Add(ent.LayerId);
+        return layer;
+    }
+
+    /// <summary>
+    /// Thực thể còn nằm trên layer khóa sau khi đã mở khóa tạm? (layer bị AEC/ứng dụng thứ ba giữ).
+    /// Hỏi TRƯỚC khi ghi thay vì để AutoCAD ném eOnLockedLayer — một layer khó tính không được phép
+    /// giết cả lệnh; caller đếm số bỏ qua và báo cho kỹ sư.
+    /// </summary>
+    private static bool ConKhoa(Transaction tr, Entity ent) =>
+        tr.GetObject(ent.LayerId, OpenMode.ForRead) is LayerTableRecord ltr && ltr.IsLocked;
+
+    /// <summary>Báo cho kỹ sư đúng những gì lệnh đã đụng vào cờ khóa layer — không im lặng.</summary>
+    private static void InTinhTrangKhoaLayer(
+        Editor ed, string viec, int soMoKhoa, IReadOnlyList<string> khongMoDuoc,
+        IReadOnlyList<string> khoaLaiHut, int soBoQua)
+    {
+        if (soMoKhoa > 0)
+            ed.WriteMessage($"[XBoss] Đã tạm mở khóa {soMoKhoa} layer để {viec} và khóa lại như cũ.\n");
+        if (khongMoDuoc.Count > 0)
+        {
+            ed.WriteMessage(
+                $"[XBoss] ⚠ {khongMoDuoc.Count} layer đang KHÓA mà không mở khóa được: " +
+                $"{string.Join(", ", khongMoDuoc)} — bỏ qua {soBoQua} đối tượng trên các layer đó.\n");
+        }
+        if (khoaLaiHut.Count > 0)
+        {
+            ed.WriteMessage(
+                $"[XBoss] ⚠ Không khóa lại được {khoaLaiHut.Count} layer đã mở tạm: " +
+                $"{string.Join(", ", khoaLaiHut)} — khóa tay lại (lệnh LAYER) trước khi lưu.\n");
+        }
+    }
 
     // ===== XBOSS_RULEPACK =====
 
@@ -170,18 +220,14 @@ public sealed class XBossCommands
             ed.WriteMessage("[XBoss] ✔ Bản vẽ đã đạt chuẩn — không có gì để sửa.\n");
             return;
         }
-        foreach (var f in truoc.Findings)
-            ed.WriteMessage($"[XBoss] • {f.Ten}: {Math.Max(f.Handles.Count, f.ChiTiet.Count)}\n");
+        var dongXemTruoc = truoc.Findings
+            .Select(f => $"{f.Ten}: {Math.Max(f.Handles.Count, f.ChiTiet.Count)}")
+            .ToList();
+        foreach (var d in dongXemTruoc) ed.WriteMessage($"[XBoss] • {d}\n");
 
-        var hoi = new PromptKeywordOptions("\n[XBoss] Thực thi chuẩn hóa? Toàn bộ hoàn tác được bằng 1 lần UNDO")
-        {
-            AllowNone = false,
-        };
-        hoi.Keywords.Add("DongY", "DongY", "Đồng ý");
-        hoi.Keywords.Add("Huy", "Huy", "Hủy");
-        hoi.Keywords.Default = "Huy";
-        var traLoi = doc.Editor.GetKeywords(hoi);
-        if (traLoi.Status != PromptStatus.OK || traLoi.StringResult != "DongY")
+        // Xác nhận: hộp thoại hiện luôn diff xem trước (M106 §7.2), rơi về câu hỏi keyword cũ khi
+        // UI không dựng được hoặc bị tắt bằng XBOSS_UI_DIALOG=0 (FR9).
+        if (!XacNhanChuanHoa(ed, pack.Version, dongXemTruoc))
         {
             ed.WriteMessage("\n[XBoss] Đã hủy — bản vẽ không thay đổi.\n");
             return;
@@ -253,28 +299,16 @@ public sealed class XBossCommands
         if (CanRulePack(ed) is not { } pack) return;
         var db = doc.Database;
 
-        // Phạm vi: toàn model space hoặc chọn vùng (M99 §6.5.1).
-        var hoi = new PromptKeywordOptions("\n[XBoss] Bóc khối lượng phạm vi nào?") { AllowNone = false };
-        hoi.Keywords.Add("ToanBo", "ToanBo", "Toàn bộ model space");
-        hoi.Keywords.Add("ChonVung", "ChonVung", "Chọn vùng");
-        hoi.Keywords.Default = "ToanBo";
-        var traLoi = ed.GetKeywords(hoi);
-        if (traLoi.Status != PromptStatus.OK) return;
-
-        // M101 §6.3: tùy chọn bóc theo vùng (tầng/zone) — mặc định KHÔNG, giữ nguyên thói quen M99.
-        var hoiVung = new PromptKeywordOptions("\n[XBoss] Bóc theo vùng (tầng/zone)?") { AllowNone = false };
-        hoiVung.Keywords.Add("Khong", "Khong", "Không chia vùng");
-        hoiVung.Keywords.Add("ChonRanhGioi", "ChonRanhGioi", "Chọn polyline ranh giới rồi đặt tên vùng");
-        hoiVung.Keywords.Default = "Khong";
-        var traLoiVung = ed.GetKeywords(hoiVung);
-        if (traLoiVung.Status != PromptStatus.OK) return;
+        // Phạm vi (M99 §6.5.1) + bóc theo vùng (M101 §6.3) gộp vào MỘT hộp thoại (M106 §7.2);
+        // UI hỏng / XBOSS_UI_DIALOG=0 → đúng hai câu hỏi keyword cũ (FR9).
+        if (HoiThamSoBocKl(ed, pack.Version) is not { } ts) return;
 
         using var khoa = doc.LockDocument();
         TakeoffResult ketQua;
         using (var tr = db.TransactionManager.StartTransaction())
         {
             IEnumerable<ObjectId> ids;
-            if (traLoi.StringResult == "ChonVung")
+            if (ts.PhamVi == PhamViBoc.ChonVung)
             {
                 var chon = ed.GetSelection();
                 if (chon.Status != PromptStatus.OK) return;
@@ -285,7 +319,7 @@ public sealed class XBossCommands
                 ids = TakeoffScanner.ModelSpaceIds(db, tr).ToList();
             }
 
-            var chonVung = traLoiVung.StringResult == "ChonRanhGioi"
+            var chonVung = ts.ChiaVung
                 ? VungChonService.Hoi(ed, tr)
                 : new VungChonService.KetQuaChonVung([], []);
             var boiCanh = TakeoffScanner.XayBoiCanh(db, tr, pack, chonVung);
@@ -320,27 +354,58 @@ public sealed class XBossCommands
         }
 
         // Đánh dấu trong 1 transaction = 1 nhóm UNDO (FR14).
+        var soMoKhoa = 0;
+        var soBoQuaKhoa = 0;
+        var khongMoDuoc = new List<string>();
+        var khoaLaiHut = new List<string>();
         using (var tr = db.TransactionManager.StartTransaction())
         {
             MarkService.EnsureRegApp(db, tr, pack.Takeoff.XdataAppName);
             var ngay = HomNayIso();
             // Tên vùng ghi kèm XData (M101 §6.3) để XBOSS_BOCKL_XUAT dựng lại bảng theo vùng.
             var vungTheoHandle = TakeoffZoning.VungTheoHandle(ketQua);
+
+            // Gom danh sách sẽ đánh dấu TRƯỚC (chỉ đọc) để biết cần mở khóa những layer nào. Không
+            // đụng gì tới số liệu: khối lượng đã tính xong ở transaction trên, đây chỉ là bước ghi
+            // dấu lên đúng những handle mà TakeoffScanner đã chọn (khối xref vốn đã bị loại từ M99).
+            var canDanhDau = new List<(ObjectId Id, string ItemId, string Vung)>();
             foreach (var line in ketQua.Lines)
             {
                 if (line.LaDanXuat) continue; // dòng cách nhiệt được TÍNH RA, không có đối tượng riêng để đánh dấu
                 foreach (var handle in line.Handles)
                 {
                     if (!db.TryGetObjectId(new Handle(Convert.ToInt64(handle, 16)), out var id)) continue;
+                    canDanhDau.Add((id, line.Item.Id, vungTheoHandle.GetValueOrDefault(handle, "")));
+                }
+            }
+
+            var daMoKhoa = VeLayerService.MoKhoaTam(
+                db, tr, khongMoDuoc, LayerCua(tr, canDanhDau.Select(x => x.Id)));
+            soMoKhoa = daMoKhoa.Count;
+            try
+            {
+                foreach (var (id, itemId, vung) in canDanhDau)
+                {
+                    if (tr.GetObject(id, OpenMode.ForRead) is not Entity entDoc) continue;
+                    if (ConKhoa(tr, entDoc)) { soBoQuaKhoa++; continue; }
+                    // Mở lại ForWrite (không UpgradeOpen): một handle lọt vào hai dòng kết quả thì
+                    // UpgradeOpen lần hai ném eWasOpenForWrite, còn GetObject ForWrite thì không.
                     if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ent) continue;
                     MarkService.Mark(
-                        ent, pack.Takeoff.XdataAppName, line.Item.Id, pack.Version, ngay,
-                        pack.Takeoff.MarkColorAci, vungTheoHandle.GetValueOrDefault(handle, ""));
+                        ent, pack.Takeoff.XdataAppName, itemId, pack.Version, ngay,
+                        pack.Takeoff.MarkColorAci, vung);
                 }
+            }
+            finally
+            {
+                // Khóa lại kể cả khi ghi ném giữa chừng — bản vẽ của kỹ sư phải rời lệnh với đúng
+                // cờ khóa như lúc vào (lối thất bại còn rollback theo Transaction.Abort).
+                VeLayerService.KhoaLai(tr, daMoKhoa, khoaLaiHut);
             }
             tr.Commit();
         }
         ed.WriteMessage("\n[XBoss] Đã đánh dấu vùng bóc. Xuất Excel: XBOSS_BOCKL_XUAT · Gỡ đánh dấu: XBOSS_BOCKL_XOA · Hoàn tác: UNDO.\n");
+        InTinhTrangKhoaLayer(ed, "đánh dấu", soMoKhoa, khongMoDuoc, khoaLaiHut, soBoQuaKhoa);
     }
 
     // ===== XBOSS_BOCKL_XOA =====
@@ -352,19 +417,19 @@ public sealed class XBossCommands
         if (CanRulePack(ed) is not { } pack) return;
         var db = doc.Database;
 
-        var hoi = new PromptKeywordOptions("\n[XBoss] Gỡ đánh dấu bóc tách ở phạm vi nào?") { AllowNone = false };
-        hoi.Keywords.Add("ToanBo", "ToanBo", "Toàn bộ");
-        hoi.Keywords.Add("ChonVung", "ChonVung", "Chọn vùng");
-        hoi.Keywords.Default = "ToanBo";
-        var traLoi = ed.GetKeywords(hoi);
-        if (traLoi.Status != PromptStatus.OK) return;
+        // Hộp thoại một câu (M106 §7.2); UI hỏng / XBOSS_UI_DIALOG=0 → câu hỏi keyword cũ (FR9).
+        if (HoiPhamViGoDau(ed) is not { } phamVi) return;
 
         using var khoa = doc.LockDocument();
         var soGo = 0;
+        var soMoKhoa = 0;
+        var soBoQuaKhoa = 0;
+        var khongMoDuoc = new List<string>();
+        var khoaLaiHut = new List<string>();
         using (var tr = db.TransactionManager.StartTransaction())
         {
             IEnumerable<ObjectId> ids;
-            if (traLoi.StringResult == "ChonVung")
+            if (phamVi == PhamViBoc.ChonVung)
             {
                 var chon = ed.GetSelection();
                 if (chon.Status != PromptStatus.OK) return;
@@ -374,16 +439,37 @@ public sealed class XBossCommands
             {
                 ids = TakeoffScanner.ModelSpaceIds(db, tr).ToList();
             }
+
+            // Lọc trước (chỉ đọc) những thực thể thật sự có dấu bóc, rồi mở khóa TẠM đúng layer của
+            // chúng: gỡ dấu là GHI (trả màu cũ + xoá XData) nên layer khóa là eOnLockedLayer.
+            var canGo = new List<ObjectId>();
             foreach (var id in ids)
             {
                 if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
                 if (MarkService.ReadMark(ent, pack.Takeoff.XdataAppName) is null) continue;
-                ent.UpgradeOpen();
-                if (MarkService.Unmark(ent, pack.Takeoff.XdataAppName)) soGo++;
+                canGo.Add(id);
+            }
+
+            var daMoKhoa = VeLayerService.MoKhoaTam(db, tr, khongMoDuoc, LayerCua(tr, canGo));
+            soMoKhoa = daMoKhoa.Count;
+            try
+            {
+                foreach (var id in canGo)
+                {
+                    if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
+                    if (ConKhoa(tr, ent)) { soBoQuaKhoa++; continue; }
+                    ent.UpgradeOpen();
+                    if (MarkService.Unmark(ent, pack.Takeoff.XdataAppName)) soGo++;
+                }
+            }
+            finally
+            {
+                VeLayerService.KhoaLai(tr, daMoKhoa, khoaLaiHut);
             }
             tr.Commit();
         }
         ed.WriteMessage($"\n[XBoss] Đã gỡ đánh dấu {soGo} đối tượng (trả đúng màu trước khi bóc). Hoàn tác: UNDO.\n");
+        InTinhTrangKhoaLayer(ed, "gỡ dấu", soMoKhoa, khongMoDuoc, khoaLaiHut, soBoQuaKhoa);
     }
 
     // ===== XBOSS_BOCKL_XUAT =====
@@ -428,19 +514,17 @@ public sealed class XBossCommands
         var ketQua = may.ComputeAssigned(daGan, (int)db.Insunits);
         InBangKetQua(ed, ketQua);
 
-        // Meta đầu trang: nhớ tên dự án/gói thầu giữa các lần xuất.
+        // Meta đầu trang + tùy chọn đối chiếu BOQ: hộp thoại một form (M106 §7.2), rơi về 3 câu hỏi
+        // dòng lệnh cũ khi UI không dựng được hoặc bị tắt (FR9). Nhớ tên dự án/gói thầu giữa các lần.
         var luu = ExcelMetaStore.Doc();
-        var tenDuAn = HoiChuoi(ed, "Tên dự án", luu.TenDuAn);
-        if (tenDuAn is null) return;
-        var goiThau = HoiChuoi(ed, "Gói thầu", luu.GoiThau);
-        if (goiThau is null) return;
+        if (HoiThamSoXuat(ed, luu) is not { } ts) return;
+        var (tenDuAn, goiThau) = (ts.TenDuAn, ts.GoiThau);
 
-        // M101 PR4 — tùy chọn kéo KL BOQ hợp đồng từ máy chủ để dựng sheet phụ "Doi-chieu".
-        // Mặc định KHÔNG kéo: chỉ Enter là hành vi y hệt trước PR4. Mọi trục trặc (chưa LOGIN,
-        // mất mạng, token hết hạn, máy chủ lỗi) chỉ CẢNH BÁO rồi xuất Excel như thường — không
-        // bao giờ chặn việc xuất bảng bóc.
+        // M101 PR4 — kéo KL BOQ hợp đồng từ máy chủ để dựng sheet phụ "Doi-chieu". Mặc định KHÔNG
+        // kéo: hành vi y hệt trước PR4. Mọi trục trặc (chưa LOGIN, mất mạng, token hết hạn, máy chủ
+        // lỗi) chỉ CẢNH BÁO rồi xuất Excel như thường — không bao giờ chặn việc xuất bảng bóc.
         var duAnId = luu.DuAnId;
-        var doiChieu = HoiDoiChieuBoq(ed, ref duAnId);
+        var doiChieu = ts.DoiChieuBoq ? TaiDoiChieuBoq(ed, ref duAnId) : null;
         ExcelMetaStore.Ghi(new ExcelMetaStore.MetaLuu(tenDuAn, goiThau, duAnId));
 
         // Mã BOQ ở cột A đến từ RULE PACK, không phải từ KL đối chiếu: rule pack đang dùng thuộc
@@ -527,15 +611,11 @@ public sealed class XBossCommands
         if (SanSang() is not (var doc, var ed)) return;
         if (CanRulePack(ed) is not { } pack) return;
 
-        var hoi = new PromptKeywordOptions("\n[XBoss] Xử lý hàng loạt cả thư mục — chế độ nào?") { AllowNone = false };
-        hoi.Keywords.Add("KiemTra", "KiemTra", "Chỉ kiểm (an toàn, không sửa)");
-        hoi.Keywords.Add("ChuanHoa", "ChuanHoa", "Chuẩn hóa (bản gốc giữ nguyên, kết quả vào thư mục con)");
-        hoi.Keywords.Add("BocKL", "BocKL", "Bóc khối lượng hàng loạt (1 Excel tổng, bản gốc giữ nguyên)");
-        hoi.Keywords.Default = "KiemTra";
-        var traLoi = ed.GetKeywords(hoi);
-        if (traLoi.Status != PromptStatus.OK) return;
-        var chuanHoa = traLoi.StringResult == "ChuanHoa";
-        var bocKl = traLoi.StringResult == "BocKL";
+        // Chọn chế độ bằng hộp thoại (M106 §7.2); UI hỏng / XBOSS_UI_DIALOG=0 → keyword cũ (FR9).
+        // Phần tiến trình chạy nền giữ nguyên như cũ (M106 §5 để ngoài phạm vi).
+        if (HoiCheDoBatch(ed, pack.Version) is not { } cheDo) return;
+        var chuanHoa = cheDo == CheDoBatch.ChuanHoa;
+        var bocKl = cheDo == CheDoBatch.BocKL;
 
         using var chonThuMuc = new System.Windows.Forms.FolderBrowserDialog
         {
@@ -600,6 +680,131 @@ public sealed class XBossCommands
             : $"[XBoss] ✔ Đã xuất Excel tổng ({ketQua.TongDongBoc} dòng): {ketQua.DuongDanExcel}\n");
     }
 
+    // ===== Thu tham số: hộp thoại (mặc định) hoặc dòng lệnh (M106 FR9) =====
+
+    /// <summary>Xác nhận chuẩn hóa — true = thực thi. Hủy ở hộp thoại = dừng lệnh (không hỏi lại).</summary>
+    private static bool XacNhanChuanHoa(Editor ed, string rulePackVersion, IReadOnlyList<string> dongXemTruoc)
+    {
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new ChuanHoaDialogViewModel(rulePackVersion, dongXemTruoc);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi) return kq is not null;
+
+        var hoi = new PromptKeywordOptions("\n[XBoss] Thực thi chuẩn hóa? Toàn bộ hoàn tác được bằng 1 lần UNDO")
+        {
+            AllowNone = false,
+        };
+        hoi.Keywords.Add("DongY", "DongY", "Đồng ý");
+        hoi.Keywords.Add("Huy", "Huy", "Hủy");
+        hoi.Keywords.Default = "Huy";
+        var traLoi = ed.GetKeywords(hoi);
+        return traLoi.Status == PromptStatus.OK && traLoi.StringResult == "DongY";
+    }
+
+    /// <summary>Phạm vi + chia vùng của <c>XBOSS_BOCKL</c>; null = kỹ sư hủy.</summary>
+    private static KetQuaBocKl? HoiThamSoBocKl(Editor ed, string rulePackVersion)
+    {
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new BocKlDialogViewModel(rulePackVersion);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi) return kq;
+
+        var hoi = new PromptKeywordOptions("\n[XBoss] Bóc khối lượng phạm vi nào?") { AllowNone = false };
+        hoi.Keywords.Add("ToanBo", "ToanBo", "Toàn bộ model space");
+        hoi.Keywords.Add("ChonVung", "ChonVung", "Chọn vùng");
+        hoi.Keywords.Default = "ToanBo";
+        var traLoi = ed.GetKeywords(hoi);
+        if (traLoi.Status != PromptStatus.OK) return null;
+
+        // M101 §6.3: tùy chọn bóc theo vùng (tầng/zone) — mặc định KHÔNG, giữ nguyên thói quen M99.
+        var hoiVung = new PromptKeywordOptions("\n[XBoss] Bóc theo vùng (tầng/zone)?") { AllowNone = false };
+        hoiVung.Keywords.Add("Khong", "Khong", "Không chia vùng");
+        hoiVung.Keywords.Add("ChonRanhGioi", "ChonRanhGioi", "Chọn polyline ranh giới rồi đặt tên vùng");
+        hoiVung.Keywords.Default = "Khong";
+        var traLoiVung = ed.GetKeywords(hoiVung);
+        if (traLoiVung.Status != PromptStatus.OK) return null;
+
+        return new KetQuaBocKl(
+            traLoi.StringResult == "ChonVung" ? PhamViBoc.ChonVung : PhamViBoc.ToanBo,
+            traLoiVung.StringResult == "ChonRanhGioi");
+    }
+
+    /// <summary>Phạm vi gỡ dấu bóc của <c>XBOSS_BOCKL_XOA</c>; null = kỹ sư hủy.</summary>
+    private static PhamViBoc? HoiPhamViGoDau(Editor ed)
+    {
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new BocKlXoaDialogViewModel();
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi) return kq?.PhamVi;
+
+        var hoi = new PromptKeywordOptions("\n[XBoss] Gỡ đánh dấu bóc tách ở phạm vi nào?") { AllowNone = false };
+        hoi.Keywords.Add("ToanBo", "ToanBo", "Toàn bộ");
+        hoi.Keywords.Add("ChonVung", "ChonVung", "Chọn vùng");
+        hoi.Keywords.Default = "ToanBo";
+        var traLoi = ed.GetKeywords(hoi);
+        if (traLoi.Status != PromptStatus.OK) return null;
+        return traLoi.StringResult == "ChonVung" ? PhamViBoc.ChonVung : PhamViBoc.ToanBo;
+    }
+
+    /// <summary>Meta đầu trang Excel + có đối chiếu BOQ không; null = kỹ sư hủy.</summary>
+    private static KetQuaBocKlXuat? HoiThamSoXuat(Editor ed, ExcelMetaStore.MetaLuu luu)
+    {
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var baseUrl = XBossLoginCommand.DocServerUrl();
+            var daGhep = baseUrl is not null && CredentialStore.DocToken(baseUrl) is not null;
+            var vm = new BocKlXuatDialogViewModel(luu.TenDuAn, luu.GoiThau, daGhep);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi) return kq;
+
+        var tenDuAn = HoiChuoi(ed, "Tên dự án", luu.TenDuAn);
+        if (tenDuAn is null) return null;
+        var goiThau = HoiChuoi(ed, "Gói thầu", luu.GoiThau);
+        if (goiThau is null) return null;
+
+        var hoi = new PromptKeywordOptions(
+            "\n[XBoss] Kéo KL BOQ hợp đồng từ máy chủ để dựng sheet \"Doi-chieu\"?")
+        { AllowNone = false };
+        hoi.Keywords.Add("Khong", "Khong", "Không (chỉ bảng bóc như cũ)");
+        hoi.Keywords.Add("Co", "Co", "Có (cần mạng + đã chạy XBOSS_LOGIN)");
+        hoi.Keywords.Default = "Khong";
+        var traLoi = ed.GetKeywords(hoi);
+        if (traLoi.Status != PromptStatus.OK) return null;
+        return new KetQuaBocKlXuat(tenDuAn, goiThau, traLoi.StringResult == "Co");
+    }
+
+    /// <summary>Chế độ của <c>XBOSS_BATCH</c>; null = kỹ sư hủy.</summary>
+    private static CheDoBatch? HoiCheDoBatch(Editor ed, string rulePackVersion)
+    {
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new BatchDialogViewModel(rulePackVersion);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi) return kq?.CheDo;
+
+        var hoi = new PromptKeywordOptions("\n[XBoss] Xử lý hàng loạt cả thư mục — chế độ nào?") { AllowNone = false };
+        hoi.Keywords.Add("KiemTra", "KiemTra", "Chỉ kiểm (an toàn, không sửa)");
+        hoi.Keywords.Add("ChuanHoa", "ChuanHoa", "Chuẩn hóa (bản gốc giữ nguyên, kết quả vào thư mục con)");
+        hoi.Keywords.Add("BocKL", "BocKL", "Bóc khối lượng hàng loạt (1 Excel tổng, bản gốc giữ nguyên)");
+        hoi.Keywords.Default = "KiemTra";
+        var traLoi = ed.GetKeywords(hoi);
+        if (traLoi.Status != PromptStatus.OK) return null;
+        return traLoi.StringResult switch
+        {
+            "ChuanHoa" => CheDoBatch.ChuanHoa,
+            "BocKL" => CheDoBatch.BocKL,
+            _ => CheDoBatch.KiemTra,
+        };
+    }
+
     // ===== Trợ giúp hiển thị =====
 
     /// <summary>Số đối tượng THẬT đã bóc: một tuyến cắt qua nhiều vùng nằm ở nhiều dòng nhưng chỉ
@@ -650,17 +855,8 @@ public sealed class XBossCommands
     /// <paramref name="duAnId"/> vào là dự án đã chọn lần trước, ra là dự án thực sự dùng (nhớ cho
     /// lần sau).
     /// </summary>
-    private static BoqSnapshot? HoiDoiChieuBoq(Editor ed, ref long? duAnId)
+    private static BoqSnapshot? TaiDoiChieuBoq(Editor ed, ref long? duAnId)
     {
-        var hoi = new PromptKeywordOptions(
-            "\n[XBoss] Kéo KL BOQ hợp đồng từ máy chủ để dựng sheet \"Doi-chieu\"?")
-        { AllowNone = false };
-        hoi.Keywords.Add("Khong", "Khong", "Không (chỉ bảng bóc như cũ)");
-        hoi.Keywords.Add("Co", "Co", "Có (cần mạng + đã chạy XBOSS_LOGIN)");
-        hoi.Keywords.Default = "Khong";
-        var traLoi = ed.GetKeywords(hoi);
-        if (traLoi.Status != PromptStatus.OK || traLoi.StringResult != "Co") return null;
-
         var baseUrl = XBossLoginCommand.DocServerUrl();
         if (baseUrl is null)
         {
