@@ -275,12 +275,14 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public bool Constant => false;
     }
 
-    public class AttributeReference : Entity
+    // ObjectARX thật: AttributeReference KẾ THỪA DBText (không phải Entity trực tiếp). Giữ đúng
+    // quan hệ này là bắt buộc, không phải chi tiết trang trí: `switch` có `case DBText` đứng trước
+    // `case AttributeReference` là nhánh CHẾT (CS8120) trên bản build thật, mà stub khai sai cây
+    // kế thừa thì cổng CI thấy hai nhánh rời nhau và cho qua — đã lọt thật xuống máy có AutoCAD
+    // ngày 2026-08-26 (StandardizePipeline.cs). Thêm kiểu stub nào cũng phải tra đúng lớp cha.
+    public class AttributeReference : DBText
     {
         public string Tag { get; set; }
-        public string TextString { get; set; }
-        public Point3d Position { get; set; }
-        public ObjectId TextStyleId { get; set; }
         public void SetAttributeFromBlock(AttributeDefinition ad, Matrix3d blockTransform) { }
     }
 

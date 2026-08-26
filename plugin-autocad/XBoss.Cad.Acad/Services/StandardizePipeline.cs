@@ -551,11 +551,15 @@ internal sealed class StandardizePipeline(CadRulePack pack)
             if (td.Loai == LoaiStyle.KieuChu)
             {
                 if (!idKieuChu.TryGetValue(td.StyleMoi, out var idStyle)) continue;
+                // AttributeReference KẾ THỪA DBText trong ObjectARX, nên phải xét TRƯỚC — đặt sau
+                // thì nhánh của nó là mã chết (CS8120 chặn build thật, chứ không im lặng bỏ qua).
+                // Cả ba nhánh làm cùng một việc nên hành vi không đổi; giữ tường minh để lần sau
+                // muốn xử lý attribute khác text thường thì có sẵn chỗ.
                 switch (tr.GetObject(entId, OpenMode.ForRead))
                 {
+                    case AttributeReference ar: ar.UpgradeOpen(); ar.TextStyleId = idStyle; soChu++; break;
                     case DBText t: t.UpgradeOpen(); t.TextStyleId = idStyle; soChu++; break;
                     case MText m: m.UpgradeOpen(); m.TextStyleId = idStyle; soChu++; break;
-                    case AttributeReference ar: ar.UpgradeOpen(); ar.TextStyleId = idStyle; soChu++; break;
                 }
             }
             else
