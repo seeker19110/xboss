@@ -46,7 +46,12 @@ việc); nối/cắt/nắn hình học; nhận `Arc`/`Spline`/block (báo rõ, k
 ## 4. Functional requirements
 
 - **FR1** Vùng chọn: kỹ sư quét chọn nhiều đối tượng. Lọc ra `Polyline`/`Line` không thuộc xref;
-  đối tượng bị loại **đếm và báo theo lý do** (không phải polyline / thuộc xref / đã là tuyến XBoss).
+  đối tượng bị loại **đếm và báo theo lý do** (không phải polyline / thuộc xref / là nét biên–nhãn–
+  vạch chia của XBoss).
+  **Hiệu chỉnh 2026-08-26 sau thi hành:** bản đầu ghi lý do bỏ qua là "đã là tuyến XBoss", mâu thuẫn
+  với FR5 (tuyến đã có XData thì NHẬN LẠI). Phân giải theo **vai trò XData**, đây là cách duy nhất
+  thoả cả hai mục: vai trò `Tim` → nhận lại theo FR5; mọi vai trò khác (`Bien`, `Nhan`, `VachChia`,
+  `NhanDot`…) → bỏ qua, vì chúng đi theo tim chứ không phải tuyến độc lập.
 - **FR2** Hộp thoại (M106): hệ → loại tuyến → cỡ từ danh mục rule pack (cho nhập ngoài danh mục kèm
   cờ `custom` + cảnh báo) → độ dốc khi `slopeRequired`. Hiện **chỉ đọc**: số tuyến sẽ nhận, layer
   đích, bề rộng nét biên suy từ cỡ. Một cỡ áp cho **toàn bộ** vùng chọn (người dùng chốt).

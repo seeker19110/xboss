@@ -44,7 +44,7 @@ Gỡ cài: xoá thư mục `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle`.
 
 ---
 
-## C. Verify tay — 26 lệnh, đi theo đúng thứ tự này
+## C. Verify tay — 27 lệnh, đi theo đúng thứ tự này
 
 Mỗi mục ghi: **làm gì** → **đúng thì thấy gì**. Gặp lệch thì ghi lại lệnh + thông điệp + tệp
 báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho qua".
@@ -132,7 +132,7 @@ bóc trên cùng bản vẽ khi **mở khoá tay hết layer từ trước** —
 17. Chọn "kéo KL BOQ hợp đồng từ máy chủ" → sheet `Doi-chieu` có chênh lệch % là công thức sống.
     Rút mạng rồi làm lại → chỉ cảnh báo, **vẫn xuất bình thường**.
 
-### C4. Bộ lệnh vẽ shop drawing (M100 — 14 lệnh, M105 — 1 lệnh)
+### C4. Bộ lệnh vẽ shop drawing (M100 — 14 lệnh, M105 — 1 lệnh, M107 — 1 lệnh ở C4b)
 
 18. `XBOSS_VE_NEN` → nền khoá + làm mờ, tạo layer đích; chạy lại → **hoàn nguyên**.
 19. `XBOSS_VE` → vẽ tuyến như PLINE (có Cung/HoànTác/Đóng); `edgeStyle=double` sinh 2 nét biên.
@@ -156,6 +156,40 @@ bóc trên cùng bản vẽ khi **mở khoá tay hết layer từ trước** —
     chưa chia, và lý do bỏ qua của phiên vừa chạy).
 26. Vẽ xong chạy `XBOSS_KIEMTRA` → **pass ngay** (đây chính là mục đích của bộ lệnh vẽ) và
     `XBOSS_BOCKL` bóc không sót nét mới vẽ.
+
+### C4b. Nhận tuyến có sẵn — `XBOSS_VE_NHANTUYEN` (M107, bắt buộc)
+
+Làm trên **bản vẽ thiết kế của người khác** (không phải bản do `XBOSS_VE` vẽ), có sẵn xref kiến
+trúc và vài layer khoá. Đây là lệnh đụng vào bản vẽ người khác nên hai ca AC6/AC4 dưới đây là bắt
+buộc, không được bỏ.
+
+- **AC1 — nhận cả loạt:** chọn 5 polyline ống gió của bản gốc → hệ HVAC, cỡ `800x400` → cả 5 đổi
+  sang layer chuẩn của loại tuyến, mang XData, mỗi tuyến có **2 nét biên cách nhau 800** (đo bằng
+  DIST) trên layer `<layer tim>EDGE`.
+- **AC2 — dùng được ngay mọi lệnh:** ngay sau AC1, `XBOSS_VE_PHUKIEN` bấm lên các tuyến đó
+  **không còn báo "không phải TUYẾN TIM do XBOSS_VE vẽ"**; `XBOSS_VE_NHAN` ghi đúng cỡ `800x400`;
+  `XBOSS_VE_CHIADOT` chọn được kiểu nối theo cỡ; `XBOSS_BOCKL` bóc được (biên **không** bị bóc).
+- **AC3 — lọc vùng chọn:** quét cả vùng có lẫn text/block/arc/spline **và một xref** → chỉ nhận
+  polyline/line ngoài xref; dòng tóm tắt đếm đủ phần bỏ qua **theo từng lý do** (không phải
+  polyline/line · thuộc xref · nét biên/nhãn của XBoss).
+- **AC4 — chạy lại không nhân đôi biên:** chạy lại trên đúng các tuyến đó với cỡ khác (vd
+  `400x200`) → nét biên dựng lại theo cỡ mới; **chọn lại toàn vùng và đếm: KHÔNG còn nét biên cũ
+  sót lại** (đếm số đối tượng trên layer `<layer tim>EDGE` phải đúng 2 × số tuyến). Tuyến đã bóc
+  khối lượng bị **gỡ dấu bóc** kèm cảnh báo chạy lại `XBOSS_BOCKL`; vạch chia đốt cũ bị xóa kèm
+  cảnh báo chạy lại `XBOSS_VE_CHIADOT`.
+- **AC5 — một lần undo:** `U` một lần → layer, XData, nét biên đều trở lại nguyên trạng.
+- **AC6 — hình học tim KHÔNG đổi (ca quan trọng nhất):** trước khi nhận, chọn một tuyến và ghi
+  tọa độ **từng đỉnh** (`LIST`, hoặc `_.PEDIT` → xem đỉnh). Sau khi nhận, `LIST` lại đúng tuyến
+  đó → **từng tọa độ đỉnh và bulge phải trùng khít**, số đỉnh không đổi, `Closed` không đổi. Lệch
+  dù một số lẻ cũng là lỗi chặn phát hành.
+- **AC7 — đường lui dòng lệnh:** đặt `XBOSS_UI_DIALOG=0` rồi chạy lại AC1 bằng hỏi đáp dòng lệnh →
+  kết quả trên bản vẽ **trùng khít** đường hộp thoại (cùng layer, cùng XData, cùng số nét biên).
+- **Ca Line (FR4):** chọn một `LINE` của bản gốc → nhận → thành **polyline 2 đỉnh cùng tọa độ**
+  với line cũ (`LIST` đối chiếu đầu/cuối), tóm tắt cuối lệnh nói rõ "đã chuyển kiểu".
+- **Ca offset hỏng (M100 §18):** nhận một polyline **tự cắt** → chỉ nhận tim + cảnh báo nêu handle
+  tuyến, **không** có nét biên nào được vẽ.
+- **Hộp thoại:** soi theo checklist C8b (nền tối, combo gõ tay được, nút OK khóa kèm lý do khi
+  vùng chọn không có tuyến nào).
 
 ### C5. Vòng đời với web (M99 PR5 + M103 + M104)
 

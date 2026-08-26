@@ -305,7 +305,7 @@ public sealed class VeDoiCommands
 
                     // (a) Nét biên cũ: xóa TRƯỚC khi dựng lại — biên là thứ phụ thuộc size, giữ lại
                     //     là để nét sai bề rộng nằm trên bản vẽ nộp.
-                    soBienXoa += XoaNetBienCu(tr, db, t);
+                    soBienXoa += VeThucThe.XoaNetBienCua(db, tr, t.XData.HandleBien, t.Handle);
 
                     // (b) Layer mới cho tim.
                     tim.Layer = tuyenMoi.Layer;
@@ -412,28 +412,6 @@ public sealed class VeDoiCommands
     }
 
     // ===== Trợ giúp =====
-
-    /// <summary>
-    /// Xóa các nét biên cũ của một tim. CHỈ xóa đối tượng thật sự là nét biên CỦA CHÍNH tim đó
-    /// (XData vai trò <see cref="VaiTroVe.Bien"/> + handle tim khớp): handle trong XData có thể đã
-    /// mục (kỹ sư xóa tay, hoặc AutoCAD cấp lại handle cho đối tượng khác) — xóa mù theo handle là
-    /// cách chắc chắn nhất để mất một đối tượng vô can.
-    /// </summary>
-    private static int XoaNetBienCu(Transaction tr, Database db, TuyenChon t)
-    {
-        var soXoa = 0;
-        foreach (var handle in t.XData.HandleBien)
-        {
-            if (VeThucThe.TimTheoHandle(db, handle) is not { } id) continue;
-            if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ent) continue;
-            var xd = VeXDataStore.Doc(ent);
-            if (xd is null || xd.VaiTro != VaiTroVe.Bien) continue;
-            if (!string.Equals(xd.HandleTim, t.Handle, StringComparison.Ordinal)) continue;
-            ent.Erase();
-            soXoa++;
-        }
-        return soXoa;
-    }
 
     /// <summary>
     /// Cập nhật mọi nhãn đang gắn với một tim: MTEXT lấy lại nội dung từ XData mới; mũi tên hướng

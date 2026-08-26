@@ -358,6 +358,43 @@ hỏi đáp keyword ở dòng lệnh, và thấy rõ đang ở bước nào củ
   chưa phủ trong PR1: câu hỏi **tỉ lệ in 1:x** của `XBOSS_VE_CHIADOT` vẫn ở dòng lệnh (§7.2 không
   liệt kê nó cho lệnh này; hỏi một lần mỗi phiên qua `VeContext.TiLeIn`).
 
+**M107 — Nhận tuyến có sẵn thành tuyến XBoss (`XBOSS_VE_NHANTUYEN`):** ✅ **XONG về mặt code
+2026-08-26** (`docs/nang-cap/M107-nhan-tuyen-co-san.md`). Bối cảnh dùng phổ biến nhất — nhận bản
+thiết kế của người khác rồi bổ sung chi tiết thi công — nay dùng được cả bộ lệnh XBoss mà **không
+phải vẽ đè lại tuyến**.
+
+- **Lệnh mới `XBoss.Cad.Acad/Commands/VeNhanTuyenCommands.cs`:** quét chọn nhiều đối tượng → khai
+  **một** hệ/loại/cỡ cho cả loạt → mỗi tuyến được đổi `Layer` về layer chuẩn của loại tuyến
+  (`VeLayerService.DamBaoLayer`), ghi XData `XBOSS_VE` vai trò `Tim` **đúng cấu trúc tuyến do
+  `XBOSS_VE` vẽ** (mọi lệnh sau — phụ kiện, nhãn, chia đốt, giá đỡ, sleeve, tag, bóc khối lượng —
+  không phân biệt được nguồn gốc), và sinh 2 nét biên qua `EdgeOffset.Tinh` cho `edgeStyle:
+"double"` với XData liên kết 2 chiều.
+- **Guardrail số 1 — không đụng hình học tim:** chỉ đổi layer, gán XData và THÊM nét biên; đỉnh
+  polyline giữ nguyên từng tọa độ + bulge. Đây là bản vẽ của người khác, kỹ sư nhận tuyến để dùng
+  tiếp chứ không phải để plugin nắn lại (AC6 là ca verify tay quan trọng nhất).
+- **`Line` được nhận** thì chuyển thành polyline 2 đỉnh **cùng tọa độ** (mọi lệnh sau đều giả định
+  tim là polyline) và nói rõ trong tóm tắt là đã chuyển kiểu.
+- **Chạy lại = nhận lại, không nhân đôi biên:** nét biên cũ **của đúng tuyến đó** bị xóa rồi dựng
+  lại theo cỡ mới; dấu bóc bị gỡ (`MarkService.Unmark`) và vạch chia đốt bị xóa
+  (`VeThucThe.XoaChiaDotCua`) kèm nhắc chạy lại — **cùng lý do** với `XBOSS_VE_DOI` (cỡ đổi thì số
+  đốt và khối lượng đều sai). Hàm xóa nét biên cũ được **đưa lên `VeThucThe.XoaNetBienCua`** dùng
+  chung cho cả 2 lệnh thay vì viết cơ chế thứ hai.
+- **Xref bỏ qua hết** (quy tắc chốt 2026-08-26) — qua `ThuocXref.KhoiChen` + chặn thêm thực thể nằm
+  trên layer phụ thuộc xref; text/block/arc/spline và nét biên/nhãn của chính XBoss cũng bị bỏ qua,
+  **đếm và nêu lý do** ở cả hộp thoại lẫn tóm tắt cuối lệnh.
+- **Offset thất bại → CHỈ nhận tim + cảnh báo nêu handle tuyến**, tuyệt đối không vẽ biên sai (luật
+  M100 §18). 1 lệnh = 1 transaction = 1 nhóm UNDO; mọi hỏi đáp nằm ngoài transaction.
+- **Hộp thoại theo khung M106:** `Core/Ui/ViewModels/NhanTuyenDialogViewModel.cs` (thuần .NET, test
+  được trên CI Linux) + `DataTemplate` trong `Ui/Wpf/XBossDialog.xaml` dùng đúng style theme tối có
+  sẵn; phần chỉ-đọc hiện số tuyến sẽ nhận, layer đích, bề rộng nét biên suy từ cỡ, các dòng bỏ qua.
+  Đường lui `XBOSS_UI_DIALOG=0` / UI hỏng → hỏi đáp dòng lệnh cho **cùng** bộ tham số (AC7). Lệnh
+  khai trong `LenhCatalog` ở bước 3 (Vẽ shop drawing) nên Ribbon và trình dẫn tự có nút.
+- **886/886 ca .NET xanh** (nền 865 → +21 ca: `NhanTuyenDialogViewModelTests.cs` + phần thuần
+  `TomTatChonNhanTuyen`), `XBoss.Cad.AcadShim` 0 warning.
+- **Còn lại:** verify tay §C4b của `plugin-autocad/VERIFY-VA-PHAT-HANH.md` trên máy có AutoCAD 2026
+  — nhấn **AC6** (so tọa độ từng đỉnh trước/sau bằng `LIST`) và **AC4** (chạy lại với cỡ khác:
+  không còn nét biên cũ sót trên layer `<layer tim>EDGE`).
+
 ## M102 PR2 — Adapter AutoCAD: bước chuẩn hóa 12/13 + quét tag cho phép kiểm 17 (2026-08-25)
 
 Thi hành `docs/nang-cap/M102-plugin-dong-tran-chuan-hoa.md` PR2 phần **Adapter** — nối dây Core PR1

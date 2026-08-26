@@ -670,6 +670,46 @@
       </StackPanel>
     </DataTemplate>
 
+    <!-- XBOSS_VE_NHANTUYEN: khai hệ/loại/cỡ cho tuyến có sẵn (M107 FR2) — một cỡ cho cả vùng chọn. -->
+    <DataTemplate DataType="{x:Type vm:NhanTuyenDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Vùng chọn" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <StackPanel>
+            <TextBlock Text="{Binding MoTaSeNhan}" TextWrapping="Wrap" Margin="0,0,0,3" />
+            <ItemsControl ItemsSource="{Binding DongBoQua}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Hệ" />
+        <ComboBox ItemsSource="{Binding CacHe}" SelectedItem="{Binding He, Mode=TwoWay}"
+                  DisplayMemberPath="Name" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Loại tuyến" />
+        <ComboBox ItemsSource="{Binding CacLoaiTuyen}" SelectedItem="{Binding Tuyen, Mode=TwoWay}"
+                  DisplayMemberPath="Name" />
+
+        <TextBlock Style="{StaticResource Nhan}"
+                   Text="Cỡ áp cho TOÀN BỘ vùng chọn (chọn trong danh mục, hoặc gõ cỡ khác)" />
+        <ComboBox IsEditable="True" ItemsSource="{Binding CacSize}"
+                  Text="{Binding Size, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <StackPanel Visibility="{Binding CanDoDoc, Converter={StaticResource CoThiHien}}">
+          <TextBlock Style="{StaticResource Nhan}" Text="Độ dốc (bắt buộc với tuyến này)" />
+          <ComboBox IsEditable="True" ItemsSource="{Binding CacDoDoc}"
+                    Text="{Binding DoDoc, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaViecSeLam}" />
+      </StackPanel>
+    </DataTemplate>
+
     <!-- XBOSS_VE_CHIADOT: phạm vi + kiểu nối + xem trước số đốt (AC4). -->
     <DataTemplate DataType="{x:Type vm:ChiaDotDialogViewModel}">
       <StackPanel>
