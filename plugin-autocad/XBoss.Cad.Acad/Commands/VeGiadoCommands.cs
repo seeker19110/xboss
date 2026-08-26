@@ -3,8 +3,10 @@ using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Geometry;
+using XBoss.Cad.Core.Ui.ViewModels;
 
 using ChoChen = XBoss.Cad.Acad.Services.BlockLibraryService.KhoiChoChen;
 
@@ -34,48 +36,18 @@ public sealed class VeGiadoCommands
         if (BlockLibraryService.CanThuVien(ed) is not { } thuVien) return;
         var db = doc.Database;
 
-        var he = VeContext.HoiHe(ed, pack);
-        if (he is null) return;
-
-        // (1) Block giá đỡ của hệ (manifest kind = support, id khai trong drawTools.fittings).
-        var danhSach = new List<BlockDef>();
-        foreach (var id in he.Fittings)
-        {
-            var def = thuVien.TimTheoId(id);
-            if (def is not null && def.KindEnum == BlockKind.Support) danhSach.Add(def);
-        }
-        if (danhSach.Count == 0)
-        {
-            ed.WriteMessage(
-                $"\n[XBoss] Thư viện {thuVien.Version} chưa có block giá đỡ (kind=support) cho hệ {he.Id} — " +
-                "phát hành lại thư viện hoặc khai id giá đỡ vào drawTools.systems[].fittings ở rule pack sau.\n");
-            return;
-        }
-        var def0 = BlockLibraryService.HoiBlock(ed, $"Giá đỡ của hệ {he.Id}", danhSach, null);
-        if (def0 is null) return;
-
-        // (2) Cách chia + phụ kiện nào cần giá đỡ tại chỗ.
-        //     Rule pack từ v7 khai thẳng danh sách phụ kiện NẶNG (drawTools.heavyFittingIds) nên
-        //     không phải hỏi nữa, và chỉ van/damper mới được một giá đỡ riêng — hỏi kiểu cũ thì
-        //     trả lời "Có" là đặt cả ở co/tê nhẹ, sai chuẩn treo đỡ. Rule pack cũ (v4–v6) không có
-        //     khóa này ⇒ giữ nguyên đường hỏi kỹ sư.
-        var cheDo = HoiCheDoChia(ed);
-        if (cheDo is null) return;
-
-        var phuKienNang = pack.DrawTools.HeavyFittingIds;
-        bool taiMoiPhuKien;
+        // (1)+(2) Hệ + block giá đỡ + cách chia + (chỉ rule pack v4–v6) giá đỡ tại mọi phụ kiện:
+        //         MỘT hộp thoại (M106 §7.2), rơi về nguyên chuỗi hỏi đáp cũ khi UI hỏng (FR9).
+        //         Rule pack từ v7 khai thẳng danh sách phụ kiện NẶNG (drawTools.heavyFittingIds) nên
+        //         không phải hỏi nữa, và chỉ van/damper mới được một giá đỡ riêng — hỏi kiểu cũ thì
+        //         trả lời "Có" là đặt cả ở co/tê nhẹ, sai chuẩn treo đỡ.
+        if (HoiThamSo(ed, pack, thuVien) is not { } ts) return;
+        var (he, def0, cheDo, taiMoiPhuKien) = (ts.He, ts.Block, ts.CheDo, ts.TaiMoiPhuKien);
         if (pack.DrawTools.CoKhaiPhuKienNang)
         {
-            taiMoiPhuKien = false;
             ed.WriteMessage(
                 $"\n[XBoss] Phụ kiện NẶNG theo rule pack {pack.RulePack.Version} (luôn có giá đỡ tại chỗ): " +
-                $"{string.Join(", ", phuKienNang)}.\n");
-        }
-        else
-        {
-            var hoiTaiPhuKien = HoiTaiPhuKien(ed, pack.RulePack.Version);
-            if (hoiTaiPhuKien is null) return;
-            taiMoiPhuKien = hoiTaiPhuKien.Value;
+                $"{string.Join(", ", pack.DrawTools.HeavyFittingIds)}.\n");
         }
 
         // (3) Chọn tuyến (ngoài transaction — ESC là bản vẽ nguyên trạng).
@@ -151,7 +123,7 @@ public sealed class VeGiadoCommands
                          (taiMoiPhuKien || pack.DrawTools.LaPhuKienNang(k.BlockId)));
 
                 var kq = SupportSpacing.Tinh(
-                    dinh, spacingMm / toMm, kin, daCo, phuKien, cheDo.Value);
+                    dinh, spacingMm / toMm, kin, daCo, phuKien, cheDo);
                 foreach (var c in kq.CanhBao)
                     ed.WriteMessage($"\n[XBoss] ⚠ Tuyến {xd.ItemId} {xd.Size} (handle {handleTim}): {c}\n");
 
@@ -215,6 +187,64 @@ public sealed class VeGiadoCommands
     }
 
     // ===== Hỏi đáp =====
+
+    /// <summary>
+    /// Hệ + block giá đỡ + cách chia + (rule pack cũ) giá đỡ tại mọi phụ kiện. Danh mục block của
+    /// MỌI hệ tra sẵn ở đây rồi mới mở hộp thoại — hộp thoại không chạm tệp thư viện (M106 §2).
+    /// Null = kỹ sư hủy hoặc không hệ nào có block giá đỡ.
+    /// </summary>
+    private static KetQuaHoiGiaDo? HoiThamSo(Editor ed, DrawToolsPack pack, BlockManifest thuVien)
+    {
+        var cacHe = new List<HeCoBlock>();
+        foreach (var sys in pack.DrawTools.Systems)
+        {
+            var dung = sys.Fittings
+                .Select(thuVien.TimTheoId)
+                .Where(d => d is not null && d.KindEnum == BlockKind.Support)
+                .Select(d => d!)
+                .ToList();
+            if (dung.Count > 0) cacHe.Add(new HeCoBlock(sys, dung, []));
+        }
+
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new GiaDoDialogViewModel(
+                thuVien.Version, pack.RulePack.Version, cacHe,
+                pack.DrawTools.CoKhaiPhuKienNang, pack.DrawTools.HeavyFittingIds, VeContext.He?.Id);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi)
+        {
+            if (kq is not null) VeContext.He = kq.He; // ghi nhớ hệ của phiên (FR4)
+            return kq;
+        }
+
+        // ----- Đường hỏi đáp dòng lệnh cũ (FR9) -----
+        var he = VeContext.HoiHe(ed, pack);
+        if (he is null) return null;
+        var muc = cacHe.FirstOrDefault(h => string.Equals(h.He.Id, he.Id, StringComparison.Ordinal));
+        if (muc is null)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] Thư viện {thuVien.Version} chưa có block giá đỡ (kind=support) cho hệ {he.Id} — " +
+                "phát hành lại thư viện hoặc khai id giá đỡ vào drawTools.systems[].fittings ở rule pack sau.\n");
+            return null;
+        }
+        var def0 = BlockLibraryService.HoiBlock(ed, $"Giá đỡ của hệ {he.Id}", muc.Blocks, null);
+        if (def0 is null) return null;
+
+        var cheDo = HoiCheDoChia(ed);
+        if (cheDo is null) return null;
+
+        var taiMoiPhuKien = false;
+        if (!pack.DrawTools.CoKhaiPhuKienNang)
+        {
+            var hoiTaiPhuKien = HoiTaiPhuKien(ed, pack.RulePack.Version);
+            if (hoiTaiPhuKien is null) return null;
+            taiMoiPhuKien = hoiTaiPhuKien.Value;
+        }
+        return new KetQuaHoiGiaDo(he, def0, cheDo.Value, taiMoiPhuKien);
+    }
 
     private static CheDoChiaGiaDo? HoiCheDoChia(Editor ed)
     {

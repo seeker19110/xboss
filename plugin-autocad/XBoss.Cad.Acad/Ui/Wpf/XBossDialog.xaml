@@ -66,6 +66,33 @@
       <Setter Property="MinHeight" Value="24" />
     </Style>
 
+    <Style TargetType="CheckBox">
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
+      <Setter Property="Margin" Value="0,6,0,0" />
+      <Setter Property="MinHeight" Value="24" />
+    </Style>
+
+    <Style TargetType="TextBox">
+      <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenO}" />
+      <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Chu}" />
+      <Setter Property="CaretBrush" Value="{x:Static wpf:MauBangWpf.Chu}" />
+      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NenKhoi}" />
+      <Setter Property="Padding" Value="6,4" />
+      <Setter Property="MinHeight" Value="30" />
+    </Style>
+
+    <!-- Ẩn/hiện cả khối theo một cờ bool của ViewModel (vd CanTang, CanKhoGiay). -->
+    <BooleanToVisibilityConverter x:Key="CoThiHien" />
+
+    <!-- Khối chỉ-đọc liệt kê nhiều dòng (xem trước, hệ quả, cảnh báo) — FR6. -->
+    <Style x:Key="KhoiChiDoc" TargetType="Border">
+      <Setter Property="Margin" Value="0,6,0,0" />
+      <Setter Property="Padding" Value="8" />
+      <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenO}" />
+      <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.NenKhoi}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
     <!-- Nút: nền đặc, cao tối thiểu 32 để bấm được chắc tay trên màn hình DPI cao. -->
     <Style x:Key="NutPhu" TargetType="Button">
       <Setter Property="Background" Value="{x:Static wpf:MauBangWpf.NenKhoi}" />
@@ -173,6 +200,388 @@
       </StackPanel>
     </DataTemplate>
 
+    <!-- ===== M106 PR3 — các lệnh còn lại của bảng §7.2 ===== -->
+
+    <!-- XBOSS_LOGIN: chỉ hỏi địa chỉ server (device pairing, không có email/mật khẩu). -->
+    <DataTemplate DataType="{x:Type vm:LoginDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Địa chỉ server XBoss (https://…)" />
+        <TextBox Text="{Binding BaseUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaCacBuoc}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_UPLOAD: bản vẽ đích + rev; sidecar gửi kèm chỉ hiển thị. -->
+    <DataTemplate DataType="{x:Type vm:UploadDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}"
+                   Text="Số bản vẽ trong sổ XBoss (vd ACMV-SD-T05-001, hoặc #12)" />
+        <TextBox Text="{Binding MaBanVe, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBlock Style="{StaticResource Nhan}" Text="Rev (vd A, B, C)" />
+        <TextBox Text="{Binding Rev, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaSidecar}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_CHUANHOA: xác nhận thực thi, kèm diff xem trước (chỉ đọc). -->
+    <DataTemplate DataType="{x:Type vm:ChuanHoaDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="{Binding TomTat}" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding DongXemTruoc}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_BATCH: chọn chế độ (thư mục vẫn chọn bằng hộp thoại hệ thống sau khi bấm OK). -->
+    <DataTemplate DataType="{x:Type vm:BatchDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Chế độ" />
+        <RadioButton GroupName="CheDoBatch" IsChecked="{Binding LaKiemTra, Mode=TwoWay}"
+                     Content="Chỉ kiểm (an toàn, không sửa)" />
+        <RadioButton GroupName="CheDoBatch" IsChecked="{Binding LaChuanHoa, Mode=TwoWay}"
+                     Content="Chuẩn hóa (bản gốc giữ nguyên, kết quả vào thư mục con)" />
+        <RadioButton GroupName="CheDoBatch" IsChecked="{Binding LaBocKL, Mode=TwoWay}"
+                     Content="Bóc khối lượng hàng loạt (1 Excel tổng)" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaCheDo}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_BOCKL: phạm vi + bóc theo vùng. -->
+    <DataTemplate DataType="{x:Type vm:BocKlDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Phạm vi bóc" />
+        <RadioButton GroupName="PhamViBoc" IsChecked="{Binding LaToanBo, Mode=TwoWay}"
+                     Content="Toàn bộ model space" />
+        <RadioButton GroupName="PhamViBoc" IsChecked="{Binding LaChonVung, Mode=TwoWay}"
+                     Content="Chọn vùng (quét chọn sau khi bấm OK)" />
+        <CheckBox IsChecked="{Binding ChiaVung, Mode=TwoWay}"
+                  Content="Bóc theo vùng (tầng/zone) — chọn polyline ranh giới rồi đặt tên vùng" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaViecTiepTheo}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_BOCKL_XOA: phạm vi gỡ dấu bóc. -->
+    <DataTemplate DataType="{x:Type vm:BocKlXoaDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Phạm vi gỡ dấu" />
+        <RadioButton GroupName="PhamViGoDau" IsChecked="{Binding LaToanBo, Mode=TwoWay}"
+                     Content="Toàn bộ model space" />
+        <RadioButton GroupName="PhamViGoDau" IsChecked="{Binding LaChonVung, Mode=TwoWay}"
+                     Content="Chọn vùng (quét chọn sau khi bấm OK)" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaViecTiepTheo}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_BOCKL_XUAT: meta đầu trang Excel + đối chiếu BOQ. -->
+    <DataTemplate DataType="{x:Type vm:BocKlXuatDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Tên dự án" />
+        <TextBox Text="{Binding TenDuAn, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBlock Style="{StaticResource Nhan}" Text="Gói thầu" />
+        <TextBox Text="{Binding GoiThau, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <CheckBox IsChecked="{Binding DoiChieuBoq, Mode=TwoWay}"
+                  Content="Kéo KL BOQ hợp đồng từ máy chủ để dựng sheet &quot;Doi-chieu&quot;" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaDoiChieu}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_NEN: chọn hệ; mức làm mờ/khóa layer do rule pack quyết (chỉ đọc). -->
+    <DataTemplate DataType="{x:Type vm:VeNenDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Hệ sắp vẽ" />
+        <ComboBox ItemsSource="{Binding CacHe}" SelectedItem="{Binding He, Mode=TwoWay}"
+                  DisplayMemberPath="Name" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaViecSeLam}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_NHAN: tỉ lệ in của phiên (nội dung nhãn lấy từ XData của tuyến). -->
+    <DataTemplate DataType="{x:Type vm:VeNhanDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Tỉ lệ in 1:x (chọn trong danh mục hoặc gõ số)" />
+        <ComboBox IsEditable="True" ItemsSource="{Binding CacTiLe}"
+                  Text="{Binding TiLe, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaCaoChu}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_DOI: hệ/loại/size/độ dốc mới + hệ quả (thay luôn câu xác nhận DongY/Huy). -->
+    <DataTemplate DataType="{x:Type vm:VeDoiDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Đang chọn" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="90" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding TomTatDangChon}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Hệ mới" />
+        <ComboBox ItemsSource="{Binding CacHe}" SelectedItem="{Binding He, Mode=TwoWay}"
+                  DisplayMemberPath="Name" />
+        <TextBlock Style="{StaticResource Nhan}" Text="Loại tuyến mới" />
+        <ComboBox ItemsSource="{Binding CacLoaiTuyen}" SelectedItem="{Binding Tuyen, Mode=TwoWay}"
+                  DisplayMemberPath="Name" />
+        <TextBlock Style="{StaticResource Nhan}" Text="Size mới (chọn trong danh mục, hoặc gõ size khác)" />
+        <ComboBox IsEditable="True" ItemsSource="{Binding CacSize}"
+                  Text="{Binding Size, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <StackPanel Visibility="{Binding CanDoDoc, Converter={StaticResource CoThiHien}}">
+          <TextBlock Style="{StaticResource Nhan}" Text="Độ dốc (bắt buộc với tuyến này)" />
+          <ComboBox IsEditable="True" ItemsSource="{Binding CacDoDoc}"
+                    Text="{Binding DoDoc, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Bấm OK sẽ:" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ItemsControl ItemsSource="{Binding HeQua}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Border>
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_PHUKIEN / XBOSS_VE_THIETBI: hệ + block (cỡ/hướng/attribute theo từng lần chèn). -->
+    <DataTemplate DataType="{x:Type vm:ChonBlockDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Hệ" />
+        <ComboBox ItemsSource="{Binding CacHe}" SelectedItem="{Binding He, Mode=TwoWay}"
+                  DisplayMemberPath="He.Name" />
+        <TextBlock Style="{StaticResource Nhan}" Text="Block trong thư viện" />
+        <ComboBox ItemsSource="{Binding CacBlock}" SelectedItem="{Binding Block, Mode=TwoWay}"
+                  DisplayMemberPath="Id" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaBlock}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_GIADO: hệ + block + cách chia (+ phụ kiện nặng với rule pack cũ). -->
+    <DataTemplate DataType="{x:Type vm:GiaDoDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Hệ" />
+        <ComboBox ItemsSource="{Binding CacHe}" SelectedItem="{Binding He, Mode=TwoWay}"
+                  DisplayMemberPath="He.Name" />
+        <TextBlock Style="{StaticResource Nhan}" Text="Block giá đỡ" />
+        <ComboBox ItemsSource="{Binding CacBlock}" SelectedItem="{Binding Block, Mode=TwoWay}"
+                  DisplayMemberPath="Id" />
+
+        <TextBlock Style="{StaticResource Nhan}"
+                   Text="Cách chia khi chiều dài không chia hết cho khoảng cách chuẩn" />
+        <RadioButton GroupName="CheDoGiaDo" IsChecked="{Binding LaKhongVuot, Mode=TwoWay}"
+                     Content="Bước luôn ≤ khoảng cách chuẩn (an toàn)" />
+        <RadioButton GroupName="CheDoGiaDo" IsChecked="{Binding LaGanNhat, Mode=TwoWay}"
+                     Content="Chia đều gần khoảng cách chuẩn nhất (ít giá đỡ hơn)" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaCheDo}" />
+
+        <CheckBox Visibility="{Binding CanHoiTaiPhuKien, Converter={StaticResource CoThiHien}}"
+                  IsChecked="{Binding TaiMoiPhuKien, Mode=TwoWay}"
+                  Content="Đặt thêm giá đỡ tại MỌI phụ kiện đã chèn trên tuyến" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaPhuKienNang}" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaKhoangCach}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_LOCHO: chèn sleeve hay xuất bảng lỗ chờ. -->
+    <DataTemplate DataType="{x:Type vm:LoChoDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Việc cần làm" />
+        <RadioButton GroupName="CheDoLoCho" IsChecked="{Binding LaChen, Mode=TwoWay}"
+                     Content="Chèn sleeve tại chỗ tuyến xuyên kết cấu" />
+        <RadioButton GroupName="CheDoLoCho" IsChecked="{Binding LaXuatBang, Mode=TwoWay}"
+                     Content="Xuất bảng lỗ chờ (Table trong bản vẽ + Excel)" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaCheDo}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_TAG: chế độ + (chỉ khi đánh lại) phạm vi và tầng. -->
+    <DataTemplate DataType="{x:Type vm:TagDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Việc cần làm" />
+        <RadioButton GroupName="CheDoTag" IsChecked="{Binding LaQuet, Mode=TwoWay}"
+                     Content="Quét trùng/nhảy số (chỉ báo, không sửa)" />
+        <RadioButton GroupName="CheDoTag" IsChecked="{Binding LaDanhLai, Mode=TwoWay}"
+                     Content="Đánh lại tuần tự" />
+        <RadioButton GroupName="CheDoTag" IsChecked="{Binding LaKhoa, Mode=TwoWay}"
+                     Content="Khóa tag đang chọn (đánh lại không đổi)" />
+        <RadioButton GroupName="CheDoTag" IsChecked="{Binding LaMoKhoa, Mode=TwoWay}"
+                     Content="Mở khóa tag đang chọn" />
+
+        <StackPanel Visibility="{Binding CanTang, Converter={StaticResource CoThiHien}}">
+          <TextBlock Style="{StaticResource Nhan}" Text="Phạm vi đánh lại" />
+          <RadioButton GroupName="PhamViTag" IsChecked="{Binding LaToanBo, Mode=TwoWay}"
+                       Content="Toàn bộ model space" />
+          <RadioButton GroupName="PhamViTag" IsChecked="{Binding LaChonVung, Mode=TwoWay}"
+                       Content="Chọn vùng (quét chọn sau khi bấm OK)" />
+          <TextBlock Style="{StaticResource Nhan}" Text="Tầng của bản vẽ (điền vào {floor} của tag)" />
+          <TextBox Text="{Binding Tang, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaCheDo}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_THONGKE: nguồn dữ liệu của bảng + tỉ lệ in. -->
+    <DataTemplate DataType="{x:Type vm:ThongKeDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Bảng lấy dữ liệu từ đâu" />
+        <RadioButton GroupName="LoaiBang" IsChecked="{Binding LaThietBi, Mode=TwoWay}"
+                     Content="Bảng thiết bị (từ attribute TAG/MODEL/SIZE)" />
+        <RadioButton GroupName="LoaiBang" IsChecked="{Binding LaKhoiLuong, Mode=TwoWay}"
+                     Content="Bảng khối lượng theo hệ (từ trạng thái bóc XBOSS_BOCKL)" />
+        <RadioButton GroupName="LoaiBang" IsChecked="{Binding LaChiaDot, Mode=TwoWay}"
+                     Content="Bảng đốt theo kiểu nối (từ dấu chia đốt XBOSS_VE_CHIADOT)" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Tỉ lệ in 1:x" />
+        <ComboBox IsEditable="True" ItemsSource="{Binding CacTiLe}"
+                  Text="{Binding TiLe, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaNguon}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_MATCAT: tỉ lệ + cao độ TỪNG tuyến (tên mặt cắt do plugin tự đánh). -->
+    <DataTemplate DataType="{x:Type vm:MatCatDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Tỉ lệ in 1:x" />
+        <ComboBox IsEditable="True" ItemsSource="{Binding CacTiLe}"
+                  Text="{Binding TiLe, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Cao độ tim từng tuyến (mm, so với điểm đặt hình cắt)" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding CacCaoDo}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="130" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding Nhan}" TextWrapping="Wrap"
+                               VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <TextBox Grid.Column="1"
+                             Text="{Binding GiaTri, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaTenMatCat}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_TRANGIN: hệ → khổ giấy → tỉ lệ → ẩn layer → CTB → thông tin khung tên. -->
+    <DataTemplate DataType="{x:Type vm:TrangInDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Hệ cần in" />
+        <ComboBox ItemsSource="{Binding CacHe}" SelectedItem="{Binding He, Mode=TwoWay}"
+                  DisplayMemberPath="Name" />
+
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0" Margin="0,0,8,0">
+            <TextBlock Style="{StaticResource Nhan}" Text="Khổ giấy" />
+            <ComboBox ItemsSource="{Binding CacKhoGiay}" SelectedItem="{Binding KhoGiay, Mode=TwoWay}" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Margin="8,0,0,0">
+            <TextBlock Style="{StaticResource Nhan}" Text="Tỉ lệ in 1:x" />
+            <ComboBox IsEditable="True" ItemsSource="{Binding CacTiLe}"
+                      Text="{Binding TiLe, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+          </StackPanel>
+        </Grid>
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaTiLe}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Ẩn layer theo viewport (VP freeze)" />
+        <RadioButton GroupName="AnLayer" IsChecked="{Binding AnHeKhac, Mode=TwoWay}"
+                     Content="Chỉ ẩn tuyến của các hệ MEP khác (giữ nền kiến trúc/trục)" />
+        <RadioButton GroupName="AnLayer" IsChecked="{Binding AnNgoaiHe, Mode=TwoWay}"
+                     Content="Ẩn mọi layer không thuộc hệ đang in" />
+        <RadioButton GroupName="AnLayer" IsChecked="{Binding KhongAn, Mode=TwoWay}"
+                     Content="Không ẩn gì" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaAnLayer}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Bảng nét in (CTB)" />
+        <ComboBox ItemsSource="{Binding CacCtb}" SelectedItem="{Binding Ctb, Mode=TwoWay}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Thông tin khung tên" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding CacThe}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="160" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding Nhan}" TextWrapping="Wrap"
+                               VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <TextBox Grid.Column="1"
+                             Text="{Binding GiaTri, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaKhungTen}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_DEXUAT: bản WPF của DeXuatBlockDialog (M103) — giữ nguyên trường + quy tắc. -->
+    <DataTemplate DataType="{x:Type vm:DeXuatBlockDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Tên block" />
+        <TextBox Text="{Binding TenBlock, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Loại block" />
+        <ComboBox ItemsSource="{Binding CacLoai}" SelectedItem="{Binding MucLoaiChon, Mode=TwoWay}"
+                  DisplayMemberPath="Nhan" />
+
+        <StackPanel Visibility="{Binding CanHe, Converter={StaticResource CoThiHien}}">
+          <TextBlock Style="{StaticResource Nhan}" Text="Hệ (layerMap)" />
+          <ComboBox ItemsSource="{Binding CacHe}" SelectedItem="{Binding MucHeChon, Mode=TwoWay}"
+                    DisplayMemberPath="Nhan" />
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding CanItem, Converter={StaticResource CoThiHien}}">
+          <TextBlock Style="{StaticResource Nhan}" Text="Item bóc tách" />
+          <ComboBox ItemsSource="{Binding CacItem}" SelectedItem="{Binding MucItemChon, Mode=TwoWay}"
+                    DisplayMemberPath="Nhan" />
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding CanKhoGiay, Converter={StaticResource CoThiHien}}">
+          <TextBlock Style="{StaticResource Nhan}" Text="Khổ giấy" />
+          <ComboBox IsEditable="True" ItemsSource="{Binding CacKhoGiay}"
+                    Text="{Binding KhoGiay, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Ghi chú" />
+        <TextBox Height="64" AcceptsReturn="True" TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto"
+                 Text="{Binding GhiChu, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+      </StackPanel>
+    </DataTemplate>
+
   </Window.Resources>
 
   <Grid Margin="18,16,18,16">
@@ -188,7 +597,11 @@
                Margin="0,0,0,6"
                Text="{Binding MoTa}" />
 
-    <ContentControl Grid.Row="1" Content="{Binding}" />
+    <!-- Cuộn được: form dài nhất (XBOSS_VE_TRANGIN, XBOSS_VE_MATCAT nhiều tuyến) vẫn vừa màn hình
+         laptop 768px mà không phải bỏ trường nào. -->
+    <ScrollViewer Grid.Row="1" MaxHeight="560" VerticalScrollBarVisibility="Auto">
+      <ContentControl Content="{Binding}" />
+    </ScrollViewer>
 
     <!-- Vùng lý do: nút OK khóa thì đây nói RÕ vì sao (FR2). -->
     <Border Grid.Row="2"

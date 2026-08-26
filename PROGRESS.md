@@ -246,10 +246,35 @@ nhân bản tầng điển hình, riser). Mỗi mục phải mở `M<xx>` mới 
 * **Còn lại:** verify tay lệnh mới trên máy có AutoCAD 2026 (cùng cổng với M99/M100/M102 — không có
   runner Windows).
 
-**M106 — Hộp thoại WPF cho lệnh plugin + trình dẫn quy trình:** ✅ **Approved 2026-08-26 — PR1
-(nền + 2 lệnh mẫu) và PR2 (trình dẫn quy trình) XONG**
+**M106 — Hộp thoại WPF cho lệnh plugin + trình dẫn quy trình:** ✅ **ĐÓNG về mặt code 2026-08-26 —
+PR1 (nền + 2 lệnh mẫu), PR2 (trình dẫn quy trình) và PR3 (phủ nốt các lệnh còn lại) XONG**
 (`docs/nang-cap/M106-hop-thoai-wpf-va-quy-trinh.md`). Kỹ sư chạy lệnh bằng **chuột** thay cho chuỗi
 hỏi đáp keyword ở dòng lệnh, và thấy rõ đang ở bước nào của quy trình.
+
+**PR3 — phủ hộp thoại cho các lệnh còn lại của §7.2:**
+
+- **19 ViewModel mới ở Core** (`Core/Ui/ViewModels/{KetNoi,ChuanHoa,Ve,ChiTiet,HoSo,BocKl}DialogViewModels.cs`
+  - `DeXuatBlockDialogViewModel.cs` + `DungChungDialog.cs`) phủ 20 lệnh: `XBOSS_LOGIN`,
+    `XBOSS_UPLOAD`, `XBOSS_CHUANHOA`, `XBOSS_BATCH`, `XBOSS_BOCKL(_XOA/_XUAT)`, `XBOSS_VE_NEN`,
+    `XBOSS_VE_NHAN`, `XBOSS_VE_DOI`, `XBOSS_VE_PHUKIEN`, `XBOSS_VE_THIETBI`, `XBOSS_VE_GIADO`,
+    `XBOSS_VE_LOCHO`, `XBOSS_VE_TAG`, `XBOSS_VE_THONGKE`, `XBOSS_VE_MATCAT`, `XBOSS_VE_TRANGIN`,
+    `XBOSS_VE_DEXUAT`. XAML là **DataTemplate thuần** trong `XBossDialog.xaml` (vẫn đúng MỘT
+    `InitializeComponent()` trong cả plugin — cổng AcadShim không phải stub thêm gì).
+- **Nội dung hộp thoại = ĐÚNG câu hỏi mà lệnh đang hỏi.** Nơi bảng §7.2 mô tả lệch với code thật thì
+  lấy **code thật** làm chuẩn và ghi rõ trong doc-comment của từng ViewModel (vd `XBOSS_LOGIN` là
+  device pairing nên không có email/mật khẩu; `XBOSS_VE_GIADO` không hỏi khoảng cách vì
+  `supportSpacingMm` tra theo từng size; `XBOSS_VE_TAG` không hỏi tiền tố/số bắt đầu vì khuôn tag
+  nằm ở rule pack). Thông tin suy ra hiện **CHỈ ĐỌC** (FR6), không mở bậc tự do mới (§2.4).
+- **Tỉ lệ in 1:x vào hộp thoại** (việc hẹn ở PR1) cho `XBOSS_VE_NHAN`, `XBOSS_VE_THONGKE`,
+  `XBOSS_VE_MATCAT`, `XBOSS_VE_TRANGIN` — vẫn nhớ ở đúng `VeContext.TiLeIn`, **không có cơ chế nhớ
+  thứ hai**; lệnh vẽ đầu tiên của phiên nay cũng chạy trọn bằng chuột.
+- **AC8:** `Ui/DeXuatBlockDialog.cs` (WinForms) đã **xóa**, thay bằng ViewModel + DataTemplate WPF
+  giữ nguyên 6 trường và `BlockDeXuatRules`; palette `XBOSS_BANG` **giữ WinForms** đúng ranh giới đã
+  chốt. Fallback FR9 giữ nguyên cho mọi lệnh (hàm `Hoi*` cũ không xóa); riêng `XBOSS_VE_DEXUAT` vốn
+  không có đường hỏi đáp keyword nên UI hỏng = dừng kèm lý do.
+- **831/831 ca .NET xanh** (nền PR2 là 735 → +96 ca ViewModel), AcadShim 0 warning.
+- **Còn lại:** verify tay §C8 (mục 43–63) của `plugin-autocad/VERIFY-VA-PHAT-HANH.md` trên máy có
+  AutoCAD 2026 — XAML không có test tự động.
 
 **PR2 — trình dẫn quy trình (FR7/FR8/FR10, AC5/AC7):**
 

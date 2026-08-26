@@ -4,8 +4,10 @@ using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Geometry;
+using XBoss.Cad.Core.Ui.ViewModels;
 
 [assembly: CommandClass(typeof(XBoss.Cad.Acad.Commands.VeMatcatCommands))]
 
@@ -66,22 +68,24 @@ public sealed class VeMatcatCommands
         }
         ed.WriteMessage($"\n[XBoss] Tuyến cắt qua {ketQua.KyHieu.Count} tuyến.\n");
 
-        // (3) Tỉ lệ (chung một cửa với XBOSS_VE_NHAN / XBOSS_VE_TRANGIN) + điểm đặt hình cắt.
-        if (VeContext.HoiTiLeIn(ed, pack) is not { } tiLe) return;
+        // (3) Tên mặt cắt tự đánh theo pattern, bỏ qua tên đã dùng trong bản vẽ (hộp thoại hiện nó
+        //     ở dạng CHỈ ĐỌC nên phải biết trước).
+        var tenMatCat = SheetSetup.TenMatCatKeTiep(pack.SheetSetup.SectionNamePattern, TenMatCatDaDung(db));
+
+        // (4) Tỉ lệ (chung một cửa với XBOSS_VE_NHAN / XBOSS_VE_TRANGIN) + cao độ TỪNG tuyến —
+        //     nhập tay, không bịa (M100 §6.4 bước 3). Hộp thoại gộp cả hai (M106 §7.2), rơi về
+        //     nguyên chuỗi hỏi đáp cũ khi UI hỏng hoặc XBOSS_UI_DIALOG=0 (FR9).
+        if (HoiThamSo(ed, pack, ketQua.KyHieu, tenMatCat) is not { } ts) return;
+        var (tiLe, caoDoMm) = (ts.TiLeIn, ts.CaoDoMm);
         var caoChu = pack.DrawTools.LabelStyle.TextHeightMm * tiLe / toMm;
 
+        // (5) Điểm đặt hình cắt.
         var kqDat = ed.GetPoint(new PromptPointOptions(
             "\n[XBoss] Điểm đặt hình cắt (điểm này = cao độ ±0.000): "));
         if (kqDat.Status != PromptStatus.OK) return;
         var diemDatWcs = kqDat.Value.TransformBy(ed.CurrentUserCoordinateSystem);
         var diemDat = new Diem2(diemDatWcs.X, diemDatWcs.Y);
 
-        // (4) Cao độ TỪNG tuyến — nhập tay, không bịa (M100 §6.4 bước 3).
-        var caoDoMm = HoiCaoDo(ed, pack, ketQua.KyHieu);
-        if (caoDoMm is null) return;
-
-        // (5) Tên mặt cắt tự đánh theo pattern, bỏ qua tên đã dùng trong bản vẽ.
-        var tenMatCat = SheetSetup.TenMatCatKeTiep(pack.SheetSetup.SectionNamePattern, TenMatCatDaDung(db));
         var ngay = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         // (6) Dựng toàn bộ trong MỘT transaction = MỘT nhóm UNDO.
@@ -113,6 +117,37 @@ public sealed class VeMatcatCommands
     }
 
     // ===== Hỏi đáp =====
+
+    /// <summary>
+    /// Tỉ lệ in + cao độ tim từng tuyến. Hộp thoại một form (M106 §7.2); UI hỏng hoặc
+    /// <c>XBOSS_UI_DIALOG=0</c> → đúng chuỗi câu hỏi dòng lệnh cũ (FR9). Tỉ lệ nhớ ở đúng
+    /// <see cref="VeContext.TiLeIn"/> (FR4). Null = kỹ sư hủy.
+    /// </summary>
+    private static KetQuaHoiMatCat? HoiThamSo(
+        Editor ed, DrawToolsPack pack, IReadOnlyList<KyHieuMatCat> kyHieu, string tenMatCat)
+    {
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new MatCatDialogViewModel(
+                pack.SheetSetup.Scales,
+                VeContext.TiLeIn,
+                kyHieu.Select(k => new TuyenCatQua(k.Tim.Handle, k.Tim.ItemId, k.Tim.Size)).ToList(),
+                tenMatCat,
+                _caoDoLanTruoc ?? pack.SheetSetup.DefaultElevations.FirstOrDefault());
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi)
+        {
+            if (kq is null) return null;
+            VeContext.TiLeIn = kq.TiLeIn;
+            if (kq.CaoDoMm.Count > 0) _caoDoLanTruoc = kq.CaoDoMm[^1];
+            return kq;
+        }
+
+        if (VeContext.HoiTiLeIn(ed, pack) is not { } tiLe) return null;
+        var caoDo = HoiCaoDo(ed, pack, kyHieu);
+        return caoDo is null ? null : new KetQuaHoiMatCat(tiLe, caoDo);
+    }
 
     private static (Diem2 Dau, Diem2 Cuoi)? HoiTuyenCat(Editor ed)
     {

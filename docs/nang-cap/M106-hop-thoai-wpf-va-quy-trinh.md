@@ -164,6 +164,27 @@ chặn** — chặn cứng thuộc về bản thân lệnh.
 Lệnh **không tham số** chạy thẳng, không hộp thoại: `XBOSS_VE_BAOCAO`, `XBOSS_VE_THUVIEN`,
 `XBOSS_BANG`.
 
+> **Hiệu chỉnh sau thi hành (2026-08-26).** Bảng trên viết TRƯỚC khi đọc kỹ từng lệnh, nên 16 dòng
+> mô tả tham số mà lệnh **không hề hỏi** (chúng suy ra từ rule pack/XData/điểm bấm). Luật đã áp:
+> **lấy code thật làm chuẩn** — hộp thoại chỉ chứa đúng câu hỏi mà đường dòng lệnh đang hỏi, thứ
+> suy ra thì hiện CHỈ ĐỌC (FR6). Thêm ô nhập cho thứ lệnh tự suy là mở bậc tự do mà dòng lệnh không
+> có, phá guardrail §2.4. Các chênh lệch đáng nhớ:
+>
+> - `XBOSS_VE_GIADO` **không bao giờ hỏi khoảng cách** — tra `supportSpacingMm` theo loại+size từng
+>   tuyến, thiếu thì bỏ qua tuyến đó. Cho gõ tay là phá chốt "không tự bịa khoảng cách treo đỡ".
+> - `XBOSS_VE_THIETBI`: giá trị attribute nhập **riêng từng lần chèn** — gom lên hộp thoại thì mọi
+>   thiết bị dính chung một TAG.
+> - `XBOSS_VE_NHAN`: nội dung nhãn/cao chữ/phía đặt đều suy ra (M100 FR7 cấm gõ tay nội dung); câu
+>   hỏi thật duy nhất là tỉ lệ in.
+> - `XBOSS_VE_TAG`: khuôn tag từ `sheetSetup.tagPattern`, số do `TagSchedule.DanhLai` tính (né số
+>   của tag đã khóa) — không có ô "tiền tố/số bắt đầu".
+> - `XBOSS_LOGIN` là luồng ghép thiết bị (chỉ hỏi URL, token nhận qua poll), không phải form
+>   email/mật khẩu — thêm 2 ô đó là dựng đường đăng nhập thứ hai.
+>
+> **3 lệnh không có hộp thoại vì không có tham số nào để hỏi:** `XBOSS_KIEMTRA` và `XBOSS_CHUANHOA`
+> (chạy trọn bộ, không tham số), `XBOSS_RULEPACK` (chỉ mở `OpenFileDialog` của hệ thống — vốn đã là
+> thao tác chuột). Ép hộp thoại rỗng vào đây chỉ thêm một cú bấm.
+
 ### 7.3 Trình dẫn quy trình
 
 - **FR7** `XBOSS_BANG` mở PaletteSet gồm 2 phần: **(a)** trạng thái hiện có của M102 (server, thiết

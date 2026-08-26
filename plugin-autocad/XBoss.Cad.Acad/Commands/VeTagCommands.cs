@@ -2,7 +2,9 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Draw;
+using XBoss.Cad.Core.Ui.ViewModels;
 
 [assembly: CommandClass(typeof(XBoss.Cad.Acad.Commands.VeTagCommands))]
 
@@ -33,6 +35,43 @@ public sealed class VeTagCommands
         var db = doc.Database;
         var mau = pack.SheetSetup.TagPattern;
 
+        // Chế độ (+ phạm vi/tầng khi đánh lại) qua MỘT hộp thoại (M106 §7.2); UI hỏng hoặc
+        // XBOSS_UI_DIALOG=0 → nguyên chuỗi hỏi đáp cũ (FR9).
+        var (daDungUi, chonUi) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            int soKhoi;
+            string? tangCu;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                soKhoi = DocTag(db, tr).Count;
+                tangCu = DocTang(db, tr);
+                tr.Commit();
+            }
+            var vm = new TagDialogViewModel(mau, soKhoi, tangCu);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi && chonUi is null) return; // kỹ sư bấm Hủy
+
+        if (chonUi is { } ui)
+        {
+            switch (ui.CheDo)
+            {
+                case CheDoTag.DanhLai:
+                    DanhLai(doc, ed, db, mau, ui.PhamVi, ui.Tang);
+                    break;
+                case CheDoTag.Khoa:
+                    DoiKhoa(doc, ed, db, khoa: true);
+                    break;
+                case CheDoTag.MoKhoa:
+                    DoiKhoa(doc, ed, db, khoa: false);
+                    break;
+                default:
+                    Quet(ed, db, mau);
+                    break;
+            }
+            return;
+        }
+
         var hoi = new PromptKeywordOptions("\n[XBoss] Đánh tag thiết bị — làm gì?") { AllowNone = false };
         hoi.Keywords.Add("QUET", "QUET", "Quét trùng/nhảy số (chỉ báo, không sửa)");
         hoi.Keywords.Add("DANHLAI", "DANHLAI", "Đánh lại tuần tự");
@@ -45,7 +84,7 @@ public sealed class VeTagCommands
         switch (kq.StringResult)
         {
             case "DANHLAI":
-                DanhLai(doc, ed, db, mau);
+                DanhLai(doc, ed, db, mau, null, null);
                 break;
             case "KHOA":
                 DoiKhoa(doc, ed, db, khoa: true);
@@ -98,26 +137,46 @@ public sealed class VeTagCommands
 
     // ===== ĐÁNH LẠI =====
 
+    /// <summary>
+    /// Đánh lại tag. <paramref name="phamViUi"/>/<paramref name="tangUi"/> khác null = hộp thoại đã
+    /// thu xong (M106); null = đường hỏi đáp dòng lệnh cũ (FR9).
+    /// </summary>
     private static void DanhLai(
-        Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, Database db, string mau)
+        Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, Database db, string mau,
+        PhamViTag? phamViUi, string? tangUi)
     {
-        var pham = new PromptKeywordOptions("\n[XBoss] Đánh lại tag trong phạm vi nào?") { AllowNone = false };
-        pham.Keywords.Add("ToanBo", "ToanBo", "Toàn bộ model space");
-        pham.Keywords.Add("ChonVung", "ChonVung", "Chọn vùng");
-        pham.Keywords.Default = "ToanBo";
-        var kqPham = ed.GetKeywords(pham);
-        if (kqPham.Status != PromptStatus.OK) return;
+        PhamViTag phamVi;
+        string tang;
+        if (phamViUi is { } pv && tangUi is { Length: > 0 } t)
+        {
+            phamVi = pv;
+            tang = t;
+        }
+        else
+        {
+            var pham = new PromptKeywordOptions("\n[XBoss] Đánh lại tag trong phạm vi nào?") { AllowNone = false };
+            pham.Keywords.Add("ToanBo", "ToanBo", "Toàn bộ model space");
+            pham.Keywords.Add("ChonVung", "ChonVung", "Chọn vùng");
+            pham.Keywords.Default = "ToanBo";
+            var kqPham = ed.GetKeywords(pham);
+            if (kqPham.Status != PromptStatus.OK) return;
+            phamVi = kqPham.StringResult == "ChonVung" ? PhamViTag.ChonVung : PhamViTag.ToanBo;
+
+            var hoiTang = HoiTang(ed, db);
+            if (hoiTang is null) return;
+            tang = hoiTang;
+        }
 
         IReadOnlyList<ObjectId>? loc = null;
-        if (kqPham.StringResult == "ChonVung")
+        if (phamVi == PhamViTag.ChonVung)
         {
             var chon = ed.GetSelection();
             if (chon.Status != PromptStatus.OK) return;
             loc = chon.Value.GetObjectIds();
         }
 
-        var tang = HoiTang(ed, db);
-        if (tang is null) return;
+        // Tầng nhớ trong CHÍNH bản vẽ (§6.9) — một cơ chế nhớ duy nhất cho cả hai đường vào.
+        GhiTangNeuDoi(db, tang);
 
         List<(TagHienCo Tag, ObjectId IdAtt)> hienCo;
         using (var tr = db.TransactionManager.StartTransaction())
@@ -281,14 +340,15 @@ public sealed class VeTagCommands
             ed.WriteMessage("\n[XBoss] Chưa có tầng — tag sẽ thiếu phần {floor}. Nhập lại rồi chạy tiếp.\n");
             return null;
         }
-
-        if (!string.Equals(tang, cu, StringComparison.Ordinal))
-        {
-            using var tr = db.TransactionManager.StartTransaction();
-            GhiTang(db, tr, tang);
-            tr.Commit();
-        }
         return tang;
+    }
+
+    /// <summary>Ghi tầng vào bản vẽ khi khác giá trị đang nhớ (không sinh Xrecord thừa).</summary>
+    private static void GhiTangNeuDoi(Database db, string tang)
+    {
+        using var tr = db.TransactionManager.StartTransaction();
+        if (!string.Equals(DocTang(db, tr), tang, StringComparison.Ordinal)) GhiTang(db, tr, tang);
+        tr.Commit();
     }
 
     private static string? DocTang(Database db, Transaction tr)

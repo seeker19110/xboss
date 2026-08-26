@@ -199,7 +199,9 @@ public sealed class VeTuyenCommands
         // (2) Tỉ lệ in để quy đổi chiều cao chữ: labelStyle.textHeightMm là mm TRÊN GIẤY.
         //     Hỏi một lần mỗi phiên, nhớ lại cho các nhãn sau — cùng cửa với XBOSS_VE_TRANGIN /
         //     XBOSS_VE_MATCAT (PR6) nên nhãn mặt bằng và tỉ lệ viewport không bao giờ lệch nhau.
-        if (VeContext.HoiTiLeIn(ed, pack) is not { } tiLe) return;
+        //     M106 PR3: đưa câu hỏi tỉ lệ vào hộp thoại để lệnh ghi nhãn đầu tiên của phiên cũng
+        //     chạy trọn bằng chuột — vẫn NHỚ ở đúng VeContext.TiLeIn, không có cơ chế nhớ thứ hai.
+        if (HoiTiLeGhiNhan(ed, pack) is not { } tiLe) return;
 
         var (toMm, _, _) = DrawingUnits.TuInsUnits((int)db.Insunits);
         var cao = pack.DrawTools.LabelStyle.TextHeightMm * tiLe / toMm;
@@ -298,6 +300,26 @@ public sealed class VeTuyenCommands
             return kq;
         }
         return HoiThamSoDongLenh(ed, pack);
+    }
+
+    /// <summary>
+    /// Tỉ lệ in cho lần ghi nhãn này (M106 §7.2 · XBOSS_VE_NHAN). Hộp thoại hiện chiều cao chữ suy
+    /// ra theo tỉ lệ đang chọn (FR6); UI hỏng hoặc <c>XBOSS_UI_DIALOG=0</c> thì về đúng
+    /// <see cref="VeContext.HoiTiLeIn"/> như cũ (FR9). Cả hai đường ghi vào cùng một chỗ nhớ của
+    /// phiên (<see cref="VeContext.TiLeIn"/> — FR4).
+    /// </summary>
+    private static double? HoiTiLeGhiNhan(Editor ed, DrawToolsPack pack)
+    {
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new VeNhanDialogViewModel(
+                pack.SheetSetup.Scales, pack.DrawTools.LabelStyle.TextHeightMm, VeContext.TiLeIn);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (!daDungUi) return VeContext.HoiTiLeIn(ed, pack);
+        if (kq is null) return null;
+        VeContext.TiLeIn = kq.TiLeIn;
+        return kq.TiLeIn;
     }
 
     /// <summary>Chuỗi 4 câu hỏi keyword của bản trước M106 — giữ nguyên cho script/batch và FR9.</summary>

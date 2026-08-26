@@ -3,10 +3,12 @@ using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Api;
 using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Geometry;
 using XBoss.Cad.Core.Matching;
+using XBoss.Cad.Core.Ui.ViewModels;
 
 // Khối chờ chèn dùng CHUNG với các lệnh chèn block khác (giá đỡ, lỗ chờ — M100 PR7): định nghĩa
 // nằm ở BlockLibraryService, ở đây chỉ đặt bí danh cho ngắn.
@@ -47,35 +49,15 @@ public sealed class VePhuKienCommands
         if (BlockLibraryService.CanThuVien(ed) is not { } thuVien) return;
         var db = doc.Database;
 
-        var he = VeContext.HoiHe(ed, pack);
-        if (he is null) return;
-
-        // (1) Danh mục phụ kiện của hệ: id khai trong rule pack, định nghĩa nằm ở manifest thư viện.
-        //     Block kind support/sleeve tuy cũng khai trong fittings[] nhưng có lệnh riêng (PR7) —
-        //     không trộn vào đây để kỹ sư không đặt giá đỡ bằng lệnh phụ kiện.
-        var danhSach = new List<BlockDef>();
-        var thieu = new List<string>();
-        foreach (var id in he.Fittings)
-        {
-            var def = thuVien.TimTheoId(id);
-            if (def is null) thieu.Add(id);
-            else if (def.KindEnum == BlockKind.Fitting) danhSach.Add(def);
-        }
-        if (thieu.Count > 0)
-        {
-            ed.WriteMessage(
-                $"\n[XBoss] ⚠ Thư viện {thuVien.Version} không có phụ kiện: {string.Join(", ", thieu)} — " +
-                "phát hành lại thư viện hoặc sửa rule pack ở version sau.\n");
-        }
-        if (danhSach.Count == 0)
-        {
-            ed.WriteMessage(
-                $"\n[XBoss] Hệ {he.Id} chưa có phụ kiện nào dùng được trong thư viện {thuVien.Version}.\n");
-            return;
-        }
-
-        var def0 = BlockLibraryService.HoiBlock(ed, $"Phụ kiện của hệ {he.Id}", danhSach, VeContext.PhuKienId);
-        if (def0 is null) return;
+        // (1) Hệ + phụ kiện trong MỘT hộp thoại (M106 §7.2); UI hỏng / XBOSS_UI_DIALOG=0 → đúng hai
+        //     câu hỏi cũ (FR9). Danh mục phụ kiện: id khai trong rule pack, định nghĩa ở manifest
+        //     thư viện. Block kind support/sleeve tuy cũng khai trong fittings[] nhưng có lệnh riêng
+        //     (PR7) — không trộn vào đây để kỹ sư không đặt giá đỡ bằng lệnh phụ kiện.
+        var chon0 = HoiHeVaBlock(
+            ed, pack, thuVien, "XBOSS_VE_PHUKIEN", "phụ kiện",
+            "Sau khi bấm OK: bấm các điểm trên TUYẾN TIM để chèn (Enter = kết thúc).",
+            s => s.Fittings, d => d.KindEnum == BlockKind.Fitting, VeContext.PhuKienId);
+        if (chon0 is not (var he, var def0)) return;
         VeContext.PhuKienId = def0.Id;
 
         var (toMm, canCanhBaoDonVi, tenDonVi) = DrawingUnits.TuInsUnits((int)db.Insunits);
@@ -206,34 +188,15 @@ public sealed class VePhuKienCommands
         if (BlockLibraryService.CanThuVien(ed) is not { } thuVien) return;
         var db = doc.Database;
 
-        var he = VeContext.HoiHe(ed, pack);
-        if (he is null) return;
-
-        // (1) Thiết bị của hệ: rule pack khai theo ID ITEM TAKEOFF (measure=count), manifest khai
-        //     block trỏ ngược lại bằng takeoffItemId — khớp theo cả hai chiều để không kén cách viết.
-        var danhSach = new List<BlockDef>();
-        var thieu = new List<string>();
-        foreach (var id in he.Equipment)
-        {
-            var def = thuVien.TimThietBiTheoItem(id);
-            if (def is null) thieu.Add(id);
-            else danhSach.Add(def);
-        }
-        if (thieu.Count > 0)
-        {
-            ed.WriteMessage(
-                $"\n[XBoss] ⚠ Thư viện {thuVien.Version} chưa có block thiết bị cho: {string.Join(", ", thieu)} — " +
-                "chèn ra sẽ không đếm được, phát hành lại thư viện.\n");
-        }
-        if (danhSach.Count == 0)
-        {
-            ed.WriteMessage(
-                $"\n[XBoss] Hệ {he.Id} chưa có thiết bị nào dùng được trong thư viện {thuVien.Version}.\n");
-            return;
-        }
-
-        var def0 = BlockLibraryService.HoiBlock(ed, $"Thiết bị của hệ {he.Id}", danhSach, VeContext.ThietBiId);
-        if (def0 is null) return;
+        // (1) Hệ + thiết bị trong MỘT hộp thoại (M106 §7.2), rơi về hai câu hỏi cũ khi UI hỏng (FR9).
+        //     Rule pack khai thiết bị theo ID ITEM TAKEOFF (measure=count), manifest khai block trỏ
+        //     ngược lại bằng takeoffItemId — khớp theo cả hai chiều để không kén cách viết.
+        var chon0 = HoiHeVaBlock(
+            ed, pack, thuVien, "XBOSS_VE_THIETBI", "thiết bị",
+            "Sau khi bấm OK: bấm điểm chèn → góc xoay → TAG và các thuộc tính cho TỪNG thiết bị " +
+            "(Enter = kết thúc).",
+            s => s.Equipment, _ => true, VeContext.ThietBiId, theoItemTakeoff: true);
+        if (chon0 is not (var he, var def0)) return;
         VeContext.ThietBiId = def0.Id;
 
         // (2) Layer đặt thiết bị + đối chiếu tên block với bảng bóc tách (AC4).
@@ -467,6 +430,77 @@ public sealed class VePhuKienCommands
 
         var (manifest, thongDiep) = BlockLibraryService.NapTay(dlgManifest.Filename, duongDanDwg);
         ed.WriteMessage($"\n[XBoss] {(manifest is null ? "" : "✔ ")}{thongDiep}\n");
+    }
+
+    // ===== Thu tham số: hộp thoại (mặc định) hoặc dòng lệnh (M106 FR9) =====
+
+    /// <summary>
+    /// Hệ + block cho một lần chèn, dùng chung cho <c>XBOSS_VE_PHUKIEN</c> và
+    /// <c>XBOSS_VE_THIETBI</c>. Danh mục block của MỌI hệ được tra sẵn ở đây (Adapter đọc manifest)
+    /// rồi mới mở hộp thoại — hộp thoại chỉ thu tham số, không chạm tệp thư viện (guardrail M106 §2).
+    /// Trả null khi kỹ sư hủy hoặc không hệ nào dùng được.
+    /// </summary>
+    private static (DrawSystem He, BlockDef Block)? HoiHeVaBlock(
+        Editor ed,
+        DrawToolsPack pack,
+        BlockManifest thuVien,
+        string lenh,
+        string nhanLoai,
+        string moTaSauOk,
+        Func<DrawSystem, IReadOnlyList<string>> idCua,
+        Func<BlockDef, bool> loc,
+        string? blockIdLanTruoc,
+        bool theoItemTakeoff = false)
+    {
+        var cacHe = new List<HeCoBlock>();
+        foreach (var sys in pack.DrawTools.Systems)
+        {
+            var dung = new List<BlockDef>();
+            var thieu = new List<string>();
+            foreach (var id in idCua(sys))
+            {
+                var def = theoItemTakeoff ? thuVien.TimThietBiTheoItem(id) : thuVien.TimTheoId(id);
+                if (def is null) thieu.Add(id);
+                else if (loc(def)) dung.Add(def);
+            }
+            if (dung.Count > 0) cacHe.Add(new HeCoBlock(sys, dung, thieu));
+        }
+
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new ChonBlockDialogViewModel(
+                lenh, nhanLoai, thuVien.Version, moTaSauOk, cacHe, VeContext.He?.Id, blockIdLanTruoc);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi)
+        {
+            if (kq is null) return null;
+            VeContext.He = kq.He; // ghi nhớ hệ của phiên (FR4)
+            return (kq.He, kq.Block);
+        }
+
+        // ----- Đường hỏi đáp dòng lệnh cũ (FR9) -----
+        var he = VeContext.HoiHe(ed, pack);
+        if (he is null) return null;
+        var muc = cacHe.FirstOrDefault(h => string.Equals(h.He.Id, he.Id, StringComparison.Ordinal));
+        var thieuCuaHe = muc?.Thieu ?? idCua(he)
+            .Where(id => (theoItemTakeoff ? thuVien.TimThietBiTheoItem(id) : thuVien.TimTheoId(id)) is null)
+            .ToList();
+        if (thieuCuaHe.Count > 0)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] ⚠ Thư viện {thuVien.Version} chưa có {nhanLoai}: {string.Join(", ", thieuCuaHe)} — " +
+                "phát hành lại thư viện hoặc sửa rule pack ở version sau.\n");
+        }
+        if (muc is null)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] Hệ {he.Id} chưa có {nhanLoai} nào dùng được trong thư viện {thuVien.Version}.\n");
+            return null;
+        }
+        var def0 = BlockLibraryService.HoiBlock(
+            ed, $"{char.ToUpperInvariant(nhanLoai[0])}{nhanLoai[1..]} của hệ {he.Id}", muc.Blocks, blockIdLanTruoc);
+        return def0 is null ? null : (he, def0);
     }
 
     // ===== Trợ giúp =====

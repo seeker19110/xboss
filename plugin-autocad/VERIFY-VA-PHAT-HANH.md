@@ -207,6 +207,96 @@ nào…`), nút chuyển nền chìm + chữ mờ.
       cuối cùng là 2 lệnh thư viện/đề xuất.
     - Panel "Kết nối": Đăng nhập → Nạp rule pack → **Upload hồ sơ đứng cuối** (thuộc bước 6).
 
+### C8. Hộp thoại WPF cho các lệnh còn lại (M106 PR3)
+
+> **Bắt buộc verify tay.** ViewModel đã có test ở Core (`*DialogViewModelTests`) nên CI kẹp được
+> danh mục, giá trị mặc định và luật khóa nút OK. **Không** kẹp được: XAML có dựng ra không, binding
+> có gõ đúng tên thuộc tính không, ô có bị cắt không, và **kết quả ra bản vẽ/tệp có y hệt đường dòng
+> lệnh không**. Với mỗi mục dưới đây: chạy một lần bằng hộp thoại, một lần bằng
+> `XBOSS_UI_DIALOG=0`, rồi **so kết quả** (đối tượng vẽ ra, tệp xuất ra, sidecar) — phải trùng khít.
+
+43. **`XBOSS_LOGIN`.** Hiện đúng một ô "Địa chỉ server XBoss". Gõ `http://…` (không phải localhost)
+    → nút OK **khóa** kèm lý do "phải là https". Gõ đúng địa chỉ → OK → chạy tiếp đúng luồng ghép
+    thiết bị cũ (mã ghép + poll + tải rule pack + thư viện block).
+44. **`XBOSS_UPLOAD`.** Hộp thoại hiện tên DWG, 2 ô (số bản vẽ, rev) và dòng "Gửi kèm … sidecar".
+    - Chưa chạy `XBOSS_CHUANHOA`/`XBOSS_BOCKL_XUAT` → dòng đó nói "Không có sidecar nào" và có
+      **cảnh báo vàng**, nhưng OK **vẫn bấm được**.
+    - Sau khi chạy 2 lệnh đó → dòng liệt kê đủ 2 sidecar, không còn cảnh báo. Revision tạo ra trên
+      web giống hệt bản trước M106.
+45. **`XBOSS_CHUANHOA`.** Hộp thoại hiện danh sách nhóm lệch chuẩn (đúng các dòng vừa in ra dòng
+    lệnh) + cảnh báo "bản vẽ sẽ bị SỬA". Bản vẽ đã đạt chuẩn → lệnh dừng trước khi mở hộp thoại.
+    Bấm Hủy → bản vẽ **không đổi một nét**; bấm OK → `U` một lần trả nguyên trạng.
+46. **`XBOSS_BATCH`.** Hộp thoại 3 radio; đổi radio thì dòng mô tả đổi theo. Bấm OK → hiện
+    `FolderBrowserDialog` chọn thư mục **như cũ**, tiến trình vẫn in ra dòng lệnh như trước.
+47. **`XBOSS_BOCKL`.** Hộp thoại: 2 radio phạm vi + checkbox "Bóc theo vùng". Bật checkbox + chọn
+    "Chọn vùng" → sau OK phải hỏi **quét chọn** rồi mới hỏi **polyline ranh giới + tên vùng**, đúng
+    thứ tự cũ. Câu xác nhận "đánh dấu n đối tượng" vẫn ở dòng lệnh (số chỉ có sau khi bóc).
+48. **`XBOSS_BOCKL_XOA`.** 2 radio; chọn "Chọn vùng" → sau OK mới quét chọn. Số đối tượng gỡ dấu
+    trùng với đường dòng lệnh.
+49. **`XBOSS_BOCKL_XUAT`.** Hộp thoại: tên dự án + gói thầu (mồi sẵn giá trị lần trước) + checkbox
+    đối chiếu BOQ. Xoá trống một ô → OK khóa kèm lý do. Bật đối chiếu khi máy **chưa** `XBOSS_LOGIN`
+    → cảnh báo vàng nhưng vẫn xuất được Excel (không có sheet `Doi-chieu`). Bấm OK → `SaveFileDialog`
+    như cũ; **Excel + sidecar JSON phải trùng khít bản chạy bằng dòng lệnh**.
+50. **`XBOSS_VE_NEN`.** Combo hệ + dòng chỉ đọc "Khóa + làm mờ N% … tạo sẵn K layer đích của hệ X";
+    đổi hệ thì con số K đổi theo. Bấm OK → nền khóa/mờ đúng như trước. Chạy lệnh lần nữa → **hoàn
+    nguyên ngay, không mở hộp thoại** (đúng hành vi cũ).
+51. **`XBOSS_VE_NHAN` — tỉ lệ in vào hộp thoại (việc hẹn ở PR1).** Mở AutoCAD mới, chọn tuyến →
+    hộp thoại hiện combo "Tỉ lệ in 1:x" + dòng "Chữ nhãn cao a mm trên giấy ⇒ b mm trong mô hình";
+    đổi tỉ lệ thì b đổi ngay. **Lệnh vẽ đầu tiên của phiên chạy trọn bằng chuột.**
+    - Chạy tiếp `XBOSS_VE_TRANGIN` → ô tỉ lệ **mồi sẵn đúng giá trị vừa chọn** (một cơ chế nhớ duy
+      nhất — không được hỏi lại từ đầu, cũng không được lệch giá trị).
+52. **`XBOSS_VE_DOI`.** Chọn vài tuyến (trong đó có tuyến **đã bóc** và tuyến **đã chia đốt**) →
+    hộp thoại hiện: danh sách đang chọn, combo hệ/loại/size/độ dốc, và khối "Bấm OK sẽ:" liệt kê
+    gỡ dấu bóc / xóa vạch chia đốt / block đang bám. **Không còn câu hỏi `DongY/Huy` ở dòng lệnh.**
+    Bấm Hủy → bản vẽ không đổi. Bấm OK → kết quả trùng bản chạy bằng `XBOSS_UI_DIALOG=0`.
+53. **`XBOSS_VE_PHUKIEN` / `XBOSS_VE_THIETBI`.** Hộp thoại: combo hệ + combo block + dòng chỉ đọc
+    (tỉ lệ theo size / xoay theo tuyến / danh sách attribute). Đổi hệ → danh mục block đổi theo.
+    Bấm OK → vòng bấm điểm (và với thiết bị: góc → TAG → attribute từng cái) **giữ nguyên như cũ**.
+    - Hệ mà rule pack khai id thư viện chưa có → cảnh báo vàng liệt kê id thiếu, OK vẫn bấm được.
+54. **`XBOSS_VE_GIADO`.** Combo hệ + combo block giá đỡ + 2 radio cách chia + dòng chỉ đọc về
+    `supportSpacingMm`. Rule pack **v9** (đã khai `heavyFittingIds`) → **không** hiện checkbox phụ
+    kiện nặng, thay bằng dòng liệt kê id nặng. Thử với rule pack v6 → checkbox xuất hiện, mặc định
+    bật (đúng mặc định `Co` của dòng lệnh cũ).
+55. **`XBOSS_VE_LOCHO`.** 2 radio. Bản vẽ chưa có lỗ chờ nào mà chọn "Xuất bảng" → OK **khóa** kèm
+    lý do. Chọn "Chèn" → sau OK, chuỗi chọn tuyến → block sleeve → điểm xuyên → cao độ/kết cấu từng
+    lỗ **giữ nguyên như cũ**.
+56. **`XBOSS_VE_TAG`.** 4 radio; chọn "Đánh lại" thì khối phạm vi + ô Tầng **hiện ra**, các chế độ
+    khác thì ẩn. Ô Tầng mồi sẵn tầng đã nhớ trong bản vẽ; để trống → OK khóa. Bấm OK → danh sách
+    tag mới vẫn in ra dòng lệnh để xác nhận trước khi ghi. Đổi tầng rồi đóng/mở lại bản vẽ → tầng
+    mới được nhớ (ghi vào NOD như cũ, không sinh cơ chế nhớ thứ hai).
+57. **`XBOSS_VE_THONGKE`.** 3 radio + combo tỉ lệ; đổi radio thì dòng "nguồn dữ liệu" đổi theo.
+    Bảng cùng loại đã có sẵn → sau OK **không hỏi điểm đặt**, cập nhật bảng cũ tại chỗ.
+58. **`XBOSS_VE_MATCAT`.** Kẻ tuyến cắt qua 3–4 tuyến → hộp thoại hiện combo tỉ lệ + **một dòng cao
+    độ cho mỗi tuyến** (đúng thứ tự trái→phải, mồi sẵn giá trị lần trước), và tên mặt cắt tự đánh ở
+    dạng chỉ đọc. Gõ chữ vào một ô cao độ → OK khóa kèm tên đúng tuyến đó. Bấm OK → mới hỏi điểm
+    đặt hình cắt; hình cắt ra **trùng khít** bản chạy bằng dòng lệnh.
+59. **`XBOSS_VE_TRANGIN`.** Hộp thoại đủ: hệ, khổ giấy, tỉ lệ, 3 radio VP-freeze, combo CTB (mồi
+    sẵn bản đã nhớ, có mục "(giữ mặc định)"), và **các ô thông tin khung tên đổi theo khổ giấy**.
+    - Gõ giá trị vào ô khung tên rồi đổi khổ giấy → giá trị đã gõ **không bị mất**.
+    - Thư viện chưa có khung tên cho khổ đó → cảnh báo vàng, OK vẫn bấm được, layout + viewport vẫn
+      tạo.
+    - Bấm OK → mới hỏi vùng in (2 góc hoặc `RanhGioi`). Layout ra phải giống hệt bản dòng lệnh:
+      viewport khóa đúng tỉ lệ, `TI_LE`/`NGAY` do plugin tự điền, số layer VP-freeze bằng nhau.
+60. **`XBOSS_VE_DEXUAT` — bản WPF (AC8).** Hộp thoại mới **có đủ 6 trường** như bản WinForms: tên
+    block, loại, hệ, item bóc tách, khổ giấy, ghi chú.
+    - Đổi loại sang **Khung tên** → ô hệ và item **biến mất**, ô khổ giấy hiện ra; đổi ngược lại thì
+      ô khổ giấy biến mất. Giá trị của ô vừa ẩn phải bị **xóa** (không lén gửi lên server).
+    - Đặt tên trùng một block đã có trong thư viện (kể cả khác hoa/thường) → OK khóa kèm lý do.
+    - Gửi thành công → server tạo đúng một đề xuất, nội dung metadata giống hệt bản M103.
+    - **Không còn tệp `Ui/DeXuatBlockDialog.cs`** trong repo; palette `XBOSS_BANG` **vẫn là
+      WinForms** (đúng ranh giới công nghệ chốt ở AC8).
+61. **Đường lui FR9 cho cả loạt.** Đặt `setx XBOSS_UI_DIALOG 0`, mở lại AutoCAD, chạy lần lượt 20
+    lệnh ở mục 43–59: mỗi lệnh in một dòng `XBOSS_UI_DIALOG=0 — dùng hỏi đáp dòng lệnh…` rồi chạy
+    **đúng chuỗi hỏi đáp keyword như trước M106**.
+    - Riêng `XBOSS_VE_DEXUAT` (mục 60) **không có** đường dòng lệnh: nó in thông báo bảo bỏ biến
+      môi trường rồi dừng — đúng thiết kế, vì lệnh này chưa bao giờ có chế độ hỏi đáp keyword.
+    - Xóa biến (`setx XBOSS_UI_DIALOG ""`) → hộp thoại trở lại.
+62. **Hủy = dừng lệnh, không hỏi lại.** Với mỗi hộp thoại ở mục 43–60: bấm **Hủy** (hoặc `Esc`) →
+    lệnh dừng ngay, **không** rơi xuống hỏi lại bằng dòng lệnh, và bản vẽ/tệp không đổi gì.
+63. **Form dài vẫn dùng được.** Trên màn hình 1366×768, mở `XBOSS_VE_TRANGIN` (khung tên nhiều thẻ)
+    và `XBOSS_VE_MATCAT` với tuyến cắt qua ≥ 8 tuyến → vùng nội dung **cuộn được**, dải nút OK/Hủy
+    và vùng lý do luôn nhìn thấy, không trường nào bị đẩy khuất.
+
 ---
 
 ## D. Kiểm thử có server — dựng tại chỗ trên máy mình

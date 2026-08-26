@@ -3,9 +3,11 @@ using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Geometry;
 using XBoss.Cad.Core.Takeoff;
+using XBoss.Cad.Core.Ui.ViewModels;
 
 [assembly: CommandClass(typeof(XBoss.Cad.Acad.Commands.VeThongkeCommands))]
 
@@ -30,21 +32,17 @@ public sealed class VeThongkeCommands
         if (VeContext.CanDrawTools(ed) is not { } pack) return;
         var db = doc.Database;
 
-        var hoi = new PromptKeywordOptions("\n[XBoss] Bảng thống kê — lấy dữ liệu từ đâu?") { AllowNone = false };
-        hoi.Keywords.Add("THIETBI", "THIETBI", "Bảng thiết bị (từ attribute)");
-        hoi.Keywords.Add("KHOILUONG", "KHOILUONG", "Bảng khối lượng theo hệ (từ trạng thái bóc XBOSS_BOCKL)");
-        hoi.Keywords.Add("CHIADOT", "CHIADOT", "Bảng đốt theo kiểu nối (từ dấu chia đốt của XBOSS_VE_CHIADOT)");
-        hoi.Keywords.Default = "THIETBI";
-        var kq = ed.GetKeywords(hoi);
-        if (kq.Status != PromptStatus.OK) return;
+        // Loại bảng + tỉ lệ in trong MỘT hộp thoại (M106 §7.2); UI hỏng / XBOSS_UI_DIALOG=0 → câu
+        // hỏi keyword cũ rồi VeContext.HoiTiLeIn như trước (FR9).
+        if (HoiThamSo(ed, pack) is not { } ts) return;
 
         BangThongKe? bang;
         using (var tr = db.TransactionManager.StartTransaction())
         {
-            bang = kq.StringResult switch
+            bang = ts.Loai switch
             {
-                "KHOILUONG" => BangKhoiLuong(ed, db, tr, pack),
-                "CHIADOT" => BangChiaDot(ed, db, tr),
+                LoaiBangThongKeUi.KhoiLuong => BangKhoiLuong(ed, db, tr, pack),
+                LoaiBangThongKeUi.ChiaDot => BangChiaDot(ed, db, tr),
                 _ => BangThietBi(ed, db, tr),
             };
             tr.Commit();
@@ -54,7 +52,45 @@ public sealed class VeThongkeCommands
         ed.WriteMessage($"\n[XBoss] ===== {bang.TieuDe} =====\n");
         foreach (var d in bang.Dong) ed.WriteMessage($"[XBoss]   {string.Join("  |  ", d)}\n");
 
-        VeBang(doc, ed, pack, bang);
+        VeBang(doc, ed, pack, bang, ts.TiLeIn);
+    }
+
+    // ===== Thu tham số: hộp thoại (mặc định) hoặc dòng lệnh (M106 FR9) =====
+
+    /// <summary>
+    /// Loại bảng + tỉ lệ in. Tỉ lệ vẫn nhớ ở đúng <see cref="VeContext.TiLeIn"/> (FR4) — hộp thoại
+    /// chỉ là lối vào thứ hai của cùng một giá trị. Null = kỹ sư hủy.
+    /// </summary>
+    private static KetQuaThongKe? HoiThamSo(Editor ed, DrawToolsPack pack)
+    {
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new ThongKeDialogViewModel(pack.SheetSetup.Scales, VeContext.TiLeIn);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi)
+        {
+            if (kq is not null) VeContext.TiLeIn = kq.TiLeIn;
+            return kq;
+        }
+
+        var hoi = new PromptKeywordOptions("\n[XBoss] Bảng thống kê — lấy dữ liệu từ đâu?") { AllowNone = false };
+        hoi.Keywords.Add("THIETBI", "THIETBI", "Bảng thiết bị (từ attribute)");
+        hoi.Keywords.Add("KHOILUONG", "KHOILUONG", "Bảng khối lượng theo hệ (từ trạng thái bóc XBOSS_BOCKL)");
+        hoi.Keywords.Add("CHIADOT", "CHIADOT", "Bảng đốt theo kiểu nối (từ dấu chia đốt của XBOSS_VE_CHIADOT)");
+        hoi.Keywords.Default = "THIETBI";
+        var traLoi = ed.GetKeywords(hoi);
+        if (traLoi.Status != PromptStatus.OK) return null;
+        var loai = traLoi.StringResult switch
+        {
+            "KHOILUONG" => LoaiBangThongKeUi.KhoiLuong,
+            "CHIADOT" => LoaiBangThongKeUi.ChiaDot,
+            _ => LoaiBangThongKeUi.ThietBi,
+        };
+        // Đường cũ hỏi tỉ lệ SAU khi in bảng ra dòng lệnh; ở đây hỏi trước để hai đường cho cùng
+        // một bản ghi tham số — giá trị và kết quả vẽ không đổi.
+        if (VeContext.HoiTiLeIn(ed, pack) is not { } tiLe) return null;
+        return new KetQuaThongKe(loai, tiLe);
     }
 
     // ===== Dựng nội dung =====
@@ -140,10 +176,10 @@ public sealed class VeThongkeCommands
     // ===== Vẽ bảng =====
 
     private static void VeBang(
-        Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, DrawToolsPack pack, BangThongKe bang)
+        Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, DrawToolsPack pack, BangThongKe bang,
+        double tiLe)
     {
         var db = doc.Database;
-        if (VeContext.HoiTiLeIn(ed, pack) is not { } tiLe) return;
         var (toMm, _, _) = DrawingUnits.TuInsUnits((int)db.Insunits);
         var caoChu = pack.SheetSetup.TableStyle.TextHeightMm * tiLe / toMm;
         var ma = ThongKeTable.Ma(bang.Loai);
