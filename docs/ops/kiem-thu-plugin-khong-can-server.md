@@ -31,20 +31,20 @@ Không cần dựng web/DB. Plugin có sẵn **đường dự phòng offline** c
 Chép tệp này từ repo sang máy AutoCAD (USB/chia sẻ mạng nội bộ đều được):
 
 ```
-lib/ky-thuat/cad/rule-packs/v7.json
+lib/ky-thuat/cad/rule-packs/v8.json
 ```
 
 Trong AutoCAD:
 
 ```
-XBOSS_RULEPACK      → chọn tệp v7.json
+XBOSS_RULEPACK      → chọn tệp v8.json
 ```
 
-Phải hiện: `Đã nạp rule pack v7 (… nhóm layer). Cache: C:\Users\<bạn>\AppData\Roaming\XBoss\rule-pack.json`
+Phải hiện: `Đã nạp rule pack v8 (… nhóm layer). Cache: C:\Users\<bạn>\AppData\Roaming\XBoss\rule-pack.json`
 
-☐ Rule pack nạp OK, version = **v7**
+☐ Rule pack nạp OK, version = **v8**
 
-> Nạp version thấp hơn v4 thì mọi lệnh `XBOSS_VE_*` từ chối chạy ("cần rule pack từ v4 trở lên") — đúng thiết kế.
+> Nạp version thấp hơn v4 thì mọi lệnh `XBOSS_VE_*` từ chối chạy ("cần rule pack từ v4 trở lên") — đúng thiết kế. v8 thêm 2 phép kiểm mới (17: tag trùng số trong cùng hệ; 18: hạng mục thiếu mã BOQ), cả hai **mặc định tắt** nên kết quả kiểm/chuẩn hóa không đổi so với v7.
 
 ### 2.2 Thư viện block — phải tự tạo, đây là phần tốn công nhất
 
@@ -98,9 +98,9 @@ Riêng vài ca cần chỉnh cách làm khi offline:
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **AC7** (trùng tên block)             | Vẫn làm được nguyên vẹn — chỉ cần thư viện đã nạp tay                                                                                                                                            |
 | **AC8** (tự cập nhật ETag)            | **Bỏ qua**, ghi "chờ server"                                                                                                                                                                     |
-| **AC9** (rule pack cũ không phá lệnh) | Nạp `v3.json` từ repo bằng `XBOSS_RULEPACK` → chạy `XBOSS_KIEMTRA`/`XBOSS_CHUANHOA`/`XBOSS_BOCKL`; xong nạp lại `v7.json`                                                                        |
+| **AC9** (rule pack cũ không phá lệnh) | Nạp `v3.json` từ repo bằng `XBOSS_RULEPACK` → chạy `XBOSS_KIEMTRA`/`XBOSS_CHUANHOA`/`XBOSS_BOCKL`; xong nạp lại `v8.json`                                                                        |
 | **`XBOSS_BOCKL_XUAT`**                | Khi hỏi "Kéo KL BOQ hợp đồng?" trả lời **Không** (mặc định) → Excel vẫn xuất đủ, chỉ thiếu sheet `Doi-chieu`                                                                                     |
-| **Mã BOQ theo dự án**                 | Không có server thì sửa tay `takeoff.items[].boqCode` trong bản `v7.json` cục bộ rồi nạp lại — **chỉ để thử**, đừng dùng cách này khi chạy thật (rule pack là append-only, phát hành qua server) |
+| **Mã BOQ theo dự án**                 | Không có server thì sửa tay `takeoff.items[].boqCode` trong bản `v8.json` cục bộ rồi nạp lại — **chỉ để thử**, đừng dùng cách này khi chạy thật (rule pack là append-only, phát hành qua server) |
 
 ---
 
@@ -118,7 +118,7 @@ Muốn dựng server tối thiểu để kiểm 3 việc này: cần `DATABASE_U
 
 ## 5. Ghi nhận
 
-☐ Rule pack v7 nạp tay OK ☐ Thư viện block tự tạo nạp OK
+☐ Rule pack v8 nạp tay OK ☐ Thư viện block tự tạo nạp OK
 ☐ Đã chạy 13 ca AC không cần server — số ca đạt: ....../13
 ☐ Ca không đạt: `________________________________`
 ☐ Còn treo chờ server: AC8, `XBOSS_UPLOAD`, sheet `Doi-chieu`
