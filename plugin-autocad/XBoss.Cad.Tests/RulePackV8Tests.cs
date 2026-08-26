@@ -27,7 +27,9 @@ public class RulePackV8Tests
     public void V8_phat_hanh_tat_moi_buoc_moi_va_moi_phep_kiem_moi()
     {
         var pack = RepoPaths.LoadRulePack();
-        Assert.Equal("v8", pack.Version);
+        // KHÔNG assert version cứng: test này canh "mọi khóa v8 đều tắt trong bản ĐANG PHÁT HÀNH",
+        // bất biến đó phải đúng ở mọi version sau v8 (v9 của M105 đã chứng minh). Số version cụ thể
+        // do tests/engineering-cad-rule-pack.test.ts canh, một chỗ duy nhất.
 
         Assert.False(pack.PolylineClosePolicy.Enabled);
         Assert.True(pack.PolylineClosePolicy.GapCloseToleranceMm > 0); // khai sẵn để bật là dùng được ngay
