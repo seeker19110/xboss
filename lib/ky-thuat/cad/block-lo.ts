@@ -194,16 +194,18 @@ export async function nhanLoBlock(input: {
   if (input.ungViens.length === 0) {
     return { status: "invalid", errors: ["Tệp không có định nghĩa block nào để nạp."] };
   }
-  if (input.ungViens.length > TRAN_BLOCK_MOI_LO) {
+  const { giuLai, boQua } = locUngVien(input.ungViens);
+  // Trần tính trên số block THẬT SỰ nạp được, không phải số định nghĩa thô: một tệp 600 định nghĩa
+  // mà 400 là block ẩn danh vẫn nằm gọn trong trần, chặn nó là chặn oan.
+  if (giuLai.length > TRAN_BLOCK_MOI_LO) {
     return {
       status: "invalid",
       errors: [
-        `Tệp có ${input.ungViens.length} định nghĩa block, vượt trần ${TRAN_BLOCK_MOI_LO} block một lô — tách tệp rồi nạp lại.`,
+        `Tệp có ${giuLai.length} block nạp được (trong ${input.ungViens.length} định nghĩa), vượt trần ` +
+          `${TRAN_BLOCK_MOI_LO} block một lô — tách tệp rồi nạp lại.`,
       ],
     };
   }
-
-  const { giuLai, boQua } = locUngVien(input.ungViens);
 
   return withTransaction<NhanLoKetQua>(async () => {
     // Cùng khoá với hai đường phát hành kia — đọc thư viện hiện hành ổn định trong suốt lượt nhận.

@@ -7,6 +7,7 @@ import { docManifest, layBlockLibHienHanh } from "@/lib/ky-thuat/cad/block-lib";
 import {
   locUngVien,
   nhanLoBlock,
+  TRAN_BLOCK_MOI_LO,
   type NhanLoKetQua,
   type UngVienLo,
 } from "@/lib/ky-thuat/cad/block-lo";
@@ -33,6 +34,17 @@ export async function napLoBlock(input: {
   // Chỉ phân loại phần chắc chắn sẽ vào lô — block ẩn danh/layout/trùng trong tệp thì bỏ ngay,
   // không tốn token.
   const { giuLai } = locUngVien(input.ungViens);
+  // Chặn vượt trần TRƯỚC khi phân loại: gọi mô hình cho 600 block rồi mới từ chối lô là đốt tiền
+  // vô ích. `nhanLoBlock` vẫn kiểm lại — nó là hàng rào thật, đây chỉ là lối ra sớm cho rẻ.
+  if (giuLai.length > TRAN_BLOCK_MOI_LO) {
+    return {
+      status: "invalid",
+      errors: [
+        `Tệp có ${giuLai.length} block nạp được (trong ${input.ungViens.length} định nghĩa), vượt trần ` +
+          `${TRAN_BLOCK_MOI_LO} block một lô — tách tệp rồi nạp lại.`,
+      ],
+    };
+  }
 
   // Block đã có trong thư viện là "mẫu đối chiếu cách đặt tên của chính dự án này" — tín hiệu tốt
   // nhất cho tầng 2. Thư viện chưa có thì cỗ máy vẫn chạy, chỉ kém chính xác hơn.

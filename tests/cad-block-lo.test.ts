@@ -338,3 +338,19 @@ test("trần lô + tệp rỗng bị từ chối kèm số đo thật", S, async
     );
   }
 });
+
+test("trần tính trên block NẠP ĐƯỢC, không phải số định nghĩa thô", S, async () => {
+  const { nhanLoBlock, TRAN_BLOCK_MOI_LO } = await import("@/lib/ky-thuat/cad/block-lo");
+  await donDep();
+  await phatHanhNen();
+
+  // Vượt trần về số định nghĩa, nhưng quá nửa là block ẩn danh ⇒ phần nạp được vẫn trong trần.
+  // Chặn ca này là chặn oan.
+  const ungViens = [
+    ...Array.from({ length: TRAN_BLOCK_MOI_LO }, (_, i) => ({ blockName: `OK${i}` })),
+    ...Array.from({ length: 50 }, (_, i) => ({ blockName: `*U${i}` })),
+  ];
+  const kq = await nhanLoBlock({ userId: pmId, nguon: "web", ungViens });
+  assert.equal(kq.status, "created", JSON.stringify(kq).slice(0, 300));
+  if (kq.status === "created") assert.equal(kq.tong, TRAN_BLOCK_MOI_LO);
+});
