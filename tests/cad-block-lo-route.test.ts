@@ -90,6 +90,25 @@ test("panel nạp lô KHÔNG dùng dangerouslySetInnerHTML cho ảnh xem trướ
   assert.match(src, /data:image\/svg\+xml;charset=utf-8/);
 });
 
+test("mọi route lô đều được UI gọi tới — route viết ra mà không ai gọi là tính năng dở dang", () => {
+  const panel = readFileSync(
+    join(process.cwd(), "app/engineering/chuan-hoa-ban-ve/components/NapLoBlockPanel.tsx"),
+    "utf8",
+  );
+  // CI có cổng `check:dead-routes` bắt việc này, nhưng bắt ở đây thì thấy ngay lúc chạy test
+  // thay vì đợi vòng CI. Chính ca `reject` đã lọt qua vòng đầu: route có, nút thì quên.
+  for (const duong of [
+    "/api/engineering/cad/block-proposals/batch",
+    "/api/engineering/cad/block-proposals/batch/${chiTiet.lo.id}",
+    "/api/engineering/cad/block-proposals/batch/${chiTiet.lo.id}/approve",
+    "/api/engineering/cad/block-proposals/batch/${chiTiet.lo.id}/reject",
+  ]) {
+    assert.ok(panel.includes(duong), `bảng duyệt lô chưa gọi ${duong}`);
+  }
+  // Từ chối bắt buộc kèm lý do — cả hai phía đều chặn, không chỉ máy chủ.
+  assert.match(panel, /disabled=\{dangGui \|\| !lyDoTuChoi\.trim\(\)\}/);
+});
+
 test("bộ đối chứng AC3 có đủ 3 lớp khó và chưa được tự nhận là đã xác nhận", () => {
   const doc = JSON.parse(
     readFileSync(join(DOI_CHUNG, "block-phan-loai-doi-chung.json"), "utf8"),

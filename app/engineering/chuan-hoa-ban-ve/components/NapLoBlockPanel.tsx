@@ -10,6 +10,7 @@ import {
   ScanSearch,
   ImageOff,
   Sparkles,
+  ThumbsDown,
   UserPen,
   X,
 } from "lucide-react";
@@ -88,6 +89,9 @@ export default function NapLoBlockPanel() {
   const [lyDoAiTat, setLyDoAiTat] = useState<string | null>(null);
   const [chiTiet, setChiTiet] = useState<ChiTietLo | null>(null);
   const [thanhCong, setThanhCong] = useState<string | null>(null);
+  // Từ chối cả lô (§6.3): mở ô nhập lý do rồi mới gửi — lý do là bắt buộc, máy chủ cũng chặn.
+  const [dangTuChoi, setDangTuChoi] = useState(false);
+  const [lyDoTuChoi, setLyDoTuChoi] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const taiLo = useCallback(async (loId: number) => {
@@ -187,6 +191,39 @@ export default function NapLoBlockPanel() {
       }
       setThanhCong(`Đã phát hành thư viện ${data.version} — thêm ${data.soBlockThem ?? 0} block.`);
       setChiTiet(null);
+      setDxf(null);
+    } finally {
+      setDangGui(false);
+    }
+  }
+
+  /** Từ chối cả lô kèm lý do — thư viện KHÔNG đổi, lô chuyển sang trạng thái `rejected`. */
+  async function tuChoi() {
+    if (!chiTiet || !lyDoTuChoi.trim()) return;
+    setDangGui(true);
+    setLoi([]);
+    try {
+      const res = await fetch(
+        `/api/engineering/cad/block-proposals/batch/${chiTiet.lo.id}/reject`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lyDo: lyDoTuChoi }),
+        },
+      );
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setLoi([data.error ?? "Từ chối lô không thành công"]);
+        return;
+      }
+      setThanhCong(`Đã từ chối lô #${chiTiet.lo.id} — thư viện không đổi.`);
+      setChiTiet(null);
+      setDangTuChoi(false);
+      setLyDoTuChoi("");
       setDxf(null);
     } finally {
       setDangGui(false);
@@ -438,12 +475,48 @@ export default function NapLoBlockPanel() {
             <Button onClick={duyet} disabled={dangGui || soChon === 0 || soChuaRo > 0}>
               {dangGui ? "Đang phát hành…" : `Duyệt & Phát Hành ${soChon} Block`}
             </Button>
+            {!dangTuChoi && (
+              <Button variant="ghost" onClick={() => setDangTuChoi(true)} disabled={dangGui}>
+                <ThumbsDown className="w-4 h-4" aria-hidden="true" />
+                Từ Chối Cả Lô
+              </Button>
+            )}
             {soChuaRo > 0 && (
               <p className="self-center text-xs text-amber-300">
                 Còn {soChuaRo} dòng chưa khai loại — khai nốt hoặc bỏ chọn thì mới phát hành được.
               </p>
             )}
           </div>
+
+          {dangTuChoi && (
+            <Card className="p-3 space-y-2">
+              <label htmlFor="ly-do-tu-choi" className="block text-xs text-zinc-300">
+                Lý do từ chối cả lô (bắt buộc) — người nạp đọc lý do này để biết phải sửa gì:
+              </label>
+              <input
+                id="ly-do-tu-choi"
+                value={lyDoTuChoi}
+                onChange={(e) => setLyDoTuChoi(e.target.value)}
+                className={O_NHAP}
+                placeholder="vd: sai tệp, đây là bản vẽ thi công chứ không phải thư viện block"
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={tuChoi} disabled={dangGui || !lyDoTuChoi.trim()}>
+                  Xác Nhận Từ Chối
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setDangTuChoi(false);
+                    setLyDoTuChoi("");
+                  }}
+                  disabled={dangGui}
+                >
+                  Thôi
+                </Button>
+              </div>
+            </Card>
+          )}
         </>
       )}
     </Section>
