@@ -1,14 +1,14 @@
 # M110 — Đặc tả: solver định tuyến tất định (một hệ, một mặt phẳng)
 
-| Thuộc tính       | Giá trị                                                                                                                               |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Issue / Goal     | `XBOSS_VE_TUDONG`: cho hai điểm, máy **tự tìm đường** cho một tuyến — tránh kết cấu, ít cút nhất, ra polyline y hệt `XBOSS_VE` vẽ tay |
-| Spec owner       | Phiên chính (tầng 1)                                                                                                                  |
-| State            | **Draft — chờ duyệt.** Không code khi chưa `Approved for implementation`                                                              |
-| Người/ngày duyệt | (chờ)                                                                                                                                 |
-| Phụ thuộc        | **M109 PR1–PR2** (nền cao độ) — bắt buộc. Không có cao độ thì solver chỉ chạy được 1 hệ, và không mở tiếp lên đa hệ được              |
-| Quyết định nền   | ADR-0006; hướng auto-routing chốt 2026-08-27: **solver tất định, KHÔNG LLM**                                                          |
-| Vị trí lộ trình  | **Mốc 2** — mốc có tỷ lệ giá trị/rủi ro tốt nhất của hướng auto-routing                                                               |
+| Thuộc tính       | Giá trị                                                                                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Issue / Goal     | `XBOSS_VE_TUDONG`: cho hai điểm, máy **tự tìm đường** cho một tuyến — tránh kết cấu, ít cút nhất, ra polyline y hệt `XBOSS_VE` vẽ tay                               |
+| Spec owner       | Phiên chính (tầng 1)                                                                                                                                                |
+| State            | **Draft — chờ duyệt.** Không code khi chưa `Approved for implementation`                                                                                            |
+| Người/ngày duyệt | (chờ)                                                                                                                                                               |
+| Phụ thuộc        | **M111** (nền đa dự án) → **M109 PR1–PR2** (nền cao độ) — bắt buộc theo đúng thứ tự. Không có cao độ thì solver chỉ chạy được 1 hệ, và không mở tiếp lên đa hệ được |
+| Quyết định nền   | ADR-0006; hướng auto-routing chốt 2026-08-27: **solver tất định, KHÔNG LLM**                                                                                        |
+| Vị trí lộ trình  | **Mốc 2** — mốc có tỷ lệ giá trị/rủi ro tốt nhất của hướng auto-routing                                                                                             |
 
 > Không code khi chưa **Approved for implementation**.
 
@@ -182,6 +182,9 @@ public sealed record KetQuaTimDuong(
 }
 ```
 
+**Khối này khai ở LỚP DỰ ÁN của M111** — `buocLuoiMm` phụ thuộc quy mô mặt bằng, `phatDoiHuongMm` phụ
+thuộc đơn giá vật tư của dự án. Lõi công ty chỉ khai giá trị khởi đầu.
+
 > `phatDoiHuongMm` là **núm chỉnh quan trọng nhất** và nên hiệu chỉnh trên bản vẽ thật ở pilot: đặt thấp
 > ra đường ngoằn ngoèo, đặt cao ra đường vòng xa. Giá trị trên là điểm khởi đầu, không phải kết luận.
 
@@ -251,5 +254,5 @@ so đường máy với đường kỹ sư, hiệu chỉnh `phatDoiHuongMm`, r�
 ## 19. Approval
 
 - [ ] Người duyệt: ……… — ngày ………
-- [ ] Xác nhận M109 PR1–PR2 đã xong trước khi bắt đầu PR1
+- [ ] Xác nhận **M111** rồi **M109 PR1–PR2** đã xong, đúng thứ tự, trước khi bắt đầu PR1
 - [ ] Chuyển State thành `Approved for implementation` trước khi code

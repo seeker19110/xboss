@@ -7,6 +7,7 @@
 | State            | **Draft — chờ duyệt.** Không code khi chưa `Approved for implementation`                                                                                                                  |
 | Người/ngày duyệt | (chờ)                                                                                                                                                                                     |
 | Quyết định nền   | `docs/adr/0006-plugin-autocad-va-pipeline-server.md` (**bản vẽ là nguồn sự thật, cấm bịa nội dung không có trong tệp**), ADR-0007/0008 (ranh giới miền)                                   |
+| Phụ thuộc        | **M111** (nền cấu hình đa dự án) — `elevationBands` bản chất per-project: trần chung cư 2,8 m ≠ nhà xưởng 8 m                                                                             |
 | Vị trí lộ trình  | **Mốc 1** của hướng auto-routing đã chốt 2026-08-27. Là **điều kiện tiên quyết** của M110 (solver định tuyến). Đứng một mình vẫn có giá trị: vá lỗi đang cho ra số sai trên màn hình thật |
 
 > Không code khi chưa **Approved for implementation**.
@@ -236,6 +237,10 @@ parseDxf ── đọc XData (1001/1000) ──→ convertDxfToSpatialRoutes (KH
 }
 ```
 
+**Khoá này khai ở LỚP DỰ ÁN của M111, không phải lõi công ty** — cao độ tầng là thứ mỗi dự án một khác
+(chung cư trần 2,8 m so với nhà xưởng 8 m). Lõi công ty chỉ khai `datum` và `clashToleranceMm` làm mặc
+định; `systems[]` để rỗng và mỗi dự án tự đè.
+
 > Các con số trên là **giá trị mẫu để minh hoạ cấu trúc**. Bảng phân tầng cao độ thật của dự án là việc
 > của kỹ sư trưởng — **không** lấy số hard-code cũ trong `dxf-parser.ts` làm chuẩn, vì chính chúng là thứ
 > đặc tả này sinh ra để dẹp.
@@ -313,4 +318,5 @@ Rule pack có version nên rollback = phát hành lại v9: mọi lệnh quay v�
 
 - [ ] Người duyệt: ……… — ngày ………
 - [ ] Chốt O1 (mốc cao độ) và O2 (tim hay đáy ống) — **chặn PR1**
+- [ ] Xác nhận **M111 PR1–PR2 đã xong** (chỗ chứa cấu hình theo dự án) trước khi bắt đầu PR1
 - [ ] Chuyển State thành `Approved for implementation` trước khi code
