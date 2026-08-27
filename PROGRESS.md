@@ -23,7 +23,7 @@ blocker) · giữ đường build tại chỗ sau cờ `--build-local`.
 
 1. **`.github/workflows/deploy.yml` build trên runner:** checkout đúng `workflow_run.head_sha`
    (không phải HEAD của `main` lúc job khởi động), `npm ci` + `NEXT_DIST_DIR=.next-ci npm run
-   build`, đóng gói `.next-ci.tar.gz` kèm phiếu `.next-ci.info` (`sha=`/`node=`), rsync sang
+build`, đóng gói `.next-ci.tar.gz` kèm phiếu `.next-ci.info` (`sha=`/`node=`), rsync sang
    VPS rồi mới gọi `bash deploy.sh`. `command_timeout` 40m thay bằng `timeout 15m` cho bước SSH
    còn lại (không còn build nên vài phút là xong).
 2. **Runner build tại đúng `/var/www/xboss`:** `.next` có nhúng **đường dẫn tuyệt đối** lúc
@@ -5622,6 +5622,13 @@ Quét lại: `git fetch origin` xác nhận nhánh làm việc hiện tại **tr
 KẾT LUẬN: Cần xử lý — không chặn vận hành hiện tại; ưu tiên (1) đổi role production `xboss_app` + khoá cửa RLS, (2) gate `workflow_run` cho deploy, (3) PR dọn nhỏ (doc drift, 0072, vercel.json, tiền vào SQL), (4) 5 spec axe + đo coverage lần đầu, (5) EXPLAIN xác nhận COALESCE.
 
 ## Tiếp theo
+
+- **M109 + M110 — đặc tả hướng auto-routing (viết 2026-08-27) — CHƯA duyệt, chưa code.** Sinh từ chuỗi câu hỏi của người dùng về trần tự động vẽ/định tuyến; hướng đã chốt: **solver tất định, không LLM**, mô hình "máy sinh phương án hợp lệ — người chọn" (giống M108 cho block).
+  - **M109 — nền cao độ & dẹp bịa tiết diện (mốc 1).** Ba phát hiện khi rà code: (a) `flattenPolicy` ép Z→0 nên **chuẩn hoá càng kỹ càng mất cao độ**, mà `drawTools` lại không có khoá cao độ nào; (b) XData đã có `caodo` (mặt cắt, đơn vị bản vẽ) và `caodomm` (lỗ chờ, mm) nhưng **không khoá nào cho tuyến** — nên M109 thêm `caodotim` (mm) chứ không nhồi nghĩa vào khoá cũ; (c) **nghiêm trọng nhất**: `convertDxfToSpatialRoutes` trong `lib/ky-thuat/cad/dxf-parser.ts` **hard-code cả cao độ lẫn tiết diện theo tên layer** (gió `2875`/`800×400`, nước `2250`/`Ø168`, mặc định `2800`), tự gắn `combineStatus: "verified"`, và **số bịa đó đi thẳng vào bảng bóc khối lượng** ở `app/engineering/cad-tracking/page.tsx:199`. Đúng lớp lỗi mà ADR-0006 sinh ra để dẹp, đã lọt vào một màn hình thật. Gốc rễ: `parseDxf` **không đọc XData** (không xử lý mã nhóm 1001/1000) nên không thấy `size` thật mà `XBOSS_VE` đã ghi. 4 PR, không migration; **PR3 vá lỗi số sai nên đứng riêng vẫn có ích**.
+  - **M110 — solver định tuyến một hệ, một mặt phẳng (mốc 2).** `XBOSS_VE_TUDONG`, A* trên lưới, chi phí = chiều dài + phạt đổi hướng. Đầu ra polyline y hệt `XBOSS_VE` nên hạ nguồn không phải sửa dòng nào — và `Curve` là thứ **duy nhất** `TakeoffScanner` đo ra mét (`BlockReference` rơi vào nhánh _đếm_, mất khối lượng; đây cũng là lý do **không** vẽ tuyến bằng block động). Oracle là `Inspector` 18 phép kiểm. `grep` xác nhận repo **chưa có thuật toán tìm đường nào**. Phụ thuộc M109 PR1–PR2.
+  - **Đính chính ghi lại để khỏi lặp:** clash 2D là **phép kiểm 11** (`PhepKiemMoRong.cs:114`), không phải 16 như tôi nói nhầm hai lần trong lúc thảo luận. Code mang sẵn cảnh báo cố định "chỉ xét giao trên MẶT BẰNG — KHÔNG thay được clash 3D" — tức oracle hiện tại tự biết mình yếu, và đó chính là thứ M109 mở khoá.
+  - **Ngã ba đã nêu với người dùng, chưa chốt:** nếu bài toán thật là "vẽ xong một tháp nhanh" thì **nhân bản tầng điển hình** (M100 §20) cho lợi ích lớn hơn auto-routing với rủi ro thấp hơn và **không cần M109**. Auto-routing thắng khi mỗi tầng một khác; nhân bản thắng khi nhiều tầng giống nhau (AVIO là tháp căn hộ). Khuyến nghị: nhân bản trước.
+  - **⛔ Điều kiện tiên quyết cho cả hai mốc:** verify tay trên máy có AutoCAD 2026 — M109 PR2 và M110 PR2 đều thao tác trên bản vẽ thật, mà plugin chưa từng chạy thật lần nào.
 
 - **M108 PR2/PR3/PR5 — tầng AI, route + UI, gợi ý ánh xạ (2026-08-26, cùng nhánh với PR1).**
   - **PR2** `lib/nen/ai.ts` (tầng 0, **cửa duy nhất** ra mô hình — `claude-opus-5`, structured output ép schema, prompt caching, bắt lỗi theo lớp typed của SDK, không bao giờ throw ra ngoài) + `lib/dich-vu/cad-block-phan-loai.ts` (cỗ máy 4 tầng) + `lib/dich-vu/cad-block-nap-lo.ts`. Thêm phụ thuộc `@anthropic-ai/sdk` — **lần đầu tiên** codebase có SDK LLM.
