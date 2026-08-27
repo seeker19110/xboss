@@ -4,6 +4,18 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Tài liệu: hướng dẫn build plugin AutoCAD từ đầu trên Windows (2026-08-27)
+
+Thêm `plugin-autocad/BUILD-WINDOWS.md` — hướng dẫn **build từ máy Windows trắng**: điều kiện máy
+(AutoCAD 2026 bản đầy đủ, LT/2021–2025 không chạy được), cài .NET 10 SDK + .NET 8 runtime, vì sao
+**không cần tải ObjectARX SDK** riêng, bước **kiểm nền .NET của `acmgd.dll`** (bẫy `CS1705` từng
+làm hỏng buổi build 2026-08-25), đường nhanh 1 lệnh `dong-goi.ps1`, và cùng việc đó **làm tay
+từng bước** (Core/Tests → cổng shim → Adapter → dựng `.bundle` → cài), kèm bảng 12 lỗi thường gặp.
+
+Ba tài liệu plugin giờ tách vai rõ: `BUILD-WINDOWS.md` (người build) → `VERIFY-VA-PHAT-HANH.md`
+(verify tay + phát hành) → `CAI-DAT.md` (kỹ sư máy trạm chỉ cài gói `.zip`). Đã chèn liên kết
+chéo ở cả ba. Chỉ tài liệu, không đụng mã nguồn.
+
 ## Đưa `next build` ra khỏi VPS — đóng blocker deploy 2026-07-19 (2026-08-26)
 
 Người dùng chọn "theo khuyến nghị" sau đợt rà ý tưởng tích hợp: làm mục ưu tiên 1 — gỡ blocker
