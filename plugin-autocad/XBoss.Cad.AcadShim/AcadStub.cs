@@ -128,8 +128,11 @@ namespace Autodesk.AutoCAD.Colors
 
     public struct Transparency
     {
-        public Transparency(byte alpha) { Alpha = alpha; }
+        public Transparency(byte alpha) { Alpha = alpha; IsByAlpha = true; }
         public byte Alpha { get; }
+        // API thật: Alpha CHỈ hợp lệ khi IsByAlpha; ByLayer/ByBlock/Invalid thì đọc Alpha ném
+        // eInvalidKey. Khai ở đây để mã Adapter buộc phải kiểm trước khi đọc (vấp thật 2026-08-27).
+        public bool IsByAlpha { get; }
     }
 }
 
@@ -474,6 +477,12 @@ namespace Autodesk.AutoCAD.DatabaseServices
         /// <summary>Trạng thái nạp của xref — Resolved khi tệp tham chiếu tìm thấy và nạp được (chỉ đọc trên API thật).</summary>
         public XrefStatus XrefStatus => XrefStatus.Resolved;
         public ObjectId AppendEntity(Entity e) => new ObjectId();
+        /// <summary>
+        /// Mọi BlockReference đang trỏ tới định nghĩa này (M108 — đếm số lần chèn của một block).
+        /// API thật trả tập rỗng khi block chưa được chèn ở đâu; stub luôn trả rỗng.
+        /// </summary>
+        public ObjectIdCollection GetBlockReferenceIds(bool directOnly, bool forceValidity) =>
+            new ObjectIdCollection();
         public IEnumerator<ObjectId> GetEnumerator() => new List<ObjectId>().GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }

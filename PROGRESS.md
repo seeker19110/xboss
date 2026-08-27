@@ -21,7 +21,14 @@ MỚI + ghi XData trót lọt, còn `XBOSS_VE_NHAN` ghi lên layer `G-ANNO-TEXT`
 2. `VeLayerService.HoanNguyen` bọc try/catch **từng layer** + báo layer không trả được. Trước đó
    một layer khó tính làm cả lệnh rollback ⇒ bản vẽ kẹt vĩnh viễn ở trạng thái nền.
 
-**Tiếp theo:** chạy lại 2 lệnh trên đúng bản vẽ đó, lấy tên bước rồi vá gốc rễ.
+**GỐC RỄ (tìm ra nhờ mốc bước):** `Autodesk.AutoCAD.Colors.Transparency.Alpha` CHỈ hợp lệ khi độ
+mờ là `ByAlpha`; layer để `ByLayer`/`ByBlock`/không hợp lệ thì **đọc** `.Alpha` ném `eInvalidKey`.
+Bản vẽ nhập từ DXF gần như luôn có layer như vậy. Hai chỗ đọc trong `VeLayerService` là đúng hai
+bước lệnh chết: `KhoaVaLamMo` (bước "khóa + làm mờ layer nền" của `XBOSS_VE_NEN`) và `DamBaoLayer`
+nhánh layer-đã-có (bước 'tạo/mở layer nhãn "G-ANNO-TEXT"' của `XBOSS_VE_NHAN`). Đã vá bằng
+`AlphaAnToan()` — không phải ByAlpha thì layer vốn KHÔNG bị làm mờ ⇒ trả 255, đúng nghiệp vụ chứ
+không phải giá trị vá víu. Stub CI bổ sung `IsByAlpha` để cổng `XBoss.Cad.AcadShim` bắt được lớp
+lỗi này ngay ở PR thay vì đợi ra máy có AutoCAD.
 
 ## Đóng tồn đọng tích hợp plugin AutoCAD (đợt 2, 2026-08-25)
 
