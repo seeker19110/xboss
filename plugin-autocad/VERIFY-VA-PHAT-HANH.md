@@ -24,7 +24,8 @@ mục cài AutoCAD: `C:\Program Files\Autodesk\AutoCAD 2026` (chứa `acdbmgd.dl
 
 ## B. Build + cài lên máy mình để verify
 
-**Đóng AutoCAD trước** (DLL đang nạp thì không ghi đè được).
+**Đóng AutoCAD trước** (DLL đang nạp thì không ghi đè được). Máy chưa cài công cụ bao giờ:
+làm theo [`BUILD-WINDOWS.md`](BUILD-WINDOWS.md) §1–§2 trước.
 
 ```powershell
 cd <thư mục repo>

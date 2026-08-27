@@ -4,6 +4,48 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Verify tay plugin v9 trên bản vẽ AEC thật — `XBOSS_VE_NEN` báo `eInvalidKey` (2026-08-27)
+
+Người dùng build plugin trên máy Windows và verify trên bản vẽ thật (`TMDV 3F.dwg`, có xref
+kiến trúc/kết cấu). Kết quả: `XBOSS_RULEPACK` nạp đúng **v9** (14 quy tắc bóc tách, 7 nhóm layer),
+`XBOSS_KIEMTRA`/`XBOSS_BATCH`/`XBOSS_VE` chạy đúng như đặc tả (kể cả cảnh báo tuyến tim tự cắt
+nên không sinh được nét biên, và chặn `XBOSS_CHUANHOA` khi bản vẽ chưa QSAVE).
+
+**Còn lỗi:** `XBOSS_VE_NEN` → `LỖI khi chuẩn bị nền — đã rollback: eInvalidKey`. Rollback đúng
+(bản vẽ nguyên trạng) nhưng thông điệp **không nói chết ở bước nào** nên không truy được nguyên
+nhân từ log; các điểm ghi bảng layer đã có sẵn guard `IsDependent` (vá 2026-08-26) nên nghi phạm
+nằm ở chỗ khác. Đã vá 2 việc, **chưa xác định được gốc rễ**:
+
+1. `VeNenCommands.ChuanBiNen`: mốc bước hiện hành (`buoc`) cập nhật trước mỗi thao tác ghi, in kèm
+   mã lỗi — lần chạy tới sẽ chỉ đúng bước (đọc clayer / khóa-làm mờ / tạo layer đích tên gì / đặt
+   clayer / ghi trạng thái NOD).
+2. `VeLayerService.HoanNguyen`: bọc try/catch **từng layer** (đối xứng `KhoaVaLamMo`) + trả danh
+   sách layer không hoàn nguyên được để lệnh BÁO. Trước đó một layer khó tính làm cả lệnh rollback
+   ⇒ bản vẽ kẹt vĩnh viễn ở trạng thái nền (mọi layer khóa + mờ, chạy lại lại chết đúng chỗ đó).
+
+**GỐC RỄ (tìm ra 2026-08-27 nhờ mốc bước):** `Autodesk.AutoCAD.Colors.Transparency.Alpha` CHỈ hợp
+lệ khi độ mờ là `ByAlpha`; layer để `ByLayer`/`ByBlock`/không hợp lệ thì **đọc** `.Alpha` ném
+`eInvalidKey`. Bản vẽ nhập từ DXF gần như luôn có layer như vậy. Hai chỗ đọc trong
+`VeLayerService` là đúng hai bước lệnh chết: `KhoaVaLamMo` (bước "khóa + làm mờ layer nền" của
+`XBOSS_VE_NEN`) và `DamBaoLayer` nhánh layer-đã-có (bước 'tạo/mở layer nhãn "G-ANNO-TEXT"' của
+`XBOSS_VE_NHAN`). Đã vá bằng `AlphaAnToan()` — không phải ByAlpha thì layer vốn KHÔNG bị làm mờ
+⇒ trả 255, đúng nghiệp vụ chứ không phải giá trị vá víu. Stub CI bổ sung `IsByAlpha` để cổng
+`XBoss.Cad.AcadShim` bắt được lớp lỗi này ở PR thay vì đợi ra máy có AutoCAD.
+
+**Tiếp theo:** verify lại 2 lệnh trên bản vẽ đó. Chưa verify `XBOSS_VE_CHIADOT` (nợ verify tay M105).
+
+## Tài liệu: hướng dẫn build plugin AutoCAD từ đầu trên Windows (2026-08-27)
+
+Thêm `plugin-autocad/BUILD-WINDOWS.md` — hướng dẫn **build từ máy Windows trắng**: điều kiện máy
+(AutoCAD 2026 bản đầy đủ, LT/2021–2025 không chạy được), cài .NET 10 SDK + .NET 8 runtime, vì sao
+**không cần tải ObjectARX SDK** riêng, bước **kiểm nền .NET của `acmgd.dll`** (bẫy `CS1705` từng
+làm hỏng buổi build 2026-08-25), đường nhanh 1 lệnh `dong-goi.ps1`, và cùng việc đó **làm tay
+từng bước** (Core/Tests → cổng shim → Adapter → dựng `.bundle` → cài), kèm bảng 12 lỗi thường gặp.
+
+Ba tài liệu plugin giờ tách vai rõ: `BUILD-WINDOWS.md` (người build) → `VERIFY-VA-PHAT-HANH.md`
+(verify tay + phát hành) → `CAI-DAT.md` (kỹ sư máy trạm chỉ cài gói `.zip`). Đã chèn liên kết
+chéo ở cả ba. Chỉ tài liệu, không đụng mã nguồn.
+
 ## Đưa `next build` ra khỏi VPS — đóng blocker deploy 2026-07-19 (2026-08-26)
 
 Người dùng chọn "theo khuyến nghị" sau đợt rà ý tưởng tích hợp: làm mục ưu tiên 1 — gỡ blocker

@@ -1,7 +1,8 @@
 # Cài đặt plugin XBoss cho AutoCAD — hướng dẫn cho kỹ sư
 
 Tài liệu này dành cho **người dùng cuối** (kỹ sư MEP/QS trên máy trạm). Người phát hành gói cài xem
-phần build/đóng gói trong [`README.md`](README.md).
+phần build/đóng gói trong [`README.md`](README.md), hoặc hướng dẫn build từ đầu trên Windows ở
+[`BUILD-WINDOWS.md`](BUILD-WINDOWS.md).
 
 > **Điều kiện bắt buộc: AutoCAD 2026** (một nền duy nhất, **.NET 10** — M99 §9.1 cập nhật 2026-08-25). Bản 2021–2024 chạy
 > runtime khác nên **không nạp được** plugin; plugin đọc `ACADVER` lúc nạp và báo tiếng Việt rồi

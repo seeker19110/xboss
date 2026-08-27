@@ -164,6 +164,8 @@ powershell -ExecutionPolicy Bypass -File plugin-autocad\dong-goi.ps1 -ChiDongGoi
 Đóng AutoCAD trước khi chạy (DLL đang nạp thì không ghi đè được). Phần dưới mô tả cấu trúc gói
 để đối chiếu khi cần làm tay.
 
+> Hướng dẫn **build chi tiết từ máy Windows trắng** (cài .NET SDK, kiểm nền .NET của AutoCAD,
+> build tay từng project, bảng lỗi thường gặp) nằm ở [`BUILD-WINDOWS.md`](BUILD-WINDOWS.md).
 > Hướng dẫn cho **người dùng cuối** (cài, ghép thiết bị, trục trặc thường gặp) nằm ở
 > [`CAI-DAT.md`](CAI-DAT.md). Quy trình đầy đủ **build → verify tay 26 lệnh trên AutoCAD thật →
 > đóng gói → phát hành → bật nút tải trên web** nằm ở

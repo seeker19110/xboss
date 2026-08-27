@@ -19,6 +19,18 @@ namespace XBoss.Cad.Acad.Services;
 /// </summary>
 internal static class VeLayerService
 {
+    /// <summary>
+    /// Đọc độ mờ của một layer AN TOÀN. <c>Transparency.Alpha</c> CHỈ hợp lệ khi giá trị là
+    /// <c>ByAlpha</c>; layer để <c>ByLayer</c>/<c>ByBlock</c>/không hợp lệ thì đọc <c>Alpha</c> ném
+    /// <c>eInvalidKey</c> và kéo cả lệnh rollback — bản vẽ nhập từ DXF gần như luôn có layer như
+    /// vậy, nên đây là lỗi chết lệnh trên đúng loại bản vẽ kỹ sư nhận từ CĐT/TVTK (vấp thật
+    /// 2026-08-27: <c>XBOSS_VE_NEN</c> và <c>XBOSS_VE_NHAN</c> cùng chết vì hai chỗ đọc Alpha).
+    ///
+    /// Không phải ByAlpha nghĩa là layer KHÔNG bị làm mờ ⇒ trả 255 (đục hoàn toàn) là đúng
+    /// nghiệp vụ, không phải giá trị vá víu.
+    /// </summary>
+    private static byte AlphaAnToan(AcadTransparency doMo) => doMo.IsByAlpha ? doMo.Alpha : (byte)255;
+
     /// <summary>Khóa mục trong Named Objects Dictionary giữ trạng thái layer trước khi làm nền.</summary>
     internal const string KhoaNOD = "XBOSS_VE_NEN";
 
@@ -115,7 +127,7 @@ internal static class VeLayerService
             // nguyên sẽ khóa vĩnh viễn nền của kỹ sư), nhưng chỉ GHI vào danh sách sau khi đổi
             // thành công — layer nào không đụng được thì không có gì để hoàn nguyên.
             var khoaCu = ltr.IsLocked;
-            var alphaCu = ltr.Transparency.Alpha;
+            var alphaCu = AlphaAnToan(ltr.Transparency);
             try
             {
                 ltr.UpgradeOpen();
@@ -210,18 +222,33 @@ internal static class VeLayerService
         return so;
     }
 
-    /// <summary>Trả layer về đúng trạng thái khóa/độ mờ đã lưu (layer đã bị xóa thì bỏ qua).</summary>
-    internal static int HoanNguyen(Database db, Transaction tr, TrangThaiNen tt)
+    /// <summary>
+    /// Trả layer về đúng trạng thái khóa/độ mờ đã lưu (layer đã bị xóa thì bỏ qua).
+    ///
+    /// Mỗi layer bọc try/catch riêng — ĐỐI XỨNG với <see cref="KhoaVaLamMo"/> và quan trọng hơn
+    /// nó: một layer khó tính làm cả lệnh rollback nghĩa là bản vẽ KẸT VĨNH VIỄN ở trạng thái nền
+    /// (mọi layer khóa + mờ, chạy lại lệnh lại chết đúng chỗ đó). Thà trả được 99/100 layer và báo
+    /// tên layer còn lại, hơn là không trả được layer nào.
+    /// </summary>
+    internal static int HoanNguyen(
+        Database db, Transaction tr, TrangThaiNen tt, List<string>? thatBai = null)
     {
         var soTra = 0;
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         foreach (var l in tt.Layer)
         {
             if (!lt.Has(l.Ten)) continue;
-            var ltr = (LayerTableRecord)tr.GetObject(lt[l.Ten], OpenMode.ForWrite);
-            ltr.IsLocked = l.Khoa;
-            ltr.Transparency = new AcadTransparency(l.Alpha);
-            soTra++;
+            try
+            {
+                var ltr = (LayerTableRecord)tr.GetObject(lt[l.Ten], OpenMode.ForWrite);
+                ltr.IsLocked = l.Khoa;
+                ltr.Transparency = new AcadTransparency(l.Alpha);
+                soTra++;
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception)
+            {
+                thatBai?.Add(l.Ten);
+            }
         }
         // Trả layer hiện hành; layer đóng băng KHÔNG được đặt làm hiện hành (AutoCAD từ chối).
         if (lt.Has(tt.ClayerCu) &&
@@ -252,7 +279,7 @@ internal static class VeLayerService
             // Bỏ đóng băng để nét vẽ ra nhìn thấy được (AutoCAD chỉ cấm ĐÓNG BĂNG layer hiện
             // hành, không cấm bỏ đóng băng).
             if (co.IsFrozen) co.IsFrozen = false;
-            if (co.Transparency.Alpha != 255) co.Transparency = new AcadTransparency(255);
+            if (AlphaAnToan(co.Transparency) != 255) co.Transparency = new AcadTransparency(255);
             return co.ObjectId;
         }
 
