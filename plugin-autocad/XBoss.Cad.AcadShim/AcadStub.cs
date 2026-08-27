@@ -128,8 +128,11 @@ namespace Autodesk.AutoCAD.Colors
 
     public struct Transparency
     {
-        public Transparency(byte alpha) { Alpha = alpha; }
+        public Transparency(byte alpha) { Alpha = alpha; IsByAlpha = true; }
         public byte Alpha { get; }
+        // API thật: Alpha CHỈ hợp lệ khi IsByAlpha; ByLayer/ByBlock/Invalid thì đọc Alpha ném
+        // eInvalidKey. Khai ở đây để mã Adapter buộc phải kiểm trước khi đọc (vấp thật 2026-08-27).
+        public bool IsByAlpha { get; }
     }
 }
 

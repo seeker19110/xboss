@@ -23,8 +23,16 @@ nằm ở chỗ khác. Đã vá 2 việc, **chưa xác định được gốc r�
    sách layer không hoàn nguyên được để lệnh BÁO. Trước đó một layer khó tính làm cả lệnh rollback
    ⇒ bản vẽ kẹt vĩnh viễn ở trạng thái nền (mọi layer khóa + mờ, chạy lại lại chết đúng chỗ đó).
 
-**Tiếp theo:** build lại trên máy có AutoCAD, chạy lại `XBOSS_VE_NEN` trên đúng bản vẽ đó, lấy
-tên bước trong thông điệp rồi vá gốc rễ. Chưa verify `XBOSS_VE_CHIADOT` (nợ verify tay của M105).
+**GỐC RỄ (tìm ra 2026-08-27 nhờ mốc bước):** `Autodesk.AutoCAD.Colors.Transparency.Alpha` CHỈ hợp
+lệ khi độ mờ là `ByAlpha`; layer để `ByLayer`/`ByBlock`/không hợp lệ thì **đọc** `.Alpha` ném
+`eInvalidKey`. Bản vẽ nhập từ DXF gần như luôn có layer như vậy. Hai chỗ đọc trong
+`VeLayerService` là đúng hai bước lệnh chết: `KhoaVaLamMo` (bước "khóa + làm mờ layer nền" của
+`XBOSS_VE_NEN`) và `DamBaoLayer` nhánh layer-đã-có (bước 'tạo/mở layer nhãn "G-ANNO-TEXT"' của
+`XBOSS_VE_NHAN`). Đã vá bằng `AlphaAnToan()` — không phải ByAlpha thì layer vốn KHÔNG bị làm mờ
+⇒ trả 255, đúng nghiệp vụ chứ không phải giá trị vá víu. Stub CI bổ sung `IsByAlpha` để cổng
+`XBoss.Cad.AcadShim` bắt được lớp lỗi này ở PR thay vì đợi ra máy có AutoCAD.
+
+**Tiếp theo:** verify lại 2 lệnh trên bản vẽ đó. Chưa verify `XBOSS_VE_CHIADOT` (nợ verify tay M105).
 
 ## Tài liệu: hướng dẫn build plugin AutoCAD từ đầu trên Windows (2026-08-27)
 
