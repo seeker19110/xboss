@@ -3290,6 +3290,61 @@
 - `api_keys_key_hash_key`: UNIQUE INDEX api_keys_key_hash_key ON public.api_keys USING btree (key_hash)
 - `api_keys_pkey`: UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)
 
+### cad_block_batch_items
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('cad_block_batch_items_id_seq'::regclass)` |
+| batch_id | integer |  |  |
+| block_name | text |  |  |
+| kind | text | ✓ |  |
+| system_id | text | ✓ |  |
+| takeoff_item_id | text | ✓ |  |
+| paper_size | text | ✓ |  |
+| attributes | jsonb | ✓ |  |
+| file_key | text | ✓ |  |
+| file_sha256 | text | ✓ |  |
+| preview_svg | text | ✓ |  |
+| nguon_quyet_dinh | text |  |  |
+| do_tin_cay | numeric(3,2) | ✓ |  |
+| ly_do | text | ✓ |  |
+| chon | boolean |  | `true` |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `batch_id` → `cad_block_batches(id)`
+
+**Index:**
+- `cad_block_batch_items_pkey`: UNIQUE INDEX cad_block_batch_items_pkey ON public.cad_block_batch_items USING btree (id)
+- `idx_cad_block_batch_items_batch`: INDEX idx_cad_block_batch_items_batch ON public.cad_block_batch_items USING btree (batch_id)
+- `idx_cad_block_batch_items_ten`: UNIQUE INDEX idx_cad_block_batch_items_ten ON public.cad_block_batch_items USING btree (batch_id, upper(block_name))
+
+### cad_block_batches
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('cad_block_batches_id_seq'::regclass)` |
+| nguon | text |  |  |
+| base_lib_version | text |  |  |
+| candidate_storage_key | text | ✓ |  |
+| candidate_dwg_sha256 | text | ✓ |  |
+| status | text |  | `'pending'::text` |
+| reject_reason | text | ✓ |  |
+| published_version | text | ✓ |  |
+| ai_enabled | boolean |  | `false` |
+| proposed_by | integer |  |  |
+| decided_by | integer | ✓ |  |
+| decided_at | timestamptz | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `decided_by` → `users(id)`
+- `proposed_by` → `users(id)`
+
+**Index:**
+- `cad_block_batches_pkey`: UNIQUE INDEX cad_block_batches_pkey ON public.cad_block_batches USING btree (id)
+- `idx_cad_block_batches_status`: INDEX idx_cad_block_batches_status ON public.cad_block_batches USING btree (status)
+
 ### cad_block_libs
 
 | Cột | Kiểu | Null | Default |

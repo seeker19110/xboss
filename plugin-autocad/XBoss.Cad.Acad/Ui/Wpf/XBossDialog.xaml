@@ -711,6 +711,41 @@
     </DataTemplate>
 
     <!-- XBOSS_VE_CHIADOT: phạm vi + kiểu nối + xem trước số đốt (AC4). -->
+    <!-- M108 §6.1 — XBOSS_VE_DEXUAT_LO: xem trước danh sách block rồi xác nhận gửi. KHÔNG có ô
+         khai metadata: phân loại do máy chủ đề xuất và người duyệt chốt trên web, hộp thoại này
+         cố ý không hỏi lại (hai chỗ cùng hỏi một câu là hai chỗ để lệch nhau). -->
+    <DataTemplate DataType="{x:Type vm:DeXuatLoDialogViewModel}">
+      <StackPanel>
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <TextBlock Text="{Binding TomTat}" TextWrapping="Wrap" />
+        </Border>
+
+        <CheckBox Content="Chỉ gửi block đang được chèn trong bản vẽ"
+                  IsChecked="{Binding ChiBlockDangDung, Mode=TwoWay}" Margin="0,8,0,0" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Block trong bản vẽ" />
+        <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
+          <ItemsControl ItemsSource="{Binding TatCa}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid Margin="0,0,0,3">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="3*" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0" Text="{Binding TenBlock}" TextWrapping="Wrap" />
+                  <!-- Lý do bỏ qua hiện NGUYÊN VĂN cạnh tên: block biến mất im lặng là thứ người
+                       dùng không bao giờ tự phát hiện được. -->
+                  <TextBlock Grid.Column="1" Text="{Binding LyDoBoQua}" TextWrapping="Wrap"
+                             Opacity="0.75" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </StackPanel>
+    </DataTemplate>
+
     <DataTemplate DataType="{x:Type vm:ChiaDotDialogViewModel}">
       <StackPanel>
         <TextBlock Style="{StaticResource Nhan}" Text="Phạm vi chia đốt" />

@@ -6,6 +6,7 @@ import { Layers, Download, FileSpreadsheet } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import PluginControlPanel from "./components/PluginControlPanel";
 import ThuVienBlockPanel from "./components/ThuVienBlockPanel";
+import NapLoBlockPanel from "./components/NapLoBlockPanel";
 import MaBoqDuAnPanel from "./components/MaBoqDuAnPanel";
 import UploadAndBrowsePanel from "./components/UploadAndBrowsePanel";
 import CadViewportStudio from "./components/CadViewportStudio";
@@ -166,6 +167,11 @@ export default function ChuanHoaBanVePage() {
             THƯ VIỆN BLOCK CHUẨN (M100 PR2) — version hiện hành, lịch sử, phát hành
         ══════════════════════════════════════════════════════════════════════ */}
         <ThuVienBlockPanel />
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            NẠP BLOCK HÀNG LOẠT (M108) — tệp tổng hợp → đề xuất phân loại → duyệt lô
+        ══════════════════════════════════════════════════════════════════════ */}
+        <NapLoBlockPanel />
 
         {/* ══════════════════════════════════════════════════════════════════════
             MÃ BOQ THEO DỰ ÁN (M101 PR4) — gán mã cho hạng mục bóc tách XBOSS_BOCKL

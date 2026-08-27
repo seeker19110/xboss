@@ -85,6 +85,120 @@ internal static class BlockUngVienBuilder
         }
     }
 
+    /// <summary>Một định nghĩa block đọc được khi quét toàn bản vẽ (M108 §6.1).</summary>
+    /// <param name="LyDoBoQua">Null = nạp được; khác null = bị loại, kèm lý do tiếng Việt.</param>
+    internal sealed record UngVienLo(
+        ObjectId IdDinhNghia,
+        string TenBlock,
+        string Layer,
+        int SoLanChen,
+        string? LyDoBoQua);
+
+    /// <summary>
+    /// Quét TOÀN BỘ block table của bản vẽ thành danh sách ứng viên cho <c>XBOSS_VE_DEXUAT_LO</c>.
+    ///
+    /// Chỉ ĐỌC — transaction tự abort khi Dispose, bản vẽ của kỹ sư không đổi một byte nào.
+    ///
+    /// Luật loại bám đúng <see cref="DocDinhNghia"/> của M103 (một block) để hai đường không lệch:
+    /// xref, block ẩn danh, layout đều bị loại KÈM LÝ DO ĐẾM ĐƯỢC — người dùng phải thấy vì sao
+    /// một block không lên, chứ không phải nó biến mất im lặng.
+    /// </summary>
+    internal static IReadOnlyList<UngVienLo> QuetToanBoDinhNghia(Database db)
+    {
+        var ketQua = new List<UngVienLo>();
+        using var tr = db.TransactionManager.StartTransaction();
+        {
+            var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+            foreach (ObjectId id in bt)
+            {
+                if (tr.GetObject(id, OpenMode.ForRead) is not BlockTableRecord btr) continue;
+
+                string? lyDo = null;
+                if (btr.IsFromExternalReference || btr.IsFromOverlayReference)
+                    lyDo = "Là tham chiếu ngoài (xref), không phải block thư viện.";
+                else if (btr.IsAnonymous)
+                    lyDo = "Block ẩn danh (do hatch/khối động sinh ra) — không có tên để đưa vào thư viện.";
+                else if (btr.IsLayout)
+                    lyDo = "Là không gian layout, không phải block thư viện.";
+
+                // Số lần chèn: đếm bản ghi tham chiếu tới định nghĩa. Chỉ để người dùng lọc, không
+                // ảnh hưởng việc nạp — block chưa chèn vẫn là block hợp lệ của thư viện.
+                var soChen = 0;
+                if (lyDo is null)
+                {
+                    using var refs = btr.GetBlockReferenceIds(directOnly: true, forceValidity: false);
+                    soChen = refs.Count;
+                }
+
+                // Layer của định nghĩa lấy từ thực thể đầu tiên — chỉ để đối chiếu bằng mắt.
+                var layer = "";
+                if (lyDo is null)
+                {
+                    foreach (ObjectId idCon in btr)
+                    {
+                        if (tr.GetObject(idCon, OpenMode.ForRead) is Entity e)
+                        {
+                            layer = e.Layer;
+                            break;
+                        }
+                    }
+                }
+
+                ketQua.Add(new UngVienLo(id, btr.Name, layer, soChen, lyDo));
+            }
+        }
+        return ketQua;
+    }
+
+    /// <summary>
+    /// Dựng tệp lô: một database MỚI, rỗng, chứa đúng những định nghĩa block được chọn + sidecar DXF.
+    ///
+    /// Khác <see cref="Dung"/> (M103): KHÔNG dựng trên bản sao <c>blocks.dwg</c> của thư viện. Máy
+    /// chủ đọc lô bằng cách liệt kê mọi định nghĩa block trong DXF, nên nếu lấy tệp thư viện làm
+    /// nền thì mọi block đang có của thư viện cũng lọt vào lô rồi bị gạt vì "trùng tên" — đúng kết
+    /// quả nhưng tốn công vô ích và làm danh sách bỏ qua đầy nhiễu.
+    ///
+    /// Bản vẽ nguồn chỉ được ĐỌC (tài liệu phải đang được khóa). Tệp tạm dọn trong <c>finally</c>.
+    /// </summary>
+    internal static TepUngVien DungLo(Database nguon, IReadOnlyList<ObjectId> idDinhNghias)
+    {
+        if (idDinhNghias.Count == 0)
+            throw new BlockManifestException("Không có định nghĩa block nào được chọn để dựng lô.");
+
+        var thuMucTam = Path.Combine(Path.GetTempPath(), $"xboss-dexuat-lo-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(thuMucTam);
+            var duongDwg = Path.Combine(thuMucTam, "lo-block.dwg");
+            var duongDxf = Path.Combine(thuMucTam, "lo-block.dxf");
+
+            using (var lo = new Database(buildDefaultDrawing: true, noDocument: true))
+            {
+                using var ids = new ObjectIdCollection();
+                foreach (var id in idDinhNghias) ids.Add(id);
+                using var anhXa = new IdMapping();
+                // Ignore: bản ghi phụ trùng tên (layer, kiểu chữ) giữ bản của tệp đích. Các định
+                // nghĩa block đều là tên mới trong một database rỗng nên không có gì bị nuốt.
+                nguon.WblockCloneObjects(ids, lo.BlockTableId, anhXa, DuplicateRecordCloning.Ignore, false);
+
+                lo.SaveAs(duongDwg, lo.OriginalFileVersion);
+                lo.DxfOut(duongDxf, 16, lo.OriginalFileVersion);
+            }
+
+            var dwg = File.ReadAllBytes(duongDwg);
+            return new TepUngVien(dwg, File.ReadAllBytes(duongDxf), BlockManifestLoader.TinhSha256(dwg));
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(thuMucTam)) Directory.Delete(thuMucTam, true);
+            }
+            catch (IOException) { /* tệp tạm — Windows tự dọn %TEMP%, không làm hỏng lệnh */ }
+            catch (UnauthorizedAccessException) { /* nt */ }
+        }
+    }
+
     /// <summary>
     /// Bản sao tệp thư viện + định nghĩa block mới clone vào + sidecar DXF + sha256.
     /// <paramref name="nguon"/> = database bản vẽ đang mở (chỉ đọc; tài liệu phải đang được KHÓA).

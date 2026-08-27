@@ -118,6 +118,9 @@ public static class LenhCatalog
         new("XBOSS_VE_DEXUAT", "Đề xuất block",
             "Gửi một block trong bản vẽ lên hàng chờ duyệt để thêm vào thư viện chuẩn (Admin/PM duyệt trên web).",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.PhuTro, 3, CanRulePack: true),
+        new("XBOSS_VE_DEXUAT_LO", "Nạp block hàng loạt",
+            "Gửi MỌI block của bản vẽ (tệp thư viện tổng hợp) lên hàng chờ; máy chủ tự đề xuất phân loại, Admin/PM duyệt theo lô trên web.",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.PhuTro, 4, CanRulePack: true),
         new("XBOSS_VE_CHIADOT", "Chia đốt",
             "Chia tuyến đã vẽ thành đốt chế tạo theo kiểu nối của rule pack: vạch chia + tag đốt trên layer riêng.",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.ChiTietCheTao, 1, CanRulePack: true),
@@ -147,7 +150,7 @@ public static class LenhCatalog
         new("XBOSS_BANG", "Bảng điều khiển",
             "Bật/tắt bảng XBoss: tab Quy trình (6 giai đoạn — đang ở bước nào, tiếp theo làm gì) " +
             "và tab Trạng thái (đăng nhập, rule pack, kết quả kiểm tra/bóc tách/vẽ gần nhất).",
-            NhomLenh.BangDieuKhien, BuocQuyTrinh.PhuTro, 4, LenhChinh: true),
+            NhomLenh.BangDieuKhien, BuocQuyTrinh.PhuTro, 5, LenhChinh: true),
     ];
 
     /// <summary>Các nhóm theo thứ tự hiện trên Ribbon.</summary>
