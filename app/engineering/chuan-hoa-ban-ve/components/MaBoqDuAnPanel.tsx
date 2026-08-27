@@ -1,7 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Hash, Save, AlertTriangle, CheckCircle2, RefreshCw, Download } from "lucide-react";
+import {
+  Hash,
+  Save,
+  AlertTriangle,
+  CheckCircle2,
+  RefreshCw,
+  Download,
+  Sparkles,
+} from "lucide-react";
 import { Button, ButtonLink } from "@/app/components/ui";
 import { Skeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
@@ -37,6 +45,10 @@ export default function MaBoqDuAnPanel() {
   const [loi, setLoi] = useState<string | null>(null);
   const [dangLuu, setDangLuu] = useState(false);
   const [thanhCong, setThanhCong] = useState<string | null>(null);
+  // M108 §6.5 — gợi ý mã BOQ. CHỈ điền vào ô nhập, KHÔNG tự lưu: người dùng vẫn phải bấm Lưu.
+  const [dangGoiY, setDangGoiY] = useState(false);
+  const [lyDoGoiY, setLyDoGoiY] = useState<string | null>(null);
+  const [maDoGoiY, setMaDoGoiY] = useState<Record<string, { doTinCay: number; lyDo: string }>>({});
 
   const tai = useCallback(async () => {
     try {
@@ -60,6 +72,52 @@ export default function MaBoqDuAnPanel() {
   useEffect(() => {
     void tai();
   }, [tai]);
+
+  /**
+   * Xin gợi ý mã BOQ. Kết quả chỉ ĐIỀN SẴN vào ô nhập và đánh dấu dòng nào do máy đề xuất —
+   * đường ghi vẫn là nút Lưu như cũ, không có đường tắt nào ghi thẳng (M108 AC11).
+   */
+  async function xinGoiY() {
+    setDangGoiY(true);
+    setLoi(null);
+    setThanhCong(null);
+    setLyDoGoiY(null);
+    try {
+      const res = await fetch("/api/engineering/cad/boq-map/suggest", { method: "POST" });
+      if (res.status === 401) return redirectToLogin();
+      const data = (await res.json().catch(() => ({}))) as {
+        goiY?: { tu: string; den: string | null; doTinCay: number; lyDo: string }[];
+        lyDoAiKhongChay?: string | null;
+        error?: string;
+      };
+      if (!res.ok) {
+        setLoi(data.error || "Không lấy được gợi ý.");
+        return;
+      }
+      const co = (data.goiY ?? []).filter((g) => g.den);
+      setNhap((cu) => {
+        const moi = { ...cu };
+        for (const g of co) {
+          // Không đè lên mã người đã gõ — gợi ý chỉ điền vào chỗ còn trống.
+          if (!(moi[g.tu] ?? "").trim()) moi[g.tu] = g.den as string;
+        }
+        return moi;
+      });
+      setMaDoGoiY(
+        Object.fromEntries(co.map((g) => [g.tu, { doTinCay: g.doTinCay, lyDo: g.lyDo }])),
+      );
+      setLyDoGoiY(
+        data.lyDoAiKhongChay ??
+          (co.length === 0
+            ? "Không có gợi ý nào đủ căn cứ — gán tay như cũ."
+            : `Đã điền sẵn ${co.length} mã — kiểm lại rồi bấm Lưu.`),
+      );
+    } catch {
+      setLoi("Lỗi mạng — không lấy được gợi ý.");
+    } finally {
+      setDangGoiY(false);
+    }
+  }
 
   async function luu() {
     if (!duLieu) return;
@@ -128,6 +186,15 @@ export default function MaBoqDuAnPanel() {
           )}
           <Button
             size="sm"
+            icon={Sparkles}
+            onClick={() => void xinGoiY()}
+            disabled={dangGoiY || !duLieu?.choSua}
+            aria-label="Gợi ý mã BOQ từ danh mục BOQ của dự án"
+          >
+            {dangGoiY ? "Đang gợi ý…" : "Gợi Ý Từ Danh Mục BOQ"}
+          </Button>
+          <Button
+            size="sm"
             icon={RefreshCw}
             onClick={() => void tai()}
             aria-label="Tải lại map mã BOQ"
@@ -141,6 +208,13 @@ export default function MaBoqDuAnPanel() {
         <p className="flex items-center gap-1.5 text-xs text-amber-300">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           {loi}
+        </p>
+      )}
+
+      {lyDoGoiY && (
+        <p className="flex items-start gap-1.5 text-xs text-sky-300">
+          <Sparkles className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+          {lyDoGoiY} Mã do máy đề xuất chỉ được điền sẵn, chưa lưu — bạn vẫn phải bấm Lưu.
         </p>
       )}
 
@@ -183,6 +257,18 @@ export default function MaBoqDuAnPanel() {
                           aria-label={`Mã BOQ cho hạng mục ${i.ten}`}
                           className="w-40 min-h-10 px-2 rounded-lg bg-zinc-950 border border-zinc-700 text-zinc-100 font-mono text-xs disabled:opacity-60"
                         />
+                        {/* Đánh dấu rõ mã nào do máy đề xuất — kèm icon + chữ, không chỉ bằng màu. */}
+                        {maDoGoiY[i.takeoffItemId] && ma === "" ? null : maDoGoiY[
+                            i.takeoffItemId
+                          ] ? (
+                          <p className="mt-1 flex items-start gap-1 text-[11px] text-sky-300">
+                            <Sparkles className="w-3 h-3 shrink-0 mt-0.5" aria-hidden="true" />
+                            <span>
+                              Máy đề xuất · {Math.round(maDoGoiY[i.takeoffItemId].doTinCay * 100)}%
+                              — {maDoGoiY[i.takeoffItemId].lyDo}
+                            </span>
+                          </p>
+                        ) : null}
                       </td>
                       <td className="py-2">
                         {ma === "" ? (

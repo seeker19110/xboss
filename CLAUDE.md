@@ -78,6 +78,8 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 - `GOOGLE_SERVICE_ACCOUNT_JSON` (hoặc cặp `GOOGLE_SA_EMAIL` + `GOOGLE_SA_PRIVATE_KEY`) + `GOOGLE_SHEET_ID` + `GOOGLE_SHEET_TAB` — (tuỳ chọn) đồng bộ hai chiều bảng vật tư ↔ Google Sheet. Thiếu cấu hình → `lib/vat-tu/google-sheets.ts` throw fail-fast khi gọi sync (build vẫn chạy).
 - `XBOSS_PLUGIN_URL` — (tuỳ chọn) đường tải gói cài plugin AutoCAD, hiện thành nút "Tải Gói Cài Plugin" trên bảng điều khiển `/engineering/chuan-hoa-ban-ve` (M99 PR6). Thiếu → nút thay bằng hướng dẫn cài trên trang `/engineering/cai-dat-plugin` (gói nhị phân không nằm trong repo).
 - `XBOSS_PLUGIN_SHA256` — (tuỳ chọn, đi kèm `XBOSS_PLUGIN_URL`) sha256 của gói `.zip` đang phát hành (64 hex, do `plugin-autocad/dong-goi.ps1` sinh cạnh gói) để kỹ sư đối chiếu tệp tải về trên trang `/engineering/cai-dat-plugin`. Thiếu/sai định dạng → ẩn, trang hướng dẫn tự kiểm bằng `Get-FileHash`.
+- `ANTHROPIC_API_KEY` — (tuỳ chọn) gợi ý phân loại block/ánh xạ bằng AI (M108: tầng 2 ngữ nghĩa + tầng 3 hình học của `lib/dich-vu/cad-block-phan-loai.ts`, gợi ý `layerMap`/`boqCode`). Cửa duy nhất ra mô hình là `lib/nen/ai.ts`. Thiếu → **tự tắt tầng 2/3**, hệ thống chạy bằng luật tất định, **không throw** (khác `XBOSS_SECRET`: thiếu AI thì mất tiện ích, thiếu khoá ký phiên thì mất an toàn).
+- `XBOSS_AI_BLOCK_CLASSIFY` — (tuỳ chọn) công tắc **dừng khẩn** cho toàn bộ gợi ý AI: đặt `0` là tắt ngay, không cần deploy lại. Mặc định bật khi có khoá.
 - `SENTRY_DSN` — (tuỳ chọn) theo dõi lỗi production qua Sentry (`instrumentation.ts` + `sentry.server.config.ts`/`sentry.edge.config.ts`, xem `docs/audit.md` §10). Thiếu → SDK tự `enabled: false`, không gửi gì, không ảnh hưởng build/dev.
 
 ## Kiến trúc

@@ -1,4 +1,4 @@
-import { query, queryOne } from "@/lib/db";
+import { query, queryOne, withProjectScope } from "@/lib/db";
 import { slugFromCode } from "@/lib/nen/sheets";
 
 // Sinh BOQCODE mặc định: <SLUG-SHEET>-<mã hàng>, phân tách thống nhất bằng "-"
@@ -69,4 +69,39 @@ export async function boqExecutedQty(boqItemId: number): Promise<number> {
     boqItemId,
   );
   return row?.executed ?? 0;
+}
+
+/** Một dòng trong danh mục BOQ của dự án — CHỈ phần mô tả, không có cột tiền nào. */
+export type DongDanhMucBoq = { code: string; name: string; unit: string };
+
+/** Trần số dòng trả về — đủ cho mọi dự án thật, chặn việc kéo cả sổ khổng lồ vào bộ nhớ/prompt. */
+export const TRAN_DANH_MUC_BOQ = 500;
+
+/**
+ * Danh mục BOQ của một dự án để đối chiếu/gợi ý ánh xạ (M108 §6.5).
+ *
+ * Cố ý **không SELECT** `unit_price`/`sub_unit_price`/thành tiền: người gọi chỉ cần biết "dự án có
+ * những công tác nào", và mọi thứ liên quan tiền đều nằm ngoài phạm vi (quy ước M45).
+ *
+ * Lọc `project_id` ở tầng app dù đã bọc `withProjectScope` — cùng lý do đã ghi trong
+ * `lib/dich-vu/cad-boq-snapshot.ts`: mã BOQ duy nhất TOÀN HỆ THỐNG nên thiếu điều kiện này là đọc
+ * được công tác của dự án khác.
+ *
+ * `daCatBot` = true khi sổ dài hơn trần: người gọi phải nói ra cho người dùng biết, không được im.
+ */
+export async function danhMucBoqTheoDuAn(
+  projectId: number,
+): Promise<{ dong: DongDanhMucBoq[]; daCatBot: boolean }> {
+  const rows = await withProjectScope(projectId, () =>
+    query<DongDanhMucBoq>(
+      `SELECT code, name, unit
+         FROM boq_items
+        WHERE project_id = ?
+        ORDER BY code
+        LIMIT ?`,
+      projectId,
+      TRAN_DANH_MUC_BOQ + 1,
+    ),
+  );
+  return { dong: rows.slice(0, TRAN_DANH_MUC_BOQ), daCatBot: rows.length > TRAN_DANH_MUC_BOQ };
 }
