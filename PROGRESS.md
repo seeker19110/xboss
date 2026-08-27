@@ -4,6 +4,25 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Verify tay plugin v9 trên bản vẽ AEC thật — `eInvalidKey` ở VE_NEN/VE_NHAN (2026-08-27)
+
+Bản vẽ thật (`TMDV 3F`, nhập từ **DXF 2018**, có xref đã bind `xref-3f-31-7$0$…`): `XBOSS_RULEPACK`
+nạp đúng v9, `XBOSS_KIEMTRA`/`XBOSS_BATCH`/`XBOSS_VE` chạy đúng đặc tả. **Hai lệnh chết bằng
+`eInvalidKey`**: `XBOSS_VE_NEN` (chuẩn bị nền) và `XBOSS_VE_NHAN` (ghi nhãn) — rollback đúng, bản
+vẽ nguyên trạng, nhưng thông điệp chỉ có mã lỗi trần nên **không truy được gốc rễ**. Các điểm ghi
+bảng layer đã có guard `IsDependent` từ 2026-08-26 nên nghi phạm nằm chỗ khác; `XBOSS_VE` tạo layer
+MỚI + ghi XData trót lọt, còn `XBOSS_VE_NHAN` ghi lên layer `G-ANNO-TEXT` ĐÃ CÓ SẴN.
+
+Đã làm (chưa phải bản vá gốc rễ):
+
+1. Mốc bước hiện hành in kèm mã lỗi cho `XBOSS_VE_NEN` (đọc clayer / khóa-làm mờ / tạo layer đích
+   tên gì / đặt clayer / ghi trạng thái NOD) và `XBOSS_VE_NHAN` (đăng ký XData / layer nhãn / tạo
+   MText / ghi XData nhãn / cập nhật XData tim).
+2. `VeLayerService.HoanNguyen` bọc try/catch **từng layer** + báo layer không trả được. Trước đó
+   một layer khó tính làm cả lệnh rollback ⇒ bản vẽ kẹt vĩnh viễn ở trạng thái nền.
+
+**Tiếp theo:** chạy lại 2 lệnh trên đúng bản vẽ đó, lấy tên bước rồi vá gốc rễ.
+
 ## Đóng tồn đọng tích hợp plugin AutoCAD (đợt 2, 2026-08-25)
 
 Sau khi PR #402 merge, rà lại toàn cụm trên `main` để trả lời "còn gì chưa tích hợp": 8/8 mục của

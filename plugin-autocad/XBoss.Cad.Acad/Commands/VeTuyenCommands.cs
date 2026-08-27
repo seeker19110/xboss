@@ -218,6 +218,8 @@ public sealed class VeTuyenCommands
         }
 
         // (4) Tạo nhãn + liên kết XData 2 chiều trong 1 transaction = 1 nhóm UNDO.
+        // Mốc bước hiện hành: mã lỗi API AutoCAD không nói chết ở đâu (xem VeNenCommands).
+        var buoc = "đăng ký ứng dụng XData";
         using (var khoa = doc.LockDocument())
         using (var tr = db.TransactionManager.StartTransaction())
         {
@@ -225,11 +227,13 @@ public sealed class VeTuyenCommands
             {
                 VeXDataStore.DangKyApp(db, tr);
                 var tenLayer = pack.DrawTools.LabelStyle.Layer;
+                buoc = $"tạo/mở layer nhãn \"{tenLayer}\"";
                 VeLayerService.DamBaoLayer(
                     db, tr, tenLayer, VeLayerStyle.AciNhan, pack.RulePack.LineweightMap, out _);
                 var ms = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
 
+                buoc = "tạo đối tượng nhãn MText";
                 var nhan = new MText
                 {
                     Contents = noiDung,
@@ -241,6 +245,7 @@ public sealed class VeTuyenCommands
                 ms.AppendEntity(nhan);
                 tr.AddNewlyCreatedDBObject(nhan, true);
                 nhan.Layer = tenLayer; // đặt SAU khi vào database
+                buoc = "ghi XData cho nhãn";
                 VeXDataStore.Ghi(nhan, new VeXDataInfo
                 {
                     VaiTro = VaiTroVe.Nhan,
@@ -254,6 +259,7 @@ public sealed class VeTuyenCommands
 
                 // Tim giữ danh sách nhãn của nó (kể cả mũi tên hướng dốc) để XBOSS_VE_DOI cập
                 // nhật được (FR8).
+                buoc = "cập nhật XData của tuyến tim";
                 if (tr.GetObject(chon.ObjectId, OpenMode.ForWrite) is Entity tim)
                 {
                     var handleNhan = thongTin.HandleNhan.ToList();
@@ -267,7 +273,7 @@ public sealed class VeTuyenCommands
             {
                 tr.Abort();
                 ed.WriteMessage(
-                    $"\n[XBoss] LỖI khi ghi nhãn — đã rollback: {e.Message}\n" +
+                    $"\n[XBoss] LỖI khi ghi nhãn ({buoc}) — đã rollback: {e.Message}\n" +
                     "[XBoss] Nếu layer tuyến/annotation đang khóa: chạy XBOSS_VE_NEN (hoặc mở khóa layer) rồi thử lại.\n");
                 return;
             }

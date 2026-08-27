@@ -55,12 +55,17 @@ public sealed class VeNenCommands
         var coSanNoiDung = new List<string>();
         var boQuaLayer = new List<string>();
         var soLayerNen = 0;
+        // Mốc bước hiện hành: lỗi API AutoCAD (eInvalidKey/eLayerFrozen…) chỉ có mã lỗi trần, không
+        // nói chết ở đâu — bản vẽ AEC thật có xref/layer lạ thì "eInvalidKey" trơ trọi là ngõ cụt
+        // cho cả kỹ sư lẫn người sửa lỗi (vấp thật 2026-08-27). Cập nhật trước mỗi thao tác ghi.
+        var buoc = "đọc layer hiện hành";
         using (var khoa = doc.LockDocument())
         using (var tr = db.TransactionManager.StartTransaction())
         {
             try
             {
                 var clayerCu = ((LayerTableRecord)tr.GetObject(db.Clayer, OpenMode.ForRead)).Name;
+                buoc = "khóa + làm mờ layer nền";
                 var trangThaiCu = VeLayerService.KhoaVaLamMo(
                     db, tr, pack.DrawTools.BaseFadePct, boQuaLayer);
                 soLayerNen = trangThaiCu.Count;
@@ -68,6 +73,7 @@ public sealed class VeNenCommands
                 ObjectId? layerVeDauTien = null;
                 foreach (var line in he.Lines)
                 {
+                    buoc = $"tạo/mở layer đích \"{line.Layer}\"";
                     var idTim = VeLayerService.DamBaoLayer(
                         db, tr, line.Layer, VeLayerStyle.AciChoTim(line.EdgeStyle),
                         pack.RulePack.LineweightMap, out var moiTim);
@@ -77,14 +83,17 @@ public sealed class VeNenCommands
 
                     if (line.EdgeStyle != "double") continue;
                     var tenBien = VeLayerStyle.LayerNetBien(line.Layer, pack.DrawTools.EdgeLayerSuffix);
+                    buoc = $"tạo/mở layer nét biên \"{tenBien}\"";
                     VeLayerService.DamBaoLayer(
                         db, tr, tenBien, VeLayerStyle.AciNetBien, pack.RulePack.LineweightMap, out var moiBien);
                     if (moiBien) daTao.Add(tenBien);
                 }
 
                 // Mọi layer nền vừa bị khóa ⇒ layer hiện hành phải chuyển sang layer vẽ được.
+                buoc = "đặt layer hiện hành";
                 if (layerVeDauTien is { } idClayer) db.Clayer = idClayer;
 
+                buoc = "ghi trạng thái nền vào bản vẽ";
                 VeLayerService.GhiTrangThai(
                     db, tr, new VeLayerService.TrangThaiNen(he.Id, clayerCu, trangThaiCu));
                 tr.Commit();
@@ -92,7 +101,9 @@ public sealed class VeNenCommands
             catch (Autodesk.AutoCAD.Runtime.Exception e)
             {
                 tr.Abort();
-                ed.WriteMessage($"\n[XBoss] LỖI khi chuẩn bị nền — đã rollback, bản vẽ nguyên trạng: {e.Message}\n");
+                ed.WriteMessage(
+                    $"\n[XBoss] LỖI khi chuẩn bị nền ({buoc}) — đã rollback, bản vẽ nguyên trạng: {e.Message}\n" +
+                    "[XBoss] Gửi dòng này kèm tên bản vẽ cho đội phát triển; lệnh vẽ XBOSS_VE vẫn dùng được bình thường.\n");
                 return;
             }
         }
@@ -150,12 +161,13 @@ public sealed class VeNenCommands
     {
         var ed = doc.Editor;
         int soTra;
+        var thatBai = new List<string>();
         using (var khoa = doc.LockDocument())
         using (var tr = db.TransactionManager.StartTransaction())
         {
             try
             {
-                soTra = VeLayerService.HoanNguyen(db, tr, tt);
+                soTra = VeLayerService.HoanNguyen(db, tr, tt, thatBai);
                 VeLayerService.XoaTrangThai(db, tr);
                 tr.Commit();
             }
@@ -169,5 +181,13 @@ public sealed class VeNenCommands
         ed.WriteMessage(
             $"\n[XBoss] Đã hoàn nguyên nền (hệ {tt.HeId}): trả khóa + độ mờ cho {soTra} layer.\n" +
             "[XBoss] Layer đích và các đối tượng đã vẽ giữ nguyên. Hoàn tác: UNDO.\n");
+        if (thatBai.Count > 0)
+        {
+            // Trạng thái nền đã bị xóa khỏi bản vẽ ở trên, nên các layer này sẽ KHÔNG được thử lại
+            // lần nữa — phải nói tên ra để kỹ sư tự mở khóa/bỏ mờ, im lặng là bỏ mặc.
+            ed.WriteMessage(
+                $"[XBoss] ⚠ {thatBai.Count} layer KHÔNG trả được khóa/độ mờ: {string.Join(", ", thatBai)}. " +
+                "Mở LAYER chỉnh tay các layer này.\n");
+        }
     }
 }

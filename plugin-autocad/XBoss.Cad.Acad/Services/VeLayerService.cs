@@ -210,18 +210,33 @@ internal static class VeLayerService
         return so;
     }
 
-    /// <summary>Trả layer về đúng trạng thái khóa/độ mờ đã lưu (layer đã bị xóa thì bỏ qua).</summary>
-    internal static int HoanNguyen(Database db, Transaction tr, TrangThaiNen tt)
+    /// <summary>
+    /// Trả layer về đúng trạng thái khóa/độ mờ đã lưu (layer đã bị xóa thì bỏ qua).
+    ///
+    /// Mỗi layer bọc try/catch riêng — ĐỐI XỨNG với <see cref="KhoaVaLamMo"/> và quan trọng hơn
+    /// nó: một layer khó tính làm cả lệnh rollback nghĩa là bản vẽ KẸT VĨNH VIỄN ở trạng thái nền
+    /// (mọi layer khóa + mờ, chạy lại lệnh lại chết đúng chỗ đó). Thà trả được 99/100 layer và báo
+    /// tên layer còn lại, hơn là không trả được layer nào.
+    /// </summary>
+    internal static int HoanNguyen(
+        Database db, Transaction tr, TrangThaiNen tt, List<string>? thatBai = null)
     {
         var soTra = 0;
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         foreach (var l in tt.Layer)
         {
             if (!lt.Has(l.Ten)) continue;
-            var ltr = (LayerTableRecord)tr.GetObject(lt[l.Ten], OpenMode.ForWrite);
-            ltr.IsLocked = l.Khoa;
-            ltr.Transparency = new AcadTransparency(l.Alpha);
-            soTra++;
+            try
+            {
+                var ltr = (LayerTableRecord)tr.GetObject(lt[l.Ten], OpenMode.ForWrite);
+                ltr.IsLocked = l.Khoa;
+                ltr.Transparency = new AcadTransparency(l.Alpha);
+                soTra++;
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception)
+            {
+                thatBai?.Add(l.Ten);
+            }
         }
         // Trả layer hiện hành; layer đóng băng KHÔNG được đặt làm hiện hành (AutoCAD từ chối).
         if (lt.Has(tt.ClayerCu) &&
