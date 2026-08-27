@@ -302,6 +302,38 @@ public sealed class XBossApiClient
         [JsonPropertyName("duocThemTrucTiep")] public bool DuocThemTrucTiep { get; init; }
     }
 
+    /// <summary>Kết quả nạp một LÔ block (M108 §10).</summary>
+    public sealed record LoBlockKetQua
+    {
+        public long LoId { get; init; }
+
+        /// <summary>Số block thật sự vào hàng chờ.</summary>
+        public int SoNhan { get; init; }
+
+        /// <summary>Block bị bỏ qua, mỗi dòng đã gồm tên + lý do — hiện nguyên văn cho kỹ sư.</summary>
+        public IReadOnlyList<string> BoQua { get; init; } = [];
+
+        /// <summary>Vì sao gợi ý AI không chạy (null = có chạy). Chỉ để nói cho kỹ sư biết.</summary>
+        public string? LyDoAiKhongChay { get; init; }
+
+        /// <summary>Lỗi kiểm định của server — có phần tử nghĩa là lô KHÔNG được tạo.</summary>
+        public IReadOnlyList<string> LoiKiemDinh { get; init; } = [];
+
+        public string? ThongDiep { get; init; }
+
+        public bool DuocNhan => LoiKiemDinh.Count == 0 && LoId > 0;
+    }
+
+    private sealed record LoBlockBoQua(
+        [property: JsonPropertyName("blockName")] string BlockName,
+        [property: JsonPropertyName("lyDo")] string LyDo);
+
+    private sealed record LoBlockTraVe(
+        [property: JsonPropertyName("loId")] long LoId,
+        [property: JsonPropertyName("tong")] int Tong,
+        [property: JsonPropertyName("boQua")] IReadOnlyList<LoBlockBoQua>? BoQua,
+        [property: JsonPropertyName("lyDoAiKhongChay")] string? LyDoAiKhongChay);
+
     private sealed record DeXuatTraVe(
         [property: JsonPropertyName("id")] long Id,
         [property: JsonPropertyName("idempotent")] bool Idempotent,
@@ -394,6 +426,73 @@ public sealed class XBossApiClient
     /// bytes .NET sinh ra (M103 §4) — nên phần này phải tự đặt header, không dùng
     /// <c>form.Add(content, name, fileName)</c>.
     /// </summary>
+    /// <summary>
+    /// Gửi một LÔ block lên hàng chờ duyệt (M108 §10 — <c>POST block-proposals/batch</c>).
+    ///
+    /// Khác <see cref="GuiDeXuatBlockAsync"/> (M103, một block kèm metadata do kỹ sư khai): lô
+    /// KHÔNG mang metadata nào — máy chủ đọc mọi định nghĩa block trong DXF, tự đề xuất phân loại,
+    /// rồi Admin/PM duyệt theo lô trên web. Vì thế ở đây chỉ có hai tệp và không có manifest.
+    /// </summary>
+    public async Task<LoBlockKetQua> GuiLoBlockAsync(
+        string token, byte[] dwg, byte[] dxf, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        // Cùng lỗi hợp đồng đã ghi ở GuiDeXuatBlockAsync: `req.formData()` (undici) đòi name/filename
+        // trong nháy kép — phải qua ThemPhan, không dùng form.Add mặc định.
+        ThemPhan(form, new ByteArrayContent(dwg), "dwg", "lo-block.dwg");
+        ThemPhan(form, new ByteArrayContent(dxf), "dxf", "lo-block.dxf");
+
+        using var req = new HttpRequestMessage(
+            HttpMethod.Post, "api/engineering/cad/block-proposals/batch")
+        {
+            Content = form,
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var res = await _http.SendAsync(req, ct);
+
+        if (res.StatusCode == HttpStatusCode.Unauthorized)
+            throw new XBossApiException("Token đã bị thu hồi hoặc hết hạn — chạy lại XBOSS_LOGIN.");
+        if (res.StatusCode == HttpStatusCode.Forbidden)
+        {
+            throw new XBossApiException(
+                "Tài khoản của bạn không có quyền nạp block (cần vai trò kỹ sư trở lên) — " +
+                "nhờ Admin/PM cấp quyền rồi thử lại.");
+        }
+
+        var body = await res.Content.ReadAsStringAsync(ct);
+        if (res.StatusCode == HttpStatusCode.UnprocessableEntity ||
+            res.StatusCode == HttpStatusCode.Conflict)
+        {
+            return new LoBlockKetQua
+            {
+                LoiKiemDinh = DocDanhSachLoi(body) is { Count: > 0 } ds
+                    ? ds
+                    : [DocLoiTuChuoi(body) ?? "Server từ chối lô (không nêu lý do)."],
+                ThongDiep = "Server từ chối lô (không tạo dòng nào) — xử lý theo lý do bên dưới rồi chạy lại.",
+            };
+        }
+        if (!res.IsSuccessStatusCode)
+            throw new XBossApiException(DocLoiTuChuoi(body) ?? $"Server trả lỗi {(int)res.StatusCode}.");
+
+        LoBlockTraVe? ok;
+        try
+        {
+            ok = System.Text.Json.JsonSerializer.Deserialize<LoBlockTraVe>(body);
+        }
+        catch (System.Text.Json.JsonException e)
+        {
+            throw new XBossApiException($"Server trả response lạ khi nhận lô: {e.Message}");
+        }
+        if (ok is null || ok.LoId <= 0) throw new XBossApiException("Server trả response thiếu id lô.");
+        return new LoBlockKetQua
+        {
+            LoId = ok.LoId,
+            SoNhan = ok.Tong,
+            BoQua = [.. (ok.BoQua ?? []).Select(b => $"{b.BlockName}: {b.LyDo}")],
+            LyDoAiKhongChay = ok.LyDoAiKhongChay,
+        };
+    }
+
     private static void ThemPhan(
         MultipartFormDataContent form, HttpContent noiDung, string ten, string? tenTep = null)
     {

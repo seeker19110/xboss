@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCadTokenUser } from "@/lib/bao-mat/cad-devices";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/gioi-han";
 import { isContentTooLarge } from "@/lib/nen/photos";
@@ -17,8 +18,18 @@ export const dynamic = "force-dynamic";
 //            `dwg` (tuỳ chọn — gói gộp của đường plugin).
 
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  // Bearer kiểm TRƯỚC: request của plugin không có cookie, và `getCurrentUser()` đụng `cookies()`
+  // (cùng lý do đã ghi ở route block-proposals của M103). Nhận cả hai đường vì lô đến từ **cả
+  // AutoCAD lẫn web** (M108 §4).
+  const nguoiTuToken = await getCadTokenUser(req.headers.get("authorization"));
+  const laPlugin = nguoiTuToken !== null;
+  const user = nguoiTuToken ?? (await getCurrentUser());
+  if (!user) {
+    return NextResponse.json(
+      { error: "Chưa đăng nhập hoặc token thiết bị không hợp lệ — chạy XBOSS_LOGIN" },
+      { status: 401 },
+    );
+  }
   if (!CAN.manageDrawings(user.role)) {
     return NextResponse.json(
       { error: "Chỉ Admin/PM/Kỹ sư được nạp block vào thư viện" },
@@ -70,7 +81,9 @@ export async function POST(req: NextRequest) {
 
   const kq = await napLoBlock({
     userId: user.id,
-    nguon: dwg instanceof File ? "plugin" : "web",
+    // Nguồn xác định theo CÁCH XÁC THỰC, không theo việc có gửi kèm .dwg hay không: chỉ plugin
+    // mới có token thiết bị, và đó mới là thứ phân biệt thật giữa hai đường.
+    nguon: laPlugin ? "plugin" : "web",
     ungViens,
   });
 

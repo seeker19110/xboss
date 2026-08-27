@@ -258,4 +258,146 @@ public sealed class VeDeXuatCommands
             .Where(i => i.MeasureKind == TakeoffMeasure.Count)
             .Select(i => new MucChon<string>(i.Id, $"{i.Id} — {i.Name} ({i.Unit})"))
             .ToList();
+
+    /// <summary>
+    /// <c>XBOSS_VE_DEXUAT_LO</c> (M108 §6.1) — nạp HÀNG LOẠT block của bản vẽ đang mở vào hàng chờ.
+    ///
+    /// Khác <see cref="DeXuatBlock"/> (M103, một block): kỹ sư KHÔNG khai metadata cho từng block.
+    /// Plugin gửi cả tệp, máy chủ đọc mọi định nghĩa block trong DXF rồi tự đề xuất phân loại;
+    /// Admin/PM duyệt theo lô trên web. Đây là lý do lệnh này KHÔNG cần đồng bộ thư viện trước như
+    /// M103: lô mang <c>base_lib_version</c> do chính máy chủ chốt lúc nhận, không phải do plugin
+    /// gửi lên, nên không có cửa nào để lệch version.
+    ///
+    /// Bản vẽ của kỹ sư chỉ được ĐỌC — mọi việc gộp diễn ra trên một database mới trong %TEMP%.
+    /// </summary>
+    [CommandMethod("XBOSS_VE_DEXUAT_LO", CommandFlags.Session)]
+    public async void DeXuatLoBlock()
+    {
+        if (VeContext.SanSang() is not (var doc, var ed)) return;
+        var db = doc.Database;
+
+        // (1) Token thiết bị — cùng chốt chặn với XBOSS_VE_DEXUAT.
+        var baseUrl = XBossLoginCommand.DocServerUrl();
+        if (baseUrl is null)
+        {
+            ed.WriteMessage("\n[XBoss] Chưa cấu hình server — chạy XBOSS_LOGIN trước.\n");
+            return;
+        }
+        if (CredentialStore.DocToken(baseUrl) is not { } token)
+        {
+            ed.WriteMessage($"\n[XBoss] Máy chưa ghép thiết bị với {baseUrl} — chạy XBOSS_LOGIN.\n");
+            return;
+        }
+
+        // (2) Quét toàn bộ block table (chỉ đọc).
+        IReadOnlyList<BlockUngVienBuilder.UngVienLo> ungVien;
+        using (doc.LockDocument())
+        {
+            ungVien = BlockUngVienBuilder.QuetToanBoDinhNghia(db);
+        }
+        if (ungVien.Count == 0)
+        {
+            ed.WriteMessage("\n[XBoss] Bản vẽ không có định nghĩa block nào để nạp.\n");
+            return;
+        }
+
+        // (3) Hộp thoại xem trước + xác nhận (khung M106). Không có đường hỏi đáp dòng lệnh thay
+        //     thế: bảng ứng viên có thể dài hàng trăm dòng, hỏi bằng keyword là không dùng được.
+        var vm = new DeXuatLoDialogViewModel(
+            [.. ungVien.Select(u => new UngVienLoItem(u.TenBlock, u.Layer, u.SoLanChen, u.LyDoBoQua))],
+            TRAN_BLOCK_MOI_LO);
+        var (daDungUi, dongY) = HopThoaiXBoss.Thu(ed, () => XBossDialog.Hoi(vm) ? vm : null);
+        if (!daDungUi)
+        {
+            ed.WriteMessage(
+                "\n[XBoss] XBOSS_VE_DEXUAT_LO cần hộp thoại để xem trước danh sách block — không có đường " +
+                "dòng lệnh thay thế. Bỏ XBOSS_UI_DIALOG=0, hoặc nạp tệp trên trang web " +
+                "/engineering/chuan-hoa-ban-ve, rồi chạy lại.\n");
+            return;
+        }
+        if (dongY is null)
+        {
+            ed.WriteMessage("\n[XBoss] Đã hủy — chưa gửi lô nào.\n");
+            return;
+        }
+
+        var seGui = vm.SeGui;
+        var idSeGui = new List<ObjectId>();
+        var theoTen = ungVien.ToDictionary(u => u.TenBlock, StringComparer.Ordinal);
+        foreach (var item in seGui)
+        {
+            if (theoTen.TryGetValue(item.TenBlock, out var u)) idSeGui.Add(u.IdDinhNghia);
+        }
+
+        // (4) Dựng tệp lô trên database mới (KHÔNG đụng bản vẽ đang mở).
+        BlockUngVienBuilder.TepUngVien tep;
+        try
+        {
+            using (doc.LockDocument())
+            {
+                tep = BlockUngVienBuilder.DungLo(db, idSeGui);
+            }
+        }
+        catch (BlockManifestException e)
+        {
+            ed.WriteMessage($"\n[XBoss] Không dựng được tệp lô: {e.Message}\n");
+            return;
+        }
+        catch (Autodesk.AutoCAD.Runtime.Exception e)
+        {
+            ed.WriteMessage($"\n[XBoss] AutoCAD không sao chép được định nghĩa block sang tệp lô: {e.Message}\n");
+            return;
+        }
+        catch (IOException e)
+        {
+            ed.WriteMessage($"\n[XBoss] Lỗi tệp khi dựng tệp lô: {e.Message}\n");
+            return;
+        }
+        catch (UnauthorizedAccessException e)
+        {
+            ed.WriteMessage($"\n[XBoss] Không có quyền ghi tệp tạm khi dựng tệp lô: {e.Message}\n");
+            return;
+        }
+
+        // (5) Gửi.
+        var client = new XBossApiClient(baseUrl);
+        ed.WriteMessage(
+            $"\n[XBoss] Đang gửi lô {seGui.Count} block ({tep.Dwg.Length / 1024} KB) lên {baseUrl}...\n");
+        try
+        {
+            var kq = await client.GuiLoBlockAsync(token, tep.Dwg, tep.Dxf);
+            if (!kq.DuocNhan)
+            {
+                ed.WriteMessage("\n[XBoss] ❌ SERVER TỪ CHỐI lô (thư viện KHÔNG đổi):\n");
+                foreach (var l in kq.LoiKiemDinh) ed.WriteMessage($"[XBoss]   • {l}\n");
+                if (kq.ThongDiep is { Length: > 0 } td) ed.WriteMessage($"[XBoss] {td}\n");
+                return;
+            }
+
+            ed.WriteMessage(
+                $"\n[XBoss] ✔ Đã nạp lô #{kq.LoId}: {kq.SoNhan} block đang CHỜ Admin/PM duyệt.\n");
+            if (kq.BoQua.Count > 0)
+            {
+                ed.WriteMessage($"[XBoss] {kq.BoQua.Count} block bị máy chủ bỏ qua:\n");
+                foreach (var l in kq.BoQua) ed.WriteMessage($"[XBoss]   • {l}\n");
+            }
+            if (kq.LyDoAiKhongChay is { Length: > 0 } lyDo)
+                ed.WriteMessage($"[XBoss] ⚠ {lyDo}\n");
+            ed.WriteMessage(
+                "[XBoss] Duyệt lô tại: mục \"Nạp Block Hàng Loạt\" trên trang /engineering/chuan-hoa-ban-ve.\n" +
+                "[XBoss] Thư viện chỉ đổi sau khi có người duyệt — chạy XBOSS_VE_THUVIEN để lấy bản mới.\n");
+        }
+        catch (XBossApiException e)
+        {
+            ed.WriteMessage($"\n[XBoss] {e.Message}\n");
+        }
+        catch (HttpRequestException e)
+        {
+            ed.WriteMessage($"\n[XBoss] Lỗi mạng khi gửi lô: {e.Message}\n");
+        }
+    }
+
+    /// <summary>Trần số block một lô — phải khớp `TRAN_BLOCK_MOI_LO` của máy chủ (M108 NFR4).</summary>
+    private const int TRAN_BLOCK_MOI_LO = 500;
+
 }
