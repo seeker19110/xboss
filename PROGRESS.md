@@ -4,6 +4,28 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Verify tay plugin v9 trên bản vẽ AEC thật — `XBOSS_VE_NEN` báo `eInvalidKey` (2026-08-27)
+
+Người dùng build plugin trên máy Windows và verify trên bản vẽ thật (`TMDV 3F.dwg`, có xref
+kiến trúc/kết cấu). Kết quả: `XBOSS_RULEPACK` nạp đúng **v9** (14 quy tắc bóc tách, 7 nhóm layer),
+`XBOSS_KIEMTRA`/`XBOSS_BATCH`/`XBOSS_VE` chạy đúng như đặc tả (kể cả cảnh báo tuyến tim tự cắt
+nên không sinh được nét biên, và chặn `XBOSS_CHUANHOA` khi bản vẽ chưa QSAVE).
+
+**Còn lỗi:** `XBOSS_VE_NEN` → `LỖI khi chuẩn bị nền — đã rollback: eInvalidKey`. Rollback đúng
+(bản vẽ nguyên trạng) nhưng thông điệp **không nói chết ở bước nào** nên không truy được nguyên
+nhân từ log; các điểm ghi bảng layer đã có sẵn guard `IsDependent` (vá 2026-08-26) nên nghi phạm
+nằm ở chỗ khác. Đã vá 2 việc, **chưa xác định được gốc rễ**:
+
+1. `VeNenCommands.ChuanBiNen`: mốc bước hiện hành (`buoc`) cập nhật trước mỗi thao tác ghi, in kèm
+   mã lỗi — lần chạy tới sẽ chỉ đúng bước (đọc clayer / khóa-làm mờ / tạo layer đích tên gì / đặt
+   clayer / ghi trạng thái NOD).
+2. `VeLayerService.HoanNguyen`: bọc try/catch **từng layer** (đối xứng `KhoaVaLamMo`) + trả danh
+   sách layer không hoàn nguyên được để lệnh BÁO. Trước đó một layer khó tính làm cả lệnh rollback
+   ⇒ bản vẽ kẹt vĩnh viễn ở trạng thái nền (mọi layer khóa + mờ, chạy lại lại chết đúng chỗ đó).
+
+**Tiếp theo:** build lại trên máy có AutoCAD, chạy lại `XBOSS_VE_NEN` trên đúng bản vẽ đó, lấy
+tên bước trong thông điệp rồi vá gốc rễ. Chưa verify `XBOSS_VE_CHIADOT` (nợ verify tay của M105).
+
 ## Tài liệu: hướng dẫn build plugin AutoCAD từ đầu trên Windows (2026-08-27)
 
 Thêm `plugin-autocad/BUILD-WINDOWS.md` — hướng dẫn **build từ máy Windows trắng**: điều kiện máy
