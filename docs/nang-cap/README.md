@@ -117,7 +117,58 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > **M102 (`M102-plugin-dong-tran-chuan-hoa.md`)** — đóng 4 khoảng trống cuối của pipeline chuẩn hóa sau M99/M100/M101: bước chuẩn hóa 12 (đóng polyline gần kín — trước đây KIEMTRA báo mà CHUANHOA không sửa), bước 13 (quy block lạc chuẩn về thư viện block 0139 — trước đây chỉ báo block nặc danh), 2 phép kiểm chéo đã hẹn ở M100 §20 (17 tag trùng, 18 mã BOQ mồ côi), và đóng phần còn lại của nợ idempotency (tài liệu `knownIssues` + test bất biến ở mức pipeline). Rule pack v8, không migration, không API mới. 2 PR. **Approved for implementation 2026-08-25.**
 > **M102 tiến độ thi hành: XONG cả 2 PR (2026-08-25, PR #398 đã merge)** — PR1 rule pack `v8.json` + validator 2 tầng + phép kiểm 17/18 (`XBoss.Cad.Core/Inspection/PhepKiemMoRong.cs`) + Core bước 12/13 (`Standardize/ChuanHoaMoRong.cs`) + test xunit/node:test + gỡ dòng `knownIssues` ghi nợ đã đóng; PR2 Adapter thi hành bước 12/13 (`XBoss.Cad.Acad/Services/StandardizePipeline.cs`) + quét tag cho phép kiểm 17 (`DrawingSnapshotBuilder.cs`) + bổ sung stub API còn thiếu trong `XBoss.Cad.AcadShim/AcadStub.cs`. Mọi khóa mới **mặc định tắt/`reportOnly`** nên v8 cho kết quả y hệt v7 — merge xong không đổi hành vi trên máy kỹ sư, bật dần theo dự án sau pilot. **Điểm lệch đặc tả đã chốt:** bước 13 nối đuôi sau bước 11 (không chèn giữa 6 và 7 như bản nháp §6.2 — tránh đánh lại số hiệu bước đã vào báo cáo JSON), đổi lại báo cáo nhắc chạy lại lệnh để purge dọn định nghĩa block cũ; phần idempotency layerMap của §6.3 bỏ khỏi phạm vi vì M101 PR2 đã vá. **Còn nợ:** verify tay Adapter trên máy có AutoCAD 2026 (không có runner Windows — M99 §18) — xem `PROGRESS.md`.
 >
-> **⇒ Đợt plugin AutoCAD giai đoạn 2 (M99 → M102) đã đóng toàn bộ về mặt code.** Việc còn lại của cả đợt là một cổng duy nhất: verify tay trên máy có AutoCAD 2026. Hướng đi tiếp đã rà nhưng **chưa có đặc tả**: gán ngữ nghĩa sâu hơn (đồ thị kết nối tuyến–thiết bị), phối hợp xung đột 2D liên hệ (combined services), và các mục để lại ở M100 §20 — mỗi mục khi làm phải mở M mới có duyệt.
+> **⇒ Đợt plugin AutoCAD giai đoạn 2 (M99 → M102) đã đóng toàn bộ về mặt code.** Việc còn lại của cả đợt là một cổng duy nhất: verify tay trên máy có AutoCAD 2026. Hướng đi tiếp đã rà nhưng **chưa có đặc tả**: gán ngữ nghĩa sâu hơn (đồ thị kết nối tuyến–thiết bị), phối hợp xung đột 2D liên hệ (combined services), và các mục để lại ở M100 §20. **Cập nhật 2026-08-28:** toàn bộ M100 §20 nay ĐÃ CÓ đặc tả (M109–M113 dưới đây, State Draft — chờ duyệt); 2 hướng lớn còn lại (đồ thị kết nối, combined services) vẫn chưa có đặc tả theo phạm vi người dùng chốt 2026-08-28.
+
+## Đặc tả CHỜ DUYỆT — đóng nốt M100 §20 (viết 2026-08-28)
+
+> Sinh từ yêu cầu người dùng 2026-08-28 ("viết nốt đặc tả cho hướng còn lại"); phạm vi + 3 ngã rẽ
+> thiết kế chốt qua `AskUserQuestion` cùng ngày: **chỉ làm các mục M100 §20** (2 hướng lớn — đồ thị
+> kết nối tuyến–thiết bị, combined services — để sau), revision cloud **chỉ phần CAD**, phối hợp xung
+> đột (nếu làm sau) đi đường "đề xuất, kỹ sư quyết". Cả 5 tệp State **Draft — không code khi chưa
+> Approved**.
+>
+> **M109 (`M109-ngat-net-giao-cheo.md`)** — `XBOSS_VE_NGATNET`/`_XOA`: ngắt nét tuyến đi dưới tại
+> chỗ giao (wipeout cho tuyến 2 nét biên, cầu vượt cho tuyến đơn nét), thứ tự trên–dưới theo
+> `crossingPolicy.priority` + đảo tay từng điểm nhớ trong XData. Dùng lại đúng bộ dò giao cắt của
+> phép kiểm 11 (M101). **Bất biến số 1: polyline tim không bao giờ bị cắt/chia/đổi tọa độ** —
+> `XBOSS_BOCKL` phải ra đúng con số như trước (AC2). Rule pack +1 version, không migration. 2 PR.
+>
+> **M110 (`M110-revision-cloud.md`)** — `XBOSS_VE_REV` / `_CHOT` / `_HIENTHI`: cloud + tam giác
+> revision + bảng revision trong attribute khung tên. Điểm khác `REVCLOUD` của AutoCAD: plugin ghi
+> **mốc** (băm hình học của mọi đối tượng có XData) khi chốt revision, nên lần sau **đề xuất được**
+> vùng thêm/xóa/đổi và cảnh báo vùng đã sửa mà chưa khoanh. Số revision append-only, cloud cũ giữ lại
+> ở layer con `-R{n}`. **Chỉ CAD — không đụng server/web/`drawing_revisions`** (chốt 2026-08-28).
+> Rule pack +1, không migration. 2 PR.
+>
+> **M111 (`M111-nhan-ban-tang-dien-hinh.md`)** — `XBOSS_VE_NHANTANG`: chép hệ của tầng điển hình sang
+> N tầng. Việc mà `COPY` của AutoCAD **không** làm được: ánh xạ lại toàn bộ handle trong XData sang
+> đối tượng của chính bản chép (`DeepCloneObjects` + `IdMapping`), đổi tag `{floor}`, đổi tên vùng
+> bóc, gỡ dấu bóc. Xem trước **bắt buộc**, nguyên tử (lỗi giữa chừng → không ghi tầng nào), AC3
+> "không handle mồ côi" kiểm **tự động**. Đây là lệnh rủi ro cao nhất của cả bộ plugin — verify tay
+> phải làm trên bản vẽ AVIO thật. Rule pack +1, không migration. 3 PR (PR2 `route: complex`).
+>
+> **M112 (`M112-so-do-dung-riser.md`)** — `XBOSS_VE_TRUCDUNG` + `XBOSS_VE_RISER`: kỹ sư đánh dấu điểm
+> trục đứng trên từng mặt bằng (XData vai trò `TrucDung` = "dữ liệu liên tầng có cấu trúc" mà M100 §20
+> nói còn thiếu), plugin dựng sơ đồ đứng từ đó. Cao độ tầng **khai tay, cấm nội suy** (luật M100 §6.3).
+> Sơ đồ là snapshot ⇒ có phép kiểm "sơ đồ đứng cũ hơn mặt bằng", cùng lối `XBOSS_VE_MATCAT`; vai trò
+> `Riser` bị loại khỏi takeoff (bất biến có test). **Điều kiện tiên quyết: M111 đã chạy thật qua
+> pilot.** Rule pack +1, không migration. 3 PR (PR3 `route: complex`).
+>
+> **M113 (`M113-thu-vien-block-theo-du-an.md`)** — thư viện block **hai tầng, dự án đè lên toàn cục**
+> (không phải thay toàn cục bằng per-project): `cad_block_libs` thêm `project_id` nullable + RLS 2
+> nhánh theo đúng khuôn `0140` của M101 PR4, `UNIQUE(version)` → unique theo `(project_id, version)`,
+> hàm thuần `tronThuVienBlock` là **chỗ duy nhất** biết luật đè. Tương thích ngược tuyệt đối: plugin
+> không gửi `?project=` nhận đúng thư viện toàn cục như hôm nay (AC1). **Migration đụng ràng buộc trên
+> dữ liệu đang có ⇒ bắt buộc qua staging, không đi thẳng production**; vùng rủi ro cao, rà
+> `docs/audit.md`. 4 PR.
+>
+> **Mục thứ 6 của M100 §20 (đối chiếu chéo M101) không cần đặc tả — đã tự đóng:** phép kiểm 17 (tag
+> trùng) và 18 (mã BOQ mồ côi) nằm trong `PhepKiemMoRong.cs` từ M102, và `support-hanger`/
+> `sleeve-opening` đã là item takeoff trong rule pack từ M100 PR5.
+>
+> **Số rule pack / số migration ghi trong 5 tệp trên là DỰ KIẾN** — người thi hành phải lấy số thật
+> bằng `ls lib/ky-thuat/cad/rule-packs | sort -V | tail -1` và `ls migrations | sort -V | tail -1`
+> (luật số migration ở mục dưới).
 > **M103 — Đề xuất block vào thư viện từ AutoCAD** (`M103-de-xuat-block-thu-vien.md`): **XONG cả 3 phần (server + web + plugin) 2026-08-25**; lệnh `XBOSS_VE_DEXUAT` (Commands/VeDeXuatCommands.cs), dialog `Ui/DeXuatBlockDialog.cs`, builder `Services/BlockUngVienBuilder.cs`.
 > **M104 — Thêm block trực tiếp từ web** (`M104-them-block-truc-tiep-tu-web.md`): server + web **đã làm 2026-08-25**, route `POST /api/engineering/cad/block-lib/blocks` + `GET ?file=` (tệp DWG lẻ lưu riêng), form kéo-thả, advisory lock chống đua, 15 ca test; plugin đọc đa tệp **đã xong cùng ngày** — **M104 XONG trọn 3 phần**.
 > **M105 — Tự động phân chia đốt toàn hệ MEPF theo kiểu kết nối** (`M105-chia-dot-mepf-theo-kieu-noi.md`): ✅ **Approved 2026-08-26 — PR1 XONG + PR2 (Core + Adapter) XONG.** Chia đốt MỌI tuyến MEPF vẽ bằng `XBOSS_VE` (ống gió nẹp C 1180 / TDC 1110 / mặt bích V 1180 — số người dùng chốt; ống nước/PCCC cây 5800 ren/grooved/măng xông; máng cáp thanh 2500 + tấm nối) bằng MỘT engine tổng quát tham số hóa qua rule pack **v9** `jointRules` — thêm hệ/kiểu nối mới về sau chỉ sửa rule pack, không sửa code. PR1: engine TS + 9 test vector JSON dùng chung + `migrations/0143` (RLS 2 nhánh) + API + trang `/engineering/joint-segmentation`. PR2 Core: bản C# `JointRulesConfig`/`JointSegmenter` ra đúng từng số như bản TS (56 ca đọc chính 9 vector đó; làm tròn phải `MidpointRounding.AwayFromZero`). PR2 Adapter: lệnh `XBOSS_VE_CHIADOT` (vẽ vạch chia + tag, XData 2 chiều nên chạy lại idempotent, 1 nhóm UNDO, tuyến không khai `jointRules` bị bỏ qua kèm lý do) + hình học ở Core `JointMarkPlacement` + bảng đốt trong `XBOSS_VE_THONGKE` + mục chia đốt trong báo cáo phiên vẽ; 661/661 ca .NET xanh. Còn lại: verify tay trên máy có AutoCAD 2026.

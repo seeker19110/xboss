@@ -4,7 +4,7 @@
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal   | Plugin M99/M100/M101 có đủ 23 lệnh nhưng thuần command line — kỹ sư mới phải thuộc lòng tên lệnh. Thêm lớp UI trong AutoCAD. |
 | State          | ✅ **Đã triển khai** (2026-08-25) — người dùng yêu cầu "làm tất cả những thứ cần thiết và nâng cao kịch trần toàn bộ"        |
-| Quyết định nền | ADR-0006 + M99 §9.1 kế thừa nguyên vẹn. UI chỉ là lớp VỎ: mọi nghiệp vụ vẫn nằm trong lệnh XBOSS_* — bấm nút = gõ lệnh.      |
+| Quyết định nền | ADR-0006 + M99 §9.1 kế thừa nguyên vẹn. UI chỉ là lớp VỎ: mọi nghiệp vụ vẫn nằm trong lệnh XBOSS\_\* — bấm nút = gõ lệnh.    |
 
 ## 1. Phạm vi (trần khả thi của kiến trúc hiện tại)
 
