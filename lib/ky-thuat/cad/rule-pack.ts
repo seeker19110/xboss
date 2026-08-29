@@ -134,6 +134,19 @@ export function kiemCrossingPolicy(drawTools: {
     }
   }
 
+  if (!Number.isFinite(cp.minAngleDeg) || cp.minAngleDeg <= 0 || cp.minAngleDeg > 90) {
+    loi.push(
+      `drawTools.crossingPolicy.minAngleDeg = ${cp.minAngleDeg} phải nằm trong khoảng (0; 90] — ` +
+        "đây là ngưỡng lọc góc giao (0..90°), giá trị âm/NaN làm mọi góc đều bị coi là đủ lớn.",
+    );
+  }
+
+  if (cp.gapMode && !["wipeout", "jog"].includes(cp.gapMode)) {
+    loi.push(
+      `drawTools.crossingPolicy.gapMode lạ "${cp.gapMode}" (chỉ nhận "wipeout" hoặc "jog").`,
+    );
+  }
+
   if (cp.enabled && !cp.layerSuffix.trim()) {
     loi.push(
       "drawTools.crossingPolicy.layerSuffix trống trong khi enabled = true — " +

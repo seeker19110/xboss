@@ -376,6 +376,21 @@ public static class DrawToolsConfig
         if (cp.JogRadiusMm <= 0 || double.IsNaN(cp.JogRadiusMm))
             throw new RulePackException($"drawTools.crossingPolicy.jogRadiusMm = {cp.JogRadiusMm} phải là số dương.");
 
+        // Ngưỡng lọc góc giao — CrossingGeometry.DuGocDeNgat() dùng thẳng giá trị này, số âm/NaN
+        // làm mọi góc giao đều "đủ lớn" (ngắt nét cả ca gần song song).
+        if (double.IsNaN(cp.MinAngleDeg) || cp.MinAngleDeg <= 0 || cp.MinAngleDeg > 90)
+        {
+            throw new RulePackException(
+                $"drawTools.crossingPolicy.minAngleDeg = {cp.MinAngleDeg} phải nằm trong khoảng (0; 90] — " +
+                "đây là ngưỡng lọc góc giao (0..90°), giá trị âm/NaN làm mọi góc đều bị coi là đủ lớn.");
+        }
+
+        if (!string.IsNullOrEmpty(cp.GapMode) && cp.GapMode is not ("wipeout" or "jog"))
+        {
+            throw new RulePackException(
+                $"drawTools.crossingPolicy.gapMode lạ \"{cp.GapMode}\" (chỉ nhận \"wipeout\" hoặc \"jog\").");
+        }
+
         if (cp.Enabled && string.IsNullOrWhiteSpace(cp.LayerSuffix))
         {
             throw new RulePackException(

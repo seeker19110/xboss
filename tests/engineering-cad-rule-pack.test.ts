@@ -1017,7 +1017,7 @@ test("v10: crossingPolicy khai đủ nhưng TẮT sẵn, priority chỉ chứa i
   );
 });
 
-test("v10: validator crossingPolicy bắt đủ 3 lỗi của M109 §5", () => {
+test("v10: validator crossingPolicy bắt đủ 3 lỗi của M109 §5 + minAngleDeg/gapMode vô nghĩa", () => {
   const goc = getCurrentRulePack().drawTools;
   const voi = (chinh: Partial<CrossingPolicy>) => ({
     systems: goc.systems,
@@ -1032,6 +1032,15 @@ test("v10: validator crossingPolicy bắt đủ 3 lỗi của M109 §5", () => {
   // (2) clearanceMm / jogRadiusMm phải dương.
   assert.match(kiemCrossingPolicy(voi({ clearanceMm: 0 }))[0], /clearanceMm/);
   assert.match(kiemCrossingPolicy(voi({ jogRadiusMm: -1 }))[0], /jogRadiusMm/);
+
+  // (2b) minAngleDeg là ngưỡng lọc góc giao (0..90] — âm/NaN làm mọi góc đều "đủ lớn".
+  assert.match(kiemCrossingPolicy(voi({ minAngleDeg: -5 }))[0], /minAngleDeg/);
+  assert.match(kiemCrossingPolicy(voi({ minAngleDeg: 91 }))[0], /minAngleDeg/);
+  assert.match(kiemCrossingPolicy(voi({ minAngleDeg: Number.NaN }))[0], /minAngleDeg/);
+
+  // (2c) gapMode chỉ nhận wipeout | jog — sai thì chặn ngay, không để lọt tới adapter.
+  assert.match(kiemCrossingPolicy(voi({ gapMode: "xoa-net" }))[0], /gapMode/);
+  assert.deepEqual(kiemCrossingPolicy(voi({ gapMode: "jog" })), []);
 
   // (3) layerSuffix rỗng khi enabled — còn tắt thì chưa gây hại.
   assert.match(kiemCrossingPolicy(voi({ enabled: true, layerSuffix: "  " }))[0], /layerSuffix/);

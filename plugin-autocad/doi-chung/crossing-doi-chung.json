@@ -74,6 +74,34 @@
       }
     },
     {
+      "ma": "min-angle-am",
+      "moTa": "Ngưỡng lọc góc giao phải nằm trong (0; 90] — số âm/NaN làm mọi góc đều bị coi là đủ lớn.",
+      "khoaLoi": "minAngleDeg",
+      "crossingPolicy": {
+        "enabled": false,
+        "priority": ["HVAC", "PIPING"],
+        "gapMode": "wipeout",
+        "clearanceMm": 50,
+        "jogRadiusMm": 150,
+        "layerSuffix": "XING",
+        "minAngleDeg": -5
+      }
+    },
+    {
+      "ma": "gap-mode-la",
+      "moTa": "gapMode chỉ nhận \"wipeout\" hoặc \"jog\"; giá trị lạ phải chặn ngay ở rule pack, không để lọt tới adapter.",
+      "khoaLoi": "gapMode",
+      "crossingPolicy": {
+        "enabled": false,
+        "priority": ["HVAC", "PIPING"],
+        "gapMode": "xoa-net",
+        "clearanceMm": 50,
+        "jogRadiusMm": 150,
+        "layerSuffix": "XING",
+        "minAngleDeg": 15
+      }
+    },
+    {
       "ma": "layer-suffix-rong-khi-bat",
       "moTa": "§5 lỗi 3 — layerSuffix rỗng trong khi enabled: đối tượng ngắt nét rơi vào chính layer tim.",
       "khoaLoi": "layerSuffix",

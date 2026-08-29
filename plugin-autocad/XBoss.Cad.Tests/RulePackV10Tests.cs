@@ -72,6 +72,31 @@ public class RulePackV10Tests
     }
 
     [Fact]
+    public void Bat_loi_minAngleDeg_ngoai_khoang_0_90()
+    {
+        // DuGocDeNgat() dùng thẳng ngưỡng này: số âm/NaN làm MỌI góc giao đều bị coi là đủ lớn.
+        Assert.Contains("minAngleDeg", LoiKhiChinh(cp => cp["minAngleDeg"] = -5).Message);
+        Assert.Contains("minAngleDeg", LoiKhiChinh(cp => cp["minAngleDeg"] = 0).Message);
+        Assert.Contains("minAngleDeg", LoiKhiChinh(cp => cp["minAngleDeg"] = 91).Message);
+    }
+
+    [Fact]
+    public void Bat_loi_gapMode_la()
+    {
+        var loi = LoiKhiChinh(cp => cp["gapMode"] = "xoa-net");
+        Assert.Contains("gapMode", loi.Message);
+        Assert.Contains("wipeout", loi.Message);
+
+        // Hai giá trị hợp lệ thì nạp được bình thường.
+        foreach (var hopLe in new[] { "wipeout", "jog" })
+        {
+            var goc = JsonNode.Parse(JsonHienHanh())!.AsObject();
+            goc["drawTools"]!["crossingPolicy"]!["gapMode"] = hopLe;
+            Assert.NotNull(DrawToolsConfig.Load(goc.ToJsonString()));
+        }
+    }
+
+    [Fact]
     public void Bat_loi_layerSuffix_rong_khi_bat()
     {
         var loi = LoiKhiChinh(cp =>
