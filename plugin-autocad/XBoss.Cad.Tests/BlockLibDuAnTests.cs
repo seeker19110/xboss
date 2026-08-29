@@ -268,4 +268,19 @@ public class BlockLibDuAnTests
 
         Assert.DoesNotContain(khoi.Dong, d => d.Muc == "Bộ đang dùng");
     }
+
+    [Fact]
+    public void Doc_cache_tron_bien_loi_quyen_doc_thanh_thong_diep_tieng_viet()
+    {
+        var pluginDir = Directory.GetParent(RepoPaths.DoiChungDir)!.FullName;
+        var service = File.ReadAllText(Path.Combine(
+            pluginDir, "XBoss.Cad.Acad", "Services", "BlockLibraryService.cs"));
+        var batDau = service.IndexOf("private static (BlockManifest? Manifest, string? Loi) DocCacheTron", StringComparison.Ordinal);
+        var ketThuc = service.IndexOf("private static string MoTaBoDuAn", batDau, StringComparison.Ordinal);
+        Assert.True(batDau >= 0 && ketThuc > batDau);
+        var thanHam = service[batDau..ketThuc];
+
+        Assert.Contains("catch (UnauthorizedAccessException e)", thanHam, StringComparison.Ordinal);
+        Assert.Contains("Không có quyền đọc thư viện block bản trộn trong cache", thanHam, StringComparison.Ordinal);
+    }
 }

@@ -343,11 +343,11 @@ public sealed class XBossCommands
         var xacNhan = new PromptKeywordOptions(
             $"\n[XBoss] Đánh dấu {SoDoiTuongDaBoc(ketQua)} đối tượng đã bóc (tô màu ACI {pack.Takeoff.MarkColorAci} + XData)?")
         { AllowNone = false };
-        xacNhan.Keywords.Add("DongY", "DongY", "Đồng ý");
-        xacNhan.Keywords.Add("Khong", "Khong", "Không");
-        xacNhan.Keywords.Default = "DongY";
+        xacNhan.Keywords.Add("Y", "Y", "Y");
+        xacNhan.Keywords.Add("N", "N", "N");
+        xacNhan.Keywords.Default = "Y";
         var kq2 = ed.GetKeywords(xacNhan);
-        if (kq2.Status != PromptStatus.OK || kq2.StringResult != "DongY")
+        if (kq2.Status != PromptStatus.OK || kq2.StringResult != "Y")
         {
             ed.WriteMessage("\n[XBoss] Không đánh dấu — kết quả chỉ hiển thị, chưa ghi vào bản vẽ.\n");
             return;

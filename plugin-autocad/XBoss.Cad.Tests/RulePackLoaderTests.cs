@@ -100,8 +100,11 @@ public class RulePackLoaderTests
     public void Tu_choi_phep_kiem_bat_ma_thieu_tham_so()
     {
         // overlapSameSystem bật nhưng dung sai = 0 → chặn ngay, không chạy im lặng.
-        var json = File.ReadAllText(RepoPaths.RulePackPath)
-            .Replace("\"enabled\": false,\n      \"overlapToleranceMm\": 50,", "\"enabled\": true,\n      \"overlapToleranceMm\": 0,");
+        var goc = JsonNode.Parse(File.ReadAllText(RepoPaths.RulePackPath))!.AsObject();
+        var overlap = goc["inspectionPolicy"]!["overlapSameSystem"]!.AsObject();
+        overlap["enabled"] = true;
+        overlap["overlapToleranceMm"] = 0;
+        var json = goc.ToJsonString();
         var loi = Assert.Throws<RulePackException>(() => RulePackLoader.Load(json));
         Assert.Contains("overlapSameSystem", loi.Message);
     }

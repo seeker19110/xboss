@@ -4,6 +4,30 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## ✅ Plugin AutoCAD — offline bootstrap + tích hợp M113/M114 sau rebase (2026-08-29)
+
+Nhánh `claude/mepf-blocklib-bootstrap-and-y-n-guard` đã rebase lên `origin/main`
+(`e76bc129`) và giải xung đột với M113 PR4 trong `BlockLibraryService`:
+
+- `XBOSS_BOCKL` dùng xác nhận ngắn `Y/N` thay `DongY/Khong`.
+- Bundle mang thư viện offline `mepf-offline-v1`: **12 block HVAC/PIPING** (không ghi nhầm có
+  Firefighting), manifest/DWG cùng SHA-256
+  `68a1f8014f7b52f25906f7e48001267e9530e44ab14532d2474dd49b62db7a23`.
+- Bootstrap chỉ seed cache hoàn toàn trống; cache server/nạp tay luôn thắng. Writer toàn cục và
+  cache trộn hai tầng M113 dùng cùng khóa liên tiến trình; tệp cache trộn publish qua temp + rename
+  nguyên tử, `bo-tron.json` là commit point. Reader kiểm hash và chụp snapshot dưới khóa rồi mới
+  nhả khóa để AutoCAD clone, giữ đúng nguồn toàn cục/dự án của M113.
+- Build Adapter thật phát hiện lỗi M114 mà AcadShim cũ bỏ lọt: `Polyline` nhập nhằng giữa
+  `DatabaseServices` và `GraphicsInterface` trong `NetTamXemTruoc`. Đã dùng alias `DbPolyline` và
+  bổ sung đúng kiểu `GraphicsInterface.Polyline` vào stub để cổng CI tái hiện/chặn hồi quy.
+- Bằng chứng sau fix: targeted bootstrap + M113 **23/23**, full .NET **1150/1150**, **0 skip**;
+  AcadShim Release và Adapter thật Release đều **0 warning / 0 error**; `dong-goi.ps1 -ChiDongGoi`
+  tạo bundle **13 tệp**, ZIP SHA-256
+  `141e8e766ebe2f83eaa931e0af3fbbf7628a2935fc937c59bb84968bf8876ddb`.
+- AutoCAD 2026 Core Console `NETLOAD` DLL trong bundle **exit 0**, có dòng plugin đã nạp; hash map
+  cache `%APPDATA%\\XBoss\\block-lib` trước/sau trùng tuyệt đối. Chưa chạy lại toàn bộ ma trận lệnh
+  GUI; verify Core Console này chỉ xác nhận load/runtime bootstrap không làm đổi cache hiện hữu.
+
 ## ✅ M114 PR4/4 — Adapter `XBOSS_VE_TUYENTUDONG` (đi tuyến tự động theo hành lang) (2026-08-29)
 
 Nhánh `feat/m114-pr4-tuyentudong-adapter`. **PR cuối** của

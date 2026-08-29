@@ -1,0 +1,102 @@
+{
+  "version": "mepf-offline-v1",
+  "dwgSha256": "68a1f8014f7b52f25906f7e48001267e9530e44ab14532d2474dd49b62db7a23",
+  "blocks": [
+    {
+      "id": "elbow-duct",
+      "blockName": "0-M-H-ELBOW-90",
+      "system": "HVAC",
+      "kind": "fitting",
+      "scaleBySize": false,
+      "rotateToPath": true
+    },
+    {
+      "id": "tee-duct",
+      "blockName": "0-M-F-TEE",
+      "system": "HVAC",
+      "kind": "fitting",
+      "scaleBySize": false,
+      "rotateToPath": true
+    },
+    {
+      "id": "reducer-duct",
+      "blockName": "0-M-H-REDUCER",
+      "system": "HVAC",
+      "kind": "fitting",
+      "scaleBySize": false,
+      "rotateToPath": true
+    },
+    {
+      "id": "damper-vcd",
+      "blockName": "VOLUME DAMPER",
+      "system": "HVAC",
+      "kind": "fitting",
+      "scaleBySize": false,
+      "rotateToPath": true
+    },
+    {
+      "id": "grille-supp",
+      "blockName": "supply grill 01",
+      "system": "HVAC",
+      "kind": "fitting",
+      "scaleBySize": false,
+      "rotateToPath": false
+    },
+    {
+      "id": "support-duct",
+      "blockName": "SUPPORT DUCT",
+      "system": "HVAC",
+      "kind": "support",
+      "scaleBySize": false,
+      "rotateToPath": true
+    },
+    {
+      "id": "elbow-pipe",
+      "blockName": "TS EB 90 100",
+      "system": "PIPING",
+      "kind": "fitting",
+      "scaleBySize": false,
+      "rotateToPath": true
+    },
+    {
+      "id": "tee-pipe",
+      "blockName": "TS TEE 100",
+      "system": "PIPING",
+      "kind": "fitting",
+      "scaleBySize": false,
+      "rotateToPath": true
+    },
+    {
+      "id": "reducer-pipe",
+      "blockName": "GEN-STEEL-PIPE-REDUCER",
+      "system": "PIPING",
+      "kind": "fitting",
+      "scaleBySize": false,
+      "rotateToPath": true
+    },
+    {
+      "id": "valve-gate",
+      "blockName": "GATE VALVE 25",
+      "system": "PIPING",
+      "kind": "fitting",
+      "scaleBySize": false,
+      "rotateToPath": true
+    },
+    {
+      "id": "support-pipe",
+      "blockName": "PIPE SEC SUPPORT",
+      "system": "PIPING",
+      "kind": "support",
+      "scaleBySize": false,
+      "rotateToPath": true
+    },
+    {
+      "id": "slope-arrow",
+      "blockName": "SLOPE%-STRO",
+      "system": "PIPING",
+      "kind": "fitting",
+      "scaleBySize": false,
+      "rotateToPath": true
+    }
+  ]
+}
