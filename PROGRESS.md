@@ -75,6 +75,38 @@ handle mồ côi tự động trong `XBOSS_KIEMTRA` (AC3) + tài liệu + mục 
 **Chưa build/test .NET cục bộ** — máy không có .NET SDK; `dotnet test` chờ CI. TS: `npm run lint`,
 `npm run typecheck`, `npm test` xanh.
 
+## 🚧 M110 PR1/2 — Core revision cloud + rule pack v14 (2026-08-29)
+
+Nhánh `feat/m110-pr1-revision-core`. **PR1 của 2** theo `docs/nang-cap/M110-revision-cloud.md` §10 —
+chỉ phần **thuần, không đụng AutoCAD**; 3 lệnh `XBOSS_VE_REV`/`_CHOT`/`_HIENTHI`, `RevisionStore`,
+layer con theo revision, hộp thoại M106 và phép kiểm FR8 nằm ở **PR2**.
+
+Đã làm:
+
+- Khối `drawTools.revisionPolicy` (M110 §5) phát hành trong rule pack mới **`v14.json`** = `v13`
+  (đã có `crossingPolicy` của M109 chồng lên `floorPolicy` của M111) + `revisionPolicy`. Lịch sử số
+  version: M111 phát hành `v12` (chỉ `floorPolicy`) và về `main` trước; M109 hợp nhất thành `v13`
+  (`v12` + `crossingPolicy`) và về `main` kế tiếp; nhánh này ban đầu gộp nhầm `revisionPolicy` thẳng
+  vào `v12.json` (lúc `v13` của M109 chưa về `main`), phát hiện khi merge lần 2 nên đã khôi phục
+  `v12.json` về đúng nội dung gốc (chỉ `floorPolicy`) rồi phát hành `v14.json` = `v13` +
+  `revisionPolicy` cho đúng thứ tự lịch sử. Mở rộng **thuần** của v9 và `enabled: false` mặc định
+  ⇒ mọi lệnh cũ chạy y hệt v9 (AC8).
+- **Validator 2 tầng** cho khóa mới: TS `lib/ky-thuat/cad/rule-pack-revision.ts`
+  (`kiemTraRevisionPolicy`) + C# `DrawToolsConfig.KiemRevisionPolicy` — cùng bộ luật: `numberFormat`
+  phải chứa `{n}`, `cloudArcMm` > 0, `triangleBlockId` khác rỗng khi bật, `maxRows` ≥ 1, layer khác
+  rỗng, `boundingPaddingMm` ≥ 0, 4 mẫu attribute khung tên phải có `{n}`.
+- **Core C# thuần** (test chạy CI Linux, không thêm NuGet): `Draw/RevisionCloud.cs` (bao hình +
+  nới `boundingPaddingMm`, số cung theo `cloudArcMm × tỉ lệ in`, chỗ đặt tam giác) và
+  `Draw/RevisionSnapshot.cs` (băm hình học SHA-256 làm tròn 0,1 mm, so mốc §4 ra 3 nhóm
+  thêm/xóa/đổi, mốc vô hiệu khi WBLOCK, mã hóa/giải mã mốc cho Xrecord).
+- **XData**: `VaiTroVe.Revision` + `SoRevision`/`HandleCapDoi`/`HandleTrongVung` trong `VeXData.cs`.
+- Test: `plugin-autocad/XBoss.Cad.Tests/RevisionCoreTests.cs` + `RulePackV14RevisionTests.cs`, và
+  test "mở rộng thuần v14" + 2 ca revisionPolicy trong `tests/engineering-cad-rule-pack.test.ts`.
+
+Còn nợ (PR2 hoặc ghi rõ trong PR1): toàn bộ tầng Adapter; ca `revisionPolicy` trong
+`plugin-autocad/doi-chung/` (bộ đối chứng hiện chỉ mang corpus layer/font, hai tầng đang được canh
+bằng validator đọc CHUNG tệp v14.json); tài liệu `README.md`/`CAI-DAT.md`/`VERIFY-VA-PHAT-HANH.md`.
+
 ## ✅ Duyệt trọn gói 6 đặc tả M109–M114 (2026-08-29)
 
 Người dùng: **"duyệt tất cả"**. Nhánh `claude/duyet-dac-ta-m109-m114`. Cả 6 tệp chuyển

@@ -56,6 +56,11 @@ export const CURRENT_RULE_PACK_VERSION = RULE_PACK_HIEN_HANH.version;
  * thuần và `enabled: false` mặc định nên mọi lệnh cũ chạy với v13 cho kết quả y hệt v9.
  * (v10/v11 bỏ trống: v10 là bản nháp crossingPolicy của nhánh M109 trước khi M111 phát hành v12,
  * không bản nào ra khỏi nhánh; v13 gộp đủ cả hai khối mới.)
+ * v14 = v13 + khối `drawTools.revisionPolicy` cho bộ lệnh revision cloud
+ * `XBOSS_VE_REV`/`_CHOT`/`_HIENTHI` (M110 §5): chiều dài cung cloud, layer, block tam giác
+ * (`kind=annotation`), định dạng số revision, mẫu tên attribute bảng revision trong khung tên, số
+ * dòng tối đa, nới bao hình. Mở rộng thuần và `enabled: false` mặc định nên v14 cho kết quả y hệt
+ * v9; 3 lệnh revision từ chối chạy tới khi công ty bật khóa này (M110 AC8).
  */
 export function getCurrentRulePack(): CadRulePack {
   return RULE_PACK_HIEN_HANH;

@@ -25,10 +25,11 @@ import {
   convertTcvn3ToUnicode,
   convertVniToUnicode,
 } from "@/lib/ky-thuat/cad/dxf-parser";
+import { kiemTraRevisionPolicy, soRevisionTheoMau } from "@/lib/ky-thuat/cad/rule-pack-revision";
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8 + floorPolicy v12 + crossingPolicy v13, version = v13", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8 + floorPolicy v12 + crossingPolicy v13 + revisionPolicy v14, version = v14", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -54,8 +55,9 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleM
   }
   assert.ok("crossingPolicy" in pack.drawTools, "Thiếu khối v13 drawTools.crossingPolicy");
   assert.ok("floorPolicy" in pack.drawTools, "Thiếu khối v12 drawTools.floorPolicy");
-  assert.equal(pack.version, "v13");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v13");
+  assert.ok("revisionPolicy" in pack.drawTools, "Thiếu khối v14 drawTools.revisionPolicy");
+  assert.equal(pack.version, "v14");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v14");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -960,9 +962,10 @@ test("v9: MỌI tuyến đều khai jointRules đủ dùng, dải chọn kiểu 
 
 // ===== v12 (M111) — floorPolicy: tham số nhân bản tầng điển hình =====
 
-test("rule pack v12 là mở rộng thuần của v9: chỉ thêm drawTools.floorPolicy (M111 §4)", async () => {
+test("rule pack v12 là mở rộng thuần của v9: chỉ thêm floorPolicy (M111 §4)", async () => {
   const v9 = (await import("@/lib/ky-thuat/cad/rule-packs/v9.json")).default;
-  // Đọc THẲNG tệp v12.json: bản hiện hành nay là v13 (M109 gộp thêm crossingPolicy lên trên v12).
+  // Đọc THẲNG tệp v12.json: bản hiện hành nay là v14 (M109 gộp crossingPolicy lên trên v12, M110
+  // gộp tiếp revisionPolicy — xem 2 test "mở rộng thuần" riêng ở dưới cho v13/v14).
   const v12 = (await import("@/lib/ky-thuat/cad/rule-packs/v12.json")).default;
 
   for (const field of [
@@ -984,7 +987,7 @@ test("rule pack v12 là mở rộng thuần của v9: chỉ thêm drawTools.floo
     assert.deepEqual(
       v12[field],
       v9[field],
-      `Field ${field} của v12 lệch v9 — v12 phải là mở rộng thuần (M111 chỉ thêm tham số nhân tầng)`,
+      `Field ${field} của v12 lệch v9 — v12 phải là mở rộng thuần (chỉ thêm 2 khối trong drawTools)`,
     );
   }
   assert.deepEqual(
@@ -1050,11 +1053,92 @@ test("v12: validator TS khớp validator C# — cả 3 kiểm còn lại của F
   assert.deepEqual(kiemFloorPolicy({ ...hopLe, gridColumns: 0 }), []);
 });
 
+// ===== v14 (M110 §5) — revisionPolicy: tham số revision cloud =====
+// (v12 = v9 + floorPolicy (M111); v13 = v12 + crossingPolicy (M109); v14 = v13 + revisionPolicy
+// (M110) — 3 nhánh song song, mỗi nhánh chỉ thêm ĐÚNG khối của mình, mở rộng thuần từng bước.)
+
+test("rule pack v14 là mở rộng thuần của v13: chỉ thêm drawTools.revisionPolicy (M110 §5)", async () => {
+  const v13 = (await import("@/lib/ky-thuat/cad/rule-packs/v13.json")).default;
+  const v14 = getCurrentRulePack();
+
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "inspectionPolicy",
+    "styleMap",
+    "sheetSetup",
+    "xrefPolicy",
+    "hatchMap",
+    "layoutPolicy",
+    "polylineClosePolicy",
+    "blockMap",
+  ] as const) {
+    assert.deepEqual(
+      v14[field],
+      v13[field],
+      `Field ${field} của v14 lệch v13 — v14 phải là mở rộng thuần (M110 chỉ thêm revisionPolicy)`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v14).filter((k) => !(k in v13)),
+    [],
+    "v14 không được thêm khối cấp cao nào — revisionPolicy nằm trong drawTools",
+  );
+
+  const { revisionPolicy: _bo, ...drawToolsV14 } = v14.drawTools;
+  assert.deepEqual(drawToolsV14, v13.drawTools, "v14 đụng tham số drawTools ngoài revisionPolicy");
+});
+
+test("v14: revisionPolicy khai đủ tham số và mặc định TẮT (M110 §5/AC8)", () => {
+  const rev = getCurrentRulePack().drawTools.revisionPolicy;
+
+  assert.equal(
+    rev.enabled,
+    false,
+    "revisionPolicy phải mặc định tắt — 3 lệnh revision dừng kèm thông báo",
+  );
+  assert.deepEqual(kiemTraRevisionPolicy(rev), [], "revisionPolicy của bản phát hành không hợp lệ");
+  assert.equal(soRevisionTheoMau(rev.numberFormat, 2), "R2");
+  for (const [khoa, mau] of Object.entries(rev.titleblockAttrPattern)) {
+    assert.ok(mau.includes("{n}"), `titleblockAttrPattern.${khoa} thiếu {n}`);
+  }
+});
+
+test("v14: validator revisionPolicy bắt đúng các ca sai của M110 §5", () => {
+  const goc = getCurrentRulePack().drawTools.revisionPolicy;
+  const sua = (p: Partial<typeof goc>) => kiemTraRevisionPolicy({ ...goc, ...p });
+
+  assert.match(sua({ numberFormat: "REV" })[0] ?? "", /numberFormat/);
+  assert.match(sua({ cloudArcMm: 0 })[0] ?? "", /cloudArcMm/);
+  assert.match(sua({ maxRows: 0 })[0] ?? "", /maxRows/);
+  assert.match(sua({ layer: "  " })[0] ?? "", /layer/);
+  assert.match(sua({ boundingPaddingMm: -1 })[0] ?? "", /boundingPaddingMm/);
+  assert.match(
+    sua({
+      titleblockAttrPattern: { ...goc.titleblockAttrPattern, ngay: "REV_DATE" },
+    })[0] ?? "",
+    /titleblockAttrPattern\.ngay/,
+  );
+
+  // triangleBlockId rỗng chỉ là lỗi khi khối đang BẬT.
+  assert.deepEqual(sua({ triangleBlockId: "" }), []);
+  assert.match(sua({ triangleBlockId: "", enabled: true })[0] ?? "", /triangleBlockId/);
+
+  // Rule pack cũ (≤ v9) không khai khối này — hợp lệ, lệnh revision tự từ chối chạy.
+  assert.deepEqual(kiemTraRevisionPolicy(undefined), []);
+});
+
 // ===== v13 (M109) — crossingPolicy: chính sách ngắt nét giao chéo =====
+// (lịch sử: v13 KHÔNG còn là bản hiện hành — v14 mới là bản phát hành, xem test "mở rộng thuần"
+// ở trên. So sánh dưới đây dùng import trực tiếp v12/v13.json, không dùng getCurrentRulePack().)
 
 test("rule pack v13 là mở rộng thuần của v12: chỉ thêm drawTools.crossingPolicy (M109 §5)", async () => {
   const v12 = (await import("@/lib/ky-thuat/cad/rule-packs/v12.json")).default;
-  const v13 = getCurrentRulePack();
+  const v13 = (await import("@/lib/ky-thuat/cad/rule-packs/v13.json")).default;
 
   for (const field of [
     "layerMap",

@@ -58,6 +58,12 @@ public enum VaiTroVe
     NhanDot,
 
     /// <summary>
+    /// Revision cloud và tam giác mang số revision (<c>XBOSS_VE_REV</c> — M110 FR3). Mang
+    /// <see cref="VeXDataInfo.SoRevision"/>, danh sách handle đối tượng nằm trong vùng
+    /// (<see cref="VeXDataInfo.HandleTrongVung"/>) và <see cref="VeXDataInfo.HandleCapDoi"/>
+    /// (cloud ↔ tam giác) để xóa/sửa luôn đi cặp — cùng kiểu liên kết 2 chiều tim↔biên của M100.
+    /// </summary>
+    Revision,
     /// Đối tượng ngắt nét giao chéo (<c>XBOSS_VE_NGATNET</c> — M109 FR5): wipeout che vùng giao
     /// hoặc cầu vượt. Mang <see cref="VeXDataInfo.HandleTim"/> = tim ĐI DƯỚI và
     /// <see cref="VeXDataInfo.HandleTimGiao"/> = tim đi trên, nên lệnh xóa/chạy lại tìm đúng đối
@@ -147,6 +153,16 @@ public sealed record VeXDataInfo
     /// <summary>Số thứ tự đốt trong tuyến (trên tag đốt, và đốt ĐỨNG TRƯỚC trên vạch chia).</summary>
     public int? ChiSoDot { get; init; }
 
+    // ===== Revision cloud (M110 FR3) — có trên CẢ cloud lẫn tam giác của vai trò Revision.
+
+    /// <summary>Số revision của cloud/tam giác (số nguyên: 1 = R1). null = không phải đối tượng revision.</summary>
+    public int? SoRevision { get; init; }
+
+    /// <summary>Handle của đối tượng đi cặp: trên cloud là tam giác, trên tam giác là cloud (FR3/FR8).</summary>
+    public string? HandleCapDoi { get; init; }
+
+    /// <summary>Handle các đối tượng nằm trong vùng cloud — nguồn của cảnh báo bỏ sót (FR5).</summary>
+    public IReadOnlyList<string> HandleTrongVung { get; init; } = [];
     // ===== Ngắt nét giao chéo (M109 FR5/FR7) =====
 
     /// <summary>
@@ -224,6 +240,9 @@ public static class VeXData
         if (tt.TongDaiDotMm is { } td)
             ra.Add($"tongdaidot={td.ToString("0.######", CultureInfo.InvariantCulture)}");
         if (tt.ChiSoDot is { } cs) ra.Add($"chisodot={cs.ToString(CultureInfo.InvariantCulture)}");
+        if (tt.SoRevision is { } sr) ra.Add($"rev={sr.ToString(CultureInfo.InvariantCulture)}");
+        Them(ra, "capdoi", tt.HandleCapDoi);
+        foreach (var h in tt.HandleTrongVung) Them(ra, "trongvung", h);
         Them(ra, "timgiao", tt.HandleTimGiao);
         if (tt.DaoTay) ra.Add("daotay=1");
         Them(ra, "tangnguon", tt.TangNguon);
@@ -246,6 +265,7 @@ public static class VeXData
         VaiTroVe.BangThongKe => "bang",
         VaiTroVe.VachChia => "vachchia",
         VaiTroVe.NhanDot => "nhandot",
+        VaiTroVe.Revision => "revision",
         VaiTroVe.NgatNet => "ngatnet",
         _ => "blockdef",
     };
@@ -274,8 +294,11 @@ public static class VeXData
         var daoTay = false;
         double? tongDaiDotMm = null;
         var tagKhoa = false;
+        int? soRevision = null;
+        string? handleCapDoi = null;
         var bien = new List<string>();
         var nhan = new List<string>();
+        var trongVung = new List<string>();
 
         foreach (var dong in chuoi)
         {
@@ -300,6 +323,7 @@ public static class VeXData
                         "bang" => VaiTroVe.BangThongKe,
                         "vachchia" => VaiTroVe.VachChia,
                         "nhandot" => VaiTroVe.NhanDot,
+                        "revision" => VaiTroVe.Revision,
                         "ngatnet" => VaiTroVe.NgatNet,
                         "blockdef" => VaiTroVe.DinhNghiaBlock,
                         _ => VaiTroVe.Tim,
@@ -350,6 +374,12 @@ public static class VeXData
                     if (int.TryParse(giaTri, NumberStyles.Integer, CultureInfo.InvariantCulture, out var cs))
                         chiSoDot = cs;
                     break;
+                case "rev":
+                    if (int.TryParse(giaTri, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sr))
+                        soRevision = sr;
+                    break;
+                case "capdoi": handleCapDoi = giaTri; break;
+                case "trongvung": trongVung.Add(giaTri); break;
                 case "timgiao": timGiao = giaTri; break;
                 case "daotay": daoTay = giaTri == "1"; break;
                 case "tangnguon": tangNguon = giaTri; break;
@@ -388,6 +418,9 @@ public static class VeXData
             SoMoiNoi = soMoiNoi,
             TongDaiDotMm = tongDaiDotMm,
             ChiSoDot = chiSoDot,
+            SoRevision = soRevision,
+            HandleCapDoi = handleCapDoi,
+            HandleTrongVung = trongVung,
             HandleTimGiao = timGiao,
             DaoTay = daoTay,
             TangNguon = tangNguon,
