@@ -45,7 +45,7 @@ Gỡ cài: xoá thư mục `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle`.
 
 ---
 
-## C. Verify tay — 27 lệnh, đi theo đúng thứ tự này
+## C. Verify tay — 36 lệnh (98 mục), đi theo đúng thứ tự này
 
 Mỗi mục ghi: **làm gì** → **đúng thì thấy gì**. Gặp lệch thì ghi lại lệnh + thông điệp + tệp
 báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho qua".
