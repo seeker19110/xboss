@@ -222,6 +222,37 @@ public class VeSessionReportTests
     }
 
     [Fact]
+    public void Muc_nhan_ban_tang_gop_theo_cap_tang_nguon_va_tang_chep()
+    {
+        // M111 FR10 — đọc từ dấu bản chép SỐNG trong bản vẽ (TangNguon/NhanTang), nên mở lại bản vẽ
+        // ở máy khác vẫn dựng lại được đúng con số này.
+        var chep = (string nguon, string dich) =>
+            Tim("HVAC", "duct-supp", "300x200") with { TangNguon = nguon, NhanTang = dich };
+        var bc = VeSessionReport.Dung(
+            [
+                Tim("HVAC", "duct-supp", "300x200"),
+                chep("05", "06"),
+                chep("05", "06"),
+                chep("05", "07"),
+            ],
+            Meta);
+
+        Assert.Equal(2, bc.NhanTang.Count);
+        Assert.Equal(2, bc.NhanTang[0].SoDoiTuong);
+        Assert.Equal("06", bc.NhanTang[0].NhanTang);
+        Assert.Equal("05", bc.NhanTang[0].TangNguon);
+        Assert.Equal(1, bc.NhanTang[1].SoDoiTuong);
+        Assert.Contains("tầng 05 → tầng 07", bc.ToVietnameseText(), StringComparison.Ordinal);
+        Assert.Equal(2, JsonDocument.Parse(bc.ToJson()).RootElement.GetProperty("nhanTang").GetArrayLength());
+    }
+
+    [Fact]
+    public void Ban_ve_chua_nhan_ban_tang_thi_muc_do_rong()
+    {
+        Assert.Empty(VeSessionReport.Dung([Tim("HVAC", "duct-supp", "300x200")], Meta).NhanTang);
+    }
+
+    [Fact]
     public void Doi_tuong_mat_HeId_van_duoc_dem_vao_nhom_rieng()
     {
         // XData bị sửa tay/hỏng: thà gom vào "(không rõ hệ)" còn hơn lặng lẽ đếm thiếu.

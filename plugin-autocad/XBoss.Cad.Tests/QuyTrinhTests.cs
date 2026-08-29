@@ -93,7 +93,7 @@ public class QuyTrinhTests
         Assert.Equal(
             [
                 "XBOSS_VE_NEN", "XBOSS_VE", "XBOSS_VE_NHANTUYEN", "XBOSS_VE_NHAN", "XBOSS_VE_PHUKIEN",
-                "XBOSS_VE_THIETBI", "XBOSS_VE_DOI",
+                "XBOSS_VE_THIETBI", "XBOSS_VE_NHANTANG", "XBOSS_VE_DOI",
             ],
             QuyTrinh.LenhCua(BuocQuyTrinh.VeShopDrawing).Select(l => l.Ten));
         Assert.Equal(
@@ -138,7 +138,7 @@ public class QuyTrinhTests
         Assert.Equal(
             [
                 "XBOSS_VE_NEN", "XBOSS_VE", "XBOSS_VE_NHANTUYEN", "XBOSS_VE_NHAN", "XBOSS_VE_PHUKIEN",
-                "XBOSS_VE_THIETBI", "XBOSS_VE_DOI",
+                "XBOSS_VE_THIETBI", "XBOSS_VE_NHANTANG", "XBOSS_VE_DOI",
                 "XBOSS_VE_CHIADOT", "XBOSS_VE_GIADO", "XBOSS_VE_LOCHO", "XBOSS_VE_TAG",
                 "XBOSS_VE_MATCAT", "XBOSS_VE_THONGKE", "XBOSS_VE_NGATNET", "XBOSS_VE_TRANGIN",
                 "XBOSS_VE_BAOCAO",

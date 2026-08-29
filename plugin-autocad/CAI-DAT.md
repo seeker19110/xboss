@@ -89,17 +89,17 @@ thì nạp tay: `XBOSS_RULEPACK` cho bộ quy tắc, `XBOSS_VE_THUVIEN` cho thư
 
 ### Trình tự một buổi vẽ
 
-| Bước | Lệnh                            | Làm gì                                                                                                                                   |
-| ---- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | `XBOSS_VE_NEN`                  | Chọn hệ sắp vẽ → nền thiết kế bị khóa + làm mờ, layer đích được tạo sẵn. **Vẽ xong chạy lại lệnh này để trả nền về như cũ**              |
-| 2    | `XBOSS_VE`                      | Chọn loại tuyến → size → (độ dốc nếu là ống thoát) → bấm điểm như PLINE. Ống gió/máng tự có 2 nét biên đúng bề rộng                      |
-| 3    | `XBOSS_VE_PHUKIEN` / `_THIETBI` | Chèn co/tê/van/miệng gió bám tuyến (tự xoay theo tuyến) và thiết bị FCU/AHU… (nhập `TAG` ngay lúc chèn)                                  |
-| 4    | `XBOSS_VE_NHAN`                 | Bấm tuyến → nhãn size tự ghi (kèm `i=2%` + mũi tên hướng dốc nếu có). **Không gõ tay** nên nhãn không bao giờ lệch tuyến                 |
-| 5    | `XBOSS_VE_GIADO` / `_LOCHO`     | Rải giá đỡ cách đều đúng chuẩn treo đỡ; chèn lỗ chờ xuyên tường/sàn rồi `XUATBANG` để có bảng builder's work (Table + Excel) gửi kết cấu |
-| 6    | `XBOSS_VE_TAG` / `_THONGKE`     | Đánh tag tuần tự + tìm tag trùng; sinh bảng thiết bị/khối lượng ngay trong bản vẽ                                                        |
+| Bước | Lệnh                            | Làm gì                                                                                                                                                                                                                     |
+| ---- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `XBOSS_VE_NEN`                  | Chọn hệ sắp vẽ → nền thiết kế bị khóa + làm mờ, layer đích được tạo sẵn. **Vẽ xong chạy lại lệnh này để trả nền về như cũ**                                                                                                |
+| 2    | `XBOSS_VE`                      | Chọn loại tuyến → size → (độ dốc nếu là ống thoát) → bấm điểm như PLINE. Ống gió/máng tự có 2 nét biên đúng bề rộng                                                                                                        |
+| 3    | `XBOSS_VE_PHUKIEN` / `_THIETBI` | Chèn co/tê/van/miệng gió bám tuyến (tự xoay theo tuyến) và thiết bị FCU/AHU… (nhập `TAG` ngay lúc chèn)                                                                                                                    |
+| 4    | `XBOSS_VE_NHAN`                 | Bấm tuyến → nhãn size tự ghi (kèm `i=2%` + mũi tên hướng dốc nếu có). **Không gõ tay** nên nhãn không bao giờ lệch tuyến                                                                                                   |
+| 5    | `XBOSS_VE_GIADO` / `_LOCHO`     | Rải giá đỡ cách đều đúng chuẩn treo đỡ; chèn lỗ chờ xuyên tường/sàn rồi `XUATBANG` để có bảng builder's work (Table + Excel) gửi kết cấu                                                                                   |
+| 6    | `XBOSS_VE_TAG` / `_THONGKE`     | Đánh tag tuần tự + tìm tag trùng; sinh bảng thiết bị/khối lượng ngay trong bản vẽ                                                                                                                                          |
 | 7    | `XBOSS_VE_NGATNET`              | Chỗ hai tuyến khác hệ cắt nhau: tuyến đi dưới **ngắt nét** cho bản vẽ đọc được ai trên ai dưới. Ai đi trên do bộ quy tắc quyết, cặp nào muốn ngược lại thì tích ô **Đảo** trong hộp thoại. Muốn bỏ: `XBOSS_VE_NGATNET_XOA` |
-| 8    | `XBOSS_VE_MATCAT` / `_TRANGIN`  | Dựng mặt cắt từ tuyến đã vẽ (cao độ **nhập tay**); tạo trang in đúng khổ/tỉ lệ, viewport đã khóa, khung tên điền sẵn                     |
-| 9    | `XBOSS_VE_BAOCAO`               | Xem lại cả buổi vẽ: bao nhiêu tuyến/block theo hệ, có size nào nằm ngoài danh mục không                                                  |
+| 8    | `XBOSS_VE_MATCAT` / `_TRANGIN`  | Dựng mặt cắt từ tuyến đã vẽ (cao độ **nhập tay**); tạo trang in đúng khổ/tỉ lệ, viewport đã khóa, khung tên điền sẵn                                                                                                       |
+| 9    | `XBOSS_VE_BAOCAO`               | Xem lại cả buổi vẽ: bao nhiêu tuyến/block theo hệ, có size nào nằm ngoài danh mục không                                                                                                                                    |
 
 ### Ba việc hay phải làm lại
 
