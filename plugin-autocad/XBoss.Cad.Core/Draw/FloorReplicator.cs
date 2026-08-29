@@ -103,6 +103,34 @@ public static class FloorReplicator
             $"floorPolicy.layoutMode không hợp lệ: \"{layoutMode}\" (chỉ nhận \"offsetY\", \"offsetX\" hoặc \"luoi\")."),
     };
 
+    /// <summary>
+    /// Chiều ngược của <see cref="DocKieuDat"/> (enum → chuỗi rule pack). Hai chiều nằm cạnh nhau
+    /// để không thể trôi khỏi nhau khi thêm kiểu dời mới.
+    /// </summary>
+    public static string MaKieuDat(KieuDatTang kieu) => kieu switch
+    {
+        KieuDatTang.OffsetX => "offsetX",
+        KieuDatTang.Luoi => "luoi",
+        _ => "offsetY",
+    };
+
+    /// <summary>
+    /// Bản sao chính sách với kiểu dời + bước dời kỹ sư chọn trong hộp thoại (FR2 — "mặc định từ
+    /// rule pack, sửa được"). Mọi khóa còn lại giữ NGUYÊN từ rule pack: <c>copyRoles</c> và
+    /// <c>zoneNamePattern</c> là hợp đồng của rule pack, lệnh không được sửa giữa đường.
+    /// </summary>
+    public static FloorPolicySection VoiKieuDat(FloorPolicySection fp, KieuDatTang kieu, double stepMm) =>
+        new()
+        {
+            Enabled = fp.Enabled,
+            Floors = fp.Floors,
+            LayoutMode = MaKieuDat(kieu),
+            StepMm = stepMm,
+            GridColumns = fp.GridColumns,
+            ZoneNamePattern = fp.ZoneNamePattern,
+            CopyRoles = fp.CopyRoles,
+        };
+
     /// <summary>Tên vai trò trong rule pack → <see cref="VaiTroVe"/>; tên lạ → lỗi tiếng Việt.</summary>
     public static VaiTroVe DocVaiTro(string ten) =>
         Enum.TryParse<VaiTroVe>(ten, ignoreCase: false, out var vaiTro)
@@ -174,6 +202,37 @@ public static class FloorReplicator
     public static IReadOnlyList<KeHoachTang> LapKeHoachDat(
         FloorPolicySection fp, IReadOnlyList<string> tangDich) =>
         tangDich.Select((tang, i) => new KeHoachTang(i, tang, ViTriDatTang(fp, i))).ToList();
+
+    /// <summary>
+    /// Kế hoạch đặt theo Ô CỐ ĐỊNH của từng nhãn tầng: ô của một tầng = vị trí của nó trong
+    /// <c>floorPolicy.floors</c> sau khi bỏ tầng nguồn (tầng nguồn giữ ô số 0 tại chỗ).
+    ///
+    /// Khác với bản chỉ nhận <paramref name="tangDich"/>: ở đây vị trí một tầng KHÔNG phụ thuộc
+    /// vào việc lần này kỹ sư tick bao nhiêu tầng. Đó là điều kiện của FR9/AC8 — chạy lại lệnh
+    /// cho riêng tầng 08 (chép đè) phải đặt tầng 08 về ĐÚNG chỗ cũ, chứ không nhảy sang chỗ của
+    /// tầng 06 chỉ vì lần này nó là tầng đầu danh sách (bản chép sẽ chồng khít lên tầng khác).
+    /// Nhãn không có trong <c>floors</c> (không xảy ra khi tick từ danh mục) được xếp sau mọi ô
+    /// đã khai, không bao giờ đè lên tầng đã khai.
+    /// </summary>
+    public static IReadOnlyList<KeHoachTang> LapKeHoachDat(
+        FloorPolicySection fp, string tangNguon, IReadOnlyList<string> tangDich)
+    {
+        var oCua = new Dictionary<string, int>(StringComparer.Ordinal);
+        var o = 0;
+        foreach (var tang in fp.Floors)
+        {
+            if (string.Equals(tang, tangNguon, StringComparison.Ordinal)) continue;
+            if (!oCua.ContainsKey(tang)) oCua[tang] = o++;
+        }
+
+        var keHoach = new List<KeHoachTang>();
+        for (var i = 0; i < tangDich.Count; i++)
+        {
+            var chiSo = oCua.TryGetValue(tangDich[i], out var oKhai) ? oKhai : fp.Floors.Count + i;
+            keHoach.Add(new KeHoachTang(chiSo, tangDich[i], ViTriDatTang(fp, chiSo)));
+        }
+        return keHoach;
+    }
 
     /// <summary>
     /// Tag của bản chép: giữ nguyên <c>{type}</c>/<c>{seq}</c>, chỉ thay <c>{floor}</c> bằng nhãn
