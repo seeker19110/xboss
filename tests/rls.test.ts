@@ -488,7 +488,10 @@ test(
     // Map mã BOQ theo dự án cho plugin AutoCAD (M101 PR4, migration 0140) — policy NGHIÊM NGẶT
     // 2 nhánh như 0077/0092 (không có nhánh "GUC rỗng → cho qua"), có WITH CHECK. Hành vi kiểm
     // riêng ở tests/cad-boq-map.test.ts bằng role xboss_app.
-    const CAD = ["cad_takeoff_boq_map"];
+    // Thư viện block hai tầng (M113 PR1, migration 0145): policy 2 nhánh CỘNG nhánh toàn cục
+    // `project_id IS NULL` (bộ dùng chung mọi dự án, giữ nguyên hành vi trước M113). Hành vi
+    // kiểm riêng ở tests/cad-block-lib-du-an.test.ts bằng role xboss_app.
+    const CAD = ["cad_takeoff_boq_map", "cad_block_libs"];
 
     // Nhóm engineering: khai theo TIỀN TỐ chứ không liệt kê tay — thêm bảng engineering_* mới
     // mà quên bật RLS thì bị bắt ở assert bên dưới, không phải ở đây.

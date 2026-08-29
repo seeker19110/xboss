@@ -569,13 +569,13 @@ public sealed class VeRevCommands
             return null;
         }
 
-        NguonDinhNghia nguon;
+        BlockLibraryService.NguonDinhNghia nguon;
         using (var tr = db.TransactionManager.StartTransaction())
         {
             (nguon, _) = BlockLibraryService.KiemTraDinhNghia(db, tr, def.BlockName, thuVien.Version);
             tr.Commit();
         }
-        if (nguon != NguonDinhNghia.ChuaCo)
+        if (nguon != BlockLibraryService.NguonDinhNghia.ChuaCo)
         {
             // Đã có định nghĩa trùng tên: DÙNG NGUYÊN bản trong bản vẽ, không hỏi ghi đè giữa lệnh —
             // tam giác chỉ là ký hiệu chú thích, redefine nó có thể đổi thể hiện của các revision CŨ

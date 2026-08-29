@@ -138,7 +138,8 @@ public class QuyTrinhTests
                 "XBOSS_VE_NEN", "XBOSS_VE", "XBOSS_VE_NHANTUYEN", "XBOSS_VE_NHAN", "XBOSS_VE_PHUKIEN",
                 "XBOSS_VE_THIETBI", "XBOSS_VE_DOI",
                 "XBOSS_VE_CHIADOT", "XBOSS_VE_GIADO", "XBOSS_VE_LOCHO", "XBOSS_VE_TAG",
-                "XBOSS_VE_MATCAT", "XBOSS_VE_THONGKE", "XBOSS_VE_TRANGIN", "XBOSS_VE_BAOCAO",
+                "XBOSS_VE_MATCAT", "XBOSS_VE_THONGKE", "XBOSS_VE_TRANGIN",
+                "XBOSS_VE_REV", "XBOSS_VE_REV_CHOT", "XBOSS_VE_REV_HIENTHI", "XBOSS_VE_BAOCAO",
                 "XBOSS_VE_THUVIEN", "XBOSS_VE_DEXUAT", "XBOSS_VE_DEXUAT_LO",
             ],
             ve);
