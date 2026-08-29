@@ -1,4 +1,5 @@
 using Autodesk.AutoCAD.DatabaseServices;
+using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Inspection;
 
 namespace XBoss.Cad.Acad.Services;
@@ -66,6 +67,7 @@ internal static class DrawingSnapshotBuilder
         }
 
         var tags = QuetTag(db, tr);
+        var nhanTang = QuetNhanTang(db, tr);
 
         return new DrawingSnapshot
         {
@@ -75,10 +77,50 @@ internal static class DrawingSnapshotBuilder
             UsedLayerNames = layerDangDung,
             AnonymousBlockNames = blockNacDanh,
             Tags = tags.Count > 0 ? tags : null,
+            NhanTang = nhanTang.Count > 0 ? nhanTang : null,
             XrefDaBoQua = soLayerXref + soKhoiXref > 0
                 ? new XrefBoQua { SoLayer = soLayerXref, SoKhoiChen = soKhoiXref }
                 : null,
         };
+    }
+
+    /// <summary>
+    /// Đối tượng do <c>XBOSS_VE_NHANTANG</c> sinh ra (mang XData <c>TangNguon</c>/<c>NhanTang</c> —
+    /// M111 FR9), kèm mọi handle mà XData của nó tham chiếu tới — nguồn của phép kiểm 19 (handle
+    /// mồ côi, M111 AC3). Chỉ quét model space cấp 1: mọi vai trò do bộ lệnh vẽ sinh (tim/biên/nhãn/
+    /// phụ kiện/thiết bị/giá đỡ/vạch chia/nhãn đốt) đều là thực thể trực tiếp trong model space,
+    /// không nằm lồng trong định nghĩa block.
+    /// </summary>
+    private static List<FloorCopyInfo> QuetNhanTang(Database db, Transaction tr)
+    {
+        var ra = new List<FloorCopyInfo>();
+        foreach (var id in TakeoffScanner.ModelSpaceIds(db, tr))
+        {
+            var obj = tr.GetObject(id, OpenMode.ForRead);
+            if (VeXDataStore.Doc(obj) is not { NhanTang: { Length: > 0 } nhanTang } xd) continue;
+
+            var thamChieu = new List<string>();
+            Them(thamChieu, xd.HandleTim);
+            thamChieu.AddRange(xd.HandleBien);
+            thamChieu.AddRange(xd.HandleNhan);
+            Them(thamChieu, xd.HandleTuyenCat);
+            Them(thamChieu, xd.HandleCapDoi);
+            thamChieu.AddRange(xd.HandleTrongVung);
+            Them(thamChieu, xd.HandleTimGiao);
+
+            ra.Add(new FloorCopyInfo
+            {
+                Handle = obj.Handle.ToString(),
+                NhanTang = nhanTang,
+                HandleThamChieu = thamChieu,
+            });
+        }
+        return ra;
+
+        static void Them(List<string> ds, string? h)
+        {
+            if (!string.IsNullOrWhiteSpace(h)) ds.Add(h);
+        }
     }
 
     /// <summary>
