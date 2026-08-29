@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using XBoss.Cad.Core.Matching;
@@ -31,6 +32,12 @@ public sealed class DrawToolsSection
     [JsonPropertyName("heavyFittingIds")] public IReadOnlyList<string> HeavyFittingIds { get; init; } = [];
 
     /// <summary>
+    /// Chính sách ngắt nét giao chéo (M109 §5, rule pack v13 trở đi). null = rule pack cũ chưa khai
+    /// ⇒ lệnh <c>XBOSS_VE_NGATNET</c> TỪ CHỐI chạy kèm thông báo, không đoán mặc định ngầm.
+    /// </summary>
+    [JsonPropertyName("crossingPolicy")] public CrossingPolicySection? CrossingPolicy { get; init; }
+
+    /// <summary>
     /// Tham số nhân bản tầng điển hình (M111 §4, rule pack v12 trở đi). null = rule pack cũ chưa
     /// khai ⇒ <c>XBOSS_VE_NHANTANG</c> từ chối chạy kèm thông báo, không đoán mặc định ngầm.
     /// </summary>
@@ -40,10 +47,105 @@ public sealed class DrawToolsSection
     /// = không phụ kiện nào nặng" với "chưa khai = phải hỏi kỹ sư".</summary>
     [JsonIgnore] public bool CoKhaiPhuKienNang => HeavyFittingIds.Count > 0;
 
+    /// <summary>
+    /// Tham số revision cloud (M110 §5, rule pack v12 trở đi). <c>null</c> = rule pack cũ chưa khai ⇒
+    /// 3 lệnh <c>XBOSS_VE_REV*</c> dừng kèm thông báo, không đoán mặc định ngầm.
+    /// </summary>
+    [JsonPropertyName("revisionPolicy")] public RevisionPolicySection? RevisionPolicy { get; init; }
+
     /// <summary>Block phụ kiện (theo id manifest) có phải phụ kiện nặng không.</summary>
     public bool LaPhuKienNang(string? blockId) =>
         blockId is { Length: > 0 } id &&
         HeavyFittingIds.Any(h => string.Equals(h, id, StringComparison.Ordinal));
+}
+
+/// <summary>
+/// Khối <c>drawTools.revisionPolicy</c> (M110 §5) — tham số revision cloud dùng chung cho 3 lệnh
+/// <c>XBOSS_VE_REV</c>/<c>_CHOT</c>/<c>_HIENTHI</c>. Mặc định <see cref="Enabled"/> = false: rule pack
+/// khai rồi nhưng chưa bật thì lệnh vẫn dừng kèm hướng dẫn cách bật (AC8).
+/// </summary>
+public sealed class RevisionPolicySection
+{
+    /// <summary>Chỗ giữ số revision trong mọi mẫu chuỗi của khối này.</summary>
+    public const string OTrongSo = "{n}";
+
+    [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+
+    /// <summary>Chiều dài cung cloud ở tỉ lệ 1:1 (mm) — nhân <c>VeContext.TiLeIn</c> khi vẽ.</summary>
+    [JsonPropertyName("cloudArcMm")] public double CloudArcMm { get; init; }
+
+    /// <summary>Layer đặt cloud + tam giác (mỗi revision còn một layer con <c>&lt;layer&gt;-R{n}</c> — FR6).</summary>
+    [JsonPropertyName("layer")] public string Layer { get; init; } = "";
+
+    /// <summary>Id block <c>kind=annotation</c> của tam giác revision trong manifest thư viện.</summary>
+    [JsonPropertyName("triangleBlockId")] public string TriangleBlockId { get; init; } = "";
+
+    /// <summary>Mẫu số revision, BẮT BUỘC chứa <see cref="OTrongSo"/> (vd <c>R{n}</c>).</summary>
+    [JsonPropertyName("numberFormat")] public string NumberFormat { get; init; } = "";
+
+    /// <summary>Mẫu tên attribute bảng revision trong khung tên.</summary>
+    [JsonPropertyName("titleblockAttrPattern")]
+    public TitleblockAttrPattern TitleblockAttrPattern { get; init; } = new();
+
+    /// <summary>Số dòng revision khung tên chứa được — vượt thì DỪNG, không ghi đè dòng cũ (FR4).</summary>
+    [JsonPropertyName("maxRows")] public int MaxRows { get; init; }
+
+    /// <summary>Nới bao hình (mm) khi đề xuất vùng khoanh.</summary>
+    [JsonPropertyName("boundingPaddingMm")] public double BoundingPaddingMm { get; init; }
+
+    /// <summary>Số revision theo <see cref="NumberFormat"/> (vd <c>R2</c>).</summary>
+    public string SoRevision(int n) => NumberFormat.Replace(OTrongSo, n.ToString(CultureInfo.InvariantCulture));
+
+    /// <summary>Chiều dài cung cloud trong mô hình ở tỉ lệ in <paramref name="tiLeIn"/>.</summary>
+    public double CungTheoTiLe(double tiLeIn) => CloudArcMm * tiLeIn;
+}
+
+/// <summary>Tên 4 attribute một DÒNG revision trong khung tên; <c>{n}</c> = số revision (M110 §5).</summary>
+public sealed class TitleblockAttrPattern
+{
+    [JsonPropertyName("so")] public string So { get; init; } = "";
+    [JsonPropertyName("ngay")] public string Ngay { get; init; } = "";
+    [JsonPropertyName("noiDung")] public string NoiDung { get; init; } = "";
+    [JsonPropertyName("nguoi")] public string Nguoi { get; init; } = "";
+
+    /// <summary>Tên 4 attribute của dòng revision thứ <paramref name="n"/>.</summary>
+    public (string So, string Ngay, string NoiDung, string Nguoi) ChoDong(int n)
+    {
+        var so = n.ToString(CultureInfo.InvariantCulture);
+        return (
+            So.Replace(RevisionPolicySection.OTrongSo, so),
+            Ngay.Replace(RevisionPolicySection.OTrongSo, so),
+            NoiDung.Replace(RevisionPolicySection.OTrongSo, so),
+            Nguoi.Replace(RevisionPolicySection.OTrongSo, so));
+    }
+}
+
+/// <summary>
+/// Khối <c>drawTools.crossingPolicy</c> (M109 §5) — quy ước TRÌNH BÀY tuyến đi dưới bị ngắt nét tại
+/// chỗ giao. KHÔNG phải cao độ thật (M109 §3 non-goals).
+/// </summary>
+public sealed class CrossingPolicySection
+{
+    /// <summary>Mặc định false — nạp rule pack mới không đổi hành vi trên máy kỹ sư (AC8).</summary>
+    [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+
+    /// <summary>Hạng trình bày: hệ đứng trước đi TRÊN. Id theo <c>drawTools.systems[].id</c>.</summary>
+    [JsonPropertyName("priority")] public IReadOnlyList<string> Priority { get; init; } = [];
+
+    /// <summary><c>wipeout</c> | <c>jog</c> — chỉ để ÉP; mặc định suy theo <c>edgeStyle</c>.</summary>
+    [JsonPropertyName("gapMode")] public string GapMode { get; init; } = "";
+
+    /// <summary>Bề rộng che cộng thêm mỗi bên mép biên tuyến đi trên (mm).</summary>
+    [JsonPropertyName("clearanceMm")] public double ClearanceMm { get; init; }
+
+    /// <summary>Bán kính cung cầu vượt cho tuyến đơn nét (mm).</summary>
+    [JsonPropertyName("jogRadiusMm")] public double JogRadiusMm { get; init; }
+
+    /// <summary>Layer đối tượng ngắt nét = <c>&lt;layer tim&gt;</c> + hậu tố này.</summary>
+    [JsonPropertyName("layerSuffix")] public string LayerSuffix { get; init; } = "";
+
+    /// <summary>Góc giao dưới ngưỡng này (độ) thì KHÔNG ngắt nét — báo cáo riêng (FR3).</summary>
+    [JsonPropertyName("minAngleDeg")] public double MinAngleDeg { get; init; }
 }
 
 public sealed class LabelStyleSection
@@ -320,5 +422,103 @@ public static class DrawToolsConfig
         // (g) titleblockId khai thì phải khác rỗng (khai nửa vời = XBOSS_VE_TRANGIN chèn khung tên rỗng).
         if (sheetSetup.TitleblockId is { } tb && string.IsNullOrWhiteSpace(tb))
             throw new RulePackException("sheetSetup.titleblockId khai rồi nhưng để rỗng.");
+
+        // (g) chính sách ngắt nét giao chéo (M109 §5) — khai rồi thì phải hợp lệ. Kiểm theo ĐÚNG
+        // tập id hệ của drawTools: priority trỏ vào hệ không tồn tại nghĩa là thứ tự trên–dưới của
+        // hệ đó lặng lẽ không có hiệu lực (rơi xuống "hệ không khai xếp sau cùng"), không ai biết.
+        if (drawTools.CrossingPolicy is { } crossing)
+            ValidateCrossingPolicy(crossing, systemIds);
+
+        // (h) khối revision (v14) khai rồi thì phải hợp lệ — cùng bộ luật với validator TS
+        // (lib/ky-thuat/cad/rule-pack-revision.ts), M110 §5.
+        if (drawTools.RevisionPolicy is { } rev) KiemRevisionPolicy(rev);
+    }
+
+    /// <summary>Kiểm khối <c>drawTools.revisionPolicy</c> (M110 §5). Sai → RulePackException tiếng Việt.</summary>
+    public static void KiemRevisionPolicy(RevisionPolicySection rev)
+    {
+        if (rev.CloudArcMm <= 0)
+            throw new RulePackException($"drawTools.revisionPolicy.cloudArcMm = {rev.CloudArcMm.ToString(CultureInfo.InvariantCulture)} phải dương.");
+        if (!rev.NumberFormat.Contains(RevisionPolicySection.OTrongSo, StringComparison.Ordinal))
+        {
+            throw new RulePackException(
+                $"drawTools.revisionPolicy.numberFormat \"{rev.NumberFormat}\" thiếu {RevisionPolicySection.OTrongSo} — " +
+                "mọi revision sẽ mang cùng một số.");
+        }
+        if (rev.Enabled && string.IsNullOrWhiteSpace(rev.TriangleBlockId))
+        {
+            throw new RulePackException(
+                "drawTools.revisionPolicy.triangleBlockId trống trong khi khối đang bật — " +
+                "không biết chèn block tam giác nào.");
+        }
+        if (rev.MaxRows < 1)
+            throw new RulePackException($"drawTools.revisionPolicy.maxRows = {rev.MaxRows.ToString(CultureInfo.InvariantCulture)} phải ≥ 1.");
+        if (string.IsNullOrWhiteSpace(rev.Layer))
+            throw new RulePackException("drawTools.revisionPolicy.layer trống — không biết đặt cloud lên layer nào.");
+        if (rev.BoundingPaddingMm < 0)
+            throw new RulePackException($"drawTools.revisionPolicy.boundingPaddingMm = {rev.BoundingPaddingMm.ToString(CultureInfo.InvariantCulture)} không được âm.");
+
+        var mau = rev.TitleblockAttrPattern;
+        foreach (var (khoa, giaTri) in new[]
+                 {
+                     ("so", mau.So), ("ngay", mau.Ngay), ("noiDung", mau.NoiDung), ("nguoi", mau.Nguoi),
+                 })
+        {
+            if (string.IsNullOrWhiteSpace(giaTri))
+                throw new RulePackException($"drawTools.revisionPolicy.titleblockAttrPattern.{khoa} trống.");
+            if (!giaTri.Contains(RevisionPolicySection.OTrongSo, StringComparison.Ordinal))
+            {
+                throw new RulePackException(
+                    $"drawTools.revisionPolicy.titleblockAttrPattern.{khoa} \"{giaTri}\" thiếu " +
+                    $"{RevisionPolicySection.OTrongSo} — mọi dòng revision sẽ ghi đè lên cùng một attribute.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Kiểm riêng khối <c>crossingPolicy</c> (M109 §5) — tầng C# của validator 2 tầng, cặp với
+    /// <c>kiemCrossingPolicy()</c> bên TS (<c>lib/ky-thuat/cad/rule-pack.ts</c>). Tách hàm public để
+    /// bộ đối chứng <c>plugin-autocad/doi-chung/crossing-doi-chung.json</c> nạp thẳng từng ca mà
+    /// không phải dựng cả một rule pack giả.
+    /// </summary>
+    /// <param name="heHopLe">Tập id hệ hợp lệ = <c>drawTools.systems[].id</c>.</param>
+    public static void ValidateCrossingPolicy(CrossingPolicySection cp, IReadOnlyCollection<string> heHopLe)
+    {
+        foreach (var id in cp.Priority)
+        {
+            if (!heHopLe.Contains(id))
+            {
+                throw new RulePackException(
+                    $"drawTools.crossingPolicy.priority chứa id hệ lạ \"{id}\" — phải là " +
+                    $"drawTools.systems[].id (hợp lệ: {string.Join(", ", heHopLe)}).");
+            }
+        }
+
+        if (cp.ClearanceMm <= 0 || double.IsNaN(cp.ClearanceMm))
+            throw new RulePackException($"drawTools.crossingPolicy.clearanceMm = {cp.ClearanceMm} phải là số dương.");
+        if (cp.JogRadiusMm <= 0 || double.IsNaN(cp.JogRadiusMm))
+            throw new RulePackException($"drawTools.crossingPolicy.jogRadiusMm = {cp.JogRadiusMm} phải là số dương.");
+
+        // Ngưỡng lọc góc giao — CrossingGeometry.DuGocDeNgat() dùng thẳng giá trị này, số âm/NaN
+        // làm mọi góc giao đều "đủ lớn" (ngắt nét cả ca gần song song).
+        if (double.IsNaN(cp.MinAngleDeg) || cp.MinAngleDeg <= 0 || cp.MinAngleDeg > 90)
+        {
+            throw new RulePackException(
+                $"drawTools.crossingPolicy.minAngleDeg = {cp.MinAngleDeg} phải nằm trong khoảng (0; 90] — " +
+                "đây là ngưỡng lọc góc giao (0..90°), giá trị âm/NaN làm mọi góc đều bị coi là đủ lớn.");
+        }
+
+        if (!string.IsNullOrEmpty(cp.GapMode) && cp.GapMode is not ("wipeout" or "jog"))
+        {
+            throw new RulePackException(
+                $"drawTools.crossingPolicy.gapMode lạ \"{cp.GapMode}\" (chỉ nhận \"wipeout\" hoặc \"jog\").");
+        }
+
+        if (cp.Enabled && string.IsNullOrWhiteSpace(cp.LayerSuffix))
+        {
+            throw new RulePackException(
+                "drawTools.crossingPolicy.layerSuffix trống trong khi enabled = true — đối tượng ngắt nét " +
+                "sẽ rơi vào chính layer tim và lệnh xóa không lọc lại được.");
+        }
     }
 }
