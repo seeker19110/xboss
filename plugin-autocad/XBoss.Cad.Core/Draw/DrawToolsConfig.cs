@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using XBoss.Cad.Core.Matching;
@@ -34,10 +35,77 @@ public sealed class DrawToolsSection
     /// = không phụ kiện nào nặng" với "chưa khai = phải hỏi kỹ sư".</summary>
     [JsonIgnore] public bool CoKhaiPhuKienNang => HeavyFittingIds.Count > 0;
 
+    /// <summary>
+    /// Tham số revision cloud (M110 §5, rule pack v11 trở đi). <c>null</c> = rule pack cũ chưa khai ⇒
+    /// 3 lệnh <c>XBOSS_VE_REV*</c> dừng kèm thông báo, không đoán mặc định ngầm.
+    /// </summary>
+    [JsonPropertyName("revisionPolicy")] public RevisionPolicySection? RevisionPolicy { get; init; }
+
     /// <summary>Block phụ kiện (theo id manifest) có phải phụ kiện nặng không.</summary>
     public bool LaPhuKienNang(string? blockId) =>
         blockId is { Length: > 0 } id &&
         HeavyFittingIds.Any(h => string.Equals(h, id, StringComparison.Ordinal));
+}
+
+/// <summary>
+/// Khối <c>drawTools.revisionPolicy</c> (M110 §5) — tham số revision cloud dùng chung cho 3 lệnh
+/// <c>XBOSS_VE_REV</c>/<c>_CHOT</c>/<c>_HIENTHI</c>. Mặc định <see cref="Enabled"/> = false: rule pack
+/// khai rồi nhưng chưa bật thì lệnh vẫn dừng kèm hướng dẫn cách bật (AC8).
+/// </summary>
+public sealed class RevisionPolicySection
+{
+    /// <summary>Chỗ giữ số revision trong mọi mẫu chuỗi của khối này.</summary>
+    public const string OTrongSo = "{n}";
+
+    [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+
+    /// <summary>Chiều dài cung cloud ở tỉ lệ 1:1 (mm) — nhân <c>VeContext.TiLeIn</c> khi vẽ.</summary>
+    [JsonPropertyName("cloudArcMm")] public double CloudArcMm { get; init; }
+
+    /// <summary>Layer đặt cloud + tam giác (mỗi revision còn một layer con <c>&lt;layer&gt;-R{n}</c> — FR6).</summary>
+    [JsonPropertyName("layer")] public string Layer { get; init; } = "";
+
+    /// <summary>Id block <c>kind=annotation</c> của tam giác revision trong manifest thư viện.</summary>
+    [JsonPropertyName("triangleBlockId")] public string TriangleBlockId { get; init; } = "";
+
+    /// <summary>Mẫu số revision, BẮT BUỘC chứa <see cref="OTrongSo"/> (vd <c>R{n}</c>).</summary>
+    [JsonPropertyName("numberFormat")] public string NumberFormat { get; init; } = "";
+
+    /// <summary>Mẫu tên attribute bảng revision trong khung tên.</summary>
+    [JsonPropertyName("titleblockAttrPattern")]
+    public TitleblockAttrPattern TitleblockAttrPattern { get; init; } = new();
+
+    /// <summary>Số dòng revision khung tên chứa được — vượt thì DỪNG, không ghi đè dòng cũ (FR4).</summary>
+    [JsonPropertyName("maxRows")] public int MaxRows { get; init; }
+
+    /// <summary>Nới bao hình (mm) khi đề xuất vùng khoanh.</summary>
+    [JsonPropertyName("boundingPaddingMm")] public double BoundingPaddingMm { get; init; }
+
+    /// <summary>Số revision theo <see cref="NumberFormat"/> (vd <c>R2</c>).</summary>
+    public string SoRevision(int n) => NumberFormat.Replace(OTrongSo, n.ToString(CultureInfo.InvariantCulture));
+
+    /// <summary>Chiều dài cung cloud trong mô hình ở tỉ lệ in <paramref name="tiLeIn"/>.</summary>
+    public double CungTheoTiLe(double tiLeIn) => CloudArcMm * tiLeIn;
+}
+
+/// <summary>Tên 4 attribute một DÒNG revision trong khung tên; <c>{n}</c> = số revision (M110 §5).</summary>
+public sealed class TitleblockAttrPattern
+{
+    [JsonPropertyName("so")] public string So { get; init; } = "";
+    [JsonPropertyName("ngay")] public string Ngay { get; init; } = "";
+    [JsonPropertyName("noiDung")] public string NoiDung { get; init; } = "";
+    [JsonPropertyName("nguoi")] public string Nguoi { get; init; } = "";
+
+    /// <summary>Tên 4 attribute của dòng revision thứ <paramref name="n"/>.</summary>
+    public (string So, string Ngay, string NoiDung, string Nguoi) ChoDong(int n)
+    {
+        var so = n.ToString(CultureInfo.InvariantCulture);
+        return (
+            So.Replace(RevisionPolicySection.OTrongSo, so),
+            Ngay.Replace(RevisionPolicySection.OTrongSo, so),
+            NoiDung.Replace(RevisionPolicySection.OTrongSo, so),
+            Nguoi.Replace(RevisionPolicySection.OTrongSo, so));
+    }
 }
 
 public sealed class LabelStyleSection
@@ -307,8 +375,53 @@ public static class DrawToolsConfig
             }
         }
 
+        // (g) khối revision (v11) khai rồi thì phải hợp lệ — cùng bộ luật với validator TS
+        // (lib/ky-thuat/cad/rule-pack-revision.ts), M110 §5.
+        if (drawTools.RevisionPolicy is { } rev) KiemRevisionPolicy(rev);
+
         // (f) titleblockId khai thì phải khác rỗng (khai nửa vời = XBOSS_VE_TRANGIN chèn khung tên rỗng).
         if (sheetSetup.TitleblockId is { } tb && string.IsNullOrWhiteSpace(tb))
             throw new RulePackException("sheetSetup.titleblockId khai rồi nhưng để rỗng.");
+    }
+
+    /// <summary>Kiểm khối <c>drawTools.revisionPolicy</c> (M110 §5). Sai → RulePackException tiếng Việt.</summary>
+    public static void KiemRevisionPolicy(RevisionPolicySection rev)
+    {
+        if (rev.CloudArcMm <= 0)
+            throw new RulePackException($"drawTools.revisionPolicy.cloudArcMm = {rev.CloudArcMm.ToString(CultureInfo.InvariantCulture)} phải dương.");
+        if (!rev.NumberFormat.Contains(RevisionPolicySection.OTrongSo, StringComparison.Ordinal))
+        {
+            throw new RulePackException(
+                $"drawTools.revisionPolicy.numberFormat \"{rev.NumberFormat}\" thiếu {RevisionPolicySection.OTrongSo} — " +
+                "mọi revision sẽ mang cùng một số.");
+        }
+        if (rev.Enabled && string.IsNullOrWhiteSpace(rev.TriangleBlockId))
+        {
+            throw new RulePackException(
+                "drawTools.revisionPolicy.triangleBlockId trống trong khi khối đang bật — " +
+                "không biết chèn block tam giác nào.");
+        }
+        if (rev.MaxRows < 1)
+            throw new RulePackException($"drawTools.revisionPolicy.maxRows = {rev.MaxRows.ToString(CultureInfo.InvariantCulture)} phải ≥ 1.");
+        if (string.IsNullOrWhiteSpace(rev.Layer))
+            throw new RulePackException("drawTools.revisionPolicy.layer trống — không biết đặt cloud lên layer nào.");
+        if (rev.BoundingPaddingMm < 0)
+            throw new RulePackException($"drawTools.revisionPolicy.boundingPaddingMm = {rev.BoundingPaddingMm.ToString(CultureInfo.InvariantCulture)} không được âm.");
+
+        var mau = rev.TitleblockAttrPattern;
+        foreach (var (khoa, giaTri) in new[]
+                 {
+                     ("so", mau.So), ("ngay", mau.Ngay), ("noiDung", mau.NoiDung), ("nguoi", mau.Nguoi),
+                 })
+        {
+            if (string.IsNullOrWhiteSpace(giaTri))
+                throw new RulePackException($"drawTools.revisionPolicy.titleblockAttrPattern.{khoa} trống.");
+            if (!giaTri.Contains(RevisionPolicySection.OTrongSo, StringComparison.Ordinal))
+            {
+                throw new RulePackException(
+                    $"drawTools.revisionPolicy.titleblockAttrPattern.{khoa} \"{giaTri}\" thiếu " +
+                    $"{RevisionPolicySection.OTrongSo} — mọi dòng revision sẽ ghi đè lên cùng một attribute.");
+            }
+        }
     }
 }

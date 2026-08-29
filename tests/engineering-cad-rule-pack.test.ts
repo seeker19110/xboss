@@ -22,10 +22,11 @@ import {
   convertTcvn3ToUnicode,
   convertVniToUnicode,
 } from "@/lib/ky-thuat/cad/dxf-parser";
+import { kiemTraRevisionPolicy, soRevisionTheoMau } from "@/lib/ky-thuat/cad/rule-pack-revision";
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8, version = v9", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8, version = v11", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -49,8 +50,8 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleM
   for (const field of ["polylineClosePolicy", "blockMap"]) {
     assert.ok(field in pack, `Thiếu field v8 ${field}`);
   }
-  assert.equal(pack.version, "v9");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v9");
+  assert.equal(pack.version, "v11");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v11");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -859,7 +860,7 @@ test("v8: ánh xạ layer idempotent — áp lại lên tên đã chuẩn không
 
 test("rule pack v9 là mở rộng thuần của v8: chỉ thêm jointRules + jointRulesNote (M105 §12)", async () => {
   const v8 = (await import("@/lib/ky-thuat/cad/rule-packs/v8.json")).default;
-  const v9 = getCurrentRulePack();
+  const v9 = (await import("@/lib/ky-thuat/cad/rule-packs/v9.json")).default;
 
   // Mọi khối ngoài drawTools phải y nguyên — kiểm/chuẩn hóa/bóc bằng v9 không đổi hành vi.
   for (const field of [
@@ -948,4 +949,81 @@ test("v9: MỌI tuyến đều khai jointRules đủ dùng, dải chọn kiểu 
       }
     }
   }
+});
+
+// ===== v11 (M110 §5) — revisionPolicy: tham số revision cloud =====
+
+test("rule pack v11 là mở rộng thuần của v9: chỉ thêm drawTools.revisionPolicy (M110 §5)", async () => {
+  const v9 = (await import("@/lib/ky-thuat/cad/rule-packs/v9.json")).default;
+  const v11 = getCurrentRulePack();
+
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "inspectionPolicy",
+    "styleMap",
+    "sheetSetup",
+    "xrefPolicy",
+    "hatchMap",
+    "layoutPolicy",
+    "polylineClosePolicy",
+    "blockMap",
+  ] as const) {
+    assert.deepEqual(
+      v11[field],
+      v9[field],
+      `Field ${field} của v11 lệch v9 — v11 phải là mở rộng thuần`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v11).filter((k) => !(k in v9)),
+    [],
+    "v11 không được thêm khối cấp cao nào — revisionPolicy nằm trong drawTools",
+  );
+
+  const { revisionPolicy: _rev, ...drawToolsV11 } = v11.drawTools;
+  assert.deepEqual(drawToolsV11, v9.drawTools, "v11 đụng tham số drawTools ngoài revisionPolicy");
+});
+
+test("v11: revisionPolicy khai đủ tham số và mặc định TẮT (M110 §5/AC8)", () => {
+  const rev = getCurrentRulePack().drawTools.revisionPolicy;
+
+  assert.equal(
+    rev.enabled,
+    false,
+    "revisionPolicy phải mặc định tắt — 3 lệnh revision dừng kèm thông báo",
+  );
+  assert.deepEqual(kiemTraRevisionPolicy(rev), [], "revisionPolicy của bản phát hành không hợp lệ");
+  assert.equal(soRevisionTheoMau(rev.numberFormat, 2), "R2");
+  for (const [khoa, mau] of Object.entries(rev.titleblockAttrPattern)) {
+    assert.ok(mau.includes("{n}"), `titleblockAttrPattern.${khoa} thiếu {n}`);
+  }
+});
+
+test("validator revisionPolicy: bắt đúng các ca sai của M110 §5", () => {
+  const goc = getCurrentRulePack().drawTools.revisionPolicy;
+  const sua = (p: Partial<typeof goc>) => kiemTraRevisionPolicy({ ...goc, ...p });
+
+  assert.match(sua({ numberFormat: "REV" })[0] ?? "", /numberFormat/);
+  assert.match(sua({ cloudArcMm: 0 })[0] ?? "", /cloudArcMm/);
+  assert.match(sua({ maxRows: 0 })[0] ?? "", /maxRows/);
+  assert.match(sua({ layer: "  " })[0] ?? "", /layer/);
+  assert.match(sua({ boundingPaddingMm: -1 })[0] ?? "", /boundingPaddingMm/);
+  assert.match(
+    sua({
+      titleblockAttrPattern: { ...goc.titleblockAttrPattern, ngay: "REV_DATE" },
+    })[0] ?? "",
+    /titleblockAttrPattern\.ngay/,
+  );
+
+  // triangleBlockId rỗng chỉ là lỗi khi khối đang BẬT.
+  assert.deepEqual(sua({ triangleBlockId: "" }), []);
+  assert.match(sua({ triangleBlockId: "", enabled: true })[0] ?? "", /triangleBlockId/);
+
+  // Rule pack cũ (≤ v9) không khai khối này — hợp lệ, lệnh revision tự từ chối chạy.
+  assert.deepEqual(kiemTraRevisionPolicy(undefined), []);
 });

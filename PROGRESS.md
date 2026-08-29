@@ -4,6 +4,33 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## 🚧 M110 PR1/2 — Core revision cloud + rule pack v11 (2026-08-29)
+
+Nhánh `feat/m110-pr1-revision-core`. **PR1 của 2** theo `docs/nang-cap/M110-revision-cloud.md` §10 —
+chỉ phần **thuần, không đụng AutoCAD**; 3 lệnh `XBOSS_VE_REV`/`_CHOT`/`_HIENTHI`, `RevisionStore`,
+layer con theo revision, hộp thoại M106 và phép kiểm FR8 nằm ở **PR2**.
+
+Đã làm:
+
+- **Rule pack `v11`** (`lib/ky-thuat/cad/rule-packs/v11.json`, phát hành qua `rule-pack-hien-hanh.ts`)
+  = v9 + khối `drawTools.revisionPolicy` (M110 §5). Số v10 do một đợt song song giữ chỗ nên M110 đi
+  thẳng v11. Mở rộng **thuần** và `enabled: false` mặc định ⇒ mọi lệnh cũ chạy y hệt v9 (AC8).
+- **Validator 2 tầng** cho khóa mới: TS `lib/ky-thuat/cad/rule-pack-revision.ts`
+  (`kiemTraRevisionPolicy`) + C# `DrawToolsConfig.KiemRevisionPolicy` — cùng bộ luật: `numberFormat`
+  phải chứa `{n}`, `cloudArcMm` > 0, `triangleBlockId` khác rỗng khi bật, `maxRows` ≥ 1, layer khác
+  rỗng, `boundingPaddingMm` ≥ 0, 4 mẫu attribute khung tên phải có `{n}`.
+- **Core C# thuần** (test chạy CI Linux, không thêm NuGet): `Draw/RevisionCloud.cs` (bao hình +
+  nới `boundingPaddingMm`, số cung theo `cloudArcMm × tỉ lệ in`, chỗ đặt tam giác) và
+  `Draw/RevisionSnapshot.cs` (băm hình học SHA-256 làm tròn 0,1 mm, so mốc §4 ra 3 nhóm
+  thêm/xóa/đổi, mốc vô hiệu khi WBLOCK, mã hóa/giải mã mốc cho Xrecord).
+- **XData**: `VaiTroVe.Revision` + `SoRevision`/`HandleCapDoi`/`HandleTrongVung` trong `VeXData.cs`.
+- Test: `plugin-autocad/XBoss.Cad.Tests/RevisionCoreTests.cs` + `RulePackV11Tests.cs`, và ca v11
+  trong `tests/engineering-cad-rule-pack.test.ts`.
+
+Còn nợ (PR2 hoặc ghi rõ trong PR1): toàn bộ tầng Adapter; ca `revisionPolicy` trong
+`plugin-autocad/doi-chung/` (bộ đối chứng hiện chỉ mang corpus layer/font, hai tầng đang được canh
+bằng validator đọc CHUNG tệp v11.json); tài liệu `README.md`/`CAI-DAT.md`/`VERIFY-VA-PHAT-HANH.md`.
+
 ## ✅ Duyệt trọn gói 6 đặc tả M109–M114 (2026-08-29)
 
 Người dùng: **"duyệt tất cả"**. Nhánh `claude/duyet-dac-ta-m109-m114`. Cả 6 tệp chuyển

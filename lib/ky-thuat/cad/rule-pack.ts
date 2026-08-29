@@ -45,7 +45,12 @@ export const CURRENT_RULE_PACK_VERSION = RULE_PACK_HIEN_HANH.version;
  * chung cho lệnh `XBOSS_VE_CHIADOT` của plugin và engine web `lib/ky-thuat/engineering-joint-segmentation.ts`
  * (M105 §7/§12). Mở rộng thuần: mọi khóa cũ giữ nguyên từng byte nên kiểm/chuẩn hóa/bóc/vẽ bằng v9 cho
  * kết quả y hệt v8; rule pack cũ (v4–v8) không có `jointRules` thì lệnh chia đốt TỪ CHỐI chạy chứ không
- * đoán mặc định ngầm.
+ * đoán mặc định ngầm;
+ * v11 = v9 + khối `drawTools.revisionPolicy` — tham số revision cloud của bộ lệnh XBOSS_VE_REV /
+ * _CHOT / _HIENTHI (M110 §5: chiều dài cung cloud, layer, block tam giác, định dạng số revision, mẫu
+ * tên attribute bảng revision trong khung tên, số dòng tối đa, nới bao hình). Số v10 do một đợt nâng
+ * cấp song song giữ chỗ nên M110 phát hành thẳng v11. Mở rộng thuần và `enabled: false` mặc định ⇒
+ * mọi lệnh cũ chạy với v11 cho kết quả y hệt v9, 3 lệnh revision dừng kèm thông báo cách bật (AC8).
  */
 export function getCurrentRulePack(): CadRulePack {
   return RULE_PACK_HIEN_HANH;
