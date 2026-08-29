@@ -56,6 +56,14 @@ public enum VaiTroVe
 
     /// <summary>Tag đốt đặt cạnh trung điểm đốt (<c>XBOSS_VE_CHIADOT</c> — M105 FR5).</summary>
     NhanDot,
+
+    /// <summary>
+    /// Đối tượng ngắt nét giao chéo (<c>XBOSS_VE_NGATNET</c> — M109 FR5): wipeout che vùng giao
+    /// hoặc cầu vượt. Mang <see cref="VeXDataInfo.HandleTim"/> = tim ĐI DƯỚI và
+    /// <see cref="VeXDataInfo.HandleTimGiao"/> = tim đi trên, nên lệnh xóa/chạy lại tìm đúng đối
+    /// tượng của đúng CẶP tuyến (FR6 idempotent). KHÔNG BAO GIỜ đụng vào polyline tim (guardrail 1).
+    /// </summary>
+    NgatNet,
 }
 
 /// <summary>Nội dung XData <c>XBOSS_VE</c> của một đối tượng do bộ lệnh vẽ sinh ra (M100 §11).</summary>
@@ -138,6 +146,20 @@ public sealed record VeXDataInfo
 
     /// <summary>Số thứ tự đốt trong tuyến (trên tag đốt, và đốt ĐỨNG TRƯỚC trên vạch chia).</summary>
     public int? ChiSoDot { get; init; }
+
+    // ===== Ngắt nét giao chéo (M109 FR5/FR7) =====
+
+    /// <summary>
+    /// Handle tim ĐI TRÊN của cặp giao (vai trò <see cref="VaiTroVe.NgatNet"/>);
+    /// <see cref="HandleTim"/> của cùng đối tượng là tim ĐI DƯỚI — cái bị ngắt nét.
+    /// </summary>
+    public string? HandleTimGiao { get; init; }
+
+    /// <summary>
+    /// Kỹ sư đã ĐẢO TAY chiều trên–dưới tại điểm giao này (FR7). Chạy lại lệnh phải giữ nguyên
+    /// quyết định của kỹ sư thay vì áp lại <c>crossingPolicy.priority</c> (AC5).
+    /// </summary>
+    public bool DaoTay { get; init; }
 }
 
 /// <summary>
@@ -192,6 +214,8 @@ public static class VeXData
         if (tt.TongDaiDotMm is { } td)
             ra.Add($"tongdaidot={td.ToString("0.######", CultureInfo.InvariantCulture)}");
         if (tt.ChiSoDot is { } cs) ra.Add($"chisodot={cs.ToString(CultureInfo.InvariantCulture)}");
+        Them(ra, "timgiao", tt.HandleTimGiao);
+        if (tt.DaoTay) ra.Add("daotay=1");
         return ra;
     }
 
@@ -210,6 +234,7 @@ public static class VeXData
         VaiTroVe.BangThongKe => "bang",
         VaiTroVe.VachChia => "vachchia",
         VaiTroVe.NhanDot => "nhandot",
+        VaiTroVe.NgatNet => "ngatnet",
         _ => "blockdef",
     };
 
@@ -232,6 +257,8 @@ public static class VeXData
         string? kieuNoi = null;
         var kieuNoiGhiDe = false;
         int? soDot = null, soMoiNoi = null, chiSoDot = null;
+        string? timGiao = null;
+        var daoTay = false;
         double? tongDaiDotMm = null;
         var tagKhoa = false;
         var bien = new List<string>();
@@ -260,6 +287,7 @@ public static class VeXData
                         "bang" => VaiTroVe.BangThongKe,
                         "vachchia" => VaiTroVe.VachChia,
                         "nhandot" => VaiTroVe.NhanDot,
+                        "ngatnet" => VaiTroVe.NgatNet,
                         "blockdef" => VaiTroVe.DinhNghiaBlock,
                         _ => VaiTroVe.Tim,
                     };
@@ -309,6 +337,8 @@ public static class VeXData
                     if (int.TryParse(giaTri, NumberStyles.Integer, CultureInfo.InvariantCulture, out var cs))
                         chiSoDot = cs;
                     break;
+                case "timgiao": timGiao = giaTri; break;
+                case "daotay": daoTay = giaTri == "1"; break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -343,6 +373,8 @@ public static class VeXData
             SoMoiNoi = soMoiNoi,
             TongDaiDotMm = tongDaiDotMm,
             ChiSoDot = chiSoDot,
+            HandleTimGiao = timGiao,
+            DaoTay = daoTay,
         };
     }
 }

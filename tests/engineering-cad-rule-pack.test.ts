@@ -15,7 +15,9 @@ import {
   getCurrentRulePack,
   getRulePackEtag,
   matchesEtag,
+  kiemCrossingPolicy,
   CURRENT_RULE_PACK_VERSION,
+  type CrossingPolicy,
 } from "@/lib/ky-thuat/cad/rule-pack";
 import {
   normalizeCadLayers,
@@ -25,7 +27,7 @@ import {
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8, version = v9", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8 + crossingPolicy v10, version = v10", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -49,8 +51,9 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleM
   for (const field of ["polylineClosePolicy", "blockMap"]) {
     assert.ok(field in pack, `Thiếu field v8 ${field}`);
   }
-  assert.equal(pack.version, "v9");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v9");
+  assert.ok("crossingPolicy" in pack.drawTools, "Thiếu khối v10 drawTools.crossingPolicy");
+  assert.equal(pack.version, "v10");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v10");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -859,7 +862,8 @@ test("v8: ánh xạ layer idempotent — áp lại lên tên đã chuẩn không
 
 test("rule pack v9 là mở rộng thuần của v8: chỉ thêm jointRules + jointRulesNote (M105 §12)", async () => {
   const v8 = (await import("@/lib/ky-thuat/cad/rule-packs/v8.json")).default;
-  const v9 = getCurrentRulePack();
+  // So THẲNG tệp v9.json, không qua getCurrentRulePack() — rule pack hiện hành đã là v10 (M109).
+  const v9 = (await import("@/lib/ky-thuat/cad/rule-packs/v9.json")).default;
 
   // Mọi khối ngoài drawTools phải y nguyên — kiểm/chuẩn hóa/bóc bằng v9 không đổi hành vi.
   for (const field of [
@@ -948,4 +952,91 @@ test("v9: MỌI tuyến đều khai jointRules đủ dùng, dải chọn kiểu 
       }
     }
   }
+});
+
+// ===== v10 (M109) — crossingPolicy: chính sách ngắt nét giao chéo =====
+
+test("rule pack v10 là mở rộng thuần của v9: chỉ thêm drawTools.crossingPolicy (M109 §5)", async () => {
+  const v9 = (await import("@/lib/ky-thuat/cad/rule-packs/v9.json")).default;
+  const v10 = getCurrentRulePack();
+
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "inspectionPolicy",
+    "styleMap",
+    "sheetSetup",
+    "xrefPolicy",
+    "hatchMap",
+    "layoutPolicy",
+    "polylineClosePolicy",
+    "blockMap",
+  ] as const) {
+    assert.deepEqual(
+      v10[field],
+      v9[field],
+      `Field ${field} của v10 lệch v9 — v10 phải là mở rộng thuần (M109 chỉ thêm ngắt nét giao chéo)`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v10).filter((k) => !(k in v9)),
+    [],
+    "v10 không được thêm khối cấp cao nào — crossingPolicy nằm trong drawTools",
+  );
+
+  const { crossingPolicy: _bo, ...drawToolsV10 } = v10.drawTools;
+  assert.deepEqual(drawToolsV10, v9.drawTools, "v10 đụng tham số drawTools ngoài crossingPolicy");
+});
+
+test("v10: crossingPolicy khai đủ nhưng TẮT sẵn, priority chỉ chứa id hệ có thật (M109 §5/AC8)", () => {
+  const pack = getCurrentRulePack();
+  const cp = pack.drawTools.crossingPolicy;
+
+  assert.equal(cp.enabled, false, "Khóa mới phải mặc định tắt — nạp v10 không đổi hành vi (AC8)");
+  assert.equal(cp.gapMode, "wipeout");
+  assert.ok(cp.clearanceMm > 0 && cp.jogRadiusMm > 0);
+  assert.ok(cp.layerSuffix.length > 0);
+  assert.ok(cp.minAngleDeg > 0 && cp.minAngleDeg < 90);
+  assert.ok(
+    /^[A-Z0-9]/.test(cp.layerSuffix),
+    "layerSuffix phải bắt đầu bằng [A-Z0-9] như edgeLayerSuffix",
+  );
+
+  const heThat = new Set(pack.drawTools.systems.map((h) => h.id));
+  for (const id of cp.priority) {
+    assert.ok(heThat.has(id), `priority chứa id hệ lạ "${id}" — phải là drawTools.systems[].id`);
+  }
+  assert.deepEqual(
+    kiemCrossingPolicy(pack.drawTools),
+    [],
+    "Rule pack phát hành phải qua validator",
+  );
+});
+
+test("v10: validator crossingPolicy bắt đủ 3 lỗi của M109 §5", () => {
+  const goc = getCurrentRulePack().drawTools;
+  const voi = (chinh: Partial<CrossingPolicy>) => ({
+    systems: goc.systems,
+    crossingPolicy: { ...goc.crossingPolicy, ...chinh },
+  });
+
+  // (1) priority chứa id hệ lạ ("duct" là không gian id khác, không có trong drawTools.systems).
+  const loiPriority = kiemCrossingPolicy(voi({ priority: ["duct", "PIPING"] }));
+  assert.equal(loiPriority.length, 1);
+  assert.match(loiPriority[0], /duct/);
+
+  // (2) clearanceMm / jogRadiusMm phải dương.
+  assert.match(kiemCrossingPolicy(voi({ clearanceMm: 0 }))[0], /clearanceMm/);
+  assert.match(kiemCrossingPolicy(voi({ jogRadiusMm: -1 }))[0], /jogRadiusMm/);
+
+  // (3) layerSuffix rỗng khi enabled — còn tắt thì chưa gây hại.
+  assert.match(kiemCrossingPolicy(voi({ enabled: true, layerSuffix: "  " }))[0], /layerSuffix/);
+  assert.deepEqual(kiemCrossingPolicy(voi({ enabled: false, layerSuffix: "" })), []);
+
+  // Rule pack cũ chưa khai khóa này thì không phải lỗi.
+  assert.deepEqual(kiemCrossingPolicy({ systems: goc.systems }), []);
 });
