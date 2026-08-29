@@ -207,6 +207,28 @@ test(
         "thiếu GUC (plugin bản cũ, đường toàn cục) vẫn thấy đúng bộ toàn cục và chỉ bộ toàn cục",
       );
 
+      // WITH CHECK: đang ở ngữ cảnh dự án A mà ghi dòng TOÀN CỤC (project_id NULL) → bị chặn.
+      // Nếu lọt, dự án A tự phát hành được block hiện ra cho MỌI dự án khác (leo thang phạm vi).
+      await assert.rejects(
+        () =>
+          chay(String(duAnA), (c) =>
+            c.query(
+              `INSERT INTO cad_block_libs (version, manifest, storage_key, dwg_sha256, project_id)
+               VALUES ('rls-leo-thang', '{}'::jsonb, 'k.dwg', 'c', NULL)`,
+            ),
+          ),
+        /row-level security/i,
+        "phiên đang scope theo dự án A KHÔNG được ghi dòng toàn cục",
+      );
+
+      // Ngược lại, đường phát hành TOÀN CỤC (GUC rỗng) vẫn ghi được — guardrail 1.
+      await chay("", (c) =>
+        c.query(
+          `INSERT INTO cad_block_libs (version, manifest, storage_key, dwg_sha256, project_id)
+           VALUES ('rls-toan-cuc', '{}'::jsonb, 'k.dwg', 'c', NULL)`,
+        ),
+      );
+
       // WITH CHECK: đang ở ngữ cảnh dự án A mà ghi bộ của dự án B → bị chặn.
       await assert.rejects(
         () =>
@@ -222,5 +244,35 @@ test(
     } finally {
       await pool.end();
     }
+  },
+);
+
+test(
+  "migration 0145: chỉ còn ĐÚNG unique theo (project_id, version) — ràng buộc UNIQUE(version) cũ đã gỡ",
+  S,
+  async () => {
+    const { query } = await import("@/lib/db");
+
+    // Ràng buộc unique một cột `version` (tên ngầm định của 0139) không được sống sót: còn nó thì
+    // hai dự án vẫn không dùng lại được cùng nhãn version — đúng thứ migration này sinh ra để bỏ.
+    const conRaBuoc = await query<{ conname: string }>(
+      `SELECT c.conname FROM pg_constraint c
+       JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+      WHERE c.conrelid = 'cad_block_libs'::regclass AND c.contype = 'u'
+        AND array_length(c.conkey, 1) = 1 AND a.attname = 'version'`,
+    );
+    assert.deepEqual(conRaBuoc, [], "còn ràng buộc UNIQUE(version) toàn bảng song song");
+
+    // Chỉ đúng 1 index unique (không tính khoá chính) và là index theo cặp.
+    const idx = await query<{ indexname: string; indexdef: string }>(
+      `SELECT indexname, indexdef FROM pg_indexes
+      WHERE tablename = 'cad_block_libs' AND indexdef LIKE 'CREATE UNIQUE%' ORDER BY 1`,
+    );
+    const khongPhaiPk = idx.filter((i) => !i.indexname.endsWith("_pkey"));
+    assert.deepEqual(
+      khongPhaiPk.map((i) => i.indexname),
+      ["ux_cad_block_libs_version"],
+    );
+    assert.match(khongPhaiPk[0].indexdef, /COALESCE\(project_id, \(?0/);
   },
 );
