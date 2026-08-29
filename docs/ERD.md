@@ -3356,14 +3356,17 @@
 | dwg_sha256 | text |  |  |
 | published_by | bigint | ✓ |  |
 | created_at | timestamptz | ✓ | `now()` |
+| project_id | bigint | ✓ |  |
 
 **Khóa ngoại:**
+- `project_id` → `projects(id)`
 - `published_by` → `users(id)`
 
 **Index:**
 - `cad_block_libs_pkey`: UNIQUE INDEX cad_block_libs_pkey ON public.cad_block_libs USING btree (id)
-- `cad_block_libs_version_key`: UNIQUE INDEX cad_block_libs_version_key ON public.cad_block_libs USING btree (version)
+- `idx_cad_block_libs_du_an`: INDEX idx_cad_block_libs_du_an ON public.cad_block_libs USING btree (project_id, id DESC)
 - `idx_cad_block_libs_moi_nhat`: INDEX idx_cad_block_libs_moi_nhat ON public.cad_block_libs USING btree (id DESC)
+- `ux_cad_block_libs_version`: UNIQUE INDEX ux_cad_block_libs_version ON public.cad_block_libs USING btree (COALESCE(project_id, (0)::bigint), version)
 
 ### cad_block_proposals
 
