@@ -787,6 +787,48 @@
       </StackPanel>
     </DataTemplate>
 
+    <!-- M109 FR7 — XBOSS_VE_NGATNET: phạm vi + danh sách cặp tuyến giao nhau, ô ĐẢO từng dòng.
+         Ô đảo là CheckBox bind hai chiều vào DongGiaoNgatNet.DaoTay (ViewModel dòng tự phát
+         PropertyChanged) — cố ý KHÔNG dùng Command/code-behind: DataTemplate không có code-behind
+         là điểm mấu chốt của khung M106 (xem chú thích đầu tệp). Dòng không ngắt nét được thì ô
+         đảo tự mờ và mô tả nói rõ LÝ DO ngay cạnh, không giấu dòng đó đi. -->
+    <DataTemplate DataType="{x:Type vm:NgatNetDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Phạm vi ngắt nét" />
+        <RadioButton GroupName="PhamViNgatNet"
+                     IsChecked="{Binding ToanBanVe, Mode=TwoWay}"
+                     Content="Toàn bộ tuyến XBoss trong bản vẽ" />
+        <RadioButton GroupName="PhamViNgatNet"
+                     IsChecked="{Binding ChonTay, Mode=TwoWay}"
+                     Content="Chọn tay các tuyến trên bản vẽ (sau khi bấm OK)" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Các cặp tuyến giao nhau" />
+        <TextBlock Foreground="{x:Static wpf:MauBangWpf.Chu}" Text="{Binding TomTat}" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding DanhSach}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,0,0,3">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <CheckBox Grid.Column="0" Content="Đảo" Margin="0,0,10,0"
+                              IsChecked="{Binding DaoTay, Mode=TwoWay}"
+                              IsEnabled="{Binding CoTheDao}" />
+                    <TextBlock Grid.Column="1" Text="{Binding MoTa}" TextWrapping="Wrap" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding GhiChuDanhSach}" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding GhiChuPhamVi}" />
+      </StackPanel>
+    </DataTemplate>
+
     <!-- ===== M106 PR3 — các lệnh còn lại của bảng §7.2 ===== -->
 
     <!-- XBOSS_LOGIN: chỉ hỏi địa chỉ server (device pairing, không có email/mật khẩu). -->
