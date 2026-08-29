@@ -7,7 +7,7 @@
  * Hàm thuần, không chạm DB/HTTP — dùng được cả ở test lẫn ở đường phát hành rule pack.
  */
 
-/** Khối `drawTools.revisionPolicy` của rule pack (v11 trở đi). */
+/** Khối `drawTools.revisionPolicy` của rule pack (v12 trở đi). */
 export type RevisionPolicy = {
   enabled: boolean;
   cloudArcMm: number;

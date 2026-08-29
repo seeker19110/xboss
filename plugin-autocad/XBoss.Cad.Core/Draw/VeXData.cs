@@ -64,6 +64,12 @@ public enum VaiTroVe
     /// (cloud ↔ tam giác) để xóa/sửa luôn đi cặp — cùng kiểu liên kết 2 chiều tim↔biên của M100.
     /// </summary>
     Revision,
+    /// Đối tượng ngắt nét giao chéo (<c>XBOSS_VE_NGATNET</c> — M109 FR5): wipeout che vùng giao
+    /// hoặc cầu vượt. Mang <see cref="VeXDataInfo.HandleTim"/> = tim ĐI DƯỚI và
+    /// <see cref="VeXDataInfo.HandleTimGiao"/> = tim đi trên, nên lệnh xóa/chạy lại tìm đúng đối
+    /// tượng của đúng CẶP tuyến (FR6 idempotent). KHÔNG BAO GIỜ đụng vào polyline tim (guardrail 1).
+    /// </summary>
+    NgatNet,
 }
 
 /// <summary>Nội dung XData <c>XBOSS_VE</c> của một đối tượng do bộ lệnh vẽ sinh ra (M100 §11).</summary>
@@ -157,6 +163,29 @@ public sealed record VeXDataInfo
 
     /// <summary>Handle các đối tượng nằm trong vùng cloud — nguồn của cảnh báo bỏ sót (FR5).</summary>
     public IReadOnlyList<string> HandleTrongVung { get; init; } = [];
+    // ===== Ngắt nét giao chéo (M109 FR5/FR7) =====
+
+    /// <summary>
+    /// Handle tim ĐI TRÊN của cặp giao (vai trò <see cref="VaiTroVe.NgatNet"/>);
+    /// <see cref="HandleTim"/> của cùng đối tượng là tim ĐI DƯỚI — cái bị ngắt nét.
+    /// </summary>
+    public string? HandleTimGiao { get; init; }
+
+    /// <summary>
+    /// Kỹ sư đã ĐẢO TAY chiều trên–dưới tại điểm giao này (FR7). Chạy lại lệnh phải giữ nguyên
+    /// quyết định của kỹ sư thay vì áp lại <c>crossingPolicy.priority</c> (AC5).
+    /// </summary>
+    public bool DaoTay { get; init; }
+
+    // ===== Nhân bản tầng điển hình (M111 FR9) =====
+    // Hai khóa dưới đây CHỈ có trên bản chép do XBOSS_VE_NHANTANG sinh ra — dấu nhận diện để chạy
+    // lại lệnh biết tầng đích đã chép rồi (bỏ qua / chép đè), và để báo cáo truy được nguồn gốc.
+
+    /// <summary>Nhãn tầng NGUỒN đã chép ra đối tượng này; null = không phải bản chép.</summary>
+    public string? TangNguon { get; init; }
+
+    /// <summary>Nhãn tầng của chính bản chép này (tầng đích).</summary>
+    public string? NhanTang { get; init; }
 }
 
 /// <summary>
@@ -214,6 +243,10 @@ public static class VeXData
         if (tt.SoRevision is { } sr) ra.Add($"rev={sr.ToString(CultureInfo.InvariantCulture)}");
         Them(ra, "capdoi", tt.HandleCapDoi);
         foreach (var h in tt.HandleTrongVung) Them(ra, "trongvung", h);
+        Them(ra, "timgiao", tt.HandleTimGiao);
+        if (tt.DaoTay) ra.Add("daotay=1");
+        Them(ra, "tangnguon", tt.TangNguon);
+        Them(ra, "nhantang", tt.NhanTang);
         return ra;
     }
 
@@ -233,6 +266,7 @@ public static class VeXData
         VaiTroVe.VachChia => "vachchia",
         VaiTroVe.NhanDot => "nhandot",
         VaiTroVe.Revision => "revision",
+        VaiTroVe.NgatNet => "ngatnet",
         _ => "blockdef",
     };
 
@@ -253,8 +287,11 @@ public static class VeXData
         string? sizeLoCho = null, ketCau = null, viTriTruc = null, loaiBang = null;
         double? caoDo = null, caoDoMm = null;
         string? kieuNoi = null;
+        string? tangNguon = null, nhanTang = null;
         var kieuNoiGhiDe = false;
         int? soDot = null, soMoiNoi = null, chiSoDot = null;
+        string? timGiao = null;
+        var daoTay = false;
         double? tongDaiDotMm = null;
         var tagKhoa = false;
         int? soRevision = null;
@@ -287,6 +324,7 @@ public static class VeXData
                         "vachchia" => VaiTroVe.VachChia,
                         "nhandot" => VaiTroVe.NhanDot,
                         "revision" => VaiTroVe.Revision,
+                        "ngatnet" => VaiTroVe.NgatNet,
                         "blockdef" => VaiTroVe.DinhNghiaBlock,
                         _ => VaiTroVe.Tim,
                     };
@@ -342,6 +380,10 @@ public static class VeXData
                     break;
                 case "capdoi": handleCapDoi = giaTri; break;
                 case "trongvung": trongVung.Add(giaTri); break;
+                case "timgiao": timGiao = giaTri; break;
+                case "daotay": daoTay = giaTri == "1"; break;
+                case "tangnguon": tangNguon = giaTri; break;
+                case "nhantang": nhanTang = giaTri; break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -379,6 +421,10 @@ public static class VeXData
             SoRevision = soRevision,
             HandleCapDoi = handleCapDoi,
             HandleTrongVung = trongVung,
+            HandleTimGiao = timGiao,
+            DaoTay = daoTay,
+            TangNguon = tangNguon,
+            NhanTang = nhanTang,
         };
     }
 }

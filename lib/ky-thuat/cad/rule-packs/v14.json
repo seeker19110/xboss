@@ -1,6 +1,6 @@
 {
-  "version": "v11",
-  "description": "Rule pack v11 = v9 + khối `drawTools.revisionPolicy` cho bộ lệnh revision cloud XBOSS_VE_REV / _CHOT / _HIENTHI (M110 §5): tham số cloud (chiều dài cung, layer, block tam giác, định dạng số revision, mẫu tên attribute bảng revision trong khung tên, số dòng tối đa, nới bao hình). Số v10 do một đợt nâng cấp song song giữ chỗ nên M110 phát hành thẳng v11. Mở rộng THUẦN: không khóa cũ nào đổi một byte và `revisionPolicy.enabled` mặc định false ⇒ mọi lệnh M99/M100/M101/M102/M105 chạy với v11 cho kết quả Y HỆT v9, 3 lệnh revision dừng kèm thông báo cách bật (M110 AC8). Đổi quy tắc = phát hành version mới, KHÔNG sửa version cũ.",
+  "version": "v14",
+  "description": "v13 (v9 + floorPolicy M111 + crossingPolicy M109) + revisionPolicy (M110 §5)",
   "layerMap": {
     "source": "lib/cad/dxf-parser.ts :: normalizeCadLayers()",
     "standard": "AIA / BS1192 / ISO 13567",
@@ -701,6 +701,22 @@
     },
     "heavyFittingIds": ["valve-gate", "damper-vcd"],
     "heavyFittingIdsNote": "v7 (M100 §6.7) — id block phụ kiện được coi là PHỤ KIỆN NẶNG: XBOSS_VE_GIADO luôn đặt thêm một giá đỡ ngay tại các phụ kiện này (van, van điều chỉnh gió — khối lượng tập trung, tiêu chuẩn treo đỡ đòi đỡ riêng). Id lấy từ manifest thư viện block (cùng bộ id với drawTools.systems[].fittings). Trước v7 rule pack không có khóa này nên lệnh phải HỎI kỹ sư mỗi lần chạy \"có đặt giá đỡ tại phụ kiện không?\" và khi trả lời Có thì đặt tại MỌI phụ kiện (kể cả co/tê nhẹ) — không đúng chuẩn treo đỡ. Danh sách RỖNG = không phụ kiện nào được coi là nặng (lệnh chỉ chia đều theo supportSpacingMm); rule pack cũ (v4–v6) KHÔNG có khóa này nên plugin giữ nguyên đường hỏi kỹ sư — hành vi cũ không đổi. Bổ sung/bớt phụ kiện nặng theo dự án = phát hành version mới.",
+    "crossingPolicy": {
+      "enabled": false,
+      "priority": ["HVAC", "PIPING", "FIREFIGHTING", "ELECTRICAL", "ELV"],
+      "priorityNote": "Hạng TRÌNH BÀY, KHÔNG phải cao độ thật: hệ đứng trước đi TRÊN, hệ đi dưới bị ngắt nét tại chỗ giao. Mỗi phần tử là một id hệ theo drawTools.systems[].id (= layerMap.groups[].id — cùng không gian id mà phép kiểm 11 dùng để suy hệ từ layer). Hệ KHÔNG khai ở đây xếp sau cùng. Hai tuyến CÙNG hệ thì không ngắt nét (kể cả cấp × thoát nước, vì cả hai cùng hệ PIPING) — ca đó cần kỹ sư xử lý bằng phụ kiện, lệnh chỉ ghi vào báo cáo mục riêng.",
+      "gapMode": "wipeout",
+      "gapModeNote": "wipeout | jog. Mặc định suy theo edgeStyle của tuyến đi dưới (double → wipeout, none → cầu vượt); khóa này chỉ để ÉP một cách thể hiện khi driver in PDF dựng wipeout sai thứ tự vẽ (M109 §11).",
+      "clearanceMm": 50,
+      "clearanceMmNote": "Bề rộng vùng che tính thêm từ mép biên tuyến ĐI TRÊN mỗi bên: bề rộng vùng che = bề rộng tuyến đi trên + 2 × clearanceMm (M109 FR4). Phải > 0.",
+      "jogRadiusMm": 150,
+      "jogRadiusMmNote": "Bán kính cung cầu vượt cho tuyến ĐƠN NÉT (edgeStyle none). Phải > 0 và đủ lớn so với bề rộng vùng giao, nếu không thì không dựng được cung — lệnh bỏ qua điểm đó kèm lý do.",
+      "layerSuffix": "XING",
+      "layerSuffixNote": "Layer đối tượng ngắt nét = <layer tim> + hậu tố này. Bắt buộc khác rỗng khi enabled (không có nó thì wipeout/cầu vượt rơi vào chính layer tim và lệnh xóa không lọc lại được). Cùng ràng buộc token với edgeLayerSuffix: hậu tố PHẢI bắt đầu bằng [A-Z0-9].",
+      "minAngleDeg": 15,
+      "minAngleDegNote": "Góc giao (0..90°) nhỏ hơn ngưỡng này thì KHÔNG ngắt nét — giao gần song song cho vùng che dài lê thê, che mất tuyến và tạo hình xấu; ghi vào báo cáo mục riêng để kỹ sư xử lý tay.",
+      "note": "M109 §5 — chính sách ngắt nét giao chéo. Mặc định enabled=false: lệnh XBOSS_VE_NGATNET dừng kèm thông báo nêu rõ khóa chưa bật (AC8), không vẽ gì."
+    },
     "systems": [
       {
         "id": "HVAC",
@@ -1355,6 +1371,27 @@
       }
     ],
     "jointRulesNote": "v9 (M105 §7/§12) — mỗi tuyến khai thêm khối `jointRules`: bảng THAM SỐ chia đốt chế tạo/lắp đặt theo kiểu kết nối, dùng chung cho lệnh XBOSS_VE_CHIADOT (plugin) và engine web lib/ky-thuat/engineering-joint-segmentation.ts. Ý nghĩa từng khóa: `selection` = bảng chọn kiểu nối TỰ ĐỘNG theo cỡ, xét THEO THỨ TỰ, mục đầu tiên khớp thì thắng — tuyến `sizeKind: \"WxH\"` so CẠNH LỚN max(W,H) với `maxSideMm`, tuyến `sizeKind: \"DN\"` so số DN với `maxDn`; giá trị `null` = mục bắt hết phần còn lại (mọi dải phải phủ kín và không chồng nhau). `maxLenMm` = chiều dài đốt tối đa, `jointGapMm` = khe mối nối (gioăng/rãnh) CỘNG THÊM giữa 2 đốt liền kề. `divideMode`: \"deu\" chia đều n đốt bằng nhau (ống gió — hạn chế đốt lẻ khó chế tạo), \"cay_nguyen\" tối đa hóa cây/thanh nguyên rồi để dư ở đốt cuối (ống nước/PCCC/máng cáp — cắt từ cây thương phẩm). `minPieceLenMm` = đốt ngắn nhất chế tạo được. `hardware` = định mức phụ kiện MỖI MỐI NỐI theo kiểu nối, `perJoint` là số hoặc biểu thức mini chỉ gồm số, biến W/H/DN (đơn vị mm), 4 phép + - * / , dấu ngoặc và ceil() — KHÔNG phải mã thực thi; `unit` là đơn vị bóc của mục (\"cái\" giữ nguyên trị biểu thức, \"m\" quy đổi mm→m khi tổng hợp). Tuyến KHÔNG khai `jointRules` thì lệnh chia đốt bỏ qua tuyến đó kèm thông báo — không có mặc định ngầm. Hậu tố layer vạch chia là \"JOINT\" (KHÔNG có dấu gạch nối đứng đầu, dù §12 của đặc tả viết \"-JOINT\"): layerMatchAny của takeoff khớp theo RANH GIỚI TOKEN nên \"M-DUCT-SUPP-JOINT\" vẫn khớp mục bóc \"M-DUCT-SUPP\" và vạch chia sẽ bị bóc trùng thành chiều dài ống gió — đúng lớp lỗi mà drawTools.edgeLayerSuffix đã né bằng \"EDGE\" (M100 FR4). Có test canh: xem tests/engineering-joint-segmentation.test.ts.",
+    "floorPolicy": {
+      "enabled": false,
+      "floors": ["05", "06", "07", "08", "09", "10"],
+      "floorsNote": "Nhãn tầng là CHUỖI (giữ số 0 đứng đầu), không phải số — tag phải khớp hồ sơ.",
+      "layoutMode": "offsetY",
+      "stepMm": 30000,
+      "gridColumns": 4,
+      "zoneNamePattern": "{zone}-T{floor}",
+      "copyRoles": [
+        "Tim",
+        "Bien",
+        "Nhan",
+        "PhuKien",
+        "ThietBi",
+        "GiaDo",
+        "LoCho",
+        "VachChia",
+        "NhanDot"
+      ],
+      "copyRolesNote": "Vai trò KHÔNG chép: MatCat, TuyenCat, BangThongKe, Revision, NgatNet — đều là hồ sơ/trình bày, dựng lại bằng lệnh của chúng sau khi chép. Cũng không chép DinhNghiaBlock: đó là ĐỊNH NGHĨA block (BlockTableRecord) dùng chung cả bản vẽ, bản chép tham chiếu lại chính định nghĩa đã có chứ không nhân bản nó."
+    },
     "revisionPolicy": {
       "enabled": false,
       "cloudArcMm": 300,

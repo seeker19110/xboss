@@ -218,7 +218,7 @@ public class RevisionCoreTests
         var tt = new VeXDataInfo
         {
             VaiTro = VaiTroVe.Revision,
-            RulePackVersion = "v11",
+            RulePackVersion = "v12",
             SoRevision = 2,
             HandleCapDoi = "3F1",
             HandleTrongVung = ["A1", "A2", "A3"],

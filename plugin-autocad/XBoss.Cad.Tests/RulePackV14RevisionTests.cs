@@ -6,12 +6,12 @@ using Xunit;
 namespace XBoss.Cad.Tests;
 
 /// <summary>
-/// M110 §5 — validator khối <c>drawTools.revisionPolicy</c> (rule pack v11), tầng C# của
+/// M110 §5 — validator khối <c>drawTools.revisionPolicy</c> (rule pack v14), tầng C# của
 /// "validator 2 tầng" (tầng TS: <c>lib/ky-thuat/cad/rule-pack-revision.ts</c>). Cùng nguyên tắc
 /// v5–v9: bản phát hành KHÔNG bật khối mới; khai bật thì phải khai đủ và đúng, thiếu/vô nghĩa là
 /// chặn ngay lúc nạp chứ không để kỹ sư phát hiện khi đứng trước AutoCAD.
 /// </summary>
-public class RulePackV11Tests
+public class RulePackV14RevisionTests
 {
     private static DrawToolsPack Nap(Action<JsonObject> chinhRevision)
     {

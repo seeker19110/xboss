@@ -38,7 +38,7 @@ Nhánh `feat/m110-pr2-revision-adapter`. **PR2 của 2** theo `docs/nang-cap/M11
 - Test: `XBoss.Cad.Tests/RevisionAdapterTests.cs` (ViewModel, phép kiểm 19, báo cáo, thứ tự lệnh),
   ca kind `annotation` trong `BlockManifestTests.cs` + `tests/cad-block-lib.test.ts` +
   `tests/cad-block-proposals.test.ts`; cập nhật `QuyTrinhTests`.
-- Tài liệu: `plugin-autocad/README.md` (3 lệnh + ghi chú rule pack v11), `CAI-DAT.md` (bước 8 trong
+- Tài liệu: `plugin-autocad/README.md` (3 lệnh + ghi chú rule pack v14), `CAI-DAT.md` (bước 8 trong
   luồng dùng thật), `VERIFY-VA-PHAT-HANH.md` mục **25b** — kịch bản verify tay AC1–AC10 + FR9.
 
 **Còn nợ (nợ kỹ thuật, ghi rõ ở đây để không tưởng nhầm là xong):**
@@ -52,7 +52,78 @@ Nhánh `feat/m110-pr2-revision-adapter`. **PR2 của 2** theo `docs/nang-cap/M11
   hiệu thay thế, đúng nếp của `slope-arrow`).
 - Ca `revisionPolicy` trong `plugin-autocad/doi-chung/` vẫn chưa có (đã ghi ở PR1).
 
-## 🚧 M110 PR1/2 — Core revision cloud + rule pack v11 (2026-08-29)
+## 🚧 M109 PR1/2 — rule pack v13 `crossingPolicy` + hình học ngắt nét giao chéo (2026-08-29)
+
+Nhánh `feat/m109-pr1-crossing-geometry`. **Mới là PR1 trong 2 PR của M109 — PR2 (Adapter: 2 lệnh
+`XBOSS_VE_NGATNET`/`_XOA`, dựng/xóa `Wipeout` + cầu vượt, `DrawOrder`, hộp thoại M106 + đảo tay,
+mục báo cáo phiên vẽ) CHƯA LÀM.** Lệnh chưa tồn tại trong plugin sau PR này.
+
+**Đã làm**
+
+- **Rule pack v13** (`lib/ky-thuat/cad/rule-packs/v13.json`, mở rộng thuần v12 của M111 — test khẳng định
+  không khóa cũ nào đổi): thêm `drawTools.crossingPolicy` (M109 §5) — `priority`, `gapMode`,
+  `clearanceMm`, `jogRadiusMm`, `layerSuffix`, `minAngleDeg`, kèm ghi chú tiếng Việt từng khóa.
+  `enabled: false` mặc định nên nạp v13 không đổi hành vi lệnh nào (AC8). Số version chốt lúc merge: nhánh này code trên v10, M111 phát hành v12 trước nên bản gộp lấy v13 — v13 chứa ĐỦ cả `floorPolicy` (M111) lẫn `crossingPolicy` (M109), không mất khóa nào của v9.
+- **Chốt của người dùng (2026-08-29):** `priority` khai theo **`drawTools.systems[].id`**
+  (HVAC/PIPING/FIREFIGHTING/ELECTRICAL/ELV) chứ không theo không gian id `duct`/`pipe-supply`/`fp`
+  ghi trong bản nháp §5 — 5 id đó **không tồn tại** trong rule pack thật, chép nguyên vào là chính
+  validator của M109 chặn chính rule pack. Đánh đổi đã chấp nhận: cấp × thoát nước cùng thuộc `PIPING` nên rơi
+  vào nhánh "cùng hệ — không ngắt nét, ghi báo cáo riêng" (đúng FR3 chữ nghĩa gốc).
+- **Validator 2 tầng** (M109 §5, bắt đủ 3 lỗi: id hệ lạ trong `priority`; `clearanceMm`/`jogRadiusMm`
+  ≤ 0; `layerSuffix` rỗng khi `enabled`): TS `kiemCrossingPolicy()` trong `lib/ky-thuat/cad/rule-pack.ts`,
+  C# `DrawToolsConfig.ValidateCrossingPolicy()` (khối `drawTools` sống ở `Draw/DrawToolsConfig.cs`
+  theo đúng tiền lệ `jointRules` của M105, không phải `RulePack/RulePackLoader.cs` như §8 ghi).
+- **`Core/Draw/CrossingGeometry.cs` (mới)** — hình học thuần, test trên CI Linux: vùng che theo bề
+  rộng tuyến đi trên + 2×clearance (dài ra theo `1/sin(góc giao)` để trùm hết tuyến đi dưới), cầu
+  vượt bán kính `jogRadiusMm` (từ chối kèm lý do khi bán kính nhỏ hơn nửa dây, không vẽ hình sai),
+  lọc góc < `minAngleDeg`, xếp hạng `priority` (hệ không khai xếp sau cùng), `DaoTay` thắng `priority`.
+- **Tách hàm giao điểm dùng chung** (FR2): `Segment2D.GiaoDiemGiuaHaiChuoi()` + `GocGiaoDeg()` —
+  phép kiểm 11 (`PhepKiemMoRong.GiaoCatKhacHe`) nay gọi lại đúng hàm này, **một** thuật toán dò giao
+  cắt cho cả kiểm tra lẫn ngắt nét.
+- **`VeXData`**: vai trò `VaiTroVe.NgatNet` + trường `HandleTimGiao` (tim đi trên) và `DaoTay`
+  (FR5/FR7) — mã hóa/giải mã khép kín.
+- **Test**: xunit `CrossingGeometryTests` / `RulePackV13Tests` / `CrossingDoiChungTests`; TS
+  `tests/cad-crossing-doi-chung.test.ts` + mục v13 trong `tests/engineering-cad-rule-pack.test.ts`.
+  Bộ đối chứng 2 tầng mới `plugin-autocad/doi-chung/crossing-doi-chung.json` (M109 §9).
+
+**Chưa xác nhận:** máy thi hành **không có .NET SDK** nên phần C# chưa build/`dotnet test` được cục
+bộ — chờ job `plugin` của CI. Phần TS: `npm run lint`, `npm run typecheck`, `npm test` xanh.
+
+**Tiếp theo:** M109 PR2 (`route: complex`) — Adapter, hộp thoại, báo cáo phiên vẽ, verify tay AC1–AC9.
+
+## M111 PR1/3 — Nhân bản tầng điển hình: rule pack v12 + Core `FloorReplicator` (2026-08-29)
+
+Nhánh `feat/m111-pr1-floor-replicator-core`. **Mới là PR1/3 của M111** (`docs/nang-cap/M111-nhan-ban-tang-dien-hinh.md`
+§9) — phần logic THUẦN, chưa có lệnh nào chạy được trong AutoCAD.
+
+**Đã làm:**
+
+- `lib/ky-thuat/cad/rule-packs/v12.json` = v9 + khối `drawTools.floorPolicy` (§4: `floors`,
+  `layoutMode`, `stepMm`, `gridColumns`, `zoneNamePattern`, `copyRoles`). Mở rộng **thuần** (mọi khóa
+  cũ giữ nguyên từng byte — có test so tệp) và `enabled: false` nên v12 cho kết quả y hệt v9 (AC12).
+  Số v12 do các nhánh song song đã giữ chỗ v10/v11.
+- **Validator 2 tầng**: TS `kiemFloorPolicy` (`lib/ky-thuat/cad/rule-pack.ts`) và C#
+  `FloorReplicator.Validate` gọi từ `DrawToolsConfig.Validate` — bắt: `floors` rỗng/trùng, `stepMm`
+  ≤ 0, `zoneNamePattern` thiếu `{floor}`, `copyRoles` có vai trò không có thật trong `VaiTroVe`
+  (kèm `layoutMode` lạ, `gridColumns` ≤ 0 khi xếp lưới).
+- Core `plugin-autocad/XBoss.Cad.Core/Draw/FloorReplicator.cs`: vị trí đặt từng tầng (offsetX/offsetY/
+  lưới), đổi tag `{floor}` qua `TagSchedule` (tag lệch mẫu → giữ nguyên + cảnh báo), đổi tên vùng bóc
+  (trùng tên → báo để lệnh DỪNG, không tự thêm hậu tố), và **kế hoạch ánh xạ handle**: handle trong
+  bảng `IdMapping` thì thay, ngoài tập chọn thì **gỡ hẳn** (guardrail §2.2 — không handle mồ côi).
+- XData `VeXData`: thêm `TangNguon` + `NhanTang` (dấu nhận diện bản chép cho FR9 idempotent).
+- Test: `FloorReplicatorTests.cs` + `RulePackV12Tests.cs` (xunit) + 3 ca trong
+  `tests/engineering-cad-rule-pack.test.ts`; đối chứng 2 tầng sinh lại (`npm run cad:doi-chung`) —
+  chỉ đổi đúng dòng version, chứng minh v12 không đụng quy tắc chuẩn hóa.
+
+**Chưa làm (đúng phạm vi PR1):** PR2 — Adapter `VeNhanTangCommands` (`DeepCloneObjects` + `IdMapping`,
+hộp thoại + xem trước FR3, FR8/FR9, nguyên tử NFR2), **rủi ro cao nhất cả bộ plugin**; PR3 — phép kiểm
+handle mồ côi tự động trong `XBOSS_KIEMTRA` (AC3) + tài liệu + mục verify tay. Ca đối chứng riêng cho
+`floorPolicy` trong `plugin-autocad/doi-chung/` chưa thêm (corpus hiện chỉ chở layer/font).
+
+**Chưa build/test .NET cục bộ** — máy không có .NET SDK; `dotnet test` chờ CI. TS: `npm run lint`,
+`npm run typecheck`, `npm test` xanh.
+
+## 🚧 M110 PR1/2 — Core revision cloud + rule pack v14 (2026-08-29)
 
 Nhánh `feat/m110-pr1-revision-core`. **PR1 của 2** theo `docs/nang-cap/M110-revision-cloud.md` §10 —
 chỉ phần **thuần, không đụng AutoCAD**; 3 lệnh `XBOSS_VE_REV`/`_CHOT`/`_HIENTHI`, `RevisionStore`,
@@ -60,9 +131,14 @@ layer con theo revision, hộp thoại M106 và phép kiểm FR8 nằm ở **PR2
 
 Đã làm:
 
-- **Rule pack `v11`** (`lib/ky-thuat/cad/rule-packs/v11.json`, phát hành qua `rule-pack-hien-hanh.ts`)
-  = v9 + khối `drawTools.revisionPolicy` (M110 §5). Số v10 do một đợt song song giữ chỗ nên M110 đi
-  thẳng v11. Mở rộng **thuần** và `enabled: false` mặc định ⇒ mọi lệnh cũ chạy y hệt v9 (AC8).
+- Khối `drawTools.revisionPolicy` (M110 §5) phát hành trong rule pack mới **`v14.json`** = `v13`
+  (đã có `crossingPolicy` của M109 chồng lên `floorPolicy` của M111) + `revisionPolicy`. Lịch sử số
+  version: M111 phát hành `v12` (chỉ `floorPolicy`) và về `main` trước; M109 hợp nhất thành `v13`
+  (`v12` + `crossingPolicy`) và về `main` kế tiếp; nhánh này ban đầu gộp nhầm `revisionPolicy` thẳng
+  vào `v12.json` (lúc `v13` của M109 chưa về `main`), phát hiện khi merge lần 2 nên đã khôi phục
+  `v12.json` về đúng nội dung gốc (chỉ `floorPolicy`) rồi phát hành `v14.json` = `v13` +
+  `revisionPolicy` cho đúng thứ tự lịch sử. Mở rộng **thuần** của v9 và `enabled: false` mặc định
+  ⇒ mọi lệnh cũ chạy y hệt v9 (AC8).
 - **Validator 2 tầng** cho khóa mới: TS `lib/ky-thuat/cad/rule-pack-revision.ts`
   (`kiemTraRevisionPolicy`) + C# `DrawToolsConfig.KiemRevisionPolicy` — cùng bộ luật: `numberFormat`
   phải chứa `{n}`, `cloudArcMm` > 0, `triangleBlockId` khác rỗng khi bật, `maxRows` ≥ 1, layer khác
@@ -72,12 +148,12 @@ layer con theo revision, hộp thoại M106 và phép kiểm FR8 nằm ở **PR2
   `Draw/RevisionSnapshot.cs` (băm hình học SHA-256 làm tròn 0,1 mm, so mốc §4 ra 3 nhóm
   thêm/xóa/đổi, mốc vô hiệu khi WBLOCK, mã hóa/giải mã mốc cho Xrecord).
 - **XData**: `VaiTroVe.Revision` + `SoRevision`/`HandleCapDoi`/`HandleTrongVung` trong `VeXData.cs`.
-- Test: `plugin-autocad/XBoss.Cad.Tests/RevisionCoreTests.cs` + `RulePackV11Tests.cs`, và ca v11
-  trong `tests/engineering-cad-rule-pack.test.ts`.
+- Test: `plugin-autocad/XBoss.Cad.Tests/RevisionCoreTests.cs` + `RulePackV14RevisionTests.cs`, và
+  test "mở rộng thuần v14" + 2 ca revisionPolicy trong `tests/engineering-cad-rule-pack.test.ts`.
 
 Còn nợ (PR2 hoặc ghi rõ trong PR1): toàn bộ tầng Adapter; ca `revisionPolicy` trong
 `plugin-autocad/doi-chung/` (bộ đối chứng hiện chỉ mang corpus layer/font, hai tầng đang được canh
-bằng validator đọc CHUNG tệp v11.json); tài liệu `README.md`/`CAI-DAT.md`/`VERIFY-VA-PHAT-HANH.md`.
+bằng validator đọc CHUNG tệp v14.json); tài liệu `README.md`/`CAI-DAT.md`/`VERIFY-VA-PHAT-HANH.md`.
 
 ## ✅ Duyệt trọn gói 6 đặc tả M109–M114 (2026-08-29)
 
