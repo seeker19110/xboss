@@ -108,6 +108,22 @@ namespace Autodesk.AutoCAD.Geometry
         public double Y { get; }
         public double Z { get; }
     }
+
+    /// <summary>
+    /// Tập đỉnh 2D — API thật dùng làm biên của <c>Wipeout.SetFrom</c> (M109). Cùng khuôn
+    /// <c>Point3dCollection</c> bên DatabaseServices: chỉ có mặt để kiểm chữ ký lời gọi.
+    /// </summary>
+    public class Point2dCollection : IDisposable, IEnumerable<Point2d>
+    {
+        public Point2dCollection() { }
+        public Point2dCollection(Point2d[] pts) { }
+        public int Count => 0;
+        public Point2d this[int i] => new Point2d(0, 0);
+        public void Add(Point2d p) { }
+        public IEnumerator<Point2d> GetEnumerator() => new List<Point2d>().GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        public void Dispose() { }
+    }
 }
 
 namespace Autodesk.AutoCAD.Colors
@@ -522,8 +538,41 @@ namespace Autodesk.AutoCAD.DatabaseServices
         /// </summary>
         public ObjectIdCollection GetBlockReferenceIds(bool directOnly, bool forceValidity) =>
             new ObjectIdCollection();
+        /// <summary>
+        /// Bảng THỨ TỰ VẼ của block record (M109): mở nó ForWrite rồi gọi MoveToTop/MoveAbove để
+        /// đẩy wipeout lên trên nét biên. API thật luôn có sẵn id này cho model space/layout.
+        /// </summary>
+        public ObjectId DrawOrderTableId => new ObjectId();
         public IEnumerator<ObjectId> GetEnumerator() => new List<ObjectId>().GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    /// <summary>
+    /// Thứ tự vẽ trong một block record (AcDbSortEntsTable). Dùng cho M109: vùng che phải nằm
+    /// TRÊN nét biên tuyến đi dưới nhưng DƯỚI nét biên tuyến đi trên.
+    /// </summary>
+    public class DrawOrderTable : DBObject
+    {
+        public void MoveToTop(ObjectIdCollection ids) { }
+        public void MoveToBottom(ObjectIdCollection ids) { }
+        public void MoveAbove(ObjectIdCollection ids, ObjectId target) { }
+        public void MoveBelow(ObjectIdCollection ids, ObjectId target) { }
+    }
+
+    // Cây kế thừa API thật: Wipeout → RasterImage → Image → Entity. Khai đủ 3 tầng (dù Adapter chỉ
+    // dùng Wipeout) theo đúng luật ở đầu tệp: stub khai sai lớp cha là cổng CI xanh giả.
+    public abstract class Image : Entity { }
+
+    public class RasterImage : Image { }
+
+    /// <summary>
+    /// Vùng che (AcDbWipeout) — M109 phương án B. <c>SetFrom</c> nhận biên đa giác 2D + pháp tuyến
+    /// mặt phẳng chứa biên.
+    /// </summary>
+    public class Wipeout : RasterImage
+    {
+        public void SetFrom(Point2dCollection vertices, Vector3d normal) { }
+        public void SetDatabaseDefaults() { }
     }
 
     public enum XrefStatus { NotAnXref, Resolved, Unresolved, FileNotFound, Unreferenced, Unloaded }
