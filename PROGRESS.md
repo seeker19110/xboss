@@ -72,6 +72,131 @@ xuất M103 vào hàng chờ của dự án) đòi cột `project_id` trên `cad
 nhưng DDL §5 lẫn §9 chỉ nói tới `cad_block_libs` (migration 0145 cũng vậy). Cần phiên chính chốt
 trước khi làm — xem báo cáo PR2.
 
+## M111 PR2/3 — Lệnh `XBOSS_VE_NHANTANG`: chép N tầng + ánh xạ lại handle (2026-08-29)
+
+Nhánh `feat/m111-pr2-nhantang-adapter`, tiếp trên PR1. **Mới là PR2/3** — lệnh đã chạy được, nhưng
+**CHƯA verify tay trên AutoCAD** (xem "Nợ kỹ thuật" dưới).
+
+**Đã làm:**
+
+- `plugin-autocad/XBoss.Cad.Acad/Commands/VeNhanTangCommands.cs` (mới) — `XBOSS_VE_NHANTANG`:
+  lọc vùng chọn theo `floorPolicy.copyRoles`, `DeepCloneObjects` từng tầng, dời theo
+  `FloorReplicator.ViTriDatTang`, **ghi đè** XData bản chép bằng kết quả `FloorReplicator.AnhXaXData`
+  (handle trong `IdMapping` thì thay, ngoài tập chọn thì gỡ), đổi tag `{floor}`, gỡ dấu bóc (FR8),
+  idempotent theo tầng (FR9), báo cáo FR10 + nhật ký phiên vẽ.
+- `plugin-autocad/XBoss.Cad.Core/Ui/ViewModels/NhanTangDialogViewModel.cs` (mới) + `DataTemplate`
+  trong `XBossDialog.xaml`: hộp thoại M106 với **bảng xem trước bắt buộc** (FR3) — số đối tượng theo
+  vai trò, số tuyến, tổng dài nhân thêm, vị trí đặt từng tầng, ví dụ tag trước → sau, kế hoạch đổi
+  tên vùng, nút _zoom tới vùng nguồn_. Đường dòng lệnh (FR11) dùng LẠI chính ViewModel này rồi in
+  bảng ra dòng lệnh + hỏi xác nhận, nên hai đường không thể lệch nhau.
+- Core `FloorReplicator`: thêm `MaKieuDat`/`VoiKieuDat` (áp kiểu dời + bước dời kỹ sư chọn, giữ
+  nguyên `copyRoles`/`zoneNamePattern`) và overload `LapKeHoachDat(fp, tangNguon, tangDich)` — **ô
+  đặt cố định theo nhãn tầng**, không phụ thuộc lần này tick bao nhiêu tầng (điều kiện của FR9/AC8:
+  chép đè riêng một tầng phải đặt về đúng chỗ cũ, không chồng lên tầng khác).
+- `VeSessionReport`: mục `nhanTang` (gộp theo cặp tầng nguồn → tầng chép, đọc từ XData sống trong
+  bản vẽ) + bản tiếng Việt; các con số của TỪNG lần chạy đi vào nhật ký phiên.
+- `LenhCatalog`: `XBOSS_VE_NHANTANG` vào bước `VeShopDrawing` thứ 7 (sau `XBOSS_VE_THIETBI`),
+  `XBOSS_VE_DOI` dời xuống 8; `AcadStub.cs` bổ sung stub `DeepCloneObjects`/`IdMapping`/`IdPair`/
+  `Entity.TransformBy`/`Matrix3d.Displacement`/`ViewTableRecord` + `GetCurrentView`/`SetCurrentView`.
+- Test: `NhanTangDialogViewModelTests` (19 ca — xem trước, ô đặt cố định, khóa OK khi tầng đích trùng
+  tầng nguồn/trùng tên vùng/bước dời sai, FR9 bỏ qua-chép đè, KIEMTRA đỏ chỉ CẢNH BÁO), bổ sung
+  `FloorReplicatorTests` + `VeSessionReportTests` + cập nhật `QuyTrinhTests`.
+
+**Ba quyết định trong ranh giới `route: complex` (phiên chính review giúp):**
+
+1. **Một transaction cho TẤT CẢ N tầng** (không transaction lồng + rollback thủ công): `tr.Abort()`
+   là phép nguyên tử thật của NFR2, một transaction cũng là một nhóm UNDO của AC11; "rollback thủ
+   công" bằng cách xóa lại bản chép đã ghi là đường tự viết, hỏng lần thứ hai thì mất dữ liệu.
+2. **XData bản chép luôn được GHI ĐÈ** bằng kết quả `AnhXaXData`, không dựa vào giả định
+   "`DeepCloneObjects` có chép XData" (mục Open §10 chưa xác minh được ở đây). Đúng-sai của giả định
+   đó không còn ảnh hưởng guardrail §2.2.
+3. **Attribute của khối: tự đo rồi mới dời.** So vị trí attribute trước/sau `BlockReference.TransformBy`;
+   dời chưa tới nửa quãng thì lệnh mới tự dời — tránh cả hai lỗi "tag đứng lại tầng nguồn" và "tag
+   dời gấp đôi" mà không phải đoán hành vi của ObjectARX.
+
+**Nợ kỹ thuật — CHẶN phát hành rộng (không phải "nên làm"):**
+
+- **Chưa verify tay trên bản vẽ AVIO thật** (M111 §8 đòi AC1–AC12 trên máy có AutoCAD 2026). Môi
+  trường code không có AutoCAD; cổng `XBoss.Cad.AcadShim` chỉ chứng minh mã Adapter **biên dịch**
+  đúng chữ ký stub, không chứng minh hành vi. Ba điểm phải soi kỹ khi verify: (a) attribute có bị
+  dời gấp đôi/đứng yên không; (b) `DeepCloneObjects` có chép XData không (bản chép phải mang XData
+  do lệnh ghi, không phải của tầng nguồn); (c) nút _zoom tới vùng nguồn_ khi hộp thoại đang modal.
+- **PR3 chưa làm**: phép kiểm handle mồ côi tự động trong `XBOSS_KIEMTRA` (AC3), tài liệu
+  (`README.md`/`CAI-DAT.md`) và mục verify tay trong `VERIFY-VA-PHAT-HANH.md`.
+- **Khoảng trống đặc tả phát hiện lúc code (FR6):** vùng bóc của M101 **không** là đối tượng sống
+  trong bản vẽ — ranh giới vùng là polyline thường (không XData) và tên vùng chỉ được gõ lúc chạy
+  `XBOSS_BOCKL`, lưu trong dấu bóc. Nên PR2 làm được: đọc tên vùng nguồn từ dấu bóc, tính tên vùng
+  đích theo `zoneNamePattern`, **DỪNG lệnh khi trùng tên** (AC9) và in bảng tên vùng để kỹ sư dùng
+  lại lúc bóc tầng mới; **không** làm được: ghi tên vùng lên bản chép (FR8 gỡ dấu bóc) và chép ranh
+  giới vùng (không mang XData nên bị `copyRoles` lọc ra). Muốn AC5 tự động đủ thì phải khai vùng
+  thành đối tượng có XData — **đổi schema XData, ngoài phạm vi PR2, cần phiên chính quyết**.
+
+**Kiểm đã chạy:** `dotnet test XBoss.Cad.Tests` 945/945 pass; `dotnet build XBoss.Cad.AcadShim`
+(biên dịch thử toàn bộ Adapter) 0 warning/0 error; `npm run lint`, `npm run typecheck`, `npm test`
+(981 pass, 464 skip vì không có `TEST_DATABASE_URL`) — PR này **không đụng TypeScript/DB/route** nào.
+
+## ✅ M109 PR2/2 — Adapter ngắt nét giao chéo: `XBOSS_VE_NGATNET` + `_XOA` (2026-08-29)
+
+Nhánh `feat/m109-pr2-ngatnet-adapter`, base trên PR1. **Code M109 xong**; còn **nợ verify tay trên
+AutoCAD thật** (xem "Nợ kỹ thuật" cuối mục này) — chưa làm xong mục đó thì chưa phát hành.
+
+**Đã làm**
+
+- **2 lệnh mới** (`XBoss.Cad.Acad/Commands/VeNgatNetCommands.cs`): `XBOSS_VE_NGATNET` dò mọi cặp
+  tuyến tim khác hệ cắt nhau (dùng lại `Segment2D.GiaoDiemGiuaHaiChuoi` của phép kiểm 11 + lọc thô
+  bằng bao hình chữ nhật, không O(n²) phép giao đoạn — NFR1), dựng `Wipeout` che vùng giao cho
+  tuyến 2 nét biên và thêm cung cầu vượt cho tuyến đơn nét; `XBOSS_VE_NGATNET_XOA` gỡ sạch (FR8).
+  Rule pack chưa khai `crossingPolicy` hoặc `enabled: false` → **dừng kèm hướng dẫn, không vẽ gì**
+  (AC8). Cả lệnh nằm trong MỘT transaction = một nhóm UNDO; hỏi đáp ngoài transaction.
+- **Guardrail 1 (tim bất khả xâm phạm)**: hai lệnh CHỈ tạo thực thể mới và CHỈ xóa thực thể vai trò
+  `NgatNet`; không có một đường nào mở tim ở chế độ ghi. `NgatNetGuardrailTests` (mới) đọc mã nguồn
+  Adapter và đỏ ngay nếu ai đó thêm lời gọi sửa hình học (`AddVertexAt`/`Explode`/…) hoặc mở
+  `ForWrite` một đích không phải model space/bảng thứ tự vẽ.
+- **Thứ tự vẽ (chỗ phải cân nhắc của PR này)**: quan hệ bắt buộc là **tuyến đi trên > vùng che >
+  tuyến đi dưới** — đẩy vùng che lên trên cùng thôi thì chính tuyến đi trên bị che (vùng che rộng
+  bằng cả bề rộng tuyến trên), đúng thứ AC1 cấm. Cách chốt: gom việc theo **hạng ưu tiên hệ đi
+  trên**, xử lý từ hạng thấp lên, mỗi nhóm đẩy vùng che lên trước rồi đẩy tuyến đi trên lên nữa ⇒
+  chồng lớp đúng theo hạng, chuỗi 3 hệ (A trên B, B trên C) cũng đúng. **Đánh đổi:** có động vào
+  thứ tự vẽ của các tuyến đi trên vốn có sẵn, nên `_XOA` gỡ được đối tượng nhưng **không hoàn
+  nguyên thứ tự vẽ** — muốn về đúng trạng thái trước lệnh thì `UNDO` (đã ghi trong thông báo lệnh,
+  README và mục verify).
+- **Đảo tay theo CẶP TUYẾN, không theo từng điểm giao** (FR7): hai tuyến cắt nhau nhiều lần chỉ có
+  một quan hệ trên–dưới thật, cho đảo riêng từng điểm là mời kỹ sư vẽ bản vẽ tự mâu thuẫn — và nhờ
+  vậy dấu đảo lưu gọn vào cặp handle `HandleTim` + `HandleTimGiao` sẵn có, không phải thêm trường
+  XData chỉ số điểm giao. Chạy lại giữ nguyên chiều đã đảo (AC5).
+- **`gapMode`**: `"jog"` = ÉP cầu vượt cho mọi tuyến; `"wipeout"` (giá trị mặc định của rule pack) và
+  rỗng = **suy theo `edgeStyle`** của tuyến đi dưới. Ép wipeout cho mọi tuyến sẽ xóa sổ cầu vượt
+  của tuyến đơn nét ngay trên rule pack mặc định, tức là AC3 không bao giờ chạy được.
+- **Hộp thoại M106** (`Core/Ui/ViewModels/NgatNetDialogViewModel.cs` + `DataTemplate` trong
+  `XBossDialog.xaml`): phạm vi toàn bản vẽ/chọn tay, danh sách cặp giao kèm ai trên, ô **Đảo** từng
+  dòng (mờ ở dòng cùng hệ, kèm lý do), cảnh báo đa giao/đảo tay. `XBOSS_UI_DIALOG=0` → hỏi đáp dòng
+  lệnh cho cùng bộ tham số (FR10).
+- **Báo cáo** (FR9): tóm tắt cuối lệnh (số điểm giao xử lý, bỏ qua theo lý do — cùng hệ / góc gắt /
+  không đọc được cỡ / xref, số đảo tay, số chỗ **đa giao**, số tuyến có đoạn cung) + mục `ngatNet`
+  trong `Core/Reporting/VeSessionReport.cs` (gộp theo tuyến đi dưới, đếm đảo tay, cảnh báo riêng khi
+  có đảo tay). Lý do bỏ qua đẩy vào nhật ký phiên cho `XBOSS_VE_BAOCAO`.
+- **Danh mục lệnh**: `XBOSS_VE_NGATNET` vào `BuocQuyTrinh.HoSoBanVe` ngay sau `XBOSS_VE_THONGKE`,
+  `_XOA` vào `PhuTro`; stub `Wipeout`/`DrawOrderTable`/`Point2dCollection` cho cổng CI `AcadShim`;
+  README + CAI-DAT + mục verify tay `C4c` trong `VERIFY-VA-PHAT-HANH.md`.
+
+**Đã kiểm cục bộ (lần này máy CÀI được .NET SDK 8 qua apt):** `dotnet build XBoss.Cad.AcadShim`
+(cổng biên dịch toàn bộ Adapter bằng stub) xanh, `dotnet test XBoss.Cad.Tests` **939 test xanh**.
+Không đụng mã TypeScript.
+
+**Nợ kỹ thuật — BẮT BUỘC trước khi phát hành rộng (mục `C4c` của `VERIFY-VA-PHAT-HANH.md`):**
+
+- **AC1 + in PDF** và **AC2 (tọa độ từng đỉnh tim không đổi + `XBOSS_BOCKL` ra đúng con số cũ)**
+  chưa ai chạy trên AutoCAD thật — CI Linux không dựng nổi bản vẽ, `NgatNetGuardrailTests` chỉ
+  chứng minh được _cách thiết kế_, không thay được bằng chứng trên bản vẽ.
+- Thứ tự vẽ của `Wipeout` khi **in PDF** phụ thuộc driver (M109 §11) — phải in thử bằng cả DWG To
+  PDF lẫn máy in thật của công ty.
+- Biên `Wipeout.SetFrom` đang truyền dạng **vòng kín** (lặp đỉnh đầu ở cuối); AC1 xác nhận luôn ca
+  này.
+- Điểm giao nằm trên **đoạn cung** của tim được dò theo dây cung (Core chỉ biết đoạn thẳng) — lệnh
+  đã cảnh báo, cần kiểm mắt; muốn chính xác thì phải duỗi cung ở Adapter (chưa làm, ngoài phạm vi).
+
+**Tiếp theo:** verify tay M109 trên máy có AutoCAD 2026, rồi M110 (revision cloud).
+
 ## ✅ M113 PR1/4 — thư viện block hai tầng: schema + RLS + hàm trộn (2026-08-29)
 
 Nhánh `feat/m113-pr1-schema-rls`. PR **1/4** của `docs/nang-cap/M113-thu-vien-block-theo-du-an.md`

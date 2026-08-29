@@ -33,4 +33,15 @@ public sealed partial class XBossDialog : Window
 
     /// <summary>Nút OK — chỉ bấm được khi ViewModel báo hợp lệ (FR2), nên ở đây không kiểm lại.</summary>
     private void BamOk(object sender, RoutedEventArgs e) => DialogResult = true;
+
+    /// <summary>
+    /// Nút "zoom tới vùng nguồn" của <c>XBOSS_VE_NHANTANG</c> (M111 FR3). Hộp thoại vẫn KHÔNG
+    /// đọc/ghi bản vẽ (guardrail M106 §2.1): việc đổi khung nhìn nằm trong một <see cref="Action"/>
+    /// do LỆNH (Adapter) cắm vào ViewModel, ở đây chỉ chuyển tiếp cú bấm — và ViewModel tự nuốt lỗi
+    /// kèm thông báo tiếng Việt để hộp thoại không bao giờ chết vì một nút phụ.
+    /// </summary>
+    private void BamZoomNguon(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is NhanTangDialogViewModel vm) vm.ZoomToiNguon();
+    }
 }
