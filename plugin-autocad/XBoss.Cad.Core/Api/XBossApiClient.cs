@@ -197,15 +197,88 @@ public sealed class XBossApiClient
     /// TRƯỚC chỗ kiểm <c>v</c>, nên tham số đó bị bỏ qua hoàn toàn; toàn vẹn của tệp lẻ đã do
     /// <c>fileSha256</c> của entry manifest canh, không cần chốt version.
     /// </summary>
+    /// <param name="libVersion">
+    /// M113 §6 — version của BỘ chứa block (lấy từ <c>libVersion</c> của entry trong manifest đã
+    /// trộn). Bỏ trống = để máy chủ tìm trong bộ hiện hành của tầng đang hỏi, y hệt trước M113.
+    /// </param>
+    /// <param name="duAnId">
+    /// M113 §6 — gửi <c>?project=</c> khi tệp lẻ thuộc bộ RIÊNG của dự án. Máy chủ tìm tệp lẻ
+    /// trong ĐÚNG MỘT tầng, nên block nguồn "toàn cục" phải hỏi KHÔNG kèm dự án (bỏ trống) còn
+    /// block nguồn "dự án" thì bắt buộc kèm — gửi sai tầng là 404 "không có tệp block nào".
+    /// </param>
     public async Task<(byte[]? Dwg, string? Etag)> FetchBlockLibTepLeAsync(
-        string token, string fileKey, string? etag = null, CancellationToken ct = default)
+        string token, string fileKey, string? etag = null, string? libVersion = null,
+        long? duAnId = null, CancellationToken ct = default)
     {
         var duongDan = "api/engineering/cad/block-lib?file=" + Uri.EscapeDataString(fileKey);
+        if (!string.IsNullOrWhiteSpace(libVersion))
+            duongDan += "&libVersion=" + Uri.EscapeDataString(libVersion);
+        if (duAnId is { } id)
+            duongDan += "&project=" + id.ToString(CultureInfo.InvariantCulture);
         using var res = await GuiKemToken(duongDan, token, etag, ct);
         if (res.StatusCode == HttpStatusCode.NotModified) return (null, etag);
         await NemNeuLoi(res, ct);
         return (await res.Content.ReadAsByteArrayAsync(ct), res.Headers.ETag?.ToString());
     }
+
+    // ===== Thư viện block HAI TẦNG theo dự án (M113 §4/§6 — FR5) =====
+
+    /// <summary>
+    /// GET /api/engineering/cad/block-lib?project=&lt;id&gt;&amp;manifest=1 — manifest ĐÃ TRỘN hai
+    /// tầng (bộ toàn cục + bộ riêng của dự án, dự án đè theo <c>blocks[].id</c>), kèm tóm tắt bộ
+    /// của dự án (<c>boDuAn</c>: version + sha256 tệp .dwg riêng) để client kiểm hash TỪNG BỘ.
+    /// Trả (null, etag, null) khi 304 — caller giữ cache trộn đang có.
+    ///
+    /// CỐ Ý tách khỏi <see cref="FetchBlockLibManifestAsync"/> thay vì thêm tham số: đường không
+    /// kèm <c>?project=</c> phải giữ nguyên từng byte cho luồng đề xuất block M103 (máy chủ so
+    /// <c>base_lib_version</c> với bộ TOÀN CỤC) và cho plugin bản cũ (M113 guardrail 1).
+    /// KHÔNG gắn <c>?v=</c>: nhánh hai tầng của route không kiểm tham số đó, toàn vẹn tệp đã do
+    /// sha256 của từng bộ canh.
+    /// </summary>
+    public async Task<(string? Json, string? Etag, BoBlockDuAn? BoDuAn)> FetchBlockLibManifestTronAsync(
+        string token, long duAnId, string? etag = null, CancellationToken ct = default)
+    {
+        using var res = await GuiKemToken(DuongDanTheoDuAn("&manifest=1", duAnId), token, etag, ct);
+        if (res.StatusCode == HttpStatusCode.NotModified) return (null, etag, null);
+        await NemNeuLoi(res, ct);
+
+        var body = await res.Content.ReadAsStringAsync(ct);
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("manifest", out var manifest))
+                throw new XBossApiException("Server trả response thiếu \"manifest\" của thư viện block.");
+            BoBlockDuAn? bo = null;
+            if (doc.RootElement.TryGetProperty("boDuAn", out var boJson) &&
+                boJson.ValueKind == System.Text.Json.JsonValueKind.Object)
+            {
+                bo = System.Text.Json.JsonSerializer.Deserialize<BoBlockDuAn>(boJson.GetRawText());
+            }
+            return (manifest.GetRawText(), res.Headers.ETag?.ToString(), bo);
+        }
+        catch (System.Text.Json.JsonException e)
+        {
+            throw new XBossApiException($"Manifest thư viện block server trả về không phải JSON hợp lệ: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// GET /api/engineering/cad/block-lib?project=&lt;id&gt; — tệp .dwg nền của bộ RIÊNG của dự án
+    /// (nhị phân). Toàn vẹn do caller đối chiếu <c>boDuAn.dwgSha256</c>, KHÔNG tin server (M100 §12).
+    /// 404 = dự án chưa phát hành bộ riêng ⇒ ném kèm nguyên văn thông điệp server.
+    /// </summary>
+    public async Task<(byte[]? Dwg, string? Etag)> FetchBlockLibDwgDuAnAsync(
+        string token, long duAnId, string? etag = null, CancellationToken ct = default)
+    {
+        using var res = await GuiKemToken(DuongDanTheoDuAn("", duAnId), token, etag, ct);
+        if (res.StatusCode == HttpStatusCode.NotModified) return (null, etag);
+        await NemNeuLoi(res, ct);
+        return (await res.Content.ReadAsByteArrayAsync(ct), res.Headers.ETag?.ToString());
+    }
+
+    private static string DuongDanTheoDuAn(string themQuery, long duAnId) =>
+        "api/engineering/cad/block-lib?project=" +
+        duAnId.ToString(CultureInfo.InvariantCulture) + themQuery;
 
     /// <summary>
     /// GET thư viện block kèm tham số cache-busting <c>?v=&lt;version&gt;</c> khi máy ĐÃ có cache.

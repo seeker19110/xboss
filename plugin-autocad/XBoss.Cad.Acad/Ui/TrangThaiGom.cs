@@ -48,6 +48,7 @@ internal static class TrangThaiGom
         }
 
         var (thuVien, loiThuVien) = BlockLibraryService.HienHanh();
+        var boTron = BlockLibraryService.BoTronHienHanh();
 
         return new TrangThaiPhien
         {
@@ -59,6 +60,9 @@ internal static class TrangThaiGom
             ThuVienVersion = thuVien?.Version,
             SoBlockThuVien = thuVien?.Blocks.Count ?? 0,
             LoiThuVien = thuVien is null ? loiThuVien : null,
+            // M113 FR6 — chỉ có khi máy đang dùng bản trộn theo dự án.
+            ThuVienHaiBo = boTron?.MoTaHaiBo,
+            SoBlockDuAn = thuVien?.Blocks.Count(b => b.LaCuaDuAn) ?? 0,
             DeXuat = _deXuat,
             LaNguoiDuyet = _laNguoiDuyet,
             LoiDeXuat = _loiDeXuat,

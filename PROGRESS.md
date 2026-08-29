@@ -36,6 +36,47 @@ lệnh nào mới**: mới là dữ liệu + hàm thuần, test trên CI Linux.
 
 **Không migration, không API mới, không đụng `app/`** (M114 §9).
 
+## ✅ M113 PR4/4 — plugin AutoCAD dùng thư viện block hai tầng (2026-08-29)
+
+Nhánh `feat/m113-pr4-plugin-project`. PR **4/4** của `docs/nang-cap/M113-thu-vien-block-theo-du-an.md`
+(phạm vi **thu hẹp**: FR7 hoãn, xem cảnh báo dưới).
+
+- `XBoss.Cad.Core/Api/XBossApiClient.cs` — `FetchBlockLibManifestTronAsync(token, duAnId, etag)`
+  (gửi `?project=<id>&manifest=1`, bóc cả `manifest` lẫn `boDuAn` = version + sha256 bộ dự án) và
+  `FetchBlockLibDwgDuAnAsync`; `FetchBlockLibTepLeAsync` nhận thêm `libVersion` + `project` để hỏi
+  tệp `.dwg` lẻ **đúng tầng**. Đường cũ (không tham số) giữ nguyên từng byte — plugin bản cũ và
+  luồng M103 không đổi hành vi (guardrail 1/AC1).
+- `XBoss.Cad.Core/Draw/BlockManifest.cs` — `BlockDef.Nguon`/`LibVersion` + `LaCuaDuAn`/`NhanNguon`,
+  `BlockManifest.CoBlockToanCuc`/`CoBlockDuAn`, `BlockManifestLoader.KiemTraHashTepTheoSha` (hash
+  kiểm theo **từng bộ**, §4.5). Máy chủ bản cũ không trả `nguon`/`libVersion` ⇒ **bỏ qua an toàn**,
+  coi như bộ toàn cục.
+- `XBoss.Cad.Core/Draw/BlockLibTron.cs` (mới) — `BoBlockDuAn` (dữ liệu máy chủ) + `BoTronCache`
+  (siêu dữ liệu ô cache trộn: dự án nào, version 2 bộ, sha256 tệp nền bộ dự án).
+- `XBoss.Cad.Acad/Services/BlockLibraryService.cs` — **ô cache thứ hai** (`manifest-tron.json`,
+  `blocks-tron-toancuc.dwg`, `blocks-tron-duan.dwg`, `blocks-tron.etag`, `bo-tron.json`) chạy song
+  song với ô toàn cục cũ; `TaiVeTronAsync` tải + kiểm hash theo từng bộ + bù tệp lẻ đúng tầng;
+  `TaiVeDayDuAsync` (dùng ở `XBOSS_LOGIN` và `XBOSS_VE_THUVIEN` → Server) tải bộ toàn cục rồi bản
+  trộn của dự án đang nhớ; chèn block lấy định nghĩa từ **đúng tệp nền của bộ** (AC9), hash kiểm
+  lại ngay trước khi dùng.
+- `XBOSS_VE_THUVIEN` thêm nhánh `Nguon` liệt kê **nguồn từng block** (`[Dự án]`/`[Toàn cục]` + bộ)
+  và dòng trạng thái nói rõ đang dùng bộ nào; `XBOSS_BANG` thêm dòng "Bộ đang dùng" hiện version
+  **cả hai bộ** + số block của dự án (FR6).
+- Test C#: `XBoss.Cad.Tests/BlockLibDuAnTests.cs` (12 ca — gửi/không gửi `project`, tệp lẻ đúng
+  tầng, 304, model đọc `nguon`/`libVersion` và bỏ qua an toàn khi vắng, hash theo từng bộ, FR6).
+  Toàn bộ: **981 pass / 0 fail**.
+- Tài liệu: `plugin-autocad/README.md` + `CAI-DAT.md` (thư viện hai tầng, cách xem nguồn block).
+
+⚠️ **FR7 HOÃN — nợ đặc tả** (cùng điểm vướng PR2 đã ghi): "đề xuất M103 vào hàng chờ **của dự án**"
+và "đường nạp lô M108 nhận `project`" đòi cột `project_id` (+ RLS) trên `cad_block_proposals` và
+`cad_block_batches`, trong khi DDL §5/§9 của M113 chỉ cấp cho `cad_block_libs` (migration 0145).
+⇒ PR4 **cố ý không đụng** `XBOSS_VE_DEXUAT`/`BlockUngVienBuilder`: chúng vẫn dựng ứng viên trên
+manifest + tệp nền **toàn cục** (máy chủ so `base_lib_version` với bộ toàn cục — trộn hai ô cache
+làm một là mọi đề xuất của kỹ sư dự án bị 409 stale/422). Điều kiện để làm sau: đặc tả bổ sung +
+migration mới cho 2 bảng đề xuất, rồi mới cho plugin gửi `project` ở đường M103/M108.
+
+⚠️ M113 chỉ **phát hành thật được sau khi migration PR1 chạy staging** (§5/§12 — `DROP CONSTRAINT` +
+`CREATE UNIQUE INDEX` đụng dữ liệu đang có).
+
 ## ✅ M113 PR3/4 — Web: 2 khối + chip nguồn (2026-08-29)
 
 Nhánh `feat/m113-pr3-web-ui`. PR **3/4** của `docs/nang-cap/M113-thu-vien-block-theo-du-an.md`
