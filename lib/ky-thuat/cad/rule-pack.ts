@@ -72,6 +72,9 @@ export const VAI_TRO_VE = [
   "NhanDot",
 ] as const;
 
+/** Kiểu dời bản chép trong model space — bản TS của enum `KieuDatTang` (Core `Draw/FloorReplicator.cs`). */
+export const KIEU_DAT_TANG = ["offsetY", "offsetX", "luoi"] as const;
+
 /** Khối `drawTools.floorPolicy` nhìn từ validator (M111 §4). */
 export type FloorPolicy = {
   enabled: boolean;
@@ -93,6 +96,15 @@ export type FloorPolicy = {
 export function kiemFloorPolicy(fp: FloorPolicy): string[] {
   const loi: string[] = [];
 
+  if (!(KIEU_DAT_TANG as readonly string[]).includes(fp.layoutMode)) {
+    loi.push(
+      `floorPolicy.layoutMode không hợp lệ: "${fp.layoutMode}" (chỉ nhận ${KIEU_DAT_TANG.map((k) => `"${k}"`).join(", ")}).`,
+    );
+  }
+  if (fp.layoutMode === "luoi" && fp.gridColumns <= 0) {
+    loi.push('floorPolicy.gridColumns phải dương khi layoutMode = "luoi".');
+  }
+
   if (fp.floors.length === 0) {
     loi.push("floorPolicy.floors rỗng — không có tầng đích nào để chép.");
   }
@@ -107,6 +119,9 @@ export function kiemFloorPolicy(fp: FloorPolicy): string[] {
     loi.push(
       `floorPolicy.zoneNamePattern "${fp.zoneNamePattern}" thiếu {floor} — mọi tầng ra cùng một tên vùng, sheet Tong-hop-vung gộp nhầm.`,
     );
+  }
+  if (fp.copyRoles.length === 0) {
+    loi.push("floorPolicy.copyRoles rỗng — không vai trò nào được chép.");
   }
   for (const vaiTro of fp.copyRoles) {
     if (!(VAI_TRO_VE as readonly string[]).includes(vaiTro)) {

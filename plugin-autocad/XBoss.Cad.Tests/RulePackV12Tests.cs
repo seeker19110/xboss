@@ -115,6 +115,14 @@ public class RulePackV12Tests
     }
 
     [Fact]
+    public void CopyRoles_rong_thi_chan()
+    {
+        var loi = Loi(fp => fp["copyRoles"] = new JsonArray());
+
+        Assert.Contains("copyRoles", loi.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Khoi_hop_le_thi_nap_duoc_ke_ca_khi_bat()
     {
         var pack = Nap(fp => fp["enabled"] = true);

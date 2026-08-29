@@ -1026,3 +1026,20 @@ test("v12: validator floorPolicy bắt đủ 4 lỗi của M111 §4", () => {
     /KhongCoVaiTroNay/,
   );
 });
+
+test("v12: validator TS khớp validator C# — cả 3 kiểm còn lại của FloorReplicator.Validate", () => {
+  // Hai tầng lệch nhau là đúng lớp rủi ro M111: rule pack qua được web nhưng plugin từ chối nạp
+  // (hoặc ngược lại). 3 ca dưới đây là phần C# đang chặn mà TS từng bỏ sót.
+  const hopLe = getCurrentRulePack().drawTools.floorPolicy;
+
+  assert.match(kiemFloorPolicy({ ...hopLe, layoutMode: "cheo" })[0], /layoutMode/);
+  assert.deepEqual(
+    kiemFloorPolicy({ ...hopLe, layoutMode: "luoi", gridColumns: 0 }),
+    ['floorPolicy.gridColumns phải dương khi layoutMode = "luoi".'],
+    "xếp lưới mà không có cột nào thì mọi tầng chồng lên nhau",
+  );
+  assert.match(kiemFloorPolicy({ ...hopLe, copyRoles: [] })[0], /copyRoles/);
+
+  // gridColumns chỉ có nghĩa với layoutMode = luoi — kiểu dời khác không được báo oan.
+  assert.deepEqual(kiemFloorPolicy({ ...hopLe, gridColumns: 0 }), []);
+});

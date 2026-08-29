@@ -1374,7 +1374,7 @@
         "VachChia",
         "NhanDot"
       ],
-      "copyRolesNote": "Vai trò KHÔNG chép: MatCat, TuyenCat, BangThongKe, Revision, NgatNet — đều là hồ sơ/trình bày, dựng lại bằng lệnh của chúng sau khi chép."
+      "copyRolesNote": "Vai trò KHÔNG chép: MatCat, TuyenCat, BangThongKe, Revision, NgatNet — đều là hồ sơ/trình bày, dựng lại bằng lệnh của chúng sau khi chép. Cũng không chép DinhNghiaBlock: đó là ĐỊNH NGHĨA block (BlockTableRecord) dùng chung cả bản vẽ, bản chép tham chiếu lại chính định nghĩa đã có chứ không nhân bản nó."
     }
   },
   "sheetSetup": {
