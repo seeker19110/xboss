@@ -131,8 +131,10 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > `crossingPolicy.priority` + đảo tay từng điểm nhớ trong XData. Dùng lại đúng bộ dò giao cắt của
 > phép kiểm 11 (M101). **Bất biến số 1: polyline tim không bao giờ bị cắt/chia/đổi tọa độ** —
 > `XBOSS_BOCKL` phải ra đúng con số như trước (AC2). Rule pack +1 version, không migration. 2 PR.
-> **Trạng thái: PR1/2 đã code** (rule pack v13 `crossingPolicy` + validator 2 tầng +
-> `CrossingGeometry` + `VaiTroVe.NgatNet` + test Core); **PR2 (Adapter, hộp thoại, báo cáo) chưa làm.**
+> **Trạng thái: code XONG cả 2 PR** — PR1 (rule pack v13 `crossingPolicy` + validator 2 tầng +
+> `CrossingGeometry` + `VaiTroVe.NgatNet` + test Core), PR2 (2 lệnh Adapter, `DrawOrder`, hộp thoại
+> M106 + đảo tay theo cặp tuyến, mục báo cáo phiên vẽ). **Còn nợ verify tay trên AutoCAD thật**
+> (AC1 + in PDF, AC2 tọa độ đỉnh tim) — mục `C4c` trong `plugin-autocad/VERIFY-VA-PHAT-HANH.md`.
 >
 > **M110 (`M110-revision-cloud.md`)** — `XBOSS_VE_REV` / `_CHOT` / `_HIENTHI`: cloud + tam giác
 > revision + bảng revision trong attribute khung tên. Điểm khác `REVCLOUD` của AutoCAD: plugin ghi
