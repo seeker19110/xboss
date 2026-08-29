@@ -94,7 +94,10 @@ public sealed class XBossLoginCommand
 
             // 6) Tải thư viện block của bộ lệnh vẽ (M100 AC8) — lỗi ở đây KHÔNG làm hỏng việc ghép
             //    thiết bị: chỉ báo, các lệnh M99 vẫn chạy bình thường khi chưa có thư viện.
-            ed.WriteMessage($"\n[XBoss] {await BlockLibraryService.TaiVeAsync(client, ok.Key)}\n");
+            //    M113 FR5: tải cả bản TRỘN của dự án vừa chọn ở bước (5) — bộ toàn cục vẫn được
+            //    giữ nguyên trong ô cache cũ vì đường đề xuất block M103 dựng ứng viên trên đó.
+            foreach (var dong in await BlockLibraryService.TaiVeDayDuAsync(client, ok.Key))
+                ed.WriteMessage($"\n[XBoss] {dong}\n");
         }
         catch (XBossApiException e)
         {

@@ -61,6 +61,29 @@ public sealed class BlockDef
     /// </summary>
     [JsonPropertyName("fileSha256")] public string? FileSha256 { get; init; }
 
+    /// <summary>
+    /// M113 §4 — block này đến từ bộ nào sau khi trộn hai tầng: <c>"global"</c> (bộ toàn cục) hay
+    /// <c>"project"</c> (bộ riêng của dự án, đè lên bản toàn cục cùng <c>id</c>).
+    /// VẮNG trường này = manifest KHÔNG trộn (máy chủ bản cũ, hoặc đường tải không kèm
+    /// <c>?project=</c>) ⇒ coi như bộ toàn cục: mọi thư viện phát hành trước M113 chạy y nguyên.
+    /// </summary>
+    [JsonPropertyName("nguon")] public string? Nguon { get; init; }
+
+    /// <summary>
+    /// M113 §4 — version của BỘ mà block này đến từ (không phải version của manifest đã trộn).
+    /// Plugin cần nó để tải đúng tệp <c>.dwg</c> lẻ của bộ đó (<c>?file=…&amp;libVersion=…</c>).
+    /// Vắng = manifest không trộn.
+    /// </summary>
+    [JsonPropertyName("libVersion")] public string? LibVersion { get; init; }
+
+    /// <summary>Block đến từ bộ RIÊNG của dự án (đè bản toàn cục hoặc chỉ dự án mới có).</summary>
+    [JsonIgnore]
+    public bool LaCuaDuAn => string.Equals(Nguon, "project", StringComparison.Ordinal);
+
+    /// <summary>Nhãn tiếng Việt của nguồn, dùng chung cho mọi chỗ in ra cho kỹ sư (FR5/FR6).</summary>
+    [JsonIgnore]
+    public string NhanNguon => LaCuaDuAn ? "Dự án" : "Toàn cục";
+
     // Khóa "previewSvg" (ảnh xem trước cho web, M104 §2) CỐ Ý không model ở đây: plugin không cần
     // ảnh, mà loader bỏ qua field lạ nên nó vẫn đi qua nguyên vẹn khi dựng manifest ứng viên.
 
@@ -112,6 +135,16 @@ public sealed class BlockManifest
     /// coi thư viện là dùng được. Rỗng với mọi thư viện phát hành trước M104.
     /// </summary>
     public IEnumerable<BlockDef> TepRieng() => Blocks.Where(b => b.CoTepRieng);
+
+    /// <summary>
+    /// Manifest có block nào lấy định nghĩa từ tệp .dwg NỀN của bộ TOÀN CỤC không (M113 §4.5).
+    /// Dùng để chỉ đòi tệp nền nào thật sự cần: dự án có bộ riêng đè hết block, hoặc máy chủ chưa
+    /// phát hành bộ toàn cục nào, thì không có gì để kiểm bằng tệp nền toàn cục.
+    /// </summary>
+    public bool CoBlockToanCuc => Blocks.Any(b => !b.CoTepRieng && !b.LaCuaDuAn);
+
+    /// <summary>Manifest có block lấy định nghĩa từ tệp .dwg nền của bộ DỰ ÁN không (M113 §4.5).</summary>
+    public bool CoBlockDuAn => Blocks.Any(b => !b.CoTepRieng && b.LaCuaDuAn);
 
     /// <summary>
     /// Block thiết bị ứng với một id khai trong <c>drawTools.systems[].equipment[]</c> (id đó là
@@ -266,6 +299,36 @@ public static class BlockManifestLoader
         if (!File.Exists(duongDanDwg))
             throw new BlockManifestException($"Không thấy tệp thư viện block: {duongDanDwg}");
         KiemTraHashTep(manifest, File.ReadAllBytes(duongDanDwg));
+    }
+
+    /// <summary>
+    /// Đối chiếu hash một tệp .dwg với sha256 CHỈ ĐỊNH (M113 §4.5 — "hash kiểm theo từng bộ",
+    /// không trộn). Bộ của dự án mang <c>dwgSha256</c> RIÊNG, máy chủ trả kèm ngoài manifest đã
+    /// trộn, nên không dùng <see cref="KiemTraHashTep(BlockManifest, byte[])"/> được.
+    /// <paramref name="moTaBo"/> đi vào thông điệp để kỹ sư biết bộ nào hỏng.
+    /// </summary>
+    public static void KiemTraHashTepTheoSha(string moTaBo, string shaMongDoi, byte[] noiDung)
+    {
+        if (!LaSha256Hex(shaMongDoi))
+        {
+            throw new BlockManifestException(
+                $"Thiếu sha256 hợp lệ của {moTaBo} — không kiểm được toàn vẹn tệp .dwg, từ chối dùng.");
+        }
+        var that = TinhSha256(noiDung);
+        if (!string.Equals(that, shaMongDoi, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new BlockManifestException(
+                $"Tệp thư viện block của {moTaBo} không khớp hash máy chủ khai " +
+                $"(máy chủ {Rut(shaMongDoi)}, tệp {Rut(that)}) — tải lại bằng XBOSS_LOGIN.");
+        }
+    }
+
+    /// <summary>Bản đọc từ đĩa của <see cref="KiemTraHashTepTheoSha(string, string, byte[])"/>.</summary>
+    public static void KiemTraHashTepTheoSha(string moTaBo, string shaMongDoi, string duongDanDwg)
+    {
+        if (!File.Exists(duongDanDwg))
+            throw new BlockManifestException($"Không thấy tệp thư viện block của {moTaBo}: {duongDanDwg}");
+        KiemTraHashTepTheoSha(moTaBo, shaMongDoi, File.ReadAllBytes(duongDanDwg));
     }
 
     /// <summary>
