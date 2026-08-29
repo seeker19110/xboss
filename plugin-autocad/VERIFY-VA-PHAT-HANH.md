@@ -155,6 +155,33 @@ bóc trên cùng bản vẽ khi **mở khoá tay hết layer từ trước** —
     _Từ M106: phạm vi/kiểu nối thu qua **hộp thoại có xem trước số đốt** — xem mục 34._
 25. `XBOSS_VE_BAOCAO` → sinh báo cáo phiên vẽ JSON cạnh DWG (có mục chia đốt: tuyến đã chia /
     chưa chia, và lý do bỏ qua của phiên vừa chạy).
+    25b. **Revision cloud (M110) — bật `drawTools.revisionPolicy.enabled = true` trong rule pack theo
+    dự án trước khi kiểm; thư viện block phải có block tam giác `kind: annotation` khai ở
+    `revisionPolicy.triangleBlockId`.**
+
+    - **AC8 (mặc định tắt):** với rule pack `enabled: false`, cả 3 lệnh `XBOSS_VE_REV`,
+      `XBOSS_VE_REV_CHOT`, `XBOSS_VE_REV_HIENTHI` **dừng kèm hướng dẫn cách bật**, bản vẽ không đổi.
+    - **AC1:** bản vẽ đã vẽ xong → `XBOSS_VE_REV_CHOT` (ngày/nội dung/người) → mốc được ghi; mở
+      **TỪNG layout** kiểm bảng revision khung tên có dòng `R1` đúng ngày/nội dung/người. Layout
+      thiếu thẻ attribute phải hiện cảnh báo nêu **tên layout**, và khung tên **không** bị thêm thẻ.
+    - **AC2:** dời 1 tuyến, đổi cỡ 1 tuyến, xóa 1 phụ kiện, thêm 1 thiết bị → `XBOSS_VE_REV` đề
+      xuất **đúng 4 vùng**, phân loại đúng thêm/xóa/đổi; vùng của phụ kiện đã xóa nằm ở **vị trí
+      cũ**; nút "Zoom tới" nhảy đúng vùng.
+    - **AC3:** khoanh 3/4 vùng rồi `XBOSS_VE_REV_CHOT` → cảnh báo nêu **đúng vùng còn thiếu**; tick
+      "vẫn chốt" (hoặc trả lời `CO` ở dòng lệnh) thì `R2` được ghi bình thường.
+    - **AC4:** cloud `R1` vẫn còn trong bản vẽ sau khi chốt `R2` và mặc định **tắt hiển thị**; bật
+      lại bằng `XBOSS_VE_REV_HIENTHI` thì hiện đúng cloud `R1` (layer `<layer>-R1`).
+    - **AC5 (idempotent):** chạy `XBOSS_VE_REV` 3 lần trên cùng một vùng → đúng **1 cloud + 1 tam
+      giác**.
+    - **AC6:** khung tên chỉ có `maxRows = 6` dòng và đang ở `R6` → chốt `R7` **dừng kèm thông
+      báo**, bảng revision **không mất dòng nào**.
+    - **AC7:** xóa cloud bằng `ERASE` → `XBOSS_KIEMTRA` báo **tam giác revision mồ côi** (phép kiểm
+      20); xóa tam giác thì báo cloud mồ côi.
+    - **AC9:** mỗi lệnh hoàn tác trọn vẹn bằng **một lần `U`**.
+    - **AC10:** chạy `XBOSS_BOCKL` trước và sau khi khoanh cloud → **đúng con số như nhau**.
+    - **FR9:** đặt biến môi trường `XBOSS_UI_DIALOG=0` rồi chạy lại cả 3 lệnh → hỏi đáp dòng lệnh
+      cho **kết quả trùng khít** với đường hộp thoại.
+
 26. Vẽ xong chạy `XBOSS_KIEMTRA` → **pass ngay** (đây chính là mục đích của bộ lệnh vẽ) và
     `XBOSS_BOCKL` bóc không sót nét mới vẽ.
 

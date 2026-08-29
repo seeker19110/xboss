@@ -15,7 +15,8 @@ public sealed record InspectionFinding
     /// font-cu / lineweight-lech / dim-override / rac-hinh-hoc / layer-rong / block-nac-danh;
     /// M101 (v5, mặc định tắt): chong-lan-cung-he / giao-cat-khac-he / khung-ten-thieu-truong /
     /// viewport-le-chuan / style-lech-chuan / nhan-lech-xdata / doi-tuong-ngoai-khung;
-    /// M102 (v8): tag-trung / ma-boq-mo-coi; M111 (v14+): nhantang-handle-mo-coi.</summary>
+    /// M102 (v8): tag-trung / ma-boq-mo-coi; M111 (v14+): nhantang-handle-mo-coi;
+    /// M110 (v14+): revision-mo-coi.</summary>
     [JsonPropertyName("id")] public required string Id { get; init; }
     [JsonPropertyName("ten")] public required string Ten { get; init; }
     [JsonPropertyName("handles")] public required IReadOnlyList<string> Handles { get; init; }
@@ -224,6 +225,10 @@ public sealed class Inspector
         // (19) Handle mồ côi trong bản chép tầng (M111 FR9/AC3) — tự tắt khi bản vẽ không có đối
         // tượng nhân bản tầng nào, nên không cần (và cố ý KHÔNG thêm) khóa rule pack riêng cho nó.
         ThemNeuCo(PhepKiemMoRong.HandleMoCoiNhanTang(snapshot));
+
+        // (20) Cloud/tam giác revision mồ côi (M110 FR8) — tự tắt khi bản vẽ không có đối tượng
+        // revision nào, nên không cần (và cố ý KHÔNG thêm) khóa rule pack mới cho riêng nó.
+        ThemNeuCo(PhepKiemMoRong.RevisionMoCoi(snapshot));
 
         return new InspectionReport { RulePackVersion = _pack.Version, Findings = findings, CanhBao = canhBao };
 

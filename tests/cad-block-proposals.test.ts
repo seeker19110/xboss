@@ -227,6 +227,10 @@ test("metadata: bộ đủ hợp lệ; thiếu hệ / item bóc tách / khổ gi
   assert.ok(
     docMetaDeXuat(metaHopLe({ paper_size: "A1" })).errors.some((e) => e.includes("paper_size")),
   );
+  // M110 — kind "annotation" (tam giác revision): thuộc một hệ như block thường nhưng KHÔNG
+  // phải khai takeoff_item_id, vì ký hiệu chú thích không bao giờ vào khối lượng.
+  const anno = docMetaDeXuat(metaHopLe({ kind: "annotation", takeoff_item_id: "" }));
+  assert.deepEqual(anno.errors, []);
   // kind lạ, sha256 sai, thiếu base version, thiếu manifest.
   assert.ok(docMetaDeXuat(metaHopLe({ kind: "phu-kien" })).errors.some((e) => e.includes("kind")));
   assert.ok(docMetaDeXuat(metaHopLe({ sha256: "abc" })).errors.some((e) => e.includes("sha256")));

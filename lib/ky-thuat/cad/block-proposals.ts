@@ -34,7 +34,13 @@ import { dungPreviewSvg } from "@/lib/ky-thuat/cad/block-preview-svg";
 
 // ── Hằng số & nhãn tiếng Việt ────────────────────────────────────────────────
 
-export const TRANG_THAI_DE_XUAT = ["pending", "approved", "rejected", "stale", "withdrawn"] as const;
+export const TRANG_THAI_DE_XUAT = [
+  "pending",
+  "approved",
+  "rejected",
+  "stale",
+  "withdrawn",
+] as const;
 export type TrangThaiDeXuat = (typeof TRANG_THAI_DE_XUAT)[number];
 
 export const NHAN_TRANG_THAI_DE_XUAT: Record<TrangThaiDeXuat, string> = {
@@ -51,9 +57,14 @@ export const NHAN_LOAI_BLOCK: Record<LoaiBlock, string> = {
   titleblock: "Khung tên",
   support: "Giá đỡ",
   sleeve: "Ống lồng",
+  annotation: "Ký hiệu chú thích",
 };
 
-/** Kind đếm khối lượng theo block (M103 §2) — bắt buộc khai `takeoff_item_id`. */
+/**
+ * Kind đếm khối lượng theo block (M103 §2) — bắt buộc khai `takeoff_item_id`.
+ * `titleblock` và `annotation` (M110) đứng ngoài: khung tên và ký hiệu chú thích không phải khối
+ * lượng thi công, ép khai `takeoff_item_id` chỉ tạo ra hạng mục ma trong BOQ.
+ */
 const KIND_DEM_KHOI_LUONG: readonly LoaiBlock[] = ["fitting", "equipment", "support", "sleeve"];
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
@@ -700,10 +711,7 @@ export type ThuHoiKetQua =
  * `proposed_by`+`status` là 1 câu lệnh nguyên tử (CAS) — không cần transaction/khoá riêng, cùng
  * cách `tuChoiDeXuat` đang làm.
  */
-export async function thuHoiDeXuat(input: {
-  id: number;
-  userId: number;
-}): Promise<ThuHoiKetQua> {
+export async function thuHoiDeXuat(input: { id: number; userId: number }): Promise<ThuHoiKetQua> {
   const kq = await run(
     `UPDATE cad_block_proposals
         SET status = 'withdrawn', decided_by = ?, decided_at = now()

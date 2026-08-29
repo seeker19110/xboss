@@ -143,6 +143,14 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > ở layer con `-R{n}`. **Chỉ CAD — không đụng server/web/`drawing_revisions`** (chốt 2026-08-28).
 > Rule pack +1, không migration. 2 PR.
 >
+> **Trạng thái M110 (2026-08-29): ĐÃ CODE XONG cả 2 PR** (PR1 Core + rule pack v14, PR2 Adapter:
+> `Commands/VeRevCommands.cs`, `Services/RevisionStore.cs`, layer con `-R{n}`, hộp thoại M106, phép
+> kiểm 20 cloud/tam giác mồ côi, tài liệu). **Còn nợ: verify tay AC1–AC7/AC9/AC10 trên máy có
+> AutoCAD 2026** (môi trường CI không chạy được AutoCAD) — chưa verify thì chưa phát hành rộng.
+> PR2 còn thêm kind `annotation` vào thư viện block (`LOAI_BLOCK` + `BlockKind`) vì đặc tả §5 dùng
+> `kind=annotation` cho tam giác revision mà enum cũ chưa có; kind này **không** nằm trong nhóm đếm
+> khối lượng.
+>
 > **M111 (`M111-nhan-ban-tang-dien-hinh.md`)** — ✅ **CODE XONG cả 3 PR** (rule pack v12+
 > `drawTools.floorPolicy`, mặc định TẮT)
 >

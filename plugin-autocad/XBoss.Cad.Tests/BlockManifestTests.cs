@@ -36,6 +36,22 @@ public class BlockManifestTests
     }
 
     [Fact]
+    public void Nhan_kind_annotation_cua_tam_giac_revision_M110()
+    {
+        // M110 §5 — tam giác số revision là ký hiệu CHÚ THÍCH: kind riêng để không lọt vào danh mục
+        // phụ kiện/thiết bị của các lệnh chèn (guardrail 1 — XBOSS_BOCKL không được đếm thêm gì).
+        var json = File.ReadAllText(ManifestMauPath)
+            .Replace("\"id\": \"elbow-duct\"", "\"id\": \"rev-tag\"")
+            .Replace("\"kind\": \"fitting\"", "\"kind\": \"annotation\"");
+        var m = BlockManifestLoader.Load(json);
+
+        var tamGiac = m.TimTheoId("rev-tag");
+        Assert.NotNull(tamGiac);
+        Assert.Equal(BlockKind.Annotation, tamGiac!.KindEnum);
+        Assert.Empty(m.TheoLoai(BlockKind.Fitting));
+    }
+
+    [Fact]
     public void Hash_khop_tep_dwg_mau()
     {
         var m = NapMau();

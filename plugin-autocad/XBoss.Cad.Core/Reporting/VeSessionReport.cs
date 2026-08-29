@@ -80,6 +80,17 @@ public sealed record VeChiaDotBoQua
 }
 
 /// <summary>
+/// Một revision đã khoanh cloud trong bản vẽ (M110) — mỗi vùng khoanh gồm 1 cloud + 1 tam giác,
+/// nên <see cref="SoDoiTuong"/> của một revision lành lặn luôn là số chẵn (lẻ = có mồ côi, phép
+/// kiểm 20 của XBOSS_KIEMTRA nói rõ đối tượng nào).
+/// </summary>
+public sealed record VeRevisionCum
+{
+    [JsonPropertyName("so")] public required int So { get; init; }
+    [JsonPropertyName("soDoiTuong")] public required int SoDoiTuong { get; init; }
+}
+
+/// <summary>
 /// Một cụm đối tượng NGẮT NÉT GIAO CHÉO (M109 FR9), gộp theo tuyến ĐI DƯỚI (hệ + loại tuyến + cỡ).
 /// Đọc từ XData vai trò <c>NgatNet</c> đang sống trong bản vẽ nên mở lại bản vẽ lúc nào cũng dựng
 /// lại được — khác các con số "bỏ qua theo lý do" vốn là chuyện của LẦN CHẠY lệnh và nằm trong
@@ -172,6 +183,8 @@ public sealed class VeSessionReport
     [JsonPropertyName("chiaDotBoQua")] public required IReadOnlyList<VeChiaDotBoQua> ChiaDotBoQua { get; init; }
     /// <summary>Mục ngắt nét giao chéo (M109 FR9): các cụm đối tượng ngắt nét theo tuyến đi dưới.</summary>
     [JsonPropertyName("ngatNet")] public required IReadOnlyList<VeNgatNetCum> NgatNet { get; init; }
+    /// <summary>Mục revision (M110): các revision đã khoanh cloud trong bản vẽ.</summary>
+    [JsonPropertyName("revision")] public IReadOnlyList<VeRevisionCum> Revision { get; init; } = [];
     /// <summary>Định nghĩa block do plugin nhập từ thư viện (đánh dấu trong BlockTable).</summary>
     [JsonPropertyName("soDinhNghiaBlock")] public int SoDinhNghiaBlock { get; init; }
     [JsonPropertyName("soBangThongKe")] public int SoBangThongKe { get; init; }
@@ -230,6 +243,7 @@ public sealed class VeSessionReport
         var tuDong = new Dictionary<(string He, string Item, string Size), (int So, int Sua, HashSet<string> Phien)>();
         var rulePackKhac = new Dictionary<string, int>(StringComparer.Ordinal);
         var thuVienKhac = new Dictionary<string, int>(StringComparer.Ordinal);
+        var revision = new Dictionary<int, int>();
         var soDinhNghia = 0;
         var soBang = 0;
         var soHanhLang = 0;
@@ -249,6 +263,12 @@ public sealed class VeSessionReport
                     // được) nên đếm riêng — gom vào bảng theo hệ chỉ đẻ ra nhóm "(không rõ hệ)"
                     // toàn số 0 trong mọi báo cáo.
                     soHanhLang++;
+                    break;
+                case VaiTroVe.Revision:
+                    // Cloud/tam giác revision là CHÚ THÍCH, không thuộc hệ nào (guardrail 1 của
+                    // M110: không đụng hình học nghiệp vụ) — đếm riêng, không cộng vào thống kê hệ.
+                    var soRev = xd.SoRevision ?? 0;
+                    revision[soRev] = revision.GetValueOrDefault(soRev) + 1;
                     break;
                 default:
                     // Đối tượng mất HeId (XData bị sửa tay) vẫn phải đếm được — gom vào một nhóm
@@ -452,6 +472,10 @@ public sealed class VeSessionReport
             SizeCustom = dsSizeCustom,
             ChiaDot = dsChiaDot,
             ChiaDotBoQua = dsChuaChia,
+            Revision = revision
+                .OrderBy(kv => kv.Key)
+                .Select(kv => new VeRevisionCum { So = kv.Key, SoDoiTuong = kv.Value })
+                .ToList(),
             NgatNet = dsNgatNet,
             SoDinhNghiaBlock = soDinhNghia,
             SoBangThongKe = soBang,
@@ -562,6 +586,15 @@ public sealed class VeSessionReport
                 "jointRules nên lệnh bỏ qua — lý do từng lần xem nhật ký phiên):");
             foreach (var c in ChiaDotBoQua)
                 sb.AppendLine($"  - {c.HeId}/{c.ItemId} {c.Size}: {c.SoTuyen} tuyến");
+        }
+        if (Revision.Count > 0)
+        {
+            sb.AppendLine("Revision cloud (XBOSS_VE_REV) — mỗi vùng khoanh gồm 1 cloud + 1 tam giác:");
+            foreach (var r in Revision)
+            {
+                var so = r.So == 0 ? "(không rõ số)" : $"R{r.So.ToString(CultureInfo.InvariantCulture)}";
+                sb.AppendLine($"  - {so}: {r.SoDoiTuong} đối tượng");
+            }
         }
         if (NhanTang.Count > 0)
         {

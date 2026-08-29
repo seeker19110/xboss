@@ -59,6 +59,28 @@ test("chặn: manifest khai block không có trong DXF sidecar (§6.10 — thư 
   assert.ok(kq.errors.some((e) => e.includes("XB-KHONG-CO-THAT")));
 });
 
+test('kind "annotation" (M110) hợp lệ và KHÔNG bị kéo vào khối lượng', async () => {
+  const { kiemDinhManifest, LOAI_BLOCK } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { NHAN_LOAI_BLOCK } = await import("@/lib/ky-thuat/cad/block-proposals");
+
+  assert.ok((LOAI_BLOCK as readonly string[]).includes("annotation"));
+  assert.ok(NHAN_LOAI_BLOCK.annotation.length > 0, "kind mới phải có nhãn tiếng Việt cho web");
+
+  // Tam giác số revision là ký hiệu chú thích: đổi một block phụ kiện sang kind annotation thì
+  // manifest vẫn hợp lệ và không sinh cảnh báo takeoff nào (guardrail 1 của M110 — khoanh
+  // revision xong, XBOSS_BOCKL phải cho đúng con số như trước).
+  const m = manifest();
+  const b = blocks(m).find((x) => x.kind === "fitting")!;
+  b.kind = "annotation";
+  delete b.takeoffItemId;
+  const kq = kiemDinhManifest(m, DWG_MAU, DXF_MAU);
+  assert.equal(kq.ok, true, JSON.stringify(kq.errors));
+  assert.ok(
+    !kq.warnings.some((w) => w.includes(String(b.id))),
+    `block annotation không được sinh cảnh báo takeoff: ${JSON.stringify(kq.warnings)}`,
+  );
+});
+
 test("chặn: kind lạ, id trùng, thiếu blockName, hai mục trùng tên block", async () => {
   const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block-lib");
 
