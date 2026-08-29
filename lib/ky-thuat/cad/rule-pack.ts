@@ -46,14 +46,95 @@ export const CURRENT_RULE_PACK_VERSION = RULE_PACK_HIEN_HANH.version;
  * (M105 §7/§12). Mở rộng thuần: mọi khóa cũ giữ nguyên từng byte nên kiểm/chuẩn hóa/bóc/vẽ bằng v9 cho
  * kết quả y hệt v8; rule pack cũ (v4–v8) không có `jointRules` thì lệnh chia đốt TỪ CHỐI chạy chứ không
  * đoán mặc định ngầm;
- * v11 = v9 + khối `drawTools.revisionPolicy` — tham số revision cloud của bộ lệnh XBOSS_VE_REV /
- * _CHOT / _HIENTHI (M110 §5: chiều dài cung cloud, layer, block tam giác, định dạng số revision, mẫu
- * tên attribute bảng revision trong khung tên, số dòng tối đa, nới bao hình). Số v10 do một đợt nâng
- * cấp song song giữ chỗ nên M110 phát hành thẳng v11. Mở rộng thuần và `enabled: false` mặc định ⇒
- * mọi lệnh cũ chạy với v11 cho kết quả y hệt v9, 3 lệnh revision dừng kèm thông báo cách bật (AC8).
+ * v12 = v9 + 2 khối độc lập nhau, cùng phát hành trong một version:
+ * (a) `drawTools.floorPolicy` cho lệnh nhân bản tầng điển hình `XBOSS_VE_NHANTANG` (M111 §4):
+ * danh sách nhãn tầng, kiểu dời + bước dời, mẫu tên vùng bóc của bản chép, danh sách vai trò được
+ * chép; (b) `drawTools.revisionPolicy` cho bộ lệnh revision cloud `XBOSS_VE_REV`/`_CHOT`/`_HIENTHI`
+ * (M110 §5): chiều dài cung cloud, layer, block tam giác, định dạng số revision, mẫu tên attribute
+ * bảng revision trong khung tên, số dòng tối đa, nới bao hình. Cả hai mở rộng thuần (mọi khóa cũ
+ * giữ nguyên từng byte) và `enabled: false` mặc định nên v12 cho kết quả y hệt v9; lệnh nhân tầng
+ * lẫn 3 lệnh revision đều từ chối chạy tới khi công ty bật khóa của mình (M111 AC12, M110 AC8).
  */
 export function getCurrentRulePack(): CadRulePack {
   return RULE_PACK_HIEN_HANH;
+}
+
+/** Vai trò đối tượng do bộ lệnh vẽ sinh ra — bản TS của enum `VaiTroVe` (Core `Draw/VeXData.cs`). */
+export const VAI_TRO_VE = [
+  "Tim",
+  "Bien",
+  "Nhan",
+  "TuyenCat",
+  "MatCat",
+  "PhuKien",
+  "ThietBi",
+  "DinhNghiaBlock",
+  "GiaDo",
+  "LoCho",
+  "BangThongKe",
+  "VachChia",
+  "NhanDot",
+] as const;
+
+/** Kiểu dời bản chép trong model space — bản TS của enum `KieuDatTang` (Core `Draw/FloorReplicator.cs`). */
+export const KIEU_DAT_TANG = ["offsetY", "offsetX", "luoi"] as const;
+
+/** Khối `drawTools.floorPolicy` nhìn từ validator (M111 §4). */
+export type FloorPolicy = {
+  enabled: boolean;
+  floors: readonly string[];
+  layoutMode: string;
+  stepMm: number;
+  gridColumns: number;
+  zoneNamePattern: string;
+  copyRoles: readonly string[];
+};
+
+/**
+ * Validator tầng TS của `drawTools.floorPolicy` (M111 §4) — đôi của `FloorReplicator.Validate`
+ * bên plugin .NET. Trả danh sách lỗi tiếng Việt; rỗng = hợp lệ.
+ *
+ * Khối đang TẮT vẫn kiểm: rule pack phát hành phải khai sẵn tham số dùng được ngay khi bật, đúng
+ * quy ước của các khối chính sách v5–v9 (bật lên là chạy, không phải sửa rule pack thêm lần nữa).
+ */
+export function kiemFloorPolicy(fp: FloorPolicy): string[] {
+  const loi: string[] = [];
+
+  if (!(KIEU_DAT_TANG as readonly string[]).includes(fp.layoutMode)) {
+    loi.push(
+      `floorPolicy.layoutMode không hợp lệ: "${fp.layoutMode}" (chỉ nhận ${KIEU_DAT_TANG.map((k) => `"${k}"`).join(", ")}).`,
+    );
+  }
+  if (fp.layoutMode === "luoi" && fp.gridColumns <= 0) {
+    loi.push('floorPolicy.gridColumns phải dương khi layoutMode = "luoi".');
+  }
+
+  if (fp.floors.length === 0) {
+    loi.push("floorPolicy.floors rỗng — không có tầng đích nào để chép.");
+  }
+  const trung = [...new Set(fp.floors.filter((t, i) => fp.floors.indexOf(t) !== i))];
+  if (trung.length > 0) {
+    loi.push(`floorPolicy.floors khai trùng nhãn tầng: ${trung.join(", ")}.`);
+  }
+  if (!(fp.stepMm > 0)) {
+    loi.push(`floorPolicy.stepMm = ${fp.stepMm} phải dương — hai tầng sẽ chồng lên nhau.`);
+  }
+  if (!fp.zoneNamePattern.includes("{floor}")) {
+    loi.push(
+      `floorPolicy.zoneNamePattern "${fp.zoneNamePattern}" thiếu {floor} — mọi tầng ra cùng một tên vùng, sheet Tong-hop-vung gộp nhầm.`,
+    );
+  }
+  if (fp.copyRoles.length === 0) {
+    loi.push("floorPolicy.copyRoles rỗng — không vai trò nào được chép.");
+  }
+  for (const vaiTro of fp.copyRoles) {
+    if (!(VAI_TRO_VE as readonly string[]).includes(vaiTro)) {
+      loi.push(
+        `floorPolicy.copyRoles["${vaiTro}"] không phải vai trò có thật trong VaiTroVe (hợp lệ: ${VAI_TRO_VE.join(", ")}).`,
+      );
+    }
+  }
+  return loi;
 }
 
 /** ETag mạnh theo hash nội dung — plugin cache cục bộ và hỏi lại bằng `If-None-Match`. */

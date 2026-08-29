@@ -15,6 +15,7 @@ import {
   getCurrentRulePack,
   getRulePackEtag,
   matchesEtag,
+  kiemFloorPolicy,
   CURRENT_RULE_PACK_VERSION,
 } from "@/lib/ky-thuat/cad/rule-pack";
 import {
@@ -26,7 +27,7 @@ import { kiemTraRevisionPolicy, soRevisionTheoMau } from "@/lib/ky-thuat/cad/rul
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8, version = v11", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8, version = v12", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -50,8 +51,8 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleM
   for (const field of ["polylineClosePolicy", "blockMap"]) {
     assert.ok(field in pack, `Thiếu field v8 ${field}`);
   }
-  assert.equal(pack.version, "v11");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v11");
+  assert.equal(pack.version, "v12");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v12");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -860,6 +861,8 @@ test("v8: ánh xạ layer idempotent — áp lại lên tên đã chuẩn không
 
 test("rule pack v9 là mở rộng thuần của v8: chỉ thêm jointRules + jointRulesNote (M105 §12)", async () => {
   const v8 = (await import("@/lib/ky-thuat/cad/rule-packs/v8.json")).default;
+  // So THẲNG tệp v9.json, không qua getCurrentRulePack() — rule pack hiện hành đã là v12 (M111),
+  // so nhầm sẽ bắt v12 phải giống v8 ở khối drawTools vốn đã có thêm floorPolicy.
   const v9 = (await import("@/lib/ky-thuat/cad/rule-packs/v9.json")).default;
 
   // Mọi khối ngoài drawTools phải y nguyên — kiểm/chuẩn hóa/bóc bằng v9 không đổi hành vi.
@@ -951,11 +954,11 @@ test("v9: MỌI tuyến đều khai jointRules đủ dùng, dải chọn kiểu 
   }
 });
 
-// ===== v11 (M110 §5) — revisionPolicy: tham số revision cloud =====
+// ===== v12 (M111) — floorPolicy: tham số nhân bản tầng điển hình =====
 
-test("rule pack v11 là mở rộng thuần của v9: chỉ thêm drawTools.revisionPolicy (M110 §5)", async () => {
+test("rule pack v12 là mở rộng thuần của v9: chỉ thêm floorPolicy + revisionPolicy (M111 §4, M110 §5)", async () => {
   const v9 = (await import("@/lib/ky-thuat/cad/rule-packs/v9.json")).default;
-  const v11 = getCurrentRulePack();
+  const v12 = getCurrentRulePack();
 
   for (const field of [
     "layerMap",
@@ -974,22 +977,85 @@ test("rule pack v11 là mở rộng thuần của v9: chỉ thêm drawTools.revi
     "blockMap",
   ] as const) {
     assert.deepEqual(
-      v11[field],
+      v12[field],
       v9[field],
-      `Field ${field} của v11 lệch v9 — v11 phải là mở rộng thuần`,
+      `Field ${field} của v12 lệch v9 — v12 phải là mở rộng thuần (chỉ thêm 2 khối trong drawTools)`,
     );
   }
   assert.deepEqual(
-    Object.keys(v11).filter((k) => !(k in v9)),
+    Object.keys(v12).filter((k) => !(k in v9)),
     [],
-    "v11 không được thêm khối cấp cao nào — revisionPolicy nằm trong drawTools",
+    "v12 không được thêm khối cấp cao nào — floorPolicy/revisionPolicy nằm trong drawTools",
   );
 
-  const { revisionPolicy: _rev, ...drawToolsV11 } = v11.drawTools;
-  assert.deepEqual(drawToolsV11, v9.drawTools, "v11 đụng tham số drawTools ngoài revisionPolicy");
+  // v12 mang 2 khối mới độc lập nhau: floorPolicy (M111) + revisionPolicy (M110) — bỏ cả hai ra
+  // rồi mới so, phần drawTools còn lại phải y nguyên v9.
+  const { floorPolicy: _bo, revisionPolicy: _rev, ...drawToolsV12 } = v12.drawTools;
+  assert.deepEqual(
+    drawToolsV12,
+    v9.drawTools,
+    "v12 đụng tham số drawTools ngoài floorPolicy + revisionPolicy",
+  );
 });
 
-test("v11: revisionPolicy khai đủ tham số và mặc định TẮT (M110 §5/AC8)", () => {
+test("v12: floorPolicy TẮT mặc định nhưng khai sẵn tham số dùng được ngay (M111 AC12)", () => {
+  const fp = getCurrentRulePack().drawTools.floorPolicy;
+
+  assert.equal(
+    fp.enabled,
+    false,
+    "lệnh nhân tầng phải tắt mặc định — nhân sai 20 tầng là hỏng cả buổi",
+  );
+  assert.deepEqual(
+    kiemFloorPolicy(fp),
+    [],
+    "khối phát hành phải hợp lệ để bật lên là chạy được ngay",
+  );
+  assert.ok(
+    (fp.floorsNote ?? "").length > 0 && (fp.copyRolesNote ?? "").length > 0,
+    "floorPolicy thiếu mô tả tiếng Việt cho người phát hành rule pack sau",
+  );
+  // Vai trò hồ sơ/trình bày không được chép (§4 copyRolesNote, FR7).
+  for (const vaiTro of ["MatCat", "TuyenCat", "BangThongKe"]) {
+    assert.ok(!fp.copyRoles.includes(vaiTro), `copyRoles không được chép vai trò hồ sơ ${vaiTro}`);
+  }
+});
+
+test("v12: validator floorPolicy bắt đủ 4 lỗi của M111 §4", () => {
+  const hopLe = getCurrentRulePack().drawTools.floorPolicy;
+
+  assert.match(kiemFloorPolicy({ ...hopLe, floors: [] })[0], /floors/);
+  assert.match(kiemFloorPolicy({ ...hopLe, floors: ["05", "06", "05"] })[0], /trùng/);
+  assert.match(kiemFloorPolicy({ ...hopLe, stepMm: 0 })[0], /stepMm/);
+  assert.match(kiemFloorPolicy({ ...hopLe, zoneNamePattern: "{zone}-T" })[0], /\{floor\}/);
+  assert.match(
+    kiemFloorPolicy({ ...hopLe, copyRoles: ["Tim", "KhongCoVaiTroNay"] })[0],
+    /KhongCoVaiTroNay/,
+  );
+});
+
+test("v12: validator TS khớp validator C# — cả 3 kiểm còn lại của FloorReplicator.Validate", () => {
+  // Hai tầng lệch nhau là đúng lớp rủi ro M111: rule pack qua được web nhưng plugin từ chối nạp
+  // (hoặc ngược lại). 3 ca dưới đây là phần C# đang chặn mà TS từng bỏ sót.
+  const hopLe = getCurrentRulePack().drawTools.floorPolicy;
+
+  assert.match(kiemFloorPolicy({ ...hopLe, layoutMode: "cheo" })[0], /layoutMode/);
+  assert.deepEqual(
+    kiemFloorPolicy({ ...hopLe, layoutMode: "luoi", gridColumns: 0 }),
+    ['floorPolicy.gridColumns phải dương khi layoutMode = "luoi".'],
+    "xếp lưới mà không có cột nào thì mọi tầng chồng lên nhau",
+  );
+  assert.match(kiemFloorPolicy({ ...hopLe, copyRoles: [] })[0], /copyRoles/);
+
+  // gridColumns chỉ có nghĩa với layoutMode = luoi — kiểu dời khác không được báo oan.
+  assert.deepEqual(kiemFloorPolicy({ ...hopLe, gridColumns: 0 }), []);
+});
+
+// ===== v12 (M110 §5) — revisionPolicy: tham số revision cloud =====
+// (v12 phát hành cùng lúc 2 khối độc lập: floorPolicy của M111 ở trên và revisionPolicy dưới đây;
+// tính "mở rộng thuần" của cả hai đã được test v12 phía trên canh chung.)
+
+test("v12: revisionPolicy khai đủ tham số và mặc định TẮT (M110 §5/AC8)", () => {
   const rev = getCurrentRulePack().drawTools.revisionPolicy;
 
   assert.equal(
@@ -1004,7 +1070,7 @@ test("v11: revisionPolicy khai đủ tham số và mặc định TẮT (M110 §5
   }
 });
 
-test("validator revisionPolicy: bắt đúng các ca sai của M110 §5", () => {
+test("v12: validator revisionPolicy bắt đúng các ca sai của M110 §5", () => {
   const goc = getCurrentRulePack().drawTools.revisionPolicy;
   const sua = (p: Partial<typeof goc>) => kiemTraRevisionPolicy({ ...goc, ...p });
 

@@ -157,6 +157,15 @@ public sealed record VeXDataInfo
 
     /// <summary>Handle các đối tượng nằm trong vùng cloud — nguồn của cảnh báo bỏ sót (FR5).</summary>
     public IReadOnlyList<string> HandleTrongVung { get; init; } = [];
+    // ===== Nhân bản tầng điển hình (M111 FR9) =====
+    // Hai khóa dưới đây CHỈ có trên bản chép do XBOSS_VE_NHANTANG sinh ra — dấu nhận diện để chạy
+    // lại lệnh biết tầng đích đã chép rồi (bỏ qua / chép đè), và để báo cáo truy được nguồn gốc.
+
+    /// <summary>Nhãn tầng NGUỒN đã chép ra đối tượng này; null = không phải bản chép.</summary>
+    public string? TangNguon { get; init; }
+
+    /// <summary>Nhãn tầng của chính bản chép này (tầng đích).</summary>
+    public string? NhanTang { get; init; }
 }
 
 /// <summary>
@@ -214,6 +223,8 @@ public static class VeXData
         if (tt.SoRevision is { } sr) ra.Add($"rev={sr.ToString(CultureInfo.InvariantCulture)}");
         Them(ra, "capdoi", tt.HandleCapDoi);
         foreach (var h in tt.HandleTrongVung) Them(ra, "trongvung", h);
+        Them(ra, "tangnguon", tt.TangNguon);
+        Them(ra, "nhantang", tt.NhanTang);
         return ra;
     }
 
@@ -253,6 +264,7 @@ public static class VeXData
         string? sizeLoCho = null, ketCau = null, viTriTruc = null, loaiBang = null;
         double? caoDo = null, caoDoMm = null;
         string? kieuNoi = null;
+        string? tangNguon = null, nhanTang = null;
         var kieuNoiGhiDe = false;
         int? soDot = null, soMoiNoi = null, chiSoDot = null;
         double? tongDaiDotMm = null;
@@ -342,6 +354,8 @@ public static class VeXData
                     break;
                 case "capdoi": handleCapDoi = giaTri; break;
                 case "trongvung": trongVung.Add(giaTri); break;
+                case "tangnguon": tangNguon = giaTri; break;
+                case "nhantang": nhanTang = giaTri; break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -379,6 +393,8 @@ public static class VeXData
             SoRevision = soRevision,
             HandleCapDoi = handleCapDoi,
             HandleTrongVung = trongVung,
+            TangNguon = tangNguon,
+            NhanTang = nhanTang,
         };
     }
 }

@@ -31,12 +31,18 @@ public sealed class DrawToolsSection
     /// </summary>
     [JsonPropertyName("heavyFittingIds")] public IReadOnlyList<string> HeavyFittingIds { get; init; } = [];
 
+    /// <summary>
+    /// Tham số nhân bản tầng điển hình (M111 §4, rule pack v12 trở đi). null = rule pack cũ chưa
+    /// khai ⇒ <c>XBOSS_VE_NHANTANG</c> từ chối chạy kèm thông báo, không đoán mặc định ngầm.
+    /// </summary>
+    [JsonPropertyName("floorPolicy")] public FloorPolicySection? FloorPolicy { get; init; }
+
     /// <summary>Rule pack có khai (dù rỗng) danh sách phụ kiện nặng chưa — phân biệt "khai rỗng
     /// = không phụ kiện nào nặng" với "chưa khai = phải hỏi kỹ sư".</summary>
     [JsonIgnore] public bool CoKhaiPhuKienNang => HeavyFittingIds.Count > 0;
 
     /// <summary>
-    /// Tham số revision cloud (M110 §5, rule pack v11 trở đi). <c>null</c> = rule pack cũ chưa khai ⇒
+    /// Tham số revision cloud (M110 §5, rule pack v12 trở đi). <c>null</c> = rule pack cũ chưa khai ⇒
     /// 3 lệnh <c>XBOSS_VE_REV*</c> dừng kèm thông báo, không đoán mặc định ngầm.
     /// </summary>
     [JsonPropertyName("revisionPolicy")] public RevisionPolicySection? RevisionPolicy { get; init; }
@@ -375,13 +381,17 @@ public static class DrawToolsConfig
             }
         }
 
-        // (g) khối revision (v11) khai rồi thì phải hợp lệ — cùng bộ luật với validator TS
-        // (lib/ky-thuat/cad/rule-pack-revision.ts), M110 §5.
-        if (drawTools.RevisionPolicy is { } rev) KiemRevisionPolicy(rev);
+        // (f) khối nhân bản tầng (v12) khai rồi thì phải hợp lệ — kiểm cả khi đang TẮT, để bật lên
+        // là dùng được ngay (cùng quy ước các khối chính sách v5–v9).
+        if (drawTools.FloorPolicy is { } floorPolicy) FloorReplicator.Validate(floorPolicy);
 
-        // (f) titleblockId khai thì phải khác rỗng (khai nửa vời = XBOSS_VE_TRANGIN chèn khung tên rỗng).
+        // (g) titleblockId khai thì phải khác rỗng (khai nửa vời = XBOSS_VE_TRANGIN chèn khung tên rỗng).
         if (sheetSetup.TitleblockId is { } tb && string.IsNullOrWhiteSpace(tb))
             throw new RulePackException("sheetSetup.titleblockId khai rồi nhưng để rỗng.");
+
+        // (h) khối revision (v12) khai rồi thì phải hợp lệ — cùng bộ luật với validator TS
+        // (lib/ky-thuat/cad/rule-pack-revision.ts), M110 §5.
+        if (drawTools.RevisionPolicy is { } rev) KiemRevisionPolicy(rev);
     }
 
     /// <summary>Kiểm khối <c>drawTools.revisionPolicy</c> (M110 §5). Sai → RulePackException tiếng Việt.</summary>
