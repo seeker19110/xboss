@@ -74,7 +74,7 @@ lệnh chèn block — thư viện block đã tải (`XBOSS_LOGIN` hoặc `XBOSS
 | `XBOSS_VE_REV_HIENTHI` | Bật/tắt hiển thị cloud **theo từng revision** (mỗi revision một layer con). Mặc định: revision hiện hành hiện, các revision cũ tắt — bản in chỉ khoanh lần sửa mới nhất mà hồ sơ vẫn tra ngược được (cloud cũ chỉ bị ẩn, không bị xóa)                                                                                                                                                                                                                                                             |
 | `XBOSS_VE_BAOCAO`      | **Báo cáo phiên vẽ** (M100 §14, chỉ đọc): số tuyến/block theo hệ, size ngoài danh mục đã dùng, các lần đụng độ định nghĩa block + lựa chọn của kỹ sư, version rule pack và thư viện; in ra dòng lệnh + ghi `<tệp>.dwg.xboss-ve.json` cạnh DWG                                                                                                                                                                                                                                                      |
 
-> **Rule pack v11 (M110)** thêm khóa `drawTools.revisionPolicy` (mặc định `enabled: false` — bật
+> **Rule pack v14 (M110)** thêm khóa `drawTools.revisionPolicy` (mặc định `enabled: false` — bật
 > mới dùng được 3 lệnh `XBOSS_VE_REV*`): chiều dài cung cloud, layer, id block tam giác
 > (`kind: annotation` trong thư viện block — loại này **không bao giờ vào khối lượng**), mẫu số
 > revision `R{n}`, mẫu tên attribute bảng revision khung tên và số dòng khung tên chứa được.

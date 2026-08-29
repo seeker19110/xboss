@@ -85,6 +85,7 @@ namespace Autodesk.AutoCAD.Geometry
 
     public struct Vector3d
     {
+        public Vector3d(double x, double y, double z) { X = x; Y = y; Z = z; }
         public double X { get; }
         public double Y { get; }
         public double Z { get; }
@@ -92,7 +93,12 @@ namespace Autodesk.AutoCAD.Geometry
         public static Vector3d operator *(Vector3d v, double k) => v;
     }
 
-    public struct Matrix3d { }
+    public struct Matrix3d
+    {
+        /// <summary>API thật: ma trận TỊNH TIẾN theo một vector — phép biến hình của lệnh nhân
+        /// bản tầng (M111) là dời thuần túy, không xoay/không co giãn.</summary>
+        public static Matrix3d Displacement(Vector3d v) => new Matrix3d();
+    }
 
     public struct Scale3d
     {
@@ -173,8 +179,28 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public void Dispose() { }
     }
 
-    public class IdMapping : IDisposable
+    /// <summary>
+    /// API thật: một cặp "đối tượng nguồn ↔ bản sao" trong bảng ánh xạ của
+    /// <see cref="Database.DeepCloneObjects"/>. <c>IsPrimary</c> = đối tượng nằm THẲNG trong tập
+    /// yêu cầu chép (khác với đối tượng con bị kéo theo, vd attribute của khối chèn).
+    /// </summary>
+    public class IdPair
     {
+        public ObjectId Key => new ObjectId();
+        public ObjectId Value => new ObjectId();
+        public bool IsPrimary => false;
+        public bool IsCloned => false;
+        public bool IsOwnerXlated => false;
+    }
+
+    /// <summary>
+    /// API thật: <c>IdMapping</c> chỉ cài <see cref="IEnumerable"/> KHÔNG generic (mỗi phần tử là
+    /// một <see cref="IdPair"/>) — giữ đúng như vậy để mã Adapter buộc phải khai kiểu tường minh
+    /// trong <c>foreach</c>, y như khi biên dịch với assembly thật.
+    /// </summary>
+    public class IdMapping : IDisposable, IEnumerable
+    {
+        public IEnumerator GetEnumerator() => new List<IdPair>().GetEnumerator();
         public void Dispose() { }
     }
 
@@ -267,6 +293,8 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public ObjectId LayerId => new ObjectId();
         public Color Color { get; set; }
         public Extents3d GeometricExtents => new Extents3d(new Point3d(0, 0, 0), new Point3d(0, 0, 0));
+        /// <summary>Biến hình thực thể (dời/xoay/co giãn) — thực thể phải mở ForWrite.</summary>
+        public void TransformBy(Matrix3d m) { }
         public void IntersectWith(Entity ent, Intersect type, Point3dCollection points, IntPtr thisGsMarker, IntPtr otherGsMarker) { }
     }
 
@@ -456,6 +484,17 @@ namespace Autodesk.AutoCAD.DatabaseServices
 
     /// <summary>Một kiểu nét đã nạp trong bản vẽ (acdbmgd: LinetypeTableRecord).</summary>
     public class LinetypeTableRecord : SymbolTableRecord { }
+
+    /// <summary>
+    /// API thật: khung nhìn hiện hành lấy/đặt qua <c>Editor.GetCurrentView</c>/<c>SetCurrentView</c>
+    /// (tâm theo hệ tọa độ hiển thị, bề rộng/chiều cao theo đơn vị bản vẽ).
+    /// </summary>
+    public class ViewTableRecord : SymbolTableRecord
+    {
+        public Point2d CenterPoint { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
+    }
 
     public class RegAppTableRecord : SymbolTableRecord { }
 
@@ -693,18 +732,6 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public void FreezeLayersInViewport(IEnumerator ids) { }
     }
 
-    /// <summary>
-    /// acdbmgd: bản ghi VIEW — dùng để đặt khung nhìn hiện hành mà KHÔNG gửi lệnh ZOOM
-    /// (nút "Zoom tới" của hộp thoại revision, M110 FR1: hộp thoại đang modal nên lệnh AutoCAD
-    /// không chạy được).
-    /// </summary>
-    public class ViewTableRecord : SymbolTableRecord
-    {
-        public Point2d CenterPoint { get; set; }
-        public double Width { get; set; }
-        public double Height { get; set; }
-    }
-
     public class Xrecord : DBObject
     {
         public ResultBuffer Data { get; set; }
@@ -739,6 +766,9 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public Point3d Extmin => new Point3d(0, 0, 0);
         public Point3d Extmax => new Point3d(0, 0, 0);
         public void WblockCloneObjects(ObjectIdCollection ids, ObjectId owner, IdMapping idMap, DuplicateRecordCloning dup, bool deferXlation) { }
+        /// <summary>Nhân bản đối tượng TRONG CÙNG database (M111): bảng ánh xạ nguồn → bản sao trả
+        /// về qua <paramref name="idMap"/>.</summary>
+        public void DeepCloneObjects(ObjectIdCollection ids, ObjectId owner, IdMapping idMap, bool deferXlation) { }
         public ObjectId Tablestyle { get; set; }
         public void Dispose() { }
         public TransactionManager TransactionManager => new TransactionManager();
@@ -898,6 +928,7 @@ namespace Autodesk.AutoCAD.EditorInput
         public PromptSelectionResult GetSelection() => new PromptSelectionResult();
         /// <summary>acmgd: chọn góc đối diện của một vùng chữ nhật (đường "tự khoanh vùng" M110 FR1).</summary>
         public PromptPointResult GetCorner(string message, Point3d basePoint) => new PromptPointResult();
+        /// <summary>Khung nhìn hiện hành (bản sao KHÔNG thuộc database — gọi xong phải Dispose).</summary>
         public ViewTableRecord GetCurrentView() => new ViewTableRecord();
         public void SetCurrentView(ViewTableRecord view) { }
         public Matrix3d CurrentUserCoordinateSystem { get; set; }
