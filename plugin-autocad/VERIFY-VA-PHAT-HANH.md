@@ -176,7 +176,7 @@ bóc trên cùng bản vẽ khi **mở khoá tay hết layer từ trước** —
     - **AC6:** khung tên chỉ có `maxRows = 6` dòng và đang ở `R6` → chốt `R7` **dừng kèm thông
       báo**, bảng revision **không mất dòng nào**.
     - **AC7:** xóa cloud bằng `ERASE` → `XBOSS_KIEMTRA` báo **tam giác revision mồ côi** (phép kiểm
-      19); xóa tam giác thì báo cloud mồ côi.
+      20); xóa tam giác thì báo cloud mồ côi.
     - **AC9:** mỗi lệnh hoàn tác trọn vẹn bằng **một lần `U`**.
     - **AC10:** chạy `XBOSS_BOCKL` trước và sau khi khoanh cloud → **đúng con số như nhau**.
     - **FR9:** đặt biến môi trường `XBOSS_UI_DIALOG=0` rồi chạy lại cả 3 lệnh → hỏi đáp dòng lệnh
@@ -271,6 +271,35 @@ không in).
   đảo; kết quả trên bản vẽ **trùng khít** đường hộp thoại.
 - **Hộp thoại:** soi theo checklist C8b (nền tối, ô **Đảo** mờ đúng ở dòng cùng hệ, nút OK khóa kèm
   lý do khi bản vẽ không có cặp nào giao nhau).
+
+### C4d. Hành lang đi ống — `XBOSS_VE_HANHLANG` (M114 PR3, bắt buộc)
+
+**Chưa làm mục này thì KHÔNG phát hành M114.** Cần rule pack có `drawTools.routingPolicy.enabled =
+true` (bản phát hành mặc định TẮT — chính ca đầu tiên dưới đây kiểm điều đó).
+
+- **AC14 — cờ tắt:** với rule pack mặc định (`enabled: false`) → lệnh **dừng ngay**, in hướng dẫn
+  cách bật, **không thực thể nào được tạo/sửa** (so số đối tượng trước/sau).
+- **Vẽ mới:** bật cờ → `VEMOI`, bấm 4 điểm trục hành lang, khai bề rộng 600 / đáy dầm 3200 / trần
+  2800, tick hết hệ → polyline nằm trên layer `M-CORRIDOR`, `LIST` thấy XData `XBOSS_VE` vai trò
+  `hanhlang` đủ 3 số và **không** có mục hệ nào (rỗng = mọi hệ).
+- **AC13 — nhận polyline giữ nguyên từng đỉnh (ca quan trọng nhất):** trước khi nhận, `LIST` một
+  polyline trục hành lang kiến trúc và ghi tọa độ **từng đỉnh**. `NHAN` nó → sau lệnh `LIST` lại:
+  **từng tọa độ đỉnh trùng khít**, số đỉnh và `Closed` không đổi; chỉ layer + XData đổi.
+- **Lọc vùng chọn:** quét vùng có lẫn arc, spline, một **polyline có đoạn cung**, text/block và một
+  xref → tất cả bị bỏ qua, tóm tắt đếm đủ **theo từng lý do**.
+- **Sửa:** `SUA` một hành lang đã có → đổi bề rộng; `LIST` xác nhận hình học không đổi và mục chiếm
+  làn (nếu đã chạy đi tuyến) **còn nguyên**.
+- **Xóa còn hệ đi qua (FR4):** trên hành lang đã có hệ chạy qua → `XOA` phải **nêu đúng handle +
+  tên hệ đang chiếm** rồi hỏi lại; chọn `Khong` = bản vẽ không đổi; chọn `Co` = hành lang mất,
+  các **tuyến vẫn còn nguyên** trong bản vẽ.
+- **AC11 — hủy giữa chừng:** bấm Hủy ở hộp thoại (và ESC ở bước bấm điểm) → so số thực thể
+  trước/sau: **không đổi một nét nào**.
+- **AC12 — một lần undo:** `U` một lần sau mỗi chế độ → bản vẽ trở lại nguyên trạng (kể cả ca nhận
+  hàng loạt và ca `LINE` chuyển thành polyline 2 đỉnh).
+- **Đường lui dòng lệnh:** `XBOSS_UI_DIALOG=0` → lệnh hỏi bề rộng/cao độ/hệ được phép bằng dòng
+  lệnh; kết quả trên bản vẽ **trùng khít** đường hộp thoại.
+- **Hộp thoại:** soi theo checklist C8b (nền tối, ô tick hệ đọc rõ, nút OK khóa kèm lý do khi thiếu
+  cao độ hoặc bỏ tick hết mọi hệ).
 
 ### C5. Vòng đời với web (M99 PR5 + M103 + M104)
 
@@ -498,6 +527,54 @@ nào…`), nút chuyển nền chìm + chữ mờ.
 67. **Kết quả ra bản vẽ KHÔNG đổi.** PR4 chỉ đụng phần trình bày — chạy lại mục 33 (`XBOSS_VE`) và
     mục 34 (`XBOSS_VE_CHIADOT`), đối chiếu `doi-chung/`: tuyến vẽ ra, số đốt, sidecar phải trùng
     khít bản trước. Lệch một nét là có thứ ngoài trình bày đã bị đụng.
+
+### C9. `XBOSS_VE_NHANTANG` — nhân bản tầng điển hình (M111 — **rủi ro cao nhất cả bộ plugin**)
+
+> **Bắt buộc trên bản vẽ AVIO thật trước khi phát hành rộng.** M100 §20 từng hoãn hẳn mục này vì
+> "giá trị lớn nhưng rủi ro nhân bản lỗi hàng loạt" (M111 §1). Bật `drawTools.floorPolicy.enabled`
+> rồi mới chạy được các bước dưới đây — rule pack mặc định TẮT (mục 68 kiểm đúng phát biểu này).
+
+68. **`floorPolicy.enabled: false` (mặc định) → dừng, không ghi gì.** Chạy `XBOSS_VE_NHANTANG` với
+    rule pack gốc → lệnh dừng kèm hướng dẫn cách bật, bản vẽ không đổi một nét (AC12).
+69. **AC1 — chép đúng số lượng, đúng vị trí.** Vẽ 1 tầng có 40 tuyến + 12 khối thiết bị (`TAG`
+    dạng `FCU-05-01`) + 3 vùng bóc (`XBOSS_BOCKL` bóc theo vùng, đặt tên). Bật `floorPolicy`, khai
+    `floors: ["06","07","08","09","10"]`, chạy `XBOSS_VE_NHANTANG` → xem trước (FR3) hiện đúng số
+    đối tượng theo vai trò, vị trí đặt từng tầng theo `stepMm`, ví dụ tag `FCU-05-01 → FCU-06-01`.
+    Bấm Thực hiện → mỗi tầng 06–10 có đủ 40 tuyến/12 khối/3 vùng, đặt đúng theo `layoutMode`/`stepMm`.
+70. **AC2 — tầng nguồn KHÔNG suy suyển.** Trước lệnh, `LIST` vài tim của tầng 05 + đọc XData (dùng
+    `XBOSS_VE_BAOCAO` hoặc xem qua `(vlax-vla-object->ename)`); sau lệnh, `LIST` lại **đúng các đối
+    tượng đó** → tọa độ đỉnh, bulge, XData phải trùng khít. Đây là guardrail 1 của M111 §2.
+71. **AC3 — không handle mồ côi (kiểm TỰ ĐỘNG, không kiểm mắt).** Ngay sau lệnh, chạy
+    `XBOSS_KIEMTRA` → phép kiểm **19** (`nhantang-handle-mo-coi`) phải **sạch** cho mọi tầng vừa
+    chép. Cố tình phá: sau khi chép, `ERASE` một nét biên của tầng 07 rồi chạy lại `XBOSS_KIEMTRA`
+    → phép 19 phải **bắt được** tim của tầng 07 còn tham chiếu tới nét biên đã xóa (chi tiết nêu rõ
+    tầng + 2 handle liên quan).
+72. **AC4 — `XBOSS_KIEMTRA` không phát sinh lỗi mới, phép 17 sạch.** So báo cáo JSON trước/sau lệnh
+    (ngoài phép 19 vốn chỉ có dữ liệu SAU lệnh): không lỗi nào tăng số lượng; phép **17** (tag
+    trùng) sạch trên toàn bản vẽ — tag `{floor}` đã đổi đúng cho mọi tầng.
+73. **AC5 — `XBOSS_BOCKL` + sheet `Tong-hop-vung`.** Bóc khối lượng toàn bản vẽ → tổng = 6 × tổng
+    tầng 05 (5 tầng chép + tầng gốc), sai số 0. `XBOSS_BOCKL_XUAT` → sheet `Tong-hop-vung` có 18
+    dòng (6 tầng × 3 vùng), tên đúng `zoneNamePattern` (vd `A-T06`).
+74. **AC6 — sửa tầng 08 KHÔNG đụng tầng 05 (bằng chứng trực tiếp guardrail 2).** `XBOSS_VE_DOI` đổi
+    size một tuyến ở tầng 08 → chỉ tuyến/biên/nhãn của tầng 08 đổi; `LIST` lại tuyến tương ứng ở
+    tầng 05 → **không suy suyển**.
+75. **AC7 — `XBOSS_VE_CHIADOT` trên tuyến đã chép.** Chạy trên tuyến tầng 08 → ra đúng số đốt như
+    tuyến gốc tầng 05 cùng size/kiểu nối.
+76. **AC8 — idempotent theo tầng.** Chạy lại lệnh, tick lại tầng 06: chọn **bỏ qua** → không sinh
+    thêm đối tượng nào (đếm layer trước/sau bằng nhau); chọn **chép đè** → số đối tượng tầng 06
+    không đổi (không nhân đôi), phép kiểm 19 vẫn sạch.
+77. **AC9 — trùng tên vùng thì dừng cả lệnh.** Đặt tên vùng đích trùng vùng đã có (vd chạy lại với
+    `zoneNamePattern` sinh ra tên đã tồn tại) → lệnh **dừng**, bản vẽ không đổi, danh sách trùng
+    hiện rõ trong hộp thoại lẫn dòng lệnh.
+78. **AC10 — ngắt giữa chừng (Esc) hoặc lỗi ở tầng thứ 3 → bản vẽ trùng khít trạng thái ban đầu.**
+    Không có trạng thái "chép được 2/5 tầng" — đếm tổng đối tượng model space trước/sau phải bằng.
+79. **AC11 — một lần `U` hoàn tác cả 5 tầng.** Chạy chép 5 tầng cùng lúc → `U` một lần → cả 5 tầng
+    biến mất, không cần bấm `U` nhiều lần.
+80. **Đường lui FR11.** `XBOSS_UI_DIALOG=0` → hỏi đáp dòng lệnh in đúng bảng xem trước dạng text
+    (số đối tượng, vị trí, tag trước→sau) rồi mới hỏi xác nhận; kết quả trùng khít đường hộp thoại.
+81. **Tầng nguồn đang đỏ `XBOSS_KIEMTRA` → chỉ CẢNH BÁO, không chặn.** Cố tình để tầng 05 có lỗi
+    (vd một tuyến hở), chạy `XBOSS_VE_NHANTANG` → hộp thoại/dòng lệnh **cảnh báo** có lỗi tồn đọng
+    nhưng lệnh **vẫn chạy được** nếu kỹ sư xác nhận tiếp tục (quyết định 2026-08-29, M111 §10).
 
 ---
 

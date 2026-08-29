@@ -17,8 +17,10 @@ import {
   matchesEtag,
   kiemCrossingPolicy,
   kiemFloorPolicy,
+  kiemRoutingPolicy,
   CURRENT_RULE_PACK_VERSION,
   type CrossingPolicy,
+  type RoutingPolicy,
 } from "@/lib/ky-thuat/cad/rule-pack";
 import {
   normalizeCadLayers,
@@ -29,7 +31,7 @@ import { kiemTraRevisionPolicy, soRevisionTheoMau } from "@/lib/ky-thuat/cad/rul
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8 + floorPolicy v12 + crossingPolicy v13 + revisionPolicy v14, version = v14", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8 + floorPolicy v12 + crossingPolicy v13 + revisionPolicy v14 + routingPolicy v15, version = v15", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -56,8 +58,9 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleM
   assert.ok("crossingPolicy" in pack.drawTools, "Thiếu khối v13 drawTools.crossingPolicy");
   assert.ok("floorPolicy" in pack.drawTools, "Thiếu khối v12 drawTools.floorPolicy");
   assert.ok("revisionPolicy" in pack.drawTools, "Thiếu khối v14 drawTools.revisionPolicy");
-  assert.equal(pack.version, "v14");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v14");
+  assert.ok("routingPolicy" in pack.drawTools, "Thiếu khối v15 drawTools.routingPolicy");
+  assert.equal(pack.version, "v15");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v15");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -1059,7 +1062,8 @@ test("v12: validator TS khớp validator C# — cả 3 kiểm còn lại của F
 
 test("rule pack v14 là mở rộng thuần của v13: chỉ thêm drawTools.revisionPolicy (M110 §5)", async () => {
   const v13 = (await import("@/lib/ky-thuat/cad/rule-packs/v13.json")).default;
-  const v14 = getCurrentRulePack();
+  // Đọc THẲNG v14.json: bản hiện hành nay là v15 (M114 gộp tiếp routingPolicy).
+  const v14 = (await import("@/lib/ky-thuat/cad/rule-packs/v14.json")).default;
 
   for (const field of [
     "layerMap",
@@ -1093,7 +1097,7 @@ test("rule pack v14 là mở rộng thuần của v13: chỉ thêm drawTools.rev
   assert.deepEqual(drawToolsV14, v13.drawTools, "v14 đụng tham số drawTools ngoài revisionPolicy");
 });
 
-test("v14: revisionPolicy khai đủ tham số và mặc định TẮT (M110 §5/AC8)", () => {
+test("v15: revisionPolicy khai đủ tham số và mặc định TẮT (M110 §5/AC8)", () => {
   const rev = getCurrentRulePack().drawTools.revisionPolicy;
 
   assert.equal(
@@ -1228,4 +1232,125 @@ test("v13: validator crossingPolicy bắt đủ 3 lỗi của M109 §5 + minAngl
 
   // Rule pack cũ chưa khai khóa này thì không phải lỗi.
   assert.deepEqual(kiemCrossingPolicy({ systems: goc.systems }), []);
+});
+
+// ===== v15 (M114 §6) — routingPolicy: đi tuyến tự động theo đồ thị hành lang =====
+
+test("rule pack v15 là mở rộng thuần của v14: chỉ thêm drawTools.routingPolicy (M114 §6)", async () => {
+  const v14 = (await import("@/lib/ky-thuat/cad/rule-packs/v14.json")).default;
+  const v15 = getCurrentRulePack();
+
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "inspectionPolicy",
+    "styleMap",
+    "sheetSetup",
+    "xrefPolicy",
+    "hatchMap",
+    "layoutPolicy",
+    "polylineClosePolicy",
+    "blockMap",
+  ] as const) {
+    assert.deepEqual(
+      v15[field],
+      v14[field],
+      `Field ${field} của v15 lệch v14 — v15 phải là mở rộng thuần (M114 chỉ thêm routingPolicy)`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v15).filter((k) => !(k in v14)),
+    [],
+    "v15 không được thêm khối cấp cao nào — routingPolicy nằm trong drawTools",
+  );
+
+  const { routingPolicy: _bo, ...drawToolsV15 } = v15.drawTools;
+  assert.deepEqual(drawToolsV15, v14.drawTools, "v15 đụng tham số drawTools ngoài routingPolicy");
+});
+
+test("v15: routingPolicy khai đủ tham số và mặc định TẮT (M114 §6/AC14)", () => {
+  const pack = getCurrentRulePack();
+  const rp = pack.drawTools.routingPolicy;
+
+  assert.equal(
+    rp.enabled,
+    false,
+    "2 lệnh đi tuyến phải tắt mặc định — bật lên là vẽ hàng trăm nhánh",
+  );
+  assert.ok(rp.snapRadiusMm > 0);
+  assert.ok(rp.corridorLayer.length > 0);
+  assert.ok(rp.cost.reuseFactor > 0 && rp.cost.reuseFactor < 1, "γ < 1 mới có gom trục");
+  assert.ok(rp.laneGapMm.elecToHot >= rp.laneGapMm.default, "khe hở điện–nóng phải ≥ khe hở chung");
+  assert.deepEqual(kiemRoutingPolicy(pack.drawTools), [], "Rule pack phát hành phải qua validator");
+
+  // Mọi hệ vẽ được đều có ĐÚNG một tier — thiếu thì hệ đó không cấp tầng được lúc đi tuyến.
+  for (const he of pack.drawTools.systems) {
+    const tier = rp.tiers.filter((t) => (t.systems as readonly string[]).includes(he.id));
+    assert.equal(tier.length, 1, `hệ ${he.id} phải nằm ở đúng 1 tier, đang ở ${tier.length}`);
+  }
+});
+
+test("v15: validator routingPolicy bắt đủ 4 lỗi của M114 §6", () => {
+  const goc = getCurrentRulePack().drawTools;
+  const voi = (chinh: Partial<RoutingPolicy>) => ({
+    systems: goc.systems,
+    routingPolicy: { ...goc.routingPolicy, ...chinh },
+  });
+
+  // (1) snapRadiusMm phải dương.
+  assert.match(kiemRoutingPolicy(voi({ snapRadiusMm: 0 }))[0], /snapRadiusMm/);
+  assert.match(kiemRoutingPolicy(voi({ snapRadiusMm: -1 }))[0], /snapRadiusMm/);
+
+  // (2) reuseFactor trong (0; 1] — γ = 1 là tắt gom trục có chủ đích (AC2), vẫn hợp lệ.
+  assert.match(
+    kiemRoutingPolicy(voi({ cost: { ...goc.routingPolicy.cost, reuseFactor: 0 } }))[0],
+    /reuseFactor/,
+  );
+  assert.match(
+    kiemRoutingPolicy(voi({ cost: { ...goc.routingPolicy.cost, reuseFactor: 1.5 } }))[0],
+    /reuseFactor/,
+  );
+  assert.deepEqual(
+    kiemRoutingPolicy(voi({ cost: { ...goc.routingPolicy.cost, reuseFactor: 1 } })),
+    [],
+  );
+
+  // (3) id hệ trong tiers/systemOrder phải có thật trong drawTools.systems.
+  assert.match(
+    kiemRoutingPolicy(voi({ tiers: [{ id: "tier1", name: "x", systems: ["PLUMB"] }] }))[0],
+    /PLUMB/,
+  );
+  assert.match(kiemRoutingPolicy(voi({ systemOrder: ["HVAC", "PLUMB_DRAIN"] }))[0], /PLUMB_DRAIN/);
+
+  // (4) một hệ không được nằm ở 2 tier.
+  assert.match(
+    kiemRoutingPolicy(
+      voi({
+        tiers: [
+          { id: "tier1", name: "a", systems: ["HVAC"] },
+          { id: "tier2", name: "b", systems: ["HVAC", "ELV"] },
+        ],
+      }),
+    )[0],
+    /2 tier/,
+  );
+
+  // Ràng buộc phụ: hệ số chi phí không âm, khe hở làn dương, layer hành lang khi đang bật.
+  assert.match(
+    kiemRoutingPolicy(voi({ cost: { ...goc.routingPolicy.cost, elbowMm: -1 } }))[0],
+    /elbowMm/,
+  );
+  assert.match(
+    kiemRoutingPolicy(voi({ laneGapMm: { ...goc.routingPolicy.laneGapMm, default: 0 } }))[0],
+    /laneGapMm\.default/,
+  );
+  assert.match(kiemRoutingPolicy(voi({ enabled: true, corridorLayer: " " }))[0], /corridorLayer/);
+  assert.deepEqual(kiemRoutingPolicy(voi({ enabled: false, corridorLayer: "" })), []);
+
+  // Rule pack cũ (≤ v14) chưa khai khóa này thì không phải lỗi.
+  assert.deepEqual(kiemRoutingPolicy({ systems: goc.systems }), []);
 });

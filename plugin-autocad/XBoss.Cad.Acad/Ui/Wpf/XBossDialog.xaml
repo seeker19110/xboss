@@ -920,6 +920,68 @@
       </StackPanel>
     </DataTemplate>
 
+    <!-- M114 FR2 — XBOSS_VE_HANHLANG: bề rộng khả dụng + cao độ đáy dầm/trần + hệ được phép đi
+         qua. Cao độ là ô NHẬP TAY (M100 §6.3 "hỏi, không suy" — bản vẽ 2D không chứa cao độ thật);
+         danh sách hệ tick hết = mọi hệ, đúng quy ước "rỗng = mọi hệ" của XData hành lang. Sổ chiếm
+         làn chỉ HIỆN RA, không sửa được ở đây: cấp/gỡ làn là việc của XBOSS_VE_TUYENTUDONG. -->
+    <DataTemplate DataType="{x:Type vm:HanhLangDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Phạm vi" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <StackPanel>
+            <TextBlock Text="{Binding MoTaSeXuLy}" TextWrapping="Wrap" Margin="0,0,0,3" />
+            <ItemsControl ItemsSource="{Binding DongBoQua}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Bề rộng khả dụng của hành lang (mm)" />
+        <TextBox Text="{Binding BeRong, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Cao độ ĐÁY DẦM (mm — nhập tay)" />
+        <TextBox Text="{Binding CotDayDam, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Cao độ TRẦN (mm — nhập tay)" />
+        <TextBox Text="{Binding CotTran, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Hệ được phép đi qua (tick hết = mọi hệ)" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="160" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding CacHe}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <CheckBox Margin="0,0,0,3" IsChecked="{Binding Chon, Mode=TwoWay}"
+                            Content="{Binding Nhan}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+
+        <StackPanel Visibility="{Binding CoChiemCho, Converter={StaticResource CoThiHien}}">
+          <TextBlock Style="{StaticResource Nhan}" Text="Làn đã cấp cho các hệ (chỉ đọc)" />
+          <Border Style="{StaticResource KhoiChiDoc}">
+            <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
+              <ItemsControl ItemsSource="{Binding DongChiemCho}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Border>
+        </StackPanel>
+
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaViecSeLam}" />
+      </StackPanel>
+    </DataTemplate>
+
     <!-- ===== M106 PR3 — các lệnh còn lại của bảng §7.2 ===== -->
 
     <!-- XBOSS_LOGIN: chỉ hỏi địa chỉ server (device pairing, không có email/mật khẩu). -->

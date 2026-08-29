@@ -358,14 +358,16 @@ public sealed class VePhuKienCommands
         _ = doc;
 
         var (hienCo, loi) = BlockLibraryService.HienHanh();
+        var boTron = BlockLibraryService.BoTronHienHanh();
         ed.WriteMessage(hienCo is not null
             ? $"\n[XBoss] Thư viện đang dùng: {hienCo.Version} — {hienCo.Blocks.Count} block " +
-              $"({BlockLibraryService.ThuMucCache})\n"
+              $"({(boTron is null ? "bộ toàn cục" : "bản trộn " + boTron.MoTaHaiBo)}, {BlockLibraryService.ThuMucCache})\n"
             : $"\n[XBoss] {loi}\n");
 
         var hoi = new PromptKeywordOptions("\n[XBoss] Nạp thư viện block từ đâu?") { AllowNone = false };
         hoi.Keywords.Add("Tep", "Tep", "Tệp trên máy");
         hoi.Keywords.Add("Server", "Server", "Tải từ server XBoss");
+        hoi.Keywords.Add("Nguon", "Nguon", "Xem nguồn từng block");
         hoi.Keywords.Default = hienCo is null ? "Server" : "Tep";
         var kq = ed.GetKeywords(hoi);
         if (kq.Status != PromptStatus.OK) return;
@@ -375,7 +377,37 @@ public sealed class VePhuKienCommands
             await TaiTuServer(ed);
             return;
         }
+        if (kq.StringResult == "Nguon")
+        {
+            LietKeNguon(ed, hienCo);
+            return;
+        }
         NapTuTep(ed);
+    }
+
+    /// <summary>
+    /// Liệt kê nguồn của TỪNG block trong thư viện đang dùng (M113 FR5): "Dự án" = lấy từ bộ riêng
+    /// của dự án (đè bản toàn cục cùng id, hoặc chỉ dự án mới có), "Toàn cục" = bộ dùng chung.
+    /// Kỹ sư phải thấy được block khung tên/ký hiệu mình sắp chèn là của ai — đây là điểm khác nhau
+    /// giữa hai chủ đầu tư, không phải chi tiết kỹ thuật.
+    /// </summary>
+    private static void LietKeNguon(Editor ed, BlockManifest? thuVien)
+    {
+        if (thuVien is null)
+        {
+            ed.WriteMessage("\n[XBoss] Chưa có thư viện trên máy nên chưa có gì để xem nguồn.\n");
+            return;
+        }
+        var soDuAn = thuVien.Blocks.Count(b => b.LaCuaDuAn);
+        ed.WriteMessage(
+            $"\n[XBoss] Nguồn từng block ({soDuAn} của dự án / " +
+            $"{thuVien.Blocks.Count - soDuAn} toàn cục):\n");
+        foreach (var b in thuVien.Blocks.OrderByDescending(b => b.LaCuaDuAn).ThenBy(b => b.Id, StringComparer.Ordinal))
+        {
+            ed.WriteMessage(
+                $"[XBoss]   [{b.NhanNguon}] {b.Id} (block {b.BlockName}" +
+                $"{(b.LibVersion is null ? "" : $", bộ {b.LibVersion}")})\n");
+        }
     }
 
     private static async Task TaiTuServer(Editor ed)
@@ -392,8 +424,9 @@ public sealed class VePhuKienCommands
             return;
         }
         ed.WriteMessage($"\n[XBoss] Đang tải thư viện block từ {baseUrl}...\n");
-        var thongDiep = await BlockLibraryService.TaiVeAsync(new XBossApiClient(baseUrl), token);
-        ed.WriteMessage($"[XBoss] {thongDiep}\n");
+        // Bộ toàn cục + bản trộn của dự án đang chọn (M113 FR5) — hai ô cache song song.
+        foreach (var dong in await BlockLibraryService.TaiVeDayDuAsync(new XBossApiClient(baseUrl), token))
+            ed.WriteMessage($"[XBoss] {dong}\n");
     }
 
     private static void NapTuTep(Editor ed)

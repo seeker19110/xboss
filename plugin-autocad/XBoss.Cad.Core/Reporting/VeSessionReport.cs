@@ -82,7 +82,7 @@ public sealed record VeChiaDotBoQua
 /// <summary>
 /// Một revision đã khoanh cloud trong bản vẽ (M110) — mỗi vùng khoanh gồm 1 cloud + 1 tam giác,
 /// nên <see cref="SoDoiTuong"/> của một revision lành lặn luôn là số chẵn (lẻ = có mồ côi, phép
-/// kiểm 19 của XBOSS_KIEMTRA nói rõ đối tượng nào).
+/// kiểm 20 của XBOSS_KIEMTRA nói rõ đối tượng nào).
 /// </summary>
 public sealed record VeRevisionCum
 {
@@ -163,11 +163,17 @@ public sealed class VeSessionReport
     [JsonPropertyName("chiaDotBoQua")] public required IReadOnlyList<VeChiaDotBoQua> ChiaDotBoQua { get; init; }
     /// <summary>Mục ngắt nét giao chéo (M109 FR9): các cụm đối tượng ngắt nét theo tuyến đi dưới.</summary>
     [JsonPropertyName("ngatNet")] public required IReadOnlyList<VeNgatNetCum> NgatNet { get; init; }
-    /// <summary>Định nghĩa block do plugin nhập từ thư viện (đánh dấu trong BlockTable).</summary>
     /// <summary>Mục revision (M110): các revision đã khoanh cloud trong bản vẽ.</summary>
     [JsonPropertyName("revision")] public IReadOnlyList<VeRevisionCum> Revision { get; init; } = [];
+    /// <summary>Định nghĩa block do plugin nhập từ thư viện (đánh dấu trong BlockTable).</summary>
     [JsonPropertyName("soDinhNghiaBlock")] public int SoDinhNghiaBlock { get; init; }
     [JsonPropertyName("soBangThongKe")] public int SoBangThongKe { get; init; }
+
+    /// <summary>
+    /// Số đoạn hành lang đã khai bằng <c>XBOSS_VE_HANHLANG</c> (M114 FR3). KHÔNG khai
+    /// <c>required</c> để báo cáo dựng bằng mã cũ vẫn biên dịch được.
+    /// </summary>
+    [JsonPropertyName("soHanhLang")] public int SoHanhLang { get; init; }
     [JsonPropertyName("rulePackKhac")] public required IReadOnlyList<VeVersionKhac> RulePackKhac { get; init; }
     [JsonPropertyName("thuVienKhac")] public required IReadOnlyList<VeVersionKhac> ThuVienKhac { get; init; }
     /// <summary>
@@ -213,6 +219,7 @@ public sealed class VeSessionReport
         var revision = new Dictionary<int, int>();
         var soDinhNghia = 0;
         var soBang = 0;
+        var soHanhLang = 0;
 
         foreach (var xd in doiTuong)
         {
@@ -223,6 +230,12 @@ public sealed class VeSessionReport
                     break;
                 case VaiTroVe.BangThongKe:
                     soBang++;
+                    break;
+                case VaiTroVe.HanhLang:
+                    // Hành lang (M114 FR3) KHÔNG thuộc hệ nào (danh sách hệ rỗng = mọi hệ đi qua
+                    // được) nên đếm riêng — gom vào bảng theo hệ chỉ đẻ ra nhóm "(không rõ hệ)"
+                    // toàn số 0 trong mọi báo cáo.
+                    soHanhLang++;
                     break;
                 case VaiTroVe.Revision:
                     // Cloud/tam giác revision là CHÚ THÍCH, không thuộc hệ nào (guardrail 1 của
@@ -404,6 +417,7 @@ public sealed class VeSessionReport
             NgatNet = dsNgatNet,
             SoDinhNghiaBlock = soDinhNghia,
             SoBangThongKe = soBang,
+            SoHanhLang = soHanhLang,
             RulePackKhac = rulePackKhac.OrderBy(k => k.Key, StringComparer.Ordinal)
                 .Select(k => new VeVersionKhac { Version = k.Key, SoDoiTuong = k.Value }).ToList(),
             ThuVienKhac = thuVienKhac.OrderBy(k => k.Key, StringComparer.Ordinal)
@@ -483,6 +497,8 @@ public sealed class VeSessionReport
                 $"lỗ chờ {h.SoLoCho} · mặt cắt {h.SoMatCat} · vạch chia {h.SoVachChia} · " +
                 $"tag đốt {h.SoNhanDot} · ngắt nét {h.SoNgatNet}");
         }
+        if (SoHanhLang > 0)
+            sb.AppendLine($"Hành lang đã khai (XBOSS_VE_HANHLANG): {SoHanhLang} đoạn");
         if (SizeCustom.Count > 0)
         {
             sb.AppendLine("Size ngoài danh mục rule pack:");

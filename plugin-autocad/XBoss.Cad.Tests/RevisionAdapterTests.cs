@@ -8,7 +8,7 @@ using Xunit;
 namespace XBoss.Cad.Tests;
 
 /// <summary>
-/// M110 PR2 — phần THUẦN của tầng Adapter: hai ViewModel hộp thoại (FR1/FR4/FR5), phép kiểm 19
+/// M110 PR2 — phần THUẦN của tầng Adapter: hai ViewModel hộp thoại (FR1/FR4/FR5), phép kiểm 20
 /// cloud/tam giác mồ côi (FR8), mục revision trong báo cáo phiên vẽ và chỗ đứng của 3 lệnh trong
 /// quy trình (FR10).
 ///
@@ -165,7 +165,7 @@ public class RevisionAdapterTests
         Assert.Contains(vm.LyDoChuaHopLe, l => l.Contains("XBOSS_VE_REV"));
     }
 
-    // ===== FR8 — phép kiểm 19 =====
+    // ===== FR8 — phép kiểm 20 =====
 
     private static DrawingSnapshot Snapshot(params RevisionInfo[] revision) =>
         new()

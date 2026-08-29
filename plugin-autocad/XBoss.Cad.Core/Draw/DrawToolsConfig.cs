@@ -53,6 +53,13 @@ public sealed class DrawToolsSection
     /// </summary>
     [JsonPropertyName("revisionPolicy")] public RevisionPolicySection? RevisionPolicy { get; init; }
 
+    /// <summary>
+    /// Chính sách đi tuyến tự động theo đồ thị hành lang (M114 §6, rule pack v15 trở đi).
+    /// <c>null</c> = rule pack cũ chưa khai ⇒ <c>XBOSS_VE_HANHLANG</c>/<c>XBOSS_VE_TUYENTUDONG</c>
+    /// từ chối chạy kèm thông báo, không đoán mặc định ngầm.
+    /// </summary>
+    [JsonPropertyName("routingPolicy")] public RoutingPolicySection? RoutingPolicy { get; init; }
+
     /// <summary>Block phụ kiện (theo id manifest) có phải phụ kiện nặng không.</summary>
     public bool LaPhuKienNang(string? blockId) =>
         blockId is { Length: > 0 } id &&
@@ -146,6 +153,70 @@ public sealed class CrossingPolicySection
 
     /// <summary>Góc giao dưới ngưỡng này (độ) thì KHÔNG ngắt nét — báo cáo riêng (FR3).</summary>
     [JsonPropertyName("minAngleDeg")] public double MinAngleDeg { get; init; }
+}
+
+/// <summary>
+/// Khối <c>drawTools.routingPolicy</c> (M114 §6) — tham số đi tuyến tự động theo đồ thị hành lang,
+/// dùng chung cho <c>XBOSS_VE_HANHLANG</c> và <c>XBOSS_VE_TUYENTUDONG</c>. Mặc định
+/// <see cref="Enabled"/> = false: khai rồi nhưng chưa bật thì cả 2 lệnh dừng kèm hướng dẫn (AC14).
+/// </summary>
+public sealed class RoutingPolicySection
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+
+    /// <summary>Layer đặt polyline tim hành lang.</summary>
+    [JsonPropertyName("corridorLayer")] public string CorridorLayer { get; init; } = "";
+
+    /// <summary>Bán kính tối đa từ thiết bị tới hành lang gần nhất để rẽ nhánh (mm — FR6).</summary>
+    [JsonPropertyName("snapRadiusMm")] public double SnapRadiusMm { get; init; }
+
+    [JsonPropertyName("cost")] public RoutingCostSection Cost { get; init; } = new();
+
+    /// <summary>Phân tầng theo hệ — dữ liệu DÙNG CHUNG với <c>planMultiTierCorridor</c> (TS).</summary>
+    [JsonPropertyName("tiers")] public IReadOnlyList<RoutingTierSection> Tiers { get; init; } = [];
+
+    [JsonPropertyName("laneGapMm")] public LaneGapSection LaneGapMm { get; init; } = new();
+
+    /// <summary>Thứ tự chạy mặc định giữa các hệ — id theo <c>drawTools.systems[].id</c>.</summary>
+    [JsonPropertyName("systemOrder")] public IReadOnlyList<string> SystemOrder { get; init; } = [];
+
+    /// <summary>Tier của một hệ; null = hệ chưa khai tier nào (không cấp tầng được).</summary>
+    public RoutingTierSection? TierCuaHe(string heId) =>
+        Tiers.FirstOrDefault(t => t.Systems.Any(s => string.Equals(s, heId, StringComparison.Ordinal)));
+}
+
+/// <summary>3 hệ số hàm chi phí đi tuyến (M114 §6): α co, β độ đông, γ gom trục.</summary>
+public sealed class RoutingCostSection
+{
+    /// <summary>α — mỗi lần chuyển hướng "đắt" bằng chừng này mm tuyến.</summary>
+    [JsonPropertyName("elbowMm")] public double ElbowMm { get; init; }
+
+    /// <summary>β — mỗi hệ đã chiếm làn trong hành lang cộng thêm chừng này mm mỗi MÉT tuyến.</summary>
+    [JsonPropertyName("congestionMm")] public double CongestionMm { get; init; }
+
+    /// <summary>γ — cạnh mà nhánh khác CỦA CHÍNH hệ này đã đi chỉ tính từng này phần giá. 1 = tắt gom trục.</summary>
+    [JsonPropertyName("reuseFactor")] public double ReuseFactor { get; init; } = 1;
+}
+
+/// <summary>Một tầng đi ống trong hành lang (M114 §6).</summary>
+public sealed class RoutingTierSection
+{
+    [JsonPropertyName("id")] public string Id { get; init; } = "";
+    [JsonPropertyName("name")] public string Name { get; init; } = "";
+    /// <summary>Id hệ theo <c>drawTools.systems[].id</c> — một hệ chỉ được ở đúng một tier.</summary>
+    [JsonPropertyName("systems")] public IReadOnlyList<string> Systems { get; init; } = [];
+    /// <summary>Khoảng cách từ đáy dầm xuống tim tầng này (mm).</summary>
+    [JsonPropertyName("offsetFromBeamMm")] public double? OffsetFromBeamMm { get; init; }
+    /// <summary>Khoảng cách từ trần lên tim tầng này (mm) — dùng cho tầng sát trần (sprinkler).</summary>
+    [JsonPropertyName("offsetFromCeilingMm")] public double? OffsetFromCeilingMm { get; init; }
+}
+
+/// <summary>Khe hở giữa 2 làn kề nhau trong cùng hành lang (mm).</summary>
+public sealed class LaneGapSection
+{
+    [JsonPropertyName("default")] public double Default { get; init; }
+    /// <summary>Khe hở khi làn kề là hệ điện cạnh hệ nóng — luôn ≥ <see cref="Default"/>.</summary>
+    [JsonPropertyName("elecToHot")] public double ElecToHot { get; init; }
 }
 
 public sealed class LabelStyleSection
@@ -432,6 +503,10 @@ public static class DrawToolsConfig
         // (h) khối revision (v14) khai rồi thì phải hợp lệ — cùng bộ luật với validator TS
         // (lib/ky-thuat/cad/rule-pack-revision.ts), M110 §5.
         if (drawTools.RevisionPolicy is { } rev) KiemRevisionPolicy(rev);
+
+        // (i) khối đi tuyến tự động (v15) khai rồi thì phải hợp lệ — cùng bộ luật với validator TS
+        // (kiemRoutingPolicy trong lib/ky-thuat/cad/rule-pack.ts), M114 §6.
+        if (drawTools.RoutingPolicy is { } routing) ValidateRoutingPolicy(routing, systemIds);
     }
 
     /// <summary>Kiểm khối <c>drawTools.revisionPolicy</c> (M110 §5). Sai → RulePackException tiếng Việt.</summary>
@@ -472,6 +547,78 @@ public static class DrawToolsConfig
                     $"drawTools.revisionPolicy.titleblockAttrPattern.{khoa} \"{giaTri}\" thiếu " +
                     $"{RevisionPolicySection.OTrongSo} — mọi dòng revision sẽ ghi đè lên cùng một attribute.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Kiểm riêng khối <c>routingPolicy</c> (M114 §6) — tầng C# của validator 2 tầng, cặp với
+    /// <c>kiemRoutingPolicy()</c> bên TS (<c>lib/ky-thuat/cad/rule-pack.ts</c>). Tách hàm public để
+    /// test nạp thẳng từng ca mà không phải dựng cả một rule pack giả.
+    /// </summary>
+    /// <param name="heHopLe">Tập id hệ hợp lệ = <c>drawTools.systems[].id</c>.</param>
+    public static void ValidateRoutingPolicy(RoutingPolicySection rp, IReadOnlyCollection<string> heHopLe)
+    {
+        if (double.IsNaN(rp.SnapRadiusMm) || rp.SnapRadiusMm <= 0)
+        {
+            throw new RulePackException(
+                $"drawTools.routingPolicy.snapRadiusMm = {rp.SnapRadiusMm} phải là số dương — " +
+                "bán kính ≤ 0 làm mọi thiết bị đều rơi vào danh sách không giải được.");
+        }
+
+        if (double.IsNaN(rp.Cost.ReuseFactor) || rp.Cost.ReuseFactor <= 0 || rp.Cost.ReuseFactor > 1)
+        {
+            throw new RulePackException(
+                $"drawTools.routingPolicy.cost.reuseFactor = {rp.Cost.ReuseFactor} phải nằm trong " +
+                "khoảng (0; 1] — > 1 là phạt (chống gom trục), ≤ 0 làm cạnh dùng lại thành miễn phí/âm giá.");
+        }
+        foreach (var (ten, giaTri) in new[] { ("elbowMm", rp.Cost.ElbowMm), ("congestionMm", rp.Cost.CongestionMm) })
+        {
+            if (double.IsNaN(giaTri) || giaTri < 0)
+                throw new RulePackException($"drawTools.routingPolicy.cost.{ten} = {giaTri} không được âm.");
+        }
+
+        var tierCuaHe = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var tier in rp.Tiers)
+        {
+            foreach (var heId in tier.Systems)
+            {
+                if (!heHopLe.Contains(heId))
+                {
+                    throw new RulePackException(
+                        $"drawTools.routingPolicy.tiers[\"{tier.Id}\"] chứa id hệ lạ \"{heId}\" — phải là " +
+                        $"drawTools.systems[].id (hợp lệ: {string.Join(", ", heHopLe)}).");
+                }
+                if (tierCuaHe.TryGetValue(heId, out var daCo))
+                {
+                    throw new RulePackException(
+                        $"drawTools.routingPolicy: hệ \"{heId}\" nằm ở 2 tier (\"{daCo}\" và \"{tier.Id}\") — " +
+                        "cấp tầng sẽ phụ thuộc thứ tự duyệt, hai tầng C#/TS trôi khỏi nhau.");
+                }
+                tierCuaHe[heId] = tier.Id;
+            }
+        }
+
+        foreach (var heId in rp.SystemOrder)
+        {
+            if (!heHopLe.Contains(heId))
+            {
+                throw new RulePackException(
+                    $"drawTools.routingPolicy.systemOrder chứa id hệ lạ \"{heId}\" — phải là " +
+                    $"drawTools.systems[].id (hợp lệ: {string.Join(", ", heHopLe)}).");
+            }
+        }
+
+        foreach (var (ten, giaTri) in new[] { ("default", rp.LaneGapMm.Default), ("elecToHot", rp.LaneGapMm.ElecToHot) })
+        {
+            if (double.IsNaN(giaTri) || giaTri <= 0)
+                throw new RulePackException($"drawTools.routingPolicy.laneGapMm.{ten} = {giaTri} phải là số dương.");
+        }
+
+        if (rp.Enabled && string.IsNullOrWhiteSpace(rp.CorridorLayer))
+        {
+            throw new RulePackException(
+                "drawTools.routingPolicy.corridorLayer trống trong khi enabled = true — hành lang sẽ " +
+                "lẫn vào layer tuyến và lệnh đi tuyến không lọc lại được.");
         }
     }
 

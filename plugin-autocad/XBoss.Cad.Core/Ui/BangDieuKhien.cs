@@ -44,6 +44,15 @@ public sealed record TrangThaiPhien
     /// <summary>Lý do thư viện block không dùng được (cache hỏng/chưa tải).</summary>
     public string? LoiThuVien { get; init; }
 
+    /// <summary>
+    /// M113 FR6 — mô tả HAI BỘ đang dùng khi máy đang chạy thư viện đã trộn theo dự án
+    /// (vd "toàn cục b3 + dự án #7 b1"). Null = đang dùng bộ toàn cục như trước M113.
+    /// </summary>
+    public string? ThuVienHaiBo { get; init; }
+
+    /// <summary>Số block đến từ bộ RIÊNG của dự án (0 khi đang dùng bộ toàn cục).</summary>
+    public int SoBlockDuAn { get; init; }
+
     /// <summary>Đề xuất block lấy từ server (Admin/PM: của cả đội) — rỗng khi chưa gọi được.</summary>
     public IReadOnlyList<XBossApiClient.DeXuatTomTat> DeXuat { get; init; } = [];
     /// <summary>Người đang xem là Admin/PM (thấy đề xuất của cả đội, duyệt trên web).</summary>
@@ -112,6 +121,16 @@ public static class BangDieuKhienModel
                 ? new("Thư viện", t.LoiThuVien ?? "Chưa có trên máy — chạy XBOSS_LOGIN hoặc XBOSS_VE_THUVIEN", MucDo.CanhBao)
                 : new("Thư viện", $"{t.ThuVienVersion} — {t.SoBlockThuVien} block", MucDo.Tot),
         };
+
+        // M113 FR6 — thư viện hai tầng: hiện version của CẢ HAI bộ đang dùng, kèm số block mà bộ
+        // của dự án đóng góp (kỹ sư biết ngay mình đang vẽ bằng ký hiệu/khung tên của dự án nào).
+        if (t.ThuVienVersion is not null && t.ThuVienHaiBo is not null)
+        {
+            dong.Add(new DongTrangThai(
+                "Bộ đang dùng",
+                $"{t.ThuVienHaiBo} — {t.SoBlockDuAn} block của dự án",
+                MucDo.Tot));
+        }
 
         var nhanDeXuat = t.LaNguoiDuyet ? "Đề xuất (cả đội)" : "Đề xuất của tôi";
         if (t.LoiDeXuat is not null)

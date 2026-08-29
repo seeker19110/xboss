@@ -497,7 +497,66 @@ public static class PhepKiemMoRong
         };
     }
 
-    // ===== (19) Cloud/tam giác revision mồ côi — M110 FR8 =====
+    // ===== (19) Handle mồ côi trong bản chép tầng — M111 AC3 =====
+
+    /// <summary>
+    /// Đối tượng do <c>XBOSS_VE_NHANTANG</c> sinh ra (mang XData <c>TangNguon</c>/<c>NhanTang</c> —
+    /// M111 FR9) mà handle tham chiếu trong chính XData của nó (tim/biên/nhãn/tuyến cắt/cặp đôi/…)
+    /// trỏ tới đối tượng KHÔNG tồn tại trong tập bản chép, hoặc trỏ SANG MỘT TẦNG CHÉP KHÁC — dấu
+    /// hiệu <c>FloorReplicator.AnhXaXData</c> (PR1) hoặc <c>DeepCloneObjects</c> (PR2) đã bỏ sót
+    /// ánh xạ. Đây chính là bất biến guardrail 2 của M111 §2 ("không sinh handle mồ côi").
+    ///
+    /// <para>Không có cờ <c>enabled</c> riêng trong rule pack — TỰ TẮT khi bản vẽ không có đối
+    /// tượng nhân bản tầng nào (<see cref="DrawingSnapshot.NhanTang"/> null/rỗng), cùng khuôn hai
+    /// tầng bảo vệ với phép kiểm 15/17: bản vẽ chưa từng chạy <c>XBOSS_VE_NHANTANG</c> không bao
+    /// giờ bị báo oan.</para>
+    /// </summary>
+    public static InspectionFinding? HandleMoCoiNhanTang(DrawingSnapshot snapshot)
+    {
+        if (snapshot.NhanTang is not { Count: > 0 } ds) return null;
+
+        // Tầng chép của MỌI đối tượng bản chép, tra theo handle — dùng để phân giải từng tham
+        // chiếu. Một handle xuất hiện ở đúng 1 tầng chép (bảng ánh xạ IdMapping của DeepCloneObjects
+        // không thể sinh 2 đối tượng cùng handle).
+        var tangTheoHandle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var d in ds) tangTheoHandle[d.Handle] = d.NhanTang;
+
+        var chiTiet = new List<string>();
+        var handles = new List<string>();
+        foreach (var d in ds)
+        {
+            foreach (var hThamChieu in d.HandleThamChieu)
+            {
+                if (string.IsNullOrWhiteSpace(hThamChieu)) continue;
+
+                if (!tangTheoHandle.TryGetValue(hThamChieu, out var tangCuaHandleKia))
+                {
+                    chiTiet.Add(
+                        $"tầng {d.NhanTang}: {d.Handle} tham chiếu {hThamChieu} — không tìm thấy trong bất kỳ bản chép nào (mồ côi)");
+                    ThemHandle(handles, d.Handle);
+                    continue;
+                }
+
+                if (!string.Equals(tangCuaHandleKia, d.NhanTang, StringComparison.OrdinalIgnoreCase))
+                {
+                    chiTiet.Add(
+                        $"tầng {d.NhanTang}: {d.Handle} tham chiếu {hThamChieu} nhưng đối tượng đó thuộc tầng {tangCuaHandleKia} (trỏ sai tầng)");
+                    ThemHandle(handles, d.Handle);
+                }
+            }
+        }
+
+        if (chiTiet.Count == 0) return null;
+        return new InspectionFinding
+        {
+            Id = "nhantang-handle-mo-coi",
+            Ten = "Handle mồ côi trong bản chép tầng (XBOSS_VE_NHANTANG — M111 AC3)",
+            Handles = handles,
+            ChiTiet = chiTiet,
+        };
+    }
+
+    // ===== (20) Cloud/tam giác revision mồ côi — M110 FR8 =====
 
     /// <summary>
     /// Cloud revision không còn tam giác đi kèm (hoặc ngược lại): xóa một bên bằng lệnh

@@ -174,7 +174,15 @@ public sealed class DrawingSnapshot
     public XrefBoQua? XrefDaBoQua { get; init; }
 
     /// <summary>
-    /// Cloud + tam giác revision do <c>XBOSS_VE_REV</c> sinh (M110 FR3) — phép kiểm 19.
+    /// Đối tượng do <c>XBOSS_VE_NHANTANG</c> sinh ra (mang XData <c>TangNguon</c>/<c>NhanTang</c> —
+    /// M111 FR9), kèm mọi handle mà XData của nó tham chiếu tới — nguồn của phép kiểm 19 (handle
+    /// mồ côi, M111 AC3). <c>null</c> = Adapter chưa quét hoặc bản vẽ không có bản chép tầng nào
+    /// → phép TỰ TẮT (bản vẽ vẽ tay không bị báo oan).
+    /// </summary>
+    public IReadOnlyList<FloorCopyInfo>? NhanTang { get; init; }
+
+    /// <summary>
+    /// Cloud + tam giác revision do <c>XBOSS_VE_REV</c> sinh (M110 FR3) — phép kiểm 20.
     /// <c>null</c> = Adapter chưa quét hoặc bản vẽ không có đối tượng revision nào → phép TỰ TẮT
     /// (cloud vẽ tay bằng lệnh REVCLOUD của AutoCAD không mang XData nên không bao giờ bị báo oan).
     /// </summary>
@@ -183,7 +191,7 @@ public sealed class DrawingSnapshot
 
 /// <summary>
 /// Một đối tượng revision (cloud hoặc tam giác) đọc từ XData <c>XBOSS_VE</c> vai trò
-/// <c>Revision</c> — phép kiểm 19 (M110 FR8). Cloud và tam giác luôn đi CẶP: mỗi bên mang handle
+/// <c>Revision</c> — phép kiểm 20 (M110 FR8). Cloud và tam giác luôn đi CẶP: mỗi bên mang handle
 /// của bên kia (<c>HandleCapDoi</c>), nên xóa một bên bằng lệnh ERASE thường là phát hiện được.
 /// </summary>
 public sealed record RevisionInfo
@@ -210,4 +218,24 @@ public sealed record TagInfo
 
     /// <summary>Layer của tim liên kết — dùng làm "hệ" để so trùng trong phạm vi từng hệ.</summary>
     public required string HeLayer { get; init; }
+}
+
+/// <summary>
+/// Một đối tượng bản chép tầng (<c>XBOSS_VE_NHANTANG</c> — M111 FR9), đọc từ XData
+/// <c>XBOSS_VE</c> — nguồn của phép kiểm 19 (handle mồ côi, M111 AC3). Chỉ những đối tượng mang
+/// <c>TangNguon</c> (tức LÀ bản chép, không phải tầng gốc) mới xuất hiện ở đây.
+/// </summary>
+public sealed record FloorCopyInfo
+{
+    public required string Handle { get; init; }
+
+    /// <summary>Nhãn tầng của chính bản chép này (tầng đích, vd <c>"06"</c>).</summary>
+    public required string NhanTang { get; init; }
+
+    /// <summary>
+    /// Mọi handle mà XData của đối tượng này tham chiếu tới (tim/biên/nhãn/tuyến cắt/cặp đôi/đối
+    /// tượng trong vùng/tim giao — gộp mọi khóa handle của <c>VeXDataInfo</c>). Phép kiểm 19 đòi
+    /// từng handle ở đây phải phân giải được và thuộc CÙNG tầng chép <see cref="NhanTang"/>.
+    /// </summary>
+    public IReadOnlyList<string> HandleThamChieu { get; init; } = [];
 }

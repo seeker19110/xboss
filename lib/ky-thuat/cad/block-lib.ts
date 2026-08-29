@@ -14,7 +14,7 @@
  *     việc phát hành block chưa có item takeoff — item đó thuộc rule pack, phát hành đường khác).
  */
 import { createHash } from "node:crypto";
-import { query, queryOne, insertId } from "@/lib/db";
+import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
 import { storagePut, storageGet } from "@/lib/nen/storage";
 import { newBlockLibFileName } from "@/lib/nen/photos";
 import { validateDxf, parseDxf, hasAnyToken } from "@/lib/ky-thuat/cad/dxf-parser";
@@ -482,6 +482,54 @@ export function tronThuVienBlock(
   return ketQua;
 }
 
+/**
+ * Xung đột **tên block AutoCAD** giữa bộ của dự án và bộ toàn cục hiện hành (M113 §4) — thuần.
+ *
+ * Hai entry khác `id` mà cùng `blockName` thì sau khi trộn sẽ có hai định nghĩa cùng tên trong một
+ * bản vẽ — điều AutoCAD không cho phép. Bắt **lúc phát hành bộ dự án**, không phải lúc dùng: người
+ * phát hành là người sửa được, còn kỹ sư đang vẽ thì không. Cùng `id` (dự án đè bản toàn cục) là
+ * chuyện bình thường, không phải xung đột. Tên block KHÔNG phân biệt hoa thường.
+ */
+export function kiemXungDotBlockName(
+  blocksDuAn: readonly BlockManifestEntry[],
+  toanCuc: BlockLibRow | null,
+): string[] {
+  if (!toanCuc) return [];
+  const theoTen = new Map(
+    toanCuc.manifest.blocks.map((b) => [b.blockName.toUpperCase(), b] as const),
+  );
+  const loi: string[] = [];
+  for (const b of blocksDuAn) {
+    const dung = theoTen.get(b.blockName.toUpperCase());
+    if (!dung || dung.id === b.id) continue;
+    loi.push(
+      `Block "${b.id}" của dự án dùng tên block "${b.blockName}" đã thuộc block "${dung.id}" của ` +
+        `bộ toàn cục ${toanCuc.version} — hai định nghĩa cùng tên không cùng tồn tại trong một bản vẽ. ` +
+        `Đổi tên block, hoặc dùng đúng id "${dung.id}" nếu muốn ĐÈ block toàn cục đó.`,
+    );
+  }
+  return loi;
+}
+
+/**
+ * ETag của **kết quả trộn** (M113 §4.6): băm cặp (id bộ toàn cục, id bộ dự án) — đổi một trong hai
+ * bộ thì client tải lại. Khác `etagBlockLib` (ETag của MỘT bộ, dùng cho tệp `.dwg` vì hash kiểm
+ * theo từng bộ, không trộn).
+ */
+export function etagBlockLibTron(toanCuc: BlockLibRow | null, cuaDuAn: BlockLibRow | null): string {
+  const cap = `${toanCuc?.id ?? 0}-${cuaDuAn?.id ?? 0}`;
+  return `"tron-${createHash("sha256").update(cap).digest("hex").slice(0, 32)}"`;
+}
+
+/**
+ * Chạy một khối thao tác trong đúng **tầng** của thư viện: không có dự án → giữ nguyên đường cũ
+ * (ngoài mọi phạm vi dự án, đúng nhánh WITH CHECK "GUC rỗng" của 0145); có dự án → trong
+ * `withProjectScope(projectId)` như mọi đường đọc/ghi theo dự án khác.
+ */
+function trongTang<T>(projectId: number | undefined, fn: () => Promise<T>): Promise<T> {
+  return projectId === undefined ? fn() : withProjectScope(projectId, fn, { readOnly: false });
+}
+
 /** Lịch sử phát hành (mới → cũ) cho bảng điều khiển web. */
 export async function layLichSuBlockLib(limit = 20): Promise<BlockLibRow[]> {
   const rows = await query<DongDb>(`${CHON} ORDER BY b.id DESC LIMIT ?`, limit);
@@ -510,45 +558,65 @@ export async function phatHanhBlockLib(input: {
   manifestTho: unknown;
   dwg: Buffer;
   dxfText: string;
+  /** M113 §6 — phát hành bộ **của dự án này**; vắng = bộ toàn cục, y hệt hôm nay (guardrail 1). */
+  projectId?: number;
 }): Promise<PhatHanhKetQua> {
   const { manifest, ...kiemDinh } = kiemDinhManifest(input.manifestTho, input.dwg, input.dxfText);
   if (!kiemDinh.ok || !manifest) return { status: "invalid", kiemDinh };
 
-  const hash = createHash("sha256").update(input.dwg).digest("hex");
-  const daCo = await queryOne<{ id: number; dwg_sha256: string }>(
-    `SELECT id, dwg_sha256 FROM cad_block_libs WHERE version = ?`,
-    manifest.version,
-  );
-  if (daCo) {
-    if (daCo.dwg_sha256 === hash) {
-      return { status: "idempotent", kiemDinh, id: daCo.id, version: manifest.version };
+  // M113 §4/FR3 — bộ dự án phải kiểm thêm xung đột tên block với bộ toàn cục hiện hành. Đọc bộ
+  // toàn cục NGOÀI phạm vi dự án (dòng project_id IS NULL ai cũng đọc được, nhưng giữ đúng tầng).
+  if (input.projectId !== undefined) {
+    const xungDot = kiemXungDotBlockName(manifest.blocks, await layBlockLibHienHanh());
+    if (xungDot.length > 0) {
+      return {
+        status: "invalid",
+        kiemDinh: { ...kiemDinh, ok: false, errors: [...kiemDinh.errors, ...xungDot] },
+      };
     }
-    return {
-      status: "version-conflict",
-      message:
-        `Version "${manifest.version}" đã phát hành với nội dung khác — thư viện là append-only, ` +
-        `tăng version (vd "${manifest.version}" → kế tiếp) rồi phát hành lại.`,
-    };
   }
 
-  const storageKey = newBlockLibFileName(manifest.version);
-  await storagePut(ORG_THU_VIEN_BLOCK, storageKey, input.dwg);
-  // DXF sidecar đặt cạnh tệp .dwg cùng quy ước tên như plugin-upload — kiểm định lại được về sau
-  // mà không cần AutoCAD.
-  await storagePut(
-    ORG_THU_VIEN_BLOCK,
-    `${storageKey}.sidecar.dxf`,
-    Buffer.from(input.dxfText, "utf8"),
-  );
+  const hash = createHash("sha256").update(input.dwg).digest("hex");
+  return trongTang(input.projectId, async () => {
+    // Nhãn version chỉ duy nhất TRONG một tầng (0145): dự án A và dự án B cùng đặt 'b1' là hợp lệ.
+    const daCo = await queryOne<{ id: number; dwg_sha256: string }>(
+      `SELECT id, dwg_sha256 FROM cad_block_libs
+        WHERE version = ? AND project_id IS NOT DISTINCT FROM ?`,
+      manifest.version,
+      input.projectId ?? null,
+    );
+    if (daCo) {
+      if (daCo.dwg_sha256 === hash) {
+        return { status: "idempotent", kiemDinh, id: daCo.id, version: manifest.version };
+      }
+      return {
+        status: "version-conflict",
+        message:
+          `Version "${manifest.version}" đã phát hành với nội dung khác — thư viện là append-only, ` +
+          `tăng version (vd "${manifest.version}" → kế tiếp) rồi phát hành lại.`,
+      };
+    }
 
-  const id = await ghiSoBlockLib({
-    version: manifest.version,
-    manifest,
-    storageKey,
-    dwgSha256: hash,
-    userId: input.userId,
+    const storageKey = newBlockLibFileName(manifest.version);
+    await storagePut(ORG_THU_VIEN_BLOCK, storageKey, input.dwg);
+    // DXF sidecar đặt cạnh tệp .dwg cùng quy ước tên như plugin-upload — kiểm định lại được về sau
+    // mà không cần AutoCAD.
+    await storagePut(
+      ORG_THU_VIEN_BLOCK,
+      `${storageKey}.sidecar.dxf`,
+      Buffer.from(input.dxfText, "utf8"),
+    );
+
+    const id = await ghiSoBlockLib({
+      version: manifest.version,
+      manifest,
+      storageKey,
+      dwgSha256: hash,
+      userId: input.userId,
+      projectId: input.projectId,
+    });
+    return { status: "created", kiemDinh, id, version: manifest.version };
   });
-  return { status: "created", kiemDinh, id, version: manifest.version };
 }
 
 /**
@@ -563,10 +631,12 @@ export async function ghiSoBlockLib(input: {
   storageKey: string;
   dwgSha256: string;
   userId: number;
+  /** Bộ của dự án (M113); vắng/null = bộ toàn cục. Người gọi phải đang ở đúng tầng (RLS 0145). */
+  projectId?: number | null;
 }): Promise<number> {
   return insertId(
-    `INSERT INTO cad_block_libs (version, manifest, storage_key, dwg_sha256, published_by)
-     VALUES (?, ?::jsonb, ?, ?, ?)`,
+    `INSERT INTO cad_block_libs (version, manifest, storage_key, dwg_sha256, published_by, project_id)
+     VALUES (?, ?::jsonb, ?, ?, ?, ?)`,
     input.version,
     // Manifest lưu NGUYÊN dạng đã chuẩn hoá (không nhét kết quả kiểm định vào) — cột này chính là
     // thứ plugin tải về qua `?manifest=1`, phải đúng hợp đồng M100 §11.
@@ -574,6 +644,7 @@ export async function ghiSoBlockLib(input: {
     input.storageKey,
     input.dwgSha256,
     input.userId,
+    input.projectId ?? null,
   );
 }
 
@@ -592,12 +663,14 @@ export function versionKeTiep(version: string): string {
  * Version kế tiếp **chắc chắn chưa dùng**: `version` là UNIQUE nên nếu ai đó đã phát hành tay
  * đúng nhãn kế tiếp, INSERT sẽ nổ giữa transaction duyệt. Nhảy tiếp tới nhãn còn trống.
  */
-export async function versionPhatHanhKeTiep(hienHanh: string): Promise<string> {
+export async function versionPhatHanhKeTiep(hienHanh: string, projectId?: number): Promise<string> {
   let ung = versionKeTiep(hienHanh);
   for (let i = 0; i < 50; i++) {
+    // Nhãn duy nhất theo TỪNG tầng (0145) — nhãn dự án A đang dùng không chặn dự án B/toàn cục.
     const da = await queryOne<{ id: number }>(
-      `SELECT id FROM cad_block_libs WHERE version = ?`,
+      `SELECT id FROM cad_block_libs WHERE version = ? AND project_id IS NOT DISTINCT FROM ?`,
       ung,
+      projectId ?? null,
     );
     if (!da) return ung;
     ung = versionKeTiep(ung);
