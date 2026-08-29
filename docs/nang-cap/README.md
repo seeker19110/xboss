@@ -199,7 +199,8 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > Người dùng chốt **"duyệt tất cả"** 2026-08-29. Cả 6 đặc tả chuyển sang
 > **Approved for implementation**; **8/9 mục Open đã chốt ngay khi duyệt** (ghi trong §Rủi ro của
 > từng tệp), mục còn lại của M114 **hoãn có chủ đích tới PR4** vì cần đo trên bản vẽ thật — PR1–PR3
-> không phụ thuộc nên không chặn.
+> không phụ thuộc nên không chặn. **Cập nhật 2026-08-29:** mục đó đã chốt khi làm PR4 (nhánh nối
+> liền, xem mục M114 bên trên) ⇒ **không còn open decision nào trong cả 6 đặc tả.**
 >
 > **Các quyết định chốt lúc duyệt:**
 >
@@ -213,7 +214,7 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > | M113   | Ai phát hành bộ block dự án   | **`CAN.manageDrawings` trong phạm vi dự án** — PM dự án làm được                                            |
 > | M113   | Tầng `org_id`                 | Chưa làm; xem lại sau UAT đa tổ chức                                                                        |
 > | M114   | Nhiều hệ một lượt             | Không; chỉ xét lại sau pilot, phải mở M mới                                                                 |
-> | M114   | Nhánh tách riêng hay nối liền | **Hoãn tới PR4** — đo trên bản vẽ thật rồi chốt                                                             |
+> | M114   | Nhánh tách riêng hay nối liền | **Chốt ở PR4 (2026-08-29): NỐI LIỀN** — mỗi cạnh hành lang vẽ đúng 1 lần, không thì `XBOSS_BOCKL` bóc trùng |
 >
 > **Thứ tự thi hành khuyến nghị** (theo phụ thuộc cứng + rủi ro):
 >
@@ -236,7 +237,8 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > nào chạy vào bản vẽ**. Thứ đáng giữ: `planMultiTierCorridor` (phân tầng cao độ + làn ngang). M77 đã
 > được **đính chính tài liệu** cùng đợt (khối cảnh báo đầu tệp).
 >
-> **`M114-auto-routing-hanh-lang.md` (Draft)** — `XBOSS_VE_HANHLANG` + `XBOSS_VE_TUYENTUDONG`. Đi
+> **`M114-auto-routing-hanh-lang.md`** — ✅ **CODE XONG cả 4 PR (2026-08-29)**, rule pack **v15**
+> `drawTools.routingPolicy` (mặc định TẮT). `XBOSS_VE_HANHLANG` + `XBOSS_VE_TUYENTUDONG`. Đi
 > tuyến trên **đồ thị hành lang** (Dijkstra vài chục nút) thay vì A\* không gian tự do: kỹ sư chuẩn bị
 > 4 mẩu dữ liệu (3 đã có sẵn công cụ — thiết bị mang XData, vùng M101 PR3, tham số tầng trong rule
 > pack; chỉ **hành lang** là lệnh mới), máy chạy **một hệ một lượt** theo thứ tự ưu tiên. Hàm chi phí
@@ -246,6 +248,22 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > `_LOCHO`/`BOCKL` dùng được ngay — auto-routing là máy phát đầu vào cho dây chuyền đã có, không phải
 > hòn đảo. Trạng thái chiếm chỗ làn sống trong XData hành lang nên **không migration, không API mới**.
 > 4 quyết định nền đã chốt với người dùng (§2); 4 PR; PR4 `route: complex`.
+>
+> - **PR1** rule pack v15 + validator 2 tầng + `Routing/HanhLangGraph.cs` + `Routing/DinhTuyen.cs`
+>   - XData `VaiTroVe.HanhLang`/`LanChiem` + test Core. **PR2** `Routing/CapPhatLanTang.cs` +
+>     `doi-chung/routing-doi-chung.json` + test đối chứng 2 tầng (C# ↔ `planMultiTierCorridor`).
+>     **PR3** lệnh `XBOSS_VE_HANHLANG` (vẽ mới / NHẬN polyline có sẵn / sửa / xóa) + hộp thoại M106.
+>     **PR4** lệnh `XBOSS_VE_TUYENTUDONG`: `Routing/KeHoachDiTuyen.cs` nối đồ thị → định tuyến → cấp
+>     tầng/làn, hộp thoại xem trước **bắt buộc** (nét mảnh tạm bằng **đồ họa tạm**, hủy là bản vẽ
+>     không đổi một thực thể nào), sinh polyline tim + nét biên, cờ `SuaTay` theo băm hình học, chạy
+>     lại idempotent (gỡ chiếm chỗ cũ trước khi cấp lại), mục báo cáo phiên vẽ, tài liệu.
+> - **Quyết định chốt ở PR4 (mục §12 "hoãn có chủ đích"): nhánh NỐI LIỀN, mỗi cạnh hành lang vẽ
+>   đúng một lần.** Vẽ mỗi nhánh một polyline riêng thì đoạn trục chung nằm chồng N lớp và
+>   `XBOSS_BOCKL` bóc gấp N lần chiều dài thật — sai thẳng vào khối lượng. Nhánh chạm cạnh đã có
+>   tuyến thì dừng tại đúng nút đó, ra hình "một trục chính + các nhánh đấu vào".
+> - **CÒN NỢ — CHẶN phát hành rộng:** chưa verify tay trên AutoCAD 2026 thật (mục `C10` của
+>   `plugin-autocad/VERIFY-VA-PHAT-HANH.md` — AC1/AC3/AC6/AC8/AC10–AC13 trên một tầng thật của
+>   AVIO). Toàn bộ mã Adapter M114 mới chỉ được biên dịch bằng stub `XBoss.Cad.AcadShim`.
 
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 

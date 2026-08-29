@@ -231,6 +231,17 @@ public sealed record VeXDataInfo
 
     /// <summary>Kỹ sư đã sửa hình học tuyến tự động (FR12) — chạy lại BỎ QUA, không đè công của người.</summary>
     public bool SuaTay { get; init; }
+
+    /// <summary>
+    /// Băm hình học của tuyến tự động NGAY LÚC SINH (<see cref="RevisionSnapshot.BamHinhHoc"/> —
+    /// cùng cơ chế mốc của M110, làm tròn 0,1 mm). Lần chạy sau băm lại đỉnh hiện tại: lệch nghĩa
+    /// là kỹ sư đã kéo/sửa tay ⇒ đặt <see cref="SuaTay"/> và BỎ QUA tuyến đó (M114 FR12).
+    ///
+    /// <para>Băm sống ngay trên đối tượng chứ không nằm trong một mốc riêng ở Named Objects
+    /// Dictionary: trạng thái của M114 luôn sống trong bản vẽ (FR3), nên tuyến copy sang bản vẽ
+    /// khác vẫn tự mang theo mốc so của chính nó.</para>
+    /// </summary>
+    public string? BamHinhHoc { get; init; }
 }
 
 /// <summary>
@@ -301,6 +312,7 @@ public static class VeXData
         if (tt.TuDong) ra.Add("tudong=1");
         Them(ra, "phien", tt.PhienTuyen);
         if (tt.SuaTay) ra.Add("suatay=1");
+        Them(ra, "bamhh", tt.BamHinhHoc);
         return ra;
     }
 
@@ -360,6 +372,7 @@ public static class VeXData
         var lanDaCap = new List<LanChiem>();
         double? beRongMm = null, cotDayDamMm = null, cotTranMm = null;
         string? phienTuyen = null;
+        string? bamHinhHoc = null;
         var tuDong = false;
         var suaTay = false;
 
@@ -467,6 +480,7 @@ public static class VeXData
                 case "tudong": tuDong = giaTri == "1"; break;
                 case "phien": phienTuyen = giaTri; break;
                 case "suatay": suaTay = giaTri == "1"; break;
+                case "bamhh": bamHinhHoc = giaTri; break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -516,6 +530,7 @@ public static class VeXData
             TuDong = tuDong,
             PhienTuyen = phienTuyen,
             SuaTay = suaTay,
+            BamHinhHoc = bamHinhHoc,
         };
     }
 

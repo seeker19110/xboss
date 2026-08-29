@@ -90,7 +90,7 @@ public static class LenhCatalog
             NhomLenh.BocKhoiLuong, BuocQuyTrinh.BocVaNop, 2, CanRulePack: true),
 
         // ── Vẽ shop drawing (M100 — 15 lệnh + M105 chia đốt + M107 nhận tuyến có sẵn
-        //    + M109 ngắt nét giao chéo + M114 hành lang) ──
+        //    + M109 ngắt nét giao chéo + M114 hành lang & đi tuyến tự động) ──
         // XBOSS_VE_HANHLANG nằm panel "Vẽ shop drawing" (kỹ thuật: cùng bộ lệnh vẽ) nhưng thuộc
         // BƯỚC 2 chuẩn bị nền (M114 FR16) — chuẩn bị hành lang xong mới đi tuyến được.
         new("XBOSS_VE_HANHLANG", "Hành lang",
@@ -100,29 +100,35 @@ public static class LenhCatalog
         new("XBOSS_VE_NEN", "Chuẩn bị nền",
             "Dựng đủ layer/style theo rule pack để bắt đầu vẽ shop drawing.",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 1, CanRulePack: true),
+        // XBOSS_VE_TUYENTUDONG đứng TRƯỚC XBOSS_VE (M114 FR16): đi tuyến tự động là đường chính cho
+        // hàng trăm nhánh giống nhau, XBOSS_VE là đường vẽ tay cho phần còn lại.
+        new("XBOSS_VE_TUYENTUDONG", "Đi tuyến tự động",
+            "Đi tuyến cả một hệ trong một lượt theo đồ thị hành lang: gom trục, cấp tầng/làn, xem trước " +
+            "bắt buộc rồi mới sinh tuyến thật; tuyến kỹ sư đã sửa tay được giữ nguyên khi chạy lại.",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 2, CanRulePack: true),
         new("XBOSS_VE", "Vẽ tuyến",
             "Vẽ tuyến ống/ống gió đúng chuẩn ngay từ đầu: layer + size XData + nét biên tự động.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 2, LenhChinh: true, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 3, LenhChinh: true, CanRulePack: true),
         new("XBOSS_VE_NHANTUYEN", "Nhận tuyến có sẵn",
             "Khai hệ/loại/cỡ cho tuyến của bản thiết kế người khác: đổi layer chuẩn + gắn dữ liệu XBoss + " +
             "sinh nét biên, hình học tim giữ nguyên — dùng được ngay mọi lệnh XBoss.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 3, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 4, CanRulePack: true),
         new("XBOSS_VE_NHAN", "Nhãn size",
             "Sinh nhãn size liên kết XData cho các tuyến đã vẽ.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 4, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 5, CanRulePack: true),
         new("XBOSS_VE_DOI", "Đổi size/hệ",
             "Đổi size hoặc hệ của tuyến đã vẽ — layer/XData/nhãn cập nhật theo.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 8, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 9, CanRulePack: true),
         new("XBOSS_VE_PHUKIEN", "Phụ kiện",
             "Đặt block phụ kiện (co/tê/van…) từ thư viện, tự khớp size với tuyến.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 5, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 6, CanRulePack: true),
         new("XBOSS_VE_THIETBI", "Thiết bị",
             "Đặt block thiết bị (FCU/AHU/quạt…) từ thư viện có version.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 6, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 7, CanRulePack: true),
         new("XBOSS_VE_NHANTANG", "Nhân bản tầng",
             "Chép hệ của tầng điển hình sang N tầng khác kèm ánh xạ lại toàn bộ liên kết dữ liệu và " +
             "đổi tag theo tầng — có bảng xem trước bắt buộc, một lần UNDO hoàn tác cả N tầng.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 7, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 8, CanRulePack: true),
         new("XBOSS_VE_THUVIEN", "Thư viện block",
             "Tải/đồng bộ thư viện block từ server hoặc nhập từ tệp manifest + DWG.",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.PhuTro, 2, CanRulePack: true),

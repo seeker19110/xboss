@@ -113,6 +113,19 @@ namespace Autodesk.AutoCAD.Geometry
     /// Tập đỉnh 2D — API thật dùng làm biên của <c>Wipeout.SetFrom</c> (M109). Cùng khuôn
     /// <c>Point3dCollection</c> bên DatabaseServices: chỉ có mặt để kiểm chữ ký lời gọi.
     /// </summary>
+    /// <summary>
+    /// API thật: danh sách số viewport truyền cho <c>TransientManager</c>. Rỗng = mọi viewport.
+    /// </summary>
+    public class IntegerCollection : IDisposable, IEnumerable<int>
+    {
+        public IntegerCollection() { }
+        public int Count => 0;
+        public void Add(int value) { }
+        public IEnumerator<int> GetEnumerator() => new List<int>().GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        public void Dispose() { }
+    }
+
     public class Point2dCollection : IDisposable, IEnumerable<Point2d>
     {
         public Point2dCollection() { }
@@ -265,7 +278,9 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public void Dispose() { }
     }
 
-    public class DBObject : IDisposable
+    // API thật: DBObject kế thừa GraphicsInterface.Drawable (xem chú thích ở lớp Drawable) — nhờ đó
+    // thực thể truyền thẳng vào TransientManager được. Dispose() thừa hưởng từ Drawable.
+    public class DBObject : Autodesk.AutoCAD.GraphicsInterface.Drawable
     {
         public ObjectId ObjectId => new ObjectId();
         public Handle Handle => new Handle(1);
@@ -273,7 +288,6 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public ResultBuffer GetXDataForApplication(string app) => null;
         public void UpgradeOpen() { }
         public void Erase() { }
-        public void Dispose() { }
     }
 
     public enum Intersect { OnBothOperands, ExtendThis, ExtendArgument, ExtendBoth }
@@ -809,10 +823,14 @@ namespace Autodesk.AutoCAD.DatabaseServices
 }
 
 /// <summary>
-/// Chỉ đủ cho FontDescriptor — Adapter đặt font TrueType cho TextStyleTableRecord qua kiểu này.
+/// FontDescriptor (Adapter đặt font TrueType cho TextStyleTableRecord) + đồ họa TẠM
+/// (<see cref="Autodesk.AutoCAD.GraphicsInterface.TransientManager"/> — M114 FR10 vẽ tuyến đề xuất
+/// mà KHÔNG thêm thực thể nào vào bản vẽ).
 /// </summary>
 namespace Autodesk.AutoCAD.GraphicsInterface
 {
+    using Autodesk.AutoCAD.Geometry;
+
     public class FontDescriptor
     {
         public FontDescriptor(string typeface, bool bold, bool italic, int charset, int pitchAndFamily)
@@ -821,6 +839,48 @@ namespace Autodesk.AutoCAD.GraphicsInterface
         }
 
         public string TypeFace { get; }
+    }
+
+    /// <summary>
+    /// API thật: lớp gốc của mọi thứ vẽ được, và <c>DatabaseServices.DBObject</c> KẾ THỪA nó — nhờ
+    /// vậy một <c>Polyline</c> chưa thuộc database vẫn truyền thẳng vào <see cref="TransientManager"/>
+    /// được. Khai đúng quan hệ kế thừa này là điểm mấu chốt: khai sai thì lời gọi
+    /// <c>AddTransient(polyline, …)</c> vẫn biên dịch trót lọt ở cổng CI mà hỏng trên AutoCAD thật.
+    /// </summary>
+    public class Drawable : IDisposable
+    {
+        public void Dispose() { }
+    }
+
+    /// <summary>Tầng vẽ của đồ họa tạm; M114 dùng <c>DirectShortTerm</c> (nét xem trước, không lưu).</summary>
+    public enum TransientDrawingMode
+    {
+        Main,
+        Sprite,
+        DirectShortTerm,
+        DirectTopmost,
+        Highlight,
+        CollectorsHighlight,
+        Contrast,
+    }
+
+    /// <summary>
+    /// Quản lý đồ họa TẠM: vẽ lên màn hình mà KHÔNG đưa thực thể nào vào database (không sinh bước
+    /// UNDO, không tạo layer). <c>viewportNumbers</c> rỗng = áp cho mọi viewport.
+    /// </summary>
+    public class TransientManager
+    {
+        public static TransientManager CurrentTransientManager => new TransientManager();
+
+        public void AddTransient(
+            Drawable drawable, TransientDrawingMode mode, int subDrawingMode, IntegerCollection viewportNumbers) { }
+
+        public void EraseTransient(Drawable drawable, IntegerCollection viewportNumbers) { }
+
+        public void EraseTransients(
+            TransientDrawingMode mode, int subDrawingMode, IntegerCollection viewportNumbers) { }
+
+        public void UpdateTransient(Drawable drawable, IntegerCollection viewportNumbers) { }
     }
 }
 
@@ -930,6 +990,8 @@ namespace Autodesk.AutoCAD.EditorInput
         public ViewTableRecord GetCurrentView() => new ViewTableRecord();
         public void SetCurrentView(ViewTableRecord view) { }
         public Matrix3d CurrentUserCoordinateSystem { get; set; }
+        /// <summary>Vẽ lại vùng đồ họa — cần gọi sau khi thêm/xóa đồ họa TẠM (M114 FR10).</summary>
+        public void UpdateScreen() { }
         public void Command(params object[] args) { }
     }
 }
