@@ -28,8 +28,23 @@ import { getCurrentRulePack } from "@/lib/ky-thuat/cad/rule-pack";
  */
 export const ORG_THU_VIEN_BLOCK = 1;
 
-/** Loại block trong thư viện (M100 §11 + §6.7–6.9 bổ sung `support`/`sleeve`). */
-export const LOAI_BLOCK = ["fitting", "equipment", "titleblock", "support", "sleeve"] as const;
+/**
+ * Loại block trong thư viện (M100 §11 + §6.7–6.9 bổ sung `support`/`sleeve`; M110 §5 bổ sung
+ * `annotation`).
+ *
+ * `annotation` = ký hiệu CHÚ THÍCH thuần (tam giác số revision của `XBOSS_VE_REV`…): không thuộc
+ * hệ nào, **không bao giờ đi vào khối lượng** — nó cố ý vắng mặt trong `KIND_DEM_KHOI_LUONG`
+ * (`lib/ky-thuat/cad/block-proposals.ts`) và trong `doiChieuTakeoff` phía dưới (chỉ soi
+ * `equipment`), đúng guardrail 1 của M110: khoanh revision không được đổi con số `XBOSS_BOCKL`.
+ */
+export const LOAI_BLOCK = [
+  "fitting",
+  "equipment",
+  "titleblock",
+  "support",
+  "sleeve",
+  "annotation",
+] as const;
 export type LoaiBlock = (typeof LOAI_BLOCK)[number];
 
 export type BlockManifestEntry = {

@@ -17,6 +17,15 @@ public enum BlockKind
     Support,
     /// <summary>Sleeve/lỗ chờ xuyên kết cấu (XBOSS_VE_LOCHO).</summary>
     Sleeve,
+
+    /// <summary>
+    /// Ký hiệu CHÚ THÍCH thuần — tam giác mang số revision của <c>XBOSS_VE_REV</c> (M110 §5).
+    /// Không thuộc hệ nào và KHÔNG BAO GIỜ vào khối lượng: các lệnh chèn phụ kiện/thiết bị/giá
+    /// đỡ/lỗ chờ đều lọc theo <see cref="BlockKind"/> của riêng chúng, nên loại này không lọt vào
+    /// danh mục nào của <c>XBOSS_BOCKL</c> (guardrail 1 của M110 — khoanh revision xong,
+    /// <c>XBOSS_BOCKL</c> phải cho đúng con số như trước).
+    /// </summary>
+    Annotation,
 }
 
 /// <summary>Một block trong manifest thư viện.</summary>
@@ -75,8 +84,9 @@ public sealed class BlockDef
         "titleblock" => BlockKind.Titleblock,
         "support" => BlockKind.Support,
         "sleeve" => BlockKind.Sleeve,
+        "annotation" => BlockKind.Annotation,
         _ => throw new BlockManifestException(
-            $"Block \"{Id}\": kind lạ \"{Kind}\" (chỉ nhận fitting/equipment/titleblock/support/sleeve)"),
+            $"Block \"{Id}\": kind lạ \"{Kind}\" (chỉ nhận fitting/equipment/titleblock/support/sleeve/annotation)"),
     };
 }
 
