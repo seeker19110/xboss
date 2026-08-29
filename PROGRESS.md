@@ -4,6 +4,39 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## ✅ Duyệt trọn gói 6 đặc tả M109–M114 (2026-08-29)
+
+Người dùng: **"duyệt tất cả"**. Nhánh `claude/duyet-dac-ta-m109-m114`. Cả 6 tệp chuyển
+**Draft → Approved for implementation**, tick đủ checklist §Approval, ghi người/ngày duyệt.
+
+**Duyệt không phải là đóng dấu suông — 9 mục Open phải có câu trả lời trước** (chính checklist của
+các đặc tả đòi "không còn blocking question"). 8/9 đã chốt ngay:
+
+| Đặc tả | Mục                                              | Chốt                                                                                                                                                                                     |
+| ------ | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M109   | `priority` mặc định có hợp lệ mọi dự án          | Giữ trong rule pack, dự án khác sửa qua `?project=` (đường per-project M101 PR4 đã có)                                                                                                   |
+| M111   | Kiểm handle mồ côi: lệnh riêng hay phép kiểm     | **Phép kiểm trong `XBOSS_KIEMTRA`** — tốn một số hiệu phép kiểm nhưng canh được MỌI lệnh về sau, không riêng M111                                                                        |
+| M111   | Tầng nguồn đang đỏ KIEMTRA thì chặn hay cảnh báo | **Cảnh báo, KHÔNG chặn** — bản vẽ của người khác gần như luôn có lỗi tồn đọng, chặn sẽ khóa kỹ sư khỏi chính tính năng họ cần; xem trước bắt buộc + nguyên tử đã là chốt an toàn đủ mạnh |
+| M112   | Trục xuyên nhiều tệp                             | Ngoài phạm vi (đụng dữ liệu liên tệp = đụng server); cần thì mở M mới                                                                                                                    |
+| M112   | Tỉ lệ đứng thật hay giãn đều                     | **Theo tỉ lệ cao độ thật** — đọc đúng khoảng cách tầng, đúng AC1 đã viết                                                                                                                 |
+| M113   | Ai được phát hành bộ block của dự án             | **`CAN.manageDrawings` trong phạm vi dự án** — PM dự án phát hành được, không dồn về Admin toàn hệ                                                                                       |
+| M113   | Có cần tầng `org_id`                             | Chưa; khuôn trộn §4 mở rộng thành 3 tầng được, xem lại sau UAT đa tổ chức                                                                                                                |
+| M114   | Nhiều hệ một lượt                                | **Không** — chỉ xét lại sau khi một-hệ-một-lượt qua pilot, và phải mở M mới                                                                                                              |
+
+**Mục thứ 9 hoãn có chủ đích, không phải bỏ sót:** M114 "một nhánh nên tách polyline riêng hay nối
+liền vào trục chung" — ảnh hưởng cách `XBOSS_BOCKL` đếm và `_CHIADOT` chia, **cần đo trên bản vẽ
+thật** chứ không đoán trước. PR1–PR3 của M114 không phụ thuộc quyết định này nên không chặn việc
+duyệt; PR4 phải chốt bằng thử nghiệm.
+
+**Thứ tự thi hành khuyến nghị** (ghi trong `docs/nang-cap/README.md`): (1) M109 + M113 song song —
+M113 PR1 **phải qua staging**, migration đụng ràng buộc trên dữ liệu đang có; (2) M110; (3) **M111 —
+rủi ro cao nhất cả bộ**, verify tay trên bản vẽ AVIO thật trước khi phát hành rộng; (4) M114, nên đi
+sau M109 để `crossingPolicy` sẵn sàng cho tuyến sinh tự động; (5) **M112 — điều kiện tiên quyết là
+M111 đã chạy thật qua pilot**, không được làm trước.
+
+**Nhắc người thi hành:** mọi số rule pack và số migration trong 6 tệp là **dự kiến** — lấy số thật
+lúc code. Mọi khóa rule pack mới mặc định `enabled: false`, nạp pack mới không đổi hành vi.
+
 ## Đặc tả M114 — auto-routing MEPF theo đồ thị hành lang (2026-08-29)
 
 Tiếp nối mục nghiên cứu ngay dưới; người dùng "chọn phương án tốt nhất" cho 4 câu còn mở, rồi "tách

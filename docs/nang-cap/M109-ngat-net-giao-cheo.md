@@ -4,8 +4,8 @@
 | :--------------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Quy ước trình bày 2D "tuyến đi dưới ngắt nét tại chỗ giao" — bản vẽ nộp đọc được ngay ai trên ai dưới, không cần tra mặt cắt                   |
 | Spec owner       | Seeker / Chief Engineering Architect                                                                                                           |
-| State            | **Draft** — chờ duyệt                                                                                                                          |
-| Người/ngày duyệt |                                                                                                                                                |
+| State            | **Approved for implementation**                                                                                                                |
+| Người/ngày duyệt | Seeker / 2026-08-29                                                                                                                            |
 | Cập nhật         | 2026-08-28                                                                                                                                     |
 | Nguồn            | `M100-xboss-ve-shop-drawing.md` §20 hàng 1 ("đụng hình học hiển thị quanh tim — phải thiết kế để gap CHỈ ở nét biên/hiển thị, tim giữ nguyên") |
 | Phụ thuộc        | M100 (XData `XBOSS_VE`, `EdgeOffset`, layer chuẩn), M101 PR1 (phép kiểm 11 clash 2D — nguồn danh sách giao cắt), M106 (hộp thoại WPF)          |
@@ -182,19 +182,20 @@ PR2 mang nhãn `complex` vì `DrawOrder` + wipeout là chỗ phải cân nhắc 
 
 ## 11. Rủi ro / open decisions
 
-| Mục                                          | Giảm thiểu                                                                               | Quyết định               |
-| :------------------------------------------- | :--------------------------------------------------------------------------------------- | :----------------------- |
-| Wipeout in PDF sai thứ tự trên vài driver    | AC1 bắt buộc in PDF thật trong verify tay; có `gapMode: "jog"` để ép sang cầu vượt       | Chấp nhận                |
-| Cắt tim do lỗi lập trình                     | AC2 là bất biến có test + verify tay; guardrail 1 ghi ở đầu tệp Adapter                  | Chốt                     |
-| `priority` mặc định có hợp lệ với mọi dự án? | Khai trong rule pack, sửa được per-project qua đường `?project=` đã có ở M101 PR4        | **Open — hỏi khi duyệt** |
-| Giao 3 tuyến trở lên tại một điểm            | Xử lý theo từng cặp, wipeout chồng nhau vẫn đúng hình; ghi rõ trong báo cáo là "đa giao" | Chấp nhận                |
+| Mục                                          | Giảm thiểu                                                                               | Quyết định                                                                                |
+| :------------------------------------------- | :--------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------- |
+| Wipeout in PDF sai thứ tự trên vài driver    | AC1 bắt buộc in PDF thật trong verify tay; có `gapMode: "jog"` để ép sang cầu vượt       | Chấp nhận                                                                                 |
+| Cắt tim do lỗi lập trình                     | AC2 là bất biến có test + verify tay; guardrail 1 ghi ở đầu tệp Adapter                  | Chốt                                                                                      |
+| `priority` mặc định có hợp lệ với mọi dự án? | Khai trong rule pack, sửa được per-project qua đường `?project=` đã có ở M101 PR4        | **Chốt 2026-08-29: giữ mặc định trong rule pack**, dự án nào khác thì sửa qua `?project=` |
+| Giao 3 tuyến trở lên tại một điểm            | Xử lý theo từng cặp, wipeout chồng nhau vẫn đúng hình; ghi rõ trong báo cáo là "đa giao" | Chấp nhận                                                                                 |
 
 ## 12. Approval
 
-- [ ] Product/scope
-- [ ] UX (hộp thoại M106 + đường lui)
-- [ ] Architecture (guardrail tim bất khả xâm phạm)
-- [ ] Test/verify tay
-- [ ] Không còn blocking question
+- [x] Product/scope
+- [x] UX (hộp thoại M106 + đường lui)
+- [x] Architecture (guardrail tim bất khả xâm phạm)
+- [x] Test/verify tay
+- [x] Không còn blocking question
 
-**Kết luận:** Draft — chờ duyệt.
+**Kết luận:** **Approved for implementation** (người dùng chốt 2026-08-29: "duyệt tất cả").
+**Người/ngày duyệt:** Seeker / 2026-08-29

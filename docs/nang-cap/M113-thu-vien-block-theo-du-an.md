@@ -4,8 +4,8 @@
 | :--------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Mỗi dự án/CĐT có bộ block riêng (ký hiệu, khung tên, quy ước thiết bị); bản đầu của M100 cố ý làm thư viện **toàn cục**                                                                         |
 | Spec owner       | Seeker / Chief Engineering Architect                                                                                                                                                            |
-| State            | **Draft** — chờ duyệt                                                                                                                                                                           |
-| Người/ngày duyệt |                                                                                                                                                                                                 |
+| State            | **Approved for implementation**                                                                                                                                                                 |
+| Người/ngày duyệt | Seeker / 2026-08-29                                                                                                                                                                             |
 | Cập nhật         | 2026-08-28                                                                                                                                                                                      |
 | Nguồn            | `M100-xboss-ve-shop-drawing.md` §20 hàng 5 ("đã chốt bản đầu toàn cục; xem lại sau UAT") + `migrations/0139` ghi chú                                                                            |
 | Phụ thuộc        | M100 PR2 (`cad_block_libs`, `lib/ky-thuat/cad/block-lib.ts`), M101 PR4 (**khuôn mẫu per-project đã chạy thật**: `0140_cad_boq_code_map.sql`, `?project=`), M103/M104/M108 (các đường nạp block) |
@@ -211,21 +211,22 @@ Thứ tự bắt buộc: schema → API → UI → plugin. PR1 **không** đi th
 
 ## 13. Rủi ro / open decisions
 
-| Mục                                                          | Giảm thiểu                                                                        | Quyết định                    |
-| :----------------------------------------------------------- | :-------------------------------------------------------------------------------- | :---------------------------- |
-| Đổi `UNIQUE(version)` trên bảng đang có dữ liệu              | Verify query + staging + dry-run (§5); đây là lý do PR1 không đi thẳng production | Chốt                          |
-| Plugin cũ gặp manifest có trường mới                         | AC1 + test C# "bỏ qua an toàn trường lạ"                                          | Chốt                          |
-| Ai được phát hành bộ của dự án — Admin toàn hệ hay PM dự án? | Đề xuất: `CAN.manageDrawings` **trong phạm vi dự án** (PM dự án làm được)         | **Open — chốt khi duyệt**     |
-| Có cần tầng `org_id` nữa không?                              | Khuôn §4 mở rộng được thành 3 tầng; chưa có nhu cầu thật                          | **Open — xác nhận khi duyệt** |
-| Dự án bị xoá → `ON DELETE CASCADE` xoá cả bộ block           | Đúng mong muốn; tệp `.dwg` trong storage dọn theo đường retention đã có           | Chấp nhận                     |
+| Mục                                                          | Giảm thiểu                                                                        | Quyết định                                                                              |
+| :----------------------------------------------------------- | :-------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------- |
+| Đổi `UNIQUE(version)` trên bảng đang có dữ liệu              | Verify query + staging + dry-run (§5); đây là lý do PR1 không đi thẳng production | Chốt                                                                                    |
+| Plugin cũ gặp manifest có trường mới                         | AC1 + test C# "bỏ qua an toàn trường lạ"                                          | Chốt                                                                                    |
+| Ai được phát hành bộ của dự án — Admin toàn hệ hay PM dự án? | Đề xuất: `CAN.manageDrawings` **trong phạm vi dự án** (PM dự án làm được)         | **Chốt 2026-08-29: `CAN.manageDrawings` trong phạm vi dự án** — PM dự án phát hành được |
+| Có cần tầng `org_id` nữa không?                              | Khuôn §4 mở rộng được thành 3 tầng; chưa có nhu cầu thật                          | **Chốt 2026-08-29: chưa làm** — khuôn §4 mở rộng được, xem lại sau UAT đa tổ chức       |
+| Dự án bị xoá → `ON DELETE CASCADE` xoá cả bộ block           | Đúng mong muốn; tệp `.dwg` trong storage dọn theo đường retention đã có           | Chấp nhận                                                                               |
 
 ## 14. Approval
 
-- [ ] Product/scope
-- [ ] UX/a11y (2 khối + chip nguồn, 2 theme)
-- [ ] Architecture/API/data (trộn 1 chỗ, append-only)
-- [ ] Security/RBAC/RLS/audit — **rà `docs/audit.md` vùng rủi ro cao**
-- [ ] Test/rollout/rollback (staging bắt buộc)
-- [ ] Không còn blocking question (2 mục Open ở §13)
+- [x] Product/scope
+- [x] UX/a11y (2 khối + chip nguồn, 2 theme)
+- [x] Architecture/API/data (trộn 1 chỗ, append-only)
+- [x] Security/RBAC/RLS/audit — **rà `docs/audit.md` vùng rủi ro cao**
+- [x] Test/rollout/rollback (staging bắt buộc)
+- [x] Không còn blocking question — 2 mục Open ở §13 đã chốt 2026-08-29
 
-**Kết luận:** Draft — chờ duyệt.
+**Kết luận:** **Approved for implementation** (người dùng chốt 2026-08-29: "duyệt tất cả").
+**Người/ngày duyệt:** Seeker / 2026-08-29
