@@ -90,7 +90,13 @@ public static class LenhCatalog
             NhomLenh.BocKhoiLuong, BuocQuyTrinh.BocVaNop, 2, CanRulePack: true),
 
         // ── Vẽ shop drawing (M100 — 15 lệnh + M105 chia đốt + M107 nhận tuyến có sẵn
-        //    + M109 ngắt nét giao chéo) ──
+        //    + M109 ngắt nét giao chéo + M114 hành lang) ──
+        // XBOSS_VE_HANHLANG nằm panel "Vẽ shop drawing" (kỹ thuật: cùng bộ lệnh vẽ) nhưng thuộc
+        // BƯỚC 2 chuẩn bị nền (M114 FR16) — chuẩn bị hành lang xong mới đi tuyến được.
+        new("XBOSS_VE_HANHLANG", "Hành lang",
+            "Khai hành lang đi ống cho đi tuyến tự động: vẽ mới hoặc NHẬN polyline có sẵn (giữ nguyên " +
+            "từng đỉnh), kèm bề rộng khả dụng, cao độ đáy dầm/trần và hệ được phép đi qua; sửa/xóa được.",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.ChuanHoaNen, 4, CanRulePack: true),
         new("XBOSS_VE_NEN", "Chuẩn bị nền",
             "Dựng đủ layer/style theo rule pack để bắt đầu vẽ shop drawing.",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 1, CanRulePack: true),

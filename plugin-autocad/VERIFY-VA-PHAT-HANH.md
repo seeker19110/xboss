@@ -245,6 +245,35 @@ không in).
 - **Hộp thoại:** soi theo checklist C8b (nền tối, ô **Đảo** mờ đúng ở dòng cùng hệ, nút OK khóa kèm
   lý do khi bản vẽ không có cặp nào giao nhau).
 
+### C4d. Hành lang đi ống — `XBOSS_VE_HANHLANG` (M114 PR3, bắt buộc)
+
+**Chưa làm mục này thì KHÔNG phát hành M114.** Cần rule pack có `drawTools.routingPolicy.enabled =
+true` (bản phát hành mặc định TẮT — chính ca đầu tiên dưới đây kiểm điều đó).
+
+- **AC14 — cờ tắt:** với rule pack mặc định (`enabled: false`) → lệnh **dừng ngay**, in hướng dẫn
+  cách bật, **không thực thể nào được tạo/sửa** (so số đối tượng trước/sau).
+- **Vẽ mới:** bật cờ → `VEMOI`, bấm 4 điểm trục hành lang, khai bề rộng 600 / đáy dầm 3200 / trần
+  2800, tick hết hệ → polyline nằm trên layer `M-CORRIDOR`, `LIST` thấy XData `XBOSS_VE` vai trò
+  `hanhlang` đủ 3 số và **không** có mục hệ nào (rỗng = mọi hệ).
+- **AC13 — nhận polyline giữ nguyên từng đỉnh (ca quan trọng nhất):** trước khi nhận, `LIST` một
+  polyline trục hành lang kiến trúc và ghi tọa độ **từng đỉnh**. `NHAN` nó → sau lệnh `LIST` lại:
+  **từng tọa độ đỉnh trùng khít**, số đỉnh và `Closed` không đổi; chỉ layer + XData đổi.
+- **Lọc vùng chọn:** quét vùng có lẫn arc, spline, một **polyline có đoạn cung**, text/block và một
+  xref → tất cả bị bỏ qua, tóm tắt đếm đủ **theo từng lý do**.
+- **Sửa:** `SUA` một hành lang đã có → đổi bề rộng; `LIST` xác nhận hình học không đổi và mục chiếm
+  làn (nếu đã chạy đi tuyến) **còn nguyên**.
+- **Xóa còn hệ đi qua (FR4):** trên hành lang đã có hệ chạy qua → `XOA` phải **nêu đúng handle +
+  tên hệ đang chiếm** rồi hỏi lại; chọn `Khong` = bản vẽ không đổi; chọn `Co` = hành lang mất,
+  các **tuyến vẫn còn nguyên** trong bản vẽ.
+- **AC11 — hủy giữa chừng:** bấm Hủy ở hộp thoại (và ESC ở bước bấm điểm) → so số thực thể
+  trước/sau: **không đổi một nét nào**.
+- **AC12 — một lần undo:** `U` một lần sau mỗi chế độ → bản vẽ trở lại nguyên trạng (kể cả ca nhận
+  hàng loạt và ca `LINE` chuyển thành polyline 2 đỉnh).
+- **Đường lui dòng lệnh:** `XBOSS_UI_DIALOG=0` → lệnh hỏi bề rộng/cao độ/hệ được phép bằng dòng
+  lệnh; kết quả trên bản vẽ **trùng khít** đường hộp thoại.
+- **Hộp thoại:** soi theo checklist C8b (nền tối, ô tick hệ đọc rõ, nút OK khóa kèm lý do khi thiếu
+  cao độ hoặc bỏ tick hết mọi hệ).
+
 ### C5. Vòng đời với web (M99 PR5 + M103 + M104)
 
 26. `XBOSS_UPLOAD` → tạo revision `submitted` trên web. **Kiểm mới của đợt này:** AutoCAD phải

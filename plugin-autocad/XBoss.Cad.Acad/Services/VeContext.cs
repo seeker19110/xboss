@@ -34,6 +34,17 @@ internal static class VeContext
 
     /// <summary>Khổ giấy chọn lần trước trong phiên (XBOSS_VE_TRANGIN).</summary>
     internal static string? KhoGiay { get; set; }
+    // ===== Hành lang (M114 FR2) — mồi sẵn cho đoạn hành lang tiếp theo trong cùng phiên =====
+    // Một tầng thường có nhiều đoạn hành lang cùng bề rộng/cao độ; hỏi lại từ đầu mỗi đoạn là
+    // đúng thứ làm kỹ sư bỏ lệnh. Vẫn là giá trị HỎI (M100 §6.3), chỉ mồi sẵn chứ không suy.
+
+    internal static double? HanhLangBeRongMm { get; set; }
+    internal static double? HanhLangCotDayDamMm { get; set; }
+    internal static double? HanhLangCotTranMm { get; set; }
+
+    /// <summary>Hệ được phép đi qua chọn lần trước; rỗng = mọi hệ.</summary>
+    internal static IReadOnlyList<string> HanhLangHeChoPhep { get; set; } = [];
+
     /// <summary>Id block phụ kiện/thiết bị chọn lần trước (mặc định cho lần sau — M100 PR4).</summary>
     internal static string? PhuKienId { get; set; }
     internal static string? ThietBiId { get; set; }
