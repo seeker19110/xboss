@@ -169,7 +169,7 @@ Nếu chốt làm, mở **M114** (số M kế tiếp — xác nhận lại bằn
 | 4   | M77 xử lý sao?                    | **Đính chính tài liệu** (đã làm: khối cảnh báo đầu `M77-auto-routing-beam-sleeve.md`); giữ `validateBeamSleeve`, lệnh plugin không gọi vào phần đi tuyến |
 
 ⇒ Đặc tả viết theo 4 quyết định này là **`M114-auto-routing-hanh-lang.md`** (State Draft, chờ duyệt) —
-nằm ở **PR riêng**, để phần đính chính sự thật về code (tệp này + M77) đi trước.
+viết trong PR kế tiếp của đợt này.
 
 ## 8. Nguồn đã đọc
 

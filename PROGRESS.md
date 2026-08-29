@@ -4,6 +4,32 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Đặc tả M114 — auto-routing MEPF theo đồ thị hành lang (2026-08-29)
+
+Tiếp nối mục nghiên cứu ngay dưới; người dùng "chọn phương án tốt nhất" cho 4 câu còn mở, rồi "tách
+riêng" nên đặc tả đi PR riêng với phần nghiên cứu. Nhánh `claude/spec-m114-auto-routing`. **CHƯA
+CODE**, State Draft.
+
+`M114-auto-routing-hanh-lang.md` — `XBOSS_VE_HANHLANG` + `XBOSS_VE_TUYENTUDONG`:
+
+- **Đồ thị hành lang + Dijkstra** (vài chục nút — không cần A\*, và §1 của nghiên cứu đã cho thấy thứ
+  tự xưng A\* trong repo cũng không phải A\*). Hàm chi phí
+  `chiều dài + α×chuyển hướng + β×độ đông − thưởng γ trên cạnh nhánh khác CỦA CHÍNH HỆ ĐÓ đã đi` —
+  `reuseFactor` là thứ khiến các nhánh gom vào trục chung rồi mới tỏa ra (xấp xỉ Steiner bằng cách đi
+  tuần tự và giảm giá cạnh đã dùng). **AC2 bắt chứng minh điều này bằng số**, không nói suông.
+- Tuyến sinh ra là **polyline tim mang XData `XBOSS_VE` đúng cấu trúc `XBOSS_VE` vẽ** (khuôn M107) ⇒
+  toàn bộ dây chuyền lệnh sẵn có dùng được ngay. Auto-routing là máy phát đầu vào, không phải hòn đảo.
+- **Trạng thái chiếm chỗ làn sống trong XData hành lang** (`lanDaCap`) ⇒ không migration, không API,
+  hệ chạy sau đọc được cả khi mở lại bản vẽ hôm khác.
+- Guardrail: một hệ một lượt (không có nút "route tất cả"); không giải được thì **báo kèm lý do và chỉ
+  đúng thiết bị**, cấm vẽ đại; nhánh kỹ sư đã sửa tay được đánh dấu và **chạy lại bỏ qua**; xem trước
+  bắt buộc; không tự nắn hệ đã chạy trước (combined services — chưa có đặc tả).
+- 4 PR; PR4 `route: complex` kèm ranh giới được phép quyết và danh sách cấm tự quyết.
+
+**Còn Open:** một nhánh nên tách polyline riêng hay nối liền vào trục chung (ảnh hưởng cách `BOCKL`
+đếm và `_CHIADOT` chia — chốt ở PR4 với bằng chứng trên bản vẽ thật); có mở chế độ nhiều hệ một lượt
+về sau không (chỉ sau khi một-hệ-một-lượt chạy ổn qua pilot, và phải mở M mới).
+
 ## Nghiên cứu auto-routing MEPF + đính chính M77 (2026-08-29)
 
 Người dùng: "nghiên cứu lại cách để auto route từng hệ riêng 1, hybird cũng được, kỹ sư chuẩn bị
@@ -44,8 +70,7 @@ sẵn** trong cùng một lệnh, chế độ nhận theo khuôn M107 (không đ
 `plugin-autocad/doi-chung/`; (3) **không** làm thủy lực ở bản đầu; (4) M77 đính chính tài liệu, giữ
 `validateBeamSleeve`, plugin không gọi vào phần đi tuyến.
 
-Đặc tả viết theo 4 quyết định này (`M114-auto-routing-hanh-lang.md`) nằm ở **PR riêng** — tách khỏi
-đợt này để phần đính chính sự thật về code đi trước, phần đề xuất chờ duyệt đi sau.
+Đặc tả viết theo 4 quyết định này là `M114-auto-routing-hanh-lang.md` — xem mục ngay dưới.
 
 ## Đặc tả M109–M113 — đóng nốt M100 §20 của đợt plugin AutoCAD (2026-08-28)
 

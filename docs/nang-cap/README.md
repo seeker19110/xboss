@@ -177,7 +177,7 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > **M108 — Nạp block hàng loạt từ file tổng hợp + gợi ý phân loại bằng AI** (`M108-nap-block-hang-loat-va-goi-y-ai.md`): ✅ **Approved for implementation 2026-08-26.** Đóng khoảng trống duy nhất còn lại của đường nạp thư viện block: hiện M103 (`XBOSS_VE_DEXUAT`) và M104 (`POST /api/engineering/cad/block-lib/blocks`) đều **một block một lần, người tự khai `kind`** — một tệp thư viện 200 block cần 200 lượt thao tác. M108 nạp cả tệp trong một lượt, phân loại **4 tầng** (luật tất định → khớp ngữ nghĩa → vision trên `dungPreviewSvg` → **người duyệt theo lô**), trùng tên thì bỏ qua kèm lý do; tái dùng cùng cỗ máy để **gợi ý `layerMap`** và **gợi ý `boqCode` per-project**. Là chỗ **đầu tiên** đưa SDK LLM vào codebase XBoss (`lib/nen/ai.ts`, `claude-opus-5`, structured output ép enum + Batches API + prompt caching), theo đúng boundary ENG-0/ENG-1: gọi **từ server**, kết quả **luôn** vào hàng chờ duyệt, AI **không đo hình học / không tự phát hành / không ghi thẳng DB**; thiếu `ANTHROPIC_API_KEY` hoặc `XBOSS_AI_BLOCK_CLASSIFY=0` → tầng 2/3 tự tắt, tầng 1 chạy bình thường. 5 PR, migration `0144` thêm thuần. 4 quyết định nền đã chốt với người dùng qua `AskUserQuestion` 2026-08-26 (§4); 3 open decision còn lại ở §18.
 > **M102 (`M102-plugin-ui.md`)** — giao diện UI plugin AutoCAD: tab Ribbon "XBoss" (5 panel/25 nút dựng từ danh mục `XBoss.Cad.Core/Ui/LenhCatalog.cs` — nguồn sự thật duy nhất, test đối chiếu với mọi `[CommandMethod]`) + bảng điều khiển `XBOSS_BANG` (PaletteSet chỉ-đọc: trạng thái đăng nhập/rule pack/sidecar JSON cạnh DWG). ✅ **Đã triển khai 2026-08-25** — xem `PROGRESS.md`.
 
-## Nghiên cứu — auto-routing MEPF (2026-08-29)
+## Nghiên cứu + đặc tả CHỜ DUYỆT — auto-routing MEPF (2026-08-29)
 
 > **`RESEARCH-AUTO-ROUTING-MEPF.md`** — nghiên cứu theo yêu cầu "auto route từng hệ riêng 1, hybrid
 > cũng được, kỹ sư chuẩn bị trước rồi auto routing". Phát hiện chính khi đọc code thật: thứ đang mang
@@ -187,7 +187,16 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > nào chạy vào bản vẽ**. Thứ đáng giữ: `planMultiTierCorridor` (phân tầng cao độ + làn ngang). M77 đã
 > được **đính chính tài liệu** cùng đợt (khối cảnh báo đầu tệp).
 >
-> Đặc tả đi kèm nghiên cứu này nằm ở PR riêng (`M114-auto-routing-hanh-lang.md`).
+> **`M114-auto-routing-hanh-lang.md` (Draft)** — `XBOSS_VE_HANHLANG` + `XBOSS_VE_TUYENTUDONG`. Đi
+> tuyến trên **đồ thị hành lang** (Dijkstra vài chục nút) thay vì A\* không gian tự do: kỹ sư chuẩn bị
+> 4 mẩu dữ liệu (3 đã có sẵn công cụ — thiết bị mang XData, vùng M101 PR3, tham số tầng trong rule
+> pack; chỉ **hành lang** là lệnh mới), máy chạy **một hệ một lượt** theo thứ tự ưu tiên. Hàm chi phí
+> có số hạng `reuseFactor` thưởng cho cạnh mà nhánh khác của chính hệ đó đã đi — đó là thứ khiến các
+> nhánh **gom vào trục chung** rồi mới tỏa ra, tức trông giống bản vẽ người làm. Tuyến sinh ra là
+> **polyline tim mang XData `XBOSS_VE`** (khuôn M107) nên `_PHUKIEN`/`_NHAN`/`_CHIADOT`/`_GIADO`/
+> `_LOCHO`/`BOCKL` dùng được ngay — auto-routing là máy phát đầu vào cho dây chuyền đã có, không phải
+> hòn đảo. Trạng thái chiếm chỗ làn sống trong XData hành lang nên **không migration, không API mới**.
+> 4 quyết định nền đã chốt với người dùng (§2); 4 PR; PR4 `route: complex`.
 
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 
