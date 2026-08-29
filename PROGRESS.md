@@ -4,6 +4,33 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## ✅ M113 PR2/4 — API `?project=` cho thư viện block hai tầng (2026-08-29)
+
+Nhánh `feat/m113-pr2-api-project`. PR **2/4** của `docs/nang-cap/M113-thu-vien-block-theo-du-an.md`
+(PR3 web 2 khối + chip nguồn, PR4 plugin — **chưa làm**).
+
+- `GET /api/engineering/cad/block-lib?project=<id>` — nhánh RIÊNG: trả manifest **đã trộn** hai tầng
+  (mỗi entry mang `nguon`/`libVersion`), ETag băm **cặp id** hai bộ (§4.6), thêm `boDuAn` để bảng
+  điều khiển hiện version cả hai bộ; tệp nhị phân kèm `?project=` trả đúng tệp `.dwg` của bộ dự án
+  (hash kiểm theo TỪNG bộ). Không kèm `?project=` ⇒ **y hệt hôm nay** (guardrail 1/AC1).
+  `?file=` nhận thêm `libVersion` và tìm trong đúng tầng.
+- `POST /api/engineering/cad/block-lib` + `POST .../block-lib/blocks` — nhận `project` (query hoặc
+  trường form): phát hành/thêm block vào bộ **của dự án**, quyền `CAN.manageDrawings` **trong phạm
+  vi dự án** (chốt M113 §13), id đối chiếu qua `chotProjectIdChoGhi`, ghi trong
+  `withProjectScope`; đường toàn cục vẫn chỉ Admin/PM. Dự án ngoài phạm vi ⇒ **404**.
+- `lib/ky-thuat/cad/block-lib.ts` — `kiemXungDotBlockName` (AC6: bộ dự án khai `blockName` trùng bộ
+  toàn cục nhưng khác `id` ⇒ **từ chối lúc phát hành**), `etagBlockLibTron`; `phatHanhBlockLib`/
+  `ghiSoBlockLib`/`versionPhatHanhKeTiep` làm việc theo **tầng** (nhãn version duy nhất trong tầng).
+- `lib/ky-thuat/cad/block-them-web.ts` — `themBlockTuWeb(projectId?)` (advisory lock **theo tầng**,
+  nền là bộ của dự án, chặn tên đụng bộ toàn cục), `timBlockLeTheoKhoa(fileKey, {projectId, libVersion})`.
+- `tests/cad-block-lib-api-du-an.test.ts` (mới) — AC2/AC3/AC4/AC5/AC6/AC8 + AC1 qua handler GET
+  thật; `docs/ERD.md` regen bằng `npm run gen:erd`.
+
+⚠️ **Còn vướng đặc tả — chưa làm**: §6 hàng cuối ("đường nạp lô M108 nhận `project`") và FR7 (đề
+xuất M103 vào hàng chờ của dự án) đòi cột `project_id` trên `cad_block_proposals`/`cad_block_batches`,
+nhưng DDL §5 lẫn §9 chỉ nói tới `cad_block_libs` (migration 0145 cũng vậy). Cần phiên chính chốt
+trước khi làm — xem báo cáo PR2.
+
 ## M111 PR2/3 — Lệnh `XBOSS_VE_NHANTANG`: chép N tầng + ánh xạ lại handle (2026-08-29)
 
 Nhánh `feat/m111-pr2-nhantang-adapter`, tiếp trên PR1. **Mới là PR2/3** — lệnh đã chạy được, nhưng
