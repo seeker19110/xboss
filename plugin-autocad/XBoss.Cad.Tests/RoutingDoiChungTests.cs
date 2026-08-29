@@ -73,6 +73,17 @@ public class RoutingDoiChungTests
     }
 
     [Fact]
+    public void Danh_sach_he_dien_cua_Core_khop_bo_doi_chung()
+    {
+        // M114 PR4: lệnh XBOSS_VE_TUYENTUDONG truyền CapPhatLanTang.HeDienDuAn vào Cap(). Rule pack
+        // chưa có cờ "hệ điện" nên danh sách khai tay ở Core — ca này ghim nó vào bộ đối chứng để
+        // hai chỗ không thể trôi khỏi nhau (khe hở elecToHot sai là sai an toàn điện–nóng).
+        Assert.Equal(
+            Doc().HeDien.OrderBy(x => x, StringComparer.Ordinal),
+            CapPhatLanTang.HeDienDuAn.OrderBy(x => x, StringComparer.Ordinal));
+    }
+
+    [Fact]
     public void CapPhatLanTang_ra_dung_tang_cao_do_va_lan_nhu_tang_TS()
     {
         var bo = Doc();

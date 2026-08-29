@@ -4,6 +4,84 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## ✅ M114 PR4/4 — Adapter `XBOSS_VE_TUYENTUDONG` (đi tuyến tự động theo hành lang) (2026-08-29)
+
+Nhánh `feat/m114-pr4-tuyentudong-adapter`. **PR cuối** của
+`docs/nang-cap/M114-auto-routing-hanh-lang.md` ⇒ **M114 XONG về mặt code cả 4 PR**. Kỹ sư đi tuyến
+**cả một hệ trong một lượt** trên hành lang đã khai ở PR3, thay vì bấm PLINE vài trăm lần.
+
+- `XBoss.Cad.Core/Routing/KeHoachDiTuyen.cs` (mới) — **THUẦN**, nối 3 mảnh của PR1/PR2 thành một kế
+  hoạch: `HanhLangGraph` (đồ thị) → `DinhTuyen` (Dijkstra α/β/γ + tự chảy) → `CapPhatLanTang`
+  (tầng/làn), rồi **gom nhánh thành polyline sao cho mỗi cạnh hành lang chỉ vẽ đúng MỘT lần**.
+  Điểm nguồn vào đồ thị dưới dạng "thiết bị ảo" (đồ thị chỉ tách nút tại đỉnh/giao/điểm rẽ) rồi bị
+  loại khỏi kết quả. Hành lang hết làn → mọi nhánh đi qua nó vào danh sách không giải được; hành
+  lang không còn dùng nữa thì **gỡ chiếm chỗ cũ** của hệ (FR13 — không rò rỉ làn).
+- `XBoss.Cad.Core/Ui/ViewModels/TuyenTuDongDialogViewModel.cs` (mới) + `DataTemplate` trong
+  `XBossDialog.xaml` — hộp thoại M106 gộp **chọn phạm vi (FR5)** và **bảng xem trước bắt buộc
+  (FR10)** vào một form: đổi hệ/loại tuyến/cỡ là kế hoạch tính lại ngay, kèm số thiết bị nối được,
+  tổng chiều dài, số co, tầng/làn từng hành lang và **danh sách không giải được kèm lý do**. Việc
+  vẽ nét tạm là một `Action` do LỆNH cắm vào nên hộp thoại vẫn không chạm bản vẽ (M106 §2.1).
+- `XBoss.Cad.Acad/Commands/VeTuyenTuDongCommands.cs` (mới) + `Services/NetTamXemTruoc.cs` (mới) —
+  lệnh `XBOSS_VE_TUYENTUDONG`: quét chọn thiết bị (Enter = mọi thiết bị của hệ chưa có tuyến) →
+  chọn polyline kín làm vùng cấm (Enter = bỏ qua) → bấm điểm nguồn → xem trước → ghi. Toàn bộ phần
+  ghi nằm trong **một transaction = một nhóm UNDO**: đánh dấu `SuaTay` cho tuyến lệch băm, xóa
+  tuyến tự động cũ + nét biên của nó, ghi sổ chiếm làn vào XData hành lang, sinh polyline tim đúng
+  cấu trúc `XBOSS_VE` (+ nét biên qua `EdgeOffset.Tinh`) mang thêm `TuDong`/`PhienTuyen`/`SuaTay`.
+- **Nét tạm xem trước dùng ĐỒ HỌA TẠM (`TransientManager`), không phải thực thể tạm** — AC11 đòi
+  "bấm Hủy thì bản vẽ không đổi một nét nào": đồ họa tạm không chạm database nên không thực thể,
+  không layer mới, không bước UNDO, và lệnh vỡ giữa chừng cũng không để lại rác. Stub
+  `XBoss.Cad.AcadShim` bổ sung `GraphicsInterface.Drawable`/`TransientDrawingMode`/
+  `TransientManager` + `Geometry.IntegerCollection` + `Editor.UpdateScreen` (`DBObject` nay kế thừa
+  `Drawable` đúng như API thật).
+- **Cờ sửa tay (FR12)** dùng `RevisionSnapshot.BamHinhHoc` của M110 (làm tròn 0,1 mm). Băm lúc sinh
+  cất trong **chính XData tuyến** (khóa `bamhh`, trường `VeXDataInfo.BamHinhHoc` mới) chứ không ở
+  một mốc riêng — trạng thái M114 luôn sống trong bản vẽ (FR3), tuyến copy sang bản vẽ khác vẫn
+  mang theo mốc so của nó.
+- `LenhCatalog.cs` — lệnh đứng **trước `XBOSS_VE`** trong bước 3 VeShopDrawing (FR16);
+  `VeSessionReport` thêm mục `tuyenTuDong` (hệ/loại/cỡ, số nhánh, số phiên, số nhánh sửa tay) +
+  cảnh báo khi có nhánh sửa tay; số liệu của TỪNG LẦN CHẠY (tổng dài, số co, tỉ lệ cạnh dùng chung,
+  lý do không giải được) vào nhật ký phiên như M111 đã làm.
+- `VeContext.CanRoutingPolicy` — gom cửa đọc `drawTools.routingPolicy` về một chỗ cho cả 2 lệnh
+  M114 (trước nằm riêng trong `VeHanhLangCommands`), để hai lệnh không bao giờ nói khác nhau về
+  "đi tuyến tự động đã bật chưa".
+- Test: `XBoss.Cad.Tests/TuyenTuDongTests.cs` (30 ca — AC1/AC2/AC4/AC5/AC6/AC7/AC9/AC10 ở mức hàm
+  thuần, bất biến "mỗi cạnh vẽ đúng một lần", NFR1 120 thiết bị × 40 hành lang, và hành vi hộp
+  thoại: khóa OK khi không nối được thiết bị nào, đếm đúng tuyến sửa tay, nét tạm hỏng không làm
+  chết hộp thoại), `VeSessionReportTests` +2 ca, `RoutingDoiChungTests` +1 ca ghim danh sách hệ
+  điện, `QuyTrinhTests` cập nhật vị trí lệnh. **1123 ca .NET xanh**, `dotnet build` shim 0 warning;
+  `npm run lint`/`npm run typecheck` xanh, `npm test` **1481 ca xanh** (Postgres 16 ephemeral).
+
+**Quyết định chốt ở PR4** (mục "hoãn có chủ đích" của M114 §12 — "nhánh tách riêng hay nối liền"):
+**NỐI LIỀN.** Vẽ mỗi nhánh một polyline riêng thì đoạn trục chung nằm chồng N lớp và `XBOSS_BOCKL`
+bóc gấp N lần chiều dài thật — sai thẳng vào khối lượng, trái AC3. Nhánh chạm cạnh đã có tuyến thì
+dừng tại đúng nút đó, ra hình "một trục chính + các nhánh đấu vào", đúng cách người vẽ. Đường về
+nguồn có thể **xen kẽ** đoạn đã vẽ/chưa vẽ (đồ thị hành lang có vòng) nên nhánh được cắt thành từng
+đoạn liên tục các cạnh chưa vẽ, chứ không phải "gặp cạnh cũ thì dừng hẳn" — dừng hẳn sẽ bỏ rơi
+phần sau và nhánh không nối tới nguồn.
+
+**Hai điểm lệch đặc tả PR2 ghi lại, nay đã xử ở PR4:**
+
+- **Rule pack không có cờ "hệ điện"** (cần cho `laneGapMm.elecToHot`): danh sách khai tường minh
+  MỘT chỗ ở `CapPhatLanTang.HeDienDuAn` và được **ghim vào `doi-chung/routing-doi-chung.json#heDien`
+  bằng test** — hai chỗ trôi khỏi nhau là CI đỏ. **Nợ kỹ thuật:** chỗ đúng của dữ liệu này là một
+  cờ trong rule pack (`drawTools.systems[].electrical`); thêm khóa rule pack nằm ngoài phạm vi M114
+  nên để lại cho mốc sau.
+- **AC6/AC7 vs con trỏ làn riêng từng tầng:** PR4 **gọi đúng** `CapPhatLanTang.Cap()`/`GoChiemCho()`
+  chứ không viết lại logic cấp làn (con trỏ làn theo từng tier là hành vi đã ghim bằng đối chứng 2
+  tầng ở PR2). Hệ quả cần biết: hai hệ **cùng một tier** thì lần chạy lại đầu tiên có thể đẩy làn
+  của hệ đang chạy ra sau làn của hệ kia (gỡ rồi cấp lại ⇒ con trỏ tính từ làn cuối còn lại), từ
+  lần thứ hai trở đi ổn định; hệ khác tier thì ổn định ngay. Ca AC9 trong test phủ tình huống một
+  hệ một tier (ca thường gặp).
+
+**Không migration, không API mới, không đụng `app/`** (M114 §9).
+
+**Nợ kỹ thuật — CHẶN phát hành rộng:** chưa verify tay trên AutoCAD 2026 thật. Kịch bản đã viết sẵn
+ở `plugin-autocad/VERIFY-VA-PHAT-HANH.md` mục **C10, item 82–98** (AC1 nối 24 miệng gió, AC3
+`_PHUKIEN`/`_NHAN`/`_CHIADOT`/`BOCKL` chạy được trên tuyến sinh ra **và bóc không trùng đoạn trục**,
+AC6/AC7 cấp làn, AC8 giữ nguyên nhánh đã sửa tay, AC10–AC13). Toàn bộ mã Adapter M114 hiện chỉ được
+biên dịch bằng stub `XBoss.Cad.AcadShim` — **chưa chạy trên AutoCAD lần nào**; riêng đồ họa tạm
+(`TransientManager`) là API lần đầu dùng trong repo nên phải soi kỹ ở item 93 (AC11).
+
 ## 🚧 M110 PR2/2 — Adapter revision cloud: 3 lệnh + mốc trong DWG (2026-08-29)
 
 Nhánh `feat/m110-pr2-revision-adapter`. **PR2 của 2** theo `docs/nang-cap/M110-revision-cloud.md`

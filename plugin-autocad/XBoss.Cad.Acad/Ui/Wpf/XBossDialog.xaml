@@ -982,6 +982,81 @@
       </StackPanel>
     </DataTemplate>
 
+    <!-- M114 FR5 + FR10 — XBOSS_VE_TUYENTUDONG: chọn phạm vi (hệ/loại tuyến/cỡ, chế độ tự chảy) và
+         BẢNG XEM TRƯỚC BẮT BUỘC trong cùng một form. Đổi hệ/loại/cỡ là ViewModel đi tuyến lại ngay
+         nên bảng số và nét mảnh tạm trên bản vẽ luôn nói về đúng lựa chọn đang thấy. Danh sách
+         "không giải được" KHÔNG bị giấu đi: guardrail M114 §3.3 — không giải được thì phải nói rõ
+         thiết bị nào, vì sao. Bán kính rẽ nhánh/độ dốc không có ô nào sửa được ở đây (§3 cấm nới
+         để cho ra kết quả) — chúng chỉ hiện ở dòng ghi chú rule pack. -->
+    <DataTemplate DataType="{x:Type vm:TuyenTuDongDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Phạm vi" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <TextBlock Text="{Binding MoTaPhamVi}" TextWrapping="Wrap" />
+        </Border>
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Hệ" />
+        <ComboBox ItemsSource="{Binding CacHe}" SelectedItem="{Binding He, Mode=TwoWay}"
+                  DisplayMemberPath="Name" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Loại tuyến" />
+        <ComboBox ItemsSource="{Binding CacLoaiTuyen}" SelectedItem="{Binding Tuyen, Mode=TwoWay}"
+                  DisplayMemberPath="Name" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Cỡ" />
+        <ComboBox ItemsSource="{Binding CacSize}" IsEditable="True"
+                  Text="{Binding Size, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+        <StackPanel Visibility="{Binding CanDoDoc, Converter={StaticResource CoThiHien}}">
+          <TextBlock Style="{StaticResource Nhan}" Text="Độ dốc (chế độ tự chảy)" />
+          <ComboBox ItemsSource="{Binding CacDoDoc}" IsEditable="True"
+                    Text="{Binding DoDoc, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+          <TextBlock Style="{StaticResource Nhan}" Text="Cao độ tim tuyến TẠI THIẾT BỊ (mm — nhập tay)" />
+          <TextBox Text="{Binding CaoDoThietBi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Nhan}" Text="Cao độ tim tuyến TẠI ĐIỂM XẢ (mm — nhập tay)" />
+          <TextBox Text="{Binding CaoDoXa, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+
+        <CheckBox Margin="0,10,0,0"
+                  IsChecked="{Binding BoQuaThietBiDaCoTuyen, Mode=TwoWay}"
+                  Content="Bỏ qua thiết bị đã có tuyến chạy tới" />
+
+        <TextBlock Style="{StaticResource Nhan}"
+                   Text="Xem trước (lệnh sẽ ghi đúng những gì liệt kê ở đây)" />
+        <TextBlock Foreground="{x:Static wpf:MauBangWpf.Chu}" Text="{Binding TomTatXemTruoc}"
+                   TextWrapping="Wrap" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding DongCapLan}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+
+        <TextBlock Style="{StaticResource Nhan}"
+                   Text="Không giải được (lệnh sẽ KHÔNG vẽ gì cho các mục này)" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding DongKhongGiai}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaTuyenCu}" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding GhiChuChinhSach}" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding ThongBaoNetTam}" />
+      </StackPanel>
+    </DataTemplate>
+
     <!-- ===== M106 PR3 — các lệnh còn lại của bảng §7.2 ===== -->
 
     <!-- XBOSS_LOGIN: chỉ hỏi địa chỉ server (device pairing, không có email/mật khẩu). -->

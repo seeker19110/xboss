@@ -130,6 +130,26 @@ public sealed record VeNhanTangCum
     [JsonPropertyName("soDoiTuong")] public required int SoDoiTuong { get; init; }
 }
 
+/// <summary>
+/// Một cụm tuyến do <c>XBOSS_VE_TUYENTUDONG</c> sinh ra (M114 FR14), gộp theo (hệ, loại tuyến, cỡ).
+/// Đọc từ XData <c>TuDong</c>/<c>SuaTay</c> đang sống trong bản vẽ nên mở lại bản vẽ ở máy khác vẫn
+/// dựng lại được. Các con số của TỪNG LẦN CHẠY (tổng chiều dài, số co, tỉ lệ cạnh dùng chung, danh
+/// sách không giải được theo lý do) nằm ở <see cref="VeSessionReport.NhatKy"/> — chúng là chuyện
+/// của lần chạy, không phải trạng thái của bản vẽ.
+/// </summary>
+public sealed record VeTuyenTuDongCum
+{
+    [JsonPropertyName("heId")] public required string HeId { get; init; }
+    [JsonPropertyName("itemId")] public required string ItemId { get; init; }
+    [JsonPropertyName("size")] public required string Size { get; init; }
+    /// <summary>Số nhánh (polyline tim) do lệnh sinh ra.</summary>
+    [JsonPropertyName("soNhanh")] public required int SoNhanh { get; init; }
+    /// <summary>Trong đó bao nhiêu nhánh mang dấu SỬA TAY — chạy lại luôn giữ nguyên (FR12).</summary>
+    [JsonPropertyName("soSuaTay")] public required int SoSuaTay { get; init; }
+    /// <summary>Số phiên chạy khác nhau còn dấu trong bản vẽ (mã phiên trên XData).</summary>
+    [JsonPropertyName("soPhien")] public required int SoPhien { get; init; }
+}
+
 /// <summary>Số đối tượng mang một version rule pack/thư viện khác bản đang dùng.</summary>
 public sealed record VeVersionKhac
 {
@@ -174,6 +194,12 @@ public sealed class VeSessionReport
     /// <c>required</c> để báo cáo dựng bằng mã cũ vẫn biên dịch được.
     /// </summary>
     [JsonPropertyName("soHanhLang")] public int SoHanhLang { get; init; }
+
+    /// <summary>
+    /// Mục đi tuyến tự động (M114 FR14): các cụm tuyến do <c>XBOSS_VE_TUYENTUDONG</c> sinh ra.
+    /// KHÔNG khai <c>required</c> để báo cáo dựng bằng mã cũ vẫn biên dịch được.
+    /// </summary>
+    [JsonPropertyName("tuyenTuDong")] public IReadOnlyList<VeTuyenTuDongCum> TuyenTuDong { get; init; } = [];
     [JsonPropertyName("rulePackKhac")] public required IReadOnlyList<VeVersionKhac> RulePackKhac { get; init; }
     [JsonPropertyName("thuVienKhac")] public required IReadOnlyList<VeVersionKhac> ThuVienKhac { get; init; }
     /// <summary>
@@ -214,6 +240,7 @@ public sealed class VeSessionReport
         var chuaChia = new Dictionary<(string He, string Item, string Size), int>();
         var nhanTang = new Dictionary<(string Nguon, string Dich), int>();
         var ngatNet = new Dictionary<(string He, string Item, string Size), (int So, int Dao)>();
+        var tuDong = new Dictionary<(string He, string Item, string Size), (int So, int Sua, HashSet<string> Phien)>();
         var rulePackKhac = new Dictionary<string, int>(StringComparer.Ordinal);
         var thuVienKhac = new Dictionary<string, int>(StringComparer.Ordinal);
         var revision = new Dictionary<int, int>();
@@ -266,6 +293,15 @@ public sealed class VeSessionReport
 
             // Mục chia đốt (M105): chỉ TIM mới mang dấu chia đốt; vạch/tag chỉ trỏ về tim.
             if (xd.VaiTro == VaiTroVe.Tim) CongChiaDot(chiaDot, chuaChia, xd);
+
+            // Mục đi tuyến tự động (M114 FR14): chỉ TIM mới mang dấu TuDong (nét biên chỉ trỏ về tim).
+            if (xd is { VaiTro: VaiTroVe.Tim, TuDong: true })
+            {
+                var khoaTd = (xd.HeId, xd.ItemId, xd.Size);
+                if (!tuDong.TryGetValue(khoaTd, out var cuTd)) cuTd = (0, 0, new HashSet<string>(StringComparer.Ordinal));
+                if (xd.PhienTuyen is { Length: > 0 } phien) cuTd.Phien.Add(phien);
+                tuDong[khoaTd] = (cuTd.So + 1, cuTd.Sua + (xd.SuaTay ? 1 : 0), cuTd.Phien);
+            }
 
             // Mục ngắt nét (M109 FR9): XData của đối tượng ngắt nét mang hệ/loại/cỡ của tuyến ĐI
             // DƯỚI (tuyến bị ngắt), nên gộp theo đúng bộ ba đó.
@@ -346,6 +382,21 @@ public sealed class VeSessionReport
             .ThenBy(c => c.Size, StringComparer.Ordinal)
             .ToList();
 
+        var dsTuDong = tuDong
+            .Select(kv => new VeTuyenTuDongCum
+            {
+                HeId = kv.Key.He,
+                ItemId = kv.Key.Item,
+                Size = kv.Key.Size,
+                SoNhanh = kv.Value.So,
+                SoSuaTay = kv.Value.Sua,
+                SoPhien = kv.Value.Phien.Count,
+            })
+            .OrderBy(c => c.HeId, StringComparer.Ordinal)
+            .ThenBy(c => c.ItemId, StringComparer.Ordinal)
+            .ThenBy(c => c.Size, StringComparer.Ordinal)
+            .ToList();
+
         var canhBao = new List<string>();
         if (dsSizeCustom.Count > 0)
         {
@@ -390,6 +441,17 @@ public sealed class VeSessionReport
                     .Select(c => $"{c.HeId}/{c.ItemId} {c.Size}: {c.SoDaoTay}")) +
                 ") — chiều trên–dưới ở đó KHÔNG theo crossingPolicy.priority, soát lại trước khi phát hành.");
         }
+        var soSuaTay = dsTuDong.Sum(c => c.SoSuaTay);
+        if (soSuaTay > 0)
+        {
+            // FR12 — tuyến sửa tay được TÔN TRỌNG (chạy lại bỏ qua), nên nó là chỗ duy nhất người
+            // nghiệm thu thấy được "nhánh này không còn khớp kết quả đi tuyến tự động".
+            canhBao.Add(
+                $"{soSuaTay} tuyến tự động mang dấu SỬA TAY (" +
+                string.Join(", ", dsTuDong.Where(c => c.SoSuaTay > 0)
+                    .Select(c => $"{c.HeId}/{c.ItemId} {c.Size}: {c.SoSuaTay}")) +
+                ") — XBOSS_VE_TUYENTUDONG chạy lại sẽ GIỮ NGUYÊN chúng, soát lại trước khi phát hành.");
+        }
         if (thuVienKhac.Count > 0)
         {
             canhBao.Add(
@@ -418,6 +480,7 @@ public sealed class VeSessionReport
             SoDinhNghiaBlock = soDinhNghia,
             SoBangThongKe = soBang,
             SoHanhLang = soHanhLang,
+            TuyenTuDong = dsTuDong,
             RulePackKhac = rulePackKhac.OrderBy(k => k.Key, StringComparer.Ordinal)
                 .Select(k => new VeVersionKhac { Version = k.Key, SoDoiTuong = k.Value }).ToList(),
             ThuVienKhac = thuVienKhac.OrderBy(k => k.Key, StringComparer.Ordinal)
@@ -538,6 +601,16 @@ public sealed class VeSessionReport
             sb.AppendLine("Nhân bản tầng (XBOSS_VE_NHANTANG) — đọc từ dấu bản chép trong bản vẽ:");
             foreach (var c in NhanTang)
                 sb.AppendLine($"  - tầng {c.TangNguon} → tầng {c.NhanTang}: {c.SoDoiTuong} đối tượng");
+        }
+        if (TuyenTuDong.Count > 0)
+        {
+            sb.AppendLine("Đi tuyến tự động (XBOSS_VE_TUYENTUDONG) — đọc từ dấu TuDong trong bản vẽ:");
+            foreach (var c in TuyenTuDong)
+            {
+                sb.AppendLine(
+                    $"  - {c.HeId}/{c.ItemId} {c.Size}: {c.SoNhanh} nhánh, {c.SoPhien} phiên chạy" +
+                    (c.SoSuaTay > 0 ? $" (trong đó {c.SoSuaTay} nhánh đã sửa tay — chạy lại giữ nguyên)" : ""));
+            }
         }
         if (NgatNet.Count > 0)
         {

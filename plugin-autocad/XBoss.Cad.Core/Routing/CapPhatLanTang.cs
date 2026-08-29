@@ -56,6 +56,19 @@ public sealed record KetQuaCapLan(
 public static class CapPhatLanTang
 {
     /// <summary>
+    /// Id các hệ ĐIỆN của dự án — tham số <c>heDien</c> mà lệnh <c>XBOSS_VE_TUYENTUDONG</c> truyền
+    /// vào <see cref="Cap"/>. Rule pack v15 chưa có cờ "hệ điện" (M114 §6 không khai), mà Core thì
+    /// KHÔNG được đoán hộ bằng tên tier — nên danh sách khai tường minh đúng MỘT chỗ tại đây và
+    /// được ghim vào <c>doi-chung/routing-doi-chung.json#heDien</c> bằng test
+    /// <c>RoutingDoiChungTests</c>: hai bên trôi khỏi nhau là CI đỏ.
+    ///
+    /// <para><b>Nợ kỹ thuật có chủ đích:</b> chỗ đúng của dữ liệu này là một cờ trong rule pack
+    /// (<c>drawTools.systems[].electrical</c>). Thêm khóa rule pack nằm ngoài phạm vi M114 nên để
+    /// lại cho mốc sau; tới lúc đó xóa hằng này và đọc thẳng từ rule pack.</para>
+    /// </summary>
+    public static readonly IReadOnlyList<string> HeDienDuAn = ["ELECTRICAL", "ELV"];
+
+    /// <summary>
     /// Cấp tầng/làn lần lượt cho <paramref name="yeuCau"/> trong <paramref name="hanhLang"/>.
     /// </summary>
     /// <param name="chinhSach">Khối <c>drawTools.routingPolicy</c> đang phát hành.</param>

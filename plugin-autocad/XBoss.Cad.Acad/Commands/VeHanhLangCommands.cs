@@ -56,7 +56,7 @@ public sealed class VeHanhLangCommands
     {
         if (VeContext.SanSang() is not (var doc, var ed)) return;
         if (VeContext.CanDrawTools(ed) is not { } pack) return;
-        if (ChinhSachDiTuyen(ed, pack) is not { } chinhSach) return;
+        if (VeContext.CanRoutingPolicy(ed, pack) is not { } chinhSach) return;
 
         var cheDo = HoiCheDo(ed);
         if (cheDo is null) return;
@@ -81,39 +81,6 @@ public sealed class VeHanhLangCommands
     // ===================================================================================
     // Cổng vào chung
     // ===================================================================================
-
-    /// <summary>
-    /// Khối <c>drawTools.routingPolicy</c> đang có hiệu lực; null + hướng dẫn cách bật khi rule
-    /// pack chưa khai hoặc còn <c>enabled: false</c> (AC14 — bản vẽ không đổi một nét nào).
-    /// </summary>
-    private static RoutingPolicySection? ChinhSachDiTuyen(Editor ed, DrawToolsPack pack)
-    {
-        if (pack.DrawTools.RoutingPolicy is not { } cs)
-        {
-            ed.WriteMessage(
-                $"\n[XBoss] Rule pack {pack.RulePack.Version} chưa khai drawTools.routingPolicy — " +
-                "đi tuyến tự động chưa dùng được. Nạp rule pack mới (v15 trở lên) rồi chạy lại.\n");
-            return null;
-        }
-        if (!cs.Enabled)
-        {
-            ed.WriteMessage(
-                $"\n[XBoss] Đi tuyến tự động đang TẮT trong rule pack {pack.RulePack.Version} " +
-                "(drawTools.routingPolicy.enabled = false) — lệnh dừng, bản vẽ không đổi.\n" +
-                "[XBoss] Cách bật: Admin/PM sửa enabled = true trong rule pack trên trang " +
-                "/engineering/chuan-hoa-ban-ve, phát hành version mới rồi chạy XBOSS_LOGIN (hoặc " +
-                "XBOSS_RULEPACK) để nạp lại.\n");
-            return null;
-        }
-        if (string.IsNullOrWhiteSpace(cs.CorridorLayer))
-        {
-            ed.WriteMessage(
-                "\n[XBoss] Rule pack khai routingPolicy.corridorLayer rỗng — không biết đặt hành lang lên " +
-                "layer nào. Bổ sung layer hành lang vào rule pack rồi chạy lại.\n");
-            return null;
-        }
-        return cs;
-    }
 
     /// <summary>Chế độ chạy — keyword dòng lệnh (một câu hỏi, ngoài transaction). Null = kỹ sư hủy.</summary>
     private static CheDoHanhLang? HoiCheDo(Editor ed)

@@ -576,6 +576,68 @@ nào…`), nút chuyển nền chìm + chữ mờ.
     (vd một tuyến hở), chạy `XBOSS_VE_NHANTANG` → hộp thoại/dòng lệnh **cảnh báo** có lỗi tồn đọng
     nhưng lệnh **vẫn chạy được** nếu kỹ sư xác nhận tiếp tục (quyết định 2026-08-29, M111 §10).
 
+### C10. `XBOSS_VE_TUYENTUDONG` — đi tuyến tự động theo hành lang (M114 PR4, bắt buộc)
+
+> **Chưa làm mục này thì KHÔNG phát hành M114.** Làm trên **một tầng thật của AVIO**, sau khi mục
+> C4d (`XBOSS_VE_HANHLANG`) đã pass — không có hành lang thì lệnh này không có gì để chạy. Cần
+> `drawTools.routingPolicy.enabled = true` (bản phát hành mặc định TẮT).
+
+82. **AC14 — cờ tắt.** Chạy với rule pack gốc (`enabled: false`) → lệnh **dừng ngay**, in hướng dẫn
+    cách bật, **không thực thể nào được tạo/sửa** (so số đối tượng model space trước/sau).
+83. **AC1 — 3 hành lang + 24 miệng gió + 1 điểm nguồn.** Khai 3 hành lang bằng `XBOSS_VE_HANHLANG`,
+    chèn 24 miệng gió hệ HVAC bằng `XBOSS_VE_THIETBI`, chạy lệnh: Enter ở bước quét chọn (dùng mọi
+    thiết bị của hệ), Enter ở bước vùng cấm, bấm điểm nguồn trên trục chính → bảng xem trước báo
+    **24/24 nối được**. Bấm OK → kiểm mắt: mọi nhánh **chạy dọc hành lang**, không cắt chéo phòng;
+    các nhánh **gom vào một trục chung** rồi mới tỏa ra (đây là tác dụng của γ `reuseFactor`).
+84. **AC3 — tuyến sinh ra dùng được ngay với dây chuyền cũ (ca quan trọng nhất).** Ngay sau bước 83:
+    - `XBOSS_VE_PHUKIEN` bấm lên một nhánh vừa sinh → **không bị từ chối**, phụ kiện xoay đúng
+      tiếp tuyến;
+    - `XBOSS_VE_NHAN` → ghi **đúng cỡ đã khai** (lấy từ XData, không gõ tay);
+    - `XBOSS_VE_CHIADOT` → chia đúng số đốt như tuyến cùng cỡ vẽ tay bằng `XBOSS_VE`;
+    - `XBOSS_BOCKL` → tổng chiều dài **khớp số đo trên bản vẽ** (dùng `LIST` cộng tay vài nhánh để
+      đối chiếu). **Đoạn trục chung chỉ được tính MỘT lần** — đây là lý do PR4 chốt "nhánh nối
+      liền, mỗi cạnh vẽ đúng một lần"; bóc ra gấp đôi ở đoạn trục là lỗi chặn phát hành.
+85. **AC2 — γ có tác dụng thật.** Phát hành rule pack thử với `cost.reuseFactor: 1` (tắt gom trục),
+    chạy lại đúng tầng đó → tổng chiều dài trong bảng xem trước **tăng**, tỉ lệ "dùng chung" **giảm
+    về 0%**. Trả rule pack về `0.35` rồi chạy lại.
+86. **AC4 — ngoài bán kính rẽ nhánh.** Dời một miệng gió ra cách mọi hành lang **6 m**
+    (`snapRadiusMm` = 4000) → bảng xem trước liệt kê **đúng tên thiết bị đó** kèm khoảng cách thật;
+    23 cái còn lại vẫn nối bình thường. **Không được** có nhánh nào chạy tới miệng gió đó.
+87. **AC5 — tự chảy vô nghiệm.** Với hệ `PIPING` loại tuyến `pipe-sanr` (`slopeRequired`), khai cao
+    độ điểm xả **cao hơn** cao độ thiết bị → lệnh báo không giải được kèm **chênh cao cần vs có**,
+    nút OK khóa, **không sinh tuyến nào**. Lệnh tuyệt đối không tự hạ độ dốc.
+88. **AC6 — hệ chạy sau thấy hệ chạy trước.** Chạy HVAC xong rồi chạy `ELECTRICAL` trên cùng hành
+    lang → bảng xem trước báo `tier2` và làn khác; `LIST` hành lang đó → XData có **đủ 2 bản ghi**
+    chiếm chỗ (HVAC + ELECTRICAL). Chạy tiếp `ELV` → làn ELV cách làn ELECTRICAL đúng
+    `laneGapMm.elecToHot` (150 mm với rule pack v15).
+89. **AC7 — hết làn.** Sửa một hành lang xuống bề rộng khả dụng 600 mm (`XBOSS_VE_HANHLANG` chế độ
+    `SUA`) rồi chạy hệ thứ 3 → báo **hết làn**, nêu **đúng tên hành lang và các hệ đang chiếm**;
+    các nhánh đi qua hành lang đó vào danh sách không giải được, **không nhánh nào được vẽ đè**.
+90. **AC8 — tôn trọng sửa tay.** Kéo một đỉnh của một nhánh tự động bằng grip, rồi chạy lại lệnh cho
+    đúng hệ đó → tóm tắt báo **đã bỏ qua 1** tuyến sửa tay; `LIST` nhánh đó thấy XData có
+    `suatay=1` và **hình học giữ nguyên đúng chỗ đã kéo**; các nhánh khác được dựng lại.
+91. **AC9 — chạy lại 3 lần liên tiếp không sửa gì.** Số nhánh, tổng chiều dài trong bảng xem trước
+    và sổ chiếm làn (`LIST` hành lang) **không đổi** sau lần 1. Không có làn rác tích tụ.
+92. **AC10 — vùng cấm.** Vẽ một polyline **kín** cắt ngang hành lang chính, chọn nó ở bước "vùng
+    cấm" → tuyến hoặc đi vòng hành lang khác, hoặc báo không giải được; **không nhánh nào cắt qua
+    vùng cấm** (kiểm mắt + `LIST` đỉnh).
+93. **AC11 — hủy ở bước xem trước.** Đếm tổng thực thể model space trước lệnh; chạy tới bảng xem
+    trước (nét mảnh tím hiện trên bản vẽ) rồi bấm **Hủy** → nét tím biến mất, đếm lại **bằng đúng
+    số cũ**, và `U` **không** hoàn tác gì của lệnh này (nét tạm là đồ họa tạm, không phải thực thể,
+    không sinh bước UNDO).
+94. **AC12 — một lần `U`.** Sau một lượt đi tuyến thành công, `U` **một lần** → mọi nhánh + nét biên
+    biến mất và sổ chiếm làn của hành lang (`LIST`) trở lại **nguyên trạng trước lệnh**.
+95. **Bóc lại sau khi dựng lại.** Bóc khối lượng (`XBOSS_BOCKL`) rồi chạy lại lệnh → tóm tắt phải
+    **cảnh báo** có N tuyến bị dựng lại từng được bóc, nhắc chạy lại `XBOSS_BOCKL`.
+96. **Đường lui FR15.** `XBOSS_UI_DIALOG=0` → lệnh hỏi hệ/loại tuyến/cỡ/độ dốc bằng dòng lệnh, **in
+    đủ bảng xem trước dạng text** (nối được bao nhiêu, tầng/làn, danh sách không giải được) rồi mới
+    hỏi xác nhận; kết quả trên bản vẽ **trùng khít** đường hộp thoại.
+97. **Hộp thoại:** soi theo checklist C8b (nền tối, combo Hệ/Loại tuyến/Cỡ đọc rõ, khối cao độ tự
+    chảy chỉ hiện với tuyến `slopeRequired`, nút OK khóa kèm lý do khi không nối được thiết bị nào).
+98. **Báo cáo phiên vẽ.** `XBOSS_VE_BAOCAO` → mục **"Đi tuyến tự động"** liệt kê đúng hệ/loại/cỡ, số
+    nhánh, số phiên chạy và số nhánh đã sửa tay; nhật ký phiên có dòng `XBOSS_VE_TUYENTUDONG` kèm
+    tổng chiều dài, số co, tỉ lệ cạnh dùng chung và lý do từng thiết bị không giải được.
+
 ---
 
 ## D. Kiểm thử có server — dựng tại chỗ trên máy mình

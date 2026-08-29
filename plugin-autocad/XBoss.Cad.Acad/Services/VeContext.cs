@@ -45,6 +45,12 @@ internal static class VeContext
     /// <summary>Hệ được phép đi qua chọn lần trước; rỗng = mọi hệ.</summary>
     internal static IReadOnlyList<string> HanhLangHeChoPhep { get; set; } = [];
 
+    // ===== Đi tuyến tự động (M114 FR8) — cao độ chế độ tự chảy, mồi sẵn cho lần chạy sau =====
+    // Cũng là giá trị HỎI (M100 §6.3): bản vẽ 2D không chứa cao độ thật, chỉ nhớ để đỡ gõ lại.
+
+    internal static double? TuChayCaoDoThietBiMm { get; set; }
+    internal static double? TuChayCaoDoXaMm { get; set; }
+
     /// <summary>Id block phụ kiện/thiết bị chọn lần trước (mặc định cho lần sau — M100 PR4).</summary>
     internal static string? PhuKienId { get; set; }
     internal static string? ThietBiId { get; set; }
@@ -122,6 +128,42 @@ internal static class VeContext
         {
             return (null, $"Không đọc được rule pack cache: {e.Message}");
         }
+    }
+
+    /// <summary>
+    /// Khối <c>drawTools.routingPolicy</c> đang có hiệu lực (M114 §6) — cửa DUY NHẤT cho cả
+    /// <c>XBOSS_VE_HANHLANG</c> lẫn <c>XBOSS_VE_TUYENTUDONG</c>, để hai lệnh không bao giờ nói khác
+    /// nhau về việc "đi tuyến tự động đã bật chưa".
+    /// Trả null + hướng dẫn cách bật khi rule pack chưa khai, còn <c>enabled: false</c>, hoặc khai
+    /// layer hành lang rỗng (AC14 — bản vẽ không đổi một nét nào).
+    /// </summary>
+    internal static RoutingPolicySection? CanRoutingPolicy(Editor ed, DrawToolsPack pack)
+    {
+        if (pack.DrawTools.RoutingPolicy is not { } cs)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] Rule pack {pack.RulePack.Version} chưa khai drawTools.routingPolicy — " +
+                "đi tuyến tự động chưa dùng được. Nạp rule pack mới (v15 trở lên) rồi chạy lại.\n");
+            return null;
+        }
+        if (!cs.Enabled)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] Đi tuyến tự động đang TẮT trong rule pack {pack.RulePack.Version} " +
+                "(drawTools.routingPolicy.enabled = false) — lệnh dừng, bản vẽ không đổi.\n" +
+                "[XBoss] Cách bật: Admin/PM sửa enabled = true trong rule pack trên trang " +
+                "/engineering/chuan-hoa-ban-ve, phát hành version mới rồi chạy XBOSS_LOGIN (hoặc " +
+                "XBOSS_RULEPACK) để nạp lại.\n");
+            return null;
+        }
+        if (string.IsNullOrWhiteSpace(cs.CorridorLayer))
+        {
+            ed.WriteMessage(
+                "\n[XBoss] Rule pack khai routingPolicy.corridorLayer rỗng — không biết đặt hành lang lên " +
+                "layer nào. Bổ sung layer hành lang vào rule pack rồi chạy lại.\n");
+            return null;
+        }
+        return cs;
     }
 
     /// <summary>Hệ đang chọn; chưa chọn (hoặc kỹ sư muốn đổi) thì hỏi bằng keyword dòng lệnh.</summary>
