@@ -104,7 +104,8 @@ public class QuyTrinhTests
         Assert.Equal(
             [
                 "XBOSS_VE_MATCAT", "XBOSS_VE_THONGKE", "XBOSS_VE_NGATNET", "XBOSS_VE_TRANGIN",
-                "XBOSS_VE_BAOCAO",
+                // M110 FR10 — 3 lệnh revision đứng SAU XBOSS_VE_TRANGIN (khoanh → chốt → hiện/ẩn).
+                "XBOSS_VE_REV", "XBOSS_VE_REV_CHOT", "XBOSS_VE_REV_HIENTHI", "XBOSS_VE_BAOCAO",
             ],
             QuyTrinh.LenhCua(BuocQuyTrinh.HoSoBanVe).Select(l => l.Ten));
         Assert.Equal(
@@ -145,7 +146,7 @@ public class QuyTrinhTests
                 "XBOSS_VE_THIETBI", "XBOSS_VE_NHANTANG", "XBOSS_VE_DOI",
                 "XBOSS_VE_CHIADOT", "XBOSS_VE_GIADO", "XBOSS_VE_LOCHO", "XBOSS_VE_TAG",
                 "XBOSS_VE_MATCAT", "XBOSS_VE_THONGKE", "XBOSS_VE_NGATNET", "XBOSS_VE_TRANGIN",
-                "XBOSS_VE_BAOCAO",
+                "XBOSS_VE_REV", "XBOSS_VE_REV_CHOT", "XBOSS_VE_REV_HIENTHI", "XBOSS_VE_BAOCAO",
                 "XBOSS_VE_THUVIEN", "XBOSS_VE_DEXUAT", "XBOSS_VE_DEXUAT_LO", "XBOSS_VE_NGATNET_XOA",
             ],
             ve);

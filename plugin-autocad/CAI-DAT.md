@@ -106,7 +106,8 @@ bảng `XBOSS_BANG`.
 | 7    | `XBOSS_VE_TAG` / `_THONGKE`     | Đánh tag tuần tự + tìm tag trùng; sinh bảng thiết bị/khối lượng ngay trong bản vẽ                                                                                                                                                                                                                                                                   |
 | 8    | `XBOSS_VE_NGATNET`              | Chỗ hai tuyến khác hệ cắt nhau: tuyến đi dưới **ngắt nét** cho bản vẽ đọc được ai trên ai dưới. Ai đi trên do bộ quy tắc quyết, cặp nào muốn ngược lại thì tích ô **Đảo** trong hộp thoại. Muốn bỏ: `XBOSS_VE_NGATNET_XOA`                                                                                                                          |
 | 9    | `XBOSS_VE_MATCAT` / `_TRANGIN`  | Dựng mặt cắt từ tuyến đã vẽ (cao độ **nhập tay**); tạo trang in đúng khổ/tỉ lệ, viewport đã khóa, khung tên điền sẵn                                                                                                                                                                                                                                |
-| 10   | `XBOSS_VE_BAOCAO`               | Xem lại cả buổi vẽ: bao nhiêu tuyến/block theo hệ, có size nào nằm ngoài danh mục không                                                                                                                                                                                                                                                             |
+| 10   | `XBOSS_VE_REV*`                 | Nộp lại sau khi sửa: `XBOSS_VE_REV` khoanh vùng đã sửa (plugin **đề xuất sẵn** vùng nào đổi so với lần chốt trước), `XBOSS_VE_REV_CHOT` ghi bảng revision vào khung tên mọi layout, `XBOSS_VE_REV_HIENTHI` chỉ hiện lần sửa mới nhất khi in                                                                                                         |
+| 11   | `XBOSS_VE_BAOCAO`               | Xem lại cả buổi vẽ: bao nhiêu tuyến/block theo hệ, có size nào nằm ngoài danh mục không                                                                                                                                                                                                                                                             |
 
 ### Ba việc hay phải làm lại
 
@@ -117,6 +118,10 @@ bảng `XBOSS_BANG`.
   một khối.
 - **Size không có trong danh mục:** vẫn gõ được, plugin đánh dấu là size ngoài danh mục và liệt kê
   trong `XBOSS_VE_BAOCAO` để kỹ sư trưởng bổ sung vào bộ quy tắc bản sau.
+
+- **Khoanh revision cho lần nộp sau:** chốt xong một lần phát hành bằng `XBOSS_VE_REV_CHOT` thì
+  plugin nhớ mốc; lần sửa sau chạy `XBOSS_VE_REV` là có sẵn danh sách "vùng đã đổi mà chưa khoanh".
+  Bản vẽ **chưa từng chốt** revision thì chưa đề xuất được — lần đầu khoanh tay, plugin nói rõ lý do.
 
 ### Khi lệnh vẽ từ chối chạy
 

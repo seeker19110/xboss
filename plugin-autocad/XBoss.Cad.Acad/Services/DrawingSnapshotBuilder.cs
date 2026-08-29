@@ -68,6 +68,7 @@ internal static class DrawingSnapshotBuilder
 
         var tags = QuetTag(db, tr);
         var nhanTang = QuetNhanTang(db, tr);
+        var revision = QuetRevision(db, tr);
 
         return new DrawingSnapshot
         {
@@ -78,6 +79,7 @@ internal static class DrawingSnapshotBuilder
             AnonymousBlockNames = blockNacDanh,
             Tags = tags.Count > 0 ? tags : null,
             NhanTang = nhanTang.Count > 0 ? nhanTang : null,
+            Revision = revision.Count > 0 ? revision : null,
             XrefDaBoQua = soLayerXref + soKhoiXref > 0
                 ? new XrefBoQua { SoLayer = soLayerXref, SoKhoiChen = soKhoiXref }
                 : null,
@@ -148,6 +150,27 @@ internal static class DrawingSnapshotBuilder
                 // "Hệ" để so trùng = layer của TIM mà khối gắn vào (XData liên kết ngược); khối
                 // không gắn tim nào (thiết bị đứng riêng) thì lấy chính layer của khối.
                 HeLayer = LayerCuaTim(db, tr, xd.HandleTim) ?? br.Layer,
+            });
+        }
+        return ra;
+    }
+
+    /// <summary>
+    /// Cloud + tam giác revision do <c>XBOSS_VE_REV</c> sinh (M110 FR3) — nguồn của phép kiểm 20.
+    /// Chỉ nhận đối tượng có XData <c>XBOSS_VE</c> vai trò <c>Revision</c>: cloud vẽ tay bằng lệnh
+    /// <c>REVCLOUD</c> của AutoCAD không có dữ liệu cặp nên báo mồ côi sẽ là báo oan.
+    /// </summary>
+    private static List<RevisionInfo> QuetRevision(Database db, Transaction tr)
+    {
+        var ra = new List<RevisionInfo>();
+        foreach (var r in RevisionStore.QuetRevision(db, tr))
+        {
+            ra.Add(new RevisionInfo
+            {
+                Handle = r.Handle,
+                SoRevision = r.XData.SoRevision,
+                LaCloud = r.LaCloud,
+                HandleCapDoi = r.XData.HandleCapDoi,
             });
         }
         return ra;

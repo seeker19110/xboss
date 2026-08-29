@@ -157,9 +157,21 @@ public static class LenhCatalog
         new("XBOSS_VE_TRANGIN", "Trang in",
             "Dựng layout trang in + khung tên theo rule pack.",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 4, CanRulePack: true),
+        new("XBOSS_VE_REV", "Khoanh revision",
+            "Khoanh revision cloud + tam giác số revision cho các vùng đã sửa; đề xuất sẵn vùng cần " +
+            "khoanh bằng cách so với mốc của lần chốt revision trước.",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 5, CanRulePack: true),
+        new("XBOSS_VE_REV_CHOT", "Chốt revision",
+            "Chốt một revision: ghi ngày/nội dung/người vào bảng revision khung tên của mọi layout, " +
+            "lưu mốc so sánh cho lần sửa sau, cảnh báo vùng đã đổi mà chưa khoanh.",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 6, CanRulePack: true),
+        new("XBOSS_VE_REV_HIENTHI", "Hiện/ẩn revision",
+            "Bật/tắt hiển thị cloud theo từng revision (mỗi revision một layer con) — bản in nộp " +
+            "thường chỉ khoanh lần sửa mới nhất, cloud cũ vẫn tra ngược được.",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 7, CanRulePack: true),
         new("XBOSS_VE_BAOCAO", "Báo cáo phiên vẽ",
             "Chỉ đọc: tổng hợp số tuyến/block theo hệ + size ngoài danh mục, ghi JSON cạnh DWG.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 5, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 8, CanRulePack: true),
         new("XBOSS_VE_NGATNET_XOA", "Xóa ngắt nét",
             "Gỡ sạch đối tượng ngắt nét giao chéo (vùng che + cầu vượt) trong vùng chọn hoặc cả bản vẽ, " +
             "trả bản vẽ về trước khi chạy XBOSS_VE_NGATNET.",

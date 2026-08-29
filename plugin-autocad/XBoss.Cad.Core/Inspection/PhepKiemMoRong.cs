@@ -556,6 +556,49 @@ public static class PhepKiemMoRong
         };
     }
 
+    // ===== (20) Cloud/tam giác revision mồ côi — M110 FR8 =====
+
+    /// <summary>
+    /// Cloud revision không còn tam giác đi kèm (hoặc ngược lại): xóa một bên bằng lệnh
+    /// <c>ERASE</c> thường thì bên kia thành MỒ CÔI — bản vẽ nộp còn tam giác "R2" chỉ vào hư
+    /// không, hoặc cloud không nói được nó thuộc lần sửa nào.
+    ///
+    /// <para>Khác các phép kiểm mở rộng khác, phép này KHÔNG có cờ <c>enabled</c> riêng trong rule
+    /// pack: nó chỉ đọc XData <c>XBOSS_VE</c> vai trò <c>Revision</c> — thứ chỉ tồn tại khi
+    /// <c>XBOSS_VE_REV</c> đã chạy (mà lệnh đó lại đòi <c>drawTools.revisionPolicy.enabled</c>).
+    /// Bản vẽ không có đối tượng revision nào (<see cref="DrawingSnapshot.Revision"/> null/rỗng) →
+    /// TỰ TẮT, nên cloud vẽ tay bằng <c>REVCLOUD</c> của AutoCAD không bao giờ bị báo oan.</para>
+    /// </summary>
+    public static InspectionFinding? RevisionMoCoi(DrawingSnapshot snapshot)
+    {
+        if (snapshot.Revision is not { Count: > 0 } ds) return null;
+
+        var conSong = new HashSet<string>(ds.Select(r => r.Handle), StringComparer.OrdinalIgnoreCase);
+        var chiTiet = new List<string>();
+        var handles = new List<string>();
+        foreach (var r in ds)
+        {
+            var coCapDoi = r.HandleCapDoi is { Length: > 0 } cap && conSong.Contains(cap);
+            if (coCapDoi) continue;
+            var ten = r.LaCloud ? "Cloud revision" : "Tam giác revision";
+            var thieu = r.LaCloud ? "tam giác mang số revision" : "cloud";
+            var so = r.SoRevision is { } n
+                ? $"R{n.ToString(CultureInfo.InvariantCulture)}"
+                : "(không rõ số revision)";
+            chiTiet.Add($"{ten} {so} (handle {r.Handle}) không còn {thieu} đi kèm");
+            ThemHandle(handles, r.Handle);
+        }
+
+        if (chiTiet.Count == 0) return null;
+        return new InspectionFinding
+        {
+            Id = "revision-mo-coi",
+            Ten = "Cloud/tam giác revision mồ côi (XBOSS_VE_REV — cặp cloud ↔ tam giác đã đứt)",
+            Handles = handles,
+            ChiTiet = chiTiet,
+        };
+    }
+
     private static double TrungVi(IEnumerable<double> giaTri)
     {
         var ds = giaTri.OrderBy(v => v).ToList();

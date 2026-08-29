@@ -1364,6 +1364,107 @@
       </StackPanel>
     </DataTemplate>
 
+    <!-- ===== M110 — bộ 3 lệnh revision cloud ===== -->
+
+    <!-- XBOSS_VE_REV: đề xuất vùng khoanh (tick + Zoom tới) hoặc tự chọn vùng bằng chuột. -->
+    <DataTemplate DataType="{x:Type vm:RevisionDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Cách chọn vùng khoanh" />
+        <RadioButton GroupName="CachKhoanh"
+                     IsChecked="{Binding TheoDeXuat, Mode=TwoWay}"
+                     Content="Khoanh theo các đề xuất đã tick bên dưới" />
+        <RadioButton GroupName="CachKhoanh"
+                     IsChecked="{Binding TuChonVung, Mode=TwoWay}"
+                     Content="Tự chọn vùng bằng chuột (sau khi bấm OK)" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Vùng đã đổi so với mốc revision gần nhất" />
+        <TextBlock Foreground="{x:Static wpf:MauBangWpf.Chu}" Text="{Binding TomTat}" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding CacDeXuat}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <CheckBox Grid.Column="0"
+                              IsChecked="{Binding Chon, Mode=TwoWay}"
+                              Content="{Binding Nhan}" />
+                    <Button Grid.Column="1"
+                            Margin="10,0,0,0"
+                            Padding="10,2"
+                            Content="Zoom tới"
+                            Command="{Binding DataContext.LenhZoom,
+                                      RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding GhiChuDeXuat}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_REV_CHOT: dòng revision ghi vào khung tên + cảnh báo vùng chưa khoanh (FR5). -->
+    <DataTemplate DataType="{x:Type vm:RevChotDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Ngày phát hành (yyyy-MM-dd)" />
+        <TextBox Text="{Binding NgayIso, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Nội dung sửa đổi" />
+        <TextBox Height="64" AcceptsReturn="True" TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto"
+                 Text="{Binding NoiDung, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Người thực hiện" />
+        <TextBox Text="{Binding Nguoi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Vùng đã đổi mà CHƯA khoanh cloud" />
+        <TextBlock Foreground="{x:Static wpf:MauBangWpf.Chu}" Text="{Binding TomTatBoSot}" />
+        <Border Style="{StaticResource KhoiChiDoc}"
+                Visibility="{Binding CoBoSot, Converter={StaticResource CoThiHien}}">
+          <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding DongBoSot}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+        <CheckBox Margin="0,6,0,0"
+                  Visibility="{Binding CoBoSot, Converter={StaticResource CoThiHien}}"
+                  IsChecked="{Binding VanChot, Mode=TwoWay}"
+                  Content="Vẫn chốt revision dù còn vùng chưa khoanh" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_VE_REV_HIENTHI: tick revision cần HIỆN (mỗi revision một layer con). -->
+    <DataTemplate DataType="{x:Type vm:HienThiRevisionDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Revision cần hiện trên bản vẽ" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding CacRevision}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <CheckBox Margin="0,0,0,4"
+                            IsChecked="{Binding Hien, Mode=TwoWay}"
+                            Content="{Binding Nhan}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding GhiChu}" />
+      </StackPanel>
+    </DataTemplate>
+
   </Window.Resources>
 
   <Grid Margin="18,16,18,16">

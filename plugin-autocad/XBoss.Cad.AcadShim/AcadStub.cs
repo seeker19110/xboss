@@ -926,6 +926,8 @@ namespace Autodesk.AutoCAD.EditorInput
         public PromptEntityResult GetEntity(PromptEntityOptions o) => new PromptEntityResult();
         public PromptDoubleResult GetAngle(PromptAngleOptions o) => new PromptDoubleResult();
         public PromptSelectionResult GetSelection() => new PromptSelectionResult();
+        /// <summary>acmgd: chọn góc đối diện của một vùng chữ nhật (đường "tự khoanh vùng" M110 FR1).</summary>
+        public PromptPointResult GetCorner(string message, Point3d basePoint) => new PromptPointResult();
         /// <summary>Khung nhìn hiện hành (bản sao KHÔNG thuộc database — gọi xong phải Dispose).</summary>
         public ViewTableRecord GetCurrentView() => new ViewTableRecord();
         public void SetCurrentView(ViewTableRecord view) { }
