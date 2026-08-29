@@ -408,10 +408,63 @@ const CHON = `SELECT b.id, b.version, b.manifest, b.storage_key, b.dwg_sha256,
                 FROM cad_block_libs b
                 LEFT JOIN users u ON u.id = b.published_by`;
 
-/** Version hiện hành = bản phát hành mới nhất (append-only nên id lớn nhất là mới nhất). */
-export async function layBlockLibHienHanh(): Promise<BlockLibRow | null> {
-  const r = await queryOne<DongDb>(`${CHON} ORDER BY b.id DESC LIMIT 1`);
+/**
+ * Version hiện hành = bản phát hành mới nhất của ĐÚNG MỘT TẦNG (append-only nên id lớn nhất là
+ * mới nhất). Không truyền `projectId` → bộ **toàn cục** (`project_id IS NULL`), y hệt hành vi
+ * trước M113 (guardrail 1: plugin bản cũ không gửi `?project=` vẫn nhận đúng thư viện cũ).
+ * Có `projectId` → bộ **của dự án đó**, `null` khi dự án chưa phát hành bộ riêng.
+ */
+export async function layBlockLibHienHanh(projectId?: number): Promise<BlockLibRow | null> {
+  const r =
+    projectId === undefined
+      ? await queryOne<DongDb>(`${CHON} WHERE b.project_id IS NULL ORDER BY b.id DESC LIMIT 1`)
+      : await queryOne<DongDb>(
+          `${CHON} WHERE b.project_id = ? ORDER BY b.id DESC LIMIT 1`,
+          projectId,
+        );
   return r ? veRow(r) : null;
+}
+
+/** Nguồn của một block trong kết quả trộn hai tầng (M113 §4.3). */
+export type NguonBlock = "global" | "project";
+
+/**
+ * Một mục manifest sau khi trộn: giữ NGUYÊN hợp đồng M100 §11, chỉ **thêm** nguồn và version của
+ * bộ chứa nó — plugin cần biết tải tệp `.dwg` từ bộ nào (hash kiểm theo TỪNG bộ, không trộn) và
+ * kỹ sư cần thấy block này là của dự án hay toàn cục.
+ */
+export type BlockTronEntry = BlockManifestEntry & { nguon: NguonBlock; libVersion: string };
+
+/**
+ * Trộn hai tầng thư viện block (M113 §4) — **chỗ duy nhất** biết luật đè, thuần, không chạm DB.
+ *
+ * Trộn theo `blocks[].id`: id có ở cả hai bộ → **bản của dự án thắng**; id chỉ có ở một bên → giữ.
+ * Thứ tự giữ theo bộ toàn cục trước (block bị đè nằm đúng chỗ cũ), block riêng của dự án nối sau.
+ * Dự án chưa có bộ riêng → kết quả **trùng khít** thư viện toàn cục (guardrail 1).
+ */
+export function tronThuVienBlock(
+  toanCuc: BlockLibRow | null,
+  cuaDuAn: BlockLibRow | null,
+): BlockTronEntry[] {
+  const duAn = new Map<string, BlockTronEntry>(
+    (cuaDuAn?.manifest.blocks ?? []).map((b) => [
+      b.id,
+      { ...b, nguon: "project" as const, libVersion: cuaDuAn!.version },
+    ]),
+  );
+  const ketQua: BlockTronEntry[] = [];
+  const daDung = new Set<string>();
+  for (const b of toanCuc?.manifest.blocks ?? []) {
+    const deLen = duAn.get(b.id);
+    if (deLen) {
+      ketQua.push(deLen);
+      daDung.add(b.id);
+    } else {
+      ketQua.push({ ...b, nguon: "global", libVersion: toanCuc!.version });
+    }
+  }
+  for (const [id, b] of duAn) if (!daDung.has(id)) ketQua.push(b);
+  return ketQua;
 }
 
 /** Lịch sử phát hành (mới → cũ) cho bảng điều khiển web. */

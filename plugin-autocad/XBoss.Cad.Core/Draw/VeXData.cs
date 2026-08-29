@@ -58,6 +58,12 @@ public enum VaiTroVe
     NhanDot,
 
     /// <summary>
+    /// Revision cloud và tam giác mang số revision (<c>XBOSS_VE_REV</c> — M110 FR3). Mang
+    /// <see cref="VeXDataInfo.SoRevision"/>, danh sách handle đối tượng nằm trong vùng
+    /// (<see cref="VeXDataInfo.HandleTrongVung"/>) và <see cref="VeXDataInfo.HandleCapDoi"/>
+    /// (cloud ↔ tam giác) để xóa/sửa luôn đi cặp — cùng kiểu liên kết 2 chiều tim↔biên của M100.
+    /// </summary>
+    Revision,
     /// Đối tượng ngắt nét giao chéo (<c>XBOSS_VE_NGATNET</c> — M109 FR5): wipeout che vùng giao
     /// hoặc cầu vượt. Mang <see cref="VeXDataInfo.HandleTim"/> = tim ĐI DƯỚI và
     /// <see cref="VeXDataInfo.HandleTimGiao"/> = tim đi trên, nên lệnh xóa/chạy lại tìm đúng đối
@@ -147,6 +153,16 @@ public sealed record VeXDataInfo
     /// <summary>Số thứ tự đốt trong tuyến (trên tag đốt, và đốt ĐỨNG TRƯỚC trên vạch chia).</summary>
     public int? ChiSoDot { get; init; }
 
+    // ===== Revision cloud (M110 FR3) — có trên CẢ cloud lẫn tam giác của vai trò Revision.
+
+    /// <summary>Số revision của cloud/tam giác (số nguyên: 1 = R1). null = không phải đối tượng revision.</summary>
+    public int? SoRevision { get; init; }
+
+    /// <summary>Handle của đối tượng đi cặp: trên cloud là tam giác, trên tam giác là cloud (FR3/FR8).</summary>
+    public string? HandleCapDoi { get; init; }
+
+    /// <summary>Handle các đối tượng nằm trong vùng cloud — nguồn của cảnh báo bỏ sót (FR5).</summary>
+    public IReadOnlyList<string> HandleTrongVung { get; init; } = [];
     // ===== Ngắt nét giao chéo (M109 FR5/FR7) =====
 
     /// <summary>
@@ -160,6 +176,16 @@ public sealed record VeXDataInfo
     /// quyết định của kỹ sư thay vì áp lại <c>crossingPolicy.priority</c> (AC5).
     /// </summary>
     public bool DaoTay { get; init; }
+
+    // ===== Nhân bản tầng điển hình (M111 FR9) =====
+    // Hai khóa dưới đây CHỈ có trên bản chép do XBOSS_VE_NHANTANG sinh ra — dấu nhận diện để chạy
+    // lại lệnh biết tầng đích đã chép rồi (bỏ qua / chép đè), và để báo cáo truy được nguồn gốc.
+
+    /// <summary>Nhãn tầng NGUỒN đã chép ra đối tượng này; null = không phải bản chép.</summary>
+    public string? TangNguon { get; init; }
+
+    /// <summary>Nhãn tầng của chính bản chép này (tầng đích).</summary>
+    public string? NhanTang { get; init; }
 }
 
 /// <summary>
@@ -214,8 +240,13 @@ public static class VeXData
         if (tt.TongDaiDotMm is { } td)
             ra.Add($"tongdaidot={td.ToString("0.######", CultureInfo.InvariantCulture)}");
         if (tt.ChiSoDot is { } cs) ra.Add($"chisodot={cs.ToString(CultureInfo.InvariantCulture)}");
+        if (tt.SoRevision is { } sr) ra.Add($"rev={sr.ToString(CultureInfo.InvariantCulture)}");
+        Them(ra, "capdoi", tt.HandleCapDoi);
+        foreach (var h in tt.HandleTrongVung) Them(ra, "trongvung", h);
         Them(ra, "timgiao", tt.HandleTimGiao);
         if (tt.DaoTay) ra.Add("daotay=1");
+        Them(ra, "tangnguon", tt.TangNguon);
+        Them(ra, "nhantang", tt.NhanTang);
         return ra;
     }
 
@@ -234,6 +265,7 @@ public static class VeXData
         VaiTroVe.BangThongKe => "bang",
         VaiTroVe.VachChia => "vachchia",
         VaiTroVe.NhanDot => "nhandot",
+        VaiTroVe.Revision => "revision",
         VaiTroVe.NgatNet => "ngatnet",
         _ => "blockdef",
     };
@@ -255,14 +287,18 @@ public static class VeXData
         string? sizeLoCho = null, ketCau = null, viTriTruc = null, loaiBang = null;
         double? caoDo = null, caoDoMm = null;
         string? kieuNoi = null;
+        string? tangNguon = null, nhanTang = null;
         var kieuNoiGhiDe = false;
         int? soDot = null, soMoiNoi = null, chiSoDot = null;
         string? timGiao = null;
         var daoTay = false;
         double? tongDaiDotMm = null;
         var tagKhoa = false;
+        int? soRevision = null;
+        string? handleCapDoi = null;
         var bien = new List<string>();
         var nhan = new List<string>();
+        var trongVung = new List<string>();
 
         foreach (var dong in chuoi)
         {
@@ -287,6 +323,7 @@ public static class VeXData
                         "bang" => VaiTroVe.BangThongKe,
                         "vachchia" => VaiTroVe.VachChia,
                         "nhandot" => VaiTroVe.NhanDot,
+                        "revision" => VaiTroVe.Revision,
                         "ngatnet" => VaiTroVe.NgatNet,
                         "blockdef" => VaiTroVe.DinhNghiaBlock,
                         _ => VaiTroVe.Tim,
@@ -337,8 +374,16 @@ public static class VeXData
                     if (int.TryParse(giaTri, NumberStyles.Integer, CultureInfo.InvariantCulture, out var cs))
                         chiSoDot = cs;
                     break;
+                case "rev":
+                    if (int.TryParse(giaTri, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sr))
+                        soRevision = sr;
+                    break;
+                case "capdoi": handleCapDoi = giaTri; break;
+                case "trongvung": trongVung.Add(giaTri); break;
                 case "timgiao": timGiao = giaTri; break;
                 case "daotay": daoTay = giaTri == "1"; break;
+                case "tangnguon": tangNguon = giaTri; break;
+                case "nhantang": nhanTang = giaTri; break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -373,8 +418,13 @@ public static class VeXData
             SoMoiNoi = soMoiNoi,
             TongDaiDotMm = tongDaiDotMm,
             ChiSoDot = chiSoDot,
+            SoRevision = soRevision,
+            HandleCapDoi = handleCapDoi,
+            HandleTrongVung = trongVung,
             HandleTimGiao = timGiao,
             DaoTay = daoTay,
+            TangNguon = tangNguon,
+            NhanTang = nhanTang,
         };
     }
 }
