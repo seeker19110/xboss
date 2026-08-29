@@ -220,6 +220,10 @@ public sealed class Inspector
         ThemNeuCo(PhepKiemMoRong.TagTrung(snapshot, ip.TagDuplicate));
         ThemNeuCo(PhepKiemMoRong.MaBoqMoCoi(_pack.Takeoff.Items, IdHangMucCoDoiTuong(snapshot), ip.BoqCodeMissing));
 
+        // (19) Cloud/tam giác revision mồ côi (M110 FR8) — tự tắt khi bản vẽ không có đối tượng
+        // revision nào, nên không cần (và cố ý KHÔNG thêm) khóa rule pack mới cho riêng nó.
+        ThemNeuCo(PhepKiemMoRong.RevisionMoCoi(snapshot));
+
         return new InspectionReport { RulePackVersion = _pack.Version, Findings = findings, CanhBao = canhBao };
 
         void ThemNeuCo(InspectionFinding? f)

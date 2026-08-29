@@ -644,6 +644,18 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public void FreezeLayersInViewport(IEnumerator ids) { }
     }
 
+    /// <summary>
+    /// acdbmgd: bản ghi VIEW — dùng để đặt khung nhìn hiện hành mà KHÔNG gửi lệnh ZOOM
+    /// (nút "Zoom tới" của hộp thoại revision, M110 FR1: hộp thoại đang modal nên lệnh AutoCAD
+    /// không chạy được).
+    /// </summary>
+    public class ViewTableRecord : SymbolTableRecord
+    {
+        public Point2d CenterPoint { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
+    }
+
     public class Xrecord : DBObject
     {
         public ResultBuffer Data { get; set; }
@@ -835,6 +847,10 @@ namespace Autodesk.AutoCAD.EditorInput
         public PromptEntityResult GetEntity(PromptEntityOptions o) => new PromptEntityResult();
         public PromptDoubleResult GetAngle(PromptAngleOptions o) => new PromptDoubleResult();
         public PromptSelectionResult GetSelection() => new PromptSelectionResult();
+        /// <summary>acmgd: chọn góc đối diện của một vùng chữ nhật (đường "tự khoanh vùng" M110 FR1).</summary>
+        public PromptPointResult GetCorner(string message, Point3d basePoint) => new PromptPointResult();
+        public ViewTableRecord GetCurrentView() => new ViewTableRecord();
+        public void SetCurrentView(ViewTableRecord view) { }
         public Matrix3d CurrentUserCoordinateSystem { get; set; }
         public void Command(params object[] args) { }
     }

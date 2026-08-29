@@ -172,6 +172,32 @@ public sealed class DrawingSnapshot
     /// <summary>Phần thuộc xref Adapter đã bỏ qua khi dựng snapshot — null = Adapter không đếm
     /// (bản vẽ không có xref, hoặc đường dựng snapshot cũ) ⇒ không báo gì.</summary>
     public XrefBoQua? XrefDaBoQua { get; init; }
+
+    /// <summary>
+    /// Cloud + tam giác revision do <c>XBOSS_VE_REV</c> sinh (M110 FR3) — phép kiểm 19.
+    /// <c>null</c> = Adapter chưa quét hoặc bản vẽ không có đối tượng revision nào → phép TỰ TẮT
+    /// (cloud vẽ tay bằng lệnh REVCLOUD của AutoCAD không mang XData nên không bao giờ bị báo oan).
+    /// </summary>
+    public IReadOnlyList<RevisionInfo>? Revision { get; init; }
+}
+
+/// <summary>
+/// Một đối tượng revision (cloud hoặc tam giác) đọc từ XData <c>XBOSS_VE</c> vai trò
+/// <c>Revision</c> — phép kiểm 19 (M110 FR8). Cloud và tam giác luôn đi CẶP: mỗi bên mang handle
+/// của bên kia (<c>HandleCapDoi</c>), nên xóa một bên bằng lệnh ERASE thường là phát hiện được.
+/// </summary>
+public sealed record RevisionInfo
+{
+    public required string Handle { get; init; }
+
+    /// <summary>Số revision (1 = R1); null = XData hỏng/thiếu.</summary>
+    public int? SoRevision { get; init; }
+
+    /// <summary>true = polyline cloud, false = block tam giác mang số revision.</summary>
+    public required bool LaCloud { get; init; }
+
+    /// <summary>Handle của đối tượng đi cặp ghi trong XData; rỗng = XData thiếu liên kết.</summary>
+    public string? HandleCapDoi { get; init; }
 }
 
 /// <summary>Một tag XBOSS_VE_TAG đọc từ XData — phép kiểm 17 (tag trùng).</summary>

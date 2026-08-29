@@ -4,6 +4,54 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## 🚧 M110 PR2/2 — Adapter revision cloud: 3 lệnh + mốc trong DWG (2026-08-29)
+
+Nhánh `feat/m110-pr2-revision-adapter`. **PR2 của 2** theo `docs/nang-cap/M110-revision-cloud.md`
+§10 — tầng Adapter AutoCAD. **Code xong, CHƯA verify tay trên AutoCAD thật** (xem "Còn nợ").
+
+Đã làm:
+
+- **3 lệnh** trong `plugin-autocad/XBoss.Cad.Acad/Commands/VeRevCommands.cs`: `XBOSS_VE_REV`
+  (đề xuất vùng theo mốc hoặc khoanh tay → cloud + tam giác, XData đi CẶP, chạy lại **cập nhật tại
+  chỗ** — FR1/FR2/FR3/FR7), `XBOSS_VE_REV_CHOT` (bảng revision vào attribute khung tên **mọi
+  layout**, mốc mới, chặn `maxRows`, cảnh báo bỏ sót — FR4/FR5), `XBOSS_VE_REV_HIENTHI` (bật/tắt
+  layer con theo revision, mặc định chỉ hiện revision hiện hành — FR6). Mỗi lệnh 1 nhóm UNDO, mọi
+  hỏi đáp ngoài transaction ghi.
+- **`Services/RevisionStore.cs`**: mốc `XBOSS_REV_SNAPSHOT` trong Xrecord ở Named Objects
+  Dictionary (đúng khuôn `VeLayerService`), quét đối tượng theo dõi + băm hình học qua Core, quét
+  cloud/tam giác, tên layer con `<revisionPolicy.layer>-R{n}`.
+- **Hộp thoại M106**: `Core/Ui/ViewModels/RevisionDialogViewModel.cs` (đề xuất có tick + nút "Zoom
+  tới" qua delegate Adapter gắn — hộp thoại vẫn KHÔNG biết gì về AutoCAD) và
+  `RevChotDialogViewModel.cs`; 3 `DataTemplate` trong `XBossDialog.xaml`; `XBOSS_UI_DIALOG=0` →
+  hỏi đáp dòng lệnh cho kết quả trùng khít (FR9).
+- **Phép kiểm 19 (FR8)** `revision-mo-coi` trong `PhepKiemMoRong.cs` + `RevisionInfo` trong
+  snapshot + quét ở `DrawingSnapshotBuilder`. **Không** thêm khóa rule pack: phép tự tắt khi bản vẽ
+  không có đối tượng XData vai trò `Revision` (cloud vẽ tay bằng `REVCLOUD` không bị báo oan).
+- **Kind `annotation` cho thư viện block** (`lib/ky-thuat/cad/block-lib.ts` + `BlockManifest.cs`) —
+  đặc tả §5 khai tam giác revision là `kind=annotation` nhưng enum cũ chỉ có
+  fitting/equipment/titleblock/support/sleeve nên manifest sẽ bị từ chối. Kind mới **không** nằm
+  trong `KIND_DEM_KHOI_LUONG` và không lọt vào `doiChieuTakeoff` ⇒ `XBOSS_BOCKL` giữ nguyên con số
+  (guardrail 1/AC10). Quyết định do coordinator chốt sau khi worker dừng báo vướng đặc tả.
+- Khai 3 lệnh trong `LenhCatalog` (bước Hồ sơ bản vẽ, sau `XBOSS_VE_TRANGIN` — FR10), mục
+  `revision` trong báo cáo phiên vẽ, stub `ViewTableRecord`/`GetCorner`/`SetCurrentView` cho cổng
+  CI `XBoss.Cad.AcadShim`.
+- Test: `XBoss.Cad.Tests/RevisionAdapterTests.cs` (ViewModel, phép kiểm 19, báo cáo, thứ tự lệnh),
+  ca kind `annotation` trong `BlockManifestTests.cs` + `tests/cad-block-lib.test.ts` +
+  `tests/cad-block-proposals.test.ts`; cập nhật `QuyTrinhTests`.
+- Tài liệu: `plugin-autocad/README.md` (3 lệnh + ghi chú rule pack v11), `CAI-DAT.md` (bước 8 trong
+  luồng dùng thật), `VERIFY-VA-PHAT-HANH.md` mục **25b** — kịch bản verify tay AC1–AC10 + FR9.
+
+**Còn nợ (nợ kỹ thuật, ghi rõ ở đây để không tưởng nhầm là xong):**
+
+- **Chưa verify tay trên AutoCAD 2026 thật** (AC1–AC7, AC9, AC10 + FR9) — môi trường thi hành không
+  có AutoCAD, cũng **không có .NET SDK nên chưa biên dịch được C#**: chờ CI job plugin/plugin-shim
+  xác nhận biên dịch, rồi phải chạy mục 25b của `VERIFY-VA-PHAT-HANH.md` trên máy có license trước
+  khi phát hành rộng.
+- Thư viện block công ty phải bổ sung block tam giác `kind: annotation` khớp
+  `revisionPolicy.triangleBlockId` — chưa có thì `XBOSS_VE_REV` dừng kèm thông báo (không tự vẽ ký
+  hiệu thay thế, đúng nếp của `slope-arrow`).
+- Ca `revisionPolicy` trong `plugin-autocad/doi-chung/` vẫn chưa có (đã ghi ở PR1).
+
 ## 🚧 M110 PR1/2 — Core revision cloud + rule pack v11 (2026-08-29)
 
 Nhánh `feat/m110-pr1-revision-core`. **PR1 của 2** theo `docs/nang-cap/M110-revision-cloud.md` §10 —

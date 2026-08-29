@@ -73,6 +73,17 @@ public sealed record VeChiaDotBoQua
     [JsonPropertyName("soTuyen")] public required int SoTuyen { get; init; }
 }
 
+/// <summary>
+/// Một revision đã khoanh cloud trong bản vẽ (M110) — mỗi vùng khoanh gồm 1 cloud + 1 tam giác,
+/// nên <see cref="SoDoiTuong"/> của một revision lành lặn luôn là số chẵn (lẻ = có mồ côi, phép
+/// kiểm 19 của XBOSS_KIEMTRA nói rõ đối tượng nào).
+/// </summary>
+public sealed record VeRevisionCum
+{
+    [JsonPropertyName("so")] public required int So { get; init; }
+    [JsonPropertyName("soDoiTuong")] public required int SoDoiTuong { get; init; }
+}
+
 /// <summary>Một size kỹ sư tự nhập ngoài danh mục rule pack (M100 §4 — phải soát lại).</summary>
 public sealed record VeSizeCustom
 {
@@ -114,6 +125,8 @@ public sealed class VeSessionReport
     /// <summary>Mục chia đốt (M105): các cụm tuyến chưa/không chia được (xem <see cref="VeChiaDotBoQua"/>).</summary>
     [JsonPropertyName("chiaDotBoQua")] public required IReadOnlyList<VeChiaDotBoQua> ChiaDotBoQua { get; init; }
     /// <summary>Định nghĩa block do plugin nhập từ thư viện (đánh dấu trong BlockTable).</summary>
+    /// <summary>Mục revision (M110): các revision đã khoanh cloud trong bản vẽ.</summary>
+    [JsonPropertyName("revision")] public IReadOnlyList<VeRevisionCum> Revision { get; init; } = [];
     [JsonPropertyName("soDinhNghiaBlock")] public int SoDinhNghiaBlock { get; init; }
     [JsonPropertyName("soBangThongKe")] public int SoBangThongKe { get; init; }
     [JsonPropertyName("rulePackKhac")] public required IReadOnlyList<VeVersionKhac> RulePackKhac { get; init; }
@@ -149,6 +162,7 @@ public sealed class VeSessionReport
         var chuaChia = new Dictionary<(string He, string Item, string Size), int>();
         var rulePackKhac = new Dictionary<string, int>(StringComparer.Ordinal);
         var thuVienKhac = new Dictionary<string, int>(StringComparer.Ordinal);
+        var revision = new Dictionary<int, int>();
         var soDinhNghia = 0;
         var soBang = 0;
 
@@ -161,6 +175,12 @@ public sealed class VeSessionReport
                     break;
                 case VaiTroVe.BangThongKe:
                     soBang++;
+                    break;
+                case VaiTroVe.Revision:
+                    // Cloud/tam giác revision là CHÚ THÍCH, không thuộc hệ nào (guardrail 1 của
+                    // M110: không đụng hình học nghiệp vụ) — đếm riêng, không cộng vào thống kê hệ.
+                    var soRev = xd.SoRevision ?? 0;
+                    revision[soRev] = revision.GetValueOrDefault(soRev) + 1;
                     break;
                 default:
                     // Đối tượng mất HeId (XData bị sửa tay) vẫn phải đếm được — gom vào một nhóm
@@ -277,6 +297,10 @@ public sealed class VeSessionReport
             SizeCustom = dsSizeCustom,
             ChiaDot = dsChiaDot,
             ChiaDotBoQua = dsChuaChia,
+            Revision = revision
+                .OrderBy(kv => kv.Key)
+                .Select(kv => new VeRevisionCum { So = kv.Key, SoDoiTuong = kv.Value })
+                .ToList(),
             SoDinhNghiaBlock = soDinhNghia,
             SoBangThongKe = soBang,
             RulePackKhac = rulePackKhac.OrderBy(k => k.Key, StringComparer.Ordinal)
@@ -380,6 +404,15 @@ public sealed class VeSessionReport
                 "jointRules nên lệnh bỏ qua — lý do từng lần xem nhật ký phiên):");
             foreach (var c in ChiaDotBoQua)
                 sb.AppendLine($"  - {c.HeId}/{c.ItemId} {c.Size}: {c.SoTuyen} tuyến");
+        }
+        if (Revision.Count > 0)
+        {
+            sb.AppendLine("Revision cloud (XBOSS_VE_REV) — mỗi vùng khoanh gồm 1 cloud + 1 tam giác:");
+            foreach (var r in Revision)
+            {
+                var so = r.So == 0 ? "(không rõ số)" : $"R{r.So.ToString(CultureInfo.InvariantCulture)}";
+                sb.AppendLine($"  - {so}: {r.SoDoiTuong} đối tượng");
+            }
         }
         if (NhatKy.Count > 0)
         {
