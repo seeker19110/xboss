@@ -6,9 +6,9 @@
  *
  * Phát hành version mới = đổi ĐÚNG một dòng `import` ở đây (append-only: không sửa tệp version cũ).
  */
-import rulePackV14 from "@/lib/ky-thuat/cad/rule-packs/v14.json";
+import rulePackV15 from "@/lib/ky-thuat/cad/rule-packs/v15.json";
 
-export type CadRulePack = typeof rulePackV14;
+export type CadRulePack = typeof rulePackV15;
 
 /** Rule pack đang phát hành cho plugin — mô tả từng version xem `getCurrentRulePack()`. */
-export const RULE_PACK_HIEN_HANH = rulePackV14;
+export const RULE_PACK_HIEN_HANH = rulePackV15;
