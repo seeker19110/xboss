@@ -98,7 +98,8 @@ thì nạp tay: `XBOSS_RULEPACK` cho bộ quy tắc, `XBOSS_VE_THUVIEN` cho thư
 | 5    | `XBOSS_VE_GIADO` / `_LOCHO`     | Rải giá đỡ cách đều đúng chuẩn treo đỡ; chèn lỗ chờ xuyên tường/sàn rồi `XUATBANG` để có bảng builder's work (Table + Excel) gửi kết cấu |
 | 6    | `XBOSS_VE_TAG` / `_THONGKE`     | Đánh tag tuần tự + tìm tag trùng; sinh bảng thiết bị/khối lượng ngay trong bản vẽ                                                        |
 | 7    | `XBOSS_VE_MATCAT` / `_TRANGIN`  | Dựng mặt cắt từ tuyến đã vẽ (cao độ **nhập tay**); tạo trang in đúng khổ/tỉ lệ, viewport đã khóa, khung tên điền sẵn                     |
-| 8    | `XBOSS_VE_BAOCAO`               | Xem lại cả buổi vẽ: bao nhiêu tuyến/block theo hệ, có size nào nằm ngoài danh mục không                                                  |
+| 8    | `XBOSS_VE_NHANTANG`             | **Vẽ xong 1 tầng điển hình** → chọn hệ đã vẽ → chọn tầng đích trong `drawTools.floorPolicy.floors` → xem trước bắt buộc → chép sang N tầng, tự đổi tag `{floor}` + tên vùng bóc + ánh xạ lại handle. Chạy lại `XBOSS_KIEMTRA` ngay sau đó để chắc không handle nào mồ côi (phép 19) |
+| 9    | `XBOSS_VE_BAOCAO`               | Xem lại cả buổi vẽ: bao nhiêu tuyến/block theo hệ, có size nào nằm ngoài danh mục không                                                  |
 
 ### Ba việc hay phải làm lại
 

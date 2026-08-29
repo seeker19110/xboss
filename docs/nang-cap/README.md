@@ -141,18 +141,26 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > ở layer con `-R{n}`. **Chỉ CAD — không đụng server/web/`drawing_revisions`** (chốt 2026-08-28).
 > Rule pack +1, không migration. 2 PR.
 >
-> **M111 (`M111-nhan-ban-tang-dien-hinh.md`)** — ⏳ **PR1+PR2/3 XONG** (rule pack v12 `drawTools.floorPolicy`
+> **M111 (`M111-nhan-ban-tang-dien-hinh.md`)** — ✅ **CODE XONG cả 3 PR** (rule pack v12+
+> `drawTools.floorPolicy`, mặc định TẮT)
 >
 > - validator 2 tầng + Core `FloorReplicator` + XData `TangNguon`/`NhanTang` + test ở PR1; lệnh
 >   `XBOSS_VE_NHANTANG` (Adapter `DeepCloneObjects` + ánh xạ handle, hộp thoại + xem trước bắt buộc,
->   FR8/FR9, nguyên tử) ở PR2. PR3 (phép kiểm handle mồ côi tự động trong `XBOSS_KIEMTRA` + tài liệu
->   - mục verify tay) CHƯA làm, và **verify tay trên bản vẽ AVIO thật là điều kiện CHẶN phát hành
->     rộng** — chưa làm được ở môi trường không có AutoCAD. `XBOSS_VE_NHANTANG`: chép hệ của tầng điển hình sang
->     N tầng. Việc mà `COPY` của AutoCAD **không** làm được: ánh xạ lại toàn bộ handle trong XData sang
->     đối tượng của chính bản chép (`DeepCloneObjects` + `IdMapping`), đổi tag `{floor}`, đổi tên vùng
->     bóc, gỡ dấu bóc. Xem trước **bắt buộc**, nguyên tử (lỗi giữa chừng → không ghi tầng nào), AC3
->     "không handle mồ côi" kiểm **tự động**. Đây là lệnh rủi ro cao nhất của cả bộ plugin — verify tay
->     phải làm trên bản vẽ AVIO thật. Rule pack +1, không migration. 3 PR (PR2 `route: complex`).
+>   FR8/FR9, nguyên tử) ở PR2; **PR3** thêm phép kiểm **19** `nhantang-handle-mo-coi` tự động trong
+>   `XBOSS_KIEMTRA` (AC3 — không cần kiểm mắt) + tài liệu (`README.md`/`CAI-DAT.md` — lệnh mới trong
+>   luồng làm việc; `VERIFY-VA-PHAT-HANH.md` mục C9, item 68–81 — kịch bản verify tay AC1–AC12).
+>   `XBOSS_VE_NHANTANG`: chép hệ của tầng điển hình sang N tầng. Việc mà `COPY` của AutoCAD **không**
+>   làm được: ánh xạ lại toàn bộ handle trong XData sang đối tượng của chính bản chép
+>   (`DeepCloneObjects` + `IdMapping`), đổi tag `{floor}`, đổi tên vùng bóc, gỡ dấu bóc. Xem trước
+>   **bắt buộc**, nguyên tử (lỗi giữa chừng → không ghi tầng nào), AC3 "không handle mồ côi" kiểm
+>   **tự động**. Rule pack +1 (v12, sau đó gộp lên v13/v14 khi hợp nhất với M109/M110), không
+>   migration. 3 PR (PR2 `route: complex`).
+>
+>   **CÒN NỢ — CHẶN phát hành rộng:** đây là lệnh rủi ro cao nhất của cả bộ plugin (chính lý do M100
+>   §20 từng hoãn mục này); **chưa verify tay trên bản vẽ AVIO thật** (môi trường code không có
+>   AutoCAD). Toàn bộ AC1–AC12 phải chạy thật trên máy có AutoCAD 2026 theo kịch bản
+>   `VERIFY-VA-PHAT-HANH.md` mục C9 **trước khi** phát hành gói cho cả đội hay cho phép M112 (riser)
+>   bắt đầu — M112 đã ghi rõ điều kiện tiên quyết này.
 >
 > **M112 (`M112-so-do-dung-riser.md`)** — `XBOSS_VE_TRUCDUNG` + `XBOSS_VE_RISER`: kỹ sư đánh dấu điểm
 > trục đứng trên từng mặt bằng (XData vai trò `TrucDung` = "dữ liệu liên tầng có cấu trúc" mà M100 §20
