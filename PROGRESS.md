@@ -50,6 +50,33 @@ tay trên AutoCAD thật (xem "Nợ kỹ thuật — CHẶN phát hành rộng" 
 `DrawingSnapshotBuilder.cs` đã sửa) 0 warning/0 error. Không đụng TypeScript/DB/route nào — không
 cần `npm run lint`/`typecheck`/`test`.
 
+## ✅ M113 PR2/4 — API `?project=` cho thư viện block hai tầng (2026-08-29)
+
+Nhánh `feat/m113-pr2-api-project`. PR **2/4** của `docs/nang-cap/M113-thu-vien-block-theo-du-an.md`
+(PR3 web 2 khối + chip nguồn, PR4 plugin — **chưa làm**).
+
+- `GET /api/engineering/cad/block-lib?project=<id>` — nhánh RIÊNG: trả manifest **đã trộn** hai tầng
+  (mỗi entry mang `nguon`/`libVersion`), ETag băm **cặp id** hai bộ (§4.6), thêm `boDuAn` để bảng
+  điều khiển hiện version cả hai bộ; tệp nhị phân kèm `?project=` trả đúng tệp `.dwg` của bộ dự án
+  (hash kiểm theo TỪNG bộ). Không kèm `?project=` ⇒ **y hệt hôm nay** (guardrail 1/AC1).
+  `?file=` nhận thêm `libVersion` và tìm trong đúng tầng.
+- `POST /api/engineering/cad/block-lib` + `POST .../block-lib/blocks` — nhận `project` (query hoặc
+  trường form): phát hành/thêm block vào bộ **của dự án**, quyền `CAN.manageDrawings` **trong phạm
+  vi dự án** (chốt M113 §13), id đối chiếu qua `chotProjectIdChoGhi`, ghi trong
+  `withProjectScope`; đường toàn cục vẫn chỉ Admin/PM. Dự án ngoài phạm vi ⇒ **404**.
+- `lib/ky-thuat/cad/block-lib.ts` — `kiemXungDotBlockName` (AC6: bộ dự án khai `blockName` trùng bộ
+  toàn cục nhưng khác `id` ⇒ **từ chối lúc phát hành**), `etagBlockLibTron`; `phatHanhBlockLib`/
+  `ghiSoBlockLib`/`versionPhatHanhKeTiep` làm việc theo **tầng** (nhãn version duy nhất trong tầng).
+- `lib/ky-thuat/cad/block-them-web.ts` — `themBlockTuWeb(projectId?)` (advisory lock **theo tầng**,
+  nền là bộ của dự án, chặn tên đụng bộ toàn cục), `timBlockLeTheoKhoa(fileKey, {projectId, libVersion})`.
+- `tests/cad-block-lib-api-du-an.test.ts` (mới) — AC2/AC3/AC4/AC5/AC6/AC8 + AC1 qua handler GET
+  thật; `docs/ERD.md` regen bằng `npm run gen:erd`.
+
+⚠️ **Còn vướng đặc tả — chưa làm**: §6 hàng cuối ("đường nạp lô M108 nhận `project`") và FR7 (đề
+xuất M103 vào hàng chờ của dự án) đòi cột `project_id` trên `cad_block_proposals`/`cad_block_batches`,
+nhưng DDL §5 lẫn §9 chỉ nói tới `cad_block_libs` (migration 0145 cũng vậy). Cần phiên chính chốt
+trước khi làm — xem báo cáo PR2.
+
 ## M111 PR2/3 — Lệnh `XBOSS_VE_NHANTANG`: chép N tầng + ánh xạ lại handle (2026-08-29)
 
 Nhánh `feat/m111-pr2-nhantang-adapter`, tiếp trên PR1. **Mới là PR2/3** — lệnh đã chạy được, nhưng
@@ -112,6 +139,68 @@ Nhánh `feat/m111-pr2-nhantang-adapter`, tiếp trên PR1. **Mới là PR2/3** �
 **Kiểm đã chạy:** `dotnet test XBoss.Cad.Tests` 945/945 pass; `dotnet build XBoss.Cad.AcadShim`
 (biên dịch thử toàn bộ Adapter) 0 warning/0 error; `npm run lint`, `npm run typecheck`, `npm test`
 (981 pass, 464 skip vì không có `TEST_DATABASE_URL`) — PR này **không đụng TypeScript/DB/route** nào.
+
+## ✅ M109 PR2/2 — Adapter ngắt nét giao chéo: `XBOSS_VE_NGATNET` + `_XOA` (2026-08-29)
+
+Nhánh `feat/m109-pr2-ngatnet-adapter`, base trên PR1. **Code M109 xong**; còn **nợ verify tay trên
+AutoCAD thật** (xem "Nợ kỹ thuật" cuối mục này) — chưa làm xong mục đó thì chưa phát hành.
+
+**Đã làm**
+
+- **2 lệnh mới** (`XBoss.Cad.Acad/Commands/VeNgatNetCommands.cs`): `XBOSS_VE_NGATNET` dò mọi cặp
+  tuyến tim khác hệ cắt nhau (dùng lại `Segment2D.GiaoDiemGiuaHaiChuoi` của phép kiểm 11 + lọc thô
+  bằng bao hình chữ nhật, không O(n²) phép giao đoạn — NFR1), dựng `Wipeout` che vùng giao cho
+  tuyến 2 nét biên và thêm cung cầu vượt cho tuyến đơn nét; `XBOSS_VE_NGATNET_XOA` gỡ sạch (FR8).
+  Rule pack chưa khai `crossingPolicy` hoặc `enabled: false` → **dừng kèm hướng dẫn, không vẽ gì**
+  (AC8). Cả lệnh nằm trong MỘT transaction = một nhóm UNDO; hỏi đáp ngoài transaction.
+- **Guardrail 1 (tim bất khả xâm phạm)**: hai lệnh CHỈ tạo thực thể mới và CHỈ xóa thực thể vai trò
+  `NgatNet`; không có một đường nào mở tim ở chế độ ghi. `NgatNetGuardrailTests` (mới) đọc mã nguồn
+  Adapter và đỏ ngay nếu ai đó thêm lời gọi sửa hình học (`AddVertexAt`/`Explode`/…) hoặc mở
+  `ForWrite` một đích không phải model space/bảng thứ tự vẽ.
+- **Thứ tự vẽ (chỗ phải cân nhắc của PR này)**: quan hệ bắt buộc là **tuyến đi trên > vùng che >
+  tuyến đi dưới** — đẩy vùng che lên trên cùng thôi thì chính tuyến đi trên bị che (vùng che rộng
+  bằng cả bề rộng tuyến trên), đúng thứ AC1 cấm. Cách chốt: gom việc theo **hạng ưu tiên hệ đi
+  trên**, xử lý từ hạng thấp lên, mỗi nhóm đẩy vùng che lên trước rồi đẩy tuyến đi trên lên nữa ⇒
+  chồng lớp đúng theo hạng, chuỗi 3 hệ (A trên B, B trên C) cũng đúng. **Đánh đổi:** có động vào
+  thứ tự vẽ của các tuyến đi trên vốn có sẵn, nên `_XOA` gỡ được đối tượng nhưng **không hoàn
+  nguyên thứ tự vẽ** — muốn về đúng trạng thái trước lệnh thì `UNDO` (đã ghi trong thông báo lệnh,
+  README và mục verify).
+- **Đảo tay theo CẶP TUYẾN, không theo từng điểm giao** (FR7): hai tuyến cắt nhau nhiều lần chỉ có
+  một quan hệ trên–dưới thật, cho đảo riêng từng điểm là mời kỹ sư vẽ bản vẽ tự mâu thuẫn — và nhờ
+  vậy dấu đảo lưu gọn vào cặp handle `HandleTim` + `HandleTimGiao` sẵn có, không phải thêm trường
+  XData chỉ số điểm giao. Chạy lại giữ nguyên chiều đã đảo (AC5).
+- **`gapMode`**: `"jog"` = ÉP cầu vượt cho mọi tuyến; `"wipeout"` (giá trị mặc định của rule pack) và
+  rỗng = **suy theo `edgeStyle`** của tuyến đi dưới. Ép wipeout cho mọi tuyến sẽ xóa sổ cầu vượt
+  của tuyến đơn nét ngay trên rule pack mặc định, tức là AC3 không bao giờ chạy được.
+- **Hộp thoại M106** (`Core/Ui/ViewModels/NgatNetDialogViewModel.cs` + `DataTemplate` trong
+  `XBossDialog.xaml`): phạm vi toàn bản vẽ/chọn tay, danh sách cặp giao kèm ai trên, ô **Đảo** từng
+  dòng (mờ ở dòng cùng hệ, kèm lý do), cảnh báo đa giao/đảo tay. `XBOSS_UI_DIALOG=0` → hỏi đáp dòng
+  lệnh cho cùng bộ tham số (FR10).
+- **Báo cáo** (FR9): tóm tắt cuối lệnh (số điểm giao xử lý, bỏ qua theo lý do — cùng hệ / góc gắt /
+  không đọc được cỡ / xref, số đảo tay, số chỗ **đa giao**, số tuyến có đoạn cung) + mục `ngatNet`
+  trong `Core/Reporting/VeSessionReport.cs` (gộp theo tuyến đi dưới, đếm đảo tay, cảnh báo riêng khi
+  có đảo tay). Lý do bỏ qua đẩy vào nhật ký phiên cho `XBOSS_VE_BAOCAO`.
+- **Danh mục lệnh**: `XBOSS_VE_NGATNET` vào `BuocQuyTrinh.HoSoBanVe` ngay sau `XBOSS_VE_THONGKE`,
+  `_XOA` vào `PhuTro`; stub `Wipeout`/`DrawOrderTable`/`Point2dCollection` cho cổng CI `AcadShim`;
+  README + CAI-DAT + mục verify tay `C4c` trong `VERIFY-VA-PHAT-HANH.md`.
+
+**Đã kiểm cục bộ (lần này máy CÀI được .NET SDK 8 qua apt):** `dotnet build XBoss.Cad.AcadShim`
+(cổng biên dịch toàn bộ Adapter bằng stub) xanh, `dotnet test XBoss.Cad.Tests` **939 test xanh**.
+Không đụng mã TypeScript.
+
+**Nợ kỹ thuật — BẮT BUỘC trước khi phát hành rộng (mục `C4c` của `VERIFY-VA-PHAT-HANH.md`):**
+
+- **AC1 + in PDF** và **AC2 (tọa độ từng đỉnh tim không đổi + `XBOSS_BOCKL` ra đúng con số cũ)**
+  chưa ai chạy trên AutoCAD thật — CI Linux không dựng nổi bản vẽ, `NgatNetGuardrailTests` chỉ
+  chứng minh được _cách thiết kế_, không thay được bằng chứng trên bản vẽ.
+- Thứ tự vẽ của `Wipeout` khi **in PDF** phụ thuộc driver (M109 §11) — phải in thử bằng cả DWG To
+  PDF lẫn máy in thật của công ty.
+- Biên `Wipeout.SetFrom` đang truyền dạng **vòng kín** (lặp đỉnh đầu ở cuối); AC1 xác nhận luôn ca
+  này.
+- Điểm giao nằm trên **đoạn cung** của tim được dò theo dây cung (Core chỉ biết đoạn thẳng) — lệnh
+  đã cảnh báo, cần kiểm mắt; muốn chính xác thì phải duỗi cung ở Adapter (chưa làm, ngoài phạm vi).
+
+**Tiếp theo:** verify tay M109 trên máy có AutoCAD 2026, rồi M110 (revision cloud).
 
 ## ✅ M113 PR1/4 — thư viện block hai tầng: schema + RLS + hàm trộn (2026-08-29)
 
