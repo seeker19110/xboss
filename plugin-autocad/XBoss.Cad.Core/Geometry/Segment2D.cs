@@ -43,6 +43,43 @@ public static class Segment2D
         return (a1.X + t * rX, a1.Y + t * rY);
     }
 
+    /// <summary>
+    /// Góc giữa hai HƯỚNG, quy về khoảng 0..90 độ — góc GIAO của hai tuyến (chiều vẽ của polyline
+    /// không đổi được kết quả nên phải gập về 0..90, không dùng góc có dấu). Hướng suy biến
+    /// (độ dài 0) → 0 độ.
+    /// </summary>
+    public static double GocGiaoDeg((double X, double Y) u, (double X, double Y) v)
+    {
+        var duU = Math.Sqrt(u.X * u.X + u.Y * u.Y);
+        var duV = Math.Sqrt(v.X * v.X + v.Y * v.Y);
+        if (duU < 1e-12 || duV < 1e-12) return 0;
+        var cos = Math.Abs(u.X * v.X + u.Y * v.Y) / (duU * duV);
+        return Math.Acos(Math.Clamp(cos, -1, 1)) * 180 / Math.PI;
+    }
+
+    /// <summary>
+    /// Mọi giao điểm giữa hai chuỗi đỉnh (tim đã duỗi thành đoạn thẳng): dùng chung cho phép kiểm 11
+    /// của <c>XBOSS_KIEMTRA</c> (chỉ cần toạ độ) và lệnh <c>XBOSS_VE_NGATNET</c> của M109 (cần thêm
+    /// hướng hai đoạn + góc giao để dựng vùng che/cầu vượt). MỘT thuật toán duy nhất cho cả hai —
+    /// bộ dò giao cắt thứ hai là đúng cách để 2 lệnh trôi khỏi nhau (M109 §1).
+    /// </summary>
+    public static IEnumerable<GiaoDiemChuoi> GiaoDiemGiuaHaiChuoi(
+        IReadOnlyList<(double X, double Y)> a, IReadOnlyList<(double X, double Y)> b)
+    {
+        for (var i = 0; i + 1 < a.Count; i++)
+        {
+            for (var j = 0; j + 1 < b.Count; j++)
+            {
+                var d = Segment2D.GiaoDiem(a[i], a[i + 1], b[j], b[j + 1]);
+                if (d is not { } diem) continue;
+                var huongA = (a[i + 1].X - a[i].X, a[i + 1].Y - a[i].Y);
+                var huongB = (b[j + 1].X - b[j].X, b[j + 1].Y - b[j].Y);
+                yield return new GiaoDiemChuoi(
+                    diem.X, diem.Y, i, j, huongA, huongB, GocGiaoDeg(huongA, huongB));
+            }
+        }
+    }
+
     /// <summary>Khoảng cách từ điểm tới đoạn (không phải tới đường thẳng vô hạn).</summary>
     public static double KhoangCachDiemToiDoan((double X, double Y) p, (double X, double Y) a, (double X, double Y) b)
     {
@@ -105,3 +142,13 @@ public static class Segment2D
         => min1.X - noiRong <= max2.X && max1.X + noiRong >= min2.X
            && min1.Y - noiRong <= max2.Y && max1.Y + noiRong >= min2.Y;
 }
+
+/// <summary>
+/// Một giao điểm giữa hai chuỗi đỉnh: toạ độ, chỉ số đoạn của mỗi bên, hướng hai đoạn tại chỗ giao
+/// và góc giao (0..90 độ).
+/// </summary>
+public readonly record struct GiaoDiemChuoi(
+    double X, double Y,
+    int ChiSoDoanA, int ChiSoDoanB,
+    (double X, double Y) HuongA, (double X, double Y) HuongB,
+    double GocDeg);

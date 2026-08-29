@@ -1,6 +1,6 @@
 {
-  "version": "v12",
-  "description": "Rule pack v12 = v9 + khối `drawTools.floorPolicy` cho lệnh nhân bản tầng điển hình XBOSS_VE_NHANTANG (M111 §4): danh sách nhãn tầng, kiểu dời + bước dời, mẫu tên vùng bóc của bản chép, danh sách vai trò được chép. Mở rộng THUẦN: không khóa cũ nào đổi một byte, mọi lệnh M99/M100/M101/M102/M105 chạy với v12 cho kết quả Y HỆT v9; `floorPolicy.enabled` mặc định false nên lệnh nhân tầng từ chối chạy cho tới khi công ty bật (M111 AC12). Đổi quy tắc = phát hành version mới, KHÔNG sửa version cũ.",
+  "version": "v14",
+  "description": "v13 (v9 + floorPolicy M111 + crossingPolicy M109) + revisionPolicy (M110 §5)",
   "layerMap": {
     "source": "lib/cad/dxf-parser.ts :: normalizeCadLayers()",
     "standard": "AIA / BS1192 / ISO 13567",
@@ -701,6 +701,22 @@
     },
     "heavyFittingIds": ["valve-gate", "damper-vcd"],
     "heavyFittingIdsNote": "v7 (M100 §6.7) — id block phụ kiện được coi là PHỤ KIỆN NẶNG: XBOSS_VE_GIADO luôn đặt thêm một giá đỡ ngay tại các phụ kiện này (van, van điều chỉnh gió — khối lượng tập trung, tiêu chuẩn treo đỡ đòi đỡ riêng). Id lấy từ manifest thư viện block (cùng bộ id với drawTools.systems[].fittings). Trước v7 rule pack không có khóa này nên lệnh phải HỎI kỹ sư mỗi lần chạy \"có đặt giá đỡ tại phụ kiện không?\" và khi trả lời Có thì đặt tại MỌI phụ kiện (kể cả co/tê nhẹ) — không đúng chuẩn treo đỡ. Danh sách RỖNG = không phụ kiện nào được coi là nặng (lệnh chỉ chia đều theo supportSpacingMm); rule pack cũ (v4–v6) KHÔNG có khóa này nên plugin giữ nguyên đường hỏi kỹ sư — hành vi cũ không đổi. Bổ sung/bớt phụ kiện nặng theo dự án = phát hành version mới.",
+    "crossingPolicy": {
+      "enabled": false,
+      "priority": ["HVAC", "PIPING", "FIREFIGHTING", "ELECTRICAL", "ELV"],
+      "priorityNote": "Hạng TRÌNH BÀY, KHÔNG phải cao độ thật: hệ đứng trước đi TRÊN, hệ đi dưới bị ngắt nét tại chỗ giao. Mỗi phần tử là một id hệ theo drawTools.systems[].id (= layerMap.groups[].id — cùng không gian id mà phép kiểm 11 dùng để suy hệ từ layer). Hệ KHÔNG khai ở đây xếp sau cùng. Hai tuyến CÙNG hệ thì không ngắt nét (kể cả cấp × thoát nước, vì cả hai cùng hệ PIPING) — ca đó cần kỹ sư xử lý bằng phụ kiện, lệnh chỉ ghi vào báo cáo mục riêng.",
+      "gapMode": "wipeout",
+      "gapModeNote": "wipeout | jog. Mặc định suy theo edgeStyle của tuyến đi dưới (double → wipeout, none → cầu vượt); khóa này chỉ để ÉP một cách thể hiện khi driver in PDF dựng wipeout sai thứ tự vẽ (M109 §11).",
+      "clearanceMm": 50,
+      "clearanceMmNote": "Bề rộng vùng che tính thêm từ mép biên tuyến ĐI TRÊN mỗi bên: bề rộng vùng che = bề rộng tuyến đi trên + 2 × clearanceMm (M109 FR4). Phải > 0.",
+      "jogRadiusMm": 150,
+      "jogRadiusMmNote": "Bán kính cung cầu vượt cho tuyến ĐƠN NÉT (edgeStyle none). Phải > 0 và đủ lớn so với bề rộng vùng giao, nếu không thì không dựng được cung — lệnh bỏ qua điểm đó kèm lý do.",
+      "layerSuffix": "XING",
+      "layerSuffixNote": "Layer đối tượng ngắt nét = <layer tim> + hậu tố này. Bắt buộc khác rỗng khi enabled (không có nó thì wipeout/cầu vượt rơi vào chính layer tim và lệnh xóa không lọc lại được). Cùng ràng buộc token với edgeLayerSuffix: hậu tố PHẢI bắt đầu bằng [A-Z0-9].",
+      "minAngleDeg": 15,
+      "minAngleDegNote": "Góc giao (0..90°) nhỏ hơn ngưỡng này thì KHÔNG ngắt nét — giao gần song song cho vùng che dài lê thê, che mất tuyến và tạo hình xấu; ghi vào báo cáo mục riêng để kỹ sư xử lý tay.",
+      "note": "M109 §5 — chính sách ngắt nét giao chéo. Mặc định enabled=false: lệnh XBOSS_VE_NGATNET dừng kèm thông báo nêu rõ khóa chưa bật (AC8), không vẽ gì."
+    },
     "systems": [
       {
         "id": "HVAC",
@@ -1375,6 +1391,21 @@
         "NhanDot"
       ],
       "copyRolesNote": "Vai trò KHÔNG chép: MatCat, TuyenCat, BangThongKe, Revision, NgatNet — đều là hồ sơ/trình bày, dựng lại bằng lệnh của chúng sau khi chép. Cũng không chép DinhNghiaBlock: đó là ĐỊNH NGHĨA block (BlockTableRecord) dùng chung cả bản vẽ, bản chép tham chiếu lại chính định nghĩa đã có chứ không nhân bản nó."
+    },
+    "revisionPolicy": {
+      "enabled": false,
+      "cloudArcMm": 300,
+      "layer": "M-ANNO-REVS",
+      "triangleBlockId": "rev-tag",
+      "numberFormat": "R{n}",
+      "titleblockAttrPattern": {
+        "so": "REV{n}_NO",
+        "ngay": "REV{n}_DATE",
+        "noiDung": "REV{n}_DESC",
+        "nguoi": "REV{n}_BY"
+      },
+      "maxRows": 6,
+      "boundingPaddingMm": 200
     }
   },
   "sheetSetup": {

@@ -32,6 +32,12 @@ public sealed class DrawToolsSection
     [JsonPropertyName("heavyFittingIds")] public IReadOnlyList<string> HeavyFittingIds { get; init; } = [];
 
     /// <summary>
+    /// Chính sách ngắt nét giao chéo (M109 §5, rule pack v13 trở đi). null = rule pack cũ chưa khai
+    /// ⇒ lệnh <c>XBOSS_VE_NGATNET</c> TỪ CHỐI chạy kèm thông báo, không đoán mặc định ngầm.
+    /// </summary>
+    [JsonPropertyName("crossingPolicy")] public CrossingPolicySection? CrossingPolicy { get; init; }
+
+    /// <summary>
     /// Tham số nhân bản tầng điển hình (M111 §4, rule pack v12 trở đi). null = rule pack cũ chưa
     /// khai ⇒ <c>XBOSS_VE_NHANTANG</c> từ chối chạy kèm thông báo, không đoán mặc định ngầm.
     /// </summary>
@@ -112,6 +118,34 @@ public sealed class TitleblockAttrPattern
             NoiDung.Replace(RevisionPolicySection.OTrongSo, so),
             Nguoi.Replace(RevisionPolicySection.OTrongSo, so));
     }
+}
+
+/// <summary>
+/// Khối <c>drawTools.crossingPolicy</c> (M109 §5) — quy ước TRÌNH BÀY tuyến đi dưới bị ngắt nét tại
+/// chỗ giao. KHÔNG phải cao độ thật (M109 §3 non-goals).
+/// </summary>
+public sealed class CrossingPolicySection
+{
+    /// <summary>Mặc định false — nạp rule pack mới không đổi hành vi trên máy kỹ sư (AC8).</summary>
+    [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+
+    /// <summary>Hạng trình bày: hệ đứng trước đi TRÊN. Id theo <c>drawTools.systems[].id</c>.</summary>
+    [JsonPropertyName("priority")] public IReadOnlyList<string> Priority { get; init; } = [];
+
+    /// <summary><c>wipeout</c> | <c>jog</c> — chỉ để ÉP; mặc định suy theo <c>edgeStyle</c>.</summary>
+    [JsonPropertyName("gapMode")] public string GapMode { get; init; } = "";
+
+    /// <summary>Bề rộng che cộng thêm mỗi bên mép biên tuyến đi trên (mm).</summary>
+    [JsonPropertyName("clearanceMm")] public double ClearanceMm { get; init; }
+
+    /// <summary>Bán kính cung cầu vượt cho tuyến đơn nét (mm).</summary>
+    [JsonPropertyName("jogRadiusMm")] public double JogRadiusMm { get; init; }
+
+    /// <summary>Layer đối tượng ngắt nét = <c>&lt;layer tim&gt;</c> + hậu tố này.</summary>
+    [JsonPropertyName("layerSuffix")] public string LayerSuffix { get; init; } = "";
+
+    /// <summary>Góc giao dưới ngưỡng này (độ) thì KHÔNG ngắt nét — báo cáo riêng (FR3).</summary>
+    [JsonPropertyName("minAngleDeg")] public double MinAngleDeg { get; init; }
 }
 
 public sealed class LabelStyleSection
@@ -389,7 +423,13 @@ public static class DrawToolsConfig
         if (sheetSetup.TitleblockId is { } tb && string.IsNullOrWhiteSpace(tb))
             throw new RulePackException("sheetSetup.titleblockId khai rồi nhưng để rỗng.");
 
-        // (h) khối revision (v12) khai rồi thì phải hợp lệ — cùng bộ luật với validator TS
+        // (g) chính sách ngắt nét giao chéo (M109 §5) — khai rồi thì phải hợp lệ. Kiểm theo ĐÚNG
+        // tập id hệ của drawTools: priority trỏ vào hệ không tồn tại nghĩa là thứ tự trên–dưới của
+        // hệ đó lặng lẽ không có hiệu lực (rơi xuống "hệ không khai xếp sau cùng"), không ai biết.
+        if (drawTools.CrossingPolicy is { } crossing)
+            ValidateCrossingPolicy(crossing, systemIds);
+
+        // (h) khối revision (v14) khai rồi thì phải hợp lệ — cùng bộ luật với validator TS
         // (lib/ky-thuat/cad/rule-pack-revision.ts), M110 §5.
         if (drawTools.RevisionPolicy is { } rev) KiemRevisionPolicy(rev);
     }
@@ -432,6 +472,53 @@ public static class DrawToolsConfig
                     $"drawTools.revisionPolicy.titleblockAttrPattern.{khoa} \"{giaTri}\" thiếu " +
                     $"{RevisionPolicySection.OTrongSo} — mọi dòng revision sẽ ghi đè lên cùng một attribute.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Kiểm riêng khối <c>crossingPolicy</c> (M109 §5) — tầng C# của validator 2 tầng, cặp với
+    /// <c>kiemCrossingPolicy()</c> bên TS (<c>lib/ky-thuat/cad/rule-pack.ts</c>). Tách hàm public để
+    /// bộ đối chứng <c>plugin-autocad/doi-chung/crossing-doi-chung.json</c> nạp thẳng từng ca mà
+    /// không phải dựng cả một rule pack giả.
+    /// </summary>
+    /// <param name="heHopLe">Tập id hệ hợp lệ = <c>drawTools.systems[].id</c>.</param>
+    public static void ValidateCrossingPolicy(CrossingPolicySection cp, IReadOnlyCollection<string> heHopLe)
+    {
+        foreach (var id in cp.Priority)
+        {
+            if (!heHopLe.Contains(id))
+            {
+                throw new RulePackException(
+                    $"drawTools.crossingPolicy.priority chứa id hệ lạ \"{id}\" — phải là " +
+                    $"drawTools.systems[].id (hợp lệ: {string.Join(", ", heHopLe)}).");
+            }
+        }
+
+        if (cp.ClearanceMm <= 0 || double.IsNaN(cp.ClearanceMm))
+            throw new RulePackException($"drawTools.crossingPolicy.clearanceMm = {cp.ClearanceMm} phải là số dương.");
+        if (cp.JogRadiusMm <= 0 || double.IsNaN(cp.JogRadiusMm))
+            throw new RulePackException($"drawTools.crossingPolicy.jogRadiusMm = {cp.JogRadiusMm} phải là số dương.");
+
+        // Ngưỡng lọc góc giao — CrossingGeometry.DuGocDeNgat() dùng thẳng giá trị này, số âm/NaN
+        // làm mọi góc giao đều "đủ lớn" (ngắt nét cả ca gần song song).
+        if (double.IsNaN(cp.MinAngleDeg) || cp.MinAngleDeg <= 0 || cp.MinAngleDeg > 90)
+        {
+            throw new RulePackException(
+                $"drawTools.crossingPolicy.minAngleDeg = {cp.MinAngleDeg} phải nằm trong khoảng (0; 90] — " +
+                "đây là ngưỡng lọc góc giao (0..90°), giá trị âm/NaN làm mọi góc đều bị coi là đủ lớn.");
+        }
+
+        if (!string.IsNullOrEmpty(cp.GapMode) && cp.GapMode is not ("wipeout" or "jog"))
+        {
+            throw new RulePackException(
+                $"drawTools.crossingPolicy.gapMode lạ \"{cp.GapMode}\" (chỉ nhận \"wipeout\" hoặc \"jog\").");
+        }
+
+        if (cp.Enabled && string.IsNullOrWhiteSpace(cp.LayerSuffix))
+        {
+            throw new RulePackException(
+                "drawTools.crossingPolicy.layerSuffix trống trong khi enabled = true — đối tượng ngắt nét " +
+                "sẽ rơi vào chính layer tim và lệnh xóa không lọc lại được.");
         }
     }
 }

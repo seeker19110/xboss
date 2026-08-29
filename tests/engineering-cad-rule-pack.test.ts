@@ -15,8 +15,10 @@ import {
   getCurrentRulePack,
   getRulePackEtag,
   matchesEtag,
+  kiemCrossingPolicy,
   kiemFloorPolicy,
   CURRENT_RULE_PACK_VERSION,
+  type CrossingPolicy,
 } from "@/lib/ky-thuat/cad/rule-pack";
 import {
   normalizeCadLayers,
@@ -27,7 +29,7 @@ import { kiemTraRevisionPolicy, soRevisionTheoMau } from "@/lib/ky-thuat/cad/rul
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8, version = v12", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8 + floorPolicy v12 + crossingPolicy v13 + revisionPolicy v14, version = v14", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -51,8 +53,11 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleM
   for (const field of ["polylineClosePolicy", "blockMap"]) {
     assert.ok(field in pack, `Thiếu field v8 ${field}`);
   }
-  assert.equal(pack.version, "v12");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v12");
+  assert.ok("crossingPolicy" in pack.drawTools, "Thiếu khối v13 drawTools.crossingPolicy");
+  assert.ok("floorPolicy" in pack.drawTools, "Thiếu khối v12 drawTools.floorPolicy");
+  assert.ok("revisionPolicy" in pack.drawTools, "Thiếu khối v14 drawTools.revisionPolicy");
+  assert.equal(pack.version, "v14");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v14");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -861,8 +866,9 @@ test("v8: ánh xạ layer idempotent — áp lại lên tên đã chuẩn không
 
 test("rule pack v9 là mở rộng thuần của v8: chỉ thêm jointRules + jointRulesNote (M105 §12)", async () => {
   const v8 = (await import("@/lib/ky-thuat/cad/rule-packs/v8.json")).default;
-  // So THẲNG tệp v9.json, không qua getCurrentRulePack() — rule pack hiện hành đã là v12 (M111),
-  // so nhầm sẽ bắt v12 phải giống v8 ở khối drawTools vốn đã có thêm floorPolicy.
+  // So THẲNG tệp v9.json, không qua getCurrentRulePack() — rule pack hiện hành đã là v13 (M109
+  // gộp trên v12 của M111), so nhầm sẽ bắt v13 phải giống v8 ở khối drawTools vốn đã có thêm
+  // jointRules/floorPolicy/crossingPolicy.
   const v9 = (await import("@/lib/ky-thuat/cad/rule-packs/v9.json")).default;
 
   // Mọi khối ngoài drawTools phải y nguyên — kiểm/chuẩn hóa/bóc bằng v9 không đổi hành vi.
@@ -956,9 +962,11 @@ test("v9: MỌI tuyến đều khai jointRules đủ dùng, dải chọn kiểu 
 
 // ===== v12 (M111) — floorPolicy: tham số nhân bản tầng điển hình =====
 
-test("rule pack v12 là mở rộng thuần của v9: chỉ thêm floorPolicy + revisionPolicy (M111 §4, M110 §5)", async () => {
+test("rule pack v12 là mở rộng thuần của v9: chỉ thêm floorPolicy (M111 §4)", async () => {
   const v9 = (await import("@/lib/ky-thuat/cad/rule-packs/v9.json")).default;
-  const v12 = getCurrentRulePack();
+  // Đọc THẲNG tệp v12.json: bản hiện hành nay là v14 (M109 gộp crossingPolicy lên trên v12, M110
+  // gộp tiếp revisionPolicy — xem 2 test "mở rộng thuần" riêng ở dưới cho v13/v14).
+  const v12 = (await import("@/lib/ky-thuat/cad/rule-packs/v12.json")).default;
 
   for (const field of [
     "layerMap",
@@ -985,17 +993,11 @@ test("rule pack v12 là mở rộng thuần của v9: chỉ thêm floorPolicy + 
   assert.deepEqual(
     Object.keys(v12).filter((k) => !(k in v9)),
     [],
-    "v12 không được thêm khối cấp cao nào — floorPolicy/revisionPolicy nằm trong drawTools",
+    "v12 không được thêm khối cấp cao nào — floorPolicy nằm trong drawTools",
   );
 
-  // v12 mang 2 khối mới độc lập nhau: floorPolicy (M111) + revisionPolicy (M110) — bỏ cả hai ra
-  // rồi mới so, phần drawTools còn lại phải y nguyên v9.
-  const { floorPolicy: _bo, revisionPolicy: _rev, ...drawToolsV12 } = v12.drawTools;
-  assert.deepEqual(
-    drawToolsV12,
-    v9.drawTools,
-    "v12 đụng tham số drawTools ngoài floorPolicy + revisionPolicy",
-  );
+  const { floorPolicy: _bo, ...drawToolsV12 } = v12.drawTools;
+  assert.deepEqual(drawToolsV12, v9.drawTools, "v12 đụng tham số drawTools ngoài floorPolicy");
 });
 
 test("v12: floorPolicy TẮT mặc định nhưng khai sẵn tham số dùng được ngay (M111 AC12)", () => {
@@ -1051,11 +1053,47 @@ test("v12: validator TS khớp validator C# — cả 3 kiểm còn lại của F
   assert.deepEqual(kiemFloorPolicy({ ...hopLe, gridColumns: 0 }), []);
 });
 
-// ===== v12 (M110 §5) — revisionPolicy: tham số revision cloud =====
-// (v12 phát hành cùng lúc 2 khối độc lập: floorPolicy của M111 ở trên và revisionPolicy dưới đây;
-// tính "mở rộng thuần" của cả hai đã được test v12 phía trên canh chung.)
+// ===== v14 (M110 §5) — revisionPolicy: tham số revision cloud =====
+// (v12 = v9 + floorPolicy (M111); v13 = v12 + crossingPolicy (M109); v14 = v13 + revisionPolicy
+// (M110) — 3 nhánh song song, mỗi nhánh chỉ thêm ĐÚNG khối của mình, mở rộng thuần từng bước.)
 
-test("v12: revisionPolicy khai đủ tham số và mặc định TẮT (M110 §5/AC8)", () => {
+test("rule pack v14 là mở rộng thuần của v13: chỉ thêm drawTools.revisionPolicy (M110 §5)", async () => {
+  const v13 = (await import("@/lib/ky-thuat/cad/rule-packs/v13.json")).default;
+  const v14 = getCurrentRulePack();
+
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "inspectionPolicy",
+    "styleMap",
+    "sheetSetup",
+    "xrefPolicy",
+    "hatchMap",
+    "layoutPolicy",
+    "polylineClosePolicy",
+    "blockMap",
+  ] as const) {
+    assert.deepEqual(
+      v14[field],
+      v13[field],
+      `Field ${field} của v14 lệch v13 — v14 phải là mở rộng thuần (M110 chỉ thêm revisionPolicy)`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v14).filter((k) => !(k in v13)),
+    [],
+    "v14 không được thêm khối cấp cao nào — revisionPolicy nằm trong drawTools",
+  );
+
+  const { revisionPolicy: _bo, ...drawToolsV14 } = v14.drawTools;
+  assert.deepEqual(drawToolsV14, v13.drawTools, "v14 đụng tham số drawTools ngoài revisionPolicy");
+});
+
+test("v14: revisionPolicy khai đủ tham số và mặc định TẮT (M110 §5/AC8)", () => {
   const rev = getCurrentRulePack().drawTools.revisionPolicy;
 
   assert.equal(
@@ -1070,7 +1108,7 @@ test("v12: revisionPolicy khai đủ tham số và mặc định TẮT (M110 §5
   }
 });
 
-test("v12: validator revisionPolicy bắt đúng các ca sai của M110 §5", () => {
+test("v14: validator revisionPolicy bắt đúng các ca sai của M110 §5", () => {
   const goc = getCurrentRulePack().drawTools.revisionPolicy;
   const sua = (p: Partial<typeof goc>) => kiemTraRevisionPolicy({ ...goc, ...p });
 
@@ -1092,4 +1130,102 @@ test("v12: validator revisionPolicy bắt đúng các ca sai của M110 §5", ()
 
   // Rule pack cũ (≤ v9) không khai khối này — hợp lệ, lệnh revision tự từ chối chạy.
   assert.deepEqual(kiemTraRevisionPolicy(undefined), []);
+});
+
+// ===== v13 (M109) — crossingPolicy: chính sách ngắt nét giao chéo =====
+// (lịch sử: v13 KHÔNG còn là bản hiện hành — v14 mới là bản phát hành, xem test "mở rộng thuần"
+// ở trên. So sánh dưới đây dùng import trực tiếp v12/v13.json, không dùng getCurrentRulePack().)
+
+test("rule pack v13 là mở rộng thuần của v12: chỉ thêm drawTools.crossingPolicy (M109 §5)", async () => {
+  const v12 = (await import("@/lib/ky-thuat/cad/rule-packs/v12.json")).default;
+  const v13 = (await import("@/lib/ky-thuat/cad/rule-packs/v13.json")).default;
+
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "inspectionPolicy",
+    "styleMap",
+    "sheetSetup",
+    "xrefPolicy",
+    "hatchMap",
+    "layoutPolicy",
+    "polylineClosePolicy",
+    "blockMap",
+  ] as const) {
+    assert.deepEqual(
+      v13[field],
+      v12[field],
+      `Field ${field} của v13 lệch v12 — v13 phải là mở rộng thuần (M109 chỉ thêm ngắt nét giao chéo)`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v13).filter((k) => !(k in v12)),
+    [],
+    "v13 không được thêm khối cấp cao nào — crossingPolicy nằm trong drawTools",
+  );
+
+  const { crossingPolicy: _bo, ...drawToolsV13 } = v13.drawTools;
+  assert.deepEqual(drawToolsV13, v12.drawTools, "v13 đụng tham số drawTools ngoài crossingPolicy");
+});
+
+test("v13: crossingPolicy khai đủ nhưng TẮT sẵn, priority chỉ chứa id hệ có thật (M109 §5/AC8)", () => {
+  const pack = getCurrentRulePack();
+  const cp = pack.drawTools.crossingPolicy;
+
+  assert.equal(cp.enabled, false, "Khóa mới phải mặc định tắt — nạp v13 không đổi hành vi (AC8)");
+  assert.equal(cp.gapMode, "wipeout");
+  assert.ok(cp.clearanceMm > 0 && cp.jogRadiusMm > 0);
+  assert.ok(cp.layerSuffix.length > 0);
+  assert.ok(cp.minAngleDeg > 0 && cp.minAngleDeg < 90);
+  assert.ok(
+    /^[A-Z0-9]/.test(cp.layerSuffix),
+    "layerSuffix phải bắt đầu bằng [A-Z0-9] như edgeLayerSuffix",
+  );
+
+  const heThat = new Set(pack.drawTools.systems.map((h) => h.id));
+  for (const id of cp.priority) {
+    assert.ok(heThat.has(id), `priority chứa id hệ lạ "${id}" — phải là drawTools.systems[].id`);
+  }
+  assert.deepEqual(
+    kiemCrossingPolicy(pack.drawTools),
+    [],
+    "Rule pack phát hành phải qua validator",
+  );
+});
+
+test("v13: validator crossingPolicy bắt đủ 3 lỗi của M109 §5 + minAngleDeg/gapMode vô nghĩa", () => {
+  const goc = getCurrentRulePack().drawTools;
+  const voi = (chinh: Partial<CrossingPolicy>) => ({
+    systems: goc.systems,
+    crossingPolicy: { ...goc.crossingPolicy, ...chinh },
+  });
+
+  // (1) priority chứa id hệ lạ ("duct" là không gian id khác, không có trong drawTools.systems).
+  const loiPriority = kiemCrossingPolicy(voi({ priority: ["duct", "PIPING"] }));
+  assert.equal(loiPriority.length, 1);
+  assert.match(loiPriority[0], /duct/);
+
+  // (2) clearanceMm / jogRadiusMm phải dương.
+  assert.match(kiemCrossingPolicy(voi({ clearanceMm: 0 }))[0], /clearanceMm/);
+  assert.match(kiemCrossingPolicy(voi({ jogRadiusMm: -1 }))[0], /jogRadiusMm/);
+
+  // (2b) minAngleDeg là ngưỡng lọc góc giao (0..90] — âm/NaN làm mọi góc đều "đủ lớn".
+  assert.match(kiemCrossingPolicy(voi({ minAngleDeg: -5 }))[0], /minAngleDeg/);
+  assert.match(kiemCrossingPolicy(voi({ minAngleDeg: 91 }))[0], /minAngleDeg/);
+  assert.match(kiemCrossingPolicy(voi({ minAngleDeg: Number.NaN }))[0], /minAngleDeg/);
+
+  // (2c) gapMode chỉ nhận wipeout | jog — sai thì chặn ngay, không để lọt tới adapter.
+  assert.match(kiemCrossingPolicy(voi({ gapMode: "xoa-net" }))[0], /gapMode/);
+  assert.deepEqual(kiemCrossingPolicy(voi({ gapMode: "jog" })), []);
+
+  // (3) layerSuffix rỗng khi enabled — còn tắt thì chưa gây hại.
+  assert.match(kiemCrossingPolicy(voi({ enabled: true, layerSuffix: "  " }))[0], /layerSuffix/);
+  assert.deepEqual(kiemCrossingPolicy(voi({ enabled: false, layerSuffix: "" })), []);
+
+  // Rule pack cũ chưa khai khóa này thì không phải lỗi.
+  assert.deepEqual(kiemCrossingPolicy({ systems: goc.systems }), []);
 });
