@@ -172,6 +172,14 @@ public sealed class DrawingSnapshot
     /// <summary>Phần thuộc xref Adapter đã bỏ qua khi dựng snapshot — null = Adapter không đếm
     /// (bản vẽ không có xref, hoặc đường dựng snapshot cũ) ⇒ không báo gì.</summary>
     public XrefBoQua? XrefDaBoQua { get; init; }
+
+    /// <summary>
+    /// Đối tượng do <c>XBOSS_VE_NHANTANG</c> sinh ra (mang XData <c>TangNguon</c>/<c>NhanTang</c> —
+    /// M111 FR9), kèm mọi handle mà XData của nó tham chiếu tới — nguồn của phép kiểm 19 (handle
+    /// mồ côi, M111 AC3). <c>null</c> = Adapter chưa quét hoặc bản vẽ không có bản chép tầng nào
+    /// → phép TỰ TẮT (bản vẽ vẽ tay không bị báo oan).
+    /// </summary>
+    public IReadOnlyList<FloorCopyInfo>? NhanTang { get; init; }
 }
 
 /// <summary>Một tag XBOSS_VE_TAG đọc từ XData — phép kiểm 17 (tag trùng).</summary>
@@ -184,4 +192,24 @@ public sealed record TagInfo
 
     /// <summary>Layer của tim liên kết — dùng làm "hệ" để so trùng trong phạm vi từng hệ.</summary>
     public required string HeLayer { get; init; }
+}
+
+/// <summary>
+/// Một đối tượng bản chép tầng (<c>XBOSS_VE_NHANTANG</c> — M111 FR9), đọc từ XData
+/// <c>XBOSS_VE</c> — nguồn của phép kiểm 19 (handle mồ côi, M111 AC3). Chỉ những đối tượng mang
+/// <c>TangNguon</c> (tức LÀ bản chép, không phải tầng gốc) mới xuất hiện ở đây.
+/// </summary>
+public sealed record FloorCopyInfo
+{
+    public required string Handle { get; init; }
+
+    /// <summary>Nhãn tầng của chính bản chép này (tầng đích, vd <c>"06"</c>).</summary>
+    public required string NhanTang { get; init; }
+
+    /// <summary>
+    /// Mọi handle mà XData của đối tượng này tham chiếu tới (tim/biên/nhãn/tuyến cắt/cặp đôi/đối
+    /// tượng trong vùng/tim giao — gộp mọi khóa handle của <c>VeXDataInfo</c>). Phép kiểm 19 đòi
+    /// từng handle ở đây phải phân giải được và thuộc CÙNG tầng chép <see cref="NhanTang"/>.
+    /// </summary>
+    public IReadOnlyList<string> HandleThamChieu { get; init; } = [];
 }

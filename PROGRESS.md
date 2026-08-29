@@ -4,6 +4,52 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## ✅ M111 PR3/3 — Phép kiểm handle mồ côi (AC3) trong `XBOSS_KIEMTRA` + tài liệu (2026-08-29)
+
+Nhánh `feat/m111-pr3-kiemtra-moico`, tiếp trên PR2. **M111 CODE XONG cả 3 PR** — vẫn còn nợ verify
+tay trên AutoCAD thật (xem "Nợ kỹ thuật — CHẶN phát hành rộng" bên dưới, không đổi so với PR2).
+
+**Đã làm:**
+
+- `plugin-autocad/XBoss.Cad.Core/Inspection/SnapshotModels.cs` — `FloorCopyInfo` (Handle/NhanTang/
+  HandleThamChieu) + `DrawingSnapshot.NhanTang`: nguồn dữ liệu thuần cho phép kiểm mới, theo đúng
+  khuôn `CenterlineInfo`/`TagInfo` đã có.
+- `plugin-autocad/XBoss.Cad.Core/Inspection/PhepKiemMoRong.cs` — phép kiểm **19**
+  `HandleMoCoiNhanTang` (id báo cáo `nhantang-handle-mo-coi`): với mọi đối tượng do
+  `XBOSS_VE_NHANTANG` sinh (mang `TangNguon`/`NhanTang`), mọi handle nó tham chiếu (tim/biên/nhãn/
+  tuyến cắt/cặp đôi/đối tượng trong vùng/tim giao) phải phân giải được và thuộc **đúng tầng chép
+  đó** — bắt trực tiếp guardrail 2 của M111 §2. Không có cờ `enabled` riêng (cùng khuôn phép kiểm
+  revision của M110): tự tắt khi bản vẽ chưa từng chạy `XBOSS_VE_NHANTANG`.
+- `Inspection/Inspector.cs` — nối phép kiểm 19 vào `Run()`, cập nhật doc-comment liệt kê slug.
+- `plugin-autocad/XBoss.Cad.Acad/Services/DrawingSnapshotBuilder.cs` — `QuetNhanTang`: quét model
+  space đọc XData `XBOSS_VE`, chỉ giữ đối tượng có `NhanTang` (tức LÀ bản chép), gộp mọi khóa handle
+  (`HandleTim`/`HandleBien`/`HandleNhan`/`HandleTuyenCat`/`HandleCapDoi`/`HandleTrongVung`/
+  `HandleTimGiao`) thành `HandleThamChieu`.
+- Test: `XBoss.Cad.Tests/InspectorNhanTangTests.cs` (5 ca — tự tắt khi không có bản chép, ca sạch,
+  handle trỏ ra ngoài tập chép, handle trỏ sang tầng khác, gộp nhiều lỗi cùng đối tượng không nhân
+  đôi handle nhờ `ThemHandle` chống trùng).
+- Tài liệu: `plugin-autocad/README.md` (dòng `XBOSS_VE_NHANTANG` trong bảng lệnh vẽ + note rule pack
+  v12+ cho phép kiểm 19 + luồng làm việc chuẩn), `CAI-DAT.md` (bước 8 trong trình tự buổi vẽ),
+  `VERIFY-VA-PHAT-HANH.md` (mục **C9**, item 68–81 — kịch bản verify tay AC1–AC12 trên bản vẽ AVIO
+  thật, kèm ca cố tình phá handle để chứng minh phép 19 bắt được lỗi thật).
+- `docs/nang-cap/README.md` — đóng mục M111: ⏳ PR1+PR2/3 → ✅ CODE XONG cả 3 PR, giữ nguyên rõ ràng
+  điều kiện CHẶN phát hành rộng (verify tay AutoCAD thật).
+
+**Nợ kỹ thuật — CHẶN phát hành rộng (không đổi so với PR2, chưa làm được ở môi trường này):**
+
+- **Chưa verify tay trên bản vẽ AVIO thật** (M111 §8 đòi AC1–AC12 trên máy có AutoCAD 2026). Môi
+  trường code không có AutoCAD — cổng `XBoss.Cad.AcadShim` chỉ chứng minh mã Adapter **biên dịch**
+  đúng chữ ký stub (`QuetNhanTang` mới cũng đã qua cổng này), không chứng minh hành vi thật. Đặc
+  biệt cần soi: (a) phép kiểm 19 có bắt đúng handle mồ côi trên dữ liệu XData THẬT do
+  `DeepCloneObjects`/`AnhXaXData` sinh ra hay không (test hiện tại dùng `FloorCopyInfo` dựng tay,
+  chưa đi qua `DrawingSnapshotBuilder.QuetNhanTang` thật); (b) hai điểm CHƯA verify từ PR2 vẫn còn
+  nguyên (attribute dời gấp đôi/đứng yên, `DeepCloneObjects` có chép XData không).
+
+**Kiểm đã chạy:** `dotnet test XBoss.Cad.Tests` 1000/1000 pass (đã tính 5 ca mới của
+`InspectorNhanTangTests`); `dotnet build XBoss.Cad.AcadShim` (biên dịch thử toàn bộ Adapter, gồm
+`DrawingSnapshotBuilder.cs` đã sửa) 0 warning/0 error. Không đụng TypeScript/DB/route nào — không
+cần `npm run lint`/`typecheck`/`test`.
+
 ## ✅ M113 PR2/4 — API `?project=` cho thư viện block hai tầng (2026-08-29)
 
 Nhánh `feat/m113-pr2-api-project`. PR **2/4** của `docs/nang-cap/M113-thu-vien-block-theo-du-an.md`
