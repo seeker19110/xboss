@@ -4,6 +4,25 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## ✅ M113 PR1/4 — thư viện block hai tầng: schema + RLS + hàm trộn (2026-08-29)
+
+Nhánh `feat/m113-pr1-schema-rls`. PR **1/4** của `docs/nang-cap/M113-thu-vien-block-theo-du-an.md`
+(PR2 API `?project=`, PR3 web 2 khối + chip nguồn, PR4 plugin — **chưa làm**).
+
+- `migrations/0145_cad_block_libs_project.sql` — `cad_block_libs.project_id` (nullable, NULL = bộ
+  toàn cục), thay `UNIQUE(version)` bằng unique `(COALESCE(project_id,0), version)` để hai dự án
+  cùng đặt nhãn `b1` được, + index `(project_id, id DESC)`, + **RLS** khuôn 2 nhánh của 0140 **cộng
+  nhánh toàn cục** `project_id IS NULL` (mọi phiên đọc/ghi được như hôm nay).
+- `lib/ky-thuat/cad/block-lib.ts` — `tronThuVienBlock(toanCuc, cuaDuAn)` (chỗ **duy nhất** biết luật
+  đè theo `blocks[].id`, gắn `nguon`/`libVersion`) + `layBlockLibHienHanh(projectId?)` lấy bộ hiện
+  hành đúng tầng; không tham số ⇒ y hệt hành vi trước M113 (guardrail 1).
+- `tests/cad-block-lib-du-an.test.ts` — unit luật trộn + tích hợp AC2/AC3/AC4 và **AC7 (RLS)** bằng
+  role `xboss_app`; `tests/rls.test.ts` khai thêm `cad_block_libs` vào danh sách bảng có RLS.
+
+⚠️ **PR1 KHÔNG đi thẳng production** (M113 §5/§12): migration đụng ràng buộc trên dữ liệu đang có
+(`DROP CONSTRAINT` + `CREATE UNIQUE INDEX`) ⇒ phải chạy `bash deploy.sh --staging` trước, verify
+`SELECT version, count(*) FROM cad_block_libs GROUP BY 1 HAVING count(*) > 1` trả 0 dòng.
+
 ## 🚧 M109 PR1/2 — rule pack v13 `crossingPolicy` + hình học ngắt nét giao chéo (2026-08-29)
 
 Nhánh `feat/m109-pr1-crossing-geometry`. **Mới là PR1 trong 2 PR của M109 — PR2 (Adapter: 2 lệnh
