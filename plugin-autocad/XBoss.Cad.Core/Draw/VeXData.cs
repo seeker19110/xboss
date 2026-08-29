@@ -82,7 +82,8 @@ public enum VaiTroVe
 
 /// <summary>
 /// Một bản ghi chiếm chỗ trong sổ <see cref="VeXDataInfo.LanDaCap"/> của hành lang (M114 FR3):
-/// hệ nào, tầng nào, chiếm làn từ đâu tới đâu (mm tính từ tim hành lang) và ở cao độ nào.
+/// hệ nào, tầng nào, chiếm làn từ đâu tới đâu (mm tính từ MÉP TRÁI hành lang — cùng gốc đo với
+/// <c>planMultiTierCorridor</c> bên TS, xem <see cref="Routing.CapPhatLanTang"/>) và ở cao độ nào.
 /// </summary>
 public sealed record LanChiem(string HeId, string TierId, double LanTuMm, double LanDenMm, double CaoDoMm)
 {
