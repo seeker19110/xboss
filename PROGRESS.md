@@ -4,6 +4,38 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## 🚧 M114 PR1/4 — rule pack v15 `routingPolicy` + đồ thị hành lang & định tuyến (Core) (2026-08-29)
+
+Nhánh `feat/m114-pr1-hanhlang-graph-core`. PR **1/4** của
+`docs/nang-cap/M114-auto-routing-hanh-lang.md` (PR2 `CapPhatLanTang` + đối chứng 2 tầng, PR3 Adapter
+`XBOSS_VE_HANHLANG`, PR4 Adapter `XBOSS_VE_TUYENTUDONG` — **chưa làm**). Sau PR này plugin **chưa có
+lệnh nào mới**: mới là dữ liệu + hàm thuần, test trên CI Linux.
+
+- `lib/ky-thuat/cad/rule-packs/v15.json` — v14 + khối `drawTools.routingPolicy` (M114 §6): layer
+  hành lang, `snapRadiusMm`, 3 hệ số chi phí α/β/γ, `tiers` phân tầng theo hệ, `laneGapMm`,
+  `systemOrder`. **Mặc định `enabled: false`** (AC14) và là mở rộng thuần (mọi khóa cũ giữ nguyên
+  từng byte). Ghi chú: §6 nêu ví dụ bằng tên hệ viết tắt (`ELEC`/`PLUMB`/`CHW`/`FP`) nhưng chính §6
+  bắt validator đòi id CÓ THẬT trong `drawTools.systems`, nên `tiers`/`systemOrder` phát hành dùng
+  đúng 5 id thật: `HVAC`, `PIPING`, `FIREFIGHTING`, `ELECTRICAL`, `ELV`.
+- **Validator 2 tầng**: `kiemRoutingPolicy()` (`lib/ky-thuat/cad/rule-pack.ts`) và
+  `DrawToolsConfig.ValidateRoutingPolicy()` (C#) — cùng bộ luật: `snapRadiusMm` > 0, `reuseFactor`
+  trong (0; 1], id hệ trong `tiers`/`systemOrder` phải có thật, một hệ không nằm ở 2 tier, hệ số
+  chi phí không âm, khe hở làn dương, `corridorLayer` khác rỗng khi bật.
+- Core mới: `Routing/HanhLangGraph.cs` (dựng đồ thị — giao điểm hành lang, điểm rẽ = hình chiếu
+  vuông góc trong `snapRadiusMm`, loại cạnh qua **vùng cấm** bằng `VungClipper` của M101 PR3, thiết
+  bị ngoài bán kính vào danh sách không giải được **kèm khoảng cách thật**) và `Routing/DinhTuyen.cs`
+  (Dijkstra trên trạng thái (nút, cạnh vào) + hàm chi phí α co / β độ đông / γ gom trục, chế độ tự
+  chảy báo **chênh cao cần vs có** thay vì hạ độ dốc cho xong).
+- `Draw/VeXData.cs` — vai trò `VaiTroVe.HanhLang` + `LanChiem` (sổ chiếm chỗ `lanDaCap` sống trong
+  DWG, FR3) + 3 khóa của tuyến tự động `TuDong`/`PhienTuyen`/`SuaTay` (FR11/FR12).
+- Test: `XBoss.Cad.Tests/RoutingHanhLangTests.cs` (đồ thị chữ T/H, điểm rẽ, ngoài bán kính, vùng cấm,
+  Dijkstra, **γ giảm tổng chiều dài vẽ ra**, β đẩy sang hành lang vắng, tự chảy có/vô nghiệm, khứ hồi
+  XData), `RulePackV15RoutingTests.cs`, và phần v15 trong `tests/engineering-cad-rule-pack.test.ts`.
+- Phát hành v15: `rule-pack-hien-hanh.ts`, `RepoPaths.TenTepHienHanh`, `doi-chung/corpus.json` +
+  `crossing-doi-chung.json` + `ket-qua-mong-doi.json` (sinh lại bằng `npm run cad:doi-chung`).
+
+**Không migration, không API mới, không đụng `app/`** (M114 §9).
+
 ## ✅ M113 PR1/4 — thư viện block hai tầng: schema + RLS + hàm trộn (2026-08-29)
 
 Nhánh `feat/m113-pr1-schema-rls`. PR **1/4** của `docs/nang-cap/M113-thu-vien-block-theo-du-an.md`

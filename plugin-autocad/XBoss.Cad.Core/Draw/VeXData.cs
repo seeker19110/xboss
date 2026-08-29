@@ -70,6 +70,24 @@ public enum VaiTroVe
     /// tượng của đúng CẶP tuyến (FR6 idempotent). KHÔNG BAO GIỜ đụng vào polyline tim (guardrail 1).
     /// </summary>
     NgatNet,
+
+    /// <summary>
+    /// Polyline tim HÀNH LANG do <c>XBOSS_VE_HANHLANG</c> vẽ mới hoặc NHẬN từ polyline có sẵn
+    /// (M114 FR3). Mang bề rộng khả dụng, cao độ đáy dầm/trần, danh sách hệ được phép đi qua và
+    /// sổ chiếm chỗ <see cref="VeXDataInfo.LanDaCap"/> — nhờ đó trạng thái chiếm làn SỐNG TRONG
+    /// BẢN VẼ, hệ chạy sau đọc được ngay cả khi mở lại bản vẽ hôm khác.
+    /// </summary>
+    HanhLang,
+}
+
+/// <summary>
+/// Một bản ghi chiếm chỗ trong sổ <see cref="VeXDataInfo.LanDaCap"/> của hành lang (M114 FR3):
+/// hệ nào, tầng nào, chiếm làn từ đâu tới đâu (mm tính từ tim hành lang) và ở cao độ nào.
+/// </summary>
+public sealed record LanChiem(string HeId, string TierId, double LanTuMm, double LanDenMm, double CaoDoMm)
+{
+    /// <summary>Bề rộng làn đã chiếm (mm).</summary>
+    public double BeRongMm => Math.Abs(LanDenMm - LanTuMm);
 }
 
 /// <summary>Nội dung XData <c>XBOSS_VE</c> của một đối tượng do bộ lệnh vẽ sinh ra (M100 §11).</summary>
@@ -186,6 +204,32 @@ public sealed record VeXDataInfo
 
     /// <summary>Nhãn tầng của chính bản chép này (tầng đích).</summary>
     public string? NhanTang { get; init; }
+
+    // ===== Hành lang + đi tuyến tự động (M114 FR3/FR11/FR12) =====
+
+    /// <summary>Bề rộng khả dụng của hành lang (mm) — vai trò <see cref="VaiTroVe.HanhLang"/>.</summary>
+    public double? BeRongMm { get; init; }
+
+    /// <summary>Cao độ đáy dầm của đoạn hành lang (mm) — HỎI kỹ sư, không suy (M100 §6.3).</summary>
+    public double? CotDayDamMm { get; init; }
+
+    /// <summary>Cao độ trần của đoạn hành lang (mm) — HỎI kỹ sư, không suy.</summary>
+    public double? CotTranMm { get; init; }
+
+    /// <summary>Id hệ được phép đi qua hành lang; rỗng = mọi hệ (mặc định FR2).</summary>
+    public IReadOnlyList<string> HeChoPhep { get; init; } = [];
+
+    /// <summary>Sổ chiếm chỗ của hành lang — mỗi hệ chạy qua ghi thêm một bản ghi (FR3/FR9).</summary>
+    public IReadOnlyList<LanChiem> LanDaCap { get; init; } = [];
+
+    /// <summary>Tuyến do <c>XBOSS_VE_TUYENTUDONG</c> sinh (FR11) — chạy lại được phép dựng lại.</summary>
+    public bool TuDong { get; init; }
+
+    /// <summary>Mã phiên chạy đã sinh tuyến này — gỡ đúng chiếm chỗ của phiên đó khi chạy lại (FR13).</summary>
+    public string? PhienTuyen { get; init; }
+
+    /// <summary>Kỹ sư đã sửa hình học tuyến tự động (FR12) — chạy lại BỎ QUA, không đè công của người.</summary>
+    public bool SuaTay { get; init; }
 }
 
 /// <summary>
@@ -247,6 +291,15 @@ public static class VeXData
         if (tt.DaoTay) ra.Add("daotay=1");
         Them(ra, "tangnguon", tt.TangNguon);
         Them(ra, "nhantang", tt.NhanTang);
+        if (tt.BeRongMm is { } br) ra.Add($"berong={So(br)}");
+        if (tt.CotDayDamMm is { } cdd) ra.Add($"cotdaydam={So(cdd)}");
+        if (tt.CotTranMm is { } ct) ra.Add($"cottran={So(ct)}");
+        foreach (var h in tt.HeChoPhep) Them(ra, "hecho", h);
+        foreach (var l in tt.LanDaCap)
+            ra.Add($"lan={l.HeId}|{l.TierId}|{So(l.LanTuMm)}|{So(l.LanDenMm)}|{So(l.CaoDoMm)}");
+        if (tt.TuDong) ra.Add("tudong=1");
+        Them(ra, "phien", tt.PhienTuyen);
+        if (tt.SuaTay) ra.Add("suatay=1");
         return ra;
     }
 
@@ -267,8 +320,11 @@ public static class VeXData
         VaiTroVe.NhanDot => "nhandot",
         VaiTroVe.Revision => "revision",
         VaiTroVe.NgatNet => "ngatnet",
+        VaiTroVe.HanhLang => "hanhlang",
         _ => "blockdef",
     };
+
+    private static string So(double v) => v.ToString("0.######", CultureInfo.InvariantCulture);
 
     private static void Them(List<string> ra, string khoa, string? giaTri)
     {
@@ -299,6 +355,12 @@ public static class VeXData
         var bien = new List<string>();
         var nhan = new List<string>();
         var trongVung = new List<string>();
+        var heChoPhep = new List<string>();
+        var lanDaCap = new List<LanChiem>();
+        double? beRongMm = null, cotDayDamMm = null, cotTranMm = null;
+        string? phienTuyen = null;
+        var tuDong = false;
+        var suaTay = false;
 
         foreach (var dong in chuoi)
         {
@@ -325,6 +387,7 @@ public static class VeXData
                         "nhandot" => VaiTroVe.NhanDot,
                         "revision" => VaiTroVe.Revision,
                         "ngatnet" => VaiTroVe.NgatNet,
+                        "hanhlang" => VaiTroVe.HanhLang,
                         "blockdef" => VaiTroVe.DinhNghiaBlock,
                         _ => VaiTroVe.Tim,
                     };
@@ -384,6 +447,25 @@ public static class VeXData
                 case "daotay": daoTay = giaTri == "1"; break;
                 case "tangnguon": tangNguon = giaTri; break;
                 case "nhantang": nhanTang = giaTri; break;
+                case "berong":
+                    if (double.TryParse(giaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var br2))
+                        beRongMm = br2;
+                    break;
+                case "cotdaydam":
+                    if (double.TryParse(giaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var cdd2))
+                        cotDayDamMm = cdd2;
+                    break;
+                case "cottran":
+                    if (double.TryParse(giaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var ct2))
+                        cotTranMm = ct2;
+                    break;
+                case "hecho": heChoPhep.Add(giaTri); break;
+                case "lan":
+                    if (DocLanChiem(giaTri) is { } lan) lanDaCap.Add(lan);
+                    break;
+                case "tudong": tuDong = giaTri == "1"; break;
+                case "phien": phienTuyen = giaTri; break;
+                case "suatay": suaTay = giaTri == "1"; break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -425,6 +507,25 @@ public static class VeXData
             DaoTay = daoTay,
             TangNguon = tangNguon,
             NhanTang = nhanTang,
+            BeRongMm = beRongMm,
+            CotDayDamMm = cotDayDamMm,
+            CotTranMm = cotTranMm,
+            HeChoPhep = heChoPhep,
+            LanDaCap = lanDaCap,
+            TuDong = tuDong,
+            PhienTuyen = phienTuyen,
+            SuaTay = suaTay,
         };
+    }
+
+    /// <summary>Đọc một bản ghi chiếm chỗ <c>heId|tierId|tu|den|caodo</c>; null nếu dòng hỏng.</summary>
+    private static LanChiem? DocLanChiem(string giaTri)
+    {
+        var phan = giaTri.Split('|');
+        if (phan.Length != 5) return null;
+        if (!double.TryParse(phan[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var tu)) return null;
+        if (!double.TryParse(phan[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var den)) return null;
+        if (!double.TryParse(phan[4], NumberStyles.Float, CultureInfo.InvariantCulture, out var caoDo)) return null;
+        return new LanChiem(phan[0], phan[1], tu, den, caoDo);
     }
 }

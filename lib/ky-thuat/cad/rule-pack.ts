@@ -61,6 +61,11 @@ export const CURRENT_RULE_PACK_VERSION = RULE_PACK_HIEN_HANH.version;
  * (`kind=annotation`), định dạng số revision, mẫu tên attribute bảng revision trong khung tên, số
  * dòng tối đa, nới bao hình. Mở rộng thuần và `enabled: false` mặc định nên v14 cho kết quả y hệt
  * v9; 3 lệnh revision từ chối chạy tới khi công ty bật khóa này (M110 AC8).
+ * v15 = v14 + khối `drawTools.routingPolicy` cho bộ lệnh đi tuyến tự động theo đồ thị hành lang
+ * `XBOSS_VE_HANHLANG`/`XBOSS_VE_TUYENTUDONG` (M114 §6): layer hành lang, bán kính rẽ nhánh, 3 hệ
+ * số hàm chi phí (α co, β độ đông, γ gom trục), phân tầng theo hệ, khe hở làn và thứ tự chạy hệ.
+ * Mở rộng thuần và `enabled: false` mặc định nên v15 cho kết quả y hệt v14; 2 lệnh đi tuyến dừng
+ * kèm hướng dẫn bật tới khi công ty bật khóa này (M114 AC14).
  */
 export function getCurrentRulePack(): CadRulePack {
   return RULE_PACK_HIEN_HANH;
@@ -240,6 +245,116 @@ export function kiemCrossingPolicy(drawTools: {
     loi.push(
       "drawTools.crossingPolicy.layerSuffix trống trong khi enabled = true — " +
         "đối tượng ngắt nét sẽ rơi vào chính layer tim và lệnh xóa không lọc lại được.",
+    );
+  }
+  return loi;
+}
+
+/** Khối `drawTools.routingPolicy` (M114 §6) — chính sách đi tuyến tự động theo đồ thị hành lang. */
+export type RoutingPolicy = {
+  enabled: boolean;
+  corridorLayer: string;
+  /** Bán kính tối đa từ thiết bị tới hành lang gần nhất để rẽ nhánh (mm). */
+  snapRadiusMm: number;
+  cost: { elbowMm: number; congestionMm: number; reuseFactor: number };
+  /** Phân tầng theo hệ — id hệ theo `drawTools.systems[].id`, một hệ chỉ ở đúng một tier. */
+  tiers: readonly {
+    id: string;
+    name: string;
+    systems: readonly string[];
+    offsetFromBeamMm?: number;
+    offsetFromCeilingMm?: number;
+  }[];
+  laneGapMm: { default: number; elecToHot: number };
+  /** Thứ tự chạy mặc định giữa các hệ — id theo `drawTools.systems[].id`. */
+  systemOrder: readonly string[];
+};
+
+/**
+ * Kiểm khối `routingPolicy` — tầng TS của validator 2 tầng (M114 §6; tầng C# là
+ * `DrawToolsConfig.ValidateRoutingPolicy`). Trả danh sách lỗi tiếng Việt, rỗng = hợp lệ.
+ *
+ * Rule pack cũ (≤ v14) không có khóa này → không lỗi: 2 lệnh đi tuyến chỉ đơn giản không chạy
+ * được, đúng luật "khóa mới mặc định không đổi hành vi".
+ */
+export function kiemRoutingPolicy(drawTools: {
+  systems: readonly { id: string }[];
+  routingPolicy?: RoutingPolicy;
+}): string[] {
+  const rp = drawTools.routingPolicy;
+  if (!rp) return [];
+
+  const loi: string[] = [];
+  const heHopLe = new Set(drawTools.systems.map((s) => s.id));
+
+  if (!Number.isFinite(rp.snapRadiusMm) || rp.snapRadiusMm <= 0) {
+    loi.push(
+      `drawTools.routingPolicy.snapRadiusMm = ${rp.snapRadiusMm} phải là số dương — ` +
+        "bán kính ≤ 0 làm mọi thiết bị đều rơi vào danh sách không giải được.",
+    );
+  }
+
+  const { elbowMm, congestionMm, reuseFactor } = rp.cost;
+  if (!Number.isFinite(reuseFactor) || reuseFactor <= 0 || reuseFactor > 1) {
+    loi.push(
+      `drawTools.routingPolicy.cost.reuseFactor = ${reuseFactor} phải nằm trong khoảng (0; 1] — ` +
+        "> 1 là phạt (chống gom trục), ≤ 0 làm cạnh dùng lại thành miễn phí/âm giá.",
+    );
+  }
+  for (const [ten, giaTri] of [
+    ["elbowMm", elbowMm],
+    ["congestionMm", congestionMm],
+  ] as const) {
+    if (!Number.isFinite(giaTri) || giaTri < 0) {
+      loi.push(`drawTools.routingPolicy.cost.${ten} = ${giaTri} không được âm.`);
+    }
+  }
+
+  // Id hệ trong tiers/systemOrder phải có thật — khai lệch thì hệ đó lặng lẽ không được cấp tầng
+  // (hoặc không bao giờ tới lượt chạy), không ai biết.
+  const tierCuaHe = new Map<string, string>();
+  for (const tier of rp.tiers) {
+    for (const heId of tier.systems) {
+      if (!heHopLe.has(heId)) {
+        loi.push(
+          `drawTools.routingPolicy.tiers["${tier.id}"] chứa id hệ lạ "${heId}" — ` +
+            `phải là drawTools.systems[].id (hợp lệ: ${[...heHopLe].join(", ")}).`,
+        );
+        continue;
+      }
+      const daCo = tierCuaHe.get(heId);
+      if (daCo) {
+        loi.push(
+          `drawTools.routingPolicy: hệ "${heId}" nằm ở 2 tier ("${daCo}" và "${tier.id}") — ` +
+            "cấp tầng sẽ phụ thuộc thứ tự duyệt, hai tầng C#/TS trôi khỏi nhau.",
+        );
+      } else {
+        tierCuaHe.set(heId, tier.id);
+      }
+    }
+  }
+  for (const heId of rp.systemOrder) {
+    if (!heHopLe.has(heId)) {
+      loi.push(
+        `drawTools.routingPolicy.systemOrder chứa id hệ lạ "${heId}" — ` +
+          `phải là drawTools.systems[].id (hợp lệ: ${[...heHopLe].join(", ")}).`,
+      );
+    }
+  }
+
+  for (const [ten, giaTri] of [
+    ["default", rp.laneGapMm.default],
+    ["elecToHot", rp.laneGapMm.elecToHot],
+  ] as const) {
+    if (!Number.isFinite(giaTri) || giaTri <= 0) {
+      loi.push(`drawTools.routingPolicy.laneGapMm.${ten} = ${giaTri} phải là số dương.`);
+    }
+  }
+
+  if (rp.enabled && !rp.corridorLayer.trim()) {
+    loi.push(
+      "drawTools.routingPolicy.corridorLayer trống trong khi enabled = true — " +
+        "hành lang sẽ lẫn vào layer tuyến và lệnh đi tuyến không lọc lại được.",
     );
   }
   return loi;

@@ -1,6 +1,6 @@
 {
   "moTa": "SINH TỰ ĐỘNG bởi scripts/sinh-doi-chung-cad.ts — đừng sửa tay. Chạy `npm run cad:doi-chung` sau khi đổi quy tắc chuẩn hóa hoặc corpus.",
-  "rulePackVersion": "v14",
+  "rulePackVersion": "v15",
   "layers": {
     "0": "0",
     "01_M_ONG_GIO_CAP_CHINH": "M-DUCT-SUPP",
