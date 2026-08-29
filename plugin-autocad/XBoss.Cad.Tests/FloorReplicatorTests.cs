@@ -243,4 +243,63 @@ public class FloorReplicatorTests
 
         Assert.Contains("offsetZ", loi.Message, StringComparison.Ordinal);
     }
+
+    // ===== Ô CỐ ĐỊNH theo nhãn tầng (M111 PR2 — điều kiện của FR9/AC8) =====
+
+    [Fact]
+    public void O_dat_cua_mot_tang_khong_phu_thuoc_lan_nay_tick_bao_nhieu_tang()
+    {
+        var fp = ChinhSach();
+        var day = FloorReplicator.LapKeHoachDat(fp, "05", ["06", "07"]);
+        var riengTang07 = FloorReplicator.LapKeHoachDat(fp, "05", ["07"]);
+
+        // Chạy lại cho riêng tầng 07 (chép đè) phải đặt về ĐÚNG ô cũ, không nhảy về ô của tầng 06.
+        Assert.Equal(day[1].Doi, riengTang07[0].Doi);
+        Assert.Equal(day[1].ChiSo, riengTang07[0].ChiSo);
+        Assert.NotEqual(day[0].Doi, day[1].Doi);
+    }
+
+    [Fact]
+    public void Tang_nguon_giu_o_so_0_nen_khong_o_nao_de_len_no()
+    {
+        var fp = ChinhSach();
+        var keHoach = FloorReplicator.LapKeHoachDat(fp, "05", ["06", "07"]);
+
+        Assert.All(keHoach, k => Assert.NotEqual(new Diem2(0, 0), k.Doi));
+        Assert.Equal(new Diem2(0, 30000), keHoach[0].Doi); // 06 là tầng đầu tiên sau khi bỏ 05
+        Assert.Equal(new Diem2(0, 60000), keHoach[1].Doi);
+    }
+
+    [Fact]
+    public void Nhan_tang_ngoai_danh_muc_duoc_xep_sau_moi_o_da_khai()
+    {
+        var fp = ChinhSach();
+        var keHoach = FloorReplicator.LapKeHoachDat(fp, "05", ["06", "TUM"]);
+
+        Assert.NotEqual(keHoach[0].Doi, keHoach[1].Doi);
+        Assert.True(keHoach[1].ChiSo >= fp.Floors.Count);
+    }
+
+    // ===== Áp lựa chọn của kỹ sư lên chính sách (FR2) =====
+
+    [Fact]
+    public void VoiKieuDat_chi_doi_kieu_va_buoc_giu_nguyen_phan_hop_dong()
+    {
+        var fp = ChinhSach();
+        var moi = FloorReplicator.VoiKieuDat(fp, KieuDatTang.Luoi, 12000);
+
+        Assert.Equal("luoi", moi.LayoutMode);
+        Assert.Equal(12000, moi.StepMm);
+        Assert.Equal(fp.CopyRoles, moi.CopyRoles);
+        Assert.Equal(fp.ZoneNamePattern, moi.ZoneNamePattern);
+        Assert.Equal(fp.Floors, moi.Floors);
+        Assert.Equal(fp.GridColumns, moi.GridColumns);
+    }
+
+    [Fact]
+    public void MaKieuDat_va_DocKieuDat_la_hai_chieu_cua_cung_mot_bang()
+    {
+        foreach (var kieu in Enum.GetValues<KieuDatTang>())
+            Assert.Equal(kieu, FloorReplicator.DocKieuDat(FloorReplicator.MaKieuDat(kieu)));
+    }
 }

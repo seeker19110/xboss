@@ -82,6 +82,19 @@ public sealed record VeSizeCustom
     [JsonPropertyName("soTuyen")] public required int SoTuyen { get; init; }
 }
 
+/// <summary>
+/// Một cụm bản chép do <c>XBOSS_VE_NHANTANG</c> sinh ra (M111 FR10), gộp theo cặp
+/// (tầng nguồn → tầng chép). Đọc từ XData <c>TangNguon</c>/<c>NhanTang</c> của chính bản vẽ nên
+/// mở lại bản vẽ ở máy khác vẫn dựng lại được — đúng nguyên tắc nguồn dữ liệu của báo cáo phiên vẽ.
+/// Các con số của TỪNG LẦN CHẠY (handle bị gỡ, tag không đổi được) nằm ở <see cref="VeSessionReport.NhatKy"/>.
+/// </summary>
+public sealed record VeNhanTangCum
+{
+    [JsonPropertyName("tangNguon")] public required string TangNguon { get; init; }
+    [JsonPropertyName("nhanTang")] public required string NhanTang { get; init; }
+    [JsonPropertyName("soDoiTuong")] public required int SoDoiTuong { get; init; }
+}
+
 /// <summary>Số đối tượng mang một version rule pack/thư viện khác bản đang dùng.</summary>
 public sealed record VeVersionKhac
 {
@@ -118,6 +131,13 @@ public sealed class VeSessionReport
     [JsonPropertyName("soBangThongKe")] public int SoBangThongKe { get; init; }
     [JsonPropertyName("rulePackKhac")] public required IReadOnlyList<VeVersionKhac> RulePackKhac { get; init; }
     [JsonPropertyName("thuVienKhac")] public required IReadOnlyList<VeVersionKhac> ThuVienKhac { get; init; }
+    /// <summary>
+    /// Mục nhân bản tầng (M111 FR10): mỗi cặp tầng nguồn → tầng chép và số đối tượng của nó.
+    /// KHÔNG khai <c>required</c> để báo cáo dựng bằng mã cũ vẫn biên dịch được — bản vẽ chưa
+    /// nhân bản tầng nào thì danh sách rỗng.
+    /// </summary>
+    [JsonPropertyName("nhanTang")] public IReadOnlyList<VeNhanTangCum> NhanTang { get; init; } = [];
+
     /// <summary>Nhật ký tương tác của phiên: đụng độ định nghĩa block và lựa chọn của kỹ sư (AC7).</summary>
     [JsonPropertyName("nhatKy")] public required IReadOnlyList<string> NhatKy { get; init; }
     [JsonPropertyName("canhBao")] public required IReadOnlyList<string> CanhBao { get; init; }
@@ -147,6 +167,7 @@ public sealed class VeSessionReport
         var sizeCustom = new Dictionary<(string He, string Item, string Size), int>();
         var chiaDot = new Dictionary<(string He, string Item, string Size, string Kieu, bool GhiDe), VeChiaDotTuyen>();
         var chuaChia = new Dictionary<(string He, string Item, string Size), int>();
+        var nhanTang = new Dictionary<(string Nguon, string Dich), int>();
         var rulePackKhac = new Dictionary<string, int>(StringComparer.Ordinal);
         var thuVienKhac = new Dictionary<string, int>(StringComparer.Ordinal);
         var soDinhNghia = 0;
@@ -168,6 +189,13 @@ public sealed class VeSessionReport
                     var he = string.IsNullOrWhiteSpace(xd.HeId) ? "(không rõ hệ)" : xd.HeId;
                     theoHe[he] = Cong(theoHe.GetValueOrDefault(he) ?? new VeThongKeHe { HeId = he }, xd.VaiTro);
                     break;
+            }
+
+            // Dấu bản chép (M111): chỉ đối tượng do XBOSS_VE_NHANTANG sinh ra mới có đủ 2 khóa này.
+            if (!string.IsNullOrWhiteSpace(xd.TangNguon) && !string.IsNullOrWhiteSpace(xd.NhanTang))
+            {
+                var khoaTang = (xd.TangNguon!, xd.NhanTang!);
+                nhanTang[khoaTang] = nhanTang.GetValueOrDefault(khoaTang) + 1;
             }
 
             if (xd.SizeTuNhap && !string.IsNullOrWhiteSpace(xd.Size) && xd.VaiTro == VaiTroVe.Tim)
@@ -222,6 +250,17 @@ public sealed class VeSessionReport
             .OrderBy(c => c.HeId, StringComparer.Ordinal)
             .ThenBy(c => c.ItemId, StringComparer.Ordinal)
             .ThenBy(c => c.Size, StringComparer.Ordinal)
+            .ToList();
+
+        var dsNhanTang = nhanTang
+            .Select(kv => new VeNhanTangCum
+            {
+                TangNguon = kv.Key.Nguon,
+                NhanTang = kv.Key.Dich,
+                SoDoiTuong = kv.Value,
+            })
+            .OrderBy(c => c.TangNguon, StringComparer.Ordinal)
+            .ThenBy(c => c.NhanTang, StringComparer.Ordinal)
             .ToList();
 
         var canhBao = new List<string>();
@@ -283,6 +322,7 @@ public sealed class VeSessionReport
                 .Select(k => new VeVersionKhac { Version = k.Key, SoDoiTuong = k.Value }).ToList(),
             ThuVienKhac = thuVienKhac.OrderBy(k => k.Key, StringComparer.Ordinal)
                 .Select(k => new VeVersionKhac { Version = k.Key, SoDoiTuong = k.Value }).ToList(),
+            NhanTang = dsNhanTang,
             NhatKy = nhatKy is null ? [] : [.. nhatKy],
             CanhBao = canhBao,
         };
@@ -380,6 +420,12 @@ public sealed class VeSessionReport
                 "jointRules nên lệnh bỏ qua — lý do từng lần xem nhật ký phiên):");
             foreach (var c in ChiaDotBoQua)
                 sb.AppendLine($"  - {c.HeId}/{c.ItemId} {c.Size}: {c.SoTuyen} tuyến");
+        }
+        if (NhanTang.Count > 0)
+        {
+            sb.AppendLine("Nhân bản tầng (XBOSS_VE_NHANTANG) — đọc từ dấu bản chép trong bản vẽ:");
+            foreach (var c in NhanTang)
+                sb.AppendLine($"  - tầng {c.TangNguon} → tầng {c.NhanTang}: {c.SoDoiTuong} đối tượng");
         }
         if (NhatKy.Count > 0)
         {

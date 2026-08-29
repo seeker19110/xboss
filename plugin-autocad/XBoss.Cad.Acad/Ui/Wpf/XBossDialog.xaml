@@ -787,6 +787,97 @@
       </StackPanel>
     </DataTemplate>
 
+    <!-- XBOSS_VE_NHANTANG (M111 FR2/FR3): khai tầng nguồn + tick tầng đích + kiểu dời, và BẢNG XEM
+         TRƯỚC BẮT BUỘC (guardrail M111 §2.4 — chép 20 tầng sai là hỏng cả buổi làm việc). Mọi con
+         số dưới đây do chính FloorReplicator tính, đúng bộ hàm mà lệnh dùng lúc ghi. -->
+    <DataTemplate DataType="{x:Type vm:NhanTangDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Vùng chọn (tầng điển hình)" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <StackPanel>
+            <TextBlock Text="{Binding MoTaVungChon}" TextWrapping="Wrap" Margin="0,0,0,3" />
+            <ItemsControl ItemsSource="{Binding DongBoQua}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3" Opacity="0.85" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Style="{StaticResource NutPhu}"
+                    Content="Zoom tới vùng nguồn"
+                    HorizontalAlignment="Left"
+                    Margin="0,6,0,0"
+                    Click="BamZoomNguon"
+                    Visibility="{Binding CoNutZoom, Converter={StaticResource CoThiHien}}" />
+            <TextBlock Style="{StaticResource GhiChu}" Text="{Binding ThongBaoZoom}" />
+          </StackPanel>
+        </Border>
+
+        <TextBlock Style="{StaticResource Nhan}"
+                   Text="Tầng NGUỒN (nhãn {floor} hiện tại — chuỗi, giữ số 0 đứng đầu)" />
+        <TextBox Text="{Binding TangNguon, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Tầng ĐÍCH (khai trong rule pack)" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding CacTangDich}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <CheckBox IsChecked="{Binding Chon, Mode=TwoWay}" Content="{Binding Nhan}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Kiểu dời bản chép" />
+        <ComboBox ItemsSource="{Binding CacKieuDat}"
+                  SelectedItem="{Binding MucKieuDatChon, Mode=TwoWay}"
+                  DisplayMemberPath="Nhan" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Bước dời giữa 2 tầng liền nhau (mm)" />
+        <TextBox Text="{Binding StepMm, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <StackPanel Visibility="{Binding CoTangDaChep, Converter={StaticResource CoThiHien}}">
+          <CheckBox Margin="0,10,0,0"
+                    IsChecked="{Binding ChepDe, Mode=TwoWay}"
+                    Content="Chép đè tầng đã có bản chép (xóa bản cũ của đúng tầng đó rồi chép lại)" />
+          <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaChepDe}" />
+        </StackPanel>
+
+        <TextBlock Style="{StaticResource Nhan}"
+                   Text="Xem trước (lệnh sẽ ghi đúng những gì liệt kê ở đây)" />
+        <TextBlock Foreground="{x:Static wpf:MauBangWpf.Chu}" Text="{Binding TomTatXemTruoc}"
+                   TextWrapping="Wrap" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="170" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding DongXemTruoc}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+
+        <StackPanel Visibility="{Binding CoVung, Converter={StaticResource CoThiHien}}">
+          <TextBlock Style="{StaticResource Nhan}" Text="Tên vùng bóc của bản chép" />
+          <Border Style="{StaticResource KhoiChiDoc}">
+            <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
+              <ItemsControl ItemsSource="{Binding DongVung}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Border>
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+
     <!-- ===== M106 PR3 — các lệnh còn lại của bảng §7.2 ===== -->
 
     <!-- XBOSS_LOGIN: chỉ hỏi địa chỉ server (device pairing, không có email/mật khẩu). -->
