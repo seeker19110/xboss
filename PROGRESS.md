@@ -23,6 +23,38 @@ Nhánh `feat/m113-pr1-schema-rls`. PR **1/4** của `docs/nang-cap/M113-thu-vien
 (`DROP CONSTRAINT` + `CREATE UNIQUE INDEX`) ⇒ phải chạy `bash deploy.sh --staging` trước, verify
 `SELECT version, count(*) FROM cad_block_libs GROUP BY 1 HAVING count(*) > 1` trả 0 dòng.
 
+## M111 PR1/3 — Nhân bản tầng điển hình: rule pack v12 + Core `FloorReplicator` (2026-08-29)
+
+Nhánh `feat/m111-pr1-floor-replicator-core`. **Mới là PR1/3 của M111** (`docs/nang-cap/M111-nhan-ban-tang-dien-hinh.md`
+§9) — phần logic THUẦN, chưa có lệnh nào chạy được trong AutoCAD.
+
+**Đã làm:**
+
+- `lib/ky-thuat/cad/rule-packs/v12.json` = v9 + khối `drawTools.floorPolicy` (§4: `floors`,
+  `layoutMode`, `stepMm`, `gridColumns`, `zoneNamePattern`, `copyRoles`). Mở rộng **thuần** (mọi khóa
+  cũ giữ nguyên từng byte — có test so tệp) và `enabled: false` nên v12 cho kết quả y hệt v9 (AC12).
+  Số v12 do các nhánh song song đã giữ chỗ v10/v11.
+- **Validator 2 tầng**: TS `kiemFloorPolicy` (`lib/ky-thuat/cad/rule-pack.ts`) và C#
+  `FloorReplicator.Validate` gọi từ `DrawToolsConfig.Validate` — bắt: `floors` rỗng/trùng, `stepMm`
+  ≤ 0, `zoneNamePattern` thiếu `{floor}`, `copyRoles` có vai trò không có thật trong `VaiTroVe`
+  (kèm `layoutMode` lạ, `gridColumns` ≤ 0 khi xếp lưới).
+- Core `plugin-autocad/XBoss.Cad.Core/Draw/FloorReplicator.cs`: vị trí đặt từng tầng (offsetX/offsetY/
+  lưới), đổi tag `{floor}` qua `TagSchedule` (tag lệch mẫu → giữ nguyên + cảnh báo), đổi tên vùng bóc
+  (trùng tên → báo để lệnh DỪNG, không tự thêm hậu tố), và **kế hoạch ánh xạ handle**: handle trong
+  bảng `IdMapping` thì thay, ngoài tập chọn thì **gỡ hẳn** (guardrail §2.2 — không handle mồ côi).
+- XData `VeXData`: thêm `TangNguon` + `NhanTang` (dấu nhận diện bản chép cho FR9 idempotent).
+- Test: `FloorReplicatorTests.cs` + `RulePackV12Tests.cs` (xunit) + 3 ca trong
+  `tests/engineering-cad-rule-pack.test.ts`; đối chứng 2 tầng sinh lại (`npm run cad:doi-chung`) —
+  chỉ đổi đúng dòng version, chứng minh v12 không đụng quy tắc chuẩn hóa.
+
+**Chưa làm (đúng phạm vi PR1):** PR2 — Adapter `VeNhanTangCommands` (`DeepCloneObjects` + `IdMapping`,
+hộp thoại + xem trước FR3, FR8/FR9, nguyên tử NFR2), **rủi ro cao nhất cả bộ plugin**; PR3 — phép kiểm
+handle mồ côi tự động trong `XBOSS_KIEMTRA` (AC3) + tài liệu + mục verify tay. Ca đối chứng riêng cho
+`floorPolicy` trong `plugin-autocad/doi-chung/` chưa thêm (corpus hiện chỉ chở layer/font).
+
+**Chưa build/test .NET cục bộ** — máy không có .NET SDK; `dotnet test` chờ CI. TS: `npm run lint`,
+`npm run typecheck`, `npm test` xanh.
+
 ## ✅ Duyệt trọn gói 6 đặc tả M109–M114 (2026-08-29)
 
 Người dùng: **"duyệt tất cả"**. Nhánh `claude/duyet-dac-ta-m109-m114`. Cả 6 tệp chuyển

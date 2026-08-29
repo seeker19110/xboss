@@ -30,6 +30,12 @@ public sealed class DrawToolsSection
     /// </summary>
     [JsonPropertyName("heavyFittingIds")] public IReadOnlyList<string> HeavyFittingIds { get; init; } = [];
 
+    /// <summary>
+    /// Tham số nhân bản tầng điển hình (M111 §4, rule pack v12 trở đi). null = rule pack cũ chưa
+    /// khai ⇒ <c>XBOSS_VE_NHANTANG</c> từ chối chạy kèm thông báo, không đoán mặc định ngầm.
+    /// </summary>
+    [JsonPropertyName("floorPolicy")] public FloorPolicySection? FloorPolicy { get; init; }
+
     /// <summary>Rule pack có khai (dù rỗng) danh sách phụ kiện nặng chưa — phân biệt "khai rỗng
     /// = không phụ kiện nào nặng" với "chưa khai = phải hỏi kỹ sư".</summary>
     [JsonIgnore] public bool CoKhaiPhuKienNang => HeavyFittingIds.Count > 0;
@@ -307,7 +313,11 @@ public static class DrawToolsConfig
             }
         }
 
-        // (f) titleblockId khai thì phải khác rỗng (khai nửa vời = XBOSS_VE_TRANGIN chèn khung tên rỗng).
+        // (f) khối nhân bản tầng (v12) khai rồi thì phải hợp lệ — kiểm cả khi đang TẮT, để bật lên
+        // là dùng được ngay (cùng quy ước các khối chính sách v5–v9).
+        if (drawTools.FloorPolicy is { } floorPolicy) FloorReplicator.Validate(floorPolicy);
+
+        // (g) titleblockId khai thì phải khác rỗng (khai nửa vời = XBOSS_VE_TRANGIN chèn khung tên rỗng).
         if (sheetSetup.TitleblockId is { } tb && string.IsNullOrWhiteSpace(tb))
             throw new RulePackException("sheetSetup.titleblockId khai rồi nhưng để rỗng.");
     }
