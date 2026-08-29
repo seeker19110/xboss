@@ -36,6 +36,22 @@ lệnh nào mới**: mới là dữ liệu + hàm thuần, test trên CI Linux.
 
 **Không migration, không API mới, không đụng `app/`** (M114 §9).
 
+## ✅ M113 PR3/4 — Web: 2 khối + chip nguồn (2026-08-29)
+
+Nhánh `feat/m113-pr3-web-ui`. PR **3/4** của `docs/nang-cap/M113-thu-vien-block-theo-du-an.md`
+(PR4 plugin — **chưa làm**).
+
+- `app/engineering/chuan-hoa-ban-ve/components/ThuVienBlockPanel.tsx` — mục "Danh Sách Block" mới:
+  2 khối **Toàn Cục** / **Của Dự Án Này**, mỗi entry hiện chip nguồn (`Toàn cục`/`Dự án`, dùng
+  `Chip`/`Card`/`Section` của `app/components/ui/` — ADR-0009) đọc thẳng manifest **đã trộn** của
+  `GET /api/engineering/cad/block-lib?manifest=1[&project=]` (PR2), không thêm route mới. Dự án
+  hiện tại tính giống `ProjectSwitcher` (cookie `xboss_project` hợp lệ, else dự án đầu trong
+  `/api/projects`) để khớp badge dự án trên header thay vì lệch nhau khi chưa từng chọn dự án.
+- `e2e/authed/chuan-hoa-ban-ve.spec.ts` — thêm ca kiểm 2 khối render; ca axe sẵn có của trang phủ
+  luôn nội dung mới (đã chạy thật trên Postgres ephemeral: 10/10 pass, axe sạch kể cả khi có dữ
+  liệu block-lib thật — publish thử bộ toàn cục + bộ dự án đè `titleblock-a1`, xác nhận khối "Của
+  Dự Án Này" hiện đúng 1 block với chip "Dự án", khối "Toàn Cục" không lặp id đã bị đè, khớp AC2).
+
 ## ✅ M111 PR3/3 — Phép kiểm handle mồ côi (AC3) trong `XBOSS_KIEMTRA` + tài liệu (2026-08-29)
 
 Nhánh `feat/m111-pr3-kiemtra-moico`, tiếp trên PR2. **M111 CODE XONG cả 3 PR** — vẫn còn nợ verify

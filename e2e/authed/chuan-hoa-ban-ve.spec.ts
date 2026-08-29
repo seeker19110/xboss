@@ -82,10 +82,22 @@ test.describe("Chuẩn hóa bản vẽ CAD 2D (sau đăng nhập)", () => {
     // Môi trường e2e không khai XBOSS_PLUGIN_URL → khối "Gói Cài Plugin" hiện hướng dẫn thay vì
     // nút tải, kèm lối sang trang hướng dẫn cài đặt ngay trong đoạn văn.
     await expect(page.getByText("Gói Cài Plugin (AutoCAD 2026)")).toBeVisible();
-    await expect(page.getByText("Quản trị chưa khai đường tải gói cài", { exact: false })).toBeVisible();
+    await expect(
+      page.getByText("Quản trị chưa khai đường tải gói cài", { exact: false }),
+    ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Quản lý thiết bị và token AutoCAD" }),
     ).toHaveAttribute("href", "/engineering/thiet-bi-cad");
+  });
+
+  // M113 PR3 — mục "Danh Sách Block" của Thư Viện Block: 2 khối (Toàn cục / Của Dự Án Này),
+  // mỗi entry có chip nguồn (đọc thẳng manifest trộn của GET ?manifest=1[&project=] — PR2).
+  test("thư viện block — hiện 2 khối Toàn Cục / Của Dự Án Này", async ({ page }) => {
+    await gotoChuanHoa(page);
+
+    await expect(page.getByText("Danh Sách Block")).toBeVisible();
+    await expect(page.getByText(/Toàn Cục \(/)).toBeVisible();
+    await expect(page.getByText(/Của Dự Án Này \(/)).toBeVisible();
   });
 
   test("mở trang Hướng Dẫn Cài Đặt Plugin từ bảng điều khiển", async ({ page }) => {
