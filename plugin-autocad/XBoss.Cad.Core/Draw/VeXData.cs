@@ -138,6 +138,16 @@ public sealed record VeXDataInfo
 
     /// <summary>Số thứ tự đốt trong tuyến (trên tag đốt, và đốt ĐỨNG TRƯỚC trên vạch chia).</summary>
     public int? ChiSoDot { get; init; }
+
+    // ===== Nhân bản tầng điển hình (M111 FR9) =====
+    // Hai khóa dưới đây CHỈ có trên bản chép do XBOSS_VE_NHANTANG sinh ra — dấu nhận diện để chạy
+    // lại lệnh biết tầng đích đã chép rồi (bỏ qua / chép đè), và để báo cáo truy được nguồn gốc.
+
+    /// <summary>Nhãn tầng NGUỒN đã chép ra đối tượng này; null = không phải bản chép.</summary>
+    public string? TangNguon { get; init; }
+
+    /// <summary>Nhãn tầng của chính bản chép này (tầng đích).</summary>
+    public string? NhanTang { get; init; }
 }
 
 /// <summary>
@@ -192,6 +202,8 @@ public static class VeXData
         if (tt.TongDaiDotMm is { } td)
             ra.Add($"tongdaidot={td.ToString("0.######", CultureInfo.InvariantCulture)}");
         if (tt.ChiSoDot is { } cs) ra.Add($"chisodot={cs.ToString(CultureInfo.InvariantCulture)}");
+        Them(ra, "tangnguon", tt.TangNguon);
+        Them(ra, "nhantang", tt.NhanTang);
         return ra;
     }
 
@@ -230,6 +242,7 @@ public static class VeXData
         string? sizeLoCho = null, ketCau = null, viTriTruc = null, loaiBang = null;
         double? caoDo = null, caoDoMm = null;
         string? kieuNoi = null;
+        string? tangNguon = null, nhanTang = null;
         var kieuNoiGhiDe = false;
         int? soDot = null, soMoiNoi = null, chiSoDot = null;
         double? tongDaiDotMm = null;
@@ -309,6 +322,8 @@ public static class VeXData
                     if (int.TryParse(giaTri, NumberStyles.Integer, CultureInfo.InvariantCulture, out var cs))
                         chiSoDot = cs;
                     break;
+                case "tangnguon": tangNguon = giaTri; break;
+                case "nhantang": nhanTang = giaTri; break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -343,6 +358,8 @@ public static class VeXData
             SoMoiNoi = soMoiNoi,
             TongDaiDotMm = tongDaiDotMm,
             ChiSoDot = chiSoDot,
+            TangNguon = tangNguon,
+            NhanTang = nhanTang,
         };
     }
 }
