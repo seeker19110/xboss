@@ -4,6 +4,41 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## 🚧 M114 PR2/4 — `CapPhatLanTang` (cấp tầng/làn) + đối chứng 2 tầng (2026-08-29)
+
+Nhánh `feat/m114-pr2-capphat-doichung`. PR **2/4** của
+`docs/nang-cap/M114-auto-routing-hanh-lang.md` (PR3 Adapter `XBOSS_VE_HANHLANG`, PR4 Adapter
+`XBOSS_VE_TUYENTUDONG` — **chưa làm**). Vẫn chưa có lệnh plugin mới: thêm hàm thuần + bộ đối chứng.
+
+- `XBoss.Cad.Core/Routing/CapPhatLanTang.cs` (mới) — cấp tầng theo `routingPolicy.tiers` và làn còn
+  trống trong hành lang theo `lanDaCap` + `laneGapMm` (FR9). Làn đo từ **mép trái** hành lang, làn
+  đầu của mỗi tầng bắt đầu ở `laneGapMm.default`, khe hở giữa 2 làn kề dùng `laneGapMm.elecToHot`
+  khi một trong hai là hệ điện; tầng sát trần lấy cao độ `trần + offsetFromCeilingMm` và đặt giữa
+  hành lang. Hết bề rộng → **báo hết làn nêu đúng hành lang + hệ đang chiếm** (AC7), sổ chiếm chỗ
+  không bị bẩn (NFR3); `GoChiemCho()` gỡ chiếm chỗ cũ trước khi dựng lại (FR13/AC9).
+- `plugin-autocad/doi-chung/routing-doi-chung.json` (mới) — 5 ca cấp tầng/làn: đầu vào viết tay,
+  phần `mongDoi` **sinh từ tầng 3** (`planMultiTierCorridor`) bằng `npm run cad:doi-chung`, nên đổi
+  thuật toán là hiện rõ trong diff. `scripts/sinh-doi-chung-cad.ts` sinh/kiểm thêm tệp này
+  (`--kiem` của CI phủ luôn).
+- Test đối chứng 2 tầng đọc chung một tệp: `tests/cad-routing-doi-chung.test.ts` (tầng 3) và
+  `XBoss.Cad.Tests/RoutingDoiChungTests.cs` (tầng 2 — `CapPhatLanTang` phải ra **cùng** tầng + cao
+  độ + làn). Thêm `CapPhatLanTangTests.cs`: khe hở mặc định/`elecToHot`, đọc `lanDaCap` của hệ chạy
+  trước, tầng sát trần, hết làn, hệ không có tier, gỡ chiếm chỗ rồi cấp lại.
+
+**Lệch đặc tả đã ghi nhận (để PR4 chốt, không tự quyết ở PR2):**
+
+- Rule pack **không có cờ "hệ điện"**, trong khi `laneGapMm.elecToHot` cần biết làn nào là hệ điện.
+  Core nhận tập hệ điện **qua tham số** (bộ đối chứng khai tường minh `heDien`), không đoán hộ bằng
+  tên tier.
+- AC6/AC7 hàm ý một **ngân sách bề rộng dùng chung cả hành lang** (ELEC cách HVAC ≥ `elecToHot`;
+  hành lang 600 mm kín làn sau ~2 hệ), còn §10 lại đòi **khớp từng làn với `planMultiTierCorridor`**
+  — mà bản TS dùng con trỏ làn **riêng cho từng tầng** (2 tầng khác nhau đều bắt đầu ở 100). PR2 giữ
+  đúng §10 (đối chứng 2 tầng là deliverable của PR2); phần AC6/AC7 ở mức DWG cần chốt lại lúc làm
+  PR4.
+
+**Nợ kỹ thuật:** verify tay trên AutoCAD 2026 (AC1/AC3/AC6/AC8/AC10–AC13, `VERIFY-VA-PHAT-HANH.md`)
+chưa làm — chờ có lệnh thật ở PR3/PR4.
+
 ## 🚧 M114 PR1/4 — rule pack v15 `routingPolicy` + đồ thị hành lang & định tuyến (Core) (2026-08-29)
 
 Nhánh `feat/m114-pr1-hanhlang-graph-core`. PR **1/4** của
