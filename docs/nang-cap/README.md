@@ -131,7 +131,7 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > `crossingPolicy.priority` + đảo tay từng điểm nhớ trong XData. Dùng lại đúng bộ dò giao cắt của
 > phép kiểm 11 (M101). **Bất biến số 1: polyline tim không bao giờ bị cắt/chia/đổi tọa độ** —
 > `XBOSS_BOCKL` phải ra đúng con số như trước (AC2). Rule pack +1 version, không migration. 2 PR.
-> **Trạng thái: PR1/2 đã code** (rule pack v10 `crossingPolicy` + validator 2 tầng +
+> **Trạng thái: PR1/2 đã code** (rule pack v13 `crossingPolicy` + validator 2 tầng +
 > `CrossingGeometry` + `VaiTroVe.NgatNet` + test Core); **PR2 (Adapter, hộp thoại, báo cáo) chưa làm.**
 >
 > **M110 (`M110-revision-cloud.md`)** — `XBOSS_VE_REV` / `_CHOT` / `_HIENTHI`: cloud + tam giác
@@ -141,12 +141,16 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > ở layer con `-R{n}`. **Chỉ CAD — không đụng server/web/`drawing_revisions`** (chốt 2026-08-28).
 > Rule pack +1, không migration. 2 PR.
 >
-> **M111 (`M111-nhan-ban-tang-dien-hinh.md`)** — `XBOSS_VE_NHANTANG`: chép hệ của tầng điển hình sang
-> N tầng. Việc mà `COPY` của AutoCAD **không** làm được: ánh xạ lại toàn bộ handle trong XData sang
-> đối tượng của chính bản chép (`DeepCloneObjects` + `IdMapping`), đổi tag `{floor}`, đổi tên vùng
-> bóc, gỡ dấu bóc. Xem trước **bắt buộc**, nguyên tử (lỗi giữa chừng → không ghi tầng nào), AC3
-> "không handle mồ côi" kiểm **tự động**. Đây là lệnh rủi ro cao nhất của cả bộ plugin — verify tay
-> phải làm trên bản vẽ AVIO thật. Rule pack +1, không migration. 3 PR (PR2 `route: complex`).
+> **M111 (`M111-nhan-ban-tang-dien-hinh.md`)** — ⏳ **PR1/3 XONG** (rule pack v12 `drawTools.floorPolicy`
+>
+> - validator 2 tầng + Core `FloorReplicator` + XData `TangNguon`/`NhanTang` + test); PR2 (Adapter
+>   `DeepCloneObjects`, xem trước, nguyên tử — `route: complex`, rủi ro cao nhất) và PR3 (phép kiểm
+>   handle mồ côi + tài liệu + verify tay) CHƯA làm. `XBOSS_VE_NHANTANG`: chép hệ của tầng điển hình sang
+>   N tầng. Việc mà `COPY` của AutoCAD **không** làm được: ánh xạ lại toàn bộ handle trong XData sang
+>   đối tượng của chính bản chép (`DeepCloneObjects` + `IdMapping`), đổi tag `{floor}`, đổi tên vùng
+>   bóc, gỡ dấu bóc. Xem trước **bắt buộc**, nguyên tử (lỗi giữa chừng → không ghi tầng nào), AC3
+>   "không handle mồ côi" kiểm **tự động**. Đây là lệnh rủi ro cao nhất của cả bộ plugin — verify tay
+>   phải làm trên bản vẽ AVIO thật. Rule pack +1, không migration. 3 PR (PR2 `route: complex`).
 >
 > **M112 (`M112-so-do-dung-riser.md`)** — `XBOSS_VE_TRUCDUNG` + `XBOSS_VE_RISER`: kỹ sư đánh dấu điểm
 > trục đứng trên từng mặt bằng (XData vai trò `TrucDung` = "dữ liệu liên tầng có cấu trúc" mà M100 §20

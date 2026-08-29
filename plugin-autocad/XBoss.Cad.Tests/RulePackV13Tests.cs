@@ -6,11 +6,11 @@ using Xunit;
 namespace XBoss.Cad.Tests;
 
 /// <summary>
-/// M109 §5 — khối <c>drawTools.crossingPolicy</c> của rule pack v10: bản phát hành khai đủ nhưng
+/// M109 §5 — khối <c>drawTools.crossingPolicy</c> của rule pack v13: bản phát hành khai đủ nhưng
 /// TẮT (AC8), và validator chặn đủ 3 lớp lỗi khai báo ngay lúc nạp (đi qua đường
 /// <see cref="DrawToolsConfig.Load"/> thật, không chỉ gọi thẳng hàm kiểm).
 /// </summary>
-public class RulePackV10Tests
+public class RulePackV13Tests
 {
     private static string JsonHienHanh() => File.ReadAllText(RepoPaths.RulePackPath);
 

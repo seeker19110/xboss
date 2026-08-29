@@ -1,6 +1,6 @@
 {
-  "version": "v10",
-  "description": "Rule pack v10 = v9 + khối `drawTools.crossingPolicy` — chính sách NGẮT NÉT GIAO CHÉO của lệnh XBOSS_VE_NGATNET (M109 §5): hạng ưu tiên trình bày giữa các hệ, bề rộng vùng che, bán kính cầu vượt, hậu tố layer đối tượng ngắt nét và ngưỡng góc giao. Mở rộng THUẦN: không khóa cũ nào đổi một byte, mọi lệnh M99/M100/M101/M102/M105 chạy với v10 cho kết quả Y HỆT v9; khóa mới mặc định `enabled: false` nên nạp v10 KHÔNG đổi hành vi trên máy kỹ sư. Đổi quy tắc = phát hành version mới, KHÔNG sửa version cũ.",
+  "version": "v13",
+  "description": "Rule pack v13 = v12 + khối `drawTools.crossingPolicy` — chính sách NGẮT NÉT GIAO CHÉO của lệnh XBOSS_VE_NGATNET (M109 §5): hạng ưu tiên trình bày giữa các hệ, bề rộng vùng che, bán kính cầu vượt, hậu tố layer đối tượng ngắt nét và ngưỡng góc giao. Gộp đủ cả hai khối mới của đợt plugin giai đoạn 3: `floorPolicy` (M111, phát hành ở v12) và `crossingPolicy` (M109). Mở rộng THUẦN: không khóa cũ nào đổi một byte, mọi lệnh M99/M100/M101/M102/M105 chạy với v13 cho kết quả Y HỆT v9; cả hai khóa mới mặc định `enabled: false` nên nạp v13 KHÔNG đổi hành vi trên máy kỹ sư. Đổi quy tắc = phát hành version mới, KHÔNG sửa version cũ.",
   "layerMap": {
     "source": "lib/cad/dxf-parser.ts :: normalizeCadLayers()",
     "standard": "AIA / BS1192 / ISO 13567",
@@ -1370,7 +1370,28 @@
         "equipment": []
       }
     ],
-    "jointRulesNote": "v9 (M105 §7/§12) — mỗi tuyến khai thêm khối `jointRules`: bảng THAM SỐ chia đốt chế tạo/lắp đặt theo kiểu kết nối, dùng chung cho lệnh XBOSS_VE_CHIADOT (plugin) và engine web lib/ky-thuat/engineering-joint-segmentation.ts. Ý nghĩa từng khóa: `selection` = bảng chọn kiểu nối TỰ ĐỘNG theo cỡ, xét THEO THỨ TỰ, mục đầu tiên khớp thì thắng — tuyến `sizeKind: \"WxH\"` so CẠNH LỚN max(W,H) với `maxSideMm`, tuyến `sizeKind: \"DN\"` so số DN với `maxDn`; giá trị `null` = mục bắt hết phần còn lại (mọi dải phải phủ kín và không chồng nhau). `maxLenMm` = chiều dài đốt tối đa, `jointGapMm` = khe mối nối (gioăng/rãnh) CỘNG THÊM giữa 2 đốt liền kề. `divideMode`: \"deu\" chia đều n đốt bằng nhau (ống gió — hạn chế đốt lẻ khó chế tạo), \"cay_nguyen\" tối đa hóa cây/thanh nguyên rồi để dư ở đốt cuối (ống nước/PCCC/máng cáp — cắt từ cây thương phẩm). `minPieceLenMm` = đốt ngắn nhất chế tạo được. `hardware` = định mức phụ kiện MỖI MỐI NỐI theo kiểu nối, `perJoint` là số hoặc biểu thức mini chỉ gồm số, biến W/H/DN (đơn vị mm), 4 phép + - * / , dấu ngoặc và ceil() — KHÔNG phải mã thực thi; `unit` là đơn vị bóc của mục (\"cái\" giữ nguyên trị biểu thức, \"m\" quy đổi mm→m khi tổng hợp). Tuyến KHÔNG khai `jointRules` thì lệnh chia đốt bỏ qua tuyến đó kèm thông báo — không có mặc định ngầm. Hậu tố layer vạch chia là \"JOINT\" (KHÔNG có dấu gạch nối đứng đầu, dù §12 của đặc tả viết \"-JOINT\"): layerMatchAny của takeoff khớp theo RANH GIỚI TOKEN nên \"M-DUCT-SUPP-JOINT\" vẫn khớp mục bóc \"M-DUCT-SUPP\" và vạch chia sẽ bị bóc trùng thành chiều dài ống gió — đúng lớp lỗi mà drawTools.edgeLayerSuffix đã né bằng \"EDGE\" (M100 FR4). Có test canh: xem tests/engineering-joint-segmentation.test.ts."
+    "jointRulesNote": "v9 (M105 §7/§12) — mỗi tuyến khai thêm khối `jointRules`: bảng THAM SỐ chia đốt chế tạo/lắp đặt theo kiểu kết nối, dùng chung cho lệnh XBOSS_VE_CHIADOT (plugin) và engine web lib/ky-thuat/engineering-joint-segmentation.ts. Ý nghĩa từng khóa: `selection` = bảng chọn kiểu nối TỰ ĐỘNG theo cỡ, xét THEO THỨ TỰ, mục đầu tiên khớp thì thắng — tuyến `sizeKind: \"WxH\"` so CẠNH LỚN max(W,H) với `maxSideMm`, tuyến `sizeKind: \"DN\"` so số DN với `maxDn`; giá trị `null` = mục bắt hết phần còn lại (mọi dải phải phủ kín và không chồng nhau). `maxLenMm` = chiều dài đốt tối đa, `jointGapMm` = khe mối nối (gioăng/rãnh) CỘNG THÊM giữa 2 đốt liền kề. `divideMode`: \"deu\" chia đều n đốt bằng nhau (ống gió — hạn chế đốt lẻ khó chế tạo), \"cay_nguyen\" tối đa hóa cây/thanh nguyên rồi để dư ở đốt cuối (ống nước/PCCC/máng cáp — cắt từ cây thương phẩm). `minPieceLenMm` = đốt ngắn nhất chế tạo được. `hardware` = định mức phụ kiện MỖI MỐI NỐI theo kiểu nối, `perJoint` là số hoặc biểu thức mini chỉ gồm số, biến W/H/DN (đơn vị mm), 4 phép + - * / , dấu ngoặc và ceil() — KHÔNG phải mã thực thi; `unit` là đơn vị bóc của mục (\"cái\" giữ nguyên trị biểu thức, \"m\" quy đổi mm→m khi tổng hợp). Tuyến KHÔNG khai `jointRules` thì lệnh chia đốt bỏ qua tuyến đó kèm thông báo — không có mặc định ngầm. Hậu tố layer vạch chia là \"JOINT\" (KHÔNG có dấu gạch nối đứng đầu, dù §12 của đặc tả viết \"-JOINT\"): layerMatchAny của takeoff khớp theo RANH GIỚI TOKEN nên \"M-DUCT-SUPP-JOINT\" vẫn khớp mục bóc \"M-DUCT-SUPP\" và vạch chia sẽ bị bóc trùng thành chiều dài ống gió — đúng lớp lỗi mà drawTools.edgeLayerSuffix đã né bằng \"EDGE\" (M100 FR4). Có test canh: xem tests/engineering-joint-segmentation.test.ts.",
+    "floorPolicy": {
+      "enabled": false,
+      "floors": ["05", "06", "07", "08", "09", "10"],
+      "floorsNote": "Nhãn tầng là CHUỖI (giữ số 0 đứng đầu), không phải số — tag phải khớp hồ sơ.",
+      "layoutMode": "offsetY",
+      "stepMm": 30000,
+      "gridColumns": 4,
+      "zoneNamePattern": "{zone}-T{floor}",
+      "copyRoles": [
+        "Tim",
+        "Bien",
+        "Nhan",
+        "PhuKien",
+        "ThietBi",
+        "GiaDo",
+        "LoCho",
+        "VachChia",
+        "NhanDot"
+      ],
+      "copyRolesNote": "Vai trò KHÔNG chép: MatCat, TuyenCat, BangThongKe, Revision, NgatNet — đều là hồ sơ/trình bày, dựng lại bằng lệnh của chúng sau khi chép. Cũng không chép DinhNghiaBlock: đó là ĐỊNH NGHĨA block (BlockTableRecord) dùng chung cả bản vẽ, bản chép tham chiếu lại chính định nghĩa đã có chứ không nhân bản nó."
+    }
   },
   "sheetSetup": {
     "source": "M100 §6.3/§6.4/§6.9/§11 — tham số trang in, mặt cắt, tag, bảng thống kê, độ dốc",

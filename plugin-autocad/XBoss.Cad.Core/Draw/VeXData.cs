@@ -160,6 +160,16 @@ public sealed record VeXDataInfo
     /// quyết định của kỹ sư thay vì áp lại <c>crossingPolicy.priority</c> (AC5).
     /// </summary>
     public bool DaoTay { get; init; }
+
+    // ===== Nhân bản tầng điển hình (M111 FR9) =====
+    // Hai khóa dưới đây CHỈ có trên bản chép do XBOSS_VE_NHANTANG sinh ra — dấu nhận diện để chạy
+    // lại lệnh biết tầng đích đã chép rồi (bỏ qua / chép đè), và để báo cáo truy được nguồn gốc.
+
+    /// <summary>Nhãn tầng NGUỒN đã chép ra đối tượng này; null = không phải bản chép.</summary>
+    public string? TangNguon { get; init; }
+
+    /// <summary>Nhãn tầng của chính bản chép này (tầng đích).</summary>
+    public string? NhanTang { get; init; }
 }
 
 /// <summary>
@@ -216,6 +226,8 @@ public static class VeXData
         if (tt.ChiSoDot is { } cs) ra.Add($"chisodot={cs.ToString(CultureInfo.InvariantCulture)}");
         Them(ra, "timgiao", tt.HandleTimGiao);
         if (tt.DaoTay) ra.Add("daotay=1");
+        Them(ra, "tangnguon", tt.TangNguon);
+        Them(ra, "nhantang", tt.NhanTang);
         return ra;
     }
 
@@ -255,6 +267,7 @@ public static class VeXData
         string? sizeLoCho = null, ketCau = null, viTriTruc = null, loaiBang = null;
         double? caoDo = null, caoDoMm = null;
         string? kieuNoi = null;
+        string? tangNguon = null, nhanTang = null;
         var kieuNoiGhiDe = false;
         int? soDot = null, soMoiNoi = null, chiSoDot = null;
         string? timGiao = null;
@@ -339,6 +352,8 @@ public static class VeXData
                     break;
                 case "timgiao": timGiao = giaTri; break;
                 case "daotay": daoTay = giaTri == "1"; break;
+                case "tangnguon": tangNguon = giaTri; break;
+                case "nhantang": nhanTang = giaTri; break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -375,6 +390,8 @@ public static class VeXData
             ChiSoDot = chiSoDot,
             HandleTimGiao = timGiao,
             DaoTay = daoTay,
+            TangNguon = tangNguon,
+            NhanTang = nhanTang,
         };
     }
 }
