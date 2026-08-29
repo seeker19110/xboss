@@ -88,7 +88,9 @@ public class QuyTrinhTests
             ["XBOSS_LOGIN", "XBOSS_RULEPACK"],
             QuyTrinh.LenhCua(BuocQuyTrinh.KetNoi).Select(l => l.Ten));
         Assert.Equal(
-            ["XBOSS_KIEMTRA", "XBOSS_CHUANHOA", "XBOSS_BATCH"],
+            // XBOSS_VE_HANHLANG đứng cuối bước 2 (M114 FR16): hành lang là mẩu dữ liệu nền cuối
+            // cùng phải chuẩn bị trước khi sang bước vẽ shop drawing.
+            ["XBOSS_KIEMTRA", "XBOSS_CHUANHOA", "XBOSS_BATCH", "XBOSS_VE_HANHLANG"],
             QuyTrinh.LenhCua(BuocQuyTrinh.ChuanHoaNen).Select(l => l.Ten));
         Assert.Equal(
             [
@@ -137,6 +139,8 @@ public class QuyTrinhTests
             .ToList();
         Assert.Equal(
             [
+                // Panel này gom cả XBOSS_VE_HANHLANG của bước 2 (M114 FR16) nên nó đứng đầu.
+                "XBOSS_VE_HANHLANG",
                 "XBOSS_VE_NEN", "XBOSS_VE", "XBOSS_VE_NHANTUYEN", "XBOSS_VE_NHAN", "XBOSS_VE_PHUKIEN",
                 "XBOSS_VE_THIETBI", "XBOSS_VE_NHANTANG", "XBOSS_VE_DOI",
                 "XBOSS_VE_CHIADOT", "XBOSS_VE_GIADO", "XBOSS_VE_LOCHO", "XBOSS_VE_TAG",

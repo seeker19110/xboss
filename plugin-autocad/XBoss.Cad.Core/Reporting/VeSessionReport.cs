@@ -155,6 +155,12 @@ public sealed class VeSessionReport
     /// <summary>Định nghĩa block do plugin nhập từ thư viện (đánh dấu trong BlockTable).</summary>
     [JsonPropertyName("soDinhNghiaBlock")] public int SoDinhNghiaBlock { get; init; }
     [JsonPropertyName("soBangThongKe")] public int SoBangThongKe { get; init; }
+
+    /// <summary>
+    /// Số đoạn hành lang đã khai bằng <c>XBOSS_VE_HANHLANG</c> (M114 FR3). KHÔNG khai
+    /// <c>required</c> để báo cáo dựng bằng mã cũ vẫn biên dịch được.
+    /// </summary>
+    [JsonPropertyName("soHanhLang")] public int SoHanhLang { get; init; }
     [JsonPropertyName("rulePackKhac")] public required IReadOnlyList<VeVersionKhac> RulePackKhac { get; init; }
     [JsonPropertyName("thuVienKhac")] public required IReadOnlyList<VeVersionKhac> ThuVienKhac { get; init; }
     /// <summary>
@@ -199,6 +205,7 @@ public sealed class VeSessionReport
         var thuVienKhac = new Dictionary<string, int>(StringComparer.Ordinal);
         var soDinhNghia = 0;
         var soBang = 0;
+        var soHanhLang = 0;
 
         foreach (var xd in doiTuong)
         {
@@ -209,6 +216,12 @@ public sealed class VeSessionReport
                     break;
                 case VaiTroVe.BangThongKe:
                     soBang++;
+                    break;
+                case VaiTroVe.HanhLang:
+                    // Hành lang (M114 FR3) KHÔNG thuộc hệ nào (danh sách hệ rỗng = mọi hệ đi qua
+                    // được) nên đếm riêng — gom vào bảng theo hệ chỉ đẻ ra nhóm "(không rõ hệ)"
+                    // toàn số 0 trong mọi báo cáo.
+                    soHanhLang++;
                     break;
                 default:
                     // Đối tượng mất HeId (XData bị sửa tay) vẫn phải đếm được — gom vào một nhóm
@@ -380,6 +393,7 @@ public sealed class VeSessionReport
             NgatNet = dsNgatNet,
             SoDinhNghiaBlock = soDinhNghia,
             SoBangThongKe = soBang,
+            SoHanhLang = soHanhLang,
             RulePackKhac = rulePackKhac.OrderBy(k => k.Key, StringComparer.Ordinal)
                 .Select(k => new VeVersionKhac { Version = k.Key, SoDoiTuong = k.Value }).ToList(),
             ThuVienKhac = thuVienKhac.OrderBy(k => k.Key, StringComparer.Ordinal)
@@ -459,6 +473,8 @@ public sealed class VeSessionReport
                 $"lỗ chờ {h.SoLoCho} · mặt cắt {h.SoMatCat} · vạch chia {h.SoVachChia} · " +
                 $"tag đốt {h.SoNhanDot} · ngắt nét {h.SoNgatNet}");
         }
+        if (SoHanhLang > 0)
+            sb.AppendLine($"Hành lang đã khai (XBOSS_VE_HANHLANG): {SoHanhLang} đoạn");
         if (SizeCustom.Count > 0)
         {
             sb.AppendLine("Size ngoài danh mục rule pack:");

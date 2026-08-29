@@ -4,6 +4,48 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## 🚧 M114 PR3/4 — Adapter `XBOSS_VE_HANHLANG` (vẽ + nhận + sửa/xóa hành lang) (2026-08-29)
+
+Nhánh `feat/m114-pr3-hanhlang-adapter`. PR **3/4** của
+`docs/nang-cap/M114-auto-routing-hanh-lang.md` (PR4 Adapter `XBOSS_VE_TUYENTUDONG` — **chưa làm**).
+Lệnh plugin ĐẦU TIÊN của M114: khai hành lang — dữ liệu nền mà bước đi tuyến tự động sẽ đọc.
+
+- `XBoss.Cad.Acad/Commands/VeHanhLangCommands.cs` (mới) — `XBOSS_VE_HANHLANG`, 4 chế độ trong một
+  lệnh (FR1/FR4): `VEMOI` bấm điểm tim hành lang (chỉ đoạn thẳng — đồ thị Core cắt cạnh theo đoạn
+  thẳng), `NHAN` nhận polyline có sẵn **không đụng một tọa độ đỉnh nào** (AC13, khuôn M107; line
+  chuyển thành polyline 2 đỉnh cùng tọa độ), `SUA` ghi đè bề rộng/cao độ/hệ được phép mà **giữ
+  nguyên sổ chiếm làn**, `XOA` — hành lang còn hệ đi qua thì nêu đúng handle + hệ nào rồi hỏi lại,
+  các tuyến cũ thành tuyến thường chứ không bị xóa theo. `routingPolicy.enabled = false` (mặc định)
+  → dừng kèm hướng dẫn cách bật, bản vẽ không đổi một nét nào (AC14). Arc/spline/polyline có đoạn
+  cung/đối tượng xref bị bỏ qua kèm **lý do đếm được**. Mọi hỏi đáp ngoài transaction, một lệnh =
+  một transaction = một nhóm UNDO.
+- `XBoss.Cad.Core/Ui/ViewModels/HanhLangDialogViewModel.cs` (mới) + `DataTemplate` trong
+  `XBossDialog.xaml` — hộp thoại M106: bề rộng khả dụng, cao độ đáy dầm/trần (**hỏi, không suy** —
+  M100 §6.3), danh sách hệ được phép đi qua (tick hết = "mọi hệ", đúng quy ước XData rỗng), phần
+  chỉ-đọc nói rõ lệnh sắp làm gì + sổ làn đã cấp. `XBOSS_UI_DIALOG=0` → hỏi đáp dòng lệnh cùng bộ
+  tham số (FR15).
+- `LenhCatalog.cs` — khai lệnh ở panel "Vẽ shop drawing", **bước 2 ChuanHoaNen** (FR16);
+  `VeLayerStyle.AciHanhLang`; `VeContext` nhớ thuộc tính hành lang trong phiên;
+  `VeSessionReport.SoHanhLang` đếm riêng hành lang (không thuộc hệ nào nên không gom vào bảng
+  theo hệ).
+- Test: `XBoss.Cad.Tests/HanhLangDialogViewModelTests.cs` (15 ca — khóa OK theo từng lý do, quy ước
+  "tick hết = rỗng = mọi hệ", cảnh báo đáy dầm ≤ trần / khoảng trần thấp hơn tầng sâu nhất / bề
+  rộng mới nhỏ hơn làn đã cấp, tóm tắt vùng chọn theo lý do bỏ qua); `QuyTrinhTests` cập nhật theo
+  vị trí lệnh mới. **1090 ca xanh**, `dotnet build` shim xanh.
+
+**Không migration, không API mới, không đụng `app/`** (M114 §9).
+
+**AC6/AC7 vẫn thuộc PR4, không giải ở PR3:** hai tiêu chí đó nói về lúc **cấp làn khi đi tuyến**
+(FR9 của `XBOSS_VE_TUYENTUDONG`). PR3 chỉ ghi/đọc sổ `lanDaCap`, không cấp và không gỡ làn, nên
+mâu thuẫn "ngân sách bề rộng dùng chung vs con trỏ làn riêng từng tầng" (ghi ở mục PR2 dưới đây)
+chưa chạm tới — vẫn chờ phiên chính chốt trước khi làm PR4.
+
+**Nợ kỹ thuật — CHẶN phát hành rộng:** chưa verify tay trên AutoCAD 2026 thật
+(`VERIFY-VA-PHAT-HANH.md`: AC11 hủy giữa chừng không đổi thực thể nào, AC12 một lần `U` hoàn tác
+trọn vẹn, AC13 nhận polyline giữ nguyên từng tọa độ đỉnh, và cảnh báo xóa hành lang còn hệ đi qua).
+Toàn bộ mã Adapter mới hiện chỉ được biên dịch bằng stub `XBoss.Cad.AcadShim` — chưa chạy trên
+AutoCAD lần nào.
+
 ## 🚧 M114 PR2/4 — `CapPhatLanTang` (cấp tầng/làn) + đối chứng 2 tầng (2026-08-29)
 
 Nhánh `feat/m114-pr2-capphat-doichung`. PR **2/4** của
