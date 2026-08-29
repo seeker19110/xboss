@@ -1,0 +1,133 @@
+{
+  "_README": "M109 §9 — bộ đối chứng 2 tầng cho validator khối drawTools.crossingPolicy (rule pack v10, §5). Dữ liệu VÀO viết tay, sửa có chủ đích. Tầng 3 (TS): tests/cad-crossing-doi-chung.test.ts gọi kiemCrossingPolicy() của lib/ky-thuat/cad/rule-pack.ts. Tầng 2 (C#): XBoss.Cad.Tests/CrossingDoiChungTests.cs gọi DrawToolsConfig.ValidateCrossingPolicy(). Mỗi ca có ĐÚNG một lỗi (hoặc không lỗi) vì tầng C# ném RulePackException ngay ở lỗi đầu tiên — hai tầng đối chiếu được với nhau bằng khóa lỗi.",
+  "rulePackVersion": "v13",
+  "systemIds": ["HVAC", "PIPING", "FIREFIGHTING", "ELECTRICAL", "ELV"],
+  "cases": [
+    {
+      "ma": "hop-le-mac-dinh",
+      "moTa": "Đúng khối đang phát hành trong v10 — phải hợp lệ ở cả 2 tầng.",
+      "khoaLoi": null,
+      "crossingPolicy": {
+        "enabled": false,
+        "priority": ["HVAC", "PIPING", "FIREFIGHTING", "ELECTRICAL", "ELV"],
+        "gapMode": "wipeout",
+        "clearanceMm": 50,
+        "jogRadiusMm": 150,
+        "layerSuffix": "XING",
+        "minAngleDeg": 15
+      }
+    },
+    {
+      "ma": "hop-le-khi-bat",
+      "moTa": "Bật khóa mà khai đủ thì vẫn hợp lệ; priority khai thiếu hệ cũng hợp lệ (hệ không khai xếp sau cùng).",
+      "khoaLoi": null,
+      "crossingPolicy": {
+        "enabled": true,
+        "priority": ["HVAC", "PIPING"],
+        "gapMode": "jog",
+        "clearanceMm": 25,
+        "jogRadiusMm": 200,
+        "layerSuffix": "XING",
+        "minAngleDeg": 20
+      }
+    },
+    {
+      "ma": "priority-id-he-la",
+      "moTa": "§5 lỗi 1 — 'duct' không phải drawTools.systems[].id (bản nháp đặc tả dùng không gian id khác).",
+      "khoaLoi": "priority",
+      "crossingPolicy": {
+        "enabled": false,
+        "priority": ["duct", "PIPING"],
+        "gapMode": "wipeout",
+        "clearanceMm": 50,
+        "jogRadiusMm": 150,
+        "layerSuffix": "XING",
+        "minAngleDeg": 15
+      }
+    },
+    {
+      "ma": "clearance-khong-duong",
+      "moTa": "§5 lỗi 2 — clearanceMm phải > 0 (bằng 0 thì vùng che ôm sát mép biên, không che nổi nét).",
+      "khoaLoi": "clearanceMm",
+      "crossingPolicy": {
+        "enabled": false,
+        "priority": ["HVAC", "PIPING"],
+        "gapMode": "wipeout",
+        "clearanceMm": 0,
+        "jogRadiusMm": 150,
+        "layerSuffix": "XING",
+        "minAngleDeg": 15
+      }
+    },
+    {
+      "ma": "jog-radius-am",
+      "moTa": "§5 lỗi 2 — jogRadiusMm phải > 0.",
+      "khoaLoi": "jogRadiusMm",
+      "crossingPolicy": {
+        "enabled": false,
+        "priority": ["HVAC", "PIPING"],
+        "gapMode": "jog",
+        "clearanceMm": 50,
+        "jogRadiusMm": -150,
+        "layerSuffix": "XING",
+        "minAngleDeg": 15
+      }
+    },
+    {
+      "ma": "min-angle-am",
+      "moTa": "Ngưỡng lọc góc giao phải nằm trong (0; 90] — số âm/NaN làm mọi góc đều bị coi là đủ lớn.",
+      "khoaLoi": "minAngleDeg",
+      "crossingPolicy": {
+        "enabled": false,
+        "priority": ["HVAC", "PIPING"],
+        "gapMode": "wipeout",
+        "clearanceMm": 50,
+        "jogRadiusMm": 150,
+        "layerSuffix": "XING",
+        "minAngleDeg": -5
+      }
+    },
+    {
+      "ma": "gap-mode-la",
+      "moTa": "gapMode chỉ nhận \"wipeout\" hoặc \"jog\"; giá trị lạ phải chặn ngay ở rule pack, không để lọt tới adapter.",
+      "khoaLoi": "gapMode",
+      "crossingPolicy": {
+        "enabled": false,
+        "priority": ["HVAC", "PIPING"],
+        "gapMode": "xoa-net",
+        "clearanceMm": 50,
+        "jogRadiusMm": 150,
+        "layerSuffix": "XING",
+        "minAngleDeg": 15
+      }
+    },
+    {
+      "ma": "layer-suffix-rong-khi-bat",
+      "moTa": "§5 lỗi 3 — layerSuffix rỗng trong khi enabled: đối tượng ngắt nét rơi vào chính layer tim.",
+      "khoaLoi": "layerSuffix",
+      "crossingPolicy": {
+        "enabled": true,
+        "priority": ["HVAC", "PIPING"],
+        "gapMode": "wipeout",
+        "clearanceMm": 50,
+        "jogRadiusMm": 150,
+        "layerSuffix": "  ",
+        "minAngleDeg": 15
+      }
+    },
+    {
+      "ma": "layer-suffix-rong-khi-tat",
+      "moTa": "Khóa đang TẮT thì layerSuffix rỗng không phải lỗi — rule pack chưa dùng tới lệnh ngắt nét.",
+      "khoaLoi": null,
+      "crossingPolicy": {
+        "enabled": false,
+        "priority": ["HVAC", "PIPING"],
+        "gapMode": "wipeout",
+        "clearanceMm": 50,
+        "jogRadiusMm": 150,
+        "layerSuffix": "",
+        "minAngleDeg": 15
+      }
+    }
+  ]
+}
