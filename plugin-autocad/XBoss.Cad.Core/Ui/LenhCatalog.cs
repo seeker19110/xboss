@@ -89,7 +89,8 @@ public static class LenhCatalog
             "Xuất khối lượng đã bóc ra Excel đúng mẫu công ty, kèm sheet đối chiếu BOQ hợp đồng (tùy chọn).",
             NhomLenh.BocKhoiLuong, BuocQuyTrinh.BocVaNop, 2, CanRulePack: true),
 
-        // ── Vẽ shop drawing (M100 — 15 lệnh + M105 chia đốt + M107 nhận tuyến có sẵn) ──
+        // ── Vẽ shop drawing (M100 — 15 lệnh + M105 chia đốt + M107 nhận tuyến có sẵn
+        //    + M109 ngắt nét giao chéo) ──
         new("XBOSS_VE_NEN", "Chuẩn bị nền",
             "Dựng đủ layer/style theo rule pack để bắt đầu vẽ shop drawing.",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 1, CanRulePack: true),
@@ -139,24 +140,32 @@ public static class LenhCatalog
         new("XBOSS_VE_MATCAT", "Mặt cắt",
             "Dựng mặt cắt bán tự động từ tuyến cắt (cao độ nhập tay — bản vẽ 2D không chứa cao độ thật).",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 1, CanRulePack: true),
+        new("XBOSS_VE_NGATNET", "Ngắt nét giao chéo",
+            "Ngắt nét tuyến ĐI DƯỚI tại chỗ giao theo hạng ưu tiên hệ của rule pack (đảo tay được từng " +
+            "cặp): vùng che cho tuyến 2 nét biên, cầu vượt cho tuyến đơn nét. Tim giữ nguyên từng đỉnh.",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 3, CanRulePack: true),
         new("XBOSS_VE_TRANGIN", "Trang in",
             "Dựng layout trang in + khung tên theo rule pack.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 3, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 4, CanRulePack: true),
         new("XBOSS_VE_REV", "Khoanh revision",
             "Khoanh revision cloud + tam giác số revision cho các vùng đã sửa; đề xuất sẵn vùng cần " +
             "khoanh bằng cách so với mốc của lần chốt revision trước.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 4, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 5, CanRulePack: true),
         new("XBOSS_VE_REV_CHOT", "Chốt revision",
             "Chốt một revision: ghi ngày/nội dung/người vào bảng revision khung tên của mọi layout, " +
             "lưu mốc so sánh cho lần sửa sau, cảnh báo vùng đã đổi mà chưa khoanh.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 5, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 6, CanRulePack: true),
         new("XBOSS_VE_REV_HIENTHI", "Hiện/ẩn revision",
             "Bật/tắt hiển thị cloud theo từng revision (mỗi revision một layer con) — bản in nộp " +
             "thường chỉ khoanh lần sửa mới nhất, cloud cũ vẫn tra ngược được.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 6, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 7, CanRulePack: true),
         new("XBOSS_VE_BAOCAO", "Báo cáo phiên vẽ",
             "Chỉ đọc: tổng hợp số tuyến/block theo hệ + size ngoài danh mục, ghi JSON cạnh DWG.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 7, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 8, CanRulePack: true),
+        new("XBOSS_VE_NGATNET_XOA", "Xóa ngắt nét",
+            "Gỡ sạch đối tượng ngắt nét giao chéo (vùng che + cầu vượt) trong vùng chọn hoặc cả bản vẽ, " +
+            "trả bản vẽ về trước khi chạy XBOSS_VE_NGATNET.",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.PhuTro, 6, CanRulePack: true),
 
         // ── Bảng điều khiển (M102) ──
         new("XBOSS_BANG", "Bảng điều khiển",

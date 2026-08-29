@@ -230,7 +230,7 @@ public class RevisionAdapterTests
         var hoSo = QuyTrinh.LenhCua(BuocQuyTrinh.HoSoBanVe).Select(l => l.Ten).ToList();
 
         Assert.Equal(
-            ["XBOSS_VE_MATCAT", "XBOSS_VE_THONGKE", "XBOSS_VE_TRANGIN", "XBOSS_VE_REV",
+            ["XBOSS_VE_MATCAT", "XBOSS_VE_THONGKE", "XBOSS_VE_NGATNET", "XBOSS_VE_TRANGIN", "XBOSS_VE_REV",
              "XBOSS_VE_REV_CHOT", "XBOSS_VE_REV_HIENTHI", "XBOSS_VE_BAOCAO"],
             hoSo);
         Assert.All(

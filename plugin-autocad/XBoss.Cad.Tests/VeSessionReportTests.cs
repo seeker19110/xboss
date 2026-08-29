@@ -151,6 +151,66 @@ public class VeSessionReportTests
         Assert.Equal(1, goc.GetProperty("nhatKy").GetArrayLength());
     }
 
+    // ===== Mục ngắt nét giao chéo (M109 FR9) =====
+
+    private static VeXDataInfo NgatNet(
+        string heDuoi, string item, string size, string timDuoi, string timTren, bool daoTay = false) =>
+        new()
+        {
+            VaiTro = VaiTroVe.NgatNet,
+            HeId = heDuoi,
+            ItemId = item,
+            Size = size,
+            RulePackVersion = "v7",
+            HandleTim = timDuoi,
+            HandleTimGiao = timTren,
+            DaoTay = daoTay,
+        };
+
+    [Fact]
+    public void Muc_ngat_net_gop_theo_tuyen_di_duoi_va_dem_dao_tay()
+    {
+        var bc = VeSessionReport.Dung(
+            [
+                Tim("PIPING", "pipe-domw", "DN100"),
+                NgatNet("PIPING", "pipe-domw", "DN100", "1A", "2B"),
+                NgatNet("PIPING", "pipe-domw", "DN100", "1A", "2B"),
+                NgatNet("PIPING", "pipe-domw", "DN100", "1A", "3C", daoTay: true),
+                NgatNet("ELV", "tray-elv", "200x100", "4D", "2B"),
+            ],
+            Meta);
+
+        Assert.Equal(2, bc.NgatNet.Count);
+        var piping = bc.NgatNet.Single(c => c.HeId == "PIPING");
+        Assert.Equal(3, piping.SoDoiTuong);
+        Assert.Equal(1, piping.SoDaoTay);
+        Assert.Equal(0, bc.NgatNet.Single(c => c.HeId == "ELV").SoDaoTay);
+
+        // Đếm theo hệ ĐI DƯỚI: hệ đi trên không sinh đối tượng ngắt nét nào.
+        Assert.Equal(3, bc.HeThong.Single(h => h.HeId == "PIPING").SoNgatNet);
+
+        // Đảo tay phải nổi lên cảnh báo — đó là chỗ duy nhất người nghiệm thu bản vẽ thấy được.
+        Assert.Contains(bc.CanhBao, c => c.Contains("ĐẢO TAY", StringComparison.Ordinal));
+
+        var text = bc.ToVietnameseText();
+        Assert.Contains("Ngắt nét giao chéo", text, StringComparison.Ordinal);
+        Assert.Contains("đảo tay", text, StringComparison.Ordinal);
+
+        using var doc = JsonDocument.Parse(bc.ToJson());
+        var ngatNet = doc.RootElement.GetProperty("ngatNet");
+        Assert.Equal(2, ngatNet.GetArrayLength());
+        Assert.Equal(1, ngatNet[1].GetProperty("soDaoTay").GetInt32());
+    }
+
+    [Fact]
+    public void Khong_co_dao_tay_thi_khong_canh_bao_thua()
+    {
+        var bc = VeSessionReport.Dung([NgatNet("PIPING", "pipe-domw", "DN100", "1A", "2B")], Meta);
+
+        Assert.Equal(0, Assert.Single(bc.NgatNet).SoDaoTay);
+        Assert.DoesNotContain(bc.CanhBao, c => c.Contains("ĐẢO TAY", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Ban_ve_trong_van_ra_bao_cao_hop_le()
     {

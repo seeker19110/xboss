@@ -219,6 +219,59 @@ buộc, không được bỏ.
 - **Hộp thoại:** soi theo checklist C8b (nền tối, combo gõ tay được, nút OK khóa kèm lý do khi
   vùng chọn không có tuyến nào).
 
+### C4c. Ngắt nét giao chéo — `XBOSS_VE_NGATNET` (M109, bắt buộc)
+
+**Chưa làm mục này thì KHÔNG phát hành M109.** CI chỉ chứng minh được phần hình học ở Core và cách
+thiết kế của Adapter (`NgatNetGuardrailTests` đọc mã nguồn: không có đường nào mở tim ở chế độ ghi).
+Ba thứ dưới đây **chỉ AutoCAD thật mới trả lời được**: wipeout hiện đúng thứ tự vẽ trên màn hình,
+wipeout in ra PDF đúng như trên màn hình, và tọa độ đỉnh tim không đổi.
+
+Chuẩn bị: rule pack có `drawTools.crossingPolicy.enabled = true` (bản phát hành mặc định là `false`
+— sửa trên rule pack của dự án rồi `XBOSS_RULEPACK`), đặt `WIPEOUTFRAME = 2` (hiện khung khi soạn,
+không in).
+
+- **AC8 — khóa chưa bật:** chạy lệnh với rule pack mặc định (`enabled: false`) → lệnh **dừng**, in
+  lý do + cách bật, **không vẽ gì**, bản vẽ không có đối tượng mới nào.
+- **AC1 — ống gió cắt ống nước (ca chính, kèm IN PDF):** vẽ ống gió `800x400` (hệ HVAC) cắt vuông
+  góc ống nước `DN100` (hệ PIPING) → chạy lệnh → **nét biên ống nước bị che tại vùng giao, ống gió
+  liền mạch** (2 nét biên ống gió KHÔNG được đứt khúc ở chỗ giao — đây là chỗ sai kinh điển khi
+  wipeout đặt sai thứ tự vẽ). Đo bề rộng vùng che: đúng `800 + 2×50 = 900`.
+  **Rồi in ra PDF** (`PLOT` → DWG To PDF, và một lần nữa bằng driver máy in thật của công ty) → mở
+  PDF: hình phải **trùng khít màn hình**. Driver nào in sai thứ tự thì ghi lại và chuyển
+  `crossingPolicy.gapMode = "jog"` cho dự án đó (M109 §11).
+- **AC2 — TIM KHÔNG ĐỔI (ca quan trọng nhất, không được bỏ):** trước khi chạy, `LIST` cả hai tuyến
+  tim và **chép lại tọa độ từng đỉnh**; chạy `XBOSS_BOCKL` ghi lại con số bóc. Sau khi chạy
+  `XBOSS_VE_NGATNET`: `LIST` lại đúng hai tuyến đó → **từng tọa độ đỉnh, số đỉnh, bulge và `Closed`
+  phải trùng khít**; chạy lại `XBOSS_BOCKL` → **đúng con số cũ**, không hơn không kém. Lệch dù một
+  số lẻ là lỗi chặn phát hành.
+- **AC3 — cầu vượt tuyến đơn nét:** hai tuyến đơn nét khác hệ cắt nhau (vd `sprn-pipe` × ống cấp
+  nước) → chỗ giao có **cung nối bán kính đúng `jogRadiusMm`** (`LIST` polyline cung để đọc bán
+  kính), tuyến dưới bị cắt hiển thị ở hai đầu cung.
+- **AC4 — idempotent:** chạy lệnh **3 lần liên tiếp** → số đối tượng trên layer `<layer tim>XING`
+  **không đổi sau lần 1** (`QSELECT` theo layer để đếm).
+- **AC5 — đảo tay:** tích ô **Đảo** ở một cặp → chạy → cặp đó đổi chiều trên–dưới. Chạy lại lệnh
+  (không tích gì) → **cặp đó GIỮ chiều đã đảo**, các cặp khác vẫn theo `priority`. Tóm tắt cuối lệnh
+  và `XBOSS_VE_BAOCAO` đều đếm đúng số cặp đảo tay.
+- **AC6 — gỡ sạch:** `XBOSS_VE_NGATNET_XOA` → `QSELECT` theo layer `…XING` không còn đối tượng nào;
+  tuyến tim và nét biên nguyên vẹn. _(Giới hạn đã biết: lệnh xóa KHÔNG hoàn nguyên thứ tự vẽ mà lệnh
+  ngắt nét đã đẩy cho các tuyến đi trên — muốn về đúng trạng thái trước lệnh thì dùng `UNDO`.)_
+- **AC7 — một lần undo:** ngay sau `XBOSS_VE_NGATNET`, gõ `U` **một lần** → mọi vùng che, cung cầu
+  vượt **và thứ tự vẽ** trở lại nguyên trạng.
+- **AC9 — xref:** quét chọn cả một xref kiến trúc → bỏ qua, tóm tắt đếm đúng phần bỏ qua **theo
+  từng lý do** (không có dữ liệu XBoss · nét biên/nhãn của XBoss · thuộc xref).
+- **Ca cùng hệ:** hai ống cùng hệ PIPING cắt nhau → **không ngắt nét**, báo cáo nêu lý do "cùng hệ —
+  xử lý bằng phụ kiện".
+- **Ca góc gắt:** hai tuyến khác hệ cắt nhau ở góc ~10° (< `minAngleDeg`) → **không ngắt nét**, đếm
+  riêng trong tóm tắt.
+- **Ca đa giao (§11):** ba tuyến ba hệ cùng cắt nhau tại một chỗ → vùng che chồng nhau nhưng hình
+  vẫn đọc đúng thứ tự hệ; tóm tắt cuối lệnh **cảnh báo "đa giao"** kèm số chỗ.
+- **Ca tuyến có cung:** tuyến tim chứa đoạn cung cắt tuyến khác → lệnh cảnh báo "dò theo dây cung";
+  kiểm mắt vị trí vùng che ở đúng chỗ đó.
+- **Đường lui dòng lệnh:** `XBOSS_UI_DIALOG=0` → lệnh hỏi phạm vi `TATCA/CHON` rồi cho gõ mã cặp để
+  đảo; kết quả trên bản vẽ **trùng khít** đường hộp thoại.
+- **Hộp thoại:** soi theo checklist C8b (nền tối, ô **Đảo** mờ đúng ở dòng cùng hệ, nút OK khóa kèm
+  lý do khi bản vẽ không có cặp nào giao nhau).
+
 ### C5. Vòng đời với web (M99 PR5 + M103 + M104)
 
 26. `XBOSS_UPLOAD` → tạo revision `submitted` trên web. **Kiểm mới của đợt này:** AutoCAD phải
