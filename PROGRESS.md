@@ -4,6 +4,64 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Đặc tả M109–M113 — đóng nốt M100 §20 của đợt plugin AutoCAD (2026-08-28)
+
+Người dùng: "viết nốt đặc tả cho hướng còn lại". Nhánh `claude/plugin-status-vd0ws9`. **Chỉ đặc tả —
+CHƯA CODE**, cả 5 tệp State **Draft, chờ duyệt**.
+
+**Phạm vi + 3 ngã rẽ thiết kế chốt qua `AskUserQuestion` cùng ngày:** (1) chỉ viết cho **các mục
+M100 §20**, hai hướng lớn còn lại (đồ thị kết nối tuyến–thiết bị, phối hợp xung đột 2D liên hệ) để
+sau; (2) revision cloud **chỉ phần CAD**, không đụng server/web/`drawing_revisions`; (3) nếu sau này
+làm combined services thì đi đường "khai cao độ/ưu tiên theo hệ + ĐỀ XUẤT, kỹ sư quyết", không tự nắn
+tuyến. (Câu hỏi về nơi lưu đồ thị kết nối cũng đã chốt "chỉ trong DWG" — ghi lại để đợt sau khỏi hỏi
+lại, dù đợt này không dùng tới.)
+
+- **`M109-ngat-net-giao-cheo.md`** — `XBOSS_VE_NGATNET`/`_XOA`. Wipeout cho tuyến 2 nét biên, cầu vượt
+  cho tuyến đơn nét; thứ tự trên–dưới theo `crossingPolicy.priority`, đảo tay từng điểm và **nhớ trong
+  XData** nên chạy lại không mất quyết định của kỹ sư. Tái dùng bộ dò giao cắt của phép kiểm 11 (M101)
+  thay vì viết bộ thứ hai. Bất biến số 1 ghi ngay đầu tệp: **tim không bao giờ bị cắt/chia/đổi tọa độ**,
+  AC2 bắt `XBOSS_BOCKL` phải ra đúng con số cũ. 2 PR (PR2 `route: complex` vì `DrawOrder`/wipeout).
+- **`M110-revision-cloud.md`** — `XBOSS_VE_REV`/`_CHOT`/`_HIENTHI`. Điểm ăn tiền so với `REVCLOUD` sẵn
+  có: chốt revision thì ghi **mốc** (Xrecord `XBOSS_REV_SNAPSHOT`, băm SHA-256 tọa độ làm tròn 0,1 mm
+  của mọi đối tượng có XData), lần sau **đề xuất** vùng thêm/xóa/đổi và cảnh báo vùng đã sửa mà chưa
+  khoanh. Số revision append-only, cloud cũ giữ ở layer con `-R{n}`, khung tên hết dòng thì **dừng chứ
+  không ghi đè**. 2 PR, cả hai `route: spec`.
+- **`M111-nhan-ban-tang-dien-hinh.md`** — `XBOSS_VE_NHANTANG`. Lý do M100 §20 hoãn mục này ("rủi ro
+  nhân bản lỗi hàng loạt") được xử lý bằng 4 chốt: xem trước bắt buộc, **nguyên tử** (lỗi ở tầng thứ k
+  → không ghi tầng nào), AC3 "không handle mồ côi" **kiểm tự động** chứ không kiểm mắt, và verify tay
+  trên bản vẽ AVIO thật. Việc thật sự khó là ánh xạ lại handle trong XData sang đối tượng của chính
+  bản chép (`DeepCloneObjects` + `IdMapping`) — copy thường để lại handle trỏ về tầng gốc, khiến
+  `XBOSS_VE_DOI` ở tầng 08 đi sửa tuyến tầng 05. 3 PR (PR2 `route: complex`, có ghi ranh giới được
+  phép quyết).
+- **`M112-so-do-dung-riser.md`** — `XBOSS_VE_TRUCDUNG` + `XBOSS_VE_RISER`. Giải bài "cần dữ liệu liên
+  tầng có cấu trúc" bằng cách để kỹ sư **đánh dấu** điểm trục đứng (XData vai trò `TrucDung`) thay vì
+  đoán từ hình học 2D; cao độ tầng khai tay, **cấm nội suy** (giữ đúng luật M100 §6.3 đã áp cho
+  `XBOSS_VE_MATCAT`). Sơ đồ là snapshot ⇒ phép kiểm "sơ đồ đứng cũ hơn mặt bằng"; vai trò `Riser` bị
+  loại khỏi takeoff (bất biến có test). **Điều kiện tiên quyết ghi ngay đầu tệp: M111 phải chạy thật
+  qua pilot trước.** 3 PR.
+- **`M113-thu-vien-block-theo-du-an.md`** — không thay thư viện toàn cục bằng per-project mà làm **hai
+  tầng, dự án đè lên toàn cục**: phần lớn block MEPF giống nhau ở mọi dự án, chỉ khung tên/ký hiệu là
+  riêng. `cad_block_libs` thêm `project_id` nullable + RLS 2 nhánh theo đúng khuôn `0140` (M101 PR4);
+  `UNIQUE(version)` đổi thành unique theo `(project_id, version)` để 2 dự án cùng đặt nhãn `b1` được;
+  luật đè nằm trong **một** hàm thuần `tronThuVienBlock`. Tương thích ngược là AC1: plugin không gửi
+  `?project=` nhận đúng thư viện như hôm nay. **Migration đụng ràng buộc trên dữ liệu đang có ⇒ bắt
+  buộc staging trước, không đi thẳng production**; vùng rủi ro cao, rà `docs/audit.md`. 4 PR.
+
+**Mục thứ 6 của M100 §20 không cần đặc tả — đã tự đóng:** phép kiểm 17 (tag trùng) + 18 (mã BOQ mồ
+côi) có trong `PhepKiemMoRong.cs` từ M102, `support-hanger`/`sleeve-opening` là item takeoff trong
+rule pack từ M100 PR5 (đã grep xác nhận, không tin bảng trạng thái).
+
+**Ghi chú cho người thi hành:** mọi số rule pack (`v<next>`) và số migration trong 5 tệp là **dự
+kiến** — lấy số thật lúc code bằng `ls lib/ky-thuat/cad/rule-packs | sort -V | tail -1` và
+`ls migrations | sort -V | tail -1`. Mọi khóa rule pack mới đều mặc định `enabled: false` theo luật đã
+áp từ M101/M102, nên nạp pack mới không đổi hành vi trên máy kỹ sư.
+
+**Còn Open (chốt lúc duyệt):** M109 — `priority` mặc định có hợp lệ mọi dự án; M111 — kiểm handle mồ
+côi làm thành lệnh riêng hay phép kiểm trong `XBOSS_KIEMTRA`, và tầng nguồn đang đỏ `XBOSS_KIEMTRA`
+thì chặn hay chỉ cảnh báo; M112 — vẽ theo tỉ lệ cao độ thật hay giãn đều, trục xuyên nhiều tệp;
+M113 — ai được phát hành bộ của dự án (đề xuất: `CAN.manageDrawings` trong phạm vi dự án), có cần
+tầng `org_id` nữa không.
+
 ## Verify tay plugin v9 trên bản vẽ AEC thật — `XBOSS_VE_NEN` báo `eInvalidKey` (2026-08-27)
 
 Người dùng build plugin trên máy Windows và verify trên bản vẽ thật (`TMDV 3F.dwg`, có xref
@@ -65,7 +123,7 @@ blocker) · giữ đường build tại chỗ sau cờ `--build-local`.
 
 1. **`.github/workflows/deploy.yml` build trên runner:** checkout đúng `workflow_run.head_sha`
    (không phải HEAD của `main` lúc job khởi động), `npm ci` + `NEXT_DIST_DIR=.next-ci npm run
-   build`, đóng gói `.next-ci.tar.gz` kèm phiếu `.next-ci.info` (`sha=`/`node=`), rsync sang
+build`, đóng gói `.next-ci.tar.gz` kèm phiếu `.next-ci.info` (`sha=`/`node=`), rsync sang
    VPS rồi mới gọi `bash deploy.sh`. `command_timeout` 40m thay bằng `timeout 15m` cho bước SSH
    còn lại (không còn build nên vài phút là xong).
 2. **Runner build tại đúng `/var/www/xboss`:** `.next` có nhúng **đường dẫn tuyệt đối** lúc
@@ -305,9 +363,9 @@ tuyến–thiết bị) là bậc có đòn bẩy lớn nhất; sau đó phối 
 cần cao độ đã khai trên đối tượng); các mục để lại ở M100 §20 (ngắt nét giao chéo, revision cloud,
 nhân bản tầng điển hình, riser). Mỗi mục phải mở `M<xx>` mới có duyệt trước khi code.
 
-**M105 — Tự động phân chia đốt toàn hệ MEPF theo kiểu kết nối:** ✅ **Approved 2026-08-26, PR1 XONG
+**M105 — Tự động phân chia đốt toàn hệ MEPF theo kiểu kết nối:** ✅ \*\*Approved 2026-08-26, PR1 XONG
 
-- PR2 (Core + Adapter) XONG** (`docs/nang-cap/M105-chia-dot-mepf-theo-kieu-noi.md`). Chia đốt MỌI tuyến MEPF
+- PR2 (Core + Adapter) XONG\*\* (`docs/nang-cap/M105-chia-dot-mepf-theo-kieu-noi.md`). Chia đốt MỌI tuyến MEPF
   vẽ bằng `XBOSS_VE`: ống gió theo kiểu nối (nẹp C max 1180 / TDC max 1110 / mặt bích V max 1180 — số
   người dùng chốt), ống nước/PCCC theo cây thương phẩm 5800 (ren/grooved/măng xông), máng cáp thanh
   2500 + tấm nối. MỘT engine tổng quát tham số hóa qua rule pack — thêm hệ/kiểu nối mới về sau chỉ là
@@ -1514,13 +1572,13 @@ Không lỗi nào trong ba lớp trên sống nổi nếu ai đó **từng bấm
 
 ### 5 cổng CI mới (đều đã chứng minh báo ĐỎ khi có vi phạm, XANH khi gỡ)
 
-| Lệnh                          | Chặn lớp lỗi                                                                                                                    | Job CI                |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| `npm run check:route-perms`   | Handler `POST/PATCH/PUT/DELETE` không tham chiếu `CAN.`/`canTouchTask`/`canTouchPackage`/`requireApiKey`                        | `static`              |
-| `npm run check:project-scope` | Route nhận `projectId` trần từ client (body/formData/**query**) không qua `chotProjectIdChoGhi` — quét **toàn bộ `app/api/**`** | `static`              |
-| `npm run check:db-params`     | Truyền mảng cho `query`/`queryOne`/`run`/`insertId` của `lib/db`                                                                | `static`              |
-| `npm run check:mau-accent`    | `text-white` trên nền accent sáng (FAIL WCAG) + hover no-op                                                                     | `static`              |
-| `npm run check:coverage`      | Coverage tụt quá ngưỡng đệm 1% so với mốc `coverage-baseline.json`                                                              | `test` (cần Postgres) |
+| Lệnh                          | Chặn lớp lỗi                                                                                                                      | Job CI                |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `npm run check:route-perms`   | Handler `POST/PATCH/PUT/DELETE` không tham chiếu `CAN.`/`canTouchTask`/`canTouchPackage`/`requireApiKey`                          | `static`              |
+| `npm run check:project-scope` | Route nhận `projectId` trần từ client (body/formData/**query**) không qua `chotProjectIdChoGhi` — quét **toàn bộ `app/api/**`\*\* | `static`              |
+| `npm run check:db-params`     | Truyền mảng cho `query`/`queryOne`/`run`/`insertId` của `lib/db`                                                                  | `static`              |
+| `npm run check:mau-accent`    | `text-white` trên nền accent sáng (FAIL WCAG) + hover no-op                                                                       | `static`              |
+| `npm run check:coverage`      | Coverage tụt quá ngưỡng đệm 1% so với mốc `coverage-baseline.json`                                                                | `test` (cần Postgres) |
 
 ### W1 — Vá 101 lời gọi SQL sai kiểu + 4 lỗi schema (`route: spec`)
 
@@ -3190,7 +3248,7 @@ lỗi đã sửa cho 10 file khác ở đợt 2026-08-22); bổ sung dọn chu�
 <summary>Ghi nhận gốc lúc mới phát hiện (giữ nguyên để đối chiếu)</summary>
 
 **Phát hiện khi chạy
-`npm test -- --release-gate` **1 lần trên Postgres 16 vừa migrate sạch** (không phải môi trường
+`npm test -- --release-gate` **1 lần trên Postgres 16 vừa migrate sạch\*\* (không phải môi trường
 tích luỹ dữ liệu cũ) để xác nhận migration `0089`/`0091`/`0092`, đối chiếu thêm bằng log CI thật
 của PR #370 trên GitHub Actions (cùng kết quả, không phải lỗi máy cục bộ). Không file nào thuộc
 `lib/cad`/`chuan-hoa-ban-ve` — không liên quan Việc 7 hay M99.
@@ -3216,7 +3274,7 @@ exist`.
 **Nghi vấn:** các bảng OS-_/PIN-_ thuộc track "Vision Complete" (`docs/nang-cap/OS-*.md`, còn
 Draft/conditional) — có khả năng test được viết trước cho schema dự kiến nhưng migration thật
 đã đổi tên cột sau đó mà không cập nhật lại test/code liên quan, hoặc ngược lại. Cần đọc lại
-migration liên quan (`0084`–`0087` và các bản OS-* nếu có) đối chiếu với code/test trước khi sửa,
+migration liên quan (`0084`–`0087` và các bản OS-\* nếu có) đối chiếu với code/test trước khi sửa,
 không đoán hướng nào đúng.
 
 _Kết luận sau khi điều tra: nghi vấn trên **sai** — không có migration nào từng định nghĩa các
@@ -3776,7 +3834,7 @@ thật `parseDxf()` + đối chứng cũ↔mới trên corpus ~1.900 chuỗi lay
   - `engineering_pipe_nesting_runs`: Lưu trữ kế hoạch cắt phôi ống 1D tối ưu thuật toán FFD.
   - `engineering_hydraulic_checks`: Lưu trữ kết quả kiểm tra thủy lực (Hazen-Williams / Darcy-Weisbach) và cảnh báo vận tốc Invariant.
   - `engineering_bcf_issues`: openBIM BCF Collaboration Issue Tracker (ISO 21597) gắn camera 3D viewpoint.
-  - `engineering_bim_routing_runs`: Lưu trữ lịch sử tìm tuyến nắn ống không gian 3D A* tự động tránh va chạm kết cấu.
+  - `engineering_bim_routing_runs`: Lưu trữ lịch sử tìm tuyến nắn ống không gian 3D A\* tự động tránh va chạm kết cấu.
 - **[AI, đã làm] Vá lỗi cốt lõi (B1–B10 Bugs Resolved):**
   - **B1 Fix:** Chuyển đổi toàn bộ `$1,$2` placeholder sang `?` trong `lib/ky-thuat/engineering-scan-to-bim.ts`.
   - **B2 Fix:** Ghi nhận và lưu phiên so sánh bản vẽ `saveCadDiffSession` vào CSDL trên `POST /api/engineering/cad/diff`.
@@ -3798,10 +3856,10 @@ thật `parseDxf()` + đối chứng cũ↔mới trên corpus ~1.900 chuỗi lay
 - **[AI, đã làm] Core BCF & 3D Auto-Routing Engine (`lib/ky-thuat/engineering-bim-routing.ts`):**
   - openBIM BCF Collaboration format (ISO 21597) với Camera Viewpoint 3D (vị trí, hướng nhìn, vector up, FOV) và luồng phân công/duyệt.
   - Thuật toán phân vùng không gian 3D Spatial Grid Index phát hiện va chạm nhanh $O(n \log n)$.
-  - Thuật toán 3D A* Auto-Routing tìm đường đi trực giao, tự động chèn cút né dầm và bảo toàn độ dốc ống trọng lực $1.0\% - 2.0\%$.
+  - Thuật toán 3D A\* Auto-Routing tìm đường đi trực giao, tự động chèn cút né dầm và bảo toàn độ dốc ống trọng lực $1.0\% - 2.0\%$.
 - **[AI, đã làm] Bộ REST API Mới:**
   - `GET/POST /api/engineering/cad-nesting` (Nesting 1D/2D, Thủy lực, QR Spool).
-  - `GET/POST /api/engineering/bim-routing` (BCF openBIM Issue Tracker, 3D A* Routing, Spatial Grid Clash).
+  - `GET/POST /api/engineering/bim-routing` (BCF openBIM Issue Tracker, 3D A\* Routing, Spatial Grid Clash).
 - **[AI, đã làm] Giao diện người dùng Nâng cấp & Mới:**
   - `app/engineering/scan-to-bim/page.tsx`: Tạo mới trang Scan-to-BIM Reality Capture & Closed-Loop Quality Engine (3 tabs: Deviation Heatmap, Point Cloud Ingestion, Closed-Loop Sync).
   - `app/engineering/cad-nesting/page.tsx`: Tạo mới trang CAD Fabrication Nesting & MEPF Hydraulic Studio (4 tabs: 1D Nesting, 2D Duct CNC, Thủy lực MEPF, Tem QR Spool).
@@ -3810,7 +3868,7 @@ thật `parseDxf()` + đối chứng cũ↔mới trên corpus ~1.900 chuỗi lay
   - `app/components/EngineeringNav.tsx`: Bổ sung 2 phân hệ mới, nâng tổng số module lên 34.
 - **[AI, đã làm] Kiểm thử tự động Toàn diện:**
   - `tests/engineering-cad-nesting.test.ts` (1D/2D Nesting, Hazen-Williams, Darcy-Weisbach, Velocity Invariants, QR).
-  - `tests/engineering-bim-routing.test.ts` (Spatial Grid Clash, 3D A* Routing).
+  - `tests/engineering-bim-routing.test.ts` (Spatial Grid Clash, 3D A\* Routing).
   - `tests/engineering-bim-viewer.test.ts` (Parametric Meshes, 4D Time-Lapse, 3D Section Cut, Pset filter).
   - `tests/engineering-scan-to-bim.test.ts` (Nearest-neighbor 3D matching, Fallback to design).
 - **Verify:** Typecheck 0 lỗi, lint 0 lỗi 0 warnings, 122 migrations hợp lệ, 181 test files pass 100%, build production thành công.
@@ -3906,7 +3964,7 @@ thật `parseDxf()` + đối chứng cũ↔mới trên corpus ~1.900 chuỗi lay
 
 - **[AI, đã làm] Migration 0111:** `migrations/0111_auto_routing_sleeve_matrix.sql` tạo 2 bảng `engineering_sleeve_schedules` và `engineering_auto_routes` kèm RLS strict.
 - **[AI, đã làm] Core Auto-Routing & Beam Sleeve Engine (`lib/ky-thuat/engineering-auto-routing.ts`):**
-  - Thuật toán 3D A* Pathfinding (`findOptimalRoute3D`) tránh hộp chướng ngại vật AABB và tối ưu hóa số lượng Co lơ (Elbows) giảm sụt áp $Pa$.
+  - Thuật toán 3D A\* Pathfinding (`findOptimalRoute3D`) tránh hộp chướng ngại vật AABB và tối ưu hóa số lượng Co lơ (Elbows) giảm sụt áp $Pa$.
   - Thuật toán kiểm chuẩn kết cấu lỗ khoét dầm (`validateBeamSleeve`): Kiểm tra đường kính $D \le 0.33H$, vị trí $0.2L \le x \le 0.4L$ và chiều dày lớp bảo vệ trên/dưới.
   - Ma trận phân cấp ưu tiên nhường đường đa hệ (`recommendClashResolution`): Thoát nước trọng lực $>$ Ống gió lớn HVAC $>$ PCCC Sprinkler $>$ Cấp nước $>$ Máng cáp điện.
 - **[AI, đã làm] Bộ REST API:** `POST /api/engineering/routing/compute`, `GET/POST /api/engineering/routing/sleeves`.
@@ -4320,7 +4378,7 @@ track ENG". **Đo trước, không sửa theo cảm tính:**
   mất RLS ngoài ý muốn. Riêng nhóm `engineering_*` khai theo **tiền tố**, nên thêm bảng mới
   mà quên bật là đỏ ngay.
 - **[AI, chứng minh guard không phải trang trí]** `DISABLE ROW LEVEL SECURITY` trên
-  `engineering_conflicts` → test đỏ đúng thông điệp "Bảng engineering_\* mới thêm nhưng CHƯA
+  `engineering_conflicts` → test đỏ đúng thông điệp "Bảng engineering\_\* mới thêm nhưng CHƯA
   bật RLS"; bật lại thì xanh.
 - **Verify**: `tests/rls.test.ts` **5/5**; `lint` 0 lỗi, `typecheck` xanh.
 
