@@ -178,17 +178,10 @@ public static class PhepKiemMoRong
     private static string KhoaCap(string a, string b) =>
         string.CompareOrdinal(a, b) <= 0 ? $"{a}|{b}" : $"{b}|{a}";
 
-    private static IEnumerable<(double X, double Y)> GiaoDiemGiuaHaiTim(CenterlineInfo a, CenterlineInfo b)
-    {
-        for (var i = 0; i + 1 < a.Vertices.Count; i++)
-        {
-            for (var j = 0; j + 1 < b.Vertices.Count; j++)
-            {
-                var d = Segment2D.GiaoDiem(a.Vertices[i], a.Vertices[i + 1], b.Vertices[j], b.Vertices[j + 1]);
-                if (d is { } diem) yield return diem;
-            }
-        }
-    }
+    // Thuật toán dò giao điểm nằm ở Segment2D.GiaoDiemGiuaHaiChuoi — dùng chung với
+    // XBOSS_VE_NGATNET (M109 FR2), phép kiểm 11 chỉ lấy phần toạ độ.
+    private static IEnumerable<(double X, double Y)> GiaoDiemGiuaHaiTim(CenterlineInfo a, CenterlineInfo b) =>
+        Segment2D.GiaoDiemGiuaHaiChuoi(a.Vertices, b.Vertices).Select(g => (g.X, g.Y));
 
     // ===== (12) Khung tên thiếu/sai trường =====
 
