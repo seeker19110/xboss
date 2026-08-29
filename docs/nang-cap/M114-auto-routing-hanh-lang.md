@@ -4,8 +4,8 @@
 | :--------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Vẽ tuyến nhánh tới hàng trăm thiết bị là việc lặp lại thuần túy; kỹ sư chuẩn bị hành lang một lần rồi máy đi tuyến từng hệ                                  |
 | Spec owner       | Seeker / Chief Engineering Architect                                                                                                                        |
-| State            | **Draft** — chờ duyệt                                                                                                                                       |
-| Người/ngày duyệt |                                                                                                                                                             |
+| State            | **Approved for implementation**                                                                                                                             |
+| Người/ngày duyệt | Seeker / 2026-08-29                                                                                                                                         |
 | Cập nhật         | 2026-08-29                                                                                                                                                  |
 | Nghiên cứu nền   | `RESEARCH-AUTO-ROUTING-MEPF.md` (2026-08-29) — đọc trước, tệp này không lặp lại phần khảo sát hiện trạng                                                    |
 | Phụ thuộc        | M100 (`XBOSS_VE` XData tim, layer chuẩn, `EdgeOffset`), M101 PR3 (`Core/Zoning/VungClipper.cs`), M106 (hộp thoại WPF), M107 (khuôn "nhận đối tượng có sẵn") |
@@ -233,21 +233,22 @@ polyline hay giữ nhiều polyline rời. **Không được tự quyết:** b�
 
 ## 12. Rủi ro / open decisions
 
-| Mục                                                            | Giảm thiểu                                                                                            | Quyết định                           |
-| :------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------- | :----------------------------------- |
-| Tuyến ra "đúng máy nhưng xấu mắt kỹ sư"                        | γ gom trục + α phạt chuyển hướng; xem trước bắt buộc; kỹ sư sửa nhánh nào cũng được và được tôn trọng | Chấp nhận                            |
-| Hai bản cấp làn (C#/TS) trôi khác nhau                         | Tham số ở rule pack + đối chứng `routing-doi-chung.json` (cơ chế đã trị rủi ro số 1 của M99)          | Chốt                                 |
-| `lanDaCap` bẩn khi lệnh lỗi giữa chừng                         | NFR3 nguyên tử + AC12; gỡ chiếm chỗ cũ trước khi dựng lại (FR13)                                      | Chốt                                 |
-| Vẽ hành lang là việc thêm cho kỹ sư                            | Chế độ **nhận** polyline có sẵn (§2 #1) bỏ được phần lớn công vẽ                                      | Chấp nhận                            |
-| Một nhánh nên tách polyline riêng hay nối liền vào trục chung? | Ảnh hưởng cách `XBOSS_BOCKL` đếm và cách `_CHIADOT` chia — cần thử trên bản vẽ thật                   | **Open — chốt ở PR4 với bằng chứng** |
-| Bản sau có nên chạy nhiều hệ một lượt?                         | Chỉ mở sau khi một-hệ-một-lượt chạy ổn qua pilot; khi làm phải mở M mới                               | **Open — để sau**                    |
+| Mục                                                            | Giảm thiểu                                                                                            | Quyết định                                                                                                 |
+| :------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------- |
+| Tuyến ra "đúng máy nhưng xấu mắt kỹ sư"                        | γ gom trục + α phạt chuyển hướng; xem trước bắt buộc; kỹ sư sửa nhánh nào cũng được và được tôn trọng | Chấp nhận                                                                                                  |
+| Hai bản cấp làn (C#/TS) trôi khác nhau                         | Tham số ở rule pack + đối chứng `routing-doi-chung.json` (cơ chế đã trị rủi ro số 1 của M99)          | Chốt                                                                                                       |
+| `lanDaCap` bẩn khi lệnh lỗi giữa chừng                         | NFR3 nguyên tử + AC12; gỡ chiếm chỗ cũ trước khi dựng lại (FR13)                                      | Chốt                                                                                                       |
+| Vẽ hành lang là việc thêm cho kỹ sư                            | Chế độ **nhận** polyline có sẵn (§2 #1) bỏ được phần lớn công vẽ                                      | Chấp nhận                                                                                                  |
+| Một nhánh nên tách polyline riêng hay nối liền vào trục chung? | Ảnh hưởng cách `XBOSS_BOCKL` đếm và cách `_CHIADOT` chia — cần thử trên bản vẽ thật                   | **Hoãn có chủ đích tới PR4** — cần đo trên bản vẽ thật; PR1–PR3 không phụ thuộc, nên không chặn việc duyệt |
+| Bản sau có nên chạy nhiều hệ một lượt?                         | Chỉ mở sau khi một-hệ-một-lượt chạy ổn qua pilot; khi làm phải mở M mới                               | **Chốt 2026-08-29: không** — chỉ xét lại sau khi một-hệ-một-lượt qua pilot, và phải mở M mới               |
 
 ## 13. Approval
 
-- [ ] Product/scope
-- [ ] UX (xem trước bắt buộc, tôn trọng sửa tay)
-- [ ] Architecture (đồ thị hành lang, chiếm chỗ sống trong DWG, Core-thuần)
-- [ ] Test/đối chứng 2 tầng/verify tay
-- [ ] Không còn blocking question (2 mục Open ở §12)
+- [x] Product/scope
+- [x] UX (xem trước bắt buộc, tôn trọng sửa tay)
+- [x] Architecture (đồ thị hành lang, chiếm chỗ sống trong DWG, Core-thuần)
+- [x] Test/đối chứng 2 tầng/verify tay
+- [x] Không còn blocking question — §12 đã chốt; riêng "nhánh tách riêng hay nối liền" **hoãn có chủ đích tới PR4** (cần đo trên bản vẽ thật, PR1–PR3 không phụ thuộc)
 
-**Kết luận:** Draft — chờ duyệt.
+**Kết luận:** **Approved for implementation** (người dùng chốt 2026-08-29: "duyệt tất cả").
+**Người/ngày duyệt:** Seeker / 2026-08-29

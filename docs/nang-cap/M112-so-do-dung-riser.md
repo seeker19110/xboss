@@ -4,8 +4,8 @@
 | :--------------- | :---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Hồ sơ MEPF bắt buộc có sơ đồ đứng cho mỗi trục kỹ thuật; hiện vẽ tay hoàn toàn và **luôn lệch** so với mặt bằng sau vài vòng sửa                |
 | Spec owner       | Seeker / Chief Engineering Architect                                                                                                            |
-| State            | **Draft** — chờ duyệt                                                                                                                           |
-| Người/ngày duyệt |                                                                                                                                                 |
+| State            | **Approved for implementation**                                                                                                                 |
+| Người/ngày duyệt | Seeker / 2026-08-29                                                                                                                             |
 | Cập nhật         | 2026-08-28                                                                                                                                      |
 | Nguồn            | `M100-xboss-ve-shop-drawing.md` §20 hàng 4 ("cần dữ liệu liên tầng có cấu trúc — chỉ khả thi sau khi nhân bản tầng + vùng/tầng M101 chạy thật") |
 | Phụ thuộc        | **M111 (nhân bản tầng — nguồn dữ liệu tầng)**, M100 (`SectionBuilder`, `sheetSetup`, XData), M101 PR3 (vùng), M106 (hộp thoại)                  |
@@ -192,20 +192,21 @@ tệp DWG khác, hay bỏ bất biến NFR3.
 
 ## 10. Rủi ro / open decisions
 
-| Mục                                                 | Giảm thiểu                                                                          | Quyết định                    |
-| :-------------------------------------------------- | :---------------------------------------------------------------------------------- | :---------------------------- |
-| Sơ đồ là snapshot nên lệch dần khi mặt bằng đổi     | Phép kiểm FR10 báo cũ; `staleWarnDays: 0` mặc định báo ngay                         | Chấp nhận (đúng lối `MATCAT`) |
-| Mọi tầng phải nằm cùng một DWG                      | Đúng đầu ra của M111; ghi rõ ở §3 non-goals và trong `CAI-DAT.md`                   | Chốt                          |
-| Trục xuyên nhiều tệp (tháp chia tệp theo khối tầng) | Ngoài phạm vi; nếu cần thì mở M mới (đụng dữ liệu liên tệp = đụng server)           | **Open — xác nhận khi duyệt** |
-| Vẽ sơ đồ theo tỉ lệ đứng thật hay giãn đều?         | Bản đầu **theo tỉ lệ cao độ thật** (AC1) — đọc đúng khoảng cách tầng                | **Open — chốt khi duyệt**     |
-| M111 chưa chạy pilot mà đã làm M112                 | Điều kiện tiên quyết ghi ngay đầu tệp; coordinator không được dispatch khi chưa đạt | Chốt                          |
+| Mục                                                 | Giảm thiểu                                                                          | Quyết định                                             |
+| :-------------------------------------------------- | :---------------------------------------------------------------------------------- | :----------------------------------------------------- |
+| Sơ đồ là snapshot nên lệch dần khi mặt bằng đổi     | Phép kiểm FR10 báo cũ; `staleWarnDays: 0` mặc định báo ngay                         | Chấp nhận (đúng lối `MATCAT`)                          |
+| Mọi tầng phải nằm cùng một DWG                      | Đúng đầu ra của M111; ghi rõ ở §3 non-goals và trong `CAI-DAT.md`                   | Chốt                                                   |
+| Trục xuyên nhiều tệp (tháp chia tệp theo khối tầng) | Ngoài phạm vi; nếu cần thì mở M mới (đụng dữ liệu liên tệp = đụng server)           | **Chốt 2026-08-29: ngoài phạm vi** — cần thì mở M mới  |
+| Vẽ sơ đồ theo tỉ lệ đứng thật hay giãn đều?         | Bản đầu **theo tỉ lệ cao độ thật** (AC1) — đọc đúng khoảng cách tầng                | **Chốt 2026-08-29: theo tỉ lệ cao độ thật** (đúng AC1) |
+| M111 chưa chạy pilot mà đã làm M112                 | Điều kiện tiên quyết ghi ngay đầu tệp; coordinator không được dispatch khi chưa đạt | Chốt                                                   |
 
 ## 11. Approval
 
-- [ ] Product/scope
-- [ ] UX (2 lệnh tách bạch, cảnh báo bỏ sót)
-- [ ] Architecture (snapshot + phép kiểm cũ hơn, loại trừ takeoff)
-- [ ] Test/verify tay
-- [ ] Không còn blocking question (2 mục Open ở §10)
+- [x] Product/scope
+- [x] UX (2 lệnh tách bạch, cảnh báo bỏ sót)
+- [x] Architecture (snapshot + phép kiểm cũ hơn, loại trừ takeoff)
+- [x] Test/verify tay
+- [x] Không còn blocking question — 2 mục Open ở §10 đã chốt 2026-08-29
 
-**Kết luận:** Draft — chờ duyệt.
+**Kết luận:** **Approved for implementation** (người dùng chốt 2026-08-29: "duyệt tất cả").
+**Người/ngày duyệt:** Seeker / 2026-08-29

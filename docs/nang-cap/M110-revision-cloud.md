@@ -4,8 +4,8 @@
 | :--------------- | :----------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Đánh dấu vùng đã sửa giữa hai lần phát hành để CĐT/tư vấn thấy ngay "lần này sửa gì ở đâu", thay vì phải dò cả tờ bản vẽ |
 | Spec owner       | Seeker / Chief Engineering Architect                                                                                     |
-| State            | **Draft** — chờ duyệt                                                                                                    |
-| Người/ngày duyệt |                                                                                                                          |
+| State            | **Approved for implementation**                                                                                          |
+| Người/ngày duyệt | Seeker / 2026-08-29                                                                                                      |
 | Cập nhật         | 2026-08-28                                                                                                               |
 | Nguồn            | `M100-xboss-ve-shop-drawing.md` §20 hàng 2                                                                               |
 | Phạm vi đã chốt  | **Chỉ phần CAD** (người dùng chốt 2026-08-28) — không đụng server/web, không liên kết `drawing_revisions` trong đợt này  |
@@ -196,10 +196,11 @@ Cả 2 PR `route: spec` — đặc tả kín, không có chỗ phải cân nhắ
 
 ## 12. Approval
 
-- [ ] Product/scope (CAD-only)
-- [ ] UX (hộp thoại + cảnh báo bỏ sót)
-- [ ] Architecture (mốc trong DWG, append-only số revision)
-- [ ] Test/verify tay
-- [ ] Không còn blocking question
+- [x] Product/scope (CAD-only)
+- [x] UX (hộp thoại + cảnh báo bỏ sót)
+- [x] Architecture (mốc trong DWG, append-only số revision)
+- [x] Test/verify tay
+- [x] Không còn blocking question
 
-**Kết luận:** Draft — chờ duyệt.
+**Kết luận:** **Approved for implementation** (người dùng chốt 2026-08-29: "duyệt tất cả").
+**Người/ngày duyệt:** Seeker / 2026-08-29

@@ -4,8 +4,8 @@
 | :--------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Tháp căn hộ (AVIO) có hàng chục tầng điển hình giống hệt nhau; vẽ xong 1 tầng rồi chép sang N tầng phải giữ nguyên dữ liệu XBoss và tự đổi tag/tên vùng theo tầng |
 | Spec owner       | Seeker / Chief Engineering Architect                                                                                                                              |
-| State            | **Draft** — chờ duyệt                                                                                                                                             |
-| Người/ngày duyệt |                                                                                                                                                                   |
+| State            | **Approved for implementation**                                                                                                                                   |
+| Người/ngày duyệt | Seeker / 2026-08-29                                                                                                                                               |
 | Cập nhật         | 2026-08-28                                                                                                                                                        |
 | Nguồn            | `M100-xboss-ve-shop-drawing.md` §20 hàng 3 ("giá trị lớn nhưng rủi ro nhân bản lỗi hàng loạt")                                                                    |
 | Phụ thuộc        | M100 (XData 2 chiều, `TagSchedule` pattern `{type}-{floor}-{seq}`), M101 PR3 (bóc theo vùng — `Core/Zoning/`), M105 (chia đốt), M106 (hộp thoại)                  |
@@ -191,20 +191,21 @@ tự quyết:** bỏ bất kỳ guardrail nào ở §2, đổi `copyRoles`, hay 
 
 ## 10. Rủi ro / open decisions
 
-| Mục                                                                  | Giảm thiểu                                                                                              | Quyết định                        |
-| :------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------ | :-------------------------------- |
-| Nhân bản sai hàng loạt (lý do M100 §20 hoãn mục này)                 | Xem trước bắt buộc FR3 + nguyên tử NFR2 + AC3/AC6 + verify tay trên bản vẽ AVIO thật                    | Chấp nhận với đủ 4 chốt           |
-| `DeepCloneObjects` không chép XData trên vài loại thực thể           | Phải xác minh **ngay đầu PR2** trên máy có AutoCAD; nếu thiếu thì tự ghi lại XData sau khi clone        | Xác minh trước khi code tiếp      |
-| Kiểm handle mồ côi: lệnh riêng hay phép kiểm trong `XBOSS_KIEMTRA`?  | Phép kiểm trong `XBOSS_KIEMTRA` có lợi lâu dài (mọi lệnh đều được canh), tốn thêm một số hiệu phép kiểm | **Open — chốt khi duyệt**         |
-| Tầng nguồn chưa chuẩn (KIEMTRA đang đỏ) thì chép nhân lỗi lên N tầng | Hộp thoại cảnh báo nếu `XBOSS_KIEMTRA` gần nhất có lỗi; **không chặn** (kỹ sư quyết)                    | **Open — chặn hay chỉ cảnh báo?** |
-| Bản chép trong cùng model space làm bản vẽ quá nặng                  | `layoutMode` cho phép chọn lưới; ghi khuyến nghị mỗi tệp ≤ 10 tầng trong `CAI-DAT.md`                   | Chấp nhận                         |
+| Mục                                                                  | Giảm thiểu                                                                                              | Quyết định                                                                                                                   |
+| :------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------------------------------------- |
+| Nhân bản sai hàng loạt (lý do M100 §20 hoãn mục này)                 | Xem trước bắt buộc FR3 + nguyên tử NFR2 + AC3/AC6 + verify tay trên bản vẽ AVIO thật                    | Chấp nhận với đủ 4 chốt                                                                                                      |
+| `DeepCloneObjects` không chép XData trên vài loại thực thể           | Phải xác minh **ngay đầu PR2** trên máy có AutoCAD; nếu thiếu thì tự ghi lại XData sau khi clone        | Xác minh trước khi code tiếp                                                                                                 |
+| Kiểm handle mồ côi: lệnh riêng hay phép kiểm trong `XBOSS_KIEMTRA`?  | Phép kiểm trong `XBOSS_KIEMTRA` có lợi lâu dài (mọi lệnh đều được canh), tốn thêm một số hiệu phép kiểm | **Chốt 2026-08-29: phép kiểm trong `XBOSS_KIEMTRA`** — canh được mọi lệnh, không chỉ M111                                    |
+| Tầng nguồn chưa chuẩn (KIEMTRA đang đỏ) thì chép nhân lỗi lên N tầng | Hộp thoại cảnh báo nếu `XBOSS_KIEMTRA` gần nhất có lỗi; **không chặn** (kỹ sư quyết)                    | **Chốt 2026-08-29: CẢNH BÁO, KHÔNG CHẶN** — bản vẽ người khác luôn có lỗi tồn đọng; xem trước + nguyên tử đã đủ chốt an toàn |
+| Bản chép trong cùng model space làm bản vẽ quá nặng                  | `layoutMode` cho phép chọn lưới; ghi khuyến nghị mỗi tệp ≤ 10 tầng trong `CAI-DAT.md`                   | Chấp nhận                                                                                                                    |
 
 ## 11. Approval
 
-- [ ] Product/scope
-- [ ] UX (xem trước bắt buộc)
-- [ ] Architecture (ánh xạ handle, nguyên tử)
-- [ ] Test/verify tay (AC3 tự động)
-- [ ] Không còn blocking question (2 mục Open ở §10)
+- [x] Product/scope
+- [x] UX (xem trước bắt buộc)
+- [x] Architecture (ánh xạ handle, nguyên tử)
+- [x] Test/verify tay (AC3 tự động)
+- [x] Không còn blocking question — 2 mục Open ở §10 đã chốt 2026-08-29
 
-**Kết luận:** Draft — chờ duyệt.
+**Kết luận:** **Approved for implementation** (người dùng chốt 2026-08-29: "duyệt tất cả").
+**Người/ngày duyệt:** Seeker / 2026-08-29

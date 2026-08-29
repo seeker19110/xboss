@@ -119,13 +119,12 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 >
 > **⇒ Đợt plugin AutoCAD giai đoạn 2 (M99 → M102) đã đóng toàn bộ về mặt code.** Việc còn lại của cả đợt là một cổng duy nhất: verify tay trên máy có AutoCAD 2026. Hướng đi tiếp đã rà nhưng **chưa có đặc tả**: gán ngữ nghĩa sâu hơn (đồ thị kết nối tuyến–thiết bị), phối hợp xung đột 2D liên hệ (combined services), và các mục để lại ở M100 §20. **Cập nhật 2026-08-28:** toàn bộ M100 §20 nay ĐÃ CÓ đặc tả (M109–M113 dưới đây, State Draft — chờ duyệt); 2 hướng lớn còn lại (đồ thị kết nối, combined services) vẫn chưa có đặc tả theo phạm vi người dùng chốt 2026-08-28.
 
-## Đặc tả CHỜ DUYỆT — đóng nốt M100 §20 (viết 2026-08-28)
+## Đặc tả ĐÃ DUYỆT — đóng nốt M100 §20 (viết 2026-08-28, duyệt 2026-08-29)
 
 > Sinh từ yêu cầu người dùng 2026-08-28 ("viết nốt đặc tả cho hướng còn lại"); phạm vi + 3 ngã rẽ
 > thiết kế chốt qua `AskUserQuestion` cùng ngày: **chỉ làm các mục M100 §20** (2 hướng lớn — đồ thị
 > kết nối tuyến–thiết bị, combined services — để sau), revision cloud **chỉ phần CAD**, phối hợp xung
-> đột (nếu làm sau) đi đường "đề xuất, kỹ sư quyết". Cả 5 tệp State **Draft — không code khi chưa
-> Approved**.
+> đột (nếu làm sau) đi đường "đề xuất, kỹ sư quyết". Cả 5 tệp **Approved for implementation 2026-08-29**.
 >
 > **M109 (`M109-ngat-net-giao-cheo.md`)** — `XBOSS_VE_NGATNET`/`_XOA`: ngắt nét tuyến đi dưới tại
 > chỗ giao (wipeout cho tuyến 2 nét biên, cầu vượt cho tuyến đơn nét), thứ tự trên–dưới theo
@@ -177,7 +176,39 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > **M108 — Nạp block hàng loạt từ file tổng hợp + gợi ý phân loại bằng AI** (`M108-nap-block-hang-loat-va-goi-y-ai.md`): ✅ **Approved for implementation 2026-08-26.** Đóng khoảng trống duy nhất còn lại của đường nạp thư viện block: hiện M103 (`XBOSS_VE_DEXUAT`) và M104 (`POST /api/engineering/cad/block-lib/blocks`) đều **một block một lần, người tự khai `kind`** — một tệp thư viện 200 block cần 200 lượt thao tác. M108 nạp cả tệp trong một lượt, phân loại **4 tầng** (luật tất định → khớp ngữ nghĩa → vision trên `dungPreviewSvg` → **người duyệt theo lô**), trùng tên thì bỏ qua kèm lý do; tái dùng cùng cỗ máy để **gợi ý `layerMap`** và **gợi ý `boqCode` per-project**. Là chỗ **đầu tiên** đưa SDK LLM vào codebase XBoss (`lib/nen/ai.ts`, `claude-opus-5`, structured output ép enum + Batches API + prompt caching), theo đúng boundary ENG-0/ENG-1: gọi **từ server**, kết quả **luôn** vào hàng chờ duyệt, AI **không đo hình học / không tự phát hành / không ghi thẳng DB**; thiếu `ANTHROPIC_API_KEY` hoặc `XBOSS_AI_BLOCK_CLASSIFY=0` → tầng 2/3 tự tắt, tầng 1 chạy bình thường. 5 PR, migration `0144` thêm thuần. 4 quyết định nền đã chốt với người dùng qua `AskUserQuestion` 2026-08-26 (§4); 3 open decision còn lại ở §18.
 > **M102 (`M102-plugin-ui.md`)** — giao diện UI plugin AutoCAD: tab Ribbon "XBoss" (5 panel/25 nút dựng từ danh mục `XBoss.Cad.Core/Ui/LenhCatalog.cs` — nguồn sự thật duy nhất, test đối chiếu với mọi `[CommandMethod]`) + bảng điều khiển `XBOSS_BANG` (PaletteSet chỉ-đọc: trạng thái đăng nhập/rule pack/sidecar JSON cạnh DWG). ✅ **Đã triển khai 2026-08-25** — xem `PROGRESS.md`.
 
-## Nghiên cứu + đặc tả CHỜ DUYỆT — auto-routing MEPF (2026-08-29)
+## ✅ Duyệt trọn gói M109–M114 (2026-08-29) — thứ tự thi hành
+
+> Người dùng chốt **"duyệt tất cả"** 2026-08-29. Cả 6 đặc tả chuyển sang
+> **Approved for implementation**; **8/9 mục Open đã chốt ngay khi duyệt** (ghi trong §Rủi ro của
+> từng tệp), mục còn lại của M114 **hoãn có chủ đích tới PR4** vì cần đo trên bản vẽ thật — PR1–PR3
+> không phụ thuộc nên không chặn.
+>
+> **Các quyết định chốt lúc duyệt:**
+>
+> | Đặc tả | Mục                           | Chốt                                                                                                        |
+> | ------ | ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
+> | M109   | `priority` mặc định           | Giữ trong rule pack; dự án khác thì sửa qua `?project=`                                                     |
+> | M111   | Kiểm handle mồ côi            | **Phép kiểm trong `XBOSS_KIEMTRA`** (canh được mọi lệnh, không riêng M111)                                  |
+> | M111   | Tầng nguồn đang đỏ KIEMTRA    | **Cảnh báo, KHÔNG chặn** — bản vẽ người khác luôn có lỗi tồn đọng; xem trước + nguyên tử đã đủ chốt an toàn |
+> | M112   | Trục xuyên nhiều tệp          | Ngoài phạm vi; cần thì mở M mới                                                                             |
+> | M112   | Tỉ lệ sơ đồ đứng              | **Theo tỉ lệ cao độ thật** (đúng AC1)                                                                       |
+> | M113   | Ai phát hành bộ block dự án   | **`CAN.manageDrawings` trong phạm vi dự án** — PM dự án làm được                                            |
+> | M113   | Tầng `org_id`                 | Chưa làm; xem lại sau UAT đa tổ chức                                                                        |
+> | M114   | Nhiều hệ một lượt             | Không; chỉ xét lại sau pilot, phải mở M mới                                                                 |
+> | M114   | Nhánh tách riêng hay nối liền | **Hoãn tới PR4** — đo trên bản vẽ thật rồi chốt                                                             |
+>
+> **Thứ tự thi hành khuyến nghị** (theo phụ thuộc cứng + rủi ro):
+>
+> 1. **M109** (ngắt nét giao chéo) và **M113** (thư viện block theo dự án) — độc lập, làm song song
+>    được. M113 PR1 **phải qua staging** (migration đụng ràng buộc trên dữ liệu đang có).
+> 2. **M110** (revision cloud) — độc lập, chỉ CAD.
+> 3. **M111** (nhân bản tầng) — **rủi ro cao nhất cả bộ**; verify tay trên bản vẽ AVIO thật trước khi
+>    phát hành rộng.
+> 4. **M114** (auto-routing) — độc lập về code nhưng nên đi sau M109 để `crossingPolicy` có sẵn cho
+>    tuyến sinh tự động.
+> 5. **M112** (riser) — **điều kiện tiên quyết: M111 đã chạy thật qua pilot**, không được làm trước.
+
+## Nghiên cứu + đặc tả ĐÃ DUYỆT — auto-routing MEPF (2026-08-29)
 
 > **`RESEARCH-AUTO-ROUTING-MEPF.md`** — nghiên cứu theo yêu cầu "auto route từng hệ riêng 1, hybrid
 > cũng được, kỹ sư chuẩn bị trước rồi auto routing". Phát hiện chính khi đọc code thật: thứ đang mang
