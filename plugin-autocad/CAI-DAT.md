@@ -87,6 +87,12 @@ tự hoặc từ khóa); **ESC bất cứ lúc nào là bản vẽ nguyên trạ
 thì nạp tay: `XBOSS_RULEPACK` cho bộ quy tắc, `XBOSS_VE_THUVIEN` cho thư viện block (chọn tệp
 `manifest.json`, tệp `.dwg` để cạnh nó).
 
+Thư viện block có **hai tầng** (M113): bộ dùng chung toàn công ty + bộ riêng của dự án (khung tên,
+ký hiệu theo CĐT) đè lên. Chọn dự án ở câu hỏi của `XBOSS_LOGIN` là plugin tự tải đúng bộ của dự án
+đó; chưa chọn thì dùng bộ toàn cục như trước. Muốn biết một block đang lấy từ đâu:
+`XBOSS_VE_THUVIEN` → `Nguon` (cột `[Dự án]` / `[Toàn cục]`), hoặc xem dòng "Bộ đang dùng" trên
+bảng `XBOSS_BANG`.
+
 ### Trình tự một buổi vẽ
 
 | Bước | Lệnh                            | Làm gì                                                                                                                                   |

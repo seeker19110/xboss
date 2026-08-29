@@ -59,7 +59,7 @@ lệnh chèn block — thư viện block đã tải (`XBOSS_LOGIN` hoặc `XBOSS
 | `XBOSS_VE_NHAN`    | Bấm tuyến → ghi nhãn size (+ `i=…%`) **lấy từ XData, không gõ tay**, cao chữ quy theo tỉ lệ in; tuyến có độ dốc thì chèn kèm block mũi tên `slope-arrow` theo chiều vẽ tuyến — thư viện chưa có block đó thì **chỉ ghi chữ** (không tự vẽ ký hiệu thay thế)                                                                          |
 | `XBOSS_VE_PHUKIEN` | Chèn phụ kiện (co, tê, giảm, van, miệng gió…) bám tuyến tim: tự xoay theo tiếp tuyến, scale theo size khi manifest khai `scaleBySize`, đúng layer tuyến                                                                                                                                                                              |
 | `XBOSS_VE_THIETBI` | Chèn thiết bị có attribute (`TAG` bắt buộc + `MODEL`/`SIZE`), layer chọn sao cho `XBOSS_BOCKL` đếm được; cảnh báo ngay khi tên block lệch `blockNameMatchAny` của rule pack                                                                                                                                                          |
-| `XBOSS_VE_THUVIEN` | Nạp thư viện block: tải lại từ server hoặc nạp tệp tay (`manifest.json` + `.dwg` cạnh nhau) — đường dự phòng offline như `XBOSS_RULEPACK`; luôn kiểm `sha256` trước khi dùng                                                                                                                                                         |
+| `XBOSS_VE_THUVIEN` | Nạp thư viện block: tải lại từ server, nạp tệp tay (`manifest.json` + `.dwg` cạnh nhau) hoặc `Nguon` = xem nguồn từng block (Toàn cục / Dự án) — đường dự phòng offline như `XBOSS_RULEPACK`; luôn kiểm `sha256` trước khi dùng                                                                                                                                                         |
 | `XBOSS_VE_DOI`     | **Đổi hệ/loại/size** đoạn đã vẽ: đổi layer + XData, **xóa và dựng lại nét biên** theo bề rộng mới, cập nhật nhãn (xóa mũi tên dốc nếu tuyến mới không có độ dốc), và **gỡ đánh dấu bóc** của đúng các đoạn đó kèm cảnh báo "đổi xong phải bóc lại". 1 UNDO trả nguyên trạng                                                          |
 | `XBOSS_VE_TRANGIN` | Trang in chuẩn công ty: layout + page setup (`sheetSetup.plotter`, khổ, CTB) + viewport **đúng tỉ lệ và khóa** + VP-freeze layer ngoài hệ + khung tên từ thư viện đã điền attribute. Vùng in nhận **2 điểm hoặc một polyline ranh giới kín** (lấy hình bao)                                                                          |
 | `XBOSS_VE_MATCAT`  | Mặt cắt bán tự động: kẻ tuyến cắt → dựng ký hiệu đúng loại/size từ XData, đúng khoảng cách ngang thật, tên A-A tự đánh; **cao độ nhập tay** (bản vẽ 2D không chứa cao độ thật — plugin không bịa)                                                                                                                                    |
@@ -189,6 +189,15 @@ Gỡ cài đặt = xoá thư mục `XBoss.bundle` (M99 §17).
 ## Luồng làm việc chuẩn của kỹ sư
 
 1. `XBOSS_LOGIN` (lần đầu / khi token hết hạn) — ghép thiết bị + tự tải rule pack **và thư viện block**. Không có mạng thì dùng `XBOSS_RULEPACK` / `XBOSS_VE_THUVIEN` nạp tệp tay.
+
+   **Thư viện block hai tầng (M113):** đã chọn dự án (câu hỏi chọn dự án của `XBOSS_LOGIN`) thì
+   plugin tải thêm **bản trộn** của dự án đó — block khai riêng cho dự án (khung tên, ký hiệu của
+   CĐT) **đè** bản toàn cục cùng `id`, phần còn lại vẫn dùng bộ dùng chung. Chưa chọn dự án, hoặc
+   dự án chưa phát hành bộ riêng ⇒ y hệt trước: bộ toàn cục. Mỗi bộ có tệp `.dwg` riêng và
+   **kiểm `sha256` riêng**; đổi dự án thì bản trộn cũ hết hiệu lực ngay. Xem đang dùng bộ nào:
+   `XBOSS_BANG` (dòng "Bộ đang dùng") hoặc `XBOSS_VE_THUVIEN` → `Nguon`.
+   Riêng `XBOSS_VE_DEXUAT` (đề xuất block) **vẫn luôn dựng trên bộ toàn cục** — hàng chờ đề xuất
+   theo dự án chưa làm (xem `PROGRESS.md`, nợ đặc tả M113 FR7).
 2. Mở bản vẽ nhận từ CĐT/TVTK → `XBOSS_KIEMTRA` xem mức lệch chuẩn.
 3. `XBOSS_CHUANHOA` → kiểm tra kết quả (sai thì UNDO 1 lần) → QSAVE.
 4. Làm shop drawing bằng bộ lệnh vẽ: `XBOSS_VE_NEN` → `XBOSS_VE` → `XBOSS_VE_PHUKIEN` /
