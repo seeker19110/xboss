@@ -177,6 +177,18 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > **M108 — Nạp block hàng loạt từ file tổng hợp + gợi ý phân loại bằng AI** (`M108-nap-block-hang-loat-va-goi-y-ai.md`): ✅ **Approved for implementation 2026-08-26.** Đóng khoảng trống duy nhất còn lại của đường nạp thư viện block: hiện M103 (`XBOSS_VE_DEXUAT`) và M104 (`POST /api/engineering/cad/block-lib/blocks`) đều **một block một lần, người tự khai `kind`** — một tệp thư viện 200 block cần 200 lượt thao tác. M108 nạp cả tệp trong một lượt, phân loại **4 tầng** (luật tất định → khớp ngữ nghĩa → vision trên `dungPreviewSvg` → **người duyệt theo lô**), trùng tên thì bỏ qua kèm lý do; tái dùng cùng cỗ máy để **gợi ý `layerMap`** và **gợi ý `boqCode` per-project**. Là chỗ **đầu tiên** đưa SDK LLM vào codebase XBoss (`lib/nen/ai.ts`, `claude-opus-5`, structured output ép enum + Batches API + prompt caching), theo đúng boundary ENG-0/ENG-1: gọi **từ server**, kết quả **luôn** vào hàng chờ duyệt, AI **không đo hình học / không tự phát hành / không ghi thẳng DB**; thiếu `ANTHROPIC_API_KEY` hoặc `XBOSS_AI_BLOCK_CLASSIFY=0` → tầng 2/3 tự tắt, tầng 1 chạy bình thường. 5 PR, migration `0144` thêm thuần. 4 quyết định nền đã chốt với người dùng qua `AskUserQuestion` 2026-08-26 (§4); 3 open decision còn lại ở §18.
 > **M102 (`M102-plugin-ui.md`)** — giao diện UI plugin AutoCAD: tab Ribbon "XBoss" (5 panel/25 nút dựng từ danh mục `XBoss.Cad.Core/Ui/LenhCatalog.cs` — nguồn sự thật duy nhất, test đối chiếu với mọi `[CommandMethod]`) + bảng điều khiển `XBOSS_BANG` (PaletteSet chỉ-đọc: trạng thái đăng nhập/rule pack/sidecar JSON cạnh DWG). ✅ **Đã triển khai 2026-08-25** — xem `PROGRESS.md`.
 
+## Nghiên cứu — auto-routing MEPF (2026-08-29)
+
+> **`RESEARCH-AUTO-ROUTING-MEPF.md`** — nghiên cứu theo yêu cầu "auto route từng hệ riêng 1, hybrid
+> cũng được, kỹ sư chuẩn bị trước rồi auto routing". Phát hiện chính khi đọc code thật: thứ đang mang
+> tên auto-routing trong repo (**M77**) **không dùng lại được** — `findOptimalRoute3D` và
+> `solve3DGenerativeRoute` ghi "3D A\*" nhưng là cây quyết định cố định, phép thử va chạm so hộp bao
+> đoạn thẳng nên báo vướng gần như mọi tuyến chéo dài, và cả hai chỉ nhận/trả JSON — **không có đường
+> nào chạy vào bản vẽ**. Thứ đáng giữ: `planMultiTierCorridor` (phân tầng cao độ + làn ngang). M77 đã
+> được **đính chính tài liệu** cùng đợt (khối cảnh báo đầu tệp).
+>
+> Đặc tả đi kèm nghiên cứu này nằm ở PR riêng (`M114-auto-routing-hanh-lang.md`).
+
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 
 > **M62 (`M62-rls-khoa-cua.md`)** — đóng nốt RLS: `withProjectScope` đọc-ghi + bọc 3 route còn lại (`notifications`, `payments/bills`, `payments/floors`) rồi migration "khoá cửa" bỏ nhánh thiếu-ngữ-cảnh (2 PR, `route: spec`; PR2 có điều kiện tiên quyết vận hành). **Đã xong hoàn toàn 2026-07-20** — PR1 (nhánh `claude/plan-m62-m63-7osrkh`, 2026-07-19) và PR2 (`migrations/0077_rls_lock.sql`, PR #300) đều đã merge `main`; người dùng xác nhận cả 2 điều kiện tiên quyết vận hành đủ trước khi merge PR2. Xem `PROGRESS.md`. **M63 (`M63-webhook-ssrf-dns-pinning.md`)** — chống SSRF DNS rebinding cho webhook: resolve + pin IP qua undici `connect.lookup`, mở rộng `isPrivateIp` (1 PR, `route: spec`). **Đã xong 2026-07-19** (nhánh `claude/plan-m62-m63-7osrkh`). Cả 2 sinh từ đợt đánh giá chi tiết lần 8 (`PROGRESS.md`).

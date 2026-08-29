@@ -159,18 +159,17 @@ Nếu chốt làm, mở **M114** (số M kế tiếp — xác nhận lại bằn
 - Không tự nắn tuyến của hệ đã chạy trước để nhường chỗ (đó là bài toán combined services, vẫn chưa
   có đặc tả; và M109 §3 đã ghi rõ ranh giới này).
 
-## 7. Câu còn phải chốt trước khi viết đặc tả
+## 7. Bốn câu đã chốt (người dùng: "chọn phương án tốt nhất", 2026-08-29)
 
-1. **Hành lang vẽ mới hay nhận từ bản kiến trúc?** Vẽ mới thì đơn giản và chắc; nhận từ nét kiến
-   trúc có sẵn thì nhanh hơn nhưng phải đoán — nghiêng về **vẽ mới**, có thể "nhận" ở đợt sau (cùng
-   lối M107 nhận tuyến).
-2. **Tầng/làn tính ở Core (C#) hay gọi server?** Core thì plugin chạy độc lập, nhưng phải chuyển
-   `planMultiTierCorridor` sang C# và gánh rủi ro 2 bản trôi khác nhau (rủi ro số 1 của M99, đã có
-   khuôn `plugin-autocad/doi-chung/` để canh).
-3. **Có làm thủy lực không** (chọn cỡ ống theo lưu lượng)? Đề xuất: **không** ở bản đầu — kỹ sư khai
-   cỡ như `XBOSS_VE` đang làm. Ghép thủy lực vào là mở một mặt trận khác.
-4. **M77 xử lý sao?** Đề xuất ghi nợ kỹ thuật: sửa tài liệu M77 cho khớp code (bỏ chữ "A\*"), hoặc
-   đánh dấu `engineering-auto-routing.ts` là ước lượng phía web và **không** để lệnh plugin gọi vào.
+| #   | Câu hỏi                           | Chốt                                                                                                                                                     |
+| :-- | :-------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Hành lang vẽ mới hay nhận có sẵn? | **Cả hai, cùng một lệnh** — vẽ mới là đường chính, thêm chế độ nhận polyline có sẵn (chỉ gán XData, không đụng hình học) theo khuôn M107                 |
+| 2   | Tầng/làn tính ở đâu?              | **Core C#** — chống trôi 2 bản bằng tham số dùng chung trong rule pack + bộ đối chứng `plugin-autocad/doi-chung/`                                        |
+| 3   | Có làm thủy lực?                  | **Không** ở bản đầu — kỹ sư khai cỡ như `XBOSS_VE`                                                                                                       |
+| 4   | M77 xử lý sao?                    | **Đính chính tài liệu** (đã làm: khối cảnh báo đầu `M77-auto-routing-beam-sleeve.md`); giữ `validateBeamSleeve`, lệnh plugin không gọi vào phần đi tuyến |
+
+⇒ Đặc tả viết theo 4 quyết định này là **`M114-auto-routing-hanh-lang.md`** (State Draft, chờ duyệt) —
+nằm ở **PR riêng**, để phần đính chính sự thật về code (tệp này + M77) đi trước.
 
 ## 8. Nguồn đã đọc
 

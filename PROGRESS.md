@@ -4,6 +4,49 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Nghiên cứu auto-routing MEPF + đính chính M77 (2026-08-29)
+
+Người dùng: "nghiên cứu lại cách để auto route từng hệ riêng 1, hybird cũng được, kỹ sư chuẩn bị
+trước rồi auto routing", sau đó "chọn phương án tốt nhất" cho 4 câu còn mở. Nhánh
+`claude/research-auto-routing-mepf`. **Chỉ tài liệu — CHƯA CODE**, M114 State Draft.
+
+**Phát hiện quan trọng nhất — thứ đang mang tên "auto-routing" trong repo không dùng lại được.**
+`M77-auto-routing-beam-sleeve.md` đánh dấu "đã hoàn thành 2026-08-19", có bảng `0111`, có API, có
+trang `/engineering/auto-routing`. Đọc code thật thì:
+
+- `findOptimalRoute3D` mang doc-comment "Thuật toán 3D A* Pathfinding" nhưng thân hàm là **cây quyết
+  định cố định**: thử tuyến trực giao 3 đoạn, vướng thì nâng cả tuyến lên `max(maxZ mọi vật cản)+150`.
+  Không open set, không heuristic, không lưới tìm kiếm. `solve3DGenerativeRoute` (dưới tiêu đề khối
+  `3D A* PATHFINDING…`) cũng là cây quyết định.
+- `doesSegmentIntersectBox` so **hộp bao của đoạn thẳng** với hộp vật cản — sai theo hướng an toàn
+  (báo thừa) nhưng khiến tuyến chéo dài gần như **luôn** bị coi là vướng, tức nhánh "bay lên trên tất
+  cả" là nhánh chạy thường xuyên chứ không phải dự phòng.
+- Cả hai chỉ nhận/trả JSON: **không đọc DWG, không sinh thực thể** — không có đường nào chạy vào bản
+  vẽ của kỹ sư. Plugin phía `plugin-autocad/` chưa có gì về routing.
+- `tests/engineering-auto-routing.test.ts` có 4 ca, đủ cho `validateBeamSleeve`, không phủ đi tuyến.
+
+**Thứ đáng giữ:** `planMultiTierCorridor` (`engineering-cad-corridor.ts:67`) là code thật — phân tầng
+cao độ, cấp phát làn ngang, kiểm thông thủy trần, cảnh báo máng cáp dưới ống nước. Đó là nửa Z + nửa
+làn của bài toán.
+
+**Đã đính chính M77** (khối cảnh báo đầu tệp): nói rõ §2.1 mô tả sai code, phạm vi dùng đúng còn lại
+là ước lượng phía web + `validateBeamSleeve`, và lệnh plugin không gọi vào phần đi tuyến.
+
+**`RESEARCH-AUTO-ROUTING-MEPF.md`** — lập luận vì sao hybrid là cách **đúng** chứ không phải bản rút
+gọn: nền 2D không có mô hình kết cấu, trần, hay lưu lượng; ép máy suy từ DXF là con đường ADR-0006 đã
+ghi lý do từ bỏ. Kỹ sư nạp đúng 4 mẩu máy không thể biết (mất vài phút), máy làm phần lặp hàng trăm
+lần. Kèm bảng so đồ thị hành lang vs A\* không gian tự do trên 6 trục (đầu vào cần, kết quả trông thế
+nào, giải thích được, chi phí tính, sai thì sao, test được không).
+
+**Bốn câu đã chốt** (người dùng "chọn phương án tốt nhất"): (1) hành lang **vẽ mới + nhận polyline có
+sẵn** trong cùng một lệnh, chế độ nhận theo khuôn M107 (không đụng hình học); (2) cấp tầng/làn ở
+**Core C#** — chống trôi 2 bản bằng tham số dùng chung trong rule pack **cộng** bộ đối chứng
+`plugin-autocad/doi-chung/`; (3) **không** làm thủy lực ở bản đầu; (4) M77 đính chính tài liệu, giữ
+`validateBeamSleeve`, plugin không gọi vào phần đi tuyến.
+
+Đặc tả viết theo 4 quyết định này (`M114-auto-routing-hanh-lang.md`) nằm ở **PR riêng** — tách khỏi
+đợt này để phần đính chính sự thật về code đi trước, phần đề xuất chờ duyệt đi sau.
+
 ## Đặc tả M109–M113 — đóng nốt M100 §20 của đợt plugin AutoCAD (2026-08-28)
 
 Người dùng: "viết nốt đặc tả cho hướng còn lại". Nhánh `claude/plugin-status-vd0ws9`. **Chỉ đặc tả —
