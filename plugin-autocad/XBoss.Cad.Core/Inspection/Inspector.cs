@@ -14,7 +14,8 @@ public sealed record InspectionFinding
     /// <summary>Slug ổn định cho báo cáo JSON — M99: layer-sai / lech-z / polyline-ho / polyline-gan-kin /
     /// font-cu / lineweight-lech / dim-override / rac-hinh-hoc / layer-rong / block-nac-danh;
     /// M101 (v5, mặc định tắt): chong-lan-cung-he / giao-cat-khac-he / khung-ten-thieu-truong /
-    /// viewport-le-chuan / style-lech-chuan / nhan-lech-xdata / doi-tuong-ngoai-khung.</summary>
+    /// viewport-le-chuan / style-lech-chuan / nhan-lech-xdata / doi-tuong-ngoai-khung;
+    /// M102 (v8): tag-trung / ma-boq-mo-coi; M111 (v14+): nhantang-handle-mo-coi.</summary>
     [JsonPropertyName("id")] public required string Id { get; init; }
     [JsonPropertyName("ten")] public required string Ten { get; init; }
     [JsonPropertyName("handles")] public required IReadOnlyList<string> Handles { get; init; }
@@ -219,6 +220,10 @@ public sealed class Inspector
         // khi thiếu dữ liệu (tag XData M100 / rule pack chưa gán mã BOQ theo dự án).
         ThemNeuCo(PhepKiemMoRong.TagTrung(snapshot, ip.TagDuplicate));
         ThemNeuCo(PhepKiemMoRong.MaBoqMoCoi(_pack.Takeoff.Items, IdHangMucCoDoiTuong(snapshot), ip.BoqCodeMissing));
+
+        // (19) Handle mồ côi trong bản chép tầng (M111 FR9/AC3) — tự tắt khi bản vẽ không có đối
+        // tượng nhân bản tầng nào, nên không cần (và cố ý KHÔNG thêm) khóa rule pack riêng cho nó.
+        ThemNeuCo(PhepKiemMoRong.HandleMoCoiNhanTang(snapshot));
 
         return new InspectionReport { RulePackVersion = _pack.Version, Findings = findings, CanhBao = canhBao };
 
