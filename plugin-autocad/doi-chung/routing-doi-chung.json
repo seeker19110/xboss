@@ -8,7 +8,10 @@
     "sprinkler_ceiling": "sprinkler"
   },
   "tierAnhXaTsNote": "MepfSystemTier (TS) ↔ drawTools.routingPolicy.tiers[].id (rule pack, dùng chung với Core C#).",
-  "heDien": ["ELECTRICAL", "ELV"],
+  "heDien": [
+    "ELECTRICAL",
+    "ELV"
+  ],
   "heDienNote": "Hệ điện — quyết định khi nào khe hở giữa 2 làn kề dùng laneGapMm.elecToHot thay cho laneGapMm.default. Rule pack không có cờ này nên bộ đối chứng khai TƯỜNG MINH: Core C# nhận qua tham số, không đoán hộ bằng tên tier.",
   "disciplineTheoHe": {
     "HVAC": "hvac",
