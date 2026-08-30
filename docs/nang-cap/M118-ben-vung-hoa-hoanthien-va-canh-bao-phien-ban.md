@@ -1,12 +1,12 @@
 # M118 — Bền vững hoá `XBOSS_HOANTHIEN` + cảnh báo phiên bản plugin lệch server
 
-| Thuộc tính       | Giá trị                                                                                                                                 |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Issue / Goal     | Đóng 2 nợ kỹ thuật ghi nhận ở review M115 PR3 (`PROGRESS.md` 2026-08-30) + 1 khoảng trống vận hành phát hiện khi rà toàn cụm plugin      |
-| Spec owner       | Phiên chính (opusplan)                                                                                                                   |
-| State            | **Approved for implementation**                                                                                                          |
-| Người/ngày duyệt | Người dùng duyệt 2026-08-30 ("duyệt M118, lập PLAN rồi merge, không thi hành")                                                           |
-| Cập nhật         | 2026-08-30                                                                                                                               |
+| Thuộc tính       | Giá trị                                                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Issue / Goal     | Đóng 2 nợ kỹ thuật ghi nhận ở review M115 PR3 (`PROGRESS.md` 2026-08-30) + 1 khoảng trống vận hành phát hiện khi rà toàn cụm plugin |
+| Spec owner       | Phiên chính (opusplan)                                                                                                              |
+| State            | **Code xong cả 3 PR (2026-08-30), chờ verify tay C12**                                                                              |
+| Người/ngày duyệt | Người dùng duyệt 2026-08-30 ("duyệt M118, lập PLAN rồi merge, không thi hành")                                                      |
+| Cập nhật         | 2026-08-30                                                                                                                          |
 
 > Không code khi chưa **Approved for implementation**.
 
@@ -24,8 +24,8 @@ vòng `foreach` **không có try/catch bao quanh từng giai đoạn**. Chỉ `D
 lại trong bản vẽ, **báo cáo phiên (`VeSessionReport`) không được ghi** nên không có dấu vết
 giai đoạn nào xong/giai đoạn nào chưa. Chấp nhận được về dữ liệu (mỗi giai đoạn idempotent —
 chạy lại là tự dọn), nhưng trải nghiệm là "lệnh crash", trái với chính nguyên tắc đã khai trong
-doc-comment của `Chay`: *"một giai đoạn thiếu tham số rule pack không được phép chặn 7 giai
-đoạn kia"* — hiện nguyên tắc đó chỉ đúng với lỗi **đoán trước được** (nhánh `return` sớm),
+doc-comment của `Chay`: _"một giai đoạn thiếu tham số rule pack không được phép chặn 7 giai
+đoạn kia"_ — hiện nguyên tắc đó chỉ đúng với lỗi **đoán trước được** (nhánh `return` sớm),
 không đúng với exception.
 
 **b) 4/8 giai đoạn ủy thác ghi đè tinh chỉnh tay của kỹ sư.** Hai giai đoạn M115 tự sinh (phụ
@@ -98,11 +98,11 @@ PM/Admin (không có cách nào biết đội đang chạy bản nào).
 
 ## 4. Phương án
 
-| Phương án                                                                       | Lợi ích                                        | Chi phí/rủi ro                                                                                   | Kết luận |
-| ------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------- |
-| Không làm                                                                        | 0                                              | Mất công tay kỹ sư mỗi lần chạy lại HOANTHIEN; lệnh crash không dấu vết; plugin cũ chạy vô hạn    | Loại     |
+| Phương án                                                                                                                                                          | Lợi ích                                                                                                    | Chi phí/rủi ro                                                                                                                                                | Kết luận |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Không làm                                                                                                                                                          | 0                                                                                                          | Mất công tay kỹ sư mỗi lần chạy lại HOANTHIEN; lệnh crash không dấu vết; plugin cũ chạy vô hạn                                                                | Loại     |
 | A — vá tối thiểu theo khuôn sẵn có (FR1 try/catch từng giai đoạn; FR2 nối `BamHinhHoc` vào 4 lệnh khi `giaiDoanM115 != null`; FR3 so version lúc `XBOSS_RULEPACK`) | Diff nhỏ, tái dùng `DaSuaTay`/`RevisionSnapshot`/`getCadTokenUser` nguyên khuôn; không đổi hành vi lệnh lẻ | Bảo vệ SuaTay chỉ phủ thực thể sinh qua pipeline, lệnh lẻ vẫn như cũ (chấp nhận — đúng ranh giới "quyền quyết định thuộc chính lệnh đó" đã khai ở `DaSuaTay`) | **Chọn** |
-| B — SuaTay toàn cục cho cả lệnh lẻ + transaction bao ngoài rollback cả pipeline | Phủ mọi đường                                  | Đổi hành vi 4 lệnh đã phát hành; transaction lồng khóa chết service con (đã ghi rõ ở doc-comment `Chay` mục 4); diff lớn | Loại     |
+| B — SuaTay toàn cục cho cả lệnh lẻ + transaction bao ngoài rollback cả pipeline                                                                                    | Phủ mọi đường                                                                                              | Đổi hành vi 4 lệnh đã phát hành; transaction lồng khóa chết service con (đã ghi rõ ở doc-comment `Chay` mục 4); diff lớn                                      | Loại     |
 
 ## 5. Scope / non-goals
 
@@ -110,6 +110,7 @@ PM/Admin (không có cách nào biết đội đang chạy bản nào).
 web hiện version (đã có sẵn trang, chỉ xác nhận không vỡ).
 
 **Non-goals:**
+
 - KHÔNG tự cập nhật plugin (auto-update/tải gói từ trong AutoCAD) — chỉ cảnh báo; đường phát
   hành vẫn là gói `.zip` + `CAI-DAT.md`.
 - KHÔNG đổi cơ chế idempotency của 4 lệnh khi chạy tay (lệnh lẻ, không qua pipeline).
@@ -127,7 +128,7 @@ web hiện version (đã có sẵn trang, chỉ xác nhận không vỡ).
   "Giữ nguyên N thực thể kỹ sư đã dời/sửa tay".
 - **Error giữa pipeline (FR1):** giai đoạn ④ ném exception → dòng `✖ Giá đỡ: lỗi — <message>`
   in ra, giai đoạn ⑤–⑧ vẫn chạy, cuối lệnh in tổng kết `7/8 giai đoạn xong, 1 lỗi — chạy lại
-  XBOSS_HOANTHIEN sau khi xử lý là an toàn (idempotent)`, `VeSessionReport` ghi đủ 8 dòng kèm
+XBOSS_HOANTHIEN sau khi xử lý là an toàn (idempotent)`, `VeSessionReport` ghi đủ 8 dòng kèm
   trạng thái. `U` một lần vẫn hoàn tác trọn phần đã vẽ.
 - **Plugin cũ (FR3):** kỹ sư `XBOSS_RULEPACK` → sau dòng kết quả rule pack in thêm
   `⚠ Plugin đang chạy 1.0.0, server phát hành 1.2.0 — tải bản mới ở <APP_URL>/engineering/cai-dat-plugin`;
@@ -142,6 +143,7 @@ web hiện version (đã có sẵn trang, chỉ xác nhận không vỡ).
 ## 7. Functional và non-functional requirements
 
 **FR1 — Cách ly lỗi từng giai đoạn trong `HoanThienPipeline.Chay`.**
+
 - Bọc **thân từng giai đoạn** (switch dòng 70) trong `try/catch (System.Exception)`; catch trả
   `KetQuaGiaiDoan(viec.GiaiDoan, DaChay: false, TomTat: "lỗi — <ex.Message>")` kèm trường mới
   `Loi: true` trên record `KetQuaGiaiDoan` để báo cáo phân biệt "bỏ qua có lý do" với "lỗi".
@@ -154,6 +156,7 @@ web hiện version (đã có sẵn trang, chỉ xác nhận không vỡ).
   service con). KHÔNG rollback giai đoạn đã xong.
 
 **FR2 — Bảo vệ sửa tay cho 4 giai đoạn ủy thác (③ chia đốt, ④ giá đỡ, ⑥ ngắt nét, ⑧ thống kê).**
+
 - Khi `giaiDoanM115 != null` (tức chạy qua pipeline), thực thể sinh ra ghi thêm
   `BamHinhHoc = RevisionSnapshot.BamHinhHoc(<đỉnh đại diện>)` vào XData (các trường
   `NguonHoanThien`/`GiaiDoanHoanThien`/`HandleTim` đã ghi sẵn từ M115 PR3). Đỉnh đại diện từng
@@ -176,6 +179,7 @@ web hiện version (đã có sẵn trang, chỉ xác nhận không vỡ).
   liệu lệnh (nhất quán với giai đoạn ②⑤ hiện tại).
 
 **FR3 — Cảnh báo phiên bản plugin lệch server.**
+
 - Server: `app/api/engineering/cad/plugin-package/route.ts` nhận thêm Bearer token scope `cad`
   theo ĐÚNG khuôn `rule-pack/route.ts:31-35` (`getCadTokenUser` kiểm trước, fallback
   `getCurrentUser`; quyền vẫn `CAN.viewEngineeringGraph`). Không đổi shape response.
@@ -192,6 +196,7 @@ web hiện version (đã có sẵn trang, chỉ xác nhận không vỡ).
   rõ" ở `XBOSS_BANG`, KHÔNG in cảnh báo ở `XBOSS_RULEPACK`. Không cache cảnh báo qua phiên.
 
 **NFR:**
+
 1. Logic quyết định (so băm, so version, tính giữ/xóa) nằm ở **Core**, test được trên CI Linux
    bằng xunit + AcadShim — Core không chạm `Database`/`Editor` (khuôn M106/M115).
 2. Mọi thông điệp tiếng Việt, đi qua `ed.WriteMessage` như hiện tại; không PII (không gửi tên
@@ -256,6 +261,7 @@ trò ranh giới HTTP). Tệp dự kiến chạm:
 Không API mới. Một route sửa auth:
 
 `GET /api/engineering/cad/plugin-package`
+
 - Auth: `getCadTokenUser(Authorization: Bearer <token cad>)` kiểm trước → fallback
   `getCurrentUser()` (session). Quyền: `CAN.viewEngineeringGraph`. 401 chưa đăng nhập/token
   sai; 403 thiếu quyền.
@@ -286,7 +292,7 @@ qua pipeline — sống trong DWG, tương thích ngược (thực thể cũ kh�
 - `XBOSS_BANG` dòng version: text thuần trong tab Trạng thái hiện có, theo layout sẵn — không
   control mới, không đổi theme/tương phản (ADR-0010 không bị chạm).
 - Copy chốt: cảnh báo `⚠ Plugin đang chạy {X}, server phát hành {Y} — tải bản mới tại
-  {APP_URL}/engineering/cai-dat-plugin` (APP_URL lấy từ base URL đã lưu ở `CredentialStore` —
+{APP_URL}/engineering/cai-dat-plugin` (APP_URL lấy từ base URL đã lưu ở `CredentialStore` —
   chính là server plugin đang nối, không đọc env phía máy kỹ sư).
 
 ## 14. Observability và vận hành
@@ -335,12 +341,12 @@ Mỗi PR tự chạy đủ cổng plugin (`dotnet test` AcadShim 0 warning) + c�
 
 ## 18. Risk/assumption/open decisions
 
-| Mục | Xác minh/giảm thiểu | Owner | Hạn | Quyết định |
-| --- | --- | --- | --- | --- |
-| Băm điểm đại diện của vùng che ngắt nét (wipeout) có thể không bắt được kiểu "sửa tay" duy nhất thực tế (kỹ sư xóa vùng che thay vì dời) | Xóa hẳn = sinh lại (đã chấp nhận ở FR2, nhất quán ②⑤); nếu pilot cho thấy cần "đã xóa thì đừng sinh lại", mở M mới với cơ chế ghi nhớ chủ đích | Phiên chính | Sau pilot | Chấp nhận rủi ro |
-| `VeBangService` có thể đã cập nhật bảng tại chỗ (FR2 nhánh "chỉ thêm test") | Worker PR2 đọc code xác định nhánh nào; cả hai nhánh đều trong đặc tả, không phải open decision | Worker PR2 | Trong PR2 | Đã chốt cả 2 nhánh |
-| `AssemblyInformationalVersion` có thể mang hậu tố `+<hash>` do SourceLink | `SoLechPhienBan` cắt từ `+` trước khi so (đã ghi ở FR3) | Worker PR3 | Trong PR3 | Đã chốt |
-| Có nên hiện cảnh báo version ngay khi NETLOAD (mỗi lần mở AutoCAD)? | Không — NETLOAD không có mạng đảm bảo và làm chậm khởi động; `XBOSS_RULEPACK`/`XBOSS_BANG` là đủ điểm chạm | — | — | **Chốt: không** |
+| Mục                                                                                                                                      | Xác minh/giảm thiểu                                                                                                                            | Owner       | Hạn       | Quyết định         |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | --------- | ------------------ |
+| Băm điểm đại diện của vùng che ngắt nét (wipeout) có thể không bắt được kiểu "sửa tay" duy nhất thực tế (kỹ sư xóa vùng che thay vì dời) | Xóa hẳn = sinh lại (đã chấp nhận ở FR2, nhất quán ②⑤); nếu pilot cho thấy cần "đã xóa thì đừng sinh lại", mở M mới với cơ chế ghi nhớ chủ đích | Phiên chính | Sau pilot | Chấp nhận rủi ro   |
+| `VeBangService` có thể đã cập nhật bảng tại chỗ (FR2 nhánh "chỉ thêm test")                                                              | Worker PR2 đọc code xác định nhánh nào; cả hai nhánh đều trong đặc tả, không phải open decision                                                | Worker PR2  | Trong PR2 | Đã chốt cả 2 nhánh |
+| `AssemblyInformationalVersion` có thể mang hậu tố `+<hash>` do SourceLink                                                                | `SoLechPhienBan` cắt từ `+` trước khi so (đã ghi ở FR3)                                                                                        | Worker PR3  | Trong PR3 | Đã chốt            |
+| Có nên hiện cảnh báo version ngay khi NETLOAD (mỗi lần mở AutoCAD)?                                                                      | Không — NETLOAD không có mạng đảm bảo và làm chậm khởi động; `XBOSS_RULEPACK`/`XBOSS_BANG` là đủ điểm chạm                                     | —           | —         | **Chốt: không**    |
 
 ## 19. Approval
 

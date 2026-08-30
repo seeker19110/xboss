@@ -1,6 +1,6 @@
 # PROGRESS.md — Trạng thái dự án
 
-## 📐 Đặc tả M118 — bền vững hoá `XBOSS_HOANTHIEN` + cảnh báo phiên bản plugin (2026-08-30, ✅ ĐÃ DUYỆT + PLAN Pha 4 — CHƯA thi hành)
+## ✅ M118 — bền vững hoá `XBOSS_HOANTHIEN` + cảnh báo phiên bản plugin — CODE XONG cả 3 PR (2026-08-30)
 
 Yêu cầu người dùng: "plugin autocad còn thiếu gì → viết đặc tả triển khai". Rà toàn cụm M99→M117:
 M116/M117 đã có đặc tả duyệt (chưa thi hành), nợ verify tay C9/C10/C11 là cổng thủ công — phần
@@ -21,13 +21,31 @@ chờ duyệt, chưa code**):
 Không migration, không khoá rule pack mới (bug fix + cảnh báo thuần). 3 PR: FR1 `route: standard`,
 FR2 `route: spec`, FR3 `route: standard`. Verify tay mục **C12** mới, xếp sau C9/C10/C11.
 
-**Cập nhật cùng ngày 2026-08-30:** người dùng **duyệt M118** ("duyệt M118, lập PLAN rồi merge,
-không thi hành") → đặc tả chuyển **Approved for implementation**; kế hoạch thi hành viết thành
-**Pha 4 trong `PLAN.md`** (Y1 FR1 `standard` → Y2 FR2 `spec`; Y3 FR3 `standard` song song được;
-nhánh nền Pha 4 = `origin/main`, độc lập M116/M117). **Trạng thái: CHƯA KÍCH HOẠT thi hành —
-chờ lệnh riêng.** Cổng phát hành rộng toàn cụm vẫn là trả nợ verify tay AutoCAD 2026.
+**Cập nhật 2026-08-30:** người dùng **duyệt M118** ("duyệt M118, lập PLAN rồi merge, không thi
+hành") → đặc tả **Approved for implementation**, kế hoạch **Pha 4 trong `PLAN.md`**; sau đó người
+dùng ra lệnh triển khai riêng, đã kiểm tra không xung đột với M116 (nhánh khác, khác vùng file) và
+M117 (chưa có nhánh) trước khi kích hoạt.
 
-**Y3 (M118 PR3 — FR3 cảnh báo phiên bản plugin) — CODE XONG, CHỜ MERGE (2026-08-30):**
+**Y1 (M118 PR1 — FR1 cách ly lỗi từng giai đoạn) — CODE XONG:** `HoanThienPipeline.Chay` bọc
+try/catch quanh thân từng giai đoạn qua hàm Core thuần mới `HoanThienKeHoach.ChayCachLyLoi`
+(logic chạy được test trên Linux, Adapter chỉ còn là lớp mỏng gọi lại); giai đoạn lỗi không chặn
+7 giai đoạn kia, `KetQuaGiaiDoan` thêm cờ `Loi`. `HoanThienCommands.cs` in `✖ <giai đoạn>: lỗi —
+<msg>` + tổng kết `x/8 giai đoạn xong, y lỗi` + nhắc chạy lại an toàn khi `y > 0`;
+`VeSessionReport` ghi đủ 8 giai đoạn kể cả khi lỗi. Test xunit `HoanThienPipelineTests` (AC1/AC8).
+
+**Y2 (M118 PR2 — FR2 giữ-tay 4 giai đoạn ủy thác ③④⑥⑧) — CODE XONG:** `DaSuaTay` chuyển về Core
+(`HoanThienKeHoach.cs`) dùng chung cho pipeline + 4 lệnh; `VeThucThe.DiemBamCua` tính điểm đại
+diện theo loại thực thể (Line 2 đầu / điểm chèn text-block-bảng / đỉnh polyline / hộp bao còn lại)
+để ghi `BamHinhHoc` khi `giaiDoanM115 != null`. Hai điểm đặc tả không khớp code thực tế đã được
+phiên chính quyết định trước khi thi hành: **④ giá đỡ** (`ChayGiaDo` vốn không có bước xóa) được
+thêm đường dọn mới — giá đỡ băm lệch/`SuaTay` được đưa vào tập `daCo` để `SupportSpacing` không
+chèn đè; **⑥ ngắt nét** (Wipeout không đọc lại đỉnh tất định qua `SetFrom`) dùng điểm đại diện
+tính lúc sinh (hộp bao) lưu vào XData thay vì đọc lại hình học. Bất biến AC3 (lệnh lẻ
+`giaiDoanM115 == null` không đổi hành vi) giữ nguyên — xác nhận bằng test + review đọc code trực
+tiếp 4 file lệnh. Test xunit `GiuTayHoanThienTests` (AC2/AC3/AC4), `NgatNetGuardrailTests` siết
+thêm. `plugin-autocad/README.md` cập nhật bảng 4 giai đoạn × điểm đại diện × hành vi.
+
+**Y3 (M118 PR3 — FR3 cảnh báo phiên bản plugin) — CODE XONG:**
 `app/api/engineering/cad/plugin-package/route.ts` nhận thêm Bearer token scope `cad` (đúng khuôn
 `rule-pack/route.ts`, fallback session, quyền `CAN.viewEngineeringGraph`, shape response giữ
 nguyên). Core (`XBoss.Cad.Core/Api/PhienBanPlugin.cs`): `SoSanhPhienBan.SoLechPhienBan` thuần (so
@@ -36,12 +54,15 @@ lệch khi không chắc) + DTO `PluginPackageInfo`; `XBossApiClient.FetchPlugin
 `Services/PhienBanPluginService.cs` đọc `AssemblyInformationalVersion` + hỏi server (timeout 20s
 khuôn `TaiSnapshotBoq`, không retry, nuốt mọi lỗi); gọi ở `XBOSS_RULEPACK` (in `⚠` khi lệch, im
 lặng khi không chắc) và `XBOSS_BANG` (dòng "Phiên bản plugin", cập nhật async cùng nhịp đề xuất
-block). Test: `tests/cad-plugin-package.test.ts` (node:test, source-check Bearer), xunit
-`PhienBanPluginTests` + `XBossApiClientTests` (FetchPluginPackageAsync) + `BangDieuKhienTests`
-(dòng version) — 1268/1268 pass; cổng `XBoss.Cad.AcadShim` build xanh (biên dịch thử Adapter).
-Tài liệu: mục **C12** mới trong `VERIFY-VA-PHAT-HANH.md` (AC5 hai máy lệch bản + AC7 một lần `U`
-— phần AC2 để trống cho Y2 bổ sung), cập nhật `README.md` + `CAI-DAT.md`. **Chưa merge/push** —
-đang ở nhánh worktree cục bộ, chờ coordinator tích hợp.
+block). Test: `tests/cad-plugin-package.test.ts` (node:test, 8/8 pass). Tài liệu: mục **C12** mới
+trong `VERIFY-VA-PHAT-HANH.md` (AC5 hai máy lệch bản + AC7 một lần `U`), cập nhật `README.md` +
+`CAI-DAT.md`.
+
+**Tích hợp cả 3 việc:** merge sạch (không xung đột) vào nhánh
+`claude/m118-deployment-conflict-check-aqdffn`; `dotnet test` toàn bộ **1286/1286 pass**,
+`XBoss.Cad.AcadShim` build 0 warning, `npm run lint`/`typecheck`/`build` xanh, reviewer soát diff
+không phát hiện lỗi correctness. **Nợ còn lại:** verify tay mục **C12** trên AutoCAD 2026 (xếp
+sau C9/C10/C11), không tự động hoá được.
 
 ## ✅ M115 — Hoàn thiện bản vẽ từ tuyến tim: rule pack v16 + `XBOSS_TUYEN_GAN`/`_TUYEN_DOTHI`/`_HOANTHIEN` — CODE XONG cả 4 PR (2026-08-30)
 
