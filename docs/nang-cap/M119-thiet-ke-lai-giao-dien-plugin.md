@@ -54,3 +54,19 @@ nhãn/nút vào đúng chỗ dễ thêm nhất. Hệ quả đọc được ngay 
 - [ ] **Verify tay trên máy có AutoCAD 2026** (nợ chung với C9-C12): mở `XBOSS_BANG` xem hai tab,
       kéo rộng/hẹp palette, rê chuột lên mọi nút, mở một hộp thoại lệnh bất kỳ. Đây là thay đổi
       THUẦN HÌNH THỨC nên cổng stub không thay được mắt người.
+
+## 5. Approval
+
+- [x] Product/scope — người dùng chốt trực tiếp trong phiên 2026-08-30: yêu cầu "thiết kế lại
+      plugin AutoCAD theo code hiện tại", chọn phạm vi **"Thiết kế lại UI/UX plugin"** (làm lại
+      giao diện các dialog/palette theo hệ design XBoss, **giữ nguyên logic**) và đầu ra
+      **"Làm luôn tới PR"**.
+- [x] UX/a11y — bám ADR-0009 (hai tông mặt, emerald = hành động chính) + ADR-0010 (accent đậm dần
+      khi rê); mọi vệt màu đi kèm chip/ký hiệu chữ.
+- [x] Architecture/API/data — không đổi: `XBoss.Cad.Core`, danh mục lệnh, API, migration đều
+      nguyên vẹn; chỉ chạm lớp vẽ của `XBoss.Cad.Acad`.
+- [x] Security/RBAC — không có bề mặt bảo mật nào bị chạm (plugin không đổi cách gọi API/xác thực).
+- [x] Test/rollout — cổng CI AcadShim + 1367 test Core giữ nguyên; rollback = revert 1 commit.
+
+**Kết luận:** **Approved for implementation**
+**Người/ngày duyệt:** Người dùng, 2026-08-30 (chốt phạm vi qua câu hỏi trong phiên trước khi code).
