@@ -18,7 +18,7 @@ const VARIANT: Record<ButtonVariant, string> = {
     "bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 hover:border-zinc-600 font-medium",
   ghost:
     "bg-transparent hover:bg-zinc-900/70 text-zinc-400 hover:text-zinc-100 border border-transparent font-medium",
-  danger: "bg-red-700 hover:bg-red-600 text-on-accent font-semibold border border-transparent",
+  danger: "bg-red-700 hover:bg-red-800 text-on-accent font-semibold border border-transparent",
   warning:
     "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium",
 };
