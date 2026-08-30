@@ -814,6 +814,26 @@ nào…`), nút chuyển nền chìm + chữ mờ.
      dài **xuống dòng đúng trong khung hộp thoại** (không chạy ra ngoài cửa sổ rộng 660). Sửa đủ
      trường → ký hiệu đổi thành `✓` màu xanh.
 
+#### Kết quả phiên verify tay 2026-08-30 (AutoCAD 2026, plugin `1.0.0+94cf0b7c`)
+
+> Bằng chứng đầy đủ: `dogfood-output/manual-2026-08-30/README.md` + ảnh/JSON cùng thư mục. Chỉ dùng
+> bản vẽ disposable `xboss-manual-smoke.dwg`; không mở/sửa bản vẽ dự án thật, không login/upload.
+
+- **C15.129: PASS.** Tab Quy trình có đủ 6 thẻ, vệt trái, chip trạng thái và thanh Làm mới dính đầu.
+- **C15.130: PASS.** Tab Trạng thái dựng đúng các thẻ; khối có cảnh báo có vệt cam; header đếm đúng
+  `1 cảnh báo`; bấm Làm mới không văng lỗi.
+- **C15.131: PARTIAL PASS.** Đo đại diện đủ 3 kiểu nút (`Chính`/`Phụ`/`Chìm`) thấy cả hover và nhấn
+  dùng đúng màu theme, không rơi về mảng sáng hệ thống; nút chính emerald đậm dần. Chưa rê qua mọi
+  nút của cả hai tab nên chưa đóng toàn mục.
+- **C15.132: FAIL.** Kéo palette hẹp xuống 631 px vật lý: chữ wrap và nút xuống hàng đúng, nhưng
+  **xuất hiện thanh cuộn ngang nội bộ ở đáy palette** (`palette-narrow-horizontal-overflow.png`) —
+  trái tiêu chí không sinh thanh cuộn ngang. C15/M119 vẫn chưa được đánh dấu hoàn tất.
+- **C15.133: PARTIAL PASS.** `XBOSS_VE` có dải tiêu đề + gạch phân cách; xóa Size khóa OK, hiện vệt
+  trái + ký hiệu cảnh báo; điền hợp lệ hiện `✓` xanh. Câu lý do vừa một dòng nên chưa kiểm được ca
+  bắt buộc wrap nhiều dòng.
+- **Bổ sung C7.38: PASS (guard/UI).** Nút mờ `Chia đốt` vẫn bấm được và mở dialog; dialog báo 0 tuyến,
+  khóa OK, Hủy không đổi bản vẽ.
+
 ---
 
 ## D. Kiểm thử có server — dựng tại chỗ trên máy mình
