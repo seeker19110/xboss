@@ -448,6 +448,7 @@ export default function SchematicGraphPanel() {
                 ref={inputRef}
                 type="file"
                 accept=".dxf"
+                aria-label="Chọn tệp DXF sơ đồ nguyên lý"
                 className="sr-only"
                 onChange={(e) => setDxf(e.target.files?.[0] ?? null)}
               />

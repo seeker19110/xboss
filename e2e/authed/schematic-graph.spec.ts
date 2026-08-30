@@ -33,7 +33,7 @@ test.describe("Sơ đồ nguyên lý — nạp DXF schematic (sau đăng nhập)
 
     await page.getByRole("button", { name: "Nạp Sơ Đồ Nguyên Lý" }).click();
     await page.getByLabel(/tra một sơ đồ đã nạp/i).fill("999999999");
-    await page.getByRole("button", { name: "Xem" }).click();
+    await page.getByRole("button", { name: "Xem", exact: true }).click();
 
     // Route thật trả 404 "Không tìm thấy sơ đồ nguyên lý" (hoặc lỗi dự án) — dù nội dung cụ thể
     // phụ thuộc seed, khối lỗi màu đỏ phải xuất hiện thay vì im lặng.
