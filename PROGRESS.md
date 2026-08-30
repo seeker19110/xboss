@@ -1,6 +1,6 @@
 # PROGRESS.md — Trạng thái dự án
 
-## Refactor gọn `XBoss.Cad.Core/Api/XBossApiClient.cs` — tách theo domain (2026-08-30)
+## Refactor gọn `XBoss.Cad.Core/Api/XBossApiClient.cs` — tách theo domain (2026-08-30, PR #452)
 
 Review chất lượng code plugin AutoCAD phát hiện `XBossApiClient.cs` (891 dòng) gộp ~10 route
 không liên quan (pairing/rule-pack/plugin-package/block-lib/block-proposals/BOQ/schematic/upload)
