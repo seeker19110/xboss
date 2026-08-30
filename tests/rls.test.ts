@@ -491,7 +491,10 @@ test(
     // Thư viện block hai tầng (M113 PR1, migration 0145): policy 2 nhánh CỘNG nhánh toàn cục
     // `project_id IS NULL` (bộ dùng chung mọi dự án, giữ nguyên hành vi trước M113). Hành vi
     // kiểm riêng ở tests/cad-block-lib-du-an.test.ts bằng role xboss_app.
-    const CAD = ["cad_takeoff_boq_map", "cad_block_libs"];
+    // Đồ thị sơ đồ nguyên lý (M117 PR1, migration 0146): mỗi dòng là bản đọc một tệp schematic
+    // của MỘT dự án ⇒ policy NGHIÊM NGẶT 2 nhánh + WITH CHECK y hệt 0140. Hành vi kiểm riêng ở
+    // tests/cad-schematic-rls.test.ts bằng role xboss_app.
+    const CAD = ["cad_takeoff_boq_map", "cad_block_libs", "cad_schematic_graphs"];
 
     // Nhóm engineering: khai theo TIỀN TỐ chứ không liệt kê tay — thêm bảng engineering_* mới
     // mà quên bật RLS thì bị bắt ở assert bên dưới, không phải ở đây.

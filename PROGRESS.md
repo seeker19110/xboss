@@ -103,6 +103,35 @@ warning, `npm run lint`/`typecheck`/`build` xanh, reviewer soát diff không ph�
 correctness. **Nợ còn lại:** verify tay mục **C13** trên AutoCAD 2026 (xếp sau C9/C10/C11/C12),
 không tự động hoá được.
 
+## ✅ M117 — AI đọc sơ đồ nguyên lý → tuyến tim gợi ý: 4 PR CODE XONG (2026-08-30)
+
+`docs/nang-cap/M117-ai-doc-so-do-nguyen-ly.md` (Approved 2026-08-30), Pha 3 của `PLAN.md`. Khép kín
+"schematic → bản vẽ thi công": AI chỉ dựng **đồ thị kết nối**, hình học vẫn do routing tất định
+M114 sinh, người duyệt hai chốt (duyệt graph trên web, duyệt tuyến trong AutoCAD).
+
+- **PR1 (X1)** migration `cad_schematic_graphs` (RLS theo `project_id`) + tầng 1 luật đọc DXF
+  schematic → graph (`lib/ky-thuat/cad/schematic.ts`), phần mơ hồ để `chua_quyet`, không đoán.
+- **PR2 (X2)** tầng 2 AI ngữ nghĩa (khối mới trong `lib/dich-vu/cad.ts`, hợp đồng y hệt M108: mẻ,
+  trần chi phí, thiếu key thì tự tắt, không throw) + 4 API `/api/engineering/cad/schematic*`
+  (upload/parse, đọc, duyệt-sửa, `:id/plugin` cho plugin — graph còn `nhap` ⇒ 409).
+- **PR3 (X3)** màn duyệt graph trên web (tab "Sơ đồ nguyên lý" của `/engineering/chuan-hoa-ban-ve`).
+- **PR4 (X4, việc này)** plugin `XBOSS_TUYEN_GOIY` + `XBOSS_TUYEN_GOIY_XOA`:
+  `Core/Schematic/` thuần (`GraphGoiY` đọc JSON hợp đồng §9, `AnhXaThietBiGoiY` khớp nút thiết bị ↔
+  block mặt bằng theo tag → tên block → kind, nhiều ứng viên thì **không đoán**, `KeHoachGoiY` nối
+  vào `Routing/KeHoachDiTuyen` của M114); Adapter tải graph qua
+  `XBossApiClient.FetchSchematicPluginAsync` + cache offline `%APPDATA%\XBoss\schematic-<id>.json`
+  (khuôn M113 — chỉ lỗi MẠNG mới rơi về cache, máy chủ từ chối thì dừng), sinh polyline tim **nháp**
+  trên layer riêng `XBOSS-GOIY` mang XData `XBOSS_VE` sẵn hệ/cỡ (dùng lại khóa `phien=goiy-<id>`,
+  **không đẻ khóa/appname mới**), **idempotent theo id graph** (chạy lại xóa đúng nháp của chính sơ
+  đồ đó; nháp đã sửa tay thì hỏi trước), chưa có hành lang ⇒ dừng sạch kèm câu chạy
+  `XBOSS_VE_HANHLANG`; nháp không ghi sổ chiếm làn hành lang (chưa phải tuyến thật). Tài liệu:
+  bảng lệnh `plugin-autocad/README.md` + mục 4c/`CAI-DAT.md` + bảng lệnh web
+  `app/engineering/cai-dat-plugin/page.tsx`, mục verify tay mới **C12** (109–118) trong
+  `VERIFY-VA-PHAT-HANH.md`. Test: `XBoss.Cad.Tests/TuyenGoiYTests.cs` (đọc JSON, 4 ca ánh xạ,
+  AC4/AC5) — `dotnet test` xanh toàn bộ 1264 ca.
+- **Trạng thái: code xong 4 PR, nợ verify tay AutoCAD 2026 (mục C12).** **CHƯA phát hành rộng** —
+  cổng chung của cả cụm plugin: trả nợ verify tay các đợt trước (M111 §C9, M114 §C10, M115 §C11).
+
 ## ✅ M115 — Hoàn thiện bản vẽ từ tuyến tim: rule pack v16 + `XBOSS_TUYEN_GAN`/`_TUYEN_DOTHI`/`_HOANTHIEN` — CODE XONG cả 4 PR (2026-08-30)
 
 `docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md`, thi hành đầu tiên của đợt "tự động triển

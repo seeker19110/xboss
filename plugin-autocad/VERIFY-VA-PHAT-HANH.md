@@ -718,15 +718,51 @@ nào…`), nút chuyển nền chìm + chữ mờ.
 115. **Một lần `U` cho mỗi lệnh.** `U` ngay sau `XBOSS_PHOIHOP` (nếu có ghi marker) → hoàn tác trọn
      vẹn về đúng trạng thái trước khi gọi lệnh.
 
-### C13. Cách ly lỗi + bảo vệ sửa tay + cảnh báo phiên bản plugin (M118 — CHƯA LÀM, xếp SAU C9/C10/C11/C12)
+### C13. `XBOSS_TUYEN_GOIY` / `XBOSS_TUYEN_GOIY_XOA` — tuyến gợi ý từ sơ đồ nguyên lý (M117 PR4 — CHƯA LÀM, chờ lượt trước xong)
 
-> **Chưa verify tay mục này.** Xếp hàng SAU C9 (M111), C10 (M114), C11 (M115), C12 (M116) theo
-> đúng thứ tự nợ verify tay hiện có (`docs/nang-cap/README.md`) — không chen ngang. Mục này gồm
-> đủ 3 phần: **AC2** (FR2 — bảo vệ sửa tay của `XBOSS_HOANTHIEN` khi dời tay giá đỡ/vạch
+> **Chưa verify tay mục này.** Cần: server XBoss chạy (mục D) có ít nhất một sơ đồ nguyên lý đã
+> **Chốt graph**, máy đã `XBOSS_LOGIN`, và bản vẽ mặt bằng đã có **hành lang** (`XBOSS_VE_HANHLANG`)
+>
+> - block thiết bị của hệ. Đợt M117 **CHƯA phát hành rộng** — xếp sau nợ verify M111 §C9 / M114
+>   §C10 / M115 §C11 / M116 §C12, ghi sẵn kịch bản để khi tới lượt không phải soạn lại.
+
+116. **AC4 — chưa chốt thì không có đường đi tắt.** Graph còn `nhap` trên web → `XBOSS_TUYEN_GOIY`
+     nhận 409 và **dừng sạch** kèm câu "vào tab Sơ đồ nguyên lý… bấm Chốt graph"; đếm số đối tượng
+     model space trước/sau: **không đổi**. Chốt graph trên web rồi chạy lại → sinh được nháp.
+117. **Luồng tải – ánh xạ – sinh nháp.** Gõ mã sơ đồ → dòng lệnh in đúng số nút/cạnh + thời điểm
+     chốt → chọn hệ/loại tuyến/cỡ mặc định + cao độ → bấm **điểm nguồn** → bảng ánh xạ liệt kê từng
+     nút `✔ <tag> → handle … (theo tag)` và từng nút thiếu kèm lý do → xác nhận **CO** → polyline
+     nháp hiện trên layer `XBOSS-GOIY`. `LIST` một nháp: XData `XBOSS_VE` phải có `vaitro=tim`,
+     `he`, `size` (đúng cỡ ghi trên sơ đồ, không phải cỡ mặc định), `caodomm`, `phien=goiy-<id>`.
+118. **Thiếu ánh xạ không chặn.** Xóa/đổi tag một block thiết bị trên mặt bằng rồi chạy lại → nút đó
+     vào danh sách thiếu, **các nhánh còn lại vẫn sinh** (M117 §6).
+119. **Chưa có hành lang.** Trên bản vẽ chưa chạy `XBOSS_VE_HANHLANG` → lệnh dừng kèm đúng câu
+     "chạy XBOSS_VE_HANHLANG… trước", **không crash**, không vẽ một nét nào.
+120. **AC5 — chạy lại không nhân đôi.** Chạy `XBOSS_TUYEN_GOIY` lần 2 với cùng mã sơ đồ và cùng điểm
+     nguồn → tổng số đối tượng model space **không đổi**; đếm riêng polyline trên `XBOSS-GOIY` cũng
+     không đổi. Đặt thêm một pline tự vẽ và một nháp của **sơ đồ khác** (mã khác) trên cùng bản vẽ →
+     cả hai **còn nguyên** sau lần chạy thứ 2.
+121. **Nháp đã sửa tay.** Kéo một đỉnh của nháp rồi chạy lại → lệnh cảnh báo đúng số tuyến lệch hình
+     học và **hỏi xác nhận**; trả lời `KHONG` → bản vẽ không đổi.
+122. **`XBOSS_TUYEN_GOIY_XOA`.** Enter (mọi sơ đồ) → xóa hết nháp, tuyến vẽ tay/tuyến `XBOSS_VE`
+     **không bị đụng**. Gõ mã một sơ đồ → chỉ nháp của sơ đồ đó biến mất.
+123. **Offline (cache M113).** Rút mạng sau khi đã tải sơ đồ một lần → chạy lại: lệnh báo "đang dùng
+     BẢN CACHE" và vẫn sinh nháp. Xóa `%APPDATA%\XBoss\schematic-<id>.json` rồi rút mạng → lệnh
+     báo thiếu cache, dừng sạch.
+124. **Một lần `U`.** `U` ngay sau mỗi lệnh → hoàn tác trọn vẹn (xóa nháp cũ + sinh nháp mới nằm
+     trong đúng một nhóm UNDO).
+125. **Nối vào M115.** Sau khi sinh nháp: `XBOSS_TUYEN_GAN` (bổ sung kiểu nối) → `XBOSS_TUYEN_DOTHI`
+     → `XBOSS_HOANTHIEN` chạy trọn như tuyến vẽ tay, không có ngoại lệ nào cho tuyến gợi ý.
+
+### C14. Cách ly lỗi + bảo vệ sửa tay + cảnh báo phiên bản plugin (M118 — CHƯA LÀM, xếp SAU C9/C10/C11/C12/C13)
+
+> **Chưa verify tay mục này.** Xếp hàng SAU C9 (M111), C10 (M114), C11 (M115), C12 (M116), C13
+> (M117) theo đúng thứ tự nợ verify tay hiện có (`docs/nang-cap/README.md`) — không chen ngang.
+> Mục này gồm đủ 3 phần: **AC2** (FR2 — bảo vệ sửa tay của `XBOSS_HOANTHIEN` khi dời tay giá đỡ/vạch
 > chia/ngắt nét/bảng thống kê), **AC5** (FR3 — cảnh báo phiên bản), **AC7** (FR1+FR2 — một lần
 > `U`) — cả 3 PR đã code xong.
 
-116. **AC2 — chạy lại `XBOSS_HOANTHIEN` giữ nguyên phần kỹ sư đã sửa tay.** Vẽ 1 tuyến, chạy
+126. **AC2 — chạy lại `XBOSS_HOANTHIEN` giữ nguyên phần kỹ sư đã sửa tay.** Vẽ 1 tuyến, chạy
      `XBOSS_HOANTHIEN` xong đủ 8 giai đoạn. Dời tay 1 vạch chia đốt, 1 giá đỡ, 1 đối tượng ngắt
      nét (vùng che/cung), kéo bảng thống kê sang vị trí khác. Vẽ thêm 1 nhánh tuyến mới rồi chạy
      lại `XBOSS_HOANTHIEN` → 4 thực thể đã dời **giữ nguyên vị trí**, phần tử của nhánh mới sinh
@@ -736,7 +772,7 @@ nào…`), nút chuyển nền chìm + chữ mờ.
      `XBOSS_VE_CHIADOT`/`_GIADO`/`_NGATNET`/`_THONGKE` trực tiếp (không qua `XBOSS_HOANTHIEN`) trên
      1 tuyến khác, dời tay 1 thực thể rồi chạy lại đúng lệnh lẻ đó → thực thể dời **bị xóa-sinh lại
      như trước M118** (không có khái niệm giữ-tay ở lệnh lẻ).
-117. **AC5 — hai máy lệch bản, cảnh báo đúng cả hai số.** Trên MÁY A: đóng gói plugin với
+127. **AC5 — hai máy lệch bản, cảnh báo đúng cả hai số.** Trên MÁY A: đóng gói plugin với
      `<Version>` trong `Directory.Build.props` thấp hơn bản đang phát hành trên server (vd cài bản
      `1.0.0` trong khi trang `/engineering/cai-dat-plugin` đang phát hành `1.2.0`). Ghép thiết bị
      bằng `XBOSS_LOGIN`, rồi chạy `XBOSS_RULEPACK` (chọn 1 tệp rule pack JSON hợp lệ) → sau dòng
@@ -749,7 +785,7 @@ nào…`), nút chuyển nền chìm + chữ mờ.
      1.2.0)" không cảnh báo. Rút mạng (hoặc tắt Wi-Fi) rồi chạy lại `XBOSS_RULEPACK` trên MÁY A →
      lệnh **vẫn nạp rule pack bình thường**, KHÔNG in dòng `⚠` nào (không chắc thì im lặng, §7 FR3);
      `XBOSS_BANG` lúc này hiện "Phiên bản plugin: 1.0.0 (server: chưa rõ)".
-118. **AC7 — một lần `U` sau `XBOSS_HOANTHIEN` kể cả lần chạy có giai đoạn lỗi.** Cố tình làm giai
+128. **AC7 — một lần `U` sau `XBOSS_HOANTHIEN` kể cả lần chạy có giai đoạn lỗi.** Cố tình làm giai
      đoạn ④ (giá đỡ) lỗi (vd khoá layer đích không mở khoá được), chạy `XBOSS_HOANTHIEN` → 7/8
      giai đoạn xong kèm dòng `✖ Giá đỡ: lỗi — ...`, sau đó `U` **một lần** → toàn bộ phần đã vẽ
      của lần chạy đó (kể cả các giai đoạn đã xong trước lỗi) biến mất, bản vẽ về đúng trạng thái

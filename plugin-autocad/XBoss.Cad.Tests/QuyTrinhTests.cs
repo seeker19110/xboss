@@ -97,6 +97,8 @@ public class QuyTrinhTests
                 // XBOSS_VE_TUYENTUDONG đứng TRƯỚC XBOSS_VE (M114 FR16).
                 "XBOSS_VE_NEN", "XBOSS_VE_TUYENTUDONG", "XBOSS_VE", "XBOSS_VE_NHANTUYEN", "XBOSS_VE_NHAN",
                 "XBOSS_VE_PHUKIEN", "XBOSS_VE_THIETBI", "XBOSS_VE_NHANTANG", "XBOSS_VE_DOI",
+                // M117 §6 bước 5 — tuyến gợi ý từ sơ đồ nguyên lý là đầu vào của quy trình M115.
+                "XBOSS_TUYEN_GOIY",
                 // M115 §6 bước 2–3–5 — gán thuộc tính tuyến tim, dựng/duyệt đồ thị, rồi hoàn thiện.
                 "XBOSS_TUYEN_GAN", "XBOSS_TUYEN_DOTHI", "XBOSS_HOANTHIEN",
             ],
@@ -119,7 +121,7 @@ public class QuyTrinhTests
         Assert.Equal(
             [
                 "XBOSS_BOCKL_XOA", "XBOSS_VE_THUVIEN", "XBOSS_VE_DEXUAT", "XBOSS_VE_DEXUAT_LO",
-                "XBOSS_BANG", "XBOSS_VE_NGATNET_XOA", "XBOSS_PHOIHOP_XOA",
+                "XBOSS_BANG", "XBOSS_VE_NGATNET_XOA", "XBOSS_PHOIHOP_XOA", "XBOSS_TUYEN_GOIY_XOA",
             ],
             QuyTrinh.LenhCua(BuocQuyTrinh.PhuTro).Select(l => l.Ten));
     }
@@ -149,13 +151,13 @@ public class QuyTrinhTests
                 "XBOSS_VE_HANHLANG",
                 "XBOSS_VE_NEN", "XBOSS_VE_TUYENTUDONG", "XBOSS_VE", "XBOSS_VE_NHANTUYEN", "XBOSS_VE_NHAN",
                 "XBOSS_VE_PHUKIEN", "XBOSS_VE_THIETBI", "XBOSS_VE_NHANTANG", "XBOSS_VE_DOI",
-                "XBOSS_TUYEN_GAN", "XBOSS_TUYEN_DOTHI", "XBOSS_HOANTHIEN",
+                "XBOSS_TUYEN_GOIY", "XBOSS_TUYEN_GAN", "XBOSS_TUYEN_DOTHI", "XBOSS_HOANTHIEN",
                 "XBOSS_VE_CHIADOT", "XBOSS_VE_GIADO", "XBOSS_VE_LOCHO", "XBOSS_VE_TAG",
                 "XBOSS_VE_MATCAT", "XBOSS_VE_THONGKE", "XBOSS_VE_NGATNET", "XBOSS_VE_TRANGIN",
                 "XBOSS_VE_REV", "XBOSS_VE_REV_CHOT", "XBOSS_VE_REV_HIENTHI", "XBOSS_VE_BAOCAO",
                 "XBOSS_PHOIHOP", "XBOSS_PHOIHOP_BAOCAO",
                 "XBOSS_VE_THUVIEN", "XBOSS_VE_DEXUAT", "XBOSS_VE_DEXUAT_LO", "XBOSS_VE_NGATNET_XOA",
-                "XBOSS_PHOIHOP_XOA",
+                "XBOSS_PHOIHOP_XOA", "XBOSS_TUYEN_GOIY_XOA",
             ],
             ve);
     }

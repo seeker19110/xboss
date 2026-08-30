@@ -74,6 +74,14 @@ const LENH_CHINH: { lenh: string; mo_ta: string }[] = [
     mo_ta: "Điều phối 8 giai đoạn hoàn thiện bản vẽ từ tuyến tim đã duyệt (M115)",
   },
   {
+    lenh: "XBOSS_TUYEN_GOIY",
+    mo_ta: "Sinh tuyến tim nháp từ sơ đồ nguyên lý đã chốt trên web, theo hành lang (M117)",
+  },
+  {
+    lenh: "XBOSS_TUYEN_GOIY_XOA",
+    mo_ta: "Dọn sạch tuyến nháp do XBOSS_TUYEN_GOIY sinh (một sơ đồ hoặc mọi sơ đồ)",
+  },
+  {
     lenh: "XBOSS_PHOIHOP",
     mo_ta:
       "Quét xung đột giữa các hệ (cao độ/hành lang/khoảng cách), đề xuất xử lý — kỹ sư quyết (M116)",

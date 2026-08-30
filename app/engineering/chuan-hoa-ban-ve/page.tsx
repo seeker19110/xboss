@@ -17,6 +17,7 @@ import LayersFontPanel from "./components/LayersFontPanel";
 import BoqDimCtbPanel from "./components/BoqDimCtbPanel";
 import XrefDiffPanel from "./components/XrefDiffPanel";
 import Step2NamingPanel from "./components/Step2NamingPanel";
+import SchematicGraphPanel from "./components/SchematicGraphPanel";
 import { useAutoHealEngine } from "./hooks/useAutoHealEngine";
 import { useBlockCatalog } from "./hooks/useBlockCatalog";
 import { useCadDiff } from "./hooks/useCadDiff";
@@ -183,6 +184,11 @@ export default function ChuanHoaBanVePage() {
             MÃ BOQ THEO DỰ ÁN (M101 PR4) — gán mã cho hạng mục bóc tách XBOSS_BOCKL
         ══════════════════════════════════════════════════════════════════════ */}
         <MaBoqDuAnPanel />
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            SƠ ĐỒ NGUYÊN LÝ (M117) — AI đọc DXF schematic → đồ thị kết nối, duyệt trên web
+        ══════════════════════════════════════════════════════════════════════ */}
+        <SchematicGraphPanel />
 
         {/* ══════════════════════════════════════════════════════════════════════
             TOP BAR: CHỌN NGUỒN CAD (TỪ THIẾT KẾ HOẶC TẢI LÊN FILE .DXF)

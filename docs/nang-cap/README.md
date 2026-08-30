@@ -314,6 +314,11 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > `XBOSS_TUYEN_GOIY` ánh xạ thiết bị + sinh tuyến tim NHÁP bằng routing M114 → nhận vào quy trình
 > M115. Có migration `cad_schematic_graphs` (RLS project) + 4 API. 4 PR. **Điều kiện kích hoạt:
 > M115 verify + pilot ổn — không kéo lên trước.**
+> **Trạng thái 2026-08-30: CODE XONG cả 4 PR** (X1 migration + tầng 1 luật · X2 tầng 2 AI + 4 API ·
+> X3 màn duyệt graph trên web · X4 plugin `XBOSS_TUYEN_GOIY`/`_GOIY_XOA` + tài liệu). **CÒN NỢ —
+> CHẶN phát hành rộng:** chưa verify tay trên AutoCAD 2026 thật (mục `C12` của
+> `plugin-autocad/VERIFY-VA-PHAT-HANH.md`, 10 mục 109–118) — xếp sau nợ verify M111 §C9 / M114 §C10
+> / M115 §C11.
 >
 > **Thứ tự thi hành đợt: M115 → M116 → M117.** Cổng chung: trả nợ verify tay AutoCAD 2026 các đợt
 > trước (M111 đang chặn) trước khi phát hành rộng bất kỳ mục nào.

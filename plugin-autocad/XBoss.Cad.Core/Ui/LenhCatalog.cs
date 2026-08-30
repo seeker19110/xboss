@@ -129,20 +129,27 @@ public static class LenhCatalog
             "Chép hệ của tầng điển hình sang N tầng khác kèm ánh xạ lại toàn bộ liên kết dữ liệu và " +
             "đổi tag theo tầng — có bảng xem trước bắt buộc, một lần UNDO hoàn tác cả N tầng.",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 8, CanRulePack: true),
+        // M117 §6 bước 5 — gợi ý tuyến tim từ sơ đồ nguyên lý đã chốt trên web. Đứng TRƯỚC
+        // XBOSS_TUYEN_GAN: nháp sinh ra là đầu vào của đúng quy trình M115 phía sau.
+        new("XBOSS_TUYEN_GOIY", "Tuyến gợi ý từ sơ đồ",
+            "Tải sơ đồ nguyên lý đã chốt trên web, ánh xạ thiết bị của sơ đồ với block trên mặt bằng " +
+            "rồi sinh tuyến tim NHÁP theo hành lang (layer XBOSS-GOIY), thuộc tính hệ/cỡ điền sẵn; " +
+            "chạy lại thay thế đúng nháp của sơ đồ đó, không nhân đôi.",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 10, CanRulePack: true),
         // M115 §6 bước 2–3 — hoàn thiện bản vẽ từ tuyến tim kỹ sư vẽ bằng AutoCAD thuần.
         new("XBOSS_TUYEN_GAN", "Gán thuộc tính tuyến",
             "Gán hệ/cỡ/cao độ/vật liệu/kiểu nối cho các line/pline tuyến tim đang chọn (hệ điền sẵn " +
             "theo layer nếu khớp layerMap); hình học và layer giữ nguyên tuyệt đối.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 10, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 11, CanRulePack: true),
         new("XBOSS_TUYEN_DOTHI", "Dựng & duyệt đồ thị",
             "Dựng đồ thị tuyến–thiết bị từ các tuyến tim đã gán thuộc tính: gộp nút, suy tê/co/cút/" +
             "giảm, báo lỗi chặn bấm-tới-đối-tượng; kỹ sư duyệt từng nút rồi chốt đồ thị vào bản vẽ.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 11, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 12, CanRulePack: true),
         new("XBOSS_HOANTHIEN", "Hoàn thiện bản vẽ",
             "Chạy chuỗi 8 giai đoạn hoàn thiện trên cụm tuyến đã chốt đồ thị (nét đôi → phụ kiện tại " +
             "nút → chia đốt → giá đỡ → lỗ chờ → ngắt nét → tag → bảng thống kê), bật/tắt từng giai " +
             "đoạn; chạy lại an toàn, tọa độ tuyến tim giữ nguyên tuyệt đối.",
-            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 12, CanRulePack: true),
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 13, CanRulePack: true),
         new("XBOSS_VE_THUVIEN", "Thư viện block",
             "Tải/đồng bộ thư viện block từ server hoặc nhập từ tệp manifest + DWG.",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.PhuTro, 2, CanRulePack: true),
@@ -214,6 +221,10 @@ public static class LenhCatalog
             "Gỡ sạch đối tượng ngắt nét giao chéo (vùng che + cầu vượt) trong vùng chọn hoặc cả bản vẽ, " +
             "trả bản vẽ về trước khi chạy XBOSS_VE_NGATNET.",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.PhuTro, 6, CanRulePack: true),
+        new("XBOSS_TUYEN_GOIY_XOA", "Xóa tuyến gợi ý",
+            "Dọn sạch tuyến tim NHÁP do XBOSS_TUYEN_GOIY sinh (của một sơ đồ hoặc mọi sơ đồ) — chỉ đụng " +
+            "polyline mang dấu gợi ý, tuyến vẽ tay giữ nguyên.",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.PhuTro, 8, CanRulePack: true),
 
         // ── Bảng điều khiển (M102) ──
         new("XBOSS_BANG", "Bảng điều khiển",
