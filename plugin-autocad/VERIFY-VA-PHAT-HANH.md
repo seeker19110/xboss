@@ -682,6 +682,42 @@ nào…`), nút chuyển nền chìm + chữ mờ.
 108. **Hộp thoại:** soi theo checklist C8b (nền tối, danh sách nút/nhánh/phụ kiện của
      `XBOSS_TUYEN_DOTHI` đọc rõ, nút OK khóa kèm lý do khi đồ thị còn lỗi chặn).
 
+### C12. `XBOSS_TUYEN_GOIY` / `XBOSS_TUYEN_GOIY_XOA` — tuyến gợi ý từ sơ đồ nguyên lý (M117 PR4 — CHƯA LÀM, chờ lượt trước xong)
+
+> **Chưa verify tay mục này.** Cần: server XBoss chạy (mục D) có ít nhất một sơ đồ nguyên lý đã
+> **Chốt graph**, máy đã `XBOSS_LOGIN`, và bản vẽ mặt bằng đã có **hành lang** (`XBOSS_VE_HANHLANG`)
+>
+> - block thiết bị của hệ. Đợt M117 **CHƯA phát hành rộng** — xếp sau nợ verify M111 §C9 / M114 §C10
+>   / M115 §C11, ghi sẵn kịch bản để khi tới lượt không phải soạn lại.
+
+109. **AC4 — chưa chốt thì không có đường đi tắt.** Graph còn `nhap` trên web → `XBOSS_TUYEN_GOIY`
+     nhận 409 và **dừng sạch** kèm câu "vào tab Sơ đồ nguyên lý… bấm Chốt graph"; đếm số đối tượng
+     model space trước/sau: **không đổi**. Chốt graph trên web rồi chạy lại → sinh được nháp.
+110. **Luồng tải – ánh xạ – sinh nháp.** Gõ mã sơ đồ → dòng lệnh in đúng số nút/cạnh + thời điểm
+     chốt → chọn hệ/loại tuyến/cỡ mặc định + cao độ → bấm **điểm nguồn** → bảng ánh xạ liệt kê từng
+     nút `✔ <tag> → handle … (theo tag)` và từng nút thiếu kèm lý do → xác nhận **CO** → polyline
+     nháp hiện trên layer `XBOSS-GOIY`. `LIST` một nháp: XData `XBOSS_VE` phải có `vaitro=tim`,
+     `he`, `size` (đúng cỡ ghi trên sơ đồ, không phải cỡ mặc định), `caodomm`, `phien=goiy-<id>`.
+111. **Thiếu ánh xạ không chặn.** Xóa/đổi tag một block thiết bị trên mặt bằng rồi chạy lại → nút đó
+     vào danh sách thiếu, **các nhánh còn lại vẫn sinh** (M117 §6).
+112. **Chưa có hành lang.** Trên bản vẽ chưa chạy `XBOSS_VE_HANHLANG` → lệnh dừng kèm đúng câu
+     "chạy XBOSS_VE_HANHLANG… trước", **không crash**, không vẽ một nét nào.
+113. **AC5 — chạy lại không nhân đôi.** Chạy `XBOSS_TUYEN_GOIY` lần 2 với cùng mã sơ đồ và cùng điểm
+     nguồn → tổng số đối tượng model space **không đổi**; đếm riêng polyline trên `XBOSS-GOIY` cũng
+     không đổi. Đặt thêm một pline tự vẽ và một nháp của **sơ đồ khác** (mã khác) trên cùng bản vẽ →
+     cả hai **còn nguyên** sau lần chạy thứ 2.
+114. **Nháp đã sửa tay.** Kéo một đỉnh của nháp rồi chạy lại → lệnh cảnh báo đúng số tuyến lệch hình
+     học và **hỏi xác nhận**; trả lời `KHONG` → bản vẽ không đổi.
+115. **`XBOSS_TUYEN_GOIY_XOA`.** Enter (mọi sơ đồ) → xóa hết nháp, tuyến vẽ tay/tuyến `XBOSS_VE`
+     **không bị đụng**. Gõ mã một sơ đồ → chỉ nháp của sơ đồ đó biến mất.
+116. **Offline (cache M113).** Rút mạng sau khi đã tải sơ đồ một lần → chạy lại: lệnh báo "đang dùng
+     BẢN CACHE" và vẫn sinh nháp. Xóa `%APPDATA%\XBoss\schematic-<id>.json` rồi rút mạng → lệnh
+     báo thiếu cache, dừng sạch.
+117. **Một lần `U`.** `U` ngay sau mỗi lệnh → hoàn tác trọn vẹn (xóa nháp cũ + sinh nháp mới nằm
+     trong đúng một nhóm UNDO).
+118. **Nối vào M115.** Sau khi sinh nháp: `XBOSS_TUYEN_GAN` (bổ sung kiểu nối) → `XBOSS_TUYEN_DOTHI`
+     → `XBOSS_HOANTHIEN` chạy trọn như tuyến vẽ tay, không có ngoại lệ nào cho tuyến gợi ý.
+
 ---
 
 ## D. Kiểm thử có server — dựng tại chỗ trên máy mình
