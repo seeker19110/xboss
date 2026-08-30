@@ -4,12 +4,14 @@ using AcadApp = Autodesk.AutoCAD.ApplicationServices.Application;
 namespace XBoss.Cad.Acad.Ui;
 
 /// <summary>
-/// PaletteSet "XBoss" (M102, mở rộng ở M106 FR7) — cửa sổ neo được, hai tab:
+/// PaletteSet "XBoss" (M102, mở rộng ở M106 FR7) — cửa sổ neo được, hai tab, thứ tự chốt sau
+/// phản hồi dùng tay trên AutoCAD 2026 thật (2026-08-30):
 /// <list type="bullet">
-/// <item><b>Quy trình</b> (<see cref="TrinhDanControl"/>) — trình dẫn 6 giai đoạn, tab mặc định
-/// vì đây là lối vào chính: đang ở bước nào, tiếp theo bấm gì.</item>
-/// <item><b>Trạng thái</b> (<see cref="BangDieuKhienControl"/>) — bảng trạng thái M102, GIỮ
-/// NGUYÊN: server/thiết bị, rule pack, thư viện block, sidecar cạnh bản vẽ.</item>
+/// <item><b>Trạng thái</b> (<see cref="BangDieuKhienControl"/>) — tab đầu/mặc định: server/thiết
+/// bị, rule pack, thư viện block, sidecar cạnh bản vẽ — thứ kỹ sư muốn liếc qua đầu tiên mỗi lần
+/// mở lại bảng.</item>
+/// <item><b>Quy trình</b> (<see cref="TrinhDanControl"/>) — trình dẫn 6 giai đoạn, tra cứu khi
+/// cần (đang ở bước nào, tiếp theo bấm gì).</item>
 /// </list>
 /// Singleton theo phiên AutoCAD, Guid cố định để AutoCAD nhớ vị trí neo giữa các lần mở.
 /// </summary>
@@ -34,8 +36,12 @@ internal static class BangDieuKhienPalette
                 Style = PaletteSetStyles.ShowCloseButton | PaletteSetStyles.ShowAutoHideButton,
                 MinimumSize = new System.Drawing.Size(280, 320),
             };
-            _paletteSet.Add("Quy trình", _trinhDan);
+            // "Trạng thái" thêm TRƯỚC "Quy trình" (đảo lại so với M106 — chốt sau phản hồi dùng
+            // tay trên AutoCAD 2026 thật, 2026-08-30): tab thêm đầu tiên là tab AutoCAD hiện sẵn
+            // khi mở bảng, và "server/rule pack/kết quả gần nhất" là thứ kỹ sư muốn liếc qua đầu
+            // tiên mỗi lần mở lại bảng — "Quy trình" (6 bước) tra cứu khi cần, không phải mặc định.
             _paletteSet.Add("Trạng thái", _control);
+            _paletteSet.Add("Quy trình", _trinhDan);
             TheoDoiDoiBanVe();
         }
 
@@ -44,8 +50,8 @@ internal static class BangDieuKhienPalette
             _paletteSet.Visible = false;
             return;
         }
-        _trinhDan!.LamMoi();
         _control!.LamMoi();
+        _trinhDan!.LamMoi();
         _paletteSet.Visible = true;
     }
 

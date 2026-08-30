@@ -36,16 +36,30 @@ internal static class RibbonBuilder
 
         var tab = new RibbonTab { Title = LenhCatalog.TenTab, Id = LenhCatalog.IdTab };
 
-        // Panel "Quy trình" đứng ĐẦU tab (M106 FR10): lối vào trình dẫn — kỹ sư mới nhìn Ribbon
-        // phải thấy ngay "bắt đầu từ đâu" trước khi thấy 26 lệnh. Nhóm BangDieuKhien chỉ có đúng
-        // lệnh XBOSS_BANG nên nó hiện Ở ĐÂY thay vì có panel riêng: không bao giờ hai nút Ribbon
-        // cùng chạy một lệnh.
-        tab.Panels.Add(Panel("Quy trình", LenhCatalog.TatCa.Where(l => l.Nhom == NhomLenh.BangDieuKhien)));
-
-        foreach (var nhom in LenhCatalog.TheoNhom())
+        // Thứ tự panel CỐ Ý khác thứ tự khai trong LenhCatalog.NhomLenh (đó là thứ tự nghiệp vụ
+        // Kết nối→Chuẩn hóa→Bóc khối lượng→Vẽ shop drawing; đây là thứ tự MẮT kỹ sư lướt Ribbon,
+        // chốt lại sau phản hồi dùng tay trên AutoCAD 2026 thật, 2026-08-30):
+        //   Kết nối → Quy trình → Chuẩn hóa → Vẽ shop drawing → Bóc khối lượng.
+        // "Kết nối" lên đầu vì đó luôn là việc đầu tiên của mọi phiên (đăng nhập/nạp rule pack);
+        // "Quy trình" (panel chỉ có nút Bảng điều khiển — lối vào trình dẫn 6 bước) đứng ngay sau
+        // để kỹ sư mới thấy "bắt đầu từ đâu" trước khi thấy hàng chục nút; "Vẽ shop drawing" đứng
+        // trước "Bóc khối lượng" vì đây là khối lệnh dùng nhiều nhất trong ngày, không nên đứng
+        // cuối cùng sau panel ít dùng hơn.
+        var thuTuPanel = new[]
         {
-            if (nhom.Key == NhomLenh.BangDieuKhien) continue;
-            tab.Panels.Add(Panel(LenhCatalog.TenNhom(nhom.Key), nhom));
+            NhomLenh.KetNoi,
+            NhomLenh.BangDieuKhien, // panel "Quy trình" — xem TenNhom
+            NhomLenh.ChuanHoa,
+            NhomLenh.VeShopDrawing,
+            NhomLenh.BocKhoiLuong,
+        };
+        var theoNhom = LenhCatalog.TheoNhom().ToDictionary(g => g.Key, g => g);
+        foreach (var nhom in thuTuPanel)
+        {
+            // "Quy trình" là tên hiển thị của panel chứa đúng lệnh XBOSS_BANG (nhóm BangDieuKhien)
+            // — không dùng TenNhom("Bảng điều khiển") ở đây, xem M106 FR10.
+            var tieuDe = nhom == NhomLenh.BangDieuKhien ? "Quy trình" : LenhCatalog.TenNhom(nhom);
+            tab.Panels.Add(Panel(tieuDe, theoNhom[nhom]));
         }
         ribbon.Tabs.Add(tab);
     }
