@@ -140,8 +140,12 @@ public sealed class VeTagCommands
     /// <summary>
     /// Đánh lại tag. <paramref name="phamViUi"/>/<paramref name="tangUi"/> khác null = hộp thoại đã
     /// thu xong (M106); null = đường hỏi đáp dòng lệnh cũ (FR9).
+    ///
+    /// <c>internal</c> để <c>XBOSS_HOANTHIEN</c> (M115 giai đoạn ⑦) gọi lại đúng hàm này — pipeline
+    /// truyền sẵn phạm vi <see cref="PhamViTag.ToanBo"/> + tầng đã nhớ trong bản vẽ nên không hỏi
+    /// lại; bước xác nhận danh sách tag mới GIỮ NGUYÊN (đó là chốt human-in-the-loop của M100).
     /// </summary>
-    private static void DanhLai(
+    internal static void DanhLai(
         Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, Database db, string mau,
         PhamViTag? phamViUi, string? tangUi)
     {
@@ -317,8 +321,20 @@ public sealed class VeTagCommands
 
     /// <summary>Attribute mang thẻ TAG của một khối; null khi khối không có thẻ đó.</summary>
 
+    /// <summary>
+    /// Tầng đang nhớ trong bản vẽ; null = bản vẽ chưa từng khai tầng. <c>internal</c> để
+    /// <c>XBOSS_HOANTHIEN</c> (M115) biết có hỏi tầng được không mà không phải mở lại Xrecord.
+    /// </summary>
+    internal static string? TangDaNho(Database db)
+    {
+        using var tr = db.TransactionManager.StartTransaction();
+        var tang = DocTang(db, tr);
+        tr.Commit();
+        return tang;
+    }
+
     /// <summary>Tầng của bản vẽ: hỏi một lần, nhớ trong chính bản vẽ (§6.9).</summary>
-    private static string? HoiTang(Editor ed, Database db)
+    internal static string? HoiTang(Editor ed, Database db)
     {
         string? cu;
         using (var tr = db.TransactionManager.StartTransaction())

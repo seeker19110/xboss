@@ -50,7 +50,37 @@ public sealed class VeNenCommands
             return;
         }
 
-        // (3) Áp nền: 1 transaction = 1 nhóm UNDO.
+        ApNen(doc, ed, pack, he);
+    }
+
+    /// <summary>
+    /// Trạng thái nền hiện tại của bản vẽ; null = chưa chạy <c>XBOSS_VE_NEN</c> lần nào (hoặc đã
+    /// hoàn nguyên). Tách ra để <c>XBOSS_HOANTHIEN</c> (M115) biết có cần áp nền nữa không —
+    /// gọi lại lệnh khi đang ở chế độ nền là HOÀN NGUYÊN, đúng thứ pipeline không được làm.
+    /// </summary>
+    internal static VeLayerService.TrangThaiNen? TrangThaiNenHienTai(Database db)
+    {
+        using var tr = db.TransactionManager.StartTransaction();
+        var tt = VeLayerService.DocTrangThai(db, tr);
+        tr.Commit();
+        return tt;
+    }
+
+    /// <summary>
+    /// Áp nền cho một hệ: khóa + làm mờ layer nền, tạo sẵn layer đích (kèm layer nét biên). Thân
+    /// bước (3) của <c>XBOSS_VE_NEN</c>, tách nguyên vẹn ra service để cả lệnh gốc lẫn
+    /// <c>XBOSS_HOANTHIEN</c> (M115 giai đoạn ① nét đôi) cùng gọi — không nhân đôi logic.
+    /// Trả false khi API AutoCAD lỗi (đã rollback, đã báo dòng lệnh).
+    /// </summary>
+    internal static bool ApNen(
+        Autodesk.AutoCAD.ApplicationServices.Document doc,
+        Autodesk.AutoCAD.EditorInput.Editor ed,
+        DrawToolsPack pack,
+        DrawSystem he)
+    {
+        var db = doc.Database;
+
+        // 1 transaction = 1 nhóm UNDO.
         var daTao = new List<string>();
         var coSanNoiDung = new List<string>();
         var boQuaLayer = new List<string>();
@@ -104,7 +134,7 @@ public sealed class VeNenCommands
                 ed.WriteMessage(
                     $"\n[XBoss] LỖI khi chuẩn bị nền ({buoc}) — đã rollback, bản vẽ nguyên trạng: {e.Message}\n" +
                     "[XBoss] Gửi dòng này kèm tên bản vẽ cho đội phát triển; lệnh vẽ XBOSS_VE vẫn dùng được bình thường.\n");
-                return;
+                return false;
             }
         }
 
@@ -127,6 +157,7 @@ public sealed class VeNenCommands
         }
         ed.WriteMessage(
             "[XBoss] Vẽ tuyến: XBOSS_VE · Ghi nhãn: XBOSS_VE_NHAN · Xong hệ: chạy lại XBOSS_VE_NEN để hoàn nguyên.\n");
+        return true;
     }
 
     /// <summary>

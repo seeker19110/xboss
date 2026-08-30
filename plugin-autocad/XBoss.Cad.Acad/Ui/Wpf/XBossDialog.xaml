@@ -1646,6 +1646,32 @@
       </StackPanel>
     </DataTemplate>
 
+    <!-- XBOSS_HOANTHIEN (M115 FR3): tick 8 giai đoạn hoàn thiện. Mặc định tick theo
+         completionPolicy.stageDefaults; thứ tự chạy CỐ ĐỊNH ① → ⑧ nên danh sách cũng hiện đúng
+         thứ tự đó, kỹ sư không hiểu nhầm là tick trước chạy trước. -->
+    <DataTemplate DataType="{x:Type vm:HoanThienDialogViewModel}">
+      <StackPanel>
+        <TextBlock Foreground="{x:Static wpf:MauBangWpf.Chu}" Text="{Binding TomTatDoThi}" TextWrapping="Wrap" />
+        <TextBlock Style="{StaticResource Nhan}" Text="Giai đoạn cần chạy (thứ tự chạy ① → ⑧)" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding CacGiaiDoan}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Margin="0,0,0,6">
+                    <CheckBox IsChecked="{Binding Bat, Mode=TwoWay}" Content="{Binding Nhan}" />
+                    <TextBlock Style="{StaticResource GhiChu}" Margin="22,0,0,0"
+                               Text="{Binding GhiChu}" TextWrapping="Wrap" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding GhiChu}" TextWrapping="Wrap" />
+      </StackPanel>
+    </DataTemplate>
+
     <!-- XBOSS_VE_REV_HIENTHI: tick revision cần HIỆN (mỗi revision một layer con). -->
     <DataTemplate DataType="{x:Type vm:HienThiRevisionDialogViewModel}">
       <StackPanel>

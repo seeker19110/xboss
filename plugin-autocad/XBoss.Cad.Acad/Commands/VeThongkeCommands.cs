@@ -35,11 +35,24 @@ public sealed class VeThongkeCommands
         // Loại bảng + tỉ lệ in trong MỘT hộp thoại (M106 §7.2); UI hỏng / XBOSS_UI_DIALOG=0 → câu
         // hỏi keyword cũ rồi VeContext.HoiTiLeIn như trước (FR9).
         if (HoiThamSo(ed, pack) is not { } ts) return;
+        ChayThongKe(doc, ed, pack, ts.Loai, ts.TiLeIn);
+    }
+
+    /// <summary>
+    /// Thân thật của <c>XBOSS_VE_THONGKE</c> — dựng nội dung bảng rồi vẽ/cập nhật bảng trong bản vẽ.
+    /// Tách nguyên vẹn khỏi <see cref="ThongKe"/> để <c>XBOSS_HOANTHIEN</c> (M115 giai đoạn ⑧) gọi
+    /// lại đúng logic này thay vì nhân đôi.
+    /// </summary>
+    internal static void ChayThongKe(
+        Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, DrawToolsPack pack,
+        LoaiBangThongKeUi loai, double tiLeIn, string? giaiDoanM115 = null)
+    {
+        var db = doc.Database;
 
         BangThongKe? bang;
         using (var tr = db.TransactionManager.StartTransaction())
         {
-            bang = ts.Loai switch
+            bang = loai switch
             {
                 LoaiBangThongKeUi.KhoiLuong => BangKhoiLuong(ed, db, tr, pack),
                 LoaiBangThongKeUi.ChiaDot => BangChiaDot(ed, db, tr),
@@ -52,7 +65,7 @@ public sealed class VeThongkeCommands
         ed.WriteMessage($"\n[XBoss] ===== {bang.TieuDe} =====\n");
         foreach (var d in bang.Dong) ed.WriteMessage($"[XBoss]   {string.Join("  |  ", d)}\n");
 
-        VeBang(doc, ed, pack, bang, ts.TiLeIn);
+        VeBang(doc, ed, pack, bang, tiLeIn, giaiDoanM115);
     }
 
     // ===== Thu tham số: hộp thoại (mặc định) hoặc dòng lệnh (M106 FR9) =====
@@ -177,7 +190,7 @@ public sealed class VeThongkeCommands
 
     private static void VeBang(
         Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, DrawToolsPack pack, BangThongKe bang,
-        double tiLe)
+        double tiLe, string? giaiDoanM115)
     {
         var db = doc.Database;
         var (toMm, _, _) = DrawingUnits.TuInsUnits((int)db.Insunits);
@@ -225,6 +238,8 @@ public sealed class VeThongkeCommands
                     db, tr2, ms, viTri, layerNhan, bang.TieuDe, bang.Cot, bang.Dong, caoChu,
                     new VeXDataInfo
                     {
+                        NguonHoanThien = giaiDoanM115 is null ? null : HoanThienKeHoach.NguonM115,
+                        GiaiDoanHoanThien = giaiDoanM115,
                         VaiTro = VaiTroVe.BangThongKe,
                         LoaiBang = ma,
                         RulePackVersion = pack.RulePack.Version,

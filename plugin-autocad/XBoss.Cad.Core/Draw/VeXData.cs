@@ -255,6 +255,20 @@ public sealed record VeXDataInfo
     /// khác vẫn tự mang theo mốc so của chính nó.</para>
     /// </summary>
     public string? BamHinhHoc { get; init; }
+
+    // ===== Hoàn thiện bản vẽ từ tuyến tim (M115 FR4) =====
+    // Khuôn idempotency của XBOSS_HOANTHIEN dùng lại chính appname XBOSS_VE (không đẻ appname mới):
+    //   nguon    = HoanThienKeHoach.NguonM115 ("M115") — <see cref="NguonHoanThien"/>
+    //   tuyenGoc = <see cref="HandleTim"/> (khóa đã có sẵn, đúng nghĩa "handle của tim")
+    //   giaiDoan = <see cref="GiaiDoanHoanThien"/>
+    // Chạy lại: xóa đúng bộ ba này rồi sinh lại. Thực thể kỹ sư tự vẽ không có dấu nên không bao
+    // giờ bị đụng; thực thể mang <see cref="SuaTay"/> thì được GIỮ (cùng luật với M114 FR12).
+
+    /// <summary>Thực thể do <c>XBOSS_HOANTHIEN</c> sinh ra; null = không phải của M115.</summary>
+    public string? NguonHoanThien { get; init; }
+
+    /// <summary>Khóa giai đoạn đã sinh ra thực thể này (<c>netDoi</c>, <c>chiaDot</c>…).</summary>
+    public string? GiaiDoanHoanThien { get; init; }
 }
 
 /// <summary>
@@ -328,6 +342,8 @@ public static class VeXData
         Them(ra, "phien", tt.PhienTuyen);
         if (tt.SuaTay) ra.Add("suatay=1");
         Them(ra, "bamhh", tt.BamHinhHoc);
+        Them(ra, "nguon", tt.NguonHoanThien);
+        Them(ra, "giaidoan", tt.GiaiDoanHoanThien);
         return ra;
     }
 
@@ -389,6 +405,7 @@ public static class VeXData
         double? beRongMm = null, cotDayDamMm = null, cotTranMm = null;
         string? phienTuyen = null;
         string? bamHinhHoc = null;
+        string? nguonHoanThien = null, giaiDoanHoanThien = null;
         var tuDong = false;
         var suaTay = false;
 
@@ -499,6 +516,8 @@ public static class VeXData
                 case "phien": phienTuyen = giaTri; break;
                 case "suatay": suaTay = giaTri == "1"; break;
                 case "bamhh": bamHinhHoc = giaTri; break;
+                case "nguon": nguonHoanThien = giaTri; break;
+                case "giaidoan": giaiDoanHoanThien = giaTri; break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -551,6 +570,8 @@ public static class VeXData
             PhienTuyen = phienTuyen,
             SuaTay = suaTay,
             BamHinhHoc = bamHinhHoc,
+            NguonHoanThien = nguonHoanThien,
+            GiaiDoanHoanThien = giaiDoanHoanThien,
         };
     }
 

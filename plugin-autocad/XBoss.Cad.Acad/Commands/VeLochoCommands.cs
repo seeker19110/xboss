@@ -502,35 +502,7 @@ public sealed class VeLochoCommands
             return null;
         }
 
-        var giao = new List<Point3d>();
-        using (var tr = db.TransactionManager.StartTransaction())
-        {
-            if (tr.GetObject(idTim, OpenMode.ForRead) is not Curve tim)
-            {
-                tr.Commit();
-                return null;
-            }
-            var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
-            foreach (ObjectId id in ms)
-            {
-                if (id == idTim) continue;
-                if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
-                if (!layerKetCau.Contains(ent.Layer)) continue;
-
-                using var diem = new Point3dCollection();
-                try
-                {
-                    tim.IntersectWith(ent, Intersect.OnBothOperands, diem, IntPtr.Zero, IntPtr.Zero);
-                }
-                catch (Autodesk.AutoCAD.Runtime.Exception)
-                {
-                    continue; // đối tượng không giao được (text, block phức tạp…) — bỏ qua
-                }
-                foreach (Point3d p in diem) giao.Add(p);
-            }
-            tr.Commit();
-        }
-
+        var giao = GiaoVoiKetCau(db, layerKetCau, idTim);
         if (giao.Count == 0)
         {
             ed.WriteMessage(
@@ -566,9 +538,48 @@ public sealed class VeLochoCommands
         return ra;
     }
 
+    /// <summary>
+    /// Giao điểm hình học giữa một tim và mọi đối tượng trên layer kết cấu — phần KHÔNG hỏi gì của
+    /// <see cref="DoGiaoKetCau"/>, tách ra để <c>XBOSS_HOANTHIEN</c> (M115 giai đoạn ⑤) dùng lại
+    /// đúng phép dò này trên cả cụm tuyến mà không phải hỏi từng điểm một.
+    /// </summary>
+    internal static List<Point3d> GiaoVoiKetCau(Database db, HashSet<string> layerKetCau, ObjectId idTim)
+    {
+        var giao = new List<Point3d>();
+        using (var tr = db.TransactionManager.StartTransaction())
+        {
+            if (tr.GetObject(idTim, OpenMode.ForRead) is not Curve tim)
+            {
+                tr.Commit();
+                return giao;
+            }
+            var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
+            foreach (ObjectId id in ms)
+            {
+                if (id == idTim) continue;
+                if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
+                if (!layerKetCau.Contains(ent.Layer)) continue;
+
+                using var diem = new Point3dCollection();
+                try
+                {
+                    tim.IntersectWith(ent, Intersect.OnBothOperands, diem, IntPtr.Zero, IntPtr.Zero);
+                }
+                catch (Autodesk.AutoCAD.Runtime.Exception)
+                {
+                    continue; // đối tượng không giao được (text, block phức tạp…) — bỏ qua
+                }
+                foreach (Point3d p in diem) giao.Add(p);
+            }
+            tr.Commit();
+        }
+        return giao;
+    }
+
     // ===== Đọc bản vẽ =====
 
-    private static HashSet<string> LayerKetCau(DrawToolsPack pack)
+    /// <summary>Layer kết cấu theo nhóm layerMap <c>STRUCTURAL</c> — KHÔNG hard-code tên layer.</summary>
+    internal static HashSet<string> LayerKetCau(DrawToolsPack pack)
     {
         var ra = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var g in pack.RulePack.LayerMap.Groups)
@@ -586,7 +597,7 @@ public sealed class VeLochoCommands
     /// Nhãn trục kết cấu trong bản vẽ: text ngắn (≤3 ký tự chữ/số) nằm trên layer kết cấu —
     /// đúng dạng bong bóng trục A/B/1/2 của bản vẽ kiến trúc-kết cấu.
     /// </summary>
-    private static List<MocTruc> MocTrucTrongBanVe(Database db, Transaction tr, DrawToolsPack pack)
+    internal static List<MocTruc> MocTrucTrongBanVe(Database db, Transaction tr, DrawToolsPack pack)
     {
         var layer = LayerKetCau(pack);
         var ra = new List<MocTruc>();
