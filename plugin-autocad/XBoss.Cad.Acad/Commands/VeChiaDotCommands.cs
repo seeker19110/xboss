@@ -153,7 +153,11 @@ public sealed class VeChiaDotCommands
     /// </summary>
     /// <param name="hoiGhiDe">true = đường dòng lệnh, còn phải hỏi ghi đè kiểu nối (FR9).</param>
     /// <param name="tiLe">Tỉ lệ in đã biết; null = hỏi kỹ sư như lệnh gốc.</param>
-    internal static void ChayChiaDot(
+    /// <returns>
+    /// Số vạch chia/nhãn đốt GIỮ NGUYÊN vì kỹ sư đã dời tay (M118 FR2) — luôn 0 khi chạy tay lệnh
+    /// lẻ (<paramref name="giaiDoanM115"/> null), để pipeline in "Giữ nguyên N" trong tóm tắt ③.
+    /// </returns>
+    internal static int ChayChiaDot(
         Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, DrawToolsPack pack, double toMm,
         IReadOnlyList<ObjectId>? daChon, DrawSystem? he, string? ghiDeKieuNoi, bool hoiGhiDe, double? tiLe,
         string? giaiDoanM115 = null)
@@ -175,17 +179,17 @@ public sealed class VeChiaDotCommands
             ed.WriteMessage(
                 "\n[XBoss] Không có tuyến nào chia đốt được — bản vẽ không thay đổi.\n" +
                 "[XBoss] Tuyến phải do XBOSS_VE vẽ (có XData) và loại tuyến phải khai jointRules trong rule pack.\n");
-            return;
+            return 0;
         }
 
         // ===== (3) Ghi đè kiểu nối + tỉ lệ in (vẫn NGOÀI transaction ghi) =====
         if (hoiGhiDe)
         {
             var ghiDe = HoiGhiDeKieuNoi(ed, ungVien);
-            if (ghiDe.Huy) return;
+            if (ghiDe.Huy) return 0;
             ghiDeKieuNoi = ghiDe.KieuNoi;
         }
-        if ((tiLe ?? VeContext.HoiTiLeIn(ed, pack)) is not { } tiLeIn) return;
+        if ((tiLe ?? VeContext.HoiTiLeIn(ed, pack)) is not { } tiLeIn) return 0;
         var caoChu = pack.DrawTools.LabelStyle.TextHeightMm * tiLeIn / toMm;
 
         // ===== (4) Chia đốt + đặt vạch/tag (Core thuần, chưa đụng bản vẽ) =====
@@ -224,11 +228,12 @@ public sealed class VeChiaDotCommands
         if (viec.Count == 0)
         {
             ed.WriteMessage("\n[XBoss] Không tuyến nào chia được — bản vẽ không thay đổi.\n");
-            return;
+            return 0;
         }
 
         // ===== (5) Vẽ: MỘT transaction = MỘT nhóm UNDO (AC9) =====
         var soXoa = 0;
+        var soGiuSuaTay = 0;
         var soVach = 0;
         var soTag = 0;
         using (var khoa = doc.LockDocument())
@@ -243,9 +248,18 @@ public sealed class VeChiaDotCommands
                 // Dọn kết quả cũ CỦA ĐÚNG các tuyến sắp vẽ lại (idempotent — journey 5/AC9):
                 // lọc theo vai trò XData + handle tim, không xóa theo layer/vùng (sẽ nuốt cả vạch
                 // của tuyến khác). Quét một lần rồi mới xóa — không sửa block record khi đang duyệt.
+                //
+                // M118 FR2: khi CHẠY QUA PIPELINE (giaiDoanM115 khác null), vạch/nhãn mang dấu
+                // nguon=M115 mà kỹ sư đã dời tay được GIỮ NGUYÊN thay vì xóa-sinh lại. Lệnh lẻ chạy
+                // tay truyền giuTayM115 = false ⇒ hành vi Y HỆT trước M118 (bất biến AC3).
                 var chiaDotCu = VeThucThe.ChiaDotTheoTim(db, tr);
                 foreach (var v in viec)
-                    soXoa += VeThucThe.XoaChiaDotCua(db, tr, chiaDotCu, v.Ung.Handle);
+                {
+                    var kqDon = VeThucThe.XoaChiaDotGiuTay(
+                        db, tr, chiaDotCu, v.Ung.Handle, giuTayM115: giaiDoanM115 is not null);
+                    soXoa += kqDon.SoXoa;
+                    soGiuSuaTay += kqDon.SoGiu;
+                }
 
                 foreach (var v in viec)
                 {
@@ -258,7 +272,11 @@ public sealed class VeChiaDotCommands
                         var (dau, cuoi) = vach.HaiDau(v.ChieuDaiVachVe);
                         var line = new Line(new Point3d(dau.X, dau.Y, 0), new Point3d(cuoi.X, cuoi.Y, 0));
                         VeThucThe.Them(tr, ms, line, v.LayerVach);
-                        VeXDataStore.Ghi(line, XDataCon(v, VaiTroVe.VachChia, vach.ChiSoDotTruoc, pack, giaiDoanM115));
+                        VeXDataStore.Ghi(
+                            line,
+                            VeThucThe.KemBam(
+                                XDataCon(v, VaiTroVe.VachChia, vach.ChiSoDotTruoc, pack, giaiDoanM115),
+                                line, giaiDoanM115));
                         soVach++;
                     }
                     foreach (var nhan in v.BoTri.Nhan)
@@ -273,7 +291,11 @@ public sealed class VeChiaDotCommands
                             Attachment = AttachmentPoint.BottomCenter,
                         };
                         VeThucThe.Them(tr, ms, text, v.LayerVach);
-                        VeXDataStore.Ghi(text, XDataCon(v, VaiTroVe.NhanDot, nhan.ChiSoDot, pack, giaiDoanM115));
+                        VeXDataStore.Ghi(
+                            text,
+                            VeThucThe.KemBam(
+                                XDataCon(v, VaiTroVe.NhanDot, nhan.ChiSoDot, pack, giaiDoanM115),
+                                text, giaiDoanM115));
                         soTag++;
                     }
 
@@ -299,11 +321,18 @@ public sealed class VeChiaDotCommands
                 ed.WriteMessage(
                     $"\n[XBoss] LỖI khi vẽ vạch chia đốt — đã rollback, bản vẽ nguyên trạng: {e.Message}\n" +
                     "[XBoss] Nếu layer đang khóa: chạy XBOSS_VE_NEN (hoặc mở khóa layer) rồi thử lại.\n");
-                return;
+                return 0;
             }
         }
 
         BaoCao(ed, viec, boQua, soXoa, soVach, soTag);
+        if (soGiuSuaTay > 0)
+        {
+            ed.WriteMessage(
+                $"[XBoss] Giữ nguyên {soGiuSuaTay} thực thể kỹ sư đã dời/sửa tay — chạy lại KHÔNG đè lên " +
+                "công của người.\n");
+        }
+        return soGiuSuaTay;
     }
 
     // ===== Hỏi đáp (NGOÀI transaction) =====

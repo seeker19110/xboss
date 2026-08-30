@@ -1,3 +1,4 @@
+using XBoss.Cad.Core.Geometry;
 using XBoss.Cad.Core.Graph;
 
 namespace XBoss.Cad.Core.Draw;
@@ -30,6 +31,21 @@ public sealed record ViecGiaiDoan(
 /// chạy lại TUYỆT ĐỐI không xóa, không đè.
 /// </param>
 public sealed record ThucTheDaSinh(string Handle, string GiaiDoan, string TuyenGoc, bool SuaTay);
+
+/// <summary>
+/// Một thực thể của lần chạy trước mà đường DỌN CŨ của lệnh ủy thác (③ chia đốt, ⑥ ngắt nét) hoặc
+/// đường ĐẾM của lệnh không dọn (④ giá đỡ, ⑧ bảng thống kê) đang cân nhắc (M118 FR2).
+/// </summary>
+/// <param name="Khoa">Khóa nhận dạng của Adapter (ObjectId/handle) — Core không cần hiểu nó là gì.</param>
+/// <param name="NguonHoanThien">Dấu <c>nguon</c> trên XData; chỉ thực thể mang <see cref="HoanThienKeHoach.NguonM115"/> mới được bảo vệ.</param>
+/// <param name="BamLucSinh">Băm hình học ghi lúc sinh; null/rỗng = thực thể cũ trước M118 hoặc do lệnh lẻ sinh.</param>
+/// <param name="BamHienTai">Băm hình học tính lại từ vị trí HIỆN TẠI trong bản vẽ.</param>
+/// <param name="SuaTayXData">Cờ <c>suatay</c> kỹ sư đã đóng sẵn trên XData (khuôn M114 PR4).</param>
+public sealed record UngVienDonCu<T>(
+    T Khoa, string? NguonHoanThien, string? BamLucSinh, string BamHienTai, bool SuaTayXData);
+
+/// <summary>Kết quả lọc đường dọn cũ (M118 FR2): xóa cái nào, giữ cái nào vì kỹ sư đã sửa tay.</summary>
+public sealed record KetQuaDonCu<T>(IReadOnlyList<T> CanXoa, IReadOnlyList<T> GiuViSuaTay);
 
 /// <summary>
 /// Kế hoạch thay thế của một lần chạy lại (M115 §7 FR4 / AC3): xóa đúng phần của chính mình rồi
@@ -155,6 +171,56 @@ public static class HoanThienKeHoach
         }
         return new KeHoachThayThe(canXoa, giuSuaTay, giuNgoai);
     }
+
+    /// <summary>
+    /// Kỹ sư đã sửa tay thực thể này chưa — khuôn M114 FR12, dùng CHUNG cho cả pipeline (② ⑤) lẫn
+    /// 4 lệnh ủy thác (③ ④ ⑥ ⑧) của M118 FR2: băm hình học hiện tại khác băm lúc sinh nghĩa là có
+    /// người kéo/dời nó. Thực thể KHÔNG mang băm (lệnh <c>XBOSS_VE_*</c> chạy tay tự lo idempotency
+    /// của nó) thì trả false: quyền quyết định vẫn thuộc chính lệnh đó.
+    /// </summary>
+    public static bool DaSuaTay(string? bamLucSinh, string bamHienTai, bool coSuaTayXData)
+    {
+        if (coSuaTayXData) return true;
+        if (bamLucSinh is not { Length: > 0 } bam) return false;
+        return !string.Equals(bam, bamHienTai, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Băm hình học để ĐÓNG vào XData lúc sinh (M118 FR2/AC4): chỉ khi thực thể do
+    /// <c>XBOSS_HOANTHIEN</c> sinh (<paramref name="giaiDoanM115"/> khác null). Chạy tay lệnh lẻ →
+    /// null, tức không đổi một hành vi nào của lệnh lẻ (AC3).
+    /// </summary>
+    public static string? BamKhiPipeline(string? giaiDoanM115, IReadOnlyList<Diem2> diem) =>
+        giaiDoanM115 is null || diem.Count == 0 ? null : RevisionSnapshot.BamHinhHoc(diem);
+
+    /// <summary>
+    /// Lọc đường DỌN CŨ của lệnh ủy thác (M118 FR2): <paramref name="giuTayM115"/> false = chạy tay
+    /// lệnh lẻ ⇒ xóa hết ĐÚNG như trước M118 (bất biến AC3); true = chạy qua pipeline ⇒ giữ lại
+    /// thực thể mang dấu <see cref="NguonM115"/> mà kỹ sư đã dời/sửa tay.
+    /// </summary>
+    public static KetQuaDonCu<T> LocDonCu<T>(IEnumerable<UngVienDonCu<T>> ungVien, bool giuTayM115)
+    {
+        var canXoa = new List<T>();
+        var giu = new List<T>();
+        foreach (var u in ungVien)
+        {
+            if (giuTayM115 && LaCuaPipelineVaDaSuaTay(u)) giu.Add(u.Khoa);
+            else canXoa.Add(u.Khoa);
+        }
+        return new KetQuaDonCu<T>(canXoa, giu);
+    }
+
+    /// <summary>
+    /// Đếm thực thể kỹ sư đã sửa tay cho hai giai đoạn KHÔNG có đường dọn (④ giá đỡ chỉ bổ sung chỗ
+    /// thiếu, ⑧ bảng thống kê cập nhật tại chỗ) — chỉ để báo "Giữ nguyên N" trong tóm tắt; chạy tay
+    /// lệnh lẻ luôn trả 0 vì lệnh lẻ không có khái niệm giữ-tay (AC3).
+    /// </summary>
+    public static int DemSuaTay<T>(IEnumerable<UngVienDonCu<T>> ungVien, bool giuTayM115) =>
+        giuTayM115 ? ungVien.Count(LaCuaPipelineVaDaSuaTay) : 0;
+
+    private static bool LaCuaPipelineVaDaSuaTay<T>(UngVienDonCu<T> u) =>
+        string.Equals(u.NguonHoanThien, NguonM115, StringComparison.Ordinal) &&
+        DaSuaTay(u.BamLucSinh, u.BamHienTai, u.SuaTayXData);
 
     /// <summary>
     /// Chạy tuần tự từng việc, CÁCH LY LỖI (M118 FR1/AC1): việc nào ném exception thì bắt lại, gọi
