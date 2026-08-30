@@ -159,7 +159,11 @@ public sealed class TuyenGanCommands
                 {
                     if (tr.GetObject(u.Id, OpenMode.ForWrite) is not Entity ent) continue;
                     var cu = u.XDataCu;
-                    VeXDataStore.Ghi(ent, new VeXDataInfo
+                    // Giữ NGUYÊN mọi trường XData khác của tuyến (chia đốt, tag, tầng nguồn, hành
+                    // lang, revision…) — lệnh này chỉ khai thuộc tính của mình, không được phép
+                    // reset dấu vết do các lệnh XBOSS_VE_* khác đã ghi trước đó (idempotent: chạy
+                    // lại XBOSS_TUYEN_GAN trên tuyến đã qua chia đốt/tag không được xoá sạch).
+                    var moi = (cu ?? new VeXDataInfo { VaiTro = VaiTroVe.Tim }) with
                     {
                         VaiTro = VaiTroVe.Tim,
                         HeId = ts.He.Id,
@@ -171,12 +175,8 @@ public sealed class TuyenGanCommands
                         VatLieu = ts.VatLieu,
                         CachNhiet = ts.CachNhiet,
                         KieuNoi = ts.KieuNoi,
-                        // Giữ nguyên mọi liên kết/dấu vết cũ của tuyến (nét biên, nhãn, độ dốc):
-                        // lệnh này chỉ khai thuộc tính, không dọn dẹp hộ thứ do lệnh khác sinh ra.
-                        DoDoc = cu?.DoDoc,
-                        HandleBien = cu?.HandleBien ?? [],
-                        HandleNhan = cu?.HandleNhan ?? [],
-                    });
+                    };
+                    VeXDataStore.Ghi(ent, moi);
                     soGan++;
                 }
                 tr.Commit();
