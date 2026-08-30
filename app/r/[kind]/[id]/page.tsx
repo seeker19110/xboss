@@ -14,7 +14,7 @@ function targetUrl(data: QrResolveResult): string {
     case "eq":
       return `/equipment?id=${data.id}`;
     case "mt":
-      return `/materials?id=${data.id}`;
+      return `/procurement?tab=inventory`;
     case "wf":
       return `/work-fronts/${encodeURIComponent(data.id)}`;
     case "tk":

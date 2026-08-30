@@ -10,9 +10,9 @@
 import { query } from "@/lib/db";
 import { PAYMENT_VIEW_ROLES, type Role } from "@/lib/nen/roles";
 
-// ⚠ BẤT BIẾN CỨNG (neo 2 chiều với migrations/0064_fts.sql):
+// ⚠ BẤT BIẾN CỨNG (neo 2 chiều với migrations/0068_fts.sql):
 //   ftsExpr(cols) PHẢI sinh biểu thức KHỚP CHÍNH XÁC với biểu thức đã CREATE INDEX
-//   trong 0064_fts.sql cho cùng bảng (cùng danh mục cột + cùng thứ tự). Postgres so
+//   trong 0068_fts.sql cho cùng bảng (cùng danh mục cột + cùng thứ tự). Postgres so
 //   khớp index biểu thức theo cây cú pháp (alias/khoảng trắng không tính, nhưng hàm/
 //   toán tử/hằng/THỨ TỰ cột phải trùng). Lệch → planner bỏ index, seq scan.
 //   Đổi `cols` của nguồn nào PHẢI đổi ĐỒNG THỜI biểu thức index tương ứng.

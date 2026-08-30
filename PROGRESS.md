@@ -7028,3 +7028,9 @@ Verify hạ tầng: Postgres 16 local (`pg_ctlcluster`, đã có sẵn trong má
      - Bộ 3 REST APIs: `GET/POST /api/engineering/iot/devices`, `GET/POST /api/engineering/iot/telemetry`, `GET/PATCH /api/engineering/iot/alerts`.
      - Giao diện `app/engineering/iot-telemetry/page.tsx`: Realtime dashboard AQI, CO, tiếng ồn, phụ tải điện kW và trung tâm cảnh báo khẩn cấp HSE.
   3. **Verification**: 116 migrations chuẩn số thứ tự; `check:sw-exclude` sạch; `lint` 0 lỗi; `typecheck` 0 lỗi; tests pass 100%.
+
+- **Vá 4 điểm lệch code phát hiện lúc đồng bộ tài liệu với code thật (2026-08-30)**:
+  1. `app/r/[kind]/[id]/page.tsx`: link QR tem vật tư (`kind=mt`) trỏ `/materials?id=` — trang đã xoá từ khi gộp vào `/procurement` (M-series sau đó), gây 404. Đổi sang `/procurement?tab=inventory`.
+  2. `lib/tien-do/search.ts` + `app/api/search/route.ts`: comment "bất biến cứng neo 2 chiều" ghi sai số migration FTS (`0064_fts.sql` — thực ra là `webhooks`), đúng phải là `0068_fts.sql`. Sửa cả 2 chỗ neo.
+  3. `app/components/ui/Button.tsx` + `app/components/dialogs.tsx`: biến thể nút `danger` dùng mẫu hover sáng dần (`bg-red-700 hover:bg-red-600`), lệch quy ước ADR-0010 "đậm dần khi rê chuột" (`-700 → -800`) — nút chính `primary` đã sửa đúng từ trước, `danger` sót lại mẫu cũ. Đổi cả `Button.tsx` (`danger`) và `dialogs.tsx` (nút confirm) sang `bg-red-700 hover:bg-red-800` / `bg-emerald-700 hover:bg-emerald-800`.
+  - **Verify**: `lint`/`typecheck`/`check:mau-accent` xanh.
