@@ -4,11 +4,7 @@ import assert from "node:assert";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { CAN } from "@/lib/bao-mat/auth";
-import {
-  DRAWING_SYSTEMS,
-  drawingRoots,
-  ensureAllDrawingTrees,
-} from "@/lib/ky-thuat/cad/drawing-tree";
+import { DRAWING_SYSTEMS, drawingRoots, ensureAllDrawingTrees } from "@/lib/ky-thuat/cad/drawing";
 import { parseDxf, exportDxf } from "@/lib/ky-thuat/cad/dxf-parser";
 import { newStandardizedDrawingFileName } from "@/lib/nen/photos";
 import { storagePut, storageGet, storageDelete } from "@/lib/nen/storage";

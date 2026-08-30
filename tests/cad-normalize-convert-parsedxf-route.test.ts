@@ -13,7 +13,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 function nguon(...phan: string[]): string {
-  return readFileSync(join(process.cwd(), "app", "api", "engineering", "cad", ...phan, "route.ts"), "utf8");
+  return readFileSync(
+    join(process.cwd(), "app", "api", "engineering", "cad", ...phan, "route.ts"),
+    "utf8",
+  );
 }
 
 // ===== normalize =====
@@ -112,14 +115,18 @@ test("route parse-dxf: nhiều tệp cùng khớp trên đĩa → 409 kèm danh 
   // Không tìm thấy tệp thật lẫn dxfContent trực tiếp → 404, KHÔNG bịa bản vẽ mẫu.
   assert.match(src, /status: 404/);
   assert.ok(
-    !/isRealDrawing = true;?\s*$/m.test(src) || src.includes("result.isRealDrawing = result.entities.length > 0"),
+    !/isRealDrawing = true;?\s*$/m.test(src) ||
+      src.includes("result.isRealDrawing = result.entities.length > 0"),
     "isRealDrawing phải suy từ có thực thể thật, không được gán cứng true",
   );
 });
 
 test("route parse-dxf: nhận diện DWG qua đuôi tệp HOẶC 4 byte đầu 'AC10' (không chỉ dựa đuôi tệp có thể sai)", () => {
   const src = nguon("parse-dxf");
-  assert.match(src, /ext === "\.dwg" \|\| fileBuffer\.subarray\(0, 4\)\.toString\("ascii"\)\.startsWith\("AC10"\)/);
+  assert.match(
+    src,
+    /ext === "\.dwg" \|\| fileBuffer\.subarray\(0, 4\)\.toString\("ascii"\)\.startsWith\("AC10"\)/,
+  );
   assert.match(src, /parseDwgBinary\(fileBuffer, fileName\)/);
 });
 
@@ -133,7 +140,7 @@ test("route parse-dxf: đọc drawing_revisions ưu tiên storage phẳng, iso_p
 // Các hàm helper mà route parse-dxf dùng để dò tệp trên đĩa (timTepBanVeTrenDia/chonTepDuyNhat/
 // duongDanAnToan) đã có test đơn vị riêng ở tests/cad-tim-tep-ban-ve.test.ts — không lặp lại.
 test("parse-dxf: các helper dò tệp route dùng thật sự tồn tại đúng chữ ký (không import module rỗng)", async () => {
-  const mod = await import("@/lib/ky-thuat/cad/tim-ban-ve");
+  const mod = await import("@/lib/ky-thuat/cad/drawing");
   assert.equal(typeof mod.timTepBanVeTrenDia, "function");
   assert.equal(typeof mod.chonTepDuyNhat, "function");
   assert.equal(typeof mod.duongDanAnToan, "function");

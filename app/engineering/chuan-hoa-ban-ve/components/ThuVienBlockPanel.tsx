@@ -24,7 +24,7 @@ import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { useBlockProposals } from "../hooks/useBlockProposals";
 import ThemBlockTuWebForm from "./ThemBlockTuWebForm";
 import type { BlockProposal, BlockProposalKind, BlockProposalStatus } from "../types";
-import type { NguonBlock } from "@/lib/ky-thuat/cad/block-lib";
+import type { NguonBlock } from "@/lib/ky-thuat/cad/block";
 
 // M100 PR2 (§13) — mục "Thư viện block" của bảng điều khiển plugin: version đang phát hành,
 // lịch sử phát hành, nút tải, và form phát hành version mới (Admin/PM).
@@ -106,7 +106,7 @@ const NHAN_LOAI: Record<BlockProposalKind, string> = {
 // thay vì sửa union dùng chung, tránh đụng file ngoài phạm vi đang có agent khác thao tác.
 
 // API `/api/engineering/cad/block-proposals` đã trả `nguoiDeXuatId` (xem `DeXuatBlock` trong
-// lib/ky-thuat/cad/block-proposals.ts) nhưng `BlockProposal` ở types.ts chưa khai trường này —
+// lib/ky-thuat/cad/block.ts) nhưng `BlockProposal` ở types.ts chưa khai trường này —
 // widen tại chỗ, cùng lý do trên (không đụng types.ts đang có agent khác thao tác).
 
 const NHAN_TRANG_THAI: Record<BlockProposalStatus, { nhan: string; tone: ChipTone }> = {

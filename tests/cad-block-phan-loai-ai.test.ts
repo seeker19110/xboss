@@ -54,7 +54,7 @@ test("FR10: XBOSS_AI_BLOCK_CLASSIFY=0 tắt AI kể cả khi có khoá (công t�
 });
 
 test("FR9: AI tắt thì phân loại lô vẫn ra kết quả tầng 1 đầy đủ, không ném lỗi", async () => {
-  const { phanLoaiLo } = await import("@/lib/dich-vu/cad-block-phan-loai");
+  const { phanLoaiLo } = await import("@/lib/dich-vu/cad");
   await voiEnv({ ANTHROPIC_API_KEY: undefined }, async () => {
     const kq = await phanLoaiLo([{ blockName: "FCU-01" }, { blockName: "BLOCK1" }]);
     assert.equal(kq.aiDaChay, false);
@@ -67,7 +67,7 @@ test("FR9: AI tắt thì phân loại lô vẫn ra kết quả tầng 1 đầy �
 // ── Hàng rào giữa đầu ra mô hình và cơ sở dữ liệu ────────────────────────────
 
 test("AC5: mô hình trả loại ngoài danh sách → CHƯA QUYẾT, không sửa thành giá trị gần đúng", async () => {
-  const { epDongTraVe } = await import("@/lib/dich-vu/cad-block-phan-loai");
+  const { epDongTraVe } = await import("@/lib/dich-vu/cad");
   const kq = epDongTraVe(
     {
       blockName: "X",
@@ -85,7 +85,7 @@ test("AC5: mô hình trả loại ngoài danh sách → CHƯA QUYẾT, không s�
 });
 
 test("mô hình tự nhận không đủ căn cứ (chua_ro) → chưa quyết, giữ nguyên lý do của nó", async () => {
-  const { epDongTraVe } = await import("@/lib/dich-vu/cad-block-phan-loai");
+  const { epDongTraVe } = await import("@/lib/dich-vu/cad");
   const kq = epDongTraVe(
     {
       blockName: "X",
@@ -103,7 +103,7 @@ test("mô hình tự nhận không đủ căn cứ (chua_ro) → chưa quyết, 
 });
 
 test("hệ và hạng mục bịa bị loại bỏ, loại block hợp lệ vẫn giữ", async () => {
-  const { epDongTraVe } = await import("@/lib/dich-vu/cad-block-phan-loai");
+  const { epDongTraVe } = await import("@/lib/dich-vu/cad");
   const kq = epDongTraVe(
     {
       blockName: "X",
@@ -121,7 +121,7 @@ test("hệ và hạng mục bịa bị loại bỏ, loại block hợp lệ vẫ
 });
 
 test("độ tin cậy bị kẹp về [0,1] và khổ giấy không bao giờ do mô hình quyết", async () => {
-  const { epDongTraVe } = await import("@/lib/dich-vu/cad-block-phan-loai");
+  const { epDongTraVe } = await import("@/lib/dich-vu/cad");
   const cao = epDongTraVe(
     {
       blockName: "X",
@@ -152,8 +152,8 @@ test("độ tin cậy bị kẹp về [0,1] và khổ giấy không bao giờ do
 // ── Ghép kết quả theo tên ────────────────────────────────────────────────────
 
 test("ghép theo TÊN chứ không theo thứ tự; mô hình đảo thứ tự vẫn đúng dòng", async () => {
-  const { ghepKetQuaMoHinh } = await import("@/lib/dich-vu/cad-block-phan-loai");
-  const { phanLoaiLoTheoLuat } = await import("@/lib/ky-thuat/cad/block-phan-loai-luat");
+  const { ghepKetQuaMoHinh } = await import("@/lib/dich-vu/cad");
+  const { phanLoaiLoTheoLuat } = await import("@/lib/ky-thuat/cad/block");
   const ungViens = [{ blockName: "AAA" }, { blockName: "BBB" }];
   const ketQua = phanLoaiLoTheoLuat(ungViens);
 
@@ -186,8 +186,8 @@ test("ghép theo TÊN chứ không theo thứ tự; mô hình đảo thứ tự 
 });
 
 test("mô hình bỏ sót dòng hoặc thêm dòng thừa đều không làm lệch dữ liệu", async () => {
-  const { ghepKetQuaMoHinh } = await import("@/lib/dich-vu/cad-block-phan-loai");
-  const { phanLoaiLoTheoLuat } = await import("@/lib/ky-thuat/cad/block-phan-loai-luat");
+  const { ghepKetQuaMoHinh } = await import("@/lib/dich-vu/cad");
+  const { phanLoaiLoTheoLuat } = await import("@/lib/ky-thuat/cad/block");
   const ungViens = [{ blockName: "AAA" }, { blockName: "BBB" }];
   const ketQua = phanLoaiLoTheoLuat(ungViens);
 
@@ -221,8 +221,8 @@ test("mô hình bỏ sót dòng hoặc thêm dòng thừa đều không làm l�
 });
 
 test("hệ suy được từ layer ở tầng 1 không bị mô hình xoá mất", async () => {
-  const { ghepKetQuaMoHinh } = await import("@/lib/dich-vu/cad-block-phan-loai");
-  const { phanLoaiLoTheoLuat } = await import("@/lib/ky-thuat/cad/block-phan-loai-luat");
+  const { ghepKetQuaMoHinh } = await import("@/lib/dich-vu/cad");
+  const { phanLoaiLoTheoLuat } = await import("@/lib/ky-thuat/cad/block");
   const ungViens = [{ blockName: "BLOCK9", layer: "M-DUCT-SUPP" }];
   const ketQua = phanLoaiLoTheoLuat(ungViens);
   assert.equal(ketQua[0].systemId, "HVAC");
@@ -249,8 +249,8 @@ test("hệ suy được từ layer ở tầng 1 không bị mô hình xoá mất
 });
 
 test("AI không bao giờ được lật kết quả đã chắc của tầng 1", async () => {
-  const { ghepKetQuaMoHinh } = await import("@/lib/dich-vu/cad-block-phan-loai");
-  const { phanLoaiLoTheoLuat } = await import("@/lib/ky-thuat/cad/block-phan-loai-luat");
+  const { ghepKetQuaMoHinh } = await import("@/lib/dich-vu/cad");
+  const { phanLoaiLoTheoLuat } = await import("@/lib/ky-thuat/cad/block");
   const ungViens = [{ blockName: "FCU-01" }];
   const ketQua = phanLoaiLoTheoLuat(ungViens);
   assert.equal(ketQua[0].kind, "equipment");

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
-import { goiYLayerMap } from "@/lib/dich-vu/cad-goi-y-anh-xa";
+import { goiYLayerMap } from "@/lib/dich-vu/cad";
 
 export const dynamic = "force-dynamic";
 

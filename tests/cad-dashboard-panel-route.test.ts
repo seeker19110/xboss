@@ -117,7 +117,7 @@ test(
       JSON.stringify(report),
     );
 
-    const { layLichSuPluginUpload } = await import("@/lib/ky-thuat/cad/bang-dieu-khien");
+    const { layLichSuPluginUpload } = await import("@/lib/ky-thuat/cad/dashboard");
     const ds = await layLichSuPluginUpload(DU_AN);
     assert.equal(ds.length, 1, "chỉ đúng 1 dòng nguồn plugin, bỏ qua nguồn web");
     assert.equal(ds[0].rev, "A");
@@ -134,14 +134,22 @@ test(
   },
 );
 
-test("layTomTatBlockLib: bản hiện hành = bản mới nhất (append-only), thư viện trống → null", S, async () => {
-  const { layTomTatBlockLib } = await import("@/lib/ky-thuat/cad/bang-dieu-khien");
-  const truoc = await layTomTatBlockLib(1000);
-  // Trường hợp thư viện đã có bản phát hành từ test khác chạy trước — chỉ kiểm bất biến cấu trúc,
-  // không giả định trạng thái tuyệt đối của bảng dùng chung.
-  if (truoc.hienHanh) {
-    assert.equal(truoc.hienHanh, truoc.lichSu[0], "bản hiện hành phải là phần tử đầu của lịch sử");
-  } else {
-    assert.deepEqual(truoc.lichSu, []);
-  }
-});
+test(
+  "layTomTatBlockLib: bản hiện hành = bản mới nhất (append-only), thư viện trống → null",
+  S,
+  async () => {
+    const { layTomTatBlockLib } = await import("@/lib/ky-thuat/cad/dashboard");
+    const truoc = await layTomTatBlockLib(1000);
+    // Trường hợp thư viện đã có bản phát hành từ test khác chạy trước — chỉ kiểm bất biến cấu trúc,
+    // không giả định trạng thái tuyệt đối của bảng dùng chung.
+    if (truoc.hienHanh) {
+      assert.equal(
+        truoc.hienHanh,
+        truoc.lichSu[0],
+        "bản hiện hành phải là phần tử đầu của lịch sử",
+      );
+    } else {
+      assert.deepEqual(truoc.lichSu, []);
+    }
+  },
+);

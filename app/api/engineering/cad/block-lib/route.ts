@@ -3,7 +3,7 @@ import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
 import { getCadTokenUser } from "@/lib/bao-mat/cad-devices";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 import { matchesEtag } from "@/lib/ky-thuat/cad/rule-pack";
-import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/gioi-han";
+import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/dashboard";
 import { isContentTooLarge } from "@/lib/nen/photos";
 import {
   chotProjectIdChoDoc,
@@ -18,8 +18,9 @@ import {
   etagBlockLibTron,
   phatHanhBlockLib,
   tronThuVienBlock,
-} from "@/lib/ky-thuat/cad/block-lib";
-import { timBlockLeTheoKhoa, docTepBlockLe } from "@/lib/ky-thuat/cad/block-them-web";
+  timBlockLeTheoKhoa,
+  docTepBlockLe,
+} from "@/lib/ky-thuat/cad/block";
 
 export const dynamic = "force-dynamic";
 

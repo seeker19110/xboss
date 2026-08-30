@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { layDongTakeoffChoExport } from "@/lib/ky-thuat/cad/bang-dieu-khien";
+import { layDongTakeoffChoExport } from "@/lib/ky-thuat/cad/dashboard";
 
 export const dynamic = "force-dynamic";
 

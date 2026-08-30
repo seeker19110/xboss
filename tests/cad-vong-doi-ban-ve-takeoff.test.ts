@@ -1,6 +1,6 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
 // Test đầu-cuối vòng đời bản vẽ ↔ KL bóc gửi kèm (M99 PR5 + M101 PR5):
-//   upload plugin đạt → tạo drawing_revision 'submitted' (lib/ky-thuat/cad/plugin-upload.ts)
+//   upload plugin đạt → tạo drawing_revision 'submitted' (lib/ky-thuat/cad/dashboard.ts)
 //   → DUYỆT revision (lib/ky-thuat/drawings.ts setRevisionStatus) → revision khác của cùng
 //     drawing đang 'approved' tự chuyển 'superseded' (không đổi standardize_report/takeoff)
 //   → khối lượng bóc (standardize_report.takeoff) đọc ra ĐÚNG theo từng revision — cả qua
@@ -111,13 +111,12 @@ test(
     "revision cũ không bị đổi nội dung khi rev mới được duyệt",
   S,
   async () => {
-    const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/plugin-upload");
+    const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/dashboard");
     const { setRevisionStatus, listRevisions } = await import("@/lib/ky-thuat/drawings");
     const { getCurrentRulePack } = await import("@/lib/ky-thuat/cad/rule-pack");
     const { queryOne } = await import("@/lib/db");
-    const { docKlBocTuBaoCao, layDongTakeoffChoExport } = await import(
-      "@/lib/ky-thuat/cad/bang-dieu-khien"
-    );
+    const { docKlBocTuBaoCao, layDongTakeoffChoExport } =
+      await import("@/lib/ky-thuat/cad/dashboard");
     const v = getCurrentRulePack().version;
 
     // ---- Rev A: upload kèm KL bóc, kiểm trạng thái submitted ----
@@ -134,8 +133,16 @@ test(
       takeoff: {
         rulePackVersion: v,
         lines: [
-          { itemId: "duct-supp", boqCode: "M.01.01", group: "HVAC", ten: "Ống gió cấp",
-            donVi: "m", khoiLuong: 20, size: "300x200", vung: "Tầng 5" },
+          {
+            itemId: "duct-supp",
+            boqCode: "M.01.01",
+            group: "HVAC",
+            ten: "Ống gió cấp",
+            donVi: "m",
+            khoiLuong: 20,
+            size: "300x200",
+            vung: "Tầng 5",
+          },
         ],
       },
     });
@@ -178,8 +185,16 @@ test(
       takeoff: {
         rulePackVersion: v,
         lines: [
-          { itemId: "duct-supp", boqCode: "M.01.01", group: "HVAC", ten: "Ống gió cấp",
-            donVi: "m", khoiLuong: 35, size: "300x200", vung: "Tầng 6" },
+          {
+            itemId: "duct-supp",
+            boqCode: "M.01.01",
+            group: "HVAC",
+            ten: "Ống gió cấp",
+            donVi: "m",
+            khoiLuong: 35,
+            size: "300x200",
+            vung: "Tầng 6",
+          },
         ],
       },
     });

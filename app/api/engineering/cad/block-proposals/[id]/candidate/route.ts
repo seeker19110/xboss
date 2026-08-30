@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CAN, getCurrentUser } from "@/lib/bao-mat/auth";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
-import { layTepUngVien } from "@/lib/ky-thuat/cad/block-proposals";
+import { layTepUngVien } from "@/lib/ky-thuat/cad/block";
 
 export const dynamic = "force-dynamic";
 

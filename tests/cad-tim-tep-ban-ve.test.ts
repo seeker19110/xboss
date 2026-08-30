@@ -9,8 +9,8 @@ import {
   chonTepDuyNhat,
   duongDanAnToan,
   type TepUngVien,
-} from "@/lib/ky-thuat/cad/tim-ban-ve";
-import { GIOI_HAN_TEP_CAD, uocLuongByteTuBase64 } from "@/lib/ky-thuat/cad/gioi-han";
+} from "@/lib/ky-thuat/cad/drawing";
+import { GIOI_HAN_TEP_CAD, uocLuongByteTuBase64 } from "@/lib/ky-thuat/cad/dashboard";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Hồi quy cho hai lỗi tìm thấy khi audit quy trình chuẩn hoá bản vẽ 2D (2026-08-24):

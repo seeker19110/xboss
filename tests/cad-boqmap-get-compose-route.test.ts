@@ -98,12 +98,15 @@ test(
     "item đã gán mã khớp dòng BOQ → đủ tên + KL hợp đồng; mã gán nhưng KHÔNG khớp dòng nào → tenBoq/klBoq vẫn null",
   S,
   async () => {
-    const { danhSachItemBocTach, ghiMapBoqTheoDuAn } = await import("@/lib/ky-thuat/cad/boq-map");
-    const { laySnapshotBoqTheoDuAn } = await import("@/lib/dich-vu/cad-boq-snapshot");
+    const { danhSachItemBocTach, ghiMapBoqTheoDuAn } = await import("@/lib/ky-thuat/cad/dashboard");
+    const { laySnapshotBoqTheoDuAn } = await import("@/lib/dich-vu/cad");
     const { insertId } = await import("@/lib/db");
 
     const items = danhSachItemBocTach();
-    assert.ok(items.length >= 2, "rule pack phải có ít nhất 2 hạng mục bóc tách để test có ý nghĩa");
+    assert.ok(
+      items.length >= 2,
+      "rule pack phải có ít nhất 2 hạng mục bóc tách để test có ý nghĩa",
+    );
     const [it1, it2] = items;
 
     const maKhop = `BMC-KHOP-${Date.now()}`;
@@ -145,7 +148,11 @@ test(
 
     const dong2 = rows.find((r) => r.takeoffItemId === it2.id)!;
     assert.notEqual(dong2.boqCode, "", "đã gán mã thì boqCode không được rỗng");
-    assert.equal(dong2.tenBoq, null, "mã gán không khớp dòng BOQ nào → tenBoq null, không phải chuỗi rỗng");
+    assert.equal(
+      dong2.tenBoq,
+      null,
+      "mã gán không khớp dòng BOQ nào → tenBoq null, không phải chuỗi rỗng",
+    );
     assert.equal(dong2.klBoq, null, "mã gán không khớp dòng BOQ nào → klBoq null, KHÔNG suy ra 0");
 
     // Hạng mục thứ 3 trở đi (nếu có) chưa gán mã nào → boqCode rỗng đúng theo hợp đồng UI.

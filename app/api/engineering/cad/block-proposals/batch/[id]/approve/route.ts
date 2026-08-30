@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import { duyetLo, docSuaDong } from "@/lib/ky-thuat/cad/block-lo";
+import { duyetLo, docSuaDong } from "@/lib/ky-thuat/cad/block";
 
 export const dynamic = "force-dynamic";
 

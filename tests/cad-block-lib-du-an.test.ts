@@ -8,7 +8,7 @@ import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { Pool } from "pg";
-import type { BlockLibRow, BlockManifestEntry } from "@/lib/ky-thuat/cad/block-lib";
+import type { BlockLibRow, BlockManifestEntry } from "@/lib/ky-thuat/cad/block";
 
 const S = { skip: !HAS_TEST_DB };
 
@@ -31,7 +31,7 @@ function bo(version: string, blocks: BlockManifestEntry[]): BlockLibRow {
 }
 
 test("tronThuVienBlock: bản của dự án ĐÈ theo id, id lẻ hai bên đều giữ, có nguon/libVersion", async () => {
-  const { tronThuVienBlock } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { tronThuVienBlock } = await import("@/lib/ky-thuat/cad/block");
   const toanCuc = bo("g3", [block("titleblock-a1", "XB-KHUNGTEN-A1"), block("co-90", "XB-CO90")]);
   const cuaDuAn = bo("b1", [
     block("titleblock-a1", "XB-KHUNGTEN-A1-CDT"),
@@ -51,7 +51,7 @@ test("tronThuVienBlock: bản của dự án ĐÈ theo id, id lẻ hai bên đ�
 });
 
 test("tronThuVienBlock: dự án chưa có bộ riêng ⇒ trùng khít bộ toàn cục (guardrail 1)", async () => {
-  const { tronThuVienBlock } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { tronThuVienBlock } = await import("@/lib/ky-thuat/cad/block");
   const toanCuc = bo("g3", [block("co-90", "XB-CO90"), block("te", "XB-TE")]);
 
   const kq = tronThuVienBlock(toanCuc, null);
@@ -65,7 +65,7 @@ test("tronThuVienBlock: dự án chưa có bộ riêng ⇒ trùng khít bộ to�
 });
 
 test("tronThuVienBlock: chưa có bộ toàn cục ⇒ chỉ block của dự án; cả hai rỗng ⇒ rỗng", async () => {
-  const { tronThuVienBlock } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { tronThuVienBlock } = await import("@/lib/ky-thuat/cad/block");
   const cuaDuAn = bo("b1", [block("van-rieng", "XB-VAN-RIENG")]);
   assert.deepEqual(
     tronThuVienBlock(null, cuaDuAn).map((b) => [b.id, b.nguon]),
@@ -128,7 +128,7 @@ test(
   "layBlockLibHienHanh: không tham số ⇒ bộ toàn cục; có projectId ⇒ bộ của dự án đó",
   S,
   async () => {
-    const { layBlockLibHienHanh, tronThuVienBlock } = await import("@/lib/ky-thuat/cad/block-lib");
+    const { layBlockLibHienHanh, tronThuVienBlock } = await import("@/lib/ky-thuat/cad/block");
 
     const toanCuc = await layBlockLibHienHanh();
     assert.equal(toanCuc?.version, "b1");

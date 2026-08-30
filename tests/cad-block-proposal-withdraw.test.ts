@@ -113,25 +113,29 @@ after(async () => {
 });
 
 test("thuHoiDeXuat: id không tồn tại → not-found (route trả 404)", S, async () => {
-  const { thuHoiDeXuat } = await import("@/lib/ky-thuat/cad/block-proposals");
+  const { thuHoiDeXuat } = await import("@/lib/ky-thuat/cad/block");
   const kq = await thuHoiDeXuat({ id: 999999999, userId: ownerId });
   assert.equal(kq.status, "not-found");
 });
 
-test("thuHoiDeXuat: người khác thu hồi → forbidden (route trả 403), không đổi trạng thái", S, async () => {
-  await xoaSach();
-  const id = await taoDeXuatPending(ownerId);
-  const { thuHoiDeXuat } = await import("@/lib/ky-thuat/cad/block-proposals");
-  const kq = await thuHoiDeXuat({ id, userId: khacId });
-  assert.equal(kq.status, "forbidden");
+test(
+  "thuHoiDeXuat: người khác thu hồi → forbidden (route trả 403), không đổi trạng thái",
+  S,
+  async () => {
+    await xoaSach();
+    const id = await taoDeXuatPending(ownerId);
+    const { thuHoiDeXuat } = await import("@/lib/ky-thuat/cad/block");
+    const kq = await thuHoiDeXuat({ id, userId: khacId });
+    assert.equal(kq.status, "forbidden");
 
-  const { queryOne } = await import("@/lib/db");
-  const dx = await queryOne<{ status: string }>(
-    `SELECT status FROM cad_block_proposals WHERE id = ?`,
-    id,
-  );
-  assert.equal(dx?.status, "pending", "trạng thái không được đổi khi người khác thu hồi");
-});
+    const { queryOne } = await import("@/lib/db");
+    const dx = await queryOne<{ status: string }>(
+      `SELECT status FROM cad_block_proposals WHERE id = ?`,
+      id,
+    );
+    assert.equal(dx?.status, "pending", "trạng thái không được đổi khi người khác thu hồi");
+  },
+);
 
 test(
   "thuHoiDeXuat: chính chủ thu hồi đề xuất pending → withdrawn (route trả 200), trạng thái đổi",
@@ -139,7 +143,7 @@ test(
   async () => {
     await xoaSach();
     const id = await taoDeXuatPending(ownerId);
-    const { thuHoiDeXuat, layDanhSachDeXuat } = await import("@/lib/ky-thuat/cad/block-proposals");
+    const { thuHoiDeXuat, layDanhSachDeXuat } = await import("@/lib/ky-thuat/cad/block");
     const kq = await thuHoiDeXuat({ id, userId: ownerId });
     assert.equal(kq.status, "withdrawn");
 
@@ -175,7 +179,7 @@ test(
       idDaTuChoi,
     );
 
-    const { thuHoiDeXuat } = await import("@/lib/ky-thuat/cad/block-proposals");
+    const { thuHoiDeXuat } = await import("@/lib/ky-thuat/cad/block");
     const kq = await thuHoiDeXuat({ id: idDaTuChoi, userId: ownerId });
     assert.equal(kq.status, "conflict");
 

@@ -80,7 +80,7 @@ before(async () => {
   );
 
   const { storagePut } = await import("@/lib/nen/storage");
-  const { ORG_THU_VIEN_BLOCK } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { ORG_THU_VIEN_BLOCK } = await import("@/lib/ky-thuat/cad/block");
   await storagePut(ORG_THU_VIEN_BLOCK, KEY, NOI_DUNG);
 
   const { insertId: insertId2 } = await import("@/lib/db");
@@ -105,7 +105,7 @@ after(async () => {
 });
 
 test("layTepUngVien: người duyệt tải được, đúng nội dung + sha256 khớp", S, async () => {
-  const { layTepUngVien } = await import("@/lib/ky-thuat/cad/block-proposals");
+  const { layTepUngVien } = await import("@/lib/ky-thuat/cad/block");
   const kq = await layTepUngVien({ id: proposalId, userId: pmId, coQuyenDuyet: true });
   assert.equal(kq.status, "ok", JSON.stringify(kq));
   if (kq.status !== "ok") return;
@@ -116,26 +116,26 @@ test("layTepUngVien: người duyệt tải được, đúng nội dung + sha256
 });
 
 test("layTepUngVien: chính người đề xuất (không có quyền duyệt) vẫn tải được", S, async () => {
-  const { layTepUngVien } = await import("@/lib/ky-thuat/cad/block-proposals");
+  const { layTepUngVien } = await import("@/lib/ky-thuat/cad/block");
   const kq = await layTepUngVien({ id: proposalId, userId: proposerId, coQuyenDuyet: false });
   assert.equal(kq.status, "ok", JSON.stringify(kq));
 });
 
 test("layTepUngVien: người khác không có quyền duyệt → forbidden", S, async () => {
-  const { layTepUngVien } = await import("@/lib/ky-thuat/cad/block-proposals");
+  const { layTepUngVien } = await import("@/lib/ky-thuat/cad/block");
   const kq = await layTepUngVien({ id: proposalId, userId: otherId, coQuyenDuyet: false });
   assert.equal(kq.status, "forbidden");
 });
 
 test("layTepUngVien: id không tồn tại → not-found", S, async () => {
-  const { layTepUngVien } = await import("@/lib/ky-thuat/cad/block-proposals");
+  const { layTepUngVien } = await import("@/lib/ky-thuat/cad/block");
   const kq = await layTepUngVien({ id: 999999999, userId: pmId, coQuyenDuyet: true });
   assert.equal(kq.status, "not-found");
 });
 
 test("layTepUngVien: tệp đã mất trên kho lưu trữ → missing-file", S, async () => {
   const { insertId, run } = await import("@/lib/db");
-  const { layTepUngVien } = await import("@/lib/ky-thuat/cad/block-proposals");
+  const { layTepUngVien } = await import("@/lib/ky-thuat/cad/block");
   const idMoCoi = await insertId(
     `INSERT INTO cad_block_proposals
        (block_name, kind, base_lib_version, candidate_manifest, candidate_storage_key,

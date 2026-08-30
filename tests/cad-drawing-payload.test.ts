@@ -4,7 +4,7 @@ import {
   DRAWING_PAYLOAD_VERSION,
   buildDrawingPayload,
   validateDrawingPayload,
-} from "@/lib/ky-thuat/cad/drawing-payload";
+} from "@/lib/ky-thuat/cad/drawing";
 import type { DxfParseResult, DxfEntityRaw, DxfLayerInfo } from "@/lib/ky-thuat/cad/dxf-parser";
 
 const layerMau: DxfLayerInfo = {

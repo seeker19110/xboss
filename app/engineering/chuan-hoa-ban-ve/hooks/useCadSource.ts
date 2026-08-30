@@ -191,7 +191,7 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
 
         if (res.status === 409 && Array.isArray(json.candidates) && json.candidates.length > 0) {
           // Nhiều bản vẽ cùng khớp trên máy chủ — KHÔNG tự chọn hộ (đúng contract vá đợt trước
-          // của tim-ban-ve.ts), bắt người dùng chỉ đích danh qua modal.
+          // của lib/ky-thuat/cad/drawing.ts), bắt người dùng chỉ đích danh qua modal.
           setAmbiguousCandidates(json.candidates);
           setAnalysisError(
             json.error || `Tìm thấy ${json.candidates.length} tệp cùng khớp — hãy chọn 1 tệp.`,

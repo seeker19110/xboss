@@ -2,7 +2,7 @@
 // Route GET /api/engineering/cad/plugin-package gọi getCurrentUser() (next/headers) nên không
 // gọi handler trực tiếp ngoài request scope thật của Next (đúng quy ước
 // tests/engineering-cad-rule-pack.test.ts) — kiểm 2 lớp:
-//   (1) lib/ky-thuat/cad/plugin-package.ts: hàm thuần bocVersionTuNoiDung + đọc thật
+//   (1) lib/ky-thuat/cad/dashboard.ts: hàm thuần bocVersionTuNoiDung + đọc thật
 //       Directory.Build.props + lọc sha256 hợp lệ từ biến môi trường — không cần DB;
 //   (2) lớp mỏng của route (auth 401/403, force-dynamic) kiểm qua mã nguồn route.
 import { test } from "node:test";
@@ -14,7 +14,7 @@ import {
   bocVersionTuNoiDung,
   docVersionGoiCai,
   layThongTinGoiCai,
-} from "@/lib/ky-thuat/cad/plugin-package";
+} from "@/lib/ky-thuat/cad/dashboard";
 
 // ===== (1) lib thuần =====
 

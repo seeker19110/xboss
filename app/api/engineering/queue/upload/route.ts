@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { enqueueAsyncTask } from "@/lib/ky-thuat/engineering-task-queue";
-import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/gioi-han";
+import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/dashboard";
 import { isContentTooLarge } from "@/lib/nen/photos";
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Tác vụ CAD dùng chung trần dung lượng với các route CAD khác (150MB, xem
-    // lib/ky-thuat/cad/gioi-han.ts) — bản vẽ MEPF thật đo được tới ~65MB, vượt trần 50MB
+    // lib/ky-thuat/cad/dashboard.ts) — bản vẽ MEPF thật đo được tới ~65MB, vượt trần 50MB
     // mặc định của route này. Tác vụ không phải CAD giữ nguyên trần 50MB cũ.
     const isCadTask = taskType.startsWith("mepf.cad.");
     const maxSize = isCadTask ? GIOI_HAN_TEP_CAD : 50 * 1024 * 1024;

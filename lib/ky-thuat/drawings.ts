@@ -2,7 +2,7 @@
 // validate thuần (unit test được) + query danh sách/chi tiết + logic supersede
 // revision khi duyệt. Xem docs/nang-cap/G06-ban-ve-ho-so.md.
 import { query, queryOne, run, withTransaction } from "@/lib/db";
-import { docKiemDinhTuBaoCao } from "@/lib/ky-thuat/cad/bang-dieu-khien";
+import { docKiemDinhTuBaoCao } from "@/lib/ky-thuat/cad/dashboard";
 
 // Thứ tự khớp thứ tự mục trong cụm sidebar "Thiết kế & BPTC" (dashboardTree.ts).
 export const DRAWING_KINDS = ["design", "bim", "shop", "method", "asbuilt"] as const;

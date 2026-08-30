@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCadTokenUser } from "@/lib/bao-mat/cad-devices";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
-import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/gioi-han";
+import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/dashboard";
 import { isContentTooLarge } from "@/lib/nen/photos";
-import { docUngVienTuDxf } from "@/lib/ky-thuat/cad/block-lo";
-import { napLoBlock } from "@/lib/dich-vu/cad-block-nap-lo";
+import { docUngVienTuDxf } from "@/lib/ky-thuat/cad/block";
+import { napLoBlock } from "@/lib/dich-vu/cad";
 
 export const dynamic = "force-dynamic";
 

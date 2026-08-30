@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import { layThongTinGoiCai } from "@/lib/ky-thuat/cad/plugin-package";
+import { layThongTinGoiCai } from "@/lib/ky-thuat/cad/dashboard";
 
 export const dynamic = "force-dynamic";
 
