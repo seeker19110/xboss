@@ -81,6 +81,19 @@ const LENH_CHINH: { lenh: string; mo_ta: string }[] = [
     lenh: "XBOSS_TUYEN_GOIY_XOA",
     mo_ta: "Dọn sạch tuyến nháp do XBOSS_TUYEN_GOIY sinh (một sơ đồ hoặc mọi sơ đồ)",
   },
+  {
+    lenh: "XBOSS_PHOIHOP",
+    mo_ta:
+      "Quét xung đột giữa các hệ (cao độ/hành lang/khoảng cách), đề xuất xử lý — kỹ sư quyết (M116)",
+  },
+  {
+    lenh: "XBOSS_PHOIHOP_XOA",
+    mo_ta: "Gỡ sạch marker phối hợp, trả bản vẽ về trước khi chạy XBOSS_PHOIHOP (M116)",
+  },
+  {
+    lenh: "XBOSS_PHOIHOP_BAOCAO",
+    mo_ta: "Xuất bảng xung đột phối hợp ra Excel + gửi kèm số liệu khi tải lên (M116)",
+  },
 ];
 
 export default function CaiDatPluginPage() {

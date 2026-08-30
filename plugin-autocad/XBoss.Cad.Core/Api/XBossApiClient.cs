@@ -137,6 +137,22 @@ public sealed class XBossApiClient
         return (json, res.Headers.ETag?.ToString());
     }
 
+    // ===== Phiên bản gói cài (M118 PR3 — FR3) =====
+
+    /// <summary>
+    /// GET /api/engineering/cad/plugin-package — version + sha256 gói cài đang phát hành, để
+    /// plugin tự so với version của chính nó (<see cref="SoSanhPhienBan.SoLechPhienBan"/>).
+    /// KHÔNG ném khi lỗi mạng/401/403/timeout — caller (<c>TaiPhienBanServer</c> ở Adapter) nuốt
+    /// mọi ngoại lệ và coi là "chưa rõ" (§7 FR3: không bao giờ cảnh báo khi không chắc).
+    /// </summary>
+    public async Task<PluginPackageInfo> FetchPluginPackageAsync(string token, CancellationToken ct = default)
+    {
+        using var res = await GuiKemToken("api/engineering/cad/plugin-package", token, null, ct);
+        await NemNeuLoi(res, ct);
+        return await res.Content.ReadFromJsonAsync<PluginPackageInfo>(ct)
+            ?? throw new XBossApiException("Server trả response rỗng khi hỏi phiên bản gói cài.");
+    }
+
     // ===== Thư viện block (M100 PR4 — FR2/AC8) =====
 
     /// <summary>
@@ -784,10 +800,15 @@ public sealed class XBossApiClient
     /// theo code), nên gửi kèm là cách duy nhất trỏ đúng bản vẽ khi hai dự án trùng
     /// <c>drawings.code</c> — trước đây chỉ gửi code nên rơi vào bản vẽ của dự án khác (403 lệch
     /// dự án) hoặc 404. Không có id ⇒ chỉ gửi code, y hệt hành vi cũ.</summary>
+    /// <paramref name="phoiHopJson"/> (M116 PR3, TÙY CHỌN): tóm tắt phối hợp xung đột liên hệ
+    /// (<c>PhoiHopTomTat</c>, sidecar <c>.xboss-phoihop.json</c> do <c>XBOSS_PHOIHOP_BAOCAO</c>
+    /// ghi) — server lưu vào <c>standardize_report.phoiHop</c>. Không gửi vẫn upload y hệt trước
+    /// M116 (chưa chạy XBOSS_PHOIHOP_BAOCAO, hoặc rule pack chưa bật coordinationPolicy).
     public async Task<UploadKetQua> UploadAsync(
         string token, string drawingCode, string rev, string rulePackVersion,
         string dwgFileName, byte[] dwgBytes, byte[] dxfBytes, string? reportJson,
-        CancellationToken ct = default, string? takeoffJson = null, long? drawingId = null)
+        CancellationToken ct = default, string? takeoffJson = null, long? drawingId = null,
+        string? phoiHopJson = null)
     {
         // Route đòi ít nhất một trong hai (400 "Thiếu drawingCode ... hoặc drawingId"). Chặn ngay
         // tại chỗ: tải vài chục MB lên rồi mới nhận 400 là phí băng thông công trường.
@@ -806,6 +827,8 @@ public sealed class XBossApiClient
             ThemPhan(form, new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(reportJson)), "report", "report.json");
         if (takeoffJson is not null)
             ThemPhan(form, new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(takeoffJson)), "takeoff", "takeoff.json");
+        if (phoiHopJson is not null)
+            ThemPhan(form, new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(phoiHopJson)), "phoiHop", "phoihop.json");
         if (!string.IsNullOrWhiteSpace(drawingCode)) ThemPhan(form, new StringContent(drawingCode), "drawingCode");
         if (drawingId is { } id)
             ThemPhan(form, new StringContent(id.ToString(CultureInfo.InvariantCulture)), "drawingId");

@@ -78,6 +78,15 @@ public enum VaiTroVe
     /// BẢN VẼ, hệ chạy sau đọc được ngay cả khi mở lại bản vẽ hôm khác.
     /// </summary>
     HanhLang,
+
+    /// <summary>
+    /// Marker xung đột phối hợp trên layer riêng <c>XBOSS-PHOIHOP</c> (<c>XBOSS_PHOIHOP</c> —
+    /// M116 FR2/FR4). Mang <see cref="VeXDataInfo.XungDotId"/> (id ổn định của xung đột),
+    /// <see cref="VeXDataInfo.TrangThaiXungDot"/> và <see cref="VeXDataInfo.LyDoXungDot"/> — nhờ đó
+    /// chạy lại lệnh nhận ra đúng marker cũ của đúng xung đột, không nhân đôi và giữ nguyên quyết
+    /// định "bỏ qua có lý do" (AC2). KHÔNG BAO GIỜ đụng vào tuyến (guardrail M116 §2).
+    /// </summary>
+    PhoiHop,
 }
 
 /// <summary>
@@ -269,6 +278,19 @@ public sealed record VeXDataInfo
 
     /// <summary>Khóa giai đoạn đã sinh ra thực thể này (<c>netDoi</c>, <c>chiaDot</c>…).</summary>
     public string? GiaiDoanHoanThien { get; init; }
+
+    // ===== Phối hợp xung đột liên hệ (M116 FR2/FR4) =====
+    // Ba khóa dưới đây CHỈ có trên marker vai trò PhoiHop. Idempotency của XBOSS_PHOIHOP bám vào
+    // XungDotId (id ổn định do Core sinh), không bám vào vị trí hay thứ tự quét.
+
+    /// <summary>Id ổn định của xung đột mà marker này đánh dấu (<c>XungDotId.Tao</c>).</summary>
+    public string? XungDotId { get; init; }
+
+    /// <summary>Mã trạng thái xử lý (<c>MaTrangThaiXungDot</c>: chua_xu_ly/chap_nhan/bo_qua).</summary>
+    public string? TrangThaiXungDot { get; init; }
+
+    /// <summary>Lý do kỹ sư BỎ QUA xung đột — bắt buộc khi trạng thái là <c>bo_qua</c>.</summary>
+    public string? LyDoXungDot { get; init; }
 }
 
 /// <summary>
@@ -344,6 +366,9 @@ public static class VeXData
         Them(ra, "bamhh", tt.BamHinhHoc);
         Them(ra, "nguon", tt.NguonHoanThien);
         Them(ra, "giaidoan", tt.GiaiDoanHoanThien);
+        Them(ra, "xdid", tt.XungDotId);
+        Them(ra, "xdtt", tt.TrangThaiXungDot);
+        Them(ra, "xdlydo", tt.LyDoXungDot);
         return ra;
     }
 
@@ -365,6 +390,7 @@ public static class VeXData
         VaiTroVe.Revision => "revision",
         VaiTroVe.NgatNet => "ngatnet",
         VaiTroVe.HanhLang => "hanhlang",
+        VaiTroVe.PhoiHop => "phoihop",
         _ => "blockdef",
     };
 
@@ -406,6 +432,7 @@ public static class VeXData
         string? phienTuyen = null;
         string? bamHinhHoc = null;
         string? nguonHoanThien = null, giaiDoanHoanThien = null;
+        string? xungDotId = null, trangThaiXungDot = null, lyDoXungDot = null;
         var tuDong = false;
         var suaTay = false;
 
@@ -435,6 +462,7 @@ public static class VeXData
                         "revision" => VaiTroVe.Revision,
                         "ngatnet" => VaiTroVe.NgatNet,
                         "hanhlang" => VaiTroVe.HanhLang,
+                        "phoihop" => VaiTroVe.PhoiHop,
                         "blockdef" => VaiTroVe.DinhNghiaBlock,
                         _ => VaiTroVe.Tim,
                     };
@@ -518,6 +546,9 @@ public static class VeXData
                 case "bamhh": bamHinhHoc = giaTri; break;
                 case "nguon": nguonHoanThien = giaTri; break;
                 case "giaidoan": giaiDoanHoanThien = giaTri; break;
+                case "xdid": xungDotId = giaTri; break;
+                case "xdtt": trangThaiXungDot = giaTri; break;
+                case "xdlydo": lyDoXungDot = giaTri; break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -572,6 +603,9 @@ public static class VeXData
             BamHinhHoc = bamHinhHoc,
             NguonHoanThien = nguonHoanThien,
             GiaiDoanHoanThien = giaiDoanHoanThien,
+            XungDotId = xungDotId,
+            TrangThaiXungDot = trangThaiXungDot,
+            LyDoXungDot = lyDoXungDot,
         };
     }
 

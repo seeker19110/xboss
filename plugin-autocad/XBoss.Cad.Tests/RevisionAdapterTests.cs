@@ -231,7 +231,9 @@ public class RevisionAdapterTests
 
         Assert.Equal(
             ["XBOSS_VE_MATCAT", "XBOSS_VE_THONGKE", "XBOSS_VE_NGATNET", "XBOSS_VE_TRANGIN", "XBOSS_VE_REV",
-             "XBOSS_VE_REV_CHOT", "XBOSS_VE_REV_HIENTHI", "XBOSS_VE_BAOCAO"],
+             "XBOSS_VE_REV_CHOT", "XBOSS_VE_REV_HIENTHI", "XBOSS_VE_BAOCAO",
+             // M116 — hai lệnh phối hợp liên hệ nối tiếp cuối bước hồ sơ.
+             "XBOSS_PHOIHOP", "XBOSS_PHOIHOP_BAOCAO"],
             hoSo);
         Assert.All(
             LenhCatalog.TatCa.Where(l => l.Ten.StartsWith("XBOSS_VE_REV", StringComparison.Ordinal)),

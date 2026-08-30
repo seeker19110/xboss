@@ -250,4 +250,42 @@ public sealed class BangDieuKhienTests
             [".xboss-kiemtra.json", ".xboss-report.json", ".xboss-takeoff.json", ".xboss-ve.json"],
             SidecarSummary.CacLoai.Select(l => l.DuoiTep));
     }
+
+    // ── Dòng "Phiên bản plugin" (M118 PR3 — FR3/AC5) ──
+
+    [Fact]
+    public void ChuaCoPluginVersion_KhongThemDongPhienBan()
+    {
+        // Không có PluginVersion (adapter cũ/lỗi đọc assembly) ⇒ không thêm dòng thay vì hiện rác.
+        var khoi = BangDieuKhienModel.Dung(TrangThaiDu());
+        Assert.DoesNotContain(khoi[0].Dong, d => d.Muc == "Phiên bản plugin");
+    }
+
+    [Fact]
+    public void PhienBanLech_CanhBaoKemCaHaiSo()
+    {
+        var khoi = BangDieuKhienModel.Dung(
+            TrangThaiDu() with { PluginVersion = "1.0.0", ServerPluginVersion = "1.2.0" });
+        Assert.Contains(khoi[0].Dong, d =>
+            d.Muc == "Phiên bản plugin" && d.NoiDung.Contains("1.0.0") && d.NoiDung.Contains("1.2.0") &&
+            d.MucDo == MucDo.CanhBao);
+    }
+
+    [Fact]
+    public void PhienBanKhop_KhongCanhBao()
+    {
+        var khoi = BangDieuKhienModel.Dung(
+            TrangThaiDu() with { PluginVersion = "1.2.0", ServerPluginVersion = "1.2.0" });
+        Assert.Contains(khoi[0].Dong, d =>
+            d.Muc == "Phiên bản plugin" && d.NoiDung.Contains("1.2.0") && d.MucDo == MucDo.Tot);
+    }
+
+    [Fact]
+    public void ChuaHoiDuocServer_HienChuaRo_KhongCanhBao()
+    {
+        var khoi = BangDieuKhienModel.Dung(
+            TrangThaiDu() with { PluginVersion = "1.0.0", ServerPluginVersion = null });
+        Assert.Contains(khoi[0].Dong, d =>
+            d.Muc == "Phiên bản plugin" && d.NoiDung.Contains("chưa rõ") && d.MucDo == MucDo.BinhThuong);
+    }
 }

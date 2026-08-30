@@ -1,6 +1,7 @@
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Core.Coordination;
 using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Reporting;
 
@@ -62,6 +63,18 @@ public sealed class VeBaocaoCommands
             tr.Commit();
         }
 
+        // Mục phối hợp (M116 PR3 §6 bước 5): CHỈ quét khi rule pack đã bật coordinationPolicy — im
+        // lặng bỏ qua (không hỏi/không cảnh báo) khi chưa khai/tắt, đúng AC4: bản vẽ chưa bật thì
+        // XBOSS_VE_BAOCAO chạy y hệt trước M116. Marker XData không mang lớp kiểm/mức nên phải quét
+        // lại (PhoiHopCommands.QuetCaBanVe), không suy được từ chỉ đếm marker.
+        IReadOnlyList<(XungDot XungDot, TrangThaiXungDot TrangThai)>? phoiHop = null;
+        if (pack.DrawTools.CoordinationPolicy is { Enabled: true } chinhSachPhoiHop)
+        {
+            phoiHop = PhoiHopCommands.QuetCaBanVe(db, pack, chinhSachPhoiHop)
+                .Select(d => (d.XungDot, d.TrangThai))
+                .ToList();
+        }
+
         var baoCao = VeSessionReport.Dung(
             xdata,
             new VeSessionMeta
@@ -73,7 +86,8 @@ public sealed class VeBaocaoCommands
                 NguoiVe = Environment.UserName,
             },
             VeContext.NhatKyPhien,
-            doThi);
+            doThi,
+            phoiHop);
 
         ed.WriteMessage("\n" + baoCao.ToVietnameseText());
         if (VeContext.NhatKyPhien.Count == 0)

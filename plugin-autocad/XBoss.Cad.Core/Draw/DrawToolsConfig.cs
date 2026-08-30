@@ -67,6 +67,13 @@ public sealed class DrawToolsSection
     /// </summary>
     [JsonPropertyName("completionPolicy")] public CompletionPolicySection? CompletionPolicy { get; init; }
 
+    /// <summary>
+    /// Chính sách phối hợp xung đột 2D liên hệ (M116 §7 FR5, rule pack v17 trở đi).
+    /// <c>null</c> = rule pack cũ chưa khai ⇒ bộ lệnh <c>XBOSS_PHOIHOP</c> từ chối chạy kèm thông
+    /// báo, không đoán mặc định ngầm.
+    /// </summary>
+    [JsonPropertyName("coordinationPolicy")] public CoordinationPolicySection? CoordinationPolicy { get; init; }
+
     /// <summary>Tập <c>fittings</c> của từng hệ — nguồn kiểm chống trôi id phụ kiện.</summary>
     public IReadOnlyDictionary<string, IReadOnlyCollection<string>> PhuKienCuaHe() =>
         Systems.ToDictionary(
@@ -528,6 +535,13 @@ public static class DrawToolsConfig
         // nút đó lặng lẽ ra "chưa quyết" hoặc lệnh chèn block không tồn tại, không ai biết.
         if (drawTools.CompletionPolicy is { } completion)
             CompletionPolicyConfig.Validate(completion, drawTools.PhuKienCuaHe());
+
+        // (l) khối phối hợp xung đột 2D liên hệ (v17) khai rồi thì phải hợp lệ — cùng bộ luật với
+        // validator TS (kiemCoordinationPolicy trong lib/ky-thuat/cad/rule-pack.ts), M116 §7 FR5.
+        // Kiểm kèm crossingPolicy vì bảng ưu tiên nhường đường THAM CHIẾU sang khối đó: bật quét
+        // mà bảng ưu tiên rỗng nghĩa là mọi xung đột cứng đều không suy được ai nhường ai.
+        if (drawTools.CoordinationPolicy is { } coordination)
+            CoordinationPolicyConfig.Validate(coordination, systemIds, drawTools.CrossingPolicy);
     }
 
     /// <summary>Kiểm khối <c>drawTools.revisionPolicy</c> (M110 §5). Sai → RulePackException tiếng Việt.</summary>

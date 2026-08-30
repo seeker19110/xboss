@@ -1,6 +1,42 @@
 # PROGRESS.md — Trạng thái dự án
 
-## 📐 Đặc tả M118 — bền vững hoá `XBOSS_HOANTHIEN` + cảnh báo phiên bản plugin (2026-08-30, ✅ ĐÃ DUYỆT + PLAN Pha 4 — CHƯA thi hành)
+## ✅ M116 — Phối hợp xung đột 2D liên hệ: rule pack v17 + `XBOSS_PHOIHOP*` — CODE XONG cả 3 PR (2026-08-30)
+
+`docs/nang-cap/M116-phoi-hop-xung-dot-lien-he.md`, mục thứ hai của đợt "tự động triển khai bản vẽ
+MEPF" (sau M115). Bản vẽ combined services hiện phối hợp tay; sau M115 mọi tuyến đã mang XData
+hệ/size/cao độ nên đủ dữ liệu để **phát hiện + đề xuất** xung đột giữa các hệ ngay trên 2D —
+guardrail: plugin **không bao giờ tự sửa tuyến**, kỹ sư quyết từng dòng.
+
+- **PR1** rule pack `v17` khối `drawTools.coordinationPolicy` (**mặc định TẮT**, bảng ưu tiên
+  nhường đường **THAM CHIẾU** `crossingPolicy.priority` thay vì chép lại, bảng khoảng cách quy
+  phạm theo cặp hệ để rỗng, khoảng bảo trì hành lang) + validator 2 tầng (TS
+  `kiemCoordinationPolicy` / C# `CoordinationPolicyConfig`) + `XBoss.Cad.Core/Coordination/` thuần:
+  `QuetXungDot` (lớp 1 giao cắt cùng cao độ ⇒ CỨNG, lớp 2 tranh chấp hành lang ⇒ MỀM, lớp 3 khoảng
+  cách quy phạm ⇒ CẢNH BÁO; tuyến thiếu cao độ chỉ vào kiểm PHẲNG kèm nhãn "thiếu cao độ", không
+  đoán), `XungDotId` (id băm ổn định ⇒ quét lại không nhân đôi), `DeXuatXuLy` (đề xuất CHỈ từ bảng
+  luật rule pack). Tái dùng `Segment2D` (đúng bộ dò của phép kiểm 11 — **không đổi hành vi phép
+  kiểm 11**) và `HanhLangDauVao` của M114; chỉ mục quét là sweep line theo X, không duyệt n² cặp.
+- **PR2** `XBOSS_PHOIHOP` (quét 3 lớp kiểm theo phạm vi cả bản vẽ/vùng chọn/hành lang, kể cả xref
+  chỉ đọc; hộp thoại M106 duyệt + đánh dấu chấp nhận/bỏ qua có lý do; ghi marker XData idempotent
+  trên layer riêng `XBOSS-PHOIHOP`) + `XBOSS_PHOIHOP_XOA` (gỡ sạch marker, không đụng tuyến).
+- **PR3 (việc này)** `XBOSS_PHOIHOP_BAOCAO` (quét lại cả bản vẽ qua hàm dùng chung
+  `PhoiHopCommands.QuetCaBanVe`, xuất Excel `<dwg>.xboss-phoihop.xlsx` +
+  `PhoiHopExcelWriter` + sidecar JSON `<dwg>.xboss-phoihop.json` qua `PhoiHopTomTat` — tổng hợp
+  DUY NHẤT dùng chung bởi Excel/sidecar/mục `phoiHop` mới trong `VeSessionReport`); `XBOSS_UPLOAD`
+  gửi kèm sidecar khi có (`XBossApiClient.UploadAsync` +optional `phoiHopJson`); server lưu vào
+  `standardize_report.phoiHop` (`xuLyPluginUpload`, JSONB thuần — không migration) và trang
+  `/engineering/chuan-hoa-ban-ve` có panel mới `PhoiHopPanel.tsx` (đếm theo lớp kiểm/mức/xử lý,
+  theo từng bản vẽ). Tài liệu: bảng lệnh trong `README.md`/`CAI-DAT.md`/`cai-dat-plugin/page.tsx`,
+  mục verify tay mới **C12** (109–115) trong `VERIFY-VA-PHAT-HANH.md`.
+- **Không migration, không API mới** (M116 §9) — số liệu đi trong `standardize_report` JSONB sẵn
+  có của `drawing_revisions`, đúng cách `takeoff` (M101 PR5) đã làm.
+- **Trạng thái: code xong cả 3 PR, nợ verify tay AutoCAD 2026** (xem mục C12 mới trong
+  `VERIFY-VA-PHAT-HANH.md` — xếp hàng sau M111 §C9/M114 §C10/M115 §C11 theo `docs/nang-cap/README.md`).
+- Cổng đã chạy: `dotnet test XBoss.Cad.Tests` (1317 ca xanh, +19 ca mới PR3), `dotnet build
+XBoss.Cad.AcadShim` xanh, `npm run lint`/`typecheck` xanh, `npx tsx --test` các file test liên
+  quan xanh (ca chạm DB skip — không có `TEST_DATABASE_URL` trong môi trường code).
+
+## ✅ M118 — bền vững hoá `XBOSS_HOANTHIEN` + cảnh báo phiên bản plugin — CODE XONG cả 3 PR (2026-08-30)
 
 Yêu cầu người dùng: "plugin autocad còn thiếu gì → viết đặc tả triển khai". Rà toàn cụm M99→M117:
 M116/M117 đã có đặc tả duyệt (chưa thi hành), nợ verify tay C9/C10/C11 là cổng thủ công — phần
@@ -19,13 +55,53 @@ chờ duyệt, chưa code**):
   version trong `XBOSS_BANG`; mọi lỗi fetch → im lặng (không bao giờ cảnh báo sai, không chặn).
 
 Không migration, không khoá rule pack mới (bug fix + cảnh báo thuần). 3 PR: FR1 `route: standard`,
-FR2 `route: spec`, FR3 `route: standard`. Verify tay mục **C12** mới, xếp sau C9/C10/C11.
+FR2 `route: spec`, FR3 `route: standard`. Verify tay mục **C13** mới, xếp sau C9/C10/C11/C12.
 
-**Cập nhật cùng ngày 2026-08-30:** người dùng **duyệt M118** ("duyệt M118, lập PLAN rồi merge,
-không thi hành") → đặc tả chuyển **Approved for implementation**; kế hoạch thi hành viết thành
-**Pha 4 trong `PLAN.md`** (Y1 FR1 `standard` → Y2 FR2 `spec`; Y3 FR3 `standard` song song được;
-nhánh nền Pha 4 = `origin/main`, độc lập M116/M117). **Trạng thái: CHƯA KÍCH HOẠT thi hành —
-chờ lệnh riêng.** Cổng phát hành rộng toàn cụm vẫn là trả nợ verify tay AutoCAD 2026.
+**Cập nhật 2026-08-30:** người dùng **duyệt M118** ("duyệt M118, lập PLAN rồi merge, không thi
+hành") → đặc tả **Approved for implementation**, kế hoạch **Pha 4 trong `PLAN.md`**; sau đó người
+dùng ra lệnh triển khai riêng, đã kiểm tra không xung đột với M116 (nhánh khác, khác vùng file) và
+M117 (chưa có nhánh) trước khi kích hoạt.
+
+**Y1 (M118 PR1 — FR1 cách ly lỗi từng giai đoạn) — CODE XONG:** `HoanThienPipeline.Chay` bọc
+try/catch quanh thân từng giai đoạn qua hàm Core thuần mới `HoanThienKeHoach.ChayCachLyLoi`
+(logic chạy được test trên Linux, Adapter chỉ còn là lớp mỏng gọi lại); giai đoạn lỗi không chặn
+7 giai đoạn kia, `KetQuaGiaiDoan` thêm cờ `Loi`. `HoanThienCommands.cs` in `✖ <giai đoạn>: lỗi —
+<msg>` + tổng kết `x/8 giai đoạn xong, y lỗi` + nhắc chạy lại an toàn khi `y > 0`;
+`VeSessionReport` ghi đủ 8 giai đoạn kể cả khi lỗi. Test xunit `HoanThienPipelineTests` (AC1/AC8).
+
+**Y2 (M118 PR2 — FR2 giữ-tay 4 giai đoạn ủy thác ③④⑥⑧) — CODE XONG:** `DaSuaTay` chuyển về Core
+(`HoanThienKeHoach.cs`) dùng chung cho pipeline + 4 lệnh; `VeThucThe.DiemBamCua` tính điểm đại
+diện theo loại thực thể (Line 2 đầu / điểm chèn text-block-bảng / đỉnh polyline / hộp bao còn lại)
+để ghi `BamHinhHoc` khi `giaiDoanM115 != null`. Hai điểm đặc tả không khớp code thực tế đã được
+phiên chính quyết định trước khi thi hành: **④ giá đỡ** (`ChayGiaDo` vốn không có bước xóa) được
+thêm đường dọn mới — giá đỡ băm lệch/`SuaTay` được đưa vào tập `daCo` để `SupportSpacing` không
+chèn đè; **⑥ ngắt nét** (Wipeout không đọc lại đỉnh tất định qua `SetFrom`) dùng điểm đại diện
+tính lúc sinh (hộp bao) lưu vào XData thay vì đọc lại hình học. Bất biến AC3 (lệnh lẻ
+`giaiDoanM115 == null` không đổi hành vi) giữ nguyên — xác nhận bằng test + review đọc code trực
+tiếp 4 file lệnh. Test xunit `GiuTayHoanThienTests` (AC2/AC3/AC4), `NgatNetGuardrailTests` siết
+thêm. `plugin-autocad/README.md` cập nhật bảng 4 giai đoạn × điểm đại diện × hành vi.
+
+**Y3 (M118 PR3 — FR3 cảnh báo phiên bản plugin) — CODE XONG:**
+`app/api/engineering/cad/plugin-package/route.ts` nhận thêm Bearer token scope `cad` (đúng khuôn
+`rule-pack/route.ts`, fallback session, quyền `CAN.viewEngineeringGraph`, shape response giữ
+nguyên). Core (`XBoss.Cad.Core/Api/PhienBanPlugin.cs`): `SoSanhPhienBan.SoLechPhienBan` thuần (so
+khác chuỗi sau chuẩn hoá + cắt hậu tố `+metadata`, null/rỗng một vế = "chưa rõ", không bao giờ báo
+lệch khi không chắc) + DTO `PluginPackageInfo`; `XBossApiClient.FetchPluginPackageAsync`. Adapter:
+`Services/PhienBanPluginService.cs` đọc `AssemblyInformationalVersion` + hỏi server (timeout 20s
+khuôn `TaiSnapshotBoq`, không retry, nuốt mọi lỗi); gọi ở `XBOSS_RULEPACK` (in `⚠` khi lệch, im
+lặng khi không chắc) và `XBOSS_BANG` (dòng "Phiên bản plugin", cập nhật async cùng nhịp đề xuất
+block). Test: `tests/cad-plugin-package.test.ts` (node:test, 8/8 pass). Tài liệu: mục **C13** mới
+trong `VERIFY-VA-PHAT-HANH.md` (AC5 hai máy lệch bản + AC7 một lần `U`), cập nhật `README.md` +
+`CAI-DAT.md`.
+
+**Tích hợp cả 3 việc + hợp nhất với M116 (đã merge main trước):** merge sạch nội dung code
+(không xung đột logic) vào nhánh `claude/m118-deployment-conflict-check-aqdffn`; xung đột thuần
+tài liệu (`PROGRESS.md`, `README.md`, số thứ tự mục verify tay — M116 đã chiếm **C12** nên M118
+đổi sang **C13**) đã giải quyết tay khi merge `origin/main`. `dotnet test` toàn bộ **1286/1286
+pass** (trước khi hợp nhất M116; đã build lại xanh sau merge), `XBoss.Cad.AcadShim` build 0
+warning, `npm run lint`/`typecheck`/`build` xanh, reviewer soát diff không phát hiện lỗi
+correctness. **Nợ còn lại:** verify tay mục **C13** trên AutoCAD 2026 (xếp sau C9/C10/C11/C12),
+không tự động hoá được.
 
 ## ✅ M117 — AI đọc sơ đồ nguyên lý → tuyến tim gợi ý: 4 PR CODE XONG (2026-08-30)
 

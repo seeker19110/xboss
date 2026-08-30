@@ -123,6 +123,15 @@ public sealed class XBossCommands
                     "[XBoss] ⚠ Bản vừa nạp KHÔNG phải bản các lệnh đang dùng " +
                     $"({RulePackStore.DuongDanHienHanh}) — chạy XBOSS_LOGIN để lấy bản của dự án đang làm.\n");
             }
+
+            // M118 PR3 (FR3) — cảnh báo phiên bản plugin lệch server, chỉ khi CHẮC CHẮN lệch (mất
+            // mạng/chưa ghép thiết bị/server chưa cấu hình version đều im lặng, không chặn lệnh).
+            if (XBossLoginCommand.DocServerUrl() is { } baseUrl)
+            {
+                var serverVersion = PhienBanPluginService.TaiPhienBanServer();
+                if (PhienBanPluginService.DongCanhBaoLech(serverVersion, baseUrl) is { } dongCanhBao)
+                    ed.WriteMessage($"[XBoss] {dongCanhBao}\n");
+            }
         }
         catch (RulePackException e)
         {

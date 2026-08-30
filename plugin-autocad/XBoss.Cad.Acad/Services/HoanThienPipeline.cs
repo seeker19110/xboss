@@ -42,8 +42,12 @@ namespace XBoss.Cad.Acad.Services;
 /// </summary>
 internal static class HoanThienPipeline
 {
-    /// <summary>Kết quả một giai đoạn để lệnh in tóm tắt và ghi báo cáo phiên.</summary>
-    internal sealed record KetQuaGiaiDoan(GiaiDoanHoanThien GiaiDoan, bool DaChay, string TomTat);
+    /// <summary>
+    /// Kết quả một giai đoạn để lệnh in tóm tắt và ghi báo cáo phiên.
+    /// <paramref name="Loi"/> (M118 FR1/AC1): true khi giai đoạn ném exception giữa chừng —
+    /// pipeline vẫn đi tiếp giai đoạn kế, không để một giai đoạn hỏng chặn 7 giai đoạn còn lại.
+    /// </summary>
+    internal sealed record KetQuaGiaiDoan(GiaiDoanHoanThien GiaiDoan, bool DaChay, string TomTat, bool Loi = false);
 
     /// <summary>Một tuyến tim trong phạm vi, đã tra được ObjectId thật trong bản vẽ.</summary>
     private sealed record TuyenTrongBanVe(
@@ -62,27 +66,37 @@ internal static class HoanThienPipeline
         var (toMm, _, _) = DrawingUnits.TuInsUnits((int)db.Insunits);
 
         var tuyen = DocTuyenTrongPhamVi(db, chot);
-        var ra = new List<KetQuaGiaiDoan>();
 
-        foreach (var viec in keHoach)
-        {
-            ed.WriteMessage($"\n[XBoss] ===== {viec.GiaiDoan.Nhan} ({viec.GiaiDoan.Lenh}) =====\n");
-            var kq = viec.GiaiDoan.Ten switch
+        // M118 FR1/AC1: cách ly lỗi từng giai đoạn qua helper THUẦN của Core
+        // (HoanThienKeHoach.ChayCachLyLoi) — giai đoạn hỏng KHÔNG được chặn các giai đoạn sau
+        // (transaction của nó đã tự abort bên trong service con, ở đây chỉ ghi nhận và đi tiếp,
+        // không mở/đóng transaction bao ngoài).
+        return HoanThienKeHoach.ChayCachLyLoi(
+            keHoach,
+            viec =>
             {
-                "netDoi" => NetDoi(doc, ed, pack, chot, viec),
-                "phuKienTaiNut" => PhuKienTaiNut(doc, ed, pack, thuVien, chot, viec, tuyen, toMm),
-                "chiaDot" => ChiaDot(doc, ed, pack, viec, tuyen, toMm),
-                "giaDo" => GiaDo(doc, ed, pack, thuVien, chot, viec, tuyen),
-                "loCho" => LoCho(doc, ed, pack, thuVien, viec, tuyen, toMm),
-                "ngatNet" => NgatNet(doc, ed, pack, viec, tuyen, toMm),
-                "tag" => Tag(doc, ed, pack, viec),
-                "thongKe" => ThongKe(doc, ed, pack, viec),
-                _ => new KetQuaGiaiDoan(viec.GiaiDoan, false, "Giai đoạn lạ — bỏ qua."),
-            };
-            ed.WriteMessage($"[XBoss] {(kq.DaChay ? "✔" : "—")} {kq.TomTat}\n");
-            ra.Add(kq);
-        }
-        return ra;
+                ed.WriteMessage($"\n[XBoss] ===== {viec.GiaiDoan.Nhan} ({viec.GiaiDoan.Lenh}) =====\n");
+                var kq = viec.GiaiDoan.Ten switch
+                {
+                    "netDoi" => NetDoi(doc, ed, pack, chot, viec),
+                    "phuKienTaiNut" => PhuKienTaiNut(doc, ed, pack, thuVien, chot, viec, tuyen, toMm),
+                    "chiaDot" => ChiaDot(doc, ed, pack, viec, tuyen, toMm),
+                    "giaDo" => GiaDo(doc, ed, pack, thuVien, chot, viec, tuyen),
+                    "loCho" => LoCho(doc, ed, pack, thuVien, viec, tuyen, toMm),
+                    "ngatNet" => NgatNet(doc, ed, pack, viec, tuyen, toMm),
+                    "tag" => Tag(doc, ed, pack, viec),
+                    "thongKe" => ThongKe(doc, ed, pack, viec),
+                    _ => new KetQuaGiaiDoan(viec.GiaiDoan, false, "Giai đoạn lạ — bỏ qua."),
+                };
+                ed.WriteMessage($"[XBoss] {(kq.DaChay ? "✔" : "—")} {kq.TomTat}\n");
+                return kq;
+            },
+            (viec, ex) =>
+            {
+                var kq = new KetQuaGiaiDoan(viec.GiaiDoan, false, $"lỗi — {ex.Message}", Loi: true);
+                ed.WriteMessage($"[XBoss] ✖ {kq.TomTat}\n");
+                return kq;
+            });
     }
 
     // ======================================================================================
@@ -219,11 +233,11 @@ internal static class HoanThienPipeline
         if (VeContext.HoiTiLeIn(ed, pack) is not { } tiLe)
             return new KetQuaGiaiDoan(viec.GiaiDoan, false, "Chưa có tỉ lệ in — bỏ qua giai đoạn này.");
 
-        VeChiaDotCommands.ChayChiaDot(
+        var soGiu = VeChiaDotCommands.ChayChiaDot(
             doc, ed, pack, toMm, tuyen.Select(t => t.Id).ToList(), he: null, ghiDeKieuNoi: null,
             hoiGhiDe: false, tiLe: tiLe, giaiDoanM115: viec.GiaiDoan.Ten);
         return new KetQuaGiaiDoan(viec.GiaiDoan, true,
-            $"Đã chia đốt {tuyen.Count} tuyến (kiểu nối do rule pack tự chọn theo cỡ).");
+            $"Đã chia đốt {tuyen.Count} tuyến (kiểu nối do rule pack tự chọn theo cỡ){TomTatGiuTay(soGiu)}.");
     }
 
     // ======================================================================================
@@ -259,11 +273,12 @@ internal static class HoanThienPipeline
         // nên chọn phía AN TOÀN, không chọn phía ít giá đỡ hơn.
         // taiMoiPhuKien = false: từ rule pack v7 chỉ phụ kiện NẶNG mới có giá đỡ riêng
         // (drawTools.heavyFittingIds), đúng mặc định của lệnh gốc trên rule pack hiện hành.
-        VeGiadoCommands.ChayGiaDo(
+        var soGiu = VeGiadoCommands.ChayGiaDo(
             doc, ed, pack, thuVien, he, def0, CheDoChiaGiaDo.KhongVuot, taiMoiPhuKien: false,
             idHe, giaiDoanM115: viec.GiaiDoan.Ten);
         return new KetQuaGiaiDoan(viec.GiaiDoan, true,
-            $"Đã rải giá đỡ {def0.Id} trên {idHe.Count} tuyến của hệ {he.Id} (bước ≤ khoảng cách chuẩn).");
+            $"Đã rải giá đỡ {def0.Id} trên {idHe.Count} tuyến của hệ {he.Id} (bước ≤ khoảng cách chuẩn)" +
+            $"{TomTatGiuTay(soGiu)}.");
     }
 
     // ======================================================================================
@@ -393,12 +408,13 @@ internal static class HoanThienPipeline
                 "drawTools.crossingPolicy.enabled = false — quy ước ngắt nét của dự án đang tắt, không vẽ gì.");
         }
 
-        VeNgatNetCommands.ChayNgatNet(
+        var soGiu = VeNgatNetCommands.ChayNgatNet(
             doc, ed, pack, chinhSach, toMm, chinhSach.ClearanceMm / toMm, chinhSach.JogRadiusMm / toMm,
             hoiThamSo: false, phamViM115: tuyen.Select(t => t.Handle).ToList(),
             giaiDoanM115: viec.GiaiDoan.Ten);
         return new KetQuaGiaiDoan(viec.GiaiDoan, true,
-            "Đã ngắt nét các cặp tuyến giao chéo trong phạm vi (đảo tay của kỹ sư giữ nguyên).");
+            "Đã ngắt nét các cặp tuyến giao chéo trong phạm vi (đảo tay của kỹ sư giữ nguyên)" +
+            $"{TomTatGiuTay(soGiu)}.");
     }
 
     // ======================================================================================
@@ -428,9 +444,10 @@ internal static class HoanThienPipeline
 
         // Bảng KHỐI LƯỢNG: đây là bảng nói về chính cụm tuyến vừa hoàn thiện (AC4 đối chiếu với
         // XBOSS_BOCKL). Bảng thiết bị/bảng đốt vẫn dựng được bằng XBOSS_VE_THONGKE như cũ.
-        VeThongkeCommands.ChayThongKe(
+        var soGiu = VeThongkeCommands.ChayThongKe(
             doc, ed, pack, LoaiBangThongKeUi.KhoiLuong, tiLe, giaiDoanM115: viec.GiaiDoan.Ten);
-        return new KetQuaGiaiDoan(viec.GiaiDoan, true, "Đã dựng/cập nhật bảng khối lượng trong bản vẽ.");
+        return new KetQuaGiaiDoan(viec.GiaiDoan, true,
+            $"Đã dựng/cập nhật bảng khối lượng trong bản vẽ{TomTatGiuTay(soGiu)}.");
     }
 
     // ======================================================================================
@@ -538,21 +555,18 @@ internal static class HoanThienPipeline
     }
 
     /// <summary>
-    /// Kỹ sư đã sửa tay thực thể này chưa — khuôn M114 FR12: băm hình học hiện tại khác băm lúc
-    /// sinh nghĩa là có người kéo/dời nó. Thực thể không mang băm (do lệnh <c>XBOSS_VE_*</c> tự lo
-    /// idempotency của nó) thì trả false: quyền quyết định vẫn thuộc chính lệnh đó.
+    /// Kỹ sư đã sửa tay thực thể này chưa — quyết định thuần nằm ở Core
+    /// (<see cref="HoanThienKeHoach.DaSuaTay"/>, dùng chung với 4 lệnh ủy thác từ M118 FR2); ở đây
+    /// chỉ đọc điểm đại diện của thực thể thật ra khỏi bản vẽ.
     /// </summary>
     private static bool DaSuaTay(Entity ent, VeXDataInfo xd)
     {
-        if (xd.SuaTay) return true;
-        if (xd.BamHinhHoc is not { Length: > 0 } bam) return false;
-        var dinh = ent switch
-        {
-            BlockReference br => new List<Diem2> { new(br.Position.X, br.Position.Y) },
-            Polyline pl => VeThucThe.DinhCua(pl).Select(d => d.Diem).ToList(),
-            _ => [],
-        };
-        return dinh.Count > 0 &&
-               !string.Equals(bam, RevisionSnapshot.BamHinhHoc(dinh), StringComparison.Ordinal);
+        var diem = VeThucThe.DiemBamCua(ent);
+        if (diem.Count == 0) return xd.SuaTay;
+        return HoanThienKeHoach.DaSuaTay(xd.BamHinhHoc, RevisionSnapshot.BamHinhHoc(diem), xd.SuaTay);
     }
+
+    /// <summary>Đuôi "Giữ nguyên N thực thể đã sửa tay" của tóm tắt giai đoạn (M118 FR2); rỗng khi N = 0.</summary>
+    private static string TomTatGiuTay(int soGiu) =>
+        soGiu > 0 ? $"; giữ nguyên {soGiu} thực thể kỹ sư đã sửa tay" : "";
 }

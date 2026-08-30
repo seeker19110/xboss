@@ -682,41 +682,114 @@ nào…`), nút chuyển nền chìm + chữ mờ.
 108. **Hộp thoại:** soi theo checklist C8b (nền tối, danh sách nút/nhánh/phụ kiện của
      `XBOSS_TUYEN_DOTHI` đọc rõ, nút OK khóa kèm lý do khi đồ thị còn lỗi chặn).
 
-### C12. `XBOSS_TUYEN_GOIY` / `XBOSS_TUYEN_GOIY_XOA` — tuyến gợi ý từ sơ đồ nguyên lý (M117 PR4 — CHƯA LÀM, chờ lượt trước xong)
+### C12. `XBOSS_PHOIHOP` / `XBOSS_PHOIHOP_XOA` / `XBOSS_PHOIHOP_BAOCAO` — phối hợp xung đột 2D liên hệ (M116 — CHƯA LÀM, chờ lượt trước xong)
+
+> **Chưa verify tay mục này.** Cần rule pack có `drawTools.coordinationPolicy.enabled = true` (bản
+> phát hành mặc định TẮT) VÀ tuyến đã mang XData cao độ/cỡ đầy đủ theo M115 (`XBOSS_TUYEN_GAN` +
+> `XBOSS_TUYEN_DOTHI`). M116 xếp hàng sau M111 §C9/M114 §C10/M115 §C11 vẫn đang chặn theo
+> `docs/nang-cap/README.md`. Ghi lại mục này để khi tới lượt có sẵn kịch bản, không phải soạn lại
+> từ đầu — cách ghi nợ giống hệt C9/C10/C11 đang treo ở trên tại thời điểm viết tài liệu này.
+
+109. **AC4 — cờ tắt.** Rule pack mặc định (`coordinationPolicy.enabled: false`) → cả 3 lệnh **dừng
+     ngay** kèm hướng dẫn cách bật, bản vẽ không đổi một thực thể nào (so số đối tượng model space
+     trước/sau) — hành vi mọi lệnh cũ (kể cả `XBOSS_VE_BAOCAO`) y hệt version rule pack trước.
+110. **AC1 — dải cao độ chồng/tách.** Vẽ 2 tuyến khác hệ (vd HVAC + PIPING) giao nhau trên mặt bằng,
+     gán cao độ bằng `XBOSS_TUYEN_GAN` sao cho dải cao độ (tim ± nửa bề cao gồm cách nhiệt) **chồng
+     nhau** → `XBOSS_PHOIHOP` phải báo đúng **1 xung đột CỨNG** kèm đề xuất nhường cao độ đúng chiều
+     `crossingPolicy.priority`. Sửa cao độ một tuyến để dải cao độ **tách hẳn** ra → chạy lại, xung
+     đột đó **không còn xuất hiện**.
+111. **AC2 — chạy 2 lần không nhân đôi, giữ trạng thái bỏ qua.** Chạy `XBOSS_PHOIHOP` lần 1 → đánh
+     dấu một dòng "bỏ qua có lý do" (nhập lý do) → OK. Chạy lại `XBOSS_PHOIHOP` lần 2 trên cùng bản
+     vẽ (không đổi gì) → đếm tổng marker trên layer `XBOSS-PHOIHOP` **không đổi** so với sau lần 1;
+     dòng đã đánh dấu "bỏ qua" vẫn hiện đúng trạng thái + lý do cũ trong hộp thoại.
+112. **AC3 — xoá marker sạch, không đổi tuyến.** Trước khi chạy `XBOSS_PHOIHOP_XOA`, `LIST` từng
+     tuyến tim liên quan (tọa độ đỉnh + bulge) và đếm tổng thực thể model space. Sau khi chạy
+     `XBOSS_PHOIHOP_XOA`: layer `XBOSS-PHOIHOP` **rỗng**, tuyến tim **tọa độ không đổi một byte**,
+     số thực thể model space = số trước `XBOSS_PHOIHOP_XOA` trừ đúng số marker vừa xoá.
+113. **AC5 — báo cáo Excel + web khớp danh sách.** Sau khi đánh dấu xong ở hộp thoại `XBOSS_PHOIHOP`
+     (vd 2 cứng, 1 mềm, 1 cảnh báo, 1 chấp nhận, 1 bỏ qua), chạy `XBOSS_PHOIHOP_BAOCAO` → đối chiếu
+     số dòng + cột (lớp kiểm/hệ A/hệ B/vị trí/mức/đề xuất/trạng thái) trong
+     `<dwg>.xboss-phoihop.xlsx` với đúng danh sách vừa thấy trong hộp thoại. `XBOSS_UPLOAD` gửi kèm
+     `<dwg>.xboss-phoihop.json` → trang `/engineering/chuan-hoa-ban-ve` (panel "Phối Hợp Liên Hệ")
+     phải hiện **đúng cùng con số** tổng/cứng/mềm/cảnh báo/đã xử lý — không lệch giữa 3 nơi.
+114. **Đường lui dòng lệnh.** `XBOSS_UI_DIALOG=0` → `XBOSS_PHOIHOP` hỏi đáp bằng dòng lệnh (liệt kê
+     xung đột + đề xuất, hỏi CÓ/KHÔNG đánh dấu) — không sửa được từng dòng nhưng trạng thái cũ đọc
+     từ marker vẫn giữ nguyên.
+115. **Một lần `U` cho mỗi lệnh.** `U` ngay sau `XBOSS_PHOIHOP` (nếu có ghi marker) → hoàn tác trọn
+     vẹn về đúng trạng thái trước khi gọi lệnh.
+
+### C13. `XBOSS_TUYEN_GOIY` / `XBOSS_TUYEN_GOIY_XOA` — tuyến gợi ý từ sơ đồ nguyên lý (M117 PR4 — CHƯA LÀM, chờ lượt trước xong)
 
 > **Chưa verify tay mục này.** Cần: server XBoss chạy (mục D) có ít nhất một sơ đồ nguyên lý đã
 > **Chốt graph**, máy đã `XBOSS_LOGIN`, và bản vẽ mặt bằng đã có **hành lang** (`XBOSS_VE_HANHLANG`)
 >
-> - block thiết bị của hệ. Đợt M117 **CHƯA phát hành rộng** — xếp sau nợ verify M111 §C9 / M114 §C10
->   / M115 §C11, ghi sẵn kịch bản để khi tới lượt không phải soạn lại.
+> - block thiết bị của hệ. Đợt M117 **CHƯA phát hành rộng** — xếp sau nợ verify M111 §C9 / M114
+>   §C10 / M115 §C11 / M116 §C12, ghi sẵn kịch bản để khi tới lượt không phải soạn lại.
 
-109. **AC4 — chưa chốt thì không có đường đi tắt.** Graph còn `nhap` trên web → `XBOSS_TUYEN_GOIY`
+116. **AC4 — chưa chốt thì không có đường đi tắt.** Graph còn `nhap` trên web → `XBOSS_TUYEN_GOIY`
      nhận 409 và **dừng sạch** kèm câu "vào tab Sơ đồ nguyên lý… bấm Chốt graph"; đếm số đối tượng
      model space trước/sau: **không đổi**. Chốt graph trên web rồi chạy lại → sinh được nháp.
-110. **Luồng tải – ánh xạ – sinh nháp.** Gõ mã sơ đồ → dòng lệnh in đúng số nút/cạnh + thời điểm
+117. **Luồng tải – ánh xạ – sinh nháp.** Gõ mã sơ đồ → dòng lệnh in đúng số nút/cạnh + thời điểm
      chốt → chọn hệ/loại tuyến/cỡ mặc định + cao độ → bấm **điểm nguồn** → bảng ánh xạ liệt kê từng
      nút `✔ <tag> → handle … (theo tag)` và từng nút thiếu kèm lý do → xác nhận **CO** → polyline
      nháp hiện trên layer `XBOSS-GOIY`. `LIST` một nháp: XData `XBOSS_VE` phải có `vaitro=tim`,
      `he`, `size` (đúng cỡ ghi trên sơ đồ, không phải cỡ mặc định), `caodomm`, `phien=goiy-<id>`.
-111. **Thiếu ánh xạ không chặn.** Xóa/đổi tag một block thiết bị trên mặt bằng rồi chạy lại → nút đó
+118. **Thiếu ánh xạ không chặn.** Xóa/đổi tag một block thiết bị trên mặt bằng rồi chạy lại → nút đó
      vào danh sách thiếu, **các nhánh còn lại vẫn sinh** (M117 §6).
-112. **Chưa có hành lang.** Trên bản vẽ chưa chạy `XBOSS_VE_HANHLANG` → lệnh dừng kèm đúng câu
+119. **Chưa có hành lang.** Trên bản vẽ chưa chạy `XBOSS_VE_HANHLANG` → lệnh dừng kèm đúng câu
      "chạy XBOSS_VE_HANHLANG… trước", **không crash**, không vẽ một nét nào.
-113. **AC5 — chạy lại không nhân đôi.** Chạy `XBOSS_TUYEN_GOIY` lần 2 với cùng mã sơ đồ và cùng điểm
+120. **AC5 — chạy lại không nhân đôi.** Chạy `XBOSS_TUYEN_GOIY` lần 2 với cùng mã sơ đồ và cùng điểm
      nguồn → tổng số đối tượng model space **không đổi**; đếm riêng polyline trên `XBOSS-GOIY` cũng
      không đổi. Đặt thêm một pline tự vẽ và một nháp của **sơ đồ khác** (mã khác) trên cùng bản vẽ →
      cả hai **còn nguyên** sau lần chạy thứ 2.
-114. **Nháp đã sửa tay.** Kéo một đỉnh của nháp rồi chạy lại → lệnh cảnh báo đúng số tuyến lệch hình
+121. **Nháp đã sửa tay.** Kéo một đỉnh của nháp rồi chạy lại → lệnh cảnh báo đúng số tuyến lệch hình
      học và **hỏi xác nhận**; trả lời `KHONG` → bản vẽ không đổi.
-115. **`XBOSS_TUYEN_GOIY_XOA`.** Enter (mọi sơ đồ) → xóa hết nháp, tuyến vẽ tay/tuyến `XBOSS_VE`
+122. **`XBOSS_TUYEN_GOIY_XOA`.** Enter (mọi sơ đồ) → xóa hết nháp, tuyến vẽ tay/tuyến `XBOSS_VE`
      **không bị đụng**. Gõ mã một sơ đồ → chỉ nháp của sơ đồ đó biến mất.
-116. **Offline (cache M113).** Rút mạng sau khi đã tải sơ đồ một lần → chạy lại: lệnh báo "đang dùng
+123. **Offline (cache M113).** Rút mạng sau khi đã tải sơ đồ một lần → chạy lại: lệnh báo "đang dùng
      BẢN CACHE" và vẫn sinh nháp. Xóa `%APPDATA%\XBoss\schematic-<id>.json` rồi rút mạng → lệnh
      báo thiếu cache, dừng sạch.
-117. **Một lần `U`.** `U` ngay sau mỗi lệnh → hoàn tác trọn vẹn (xóa nháp cũ + sinh nháp mới nằm
+124. **Một lần `U`.** `U` ngay sau mỗi lệnh → hoàn tác trọn vẹn (xóa nháp cũ + sinh nháp mới nằm
      trong đúng một nhóm UNDO).
-118. **Nối vào M115.** Sau khi sinh nháp: `XBOSS_TUYEN_GAN` (bổ sung kiểu nối) → `XBOSS_TUYEN_DOTHI`
+125. **Nối vào M115.** Sau khi sinh nháp: `XBOSS_TUYEN_GAN` (bổ sung kiểu nối) → `XBOSS_TUYEN_DOTHI`
      → `XBOSS_HOANTHIEN` chạy trọn như tuyến vẽ tay, không có ngoại lệ nào cho tuyến gợi ý.
+
+### C14. Cách ly lỗi + bảo vệ sửa tay + cảnh báo phiên bản plugin (M118 — CHƯA LÀM, xếp SAU C9/C10/C11/C12/C13)
+
+> **Chưa verify tay mục này.** Xếp hàng SAU C9 (M111), C10 (M114), C11 (M115), C12 (M116), C13
+> (M117) theo đúng thứ tự nợ verify tay hiện có (`docs/nang-cap/README.md`) — không chen ngang.
+> Mục này gồm đủ 3 phần: **AC2** (FR2 — bảo vệ sửa tay của `XBOSS_HOANTHIEN` khi dời tay giá đỡ/vạch
+> chia/ngắt nét/bảng thống kê), **AC5** (FR3 — cảnh báo phiên bản), **AC7** (FR1+FR2 — một lần
+> `U`) — cả 3 PR đã code xong.
+
+126. **AC2 — chạy lại `XBOSS_HOANTHIEN` giữ nguyên phần kỹ sư đã sửa tay.** Vẽ 1 tuyến, chạy
+     `XBOSS_HOANTHIEN` xong đủ 8 giai đoạn. Dời tay 1 vạch chia đốt, 1 giá đỡ, 1 đối tượng ngắt
+     nét (vùng che/cung), kéo bảng thống kê sang vị trí khác. Vẽ thêm 1 nhánh tuyến mới rồi chạy
+     lại `XBOSS_HOANTHIEN` → 4 thực thể đã dời **giữ nguyên vị trí**, phần tử của nhánh mới sinh
+     đủ, dòng tóm tắt giai đoạn tương ứng có "giữ nguyên N thực thể kỹ sư đã sửa tay". Xóa hẳn (không
+     dời) 1 vạch chia khác rồi chạy lại → vạch đó được **sinh lại** (không phân biệt được xóa hẳn
+     với chưa từng có — hành vi đã ghi rõ trong đặc tả). Đối chiếu với lệnh lẻ: gõ tay
+     `XBOSS_VE_CHIADOT`/`_GIADO`/`_NGATNET`/`_THONGKE` trực tiếp (không qua `XBOSS_HOANTHIEN`) trên
+     1 tuyến khác, dời tay 1 thực thể rồi chạy lại đúng lệnh lẻ đó → thực thể dời **bị xóa-sinh lại
+     như trước M118** (không có khái niệm giữ-tay ở lệnh lẻ).
+127. **AC5 — hai máy lệch bản, cảnh báo đúng cả hai số.** Trên MÁY A: đóng gói plugin với
+     `<Version>` trong `Directory.Build.props` thấp hơn bản đang phát hành trên server (vd cài bản
+     `1.0.0` trong khi trang `/engineering/cai-dat-plugin` đang phát hành `1.2.0`). Ghép thiết bị
+     bằng `XBOSS_LOGIN`, rồi chạy `XBOSS_RULEPACK` (chọn 1 tệp rule pack JSON hợp lệ) → sau dòng
+     `Đã nạp rule pack ...` phải in thêm đúng 1 dòng
+     `⚠ Plugin đang chạy 1.0.0, server phát hành 1.2.0 — tải bản mới tại <baseUrl>/engineering/cai-dat-plugin`
+     (baseUrl đúng địa chỉ server đã ghép ở `XBOSS_LOGIN`, KHÔNG phải biến môi trường máy). Mở
+     `XBOSS_BANG` (bảng điều khiển) → khối "Kết nối XBoss" có dòng "Phiên bản plugin: 1.0.0
+     (server: 1.2.0 — cũ)" màu cảnh báo. Trên MÁY B đã cài đúng bản `1.2.0`: chạy lại 2 bước trên →
+     KHÔNG có dòng `⚠` nào ở `XBOSS_RULEPACK`, `XBOSS_BANG` hiện "Phiên bản plugin: 1.2.0 (server:
+     1.2.0)" không cảnh báo. Rút mạng (hoặc tắt Wi-Fi) rồi chạy lại `XBOSS_RULEPACK` trên MÁY A →
+     lệnh **vẫn nạp rule pack bình thường**, KHÔNG in dòng `⚠` nào (không chắc thì im lặng, §7 FR3);
+     `XBOSS_BANG` lúc này hiện "Phiên bản plugin: 1.0.0 (server: chưa rõ)".
+128. **AC7 — một lần `U` sau `XBOSS_HOANTHIEN` kể cả lần chạy có giai đoạn lỗi.** Cố tình làm giai
+     đoạn ④ (giá đỡ) lỗi (vd khoá layer đích không mở khoá được), chạy `XBOSS_HOANTHIEN` → 7/8
+     giai đoạn xong kèm dòng `✖ Giá đỡ: lỗi — ...`, sau đó `U` **một lần** → toàn bộ phần đã vẽ
+     của lần chạy đó (kể cả các giai đoạn đã xong trước lỗi) biến mất, bản vẽ về đúng trạng thái
+     trước khi gọi lệnh.
 
 ---
 

@@ -1646,6 +1646,68 @@
       </StackPanel>
     </DataTemplate>
 
+    <!-- M116 §6 bước 3–4 — XBOSS_PHOIHOP: bảng xung đột phối hợp, lọc theo hệ/mức, mỗi dòng bấm
+         "Zoom tới" và đánh dấu CHẤP NHẬN / BỎ QUA (ô lý do bắt buộc khi bỏ qua — ViewModel khóa nút
+         OK kèm lý do, XAML không tự kiểm lại). Hai ô đánh dấu là CheckBox bind hai chiều vào
+         DongXungDot (dòng tự phát PropertyChanged), cố ý không dùng code-behind: DataTemplate không
+         có code-behind là điểm mấu chốt của khung M106 (xem chú thích đầu tệp). -->
+    <DataTemplate DataType="{x:Type vm:PhoiHopDialogViewModel}">
+      <StackPanel>
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0" Margin="0,0,8,0">
+            <TextBlock Style="{StaticResource Nhan}" Text="Lọc theo hệ" />
+            <ComboBox ItemsSource="{Binding CacHe}" SelectedItem="{Binding HeLoc, Mode=TwoWay}" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Margin="8,0,0,0">
+            <TextBlock Style="{StaticResource Nhan}" Text="Lọc theo mức" />
+            <ComboBox ItemsSource="{Binding CacMuc}" SelectedItem="{Binding MucLoc, Mode=TwoWay}"
+                      DisplayMemberPath="Nhan" />
+          </StackPanel>
+        </Grid>
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Xung đột phát hiện được" />
+        <TextBlock Foreground="{x:Static wpf:MauBangWpf.Chu}" Text="{Binding TomTat}" TextWrapping="Wrap" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding DanhSach}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Margin="0,0,0,10">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Grid.Column="0" Text="{Binding Nhan}" TextWrapping="Wrap"
+                                 VerticalAlignment="Center" />
+                      <Button Grid.Column="1" Margin="10,0,0,0" Padding="10,2" Content="Zoom tới"
+                              Command="{Binding DataContext.LenhZoom,
+                                        RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                              CommandParameter="{Binding}" />
+                    </Grid>
+                    <TextBlock Style="{StaticResource GhiChu}" Text="{Binding NhanDeXuat}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                      <CheckBox Content="Chấp nhận (tự sửa tay)" Margin="0,0,14,0"
+                                IsChecked="{Binding ChapNhan, Mode=TwoWay}" />
+                      <CheckBox Content="Bỏ qua có lý do" IsChecked="{Binding BoQua, Mode=TwoWay}" />
+                    </StackPanel>
+                    <TextBox Margin="0,3,0,0" IsEnabled="{Binding BoQua}"
+                             Text="{Binding LyDo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding GhiChuDanhSach}" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding GhiChu}" />
+      </StackPanel>
+    </DataTemplate>
+
     <!-- XBOSS_HOANTHIEN (M115 FR3): tick 8 giai đoạn hoàn thiện. Mặc định tick theo
          completionPolicy.stageDefaults; thứ tự chạy CỐ ĐỊNH ① → ⑧ nên danh sách cũng hiện đúng
          thứ tự đó, kỹ sư không hiểu nhầm là tick trước chạy trước. -->

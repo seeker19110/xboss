@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Layers, Download, FileSpreadsheet } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import PluginControlPanel from "./components/PluginControlPanel";
+import PhoiHopPanel from "./components/PhoiHopPanel";
 import ThuVienBlockPanel from "./components/ThuVienBlockPanel";
 import NapLoBlockPanel from "./components/NapLoBlockPanel";
 import MaBoqDuAnPanel from "./components/MaBoqDuAnPanel";
@@ -163,6 +164,11 @@ export default function ChuanHoaBanVePage() {
             BẢNG ĐIỀU KHIỂN PLUGIN AUTOCAD (M99 PR6) — rule pack, gói cài, lịch sử upload
         ══════════════════════════════════════════════════════════════════════ */}
         <PluginControlPanel />
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            PHỐI HỢP LIÊN HỆ (M116 PR3) — xung đột 2D liên hệ theo bản vẽ đã gửi từ plugin
+        ══════════════════════════════════════════════════════════════════════ */}
+        <PhoiHopPanel />
 
         {/* ══════════════════════════════════════════════════════════════════════
             THƯ VIỆN BLOCK CHUẨN (M100 PR2) — version hiện hành, lịch sử, phát hành

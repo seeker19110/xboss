@@ -310,4 +310,43 @@ public class VeSessionReportTests
         var bc = VeSessionReport.Dung([Tim("", "duct-supp", "300x200")], Meta);
         Assert.Equal("(không rõ hệ)", Assert.Single(bc.HeThong).HeId);
     }
+
+    // ===== Mục phối hợp (M116 PR3 §6 bước 5) =====
+
+    private static XBoss.Cad.Core.Coordination.XungDot XungDotThu(string id) => new(
+        id, XBoss.Cad.Core.Coordination.LopKiem.GiaoCatCaoDo, XBoss.Cad.Core.Coordination.MucXungDot.Cung,
+        [id + "-a", id + "-b"], ["HVAC", "PIPING"], "mô tả thử", new Diem2(1, 2), 100, false, []);
+
+    [Fact]
+    public void Khong_truyen_phoiHop_thi_muc_phoiHop_null_bao_cao_cu_khong_doi()
+    {
+        var bc = VeSessionReport.Dung([Tim("HVAC", "duct-supp", "300x200")], Meta);
+        Assert.Null(bc.PhoiHop);
+        Assert.DoesNotContain("Phối hợp", bc.ToVietnameseText(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Truyen_phoiHop_rong_thi_van_null_khong_hien_muc_thua()
+    {
+        var bc = VeSessionReport.Dung([Tim("HVAC", "duct-supp", "300x200")], Meta, phoiHop: []);
+        Assert.Null(bc.PhoiHop);
+    }
+
+    [Fact]
+    public void Truyen_phoiHop_co_du_lieu_thi_dung_tom_tat_va_hien_trong_van_ban()
+    {
+        var phoiHop = new List<(XBoss.Cad.Core.Coordination.XungDot, XBoss.Cad.Core.Coordination.TrangThaiXungDot)>
+        {
+            (XungDotThu("xd-1"), XBoss.Cad.Core.Coordination.TrangThaiXungDot.ChuaXuLy),
+        };
+        var bc = VeSessionReport.Dung([Tim("HVAC", "duct-supp", "300x200")], Meta, phoiHop: phoiHop);
+
+        Assert.NotNull(bc.PhoiHop);
+        Assert.Equal(1, bc.PhoiHop!.TongSo);
+        Assert.Equal(1, bc.PhoiHop.SoCung);
+        Assert.Contains("Phối hợp xung đột liên hệ", bc.ToVietnameseText(), StringComparison.Ordinal);
+
+        var json = JsonDocument.Parse(bc.ToJson());
+        Assert.Equal(1, json.RootElement.GetProperty("phoiHop").GetProperty("tongSo").GetInt32());
+    }
 }
