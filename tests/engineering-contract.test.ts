@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
+import type { ClaimLike } from "@/lib/ky-thuat/engineering-agents";
 
 const S = { skip: !HAS_TEST_DB };
 const FIXTURE_DIR = join(process.cwd(), "tests", "fixtures", "engineering-ingest");
@@ -71,7 +72,7 @@ async function post(key: string, body: unknown, idem?: string) {
 before(async () => {
   if (!HAS_TEST_DB) return;
   const { insertId } = await import("@/lib/db");
-  const { generateApiKey, hashApiKey } = await import("@/lib/api-keys");
+  const { generateApiKey, hashApiKey } = await import("@/lib/bao-mat/api-keys");
   U = await insertId(
     `INSERT INTO users (name, email, role, password_hash) VALUES ('Contract','contract-test@x.vn','admin','x')`,
   );
@@ -122,7 +123,7 @@ after(async () => {
 // ---------------------------------------------------------------------------------------
 
 test("OpenAPI: giới hạn objects/relations khớp hằng số route thật", async () => {
-  const { MAX_OBJECTS, MAX_RELATIONS } = await import("@/lib/engineering-ingest");
+  const { MAX_OBJECTS, MAX_RELATIONS } = await import("@/lib/ky-thuat/engineering-ingest");
   const doc = openapi();
   const p = doc.components.schemas.IngestRequest.properties;
   assert.equal(
@@ -135,7 +136,7 @@ test("OpenAPI: giới hạn objects/relations khớp hằng số route thật", 
 });
 
 test("OpenAPI: enum sourceType khớp schema Zod (nguồn sự thật)", async () => {
-  const { engineeringSourceInputSchema } = await import("@/lib/engineering-kernel");
+  const { engineeringSourceInputSchema } = await import("@/lib/ky-thuat/engineering-kernel");
   const shape = engineeringSourceInputSchema.shape as unknown as {
     sourceType: { options: readonly string[] };
   };
@@ -225,7 +226,7 @@ test("Fixture 06: CÁCH LY DỰ ÁN — relation trỏ key dự án khác → 42
 });
 
 test("Fixture 07: vượt giới hạn objects → 422", S, async () => {
-  const { MAX_OBJECTS } = await import("@/lib/engineering-ingest");
+  const { MAX_OBJECTS } = await import("@/lib/ky-thuat/engineering-ingest");
   const fx = fixture("07-limits-exceeded.json");
   const n = (fx.generate as { objects: number }).objects;
   assert.equal(n, MAX_OBJECTS + 1, "fixture phải vượt đúng 1 phần tử so với giới hạn thật");
@@ -236,4 +237,43 @@ test("Fixture 07: vượt giới hạn objects → 422", S, async () => {
   const r = await post(keyA, { contractVersion: fx.contractVersion, objects }, randomUUID());
   assert.equal(r.status, (fx.expect as { status: number }).status);
   assert.equal(r.body.pointer, (fx.expect as { pointer: string }).pointer);
+});
+
+test("Fixture 08: Agent claims conflict — phân loại và phân xử theo authority (C2 §5.7)", async () => {
+  const { detectConflicts, classifyConflict, proposeResolution } =
+    await import("@/lib/ky-thuat/engineering-agents");
+  const fx = fixture("08-agent-claims-conflict.json") as {
+    request: { topic: string; claims: Array<Partial<ClaimLike>> };
+    expect: {
+      hasConflict: boolean;
+      conflictType: string;
+      winningAuthority: string;
+      majorityVoteApplied: boolean;
+      selectedClaimIndex: number;
+      humanResolutionRequired: boolean;
+    };
+  };
+
+  const claims: ClaimLike[] = fx.request.claims.map((c, i) => ({
+    id: `claim-${i}`,
+    agentRole: c.agentRole ?? "specialist",
+    topic: fx.request.topic,
+    claim: c.claim ?? "",
+    assumptions: c.assumptions ?? [],
+    confidence: c.confidence ?? "medium",
+    sourceAuthority: c.sourceAuthority ?? "derived",
+    sourceRevisionId: c.sourceRevisionId ?? null,
+    payload: c.payload ?? {},
+  }));
+
+  const conflicts = detectConflicts(claims);
+  assert.equal(conflicts.length > 0, fx.expect.hasConflict);
+
+  const conflictType = classifyConflict(claims);
+  assert.equal(conflictType, fx.expect.conflictType);
+
+  const resolution = proposeResolution("data", claims);
+  assert.equal(resolution.winnerClaimId, claims[fx.expect.selectedClaimIndex].id);
+  assert.equal(resolution.method, "source_authority");
+  assert.equal(resolution.needsHuman, fx.expect.humanResolutionRequired);
 });

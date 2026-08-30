@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateVoInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateVoInput } = await import("@/lib/vo");
+  const { validateVoInput } = await import("@/lib/tai-chinh/vo");
 
   const base = {
     title: "Bổ sung ống gió tầng 5",
@@ -44,7 +44,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listVariations, getVariation } = await import("@/lib/vo");
+    const { listVariations, getVariation } = await import("@/lib/tai-chinh/vo");
 
     const voId = await insertId(
       `INSERT INTO variation_orders (code, title, reason, status)
@@ -90,8 +90,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { pendingVariations } = await import("@/lib/vo");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { pendingVariations } = await import("@/lib/tai-chinh/vo");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const overdueId = await insertId(
       `INSERT INTO variation_orders (code, title, reason, status, submitted_at)
@@ -123,7 +123,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { costSummary, systemBudget } = await import("@/lib/cost");
+    const { costSummary, systemBudget } = await import("@/lib/tai-chinh/cost");
 
     const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien);
@@ -167,7 +167,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listVariations, getVariation } = await import("@/lib/vo");
+    const { listVariations, getVariation } = await import("@/lib/tai-chinh/vo");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA VO 1', 'PJT-VO1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA VO 2', 'PJT-VO2')`);

@@ -9,7 +9,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { costSummary, systemBudget } = await import("@/lib/cost");
+    const { costSummary, systemBudget } = await import("@/lib/tai-chinh/cost");
 
     const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien);
@@ -103,7 +103,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { costSummary, costTotals } = await import("@/lib/cost");
+    const { costSummary, costTotals } = await import("@/lib/tai-chinh/cost");
 
     const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien);
@@ -242,7 +242,7 @@ test(
   "getCostSettings/updateCostSettings: đọc mặc định + cập nhật ngưỡng",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { getCostSettings, updateCostSettings } = await import("@/lib/cost");
+    const { getCostSettings, updateCostSettings } = await import("@/lib/tai-chinh/cost");
 
     const before = await getCostSettings();
     assert.equal(before.warnPct, 90);

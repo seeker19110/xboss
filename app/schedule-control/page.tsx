@@ -7,7 +7,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
 import DelayedGroupsTable from "@/app/components/DelayedGroupsTable";
 import SystemFilter from "@/app/components/SystemFilter";
-import type { CriticalRow } from "@/lib/schedule-control";
+import type { CriticalRow } from "@/lib/tien-do/schedule-control";
 
 type Delayed = {
   id: number;

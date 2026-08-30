@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TRAFFIC_TOKEN_HEADER, trafficToken } from "@/lib/traffic-token";
+import { TRAFFIC_TOKEN_HEADER, trafficToken } from "@/lib/bao-mat/traffic-token";
 
 test("TRAFFIC_TOKEN_HEADER: đúng tên header thống nhất giữa proxy và endpoint", () => {
   assert.equal(TRAFFIC_TOKEN_HEADER, "x-traffic-token");

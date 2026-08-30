@@ -17,7 +17,9 @@ test.describe("Claim chi phí & EOT (sau đăng nhập)", () => {
   test("render nội dung chính + 2 thẻ KPI theo loại", async ({ page }) => {
     await gotoClaims(page);
     await expect(page.getByText("Claim chi phí đang mở", { exact: false })).toBeVisible();
-    await expect(page.getByText("Claim EOT đang mở", { exact: false })).toBeVisible();
+    // Nhãn thẻ KPI trên trang là "Claim EOT gia hạn đang mở" — spec cũ tìm chuỗi con
+    // "Claim EOT đang mở" nên trượt. Cùng một thẻ, chỉ khác chữ.
+    await expect(page.getByText("Claim EOT gia hạn đang mở", { exact: false })).toBeVisible();
   });
 
   test("toggle lọc theo loại claim (Tất cả/Chi phí/EOT)", async ({ page }) => {

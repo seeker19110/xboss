@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, insertId, withTransaction, withProjectScope } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { withUniqueRetry, isUniqueViolation } from "@/lib/seqcode";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { withUniqueRetry, isUniqueViolation } from "@/lib/ha-tang/seqcode";
 import {
   listTenders,
   nextTenderCode,
   validateTenderInput,
   type TenderItemInput,
-} from "@/lib/tender";
+} from "@/lib/tai-chinh/tender";
 
 export const dynamic = "force-dynamic";
 

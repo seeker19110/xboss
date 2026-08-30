@@ -51,3 +51,50 @@ export function PageSkeleton() {
     </div>
   );
 }
+
+// Skeleton cho bảng dữ liệu: mô phỏng chính xác header và các hàng dữ liệu
+export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
+  return (
+    <div className="w-full space-y-2 p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
+      <div className="flex gap-4 pb-3 border-b border-zinc-800">
+        {Array.from({ length: cols }, (_, i) => (
+          <Skeleton key={i} className="h-4 flex-1" />
+        ))}
+      </div>
+      <div className="space-y-3 pt-2">
+        {Array.from({ length: rows }, (_, r) => (
+          <div key={r} className="flex gap-4 items-center">
+            {Array.from({ length: cols }, (_, c) => (
+              <Skeleton key={c} className="h-4 flex-1 opacity-80" />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Skeleton cho thẻ Metric / Bento grid card
+export function CardSkeleton({ className = "" }: { className?: string }) {
+  return (
+    <div className={`p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3 ${className}`}>
+      <div className="flex justify-between items-center">
+        <Skeleton className="h-3.5 w-24" />
+        <Skeleton className="h-6 w-6 rounded-md" />
+      </div>
+      <Skeleton className="h-7 w-20" />
+      <Skeleton className="h-2 w-full rounded-full" />
+    </div>
+  );
+}
+
+// Skeleton cho hàng thẻ KPI
+export function MetricsRowSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {Array.from({ length: count }, (_, i) => (
+        <CardSkeleton key={i} />
+      ))}
+    </div>
+  );
+}

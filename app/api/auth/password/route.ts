@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { hitRateLimit } from "@/lib/ratelimit";
+import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 import {
   getCurrentUser,
   hashPassword,
@@ -8,9 +8,10 @@ import {
   makeToken,
   requiredRoles,
   computeMustSetup2fa,
+  isSecureCookie,
   COOKIE,
   COOKIE_MAX_AGE,
-} from "@/lib/auth";
+} from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,7 @@ export async function PATCH(req: NextRequest) {
     path: "/",
     maxAge: COOKIE_MAX_AGE,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureCookie(req),
   });
   return res;
 }

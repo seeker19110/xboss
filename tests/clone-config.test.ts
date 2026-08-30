@@ -8,7 +8,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { query, queryOne, insertId, run } = await import("@/lib/db");
-    const { cloneProjectConfig } = await import("@/lib/clone-config");
+    const { cloneProjectConfig } = await import("@/lib/tien-do/clone-config");
 
     // Người thực hiện sao chép (created_by/updated_by).
     const actorId = await insertId(

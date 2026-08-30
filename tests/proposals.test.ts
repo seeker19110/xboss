@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateProposalInput: kind hợp lệ, title bắt buộc, amount ≥ 0", async () => {
-  const { validateProposalInput } = await import("@/lib/proposals");
+  const { validateProposalInput } = await import("@/lib/tai-chinh/proposals");
 
   const base = {
     kind: "advance" as const,
@@ -33,8 +33,8 @@ test(
   async () => {
     const { run, insertId, queryOne, query } = await import("@/lib/db");
     const { decideProposal, pendingProposalsOver, nextProposalCode } =
-      await import("@/lib/proposals");
-    const { daysFromTodayISO, todayISO } = await import("@/lib/date");
+      await import("@/lib/tai-chinh/proposals");
+    const { daysFromTodayISO, todayISO } = await import("@/lib/nen/date");
 
     const pmId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('PM Proposal', 'proposal-pm@xboss.vn', 'x', 'pm')`,
@@ -158,7 +158,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listProposals, getProposal } = await import("@/lib/proposals");
+    const { listProposals, getProposal } = await import("@/lib/tai-chinh/proposals");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA DX 1', 'PJT-DX1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA DX 2', 'PJT-DX2')`);

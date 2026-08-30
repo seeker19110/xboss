@@ -9,7 +9,7 @@ import { CheckSquare, Search } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
-import { formatDateTimeVN } from "@/lib/date";
+import { formatDateTimeVN } from "@/lib/nen/date";
 
 type Notif = {
   id: number;

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, todayISO, daysFromTodayISO } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import type { Prefs } from "@/app/api/notifications/prefs/route";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import type { Prefs } from "@/lib/van-hanh/notification-prefs";
 
 export const dynamic = "force-dynamic";
 

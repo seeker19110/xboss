@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   parseEnvMonitoringBody,
   validateMonitoringInput,
   type EnvMonitoringInput,
-} from "@/lib/environment";
+} from "@/lib/hien-truong/environment";
 
 export const dynamic = "force-dynamic";
 

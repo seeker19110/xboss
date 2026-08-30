@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { parseTechLinkBody, validateTechLink, type TechLinkInput } from "@/lib/tech";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { parseTechLinkBody, validateTechLink, type TechLinkInput } from "@/lib/ky-thuat/tech";
 
 export const dynamic = "force-dynamic";
 

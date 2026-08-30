@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("assertDiaryUnlocked: ném 409 khi đã khoá, không ném khi draft/chưa có", async () => {
-  const { assertDiaryUnlocked } = await import("@/lib/diary");
+  const { assertDiaryUnlocked } = await import("@/lib/hien-truong/diary");
 
   assert.doesNotThrow(() => assertDiaryUnlocked(undefined));
   assert.doesNotThrow(() => assertDiaryUnlocked("draft"));
@@ -19,7 +19,7 @@ test("assertDiaryUnlocked: ném 409 khi đã khoá, không ném khi draft/chưa 
 });
 
 test("canLockDiary/canUnlockDiary: đúng phân quyền khoá/mở khoá", async () => {
-  const { canLockDiary, canUnlockDiary } = await import("@/lib/diary");
+  const { canLockDiary, canUnlockDiary } = await import("@/lib/hien-truong/diary");
 
   assert.equal(canLockDiary("admin"), true);
   assert.equal(canLockDiary("pm"), true);
@@ -37,7 +37,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { buildDiaryPrefill } = await import("@/lib/diary");
+    const { buildDiaryPrefill } = await import("@/lib/hien-truong/diary");
 
     const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien, "systems seed phải có sẵn từ migration 0005_boq.sql");
@@ -87,7 +87,10 @@ test(
     );
 
     const prefill = await buildDiaryPrefill(date);
-    assert.match(prefill.workDone, /Điện T5: cập nhật 2 hạng mục \(D1,01 → D1,02\)/);
+    assert.match(
+      prefill.workDone,
+      /Điện & Điện nhẹ \(ELV\) T5: cập nhật 2 hạng mục \(D1,01 → D1,02\)/,
+    );
     assert.deepEqual(prefill.updatedBy, ["Nguyễn Văn A", "Trần Thị B"]);
     assert.equal(prefill.photos.length, 0);
 
@@ -105,7 +108,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { missingDiaryDates } = await import("@/lib/diary");
+    const { missingDiaryDates } = await import("@/lib/hien-truong/diary");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test missing diary')`);
     const towerId = await insertId(
@@ -155,7 +158,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { missingDiaryDates } = await import("@/lib/diary");
+    const { missingDiaryDates } = await import("@/lib/hien-truong/diary");
 
     const p1 = await insertId(`INSERT INTO projects (name) VALUES ('DA missing 1')`);
     const p2 = await insertId(`INSERT INTO projects (name) VALUES ('DA missing 2')`);
@@ -250,7 +253,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { getDiaryByDate, listDiaryCalendar } = await import("@/lib/diary");
+    const { getDiaryByDate, listDiaryCalendar } = await import("@/lib/hien-truong/diary");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA NK 1', 'PJT-NK1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA NK 2', 'PJT-NK2')`);

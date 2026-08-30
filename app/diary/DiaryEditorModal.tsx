@@ -9,7 +9,7 @@ import {
   getQueuedDiaryNote,
   discardDiaryDraft,
 } from "@/app/components/offlineQueue";
-import { formatDateDMY, formatDateTimeVN } from "@/lib/date";
+import { formatDateDMY, formatDateTimeVN } from "@/lib/nen/date";
 
 type ManpowerRow = { crew: string; headcount: string; note: string };
 type Diary = {
@@ -423,7 +423,7 @@ export default function DiaryEditorModal({
                         className="w-full h-full object-cover"
                       />
                       {checked && (
-                        <span className="absolute top-1 right-1 bg-sky-600 text-on-accent rounded-full w-4 h-4 flex items-center justify-center text-[10px]">
+                        <span className="absolute top-1 right-1 bg-sky-700 text-on-accent rounded-full w-4 h-4 flex items-center justify-center text-[10px]">
                           ✓
                         </span>
                       )}
@@ -461,7 +461,7 @@ export default function DiaryEditorModal({
               <button
                 onClick={save}
                 disabled={saving}
-                className="flex-1 min-w-[120px] bg-sky-600 hover:bg-sky-700 disabled:opacity-50 py-2.5 rounded-lg text-sm font-medium text-on-accent"
+                className="flex-1 min-w-[120px] bg-sky-700 hover:bg-sky-800 disabled:opacity-50 py-2.5 rounded-lg text-sm font-medium text-on-accent"
               >
                 {saving ? "Đang lưu…" : "Lưu nháp"}
               </button>
@@ -469,7 +469,7 @@ export default function DiaryEditorModal({
             {!isLocked && canLock && diary?.id && (
               <button
                 onClick={lock}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-emerald-700 hover:bg-emerald-600 text-on-accent"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-emerald-700 hover:bg-emerald-800 text-on-accent"
               >
                 <Lock className="w-4 h-4" /> Khoá sổ
               </button>

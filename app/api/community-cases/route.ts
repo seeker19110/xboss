@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { todayISO } from "@/lib/date";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { todayISO } from "@/lib/nen/date";
 import {
   COMMUNITY_CASE_STATUSES,
   listCommunityCases,
   parseCommunityCaseBody,
   validateCommunityCaseInput,
   type CommunityCaseStatus,
-} from "@/lib/monitoring";
+} from "@/lib/hien-truong/monitoring";
 
 export const dynamic = "force-dynamic";
 

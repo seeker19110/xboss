@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 const S = Date.now().toString(36);
 
 test("sha256Hex: khớp đúng crypto.createHash('sha256') tính tay trên buffer", async () => {
-  const { sha256Hex } = await import("@/lib/photos");
+  const { sha256Hex } = await import("@/lib/nen/photos");
   const buf = Buffer.from("Nội dung biên bản nghiệm thu test M43 PR3");
   const expected = createHash("sha256").update(buf).digest("hex");
   assert.equal(sha256Hex(buf), expected);
@@ -20,7 +20,7 @@ test("sha256Hex: khớp đúng crypto.createHash('sha256') tính tay trên buffe
 });
 
 test("sha256Hex: buffer khác nội dung cho hash khác nhau", async () => {
-  const { sha256Hex } = await import("@/lib/photos");
+  const { sha256Hex } = await import("@/lib/nen/photos");
   const a = sha256Hex(Buffer.from("nội dung A"));
   const b = sha256Hex(Buffer.from("nội dung B"));
   assert.notEqual(a, b);
@@ -31,7 +31,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, queryOne, run } = await import("@/lib/db");
-    const { sha256Hex } = await import("@/lib/photos");
+    const { sha256Hex } = await import("@/lib/nen/photos");
 
     const buf = Buffer.from(`fake-pdf-content-task-${S}`);
     const sha256 = sha256Hex(buf);
@@ -63,7 +63,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, queryOne, run } = await import("@/lib/db");
-    const { sha256Hex } = await import("@/lib/photos");
+    const { sha256Hex } = await import("@/lib/nen/photos");
 
     const buf = Buffer.from(`fake-file-content-${S}`);
     const sha256 = sha256Hex(buf);

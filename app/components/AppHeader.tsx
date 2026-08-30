@@ -27,7 +27,8 @@ import {
   type DashNode,
   type DashCluster,
 } from "@/app/lib/dashboardTree";
-import { MODULES } from "@/lib/modules";
+import { MODULES } from "@/lib/nen/modules";
+import { ROLE_LABELS, type Role } from "@/lib/nen/roles";
 
 type Me = { id: number; name: string; email: string; role: string };
 
@@ -162,8 +163,8 @@ export default function AppHeader({
         aria-current={itemActive ? "page" : undefined}
         className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
           itemActive
-            ? "bg-zinc-800 text-white font-medium border-emerald-400"
-            : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
+            ? "bg-emerald-500/10 text-emerald-300 font-semibold border-emerald-400"
+            : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60 border-transparent"
         }`}
       >
         <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
@@ -188,8 +189,8 @@ export default function AppHeader({
             aria-current={path === `/hub/${dash.id}` ? "page" : undefined}
             className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
               path === `/hub/${dash.id}`
-                ? "bg-zinc-800 text-white font-medium border-emerald-400"
-                : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
+                ? "bg-emerald-500/10 text-emerald-300 font-semibold border-emerald-400"
+                : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60 border-transparent"
             }`}
           >
             <LayoutDashboard className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
@@ -326,7 +327,7 @@ export default function AppHeader({
       )}
 
       {/* ── Topbar ── */}
-      <header className="sticky top-0 z-30 bg-zinc-950 border-b border-zinc-800 safe-top print:hidden">
+      <header className="sticky top-0 z-30 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-800 safe-top print:hidden">
         <div className="flex items-center gap-2 px-3 sm:px-6 h-12 min-w-0">
           <button
             onClick={() => setMobileOpen(true)}
@@ -353,7 +354,13 @@ export default function AppHeader({
             )}
           </div>
 
-          <div className="flex items-center gap-1 shrink-0 ml-1">
+          {search && (
+            <div className="hidden md:block w-full max-w-xs shrink">
+              <GlobalSearch placement="top" />
+            </div>
+          )}
+
+          <div className="flex items-center gap-1.5 shrink-0 ml-1">
             {children}
             <OfflineQueueBadge />
             <ThemeToggle />
@@ -362,14 +369,24 @@ export default function AppHeader({
             {me && (
               <a
                 href="/account"
-                title="Tài khoản"
+                title={`Tài khoản: ${me.name} (${ROLE_LABELS[me.role as Role] ?? me.role})`}
                 aria-label={`Tài khoản — ${me.name}`}
-                className="flex items-center gap-1.5 ml-1 pl-2 min-h-[44px] border-l border-zinc-800 rounded-lg text-zinc-400 hover:text-white transition"
+                className="flex items-center gap-2 ml-1 pl-2.5 py-1 min-h-[40px] border-l border-zinc-800 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900/60 transition group"
               >
-                <span className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-[11px] font-bold text-emerald-400 shrink-0">
-                  {me.name.trim().charAt(0).toUpperCase()}
-                </span>
-                <span className="hidden lg:inline text-xs font-medium">{me.name}</span>
+                <div className="relative">
+                  <span className="w-7 h-7 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xs font-bold text-emerald-400 group-hover:border-emerald-500/50 transition-colors shrink-0 shadow-xs">
+                    {me.name.trim().charAt(0).toUpperCase()}
+                  </span>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-zinc-950" />
+                </div>
+                <div className="hidden xl:flex flex-col text-left leading-tight">
+                  <span className="text-xs font-semibold text-zinc-200 group-hover:text-white truncate max-w-[120px]">
+                    {me.name}
+                  </span>
+                  <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">
+                    {ROLE_LABELS[me.role as Role] ?? me.role}
+                  </span>
+                </div>
               </a>
             )}
           </div>
@@ -380,10 +397,16 @@ export default function AppHeader({
           hành động riêng của trang (Excel/PDF/Import…) ở trang có truyền bottomActions.
           .app-bottombar tự bù chiều rộng sidebar trên desktop (xem globals.css). */}
       {(isHome || bottomActions) && (
-        <div className="app-bottombar fixed bottom-0 inset-x-0 z-30 bg-zinc-950 border-t border-zinc-800 safe-bottom print:hidden">
+        <div
+          className={`app-bottombar fixed bottom-0 inset-x-0 z-30 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800 safe-bottom print:hidden ${
+            // Chỉ có ô tìm kiếm (trang chủ, không nút riêng) → ẩn hẳn trên desktop vì ô
+            // tìm kiếm đã nằm trên topbar; giữ lại trên mobile.
+            bottomActions ? "" : "md:hidden"
+          }`}
+        >
           <div className="flex items-center gap-2 px-3 sm:px-6 py-2 overflow-x-auto scrollbar-none">
             {search && isHome && (
-              <div className="flex-1 min-w-[140px]">
+              <div className="flex-1 min-w-[140px] md:hidden">
                 <GlobalSearch />
               </div>
             )}

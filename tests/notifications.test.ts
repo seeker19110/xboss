@@ -12,7 +12,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, daysFromTodayISO } = await import("@/lib/db");
-    const { poLateList } = await import("@/lib/procurement");
+    const { poLateList } = await import("@/lib/tai-chinh/procurement");
 
     const p1 = await insertId(`INSERT INTO projects (name) VALUES ('DA notif PO 1')`);
     const p2 = await insertId(`INSERT INTO projects (name) VALUES ('DA notif PO 2')`);
@@ -53,7 +53,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { vehicleLateList } = await import("@/lib/procurement");
+    const { vehicleLateList } = await import("@/lib/tai-chinh/procurement");
 
     const p1 = await insertId(`INSERT INTO projects (name) VALUES ('DA notif xe 1')`);
     const p2 = await insertId(`INSERT INTO projects (name) VALUES ('DA notif xe 2')`);

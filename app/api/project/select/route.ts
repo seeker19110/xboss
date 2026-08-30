@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { PROJECT_COOKIE, visibleProjectIds } from "@/lib/projects";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { PROJECT_COOKIE, visibleProjectIds } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 

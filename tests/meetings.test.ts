@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateMeetingInput: bắt buộc ngày/loại/tiêu đề", async () => {
-  const { validateMeetingInput } = await import("@/lib/meetings");
+  const { validateMeetingInput } = await import("@/lib/hien-truong/meetings");
 
   const base = {
     meetingDate: "2026-07-06",
@@ -22,7 +22,7 @@ test("validateMeetingInput: bắt buộc ngày/loại/tiêu đề", async () => 
 });
 
 test("validateMeetingActionInput: bắt buộc nội dung, hạn đúng định dạng", async () => {
-  const { validateMeetingActionInput } = await import("@/lib/meetings");
+  const { validateMeetingActionInput } = await import("@/lib/hien-truong/meetings");
 
   const base = {
     content: "Gửi lại bản vẽ shop tầng 12",
@@ -44,8 +44,8 @@ test(
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
     const { openMeetingActions, overdueMeetingActions, setMeetingActionStatus } =
-      await import("@/lib/meetings");
-    const { daysFromTodayISO, todayISO } = await import("@/lib/date");
+      await import("@/lib/hien-truong/meetings");
+    const { daysFromTodayISO, todayISO } = await import("@/lib/nen/date");
 
     const userId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Meeting Test', 'meeting-test@xboss.vn', 'x', 'engineer')`,
@@ -116,8 +116,8 @@ test(
   async () => {
     const { run, insertId } = await import("@/lib/db");
     const { listMeetings, openMeetingActions, overdueMeetingActions } =
-      await import("@/lib/meetings");
-    const { daysFromTodayISO, todayISO } = await import("@/lib/date");
+      await import("@/lib/hien-truong/meetings");
+    const { daysFromTodayISO, todayISO } = await import("@/lib/nen/date");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Họp 1', 'PJT-MT1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Họp 2', 'PJT-MT2')`);

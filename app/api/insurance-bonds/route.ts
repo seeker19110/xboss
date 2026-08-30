@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, withProjectScope } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   INSURANCE_KINDS,
   checkInsuranceContractRef,
@@ -9,7 +9,7 @@ import {
   parseInsuranceBody,
   validateInsuranceInput,
   type InsuranceKind,
-} from "@/lib/insurance";
+} from "@/lib/tai-chinh/insurance";
 
 export const dynamic = "force-dynamic";
 

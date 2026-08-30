@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateMonitoringInput: tính passed đúng đủ ca biên (đủ 2 giá trị / thiếu 1 → NULL)", async () => {
-  const { validateMonitoringInput } = await import("@/lib/environment");
+  const { validateMonitoringInput } = await import("@/lib/hien-truong/environment");
 
   const base = {
     measuredAt: "2026-07-01",
@@ -63,7 +63,7 @@ test("validateMonitoringInput: tính passed đúng đủ ca biên (đủ 2 giá 
 });
 
 test("validateEnvPermitInput: đủ ca hợp lệ/không hợp lệ (bám pattern validateLegalInput)", async () => {
-  const { validateEnvPermitInput } = await import("@/lib/environment");
+  const { validateEnvPermitInput } = await import("@/lib/hien-truong/environment");
 
   const base = {
     kind: "giay_phep_mt" as const,
@@ -87,7 +87,7 @@ test("validateEnvPermitInput: đủ ca hợp lệ/không hợp lệ (bám patter
 });
 
 test("validateWasteInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateWasteInput } = await import("@/lib/environment");
+  const { validateWasteInput } = await import("@/lib/hien-truong/environment");
 
   const base = {
     logDate: "2026-07-01",
@@ -112,8 +112,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { expiringEnvPermits } = await import("@/lib/environment");
-    const { todayISO, daysFromTodayISO } = await import("@/lib/date");
+    const { expiringEnvPermits } = await import("@/lib/hien-truong/environment");
+    const { todayISO, daysFromTodayISO } = await import("@/lib/nen/date");
 
     const soonId = await insertId(
       `INSERT INTO env_permits (kind, title, status, expiry_date)
@@ -170,8 +170,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { exceededMonitoring } = await import("@/lib/environment");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { exceededMonitoring } = await import("@/lib/hien-truong/environment");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     // Cùng tổ hợp (nuoc_thai, pH, Cổng B): kỳ cũ vượt ngưỡng, kỳ mới đạt → không còn cảnh báo.
     const oldFailId = await insertId(
@@ -219,8 +219,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { expiringEnvPermits } = await import("@/lib/environment");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { expiringEnvPermits } = await import("@/lib/hien-truong/environment");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const userId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Test Notif Env', 'notifenv@test.local', 'x', 'admin')`,
@@ -264,8 +264,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { exceededMonitoring } = await import("@/lib/environment");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { exceededMonitoring } = await import("@/lib/hien-truong/environment");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const userId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Test Notif Mon', 'notifmon@test.local', 'x', 'admin')`,

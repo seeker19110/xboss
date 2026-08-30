@@ -26,10 +26,10 @@
 //    (`bash deploy.sh --staging`, xem docs/ops/staging.md) rồi mới tới production.
 import "./env";
 import * as XLSX from "xlsx";
-import { query, run, withTransaction } from "../lib/db";
-import { SHEET_MAP, classifyRow, toISO } from "../lib/import";
-import { recomputeTask, recomputePackage } from "../lib/recompute";
-import { addDaysISO } from "../lib/date";
+import { query, run, withTransaction } from "@/lib/db";
+import { SHEET_MAP, classifyRow, toISO } from "@/lib/tien-do/import";
+import { recomputeTask, recomputePackage } from "@/lib/tien-do/recompute";
+import { addDaysISO } from "@/lib/nen/date";
 
 const DATA_START = 5; // phải khớp lib/import.ts
 

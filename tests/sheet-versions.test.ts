@@ -72,8 +72,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { sheetVersion } = await import("@/lib/version");
-    const { recomputeTask } = await import("@/lib/recompute");
+    const { sheetVersion } = await import("@/lib/ha-tang/version");
+    const { recomputeTask } = await import("@/lib/tien-do/recompute");
 
     const s = await seedSheet("tick");
     const taskId = await insertId(
@@ -98,7 +98,7 @@ test(
 
 test("sheetVersion: tạo task rồi xoá task đều bump", { skip: !HAS_TEST_DB }, async () => {
   const { insertId, run } = await import("@/lib/db");
-  const { sheetVersion } = await import("@/lib/version");
+  const { sheetVersion } = await import("@/lib/ha-tang/version");
 
   const s = await seedSheet("crud");
   const v0 = await sheetVersion(s.slug);
@@ -122,7 +122,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { sheetVersion } = await import("@/lib/version");
+    const { sheetVersion } = await import("@/lib/ha-tang/version");
 
     const a = await seedSheet("mvtsk-a");
     // Sheet B nằm cùng project A để cleanup 1 lần gom hết.
@@ -161,7 +161,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { sheetVersion } = await import("@/lib/version");
+    const { sheetVersion } = await import("@/lib/ha-tang/version");
 
     const a = await seedSheet("mvwp-a");
     const bStId = await insertId(
@@ -190,7 +190,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { sheetVersion } = await import("@/lib/version");
+    const { sheetVersion } = await import("@/lib/ha-tang/version");
 
     const s = await seedSheet("note");
     const taskId = await insertId(

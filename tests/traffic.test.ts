@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { recordTraffic, getRecent, subscribeTraffic, latestId } from "@/lib/traffic";
+import { recordTraffic, getRecent, subscribeTraffic, latestId } from "@/lib/bao-mat/traffic";
 
 // Lưu ý: `lib/traffic.ts` giữ state ở cấp module (seq/buf/listeners) — tồn tại
 // xuyên suốt mọi test TRONG file này (cùng 1 process). Không giả định buffer

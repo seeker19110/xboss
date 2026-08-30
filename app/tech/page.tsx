@@ -17,6 +17,10 @@ import {
   ShieldCheck,
   Upload,
   Image as ImageIcon,
+  Activity,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
@@ -24,7 +28,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN } from "@/lib/nen/date";
 
 type TechCategory = "bim" | "schedule" | "camera" | "drone" | "other";
 const CATEGORY_LABEL: Record<TechCategory, string> = {
@@ -67,6 +71,23 @@ type SystemStatus = {
   swCacheVersion: string | null;
 };
 
+type HealthCheckItem = {
+  key: string;
+  label: string;
+  kind: "api" | "non_api";
+  status: "ok" | "warn" | "fail" | "skip";
+  detail: string;
+};
+
+type HealthCheckReport = {
+  checkedAt: string;
+  items: HealthCheckItem[];
+  failCount: number;
+  warnCount: number;
+  hasIssues: boolean;
+  lastNotifiedAt: string | null;
+};
+
 type Tab = "cde" | "bim" | "giam-sat" | "phan-mem" | "he-thong";
 
 function formatBytes(n: number): string {
@@ -86,6 +107,8 @@ export default function TechPage() {
   const [links, setLinks] = useState<TechLink[]>([]);
   const [albums, setAlbums] = useState<ProgressAlbum[]>([]);
   const [status, setStatus] = useState<SystemStatus | null>(null);
+  const [health, setHealth] = useState<HealthCheckReport | null>(null);
+  const [healthChecking, setHealthChecking] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("cde");
   const [addLinkOpen, setAddLinkOpen] = useState<TechCategory | null>(null);
@@ -133,6 +156,27 @@ export default function TechPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setStatus(j))
       .catch(() => setStatus(null));
+  }, [tab, isAdmin]);
+
+  async function runHealthCheck() {
+    setHealthChecking(true);
+    try {
+      const res = await fetch("/api/tech/health-check");
+      if (!res.ok) {
+        showToast((await res.json().catch(() => null))?.error ?? "Kiểm tra thất bại", "error");
+        return;
+      }
+      setHealth(await res.json());
+    } catch {
+      showToast("Mất kết nối — kiểm tra mạng rồi thử lại", "error");
+    } finally {
+      setHealthChecking(false);
+    }
+  }
+
+  useEffect(() => {
+    if (tab !== "he-thong" || !isAdmin) return;
+    runHealthCheck();
   }, [tab, isAdmin]);
 
   async function refreshLinks() {
@@ -217,7 +261,7 @@ export default function TechPage() {
               </div>
             </a>
             <a
-              href="/proposals"
+              href="/commercial?tab=ipc-payments&sub=proposals"
               className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl p-4 flex items-center gap-3 transition"
             >
               <ShieldCheck className="w-8 h-8 text-emerald-400 shrink-0" />
@@ -275,7 +319,7 @@ export default function TechPage() {
                 {canManage && (
                   <button
                     onClick={() => setAddAlbumOpen(true)}
-                    className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-accent"
+                    className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-accent"
                   >
                     <Plus className="w-3.5 h-3.5" /> Thêm album
                   </button>
@@ -370,6 +414,69 @@ export default function TechPage() {
               <Wrench className="w-3.5 h-3.5" /> Sao lưu định kỳ dữ liệu (Postgres) + thư mục
               data/uploads/ nên được thiết lập ở tầng hạ tầng VPS — xem DEPLOY.md.
             </p>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Activity className="w-4 h-4" /> Kiểm tra trạng thái hoạt động
+                </h3>
+                <button
+                  onClick={runHealthCheck}
+                  disabled={healthChecking}
+                  className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-100"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${healthChecking ? "animate-spin" : ""}`} />
+                  {healthChecking ? "Đang kiểm tra…" : "Kiểm tra ngay"}
+                </button>
+              </div>
+              <p className="text-xs text-zinc-500 mb-3">
+                Tự động chạy 2 lần/ngày qua cron (xem DEPLOY.md) — gửi email + Telegram cho Admin
+                khi phát hiện lỗi hoặc cảnh báo. Bấm “Kiểm tra ngay” để chạy thủ công.
+              </p>
+              {!health ? (
+                <p className="text-sm text-zinc-400">Đang tải…</p>
+              ) : (
+                <div className="space-y-2">
+                  <div
+                    className={`text-xs rounded-lg px-3 py-2 border ${
+                      health.hasIssues
+                        ? "border-amber-800 bg-amber-950/30 text-amber-300"
+                        : "border-emerald-800 bg-emerald-950/30 text-emerald-300"
+                    }`}
+                  >
+                    {health.hasIssues
+                      ? `Phát hiện ${health.failCount} lỗi, ${health.warnCount} cảnh báo`
+                      : "Tất cả tính năng hoạt động bình thường"}{" "}
+                    · kiểm tra lúc {new Date(health.checkedAt).toLocaleString("vi-VN")}
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {health.items.map((it) => (
+                      <div
+                        key={it.key}
+                        className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 flex items-start gap-2"
+                      >
+                        {it.status === "ok" ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        ) : it.status === "fail" ? (
+                          <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium flex items-center gap-1.5">
+                            {it.label}
+                            <span className="text-[10px] text-zinc-500 font-normal">
+                              ({it.kind === "api" ? "API" : "không dùng API"})
+                            </span>
+                          </p>
+                          <p className="text-xs text-zinc-400">{it.detail}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>
@@ -440,7 +547,7 @@ function TechLinkSection({
         {canManage && (
           <button
             onClick={onAdd}
-            className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-accent"
+            className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-accent"
           >
             <Plus className="w-3.5 h-3.5" /> Thêm link
           </button>
@@ -605,7 +712,7 @@ function TechLinkModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -692,7 +799,7 @@ function AlbumModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>

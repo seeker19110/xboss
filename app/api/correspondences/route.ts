@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   CORRESPONDENCE_KINDS,
   CORRESPONDENCE_STATUSES,
@@ -11,7 +11,7 @@ import {
   validateCorrespondenceInput,
   type CorrespondenceKind,
   type CorrespondenceStatus,
-} from "@/lib/correspondence";
+} from "@/lib/hien-truong/correspondence";
 
 export const dynamic = "force-dynamic";
 

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
-import { query, queryOne, insertId, run } from "@/lib/db";
-import { getCurrentUser, type Role } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
-import { isContentTooLarge } from "@/lib/photos";
+import { queryOne, insertId, run } from "@/lib/db";
+import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { isContentTooLarge } from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -15,14 +15,42 @@ const MAX_BYTES = 20 * 1024 * 1024;
 
 const VALID_STATUSES = ["dat_hang", "ve_kho", "da_dung"];
 
+const IGNORE_SHEET_PATTERNS = [
+  /HUONG_DAN/i,
+  /HDSD/i,
+  /GUIDE/i,
+  /DASHBOARD/i,
+  /KIEM_SOAT/i,
+  /In phieu/i,
+  /Phieu xuat/i,
+];
+
 type RowResult = {
   row: number;
+  code?: string | null;
   name: string;
+  unit?: string | null;
+  qtyBoq?: number;
+  qtyPlanned?: number;
   status: "ok" | "skip" | "error";
   message?: string;
 };
 
-// POST /api/materials/import  body: FormData { file: File, mode: "append"|"replace" }
+function clean(v: unknown): string {
+  return String(v ?? "")
+    .replace(/\n/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function num(v: unknown): number {
+  if (v == null || v === "") return 0;
+  const n = typeof v === "number" ? v : Number(String(v).replace(/,/g, "").trim());
+  return isFinite(n) ? n : 0;
+}
+
+// POST /api/materials/import
+// body: FormData { file: File, mode: "append"|"replace", sheetId: string|number, sheetName?: string }
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -42,13 +70,57 @@ export async function POST(req: NextRequest) {
     );
 
   const form = await req.formData().catch(() => null);
-  if (!form) return NextResponse.json({ error: "Không đọc được form" }, { status: 400 });
+  if (!form) return NextResponse.json({ error: "Không đọc được form dữ liệu" }, { status: 400 });
 
   const file = form.get("file") as File | null;
-  if (!file) return NextResponse.json({ error: "Thiếu file" }, { status: 400 });
+  if (!file) return NextResponse.json({ error: "Thiếu file Excel" }, { status: 400 });
 
+  const systemIdRaw = form.get("systemId") ?? form.get("sheetId");
+  const targetSystemId = parseInt(String(systemIdRaw ?? "")) || null;
+  if (!targetSystemId) {
+    return NextResponse.json(
+      { error: "Vui lòng chọn hệ MEPF trước khi import (HVAC, Điện, Cấp Thoát Nước, PCCC...)" },
+      { status: 400 },
+    );
+  }
+
+  // Xác minh systemId tồn tại trong systems hoặc sheet_types
+  let system = await queryOne<{ id: number; name: string; code: string }>(
+    `SELECT id, name, code FROM systems WHERE id = ?`,
+    targetSystemId,
+  );
+  let defaultSheetId: number | null = null;
+
+  if (system) {
+    const defaultSheet = await queryOne<{ id: number }>(
+      `SELECT id FROM sheet_types WHERE system_id = ? ORDER BY id LIMIT 1`,
+      system.id,
+    );
+    defaultSheetId = defaultSheet?.id ?? null;
+  } else {
+    // Fallback: nếu truyền sheet_type_id
+    const st = await queryOne<{ id: number; name: string; system_id: number | null }>(
+      `SELECT id, name, system_id FROM sheet_types WHERE id = ?`,
+      targetSystemId,
+    );
+    if (!st) {
+      return NextResponse.json(
+        { error: "Hệ đã chọn không tồn tại trong hệ thống" },
+        { status: 400 },
+      );
+    }
+    defaultSheetId = st.id;
+    if (st.system_id) {
+      system = await queryOne<{ id: number; name: string; code: string }>(
+        `SELECT id, name, code FROM systems WHERE id = ?`,
+        st.system_id,
+      );
+    }
+  }
+
+  const resolvedSystemId = system?.id ?? null;
   const mode = String(form.get("mode") ?? "append"); // append | replace
-  const defaultSheetId = parseInt(String(form.get("sheetId") ?? "")) || null;
+  const requestedSheetName = form.get("sheetName") ? String(form.get("sheetName")).trim() : null;
 
   const buf = Buffer.from(await file.arrayBuffer());
   let wb: XLSX.WorkBook;
@@ -61,186 +133,242 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Ưu tiên sheet "Data-BOQ" nếu có, ngược lại lấy sheet đầu tiên
-  const sheetName = wb.SheetNames.includes("Data-BOQ") ? "Data-BOQ" : wb.SheetNames[0];
-  const ws = wb.Sheets[sheetName];
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
+  if (!wb.SheetNames || wb.SheetNames.length === 0) {
+    return NextResponse.json({ error: "File Excel không có sheet nào" }, { status: 400 });
+  }
 
-  if (!rows.length) return NextResponse.json({ error: "File không có dữ liệu" }, { status: 400 });
+  // Chọn sheet dữ liệu:
+  // 1. Ưu tiên sheetName do người dùng chỉ định
+  // 2. Ưu tiên 'Data-BOQ', 'Vật tư', 'BOQ'
+  // 3. Ưu tiên sheet đầu tiên không phải sheet hướng dẫn / dashboard / in phiếu
+  // 4. Fallback sheet đầu tiên
+  const targetSheetName: string =
+    (requestedSheetName && wb.Sheets[requestedSheetName] ? requestedSheetName : "") ||
+    wb.SheetNames.find((s) => s === "Data-BOQ" || s === "Vật tư" || s === "BOQ") ||
+    wb.SheetNames.find((s) => !IGNORE_SHEET_PATTERNS.some((p) => p.test(s))) ||
+    wb.SheetNames[0];
 
-  // Chuẩn hoá key: trim khoảng trắng + bỏ dấu ngoặc kép thừa + NFC
-  const normalizedRows = rows.map((r) =>
-    Object.fromEntries(
-      Object.entries(r).map(([k, v]) => [
-        k
-          .trim()
-          .replace(/^"+|"+$/g, "")
-          .trim()
-          .normalize("NFC"),
-        v,
-      ]),
-    ),
-  );
+  const ws = wb.Sheets[targetSheetName];
+  if (!ws) {
+    return NextResponse.json(
+      { error: `Không đọc được sheet "${targetSheetName}" trong file` },
+      { status: 400 },
+    );
+  }
 
-  // Cột tên vật tư trong file BOQ có thể là "Vật tư", "MÔ TẢ", "MO TA"
-  const BOQ_NAME_COLS = ["Vật tư", "MÔ TẢ", "MO TA"];
-  const firstRow = normalizedRows[0];
-  const boqNameCol = BOQ_NAME_COLS.find((c) => c in firstRow) ?? null;
-  const isBOQFormat = !("Tên vật tư *" in firstRow) && boqNameCol !== null;
+  const raw: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+  if (!raw.length) return NextResponse.json({ error: "Sheet không có dữ liệu" }, { status: 400 });
 
-  // Cột mã BOQ trong file BOQ có thể là "Mã BOQ" hoặc "MãBOQ"
-  const boqCodeCol = "Mã BOQ" in firstRow ? "Mã BOQ" : "MãBOQ";
+  // Dò dòng tiêu đề và ánh xạ cột
+  let headerRow = -1;
+  const colMap = {
+    code: -1,
+    name: -1,
+    unit: -1,
+    qtyBoq: -1,
+    qtyPlanned: -1,
+    status: -1,
+    note: -1,
+  };
 
-  if (!isBOQFormat && !("Tên vật tư *" in firstRow)) {
+  for (let i = 0; i < Math.min(raw.length, 35); i++) {
+    const r = raw[i];
+    if (!r) continue;
+
+    let foundName = false;
+    r.forEach((cell, idx) => {
+      const c = clean(cell).toLowerCase();
+      if (
+        c.includes("mã boq") ||
+        c === "mãboq" ||
+        c === "mã hàng" ||
+        c.includes("mã hiệu") ||
+        c.includes("mã vt") ||
+        c.includes("mã vật tư")
+      ) {
+        colMap.code = idx;
+      }
+      if (
+        c.includes("mô tả") ||
+        c.includes("tên vật tư") ||
+        c === "vật tư" ||
+        c === "diễn giải" ||
+        c.includes("nội dung công tác") ||
+        c === "tên hàng" ||
+        c.includes("hạng mục công việc")
+      ) {
+        colMap.name = idx;
+        foundName = true;
+      }
+      if (c === "đơn vị" || c === "đvt" || c === "dvt" || c.includes("đơn vị tính")) {
+        colMap.unit = idx;
+      }
+      if (
+        c.includes("khối lượng boq") ||
+        c.includes("định mức boq") ||
+        c.includes("kl boq") ||
+        c.includes("khối lượng hợp đồng") ||
+        c.includes("kl hợp đồng") ||
+        c.includes("khối lượng dự toán") ||
+        c.includes("kl dự toán") ||
+        (colMap.qtyBoq === -1 && (c === "khối lượng" || c === "kl"))
+      ) {
+        colMap.qtyBoq = idx;
+      }
+      if (
+        c.includes("khối lượng định mức") ||
+        c.includes("định mức tháp") ||
+        c.includes("kl định mức") ||
+        c.includes("bản vẽ thi công") ||
+        c.includes("bản vẽ shop") ||
+        (colMap.qtyPlanned === -1 && c.includes("định mức") && !c.includes("định mức boq"))
+      ) {
+        colMap.qtyPlanned = idx;
+      }
+      if (c.includes("trạng thái") || c === "status") colMap.status = idx;
+      if (c.includes("ghi chú") || c === "note") colMap.note = idx;
+    });
+
+    if (foundName) {
+      headerRow = i;
+      break;
+    }
+  }
+
+  if (headerRow === -1 || colMap.name === -1) {
     return NextResponse.json(
       {
         error:
-          "File không đúng cấu trúc. Cần có cột 'Tên vật tư *' (template mẫu) hoặc 'Vật tư' / 'MÔ TẢ' (file BOQ gốc).",
+          "Không tìm thấy dòng tiêu đề hợp lệ. File cần có cột 'MÔ TẢ', 'Tên vật tư', hoặc 'Diễn giải'.",
       },
       { status: 400 },
     );
   }
 
-  // Template format mà không chọn hệ → báo lỗi sớm
-  if (!isBOQFormat && !defaultSheetId) {
-    return NextResponse.json({ error: "Vui lòng chọn hệ trước khi import." }, { status: 400 });
-  }
-
-  // Tìm cột trong firstRow theo danh sách ưu tiên (case-insensitive, NFC)
-  function findCol(candidates: string[]): string | null {
-    const keys = Object.keys(firstRow).map((k) => k.toLowerCase());
-    for (const c of candidates) {
-      const idx = keys.indexOf(c.toLowerCase());
-      if (idx >= 0) return Object.keys(firstRow)[idx];
-    }
-    return null;
-  }
-
-  const boqQtyCol = findCol(["ĐỊnh Mức BOQ", "KHỐI LƯỢNG BOQ", "Định mức BOQ", "KL BOQ"]);
-  const plannedCol = findCol(["Định mức Tháp A", "KL Định Mức", "KL Định mức", "Định mức tháp A"]);
-  const unitColBOQ = findCol(["ĐVT", "Đơn vị", "DVT"]);
-  const noteColBOQ = findCol(["GHI CHÚ", "Ghi chú", "Ghi chu"]);
-  const statusColBOQ = findCol(["Trạng Thái", "Trạng thái", "TRANG THAI"]);
-
-  // Helper đọc trường theo format
-  function getField(row: Record<string, unknown>, templateKey: string, boqKey: string): string {
-    if (isBOQFormat) return String(row[boqKey] ?? "").trim();
-    return String(row[templateKey] ?? "").trim();
-  }
-
-  // Danh sách hệ (sheet_types) để tra mã → id
-  const sheetTypes = await query<{ id: number; code: string }>(
-    `SELECT id, code FROM sheet_types ORDER BY id`,
-  );
-  const sheetMap = new Map(sheetTypes.map((s) => [s.code.trim().toLowerCase(), s.id]));
-
   const results: RowResult[] = [];
   let inserted = 0;
+  let updated = 0;
   let skipped = 0;
   let errors = 0;
 
-  // mode=replace với template format: xoá vật tư của hệ được chọn (trong dự án hiện tại)
-  if (mode === "replace" && !isBOQFormat && defaultSheetId) {
-    await run(
-      `DELETE FROM materials WHERE sheet_type_id = ? AND project_id = ?`,
-      defaultSheetId,
-      projectId,
-    );
+  // mode=replace: xoá toàn bộ vật tư của đúng hệ được chọn trong dự án hiện tại
+  if (mode === "replace") {
+    if (resolvedSystemId) {
+      await run(
+        `DELETE FROM materials WHERE (system_id = ? OR sheet_type_id IN (SELECT id FROM sheet_types WHERE system_id = ?)) AND project_id = ?`,
+        resolvedSystemId,
+        resolvedSystemId,
+        projectId,
+      );
+    } else if (defaultSheetId) {
+      await run(
+        `DELETE FROM materials WHERE sheet_type_id = ? AND project_id = ?`,
+        defaultSheetId,
+        projectId,
+      );
+    }
   }
 
-  // sort_order counter: null key = vật tư không có hệ
-  const sortCounters = new Map<number | null, number>();
-  const getCounter = async (sid: number | null): Promise<number> => {
-    if (!sortCounters.has(sid)) {
-      if (mode === "replace" || sid === null) {
-        sortCounters.set(sid, 1);
-      } else {
-        const maxRow = await queryOne<{ m: number | null }>(
-          `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id ${sid === null ? "IS NULL" : "= ?"}`,
-          ...(sid !== null ? [sid] : []),
+  // sort_order counter
+  let currentSortOrder = 0;
+  if (mode !== "replace") {
+    const maxRow = resolvedSystemId
+      ? await queryOne<{ m: number | null }>(
+          `SELECT MAX(sort_order) AS m FROM materials WHERE (system_id = ? OR sheet_type_id IN (SELECT id FROM sheet_types WHERE system_id = ?)) AND project_id = ?`,
+          resolvedSystemId,
+          resolvedSystemId,
+          projectId,
+        )
+      : await queryOne<{ m: number | null }>(
+          `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ? AND project_id = ?`,
+          defaultSheetId,
+          projectId,
         );
-        sortCounters.set(sid, (maxRow?.m ?? 0) + 1);
-      }
-    }
-    const val = sortCounters.get(sid)!;
-    sortCounters.set(sid, val + 1);
-    return val;
-  };
+    currentSortOrder = maxRow?.m ?? 0;
+  }
 
-  for (let i = 0; i < normalizedRows.length; i++) {
-    const raw = normalizedRows[i];
-    const rowNum = i + 2;
-    const name = getField(raw, "Tên vật tư *", boqNameCol ?? "Vật tư");
+  for (let i = headerRow + 1; i < raw.length; i++) {
+    const r = raw[i];
+    if (!r) continue;
+    const rowNum = i + 1;
 
-    if (!name) {
+    const rawName = colMap.name >= 0 ? clean(r[colMap.name]) : "";
+    const boqCode = colMap.code >= 0 ? clean(r[colMap.code]) || null : null;
+    const unit = colMap.unit >= 0 ? clean(r[colMap.unit]) || null : null;
+    const qtyBoq = colMap.qtyBoq >= 0 ? num(r[colMap.qtyBoq]) : 0;
+    const qtyPlanned = colMap.qtyPlanned >= 0 ? num(r[colMap.qtyPlanned]) : 0;
+    const note = colMap.note >= 0 ? clean(r[colMap.note]) || null : null;
+
+    // Bỏ qua dòng hoàn toàn trống
+    if (!rawName && !boqCode) {
       skipped++;
-      results.push({ row: rowNum, name: "—", status: "skip", message: "Bỏ qua (không có tên)" });
+      results.push({
+        row: rowNum,
+        name: "—",
+        status: "skip",
+        message: "Bỏ qua (dòng trống)",
+      });
       continue;
     }
 
-    // Xác định sheetId: template dùng defaultSheetId, BOQ thử prefix rồi fallback null
-    let sheetId: number | null;
-    if (isBOQFormat) {
-      const boqPrefix = String(raw[boqCodeCol] ?? "")
-        .split("-")[0]
-        .toLowerCase();
-      sheetId = sheetMap.get(boqPrefix) ?? defaultSheetId ?? null;
-    } else {
-      sheetId = defaultSheetId!;
-    }
+    const name = rawName || boqCode || "—";
 
-    const boqCode = getField(raw, "Mã BOQ", boqCodeCol) || null;
+    currentSortOrder++;
+    const sortOrder = currentSortOrder;
 
-    const unit = isBOQFormat
-      ? String(raw[unitColBOQ ?? "ĐVT"] ?? "").trim() || null
-      : String(raw["ĐVT"] ?? "").trim() || null;
-    const qtyBoq =
-      parseFloat(String(raw[isBOQFormat ? (boqQtyCol ?? "") : "Định mức BOQ"] ?? "")) || 0;
-    const qtyPlanned =
-      parseFloat(String(raw[isBOQFormat ? (plannedCol ?? "") : "Định mức Tháp A"] ?? "")) || 0;
-    const noteRaw = isBOQFormat
-      ? String(raw[noteColBOQ ?? "GHI CHÚ"] ?? "").trim()
-      : String(raw["Ghi chú"] ?? "").trim();
-    const note = noteRaw || null;
-
-    // sort_order theo thứ tự dòng trong file
-    const sortOrder = await getCounter(sheetId);
-
-    // Nếu mã BOQ đã tồn tại ở vật tư (trong dự án hiện tại) → cập nhật số liệu + sort_order
+    // Nếu mã BOQ đã tồn tại trong cùng hệ của dự án → Cập nhật số liệu
     if (boqCode) {
-      const existing = await queryOne<{ id: number }>(
-        `SELECT id FROM materials WHERE boq_code = ? AND project_id = ?`,
-        boqCode,
-        projectId,
-      );
+      const existing = resolvedSystemId
+        ? await queryOne<{ id: number }>(
+            `SELECT id FROM materials WHERE boq_code = ? AND (system_id = ? OR sheet_type_id IN (SELECT id FROM sheet_types WHERE system_id = ?)) AND project_id = ?`,
+            boqCode,
+            resolvedSystemId,
+            resolvedSystemId,
+            projectId,
+          )
+        : await queryOne<{ id: number }>(
+            `SELECT id FROM materials WHERE boq_code = ? AND sheet_type_id = ? AND project_id = ?`,
+            boqCode,
+            defaultSheetId,
+            projectId,
+          );
       if (existing) {
         await run(
-          `UPDATE materials SET name=?, unit=?, qty_boq=?, qty_planned=?, note=?, sort_order=? WHERE id=? AND project_id=?`,
+          `UPDATE materials SET name=?, unit=?, qty_boq=?, qty_planned=?, note=?, sort_order=?, system_id=COALESCE(?, system_id) WHERE id=? AND project_id=?`,
           name,
           unit,
           qtyBoq,
           qtyPlanned,
           note,
           sortOrder,
+          resolvedSystemId,
           existing.id,
           projectId,
         );
-        inserted++;
-        results.push({ row: rowNum, name, status: "ok", message: "Cập nhật" });
+        updated++;
+        results.push({
+          row: rowNum,
+          code: boqCode,
+          name,
+          unit,
+          qtyBoq,
+          qtyPlanned,
+          status: "ok",
+          message: "Cập nhật",
+        });
         continue;
       }
     }
 
-    let status = isBOQFormat
-      ? String(raw[statusColBOQ ?? "Trạng Thái"] ?? "").trim()
-      : String(raw["Trạng thái"] ?? "").trim();
+    let status = colMap.status >= 0 ? clean(r[colMap.status]) : "dat_hang";
     if (!VALID_STATUSES.includes(status)) status = "dat_hang";
 
     try {
       await insertId(
-        `INSERT INTO materials (sheet_type_id, boq_code, name, unit, qty_boq, qty_planned, qty_used, status, note, sort_order, project_id)
-         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
-        sheetId,
+        `INSERT INTO materials (system_id, sheet_type_id, boq_code, name, unit, qty_boq, qty_planned, qty_used, status, note, sort_order, project_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+        resolvedSystemId,
+        defaultSheetId,
         boqCode,
         name,
         unit,
@@ -252,11 +380,21 @@ export async function POST(req: NextRequest) {
         projectId,
       );
       inserted++;
-      results.push({ row: rowNum, name, status: "ok" });
+      results.push({
+        row: rowNum,
+        code: boqCode,
+        name,
+        unit,
+        qtyBoq,
+        qtyPlanned,
+        status: "ok",
+        message: "Thêm mới",
+      });
     } catch (e: unknown) {
       errors++;
       results.push({
         row: rowNum,
+        code: boqCode,
         name,
         status: "error",
         message: e instanceof Error ? e.message : String(e),
@@ -264,5 +402,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ inserted, skipped, errors, results });
+  return NextResponse.json({
+    inserted,
+    updated,
+    skipped,
+    errors,
+    sheetUsed: targetSheetName,
+    results,
+  });
 }

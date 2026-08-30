@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateCertItems: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateCertItems } = await import("@/lib/paymentcerts");
+  const { validateCertItems } = await import("@/lib/tai-chinh/paymentcerts");
 
   assert.equal(validateCertItems([{ boqItemId: 1, qtyPeriod: 10 }]), null);
   assert.match(validateCertItems([])!, /ít nhất 1 dòng/i);
@@ -48,7 +48,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, contractId, boqId1 } = await setupContractWithBoq();
-    const { suggestQtyForContract } = await import("@/lib/paymentcerts");
+    const { suggestQtyForContract } = await import("@/lib/tai-chinh/paymentcerts");
 
     // Map task hoàn thành 60% vào dòng 1 (qty_contract=100) → KL thực hiện = 60.
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test IPC')`);
@@ -115,7 +115,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, contractId, boqId1, boqId2 } = await setupContractWithBoq();
-    const { certTotals } = await import("@/lib/paymentcerts");
+    const { certTotals } = await import("@/lib/tai-chinh/paymentcerts");
 
     const certId = await insertId(
       `INSERT INTO payment_certs (code, contract_id, period_no, status)
@@ -149,7 +149,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, contractId, boqId1 } = await setupContractWithBoq();
-    const { overContractCerts } = await import("@/lib/paymentcerts");
+    const { overContractCerts } = await import("@/lib/tai-chinh/paymentcerts");
 
     // HĐ giá trị 100,000 — đợt approved luỹ kế 150 * 1000 = 150,000 > 100,000 → phải cảnh báo.
     const certId = await insertId(
@@ -183,7 +183,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, contractId } = await setupContractWithBoq();
-    const { isUniqueViolation } = await import("@/lib/seqcode");
+    const { isUniqueViolation } = await import("@/lib/ha-tang/seqcode");
 
     const certId = await insertId(
       `INSERT INTO payment_certs (code, contract_id, period_no) VALUES ('IPC-TEST-004', ?, 1)`,

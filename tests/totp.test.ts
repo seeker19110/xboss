@@ -14,7 +14,7 @@ process.env.XBOSS_SECRET = "test-secret-for-totp-unit";
 // ===== Unit: lib/totp.ts =====
 
 test("encryptTotpSecret/decryptTotpSecret: round-trip đúng, ciphertext khác nhau mỗi lần (iv ngẫu nhiên)", async () => {
-  const { encryptTotpSecret, decryptTotpSecret } = await import("@/lib/totp");
+  const { encryptTotpSecret, decryptTotpSecret } = await import("@/lib/bao-mat/totp");
   const secret = "JBSWY3DPEHPK3PXP";
   const enc1 = encryptTotpSecret(secret);
   const enc2 = encryptTotpSecret(secret);
@@ -24,7 +24,7 @@ test("encryptTotpSecret/decryptTotpSecret: round-trip đúng, ciphertext khác n
 });
 
 test("generateNewTotpSecret: sinh secret khác nhau mỗi lần", async () => {
-  const { generateNewTotpSecret } = await import("@/lib/totp");
+  const { generateNewTotpSecret } = await import("@/lib/bao-mat/totp");
   const a = generateNewTotpSecret();
   const b = generateNewTotpSecret();
   assert.notEqual(a, b);
@@ -32,7 +32,7 @@ test("generateNewTotpSecret: sinh secret khác nhau mỗi lần", async () => {
 });
 
 test("totpAuthUri: chứa issuer XBoss + secret + email", async () => {
-  const { totpAuthUri } = await import("@/lib/totp");
+  const { totpAuthUri } = await import("@/lib/bao-mat/totp");
   const uri = totpAuthUri("user@xboss.vn", "JBSWY3DPEHPK3PXP");
   assert.match(uri, /^otpauth:\/\/totp\//);
   const url = new URL(uri);
@@ -41,7 +41,7 @@ test("totpAuthUri: chứa issuer XBoss + secret + email", async () => {
 });
 
 test("generateRecoveryCodes: 8 mã đúng định dạng xxxxx-xxxxx, không trùng nhau", async () => {
-  const { generateRecoveryCodes } = await import("@/lib/totp");
+  const { generateRecoveryCodes } = await import("@/lib/bao-mat/totp");
   const codes = generateRecoveryCodes();
   assert.equal(codes.length, 8);
   for (const c of codes) assert.match(c, /^[0-9a-f]{5}-[0-9a-f]{5}$/);
@@ -49,7 +49,7 @@ test("generateRecoveryCodes: 8 mã đúng định dạng xxxxx-xxxxx, không tr�
 });
 
 test("verifyTotpCode: mã đúng theo thời điểm hiện tại → valid true", async () => {
-  const { generateNewTotpSecret, verifyTotpCode } = await import("@/lib/totp");
+  const { generateNewTotpSecret, verifyTotpCode } = await import("@/lib/bao-mat/totp");
   const secret = generateNewTotpSecret();
   const token = await generate({ secret });
   const result = await verifyTotpCode(secret, token);
@@ -57,14 +57,14 @@ test("verifyTotpCode: mã đúng theo thời điểm hiện tại → valid true
 });
 
 test("verifyTotpCode: mã sai → valid false", async () => {
-  const { generateNewTotpSecret, verifyTotpCode } = await import("@/lib/totp");
+  const { generateNewTotpSecret, verifyTotpCode } = await import("@/lib/bao-mat/totp");
   const secret = generateNewTotpSecret();
   const result = await verifyTotpCode(secret, "000000");
   assert.equal(result.valid, false);
 });
 
 test("verifyTotpCode: chuỗi không phải 6 số → valid false (không gọi thư viện)", async () => {
-  const { generateNewTotpSecret, verifyTotpCode } = await import("@/lib/totp");
+  const { generateNewTotpSecret, verifyTotpCode } = await import("@/lib/bao-mat/totp");
   const secret = generateNewTotpSecret();
   const result = await verifyTotpCode(secret, "abcdef");
   assert.equal(result.valid, false);
@@ -73,7 +73,8 @@ test("verifyTotpCode: chuỗi không phải 6 số → valid false (không gọi
 // ===== Unit: lib/auth.ts — token tạm "chờ 2FA" =====
 
 test("makeTotpPendingToken/parseTotpPendingToken: round-trip đúng userId + pwFrag", async () => {
-  const { makeTotpPendingToken, parseTotpPendingToken, hashPassword } = await import("@/lib/auth");
+  const { makeTotpPendingToken, parseTotpPendingToken, hashPassword } =
+    await import("@/lib/bao-mat/auth");
   const hash = hashPassword("pw123");
   const token = makeTotpPendingToken(7, hash);
   const parsed = parseTotpPendingToken(token);
@@ -83,7 +84,7 @@ test("makeTotpPendingToken/parseTotpPendingToken: round-trip đúng userId + pwF
 });
 
 test("parseTotpPendingToken: token phiên đăng nhập thường (không có purpose 2fa) bị từ chối", async () => {
-  const { makeToken, parseTotpPendingToken, hashPassword } = await import("@/lib/auth");
+  const { makeToken, parseTotpPendingToken, hashPassword } = await import("@/lib/bao-mat/auth");
   const hash = hashPassword("pw123");
   // Token phiên có 7 phần (userId.exp.pwFrag.flag.sv.orgId.mac từ M54 PR2) — pending 2FA 5
   // phần với phần thứ 4 = "2fa" → khác cấu trúc, vẫn bị từ chối.
@@ -92,7 +93,8 @@ test("parseTotpPendingToken: token phiên đăng nhập thường (không có pu
 });
 
 test("parseTotpPendingToken: token bị sửa (tamper) → null", async () => {
-  const { makeTotpPendingToken, parseTotpPendingToken, hashPassword } = await import("@/lib/auth");
+  const { makeTotpPendingToken, parseTotpPendingToken, hashPassword } =
+    await import("@/lib/bao-mat/auth");
   const hash = hashPassword("pw123");
   const token = makeTotpPendingToken(7, hash);
   const tampered = token.replace(/^\d+/, "999");
@@ -102,8 +104,8 @@ test("parseTotpPendingToken: token bị sửa (tamper) → null", async () => {
 // ===== Unit: M56 PR2 — Bắt buộc 2FA theo vai trò =====
 
 test("computeMustSetup2fa: role bắt buộc + chưa bật 2FA → true; các biên còn lại → false", async () => {
-  const { computeMustSetup2fa } = await import("@/lib/auth");
-  const required = new Set(["engineer"]) as Set<import("@/lib/roles").Role>;
+  const { computeMustSetup2fa } = await import("@/lib/bao-mat/auth");
+  const required = new Set(["engineer"]) as Set<import("@/lib/nen/roles").Role>;
   // role trong danh sách + chưa bật → true
   assert.equal(computeMustSetup2fa("engineer", null, required), true);
   assert.equal(computeMustSetup2fa("engineer", undefined, required), true);
@@ -116,7 +118,8 @@ test("computeMustSetup2fa: role bắt buộc + chưa bật 2FA → true; các bi
 });
 
 test("parseToken: round-trip cờ mustSetup2fa (0/1); từ chối token pending 2FA (flag lạ)", async () => {
-  const { makeToken, parseToken, hashPassword, makeTotpPendingToken } = await import("@/lib/auth");
+  const { makeToken, parseToken, hashPassword, makeTotpPendingToken } =
+    await import("@/lib/bao-mat/auth");
   const hash = hashPassword("pw");
   assert.equal(parseToken(makeToken(9, hash, true, 0, 1))?.mustSetup2fa, true);
   const t0 = parseToken(makeToken(9, hash, false, 0, 1));
@@ -127,7 +130,7 @@ test("parseToken: round-trip cờ mustSetup2fa (0/1); từ chối token pending 
 });
 
 test("proxy: cờ mustSetup2fa=1 chặn API ngoài whitelist (403 2fa_required); /api/auth/* đi qua", async () => {
-  const { makeToken, hashPassword } = await import("@/lib/auth");
+  const { makeToken, hashPassword } = await import("@/lib/bao-mat/auth");
   const { proxy } = await import("@/proxy");
   const hash = hashPassword("pw");
   const locked = makeToken(1, hash, true, 0, 1);
@@ -180,8 +183,8 @@ test(
   S,
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { hashPassword } = await import("@/lib/auth");
-    const { encryptTotpSecret, generateNewTotpSecret } = await import("@/lib/totp");
+    const { hashPassword } = await import("@/lib/bao-mat/auth");
+    const { encryptTotpSecret, generateNewTotpSecret } = await import("@/lib/bao-mat/totp");
 
     const secret = generateNewTotpSecret();
     const suffix = Date.now().toString(36);
@@ -224,9 +227,9 @@ test(
   S,
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { hashPassword } = await import("@/lib/auth");
+    const { hashPassword } = await import("@/lib/bao-mat/auth");
     const { encryptTotpSecret, generateNewTotpSecret, generateRecoveryCodes } =
-      await import("@/lib/totp");
+      await import("@/lib/bao-mat/totp");
 
     const secret = generateNewTotpSecret();
     const suffix = Date.now().toString(36);
@@ -267,7 +270,7 @@ test(
 
 test("login: user chưa bật 2FA → hành vi cũ (không đổi), set cookie ngay", S, async () => {
   const { insertId, run } = await import("@/lib/db");
-  const { hashPassword } = await import("@/lib/auth");
+  const { hashPassword } = await import("@/lib/bao-mat/auth");
 
   const suffix = Date.now().toString(36);
   const email = `no-totp-${suffix}@x.vn`;
@@ -295,8 +298,8 @@ test(
   S,
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { hashPassword, parseToken } = await import("@/lib/auth");
-    const { createItem, deleteItem } = await import("@/lib/code-lists");
+    const { hashPassword, parseToken } = await import("@/lib/bao-mat/auth");
+    const { createItem, deleteItem } = await import("@/lib/ha-tang/code-lists");
     const { proxy } = await import("@/proxy");
     const { POST: loginPost } = await import("@/app/api/auth/login/route");
 

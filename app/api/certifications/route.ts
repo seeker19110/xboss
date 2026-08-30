@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, query, queryOne } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { parseCertificationBody, validateCertificationInput } from "@/lib/hr";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { parseCertificationBody, validateCertificationInput } from "@/lib/hien-truong/hr";
 
 export const dynamic = "force-dynamic";
 

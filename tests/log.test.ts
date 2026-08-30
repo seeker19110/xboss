@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // chạm DB — xem CLAUDE.md/tests/setup.ts).
 
 test("log.info (production): in 1 dòng JSON đủ trường t/level/msg", async () => {
-  const { log } = await import("@/lib/log");
+  const { log } = await import("@/lib/nen/log");
   const origEnv = process.env.NODE_ENV;
   const origConsoleLog = console.log;
   const calls: string[] = [];
@@ -28,7 +28,7 @@ test("log.info (production): in 1 dòng JSON đủ trường t/level/msg", async
 });
 
 test("log.error (production): dùng console.error, giữ nguyên level=error", async () => {
-  const { log } = await import("@/lib/log");
+  const { log } = await import("@/lib/nen/log");
   const origEnv = process.env.NODE_ENV;
   const origConsoleError = console.error;
   const calls: string[] = [];
@@ -47,15 +47,15 @@ test("log.error (production): dùng console.error, giữ nguyên level=error", a
 });
 
 test("log.info: không throw khi chưa có request context (ngoài request scope)", async () => {
-  const { log } = await import("@/lib/log");
+  const { log } = await import("@/lib/nen/log");
   assert.doesNotThrow(() => log.info("không context"));
   assert.doesNotThrow(() => log.warn("không context"));
   assert.doesNotThrow(() => log.error("không context"));
 });
 
 test("log.info: đọc requestId/userId từ getRequestContext khi có ngữ cảnh", async () => {
-  const { log } = await import("@/lib/log");
-  const { runWithRequestContext } = await import("@/lib/request-context");
+  const { log } = await import("@/lib/nen/log");
+  const { runWithRequestContext } = await import("@/lib/nen/request-context");
   const origEnv = process.env.NODE_ENV;
   const origConsoleLog = console.log;
   const calls: string[] = [];
@@ -76,7 +76,7 @@ test("log.info: đọc requestId/userId từ getRequestContext khi có ngữ c�
 });
 
 test("log.warn (dev, NODE_ENV khác production): không throw, in dòng có nhãn [WARN]", async () => {
-  const { log } = await import("@/lib/log");
+  const { log } = await import("@/lib/nen/log");
   const origEnv = process.env.NODE_ENV;
   const origConsoleWarn = console.warn;
   const calls: string[] = [];
@@ -117,7 +117,7 @@ async function captureProdLog(
 }
 
 test("redaction: field tên nhạy cảm (password/token/secret/apiKey) bị thay bằng [REDACTED]", async () => {
-  const { log } = await import("@/lib/log");
+  const { log } = await import("@/lib/nen/log");
   const entry = await captureProdLog(() => {
     log.error("lỗi đăng nhập", {
       password: "mat-khau-that-123",
@@ -137,7 +137,7 @@ test("redaction: field tên nhạy cảm (password/token/secret/apiKey) bị tha
 });
 
 test("redaction: khớp không phân biệt hoa/thường và khi tên trường là 1 phần của key dài hơn", async () => {
-  const { log } = await import("@/lib/log");
+  const { log } = await import("@/lib/nen/log");
   const entry = await captureProdLog(() => {
     log.error("test", { dbPassword: "x", userToken: "y", PRIVATE_KEY: "z", cookieValue: "w" });
   });
@@ -148,7 +148,7 @@ test("redaction: khớp không phân biệt hoa/thường và khi tên trường
 });
 
 test("redaction: đệ quy vào object/mảng lồng nhau", async () => {
-  const { log } = await import("@/lib/log");
+  const { log } = await import("@/lib/nen/log");
   const entry = await captureProdLog(() => {
     log.error("test", {
       detail: { headers: { authorization: "Bearer abc" }, ok: true },
@@ -164,7 +164,7 @@ test("redaction: đệ quy vào object/mảng lồng nhau", async () => {
 });
 
 test("redaction: mật khẩu trong connection string Postgres bị che, phần còn lại giữ nguyên", async () => {
-  const { log } = await import("@/lib/log");
+  const { log } = await import("@/lib/nen/log");
   const entry = await captureProdLog(() => {
     log.error("kết nối DB lỗi", {
       err: "connect ECONNREFUSED postgres://xboss_app:MatKhauThat123@10.0.0.5:5432/xboss",
@@ -177,7 +177,7 @@ test("redaction: mật khẩu trong connection string Postgres bị che, phần 
 });
 
 test("redaction: chuỗi 'Bearer <token>' và API key thô xbk_... trong message bị che", async () => {
-  const { log } = await import("@/lib/log");
+  const { log } = await import("@/lib/nen/log");
   const entry = await captureProdLog(() => {
     log.warn("OIDC callback đổi token lỗi", {
       error: "token_exchange_failed: header Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.abc.def",
@@ -196,7 +196,7 @@ test("redaction: chuỗi 'Bearer <token>' và API key thô xbk_... trong message
 });
 
 test("redaction: chuỗi dạng JWT độc lập (không đứng sau 'Bearer') cũng bị che", async () => {
-  const { log } = await import("@/lib/log");
+  const { log } = await import("@/lib/nen/log");
   // JWT mẫu công khai của jwt.io (header/payload rỗng ý nghĩa, chữ ký minh hoạ) — không
   // phải bí mật thật, nhưng đúng cấu trúc JWT nên gitleaks báo nhầm theo rule "jwt".
   // gitleaks:allow
@@ -209,7 +209,7 @@ test("redaction: chuỗi dạng JWT độc lập (không đứng sau 'Bearer') c
 });
 
 test("redaction: message (tham số msg) cũng được quét, không chỉ fields", async () => {
-  const { log } = await import("@/lib/log");
+  const { log } = await import("@/lib/nen/log");
   const entry = await captureProdLog(() => {
     log.error("Lỗi kết nối postgres://app:BiMat456@db:5432/x xảy ra khi khởi động");
   });
@@ -217,7 +217,7 @@ test("redaction: message (tham số msg) cũng được quét, không chỉ fiel
 });
 
 test("redaction: KHÔNG động vào field/chuỗi bình thường (không báo nhầm)", async () => {
-  const { log } = await import("@/lib/log");
+  const { log } = await import("@/lib/nen/log");
   const entry = await captureProdLog(() => {
     log.info("Import hoàn tất", {
       route: "/api/import/excel",

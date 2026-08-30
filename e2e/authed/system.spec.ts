@@ -6,7 +6,10 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoAcmv(page: import("@playwright/test").Page) {
   await page.goto("/system/acmv");
-  await expect(page.getByRole("heading", { name: "ACMV" })).toBeVisible({ timeout: 15_000 });
+  // Tiêu đề lấy từ systems.name trong DB, và tên hiển thị của hệ `acmv` nay là
+  // "HVAC (Điều hòa không khí & Thông gió)" chứ không còn là "ACMV" — khớp theo tiền tố
+  // để không vỡ lần nữa nếu phần mô tả trong ngoặc được chỉnh.
+  await expect(page.getByRole("heading", { name: /^HVAC/ })).toBeVisible({ timeout: 15_000 });
 }
 
 test.describe("Trang hệ /system/[code] (sau đăng nhập)", () => {
@@ -17,7 +20,7 @@ test.describe("Trang hệ /system/[code] (sau đăng nhập)", () => {
     await page.goto("/");
     await page.locator('a[href="/system/acmv"]').first().click();
     await expect(page).toHaveURL(/\/system\/acmv$/);
-    await expect(page.getByRole("heading", { name: "ACMV" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: /^HVAC/ })).toBeVisible({ timeout: 15_000 });
   });
 
   test("render KPI + danh sách sheet ở tab Tổng quan", async ({ page }) => {

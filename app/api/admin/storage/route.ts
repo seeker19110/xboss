@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { UPLOAD_DIR, dirSize, STORAGE_WARN_BYTES } from "@/lib/photos";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { UPLOAD_DIR, dirSize, STORAGE_WARN_BYTES } from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 

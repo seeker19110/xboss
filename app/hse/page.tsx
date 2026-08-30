@@ -7,7 +7,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN, formatDateTimeVN } from "@/lib/date";
+import { formatDateVN, formatDateTimeVN, todayISO } from "@/lib/nen/date";
 
 type HseKind = "inspection" | "toolbox" | "incident" | "near_miss" | "permit";
 const HSE_KIND_LABEL: Record<HseKind, string> = {
@@ -56,10 +56,6 @@ type HseRecord = {
   actionDue: string | null;
   actionStatus: "none" | "open" | "closed";
 };
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export default function HsePage() {
   const [me, setMe] = useState<Me | null>(null);
@@ -139,8 +135,8 @@ export default function HsePage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <AppHeader
-        title="HSE / An toàn"
-        subtitle="Kiểm tra, toolbox talk, sự cố/cận nguy, giấy phép làm việc đặc biệt"
+        title="HSE / An toàn Lao động"
+        subtitle="Kiểm tra hiện trường, toolbox talk, sự cố/cận nguy, giấy phép làm việc đặc biệt"
         bottomActions={
           <div className="flex items-center gap-2">
             {canManage && (
@@ -149,7 +145,7 @@ export default function HsePage() {
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Báo cáo tháng"
-                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition shrink-0"
+                className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium text-zinc-300 hover:text-zinc-100 transition shrink-0 h-10"
               >
                 <Download className="w-4 h-4" />{" "}
                 <span className="hidden sm:inline">Báo cáo tháng</span>
@@ -159,51 +155,68 @@ export default function HsePage() {
               <button
                 onClick={() => setAddOpen(true)}
                 aria-label="Ghi nhận HSE"
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
               >
-                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Ghi nhận</span>
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Ghi nhận mới</span>
               </button>
             )}
           </div>
         }
       />
 
-      <main className="p-4 sm:p-6 pb-24 space-y-4">
+      <main className="p-4 sm:p-6 pb-24 space-y-6 max-w-screen-2xl mx-auto">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-emerald-400">{stats.daysSince ?? "—"}</p>
-            <p className="text-xs text-zinc-400">Ngày không sự cố</p>
+          <div className="bento-card p-4 flex flex-col justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Ngày không sự cố
+            </span>
+            <p className="text-2xl font-bold font-mono text-emerald-400 mt-2">
+              {stats.daysSince ?? "—"}
+            </p>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold">{stats.openActions}</p>
-            <p className="text-xs text-zinc-400">Action đang mở</p>
+          <div className="bento-card p-4 flex flex-col justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Action đang mở
+            </span>
+            <p className="text-2xl font-bold font-mono text-zinc-100 mt-2">{stats.openActions}</p>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
-            <p className={`text-2xl font-bold ${stats.overdueActions > 0 ? "text-rose-400" : ""}`}>
+          <div className="bento-card p-4 flex flex-col justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Action quá hạn
+            </span>
+            <p
+              className={`text-2xl font-bold font-mono mt-2 ${stats.overdueActions > 0 ? "text-rose-400" : "text-emerald-400"}`}
+            >
               {stats.overdueActions}
             </p>
-            <p className="text-xs text-zinc-400">Action quá hạn</p>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-sky-400">{stats.activePermits}</p>
-            <p className="text-xs text-zinc-400">Giấy phép hiệu lực</p>
+          <div className="bento-card p-4 flex flex-col justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Giấy phép hiệu lực
+            </span>
+            <p className="text-2xl font-bold font-mono text-sky-400 mt-2">{stats.activePermits}</p>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Loại ghi nhận HSE">
+        <div
+          className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl w-fit flex-wrap"
+          role="tablist"
+          aria-label="Loại ghi nhận HSE"
+        >
           {(Object.keys(HSE_KIND_LABEL) as HseKind[]).map((k) => (
             <button
               key={k}
               role="tab"
               aria-selected={tab === k}
               onClick={() => setTab(k)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
-                tab === k
-                  ? "bg-zinc-700 border-zinc-600 text-white"
-                  : "border-zinc-700 text-zinc-400 hover:text-white"
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                tab === k ? "bg-zinc-800 text-white shadow-xs" : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
-              {HSE_KIND_LABEL[k]} ({records.filter((r) => r.kind === k).length})
+              {HSE_KIND_LABEL[k]}{" "}
+              <span className="font-mono opacity-80">
+                ({records.filter((r) => r.kind === k).length})
+              </span>
             </button>
           ))}
         </div>
@@ -551,7 +564,7 @@ function AddHseModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Ghi nhận"}
         </button>

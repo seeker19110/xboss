@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 
 // ── Lớp thuần: luật validate (không cần DB) ──────────────────────────────────────
 test("validatePermOverride: chặn role/permKey sai + luật mở quyền ghi", async () => {
-  const { validatePermOverride, LOCKED_PERMS, PERM_KEYS } = await import("@/lib/auth");
+  const { validatePermOverride, LOCKED_PERMS, PERM_KEYS } = await import("@/lib/bao-mat/auth");
 
   // Vai trò không hợp lệ.
   assert.equal(typeof validatePermOverride("khong_ton_tai", "approve", false), "string");
@@ -43,7 +43,7 @@ test("validatePermOverride: chặn role/permKey sai + luật mở quyền ghi", 
 
 // ── M61: luật validate áp cho MỌI phạm vi (toàn hệ + theo dự án) ──────────────────
 test("validatePermOverride: luật LOCKED_PERMS + chống tự khoá áp cả phạm vi dự án", async () => {
-  const { validatePermOverride } = await import("@/lib/auth");
+  const { validatePermOverride } = await import("@/lib/bao-mat/auth");
 
   // Mở quyền GHI theo dự án (projectId số) vẫn bị chặn — LOCKED_PERMS áp mọi phạm vi.
   assert.equal(typeof validatePermOverride("engineer", "approve", true, 7), "string");
@@ -64,16 +64,29 @@ test("validatePermOverride: luật LOCKED_PERMS + chống tự khoá áp cả ph
   assert.equal(typeof validatePermOverride("pm", "approve", false, 1.5), "string");
 });
 
+// ── Lớp thuần: CAN mặc định theo vai trò (C4 §4 canh bất biến RBAC không cần DB) ──
+test("CAN: mặc định chỉ Admin và PM có quyền approve nghiệm thu (C4 §4)", async () => {
+  const { CAN } = await import("@/lib/bao-mat/auth");
+  assert.equal(CAN.approve("admin"), true, "admin phải được approve");
+  assert.equal(CAN.approve("pm"), true, "pm phải được approve");
+  assert.equal(CAN.approve("engineer"), false, "engineer không được approve");
+  assert.equal(CAN.approve("subcon"), false, "subcon không được approve");
+  assert.equal(CAN.approve("viewer"), false, "viewer không được approve");
+  assert.equal(CAN.approve("bch"), false, "bch không được approve");
+  assert.equal(CAN.approve("cdt"), false, "cdt không được approve");
+  assert.equal(CAN.approve(undefined), false, "chưa đăng nhập không được approve");
+});
+
 // ── Lớp tích hợp: cache + CAN + audit (cần Postgres) ─────────────────────────────
 test(
   "override: default → siết pm.approve → xoá về default; mở viewer.viewPayments; audit ghi",
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, query } = await import("@/lib/db");
-    const { runWithRequestContext } = await import("@/lib/request-context");
-    const { CAN } = await import("@/lib/auth");
+    const { runWithRequestContext } = await import("@/lib/nen/request-context");
+    const { CAN } = await import("@/lib/bao-mat/auth");
     const { setPermissionOverride, invalidatePermissionCache, _resetPermissionCacheForTests } =
-      await import("@/lib/permissions");
+      await import("@/lib/bao-mat/permissions");
 
     // Sạch bảng để test tất định (bảng cấu hình toàn hệ, không theo dự án).
     await run(`DELETE FROM role_permissions`);
@@ -92,7 +105,7 @@ test(
     assert.equal(CAN.approve("admin"), true, "siết pm không ảnh hưởng admin");
 
     // (6) Cache đã invalidate NGAY trong cùng process (không cần chờ TTL).
-    const { getPermissionOverride } = await import("@/lib/permissions");
+    const { getPermissionOverride } = await import("@/lib/bao-mat/permissions");
     assert.equal(getPermissionOverride("pm", "approve"), false);
 
     // (4) Mở quyền XEM viewPayments cho viewer → true.
@@ -130,7 +143,7 @@ test(
 // KHÔNG throw dù chưa reload lần nào.
 test("cache cold start trả undefined, không throw", async () => {
   const { getPermissionOverride, _resetPermissionCacheForTests } =
-    await import("@/lib/permissions");
+    await import("@/lib/bao-mat/permissions");
   _resetPermissionCacheForTests();
   assert.equal(getPermissionOverride("pm", "approve"), undefined);
 });

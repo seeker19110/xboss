@@ -21,7 +21,8 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN, todayISO } from "@/lib/date";
+import { formatDateVN, todayISO } from "@/lib/nen/date";
+import { isExpired, isExpiringSoon } from "@/lib/nen/han-hieu-luc";
 
 // ===== Giấy phép môi trường =====
 
@@ -45,8 +46,6 @@ const PERMIT_STATUS_BADGE: Record<PermitStatus, string> = {
   superseded: "bg-zinc-800 text-zinc-500",
 };
 
-const EXPIRY_WARN_DAYS = 30;
-
 type Permit = {
   id: number;
   kind: PermitKind;
@@ -59,15 +58,6 @@ type Permit = {
   fileName: string | null;
   originalName: string | null;
 };
-
-function isExpiringSoon(d: Permit): boolean {
-  if (d.status !== "valid" || !d.expiryDate) return false;
-  const limit = new Date(Date.now() + EXPIRY_WARN_DAYS * 86400_000).toISOString().slice(0, 10);
-  return d.expiryDate <= limit;
-}
-function isExpired(d: Permit): boolean {
-  return d.status === "valid" && !!d.expiryDate && d.expiryDate < todayISO();
-}
 
 // ===== Quan trắc môi trường =====
 
@@ -260,7 +250,7 @@ export default function EnvironmentPage() {
                 <button
                   onClick={() => setAddPermitOpen(true)}
                   aria-label="Thêm hồ sơ"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm hồ sơ</span>
                 </button>
@@ -269,7 +259,7 @@ export default function EnvironmentPage() {
                 <button
                   onClick={() => setAddMonOpen(true)}
                   aria-label="Thêm kỳ quan trắc"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm kỳ quan trắc</span>
@@ -279,7 +269,7 @@ export default function EnvironmentPage() {
                 <button
                   onClick={() => setAddWasteOpen(true)}
                   aria-label="Ghi nhận chất thải"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Ghi nhận chất thải</span>
@@ -996,7 +986,7 @@ function PermitModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1159,7 +1149,7 @@ function MonitoringModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1309,7 +1299,7 @@ function WasteModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>

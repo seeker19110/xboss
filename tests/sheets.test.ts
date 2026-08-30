@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SHEET_SLUGS, slugFromCode, toSlug, SLUG_RE } from "@/lib/sheets";
+import { SHEET_SLUGS, slugFromCode, toSlug, SLUG_RE } from "@/lib/nen/sheets";
 
 test("SHEET_SLUGS: đúng 5 phần tử, khớp đầy đủ từng bộ {slug, code, name}", () => {
   assert.equal(SHEET_SLUGS.length, 5);

@@ -13,7 +13,7 @@
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { MODULES } from "../lib/modules";
+import { MODULES } from "@/lib/nen/modules";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const swSource = readFileSync(join(root, "public/sw.js"), "utf8");

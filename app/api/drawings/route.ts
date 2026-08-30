@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   DRAWING_KINDS,
   REVISION_STATUSES,
@@ -11,7 +11,7 @@ import {
   validateDrawingInput,
   type DrawingKind,
   type RevisionStatus,
-} from "@/lib/drawings";
+} from "@/lib/ky-thuat/drawings";
 
 export const dynamic = "force-dynamic";
 

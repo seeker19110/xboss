@@ -5,7 +5,7 @@ import { ArrowLeft, Printer, CalendarClock } from "lucide-react";
 import { LookaheadTable } from "@/app/components/LookaheadTable";
 import SystemFilter from "@/app/components/SystemFilter";
 import { redirectToLogin } from "@/app/lib/me";
-import { formatDateVN, formatDateTimeVN } from "@/lib/date";
+import { formatDateVN, formatDateTimeVN } from "@/lib/nen/date";
 
 type LTask = {
   id: number;

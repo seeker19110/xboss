@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, withProjectScope } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { withUniqueRetry } from "@/lib/seqcode";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { withUniqueRetry } from "@/lib/ha-tang/seqcode";
 import {
   CLAIM_KINDS,
   CLAIM_STATUSES,
@@ -13,7 +13,7 @@ import {
   validateClaimInput,
   type ClaimKind,
   type ClaimStatus,
-} from "@/lib/claims";
+} from "@/lib/tai-chinh/claims";
 
 export const dynamic = "force-dynamic";
 

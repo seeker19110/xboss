@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, type Role } from "@/lib/auth";
-import { isUniqueViolation } from "@/lib/seqcode";
+import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
+import { isUniqueViolation } from "@/lib/ha-tang/seqcode";
 
 export const dynamic = "force-dynamic";
 

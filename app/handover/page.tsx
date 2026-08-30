@@ -24,7 +24,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN, todayISO } from "@/lib/date";
+import { formatDateVN, todayISO } from "@/lib/nen/date";
 
 // ===== Kiểu dữ liệu (client) — mirror lib/handover.ts =====
 
@@ -333,7 +333,7 @@ export default function HandoverPage() {
                 <button
                   onClick={() => setAddTcOpen(true)}
                   aria-label="Thêm hệ thống T&C"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm hệ thống</span>
@@ -343,7 +343,7 @@ export default function HandoverPage() {
                 <button
                   onClick={() => setAddHiOpen(true)}
                   aria-label="Thêm hạng mục bàn giao"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm hạng mục</span>
@@ -353,7 +353,7 @@ export default function HandoverPage() {
                 <button
                   onClick={() => setAddPunchOpen(true)}
                   aria-label="Thêm tồn tại"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm tồn tại</span>
@@ -363,7 +363,7 @@ export default function HandoverPage() {
                 <button
                   onClick={() => setAddDemobOpen(true)}
                   aria-label="Thêm hạng mục giải thể"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm hạng mục</span>
@@ -373,7 +373,7 @@ export default function HandoverPage() {
                 <button
                   onClick={() => setAddLessonOpen(true)}
                   aria-label="Thêm bài học"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm bài học</span>
@@ -1332,7 +1332,7 @@ function TcModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1505,7 +1505,7 @@ function HandoverModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1669,7 +1669,7 @@ function PunchModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1783,7 +1783,7 @@ function DemobModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1880,7 +1880,7 @@ function LessonModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>

@@ -3,8 +3,8 @@
 // Logic thuần nằm ở lib/audit-chain.ts (dùng chung với cron báo cáo tuần).
 // Chạy tay: npx tsx scripts/verify-audit-chain.ts
 import "./env";
-import { getPool } from "../lib/db";
-import { verifyAuditChain } from "../lib/audit-chain";
+import { getPool } from "@/lib/db";
+import { verifyAuditChain } from "@/lib/bao-mat/audit-chain";
 
 async function main() {
   console.log("⏳ Đang xác minh chuỗi hash audit_log…");

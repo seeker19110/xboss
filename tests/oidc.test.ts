@@ -2,7 +2,7 @@ import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
-import { resolveSsoUser } from "@/lib/oidc";
+import { resolveSsoUser } from "@/lib/bao-mat/oidc";
 
 // ===== Unit thuần: resolveSsoUser (không chạm DB, không cần IdP) =====
 
@@ -134,8 +134,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { queryOne, run } = await import("@/lib/db");
-    const { upsertSsoUser } = await import("@/lib/oidc");
-    const { makeToken } = await import("@/lib/auth");
+    const { upsertSsoUser } = await import("@/lib/bao-mat/oidc");
+    const { makeToken } = await import("@/lib/bao-mat/auth");
     const email = `sso-new-${Date.now()}@example.com`;
 
     try {
@@ -169,7 +169,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run } = await import("@/lib/db");
-    const { upsertSsoUser } = await import("@/lib/oidc");
+    const { upsertSsoUser } = await import("@/lib/bao-mat/oidc");
     const email = `sso-def-${Date.now()}@example.com`;
     process.env.OIDC_DEFAULT_ROLE = "engineer";
     try {
@@ -187,7 +187,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, queryOne } = await import("@/lib/db");
-    const { upsertSsoUser } = await import("@/lib/oidc");
+    const { upsertSsoUser } = await import("@/lib/bao-mat/oidc");
     const email = `sso-upd-${Date.now()}@example.com`;
     try {
       const u1 = await upsertSsoUser({ email, name: "SSO Upd", roleFromClaim: null });
@@ -205,7 +205,7 @@ test(
 
 test("upsertSsoUser: KHÔNG hạ cấp admin cuối cùng theo claim", { skip: !HAS_TEST_DB }, async () => {
   const { run, query } = await import("@/lib/db");
-  const { upsertSsoUser } = await import("@/lib/oidc");
+  const { upsertSsoUser } = await import("@/lib/bao-mat/oidc");
   const email = `sso-admin-${Date.now()}@example.com`;
   // Snapshot các admin hiện có để khôi phục sau (test chạy tuần tự theo file).
   const others = await query<{ id: number }>(`SELECT id FROM users WHERE role = 'admin'`);

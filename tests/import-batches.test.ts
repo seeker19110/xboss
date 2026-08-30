@@ -58,7 +58,7 @@ test(
   "Import KHÔNG truyền source → không ghi sổ, không đóng dấu (đường gọi cũ giữ nguyên)",
   S,
   async () => {
-    const { importWorkbook } = await import("@/lib/import");
+    const { importWorkbook } = await import("@/lib/tien-do/import");
     const { queryOne } = await import("@/lib/db");
     try {
       const stats = await importWorkbook(wbWithGrid(), { dimDenominator: "row-nonempty" });
@@ -79,7 +79,7 @@ test(
 );
 
 test("Import CÓ source → ghi sổ đủ băm/chế độ/người chạy và đóng dấu lên task", S, async () => {
-  const { importWorkbook } = await import("@/lib/import");
+  const { importWorkbook } = await import("@/lib/tien-do/import");
   const { queryOne, insertId, run } = await import("@/lib/db");
   const userId = await insertId(
     `INSERT INTO users (name, email, role, password_hash) VALUES ('Người import', ?, 'admin', 'x') RETURNING id`,
@@ -129,7 +129,7 @@ test(
   "Import ĐÈ bằng chế độ khác → dấu trên task đổi theo lần MỚI NHẤT, sổ giữ đủ 2 lần",
   S,
   async () => {
-    const { importWorkbook } = await import("@/lib/import");
+    const { importWorkbook } = await import("@/lib/tien-do/import");
     const { queryOne, query } = await import("@/lib/db");
     try {
       const first = await importWorkbook(wbWithGrid(), {
@@ -160,7 +160,7 @@ test(
 );
 
 test("Mẫu số đổi thật sự đổi số ô lưới — đúng thứ mà dấu đang ghi lại", S, async () => {
-  const { importWorkbook } = await import("@/lib/import");
+  const { importWorkbook } = await import("@/lib/tien-do/import");
   const { queryOne } = await import("@/lib/db");
   try {
     await importWorkbook(wbWithGrid(), {

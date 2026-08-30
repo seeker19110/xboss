@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { isQrKind, resolveQr } from "@/lib/qr";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { isQrKind, resolveQr } from "@/lib/ha-tang/qr";
 
 export const dynamic = "force-dynamic";
 

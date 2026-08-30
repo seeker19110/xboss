@@ -265,7 +265,7 @@ export default function ImportPage() {
               <button
                 onClick={handleImport}
                 disabled={busy}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-zinc-800 py-3 rounded-lg font-medium transition text-on-accent"
+                className="flex-1 bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-800 py-3 rounded-lg font-medium transition text-on-accent"
               >
                 {busy ? "Đang import..." : `✓ Xác nhận import ${preview.totalTasks} task`}
               </button>

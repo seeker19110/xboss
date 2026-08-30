@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
-import { isDelayReason } from "@/lib/delay";
+import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { isDelayReason } from "@/lib/tien-do/delay";
 
 export const dynamic = "force-dynamic";
 

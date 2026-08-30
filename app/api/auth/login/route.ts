@@ -7,11 +7,16 @@ import {
   ensureDefaultUsers,
   requiredRoles,
   computeMustSetup2fa,
+  isSecureCookie,
   COOKIE,
   COOKIE_MAX_AGE,
   type Role,
-} from "@/lib/auth";
-import { loginBlockedSeconds, recordLoginFailure, recordLoginSuccess } from "@/lib/ratelimit";
+} from "@/lib/bao-mat/auth";
+import {
+  loginBlockedSeconds,
+  recordLoginFailure,
+  recordLoginSuccess,
+} from "@/lib/bao-mat/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +89,7 @@ export async function POST(req: NextRequest) {
       path: "/",
       maxAge: COOKIE_MAX_AGE,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production", // dev qua HTTP vẫn set được
+      secure: isSecureCookie(req),
     },
   );
   return res;

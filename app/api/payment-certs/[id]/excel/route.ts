@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { queryOne, withProjectScope } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getCert, certTotals } from "@/lib/paymentcerts";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getCert, certTotals } from "@/lib/tai-chinh/paymentcerts";
 
 export const dynamic = "force-dynamic";
 

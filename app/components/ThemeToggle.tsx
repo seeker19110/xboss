@@ -25,7 +25,7 @@ const THEME_COLORS: Record<Theme, string> = {
   light: "#f6f7f9",
   dark: "#0a0a0a",
   kingblue: "#0a1f4d",
-  darkblue: "#0c1a2e",
+  darkblue: "#0e1726",
   navy: "#060b18",
 };
 

@@ -5,6 +5,8 @@ const config = [
   { ignores: ["_framework-dropins/**"] },
   // Worktree tạm của agent (chứa build artifact .next riêng) — không lint, xem .gitignore
   { ignores: [".claude/**"] },
+  // MEPF-Agents đã gộp phẳng vào repo (Python project + React app riêng) — không lint
+  { ignores: ["mepf-worker/**"] },
   ...nextConfig,
   {
     rules: {
@@ -15,6 +17,9 @@ const config = [
       "react-hooks/refs": "off",
       "react-hooks/purity": "off",
       "react-hooks/incompatible-library": "off",
+      // Dự án dùng hard navigation (window.location.href) có chủ đích khi đổi project/401/logout
+      // để reset hoàn toàn cache trình duyệt, service worker và state client
+      "@next/next/no-location-assign-relative-destination": "off",
     },
   },
 ];

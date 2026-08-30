@@ -37,7 +37,7 @@ async function seedCorrespondence(projectId: number, subject: string): Promise<n
 }
 
 test("FTS unaccent 2 chiều: 'nghiem thu' khớp 'nghiệm thu' và ngược lại", { skip }, async () => {
-  const { searchSources } = await import("@/lib/search");
+  const { searchSources } = await import("@/lib/tien-do/search");
   const { projectId } = await seedProject("fts-unaccent");
 
   const accentedId = await seedCorrespondence(projectId, "Biên bản nghiệm thu tầng 5");
@@ -60,7 +60,7 @@ test("FTS unaccent 2 chiều: 'nghiem thu' khớp 'nghiệm thu' và ngược l�
 
 test("project scope: 2 dự án không lẫn + bỏ bản ghi soft-delete", { skip }, async () => {
   const { insertId } = await import("@/lib/db");
-  const { searchSources } = await import("@/lib/search");
+  const { searchSources } = await import("@/lib/tien-do/search");
 
   const a = await seedProject("scope-A");
   const b = await seedProject("scope-B");
@@ -95,7 +95,7 @@ test("project scope: 2 dự án không lẫn + bỏ bản ghi soft-delete", { sk
 
 test("phân quyền: engineer KHÔNG thấy nhóm contracts, admin thấy", { skip }, async () => {
   const { insertId } = await import("@/lib/db");
-  const { searchSources } = await import("@/lib/search");
+  const { searchSources } = await import("@/lib/tien-do/search");
   const { projectId } = await seedProject("perm-contract");
 
   const contractId = await insertId(
@@ -119,7 +119,7 @@ test("phân quyền: engineer KHÔNG thấy nhóm contracts, admin thấy", { sk
 
 test("EXPLAIN xác nhận dùng index GIN idx_correspondences_fts", { skip }, async () => {
   const { query, withTransaction } = await import("@/lib/db");
-  const { ftsExpr } = await import("@/lib/search");
+  const { ftsExpr } = await import("@/lib/tien-do/search");
   const { projectId } = await seedProject("explain-gin");
 
   // Seed đủ nhiều dòng để bảng không quá nhỏ.

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("warrantyExpiry: tính đúng from + months, đủ ca biên", async () => {
-  const { warrantyExpiry } = await import("@/lib/warranty");
+  const { warrantyExpiry } = await import("@/lib/hien-truong/warranty");
 
   assert.equal(warrantyExpiry({ warrantyFrom: "2026-01-15", warrantyMonths: 12 }), "2027-01-15");
   // tràn năm/tháng
@@ -20,7 +20,7 @@ test("warrantyExpiry: tính đúng from + months, đủ ca biên", async () => {
 });
 
 test("validateWarrantyInput/validateClaimInput: đủ ca biên", async () => {
-  const { validateWarrantyInput, validateClaimInput } = await import("@/lib/warranty");
+  const { validateWarrantyInput, validateClaimInput } = await import("@/lib/hien-truong/warranty");
 
   assert.equal(
     validateWarrantyInput({
@@ -144,8 +144,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { expiringWarranties } = await import("@/lib/warranty");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { expiringWarranties } = await import("@/lib/hien-truong/warranty");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA WR 1', 'PJT-WR1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA WR 2', 'PJT-WR2')`);
@@ -216,8 +216,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { overdueClaims } = await import("@/lib/warranty");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { overdueClaims } = await import("@/lib/hien-truong/warranty");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const userId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Test Warranty User', 'warrantyuser@test.local', 'x', 'engineer')`,

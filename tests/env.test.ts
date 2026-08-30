@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseServerEnv, getServerEnv, __resetServerEnvCache } from "@/lib/env";
+import { parseServerEnv, getServerEnv, __resetServerEnvCache } from "@/lib/nen/env";
 
 test("parseServerEnv: nguồn hợp lệ tối thiểu → có DATABASE_URL, NODE_ENV mặc định development", () => {
   const env = parseServerEnv({ DATABASE_URL: "postgres://u:p@localhost:5432/db" });

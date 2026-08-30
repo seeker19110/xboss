@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
-import { getCurrentUser, canTouchVehicle, type Role } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getVehicle, nextVehicleStatus, type VehicleAction } from "@/lib/procurement";
+import { getCurrentUser, canTouchVehicle, type Role } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getVehicle, nextVehicleStatus, type VehicleAction } from "@/lib/tai-chinh/procurement";
 
 export const dynamic = "force-dynamic";
 

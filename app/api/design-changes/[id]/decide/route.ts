@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { canDecideDesignChange, decideDesignChange } from "@/lib/designchanges";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { canDecideDesignChange, decideDesignChange } from "@/lib/ky-thuat/designchanges";
 
 export const dynamic = "force-dynamic";
 

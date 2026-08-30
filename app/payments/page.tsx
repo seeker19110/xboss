@@ -24,7 +24,7 @@ import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
 import { appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
-import { formatDateDMY, todayISO } from "@/lib/date";
+import { formatDateDMY, todayISO } from "@/lib/nen/date";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -136,16 +136,16 @@ function KpiCard({
   accent?: string;
 }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 sm:px-4 py-3 sm:py-3.5">
-      <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-zinc-400 mb-1 leading-tight">
+    <div className="bento-card p-3.5 sm:p-4 flex flex-col justify-between">
+      <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-zinc-400">
         {label}
-      </p>
+      </span>
       <p
-        className={`text-xl sm:text-2xl font-bold tabular-nums truncate ${accent ?? "text-white"}`}
+        className={`text-lg sm:text-2xl font-bold font-mono tabular-nums truncate mt-1.5 ${accent ?? "text-zinc-100"}`}
       >
         {value}
       </p>
-      {sub && <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 truncate">{sub}</p>}
+      {sub && <p className="text-[10px] sm:text-xs text-zinc-400 mt-1 truncate">{sub}</p>}
     </div>
   );
 }
@@ -406,7 +406,7 @@ export default function PaymentsPage() {
         {editMode && Object.keys(edits).length > 0 && !saving && (
           <button
             onClick={() => data && saveEdits(edits, data.rows)}
-            className="flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 text-on-accent px-3 py-1.5 rounded-lg transition shrink-0"
+            className="flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-800 text-on-accent px-3 py-1.5 rounded-lg transition shrink-0"
           >
             <Save className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Lưu ngay</span>
@@ -904,7 +904,7 @@ function BillsSection({
                 <button
                   onClick={submitAll}
                   disabled={busy}
-                  className="ml-auto flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent px-3 py-1.5 rounded-lg transition shrink-0"
+                  className="ml-auto flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent px-3 py-1.5 rounded-lg transition shrink-0"
                 >
                   {busy ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

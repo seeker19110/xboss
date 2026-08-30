@@ -64,7 +64,7 @@ test(
   "(1) emitWebhook chỉ tạo delivery cho webhook active + khớp event + khớp project",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { emitWebhook } = await import("@/lib/webhooks");
+    const { emitWebhook } = await import("@/lib/bao-mat/webhooks");
     const { query } = await import("@/lib/db");
     const { userId, projectId } = await freshEnv();
 
@@ -117,7 +117,7 @@ test(
   "(2) deliverDueWebhooks: 2xx → ok; 500 → attempts+1 + backoff [5m,30m,2h,2h]; attempts>=5 → failed",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { emitWebhook, deliverDueWebhooks } = await import("@/lib/webhooks");
+    const { emitWebhook, deliverDueWebhooks } = await import("@/lib/bao-mat/webhooks");
     const { query, queryOne, run } = await import("@/lib/db");
     const { userId, projectId } = await freshEnv();
 
@@ -195,7 +195,7 @@ test(
   "(3) chữ ký X-Xboss-Signature verify lại đúng bằng secret; 3xx tính là lỗi",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { emitWebhook, deliverDueWebhooks } = await import("@/lib/webhooks");
+    const { emitWebhook, deliverDueWebhooks } = await import("@/lib/bao-mat/webhooks");
     const { userId, projectId } = await freshEnv();
     const secret = "sieu-bi-mat-123";
     await makeWebhook({ userId, projectId, events: ["ping"], secret });
@@ -238,7 +238,7 @@ test(
   "(4) validateWebhookUrl: http production/IP nội bộ → ok:false",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { validateWebhookUrl } = await import("@/lib/webhooks");
+    const { validateWebhookUrl } = await import("@/lib/bao-mat/webhooks");
     // NODE_ENV là read-only trong @types/node mới → gán qua bản ghi động.
     const env = process.env as Record<string, string | undefined>;
     const origEnv = env.NODE_ENV;
@@ -281,7 +281,7 @@ test(
   "(5) emitWebhook không throw khi không có webhook nào khớp (bảng rỗng)",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { emitWebhook } = await import("@/lib/webhooks");
+    const { emitWebhook } = await import("@/lib/bao-mat/webhooks");
     const { run } = await import("@/lib/db");
     await run(`DELETE FROM webhook_deliveries`);
     await run(`DELETE FROM webhooks`);
@@ -298,7 +298,7 @@ test(
 // Unit thuần, không cần TEST_DATABASE_URL (isPrivateIp không chạm DB).
 
 test("(6) isPrivateIp: bảng ca đủ các dải IPv4/IPv6 (mỗi dải 1 IP trong + 1 IP ngoài biên)", async () => {
-  const { isPrivateIp } = await import("@/lib/webhooks");
+  const { isPrivateIp } = await import("@/lib/bao-mat/webhooks");
 
   const cases: Array<[string, boolean, string]> = [
     // IPv4
@@ -353,7 +353,7 @@ test("(6) isPrivateIp: bảng ca đủ các dải IPv4/IPv6 (mỗi dải 1 IP tr
 });
 
 test("(7) safeLookup: fail-closed khi lẫn IP private, propagate lỗi resolve, OK khi toàn public", async () => {
-  const { safeLookup } = await import("@/lib/webhooks");
+  const { safeLookup } = await import("@/lib/bao-mat/webhooks");
   const origLookup = dns.promises.lookup;
   try {
     // (a) toàn IP public → trả đúng danh sách.
@@ -438,7 +438,7 @@ test(
     }) as unknown as typeof dns.promises.lookup;
 
     try {
-      const { emitWebhook, deliverDueWebhooks } = await import("@/lib/webhooks");
+      const { emitWebhook, deliverDueWebhooks } = await import("@/lib/bao-mat/webhooks");
       const { run, queryOne } = await import("@/lib/db");
       const { userId, projectId } = await freshEnv();
       await makeWebhook({

@@ -512,7 +512,7 @@ function ProfileTab({
               <button
                 onClick={save}
                 disabled={saving}
-                className="flex-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+                className="flex-1 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
               >
                 {saving ? "Đang lưu…" : "Lưu"}
               </button>
@@ -671,7 +671,7 @@ function UploadDocModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -918,7 +918,7 @@ function AddEvaluationModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -977,7 +977,10 @@ function DebtTab({ detail }: { detail: SubcontractorDetail }) {
                 return (
                   <tr key={c.id} className="border-b border-zinc-800/60 last:border-0">
                     <td className="p-2">
-                      <a href="/contracts" className="text-sky-400 hover:text-sky-300 font-medium">
+                      <a
+                        href="/commercial?tab=contracts"
+                        className="text-sky-400 hover:text-sky-300 font-medium"
+                      >
                         {c.code}
                       </a>
                     </td>

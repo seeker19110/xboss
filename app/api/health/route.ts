@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { checkHealth } from "@/lib/health";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { checkHealth } from "@/lib/van-hanh/health";
 import { poolStats } from "@/lib/db";
 import { getOpenStreamCount } from "@/app/api/events/route";
 

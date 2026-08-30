@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
-import { getCert, certTotals, type PaymentCertRow, type CertTotals } from "@/lib/paymentcerts";
-import { formatDateVN } from "@/lib/date";
+import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/nen/pdf-fonts";
+import {
+  getCert,
+  certTotals,
+  type PaymentCertRow,
+  type CertTotals,
+} from "@/lib/tai-chinh/paymentcerts";
+import { formatDateVN } from "@/lib/nen/date";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();

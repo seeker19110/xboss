@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 
 // DELETE /api/package-dependencies/:id → xoá 1 quan hệ phụ thuộc (Admin/PM).
-export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  _req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role))

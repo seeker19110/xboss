@@ -27,11 +27,11 @@ import { enqueuePhoto, offlineQueue } from "@/app/components/offlineQueue";
 import CustomFieldsSection from "@/app/components/CustomFieldsSection";
 import { Modal, appAlert, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
-import { DELAY_REASON_LABEL } from "@/lib/delay";
-import { ROLE_LABELS } from "@/lib/roles";
+import { DELAY_REASON_LABEL } from "@/lib/tien-do/delay";
+import { ROLE_LABELS } from "@/lib/nen/roles";
 import { fetchMe } from "@/app/lib/me";
-import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
-import { formatDateTimeVN } from "@/lib/date";
+import { STATUS_LABEL, type StatusSlug } from "@/lib/tien-do/status";
+import { formatDateTimeVN } from "@/lib/nen/date";
 import { StatusBadge } from "@/app/components/StatusBadge";
 import { DateEditModal } from "./DateEditModal";
 import type { Pkg, Cell, GridTask, Grid } from "./types";
@@ -1921,6 +1921,7 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
     }
     setUploading(false);
     load();
+    refreshPending();
   }
 
   async function remove(p: Photo) {

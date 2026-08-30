@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storageGet, storageDelete } from "@/lib/storage";
+import { storageGet, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { canEditProposal, canSeeAllProposals, getProposal } from "@/lib/proposals";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { canEditProposal, canSeeAllProposals, getProposal } from "@/lib/tai-chinh/proposals";
 
 export const dynamic = "force-dynamic";
 

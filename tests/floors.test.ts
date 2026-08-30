@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { floorOrder, sortFloorsAsc, sortFloorsDesc } from "@/lib/floors";
+import { floorOrder, sortFloorsAsc, sortFloorsDesc } from "@/lib/tien-do/floors";
 
 test("floorOrder: hầm âm theo độ sâu, tầng số theo giá trị, RF cao nhất", () => {
   assert.equal(floorOrder("B1F"), -1);

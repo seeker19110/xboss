@@ -1,12 +1,12 @@
 import "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load (constructionStages import lib/db)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addDaysISO } from "@/lib/date";
+import { addDaysISO } from "@/lib/nen/date";
 import {
   computePlannedDates,
   type StageRow,
   type FloorStageFrontRow,
-} from "@/lib/constructionStages";
+} from "@/lib/tien-do/constructionStages";
 
 test("addDaysISO: cộng/trừ ngày thuần, không phụ thuộc hôm nay", () => {
   assert.equal(addDaysISO("2026-07-01", 5), "2026-07-06");

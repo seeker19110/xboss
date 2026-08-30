@@ -14,8 +14,8 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { ROLES, ROLE_LABELS, type Role } from "@/lib/roles";
-import { formatVnd } from "@/lib/money";
+import { ROLES, ROLE_LABELS, type Role } from "@/lib/nen/roles";
+import { formatVnd } from "@/lib/nen/money";
 
 type ApprovalEntityType = "variation" | "payment_cert" | "proposal" | "task_acceptance";
 
@@ -151,7 +151,7 @@ export default function ApprovalFlowsPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm flow"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm flow</span>
             </button>
@@ -585,7 +585,7 @@ function FlowFormModal({
         <button
           onClick={save}
           disabled={saving}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : mode === "create" ? "Tạo flow" : "Lưu thay đổi"}
         </button>

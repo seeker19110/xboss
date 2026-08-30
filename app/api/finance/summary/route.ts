@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { todayISO } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   cashflowActual,
   receivables,
   payables,
   advanceOutstanding,
   vatSummary,
-} from "@/lib/finance";
+} from "@/lib/tai-chinh/finance";
 
 export const dynamic = "force-dynamic";
 

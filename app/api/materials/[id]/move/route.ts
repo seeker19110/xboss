@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, type Role } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
+import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 
 export const dynamic = "force-dynamic";
 

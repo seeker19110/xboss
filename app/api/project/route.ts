@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, isAdminOrPm } from "@/lib/auth";
+import { getCurrentUser, isAdminOrPm } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 

@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { query } from "@/lib/db";
-import { getCurrentUser, CAN, checkCronSecret } from "@/lib/auth";
-import { log } from "@/lib/log";
+import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
+import { log } from "@/lib/nen/log";
 import {
   buildWeeklyReport,
   weeklyToHtml,
   weeklyToTelegramText,
   sendTelegram,
   type AuditChainSummary,
-} from "@/lib/report";
-import { verifyAuditChain } from "@/lib/audit-chain";
-import { acquireSyncLock, releaseSyncLock } from "@/lib/sync-locks";
+} from "@/lib/tien-do/report";
+import { verifyAuditChain } from "@/lib/bao-mat/audit-chain";
+import { acquireSyncLock, releaseSyncLock } from "@/lib/ha-tang/sync-locks";
 
 export const dynamic = "force-dynamic";
 

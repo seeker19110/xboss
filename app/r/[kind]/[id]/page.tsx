@@ -7,14 +7,14 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import type { QrResolveResult } from "@/lib/qr";
+import type { QrResolveResult } from "@/lib/ha-tang/qr";
 
 function targetUrl(data: QrResolveResult): string {
   switch (data.kind) {
     case "eq":
       return `/equipment?id=${data.id}`;
     case "mt":
-      return `/materials?id=${data.id}`;
+      return `/procurement?tab=inventory`;
     case "wf":
       return `/work-fronts/${encodeURIComponent(data.id)}`;
     case "tk":

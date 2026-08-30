@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import { Activity, ExternalLink } from "lucide-react";
 import { Skeleton } from "@/app/components/Skeleton";
-import { formatDateVN } from "@/lib/date";
-import type { CriticalRow } from "@/lib/schedule-control";
+import { formatDateVN } from "@/lib/nen/date";
+import type { CriticalRow } from "@/lib/tien-do/schedule-control";
 
 // Panel "Nhóm việc trên đường găng" — tách từ trang /schedule-control (M36 PR3) thành
 // component dùng chung để nhúng vào Dashboard tổng. Không truyền `critical` → tự fetch
@@ -42,7 +42,7 @@ export default function ScheduleControlPanel({
             trang /schedule-control (truyền `critical`) thì thừa. */}
         {selfFetch && (
           <a
-            href="/schedule-control"
+            href="/schedule?tab=wbs"
             className="ml-auto flex items-center gap-1 text-xs text-zinc-400 hover:text-emerald-400 transition shrink-0"
           >
             Đường găng &amp; Chậm tiến độ <ExternalLink className="w-3 h-3" />

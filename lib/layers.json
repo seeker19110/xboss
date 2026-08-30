@@ -1,0 +1,17 @@
+{
+  "_": "Bản đồ tầng của lib/ — nguồn sự thật cho scripts/check-lib-layers.ts và docs/adr/0007-lib-theo-mien.md. Số tầng nhỏ hơn = nền hơn. Một thư mục CHỈ được import xuống tầng thấp hơn mình; riêng các miền nghiệp vụ (cùng tầng 4) được import chéo nhau, miễn không tạo chu trình. Tầng 5 dich-vu/ là nơi đặt các hàm PHỐI HỢP nhiều miền — xem ADR-0008.",
+  "_cross_layer": 4,
+  "_cross_layer_note": "Tầng mà các thư mục cùng tầng được phép import chéo nhau (các miền nghiệp vụ) — vẫn cấm chu trình. Mọi tầng khác: chỉ import xuống tầng thấp hơn.",
+  "nen": 0,
+  "db": 1,
+  "ha-tang": 2,
+  "bao-mat": 3,
+  "van-hanh": 4,
+  "tien-do": 4,
+  "khoi-luong": 4,
+  "tai-chinh": 4,
+  "vat-tu": 4,
+  "hien-truong": 4,
+  "ky-thuat": 4,
+  "dich-vu": 5
+}
