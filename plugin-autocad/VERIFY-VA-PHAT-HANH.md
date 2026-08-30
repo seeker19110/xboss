@@ -791,6 +791,29 @@ nào…`), nút chuyển nền chìm + chữ mờ.
      của lần chạy đó (kể cả các giai đoạn đã xong trước lỗi) biến mất, bản vẽ về đúng trạng thái
      trước khi gọi lệnh.
 
+### C15. Thiết kế lại giao diện bảng XBoss + hộp thoại lệnh (M119 — CHƯA LÀM, xếp SAU C9–C14)
+
+> **Chưa verify tay mục này.** Thay đổi THUẦN HÌNH THỨC (M119): không đổi lệnh/dữ liệu/API, cổng
+> CI (`XBoss.Cad.AcadShim` biên dịch bằng stub + 1367 test Core) không thay được mắt người trên
+> WinForms/WPF thật. Xếp SAU C9-C14 theo đúng thứ tự nợ verify tay hiện có.
+
+129. **Bảng XBoss — tab Quy trình.** Mở `XBOSS_BANG` → tab "Quy trình" hiện 6 thẻ, mỗi thẻ có vệt
+     màu cạnh trái + chip trạng thái (`✓ Đã xong`/`○ Chưa làm`/`– Không áp dụng`) + tên bước + dấu
+     hiệu xong + hàng nút. Nút "Làm mới" nằm ở thanh **dính đầu tab** (không nằm trong vùng cuộn):
+     cuộn xuống thẻ cuối vẫn thấy nút. Thanh đó có dòng ngữ cảnh "Đã xong n/6 bước · ...".
+130. **Bảng XBoss — tab Trạng thái.** Chuyển sang tab "Trạng thái" → mỗi khối là 1 thẻ; khối có
+     dòng cảnh báo (mức `CanhBao`) có vệt màu cam ở cạnh trái. Thanh dính đầu tab hiện đúng số
+     cảnh báo hiện có. Bấm "Làm mới" → cả hai tab vẽ lại đúng, không văng lỗi.
+131. **Rê chuột lên mọi nút** (cả hai tab + nút trong thanh dính đầu tab) → nền nút **đậm dần**
+     (không sáng lên thành màu hệ thống của Windows) đúng ADR-0010; bấm giữ → đậm thêm một mức nữa.
+132. **Kéo hẹp/rộng palette** (kéo cạnh PaletteSet) → chữ trong thẻ ngắt dòng lại theo bề rộng mới,
+     KHÔNG sinh thanh cuộn ngang, KHÔNG đẩy thẻ phình ra ngoài khung nhìn.
+133. **Hộp thoại lệnh WPF** (mở bất kỳ lệnh nào có hộp thoại, vd `XBOSS_VE`): thân hộp thoại hiện
+     dải tiêu đề tên lệnh + gạch phân cách phía trên câu dẫn. Đặt hộp thoại vào trạng thái khoá OK
+     (thiếu trường bắt buộc) → vùng thông điệp hiện ký hiệu `⛔` + vệt màu trái đỏ/vàng, câu lý do
+     dài **xuống dòng đúng trong khung hộp thoại** (không chạy ra ngoài cửa sổ rộng 660). Sửa đủ
+     trường → ký hiệu đổi thành `✓` màu xanh.
+
 ---
 
 ## D. Kiểm thử có server — dựng tại chỗ trên máy mình
