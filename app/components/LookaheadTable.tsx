@@ -2,12 +2,17 @@
 
 import { useMemo, useState } from "react";
 import {
+  columnSizingFeature,
+  columnVisibilityFeature,
   createColumnHelper,
+  type ColumnDef,
+  createSortedRowModel,
   flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
+  rowSortingFeature,
+  sortFns,
   SortingState,
-  useReactTable,
+  tableFeatures,
+  useTable,
 } from "@tanstack/react-table";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { DELAY_REASON_LABEL } from "@/lib/tien-do/delay";
@@ -34,79 +39,89 @@ type TableProps = {
   dateCol: "startDate" | "endDate";
 };
 
-const columnHelper = createColumnHelper<LTask>();
+// react-table v9: mỗi tính năng phải khai tường minh (tree-shakeable) thay vì bật ngầm như v8.
+// Bảng này chỉ cần sắp xếp theo cột + đặt bề rộng cột.
+const features = tableFeatures({
+  rowSortingFeature,
+  columnSizingFeature,
+  columnVisibilityFeature, // cần cho row.getVisibleCells()
+  sortedRowModel: createSortedRowModel(),
+  sortFns,
+});
+
+const columnHelper = createColumnHelper<typeof features, LTask>();
 
 export function LookaheadTable({ tasks, dateCol }: TableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const columns = useMemo(
-    () => [
-      columnHelper.accessor("code", {
-        header: "Mã",
-        cell: (info) => <span className="font-mono text-xs">{info.getValue()}</span>,
-        size: 100,
-      }),
-      columnHelper.accessor("name", {
-        header: "Công việc",
-        cell: (info) => info.getValue(),
-      }),
-      columnHelper.accessor("floorLabel", {
-        header: "Tầng",
-        cell: (info) => info.getValue() ?? "—",
-        size: 80,
-      }),
-      columnHelper.accessor(dateCol, {
-        header: dateCol === "startDate" ? "Bắt đầu" : "Đến hạn",
-        cell: (info) => {
-          const dateVal = info.getValue();
-          const status = info.row.original.status;
-          const isOverdue = dateCol === "endDate" && status === "tre";
-          return (
-            <span className={isOverdue ? "text-red-600 font-medium" : ""}>
-              {formatDateVN(dateVal)}
-            </span>
-          );
-        },
-        size: 100,
-      }),
-      columnHelper.accessor("progressPercent", {
-        header: "%",
-        cell: (info) => `${Math.round((info.getValue() ?? 0) * 100)}%`,
-        size: 60,
-      }),
-      columnHelper.accessor("status", {
-        header: "Ghi chú",
-        cell: (info) => {
-          const status = info.getValue();
-          const delayReason = info.row.original.delayReason;
-          const waitingFront = info.row.original.waitingFront;
-          return (
-            <span className="text-xs text-zinc-500">
-              {status === "tre"
-                ? `Đang trễ${delayReason ? ` · ${DELAY_REASON_LABEL[delayReason as keyof typeof DELAY_REASON_LABEL] ?? delayReason}` : ""}`
-                : (STATUS_LABEL[status as StatusSlug] ?? "")}
-              {waitingFront && (
-                <span className="text-amber-700 font-medium">
-                  {status === "tre" ? " · " : " "}⚠ chưa bàn giao MB
-                </span>
-              )}
-            </span>
-          );
-        },
-      }),
-    ],
+    () =>
+      [
+        columnHelper.accessor("code", {
+          header: "Mã",
+          cell: (info) => <span className="font-mono text-xs">{info.getValue()}</span>,
+          size: 100,
+        }),
+        columnHelper.accessor("name", {
+          header: "Công việc",
+          cell: (info) => info.getValue(),
+        }),
+        columnHelper.accessor("floorLabel", {
+          header: "Tầng",
+          cell: (info) => info.getValue() ?? "—",
+          size: 80,
+        }),
+        columnHelper.accessor(dateCol, {
+          header: dateCol === "startDate" ? "Bắt đầu" : "Đến hạn",
+          cell: (info) => {
+            const dateVal = info.getValue();
+            const status = info.row.original.status;
+            const isOverdue = dateCol === "endDate" && status === "tre";
+            return (
+              <span className={isOverdue ? "text-red-600 font-medium" : ""}>
+                {formatDateVN(dateVal)}
+              </span>
+            );
+          },
+          size: 100,
+        }),
+        columnHelper.accessor("progressPercent", {
+          header: "%",
+          cell: (info) => `${Math.round((info.getValue() ?? 0) * 100)}%`,
+          size: 60,
+        }),
+        columnHelper.accessor("status", {
+          header: "Ghi chú",
+          cell: (info) => {
+            const status = info.getValue();
+            const delayReason = info.row.original.delayReason;
+            const waitingFront = info.row.original.waitingFront;
+            return (
+              <span className="text-xs text-zinc-500">
+                {status === "tre"
+                  ? `Đang trễ${delayReason ? ` · ${DELAY_REASON_LABEL[delayReason as keyof typeof DELAY_REASON_LABEL] ?? delayReason}` : ""}`
+                  : (STATUS_LABEL[status as StatusSlug] ?? "")}
+                {waitingFront && (
+                  <span className="text-amber-700 font-medium">
+                    {status === "tre" ? " · " : " "}⚠ chưa bàn giao MB
+                  </span>
+                )}
+              </span>
+            );
+          },
+        }),
+        // v9 gắn kiểu giá trị vào từng ColumnDef nên mảng cột hỗn hợp (string/number/null)
+        // không tự khớp `ColumnDef<..., unknown>[]` — ép về kiểu chung của tuỳ chọn `columns`.
+      ] as unknown as ColumnDef<typeof features, LTask>[],
     [dateCol],
   );
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: tasks,
     columns,
-    state: {
-      sorting,
-    },
+    state: { sorting },
     onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
   });
 
   return (
