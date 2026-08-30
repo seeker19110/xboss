@@ -51,6 +51,15 @@ internal static class VeContext
     internal static double? TuChayCaoDoThietBiMm { get; set; }
     internal static double? TuChayCaoDoXaMm { get; set; }
 
+    // ===== Gán thuộc tính tuyến tim (M115 §6 bước 2) — mồi sẵn cho lần gán sau trong phiên =====
+    // Hệ/loại tuyến/cỡ dùng chung ba trường ở trên (He/Tuyen/Size): một cơ chế nhớ duy nhất cho
+    // mọi lệnh vẽ. Bốn trường dưới là thứ chỉ XBOSS_TUYEN_GAN hỏi.
+
+    internal static double? TuyenGanCaoDoMm { get; set; }
+    internal static string? TuyenGanVatLieu { get; set; }
+    internal static string? TuyenGanCachNhiet { get; set; }
+    internal static string? TuyenGanKieuNoi { get; set; }
+
     /// <summary>Id block phụ kiện/thiết bị chọn lần trước (mặc định cho lần sau — M100 PR4).</summary>
     internal static string? PhuKienId { get; set; }
     internal static string? ThietBiId { get; set; }
@@ -161,6 +170,41 @@ internal static class VeContext
             ed.WriteMessage(
                 "\n[XBoss] Rule pack khai routingPolicy.corridorLayer rỗng — không biết đặt hành lang lên " +
                 "layer nào. Bổ sung layer hành lang vào rule pack rồi chạy lại.\n");
+            return null;
+        }
+        return cs;
+    }
+
+    /// <summary>
+    /// Khối <c>drawTools.completionPolicy</c> đang có hiệu lực (M115 §7 FR5) — cửa DUY NHẤT cho
+    /// <c>XBOSS_TUYEN_DOTHI</c> và <c>XBOSS_HOANTHIEN</c>, để hai lệnh không bao giờ nói khác nhau
+    /// về việc "hoàn thiện bản vẽ đã bật chưa".
+    ///
+    /// Trả null + hướng dẫn cách bật khi rule pack chưa khai hoặc còn <c>enabled: false</c> (AC5 —
+    /// nạp rule pack v16 mà chưa bật thì mọi lệnh cũ cho kết quả y hệt v15).
+    ///
+    /// <c>XBOSS_TUYEN_GAN</c> CỐ Ý không đi qua cửa này: nó chỉ ghi thuộc tính lên tuyến kỹ sư đã
+    /// vẽ (đúng schema XData M107), không sinh một nét nào — chặn nó chẳng bảo vệ gì mà lại khoá
+    /// mất bước chuẩn bị dữ liệu.
+    /// </summary>
+    internal static CompletionPolicySection? CanCompletionPolicy(Editor ed, DrawToolsPack pack)
+    {
+        if (pack.DrawTools.CompletionPolicy is not { } cs)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] Rule pack {pack.RulePack.Version} chưa khai drawTools.completionPolicy — " +
+                "hoàn thiện bản vẽ từ tuyến tim chưa dùng được. Nạp rule pack mới (v16 trở lên) rồi " +
+                "chạy lại.\n");
+            return null;
+        }
+        if (!cs.Enabled)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] Hoàn thiện bản vẽ từ tuyến tim đang TẮT trong rule pack {pack.RulePack.Version} " +
+                "(drawTools.completionPolicy.enabled = false) — lệnh dừng, bản vẽ không đổi.\n" +
+                "[XBoss] Cách bật: Admin/PM sửa enabled = true trong rule pack trên trang " +
+                "/engineering/chuan-hoa-ban-ve, phát hành version mới rồi chạy XBOSS_LOGIN (hoặc " +
+                "XBOSS_RULEPACK) để nạp lại.\n");
             return null;
         }
         return cs;

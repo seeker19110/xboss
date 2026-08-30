@@ -140,8 +140,21 @@ public sealed record VeXDataInfo
     /// <summary>
     /// Cao độ lỗ chờ do kỹ sư NHẬP TAY, đơn vị <b>mm</b> (khác <see cref="CaoDo"/> của mặt cắt —
     /// cái đó theo đơn vị bản vẽ; bảng builder's work luôn ghi mm nên tách khóa riêng cho khỏi lẫn).
+    ///
+    /// <para>M115 §6 bước 2: trên vai trò <see cref="VaiTroVe.Tim"/>, đây là CAO ĐỘ TIM TUYẾN do
+    /// <c>XBOSS_TUYEN_GAN</c> ghi — cùng đơn vị mm, cùng khóa XData <c>caodomm</c>, vì
+    /// <c>TuyenDauVao.CaoDoMm</c> của bộ dựng đồ thị cũng đo bằng mm.</para>
     /// </summary>
     public double? CaoDoMm { get; init; }
+
+    /// <summary>
+    /// Vật liệu tuyến do kỹ sư gõ tay ở <c>XBOSS_TUYEN_GAN</c> (M115 §6 bước 2). Rule pack không
+    /// khai danh mục vật liệu nên đây là chuỗi tự do; null = kỹ sư để trống.
+    /// </summary>
+    public string? VatLieu { get; init; }
+
+    /// <summary>Cách nhiệt tuyến, cùng cơ chế gõ tay như <see cref="VatLieu"/>.</summary>
+    public string? CachNhiet { get; init; }
 
     /// <summary>Tag của khối đã được kỹ sư KHÓA — <c>XBOSS_VE_TAG</c> đánh lại phải giữ nguyên.</summary>
     public bool TagKhoa { get; init; }
@@ -242,6 +255,20 @@ public sealed record VeXDataInfo
     /// khác vẫn tự mang theo mốc so của chính nó.</para>
     /// </summary>
     public string? BamHinhHoc { get; init; }
+
+    // ===== Hoàn thiện bản vẽ từ tuyến tim (M115 FR4) =====
+    // Khuôn idempotency của XBOSS_HOANTHIEN dùng lại chính appname XBOSS_VE (không đẻ appname mới):
+    //   nguon    = HoanThienKeHoach.NguonM115 ("M115") — <see cref="NguonHoanThien"/>
+    //   tuyenGoc = <see cref="HandleTim"/> (khóa đã có sẵn, đúng nghĩa "handle của tim")
+    //   giaiDoan = <see cref="GiaiDoanHoanThien"/>
+    // Chạy lại: xóa đúng bộ ba này rồi sinh lại. Thực thể kỹ sư tự vẽ không có dấu nên không bao
+    // giờ bị đụng; thực thể mang <see cref="SuaTay"/> thì được GIỮ (cùng luật với M114 FR12).
+
+    /// <summary>Thực thể do <c>XBOSS_HOANTHIEN</c> sinh ra; null = không phải của M115.</summary>
+    public string? NguonHoanThien { get; init; }
+
+    /// <summary>Khóa giai đoạn đã sinh ra thực thể này (<c>netDoi</c>, <c>chiaDot</c>…).</summary>
+    public string? GiaiDoanHoanThien { get; init; }
 }
 
 /// <summary>
@@ -287,6 +314,8 @@ public static class VeXData
         Them(ra, "ketcau", tt.KetCau);
         Them(ra, "truc", tt.ViTriTruc);
         if (tt.CaoDoMm is { } cdm) ra.Add($"caodomm={cdm.ToString("0.######", CultureInfo.InvariantCulture)}");
+        Them(ra, "vatlieu", tt.VatLieu);
+        Them(ra, "cachnhiet", tt.CachNhiet);
         if (tt.TagKhoa) ra.Add("tagkhoa=1");
         Them(ra, "bang", tt.LoaiBang);
         Them(ra, "kieunoi", tt.KieuNoi);
@@ -313,6 +342,8 @@ public static class VeXData
         Them(ra, "phien", tt.PhienTuyen);
         if (tt.SuaTay) ra.Add("suatay=1");
         Them(ra, "bamhh", tt.BamHinhHoc);
+        Them(ra, "nguon", tt.NguonHoanThien);
+        Them(ra, "giaidoan", tt.GiaiDoanHoanThien);
         return ra;
     }
 
@@ -356,6 +387,7 @@ public static class VeXData
         string? sizeLoCho = null, ketCau = null, viTriTruc = null, loaiBang = null;
         double? caoDo = null, caoDoMm = null;
         string? kieuNoi = null;
+        string? vatLieu = null, cachNhiet = null;
         string? tangNguon = null, nhanTang = null;
         var kieuNoiGhiDe = false;
         int? soDot = null, soMoiNoi = null, chiSoDot = null;
@@ -373,6 +405,7 @@ public static class VeXData
         double? beRongMm = null, cotDayDamMm = null, cotTranMm = null;
         string? phienTuyen = null;
         string? bamHinhHoc = null;
+        string? nguonHoanThien = null, giaiDoanHoanThien = null;
         var tuDong = false;
         var suaTay = false;
 
@@ -431,6 +464,8 @@ public static class VeXData
                     if (double.TryParse(giaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var cdm))
                         caoDoMm = cdm;
                     break;
+                case "vatlieu": vatLieu = giaTri; break;
+                case "cachnhiet": cachNhiet = giaTri; break;
                 case "tagkhoa": tagKhoa = giaTri == "1"; break;
                 case "bang": loaiBang = giaTri; break;
                 case "kieunoi": kieuNoi = giaTri; break;
@@ -481,6 +516,8 @@ public static class VeXData
                 case "phien": phienTuyen = giaTri; break;
                 case "suatay": suaTay = giaTri == "1"; break;
                 case "bamhh": bamHinhHoc = giaTri; break;
+                case "nguon": nguonHoanThien = giaTri; break;
+                case "giaidoan": giaiDoanHoanThien = giaTri; break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -507,6 +544,8 @@ public static class VeXData
             KetCau = ketCau,
             ViTriTruc = viTriTruc,
             CaoDoMm = caoDoMm,
+            VatLieu = vatLieu,
+            CachNhiet = cachNhiet,
             TagKhoa = tagKhoa,
             LoaiBang = loaiBang,
             KieuNoi = kieuNoi,
@@ -531,6 +570,8 @@ public static class VeXData
             PhienTuyen = phienTuyen,
             SuaTay = suaTay,
             BamHinhHoc = bamHinhHoc,
+            NguonHoanThien = nguonHoanThien,
+            GiaiDoanHoanThien = giaiDoanHoanThien,
         };
     }
 

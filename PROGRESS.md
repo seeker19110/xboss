@@ -1,5 +1,45 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ M115 — Hoàn thiện bản vẽ từ tuyến tim: rule pack v16 + `XBOSS_TUYEN_GAN`/`_TUYEN_DOTHI`/`_HOANTHIEN` — CODE XONG cả 4 PR (2026-08-30)
+
+`docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md`, thi hành đầu tiên của đợt "tự động triển
+khai bản vẽ MEPF" (xem mục nghiên cứu bên dưới). Kỹ sư chỉ vẽ **line/pline tuyến tim** bằng
+AutoCAD thuần từ điểm nguồn tới thiết bị — plugin tự hoàn thiện phần còn lại (nét đôi, phụ kiện,
+chia đốt, giá đỡ, lỗ chờ, ngắt nét, tag, thống kê) bằng cách **điều phối lại đúng bộ lệnh
+`XBOSS_VE_*` đã có** (M100→M114), không nhân đôi logic vẽ.
+
+- **PR1** rule pack `v16` khối `drawTools.completionPolicy` (dung sai bắt điểm gộp nút, bảng chọn
+  co/cút/tê theo hệ+size+góc, danh sách 8 giai đoạn — **mặc định TẮT hết**, merge không đổi hành
+  vi máy kỹ sư nào) + validator 2 tầng (TS + C#) + `Core/Graph/` thuần (`TuyenGraph`, `NutPhanLoai`,
+  `SuyPhuKien`, `KiemTuyen`) dựng đồ thị tuyến–thiết bị, phân loại nút, suy phụ kiện, kiểm hở/thiếu
+  size — test xunit + node:test trên CI Linux, không tham chiếu AutoCAD.
+- **PR2** `XBOSS_TUYEN_GAN` (gán hệ/size/cao độ/vật liệu/kiểu nối cho 1..n tuyến một lượt qua XData,
+  suy hệ từ `layerMap` khi khớp) + `XBOSS_TUYEN_DOTHI` (dựng đồ thị + kiểm, hộp thoại M106 cho kỹ
+  sư duyệt/sửa từng nút suy ra — chốt human-in-the-loop số 1).
+- **PR3** `XBOSS_HOANTHIEN` điều phối 8 giai đoạn cố định (`VE_NEN` → `VE_PHUKIEN` → `VE_CHIADOT` →
+  `VE_GIADO` → `VE_LOCHO` → `VE_NGATNET` → `VE_TAG` → `VE_THONGKE`) trên cả cụm tuyến, bật/tắt được
+  từng giai đoạn, ghi báo cáo phiên (`VeSessionReport`); phần tử sinh ra mang XData `nguon=M115` +
+  id tuyến gốc nên chạy lại là **idempotent** (thay thế đúng phần của chính nó, không đụng phần kỹ
+  sư vẽ/sửa tay); nối vào `LenhCatalog`/Ribbon giai đoạn "Vẽ".
+- **PR4 (việc này)** tài liệu: bảng lệnh + mục "Quy trình hoàn thiện bản vẽ từ tuyến tim" trong
+  `plugin-autocad/README.md`, mục 4c trong `CAI-DAT.md`, bảng lệnh web
+  `app/engineering/cai-dat-plugin/page.tsx`, mục verify tay mới **C11** trong
+  `VERIFY-VA-PHAT-HANH.md` (99–108, đánh dấu CHƯA LÀM).
+- **Không migration, không API mới** (M115 §9/§10–11) — dữ liệu graph sống trong DWG (XData) +
+  báo cáo phiên JSON hiện có, giống hệt các đợt plugin trước.
+- **Trạng thái: code xong, nợ verify tay AutoCAD 2026.** Cổng CI cục bộ (lint/typecheck/build) xanh
+  cho phần web; phần Adapter/Core vẫn theo cổng cũ của plugin (`XBoss.Cad.Tests` + `AcadShim`).
+  **CHƯA phát hành rộng** — xếp hàng sau khi trả nợ verify tay các đợt AutoCAD 2026 trước (M111 §C9,
+  M114 §C10 đang chặn theo `docs/nang-cap/README.md`) rồi mới tới lượt verify riêng M115 (mục C11).
+- **Nợ kỹ thuật ghi nhận qua review PR3 (không chặn, cân nhắc PR sau):** (1) `HoanThienPipeline.Chay`
+  không có try/catch bao ngoài vòng lặp 8 giai đoạn — lỗi .NET thường (không phải
+  `Autodesk.AutoCAD.Runtime.Exception`) giữa chừng sẽ bung khỏi lệnh, các giai đoạn trước đã
+  `tr.Commit()` không rollback theo (chấp nhận được vì mỗi giai đoạn tự idempotent, nhưng nên báo
+  lỗi rõ ràng hơn là để crash lệnh); (2) 4/8 giai đoạn ủy thác cho lệnh gốc (chia đốt, giá đỡ, ngắt
+  nét, thống kê) dùng cơ chế idempotent riêng theo handle tim, chưa có khái niệm `SuaTay` như 2 giai
+  đoạn do M115 tự sinh (phụ kiện, lỗ chờ) — chạy lại `XBOSS_HOANTHIEN` có thể ghi đè tinh chỉnh tay
+  của kỹ sư ở 4 giai đoạn đó.
+
 > Cập nhật sau mỗi mốc đáng kể. AI đọc file này để biết đang ở đâu.
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.

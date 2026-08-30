@@ -116,6 +116,26 @@ public sealed class VeNgatNetCommands
         var clearance = chinhSach.ClearanceMm / toMm;
         var banKinhCung = chinhSach.JogRadiusMm / toMm;
 
+        ChayNgatNet(doc, ed, pack, chinhSach, toMm, clearance, banKinhCung, hoiThamSo: true, phamViM115: null);
+    }
+
+    /// <summary>
+    /// Thân thật của <c>XBOSS_VE_NGATNET</c> — dò giao cắt, tính vùng che/cầu vượt, dọn kết quả cũ
+    /// rồi vẽ lại. Tách nguyên vẹn khỏi <see cref="NgatNet"/> để <c>XBOSS_HOANTHIEN</c> (M115 giai
+    /// đoạn ⑥) gọi lại đúng logic này; hành vi lệnh gốc không đổi vì mọi câu hỏi vẫn ở đúng chỗ cũ.
+    /// </summary>
+    /// <param name="hoiThamSo">true = lệnh gốc (hỏi phạm vi + đảo tay); false = pipeline M115.</param>
+    /// <param name="phamViM115">
+    /// Handle các tuyến tim trong phạm vi khi pipeline gọi; null + <paramref name="hoiThamSo"/>
+    /// false = cả bản vẽ.
+    /// </param>
+    internal static void ChayNgatNet(
+        Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, DrawToolsPack pack,
+        CrossingPolicySection chinhSach, double toMm, double clearance, double banKinhCung,
+        bool hoiThamSo, IReadOnlyCollection<string>? phamViM115, string? giaiDoanM115 = null)
+    {
+        var db = doc.Database;
+
         // ===== (2) Đọc tim + dò giao cắt cả bản vẽ (transaction CHỈ ĐỌC) =====
 
         List<UngVienTim> tim;
@@ -137,12 +157,33 @@ public sealed class VeNgatNetCommands
         }
 
         // ===== (3) Phạm vi + đảo tay: hộp thoại (mặc định) hoặc dòng lệnh (FR10) =====
+        // Pipeline M115 KHÔNG hỏi lại: phạm vi đã do đồ thị chốt quyết, đảo tay giữ nguyên quyết
+        // định cũ đọc từ XData ở bước (2) — kỹ sư không phải duyệt hai lần cho cùng một việc.
 
-        if (HoiThamSo(ed, cap.Select(c => c.Dong).ToList(), chinhSach, DungSaiDaGiaoMm / toMm) is not { } ts) return;
+        KetQuaHoiNgatNet ts;
+        if (hoiThamSo)
+        {
+            if (HoiThamSo(ed, cap.Select(c => c.Dong).ToList(), chinhSach, DungSaiDaGiaoMm / toMm) is not { } hoi)
+                return;
+            ts = hoi;
+        }
+        else
+        {
+            ts = new KetQuaHoiNgatNet(
+                phamViM115 is null ? PhamViNgatNet.ToanBanVe : PhamViNgatNet.ChonTay,
+                cap.Select(c => c.Dong).ToList());
+        }
 
         var trongPhamVi = cap;
         var tomTatChon = new TomTatChonNgatNet(SoTim: tim.Count);
-        if (ts.PhamVi == PhamViNgatNet.ChonTay)
+        if (!hoiThamSo && phamViM115 is not null)
+        {
+            var handleM115 = new HashSet<string>(phamViM115, StringComparer.OrdinalIgnoreCase);
+            trongPhamVi = cap
+                .Where(c => handleM115.Contains(c.A.Handle) || handleM115.Contains(c.B.Handle))
+                .ToList();
+        }
+        else if (ts.PhamVi == PhamViNgatNet.ChonTay)
         {
             if (HoiVungChon(ed, db, tim) is not { } vungChon) return;
             tomTatChon = vungChon.TomTat;
@@ -164,7 +205,7 @@ public sealed class VeNgatNetCommands
         // ===== (4) Tính hình học từng điểm giao (Core thuần, CHƯA đụng bản vẽ) =====
 
         var boQua = new List<string>();
-        var viec = DungViecVe(trongPhamVi, chinhSach, clearance, banKinhCung, pack, boQua);
+        var viec = DungViecVe(trongPhamVi, chinhSach, clearance, banKinhCung, pack, boQua, giaiDoanM115);
         foreach (var d in boQua) ed.WriteMessage($"[XBoss] ⚠ {d}\n");
 
         // Cặp bị dọn kết quả cũ = mọi cặp TRONG PHẠM VI, kể cả cặp lần này không vẽ nữa (đổi
@@ -487,7 +528,8 @@ public sealed class VeNgatNetCommands
         double clearance,
         double banKinhCung,
         DrawToolsPack pack,
-        List<string> boQua)
+        List<string> boQua,
+        string? giaiDoanM115)
     {
         var ra = new List<ViecVeDiem>();
         var soGocGat = 0;
@@ -555,6 +597,8 @@ public sealed class VeNgatNetCommands
                     VeLayerStyle.AciChoTim(timDuoi.ChoCore.EdgeStyle),
                     new VeXDataInfo
                     {
+                        NguonHoanThien = giaiDoanM115 is null ? null : HoanThienKeHoach.NguonM115,
+                        GiaiDoanHoanThien = giaiDoanM115,
                         VaiTro = VaiTroVe.NgatNet,
                         HeId = timDuoi.ChoCore.HeId,
                         ItemId = timDuoi.ChoCore.ItemId,

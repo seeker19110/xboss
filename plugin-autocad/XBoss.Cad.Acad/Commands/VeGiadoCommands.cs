@@ -60,6 +60,20 @@ public sealed class VeGiadoCommands
             return;
         }
 
+        ChayGiaDo(doc, ed, pack, thuVien, he, def0, cheDo, taiMoiPhuKien, chon.Value.GetObjectIds());
+    }
+
+    /// <summary>
+    /// Thân thật của <c>XBOSS_VE_GIADO</c> — tính vị trí giá đỡ trên các tim đã chọn rồi chèn cả lô.
+    /// Tách nguyên vẹn khỏi <see cref="DatGiaDo"/> để <c>XBOSS_HOANTHIEN</c> (M115 giai đoạn ④) gọi
+    /// lại đúng logic này; mọi hỏi đáp vẫn nằm ở lệnh gốc nên hành vi lệnh gốc không đổi.
+    /// </summary>
+    internal static void ChayGiaDo(
+        Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, DrawToolsPack pack,
+        BlockManifest thuVien, DrawSystem he, BlockDef def0, CheDoChiaGiaDo cheDo, bool taiMoiPhuKien,
+        IReadOnlyList<ObjectId> idTim, string? giaiDoanM115 = null)
+    {
+        var db = doc.Database;
         var (toMm, canCanhBaoDonVi, tenDonVi) = DrawingUnits.TuInsUnits((int)db.Insunits);
         if (canCanhBaoDonVi)
         {
@@ -76,7 +90,7 @@ public sealed class VeGiadoCommands
         using (var tr = db.TransactionManager.StartTransaction())
         {
             var khoiTheoTim = VeThucThe.KhoiTheoTim(db, tr);
-            foreach (var id in chon.Value.GetObjectIds())
+            foreach (var id in idTim)
             {
                 if (tr.GetObject(id, OpenMode.ForRead) is not Polyline pl) continue;
                 var xd = VeXDataStore.Doc(pl);
@@ -139,6 +153,8 @@ public sealed class VeGiadoCommands
                         pl.Layer,
                         new VeXDataInfo
                         {
+                            NguonHoanThien = giaiDoanM115 is null ? null : HoanThienKeHoach.NguonM115,
+                            GiaiDoanHoanThien = giaiDoanM115,
                             VaiTro = VaiTroVe.GiaDo,
                             HeId = xd.HeId,
                             ItemId = xd.ItemId,

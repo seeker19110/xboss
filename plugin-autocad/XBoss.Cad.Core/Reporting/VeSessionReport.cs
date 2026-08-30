@@ -150,6 +150,29 @@ public sealed record VeTuyenTuDongCum
     [JsonPropertyName("soPhien")] public required int SoPhien { get; init; }
 }
 
+/// <summary>
+/// Một giai đoạn của <c>XBOSS_HOANTHIEN</c> đã để lại dấu trong bản vẽ (M115 FR3/FR4). Đọc từ
+/// XData <c>nguon=M115</c> + <c>giaiDoan</c> đang sống trên chính thực thể, nên mở lại bản vẽ ở máy
+/// khác vẫn dựng lại được — đúng nguồn dữ liệu của báo cáo phiên vẽ.
+/// </summary>
+public sealed record VeHoanThienGiaiDoan
+{
+    /// <summary>Khóa giai đoạn (<c>netDoi</c>, <c>phuKienTaiNut</c>…).</summary>
+    [JsonPropertyName("giaiDoan")] public required string GiaiDoan { get; init; }
+
+    /// <summary>Nhãn tiếng Việt của giai đoạn; khóa lạ (rule pack sau) giữ nguyên chuỗi khóa.</summary>
+    [JsonPropertyName("nhan")] public required string Nhan { get; init; }
+
+    /// <summary>Số thực thể giai đoạn này đã sinh ra và còn sống trong bản vẽ.</summary>
+    [JsonPropertyName("soThucThe")] public required int SoThucThe { get; init; }
+
+    /// <summary>Số tuyến tim khác nhau mà giai đoạn này đã hoàn thiện.</summary>
+    [JsonPropertyName("soTuyen")] public required int SoTuyen { get; init; }
+
+    /// <summary>Trong đó bao nhiêu thực thể mang dấu SỬA TAY — chạy lại luôn giữ nguyên (FR4).</summary>
+    [JsonPropertyName("soSuaTay")] public required int SoSuaTay { get; init; }
+}
+
 /// <summary>Số đối tượng mang một version rule pack/thư viện khác bản đang dùng.</summary>
 public sealed record VeVersionKhac
 {
@@ -209,6 +232,18 @@ public sealed class VeSessionReport
     /// </summary>
     [JsonPropertyName("nhanTang")] public IReadOnlyList<VeNhanTangCum> NhanTang { get; init; } = [];
 
+    /// <summary>
+    /// Mục hoàn thiện bản vẽ (M115 FR3): mỗi giai đoạn của <c>XBOSS_HOANTHIEN</c> đã sinh bao nhiêu
+    /// thực thể. KHÔNG khai <c>required</c> để báo cáo dựng bằng mã cũ vẫn biên dịch được.
+    /// </summary>
+    [JsonPropertyName("hoanThien")] public IReadOnlyList<VeHoanThienGiaiDoan> HoanThien { get; init; } = [];
+
+    /// <summary>Số nút kỹ sư đã bấm BỎ QUA ở bước duyệt đồ thị (<c>pk.BoQua=1</c> — M115 §6 bước 4).</summary>
+    [JsonPropertyName("hoanThienNutBoQua")] public int HoanThienNutBoQua { get; init; }
+
+    /// <summary>Số nút CHƯA QUYẾT được phụ kiện — plugin không chèn block gần đúng (M115 FR2).</summary>
+    [JsonPropertyName("hoanThienNutChuaQuyet")] public int HoanThienNutChuaQuyet { get; init; }
+
     /// <summary>Nhật ký tương tác của phiên: đụng độ định nghĩa block và lựa chọn của kỹ sư (AC7).</summary>
     [JsonPropertyName("nhatKy")] public required IReadOnlyList<string> NhatKy { get; init; }
     [JsonPropertyName("canhBao")] public required IReadOnlyList<string> CanhBao { get; init; }
@@ -231,8 +266,13 @@ public sealed class VeSessionReport
     /// Dựng báo cáo từ XData của mọi đối tượng do bộ lệnh vẽ sinh ra trong bản vẽ.
     /// <paramref name="nhatKy"/> = <c>VeContext.NhatKyPhien</c> của Adapter (có thể rỗng).
     /// </summary>
+    /// <param name="doThi">
+    /// Đồ thị đã chốt của <c>XBOSS_TUYEN_DOTHI</c> (M115) — nguồn của hai con số "nút bỏ qua" và
+    /// "nút chưa quyết". null = bản vẽ chưa chốt đồ thị lần nào.
+    /// </param>
     public static VeSessionReport Dung(
-        IEnumerable<VeXDataInfo> doiTuong, VeSessionMeta meta, IReadOnlyList<string>? nhatKy = null)
+        IEnumerable<VeXDataInfo> doiTuong, VeSessionMeta meta, IReadOnlyList<string>? nhatKy = null,
+        Graph.DoThiChot? doThi = null)
     {
         var theoHe = new Dictionary<string, VeThongKeHe>(StringComparer.Ordinal);
         var sizeCustom = new Dictionary<(string He, string Item, string Size), int>();
@@ -241,6 +281,7 @@ public sealed class VeSessionReport
         var nhanTang = new Dictionary<(string Nguon, string Dich), int>();
         var ngatNet = new Dictionary<(string He, string Item, string Size), (int So, int Dao)>();
         var tuDong = new Dictionary<(string He, string Item, string Size), (int So, int Sua, HashSet<string> Phien)>();
+        var hoanThien = new Dictionary<string, (int So, int Sua, HashSet<string> Tuyen)>(StringComparer.Ordinal);
         var rulePackKhac = new Dictionary<string, int>(StringComparer.Ordinal);
         var thuVienKhac = new Dictionary<string, int>(StringComparer.Ordinal);
         var revision = new Dictionary<int, int>();
@@ -301,6 +342,17 @@ public sealed class VeSessionReport
                 if (!tuDong.TryGetValue(khoaTd, out var cuTd)) cuTd = (0, 0, new HashSet<string>(StringComparer.Ordinal));
                 if (xd.PhienTuyen is { Length: > 0 } phien) cuTd.Phien.Add(phien);
                 tuDong[khoaTd] = (cuTd.So + 1, cuTd.Sua + (xd.SuaTay ? 1 : 0), cuTd.Phien);
+            }
+
+            // Mục hoàn thiện (M115 FR3/FR4): chỉ thực thể do XBOSS_HOANTHIEN sinh ra mới mang dấu
+            // nguon=M115; giai đoạn nào sinh ra nó nằm ngay trên XData, không phải suy từ vai trò.
+            if (string.Equals(xd.NguonHoanThien, HoanThienKeHoach.NguonM115, StringComparison.Ordinal) &&
+                xd.GiaiDoanHoanThien is { Length: > 0 } giaiDoan)
+            {
+                if (!hoanThien.TryGetValue(giaiDoan, out var cuHt))
+                    cuHt = (0, 0, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+                if (xd.HandleTim is { Length: > 0 } timGoc) cuHt.Tuyen.Add(timGoc);
+                hoanThien[giaiDoan] = (cuHt.So + 1, cuHt.Sua + (xd.SuaTay ? 1 : 0), cuHt.Tuyen);
             }
 
             // Mục ngắt nét (M109 FR9): XData của đối tượng ngắt nét mang hệ/loại/cỡ của tuyến ĐI
@@ -397,6 +449,27 @@ public sealed class VeSessionReport
             .ThenBy(c => c.Size, StringComparer.Ordinal)
             .ToList();
 
+        // Thứ tự bảng hoàn thiện bám ĐÚNG thứ tự chạy 1..8 của HoanThienKeHoach.DanhMuc (không sắp
+        // theo bảng chữ cái): người đọc báo cáo đang dò lại đúng trình tự lệnh đã chạy.
+        var dsHoanThien = hoanThien
+            .Select(kv => new
+            {
+                Khoa = kv.Key,
+                GiaiDoan = HoanThienKeHoach.Tim(kv.Key),
+                kv.Value,
+            })
+            .OrderBy(x => x.GiaiDoan?.SoThuTu ?? int.MaxValue)
+            .ThenBy(x => x.Khoa, StringComparer.Ordinal)
+            .Select(x => new VeHoanThienGiaiDoan
+            {
+                GiaiDoan = x.Khoa,
+                Nhan = x.GiaiDoan?.Nhan ?? x.Khoa,
+                SoThucThe = x.Value.So,
+                SoTuyen = x.Value.Tuyen.Count,
+                SoSuaTay = x.Value.Sua,
+            })
+            .ToList();
+
         var canhBao = new List<string>();
         if (dsSizeCustom.Count > 0)
         {
@@ -452,6 +525,17 @@ public sealed class VeSessionReport
                     .Select(c => $"{c.HeId}/{c.ItemId} {c.Size}: {c.SoSuaTay}")) +
                 ") — XBOSS_VE_TUYENTUDONG chạy lại sẽ GIỮ NGUYÊN chúng, soát lại trước khi phát hành.");
         }
+        var soSuaTayHt = dsHoanThien.Sum(c => c.SoSuaTay);
+        if (soSuaTayHt > 0)
+        {
+            // FR4 — thực thể hoàn thiện đã sửa tay được GIỮ khi chạy lại, nên nó là chỗ duy nhất
+            // người nghiệm thu thấy được "chỗ này không còn khớp kết quả tự động".
+            canhBao.Add(
+                $"{soSuaTayHt} thực thể do XBOSS_HOANTHIEN sinh ra mang dấu SỬA TAY (" +
+                string.Join(", ", dsHoanThien.Where(c => c.SoSuaTay > 0)
+                    .Select(c => $"{c.Nhan}: {c.SoSuaTay}")) +
+                ") — chạy lại lệnh sẽ GIỮ NGUYÊN chúng, soát lại trước khi phát hành.");
+        }
         if (thuVienKhac.Count > 0)
         {
             canhBao.Add(
@@ -486,6 +570,10 @@ public sealed class VeSessionReport
             ThuVienKhac = thuVienKhac.OrderBy(k => k.Key, StringComparer.Ordinal)
                 .Select(k => new VeVersionKhac { Version = k.Key, SoDoiTuong = k.Value }).ToList(),
             NhanTang = dsNhanTang,
+            HoanThien = dsHoanThien,
+            HoanThienNutBoQua = doThi?.PhuKien.Count(p => p.BoQua) ?? 0,
+            HoanThienNutChuaQuyet =
+                doThi?.PhuKien.Count(p => !p.BoQua && p.TrangThai == Graph.TrangThaiPhuKien.ChuaQuyet) ?? 0,
             NhatKy = nhatKy is null ? [] : [.. nhatKy],
             CanhBao = canhBao,
         };
@@ -610,6 +698,22 @@ public sealed class VeSessionReport
                 sb.AppendLine(
                     $"  - {c.HeId}/{c.ItemId} {c.Size}: {c.SoNhanh} nhánh, {c.SoPhien} phiên chạy" +
                     (c.SoSuaTay > 0 ? $" (trong đó {c.SoSuaTay} nhánh đã sửa tay — chạy lại giữ nguyên)" : ""));
+            }
+        }
+        if (HoanThien.Count > 0)
+        {
+            sb.AppendLine("Hoàn thiện bản vẽ (XBOSS_HOANTHIEN) — theo từng giai đoạn, thứ tự chạy ① → ⑧:");
+            foreach (var c in HoanThien)
+            {
+                sb.AppendLine(
+                    $"  - {c.Nhan}: {c.SoThucThe} thực thể trên {c.SoTuyen} tuyến" +
+                    (c.SoSuaTay > 0 ? $" (trong đó {c.SoSuaTay} đã sửa tay — chạy lại giữ nguyên)" : ""));
+            }
+            if (HoanThienNutBoQua + HoanThienNutChuaQuyet > 0)
+            {
+                sb.AppendLine(
+                    $"  - Nút KHÔNG chèn phụ kiện: {HoanThienNutBoQua} nút kỹ sư bấm bỏ qua, " +
+                    $"{HoanThienNutChuaQuyet} nút chưa quyết được (plugin không chèn block gần đúng).");
             }
         }
         if (NgatNet.Count > 0)

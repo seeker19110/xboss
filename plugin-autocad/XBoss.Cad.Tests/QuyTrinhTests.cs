@@ -97,6 +97,8 @@ public class QuyTrinhTests
                 // XBOSS_VE_TUYENTUDONG đứng TRƯỚC XBOSS_VE (M114 FR16).
                 "XBOSS_VE_NEN", "XBOSS_VE_TUYENTUDONG", "XBOSS_VE", "XBOSS_VE_NHANTUYEN", "XBOSS_VE_NHAN",
                 "XBOSS_VE_PHUKIEN", "XBOSS_VE_THIETBI", "XBOSS_VE_NHANTANG", "XBOSS_VE_DOI",
+                // M115 §6 bước 2–3–5 — gán thuộc tính tuyến tim, dựng/duyệt đồ thị, rồi hoàn thiện.
+                "XBOSS_TUYEN_GAN", "XBOSS_TUYEN_DOTHI", "XBOSS_HOANTHIEN",
             ],
             QuyTrinh.LenhCua(BuocQuyTrinh.VeShopDrawing).Select(l => l.Ten));
         Assert.Equal(
@@ -145,6 +147,7 @@ public class QuyTrinhTests
                 "XBOSS_VE_HANHLANG",
                 "XBOSS_VE_NEN", "XBOSS_VE_TUYENTUDONG", "XBOSS_VE", "XBOSS_VE_NHANTUYEN", "XBOSS_VE_NHAN",
                 "XBOSS_VE_PHUKIEN", "XBOSS_VE_THIETBI", "XBOSS_VE_NHANTANG", "XBOSS_VE_DOI",
+                "XBOSS_TUYEN_GAN", "XBOSS_TUYEN_DOTHI", "XBOSS_HOANTHIEN",
                 "XBOSS_VE_CHIADOT", "XBOSS_VE_GIADO", "XBOSS_VE_LOCHO", "XBOSS_VE_TAG",
                 "XBOSS_VE_MATCAT", "XBOSS_VE_THONGKE", "XBOSS_VE_NGATNET", "XBOSS_VE_TRANGIN",
                 "XBOSS_VE_REV", "XBOSS_VE_REV_CHOT", "XBOSS_VE_REV_HIENTHI", "XBOSS_VE_BAOCAO",

@@ -60,6 +60,20 @@ public sealed class DrawToolsSection
     /// </summary>
     [JsonPropertyName("routingPolicy")] public RoutingPolicySection? RoutingPolicy { get; init; }
 
+    /// <summary>
+    /// Chính sách hoàn thiện bản vẽ từ tuyến tim (M115 §7 FR5, rule pack v16 trở đi).
+    /// <c>null</c> = rule pack cũ chưa khai ⇒ <c>XBOSS_TUYEN_DOTHI</c>/<c>XBOSS_HOANTHIEN</c>
+    /// từ chối chạy kèm thông báo, không đoán mặc định ngầm.
+    /// </summary>
+    [JsonPropertyName("completionPolicy")] public CompletionPolicySection? CompletionPolicy { get; init; }
+
+    /// <summary>Tập <c>fittings</c> của từng hệ — nguồn kiểm chống trôi id phụ kiện.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyCollection<string>> PhuKienCuaHe() =>
+        Systems.ToDictionary(
+            s => s.Id,
+            s => (IReadOnlyCollection<string>)new HashSet<string>(s.Fittings, StringComparer.Ordinal),
+            StringComparer.Ordinal);
+
     /// <summary>Block phụ kiện (theo id manifest) có phải phụ kiện nặng không.</summary>
     public bool LaPhuKienNang(string? blockId) =>
         blockId is { Length: > 0 } id &&
@@ -507,6 +521,13 @@ public static class DrawToolsConfig
         // (i) khối đi tuyến tự động (v15) khai rồi thì phải hợp lệ — cùng bộ luật với validator TS
         // (kiemRoutingPolicy trong lib/ky-thuat/cad/rule-pack.ts), M114 §6.
         if (drawTools.RoutingPolicy is { } routing) ValidateRoutingPolicy(routing, systemIds);
+
+        // (k) khối hoàn thiện bản vẽ từ tuyến tim (v16) khai rồi thì phải hợp lệ — cùng bộ luật với
+        // validator TS (kiemCompletionPolicy trong lib/ky-thuat/cad/rule-pack.ts), M115 §7 FR5.
+        // Kiểm theo ĐÚNG tập fittings của từng hệ: blockId trỏ vào phụ kiện không có thật nghĩa là
+        // nút đó lặng lẽ ra "chưa quyết" hoặc lệnh chèn block không tồn tại, không ai biết.
+        if (drawTools.CompletionPolicy is { } completion)
+            CompletionPolicyConfig.Validate(completion, drawTools.PhuKienCuaHe());
     }
 
     /// <summary>Kiểm khối <c>drawTools.revisionPolicy</c> (M110 §5). Sai → RulePackException tiếng Việt.</summary>
