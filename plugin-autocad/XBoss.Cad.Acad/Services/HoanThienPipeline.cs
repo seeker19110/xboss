@@ -42,8 +42,12 @@ namespace XBoss.Cad.Acad.Services;
 /// </summary>
 internal static class HoanThienPipeline
 {
-    /// <summary>Kết quả một giai đoạn để lệnh in tóm tắt và ghi báo cáo phiên.</summary>
-    internal sealed record KetQuaGiaiDoan(GiaiDoanHoanThien GiaiDoan, bool DaChay, string TomTat);
+    /// <summary>
+    /// Kết quả một giai đoạn để lệnh in tóm tắt và ghi báo cáo phiên.
+    /// <paramref name="Loi"/> (M118 FR1/AC1): true khi giai đoạn ném exception giữa chừng —
+    /// pipeline vẫn đi tiếp giai đoạn kế, không để một giai đoạn hỏng chặn 7 giai đoạn còn lại.
+    /// </summary>
+    internal sealed record KetQuaGiaiDoan(GiaiDoanHoanThien GiaiDoan, bool DaChay, string TomTat, bool Loi = false);
 
     /// <summary>Một tuyến tim trong phạm vi, đã tra được ObjectId thật trong bản vẽ.</summary>
     private sealed record TuyenTrongBanVe(
@@ -62,27 +66,37 @@ internal static class HoanThienPipeline
         var (toMm, _, _) = DrawingUnits.TuInsUnits((int)db.Insunits);
 
         var tuyen = DocTuyenTrongPhamVi(db, chot);
-        var ra = new List<KetQuaGiaiDoan>();
 
-        foreach (var viec in keHoach)
-        {
-            ed.WriteMessage($"\n[XBoss] ===== {viec.GiaiDoan.Nhan} ({viec.GiaiDoan.Lenh}) =====\n");
-            var kq = viec.GiaiDoan.Ten switch
+        // M118 FR1/AC1: cách ly lỗi từng giai đoạn qua helper THUẦN của Core
+        // (HoanThienKeHoach.ChayCachLyLoi) — giai đoạn hỏng KHÔNG được chặn các giai đoạn sau
+        // (transaction của nó đã tự abort bên trong service con, ở đây chỉ ghi nhận và đi tiếp,
+        // không mở/đóng transaction bao ngoài).
+        return HoanThienKeHoach.ChayCachLyLoi(
+            keHoach,
+            viec =>
             {
-                "netDoi" => NetDoi(doc, ed, pack, chot, viec),
-                "phuKienTaiNut" => PhuKienTaiNut(doc, ed, pack, thuVien, chot, viec, tuyen, toMm),
-                "chiaDot" => ChiaDot(doc, ed, pack, viec, tuyen, toMm),
-                "giaDo" => GiaDo(doc, ed, pack, thuVien, chot, viec, tuyen),
-                "loCho" => LoCho(doc, ed, pack, thuVien, viec, tuyen, toMm),
-                "ngatNet" => NgatNet(doc, ed, pack, viec, tuyen, toMm),
-                "tag" => Tag(doc, ed, pack, viec),
-                "thongKe" => ThongKe(doc, ed, pack, viec),
-                _ => new KetQuaGiaiDoan(viec.GiaiDoan, false, "Giai đoạn lạ — bỏ qua."),
-            };
-            ed.WriteMessage($"[XBoss] {(kq.DaChay ? "✔" : "—")} {kq.TomTat}\n");
-            ra.Add(kq);
-        }
-        return ra;
+                ed.WriteMessage($"\n[XBoss] ===== {viec.GiaiDoan.Nhan} ({viec.GiaiDoan.Lenh}) =====\n");
+                var kq = viec.GiaiDoan.Ten switch
+                {
+                    "netDoi" => NetDoi(doc, ed, pack, chot, viec),
+                    "phuKienTaiNut" => PhuKienTaiNut(doc, ed, pack, thuVien, chot, viec, tuyen, toMm),
+                    "chiaDot" => ChiaDot(doc, ed, pack, viec, tuyen, toMm),
+                    "giaDo" => GiaDo(doc, ed, pack, thuVien, chot, viec, tuyen),
+                    "loCho" => LoCho(doc, ed, pack, thuVien, viec, tuyen, toMm),
+                    "ngatNet" => NgatNet(doc, ed, pack, viec, tuyen, toMm),
+                    "tag" => Tag(doc, ed, pack, viec),
+                    "thongKe" => ThongKe(doc, ed, pack, viec),
+                    _ => new KetQuaGiaiDoan(viec.GiaiDoan, false, "Giai đoạn lạ — bỏ qua."),
+                };
+                ed.WriteMessage($"[XBoss] {(kq.DaChay ? "✔" : "—")} {kq.TomTat}\n");
+                return kq;
+            },
+            (viec, ex) =>
+            {
+                var kq = new KetQuaGiaiDoan(viec.GiaiDoan, false, $"lỗi — {ex.Message}", Loi: true);
+                ed.WriteMessage($"[XBoss] ✖ {kq.TomTat}\n");
+                return kq;
+            });
     }
 
     // ======================================================================================

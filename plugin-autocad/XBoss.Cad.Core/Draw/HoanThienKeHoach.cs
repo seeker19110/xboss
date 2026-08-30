@@ -155,4 +155,35 @@ public static class HoanThienKeHoach
         }
         return new KeHoachThayThe(canXoa, giuSuaTay, giuNgoai);
     }
+
+    /// <summary>
+    /// Chạy tuần tự từng việc, CÁCH LY LỖI (M118 FR1/AC1): việc nào ném exception thì bắt lại, gọi
+    /// <paramref name="khiLoi"/> để dựng kết quả lỗi, rồi ĐI TIẾP việc kế — không exception nào
+    /// thoát khỏi hàm này và không việc nào bị bỏ sót khỏi kết quả trả về. THUẦN (không biết
+    /// AutoCAD) nên test được trực tiếp bằng delegate mock, không cần AcadShim.
+    ///
+    /// <c>HoanThienPipeline.Chay</c> (Adapter <c>XBoss.Cad.Acad</c>, không build được trên Linux)
+    /// gọi hàm này để chạy 8 giai đoạn của <c>XBOSS_HOANTHIEN</c> — thân từng giai đoạn nằm trong
+    /// tham số <paramref name="chay"/> nên một giai đoạn hỏng (thiếu tham số rule pack, exception
+    /// .NET thường…) không được phép chặn các giai đoạn còn lại.
+    /// </summary>
+    public static IReadOnlyList<TKetQua> ChayCachLyLoi<TViec, TKetQua>(
+        IEnumerable<TViec> danhSach, Func<TViec, TKetQua> chay, Func<TViec, Exception, TKetQua> khiLoi)
+    {
+        var ra = new List<TKetQua>();
+        foreach (var viec in danhSach)
+        {
+            TKetQua kq;
+            try
+            {
+                kq = chay(viec);
+            }
+            catch (Exception ex)
+            {
+                kq = khiLoi(viec, ex);
+            }
+            ra.Add(kq);
+        }
+        return ra;
+    }
 }
