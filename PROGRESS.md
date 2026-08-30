@@ -4,14 +4,26 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## ✅ Dọn PR tồn + chặn XSS lưu trữ qua SVG (2026-08-30)
+
+**Đã làm**
+
+- **Bảo mật — XSS lưu trữ qua SVG:** `generateAsBuiltStamp` (`engineering-god-tier.ts`), `generateSpoolIsometricDrawing` (`engineering-cad-dfma-isometric.ts`) và `generateAsBuiltRedlineAndStamp` (`engineering-scan-to-bim.ts`) nhúng thẳng chuỗi người dùng nhập (mã model, spoolCode, tên nhà thầu/chỉ huy) vào SVG; SVG đó lại được render bằng `dangerouslySetInnerHTML` ở `/engineering/god-tier-studio` và `/engineering/cad-corridor` → attribute sự kiện chèn qua innerHTML CÓ chạy. Thêm `lib/nen/escape.ts` (`escapeXml`, tầng 0 theo ADR-0007) và escape mọi điểm nội suy; `lib/ha-tang/qr.ts` re-export `escapeHtml` từ đó (DRY, giữ tên cũ). Test hồi quy trong `tests/engineering-god-tier.test.ts`. Vớt lại từ PR #378 — nhánh đó không còn tổ tiên chung với `main` nên không hoà được.
+- **Dọn PR tồn:** đóng #388 (M99 PR5 — nội dung đã có trên `main`, `main` còn đi xa hơn qua #432/#438), #372 (6 bug SQL — đã sửa hết trên `main`), #365 (CAD — `main` đã lên bộ ghi DXF R2000, hoà vào sẽ kéo lùi), #378 (phần webhook/OTP đã có trên `main`, phần XSS vớt sang mục trên).
+
+**Nợ kỹ thuật ghi nhận**
+
+- Lịch sử `main` từng bị force-push nên các nhánh PR mở trước đó **không còn merge-base** với `main` — mọi PR cũ còn tồn phải viết lại trên nền `main` thay vì hoà. Cần tránh lặp lại force-push trên `main`.
+- `metadata` (job `pr-policy`) đòi PR có đủ 6 mục tiêu đề; PR do dependabot mở luôn thiếu → phải sửa mô tả PR bằng tay trước khi merge. Cân nhắc miễn trừ cho `dependabot[bot]`.
+
 ## 📐 Nghiên cứu + đặc tả đợt "tự động triển khai bản vẽ từ sơ đồ nguyên lý MEPF" (2026-08-30)
 
 Nhánh `claude/mepf-auto-deploy-plugin-6qsbq8`. Khảo sát thị trường tool auto-routing MEP có AI
 2024–2026 (Augmenta, FireDesign.ai, MagiCAD, Stabicad, eVolve/SysQue, Firmus/Kreo, Revit 2026…)
 đối chiếu nền tảng plugin M99→M114. **Người dùng chốt hướng:** kỹ sư vẽ line/pline tuyến tim từ
 nguồn tới thiết bị (kèm thuộc tính/cao độ) — plugin tự hoàn thiện bản vẽ (nét đôi, tê, co/cút,
-chia đốt, giá đỡ, lỗ chờ, ngắt nét, tag, thống kê), tích hợp thẳng vào plugin; nguyên tắc: *AI
-hiểu ngữ nghĩa, thuật toán vẽ hình học*. Viết 3 đặc tả mới, người dùng **duyệt cả 3 cùng ngày (Approved for implementation)**; kế hoạch thi hành trọn đợt ở `PLAN.md`:
+chia đốt, giá đỡ, lỗ chờ, ngắt nét, tag, thống kê), tích hợp thẳng vào plugin; nguyên tắc: _AI
+hiểu ngữ nghĩa, thuật toán vẽ hình học_. Viết 3 đặc tả mới, người dùng **duyệt cả 3 cùng ngày (Approved for implementation)**; kế hoạch thi hành trọn đợt ở `PLAN.md`:
 
 - `docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md` — `XBOSS_TUYEN_GAN`/`_TUYEN_DOTHI`/
   `_HOANTHIEN`, rule pack `completionPolicy`, không migration/API. Thi hành đầu tiên.
