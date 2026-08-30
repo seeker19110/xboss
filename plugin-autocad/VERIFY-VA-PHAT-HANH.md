@@ -682,6 +682,34 @@ nào…`), nút chuyển nền chìm + chữ mờ.
 108. **Hộp thoại:** soi theo checklist C8b (nền tối, danh sách nút/nhánh/phụ kiện của
      `XBOSS_TUYEN_DOTHI` đọc rõ, nút OK khóa kèm lý do khi đồ thị còn lỗi chặn).
 
+### C12. Cách ly lỗi + bảo vệ sửa tay + cảnh báo phiên bản plugin (M118 — CHƯA LÀM, xếp SAU C9/C10/C11)
+
+> **Chưa verify tay mục này.** Xếp hàng SAU C9 (M111), C10 (M114), C11 (M115) theo đúng thứ tự nợ
+> verify tay hiện có (`docs/nang-cap/README.md`) — không chen ngang. Mục này gồm 2 phần: phần AC2
+> (FR2 — bảo vệ sửa tay của `XBOSS_HOANTHIEN` khi dời tay giá đỡ/vạch chia/bảng thống kê) do **Y2**
+> bổ sung sau, CHƯA viết ở đây; phần dưới đây chỉ ghi kịch bản **AC5** (FR3 — cảnh báo phiên bản)
+> và **AC7** (FR1+FR2 — một lần `U`), là phần đã code xong ở PR3.
+
+109. **AC5 — hai máy lệch bản, cảnh báo đúng cả hai số.** Trên MÁY A: đóng gói plugin với
+     `<Version>` trong `Directory.Build.props` thấp hơn bản đang phát hành trên server (vd cài bản
+     `1.0.0` trong khi trang `/engineering/cai-dat-plugin` đang phát hành `1.2.0`). Ghép thiết bị
+     bằng `XBOSS_LOGIN`, rồi chạy `XBOSS_RULEPACK` (chọn 1 tệp rule pack JSON hợp lệ) → sau dòng
+     `Đã nạp rule pack ...` phải in thêm đúng 1 dòng
+     `⚠ Plugin đang chạy 1.0.0, server phát hành 1.2.0 — tải bản mới tại <baseUrl>/engineering/cai-dat-plugin`
+     (baseUrl đúng địa chỉ server đã ghép ở `XBOSS_LOGIN`, KHÔNG phải biến môi trường máy). Mở
+     `XBOSS_BANG` (bảng điều khiển) → khối "Kết nối XBoss" có dòng "Phiên bản plugin: 1.0.0
+     (server: 1.2.0 — cũ)" màu cảnh báo. Trên MÁY B đã cài đúng bản `1.2.0`: chạy lại 2 bước trên →
+     KHÔNG có dòng `⚠` nào ở `XBOSS_RULEPACK`, `XBOSS_BANG` hiện "Phiên bản plugin: 1.2.0 (server:
+     1.2.0)" không cảnh báo. Rút mạng (hoặc tắt Wi-Fi) rồi chạy lại `XBOSS_RULEPACK` trên MÁY A →
+     lệnh **vẫn nạp rule pack bình thường**, KHÔNG in dòng `⚠` nào (không chắc thì im lặng, §7 FR3);
+     `XBOSS_BANG` lúc này hiện "Phiên bản plugin: 1.0.0 (server: chưa rõ)".
+110. **AC7 — một lần `U` sau `XBOSS_HOANTHIEN` kể cả lần chạy có giai đoạn lỗi.** Cần đợi Y2
+     (FR1/FR2) hoàn thành trước khi verify được mục này — ghi chỗ đứng trước, chưa chạy: sau khi
+     Y2 xong, cố tình làm giai đoạn ④ (giá đỡ) lỗi (vd khoá layer đích không mở khoá được), chạy
+     `XBOSS_HOANTHIEN` → 7/8 giai đoạn xong kèm dòng `✖ Giá đỡ: lỗi — ...`, sau đó `U` **một lần**
+     → toàn bộ phần đã vẽ của lần chạy đó (kể cả các giai đoạn đã xong trước lỗi) biến mất, bản vẽ
+     về đúng trạng thái trước khi gọi lệnh.
+
 ---
 
 ## D. Kiểm thử có server — dựng tại chỗ trên máy mình

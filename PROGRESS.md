@@ -27,6 +27,22 @@ không thi hành") → đặc tả chuyển **Approved for implementation**; k�
 nhánh nền Pha 4 = `origin/main`, độc lập M116/M117). **Trạng thái: CHƯA KÍCH HOẠT thi hành —
 chờ lệnh riêng.** Cổng phát hành rộng toàn cụm vẫn là trả nợ verify tay AutoCAD 2026.
 
+**Y3 (M118 PR3 — FR3 cảnh báo phiên bản plugin) — CODE XONG, CHỜ MERGE (2026-08-30):**
+`app/api/engineering/cad/plugin-package/route.ts` nhận thêm Bearer token scope `cad` (đúng khuôn
+`rule-pack/route.ts`, fallback session, quyền `CAN.viewEngineeringGraph`, shape response giữ
+nguyên). Core (`XBoss.Cad.Core/Api/PhienBanPlugin.cs`): `SoSanhPhienBan.SoLechPhienBan` thuần (so
+khác chuỗi sau chuẩn hoá + cắt hậu tố `+metadata`, null/rỗng một vế = "chưa rõ", không bao giờ báo
+lệch khi không chắc) + DTO `PluginPackageInfo`; `XBossApiClient.FetchPluginPackageAsync`. Adapter:
+`Services/PhienBanPluginService.cs` đọc `AssemblyInformationalVersion` + hỏi server (timeout 20s
+khuôn `TaiSnapshotBoq`, không retry, nuốt mọi lỗi); gọi ở `XBOSS_RULEPACK` (in `⚠` khi lệch, im
+lặng khi không chắc) và `XBOSS_BANG` (dòng "Phiên bản plugin", cập nhật async cùng nhịp đề xuất
+block). Test: `tests/cad-plugin-package.test.ts` (node:test, source-check Bearer), xunit
+`PhienBanPluginTests` + `XBossApiClientTests` (FetchPluginPackageAsync) + `BangDieuKhienTests`
+(dòng version) — 1268/1268 pass; cổng `XBoss.Cad.AcadShim` build xanh (biên dịch thử Adapter).
+Tài liệu: mục **C12** mới trong `VERIFY-VA-PHAT-HANH.md` (AC5 hai máy lệch bản + AC7 một lần `U`
+— phần AC2 để trống cho Y2 bổ sung), cập nhật `README.md` + `CAI-DAT.md`. **Chưa merge/push** —
+đang ở nhánh worktree cục bộ, chờ coordinator tích hợp.
+
 ## ✅ M115 — Hoàn thiện bản vẽ từ tuyến tim: rule pack v16 + `XBOSS_TUYEN_GAN`/`_TUYEN_DOTHI`/`_HOANTHIEN` — CODE XONG cả 4 PR (2026-08-30)
 
 `docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md`, thi hành đầu tiên của đợt "tự động triển

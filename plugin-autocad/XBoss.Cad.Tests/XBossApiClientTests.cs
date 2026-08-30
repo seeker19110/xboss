@@ -254,4 +254,51 @@ public class XBossApiClientTests
             () => client.FetchBlockLibTepLeAsync("xbk_t", "blocklib-la-hoac-da-thay-the.dwg"));
         Assert.Contains("Không có tệp block nào mang khoá này", loi.Message);
     }
+
+    // ===== Phiên bản gói cài (M118 PR3 — FR3) =====
+
+    [Fact]
+    public async Task FetchPluginPackage_doc_dung_version_va_sha256_kem_bearer()
+    {
+        var handler = new FakeHandler(_ => Json(HttpStatusCode.OK, new
+        {
+            version = "1.2.0",
+            sha256 = "a".PadRight(64, 'a'),
+        }));
+        var client = new XBossApiClient("https://xboss.local", handler);
+        var tt = await client.FetchPluginPackageAsync("xbk_t");
+        Assert.Equal("1.2.0", tt.Version);
+        Assert.Equal("https://xboss.local/api/engineering/cad/plugin-package", handler.DaNhan[0].RequestUri!.ToString());
+        Assert.Equal("Bearer xbk_t", handler.DaNhan[0].Headers.Authorization!.ToString());
+    }
+
+    [Fact]
+    public async Task FetchPluginPackage_version_null_khong_nem_KHONG_bia_so()
+    {
+        var handler = new FakeHandler(_ => Json(HttpStatusCode.OK, new { version = (string?)null, sha256 = (string?)null }));
+        var client = new XBossApiClient("https://xboss.local", handler);
+        var tt = await client.FetchPluginPackageAsync("xbk_t");
+        Assert.Null(tt.Version);
+    }
+
+    [Fact]
+    public async Task FetchPluginPackage_401_nem_huong_dan_login_lai()
+    {
+        var handler = new FakeHandler(_ => Json(HttpStatusCode.Unauthorized, new { error = "x" }));
+        var client = new XBossApiClient("https://xboss.local", handler);
+        var loi = await Assert.ThrowsAsync<XBossApiException>(() => client.FetchPluginPackageAsync("xbk_thu-hoi"));
+        Assert.Contains("XBOSS_LOGIN", loi.Message);
+    }
+
+    [Fact]
+    public async Task FetchPluginPackage_403_nem_thong_diep_server()
+    {
+        var handler = new FakeHandler(_ => Json(HttpStatusCode.Forbidden, new
+        {
+            error = "Không có quyền xem thông tin gói cài plugin",
+        }));
+        var client = new XBossApiClient("https://xboss.local", handler);
+        var loi = await Assert.ThrowsAsync<XBossApiException>(() => client.FetchPluginPackageAsync("xbk_t"));
+        Assert.Contains("Không có quyền", loi.Message);
+    }
 }
