@@ -141,6 +141,36 @@ public static class Segment2D
         }
     }
 
+    /// <summary>
+    /// Chỗ HAI ĐOẠN gần nhau nhất: khoảng cách ngắn nhất giữa chúng (đoạn thẳng, không phải đường
+    /// thẳng vô hạn) kèm điểm giữa của cặp điểm gần nhau nhất — hai đoạn cắt nhau → (0, giao điểm).
+    /// Dùng cho lớp kiểm khoảng cách quy phạm của <c>XBOSS_PHOIHOP</c> (M116 §6 bước 2 lớp 3): cần
+    /// cả số đo lẫn CHỖ để đánh dấu/nhảy tới trên bản vẽ.
+    ///
+    /// Đặt ở đây thay vì trong <c>Coordination/</c> vì là hình học thuần, cùng họ với
+    /// <see cref="KhoangCachDiemToiDoan"/>; thêm THUẦN TÚY, không đụng hàm nào sẵn có.
+    /// </summary>
+    public static (double KhoangCach, (double X, double Y) Diem) GanNhatHaiDoan(
+        (double X, double Y) a1, (double X, double Y) a2,
+        (double X, double Y) b1, (double X, double Y) b2)
+    {
+        if (GiaoDiem(a1, a2, b1, b2) is { } giao) return (0, giao);
+
+        // Không cắt nhau ⇒ cặp điểm gần nhau nhất luôn có ít nhất một ĐẦU MÚT của một trong hai đoạn.
+        var tot = (KhoangCach: double.MaxValue, Diem: a1);
+        foreach (var (p, q1, q2) in new[]
+                 {
+                     (a1, b1, b2), (a2, b1, b2), (b1, a1, a2), (b2, a1, a2),
+                 })
+        {
+            var (_, hinhChieu) = ChieuLenDoan(p, q1, q2);
+            var d = ChieuDai(p, hinhChieu);
+            if (d >= tot.KhoangCach) continue;
+            tot = (d, ((p.X + hinhChieu.X) / 2, (p.Y + hinhChieu.Y) / 2));
+        }
+        return tot;
+    }
+
     /// <summary>Khoảng cách từ điểm tới hình chữ nhật trục toạ độ; điểm nằm trong → 0.</summary>
     public static double KhoangCachDiemToiHinhChuNhat(
         (double X, double Y) p, (double X, double Y) min, (double X, double Y) max)

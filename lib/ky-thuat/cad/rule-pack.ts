@@ -16,7 +16,7 @@
  * bundle client — đã kiểm bằng `npm run build` (không chunk client nào chứa `node:crypto`).
  */
 
-import rulePackV16 from "@/lib/ky-thuat/cad/rule-packs/v16.json";
+import rulePackV17 from "@/lib/ky-thuat/cad/rule-packs/v17.json";
 import { createHash } from "node:crypto";
 
 // ===== rule-pack-hien-hanh.ts =====
@@ -30,10 +30,10 @@ import { createHash } from "node:crypto";
  * tệp version cũ).
  */
 
-export type CadRulePack = typeof rulePackV16;
+export type CadRulePack = typeof rulePackV17;
 
 /** Rule pack đang phát hành cho plugin — mô tả từng version xem `getCurrentRulePack()`. */
-export const RULE_PACK_HIEN_HANH = rulePackV16;
+export const RULE_PACK_HIEN_HANH = rulePackV17;
 
 // ===== rule-pack.ts =====
 // Đọc rule pack, ETag cho plugin tải về, và các validator khối chính sách
@@ -97,6 +97,12 @@ export const CURRENT_RULE_PACK_VERSION = RULE_PACK_HIEN_HANH.version;
  * dung sai cao độ, góc tối thiểu coi là đổi hướng, bảng luật chọn phụ kiện tại nút theo
  * hệ+cỡ+góc (`fittingRules`) và trạng thái tích sẵn của 8 giai đoạn hoàn thiện (`stageDefaults`).
  * Mở rộng thuần, `enabled: false` và cả 8 giai đoạn `false` nên v16 cho kết quả y hệt v15 (AC5).
+ * v17 = v16 + khối `drawTools.coordinationPolicy` cho bộ lệnh phối hợp xung đột 2D liên hệ
+ * `XBOSS_PHOIHOP` (M116 §7 FR5): nguồn bảng ưu tiên nhường đường (`priorityFrom`, THAM CHIẾU
+ * `crossingPolicy.priority` chứ không chép lại), bảng khoảng cách tối thiểu theo cặp hệ
+ * (`minClearancePairsMm`, để rỗng ở bản phát hành) và khoảng bảo trì của lớp kiểm hành lang
+ * (`maintenanceGapMm`). Mở rộng thuần và `enabled: false` mặc định nên v17 cho kết quả y hệt v16
+ * (AC4); bộ lệnh phối hợp dừng kèm hướng dẫn bật tới khi công ty bật khóa này.
  */
 export function getCurrentRulePack(): CadRulePack {
   return RULE_PACK_HIEN_HANH;
@@ -586,6 +592,111 @@ export function kiemCompletionPolicy(drawTools: {
       `${G}.enabled = true nhưng cả 8 giai đoạn đều tắt — ` +
         "XBOSS_HOANTHIEN sẽ chạy xong mà không làm gì.",
     );
+  }
+  return loi;
+}
+
+/** Nguồn hợp lệ của bảng ưu tiên nhường đường — `coordinationPolicy.priorityFrom` (M116 §7 FR3). */
+export const NGUON_UU_TIEN_PHOI_HOP = ["crossingPolicy"] as const;
+
+/** Một cặp hệ + khoảng cách tối thiểu của lớp kiểm 3 — `coordinationPolicy.minClearancePairsMm[]`. */
+export type CapKhoangCach = {
+  /** Id hệ theo `drawTools.systems[].id`. */
+  systemA: string;
+  systemB: string;
+  /** Khoảng cách mép–mép tối thiểu (mm); gần hơn ngưỡng này ⇒ CẢNH BÁO. */
+  minClearanceMm: number;
+};
+
+/** Khối `drawTools.coordinationPolicy` (M116 §7 FR5) — chính sách phối hợp xung đột 2D liên hệ. */
+export type CoordinationPolicy = {
+  enabled: boolean;
+  /** Chỉ nhận `"crossingPolicy"`: bảng ưu tiên lấy THẲNG từ `crossingPolicy.priority`. */
+  priorityFrom: string;
+  minClearancePairsMm: readonly CapKhoangCach[];
+  /** Khoảng bảo trì chừa cho mỗi làn khi kiểm tranh chấp hành lang (mm). */
+  maintenanceGapMm: number;
+};
+
+/**
+ * Kiểm khối `coordinationPolicy` — tầng TS của validator 2 tầng (M116 §7 FR5; tầng C# là
+ * `CoordinationPolicyConfig.Validate` trong
+ * `plugin-autocad/XBoss.Cad.Core/Draw/CoordinationPolicy.cs`). Trả danh sách lỗi tiếng Việt, rỗng
+ * = hợp lệ.
+ *
+ * Rule pack cũ (≤ v16) không có khóa này → không lỗi: bộ lệnh phối hợp chỉ đơn giản không chạy
+ * được, đúng luật "khóa mới mặc định không đổi hành vi".
+ *
+ * Khối đang TẮT vẫn kiểm đầy đủ (cùng quy ước các khối chính sách v5–v16), TRỪ ràng buộc "phải có
+ * bảng ưu tiên": nó chỉ có nghĩa khi khối đã bật, vì rule pack cũ có thể chưa khai `crossingPolicy`.
+ */
+export function kiemCoordinationPolicy(drawTools: {
+  systems: readonly { id: string }[];
+  crossingPolicy?: CrossingPolicy;
+  coordinationPolicy?: CoordinationPolicy;
+}): string[] {
+  const cp = drawTools.coordinationPolicy;
+  if (!cp) return [];
+
+  const loi: string[] = [];
+  const G = "drawTools.coordinationPolicy";
+  const heHopLe = new Set(drawTools.systems.map((s) => s.id));
+
+  if (!(NGUON_UU_TIEN_PHOI_HOP as readonly string[]).includes(cp.priorityFrom)) {
+    loi.push(
+      `${G}.priorityFrom lạ "${cp.priorityFrom}" ` +
+        `(chỉ nhận ${NGUON_UU_TIEN_PHOI_HOP.map((n) => `"${n}"`).join(", ")}) — ` +
+        "bảng ưu tiên nhường đường phải tham chiếu khối có thật, không chép lại danh sách hệ.",
+    );
+  } else if (cp.enabled && !(drawTools.crossingPolicy?.priority.length ?? 0)) {
+    // Bật quét mà không có bảng ưu tiên: vẫn tìm ra xung đột nhưng không đề xuất nổi ai nhường ai.
+    loi.push(
+      `${G}.enabled = true nhưng drawTools.crossingPolicy.priority thiếu/rỗng — ` +
+        "mọi xung đột cứng sẽ không suy được chiều nhường, chỉ còn đề xuất fitting vượt.",
+    );
+  }
+
+  if (!Number.isFinite(cp.maintenanceGapMm) || cp.maintenanceGapMm < 0) {
+    loi.push(
+      `${G}.maintenanceGapMm = ${cp.maintenanceGapMm} không được âm — ` +
+        "khoảng bảo trì âm làm hành lang rộng thêm và giấu mất tranh chấp thật.",
+    );
+  }
+
+  const daKhai = new Set<string>();
+  for (const [i, cap] of cp.minClearancePairsMm.entries()) {
+    const nhan = `${G}.minClearancePairsMm[${i}] ("${cap.systemA}" × "${cap.systemB}")`;
+
+    for (const [ten, id] of [
+      ["systemA", cap.systemA],
+      ["systemB", cap.systemB],
+    ] as const) {
+      if (!heHopLe.has(id)) {
+        loi.push(
+          `${nhan}: ${ten} lạ "${id}" — phải là drawTools.systems[].id ` +
+            `(hợp lệ: ${[...heHopLe].join(", ")}).`,
+        );
+      }
+    }
+    if (cap.systemA === cap.systemB) {
+      loi.push(
+        `${nhan}: hai vế cùng một hệ "${cap.systemA}" — lớp kiểm khoảng cách chỉ xét cặp KHÁC hệ ` +
+          "(cùng hệ là việc của kỹ sư, đúng quy ước crossingPolicy), luật này không bao giờ được xét.",
+      );
+    }
+    if (!Number.isFinite(cap.minClearanceMm) || cap.minClearanceMm <= 0) {
+      loi.push(`${nhan}: minClearanceMm = ${cap.minClearanceMm} phải là số dương.`);
+    }
+
+    const khoa = [cap.systemA, cap.systemB].sort().join("|");
+    if (daKhai.has(khoa)) {
+      loi.push(
+        `${nhan}: cặp hệ khai trùng — ngưỡng nào thắng sẽ phụ thuộc thứ tự duyệt, ` +
+          "hai tầng C#/TS trôi khỏi nhau.",
+      );
+    } else {
+      daKhai.add(khoa);
+    }
   }
   return loi;
 }

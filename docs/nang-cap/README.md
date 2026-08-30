@@ -299,6 +299,11 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > (giao cắt cùng dải cao độ, tranh chấp hành lang, khoảng cách quy phạm giữa cặp hệ) trên tuyến
 > mang XData M115 kể cả qua xref; **chỉ phát hiện + đề xuất theo `coordinationPolicy`, kỹ sư
 > quyết** (ngã rẽ chốt 2026-08-28), marker layer riêng, báo cáo Excel + web. 3 PR. Sau M115.
+> **State: 🚧 PR1 CODE XONG (2026-08-30)** — rule pack `v17` khối `drawTools.coordinationPolicy`
+> (mặc định TẮT, bảng ưu tiên THAM CHIẾU `crossingPolicy.priority`) + validator 2 tầng (TS + C#) +
+> `Core/Coordination/` thuần (`QuetXungDot` 3 lớp kiểm, `XungDotId`, `DeXuatXuLy`), test xunit +
+> node:test trên CI Linux. **Còn PR2** (3 lệnh Adapter + hộp thoại + marker/XData) **và PR3** (báo
+> cáo Excel + hiển thị web + tài liệu + mục verify).
 > **`M117-ai-doc-so-do-nguyen-ly.md`** — mảnh cuối: upload DXF schematic lên web → tầng 1 luật
 > dựng graph, tầng 2 AI ngữ nghĩa bù phần `chua_quyet` (hợp đồng y hệt M108 qua `lib/nen/ai.ts`,
 > tắt được bằng `XBOSS_AI_BLOCK_CLASSIFY=0`), người duyệt graph trên web → plugin

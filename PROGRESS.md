@@ -1,5 +1,27 @@
 # PROGRESS.md — Trạng thái dự án
 
+## 🚧 M116 — Phối hợp xung đột 2D liên hệ: rule pack v17 + `Core/Coordination/` — PR1 CODE XONG (2026-08-30)
+
+`docs/nang-cap/M116-phoi-hop-xung-dot-lien-he.md`, mục thứ hai của đợt "tự động triển khai bản vẽ
+MEPF" (sau M115). Bản vẽ combined services hiện phối hợp tay; sau M115 mọi tuyến đã mang XData
+hệ/size/cao độ nên đủ dữ liệu để **phát hiện + đề xuất** xung đột giữa các hệ ngay trên 2D —
+guardrail: plugin **không bao giờ tự sửa tuyến**, kỹ sư quyết từng dòng.
+
+- **PR1 (việc này)** rule pack `v17` khối `drawTools.coordinationPolicy` (**mặc định TẮT**, bảng
+  ưu tiên nhường đường **THAM CHIẾU** `crossingPolicy.priority` thay vì chép lại, bảng khoảng cách
+  quy phạm theo cặp hệ để rỗng, khoảng bảo trì hành lang) + validator 2 tầng (TS
+  `kiemCoordinationPolicy` / C# `CoordinationPolicyConfig`) + `XBoss.Cad.Core/Coordination/` thuần:
+  `QuetXungDot` (lớp 1 giao cắt cùng cao độ ⇒ CỨNG, lớp 2 tranh chấp hành lang ⇒ MỀM, lớp 3 khoảng
+  cách quy phạm ⇒ CẢNH BÁO; tuyến thiếu cao độ chỉ vào kiểm PHẲNG kèm nhãn "thiếu cao độ", không
+  đoán), `XungDotId` (id băm ổn định ⇒ quét lại không nhân đôi), `DeXuatXuLy` (đề xuất CHỈ từ bảng
+  luật rule pack). Tái dùng `Segment2D` (đúng bộ dò của phép kiểm 11 — **không đổi hành vi phép
+  kiểm 11**) và `HanhLangDauVao` của M114; chỉ mục quét là sweep line theo X, không duyệt n² cặp.
+- **Còn lại:** PR2 (3 lệnh Adapter `XBOSS_PHOIHOP`/`_XOA`/`_BAOCAO` + hộp thoại + marker/XData),
+  PR3 (báo cáo Excel + hiển thị web + tài liệu + mục verify tay).
+- **Không migration, không API mới** (M116 §9) — số liệu đi trong báo cáo phiên upload sẵn có.
+- Cổng đã chạy: `dotnet test XBoss.Cad.Tests` (1298 ca xanh, +48 ca mới), `npm run lint` /
+  `typecheck` / `build` xanh, `npm test` xanh với Postgres thật (1489 ca pass, 0 fail).
+
 ## ✅ M115 — Hoàn thiện bản vẽ từ tuyến tim: rule pack v16 + `XBOSS_TUYEN_GAN`/`_TUYEN_DOTHI`/`_HOANTHIEN` — CODE XONG cả 4 PR (2026-08-30)
 
 `docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md`, thi hành đầu tiên của đợt "tự động triển
