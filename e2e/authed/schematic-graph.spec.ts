@@ -35,9 +35,11 @@ test.describe("Sơ đồ nguyên lý — nạp DXF schematic (sau đăng nhập)
     await page.getByLabel(/tra một sơ đồ đã nạp/i).fill("999999999");
     await page.getByRole("button", { name: "Xem", exact: true }).click();
 
-    // Route thật trả 404 "Không tìm thấy sơ đồ nguyên lý" (hoặc lỗi dự án) — dù nội dung cụ thể
-    // phụ thuộc seed, khối lỗi màu đỏ phải xuất hiện thay vì im lặng.
-    await expect(page.locator("text=/Không tìm thấy|dự án/i").first()).toBeVisible({
+    // Route thật trả 404 "Không tìm thấy sơ đồ nguyên lý" (hoặc "Không tìm thấy dự án") — cả hai
+    // đều bắt đầu bằng "Không tìm thấy". Không dùng riêng "dự án" làm điều kiện: chuỗi đó khớp cả
+    // mục sidebar "Quản Trị Dự Án…" (luôn có trong DOM dù ẩn), khiến .first() bắt nhầm phần tử ẩn
+    // đó thay vì chờ thông báo lỗi thật xuất hiện.
+    await expect(page.locator("text=/Không tìm thấy/i").first()).toBeVisible({
       timeout: 10_000,
     });
   });
