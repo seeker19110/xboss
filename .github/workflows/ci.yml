@@ -36,7 +36,7 @@ jobs:
       # nhầm cây phụ thuộc cũ.
       - name: Cache node_modules
         id: cache-node-modules
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: node24-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -150,7 +150,7 @@ jobs:
 
       - name: Cache node_modules
         id: cache-node-modules
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: node24-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -202,7 +202,7 @@ jobs:
 
       - name: Cache node_modules
         id: cache-node-modules
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: node24-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -248,7 +248,7 @@ jobs:
           kiem plugin-autocad/XBoss.Cad.AcadShim/XBoss.Cad.AcadShim.csproj net8.0
 
       - name: Cache gói NuGet
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('plugin-autocad/**/*.csproj') }}
@@ -296,7 +296,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Cache gói NuGet
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('plugin-autocad/**/*.csproj') }}
@@ -374,7 +374,7 @@ jobs:
 
       - name: Cache node_modules
         id: cache-node-modules
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: node24-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -388,7 +388,7 @@ jobs:
       # Lệnh `playwright install` vẫn chạy dù cache trúng: nó cần cài thêm gói hệ thống
       # (--with-deps) và tự nhận ra trình duyệt đã có sẵn nên không tải lại.
       - name: Cache trình duyệt Playwright
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
