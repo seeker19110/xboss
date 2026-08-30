@@ -4,8 +4,8 @@
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Đóng 2 nợ kỹ thuật ghi nhận ở review M115 PR3 (`PROGRESS.md` 2026-08-30) + 1 khoảng trống vận hành phát hiện khi rà toàn cụm plugin      |
 | Spec owner       | Phiên chính (opusplan)                                                                                                                   |
-| State            | Draft                                                                                                                                    |
-| Người/ngày duyệt | —                                                                                                                                        |
+| State            | **Approved for implementation**                                                                                                          |
+| Người/ngày duyệt | Người dùng duyệt 2026-08-30 ("duyệt M118, lập PLAN rồi merge, không thi hành")                                                           |
 | Cập nhật         | 2026-08-30                                                                                                                               |
 
 > Không code khi chưa **Approved for implementation**.
@@ -344,12 +344,13 @@ Mỗi PR tự chạy đủ cổng plugin (`dotnet test` AcadShim 0 warning) + c�
 
 ## 19. Approval
 
-- [ ] Product/scope
-- [ ] UX/a11y
-- [ ] Architecture/API/data
-- [ ] Security/RBAC/SoD/audit
-- [ ] Test/telemetry/rollout/rollback
-- [ ] Không còn blocking question
+- [x] Product/scope
+- [x] UX/a11y
+- [x] Architecture/API/data
+- [x] Security/RBAC/SoD/audit
+- [x] Test/telemetry/rollout/rollback
+- [x] Không còn blocking question (§18: mọi mục đã chốt hoặc chấp nhận rủi ro, không mục nào chờ quyết)
 
-**Kết luận:** Draft
-**Người/ngày duyệt:** —
+**Kết luận:** **Approved for implementation**
+**Người/ngày duyệt:** Người dùng, 2026-08-30. Kế hoạch thi hành: `PLAN.md` Pha 4 — **CHƯA kích
+hoạt**, chờ lệnh thi hành riêng.

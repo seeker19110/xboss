@@ -309,9 +309,10 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > **Thứ tự thi hành đợt: M115 → M116 → M117.** Cổng chung: trả nợ verify tay AutoCAD 2026 các đợt
 > trước (M111 đang chặn) trước khi phát hành rộng bất kỳ mục nào.
 
-## Đặc tả Draft — đóng nợ kỹ thuật plugin sau M115 (viết 2026-08-30)
+## Đặc tả ĐÃ DUYỆT — đóng nợ kỹ thuật plugin sau M115 (viết + duyệt 2026-08-30)
 
-> **`M118-ben-vung-hoa-hoanthien-va-canh-bao-phien-ban.md`** — **State: Draft, chờ duyệt.** Đóng
+> **`M118-ben-vung-hoa-hoanthien-va-canh-bao-phien-ban.md`** — ✅ **Approved for implementation
+> 2026-08-30** (kế hoạch thi hành: `PLAN.md` Pha 4 — chưa kích hoạt, chờ lệnh thi hành). Đóng
 > 2 nợ kỹ thuật ghi nhận ở review M115 PR3 (`PROGRESS.md` 2026-08-30) + 1 khoảng trống vận hành:
 > (1) `HoanThienPipeline.Chay` không có try/catch từng giai đoạn — lỗi .NET thường giữa pipeline
 > bung khỏi lệnh, mất báo cáo phiên; (2) 4/8 giai đoạn ủy thác (chia đốt/giá đỡ/ngắt nét/thống kê)

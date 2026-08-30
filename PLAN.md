@@ -1,7 +1,8 @@
-# PLAN.md — Đợt M115→M117: tự động triển khai bản vẽ MEPF từ tuyến tim
+# PLAN.md — Đợt M115→M117 + M118: tự động triển khai bản vẽ MEPF từ tuyến tim & đóng nợ plugin
 
 **Cập nhật:** 2026-08-30 · **Nguồn:** `docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md`,
-`M116-phoi-hop-xung-dot-lien-he.md`, `M117-ai-doc-so-do-nguyen-ly.md` (cả 3 **Approved 2026-08-30**).
+`M116-phoi-hop-xung-dot-lien-he.md`, `M117-ai-doc-so-do-nguyen-ly.md` (cả 3 **Approved 2026-08-30**),
+`M118-ben-vung-hoa-hoanthien-va-canh-bao-phien-ban.md` (**Approved 2026-08-30** — Pha 4 bên dưới).
 **Nhánh nền:** `claude/mepf-auto-deploy-plugin-6qsbq8` — base MỌI worktree trên nhánh này (KHÔNG
 origin/main: nhánh này chứa 3 đặc tả; trước khi bắt đầu chạy `git fetch origin` và rebase nhánh nền
 lên `origin/main` mới nhất nếu main đã tiến).
@@ -253,11 +254,102 @@ verify M117 + `PROGRESS.md`/README nâng cấp cho trọn đợt.
 
 ---
 
+# Pha 4 — M118: Bền vững hoá `XBOSS_HOANTHIEN` + cảnh báo phiên bản plugin (độc lập M116/M117)
+
+**Đặc tả:** `docs/nang-cap/M118-ben-vung-hoa-hoanthien-va-canh-bao-phien-ban.md` (**Approved
+2026-08-30**). Không migration, không API mới (1 route sửa auth), không khoá rule pack mới.
+**Nhánh nền Pha 4:** `origin/main` mới nhất (đặc tả M118 đã merge main — KHÔNG dùng nhánh nền
+M115→M117). **Điều kiện tiên quyết:** M115 đã trên main (đã thoả — merge 2026-08-30). Pha 4 độc
+lập hoàn toàn với Pha 2/3 (khác vùng file), có thể kích hoạt trước/sau/song song đợt M116/M117.
+**Bất biến toàn pha:** không đổi hành vi 4 lệnh lẻ chạy tay (`XBOSS_VE_CHIADOT`/`_GIADO`/
+`_NGATNET`/`_THONGKE` không qua pipeline) — có test khẳng định; không transaction bao ngoài
+pipeline; mọi ràng buộc CỨNG ở đầu PLAN này áp dụng nguyên vẹn.
+
+## Việc Y1 — FR1: cách ly lỗi từng giai đoạn pipeline (M118 PR1) — `route: standard`
+
+Đặc tả §7 FR1, §8 AC1/AC7/AC8, §9.
+
+1. `Services/HoanThienPipeline.cs`: bọc thân từng giai đoạn (switch trong `Chay`) bằng
+   `try/catch (System.Exception)`; catch → `KetQuaGiaiDoan(DaChay: false, TomTat: "lỗi — <msg>")`,
+   pipeline đi tiếp giai đoạn kế. Record `KetQuaGiaiDoan` thêm trường `Loi` (bool, mặc định false)
+   — record nằm ở đâu thì sửa ở đó, cân nhắc chuyển về Core nếu report cần (xem Y2 dùng chung).
+2. `Commands/HoanThienCommands.cs`: giai đoạn lỗi in dòng `✖`; cuối lệnh in tổng kết
+   `x/8 giai đoạn xong, y lỗi` + khi `y > 0` nhắc "chạy lại XBOSS_HOANTHIEN sau khi xử lý là an
+   toàn (idempotent)"; `VeSessionReport` ghi đủ mọi giai đoạn kèm cờ lỗi (AC8).
+3. KHÔNG thêm transaction bao ngoài, KHÔNG rollback giai đoạn đã commit (doc-comment `Chay` mục 4
+   giữ nguyên). Test xunit (AcadShim): AC1 — giai đoạn ④ ném `InvalidOperationException` → trả đủ
+   8 kết quả, phần tử 4 `Loi == true`, ⑤–⑧ vẫn được gọi, không exception thoát khỏi `Chay`; AC8.
+
+**Tiêu chí chấp nhận:** dotnet test xanh toàn bộ (không đỏ ca cũ); AcadShim 0 warning.
+
+## Việc Y2 — FR2: giữ-tay 4 giai đoạn ủy thác ③④⑥⑧ (M118 PR2) — `route: spec` (SAU Y1)
+
+Đặc tả §7 FR2, §8 AC2/AC3/AC4, §9. Mọi quyết định đã chốt trong đặc tả — thi hành chính xác:
+
+1. Chuyển logic `DaSuaTay` (hiện `HoanThienPipeline.cs:545`) về Core (cạnh `HoanThienKeHoach`)
+   thành hàm thuần nhận DTO (băm lúc sinh, đỉnh hiện tại, cờ SuaTay) — pipeline lẫn 4 lệnh dùng
+   chung, có test riêng (khớp/lệch/không băm/cờ SuaTay).
+2. Khi `giaiDoanM115 != null`, thực thể sinh ra ghi thêm `BamHinhHoc = RevisionSnapshot.BamHinhHoc`
+   với đỉnh đại diện chốt ở §7 FR2: vạch chia = 2 đầu `Line`; nhãn đốt = điểm chèn text; giá đỡ =
+   `BlockReference.Position`; đối tượng ngắt nét = điểm đại diện sẵn có của `VeThucThe` cho loại
+   đó; bảng thống kê = điểm chèn bảng. Tệp chạm: `Commands/VeChiaDotCommands.cs`,
+   `VeGiadoCommands.cs`, `VeNgatNetCommands.cs`, `VeThongkeCommands.cs`,
+   `Services/VeBangService.cs`, `Services/VeThucThe.cs`.
+3. Đường dọn cũ của từng lệnh, CHỈ khi `giaiDoanM115 != null`: giữ thực thể `SuaTay == true` hoặc
+   băm hiện tại ≠ `BamHinhHoc`; đếm + báo "Giữ nguyên N thực thể đã sửa tay" trong tóm tắt giai
+   đoạn. Chạy tay (`giaiDoanM115 == null`): KHÔNG đổi một hành vi nào (AC3 test khẳng định hành
+   vi cũ).
+4. Bảng thống kê ⑧: đọc `VeBangService` xác định nhánh — đã cập nhật tại chỗ thì chỉ thêm test
+   khẳng định giữ vị trí; đang xóa-vẽ-lại tại vị trí mặc định thì sửa thành cập nhật tại vị trí
+   hiện tại (cả 2 nhánh đều trong đặc tả §18, không phải open decision). Nội dung bảng luôn ghi
+   mới.
+5. Test xunit: AC2 (dời 1 vạch chia + 1 giá đỡ + bảng → chạy lại → 3 thứ giữ nguyên, phần khác
+   tái sinh, tóm tắt "Giữ nguyên 3"), AC3, AC4 (XData có/không `BamHinhHoc` đúng theo đường sinh).
+6. Tài liệu: ghi hành vi giữ-tay + ranh giới "xóa hẳn thì sinh lại" vào `plugin-autocad/README.md`
+   (mục quy trình hoàn thiện M115).
+
+**Tiêu chí chấp nhận:** dotnet test xanh toàn bộ; AC3 chứng minh lệnh lẻ không đổi hành vi;
+AcadShim 0 warning.
+
+## Việc Y3 — FR3: cảnh báo phiên bản plugin lệch server (M118 PR3) — `route: standard` (song song Y1/Y2 được — khác vùng file)
+
+Đặc tả §7 FR3, §8 AC5/AC6, §10, §13.
+
+1. Web: `app/api/engineering/cad/plugin-package/route.ts` nhận Bearer token cad theo ĐÚNG khuôn
+   `rule-pack/route.ts:31-35` (`getCadTokenUser` kiểm trước → fallback `getCurrentUser`; quyền
+   `CAN.viewEngineeringGraph`; shape response không đổi). Test node:test theo khuôn test rule-pack
+   (Bearer hợp lệ 200 / token sai 401 / thiếu quyền 403 / session cũ vẫn chạy).
+2. Core: hàm thuần `SoLechPhienBan(cuaPlugin, cuaServer)` — chuẩn hoá (trim, cắt hậu tố từ `+`)
+   rồi so KHÁC chuỗi; `null`/rỗng một vế → "chưa rõ", không lệch. DTO `PluginPackageInfo`. Test
+   xunit đủ ca (lệch/khớp/null/metadata `+hash`).
+3. Adapter: version plugin đọc `AssemblyInformationalVersion` (nhúng từ `<Version>` của
+   `Directory.Build.props` — không hard-code); `XBossApiClient.FetchPluginPackageAsync(token)`
+   gọi GET `/api/engineering/cad/plugin-package`, timeout ngắn theo khuôn `TaiSnapshotBoq`
+   (`XBossCommands.cs:912-918`), không retry. Điểm gọi: (a) cuối `XBOSS_RULEPACK` sau khi kéo
+   rule pack thành công → lệch thì in đúng 1 dòng
+   `⚠ Plugin đang chạy {X}, server phát hành {Y} — tải bản mới tại {baseUrl}/engineering/cai-dat-plugin`
+   (baseUrl từ `CredentialStore`); (b) `XBOSS_BANG` tab Trạng thái (`Ui/TrangThaiGom.cs`) dòng
+   "Phiên bản plugin: X (server: Y / chưa rõ)". Mọi lỗi fetch/401/`version: null` → nuốt im lặng,
+   KHÔNG cảnh báo (AC5 ca âm).
+4. Tài liệu: mục **C12** mới trong `plugin-autocad/VERIFY-VA-PHAT-HANH.md` (AC2 chuột thật, AC5
+   hai máy lệch bản, AC7 một lần `U` — ghi rõ xếp SAU C9/C10/C11); cập nhật `README.md` +
+   `CAI-DAT.md` về cảnh báo version.
+5. Việc cuối pha: cập nhật `PROGRESS.md` + State trong `docs/nang-cap/README.md` (M118 code xong,
+   nợ verify tay C12).
+
+**Tiêu chí chấp nhận:** dotnet test + `npm run lint` + `npm run typecheck` + test node route xanh;
+không đổi shape response; cảnh báo không bao giờ chặn lệnh.
+
+---
+
 ## Thứ tự & phụ thuộc toàn đợt
 
 V1 → V2 → V3 → V4 ‖ sau đó (W1 → W2 → W3) và (X1 → X2 → (X3 ‖ X4)); X-pha có thể chạy song song
 W-pha (khác vùng file: W chạm `Core/Coordination` + `Commands/PhoiHop*`, X chạm web/server +
-`Commands/TuyenGoiY*`), nhưng X4 cần Pha 1 đã tích hợp. Mỗi việc 1 worktree riêng; tên file như
+`Commands/TuyenGoiY*`), nhưng X4 cần Pha 1 đã tích hợp. **Pha 4 (Y1 → Y2 ‖ Y3) độc lập hoàn toàn
+với Pha 2/3** — kích hoạt được bất cứ lúc nào sau khi M115 đã trên main (đã thoả), trên nhánh nền
+riêng từ `origin/main`; Y3 song song Y1/Y2 được (khác vùng file), Y2 phải SAU Y1 (cùng chạm
+`HoanThienPipeline.cs`). Mỗi việc 1 worktree riêng; tên file như
 brief để không đụng nhau; `XBoss.Cad.Acad.csproj` glob SDK-style nên thêm file không sửa csproj.
 Reviewer soát từng việc trước khi tích hợp tuần tự vào nhánh nền. Coordinator KHÔNG push/mở PR —
 phiên chính duyệt cuối rồi quyết định push/PR theo quy ước repo.

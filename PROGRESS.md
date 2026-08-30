@@ -1,6 +1,6 @@
 # PROGRESS.md — Trạng thái dự án
 
-## 📐 Đặc tả M118 — bền vững hoá `XBOSS_HOANTHIEN` + cảnh báo phiên bản plugin (2026-08-30, Draft)
+## 📐 Đặc tả M118 — bền vững hoá `XBOSS_HOANTHIEN` + cảnh báo phiên bản plugin (2026-08-30, ✅ ĐÃ DUYỆT + PLAN Pha 4 — CHƯA thi hành)
 
 Yêu cầu người dùng: "plugin autocad còn thiếu gì → viết đặc tả triển khai". Rà toàn cụm M99→M117:
 M116/M117 đã có đặc tả duyệt (chưa thi hành), nợ verify tay C9/C10/C11 là cổng thủ công — phần
@@ -20,8 +20,12 @@ chờ duyệt, chưa code**):
 
 Không migration, không khoá rule pack mới (bug fix + cảnh báo thuần). 3 PR: FR1 `route: standard`,
 FR2 `route: spec`, FR3 `route: standard`. Verify tay mục **C12** mới, xếp sau C9/C10/C11.
-**Tiếp theo:** người dùng duyệt đặc tả → thi hành theo PLAN; cổng phát hành rộng toàn cụm vẫn là
-trả nợ verify tay AutoCAD 2026.
+
+**Cập nhật cùng ngày 2026-08-30:** người dùng **duyệt M118** ("duyệt M118, lập PLAN rồi merge,
+không thi hành") → đặc tả chuyển **Approved for implementation**; kế hoạch thi hành viết thành
+**Pha 4 trong `PLAN.md`** (Y1 FR1 `standard` → Y2 FR2 `spec`; Y3 FR3 `standard` song song được;
+nhánh nền Pha 4 = `origin/main`, độc lập M116/M117). **Trạng thái: CHƯA KÍCH HOẠT thi hành —
+chờ lệnh riêng.** Cổng phát hành rộng toàn cụm vẫn là trả nợ verify tay AutoCAD 2026.
 
 ## ✅ M115 — Hoàn thiện bản vẽ từ tuyến tim: rule pack v16 + `XBOSS_TUYEN_GAN`/`_TUYEN_DOTHI`/`_HOANTHIEN` — CODE XONG cả 4 PR (2026-08-30)
 
