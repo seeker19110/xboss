@@ -42,8 +42,13 @@ internal static class ThanhPhan
     /// </summary>
     internal const int LeTrongThe = 24;
 
-    /// <summary>Chiều cao tối thiểu của nút: vùng chạm thoải mái cả khi kỹ sư dùng máy màn cảm ứng.</summary>
-    private const int CaoNut = 30;
+    /// <summary>
+    /// Chiều cao tối thiểu của nút: vùng chạm thoải mái cả khi kỹ sư dùng máy màn cảm ứng.
+    /// Nâng từ 30 lên 36 sau phản hồi dùng tay trên AutoCAD 2026 thật (2026-08-30) — "bấm ăn
+    /// nhưng phạm vi bấm hiện hẹp": 30px vẫn trong khuyến nghị 40px tối thiểu của Windows nhưng
+    /// sát ngưỡng dưới khi nhiều nút xếp liền nhau trên màn cảm ứng công trường.
+    /// </summary>
+    private const int CaoNut = 36;
 
     private const string PhongChu = "Segoe UI";
 
@@ -144,10 +149,14 @@ internal static class ThanhPhan
             ForeColor = chuMau,
             FlatStyle = FlatStyle.Flat,
             AutoSize = true,
-            MinimumSize = new Size(0, CaoNut),
+            MinimumSize = new Size(56, CaoNut),
             Font = new Font(PhongChu, 9f),
             Margin = new Padding(0, 6, 6, 0),
-            Padding = new Padding(10, 5, 10, 5),
+            // Đệm ngang/dọc rộng hơn (10,5 → 14,8) cùng đợt nâng CaoNut: nút chữ ngắn (vd "OK",
+            // "Hủy") trước đây co gần khít chữ, vùng bấm quanh chữ hẹp — WinForms tính vùng bấm
+            // đúng bằng Bounds sau AutoSize (gồm cả Padding), nên đệm rộng ra là NỚI THẬT vùng
+            // bấm, không phải chỉ trang trí.
+            Padding = new Padding(14, 8, 14, 8),
             UseVisualStyleBackColor = false,
         };
         // Không khai 3 dòng này thì WinForms vẽ trạng thái rê/nhấn bằng màu hệ thống (xanh nhạt) —
