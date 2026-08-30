@@ -94,13 +94,25 @@ public sealed class HoanThienCommands
         var thuVien = BlockLibraryService.HienHanh().Manifest;
         var ketQua = HoanThienPipeline.Chay(doc, ed, pack, thuVien, chot, keHoach);
 
-        // ===== (4) Tóm tắt =====
+        // ===== (4) Tóm tắt — VeSessionReport của lần chạy này (M118 FR1/AC1/AC8): ghi đủ ĐÚNG
+        // 8/8 giai đoạn dù có giai đoạn lỗi, không bỏ sót giai đoạn nào =====
 
         var soChay = ketQua.Count(k => k.DaChay);
+        var soLoi = ketQua.Count(k => k.Loi);
         ed.WriteMessage(
             $"\n[XBoss] ===== HOÀN THIỆN XONG — {soChay}/{keHoach.Count} giai đoạn có thay đổi bản vẽ =====\n");
         foreach (var k in ketQua)
-            ed.WriteMessage($"[XBoss]   {(k.DaChay ? "✔" : "—")} {k.GiaiDoan.Nhan}: {k.TomTat}\n");
+        {
+            var daHieu = k.Loi ? "✖" : k.DaChay ? "✔" : "—";
+            ed.WriteMessage($"[XBoss]   {daHieu} {k.GiaiDoan.Nhan}: {k.TomTat}\n");
+        }
+        ed.WriteMessage(
+            $"[XBoss] Tổng kết: {keHoach.Count}/8 giai đoạn xong, {soLoi} lỗi.\n");
+        if (soLoi > 0)
+        {
+            ed.WriteMessage(
+                "[XBoss] Có giai đoạn lỗi — chạy lại XBOSS_HOANTHIEN sau khi xử lý là an toàn (idempotent).\n");
+        }
         ed.WriteMessage(
             "[XBoss] Tọa độ tuyến tim KHÔNG bị đụng (AC2). Chạy lại lệnh này an toàn: mỗi giai đoạn " +
             "thay thế đúng phần của chính nó (AC3).\n" +

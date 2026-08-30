@@ -67,8 +67,17 @@ public sealed class VeGiadoCommands
     /// Thân thật của <c>XBOSS_VE_GIADO</c> — tính vị trí giá đỡ trên các tim đã chọn rồi chèn cả lô.
     /// Tách nguyên vẹn khỏi <see cref="DatGiaDo"/> để <c>XBOSS_HOANTHIEN</c> (M115 giai đoạn ④) gọi
     /// lại đúng logic này; mọi hỏi đáp vẫn nằm ở lệnh gốc nên hành vi lệnh gốc không đổi.
+    ///
+    /// M118 FR2 — giá đỡ KHÔNG có đường dọn (lệnh chỉ bổ sung chỗ còn thiếu, giá đỡ kỹ sư đã dời vẫn
+    /// nằm trong tập <c>daCo</c> nên không bị đặt chồng): phần thêm ở đây chỉ là ĐÓNG băm hình học
+    /// lúc sinh khi chạy qua pipeline, và ĐẾM số giá đỡ kỹ sư đã dời tay để tóm tắt ④ báo "Giữ
+    /// nguyên N". Cơ chế tính vị trí không đổi một ly, kể cả khi chạy qua pipeline.
     /// </summary>
-    internal static void ChayGiaDo(
+    /// <returns>
+    /// Số giá đỡ GIỮ NGUYÊN vì kỹ sư đã dời tay — luôn 0 khi chạy tay lệnh lẻ
+    /// (<paramref name="giaiDoanM115"/> null; lệnh lẻ không có khái niệm giữ-tay, bất biến AC3).
+    /// </returns>
+    internal static int ChayGiaDo(
         Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, DrawToolsPack pack,
         BlockManifest thuVien, DrawSystem he, BlockDef def0, CheDoChiaGiaDo cheDo, bool taiMoiPhuKien,
         IReadOnlyList<ObjectId> idTim, string? giaiDoanM115 = null)
@@ -86,6 +95,7 @@ public sealed class VeGiadoCommands
         var muc = new List<ChoChen>();
         var soTuyen = 0;
         var soDaCo = 0;
+        var soGiuSuaTay = 0;
         var boQua = 0;
         using (var tr = db.TransactionManager.StartTransaction())
         {
@@ -130,7 +140,13 @@ public sealed class VeGiadoCommands
                 var handleTim = pl.Handle.ToString();
                 khoiTheoTim.TryGetValue(handleTim, out var khoiCu);
 
+                // Tập "đã có" KHÔNG lọc theo băm: giá đỡ kỹ sư dời tay vẫn là một giá đỡ có thật trên
+                // tuyến, tính nó vào đây là cách để lệnh không chèn cái mới đè đúng chỗ nó vừa rời
+                // khỏi (M118 FR2 — cơ chế cũ giữ nguyên, chỉ thêm phần ĐẾM bên dưới).
                 var daCo = QuyVeDoc(dinh, kin, khoiCu, k => k.VaiTro == VaiTroVe.GiaDo);
+                soGiuSuaTay += HoanThienKeHoach.DemSuaTay(
+                    (khoiCu ?? []).Where(k => k.VaiTro == VaiTroVe.GiaDo).Select(UngVienGiaDo),
+                    giuTayM115: giaiDoanM115 is not null);
                 var phuKien = QuyVeDoc(
                     dinh, kin, khoiCu,
                     k => k.VaiTro == VaiTroVe.PhuKien &&
@@ -163,6 +179,10 @@ public sealed class VeGiadoCommands
                             BlockId = def0.Id,
                             ThuVienVersion = thuVien.Version,
                             HandleTim = handleTim,
+                            // M118 FR2/AC4: băm vị trí lúc sinh, CHỈ khi chạy qua pipeline. Điểm đại
+                            // diện là đúng BlockReference.Position sẽ được chèn tới, khớp với
+                            // VeThucThe.DiemBamCua ở lần chạy sau.
+                            BamHinhHoc = HoanThienKeHoach.BamKhiPipeline(giaiDoanM115, [vt.Diem]),
                         },
                         []));
                 }
@@ -180,27 +200,41 @@ public sealed class VeGiadoCommands
                 $"\n[XBoss] Bỏ qua {boQua} đối tượng không phải tuyến tim của XBOSS_VE " +
                 "(giá đỡ chỉ bám tuyến có XData để biết size và khoảng cách chuẩn).\n");
         }
+        if (soGiuSuaTay > 0)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] Giữ nguyên {soGiuSuaTay} giá đỡ kỹ sư đã dời tay — chạy lại KHÔNG đè lên " +
+                "công của người.\n");
+        }
         if (soTuyen == 0)
         {
             ed.WriteMessage("\n[XBoss] Không có tuyến nào đặt được giá đỡ — bản vẽ không thay đổi.\n");
-            return;
+            return soGiuSuaTay;
         }
         if (muc.Count == 0)
         {
             ed.WriteMessage(
                 $"\n[XBoss] {soTuyen} tuyến đã đủ giá đỡ ({soDaCo} vị trí) — không thêm cái nào.\n");
-            return;
+            return soGiuSuaTay;
         }
 
         // (5) Chèn cả lô trong MỘT transaction = MỘT nhóm UNDO.
-        if (!BlockLibraryService.ChenHangLoat(doc, ed, db, def0, thuVien, muc)) return;
+        if (!BlockLibraryService.ChenHangLoat(doc, ed, db, def0, thuVien, muc)) return soGiuSuaTay;
 
         ed.WriteMessage(
             $"\n[XBoss] Đã đặt {muc.Count} giá đỡ {def0.Id} ({def0.BlockName}) trên {soTuyen} tuyến " +
             $"({soDaCo} vị trí đã có sẵn, không đặt trùng).\n");
         BlockLibraryService.BaoItemDem(ed, pack.RulePack, def0, "giá đỡ");
         ed.WriteMessage("[XBoss] Hoàn tác cả lệnh: UNDO 1 lần.\n");
+        return soGiuSuaTay;
     }
+
+    /// <summary>
+    /// Một giá đỡ đang có trên tuyến → ứng viên cho phép đếm "đã sửa tay" của Core (M118 FR2). Băm
+    /// hiện tại tính từ <c>BlockReference.Position</c>, đúng điểm đại diện đã băm lúc sinh.
+    /// </summary>
+    private static UngVienDonCu<Diem2> UngVienGiaDo(VeThucThe.KhoiBamTim k) =>
+        new(k.Diem, k.NguonHoanThien, k.BamHinhHoc, RevisionSnapshot.BamHinhHoc([k.Diem]), k.SuaTay);
 
     // ===== Hỏi đáp =====
 

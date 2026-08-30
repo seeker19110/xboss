@@ -76,15 +76,27 @@ public sealed class NgatNetGuardrailTests
     [Fact]
     public void Chi_xoa_doi_tuong_mang_vai_tro_NgatNet()
     {
-        // Lệnh không tự gọi Erase(): mọi lần xóa đi qua VeThucThe.XoaNgatNet, và hàm đó kiểm lại
-        // vai trò XData ngay trước khi mở ForWrite.
+        // Lệnh không tự gọi Erase(): mọi lần xóa đi qua VeThucThe.XoaNgatNet /
+        // VeThucThe.XoaNgatNetGiuTay (M118 FR2), cả hai đều xóa qua ĐÚNG MỘT hàm VeThucThe.XoaMotNgatNet
+        // và hàm đó kiểm lại vai trò XData ngay trước khi mở ForWrite.
         Assert.DoesNotContain("Erase()", MaLenh, StringComparison.Ordinal);
 
         var than = Regex.Match(
             MaThucThe,
-            @"internal static int XoaNgatNet\(.*?\n    \}",
+            @"private static bool XoaMotNgatNet\(.*?\n    \}",
             RegexOptions.Singleline);
-        Assert.True(than.Success, "Không đọc được thân VeThucThe.XoaNgatNet — test đang dò nhầm tệp?");
+        Assert.True(than.Success, "Không đọc được thân VeThucThe.XoaMotNgatNet — test đang dò nhầm tệp?");
+        Assert.Contains("Erase()", than.Value, StringComparison.Ordinal);
+
+        // Không đường nào khác trong VeThucThe xóa đối tượng ngắt nét: hai hàm công khai đều gọi lại
+        // XoaMotNgatNet chứ không tự gọi Erase().
+        foreach (var ten in new[] { "XoaNgatNet", "XoaNgatNetGiuTay" })
+        {
+            var thanCong = Regex.Match(
+                MaThucThe, $@"internal static [^\n]*{ten}\(.*?\n    \}}", RegexOptions.Singleline);
+            Assert.True(thanCong.Success, $"Không đọc được thân VeThucThe.{ten} — test đang dò nhầm tệp?");
+            Assert.DoesNotContain("Erase()", thanCong.Value, StringComparison.Ordinal);
+        }
         Assert.Contains("VaiTro: VaiTroVe.NgatNet", than.Value, StringComparison.Ordinal);
     }
 

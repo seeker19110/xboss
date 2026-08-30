@@ -168,6 +168,35 @@ Trạng thái lỗi/offline: bước 4 không đạt → không cho chạy bư�
 (zoom); mất mạng → dùng rule pack/thư viện block cache offline M113, không chặn. Xem đặc tả đầy đủ
 ở `docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md`.
 
+### Chạy lại `XBOSS_HOANTHIEN` KHÔNG đè lên phần kỹ sư sửa tay (M118)
+
+Bước 7 → bước 6 là vòng lặp tự nhiên của quy trình, nên **mọi thực thể do 8 giai đoạn sinh ra đều
+mang băm hình học lúc sinh** trong XData. Lần chạy sau, thực thể nào có băm lệch (kỹ sư đã kéo/dời
+tay) hoặc mang cờ `suatay` thì được **GIỮ NGUYÊN**, không xóa-sinh lại; phần còn lại vẫn được thay
+mới bình thường. Tóm tắt từng giai đoạn in thêm `giữ nguyên N thực thể kỹ sư đã sửa tay`.
+
+Cách 4 giai đoạn ủy thác cho lệnh `XBOSS_VE_*` thực hiện điều đó:
+
+| Giai đoạn        | Điểm đại diện để băm                      | Chạy lại thì làm gì                                                            |
+| ---------------- | ----------------------------------------- | ------------------------------------------------------------------------------ |
+| ③ Chia đốt      | 2 đầu `Line` vạch chia / điểm chèn `MText` | Đường dọn theo handle tim BỎ QUA vạch/nhãn đã dời tay                          |
+| ④ Giá đỡ        | `BlockReference.Position` (lưu XData)     | Không xóa gì (vốn chỉ bổ sung chỗ thiếu); giá đỡ đã dời vẫn tính là "đã có" nên không bị đặt chồng, và được đếm vào dòng "giữ nguyên" |
+| ⑥ Ngắt nét      | 2 góc hộp bao lúc sinh (lưu XData)        | Đường dọn theo cặp tuyến BỎ QUA vùng che/cung đã dời tay                       |
+| ⑧ Bảng thống kê | Điểm chèn bảng (`Table.Position`)         | Bảng cũ luôn cập nhật **tại chỗ** — kéo bảng sang góc khác thì chạy lại không kéo về |
+
+Hai lưu ý:
+
+- **Giá đỡ và đối tượng ngắt nét dùng điểm đại diện đã lưu trong XData, không đọc lại hình học đầy
+  đủ.** Riêng vùng che `Wipeout` của ⑥ thì đỉnh đọc lại qua `SetFrom` không tất định, nên điểm đại
+  diện là 2 góc hộp bao — dời đối tượng là hộp bao dời theo, đủ để nhận ra kỹ sư đã kéo tay.
+- **Xóa hẳn thì chạy lại vẫn sinh lại** (xóa không để lại XData nên không phân biệt được với "chưa
+  từng sinh") — giống hệt giai đoạn ② phụ kiện và ⑤ lỗ chờ.
+
+**Lệnh lẻ chạy tay (`XBOSS_VE_CHIADOT` / `_GIADO` / `_NGATNET` / `_THONGKE` gõ trực tiếp) không đổi
+một hành vi nào**: thực thể chúng sinh không mang băm và cơ chế idempotent riêng của chúng giữ
+nguyên — bảo vệ sửa tay chỉ bật cho thực thể mang dấu `nguon=M115`. Đây là bất biến có test
+(`GiuTayHoanThienTests`, M118 AC3).
+
 ## Build
 
 ### Core + Tests (mọi HĐH — đây là phần CI chạy)
