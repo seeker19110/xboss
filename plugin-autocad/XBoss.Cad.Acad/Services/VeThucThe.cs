@@ -53,6 +53,57 @@ internal static class VeThucThe
         return pl;
     }
 
+    // ===== Băm hình học để giữ công sửa tay của kỹ sư (M118 FR2) =====
+
+    /// <summary>
+    /// Chuỗi điểm ĐẠI DIỆN của một thực thể để băm hình học (M118 FR2) — tính CÙNG MỘT CÁCH lúc
+    /// sinh và lúc kiểm ở lần chạy sau, nếu không thì băm luôn lệch và mọi thứ thành "đã sửa tay".
+    ///
+    /// Line/MText/khối chèn/bảng dùng điểm đặc trưng đọc lại được tất định; polyline dùng đỉnh.
+    /// Còn lại (đáng kể nhất là <see cref="Wipeout"/> của ⑥ ngắt nét — đọc lại đỉnh qua
+    /// <c>SetFrom</c> KHÔNG tất định) dùng 2 góc hộp bao, đúng cách <c>RevisionStore.DiemBam</c> đã
+    /// làm cho mốc revision: dời đối tượng là hộp bao dời theo, đủ để nhận ra kỹ sư đã kéo tay.
+    /// Rỗng = không lấy được điểm đại diện ⇒ coi như không có băm (đi đường cũ).
+    /// </summary>
+    internal static IReadOnlyList<Diem2> DiemBamCua(Entity ent)
+    {
+        switch (ent)
+        {
+            case Line l:
+                return [new Diem2(l.StartPoint.X, l.StartPoint.Y), new Diem2(l.EndPoint.X, l.EndPoint.Y)];
+            case MText t:
+                return [new Diem2(t.Location.X, t.Location.Y)];
+            case BlockReference br:
+                return [new Diem2(br.Position.X, br.Position.Y)];
+            case Table tb:
+                return [new Diem2(tb.Position.X, tb.Position.Y)];
+            case Polyline pl:
+                return DinhCua(pl).Select(d => new Diem2(d.X, d.Y)).ToList();
+            default:
+                return RevisionStore.BaoHinhCua(ent) is { } bao
+                    ? [new Diem2(bao.MinX, bao.MinY), new Diem2(bao.MaxX, bao.MaxY)]
+                    : [];
+        }
+    }
+
+    /// <summary>
+    /// XData kèm băm hình học lúc sinh khi (và chỉ khi) thực thể do <c>XBOSS_HOANTHIEN</c> sinh ra
+    /// (M118 FR2/AC4). Gọi SAU khi thực thể đã vào database — điểm đại diện của hộp bao chỉ đọc
+    /// được lúc đó.
+    /// </summary>
+    internal static VeXDataInfo KemBam(VeXDataInfo xd, Entity ent, string? giaiDoanM115) =>
+        HoanThienKeHoach.BamKhiPipeline(giaiDoanM115, DiemBamCua(ent)) is { } bam
+            ? xd with { BamHinhHoc = bam }
+            : xd;
+
+    /// <summary>Ứng viên cho đường dọn cũ giữ-tay của Core (M118 FR2) đọc từ một thực thể thật.</summary>
+    internal static UngVienDonCu<ObjectId> UngVienDonCua(ObjectId id, Entity ent, VeXDataInfo? xd) =>
+        new(id,
+            xd?.NguonHoanThien,
+            xd?.BamHinhHoc,
+            RevisionSnapshot.BamHinhHoc(DiemBamCua(ent)),
+            xd?.SuaTay ?? false);
+
     /// <summary>ObjectId từ chuỗi handle trong XData; null khi handle đã mục (đối tượng bị xóa).</summary>
     internal static ObjectId? TimTheoHandle(Database db, string? handle)
     {
@@ -98,11 +149,32 @@ internal static class VeThucThe
     /// mở theo layer thật của đối tượng thì không phải tra ngược hậu tố layer trong rule pack.
     /// </summary>
     internal static int XoaChiaDotCua(
-        Database db, Transaction tr, IReadOnlyDictionary<string, List<ObjectId>> theoTim, string handleTim)
+        Database db, Transaction tr, IReadOnlyDictionary<string, List<ObjectId>> theoTim, string handleTim) =>
+        XoaChiaDotGiuTay(db, tr, theoTim, handleTim, giuTayM115: false).SoXoa;
+
+    /// <summary>
+    /// Như <see cref="XoaChiaDotCua"/> nhưng có đường GIỮ-TAY của M118 FR2: <paramref name="giuTayM115"/>
+    /// true (chỉ khi <c>XBOSS_HOANTHIEN</c> gọi) thì vạch chia/nhãn đốt mang dấu <c>nguon=M115</c> mà
+    /// kỹ sư đã dời tay được giữ nguyên thay vì xóa-sinh lại. Chạy tay lệnh lẻ truyền false ⇒ hành vi
+    /// Y HỆT trước M118 (bất biến AC3). Quyết định giữ/xóa tính ở Core
+    /// (<see cref="HoanThienKeHoach.LocDonCu{T}"/>, có test).
+    /// </summary>
+    internal static (int SoXoa, int SoGiu) XoaChiaDotGiuTay(
+        Database db, Transaction tr, IReadOnlyDictionary<string, List<ObjectId>> theoTim, string handleTim,
+        bool giuTayM115)
     {
-        if (!theoTim.TryGetValue(handleTim, out var ids)) return 0;
-        var soXoa = 0;
+        if (!theoTim.TryGetValue(handleTim, out var ids)) return (0, 0);
+
+        var ungVien = new List<UngVienDonCu<ObjectId>>();
         foreach (var id in ids)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not Entity doc) continue;
+            ungVien.Add(UngVienDonCua(id, doc, VeXDataStore.Doc(doc)));
+        }
+
+        var kq = HoanThienKeHoach.LocDonCu(ungVien, giuTayM115);
+        var soXoa = 0;
+        foreach (var id in kq.CanXoa)
         {
             if (tr.GetObject(id, OpenMode.ForRead) is not Entity doc) continue;
             VeLayerService.MoKhoaNeuCo(db, tr, doc.Layer);
@@ -110,7 +182,7 @@ internal static class VeThucThe
             ghi.Erase();
             soXoa++;
         }
-        return soXoa;
+        return (soXoa, kq.GiuViSuaTay.Count);
     }
 
     /// <summary>
@@ -219,14 +291,49 @@ internal static class VeThucThe
         var soXoa = 0;
         foreach (var id in ids)
         {
-            if (tr.GetObject(id, OpenMode.ForRead) is not Entity doc) continue;
-            if (VeXDataStore.Doc(doc) is not { VaiTro: VaiTroVe.NgatNet }) continue;
-            VeLayerService.MoKhoaNeuCo(db, tr, doc.Layer);
-            if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ghi) continue;
-            ghi.Erase();
-            soXoa++;
+            if (XoaMotNgatNet(db, tr, id)) soXoa++;
         }
         return soXoa;
+    }
+
+    /// <summary>
+    /// Như <see cref="XoaNgatNet"/> nhưng có đường GIỮ-TAY của M118 FR2 (chỉ <c>XBOSS_HOANTHIEN</c>
+    /// gọi): đối tượng ngắt nét mang dấu <c>nguon=M115</c> mà kỹ sư đã dời tay được giữ nguyên.
+    /// Lệnh lẻ <c>XBOSS_VE_NGATNET</c> và <c>XBOSS_VE_NGATNET_XOA</c> vẫn đi <see cref="XoaNgatNet"/>
+    /// nên hành vi của chúng không đổi (bất biến AC3 — riêng lệnh gỡ sạch thì PHẢI gỡ được tất).
+    /// </summary>
+    internal static (int SoXoa, int SoGiu) XoaNgatNetGiuTay(
+        Database db, Transaction tr, IEnumerable<ObjectId> ids)
+    {
+        var ungVien = new List<UngVienDonCu<ObjectId>>();
+        foreach (var id in ids)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not Entity doc) continue;
+            ungVien.Add(UngVienDonCua(id, doc, VeXDataStore.Doc(doc)));
+        }
+
+        var kq = HoanThienKeHoach.LocDonCu(ungVien, giuTayM115: true);
+        var soXoa = 0;
+        foreach (var id in kq.CanXoa)
+        {
+            if (XoaMotNgatNet(db, tr, id)) soXoa++;
+        }
+        return (soXoa, kq.GiuViSuaTay.Count);
+    }
+
+    /// <summary>
+    /// Xóa MỘT đối tượng ngắt nét sau khi kiểm lại vai trò XData (<c>VaiTro: VaiTroVe.NgatNet</c>) —
+    /// danh sách id dựng ở transaction TRƯỚC, giữa hai lần đó bản vẽ có thể đã đổi. Đây là chỗ DUY
+    /// NHẤT của M109 gọi <c>Erase()</c> (guardrail M109 §2).
+    /// </summary>
+    private static bool XoaMotNgatNet(Database db, Transaction tr, ObjectId id)
+    {
+        if (tr.GetObject(id, OpenMode.ForRead) is not Entity doc) return false;
+        if (VeXDataStore.Doc(doc) is not { VaiTro: VaiTroVe.NgatNet }) return false;
+        VeLayerService.MoKhoaNeuCo(db, tr, doc.Layer);
+        if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ghi) return false;
+        ghi.Erase();
+        return true;
     }
 
     /// <summary>
@@ -248,7 +355,12 @@ internal static class VeThucThe
     }
 
     /// <summary>Một khối do bộ lệnh vẽ chèn và đang bám vào một tuyến tim.</summary>
-    internal readonly record struct KhoiBamTim(VaiTroVe VaiTro, Diem2 Diem, string? BlockId);
+    /// <remarks>
+    /// Ba trường cuối (dấu <c>nguon</c>, băm lúc sinh, cờ sửa tay) đủ để giai đoạn ④ giá đỡ đếm khối
+    /// kỹ sư đã dời tay (M118 FR2) mà không phải quét bản vẽ thêm một lượt nữa.
+    /// </remarks>
+    internal readonly record struct KhoiBamTim(
+        VaiTroVe VaiTro, Diem2 Diem, string? BlockId, string? NguonHoanThien, string? BamHinhHoc, bool SuaTay);
 
     /// <summary>
     /// Mọi khối do bộ lệnh vẽ chèn, nhóm theo handle của tim mà nó bám vào (phụ kiện, thiết bị,
@@ -265,7 +377,9 @@ internal static class VeThucThe
             var xd = VeXDataStore.Doc(br);
             if (xd?.HandleTim is not { Length: > 0 } tim) continue;
             if (!ra.TryGetValue(tim, out var ds)) ra[tim] = ds = [];
-            ds.Add(new KhoiBamTim(xd.VaiTro, new Diem2(br.Position.X, br.Position.Y), xd.BlockId));
+            ds.Add(new KhoiBamTim(
+                xd.VaiTro, new Diem2(br.Position.X, br.Position.Y), xd.BlockId,
+                xd.NguonHoanThien, xd.BamHinhHoc, xd.SuaTay));
         }
         return ra;
     }

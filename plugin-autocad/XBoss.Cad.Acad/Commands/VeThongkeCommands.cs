@@ -43,7 +43,12 @@ public sealed class VeThongkeCommands
     /// Tách nguyên vẹn khỏi <see cref="ThongKe"/> để <c>XBOSS_HOANTHIEN</c> (M115 giai đoạn ⑧) gọi
     /// lại đúng logic này thay vì nhân đôi.
     /// </summary>
-    internal static void ChayThongKe(
+    /// <returns>
+    /// 1 khi bảng cũ đã bị kỹ sư KÉO ĐI CHỖ KHÁC và lần chạy này giữ nguyên vị trí đó (M118 FR2 —
+    /// "sửa tay" của một bảng nghĩa là dời bảng; nội dung thì luôn ghi mới, đó là mục đích của việc
+    /// chạy lại); 0 khi chạy tay lệnh lẻ hoặc bảng còn ở đúng chỗ plugin đặt.
+    /// </returns>
+    internal static int ChayThongKe(
         Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, DrawToolsPack pack,
         LoaiBangThongKeUi loai, double tiLeIn, string? giaiDoanM115 = null)
     {
@@ -60,12 +65,12 @@ public sealed class VeThongkeCommands
             };
             tr.Commit();
         }
-        if (bang is null) return;
+        if (bang is null) return 0;
 
         ed.WriteMessage($"\n[XBoss] ===== {bang.TieuDe} =====\n");
         foreach (var d in bang.Dong) ed.WriteMessage($"[XBoss]   {string.Join("  |  ", d)}\n");
 
-        VeBang(doc, ed, pack, bang, tiLeIn, giaiDoanM115);
+        return VeBang(doc, ed, pack, bang, tiLeIn, giaiDoanM115);
     }
 
     // ===== Thu tham số: hộp thoại (mặc định) hoặc dòng lệnh (M106 FR9) =====
@@ -188,7 +193,13 @@ public sealed class VeThongkeCommands
 
     // ===== Vẽ bảng =====
 
-    private static void VeBang(
+    /// <summary>
+    /// Vẽ mới hoặc CẬP NHẬT TẠI CHỖ bảng cũ cùng loại. Bảng cũ luôn được cập nhật ngay tại
+    /// <c>Table.Position</c> hiện tại của nó (M118 FR2/AC2: kỹ sư kéo bảng sang góc khác thì chạy
+    /// lại không kéo về chỗ cũ) — <see cref="VeBangService.DoNoiDung"/> chỉ đổ lại ô, không đụng
+    /// <c>Position</c>. Trả 1 nếu bảng cũ đã bị dời tay và lần này được giữ nguyên chỗ.
+    /// </summary>
+    private static int VeBang(
         Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, DrawToolsPack pack, BangThongKe bang,
         double tiLe, string? giaiDoanM115)
     {
@@ -211,11 +222,12 @@ public sealed class VeThongkeCommands
             if (kqDiem.Status != PromptStatus.OK)
             {
                 ed.WriteMessage("\n[XBoss] Đã hủy — bản vẽ không thay đổi.\n");
-                return;
+                return 0;
             }
             viTri = kqDiem.Value.TransformBy(ed.CurrentUserCoordinateSystem);
         }
 
+        var soGiuSuaTay = 0;
         using var khoa = doc.LockDocument();
         using var tr2 = db.TransactionManager.StartTransaction();
         try
@@ -226,9 +238,20 @@ public sealed class VeThongkeCommands
 
             if (bangCu is { } id && tr2.GetObject(id, OpenMode.ForWrite) is Table cu)
             {
+                // Đếm trước khi đổ nội dung: DoNoiDung không đụng Position nên băm không đổi, nhưng
+                // đọc trước là cách chắc chắn nhất để "vị trí hiện tại" đúng là vị trí kỹ sư để lại.
+                var ungVien = VeThucThe.UngVienDonCua(id, cu, VeXDataStore.Doc(cu));
+                soGiuSuaTay = HoanThienKeHoach.DemSuaTay(
+                    [ungVien], giuTayM115: giaiDoanM115 is not null);
+
                 VeBangService.DoNoiDung(cu, bang.TieuDe, bang.Cot, bang.Dong, caoChu);
                 ed.WriteMessage(
                     $"\n[XBoss] Đã CẬP NHẬT bảng cũ tại chỗ ({bang.Dong.Count} dòng) — không sinh bảng đôi.\n");
+                if (soGiuSuaTay > 0)
+                {
+                    ed.WriteMessage(
+                        "[XBoss] Giữ nguyên vị trí bảng kỹ sư đã kéo tay — chạy lại KHÔNG kéo bảng về chỗ cũ.\n");
+                }
             }
             else
             {
@@ -243,6 +266,10 @@ public sealed class VeThongkeCommands
                         VaiTro = VaiTroVe.BangThongKe,
                         LoaiBang = ma,
                         RulePackVersion = pack.RulePack.Version,
+                        // M118 FR2/AC4 — điểm chèn bảng, khớp Table.Position mà VeThucThe.DiemBamCua
+                        // đọc lại ở lần chạy sau.
+                        BamHinhHoc = HoanThienKeHoach.BamKhiPipeline(
+                            giaiDoanM115, [new Diem2(viTri.X, viTri.Y)]),
                     });
                 ed.WriteMessage($"\n[XBoss] Đã tạo bảng ({bang.Dong.Count} dòng) trong bản vẽ.\n");
             }
@@ -254,9 +281,10 @@ public sealed class VeThongkeCommands
             ed.WriteMessage(
                 $"\n[XBoss] LỖI khi dựng bảng — đã rollback, bản vẽ nguyên trạng: {e.Message}\n" +
                 "[XBoss] Nếu layer chú thích đang khóa: chạy XBOSS_VE_NEN (hoặc mở khóa layer) rồi thử lại.\n");
-            return;
+            return 0;
         }
 
         ed.WriteMessage("[XBoss] Hoàn tác: UNDO 1 lần.\n");
+        return soGiuSuaTay;
     }
 }

@@ -129,7 +129,11 @@ public sealed class VeNgatNetCommands
     /// Handle các tuyến tim trong phạm vi khi pipeline gọi; null + <paramref name="hoiThamSo"/>
     /// false = cả bản vẽ.
     /// </param>
-    internal static void ChayNgatNet(
+    /// <returns>
+    /// Số đối tượng ngắt nét GIỮ NGUYÊN vì kỹ sư đã dời tay (M118 FR2) — luôn 0 khi chạy tay lệnh
+    /// lẻ (<paramref name="giaiDoanM115"/> null), để pipeline in "Giữ nguyên N" trong tóm tắt ⑥.
+    /// </returns>
+    internal static int ChayNgatNet(
         Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, DrawToolsPack pack,
         CrossingPolicySection chinhSach, double toMm, double clearance, double banKinhCung,
         bool hoiThamSo, IReadOnlyCollection<string>? phamViM115, string? giaiDoanM115 = null)
@@ -153,7 +157,7 @@ public sealed class VeNgatNetCommands
             ed.WriteMessage(
                 $"\n[XBoss] Bản vẽ có {tim.Count} tuyến tim XBoss nhưng không cặp nào giao nhau — " +
                 "bản vẽ không thay đổi.\n");
-            return;
+            return 0;
         }
 
         // ===== (3) Phạm vi + đảo tay: hộp thoại (mặc định) hoặc dòng lệnh (FR10) =====
@@ -164,7 +168,7 @@ public sealed class VeNgatNetCommands
         if (hoiThamSo)
         {
             if (HoiThamSo(ed, cap.Select(c => c.Dong).ToList(), chinhSach, DungSaiDaGiaoMm / toMm) is not { } hoi)
-                return;
+                return 0;
             ts = hoi;
         }
         else
@@ -185,7 +189,7 @@ public sealed class VeNgatNetCommands
         }
         else if (ts.PhamVi == PhamViNgatNet.ChonTay)
         {
-            if (HoiVungChon(ed, db, tim) is not { } vungChon) return;
+            if (HoiVungChon(ed, db, tim) is not { } vungChon) return 0;
             tomTatChon = vungChon.TomTat;
             var handleChon = vungChon.Handle;
             foreach (var d in tomTatChon.DongBoQua) ed.WriteMessage($"[XBoss] Bỏ qua {d}\n");
@@ -193,7 +197,7 @@ public sealed class VeNgatNetCommands
             {
                 ed.WriteMessage(
                     "\n[XBoss] Vùng chọn không có tuyến tim XBoss nào — bản vẽ không thay đổi.\n");
-                return;
+                return 0;
             }
             // Một cặp thuộc phạm vi khi CÓ ÍT NHẤT MỘT tuyến của nó được chọn: kỹ sư chọn một tuyến
             // vừa dời là muốn ngắt nét của tuyến đó cập nhật theo, dù tuyến kia nằm ngoài vùng chọn.
@@ -220,12 +224,13 @@ public sealed class VeNgatNetCommands
         if (viec.Count == 0 && handlePhamVi.Count == 0)
         {
             ed.WriteMessage("\n[XBoss] Không có gì để vẽ hay để dọn — bản vẽ không thay đổi.\n");
-            return;
+            return 0;
         }
 
         // ===== (5) Vẽ: MỘT transaction = MỘT nhóm UNDO (AC7) =====
 
         var soXoa = 0;
+        var soGiuSuaTay = 0;
         var soChe = 0;
         var soCung = 0;
         using (var khoa = doc.LockDocument())
@@ -240,13 +245,22 @@ public sealed class VeNgatNetCommands
                 // (a) Dọn kết quả cũ của ĐÚNG các tuyến trong phạm vi (FR6 — idempotent). Lọc theo
                 //     CẢ HAI handle trong XData: đảo tay hoán đổi vai trò trên/dưới nên tuyến đang
                 //     chọn có thể nằm ở vế "tim đi trên" của đối tượng cũ.
-                soXoa = VeThucThe.XoaNgatNet(
-                    db, tr,
-                    VeThucThe.NgatNetTrongBanVe(db, tr)
-                        .Where(o => handlePhamVi.Contains(o.HandleTim) ||
-                                    (o.HandleTimGiao is { Length: > 0 } giao && handlePhamVi.Contains(giao)))
-                        .Select(o => o.Id)
-                        .ToList());
+                //     M118 FR2: chạy QUA PIPELINE thì đối tượng mang dấu nguon=M115 mà kỹ sư đã dời
+                //     tay được giữ nguyên; chạy tay lệnh lẻ vẫn đi đường cũ XoaNgatNet, xóa hết như
+                //     trước M118 (bất biến AC3).
+                var canDon = VeThucThe.NgatNetTrongBanVe(db, tr)
+                    .Where(o => handlePhamVi.Contains(o.HandleTim) ||
+                                (o.HandleTimGiao is { Length: > 0 } giao && handlePhamVi.Contains(giao)))
+                    .Select(o => o.Id)
+                    .ToList();
+                if (giaiDoanM115 is null)
+                {
+                    soXoa = VeThucThe.XoaNgatNet(db, tr, canDon);
+                }
+                else
+                {
+                    (soXoa, soGiuSuaTay) = VeThucThe.XoaNgatNetGiuTay(db, tr, canDon);
+                }
 
                 // (b) Dựng vùng che + cầu vượt.
                 var theoHang = new Dictionary<int, (List<ObjectId> Che, List<ObjectId> LenTren)>();
@@ -261,7 +275,9 @@ public sealed class VeNgatNetCommands
 
                     var che = VeThucThe.TaoWipeout(v.VungChe);
                     VeThucThe.Them(tr, ms, che, v.LayerNgat);
-                    VeXDataStore.Ghi(che, v.XData);
+                    // Băm ghi SAU khi thực thể đã vào bản vẽ: điểm đại diện của vùng che là hộp bao
+                    // (đỉnh Wipeout đọc lại qua SetFrom không tất định — M118 FR2).
+                    VeXDataStore.Ghi(che, VeThucThe.KemBam(v.XData, che, giaiDoanM115));
                     nhom.Che.Add(che.ObjectId);
                     soChe++;
 
@@ -269,7 +285,7 @@ public sealed class VeNgatNetCommands
                     {
                         var cung = VeThucThe.TaoCungCauVuot(cv);
                         VeThucThe.Them(tr, ms, cung, v.LayerNgat);
-                        VeXDataStore.Ghi(cung, v.XData);
+                        VeXDataStore.Ghi(cung, VeThucThe.KemBam(v.XData, cung, giaiDoanM115));
                         // Cung phải nằm TRÊN vùng che của chính nó, nếu không thì bị chính vùng che
                         // xóa mất — xếp cùng nhóm "lên trên" với tuyến đi trên.
                         nhom.LenTren.Add(cung.ObjectId);
@@ -294,11 +310,18 @@ public sealed class VeNgatNetCommands
                 ed.WriteMessage(
                     $"\n[XBoss] LỖI khi vẽ ngắt nét — đã rollback, bản vẽ nguyên trạng: {e.Message}\n" +
                     "[XBoss] Nếu layer đang khóa: chạy XBOSS_VE_NEN (hoặc mở khóa layer) rồi thử lại.\n");
-                return;
+                return 0;
             }
         }
 
         BaoCao(ed, trongPhamVi, viec, tomTatChon, soXoa, soChe, soCung, boQua, chinhSach, toMm);
+        if (soGiuSuaTay > 0)
+        {
+            ed.WriteMessage(
+                $"[XBoss] Giữ nguyên {soGiuSuaTay} đối tượng ngắt nét kỹ sư đã dời tay — chạy lại KHÔNG đè " +
+                "lên công của người.\n");
+        }
+        return soGiuSuaTay;
     }
 
     // ==========================================================================================

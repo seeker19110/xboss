@@ -20,6 +20,11 @@ internal static class TrangThaiGom
     private static bool _laNguoiDuyet;
     private static string? _loiDeXuat = "Đang hỏi server...";
 
+    // M118 PR3 (FR3) — version server phát hành, hỏi async NHƯ đề xuất block ở trên (bảng vẽ
+    // ngay bằng bản gần nhất, LamMoiPhienBanPluginAsync cập nhật rồi vẽ lại). Null = chưa hỏi
+    // được/chưa hỏi lần nào — hiển thị "chưa rõ", KHÔNG BAO GIỜ coi là lệch.
+    private static string? _serverPluginVersion;
+
     internal static TrangThaiPhien LayTrangThai()
     {
         var serverUrl = XBossLoginCommand.DocServerUrl();
@@ -54,6 +59,8 @@ internal static class TrangThaiGom
         {
             ServerUrl = serverUrl,
             DaGhepThietBi = daGhep,
+            PluginVersion = PhienBanPluginService.PluginVersion,
+            ServerPluginVersion = _serverPluginVersion,
             RulePackVersion = pack?.Version,
             SoQuyTacBoc = pack?.Takeoff.Items.Count ?? 0,
             SoNhomLayer = pack?.LayerMap.Groups.Count ?? 0,
@@ -109,5 +116,16 @@ internal static class TrangThaiGom
         {
             _loiDeXuat = "Server phản hồi quá lâu — thử Làm mới lại";
         }
+    }
+
+    /// <summary>
+    /// M118 PR3 (FR3) — hỏi server phiên bản gói cài đang phát hành cho dòng "Phiên bản plugin"
+    /// (§13 UX). KHÔNG BAO GIỜ ném — mọi lỗi mạng/xác thực/timeout đã bị
+    /// <see cref="PhienBanPluginService.TaiPhienBanServerAsync"/> nuốt và trả null, giữ nguyên
+    /// "chưa rõ" trên bảng thay vì làm sập palette.
+    /// </summary>
+    internal static async Task LamMoiPhienBanPluginAsync()
+    {
+        _serverPluginVersion = await PhienBanPluginService.TaiPhienBanServerAsync();
     }
 }

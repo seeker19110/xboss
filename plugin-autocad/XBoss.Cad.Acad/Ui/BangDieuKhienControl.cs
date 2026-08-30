@@ -73,7 +73,8 @@ internal sealed class BangDieuKhienControl : UserControl
         _dangHoiDeXuat = true;
         try
         {
-            await TrangThaiGom.LamMoiDeXuatAsync(); // không ném — tự nuốt lỗi thành thông điệp
+            // Cả hai đều không ném — tự nuốt lỗi thành thông điệp/"chưa rõ" (M118 PR3).
+            await Task.WhenAll(TrangThaiGom.LamMoiDeXuatAsync(), TrangThaiGom.LamMoiPhienBanPluginAsync());
             HienThi(TrangThaiGom.LayTrangThai());
         }
         finally

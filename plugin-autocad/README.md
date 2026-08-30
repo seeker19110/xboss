@@ -24,7 +24,8 @@ Plugin có 2 lớp giao diện, đều chỉ là VỎ trên bộ lệnh (bấm n
   lệnh gõ tay.
 - **Bảng điều khiển `XBOSS_BANG`** — PaletteSet neo được: trạng thái server/thiết bị, rule pack
   đang nạp, bản vẽ hiện hành + tóm tắt các báo cáo JSON cạnh DWG, kèm nút khắc phục nhanh
-  (Đăng nhập/Nạp rule pack). Chỉ đọc, không đụng bản vẽ, không gọi mạng.
+  (Đăng nhập/Nạp rule pack). Chỉ đọc, không đụng bản vẽ, không gọi mạng — riêng dòng "Phiên bản
+  plugin" (M118 PR3) cập nhật khi bấm "Làm mới trạng thái" (cùng nhịp với đề xuất block).
 
 Xem đặc tả `docs/nang-cap/M102-plugin-ui.md`.
 
@@ -33,7 +34,7 @@ Xem đặc tả `docs/nang-cap/M102-plugin-ui.md`.
 | Lệnh               | Chức năng                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `XBOSS_LOGIN`      | Ghép thiết bị với server XBoss (M99 PR2): xin mã → duyệt trên trang web `/engineering/thiet-bi-cad` → nhận token (cất **Windows Credential Manager**, hạn 90 ngày, thu hồi được trên web) → tự tải rule pack mới nhất (ETag)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `XBOSS_RULEPACK`   | Nạp tệp rule pack JSON bằng tay (đường dự phòng offline) — cache `%APPDATA%\XBoss\rule-pack.json`. Chưa có rule pack (qua LOGIN hoặc lệnh này) thì mọi lệnh khác từ chối chạy                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `XBOSS_RULEPACK`   | Nạp tệp rule pack JSON bằng tay (đường dự phòng offline) — cache `%APPDATA%\XBoss\rule-pack.json`. Chưa có rule pack (qua LOGIN hoặc lệnh này) thì mọi lệnh khác từ chối chạy. **M118 PR3:** nạp xong so version của chính plugin với server (đã ghép thiết bị) — lệch thì in thêm 1 dòng `⚠` kèm đường dẫn tải bản mới; mất mạng/chưa ghép/khớp bản thì im lặng, không chặn lệnh                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `XBOSS_KIEMTRA`    | Chỉ kiểm, không sửa — 9 phép kiểm nền: layer sai chuẩn, lệch Z, polyline hở/gần kín, font TCVN3/VNI, lineweight lệch CTB, dim override, rác hình học, layer rỗng, block nặc danh (rule pack v5/v8 bật thêm phép 10–16 và **17** tag trùng số trong cùng hệ / **18** hạng mục có đối tượng nhưng thiếu mã BOQ — đều mặc định TẮT, tự tắt khi bản vẽ thiếu dữ liệu; **19** handle mồ côi trong bản chép tầng của `XBOSS_VE_NHANTANG` — M111, và **20** cloud/tam giác revision mồ côi của `XBOSS_VE_REV` — M110; hai phép này KHÔNG có cờ `enabled`, tự tắt khi bản vẽ chưa từng chạy lệnh tương ứng) — khoanh tròn vị trí lỗi trên layer tạm `XBOSS_KIEMTRA_MARK` (không in, tự dọn) + báo cáo JSON `<tệp>.dwg.xboss-kiemtra.json` cạnh DWG                                                                                |
 | `XBOSS_CHUANHOA`   | Pipeline thứ tự cố định 13 bước: Audit → layer mapping → font (giải mã TCVN3/VNI **và đổi font kiểu chữ sang `fontMap.targetFont`** — rule pack v3) → flatten Z=0 → overkill → purge → lineweight/CTB + gỡ dim override → **style map (text/dim về bộ chuẩn `styleMap`, KHÔNG phá liên kết đo của dimension) → xref (báo đứt đường dẫn, tương đối hóa; chỉ bind xref khai trong `bindMatchAny`) → hatch (mẫu + tỉ lệ theo layer, hatch solid giữ nguyên) → layout (xóa layout rỗng, đổi tên theo `namePattern`) → đóng polyline gần kín (khe ≤ `gapCloseToleranceMm`) → block map (quy block lạc chuẩn về block thư viện, bản đầu `reportOnly`)** — 4 bước 8–11 là rule pack v7, 2 bước 12–13 là rule pack v8, **đều mặc định TẮT**. Xem trước diff, xác nhận, **1 lần UNDO hoàn tác toàn bộ**; báo cáo JSON ghi cạnh DWG |
 | `XBOSS_BOCKL`      | Bóc khối lượng theo rule pack (`takeoff`): đo chiều dài/diện tích/đếm block theo layer mapping, quy đổi INSUNITS, tô màu vùng đã bóc + XData chống bóc trùng. **v6 (M101 PR3):** hỏi thêm "bóc theo vùng?" — chọn polyline ranh giới + đặt tên vùng thì tuyến cắt ranh giới được cắt đúng tại giao điểm (bản thân đường ranh giới không bị tính)                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -187,6 +188,35 @@ chấp hành lang, khoảng cách quy phạm) rồi **đề xuất cách xử l�
 > không đổi hành vi máy kỹ sư nào đang dùng rule pack cũ. `Core/Coordination/` (`QuetXungDot`,
 > `DeXuatXuLy`, `XungDotId`, `PhoiHopTomTat`) là phần THUẦN quét + tổng hợp, test xunit trên CI
 > Linux như mọi phần Core khác — không tham chiếu AutoCAD.
+
+### Chạy lại `XBOSS_HOANTHIEN` KHÔNG đè lên phần kỹ sư sửa tay (M118)
+
+Bước 7 → bước 6 là vòng lặp tự nhiên của quy trình, nên **mọi thực thể do 8 giai đoạn sinh ra đều
+mang băm hình học lúc sinh** trong XData. Lần chạy sau, thực thể nào có băm lệch (kỹ sư đã kéo/dời
+tay) hoặc mang cờ `suatay` thì được **GIỮ NGUYÊN**, không xóa-sinh lại; phần còn lại vẫn được thay
+mới bình thường. Tóm tắt từng giai đoạn in thêm `giữ nguyên N thực thể kỹ sư đã sửa tay`.
+
+Cách 4 giai đoạn ủy thác cho lệnh `XBOSS_VE_*` thực hiện điều đó:
+
+| Giai đoạn       | Điểm đại diện để băm                       | Chạy lại thì làm gì                                                                                                                   |
+| --------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| ③ Chia đốt      | 2 đầu `Line` vạch chia / điểm chèn `MText` | Đường dọn theo handle tim BỎ QUA vạch/nhãn đã dời tay                                                                                 |
+| ④ Giá đỡ        | `BlockReference.Position` (lưu XData)      | Không xóa gì (vốn chỉ bổ sung chỗ thiếu); giá đỡ đã dời vẫn tính là "đã có" nên không bị đặt chồng, và được đếm vào dòng "giữ nguyên" |
+| ⑥ Ngắt nét      | 2 góc hộp bao lúc sinh (lưu XData)         | Đường dọn theo cặp tuyến BỎ QUA vùng che/cung đã dời tay                                                                              |
+| ⑧ Bảng thống kê | Điểm chèn bảng (`Table.Position`)          | Bảng cũ luôn cập nhật **tại chỗ** — kéo bảng sang góc khác thì chạy lại không kéo về                                                  |
+
+Hai lưu ý:
+
+- **Giá đỡ và đối tượng ngắt nét dùng điểm đại diện đã lưu trong XData, không đọc lại hình học đầy
+  đủ.** Riêng vùng che `Wipeout` của ⑥ thì đỉnh đọc lại qua `SetFrom` không tất định, nên điểm đại
+  diện là 2 góc hộp bao — dời đối tượng là hộp bao dời theo, đủ để nhận ra kỹ sư đã kéo tay.
+- **Xóa hẳn thì chạy lại vẫn sinh lại** (xóa không để lại XData nên không phân biệt được với "chưa
+  từng sinh") — giống hệt giai đoạn ② phụ kiện và ⑤ lỗ chờ.
+
+**Lệnh lẻ chạy tay (`XBOSS_VE_CHIADOT` / `_GIADO` / `_NGATNET` / `_THONGKE` gõ trực tiếp) không đổi
+một hành vi nào**: thực thể chúng sinh không mang băm và cơ chế idempotent riêng của chúng giữ
+nguyên — bảo vệ sửa tay chỉ bật cho thực thể mang dấu `nguon=M115`. Đây là bất biến có test
+(`GiuTayHoanThienTests`, M118 AC3).
 
 ## Build
 
