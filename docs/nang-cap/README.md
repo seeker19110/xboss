@@ -280,7 +280,7 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > dùng chốt 2026-08-30:** kỹ sư vẽ line/pline tuyến tim từ nguồn tới thiết bị (kèm thuộc tính,
 > cao độ khi cần) — plugin tự hoàn thiện bản vẽ (nét đôi, tê/nhánh, co/cút, chia đốt, giá đỡ, lỗ
 > chờ, ngắt nét, tag, thống kê); **tích hợp thẳng vào plugin AutoCAD**, không tool rời; nguyên
-> tắc bất biến: *AI hiểu ngữ nghĩa, thuật toán vẽ hình học* — LLM không bao giờ sinh tọa độ.
+> tắc bất biến: _AI hiểu ngữ nghĩa, thuật toán vẽ hình học_ — LLM không bao giờ sinh tọa độ.
 > Đợt này ĐÓNG nốt 2 hướng "chưa có đặc tả" ghi ở cuối mục M99→M102 phía trên (đồ thị kết nối
 > tuyến–thiết bị → M115; combined services → M116) + thêm mảnh AI schematic (M117).
 >
@@ -290,6 +290,11 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > (điều phối 8 giai đoạn chạy chuỗi lệnh `XBOSS_VE_*` sẵn có trên cả cụm tuyến, idempotent, không
 > bao giờ đụng tọa độ tuyến gốc). Rule pack +1 version `completionPolicy` mặc định TẮT; không
 > migration, không API mới. 4 PR. **Thi hành ĐẦU TIÊN của đợt.**
+> **State: ✅ CODE XONG cả 4 PR (2026-08-30)** — rule pack `v16` + `Core/Graph/` (PR1),
+> `XBOSS_TUYEN_GAN`/`XBOSS_TUYEN_DOTHI` (PR2), `XBOSS_HOANTHIEN` (PR3), tài liệu +
+> `VERIFY-VA-PHAT-HANH.md` mục C11 (PR4). **CÒN NỢ — CHẶN phát hành rộng:** chưa verify tay trên
+> AutoCAD 2026 thật (mục `C11` của `plugin-autocad/VERIFY-VA-PHAT-HANH.md`, 10 mục 99–108) — xếp
+> hàng sau khi trả nợ verify tay các đợt trước (M111 §C9, M114 §C10) rồi mới tới lượt M115.
 > **`M116-phoi-hop-xung-dot-lien-he.md`** — combined services 2D: `XBOSS_PHOIHOP` quét 3 lớp
 > (giao cắt cùng dải cao độ, tranh chấp hành lang, khoảng cách quy phạm giữa cặp hệ) trên tuyến
 > mang XData M115 kể cả qua xref; **chỉ phát hiện + đề xuất theo `coordinationPolicy`, kỹ sư

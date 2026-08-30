@@ -36,7 +36,10 @@ const LENH_CHINH: { lenh: string; mo_ta: string }[] = [
   { lenh: "XBOSS_LOGIN", mo_ta: "Ghép thiết bị lần đầu / xin token mới" },
   { lenh: "XBOSS_RULEPACK", mo_ta: "Nạp tay bộ quy tắc (JSON) khi máy không ra được mạng" },
   { lenh: "XBOSS_KIEMTRA", mo_ta: "Chỉ kiểm, không đụng bản vẽ; xuất báo cáo JSON cạnh tệp DWG" },
-  { lenh: "XBOSS_CHUANHOA", mo_ta: "Chuẩn hóa theo bộ quy tắc; sai thì 1 lần UNDO về nguyên trạng" },
+  {
+    lenh: "XBOSS_CHUANHOA",
+    mo_ta: "Chuẩn hóa theo bộ quy tắc; sai thì 1 lần UNDO về nguyên trạng",
+  },
   { lenh: "XBOSS_BATCH", mo_ta: "Xử lý hàng loạt cả thư mục, kết quả vào da-chuan-hoa/" },
   { lenh: "XBOSS_BOCKL", mo_ta: "Bóc khối lượng theo layer, tô màu + đánh dấu vùng đã bóc" },
   { lenh: "XBOSS_BOCKL_XOA", mo_ta: "Gỡ đánh dấu, trả màu đối tượng về trước khi bóc" },
@@ -57,7 +60,19 @@ const LENH_CHINH: { lenh: string; mo_ta: string }[] = [
   { lenh: "XBOSS_VE_THONGKE", mo_ta: "Sinh bảng thiết bị/khối lượng ngay trong bản vẽ" },
   { lenh: "XBOSS_VE_MATCAT", mo_ta: "Dựng mặt cắt từ tuyến đã vẽ (cao độ nhập tay)" },
   { lenh: "XBOSS_VE_TRANGIN", mo_ta: "Tạo trang in đúng khổ/tỉ lệ, khung tên điền sẵn" },
-  { lenh: "XBOSS_VE_BAOCAO", mo_ta: "Xem lại cả buổi vẽ: tuyến/block theo hệ, size ngoài danh mục" },
+  {
+    lenh: "XBOSS_VE_BAOCAO",
+    mo_ta: "Xem lại cả buổi vẽ: tuyến/block theo hệ, size ngoài danh mục",
+  },
+  { lenh: "XBOSS_TUYEN_GAN", mo_ta: "Gán hệ/size/cao độ cho line/pline tuyến tim vừa vẽ (M115)" },
+  {
+    lenh: "XBOSS_TUYEN_DOTHI",
+    mo_ta: "Dựng đồ thị tuyến–thiết bị, suy tê/co/cút, kỹ sư duyệt trước khi hoàn thiện (M115)",
+  },
+  {
+    lenh: "XBOSS_HOANTHIEN",
+    mo_ta: "Điều phối 8 giai đoạn hoàn thiện bản vẽ từ tuyến tim đã duyệt (M115)",
+  },
 ];
 
 export default function CaiDatPluginPage() {
@@ -159,9 +174,7 @@ export default function CaiDatPluginPage() {
                       </span>
                     </p>
                   ) : (
-                    <p className="text-zinc-500">
-                      Chưa xác định được phiên bản gói cài hiện hành.
-                    </p>
+                    <p className="text-zinc-500">Chưa xác định được phiên bản gói cài hiện hành.</p>
                   )}
                   {thongTin?.sha256 ? (
                     <div className="text-zinc-300 space-y-1">
@@ -237,28 +250,26 @@ export default function CaiDatPluginPage() {
               → nhập mã → <strong>Duyệt</strong>.
             </li>
             <li>
-              Quay lại AutoCAD: plugin nhận token (hạn 90 ngày) và tự tải bộ quy tắc đang phát
-              hành.
+              Quay lại AutoCAD: plugin nhận token (hạn 90 ngày) và tự tải bộ quy tắc đang phát hành.
             </li>
           </ol>
           <p className="text-xs text-zinc-500">
             Token lưu trong Windows Credential Manager, không ghi ra tệp. Mất máy/nghi lộ → vào
-            trang Thiết Bị &amp; Token bấm <strong>Thu hồi</strong>; lần gọi kế tiếp của máy đó
-            nhận 401 và phải ghép lại.
+            trang Thiết Bị &amp; Token bấm <strong>Thu hồi</strong>; lần gọi kế tiếp của máy đó nhận
+            401 và phải ghép lại.
           </p>
           <p className="text-xs text-zinc-500">
             Máy không ra được mạng nội bộ: tải tệp JSON bộ quy tắc từ bảng điều khiển plugin (nút
-            Tải JSON), chép sang máy trạm rồi gõ <code>XBOSS_RULEPACK</code> chọn tệp. Chuẩn hóa
-            vẫn chạy, nhưng không tải bản vẽ lên được cho tới khi bộ quy tắc khớp bản đang phát
-            hành.
+            Tải JSON), chép sang máy trạm rồi gõ <code>XBOSS_RULEPACK</code> chọn tệp. Chuẩn hóa vẫn
+            chạy, nhưng không tải bản vẽ lên được cho tới khi bộ quy tắc khớp bản đang phát hành.
           </p>
         </Section>
 
         <Section title="4. Bảng lệnh chính" icon={LayoutList}>
           <p className="text-xs text-zinc-500 mb-2">
             Không cần thuộc tên lệnh: trên Ribbon có tab <strong>XBoss</strong> — đủ nút cho mọi
-            lệnh dưới đây, chia theo nhóm Kết nối / Chuẩn hóa / Bóc khối lượng / Vẽ shop drawing,
-            rê chuột vào nút là có chú thích tiếng Việt.
+            lệnh dưới đây, chia theo nhóm Kết nối / Chuẩn hóa / Bóc khối lượng / Vẽ shop drawing, rê
+            chuột vào nút là có chú thích tiếng Việt.
           </p>
           <div className="overflow-x-auto rounded-xl border border-zinc-800">
             <table className="w-full text-xs">
@@ -294,20 +305,19 @@ export default function CaiDatPluginPage() {
             </li>
             <li>
               <strong>Lệnh báo &quot;chưa nạp bộ quy tắc&quot;</strong> — chạy{" "}
-              <code>XBOSS_LOGIN</code> (có
-              mạng) hoặc <code>XBOSS_RULEPACK</code> (nạp tệp JSON).
+              <code>XBOSS_LOGIN</code> (có mạng) hoặc <code>XBOSS_RULEPACK</code> (nạp tệp JSON).
             </li>
             <li>
               <strong>Gọi lệnh nhận 401</strong> — token hết hạn hoặc đã bị thu hồi →{" "}
               <code>XBOSS_LOGIN</code> ghép lại.
             </li>
             <li>
-              <strong>XBOSS_UPLOAD báo 422 kèm danh sách lỗi</strong> — server kiểm định không
-              đạt, sửa đúng các lỗi liệt kê rồi tải lại; không có bản vẽ nào được ghi sổ.
+              <strong>XBOSS_UPLOAD báo 422 kèm danh sách lỗi</strong> — server kiểm định không đạt,
+              sửa đúng các lỗi liệt kê rồi tải lại; không có bản vẽ nào được ghi sổ.
             </li>
             <li>
-              <strong>XBOSS_UPLOAD báo trùng rev</strong> — rev đó đã có với nội dung khác, tăng
-              rev rồi gửi lại.
+              <strong>XBOSS_UPLOAD báo trùng rev</strong> — rev đó đã có với nội dung khác, tăng rev
+              rồi gửi lại.
             </li>
           </ul>
         </Section>
