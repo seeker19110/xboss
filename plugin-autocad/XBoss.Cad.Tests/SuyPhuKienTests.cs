@@ -82,10 +82,20 @@ public class SuyPhuKienTests
     {
         var cp = Cp();
 
-        foreach (var loai in new[] { LoaiNut.Nguon, LoaiNut.KetNoiThietBi, LoaiNut.Thang, LoaiNut.DauTuDo })
+        foreach (var loai in new[] { LoaiNut.Nguon, LoaiNut.KetNoiThietBi, LoaiNut.Thang })
         {
             Assert.Equal(TrangThaiPhuKien.KhongCan, SuyPhuKien.SuyMotNut(Nut(loai, 0), cp).TrangThai);
         }
+    }
+
+    [Fact]
+    public void Dau_tu_do_la_chua_quyet_khong_phai_khong_can()
+    {
+        // Đầu tự do là lỗi CHẶN (tuyến hở) ở KiemTuyen — SuyPhuKien không được ngầm coi là
+        // "không cần phụ kiện" kẻo hộp thoại duyệt bỏ sót cảnh báo này.
+        var cp = Cp();
+        var kq = SuyPhuKien.SuyMotNut(Nut(LoaiNut.DauTuDo, 0), cp);
+        Assert.Equal(TrangThaiPhuKien.ChuaQuyet, kq.TrangThai);
     }
 
     [Fact]

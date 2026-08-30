@@ -106,6 +106,21 @@ public class KiemTuyenTests
         Assert.Contains(kq.CanhBao, l => l.Loai == LoaiLoiTuyen.ThieuThuocTinh && l.ThietBiId == "FCU-3");
     }
 
+    [Fact]
+    public void Thiet_bi_da_khai_he_nhung_canh_tai_nut_chua_gan_he_thi_canh_bao_khong_im_lang()
+    {
+        // Thiết bị có HeId hợp lệ nhưng CẠNH nối vào nó chưa gán hệ (HeId null) — chưa đối chiếu
+        // được nên KHÔNG được kết luận sai hệ, nhưng cũng KHÔNG được im lặng bỏ qua như trước sửa.
+        var (tuyen, thietBi) = TuyenGraphTests.BanVeAc1();
+        var sua = tuyen.Select(t => t.Id == "NHANH-A" ? t with { HeId = null } : t).ToList();
+
+        var kq = KiemTuyen.Kiem(
+            TuyenGraph.Dung(sua, thietBi, D(0, 0), TuyenGraphTests.ThamSoPhatHanh()));
+
+        Assert.False(Co(kq, LoaiLoiTuyen.ThietBiSaiHe));
+        Assert.Contains(kq.CanhBao, l => l.Loai == LoaiLoiTuyen.ThieuThuocTinh && l.ThietBiId == "FCU-2");
+    }
+
     // ===== (4) Cao độ mâu thuẫn =====
 
     [Fact]

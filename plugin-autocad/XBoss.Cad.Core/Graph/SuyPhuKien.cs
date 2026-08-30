@@ -47,6 +47,11 @@ public static class SuyPhuKien
     public static PhuKienTaiNut SuyMotNut(PhanLoaiNut n, CompletionPolicySection cp)
     {
         var loaiLuat = LoaiLuatCho(n.Loai);
+        if (n.Loai == LoaiNut.DauTuDo)
+        {
+            return ChuaQuyet(n,
+                "Đầu tuyến tự do — đây là lỗi chặn (tuyến hở) ở bước kiểm, không phải nút cần phụ kiện.");
+        }
         if (loaiLuat.Count == 0)
         {
             return n.Loai is LoaiNut.NgaTu or LoaiNut.DoanLenXuong

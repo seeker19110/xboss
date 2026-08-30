@@ -119,7 +119,16 @@ public static class KiemTuyen
                     null, tb.Nut, g.Nut[tb.Nut].ViTri, tb.ThietBiId));
                 continue;
             }
-            if (heTaiNut.Count == 0 || tb.KhopHe) continue;
+            if (tb.KhopHe) continue;
+            if (heTaiNut.Count == 0)
+            {
+                canhBao.Add(new LoiTuyen(
+                    MucLoiTuyen.CanhBao, LoaiLoiTuyen.ThieuThuocTinh,
+                    $"Thiết bị \"{tb.Tag ?? tb.ThietBiId}\" thuộc hệ \"{tb.HeId}\" nhưng tuyến nối vào nó " +
+                    "chưa gán hệ — chưa đối chiếu được, gán hệ cho tuyến rồi kiểm lại.",
+                    null, tb.Nut, g.Nut[tb.Nut].ViTri, tb.ThietBiId));
+                continue;
+            }
             chan.Add(new LoiTuyen(
                 MucLoiTuyen.Chan, LoaiLoiTuyen.ThietBiSaiHe,
                 $"Thiết bị \"{tb.Tag ?? tb.ThietBiId}\" thuộc hệ \"{tb.HeId}\" nhưng tuyến nối vào nó " +
