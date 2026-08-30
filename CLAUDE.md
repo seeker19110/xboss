@@ -224,6 +224,7 @@ Parse file tracking gốc (sheet OGTĐ/OGHL/OGCH/ODNN) thành WBS — chứa log
 ## Quy ước
 
 - Commit message: conventional prefix (`fix:`, `feat:`, `chore:`, `ci:`) + mô tả tiếng Việt, dòng đầu nói rõ thay đổi gì ở đâu.
+- **Đã mở PR cho một việc thì việc phát sinh/liên quan tiếp theo commit thẳng vào nhánh của PR đó, không mở PR mới** — trừ khi PR đã merge/đóng (lúc đó bắt đầu nhánh + PR mới) hoặc người dùng yêu cầu tách riêng. Mỗi lần commit thêm vẫn tuân Definition of Done bên dưới trước khi push.
 - Khi thêm API route mới: luôn có check auth + `export const dynamic = "force-dynamic"`.
 - TypeScript strict, import nội bộ qua alias `@/*`, tránh `any` tuỳ tiện.
 - SQL luôn dùng helper `lib/db` với placeholder `?` — **không nối chuỗi để chèn giá trị**.
