@@ -124,6 +124,50 @@ lệnh chèn block — thư viện block đã tải (`XBOSS_LOGIN` hoặc `XBOSS
 > xác định được size **không bị đoán**: nó nằm ở dòng "(chưa có size)" và phần cách nhiệt tương ứng
 > được báo là "còn X m chưa tính".
 
+### Bộ lệnh Hoàn thiện bản vẽ từ tuyến tim (M115 — 3 lệnh)
+
+Hướng đi chốt sau khảo sát thị trường tool auto-routing MEP 2026-08-30 (`RESEARCH-AUTO-ROUTING-MEPF.md`):
+kỹ sư chỉ vẽ **line/pline tuyến tim** từ điểm nguồn tới thiết bị bằng AutoCAD thuần — plugin tự
+hoàn thiện phần còn lại bằng cách điều phối lại đúng bộ lệnh `XBOSS_VE_*` đã có ở trên (không nhân
+đôi logic vẽ). Con người quyết _đi đâu_, máy lo _vẽ đúng chuẩn thế nào_. Cần rule pack từ **v16**
+(khối `drawTools.completionPolicy`, mặc định **TẮT** — merge không đổi hành vi máy kỹ sư).
+
+| Lệnh                | Chức năng                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `XBOSS_TUYEN_GAN`   | **Gán thuộc tính tuyến** (mở rộng M107): chọn 1..n line/pline tuyến tim → hộp thoại (hệ, size, cao độ, vật liệu/cách nhiệt, kiểu nối) → ghi XData `XBOSS_VE` cho cả lô cùng lúc; layer khớp `layerMap` thì hệ được điền sẵn. Không đụng XData cũ khác của tuyến (chỉ ghi đè đúng các trường vừa chọn)                                                                                                                                                                                                |
+| `XBOSS_TUYEN_DOTHI` | **Dựng đồ thị + kiểm** trên cả cụm tuyến đã gán thuộc tính: gộp điểm chạm/giao thành nút, suy tê (nút 3 nhánh)/co-cút (đổi hướng tại đỉnh)/giảm (đổi size 2 đoạn)/đoạn lên-xuống (đổi cao độ), chiều dòng tính từ điểm nguồn, snap đầu tuyến vào block thiết bị đúng hệ. Hộp thoại M106 cho kỹ sư duyệt/sửa từng điểm suy ra (đổi loại tê/co, bỏ qua) trước khi sang bước hoàn thiện; tuyến hở/thiếu size/thiết bị sai hệ bị **chặn**, không đoán                                                    |
+| `XBOSS_HOANTHIEN`   | **Điều phối 8 giai đoạn hoàn thiện** trên đồ thị đã duyệt — chạy lại đúng thứ tự chuỗi lệnh sẵn có: ① `VE_NEN` ② `VE_PHUKIEN` (phụ kiện tại nút) ③ `VE_CHIADOT` ④ `VE_GIADO` ⑤ `VE_LOCHO` (giao tường) ⑥ `VE_NGATNET` (giao chéo) ⑦ `VE_TAG` ⑧ `VE_THONGKE`; xem trước + bật/tắt được từng giai đoạn. **Không bao giờ đụng tọa độ tuyến tim của kỹ sư** — mọi phần tử sinh ra là thực thể mới mang XData `nguon=M115` trỏ về tuyến gốc; chạy lại là **idempotent** (thay thế đúng phần của chính nó) |
+
+> **Rule pack v16 (M115)** khai khối `drawTools.completionPolicy` (dung sai bắt điểm khi gộp nút,
+> bảng chọn co/cút/tê theo hệ+size+góc, danh sách 8 giai đoạn bật mặc định) — **mặc định TẮT** nên
+> merge không đổi hành vi máy kỹ sư nào đang dùng rule pack cũ. `Core/Graph/` (`TuyenGraph`,
+> `NutPhanLoai`, `SuyPhuKien`, `KiemTuyen`) là phần THUẦN dựng đồ thị, test xunit trên CI Linux như
+> mọi phần Core khác — không tham chiếu AutoCAD.
+
+## Quy trình hoàn thiện bản vẽ từ tuyến tim (M115)
+
+Nối vào trình dẫn 6 giai đoạn M106 (giai đoạn "Vẽ shop drawing"), toàn bộ trong AutoCAD:
+
+1. **Kỹ sư** ghép máy, tải rule pack + thư viện block, chuẩn hóa nền kiến trúc (`XBOSS_LOGIN`,
+   `XBOSS_CHUANHOA` — đã có).
+2. **Kỹ sư** vẽ **line/pline tuyến tim** bằng AutoCAD thuần, từ điểm nguồn tới từng thiết bị (block
+   thư viện đã đặt sẵn); rẽ nhánh = pline chạm/giao tuyến chính.
+3. **Kỹ sư** gán thuộc tính cho các tuyến vừa vẽ bằng `XBOSS_TUYEN_GAN`.
+4. **Plugin** dựng đồ thị + kiểm bằng `XBOSS_TUYEN_DOTHI` — gộp nút, suy tê/co/cút/giảm/lên-xuống,
+   snap thiết bị, báo lỗi chặn (tuyến hở, thiếu size, sai hệ, cao độ mâu thuẫn).
+5. **Kỹ sư** duyệt đồ thị trên hộp thoại (bước 4, chốt human-in-the-loop số 1): sửa từng điểm suy
+   ra (đổi loại tê/co, bỏ qua).
+6. **Plugin** hoàn thiện bản vẽ bằng `XBOSS_HOANTHIEN` — chạy chuỗi 8 giai đoạn trên toàn cụm
+   tuyến, từng giai đoạn hoặc trọn gói, xem trước + bỏ qua được từng giai đoạn.
+7. **Kỹ sư** sửa tay phần chưa ưng (bản vẽ là "draft ~80%" — chốt human-in-the-loop số 2); chạy lại
+   bước 6 an toàn (idempotent) nếu cần.
+8. **Kỹ sư** kiểm + bóc khối lượng + nộp về server như quy trình hiện hành (`XBOSS_KIEMTRA`,
+   `XBOSS_BOCKL`, `XBOSS_UPLOAD` — đã có).
+
+Trạng thái lỗi/offline: bước 4 không đạt → không cho chạy bước 6, danh sách lỗi bấm-tới-đối-tượng
+(zoom); mất mạng → dùng rule pack/thư viện block cache offline M113, không chặn. Xem đặc tả đầy đủ
+ở `docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md`.
+
 ## Build
 
 ### Core + Tests (mọi HĐH — đây là phần CI chạy)

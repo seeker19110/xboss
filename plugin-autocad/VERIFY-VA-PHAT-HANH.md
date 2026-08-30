@@ -45,7 +45,7 @@ Gỡ cài: xoá thư mục `%APPDATA%\Autodesk\ApplicationPlugins\XBoss.bundle`.
 
 ---
 
-## C. Verify tay — 36 lệnh (98 mục), đi theo đúng thứ tự này
+## C. Verify tay — 39 lệnh (108 mục), đi theo đúng thứ tự này
 
 Mỗi mục ghi: **làm gì** → **đúng thì thấy gì**. Gặp lệch thì ghi lại lệnh + thông điệp + tệp
 báo cáo JSON cạnh DWG rồi báo lại, đừng sửa bản vẽ để "cho qua".
@@ -637,6 +637,50 @@ nào…`), nút chuyển nền chìm + chữ mờ.
 98. **Báo cáo phiên vẽ.** `XBOSS_VE_BAOCAO` → mục **"Đi tuyến tự động"** liệt kê đúng hệ/loại/cỡ, số
     nhánh, số phiên chạy và số nhánh đã sửa tay; nhật ký phiên có dòng `XBOSS_VE_TUYENTUDONG` kèm
     tổng chiều dài, số co, tỉ lệ cạnh dùng chung và lý do từng thiết bị không giải được.
+
+### C11. `XBOSS_TUYEN_GAN` / `XBOSS_TUYEN_DOTHI` / `XBOSS_HOANTHIEN` — hoàn thiện bản vẽ từ tuyến tim (M115 — CHƯA LÀM, chờ lượt trước xong)
+
+> **Chưa verify tay mục này.** Cần rule pack có `drawTools.completionPolicy.enabled = true` (bản
+> phát hành mặc định TẮT). Đợt M115 (và dự kiến M116/M117 nối theo) **CHƯA phát hành rộng** —
+> đang xếp hàng sau khi trả nợ verify tay AutoCAD 2026 các đợt trước (M111 §C9, M114 §C10 vẫn đang
+> chặn theo `docs/nang-cap/README.md`) rồi mới tới lượt verify riêng của M115. Ghi lại mục này để
+> khi tới lượt có sẵn kịch bản, không phải soạn lại từ đầu — cách ghi nợ giống hệt cách C9/C10 đang
+> treo ở trên tại thời điểm viết tài liệu này.
+
+99. **AC5 — cờ tắt.** Rule pack mặc định (`completionPolicy.enabled: false`) → cả 3 lệnh **dừng
+    ngay** kèm hướng dẫn cách bật, bản vẽ không đổi một thực thể nào (so số đối tượng model space
+    trước/sau).
+100. **AC1 — dựng đồ thị đúng.** Vẽ 1 pline nguồn + 2 nhánh chạm + 1 block FCU đúng hệ (AutoCAD
+     thuần, không dùng `XBOSS_VE`) → `XBOSS_TUYEN_GAN` gán hệ/size/cao độ cho cả 3 đoạn → chạy
+     `XBOSS_TUYEN_DOTHI` → hộp thoại phải liệt kê đúng **2 tê** + các co tại đỉnh đổi hướng + **3**
+     kết nối thiết bị, **0 lỗi chặn**.
+101. **AC2 — TIM KHÔNG ĐỔI (ca quan trọng nhất, không được bỏ).** Trước khi chạy `XBOSS_HOANTHIEN`,
+     `LIST` **từng** polyline tim và chép lại tọa độ từng đỉnh + bulge + `Closed`. Sau khi chạy hết
+     8 giai đoạn: `LIST` lại đúng các tuyến đó → **tọa độ từng đỉnh phải trùng khít từng byte**, số
+     đỉnh/bulge/`Closed` không đổi. Lệch dù một số lẻ là lỗi chặn phát hành (đúng khuôn AC2 của
+     C4b/C4c/C4d/C9 — bất biến M109 mở rộng).
+102. **AC3 — idempotent.** Chạy `XBOSS_HOANTHIEN` **2 lần liên tiếp** trên cùng đồ thị đã duyệt →
+     đếm tổng số thực thể model space trước và sau lần 2: **không đổi** (lần 2 chỉ thay thế đúng
+     phần tử của chính nó, không nhân đôi phụ kiện/giá đỡ/tag/bảng thống kê).
+103. **AC4 — khối lượng khớp.** `XBOSS_BOCKL` trên bản vẽ đã hoàn thiện → khối lượng tuyến + phụ
+     kiện phải bằng đúng khối lượng tính tay trên tuyến tim + phụ kiện đã duyệt ở bước 4 (đối chiếu
+     bằng `LIST` cộng tay vài đoạn, không chỉ tin số plugin báo).
+104. **AC6 — chặn tuyến hở/thiếu size.** Vẽ 1 pline hở (không chạm khối thiết bị) hoặc thiếu size
+     ở `XBOSS_TUYEN_GAN` → `XBOSS_TUYEN_DOTHI` phải **chặn**, danh sách lỗi bấm-tới-đối-tượng
+     (zoom) nêu đúng tuyến/đỉnh lỗi; `XBOSS_HOANTHIEN` **không cho chạy** khi đồ thị chưa đạt.
+105. **Luồng đầy đủ 7 bước trên một tầng thật của TT AVIO — CHƯA CHẠY (nợ, chờ máy Windows/AutoCAD
+     2026 thật).** Kịch bản khi tới lượt: chuẩn hóa nền (bước 0–1) → vẽ tuyến tim tay cho 1 hệ của
+     1 tầng điển hình → `XBOSS_TUYEN_GAN` cho cả cụm → `XBOSS_TUYEN_DOTHI` + duyệt hộp thoại →
+     `XBOSS_HOANTHIEN` trọn 8 giai đoạn → sửa tay phần chưa ưng → `XBOSS_KIEMTRA` (kỳ vọng: pass
+     ngay, đúng mục đích của bộ lệnh) → `XBOSS_BOCKL`/`XBOSS_BOCKL_XUAT` → `XBOSS_UPLOAD`. Đo thời
+     gian cả luồng đối chiếu target "giảm ≥70% so với vẽ tay từng lệnh" (M115 §2) và tỉ lệ phần tử
+     phải sửa tay <20%.
+106. **Đường lui dòng lệnh.** `XBOSS_UI_DIALOG=0` → cả 3 lệnh hỏi đáp bằng dòng lệnh, kết quả trên
+     bản vẽ **trùng khít** đường hộp thoại.
+107. **Một lần `U` cho mỗi lệnh.** `U` ngay sau `XBOSS_TUYEN_GAN`/`XBOSS_TUYEN_DOTHI` (nếu có ghi
+     gì)/`XBOSS_HOANTHIEN` → mỗi lệnh hoàn tác trọn vẹn về đúng trạng thái trước khi gọi.
+108. **Hộp thoại:** soi theo checklist C8b (nền tối, danh sách nút/nhánh/phụ kiện của
+     `XBOSS_TUYEN_DOTHI` đọc rõ, nút OK khóa kèm lý do khi đồ thị còn lỗi chặn).
 
 ---
 

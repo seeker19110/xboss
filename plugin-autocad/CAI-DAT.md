@@ -143,6 +143,28 @@ bảng `XBOSS_BANG`.
 | Đi tuyến tự động báo "quá bán kính rẽ nhánh"             | Thiết bị nằm xa mọi hành lang hơn `snapRadiusMm` → **vẽ thêm hành lang** tới khu đó rồi chạy lại. Lệnh cố ý **không** nới bán kính cho ra kết quả |
 | Đi tuyến tự động báo "hết làn"                           | Hành lang đó đã kín làn cho các hệ chạy trước → tăng bề rộng khả dụng bằng `XBOSS_VE_HANHLANG` (chế độ `SUA`), hoặc cho hệ này đi hành lang khác  |
 
+## 4c. Hoàn thiện bản vẽ từ tuyến tim bằng `XBOSS_TUYEN_*` / `XBOSS_HOANTHIEN` (M115)
+
+Ý tưởng: **chỉ vẽ tay đúng một thứ** — line/pline tuyến tim từ điểm nguồn tới thiết bị bằng AutoCAD
+thuần (không cần lệnh `XBOSS_VE`) — rồi để plugin tự hoàn thiện phần còn lại (nét đôi, phụ kiện,
+chia đốt, giá đỡ, lỗ chờ, ngắt nét, tag, thống kê) bằng cách điều phối lại đúng bộ lệnh `XBOSS_VE_*`
+đã quen thuộc ở mục 4b. Con người quyết _đi đâu_, máy lo _vẽ đúng chuẩn thế nào_.
+
+**Cần có trước:** rule pack từ **v16** (khối `drawTools.completionPolicy`, mặc định TẮT — nhờ
+Admin/PM bật rồi phát hành bản quy tắc mới nếu lệnh báo chưa đủ version).
+
+| Bước | Lệnh                | Làm gì                                                                                                                                                                                                           |
+| ---- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | AutoCAD thuần       | Vẽ **line/pline tuyến tim** từ điểm nguồn tới từng thiết bị (block thư viện đã đặt sẵn). Rẽ nhánh = pline chạm/giao tuyến chính                                                                                  |
+| 2    | `XBOSS_TUYEN_GAN`   | Chọn 1..n tuyến vừa vẽ → hộp thoại chọn hệ/size/cao độ/vật liệu/kiểu nối → ghi thuộc tính cho cả lô một lượt; layer khớp `layerMap` thì hệ được điền sẵn                                                         |
+| 3    | `XBOSS_TUYEN_DOTHI` | Dựng đồ thị + kiểm: gộp điểm chạm/giao thành nút, suy tê/co-cút/giảm/lên-xuống, snap đầu tuyến vào thiết bị đúng hệ. Hộp thoại hiện danh sách nút/nhánh/phụ kiện suy ra để **duyệt/sửa** trước khi hoàn thiện    |
+| 4    | (trong hộp thoại)   | **Duyệt đồ thị** — sửa từng điểm chưa ưng (đổi loại tê/co, bỏ qua). Tuyến hở/thiếu size/sai hệ bị **chặn**, có danh sách lỗi bấm-tới-đối-tượng                                                                   |
+| 5    | `XBOSS_HOANTHIEN`   | Hoàn thiện bản vẽ — chạy chuỗi 8 giai đoạn (`VE_NEN` → `VE_PHUKIEN` → `VE_CHIADOT` → `VE_GIADO` → `VE_LOCHO` → `VE_NGATNET` → `VE_TAG` → `VE_THONGKE`) trên cả cụm tuyến, xem trước + bỏ qua được từng giai đoạn |
+| 6    | Tay                 | Sửa phần chưa ưng — bản vẽ là "draft ~80%". Chạy lại bước 5 an toàn (idempotent), **không đụng tọa độ tuyến tim**                                                                                                |
+| 7    | (đã có)             | `XBOSS_KIEMTRA` → `XBOSS_BOCKL` → `XBOSS_UPLOAD` như quy trình hiện hành                                                                                                                                         |
+
+Mất mạng thì dùng rule pack/thư viện block cache offline M113 như mọi lệnh khác, không chặn.
+
 ## 5. Trục trặc thường gặp
 
 | Hiện tượng                                      | Nguyên nhân & xử lý                                                                                    |
