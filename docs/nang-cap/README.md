@@ -309,6 +309,19 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > **Thứ tự thi hành đợt: M115 → M116 → M117.** Cổng chung: trả nợ verify tay AutoCAD 2026 các đợt
 > trước (M111 đang chặn) trước khi phát hành rộng bất kỳ mục nào.
 
+## Đặc tả ĐÃ DUYỆT — đóng nợ kỹ thuật plugin sau M115 (viết + duyệt 2026-08-30)
+
+> **`M118-ben-vung-hoa-hoanthien-va-canh-bao-phien-ban.md`** — ✅ **Approved for implementation
+> 2026-08-30** (kế hoạch thi hành: `PLAN.md` Pha 4 — chưa kích hoạt, chờ lệnh thi hành). Đóng
+> 2 nợ kỹ thuật ghi nhận ở review M115 PR3 (`PROGRESS.md` 2026-08-30) + 1 khoảng trống vận hành:
+> (1) `HoanThienPipeline.Chay` không có try/catch từng giai đoạn — lỗi .NET thường giữa pipeline
+> bung khỏi lệnh, mất báo cáo phiên; (2) 4/8 giai đoạn ủy thác (chia đốt/giá đỡ/ngắt nét/thống kê)
+> chưa có `BamHinhHoc`/SuaTay — chạy lại `XBOSS_HOANTHIEN` ghi đè tinh chỉnh tay của kỹ sư;
+> (3) plugin không so version assembly với `GET /api/engineering/cad/plugin-package` (route này
+> cũng phải nhận thêm Bearer token cad theo khuôn `rule-pack`) — kỹ sư chạy bản cũ vô hạn không
+> cảnh báo. 3 PR (`standard`/`spec`/`standard`), không migration, không khoá rule pack mới, không
+> đổi hành vi lệnh lẻ chạy tay; verify tay mục **C12** nối sau C9/C10/C11. Độc lập với M116/M117.
+
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 
 > **M62 (`M62-rls-khoa-cua.md`)** — đóng nốt RLS: `withProjectScope` đọc-ghi + bọc 3 route còn lại (`notifications`, `payments/bills`, `payments/floors`) rồi migration "khoá cửa" bỏ nhánh thiếu-ngữ-cảnh (2 PR, `route: spec`; PR2 có điều kiện tiên quyết vận hành). **Đã xong hoàn toàn 2026-07-20** — PR1 (nhánh `claude/plan-m62-m63-7osrkh`, 2026-07-19) và PR2 (`migrations/0077_rls_lock.sql`, PR #300) đều đã merge `main`; người dùng xác nhận cả 2 điều kiện tiên quyết vận hành đủ trước khi merge PR2. Xem `PROGRESS.md`. **M63 (`M63-webhook-ssrf-dns-pinning.md`)** — chống SSRF DNS rebinding cho webhook: resolve + pin IP qua undici `connect.lookup`, mở rộng `isPrivateIp` (1 PR, `route: spec`). **Đã xong 2026-07-19** (nhánh `claude/plan-m62-m63-7osrkh`). Cả 2 sinh từ đợt đánh giá chi tiết lần 8 (`PROGRESS.md`).

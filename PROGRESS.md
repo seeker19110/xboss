@@ -1,5 +1,32 @@
 # PROGRESS.md — Trạng thái dự án
 
+## 📐 Đặc tả M118 — bền vững hoá `XBOSS_HOANTHIEN` + cảnh báo phiên bản plugin (2026-08-30, ✅ ĐÃ DUYỆT + PLAN Pha 4 — CHƯA thi hành)
+
+Yêu cầu người dùng: "plugin autocad còn thiếu gì → viết đặc tả triển khai". Rà toàn cụm M99→M117:
+M116/M117 đã có đặc tả duyệt (chưa thi hành), nợ verify tay C9/C10/C11 là cổng thủ công — phần
+**chưa có đặc tả** đúng là 2 nợ kỹ thuật ghi ở review M115 PR3 + 1 khoảng trống vận hành tự phát
+hiện. Viết `docs/nang-cap/M118-ben-vung-hoa-hoanthien-va-canh-bao-phien-ban.md` (State: **Draft —
+chờ duyệt, chưa code**):
+
+- **FR1** cách ly lỗi từng giai đoạn trong `HoanThienPipeline.Chay` (try/catch `System.Exception`,
+  đi tiếp giai đoạn sau, `VeSessionReport` ghi đủ 8 dòng kèm cờ lỗi, in tổng kết `x/8`).
+- **FR2** bảo vệ sửa tay cho 4 giai đoạn ủy thác ③④⑥⑧: ghi `BamHinhHoc` khi sinh qua pipeline
+  (`giaiDoanM115 != null`), đường dọn cũ giữ thực thể băm lệch/`SuaTay`; chuyển `DaSuaTay` về
+  Core dùng chung; **bất biến: lệnh lẻ chạy tay không đổi một hành vi nào** (có AC riêng).
+- **FR3** cảnh báo plugin lệch server: so `AssemblyInformationalVersion` với
+  `GET /api/engineering/cad/plugin-package` (route sửa nhận thêm Bearer token cad theo đúng khuôn
+  `rule-pack` — hiện chỉ auth session nên plugin chưa gọi được); in ⚠ ở `XBOSS_RULEPACK` + dòng
+  version trong `XBOSS_BANG`; mọi lỗi fetch → im lặng (không bao giờ cảnh báo sai, không chặn).
+
+Không migration, không khoá rule pack mới (bug fix + cảnh báo thuần). 3 PR: FR1 `route: standard`,
+FR2 `route: spec`, FR3 `route: standard`. Verify tay mục **C12** mới, xếp sau C9/C10/C11.
+
+**Cập nhật cùng ngày 2026-08-30:** người dùng **duyệt M118** ("duyệt M118, lập PLAN rồi merge,
+không thi hành") → đặc tả chuyển **Approved for implementation**; kế hoạch thi hành viết thành
+**Pha 4 trong `PLAN.md`** (Y1 FR1 `standard` → Y2 FR2 `spec`; Y3 FR3 `standard` song song được;
+nhánh nền Pha 4 = `origin/main`, độc lập M116/M117). **Trạng thái: CHƯA KÍCH HOẠT thi hành —
+chờ lệnh riêng.** Cổng phát hành rộng toàn cụm vẫn là trả nợ verify tay AutoCAD 2026.
+
 ## ✅ M115 — Hoàn thiện bản vẽ từ tuyến tim: rule pack v16 + `XBOSS_TUYEN_GAN`/`_TUYEN_DOTHI`/`_HOANTHIEN` — CODE XONG cả 4 PR (2026-08-30)
 
 `docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md`, thi hành đầu tiên của đợt "tự động triển
