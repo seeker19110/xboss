@@ -4,7 +4,7 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
-## ✅ Gộp module CAD/BIM: 23 tệp → 7 tệp (2026-08-30)
+## ✅ Gộp module CAD/BIM: 23 tệp → 7 tệp (2026-08-30, PR #438 đã merge — `f58ec985`)
 
 Nhánh `claude/autocad-revit-module-consolidation-w643eb`. Refactor thuần **không đổi hành vi**: gộp
 họ module AutoCAD/Revit/CAD/BIM trong `lib/ky-thuat/cad/` và `lib/dich-vu/cad-*.ts` theo chức năng.
@@ -2300,9 +2300,14 @@ kiểm khác hẳn), `workpackages/:id/bbnt` + `workpackages/:id/drawing` + `flo
   `app/environment/page.tsx` ↔ `app/kickoff/page.tsx`, 311 dòng trùng). Là đợt tách component form
   dùng chung riêng, không phải gộp tính năng.
 
-### Nợ kỹ thuật ghi nhận khi hợp nhất — TRÙNG SỐ MIGRATION 0133 (chưa sửa)
+### ~~Nợ kỹ thuật ghi nhận khi hợp nhất — TRÙNG SỐ MIGRATION 0133 (chưa sửa)~~ → **ĐÃ ĐÓNG**
 
-`npm run check:migrations` đang **ĐỎ trên chính `origin/main`**, không phải do nhánh này:
+> **Đối chiếu lại code thật (2026-08-30):** nợ này đã được đóng ngay trong đợt đó bằng PR #389
+> (`4263a132`) — `0133_cad_device_pairing.sql` đã đổi tên thành `0135_cad_device_pairing.sql` đúng
+> như hướng xử lý đề nghị bên dưới, `migrations/` hiện **không còn số trùng** và
+> `npm run check:migrations` xanh (145 file). Giữ nguyên nội dung gốc bên dưới làm lịch sử.
+
+`npm run check:migrations` **khi đó** đang ĐỎ trên chính `origin/main`, không phải do nhánh này:
 
 ```
 [LỖI] Nhiều file migration cùng số thứ tự:
@@ -5919,7 +5924,7 @@ Audit ĐỌC + BÁO CÁO trước (3 subagent song song đúng vùng rủi ro ca
 
 ~~**Ghi nhận 2026-07-19 (blocker OOM-kill lúc build)**~~ → **đã đổi dạng, không còn OOM-kill nữa** (kiểm lại cùng ngày, sau khi ghi nhận blocker OOM ở trên — run `29689527953` lúc 13:46 vẫn `Killed`/137 như mô tả, nhưng **retry lần 2 cùng commit `125945e` (run `29689586264`, attempt 2, 15:16→15:37) build sống sót, xong trong ~20 phút** — không còn thấy `Killed`. Nghi ngờ swap đĩa đã được thêm ở tầng VPS (đúng khuyến nghị "thêm swap" từng đưa ra) — đổi lại triệu chứng: build không còn bị OOM-kill nhưng **chậm bất thường (20-23 phút thay vì vài phút)** do swap đĩa chậm hơn RAM.
 
-**🔴 Blocker MỚI (2026-07-19, phát hiện ngay sau khi OOM hết): build chậm sát/vượt `command_timeout: 25m` của `appleboy/ssh-action`, cắt ngang deploy đúng lúc build vừa xong.** Run `29693453254` (commit `3115794` — HEAD hiện tại, 15:44→16:09): log in đủ route table (`Compiled successfully in 19.6min` + generate 73 trang tĩnh) nhưng **không có dòng `==> 6/7 Swap...` nào** — script bị cắt bởi `Run Command Timeout` ở phút thứ 25 tính từ lúc SSH bắt đầu, ngay sau khi `next build` in xong output (có thể còn đang ở bước finalize ngầm của Next.js). **Hệ quả: commit `3115794` (mới nhất trên `main`) CHƯA lên production** — production vẫn đứng ở `125945e` (deploy thành công gần nhất, qua retry). Không mất dữ liệu/an toàn (script dừng trước bước `mv` swap `.next`, app đang chạy không bị đụng).
+~~**🔴 Blocker MỚI (2026-07-19, phát hiện ngay sau khi OOM hết): build chậm sát/vượt `command_timeout: 25m` của `appleboy/ssh-action`, cắt ngang deploy đúng lúc build vừa xong.**~~ → **ĐÃ ĐÓNG 2026-08-26** (xác nhận lại trên code 2026-08-30): `.github/workflows/deploy.yml` nay build trên GitHub runner (`NEXT_DIST_DIR=.next-ci npm run build`) rồi rsync `.next` sang VPS, bước SSH còn lại bọc `timeout 15m` — không còn `appleboy/ssh-action`/`command_timeout` nào trong file. Xem mục "Đưa `next build` ra khỏi VPS" phía trên. Nội dung gốc giữ nguyên bên dưới làm lịch sử: Run `29693453254` (commit `3115794` — HEAD hiện tại, 15:44→16:09): log in đủ route table (`Compiled successfully in 19.6min` + generate 73 trang tĩnh) nhưng **không có dòng `==> 6/7 Swap...` nào** — script bị cắt bởi `Run Command Timeout` ở phút thứ 25 tính từ lúc SSH bắt đầu, ngay sau khi `next build` in xong output (có thể còn đang ở bước finalize ngầm của Next.js). **Hệ quả: commit `3115794` (mới nhất trên `main`) CHƯA lên production** — production vẫn đứng ở `125945e` (deploy thành công gần nhất, qua retry). Không mất dữ liệu/an toàn (script dừng trước bước `mv` swap `.next`, app đang chạy không bị đụng).
 
 **Đã vá phần tôi kiểm soát được (repo code):** tăng `command_timeout` trong `.github/workflows/deploy.yml` từ `25m` → `40m` (nhánh này, chưa merge `main`) — chỉ tránh bị cắt ngang, KHÔNG giải quyết gốc rễ (build chậm do swap đĩa thay RAM thật). **Còn cần ops:** (1) re-run job "Deploy to VPS" thất bại gần nhất (hoặc chờ lần push kế tiếp) sau khi PR nới timeout này merge; (2) xác nhận có đúng là đã thêm swap trên VPS chưa, và cân nhắc thêm RAM thật thay vì tiếp tục dựa vào swap (swap chỉ là giải pháp tạm, build 20+ phút sẽ tiếp tục kéo dài khi codebase lớn thêm).
 
