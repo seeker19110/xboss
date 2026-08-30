@@ -8,7 +8,11 @@
 import { createHmac } from "node:crypto";
 import dns, { type LookupAddress, type LookupOptions } from "node:dns";
 import { isIP } from "node:net";
-import { Agent } from "undici";
+// Dùng `fetch` của chính gói undici (không phải fetch toàn cục của Node): Agent bên dưới cũng
+// là của gói này, mà từ undici 8 giao diện handler (`onRequestStart`) không còn tương thích với
+// bản undici gói kèm trong Node — trộn 2 bản khiến mọi request lỗi "invalid onRequestStart method"
+// và mất luôn thông điệp chặn SSRF của safeLookup.
+import { Agent, fetch as undiciFetch } from "undici";
 import { query, run, withTransaction } from "@/lib/db";
 import { log } from "@/lib/nen/log";
 
@@ -238,6 +242,10 @@ type DueDelivery = {
 // (lúc tạo/sửa webhook) giữ nguyên hành vi cũ (không resolve DNS).
 const webhookAgent = new Agent({ connect: { lookup: safeLookup } });
 
+// Điểm gọi HTTP tách riêng để test thay được: dùng `fetch` của gói undici nên không còn
+// mock được qua `globalThis.fetch`.
+export const webhookHttp = { fetch: undiciFetch };
+
 // Gửi 1 delivery thật + cập nhật trạng thái. Trả true nếu 2xx (thành công).
 async function sendOne(d: DueDelivery): Promise<boolean> {
   const body = JSON.stringify(d.payload); // stringify đúng 1 lần — ký & gửi trên cùng chuỗi
@@ -245,7 +253,7 @@ async function sendOne(d: DueDelivery): Promise<boolean> {
   let ok = false;
   let lastError: string | null = null;
   try {
-    const res = await fetch(d.url, {
+    const res = await webhookHttp.fetch(d.url, {
       method: "POST",
       body,
       redirect: "manual", // KHÔNG follow redirect — 3xx tính là lỗi (chống chuyển về nội bộ)
@@ -256,7 +264,6 @@ async function sendOne(d: DueDelivery): Promise<boolean> {
         "X-Xboss-Signature": `sha256=${signature}`,
       },
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
-      // @ts-expect-error dispatcher là tuỳ chọn của undici, chưa có trong type chuẩn lib.dom fetch
       dispatcher: webhookAgent,
     });
     if (res.status >= 200 && res.status < 300) ok = true;
