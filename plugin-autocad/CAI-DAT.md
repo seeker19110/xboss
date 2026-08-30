@@ -169,6 +169,24 @@ Admin/PM bật rồi phát hành bản quy tắc mới nếu lệnh báo chưa �
 
 Mất mạng thì dùng rule pack/thư viện block cache offline M113 như mọi lệnh khác, không chặn.
 
+## 4d. Phối hợp xung đột 2D liên hệ bằng `XBOSS_PHOIHOP*` (M116)
+
+Ý tưởng: sau khi các hệ đã hoàn thiện theo M115 (đủ hệ/cao độ/cỡ trong XData), plugin **quét ra
+xung đột giữa các hệ** trên bản vẽ combined services (hoặc bản vẽ hệ mình + xref các hệ khác) rồi
+**đề xuất cách xử lý theo luật** — kỹ sư quyết, plugin **không bao giờ tự sửa tuyến**.
+
+**Cần có trước:** rule pack từ **v17** (khối `drawTools.coordinationPolicy`, mặc định TẮT — nhờ
+Admin/PM bật rồi phát hành bản quy tắc mới nếu lệnh báo chưa đủ version).
+
+| Bước | Lệnh                   | Làm gì                                                                                                                                                                                                                                                                           |
+| ---- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `XBOSS_PHOIHOP`        | Chọn phạm vi (cả bản vẽ / vùng chọn / theo hành lang) → quét 3 lớp kiểm: giao cắt cùng cao độ (CỨNG), tranh chấp hành lang (MỀM), khoảng cách quy phạm (CẢNH BÁO). Hộp thoại liệt kê + đề xuất xử lý, đánh dấu **chấp nhận** (tự sửa tay) hoặc **bỏ qua có lý do** cho từng dòng |
+| 2    | Tay                    | Xử lý theo đề xuất (thường là sửa cao độ bằng `XBOSS_TUYEN_GAN` rồi chạy lại `XBOSS_HOANTHIEN`), rồi chạy lại bước 1 — trạng thái đã đánh dấu **giữ nguyên** (idempotent theo id)                                                                                                |
+| 3    | `XBOSS_PHOIHOP_BAOCAO` | Xuất bảng xung đột ra Excel + sidecar JSON cạnh DWG — `XBOSS_UPLOAD` gửi kèm để web hiện số liệu phối hợp trên bảng điều khiển                                                                                                                                                   |
+| —    | `XBOSS_PHOIHOP_XOA`    | Gỡ sạch marker phối hợp trên layer `XBOSS-PHOIHOP`, trả bản vẽ về đúng trước khi chạy `XBOSS_PHOIHOP` — tuyến không đụng                                                                                                                                                         |
+
+Mất mạng thì dùng rule pack cache offline M113 như mọi lệnh khác, không chặn.
+
 ## 5. Trục trặc thường gặp
 
 | Hiện tượng                                      | Nguyên nhân & xử lý                                                                                    |

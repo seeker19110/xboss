@@ -19,12 +19,16 @@ import {
   kiemFloorPolicy,
   kiemRoutingPolicy,
   kiemCompletionPolicy,
+  kiemCoordinationPolicy,
+  NGUON_UU_TIEN_PHOI_HOP,
   GIAI_DOAN_HOAN_THIEN,
   LOAI_NUT_PHU_KIEN,
   CURRENT_RULE_PACK_VERSION,
   type CrossingPolicy,
   type RoutingPolicy,
   type CompletionPolicy,
+  type CoordinationPolicy,
+  type CapKhoangCach,
   type FittingRule,
   kiemTraRevisionPolicy,
   soRevisionTheoMau,
@@ -37,7 +41,7 @@ import {
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8 + floorPolicy v12 + crossingPolicy v13 + revisionPolicy v14 + routingPolicy v15 + completionPolicy v16, version = v16", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8 + floorPolicy v12 + crossingPolicy v13 + revisionPolicy v14 + routingPolicy v15 + completionPolicy v16 + coordinationPolicy v17, version = v17", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -66,8 +70,9 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleM
   assert.ok("revisionPolicy" in pack.drawTools, "Thiếu khối v14 drawTools.revisionPolicy");
   assert.ok("routingPolicy" in pack.drawTools, "Thiếu khối v15 drawTools.routingPolicy");
   assert.ok("completionPolicy" in pack.drawTools, "Thiếu khối v16 drawTools.completionPolicy");
-  assert.equal(pack.version, "v16");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v16");
+  assert.ok("coordinationPolicy" in pack.drawTools, "Thiếu khối v17 drawTools.coordinationPolicy");
+  assert.equal(pack.version, "v17");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v17");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -1245,7 +1250,8 @@ test("v13: validator crossingPolicy bắt đủ 3 lỗi của M109 §5 + minAngl
 
 test("rule pack v15 là mở rộng thuần của v14: chỉ thêm drawTools.routingPolicy (M114 §6)", async () => {
   const v14 = (await import("@/lib/ky-thuat/cad/rule-packs/v14.json")).default;
-  // Đọc THẲNG v15.json: bản hiện hành nay là v16 (M115 gộp tiếp completionPolicy).
+  // Đọc THẲNG v15.json: bản hiện hành nay là v17 (M115 gộp completionPolicy, M116 gộp tiếp
+  // coordinationPolicy).
   const v15 = (await import("@/lib/ky-thuat/cad/rule-packs/v15.json")).default;
 
   for (const field of [
@@ -1367,7 +1373,8 @@ test("v15: validator routingPolicy bắt đủ 4 lỗi của M114 §6", () => {
 
 test("rule pack v16 là mở rộng thuần của v15: chỉ thêm drawTools.completionPolicy (M115 §7 FR5)", async () => {
   const v15 = (await import("@/lib/ky-thuat/cad/rule-packs/v15.json")).default;
-  const v16 = getCurrentRulePack();
+  // Đọc THẲNG v16.json: bản hiện hành nay là v17 (M116 gộp tiếp coordinationPolicy).
+  const v16 = (await import("@/lib/ky-thuat/cad/rule-packs/v16.json")).default;
 
   for (const field of [
     "layerMap",
@@ -1594,4 +1601,154 @@ test("v16: validator completionPolicy bắt đủ lỗi của M115 §7 FR5", () 
 
   // Rule pack cũ (≤ v15) chưa khai khóa này thì không phải lỗi.
   assert.deepEqual(kiemCompletionPolicy({ systems: goc.systems }), []);
+});
+
+// ===== v17 (M116 §7 FR5) — coordinationPolicy: phối hợp xung đột 2D liên hệ =====
+
+test("rule pack v17 là mở rộng thuần của v16: chỉ thêm drawTools.coordinationPolicy (M116 §7 FR5)", async () => {
+  const v16 = (await import("@/lib/ky-thuat/cad/rule-packs/v16.json")).default;
+  const v17 = getCurrentRulePack();
+
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "inspectionPolicy",
+    "styleMap",
+    "sheetSetup",
+    "xrefPolicy",
+    "hatchMap",
+    "layoutPolicy",
+    "polylineClosePolicy",
+    "blockMap",
+  ] as const) {
+    assert.deepEqual(
+      v17[field],
+      v16[field],
+      `Field ${field} của v17 lệch v16 — v17 phải là mở rộng thuần (M116 chỉ thêm coordinationPolicy)`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v17).filter((k) => !(k in v16)),
+    [],
+    "v17 không được thêm khối cấp cao nào — coordinationPolicy nằm trong drawTools",
+  );
+
+  const { coordinationPolicy: _bo, ...drawToolsV17 } = v17.drawTools;
+  assert.deepEqual(
+    drawToolsV17,
+    v16.drawTools,
+    "v17 đụng tham số drawTools ngoài coordinationPolicy",
+  );
+});
+
+test("v17: coordinationPolicy khai đủ tham số, mặc định TẮT và tham chiếu bảng ưu tiên (M116 AC4)", () => {
+  const pack = getCurrentRulePack();
+  const cp = pack.drawTools.coordinationPolicy;
+
+  assert.equal(
+    cp.enabled,
+    false,
+    "khối phải tắt mặc định — bộ lệnh phối hợp dừng kèm hướng dẫn, hành vi lệnh cũ không đổi",
+  );
+  assert.equal(
+    cp.priorityFrom,
+    "crossingPolicy",
+    "bảng ưu tiên phải THAM CHIẾU crossingPolicy, không chép lại danh sách hệ",
+  );
+  assert.ok(
+    (NGUON_UU_TIEN_PHOI_HOP as readonly string[]).includes(cp.priorityFrom),
+    "priorityFrom nằm ngoài danh mục nguồn hợp lệ",
+  );
+  assert.ok(cp.maintenanceGapMm >= 0);
+  assert.deepEqual(
+    cp.minClearancePairsMm,
+    [],
+    "bảng khoảng cách quy phạm phải rỗng mặc định (an toàn — ngưỡng theo tiêu chuẩn từng dự án)",
+  );
+  // Bảng ưu tiên tham chiếu tới phải có thật và không rỗng, nếu không bật lên là không đề xuất được gì.
+  assert.ok(pack.drawTools.crossingPolicy.priority.length > 0);
+  assert.deepEqual(
+    kiemCoordinationPolicy(pack.drawTools),
+    [],
+    "Rule pack phát hành phải qua validator",
+  );
+
+  // Mỗi khóa mới tự tài liệu hóa bằng tiếng Việt ngay trong rule pack (quy ước từ M101 §18).
+  for (const khoa of [
+    "priorityFromNote",
+    "minClearancePairsMmNote",
+    "maintenanceGapMmNote",
+    "note",
+  ] as const) {
+    assert.ok((cp[khoa] ?? "").length > 0, `coordinationPolicy thiếu mô tả ${khoa}`);
+  }
+});
+
+test("v17: validator coordinationPolicy bắt đủ lỗi của M116 §7 FR5", () => {
+  const goc = getCurrentRulePack().drawTools;
+  const cpGoc: CoordinationPolicy = goc.coordinationPolicy;
+  const voi = (chinh: Partial<CoordinationPolicy>, crossing = goc.crossingPolicy) => ({
+    systems: goc.systems,
+    crossingPolicy: crossing as CrossingPolicy,
+    coordinationPolicy: { ...cpGoc, ...chinh },
+  });
+  const cap = (chinh: Partial<CapKhoangCach> = {}): CapKhoangCach => ({
+    systemA: "ELECTRICAL",
+    systemB: "PIPING",
+    minClearanceMm: 300,
+    ...chinh,
+  });
+
+  // (1) priorityFrom chỉ nhận nguồn có thật.
+  assert.match(kiemCoordinationPolicy(voi({ priorityFrom: "routingPolicy" }))[0], /priorityFrom/);
+
+  // (2) Bật khối mà bảng ưu tiên rỗng → không suy được ai nhường ai; còn tắt thì chưa gây hại.
+  const bangRong = { ...goc.crossingPolicy, priority: [] as string[] };
+  assert.match(
+    kiemCoordinationPolicy(voi({ enabled: true }, bangRong))[0],
+    /crossingPolicy\.priority/,
+  );
+  assert.deepEqual(kiemCoordinationPolicy(voi({}, bangRong)), []);
+  assert.deepEqual(kiemCoordinationPolicy(voi({ enabled: true })), []);
+
+  // (3) Khoảng bảo trì không được âm; 0 là hợp lệ (bề rộng khai đã gồm khoảng thao tác).
+  assert.match(kiemCoordinationPolicy(voi({ maintenanceGapMm: -1 }))[0], /maintenanceGapMm/);
+  assert.deepEqual(kiemCoordinationPolicy(voi({ maintenanceGapMm: 0 })), []);
+
+  // (4) Id hệ trong cặp khoảng cách phải có thật.
+  assert.match(
+    kiemCoordinationPolicy(voi({ minClearancePairsMm: [cap({ systemB: "PLUMB" })] }))[0],
+    /PLUMB/,
+  );
+
+  // (5) Cặp phải KHÁC hệ và ngưỡng phải dương.
+  assert.match(
+    kiemCoordinationPolicy(voi({ minClearancePairsMm: [cap({ systemB: "ELECTRICAL" })] }))[0],
+    /cùng một hệ/,
+  );
+  assert.match(
+    kiemCoordinationPolicy(voi({ minClearancePairsMm: [cap({ minClearanceMm: 0 })] }))[0],
+    /minClearanceMm/,
+  );
+
+  // (6) Không được khai trùng một cặp (kể cả khi đảo thứ tự hai vế).
+  assert.match(
+    kiemCoordinationPolicy(
+      voi({
+        minClearancePairsMm: [cap(), cap({ systemA: "PIPING", systemB: "ELECTRICAL" })],
+      }),
+    )[0],
+    /khai trùng/,
+  );
+  assert.deepEqual(
+    kiemCoordinationPolicy(voi({ minClearancePairsMm: [cap(), cap({ systemB: "FIREFIGHTING" })] })),
+    [],
+  );
+
+  // Rule pack cũ (≤ v16) chưa khai khóa này thì không phải lỗi.
+  assert.deepEqual(kiemCoordinationPolicy({ systems: goc.systems }), []);
 });

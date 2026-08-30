@@ -769,10 +769,15 @@ public sealed class XBossApiClient
     /// theo code), nên gửi kèm là cách duy nhất trỏ đúng bản vẽ khi hai dự án trùng
     /// <c>drawings.code</c> — trước đây chỉ gửi code nên rơi vào bản vẽ của dự án khác (403 lệch
     /// dự án) hoặc 404. Không có id ⇒ chỉ gửi code, y hệt hành vi cũ.</summary>
+    /// <paramref name="phoiHopJson"/> (M116 PR3, TÙY CHỌN): tóm tắt phối hợp xung đột liên hệ
+    /// (<c>PhoiHopTomTat</c>, sidecar <c>.xboss-phoihop.json</c> do <c>XBOSS_PHOIHOP_BAOCAO</c>
+    /// ghi) — server lưu vào <c>standardize_report.phoiHop</c>. Không gửi vẫn upload y hệt trước
+    /// M116 (chưa chạy XBOSS_PHOIHOP_BAOCAO, hoặc rule pack chưa bật coordinationPolicy).
     public async Task<UploadKetQua> UploadAsync(
         string token, string drawingCode, string rev, string rulePackVersion,
         string dwgFileName, byte[] dwgBytes, byte[] dxfBytes, string? reportJson,
-        CancellationToken ct = default, string? takeoffJson = null, long? drawingId = null)
+        CancellationToken ct = default, string? takeoffJson = null, long? drawingId = null,
+        string? phoiHopJson = null)
     {
         // Route đòi ít nhất một trong hai (400 "Thiếu drawingCode ... hoặc drawingId"). Chặn ngay
         // tại chỗ: tải vài chục MB lên rồi mới nhận 400 là phí băng thông công trường.
@@ -791,6 +796,8 @@ public sealed class XBossApiClient
             ThemPhan(form, new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(reportJson)), "report", "report.json");
         if (takeoffJson is not null)
             ThemPhan(form, new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(takeoffJson)), "takeoff", "takeoff.json");
+        if (phoiHopJson is not null)
+            ThemPhan(form, new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(phoiHopJson)), "phoiHop", "phoihop.json");
         if (!string.IsNullOrWhiteSpace(drawingCode)) ThemPhan(form, new StringContent(drawingCode), "drawingCode");
         if (drawingId is { } id)
             ThemPhan(form, new StringContent(id.ToString(CultureInfo.InvariantCulture)), "drawingId");

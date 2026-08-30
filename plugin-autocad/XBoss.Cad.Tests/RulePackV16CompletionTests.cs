@@ -119,7 +119,9 @@ public class RulePackV16CompletionTests
     public void v16_la_mo_rong_thuan_cua_v15_chi_them_completionPolicy()
     {
         var v15 = JsonNode.Parse(File.ReadAllText(RepoPaths.RulePackPathCua("v15.json")))!.AsObject();
-        var v16 = JsonNode.Parse(File.ReadAllText(RepoPaths.RulePackPath))!.AsObject();
+        // Đọc THẲNG v16.json, không qua RepoPaths.RulePackPath: bản hiện hành nay là v17 (M116 gộp
+        // tiếp coordinationPolicy) — so nhầm sẽ bắt v17 phải giống v15 ở khối drawTools.
+        var v16 = JsonNode.Parse(File.ReadAllText(RepoPaths.RulePackPathCua("v16.json")))!.AsObject();
 
         Assert.Equal("v16", v16["version"]!.GetValue<string>());
         Assert.DoesNotContain(v16.Select(k => k.Key), k => !v15.ContainsKey(k));

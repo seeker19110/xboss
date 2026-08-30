@@ -73,6 +73,19 @@ const LENH_CHINH: { lenh: string; mo_ta: string }[] = [
     lenh: "XBOSS_HOANTHIEN",
     mo_ta: "Điều phối 8 giai đoạn hoàn thiện bản vẽ từ tuyến tim đã duyệt (M115)",
   },
+  {
+    lenh: "XBOSS_PHOIHOP",
+    mo_ta:
+      "Quét xung đột giữa các hệ (cao độ/hành lang/khoảng cách), đề xuất xử lý — kỹ sư quyết (M116)",
+  },
+  {
+    lenh: "XBOSS_PHOIHOP_XOA",
+    mo_ta: "Gỡ sạch marker phối hợp, trả bản vẽ về trước khi chạy XBOSS_PHOIHOP (M116)",
+  },
+  {
+    lenh: "XBOSS_PHOIHOP_BAOCAO",
+    mo_ta: "Xuất bảng xung đột phối hợp ra Excel + gửi kèm số liệu khi tải lên (M116)",
+  },
 ];
 
 export default function CaiDatPluginPage() {

@@ -682,15 +682,61 @@ nào…`), nút chuyển nền chìm + chữ mờ.
 108. **Hộp thoại:** soi theo checklist C8b (nền tối, danh sách nút/nhánh/phụ kiện của
      `XBOSS_TUYEN_DOTHI` đọc rõ, nút OK khóa kèm lý do khi đồ thị còn lỗi chặn).
 
-### C12. Cách ly lỗi + bảo vệ sửa tay + cảnh báo phiên bản plugin (M118 — CHƯA LÀM, xếp SAU C9/C10/C11)
+### C12. `XBOSS_PHOIHOP` / `XBOSS_PHOIHOP_XOA` / `XBOSS_PHOIHOP_BAOCAO` — phối hợp xung đột 2D liên hệ (M116 — CHƯA LÀM, chờ lượt trước xong)
 
-> **Chưa verify tay mục này.** Xếp hàng SAU C9 (M111), C10 (M114), C11 (M115) theo đúng thứ tự nợ
-> verify tay hiện có (`docs/nang-cap/README.md`) — không chen ngang. Mục này gồm 2 phần: phần AC2
-> (FR2 — bảo vệ sửa tay của `XBOSS_HOANTHIEN` khi dời tay giá đỡ/vạch chia/bảng thống kê) do **Y2**
-> bổ sung sau, CHƯA viết ở đây; phần dưới đây chỉ ghi kịch bản **AC5** (FR3 — cảnh báo phiên bản)
-> và **AC7** (FR1+FR2 — một lần `U`), là phần đã code xong ở PR3.
+> **Chưa verify tay mục này.** Cần rule pack có `drawTools.coordinationPolicy.enabled = true` (bản
+> phát hành mặc định TẮT) VÀ tuyến đã mang XData cao độ/cỡ đầy đủ theo M115 (`XBOSS_TUYEN_GAN` +
+> `XBOSS_TUYEN_DOTHI`). M116 xếp hàng sau M111 §C9/M114 §C10/M115 §C11 vẫn đang chặn theo
+> `docs/nang-cap/README.md`. Ghi lại mục này để khi tới lượt có sẵn kịch bản, không phải soạn lại
+> từ đầu — cách ghi nợ giống hệt C9/C10/C11 đang treo ở trên tại thời điểm viết tài liệu này.
 
-109. **AC5 — hai máy lệch bản, cảnh báo đúng cả hai số.** Trên MÁY A: đóng gói plugin với
+109. **AC4 — cờ tắt.** Rule pack mặc định (`coordinationPolicy.enabled: false`) → cả 3 lệnh **dừng
+     ngay** kèm hướng dẫn cách bật, bản vẽ không đổi một thực thể nào (so số đối tượng model space
+     trước/sau) — hành vi mọi lệnh cũ (kể cả `XBOSS_VE_BAOCAO`) y hệt version rule pack trước.
+110. **AC1 — dải cao độ chồng/tách.** Vẽ 2 tuyến khác hệ (vd HVAC + PIPING) giao nhau trên mặt bằng,
+     gán cao độ bằng `XBOSS_TUYEN_GAN` sao cho dải cao độ (tim ± nửa bề cao gồm cách nhiệt) **chồng
+     nhau** → `XBOSS_PHOIHOP` phải báo đúng **1 xung đột CỨNG** kèm đề xuất nhường cao độ đúng chiều
+     `crossingPolicy.priority`. Sửa cao độ một tuyến để dải cao độ **tách hẳn** ra → chạy lại, xung
+     đột đó **không còn xuất hiện**.
+111. **AC2 — chạy 2 lần không nhân đôi, giữ trạng thái bỏ qua.** Chạy `XBOSS_PHOIHOP` lần 1 → đánh
+     dấu một dòng "bỏ qua có lý do" (nhập lý do) → OK. Chạy lại `XBOSS_PHOIHOP` lần 2 trên cùng bản
+     vẽ (không đổi gì) → đếm tổng marker trên layer `XBOSS-PHOIHOP` **không đổi** so với sau lần 1;
+     dòng đã đánh dấu "bỏ qua" vẫn hiện đúng trạng thái + lý do cũ trong hộp thoại.
+112. **AC3 — xoá marker sạch, không đổi tuyến.** Trước khi chạy `XBOSS_PHOIHOP_XOA`, `LIST` từng
+     tuyến tim liên quan (tọa độ đỉnh + bulge) và đếm tổng thực thể model space. Sau khi chạy
+     `XBOSS_PHOIHOP_XOA`: layer `XBOSS-PHOIHOP` **rỗng**, tuyến tim **tọa độ không đổi một byte**,
+     số thực thể model space = số trước `XBOSS_PHOIHOP_XOA` trừ đúng số marker vừa xoá.
+113. **AC5 — báo cáo Excel + web khớp danh sách.** Sau khi đánh dấu xong ở hộp thoại `XBOSS_PHOIHOP`
+     (vd 2 cứng, 1 mềm, 1 cảnh báo, 1 chấp nhận, 1 bỏ qua), chạy `XBOSS_PHOIHOP_BAOCAO` → đối chiếu
+     số dòng + cột (lớp kiểm/hệ A/hệ B/vị trí/mức/đề xuất/trạng thái) trong
+     `<dwg>.xboss-phoihop.xlsx` với đúng danh sách vừa thấy trong hộp thoại. `XBOSS_UPLOAD` gửi kèm
+     `<dwg>.xboss-phoihop.json` → trang `/engineering/chuan-hoa-ban-ve` (panel "Phối Hợp Liên Hệ")
+     phải hiện **đúng cùng con số** tổng/cứng/mềm/cảnh báo/đã xử lý — không lệch giữa 3 nơi.
+114. **Đường lui dòng lệnh.** `XBOSS_UI_DIALOG=0` → `XBOSS_PHOIHOP` hỏi đáp bằng dòng lệnh (liệt kê
+     xung đột + đề xuất, hỏi CÓ/KHÔNG đánh dấu) — không sửa được từng dòng nhưng trạng thái cũ đọc
+     từ marker vẫn giữ nguyên.
+115. **Một lần `U` cho mỗi lệnh.** `U` ngay sau `XBOSS_PHOIHOP` (nếu có ghi marker) → hoàn tác trọn
+     vẹn về đúng trạng thái trước khi gọi lệnh.
+
+### C13. Cách ly lỗi + bảo vệ sửa tay + cảnh báo phiên bản plugin (M118 — CHƯA LÀM, xếp SAU C9/C10/C11/C12)
+
+> **Chưa verify tay mục này.** Xếp hàng SAU C9 (M111), C10 (M114), C11 (M115), C12 (M116) theo
+> đúng thứ tự nợ verify tay hiện có (`docs/nang-cap/README.md`) — không chen ngang. Mục này gồm
+> đủ 3 phần: **AC2** (FR2 — bảo vệ sửa tay của `XBOSS_HOANTHIEN` khi dời tay giá đỡ/vạch
+> chia/ngắt nét/bảng thống kê), **AC5** (FR3 — cảnh báo phiên bản), **AC7** (FR1+FR2 — một lần
+> `U`) — cả 3 PR đã code xong.
+
+116. **AC2 — chạy lại `XBOSS_HOANTHIEN` giữ nguyên phần kỹ sư đã sửa tay.** Vẽ 1 tuyến, chạy
+     `XBOSS_HOANTHIEN` xong đủ 8 giai đoạn. Dời tay 1 vạch chia đốt, 1 giá đỡ, 1 đối tượng ngắt
+     nét (vùng che/cung), kéo bảng thống kê sang vị trí khác. Vẽ thêm 1 nhánh tuyến mới rồi chạy
+     lại `XBOSS_HOANTHIEN` → 4 thực thể đã dời **giữ nguyên vị trí**, phần tử của nhánh mới sinh
+     đủ, dòng tóm tắt giai đoạn tương ứng có "giữ nguyên N thực thể kỹ sư đã sửa tay". Xóa hẳn (không
+     dời) 1 vạch chia khác rồi chạy lại → vạch đó được **sinh lại** (không phân biệt được xóa hẳn
+     với chưa từng có — hành vi đã ghi rõ trong đặc tả). Đối chiếu với lệnh lẻ: gõ tay
+     `XBOSS_VE_CHIADOT`/`_GIADO`/`_NGATNET`/`_THONGKE` trực tiếp (không qua `XBOSS_HOANTHIEN`) trên
+     1 tuyến khác, dời tay 1 thực thể rồi chạy lại đúng lệnh lẻ đó → thực thể dời **bị xóa-sinh lại
+     như trước M118** (không có khái niệm giữ-tay ở lệnh lẻ).
+117. **AC5 — hai máy lệch bản, cảnh báo đúng cả hai số.** Trên MÁY A: đóng gói plugin với
      `<Version>` trong `Directory.Build.props` thấp hơn bản đang phát hành trên server (vd cài bản
      `1.0.0` trong khi trang `/engineering/cai-dat-plugin` đang phát hành `1.2.0`). Ghép thiết bị
      bằng `XBOSS_LOGIN`, rồi chạy `XBOSS_RULEPACK` (chọn 1 tệp rule pack JSON hợp lệ) → sau dòng
@@ -703,12 +749,11 @@ nào…`), nút chuyển nền chìm + chữ mờ.
      1.2.0)" không cảnh báo. Rút mạng (hoặc tắt Wi-Fi) rồi chạy lại `XBOSS_RULEPACK` trên MÁY A →
      lệnh **vẫn nạp rule pack bình thường**, KHÔNG in dòng `⚠` nào (không chắc thì im lặng, §7 FR3);
      `XBOSS_BANG` lúc này hiện "Phiên bản plugin: 1.0.0 (server: chưa rõ)".
-110. **AC7 — một lần `U` sau `XBOSS_HOANTHIEN` kể cả lần chạy có giai đoạn lỗi.** Cần đợi Y2
-     (FR1/FR2) hoàn thành trước khi verify được mục này — ghi chỗ đứng trước, chưa chạy: sau khi
-     Y2 xong, cố tình làm giai đoạn ④ (giá đỡ) lỗi (vd khoá layer đích không mở khoá được), chạy
-     `XBOSS_HOANTHIEN` → 7/8 giai đoạn xong kèm dòng `✖ Giá đỡ: lỗi — ...`, sau đó `U` **một lần**
-     → toàn bộ phần đã vẽ của lần chạy đó (kể cả các giai đoạn đã xong trước lỗi) biến mất, bản vẽ
-     về đúng trạng thái trước khi gọi lệnh.
+118. **AC7 — một lần `U` sau `XBOSS_HOANTHIEN` kể cả lần chạy có giai đoạn lỗi.** Cố tình làm giai
+     đoạn ④ (giá đỡ) lỗi (vd khoá layer đích không mở khoá được), chạy `XBOSS_HOANTHIEN` → 7/8
+     giai đoạn xong kèm dòng `✖ Giá đỡ: lỗi — ...`, sau đó `U` **một lần** → toàn bộ phần đã vẽ
+     của lần chạy đó (kể cả các giai đoạn đã xong trước lỗi) biến mất, bản vẽ về đúng trạng thái
+     trước khi gọi lệnh.
 
 ---
 
