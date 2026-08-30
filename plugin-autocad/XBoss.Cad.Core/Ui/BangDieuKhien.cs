@@ -27,6 +27,18 @@ public sealed record TrangThaiPhien
 {
     public string? ServerUrl { get; init; }
     public bool DaGhepThietBi { get; init; }
+
+    // ===== Phiên bản gói cài (M118 PR3 — FR3) =====
+
+    /// <summary>Version của CHÍNH plugin đang chạy (AssemblyInformationalVersion, nhúng từ thẻ
+    /// &lt;Version&gt; của Directory.Build.props) — luôn có, không phụ thuộc mạng.</summary>
+    public string? PluginVersion { get; init; }
+
+    /// <summary>Version server đang phát hành, hỏi qua <c>GET /api/engineering/cad/plugin-package</c>.
+    /// Null = chưa hỏi được (mất mạng/401/403/timeout/server chưa cấu hình) — hiển thị "chưa rõ",
+    /// KHÔNG coi là lệch (§7 FR3).</summary>
+    public string? ServerPluginVersion { get; init; }
+
     public string? RulePackVersion { get; init; }
     public int SoQuyTacBoc { get; init; }
     public int SoNhomLayer { get; init; }
@@ -76,6 +88,7 @@ public static class BangDieuKhienModel
                 ? new("Thiết bị", "Đã ghép — token trong Credential Manager", MucDo.Tot)
                 : new("Thiết bị", "Chưa ghép — upload/đối chiếu BOQ sẽ từ chối chạy", MucDo.CanhBao),
         };
+        if (t.PluginVersion is not null) ketNoi.Add(DongPhienBanPlugin(t));
 
         var rulePack = new List<DongTrangThai>();
         if (t.LoiRulePack is not null)
@@ -106,6 +119,23 @@ public static class BangDieuKhienModel
             KhoiThuVienBlock(t),
             new("Bản vẽ hiện hành", banVe, null),
         ];
+    }
+
+    /// <summary>
+    /// Dòng "Phiên bản plugin" (M118 PR3 — FR3): so version plugin đang chạy với server bằng
+    /// <see cref="SoSanhPhienBan.SoLechPhienBan"/> — LOGIC THUẦN, test được không cần mạng.
+    /// </summary>
+    private static DongTrangThai DongPhienBanPlugin(TrangThaiPhien t)
+    {
+        var lech = SoSanhPhienBan.SoLechPhienBan(t.PluginVersion, t.ServerPluginVersion);
+        return lech switch
+        {
+            LechPhienBan.Lech => new("Phiên bản plugin",
+                $"{t.PluginVersion} (server: {t.ServerPluginVersion} — cũ)", MucDo.CanhBao),
+            LechPhienBan.Khop => new("Phiên bản plugin",
+                $"{t.PluginVersion} (server: {t.ServerPluginVersion})", MucDo.Tot),
+            _ => new("Phiên bản plugin", $"{t.PluginVersion} (server: chưa rõ)", MucDo.BinhThuong),
+        };
     }
 
     /// <summary>

@@ -89,3 +89,24 @@ test("route plugin-package: có kiểm đăng nhập 401, kiểm quyền 403, fo
     "route phải khai force-dynamic",
   );
 });
+
+// M118 PR3 (FR3/AC6) — route nhận thêm Bearer token scope 'cad' đúng khuôn rule-pack, để
+// plugin AutoCAD tự so version mà không cần phiên web.
+test("route plugin-package: nhận Bearer token scope 'cad' theo đúng khuôn rule-pack, không đổi shape response", () => {
+  const src = readFileSync(
+    join(process.cwd(), "app/api/engineering/cad/plugin-package/route.ts"),
+    "utf-8",
+  );
+  assert.ok(src.includes("getCadTokenUser"), "phải kiểm Bearer token qua getCadTokenUser");
+  assert.ok(
+    /getCadTokenUser\(req\.headers\.get\("authorization"\)\)\)\s*\?\?\s*\(await getCurrentUser\(\)\)/.test(
+      src,
+    ),
+    "Bearer phải kiểm TRƯỚC, không có/sai mới rơi về getCurrentUser() (đúng khuôn rule-pack)",
+  );
+  assert.ok(src.includes("export async function GET(req: Request)"), "GET phải nhận request");
+  assert.ok(
+    src.includes("return NextResponse.json(thongTin)"),
+    "shape response 200 không được đổi (vẫn { version, sha256 } từ layThongTinGoiCai())",
+  );
+});
