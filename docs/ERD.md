@@ -3423,6 +3423,30 @@
 - `cad_device_pairings_pkey`: UNIQUE INDEX cad_device_pairings_pkey ON public.cad_device_pairings USING btree (id)
 - `cad_device_pairings_user_code_key`: UNIQUE INDEX cad_device_pairings_user_code_key ON public.cad_device_pairings USING btree (user_code)
 
+### cad_schematic_graphs
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | bigint |  | `nextval('cad_schematic_graphs_id_seq'::regclass)` |
+| project_id | bigint |  |  |
+| system_id | text |  |  |
+| file_path | text |  |  |
+| graph | jsonb |  |  |
+| trang_thai | text |  | `'nhap'::text` |
+| duyet_boi | bigint | ✓ |  |
+| duyet_luc | timestamptz | ✓ |  |
+| created_by | bigint |  |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `duyet_boi` → `users(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `cad_schematic_graphs_pkey`: UNIQUE INDEX cad_schematic_graphs_pkey ON public.cad_schematic_graphs USING btree (id)
+- `idx_schematic_project`: INDEX idx_schematic_project ON public.cad_schematic_graphs USING btree (project_id)
+
 ### cad_takeoff_boq_map
 
 | Cột | Kiểu | Null | Default |
