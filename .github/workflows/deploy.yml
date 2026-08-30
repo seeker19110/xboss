@@ -17,28 +17,128 @@ concurrency:
   group: deploy-main
   cancel-in-progress: false
 
-# Job chỉ SSH vào VPS bằng secrets riêng — không cần bất kỳ quyền GITHUB_TOKEN nào
-# (least-privilege theo docs/audit.md §6).
-permissions: {}
+# Chỉ cần đọc code để checkout đúng commit đã qua CI. Không cần quyền ghi nào
+# (least-privilege theo docs/audit.md §6) — thao tác trên VPS đi bằng SSH key riêng.
+permissions:
+  contents: read
 
 jobs:
   deploy:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
+    env:
+      # Đường dẫn app trên VPS. Runner build NGAY TẠI đường dẫn này (xem bước bên dưới) —
+      # không phải chuyện làm cho đẹp: `.next` có nhúng đường dẫn tuyệt đối của lúc build
+      # (required-server-files.json, các file trace *.nft.json). Build ở /home/runner/... rồi
+      # chạy ở /var/www/xboss là một lớp lệch âm thầm không đáng phải gánh.
+      APP_DIR: /var/www/xboss
     steps:
-      - name: Deploy to VPS via SSH
-        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+      # Checkout ĐÚNG commit đã chạy CI, không phải HEAD của main lúc job này khởi động:
+      # hai push sát nhau sẽ khiến bản build lệch với commit mà deploy.sh reset về trên VPS
+      # (deploy.sh có cổng đối chiếu SHA, sẽ dừng deploy — nhưng tốt nhất là đừng tạo ra
+      # tình huống đó ngay từ đầu).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          # 2026-07-19: build trên VPS đang chạy ~20-23 phút (nghi do đã bù OOM bằng swap
-          # đĩa thay vì RAM thật — chậm hơn nhiều so với trước) nên sát/vượt quá 25m cũ,
-          # cắt ngang đúng lúc build vừa xong, chưa kịp swap ".next"/pm2 reload. Nới lên
-          # 40m để có đệm — không giải quyết gốc rễ (RAM/swap VPS), chỉ tránh cắt ngang
-          # deploy đang chạy đúng.
-          command_timeout: 40m
-          script: |
-            set -e
-            cd /var/www/xboss
-            bash deploy.sh
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Dựng thư mục build khớp đường dẫn production
+        run: |
+          set -e
+          sudo mkdir -p "$APP_DIR"
+          sudo chown -R "$USER" "$(dirname "$APP_DIR")"
+          rsync -a --delete "$GITHUB_WORKSPACE/" "$APP_DIR/"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Cài dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: npm ci
+
+      # ── Build ở runner, KHÔNG build trên VPS ──────────────────────────────
+      # Lý do (PROGRESS.md 2026-07-19): `next build` trên VPS chạy 20-23 phút vì RAM thiếu
+      # phải bù bằng swap đĩa, có lúc bị OOM-kill (exit 137), có lúc vượt command_timeout
+      # của ssh-action và bị cắt ngang đúng lúc build vừa xong ⇒ commit mới nhất không lên
+      # được production. Runner GitHub có RAM/CPU dư nên build vài phút; VPS chỉ còn việc
+      # nhận file, áp migration, swap và reload.
+      - name: Build production (thư mục .next-ci)
+        working-directory: ${{ env.APP_DIR }}
+        run: NEXT_DIST_DIR=.next-ci npm run build
+        env:
+          # Build không kết nối DB (Pool khởi tạo lazy) — chỉ cần biến tồn tại.
+          DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_build
+          # BIẾN NÀY ĐƯỢC NHÚNG VÀO BUNDLE LÚC BUILD, không đọc lúc chạy: trước đây build
+          # diễn ra trên VPS nên nó lấy từ .env.local ở đó. Build ở runner mà không truyền
+          # vào thì Sentry phía TRÌNH DUYỆT tự tắt (SDK no-op) — hỏng âm thầm, không có lỗi.
+          # Khai secret cùng tên trong repo nếu đang dùng Sentry client; bỏ trống thì hành vi
+          # đúng như khi VPS không đặt biến. Sentry phía server đọc SENTRY_DSN lúc chạy nên
+          # không bị ảnh hưởng.
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+
+      # Kèm phiếu thông tin để deploy.sh kiểm chéo trước khi swap: SHA phải khớp commit VPS
+      # reset về (chống deploy nhầm bản build của commit khác) và Node major phải khớp bản
+      # trên VPS (lệch major = nguy cơ lệch native module/runtime, DEPLOY.md mục "Build ở
+      # máy khác" đã nêu điều kiện này).
+      - name: Đóng gói bản build
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          {
+            echo "sha=${{ github.event.workflow_run.head_sha }}"
+            echo "node=$(node -p 'process.versions.node.split(".")[0]')"
+          } > .next-ci.info
+          tar -czf .next-ci.tar.gz .next-ci .next-ci.info
+          ls -lh .next-ci.tar.gz
+
+      - name: Chuẩn bị SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # Ưu tiên host key đã ghim trong secret (chống MITM thật sự). Không có thì lấy
+          # bằng ssh-keyscan như trước đây ssh-action vẫn làm ngầm — ghi rõ ra đây để biết
+          # mình đang chấp nhận TOFU, không tưởng là đã ghim.
+          if [ -n "$VPS_SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            echo "⚠️  Chưa khai secret VPS_SSH_KNOWN_HOSTS — dùng ssh-keyscan (tin lần đầu)."
+            ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Gửi bản build sang VPS
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -e
+          # Gửi vào tên tạm rồi đổi tên trên VPS: deploy.sh chỉ thấy ".next-ci.tar.gz" khi
+          # file đã sang trọn vẹn, không bao giờ đọc phải gói còn dở nếu mạng đứt giữa chừng.
+          rsync -az --timeout=120 -e "ssh -i ~/.ssh/id_deploy -o BatchMode=yes" \
+            .next-ci.tar.gz "$VPS_USER@$VPS_HOST:$APP_DIR/.next-ci.tar.gz.part"
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes "$VPS_USER@$VPS_HOST" \
+            "mv '$APP_DIR/.next-ci.tar.gz.part' '$APP_DIR/.next-ci.tar.gz'"
+
+      - name: Chạy deploy trên VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -e
+          # Không còn build trên VPS nên các bước còn lại (npm ci, migrate, swap, reload,
+          # health-check) chỉ mất vài phút — 15m là dư, không cần 40m như trước.
+          timeout 15m ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o ServerAliveInterval=30 \
+            "$VPS_USER@$VPS_HOST" "cd '$APP_DIR' && bash deploy.sh"
+
+      - name: Dọn khoá SSH
+        if: always()
+        run: rm -f ~/.ssh/id_deploy

@@ -1,0 +1,262 @@
+{
+  "_README": "M114 §10 — bộ đối chứng 2 tầng cho việc CẤP TẦNG/LÀN trong hành lang. Phần `cases[].vao` viết TAY (sửa có chủ đích); phần `cases[].mongDoi` SINH TỰ ĐỘNG từ tầng 3 (TS, planMultiTierCorridor trong lib/ky-thuat/engineering-cad-corridor.ts) bằng `npm run cad:doi-chung` — đổi thuật toán là tệp đổi theo và HIỆN RÕ TRONG DIFF. Tầng 3 kiểm ở tests/cad-routing-doi-chung.test.ts, tầng 2 (C#, CapPhatLanTang) kiểm ở XBoss.Cad.Tests/RoutingDoiChungTests.cs — hai bên đọc chung tệp này nên một bên trôi là đỏ ngay (rủi ro số 1 của M99).",
+  "rulePackVersion": "v15",
+  "tierAnhXaTs": {
+    "tier_1_top": "tier1",
+    "tier_2_mid": "tier2",
+    "tier_3_bot": "tier3",
+    "sprinkler_ceiling": "sprinkler"
+  },
+  "tierAnhXaTsNote": "MepfSystemTier (TS) ↔ drawTools.routingPolicy.tiers[].id (rule pack, dùng chung với Core C#).",
+  "heDien": [
+    "ELECTRICAL",
+    "ELV"
+  ],
+  "heDienNote": "Hệ điện — quyết định khi nào khe hở giữa 2 làn kề dùng laneGapMm.elecToHot thay cho laneGapMm.default. Rule pack không có cờ này nên bộ đối chứng khai TƯỜNG MINH: Core C# nhận qua tham số, không đoán hộ bằng tên tier.",
+  "disciplineTheoHe": {
+    "HVAC": "hvac",
+    "ELECTRICAL": "electrical",
+    "ELV": "electrical",
+    "PIPING": "plumbing",
+    "FIREFIGHTING": "firefighting"
+  },
+  "disciplineTheoHeNote": "planMultiTierCorridor (TS) phân tầng theo `discipline`, rule pack phân tầng theo id hệ — bảng này ghim đúng một cách hiểu chung cho cả 2 tầng.",
+  "cases": [
+    {
+      "ma": "ba-tang-co-ban",
+      "moTa": "Một hệ mỗi tầng: gió sát đáy dầm, máng cáp ở giữa, ống nước dưới cùng. Cả 3 làn đầu tầng đều bắt đầu ở laneGapMm.default = 100.",
+      "vao": {
+        "hanhLang": {
+          "id": "HL-1",
+          "beRongMm": 2400,
+          "cotDayDamMm": 3100,
+          "cotTranMm": 2600
+        },
+        "he": [
+          {
+            "heId": "HVAC",
+            "beRongMm": 600,
+            "caoThietDienMm": 300
+          },
+          {
+            "heId": "ELECTRICAL",
+            "beRongMm": 300,
+            "caoThietDienMm": 100
+          },
+          {
+            "heId": "PIPING",
+            "beRongMm": 150,
+            "caoThietDienMm": 150
+          }
+        ]
+      },
+      "mongDoi": [
+        {
+          "heId": "HVAC",
+          "tierId": "tier1",
+          "lanTuMm": 100,
+          "lanDenMm": 700,
+          "caoDoMm": 2770
+        },
+        {
+          "heId": "ELECTRICAL",
+          "tierId": "tier2",
+          "lanTuMm": 100,
+          "lanDenMm": 400,
+          "caoDoMm": 2860
+        },
+        {
+          "heId": "PIPING",
+          "tierId": "tier3",
+          "lanTuMm": 100,
+          "lanDenMm": 250,
+          "caoDoMm": 2710
+        }
+      ]
+    },
+    {
+      "ma": "hai-lan-cung-tang-khe-default",
+      "moTa": "Hai ống gió cùng tier1: làn thứ hai đặt sau làn thứ nhất đúng laneGapMm.default = 100.",
+      "vao": {
+        "hanhLang": {
+          "id": "HL-2",
+          "beRongMm": 2400,
+          "cotDayDamMm": 3100,
+          "cotTranMm": 2600
+        },
+        "he": [
+          {
+            "heId": "HVAC",
+            "beRongMm": 600,
+            "caoThietDienMm": 300
+          },
+          {
+            "heId": "HVAC",
+            "beRongMm": 400,
+            "caoThietDienMm": 250
+          }
+        ]
+      },
+      "mongDoi": [
+        {
+          "heId": "HVAC",
+          "tierId": "tier1",
+          "lanTuMm": 100,
+          "lanDenMm": 700,
+          "caoDoMm": 2770
+        },
+        {
+          "heId": "HVAC",
+          "tierId": "tier1",
+          "lanTuMm": 800,
+          "lanDenMm": 1200,
+          "caoDoMm": 2820
+        }
+      ]
+    },
+    {
+      "ma": "hai-lan-he-dien-khe-elecToHot",
+      "moTa": "Máng cáp điện rồi máng ELV cùng tier2: khe hở dùng laneGapMm.elecToHot = 150 vì làn kề là hệ điện.",
+      "vao": {
+        "hanhLang": {
+          "id": "HL-3",
+          "beRongMm": 2400,
+          "cotDayDamMm": 3100,
+          "cotTranMm": 2600
+        },
+        "he": [
+          {
+            "heId": "ELECTRICAL",
+            "beRongMm": 300,
+            "caoThietDienMm": 100
+          },
+          {
+            "heId": "ELV",
+            "beRongMm": 200,
+            "caoThietDienMm": 80
+          }
+        ]
+      },
+      "mongDoi": [
+        {
+          "heId": "ELECTRICAL",
+          "tierId": "tier2",
+          "lanTuMm": 100,
+          "lanDenMm": 400,
+          "caoDoMm": 2860
+        },
+        {
+          "heId": "ELV",
+          "tierId": "tier2",
+          "lanTuMm": 550,
+          "lanDenMm": 750,
+          "caoDoMm": 2880
+        }
+      ]
+    },
+    {
+      "ma": "sprinkler-sat-tran",
+      "moTa": "Hệ chữa cháy đi tầng sát trần: cao độ = trần + offsetFromCeilingMm, làn đặt giữa hành lang và KHÔNG đẩy con trỏ làn của tầng khác.",
+      "vao": {
+        "hanhLang": {
+          "id": "HL-4",
+          "beRongMm": 2000,
+          "cotDayDamMm": 3200,
+          "cotTranMm": 2700
+        },
+        "he": [
+          {
+            "heId": "HVAC",
+            "beRongMm": 500,
+            "caoThietDienMm": 250
+          },
+          {
+            "heId": "FIREFIGHTING",
+            "beRongMm": 100,
+            "caoThietDienMm": 100
+          }
+        ]
+      },
+      "mongDoi": [
+        {
+          "heId": "HVAC",
+          "tierId": "tier1",
+          "lanTuMm": 100,
+          "lanDenMm": 600,
+          "caoDoMm": 2920
+        },
+        {
+          "heId": "FIREFIGHTING",
+          "tierId": "sprinkler",
+          "lanTuMm": 1000,
+          "lanDenMm": 1100,
+          "caoDoMm": 2780
+        }
+      ]
+    },
+    {
+      "ma": "hanh-lang-hep-du-cho",
+      "moTa": "Hành lang hẹp 1200 mm với đủ 4 hệ ở 4 tầng khác nhau — vẫn cấp đủ vì mỗi tầng có con trỏ làn riêng.",
+      "vao": {
+        "hanhLang": {
+          "id": "HL-5",
+          "beRongMm": 1200,
+          "cotDayDamMm": 3000,
+          "cotTranMm": 2550
+        },
+        "he": [
+          {
+            "heId": "HVAC",
+            "beRongMm": 400,
+            "caoThietDienMm": 200
+          },
+          {
+            "heId": "ELV",
+            "beRongMm": 200,
+            "caoThietDienMm": 60
+          },
+          {
+            "heId": "PIPING",
+            "beRongMm": 100,
+            "caoThietDienMm": 100
+          },
+          {
+            "heId": "FIREFIGHTING",
+            "beRongMm": 80,
+            "caoThietDienMm": 80
+          }
+        ]
+      },
+      "mongDoi": [
+        {
+          "heId": "HVAC",
+          "tierId": "tier1",
+          "lanTuMm": 100,
+          "lanDenMm": 500,
+          "caoDoMm": 2770
+        },
+        {
+          "heId": "ELV",
+          "tierId": "tier2",
+          "lanTuMm": 100,
+          "lanDenMm": 300,
+          "caoDoMm": 2800
+        },
+        {
+          "heId": "PIPING",
+          "tierId": "tier3",
+          "lanTuMm": 100,
+          "lanDenMm": 200,
+          "caoDoMm": 2660
+        },
+        {
+          "heId": "FIREFIGHTING",
+          "tierId": "sprinkler",
+          "lanTuMm": 600,
+          "lanDenMm": 680,
+          "caoDoMm": 2630
+        }
+      ]
+    }
+  ]
+}

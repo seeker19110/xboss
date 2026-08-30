@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
-import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/gioi-han";
+import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/dashboard";
 import { isContentTooLarge } from "@/lib/nen/photos";
-import { themBlockTuWeb } from "@/lib/ky-thuat/cad/block-them-web";
+import { themBlockTuWeb } from "@/lib/ky-thuat/cad/block";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,9 @@ export const dynamic = "force-dynamic";
 //      duyệt của M103, đường này bỏ qua duyệt nên phải là người đang đăng nhập trên trình duyệt.
 //      Vai trò admin/pm/engineer (CAN.manageDrawings) — subcon/viewer/bch 403. Multipart: `dwg`
 //      (tệp block), `dxf` (cùng nội dung, để máy chủ kiểm định + dựng ảnh xem trước), `meta` JSON.
+//      M113 §6: `project` (query hoặc trường form) TUỲ CHỌN — có thì thêm vào bộ CỦA DỰ ÁN đó
+//      (quyền `CAN.manageDrawings` trong phạm vi dự án, id đối chiếu qua `chotProjectIdChoGhi`;
+//      tên block còn phải không đụng bộ toàn cục — §4); không có thì y hệt hôm nay (bộ toàn cục).
 //      Same-origin/CSRF đã phủ tập trung ở proxy.ts cho mọi request mutating tới /api/*.
 
 export async function POST(req: NextRequest) {
@@ -39,6 +43,16 @@ export async function POST(req: NextRequest) {
 
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Body multipart không hợp lệ" }, { status: 400 });
+
+  const thamSoDuAn = req.nextUrl.searchParams.get("project") ?? form.get("project");
+  let projectId: number | undefined;
+  if (typeof thamSoDuAn === "string" && thamSoDuAn !== "") {
+    const hienTai = (await getCurrentProjectId(user)) ?? 0;
+    const chot = await chotProjectIdChoGhi(user, thamSoDuAn, hienTai);
+    // Ngoài phạm vi ⇒ 404, không tiết lộ sự tồn tại của dự án khác (M113 §6).
+    if (!chot.ok) return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
+    projectId = chot.projectId;
+  }
 
   const dwg = form.get("dwg");
   const dxf = form.get("dxf");
@@ -77,6 +91,7 @@ export async function POST(req: NextRequest) {
     metaTho: metaJson,
     dwg: Buffer.from(await dwg.arrayBuffer()),
     dxfText: await dxf.text(),
+    projectId,
   });
 
   if (kq.status === "invalid") {
@@ -89,7 +104,12 @@ export async function POST(req: NextRequest) {
     );
   }
   return NextResponse.json(
-    { version: kq.version, libId: kq.libId, coPreview: kq.coPreview },
+    {
+      version: kq.version,
+      libId: kq.libId,
+      coPreview: kq.coPreview,
+      ...(projectId === undefined ? {} : { projectId }),
+    },
     { status: 201 },
   );
 }

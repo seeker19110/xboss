@@ -5,7 +5,7 @@ import {
   layLichSuPluginUpload,
   layTomTatBlockLib,
   tomTatRulePack,
-} from "@/lib/ky-thuat/cad/bang-dieu-khien";
+} from "@/lib/ky-thuat/cad/dashboard";
 
 export const dynamic = "force-dynamic";
 

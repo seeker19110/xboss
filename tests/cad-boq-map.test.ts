@@ -17,7 +17,7 @@ const S = { skip: !HAS_TEST_DB };
 // ===== (1) Unit thuần =====
 
 test("ganMaBoqVaoItems: gán đúng item, KHÔNG sửa rule pack dùng chung", async () => {
-  const { ganMaBoqVaoItems } = await import("@/lib/ky-thuat/cad/boq-map");
+  const { ganMaBoqVaoItems } = await import("@/lib/ky-thuat/cad/dashboard");
   const { getCurrentRulePack } = await import("@/lib/ky-thuat/cad/rule-pack");
 
   const pack = getCurrentRulePack();
@@ -163,7 +163,7 @@ after(async () => {
 
 test("ghi map: upsert idempotent, mã rỗng = gỡ, id hạng mục lạ bị từ chối cả lô", S, async () => {
   const { ghiMapBoqTheoDuAn, layMapBoqTheoDuAn, danhSachItemBocTach } =
-    await import("@/lib/ky-thuat/cad/boq-map");
+    await import("@/lib/ky-thuat/cad/dashboard");
   const [it1, it2] = danhSachItemBocTach();
 
   const l1 = await ghiMapBoqTheoDuAn(duAnA, pmId, [
@@ -234,8 +234,8 @@ test(
   async () => {
     const { insertId, run } = await import("@/lib/db");
     const { createCadToken } = await import("@/lib/bao-mat/cad-devices");
-    const { ghiMapBoqTheoDuAn } = await import("@/lib/ky-thuat/cad/boq-map");
-    const { danhSachItemBocTach } = await import("@/lib/ky-thuat/cad/boq-map");
+    const { ghiMapBoqTheoDuAn } = await import("@/lib/ky-thuat/cad/dashboard");
+    const { danhSachItemBocTach } = await import("@/lib/ky-thuat/cad/dashboard");
     const { GET } = await import("@/app/api/engineering/cad/boq-snapshot/route");
     const [it1, it2] = danhSachItemBocTach();
 
@@ -299,7 +299,7 @@ test(
   S,
   async () => {
     const { createCadToken } = await import("@/lib/bao-mat/cad-devices");
-    const { ghiMapBoqTheoDuAn, danhSachItemBocTach } = await import("@/lib/ky-thuat/cad/boq-map");
+    const { ghiMapBoqTheoDuAn, danhSachItemBocTach } = await import("@/lib/ky-thuat/cad/dashboard");
     const { GET } = await import("@/app/api/engineering/cad/rule-pack/route");
     const [it1] = danhSachItemBocTach();
     await ghiMapBoqTheoDuAn(duAnA, pmId, [{ takeoffItemId: it1.id, boqCode: "RP-A-01" }]);

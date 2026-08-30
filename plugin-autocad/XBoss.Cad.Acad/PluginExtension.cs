@@ -40,6 +40,21 @@ public sealed class PluginExtension : IExtensionApplication
             "\n[XBoss] Vẽ (cần rule pack v4): XBOSS_VE_NEN, XBOSS_VE, XBOSS_VE_NHAN, XBOSS_VE_TRANGIN, XBOSS_VE_MATCAT" +
             "\n[XBoss] Giao diện (M102): tab Ribbon \"XBoss\" + bảng điều khiển XBOSS_BANG\n");
 
+        // Máy mới/offline vẫn có bộ phụ kiện MEPF tối thiểu. Bản tải server hoặc nạp tay đã có
+        // luôn được giữ nguyên; asset đóng gói chỉ seed khi cache hoàn toàn trống.
+        try
+        {
+            var thongDiepThuVien = Services.BlockLibraryService.KhoiTaoTuGoiCaiDat();
+            if (thongDiepThuVien is not null)
+                doc?.Editor.WriteMessage($"\n[XBoss] {thongDiepThuVien}\n");
+        }
+        catch (System.Exception e)
+        {
+            doc?.Editor.WriteMessage(
+                $"\n[XBoss] ⚠ Không khởi tạo được thư viện MEPF đóng kèm ({e.Message}) — " +
+                "chạy XBOSS_LOGIN hoặc XBOSS_VE_THUVIEN để nạp lại.\n");
+        }
+
         // Tab Ribbon "XBoss" (M102) — chỉ dựng khi đúng đời AutoCAD; ribbon chưa sẵn sàng
         // thì RibbonBuilder tự chờ. Ribbon lỗi không được làm hỏng phần lệnh gõ tay.
         try

@@ -1,5 +1,10 @@
 // lib/engineering-cad-skills.ts — Cognitive CAD Engine & Autonomous Drafting (M65 / M89)
-import { query, queryOne, run } from "@/lib/db";
+// `engineering_cad_diff_sessions` và `engineering_cad_block_catalogs` (migration 0099) bật
+// FORCE ROW LEVEL SECURITY với policy KHÔNG có nhánh "GUC rỗng thì cho qua" (khác 11 bảng của
+// migrations/0069_rls.sql) — mọi truy vấn 2 bảng này ở dưới BẮT BUỘC bọc `withProjectScope`
+// (đúng khuôn `lib/ky-thuat/cad/dashboard.ts`), nếu không role `xboss_app` (NOBYPASSRLS trên
+// production) sẽ đọc rỗng/ghi thất bại âm thầm dù DB có dữ liệu — KHÔNG được gỡ ra.
+import { query, queryOne, withProjectScope } from "@/lib/db";
 
 export type CadEntityType =
   "line" | "polyline" | "circle" | "arc" | "text" | "insert_block" | "dimension";
@@ -240,8 +245,12 @@ export async function saveCadDiffSession(
   result: CadDiffResult,
   userId?: number | null,
 ): Promise<{ id: string }> {
-  const row = await queryOne<{ id: string }>(
-    `INSERT INTO engineering_cad_diff_sessions (
+  // readOnly: false — đây là đường GHI; withProjectScope mặc định mở transaction READ ONLY.
+  const row = await withProjectScope(
+    projectId,
+    () =>
+      queryOne<{ id: string }>(
+        `INSERT INTO engineering_cad_diff_sessions (
       project_id, base_drawing_id, compare_drawing_id,
       total_entities_base, total_entities_compare,
       diff_summary, diff_details, potential_vo_impact,
@@ -253,15 +262,17 @@ export async function saveCadDiffSession(
       ?
     ) RETURNING id`,
 
-    projectId,
-    baseDrawingId,
-    compareDrawingId,
-    result.totalBase,
-    result.totalCompare,
-    JSON.stringify(result.summary),
-    JSON.stringify(result.differences),
-    JSON.stringify(result.potentialVoImpact),
-    userId ?? null,
+        projectId,
+        baseDrawingId,
+        compareDrawingId,
+        result.totalBase,
+        result.totalCompare,
+        JSON.stringify(result.summary),
+        JSON.stringify(result.differences),
+        JSON.stringify(result.potentialVoImpact),
+        userId ?? null,
+      ),
+    { readOnly: false },
   );
 
   if (!row) throw new Error("Failed to save CAD Diff session");
@@ -269,15 +280,19 @@ export async function saveCadDiffSession(
 }
 
 export async function listCadDiffSessions(projectId: number) {
-  return await query(
-    `SELECT * FROM engineering_cad_diff_sessions WHERE project_id = ? ORDER BY created_at DESC LIMIT 50`,
-    projectId,
+  return await withProjectScope(projectId, () =>
+    query(
+      `SELECT * FROM engineering_cad_diff_sessions WHERE project_id = ? ORDER BY created_at DESC LIMIT 50`,
+      projectId,
+    ),
   );
 }
 
 export async function listCadBlockCatalogs(projectId: number) {
-  return await query<CadBlockCatalogRecord>(
-    `SELECT * FROM engineering_cad_block_catalogs WHERE project_id = ? ORDER BY block_name ASC`,
-    projectId,
+  return await withProjectScope(projectId, () =>
+    query<CadBlockCatalogRecord>(
+      `SELECT * FROM engineering_cad_block_catalogs WHERE project_id = ? ORDER BY block_name ASC`,
+      projectId,
+    ),
   );
 }

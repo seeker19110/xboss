@@ -178,17 +178,10 @@ public static class PhepKiemMoRong
     private static string KhoaCap(string a, string b) =>
         string.CompareOrdinal(a, b) <= 0 ? $"{a}|{b}" : $"{b}|{a}";
 
-    private static IEnumerable<(double X, double Y)> GiaoDiemGiuaHaiTim(CenterlineInfo a, CenterlineInfo b)
-    {
-        for (var i = 0; i + 1 < a.Vertices.Count; i++)
-        {
-            for (var j = 0; j + 1 < b.Vertices.Count; j++)
-            {
-                var d = Segment2D.GiaoDiem(a.Vertices[i], a.Vertices[i + 1], b.Vertices[j], b.Vertices[j + 1]);
-                if (d is { } diem) yield return diem;
-            }
-        }
-    }
+    // Thuật toán dò giao điểm nằm ở Segment2D.GiaoDiemGiuaHaiChuoi — dùng chung với
+    // XBOSS_VE_NGATNET (M109 FR2), phép kiểm 11 chỉ lấy phần toạ độ.
+    private static IEnumerable<(double X, double Y)> GiaoDiemGiuaHaiTim(CenterlineInfo a, CenterlineInfo b) =>
+        Segment2D.GiaoDiemGiuaHaiChuoi(a.Vertices, b.Vertices).Select(g => (g.X, g.Y));
 
     // ===== (12) Khung tên thiếu/sai trường =====
 
@@ -500,6 +493,108 @@ public static class PhepKiemMoRong
             Id = "ma-boq-mo-coi",
             Ten = "Hạng mục bóc tách chưa gán mã BOQ (cột A Excel sẽ trống)",
             Handles = [],
+            ChiTiet = chiTiet,
+        };
+    }
+
+    // ===== (19) Handle mồ côi trong bản chép tầng — M111 AC3 =====
+
+    /// <summary>
+    /// Đối tượng do <c>XBOSS_VE_NHANTANG</c> sinh ra (mang XData <c>TangNguon</c>/<c>NhanTang</c> —
+    /// M111 FR9) mà handle tham chiếu trong chính XData của nó (tim/biên/nhãn/tuyến cắt/cặp đôi/…)
+    /// trỏ tới đối tượng KHÔNG tồn tại trong tập bản chép, hoặc trỏ SANG MỘT TẦNG CHÉP KHÁC — dấu
+    /// hiệu <c>FloorReplicator.AnhXaXData</c> (PR1) hoặc <c>DeepCloneObjects</c> (PR2) đã bỏ sót
+    /// ánh xạ. Đây chính là bất biến guardrail 2 của M111 §2 ("không sinh handle mồ côi").
+    ///
+    /// <para>Không có cờ <c>enabled</c> riêng trong rule pack — TỰ TẮT khi bản vẽ không có đối
+    /// tượng nhân bản tầng nào (<see cref="DrawingSnapshot.NhanTang"/> null/rỗng), cùng khuôn hai
+    /// tầng bảo vệ với phép kiểm 15/17: bản vẽ chưa từng chạy <c>XBOSS_VE_NHANTANG</c> không bao
+    /// giờ bị báo oan.</para>
+    /// </summary>
+    public static InspectionFinding? HandleMoCoiNhanTang(DrawingSnapshot snapshot)
+    {
+        if (snapshot.NhanTang is not { Count: > 0 } ds) return null;
+
+        // Tầng chép của MỌI đối tượng bản chép, tra theo handle — dùng để phân giải từng tham
+        // chiếu. Một handle xuất hiện ở đúng 1 tầng chép (bảng ánh xạ IdMapping của DeepCloneObjects
+        // không thể sinh 2 đối tượng cùng handle).
+        var tangTheoHandle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var d in ds) tangTheoHandle[d.Handle] = d.NhanTang;
+
+        var chiTiet = new List<string>();
+        var handles = new List<string>();
+        foreach (var d in ds)
+        {
+            foreach (var hThamChieu in d.HandleThamChieu)
+            {
+                if (string.IsNullOrWhiteSpace(hThamChieu)) continue;
+
+                if (!tangTheoHandle.TryGetValue(hThamChieu, out var tangCuaHandleKia))
+                {
+                    chiTiet.Add(
+                        $"tầng {d.NhanTang}: {d.Handle} tham chiếu {hThamChieu} — không tìm thấy trong bất kỳ bản chép nào (mồ côi)");
+                    ThemHandle(handles, d.Handle);
+                    continue;
+                }
+
+                if (!string.Equals(tangCuaHandleKia, d.NhanTang, StringComparison.OrdinalIgnoreCase))
+                {
+                    chiTiet.Add(
+                        $"tầng {d.NhanTang}: {d.Handle} tham chiếu {hThamChieu} nhưng đối tượng đó thuộc tầng {tangCuaHandleKia} (trỏ sai tầng)");
+                    ThemHandle(handles, d.Handle);
+                }
+            }
+        }
+
+        if (chiTiet.Count == 0) return null;
+        return new InspectionFinding
+        {
+            Id = "nhantang-handle-mo-coi",
+            Ten = "Handle mồ côi trong bản chép tầng (XBOSS_VE_NHANTANG — M111 AC3)",
+            Handles = handles,
+            ChiTiet = chiTiet,
+        };
+    }
+
+    // ===== (20) Cloud/tam giác revision mồ côi — M110 FR8 =====
+
+    /// <summary>
+    /// Cloud revision không còn tam giác đi kèm (hoặc ngược lại): xóa một bên bằng lệnh
+    /// <c>ERASE</c> thường thì bên kia thành MỒ CÔI — bản vẽ nộp còn tam giác "R2" chỉ vào hư
+    /// không, hoặc cloud không nói được nó thuộc lần sửa nào.
+    ///
+    /// <para>Khác các phép kiểm mở rộng khác, phép này KHÔNG có cờ <c>enabled</c> riêng trong rule
+    /// pack: nó chỉ đọc XData <c>XBOSS_VE</c> vai trò <c>Revision</c> — thứ chỉ tồn tại khi
+    /// <c>XBOSS_VE_REV</c> đã chạy (mà lệnh đó lại đòi <c>drawTools.revisionPolicy.enabled</c>).
+    /// Bản vẽ không có đối tượng revision nào (<see cref="DrawingSnapshot.Revision"/> null/rỗng) →
+    /// TỰ TẮT, nên cloud vẽ tay bằng <c>REVCLOUD</c> của AutoCAD không bao giờ bị báo oan.</para>
+    /// </summary>
+    public static InspectionFinding? RevisionMoCoi(DrawingSnapshot snapshot)
+    {
+        if (snapshot.Revision is not { Count: > 0 } ds) return null;
+
+        var conSong = new HashSet<string>(ds.Select(r => r.Handle), StringComparer.OrdinalIgnoreCase);
+        var chiTiet = new List<string>();
+        var handles = new List<string>();
+        foreach (var r in ds)
+        {
+            var coCapDoi = r.HandleCapDoi is { Length: > 0 } cap && conSong.Contains(cap);
+            if (coCapDoi) continue;
+            var ten = r.LaCloud ? "Cloud revision" : "Tam giác revision";
+            var thieu = r.LaCloud ? "tam giác mang số revision" : "cloud";
+            var so = r.SoRevision is { } n
+                ? $"R{n.ToString(CultureInfo.InvariantCulture)}"
+                : "(không rõ số revision)";
+            chiTiet.Add($"{ten} {so} (handle {r.Handle}) không còn {thieu} đi kèm");
+            ThemHandle(handles, r.Handle);
+        }
+
+        if (chiTiet.Count == 0) return null;
+        return new InspectionFinding
+        {
+            Id = "revision-mo-coi",
+            Ten = "Cloud/tam giác revision mồ côi (XBOSS_VE_REV — cặp cloud ↔ tam giác đã đứt)",
+            Handles = handles,
             ChiTiet = chiTiet,
         };
     }

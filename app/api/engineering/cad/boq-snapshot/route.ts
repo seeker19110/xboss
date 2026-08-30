@@ -3,7 +3,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCadTokenUser } from "@/lib/bao-mat/cad-devices";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 import { chotProjectIdChoDoc } from "@/lib/ha-tang/projects";
-import { laySnapshotBoqTheoDuAn } from "@/lib/dich-vu/cad-boq-snapshot";
+import { laySnapshotBoqTheoDuAn } from "@/lib/dich-vu/cad";
 
 export const dynamic = "force-dynamic";
 

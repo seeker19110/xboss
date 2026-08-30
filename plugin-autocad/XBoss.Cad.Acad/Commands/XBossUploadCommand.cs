@@ -2,7 +2,9 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Api;
+using XBoss.Cad.Core.Ui.ViewModels;
 using AcadApp = Autodesk.AutoCAD.ApplicationServices.Application;
 
 [assembly: CommandClass(typeof(XBoss.Cad.Acad.Commands.XBossUploadCommand))]
@@ -64,11 +66,18 @@ public sealed class XBossUploadCommand
             return;
         }
 
-        // Số bản vẽ trong sổ (drawings.code) + rev.
-        var maBanVe = HoiChuoi(ed, "Số bản vẽ trong sổ XBoss (drawings.code, vd ACMV-SD-T05-001)");
-        if (maBanVe is null or "") return;
-        var rev = HoiChuoi(ed, "Rev (vd A, B, C)");
-        if (rev is null or "") return;
+        // Bản vẽ đích: số bản vẽ trong sổ (drawings.code) hoặc mã số bản vẽ "#<id>" khi kỹ sư biết.
+        // Mã bản vẽ chỉ duy nhất TRONG một dự án — hai dự án trùng mã thì chỉ #id mới trỏ đúng
+        // bản ghi (route ưu tiên drawingId). Gõ như cũ thì mọi thứ chạy y như cũ.
+        // Hộp thoại (M106 §7.2) hiện luôn các sidecar sẽ gửi kèm; hỏng UI thì về dòng lệnh (FR9).
+        if (HoiThamSo(ed, Path.GetFileName(db.Filename), MoTaSidecar(db.Filename)) is not { } ts) return;
+        var banVe = MaBanVeDich.PhanTich(ts.MaBanVe);
+        if (!banVe.HopLe)
+        {
+            ed.WriteMessage($"\n[XBoss] {banVe.Loi}\n");
+            return;
+        }
+        var rev = ts.Rev;
 
         // DXF sidecar: DXFOUT ra tệp tạm rồi đọc bytes (server chỉ kiểm DXF — FR10).
         var tenDwg = Path.GetFileName(db.Filename);
@@ -107,9 +116,9 @@ public sealed class XBossUploadCommand
         {
             var client = new XBossApiClient(baseUrl);
             var kq = await client.UploadAsync(
-                token, maBanVe, rev, pack.Version,
+                token, banVe.Code ?? "", rev, pack.Version,
                 tenDwg, File.ReadAllBytes(db.Filename), dxfBytes, reportJson,
-                takeoffJson: takeoffJson);
+                takeoffJson: takeoffJson, drawingId: banVe.Id);
 
             if (!kq.DuocNhan)
             {
@@ -127,7 +136,7 @@ public sealed class XBossUploadCommand
                 {
                     ed.WriteMessage(job.Idempotent
                         ? $"\n[XBoss] ✔ Tệp này đã tải trước đó — revision #{job.RevisionId} (không tạo bản đôi).\n"
-                        : $"\n[XBoss] ✔ Đã tạo revision #{job.RevisionId} (trạng thái submitted) cho bản vẽ {maBanVe}, rev {rev}.\n");
+                        : $"\n[XBoss] ✔ Đã tạo revision #{job.RevisionId} (trạng thái submitted) cho bản vẽ {banVe.MoTa}, rev {rev}.\n");
                     return;
                 }
                 if (job.Status == "failed")
@@ -148,6 +157,39 @@ public sealed class XBossUploadCommand
         {
             ed.WriteMessage($"\n[XBoss] Lỗi mạng: {e.Message}\n");
         }
+    }
+
+    // ===== Thu tham số: hộp thoại (mặc định) hoặc dòng lệnh (M106 FR9) =====
+
+    /// <summary>
+    /// Mã bản vẽ + rev cho lần tải này. Hộp thoại trước (M106 §7.2), rơi về ĐÚNG hai câu hỏi dòng
+    /// lệnh cũ khi UI không dựng được hoặc bị tắt bằng <c>XBOSS_UI_DIALOG=0</c> (FR9).
+    /// Hủy ở hộp thoại = dừng lệnh.
+    /// </summary>
+    private static KetQuaUpload? HoiThamSo(Editor ed, string tenDwg, IReadOnlyList<string> sidecar)
+    {
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new UploadDialogViewModel(tenDwg, sidecar);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi) return kq;
+
+        var ma = HoiChuoi(
+            ed, "Số bản vẽ trong sổ XBoss (drawings.code, vd ACMV-SD-T05-001; hoặc #<mã số> khi biết)");
+        if (ma is null or "") return null;
+        var rev = HoiChuoi(ed, "Rev (vd A, B, C)");
+        if (rev is null or "") return null;
+        return new KetQuaUpload(ma, rev);
+    }
+
+    /// <summary>Các sidecar CÓ THẬT cạnh DWG — hộp thoại chỉ hiện, không đọc đĩa (guardrail M106 §2).</summary>
+    private static IReadOnlyList<string> MoTaSidecar(string duongDanDwg)
+    {
+        var ra = new List<string>();
+        if (File.Exists(duongDanDwg + ".xboss-report.json")) ra.Add("báo cáo chuẩn hóa");
+        if (File.Exists(duongDanDwg + XBossCommands.TenSidecarBocKL)) ra.Add("kết quả bóc khối lượng");
+        return ra;
     }
 
     private static string? HoiChuoi(Editor ed, string nhan)

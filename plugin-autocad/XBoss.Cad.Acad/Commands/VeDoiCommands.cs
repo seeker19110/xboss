@@ -3,8 +3,10 @@ using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Geometry;
+using XBoss.Cad.Core.Ui.ViewModels;
 
 [assembly: CommandClass(typeof(XBoss.Cad.Acad.Commands.VeDoiCommands))]
 
@@ -103,58 +105,94 @@ public sealed class VeDoiCommands
             return;
         }
 
+        var tomTat = danhSach
+            .GroupBy(t => (t.XData.HeId, t.XData.ItemId, t.XData.Size))
+            .Select(n => $"{n.Key.HeId}/{n.Key.ItemId} {n.Key.Size}: {n.Count()} tuyến")
+            .ToList();
         ed.WriteMessage($"\n[XBoss] {danhSach.Count} tuyến tim đang chọn:\n");
-        foreach (var nhom in danhSach.GroupBy(t => (t.XData.HeId, t.XData.ItemId, t.XData.Size)))
+        foreach (var d in tomTat) ed.WriteMessage($"[XBoss]   {d}\n");
+
+        // ===== (2) Hệ/loại/size/độ dốc MỚI + xác nhận =====
+        // Hộp thoại một form (M106 §7.2) gộp cả 4 câu hỏi lẫn câu xác nhận DongY/Huy, và hiện hệ
+        // quả (gỡ dấu bóc, xóa vạch chia đốt, block đang bám) ngay tại chỗ. UI hỏng hoặc
+        // XBOSS_UI_DIALOG=0 → nguyên chuỗi hỏi đáp cũ (FR9).
+        var soDaBoc = danhSach.Count(t => t.DaBoc);
+        var soKhoiBam = danhSach.Sum(t => t.SoKhoiBam);
+        var (daDungUi, chonUi) = HopThoaiXBoss.Thu(ed, () =>
         {
-            ed.WriteMessage(
-                $"[XBoss]   {nhom.Key.HeId}/{nhom.Key.ItemId} {nhom.Key.Size}: {nhom.Count()} tuyến\n");
+            var vm = new VeDoiDialogViewModel(
+                pack.DrawTools.Systems, pack.SheetSetup.Slopes, tomTat,
+                danhSach.Count, soDaBoc, soKhoiBam,
+                danhSach[0].XData.Size, danhSach[0].XData.DoDoc ?? VeContext.DoDoc);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi && chonUi is null)
+        {
+            ed.WriteMessage("\n[XBoss] Đã hủy — bản vẽ không thay đổi.\n");
+            return;
         }
 
-        // ===== (2) Hệ/loại/size/độ dốc MỚI =====
+        DrawSystem he;
+        DrawLine tuyenMoi;
+        VeContext.ChonTuDanhMuc size;
+        string? doDoc = null;
 
-        // Luôn hỏi lại hệ: đây là lệnh ĐỔI, giữ ngầm hệ của phiên trước là đường ngắn nhất tới
-        // việc đổi nhầm cả loạt tuyến sang hệ khác.
-        var he = VeContext.HoiHe(ed, pack, batBuocHoiLai: true);
-        if (he is null) return;
-        DrawLine? tuyenMoi = null;
-        while (tuyenMoi is null)
+        if (chonUi is { } ui)
         {
-            var (chonTuyen, doiHe) = VeContext.HoiLoaiTuyen(ed, he);
-            if (doiHe)
+            he = ui.He;
+            tuyenMoi = ui.Tuyen;
+            size = new VeContext.ChonTuDanhMuc(ui.Size, ui.SizeTuNhap);
+            doDoc = ui.DoDoc;
+        }
+        else
+        {
+            // Luôn hỏi lại hệ: đây là lệnh ĐỔI, giữ ngầm hệ của phiên trước là đường ngắn nhất tới
+            // việc đổi nhầm cả loạt tuyến sang hệ khác.
+            var heHoi = VeContext.HoiHe(ed, pack, batBuocHoiLai: true);
+            if (heHoi is null) return;
+            DrawLine? chonLoai = null;
+            while (chonLoai is null)
             {
-                var heMoi = VeContext.HoiHe(ed, pack, batBuocHoiLai: true);
-                if (heMoi is null) return;
-                he = heMoi;
-                continue;
+                var (chonTuyen, doiHe) = VeContext.HoiLoaiTuyen(ed, heHoi);
+                if (doiHe)
+                {
+                    var heMoi = VeContext.HoiHe(ed, pack, batBuocHoiLai: true);
+                    if (heMoi is null) return;
+                    heHoi = heMoi;
+                    continue;
+                }
+                if (chonTuyen is null) return;
+                chonLoai = chonTuyen;
             }
-            if (chonTuyen is null) return;
-            tuyenMoi = chonTuyen;
+            he = heHoi;
+            tuyenMoi = chonLoai;
+
+            var sizeCu = danhSach[0].XData.Size;
+            var chonSize = VeContext.HoiDanhMuc(
+                ed, $"Size mới cho {tuyenMoi.Name} ({tuyenMoi.SizeKind})", tuyenMoi.Sizes,
+                tuyenMoi.Sizes.Contains(sizeCu) ? sizeCu : VeContext.Size, choTuNhap: true);
+            if (chonSize is not { } s) return;
+            size = s;
+
+            // Độ dốc: loại tuyến mới bắt buộc thì hỏi (mặc định giữ độ dốc cũ nếu có); loại tuyến
+            // mới KHÔNG có độ dốc thì bỏ hẳn — giữ "i=2%" trên tuyến cấp nước là ghi chú sai.
+            if (tuyenMoi.SlopeRequired)
+            {
+                var chonDoc = VeContext.HoiDanhMuc(
+                    ed, $"Độ dốc tuyến {tuyenMoi.Name}", pack.SheetSetup.Slopes,
+                    danhSach[0].XData.DoDoc ?? VeContext.DoDoc, choTuNhap: true);
+                if (chonDoc is not { } dd) return;
+                doDoc = dd.GiaTri;
+            }
         }
 
-        var sizeCu = danhSach[0].XData.Size;
-        var chonSize = VeContext.HoiDanhMuc(
-            ed, $"Size mới cho {tuyenMoi.Name} ({tuyenMoi.SizeKind})", tuyenMoi.Sizes,
-            tuyenMoi.Sizes.Contains(sizeCu) ? sizeCu : VeContext.Size, choTuNhap: true);
-        if (chonSize is not { } size) return;
         VeContext.Size = size.GiaTri;
         VeContext.SizeTuNhap = size.TuNhap;
+        if (doDoc is not null) VeContext.DoDoc = doDoc;
         if (size.TuNhap)
         {
             ed.WriteMessage(
                 $"\n[XBoss] ⚠ Size \"{size.GiaTri}\" ngoài danh mục rule pack — vẫn đổi, XData đánh dấu \"custom\".\n");
-        }
-
-        // Độ dốc: loại tuyến mới bắt buộc thì hỏi (mặc định giữ độ dốc cũ nếu có); loại tuyến mới
-        // KHÔNG có độ dốc thì bỏ hẳn — giữ lại "i=2%" trên tuyến cấp nước là ghi chú sai.
-        string? doDoc = null;
-        if (tuyenMoi.SlopeRequired)
-        {
-            var chonDoc = VeContext.HoiDanhMuc(
-                ed, $"Độ dốc tuyến {tuyenMoi.Name}", pack.SheetSetup.Slopes,
-                danhSach[0].XData.DoDoc ?? VeContext.DoDoc, choTuNhap: true);
-            if (chonDoc is not { } dd) return;
-            doDoc = dd.GiaTri;
-            VeContext.DoDoc = doDoc;
         }
 
         // ===== (3) Bề rộng nét biên mới =====
@@ -177,15 +215,14 @@ public sealed class VeDoiCommands
         }
 
         // ===== (4) Cảnh báo trước khi làm =====
+        // Hộp thoại đã hiện đủ các cảnh báo này và đóng luôn vai xác nhận ⇒ không hỏi lại.
 
-        var soDaBoc = danhSach.Count(t => t.DaBoc);
         if (soDaBoc > 0)
         {
             ed.WriteMessage(
                 $"\n[XBoss] ⚠ {soDaBoc} tuyến ĐÃ BÓC KHỐI LƯỢNG — đổi xong PHẢI BÓC LẠI. Lệnh sẽ gỡ đánh dấu " +
                 "bóc của đúng các tuyến này (trả màu cũ) để XBOSS_BOCKL nhìn thấy chúng lần sau (M100 §6.2).\n");
         }
-        var soKhoiBam = danhSach.Sum(t => t.SoKhoiBam);
         if (soKhoiBam > 0)
         {
             ed.WriteMessage(
@@ -194,20 +231,23 @@ public sealed class VeDoiCommands
                 "XBOSS_VE_LOCHO và kiểm phụ kiện sau khi đổi.\n");
         }
 
-        var hoiXacNhan = new PromptKeywordOptions(
-            $"\n[XBoss] Đổi {danhSach.Count} tuyến sang {he.Id}/{tuyenMoi.ItemId} {size.GiaTri}" +
-            $"{(doDoc is null ? "" : $" i={doDoc}")} (layer {tuyenMoi.Layer})?")
+        if (chonUi is null)
         {
-            AllowNone = false,
-        };
-        hoiXacNhan.Keywords.Add("DongY", "DongY", "Đồng ý");
-        hoiXacNhan.Keywords.Add("Huy", "Huy", "Hủy");
-        hoiXacNhan.Keywords.Default = "DongY";
-        var traLoi = ed.GetKeywords(hoiXacNhan);
-        if (traLoi.Status != PromptStatus.OK || traLoi.StringResult != "DongY")
-        {
-            ed.WriteMessage("\n[XBoss] Đã hủy — bản vẽ không thay đổi.\n");
-            return;
+            var hoiXacNhan = new PromptKeywordOptions(
+                $"\n[XBoss] Đổi {danhSach.Count} tuyến sang {he.Id}/{tuyenMoi.ItemId} {size.GiaTri}" +
+                $"{(doDoc is null ? "" : $" i={doDoc}")} (layer {tuyenMoi.Layer})?")
+            {
+                AllowNone = false,
+            };
+            hoiXacNhan.Keywords.Add("DongY", "DongY", "Đồng ý");
+            hoiXacNhan.Keywords.Add("Huy", "Huy", "Hủy");
+            hoiXacNhan.Keywords.Default = "DongY";
+            var traLoi = ed.GetKeywords(hoiXacNhan);
+            if (traLoi.Status != PromptStatus.OK || traLoi.StringResult != "DongY")
+            {
+                ed.WriteMessage("\n[XBoss] Đã hủy — bản vẽ không thay đổi.\n");
+                return;
+            }
         }
 
         // ===== (5) Thi hành: MỘT transaction = MỘT nhóm UNDO =====
@@ -218,6 +258,7 @@ public sealed class VeDoiCommands
         var soNhanCapNhat = 0;
         var soMuiTenXoa = 0;
         var soGoDauBoc = 0;
+        var soChiaDotXoa = 0;
         var canhBao = new List<string>();
 
         using (var khoa = doc.LockDocument())
@@ -255,13 +296,16 @@ public sealed class VeDoiCommands
                         SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
                 }
 
+                // Vạch chia đốt của các tuyến sắp đổi (M105) — quét một lần cho cả lệnh.
+                var chiaDotTheoTim = VeThucThe.ChiaDotTheoTim(db, tr);
+
                 foreach (var t in danhSach)
                 {
                     if (tr.GetObject(t.Id, OpenMode.ForWrite) is not Polyline tim) continue;
 
                     // (a) Nét biên cũ: xóa TRƯỚC khi dựng lại — biên là thứ phụ thuộc size, giữ lại
                     //     là để nét sai bề rộng nằm trên bản vẽ nộp.
-                    soBienXoa += XoaNetBienCu(tr, db, t);
+                    soBienXoa += VeThucThe.XoaNetBienCua(db, tr, t.XData.HandleBien, t.Handle);
 
                     // (b) Layer mới cho tim.
                     tim.Layer = tuyenMoi.Layer;
@@ -302,7 +346,12 @@ public sealed class VeDoiCommands
                     soNhanCapNhat += capNhat;
                     soMuiTenXoa += muiTenXoa;
 
-                    // (e) XData mới của tim.
+                    // (e) Vạch chia đốt cũ (M105): số đốt/kiểu nối phụ thuộc CỠ tuyến, đổi cỡ xong
+                    //     thì vạch cũ là thông tin sai đưa thẳng ra xưởng — xóa kèm dấu chia đốt
+                    //     trên tim, kỹ sư chạy lại XBOSS_VE_CHIADOT (cùng lý do phải gỡ dấu bóc).
+                    soChiaDotXoa += VeThucThe.XoaChiaDotCua(db, tr, chiaDotTheoTim, t.Handle);
+
+                    // (f) XData mới của tim.
                     VeXDataStore.Ghi(tim, t.XData with
                     {
                         HeId = he.Id,
@@ -313,9 +362,14 @@ public sealed class VeDoiCommands
                         DoDoc = doDoc,
                         HandleBien = handleBien,
                         HandleNhan = handleNhan,
+                        KieuNoi = null,
+                        KieuNoiGhiDe = false,
+                        SoDot = null,
+                        SoMoiNoi = null,
+                        TongDaiDotMm = null,
                     });
 
-                    // (f) Gỡ đánh dấu bóc của ĐÚNG tuyến này (logic XBOSS_BOCKL_XOA theo vùng chọn).
+                    // (g) Gỡ đánh dấu bóc của ĐÚNG tuyến này (logic XBOSS_BOCKL_XOA theo vùng chọn).
                     if (t.DaBoc && MarkService.Unmark(tim, appBoc)) soGoDauBoc++;
 
                     soTuyenDoi++;
@@ -347,33 +401,17 @@ public sealed class VeDoiCommands
                 $"[XBoss] ⚠ Đã gỡ đánh dấu bóc của {soGoDauBoc} tuyến — CHẠY LẠI XBOSS_BOCKL để khối lượng " +
                 "khớp bản vẽ (số cũ đã sai vì hệ/size đổi).\n");
         }
+        if (soChiaDotXoa > 0)
+        {
+            ed.WriteMessage(
+                $"[XBoss] ⚠ Đã xóa {soChiaDotXoa} vạch/tag chia đốt của các tuyến vừa đổi — CHẠY LẠI " +
+                "XBOSS_VE_CHIADOT (chiều dài đốt và kiểu nối phụ thuộc cỡ tuyến).\n");
+        }
         foreach (var c in canhBao) ed.WriteMessage($"[XBoss] ⚠ {c}\n");
         ed.WriteMessage("[XBoss] Hoàn tác cả lệnh: UNDO 1 lần.\n");
     }
 
     // ===== Trợ giúp =====
-
-    /// <summary>
-    /// Xóa các nét biên cũ của một tim. CHỈ xóa đối tượng thật sự là nét biên CỦA CHÍNH tim đó
-    /// (XData vai trò <see cref="VaiTroVe.Bien"/> + handle tim khớp): handle trong XData có thể đã
-    /// mục (kỹ sư xóa tay, hoặc AutoCAD cấp lại handle cho đối tượng khác) — xóa mù theo handle là
-    /// cách chắc chắn nhất để mất một đối tượng vô can.
-    /// </summary>
-    private static int XoaNetBienCu(Transaction tr, Database db, TuyenChon t)
-    {
-        var soXoa = 0;
-        foreach (var handle in t.XData.HandleBien)
-        {
-            if (VeThucThe.TimTheoHandle(db, handle) is not { } id) continue;
-            if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ent) continue;
-            var xd = VeXDataStore.Doc(ent);
-            if (xd is null || xd.VaiTro != VaiTroVe.Bien) continue;
-            if (!string.Equals(xd.HandleTim, t.Handle, StringComparison.Ordinal)) continue;
-            ent.Erase();
-            soXoa++;
-        }
-        return soXoa;
-    }
 
     /// <summary>
     /// Cập nhật mọi nhãn đang gắn với một tim: MTEXT lấy lại nội dung từ XData mới; mũi tên hướng

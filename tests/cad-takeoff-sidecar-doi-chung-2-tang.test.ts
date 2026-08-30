@@ -1,5 +1,5 @@
 // Đối chứng 2 tầng cho sidecar `takeoff.json` (M101 §6.4 PR5): server đọc kiểu duck-typing ở
-// lib/ky-thuat/cad/bang-dieu-khien.ts (docKlBocTuBaoCao / layDongTakeoffChoExport) còn plugin
+// lib/ky-thuat/cad/dashboard.ts (docKlBocTuBaoCao / layDongTakeoffChoExport) còn plugin
 // C# sinh JSON này ở plugin-autocad/XBoss.Cad.Core/Reporting/TakeoffJsonReport.cs — trước PR này
 // không có tệp mẫu chung nên hai tầng có thể trôi tên field mà không ai biết. Tệp mẫu
 // plugin-autocad/doi-chung/takeoff-sidecar-mau.json khớp tay đúng tên [JsonPropertyName] sinh
@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { docKlBocTuBaoCao } from "@/lib/ky-thuat/cad/bang-dieu-khien";
+import { docKlBocTuBaoCao } from "@/lib/ky-thuat/cad/dashboard";
 
 const DOI_CHUNG = join(process.cwd(), "plugin-autocad", "doi-chung");
 const TAKEOFF_MAU = JSON.parse(
@@ -66,7 +66,7 @@ test(
     "và vùng khớp tổng tính tay",
   () => {
     // Sidecar mẫu được LƯU NGUYÊN vào standardize_report.takeoff khi upload (xem
-    // lib/ky-thuat/cad/plugin-upload.ts: `...(input.takeoff ? { takeoff: input.takeoff } : {})`),
+    // lib/ky-thuat/cad/dashboard.ts: `...(input.takeoff ? { takeoff: input.takeoff } : {})`),
     // nên report.takeoff CHÍNH LÀ nội dung JSON gốc — không có tầng bọc/đổi tên nào ở giữa.
     const kq = docKlBocTuBaoCao({ takeoff: TAKEOFF_MAU });
     assert.ok(kq);
@@ -101,7 +101,7 @@ test(
 
 test(
   "server đọc đủ field dùng trong Excel gộp (itemId/boqCode/group/ten/donVi/khoiLuong/size/vung) " +
-    "khớp DongTakeoffRaw ở lib/ky-thuat/cad/bang-dieu-khien.ts — giá trị THẬT, không tự so với chính nó",
+    "khớp DongTakeoffRaw ở lib/ky-thuat/cad/dashboard.ts — giá trị THẬT, không tự so với chính nó",
   () => {
     // layDongTakeoffChoExport (chạm DB, có test riêng ở tests/cad-vong-doi-ban-ve-takeoff.test.ts)
     // đọc từng dòng raw theo đúng khuôn `typeof raw.<field> === "string" ? raw.<field> : ""` /
@@ -117,17 +117,29 @@ test(
       khoiLuong?: unknown;
       size?: unknown;
       vung?: unknown;
+      heSoQuyDoi?: unknown;
+      moTaQuyDoi?: unknown;
+      klQuyDoi?: unknown;
     };
-    const doc = (raw: DongTakeoffRaw) => ({
-      itemId: typeof raw.itemId === "string" ? raw.itemId : "",
-      boqCode: typeof raw.boqCode === "string" ? raw.boqCode : "",
-      group: typeof raw.group === "string" ? raw.group : "",
-      ten: typeof raw.ten === "string" ? raw.ten : "",
-      donVi: typeof raw.donVi === "string" ? raw.donVi : "",
-      khoiLuong: typeof raw.khoiLuong === "number" ? raw.khoiLuong : 0,
-      size: typeof raw.size === "string" ? raw.size : "",
-      vung: typeof raw.vung === "string" ? raw.vung : "",
-    });
+    const doc = (raw: DongTakeoffRaw) => {
+      // 0 = rule pack không khai hệ số quy đổi → coi như không có, để trống (khớp
+      // lib/ky-thuat/cad/dashboard.ts: layDongTakeoffChoExport).
+      const heSoQuyDoi =
+        typeof raw.heSoQuyDoi === "number" && raw.heSoQuyDoi > 0 ? raw.heSoQuyDoi : null;
+      return {
+        itemId: typeof raw.itemId === "string" ? raw.itemId : "",
+        boqCode: typeof raw.boqCode === "string" ? raw.boqCode : "",
+        group: typeof raw.group === "string" ? raw.group : "",
+        ten: typeof raw.ten === "string" ? raw.ten : "",
+        donVi: typeof raw.donVi === "string" ? raw.donVi : "",
+        khoiLuong: typeof raw.khoiLuong === "number" ? raw.khoiLuong : 0,
+        size: typeof raw.size === "string" ? raw.size : "",
+        vung: typeof raw.vung === "string" ? raw.vung : "",
+        heSoQuyDoi,
+        moTaQuyDoi: heSoQuyDoi !== null && typeof raw.moTaQuyDoi === "string" ? raw.moTaQuyDoi : "",
+        klQuyDoi: heSoQuyDoi !== null && typeof raw.klQuyDoi === "number" ? raw.klQuyDoi : null,
+      };
+    };
 
     const lines = TAKEOFF_MAU.lines as DongTakeoffRaw[];
     assert.deepEqual(doc(lines[0]), {
@@ -139,6 +151,10 @@ test(
       khoiLuong: 20,
       size: "300x200",
       vung: "Tầng 5",
+      // heSoQuyDoi=0 trong tệp mẫu → rule pack không khai hệ số cho dòng này, phải để TRỐNG.
+      heSoQuyDoi: null,
+      moTaQuyDoi: "",
+      klQuyDoi: null,
     });
     assert.deepEqual(doc(lines[1]), {
       itemId: "duct-cachnhiet",
@@ -149,6 +165,10 @@ test(
       khoiLuong: 20,
       size: "300x200",
       vung: "Tầng 5",
+      // Item dẫn xuất (cách nhiệt) — có hệ số quy đổi thật trong tệp mẫu.
+      heSoQuyDoi: 1.6,
+      moTaQuyDoi: "Diện tích cách nhiệt = chu vi x chiều dài x hệ số",
+      klQuyDoi: 32,
     });
   },
 );

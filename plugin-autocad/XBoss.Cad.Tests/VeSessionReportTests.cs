@@ -151,6 +151,66 @@ public class VeSessionReportTests
         Assert.Equal(1, goc.GetProperty("nhatKy").GetArrayLength());
     }
 
+    // ===== Mục ngắt nét giao chéo (M109 FR9) =====
+
+    private static VeXDataInfo NgatNet(
+        string heDuoi, string item, string size, string timDuoi, string timTren, bool daoTay = false) =>
+        new()
+        {
+            VaiTro = VaiTroVe.NgatNet,
+            HeId = heDuoi,
+            ItemId = item,
+            Size = size,
+            RulePackVersion = "v7",
+            HandleTim = timDuoi,
+            HandleTimGiao = timTren,
+            DaoTay = daoTay,
+        };
+
+    [Fact]
+    public void Muc_ngat_net_gop_theo_tuyen_di_duoi_va_dem_dao_tay()
+    {
+        var bc = VeSessionReport.Dung(
+            [
+                Tim("PIPING", "pipe-domw", "DN100"),
+                NgatNet("PIPING", "pipe-domw", "DN100", "1A", "2B"),
+                NgatNet("PIPING", "pipe-domw", "DN100", "1A", "2B"),
+                NgatNet("PIPING", "pipe-domw", "DN100", "1A", "3C", daoTay: true),
+                NgatNet("ELV", "tray-elv", "200x100", "4D", "2B"),
+            ],
+            Meta);
+
+        Assert.Equal(2, bc.NgatNet.Count);
+        var piping = bc.NgatNet.Single(c => c.HeId == "PIPING");
+        Assert.Equal(3, piping.SoDoiTuong);
+        Assert.Equal(1, piping.SoDaoTay);
+        Assert.Equal(0, bc.NgatNet.Single(c => c.HeId == "ELV").SoDaoTay);
+
+        // Đếm theo hệ ĐI DƯỚI: hệ đi trên không sinh đối tượng ngắt nét nào.
+        Assert.Equal(3, bc.HeThong.Single(h => h.HeId == "PIPING").SoNgatNet);
+
+        // Đảo tay phải nổi lên cảnh báo — đó là chỗ duy nhất người nghiệm thu bản vẽ thấy được.
+        Assert.Contains(bc.CanhBao, c => c.Contains("ĐẢO TAY", StringComparison.Ordinal));
+
+        var text = bc.ToVietnameseText();
+        Assert.Contains("Ngắt nét giao chéo", text, StringComparison.Ordinal);
+        Assert.Contains("đảo tay", text, StringComparison.Ordinal);
+
+        using var doc = JsonDocument.Parse(bc.ToJson());
+        var ngatNet = doc.RootElement.GetProperty("ngatNet");
+        Assert.Equal(2, ngatNet.GetArrayLength());
+        Assert.Equal(1, ngatNet[1].GetProperty("soDaoTay").GetInt32());
+    }
+
+    [Fact]
+    public void Khong_co_dao_tay_thi_khong_canh_bao_thua()
+    {
+        var bc = VeSessionReport.Dung([NgatNet("PIPING", "pipe-domw", "DN100", "1A", "2B")], Meta);
+
+        Assert.Equal(0, Assert.Single(bc.NgatNet).SoDaoTay);
+        Assert.DoesNotContain(bc.CanhBao, c => c.Contains("ĐẢO TAY", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Ban_ve_trong_van_ra_bao_cao_hop_le()
     {
@@ -159,6 +219,88 @@ public class VeSessionReportTests
         Assert.Equal(0, bc.TongTuyen);
         Assert.Equal(0, bc.TongBlock);
         Assert.Contains("chưa có đối tượng nào", bc.ToVietnameseText());
+    }
+
+    [Fact]
+    public void Muc_nhan_ban_tang_gop_theo_cap_tang_nguon_va_tang_chep()
+    {
+        // M111 FR10 — đọc từ dấu bản chép SỐNG trong bản vẽ (TangNguon/NhanTang), nên mở lại bản vẽ
+        // ở máy khác vẫn dựng lại được đúng con số này.
+        var chep = (string nguon, string dich) =>
+            Tim("HVAC", "duct-supp", "300x200") with { TangNguon = nguon, NhanTang = dich };
+        var bc = VeSessionReport.Dung(
+            [
+                Tim("HVAC", "duct-supp", "300x200"),
+                chep("05", "06"),
+                chep("05", "06"),
+                chep("05", "07"),
+            ],
+            Meta);
+
+        Assert.Equal(2, bc.NhanTang.Count);
+        Assert.Equal(2, bc.NhanTang[0].SoDoiTuong);
+        Assert.Equal("06", bc.NhanTang[0].NhanTang);
+        Assert.Equal("05", bc.NhanTang[0].TangNguon);
+        Assert.Equal(1, bc.NhanTang[1].SoDoiTuong);
+        Assert.Contains("tầng 05 → tầng 07", bc.ToVietnameseText(), StringComparison.Ordinal);
+        Assert.Equal(2, JsonDocument.Parse(bc.ToJson()).RootElement.GetProperty("nhanTang").GetArrayLength());
+    }
+
+    [Fact]
+    public void Ban_ve_chua_nhan_ban_tang_thi_muc_do_rong()
+    {
+        Assert.Empty(VeSessionReport.Dung([Tim("HVAC", "duct-supp", "300x200")], Meta).NhanTang);
+    }
+
+    // ===== Mục đi tuyến tự động (M114 FR14) =====
+
+    private static VeXDataInfo TimTuDong(
+        string he, string item, string size, string phien, bool suaTay = false) =>
+        Tim(he, item, size) with { TuDong = true, PhienTuyen = phien, SuaTay = suaTay };
+
+    [Fact]
+    public void Muc_di_tuyen_tu_dong_gop_theo_he_va_dem_nhanh_sua_tay()
+    {
+        var bc = VeSessionReport.Dung(
+            [
+                Tim("HVAC", "duct-supp", "300x200"), // vẽ tay — KHÔNG vào mục tự động
+                TimTuDong("HVAC", "duct-supp", "600x300", "HVAC-20260829-100000"),
+                TimTuDong("HVAC", "duct-supp", "600x300", "HVAC-20260829-100000"),
+                TimTuDong("HVAC", "duct-supp", "600x300", "HVAC-20260829-183000", suaTay: true),
+                TimTuDong("ELV", "tray-elv", "200x100", "ELV-20260829-110000"),
+            ],
+            Meta);
+
+        Assert.Equal(2, bc.TuyenTuDong.Count);
+        var hvac = bc.TuyenTuDong.Single(c => c.HeId == "HVAC");
+        Assert.Equal(3, hvac.SoNhanh);
+        Assert.Equal(1, hvac.SoSuaTay);
+        Assert.Equal(2, hvac.SoPhien);
+        Assert.Equal(0, bc.TuyenTuDong.Single(c => c.HeId == "ELV").SoSuaTay);
+
+        // Tuyến tự động vẫn là TIM nên vẫn đếm vào số tuyến của hệ (bóc khối lượng không đổi).
+        Assert.Equal(4, bc.HeThong.Single(h => h.HeId == "HVAC").SoTuyen);
+
+        // Sửa tay phải nổi lên cảnh báo: đó là chỗ người nghiệm thu thấy "nhánh này lệch máy".
+        Assert.Contains(bc.CanhBao, c => c.Contains("SỬA TAY", StringComparison.Ordinal));
+
+        var text = bc.ToVietnameseText();
+        Assert.Contains("Đi tuyến tự động", text, StringComparison.Ordinal);
+        Assert.Contains("đã sửa tay", text, StringComparison.Ordinal);
+
+        using var doc = JsonDocument.Parse(bc.ToJson());
+        var tuDong = doc.RootElement.GetProperty("tuyenTuDong");
+        Assert.Equal(2, tuDong.GetArrayLength());
+        Assert.Equal(1, tuDong[1].GetProperty("soSuaTay").GetInt32());
+    }
+
+    [Fact]
+    public void Ban_ve_chi_ve_tay_thi_muc_di_tuyen_tu_dong_rong_va_khong_canh_bao_thua()
+    {
+        var bc = VeSessionReport.Dung([Tim("HVAC", "duct-supp", "300x200")], Meta);
+
+        Assert.Empty(bc.TuyenTuDong);
+        Assert.DoesNotContain(bc.CanhBao, c => c.Contains("SỬA TAY", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -1,16 +1,42 @@
-// lib/cad/rule-pack.ts — Nguồn quy tắc chuẩn hóa CAD duy nhất (M99 PR1)
+// lib/ky-thuat/cad/rule-pack.ts — Nguồn quy tắc chuẩn hóa CAD duy nhất (M99 PR1)
 /**
- * Rule pack là "một nguồn quy tắc" cho cả tầng web (TypeScript) lẫn plugin AutoCAD .NET:
- * plugin tải về qua GET /api/engineering/cad/rule-pack rồi áp đúng bộ quy tắc đó, nên
- * hai tầng không trôi khỏi nhau (ADR-0006 nguyên tắc 1).
+ * Gộp 3 mảnh của cùng một họ: rule pack ĐANG PHÁT HÀNH (dữ liệu thuần), các tiện ích đọc/ETag/
+ * kiểm khối chính sách, và validator khối `drawTools.revisionPolicy` (M110 §5).
  *
- * Đổi quy tắc = thêm tệp version mới trong `lib/cad/rule-packs/`, KHÔNG sửa version đã
- * phát hành (cùng triết lý append-only của migration).
+ * Rule pack là "một nguồn quy tắc" cho cả tầng web (TypeScript) lẫn plugin AutoCAD .NET: plugin
+ * tải về qua GET /api/engineering/cad/rule-pack rồi áp đúng bộ quy tắc đó, nên hai tầng không
+ * trôi khỏi nhau (ADR-0006 nguyên tắc 1).
+ *
+ * Đổi quy tắc = thêm tệp version mới trong `lib/ky-thuat/cad/rule-packs/`, KHÔNG sửa version đã
+ * phát hành (cùng triết lý append-only của migration). Phát hành version mới = đổi ĐÚNG một dòng
+ * `import` ở đầu tệp này.
+ *
+ * `node:crypto` chỉ dùng trong các hàm ETag (phía máy chủ). `dxf-parser.ts` chạy cả ở trình duyệt
+ * và chỉ lấy `RULE_PACK_HIEN_HANH`; bundler loại bỏ nhánh ETag nên không kéo `node:crypto` vào
+ * bundle client — đã kiểm bằng `npm run build` (không chunk client nào chứa `node:crypto`).
  */
-import { createHash } from "node:crypto";
-import { RULE_PACK_HIEN_HANH, type CadRulePack } from "@/lib/ky-thuat/cad/rule-pack-hien-hanh";
 
-export type { CadRulePack };
+import rulePackV15 from "@/lib/ky-thuat/cad/rule-packs/v15.json";
+import { createHash } from "node:crypto";
+
+// ===== rule-pack-hien-hanh.ts =====
+// Rule pack ĐANG PHÁT HÀNH (dữ liệu thuần)
+/**
+ * `dxf-parser.ts` chạy cả ở client (trang chuẩn hóa bản vẽ) và chỉ cần đúng hai khai báo dưới đây
+ * để đọc danh sách layer đích cho ánh xạ layer idempotent — giữ chúng ở ngay đầu tệp, không phụ
+ * thuộc gì vào phần ETag bên dưới.
+ *
+ * Phát hành version mới = đổi ĐÚNG một dòng `import rulePackV..` ở đầu tệp (append-only: không sửa
+ * tệp version cũ).
+ */
+
+export type CadRulePack = typeof rulePackV15;
+
+/** Rule pack đang phát hành cho plugin — mô tả từng version xem `getCurrentRulePack()`. */
+export const RULE_PACK_HIEN_HANH = rulePackV15;
+
+// ===== rule-pack.ts =====
+// Đọc rule pack, ETag cho plugin tải về, và các validator khối chính sách
 
 /** Version đang phát hành cho plugin. */
 export const CURRENT_RULE_PACK_VERSION = RULE_PACK_HIEN_HANH.version;
@@ -38,10 +64,115 @@ export const CURRENT_RULE_PACK_VERSION = RULE_PACK_HIEN_HANH.version;
  * số 18 — cả hai còn TỰ TẮT khi thiếu dữ liệu, không chỉ theo cờ `enabled`) + 2 khối chính sách cho
  * bước chuẩn hóa 12/13 (`polylineClosePolicy` đóng polyline gần kín, `blockMap` quy block lạc chuẩn
  * về thư viện block 0139). Mọi khóa mới mặc định tắt → v8 cho kết quả y hệt v7. Kèm sửa
- * `layerMap.knownIssues`: nợ "không idempotent" đã đóng ở M101 PR2 nhưng mô tả cũ còn ghi là nợ.
+ * `layerMap.knownIssues`: nợ "không idempotent" đã đóng ở M101 PR2 nhưng mô tả cũ còn ghi là nợ;
+ * v9 = v8 + khối `drawTools.systems[].lines[].jointRules` cho ĐỦ 9 tuyến hiện có (3 ống gió + 4 ống
+ * nước/PCCC + 2 máng cáp): tham số chia đốt chế tạo/lắp đặt theo kiểu kết nối (bảng chọn kiểu nối theo
+ * cỡ, chiều dài đốt tối đa, khe mối nối, chế độ chia, đốt tối thiểu, định mức phụ kiện mối nối) — dùng
+ * chung cho lệnh `XBOSS_VE_CHIADOT` của plugin và engine web `lib/ky-thuat/engineering-joint-segmentation.ts`
+ * (M105 §7/§12). Mở rộng thuần: mọi khóa cũ giữ nguyên từng byte nên kiểm/chuẩn hóa/bóc/vẽ bằng v9 cho
+ * kết quả y hệt v8; rule pack cũ (v4–v8) không có `jointRules` thì lệnh chia đốt TỪ CHỐI chạy chứ không
+ * đoán mặc định ngầm;
+ * v12 = v9 + khối `drawTools.floorPolicy` cho lệnh nhân bản tầng điển hình `XBOSS_VE_NHANTANG`
+ * (M111 §4): danh sách nhãn tầng, kiểu dời + bước dời, mẫu tên vùng bóc của bản chép, danh sách vai
+ * trò được chép. Mở rộng thuần (mọi khóa cũ giữ nguyên từng byte) và `enabled: false` mặc định nên
+ * v12 cho kết quả y hệt v9; lệnh nhân tầng từ chối chạy tới khi công ty bật khóa này (M111 AC12);
+ * v13 = v12 + khối `drawTools.crossingPolicy` — chính sách ngắt nét giao chéo của lệnh
+ * `XBOSS_VE_NGATNET` (M109 §5): hạng ưu tiên trình bày giữa các hệ (id theo `systems[].id`), bề
+ * rộng vùng che, bán kính cầu vượt, hậu tố layer đối tượng ngắt nét, ngưỡng góc giao. Mở rộng
+ * thuần và `enabled: false` mặc định nên mọi lệnh cũ chạy với v13 cho kết quả y hệt v9.
+ * (v10/v11 bỏ trống: v10 là bản nháp crossingPolicy của nhánh M109 trước khi M111 phát hành v12,
+ * không bản nào ra khỏi nhánh; v13 gộp đủ cả hai khối mới.)
+ * v14 = v13 + khối `drawTools.revisionPolicy` cho bộ lệnh revision cloud
+ * `XBOSS_VE_REV`/`_CHOT`/`_HIENTHI` (M110 §5): chiều dài cung cloud, layer, block tam giác
+ * (`kind=annotation`), định dạng số revision, mẫu tên attribute bảng revision trong khung tên, số
+ * dòng tối đa, nới bao hình. Mở rộng thuần và `enabled: false` mặc định nên v14 cho kết quả y hệt
+ * v9; 3 lệnh revision từ chối chạy tới khi công ty bật khóa này (M110 AC8).
+ * v15 = v14 + khối `drawTools.routingPolicy` cho bộ lệnh đi tuyến tự động theo đồ thị hành lang
+ * `XBOSS_VE_HANHLANG`/`XBOSS_VE_TUYENTUDONG` (M114 §6): layer hành lang, bán kính rẽ nhánh, 3 hệ
+ * số hàm chi phí (α co, β độ đông, γ gom trục), phân tầng theo hệ, khe hở làn và thứ tự chạy hệ.
+ * Mở rộng thuần và `enabled: false` mặc định nên v15 cho kết quả y hệt v14; 2 lệnh đi tuyến dừng
+ * kèm hướng dẫn bật tới khi công ty bật khóa này (M114 AC14).
  */
 export function getCurrentRulePack(): CadRulePack {
   return RULE_PACK_HIEN_HANH;
+}
+
+/** Vai trò đối tượng do bộ lệnh vẽ sinh ra — bản TS của enum `VaiTroVe` (Core `Draw/VeXData.cs`). */
+export const VAI_TRO_VE = [
+  "Tim",
+  "Bien",
+  "Nhan",
+  "TuyenCat",
+  "MatCat",
+  "PhuKien",
+  "ThietBi",
+  "DinhNghiaBlock",
+  "GiaDo",
+  "LoCho",
+  "BangThongKe",
+  "VachChia",
+  "NhanDot",
+] as const;
+
+/** Kiểu dời bản chép trong model space — bản TS của enum `KieuDatTang` (Core `Draw/FloorReplicator.cs`). */
+export const KIEU_DAT_TANG = ["offsetY", "offsetX", "luoi"] as const;
+
+/** Khối `drawTools.floorPolicy` nhìn từ validator (M111 §4). */
+export type FloorPolicy = {
+  enabled: boolean;
+  floors: readonly string[];
+  layoutMode: string;
+  stepMm: number;
+  gridColumns: number;
+  zoneNamePattern: string;
+  copyRoles: readonly string[];
+};
+
+/**
+ * Validator tầng TS của `drawTools.floorPolicy` (M111 §4) — đôi của `FloorReplicator.Validate`
+ * bên plugin .NET. Trả danh sách lỗi tiếng Việt; rỗng = hợp lệ.
+ *
+ * Khối đang TẮT vẫn kiểm: rule pack phát hành phải khai sẵn tham số dùng được ngay khi bật, đúng
+ * quy ước của các khối chính sách v5–v9 (bật lên là chạy, không phải sửa rule pack thêm lần nữa).
+ */
+export function kiemFloorPolicy(fp: FloorPolicy): string[] {
+  const loi: string[] = [];
+
+  if (!(KIEU_DAT_TANG as readonly string[]).includes(fp.layoutMode)) {
+    loi.push(
+      `floorPolicy.layoutMode không hợp lệ: "${fp.layoutMode}" (chỉ nhận ${KIEU_DAT_TANG.map((k) => `"${k}"`).join(", ")}).`,
+    );
+  }
+  if (fp.layoutMode === "luoi" && fp.gridColumns <= 0) {
+    loi.push('floorPolicy.gridColumns phải dương khi layoutMode = "luoi".');
+  }
+
+  if (fp.floors.length === 0) {
+    loi.push("floorPolicy.floors rỗng — không có tầng đích nào để chép.");
+  }
+  const trung = [...new Set(fp.floors.filter((t, i) => fp.floors.indexOf(t) !== i))];
+  if (trung.length > 0) {
+    loi.push(`floorPolicy.floors khai trùng nhãn tầng: ${trung.join(", ")}.`);
+  }
+  if (!(fp.stepMm > 0)) {
+    loi.push(`floorPolicy.stepMm = ${fp.stepMm} phải dương — hai tầng sẽ chồng lên nhau.`);
+  }
+  if (!fp.zoneNamePattern.includes("{floor}")) {
+    loi.push(
+      `floorPolicy.zoneNamePattern "${fp.zoneNamePattern}" thiếu {floor} — mọi tầng ra cùng một tên vùng, sheet Tong-hop-vung gộp nhầm.`,
+    );
+  }
+  if (fp.copyRoles.length === 0) {
+    loi.push("floorPolicy.copyRoles rỗng — không vai trò nào được chép.");
+  }
+  for (const vaiTro of fp.copyRoles) {
+    if (!(VAI_TRO_VE as readonly string[]).includes(vaiTro)) {
+      loi.push(
+        `floorPolicy.copyRoles["${vaiTro}"] không phải vai trò có thật trong VaiTroVe (hợp lệ: ${VAI_TRO_VE.join(", ")}).`,
+      );
+    }
+  }
+  return loi;
 }
 
 /** ETag mạnh theo hash nội dung — plugin cache cục bộ và hỏi lại bằng `If-None-Match`. */
@@ -75,4 +206,263 @@ export function matchesEtag(ifNoneMatch: string | null, etag: string): boolean {
   if (!ifNoneMatch) return false;
   const strip = (v: string) => v.trim().replace(/^W\//, "");
   return ifNoneMatch.split(",").some((v) => strip(v) === strip(etag) || v.trim() === "*");
+}
+
+/** Khối `drawTools.crossingPolicy` (M109 §5) — chính sách ngắt nét giao chéo. */
+export type CrossingPolicy = {
+  enabled: boolean;
+  /** Hạng trình bày: id hệ đứng trước đi TRÊN. Id theo `drawTools.systems[].id`. */
+  priority: readonly string[];
+  gapMode?: string;
+  clearanceMm: number;
+  jogRadiusMm: number;
+  layerSuffix: string;
+  minAngleDeg: number;
+};
+
+/**
+ * Kiểm khối `crossingPolicy` — tầng TS của validator 2 tầng (M109 §5; tầng C# là
+ * `DrawToolsConfig.Validate`). Trả danh sách lỗi tiếng Việt, rỗng = hợp lệ.
+ *
+ * Rule pack cũ (v4–v9) không có khóa này → không lỗi: lệnh ngắt nét chỉ đơn giản không chạy được,
+ * đúng luật "khóa mới mặc định không đổi hành vi".
+ */
+export function kiemCrossingPolicy(drawTools: {
+  systems: readonly { id: string }[];
+  crossingPolicy?: CrossingPolicy;
+}): string[] {
+  const cp = drawTools.crossingPolicy;
+  if (!cp) return [];
+
+  const loi: string[] = [];
+  const heHopLe = new Set(drawTools.systems.map((s) => s.id));
+  for (const id of cp.priority) {
+    if (!heHopLe.has(id)) {
+      loi.push(
+        `drawTools.crossingPolicy.priority chứa id hệ lạ "${id}" — ` +
+          `phải là drawTools.systems[].id (hợp lệ: ${[...heHopLe].join(", ")}).`,
+      );
+    }
+  }
+
+  for (const [ten, giaTri] of [
+    ["clearanceMm", cp.clearanceMm],
+    ["jogRadiusMm", cp.jogRadiusMm],
+  ] as const) {
+    if (!Number.isFinite(giaTri) || giaTri <= 0) {
+      loi.push(`drawTools.crossingPolicy.${ten} = ${giaTri} phải là số dương.`);
+    }
+  }
+
+  if (!Number.isFinite(cp.minAngleDeg) || cp.minAngleDeg <= 0 || cp.minAngleDeg > 90) {
+    loi.push(
+      `drawTools.crossingPolicy.minAngleDeg = ${cp.minAngleDeg} phải nằm trong khoảng (0; 90] — ` +
+        "đây là ngưỡng lọc góc giao (0..90°), giá trị âm/NaN làm mọi góc đều bị coi là đủ lớn.",
+    );
+  }
+
+  if (cp.gapMode && !["wipeout", "jog"].includes(cp.gapMode)) {
+    loi.push(
+      `drawTools.crossingPolicy.gapMode lạ "${cp.gapMode}" (chỉ nhận "wipeout" hoặc "jog").`,
+    );
+  }
+
+  if (cp.enabled && !cp.layerSuffix.trim()) {
+    loi.push(
+      "drawTools.crossingPolicy.layerSuffix trống trong khi enabled = true — " +
+        "đối tượng ngắt nét sẽ rơi vào chính layer tim và lệnh xóa không lọc lại được.",
+    );
+  }
+  return loi;
+}
+
+/** Khối `drawTools.routingPolicy` (M114 §6) — chính sách đi tuyến tự động theo đồ thị hành lang. */
+export type RoutingPolicy = {
+  enabled: boolean;
+  corridorLayer: string;
+  /** Bán kính tối đa từ thiết bị tới hành lang gần nhất để rẽ nhánh (mm). */
+  snapRadiusMm: number;
+  cost: { elbowMm: number; congestionMm: number; reuseFactor: number };
+  /** Phân tầng theo hệ — id hệ theo `drawTools.systems[].id`, một hệ chỉ ở đúng một tier. */
+  tiers: readonly {
+    id: string;
+    name: string;
+    systems: readonly string[];
+    offsetFromBeamMm?: number;
+    offsetFromCeilingMm?: number;
+  }[];
+  laneGapMm: { default: number; elecToHot: number };
+  /** Thứ tự chạy mặc định giữa các hệ — id theo `drawTools.systems[].id`. */
+  systemOrder: readonly string[];
+};
+
+/**
+ * Kiểm khối `routingPolicy` — tầng TS của validator 2 tầng (M114 §6; tầng C# là
+ * `DrawToolsConfig.ValidateRoutingPolicy`). Trả danh sách lỗi tiếng Việt, rỗng = hợp lệ.
+ *
+ * Rule pack cũ (≤ v14) không có khóa này → không lỗi: 2 lệnh đi tuyến chỉ đơn giản không chạy
+ * được, đúng luật "khóa mới mặc định không đổi hành vi".
+ */
+export function kiemRoutingPolicy(drawTools: {
+  systems: readonly { id: string }[];
+  routingPolicy?: RoutingPolicy;
+}): string[] {
+  const rp = drawTools.routingPolicy;
+  if (!rp) return [];
+
+  const loi: string[] = [];
+  const heHopLe = new Set(drawTools.systems.map((s) => s.id));
+
+  if (!Number.isFinite(rp.snapRadiusMm) || rp.snapRadiusMm <= 0) {
+    loi.push(
+      `drawTools.routingPolicy.snapRadiusMm = ${rp.snapRadiusMm} phải là số dương — ` +
+        "bán kính ≤ 0 làm mọi thiết bị đều rơi vào danh sách không giải được.",
+    );
+  }
+
+  const { elbowMm, congestionMm, reuseFactor } = rp.cost;
+  if (!Number.isFinite(reuseFactor) || reuseFactor <= 0 || reuseFactor > 1) {
+    loi.push(
+      `drawTools.routingPolicy.cost.reuseFactor = ${reuseFactor} phải nằm trong khoảng (0; 1] — ` +
+        "> 1 là phạt (chống gom trục), ≤ 0 làm cạnh dùng lại thành miễn phí/âm giá.",
+    );
+  }
+  for (const [ten, giaTri] of [
+    ["elbowMm", elbowMm],
+    ["congestionMm", congestionMm],
+  ] as const) {
+    if (!Number.isFinite(giaTri) || giaTri < 0) {
+      loi.push(`drawTools.routingPolicy.cost.${ten} = ${giaTri} không được âm.`);
+    }
+  }
+
+  // Id hệ trong tiers/systemOrder phải có thật — khai lệch thì hệ đó lặng lẽ không được cấp tầng
+  // (hoặc không bao giờ tới lượt chạy), không ai biết.
+  const tierCuaHe = new Map<string, string>();
+  for (const tier of rp.tiers) {
+    for (const heId of tier.systems) {
+      if (!heHopLe.has(heId)) {
+        loi.push(
+          `drawTools.routingPolicy.tiers["${tier.id}"] chứa id hệ lạ "${heId}" — ` +
+            `phải là drawTools.systems[].id (hợp lệ: ${[...heHopLe].join(", ")}).`,
+        );
+        continue;
+      }
+      const daCo = tierCuaHe.get(heId);
+      if (daCo) {
+        loi.push(
+          `drawTools.routingPolicy: hệ "${heId}" nằm ở 2 tier ("${daCo}" và "${tier.id}") — ` +
+            "cấp tầng sẽ phụ thuộc thứ tự duyệt, hai tầng C#/TS trôi khỏi nhau.",
+        );
+      } else {
+        tierCuaHe.set(heId, tier.id);
+      }
+    }
+  }
+  for (const heId of rp.systemOrder) {
+    if (!heHopLe.has(heId)) {
+      loi.push(
+        `drawTools.routingPolicy.systemOrder chứa id hệ lạ "${heId}" — ` +
+          `phải là drawTools.systems[].id (hợp lệ: ${[...heHopLe].join(", ")}).`,
+      );
+    }
+  }
+
+  for (const [ten, giaTri] of [
+    ["default", rp.laneGapMm.default],
+    ["elecToHot", rp.laneGapMm.elecToHot],
+  ] as const) {
+    if (!Number.isFinite(giaTri) || giaTri <= 0) {
+      loi.push(`drawTools.routingPolicy.laneGapMm.${ten} = ${giaTri} phải là số dương.`);
+    }
+  }
+
+  if (rp.enabled && !rp.corridorLayer.trim()) {
+    loi.push(
+      "drawTools.routingPolicy.corridorLayer trống trong khi enabled = true — " +
+        "hành lang sẽ lẫn vào layer tuyến và lệnh đi tuyến không lọc lại được.",
+    );
+  }
+  return loi;
+}
+
+// ===== rule-pack-revision.ts =====
+
+// lib/ky-thuat/cad/rule-pack.ts — Validator khóa `drawTools.revisionPolicy` (M110 §5)
+/**
+ * Tầng TS của "validator 2 tầng": cùng bộ luật với `RevisionPolicyConfig.Validate()` bên plugin
+ * (`plugin-autocad/XBoss.Cad.Core/Draw/DrawToolsConfig.cs`). Rule pack sai ở đây thì phải chặn từ
+ * lúc phát hành, đừng để kỹ sư phát hiện khi đứng trước AutoCAD (ADR-0006 nguyên tắc 1).
+ *
+ * Hàm thuần, không chạm DB/HTTP — dùng được cả ở test lẫn ở đường phát hành rule pack.
+ */
+
+/** Khối `drawTools.revisionPolicy` của rule pack (v12 trở đi). */
+export type RevisionPolicy = {
+  enabled: boolean;
+  cloudArcMm: number;
+  layer: string;
+  triangleBlockId: string;
+  numberFormat: string;
+  titleblockAttrPattern: { so: string; ngay: string; noiDung: string; nguoi: string };
+  maxRows: number;
+  boundingPaddingMm: number;
+};
+
+/** Chỗ giữ số revision trong mọi mẫu chuỗi của khối này. */
+export const O_TRONG_SO_REVISION = "{n}";
+
+/**
+ * Kiểm khối `revisionPolicy`; trả danh sách lỗi tiếng Việt (rỗng = hợp lệ).
+ * `undefined` = rule pack cũ (≤ v9) không khai khối này — hợp lệ, 3 lệnh revision tự từ chối chạy.
+ */
+export function kiemTraRevisionPolicy(policy: RevisionPolicy | undefined): string[] {
+  if (!policy) return [];
+  const loi: string[] = [];
+
+  if (!(policy.cloudArcMm > 0)) {
+    loi.push(`drawTools.revisionPolicy.cloudArcMm = ${policy.cloudArcMm} phải dương.`);
+  }
+  if (!policy.numberFormat.includes(O_TRONG_SO_REVISION)) {
+    loi.push(
+      `drawTools.revisionPolicy.numberFormat "${policy.numberFormat}" thiếu ${O_TRONG_SO_REVISION} — ` +
+        "mọi revision sẽ mang cùng một số.",
+    );
+  }
+  if (policy.enabled && policy.triangleBlockId.trim() === "") {
+    loi.push(
+      "drawTools.revisionPolicy.triangleBlockId trống trong khi khối đang bật — " +
+        "không biết chèn block tam giác nào.",
+    );
+  }
+  if (!Number.isInteger(policy.maxRows) || policy.maxRows < 1) {
+    loi.push(`drawTools.revisionPolicy.maxRows = ${policy.maxRows} phải là số nguyên ≥ 1.`);
+  }
+  if (policy.layer.trim() === "") {
+    loi.push("drawTools.revisionPolicy.layer trống — không biết đặt cloud lên layer nào.");
+  }
+  if (policy.boundingPaddingMm < 0) {
+    loi.push(
+      `drawTools.revisionPolicy.boundingPaddingMm = ${policy.boundingPaddingMm} không được âm.`,
+    );
+  }
+  const mau = policy.titleblockAttrPattern;
+  for (const [khoa, giaTri] of Object.entries(mau) as [keyof typeof mau, string][]) {
+    if (giaTri.trim() === "") {
+      loi.push(`drawTools.revisionPolicy.titleblockAttrPattern.${khoa} trống.`);
+      continue;
+    }
+    if (!giaTri.includes(O_TRONG_SO_REVISION)) {
+      loi.push(
+        `drawTools.revisionPolicy.titleblockAttrPattern.${khoa} "${giaTri}" thiếu ` +
+          `${O_TRONG_SO_REVISION} — mọi dòng revision sẽ ghi đè lên cùng một attribute.`,
+      );
+    }
+  }
+  return loi;
+}
+
+/** Số revision theo `numberFormat` (vd `R{n}` + 2 → `R2`). */
+export function soRevisionTheoMau(numberFormat: string, n: number): string {
+  return numberFormat.split(O_TRONG_SO_REVISION).join(String(n));
 }

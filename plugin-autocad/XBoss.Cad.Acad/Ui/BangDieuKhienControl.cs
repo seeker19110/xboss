@@ -28,8 +28,33 @@ internal sealed class BangDieuKhienControl : UserControl
             WrapContents = false,
             AutoScroll = true,
             Padding = new Padding(8),
+            // Nền TƯỜNG MINH — trong PaletteSet, control con không kế thừa BackColor của
+            // UserControl mà rơi về nền trắng hệ thống (thấy tận mắt trên AutoCAD 2026 ngày
+            // 2026-08-26 ở tab Quy trình). Chữ theme tối trên nền trắng gần như không đọc được.
+            BackColor = MauBang.Nen,
         };
         Controls.Add(_flow);
+    }
+
+    /// <summary>Bề rộng ngắt dòng — bám palette, có sàn để palette bị bóp hẹp không vỡ chữ.</summary>
+    private int BeRongNoiDung => Math.Max(240, ClientSize.Width - 40);
+
+    /// <summary>Kéo rộng/hẹp palette thì chỉ ngắt dòng lại, KHÔNG dựng lại bảng (dựng lại kéo theo
+    /// một lượt hỏi server danh sách đề xuất block — xem <see cref="LamMoi"/>).</summary>
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        NgatDongLai(_flow);
+    }
+
+    private void NgatDongLai(Control cha)
+    {
+        var rong = BeRongNoiDung;
+        foreach (Control con in cha.Controls)
+        {
+            if (con.MaximumSize.Width > 0) con.MaximumSize = new Size(rong, 0);
+            if (con.HasChildren) NgatDongLai(con);
+        }
     }
 
     /// <summary>
@@ -73,6 +98,7 @@ internal sealed class BangDieuKhienControl : UserControl
             {
                 Text = khoi.TieuDe.ToUpperInvariant(),
                 ForeColor = MauBang.ChuMo,
+                BackColor = MauBang.Nen,
                 Font = new Font("Segoe UI", 8f, FontStyle.Bold),
                 AutoSize = true,
                 Margin = new Padding(2, 12, 2, 2),
@@ -88,9 +114,12 @@ internal sealed class BangDieuKhienControl : UserControl
                         MucDo.CanhBao => MauBang.CanhBao,
                         _ => MauBang.Chu,
                     },
+                    BackColor = MauBang.Nen,
                     Font = new Font("Segoe UI", 9f),
                     AutoSize = true,
-                    MaximumSize = new Size(300, 0), // xuống dòng thay vì tràn ngang palette
+                    // Ngắt dòng theo BỀ RỘNG THẬT của palette, không phải hằng số cứng: kéo
+                    // palette rộng ra mà vẫn ngắt ở 300px thì chữ vỡ dòng vô lý giữa vùng trống.
+                    MaximumSize = new Size(BeRongNoiDung, 0),
                     Margin = new Padding(2, 2, 2, 2),
                 });
             }

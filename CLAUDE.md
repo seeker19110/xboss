@@ -49,7 +49,7 @@ Làm việc với vai trò **kỹ sư full-stack senior kiêm chuyên gia thiế
 ```bash
 npm run dev          # dev server (cần .env.local với DATABASE_URL)
 npm run build        # build production (không cần DB thật — pool kết nối lazy)
-npm run lint         # next lint (eslint.config.mjs — flat config, next/core-web-vitals)
+npm run lint         # eslint . (eslint.config.mjs — flat config, next/core-web-vitals)
 npm run typecheck    # tsc --noEmit
 npm test             # node:test qua tsx — hơn 100 file trong tests/ (không hard-code số tuyệt đối, dễ lệch)
 npm test -- --release-gate   # như trên, nhưng ca bị SKIP = LỖI (trừ file có lý do trong scripts/test-skip-allowlist.json). CI dùng cờ này.
@@ -68,15 +68,25 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 
 ## Biến môi trường quan trọng
 
-- `DATABASE_URL` — bắt buộc khi chạy app.
+Danh sách **đầy đủ** (kèm biến bắt buộc/tuỳ chọn và luật validate) khai tập trung trong schema zod của `lib/nen/env.ts` — mục dưới chỉ tóm tắt các biến hay chạm.
+
+- `DATABASE_URL` — bắt buộc khi chạy app. `MIGRATE_DATABASE_URL` (tuỳ chọn) — chuỗi kết nối role owner chỉ dùng để chạy migration (`lib/db/migrate.ts`, ADR-0005); thiếu thì fallback về `DATABASE_URL`.
+- `XBOSS_PG_POOL_MAX` / `XBOSS_PG_STMT_TIMEOUT_MS` / `XBOSS_SLOW_QUERY_MS` — (tuỳ chọn, M53) chỉnh pool + `statement_timeout` + ngưỡng log query chậm trong `lib/db/index.ts` (mặc định 10 / 30000 / 500; `XBOSS_SLOW_QUERY_MS=0` là tắt log).
 - `XBOSS_SECRET` — ký cookie phiên. **Bắt buộc trong production**: thiếu sẽ throw lúc ký/xác minh token (chủ đích fail-fast, build vẫn chạy được).
 - `XBOSS_ADMIN_PASSWORD` — production + DB trống chỉ tạo 1 admin với mật khẩu này (không seed 4 tài khoản demo như dev).
 - `CRON_SECRET` — bảo vệ `/api/cron/daily-report`, chỉ nhận qua header `Authorization: Bearer` (không qua query param).
+- `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` + `REPORT_EMAIL_TO` — (tuỳ chọn) gửi báo cáo ngày/tuần + cảnh báo health-check qua email. Thiếu `SMTP_HOST`/`USER`/`PASS` → route cron trả **preview** thay vì gửi (không throw).
+- `APP_URL` — (tuỳ chọn) URL gốc của app, dùng dựng link tuyệt đối trong email/push và làm `redirect_uri` của SSO OIDC.
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` — (tuỳ chọn) gửi báo cáo trễ hạn hằng ngày qua Telegram, song song với email SMTP.
 - `TELEGRAM_WEBHOOK_SECRET` / `ZALO_OA_SECRET` — xác thực webhook **đi vào** của bot hiện trường (`lib/bao-mat/webhook-inbound.ts`). Telegram so header `X-Telegram-Bot-Api-Secret-Token`; Zalo kiểm HMAC-SHA256 trên raw body (`X-ZEvent-Signature`). Sai/thiếu chữ ký → **401**, không ghi dòng DB nào. Thiếu biến → **throw fail-fast** ngay khi webhook được gọi (build/dev vẫn chạy bình thường).
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — (tuỳ chọn) Web Push; sinh key bằng `npx web-push generate-vapid-keys`. Thiếu key → nút bật push tự ẩn, mọi hàm gửi trong `lib/van-hanh/push.ts` là no-op.
 - `GOOGLE_SERVICE_ACCOUNT_JSON` (hoặc cặp `GOOGLE_SA_EMAIL` + `GOOGLE_SA_PRIVATE_KEY`) + `GOOGLE_SHEET_ID` + `GOOGLE_SHEET_TAB` — (tuỳ chọn) đồng bộ hai chiều bảng vật tư ↔ Google Sheet. Thiếu cấu hình → `lib/vat-tu/google-sheets.ts` throw fail-fast khi gọi sync (build vẫn chạy).
-- `XBOSS_PLUGIN_URL` — (tuỳ chọn) đường tải gói cài plugin AutoCAD, hiện thành nút "Tải Gói Cài Plugin" trên bảng điều khiển `/engineering/chuan-hoa-ban-ve` (M99 PR6). Thiếu → nút thay bằng hướng dẫn tự dựng theo `plugin-autocad/README.md` (gói nhị phân không nằm trong repo).
+- `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` (+ `OIDC_ROLE_CLAIM`, `OIDC_DEFAULT_ROLE`, cần cả `APP_URL`) — (tuỳ chọn) đăng nhập SSO OIDC (`lib/bao-mat/oidc.ts`). Thiếu bất kỳ biến bắt buộc → nút SSO tự ẩn, đăng nhập mật khẩu như cũ.
+- `S3_ENDPOINT` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_BUCKET` (+ `S3_REGION`, `S3_FORCE_PATH_STYLE`) — (tuỳ chọn) lưu file upload lên MinIO/S3 qua `lib/nen/storage.ts`. Thiếu ≥1 trong 4 biến bắt buộc → dùng đĩa cục bộ `data/uploads/` (hành vi mặc định).
+- `XBOSS_PLUGIN_URL` — (tuỳ chọn) đường tải gói cài plugin AutoCAD, hiện thành nút "Tải Gói Cài Plugin" trên bảng điều khiển `/engineering/chuan-hoa-ban-ve` (M99 PR6). Thiếu → nút thay bằng hướng dẫn cài trên trang `/engineering/cai-dat-plugin` (gói nhị phân không nằm trong repo).
+- `XBOSS_PLUGIN_SHA256` — (tuỳ chọn, đi kèm `XBOSS_PLUGIN_URL`) sha256 của gói `.zip` đang phát hành (64 hex, do `plugin-autocad/dong-goi.ps1` sinh cạnh gói) để kỹ sư đối chiếu tệp tải về trên trang `/engineering/cai-dat-plugin`. Thiếu/sai định dạng → ẩn, trang hướng dẫn tự kiểm bằng `Get-FileHash`.
+- `ANTHROPIC_API_KEY` — (tuỳ chọn) gợi ý phân loại block/ánh xạ bằng AI (M108: tầng 2 ngữ nghĩa + tầng 3 hình học của `lib/dich-vu/cad.ts`, gợi ý `layerMap`/`boqCode`). Cửa duy nhất ra mô hình là `lib/nen/ai.ts`. Thiếu → **tự tắt tầng 2/3**, hệ thống chạy bằng luật tất định, **không throw** (khác `XBOSS_SECRET`: thiếu AI thì mất tiện ích, thiếu khoá ký phiên thì mất an toàn).
+- `XBOSS_AI_BLOCK_CLASSIFY` — (tuỳ chọn) công tắc **dừng khẩn** cho toàn bộ gợi ý AI: đặt `0` là tắt ngay, không cần deploy lại. Mặc định bật khi có khoá.
 - `SENTRY_DSN` — (tuỳ chọn) theo dõi lỗi production qua Sentry (`instrumentation.ts` + `sentry.server.config.ts`/`sentry.edge.config.ts`, xem `docs/audit.md` §10). Thiếu → SDK tự `enabled: false`, không gửi gì, không ảnh hưởng build/dev.
 
 ## Kiến trúc
@@ -93,7 +103,7 @@ chéo nhau nhưng **không được tạo chu trình**. `npm run check:lib-layer
 | 1    | `lib/db/`          | Lớp truy cập DB + migrate                                                                                  |
 | 2    | `lib/ha-tang/`     | Dịch vụ hạ tầng **có** chạm DB: projects, feature-flags, code-lists, custom-fields, retention, sync-locks… |
 | 3    | `lib/bao-mat/`     | auth, permissions, sod, csrf, totp, oidc, ratelimit, audit…                                                |
-| 4    | `lib/tien-do/`     | recompute, status, grid, cpm, evm, gantt, report, import, approvals…                                       |
+| 4    | `lib/tien-do/`     | recompute, status, grid, cpm, evm, gantt-data, report, import, approvals…                                  |
 | 4    | `lib/khoi-luong/`  | boq, boq-import, norms                                                                                     |
 | 4    | `lib/tai-chinh/`   | finance, cost, contracts, claims, vo, paymentcerts, procurement, tender…                                   |
 | 4    | `lib/vat-tu/`      | material-sync, google-sheets, resources, equipment                                                         |
@@ -119,7 +129,7 @@ dùng alias `@/lib/<miền>/<module>`, không dùng đường dẫn tương đ�
 
 ### Auth (`lib/bao-mat/auth.ts`)
 
-- Phiên stateless: cookie `xboss_session` = `userId.exp.HMAC` — không có bảng session.
+- Phiên stateless: cookie `xboss_session` ký HMAC, **7 phần** `userId.exp.pwFrag.flag2fa.sessionVersion.orgId.HMAC` (ký/verify trong `lib/bao-mat/session-token.ts` — tách riêng để `proxy.ts` import được mà không kéo `next/headers`/`pg`) — không có bảng session. Đổi mật khẩu (pwFrag), thu hồi phiên (`users.session_version`) hay đổi tổ chức đều làm token cũ hết hiệu lực; `flag2fa=1` bị `proxy.ts` chặn mọi API ngoài `/api/auth/*` cho tới khi bật 2FA (M56 PR2).
 - Login có rate limit lưu Postgres (`lib/bao-mat/ratelimit.ts`, bảng `login_rate_limits`): 5 lần sai/15 phút theo IP+email, 20/IP → 429 + `Retry-After`. Upsert atomic qua `ON CONFLICT` nên đúng khi chạy nhiều instance.
 - 7 vai trò (`lib/nen/roles.ts`): `admin | pm | engineer | subcon` (thao tác) + `bch | cdt | viewer` (chỉ-xem + bình luận, `VIEW_ONLY_ROLES`). Quyền tập trung trong map `CAN`; subcon chỉ thao tác task được gán (`canTouchTask`); `bch` thêm được xem các trang tài chính (`PAYMENT_VIEW_ROLES` = `admin/pm/bch`).
 - **Các trang chỉ redirect client-side khi 401 — API route là ranh giới bảo mật duy nhất.** Mọi route handler mới phải gọi `getCurrentUser()` và trả 401 khi chưa đăng nhập (pattern xem `app/api/dashboard/route.ts`).
@@ -134,23 +144,23 @@ Project → Tower → SheetType (5 sheet) → WorkPackage → Task → ProgressD
 - `ProgressDimension` = ô checkbox trong lưới tracking (mỗi kích thước ống hoặc mỗi căn hộ).
 - BOQCODE (`lib/khoi-luong/boq.ts`): mã duy nhất **toàn hệ thống trên tasks, work_packages lẫn materials** — khi sửa/tạo phải check `boqTakenBy` trước.
 - Vật tư: mọi thay đổi `qty_used` ghi vào `material_transactions` (delta ±, người ghi) — qua `POST /api/materials/:id/transactions` hoặc tự động khi PATCH `qtyUsed` trực tiếp.
-- **Đồng bộ Google Sheet (`lib/vat-tu/material-sync.ts` + `lib/vat-tu/google-sheets.ts`):** đồng bộ **hai chiều** `materials` ↔ một Google Sheet bằng Service Account. Khớp dòng theo cột `ID`; 3-way merge dựa snapshot bảng `material_sync` (chỉ DB đổi → đẩy ra Sheet, chỉ Sheet đổi → kéo vào DB, cả hai đổi → xung đột, **DB ưu tiên** qua `CONFLICT_POLICY`). Chỉ các trường định nghĩa (`SYNCED_FIELDS`: boqCode/name/unit/qtyBoq/qtyPlanned/status/note) là hai chiều; `qty_used`/`qty_stock`/`min_stock_level` chỉ DB→Sheet (giữ nguyên audit). Chống chạy chồng bằng bảng khoá `sync_locks`. Điểm vào: `POST /api/materials/sync` (nút Admin/PM trên `/materials`) và `GET /api/cron/sync-sheets` (cron, xác thực `CRON_SECRET` Bearer hoặc session Admin/PM). Logic merge thuần `decideMerge` test ở `tests/material-sync.test.ts`.
+- **Đồng bộ Google Sheet (`lib/vat-tu/material-sync.ts` + `lib/vat-tu/google-sheets.ts`):** đồng bộ **hai chiều** `materials` ↔ một Google Sheet bằng Service Account. Khớp dòng theo cột `ID`; 3-way merge dựa snapshot bảng `material_sync` (chỉ DB đổi → đẩy ra Sheet, chỉ Sheet đổi → kéo vào DB, cả hai đổi → xung đột, **DB ưu tiên** qua `CONFLICT_POLICY`). Chỉ các trường định nghĩa (`SYNCED_FIELDS`: boqCode/name/unit/qtyBoq/qtyPlanned/status/note) là hai chiều; `qty_used`/`qty_stock`/`min_stock_level` chỉ DB→Sheet (giữ nguyên audit). Chống chạy chồng bằng bảng khoá `sync_locks`. Điểm vào: `POST /api/materials/sync` (nút Admin/PM trong tab "Kho & Định Mức" của `/procurement` — `app/procurement/_components/InventoryTab.tsx`) và `GET /api/cron/sync-sheets` (cron, xác thực `CRON_SECRET` Bearer hoặc session Admin/PM). Logic merge thuần `decideMerge` test ở `tests/material-sync.test.ts`.
 
 ### Chuỗi tính toán tiến độ (`lib/tien-do/recompute.ts`)
 
 Tick checkbox dimension → `recomputeTask` (% = số ô checked / tổng ô) → `deriveStatus` → `recomputePackage` (% nhóm = trung bình các task) → ghi `task_history` nếu % đổi. Status là enum slug trong `lib/tien-do/status.ts` (`chuan_bi | dang_thi_cong | hoan_thanh | tre | nghiem_thu`); `toStatusSlug` map mọi biến thể tiếng Việt có dấu/không dấu từ Excel. Quy tắc: `nghiem_thu` không bao giờ bị hạ cấp tự động; `tre` suy ra từ `end_date < hôm nay && progress < 1`.
 
-**Nghiệm thu 2 bước:** `nghiem_thu` chỉ đặt/huỷ được qua `POST/DELETE /api/tasks/:id/approve` (quyền `CAN.approve` = Admin/PM, task phải đạt 100%, ghi audit vào `task_history`). PATCH task thường chặn `status=nghiem_thu`. Duyệt theo lô qua `POST /api/approvals { taskIds }` (cùng quy tắc); trang `/approvals` liệt kê task chờ duyệt + đã duyệt, kèm upload **biên bản nghiệm thu** (bảng `task_documents`, PDF/ảnh max 20MB, route `/api/tasks/:id/documents` + `/api/documents/:id`, file chung thư mục `data/uploads/`).
+**Nghiệm thu 2 bước:** `nghiem_thu` chỉ đặt/huỷ được qua `POST/DELETE /api/tasks/:id/approve` (quyền `CAN.approve` = Admin/PM, task phải đạt 100%, ghi audit vào `task_history`). PATCH task thường chặn `status=nghiem_thu`. Duyệt theo lô qua `POST /api/approvals { taskIds }` (cùng quy tắc); trang `/approvals` liệt kê task chờ duyệt + đã duyệt, kèm upload **biên bản nghiệm thu** (bảng `task_documents`, PDF/ảnh max 20MB, route `/api/tasks/:id/documents` + `/api/documents/:id`, file đi chung lớp lưu trữ `lib/nen/storage.ts` với ảnh hiện trường).
 
 **Baseline kế hoạch:** `POST /api/baselines` (Admin/PM) snapshot ngày BĐ/KT + % của mọi task vào `baselines`/`baseline_tasks`; S-curve nhận `?baseline=<id>` để vẽ đường kế hoạch theo ngày đã chốt (đo độ lệch thật khi PM dời ngày). Selector + nút "Chốt baseline" trong `SCurveChart`.
 
 ### Tính năng kèm theo task
 
-- **Ảnh hiện trường** (`task_photos`): file lưu `data/uploads/` (ngoài git), tên file do server sinh (`lib/nen/photos.ts`), chỉ nhận mime ảnh, max 10MB. Route: `/api/tasks/:id/photos`, `/api/photos/:id`.
+- **Ảnh hiện trường** (`task_photos`): file ghi qua `lib/nen/storage.ts` (mặc định đĩa cục bộ `data/uploads/` ngoài git; chuyển sang MinIO/S3 khi có đủ biến `S3_*`), tên file do server sinh (`lib/nen/photos.ts`), chỉ nhận mime ảnh, max 10MB. Route: `/api/tasks/:id/photos`, `/api/photos/:id`.
 - **Bình luận** (`task_comments`): `/api/tasks/:id/comments` — bình luận mới upsert notification type `comment` cho người được giao + người từng bình luận.
-- **Thông báo** (`/api/notifications`): đồng bộ on-fetch 4 loại — `delayed`, `due_soon` (hạn ≤3 ngày, progress <70%), `comment`, `material_over` (vật tư vượt định mức, dedup theo cột `material_id` + unique index một phần). Loại nào hết điều kiện thì tự dọn bản ghi chưa đọc.
-- **Web Push** (`lib/van-hanh/push.ts` + bảng `push_subscriptions`): đăng ký per thiết bị qua `/api/push/subscribe` (upsert theo `endpoint`), nút bật/tắt trong chuông thông báo. Điểm gửi: bình luận mới (tới người liên quan) + cron báo cáo ngày (tóm tắt tới mọi thiết bị). Subscription chết (404/410) tự xoá khi gửi.
-- **Tìm kiếm toàn cục** (`/api/search?q=` + `GlobalSearch` trên header Dashboard): ILIKE trên mã Excel/BOQCODE/tên của cả tasks lẫn work_packages, kết quả nhảy tới sheet + filter tầng.
+- **Thông báo** (`/api/notifications` → `lib/dich-vu/thong-bao.ts`): đồng bộ on-fetch hơn 30 loại cảnh báo (`delayed`, `due_soon`, `stalled`, `comment`, `material_over`, `cost_over`, `ncr_overdue`, `po_late`, `diary_missing`…), mỗi loại lọc theo vai trò + dự án đang chọn, dedup bằng cột khoá riêng (`material_id`, `po_id`, `ncr_id`…) + unique index một phần; loại nào hết điều kiện thì tự dọn bản ghi chưa đọc. Ngưỡng của `due_soon`/`material_over`… **cấu hình được** qua bảng `alert_rules` (`lib/van-hanh/alerts.ts`, mặc định hạn ≤3 ngày + progress <70%).
+- **Web Push** (`lib/van-hanh/push.ts` + bảng `push_subscriptions`): đăng ký per thiết bị qua `/api/push/subscribe` (upsert theo `endpoint`), nút bật/tắt trong chuông thông báo. Điểm gửi hiện có: bình luận mới, phân công task (`lib/tien-do/assignments.ts`), phát hành bản vẽ mới, đổi cấu hình nav — đều `sendPushToUsers`; riêng cron báo cáo ngày dùng `sendPushToAll` (tóm tắt tới mọi thiết bị). Subscription chết (404/410) tự xoá khi gửi.
+- **Tìm kiếm toàn cục** (`/api/search?q=` + `GlobalSearch` trên header Dashboard): tasks/work_packages tìm bằng ILIKE prefix trên mã Excel/BOQCODE/tên (kết quả nhảy tới sheet + filter tầng); các nguồn còn lại (hợp đồng, công văn, tài liệu…) đi qua registry **toàn văn FTS** `lib/tien-do/search.ts` (`to_tsvector` + `xboss_unaccent`, index GIN trong `migrations/0068_fts.sql`), mỗi nguồn tự khai quyền xem + lọc dự án.
 
 ### Nguyên nhân trễ & kế hoạch ngắn hạn
 
@@ -169,7 +179,7 @@ Tick checkbox dimension → `recomputeTask` (% = số ô checked / tổng ô) �
 
 ### Offline (PWA)
 
-`public/sw.js`: API GET stale-while-revalidate + cache (trừ `/api/photos/`). Tick checkbox khi mất mạng được xếp hàng trong IndexedDB (`app/components/offlineQueue/` — `useOfflineTickQueue`, 3 loại op: tick/photo/diary) và tự PATCH lại khi online; 4xx bị bỏ để không kẹt hàng đợi. **App Shell**: `SHELL_URLS` precache `/offline` + manifest/icon lúc cài đặt SW; điều hướng HTML mất mạng mà chưa có trong cache (chưa từng ghé) rơi về trang `/offline` (`app/offline/page.tsx`) thay vì lỗi mạng mặc định của trình duyệt. Đổi logic cache nhớ tăng version `CACHE` trong sw.js.
+`public/sw.js`: API GET stale-while-revalidate + cache (trừ `/api/photos/`). Tick checkbox khi mất mạng được xếp hàng trong IndexedDB (`app/components/offlineQueue/` — `useOfflineTickQueue`, 3 loại op: `tick`/`photo`/`diary_note`) và tự PATCH lại khi online; 4xx bị bỏ để không kẹt hàng đợi. **App Shell**: `SHELL_URLS` precache `/offline` + manifest/icon lúc cài đặt SW; điều hướng HTML mất mạng mà chưa có trong cache (chưa từng ghé) rơi về trang `/offline` (`app/offline/page.tsx`) thay vì lỗi mạng mặc định của trình duyệt. Đổi logic cache nhớ tăng version `CACHE` trong sw.js.
 
 ### Frontend
 
@@ -214,6 +224,7 @@ Parse file tracking gốc (sheet OGTĐ/OGHL/OGCH/ODNN) thành WBS — chứa log
 ## Quy ước
 
 - Commit message: conventional prefix (`fix:`, `feat:`, `chore:`, `ci:`) + mô tả tiếng Việt, dòng đầu nói rõ thay đổi gì ở đâu.
+- **Đã mở PR cho một việc thì việc phát sinh/liên quan tiếp theo commit thẳng vào nhánh của PR đó, không mở PR mới** — trừ khi PR đã merge/đóng (lúc đó bắt đầu nhánh + PR mới) hoặc người dùng yêu cầu tách riêng. Mỗi lần commit thêm vẫn tuân Definition of Done bên dưới trước khi push.
 - Khi thêm API route mới: luôn có check auth + `export const dynamic = "force-dynamic"`.
 - TypeScript strict, import nội bộ qua alias `@/*`, tránh `any` tuỳ tiện.
 - SQL luôn dùng helper `lib/db` với placeholder `?` — **không nối chuỗi để chèn giá trị**.

@@ -44,6 +44,15 @@ public sealed record TrangThaiPhien
     /// <summary>Lý do thư viện block không dùng được (cache hỏng/chưa tải).</summary>
     public string? LoiThuVien { get; init; }
 
+    /// <summary>
+    /// M113 FR6 — mô tả HAI BỘ đang dùng khi máy đang chạy thư viện đã trộn theo dự án
+    /// (vd "toàn cục b3 + dự án #7 b1"). Null = đang dùng bộ toàn cục như trước M113.
+    /// </summary>
+    public string? ThuVienHaiBo { get; init; }
+
+    /// <summary>Số block đến từ bộ RIÊNG của dự án (0 khi đang dùng bộ toàn cục).</summary>
+    public int SoBlockDuAn { get; init; }
+
     /// <summary>Đề xuất block lấy từ server (Admin/PM: của cả đội) — rỗng khi chưa gọi được.</summary>
     public IReadOnlyList<XBossApiClient.DeXuatTomTat> DeXuat { get; init; } = [];
     /// <summary>Người đang xem là Admin/PM (thấy đề xuất của cả đội, duyệt trên web).</summary>
@@ -113,6 +122,16 @@ public static class BangDieuKhienModel
                 : new("Thư viện", $"{t.ThuVienVersion} — {t.SoBlockThuVien} block", MucDo.Tot),
         };
 
+        // M113 FR6 — thư viện hai tầng: hiện version của CẢ HAI bộ đang dùng, kèm số block mà bộ
+        // của dự án đóng góp (kỹ sư biết ngay mình đang vẽ bằng ký hiệu/khung tên của dự án nào).
+        if (t.ThuVienVersion is not null && t.ThuVienHaiBo is not null)
+        {
+            dong.Add(new DongTrangThai(
+                "Bộ đang dùng",
+                $"{t.ThuVienHaiBo} — {t.SoBlockDuAn} block của dự án",
+                MucDo.Tot));
+        }
+
         var nhanDeXuat = t.LaNguoiDuyet ? "Đề xuất (cả đội)" : "Đề xuất của tôi";
         if (t.LoiDeXuat is not null)
         {
@@ -160,14 +179,36 @@ public static class BangDieuKhienModel
 /// </summary>
 public static class SidecarSummary
 {
+    /// <summary>Đuôi tệp sidecar báo cáo kiểm tra (nối sau đường dẫn DWG đầy đủ).</summary>
+    public const string DuoiKiemTra = ".xboss-kiemtra.json";
+
     /// <summary>Đuôi tệp sidecar (nối sau đường dẫn DWG đầy đủ) → nhãn mục hiển thị.</summary>
     public static readonly IReadOnlyList<(string DuoiTep, string Nhan)> CacLoai =
     [
-        (".xboss-kiemtra.json", "Kiểm tra"),
+        (DuoiKiemTra, "Kiểm tra"),
         (".xboss-report.json", "Chuẩn hóa"),
         (".xboss-takeoff.json", "Bóc KL"),
         (".xboss-ve.json", "Phiên vẽ"),
     ];
+
+    /// <summary>
+    /// Số lỗi lệch chuẩn trong sidecar kiểm tra; <c>null</c> khi tệp không phải báo cáo kiểm tra
+    /// hoặc hỏng — trình dẫn quy trình (M106 FR8) coi <c>null</c> là "chưa chứng minh được nền
+    /// sạch", KHÁC hẳn với 0 lỗi. Phòng thủ y như <see cref="TomTat"/>: không bao giờ ném.
+    /// </summary>
+    public static int? SoLoiKiemTra(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var goc = doc.RootElement;
+            return goc.ValueKind == JsonValueKind.Object ? SoLoi(goc) : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
     public static DongTrangThai? TomTat(string nhan, string json)
     {
@@ -198,9 +239,10 @@ public static class SidecarSummary
 
         DongTrangThai TomTatKiemTra(JsonElement goc, string duoi)
         {
-            var soLoi = goc.TryGetProperty("tongSoLoi", out var e) && e.ValueKind == JsonValueKind.Number
-                ? e.GetInt32()
-                : (goc.TryGetProperty("findings", out var f) && f.ValueKind == JsonValueKind.Array ? f.GetArrayLength() : 0);
+            // Bảng điều khiển hiển thị "0 lỗi" khi báo cáo không khai khóa nào (bản sidecar rất cũ);
+            // trình dẫn thì đọc null qua SoLoiKiemTra và coi là chưa kiểm — hai cách dùng khác nhau
+            // của cùng một phép đọc, cố ý.
+            var soLoi = SoLoi(goc) ?? 0;
             return soLoi == 0
                 ? new DongTrangThai(nhan, $"Đạt chuẩn — 0 lỗi{duoi}", MucDo.Tot)
                 : new DongTrangThai(nhan, $"{soLoi} lỗi lệch chuẩn{duoi}", MucDo.CanhBao);
@@ -210,6 +252,16 @@ public static class SidecarSummary
             goc.TryGetProperty(khoa, out var m) && m.ValueKind == JsonValueKind.Array
                 ? new DongTrangThai(nhan, $"{m.GetArrayLength()} {donVi}{duoi}", MucDo.BinhThuong)
                 : null;
+    }
+
+    /// <summary>Số lỗi khai trong báo cáo kiểm tra: <c>tongSoLoi</c>, hoặc độ dài <c>findings</c>.</summary>
+    private static int? SoLoi(JsonElement goc)
+    {
+        if (goc.TryGetProperty("tongSoLoi", out var e) && e.ValueKind == JsonValueKind.Number)
+            return e.GetInt32();
+        return goc.TryGetProperty("findings", out var f) && f.ValueKind == JsonValueKind.Array
+            ? f.GetArrayLength()
+            : null;
     }
 
     private static string? Chuoi(JsonElement goc, string khoa) =>

@@ -2,6 +2,19 @@
 
 > **Trạng thái:** Đã hoàn thành (2026-08-19)  
 > **Phụ thuộc:** `migrations/0111_auto_routing_sleeve_matrix.sql`, `lib/engineering-auto-routing.ts`
+>
+> **⚠️ Đính chính 2026-08-29 (đọc lại code thật, xem `RESEARCH-AUTO-ROUTING-MEPF.md` §1):** mục §2.1
+> dưới đây **mô tả sai code**. `findOptimalRoute3D` **không phải A\*** — không có open set, heuristic
+> hay lưới tìm kiếm; thân hàm là một cây quyết định cố định: thử tuyến trực giao 3 đoạn, nếu vướng
+> thì nâng **toàn bộ** tuyến lên `max(maxZ của mọi vật cản) + 150`. `doesSegmentIntersectBox` so
+> **hộp bao của đoạn thẳng** với hộp vật cản (báo thừa, không báo sót) nên tuyến chéo dài gần như
+> luôn bị coi là vướng. `solve3DGenerativeRoute` trong `engineering-generative-routing.ts` cũng là
+> cây quyết định, không phải A\* như tiêu đề khối ghi.
+>
+> **Phạm vi dùng đúng của M77:** ước lượng phía web (chiều dài/số co/sụt áp sơ bộ) + `validateBeamSleeve`
+> (phần này là logic kiểm chuẩn thật, dùng được). **Không** dùng làm nền cho auto-routing trong plugin
+> AutoCAD — hướng đó đi theo `M114-auto-routing-hanh-lang.md` (đồ thị hành lang), và lệnh plugin
+> không gọi vào các hàm ở đây.
 
 ## 1. Mục tiêu & Bối cảnh
 
@@ -9,7 +22,7 @@ Tự động hóa tìm hướng tuyến 3D tối ưu cho các hệ thống cơ �
 
 ## 2. Năng Lực Cốt Lõi
 
-1. _*3D A* Pathfinding & Elbow Optimization (`findOptimalRoute3D`):_*
+1. _*3D A* Pathfinding & Elbow Optimization (`findOptimalRoute3D`):_\*
    - Thuật toán tránh va chạm đa giác hộp không gian AABB 3D (`doesSegmentIntersectBox`).
    - Tối ưu hóa hàm chi phí $Cost = L + 3.0 \cdot N_{\text{elbow}}$, ưu tiên giảm số lượng Co lơ để giảm thiểu sụt áp thủy lực ($Pa$).
 2. **Beam Sleeve Structural Validation (`validateBeamSleeve`):**

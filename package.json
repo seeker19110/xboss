@@ -44,6 +44,7 @@
     "setup:drawing-tree": "tsx scripts/ensure-drawing-tree.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.121.0",
     "@aws-sdk/client-s3": "^3.1106.0",
     "@react-pdf/renderer": "^4.6.1",
     "@sentry/nextjs": "^10.67.0",
@@ -103,7 +104,7 @@
     "eslint": "^10.9.0",
     "eslint-config-next": "^16.3.0",
     "husky": "^9.1.7",
-    "lint-staged": "^17.2.0",
+    "lint-staged": "^17.3.0",
     "prettier": "^3.9.6",
     "tailwindcss": "^4.3.2",
     "tsx": "^4.23.11",

@@ -25,6 +25,13 @@ public static class VeLayerStyle
     public const int AciNetBien = 2;
     public const int AciNhan = 7;
 
+    /// <summary>
+    /// Layer hành lang (M114 <c>routingPolicy.corridorLayer</c>) — ACI 4 như nét tim/trục: hành
+    /// lang là ĐƯỜNG DỰNG HÌNH cho việc đi tuyến, không phải nét thấy của thiết bị nào, nên đi
+    /// cùng hạng "Nét tim ống, trục Centerline" của bảng CTB thay vì bịa một màu mới.
+    /// </summary>
+    public const int AciHanhLang = AciTimCoNetBien;
+
     /// <summary>ACI cho layer tim theo <c>edgeStyle</c> của loại tuyến.</summary>
     public static int AciChoTim(string? edgeStyle) =>
         string.Equals(edgeStyle, "double", StringComparison.Ordinal) ? AciTimCoNetBien : AciTimTran;

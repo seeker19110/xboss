@@ -14,7 +14,9 @@ public sealed record InspectionFinding
     /// <summary>Slug ổn định cho báo cáo JSON — M99: layer-sai / lech-z / polyline-ho / polyline-gan-kin /
     /// font-cu / lineweight-lech / dim-override / rac-hinh-hoc / layer-rong / block-nac-danh;
     /// M101 (v5, mặc định tắt): chong-lan-cung-he / giao-cat-khac-he / khung-ten-thieu-truong /
-    /// viewport-le-chuan / style-lech-chuan / nhan-lech-xdata / doi-tuong-ngoai-khung.</summary>
+    /// viewport-le-chuan / style-lech-chuan / nhan-lech-xdata / doi-tuong-ngoai-khung;
+    /// M102 (v8): tag-trung / ma-boq-mo-coi; M111 (v14+): nhantang-handle-mo-coi;
+    /// M110 (v14+): revision-mo-coi.</summary>
     [JsonPropertyName("id")] public required string Id { get; init; }
     [JsonPropertyName("ten")] public required string Ten { get; init; }
     [JsonPropertyName("handles")] public required IReadOnlyList<string> Handles { get; init; }
@@ -77,6 +79,16 @@ public sealed class Inspector
         var canhBao = new List<string>();
         if (canCanhBaoDonVi)
             canhBao.Add($"Đơn vị bản vẽ: {tenDonVi} (INSUNITS={snapshot.InsUnits}) — dung sai đã quy đổi tương ứng, chuẩn dự án là mm.");
+        if (snapshot.XrefDaBoQua is { Tong: > 0 } xref)
+        {
+            // Nói rõ phạm vi kiểm: im lặng ở đây là để kỹ sư tưởng bản vẽ đã được kiểm hết.
+            var phan = new List<string>();
+            if (xref.SoLayer > 0) phan.Add($"{xref.SoLayer} layer của xref");
+            if (xref.SoKhoiChen > 0) phan.Add($"{xref.SoKhoiChen} khối chèn xref");
+            canhBao.Add(
+                $"KHÔNG kiểm phần thuộc xref (quy ước dự án): bỏ qua {string.Join(" và ", phan)}. " +
+                "Nội dung xref phải kiểm/sửa trong chính tệp tham chiếu rồi reload.");
+        }
 
         // (1) Layer sai chuẩn — tên sẽ bị đổi khi chuẩn hóa.
         var layerSai = snapshot.Layers
@@ -209,6 +221,14 @@ public sealed class Inspector
         // khi thiếu dữ liệu (tag XData M100 / rule pack chưa gán mã BOQ theo dự án).
         ThemNeuCo(PhepKiemMoRong.TagTrung(snapshot, ip.TagDuplicate));
         ThemNeuCo(PhepKiemMoRong.MaBoqMoCoi(_pack.Takeoff.Items, IdHangMucCoDoiTuong(snapshot), ip.BoqCodeMissing));
+
+        // (19) Handle mồ côi trong bản chép tầng (M111 FR9/AC3) — tự tắt khi bản vẽ không có đối
+        // tượng nhân bản tầng nào, nên không cần (và cố ý KHÔNG thêm) khóa rule pack riêng cho nó.
+        ThemNeuCo(PhepKiemMoRong.HandleMoCoiNhanTang(snapshot));
+
+        // (20) Cloud/tam giác revision mồ côi (M110 FR8) — tự tắt khi bản vẽ không có đối tượng
+        // revision nào, nên không cần (và cố ý KHÔNG thêm) khóa rule pack mới cho riêng nó.
+        ThemNeuCo(PhepKiemMoRong.RevisionMoCoi(snapshot));
 
         return new InspectionReport { RulePackVersion = _pack.Version, Findings = findings, CanhBao = canhBao };
 

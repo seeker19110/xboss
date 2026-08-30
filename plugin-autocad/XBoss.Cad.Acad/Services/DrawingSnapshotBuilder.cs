@@ -1,4 +1,5 @@
 using Autodesk.AutoCAD.DatabaseServices;
+using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Inspection;
 
 namespace XBoss.Cad.Acad.Services;
@@ -7,16 +8,24 @@ namespace XBoss.Cad.Acad.Services;
 /// Dựng DrawingSnapshot thuần cho XBoss.Cad.Core từ bản vẽ thật (M99 §6.4):
 /// Adapter chỉ ĐỌC dữ liệu, mọi phán xét nằm ở Core.Inspector. Chỉ quét model space
 /// (paper space và nội dung xref ngoài phạm vi kiểm/chuẩn hóa — ADR-0006).
+///
+/// <para>MỌI thứ thuộc xref đều nằm ngoài snapshot (quy tắc dự án 2026-08-26, xem
+/// <see cref="ThuocXref"/>): layer phụ thuộc xref và khối chèn xref. Báo lỗi trên chúng là báo thứ
+/// kỹ sư không sửa được ở bản vẽ chủ, mà pipeline chuẩn hóa cũng bỏ qua đúng tập này — hai tầng
+/// lệch phạm vi thì "xem trước chuẩn hóa" báo lỗi mãi không hết. Số lượng bỏ qua đi kèm snapshot
+/// (<see cref="XrefBoQua"/>) để Inspector nói rõ phạm vi thay vì im lặng.</para>
 /// </summary>
 internal static class DrawingSnapshotBuilder
 {
     internal static DrawingSnapshot Build(Database db, Transaction tr)
     {
         var layers = new List<LayerInfo>();
+        var soLayerXref = 0;
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         foreach (ObjectId id in lt)
         {
             var ltr = (LayerTableRecord)tr.GetObject(id, OpenMode.ForRead);
+            if (ltr.IsDependent) { soLayerXref++; continue; }
             layers.Add(new LayerInfo
             {
                 Name = ltr.Name,
@@ -27,11 +36,13 @@ internal static class DrawingSnapshotBuilder
         }
 
         var entities = new List<EntityInfo>();
+        var soKhoiXref = 0;
         var ms = (BlockTableRecord)tr.GetObject(
             SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
         foreach (ObjectId id in ms)
         {
             if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
+            if (ThuocXref.KhoiChen(tr, ent)) { soKhoiXref++; continue; }
             ThuThap(tr, ent, entities);
         }
 
@@ -48,11 +59,16 @@ internal static class DrawingSnapshotBuilder
             if (btr.IsAnonymous && !btr.IsLayout) blockNacDanh.Add(btr.Name);
             foreach (ObjectId entId in btr)
             {
+                // CỐ Ý không lọc khối chèn xref ở đây: bản thân khối chèn là đối tượng của BẢN VẼ
+                // CHỦ nằm trên layer của bản vẽ chủ — bỏ nó đi thì layer đó bị báo "rỗng" và bước
+                // purge xóa mất layer đang thật sự có đối tượng.
                 if (tr.GetObject(entId, OpenMode.ForRead) is Entity ent) layerDangDung.Add(ent.Layer);
             }
         }
 
         var tags = QuetTag(db, tr);
+        var nhanTang = QuetNhanTang(db, tr);
+        var revision = QuetRevision(db, tr);
 
         return new DrawingSnapshot
         {
@@ -62,7 +78,51 @@ internal static class DrawingSnapshotBuilder
             UsedLayerNames = layerDangDung,
             AnonymousBlockNames = blockNacDanh,
             Tags = tags.Count > 0 ? tags : null,
+            NhanTang = nhanTang.Count > 0 ? nhanTang : null,
+            Revision = revision.Count > 0 ? revision : null,
+            XrefDaBoQua = soLayerXref + soKhoiXref > 0
+                ? new XrefBoQua { SoLayer = soLayerXref, SoKhoiChen = soKhoiXref }
+                : null,
         };
+    }
+
+    /// <summary>
+    /// Đối tượng do <c>XBOSS_VE_NHANTANG</c> sinh ra (mang XData <c>TangNguon</c>/<c>NhanTang</c> —
+    /// M111 FR9), kèm mọi handle mà XData của nó tham chiếu tới — nguồn của phép kiểm 19 (handle
+    /// mồ côi, M111 AC3). Chỉ quét model space cấp 1: mọi vai trò do bộ lệnh vẽ sinh (tim/biên/nhãn/
+    /// phụ kiện/thiết bị/giá đỡ/vạch chia/nhãn đốt) đều là thực thể trực tiếp trong model space,
+    /// không nằm lồng trong định nghĩa block.
+    /// </summary>
+    private static List<FloorCopyInfo> QuetNhanTang(Database db, Transaction tr)
+    {
+        var ra = new List<FloorCopyInfo>();
+        foreach (var id in TakeoffScanner.ModelSpaceIds(db, tr))
+        {
+            var obj = tr.GetObject(id, OpenMode.ForRead);
+            if (VeXDataStore.Doc(obj) is not { NhanTang: { Length: > 0 } nhanTang } xd) continue;
+
+            var thamChieu = new List<string>();
+            Them(thamChieu, xd.HandleTim);
+            thamChieu.AddRange(xd.HandleBien);
+            thamChieu.AddRange(xd.HandleNhan);
+            Them(thamChieu, xd.HandleTuyenCat);
+            Them(thamChieu, xd.HandleCapDoi);
+            thamChieu.AddRange(xd.HandleTrongVung);
+            Them(thamChieu, xd.HandleTimGiao);
+
+            ra.Add(new FloorCopyInfo
+            {
+                Handle = obj.Handle.ToString(),
+                NhanTang = nhanTang,
+                HandleThamChieu = thamChieu,
+            });
+        }
+        return ra;
+
+        static void Them(List<string> ds, string? h)
+        {
+            if (!string.IsNullOrWhiteSpace(h)) ds.Add(h);
+        }
     }
 
     /// <summary>
@@ -90,6 +150,27 @@ internal static class DrawingSnapshotBuilder
                 // "Hệ" để so trùng = layer của TIM mà khối gắn vào (XData liên kết ngược); khối
                 // không gắn tim nào (thiết bị đứng riêng) thì lấy chính layer của khối.
                 HeLayer = LayerCuaTim(db, tr, xd.HandleTim) ?? br.Layer,
+            });
+        }
+        return ra;
+    }
+
+    /// <summary>
+    /// Cloud + tam giác revision do <c>XBOSS_VE_REV</c> sinh (M110 FR3) — nguồn của phép kiểm 20.
+    /// Chỉ nhận đối tượng có XData <c>XBOSS_VE</c> vai trò <c>Revision</c>: cloud vẽ tay bằng lệnh
+    /// <c>REVCLOUD</c> của AutoCAD không có dữ liệu cặp nên báo mồ côi sẽ là báo oan.
+    /// </summary>
+    private static List<RevisionInfo> QuetRevision(Database db, Transaction tr)
+    {
+        var ra = new List<RevisionInfo>();
+        foreach (var r in RevisionStore.QuetRevision(db, tr))
+        {
+            ra.Add(new RevisionInfo
+            {
+                Handle = r.Handle,
+                SoRevision = r.XData.SoRevision,
+                LaCloud = r.LaCloud,
+                HandleCapDoi = r.XData.HandleCapDoi,
             });
         }
         return ra;

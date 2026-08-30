@@ -4,6 +4,988 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## ✅ Gộp module CAD/BIM: 23 tệp → 7 tệp (2026-08-30, PR #438 đã merge — `f58ec985`)
+
+Nhánh `claude/autocad-revit-module-consolidation-w643eb`. Refactor thuần **không đổi hành vi**: gộp
+họ module AutoCAD/Revit/CAD/BIM trong `lib/ky-thuat/cad/` và `lib/dich-vu/cad-*.ts` theo chức năng.
+Không có shim re-export — mọi nơi import được sửa thẳng. `plugin-autocad/` không đụng gì.
+
+- `lib/ky-thuat/cad/` 19 tệp → 5 tệp + thư mục `rule-packs/`:
+  - `rule-pack.ts` ← thêm `rule-pack-hien-hanh.ts` + `rule-pack-revision.ts`.
+  - `block.ts` (mới) ← `block-lib` + `block-phan-loai-luat` + `block-preview-svg` + `block-lo` +
+    `block-proposals` + `block-them-web` (thứ tự trong tệp = thứ tự phụ thuộc).
+  - `drawing.ts` (mới) ← `drawing-payload` + `drawing-tree` + `tim-ban-ve`.
+  - `dashboard.ts` (mới) ← `bang-dieu-khien` + `boq-map` + `gioi-han` + `plugin-package` +
+    `plugin-upload`.
+  - Giữ nguyên `index.ts` (facade không trỏ tới tệp nào bị gộp) và `dxf-parser.ts` (4.551 dòng).
+- `lib/dich-vu/cad.ts` (mới) ← `cad-block-phan-loai` + `cad-block-nap-lo` + `cad-boq-snapshot` +
+  `cad-goi-y-anh-xa`. Vẫn đúng ADR-0008: không tệp nào biết gì về HTTP.
+- Mỗi khối cũ giữ nguyên comment giải thích, mở đầu bằng `// ===== <tên tệp cũ> =====` để tra cứu
+  theo log/đặc tả cũ vẫn ra đúng chỗ. **Toàn bộ export public giữ nguyên tên** (đã đối chiếu bằng
+  script: không thiếu, không thừa một ký hiệu nào).
+- 182 lượt import trong 58 tệp (`app/`, `lib/`, `tests/`, `scripts/`) đổi sang đường dẫn mới.
+- 3 va chạm tên khi gộp: `SHA256_HEX`, `thuocTinhTuDxf`, `idTuTenBlock` **trùng khít từng ký tự** ở
+  2 tệp ⇒ bỏ bản sao (DRY). `DongDb` là 2 shape KHÁC nhau ⇒ đổi tên theo ngữ nghĩa
+  (`DongBlockLibDb` / `DongUngVienLoDb`), không hợp nhất bừa.
+- **Bẫy build đã xử lý:** gộp `drawing-tree` vào `drawing.ts` kéo `mkdirSync(join(baseDir, …))` vào
+  đồ thị import của route `parse-dxf`, làm Turbopack bật lại cảnh báo "Dynamic filesystem access
+  causes tracing of the whole project" (baseline 0 cảnh báo → 1). Chặn bằng `turbopackIgnore` ngay
+  tại lời gọi (hàm chỉ do `npm run setup:drawing-tree` và test gọi, không route nào gọi) — build
+  trở lại 0 cảnh báo. Ghi chú ở `scripts/ensure-drawing-tree.ts` cập nhật theo.
+- `tests/cad-goi-y-anh-xa.test.ts` (AC10/AC11 quét mã nguồn): đọc **đúng khối**
+  `cad-goi-y-anh-xa` trong tệp gộp thay vì cả tệp — khối `cad-boq-snapshot` có nhắc tên cột tiền
+  trong comment giải thích vì sao nó KHÔNG đọc cột đó. Logic assert giữ nguyên.
+- Cổng: `npm run lint`, `npm run typecheck`, `npm run check:lib-layers`, `npm run check:dead-code`,
+  `npm run build` (0 cảnh báo) xanh; `npm test` **255 tệp, 1482 ca pass, 0 fail, 1 skip cố ý**
+  (Postgres 16 ephemeral).
+
+## ✅ Plugin AutoCAD — offline bootstrap + tích hợp M113/M114 sau rebase (2026-08-29)
+
+Nhánh `claude/mepf-blocklib-bootstrap-and-y-n-guard` đã rebase lên `origin/main`
+(`e76bc129`) và giải xung đột với M113 PR4 trong `BlockLibraryService`:
+
+- `XBOSS_BOCKL` dùng xác nhận ngắn `Y/N` thay `DongY/Khong`.
+- Bundle mang thư viện offline `mepf-offline-v1`: **12 block HVAC/PIPING** (không ghi nhầm có
+  Firefighting), manifest/DWG cùng SHA-256
+  `68a1f8014f7b52f25906f7e48001267e9530e44ab14532d2474dd49b62db7a23`.
+- Bootstrap chỉ seed cache hoàn toàn trống; cache server/nạp tay luôn thắng. Writer toàn cục và
+  cache trộn hai tầng M113 dùng cùng khóa liên tiến trình; tệp cache trộn publish qua temp + rename
+  nguyên tử, `bo-tron.json` là commit point. Reader kiểm hash và chụp snapshot dưới khóa rồi mới
+  nhả khóa để AutoCAD clone, giữ đúng nguồn toàn cục/dự án của M113.
+- Build Adapter thật phát hiện lỗi M114 mà AcadShim cũ bỏ lọt: `Polyline` nhập nhằng giữa
+  `DatabaseServices` và `GraphicsInterface` trong `NetTamXemTruoc`. Đã dùng alias `DbPolyline` và
+  bổ sung đúng kiểu `GraphicsInterface.Polyline` vào stub để cổng CI tái hiện/chặn hồi quy.
+- **Vá hậu kiểm M113 (2026-08-29):** cache trộn nay là snapshot crash-transactional: journal lưu
+  backup của mọi DWG/manifest/ETag/metadata, `bo-tron.json` vẫn publish cuối nhưng **xóa journal mới
+  là commit point**; process chết giữa chừng thì lần lấy khóa kế tiếp phục hồi nguyên snapshot cũ.
+  Khi chèn block, selection → manifest hiện hành → hash → snapshot nằm trong **cùng một khóa** và
+  đối chiếu `id`/nguồn/`libVersion`/tệp/hash/thuộc tính; refresh hoặc đổi dự án chen giữa lệnh bị
+  từ chối thay vì clone bytes mới rồi ghi provenance cũ.
+- Bằng chứng sau fix: 3 regression mới (crash recovery + snapshot binding) **3/3**, full .NET
+  **1153/1153**, **0 skip**; AcadShim Release và Adapter thật Release đều **0 warning / 0 error**;
+  `dong-goi.ps1 -ChiDongGoi` tạo bundle **13 tệp**, ZIP SHA-256
+  `dc0149ae2856d75cdf51bc6020c3b095f4a221cbcf0207ffd9a00145aac53cf8`.
+- AutoCAD 2026 Core Console `NETLOAD` DLL trong bundle **exit 0**, có dòng plugin đã nạp; hash map
+  cache `%APPDATA%\\XBoss\\block-lib` trước/sau trùng tuyệt đối. Chưa chạy lại toàn bộ ma trận lệnh
+  GUI; verify Core Console này chỉ xác nhận load/runtime bootstrap không làm đổi cache hiện hữu.
+
+## ✅ M114 PR4/4 — Adapter `XBOSS_VE_TUYENTUDONG` (đi tuyến tự động theo hành lang) (2026-08-29)
+
+Nhánh `feat/m114-pr4-tuyentudong-adapter`. **PR cuối** của
+`docs/nang-cap/M114-auto-routing-hanh-lang.md` ⇒ **M114 XONG về mặt code cả 4 PR**. Kỹ sư đi tuyến
+**cả một hệ trong một lượt** trên hành lang đã khai ở PR3, thay vì bấm PLINE vài trăm lần.
+
+- `XBoss.Cad.Core/Routing/KeHoachDiTuyen.cs` (mới) — **THUẦN**, nối 3 mảnh của PR1/PR2 thành một kế
+  hoạch: `HanhLangGraph` (đồ thị) → `DinhTuyen` (Dijkstra α/β/γ + tự chảy) → `CapPhatLanTang`
+  (tầng/làn), rồi **gom nhánh thành polyline sao cho mỗi cạnh hành lang chỉ vẽ đúng MỘT lần**.
+  Điểm nguồn vào đồ thị dưới dạng "thiết bị ảo" (đồ thị chỉ tách nút tại đỉnh/giao/điểm rẽ) rồi bị
+  loại khỏi kết quả. Hành lang hết làn → mọi nhánh đi qua nó vào danh sách không giải được; hành
+  lang không còn dùng nữa thì **gỡ chiếm chỗ cũ** của hệ (FR13 — không rò rỉ làn).
+- `XBoss.Cad.Core/Ui/ViewModels/TuyenTuDongDialogViewModel.cs` (mới) + `DataTemplate` trong
+  `XBossDialog.xaml` — hộp thoại M106 gộp **chọn phạm vi (FR5)** và **bảng xem trước bắt buộc
+  (FR10)** vào một form: đổi hệ/loại tuyến/cỡ là kế hoạch tính lại ngay, kèm số thiết bị nối được,
+  tổng chiều dài, số co, tầng/làn từng hành lang và **danh sách không giải được kèm lý do**. Việc
+  vẽ nét tạm là một `Action` do LỆNH cắm vào nên hộp thoại vẫn không chạm bản vẽ (M106 §2.1).
+- `XBoss.Cad.Acad/Commands/VeTuyenTuDongCommands.cs` (mới) + `Services/NetTamXemTruoc.cs` (mới) —
+  lệnh `XBOSS_VE_TUYENTUDONG`: quét chọn thiết bị (Enter = mọi thiết bị của hệ chưa có tuyến) →
+  chọn polyline kín làm vùng cấm (Enter = bỏ qua) → bấm điểm nguồn → xem trước → ghi. Toàn bộ phần
+  ghi nằm trong **một transaction = một nhóm UNDO**: đánh dấu `SuaTay` cho tuyến lệch băm, xóa
+  tuyến tự động cũ + nét biên của nó, ghi sổ chiếm làn vào XData hành lang, sinh polyline tim đúng
+  cấu trúc `XBOSS_VE` (+ nét biên qua `EdgeOffset.Tinh`) mang thêm `TuDong`/`PhienTuyen`/`SuaTay`.
+- **Nét tạm xem trước dùng ĐỒ HỌA TẠM (`TransientManager`), không phải thực thể tạm** — AC11 đòi
+  "bấm Hủy thì bản vẽ không đổi một nét nào": đồ họa tạm không chạm database nên không thực thể,
+  không layer mới, không bước UNDO, và lệnh vỡ giữa chừng cũng không để lại rác. Stub
+  `XBoss.Cad.AcadShim` bổ sung `GraphicsInterface.Drawable`/`TransientDrawingMode`/
+  `TransientManager` + `Geometry.IntegerCollection` + `Editor.UpdateScreen` (`DBObject` nay kế thừa
+  `Drawable` đúng như API thật).
+- **Cờ sửa tay (FR12)** dùng `RevisionSnapshot.BamHinhHoc` của M110 (làm tròn 0,1 mm). Băm lúc sinh
+  cất trong **chính XData tuyến** (khóa `bamhh`, trường `VeXDataInfo.BamHinhHoc` mới) chứ không ở
+  một mốc riêng — trạng thái M114 luôn sống trong bản vẽ (FR3), tuyến copy sang bản vẽ khác vẫn
+  mang theo mốc so của nó.
+- `LenhCatalog.cs` — lệnh đứng **trước `XBOSS_VE`** trong bước 3 VeShopDrawing (FR16);
+  `VeSessionReport` thêm mục `tuyenTuDong` (hệ/loại/cỡ, số nhánh, số phiên, số nhánh sửa tay) +
+  cảnh báo khi có nhánh sửa tay; số liệu của TỪNG LẦN CHẠY (tổng dài, số co, tỉ lệ cạnh dùng chung,
+  lý do không giải được) vào nhật ký phiên như M111 đã làm.
+- `VeContext.CanRoutingPolicy` — gom cửa đọc `drawTools.routingPolicy` về một chỗ cho cả 2 lệnh
+  M114 (trước nằm riêng trong `VeHanhLangCommands`), để hai lệnh không bao giờ nói khác nhau về
+  "đi tuyến tự động đã bật chưa".
+- Test: `XBoss.Cad.Tests/TuyenTuDongTests.cs` (30 ca — AC1/AC2/AC4/AC5/AC6/AC7/AC9/AC10 ở mức hàm
+  thuần, bất biến "mỗi cạnh vẽ đúng một lần", NFR1 120 thiết bị × 40 hành lang, và hành vi hộp
+  thoại: khóa OK khi không nối được thiết bị nào, đếm đúng tuyến sửa tay, nét tạm hỏng không làm
+  chết hộp thoại), `VeSessionReportTests` +2 ca, `RoutingDoiChungTests` +1 ca ghim danh sách hệ
+  điện, `QuyTrinhTests` cập nhật vị trí lệnh. **1123 ca .NET xanh**, `dotnet build` shim 0 warning;
+  `npm run lint`/`npm run typecheck` xanh, `npm test` **1481 ca xanh** (Postgres 16 ephemeral).
+
+**Quyết định chốt ở PR4** (mục "hoãn có chủ đích" của M114 §12 — "nhánh tách riêng hay nối liền"):
+**NỐI LIỀN.** Vẽ mỗi nhánh một polyline riêng thì đoạn trục chung nằm chồng N lớp và `XBOSS_BOCKL`
+bóc gấp N lần chiều dài thật — sai thẳng vào khối lượng, trái AC3. Nhánh chạm cạnh đã có tuyến thì
+dừng tại đúng nút đó, ra hình "một trục chính + các nhánh đấu vào", đúng cách người vẽ. Đường về
+nguồn có thể **xen kẽ** đoạn đã vẽ/chưa vẽ (đồ thị hành lang có vòng) nên nhánh được cắt thành từng
+đoạn liên tục các cạnh chưa vẽ, chứ không phải "gặp cạnh cũ thì dừng hẳn" — dừng hẳn sẽ bỏ rơi
+phần sau và nhánh không nối tới nguồn.
+
+**Hai điểm lệch đặc tả PR2 ghi lại, nay đã xử ở PR4:**
+
+- **Rule pack không có cờ "hệ điện"** (cần cho `laneGapMm.elecToHot`): danh sách khai tường minh
+  MỘT chỗ ở `CapPhatLanTang.HeDienDuAn` và được **ghim vào `doi-chung/routing-doi-chung.json#heDien`
+  bằng test** — hai chỗ trôi khỏi nhau là CI đỏ. **Nợ kỹ thuật:** chỗ đúng của dữ liệu này là một
+  cờ trong rule pack (`drawTools.systems[].electrical`); thêm khóa rule pack nằm ngoài phạm vi M114
+  nên để lại cho mốc sau.
+- **AC6/AC7 vs con trỏ làn riêng từng tầng:** PR4 **gọi đúng** `CapPhatLanTang.Cap()`/`GoChiemCho()`
+  chứ không viết lại logic cấp làn (con trỏ làn theo từng tier là hành vi đã ghim bằng đối chứng 2
+  tầng ở PR2). Hệ quả cần biết: hai hệ **cùng một tier** thì lần chạy lại đầu tiên có thể đẩy làn
+  của hệ đang chạy ra sau làn của hệ kia (gỡ rồi cấp lại ⇒ con trỏ tính từ làn cuối còn lại), từ
+  lần thứ hai trở đi ổn định; hệ khác tier thì ổn định ngay. Ca AC9 trong test phủ tình huống một
+  hệ một tier (ca thường gặp).
+
+**Không migration, không API mới, không đụng `app/`** (M114 §9).
+
+**Nợ kỹ thuật — CHẶN phát hành rộng:** chưa verify tay trên AutoCAD 2026 thật. Kịch bản đã viết sẵn
+ở `plugin-autocad/VERIFY-VA-PHAT-HANH.md` mục **C10, item 82–98** (AC1 nối 24 miệng gió, AC3
+`_PHUKIEN`/`_NHAN`/`_CHIADOT`/`BOCKL` chạy được trên tuyến sinh ra **và bóc không trùng đoạn trục**,
+AC6/AC7 cấp làn, AC8 giữ nguyên nhánh đã sửa tay, AC10–AC13). Toàn bộ mã Adapter M114 hiện chỉ được
+biên dịch bằng stub `XBoss.Cad.AcadShim` — **chưa chạy trên AutoCAD lần nào**; riêng đồ họa tạm
+(`TransientManager`) là API lần đầu dùng trong repo nên phải soi kỹ ở item 93 (AC11).
+
+## 🚧 M110 PR2/2 — Adapter revision cloud: 3 lệnh + mốc trong DWG (2026-08-29)
+
+Nhánh `feat/m110-pr2-revision-adapter`. **PR2 của 2** theo `docs/nang-cap/M110-revision-cloud.md`
+§10 — tầng Adapter AutoCAD. **Code xong, CHƯA verify tay trên AutoCAD thật** (xem "Còn nợ").
+
+Đã làm:
+
+- **3 lệnh** trong `plugin-autocad/XBoss.Cad.Acad/Commands/VeRevCommands.cs`: `XBOSS_VE_REV`
+  (đề xuất vùng theo mốc hoặc khoanh tay → cloud + tam giác, XData đi CẶP, chạy lại **cập nhật tại
+  chỗ** — FR1/FR2/FR3/FR7), `XBOSS_VE_REV_CHOT` (bảng revision vào attribute khung tên **mọi
+  layout**, mốc mới, chặn `maxRows`, cảnh báo bỏ sót — FR4/FR5), `XBOSS_VE_REV_HIENTHI` (bật/tắt
+  layer con theo revision, mặc định chỉ hiện revision hiện hành — FR6). Mỗi lệnh 1 nhóm UNDO, mọi
+  hỏi đáp ngoài transaction ghi.
+- **`Services/RevisionStore.cs`**: mốc `XBOSS_REV_SNAPSHOT` trong Xrecord ở Named Objects
+  Dictionary (đúng khuôn `VeLayerService`), quét đối tượng theo dõi + băm hình học qua Core, quét
+  cloud/tam giác, tên layer con `<revisionPolicy.layer>-R{n}`.
+- **Hộp thoại M106**: `Core/Ui/ViewModels/RevisionDialogViewModel.cs` (đề xuất có tick + nút "Zoom
+  tới" qua delegate Adapter gắn — hộp thoại vẫn KHÔNG biết gì về AutoCAD) và
+  `RevChotDialogViewModel.cs`; 3 `DataTemplate` trong `XBossDialog.xaml`; `XBOSS_UI_DIALOG=0` →
+  hỏi đáp dòng lệnh cho kết quả trùng khít (FR9).
+- **Phép kiểm 20 (FR8)** `revision-mo-coi` trong `PhepKiemMoRong.cs` + `RevisionInfo` trong
+  snapshot + quét ở `DrawingSnapshotBuilder`. **Không** thêm khóa rule pack: phép tự tắt khi bản vẽ
+  không có đối tượng XData vai trò `Revision` (cloud vẽ tay bằng `REVCLOUD` không bị báo oan).
+  _(Đánh số 19 lúc viết; lúc trộn `main` thì M111 PR3 đã lấy số 19 cho `nhantang-handle-mo-coi` nên
+  phép này lùi xuống **20** — slug `revision-mo-coi` và hành vi không đổi.)_
+- **Kind `annotation` cho thư viện block** (`lib/ky-thuat/cad/block-lib.ts` + `BlockManifest.cs`) —
+  đặc tả §5 khai tam giác revision là `kind=annotation` nhưng enum cũ chỉ có
+  fitting/equipment/titleblock/support/sleeve nên manifest sẽ bị từ chối. Kind mới **không** nằm
+  trong `KIND_DEM_KHOI_LUONG` và không lọt vào `doiChieuTakeoff` ⇒ `XBOSS_BOCKL` giữ nguyên con số
+  (guardrail 1/AC10). Quyết định do coordinator chốt sau khi worker dừng báo vướng đặc tả.
+- Khai 3 lệnh trong `LenhCatalog` (bước Hồ sơ bản vẽ, sau `XBOSS_VE_TRANGIN` — FR10), mục
+  `revision` trong báo cáo phiên vẽ, stub `ViewTableRecord`/`GetCorner`/`SetCurrentView` cho cổng
+  CI `XBoss.Cad.AcadShim`.
+- Test: `XBoss.Cad.Tests/RevisionAdapterTests.cs` (ViewModel, phép kiểm 20, báo cáo, thứ tự lệnh),
+  ca kind `annotation` trong `BlockManifestTests.cs` + `tests/cad-block-lib.test.ts` +
+  `tests/cad-block-proposals.test.ts`; cập nhật `QuyTrinhTests`.
+- Tài liệu: `plugin-autocad/README.md` (3 lệnh + ghi chú rule pack v14), `CAI-DAT.md` (bước 10 trong
+  luồng dùng thật), `VERIFY-VA-PHAT-HANH.md` mục **25b** — kịch bản verify tay AC1–AC10 + FR9.
+- **Trộn `main` (2026-08-29)**: nhánh đứng sau M111 PR1–PR3, M113 PR1–PR4, M114 PR1–PR3 nên phải
+  giải xung đột — phép kiểm revision lùi 19 → **20**, bảng lệnh/bảng trình tự trong
+  `plugin-autocad/README.md` + `CAI-DAT.md` gộp thêm `XBOSS_VE_HANHLANG`/`XBOSS_VE_NHANTANG`.
+  Đã biên dịch thật: `dotnet build XBoss.Cad.AcadShim` 0 cảnh báo/0 lỗi, `dotnet test` **1105 ca
+  xanh**.
+
+**Còn nợ (nợ kỹ thuật, ghi rõ ở đây để không tưởng nhầm là xong):**
+
+- **Chưa verify tay trên AutoCAD 2026 thật** (AC1–AC7, AC9, AC10 + FR9) — môi trường thi hành không
+  có AutoCAD; mã Adapter mới hiện chỉ được biên dịch bằng stub `XBoss.Cad.AcadShim`, chưa chạy trên
+  AutoCAD lần nào. Phải chạy mục 25b của `VERIFY-VA-PHAT-HANH.md` trên máy có license trước khi
+  phát hành rộng.
+- Thư viện block công ty phải bổ sung block tam giác `kind: annotation` khớp
+  `revisionPolicy.triangleBlockId` — chưa có thì `XBOSS_VE_REV` dừng kèm thông báo (không tự vẽ ký
+  hiệu thay thế, đúng nếp của `slope-arrow`).
+- Ca `revisionPolicy` trong `plugin-autocad/doi-chung/` vẫn chưa có (đã ghi ở PR1).
+
+## 🚧 M114 PR3/4 — Adapter `XBOSS_VE_HANHLANG` (vẽ + nhận + sửa/xóa hành lang) (2026-08-29)
+
+Nhánh `feat/m114-pr3-hanhlang-adapter`. PR **3/4** của
+`docs/nang-cap/M114-auto-routing-hanh-lang.md` (PR4 Adapter `XBOSS_VE_TUYENTUDONG` — **chưa làm**).
+Lệnh plugin ĐẦU TIÊN của M114: khai hành lang — dữ liệu nền mà bước đi tuyến tự động sẽ đọc.
+
+- `XBoss.Cad.Acad/Commands/VeHanhLangCommands.cs` (mới) — `XBOSS_VE_HANHLANG`, 4 chế độ trong một
+  lệnh (FR1/FR4): `VEMOI` bấm điểm tim hành lang (chỉ đoạn thẳng — đồ thị Core cắt cạnh theo đoạn
+  thẳng), `NHAN` nhận polyline có sẵn **không đụng một tọa độ đỉnh nào** (AC13, khuôn M107; line
+  chuyển thành polyline 2 đỉnh cùng tọa độ), `SUA` ghi đè bề rộng/cao độ/hệ được phép mà **giữ
+  nguyên sổ chiếm làn**, `XOA` — hành lang còn hệ đi qua thì nêu đúng handle + hệ nào rồi hỏi lại,
+  các tuyến cũ thành tuyến thường chứ không bị xóa theo. `routingPolicy.enabled = false` (mặc định)
+  → dừng kèm hướng dẫn cách bật, bản vẽ không đổi một nét nào (AC14). Arc/spline/polyline có đoạn
+  cung/đối tượng xref bị bỏ qua kèm **lý do đếm được**. Mọi hỏi đáp ngoài transaction, một lệnh =
+  một transaction = một nhóm UNDO.
+- `XBoss.Cad.Core/Ui/ViewModels/HanhLangDialogViewModel.cs` (mới) + `DataTemplate` trong
+  `XBossDialog.xaml` — hộp thoại M106: bề rộng khả dụng, cao độ đáy dầm/trần (**hỏi, không suy** —
+  M100 §6.3), danh sách hệ được phép đi qua (tick hết = "mọi hệ", đúng quy ước XData rỗng), phần
+  chỉ-đọc nói rõ lệnh sắp làm gì + sổ làn đã cấp. `XBOSS_UI_DIALOG=0` → hỏi đáp dòng lệnh cùng bộ
+  tham số (FR15).
+- `LenhCatalog.cs` — khai lệnh ở panel "Vẽ shop drawing", **bước 2 ChuanHoaNen** (FR16);
+  `VeLayerStyle.AciHanhLang`; `VeContext` nhớ thuộc tính hành lang trong phiên;
+  `VeSessionReport.SoHanhLang` đếm riêng hành lang (không thuộc hệ nào nên không gom vào bảng
+  theo hệ).
+- Test: `XBoss.Cad.Tests/HanhLangDialogViewModelTests.cs` (15 ca — khóa OK theo từng lý do, quy ước
+  "tick hết = rỗng = mọi hệ", cảnh báo đáy dầm ≤ trần / khoảng trần thấp hơn tầng sâu nhất / bề
+  rộng mới nhỏ hơn làn đã cấp, tóm tắt vùng chọn theo lý do bỏ qua); `QuyTrinhTests` cập nhật theo
+  vị trí lệnh mới. **1090 ca xanh**, `dotnet build` shim xanh.
+
+**Không migration, không API mới, không đụng `app/`** (M114 §9).
+
+**AC6/AC7 vẫn thuộc PR4, không giải ở PR3:** hai tiêu chí đó nói về lúc **cấp làn khi đi tuyến**
+(FR9 của `XBOSS_VE_TUYENTUDONG`). PR3 chỉ ghi/đọc sổ `lanDaCap`, không cấp và không gỡ làn, nên
+mâu thuẫn "ngân sách bề rộng dùng chung vs con trỏ làn riêng từng tầng" (ghi ở mục PR2 dưới đây)
+chưa chạm tới — vẫn chờ phiên chính chốt trước khi làm PR4.
+
+**Nợ kỹ thuật — CHẶN phát hành rộng:** chưa verify tay trên AutoCAD 2026 thật
+(`VERIFY-VA-PHAT-HANH.md`: AC11 hủy giữa chừng không đổi thực thể nào, AC12 một lần `U` hoàn tác
+trọn vẹn, AC13 nhận polyline giữ nguyên từng tọa độ đỉnh, và cảnh báo xóa hành lang còn hệ đi qua).
+Toàn bộ mã Adapter mới hiện chỉ được biên dịch bằng stub `XBoss.Cad.AcadShim` — chưa chạy trên
+AutoCAD lần nào.
+
+## 🚧 M114 PR2/4 — `CapPhatLanTang` (cấp tầng/làn) + đối chứng 2 tầng (2026-08-29)
+
+Nhánh `feat/m114-pr2-capphat-doichung`. PR **2/4** của
+`docs/nang-cap/M114-auto-routing-hanh-lang.md` (PR3 Adapter `XBOSS_VE_HANHLANG`, PR4 Adapter
+`XBOSS_VE_TUYENTUDONG` — **chưa làm**). Vẫn chưa có lệnh plugin mới: thêm hàm thuần + bộ đối chứng.
+
+- `XBoss.Cad.Core/Routing/CapPhatLanTang.cs` (mới) — cấp tầng theo `routingPolicy.tiers` và làn còn
+  trống trong hành lang theo `lanDaCap` + `laneGapMm` (FR9). Làn đo từ **mép trái** hành lang, làn
+  đầu của mỗi tầng bắt đầu ở `laneGapMm.default`, khe hở giữa 2 làn kề dùng `laneGapMm.elecToHot`
+  khi một trong hai là hệ điện; tầng sát trần lấy cao độ `trần + offsetFromCeilingMm` và đặt giữa
+  hành lang. Hết bề rộng → **báo hết làn nêu đúng hành lang + hệ đang chiếm** (AC7), sổ chiếm chỗ
+  không bị bẩn (NFR3); `GoChiemCho()` gỡ chiếm chỗ cũ trước khi dựng lại (FR13/AC9).
+- `plugin-autocad/doi-chung/routing-doi-chung.json` (mới) — 5 ca cấp tầng/làn: đầu vào viết tay,
+  phần `mongDoi` **sinh từ tầng 3** (`planMultiTierCorridor`) bằng `npm run cad:doi-chung`, nên đổi
+  thuật toán là hiện rõ trong diff. `scripts/sinh-doi-chung-cad.ts` sinh/kiểm thêm tệp này
+  (`--kiem` của CI phủ luôn).
+- Test đối chứng 2 tầng đọc chung một tệp: `tests/cad-routing-doi-chung.test.ts` (tầng 3) và
+  `XBoss.Cad.Tests/RoutingDoiChungTests.cs` (tầng 2 — `CapPhatLanTang` phải ra **cùng** tầng + cao
+  độ + làn). Thêm `CapPhatLanTangTests.cs`: khe hở mặc định/`elecToHot`, đọc `lanDaCap` của hệ chạy
+  trước, tầng sát trần, hết làn, hệ không có tier, gỡ chiếm chỗ rồi cấp lại.
+
+**Lệch đặc tả đã ghi nhận (để PR4 chốt, không tự quyết ở PR2):**
+
+- Rule pack **không có cờ "hệ điện"**, trong khi `laneGapMm.elecToHot` cần biết làn nào là hệ điện.
+  Core nhận tập hệ điện **qua tham số** (bộ đối chứng khai tường minh `heDien`), không đoán hộ bằng
+  tên tier.
+- AC6/AC7 hàm ý một **ngân sách bề rộng dùng chung cả hành lang** (ELEC cách HVAC ≥ `elecToHot`;
+  hành lang 600 mm kín làn sau ~2 hệ), còn §10 lại đòi **khớp từng làn với `planMultiTierCorridor`**
+  — mà bản TS dùng con trỏ làn **riêng cho từng tầng** (2 tầng khác nhau đều bắt đầu ở 100). PR2 giữ
+  đúng §10 (đối chứng 2 tầng là deliverable của PR2); phần AC6/AC7 ở mức DWG cần chốt lại lúc làm
+  PR4.
+
+**Nợ kỹ thuật:** verify tay trên AutoCAD 2026 (AC1/AC3/AC6/AC8/AC10–AC13, `VERIFY-VA-PHAT-HANH.md`)
+chưa làm — chờ có lệnh thật ở PR3/PR4.
+
+## 🚧 M114 PR1/4 — rule pack v15 `routingPolicy` + đồ thị hành lang & định tuyến (Core) (2026-08-29)
+
+Nhánh `feat/m114-pr1-hanhlang-graph-core`. PR **1/4** của
+`docs/nang-cap/M114-auto-routing-hanh-lang.md` (PR2 `CapPhatLanTang` + đối chứng 2 tầng, PR3 Adapter
+`XBOSS_VE_HANHLANG`, PR4 Adapter `XBOSS_VE_TUYENTUDONG` — **chưa làm**). Sau PR này plugin **chưa có
+lệnh nào mới**: mới là dữ liệu + hàm thuần, test trên CI Linux.
+
+- `lib/ky-thuat/cad/rule-packs/v15.json` — v14 + khối `drawTools.routingPolicy` (M114 §6): layer
+  hành lang, `snapRadiusMm`, 3 hệ số chi phí α/β/γ, `tiers` phân tầng theo hệ, `laneGapMm`,
+  `systemOrder`. **Mặc định `enabled: false`** (AC14) và là mở rộng thuần (mọi khóa cũ giữ nguyên
+  từng byte). Ghi chú: §6 nêu ví dụ bằng tên hệ viết tắt (`ELEC`/`PLUMB`/`CHW`/`FP`) nhưng chính §6
+  bắt validator đòi id CÓ THẬT trong `drawTools.systems`, nên `tiers`/`systemOrder` phát hành dùng
+  đúng 5 id thật: `HVAC`, `PIPING`, `FIREFIGHTING`, `ELECTRICAL`, `ELV`.
+- **Validator 2 tầng**: `kiemRoutingPolicy()` (`lib/ky-thuat/cad/rule-pack.ts`) và
+  `DrawToolsConfig.ValidateRoutingPolicy()` (C#) — cùng bộ luật: `snapRadiusMm` > 0, `reuseFactor`
+  trong (0; 1], id hệ trong `tiers`/`systemOrder` phải có thật, một hệ không nằm ở 2 tier, hệ số
+  chi phí không âm, khe hở làn dương, `corridorLayer` khác rỗng khi bật.
+- Core mới: `Routing/HanhLangGraph.cs` (dựng đồ thị — giao điểm hành lang, điểm rẽ = hình chiếu
+  vuông góc trong `snapRadiusMm`, loại cạnh qua **vùng cấm** bằng `VungClipper` của M101 PR3, thiết
+  bị ngoài bán kính vào danh sách không giải được **kèm khoảng cách thật**) và `Routing/DinhTuyen.cs`
+  (Dijkstra trên trạng thái (nút, cạnh vào) + hàm chi phí α co / β độ đông / γ gom trục, chế độ tự
+  chảy báo **chênh cao cần vs có** thay vì hạ độ dốc cho xong).
+- `Draw/VeXData.cs` — vai trò `VaiTroVe.HanhLang` + `LanChiem` (sổ chiếm chỗ `lanDaCap` sống trong
+  DWG, FR3) + 3 khóa của tuyến tự động `TuDong`/`PhienTuyen`/`SuaTay` (FR11/FR12).
+- Test: `XBoss.Cad.Tests/RoutingHanhLangTests.cs` (đồ thị chữ T/H, điểm rẽ, ngoài bán kính, vùng cấm,
+  Dijkstra, **γ giảm tổng chiều dài vẽ ra**, β đẩy sang hành lang vắng, tự chảy có/vô nghiệm, khứ hồi
+  XData), `RulePackV15RoutingTests.cs`, và phần v15 trong `tests/engineering-cad-rule-pack.test.ts`.
+- Phát hành v15: `rule-pack-hien-hanh.ts`, `RepoPaths.TenTepHienHanh`, `doi-chung/corpus.json` +
+  `crossing-doi-chung.json` + `ket-qua-mong-doi.json` (sinh lại bằng `npm run cad:doi-chung`).
+
+**Không migration, không API mới, không đụng `app/`** (M114 §9).
+
+## ✅ M113 PR4/4 — plugin AutoCAD dùng thư viện block hai tầng (2026-08-29)
+
+Nhánh `feat/m113-pr4-plugin-project`. PR **4/4** của `docs/nang-cap/M113-thu-vien-block-theo-du-an.md`
+(phạm vi **thu hẹp**: FR7 hoãn, xem cảnh báo dưới).
+
+- `XBoss.Cad.Core/Api/XBossApiClient.cs` — `FetchBlockLibManifestTronAsync(token, duAnId, etag)`
+  (gửi `?project=<id>&manifest=1`, bóc cả `manifest` lẫn `boDuAn` = version + sha256 bộ dự án) và
+  `FetchBlockLibDwgDuAnAsync`; `FetchBlockLibTepLeAsync` nhận thêm `libVersion` + `project` để hỏi
+  tệp `.dwg` lẻ **đúng tầng**. Đường cũ (không tham số) giữ nguyên từng byte — plugin bản cũ và
+  luồng M103 không đổi hành vi (guardrail 1/AC1).
+- `XBoss.Cad.Core/Draw/BlockManifest.cs` — `BlockDef.Nguon`/`LibVersion` + `LaCuaDuAn`/`NhanNguon`,
+  `BlockManifest.CoBlockToanCuc`/`CoBlockDuAn`, `BlockManifestLoader.KiemTraHashTepTheoSha` (hash
+  kiểm theo **từng bộ**, §4.5). Máy chủ bản cũ không trả `nguon`/`libVersion` ⇒ **bỏ qua an toàn**,
+  coi như bộ toàn cục.
+- `XBoss.Cad.Core/Draw/BlockLibTron.cs` (mới) — `BoBlockDuAn` (dữ liệu máy chủ) + `BoTronCache`
+  (siêu dữ liệu ô cache trộn: dự án nào, version 2 bộ, sha256 tệp nền bộ dự án).
+- `XBoss.Cad.Acad/Services/BlockLibraryService.cs` — **ô cache thứ hai** (`manifest-tron.json`,
+  `blocks-tron-toancuc.dwg`, `blocks-tron-duan.dwg`, `blocks-tron.etag`, `bo-tron.json`) chạy song
+  song với ô toàn cục cũ; `TaiVeTronAsync` tải + kiểm hash theo từng bộ + bù tệp lẻ đúng tầng;
+  `TaiVeDayDuAsync` (dùng ở `XBOSS_LOGIN` và `XBOSS_VE_THUVIEN` → Server) tải bộ toàn cục rồi bản
+  trộn của dự án đang nhớ; chèn block lấy định nghĩa từ **đúng tệp nền của bộ** (AC9), hash kiểm
+  lại ngay trước khi dùng.
+- `XBOSS_VE_THUVIEN` thêm nhánh `Nguon` liệt kê **nguồn từng block** (`[Dự án]`/`[Toàn cục]` + bộ)
+  và dòng trạng thái nói rõ đang dùng bộ nào; `XBOSS_BANG` thêm dòng "Bộ đang dùng" hiện version
+  **cả hai bộ** + số block của dự án (FR6).
+- Test C#: `XBoss.Cad.Tests/BlockLibDuAnTests.cs` (12 ca — gửi/không gửi `project`, tệp lẻ đúng
+  tầng, 304, model đọc `nguon`/`libVersion` và bỏ qua an toàn khi vắng, hash theo từng bộ, FR6).
+  Toàn bộ: **981 pass / 0 fail**.
+- Tài liệu: `plugin-autocad/README.md` + `CAI-DAT.md` (thư viện hai tầng, cách xem nguồn block).
+
+⚠️ **FR7 HOÃN — nợ đặc tả** (cùng điểm vướng PR2 đã ghi): "đề xuất M103 vào hàng chờ **của dự án**"
+và "đường nạp lô M108 nhận `project`" đòi cột `project_id` (+ RLS) trên `cad_block_proposals` và
+`cad_block_batches`, trong khi DDL §5/§9 của M113 chỉ cấp cho `cad_block_libs` (migration 0145).
+⇒ PR4 **cố ý không đụng** `XBOSS_VE_DEXUAT`/`BlockUngVienBuilder`: chúng vẫn dựng ứng viên trên
+manifest + tệp nền **toàn cục** (máy chủ so `base_lib_version` với bộ toàn cục — trộn hai ô cache
+làm một là mọi đề xuất của kỹ sư dự án bị 409 stale/422). Điều kiện để làm sau: đặc tả bổ sung +
+migration mới cho 2 bảng đề xuất, rồi mới cho plugin gửi `project` ở đường M103/M108.
+
+⚠️ M113 chỉ **phát hành thật được sau khi migration PR1 chạy staging** (§5/§12 — `DROP CONSTRAINT` +
+`CREATE UNIQUE INDEX` đụng dữ liệu đang có).
+
+## ✅ M113 PR3/4 — Web: 2 khối + chip nguồn (2026-08-29)
+
+Nhánh `feat/m113-pr3-web-ui`. PR **3/4** của `docs/nang-cap/M113-thu-vien-block-theo-du-an.md`
+(PR4 plugin — **chưa làm**).
+
+- `app/engineering/chuan-hoa-ban-ve/components/ThuVienBlockPanel.tsx` — mục "Danh Sách Block" mới:
+  2 khối **Toàn Cục** / **Của Dự Án Này**, mỗi entry hiện chip nguồn (`Toàn cục`/`Dự án`, dùng
+  `Chip`/`Card`/`Section` của `app/components/ui/` — ADR-0009) đọc thẳng manifest **đã trộn** của
+  `GET /api/engineering/cad/block-lib?manifest=1[&project=]` (PR2), không thêm route mới. Dự án
+  hiện tại tính giống `ProjectSwitcher` (cookie `xboss_project` hợp lệ, else dự án đầu trong
+  `/api/projects`) để khớp badge dự án trên header thay vì lệch nhau khi chưa từng chọn dự án.
+- `e2e/authed/chuan-hoa-ban-ve.spec.ts` — thêm ca kiểm 2 khối render; ca axe sẵn có của trang phủ
+  luôn nội dung mới (đã chạy thật trên Postgres ephemeral: 10/10 pass, axe sạch kể cả khi có dữ
+  liệu block-lib thật — publish thử bộ toàn cục + bộ dự án đè `titleblock-a1`, xác nhận khối "Của
+  Dự Án Này" hiện đúng 1 block với chip "Dự án", khối "Toàn Cục" không lặp id đã bị đè, khớp AC2).
+
+## ✅ M111 PR3/3 — Phép kiểm handle mồ côi (AC3) trong `XBOSS_KIEMTRA` + tài liệu (2026-08-29)
+
+Nhánh `feat/m111-pr3-kiemtra-moico`, tiếp trên PR2. **M111 CODE XONG cả 3 PR** — vẫn còn nợ verify
+tay trên AutoCAD thật (xem "Nợ kỹ thuật — CHẶN phát hành rộng" bên dưới, không đổi so với PR2).
+
+**Đã làm:**
+
+- `plugin-autocad/XBoss.Cad.Core/Inspection/SnapshotModels.cs` — `FloorCopyInfo` (Handle/NhanTang/
+  HandleThamChieu) + `DrawingSnapshot.NhanTang`: nguồn dữ liệu thuần cho phép kiểm mới, theo đúng
+  khuôn `CenterlineInfo`/`TagInfo` đã có.
+- `plugin-autocad/XBoss.Cad.Core/Inspection/PhepKiemMoRong.cs` — phép kiểm **19**
+  `HandleMoCoiNhanTang` (id báo cáo `nhantang-handle-mo-coi`): với mọi đối tượng do
+  `XBOSS_VE_NHANTANG` sinh (mang `TangNguon`/`NhanTang`), mọi handle nó tham chiếu (tim/biên/nhãn/
+  tuyến cắt/cặp đôi/đối tượng trong vùng/tim giao) phải phân giải được và thuộc **đúng tầng chép
+  đó** — bắt trực tiếp guardrail 2 của M111 §2. Không có cờ `enabled` riêng (cùng khuôn phép kiểm
+  revision của M110): tự tắt khi bản vẽ chưa từng chạy `XBOSS_VE_NHANTANG`.
+- `Inspection/Inspector.cs` — nối phép kiểm 19 vào `Run()`, cập nhật doc-comment liệt kê slug.
+- `plugin-autocad/XBoss.Cad.Acad/Services/DrawingSnapshotBuilder.cs` — `QuetNhanTang`: quét model
+  space đọc XData `XBOSS_VE`, chỉ giữ đối tượng có `NhanTang` (tức LÀ bản chép), gộp mọi khóa handle
+  (`HandleTim`/`HandleBien`/`HandleNhan`/`HandleTuyenCat`/`HandleCapDoi`/`HandleTrongVung`/
+  `HandleTimGiao`) thành `HandleThamChieu`.
+- Test: `XBoss.Cad.Tests/InspectorNhanTangTests.cs` (5 ca — tự tắt khi không có bản chép, ca sạch,
+  handle trỏ ra ngoài tập chép, handle trỏ sang tầng khác, gộp nhiều lỗi cùng đối tượng không nhân
+  đôi handle nhờ `ThemHandle` chống trùng).
+- Tài liệu: `plugin-autocad/README.md` (dòng `XBOSS_VE_NHANTANG` trong bảng lệnh vẽ + note rule pack
+  v12+ cho phép kiểm 19 + luồng làm việc chuẩn), `CAI-DAT.md` (bước 8 trong trình tự buổi vẽ),
+  `VERIFY-VA-PHAT-HANH.md` (mục **C9**, item 68–81 — kịch bản verify tay AC1–AC12 trên bản vẽ AVIO
+  thật, kèm ca cố tình phá handle để chứng minh phép 19 bắt được lỗi thật).
+- `docs/nang-cap/README.md` — đóng mục M111: ⏳ PR1+PR2/3 → ✅ CODE XONG cả 3 PR, giữ nguyên rõ ràng
+  điều kiện CHẶN phát hành rộng (verify tay AutoCAD thật).
+
+**Nợ kỹ thuật — CHẶN phát hành rộng (không đổi so với PR2, chưa làm được ở môi trường này):**
+
+- **Chưa verify tay trên bản vẽ AVIO thật** (M111 §8 đòi AC1–AC12 trên máy có AutoCAD 2026). Môi
+  trường code không có AutoCAD — cổng `XBoss.Cad.AcadShim` chỉ chứng minh mã Adapter **biên dịch**
+  đúng chữ ký stub (`QuetNhanTang` mới cũng đã qua cổng này), không chứng minh hành vi thật. Đặc
+  biệt cần soi: (a) phép kiểm 19 có bắt đúng handle mồ côi trên dữ liệu XData THẬT do
+  `DeepCloneObjects`/`AnhXaXData` sinh ra hay không (test hiện tại dùng `FloorCopyInfo` dựng tay,
+  chưa đi qua `DrawingSnapshotBuilder.QuetNhanTang` thật); (b) hai điểm CHƯA verify từ PR2 vẫn còn
+  nguyên (attribute dời gấp đôi/đứng yên, `DeepCloneObjects` có chép XData không).
+
+**Kiểm đã chạy:** `dotnet test XBoss.Cad.Tests` 1000/1000 pass (đã tính 5 ca mới của
+`InspectorNhanTangTests`); `dotnet build XBoss.Cad.AcadShim` (biên dịch thử toàn bộ Adapter, gồm
+`DrawingSnapshotBuilder.cs` đã sửa) 0 warning/0 error. Không đụng TypeScript/DB/route nào — không
+cần `npm run lint`/`typecheck`/`test`.
+
+## ✅ M113 PR2/4 — API `?project=` cho thư viện block hai tầng (2026-08-29)
+
+Nhánh `feat/m113-pr2-api-project`. PR **2/4** của `docs/nang-cap/M113-thu-vien-block-theo-du-an.md`
+(PR3 web 2 khối + chip nguồn, PR4 plugin — **chưa làm**).
+
+- `GET /api/engineering/cad/block-lib?project=<id>` — nhánh RIÊNG: trả manifest **đã trộn** hai tầng
+  (mỗi entry mang `nguon`/`libVersion`), ETag băm **cặp id** hai bộ (§4.6), thêm `boDuAn` để bảng
+  điều khiển hiện version cả hai bộ; tệp nhị phân kèm `?project=` trả đúng tệp `.dwg` của bộ dự án
+  (hash kiểm theo TỪNG bộ). Không kèm `?project=` ⇒ **y hệt hôm nay** (guardrail 1/AC1).
+  `?file=` nhận thêm `libVersion` và tìm trong đúng tầng.
+- `POST /api/engineering/cad/block-lib` + `POST .../block-lib/blocks` — nhận `project` (query hoặc
+  trường form): phát hành/thêm block vào bộ **của dự án**, quyền `CAN.manageDrawings` **trong phạm
+  vi dự án** (chốt M113 §13), id đối chiếu qua `chotProjectIdChoGhi`, ghi trong
+  `withProjectScope`; đường toàn cục vẫn chỉ Admin/PM. Dự án ngoài phạm vi ⇒ **404**.
+- `lib/ky-thuat/cad/block-lib.ts` — `kiemXungDotBlockName` (AC6: bộ dự án khai `blockName` trùng bộ
+  toàn cục nhưng khác `id` ⇒ **từ chối lúc phát hành**), `etagBlockLibTron`; `phatHanhBlockLib`/
+  `ghiSoBlockLib`/`versionPhatHanhKeTiep` làm việc theo **tầng** (nhãn version duy nhất trong tầng).
+- `lib/ky-thuat/cad/block-them-web.ts` — `themBlockTuWeb(projectId?)` (advisory lock **theo tầng**,
+  nền là bộ của dự án, chặn tên đụng bộ toàn cục), `timBlockLeTheoKhoa(fileKey, {projectId, libVersion})`.
+- `tests/cad-block-lib-api-du-an.test.ts` (mới) — AC2/AC3/AC4/AC5/AC6/AC8 + AC1 qua handler GET
+  thật; `docs/ERD.md` regen bằng `npm run gen:erd`.
+
+⚠️ **Còn vướng đặc tả — chưa làm**: §6 hàng cuối ("đường nạp lô M108 nhận `project`") và FR7 (đề
+xuất M103 vào hàng chờ của dự án) đòi cột `project_id` trên `cad_block_proposals`/`cad_block_batches`,
+nhưng DDL §5 lẫn §9 chỉ nói tới `cad_block_libs` (migration 0145 cũng vậy). Cần phiên chính chốt
+trước khi làm — xem báo cáo PR2.
+
+## M111 PR2/3 — Lệnh `XBOSS_VE_NHANTANG`: chép N tầng + ánh xạ lại handle (2026-08-29)
+
+Nhánh `feat/m111-pr2-nhantang-adapter`, tiếp trên PR1. **Mới là PR2/3** — lệnh đã chạy được, nhưng
+**CHƯA verify tay trên AutoCAD** (xem "Nợ kỹ thuật" dưới).
+
+**Đã làm:**
+
+- `plugin-autocad/XBoss.Cad.Acad/Commands/VeNhanTangCommands.cs` (mới) — `XBOSS_VE_NHANTANG`:
+  lọc vùng chọn theo `floorPolicy.copyRoles`, `DeepCloneObjects` từng tầng, dời theo
+  `FloorReplicator.ViTriDatTang`, **ghi đè** XData bản chép bằng kết quả `FloorReplicator.AnhXaXData`
+  (handle trong `IdMapping` thì thay, ngoài tập chọn thì gỡ), đổi tag `{floor}`, gỡ dấu bóc (FR8),
+  idempotent theo tầng (FR9), báo cáo FR10 + nhật ký phiên vẽ.
+- `plugin-autocad/XBoss.Cad.Core/Ui/ViewModels/NhanTangDialogViewModel.cs` (mới) + `DataTemplate`
+  trong `XBossDialog.xaml`: hộp thoại M106 với **bảng xem trước bắt buộc** (FR3) — số đối tượng theo
+  vai trò, số tuyến, tổng dài nhân thêm, vị trí đặt từng tầng, ví dụ tag trước → sau, kế hoạch đổi
+  tên vùng, nút _zoom tới vùng nguồn_. Đường dòng lệnh (FR11) dùng LẠI chính ViewModel này rồi in
+  bảng ra dòng lệnh + hỏi xác nhận, nên hai đường không thể lệch nhau.
+- Core `FloorReplicator`: thêm `MaKieuDat`/`VoiKieuDat` (áp kiểu dời + bước dời kỹ sư chọn, giữ
+  nguyên `copyRoles`/`zoneNamePattern`) và overload `LapKeHoachDat(fp, tangNguon, tangDich)` — **ô
+  đặt cố định theo nhãn tầng**, không phụ thuộc lần này tick bao nhiêu tầng (điều kiện của FR9/AC8:
+  chép đè riêng một tầng phải đặt về đúng chỗ cũ, không chồng lên tầng khác).
+- `VeSessionReport`: mục `nhanTang` (gộp theo cặp tầng nguồn → tầng chép, đọc từ XData sống trong
+  bản vẽ) + bản tiếng Việt; các con số của TỪNG lần chạy đi vào nhật ký phiên.
+- `LenhCatalog`: `XBOSS_VE_NHANTANG` vào bước `VeShopDrawing` thứ 7 (sau `XBOSS_VE_THIETBI`),
+  `XBOSS_VE_DOI` dời xuống 8; `AcadStub.cs` bổ sung stub `DeepCloneObjects`/`IdMapping`/`IdPair`/
+  `Entity.TransformBy`/`Matrix3d.Displacement`/`ViewTableRecord` + `GetCurrentView`/`SetCurrentView`.
+- Test: `NhanTangDialogViewModelTests` (19 ca — xem trước, ô đặt cố định, khóa OK khi tầng đích trùng
+  tầng nguồn/trùng tên vùng/bước dời sai, FR9 bỏ qua-chép đè, KIEMTRA đỏ chỉ CẢNH BÁO), bổ sung
+  `FloorReplicatorTests` + `VeSessionReportTests` + cập nhật `QuyTrinhTests`.
+
+**Ba quyết định trong ranh giới `route: complex` (phiên chính review giúp):**
+
+1. **Một transaction cho TẤT CẢ N tầng** (không transaction lồng + rollback thủ công): `tr.Abort()`
+   là phép nguyên tử thật của NFR2, một transaction cũng là một nhóm UNDO của AC11; "rollback thủ
+   công" bằng cách xóa lại bản chép đã ghi là đường tự viết, hỏng lần thứ hai thì mất dữ liệu.
+2. **XData bản chép luôn được GHI ĐÈ** bằng kết quả `AnhXaXData`, không dựa vào giả định
+   "`DeepCloneObjects` có chép XData" (mục Open §10 chưa xác minh được ở đây). Đúng-sai của giả định
+   đó không còn ảnh hưởng guardrail §2.2.
+3. **Attribute của khối: tự đo rồi mới dời.** So vị trí attribute trước/sau `BlockReference.TransformBy`;
+   dời chưa tới nửa quãng thì lệnh mới tự dời — tránh cả hai lỗi "tag đứng lại tầng nguồn" và "tag
+   dời gấp đôi" mà không phải đoán hành vi của ObjectARX.
+
+**Nợ kỹ thuật — CHẶN phát hành rộng (không phải "nên làm"):**
+
+- **Chưa verify tay trên bản vẽ AVIO thật** (M111 §8 đòi AC1–AC12 trên máy có AutoCAD 2026). Môi
+  trường code không có AutoCAD; cổng `XBoss.Cad.AcadShim` chỉ chứng minh mã Adapter **biên dịch**
+  đúng chữ ký stub, không chứng minh hành vi. Ba điểm phải soi kỹ khi verify: (a) attribute có bị
+  dời gấp đôi/đứng yên không; (b) `DeepCloneObjects` có chép XData không (bản chép phải mang XData
+  do lệnh ghi, không phải của tầng nguồn); (c) nút _zoom tới vùng nguồn_ khi hộp thoại đang modal.
+- **PR3 chưa làm**: phép kiểm handle mồ côi tự động trong `XBOSS_KIEMTRA` (AC3), tài liệu
+  (`README.md`/`CAI-DAT.md`) và mục verify tay trong `VERIFY-VA-PHAT-HANH.md`.
+- **Khoảng trống đặc tả phát hiện lúc code (FR6):** vùng bóc của M101 **không** là đối tượng sống
+  trong bản vẽ — ranh giới vùng là polyline thường (không XData) và tên vùng chỉ được gõ lúc chạy
+  `XBOSS_BOCKL`, lưu trong dấu bóc. Nên PR2 làm được: đọc tên vùng nguồn từ dấu bóc, tính tên vùng
+  đích theo `zoneNamePattern`, **DỪNG lệnh khi trùng tên** (AC9) và in bảng tên vùng để kỹ sư dùng
+  lại lúc bóc tầng mới; **không** làm được: ghi tên vùng lên bản chép (FR8 gỡ dấu bóc) và chép ranh
+  giới vùng (không mang XData nên bị `copyRoles` lọc ra). Muốn AC5 tự động đủ thì phải khai vùng
+  thành đối tượng có XData — **đổi schema XData, ngoài phạm vi PR2, cần phiên chính quyết**.
+
+**Kiểm đã chạy:** `dotnet test XBoss.Cad.Tests` 945/945 pass; `dotnet build XBoss.Cad.AcadShim`
+(biên dịch thử toàn bộ Adapter) 0 warning/0 error; `npm run lint`, `npm run typecheck`, `npm test`
+(981 pass, 464 skip vì không có `TEST_DATABASE_URL`) — PR này **không đụng TypeScript/DB/route** nào.
+
+## ✅ M109 PR2/2 — Adapter ngắt nét giao chéo: `XBOSS_VE_NGATNET` + `_XOA` (2026-08-29)
+
+Nhánh `feat/m109-pr2-ngatnet-adapter`, base trên PR1. **Code M109 xong**; còn **nợ verify tay trên
+AutoCAD thật** (xem "Nợ kỹ thuật" cuối mục này) — chưa làm xong mục đó thì chưa phát hành.
+
+**Đã làm**
+
+- **2 lệnh mới** (`XBoss.Cad.Acad/Commands/VeNgatNetCommands.cs`): `XBOSS_VE_NGATNET` dò mọi cặp
+  tuyến tim khác hệ cắt nhau (dùng lại `Segment2D.GiaoDiemGiuaHaiChuoi` của phép kiểm 11 + lọc thô
+  bằng bao hình chữ nhật, không O(n²) phép giao đoạn — NFR1), dựng `Wipeout` che vùng giao cho
+  tuyến 2 nét biên và thêm cung cầu vượt cho tuyến đơn nét; `XBOSS_VE_NGATNET_XOA` gỡ sạch (FR8).
+  Rule pack chưa khai `crossingPolicy` hoặc `enabled: false` → **dừng kèm hướng dẫn, không vẽ gì**
+  (AC8). Cả lệnh nằm trong MỘT transaction = một nhóm UNDO; hỏi đáp ngoài transaction.
+- **Guardrail 1 (tim bất khả xâm phạm)**: hai lệnh CHỈ tạo thực thể mới và CHỈ xóa thực thể vai trò
+  `NgatNet`; không có một đường nào mở tim ở chế độ ghi. `NgatNetGuardrailTests` (mới) đọc mã nguồn
+  Adapter và đỏ ngay nếu ai đó thêm lời gọi sửa hình học (`AddVertexAt`/`Explode`/…) hoặc mở
+  `ForWrite` một đích không phải model space/bảng thứ tự vẽ.
+- **Thứ tự vẽ (chỗ phải cân nhắc của PR này)**: quan hệ bắt buộc là **tuyến đi trên > vùng che >
+  tuyến đi dưới** — đẩy vùng che lên trên cùng thôi thì chính tuyến đi trên bị che (vùng che rộng
+  bằng cả bề rộng tuyến trên), đúng thứ AC1 cấm. Cách chốt: gom việc theo **hạng ưu tiên hệ đi
+  trên**, xử lý từ hạng thấp lên, mỗi nhóm đẩy vùng che lên trước rồi đẩy tuyến đi trên lên nữa ⇒
+  chồng lớp đúng theo hạng, chuỗi 3 hệ (A trên B, B trên C) cũng đúng. **Đánh đổi:** có động vào
+  thứ tự vẽ của các tuyến đi trên vốn có sẵn, nên `_XOA` gỡ được đối tượng nhưng **không hoàn
+  nguyên thứ tự vẽ** — muốn về đúng trạng thái trước lệnh thì `UNDO` (đã ghi trong thông báo lệnh,
+  README và mục verify).
+- **Đảo tay theo CẶP TUYẾN, không theo từng điểm giao** (FR7): hai tuyến cắt nhau nhiều lần chỉ có
+  một quan hệ trên–dưới thật, cho đảo riêng từng điểm là mời kỹ sư vẽ bản vẽ tự mâu thuẫn — và nhờ
+  vậy dấu đảo lưu gọn vào cặp handle `HandleTim` + `HandleTimGiao` sẵn có, không phải thêm trường
+  XData chỉ số điểm giao. Chạy lại giữ nguyên chiều đã đảo (AC5).
+- **`gapMode`**: `"jog"` = ÉP cầu vượt cho mọi tuyến; `"wipeout"` (giá trị mặc định của rule pack) và
+  rỗng = **suy theo `edgeStyle`** của tuyến đi dưới. Ép wipeout cho mọi tuyến sẽ xóa sổ cầu vượt
+  của tuyến đơn nét ngay trên rule pack mặc định, tức là AC3 không bao giờ chạy được.
+- **Hộp thoại M106** (`Core/Ui/ViewModels/NgatNetDialogViewModel.cs` + `DataTemplate` trong
+  `XBossDialog.xaml`): phạm vi toàn bản vẽ/chọn tay, danh sách cặp giao kèm ai trên, ô **Đảo** từng
+  dòng (mờ ở dòng cùng hệ, kèm lý do), cảnh báo đa giao/đảo tay. `XBOSS_UI_DIALOG=0` → hỏi đáp dòng
+  lệnh cho cùng bộ tham số (FR10).
+- **Báo cáo** (FR9): tóm tắt cuối lệnh (số điểm giao xử lý, bỏ qua theo lý do — cùng hệ / góc gắt /
+  không đọc được cỡ / xref, số đảo tay, số chỗ **đa giao**, số tuyến có đoạn cung) + mục `ngatNet`
+  trong `Core/Reporting/VeSessionReport.cs` (gộp theo tuyến đi dưới, đếm đảo tay, cảnh báo riêng khi
+  có đảo tay). Lý do bỏ qua đẩy vào nhật ký phiên cho `XBOSS_VE_BAOCAO`.
+- **Danh mục lệnh**: `XBOSS_VE_NGATNET` vào `BuocQuyTrinh.HoSoBanVe` ngay sau `XBOSS_VE_THONGKE`,
+  `_XOA` vào `PhuTro`; stub `Wipeout`/`DrawOrderTable`/`Point2dCollection` cho cổng CI `AcadShim`;
+  README + CAI-DAT + mục verify tay `C4c` trong `VERIFY-VA-PHAT-HANH.md`.
+
+**Đã kiểm cục bộ (lần này máy CÀI được .NET SDK 8 qua apt):** `dotnet build XBoss.Cad.AcadShim`
+(cổng biên dịch toàn bộ Adapter bằng stub) xanh, `dotnet test XBoss.Cad.Tests` **939 test xanh**.
+Không đụng mã TypeScript.
+
+**Nợ kỹ thuật — BẮT BUỘC trước khi phát hành rộng (mục `C4c` của `VERIFY-VA-PHAT-HANH.md`):**
+
+- **AC1 + in PDF** và **AC2 (tọa độ từng đỉnh tim không đổi + `XBOSS_BOCKL` ra đúng con số cũ)**
+  chưa ai chạy trên AutoCAD thật — CI Linux không dựng nổi bản vẽ, `NgatNetGuardrailTests` chỉ
+  chứng minh được _cách thiết kế_, không thay được bằng chứng trên bản vẽ.
+- Thứ tự vẽ của `Wipeout` khi **in PDF** phụ thuộc driver (M109 §11) — phải in thử bằng cả DWG To
+  PDF lẫn máy in thật của công ty.
+- Biên `Wipeout.SetFrom` đang truyền dạng **vòng kín** (lặp đỉnh đầu ở cuối); AC1 xác nhận luôn ca
+  này.
+- Điểm giao nằm trên **đoạn cung** của tim được dò theo dây cung (Core chỉ biết đoạn thẳng) — lệnh
+  đã cảnh báo, cần kiểm mắt; muốn chính xác thì phải duỗi cung ở Adapter (chưa làm, ngoài phạm vi).
+
+**Tiếp theo:** verify tay M109 trên máy có AutoCAD 2026, rồi M110 (revision cloud).
+
+## ✅ M113 PR1/4 — thư viện block hai tầng: schema + RLS + hàm trộn (2026-08-29)
+
+Nhánh `feat/m113-pr1-schema-rls`. PR **1/4** của `docs/nang-cap/M113-thu-vien-block-theo-du-an.md`
+(PR2 API `?project=`, PR3 web 2 khối + chip nguồn, PR4 plugin — **chưa làm**).
+
+- `migrations/0145_cad_block_libs_project.sql` — `cad_block_libs.project_id` (nullable, NULL = bộ
+  toàn cục), thay `UNIQUE(version)` bằng unique `(COALESCE(project_id,0), version)` để hai dự án
+  cùng đặt nhãn `b1` được, + index `(project_id, id DESC)`, + **RLS** khuôn 2 nhánh của 0140 **cộng
+  nhánh toàn cục** `project_id IS NULL` (mọi phiên đọc/ghi được như hôm nay).
+- `lib/ky-thuat/cad/block-lib.ts` — `tronThuVienBlock(toanCuc, cuaDuAn)` (chỗ **duy nhất** biết luật
+  đè theo `blocks[].id`, gắn `nguon`/`libVersion`) + `layBlockLibHienHanh(projectId?)` lấy bộ hiện
+  hành đúng tầng; không tham số ⇒ y hệt hành vi trước M113 (guardrail 1).
+- `tests/cad-block-lib-du-an.test.ts` — unit luật trộn + tích hợp AC2/AC3/AC4 và **AC7 (RLS)** bằng
+  role `xboss_app`; `tests/rls.test.ts` khai thêm `cad_block_libs` vào danh sách bảng có RLS.
+
+⚠️ **PR1 KHÔNG đi thẳng production** (M113 §5/§12): migration đụng ràng buộc trên dữ liệu đang có
+(`DROP CONSTRAINT` + `CREATE UNIQUE INDEX`) ⇒ phải chạy `bash deploy.sh --staging` trước, verify
+`SELECT version, count(*) FROM cad_block_libs GROUP BY 1 HAVING count(*) > 1` trả 0 dòng.
+
+## 🚧 M109 PR1/2 — rule pack v13 `crossingPolicy` + hình học ngắt nét giao chéo (2026-08-29)
+
+Nhánh `feat/m109-pr1-crossing-geometry`. **Mới là PR1 trong 2 PR của M109 — PR2 (Adapter: 2 lệnh
+`XBOSS_VE_NGATNET`/`_XOA`, dựng/xóa `Wipeout` + cầu vượt, `DrawOrder`, hộp thoại M106 + đảo tay,
+mục báo cáo phiên vẽ) CHƯA LÀM.** Lệnh chưa tồn tại trong plugin sau PR này.
+
+**Đã làm**
+
+- **Rule pack v13** (`lib/ky-thuat/cad/rule-packs/v13.json`, mở rộng thuần v12 của M111 — test khẳng định
+  không khóa cũ nào đổi): thêm `drawTools.crossingPolicy` (M109 §5) — `priority`, `gapMode`,
+  `clearanceMm`, `jogRadiusMm`, `layerSuffix`, `minAngleDeg`, kèm ghi chú tiếng Việt từng khóa.
+  `enabled: false` mặc định nên nạp v13 không đổi hành vi lệnh nào (AC8). Số version chốt lúc merge: nhánh này code trên v10, M111 phát hành v12 trước nên bản gộp lấy v13 — v13 chứa ĐỦ cả `floorPolicy` (M111) lẫn `crossingPolicy` (M109), không mất khóa nào của v9.
+- **Chốt của người dùng (2026-08-29):** `priority` khai theo **`drawTools.systems[].id`**
+  (HVAC/PIPING/FIREFIGHTING/ELECTRICAL/ELV) chứ không theo không gian id `duct`/`pipe-supply`/`fp`
+  ghi trong bản nháp §5 — 5 id đó **không tồn tại** trong rule pack thật, chép nguyên vào là chính
+  validator của M109 chặn chính rule pack. Đánh đổi đã chấp nhận: cấp × thoát nước cùng thuộc `PIPING` nên rơi
+  vào nhánh "cùng hệ — không ngắt nét, ghi báo cáo riêng" (đúng FR3 chữ nghĩa gốc).
+- **Validator 2 tầng** (M109 §5, bắt đủ 3 lỗi: id hệ lạ trong `priority`; `clearanceMm`/`jogRadiusMm`
+  ≤ 0; `layerSuffix` rỗng khi `enabled`): TS `kiemCrossingPolicy()` trong `lib/ky-thuat/cad/rule-pack.ts`,
+  C# `DrawToolsConfig.ValidateCrossingPolicy()` (khối `drawTools` sống ở `Draw/DrawToolsConfig.cs`
+  theo đúng tiền lệ `jointRules` của M105, không phải `RulePack/RulePackLoader.cs` như §8 ghi).
+- **`Core/Draw/CrossingGeometry.cs` (mới)** — hình học thuần, test trên CI Linux: vùng che theo bề
+  rộng tuyến đi trên + 2×clearance (dài ra theo `1/sin(góc giao)` để trùm hết tuyến đi dưới), cầu
+  vượt bán kính `jogRadiusMm` (từ chối kèm lý do khi bán kính nhỏ hơn nửa dây, không vẽ hình sai),
+  lọc góc < `minAngleDeg`, xếp hạng `priority` (hệ không khai xếp sau cùng), `DaoTay` thắng `priority`.
+- **Tách hàm giao điểm dùng chung** (FR2): `Segment2D.GiaoDiemGiuaHaiChuoi()` + `GocGiaoDeg()` —
+  phép kiểm 11 (`PhepKiemMoRong.GiaoCatKhacHe`) nay gọi lại đúng hàm này, **một** thuật toán dò giao
+  cắt cho cả kiểm tra lẫn ngắt nét.
+- **`VeXData`**: vai trò `VaiTroVe.NgatNet` + trường `HandleTimGiao` (tim đi trên) và `DaoTay`
+  (FR5/FR7) — mã hóa/giải mã khép kín.
+- **Test**: xunit `CrossingGeometryTests` / `RulePackV13Tests` / `CrossingDoiChungTests`; TS
+  `tests/cad-crossing-doi-chung.test.ts` + mục v13 trong `tests/engineering-cad-rule-pack.test.ts`.
+  Bộ đối chứng 2 tầng mới `plugin-autocad/doi-chung/crossing-doi-chung.json` (M109 §9).
+
+**Chưa xác nhận:** máy thi hành **không có .NET SDK** nên phần C# chưa build/`dotnet test` được cục
+bộ — chờ job `plugin` của CI. Phần TS: `npm run lint`, `npm run typecheck`, `npm test` xanh.
+
+**Tiếp theo:** M109 PR2 (`route: complex`) — Adapter, hộp thoại, báo cáo phiên vẽ, verify tay AC1–AC9.
+
+## M111 PR1/3 — Nhân bản tầng điển hình: rule pack v12 + Core `FloorReplicator` (2026-08-29)
+
+Nhánh `feat/m111-pr1-floor-replicator-core`. **Mới là PR1/3 của M111** (`docs/nang-cap/M111-nhan-ban-tang-dien-hinh.md`
+§9) — phần logic THUẦN, chưa có lệnh nào chạy được trong AutoCAD.
+
+**Đã làm:**
+
+- `lib/ky-thuat/cad/rule-packs/v12.json` = v9 + khối `drawTools.floorPolicy` (§4: `floors`,
+  `layoutMode`, `stepMm`, `gridColumns`, `zoneNamePattern`, `copyRoles`). Mở rộng **thuần** (mọi khóa
+  cũ giữ nguyên từng byte — có test so tệp) và `enabled: false` nên v12 cho kết quả y hệt v9 (AC12).
+  Số v12 do các nhánh song song đã giữ chỗ v10/v11.
+- **Validator 2 tầng**: TS `kiemFloorPolicy` (`lib/ky-thuat/cad/rule-pack.ts`) và C#
+  `FloorReplicator.Validate` gọi từ `DrawToolsConfig.Validate` — bắt: `floors` rỗng/trùng, `stepMm`
+  ≤ 0, `zoneNamePattern` thiếu `{floor}`, `copyRoles` có vai trò không có thật trong `VaiTroVe`
+  (kèm `layoutMode` lạ, `gridColumns` ≤ 0 khi xếp lưới).
+- Core `plugin-autocad/XBoss.Cad.Core/Draw/FloorReplicator.cs`: vị trí đặt từng tầng (offsetX/offsetY/
+  lưới), đổi tag `{floor}` qua `TagSchedule` (tag lệch mẫu → giữ nguyên + cảnh báo), đổi tên vùng bóc
+  (trùng tên → báo để lệnh DỪNG, không tự thêm hậu tố), và **kế hoạch ánh xạ handle**: handle trong
+  bảng `IdMapping` thì thay, ngoài tập chọn thì **gỡ hẳn** (guardrail §2.2 — không handle mồ côi).
+- XData `VeXData`: thêm `TangNguon` + `NhanTang` (dấu nhận diện bản chép cho FR9 idempotent).
+- Test: `FloorReplicatorTests.cs` + `RulePackV12Tests.cs` (xunit) + 3 ca trong
+  `tests/engineering-cad-rule-pack.test.ts`; đối chứng 2 tầng sinh lại (`npm run cad:doi-chung`) —
+  chỉ đổi đúng dòng version, chứng minh v12 không đụng quy tắc chuẩn hóa.
+
+**Chưa làm (đúng phạm vi PR1):** PR2 — Adapter `VeNhanTangCommands` (`DeepCloneObjects` + `IdMapping`,
+hộp thoại + xem trước FR3, FR8/FR9, nguyên tử NFR2), **rủi ro cao nhất cả bộ plugin**; PR3 — phép kiểm
+handle mồ côi tự động trong `XBOSS_KIEMTRA` (AC3) + tài liệu + mục verify tay. Ca đối chứng riêng cho
+`floorPolicy` trong `plugin-autocad/doi-chung/` chưa thêm (corpus hiện chỉ chở layer/font).
+
+**Chưa build/test .NET cục bộ** — máy không có .NET SDK; `dotnet test` chờ CI. TS: `npm run lint`,
+`npm run typecheck`, `npm test` xanh.
+
+## 🚧 M110 PR1/2 — Core revision cloud + rule pack v14 (2026-08-29)
+
+Nhánh `feat/m110-pr1-revision-core`. **PR1 của 2** theo `docs/nang-cap/M110-revision-cloud.md` §10 —
+chỉ phần **thuần, không đụng AutoCAD**; 3 lệnh `XBOSS_VE_REV`/`_CHOT`/`_HIENTHI`, `RevisionStore`,
+layer con theo revision, hộp thoại M106 và phép kiểm FR8 nằm ở **PR2**.
+
+Đã làm:
+
+- Khối `drawTools.revisionPolicy` (M110 §5) phát hành trong rule pack mới **`v14.json`** = `v13`
+  (đã có `crossingPolicy` của M109 chồng lên `floorPolicy` của M111) + `revisionPolicy`. Lịch sử số
+  version: M111 phát hành `v12` (chỉ `floorPolicy`) và về `main` trước; M109 hợp nhất thành `v13`
+  (`v12` + `crossingPolicy`) và về `main` kế tiếp; nhánh này ban đầu gộp nhầm `revisionPolicy` thẳng
+  vào `v12.json` (lúc `v13` của M109 chưa về `main`), phát hiện khi merge lần 2 nên đã khôi phục
+  `v12.json` về đúng nội dung gốc (chỉ `floorPolicy`) rồi phát hành `v14.json` = `v13` +
+  `revisionPolicy` cho đúng thứ tự lịch sử. Mở rộng **thuần** của v9 và `enabled: false` mặc định
+  ⇒ mọi lệnh cũ chạy y hệt v9 (AC8).
+- **Validator 2 tầng** cho khóa mới: TS `lib/ky-thuat/cad/rule-pack-revision.ts`
+  (`kiemTraRevisionPolicy`) + C# `DrawToolsConfig.KiemRevisionPolicy` — cùng bộ luật: `numberFormat`
+  phải chứa `{n}`, `cloudArcMm` > 0, `triangleBlockId` khác rỗng khi bật, `maxRows` ≥ 1, layer khác
+  rỗng, `boundingPaddingMm` ≥ 0, 4 mẫu attribute khung tên phải có `{n}`.
+- **Core C# thuần** (test chạy CI Linux, không thêm NuGet): `Draw/RevisionCloud.cs` (bao hình +
+  nới `boundingPaddingMm`, số cung theo `cloudArcMm × tỉ lệ in`, chỗ đặt tam giác) và
+  `Draw/RevisionSnapshot.cs` (băm hình học SHA-256 làm tròn 0,1 mm, so mốc §4 ra 3 nhóm
+  thêm/xóa/đổi, mốc vô hiệu khi WBLOCK, mã hóa/giải mã mốc cho Xrecord).
+- **XData**: `VaiTroVe.Revision` + `SoRevision`/`HandleCapDoi`/`HandleTrongVung` trong `VeXData.cs`.
+- Test: `plugin-autocad/XBoss.Cad.Tests/RevisionCoreTests.cs` + `RulePackV14RevisionTests.cs`, và
+  test "mở rộng thuần v14" + 2 ca revisionPolicy trong `tests/engineering-cad-rule-pack.test.ts`.
+
+Còn nợ (PR2 hoặc ghi rõ trong PR1): toàn bộ tầng Adapter; ca `revisionPolicy` trong
+`plugin-autocad/doi-chung/` (bộ đối chứng hiện chỉ mang corpus layer/font, hai tầng đang được canh
+bằng validator đọc CHUNG tệp v14.json); tài liệu `README.md`/`CAI-DAT.md`/`VERIFY-VA-PHAT-HANH.md`.
+
+## ✅ Duyệt trọn gói 6 đặc tả M109–M114 (2026-08-29)
+
+Người dùng: **"duyệt tất cả"**. Nhánh `claude/duyet-dac-ta-m109-m114`. Cả 6 tệp chuyển
+**Draft → Approved for implementation**, tick đủ checklist §Approval, ghi người/ngày duyệt.
+
+**Duyệt không phải là đóng dấu suông — 9 mục Open phải có câu trả lời trước** (chính checklist của
+các đặc tả đòi "không còn blocking question"). 8/9 đã chốt ngay:
+
+| Đặc tả | Mục                                              | Chốt                                                                                                                                                                                     |
+| ------ | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M109   | `priority` mặc định có hợp lệ mọi dự án          | Giữ trong rule pack, dự án khác sửa qua `?project=` (đường per-project M101 PR4 đã có)                                                                                                   |
+| M111   | Kiểm handle mồ côi: lệnh riêng hay phép kiểm     | **Phép kiểm trong `XBOSS_KIEMTRA`** — tốn một số hiệu phép kiểm nhưng canh được MỌI lệnh về sau, không riêng M111                                                                        |
+| M111   | Tầng nguồn đang đỏ KIEMTRA thì chặn hay cảnh báo | **Cảnh báo, KHÔNG chặn** — bản vẽ của người khác gần như luôn có lỗi tồn đọng, chặn sẽ khóa kỹ sư khỏi chính tính năng họ cần; xem trước bắt buộc + nguyên tử đã là chốt an toàn đủ mạnh |
+| M112   | Trục xuyên nhiều tệp                             | Ngoài phạm vi (đụng dữ liệu liên tệp = đụng server); cần thì mở M mới                                                                                                                    |
+| M112   | Tỉ lệ đứng thật hay giãn đều                     | **Theo tỉ lệ cao độ thật** — đọc đúng khoảng cách tầng, đúng AC1 đã viết                                                                                                                 |
+| M113   | Ai được phát hành bộ block của dự án             | **`CAN.manageDrawings` trong phạm vi dự án** — PM dự án phát hành được, không dồn về Admin toàn hệ                                                                                       |
+| M113   | Có cần tầng `org_id`                             | Chưa; khuôn trộn §4 mở rộng thành 3 tầng được, xem lại sau UAT đa tổ chức                                                                                                                |
+| M114   | Nhiều hệ một lượt                                | **Không** — chỉ xét lại sau khi một-hệ-một-lượt qua pilot, và phải mở M mới                                                                                                              |
+
+**Mục thứ 9 hoãn có chủ đích, không phải bỏ sót:** M114 "một nhánh nên tách polyline riêng hay nối
+liền vào trục chung" — ảnh hưởng cách `XBOSS_BOCKL` đếm và `_CHIADOT` chia, **cần đo trên bản vẽ
+thật** chứ không đoán trước. PR1–PR3 của M114 không phụ thuộc quyết định này nên không chặn việc
+duyệt; PR4 phải chốt bằng thử nghiệm.
+
+**Thứ tự thi hành khuyến nghị** (ghi trong `docs/nang-cap/README.md`): (1) M109 + M113 song song —
+M113 PR1 **phải qua staging**, migration đụng ràng buộc trên dữ liệu đang có; (2) M110; (3) **M111 —
+rủi ro cao nhất cả bộ**, verify tay trên bản vẽ AVIO thật trước khi phát hành rộng; (4) M114, nên đi
+sau M109 để `crossingPolicy` sẵn sàng cho tuyến sinh tự động; (5) **M112 — điều kiện tiên quyết là
+M111 đã chạy thật qua pilot**, không được làm trước.
+
+**Nhắc người thi hành:** mọi số rule pack và số migration trong 6 tệp là **dự kiến** — lấy số thật
+lúc code. Mọi khóa rule pack mới mặc định `enabled: false`, nạp pack mới không đổi hành vi.
+
+## Đặc tả M114 — auto-routing MEPF theo đồ thị hành lang (2026-08-29)
+
+Tiếp nối mục nghiên cứu ngay dưới; người dùng "chọn phương án tốt nhất" cho 4 câu còn mở, rồi "tách
+riêng" nên đặc tả đi PR riêng với phần nghiên cứu. Nhánh `claude/spec-m114-auto-routing`. **CHƯA
+CODE**, State Draft.
+
+`M114-auto-routing-hanh-lang.md` — `XBOSS_VE_HANHLANG` + `XBOSS_VE_TUYENTUDONG`:
+
+- **Đồ thị hành lang + Dijkstra** (vài chục nút — không cần A\*, và §1 của nghiên cứu đã cho thấy thứ
+  tự xưng A\* trong repo cũng không phải A\*). Hàm chi phí
+  `chiều dài + α×chuyển hướng + β×độ đông − thưởng γ trên cạnh nhánh khác CỦA CHÍNH HỆ ĐÓ đã đi` —
+  `reuseFactor` là thứ khiến các nhánh gom vào trục chung rồi mới tỏa ra (xấp xỉ Steiner bằng cách đi
+  tuần tự và giảm giá cạnh đã dùng). **AC2 bắt chứng minh điều này bằng số**, không nói suông.
+- Tuyến sinh ra là **polyline tim mang XData `XBOSS_VE` đúng cấu trúc `XBOSS_VE` vẽ** (khuôn M107) ⇒
+  toàn bộ dây chuyền lệnh sẵn có dùng được ngay. Auto-routing là máy phát đầu vào, không phải hòn đảo.
+- **Trạng thái chiếm chỗ làn sống trong XData hành lang** (`lanDaCap`) ⇒ không migration, không API,
+  hệ chạy sau đọc được cả khi mở lại bản vẽ hôm khác.
+- Guardrail: một hệ một lượt (không có nút "route tất cả"); không giải được thì **báo kèm lý do và chỉ
+  đúng thiết bị**, cấm vẽ đại; nhánh kỹ sư đã sửa tay được đánh dấu và **chạy lại bỏ qua**; xem trước
+  bắt buộc; không tự nắn hệ đã chạy trước (combined services — chưa có đặc tả).
+- 4 PR; PR4 `route: complex` kèm ranh giới được phép quyết và danh sách cấm tự quyết.
+
+**Còn Open:** một nhánh nên tách polyline riêng hay nối liền vào trục chung (ảnh hưởng cách `BOCKL`
+đếm và `_CHIADOT` chia — chốt ở PR4 với bằng chứng trên bản vẽ thật); có mở chế độ nhiều hệ một lượt
+về sau không (chỉ sau khi một-hệ-một-lượt chạy ổn qua pilot, và phải mở M mới).
+
+## Nghiên cứu auto-routing MEPF + đính chính M77 (2026-08-29)
+
+Người dùng: "nghiên cứu lại cách để auto route từng hệ riêng 1, hybird cũng được, kỹ sư chuẩn bị
+trước rồi auto routing", sau đó "chọn phương án tốt nhất" cho 4 câu còn mở. Nhánh
+`claude/research-auto-routing-mepf`. **Chỉ tài liệu — CHƯA CODE**, M114 State Draft.
+
+**Phát hiện quan trọng nhất — thứ đang mang tên "auto-routing" trong repo không dùng lại được.**
+`M77-auto-routing-beam-sleeve.md` đánh dấu "đã hoàn thành 2026-08-19", có bảng `0111`, có API, có
+trang `/engineering/auto-routing`. Đọc code thật thì:
+
+- `findOptimalRoute3D` mang doc-comment "Thuật toán 3D A* Pathfinding" nhưng thân hàm là **cây quyết
+  định cố định**: thử tuyến trực giao 3 đoạn, vướng thì nâng cả tuyến lên `max(maxZ mọi vật cản)+150`.
+  Không open set, không heuristic, không lưới tìm kiếm. `solve3DGenerativeRoute` (dưới tiêu đề khối
+  `3D A* PATHFINDING…`) cũng là cây quyết định.
+- `doesSegmentIntersectBox` so **hộp bao của đoạn thẳng** với hộp vật cản — sai theo hướng an toàn
+  (báo thừa) nhưng khiến tuyến chéo dài gần như **luôn** bị coi là vướng, tức nhánh "bay lên trên tất
+  cả" là nhánh chạy thường xuyên chứ không phải dự phòng.
+- Cả hai chỉ nhận/trả JSON: **không đọc DWG, không sinh thực thể** — không có đường nào chạy vào bản
+  vẽ của kỹ sư. Plugin phía `plugin-autocad/` chưa có gì về routing.
+- `tests/engineering-auto-routing.test.ts` có 4 ca, đủ cho `validateBeamSleeve`, không phủ đi tuyến.
+
+**Thứ đáng giữ:** `planMultiTierCorridor` (`engineering-cad-corridor.ts:67`) là code thật — phân tầng
+cao độ, cấp phát làn ngang, kiểm thông thủy trần, cảnh báo máng cáp dưới ống nước. Đó là nửa Z + nửa
+làn của bài toán.
+
+**Đã đính chính M77** (khối cảnh báo đầu tệp): nói rõ §2.1 mô tả sai code, phạm vi dùng đúng còn lại
+là ước lượng phía web + `validateBeamSleeve`, và lệnh plugin không gọi vào phần đi tuyến.
+
+**`RESEARCH-AUTO-ROUTING-MEPF.md`** — lập luận vì sao hybrid là cách **đúng** chứ không phải bản rút
+gọn: nền 2D không có mô hình kết cấu, trần, hay lưu lượng; ép máy suy từ DXF là con đường ADR-0006 đã
+ghi lý do từ bỏ. Kỹ sư nạp đúng 4 mẩu máy không thể biết (mất vài phút), máy làm phần lặp hàng trăm
+lần. Kèm bảng so đồ thị hành lang vs A\* không gian tự do trên 6 trục (đầu vào cần, kết quả trông thế
+nào, giải thích được, chi phí tính, sai thì sao, test được không).
+
+**Bốn câu đã chốt** (người dùng "chọn phương án tốt nhất"): (1) hành lang **vẽ mới + nhận polyline có
+sẵn** trong cùng một lệnh, chế độ nhận theo khuôn M107 (không đụng hình học); (2) cấp tầng/làn ở
+**Core C#** — chống trôi 2 bản bằng tham số dùng chung trong rule pack **cộng** bộ đối chứng
+`plugin-autocad/doi-chung/`; (3) **không** làm thủy lực ở bản đầu; (4) M77 đính chính tài liệu, giữ
+`validateBeamSleeve`, plugin không gọi vào phần đi tuyến.
+
+Đặc tả viết theo 4 quyết định này là `M114-auto-routing-hanh-lang.md` — xem mục ngay dưới.
+
+## Đặc tả M109–M113 — đóng nốt M100 §20 của đợt plugin AutoCAD (2026-08-28)
+
+Người dùng: "viết nốt đặc tả cho hướng còn lại". Nhánh `claude/plugin-status-vd0ws9`. **Chỉ đặc tả —
+CHƯA CODE**, cả 5 tệp State **Draft, chờ duyệt**.
+
+**Phạm vi + 3 ngã rẽ thiết kế chốt qua `AskUserQuestion` cùng ngày:** (1) chỉ viết cho **các mục
+M100 §20**, hai hướng lớn còn lại (đồ thị kết nối tuyến–thiết bị, phối hợp xung đột 2D liên hệ) để
+sau; (2) revision cloud **chỉ phần CAD**, không đụng server/web/`drawing_revisions`; (3) nếu sau này
+làm combined services thì đi đường "khai cao độ/ưu tiên theo hệ + ĐỀ XUẤT, kỹ sư quyết", không tự nắn
+tuyến. (Câu hỏi về nơi lưu đồ thị kết nối cũng đã chốt "chỉ trong DWG" — ghi lại để đợt sau khỏi hỏi
+lại, dù đợt này không dùng tới.)
+
+- **`M109-ngat-net-giao-cheo.md`** — `XBOSS_VE_NGATNET`/`_XOA`. Wipeout cho tuyến 2 nét biên, cầu vượt
+  cho tuyến đơn nét; thứ tự trên–dưới theo `crossingPolicy.priority`, đảo tay từng điểm và **nhớ trong
+  XData** nên chạy lại không mất quyết định của kỹ sư. Tái dùng bộ dò giao cắt của phép kiểm 11 (M101)
+  thay vì viết bộ thứ hai. Bất biến số 1 ghi ngay đầu tệp: **tim không bao giờ bị cắt/chia/đổi tọa độ**,
+  AC2 bắt `XBOSS_BOCKL` phải ra đúng con số cũ. 2 PR (PR2 `route: complex` vì `DrawOrder`/wipeout).
+- **`M110-revision-cloud.md`** — `XBOSS_VE_REV`/`_CHOT`/`_HIENTHI`. Điểm ăn tiền so với `REVCLOUD` sẵn
+  có: chốt revision thì ghi **mốc** (Xrecord `XBOSS_REV_SNAPSHOT`, băm SHA-256 tọa độ làm tròn 0,1 mm
+  của mọi đối tượng có XData), lần sau **đề xuất** vùng thêm/xóa/đổi và cảnh báo vùng đã sửa mà chưa
+  khoanh. Số revision append-only, cloud cũ giữ ở layer con `-R{n}`, khung tên hết dòng thì **dừng chứ
+  không ghi đè**. 2 PR, cả hai `route: spec`.
+- **`M111-nhan-ban-tang-dien-hinh.md`** — `XBOSS_VE_NHANTANG`. Lý do M100 §20 hoãn mục này ("rủi ro
+  nhân bản lỗi hàng loạt") được xử lý bằng 4 chốt: xem trước bắt buộc, **nguyên tử** (lỗi ở tầng thứ k
+  → không ghi tầng nào), AC3 "không handle mồ côi" **kiểm tự động** chứ không kiểm mắt, và verify tay
+  trên bản vẽ AVIO thật. Việc thật sự khó là ánh xạ lại handle trong XData sang đối tượng của chính
+  bản chép (`DeepCloneObjects` + `IdMapping`) — copy thường để lại handle trỏ về tầng gốc, khiến
+  `XBOSS_VE_DOI` ở tầng 08 đi sửa tuyến tầng 05. 3 PR (PR2 `route: complex`, có ghi ranh giới được
+  phép quyết).
+- **`M112-so-do-dung-riser.md`** — `XBOSS_VE_TRUCDUNG` + `XBOSS_VE_RISER`. Giải bài "cần dữ liệu liên
+  tầng có cấu trúc" bằng cách để kỹ sư **đánh dấu** điểm trục đứng (XData vai trò `TrucDung`) thay vì
+  đoán từ hình học 2D; cao độ tầng khai tay, **cấm nội suy** (giữ đúng luật M100 §6.3 đã áp cho
+  `XBOSS_VE_MATCAT`). Sơ đồ là snapshot ⇒ phép kiểm "sơ đồ đứng cũ hơn mặt bằng"; vai trò `Riser` bị
+  loại khỏi takeoff (bất biến có test). **Điều kiện tiên quyết ghi ngay đầu tệp: M111 phải chạy thật
+  qua pilot trước.** 3 PR.
+- **`M113-thu-vien-block-theo-du-an.md`** — không thay thư viện toàn cục bằng per-project mà làm **hai
+  tầng, dự án đè lên toàn cục**: phần lớn block MEPF giống nhau ở mọi dự án, chỉ khung tên/ký hiệu là
+  riêng. `cad_block_libs` thêm `project_id` nullable + RLS 2 nhánh theo đúng khuôn `0140` (M101 PR4);
+  `UNIQUE(version)` đổi thành unique theo `(project_id, version)` để 2 dự án cùng đặt nhãn `b1` được;
+  luật đè nằm trong **một** hàm thuần `tronThuVienBlock`. Tương thích ngược là AC1: plugin không gửi
+  `?project=` nhận đúng thư viện như hôm nay. **Migration đụng ràng buộc trên dữ liệu đang có ⇒ bắt
+  buộc staging trước, không đi thẳng production**; vùng rủi ro cao, rà `docs/audit.md`. 4 PR.
+
+**Mục thứ 6 của M100 §20 không cần đặc tả — đã tự đóng:** phép kiểm 17 (tag trùng) + 18 (mã BOQ mồ
+côi) có trong `PhepKiemMoRong.cs` từ M102, `support-hanger`/`sleeve-opening` là item takeoff trong
+rule pack từ M100 PR5 (đã grep xác nhận, không tin bảng trạng thái).
+
+**Ghi chú cho người thi hành:** mọi số rule pack (`v<next>`) và số migration trong 5 tệp là **dự
+kiến** — lấy số thật lúc code bằng `ls lib/ky-thuat/cad/rule-packs | sort -V | tail -1` và
+`ls migrations | sort -V | tail -1`. Mọi khóa rule pack mới đều mặc định `enabled: false` theo luật đã
+áp từ M101/M102, nên nạp pack mới không đổi hành vi trên máy kỹ sư.
+
+**Còn Open (chốt lúc duyệt):** M109 — `priority` mặc định có hợp lệ mọi dự án; M111 — kiểm handle mồ
+côi làm thành lệnh riêng hay phép kiểm trong `XBOSS_KIEMTRA`, và tầng nguồn đang đỏ `XBOSS_KIEMTRA`
+thì chặn hay chỉ cảnh báo; M112 — vẽ theo tỉ lệ cao độ thật hay giãn đều, trục xuyên nhiều tệp;
+M113 — ai được phát hành bộ của dự án (đề xuất: `CAN.manageDrawings` trong phạm vi dự án), có cần
+tầng `org_id` nữa không.
+
+## Verify tay plugin v9 trên bản vẽ AEC thật — `XBOSS_VE_NEN` báo `eInvalidKey` (2026-08-27)
+
+Người dùng build plugin trên máy Windows và verify trên bản vẽ thật (`TMDV 3F.dwg`, có xref
+kiến trúc/kết cấu). Kết quả: `XBOSS_RULEPACK` nạp đúng **v9** (14 quy tắc bóc tách, 7 nhóm layer),
+`XBOSS_KIEMTRA`/`XBOSS_BATCH`/`XBOSS_VE` chạy đúng như đặc tả (kể cả cảnh báo tuyến tim tự cắt
+nên không sinh được nét biên, và chặn `XBOSS_CHUANHOA` khi bản vẽ chưa QSAVE).
+
+**Còn lỗi:** `XBOSS_VE_NEN` → `LỖI khi chuẩn bị nền — đã rollback: eInvalidKey`. Rollback đúng
+(bản vẽ nguyên trạng) nhưng thông điệp **không nói chết ở bước nào** nên không truy được nguyên
+nhân từ log; các điểm ghi bảng layer đã có sẵn guard `IsDependent` (vá 2026-08-26) nên nghi phạm
+nằm ở chỗ khác. Đã vá 2 việc, **chưa xác định được gốc rễ**:
+
+1. `VeNenCommands.ChuanBiNen`: mốc bước hiện hành (`buoc`) cập nhật trước mỗi thao tác ghi, in kèm
+   mã lỗi — lần chạy tới sẽ chỉ đúng bước (đọc clayer / khóa-làm mờ / tạo layer đích tên gì / đặt
+   clayer / ghi trạng thái NOD).
+2. `VeLayerService.HoanNguyen`: bọc try/catch **từng layer** (đối xứng `KhoaVaLamMo`) + trả danh
+   sách layer không hoàn nguyên được để lệnh BÁO. Trước đó một layer khó tính làm cả lệnh rollback
+   ⇒ bản vẽ kẹt vĩnh viễn ở trạng thái nền (mọi layer khóa + mờ, chạy lại lại chết đúng chỗ đó).
+
+**GỐC RỄ (tìm ra 2026-08-27 nhờ mốc bước):** `Autodesk.AutoCAD.Colors.Transparency.Alpha` CHỈ hợp
+lệ khi độ mờ là `ByAlpha`; layer để `ByLayer`/`ByBlock`/không hợp lệ thì **đọc** `.Alpha` ném
+`eInvalidKey`. Bản vẽ nhập từ DXF gần như luôn có layer như vậy. Hai chỗ đọc trong
+`VeLayerService` là đúng hai bước lệnh chết: `KhoaVaLamMo` (bước "khóa + làm mờ layer nền" của
+`XBOSS_VE_NEN`) và `DamBaoLayer` nhánh layer-đã-có (bước 'tạo/mở layer nhãn "G-ANNO-TEXT"' của
+`XBOSS_VE_NHAN`). Đã vá bằng `AlphaAnToan()` — không phải ByAlpha thì layer vốn KHÔNG bị làm mờ
+⇒ trả 255, đúng nghiệp vụ chứ không phải giá trị vá víu. Stub CI bổ sung `IsByAlpha` để cổng
+`XBoss.Cad.AcadShim` bắt được lớp lỗi này ở PR thay vì đợi ra máy có AutoCAD.
+
+**Tiếp theo:** verify lại 2 lệnh trên bản vẽ đó. Chưa verify `XBOSS_VE_CHIADOT` (nợ verify tay M105).
+
+## Tài liệu: hướng dẫn build plugin AutoCAD từ đầu trên Windows (2026-08-27)
+
+Thêm `plugin-autocad/BUILD-WINDOWS.md` — hướng dẫn **build từ máy Windows trắng**: điều kiện máy
+(AutoCAD 2026 bản đầy đủ, LT/2021–2025 không chạy được), cài .NET 10 SDK + .NET 8 runtime, vì sao
+**không cần tải ObjectARX SDK** riêng, bước **kiểm nền .NET của `acmgd.dll`** (bẫy `CS1705` từng
+làm hỏng buổi build 2026-08-25), đường nhanh 1 lệnh `dong-goi.ps1`, và cùng việc đó **làm tay
+từng bước** (Core/Tests → cổng shim → Adapter → dựng `.bundle` → cài), kèm bảng 12 lỗi thường gặp.
+
+Ba tài liệu plugin giờ tách vai rõ: `BUILD-WINDOWS.md` (người build) → `VERIFY-VA-PHAT-HANH.md`
+(verify tay + phát hành) → `CAI-DAT.md` (kỹ sư máy trạm chỉ cài gói `.zip`). Đã chèn liên kết
+chéo ở cả ba. Chỉ tài liệu, không đụng mã nguồn.
+
+## Đưa `next build` ra khỏi VPS — đóng blocker deploy 2026-07-19 (2026-08-26)
+
+Người dùng chọn "theo khuyến nghị" sau đợt rà ý tưởng tích hợp: làm mục ưu tiên 1 — gỡ blocker
+deploy đang chặn production, trước mọi tính năng mới.
+
+**Vấn đề (đã ghi ở mục blocker 2026-07-19 phía dưới):** `next build` chạy trên VPS mất 20-23
+phút vì RAM thiếu phải bù bằng swap đĩa; từng bị OOM-kill (exit 137), từng vượt
+`command_timeout` của `appleboy/ssh-action` và bị cắt ngang **đúng lúc build vừa xong** (chưa
+kịp swap `.next`/`pm2 reload`) ⇒ commit mới nhất trên `main` không lên được production. Cách vá
+cũ chỉ là nới timeout 25m → 40m, không đụng gốc rễ.
+
+**Quyết định người dùng chốt (3 câu hỏi):** rsync thẳng từ Actions (không thêm PAT trên VPS) ·
+giữ `next start` + chỉ chuyển `.next` (không đổi sang `output: "standalone"` trong đợt gỡ
+blocker) · giữ đường build tại chỗ sau cờ `--build-local`.
+
+**Đã làm**
+
+1. **`.github/workflows/deploy.yml` build trên runner:** checkout đúng `workflow_run.head_sha`
+   (không phải HEAD của `main` lúc job khởi động), `npm ci` + `NEXT_DIST_DIR=.next-ci npm run
+build`, đóng gói `.next-ci.tar.gz` kèm phiếu `.next-ci.info` (`sha=`/`node=`), rsync sang
+   VPS rồi mới gọi `bash deploy.sh`. `command_timeout` 40m thay bằng `timeout 15m` cho bước SSH
+   còn lại (không còn build nên vài phút là xong).
+2. **Runner build tại đúng `/var/www/xboss`:** `.next` có nhúng **đường dẫn tuyệt đối** lúc
+   build (`required-server-files.json`, trace `*.nft.json`) — build ở `/home/runner/...` rồi
+   chạy ở `/var/www/xboss` là lớp lệch âm thầm không đáng gánh.
+3. **`NEXT_PUBLIC_SENTRY_DSN` (bẫy hỏng-âm-thầm, phát hiện khi rà):** biến `NEXT_PUBLIC_*`
+   được **nhúng vào bundle lúc build**, trước đây lấy từ `.env.local` trên VPS. Chuyển build
+   sang runner mà không truyền vào thì Sentry phía trình duyệt tự tắt, không lỗi nào báo ra.
+   Đã truyền qua secret cùng tên (tuỳ chọn — bỏ trống thì hành vi y như VPS không đặt biến).
+4. **`deploy.sh` hai chế độ:** mặc định giải nén gói từ CI; `--build-local` giữ nguyên đường
+   cũ; `--staging` luôn tự build tại chỗ (không workflow nào gửi gói cho staging). Giữ nguyên
+   toàn bộ swap atomic + health-check + auto-rollback. Thêm `-e` cho gói CI trong `git clean`
+   (không thì bước 2/7 xoá mất gói vừa rsync sang), cờ lạ → `exit 2`.
+5. **Hai cổng chặn trước khi swap:** SHA trong gói phải khớp `git rev-parse HEAD` (chống chạy
+   bundle của commit khác với mã nguồn/migration vừa áp khi có push chen vào giữa) và Node
+   major lúc build phải khớp Node trên VPS. Gói chỉ bị xoá sau khi health-check pass ⇒ deploy
+   hỏng giữa chừng chạy lại `bash deploy.sh` được ngay, không phải chờ CI build lại.
+6. **Host key SSH:** thêm secret tuỳ chọn `VPS_SSH_KNOWN_HOSTS` để ghim; không có thì
+   `ssh-keyscan` (đúng thứ `ssh-action` vẫn làm ngầm trước đây) và **in cảnh báo** — chấp nhận
+   TOFU một cách tường minh thay vì tưởng đã ghim.
+7. **Tài liệu:** `DEPLOY.md` mục yêu cầu phần cứng (đỉnh RAM khi deploy biến mất ở cấu hình
+   mặc định), bảng 3 chế độ deploy, danh sách secrets workflow cần; `.gitignore` cho `.next-ci*`.
+
+**Verify:** `deploy.sh` chạy thật trong sandbox (git giả + stub `npm`/`pm2`/`curl`) đủ 7 ca —
+gói đúng (deploy xong, gói được dọn), sai SHA (exit 1), sai Node major (exit 1), thiếu gói
+(exit 1, chỉ đường `--build-local`), `--build-local`, `--staging`, cờ lạ (exit 2). `bash -n`
+xanh. Không đụng file TypeScript nào nên lint/typecheck không liên quan.
+
+**Còn nợ:** lần deploy thật đầu tiên phải theo dõi tận nơi (đây là đường deploy production).
+Nếu đang dùng Sentry client thì **khai secret `NEXT_PUBLIC_SENTRY_DSN` trước** khi merge, nếu
+không bản deploy kế tiếp sẽ mất Sentry phía trình duyệt. `output: "standalone"` để dành cho đợt
+sau nếu muốn bỏ luôn `npm ci` trên VPS.
+
+## Đóng tồn đọng tích hợp plugin AutoCAD (đợt 2, 2026-08-25)
+
+Sau khi PR #402 merge, rà lại toàn cụm trên `main` để trả lời "còn gì chưa tích hợp": 8/8 mục của
+PR #402 xác minh có thật trong code; phần tồn đọng còn lại thi hành song song 10 gói.
+
+**Đã làm**
+
+1. **KL lệch giữa 2 tầng (chặn):** Excel gộp KL trên web thiếu cột quy đổi trong khi Excel plugin
+   có ⇒ cùng bản vẽ ra 2 con số. Thêm cột "Hệ số quy đổi"/"Mô tả quy đổi"/"KL quy đổi", đổi tên
+   cột cũ thành "Khối lượng (đo)"; chỉ coi là có quy đổi khi `heSoQuyDoi > 0` (khớp ngữ nghĩa
+   `TakeoffLine.HeSoQuyDoi` bên C#), thiếu thì để trống — không suy đoán.
+2. **Lỗi RLS thật (phát hiện khi viết test):** `saveCadDiffSession`/`listCadDiffSessions`/
+   `listCadBlockCatalogs` trong `lib/ky-thuat/engineering-cad-skills.ts` không bọc
+   `withProjectScope`, mà 2 bảng của migration 0099 bật `FORCE ROW LEVEL SECURITY` không có nhánh
+   "GUC rỗng thì cho qua" ⇒ trên production (role `xboss_app`, NOBYPASSRLS) `GET /api/engineering/
+cad/diff` và `/blocks` **luôn trả rỗng**, lưu phiên diff **thất bại âm thầm**. Đã vá + test hai
+   chiều (đúng dự án thì thấy, dự án khác thì không, ghi chéo bị `WITH CHECK` chặn).
+3. **Thu hồi revision bản vẽ:** `POST /api/drawings/revisions/[id]/withdraw` (chính chủ +
+   `CAN.manageDrawings`, chỉ khi `submitted`/`commented`), trạng thái mới `withdrawn` —
+   migration `0142` chỉ **nới** CHECK constraint (không đụng dữ liệu, idempotent); nút "Thu Hồi"
+   trên `/ban-ve` hiện theo cờ `canWithdraw` server tính.
+4. **Duyệt block hết "mù":** `GET /api/engineering/cad/block-proposals/[id]/candidate` trả DWG
+   ứng viên (key đọc từ DB, không ghép path từ client) + hiện `sha256` để đối chiếu.
+5. **Bước chuẩn hoá & cảnh báo** từ `standardize_report` nay hiện trong bảng điều khiển plugin.
+6. **Plugin (C#):** gửi kèm `drawingId` khi biết (server ưu tiên id), `?v=` cache-busting cho
+   manifest/DWG nền thư viện block (404 → hỏi lại 1 lần bỏ `v`, giữ ETag), đọc `duocThemTrucTiep`
+   để chỉ đường sang web khi người dùng có quyền thêm thẳng.
+7. **Xác minh gói cài:** `GET /api/engineering/cad/plugin-package` đọc `<Version>` từ
+   `plugin-autocad/Directory.Build.props`; biến mới `XBOSS_PLUGIN_SHA256` (tuỳ chọn) hiện checksum
+   để kỹ sư đối chiếu tệp tải về; thiếu nguồn → ẩn, không bịa số.
+8. **Chống trôi & phủ test:** test C# nạp `doi-chung/takeoff-sidecar-mau.json` (đối chứng 2 tầng
+   nay khép cả phía plugin); test cho 8 route CAD trước đây không có test nào; test nhánh
+   `drawingId`; bước CI kiểm `dotnet --version` phải là 8.x (repo ghim action theo SHA nhưng phiên
+   không tra được SHA của `actions/setup-dotnet` — dùng bước kiểm để CI đỏ có thông báo rõ).
+9. **Dọn nợ UI:** 29 hex cứng trong `CadViewportStudio` — màu giao diện về token (đảo theme đúng),
+   màu vẽ CAD gom vào `cad-layer-colors.ts` kèm chú thích "cố ý không theo theme".
+
+**Giữ nguyên có chủ đích:** `maxRetries: 1` ở `plugin-upload` (luồng đồng bộ không có worker chạy
+lại, retry mặc định 3 sẽ đưa tác vụ lỗi về `pending` treo mãi).
+
+**Nợ còn lại:** phát hành gói cài đầu-cuối cần runner Windows có AutoCAD 2026 + ObjectARX bản
+quyền; verify tay plugin trên máy thật; `drawings.code` hiện UNIQUE toàn cục nên ca "trùng mã giữa
+2 dự án" chưa dựng được (giá trị của `drawingId` là đúng địa chỉ + sẵn sàng khi ràng buộc đổi).
+
 ## Bổ sung tích hợp toàn cụm plugin AutoCAD M99–M104 (2026-08-25)
 
 Người dùng: "bổ sung tích hợp toàn bộ plugin M99–M104 · kiểm tra lại chưa có thì viết". Ba luồng
@@ -165,6 +1147,191 @@ M101/M102 khi bật.
 tuyến–thiết bị) là bậc có đòn bẩy lớn nhất; sau đó phối hợp xung đột 2D liên hệ (combined services,
 cần cao độ đã khai trên đối tượng); các mục để lại ở M100 §20 (ngắt nét giao chéo, revision cloud,
 nhân bản tầng điển hình, riser). Mỗi mục phải mở `M<xx>` mới có duyệt trước khi code.
+
+**M105 — Tự động phân chia đốt toàn hệ MEPF theo kiểu kết nối:** ✅ \*\*Approved 2026-08-26, PR1 XONG
+
+- PR2 (Core + Adapter) XONG\*\* (`docs/nang-cap/M105-chia-dot-mepf-theo-kieu-noi.md`). Chia đốt MỌI tuyến MEPF
+  vẽ bằng `XBOSS_VE`: ống gió theo kiểu nối (nẹp C max 1180 / TDC max 1110 / mặt bích V max 1180 — số
+  người dùng chốt), ống nước/PCCC theo cây thương phẩm 5800 (ren/grooved/măng xông), máng cáp thanh
+  2500 + tấm nối. MỘT engine tổng quát tham số hóa qua rule pack — thêm hệ/kiểu nối mới về sau chỉ là
+  sửa rule pack, không sửa code.
+
+* **PR1 (xong):** rule pack **v9** (`jointRules` cho đủ 9 tuyến, mở rộng thuần trên v8 — có test canh);
+  engine TS `lib/ky-thuat/engineering-joint-segmentation.ts` (2 chế độ chia `deu`/`cay_nguyen`, chọn
+  kiểu nối theo cạnh lớn hoặc DN, parser biểu thức định mức phụ kiện — không dùng eval); 9 **test
+  vector JSON dùng chung** ở `plugin-autocad/testdata/joint-segmentation/`; `migrations/0143` (2 bảng
+  - RLS 2 nhánh theo mẫu 0092) + store upsert idempotent + `POST/GET /api/engineering/joint-segmentation`
+    (kiểm LẠI bất biến "tổng đốt + khe = chiều dài đoạn" ở server, 422 khi lệch) + trang
+    `/engineering/joint-segmentation`. 29 ca test engine + 36 ca rule pack xanh.
+* **PR2 phần Core (xong):** `XBoss.Cad.Core/Draw/JointRulesConfig.cs` + `JointSegmenter.cs` — bản C#
+  cho ra **đúng từng số** như bản TS, chứng minh bằng 56 ca đọc thẳng 9 test vector đó. 644/644 ca
+  .NET xanh. **Bẫy đã né:** làm tròn 0,1 mm phải là `MidpointRounding.AwayFromZero` — mặc định .NET
+  là làm tròn ngân hàng nên lệch bản TS ở các ca `,x5` (đã kiểm bằng mutation: đổi về mặc định → 3 ca đỏ).
+* **PR2 phần Adapter (xong):** lệnh `XBOSS_VE_CHIADOT` (`XBoss.Cad.Acad/Commands/VeChiaDotCommands.cs`)
+  — chọn tuyến hoặc quét cả hệ, hỏi đáp ngoài transaction, vẽ vạch chia + tag đốt trong **1
+  transaction = 1 nhóm UNDO**, XData 2 chiều (vạch/tag mang handle tim + chỉ số đốt; tim mang dấu
+  chia đốt) nên chạy lại là **idempotent**; tuyến không khai `jointRules` bị **bỏ qua kèm lý do**
+  (AC10). Hình học đẩy xuống Core `Draw/JointMarkPlacement.cs` (cắt đoạn theo vertex, vị trí vạch
+  cộng dồn **có cộng khe mối nối**, chiều dài vạch theo `edgeStyle`) để test được trên CI Linux.
+  Kèm bảng đốt trong `XBOSS_VE_THONGKE` (bảng RIÊNG, mã `chiadot`) và mục chia đốt trong báo cáo
+  phiên vẽ (`ChiaDot`/`ChiaDotBoQua` + cảnh báo ghi đè kiểu nối). `XBOSS_VE_DOI` đổi cỡ tuyến thì
+  **xóa vạch chia cũ + dấu chia đốt** kèm nhắc chạy lại (cùng lý do phải gỡ dấu bóc). 661/661 ca
+  .NET xanh (644 + 17 ca mới), cổng biên dịch Adapter `XBoss.Cad.AcadShim` xanh.
+* **Bẫy layer đã né:** hậu tố layer vạch chia là `JOINT` **không có gạch nối đầu** — `layerMatchAny`
+  của takeoff khớp theo ranh giới token nên `M-DUCT-SUPP-JOINT` vẫn khớp mục bóc `M-DUCT-SUPP` và
+  vạch chia sẽ bị bóc trùng thành chiều dài ống. Cùng lớp lỗi mà `edgeLayerSuffix` đã né bằng `EDGE`
+  (M100 FR4); có test canh ở cả 2 tầng.
+* **Còn lại:** verify tay lệnh mới trên máy có AutoCAD 2026 (cùng cổng với M99/M100/M102 — không có
+  runner Windows).
+
+**M106 — Hộp thoại WPF cho lệnh plugin + trình dẫn quy trình:** ✅ **ĐÓNG về mặt code 2026-08-26 —
+PR1 (nền + 2 lệnh mẫu), PR2 (trình dẫn quy trình) và PR3 (phủ nốt các lệnh còn lại) XONG**
+(`docs/nang-cap/M106-hop-thoai-wpf-va-quy-trinh.md`). Kỹ sư chạy lệnh bằng **chuột** thay cho chuỗi
+hỏi đáp keyword ở dòng lệnh, và thấy rõ đang ở bước nào của quy trình.
+
+**PR4 — theme tối cho từng control trong hộp thoại (sửa lỗi thật từ ảnh AutoCAD 2026, 2026-08-26):**
+
+- **Bệnh:** `ComboBox` của `XBOSS_VE` (Hệ / Loại tuyến / Size) hiện **nền sáng + chữ gần trắng**,
+  trông như đang bị khóa, lệch hẳn phần còn lại của cửa sổ. Nguyên nhân: ControlTemplate **mặc định**
+  của WPF vẽ chrome bằng brush hard-code của Windows và **bỏ qua `Background`** — Setter màu suông
+  không ăn, trong khi Setter `Foreground` thì ăn, nên ra đúng cảnh chữ sáng trên nền sáng.
+- **Sửa:** thay hẳn ControlTemplate trong `Ui/Wpf/XBossDialog.xaml` cho mọi control **đang dùng** mà
+  WPF tự vẽ chrome hoặc ghi đè màu ở trigger của theme: `ComboBox` (kể cả `IsEditable` + `Popup` xổ
+  xuống), `ComboBoxItem`, `TextBox`, `CheckBox`, `RadioButton`, `ScrollBar`, và 2 kiểu `Button`
+  (OK/Hủy). Mỗi template vẽ đủ **thường / rê chuột / có focus / đang mở / bị khóa** — trạng thái khóa
+  phải cách trạng thái thường thật xa, vì lỗi gốc chính là ô bình thường trông như khóa.
+- **8 tông trạng thái mới trong `Ui/MauBang.cs`** (Vien/VienSang/VienKhoa/NenRe/NenKhoa/ChuKhoa/
+  NutChinhRe/NutChinhNhan) — vẫn **một nguồn màu duy nhất** cho cả WinForms lẫn WPF, không hardcode
+  mã màu trong XAML. Viền đạt 3:1 với nền (ngưỡng WCAG cho ranh giới control); nút màu **đậm dần**
+  khi rê chuột đúng ADR-0010, nút xám thì sáng dần (đậm thêm sẽ chìm vào nền cửa sổ).
+- **Tương phản chữ:** nhãn trường và câu dẫn chuyển từ `ChuMo` sang `Chu`; khối chỉ-đọc và vùng lý do
+  có viền `Vien` thay vì `NenKhoi` (chỉ hơn nền vài mức xám, coi như không có viền trên máy công trường).
+- **Vá lỗ cổng CI:** XAML không được biên dịch ở CI (WPF chỉ có trên Windows) nên thêm bất biến đọc
+  thẳng tệp XAML — `XBoss.Cad.Tests/ThemeHopThoaiTests.cs`: style màu **phải** kèm `Template`, phải có
+  trạng thái `IsEnabled=False`, `TargetName` phải tồn tại trong chính template đó, brush phải có thật
+  trong `MauBangWpf`, cấm hardcode mã màu, và control cùng bệnh **mới thêm** vào XAML mà thiếu template
+  thì test tự đỏ. **865/865 ca .NET xanh** (nền trước khi sửa là 841 → +24 ca mới),
+  AcadShim 0 warning.
+- **Còn lại:** verify tay §C8b (mục 64–67) — 5 trạng thái của từng control, ở cả DPI 100 % và 150 %.
+  Không đụng ViewModel/binding/hành vi lệnh nên kết quả ra bản vẽ phải y hệt (mục 67 đối chiếu).
+
+**PR3 — phủ hộp thoại cho các lệnh còn lại của §7.2:**
+
+- **19 ViewModel mới ở Core** (`Core/Ui/ViewModels/{KetNoi,ChuanHoa,Ve,ChiTiet,HoSo,BocKl}DialogViewModels.cs`
+  - `DeXuatBlockDialogViewModel.cs` + `DungChungDialog.cs`) phủ 20 lệnh: `XBOSS_LOGIN`,
+    `XBOSS_UPLOAD`, `XBOSS_CHUANHOA`, `XBOSS_BATCH`, `XBOSS_BOCKL(_XOA/_XUAT)`, `XBOSS_VE_NEN`,
+    `XBOSS_VE_NHAN`, `XBOSS_VE_DOI`, `XBOSS_VE_PHUKIEN`, `XBOSS_VE_THIETBI`, `XBOSS_VE_GIADO`,
+    `XBOSS_VE_LOCHO`, `XBOSS_VE_TAG`, `XBOSS_VE_THONGKE`, `XBOSS_VE_MATCAT`, `XBOSS_VE_TRANGIN`,
+    `XBOSS_VE_DEXUAT`. XAML là **DataTemplate thuần** trong `XBossDialog.xaml` (vẫn đúng MỘT
+    `InitializeComponent()` trong cả plugin — cổng AcadShim không phải stub thêm gì).
+- **Nội dung hộp thoại = ĐÚNG câu hỏi mà lệnh đang hỏi.** Nơi bảng §7.2 mô tả lệch với code thật thì
+  lấy **code thật** làm chuẩn và ghi rõ trong doc-comment của từng ViewModel (vd `XBOSS_LOGIN` là
+  device pairing nên không có email/mật khẩu; `XBOSS_VE_GIADO` không hỏi khoảng cách vì
+  `supportSpacingMm` tra theo từng size; `XBOSS_VE_TAG` không hỏi tiền tố/số bắt đầu vì khuôn tag
+  nằm ở rule pack). Thông tin suy ra hiện **CHỈ ĐỌC** (FR6), không mở bậc tự do mới (§2.4).
+- **Tỉ lệ in 1:x vào hộp thoại** (việc hẹn ở PR1) cho `XBOSS_VE_NHAN`, `XBOSS_VE_THONGKE`,
+  `XBOSS_VE_MATCAT`, `XBOSS_VE_TRANGIN` — vẫn nhớ ở đúng `VeContext.TiLeIn`, **không có cơ chế nhớ
+  thứ hai**; lệnh vẽ đầu tiên của phiên nay cũng chạy trọn bằng chuột.
+- **AC8:** `Ui/DeXuatBlockDialog.cs` (WinForms) đã **xóa**, thay bằng ViewModel + DataTemplate WPF
+  giữ nguyên 6 trường và `BlockDeXuatRules`; palette `XBOSS_BANG` **giữ WinForms** đúng ranh giới đã
+  chốt. Fallback FR9 giữ nguyên cho mọi lệnh (hàm `Hoi*` cũ không xóa); riêng `XBOSS_VE_DEXUAT` vốn
+  không có đường hỏi đáp keyword nên UI hỏng = dừng kèm lý do.
+- **831/831 ca .NET xanh** (nền PR2 là 735 → +96 ca ViewModel), AcadShim 0 warning.
+- **Còn lại:** verify tay §C8 (mục 43–63) của `plugin-autocad/VERIFY-VA-PHAT-HANH.md` trên máy có
+  AutoCAD 2026 — XAML không có test tự động.
+
+**PR2 — trình dẫn quy trình (FR7/FR8/FR10, AC5/AC7):**
+
+- **Luật ở Core, có test:** `Core/Ui/QuyTrinh.cs` thêm `DauHieuQuyTrinh` (dữ liệu **đã đọc sẵn**:
+  token, rule pack, sidecar cạnh DWG, XData trên bản vẽ) + `TinhTrang`/`TinhTrangTatCa` trả
+  `Xong`/`Chua`/`KhongApDung` kèm **lý do tiếng Việt** khi chưa đủ điều kiện vào bước. Core không
+  mở `Database`, không đọc tệp — Adapter đọc rồi truyền vào, nên **toàn bộ quy tắc test được trên
+  CI Linux** và UI không có nhánh nghiệp vụ nào của riêng nó.
+- **Dấu hiệu "xong" đều SỐNG trong bản vẽ/tệp cạnh nó** (XData `XBOSS_VE`, dấu bóc, sidecar), không
+  phải cờ nhớ trong phiên: mở lại bản vẽ đã làm dở từ hôm trước là 6 bước nhận đúng ngay, không bắt
+  làm lại (có ca test riêng). Bước 5 nhận layout trang in **theo mẫu tên rule pack**
+  (`SheetSetup.LaTenLayoutTrangIn`) — đếm suông "có layout" sẽ báo xong ngay trên bản vẽ trắng vì
+  AutoCAD sẵn có Layout1.
+- **`XBOSS_BANG` thành 2 tab:** **Quy trình** (`Ui/TrinhDanControl.cs` — 6 giai đoạn đúng thứ tự §6,
+  mỗi bước: trạng thái ✓/○/– + lý do + nút chạy từng lệnh lấy từ `QuyTrinh.LenhCua`) và **Trạng
+  thái** (bảng M102 giữ nguyên). Nút của bước chưa đủ điều kiện chỉ **làm mờ kèm lý do, vẫn bấm
+  được** — §6 chốt đây là hướng dẫn, không phải cổng chặn (ca hợp lệ: mở lại bản vẽ đã chuẩn hóa từ
+  phiên trước). Bấm nút = `SendStringToExecute` đúng lệnh, y hệt Ribbon.
+- **Tự tính lại khi đổi bản vẽ:** `DocumentManager.DocumentActivated` → vẽ lại cả hai tab bằng dữ
+  liệu cục bộ (cố ý **không** kèm lượt hỏi server danh sách đề xuất block — mạng công trường yếu).
+- **Ribbon theo quy trình:** panel **"Quy trình"** đứng đầu tab XBoss (nút to mở `XBOSS_BANG`; nhóm
+  "Bảng điều khiển" chỉ có đúng lệnh này nên hiện ở đây, không có hai nút cùng chạy một lệnh); nút
+  trong mỗi panel xếp theo `(Buoc, ThuTuTrongBuoc)` — sắp theo mỗi `ThuTuTrongBuoc` thì các bước
+  đan xen nhau vì bước nào cũng đánh số từ 1.
+- **Cổng CI:** 735/735 ca .NET xanh (707 + 28 ca mới), `XBoss.Cad.AcadShim` 0 warning.
+- **Còn lại:** verify tay §C7 (mục 37–42) của `plugin-autocad/VERIFY-VA-PHAT-HANH.md` — palette
+  không có test tự động. PR3 (16 lệnh còn lại + chuyển `DeXuatBlockDialog` sang WPF) chưa làm; AC8
+  ("không còn tệp WinForms nào trong `Ui/`") vẫn hở vì palette M102 + trình dẫn mới đang là WinForms
+  — chuyển cả palette sang WPF là quyết định riêng của PR3, không gộp vào PR2.
+
+**PR1 — nền hộp thoại WPF:**
+
+- **Nền quy trình (Core):** `XBoss.Cad.Core/Ui/QuyTrinh.cs` khai 6 giai đoạn vòng đời bản vẽ
+  (Kết nối → Chuẩn hóa nền → Vẽ shop drawing → Chi tiết chế tạo → Hồ sơ bản vẽ → Bóc & nộp) +
+  nhóm phụ trợ; `LenhCatalog.LenhInfo` thêm `Buoc`/`ThuTuTrongBuoc` **không có giá trị mặc định**
+  nên thêm lệnh mà quên xếp bước là **không biên dịch nổi** (FR10/AC7). Hàm suy trạng thái từng
+  bước để cho PR2 (chỗ cắm đã khai: `TrangThaiBuoc`/`TinhTrangBuoc`).
+- **Khung hộp thoại:** `Core/Ui/ViewModels/DialogViewModelBase.cs` — **thuần .NET**, chỉ
+  `INotifyPropertyChanged`, không tham chiếu WPF/AutoCAD, nên **toàn bộ hành vi hộp thoại test được
+  trên CI Linux**; Adapter `Ui/Wpf/XBossDialog.xaml(.cs)` là cửa sổ WPF mỏng (nội dung từng lệnh là
+  `DataTemplate`, không code-behind riêng), mở bằng `Application.ShowModalWindow`, Enter = OK,
+  Esc = Hủy, màu bọc lại `MauBang` của bảng điều khiển M102 qua `MauBangWpf`.
+- **2 lệnh mẫu:** `XBOSS_VE` gộp 5 câu hỏi nối tiếp vào **một form** sửa qua lại tự do (bề rộng nét
+  biên hiện theo size, size ngoài danh mục → cảnh báo `custom` ngay tại hộp thoại);
+  `XBOSS_VE_CHIADOT` có **xem trước số đốt + chiều dài từng đốt** gọi thẳng `JointSegmenter.ChiaTuyen`
+  — đổi kiểu nối là con số đổi ngay (AC4).
+- **FR9 — không lệnh nào chết vì UI:** `Ui/Wpf/HopThoaiXBoss.Thu` bắt mọi lỗi dựng UI và đọc biến
+  `XBOSS_UI_DIALOG=0` → rơi về **đúng** chuỗi hỏi đáp dòng lệnh cũ (các hàm `Hoi*` giữ nguyên).
+  Hộp thoại nằm NGOÀI transaction, 1 lệnh = 1 nhóm UNDO, kết quả vẽ ra bản vẽ **không đổi**.
+- **Cổng CI:** 706/706 ca .NET xanh (661 + 45 ca mới); `XBoss.Cad.AcadShim` xanh 0 warning nhờ
+  `WpfStub.cs` khai giả WPF + phần `InitializeComponent` sinh từ XAML.
+- **Còn lại:** verify tay 2 hộp thoại + đường lui FR9 trên máy có AutoCAD 2026 —
+  `plugin-autocad/VERIFY-VA-PHAT-HANH.md` §C6 (mục 33–36). PR3 (16 lệnh còn lại + chuyển
+  `DeXuatBlockDialog` sang WPF) chưa làm. Một điểm
+  chưa phủ trong PR1: câu hỏi **tỉ lệ in 1:x** của `XBOSS_VE_CHIADOT` vẫn ở dòng lệnh (§7.2 không
+  liệt kê nó cho lệnh này; hỏi một lần mỗi phiên qua `VeContext.TiLeIn`).
+
+**M107 — Nhận tuyến có sẵn thành tuyến XBoss (`XBOSS_VE_NHANTUYEN`):** ✅ **XONG về mặt code
+2026-08-26** (`docs/nang-cap/M107-nhan-tuyen-co-san.md`). Bối cảnh dùng phổ biến nhất — nhận bản
+thiết kế của người khác rồi bổ sung chi tiết thi công — nay dùng được cả bộ lệnh XBoss mà **không
+phải vẽ đè lại tuyến**.
+
+- **Lệnh mới `XBoss.Cad.Acad/Commands/VeNhanTuyenCommands.cs`:** quét chọn nhiều đối tượng → khai
+  **một** hệ/loại/cỡ cho cả loạt → mỗi tuyến được đổi `Layer` về layer chuẩn của loại tuyến
+  (`VeLayerService.DamBaoLayer`), ghi XData `XBOSS_VE` vai trò `Tim` **đúng cấu trúc tuyến do
+  `XBOSS_VE` vẽ** (mọi lệnh sau — phụ kiện, nhãn, chia đốt, giá đỡ, sleeve, tag, bóc khối lượng —
+  không phân biệt được nguồn gốc), và sinh 2 nét biên qua `EdgeOffset.Tinh` cho `edgeStyle:
+"double"` với XData liên kết 2 chiều.
+- **Guardrail số 1 — không đụng hình học tim:** chỉ đổi layer, gán XData và THÊM nét biên; đỉnh
+  polyline giữ nguyên từng tọa độ + bulge. Đây là bản vẽ của người khác, kỹ sư nhận tuyến để dùng
+  tiếp chứ không phải để plugin nắn lại (AC6 là ca verify tay quan trọng nhất).
+- **`Line` được nhận** thì chuyển thành polyline 2 đỉnh **cùng tọa độ** (mọi lệnh sau đều giả định
+  tim là polyline) và nói rõ trong tóm tắt là đã chuyển kiểu.
+- **Chạy lại = nhận lại, không nhân đôi biên:** nét biên cũ **của đúng tuyến đó** bị xóa rồi dựng
+  lại theo cỡ mới; dấu bóc bị gỡ (`MarkService.Unmark`) và vạch chia đốt bị xóa
+  (`VeThucThe.XoaChiaDotCua`) kèm nhắc chạy lại — **cùng lý do** với `XBOSS_VE_DOI` (cỡ đổi thì số
+  đốt và khối lượng đều sai). Hàm xóa nét biên cũ được **đưa lên `VeThucThe.XoaNetBienCua`** dùng
+  chung cho cả 2 lệnh thay vì viết cơ chế thứ hai.
+- **Xref bỏ qua hết** (quy tắc chốt 2026-08-26) — qua `ThuocXref.KhoiChen` + chặn thêm thực thể nằm
+  trên layer phụ thuộc xref; text/block/arc/spline và nét biên/nhãn của chính XBoss cũng bị bỏ qua,
+  **đếm và nêu lý do** ở cả hộp thoại lẫn tóm tắt cuối lệnh.
+- **Offset thất bại → CHỈ nhận tim + cảnh báo nêu handle tuyến**, tuyệt đối không vẽ biên sai (luật
+  M100 §18). 1 lệnh = 1 transaction = 1 nhóm UNDO; mọi hỏi đáp nằm ngoài transaction.
+- **Hộp thoại theo khung M106:** `Core/Ui/ViewModels/NhanTuyenDialogViewModel.cs` (thuần .NET, test
+  được trên CI Linux) + `DataTemplate` trong `Ui/Wpf/XBossDialog.xaml` dùng đúng style theme tối có
+  sẵn; phần chỉ-đọc hiện số tuyến sẽ nhận, layer đích, bề rộng nét biên suy từ cỡ, các dòng bỏ qua.
+  Đường lui `XBOSS_UI_DIALOG=0` / UI hỏng → hỏi đáp dòng lệnh cho **cùng** bộ tham số (AC7). Lệnh
+  khai trong `LenhCatalog` ở bước 3 (Vẽ shop drawing) nên Ribbon và trình dẫn tự có nút.
+- **886/886 ca .NET xanh** (nền 865 → +21 ca: `NhanTuyenDialogViewModelTests.cs` + phần thuần
+  `TomTatChonNhanTuyen`), `XBoss.Cad.AcadShim` 0 warning.
+- **Còn lại:** verify tay §C4b của `plugin-autocad/VERIFY-VA-PHAT-HANH.md` trên máy có AutoCAD 2026
+  — nhấn **AC6** (so tọa độ từng đỉnh trước/sau bằng `LIST`) và **AC4** (chạy lại với cỡ khác:
+  không còn nét biên cũ sót trên layer `<layer tim>EDGE`).
 
 ## M102 PR2 — Adapter AutoCAD: bước chuẩn hóa 12/13 + quét tag cho phép kiểm 17 (2026-08-25)
 
@@ -1133,9 +2300,14 @@ kiểm khác hẳn), `workpackages/:id/bbnt` + `workpackages/:id/drawing` + `flo
   `app/environment/page.tsx` ↔ `app/kickoff/page.tsx`, 311 dòng trùng). Là đợt tách component form
   dùng chung riêng, không phải gộp tính năng.
 
-### Nợ kỹ thuật ghi nhận khi hợp nhất — TRÙNG SỐ MIGRATION 0133 (chưa sửa)
+### ~~Nợ kỹ thuật ghi nhận khi hợp nhất — TRÙNG SỐ MIGRATION 0133 (chưa sửa)~~ → **ĐÃ ĐÓNG**
 
-`npm run check:migrations` đang **ĐỎ trên chính `origin/main`**, không phải do nhánh này:
+> **Đối chiếu lại code thật (2026-08-30):** nợ này đã được đóng ngay trong đợt đó bằng PR #389
+> (`4263a132`) — `0133_cad_device_pairing.sql` đã đổi tên thành `0135_cad_device_pairing.sql` đúng
+> như hướng xử lý đề nghị bên dưới, `migrations/` hiện **không còn số trùng** và
+> `npm run check:migrations` xanh (145 file). Giữ nguyên nội dung gốc bên dưới làm lịch sử.
+
+`npm run check:migrations` **khi đó** đang ĐỎ trên chính `origin/main`, không phải do nhánh này:
 
 ```
 [LỖI] Nhiều file migration cùng số thứ tự:
@@ -1190,13 +2362,13 @@ Không lỗi nào trong ba lớp trên sống nổi nếu ai đó **từng bấm
 
 ### 5 cổng CI mới (đều đã chứng minh báo ĐỎ khi có vi phạm, XANH khi gỡ)
 
-| Lệnh                          | Chặn lớp lỗi                                                                                                                    | Job CI                |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| `npm run check:route-perms`   | Handler `POST/PATCH/PUT/DELETE` không tham chiếu `CAN.`/`canTouchTask`/`canTouchPackage`/`requireApiKey`                        | `static`              |
-| `npm run check:project-scope` | Route nhận `projectId` trần từ client (body/formData/**query**) không qua `chotProjectIdChoGhi` — quét **toàn bộ `app/api/**`** | `static`              |
-| `npm run check:db-params`     | Truyền mảng cho `query`/`queryOne`/`run`/`insertId` của `lib/db`                                                                | `static`              |
-| `npm run check:mau-accent`    | `text-white` trên nền accent sáng (FAIL WCAG) + hover no-op                                                                     | `static`              |
-| `npm run check:coverage`      | Coverage tụt quá ngưỡng đệm 1% so với mốc `coverage-baseline.json`                                                              | `test` (cần Postgres) |
+| Lệnh                          | Chặn lớp lỗi                                                                                                                      | Job CI                |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `npm run check:route-perms`   | Handler `POST/PATCH/PUT/DELETE` không tham chiếu `CAN.`/`canTouchTask`/`canTouchPackage`/`requireApiKey`                          | `static`              |
+| `npm run check:project-scope` | Route nhận `projectId` trần từ client (body/formData/**query**) không qua `chotProjectIdChoGhi` — quét **toàn bộ `app/api/**`\*\* | `static`              |
+| `npm run check:db-params`     | Truyền mảng cho `query`/`queryOne`/`run`/`insertId` của `lib/db`                                                                  | `static`              |
+| `npm run check:mau-accent`    | `text-white` trên nền accent sáng (FAIL WCAG) + hover no-op                                                                       | `static`              |
+| `npm run check:coverage`      | Coverage tụt quá ngưỡng đệm 1% so với mốc `coverage-baseline.json`                                                                | `test` (cần Postgres) |
 
 ### W1 — Vá 101 lời gọi SQL sai kiểu + 4 lỗi schema (`route: spec`)
 
@@ -2866,7 +4038,7 @@ lỗi đã sửa cho 10 file khác ở đợt 2026-08-22); bổ sung dọn chu�
 <summary>Ghi nhận gốc lúc mới phát hiện (giữ nguyên để đối chiếu)</summary>
 
 **Phát hiện khi chạy
-`npm test -- --release-gate` **1 lần trên Postgres 16 vừa migrate sạch** (không phải môi trường
+`npm test -- --release-gate` **1 lần trên Postgres 16 vừa migrate sạch\*\* (không phải môi trường
 tích luỹ dữ liệu cũ) để xác nhận migration `0089`/`0091`/`0092`, đối chiếu thêm bằng log CI thật
 của PR #370 trên GitHub Actions (cùng kết quả, không phải lỗi máy cục bộ). Không file nào thuộc
 `lib/cad`/`chuan-hoa-ban-ve` — không liên quan Việc 7 hay M99.
@@ -2892,7 +4064,7 @@ exist`.
 **Nghi vấn:** các bảng OS-_/PIN-_ thuộc track "Vision Complete" (`docs/nang-cap/OS-*.md`, còn
 Draft/conditional) — có khả năng test được viết trước cho schema dự kiến nhưng migration thật
 đã đổi tên cột sau đó mà không cập nhật lại test/code liên quan, hoặc ngược lại. Cần đọc lại
-migration liên quan (`0084`–`0087` và các bản OS-* nếu có) đối chiếu với code/test trước khi sửa,
+migration liên quan (`0084`–`0087` và các bản OS-\* nếu có) đối chiếu với code/test trước khi sửa,
 không đoán hướng nào đúng.
 
 _Kết luận sau khi điều tra: nghi vấn trên **sai** — không có migration nào từng định nghĩa các
@@ -3452,7 +4624,7 @@ thật `parseDxf()` + đối chứng cũ↔mới trên corpus ~1.900 chuỗi lay
   - `engineering_pipe_nesting_runs`: Lưu trữ kế hoạch cắt phôi ống 1D tối ưu thuật toán FFD.
   - `engineering_hydraulic_checks`: Lưu trữ kết quả kiểm tra thủy lực (Hazen-Williams / Darcy-Weisbach) và cảnh báo vận tốc Invariant.
   - `engineering_bcf_issues`: openBIM BCF Collaboration Issue Tracker (ISO 21597) gắn camera 3D viewpoint.
-  - `engineering_bim_routing_runs`: Lưu trữ lịch sử tìm tuyến nắn ống không gian 3D A* tự động tránh va chạm kết cấu.
+  - `engineering_bim_routing_runs`: Lưu trữ lịch sử tìm tuyến nắn ống không gian 3D A\* tự động tránh va chạm kết cấu.
 - **[AI, đã làm] Vá lỗi cốt lõi (B1–B10 Bugs Resolved):**
   - **B1 Fix:** Chuyển đổi toàn bộ `$1,$2` placeholder sang `?` trong `lib/ky-thuat/engineering-scan-to-bim.ts`.
   - **B2 Fix:** Ghi nhận và lưu phiên so sánh bản vẽ `saveCadDiffSession` vào CSDL trên `POST /api/engineering/cad/diff`.
@@ -3474,10 +4646,10 @@ thật `parseDxf()` + đối chứng cũ↔mới trên corpus ~1.900 chuỗi lay
 - **[AI, đã làm] Core BCF & 3D Auto-Routing Engine (`lib/ky-thuat/engineering-bim-routing.ts`):**
   - openBIM BCF Collaboration format (ISO 21597) với Camera Viewpoint 3D (vị trí, hướng nhìn, vector up, FOV) và luồng phân công/duyệt.
   - Thuật toán phân vùng không gian 3D Spatial Grid Index phát hiện va chạm nhanh $O(n \log n)$.
-  - Thuật toán 3D A* Auto-Routing tìm đường đi trực giao, tự động chèn cút né dầm và bảo toàn độ dốc ống trọng lực $1.0\% - 2.0\%$.
+  - Thuật toán 3D A\* Auto-Routing tìm đường đi trực giao, tự động chèn cút né dầm và bảo toàn độ dốc ống trọng lực $1.0\% - 2.0\%$.
 - **[AI, đã làm] Bộ REST API Mới:**
   - `GET/POST /api/engineering/cad-nesting` (Nesting 1D/2D, Thủy lực, QR Spool).
-  - `GET/POST /api/engineering/bim-routing` (BCF openBIM Issue Tracker, 3D A* Routing, Spatial Grid Clash).
+  - `GET/POST /api/engineering/bim-routing` (BCF openBIM Issue Tracker, 3D A\* Routing, Spatial Grid Clash).
 - **[AI, đã làm] Giao diện người dùng Nâng cấp & Mới:**
   - `app/engineering/scan-to-bim/page.tsx`: Tạo mới trang Scan-to-BIM Reality Capture & Closed-Loop Quality Engine (3 tabs: Deviation Heatmap, Point Cloud Ingestion, Closed-Loop Sync).
   - `app/engineering/cad-nesting/page.tsx`: Tạo mới trang CAD Fabrication Nesting & MEPF Hydraulic Studio (4 tabs: 1D Nesting, 2D Duct CNC, Thủy lực MEPF, Tem QR Spool).
@@ -3486,7 +4658,7 @@ thật `parseDxf()` + đối chứng cũ↔mới trên corpus ~1.900 chuỗi lay
   - `app/components/EngineeringNav.tsx`: Bổ sung 2 phân hệ mới, nâng tổng số module lên 34.
 - **[AI, đã làm] Kiểm thử tự động Toàn diện:**
   - `tests/engineering-cad-nesting.test.ts` (1D/2D Nesting, Hazen-Williams, Darcy-Weisbach, Velocity Invariants, QR).
-  - `tests/engineering-bim-routing.test.ts` (Spatial Grid Clash, 3D A* Routing).
+  - `tests/engineering-bim-routing.test.ts` (Spatial Grid Clash, 3D A\* Routing).
   - `tests/engineering-bim-viewer.test.ts` (Parametric Meshes, 4D Time-Lapse, 3D Section Cut, Pset filter).
   - `tests/engineering-scan-to-bim.test.ts` (Nearest-neighbor 3D matching, Fallback to design).
 - **Verify:** Typecheck 0 lỗi, lint 0 lỗi 0 warnings, 122 migrations hợp lệ, 181 test files pass 100%, build production thành công.
@@ -3582,7 +4754,7 @@ thật `parseDxf()` + đối chứng cũ↔mới trên corpus ~1.900 chuỗi lay
 
 - **[AI, đã làm] Migration 0111:** `migrations/0111_auto_routing_sleeve_matrix.sql` tạo 2 bảng `engineering_sleeve_schedules` và `engineering_auto_routes` kèm RLS strict.
 - **[AI, đã làm] Core Auto-Routing & Beam Sleeve Engine (`lib/ky-thuat/engineering-auto-routing.ts`):**
-  - Thuật toán 3D A* Pathfinding (`findOptimalRoute3D`) tránh hộp chướng ngại vật AABB và tối ưu hóa số lượng Co lơ (Elbows) giảm sụt áp $Pa$.
+  - Thuật toán 3D A\* Pathfinding (`findOptimalRoute3D`) tránh hộp chướng ngại vật AABB và tối ưu hóa số lượng Co lơ (Elbows) giảm sụt áp $Pa$.
   - Thuật toán kiểm chuẩn kết cấu lỗ khoét dầm (`validateBeamSleeve`): Kiểm tra đường kính $D \le 0.33H$, vị trí $0.2L \le x \le 0.4L$ và chiều dày lớp bảo vệ trên/dưới.
   - Ma trận phân cấp ưu tiên nhường đường đa hệ (`recommendClashResolution`): Thoát nước trọng lực $>$ Ống gió lớn HVAC $>$ PCCC Sprinkler $>$ Cấp nước $>$ Máng cáp điện.
 - **[AI, đã làm] Bộ REST API:** `POST /api/engineering/routing/compute`, `GET/POST /api/engineering/routing/sleeves`.
@@ -3996,7 +5168,7 @@ track ENG". **Đo trước, không sửa theo cảm tính:**
   mất RLS ngoài ý muốn. Riêng nhóm `engineering_*` khai theo **tiền tố**, nên thêm bảng mới
   mà quên bật là đỏ ngay.
 - **[AI, chứng minh guard không phải trang trí]** `DISABLE ROW LEVEL SECURITY` trên
-  `engineering_conflicts` → test đỏ đúng thông điệp "Bảng engineering_\* mới thêm nhưng CHƯA
+  `engineering_conflicts` → test đỏ đúng thông điệp "Bảng engineering\_\* mới thêm nhưng CHƯA
   bật RLS"; bật lại thì xanh.
 - **Verify**: `tests/rls.test.ts` **5/5**; `lint` 0 lỗi, `typecheck` xanh.
 
@@ -4752,7 +5924,7 @@ Audit ĐỌC + BÁO CÁO trước (3 subagent song song đúng vùng rủi ro ca
 
 ~~**Ghi nhận 2026-07-19 (blocker OOM-kill lúc build)**~~ → **đã đổi dạng, không còn OOM-kill nữa** (kiểm lại cùng ngày, sau khi ghi nhận blocker OOM ở trên — run `29689527953` lúc 13:46 vẫn `Killed`/137 như mô tả, nhưng **retry lần 2 cùng commit `125945e` (run `29689586264`, attempt 2, 15:16→15:37) build sống sót, xong trong ~20 phút** — không còn thấy `Killed`. Nghi ngờ swap đĩa đã được thêm ở tầng VPS (đúng khuyến nghị "thêm swap" từng đưa ra) — đổi lại triệu chứng: build không còn bị OOM-kill nhưng **chậm bất thường (20-23 phút thay vì vài phút)** do swap đĩa chậm hơn RAM.
 
-**🔴 Blocker MỚI (2026-07-19, phát hiện ngay sau khi OOM hết): build chậm sát/vượt `command_timeout: 25m` của `appleboy/ssh-action`, cắt ngang deploy đúng lúc build vừa xong.** Run `29693453254` (commit `3115794` — HEAD hiện tại, 15:44→16:09): log in đủ route table (`Compiled successfully in 19.6min` + generate 73 trang tĩnh) nhưng **không có dòng `==> 6/7 Swap...` nào** — script bị cắt bởi `Run Command Timeout` ở phút thứ 25 tính từ lúc SSH bắt đầu, ngay sau khi `next build` in xong output (có thể còn đang ở bước finalize ngầm của Next.js). **Hệ quả: commit `3115794` (mới nhất trên `main`) CHƯA lên production** — production vẫn đứng ở `125945e` (deploy thành công gần nhất, qua retry). Không mất dữ liệu/an toàn (script dừng trước bước `mv` swap `.next`, app đang chạy không bị đụng).
+~~**🔴 Blocker MỚI (2026-07-19, phát hiện ngay sau khi OOM hết): build chậm sát/vượt `command_timeout: 25m` của `appleboy/ssh-action`, cắt ngang deploy đúng lúc build vừa xong.**~~ → **ĐÃ ĐÓNG 2026-08-26** (xác nhận lại trên code 2026-08-30): `.github/workflows/deploy.yml` nay build trên GitHub runner (`NEXT_DIST_DIR=.next-ci npm run build`) rồi rsync `.next` sang VPS, bước SSH còn lại bọc `timeout 15m` — không còn `appleboy/ssh-action`/`command_timeout` nào trong file. Xem mục "Đưa `next build` ra khỏi VPS" phía trên. Nội dung gốc giữ nguyên bên dưới làm lịch sử: Run `29693453254` (commit `3115794` — HEAD hiện tại, 15:44→16:09): log in đủ route table (`Compiled successfully in 19.6min` + generate 73 trang tĩnh) nhưng **không có dòng `==> 6/7 Swap...` nào** — script bị cắt bởi `Run Command Timeout` ở phút thứ 25 tính từ lúc SSH bắt đầu, ngay sau khi `next build` in xong output (có thể còn đang ở bước finalize ngầm của Next.js). **Hệ quả: commit `3115794` (mới nhất trên `main`) CHƯA lên production** — production vẫn đứng ở `125945e` (deploy thành công gần nhất, qua retry). Không mất dữ liệu/an toàn (script dừng trước bước `mv` swap `.next`, app đang chạy không bị đụng).
 
 **Đã vá phần tôi kiểm soát được (repo code):** tăng `command_timeout` trong `.github/workflows/deploy.yml` từ `25m` → `40m` (nhánh này, chưa merge `main`) — chỉ tránh bị cắt ngang, KHÔNG giải quyết gốc rễ (build chậm do swap đĩa thay RAM thật). **Còn cần ops:** (1) re-run job "Deploy to VPS" thất bại gần nhất (hoặc chờ lần push kế tiếp) sau khi PR nới timeout này merge; (2) xác nhận có đúng là đã thêm swap trên VPS chưa, và cân nhắc thêm RAM thật thay vì tiếp tục dựa vào swap (swap chỉ là giải pháp tạm, build 20+ phút sẽ tiếp tục kéo dài khi codebase lớn thêm).
 
@@ -5341,6 +6513,39 @@ KẾT LUẬN: Cần xử lý — không chặn vận hành hiện tại; ưu ti�
 
 ## Tiếp theo
 
+- **M108 PR2/PR3/PR5 — tầng AI, route + UI, gợi ý ánh xạ (2026-08-26, cùng nhánh với PR1).**
+  - **PR2** `lib/nen/ai.ts` (tầng 0, **cửa duy nhất** ra mô hình — `claude-opus-5`, structured output ép schema, prompt caching, bắt lỗi theo lớp typed của SDK, không bao giờ throw ra ngoài) + `lib/dich-vu/cad-block-phan-loai.ts` (cỗ máy 4 tầng) + `lib/dich-vu/cad-block-nap-lo.ts`. Thêm phụ thuộc `@anthropic-ai/sdk` — **lần đầu tiên** codebase có SDK LLM.
+  - **Hướng tầng:** `block-lo.ts` (tầng 4) **không** gọi lên cỗ máy (tầng 5) mà **nhận kết quả phân loại truyền xuống** qua tham số `phanLoai` — tầng 4 import tầng 5 là ngược hướng, ADR-0007 cấm. `check:lib-layers` xanh.
+  - **4 open decision của §18 đã chốt hết khi thi hành**, ghi lý do vào đặc tả: **O1** không rasterize SVG→PNG mà **gửi thẳng nguồn SVG** (với block CAD, nguồn SVG _chính là_ hình học — rasterize chỉ mất độ chính xác và thêm thư viện render nặng); **O2** ngưỡng chọn sẵn 0.80 thành hằng `NGUONG_CHON_SAN`; **O3** không gửi tên dự án; **O4 (phát sinh)** **bỏ Batches API** — §4 dự tính một lượt gọi/block nên mới cần batch giảm 50%, nhưng thi hành thật thì tầng 2 là **một lượt cho cả lô** và tầng 3 chia mẻ 25, số lượt tỉ lệ với số _mẻ_ chứ không phải số block, nên Batches chỉ thêm hạ tầng polling mà không giảm gì.
+  - **PR3** 4 route `/api/engineering/cad/block-proposals/batch[...]` + `NapLoBlockPanel.tsx` (bảng duyệt lô: sửa từng dòng, bỏ chọn, chip nguồn quyết định **có icon + chữ chứ không chỉ màu**, lý do một dòng). Quyền: nạp = `CAN.manageDrawings`, duyệt/từ chối = `CAN.approve` (hẹp hơn). Ảnh xem trước đi qua `<img src="data:...">` **không** `dangerouslySetInnerHTML` — bám đúng lựa chọn `ThuVienBlockPanel` đã làm, có test canh.
+  - **PR5** `lib/dich-vu/cad-goi-y-anh-xa.ts` + 2 route gợi ý + nút "Gợi Ý Từ Danh Mục BOQ" trong `MaBoqDuAnPanel`. Gợi ý `layerMap` **chỉ trả JSON để người tự dán** vào rule pack (không đường nào ghi rule pack); gợi ý `boqCode` **chỉ điền sẵn ô nhập**, đường ghi vẫn là nút Lưu cũ. Thêm `danhMucBoqTheoDuAn` trong `lib/khoi-luong/boq.ts` — **cố ý không SELECT cột tiền nào**, có test canh cả hai ranh giới này.
+  - **Bộ đối chứng AC3** (`plugin-autocad/doi-chung/block-phan-loai-doi-chung.json`, 56 block, 3 lớp khó) + `scripts/do-phan-loai-block.ts`. **Số đo thật của tầng 1: 26,8% (15/56), 0 ca SAI, 41 ca bỏ trống.** Con số này thấp hơn ước lượng "70–80%" tôi nói lúc đầu vì bộ đối chứng **cố ý dồn vào phần khó** (36/56 là viết tắt tiếng Việt + tên vô nghĩa) — trên một tệp thư viện đặt tên tử tế thì tỉ lệ khác hẳn. Điều đáng giá hơn con số: **tầng 1 không đoán sai lần nào**, chỉ bỏ trống, đúng như thiết kế.
+  - **Nhãn bộ đối chứng CHƯA được xác nhận** (`nhanDaXacNhan: false`) — theo §18 R4 nhãn chuẩn phải do kỹ sư trưởng/CAD manager gán, người viết code tự gán rồi tự chấm điểm mình là đo thiên vị. Script in cảnh báo đậm và **có test canh không cho tự bật cờ này**. ⇒ **AC3 chưa kết luận được**, và cũng chưa đo được đóng góp thật của AI vì môi trường không có `ANTHROPIC_API_KEY`.
+  - Biến môi trường mới ghi vào `CLAUDE.md`: `ANTHROPIC_API_KEY` (tuỳ chọn, thiếu → tầng 2/3 tự tắt, **không throw**) và `XBOSS_AI_BLOCK_CLASSIFY=0` (công tắc dừng khẩn).
+  - Cổng: `lint`/`typecheck`/`build`/`check:lib-layers`/`check:migrations`/`check:contrast`/`check:mau-accent` xanh; `npm test -- --release-gate` với Postgres 16 thật.
+
+- **M108 PR4 — lệnh `XBOSS_VE_DEXUAT_LO` trong plugin (2026-08-26).** Ban đầu tưởng bị chặn vì không cài được .NET (`builds.dotnet.microsoft.com` bị chính sách mạng chặn, CONNECT 403), nhưng **kho apt của chính Ubuntu 24.04 có `dotnet-sdk-8.0`** — cài từ đó là verify được đầy đủ. Bài học: bị chặn một nguồn tải không có nghĩa là bị chặn công cụ.
+  - `BlockUngVienBuilder.QuetToanBoDinhNghia` (quét cả block table, chỉ đọc, loại xref/ẩn danh/layout **kèm lý do đếm được**) + `DungLo` (clone N định nghĩa sang một database **mới, rỗng** — cố ý KHÔNG dựng trên bản sao `blocks.dwg` như M103, vì máy chủ đọc lô bằng cách liệt kê mọi block trong DXF nên lấy tệp thư viện làm nền sẽ kéo cả thư viện vào lô rồi bị gạt "trùng tên": đúng kết quả nhưng tốn công và làm danh sách bỏ qua đầy nhiễu).
+  - `XBossApiClient.GuiLoBlockAsync` + `DeXuatLoDialogViewModel` (Core, thuần .NET nên test được trên CI Linux) + `DataTemplate` trong `XBossDialog.xaml` + đăng ký `LenhCatalog`.
+  - **Lỗ trong PR3 do PR4 lộ ra, đã vá:** route `/batch` ban đầu chỉ nhận phiên web, mà plugin xác thực bằng Bearer token thiết bị ⇒ lệnh này **không gọi nổi route của chính nó**. Đã cho route nhận cả token `cad` lẫn phiên web như route M103, và xác định `nguon` theo **cách xác thực** chứ không theo việc có gửi kèm `.dwg` hay không.
+  - **Ba lần bộ test .NET bắt lỗi thật:** (a) `AcadStub.cs` thiếu `GetBlockReferenceIds` → bổ sung stub (đúng cách M102 PR2 đã làm); (b) `LenhCatalog` trùng thứ tự trong bước `PhuTro` (`XBOSS_BANG` đang giữ số 4) → dời `XBOSS_BANG` sang 5; (c) 2 danh sách lệnh kỳ vọng trong `QuyTrinhTests` phải cập nhật — sửa danh sách kỳ vọng, **không** nới lỏng bất biến "không trùng thứ tự, đánh số liên tục".
+  - 892/892 ca .NET xanh (886 cũ + 6 ca mới cho ViewModel), AcadShim build `-warnaserror` 0 cảnh báo.
+  - **Lỗi CI thứ hai (`test (Postgres)` → bước "Kiểm ERD khớp schema"):** quên chạy `npm run gen:erd` sau khi thêm migration `0144` ⇒ `docs/ERD.md` thiếu 2 bảng mới, `git diff --exit-code` đỏ. **Đúng lỗi mà `PROGRESS.md` đã ghi có người mắc ở đợt M53/M57** ("quên `npm run gen:erd` sau khi thêm 2 migration mới") — tài liệu đã cảnh báo mà vẫn lặp lại. Lưu ý cách đọc log: bộ test **xanh hết** (`1447 ca pass, 0 ca fail`), job đỏ ở bước **sau** đó; đuôi log lại là stderr của container Postgres đầy lỗi _dự kiến_ từ các ca test âm — dễ tưởng nhầm là test hỏng. Đã sinh lại ERD (chỉ thêm đúng 2 bảng mới) và chạy nốt `check:coverage` (86,68% lines, không tụt).
+  - **Bài học chung của cả hai lỗi CI:** tôi chạy cổng theo trí nhớ thay vì theo `ci.yml`. Ba cổng bị bỏ sót đều nằm ngay trong file đó: `check:dead-routes` (job `static`), `check:coverage` và `gen:erd` + `git diff --exit-code docs/ERD.md` (job `test`). Hai cổng sau **bắt buộc phải có Postgres đã áp migration** nên không chạy được nếu chỉ chạy lệnh quen tay.
+  - **Lỗi CI bắt được sau khi mở PR #415 (`check:dead-routes`):** route `batch/[id]/reject` **không có dòng mã nào gọi tới** — tôi viết route nhưng **quên nút "Từ chối" trong bảng duyệt**, dù đặc tả §6.3 có. Nguyên nhân gốc: lúc chạy cổng cục bộ tôi chạy `check:dead-code` mà **bỏ sót `check:dead-routes`** (hai script khác nhau, tên gần giống). Đã nối nút + ô nhập lý do vào panel (không nhét route vào allowlist — tính năng dở dang thì phải làm nốt, không phải khai miễn trừ), thêm ca test canh mọi route lô đều được UI gọi, và từ nay chạy **đủ 14 cổng của job `static`** chứ không chạy vài cái quen tay.
+  - **Lỗi tự review bắt được sau khi đã push:** trần lô đang tính trên **số định nghĩa thô** thay vì số block thật sự nạp được — một tệp 600 định nghĩa mà 400 là block ẩn danh vẫn nằm gọn trong trần 500, chặn nó là chặn oan; ngoài ra `napLoBlock` phân loại (gọi mô hình, tốn tiền) TRƯỚC rồi mới để `nhanLoBlock` từ chối. Đã sửa cả hai: trần tính trên danh sách đã lọc, và có lối ra sớm trong `napLoBlock` trước khi gọi mô hình, kèm ca test riêng.
+  - **Còn lại như mọi đợt plugin trước:** verify tay trên máy có AutoCAD 2026 — AcadShim chỉ bắt lỗi biên dịch, không thay được việc chạy thật (mục mới đã thêm vào `plugin-autocad/VERIFY-VA-PHAT-HANH.md`).
+
+- **M108 PR1 — nạp lô + tầng 1 phân loại tất định (2026-08-26, nhánh `claude/plugin-upgrade-block-classification-trljlf`).** Chưa có AI, chưa có UI — đứng một mình đã nạp lô được bằng tay.
+  - `migrations/0144_cad_block_batches.sql` — `cad_block_batches` + `cad_block_batch_items` (thêm thuần, đi thẳng production). **KHÔNG có RLS**, và đây là **sửa đặc tả**: bản nháp §11 ghi "RLS theo khuôn 0143" là sai — hai bảng anh em `cad_block_libs` (0139) và `cad_block_proposals` (0141) cố ý không có RLS vì thư viện block là dữ liệu phát hành **toàn cục** (lý do ghi thẳng đầu file 0139); thêm RLS riêng cho bảng lô sẽ làm lô lệch phạm vi với chính thư viện nó ghi vào.
+  - `lib/ky-thuat/cad/block-phan-loai-luat.ts` — tầng 1 thuần, không mạng/không DB. Mọi suy luận bắt nguồn từ **rule pack** (không hard-code danh sách tên trong code), dùng đúng matcher token-boundary dùng chung `hasAnyToken`. **Sửa đặc tả thứ hai:** bản nháp xếp cả cỗ máy vào `lib/dich-vu/cad-block-phan-loai.ts`, nhưng tầng 1 chỉ đọc rule pack = **một miền** → đặt vào `dich-vu/` là vi phạm ADR-0008 ("từ 2 miền trở lên", "không phải sọt rác"). `dich-vu/cad-block-phan-loai.ts` để dành PR2 khi thật sự phối `ky-thuat` + `khoi-luong` + `nen/ai`.
+  - `lib/ky-thuat/cad/block-lo.ts` — nhận lô (lọc → phân loại → hàng chờ), duyệt lô (phát hành **một** version, idempotent, chống đua bằng `base_lib_version` + advisory lock cùng khoá với M103/M104), từ chối lô. Tái dùng nguyên `docManifest`/`kiemThuocTinhTheoLoai`/`ghiSoBlockLib`/`versionPhatHanhKeTiep` — không có đường vòng nào qua mặt luật metadata (FR7).
+  - **Bẫy rule pack phát hiện lúc code:** `support-hanger`/`sleeve-opening` là item `measure: "count"` **cố ý đứng ngoài** `drawTools` (chúng đếm giá đỡ/lỗ chờ do `XBOSS_VE_GIADO`/`_LOCHO` sinh ra — M100 PR7), không phải id block thư viện. Bản code đầu tiên của tôi đổ lỗi oan cho rule pack là "thiếu nhất quán"; đã sửa thành suy `kind` từ token của chính id item, có test riêng canh.
+  - `tests/cad-block-lo.test.ts` — 12 ca, **12/12 xanh với Postgres thật** (7 thuần + 5 tích hợp phủ AC5/AC6/AC7/AC8/AC9). Ca AC8 lúc đầu **pass rỗng** (nhánh `if (...) return` nuốt lỗi vì `themBlockTuWeb` cần DXF có sẵn định nghĩa block) — đã siết assertion, phát hiện, và đổi sang tình huống hai lô chen nhau. Bài học lặp lại: nhánh thoát sớm trong test là chỗ trốn của ca không bao giờ chạy.
+  - Cổng đã chạy: `lint`, `typecheck`, `build`, `check:lib-layers`, `check:migrations` đều xanh.
+
+- **M108 — nạp block hàng loạt + gợi ý phân loại bằng AI (`docs/nang-cap/M108-nap-block-hang-loat-va-goi-y-ai.md`) — ✅ Approved for implementation 2026-08-26; XONG cả 5 PR cùng ngày (2026-08-26).** Sinh từ câu hỏi người dùng "đưa file tổng hợp block thì có tự nhận diện phân loại và đưa vào thư viện không?" — rà code thật cho câu trả lời **chưa**: cả 2 đường nạp thư viện hiện có đều một-block-một-lần và người tự khai `kind` (`VeDeXuatCommands.cs:85` `ed.GetEntity` chọn đúng 1 khối; `block-them-web.ts:45` tìm đúng 1 định nghĩa trùng tên người gõ), và **không có dòng nào suy ra `kind`** — `docMetaBlockCoBan` chỉ _kiểm_ tính nhất quán theo kind. Đặc tả đóng khoảng trống đó bằng 4 tầng (luật tất định ~70–80% → khớp ngữ nghĩa → vision trên `dungPreviewSvg` → người duyệt lô), trùng tên thì bỏ qua kèm lý do, tái dùng cùng cỗ máy cho **gợi ý `layerMap`** + **gợi ý `boqCode` per-project**. 5 PR, migration `0144` (thêm thuần), 4 quyết định nền đã chốt với người dùng qua `AskUserQuestion` (§4), 3 open decision còn lại (§18: rasterize SVG→PNG, ngưỡng tin cậy chọn sẵn, có gửi tên dự án kèm prompt không). **Lưu ý kiến trúc:** đây là chỗ **đầu tiên** đưa SDK LLM vào codebase XBoss — `grep` hiện trả rỗng cho mọi dấu vết `anthropic`/`openai`/`langchain` trong `lib/`+`app/`+`package.json`; cô lập trong `lib/nen/ai.ts`, theo boundary ENG-0/ENG-1 (gọi từ server, kết quả luôn vào hàng chờ duyệt, AI không đo hình học/không tự phát hành/không ghi thẳng DB), tắt được bằng `XBOSS_AI_BLOCK_CLASSIFY=0` hoặc gỡ `ANTHROPIC_API_KEY`.
+
 - **Hàng đợi thi hành đã chốt lại (cập nhật 2026-07-18, rà lại code thật sau merge #252/#256/#259/#260/#261/#262/#263/#264 — nguồn chuẩn duy nhất: `docs/nang-cap/README.md` mục "Đặc tả chờ triển khai"):** M53 (cả 4 PR — PR4 merge qua **PR #262**, xem mục "M53 PR4" phía dưới), M56 (cả 2 PR), M61, M51 GĐ0, M55, M58 (cả 3 PR) đều **đã xong**. Ngoài hàng đợi thứ tự chính (không nằm trong dây chuyền phụ thuộc): **M57 PR2** (extract text PDF, xem mục riêng bên dưới) cũng vừa xong. Ngoài hàng đợi module chính: vừa đóng thêm 1 nợ kỹ thuật phát sinh ngoài kế hoạch — rò rỉ chéo dự án `payments/bills`/`payments/floors` (PR #263, **đã merge**, xem mục ngay phía trên). Hàng đợi module còn lại (chưa triển khai): **M54 GĐ1** (multi-tenant SaaS, phụ thuộc M51) — **PR1 (trục `org_id`) đã xong 2026-07-21, xem mục "M54 GĐ1 PR1" trong "Đã xong"; PR2+ (session mang orgId thật, RLS org, thay hằng số 1 trong `boqTakenBy`) còn lại** → **M59** (histogram tài nguyên). Các dòng "thứ tự thi hành" cũ hơn trong log dưới đây là lịch sử, không sửa lại. **LUẬT trước khi thi hành BẤT KỲ hạng mục nào (yêu cầu người dùng 2026-07-18): kiểm tra trên code thật xem hạng mục đã được làm chưa** — grep điểm chạm chính ghi trong đặc tả (bảng/migration, hàm lib, route, trang UI) trước khi lập nhánh/giao worker; đã có rồi thì cập nhật tài liệu thay vì code lại (bài học 2026-07-17: 3/5 mục "dở dang" thực ra đã xong; lặp lại 2026-07-18 **hai lần liên tiếp**: lần 1 tài liệu vẫn ghi M53/M57 PR1 "chưa" dù đã merge từ trước; lần 2 phát hiện M53 PR4 đã có code sẵn trên nhánh `claude/plan-md-30cmcp` — làm bởi phiên khác — nhưng chưa merge/chưa có PR, suýt bị code trùng lại nếu không kiểm tra `git log --all`/branch trước khi bắt tay code — luôn grep + kiểm tra branch/PR đang mở trước, đừng tin bảng trạng thái).
 
 - **M53 (PR1-3) + M57 PR1 — Scale headroom & tìm kiếm toàn văn** (2026-07-18, PR #252, commit `cefda6a`, `docs/nang-cap/M53-scale-headroom.md` + `M57-tim-kiem-toan-van.md`): **M53 PR1** — quan trắc tải: `poolStats()` (`lib/db/index.ts`), log `slow_query` khi vượt `XBOSS_SLOW_QUERY_MS` (mặc định 500ms, không log params), đếm SSE stream đang mở (`app/api/events/route.ts`), `GET /api/health` trả thêm `{pool, sseStreams}` cho Admin/PM. **M53 PR2** — watermark SSE O(1): `migrations/0067_sheet_versions.sql` (bảng `sheet_versions` 1 dòng/sheet + trigger `bump_sheet_version()` dùng chung cho `tasks`/`work_packages`, move task/nhóm bump cả sheet cũ lẫn mới), `lib/ha-tang/version.ts` đổi từ aggregate JOIN 3 bảng sang SELECT 1 dòng theo khoá chính (giữ nguyên chữ ký). **M53 PR3** — pool cứng cáp qua env: `XBOSS_PG_POOL_MAX` (mặc định 10, clamp 1-100), `statement_timeout` từ `XBOSS_PG_STMT_TIMEOUT_MS` (mặc định 30s), `idle_in_transaction_session_timeout=15s`, `connectionTimeoutMillis=10s`. **M57 PR1** — FTS toàn văn: `lib/tien-do/search.ts` (`to_tsvector('simple', xboss_unaccent(...))`), `migrations/0068_fts.sql` (GIN index + hàm `xboss_unaccent`), `GET /api/search` + `GlobalSearch.tsx` chuyển từ ILIKE sang FTS. Sự cố phát hiện + sửa lúc tích hợp: renumber migration 0064→0067 (0064 đã bị `webhooks` chiếm trên `main`); CI báo lỗi lặp "function unaccent(unknown, text) does not exist" mỗi chu kỳ autovacuum — do hàm IMMUTABLE bị planner inline, autovacuum chạy `search_path` thu hẹp chỉ `pg_catalog` → phải schema-qualify `public.unaccent(...)`/`'public.unaccent'` cả trong hàm lẫn tên dictionary; quên `npm run gen:erd` sau khi thêm 2 migration mới — đã sinh lại đúng 140 bảng. Test: `tests/db-pool.test.ts`, `tests/sheet-versions.test.ts` (5 ca), `tests/search.test.ts`.
@@ -5823,3 +7028,9 @@ Verify hạ tầng: Postgres 16 local (`pg_ctlcluster`, đã có sẵn trong má
      - Bộ 3 REST APIs: `GET/POST /api/engineering/iot/devices`, `GET/POST /api/engineering/iot/telemetry`, `GET/PATCH /api/engineering/iot/alerts`.
      - Giao diện `app/engineering/iot-telemetry/page.tsx`: Realtime dashboard AQI, CO, tiếng ồn, phụ tải điện kW và trung tâm cảnh báo khẩn cấp HSE.
   3. **Verification**: 116 migrations chuẩn số thứ tự; `check:sw-exclude` sạch; `lint` 0 lỗi; `typecheck` 0 lỗi; tests pass 100%.
+
+- **Vá 4 điểm lệch code phát hiện lúc đồng bộ tài liệu với code thật (2026-08-30)**:
+  1. `app/r/[kind]/[id]/page.tsx`: link QR tem vật tư (`kind=mt`) trỏ `/materials?id=` — trang đã xoá từ khi gộp vào `/procurement` (M-series sau đó), gây 404. Đổi sang `/procurement?tab=inventory`.
+  2. `lib/tien-do/search.ts` + `app/api/search/route.ts`: comment "bất biến cứng neo 2 chiều" ghi sai số migration FTS (`0064_fts.sql` — thực ra là `webhooks`), đúng phải là `0068_fts.sql`. Sửa cả 2 chỗ neo.
+  3. `app/components/ui/Button.tsx` + `app/components/dialogs.tsx`: biến thể nút `danger` dùng mẫu hover sáng dần (`bg-red-700 hover:bg-red-600`), lệch quy ước ADR-0010 "đậm dần khi rê chuột" (`-700 → -800`) — nút chính `primary` đã sửa đúng từ trước, `danger` sót lại mẫu cũ. Đổi cả `Button.tsx` (`danger`) và `dialogs.tsx` (nút confirm) sang `bg-red-700 hover:bg-red-800` / `bg-emerald-700 hover:bg-emerald-800`.
+  - **Verify**: `lint`/`typecheck`/`check:mau-accent` xanh.

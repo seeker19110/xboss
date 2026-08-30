@@ -34,7 +34,7 @@ function blocks(m: Record<string, unknown>): Record<string, unknown>[] {
 // ===== (1) Unit thuần =====
 
 test("bộ mẫu doi-chung/ hợp lệ: hash khớp, mọi block khai có thật trong DXF, 0 lỗi 0 cảnh báo", async () => {
-  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block");
   const kq = kiemDinhManifest(manifest(), DWG_MAU, DXF_MAU);
   assert.equal(kq.ok, true, JSON.stringify(kq.errors));
   assert.deepEqual(kq.warnings, []);
@@ -44,14 +44,14 @@ test("bộ mẫu doi-chung/ hợp lệ: hash khớp, mọi block khai có thật
 });
 
 test("chặn: dwgSha256 không khớp tệp .dwg nộp kèm (toàn vẹn chuỗi cung ứng §12)", async () => {
-  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block");
   const kq = kiemDinhManifest(manifest(), Buffer.from("AC1032 tệp đã bị tráo"), DXF_MAU);
   assert.equal(kq.ok, false);
   assert.ok(kq.errors.some((e) => e.includes("không khớp tệp .dwg")));
 });
 
 test("chặn: manifest khai block không có trong DXF sidecar (§6.10 — thư viện hỏng)", async () => {
-  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block");
   const m = manifest();
   blocks(m)[0].blockName = "XB-KHONG-CO-THAT";
   const kq = kiemDinhManifest(m, DWG_MAU, DXF_MAU);
@@ -59,8 +59,30 @@ test("chặn: manifest khai block không có trong DXF sidecar (§6.10 — thư 
   assert.ok(kq.errors.some((e) => e.includes("XB-KHONG-CO-THAT")));
 });
 
+test('kind "annotation" (M110) hợp lệ và KHÔNG bị kéo vào khối lượng', async () => {
+  const { kiemDinhManifest, LOAI_BLOCK } = await import("@/lib/ky-thuat/cad/block");
+  const { NHAN_LOAI_BLOCK } = await import("@/lib/ky-thuat/cad/block");
+
+  assert.ok((LOAI_BLOCK as readonly string[]).includes("annotation"));
+  assert.ok(NHAN_LOAI_BLOCK.annotation.length > 0, "kind mới phải có nhãn tiếng Việt cho web");
+
+  // Tam giác số revision là ký hiệu chú thích: đổi một block phụ kiện sang kind annotation thì
+  // manifest vẫn hợp lệ và không sinh cảnh báo takeoff nào (guardrail 1 của M110 — khoanh
+  // revision xong, XBOSS_BOCKL phải cho đúng con số như trước).
+  const m = manifest();
+  const b = blocks(m).find((x) => x.kind === "fitting")!;
+  b.kind = "annotation";
+  delete b.takeoffItemId;
+  const kq = kiemDinhManifest(m, DWG_MAU, DXF_MAU);
+  assert.equal(kq.ok, true, JSON.stringify(kq.errors));
+  assert.ok(
+    !kq.warnings.some((w) => w.includes(String(b.id))),
+    `block annotation không được sinh cảnh báo takeoff: ${JSON.stringify(kq.warnings)}`,
+  );
+});
+
 test("chặn: kind lạ, id trùng, thiếu blockName, hai mục trùng tên block", async () => {
-  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block");
 
   const mKind = manifest();
   blocks(mKind)[0].kind = "phu-kien";
@@ -83,7 +105,7 @@ test("chặn: kind lạ, id trùng, thiếu blockName, hai mục trùng tên blo
 });
 
 test("chặn: thiết bị thiếu thuộc tính TAG (FR6), khung tên thiếu khổ giấy (FR9a)", async () => {
-  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block");
 
   const mTag = manifest();
   const tb = blocks(mTag).find((b) => b.kind === "equipment")!;
@@ -96,7 +118,7 @@ test("chặn: thiết bị thiếu thuộc tính TAG (FR6), khung tên thiếu k
 });
 
 test("chặn: nộp nhầm DXF vào ô .dwg (không mang chữ ký DWG)", async () => {
-  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block");
   const m = manifest();
   m.dwgSha256 = createHash("sha256").update(DXF_MAU).digest("hex");
   const kq = kiemDinhManifest(m, Buffer.from(DXF_MAU, "utf8"), DXF_MAU);
@@ -105,14 +127,14 @@ test("chặn: nộp nhầm DXF vào ô .dwg (không mang chữ ký DWG)", async 
 });
 
 test("chặn: DXF sidecar hỏng cấu trúc", async () => {
-  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block");
   const kq = kiemDinhManifest(manifest(), DWG_MAU, "0\nSECTION\nrác không phải DXF");
   assert.equal(kq.ok, false);
   assert.ok(kq.errors.some((e) => e.includes("DXF sidecar")));
 });
 
 test("cảnh báo (không chặn): tên block thiết bị lệch blockNameMatchAny của rule pack §18", async () => {
-  const { kiemDinhManifest, doiChieuTakeoff } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { kiemDinhManifest, doiChieuTakeoff } = await import("@/lib/ky-thuat/cad/block");
 
   // Đổi cả tên block trong manifest LẪN trong DXF để chỉ còn đúng một sai lệch: khớp takeoff.
   const m = manifest();
@@ -136,7 +158,7 @@ test("cảnh báo (không chặn): tên block thiết bị lệch blockNameMatch
 });
 
 test("cảnh báo: manifest khai thuộc tính mà DXF không có ATTDEF tương ứng", async () => {
-  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block");
   const m = manifest();
   const tb = blocks(m).find((b) => b.kind === "equipment")!;
   tb.attributes = ["TAG", "MODEL", "SIZE", "LUU_LUONG"];
@@ -146,7 +168,7 @@ test("cảnh báo: manifest khai thuộc tính mà DXF không có ATTDEF tương
 });
 
 test('chặn: "attributes" sai kiểu (không phải mảng) chỉ sinh ĐÚNG 1 lỗi — không chồng thêm "thiếu TAG"', async () => {
-  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block");
   const m = manifest();
   const tb = blocks(m).find((b) => b.kind === "equipment")!;
   tb.attributes = "khong-phai-mang"; // sai kiểu — phải là mảng chuỗi
@@ -253,7 +275,7 @@ test(
   S,
   async () => {
     const { phatHanhBlockLib, layBlockLibHienHanh, docTepBlockLib } =
-      await import("@/lib/ky-thuat/cad/block-lib");
+      await import("@/lib/ky-thuat/cad/block");
 
     const kq = await phatHanhBlockLib({
       userId,
@@ -307,7 +329,7 @@ test(
 );
 
 test("kiểm định fail → KHÔNG ghi dòng nào (không có thư viện nửa vời)", S, async () => {
-  const { phatHanhBlockLib } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { phatHanhBlockLib } = await import("@/lib/ky-thuat/cad/block");
   const { queryOne } = await import("@/lib/db");
   const truoc = await queryOne<{ n: number }>(`SELECT COUNT(*)::int AS n FROM cad_block_libs`);
 
@@ -327,12 +349,12 @@ test(
   async () => {
     const { createCadToken } = await import("@/lib/bao-mat/cad-devices");
     const { GET } = await import("@/app/api/engineering/cad/block-lib/route");
-    const { layBlockLibHienHanh, etagBlockLib } = await import("@/lib/ky-thuat/cad/block-lib");
+    const { layBlockLibHienHanh, etagBlockLib } = await import("@/lib/ky-thuat/cad/block");
 
     // Bảo đảm đã có bản phát hành (ca này có thể chạy độc lập với ca trên).
     let hienHanh = await layBlockLibHienHanh();
     if (!hienHanh) {
-      const { phatHanhBlockLib } = await import("@/lib/ky-thuat/cad/block-lib");
+      const { phatHanhBlockLib } = await import("@/lib/ky-thuat/cad/block");
       await phatHanhBlockLib({ userId, manifestTho: manifest(), dwg: DWG_MAU, dxfText: DXF_MAU });
       hienHanh = await layBlockLibHienHanh();
       if (hienHanh) daLuu.push(hienHanh.storageKey);
@@ -381,7 +403,7 @@ test(
   async () => {
     const { createCadToken } = await import("@/lib/bao-mat/cad-devices");
     const { GET } = await import("@/app/api/engineering/cad/block-lib/route");
-    const { layBlockLibHienHanh, phatHanhBlockLib } = await import("@/lib/ky-thuat/cad/block-lib");
+    const { layBlockLibHienHanh, phatHanhBlockLib } = await import("@/lib/ky-thuat/cad/block");
 
     let hienHanh = await layBlockLibHienHanh();
     if (!hienHanh) {

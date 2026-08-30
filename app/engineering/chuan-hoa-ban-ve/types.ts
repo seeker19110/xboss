@@ -207,6 +207,8 @@ export interface BlockProposal {
   note: string | null;
   baseLibVersion: string;
   previewSvg: string | null;
+  /** sha256 (64 hex) của tệp .dwg ứng viên — người duyệt đối chiếu với tệp tải qua route candidate. */
+  dwgSha256: string;
   status: BlockProposalStatus;
   statusNhan: string;
   rejectReason: string | null;

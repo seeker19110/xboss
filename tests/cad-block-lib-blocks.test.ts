@@ -113,7 +113,7 @@ function manifestDaTep(over?: Record<string, unknown>): Record<string, unknown> 
 // ===== (1) Unit thuần — manifest đa tệp =====
 
 test("manifest đa tệp: nhận fileKey/fileSha256/previewSvg; entry cũ không có → undefined (AC7)", async () => {
-  const { docManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { docManifest } = await import("@/lib/ky-thuat/cad/block");
 
   // Tương thích ngược: manifest đã phát hành (không trường nào của M104) đọc y như trước.
   const cu = docManifest(JSON.parse(JSON.stringify(MANIFEST_MAU)));
@@ -132,7 +132,7 @@ test("manifest đa tệp: nhận fileKey/fileSha256/previewSvg; entry cũ không
 });
 
 test("manifest đa tệp chặn: fileKey tự đặt, thiếu fileSha256, hash mồ côi, previewSvg lạ", async () => {
-  const { docManifest, laKhoaTepBlockHopLe } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { docManifest, laKhoaTepBlockHopLe } = await import("@/lib/ky-thuat/cad/block");
 
   // Khoá tệp phải đúng khuôn tên do máy chủ sinh — chặn cả path traversal lẫn khoá trỏ tệp khác.
   assert.equal(laKhoaTepBlockHopLe(KHOA_MAU), true);
@@ -159,7 +159,7 @@ test("manifest đa tệp chặn: fileKey tự đặt, thiếu fileSha256, hash m
 });
 
 test("kiemDinhManifest: block có fileKey không bị đòi nằm trong DXF nền; không fileKey vẫn bị đòi (AC7)", async () => {
-  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { kiemDinhManifest } = await import("@/lib/ky-thuat/cad/block");
 
   // Block ở tệp riêng: DXF sidecar mô tả tệp NỀN nên không chứa nó — vẫn hợp lệ.
   const daTep = kiemDinhManifest(manifestDaTep(), DWG_MAU, DXF_MAU);
@@ -182,8 +182,8 @@ test("kiemDinhManifest: block có fileKey không bị đòi nằm trong DXF nề
 });
 
 test("đề xuất M103 không được bỏ fileKey của block thêm từ web", async () => {
-  const { soSanhManifestUngVien } = await import("@/lib/ky-thuat/cad/block-proposals");
-  const { docManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { soSanhManifestUngVien } = await import("@/lib/ky-thuat/cad/block");
+  const { docManifest } = await import("@/lib/ky-thuat/cad/block");
 
   const hienHanh = docManifest(manifestDaTep()).manifest!;
   const ungVien = docManifest(manifestDaTep()).manifest!;
@@ -199,7 +199,7 @@ test("đề xuất M103 không được bỏ fileKey của block thêm từ web"
 });
 
 test("metadata thêm từ web: nhận camelCase (M104 §2) lẫn snake_case (M103 §3)", async () => {
-  const { docMetaBlockCoBan } = await import("@/lib/ky-thuat/cad/block-proposals");
+  const { docMetaBlockCoBan } = await import("@/lib/ky-thuat/cad/block");
 
   assert.deepEqual(docMetaBlockCoBan(metaHopLe()).errors, []);
   assert.equal(docMetaBlockCoBan(metaHopLe()).meta?.systemId, "HVAC");
@@ -311,7 +311,7 @@ async function donDep() {
 
 /** Phát hành thư viện nền b0-mau (tệp nền của mọi ca dưới đây). */
 async function phatHanhNen(): Promise<{ version: string; sha: string; storageKey: string }> {
-  const { phatHanhBlockLib, layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { phatHanhBlockLib, layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block");
   const kq = await phatHanhBlockLib({
     userId: pmId,
     manifestTho: JSON.parse(JSON.stringify(MANIFEST_MAU)),
@@ -370,8 +370,8 @@ test(
     await donDep();
     const nen = await phatHanhNen();
     const { themBlockTuWeb, timBlockLeTheoKhoa, docTepBlockLe } =
-      await import("@/lib/ky-thuat/cad/block-them-web");
-    const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block-lib");
+      await import("@/lib/ky-thuat/cad/block");
+    const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block");
     const { queryOne } = await import("@/lib/db");
 
     const kq = await themBlockTuWeb({
@@ -426,7 +426,7 @@ test(
   async () => {
     await donDep();
     await phatHanhNen();
-    const { themBlockTuWeb } = await import("@/lib/ky-thuat/cad/block-them-web");
+    const { themBlockTuWeb } = await import("@/lib/ky-thuat/cad/block");
     const { queryOne } = await import("@/lib/db");
 
     const truocTep = await demTepKho();
@@ -480,7 +480,7 @@ test(
   async () => {
     await donDep();
     await phatHanhNen();
-    const { themBlockTuWeb } = await import("@/lib/ky-thuat/cad/block-them-web");
+    const { themBlockTuWeb } = await import("@/lib/ky-thuat/cad/block");
     const { queryOne } = await import("@/lib/db");
     const truocTep = await demTepKho();
 
@@ -535,7 +535,7 @@ test(
 
 test("chưa có thư viện nền → 409 chua-co-thu-vien, không tệp mồ côi", S, async () => {
   await donDep();
-  const { themBlockTuWeb } = await import("@/lib/ky-thuat/cad/block-them-web");
+  const { themBlockTuWeb } = await import("@/lib/ky-thuat/cad/block");
   const truocTep = await demTepKho();
 
   const kq = await themBlockTuWeb({
@@ -552,8 +552,8 @@ test("chưa có thư viện nền → 409 chua-co-thu-vien, không tệp mồ c�
 test("GET ?file= qua handler thật: token cad tải được tệp lẻ; khoá lạ → 404 (AC4)", S, async () => {
   await donDep();
   await phatHanhNen();
-  const { themBlockTuWeb } = await import("@/lib/ky-thuat/cad/block-them-web");
-  const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { themBlockTuWeb } = await import("@/lib/ky-thuat/cad/block");
+  const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block");
   const { createCadToken } = await import("@/lib/bao-mat/cad-devices");
   const { GET } = await import("@/app/api/engineering/cad/block-lib/route");
 
@@ -615,8 +615,8 @@ test("GET ?file= qua handler thật: token cad tải được tệp lẻ; khoá 
 test("hai lượt thêm SONG SONG: hai version nối tiếp, không mất block nào (AC6)", S, async () => {
   await donDep();
   await phatHanhNen();
-  const { themBlockTuWeb } = await import("@/lib/ky-thuat/cad/block-them-web");
-  const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { themBlockTuWeb } = await import("@/lib/ky-thuat/cad/block");
+  const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block");
 
   const tenB = "XB-RED-DUCT-WEB";
   const [a, b] = await Promise.all([

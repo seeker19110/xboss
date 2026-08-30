@@ -2,8 +2,10 @@ using System.Text.Json;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Api;
 using XBoss.Cad.Core.RulePack;
+using XBoss.Cad.Core.Ui.ViewModels;
 using AcadApp = Autodesk.AutoCAD.ApplicationServices.Application;
 
 [assembly: CommandClass(typeof(XBoss.Cad.Acad.Commands.XBossLoginCommand))]
@@ -54,23 +56,8 @@ public sealed class XBossLoginCommand
             return;
         }
 
-        // 1) Địa chỉ server (nhớ giữa các lần).
-        var macDinh = DocServerUrl() ?? "";
-        var hoiUrl = new PromptStringOptions(
-            $"\n[XBoss] Địa chỉ server XBoss{(macDinh.Length > 0 ? $" <{macDinh}>" : " (vd https://xboss.congty.vn)")}: ")
-        {
-            AllowSpaces = false,
-        };
-        var kqUrl = ed.GetString(hoiUrl);
-        if (kqUrl.Status != PromptStatus.OK) return;
-        var baseUrl = kqUrl.StringResult.Length > 0 ? kqUrl.StringResult.TrimEnd('/') : macDinh;
-        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) ||
-            (uri.Scheme != "https" && !uri.IsLoopback))
-        {
-            // Chỉ HTTPS (token đi qua đường này) — loopback cho dev.
-            ed.WriteMessage("\n[XBoss] Địa chỉ phải là https:// (hoặc localhost khi dev).\n");
-            return;
-        }
+        // 1) Địa chỉ server (nhớ giữa các lần) — hộp thoại trước, rơi về dòng lệnh khi UI hỏng (FR9).
+        if (HoiServerUrl(ed) is not { } baseUrl) return;
         LuuServerUrl(baseUrl);
 
         var client = new XBossApiClient(baseUrl);
@@ -107,7 +94,10 @@ public sealed class XBossLoginCommand
 
             // 6) Tải thư viện block của bộ lệnh vẽ (M100 AC8) — lỗi ở đây KHÔNG làm hỏng việc ghép
             //    thiết bị: chỉ báo, các lệnh M99 vẫn chạy bình thường khi chưa có thư viện.
-            ed.WriteMessage($"\n[XBoss] {await BlockLibraryService.TaiVeAsync(client, ok.Key)}\n");
+            //    M113 FR5: tải cả bản TRỘN của dự án vừa chọn ở bước (5) — bộ toàn cục vẫn được
+            //    giữ nguyên trong ô cache cũ vì đường đề xuất block M103 dựng ứng viên trên đó.
+            foreach (var dong in await BlockLibraryService.TaiVeDayDuAsync(client, ok.Key))
+                ed.WriteMessage($"\n[XBoss] {dong}\n");
         }
         catch (XBossApiException e)
         {
@@ -117,6 +107,46 @@ public sealed class XBossLoginCommand
         {
             ed.WriteMessage($"\n[XBoss] Không kết nối được server ({e.Message}) — kiểm tra mạng/địa chỉ.\n");
         }
+    }
+
+    // ===== Thu tham số: hộp thoại (mặc định) hoặc dòng lệnh (M106 FR9) =====
+
+    /// <summary>
+    /// Địa chỉ server cho lần ghép này. Thử hộp thoại một ô trước (M106 §7.2); UI không dựng được
+    /// hoặc bị tắt bằng <c>XBOSS_UI_DIALOG=0</c> thì rơi về ĐÚNG câu hỏi dòng lệnh cũ (FR9). Hủy ở
+    /// hộp thoại = dừng lệnh, không hỏi lại.
+    /// </summary>
+    private static string? HoiServerUrl(Editor ed)
+    {
+        var (daDungUi, kq) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new LoginDialogViewModel(DocServerUrl());
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi) return kq?.BaseUrl;
+        return HoiServerUrlDongLenh(ed);
+    }
+
+    /// <summary>Câu hỏi dòng lệnh của bản trước M106 — giữ nguyên cho script/batch và FR9.</summary>
+    private static string? HoiServerUrlDongLenh(Editor ed)
+    {
+        var macDinh = DocServerUrl() ?? "";
+        var hoiUrl = new PromptStringOptions(
+            $"\n[XBoss] Địa chỉ server XBoss{(macDinh.Length > 0 ? $" <{macDinh}>" : " (vd https://xboss.congty.vn)")}: ")
+        {
+            AllowSpaces = false,
+        };
+        var kqUrl = ed.GetString(hoiUrl);
+        if (kqUrl.Status != PromptStatus.OK) return null;
+        var baseUrl = kqUrl.StringResult.Length > 0 ? kqUrl.StringResult.TrimEnd('/') : macDinh;
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != "https" && !uri.IsLoopback))
+        {
+            // Chỉ HTTPS (token đi qua đường này) — loopback cho dev.
+            ed.WriteMessage("\n[XBoss] Địa chỉ phải là https:// (hoặc localhost khi dev).\n");
+            return null;
+        }
+        return baseUrl;
     }
 
     /// <summary>

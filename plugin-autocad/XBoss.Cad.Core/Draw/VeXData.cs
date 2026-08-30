@@ -46,6 +46,49 @@ public enum VaiTroVe
     /// ĐÚNG bảng này tại chỗ, không sinh bảng đôi (FR9f).
     /// </summary>
     BangThongKe,
+
+    /// <summary>
+    /// Vạch chia đốt vuông góc tim (<c>XBOSS_VE_CHIADOT</c> — M105 FR5). Mang
+    /// <see cref="VeXDataInfo.HandleTim"/> + <see cref="VeXDataInfo.ChiSoDot"/> để chạy lại lệnh
+    /// xóa đúng vạch cũ CỦA TUYẾN ĐÓ rồi vẽ lại (idempotent — FR6/AC9).
+    /// </summary>
+    VachChia,
+
+    /// <summary>Tag đốt đặt cạnh trung điểm đốt (<c>XBOSS_VE_CHIADOT</c> — M105 FR5).</summary>
+    NhanDot,
+
+    /// <summary>
+    /// Revision cloud và tam giác mang số revision (<c>XBOSS_VE_REV</c> — M110 FR3). Mang
+    /// <see cref="VeXDataInfo.SoRevision"/>, danh sách handle đối tượng nằm trong vùng
+    /// (<see cref="VeXDataInfo.HandleTrongVung"/>) và <see cref="VeXDataInfo.HandleCapDoi"/>
+    /// (cloud ↔ tam giác) để xóa/sửa luôn đi cặp — cùng kiểu liên kết 2 chiều tim↔biên của M100.
+    /// </summary>
+    Revision,
+    /// Đối tượng ngắt nét giao chéo (<c>XBOSS_VE_NGATNET</c> — M109 FR5): wipeout che vùng giao
+    /// hoặc cầu vượt. Mang <see cref="VeXDataInfo.HandleTim"/> = tim ĐI DƯỚI và
+    /// <see cref="VeXDataInfo.HandleTimGiao"/> = tim đi trên, nên lệnh xóa/chạy lại tìm đúng đối
+    /// tượng của đúng CẶP tuyến (FR6 idempotent). KHÔNG BAO GIỜ đụng vào polyline tim (guardrail 1).
+    /// </summary>
+    NgatNet,
+
+    /// <summary>
+    /// Polyline tim HÀNH LANG do <c>XBOSS_VE_HANHLANG</c> vẽ mới hoặc NHẬN từ polyline có sẵn
+    /// (M114 FR3). Mang bề rộng khả dụng, cao độ đáy dầm/trần, danh sách hệ được phép đi qua và
+    /// sổ chiếm chỗ <see cref="VeXDataInfo.LanDaCap"/> — nhờ đó trạng thái chiếm làn SỐNG TRONG
+    /// BẢN VẼ, hệ chạy sau đọc được ngay cả khi mở lại bản vẽ hôm khác.
+    /// </summary>
+    HanhLang,
+}
+
+/// <summary>
+/// Một bản ghi chiếm chỗ trong sổ <see cref="VeXDataInfo.LanDaCap"/> của hành lang (M114 FR3):
+/// hệ nào, tầng nào, chiếm làn từ đâu tới đâu (mm tính từ MÉP TRÁI hành lang — cùng gốc đo với
+/// <c>planMultiTierCorridor</c> bên TS, xem <see cref="Routing.CapPhatLanTang"/>) và ở cao độ nào.
+/// </summary>
+public sealed record LanChiem(string HeId, string TierId, double LanTuMm, double LanDenMm, double CaoDoMm)
+{
+    /// <summary>Bề rộng làn đã chiếm (mm).</summary>
+    public double BeRongMm => Math.Abs(LanDenMm - LanTuMm);
 }
 
 /// <summary>Nội dung XData <c>XBOSS_VE</c> của một đối tượng do bộ lệnh vẽ sinh ra (M100 §11).</summary>
@@ -105,6 +148,100 @@ public sealed record VeXDataInfo
 
     /// <summary>Mã loại bảng thống kê (<c>thietbi</c>/<c>khoiluong</c> — xem <c>ThongKeTable.Ma</c>).</summary>
     public string? LoaiBang { get; init; }
+
+    // ===== Chia đốt (M105 FR6) =====
+    // Trên TIM: 4 khóa tóm tắt dưới đây là "dấu đã chia đốt" — nguồn của bảng đốt trong bản vẽ và
+    // của mục chia đốt trong báo cáo phiên vẽ, đọc lại được sau khi đóng/mở bản vẽ.
+    // Trên VẠCH/TAG: HandleTim + ChiSoDot đủ để chạy lại lệnh dọn đúng đối tượng cũ.
+
+    /// <summary>Kiểu nối đã dùng để chia đốt (slug rule pack, vd <c>tdc</c>); null = tuyến chưa chia.</summary>
+    public string? KieuNoi { get; init; }
+
+    /// <summary>Kỹ sư ghi đè kiểu nối tự chọn (FR1) — vào báo cáo để soát lại.</summary>
+    public bool KieuNoiGhiDe { get; init; }
+
+    /// <summary>Số đốt của tuyến sau khi chia (chỉ trên tim).</summary>
+    public int? SoDot { get; init; }
+
+    /// <summary>Số mối nối của tuyến (Σ(nᵢ−1) theo đoạn — chỉ trên tim).</summary>
+    public int? SoMoiNoi { get; init; }
+
+    /// <summary>Tổng chiều dài tuyến đã chia (mm — chỉ trên tim).</summary>
+    public double? TongDaiDotMm { get; init; }
+
+    /// <summary>Số thứ tự đốt trong tuyến (trên tag đốt, và đốt ĐỨNG TRƯỚC trên vạch chia).</summary>
+    public int? ChiSoDot { get; init; }
+
+    // ===== Revision cloud (M110 FR3) — có trên CẢ cloud lẫn tam giác của vai trò Revision.
+
+    /// <summary>Số revision của cloud/tam giác (số nguyên: 1 = R1). null = không phải đối tượng revision.</summary>
+    public int? SoRevision { get; init; }
+
+    /// <summary>Handle của đối tượng đi cặp: trên cloud là tam giác, trên tam giác là cloud (FR3/FR8).</summary>
+    public string? HandleCapDoi { get; init; }
+
+    /// <summary>Handle các đối tượng nằm trong vùng cloud — nguồn của cảnh báo bỏ sót (FR5).</summary>
+    public IReadOnlyList<string> HandleTrongVung { get; init; } = [];
+    // ===== Ngắt nét giao chéo (M109 FR5/FR7) =====
+
+    /// <summary>
+    /// Handle tim ĐI TRÊN của cặp giao (vai trò <see cref="VaiTroVe.NgatNet"/>);
+    /// <see cref="HandleTim"/> của cùng đối tượng là tim ĐI DƯỚI — cái bị ngắt nét.
+    /// </summary>
+    public string? HandleTimGiao { get; init; }
+
+    /// <summary>
+    /// Kỹ sư đã ĐẢO TAY chiều trên–dưới tại điểm giao này (FR7). Chạy lại lệnh phải giữ nguyên
+    /// quyết định của kỹ sư thay vì áp lại <c>crossingPolicy.priority</c> (AC5).
+    /// </summary>
+    public bool DaoTay { get; init; }
+
+    // ===== Nhân bản tầng điển hình (M111 FR9) =====
+    // Hai khóa dưới đây CHỈ có trên bản chép do XBOSS_VE_NHANTANG sinh ra — dấu nhận diện để chạy
+    // lại lệnh biết tầng đích đã chép rồi (bỏ qua / chép đè), và để báo cáo truy được nguồn gốc.
+
+    /// <summary>Nhãn tầng NGUỒN đã chép ra đối tượng này; null = không phải bản chép.</summary>
+    public string? TangNguon { get; init; }
+
+    /// <summary>Nhãn tầng của chính bản chép này (tầng đích).</summary>
+    public string? NhanTang { get; init; }
+
+    // ===== Hành lang + đi tuyến tự động (M114 FR3/FR11/FR12) =====
+
+    /// <summary>Bề rộng khả dụng của hành lang (mm) — vai trò <see cref="VaiTroVe.HanhLang"/>.</summary>
+    public double? BeRongMm { get; init; }
+
+    /// <summary>Cao độ đáy dầm của đoạn hành lang (mm) — HỎI kỹ sư, không suy (M100 §6.3).</summary>
+    public double? CotDayDamMm { get; init; }
+
+    /// <summary>Cao độ trần của đoạn hành lang (mm) — HỎI kỹ sư, không suy.</summary>
+    public double? CotTranMm { get; init; }
+
+    /// <summary>Id hệ được phép đi qua hành lang; rỗng = mọi hệ (mặc định FR2).</summary>
+    public IReadOnlyList<string> HeChoPhep { get; init; } = [];
+
+    /// <summary>Sổ chiếm chỗ của hành lang — mỗi hệ chạy qua ghi thêm một bản ghi (FR3/FR9).</summary>
+    public IReadOnlyList<LanChiem> LanDaCap { get; init; } = [];
+
+    /// <summary>Tuyến do <c>XBOSS_VE_TUYENTUDONG</c> sinh (FR11) — chạy lại được phép dựng lại.</summary>
+    public bool TuDong { get; init; }
+
+    /// <summary>Mã phiên chạy đã sinh tuyến này — gỡ đúng chiếm chỗ của phiên đó khi chạy lại (FR13).</summary>
+    public string? PhienTuyen { get; init; }
+
+    /// <summary>Kỹ sư đã sửa hình học tuyến tự động (FR12) — chạy lại BỎ QUA, không đè công của người.</summary>
+    public bool SuaTay { get; init; }
+
+    /// <summary>
+    /// Băm hình học của tuyến tự động NGAY LÚC SINH (<see cref="RevisionSnapshot.BamHinhHoc"/> —
+    /// cùng cơ chế mốc của M110, làm tròn 0,1 mm). Lần chạy sau băm lại đỉnh hiện tại: lệch nghĩa
+    /// là kỹ sư đã kéo/sửa tay ⇒ đặt <see cref="SuaTay"/> và BỎ QUA tuyến đó (M114 FR12).
+    ///
+    /// <para>Băm sống ngay trên đối tượng chứ không nằm trong một mốc riêng ở Named Objects
+    /// Dictionary: trạng thái của M114 luôn sống trong bản vẽ (FR3), nên tuyến copy sang bản vẽ
+    /// khác vẫn tự mang theo mốc so của chính nó.</para>
+    /// </summary>
+    public string? BamHinhHoc { get; init; }
 }
 
 /// <summary>
@@ -152,6 +289,30 @@ public static class VeXData
         if (tt.CaoDoMm is { } cdm) ra.Add($"caodomm={cdm.ToString("0.######", CultureInfo.InvariantCulture)}");
         if (tt.TagKhoa) ra.Add("tagkhoa=1");
         Them(ra, "bang", tt.LoaiBang);
+        Them(ra, "kieunoi", tt.KieuNoi);
+        if (tt.KieuNoiGhiDe) ra.Add("kieunoighide=1");
+        if (tt.SoDot is { } sd) ra.Add($"sodot={sd.ToString(CultureInfo.InvariantCulture)}");
+        if (tt.SoMoiNoi is { } sm) ra.Add($"somoi={sm.ToString(CultureInfo.InvariantCulture)}");
+        if (tt.TongDaiDotMm is { } td)
+            ra.Add($"tongdaidot={td.ToString("0.######", CultureInfo.InvariantCulture)}");
+        if (tt.ChiSoDot is { } cs) ra.Add($"chisodot={cs.ToString(CultureInfo.InvariantCulture)}");
+        if (tt.SoRevision is { } sr) ra.Add($"rev={sr.ToString(CultureInfo.InvariantCulture)}");
+        Them(ra, "capdoi", tt.HandleCapDoi);
+        foreach (var h in tt.HandleTrongVung) Them(ra, "trongvung", h);
+        Them(ra, "timgiao", tt.HandleTimGiao);
+        if (tt.DaoTay) ra.Add("daotay=1");
+        Them(ra, "tangnguon", tt.TangNguon);
+        Them(ra, "nhantang", tt.NhanTang);
+        if (tt.BeRongMm is { } br) ra.Add($"berong={So(br)}");
+        if (tt.CotDayDamMm is { } cdd) ra.Add($"cotdaydam={So(cdd)}");
+        if (tt.CotTranMm is { } ct) ra.Add($"cottran={So(ct)}");
+        foreach (var h in tt.HeChoPhep) Them(ra, "hecho", h);
+        foreach (var l in tt.LanDaCap)
+            ra.Add($"lan={l.HeId}|{l.TierId}|{So(l.LanTuMm)}|{So(l.LanDenMm)}|{So(l.CaoDoMm)}");
+        if (tt.TuDong) ra.Add("tudong=1");
+        Them(ra, "phien", tt.PhienTuyen);
+        if (tt.SuaTay) ra.Add("suatay=1");
+        Them(ra, "bamhh", tt.BamHinhHoc);
         return ra;
     }
 
@@ -168,8 +329,15 @@ public static class VeXData
         VaiTroVe.GiaDo => "giado",
         VaiTroVe.LoCho => "locho",
         VaiTroVe.BangThongKe => "bang",
+        VaiTroVe.VachChia => "vachchia",
+        VaiTroVe.NhanDot => "nhandot",
+        VaiTroVe.Revision => "revision",
+        VaiTroVe.NgatNet => "ngatnet",
+        VaiTroVe.HanhLang => "hanhlang",
         _ => "blockdef",
     };
+
+    private static string So(double v) => v.ToString("0.######", CultureInfo.InvariantCulture);
 
     private static void Them(List<string> ra, string khoa, string? giaTri)
     {
@@ -187,9 +355,26 @@ public static class VeXData
         string? blockId = null, thuVien = null;
         string? sizeLoCho = null, ketCau = null, viTriTruc = null, loaiBang = null;
         double? caoDo = null, caoDoMm = null;
+        string? kieuNoi = null;
+        string? tangNguon = null, nhanTang = null;
+        var kieuNoiGhiDe = false;
+        int? soDot = null, soMoiNoi = null, chiSoDot = null;
+        string? timGiao = null;
+        var daoTay = false;
+        double? tongDaiDotMm = null;
         var tagKhoa = false;
+        int? soRevision = null;
+        string? handleCapDoi = null;
         var bien = new List<string>();
         var nhan = new List<string>();
+        var trongVung = new List<string>();
+        var heChoPhep = new List<string>();
+        var lanDaCap = new List<LanChiem>();
+        double? beRongMm = null, cotDayDamMm = null, cotTranMm = null;
+        string? phienTuyen = null;
+        string? bamHinhHoc = null;
+        var tuDong = false;
+        var suaTay = false;
 
         foreach (var dong in chuoi)
         {
@@ -212,6 +397,11 @@ public static class VeXData
                         "giado" => VaiTroVe.GiaDo,
                         "locho" => VaiTroVe.LoCho,
                         "bang" => VaiTroVe.BangThongKe,
+                        "vachchia" => VaiTroVe.VachChia,
+                        "nhandot" => VaiTroVe.NhanDot,
+                        "revision" => VaiTroVe.Revision,
+                        "ngatnet" => VaiTroVe.NgatNet,
+                        "hanhlang" => VaiTroVe.HanhLang,
                         "blockdef" => VaiTroVe.DinhNghiaBlock,
                         _ => VaiTroVe.Tim,
                     };
@@ -243,6 +433,54 @@ public static class VeXData
                     break;
                 case "tagkhoa": tagKhoa = giaTri == "1"; break;
                 case "bang": loaiBang = giaTri; break;
+                case "kieunoi": kieuNoi = giaTri; break;
+                case "kieunoighide": kieuNoiGhiDe = giaTri == "1"; break;
+                case "sodot":
+                    if (int.TryParse(giaTri, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sd))
+                        soDot = sd;
+                    break;
+                case "somoi":
+                    if (int.TryParse(giaTri, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sm))
+                        soMoiNoi = sm;
+                    break;
+                case "tongdaidot":
+                    if (double.TryParse(giaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var td))
+                        tongDaiDotMm = td;
+                    break;
+                case "chisodot":
+                    if (int.TryParse(giaTri, NumberStyles.Integer, CultureInfo.InvariantCulture, out var cs))
+                        chiSoDot = cs;
+                    break;
+                case "rev":
+                    if (int.TryParse(giaTri, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sr))
+                        soRevision = sr;
+                    break;
+                case "capdoi": handleCapDoi = giaTri; break;
+                case "trongvung": trongVung.Add(giaTri); break;
+                case "timgiao": timGiao = giaTri; break;
+                case "daotay": daoTay = giaTri == "1"; break;
+                case "tangnguon": tangNguon = giaTri; break;
+                case "nhantang": nhanTang = giaTri; break;
+                case "berong":
+                    if (double.TryParse(giaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var br2))
+                        beRongMm = br2;
+                    break;
+                case "cotdaydam":
+                    if (double.TryParse(giaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var cdd2))
+                        cotDayDamMm = cdd2;
+                    break;
+                case "cottran":
+                    if (double.TryParse(giaTri, NumberStyles.Float, CultureInfo.InvariantCulture, out var ct2))
+                        cotTranMm = ct2;
+                    break;
+                case "hecho": heChoPhep.Add(giaTri); break;
+                case "lan":
+                    if (DocLanChiem(giaTri) is { } lan) lanDaCap.Add(lan);
+                    break;
+                case "tudong": tuDong = giaTri == "1"; break;
+                case "phien": phienTuyen = giaTri; break;
+                case "suatay": suaTay = giaTri == "1"; break;
+                case "bamhh": bamHinhHoc = giaTri; break;
                 // khóa lạ (PR sau) — bỏ qua, không coi là dữ liệu hỏng
             }
         }
@@ -271,6 +509,39 @@ public static class VeXData
             CaoDoMm = caoDoMm,
             TagKhoa = tagKhoa,
             LoaiBang = loaiBang,
+            KieuNoi = kieuNoi,
+            KieuNoiGhiDe = kieuNoiGhiDe,
+            SoDot = soDot,
+            SoMoiNoi = soMoiNoi,
+            TongDaiDotMm = tongDaiDotMm,
+            ChiSoDot = chiSoDot,
+            SoRevision = soRevision,
+            HandleCapDoi = handleCapDoi,
+            HandleTrongVung = trongVung,
+            HandleTimGiao = timGiao,
+            DaoTay = daoTay,
+            TangNguon = tangNguon,
+            NhanTang = nhanTang,
+            BeRongMm = beRongMm,
+            CotDayDamMm = cotDayDamMm,
+            CotTranMm = cotTranMm,
+            HeChoPhep = heChoPhep,
+            LanDaCap = lanDaCap,
+            TuDong = tuDong,
+            PhienTuyen = phienTuyen,
+            SuaTay = suaTay,
+            BamHinhHoc = bamHinhHoc,
         };
+    }
+
+    /// <summary>Đọc một bản ghi chiếm chỗ <c>heId|tierId|tu|den|caodo</c>; null nếu dòng hỏng.</summary>
+    private static LanChiem? DocLanChiem(string giaTri)
+    {
+        var phan = giaTri.Split('|');
+        if (phan.Length != 5) return null;
+        if (!double.TryParse(phan[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var tu)) return null;
+        if (!double.TryParse(phan[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var den)) return null;
+        if (!double.TryParse(phan[4], NumberStyles.Float, CultureInfo.InvariantCulture, out var caoDo)) return null;
+        return new LanChiem(phan[0], phan[1], tu, den, caoDo);
     }
 }

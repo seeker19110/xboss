@@ -1,4 +1,5 @@
 using XBoss.Cad.Core.RulePack;
+using System.Text.Json.Nodes;
 using Xunit;
 
 namespace XBoss.Cad.Tests;
@@ -99,8 +100,11 @@ public class RulePackLoaderTests
     public void Tu_choi_phep_kiem_bat_ma_thieu_tham_so()
     {
         // overlapSameSystem bật nhưng dung sai = 0 → chặn ngay, không chạy im lặng.
-        var json = File.ReadAllText(RepoPaths.RulePackPath)
-            .Replace("\"enabled\": false,\n      \"overlapToleranceMm\": 50,", "\"enabled\": true,\n      \"overlapToleranceMm\": 0,");
+        var goc = JsonNode.Parse(File.ReadAllText(RepoPaths.RulePackPath))!.AsObject();
+        var overlap = goc["inspectionPolicy"]!["overlapSameSystem"]!.AsObject();
+        overlap["enabled"] = true;
+        overlap["overlapToleranceMm"] = 0;
+        var json = goc.ToJsonString();
         var loi = Assert.Throws<RulePackException>(() => RulePackLoader.Load(json));
         Assert.Contains("overlapSameSystem", loi.Message);
     }
@@ -137,10 +141,12 @@ public class RulePackLoaderTests
     [Fact]
     public void Bo_qua_field_khong_biet_de_ban_moi_mo_rong_thuan_khong_lam_vo_plugin()
     {
-        var json = File.ReadAllText(RepoPaths.RulePackPath)
-            .Replace("\"version\": \"v8\",", "\"version\": \"v8\", \"fieldTuongLai\": { \"x\": 1 },");
-        // Thay thế phải TRÚNG thì test mới có nghĩa (bản trước còn tìm chuỗi "v6" trên tệp v7 nên
-        // không chèn được field lạ nào mà vẫn xanh).
+        // Chèn field lạ qua JsonNode, KHÔNG Replace chuỗi thô: tệp rule pack do prettier format
+        // nên mọi phép tìm chuỗi có khoảng trắng đều gãy im lặng ở lần phát hành sau (v9 làm gãy
+        // đúng như vậy) — test vẫn xanh mà chẳng chèn được gì, tức là canh hụt.
+        var goc = JsonNode.Parse(File.ReadAllText(RepoPaths.RulePackPath))!.AsObject();
+        goc["fieldTuongLai"] = new JsonObject { ["x"] = 1 };
+        var json = goc.ToJsonString();
         Assert.Contains("fieldTuongLai", json, StringComparison.Ordinal);
         var pack = RulePackLoader.Load(json);
         Assert.Equal(RepoPaths.VersionHienHanh, pack.Version);

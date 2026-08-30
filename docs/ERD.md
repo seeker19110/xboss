@@ -3290,6 +3290,61 @@
 - `api_keys_key_hash_key`: UNIQUE INDEX api_keys_key_hash_key ON public.api_keys USING btree (key_hash)
 - `api_keys_pkey`: UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)
 
+### cad_block_batch_items
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('cad_block_batch_items_id_seq'::regclass)` |
+| batch_id | integer |  |  |
+| block_name | text |  |  |
+| kind | text | ✓ |  |
+| system_id | text | ✓ |  |
+| takeoff_item_id | text | ✓ |  |
+| paper_size | text | ✓ |  |
+| attributes | jsonb | ✓ |  |
+| file_key | text | ✓ |  |
+| file_sha256 | text | ✓ |  |
+| preview_svg | text | ✓ |  |
+| nguon_quyet_dinh | text |  |  |
+| do_tin_cay | numeric(3,2) | ✓ |  |
+| ly_do | text | ✓ |  |
+| chon | boolean |  | `true` |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `batch_id` → `cad_block_batches(id)`
+
+**Index:**
+- `cad_block_batch_items_pkey`: UNIQUE INDEX cad_block_batch_items_pkey ON public.cad_block_batch_items USING btree (id)
+- `idx_cad_block_batch_items_batch`: INDEX idx_cad_block_batch_items_batch ON public.cad_block_batch_items USING btree (batch_id)
+- `idx_cad_block_batch_items_ten`: UNIQUE INDEX idx_cad_block_batch_items_ten ON public.cad_block_batch_items USING btree (batch_id, upper(block_name))
+
+### cad_block_batches
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('cad_block_batches_id_seq'::regclass)` |
+| nguon | text |  |  |
+| base_lib_version | text |  |  |
+| candidate_storage_key | text | ✓ |  |
+| candidate_dwg_sha256 | text | ✓ |  |
+| status | text |  | `'pending'::text` |
+| reject_reason | text | ✓ |  |
+| published_version | text | ✓ |  |
+| ai_enabled | boolean |  | `false` |
+| proposed_by | integer |  |  |
+| decided_by | integer | ✓ |  |
+| decided_at | timestamptz | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `decided_by` → `users(id)`
+- `proposed_by` → `users(id)`
+
+**Index:**
+- `cad_block_batches_pkey`: UNIQUE INDEX cad_block_batches_pkey ON public.cad_block_batches USING btree (id)
+- `idx_cad_block_batches_status`: INDEX idx_cad_block_batches_status ON public.cad_block_batches USING btree (status)
+
 ### cad_block_libs
 
 | Cột | Kiểu | Null | Default |
@@ -3301,14 +3356,17 @@
 | dwg_sha256 | text |  |  |
 | published_by | bigint | ✓ |  |
 | created_at | timestamptz | ✓ | `now()` |
+| project_id | bigint | ✓ |  |
 
 **Khóa ngoại:**
+- `project_id` → `projects(id)`
 - `published_by` → `users(id)`
 
 **Index:**
 - `cad_block_libs_pkey`: UNIQUE INDEX cad_block_libs_pkey ON public.cad_block_libs USING btree (id)
-- `cad_block_libs_version_key`: UNIQUE INDEX cad_block_libs_version_key ON public.cad_block_libs USING btree (version)
+- `idx_cad_block_libs_du_an`: INDEX idx_cad_block_libs_du_an ON public.cad_block_libs USING btree (project_id, id DESC)
 - `idx_cad_block_libs_moi_nhat`: INDEX idx_cad_block_libs_moi_nhat ON public.cad_block_libs USING btree (id DESC)
+- `ux_cad_block_libs_version`: UNIQUE INDEX ux_cad_block_libs_version ON public.cad_block_libs USING btree (COALESCE(project_id, (0)::bigint), version)
 
 ### cad_block_proposals
 
@@ -5041,6 +5099,56 @@
 **Index:**
 - `engineering_iot_threshold_alerts_pkey`: UNIQUE INDEX engineering_iot_threshold_alerts_pkey ON public.engineering_iot_threshold_alerts USING btree (id)
 - `uq_iot_alert_dang_mo`: UNIQUE INDEX uq_iot_alert_dang_mo ON public.engineering_iot_threshold_alerts USING btree (device_id) WHERE (is_resolved = false)
+
+### engineering_joint_pieces
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| run_id | uuid |  |  |
+| piece_index | integer |  |  |
+| length_mm | numeric(12,1) |  |  |
+| tag | text |  |  |
+
+**Khóa ngoại:**
+- `project_id` → `projects(id)`
+- `run_id` → `engineering_joint_runs(id)`
+
+**Index:**
+- `engineering_joint_pieces_pkey`: UNIQUE INDEX engineering_joint_pieces_pkey ON public.engineering_joint_pieces USING btree (id)
+- `engineering_joint_pieces_run_id_piece_index_key`: UNIQUE INDEX engineering_joint_pieces_run_id_piece_index_key ON public.engineering_joint_pieces USING btree (run_id, piece_index)
+
+### engineering_joint_runs
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| drawing_id | integer |  |  |
+| run_key | text |  |  |
+| system_id | text |  |  |
+| item_id | text |  |  |
+| size | text |  |  |
+| joint_type | text |  |  |
+| divide_mode | text |  |  |
+| overridden | boolean |  | `false` |
+| rule_pack_version | text |  |  |
+| total_length_mm | numeric(12,1) |  |  |
+| piece_count | integer |  |  |
+| joint_count | integer |  |  |
+| created_by | integer | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `drawing_id` → `drawings(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `engineering_joint_runs_drawing_id_run_key_key`: UNIQUE INDEX engineering_joint_runs_drawing_id_run_key_key ON public.engineering_joint_runs USING btree (drawing_id, run_key)
+- `engineering_joint_runs_pkey`: UNIQUE INDEX engineering_joint_runs_pkey ON public.engineering_joint_runs USING btree (id)
+- `idx_joint_runs_drawing`: INDEX idx_joint_runs_drawing ON public.engineering_joint_runs USING btree (drawing_id)
 
 ### engineering_knowledge_patterns
 

@@ -5,13 +5,13 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { parseDxf, parseDwgBinary, DwgUnsupportedError } from "@/lib/ky-thuat/cad/dxf-parser";
 import { queryOne } from "@/lib/db";
 import { storageGet } from "@/lib/nen/storage";
-import { GIOI_HAN_TEP_CAD, uocLuongByteTuBase64 } from "@/lib/ky-thuat/cad/gioi-han";
+import { GIOI_HAN_TEP_CAD, uocLuongByteTuBase64 } from "@/lib/ky-thuat/cad/dashboard";
 import {
   timTepBanVeTrenDia,
   chonTepDuyNhat,
   duongDanAnToan,
   type TepUngVien,
-} from "@/lib/ky-thuat/cad/tim-ban-ve";
+} from "@/lib/ky-thuat/cad/drawing";
 
 export const dynamic = "force-dynamic";
 

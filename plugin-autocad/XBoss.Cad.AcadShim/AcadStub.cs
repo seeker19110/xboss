@@ -85,6 +85,7 @@ namespace Autodesk.AutoCAD.Geometry
 
     public struct Vector3d
     {
+        public Vector3d(double x, double y, double z) { X = x; Y = y; Z = z; }
         public double X { get; }
         public double Y { get; }
         public double Z { get; }
@@ -92,7 +93,12 @@ namespace Autodesk.AutoCAD.Geometry
         public static Vector3d operator *(Vector3d v, double k) => v;
     }
 
-    public struct Matrix3d { }
+    public struct Matrix3d
+    {
+        /// <summary>API thật: ma trận TỊNH TIẾN theo một vector — phép biến hình của lệnh nhân
+        /// bản tầng (M111) là dời thuần túy, không xoay/không co giãn.</summary>
+        public static Matrix3d Displacement(Vector3d v) => new Matrix3d();
+    }
 
     public struct Scale3d
     {
@@ -101,6 +107,35 @@ namespace Autodesk.AutoCAD.Geometry
         public double X { get; }
         public double Y { get; }
         public double Z { get; }
+    }
+
+    /// <summary>
+    /// Tập đỉnh 2D — API thật dùng làm biên của <c>Wipeout.SetFrom</c> (M109). Cùng khuôn
+    /// <c>Point3dCollection</c> bên DatabaseServices: chỉ có mặt để kiểm chữ ký lời gọi.
+    /// </summary>
+    /// <summary>
+    /// API thật: danh sách số viewport truyền cho <c>TransientManager</c>. Rỗng = mọi viewport.
+    /// </summary>
+    public class IntegerCollection : IDisposable, IEnumerable<int>
+    {
+        public IntegerCollection() { }
+        public int Count => 0;
+        public void Add(int value) { }
+        public IEnumerator<int> GetEnumerator() => new List<int>().GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        public void Dispose() { }
+    }
+
+    public class Point2dCollection : IDisposable, IEnumerable<Point2d>
+    {
+        public Point2dCollection() { }
+        public Point2dCollection(Point2d[] pts) { }
+        public int Count => 0;
+        public Point2d this[int i] => new Point2d(0, 0);
+        public void Add(Point2d p) { }
+        public IEnumerator<Point2d> GetEnumerator() => new List<Point2d>().GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        public void Dispose() { }
     }
 }
 
@@ -128,8 +163,11 @@ namespace Autodesk.AutoCAD.Colors
 
     public struct Transparency
     {
-        public Transparency(byte alpha) { Alpha = alpha; }
+        public Transparency(byte alpha) { Alpha = alpha; IsByAlpha = true; }
         public byte Alpha { get; }
+        // API thật: Alpha CHỈ hợp lệ khi IsByAlpha; ByLayer/ByBlock/Invalid thì đọc Alpha ném
+        // eInvalidKey. Khai ở đây để mã Adapter buộc phải kiểm trước khi đọc (vấp thật 2026-08-27).
+        public bool IsByAlpha { get; }
     }
 }
 
@@ -154,8 +192,28 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public void Dispose() { }
     }
 
-    public class IdMapping : IDisposable
+    /// <summary>
+    /// API thật: một cặp "đối tượng nguồn ↔ bản sao" trong bảng ánh xạ của
+    /// <see cref="Database.DeepCloneObjects"/>. <c>IsPrimary</c> = đối tượng nằm THẲNG trong tập
+    /// yêu cầu chép (khác với đối tượng con bị kéo theo, vd attribute của khối chèn).
+    /// </summary>
+    public class IdPair
     {
+        public ObjectId Key => new ObjectId();
+        public ObjectId Value => new ObjectId();
+        public bool IsPrimary => false;
+        public bool IsCloned => false;
+        public bool IsOwnerXlated => false;
+    }
+
+    /// <summary>
+    /// API thật: <c>IdMapping</c> chỉ cài <see cref="IEnumerable"/> KHÔNG generic (mỗi phần tử là
+    /// một <see cref="IdPair"/>) — giữ đúng như vậy để mã Adapter buộc phải khai kiểu tường minh
+    /// trong <c>foreach</c>, y như khi biên dịch với assembly thật.
+    /// </summary>
+    public class IdMapping : IDisposable, IEnumerable
+    {
+        public IEnumerator GetEnumerator() => new List<IdPair>().GetEnumerator();
         public void Dispose() { }
     }
 
@@ -195,6 +253,9 @@ namespace Autodesk.AutoCAD.DatabaseServices
         // chỗ dùng duy nhất là truyền `ObjectId.Null` làm đối số (StandardizePipeline).
         public static ObjectId Null => new ObjectId();
         public bool IsNull => false;
+        /// <summary>ObjectARX thật: đối tượng đã bị xóa — phải kiểm trước khi mở, mở ForWrite một
+        /// id đã xóa là ném lỗi. Dùng khi khôi phục trạng thái khóa layer sau chuẩn hóa.</summary>
+        public bool IsErased => false;
         public Handle Handle => new Handle(1);
         public DBObject GetObject(OpenMode mode) => null;
         public static bool operator ==(ObjectId a, ObjectId b) => true;
@@ -217,7 +278,9 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public void Dispose() { }
     }
 
-    public class DBObject : IDisposable
+    // API thật: DBObject kế thừa GraphicsInterface.Drawable (xem chú thích ở lớp Drawable) — nhờ đó
+    // thực thể truyền thẳng vào TransientManager được. Dispose() thừa hưởng từ Drawable.
+    public class DBObject : Autodesk.AutoCAD.GraphicsInterface.Drawable
     {
         public ObjectId ObjectId => new ObjectId();
         public Handle Handle => new Handle(1);
@@ -225,7 +288,6 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public ResultBuffer GetXDataForApplication(string app) => null;
         public void UpgradeOpen() { }
         public void Erase() { }
-        public void Dispose() { }
     }
 
     public enum Intersect { OnBothOperands, ExtendThis, ExtendArgument, ExtendBoth }
@@ -240,8 +302,13 @@ namespace Autodesk.AutoCAD.DatabaseServices
     public class Entity : DBObject
     {
         public string Layer { get; set; }
+        // ObjectARX thật có CẢ hai: Layer (tên) và LayerId (ObjectId của LayerTableRecord). Mã
+        // Adapter lọc layer theo ObjectId (tên có thể bị bước chuẩn hóa đổi giữa chừng).
+        public ObjectId LayerId => new ObjectId();
         public Color Color { get; set; }
         public Extents3d GeometricExtents => new Extents3d(new Point3d(0, 0, 0), new Point3d(0, 0, 0));
+        /// <summary>Biến hình thực thể (dời/xoay/co giãn) — thực thể phải mở ForWrite.</summary>
+        public void TransformBy(Matrix3d m) { }
         public void IntersectWith(Entity ent, Intersect type, Point3dCollection points, IntPtr thisGsMarker, IntPtr otherGsMarker) { }
     }
 
@@ -275,12 +342,14 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public bool Constant => false;
     }
 
-    public class AttributeReference : Entity
+    // ObjectARX thật: AttributeReference KẾ THỪA DBText (không phải Entity trực tiếp). Giữ đúng
+    // quan hệ này là bắt buộc, không phải chi tiết trang trí: `switch` có `case DBText` đứng trước
+    // `case AttributeReference` là nhánh CHẾT (CS8120) trên bản build thật, mà stub khai sai cây
+    // kế thừa thì cổng CI thấy hai nhánh rời nhau và cho qua — đã lọt thật xuống máy có AutoCAD
+    // ngày 2026-08-26 (StandardizePipeline.cs). Thêm kiểu stub nào cũng phải tra đúng lớp cha.
+    public class AttributeReference : DBText
     {
         public string Tag { get; set; }
-        public string TextString { get; set; }
-        public Point3d Position { get; set; }
-        public ObjectId TextStyleId { get; set; }
         public void SetAttributeFromBlock(AttributeDefinition ad, Matrix3d blockTransform) { }
     }
 
@@ -403,6 +472,15 @@ namespace Autodesk.AutoCAD.DatabaseServices
     public class SymbolTableRecord : DBObject
     {
         public string Name { get; set; }
+
+        /// <summary>
+        /// ObjectARX thật: bản ghi đến từ XREF (layer/kiểu chữ/kiểu kích thước/block "TEP|TEN") —
+        /// KHÔNG sửa được, mở ForWrite ném eInvalidKey. Khai ở LỚP CHA vì API thật đặt ở
+        /// <c>AcDbSymbolTableRecord::isDependent()</c>: khai riêng cho LayerTableRecord thì mã bỏ
+        /// qua xref cho kiểu chữ/kiểu kích thước/block sẽ không biên dịch được trên cổng dù bản
+        /// thật chạy tốt (cây kế thừa của stub là một phần hợp đồng của cổng).
+        /// </summary>
+        public bool IsDependent { get; set; }
     }
 
     public class LayerTableRecord : SymbolTableRecord
@@ -414,6 +492,22 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public bool IsPlottable { get; set; }
         public Transparency Transparency { get; set; }
         public LineWeight LineWeight { get; set; }
+        /// <summary>Kiểu nét của layer (M105: layer vạch chia đốt lấy linetype từ rule pack).</summary>
+        public ObjectId LinetypeObjectId { get; set; }
+    }
+
+    /// <summary>Một kiểu nét đã nạp trong bản vẽ (acdbmgd: LinetypeTableRecord).</summary>
+    public class LinetypeTableRecord : SymbolTableRecord { }
+
+    /// <summary>
+    /// API thật: khung nhìn hiện hành lấy/đặt qua <c>Editor.GetCurrentView</c>/<c>SetCurrentView</c>
+    /// (tâm theo hệ tọa độ hiển thị, bề rộng/chiều cao theo đơn vị bản vẽ).
+    /// </summary>
+    public class ViewTableRecord : SymbolTableRecord
+    {
+        public Point2d CenterPoint { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
     }
 
     public class RegAppTableRecord : SymbolTableRecord { }
@@ -452,8 +546,47 @@ namespace Autodesk.AutoCAD.DatabaseServices
         /// <summary>Trạng thái nạp của xref — Resolved khi tệp tham chiếu tìm thấy và nạp được (chỉ đọc trên API thật).</summary>
         public XrefStatus XrefStatus => XrefStatus.Resolved;
         public ObjectId AppendEntity(Entity e) => new ObjectId();
+        /// <summary>
+        /// Mọi BlockReference đang trỏ tới định nghĩa này (M108 — đếm số lần chèn của một block).
+        /// API thật trả tập rỗng khi block chưa được chèn ở đâu; stub luôn trả rỗng.
+        /// </summary>
+        public ObjectIdCollection GetBlockReferenceIds(bool directOnly, bool forceValidity) =>
+            new ObjectIdCollection();
+        /// <summary>
+        /// Bảng THỨ TỰ VẼ của block record (M109): mở nó ForWrite rồi gọi MoveToTop/MoveAbove để
+        /// đẩy wipeout lên trên nét biên. API thật luôn có sẵn id này cho model space/layout.
+        /// </summary>
+        public ObjectId DrawOrderTableId => new ObjectId();
         public IEnumerator<ObjectId> GetEnumerator() => new List<ObjectId>().GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    /// <summary>
+    /// Thứ tự vẽ trong một block record (AcDbSortEntsTable). Dùng cho M109: vùng che phải nằm
+    /// TRÊN nét biên tuyến đi dưới nhưng DƯỚI nét biên tuyến đi trên.
+    /// </summary>
+    public class DrawOrderTable : DBObject
+    {
+        public void MoveToTop(ObjectIdCollection ids) { }
+        public void MoveToBottom(ObjectIdCollection ids) { }
+        public void MoveAbove(ObjectIdCollection ids, ObjectId target) { }
+        public void MoveBelow(ObjectIdCollection ids, ObjectId target) { }
+    }
+
+    // Cây kế thừa API thật: Wipeout → RasterImage → Image → Entity. Khai đủ 3 tầng (dù Adapter chỉ
+    // dùng Wipeout) theo đúng luật ở đầu tệp: stub khai sai lớp cha là cổng CI xanh giả.
+    public abstract class Image : Entity { }
+
+    public class RasterImage : Image { }
+
+    /// <summary>
+    /// Vùng che (AcDbWipeout) — M109 phương án B. <c>SetFrom</c> nhận biên đa giác 2D + pháp tuyến
+    /// mặt phẳng chứa biên.
+    /// </summary>
+    public class Wipeout : RasterImage
+    {
+        public void SetFrom(Point2dCollection vertices, Vector3d normal) { }
+        public void SetDatabaseDefaults() { }
     }
 
     public enum XrefStatus { NotAnXref, Resolved, Unresolved, FileNotFound, Unreferenced, Unloaded }
@@ -468,6 +601,8 @@ namespace Autodesk.AutoCAD.DatabaseServices
     }
 
     public class LayerTable : SymbolTable { }
+
+    public class LinetypeTable : SymbolTable { }
 
     public class RegAppTable : SymbolTable { }
 
@@ -645,10 +780,14 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public Point3d Extmin => new Point3d(0, 0, 0);
         public Point3d Extmax => new Point3d(0, 0, 0);
         public void WblockCloneObjects(ObjectIdCollection ids, ObjectId owner, IdMapping idMap, DuplicateRecordCloning dup, bool deferXlation) { }
+        /// <summary>Nhân bản đối tượng TRONG CÙNG database (M111): bảng ánh xạ nguồn → bản sao trả
+        /// về qua <paramref name="idMap"/>.</summary>
+        public void DeepCloneObjects(ObjectIdCollection ids, ObjectId owner, IdMapping idMap, bool deferXlation) { }
         public ObjectId Tablestyle { get; set; }
         public void Dispose() { }
         public TransactionManager TransactionManager => new TransactionManager();
         public ObjectId LayerTableId => new ObjectId();
+        public ObjectId LinetypeTableId => new ObjectId();
         public ObjectId BlockTableId => new ObjectId();
         public ObjectId RegAppTableId => new ObjectId();
         public ObjectId NamedObjectsDictionaryId => new ObjectId();
@@ -684,10 +823,14 @@ namespace Autodesk.AutoCAD.DatabaseServices
 }
 
 /// <summary>
-/// Chỉ đủ cho FontDescriptor — Adapter đặt font TrueType cho TextStyleTableRecord qua kiểu này.
+/// FontDescriptor (Adapter đặt font TrueType cho TextStyleTableRecord) + đồ họa TẠM
+/// (<see cref="Autodesk.AutoCAD.GraphicsInterface.TransientManager"/> — M114 FR10 vẽ tuyến đề xuất
+/// mà KHÔNG thêm thực thể nào vào bản vẽ).
 /// </summary>
 namespace Autodesk.AutoCAD.GraphicsInterface
 {
+    using Autodesk.AutoCAD.Geometry;
+
     public class FontDescriptor
     {
         public FontDescriptor(string typeface, bool bold, bool italic, int charset, int pitchAndFamily)
@@ -696,6 +839,54 @@ namespace Autodesk.AutoCAD.GraphicsInterface
         }
 
         public string TypeFace { get; }
+    }
+
+    /// <summary>
+    /// API thật: lớp gốc của mọi thứ vẽ được, và <c>DatabaseServices.DBObject</c> KẾ THỪA nó — nhờ
+    /// vậy một <c>Polyline</c> chưa thuộc database vẫn truyền thẳng vào <see cref="TransientManager"/>
+    /// được. Khai đúng quan hệ kế thừa này là điểm mấu chốt: khai sai thì lời gọi
+    /// <c>AddTransient(polyline, …)</c> vẫn biên dịch trót lọt ở cổng CI mà hỏng trên AutoCAD thật.
+    /// </summary>
+    public class Drawable : IDisposable
+    {
+        public void Dispose() { }
+    }
+
+    /// <summary>
+    /// API thật còn có kiểu GraphicsInterface.Polyline; khai stub để cổng CI bắt tên `Polyline`
+    /// nhập nhằng khi Adapter đồng thời import DatabaseServices và GraphicsInterface.
+    /// </summary>
+    public class Polyline : Drawable { }
+
+    /// <summary>Tầng vẽ của đồ họa tạm; M114 dùng <c>DirectShortTerm</c> (nét xem trước, không lưu).</summary>
+    public enum TransientDrawingMode
+    {
+        Main,
+        Sprite,
+        DirectShortTerm,
+        DirectTopmost,
+        Highlight,
+        CollectorsHighlight,
+        Contrast,
+    }
+
+    /// <summary>
+    /// Quản lý đồ họa TẠM: vẽ lên màn hình mà KHÔNG đưa thực thể nào vào database (không sinh bước
+    /// UNDO, không tạo layer). <c>viewportNumbers</c> rỗng = áp cho mọi viewport.
+    /// </summary>
+    public class TransientManager
+    {
+        public static TransientManager CurrentTransientManager => new TransientManager();
+
+        public void AddTransient(
+            Drawable drawable, TransientDrawingMode mode, int subDrawingMode, IntegerCollection viewportNumbers) { }
+
+        public void EraseTransient(Drawable drawable, IntegerCollection viewportNumbers) { }
+
+        public void EraseTransients(
+            TransientDrawingMode mode, int subDrawingMode, IntegerCollection viewportNumbers) { }
+
+        public void UpdateTransient(Drawable drawable, IntegerCollection viewportNumbers) { }
     }
 }
 
@@ -801,7 +992,14 @@ namespace Autodesk.AutoCAD.EditorInput
         public PromptEntityResult GetEntity(PromptEntityOptions o) => new PromptEntityResult();
         public PromptDoubleResult GetAngle(PromptAngleOptions o) => new PromptDoubleResult();
         public PromptSelectionResult GetSelection() => new PromptSelectionResult();
+        /// <summary>acmgd: chọn góc đối diện của một vùng chữ nhật (đường "tự khoanh vùng" M110 FR1).</summary>
+        public PromptPointResult GetCorner(string message, Point3d basePoint) => new PromptPointResult();
+        /// <summary>Khung nhìn hiện hành (bản sao KHÔNG thuộc database — gọi xong phải Dispose).</summary>
+        public ViewTableRecord GetCurrentView() => new ViewTableRecord();
+        public void SetCurrentView(ViewTableRecord view) { }
         public Matrix3d CurrentUserCoordinateSystem { get; set; }
+        /// <summary>Vẽ lại vùng đồ họa — cần gọi sau khi thêm/xóa đồ họa TẠM (M114 FR10).</summary>
+        public void UpdateScreen() { }
         public void Command(params object[] args) { }
     }
 }
@@ -825,10 +1023,24 @@ namespace Autodesk.AutoCAD.ApplicationServices
         public void SendStringToExecute(string command, bool activate, bool wrapUpInactiveDoc, bool echoCommand) { }
     }
 
+    /// <summary>acmgd: đối số của các sự kiện cấp tài liệu (DocumentCreated/Activated/…).</summary>
+    public class DocumentCollectionEventArgs : EventArgs
+    {
+        public Document Document => new Document();
+    }
+
+    public delegate void DocumentCollectionEventHandler(object sender, DocumentCollectionEventArgs e);
+
     public class DocumentCollection : IEnumerable
     {
         public Document MdiActiveDocument => new Document();
         public IEnumerator GetEnumerator() => new List<Document>().GetEnumerator();
+
+        /// <summary>
+        /// acmgd: <c>public event DocumentCollectionEventHandler DocumentActivated</c> — bắn trên
+        /// luồng chính khi kỹ sư chuyển sang tab bản vẽ khác (M106: bảng điều khiển tính lại).
+        /// </summary>
+        public event DocumentCollectionEventHandler DocumentActivated { add { } remove { } }
     }
 
     public static class Application
@@ -842,6 +1054,13 @@ namespace Autodesk.AutoCAD.ApplicationServices
         /// </summary>
         public static System.Windows.Forms.DialogResult ShowModalDialog(System.Windows.Forms.Form formToShow) =>
             System.Windows.Forms.DialogResult.Cancel;
+
+        /// <summary>
+        /// acmgd: <c>public static bool? ShowModalWindow(System.Windows.Window window)</c> — bản WPF
+        /// của ShowModalDialog, AutoCAD tự đặt cửa sổ chính làm chủ (M106 FR3). Trả
+        /// <c>Window.DialogResult</c>, nên <c>null</c> = cửa sổ bị đóng mà không đặt kết quả.
+        /// </summary>
+        public static bool? ShowModalWindow(System.Windows.Window window) => null;
     }
 
     namespace Core
@@ -991,13 +1210,19 @@ namespace System.Windows.Forms
 
     public class Control : IDisposable
     {
-        public class ControlCollection
+        // Duyệt được: mã Adapter lặp `foreach (Control con in cha.Controls)` để ngắt dòng lại theo
+        // bề rộng palette. Stub không duyệt được thì cổng đỏ giả ở một tính năng chạy đúng.
+        public class ControlCollection : IEnumerable<Control>
         {
             public void Add(Control value) { }
             public void Clear() { }
+            public IEnumerator<Control> GetEnumerator() => new List<Control>().GetEnumerator();
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
 
         public ControlCollection Controls { get; } = new ControlCollection();
+        public System.Drawing.Size ClientSize { get; set; }
+        public bool HasChildren => false;
         public System.Drawing.Color BackColor { get; set; }
         public System.Drawing.Color ForeColor { get; set; }
         public DockStyle Dock { get; set; }
@@ -1016,6 +1241,10 @@ namespace System.Windows.Forms
         public void SuspendLayout() { }
         public void ResumeLayout() { }
         public void Dispose() { }
+
+        /// <summary>WinForms thật: <c>protected virtual void OnResize(EventArgs)</c> — Adapter
+        /// override để ngắt dòng lại khi kỹ sư kéo rộng/hẹp palette.</summary>
+        protected virtual void OnResize(EventArgs e) { }
     }
 
     public class ScrollableControl : Control
@@ -1067,7 +1296,6 @@ namespace System.Windows.Forms
         public FormStartPosition StartPosition { get; set; }
         public bool MaximizeBox { get; set; }
         public bool MinimizeBox { get; set; }
-        public System.Drawing.Size ClientSize { get; set; }
         public IButtonControl AcceptButton { get; set; }
         public IButtonControl CancelButton { get; set; }
         public DialogResult DialogResult { get; set; }
@@ -1116,4 +1344,12 @@ namespace System.Drawing
         public Font(string familyName, float emSize) { }
         public Font(string familyName, float emSize, FontStyle style) { }
     }
+
+    // Brush/Pen KHÔNG được mã Adapter dùng tới — stub ở đây chỉ để TÁI HIỆN CẶP TÊN TRÙNG giữa
+    // System.Drawing (WinForms) và System.Windows.Media (WPF). Không có chúng, cổng CI chỉ thấy
+    // một nửa bộ implicit using của bản build thật và bỏ lọt CS0104 "ambiguous reference" — đúng
+    // lỗi đã lọt xuống máy có AutoCAD ngày 2026-08-26 (MauBangWpf.cs). Xóa 2 lớp này = mở lại lỗ.
+    public abstract class Brush { }
+
+    public class Pen { }
 }

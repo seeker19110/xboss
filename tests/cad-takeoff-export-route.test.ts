@@ -1,6 +1,6 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
 // Test cho app/api/engineering/cad/takeoff-export/route.ts (chưa có test nào trước PR này) +
-// hàm dựng dòng dữ liệu layDongTakeoffChoExport trong lib/ky-thuat/cad/bang-dieu-khien.ts (~205-238).
+// hàm dựng dòng dữ liệu layDongTakeoffChoExport trong lib/ky-thuat/cad/dashboard.ts (~205-238).
 // (1) Route-source: force-dynamic, 401 chưa đăng nhập, phân quyền CAN.viewEngineeringGraph.
 // (2) Integration (TEST_DATABASE_URL, tự skip): layDongTakeoffChoExport dựng đúng từng dòng từ
 //     standardize_report.takeoff.lines của mọi revision plugin trong dự án, bỏ qua revision không
@@ -34,7 +34,10 @@ test("route takeoff-export: force-dynamic, 401 khi chưa đăng nhập, 403 theo
   const iAuth403 = src.indexOf("status: 403");
   const iQuery = src.indexOf("layDongTakeoffChoExport(");
   assert.ok(iAuth401 >= 0 && iAuth403 >= 0 && iQuery >= 0);
-  assert.ok(iAuth401 < iQuery && iAuth403 < iQuery, "kiểm quyền phải chạy trước khi truy vấn dữ liệu");
+  assert.ok(
+    iAuth401 < iQuery && iAuth403 < iQuery,
+    "kiểm quyền phải chạy trước khi truy vấn dữ liệu",
+  );
 });
 
 test("route takeoff-export: không đụng bảng BOQ, chỉ đọc lại dữ liệu đã lưu trong standardize_report", () => {
@@ -46,20 +49,76 @@ test("route takeoff-export: không đụng bảng BOQ, chỉ đọc lại dữ l
   );
 });
 
+test("route takeoff-export: header Excel có đủ cột KL đo lẫn cột quy đổi (hệ số/mô tả/KL quy đổi)", () => {
+  const src = nguon();
+  for (const cot of ["Khối lượng (đo)", "Hệ số quy đổi", "Mô tả quy đổi", "KL quy đổi"]) {
+    assert.ok(src.includes(cot), `thiếu cột header "${cot}"`);
+  }
+  // Cột quy đổi để trống khi null — không tự ý gán 0 (tránh đọc nhầm "không quy đổi" thành 0).
+  assert.match(src, /d\.heSoQuyDoi \?\? ""/);
+  assert.match(src, /d\.klQuyDoi \?\? ""/);
+});
+
 // ===== (2) Integration =====
 
 const DXF_HOP_LE = [
-  "0", "SECTION", "2", "HEADER", "0", "ENDSEC",
-  "0", "SECTION", "2", "BLOCKS", "0", "ENDSEC",
-  "0", "SECTION", "2", "TABLES",
-  "0", "TABLE", "2", "LAYER",
-  "0", "LAYER", "2", "01_ONG_GIO_CAP", "62", "140", "6", "CONTINUOUS",
-  "0", "ENDTAB", "0", "ENDSEC",
-  "0", "SECTION", "2", "ENTITIES",
-  "0", "LINE", "8", "01_ONG_GIO_CAP",
-  "10", "0.0", "20", "0.0", "30", "0.0",
-  "11", "1000.0", "21", "0.0", "31", "0.0",
-  "0", "ENDSEC", "0", "EOF", "",
+  "0",
+  "SECTION",
+  "2",
+  "HEADER",
+  "0",
+  "ENDSEC",
+  "0",
+  "SECTION",
+  "2",
+  "BLOCKS",
+  "0",
+  "ENDSEC",
+  "0",
+  "SECTION",
+  "2",
+  "TABLES",
+  "0",
+  "TABLE",
+  "2",
+  "LAYER",
+  "0",
+  "LAYER",
+  "2",
+  "01_ONG_GIO_CAP",
+  "62",
+  "140",
+  "6",
+  "CONTINUOUS",
+  "0",
+  "ENDTAB",
+  "0",
+  "ENDSEC",
+  "0",
+  "SECTION",
+  "2",
+  "ENTITIES",
+  "0",
+  "LINE",
+  "8",
+  "01_ONG_GIO_CAP",
+  "10",
+  "0.0",
+  "20",
+  "0.0",
+  "30",
+  "0.0",
+  "11",
+  "1000.0",
+  "21",
+  "0.0",
+  "31",
+  "0.0",
+  "0",
+  "ENDSEC",
+  "0",
+  "EOF",
+  "",
 ].join("\n");
 
 let U = 0;
@@ -114,9 +173,9 @@ test(
     "standardize_report.takeoff.lines, bỏ qua revision không kèm takeoff, chỉ trong đúng dự án",
   S,
   async () => {
-    const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/plugin-upload");
+    const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/dashboard");
     const { getCurrentRulePack } = await import("@/lib/ky-thuat/cad/rule-pack");
-    const { layDongTakeoffChoExport } = await import("@/lib/ky-thuat/cad/bang-dieu-khien");
+    const { layDongTakeoffChoExport } = await import("@/lib/ky-thuat/cad/dashboard");
     const v = getCurrentRulePack().version;
 
     // Rev A của dự án 1 — CÓ takeoff.
@@ -142,6 +201,21 @@ test(
             khoiLuong: 12,
             size: "300x200",
             vung: "Tầng 3",
+            // Không có hệ số quy đổi (rule pack không khai) — kiểm tra cột quy đổi để TRỐNG.
+          },
+          {
+            itemId: "duct-cachnhiet",
+            boqCode: "M.01.02",
+            group: "HVAC",
+            ten: "Cách nhiệt ống gió",
+            donVi: "m2",
+            khoiLuong: 20,
+            size: "300x200",
+            vung: "Tầng 3",
+            // Có hệ số quy đổi — item dẫn xuất (cách nhiệt), khớp ví dụ trong sidecar mẫu.
+            heSoQuyDoi: 1.6,
+            moTaQuyDoi: "Diện tích cách nhiệt = chu vi x chiều dài x hệ số",
+            klQuyDoi: 32,
           },
         ],
       },
@@ -192,7 +266,7 @@ test(
 
     const dong1 = await layDongTakeoffChoExport(PROJECT_1);
     const cuaP1 = dong1.filter((d) => d.drawingCode === "TXE-P1-001");
-    assert.equal(cuaP1.length, 1, "rev B không kèm takeoff phải bị bỏ qua");
+    assert.equal(cuaP1.length, 2, "rev B không kèm takeoff phải bị bỏ qua, rev A có 2 dòng");
     assert.deepEqual(cuaP1[0], {
       drawingCode: "TXE-P1-001",
       drawingName: "Bản vẽ dự án 1",
@@ -204,6 +278,26 @@ test(
       donVi: "m",
       khoiLuong: 12,
       boqCode: "M.01.01",
+      // Dòng không kèm dữ liệu quy đổi trong sidecar → phải để TRỐNG (null), không suy đoán/mặc định 1.
+      heSoQuyDoi: null,
+      moTaQuyDoi: "",
+      klQuyDoi: null,
+    });
+    assert.deepEqual(cuaP1[1], {
+      drawingCode: "TXE-P1-001",
+      drawingName: "Bản vẽ dự án 1",
+      rev: "A",
+      he: "HVAC",
+      ten: "Cách nhiệt ống gió",
+      size: "300x200",
+      vung: "Tầng 3",
+      donVi: "m2",
+      khoiLuong: 20,
+      boqCode: "M.01.02",
+      // Dòng có hệ số quy đổi (item dẫn xuất) → phải xuất đúng cả 3 trường quy đổi từ sidecar.
+      heSoQuyDoi: 1.6,
+      moTaQuyDoi: "Diện tích cách nhiệt = chu vi x chiều dài x hệ số",
+      klQuyDoi: 32,
     });
 
     assert.ok(

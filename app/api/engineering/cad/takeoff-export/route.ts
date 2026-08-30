@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { layDongTakeoffChoExport } from "@/lib/ky-thuat/cad/bang-dieu-khien";
+import { layDongTakeoffChoExport } from "@/lib/ky-thuat/cad/dashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +39,11 @@ export async function GET() {
     "Size",
     "Vùng",
     "Đơn vị",
-    "Khối lượng",
+    "Khối lượng (đo)",
     "Mã BOQ",
+    "Hệ số quy đổi",
+    "Mô tả quy đổi",
+    "KL quy đổi",
   ]);
   header.eachCell((cell) => {
     cell.font = { bold: true };
@@ -59,6 +62,10 @@ export async function GET() {
       d.donVi,
       d.khoiLuong,
       d.boqCode,
+      // Hệ số/KL quy đổi để TRỐNG khi rule pack không khai (null) — không suy đoán, không mặc định 1.
+      d.heSoQuyDoi ?? "",
+      d.moTaQuyDoi,
+      d.klQuyDoi ?? "",
     ]);
   }
 

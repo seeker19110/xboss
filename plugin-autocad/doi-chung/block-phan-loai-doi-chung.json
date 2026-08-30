@@ -1,0 +1,375 @@
+{
+  "_README": "M108 §15.4 — bộ đối chứng đo AC3 (tỷ lệ phân loại kind đúng ngay từ đầu ≥90%). Mỗi dòng: blockName + nhãn kind CHUẨN + lớp khó. Chạy `npx tsx scripts/do-phan-loai-block.ts`.",
+  "_CANH_BAO": "nhanDaXacNhan=false ⇒ đây là NHÃN NHÁP do người viết code đặt, KHÔNG dùng để tuyên bố AC3 đạt. Theo M108 §18 R4, nhãn chuẩn phải do kỹ sư trưởng/CAD manager gán (cùng lý do M100 §16 giao nội dung block cho họ) — người viết code tự gán nhãn rồi tự chấm điểm mình là đo thiên vị. Kỹ sư trưởng rà xong thì sửa từng nhãn sai và đặt cờ này thành true.",
+  "nhanDaXacNhan": false,
+  "nguoiGanNhan": null,
+  "ngayGanNhan": null,
+  "lop": {
+    "A-chuan": "Tên theo chuẩn rule pack — luật tất định phải bắt được. Đây là SỐ NỀN.",
+    "B-viet-tat-VN": "Viết tắt tiếng Việt không dấu — luật tất định mù, phần AI phải gánh.",
+    "C-ten-vo-nghia": "Tên nhà cung cấp xuất ra, không attribute — chỉ hình học mới cứu được."
+  },
+  "blocks": [
+    {
+      "blockName": "FCU-01",
+      "nhan": "equipment",
+      "lop": "A-chuan",
+      "layer": "M-DUCT-SUPP",
+      "attributes": ["TAG"]
+    },
+    {
+      "blockName": "FCU-T05-12",
+      "nhan": "equipment",
+      "lop": "A-chuan",
+      "layer": "M-DUCT-SUPP",
+      "attributes": ["TAG"]
+    },
+    {
+      "blockName": "AHU-01",
+      "nhan": "equipment",
+      "lop": "A-chuan",
+      "layer": "M-DUCT-SUPP",
+      "attributes": ["TAG"]
+    },
+    {
+      "blockName": "AHU-ROOF-2",
+      "nhan": "equipment",
+      "lop": "A-chuan",
+      "layer": "M-DUCT-SUPP",
+      "attributes": ["TAG"]
+    },
+    {
+      "blockName": "SPK-PENDENT",
+      "nhan": "equipment",
+      "lop": "A-chuan",
+      "layer": "F-SPK-PIPE",
+      "attributes": ["TAG"]
+    },
+    {
+      "blockName": "SPRINKLER-UP",
+      "nhan": "equipment",
+      "lop": "A-chuan",
+      "layer": "F-SPK-PIPE",
+      "attributes": ["TAG"]
+    },
+    {
+      "blockName": "XB-SUP-DUCT",
+      "nhan": "support",
+      "lop": "A-chuan",
+      "layer": "M-DUCT-SUPP"
+    },
+    {
+      "blockName": "XB-SUP-PIPE-01",
+      "nhan": "support",
+      "lop": "A-chuan",
+      "layer": "P-CHW-PIPE"
+    },
+    {
+      "blockName": "SUPPORT-TRAY-A",
+      "nhan": "support",
+      "lop": "A-chuan",
+      "layer": "E-TRAY-PWR"
+    },
+    {
+      "blockName": "HANGER-D200",
+      "nhan": "support",
+      "lop": "A-chuan",
+      "layer": "M-DUCT-SUPP"
+    },
+    {
+      "blockName": "XB-SLEEVE-W",
+      "nhan": "sleeve",
+      "lop": "A-chuan",
+      "layer": "S-WALL"
+    },
+    {
+      "blockName": "SLEEVE-FLOOR-150",
+      "nhan": "sleeve",
+      "lop": "A-chuan",
+      "layer": "S-SLAB"
+    },
+    {
+      "blockName": "SLV-D100",
+      "nhan": "sleeve",
+      "lop": "A-chuan",
+      "layer": "S-WALL"
+    },
+    {
+      "blockName": "LOCHO-DAM-300",
+      "nhan": "sleeve",
+      "lop": "A-chuan",
+      "layer": "S-BEAM"
+    },
+    {
+      "blockName": "TITLEBLOCK-A1",
+      "nhan": "titleblock",
+      "lop": "A-chuan"
+    },
+    {
+      "blockName": "TITLEBLOCK-A3",
+      "nhan": "titleblock",
+      "lop": "A-chuan"
+    },
+    {
+      "blockName": "V1C",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "P-CHW-PIPE",
+      "ghiChu": "van 1 chiều (check valve)"
+    },
+    {
+      "blockName": "VAN 1 CHIEU",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "P-CHW-PIPE",
+      "ghiChu": "van 1 chiều viết đầy đủ"
+    },
+    {
+      "blockName": "VC-DN100",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "P-CHW-PIPE",
+      "ghiChu": "van chặn DN100"
+    },
+    {
+      "blockName": "VAN-CHAN-DN50",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "P-CHW-PIPE",
+      "ghiChu": "van chặn"
+    },
+    {
+      "blockName": "CO90",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "M-DUCT-SUPP",
+      "ghiChu": "cút 90 độ"
+    },
+    {
+      "blockName": "CO 90 DO",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "M-DUCT-SUPP",
+      "ghiChu": "cút 90 độ viết đầy đủ"
+    },
+    {
+      "blockName": "CO45-D200",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "P-CHW-PIPE",
+      "ghiChu": "cút 45 độ"
+    },
+    {
+      "blockName": "TE THU",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "M-DUCT-SUPP",
+      "ghiChu": "tê thu (reducing tee)"
+    },
+    {
+      "blockName": "TE-DEU-300",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "M-DUCT-SUPP",
+      "ghiChu": "tê đều"
+    },
+    {
+      "blockName": "CON-THU-400-300",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "M-DUCT-SUPP",
+      "ghiChu": "côn thu (reducer)"
+    },
+    {
+      "blockName": "GIAM-D150-D100",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "P-CHW-PIPE",
+      "ghiChu": "côn giảm"
+    },
+    {
+      "blockName": "MG-CAP-600x600",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "M-DUCT-SUPP",
+      "ghiChu": "miệng gió cấp"
+    },
+    {
+      "blockName": "MIENG-GIO-HOI",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "M-DUCT-RETN",
+      "ghiChu": "miệng gió hồi"
+    },
+    {
+      "blockName": "VCD-400x300",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "M-DUCT-SUPP",
+      "ghiChu": "van điều chỉnh lưu lượng"
+    },
+    {
+      "blockName": "CUA-GIO-THAI",
+      "nhan": "fitting",
+      "lop": "B-viet-tat-VN",
+      "layer": "M-DUCT-EXHT",
+      "ghiChu": "cửa gió thải"
+    },
+    {
+      "blockName": "TY-TREO-M10",
+      "nhan": "support",
+      "lop": "B-viet-tat-VN",
+      "layer": "M-DUCT-SUPP",
+      "ghiChu": "ty treo"
+    },
+    {
+      "blockName": "GIA-DO-MANG-CAP",
+      "nhan": "support",
+      "lop": "B-viet-tat-VN",
+      "layer": "E-TRAY-PWR",
+      "ghiChu": "giá đỡ máng cáp"
+    },
+    {
+      "blockName": "QUAT-HUT-EF01",
+      "nhan": "equipment",
+      "lop": "B-viet-tat-VN",
+      "layer": "M-DUCT-EXHT",
+      "attributes": ["TAG"],
+      "ghiChu": "quạt hút"
+    },
+    {
+      "blockName": "BOM-NUOC-P01",
+      "nhan": "equipment",
+      "lop": "B-viet-tat-VN",
+      "layer": "P-CHW-PIPE",
+      "attributes": ["TAG"],
+      "ghiChu": "bơm nước"
+    },
+    {
+      "blockName": "KHUNG-TEN-A2",
+      "nhan": "titleblock",
+      "lop": "B-viet-tat-VN",
+      "ghiChu": "khung tên A2"
+    },
+    {
+      "blockName": "BLOCK1",
+      "nhan": "fitting",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK2",
+      "nhan": "fitting",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK3",
+      "nhan": "equipment",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK4",
+      "nhan": "fitting",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK5",
+      "nhan": "support",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK6",
+      "nhan": "sleeve",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK7",
+      "nhan": "fitting",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK8",
+      "nhan": "equipment",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK9",
+      "nhan": "fitting",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK10",
+      "nhan": "titleblock",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK11",
+      "nhan": "fitting",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK12",
+      "nhan": "support",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK13",
+      "nhan": "fitting",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK14",
+      "nhan": "equipment",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK15",
+      "nhan": "sleeve",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK16",
+      "nhan": "fitting",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK17",
+      "nhan": "fitting",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK18",
+      "nhan": "equipment",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK19",
+      "nhan": "fitting",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    },
+    {
+      "blockName": "BLOCK20",
+      "nhan": "support",
+      "lop": "C-ten-vo-nghia",
+      "ghiChu": "tên do nhà cung cấp xuất, không mang nghĩa"
+    }
+  ]
+}

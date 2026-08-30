@@ -1,7 +1,8 @@
 # Cài đặt plugin XBoss cho AutoCAD — hướng dẫn cho kỹ sư
 
 Tài liệu này dành cho **người dùng cuối** (kỹ sư MEP/QS trên máy trạm). Người phát hành gói cài xem
-phần build/đóng gói trong [`README.md`](README.md).
+phần build/đóng gói trong [`README.md`](README.md), hoặc hướng dẫn build từ đầu trên Windows ở
+[`BUILD-WINDOWS.md`](BUILD-WINDOWS.md).
 
 > **Điều kiện bắt buộc: AutoCAD 2026** (một nền duy nhất, **.NET 10** — M99 §9.1 cập nhật 2026-08-25). Bản 2021–2024 chạy
 > runtime khác nên **không nạp được** plugin; plugin đọc `ACADVER` lúc nạp và báo tiếng Việt rồi
@@ -86,38 +87,61 @@ tự hoặc từ khóa); **ESC bất cứ lúc nào là bản vẽ nguyên trạ
 thì nạp tay: `XBOSS_RULEPACK` cho bộ quy tắc, `XBOSS_VE_THUVIEN` cho thư viện block (chọn tệp
 `manifest.json`, tệp `.dwg` để cạnh nó).
 
+Thư viện block có **hai tầng** (M113): bộ dùng chung toàn công ty + bộ riêng của dự án (khung tên,
+ký hiệu theo CĐT) đè lên. Chọn dự án ở câu hỏi của `XBOSS_LOGIN` là plugin tự tải đúng bộ của dự án
+đó; chưa chọn thì dùng bộ toàn cục như trước. Muốn biết một block đang lấy từ đâu:
+`XBOSS_VE_THUVIEN` → `Nguon` (cột `[Dự án]` / `[Toàn cục]`), hoặc xem dòng "Bộ đang dùng" trên
+bảng `XBOSS_BANG`.
+
 ### Trình tự một buổi vẽ
 
-| Bước | Lệnh                            | Làm gì                                                                                                                                   |
-| ---- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | `XBOSS_VE_NEN`                  | Chọn hệ sắp vẽ → nền thiết kế bị khóa + làm mờ, layer đích được tạo sẵn. **Vẽ xong chạy lại lệnh này để trả nền về như cũ**              |
-| 2    | `XBOSS_VE`                      | Chọn loại tuyến → size → (độ dốc nếu là ống thoát) → bấm điểm như PLINE. Ống gió/máng tự có 2 nét biên đúng bề rộng                      |
-| 3    | `XBOSS_VE_PHUKIEN` / `_THIETBI` | Chèn co/tê/van/miệng gió bám tuyến (tự xoay theo tuyến) và thiết bị FCU/AHU… (nhập `TAG` ngay lúc chèn)                                  |
-| 4    | `XBOSS_VE_NHAN`                 | Bấm tuyến → nhãn size tự ghi (kèm `i=2%` + mũi tên hướng dốc nếu có). **Không gõ tay** nên nhãn không bao giờ lệch tuyến                 |
-| 5    | `XBOSS_VE_GIADO` / `_LOCHO`     | Rải giá đỡ cách đều đúng chuẩn treo đỡ; chèn lỗ chờ xuyên tường/sàn rồi `XUATBANG` để có bảng builder's work (Table + Excel) gửi kết cấu |
-| 6    | `XBOSS_VE_TAG` / `_THONGKE`     | Đánh tag tuần tự + tìm tag trùng; sinh bảng thiết bị/khối lượng ngay trong bản vẽ                                                        |
-| 7    | `XBOSS_VE_MATCAT` / `_TRANGIN`  | Dựng mặt cắt từ tuyến đã vẽ (cao độ **nhập tay**); tạo trang in đúng khổ/tỉ lệ, viewport đã khóa, khung tên điền sẵn                     |
-| 8    | `XBOSS_VE_BAOCAO`               | Xem lại cả buổi vẽ: bao nhiêu tuyến/block theo hệ, có size nào nằm ngoài danh mục không                                                  |
+| Bước | Lệnh                            | Làm gì                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ---- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1    | `XBOSS_VE_HANHLANG`             | (M114, chỉ khi rule pack bật `routingPolicy`) Khai **hành lang đi ống** một lần cho cả tầng: vẽ tim hành lang mới hoặc **nhận** polyline trục hành lang có sẵn (giữ nguyên từng đỉnh), kèm bề rộng khả dụng, cao độ đáy dầm/trần và hệ nào được đi qua. Sửa/xóa cũng bằng lệnh này — xóa hành lang còn hệ đi qua thì lệnh nêu rõ hệ nào rồi hỏi lại                                                                                                                            |
+| 2    | `XBOSS_VE_NEN`                  | Chọn hệ sắp vẽ → nền thiết kế bị khóa + làm mờ, layer đích được tạo sẵn. **Vẽ xong chạy lại lệnh này để trả nền về như cũ**                                                                                                                                                                                                                                                                                                                                                    |
+| 3    | `XBOSS_VE_TUYENTUDONG`          | (M114, chỉ khi rule pack bật `routingPolicy`) Nối **cả một hệ trong một lượt** theo hành lang đã khai ở bước 1: quét chọn thiết bị (Enter = mọi thiết bị của hệ chưa có tuyến) → chọn vùng cấm nếu có (Enter = bỏ qua) → bấm điểm nguồn → xem bảng đề xuất + nét mảnh tạm rồi bấm OK. **Không bấm OK là bản vẽ không đổi gì.** Thiết bị nào không nối được thì lệnh **nói rõ vì sao** chứ không vẽ đại. Chạy lại được nhiều lần — nhánh nào bạn đã sửa tay thì lệnh giữ nguyên |
+| 4    | `XBOSS_VE`                      | Vẽ tay phần còn lại (nhánh lắt léo, đoạn ngoài hành lang): chọn loại tuyến → size → (độ dốc nếu là ống thoát) → bấm điểm như PLINE. Ống gió/máng tự có 2 nét biên đúng bề rộng                                                                                                                                                                                                                                                                                                 |
+| 5    | `XBOSS_VE_PHUKIEN` / `_THIETBI` | Chèn co/tê/van/miệng gió bám tuyến (tự xoay theo tuyến) và thiết bị FCU/AHU… (nhập `TAG` ngay lúc chèn)                                                                                                                                                                                                                                                                                                                                                                        |
+| 6    | `XBOSS_VE_NHAN`                 | Bấm tuyến → nhãn size tự ghi (kèm `i=2%` + mũi tên hướng dốc nếu có). **Không gõ tay** nên nhãn không bao giờ lệch tuyến                                                                                                                                                                                                                                                                                                                                                       |
+| 7    | `XBOSS_VE_GIADO` / `_LOCHO`     | Rải giá đỡ cách đều đúng chuẩn treo đỡ; chèn lỗ chờ xuyên tường/sàn rồi `XUATBANG` để có bảng builder's work (Table + Excel) gửi kết cấu                                                                                                                                                                                                                                                                                                                                       |
+| 8    | `XBOSS_VE_TAG` / `_THONGKE`     | Đánh tag tuần tự + tìm tag trùng; sinh bảng thiết bị/khối lượng ngay trong bản vẽ                                                                                                                                                                                                                                                                                                                                                                                              |
+| 9    | `XBOSS_VE_NGATNET`              | Chỗ hai tuyến khác hệ cắt nhau: tuyến đi dưới **ngắt nét** cho bản vẽ đọc được ai trên ai dưới. Ai đi trên do bộ quy tắc quyết, cặp nào muốn ngược lại thì tích ô **Đảo** trong hộp thoại. Muốn bỏ: `XBOSS_VE_NGATNET_XOA`                                                                                                                                                                                                                                                     |
+| 10   | `XBOSS_VE_MATCAT` / `_TRANGIN`  | Dựng mặt cắt từ tuyến đã vẽ (cao độ **nhập tay**); tạo trang in đúng khổ/tỉ lệ, viewport đã khóa, khung tên điền sẵn                                                                                                                                                                                                                                                                                                                                                           |
+| 11   | `XBOSS_VE_REV*`                 | Nộp lại sau khi sửa: `XBOSS_VE_REV` khoanh vùng đã sửa (plugin **đề xuất sẵn** vùng nào đổi so với lần chốt trước), `XBOSS_VE_REV_CHOT` ghi bảng revision vào khung tên mọi layout, `XBOSS_VE_REV_HIENTHI` chỉ hiện lần sửa mới nhất khi in                                                                                                                                                                                                                                    |
+| 12   | `XBOSS_VE_BAOCAO`               | Xem lại cả buổi vẽ: bao nhiêu tuyến/block theo hệ, bao nhiêu nhánh do đi tuyến tự động sinh, có size nào nằm ngoài danh mục không                                                                                                                                                                                                                                                                                                                                              |
 
-### Ba việc hay phải làm lại
+### Bốn việc hay phải làm lại
 
 - **Đổi size/hệ đoạn đã vẽ:** dùng `XBOSS_VE_DOI`, đừng sửa tay. Lệnh đổi luôn layer, nhãn và
   **dựng lại nét biên** theo size mới; đoạn nào đã bóc khối lượng thì lệnh gỡ đánh dấu và nhắc
   **chạy lại `XBOSS_BOCKL`** (số cũ đã sai).
+- **Đi tuyến tự động lại sau khi thêm/bớt thiết bị hay dời hành lang:** cứ chạy lại
+  `XBOSS_VE_TUYENTUDONG` cho đúng hệ đó. Lệnh xóa các nhánh tự động cũ rồi dựng lại theo kết quả
+  mới (chỗ chiếm làn trong hành lang được gỡ trước khi cấp lại), nên chạy bao nhiêu lần cũng ra
+  cùng một bản vẽ. **Nhánh nào bạn đã kéo/sửa tay thì lệnh nhận ra và giữ nguyên** — muốn nó được
+  dựng lại thì xóa hẳn nhánh đó rồi chạy lệnh. Nhánh bị dựng lại mà từng bóc khối lượng thì lệnh
+  nhắc **chạy lại `XBOSS_BOCKL`**.
 - **Vẽ nhầm hệ:** cứ `U` (UNDO) một lần cho mỗi lệnh — tim, nét biên và nhãn của một lần vẽ đi liền
   một khối.
 - **Size không có trong danh mục:** vẫn gõ được, plugin đánh dấu là size ngoài danh mục và liệt kê
   trong `XBOSS_VE_BAOCAO` để kỹ sư trưởng bổ sung vào bộ quy tắc bản sau.
 
+- **Khoanh revision cho lần nộp sau:** chốt xong một lần phát hành bằng `XBOSS_VE_REV_CHOT` thì
+  plugin nhớ mốc; lần sửa sau chạy `XBOSS_VE_REV` là có sẵn danh sách "vùng đã đổi mà chưa khoanh".
+  Bản vẽ **chưa từng chốt** revision thì chưa đề xuất được — lần đầu khoanh tay, plugin nói rõ lý do.
+
 ### Khi lệnh vẽ từ chối chạy
 
-| Hiện tượng                                               | Nguyên nhân & xử lý                                                                                               |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| "cần rule pack từ v4 trở lên"                            | Bộ quy tắc trên máy quá cũ → `XBOSS_LOGIN` (hoặc `XBOSS_RULEPACK` nạp tệp mới)                                    |
-| "Chưa có thư viện block trên máy"                        | `XBOSS_LOGIN` để tải, hoặc `XBOSS_VE_THUVIEN` nạp tệp tay. Riêng `XBOSS_VE` (vẽ tuyến) **không cần** thư viện     |
-| Nhãn độ dốc chỉ có chữ, không có mũi tên                 | Thư viện chưa có block `slope-arrow` — plugin **không tự vẽ ký hiệu thay thế**; báo kỹ sư trưởng bổ sung thư viện |
-| "Rule pack chưa khai supportSpacingMm/sleeveClearanceMm" | Thiếu số liệu chuẩn treo đỡ/khe hở cho loại tuyến đó — plugin không tự bịa; bổ sung ở bản quy tắc sau             |
-| Báo bản vẽ đang khóa layer                               | Đang trong chế độ nền của `XBOSS_VE_NEN` → chạy lại `XBOSS_VE_NEN` để hoàn nguyên rồi thử lại                     |
+| Hiện tượng                                               | Nguyên nhân & xử lý                                                                                                                               |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "cần rule pack từ v4 trở lên"                            | Bộ quy tắc trên máy quá cũ → `XBOSS_LOGIN` (hoặc `XBOSS_RULEPACK` nạp tệp mới)                                                                    |
+| "Chưa có thư viện block trên máy"                        | `XBOSS_LOGIN` để tải, hoặc `XBOSS_VE_THUVIEN` nạp tệp tay. Riêng `XBOSS_VE` (vẽ tuyến) **không cần** thư viện                                     |
+| Nhãn độ dốc chỉ có chữ, không có mũi tên                 | Thư viện chưa có block `slope-arrow` — plugin **không tự vẽ ký hiệu thay thế**; báo kỹ sư trưởng bổ sung thư viện                                 |
+| "Rule pack chưa khai supportSpacingMm/sleeveClearanceMm" | Thiếu số liệu chuẩn treo đỡ/khe hở cho loại tuyến đó — plugin không tự bịa; bổ sung ở bản quy tắc sau                                             |
+| Báo bản vẽ đang khóa layer                               | Đang trong chế độ nền của `XBOSS_VE_NEN` → chạy lại `XBOSS_VE_NEN` để hoàn nguyên rồi thử lại                                                     |
+| "Đi tuyến tự động đang TẮT trong rule pack"              | `drawTools.routingPolicy.enabled = false` (mặc định) → nhờ Admin/PM bật rồi phát hành bản quy tắc mới                                             |
+| Đi tuyến tự động báo "quá bán kính rẽ nhánh"             | Thiết bị nằm xa mọi hành lang hơn `snapRadiusMm` → **vẽ thêm hành lang** tới khu đó rồi chạy lại. Lệnh cố ý **không** nới bán kính cho ra kết quả |
+| Đi tuyến tự động báo "hết làn"                           | Hành lang đó đã kín làn cho các hệ chạy trước → tăng bề rộng khả dụng bằng `XBOSS_VE_HANHLANG` (chế độ `SUA`), hoặc cho hệ này đi hành lang khác  |
 
 ## 5. Trục trặc thường gặp
 

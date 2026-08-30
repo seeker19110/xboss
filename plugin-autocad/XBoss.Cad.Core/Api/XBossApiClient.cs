@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -143,11 +144,14 @@ public sealed class XBossApiClient
     /// Trả (json manifest, etag), hoặc (null, etag) khi 304 — caller giữ bản cache.
     /// Server bọc manifest trong <c>{version, dwgSha256, manifest}</c>; ở đây bóc đúng phần
     /// <c>manifest</c> để đưa thẳng cho <c>BlockManifestLoader</c> (một hình dạng dữ liệu duy nhất).
+    /// <paramref name="versionCache"/>: version thư viện đang nằm trong cache của máy — xem
+    /// <see cref="GuiBlockLibAsync"/>. Bỏ trống = không gửi <c>?v=</c>, y hệt hành vi cũ.
     /// </summary>
     public async Task<(string? Json, string? Etag)> FetchBlockLibManifestAsync(
-        string token, string? etag = null, CancellationToken ct = default)
+        string token, string? etag = null, string? versionCache = null, CancellationToken ct = default)
     {
-        using var res = await GuiKemToken("api/engineering/cad/block-lib?manifest=1", token, etag, ct);
+        using var res = await GuiBlockLibAsync(
+            "api/engineering/cad/block-lib?manifest=1", token, etag, versionCache, ct);
         if (res.StatusCode == HttpStatusCode.NotModified) return (null, etag);
         await NemNeuLoi(res, ct);
 
@@ -168,11 +172,15 @@ public sealed class XBossApiClient
     /// <summary>
     /// GET /api/engineering/cad/block-lib — tệp .dwg thư viện đang phát hành (nhị phân).
     /// Trả (null, etag) khi 304. Toàn vẹn tệp do caller kiểm bằng sha256 trong manifest (FR2).
+    /// <paramref name="versionCache"/>: truyền version của manifest vừa nhận để GHÉP ĐÚNG CẶP
+    /// manifest↔tệp — máy chủ phát hành version mới xen giữa hai lời gọi thì server báo lệch
+    /// (xem <see cref="GuiBlockLibAsync"/>) thay vì trả tệp .dwg của version khác, vốn chỉ lộ ra
+    /// sau đó dưới dạng "hash lệch, giữ cache cũ".
     /// </summary>
     public async Task<(byte[]? Dwg, string? Etag)> FetchBlockLibDwgAsync(
-        string token, string? etag = null, CancellationToken ct = default)
+        string token, string? etag = null, string? versionCache = null, CancellationToken ct = default)
     {
-        using var res = await GuiKemToken("api/engineering/cad/block-lib", token, etag, ct);
+        using var res = await GuiBlockLibAsync("api/engineering/cad/block-lib", token, etag, versionCache, ct);
         if (res.StatusCode == HttpStatusCode.NotModified) return (null, etag);
         await NemNeuLoi(res, ct);
         return (await res.Content.ReadAsByteArrayAsync(ct), res.Headers.ETag?.ToString());
@@ -184,15 +192,121 @@ public sealed class XBossApiClient
     /// trả (null, etag) khi 304. Toàn vẹn tệp do caller đối chiếu <c>fileSha256</c> của entry
     /// manifest — client KHÔNG tự tin vào server (M100 §12).
     /// 404 = khoá không thuộc manifest version nào → ném kèm nguyên văn thông điệp server.
+    ///
+    /// CỐ Ý không kèm <c>?v=</c> như hai lời gọi trên: nhánh <c>?file=</c> của route trả kết quả
+    /// TRƯỚC chỗ kiểm <c>v</c>, nên tham số đó bị bỏ qua hoàn toàn; toàn vẹn của tệp lẻ đã do
+    /// <c>fileSha256</c> của entry manifest canh, không cần chốt version.
     /// </summary>
+    /// <param name="libVersion">
+    /// M113 §6 — version của BỘ chứa block (lấy từ <c>libVersion</c> của entry trong manifest đã
+    /// trộn). Bỏ trống = để máy chủ tìm trong bộ hiện hành của tầng đang hỏi, y hệt trước M113.
+    /// </param>
+    /// <param name="duAnId">
+    /// M113 §6 — gửi <c>?project=</c> khi tệp lẻ thuộc bộ RIÊNG của dự án. Máy chủ tìm tệp lẻ
+    /// trong ĐÚNG MỘT tầng, nên block nguồn "toàn cục" phải hỏi KHÔNG kèm dự án (bỏ trống) còn
+    /// block nguồn "dự án" thì bắt buộc kèm — gửi sai tầng là 404 "không có tệp block nào".
+    /// </param>
     public async Task<(byte[]? Dwg, string? Etag)> FetchBlockLibTepLeAsync(
-        string token, string fileKey, string? etag = null, CancellationToken ct = default)
+        string token, string fileKey, string? etag = null, string? libVersion = null,
+        long? duAnId = null, CancellationToken ct = default)
     {
         var duongDan = "api/engineering/cad/block-lib?file=" + Uri.EscapeDataString(fileKey);
+        if (!string.IsNullOrWhiteSpace(libVersion))
+            duongDan += "&libVersion=" + Uri.EscapeDataString(libVersion);
+        if (duAnId is { } id)
+            duongDan += "&project=" + id.ToString(CultureInfo.InvariantCulture);
         using var res = await GuiKemToken(duongDan, token, etag, ct);
         if (res.StatusCode == HttpStatusCode.NotModified) return (null, etag);
         await NemNeuLoi(res, ct);
         return (await res.Content.ReadAsByteArrayAsync(ct), res.Headers.ETag?.ToString());
+    }
+
+    // ===== Thư viện block HAI TẦNG theo dự án (M113 §4/§6 — FR5) =====
+
+    /// <summary>
+    /// GET /api/engineering/cad/block-lib?project=&lt;id&gt;&amp;manifest=1 — manifest ĐÃ TRỘN hai
+    /// tầng (bộ toàn cục + bộ riêng của dự án, dự án đè theo <c>blocks[].id</c>), kèm tóm tắt bộ
+    /// của dự án (<c>boDuAn</c>: version + sha256 tệp .dwg riêng) để client kiểm hash TỪNG BỘ.
+    /// Trả (null, etag, null) khi 304 — caller giữ cache trộn đang có.
+    ///
+    /// CỐ Ý tách khỏi <see cref="FetchBlockLibManifestAsync"/> thay vì thêm tham số: đường không
+    /// kèm <c>?project=</c> phải giữ nguyên từng byte cho luồng đề xuất block M103 (máy chủ so
+    /// <c>base_lib_version</c> với bộ TOÀN CỤC) và cho plugin bản cũ (M113 guardrail 1).
+    /// KHÔNG gắn <c>?v=</c>: nhánh hai tầng của route không kiểm tham số đó, toàn vẹn tệp đã do
+    /// sha256 của từng bộ canh.
+    /// </summary>
+    public async Task<(string? Json, string? Etag, BoBlockDuAn? BoDuAn)> FetchBlockLibManifestTronAsync(
+        string token, long duAnId, string? etag = null, CancellationToken ct = default)
+    {
+        using var res = await GuiKemToken(DuongDanTheoDuAn("&manifest=1", duAnId), token, etag, ct);
+        if (res.StatusCode == HttpStatusCode.NotModified) return (null, etag, null);
+        await NemNeuLoi(res, ct);
+
+        var body = await res.Content.ReadAsStringAsync(ct);
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("manifest", out var manifest))
+                throw new XBossApiException("Server trả response thiếu \"manifest\" của thư viện block.");
+            BoBlockDuAn? bo = null;
+            if (doc.RootElement.TryGetProperty("boDuAn", out var boJson) &&
+                boJson.ValueKind == System.Text.Json.JsonValueKind.Object)
+            {
+                bo = System.Text.Json.JsonSerializer.Deserialize<BoBlockDuAn>(boJson.GetRawText());
+            }
+            return (manifest.GetRawText(), res.Headers.ETag?.ToString(), bo);
+        }
+        catch (System.Text.Json.JsonException e)
+        {
+            throw new XBossApiException($"Manifest thư viện block server trả về không phải JSON hợp lệ: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// GET /api/engineering/cad/block-lib?project=&lt;id&gt; — tệp .dwg nền của bộ RIÊNG của dự án
+    /// (nhị phân). Toàn vẹn do caller đối chiếu <c>boDuAn.dwgSha256</c>, KHÔNG tin server (M100 §12).
+    /// 404 = dự án chưa phát hành bộ riêng ⇒ ném kèm nguyên văn thông điệp server.
+    /// </summary>
+    public async Task<(byte[]? Dwg, string? Etag)> FetchBlockLibDwgDuAnAsync(
+        string token, long duAnId, string? etag = null, CancellationToken ct = default)
+    {
+        using var res = await GuiKemToken(DuongDanTheoDuAn("", duAnId), token, etag, ct);
+        if (res.StatusCode == HttpStatusCode.NotModified) return (null, etag);
+        await NemNeuLoi(res, ct);
+        return (await res.Content.ReadAsByteArrayAsync(ct), res.Headers.ETag?.ToString());
+    }
+
+    private static string DuongDanTheoDuAn(string themQuery, long duAnId) =>
+        "api/engineering/cad/block-lib?project=" +
+        duAnId.ToString(CultureInfo.InvariantCulture) + themQuery;
+
+    /// <summary>
+    /// GET thư viện block kèm tham số cache-busting <c>?v=&lt;version&gt;</c> khi máy ĐÃ có cache.
+    ///
+    /// Ngữ nghĩa lấy từ chính route (<c>app/api/engineering/cad/block-lib/route.ts</c>): <c>v</c>
+    /// KHÔNG phải để chọn bản tải về — thư viện chỉ giữ bản đang phát hành. Gửi <c>v</c> khác bản
+    /// hiện hành thì server trả <b>404</b> kèm thông điệp "phiên bản không còn là bản hiện hành"
+    /// thay vì âm thầm trả bản khác với thứ client tưởng đang xin.
+    ///
+    /// Với plugin, 404 đó nghĩa là "cache trên máy đã cũ" — KHÁC hẳn 404 "chưa phát hành thư viện
+    /// nào". Không phân biệt hai thứ bằng cách đọc chữ trong thông điệp (dễ vỡ): cứ hỏi lại đúng
+    /// MỘT lần, bỏ <c>v</c> và GIỮ NGUYÊN ETag — cache cũ thì lần hai trả 200 bản mới (ETag của
+    /// server có version bên trong nên chắc chắn không khớp nữa), còn thư viện chưa phát hành thì
+    /// lần hai vẫn 404 và caller nhận đúng thông điệp hướng dẫn của server.
+    ///
+    /// Chưa có cache (<paramref name="versionCache"/> rỗng) ⇒ không gửi <c>v</c>: đúng một request,
+    /// hành vi y hệt trước, luồng offline không đổi.
+    /// </summary>
+    private async Task<HttpResponseMessage> GuiBlockLibAsync(
+        string duongDan, string token, string? etag, string? versionCache, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(versionCache)) return await GuiKemToken(duongDan, token, etag, ct);
+
+        var noi = duongDan.Contains('?') ? "&" : "?";
+        var res = await GuiKemToken(duongDan + noi + "v=" + Uri.EscapeDataString(versionCache), token, etag, ct);
+        if (res.StatusCode != HttpStatusCode.NotFound) return res;
+        res.Dispose();
+        return await GuiKemToken(duongDan, token, etag, ct);
     }
 
     // ===== Đề xuất block vào thư viện (M103 §3/§4) =====
@@ -250,7 +364,48 @@ public sealed class XBossApiClient
     {
         [JsonPropertyName("deXuat")] public IReadOnlyList<DeXuatTomTat> DeXuat { get; init; } = [];
         [JsonPropertyName("laNguoiDuyet")] public bool LaNguoiDuyet { get; init; }
+
+        /// <summary>
+        /// M104 §3 — vai trò này được thêm block THẲNG vào thư viện TRÊN WEB (bỏ qua hàng chờ),
+        /// do server tự chấm theo quyền của token/phiên. Plugin chỉ dùng để nói đúng việc tiếp
+        /// theo cho kỹ sư, KHÔNG mở đường ghi thẳng từ AutoCAD: route thêm trực tiếp
+        /// (<c>POST /api/engineering/cad/block-lib/blocks</c>) chỉ nhận phiên trình duyệt, không
+        /// nhận token thiết bị. Server cũ chưa trả cờ ⇒ mặc định false, thông điệp giữ như trước.
+        /// </summary>
+        [JsonPropertyName("duocThemTrucTiep")] public bool DuocThemTrucTiep { get; init; }
     }
+
+    /// <summary>Kết quả nạp một LÔ block (M108 §10).</summary>
+    public sealed record LoBlockKetQua
+    {
+        public long LoId { get; init; }
+
+        /// <summary>Số block thật sự vào hàng chờ.</summary>
+        public int SoNhan { get; init; }
+
+        /// <summary>Block bị bỏ qua, mỗi dòng đã gồm tên + lý do — hiện nguyên văn cho kỹ sư.</summary>
+        public IReadOnlyList<string> BoQua { get; init; } = [];
+
+        /// <summary>Vì sao gợi ý AI không chạy (null = có chạy). Chỉ để nói cho kỹ sư biết.</summary>
+        public string? LyDoAiKhongChay { get; init; }
+
+        /// <summary>Lỗi kiểm định của server — có phần tử nghĩa là lô KHÔNG được tạo.</summary>
+        public IReadOnlyList<string> LoiKiemDinh { get; init; } = [];
+
+        public string? ThongDiep { get; init; }
+
+        public bool DuocNhan => LoiKiemDinh.Count == 0 && LoId > 0;
+    }
+
+    private sealed record LoBlockBoQua(
+        [property: JsonPropertyName("blockName")] string BlockName,
+        [property: JsonPropertyName("lyDo")] string LyDo);
+
+    private sealed record LoBlockTraVe(
+        [property: JsonPropertyName("loId")] long LoId,
+        [property: JsonPropertyName("tong")] int Tong,
+        [property: JsonPropertyName("boQua")] IReadOnlyList<LoBlockBoQua>? BoQua,
+        [property: JsonPropertyName("lyDoAiKhongChay")] string? LyDoAiKhongChay);
 
     private sealed record DeXuatTraVe(
         [property: JsonPropertyName("id")] long Id,
@@ -344,6 +499,73 @@ public sealed class XBossApiClient
     /// bytes .NET sinh ra (M103 §4) — nên phần này phải tự đặt header, không dùng
     /// <c>form.Add(content, name, fileName)</c>.
     /// </summary>
+    /// <summary>
+    /// Gửi một LÔ block lên hàng chờ duyệt (M108 §10 — <c>POST block-proposals/batch</c>).
+    ///
+    /// Khác <see cref="GuiDeXuatBlockAsync"/> (M103, một block kèm metadata do kỹ sư khai): lô
+    /// KHÔNG mang metadata nào — máy chủ đọc mọi định nghĩa block trong DXF, tự đề xuất phân loại,
+    /// rồi Admin/PM duyệt theo lô trên web. Vì thế ở đây chỉ có hai tệp và không có manifest.
+    /// </summary>
+    public async Task<LoBlockKetQua> GuiLoBlockAsync(
+        string token, byte[] dwg, byte[] dxf, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        // Cùng lỗi hợp đồng đã ghi ở GuiDeXuatBlockAsync: `req.formData()` (undici) đòi name/filename
+        // trong nháy kép — phải qua ThemPhan, không dùng form.Add mặc định.
+        ThemPhan(form, new ByteArrayContent(dwg), "dwg", "lo-block.dwg");
+        ThemPhan(form, new ByteArrayContent(dxf), "dxf", "lo-block.dxf");
+
+        using var req = new HttpRequestMessage(
+            HttpMethod.Post, "api/engineering/cad/block-proposals/batch")
+        {
+            Content = form,
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var res = await _http.SendAsync(req, ct);
+
+        if (res.StatusCode == HttpStatusCode.Unauthorized)
+            throw new XBossApiException("Token đã bị thu hồi hoặc hết hạn — chạy lại XBOSS_LOGIN.");
+        if (res.StatusCode == HttpStatusCode.Forbidden)
+        {
+            throw new XBossApiException(
+                "Tài khoản của bạn không có quyền nạp block (cần vai trò kỹ sư trở lên) — " +
+                "nhờ Admin/PM cấp quyền rồi thử lại.");
+        }
+
+        var body = await res.Content.ReadAsStringAsync(ct);
+        if (res.StatusCode == HttpStatusCode.UnprocessableEntity ||
+            res.StatusCode == HttpStatusCode.Conflict)
+        {
+            return new LoBlockKetQua
+            {
+                LoiKiemDinh = DocDanhSachLoi(body) is { Count: > 0 } ds
+                    ? ds
+                    : [DocLoiTuChuoi(body) ?? "Server từ chối lô (không nêu lý do)."],
+                ThongDiep = "Server từ chối lô (không tạo dòng nào) — xử lý theo lý do bên dưới rồi chạy lại.",
+            };
+        }
+        if (!res.IsSuccessStatusCode)
+            throw new XBossApiException(DocLoiTuChuoi(body) ?? $"Server trả lỗi {(int)res.StatusCode}.");
+
+        LoBlockTraVe? ok;
+        try
+        {
+            ok = System.Text.Json.JsonSerializer.Deserialize<LoBlockTraVe>(body);
+        }
+        catch (System.Text.Json.JsonException e)
+        {
+            throw new XBossApiException($"Server trả response lạ khi nhận lô: {e.Message}");
+        }
+        if (ok is null || ok.LoId <= 0) throw new XBossApiException("Server trả response thiếu id lô.");
+        return new LoBlockKetQua
+        {
+            LoId = ok.LoId,
+            SoNhan = ok.Tong,
+            BoQua = [.. (ok.BoQua ?? []).Select(b => $"{b.BlockName}: {b.LyDo}")],
+            LyDoAiKhongChay = ok.LyDoAiKhongChay,
+        };
+    }
+
     private static void ThemPhan(
         MultipartFormDataContent form, HttpContent noiDung, string ten, string? tenTep = null)
     {
@@ -525,12 +747,25 @@ public sealed class XBossApiClient
     /// trả danh sách lỗi thay vì ném để command hiện đủ cho kỹ sư.
     /// <paramref name="takeoffJson"/> (M101 §6.4, PR5): sidecar JSON kết quả bóc khối lượng
     /// (<c>TakeoffJsonReport</c>, cạnh Excel từ <c>XBOSS_BOCKL_XUAT</c>) — TÙY CHỌN, không gửi
-    /// vẫn upload y hệt trước (đường ghi sổ BOQ không đổi, server chỉ lưu để đối chiếu).</summary>
+    /// vẫn upload y hệt trước (đường ghi sổ BOQ không đổi, server chỉ lưu để đối chiếu).
+    /// <paramref name="drawingId"/>: mã số bản vẽ trong sổ (<c>drawings.id</c>) khi kỹ sư biết —
+    /// TÙY CHỌN. Route nhận CẢ HAI trường và ƯU TIÊN <c>drawingId</c> (tra theo id, không tra
+    /// theo code), nên gửi kèm là cách duy nhất trỏ đúng bản vẽ khi hai dự án trùng
+    /// <c>drawings.code</c> — trước đây chỉ gửi code nên rơi vào bản vẽ của dự án khác (403 lệch
+    /// dự án) hoặc 404. Không có id ⇒ chỉ gửi code, y hệt hành vi cũ.</summary>
     public async Task<UploadKetQua> UploadAsync(
         string token, string drawingCode, string rev, string rulePackVersion,
         string dwgFileName, byte[] dwgBytes, byte[] dxfBytes, string? reportJson,
-        CancellationToken ct = default, string? takeoffJson = null)
+        CancellationToken ct = default, string? takeoffJson = null, long? drawingId = null)
     {
+        // Route đòi ít nhất một trong hai (400 "Thiếu drawingCode ... hoặc drawingId"). Chặn ngay
+        // tại chỗ: tải vài chục MB lên rồi mới nhận 400 là phí băng thông công trường.
+        if (drawingId is null && string.IsNullOrWhiteSpace(drawingCode))
+        {
+            throw new XBossApiException(
+                "Thiếu số bản vẽ trong sổ (drawings.code) hoặc mã số bản vẽ — chưa gửi gì lên server.");
+        }
+
         // Cùng lỗi hợp đồng với GuiDeXuatBlockAsync: req.formData() (undici) đòi name/filename
         // trong nháy kép và từ chối filename* — phải qua ThemPhan, không dùng form.Add mặc định.
         using var form = new MultipartFormDataContent();
@@ -540,7 +775,9 @@ public sealed class XBossApiClient
             ThemPhan(form, new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(reportJson)), "report", "report.json");
         if (takeoffJson is not null)
             ThemPhan(form, new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(takeoffJson)), "takeoff", "takeoff.json");
-        ThemPhan(form, new StringContent(drawingCode), "drawingCode");
+        if (!string.IsNullOrWhiteSpace(drawingCode)) ThemPhan(form, new StringContent(drawingCode), "drawingCode");
+        if (drawingId is { } id)
+            ThemPhan(form, new StringContent(id.ToString(CultureInfo.InvariantCulture)), "drawingId");
         ThemPhan(form, new StringContent(rev), "rev");
         ThemPhan(form, new StringContent(rulePackVersion), "rulePackVersion");
 

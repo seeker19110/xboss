@@ -70,6 +70,15 @@ if ($BoQuaBuild) {
         throw "Thiếu .NET 10 SDK (Adapter build cho net10.0-windows). Cài: winget install Microsoft.DotNet.SDK.10"
     }
 
+    # AutoCAD đang mở thì GIỮ acad.exe khóa DLL: build ghi đè được (bin\Release) nhưng bước cài
+    # bên dưới sẽ ném UnauthorizedAccessException khó hiểu. Chặn sớm, nói rõ bằng tiếng Việt —
+    # rẻ hơn nhiều so với để kỹ sư đọc stack trace của Remove-Item (vấp thật 2026-08-26).
+    $acad = Get-Process -Name acad -ErrorAction SilentlyContinue
+    if ($acad -and -not $ChiDongGoi) {
+        throw "AutoCAD đang mở ($($acad.Count) tiến trình) — DLL đang bị khóa nên không cài đè được. " +
+              "Đóng hẳn AutoCAD rồi chạy lại lệnh này. (Chỉ muốn tạo gói mà không cài: thêm -ChiDongGoi)"
+    }
+
     Write-Host "[XBoss] Build Adapter (Release)..." -ForegroundColor Cyan
     dotnet build $duAn -c Release -p:AcadSdkDir="$AcadDir"
     if ($LASTEXITCODE -ne 0) { throw "Build thất bại." }
@@ -97,7 +106,19 @@ Get-ChildItem $out -File |
     Where-Object { $_.Extension -in ".dll", ".json" -and $cuaAutoCad -notcontains $_.Name } |
     Copy-Item -Destination $noiDung
 
-$soTep = (Get-ChildItem $noiDung -File).Count
+# Thư viện MEPF offline tối thiểu đi CÙNG bundle để máy mới dùng được XBOSS_VE_PHUKIEN khi chưa
+# có server. Plugin chỉ seed cặp này khi cache hoàn toàn trống; cache tải từ server/nạp tay vẫn thắng.
+$thuVienNguon = Join-Path $PSScriptRoot "block-library"
+$manifestThuVien = Join-Path $thuVienNguon "manifest.json"
+$dwgThuVien = Join-Path $thuVienNguon "blocks.dwg"
+if (-not (Test-Path $manifestThuVien) -or -not (Test-Path $dwgThuVien)) {
+    throw "Thiếu thư viện MEPF đóng kèm: cần đủ '$manifestThuVien' và '$dwgThuVien'."
+}
+$thuVienDich = Join-Path $noiDung "BlockLibrary"
+New-Item -ItemType Directory -Path $thuVienDich -Force | Out-Null
+Copy-Item -LiteralPath $manifestThuVien, $dwgThuVien -Destination $thuVienDich
+
+$soTep = (Get-ChildItem $noiDung -File -Recurse).Count
 Write-Host "[XBoss] Đã tạo gói: $dich ($soTep tệp trong Contents, version $version)" -ForegroundColor Green
 
 if ($ChiDongGoi -and -not $KhongNen) {

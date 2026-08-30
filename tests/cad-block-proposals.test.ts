@@ -132,7 +132,7 @@ function ent(e: Partial<DxfEntityRaw> & { type: DxfEntityRaw["type"] }): DxfEnti
 }
 
 test("preview SVG: viewBox khớp khung bao, lật trục Y, dùng currentColor (không hex cứng)", async () => {
-  const { dungPreviewSvg } = await import("@/lib/ky-thuat/cad/block-preview-svg");
+  const { dungPreviewSvg } = await import("@/lib/ky-thuat/cad/block");
   const svg = dungPreviewSvg(
     [
       ent({ type: "LINE", coordinates: { start: [0, 0, 0], end: [100, 0, 0] } }),
@@ -151,7 +151,7 @@ test("preview SVG: viewBox khớp khung bao, lật trục Y, dùng currentColor 
 });
 
 test("preview SVG: vẽ CIRCLE/ARC/LWPOLYLINE/TEXT, bỏ qua thực thể lạ, rỗng → null", async () => {
-  const { dungPreviewSvg } = await import("@/lib/ky-thuat/cad/block-preview-svg");
+  const { dungPreviewSvg } = await import("@/lib/ky-thuat/cad/block");
   const svg = dungPreviewSvg([
     ent({ type: "CIRCLE", coordinates: { center: [0, 0, 0], radius: 10 } }),
     ent({
@@ -185,7 +185,7 @@ test("preview SVG: vẽ CIRCLE/ARC/LWPOLYLINE/TEXT, bỏ qua thực thể lạ, 
 });
 
 test("preview SVG: toạ độ NaN/thiếu không làm hỏng ảnh", async () => {
-  const { dungPreviewSvg } = await import("@/lib/ky-thuat/cad/block-preview-svg");
+  const { dungPreviewSvg } = await import("@/lib/ky-thuat/cad/block");
   const svg = dungPreviewSvg([
     ent({ type: "LINE", coordinates: { start: [Number.NaN, 0, 0], end: [1, 1, 0] } }),
     ent({ type: "LINE", coordinates: { start: [0, 0, 0], end: [10, 10, 0] } }),
@@ -197,7 +197,7 @@ test("preview SVG: toạ độ NaN/thiếu không làm hỏng ảnh", async () =
 // ===== (1) Unit thuần — metadata theo kind =====
 
 test("metadata: bộ đủ hợp lệ; thiếu hệ / item bóc tách / khổ giấy theo kind → lỗi", async () => {
-  const { docMetaDeXuat } = await import("@/lib/ky-thuat/cad/block-proposals");
+  const { docMetaDeXuat } = await import("@/lib/ky-thuat/cad/block");
 
   const ok = docMetaDeXuat(metaHopLe());
   assert.deepEqual(ok.errors, []);
@@ -227,6 +227,10 @@ test("metadata: bộ đủ hợp lệ; thiếu hệ / item bóc tách / khổ gi
   assert.ok(
     docMetaDeXuat(metaHopLe({ paper_size: "A1" })).errors.some((e) => e.includes("paper_size")),
   );
+  // M110 — kind "annotation" (tam giác revision): thuộc một hệ như block thường nhưng KHÔNG
+  // phải khai takeoff_item_id, vì ký hiệu chú thích không bao giờ vào khối lượng.
+  const anno = docMetaDeXuat(metaHopLe({ kind: "annotation", takeoff_item_id: "" }));
+  assert.deepEqual(anno.errors, []);
   // kind lạ, sha256 sai, thiếu base version, thiếu manifest.
   assert.ok(docMetaDeXuat(metaHopLe({ kind: "phu-kien" })).errors.some((e) => e.includes("kind")));
   assert.ok(docMetaDeXuat(metaHopLe({ sha256: "abc" })).errors.some((e) => e.includes("sha256")));
@@ -246,8 +250,8 @@ test("metadata: bộ đủ hợp lệ; thiếu hệ / item bóc tách / khổ gi
 // ===== (1) Unit thuần — so manifest ứng viên =====
 
 test("manifest ứng viên phải = hiện hành + đúng 1 block mới đúng tên", async () => {
-  const { soSanhManifestUngVien } = await import("@/lib/ky-thuat/cad/block-proposals");
-  const { docManifest } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { soSanhManifestUngVien } = await import("@/lib/ky-thuat/cad/block");
+  const { docManifest } = await import("@/lib/ky-thuat/cad/block");
 
   const hienHanh = docManifest(MANIFEST_MAU).manifest!;
   const ungVien = docManifest(manifestUngVien()).manifest!;
@@ -286,7 +290,7 @@ test("manifest ứng viên phải = hiện hành + đúng 1 block mới đúng t
 });
 
 test("versionKeTiep: tăng cụm số cuối, giữ phần chữ", async () => {
-  const { versionKeTiep } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { versionKeTiep } = await import("@/lib/ky-thuat/cad/block");
   assert.equal(versionKeTiep("b1"), "b2");
   assert.equal(versionKeTiep("b9"), "b10");
   assert.equal(versionKeTiep("b0-mau"), "b1-mau");
@@ -366,7 +370,7 @@ async function donDep() {
 
 /** Phát hành thư viện nền b0-mau và trả version hiện hành. */
 async function phatHanhNen(): Promise<string> {
-  const { phatHanhBlockLib, layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { phatHanhBlockLib, layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block");
   const kq = await phatHanhBlockLib({
     userId: pmId,
     manifestTho: JSON.parse(JSON.stringify(MANIFEST_MAU)),
@@ -418,7 +422,7 @@ test(
   async () => {
     await donDep();
     const base = await phatHanhNen();
-    const { nhanDeXuat, layDanhSachDeXuat } = await import("@/lib/ky-thuat/cad/block-proposals");
+    const { nhanDeXuat, layDanhSachDeXuat } = await import("@/lib/ky-thuat/cad/block");
     const { queryOne } = await import("@/lib/db");
 
     const kq = await nhanDeXuat({
@@ -459,7 +463,7 @@ test(
 test("trùng tên (pending khác / thư viện hiện hành) → 409, không tạo dòng (AC3)", S, async () => {
   await donDep();
   const base = await phatHanhNen();
-  const { nhanDeXuat, layDanhSachDeXuat } = await import("@/lib/ky-thuat/cad/block-proposals");
+  const { nhanDeXuat, layDanhSachDeXuat } = await import("@/lib/ky-thuat/cad/block");
 
   await nhanDeXuat({
     userId: engineerId,
@@ -509,7 +513,7 @@ test(
   async () => {
     await donDep();
     const base = await phatHanhNen();
-    const { nhanDeXuat } = await import("@/lib/ky-thuat/cad/block-proposals");
+    const { nhanDeXuat } = await import("@/lib/ky-thuat/cad/block");
 
     const stale = await nhanDeXuat({
       userId: engineerId,
@@ -560,9 +564,8 @@ test(
   async () => {
     await donDep();
     const base = await phatHanhNen();
-    const { nhanDeXuat, duyetDeXuat, layDanhSachDeXuat } =
-      await import("@/lib/ky-thuat/cad/block-proposals");
-    const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block-lib");
+    const { nhanDeXuat, duyetDeXuat, layDanhSachDeXuat } = await import("@/lib/ky-thuat/cad/block");
+    const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block");
 
     const kq = await nhanDeXuat({
       userId: engineerId,
@@ -604,9 +607,8 @@ test(
   async () => {
     await donDep();
     const base = await phatHanhNen();
-    const { nhanDeXuat, duyetDeXuat, layDanhSachDeXuat } =
-      await import("@/lib/ky-thuat/cad/block-proposals");
-    const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block-lib");
+    const { nhanDeXuat, duyetDeXuat, layDanhSachDeXuat } = await import("@/lib/ky-thuat/cad/block");
+    const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block");
 
     const dxfB = dxfThemBlock(DXF_MAU, "XB-RED-DUCT");
     const dwgB = Buffer.concat([DWG_MAU, Buffer.from("b")]);
@@ -654,7 +656,7 @@ test("từ chối: bắt lý do, đổi trạng thái, không duyệt lại đư
   await donDep();
   const base = await phatHanhNen();
   const { nhanDeXuat, tuChoiDeXuat, duyetDeXuat, layDanhSachDeXuat } =
-    await import("@/lib/ky-thuat/cad/block-proposals");
+    await import("@/lib/ky-thuat/cad/block");
 
   const kq = await nhanDeXuat({
     userId: engineerId,
@@ -680,7 +682,7 @@ test("từ chối: bắt lý do, đổi trạng thái, không duyệt lại đư
 test("danh sách: engineer chỉ thấy đề xuất của mình", S, async () => {
   await donDep();
   const base = await phatHanhNen();
-  const { nhanDeXuat, layDanhSachDeXuat } = await import("@/lib/ky-thuat/cad/block-proposals");
+  const { nhanDeXuat, layDanhSachDeXuat } = await import("@/lib/ky-thuat/cad/block");
 
   await nhanDeXuat({
     userId: engineerId,

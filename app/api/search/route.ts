@@ -28,7 +28,7 @@ export type SearchHit = {
 //   - code / boq_code / mã hệ: prefix match lower(...) LIKE 'term%' — B-tree index,
 //     GIỮ NGUYÊN (FTS tách token kém với mã kiểu "A1,03").
 //   - name (task/nhóm): FTS index GIN biểu thức unaccent (ftsExpr) → "nghiem thu"
-//     khớp "nghiệm thu". Dùng ĐÚNG index idx_tasks_fts_ua/idx_wp_fts_ua (0064_fts).
+//     khớp "nghiệm thu". Dùng ĐÚNG index idx_tasks_fts_ua/idx_wp_fts_ua (0068_fts).
 // Mọi vai trò tìm thấy toàn bộ task/nhóm (giống lưới tracking). Nguồn kho hồ sơ lọc
 // quyền theo registry (contracts chỉ PAYMENT_VIEW_ROLES).
 export async function GET(req: NextRequest) {

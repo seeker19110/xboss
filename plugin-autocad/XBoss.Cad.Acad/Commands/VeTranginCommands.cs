@@ -6,8 +6,10 @@ using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Acad.Ui.Wpf;
 using XBoss.Cad.Core.Draw;
 using XBoss.Cad.Core.Geometry;
+using XBoss.Cad.Core.Ui.ViewModels;
 
 [assembly: CommandClass(typeof(XBoss.Cad.Acad.Commands.VeTranginCommands))]
 
@@ -54,14 +56,57 @@ public sealed class VeTranginCommands
 
         // Hỏi lại hệ mỗi lần: tên layout mang mã hệ và phạm vi VP-freeze phụ thuộc hệ — in nhầm hệ
         // là in ra cả tập bản vẽ sai, đắt hơn nhiều so với một lần bấm Enter.
-        var he = VeContext.HoiHe(ed, pack, batBuocHoiLai: true);
-        if (he is null) return;
+        // Hộp thoại gộp hệ + khổ giấy + tỉ lệ + phạm vi ẩn + CTB + thông tin khung tên (M106 §7.2);
+        // UI hỏng hoặc XBOSS_UI_DIALOG=0 → nguyên chuỗi hỏi đáp cũ theo đúng thứ tự (FR9).
+        var ghiNho = GhiNhoTrangIn.Doc();
+        var (thuVien, loiThuVien) = BlockLibraryService.HienHanh();
+        var (daDungUi, chonUi) = HopThoaiXBoss.Thu(ed, () =>
+        {
+            var vm = new TrangInDialogViewModel(
+                pack.DrawTools.Systems, sheet.PaperSizes, sheet.Scales,
+                KhungTenTheoKhoGiay(thuVien, sheet, loiThuVien), DanhSachCtb(),
+                VeContext.TiLeIn, VeContext.KhoGiay, ghiNho.Ctb, ghiNho.ThuocTinh, VeContext.He?.Id);
+            return XBossDialog.Hoi(vm) ? vm.KetQua() : null;
+        });
+        if (daDungUi && chonUi is null) return; // kỹ sư bấm Hủy
 
-        var chonKho = VeContext.HoiDanhMuc(ed, "Khổ giấy", sheet.PaperSizes, VeContext.KhoGiay, choTuNhap: false);
-        if (chonKho is not { } kho) return;
-        VeContext.KhoGiay = kho.GiaTri;
+        DrawSystem he;
+        string khoGiay;
+        double tiLe;
+        CheDoAnLayerTrangIn cheDoAn;
+        string? ctb;
+        Dictionary<string, string>? theTuHopThoai = null;
 
-        if (VeContext.HoiTiLeIn(ed, pack, batBuocHoiLai: true) is not { } tiLe) return;
+        if (chonUi is { } ui)
+        {
+            he = ui.He;
+            khoGiay = ui.KhoGiay;
+            tiLe = ui.TiLeIn;
+            cheDoAn = ui.CheDoAn;
+            ctb = ui.Ctb;
+            theTuHopThoai = new Dictionary<string, string>(ui.ThuocTinhKhungTen, StringComparer.OrdinalIgnoreCase);
+            VeContext.He = ui.He;
+            VeContext.TiLeIn = ui.TiLeIn;
+        }
+        else
+        {
+            var heHoi = VeContext.HoiHe(ed, pack, batBuocHoiLai: true);
+            if (heHoi is null) return;
+            he = heHoi;
+
+            var chonKho = VeContext.HoiDanhMuc(ed, "Khổ giấy", sheet.PaperSizes, VeContext.KhoGiay, choTuNhap: false);
+            if (chonKho is not { } kho) return;
+            khoGiay = kho.GiaTri;
+
+            if (VeContext.HoiTiLeIn(ed, pack, batBuocHoiLai: true) is not { } tl) return;
+            tiLe = tl;
+
+            var chonAn = HoiCheDoAnLayer(ed);
+            if (chonAn is null) return;
+            cheDoAn = chonAn.Value;
+            ctb = HoiCtb(ed, ghiNho.Ctb);
+        }
+        VeContext.KhoGiay = khoGiay;
 
         var (toMm, canCanhBaoDonVi, tenDonVi) = DrawingUnits.TuInsUnits((int)db.Insunits);
         if (canCanhBaoDonVi)
@@ -75,15 +120,8 @@ public sealed class VeTranginCommands
         var vung = HoiVungIn(ed, db);
         if (vung is not { } khungMoHinh) return;
 
-        var cheDoAn = HoiCheDoAnLayer(ed);
-        if (cheDoAn is null) return;
-
-        var ghiNho = GhiNhoTrangIn.Doc();
-        var ctb = HoiCtb(ed, ghiNho.Ctb);
-
         // Khung tên: tra manifest thư viện block (kind=titleblock theo khổ giấy) — dùng CHUNG một
         // cửa thư viện với XBOSS_VE_PHUKIEN/_THIETBI (BlockLibraryService: cache + kiểm sha256).
-        var (thuVien, loiThuVien) = BlockLibraryService.HienHanh();
         BlockDef? khungTen = null;
         var giaTriThe = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (thuVien is null)
@@ -94,7 +132,7 @@ public sealed class VeTranginCommands
         }
         else
         {
-            var (tim, loiKhung) = SheetSetup.TimKhungTen(thuVien, sheet, kho.GiaTri);
+            var (tim, loiKhung) = SheetSetup.TimKhungTen(thuVien, sheet, khoGiay);
             if (tim is null)
             {
                 ed.WriteMessage($"\n[XBoss] ⚠ {loiKhung} — vẫn tạo layout + viewport, khung tên chèn sau.\n");
@@ -102,7 +140,10 @@ public sealed class VeTranginCommands
             else
             {
                 khungTen = tim;
-                giaTriThe = HoiThuocTinhKhungTen(ed, tim, tiLe, ghiNho);
+                // Hộp thoại đã thu giá trị các thẻ; TI_LE/NGAY vẫn do plugin tự điền ở cả hai đường.
+                giaTriThe = theTuHopThoai is null
+                    ? HoiThuocTinhKhungTen(ed, tim, tiLe, ghiNho)
+                    : TheTuHopThoai(theTuHopThoai, tim, tiLe);
             }
         }
 
@@ -115,7 +156,7 @@ public sealed class VeTranginCommands
         // dưới, gọi giữa một transaction đang mở là nguồn lỗi khó lần.
         if (khungTen is not null && !CoDinhNghiaBlock(db, khungTen.BlockName))
         {
-            if (!NhapKhungTen(db, khungTen, canhBao) || !CoDinhNghiaBlock(db, khungTen.BlockName))
+            if (!NhapKhungTen(db, khungTen, thuVien!, canhBao) || !CoDinhNghiaBlock(db, khungTen.BlockName))
             {
                 canhBao.Add($"Chưa nhập được block khung tên \"{khungTen.BlockName}\" — chèn khung tên sau bằng INSERT.");
                 khungTen = null;
@@ -146,13 +187,13 @@ public sealed class VeTranginCommands
             try
             {
                 var layout = (Layout)tr.GetObject(layoutId, OpenMode.ForWrite);
-                DatPageSetup(layout, sheet.Plotter, kho.GiaTri, ctb, canhBao);
+                DatPageSetup(layout, sheet.Plotter, khoGiay, ctb, canhBao);
 
                 var psBtr = (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForWrite);
                 var (rongGiay, caoGiay) = KhoGiayMm(layout);
 
                 var vp = TaoViewport(tr, psBtr, khungMoHinh, tiLeViewport, rongGiay, caoGiay, canhBao);
-                soLayerAn = AnLayerTrongViewport(db, tr, vp, pack, he.Id, cheDoAn.Value, canhBao);
+                soLayerAn = AnLayerTrongViewport(db, tr, vp, pack, he.Id, cheDoAn, canhBao);
                 vp.Locked = true; // ĐẶT CUỐI: khóa rồi thì mọi thay đổi tỉ lệ đều bị chặn
 
                 if (khungTen is not null) daChenKhungTen = ChenKhungTen(db, tr, psBtr, khungTen, giaTriThe);
@@ -172,7 +213,7 @@ public sealed class VeTranginCommands
         if (daChenKhungTen) ghiNho.Luu(giaTriThe, ctb);
 
         ed.WriteMessage(
-            $"\n[XBoss] ===== TRANG IN \"{tenLayout}\" — hệ {he.Id}, khổ {kho.GiaTri}, tỉ lệ 1:{tiLe:0.##} =====\n" +
+            $"\n[XBoss] ===== TRANG IN \"{tenLayout}\" — hệ {he.Id}, khổ {khoGiay}, tỉ lệ 1:{tiLe:0.##} =====\n" +
             $"[XBoss] Viewport đã KHÓA tỉ lệ ({tiLeViewport.ToString("0.######", CultureInfo.InvariantCulture)} mm giấy / 1 đơn vị bản vẽ) — " +
             "kéo lại khung viewport cho vừa khung tên vẫn giữ đúng tỉ lệ.\n" +
             $"[XBoss] Ẩn theo viewport (VP freeze): {soLayerAn} layer.\n" +
@@ -181,6 +222,70 @@ public sealed class VeTranginCommands
                 : "[XBoss] Chưa chèn khung tên (xem cảnh báo bên trên).\n"));
         foreach (var c in canhBao) ed.WriteMessage($"[XBoss] ⚠ {c}\n");
         ed.WriteMessage("[XBoss] Hoàn tác trọn trang in: UNDO 1 lần.\n");
+    }
+
+    // ===== Dữ liệu cho hộp thoại (M106) =====
+
+    /// <summary>
+    /// Khung tên tra sẵn cho TỪNG khổ giấy rule pack khai. Tra ở đây (Adapter) chứ không trong hộp
+    /// thoại: hộp thoại không được đọc tệp thư viện (guardrail M106 §2), nhưng đổi khổ giấy vẫn phải
+    /// đổi ngay danh sách thẻ attribute hiện lên.
+    /// </summary>
+    private static IReadOnlyList<KhungTenTheoKho> KhungTenTheoKhoGiay(
+        BlockManifest? thuVien, SheetSetupSection sheet, string? loiThuVien)
+    {
+        var ra = new List<KhungTenTheoKho>();
+        foreach (var kho in sheet.PaperSizes)
+        {
+            if (thuVien is null)
+            {
+                ra.Add(new KhungTenTheoKho(kho, null, [], loiThuVien));
+                continue;
+            }
+            var (tim, loi) = SheetSetup.TimKhungTen(thuVien, sheet, kho);
+            ra.Add(tim is null
+                ? new KhungTenTheoKho(kho, null, [], loi)
+                : new KhungTenTheoKho(
+                    kho,
+                    tim.BlockName,
+                    // TI_LE/NGAY plugin tự điền ⇒ không đưa vào form (đúng như đường dòng lệnh).
+                    tim.Attributes.Where(t => t is not (TheTiLe or TheNgay)).ToList(),
+                    null));
+        }
+        return ra;
+    }
+
+    /// <summary>Bảng nét in CTB có trên máy; rỗng khi không đọc được (giữ mặc định của layout).</summary>
+    private static IReadOnlyList<string> DanhSachCtb()
+    {
+        try
+        {
+            return PlotSettingsValidator.Current.GetPlotStyleSheetList()
+                .Cast<string>()
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .ToList();
+        }
+        catch (Autodesk.AutoCAD.Runtime.Exception)
+        {
+            return []; // không đọc được danh sách CTB — giữ mặc định, không chặn lệnh
+        }
+    }
+
+    /// <summary>Giá trị thẻ khung tên từ hộp thoại + TI_LE/NGAY plugin tự điền (không hỏi kỹ sư).</summary>
+    private static Dictionary<string, string> TheTuHopThoai(
+        IReadOnlyDictionary<string, string> tuHopThoai, BlockDef khung, double tiLe)
+    {
+        var ra = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [TheTiLe] = $"1:{tiLe.ToString("0.##", CultureInfo.InvariantCulture)}",
+            [TheNgay] = DateTime.Now.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+        };
+        foreach (var the in khung.Attributes)
+        {
+            if (ra.ContainsKey(the)) continue;
+            ra[the] = tuHopThoai.GetValueOrDefault(the, "");
+        }
+        return ra;
     }
 
     // ===== Hỏi đáp =====
@@ -280,18 +385,10 @@ public sealed class VeTranginCommands
         return (new Point2d(tamX, tamY), rong, cao);
     }
 
-    /// <summary>Phạm vi VP-freeze — mặc định chỉ ẩn hệ MEP khác, giữ nền kiến trúc/trục.</summary>
-    private enum CheDoAnLayer
-    {
-        /// <summary>Chỉ ẩn layer tuyến của các hệ KHÁC trong rule pack (nền kiến trúc vẫn thấy).</summary>
-        HeKhac,
-        /// <summary>Ẩn mọi layer không thuộc hệ đang in (chỉ còn hệ này + chú thích).</summary>
-        NgoaiHe,
-        /// <summary>Không ẩn gì.</summary>
-        Khong,
-    }
+    // Phạm vi VP-freeze dùng enum CheDoAnLayerTrangIn của Core (M106): một khai báo duy nhất cho cả
+    // hộp thoại lẫn đường dòng lệnh — mặc định chỉ ẩn hệ MEP khác, giữ nền kiến trúc/trục.
 
-    private static CheDoAnLayer? HoiCheDoAnLayer(Editor ed)
+    private static CheDoAnLayerTrangIn? HoiCheDoAnLayer(Editor ed)
     {
         ed.WriteMessage(
             "\n[XBoss] Ẩn layer theo viewport (VP freeze — KHÔNG đổi trạng thái layer toàn cục):\n" +
@@ -307,9 +404,9 @@ public sealed class VeTranginCommands
         if (kq.Status != PromptStatus.OK) return null;
         return kq.StringResult switch
         {
-            "NGOAIHE" => CheDoAnLayer.NgoaiHe,
-            "KHONG" => CheDoAnLayer.Khong,
-            _ => CheDoAnLayer.HeKhac,
+            "NGOAIHE" => CheDoAnLayerTrangIn.NgoaiHe,
+            "KHONG" => CheDoAnLayerTrangIn.Khong,
+            _ => CheDoAnLayerTrangIn.HeKhac,
         };
     }
 
@@ -320,21 +417,10 @@ public sealed class VeTranginCommands
     /// </summary>
     private static string? HoiCtb(Editor ed, string? macDinh)
     {
-        List<string> danhSach;
-        try
-        {
-            danhSach = PlotSettingsValidator.Current.GetPlotStyleSheetList()
-                .Cast<string>()
-                .Where(s => !string.IsNullOrWhiteSpace(s))
-                .ToList();
-        }
-        catch (Autodesk.AutoCAD.Runtime.Exception)
-        {
-            return null; // không đọc được danh sách CTB — giữ mặc định, không chặn lệnh
-        }
+        var danhSach = DanhSachCtb();
         if (danhSach.Count == 0) return null;
 
-        const string giuMacDinh = "(giữ mặc định)";
+        const string giuMacDinh = TrangInDialogViewModel.GiuCtbMacDinh;
         var menu = new List<string> { giuMacDinh };
         menu.AddRange(danhSach);
         var goi = macDinh is not null && danhSach.Contains(macDinh, StringComparer.OrdinalIgnoreCase)
@@ -489,9 +575,9 @@ public sealed class VeTranginCommands
     /// <summary>VP-freeze các layer ngoài phạm vi in; trả số layer đã ẩn.</summary>
     private static int AnLayerTrongViewport(
         Database db, Transaction tr, Viewport vp, DrawToolsPack pack, string heId,
-        CheDoAnLayer cheDo, List<string> canhBao)
+        CheDoAnLayerTrangIn cheDo, List<string> canhBao)
     {
-        if (cheDo == CheDoAnLayer.Khong) return 0;
+        if (cheDo == CheDoAnLayerTrangIn.Khong) return 0;
 
         var giu = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -525,9 +611,14 @@ public sealed class VeTranginCommands
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         foreach (ObjectId id in lt)
         {
+            // xref-ok: layer của xref VẪN được đóng băng theo viewport ở đây. Quy tắc "bỏ qua xref"
+            // cấm SỬA thứ thuộc xref, còn đóng băng-theo-viewport là thuộc tính của chính VIEWPORT
+            // trong bản vẽ chủ (như lệnh VPLAYER) — bản ghi layer và tệp tham chiếu không bị đụng.
+            // Bỏ qua ở đây thì nền kiến trúc/kết cấu của xref vẫn hiện trên trang in "chỉ hệ này",
+            // tức là hỏng đúng thứ lệnh sinh ra để làm.
             var ltr = (LayerTableRecord)tr.GetObject(id, OpenMode.ForRead);
             if (giu.Contains(ltr.Name)) continue;
-            var can = cheDo == CheDoAnLayer.NgoaiHe || heKhac.Contains(ltr.Name);
+            var can = cheDo == CheDoAnLayerTrangIn.NgoaiHe || heKhac.Contains(ltr.Name);
             if (can) an.Add(ltr.ObjectId);
         }
         if (an.Count == 0) return 0;
@@ -582,14 +673,15 @@ public sealed class VeTranginCommands
     /// ở đây chỉ chuyển lỗi thành cảnh báo, vì thiếu khung tên KHÔNG được chặn cả trang in
     /// (layout + viewport vẫn có giá trị, khung tên chèn sau).
     /// </summary>
-    private static bool NhapKhungTen(Database db, BlockDef khungTen, List<string> canhBao)
+    private static bool NhapKhungTen(
+        Database db, BlockDef khungTen, BlockManifest thuVien, List<string> canhBao)
     {
         var tenBlock = khungTen.BlockName;
         try
         {
             // Truyền cả BlockDef (không chỉ tên): khung tên thêm từ web nằm ở tệp .dwg riêng nên
             // dịch vụ cần "fileKey" mới biết lấy định nghĩa ở đâu (M104 §1).
-            BlockLibraryService.NhapDinhNghia(db, [khungTen], ghiDe: false);
+            BlockLibraryService.NhapDinhNghia(db, [khungTen], thuVien, ghiDe: false);
             return true;
         }
         catch (BlockManifestException e)

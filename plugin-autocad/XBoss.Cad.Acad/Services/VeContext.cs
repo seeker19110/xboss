@@ -34,6 +34,23 @@ internal static class VeContext
 
     /// <summary>Khổ giấy chọn lần trước trong phiên (XBOSS_VE_TRANGIN).</summary>
     internal static string? KhoGiay { get; set; }
+    // ===== Hành lang (M114 FR2) — mồi sẵn cho đoạn hành lang tiếp theo trong cùng phiên =====
+    // Một tầng thường có nhiều đoạn hành lang cùng bề rộng/cao độ; hỏi lại từ đầu mỗi đoạn là
+    // đúng thứ làm kỹ sư bỏ lệnh. Vẫn là giá trị HỎI (M100 §6.3), chỉ mồi sẵn chứ không suy.
+
+    internal static double? HanhLangBeRongMm { get; set; }
+    internal static double? HanhLangCotDayDamMm { get; set; }
+    internal static double? HanhLangCotTranMm { get; set; }
+
+    /// <summary>Hệ được phép đi qua chọn lần trước; rỗng = mọi hệ.</summary>
+    internal static IReadOnlyList<string> HanhLangHeChoPhep { get; set; } = [];
+
+    // ===== Đi tuyến tự động (M114 FR8) — cao độ chế độ tự chảy, mồi sẵn cho lần chạy sau =====
+    // Cũng là giá trị HỎI (M100 §6.3): bản vẽ 2D không chứa cao độ thật, chỉ nhớ để đỡ gõ lại.
+
+    internal static double? TuChayCaoDoThietBiMm { get; set; }
+    internal static double? TuChayCaoDoXaMm { get; set; }
+
     /// <summary>Id block phụ kiện/thiết bị chọn lần trước (mặc định cho lần sau — M100 PR4).</summary>
     internal static string? PhuKienId { get; set; }
     internal static string? ThietBiId { get; set; }
@@ -71,6 +88,18 @@ internal static class VeContext
     /// </summary>
     internal static DrawToolsPack? CanDrawTools(Editor ed)
     {
+        var (pack, loi) = DrawToolsHienHanh();
+        if (loi is not null) ed.WriteMessage($"\n[XBoss] {loi}\n");
+        return pack;
+    }
+
+    /// <summary>
+    /// Như <see cref="CanDrawTools"/> nhưng IM LẶNG: trả kèm lý do thay vì in ra dòng lệnh. Dành
+    /// cho màn hình chỉ-đọc (trình dẫn quy trình M106 — làm mới mỗi lần đổi bản vẽ, không được
+    /// rải thông báo lên dòng lệnh kỹ sư đang làm việc).
+    /// </summary>
+    internal static (DrawToolsPack? Pack, string? LoiTiengViet) DrawToolsHienHanh()
+    {
         try
         {
             // Tệp rule pack ĐANG có hiệu lực (M101 PR4: có thể là bản của dự án đang làm, không
@@ -79,29 +108,62 @@ internal static class VeContext
             var duongDan = RulePackStore.DuongDanHienHanh;
             if (!File.Exists(duongDan))
             {
-                ed.WriteMessage(
-                    "\n[XBoss] Chưa nạp rule pack. Tải tệp JSON từ trang XBoss /engineering/chuan-hoa-ban-ve " +
-                    "rồi chạy XBOSS_RULEPACK (hoặc XBOSS_LOGIN để tải tự động).\n");
-                return null;
+                return (null,
+                    "Chưa nạp rule pack. Tải tệp JSON từ trang XBoss /engineering/chuan-hoa-ban-ve " +
+                    "rồi chạy XBOSS_RULEPACK (hoặc XBOSS_LOGIN để tải tự động).");
             }
             var thoiDiem = File.GetLastWriteTimeUtc(duongDan);
-            if (_cache is not null && duongDan == _duongDanCache && thoiDiem == _thoiDiemCache) return _cache;
+            if (_cache is not null && duongDan == _duongDanCache && thoiDiem == _thoiDiemCache) return (_cache, null);
 
             _cache = DrawToolsConfig.Load(File.ReadAllText(duongDan));
             _duongDanCache = duongDan;
             _thoiDiemCache = thoiDiem;
-            return _cache;
+            return (_cache, null);
         }
         catch (RulePackException e)
         {
-            ed.WriteMessage($"\n[XBoss] Rule pack không dùng được cho bộ lệnh vẽ: {e.Message}\n");
-            return null;
+            return (null, $"Rule pack không dùng được cho bộ lệnh vẽ: {e.Message}");
         }
         catch (IOException e)
         {
-            ed.WriteMessage($"\n[XBoss] Không đọc được rule pack cache: {e.Message}\n");
+            return (null, $"Không đọc được rule pack cache: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Khối <c>drawTools.routingPolicy</c> đang có hiệu lực (M114 §6) — cửa DUY NHẤT cho cả
+    /// <c>XBOSS_VE_HANHLANG</c> lẫn <c>XBOSS_VE_TUYENTUDONG</c>, để hai lệnh không bao giờ nói khác
+    /// nhau về việc "đi tuyến tự động đã bật chưa".
+    /// Trả null + hướng dẫn cách bật khi rule pack chưa khai, còn <c>enabled: false</c>, hoặc khai
+    /// layer hành lang rỗng (AC14 — bản vẽ không đổi một nét nào).
+    /// </summary>
+    internal static RoutingPolicySection? CanRoutingPolicy(Editor ed, DrawToolsPack pack)
+    {
+        if (pack.DrawTools.RoutingPolicy is not { } cs)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] Rule pack {pack.RulePack.Version} chưa khai drawTools.routingPolicy — " +
+                "đi tuyến tự động chưa dùng được. Nạp rule pack mới (v15 trở lên) rồi chạy lại.\n");
             return null;
         }
+        if (!cs.Enabled)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] Đi tuyến tự động đang TẮT trong rule pack {pack.RulePack.Version} " +
+                "(drawTools.routingPolicy.enabled = false) — lệnh dừng, bản vẽ không đổi.\n" +
+                "[XBoss] Cách bật: Admin/PM sửa enabled = true trong rule pack trên trang " +
+                "/engineering/chuan-hoa-ban-ve, phát hành version mới rồi chạy XBOSS_LOGIN (hoặc " +
+                "XBOSS_RULEPACK) để nạp lại.\n");
+            return null;
+        }
+        if (string.IsNullOrWhiteSpace(cs.CorridorLayer))
+        {
+            ed.WriteMessage(
+                "\n[XBoss] Rule pack khai routingPolicy.corridorLayer rỗng — không biết đặt hành lang lên " +
+                "layer nào. Bổ sung layer hành lang vào rule pack rồi chạy lại.\n");
+            return null;
+        }
+        return cs;
     }
 
     /// <summary>Hệ đang chọn; chưa chọn (hoặc kỹ sư muốn đổi) thì hỏi bằng keyword dòng lệnh.</summary>

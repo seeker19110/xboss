@@ -27,6 +27,7 @@ import {
   AlertCircle,
   ShieldCheck,
   Cpu,
+  Undo2,
   type LucideIcon,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
@@ -39,7 +40,13 @@ import { fetchMe, type Me } from "@/app/lib/me";
 
 export type DrawingKind = "design" | "shop" | "asbuilt" | "bim" | "method";
 export type RevisionStatus =
-  "submitted" | "commented" | "approved" | "approved_with_comments" | "rejected" | "superseded";
+  | "submitted"
+  | "commented"
+  | "approved"
+  | "approved_with_comments"
+  | "rejected"
+  | "superseded"
+  | "withdrawn";
 
 export type TradeDiscipline = "all" | "M" | "E" | "P" | "F" | "ELV";
 
@@ -69,6 +76,7 @@ const STATUS_LABEL: Record<RevisionStatus, string> = {
   approved_with_comments: "Duyệt kèm ý kiến",
   rejected: "Từ chối",
   superseded: "Đã thay thế",
+  withdrawn: "Đã thu hồi",
 };
 
 const STATUS_BADGE: Record<RevisionStatus, string> = {
@@ -78,6 +86,7 @@ const STATUS_BADGE: Record<RevisionStatus, string> = {
   approved_with_comments: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
   rejected: "bg-rose-500/10 text-rose-400 border-rose-500/30",
   superseded: "bg-zinc-800 text-zinc-500 border-zinc-700 line-through",
+  withdrawn: "bg-zinc-800 text-zinc-400 border-zinc-700",
 };
 
 const STATUS_ICON: Record<RevisionStatus, LucideIcon> = {
@@ -87,6 +96,7 @@ const STATUS_ICON: Record<RevisionStatus, LucideIcon> = {
   approved_with_comments: CheckCircle2,
   rejected: XCircle,
   superseded: History,
+  withdrawn: Undo2,
 };
 
 export type DrawingRow = {
@@ -131,6 +141,9 @@ export type DrawingRevisionRow = {
   rulePackVersion: string | null;
   kiemDinh: { ok: boolean; soLoi: number; soCanhBao: number; canhBao: string[] } | null;
   contentSha256: string | null;
+  // Cờ server tính sẵn: chính chủ + còn ở trạng thái chưa quyết mới được tự thu hồi — không
+  // suy từ uploadedBy ở client (xem GET /api/drawings/:id).
+  canWithdraw?: boolean;
 };
 
 const fmtSize = (b: number) =>
@@ -1004,6 +1017,30 @@ function DrawingWorkspaceDetail({
     }
   }
 
+  async function withdraw(rev: DrawingRevisionRow) {
+    const ok = await appConfirm(
+      `Thu hồi Rev ${rev.rev} vừa gửi? Bản vẽ sẽ không còn nằm trong hàng chờ duyệt — bạn có thể tải lên bản khác sau.`,
+      { danger: true, confirmLabel: "Thu hồi" },
+    );
+    if (!ok) return;
+    setBusyRevId(rev.id);
+    try {
+      const res = await fetch(`/api/drawings/revisions/${rev.id}/withdraw`, { method: "POST" });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast(j?.error ?? "Không thu hồi được revision", "error");
+        return;
+      }
+      showToast("Đã thu hồi revision");
+      loadRevs({ fresh: true });
+      onChanged();
+    } catch {
+      showToast("Mất kết nối — kiểm tra mạng rồi thử lại", "error");
+    } finally {
+      setBusyRevId(null);
+    }
+  }
+
   function viewFile(revId: number) {
     window.open(`/api/drawings/revisions/${revId}/file`, "_blank", "noopener,noreferrer");
   }
@@ -1273,6 +1310,21 @@ function DrawingWorkspaceDetail({
                         className="flex items-center gap-1 text-xs font-semibold bg-rose-950 hover:bg-rose-900 disabled:opacity-50 text-rose-200 border border-rose-800 px-2.5 py-1.5 rounded-lg transition min-h-[38px]"
                       >
                         <XCircle className="w-3.5 h-3.5" /> Từ Chối
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Chính người tải lên tự thu hồi bản gửi sai — cờ do server tính, không tin
+                      id ở client (xem GET /api/drawings/:id, canWithdraw). */}
+                  {r.canWithdraw && (
+                    <div className="mt-2.5 pt-2.5 border-t border-zinc-800">
+                      <button
+                        disabled={isBusy}
+                        onClick={() => withdraw(r)}
+                        aria-label={`Thu hồi Rev ${r.rev}`}
+                        className="flex items-center gap-1 text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 border border-zinc-700 px-2.5 py-1.5 rounded-lg transition min-h-[38px]"
+                      >
+                        <Undo2 className="w-3.5 h-3.5" /> Thu Hồi
                       </button>
                     </div>
                   )}

@@ -6,7 +6,7 @@
       AppVersion trong bundle/PackageContents.xml lúc đóng gói và đặt tên tệp .zip phát hành
       (dist\XBoss.bundle-<version>.zip). Đổi version thì chỉ sửa DUY NHẤT ở đây.
       1.0.0: mốc phát hành đầu tiên có gói cài — đã qua M99 (đóng gói/cài đặt cơ bản) đến
-      M104 (thư viện block 2 chiều), đủ 25 lệnh XBOSS_* theo LenhCatalog.
+      M105 (thư viện block 2 chiều ở M104, chia đốt MEPF ở M105), đủ 26 lệnh XBOSS_* theo LenhCatalog.
     -->
     <Version>1.0.0</Version>
     <LangVersion>latest</LangVersion>

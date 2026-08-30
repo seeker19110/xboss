@@ -61,6 +61,30 @@ public static class SheetSetup
     }
 
     /// <summary>
+    /// Tên layout này có phải trang in do <c>XBOSS_VE_TRANGIN</c> dựng theo
+    /// <c>sheetSetup.layoutNamePattern</c> không — dấu hiệu "đã có trang in" của trình dẫn quy
+    /// trình (M106 FR8, bước 5).
+    ///
+    /// Phải soi theo MẪU TÊN chứ không đếm "có layout nào ngoài Model": bản vẽ mới của AutoCAD đã
+    /// sẵn Layout1/Layout2, đếm suông là báo xong khi chưa làm gì — sai lệch nguy hiểm nhất của
+    /// một trình dẫn. Ngược lại, layout đặt tên tay theo lối khác chỉ bị báo "chưa" (nút vẫn bấm
+    /// được), đó là phía an toàn.
+    /// </summary>
+    public static bool LaTenLayoutTrangIn(string pattern, string ten)
+    {
+        if (string.IsNullOrWhiteSpace(ten)) return false;
+        var mau = string.IsNullOrWhiteSpace(pattern) ? "SHOP-{system}-{seq}" : pattern;
+        var re = new Regex(
+            "^" + Regex.Escape(mau)
+                .Replace(@"\{system}", ".+", StringComparison.Ordinal)
+                .Replace(@"\{seq}", @"\d+", StringComparison.Ordinal)
+            // Hậu tố "-2", "-3"… mà TenLayoutKeTiep thêm khi mẫu không có {seq} và tên bị trùng.
+            + @"(-\d+)?$",
+            RegexOptions.IgnoreCase);
+        return re.IsMatch(ten.Trim());
+    }
+
+    /// <summary>
     /// Tên mặt cắt kế tiếp theo <c>sheetSetup.sectionNamePattern</c> (vd <c>{alpha}-{alpha}</c>
     /// → A-A, B-B… rồi AA-AA khi hết chữ cái). Bỏ qua các chữ cái đã dùng trong bản vẽ.
     /// </summary>

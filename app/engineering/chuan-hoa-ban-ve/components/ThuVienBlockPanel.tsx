@@ -14,14 +14,17 @@ import {
   X,
   Plus,
   Undo2,
+  Globe,
+  FolderKanban,
 } from "lucide-react";
-import { Button, ButtonLink, Chip } from "@/app/components/ui";
+import { Button, ButtonLink, Card, Chip, Section } from "@/app/components/ui";
 import type { ChipTone } from "@/app/components/ui/Chip";
 import { Skeleton } from "@/app/components/Skeleton";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { useBlockProposals } from "../hooks/useBlockProposals";
 import ThemBlockTuWebForm from "./ThemBlockTuWebForm";
 import type { BlockProposal, BlockProposalKind, BlockProposalStatus } from "../types";
+import type { NguonBlock } from "@/lib/ky-thuat/cad/block";
 
 // M100 PR2 (§13) — mục "Thư viện block" của bảng điều khiển plugin: version đang phát hành,
 // lịch sử phát hành, nút tải, và form phát hành version mới (Admin/PM).
@@ -46,6 +49,44 @@ type DuLieuBlockLib = {
 
 type KetQuaKiemDinh = { errors: string[]; warnings: string[] };
 
+// M113 PR3 — mục "Danh Sách Block": trộn 2 tầng (toàn cục + của dự án đang chọn) đọc thẳng từ
+// manifest GET ?manifest=1[&project=] (PR2 đã trả `nguon`/`libVersion` mỗi entry khi có `project`;
+// không kèm `project` thì mọi entry mặc định coi là "global" — đúng hành vi hôm nay).
+type BlockManifestHienThi = {
+  id: string;
+  blockName: string;
+  kind: BlockProposalKind;
+  nguon?: NguonBlock;
+  libVersion?: string;
+};
+
+const NHAN_NGUON: Record<NguonBlock, { nhan: string; tone: ChipTone; icon: typeof Globe }> = {
+  global: { nhan: "Toàn cục", tone: "info", icon: Globe },
+  project: { nhan: "Dự án", tone: "success", icon: FolderKanban },
+};
+
+// Dự án đang chọn lưu ở cookie `xboss_project` (đặt bởi POST /api/project/select — cùng cookie
+// ProjectSwitcher đọc). Không có route riêng để hỏi "dự án hiện tại" ở client, đọc thẳng cookie.
+function docCookieDuAn(): number | null {
+  if (typeof document === "undefined") return null;
+  const m = document.cookie.match(/(?:^|; )xboss_project=([^;]+)/);
+  return m ? Number(m[1]) : null;
+}
+
+function DanhSachBlockRow({ block }: { block: BlockManifestHienThi }) {
+  const nguon = NHAN_NGUON[block.nguon ?? "global"];
+  return (
+    <li className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs">
+      <span className="font-mono font-bold text-zinc-100 truncate">{block.blockName}</span>
+      <span className="text-zinc-500 truncate">({block.id})</span>
+      <Chip tone="accent">{NHAN_LOAI[block.kind] ?? block.kind}</Chip>
+      <Chip tone={nguon.tone} icon={nguon.icon}>
+        {nguon.nhan}
+      </Chip>
+    </li>
+  );
+}
+
 function ngay(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("vi-VN");
@@ -65,7 +106,7 @@ const NHAN_LOAI: Record<BlockProposalKind, string> = {
 // thay vì sửa union dùng chung, tránh đụng file ngoài phạm vi đang có agent khác thao tác.
 
 // API `/api/engineering/cad/block-proposals` đã trả `nguoiDeXuatId` (xem `DeXuatBlock` trong
-// lib/ky-thuat/cad/block-proposals.ts) nhưng `BlockProposal` ở types.ts chưa khai trường này —
+// lib/ky-thuat/cad/block.ts) nhưng `BlockProposal` ở types.ts chưa khai trường này —
 // widen tại chỗ, cùng lý do trên (không đụng types.ts đang có agent khác thao tác).
 
 const NHAN_TRANG_THAI: Record<BlockProposalStatus, { nhan: string; tone: ChipTone }> = {
@@ -104,17 +145,31 @@ function BlockProposalRow({
   const dangCho = item.status === "pending";
   return (
     <li className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row gap-3">
-      <div className="shrink-0 w-16 h-16 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden">
-        {item.previewSvg ? (
-          // eslint-disable-next-line @next/next/no-img-element -- data URL cục bộ, không phải ảnh từ xa
-          <img
-            src={anhXemTruoc(item.previewSvg)}
-            alt={`Xem trước block ${item.blockName}`}
-            className="w-full h-full object-contain"
-          />
-        ) : (
-          <ImageOff className="w-6 h-6 text-zinc-600" strokeWidth={1.5} aria-hidden="true" />
-        )}
+      <div className="shrink-0 flex flex-row sm:flex-col items-center gap-2 w-full sm:w-16">
+        <div className="w-16 h-16 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden">
+          {item.previewSvg ? (
+            // eslint-disable-next-line @next/next/no-img-element -- data URL cục bộ, không phải ảnh từ xa
+            <img
+              src={anhXemTruoc(item.previewSvg)}
+              alt={`Xem trước block ${item.blockName}`}
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <ImageOff className="w-6 h-6 text-zinc-600" strokeWidth={1.5} aria-hidden="true" />
+          )}
+        </div>
+        {/* Ảnh xem trước là best-effort (có thể rỗng/sai lệch) — nút này tải TỆP THẬT để người
+            duyệt đối chiếu, kèm sha256 rút gọn (tooltip hiện đầy đủ 64 ký tự hex). */}
+        <ButtonLink
+          size="sm"
+          icon={Download}
+          href={`/api/engineering/cad/block-proposals/${item.id}/candidate`}
+          download={`${item.blockName}-ung-vien.dwg`}
+          aria-label={`Tải tệp DWG ứng viên của block ${item.blockName}`}
+          title={`sha256: ${item.dwgSha256}`}
+        >
+          <span className="font-mono text-[10px]">{item.dwgSha256.slice(0, 8)}…</span>
+        </ButtonLink>
       </div>
 
       <div className="flex-1 min-w-0 space-y-1.5">
@@ -227,6 +282,66 @@ export default function ThuVienBlockPanel() {
 
   // M104 — form thêm block thẳng từ web (admin/pm/engineer), mặc định đóng cho gọn panel.
   const [moFormThem, setMoFormThem] = useState(false);
+
+  // M113 PR3 — Danh sách block trộn 2 tầng (FR4/AC10): toàn cục + của dự án đang chọn.
+  // "Dự án đang chọn" tính đúng như ProjectSwitcher (app/components/ProjectSwitcher.tsx):
+  // cookie `xboss_project` nếu hợp lệ, else dự án đầu trong danh sách user thấy — khớp
+  // hành vi mặc định của server (`resolveProjectId`), tránh lệch với badge dự án trên header.
+  const [projectId, setProjectId] = useState<number | null>(null);
+  const [danhSachBlock, setDanhSachBlock] = useState<BlockManifestHienThi[] | null>(null);
+  const [loiDanhSachBlock, setLoiDanhSachBlock] = useState<string | null>(null);
+
+  useEffect(() => {
+    let huy = false;
+    fetch("/api/projects")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (huy) return;
+        const list: { id: number }[] = Array.isArray(data?.projects) ? data.projects : [];
+        if (list.length === 0) return setProjectId(null);
+        const cookieId = docCookieDuAn();
+        const found = cookieId != null && list.some((p) => p.id === cookieId);
+        setProjectId(found ? cookieId : list[0].id);
+      })
+      .catch(() => {
+        if (!huy) setProjectId(docCookieDuAn());
+      });
+    return () => {
+      huy = true;
+    };
+  }, []);
+
+  const taiDanhSachBlock = useCallback(async () => {
+    try {
+      const qs = projectId != null ? `?manifest=1&project=${projectId}` : "?manifest=1";
+      const res = await fetch(`/api/engineering/cad/block-lib${qs}`);
+      if (res.status === 401) return redirectToLogin();
+      if (res.status === 404) {
+        // Chưa phát hành thư viện nào (guardrail 1) — chưa có dữ liệu, không phải lỗi.
+        setLoiDanhSachBlock(null);
+        setDanhSachBlock([]);
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setLoiDanhSachBlock(data?.error || "Không tải được danh sách block.");
+        setDanhSachBlock(null);
+        return;
+      }
+      setLoiDanhSachBlock(null);
+      const blocks = Array.isArray(data?.manifest?.blocks) ? data.manifest.blocks : [];
+      setDanhSachBlock(blocks as BlockManifestHienThi[]);
+    } catch {
+      setLoiDanhSachBlock("Lỗi mạng — không tải được danh sách block.");
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    void taiDanhSachBlock();
+  }, [taiDanhSachBlock]);
+
+  const blocksToanCuc = danhSachBlock?.filter((b) => (b.nguon ?? "global") === "global") ?? [];
+  const blocksDuAn = danhSachBlock?.filter((b) => b.nguon === "project") ?? [];
 
   const tai = useCallback(async () => {
     try {
@@ -461,6 +576,79 @@ export default function ThuVienBlockPanel() {
           </div>
         </div>
       )}
+
+      {/* M113 PR3 (FR4/AC10) — 2 khối: block toàn cục / block của dự án đang chọn, mỗi block
+          hiển thị chip nguồn. Đọc thẳng manifest đã trộn GET ?manifest=1[&project=] (PR2). */}
+      <Section
+        title="Danh Sách Block"
+        icon={Blocks}
+        description="Toàn cục dùng cho mọi dự án; block khai riêng của dự án đang chọn đè lên block toàn cục cùng id (id đó không hiện lặp ở khối Toàn cục)."
+        actions={
+          <Button
+            size="sm"
+            icon={RefreshCw}
+            onClick={() => void taiDanhSachBlock()}
+            aria-label="Tải lại danh sách block"
+          >
+            Tải Lại
+          </Button>
+        }
+      >
+        {loiDanhSachBlock && (
+          <p className="flex items-center gap-1.5 text-xs text-amber-300">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            {loiDanhSachBlock}
+          </p>
+        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Card tone="sunken" className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-200 uppercase tracking-wide">
+              <Globe className="w-3.5 h-3.5 text-sky-400" strokeWidth={1.75} aria-hidden="true" />
+              Toàn Cục ({danhSachBlock === null ? "…" : blocksToanCuc.length})
+            </div>
+            {danhSachBlock === null ? (
+              <Skeleton className="h-16 w-full" />
+            ) : blocksToanCuc.length === 0 ? (
+              <p className="text-xs text-zinc-400">Chưa có block toàn cục nào.</p>
+            ) : (
+              <ul className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                {blocksToanCuc.map((b) => (
+                  <DanhSachBlockRow key={b.id} block={b} />
+                ))}
+              </ul>
+            )}
+          </Card>
+          <Card tone="sunken" className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-200 uppercase tracking-wide">
+              <FolderKanban
+                className="w-3.5 h-3.5 text-emerald-400"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
+              Của Dự Án Này ({danhSachBlock === null || projectId == null ? "…" : blocksDuAn.length}
+              )
+            </div>
+            {projectId == null ? (
+              <p className="text-xs text-zinc-400">
+                Chưa chọn dự án — chọn dự án ở góc trên bên trái để xem thư viện block riêng của dự
+                án đó.
+              </p>
+            ) : danhSachBlock === null ? (
+              <Skeleton className="h-16 w-full" />
+            ) : blocksDuAn.length === 0 ? (
+              <p className="text-xs text-zinc-400">
+                Dự án này chưa phát hành block riêng — đang dùng nguyên bộ toàn cục.
+              </p>
+            ) : (
+              <ul className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                {blocksDuAn.map((b) => (
+                  <DanhSachBlockRow key={b.id} block={b} />
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+      </Section>
 
       {/* Form phát hành — chỉ Admin/PM (máy chủ vẫn kiểm lại quyền ở POST) */}
       {duLieu?.choPhatHanh && (

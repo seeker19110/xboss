@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
-import { thuHoiDeXuat } from "@/lib/ky-thuat/cad/block-proposals";
+import { thuHoiDeXuat } from "@/lib/ky-thuat/cad/block";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +35,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
   }
   if (kq.status === "forbidden") {
-    return NextResponse.json(
-      { error: "Chỉ người gửi đề xuất mới được thu hồi" },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: "Chỉ người gửi đề xuất mới được thu hồi" }, { status: 403 });
   }
   if (kq.status === "conflict") {
     return NextResponse.json({ error: kq.message }, { status: 409 });
