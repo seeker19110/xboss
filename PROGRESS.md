@@ -11,7 +11,7 @@ Nhánh `claude/mepf-auto-deploy-plugin-6qsbq8`. Khảo sát thị trường tool
 đối chiếu nền tảng plugin M99→M114. **Người dùng chốt hướng:** kỹ sư vẽ line/pline tuyến tim từ
 nguồn tới thiết bị (kèm thuộc tính/cao độ) — plugin tự hoàn thiện bản vẽ (nét đôi, tê, co/cút,
 chia đốt, giá đỡ, lỗ chờ, ngắt nét, tag, thống kê), tích hợp thẳng vào plugin; nguyên tắc: *AI
-hiểu ngữ nghĩa, thuật toán vẽ hình học*. Viết 3 đặc tả mới (State **Draft — chờ duyệt**):
+hiểu ngữ nghĩa, thuật toán vẽ hình học*. Viết 3 đặc tả mới, người dùng **duyệt cả 3 cùng ngày (Approved for implementation)**; kế hoạch thi hành trọn đợt ở `PLAN.md`:
 
 - `docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md` — `XBOSS_TUYEN_GAN`/`_TUYEN_DOTHI`/
   `_HOANTHIEN`, rule pack `completionPolicy`, không migration/API. Thi hành đầu tiên.

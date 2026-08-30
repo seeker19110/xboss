@@ -4,8 +4,8 @@
 | --- | --- |
 | Issue / Goal | AI đọc bản vẽ sơ đồ nguyên lý MEPF thành đồ thị kết nối, gợi ý sẵn tuyến tim cho kỹ sư sửa — khép kín "schematic → bản vẽ thi công" |
 | Spec owner | Phiên chính (opusplan) |
-| State | Draft — chờ duyệt; **chỉ thi hành sau khi M115 chạy ổn pilot** (điều kiện kích hoạt) |
-| Người/ngày duyệt | (chờ) |
+| State | **Approved for implementation** — code được phép đi ngay sau M115/M116 (mọi khoá mặc định tắt); **PHÁT HÀNH rộng chỉ sau khi M115 verify + pilot ổn** |
+| Người/ngày duyệt | Người dùng duyệt 2026-08-30 |
 | Cập nhật | 2026-08-30 |
 | Phụ thuộc | M115 (graph + hoàn thiện), M108 (pipeline AI nhiều tầng + `lib/nen/ai.ts`), M114 (`routingPolicy`, hành lang) |
 

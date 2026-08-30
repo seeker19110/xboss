@@ -1,124 +1,263 @@
-# PLAN.md — Đợt M100+M101 Pha 2: bộ lệnh vẽ Adapter (M100 PR3 → PR4/PR6 → PR7)
+# PLAN.md — Đợt M115→M117: tự động triển khai bản vẽ MEPF từ tuyến tim
 
-**Cập nhật:** 2026-08-25 · **Nguồn:** `docs/nang-cap/M100-xboss-ve-shop-drawing.md` (Approved)
-**Nhánh nền:** `claude/plugin-capabilities-limits-rrd2gp` — base mọi worktree trên nhánh này (KHÔNG origin/main). Pha 1 đã tích hợp: rule pack v4 + `Core/Draw/{DrawToolsConfig,TakeoffCrossCheck,BlockManifest}` + server block-lib.
+**Cập nhật:** 2026-08-30 · **Nguồn:** `docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md`,
+`M116-phoi-hop-xung-dot-lien-he.md`, `M117-ai-doc-so-do-nguyen-ly.md` (cả 3 **Approved 2026-08-30**).
+**Nhánh nền:** `claude/mepf-auto-deploy-plugin-6qsbq8` — base MỌI worktree trên nhánh này (KHÔNG
+origin/main: nhánh này chứa 3 đặc tả; trước khi bắt đầu chạy `git fetch origin` và rebase nhánh nền
+lên `origin/main` mới nhất nếu main đã tiến).
+**Trạng thái thi hành:** CHƯA KÍCH HOẠT — người dùng sẽ ra lệnh thi hành sau. Khi kích hoạt: giao
+nguyên văn tệp này cho `coordinator`.
 
 ## Bối cảnh & ràng buộc CỨNG cho mọi việc
 
-- Worker không thấy hội thoại. Đọc: `CLAUDE.md`, TOÀN BỘ đặc tả M100, `plugin-autocad/README.md` (mục Ràng buộc thiết kế), code hiện trạng `XBoss.Cad.Acad/Commands/` + `Services/` (bám đúng phong cách lệnh M99: transaction, UNDO group, prompt tiếng Việt, xử lý lỗi).
-- **`XBoss.Cad.Acad` KHÔNG build được trên Linux** (net10.0-windows + ObjectARX). Code Adapter viết "mù" — vì vậy: (1) mọi logic tính toán được phải đẩy xuống `XBoss.Cad.Core` (net8.0, thuần, CÓ test — `export SSL_CERT_FILE=/root/.ccr/ca-bundle.crt` trước khi chạy `dotnet test`); (2) Adapter chỉ còn lớp mỏng gọi API AutoCAD; (3) đối chiếu kỹ tên API với code Adapter hiện có (`PluginExtension.cs`, các lệnh `XBOSS_*` sẵn có) — dùng đúng các using/pattern đã compile được trên máy thật (bài học "8 lỗi CI không thể bắt" trong PROGRESS.md); (4) mô phỏng tay từng luồng lệnh trong đầu trước khi báo xong.
-- Core CẤM tham chiếu assembly AutoCAD. Mỗi lệnh = 1 transaction = 1 UNDO group. Không đụng hành vi lệnh M99.
-- XData appname `XBOSS_VE` theo M100 §11; KHÔNG đụng appname `XBOSS_BOCKL`.
-- Tiếng Việt toàn bộ prompt/thông báo/comment/commit. Không push — commit trong worktree.
-- Node chỉ cần nếu việc chạm TS (Pha 2 không chạm TS trừ khi đặc tả bắt).
-- Cổng mỗi việc: `dotnet test plugin-autocad/XBoss.Cad.Tests/XBoss.Cad.Tests.csproj` xanh toàn bộ (không làm đỏ ca cũ).
-
-## Việc V3 — Nền vẽ + tuyến + nhãn (M100 PR3) — `route: complex`
-
-Đặc tả: §6.1 (journey 1–3, 6), §6.11, §7 FR3/FR4/FR7(nhãn)/FR9/FR10, §8 AC1/AC2(phần layer)/AC3.
-
-1. Core `Draw/EdgeOffset.cs`: polyline tim (danh sách đỉnh + bulge) + width → 2 polyline biên offset ±w/2; đoạn thẳng + cung tròn (bulge); spline/tự cắt → trả "không offset được" (Adapter chỉ vẽ tim + cảnh báo). Test kỹ (thẳng/gãy khúc/cung/width lẻ).
-2. Adapter `Services/VeContext.cs`: trạng thái phiên vẽ (hệ đang chọn, line đang chọn, size, slope) + đọc `drawTools` qua `DrawToolsConfig` từ rule pack cache hiện có (xem service rule pack của M99).
-3. Adapter `Commands/VeNenCommands.cs`: `XBOSS_VE_NEN` — chọn hệ; khóa + transparency (`baseFadePct`) mọi layer hiện có; tạo layer đích của hệ + `-EDGE` (màu/lineweight theo `lineweightMap`); chạy lại → hoàn nguyên (lưu trạng thái trước vào XData NOD hoặc dictionary bản vẽ). KHÔNG sửa/xóa đối tượng nền.
-4. Adapter `Commands/VeTuyenCommands.cs`: `XBOSS_VE` — chọn loại tuyến/size (keyword prompt; `slopeRequired` → hỏi slope từ `slopes`); vẽ polyline như PLINE; kết thúc: đặt layer, ghi XData `[systemId, itemId, size, rulePackVersion, custom?, slope?]`; `edgeStyle=double` → `EdgeOffset` sinh biên trên `-EDGE`, XData 2 chiều (biên giữ handle tim, tim giữ handles biên). ESC → abort sạch. `XBOSS_VE_NHAN` — bấm tuyến → MTEXT nhãn size (+`i=…%` kèm block `slope-arrow` nếu có slope; thiếu block trong thư viện → chỉ text) trên layer `G-ANNO-TEXT`, `labelStyle`, XData liên kết tim.
-   Ranh giới được quyết: chi tiết prompt/keyword; cách lưu trạng thái VE_NEN; jig hay PLINE wrap.
-
-## Việc V4 — Phụ kiện + thiết bị + thư viện (M100 PR4) — `route: complex` (SAU V3)
-
-Đặc tả: §6.1 bước 4–5, §6.10, §7 FR5/FR6, §8 AC4/AC5/AC7/AC8.
-
-1. Core `Draw/FittingPlacement.cs`: điểm chèn trên polyline → góc tiếp tuyến (đoạn thẳng + cung) + scale theo size (manifest `scaleBySize`); test (giữa đoạn/tại đỉnh/trên cung, sai số ≤0.1°).
-2. Adapter `Services/BlockLibraryService.cs`: tải qua `GET /api/engineering/cad/block-lib` (token M99, ETag, cache `%APPDATA%\XBoss\block-lib\`), kiểm sha256 (`BlockManifest`); nhập định nghĩa block vào DWG 1 lần (`Database.Insert` từ tệp cache), trùng tên khác định nghĩa → hỏi (AC7).
-3. Adapter `Commands/VePhuKienCommands.cs`: `XBOSS_VE_PHUKIEN` (chọn theo `fittings` của hệ, bấm điểm trên tim → xoay `rotateToPath`, layer hệ), `XBOSS_VE_THIETBI` (equipment, attribute TAG bắt buộc + MODEL/SIZE, prompt nhập), `XBOSS_VE_THUVIEN` (nạp tệp thư viện tay: .dwg + manifest.json cạnh nhau).
-
-## Việc V5 — Trang in + mặt cắt (M100 PR6) — `route: complex` (SAU V3, ∥ V4)
-
-Đặc tả: §6.3, §6.4, §7 FR9a/FR9b, §8 AC10/AC11, `sheetSetup` §11.
-
-1. Core `Draw/SectionBuilder.cs`: tuyến cắt (2 điểm) + danh sách tim (đỉnh + XData size + loại) → giao điểm, thứ tự chiếu lên tuyến cắt, toạ độ ký hiệu (chữ nhật WxH / tròn DN / máng) theo khoảng cách ngang thật; tuyến song song tuyến cắt → bỏ qua kèm cảnh báo. Test kỹ.
-2. Adapter `Commands/VeTranginCommands.cs`: `XBOSS_VE_TRANGIN` — layout mới + page setup (`sheetSetup.plotter`, khổ, CTB theo `lineweightMap`), viewport đúng tỉ lệ + LOCK, VP-freeze layer ngoài hệ, chèn titleblock (manifest kind `titleblock` theo khổ) + điền attribute (DU_AN từ cache LOGIN nếu có, còn lại prompt + nhớ lần trước), tên layout theo `layoutNamePattern`; 1 UNDO xóa trọn.
-3. Adapter `Commands/VeMatcatCommands.cs`: `XBOSS_VE_MATCAT` — kẻ tuyến cắt, tìm giao qua `SectionBuilder`, cao độ prompt từng tuyến (mặc định `defaultElevations`/lần trước), dựng hình + nhãn + tên A-A tự đánh (`sectionNamePattern`), XData snapshot `[tuyến-cắt-handle, ngày]`.
-
-## Việc V6 — Giá đỡ + lỗ chờ + tag + thống kê (M100 PR7) — `route: complex` (SAU V3+V4)
-
-Đặc tả: §6.7/§6.8/§6.9, FR9c–9g, AC12/AC13/AC14.
-
-1. Core `Draw/SupportSpacing.cs`: chiều dài tuyến + spacing + vị trí phụ kiện nặng → danh sách vị trí giá đỡ (đầu/cuối luôn có, chia đều ≤ spacing); bổ sung đoạn thiếu khi đã có giá đỡ cũ. Test AC12 (10m/2400 → 5 vị trí).
-2. Core: bảng lỗ chờ Excel (`Excel/` — ClosedXML, bảng đơn giản STT/vị trí trục/cao độ/size/hệ, KHÔNG đụng mẫu BOQ).
-3. Adapter `Commands/VeGiadoCommands.cs` (`XBOSS_VE_GIADO` — block kind `support`, vuông góc tuyến, XData tim↔giá đỡ chống trùng), `Commands/VeLochoCommands.cs` (`XBOSS_VE_LOCHO` — chèn sleeve size ống + `sleeveClearanceMm` tại điểm bấm/giao layer `S-GRID-COLS` có xác nhận; chế độ xuất: Table trong bản vẽ + Excel), `Commands/VeTagCommands.cs` (`XBOSS_VE_TAG` — đánh/đánh lại theo `tagPattern`, tầng nhớ per bản vẽ, quét trùng/nhảy số, option khóa tag), `Commands/VeThongkeCommands.cs` (`XBOSS_VE_THONGKE` — Table thiết bị từ attribute hoặc KL từ XData `XBOSS_BOCKL` (chỉ ĐỌC appname đó), style `tableStyle`, chạy lại cập nhật tại chỗ qua XData đánh dấu bảng).
-4. Rule pack: nếu v4 thiếu khóa nào §6.7–6.9 cần → BÁO, không tự sửa v4 (append-only; phiên chính quyết).
-
-## Việc V7 — VE_DOI + báo cáo phiên vẽ + tài liệu (M100 PR5) — `route: standard` (CUỐI)
-
-Đặc tả: §6.2, FR8, §14. `XBOSS_VE_DOI` trong `Commands/VeDoiCommands.cs`: đổi layer/XData/dựng lại biên (EdgeOffset)/cập nhật nhãn; đoạn đã bóc → gỡ đánh dấu (tái dùng logic BOCKL_XOA theo selection) + cảnh báo. Báo cáo phiên vẽ JSON cạnh DWG (khung báo cáo M99). Cập nhật `plugin-autocad/README.md` (bảng lệnh) + `CAI-DAT.md` (mục dùng lệnh vẽ) + M100 State.
-
-## Thứ tự & phụ thuộc
-
-V3 → (V4 ∥ V5) → V6 → V7. Mỗi việc worktree riêng; các file Commands/Core đặt tên như trên để không đụng nhau; `XBoss.Cad.Acad.csproj` dùng glob compile mặc định SDK-style nên thêm file không sửa csproj. Reviewer soát từng việc; tích hợp tuần tự vào nhánh nền, KHÔNG push.
+- Worker không thấy hội thoại. Bắt buộc đọc trước: `CLAUDE.md`; TOÀN BỘ đặc tả M của việc mình;
+  `plugin-autocad/README.md` (Ràng buộc thiết kế); code hiện trạng nêu trong brief.
+- **`XBoss.Cad.Acad` KHÔNG build được trên Linux** (net10.0-windows + ObjectARX). Vì vậy: (1) mọi
+  logic tính được đẩy xuống `XBoss.Cad.Core` (thuần, có test — `export SSL_CERT_FILE=/root/.ccr/ca-bundle.crt`
+  trước `dotnet test plugin-autocad/XBoss.Cad.Tests/XBoss.Cad.Tests.csproj`); (2) Adapter là lớp
+  mỏng gọi API AutoCAD, đối chiếu tên API/using với các lệnh `XBOSS_*` đã compile trên máy thật
+  (bài học "8 lỗi CI không thể bắt", `PROGRESS.md`); (3) thiếu API trong `XBoss.Cad.AcadShim/AcadStub.cs`
+  → bổ sung stub, không đổi chữ ký stub cũ; (4) mô phỏng tay từng luồng lệnh trước khi báo xong.
+- Core CẤM tham chiếu assembly AutoCAD. Mỗi lệnh = 1 transaction = 1 UNDO group. KHÔNG đổi hành vi
+  lệnh hiện có (M99→M114). Hộp thoại theo khuôn M106: ViewModel thuần trong `Core/Ui/ViewModels/` +
+  DataTemplate trong `XBoss.Cad.Acad/Ui/Wpf/XBossDialog.xaml`; lệnh mới khai trong
+  `Core/Ui/LenhCatalog.cs` (nguồn sự thật Ribbon/trình dẫn).
+- **Rule pack append-only**: version cũ không đổi 1 byte; version mới mọi khoá mặc định TẮT ⇒ merge
+  không đổi hành vi máy kỹ sư. Số version lấy theo max thật trong `lib/ky-thuat/cad/rule-packs/`
+  tại thời điểm code (hiện v15 — KHÔNG tin số này, ls lại); validator 2 tầng: TS trong
+  `lib/ky-thuat/cad/rule-pack.ts` + C# trong `Core/RulePack/`.
+- Web sau refactor #438: KHÔNG tạo lại tệp đã gộp — sửa đúng khối `// ===== <tên cũ> =====` trong
+  `lib/ky-thuat/cad/{rule-pack,block,drawing,dashboard}.ts`, `lib/dich-vu/cad.ts`.
+- Tiếng Việt toàn bộ prompt/thông báo/comment/commit. Worker KHÔNG push — commit trong worktree,
+  coordinator tích hợp tuần tự vào nhánh nền.
+- Cổng mỗi việc: `dotnet test` xanh toàn bộ (không làm đỏ ca cũ); việc chạm TS thêm
+  `npm run lint` + `npm run typecheck` + test node liên quan; việc chạm web/UI thêm `npm run build`.
+- Việc cuối mỗi pha cập nhật `PROGRESS.md` + State trong `docs/nang-cap/README.md` + mục verify
+  mới trong `plugin-autocad/VERIFY-VA-PHAT-HANH.md` (toàn đợt CHƯA phát hành rộng cho tới khi
+  verify tay AutoCAD 2026 — nợ M111 vẫn chặn, ghi rõ trong báo cáo).
 
 ---
 
-# Pha 3 — M101 (nâng trần KIEMTRA/CHUANHOA/BOCKL)
+# Pha 1 — M115: Hoàn thiện bản vẽ từ tuyến tim (làm TRƯỚC, trọn pha rồi mới sang Pha 2)
 
-**Đặc tả:** `docs/nang-cap/M101-plugin-nang-tran.md` (Approved). Ràng buộc chung giống Pha 2 (Core thuần test được, Adapter không build trên Linux, tiếng Việt, 1 UNDO, không đụng hành vi M99).
+**Đặc tả:** `docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md`. Không migration, không API mới.
 
-## Việc W1 — Rule pack v5 + 7 phép kiểm mới (M101 PR1) — `route: complex`
+## Việc V1 — Rule pack `completionPolicy` + Core graph (M115 PR1) — `route: complex`
 
-Đặc tả M101 §6.1 (bảng 7 phép kiểm 10–16), §7 FR1/FR2, §15, §18.
+Đặc tả §6 bước 3, §7 FR2/FR5, §8 AC1/AC5.
 
-- `lib/ky-thuat/cad/rule-packs/v5.json` — append-only từ v4 (v1–v4 KHÔNG đổi 1 byte). Mở rộng khối `inspectionPolicy` (xem v2/v3 hiện có): mỗi phép kiểm mới 1 mục có `enabled` riêng, **mặc định `false`** (M101 §6.2/§7 FR1: nạp plugin cũ không đổi hành vi), kèm tham số: `overlapToleranceMm`/`overlapMinLengthMm` (phép 10), `clashPairs` (phép 11, mảng cặp hệ, mặc định rỗng), `titleblockNameMatchAny` (phép 12 — dùng khi manifest M100 chưa có), `scales` cho phép 13 (tái dùng `sheetSetup.scales` nếu có, khai fallback), `styleMap` (phép 14: textstyle/dimstyle chuẩn — đây cũng là dữ liệu bước chuẩn hóa 8 của PR2, khai một lần dùng chung), `strayDistanceFactor` (phép 16). Mô tả tiếng Việt từng khóa như phong cách v3/v4.
-- `XBoss.Cad.Core/Inspection/` — thêm 7 phép kiểm THUẦN theo đúng khung `Inspector` hiện có (ĐỌC code hiện trạng trước, giữ nguyên kiểu dữ liệu báo cáo/marker): 10 chồng lấn cùng hệ, 11 clash 2D (nhãn cảnh báo cố định "(mặt bằng) — không thay được clash 3D"), 12 khung tên thiếu trường, 13 viewport không khóa/tỉ lệ lạ, 14 text/dim style lệch, 15 nhãn size lệch XData (thiếu dữ liệu M100 → **tự tắt**, không báo oan), 16 đối tượng ngoài khung. Dữ liệu hình học/viewport/attribute do Adapter cung cấp — **định nghĩa DTO đầu vào trong Core**, Adapter điền ở PR sau (PR này KHÔNG sửa `XBoss.Cad.Acad`).
-- Báo cáo JSON: thêm các phép mới vào cùng cấu trúc `checks[]` hiện có, không phá khung cũ.
-- Test: mỗi phép 1 ca dương + 1 ca âm (không báo oan), + ca "v5 mặc định tắt hết phép mới → kết quả y hệt v4", + ca "v4 vẫn nạp được sau khi phát hành v5".
-- `lib/ky-thuat/cad/rule-pack.ts` + route: phát hành v5 là bản hiện hành (như V1 đã làm với v4).
+1. Rule pack version mới (append-only): khối `drawTools.completionPolicy` — `enabled` (mặc định
+   `false`), `nodeToleranceMm` (dung sai gộp điểm chạm/giao thành nút), bảng `fittingRules` (chọn
+   co/cút/tê/giảm theo systemId + size + khoảng góc; tham chiếu block `kind=fitting` trong thư
+   viện 0139/0145), `stageDefaults` (8 giai đoạn hoàn thiện, mỗi giai đoạn bật/tắt), mô tả tiếng
+   Việt từng khoá theo phong cách v13–v15. Validator 2 tầng (TS + C#) + phát hành thành bản hiện hành.
+2. `XBoss.Cad.Core/Graph/` (mới, thuần): `TuyenGraph.cs` (input: danh sách polyline tim [đỉnh +
+   XData hệ/size/cao độ/kiểu nối — DTO tự định nghĩa, Adapter điền ở V2] + danh sách block thiết bị
+   [tâm + kind/systemId/tag] → gộp nút theo `nodeToleranceMm`, cạnh có hướng từ điểm nguồn);
+   `NutPhanLoai.cs` (tê 3 nhánh, co/cút tại đỉnh đổi hướng theo khoảng góc, giảm khi size 2 đoạn
+   khác, đoạn lên/xuống khi cao độ đổi, kết nối thiết bị khi đầu tuyến chạm block đúng hệ);
+   `SuyPhuKien.cs` (nút phân loại → block phụ kiện theo `fittingRules`; không có luật khớp →
+   `chua_quyet`, KHÔNG đoán); `KiemTuyen.cs` (lỗi chặn: tuyến hở — đầu tự do không chạm thiết
+   bị/tuyến khác, thiếu size, thiết bị sai hệ, cao độ mâu thuẫn tại nút; cảnh báo: tuyến chưa gán
+   thuộc tính). Tái dùng `Geometry/Segment2D`; tham khảo cấu trúc `Routing/HanhLangGraph.cs`.
+3. Test xunit: AC1 (1 nguồn + 2 nhánh + block FCU → 2 tê + co đúng vị trí + 3 kết nối, 0 lỗi);
+   dung sai nút (2 điểm cách < / > tolerance); mỗi loại lỗi chặn 1 ca dương + 1 ca âm; `fittingRules`
+   không khớp → `chua_quyet`; AC5 (rule pack mới mặc định tắt → validator nhận cả version cũ,
+   test snapshot version cũ không đổi byte). Test node cho validator TS.
 
-**Tiêu chí chấp nhận:** dotnet test xanh toàn bộ (119 hiện tại + mới); test node liên quan xanh; v1–v4 không đổi; chứng minh mutation (bật 1 phép + dữ liệu vi phạm → đỏ; gỡ → xanh).
+**Ranh giới được quyết:** shape DTO input graph; cấu trúc `fittingRules` (miễn đủ hệ+size+góc→block
+và validator chặt); thuật toán gộp nút. **KHÔNG được:** sửa version rule pack cũ, đụng
+`XBoss.Cad.Acad`, đổi lệnh hiện có.
+**Tiêu chí chấp nhận:** dotnet test + npm test liên quan xanh toàn bộ; v1..v15 không đổi 1 byte.
 
-## Việc W3 — Bóc theo size + theo vùng + cách nhiệt + hệ số quy đổi (M101 PR3) — `route: complex`
+## Việc V2 — `XBOSS_TUYEN_GAN` + `XBOSS_TUYEN_DOTHI` (M115 PR2) — `route: spec` (SAU V1)
 
-Đặc tả M101 §6.3 (bảng 6 nâng cấp — làm 4 mục đầu ở PR này, `boqCode` per-project + đối chiếu BOQ để PR4), §7 FR4/FR6, §8 (c)(d), §15, §18.
+Đặc tả §6 bước 2–4, §7 FR1/FR2, §8 AC6.
 
-**Nền có sẵn:** rule pack v5 (hiện hành), `XBoss.Cad.Core/Takeoff/` (bóc hiện tại), `Excel/` (ClosedXML, mẫu công ty §13.2 M99 — **hợp đồng layout, cột/sheet mới chỉ được CỘNG THÊM**), `Draw/VeXData.cs` (đọc XData `XBOSS_VE` do M100 ghi: hệ/item/size/slope), `Matching/TokenMatcher.cs`.
+1. Adapter `Commands/TuyenGanCommands.cs`: `XBOSS_TUYEN_GAN` — chọn 1..n line/pline; form WPF
+   (DataTemplate + ViewModel `Core/Ui/ViewModels/TuyenGanViewModel.cs`): hệ (từ `drawTools.systems`),
+   size, cao độ mm, vật liệu/cách nhiệt, kiểu nối (từ `jointRules`); layer khớp `layerMap` → điền
+   sẵn hệ; ghi XData appname `XBOSS_VE` theo khuôn M107 (đối chiếu code M107 hiện có — KHÔNG đổi
+   schema XData cũ, chỉ thêm trường thiếu như cao độ/kiểu nối nếu chưa có); line thường được
+   convert? KHÔNG — giữ nguyên thực thể, chỉ ghi XData (bất biến tọa độ). Liệt kê tuyến chưa đủ
+   thuộc tính (bấm → zoom).
+2. Adapter `Commands/TuyenDoThiCommands.cs`: `XBOSS_TUYEN_DOTHI` — quét tuyến mang XData + block
+   thiết bị trong phạm vi chọn (cả bản vẽ / cửa sổ), điền DTO, gọi `Core/Graph/`; hộp thoại kết
+   quả (ViewModel `TuyenDoThiViewModel`): tab lỗi chặn/cảnh báo (bấm → zoom đối tượng), tab
+   nút/phụ kiện suy ra — kỹ sư sửa từng dòng (đổi block phụ kiện trong danh sách hợp lệ của hệ,
+   hoặc "bỏ qua nút này"); bấm "Chốt đồ thị" → ghi kết quả graph (kể cả phần kỹ sư sửa) vào XData
+   NOD/dictionary bản vẽ (khuôn lưu trạng thái của `XBOSS_VE_NEN`), làm đầu vào cho V3. Còn lỗi
+   chặn → không cho chốt.
+3. Test: ViewModel logic thuần (lọc, chuyển trạng thái duyệt) trong xunit; luồng Adapter mô phỏng tay.
 
-1. **Rule pack v6** (append-only, v1–v5 không đổi 1 byte): `takeoff.items[]` thêm khóa tùy chọn `groupBySize` (bool), `sizeFromNearbyText` (`{enabled, maxDistanceMm, sizePatterns[]}`), `wastagePct` (số, mặc định 0), `perCountAdd` (số, mặc định 0), và item dẫn xuất `derivedFrom` + `formula` (`"perimeter*length"` | `"pi*dn*length"`). Mọi khóa mới **mặc định vắng/0** → v6 cho kết quả y hệt v5 (ca test bắt buộc).
-2. **Core `Takeoff/`**: bóc tách dòng theo size khi `groupBySize` — nguồn size ưu tiên XData `XBOSS_VE`, thiếu thì đọc nhãn gần tuyến theo `sizePatterns` (ghi rõ **nguồn** "XData" / "đọc từ nhãn" vào kết quả từng dòng); item dẫn xuất tính từ size đã tách (thiếu size → bỏ qua + đếm mét chưa tính, KHÔNG đoán); `wastagePct`/`perCountAdd` tính thành cột RIÊNG, không trộn vào KL đo.
-3. **Core `Zoning/` (MỚI, thuần)**: clip polyline theo ranh giới (polyline kín) — trả phần nằm trong + chiều dài từng phần, cắt đúng tại giao điểm; đoạn cung xử lý đúng. Kết quả bóc gắn tên vùng.
-4. **Excel**: thêm cột "Vùng", tách cột "KL đo" / "KL quy đổi" (công thức sống), subtotal theo vùng; giữ nguyên cột A–K + công thức H/J/K + SUBTOTAL tổng của mẫu công ty. Sidecar JSON thêm size/vùng/nguồn size.
-5. **Adapter**: chỉ phần tối thiểu để truyền vùng chọn + nhãn gần tuyến vào Core (dùng stub `/tmp/claude-0/-home-user-xboss/3f35183b-b0e6-57b0-a97e-118b57e3f070/scratchpad/acad-shim/` để biên dịch thử). Nếu phần Adapter quá rủi ro khi code mù → làm Core + test trọn vẹn, để Adapter tối thiểu và GHI RÕ trong báo cáo.
+**Tiêu chí chấp nhận:** dotnet test xanh; không lỗi chặn mới trong lệnh cũ; 2 lệnh vào `LenhCatalog.cs`
+(giai đoạn "Vẽ") + Ribbon.
 
-**Tiêu chí chấp nhận:** AC (c) tuyến 10m cắt ranh giới 6/4 → vùng A 6.00m, vùng B 4.00m; AC (d) cách nhiệt ống gió 300x200 dài 10m → 10×(0.3+0.2)×2 = 10.00 m²; v6 mặc định = v5; Excel mở được, mẫu cũ không vỡ (test round-trip ClosedXML như M99 đã có).
+## Việc V3 — `XBOSS_HOANTHIEN` điều phối 8 giai đoạn (M115 PR3) — `route: spec` (SAU V2)
 
-## Việc W2 — 4 bước chuẩn hóa mới: style/xref/hatch/layout (M101 PR2) — `route: complex`
+Đặc tả §6 bước 5–6, §7 FR3/FR4, §8 AC2/AC3/AC4/AC6.
 
-Đặc tả M101 §6.2 (bảng 4 bước, chèn SAU bước lineweight/CTB hiện tại — thứ tự cố định mới 8/9/10/11), §7 FR3.
+1. Adapter `Commands/HoanThienCommands.cs` + `Services/HoanThienPipeline.cs`: đọc graph đã chốt
+   (V2); hộp thoại chọn giai đoạn (mặc định theo `stageDefaults`): ① nét đôi ② phụ kiện tại nút
+   ③ chia đốt ④ giá đỡ ⑤ lỗ chờ ⑥ ngắt nét ⑦ tag ⑧ thống kê — mỗi giai đoạn GỌI LẠI service của
+   lệnh `XBOSS_VE_*` tương ứng (tái cấu trúc tối thiểu: nếu logic đang nằm trong thân lệnh, tách
+   phần thân ra service để gọi chung — hành vi lệnh gốc không đổi; KHÔNG copy-paste logic vẽ).
+   Chạy trọn gói hoặc từng giai đoạn; toàn phiên 1 UNDO group.
+2. Idempotency (FR4): mọi thực thể sinh ra ghi XData `nguon=M115` + handle tuyến gốc + giai đoạn;
+   chạy lại → xoá đúng phần `nguon=M115` của tuyến trong phạm vi rồi sinh lại; thực thể kỹ sư
+   vẽ/sửa tay (không mang `nguon=M115`, hoặc cờ `SuaTay` theo băm hình học — tái dùng khuôn M114
+   PR4) KHÔNG bị đụng. Bất biến: tọa độ đỉnh mọi polyline tim không đổi (AC2).
+3. Báo cáo phiên: thêm mục hoàn thiện (số phần tử theo giai đoạn, số bỏ qua) vào `VeSessionReport`.
+4. Test Core cho phần tính được (kế hoạch giai đoạn, tập thực thể cần thay); luồng Adapter mô phỏng tay.
 
-- Rule pack **v7** (append-only; v1–v6 KHÔNG đổi 1 byte): thêm `xrefPolicy` (`{enabled:false, pathPolicy:"relative", bindMatchAny:[]}`), `hatchMap` (`{enabled:false, byLayer:[…]}`), `layoutPolicy` (`{enabled:false, removeEmpty:true, renameLayouts:false, namePattern}`). **`styleMap` đã có sẵn từ v5** — bước 8 dùng lại chính nó, KHÔNG khai trùng. Mọi bước mới **mặc định tắt** ⇒ ca test bắt buộc "v7 mặc định = v6".
-- `XBoss.Cad.Core`: logic thuần cho 4 bước (quyết định đổi gì → trả danh sách thay đổi + báo cáo), theo đúng khung `StandardizePipeline` hiện có (ĐỌC trước). Adapter áp thay đổi — **chỉ sửa `StandardizePipeline`/lệnh CHUANHOA ở mức tối thiểu**, dùng stub `/tmp/claude-0/-home-user-xboss/3f35183b-b0e6-57b0-a97e-118b57e3f070/scratchpad/acad-shim/app-w3/` để biên dịch thử (W3 đã mở rộng stub đủ cho `XBossCommands.cs`).
-- Ràng buộc: dimension không mất associativity (M99 O3); xref mặc định CHỈ BÁO, không bind; 1 UNDO cho cả pipeline; diff preview + báo cáo JSON giữ khung cũ.
-- **Nợ phải đóng luôn trong việc này** (hazard có sẵn, ghi ở `PROGRESS.md`): `StandardizePipeline.Buoc2LayerMapping` gộp layer bằng `LayerTable.Has(tên đích)` — `Has` KHÔNG phân biệt hoa/thường, nên layer chỉ lệch hoa/thường với tên đích (vd `m-duct-supp`) rơi vào nhánh "gộp" rồi `Erase()` chính layer đang chứa thực thể. Sửa: bỏ qua khi `string.Equals(cũ, mới, OrdinalIgnoreCase)`. Kèm test.
+**Tiêu chí chấp nhận:** dotnet test xanh; AC3 (2 lần chạy → số thực thể không đổi) có test ở mức
+kế-hoạch-thực-thể trong Core; lệnh vào `LenhCatalog.cs` + Ribbon; không đổi hành vi lệnh `VE_*` gốc.
 
-**Tiêu chí chấp nhận:** dotnet test xanh toàn bộ (hiện 365 ca); v7 mặc định = v6 (ca test); hazard hoa/thường có test chứng minh bắt được.
+## Việc V4 — Tài liệu + verify + web (M115 PR4) — `route: standard` (CUỐI PHA 1)
 
-## Việc W4 — `boqCode` per-project + đối chiếu BOQ chỉ-đọc (M101 PR4) — `route: complex`
+1. `plugin-autocad/README.md` + `CAI-DAT.md`: bảng lệnh thêm 3 lệnh mới + mục "Quy trình hoàn thiện
+   từ tuyến tim" (7 bước theo đặc tả §6). Trang `app/engineering/cai-dat-plugin/page.tsx`: thêm 3
+   lệnh vào bảng lệnh (đúng phong cách bảng hiện có).
+2. `plugin-autocad/VERIFY-VA-PHAT-HANH.md`: mục verify mới (AC2 tọa độ từng byte, AC3 idempotent,
+   AC4 khối lượng khớp, luồng 7 bước trên 1 tầng thật AVIO).
+3. `PROGRESS.md` + `docs/nang-cap/README.md`: M115 code xong, nợ verify.
 
-⚠️ **Vùng rủi ro cao** (`lib/khoi-luong/boq.ts`) — bắt buộc rà `docs/audit.md` mục "Vùng rủi ro cao" và mục bảo mật/phân quyền trước khi code.
+**Tiêu chí chấp nhận:** `npm run lint`/`typecheck`/`build` xanh; tài liệu khớp tên lệnh thật.
 
-Đặc tả M101 §6.3 (2 dòng cuối bảng: `boqCode` theo dự án, đối chiếu BOQ trong Excel), §7 FR5/FR6, §9, §16 (PR4), §18.
+---
 
-1. **Map `boqCode` theo dự án**: DDL thêm thuần (lấy số migration thật bằng `ls migrations | sort -V | tail -3`) — bảng map `(project_id, takeoff_item_id) → boq_code`; **có `project_id` ⇒ phải vào RLS theo đúng khuôn các bảng theo dự án hiện có** (ĐỌC migration RLS gần nhất + `lib/bao-mat/` trước). Admin/PM nhập trên web (thêm mục vào bảng điều khiển plugin `/engineering/chuan-hoa-ban-ve`).
-2. **`GET /api/engineering/cad/rule-pack?project=<id>`**: trả rule pack hiện hành có `takeoff.items[].boqCode` đã gán theo map của dự án; không có `?project=` → giữ nguyên hành vi cũ (toàn cục). Auth như route rule-pack hiện tại; **project scope phải kiểm bằng ngữ cảnh phiên/token, KHÔNG tin id client gửi** (bài học lặp lại nhiều đợt — xem `docs/audit.md`).
-3. **`GET /api/engineering/cad/boq-snapshot?project=<id>`** (MỚI, **chỉ đọc**): trả KL BOQ hợp đồng theo item để plugin đặt cạnh KL bóc. Token scope `cad` hoặc phiên; **không mở bất kỳ đường ghi nào** (đường ghi sổ duy nhất vẫn là upload có kiểm định). Cột tiền: M101 PR4 **không đụng tiền** — chỉ khối lượng; nếu buộc phải chạm cột tiền thì cast `::text` theo quy ước M45 (`lib/nen/money.ts`).
-4. **Excel**: sheet phụ `Doi-chieu` (tùy chọn khi phát lệnh) — KL BOQ hợp đồng cạnh KL bóc, chênh lệch % bằng **công thức sống**. Không đụng `Data-BOQ` (mẫu công ty) và không đụng sheet `Tong-hop-vung` của PR3.
-5. **Adapter**: `XBOSS_BOCKL_XUAT` thêm tùy chọn kéo snapshot (có mạng + token) → dựng sheet đối chiếu; không mạng → bỏ qua kèm thông báo, KHÔNG chặn xuất Excel.
+# Pha 2 — M116: Phối hợp xung đột liên hệ (SAU khi Pha 1 tích hợp xong)
 
-**Tiêu chí chấp nhận:** AC (e) — đổi KL BOQ trên server thì sheet `Doi-chieu` lần xuất sau đổi theo, bản vẽ không đổi; route mới có `getCurrentUser()` + 401 + kiểm quyền; test node phủ auth 401/403 + RLS chéo dự án; dotnet test xanh toàn bộ.
+**Đặc tả:** `docs/nang-cap/M116-phoi-hop-xung-dot-lien-he.md`. Không migration.
 
-## Việc W5 — `XBOSS_BATCH` bóc hàng loạt + upload kèm KL + web (M101 PR5) — `route: standard`
+## Việc W1 — Rule pack `coordinationPolicy` + `Core/Coordination/` (M116 PR1) — `route: complex`
 
-Đặc tả M101 §6.4.
+Đặc tả §6 bước 2, §7 FR1/FR3/FR5, §8 AC1/AC4.
 
-1. `XBOSS_BATCH` thêm chế độ `bocl`: bóc cả thư mục `.dwg` qua side database → **1 Excel tổng** nhiều bản vẽ (thêm cột "Tệp"), bản gốc giữ nguyên, tệp lỗi bỏ qua + ghi nhật ký (bám đúng khuôn `BatchProcessor` hiện có).
-2. `XBOSS_UPLOAD` gửi kèm **sidecar JSON kết quả bóc** (đã có sẵn từ PR-B) → server lưu vào `drawing_revisions.standardize_report` khối `takeoff`. **KHÔNG ghi vào bảng BOQ** (giữ nguyên đường ghi sổ duy nhất).
-3. Web: bảng điều khiển hiện KL đã bóc theo revision (biểu đồ theo hệ/vùng) + nút tải Excel gộp.
+1. Rule pack version mới: khối `coordinationPolicy` — `enabled` (mặc định `false`), `priority`
+   (kế thừa/tham chiếu `crossingPolicy.priority`, không trùng lặp dữ liệu nếu tham chiếu được),
+   `minClearancePairsMm` (mảng cặp hệ + khoảng cách tối thiểu, mặc định rỗng), `maintenanceGapMm`.
+   Validator 2 tầng.
+2. `XBoss.Cad.Core/Coordination/`: `QuetXungDot.cs` — 3 lớp kiểm trên DTO tuyến (đỉnh + hệ + size
+   + cao độ + bề cao gồm cách nhiệt từ rule pack): lớp 1 giao cắt mà dải cao độ chồng (tái dùng bộ
+   dò giao cắt phép kiểm 11 trong `Inspection/PhepKiemMoRong.cs` — tách phần dò dùng chung nếu
+   cần, KHÔNG đổi hành vi phép kiểm 11); lớp 2 tranh chấp hành lang (tổng bề rộng + khoảng bảo trì
+   vs bề rộng hành lang — dữ liệu hành lang/làn từ XData M114); lớp 3 khoảng cách quy phạm theo
+   `minClearancePairsMm`. `XungDotId.cs` — id ổn định = hash (handle 2 tuyến sắp thứ tự + toạ độ
+   điểm/đoạn làm tròn mm). `DeXuatXuLy.cs` — đề xuất theo luật (hệ ưu tiên thấp nhường cao độ /
+   dịch làn trống / cần fitting vượt), CHỈ từ bảng luật.
+3. Test: AC1 (dải cao độ chồng → CỨNG đúng chiều ưu tiên; tách → không báo); id ổn định qua 2 lần
+   quét; tuyến thiếu cao độ → chỉ vào kiểm phẳng kèm nhãn "thiếu cao độ" (đặc tả §11); AC4 snapshot
+   version cũ.
 
-**Tiêu chí chấp nhận:** dotnet test + test node liên quan xanh; upload cũ (không kèm KL) vẫn chạy y nguyên; không có đường ghi mới nào vào bảng BOQ.
+**Ranh giới được quyết:** cấu trúc DTO + thuật toán chỉ mục quét (sweep line hay grid — miễn NFR
+2.000 đoạn × 4 hệ <5s); cách tham chiếu `crossingPolicy.priority`. **KHÔNG:** đổi phép kiểm 11,
+sửa version cũ.
+**Tiêu chí chấp nhận:** dotnet test + test node validator xanh; version cũ không đổi.
+
+## Việc W2 — 3 lệnh `XBOSS_PHOIHOP*` (M116 PR2) — `route: spec` (SAU W1)
+
+Đặc tả §6 bước 1–4, §7 FR1/FR2/FR4, §8 AC2/AC3.
+
+`Commands/PhoiHopCommands.cs`: `XBOSS_PHOIHOP` (chọn phạm vi cả bản vẽ/cửa sổ/theo hành lang; quét
+tuyến XData M115 kể cả trong xref — chỉ đọc, qua snapshot builder hiện có; gọi `Core/Coordination`;
+hộp thoại M106: danh sách lọc theo hệ/mức, bấm → zoom; marker trên layer `XBOSS-PHOIHOP` — khuôn
+marker của `XBOSS_KIEMTRA`, XData mang `XungDotId` + trạng thái; chạy lại: đối chiếu id — giữ
+trạng thái "bỏ qua có lý do", xoá marker của xung đột đã hết, không nhân đôi); `XBOSS_PHOIHOP_XOA`
+(xoá toàn bộ marker, không đụng gì khác — AC3); đánh dấu trạng thái từng dòng (chấp nhận/bỏ qua +
+lý do) ghi vào XData marker. 3 lệnh vào `LenhCatalog.cs` (giai đoạn "Kiểm") — lệnh thứ 3 là
+`XBOSS_PHOIHOP_BAOCAO` khai ở đây nhưng thân làm ở W3 (stub thông báo "chưa có" nếu W3 chưa tích
+hợp — coordinator tích hợp W2+W3 cùng đợt thì bỏ stub).
+**Tiêu chí chấp nhận:** dotnet test xanh; mô phỏng tay luồng quét/đánh dấu/xoá; không đổi lệnh cũ.
+
+## Việc W3 — Báo cáo phối hợp + web (M116 PR3) — `route: standard` (SAU W2)
+
+Đặc tả §6 bước 5, §8 AC5. `XBOSS_PHOIHOP_BAOCAO`: xuất Excel (khuôn `Core/Excel/` — bảng
+STT/lớp/hệ A–B/vị trí/đề xuất/trạng thái) + ghi mục phối hợp (đếm theo lớp + trạng thái) vào báo
+cáo phiên upload (trường JSON mới OPTIONAL, backward-compatible — server cũ bỏ qua). Web: ô "Phối
+hợp liên hệ" trên `/engineering/chuan-hoa-ban-ve` (component mới cạnh các panel hiện có, đọc từ
+payload upload đã lưu; đúng hệ design ADR-0009/0010, không hex, không `dark:`). Tài liệu + mục
+verify M116 + `PROGRESS.md`/README nâng cấp.
+**Tiêu chí chấp nhận:** dotnet test + `npm run lint`/`typecheck`/`build` + test node liên quan xanh.
+
+---
+
+# Pha 3 — M117: AI đọc sơ đồ nguyên lý (SAU Pha 1; có thể song song Pha 2 NẾU Pha 2 đã qua W1)
+
+**Đặc tả:** `docs/nang-cap/M117-ai-doc-so-do-nguyen-ly.md`. CÓ migration + 4 API. Nhắc lại: code
+được đi, nhưng PHÁT HÀNH rộng chờ M115 verify + pilot — mọi khoá mặc định tắt.
+
+## Việc X1 — Migration + tầng 1 luật (M117 PR1) — `route: complex`
+
+Đặc tả §6 bước 1–2, §7 FR1/FR2, §8 AC1, §9 DDL.
+
+1. Migration `cad_schematic_graphs` đúng DDL §9 + RLS theo `project_id` (pattern
+   `0140_cad_boq_code_map.sql`). **Số migration: `ls migrations | sort -V | tail -3` tại thời
+   điểm code — không đoán.** Chạy `npm run gen:erd` cùng PR.
+2. `lib/ky-thuat/cad/schematic.ts` (module mới, tầng 4 `ky-thuat` — kiểm `npm run check:lib-layers`):
+   parse DXF schematic (tái dùng hàm đọc block/text/line của `dxf-parser.ts`, không nhân đôi) →
+   graph thô: node từ block (đối chiếu thư viện block theo tên/`kind` — đọc qua khối `block-lib`
+   trong `lib/ky-thuat/cad/block.ts`), cạnh từ line/pline chạm nhau + chạm block, size/tag từ text
+   gần cạnh (ngưỡng khoảng cách tham số hoá); phần suy được `nguon='luat'`, mơ hồ `chua_quyet`.
+   Shape JSONB đúng đặc tả §9.
+3. Test node bằng DXF mẫu tự dựng trong `tests/` (AC1: ≥90% cạnh đúng trên mẫu chuẩn; block lạ/
+   text xa → `chua_quyet`).
+
+**Ranh giới được quyết:** heuristic bắt cạnh–text (tham số hoá được); cấu trúc chi tiết JSONB trong
+khung §9. **KHÔNG:** gọi AI ở việc này, đổi `dxf-parser.ts` hành vi cũ.
+**Tiêu chí chấp nhận:** `npm run lint`/`typecheck`/test/`check:lib-layers` xanh; migration idempotent.
+
+## Việc X2 — Tầng 2 AI + 4 API (M117 PR2) — `route: spec` (SAU X1)
+
+Đặc tả §6 bước 3, §7 FR3/FR5, §8 AC2/AC3/AC6.
+
+1. `lib/dich-vu/cad.ts` khối mới `// ===== cad-schematic =====`: hợp đồng Y HỆT khối
+   `cad-block-phan-loai` (đọc kỹ code đó trước): chỉ nhận phần `chua_quyet`, một lượt/lô qua
+   `lib/nen/ai.ts` (schema Zod: gán node vào block-kind/hệ, size cho cạnh, nối cặp node đứt),
+   giá trị ngoài enum → giữ `chua_quyet`, AI không lật `nguon='luat'`, `doTinCay` ghi theo,
+   không gửi tên dự án/tài chính; `aiKhaDung()` false → bỏ tầng 2 êm.
+2. 4 route dưới `app/api/engineering/cad/schematic/`: POST (upload `.dxf` ≤50MB qua
+   `lib/nen/storage.ts`, parse tầng 1, chạy tầng 2 nếu bật, INSERT), GET `:id`, PATCH `:id`
+   (sửa node/cạnh + duyệt `trang_thai='da_duyet'` — ghi `duyet_boi/duyet_luc`, audit), GET
+   `:id/plugin` (xác thực device pairing như route rule-pack cho plugin; chưa `da_duyet` → 409).
+   Chuẩn route: `force-dynamic`, `getCurrentUser()` → 401, quyền Admin/PM/engineer của dự án,
+   scope RLS `withProjectScope`, validate input.
+3. Test: mock AI (AC3), AC2 (tắt AI vẫn chạy), AC6 (quét payload prompt như test M108), route
+   test theo pattern API test hiện có, import `tests/setup.ts` đầu tiên.
+
+**Tiêu chí chấp nhận:** lint/typecheck/test xanh; không đổi hành vi khối `cad-block-phan-loai`.
+
+## Việc X3 — Màn duyệt graph trên web (M117 PR3) — `route: standard` (SAU X2)
+
+Đặc tả §6 bước 1+4. Tab "Sơ đồ nguyên lý" trên `/engineering/chuan-hoa-ban-ve` theo khuôn
+`NapLoBlockPanel.tsx` (đọc kỹ trước): upload DXF, danh sách graph của dự án, màn duyệt (bảng
+nút/cạnh — nguồn luật/AI/`chua_quyet` + `doTinCay`, sửa từng dòng, SVG sơ hoạ từ toạ độ schematic
+— tái dùng cách dựng SVG của `block-preview-svg` trong `lib/ky-thuat/cad/block.ts` nếu hợp), nút
+"Chốt graph". Đúng hệ design (ADR-0009/0010, tiếng Việt, skeleton/rỗng/lỗi đủ). E2e axe
+`e2e/authed/` theo pattern sẵn có.
+**Tiêu chí chấp nhận:** lint/typecheck/build + e2e liên quan xanh.
+
+## Việc X4 — `XBOSS_TUYEN_GOIY` + tài liệu (M117 PR4) — `route: spec` (SAU X2; cần Pha 1 đã tích hợp)
+
+Đặc tả §6 bước 5–6, §7 FR6, §8 AC4/AC5.
+
+Adapter `Commands/TuyenGoiYCommands.cs`: tải graph `da_duyet` qua API `:id/plugin` (service HTTP +
+cache offline theo khuôn M113); kỹ sư chỉ điểm nguồn + chọn tầng; ánh xạ node thiết bị graph ↔
+block trên mặt bằng theo `kind`/`systemId`/tag (thiếu → liệt kê, sinh phần tìm thấy); sinh tuyến
+tim NHÁP qua `Routing/KeHoachDiTuyen` (M114 — hành lang phải có sẵn; chưa có → thông báo chạy
+`XBOSS_VE_HANHLANG` trước) trên layer `XBOSS-GOIY`, XData thuộc tính điền sẵn từ graph (khuôn
+`XBOSS_TUYEN_GAN` V2); idempotent theo id graph (AC5); lệnh xoá nháp đi kèm (subcommand hoặc
+keyword). Sau đó kỹ sư nhận nháp vào quy trình M115. Tài liệu (README/CAI-DAT/bảng lệnh web) + mục
+verify M117 + `PROGRESS.md`/README nâng cấp cho trọn đợt.
+**Tiêu chí chấp nhận:** dotnet test xanh; mô phỏng tay luồng tải-ánh xạ-sinh nháp; tài liệu khớp.
+
+---
+
+## Thứ tự & phụ thuộc toàn đợt
+
+V1 → V2 → V3 → V4 ‖ sau đó (W1 → W2 → W3) và (X1 → X2 → (X3 ‖ X4)); X-pha có thể chạy song song
+W-pha (khác vùng file: W chạm `Core/Coordination` + `Commands/PhoiHop*`, X chạm web/server +
+`Commands/TuyenGoiY*`), nhưng X4 cần Pha 1 đã tích hợp. Mỗi việc 1 worktree riêng; tên file như
+brief để không đụng nhau; `XBoss.Cad.Acad.csproj` glob SDK-style nên thêm file không sửa csproj.
+Reviewer soát từng việc trước khi tích hợp tuần tự vào nhánh nền. Coordinator KHÔNG push/mở PR —
+phiên chính duyệt cuối rồi quyết định push/PR theo quy ước repo.

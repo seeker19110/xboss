@@ -273,7 +273,7 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 >   `plugin-autocad/VERIFY-VA-PHAT-HANH.md` — AC1/AC3/AC6/AC8/AC10–AC13 trên một tầng thật của
 >   AVIO). Toàn bộ mã Adapter M114 mới chỉ được biên dịch bằng stub `XBoss.Cad.AcadShim`.
 
-## Đặc tả MỚI — đợt "tự động triển khai bản vẽ từ sơ đồ nguyên lý MEPF" (viết 2026-08-30, State Draft — chờ duyệt)
+## Đặc tả ĐÃ DUYỆT — đợt "tự động triển khai bản vẽ từ sơ đồ nguyên lý MEPF" (viết + duyệt 2026-08-30)
 
 > Sinh từ phiên nghiên cứu 2026-08-30: khảo sát thị trường tool auto-routing MEP có AI (Augmenta,
 > FireDesign.ai, MagiCAD, eVolve/SysQue, Firmus…) đối chiếu nền tảng M99→M114. **Hướng đi người

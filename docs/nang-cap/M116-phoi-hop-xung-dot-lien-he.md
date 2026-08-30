@@ -4,8 +4,8 @@
 | --- | --- |
 | Issue / Goal | Phát hiện + đề xuất xử lý xung đột giữa các hệ MEPF trên bản vẽ 2D tổng hợp; kỹ sư quyết |
 | Spec owner | Phiên chính (opusplan) |
-| State | Draft — chờ duyệt (ngã rẽ "đề xuất, kỹ sư quyết" đã được người dùng chốt 2026-08-28) |
-| Người/ngày duyệt | (chờ) |
+| State | **Approved for implementation** (ngã rẽ "đề xuất, kỹ sư quyết" chốt 2026-08-28) |
+| Người/ngày duyệt | Người dùng duyệt 2026-08-30 |
 | Cập nhật | 2026-08-30 |
 | Phụ thuộc | M115 (đồ thị tuyến có cao độ/size trong XData); M109 (`crossingPolicy`); M101 phép kiểm clash 2D |
 

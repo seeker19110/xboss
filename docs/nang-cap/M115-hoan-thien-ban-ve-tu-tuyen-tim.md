@@ -4,8 +4,8 @@
 | --- | --- |
 | Issue / Goal | Tự động triển khai bản vẽ thi công MEPF: kỹ sư chỉ vẽ tuyến tim, plugin hoàn thiện phần còn lại |
 | Spec owner | Phiên chính (opusplan) |
-| State | Draft — **hướng đi đã được người dùng chốt 2026-08-30**, chờ duyệt đặc tả chi tiết |
-| Người/ngày duyệt | (chờ) |
+| State | **Approved for implementation** |
+| Người/ngày duyệt | Người dùng duyệt 2026-08-30 |
 | Cập nhật | 2026-08-30 |
 
 > Không code khi chưa **Approved for implementation**.
