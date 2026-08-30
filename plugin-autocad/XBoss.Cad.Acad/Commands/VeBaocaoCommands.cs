@@ -31,6 +31,14 @@ public sealed class VeBaocaoCommands
         if (thuVien is null) ed.WriteMessage($"\n[XBoss] ⚠ {loiThuVien}\n");
 
         var xdata = new List<VeXDataInfo>();
+        // Đồ thị đã chốt (M115): nguồn của hai con số "nút bỏ qua"/"nút chưa quyết" trong mục hoàn
+        // thiện — bản vẽ chưa chốt đồ thị lần nào thì null và mục đó đơn giản là không hiện.
+        XBoss.Cad.Core.Graph.DoThiChot? doThi;
+        using (var tr = db.TransactionManager.StartTransaction())
+        {
+            doThi = TuyenDoThiStore.Doc(db, tr);
+            tr.Commit();
+        }
         using (var tr = db.TransactionManager.StartTransaction())
         {
             var ms = (BlockTableRecord)tr.GetObject(
@@ -64,7 +72,8 @@ public sealed class VeBaocaoCommands
                 NgayIso = DateTime.Now.ToString("yyyy-MM-dd"),
                 NguoiVe = Environment.UserName,
             },
-            VeContext.NhatKyPhien);
+            VeContext.NhatKyPhien,
+            doThi);
 
         ed.WriteMessage("\n" + baoCao.ToVietnameseText());
         if (VeContext.NhatKyPhien.Count == 0)

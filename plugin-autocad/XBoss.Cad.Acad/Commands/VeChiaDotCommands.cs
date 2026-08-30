@@ -139,6 +139,27 @@ public sealed class VeChiaDotCommands
             daChon = chon.Value.GetObjectIds().ToList();
         }
 
+        // ===== (3a) Ghi đè kiểu nối — vẫn NGOÀI transaction ghi, và cần danh sách ứng viên =====
+        // Đường dòng lệnh hỏi ghi đè SAU khi đọc ứng viên, nên phần đọc + hỏi + chạy nằm gọn trong
+        // service dùng chung dưới đây (cả lệnh gốc lẫn XBOSS_HOANTHIEN cùng gọi).
+        ChayChiaDot(doc, ed, pack, toMm, daChon, he, ghiDeKieuNoi, hoiGhiDe: chonHopThoai is null, tiLe: null);
+    }
+
+    /// <summary>
+    /// Thân thật của <c>XBOSS_VE_CHIADOT</c> — đọc ứng viên theo phạm vi, chia đốt, vẽ vạch/tag.
+    /// Tách nguyên vẹn khỏi <see cref="ChiaDot"/> để <c>XBOSS_HOANTHIEN</c> (M115 giai đoạn ③) gọi
+    /// lại đúng logic này thay vì nhân đôi; hành vi lệnh gốc không đổi vì mọi câu hỏi vẫn ở đúng
+    /// chỗ cũ trong luồng.
+    /// </summary>
+    /// <param name="hoiGhiDe">true = đường dòng lệnh, còn phải hỏi ghi đè kiểu nối (FR9).</param>
+    /// <param name="tiLe">Tỉ lệ in đã biết; null = hỏi kỹ sư như lệnh gốc.</param>
+    internal static void ChayChiaDot(
+        Autodesk.AutoCAD.ApplicationServices.Document doc, Editor ed, DrawToolsPack pack, double toMm,
+        IReadOnlyList<ObjectId>? daChon, DrawSystem? he, string? ghiDeKieuNoi, bool hoiGhiDe, double? tiLe,
+        string? giaiDoanM115 = null)
+    {
+        var db = doc.Database;
+
         // ===== (2) Đọc bản vẽ theo đúng phạm vi (transaction CHỈ ĐỌC) =====
         var boQua = new List<string>();
         List<UngVien> ungVien;
@@ -158,14 +179,14 @@ public sealed class VeChiaDotCommands
         }
 
         // ===== (3) Ghi đè kiểu nối + tỉ lệ in (vẫn NGOÀI transaction ghi) =====
-        if (chonHopThoai is null)
+        if (hoiGhiDe)
         {
             var ghiDe = HoiGhiDeKieuNoi(ed, ungVien);
             if (ghiDe.Huy) return;
             ghiDeKieuNoi = ghiDe.KieuNoi;
         }
-        if (VeContext.HoiTiLeIn(ed, pack) is not { } tiLe) return;
-        var caoChu = pack.DrawTools.LabelStyle.TextHeightMm * tiLe / toMm;
+        if ((tiLe ?? VeContext.HoiTiLeIn(ed, pack)) is not { } tiLeIn) return;
+        var caoChu = pack.DrawTools.LabelStyle.TextHeightMm * tiLeIn / toMm;
 
         // ===== (4) Chia đốt + đặt vạch/tag (Core thuần, chưa đụng bản vẽ) =====
         var viec = new List<ViecVe>();
@@ -237,7 +258,7 @@ public sealed class VeChiaDotCommands
                         var (dau, cuoi) = vach.HaiDau(v.ChieuDaiVachVe);
                         var line = new Line(new Point3d(dau.X, dau.Y, 0), new Point3d(cuoi.X, cuoi.Y, 0));
                         VeThucThe.Them(tr, ms, line, v.LayerVach);
-                        VeXDataStore.Ghi(line, XDataCon(v, VaiTroVe.VachChia, vach.ChiSoDotTruoc, pack));
+                        VeXDataStore.Ghi(line, XDataCon(v, VaiTroVe.VachChia, vach.ChiSoDotTruoc, pack, giaiDoanM115));
                         soVach++;
                     }
                     foreach (var nhan in v.BoTri.Nhan)
@@ -252,7 +273,7 @@ public sealed class VeChiaDotCommands
                             Attachment = AttachmentPoint.BottomCenter,
                         };
                         VeThucThe.Them(tr, ms, text, v.LayerVach);
-                        VeXDataStore.Ghi(text, XDataCon(v, VaiTroVe.NhanDot, nhan.ChiSoDot, pack));
+                        VeXDataStore.Ghi(text, XDataCon(v, VaiTroVe.NhanDot, nhan.ChiSoDot, pack, giaiDoanM115));
                         soTag++;
                     }
 
@@ -498,10 +519,16 @@ public sealed class VeChiaDotCommands
         }
     }
 
-    /// <summary>XData của vạch/tag: liên kết ngược về tim + chỉ số đốt (FR6).</summary>
-    private static VeXDataInfo XDataCon(ViecVe v, VaiTroVe vaiTro, int chiSoDot, DrawToolsPack pack) =>
+    /// <summary>
+    /// XData của vạch/tag: liên kết ngược về tim + chỉ số đốt (FR6). <paramref name="giaiDoanM115"/>
+    /// khác null = do <c>XBOSS_HOANTHIEN</c> sinh ra, đóng thêm dấu nguồn/giai đoạn (M115 FR4).
+    /// </summary>
+    private static VeXDataInfo XDataCon(
+        ViecVe v, VaiTroVe vaiTro, int chiSoDot, DrawToolsPack pack, string? giaiDoanM115) =>
         new()
         {
+            NguonHoanThien = giaiDoanM115 is null ? null : HoanThienKeHoach.NguonM115,
+            GiaiDoanHoanThien = giaiDoanM115,
             VaiTro = vaiTro,
             HeId = v.Ung.XData.HeId,
             ItemId = v.Ung.XData.ItemId,

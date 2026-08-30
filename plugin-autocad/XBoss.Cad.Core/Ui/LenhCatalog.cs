@@ -138,6 +138,11 @@ public static class LenhCatalog
             "Dựng đồ thị tuyến–thiết bị từ các tuyến tim đã gán thuộc tính: gộp nút, suy tê/co/cút/" +
             "giảm, báo lỗi chặn bấm-tới-đối-tượng; kỹ sư duyệt từng nút rồi chốt đồ thị vào bản vẽ.",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 11, CanRulePack: true),
+        new("XBOSS_HOANTHIEN", "Hoàn thiện bản vẽ",
+            "Chạy chuỗi 8 giai đoạn hoàn thiện trên cụm tuyến đã chốt đồ thị (nét đôi → phụ kiện tại " +
+            "nút → chia đốt → giá đỡ → lỗ chờ → ngắt nét → tag → bảng thống kê), bật/tắt từng giai " +
+            "đoạn; chạy lại an toàn, tọa độ tuyến tim giữ nguyên tuyệt đối.",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.VeShopDrawing, 12, CanRulePack: true),
         new("XBOSS_VE_THUVIEN", "Thư viện block",
             "Tải/đồng bộ thư viện block từ server hoặc nhập từ tệp manifest + DWG.",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.PhuTro, 2, CanRulePack: true),
