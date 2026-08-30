@@ -305,6 +305,12 @@ public sealed class VeSessionReport
                     // toàn số 0 trong mọi báo cáo.
                     soHanhLang++;
                     break;
+                case VaiTroVe.PhoiHop:
+                    // Marker xung đột phối hợp (M116 FR2) là DẤU KIỂM trên layer riêng, không phải
+                    // đối tượng nghiệp vụ của hệ nào — cộng vào thống kê hệ là thổi phồng số tuyến/
+                    // khối của bản vẽ, đúng lỗi mà guardrail của M110 đã chặn cho revision. Số liệu
+                    // phối hợp có ô riêng trong báo cáo ở M116 PR3.
+                    break;
                 case VaiTroVe.Revision:
                     // Cloud/tam giác revision là CHÚ THÍCH, không thuộc hệ nào (guardrail 1 của
                     // M110: không đụng hình học nghiệp vụ) — đếm riêng, không cộng vào thống kê hệ.

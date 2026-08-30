@@ -210,6 +210,37 @@ internal static class VeContext
         return cs;
     }
 
+    /// <summary>
+    /// Khối <c>drawTools.coordinationPolicy</c> đang có hiệu lực (M116 §7 FR5) — cửa DUY NHẤT cho
+    /// bộ lệnh <c>XBOSS_PHOIHOP*</c>, cùng khuôn <see cref="CanRoutingPolicy"/>/
+    /// <see cref="CanCompletionPolicy"/>.
+    ///
+    /// Trả null + hướng dẫn cách bật khi rule pack chưa khai hoặc còn <c>enabled: false</c> (mặc
+    /// định của v17 — AC4: nạp rule pack mới mà chưa bật thì mọi lệnh cũ chạy y hệt version trước,
+    /// và lệnh phối hợp KHÔNG quét gì, không đụng bản vẽ).
+    /// </summary>
+    internal static CoordinationPolicySection? CanCoordinationPolicy(Editor ed, DrawToolsPack pack)
+    {
+        if (pack.DrawTools.CoordinationPolicy is not { } cs)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] Rule pack {pack.RulePack.Version} chưa khai drawTools.coordinationPolicy — " +
+                "phối hợp xung đột liên hệ chưa dùng được. Nạp rule pack mới (v17 trở lên) rồi chạy lại.\n");
+            return null;
+        }
+        if (!cs.Enabled)
+        {
+            ed.WriteMessage(
+                $"\n[XBoss] Phối hợp xung đột liên hệ đang TẮT trong rule pack {pack.RulePack.Version} " +
+                "(drawTools.coordinationPolicy.enabled = false) — lệnh dừng, bản vẽ không đổi.\n" +
+                "[XBoss] Cách bật: Admin/PM sửa enabled = true trong rule pack trên trang " +
+                "/engineering/chuan-hoa-ban-ve, phát hành version mới rồi chạy XBOSS_LOGIN (hoặc " +
+                "XBOSS_RULEPACK) để nạp lại.\n");
+            return null;
+        }
+        return cs;
+    }
+
     /// <summary>Hệ đang chọn; chưa chọn (hoặc kỹ sư muốn đổi) thì hỏi bằng keyword dòng lệnh.</summary>
     internal static DrawSystem? HoiHe(Editor ed, DrawToolsPack pack, bool batBuocHoiLai = false)
     {

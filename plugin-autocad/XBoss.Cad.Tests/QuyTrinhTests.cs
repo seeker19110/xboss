@@ -109,6 +109,8 @@ public class QuyTrinhTests
                 "XBOSS_VE_MATCAT", "XBOSS_VE_THONGKE", "XBOSS_VE_NGATNET", "XBOSS_VE_TRANGIN",
                 // M110 FR10 — 3 lệnh revision đứng SAU XBOSS_VE_TRANGIN (khoanh → chốt → hiện/ẩn).
                 "XBOSS_VE_REV", "XBOSS_VE_REV_CHOT", "XBOSS_VE_REV_HIENTHI", "XBOSS_VE_BAOCAO",
+                // M116 §6 — kiểm phối hợp liên hệ + báo cáo phối hợp, chạy trước khi phát hành hồ sơ.
+                "XBOSS_PHOIHOP", "XBOSS_PHOIHOP_BAOCAO",
             ],
             QuyTrinh.LenhCua(BuocQuyTrinh.HoSoBanVe).Select(l => l.Ten));
         Assert.Equal(
@@ -117,7 +119,7 @@ public class QuyTrinhTests
         Assert.Equal(
             [
                 "XBOSS_BOCKL_XOA", "XBOSS_VE_THUVIEN", "XBOSS_VE_DEXUAT", "XBOSS_VE_DEXUAT_LO",
-                "XBOSS_BANG", "XBOSS_VE_NGATNET_XOA",
+                "XBOSS_BANG", "XBOSS_VE_NGATNET_XOA", "XBOSS_PHOIHOP_XOA",
             ],
             QuyTrinh.LenhCua(BuocQuyTrinh.PhuTro).Select(l => l.Ten));
     }
@@ -151,7 +153,9 @@ public class QuyTrinhTests
                 "XBOSS_VE_CHIADOT", "XBOSS_VE_GIADO", "XBOSS_VE_LOCHO", "XBOSS_VE_TAG",
                 "XBOSS_VE_MATCAT", "XBOSS_VE_THONGKE", "XBOSS_VE_NGATNET", "XBOSS_VE_TRANGIN",
                 "XBOSS_VE_REV", "XBOSS_VE_REV_CHOT", "XBOSS_VE_REV_HIENTHI", "XBOSS_VE_BAOCAO",
+                "XBOSS_PHOIHOP", "XBOSS_PHOIHOP_BAOCAO",
                 "XBOSS_VE_THUVIEN", "XBOSS_VE_DEXUAT", "XBOSS_VE_DEXUAT_LO", "XBOSS_VE_NGATNET_XOA",
+                "XBOSS_PHOIHOP_XOA",
             ],
             ve);
     }
