@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { supplierSummary } from "@/lib/procurement";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { supplierSummary } from "@/lib/tai-chinh/procurement";
 
 export const dynamic = "force-dynamic";
 

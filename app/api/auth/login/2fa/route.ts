@@ -4,11 +4,12 @@ import {
   parseTotpPendingToken,
   verifyPassword,
   makeToken,
+  isSecureCookie,
   COOKIE,
   COOKIE_MAX_AGE,
-} from "@/lib/auth";
-import { decryptTotpSecret, verifyTotpCode } from "@/lib/totp";
-import { hitRateLimit } from "@/lib/ratelimit";
+} from "@/lib/bao-mat/auth";
+import { decryptTotpSecret, verifyTotpCode } from "@/lib/bao-mat/totp";
+import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
     path: "/",
     maxAge: COOKIE_MAX_AGE,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureCookie(req),
   });
   return res;
 }

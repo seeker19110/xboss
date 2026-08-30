@@ -1,0 +1,100 @@
+{
+  "id": "pipe-ren-11700-dot-le-ngan",
+  "ac": "FR3",
+  "note": "Ống cấp nước DN40 (≤ DN50 → ren, khe 0), 11700 mm cây nguyên: đốt dư 100 mm ngắn hơn tối thiểu 300 → dồn vào đốt trước rồi chia đôi đều 2 đốt cuối (2950 + 2950).",
+  "input": {
+    "systemId": "PIPING",
+    "itemId": "pipe-domw",
+    "size": "DN40",
+    "sizeKind": "DN",
+    "runIndex": 3,
+    "rules": {
+      "selection": [
+        {
+          "jointType": "ren",
+          "maxDn": 50,
+          "maxLenMm": 5800,
+          "jointGapMm": 0
+        },
+        {
+          "jointType": "grooved",
+          "maxDn": null,
+          "maxLenMm": 5800,
+          "jointGapMm": 3
+        }
+      ],
+      "divideMode": "cay_nguyen",
+      "minPieceLenMm": 300,
+      "layerStyle": {
+        "suffix": "JOINT",
+        "color": 8,
+        "linetype": "DASHED"
+      },
+      "hardware": {
+        "ren": [
+          {
+            "item": "mang-xong-ren",
+            "perJoint": 1,
+            "unit": "cái"
+          }
+        ],
+        "grooved": [
+          {
+            "item": "coupling-grooved",
+            "perJoint": 1,
+            "unit": "cái"
+          },
+          {
+            "item": "gioang-grooved",
+            "perJoint": 1,
+            "unit": "cái"
+          }
+        ]
+      }
+    },
+    "segments": [
+      {
+        "lengthMm": 11700
+      }
+    ]
+  },
+  "expected": {
+    "jointType": "ren",
+    "overridden": false,
+    "divideMode": "cay_nguyen",
+    "maxLenMm": 5800,
+    "jointGapMm": 0,
+    "minPieceLenMm": 300,
+    "totalLengthMm": 11700,
+    "pieceCount": 3,
+    "jointCount": 2,
+    "pieces": [
+      {
+        "segmentIndex": 0,
+        "pieceIndex": 1,
+        "lengthMm": 5800,
+        "tag": "D-pipe-domw-003-01"
+      },
+      {
+        "segmentIndex": 0,
+        "pieceIndex": 2,
+        "lengthMm": 2950,
+        "tag": "D-pipe-domw-003-02"
+      },
+      {
+        "segmentIndex": 0,
+        "pieceIndex": 3,
+        "lengthMm": 2950,
+        "tag": "D-pipe-domw-003-03"
+      }
+    ],
+    "warnings": [],
+    "hardware": [
+      {
+        "item": "mang-xong-ren",
+        "unit": "cái",
+        "quantity": 2
+      }
+    ]
+  }
+}

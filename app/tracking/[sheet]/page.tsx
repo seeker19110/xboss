@@ -11,18 +11,21 @@ import {
   EyeOff,
   Trash2,
   Plus,
+  Inbox,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EditableText from "@/app/components/EditableText";
 import { Modal, appConfirm } from "@/app/components/dialogs";
+import EmptyState from "@/app/components/EmptyState";
+import { Button, Card } from "@/app/components/ui";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { ErrorState } from "@/app/components/ErrorState";
-import { toSlug } from "@/lib/sheets";
+import { toSlug } from "@/lib/nen/sheets";
 import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_LABELS } from "@/lib/nen/roles";
 import { fetchMe } from "@/app/lib/me";
-import { sortFloorsDesc } from "@/lib/floors";
+import { sortFloorsDesc } from "@/lib/tien-do/floors";
 import { useTrackingData } from "./useTrackingData";
 import { TrackingToolbar } from "./TrackingToolbar";
 import { TrackingGrid } from "./TrackingGrid";
@@ -315,7 +318,10 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
         }
         subtitle={`${data?.sheet.code ?? ""} ${data?.sheet.responsible ? `· ${data.sheet.responsible}` : ""}`}
       >
-        <button
+        <Button
+          size="sm"
+          icon={Printer}
+          labelOnDesktopOnly
           onClick={() => {
             setPrintTitle(
               (prev) =>
@@ -325,10 +331,10 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
             setPrintPanel((p) => !p);
           }}
           title="In PDF / Xuất bảng tracking"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+          aria-label="In PDF / Xuất bảng tracking"
         >
-          <Printer className="w-4 h-4" /> <span className="hidden sm:inline">In PDF</span>
-        </button>
+          In PDF
+        </Button>
         <EditModeToggle
           canEdit={canProgress || canEdit}
           editMode={editMode}
@@ -397,7 +403,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
               <button
                 onClick={saveAddPkg}
                 disabled={!addPkgModal.code.trim() || !addPkgModal.name.trim() || addPkgSaving}
-                className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg font-medium text-on-accent"
+                className="px-3 py-1.5 text-sm bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 rounded-lg font-medium text-on-accent"
               >
                 {addPkgSaving ? "Đang lưu..." : "Tạo hạng mục"}
               </button>
@@ -408,7 +414,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
 
       {/* ── Panel in PDF (ẩn khi in thật) ── */}
       {printPanel && (
-        <div className="no-print px-6 py-4 bg-zinc-900 border-b border-zinc-700 space-y-3">
+        <div className="no-print px-4 sm:px-6 py-4 bg-zinc-900 border-b border-zinc-800 space-y-3">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-xs text-zinc-400 shrink-0">Tiêu đề bảng in:</span>
             <input
@@ -416,18 +422,21 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
               onChange={(e) => setPrintTitle(e.target.value)}
               className="flex-1 min-w-60 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm outline-none focus:border-emerald-600 font-semibold uppercase"
             />
-            <button
+            <Button
+              variant="primary"
+              icon={Printer}
               onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium shrink-0 text-on-accent"
+              className="shrink-0"
             >
-              <Printer className="w-4 h-4" /> In / Lưu PDF
-            </button>
-            <button
+              In / Lưu PDF
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              icon={X}
               onClick={() => setPrintPanel(false)}
-              className="text-zinc-500 hover:text-zinc-300"
-            >
-              <X className="w-4 h-4" />
-            </button>
+              aria-label="Đóng panel in"
+            />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-zinc-500 shrink-0">Ẩn cột khi in:</span>
@@ -444,7 +453,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
                         return n;
                       })
                     }
-                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border transition ${hidden ? "bg-zinc-800 border-zinc-700 text-zinc-500 line-through" : "bg-zinc-700 border-zinc-600 text-zinc-200"}`}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] border transition ${hidden ? "bg-zinc-900 border-zinc-800 text-zinc-400 line-through" : "bg-zinc-800 border-zinc-700 text-zinc-100"}`}
                   >
                     {hidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {col}
                   </button>
@@ -464,7 +473,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
                       return n;
                     })
                   }
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border transition ${hidden ? "bg-zinc-800 border-zinc-700 text-zinc-500 line-through" : "bg-zinc-700 border-zinc-600 text-zinc-200"}`}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] border transition ${hidden ? "bg-zinc-900 border-zinc-800 text-zinc-400 line-through" : "bg-zinc-800 border-zinc-700 text-zinc-100"}`}
                 >
                   {hidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {col}
                 </button>
@@ -515,10 +524,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
         <div className="overflow-x-auto scrollbar-none">
           <div className="space-y-2" style={{ width: "max-content", minWidth: "100%" }}>
             {packages.map((p, pi) => (
-              <div
-                key={p.id}
-                className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden"
-              >
+              <Card key={p.id} pad="none" className="overflow-hidden">
                 <TrackingGrid
                   pkg={p}
                   pkgIdx={pi}
@@ -537,12 +543,16 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
                   pendingFront={!!p.floorLabel && pendingFronts.has(p.floorLabel)}
                   qcReason={qcBlocked.get(p.id)}
                 />
-              </div>
+              </Card>
             ))}
             {packages.length === 0 && (
-              <div className="p-8 text-center text-zinc-500 bg-zinc-900 border border-zinc-800 rounded-xl">
-                {"Không có dữ liệu. Hãy import file Excel hoặc copy từ trang khác."}
-              </div>
+              <Card pad="none">
+                <EmptyState
+                  icon={Inbox}
+                  title="Chưa có dữ liệu trong trang này"
+                  message="Hãy import file Excel, hoặc tạo hạng mục mới bằng cách sao chép cấu trúc từ trang khác."
+                />
+              </Card>
             )}
           </div>
         </div>
@@ -699,7 +709,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
                 <button
                   onClick={saveSheet}
                   disabled={!sheetModal.name.trim() || !sheetModal.code.trim()}
-                  className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg font-medium text-on-accent"
+                  className="px-3 py-1.5 text-sm bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 rounded-lg font-medium text-on-accent"
                 >
                   Lưu
                 </button>

@@ -9,7 +9,7 @@ import {
   reconstructProgressAtDate,
   type DailyReport,
   type WeeklyReport,
-} from "@/lib/report";
+} from "@/lib/tien-do/report";
 
 // ===== Test thuần: reconstructProgressAtDate (tái dựng % tại 1 mốc ngày, M36 PR3) =====
 
@@ -205,7 +205,7 @@ test(
   async () => {
     const { insertId, run } = await import("@/lib/db");
     const { daysFromTodayISO } = await import("@/lib/db");
-    const { buildDailyReport } = await import("@/lib/report");
+    const { buildDailyReport } = await import("@/lib/tien-do/report");
 
     const sheetCode = uniqueCode("TESTRPTD");
     const ids = await seedProject(sheetCode);
@@ -281,7 +281,7 @@ test(
   async () => {
     const { insertId, run } = await import("@/lib/db");
     const { daysFromTodayISO } = await import("@/lib/db");
-    const { buildWeeklyReport } = await import("@/lib/report");
+    const { buildWeeklyReport } = await import("@/lib/tien-do/report");
 
     const sheetCode = uniqueCode("TESTRPTW");
     const ids = await seedProject(sheetCode);
@@ -322,7 +322,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { progressAtDate } = await import("@/lib/report");
+    const { progressAtDate } = await import("@/lib/tien-do/report");
 
     const sheetA = uniqueCode("TESTRPTPA");
     const sheetB = uniqueCode("TESTRPTPB");

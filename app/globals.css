@@ -8,17 +8,34 @@
      chỉ đúng khi text nằm trên nền zinc cũng tự đảo cùng lúc, vd bg-zinc-950 text-white).
      Không khai báo lại trong bất kỳ html.<theme> nào — phải luôn là #ffffff. */
   --on-accent: #ffffff;
+  /* Đối xứng với --on-accent, dùng cho nền màu nhấn SÁNG (-500/-600 của amber, emerald,
+     cyan, sky, lime, yellow...). Ở các nền đó chữ trắng chỉ đạt 2,2-3,7:1 — dưới ngưỡng
+     WCAG AA — còn chữ gần đen đạt 5,4-9,3:1. Không dùng text-zinc-950 vì html.light ĐẢO
+     thang zinc: chữ sẽ hoá gần trắng ở chế độ sáng và tương phản sụp còn 2,0-3,2:1.
+     Cũng không khai báo lại trong bất kỳ html.<theme> nào — phải luôn là #09090b.
+     Chọn chữ theo ĐỘ SÁNG CỦA NỀN, không theo một luật chung: nền -700 trở lên (và
+     red-600) thì ngược lại, phải dùng --on-accent (trắng). */
+  --on-accent-dark: #09090b;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-on-accent: var(--on-accent);
+  --color-on-accent-dark: var(--on-accent-dark);
 }
 
 /* Chế độ tối (mặc định) — script trong layout gắn class theo localStorage('xboss_theme') */
 html.dark {
   color-scheme: dark;
+  /* zinc-500 gốc Tailwind (#71717a) dùng làm MÀU CHỮ trên mặt thẻ tối chỉ đạt 3,6-4,1:1
+     — dưới ngưỡng WCAG AA 4,5:1 (axe bắt hàng loạt "serious" khi trang có nhiều dữ liệu).
+     Cả 4 theme tối đều mắc, và `text-zinc-500` là màu chữ phụ dùng ở gần 700 chỗ nên sửa
+     ở TOKEN thay vì đổi tay từng class: giữ nguyên thứ bậc 3 mức chữ (300 > 400 > 500) mà
+     vẫn đạt AA. Giá trị chọn sao cho đạt ≥4,5:1 trên cả nền đậm nhất mà chữ phụ thực sự
+     nằm lên (zinc-800): 4,59:1 / zinc-900 5,46:1 / zinc-950 6,13:1.
+     `.sheet-stable` (vùng "giấy trắng") tự ghim lại #71717a nên không bị ảnh hưởng. */
+  --color-zinc-500: #8e8e98;
 }
 
 /* ─── Theme xanh dương (King Blue / Dark Blue / Navy) ───────────────────────
@@ -36,30 +53,58 @@ html.kingblue {
   --color-zinc-800: #1a3f94;
   --color-zinc-700: #2451b5;
   --color-zinc-600: #3a6bd0;
-  --color-zinc-500: #5d87de;
-  --color-zinc-400: #8aabec;
+  /* -500/-400 sáng hơn bảng gốc của theme: mặt thẻ King Blue (#123075/#1a3f94) sáng hơn
+     hẳn các theme tối khác nên hai mức chữ phụ cũ chỉ đạt 3,3-4,2:1. Giá trị mới đạt
+     ≥4,6:1 trên cả zinc-800/900/950 mà vẫn giữ thứ bậc 300 > 400 > 500. */
+  --color-zinc-500: #7eb7ff;
+  --color-zinc-400: #a8ccff;
   --color-zinc-300: #b3c9f4;
   --color-zinc-200: #d4e2fa;
   --color-zinc-100: #e8f0fd;
   --color-zinc-50: #f4f8fe;
+  /* Mặt thẻ King Blue sáng hơn hẳn các theme tối khác nên 8 màu nhấn dưới đây dùng làm
+     CHỮ chỉ đạt 3,1-4,4:1 ở mức -400. Đổi -400 sang đúng giá trị -400 của thang là không
+     đủ, nên lấy giá trị -300 (sáng hơn một bậc, đạt 4,8-5,8:1) — cùng cách html.light xử
+     lý theo hướng ngược lại. Ghi bằng hex CHỐT, không dùng var(--color-*-300): biến đó do
+     Tailwind chỉ phát sinh khi trong mã còn chỗ dùng shade -300, gỡ hết chỗ dùng là biến
+     biến mất và class -400 vỡ theo (im lặng). Các màu không liệt kê (amber/emerald/green/
+     teal/cyan/yellow) đã đạt AA sẵn nên GIỮ NGUYÊN -400 để không làm nhạt màu vô cớ.
+     Mức -400 chỉ dùng làm nền ở các chấm/thanh trang trí (không có chữ đặt lên) nên đổi
+     giá trị không ảnh hưởng tương phản ở đó. */
+  --color-red-400: #ffa2a2;
+  --color-rose-400: #ffa1ad;
+  --color-orange-400: #ffb86a;
+  --color-sky-400: #74d4ff;
+  --color-blue-400: #8ec5ff;
+  --color-indigo-400: #a3b3ff;
+  --color-violet-400: #c4b4ff;
+  --color-purple-400: #dab2ff;
 }
 
-/* Dark Blue — xanh dương đậm, dịu hơn King Blue */
+/* Dark Blue — xanh dương slate dịu mắt, nhạt và mờ êm dịu */
 html.darkblue {
   color-scheme: dark;
-  --background: #0c1a2e;
-  --foreground: #dbeafe;
-  --color-zinc-950: #0f2138;
-  --color-zinc-900: #152b48;
-  --color-zinc-800: #1e3a5f;
-  --color-zinc-700: #2a4d73;
-  --color-zinc-600: #3b6188;
-  --color-zinc-500: #5a7ca0;
-  --color-zinc-400: #8aacc8;
-  --color-zinc-300: #b6d3e8;
-  --color-zinc-200: #d7e8f5;
-  --color-zinc-100: #eaf3fb;
-  --color-zinc-50: #f5fafd;
+  --background: #0e1726;
+  --foreground: #e2e8f0;
+  --color-zinc-950: #121e33;
+  --color-zinc-900: #182741;
+  --color-zinc-800: #223554;
+  --color-zinc-700: #2f466c;
+  --color-zinc-600: #445e89;
+  /* Sáng hơn bảng gốc (#6582ab chỉ đạt 3,7-4,2:1 khi làm màu chữ) — xem ghi chú ở html.dark. */
+  --color-zinc-500: #7da1d3;
+  --color-zinc-400: #92a9cb;
+  --color-zinc-300: #bcd0e8;
+  --color-zinc-200: #dae6f4;
+  --color-zinc-100: #ecf2fa;
+  --color-zinc-50: #f6f9fd;
+  /* Cùng lý do như King Blue (xem ghi chú ở trên) nhưng mặt thẻ đỡ sáng hơn nên chỉ 5 màu
+     tím-đỏ hụt ngưỡng ở mức -400 (3,9-4,4:1); lấy giá trị -300 đưa lên 6,1-6,9:1. */
+  --color-red-400: #ffa2a2;
+  --color-rose-400: #ffa1ad;
+  --color-indigo-400: #a3b3ff;
+  --color-violet-400: #c4b4ff;
+  --color-purple-400: #dab2ff;
 }
 
 /* Navy — xanh hải quân thâm trầm nhất, tông slate xanh-xám */
@@ -72,7 +117,8 @@ html.navy {
   --color-zinc-800: #1c2a44;
   --color-zinc-700: #2c3e5e;
   --color-zinc-600: #475569;
-  --color-zinc-500: #64748b;
+  /* Sáng hơn bảng gốc (#64748b chỉ đạt 3,5-3,9:1 khi làm màu chữ) — xem ghi chú ở html.dark. */
+  --color-zinc-500: #7f94b1;
   --color-zinc-400: #94a3b8;
   --color-zinc-300: #cbd5e1;
   --color-zinc-200: #e2e8f0;
@@ -121,11 +167,16 @@ html.light {
   --color-teal-300: #0f766e;
   --color-teal-400: #0f766e;
   --color-red-300: #b91c1c;
-  --color-red-400: #dc2626;
+  /* #dc2626 đạt 4,83:1 trên mặt thẻ trắng nhưng chỉ 4,34:1 trên DÒNG SỌC XEN KẼ của bảng
+     (nền zebra zinc-800/20 phủ lên thẻ ra #f1f3f6) — mà chữ đỏ hầu như luôn nằm trong bảng
+     (cột "trễ (ngày)"). Đậm thêm một bậc: 5,16:1 trên dòng sọc, 5,74:1 trên thẻ trắng. */
+  --color-red-400: #c81e1e;
   --color-blue-300: #1d4ed8;
   --color-blue-400: #2563eb;
-  --color-orange-300: #c2410c;
-  --color-orange-400: #c2410c;
+  /* orange-800 thay vì -700: trên nền mờ cùng tông (bg-orange-500/10) shade -700 chỉ đạt
+     3,8-4,4:1, dưới ngưỡng AA. -800 đưa lên 5,3-6,2:1. Không dùng làm nền ở đâu nên an toàn. */
+  --color-orange-300: #9a3412;
+  --color-orange-400: #9a3412;
   --color-yellow-300: #a16207;
   --color-yellow-400: #a16207;
   --color-cyan-300: #0e7490;
@@ -151,7 +202,13 @@ html.light {
      KHÔNG cần đảo nền vì cả nền lẫn chữ cùng giữ nguyên giá trị ở mọi theme. Badge/chip
      dùng chữ -300/-400 (ĐÃ đảo đậm cho mục đích "chữ thường trên nền trang") phải đổi
      sang -200 (không đảo, luôn sáng) khi ghép với nền chip cùng màu — xem các chỗ dùng
-     bg-{màu}-950/900/800 + text-{màu}-300/400 đã đổi thành text-{màu}-200 trong JSX. */
+     bg-{màu}-950/900/800 + text-{màu}-300/400 đã đổi thành text-{màu}-200 trong JSX.
+     NGOẠI LỆ QUAN TRỌNG của (2): quy tắc "chip tối + chữ -200" chỉ đúng khi nền ĐẶC.
+     Với nền MỜ (bg-{màu}-950/20, /40...) thì ở chế độ sáng, 20-40% màu tối phủ trên nền
+     trang sáng cho ra màu NHẠT, mà chữ -200 lại cố định sáng → tương phản sụp còn
+     1,2-1,9:1. Nền mờ phải dùng shade KHÔNG bị đảo làm nền (bg-{màu}-500/10) ghép với
+     chữ -300 (tự đảo): đạt ~7:1 ở chế độ sáng và ~10:1 ở chế độ tối. Xem
+     app/materials/import/page.tsx. */
 }
 
 body {
@@ -244,6 +301,13 @@ body {
   }
 }
 
+/* Neo trong trang (href="#id") phải chừa chiều cao topbar dính (h-12) + chút thở, nếu
+   không phần tử được nhảy tới sẽ nằm khuất ngay dưới topbar. Áp dụng toàn cục cho mọi
+   phần tử là đích của hash — không phải thêm class ở từng trang. */
+:target {
+  scroll-margin-top: 4.5rem;
+}
+
 /* Ẩn scrollbar trên nav cuộn ngang (iOS/Android) */
 .scrollbar-none {
   scrollbar-width: none;
@@ -258,7 +322,102 @@ body {
 :focus-visible {
   outline: 2px solid #34d399; /* emerald-400 */
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 6px;
+}
+
+/* ─── Modern UI/UX Utility Classes (ui-ux-craftsman) ─────────────────────── */
+.card-surface {
+  background-color: var(--color-zinc-900);
+  border: 1px solid var(--color-zinc-800);
+  border-radius: 0.875rem;
+  transition:
+    border-color 0.2s ease-out,
+    box-shadow 0.2s ease-out,
+    transform 0.2s ease-out;
+}
+.card-surface:hover {
+  border-color: var(--color-zinc-700);
+}
+
+.bento-card {
+  background-color: var(--color-zinc-950);
+  border: 1px solid var(--color-zinc-800);
+  border-radius: 1rem;
+  transition:
+    border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.bento-card:hover {
+  border-color: var(--color-zinc-700);
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.3);
+}
+
+.glass-surface {
+  background-color: color-mix(in srgb, var(--color-zinc-950) 85%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--color-zinc-800);
+}
+
+.interactive-press {
+  transition:
+    transform 0.15s ease-out,
+    background-color 0.15s ease-out,
+    border-color 0.15s ease-out,
+    opacity 0.15s ease-out;
+}
+.interactive-press:active {
+  transform: scale(0.98);
+}
+
+/* Live Pulse indicator cho sự kiện trực tiếp / SSE */
+.live-pulse {
+  position: relative;
+  display: inline-flex;
+}
+.live-pulse::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  background-color: inherit;
+  opacity: 0.75;
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+}
+
+/* Custom scrollbar thanh lịch */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-zinc-700) transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--color-zinc-700);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-zinc-600);
 }
 
 /* Safe area padding cho thiết bị có notch/home indicator (iPhone X+, Android notch) */

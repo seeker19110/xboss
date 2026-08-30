@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { packagesWithQcBlock } from "@/lib/qaqc";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { packagesWithQcBlock } from "@/lib/ky-thuat/qaqc";
 
 export const dynamic = "force-dynamic";
 

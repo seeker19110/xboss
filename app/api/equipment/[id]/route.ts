@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getEquipment, parseEquipmentBody, validateEquipmentInput } from "@/lib/equipment";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getEquipment, parseEquipmentBody, validateEquipmentInput } from "@/lib/vat-tu/equipment";
 
 export const dynamic = "force-dynamic";
 

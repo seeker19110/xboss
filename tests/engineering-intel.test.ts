@@ -10,7 +10,7 @@ import {
   computeConfidence,
   initialStatus,
   PRIORITY_ORDER,
-} from "@/lib/engineering-intel";
+} from "@/lib/ky-thuat/engineering-intel";
 
 const S = { skip: !HAS_TEST_DB };
 
@@ -122,7 +122,7 @@ function reqOf(path: string, key: string, body?: unknown): NextRequest {
 before(async () => {
   if (!HAS_TEST_DB) return;
   const { insertId } = await import("@/lib/db");
-  const { generateApiKey, hashApiKey } = await import("@/lib/api-keys");
+  const { generateApiKey, hashApiKey } = await import("@/lib/bao-mat/api-keys");
 
   U = await insertId(
     `INSERT INTO users (name, email, role, password_hash) VALUES ('IntelTest','intel-test@x.vn','admin','x')`,
@@ -240,9 +240,10 @@ test("ingest: scope read → 403", S, async () => {
 });
 
 test("listSuggestions: sắp đúng ranking + cách ly đa dự án", S, async () => {
-  const { ingestIntelligencePackage, listSuggestions } = await import("@/lib/engineering-intel");
+  const { ingestIntelligencePackage, listSuggestions } =
+    await import("@/lib/ky-thuat/engineering-intel");
 
-  const { intelligencePackageInputSchema } = await import("@/lib/engineering-intel");
+  const { intelligencePackageInputSchema } = await import("@/lib/ky-thuat/engineering-intel");
   await ingestIntelligencePackage(
     pA,
     null,
@@ -282,8 +283,8 @@ test("listSuggestions: sắp đúng ranking + cách ly đa dự án", S, async (
 
 test("decideSuggestion: ghi quyết định + chặn dự án khác", S, async () => {
   const { ingestIntelligencePackage, decideSuggestion, getSuggestion } =
-    await import("@/lib/engineering-intel");
-  const { intelligencePackageInputSchema } = await import("@/lib/engineering-intel");
+    await import("@/lib/ky-thuat/engineering-intel");
+  const { intelligencePackageInputSchema } = await import("@/lib/ky-thuat/engineering-intel");
   const r = await ingestIntelligencePackage(
     pA,
     null,

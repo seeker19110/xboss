@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,10 @@ export async function GET(req: NextRequest) {
        LEFT JOIN users n ON al.new_user_id = n.id
        LEFT JOIN users cb ON al.changed_by = cb.id
       ORDER BY al.changed_at DESC
-      LIMIT ? OFFSET ?`, limit, offset);
+      LIMIT ? OFFSET ?`,
+    limit,
+    offset,
+  );
 
   const total = await query<{ n: number }>(`SELECT COUNT(*) AS n FROM assignment_log`);
 

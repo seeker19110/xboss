@@ -8,7 +8,7 @@ test(
   "tableExists: true với bảng có sẵn, false với bảng chưa tồn tại",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { tableExists } = await import("@/lib/dashboardext");
+    const { tableExists } = await import("@/lib/tien-do/dashboardext");
     assert.equal(await tableExists("tasks"), true);
     assert.equal(await tableExists("bang_khong_ton_tai_xyz"), false);
   },
@@ -19,8 +19,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { workfrontBlock } = await import("@/lib/dashboardext");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { workfrontBlock } = await import("@/lib/tien-do/dashboardext");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     // sort_order rất lớn để chắc chắn là "công tác cuối" toàn cục trong lúc test chạy,
     // không phụ thuộc/đụng tới 7 công tác seed sẵn (Trắc đạc..Đóng trần) hay dữ liệu
@@ -64,8 +64,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { qualityBlock } = await import("@/lib/dashboardext");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { qualityBlock } = await import("@/lib/tien-do/dashboardext");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     // work_packages có thể rỗng trong DB test tích hợp (không seed sẵn) — tự tạo
     // đủ chuỗi FK project→tower→sheet_type→work_package (pattern tests/boq.test.ts).
@@ -126,7 +126,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { voBlock } = await import("@/lib/dashboardext");
+    const { voBlock } = await import("@/lib/tien-do/dashboardext");
 
     const draftId = await insertId(
       `INSERT INTO variation_orders (code, title, reason, status) VALUES ('VO-D9-1', 'VO draft', 'other', 'draft')`,
@@ -156,7 +156,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { query } = await import("@/lib/db");
-    const { bySystemBlock } = await import("@/lib/dashboardext");
+    const { bySystemBlock } = await import("@/lib/tien-do/dashboardext");
 
     const systems = await query<{ code: string }>(`SELECT code FROM systems`);
     const rows = await bySystemBlock();
@@ -174,7 +174,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { qualityBlock } = await import("@/lib/dashboardext");
+    const { qualityBlock } = await import("@/lib/tien-do/dashboardext");
 
     const pA = await insertId(`INSERT INTO projects (name) VALUES ('Test QB Leak A')`);
     const pB = await insertId(`INSERT INTO projects (name) VALUES ('Test QB Leak B')`);
@@ -204,8 +204,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { procurementBlock } = await import("@/lib/dashboardext");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { procurementBlock } = await import("@/lib/tien-do/dashboardext");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const pA = await insertId(`INSERT INTO projects (name) VALUES ('Test Proc Leak A')`);
     const pB = await insertId(`INSERT INTO projects (name) VALUES ('Test Proc Leak B')`);

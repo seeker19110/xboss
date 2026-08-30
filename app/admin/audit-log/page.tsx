@@ -9,8 +9,8 @@ import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton, Skeleton } from "@/app/components/Skeleton";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { ROLE_LABELS } from "@/lib/roles";
-import { AUDIT_ENTITY_TYPES } from "@/lib/audit";
+import { ROLE_LABELS } from "@/lib/nen/roles";
+import { AUDIT_ENTITY_TYPES } from "@/lib/bao-mat/audit";
 
 type AuditAction = "INSERT" | "UPDATE" | "DELETE";
 
@@ -191,23 +191,24 @@ export default function AuditLogPage() {
           <button
             onClick={exportExcel}
             aria-label="Xuất Excel"
-            className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+            className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-zinc-200 hover:text-white h-10"
           >
-            <Download className="w-4 h-4" /> <span className="hidden sm:inline">Xuất Excel</span>
+            <Download className="w-4 h-4 text-emerald-400" />{" "}
+            <span className="hidden sm:inline">Xuất Excel</span>
           </button>
         }
       />
 
-      <main className="p-4 sm:p-6 pb-24 space-y-4">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="text-xs text-zinc-400">
+      <main className="p-4 sm:p-6 pb-24 space-y-6 max-w-screen-2xl mx-auto">
+        <div className="bento-card p-4 sm:p-5 space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-xs font-semibold text-zinc-300">
               Thực thể
               <select
                 value={entity}
                 onChange={(e) => setEntity(e.target.value)}
                 aria-label="Lọc theo loại thực thể"
-                className="mt-1 block w-44 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+                className="mt-1 block w-44 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 transition"
               >
                 <option value="">Tất cả</option>
                 {AUDIT_ENTITY_TYPES.map((t) => (
@@ -217,7 +218,7 @@ export default function AuditLogPage() {
                 ))}
               </select>
             </label>
-            <label className="text-xs text-zinc-400">
+            <label className="text-xs font-semibold text-zinc-300">
               ID thực thể
               <input
                 value={entityId}
@@ -225,10 +226,10 @@ export default function AuditLogPage() {
                 inputMode="numeric"
                 placeholder="vd: 12"
                 aria-label="Lọc theo ID thực thể"
-                className="mt-1 block w-24 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500"
+                className="mt-1 block w-24 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 transition"
               />
             </label>
-            <label className="text-xs text-zinc-400">
+            <label className="text-xs font-semibold text-zinc-300">
               ID người thực hiện
               <input
                 value={actorId}
@@ -236,32 +237,32 @@ export default function AuditLogPage() {
                 inputMode="numeric"
                 placeholder="vd: 3"
                 aria-label="Lọc theo ID người thực hiện"
-                className="mt-1 block w-28 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500"
+                className="mt-1 block w-28 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 transition"
               />
             </label>
-            <label className="text-xs text-zinc-400">
+            <label className="text-xs font-semibold text-zinc-300">
               Từ ngày
               <input
                 type="date"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
                 aria-label="Từ ngày"
-                className="mt-1 block bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+                className="mt-1 block bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 transition"
               />
             </label>
-            <label className="text-xs text-zinc-400">
+            <label className="text-xs font-semibold text-zinc-300">
               Đến ngày
               <input
                 type="date"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
                 aria-label="Đến ngày"
-                className="mt-1 block bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+                className="mt-1 block bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 transition"
               />
             </label>
           </div>
-          <p className="text-xs text-zinc-400">
-            Tổng: <b className="text-zinc-100">{total}</b> bản ghi.
+          <p className="text-xs text-zinc-400 font-mono">
+            Tổng: <b className="text-emerald-400 font-bold">{total}</b> bản ghi audit trail.
           </p>
         </div>
 
@@ -291,7 +292,7 @@ export default function AuditLogPage() {
             message="Không có audit trail khớp bộ lọc hiện tại."
           />
         ) : (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="bento-card overflow-hidden">
             <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Audit trail">
               <table className="w-full text-sm sm:min-w-[860px]">
                 <thead className="sticky top-0 bg-zinc-900 z-10">

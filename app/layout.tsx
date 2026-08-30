@@ -8,7 +8,7 @@ import BottomBarSpacer from "@/app/components/BottomBarSpacer";
 
 export const metadata: Metadata = {
   title: "XBoss — ACMV Tracking",
-  description: "Quản lý tiến độ thi công ACMV — TT AVIO Tháp A",
+  description: "Quản lý tiến độ thi công MEP/ACMV",
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icon.svg", apple: "/icon-192.png" },
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "XBoss" },
@@ -30,7 +30,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <Script
           id="theme-init"
           strategy="beforeInteractive"
-        >{`try{var T=['dark','light','kingblue','darkblue','navy'];var C={light:'#f6f7f9',dark:'#0a0a0a',kingblue:'#0a1f4d',darkblue:'#0c1a2e',navy:'#060b18'};var t=localStorage.getItem('xboss_theme');var active='light';if(t&&T.indexOf(t)>=0&&t!=='light'){var e=document.documentElement;e.classList.remove('light');e.classList.add(t);active=t;}var m=document.querySelector('meta[name="theme-color"]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');document.head.appendChild(m);}m.setAttribute('content',C[active]);}catch(_){}`}</Script>
+        >{`try{var T=['dark','light','kingblue','darkblue','navy'];var C={light:'#f6f7f9',dark:'#0a0a0a',kingblue:'#0a1f4d',darkblue:'#0e1726',navy:'#060b18'};var t=localStorage.getItem('xboss_theme');var active='light';if(t&&T.indexOf(t)>=0&&t!=='light'){var e=document.documentElement;e.classList.remove('light');e.classList.add(t);active=t;}var m=document.querySelector('meta[name="theme-color"]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');document.head.appendChild(m);}m.setAttribute('content',C[active]);}catch(_){}`}</Script>
         <Script
           id="sidebar-init"
           strategy="beforeInteractive"

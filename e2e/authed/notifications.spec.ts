@@ -1,11 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-// Trang /notifications — trung tâm thông báo (feed trễ hạn/đến hạn/bình luận/vật tư vượt định
-// mức + cài đặt). Mật độ ứng viên contrast cao (23 chỗ) — quy tắc tương phản: docs/audit.md §13.
+// Trung tâm thông báo (feed trễ hạn/đến hạn/bình luận/vật tư vượt định mức + cài đặt) — đã gộp
+// vào tab "Thông báo" của /my-tasks; route /notifications cũ chỉ còn chuyển hướng sang đây.
+// Mật độ ứng viên contrast cao (23 chỗ) — quy tắc tương phản: docs/audit.md §13.
 
 async function gotoNotifications(page: Page) {
-  await page.goto("/notifications");
+  await page.goto("/my-tasks?tab=notifications");
   // Nút "Làm mới" trên AppHeader chỉ render sau khi feed đã tải xong (qua PageSkeleton).
   await expect(page.getByRole("button", { name: /Làm mới/ })).toBeVisible({ timeout: 15_000 });
 }
@@ -13,6 +14,14 @@ async function gotoNotifications(page: Page) {
 test.describe("Thông báo (sau đăng nhập)", () => {
   test("render nội dung chính", async ({ page }) => {
     await gotoNotifications(page);
+  });
+
+  test("route /notifications cũ chuyển hướng sang tab Thông báo của /my-tasks", async ({
+    page,
+  }) => {
+    await page.goto("/notifications");
+    await expect(page).toHaveURL(/\/my-tasks\?tab=notifications/, { timeout: 15_000 });
+    await expect(page.getByRole("button", { name: /Làm mới/ })).toBeVisible({ timeout: 15_000 });
   });
 
   test("không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
@@ -68,7 +77,7 @@ test.describe("Chuông thông báo — dropdown (sau đăng nhập)", () => {
   });
 });
 
-// Trang /notifications/all (M40 — danh sách đầy đủ thông báo, khác /notifications feed cũ).
+// Trang /notifications/all (M40 — danh sách đầy đủ bảng notifications, khác feed ở /my-tasks).
 test.describe("Tất cả thông báo (sau đăng nhập)", () => {
   test("render nội dung chính, không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
     await page.goto("/notifications/all");

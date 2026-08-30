@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { getCurrentUser, canTouchPackage } from "@/lib/auth";
+import { getCurrentUser, canTouchPackage } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 

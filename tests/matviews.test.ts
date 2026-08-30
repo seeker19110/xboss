@@ -178,7 +178,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { runReport } = await import("@/lib/reports");
+    const { runReport } = await import("@/lib/tien-do/reports");
 
     let projectId = 0;
     let towerId = 0;

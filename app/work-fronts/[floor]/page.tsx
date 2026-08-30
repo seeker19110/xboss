@@ -8,7 +8,7 @@ import { showToast } from "@/app/components/Toast";
 import { appConfirm } from "@/app/components/dialogs";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { compressImageToWebp } from "@/app/lib/compressImage";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN } from "@/lib/nen/date";
 
 type Stage = { id: number; name: string; sortOrder: number; active: boolean; durationDays: number };
 type Supplier = { id: number; name: string };
@@ -86,7 +86,7 @@ export default function FloorStageFrontsPage({ params }: { params: Promise<{ flo
 
       <main className="p-4 sm:p-6 pb-24 space-y-4">
         <Link
-          href="/work-fronts"
+          href="/site?tab=work-fronts"
           className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white"
         >
           <ArrowLeft className="w-4 h-4" /> Quay lại danh sách tầng
@@ -408,7 +408,7 @@ function StageCard({
             <button
               onClick={save}
               disabled={busy}
-              className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold px-4 py-2 rounded-lg text-sm"
+              className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold px-4 py-2 rounded-lg text-sm"
             >
               {busy ? "Đang lưu…" : "Lưu"}
             </button>

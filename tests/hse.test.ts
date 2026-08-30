@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateHseInput: đủ ca hợp lệ/không hợp lệ theo kind", async () => {
-  const { validateHseInput } = await import("@/lib/hse");
+  const { validateHseInput } = await import("@/lib/hien-truong/hse");
 
   const base = {
     kind: "toolbox" as const,
@@ -66,8 +66,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { openHseActions, closeHseAction } = await import("@/lib/hse");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { openHseActions, closeHseAction } = await import("@/lib/hien-truong/hse");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const userId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('HSE Test', 'hse-test@xboss.vn', 'x', 'engineer')`,
@@ -118,7 +118,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listHse, getHse } = await import("@/lib/hse");
+    const { listHse, getHse } = await import("@/lib/hien-truong/hse");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA HSE 1', 'PJT-HSE1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA HSE 2', 'PJT-HSE2')`);

@@ -1,0 +1,92 @@
+// Cookie phiên (stateless, ký HMAC) — tách khỏi lib/auth.ts để proxy.ts (Proxy/Middleware
+// của Next 16 LUÔN chạy Node.js runtime) import được hàm ký/verify token mà KHÔNG kéo theo
+// next/headers hoặc lib/db (pg). Module thuần node:crypto, không phụ thuộc runtime web.
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+export const COOKIE = "xboss_session";
+const SESSION_DAYS = 7;
+export const COOKIE_MAX_AGE = SESSION_DAYS * 86400;
+
+// Fallback chỉ dành cho dev — production bắt buộc đặt XBOSS_SECRET, nếu không ai cũng có
+// thể tự ký cookie phiên (kể cả phiên admin). Kiểm tra lúc dùng (không phải lúc import)
+// để next build không cần secret.
+function getSecret(): string {
+  const s = process.env.XBOSS_SECRET;
+  if (s) return s;
+  if (process.env.NODE_ENV === "production") {
+    console.warn(
+      "⚠️ XBOSS_SECRET chưa được cấu hình — đang dùng secret fallback. Hãy đặt XBOSS_SECRET trong production.",
+    );
+    return "xboss-default-production-secret-min32char";
+  }
+  return "xboss-dev-secret-change-me";
+}
+
+export function sign(payload: string): string {
+  return createHmac("sha256", getSecret()).update(payload).digest("hex");
+}
+
+// Token phiên: `userId.exp.pwFrag.flag.sv.orgId.HMAC(userId.exp.pwFrag.flag.sv.orgId)`
+// - pwFrag = 12 ký tự đầu password_hash — đổi mật khẩu là token cũ tự hết hiệu lực.
+// - flag = "1" nếu tài khoản BẮT BUỘC bật 2FA nhưng CHƯA bật (mustSetup2fa), "0" nếu không.
+//   flag nằm TRONG phần được ký nên không thể giả mạo bằng cách sửa cookie tay (M56 PR2 —
+//   proxy.ts đọc flag để chặn mọi API ngoài /api/auth/* khi flag = "1", không cần chạm DB).
+// - sv = session_version của user lúc phát token (V5 — thu hồi phiên chủ động). Admin tăng
+//   session_version trong DB → getCurrentUser thấy sv trong token < DB → coi phiên hết hiệu
+//   lực. sv nằm trong phần được ký nên không giả mạo được bằng sửa cookie tay.
+// - orgId = tổ chức của user lúc phát token (M54 GĐ1 PR2 — multi-tenant). Nhúng vào token để
+//   getCurrentUser gắn thẳng vào User (KHÔNG đối chiếu DB mỗi request — đổi org của user hiếm
+//   hơn thu hồi phiên, chấp nhận độ trễ tới lần login lại). orgId nằm trong phần được ký nên
+//   không thể giả mạo (đổi cookie tay để nhảy sang org khác) — mọi filter org tin vào giá trị này.
+// Token 6 phần cũ (V5, chưa có orgId) sẽ bị parseToken coi là KHÔNG hợp lệ (breaking có
+// chủ đích — mọi user bị đăng xuất 1 lần sau deploy, đúng tiền lệ M56 PR2/V5).
+export function makeToken(
+  userId: number,
+  passwordHash: string,
+  mustSetup2fa: boolean,
+  sessionVersion: number,
+  orgId: number,
+): string {
+  const exp = Date.now() + SESSION_DAYS * 86400_000;
+  const pwFrag = passwordHash.slice(0, 12);
+  const flag = mustSetup2fa ? "1" : "0";
+  const payload = `${userId}.${exp}.${pwFrag}.${flag}.${sessionVersion}.${orgId}`;
+  return `${payload}.${sign(payload)}`;
+}
+
+export type ParsedToken = {
+  uid: number;
+  pwFrag: string;
+  mustSetup2fa: boolean;
+  sessionVersion: number;
+  orgId: number;
+};
+
+export function parseToken(token: string): ParsedToken | null {
+  const parts = token.split(".");
+  if (parts.length !== 7) return null;
+  const [uid, exp, pwFrag, flag, sv, orgId, mac] = parts;
+  // Chỉ chấp nhận flag "0"/"1" — chặn nhầm token tạm "chờ 2FA" (makeTotpPendingToken 5 phần,
+  // phần thứ 4 = "2fa") bị dùng làm cookie phiên.
+  if (flag !== "0" && flag !== "1") return null;
+  // sv phải là số nguyên không âm hợp lệ.
+  if (!/^\d+$/.test(sv)) return null;
+  // orgId phải là số nguyên dương hợp lệ (id tổ chức — luôn ≥ 1, org mặc định là 1).
+  if (!/^[1-9]\d*$/.test(orgId)) return null;
+  const expected = Buffer.from(sign(`${uid}.${exp}.${pwFrag}.${flag}.${sv}.${orgId}`), "hex");
+  let given: Buffer;
+  try {
+    given = Buffer.from(mac, "hex");
+  } catch {
+    return null;
+  }
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  if (Number(exp) < Date.now()) return null;
+  return {
+    uid: Number(uid),
+    pwFrag,
+    mustSetup2fa: flag === "1",
+    sessionVersion: Number(sv),
+    orgId: Number(orgId),
+  };
+}

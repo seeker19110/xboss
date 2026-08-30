@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getAgentSession } from "@/lib/engineering-agents";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getAgentSession } from "@/lib/ky-thuat/engineering-agents";
 
 export const dynamic = "force-dynamic";
 

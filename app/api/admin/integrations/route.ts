@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { query } from "@/lib/db";
-import { getAdapter } from "@/lib/integrations/core";
+import { getAdapter } from "@/lib/ha-tang/integrations/core";
 
 export const dynamic = "force-dynamic";
 

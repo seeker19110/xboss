@@ -9,7 +9,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { handoverBlocked } = await import("@/lib/qaqc");
+    const { handoverBlocked } = await import("@/lib/ky-thuat/qaqc");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test qaqc')`);
     const towerId = await insertId(
@@ -98,7 +98,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { packagesWithQcBlock } = await import("@/lib/qaqc");
+    const { packagesWithQcBlock } = await import("@/lib/ky-thuat/qaqc");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test qc icon')`);
     const towerId = await insertId(
@@ -161,7 +161,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { methodStatementBlocked } = await import("@/lib/qaqc");
+    const { methodStatementBlocked } = await import("@/lib/ky-thuat/qaqc");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test method gate')`);
     const towerId = await insertId(
@@ -218,7 +218,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { requiredInspectionMissing } = await import("@/lib/qaqc");
+    const { requiredInspectionMissing } = await import("@/lib/ky-thuat/qaqc");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test qaqc gate')`);
     const towerId = await insertId(
@@ -275,7 +275,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { nextSeqCode, withUniqueRetry } = await import("@/lib/seqcode");
+    const { nextSeqCode, withUniqueRetry } = await import("@/lib/ha-tang/seqcode");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test YCNT')`);
     const towerId = await insertId(
@@ -349,7 +349,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { DOC_CATEGORIES } = await import("@/lib/qaqc");
+    const { DOC_CATEGORIES } = await import("@/lib/ky-thuat/qaqc");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test doc category')`);
     const towerId = await insertId(
@@ -390,7 +390,7 @@ test(
 // ===== Test thuần (validate JSONB) =====
 
 test("validateChecklistItems: chấp nhận mảng hợp lệ, từ chối dữ liệu rác", async () => {
-  const { validateChecklistItems } = await import("@/lib/qaqc");
+  const { validateChecklistItems } = await import("@/lib/ky-thuat/qaqc");
   assert.equal(validateChecklistItems([{ label: "Độ kín", type: "pass_fail" }]), true);
   assert.equal(
     validateChecklistItems([{ label: "Lưu lượng", type: "measure", unit: "m3/h" }]),
@@ -404,7 +404,7 @@ test("validateChecklistItems: chấp nhận mảng hợp lệ, từ chối dữ 
 });
 
 test("validateInspectionResults: chấp nhận mảng hợp lệ, từ chối dữ liệu rác", async () => {
-  const { validateInspectionResults } = await import("@/lib/qaqc");
+  const { validateInspectionResults } = await import("@/lib/ky-thuat/qaqc");
   assert.equal(validateInspectionResults([{ label: "Độ kín", pass: true }]), true);
   assert.equal(
     validateInspectionResults([{ label: "Lưu lượng", pass: false, measured: "12", note: "thấp" }]),
@@ -419,7 +419,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listQcChecklists, listNcrs } = await import("@/lib/qaqc");
+    const { listQcChecklists, listNcrs } = await import("@/lib/ky-thuat/qaqc");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA QC 1', 'PJT-QC1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA QC 2', 'PJT-QC2')`);

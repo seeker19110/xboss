@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, run, withTransaction } from "@/lib/db";
-import { recomputeTask } from "@/lib/recompute";
-import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
-import { handoverBlocked, methodStatementBlocked } from "@/lib/qaqc";
+import { recomputeTask } from "@/lib/tien-do/recompute";
+import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { handoverBlocked, methodStatementBlocked } from "@/lib/ky-thuat/qaqc";
 
 export const dynamic = "force-dynamic";
 

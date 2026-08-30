@@ -13,7 +13,7 @@ import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
 import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
-import { toSlug } from "@/lib/sheets";
+import { toSlug } from "@/lib/nen/sheets";
 import SCurveChart from "@/app/components/SCurveChart";
 import ProgressMap from "@/app/components/ProgressMap";
 import SpiCards from "@/app/components/SpiCards";
@@ -227,7 +227,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
             action={
               <a
                 href={`/system/${system}`}
-                className="mt-1 inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-on-accent text-sm font-medium px-4 py-2 rounded-lg transition"
+                className="mt-1 inline-flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-on-accent text-sm font-medium px-4 py-2 rounded-lg transition"
               >
                 Tạo sheet cho hệ {label}
               </a>
@@ -489,7 +489,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
               <button
                 onClick={createSheet}
                 disabled={creatingSheet || !newSheetName.trim()}
-                className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 rounded-lg font-semibold transition text-on-accent"
+                className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 rounded-lg font-semibold transition text-on-accent"
               >
                 {creatingSheet ? "Đang tạo…" : "Tạo hạng mục"}
               </button>

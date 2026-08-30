@@ -7,7 +7,7 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoCorrespondences(page: Page) {
   await page.goto("/correspondences");
-  await expect(page.getByPlaceholder("Tìm số VB/trích yếu…")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByPlaceholder("Tìm số VB / trích yếu…")).toBeVisible({ timeout: 15_000 });
 }
 
 test.describe("Công văn (sau đăng nhập)", () => {

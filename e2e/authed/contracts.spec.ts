@@ -14,9 +14,13 @@ async function gotoContracts(page: Page) {
 test.describe("Hợp đồng (sau đăng nhập)", () => {
   test("render nội dung chính + 3 thẻ tổng theo loại", async ({ page }) => {
     await gotoContracts(page);
-    await expect(page.getByText("Nhận thầu", { exact: false }).first()).toBeVisible();
-    await expect(page.getByText("Giao thầu", { exact: false }).first()).toBeVisible();
-    await expect(page.getByText("Nhà cung cấp", { exact: false }).first()).toBeVisible();
+    // Giới hạn trong <main>: sidebar desktop LUÔN mount (chỉ ẩn bằng CSS trên mobile) và
+    // cũng có nhãn "Nhà cung cấp", nên .first() không giới hạn sẽ bắt trúng phần tử sidebar
+    // — pass giả trên desktop (sidebar hiện) và đỏ trên mobile (sidebar ẩn).
+    const main = page.getByRole("main");
+    await expect(main.getByText("Nhận thầu", { exact: false }).first()).toBeVisible();
+    await expect(main.getByText("Giao thầu", { exact: false }).first()).toBeVisible();
+    await expect(main.getByText("Nhà cung cấp", { exact: false }).first()).toBeVisible();
   });
 
   test("mở modal thêm hợp đồng, chuyển loại đổi form đối tác", async ({ page }) => {

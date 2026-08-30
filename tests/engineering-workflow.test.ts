@@ -10,7 +10,7 @@ import {
   canTransition,
   riskInputsSchema,
   HIGH_FINANCIAL_IMPACT_VND,
-} from "@/lib/engineering-workflow";
+} from "@/lib/ky-thuat/engineering-workflow";
 
 const S = { skip: !HAS_TEST_DB };
 
@@ -116,7 +116,7 @@ before(async () => {
 
   // 1 suggestion đã accepted để Gate 0 đi qua được.
   const { ingestIntelligencePackage, intelligencePackageInputSchema, decideSuggestion } =
-    await import("@/lib/engineering-intel");
+    await import("@/lib/ky-thuat/engineering-intel");
   const r = await ingestIntelligencePackage(
     pA,
     null,
@@ -164,9 +164,9 @@ after(async () => {
 
 test("Gate 0 CHẶN: suggestion chưa accepted → không tạo được workflow", S, async () => {
   const { ingestIntelligencePackage, intelligencePackageInputSchema } =
-    await import("@/lib/engineering-intel");
+    await import("@/lib/ky-thuat/engineering-intel");
   const { createWorkflow, Gate0FailedError, workflowInputSchema } =
-    await import("@/lib/engineering-workflow");
+    await import("@/lib/ky-thuat/engineering-workflow");
   const { queryOne } = await import("@/lib/db");
 
   const r = await ingestIntelligencePackage(
@@ -213,7 +213,7 @@ test("Gate 0 CHẶN: suggestion chưa accepted → không tạo được workflo
 
 test("Gate 0 CHẶN: non-reversible mà không khai rollback strategy", S, async () => {
   const { createWorkflow, Gate0FailedError, workflowInputSchema } =
-    await import("@/lib/engineering-workflow");
+    await import("@/lib/ky-thuat/engineering-workflow");
   await assert.rejects(
     () =>
       createWorkflow(
@@ -230,7 +230,7 @@ test("Gate 0 CHẶN: non-reversible mà không khai rollback strategy", S, async
 
 test("Luồng đủ PROFILE-C: tạo → submit → ký 2 gate → approved", S, async () => {
   const { createWorkflow, submitForApproval, approveGate, getWorkflow, workflowInputSchema } =
-    await import("@/lib/engineering-workflow");
+    await import("@/lib/ky-thuat/engineering-workflow");
 
   const wf = await createWorkflow(
     pA,
@@ -266,7 +266,7 @@ test("Luồng đủ PROFILE-C: tạo → submit → ký 2 gate → approved", S,
 
 test("Separation of duties: người tạo không được tự ký", S, async () => {
   const { createWorkflow, submitForApproval, approveGate, workflowInputSchema } =
-    await import("@/lib/engineering-workflow");
+    await import("@/lib/ky-thuat/engineering-workflow");
   const wf = await createWorkflow(
     pA,
     engineer,
@@ -282,7 +282,7 @@ test("Separation of duties: người tạo không được tự ký", S, async (
 
 test("Separation of duties: rủi ro cao — 1 người không ký 2 gate", S, async () => {
   const { createWorkflow, submitForApproval, approveGate, workflowInputSchema } =
-    await import("@/lib/engineering-workflow");
+    await import("@/lib/ky-thuat/engineering-workflow");
   const wf = await createWorkflow(
     pA,
     engineer,
@@ -305,7 +305,7 @@ test("Separation of duties: rủi ro cao — 1 người không ký 2 gate", S, a
 
 test("Từ chối 1 gate → workflow rejected ngay, không cần ký gate còn lại", S, async () => {
   const { createWorkflow, submitForApproval, approveGate, getWorkflow, workflowInputSchema } =
-    await import("@/lib/engineering-workflow");
+    await import("@/lib/ky-thuat/engineering-workflow");
   const wf = await createWorkflow(
     pA,
     engineer,
@@ -323,7 +323,7 @@ test("Từ chối 1 gate → workflow rejected ngay, không cần ký gate còn 
 
 test("PROFILE-A (không side effect): không gate, submit là approved luôn", S, async () => {
   const { createWorkflow, submitForApproval, getWorkflow, workflowInputSchema } =
-    await import("@/lib/engineering-workflow");
+    await import("@/lib/ky-thuat/engineering-workflow");
   const wf = await createWorkflow(
     pA,
     engineer,
@@ -342,7 +342,7 @@ test("PROFILE-A (không side effect): không gate, submit là approved luôn", S
 
 test("Cách ly đa dự án: không đọc/ký được workflow của dự án khác", S, async () => {
   const { createWorkflow, getWorkflow, submitForApproval, workflowInputSchema } =
-    await import("@/lib/engineering-workflow");
+    await import("@/lib/ky-thuat/engineering-workflow");
   const wf = await createWorkflow(
     pA,
     engineer,

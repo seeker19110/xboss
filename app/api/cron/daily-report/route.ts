@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { query } from "@/lib/db";
-import { getCurrentUser, CAN, checkCronSecret } from "@/lib/auth";
-import { buildDailyReport, reportToHtml, reportToTelegramText, sendTelegram } from "@/lib/report";
-import { sendPushToAll } from "@/lib/push";
-import { getEvmSeries } from "@/lib/evm";
-import { getAlertThreshold } from "@/lib/alerts";
-import { acquireSyncLock, releaseSyncLock } from "@/lib/sync-locks";
+import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
+import {
+  buildDailyReport,
+  reportToHtml,
+  reportToTelegramText,
+  sendTelegram,
+} from "@/lib/tien-do/report";
+import { sendPushToAll } from "@/lib/van-hanh/push";
+import { getEvmSeries } from "@/lib/tien-do/evm";
+import { getAlertThreshold } from "@/lib/van-hanh/alerts";
+import { acquireSyncLock, releaseSyncLock } from "@/lib/ha-tang/sync-locks";
 
 export const dynamic = "force-dynamic";
 

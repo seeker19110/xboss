@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { deleteAlertRule } from "@/lib/alerts";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { deleteAlertRule } from "@/lib/van-hanh/alerts";
 
 export const dynamic = "force-dynamic";
 

@@ -15,7 +15,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, queryOne, query, run } = await import("@/lib/db");
-    const { sha256Hex } = await import("@/lib/photos");
+    const { sha256Hex } = await import("@/lib/nen/photos");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test photo dedupe')`);
     const towerId = await insertId(

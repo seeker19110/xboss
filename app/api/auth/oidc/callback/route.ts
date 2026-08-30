@@ -8,10 +8,10 @@ import {
   oidcCallbackBlocked,
   recordOidcCallbackFailure,
   type SsoClaims,
-} from "@/lib/oidc";
-import { OIDC_TMP_COOKIE } from "../login/route";
-import { makeToken, COOKIE, COOKIE_MAX_AGE } from "@/lib/auth";
-import { log } from "@/lib/log";
+  OIDC_TMP_COOKIE,
+} from "@/lib/bao-mat/oidc";
+import { makeToken, isSecureCookie, COOKIE, COOKIE_MAX_AGE } from "@/lib/bao-mat/auth";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
       path: "/",
       maxAge: COOKIE_MAX_AGE,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecureCookie(req),
     },
   );
   res.cookies.delete({ name: OIDC_TMP_COOKIE, path: "/api/auth/oidc" });

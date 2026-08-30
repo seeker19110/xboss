@@ -10,7 +10,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import type { EntityApprovalStatus } from "@/lib/approvals";
+import type { EntityApprovalStatus } from "@/lib/tien-do/approvals";
 
 type CertStatus = "draft" | "submitted" | "approved" | "rejected";
 const STATUS_LABEL: Record<CertStatus, string> = {
@@ -184,16 +184,16 @@ function PaymentCertsInner() {
           />
         ) : (
           <>
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="text-xs text-zinc-400">
-                Hợp đồng
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <label className="flex items-center gap-2 text-xs font-semibold text-zinc-300">
+                Hợp đồng:
                 <select
                   value={contractId}
                   onChange={(e) => {
                     setContractId(Number(e.target.value));
                     setSelectedId(null);
                   }}
-                  className="mt-1 min-w-[260px] bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="min-w-[260px] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 h-10 transition"
                 >
                   {contracts.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -206,7 +206,7 @@ function PaymentCertsInner() {
                 <button
                   onClick={createCert}
                   disabled={creating || !contractId}
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] disabled:opacity-50 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
                 >
                   <Plus className="w-4 h-4" /> {creating ? "Đang lập…" : "Lập đợt mới"}
                 </button>
@@ -214,32 +214,57 @@ function PaymentCertsInner() {
             </div>
 
             {contract && (
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
-                  <p className="text-xs text-zinc-400 uppercase tracking-wide">Giá trị HĐ</p>
-                  <p className="text-lg font-semibold mt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bento-card p-4 flex flex-col justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    Giá trị hợp đồng
+                  </span>
+                  <p className="text-2xl font-bold font-mono tabular-nums text-zinc-100 mt-2">
                     <MaskedValue value={contractValue} format={fmtVND} />
                   </p>
+                  <p className="text-[11px] text-zinc-500 mt-1">Bao gồm phụ lục bổ sung</p>
                 </div>
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
-                  <p className="text-xs text-zinc-400 uppercase tracking-wide">Luỹ kế đã duyệt</p>
+                <div className="bento-card p-4 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                      Luỹ kế đã duyệt
+                    </span>
+                    {pctUsed != null && (
+                      <span className="text-xs font-bold font-mono text-emerald-400">
+                        {pctUsed}%
+                      </span>
+                    )}
+                  </div>
                   <p
-                    className={`text-lg font-semibold mt-1 ${overContract ? "text-rose-300" : ""}`}
+                    className={`text-2xl font-bold font-mono tabular-nums mt-2 ${overContract ? "text-rose-400" : "text-emerald-400"}`}
                   >
                     <MaskedValue value={approvedCumulative} format={fmtVND} />
                   </p>
+                  <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden mt-2 border border-zinc-800">
+                    <div
+                      className={`h-full rounded-full transition-all ${overContract ? "bg-rose-500" : "bg-emerald-500"}`}
+                      style={{
+                        width: `${pctUsed != null ? Math.min(100, pctUsed) : 0}%`,
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
-                  <p className="text-xs text-zinc-400 uppercase tracking-wide">% dùng</p>
-                  <p className="text-lg font-semibold mt-1">
-                    <MaskedValue value={pctUsed} format={(n) => `${n}%`} />
+                <div className="bento-card p-4 flex flex-col justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    Số đợt thanh toán
+                  </span>
+                  <p className="text-2xl font-bold font-mono tabular-nums text-sky-400 mt-2">
+                    {certs.length} đợt
+                  </p>
+                  <p className="text-[11px] text-zinc-500 mt-1">
+                    Đã duyệt: {certs.filter((c) => c.status === "approved").length}
                   </p>
                 </div>
               </div>
             )}
 
             {overContract && (
-              <div className="bg-rose-950 border border-rose-900/60 rounded-xl px-4 py-3 text-xs text-rose-200">
+              <div className="bento-card border-rose-900/60 bg-rose-950/20 px-4 py-3 text-xs text-rose-200">
                 Luỹ kế đã duyệt vượt giá trị hợp đồng (gồm phụ lục) — kiểm tra lại phụ lục/VO trước
                 khi lập đợt tiếp theo.
               </div>
@@ -251,7 +276,7 @@ function PaymentCertsInner() {
                 compact
               />
             ) : (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+              <div className="bento-card overflow-hidden">
                 <div
                   className="overflow-x-auto"
                   tabIndex={0}
@@ -566,7 +591,7 @@ function CertDetailModal({
             <button
               onClick={submitCert}
               disabled={busy}
-              className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
+              className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
             >
               Trình lên CĐT/TVGS
             </button>
@@ -576,7 +601,7 @@ function CertDetailModal({
               <button
                 onClick={() => decide("approved")}
                 disabled={busy}
-                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
+                className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
               >
                 Duyệt
               </button>

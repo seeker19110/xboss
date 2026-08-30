@@ -51,8 +51,13 @@ try {
 }
 
 // TAP tóm tắt của node:test in ra các dòng "# pass 12" / "# fail 0" / "# skipped 3".
+// node:test đổi reporter mặc định theo phiên bản: reporter `tap` in "# pass 11", còn
+// reporter `spec` (mặc định từ Node 20+ khi stdout không phải TTY) in "ℹ pass 11". Trước
+// đây hàm này chỉ khớp dạng TAP nên trên Node 24 KHÔNG khớp dòng nào — total.pass/fail/
+// skipped luôn = 0, và cổng release-gate (chặn dựa trên total.skipped > 0) chưa từng
+// kích hoạt. Khớp cả hai dạng để cổng hoạt động thật.
 function tapCount(out, label) {
-  const m = out.match(new RegExp(`^# ${label} (\\d+)$`, "m"));
+  const m = out.match(new RegExp(`^(?:#|ℹ) ${label} (\\d+)$`, "m"));
   return m ? Number(m[1]) : 0;
 }
 
@@ -62,37 +67,46 @@ const skippedByFile = {};
 
 let failed = 0;
 const coverageMaps = [];
-for (const file of files) {
-  process.stdout.write(`\n=== ${file} ===\n`);
-  let res;
-  if (coverageMode) {
-    // dùng `node --import=tsx-loader --test` thay vì binary `tsx` để truyền được cờ coverage;
-    // bắt stdout để vừa in lại vừa trích bảng coverage, giữ stderr/stdin inherit như cũ.
-    res = spawnSync(
-      process.execPath,
-      ["--experimental-test-coverage", `--import=${tsxLoader}`, "--test", file],
-      { stdio: ["inherit", "pipe", "inherit"], encoding: "utf8" },
-    );
-    process.stdout.write(res.stdout ?? "");
-    if (res.stdout) coverageMaps.push(parseCoverageTable(res.stdout));
-  } else {
-    // Bắt stdout để đếm được pass/fail/skip rồi in lại NGUYÊN VẸN — người xem log vẫn thấy
-    // đúng những gì trước đây thấy, chỉ thêm phần tổng kết ở cuối.
-    res = spawnSync(process.execPath, [`--import=${tsxLoader}`, "--test", file], {
-      stdio: ["inherit", "pipe", "inherit"],
-      encoding: "utf8",
-    });
-    process.stdout.write(res.stdout ?? "");
-  }
-  if (res.status !== 0) failed++;
 
-  const out = res.stdout ?? "";
-  total.pass += tapCount(out, "pass");
-  total.fail += tapCount(out, "fail");
-  total.todo += tapCount(out, "todo");
-  const skipped = tapCount(out, "skipped");
+/** Cộng dồn kết quả 1 lần chạy vào bảng tổng. */
+function thuKetQua(nhan, out, status) {
+  process.stdout.write(`\n=== ${nhan} ===\n`);
+  process.stdout.write(out ?? "");
+  if (status !== 0) failed++;
+  const o = out ?? "";
+  total.pass += tapCount(o, "pass");
+  total.fail += tapCount(o, "fail");
+  total.todo += tapCount(o, "todo");
+  const skipped = tapCount(o, "skipped");
   total.skipped += skipped;
-  if (skipped > 0) skippedByFile[file] = skipped;
+  if (skipped > 0) skippedByFile[nhan] = skipped;
+}
+
+function chayDongBo(args, env) {
+  const res = spawnSync(process.execPath, args, {
+    stdio: ["inherit", "pipe", "inherit"],
+    encoding: "utf8",
+    env: { ...process.env, ...env },
+  });
+  return { out: res.stdout ?? "", status: res.status };
+}
+
+if (coverageMode) {
+  // Chế độ coverage giữ nguyên đường cũ: tuần tự, 1 process/file. Coverage cần gộp bảng
+  // theo từng tiến trình nên không song song hoá ở đây (chạy thủ công, không nằm trên CI).
+  for (const file of files) {
+    const { out, status } = chayDongBo([
+      "--experimental-test-coverage",
+      `--import=${tsxLoader}`,
+      "--test",
+      file,
+    ]);
+    if (out) coverageMaps.push(parseCoverageTable(out));
+    thuKetQua(file, out, status);
+  }
+} else {
+  const { chayNhanh } = await import("./run-tests-parallel.mjs");
+  await chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua });
 }
 
 process.stdout.write(
@@ -141,4 +155,9 @@ if (coverageMode) {
   }
 }
 
-process.exit(failed > 0 ? 1 : 0);
+// KHÔNG dùng process.exit(): khi stdout là PIPE (CI, spawnSync của check-coverage.ts),
+// write() là bất đồng bộ — exit() vứt bỏ phần output còn xếp hàng, làm cụt đúng khối
+// tổng kết coverage in cuối cùng ("Số file trong phạm vi"/"lines:"...) mà cổng ratchet
+// cần đọc (đã xảy ra thật trên CI PR #389: test xanh, exit 0, nhưng summary biến mất).
+// Đặt exitCode rồi để process tự thoát → Node drain hết stdout trước khi chết.
+process.exitCode = failed > 0 ? 1 : 0;

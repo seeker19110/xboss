@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { todayISO } from "@/lib/nen/date";
 import {
   Plus,
   X,
@@ -57,10 +58,6 @@ type Correspondence = {
   createdAt: string;
 };
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export default function CorrespondencesPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [items, setItems] = useState<Correspondence[]>([]);
@@ -117,14 +114,14 @@ export default function CorrespondencesPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <AppHeader
-        title="Công văn"
-        subtitle="Sổ công văn/RFI với CĐT/TVGS/Tổng thầu"
+        title="Sổ công văn"
+        subtitle="Quản lý Công văn · RFI · Chỉ thị hiện trường"
         bottomActions={
           canManage ? (
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm công văn"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm công văn</span>
             </button>
@@ -132,55 +129,77 @@ export default function CorrespondencesPage() {
         }
       />
 
-      <main className="p-4 sm:p-6 pb-24 space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Lọc theo trạng thái">
-            <button
-              onClick={() => setStatusFilter("")}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
-                statusFilter === ""
-                  ? "bg-zinc-700 border-zinc-600 text-white"
-                  : "border-zinc-700 text-zinc-400 hover:text-white"
-              }`}
+      <main className="p-4 sm:p-6 pb-24 space-y-6 max-w-screen-2xl mx-auto">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl"
+              role="group"
+              aria-label="Lọc theo trạng thái"
             >
-              Tất cả
-            </button>
-            {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
               <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
-                  statusFilter === s
-                    ? "bg-zinc-700 border-zinc-600 text-white"
-                    : "border-zinc-700 text-zinc-400 hover:text-white"
+                onClick={() => setStatusFilter("")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  statusFilter === ""
+                    ? "bg-zinc-800 text-white shadow-xs"
+                    : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
-                {STATUS_LABEL[s]}
+                Tất cả
               </button>
-            ))}
+              {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    statusFilter === s
+                      ? "bg-zinc-800 text-white shadow-xs"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {STATUS_LABEL[s]}
+                </button>
+              ))}
+            </div>
+
+            <div
+              className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl"
+              role="group"
+              aria-label="Lọc theo loại"
+            >
+              {(Object.keys(KIND_LABEL) as Kind[]).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setKindFilter(kindFilter === k ? "" : k)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    kindFilter === k
+                      ? "bg-sky-950/80 border border-sky-700 text-sky-300 shadow-xs"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {KIND_LABEL[k]}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Lọc theo loại">
-            {(Object.keys(KIND_LABEL) as Kind[]).map((k) => (
+
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Tìm số VB / trích yếu…"
+              aria-label="Tìm kiếm công văn"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-3 pr-8 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition h-10"
+            />
+            {q && (
               <button
-                key={k}
-                onClick={() => setKindFilter(kindFilter === k ? "" : k)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
-                  kindFilter === k
-                    ? "bg-sky-900 border-sky-700 text-sky-200"
-                    : "border-zinc-700 text-zinc-400 hover:text-white"
-                }`}
+                onClick={() => setQ("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
               >
-                {KIND_LABEL[k]}
+                <X className="w-3.5 h-3.5" />
               </button>
-            ))}
+            )}
           </div>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Tìm số VB/trích yếu…"
-            aria-label="Tìm kiếm công văn"
-            className="flex-1 min-w-[160px] bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-zinc-500"
-          />
         </div>
 
         {filtered.length === 0 ? (
@@ -190,7 +209,7 @@ export default function CorrespondencesPage() {
             message={canManage ? 'Bấm "Thêm công văn" để bắt đầu.' : "Chưa có dữ liệu công văn."}
           />
         ) : (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="bento-card overflow-hidden">
             <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Sổ công văn">
               <table className="w-full text-sm sm:min-w-[760px]">
                 <thead>
@@ -459,7 +478,7 @@ function AddCorrespondenceModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo công văn"}
         </button>
@@ -667,7 +686,7 @@ function CorrespondenceDetailModal({
                 <button
                   onClick={sendReply}
                   disabled={busy || !replyCode.trim() || !replySubject.trim()}
-                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
+                  className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
                 >
                   Gửi trả lời
                 </button>

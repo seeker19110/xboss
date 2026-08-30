@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Network, Info } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
@@ -158,6 +159,7 @@ export default function AgentSessionsPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader title="Phiên phối hợp agent" />
       <main className="mx-auto max-w-6xl px-4 py-6">
+        <EngineeringNav />
         {loading ? (
           <PageSkeleton />
         ) : !items || items.length === 0 ? (
@@ -299,7 +301,7 @@ export default function AgentSessionsPage() {
                               type="button"
                               disabled={submitting}
                               onClick={() => resolve(c.id, c.proposal.method)}
-                              className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm text-on-accent hover:bg-emerald-600 disabled:opacity-50"
+                              className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm text-on-accent hover:bg-emerald-800 disabled:opacity-50"
                             >
                               {submitting ? "Đang lưu..." : "Chốt xung đột"}
                             </button>

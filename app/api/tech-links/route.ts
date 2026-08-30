@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   TECH_CATEGORIES,
   listTechLinks,
   parseTechLinkBody,
   validateTechLink,
   type TechCategory,
-} from "@/lib/tech";
+} from "@/lib/ky-thuat/tech";
 
 export const dynamic = "force-dynamic";
 

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateTechLink: URL không https bị chặn", async () => {
-  const { validateTechLink } = await import("@/lib/tech");
+  const { validateTechLink } = await import("@/lib/ky-thuat/tech");
   const base = {
     category: "bim" as const,
     title: "P6 Online",
@@ -22,7 +22,7 @@ test("validateTechLink: URL không https bị chặn", async () => {
 });
 
 test("validateTechLink: embed chỉ cho host whitelist", async () => {
-  const { validateTechLink, EMBED_HOST_WHITELIST } = await import("@/lib/tech");
+  const { validateTechLink, EMBED_HOST_WHITELIST } = await import("@/lib/ky-thuat/tech");
   assert.ok(EMBED_HOST_WHITELIST.length > 0);
 
   const whitelisted = EMBED_HOST_WHITELIST[0];
@@ -51,7 +51,7 @@ test("validateTechLink: embed chỉ cho host whitelist", async () => {
 });
 
 test("validateAlbumInput: tên mốc bắt buộc, ngày đúng định dạng", async () => {
-  const { validateAlbumInput } = await import("@/lib/tech");
+  const { validateAlbumInput } = await import("@/lib/ky-thuat/tech");
   assert.equal(
     validateAlbumInput({
       milestoneLabel: "Hoàn thiện tầng 10",
@@ -74,7 +74,7 @@ test("validateAlbumInput: tên mốc bắt buộc, ngày đúng định dạng",
 
 test("listTechLinks: lọc theo category + projectId", { skip: !HAS_TEST_DB }, async () => {
   const { run, insertId } = await import("@/lib/db");
-  const { listTechLinks } = await import("@/lib/tech");
+  const { listTechLinks } = await import("@/lib/ky-thuat/tech");
 
   const pId = await insertId(
     `INSERT INTO projects (name, code) VALUES ('DA Tech Test', 'PJT-TECH1')`,
@@ -104,7 +104,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listAlbums, listAlbumPhotos } = await import("@/lib/tech");
+    const { listAlbums, listAlbumPhotos } = await import("@/lib/ky-thuat/tech");
 
     const pId = await insertId(
       `INSERT INTO projects (name, code) VALUES ('DA Tech Test 2', 'PJT-TECH2')`,

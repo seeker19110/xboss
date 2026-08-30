@@ -38,24 +38,37 @@ export default function SpiCards({ system }: { system?: string }) {
   const o = tone(data.overall.spi);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-8">
-      <h2 className="font-semibold mb-1 text-sm text-zinc-300 flex items-center gap-2">
-        <Gauge className="w-4 h-4 text-sky-400" /> Chỉ số tiến độ (SPI)
-      </h2>
-      <p className="text-xs text-zinc-400 mb-3">
-        SPI = % thực tế ÷ % kế hoạch tại hôm nay. ≥ 1 đúng/vượt kế hoạch · 0.9–1 hơi chậm · &lt; 0.9
-        chậm đáng kể.
+    <div className="bento-card p-5 mb-6">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="font-bold text-sm text-zinc-100 flex items-center gap-2">
+          <Gauge className="w-4 h-4 text-sky-400" /> Chỉ số hiệu suất tiến độ (SPI)
+        </h2>
+        <span className="text-xs text-zinc-500 font-medium">Earned Value Analysis</span>
+      </div>
+      <p className="text-xs text-zinc-400 mb-4">
+        SPI = % thực tế ÷ % kế hoạch tại hôm nay. ≥ 1.0 đúng/vượt kế hoạch · 0.9–1.0 hơi chậm · &lt;
+        0.9 chậm đáng kể.
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
-        <div className={`bg-zinc-950/60 border ${o.ring} rounded-lg p-3 lg:col-span-1`}>
-          <p className="text-xs text-zinc-400 uppercase mb-1">Toàn dự án</p>
-          <p className={`text-3xl font-bold ${o.text}`}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+        <div className={`bento-card p-4 border ${o.ring} bg-zinc-950/80`}>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+              Toàn dự án
+            </p>
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-semibold bg-zinc-900 border border-zinc-800 ${o.text}`}
+            >
+              {o.label}
+            </span>
+          </div>
+          <p className={`text-3xl font-bold font-mono tabular-nums mt-2 ${o.text}`}>
             {data.overall.spi === null ? "—" : data.overall.spi.toFixed(2)}
           </p>
-          <p className={`text-xs mt-1 font-medium ${o.text}`}>{o.label}</p>
-          <p className="text-[11px] text-zinc-400 mt-1">
-            Thực tế {pct(data.overall.actual)} · Kế hoạch {pct(data.overall.planned)}
+          <p className="text-[11px] text-zinc-400 mt-2 pt-2 border-t border-zinc-800/80">
+            Thực tế <span className="font-semibold text-zinc-200">{pct(data.overall.actual)}</span>{" "}
+            · Kế hoạch{" "}
+            <span className="font-semibold text-zinc-200">{pct(data.overall.planned)}</span>
           </p>
         </div>
       </div>
@@ -64,12 +77,17 @@ export default function SpiCards({ system }: { system?: string }) {
         {data.spi.map((s) => {
           const t = tone(s.spi);
           return (
-            <div key={s.sheetType} className={`bg-zinc-950/60 border ${t.ring} rounded-lg p-3`}>
-              <p className="text-xs text-zinc-400 uppercase truncate mb-1">{s.sheetType}</p>
-              <p className={`text-xl font-bold ${t.text}`}>
+            <div
+              key={s.sheetType}
+              className={`bento-card p-3.5 border ${t.ring} bg-zinc-950/60 flex flex-col justify-between`}
+            >
+              <p className="text-xs font-bold text-zinc-300 uppercase truncate mb-1">
+                {s.sheetType}
+              </p>
+              <p className={`text-2xl font-bold font-mono tabular-nums ${t.text}`}>
                 {s.spi === null ? "—" : s.spi.toFixed(2)}
               </p>
-              <p className="text-[11px] text-zinc-400 mt-1">
+              <p className="text-[11px] text-zinc-400 mt-2">
                 TT {pct(s.actual)} · KH {pct(s.planned)}
               </p>
             </div>

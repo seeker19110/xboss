@@ -1,0 +1,45 @@
+{
+  "name": "08-agent-claims-conflict",
+  "contractVersion": "1.0",
+  "description": "C2 §5.7 — Fixture claims từ nhiều agent có mâu thuẫn về kích thước đường ống, kiểm tra phân xử không đếm phiếu số đông",
+  "request": {
+    "topic": "hvac_chilled_water_sizing",
+    "claims": [
+      {
+        "agentRole": "mep_hvac_engineer",
+        "claim": "Đường ống cấp CHW nhánh 3F đường kính DN150",
+        "assumptions": ["Lưu lượng đỉnh 45 m3/h", "Vận tốc nước max 2.0 m/s"],
+        "confidence": "high",
+        "sourceAuthority": "primary_spec",
+        "sourceRevisionId": "rev_spec_v1",
+        "payload": { "diameterMm": 150, "velocityMs": 1.8 }
+      },
+      {
+        "agentRole": "energy_optimization_agent",
+        "claim": "Đường ống cấp CHW nhánh 3F đường kính DN125",
+        "assumptions": ["Lưu lượng trung bình 32 m3/h", "Tiết kiệm chi phí đầu tư"],
+        "confidence": "high",
+        "sourceAuthority": "derived",
+        "sourceRevisionId": "rev_opt_v2",
+        "payload": { "diameterMm": 125, "velocityMs": 2.4 }
+      },
+      {
+        "agentRole": "cost_estimator_agent",
+        "claim": "Đường ống cấp CHW nhánh 3F đường kính DN125",
+        "assumptions": ["Bám theo đề xuất tối ưu chi phí"],
+        "confidence": "medium",
+        "sourceAuthority": "derived",
+        "sourceRevisionId": "rev_opt_v2",
+        "payload": { "diameterMm": 125 }
+      }
+    ]
+  },
+  "expect": {
+    "hasConflict": true,
+    "conflictType": "data",
+    "winningAuthority": "primary_spec",
+    "majorityVoteApplied": false,
+    "selectedClaimIndex": 0,
+    "humanResolutionRequired": false
+  }
+}

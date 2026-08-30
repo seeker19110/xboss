@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("computeLevel: đủ ca biên normal/warn/alarm", async () => {
-  const { computeLevel } = await import("@/lib/monitoring");
+  const { computeLevel } = await import("@/lib/hien-truong/monitoring");
 
   const point = { warnThreshold: 10, alarmThreshold: 20 };
 
@@ -32,7 +32,7 @@ test("computeLevel: đủ ca biên normal/warn/alarm", async () => {
 });
 
 test("validateReadingInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateReadingInput } = await import("@/lib/monitoring");
+  const { validateReadingInput } = await import("@/lib/hien-truong/monitoring");
 
   const base = { measuredAt: "2026-07-01", value: 5, cumulative: 10, note: null };
   assert.equal(validateReadingInput(base), null);
@@ -44,7 +44,8 @@ test("validateReadingInput: đủ ca hợp lệ/không hợp lệ", async () => 
 });
 
 test("validatePointInput/validateCommunityCaseInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validatePointInput, validateCommunityCaseInput } = await import("@/lib/monitoring");
+  const { validatePointInput, validateCommunityCaseInput } =
+    await import("@/lib/hien-truong/monitoring");
 
   const basePoint = {
     code: "M-01",
@@ -87,7 +88,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { readingsSeries } = await import("@/lib/monitoring");
+    const { readingsSeries } = await import("@/lib/hien-truong/monitoring");
 
     const pointId = await insertId(
       `INSERT INTO monitoring_points (code, kind, warn_threshold, alarm_threshold, unit)
@@ -123,7 +124,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { alarmingPoints } = await import("@/lib/monitoring");
+    const { alarmingPoints } = await import("@/lib/hien-truong/monitoring");
 
     const pointId = await insertId(
       `INSERT INTO monitoring_points (code, kind, warn_threshold, alarm_threshold, unit)
@@ -188,7 +189,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { alarmingPoints } = await import("@/lib/monitoring");
+    const { alarmingPoints } = await import("@/lib/hien-truong/monitoring");
 
     const userId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Test Notif Mon', 'notifmon@test.local', 'x', 'admin')`,

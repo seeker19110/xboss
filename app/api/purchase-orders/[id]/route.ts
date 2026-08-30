@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction, withProjectScope } from "@/lib/db";
-import { getCurrentUser, type Role } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
+import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   PO_ALL_STATUSES,
   getPurchaseOrder,
   isValidPoTransition,
   logPoStatusChange,
-} from "@/lib/procurement";
-import { stripSensitive } from "@/lib/sensitive-fields";
+} from "@/lib/tai-chinh/procurement";
+import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 

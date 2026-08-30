@@ -16,9 +16,7 @@ import assert from "node:assert/strict";
 // PDF hợp lệ tối giản (raw PDF syntax) — vẽ 1 dòng text qua toán tử Tj trong content
 // stream. Dùng để test có/không có text layer bằng cách bật/tắt nội dung vẽ.
 function buildMinimalPdf(text: string | null): Buffer {
-  const contentOps = text
-    ? `BT /F1 18 Tf 20 100 Td (${text.replace(/[()\\]/g, "")}) Tj ET`
-    : ""; // rỗng = không có text layer (mô phỏng PDF scan ảnh thuần)
+  const contentOps = text ? `BT /F1 18 Tf 20 100 Td (${text.replace(/[()\\]/g, "")}) Tj ET` : ""; // rỗng = không có text layer (mô phỏng PDF scan ảnh thuần)
   const content = `%PDF-1.4
 1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
@@ -38,7 +36,7 @@ startxref
 }
 
 test("extractPdfText: PDF có text layer → trả về text chứa nội dung đã vẽ", async () => {
-  const { extractPdfText } = await import("@/lib/pdf-extract");
+  const { extractPdfText } = await import("@/lib/nen/pdf-extract");
   const buf = buildMinimalPdf("Hello XBoss nghiem thu");
   const text = await extractPdfText(buf);
   assert.ok(text, "phải trích được text");
@@ -46,21 +44,21 @@ test("extractPdfText: PDF có text layer → trả về text chứa nội dung �
 });
 
 test("extractPdfText: PDF không có text layer (content stream rỗng) → trả về null, không throw", async () => {
-  const { extractPdfText } = await import("@/lib/pdf-extract");
+  const { extractPdfText } = await import("@/lib/nen/pdf-extract");
   const buf = buildMinimalPdf(null);
   const text = await extractPdfText(buf);
   assert.equal(text, null);
 });
 
 test("extractPdfText: buffer không phải PDF hợp lệ → trả về null êm, không throw", async () => {
-  const { extractPdfText } = await import("@/lib/pdf-extract");
+  const { extractPdfText } = await import("@/lib/nen/pdf-extract");
   const buf = Buffer.from("đây không phải file PDF, chỉ là text thường");
   const text = await extractPdfText(buf);
   assert.equal(text, null);
 });
 
 test("extractPdfText: không treo quá thời gian cho phép (kể cả input lớn/nhiều trang)", async () => {
-  const { extractPdfText } = await import("@/lib/pdf-extract");
+  const { extractPdfText } = await import("@/lib/nen/pdf-extract");
   // PDF nhiều "trang" mô phỏng bằng buffer rác lớn (không parse được nhưng đủ lớn để
   // kiểm hàm không phình thời gian xử lý) — timeout cứng 5s trong extractPdfText đảm
   // bảo hàm luôn trả lời trong khoảng hợp lý dù input bất thường.
@@ -78,8 +76,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, queryOne, run } = await import("@/lib/db");
-    const { extractPdfText } = await import("@/lib/pdf-extract");
-    const { searchSources } = await import("@/lib/search");
+    const { extractPdfText } = await import("@/lib/nen/pdf-extract");
+    const { searchSources } = await import("@/lib/tien-do/search");
 
     const projectId = await insertId(
       `INSERT INTO projects (name) VALUES (?)`,
@@ -125,7 +123,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, queryOne, run } = await import("@/lib/db");
-    const { extractPdfText } = await import("@/lib/pdf-extract");
+    const { extractPdfText } = await import("@/lib/nen/pdf-extract");
 
     const projectId = await insertId(
       `INSERT INTO projects (name) VALUES (?)`,

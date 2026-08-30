@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateClaimInput: kind='cost' bắt buộc amountRequested, kind='eot' bắt buộc daysRequested", async () => {
-  const { validateClaimInput } = await import("@/lib/claims");
+  const { validateClaimInput } = await import("@/lib/tai-chinh/claims");
 
   const base = {
     kind: "cost" as const,
@@ -36,7 +36,7 @@ test("validateClaimInput: kind='cost' bắt buộc amountRequested, kind='eot' b
 
 test("nextClaimCode: sinh mã tuần tự CLM-NNNN", { skip: !HAS_TEST_DB }, async () => {
   const { run, insertId } = await import("@/lib/db");
-  const { nextClaimCode } = await import("@/lib/claims");
+  const { nextClaimCode } = await import("@/lib/tai-chinh/claims");
 
   const code1 = await nextClaimCode();
   assert.match(code1, /^CLM-\d{4}$/);
@@ -59,8 +59,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { pendingClaims } = await import("@/lib/claims");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { pendingClaims } = await import("@/lib/tai-chinh/claims");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const projA = await insertId(`INSERT INTO projects (name) VALUES ('Dự án claim A')`);
     const projB = await insertId(`INSERT INTO projects (name) VALUES ('Dự án claim B')`);
@@ -113,7 +113,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { settleClaim, rejectClaim } = await import("@/lib/claims");
+    const { settleClaim, rejectClaim } = await import("@/lib/tai-chinh/claims");
 
     const pmId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('PM Claim', 'claim-pm@xboss.vn', 'x', 'pm')`,

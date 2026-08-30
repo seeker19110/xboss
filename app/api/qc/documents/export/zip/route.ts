@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZipArchive } from "archiver";
 import { query } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { DOC_CATEGORIES, type DocCategory } from "@/lib/qaqc";
-import { storageGet } from "@/lib/storage";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { DOC_CATEGORIES, type DocCategory } from "@/lib/ky-thuat/qaqc";
+import { storageGet } from "@/lib/nen/storage";
 
 export const dynamic = "force-dynamic";
 

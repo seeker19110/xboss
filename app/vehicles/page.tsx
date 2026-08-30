@@ -18,7 +18,7 @@ import AppHeader from "@/app/components/AppHeader";
 import { appConfirm, appPrompt } from "@/app/components/dialogs";
 import EmptyState from "@/app/components/EmptyState";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
-import { todayISO } from "@/lib/date";
+import { todayISO } from "@/lib/nen/date";
 
 type Vehicle = {
   id: number;
@@ -314,7 +314,7 @@ export default function VehiclesPage() {
                   {["registered", "approved"].includes(v.status) && (
                     <button
                       onClick={() => doAction(v, "enter")}
-                      className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 rounded-lg py-3 text-sm font-semibold text-on-accent"
+                      className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg py-3 text-sm font-semibold text-on-accent"
                     >
                       <LogIn className="w-4 h-4" /> Đã vào
                     </button>

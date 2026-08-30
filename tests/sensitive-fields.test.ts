@@ -1,9 +1,9 @@
 import "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load (qua lib/auth)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { stripSensitive } from "@/lib/sensitive-fields";
-import { _resetPermissionCacheForTests } from "@/lib/permissions";
-import type { Role } from "@/lib/roles";
+import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
+import { _resetPermissionCacheForTests } from "@/lib/bao-mat/permissions";
+import type { Role } from "@/lib/nen/roles";
 
 // ===== M50 PR2 — Quyền theo trường (che trường tiền/đơn giá/tỷ lệ) =====
 // Thuần logic (không chạm DB): kiểm stripSensitive che ĐÚNG trường theo perm mặc định

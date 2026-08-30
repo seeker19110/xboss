@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, type Role } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
-import { runMaterialSync } from "@/lib/material-sync";
-import { log } from "@/lib/log";
+import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { runMaterialSync } from "@/lib/vat-tu/material-sync";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 

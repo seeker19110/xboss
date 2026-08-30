@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, withProjectScope } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   CONTRACT_KINDS,
   checkContractRefs,
@@ -9,8 +9,8 @@ import {
   parseContractBody,
   validateContractInput,
   type ContractKind,
-} from "@/lib/contracts";
-import { stripSensitive } from "@/lib/sensitive-fields";
+} from "@/lib/tai-chinh/contracts";
+import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 

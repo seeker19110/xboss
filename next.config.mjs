@@ -16,13 +16,31 @@ const nextConfig = {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 3600,
   },
+  async redirects() {
+    return [
+      {
+        source: "/drawings",
+        destination: "/ban-ve",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
-      // Chunk JS/CSS build Next (tên file hash) — cache vĩnh viễn, immutable
-      {
-        source: "/_next/static/:path*",
-        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
-      },
+      // Chunk JS/CSS build Next (tên file hash) — cache vĩnh viễn, immutable. CHỈ áp dụng ở
+      // production: Turbopack dev đặt tên chunk ổn định theo đường dẫn (không hash theo nội
+      // dung như build production), nên header "immutable" ở dev khiến trình duyệt giữ mãi
+      // bundle cũ dù sửa code — Next.js tự cảnh báo điều này lúc khởi động dev server (đã xác
+      // nhận thật 2026-08-24: sửa code nhiều vòng, xoá cả .next, trình duyệt vẫn phục vụ bundle
+      // từ trước khi sửa cho tới khi cache bị buộc bỏ qua thủ công).
+      ...(process.env.NODE_ENV === "production"
+        ? [
+            {
+              source: "/_next/static/:path*",
+              headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+            },
+          ]
+        : []),
       // Manifest + icons — cache 7 ngày (thay đổi khi deploy mới)
       {
         source: "/:file(manifest\\.webmanifest|icon.*\\.png|icon\\.svg)",

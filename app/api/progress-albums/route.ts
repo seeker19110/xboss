@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { listAlbums, parseAlbumBody, validateAlbumInput } from "@/lib/tech";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { listAlbums, parseAlbumBody, validateAlbumInput } from "@/lib/ky-thuat/tech";
 
 export const dynamic = "force-dynamic";
 

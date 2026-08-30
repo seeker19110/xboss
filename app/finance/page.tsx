@@ -21,7 +21,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN, todayISO } from "@/lib/date";
+import { formatDateVN, todayISO } from "@/lib/nen/date";
 
 function fmtVND(n: number) {
   if (!n) return "0 đ";
@@ -236,7 +236,7 @@ export default function FinancePage() {
                 <button
                   onClick={() => setAddInvoiceOpen(true)}
                   aria-label="Thêm hoá đơn"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm hoá đơn</span>
@@ -249,7 +249,7 @@ export default function FinancePage() {
                     setAddPayrollOpen(true);
                   }}
                   aria-label="Thêm kỳ lương"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm kỳ lương</span>
@@ -468,7 +468,7 @@ function DebtTab({ receivables, payables }: { receivables: number; payables: num
             Xem hợp đồng <ExternalLink className="w-3.5 h-3.5" />
           </a>
           <a
-            href="/materials/purchase-orders"
+            href="/procurement?tab=orders"
             className="inline-flex items-center gap-1 text-sky-400 hover:text-sky-300 text-xs"
           >
             Xem đơn đặt hàng <ExternalLink className="w-3.5 h-3.5" />
@@ -921,7 +921,7 @@ function InvoiceModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1124,7 +1124,7 @@ function PayrollModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>

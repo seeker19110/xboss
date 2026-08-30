@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { listMobilization, parseMobilizationBody, validateMobilizationInput } from "@/lib/kickoff";
-import { todayISO } from "@/lib/date";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import {
+  listMobilization,
+  parseMobilizationBody,
+  validateMobilizationInput,
+} from "@/lib/hien-truong/kickoff";
+import { todayISO } from "@/lib/nen/date";
 
 export const dynamic = "force-dynamic";
 

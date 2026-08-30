@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { pushConfigured } from "@/lib/push";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { pushConfigured } from "@/lib/van-hanh/push";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,11 @@ export async function POST(req: NextRequest) {
   await run(
     `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)
      ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth`,
-    user.id, endpoint, p256dh, auth);
+    user.id,
+    endpoint,
+    p256dh,
+    auth,
+  );
 
   return NextResponse.json({ ok: true });
 }
@@ -42,6 +46,10 @@ export async function DELETE(req: NextRequest) {
   if (typeof body.endpoint !== "string")
     return NextResponse.json({ error: "Thiếu endpoint" }, { status: 400 });
 
-  await run(`DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?`, body.endpoint, user.id);
+  await run(
+    `DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?`,
+    body.endpoint,
+    user.id,
+  );
   return NextResponse.json({ ok: true });
 }

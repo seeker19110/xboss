@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   attendanceByDate,
   attendanceSummary,
   listAttendance,
   parseAttendanceBody,
   validateAttendanceInput,
-} from "@/lib/hr";
-import { todayISO, daysFromTodayISO } from "@/lib/date";
+} from "@/lib/hien-truong/hr";
+import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
 
 export const dynamic = "force-dynamic";
 

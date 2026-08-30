@@ -9,6 +9,7 @@ import {
   Trash2,
   AlertTriangle,
   FileUp,
+  Download,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
@@ -183,7 +184,7 @@ export default function BoqPage() {
               <button
                 onClick={() => setAddOpen(true)}
                 aria-label="Thêm dòng BOQ"
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
               >
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm dòng BOQ</span>
               </button>
@@ -192,23 +193,76 @@ export default function BoqPage() {
         }
       />
 
-      <main className="p-4 sm:p-6 pb-24 space-y-4">
-        <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
-          <input
-            type="checkbox"
-            checked={includeVo}
-            onChange={(e) => setIncludeVo(e.target.checked)}
-            className="rounded border-zinc-600 bg-zinc-800"
-          />
-          Gồm phát sinh (VO)
-        </label>
+      <main className="p-4 sm:p-6 pb-24 space-y-6 max-w-screen-2xl mx-auto">
+        {/* KPI Bento Summary Cards */}
+        {items.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bento-card p-4 flex flex-col justify-between">
+              <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">
+                Giá trị hợp đồng nhận thầu
+              </span>
+              <p className="text-2xl font-bold font-mono tabular-nums text-zinc-100 mt-2">
+                {fmtVND(totals.contractValue)}
+              </p>
+              <p className="text-[11px] text-zinc-500 mt-1">Khối lượng BOQ gốc + VO duyệt</p>
+            </div>
+
+            <div className="bento-card p-4 flex flex-col justify-between">
+              <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">
+                Giá trị giao thầu phụ
+              </span>
+              <p className="text-2xl font-bold font-mono tabular-nums text-sky-400 mt-2">
+                {fmtVND(totals.subValue)}
+              </p>
+              <p className="text-[11px] text-zinc-500 mt-1">Phân bổ tổ đội thi công</p>
+            </div>
+
+            <div className="bento-card p-4 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">
+                  Giá trị thực hiện lũy kế
+                </span>
+                <span className="text-xs font-bold font-mono text-emerald-400">
+                  {totals.contractValue > 0
+                    ? `${Math.round((totals.executedValue / totals.contractValue) * 100)}%`
+                    : "0%"}
+                </span>
+              </div>
+              <p className="text-2xl font-bold font-mono tabular-nums text-emerald-400 mt-2">
+                {fmtVND(totals.executedValue)}
+              </p>
+              <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden mt-2 border border-zinc-800">
+                <div
+                  className="bg-emerald-500 h-full rounded-full transition-all"
+                  style={{
+                    width: `${totals.contractValue > 0 ? Math.min(100, Math.round((totals.executedValue / totals.contractValue) * 100)) : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <label className="inline-flex items-center gap-2 text-xs font-medium text-zinc-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={includeVo}
+              onChange={(e) => setIncludeVo(e.target.checked)}
+              className="rounded border-zinc-700 bg-zinc-900 text-emerald-600 focus:ring-emerald-500"
+            />
+            Gồm phát sinh (VO)
+          </label>
+          <span className="text-xs text-zinc-500 font-mono">{items.length} hạng mục</span>
+        </div>
+
         {items.length === 0 ? (
           <EmptyState
             title="Chưa có dòng BOQ nào"
             message={canManage ? 'Bấm "Thêm dòng BOQ" để bắt đầu.' : "Chưa có dữ liệu khối lượng."}
           />
         ) : (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="bento-card overflow-hidden">
             <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Bảng BOQ">
               <table className="w-full text-sm sm:min-w-[720px]">
                 <thead>
@@ -501,7 +555,7 @@ function AddBoqModal({
         <button
           onClick={submit}
           disabled={saving || !code.trim() || !name.trim() || !unit.trim()}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo dòng BOQ"}
         </button>
@@ -619,17 +673,37 @@ function ImportBoqModal({
             )}
             <button
               onClick={onImported}
-              className="w-full bg-emerald-700 hover:bg-emerald-600 text-on-accent font-semibold py-2 rounded-lg text-sm"
+              className="w-full bg-emerald-700 hover:bg-emerald-800 text-on-accent font-semibold py-2 rounded-lg text-sm"
             >
               Xong
             </button>
           </div>
         ) : (
           <>
+            <div className="flex items-center justify-between bg-zinc-800/80 p-3 rounded-lg border border-zinc-700/60">
+              <div className="text-xs text-zinc-300 pr-2">
+                <p className="font-medium text-white">
+                  Biểu mẫu BOQ & Kiểm soát Đặt hàng chuẩn xBOSS
+                </p>
+                <p className="text-zinc-400 mt-0.5">
+                  Bao gồm hướng dẫn 4 nguyên tắc cốt lõi, bảng điều khiển định mức, mẫu trống và một
+                  bộ dữ liệu mẫu.
+                </p>
+              </div>
+              <a
+                href="/api/boq/template"
+                download="MAU-KHOI-LUONG-BOQ.xlsx"
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-on-accent rounded-lg text-xs font-semibold shrink-0 transition"
+              >
+                <Download className="w-4 h-4" />
+                Tải file mẫu
+              </a>
+            </div>
+
             <p className="text-xs text-zinc-400">
-              Nhận file &quot;Bảng khối lượng thanh toán&quot; — chỉ lấy phần khối lượng theo hợp
-              đồng gốc (bỏ qua phát sinh/khấu trừ/phạt) và chỉ khối lượng Tháp A. File không có cột
-              mã nên hệ thống tự sinh BOQCODE tuần tự theo hệ đã chọn.
+              Hỗ trợ file biểu mẫu chuẩn (tự động nhận diện Mã BOQ duy nhất, KL Hợp đồng, KL Định
+              mức bóc tách) hoặc file Bảng khối lượng thanh toán (IPC). Với các dòng chưa có mã, hệ
+              thống sẽ tự sinh BOQCODE tuần tự theo hệ đã chọn.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <label className="text-xs text-zinc-400 col-span-2">
@@ -645,7 +719,7 @@ function ImportBoqModal({
                 />
               </label>
               <label className="text-xs text-zinc-400 col-span-2">
-                Hệ (dùng để sinh mã, vd ACMV-0001)
+                Hệ (dùng để sinh mã cho các dòng chưa có mã, vd ACMV-0001)
                 <select
                   value={systemId}
                   onChange={(e) => {
@@ -743,7 +817,7 @@ function ImportBoqModal({
                 <button
                   onClick={commit}
                   disabled={busy || addCount === 0}
-                  className="flex-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-on-accent font-semibold py-2 rounded-lg text-sm"
+                  className="flex-1 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-on-accent font-semibold py-2 rounded-lg text-sm"
                 >
                   {busy ? "Đang ghi…" : `Xác nhận ghi ${addCount} dòng`}
                 </button>
@@ -1058,7 +1132,7 @@ function BoqDetailModal({
               <button
                 onClick={saveMap}
                 disabled={savingMap}
-                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-sm font-medium px-4 py-2 rounded-lg"
+                className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-sm font-medium px-4 py-2 rounded-lg"
               >
                 {savingMap ? "Đang lưu…" : "Lưu map"}
               </button>
@@ -1286,7 +1360,7 @@ function NormsSection({ boqItemId, canManage }: { boqItemId: number; canManage: 
           <button
             onClick={addNorm}
             disabled={saving || !qtyPerUnit || !unitLabel.trim()}
-            className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
+            className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
           >
             Thêm định mức
           </button>

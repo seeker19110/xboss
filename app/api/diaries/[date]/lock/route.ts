@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { canLockDiary, canUnlockDiary } from "@/lib/diary";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { canLockDiary, canUnlockDiary } from "@/lib/hien-truong/diary";
 
 export const dynamic = "force-dynamic";
 

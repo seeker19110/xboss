@@ -24,11 +24,11 @@ XBoss khởi đầu là công cụ thay thế file Excel tracking tiến độ t
 Project → Tower → SheetType [slug động, discipline_id] → WorkPackage → Task → ProgressDimension
 ```
 
-- **Sheet động**: tạo/sửa/xoá qua `/api/sheets` (không hard-code); `lib/sheets.ts` chỉ dùng backfill 5 sheet gốc (`ogtd`/`oghl`/`ogch`/`odnn1`/`odnn2`) + fallback client.
+- **Sheet động**: tạo/sửa/xoá qua `/api/sheets` (không hard-code); `lib/nen/sheets.ts` chỉ dùng backfill 5 sheet gốc (`ogtd`/`oghl`/`ogch`/`odnn1`/`odnn2`) + fallback client.
 - **Pattern mã**: `A{n}` (OGTĐ, cũng dùng cho ODNN Zone 1&2 — phân biệt qua `sheet_type_id`), `H{n}` (OGHL), `OGCH{n}` (OGCH); task con: `{mã nhóm},{mm}`.
 - **ProgressDimension** = 1 ô checkbox trong lưới tracking (mỗi kích thước ống hoặc mỗi căn hộ).
-- **Trạng thái** (`lib/status.ts`): `chuan_bi` → `dang_thi_cong` → `hoan_thanh` / `tre` (suy tự động) → `nghiem_thu` (2 bước + gate QA&QC, không tự hạ cấp).
-- **Đa dự án (M22)**: bảng `user_projects` (ai thấy dự án nào), cookie `xboss_project` chọn dự án hiện tại (không path prefix), `getCurrentProjectId(user)` (`lib/projects.ts`) suy dự án ở mọi route cần lọc. Bảng "gốc cụm" có cột `project_id` trực tiếp; bảng con suy qua JOIN cha. Portfolio (`/portfolio`) + `ProjectSwitcher.tsx` là lớp mỏng phía trên. Chi tiết: `docs/adr/0004-multi-project.md`.
+- **Trạng thái** (`lib/tien-do/status.ts`): `chuan_bi` → `dang_thi_cong` → `hoan_thanh` / `tre` (suy tự động) → `nghiem_thu` (2 bước + gate QA&QC, không tự hạ cấp).
+- **Đa dự án (M22)**: bảng `user_projects` (ai thấy dự án nào), cookie `xboss_project` chọn dự án hiện tại (không path prefix), `getCurrentProjectId(user)` (`lib/ha-tang/projects.ts`) suy dự án ở mọi route cần lọc. Bảng "gốc cụm" có cột `project_id` trực tiếp; bảng con suy qua JOIN cha. Portfolio (`/portfolio`) + `ProjectSwitcher.tsx` là lớp mỏng phía trên. Chi tiết: `docs/adr/0004-multi-project.md`.
 
 ---
 
@@ -42,7 +42,7 @@ Quản lý qua **hệ migrate SQL nhẹ** (`migrations/000N_*.sql`, đánh số 
 
 - Cookie `xboss_session` = `userId.exp.pwFrag.HMAC(...)` (stateless, ký `XBOSS_SECRET`) — `pwFrag` = 12 ký tự đầu `password_hash` nên đổi mật khẩu tự vô hiệu hoá token cũ. Hết hạn 7 ngày.
 - Rate limit lưu **Postgres** (`login_rate_limits`): 5 lần sai/15 phút theo IP+email, 20/IP → 429 + `Retry-After` (đúng khi chạy nhiều instance).
-- **7 vai trò** (`lib/roles.ts`): `admin`/`pm` (toàn quyền, PM trừ quản lý user) · `engineer` (ghi nhận hiện trường) · `subcon` (chỉ task/module được gán, `canTouchTask`/`canTouchPackage`) · `bch`/`cdt`/`viewer` = `VIEW_ONLY_ROLES` (chỉ xem + bình luận; `bch` thêm xem Thanh toán/Chi phí qua `PAYMENT_VIEW_ROLES`; `cdt` không xem VO/IPC/đấu thầu/claim). Quyền tập trung trong map `CAN` (`lib/auth.ts`).
+- **7 vai trò** (`lib/nen/roles.ts`): `admin`/`pm` (toàn quyền, PM trừ quản lý user) · `engineer` (ghi nhận hiện trường) · `subcon` (chỉ task/module được gán, `canTouchTask`/`canTouchPackage`) · `bch`/`cdt`/`viewer` = `VIEW_ONLY_ROLES` (chỉ xem + bình luận; `bch` thêm xem Thanh toán/Chi phí qua `PAYMENT_VIEW_ROLES`; `cdt` không xem VO/IPC/đấu thầu/claim). Quyền tập trung trong map `CAN` (`lib/bao-mat/auth.ts`).
 
 > **Ranh giới bảo mật duy nhất là API route.** Mọi route gọi `getCurrentUser()`, trả 401 khi chưa đăng nhập, kiểm quyền qua `CAN`/`canTouchTask`/`canTouchPackage`. Trang client chỉ redirect khi nhận 401 — không tự ý ẩn UI thay cho kiểm quyền thật.
 
@@ -52,22 +52,22 @@ Quản lý qua **hệ migrate SQL nhẹ** (`migrations/000N_*.sql`, đánh số 
 
 Mỗi module có đặc tả tự chứa trong `docs/nang-cap/G<nn>-*.md` (schema/lib/API/UI/test). `PROGRESS.md` giữ lịch sử/nợ kỹ thuật.
 
-| Nhóm (file `docs/nang-cap/G<nn>-*.md`) | Module (Mxx) gộp bên trong                                          | Route                                                                              |
-| ---------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| G00 nền tảng                            | M0 AppShell sidebar · M21 IA đầy đủ (hub) · M22 đa dự án            | `/`, `/hub/[id]`, `/portfolio`                                                     |
-| G01 tiến độ & BOQ                       | M1 BOQ · M15 trang hệ · M9 dashboard mở rộng · M35 BPTC · M36 trang tiến độ theo hệ | `/tracking/[slug]`, `/boq`, `/he/[code]`, `/tien-do/[he]`                          |
-| G02 chi phí & hợp đồng                  | M2 chi phí · M16 hợp đồng · M6 VO · M17 thanh toán KL (IPC) · M7 đấu thầu · M27 tài chính & kế toán | `/costs`, `/contracts`, `/variations`, `/payment-certs`, `/tenders`, `/finance`    |
-| G03 mua sắm & vật tư                    | M4 NCC & đơn hàng, xe ra vào · M18 định mức · M33 hồ sơ năng lực NTP | `/materials/*`, `/vehicles`                                                        |
-| G04 chất lượng & an toàn                | M3 QA&QC + hồ sơ chất lượng · M11 HSE                                | `/quality`, `/hse`                                                                 |
-| G05 hiện trường                         | M5 nhật ký thi công · M14 mặt bằng · M12 thiết bị                    | `/diary`, `/work-fronts`, `/equipment`                                             |
-| G06 bản vẽ & hồ sơ                      | M8 bản vẽ BIM/Shop · M32 thay đổi thiết kế · M10 RFI/công văn · M13 họp & rủi ro · M34 claim & EOT · M19 đề xuất & phê duyệt · M20 kho hồ sơ | `/drawings`, `/correspondences`, `/meetings`, `/risks`, `/proposals`, `/documents` |
-| G07 khởi động & tổ chức                 | M23 khởi động & pháp lý · M24 nhân sự & tổ chức                      | `/kickoff`, `/org`, `/personnel`, `/attendance`                                    |
-| G08 môi trường & rủi ro                 | M25 môi trường & giấy phép · M26 quan hệ & quan trắc                 | `/environment`, `/monitoring`                                                      |
-| G09 bàn giao & vận hành                 | M28 bảo hiểm & bảo lãnh · M29 bàn giao & kết thúc · M30 bảo hành & bảo trì | `/insurance`, `/handover`, `/warranty`                                             |
-| G10 công nghệ                           | M31 chuyển đổi số (CDE/BIM link/album drone)                         | `/tech`                                                                            |
-| Lập kế hoạch & báo cáo (không module riêng) | —                                                       | `/lookahead`, `/gantt`, `/timeline`, `/report`, `/my-tasks`, `/notifications` (M40) |
-| Quản trị hệ thống (không module riêng) | —                                                             | `/login`, `/password`, `/users`, `/admin`, `/import`, `/offline`                   |
-| G11 UI/UX xuyên suốt (không route riêng) | M37 theme sáng · M38 màu/token tương phản · M39 bảng filter/sort/sticky · M40 trung tâm thông báo · M41 responsive mobile · M42 flatten sidebar | —                                                                                  |
+| Nhóm (file `docs/nang-cap/G<nn>-*.md`)      | Module (Mxx) gộp bên trong                                                                                                                      | Route                                                                               |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| G00 nền tảng                                | M0 AppShell sidebar · M21 IA đầy đủ (hub) · M22 đa dự án                                                                                        | `/`, `/hub/[id]`, `/portfolio`                                                      |
+| G01 tiến độ & BOQ                           | M1 BOQ · M15 trang hệ · M9 dashboard mở rộng · M35 BPTC · M36 trang tiến độ theo hệ                                                             | `/tracking/[slug]`, `/boq`, `/he/[code]`, `/tien-do/[he]`                           |
+| G02 chi phí & hợp đồng                      | M2 chi phí · M16 hợp đồng · M6 VO · M17 thanh toán KL (IPC) · M7 đấu thầu · M27 tài chính & kế toán                                             | `/costs`, `/contracts`, `/variations`, `/payment-certs`, `/tenders`, `/finance`     |
+| G03 mua sắm & vật tư                        | M4 NCC & đơn hàng, xe ra vào · M18 định mức · M33 hồ sơ năng lực NTP                                                                            | `/materials/*`, `/vehicles`                                                         |
+| G04 chất lượng & an toàn                    | M3 QA&QC + hồ sơ chất lượng · M11 HSE                                                                                                           | `/quality`, `/hse`                                                                  |
+| G05 hiện trường                             | M5 nhật ký thi công · M14 mặt bằng · M12 thiết bị                                                                                               | `/diary`, `/work-fronts`, `/equipment`                                              |
+| G06 bản vẽ & hồ sơ                          | M8 bản vẽ BIM/Shop · M32 thay đổi thiết kế · M10 RFI/công văn · M13 họp & rủi ro · M34 claim & EOT · M19 đề xuất & phê duyệt · M20 kho hồ sơ    | `/drawings`, `/correspondences`, `/meetings`, `/risks`, `/proposals`, `/documents`  |
+| G07 khởi động & tổ chức                     | M23 khởi động & pháp lý · M24 nhân sự & tổ chức                                                                                                 | `/kickoff`, `/org`, `/personnel`, `/attendance`                                     |
+| G08 môi trường & rủi ro                     | M25 môi trường & giấy phép · M26 quan hệ & quan trắc                                                                                            | `/environment`, `/monitoring`                                                       |
+| G09 bàn giao & vận hành                     | M28 bảo hiểm & bảo lãnh · M29 bàn giao & kết thúc · M30 bảo hành & bảo trì                                                                      | `/insurance`, `/handover`, `/warranty`                                              |
+| G10 công nghệ                               | M31 chuyển đổi số (CDE/BIM link/album drone)                                                                                                    | `/tech`                                                                             |
+| Lập kế hoạch & báo cáo (không module riêng) | —                                                                                                                                               | `/lookahead`, `/gantt`, `/timeline`, `/report`, `/my-tasks`, `/notifications` (M40) |
+| Quản trị hệ thống (không module riêng)      | —                                                                                                                                               | `/login`, `/password`, `/users`, `/admin`, `/import`, `/offline`                    |
+| G11 UI/UX xuyên suốt (không route riêng)    | M37 theme sáng · M38 màu/token tương phản · M39 bảng filter/sort/sticky · M40 trung tâm thông báo · M41 responsive mobile · M42 flatten sidebar | —                                                                                   |
 
 **Chủ động không làm** (2026-07-05, `docs/ke-hoach-fastcons-2026-07.md` §5): bảo hành kiểu FastCons cũ, điểm danh GPS, CRM bán hàng, HRM/lương độc lập, thu chi nội bộ ngoài công trình, Map vị trí.
 
@@ -91,7 +91,7 @@ Mỗi module có đặc tả tự chứa trong `docs/nang-cap/G<nn>-*.md` (schem
 
 ## 7. Logic nghiệp vụ trung tâm
 
-- **% tiến độ**: `progress(task) = COUNT(dimension đã tick) / COUNT(tổng dimension)`; `progress(work_package) = AVG(task.progress)`. Chuỗi: `recomputeTask` → `deriveStatus` → `recomputePackage` (`lib/recompute.ts`), luôn `withTransaction` + `SELECT ... FOR UPDATE`.
+- **% tiến độ**: `progress(task) = COUNT(dimension đã tick) / COUNT(tổng dimension)`; `progress(work_package) = AVG(task.progress)`. Chuỗi: `recomputeTask` → `deriveStatus` → `recomputePackage` (`lib/tien-do/recompute.ts`), luôn `withTransaction` + `SELECT ... FOR UPDATE`.
 - **Trạng thái & gate nghiệm thu**: `nghiem_thu` không tự hạ cấp — chỉ đặt/huỷ qua `/api/tasks/:id/approve` hoặc `/api/approvals`. `tre` suy ra `end_date < hôm nay AND progress < 1` (tính lại mỗi lần recompute, không lưu cứng). **Gate QA&QC (M3)**: `requiredInspectionMissing(taskId)` chặn approve khi còn checklist bắt buộc chưa `passed`; `handoverBlocked(packageId)` (hold-point) chặn TĂNG tiến độ khi predecessor chưa nghiệm thu/chưa có biên bản chuyển bước — cả 2 trả 409 kèm lý do.
 - **Đồng bộ & Offline**: SSE `/api/events?sheet=` đẩy event `version` khi `sheetVersion` đổi (poll 3s server-side); lỗi/bị cắt → fallback poll `/api/tasks/version` 10s. `public/sw.js`: GET network-first + cache (trừ `/api/photos/`, `/api/events`); tick offline → queue `localStorage` (`useOfflineTickQueue`) → PATCH khi online (bỏ 4xx khỏi queue).
 - **BOQCODE**: mã duy nhất toàn hệ thống trên `tasks`/`work_packages`/`materials`/`boq_items` — registry `boq_codes` + trigger DB `boq_codes_sync()` atomic trong transaction ghi (đóng race mà check thuần code `boqTakenBy()` có thể bỏ lọt).
@@ -101,25 +101,25 @@ Mỗi module có đặc tả tự chứa trong `docs/nang-cap/G<nn>-*.md` (schem
 
 ## 8. Biến môi trường (xem thêm `CLAUDE.md` + `.env.example`)
 
-| Biến                                                       | Bắt buộc        | Mô tả                                                        |
-| ------------------------------------------------------------ | --------------- | ---------------------------------------------------------------- |
-| `DATABASE_URL`                                             | ✓ runtime       | Chuỗi kết nối PostgreSQL tự host                             |
-| `XBOSS_SECRET`                                             | ✓ production    | Ký cookie session — thiếu → throw fail-fast                  |
-| `XBOSS_ADMIN_PASSWORD`                                     | production      | Mật khẩu admin khi DB trống (thay 4 tài khoản demo dev)      |
-| `CRON_SECRET`                                               | ✓ cron          | Header `Authorization: Bearer` cho `/api/cron/*`             |
-| `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`                    | tuỳ chọn        | Báo cáo trễ hạn qua Telegram                                 |
-| `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`     | tuỳ chọn        | Web Push                                                     |
-| `SMTP_HOST/PORT/USER/PASS/FROM`, `REPORT_EMAIL_TO`         | tuỳ chọn        | Gửi email báo cáo                                            |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` (hoặc `GOOGLE_SA_EMAIL`+`GOOGLE_SA_PRIVATE_KEY`) + `GOOGLE_SHEET_ID` + `GOOGLE_SHEET_TAB` | tuỳ chọn | Đồng bộ 2 chiều vật tư ↔ Google Sheet |
-| `SENTRY_DSN`                                               | tuỳ chọn        | Theo dõi lỗi production (server + browser)                   |
-| `XLSX_FILE`                                                | tuỳ chọn        | File Excel gốc cho `npm run db:seed`                         |
-| `APP_URL`                                                  | tuỳ chọn        | Base URL dùng trong email/push                               |
+| Biến                                                                                                                    | Bắt buộc     | Mô tả                                                   |
+| ----------------------------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------- |
+| `DATABASE_URL`                                                                                                          | ✓ runtime    | Chuỗi kết nối PostgreSQL tự host                        |
+| `XBOSS_SECRET`                                                                                                          | ✓ production | Ký cookie session — thiếu → throw fail-fast             |
+| `XBOSS_ADMIN_PASSWORD`                                                                                                  | production   | Mật khẩu admin khi DB trống (thay 4 tài khoản demo dev) |
+| `CRON_SECRET`                                                                                                           | ✓ cron       | Header `Authorization: Bearer` cho `/api/cron/*`        |
+| `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`                                                                                 | tuỳ chọn     | Báo cáo trễ hạn qua Telegram                            |
+| `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`                                                                  | tuỳ chọn     | Web Push                                                |
+| `SMTP_HOST/PORT/USER/PASS/FROM`, `REPORT_EMAIL_TO`                                                                      | tuỳ chọn     | Gửi email báo cáo                                       |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` (hoặc `GOOGLE_SA_EMAIL`+`GOOGLE_SA_PRIVATE_KEY`) + `GOOGLE_SHEET_ID` + `GOOGLE_SHEET_TAB` | tuỳ chọn     | Đồng bộ 2 chiều vật tư ↔ Google Sheet                   |
+| `SENTRY_DSN`                                                                                                            | tuỳ chọn     | Theo dõi lỗi production (server + browser)              |
+| `XLSX_FILE`                                                                                                             | tuỳ chọn     | File Excel gốc cho `npm run db:seed`                    |
+| `APP_URL`                                                                                                               | tuỳ chọn     | Base URL dùng trong email/push                          |
 
 ---
 
 ## 9. Tech Stack (xác minh `package.json`)
 
-Next.js **16.2** App Router (React **19.2**) · TypeScript **6.0** strict · Tailwind **4.3** (`@theme inline`, không `tailwind.config`, dark-first đảo màu qua `app/globals.css`) · PostgreSQL qua `pg` **8.22** (raw SQL, migrate nhẹ ADR-0003, không ORM/Supabase SDK) · Auth HMAC cookie tự chế · SSE realtime · Recharts · `@tanstack/react-table` + `react-virtual` · `exceljs`/`@e965/xlsx` · `@react-pdf/renderer` (+ `lib/pdf-fonts.ts` font tiếng Việt) · `web-push` · Nodemailer · Service Worker PWA · Sentry (tuỳ chọn) · Test: `node:test` qua `tsx` (ADR-0002) + Playwright e2e. CI: GitHub Actions (`npm audit` → lint → typecheck → test Postgres 16 → build). **Deploy: tự host VPS** (Docker Compose hoặc pm2 + reverse proxy, `DEPLOY.md`) — **không Vercel** (SSE + cron tự host không hợp serverless).
+Next.js **16.2** App Router (React **19.2**) · TypeScript **6.0** strict · Tailwind **4.3** (`@theme inline`, không `tailwind.config`, dark-first đảo màu qua `app/globals.css`) · PostgreSQL qua `pg` **8.22** (raw SQL, migrate nhẹ ADR-0003, không ORM/Supabase SDK) · Auth HMAC cookie tự chế · SSE realtime · Recharts · `@tanstack/react-table` + `react-virtual` · `exceljs`/`@e965/xlsx` · `@react-pdf/renderer` (+ `lib/nen/pdf-fonts.ts` font tiếng Việt) · `web-push` · Nodemailer · Service Worker PWA · Sentry (tuỳ chọn) · Test: `node:test` qua `tsx` (ADR-0002) + Playwright e2e. CI: GitHub Actions (`npm audit` → lint → typecheck → test Postgres 16 → build). **Deploy: tự host VPS** (PM2 + reverse proxy, `ecosystem.config.js` + `DEPLOY.md`; **không Docker**) — **không Vercel** (SSE + cron tự host không hợp serverless).
 
 ---
 

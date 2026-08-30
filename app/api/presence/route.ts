@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { heartbeat, getOnlineUsers } from "@/lib/presence";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { heartbeat, getOnlineUsers } from "@/lib/hien-truong/presence";
 
 export const dynamic = "force-dynamic";
 

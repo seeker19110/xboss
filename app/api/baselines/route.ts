@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, insertId, todayISO } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,8 @@ export async function GET() {
             (SELECT COUNT(*) FROM baseline_tasks bt WHERE bt.baseline_id = b.id) AS "taskCount"
        FROM baselines b
        LEFT JOIN users u ON b.created_by = u.id
-      ORDER BY b.id DESC`);
+      ORDER BY b.id DESC`,
+  );
   return NextResponse.json({ baselines });
 }
 
@@ -32,13 +33,22 @@ export async function POST(req: NextRequest) {
 
   const taskCount = await queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM tasks`);
   if (!taskCount || Number(taskCount.n) === 0)
-    return NextResponse.json({ error: "Chưa có task nào — import dữ liệu trước khi chốt baseline" }, { status: 422 });
+    return NextResponse.json(
+      { error: "Chưa có task nào — import dữ liệu trước khi chốt baseline" },
+      { status: 422 },
+    );
 
   const id = await insertId(
-    `INSERT INTO baselines (name, note, created_by) VALUES (?, ?, ?)`, name, note, user.id);
+    `INSERT INTO baselines (name, note, created_by) VALUES (?, ?, ?)`,
+    name,
+    note,
+    user.id,
+  );
   await run(
     `INSERT INTO baseline_tasks (baseline_id, task_id, start_date, end_date, progress_percent)
-     SELECT ?, id, start_date, end_date, progress_percent FROM tasks`, id);
+     SELECT ?, id, start_date, end_date, progress_percent FROM tasks`,
+    id,
+  );
 
   return NextResponse.json({ id, name, taskCount: Number(taskCount.n) }, { status: 201 });
 }

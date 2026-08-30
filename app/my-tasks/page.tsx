@@ -23,15 +23,15 @@ import {
   Share2,
   DollarSign,
 } from "lucide-react";
-import { slugFromCode } from "@/lib/sheets";
-import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
-import { formatDateVN } from "@/lib/date";
-import { PAYMENT_VIEW_ROLES, type Role } from "@/lib/roles";
+import { slugFromCode } from "@/lib/nen/sheets";
+import { STATUS_LABEL, type StatusSlug } from "@/lib/tien-do/status";
+import { formatDateVN } from "@/lib/nen/date";
+import { PAYMENT_VIEW_ROLES, type Role } from "@/lib/nen/roles";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import { DELAY_REASON_LABEL } from "@/lib/delay";
-import type { PrefKey, Prefs } from "@/app/api/notifications/prefs/route";
+import { DELAY_REASON_LABEL } from "@/lib/tien-do/delay";
+import type { PrefKey, Prefs } from "@/lib/van-hanh/notification-prefs";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -373,6 +373,9 @@ function PrefRow({
       <button
         onClick={() => onToggle(prefKey, !enabled)}
         disabled={saving}
+        role="switch"
+        aria-checked={enabled}
+        aria-label={label}
         className={`relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-60 ${enabled ? "bg-emerald-600" : "bg-zinc-700"}`}
       >
         <span
@@ -408,6 +411,13 @@ export default function MyTasksPage() {
       setTimeout(() => setCopied(null), 1800);
     });
   }
+
+  // Deep-link: /my-tasks?tab=notifications mở thẳng tab Thông báo (route /notifications
+  // cũ đã gộp vào đây, chỉ còn chuyển hướng sang URL này).
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab === "notifications") setSegment("notifications");
+  }, []);
 
   useEffect(() => {
     fetch("/api/my-tasks")
@@ -589,7 +599,7 @@ export default function MyTasksPage() {
         {/* ── Thanh toán tiến độ — chỉ Admin/PM/BCH ── */}
         {myRole && PAYMENT_VIEW_ROLES.includes(myRole as Role) && (
           <a
-            href="/payments"
+            href="/commercial?tab=ipc-payments&sub=payments"
             className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3.5 hover:border-emerald-700 transition group"
           >
             <span className="p-2 bg-emerald-950/60 rounded-lg shrink-0">
@@ -964,7 +974,7 @@ export default function MyTasksPage() {
                         {feed.materialOver.map((m) => (
                           <a
                             key={m.id}
-                            href="/materials"
+                            href="/procurement?tab=inventory"
                             className="flex items-center gap-3 px-4 py-3.5 hover:bg-zinc-800/50 transition group"
                           >
                             <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />

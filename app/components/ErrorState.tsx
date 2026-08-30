@@ -12,17 +12,19 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 py-16 text-center min-h-[60vh]">
-      <WifiOff className="w-12 h-12 text-zinc-400" strokeWidth={1.5} aria-hidden="true" />
-      <h1 className="text-lg font-semibold">Đã xảy ra lỗi</h1>
-      <p className="text-sm text-zinc-400 max-w-sm">{message}</p>
+    <div className="flex-1 flex flex-col items-center justify-center px-6 py-16 text-center min-h-[50vh]">
+      <div className="w-14 h-14 rounded-2xl bg-red-950/30 border border-red-900/50 flex items-center justify-center text-red-400 mb-4 shadow-inner">
+        <WifiOff className="w-7 h-7" strokeWidth={1.75} aria-hidden="true" />
+      </div>
+      <h2 className="text-base font-semibold text-zinc-100 mb-1">Đã xảy ra lỗi tải dữ liệu</h2>
+      <p className="text-xs text-zinc-400 max-w-sm mb-5 leading-relaxed">{message}</p>
       {onRetry && (
         <button
           onClick={onRetry}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-700 text-on-accent text-sm font-medium hover:bg-emerald-600 transition min-h-10"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-on-accent text-sm font-medium transition min-h-[44px] min-w-[120px] shadow-sm focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
         >
-          <RefreshCw className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
-          Thử lại
+          <RefreshCw className="w-4 h-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+          <span>Thử lại</span>
         </button>
       )}
     </div>

@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 // cookies()/headers() nên gọi được handler trực tiếp ngoài request scope thật của Next.
 
 test("checkHealth: DB lỗi (queryOneFn giả lập) → status degraded, db false, migration null", async () => {
-  const { checkHealth } = await import("@/lib/health");
+  const { checkHealth } = await import("@/lib/van-hanh/health");
   const result = await checkHealth(async () => {
     throw new Error("giả lập mất kết nối DB");
   });
@@ -20,7 +20,7 @@ test(
   "checkHealth: DB thật (TEST_DATABASE_URL) → status ok, db true, migration là tên file migration",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { checkHealth } = await import("@/lib/health");
+    const { checkHealth } = await import("@/lib/van-hanh/health");
     const result = await checkHealth();
     assert.equal(result.status, "ok");
     assert.equal(result.db, true);

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { listProjects } from "@/lib/projects";
-import { MODULES } from "@/lib/modules";
-import { getModuleFlags, setFlag } from "@/lib/feature-flags";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { listProjects } from "@/lib/ha-tang/projects";
+import { MODULES } from "@/lib/nen/modules";
+import { getModuleFlags, setFlag } from "@/lib/ha-tang/feature-flags";
 
 export const dynamic = "force-dynamic";
 

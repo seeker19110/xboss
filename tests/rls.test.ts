@@ -481,10 +481,22 @@ test(
     );
     const thucTe = rows.map((r) => r.t);
 
+    // 3 bảng Zalo Field Copilot (M86, migration 0119) — scope theo project_id, policy cùng
+    // dạng USING (project_id::text = current_setting('app.project_id', true) OR ... = '*').
+    const ZALO = ["zalo_field_action_dispatches", "zalo_site_message_logs", "zalo_user_bindings"];
+
+    // Map mã BOQ theo dự án cho plugin AutoCAD (M101 PR4, migration 0140) — policy NGHIÊM NGẶT
+    // 2 nhánh như 0077/0092 (không có nhánh "GUC rỗng → cho qua"), có WITH CHECK. Hành vi kiểm
+    // riêng ở tests/cad-boq-map.test.ts bằng role xboss_app.
+    // Thư viện block hai tầng (M113 PR1, migration 0145): policy 2 nhánh CỘNG nhánh toàn cục
+    // `project_id IS NULL` (bộ dùng chung mọi dự án, giữ nguyên hành vi trước M113). Hành vi
+    // kiểm riêng ở tests/cad-block-lib-du-an.test.ts bằng role xboss_app.
+    const CAD = ["cad_takeoff_boq_map", "cad_block_libs"];
+
     // Nhóm engineering: khai theo TIỀN TỐ chứ không liệt kê tay — thêm bảng engineering_* mới
     // mà quên bật RLS thì bị bắt ở assert bên dưới, không phải ở đây.
     const eng = thucTe.filter((t) => t.startsWith("engineering_"));
-    const khai = new Set([...TAI_CHINH, ...TO_CHUC, ...eng]);
+    const khai = new Set([...TAI_CHINH, ...TO_CHUC, ...ZALO, ...CAD, ...eng]);
 
     const laKhaiThieu = thucTe.filter((t) => !khai.has(t));
     assert.deepEqual(
@@ -493,22 +505,42 @@ test(
       "Có bảng BẬT RLS nhưng chưa khai trong test/tài liệu — bổ sung vào danh sách trên và cập nhật PROJECT.md + ADR-0005",
     );
 
-    const matRls = [...TAI_CHINH, ...TO_CHUC].filter((t) => !thucTe.includes(t));
+    const matRls = [...TAI_CHINH, ...TO_CHUC, ...ZALO, ...CAD].filter((t) => !thucTe.includes(t));
     assert.deepEqual(
       matRls,
       [],
       "Có bảng ĐÁNG LẼ có RLS nhưng đã mất — kiểm tra migration nào DROP/DISABLE nhầm",
     );
 
-    // Mọi bảng engineering_* đều phải nằm trong vùng RLS (0092). Bảng mới thêm sau này mà
-    // quên bật thì đây là chỗ báo.
+    // Mọi bảng engineering_* đều phải nằm trong vùng RLS (0092), TRỪ nhóm dữ liệu tham
+    // chiếu/toàn cục không có (hoặc không thể biểu đạt qua) cột project_id trực tiếp — bật
+    // RLS ngây thơ trên các bảng này sẽ trả rỗng âm thầm (đúng cạm bẫy ADR-0005 cảnh báo),
+    // không phải lỗ hổng cách ly dự án. Xem chi tiết trong ADR-0005 (cập nhật 2026-08-22).
+    const ENG_NO_RLS = new Set([
+      // Thư viện chuẩn/quy chuẩn dùng chung mọi dự án (migration 0098) — không có cột
+      // project_id, thiết kế cố ý là dữ liệu tham chiếu toàn cục.
+      "engineering_compliance_rules",
+      // Kho pattern học máy xuyên dự án (migration 0098) — không có project_id, đúng bản
+      // chất "cross-project" theo tên bảng.
+      "engineering_knowledge_patterns",
+      // Bài học xuyên dự án (migration 0098) — source_project_id NULLABLE (SET NULL), cố ý
+      // không ràng buộc 1 dự án để tổng hợp toàn hệ thống.
+      "engineering_cross_project_lessons",
+      // Lập luận trong phiên debate đa agent (migration 0098) — không có project_id trực
+      // tiếp, chỉ scope được qua JOIN debate_id → engineering_swarm_debates.project_id
+      // (RLS USING không diễn đạt subquery kiểu này theo đúng khuyến cáo ADR-0005).
+      "engineering_swarm_arguments",
+      // Thư viện AutoLISP template chi tiết cấu tạo dùng chung (migration 0099) — không có
+      // project_id, khoá duy nhất theo template_code toàn hệ thống.
+      "engineering_cad_lisp_templates",
+    ]);
     const engCoRls = new Set(eng);
     const engTatCa = await query<{ t: string }>(
       `SELECT table_name AS t FROM information_schema.tables
       WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
         AND table_name LIKE 'engineering\\_%' ORDER BY 1`,
     );
-    const engThieu = engTatCa.map((r) => r.t).filter((t) => !engCoRls.has(t));
+    const engThieu = engTatCa.map((r) => r.t).filter((t) => !engCoRls.has(t) && !ENG_NO_RLS.has(t));
     assert.deepEqual(
       engThieu,
       [],

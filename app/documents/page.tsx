@@ -6,7 +6,7 @@ import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { systemColorClasses } from "@/lib/systemColors";
+import { systemColorClasses } from "@/lib/nen/systemColors";
 
 type DocumentSource = "task" | "contract" | "vo" | "drawing" | "project";
 
@@ -104,7 +104,7 @@ export default function DocumentsPage() {
             <button
               onClick={() => setUploadOpen(true)}
               aria-label="Tải lên hồ sơ dự án"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
             >
               <Plus className="w-4 h-4" />{" "}
               <span className="hidden sm:inline">Tải lên hồ sơ dự án</span>
@@ -113,15 +113,19 @@ export default function DocumentsPage() {
         }
       />
 
-      <main className="p-4 sm:p-6 pb-24 space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Lọc theo hệ">
+      <main className="p-4 sm:p-6 pb-24 space-y-6 max-w-screen-2xl mx-auto">
+        <div className="flex flex-wrap items-center gap-3">
+          <div
+            className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl flex-wrap"
+            role="group"
+            aria-label="Lọc theo hệ"
+          >
             <button
               onClick={() => setSystemFilter("")}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                 systemFilter === ""
-                  ? "bg-zinc-700 border-zinc-600 text-white"
-                  : "border-zinc-700 text-zinc-400 hover:text-white"
+                  ? "bg-zinc-800 text-white shadow-xs"
+                  : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
               Mọi hệ
@@ -132,13 +136,13 @@ export default function DocumentsPage() {
                 <button
                   key={d.code}
                   onClick={() => setSystemFilter(systemFilter === d.code ? "" : d.code)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                     systemFilter === d.code
-                      ? `${c.border} ${c.text} bg-zinc-800`
-                      : "border-zinc-700 text-zinc-400 hover:text-white"
+                      ? `${c.border} ${c.text} bg-zinc-800 shadow-xs`
+                      : "text-zinc-400 hover:text-zinc-200"
                   }`}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+                  <span className={`w-2 h-2 rounded-full ${c.dot}`} />
                   {d.name}
                 </button>
               );
@@ -149,7 +153,7 @@ export default function DocumentsPage() {
               value={floorFilter}
               onChange={(e) => setFloorFilter(e.target.value)}
               aria-label="Lọc theo tầng"
-              className="bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 h-10 transition"
             >
               <option value="">Mọi tầng</option>
               {floors.map((f) => (
@@ -159,15 +163,19 @@ export default function DocumentsPage() {
               ))}
             </select>
           )}
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Lọc theo nguồn">
+          <div
+            className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl flex-wrap"
+            role="group"
+            aria-label="Lọc theo nguồn"
+          >
             {(Object.keys(SOURCE_LABEL) as DocumentSource[]).map((s) => (
               <button
                 key={s}
                 onClick={() => setSourceFilter(sourceFilter === s ? "" : s)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                   sourceFilter === s
-                    ? "bg-sky-900 border-sky-700 text-sky-200"
-                    : "border-zinc-700 text-zinc-400 hover:text-white"
+                    ? "bg-sky-950/80 border border-sky-700 text-sky-300 shadow-xs"
+                    : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
                 {SOURCE_LABEL[s]}
@@ -179,7 +187,7 @@ export default function DocumentsPage() {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Tìm tên hồ sơ…"
             aria-label="Tìm kiếm hồ sơ"
-            className="flex-1 min-w-[160px] bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-zinc-500"
+            className="flex-1 min-w-[200px] bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 h-10 transition"
           />
         </div>
 
@@ -194,7 +202,7 @@ export default function DocumentsPage() {
             }
           />
         ) : (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="bento-card overflow-hidden">
             <div
               className="overflow-x-auto"
               tabIndex={0}
@@ -366,7 +374,7 @@ function UploadProjectDocModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tải lên…" : "Tải lên"}
         </button>

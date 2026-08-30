@@ -1,7 +1,22 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hashPassword, verifyPassword, makeToken, parseToken } from "@/lib/auth";
+import {
+  hashPassword,
+  verifyPassword,
+  makeToken,
+  parseToken,
+  isSecureCookie,
+} from "@/lib/bao-mat/auth";
+
+// process.env stringify hoá mọi giá trị gán — set lại "= undefined" biến thành chuỗi
+// "undefined" thật (không xoá biến), làm hỏng NODE_ENV cho mọi test chạy sau. Phải
+// delete khi giá trị gốc là undefined.
+function restoreNodeEnv(orig: string | undefined) {
+  const envObj = process.env as Record<string, string | undefined>;
+  if (orig === undefined) delete envObj.NODE_ENV;
+  else envObj.NODE_ENV = orig;
+}
 
 // ===== Unit tests: hash + verify mật khẩu =====
 
@@ -48,7 +63,7 @@ test("makeToken: token chứa userId + pwFrag + exp + cờ mustSetup2fa + sessio
 
 test("parseToken: token 6 phần cũ (V5, chưa có orgId) bị coi không hợp lệ", async () => {
   process.env.XBOSS_SECRET = "test-secret-for-unit";
-  const { parseToken, sign } = await import("@/lib/session-token");
+  const { parseToken, sign } = await import("@/lib/bao-mat/session-token");
   const hash = hashPassword("pw");
   const pwFrag = hash.slice(0, 12);
   const exp = Date.now() + 86400_000;
@@ -69,7 +84,7 @@ test("parseToken: round-trip session_version + orgId", () => {
 
 test("parseToken: orgId phải là số nguyên dương (0 → null)", async () => {
   process.env.XBOSS_SECRET = "test-secret-for-unit";
-  const { parseToken, sign } = await import("@/lib/session-token");
+  const { parseToken, sign } = await import("@/lib/bao-mat/session-token");
   const hash = hashPassword("pw");
   const pwFrag = hash.slice(0, 12);
   const exp = Date.now() + 86400_000;
@@ -79,11 +94,46 @@ test("parseToken: orgId phải là số nguyên dương (0 → null)", async () 
   assert.equal(parseToken(badToken), null, "orgId = 0 phải bị từ chối");
 });
 
+test("isSecureCookie: dev mode luôn trả false", () => {
+  const orig = process.env.NODE_ENV;
+  const envObj = process.env as Record<string, string | undefined>;
+  try {
+    envObj.NODE_ENV = "development";
+    assert.equal(isSecureCookie({ headers: new Headers({ "x-forwarded-proto": "https" }) }), false);
+  } finally {
+    restoreNodeEnv(orig);
+  }
+});
+
+test("isSecureCookie: production HTTP trả false để trình duyệt lưu cookie", () => {
+  const orig = process.env.NODE_ENV;
+  const envObj = process.env as Record<string, string | undefined>;
+  try {
+    envObj.NODE_ENV = "production";
+    assert.equal(isSecureCookie({ headers: new Headers() }), false);
+    assert.equal(isSecureCookie({ headers: new Headers({ "x-forwarded-proto": "http" }) }), false);
+  } finally {
+    restoreNodeEnv(orig);
+  }
+});
+
+test("isSecureCookie: production HTTPS trả true", () => {
+  const orig = process.env.NODE_ENV;
+  const envObj = process.env as Record<string, string | undefined>;
+  try {
+    envObj.NODE_ENV = "production";
+    assert.equal(isSecureCookie({ headers: new Headers({ "x-forwarded-proto": "https" }) }), true);
+  } finally {
+    restoreNodeEnv(orig);
+  }
+});
+
 // ===== Integration tests: DB =====
 
 test("ensureDefaultUsers: tạo 4 tài khoản demo trong dev", { skip: !HAS_TEST_DB }, async () => {
   const { run, queryOne, withTransaction } = await import("@/lib/db");
-  const { ensureDefaultUsers, _resetDefaultUsersCacheForTests } = await import("@/lib/auth");
+  const { ensureDefaultUsers, _resetDefaultUsersCacheForTests } =
+    await import("@/lib/bao-mat/auth");
 
   // `DELETE FROM users` xoá SẠCH bảng dùng chung giữa mọi file test — nếu chạy đúng
   // lúc file khác đang có user chưa commit/chưa dọn (FK từ work_packages/tasks/...),
@@ -117,7 +167,7 @@ test("ensureDefaultUsers: tạo 4 tài khoản demo trong dev", { skip: !HAS_TES
 
 test("password change invalidates old token (pwFrag check)", { skip: !HAS_TEST_DB }, async () => {
   const { run, insertId, queryOne } = await import("@/lib/db");
-  const { hashPassword: hp, makeToken: mt } = await import("@/lib/auth");
+  const { hashPassword: hp, makeToken: mt } = await import("@/lib/bao-mat/auth");
 
   const pw1 = "password1";
   const hash1 = hp(pw1);
@@ -159,7 +209,7 @@ test("password change invalidates old token (pwFrag check)", { skip: !HAS_TEST_D
 // cộng với UPDATE của route revoke-sessions.
 test("revoke sessions: tăng session_version vô hiệu token cũ", { skip: !HAS_TEST_DB }, async () => {
   const { run, insertId, queryOne } = await import("@/lib/db");
-  const { hashPassword: hp, makeToken: mt, parseToken: pt } = await import("@/lib/auth");
+  const { hashPassword: hp, makeToken: mt, parseToken: pt } = await import("@/lib/bao-mat/auth");
 
   const hash = hp("password1");
   const userId = await insertId(

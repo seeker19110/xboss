@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Lightbulb, HelpCircle, AlertTriangle } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
@@ -92,7 +93,7 @@ const DECISIONS: { value: string; label: string; cls: string }[] = [
   {
     value: "accepted",
     label: "Chấp nhận",
-    cls: "bg-emerald-700 hover:bg-emerald-600 text-on-accent",
+    cls: "bg-emerald-700 hover:bg-emerald-800 text-on-accent",
   },
   { value: "modified", label: "Điều chỉnh", cls: "bg-sky-800 hover:bg-sky-700 text-on-accent" },
   { value: "deferred", label: "Tạm hoãn", cls: "bg-zinc-700 hover:bg-zinc-600 text-zinc-100" },
@@ -189,6 +190,7 @@ export default function SuggestionsPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader title="Đề xuất kỹ thuật (AI)" />
       <main className="mx-auto max-w-6xl px-4 py-6">
+        <EngineeringNav />
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <div>
             <label htmlFor="sug-status" className="mb-1 block text-xs text-zinc-400">

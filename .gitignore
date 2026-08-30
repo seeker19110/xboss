@@ -4,6 +4,12 @@ node_modules/
 .next-old/
 .next-build-staging/
 .next-old-staging/
+# Gói build do GitHub Actions gửi sang VPS (.github/workflows/deploy.yml) + thư mục giải nén
+.next-ci/
+.next-ci.tar.gz
+.next-ci.tar.gz.part
+.next-ci.info
+.env
 .env.local
 .env.staging
 .env*.local
@@ -25,8 +31,7 @@ backups/
 cloudflared.exe
 cloudflared-*.txt
 
-# Skill/agent của công cụ dev — không đưa vào repo dự án
-.agents/
+# Claude settings — không đưa vào repo dự án
 .claude/
 
 # SQLite cũ (đã chuyển sang Postgres) — giữ file local làm backup
@@ -48,3 +53,20 @@ xboss.tar.gz
 /playwright/.cache/
 /playwright/.auth/
 .lighthouseci/
+
+# Artifact Python — worker MEPF (`scripts/mepf/`, `mepf-worker/`) chạy bằng Python.
+# `mepf-worker/.gitignore` chỉ phủ cây con của nó, không phủ `scripts/mepf/`.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Log do PM2 sinh (ecosystem.config.js)
+logs/
+
+# .NET build output của plugin AutoCAD (plugin-autocad/)
+plugin-autocad/**/bin/
+plugin-autocad/**/obj/
+
+# Bundle AutoCAD sinh bởi plugin-autocad/dong-goi.ps1 — artifact phát hành, không commit
+/dist/

@@ -1,0 +1,1161 @@
+using Autodesk.AutoCAD.ApplicationServices;
+using Autodesk.AutoCAD.DatabaseServices;
+using Autodesk.AutoCAD.EditorInput;
+using Autodesk.AutoCAD.Geometry;
+using XBoss.Cad.Core.Api;
+using XBoss.Cad.Core.Draw;
+using XBoss.Cad.Core.Matching;
+using XBoss.Cad.Core.RulePack;
+
+namespace XBoss.Cad.Acad.Services;
+
+/// <summary>
+/// Thư viện block chuẩn của bộ lệnh vẽ (M100 §6.10, FR2/FR5/FR6, AC7/AC8).
+///
+/// Ba việc:
+/// <list type="number">
+/// <item><b>Cache cục bộ</b> tại <c>%APPDATA%\XBoss\block-lib\</c> (manifest.json + blocks.dwg +
+/// etag) — đọc được khi offline, và luôn kiểm sha256 manifest↔tệp TRƯỚC khi dùng (§12: hash lệch
+/// là từ chối thẳng, không "dùng tạm").</item>
+/// <item><b>Tải từ server</b> qua <c>GET /api/engineering/cad/block-lib</c> bằng đúng token thiết
+/// bị của <c>XBOSS_LOGIN</c> (Credential Manager) + ETag — 304 thì giữ nguyên cache (AC8).</item>
+/// <item><b>Thư viện ĐA TỆP</b> (M104 §1): block thêm thẳng từ web nằm ở tệp .dwg RIÊNG — máy chủ
+/// không chạy AutoCAD nên không gộp được chúng vào <c>blocks.dwg</c> nền. Entry manifest có
+/// <c>fileKey</c> ⇒ tải tệp lẻ qua <c>?file=</c>, cache tại <c>block-lib\files\&lt;fileKey&gt;</c>,
+/// kiểm sha256 TỪNG tệp y hệt tệp nền. Entry không có <c>fileKey</c> = block nằm trong tệp nền như
+/// cũ (mọi thư viện phát hành trước M104 không đổi hành vi).</item>
+/// <item><b>Nhập định nghĩa block vào DWG một lần</b> (WblockClone từ tệp cache): bản vẽ tự chứa
+/// định nghĩa, mở trên máy chưa cài plugin vẫn đúng hình. Định nghĩa nhập vào được đánh dấu XData
+/// <c>XBOSS_VE</c> (vai trò <see cref="VaiTroVe.DinhNghiaBlock"/> + version thư viện) để lần chèn
+/// sau biết định nghĩa đang có đến từ đâu — trùng tên mà khác nguồn thì HỎI, không ghi đè âm thầm
+/// (AC7).</item>
+/// </list>
+/// </summary>
+internal static class BlockLibraryService
+{
+    internal static string ThuMucCache => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XBoss", "block-lib");
+
+    internal static string ManifestPath => Path.Combine(ThuMucCache, "manifest.json");
+    internal static string DwgPath => Path.Combine(ThuMucCache, "blocks.dwg");
+    internal static string EtagPath => Path.Combine(ThuMucCache, "blocks.etag");
+
+    /// <summary>Thư mục chứa tệp .dwg LẺ của các block thêm từ web (M104 §1), tên tệp = fileKey.</summary>
+    internal static string ThuMucTepLe => Path.Combine(ThuMucCache, "files");
+
+    // ===== Ô CACHE THỨ HAI: thư viện ĐÃ TRỘN theo dự án (M113 PR4 — FR5) =====
+    //
+    // Cache trộn nằm SONG SONG với cache toàn cục ở trên, KHÔNG thay thế nó: đường đề xuất block
+    // M103 (XBOSS_VE_DEXUAT + BlockUngVienBuilder) dựng ứng viên trên manifest/tệp nền TOÀN CỤC vì
+    // máy chủ so `base_lib_version` với bộ toàn cục hiện hành. Ghi bản trộn đè lên ô cũ là mọi đề
+    // xuất của kỹ sư dự án bị từ chối (409 stale / 422 manifest lệch) mà không ai hiểu vì sao.
+    //
+    // Bản trộn cần HAI tệp .dwg nền (§4.5, hash kiểm theo từng bộ): block nguồn "Toàn cục" lấy
+    // định nghĩa từ tệp nền bộ toàn cục, block nguồn "Dự án" lấy từ tệp nền bộ của dự án.
+
+    /// <summary>Manifest ĐÃ TRỘN hai tầng của dự án đang chọn.</summary>
+    internal static string ManifestTronPath => Path.Combine(ThuMucCache, "manifest-tron.json");
+
+    /// <summary>Tệp .dwg nền của bộ TOÀN CỤC, bản đi kèm manifest trộn.</summary>
+    internal static string DwgTronToanCucPath => Path.Combine(ThuMucCache, "blocks-tron-toancuc.dwg");
+
+    /// <summary>Tệp .dwg nền của bộ RIÊNG của dự án.</summary>
+    internal static string DwgTronDuAnPath => Path.Combine(ThuMucCache, "blocks-tron-duan.dwg");
+
+    internal static string EtagTronPath => Path.Combine(ThuMucCache, "blocks-tron.etag");
+
+    /// <summary>Siêu dữ liệu cache trộn: dự án nào, version hai bộ, sha256 tệp nền bộ dự án.</summary>
+    internal static string BoTronPath => Path.Combine(ThuMucCache, "bo-tron.json");
+
+    /// <summary>Đuôi tệp ghi ETag của một tệp lẻ, đặt cạnh chính tệp đó.</summary>
+    private const string DuoiEtag = ".etag";
+
+    private static BlockManifest? _cache;
+    private static DateTime _thoiDiemCache;
+
+    /// <summary>Manifest nào đang nằm trong <see cref="_cache"/> — toàn cục hay bản trộn.</summary>
+    private static string? _duongDanCache;
+
+    /// <summary>Thông điệp tiếng Việt chỉ đường khi máy chưa có thư viện (§6.10).</summary>
+    private const string HuongDanLayThuVien =
+        "Chưa có thư viện block trên máy. Chạy XBOSS_LOGIN (tự tải bản đang phát hành) " +
+        "hoặc XBOSS_VE_THUVIEN để nạp tệp tay (manifest.json + tệp .dwg cạnh nhau).";
+
+    /// <summary>
+    /// Lần chạy đầu trên máy mới: lấy thư viện MEPF tối thiểu đóng cùng bundle để các lệnh phụ kiện
+    /// dùng được khi offline. Cache server/nạp tay đã có luôn thắng, không bị bundle hạ cấp.
+    /// </summary>
+    internal static string? KhoiTaoTuGoiCaiDat()
+    {
+        var thuMucGoi = Path.Combine(
+            Path.GetDirectoryName(typeof(BlockLibraryService).Assembly.Location) ?? "",
+            "BlockLibrary");
+        if (!Directory.Exists(thuMucGoi)) return null;
+        if (!BlockLibraryBootstrap.SeedIfAbsent(thuMucGoi, ThuMucCache)) return null;
+
+        _cache = null;
+        _thoiDiemCache = default;
+        var manifest = BlockManifestLoader.Load(File.ReadAllText(ManifestPath));
+        return $"Đã khởi tạo thư viện MEPF offline {manifest.Version} ({manifest.Blocks.Count} block) → {ThuMucCache}";
+    }
+
+    // ===== Cache cục bộ =====
+
+    /// <summary>
+    /// Thư viện đang dùng được: manifest đã kiểm + hash tệp .dwg nền khớp + ĐỦ tệp .dwg lẻ của
+    /// mọi block thêm từ web, hash từng tệp khớp (M104 §1). Trả (null, lý do tiếng Việt) khi chưa
+    /// có/hỏng. Đọc lại khi tệp manifest đổi (vừa tải/nạp tay xong).
+    /// </summary>
+    internal static (BlockManifest? Manifest, string? Loi) HienHanh() =>
+        BoTronDangDung() is { } bo ? DocCacheTron(bo) : DocCacheToanCuc();
+
+    /// <summary>
+    /// Cache TRỘN có hiệu lực cho dự án đang chọn hay không (M113 §4): phải có cache trộn trên máy
+    /// VÀ nó thuộc đúng dự án đang nhớ trong <see cref="ExcelMetaStore.DuAnHienHanh"/>. Đổi dự án
+    /// (hoặc bỏ chọn dự án) là bản trộn cũ hết hiệu lực NGAY — thà lui về bộ toàn cục còn hơn chèn
+    /// khung tên của chủ đầu tư khác (AC9).
+    /// </summary>
+    private static BoTronCache? BoTronDangDung()
+    {
+        if (ExcelMetaStore.DuAnHienHanh is not { } duAn || duAn <= 0) return null;
+        try
+        {
+            if (!File.Exists(BoTronPath) || !File.Exists(ManifestTronPath)) return null;
+            var bo = BoTronCache.DocJson(File.ReadAllText(BoTronPath));
+            return bo is not null && bo.DuAnId == duAn ? bo : null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Bản trộn đang dùng (null = đang dùng bộ toàn cục) — cho XBOSS_BANG/XBOSS_VE_THUVIEN.</summary>
+    internal static BoTronCache? BoTronHienHanh() => BoTronDangDung();
+
+    private static (BlockManifest? Manifest, string? Loi) DocCacheToanCuc()
+    {
+        try
+        {
+            using var cacheLock = BlockLibraryBootstrap.AcquireCacheLock(ThuMucCache);
+            if (!File.Exists(ManifestPath) || !File.Exists(DwgPath)) return (null, HuongDanLayThuVien);
+            var thoiDiem = File.GetLastWriteTimeUtc(ManifestPath);
+            if (_cache is not null && _duongDanCache == ManifestPath && thoiDiem == _thoiDiemCache)
+                return (_cache, null);
+
+            var manifest = BlockManifestLoader.Load(File.ReadAllText(ManifestPath));
+            BlockManifestLoader.KiemTraHashTep(manifest, DwgPath); // ném khi lệch — không dùng tạm
+            KiemTraTepLe(manifest); // nt cho từng tệp lẻ (M104)
+            GhiNhoCache(manifest, ManifestPath, thoiDiem);
+            return (manifest, null);
+        }
+        catch (BlockManifestException e)
+        {
+            _cache = null;
+            return (null, $"Thư viện block trong cache KHÔNG dùng được: {e.Message}");
+        }
+        catch (IOException e)
+        {
+            _cache = null;
+            return (null, $"Không đọc được thư viện block trong cache: {e.Message}");
+        }
+        catch (UnauthorizedAccessException e)
+        {
+            _cache = null;
+            return (null, $"Không có quyền đọc thư viện block trong cache: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Bản TRỘN trong cache: manifest đã trộn + hash kiểm theo TỪNG bộ (§4.5) — tệp nền bộ toàn cục
+    /// theo <c>dwgSha256</c> của manifest, tệp nền bộ dự án theo <c>boDuAn.dwgSha256</c> máy chủ trả
+    /// kèm. Bộ nào không có block nào dùng tới thì không đòi tệp của bộ đó.
+    /// Hỏng thì báo lỗi chứ KHÔNG âm thầm lui về bộ toàn cục: lui im lặng nghĩa là chèn block toàn
+    /// cục trong khi kỹ sư tưởng đang dùng bộ của dự án.
+    /// </summary>
+    private static (BlockManifest? Manifest, string? Loi) DocCacheTron(BoTronCache bo)
+    {
+        try
+        {
+            using var cacheLock = BlockLibraryBootstrap.AcquireCacheLock(ThuMucCache);
+            var thoiDiem = File.GetLastWriteTimeUtc(ManifestTronPath);
+            if (_cache is not null && _duongDanCache == ManifestTronPath && thoiDiem == _thoiDiemCache)
+                return (_cache, null);
+
+            var manifest = BlockManifestLoader.Load(File.ReadAllText(ManifestTronPath));
+            if (manifest.CoBlockToanCuc)
+                BlockManifestLoader.KiemTraHashTep(manifest, DwgTronToanCucPath);
+            if (manifest.CoBlockDuAn)
+            {
+                BlockManifestLoader.KiemTraHashTepTheoSha(
+                    MoTaBoDuAn(bo), bo.DwgSha256DuAn ?? "", DwgTronDuAnPath);
+            }
+            KiemTraTepLe(manifest);
+            GhiNhoCache(manifest, ManifestTronPath, thoiDiem);
+            return (manifest, null);
+        }
+        catch (BlockManifestException e)
+        {
+            _cache = null;
+            return (null,
+                $"Thư viện block (bản trộn {bo.MoTaHaiBo}) trong cache KHÔNG dùng được: {e.Message}");
+        }
+        catch (IOException e)
+        {
+            _cache = null;
+            return (null, $"Không đọc được thư viện block bản trộn trong cache: {e.Message}");
+        }
+        catch (UnauthorizedAccessException e)
+        {
+            _cache = null;
+            return (null, $"Không có quyền đọc thư viện block bản trộn trong cache: {e.Message}");
+        }
+    }
+
+    private static string MoTaBoDuAn(BoTronCache bo) =>
+        $"bộ riêng của dự án #{bo.DuAnId} ({bo.VersionDuAn ?? "?"})";
+
+    private static void GhiNhoCache(BlockManifest manifest, string duongDan, DateTime thoiDiem)
+    {
+        _cache = manifest;
+        _duongDanCache = duongDan;
+        _thoiDiemCache = thoiDiem;
+    }
+
+    /// <summary>
+    /// JSON manifest trong cache, NGUYÊN VĂN như server gửi — kể cả những khóa plugin chưa model
+    /// (vd <c>fileKey</c> của M104). Manifest ứng viên (M103) phải dựng trên chuỗi này, không dựng
+    /// lại từ model, nếu không các khóa đó rụng và server từ chối ứng viên.
+    /// </summary>
+    /// <remarks>
+    /// LUÔN là manifest TOÀN CỤC, kể cả khi máy đang dùng bản trộn theo dự án (M113 PR4): máy chủ
+    /// kiểm đề xuất M103 bằng bộ toàn cục hiện hành, gửi bản trộn lên là bị từ chối ngay.
+    /// </remarks>
+    internal static string ManifestJson()
+    {
+        using var cacheLock = BlockLibraryBootstrap.AcquireCacheLock(ThuMucCache);
+        return File.ReadAllText(ManifestPath);
+    }
+
+    /// <summary>Thư viện hiện hành hoặc null kèm thông báo đã in ra dòng lệnh (dùng đầu mỗi lệnh).</summary>
+    internal static BlockManifest? CanThuVien(Editor ed)
+    {
+        var (manifest, loi) = HienHanh();
+        if (manifest is null) ed.WriteMessage($"\n[XBoss] {loi}\n");
+        return manifest;
+    }
+
+    /// <summary>Ghi cặp manifest + .dwg vào cache (kiểm hash TRƯỚC, hợp lệ mới ghi đè).</summary>
+    private static BlockManifest GhiCache(string manifestJson, byte[] dwg, string? etag)
+    {
+        var manifest = BlockManifestLoader.Load(manifestJson);
+        BlockManifestLoader.KiemTraHashTep(manifest, dwg);
+
+        BlockLibraryBootstrap.WriteCachePair(
+            ThuMucCache, manifestJson, dwg, overwrite: true,
+            afterCommit: () =>
+            {
+                if (etag is null) DonEtag();
+                else File.WriteAllText(EtagPath, etag);
+            });
+
+        // KHÔNG đặt _cache ở đây: manifest mới có thể còn thiếu tệp .dwg lẻ chưa tải (M104 §1),
+        // đặt sẵn là biến "chưa dùng được" thành "dùng được" trong mắt HienHanh(). Xoá cache nhớ
+        // để lần HienHanh() kế tiếp kiểm lại từ đầu (gồm cả tệp lẻ).
+        _cache = null;
+        return manifest;
+    }
+
+    // ===== Tệp .dwg lẻ của block thêm từ web (M104 §1) =====
+
+    /// <summary>Đường dẫn tệp lẻ trong cache. Ném khi khoá không dùng làm tên tệp được.</summary>
+    internal static string DuongDanTepLe(string fileKey)
+    {
+        // Manifest đã kiểm khoá lúc Load; kiểm lại ngay trước khi ghép đường dẫn vì đây là chỗ
+        // DUY NHẤT dữ liệu từ mạng biến thành tên tệp trên đĩa (phòng đường gọi mới quên kiểm).
+        if (!BlockManifestLoader.LaKhoaTepHopLe(fileKey))
+        {
+            throw new BlockManifestException(
+                $"Khoá tệp block \"{fileKey}\" không hợp lệ — thư viện hỏng, tải lại bằng XBOSS_LOGIN.");
+        }
+        return Path.Combine(ThuMucTepLe, fileKey);
+    }
+
+    /// <summary>Tệp lẻ của block đã có trong cache và hash khớp manifest (không cần tải lại).</summary>
+    private static bool TepLeConTot(BlockDef def)
+    {
+        try
+        {
+            var duong = DuongDanTepLe(def.FileKey!);
+            if (!File.Exists(duong)) return false;
+            BlockManifestLoader.KiemTraHashTepLe(def, File.ReadAllBytes(duong));
+            return true;
+        }
+        catch (BlockManifestException)
+        {
+            return false; // thiếu/lệch hash — coi như chưa có, sẽ tải lại
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Mọi block có <c>fileKey</c> đều phải có tệp lẻ trong cache với hash khớp — thiếu/lệch thì
+    /// NÉM kèm tên các block đó và cách lấy lại. Không có tệp lẻ mà vẫn cho vẽ thì lệnh chèn sẽ
+    /// chết giữa chừng với thông điệp khó hiểu, hoặc tệ hơn là chèn nhầm định nghĩa cùng tên.
+    /// </summary>
+    private static void KiemTraTepLe(BlockManifest manifest)
+    {
+        var thieu = new List<string>();
+        foreach (var def in manifest.TepRieng())
+        {
+            if (!TepLeConTot(def)) thieu.Add($"\"{def.BlockName}\"");
+        }
+        if (thieu.Count == 0) return;
+        throw new BlockManifestException(
+            $"Thiếu tệp .dwg của {thieu.Count} block thêm từ web ({string.Join(", ", thieu)}) trong cache " +
+            $"({ThuMucTepLe}) hoặc tệp không khớp hash — chạy XBOSS_LOGIN (hoặc XBOSS_VE_THUVIEN → Server) " +
+            "để tải lại thư viện.");
+    }
+
+    /// <summary>Ghi tệp lẻ vào cache — CHỈ gọi sau khi hash đã khớp manifest.</summary>
+    private static void GhiTepLe(string fileKey, byte[] dwg, string? etag)
+    {
+        var duong = DuongDanTepLe(fileKey);
+        using var cacheLock = BlockLibraryBootstrap.AcquireCacheLock(ThuMucCache);
+        Directory.CreateDirectory(ThuMucTepLe);
+        var tam = duong + $".tmp-{Guid.NewGuid():N}";
+        try
+        {
+            File.WriteAllBytes(tam, dwg);
+            File.Move(tam, duong, overwrite: true);
+            if (etag is null)
+            {
+                try
+                {
+                    if (File.Exists(duong + DuoiEtag)) File.Delete(duong + DuoiEtag);
+                }
+                catch (IOException) { /* etag mất chỉ tốn 1 lần tải lại */ }
+            }
+            else File.WriteAllText(duong + DuoiEtag, etag);
+        }
+        finally
+        {
+            try { if (File.Exists(tam)) File.Delete(tam); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        _cache = null; // buộc HienHanh() kiểm lại thư viện sau khi cache đổi
+    }
+
+    private static string? EtagTepLeCu(string fileKey)
+    {
+        try
+        {
+            var duong = DuongDanTepLe(fileKey) + DuoiEtag;
+            return File.Exists(duong) ? File.ReadAllText(duong) : null;
+        }
+        catch (BlockManifestException)
+        {
+            return null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    private static void DonEtag()
+    {
+        try
+        {
+            if (File.Exists(EtagPath)) File.Delete(EtagPath);
+        }
+        catch (IOException) { /* etag mất chỉ tốn 1 lần tải lại */ }
+    }
+
+    private static string? EtagCu()
+    {
+        try
+        {
+            return File.Exists(EtagPath) ? File.ReadAllText(EtagPath) : null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    // ===== Tải từ server =====
+
+    /// <summary>
+    /// Tải thư viện đang phát hành (AC8). Trả thông điệp tiếng Việt để lệnh gọi in ra — KHÔNG ném
+    /// ra ngoài các lỗi "mềm" (chưa phát hành, mất mạng): thiếu thư viện chỉ chặn lệnh chèn block,
+    /// không được làm hỏng luồng XBOSS_LOGIN.
+    /// </summary>
+    internal static async Task<string> TaiVeAsync(XBossApiClient client, string token) =>
+        (await TaiVeChiTietAsync(client, token)).ThongDiep;
+
+    /// <summary>
+    /// Như <see cref="TaiVeAsync"/> nhưng nói rõ ĐÃ CHẮC CHẮN cache = bản đang phát hành hay chưa.
+    /// <c>ThanhCong = true</c> chỉ khi cache khớp server (tải mới xong, hoặc 304 và cache còn lành).
+    /// Cần cho <c>XBOSS_VE_DEXUAT</c> (M103 §1): đề xuất dựng trên thư viện cũ sẽ bị server trả
+    /// 409 stale, nên thà dừng ngay còn hơn để kỹ sư dựng ứng viên xong mới biết.
+    /// </summary>
+    internal static async Task<(bool ThanhCong, string ThongDiep)> TaiVeChiTietAsync(
+        XBossApiClient client, string token)
+    {
+        try
+        {
+            var etag = EtagCu();
+            // ?v=<version đang cache> đi KÈM ETag chứ không thay ETag (M104 §2): ETag lo việc
+            // "không đổi thì đừng gửi lại", còn v lo việc nói thẳng "bản trên máy đã cũ" — server
+            // trả 404 kèm version hiện hành thay vì im lặng đưa bản khác. Client tự hỏi lại lần
+            // hai không kèm v, nên luồng vẫn là "cũ thì tự lấy bản mới".
+            var (json, etagMoi) = await client.FetchBlockLibManifestAsync(token, etag, VersionCache());
+            if (json is null && File.Exists(ManifestPath) && File.Exists(DwgPath))
+            {
+                var (cu, loi) = HienHanh();
+                if (cu is null && ManifestCache() is { } tam)
+                {
+                    // 304 KHÔNG mang manifest mới về, nên tệp lẻ còn thiếu (lần tải trước đứt giữa
+                    // chừng, hoặc bản M104 đầu tiên cài lên máy đã có cache cũ) phải bù từ chính
+                    // manifest đang nằm trong cache, rồi kiểm lại.
+                    var loiLe = await TaiTepLeAsync(client, token, tam);
+                    (cu, loi) = HienHanh();
+                    if (cu is null && loiLe is not null) return (false, loiLe);
+                }
+                return cu is not null
+                    ? (true, $"Thư viện block không đổi so với cache (version {cu.Version}, {cu.Blocks.Count} block).")
+                    : (false, $"Thư viện block không đổi trên server nhưng cache hỏng: {loi}");
+            }
+
+            // 304 mà cache khuyết tệp ⇒ hỏi lại từ đầu, không giữ etag rỗng nghĩa.
+            if (json is null)
+            {
+                (json, etagMoi) = await client.FetchBlockLibManifestAsync(token);
+                if (json is null)
+                    return (false, "Server báo thư viện block không đổi nhưng máy chưa có cache — thử lại sau.");
+            }
+
+            // Chốt tệp .dwg theo ĐÚNG version của manifest vừa nhận: máy chủ phát hành bản mới xen
+            // giữa hai lời gọi thì server báo lệch version thay vì đưa tệp của bản kia — ghép nhầm
+            // cặp chỉ lộ ra sau đó dưới dạng "hash lệch" khó truy nguyên. Load ở đây rẻ (JSON nhỏ)
+            // và không ghi gì vào cache; GhiCache vẫn kiểm lại đầy đủ như cũ.
+            var versionMoi = BlockManifestLoader.Load(json).Version;
+            var (dwg, _) = await client.FetchBlockLibDwgAsync(token, null, versionMoi);
+            if (dwg is null || dwg.Length == 0) return (false, "Server không trả được tệp .dwg thư viện block.");
+
+            var manifest = GhiCache(json, dwg, etagMoi);
+            var loiTepLe = await TaiTepLeAsync(client, token, manifest);
+            if (loiTepLe is not null) return (false, loiTepLe);
+
+            var soLe = manifest.TepRieng().Count();
+            return (true,
+                $"Đã tải thư viện block {manifest.Version} ({manifest.Blocks.Count} block" +
+                $"{(soLe > 0 ? $", {soLe} block thêm từ web ở tệp riêng" : "")}) → {ThuMucCache}");
+        }
+        catch (BlockManifestException e)
+        {
+            return (false, $"Thư viện block server trả về KHÔNG hợp lệ — giữ cache cũ: {e.Message}");
+        }
+        catch (XBossApiException e)
+        {
+            return (false, $"Không tải được thư viện block: {e.Message}");
+        }
+        catch (HttpRequestException e)
+        {
+            return (false, $"Không kết nối được server để tải thư viện block ({e.Message}) — dùng cache cục bộ nếu có.");
+        }
+        catch (IOException e)
+        {
+            return (false, $"Không ghi được thư viện block vào cache: {e.Message}");
+        }
+        catch (UnauthorizedAccessException e)
+        {
+            // Lệnh gọi là async void (XBOSS_LOGIN) — ngoại lệ lọt ra sẽ hạ cả AutoCAD, nên bắt luôn.
+            return (false, $"Không có quyền ghi vào {ThuMucCache}: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Tải các tệp .dwg LẺ (block thêm từ web — M104 §1) còn thiếu/lệch hash về cache, bằng cùng
+    /// token thiết bị + ETag như tệp nền. Tệp đã có và đúng hash thì BỎ QUA (không tốn lượt tải).
+    /// Hash kiểm TRƯỚC khi ghi: server trả tệp lệch hash thì không có gì rơi vào cache.
+    /// Trả null khi đủ, hoặc thông điệp tiếng Việt liệt kê những block chưa lấy được.
+    /// </summary>
+    /// <param name="duAnId">
+    /// M113 §6 — dự án của bản trộn (null = đang tải bộ toàn cục). Tệp lẻ tìm trong ĐÚNG MỘT tầng
+    /// nên block nguồn "Dự án" phải hỏi kèm <c>?project=</c>, block nguồn "Toàn cục" thì không.
+    /// </param>
+    private static async Task<string?> TaiTepLeAsync(
+        XBossApiClient client, string token, BlockManifest manifest, long? duAnId = null)
+    {
+        var hong = new List<string>();
+        foreach (var def in manifest.TepRieng())
+        {
+            if (TepLeConTot(def)) continue;
+            try
+            {
+                var fileKey = def.FileKey!;
+                var duAnCuaBlock = def.LaCuaDuAn ? duAnId : null;
+                var (dwg, etagMoi) = await client.FetchBlockLibTepLeAsync(
+                    token, fileKey, EtagTepLeCu(fileKey), def.LibVersion, duAnCuaBlock);
+                // 304 mà tệp trong cache không dùng được (đã kiểm ở trên) ⇒ hỏi lại không kèm ETag.
+                if (dwg is null || dwg.Length == 0)
+                {
+                    (dwg, etagMoi) = await client.FetchBlockLibTepLeAsync(
+                        token, fileKey, null, def.LibVersion, duAnCuaBlock);
+                }
+                if (dwg is null || dwg.Length == 0)
+                {
+                    hong.Add($"\"{def.BlockName}\": server không trả được tệp");
+                    continue;
+                }
+                BlockManifestLoader.KiemTraHashTepLe(def, dwg);
+                GhiTepLe(fileKey, dwg, etagMoi);
+            }
+            catch (BlockManifestException e)
+            {
+                hong.Add($"\"{def.BlockName}\": {e.Message}");
+            }
+            catch (XBossApiException e)
+            {
+                hong.Add($"\"{def.BlockName}\": {e.Message}");
+            }
+        }
+        if (hong.Count == 0) return null;
+        return $"Thiếu {hong.Count} tệp block thêm từ web nên thư viện CHƯA dùng được — " +
+               string.Join("; ", hong) +
+               ". Nhờ Admin/PM kiểm lại trên web rồi chạy lại XBOSS_LOGIN.";
+    }
+
+    /// <summary>
+    /// Version thư viện đang nằm trong cache để gắn <c>?v=</c> khi hỏi server; null khi máy chưa
+    /// có cache hoặc manifest cache hỏng (lúc đó không gửi <c>v</c>, hỏi như lần đầu).
+    /// </summary>
+    private static string? VersionCache() => ManifestCache()?.Version;
+
+    /// <summary>Manifest trong cache, KHÔNG kiểm hash tệp — chỉ để biết cần bù tệp lẻ nào.</summary>
+    private static BlockManifest? ManifestCache()
+    {
+        try
+        {
+            using var cacheLock = BlockLibraryBootstrap.AcquireCacheLock(ThuMucCache);
+            return BlockManifestLoader.Load(File.ReadAllText(ManifestPath));
+        }
+        catch (BlockManifestException)
+        {
+            return null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    // ===== Tải bản TRỘN theo dự án (M113 PR4 — FR5/AC9) =====
+
+    /// <summary>Manifest trộn trong cache, KHÔNG kiểm hash — chỉ để tra sha nền bộ toàn cục.</summary>
+    private static BlockManifest? ManifestCacheTron()
+    {
+        try
+        {
+            return BlockManifestLoader.Load(File.ReadAllText(ManifestTronPath));
+        }
+        catch (BlockManifestException)
+        {
+            return null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    private static string? EtagTronCu()
+    {
+        try
+        {
+            return File.Exists(EtagTronPath) ? File.ReadAllText(EtagTronPath) : null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Ghi ô cache TRỘN (manifest + tệp nền của bộ nào thật sự cần) — hash đã kiểm trước.</summary>
+    private static void GhiCacheTron(
+        string manifestJson, byte[]? nenToanCuc, byte[]? nenDuAn, string? etag, BoTronCache bo)
+    {
+        Directory.CreateDirectory(ThuMucCache);
+        using var cacheLock = BlockLibraryBootstrap.AcquireCacheLock(ThuMucCache);
+        var tep = new List<BlockLibraryBootstrap.CacheSetEntry>();
+        if (nenToanCuc is not null)
+            tep.Add(new(Path.GetFileName(DwgTronToanCucPath), nenToanCuc));
+        if (nenDuAn is not null)
+            tep.Add(new(Path.GetFileName(DwgTronDuAnPath), nenDuAn));
+        tep.Add(new(
+            Path.GetFileName(ManifestTronPath), System.Text.Encoding.UTF8.GetBytes(manifestJson)));
+        tep.Add(new(
+            Path.GetFileName(EtagTronPath),
+            etag is null ? null : System.Text.Encoding.UTF8.GetBytes(etag)));
+        // Metadata đứng cuối và là tệp commit: crash giữa publication sẽ rollback nguyên snapshot cũ.
+        tep.Add(new(
+            Path.GetFileName(BoTronPath), System.Text.Encoding.UTF8.GetBytes(bo.GhiJson())));
+        BlockLibraryBootstrap.PublishCacheSet(
+            ThuMucCache, "block-lib-mixed", tep, Path.GetFileName(BoTronPath));
+        _cache = null; // buộc HienHanh() kiểm lại từ đầu (gồm cả tệp lẻ)
+    }
+
+    /// <summary>
+    /// Tải thư viện ĐÃ TRỘN của một dự án (M113 §4): manifest trộn + tệp nền của bộ toàn cục và/hoặc
+    /// bộ riêng của dự án, hash kiểm theo TỪNG bộ, rồi bù các tệp .dwg lẻ (M104) của đúng tầng.
+    ///
+    /// KHÔNG đụng ô cache toàn cục — <c>XBOSS_VE_DEXUAT</c> vẫn dựng ứng viên trên bộ toàn cục.
+    /// Như <see cref="TaiVeChiTietAsync"/>, mọi lỗi "mềm" trả về thành thông điệp tiếng Việt để lệnh
+    /// gọi in ra: không tải được bộ dự án thì kỹ sư vẫn làm việc với bộ toàn cục.
+    /// </summary>
+    internal static async Task<(bool ThanhCong, string ThongDiep)> TaiVeTronAsync(
+        XBossApiClient client, string token, long duAnId)
+    {
+        try
+        {
+            var etag = EtagTronCu();
+            var (json, etagMoi, boMayChu) = await client.FetchBlockLibManifestTronAsync(token, duAnId, etag);
+            if (json is null)
+            {
+                // 304: giữ cache trộn nếu nó còn lành, không thì hỏi lại từ đầu (bỏ ETag).
+                if (BoTronDangDung() is { } boCu && DocCacheTron(boCu).Manifest is { } cu)
+                {
+                    return (true,
+                        $"Thư viện block (bản trộn {boCu.MoTaHaiBo}) không đổi so với cache — {cu.Blocks.Count} block.");
+                }
+                (json, etagMoi, boMayChu) = await client.FetchBlockLibManifestTronAsync(token, duAnId);
+                if (json is null)
+                {
+                    return (false,
+                        "Server báo thư viện block của dự án không đổi nhưng máy chưa có cache — thử lại sau.");
+                }
+            }
+
+            var manifest = BlockManifestLoader.Load(json);
+
+            byte[]? nenToanCuc = null;
+            if (manifest.CoBlockToanCuc)
+            {
+                (nenToanCuc, _) = await client.FetchBlockLibDwgAsync(token);
+                if (nenToanCuc is null || nenToanCuc.Length == 0)
+                    return (false, "Server không trả được tệp .dwg của bộ block toàn cục.");
+                BlockManifestLoader.KiemTraHashTep(manifest, nenToanCuc);
+            }
+
+            byte[]? nenDuAn = null;
+            if (manifest.CoBlockDuAn)
+            {
+                if (boMayChu is null)
+                {
+                    return (false,
+                        "Manifest trộn có block của dự án nhưng server không kèm \"boDuAn\" (version + sha256) — " +
+                        "không kiểm được toàn vẹn tệp, từ chối dùng.");
+                }
+                (nenDuAn, _) = await client.FetchBlockLibDwgDuAnAsync(token, duAnId);
+                if (nenDuAn is null || nenDuAn.Length == 0)
+                    return (false, "Server không trả được tệp .dwg của bộ block riêng của dự án.");
+                BlockManifestLoader.KiemTraHashTepTheoSha(
+                    $"bộ riêng của dự án #{duAnId} ({boMayChu.Version})", boMayChu.DwgSha256, nenDuAn);
+            }
+
+            var bo = new BoTronCache
+            {
+                DuAnId = duAnId,
+                // Version bộ toàn cục lấy từ chính entry trộn (`libVersion` của block nguồn toàn
+                // cục) — chính xác hơn đọc cache toàn cục trên máy, vốn có thể đang là bản khác.
+                VersionToanCuc = manifest.Blocks.FirstOrDefault(b => !b.LaCuaDuAn)?.LibVersion,
+                VersionDuAn = boMayChu?.Version,
+                DwgSha256DuAn = boMayChu?.DwgSha256,
+            };
+            GhiCacheTron(json, nenToanCuc, nenDuAn, etagMoi, bo);
+
+            var loiTepLe = await TaiTepLeAsync(client, token, manifest, duAnId);
+            if (loiTepLe is not null) return (false, loiTepLe);
+
+            var soDuAn = manifest.Blocks.Count(b => b.LaCuaDuAn);
+            return (true,
+                $"Đã tải thư viện block của dự án #{duAnId}: {manifest.Blocks.Count} block " +
+                $"({soDuAn} của dự án{(boMayChu is null ? "" : $", bộ {boMayChu.Version}")}, " +
+                $"{manifest.Blocks.Count - soDuAn} toàn cục) → {ThuMucCache}");
+        }
+        catch (BlockManifestException e)
+        {
+            return (false, $"Thư viện block của dự án server trả về KHÔNG hợp lệ — giữ cache cũ: {e.Message}");
+        }
+        catch (XBossApiException e)
+        {
+            return (false, $"Không tải được thư viện block của dự án: {e.Message}");
+        }
+        catch (HttpRequestException e)
+        {
+            return (false, $"Không kết nối được server để tải thư viện block của dự án ({e.Message}).");
+        }
+        catch (IOException e)
+        {
+            return (false, $"Không ghi được thư viện block (bản trộn) vào cache: {e.Message}");
+        }
+        catch (UnauthorizedAccessException e)
+        {
+            return (false, $"Không có quyền ghi vào {ThuMucCache}: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Tải thư viện cho lệnh vẽ: bộ toàn cục (luôn, vì M103 cần) rồi bản trộn của dự án đang chọn
+    /// nếu có (M113 FR5). Trả từng dòng thông điệp để lệnh gọi in ra nguyên văn.
+    /// </summary>
+    internal static async Task<IReadOnlyList<string>> TaiVeDayDuAsync(XBossApiClient client, string token)
+    {
+        var dong = new List<string> { await TaiVeAsync(client, token) };
+        if (ExcelMetaStore.DuAnHienHanh is { } duAn && duAn > 0)
+        {
+            var (_, thongDiep) = await TaiVeTronAsync(client, token, duAn);
+            dong.Add(thongDiep);
+        }
+        return dong;
+    }
+
+    /// <summary>
+    /// Nạp thư viện từ tệp tay (XBOSS_VE_THUVIEN — đường dự phòng khi offline, như XBOSS_RULEPACK).
+    /// Kiểm manifest + hash tệp .dwg TRƯỚC, đạt mới ghi đè cache. Trả thông điệp tiếng Việt.
+    /// </summary>
+    internal static (BlockManifest? Manifest, string ThongDiep) NapTay(string manifestPath, string dwgPath)
+    {
+        try
+        {
+            var manifest = GhiCache(File.ReadAllText(manifestPath), File.ReadAllBytes(dwgPath), etag: null);
+            // Nạp tay chỉ mang về tệp NỀN. Thư viện có block thêm từ web (M104 §1) còn cần tệp lẻ,
+            // mà chúng chỉ tải được từ server ⇒ nói thẳng thay vì báo "đã nạp" rồi để lệnh vẽ chết.
+            var (dungDuoc, loi) = HienHanh();
+            if (dungDuoc is null)
+                return (null, $"Đã ghi cache nhưng thư viện CHƯA dùng được: {loi}");
+            return (manifest,
+                $"Đã nạp thư viện block {manifest.Version} ({manifest.Blocks.Count} block) từ tệp tay → {ThuMucCache}");
+        }
+        catch (BlockManifestException e)
+        {
+            return (null, $"Thư viện block KHÔNG hợp lệ — không nạp: {e.Message}");
+        }
+        catch (IOException e)
+        {
+            return (null, $"Không đọc/ghi được tệp thư viện block: {e.Message}");
+        }
+        catch (UnauthorizedAccessException e)
+        {
+            return (null, $"Không có quyền đọc/ghi tệp thư viện block: {e.Message}");
+        }
+    }
+
+    // ===== Định nghĩa block trong bản vẽ =====
+
+    /// <summary>Định nghĩa block cùng tên đang có trong bản vẽ đến từ đâu.</summary>
+    internal enum NguonDinhNghia
+    {
+        /// <summary>Bản vẽ chưa có block tên này — cứ nhập từ thư viện.</summary>
+        ChuaCo,
+        /// <summary>Do plugin nhập từ ĐÚNG version thư viện đang dùng — tái dùng, không hỏi.</summary>
+        DungThuVien,
+        /// <summary>Do plugin nhập từ version thư viện KHÁC — hỏi (AC7).</summary>
+        ThuVienKhacVersion,
+        /// <summary>Có sẵn trong bản vẽ, không do plugin nhập — không xác minh được, hỏi (AC7).</summary>
+        KhongRoNguon,
+    }
+
+    /// <summary>Nguồn của định nghĩa block cùng tên trong bản vẽ (transaction chỉ đọc).</summary>
+    internal static (NguonDinhNghia Nguon, string? VersionTrongBanVe) KiemTraDinhNghia(
+        Database db, Transaction tr, string tenBlock, string versionThuVien)
+    {
+        var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+        if (!bt.Has(tenBlock)) return (NguonDinhNghia.ChuaCo, null);
+
+        var btr = (BlockTableRecord)tr.GetObject(bt[tenBlock], OpenMode.ForRead);
+        var xd = VeXDataStore.Doc(btr);
+        if (xd is null || xd.VaiTro != VaiTroVe.DinhNghiaBlock || xd.ThuVienVersion is null)
+            return (NguonDinhNghia.KhongRoNguon, null);
+        return string.Equals(xd.ThuVienVersion, versionThuVien, StringComparison.Ordinal)
+            ? (NguonDinhNghia.DungThuVien, xd.ThuVienVersion)
+            : (NguonDinhNghia.ThuVienKhacVersion, xd.ThuVienVersion);
+    }
+
+    /// <summary>
+    /// Hỏi kỹ sư khi bản vẽ đã có block trùng tên mà không chắc cùng định nghĩa (AC7).
+    /// Trả true = cập nhật theo thư viện (redefine), false = giữ định nghĩa trong bản vẽ,
+    /// null = hủy lệnh.
+    /// </summary>
+    internal static bool? HoiKhiTrungTen(
+        Editor ed, BlockDef def, NguonDinhNghia nguon, string? versionTrongBanVe, string versionThuVien)
+    {
+        var moTa = nguon == NguonDinhNghia.ThuVienKhacVersion
+            ? $"do XBoss nhập từ thư viện version {versionTrongBanVe} (thư viện hiện tại: {versionThuVien})"
+            : "đã có sẵn trong bản vẽ, KHÔNG do XBoss nhập — không xác minh được có đúng định nghĩa chuẩn không";
+        ed.WriteMessage(
+            $"\n[XBoss] ⚠ Bản vẽ đã có block \"{def.BlockName}\" {moTa}.\n" +
+            "[XBoss]   GiuBanVe = giữ nguyên định nghĩa đang có (chèn thêm vẫn dùng định nghĩa cũ)\n" +
+            "[XBoss]   CapNhat  = cập nhật định nghĩa theo thư viện chuẩn (mọi khối đã chèn đổi hình theo; UNDO được)\n");
+
+        var hoi = new PromptKeywordOptions("\n[XBoss] Xử lý block trùng tên") { AllowNone = false };
+        hoi.Keywords.Add("GiuBanVe", "GiuBanVe", "GiuBanVe");
+        hoi.Keywords.Add("CapNhat", "CapNhat", "CapNhat");
+        hoi.Keywords.Default = "GiuBanVe";
+        var kq = ed.GetKeywords(hoi);
+        if (kq.Status != PromptStatus.OK) return null;
+        return kq.StringResult == "CapNhat";
+    }
+
+    /// <summary>
+    /// Nhập định nghĩa block từ tệp thư viện trong cache vào bản vẽ.
+    /// Gọi NGOÀI transaction của bản vẽ đích (WblockCloneObjects làm việc trực tiếp trên database);
+    /// vẫn nằm trong CÙNG một lệnh nên UNDO một lần xóa cả định nghĩa lẫn khối vừa chèn.
+    /// <paramref name="ghiDe"/> = true khi kỹ sư chọn cập nhật định nghĩa cũ (AC7).
+    ///
+    /// Thư viện ĐA TỆP (M104 §1): block không có <c>fileKey</c> lấy từ <c>blocks.dwg</c> nền như cũ,
+    /// block có <c>fileKey</c> lấy từ ĐÚNG tệp lẻ của nó trong cache. Mỗi tệp nguồn mở một lần,
+    /// clone theo lô — vẫn một lệnh, một lần UNDO.
+    /// </summary>
+    internal static string NhapDinhNghia(
+        Database db, IReadOnlyList<BlockDef> def, BlockManifest manifestDaChon, bool ghiDe)
+    {
+        if (def.Count == 0) return manifestDaChon.Version;
+
+        var banChup = new List<(string DuongDan, IReadOnlyList<string> TenBlock, bool LaTepLe)>();
+        string versionHienTai;
+        try
+        {
+            // Selection → manifest hiện hành → hash → snapshot nằm trong CÙNG một critical section.
+            // Refresh/chuyển dự án chen giữa các bước sẽ bị phát hiện thay vì clone bytes mới rồi ghi
+            // provenance của lựa chọn cũ.
+            using (BlockLibraryBootstrap.AcquireCacheLock(ThuMucCache))
+            {
+                var boTron = BoTronDangDung();
+                var manifestHienTai = BlockManifestLoader.Load(File.ReadAllText(
+                    boTron is null ? ManifestPath : ManifestTronPath));
+                var defHienTai = def.Select(d =>
+                {
+                    var daChon = BlockManifestLoader.KiemTraBlockKhongDoi(d, manifestDaChon);
+                    return BlockManifestLoader.KiemTraBlockKhongDoi(daChon, manifestHienTai);
+                }).ToList();
+                versionHienTai = manifestHienTai.Version;
+
+                // Gom theo TỆP NGUỒN: tệp lẻ + tệp nền của TỪNG BỘ M113.
+                foreach (var nhom in defHienTai.GroupBy(
+                    d => d.CoTepRieng
+                        ? d.FileKey!
+                        : (boTron is not null && d.LaCuaDuAn ? "\u0001duan" : "\u0001nen"),
+                    StringComparer.Ordinal))
+                {
+                    var laTepLe = !nhom.Key.StartsWith('\u0001');
+                    var duongDan = laTepLe
+                        ? DuongDanTepLe(nhom.Key)
+                        : boTron is null ? DwgPath
+                        : nhom.Key == "\u0001duan" ? DwgTronDuAnPath : DwgTronToanCucPath;
+                    if (laTepLe)
+                    {
+                        foreach (var d in nhom) BlockManifestLoader.KiemTraHashTepLe(d, duongDan);
+                    }
+                    else if (boTron is not null && nhom.Key == "\u0001duan")
+                    {
+                        BlockManifestLoader.KiemTraHashTepTheoSha(
+                            MoTaBoDuAn(boTron), boTron.DwgSha256DuAn ?? "", duongDan);
+                    }
+                    else
+                    {
+                        BlockManifestLoader.KiemTraHashTep(manifestHienTai, duongDan);
+                    }
+
+                    var snapshot = Path.Combine(
+                        Path.GetTempPath(), $"xboss-block-snapshot-{Guid.NewGuid():N}.dwg");
+                    var tenBlock = nhom.Select(d => d.BlockName).ToList();
+                    banChup.Add((snapshot, tenBlock, laTepLe));
+                    File.Copy(duongDan, snapshot);
+                }
+            }
+
+            foreach (var snapshot in banChup)
+                NhapTuTep(db, snapshot.DuongDan, snapshot.TenBlock, ghiDe, snapshot.LaTepLe);
+            return versionHienTai;
+        }
+        finally
+        {
+            foreach (var snapshot in banChup)
+            {
+                try { if (File.Exists(snapshot.DuongDan)) File.Delete(snapshot.DuongDan); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+        }
+    }
+
+    /// <summary>WblockClone một lô định nghĩa block từ MỘT tệp .dwg trong cache sang bản vẽ đích.</summary>
+    private static void NhapTuTep(
+        Database db, string duongDanNguon, IReadOnlyList<string> tenBlock, bool ghiDe, bool laTepLe)
+    {
+        // Side database chỉ để đọc định nghĩa — cùng cách BatchProcessor (M99) mở tệp DWG ngoài.
+        using var nguon = new Database(buildDefaultDrawing: false, noDocument: true);
+        nguon.ReadDwgFile(duongDanNguon, FileOpenMode.OpenForReadAndAllShare, allowCPConversion: true, password: null);
+        nguon.CloseInput(true); // nhả tệp thư viện ngay, không giữ khóa suốt phiên vẽ
+
+        using var ids = new ObjectIdCollection();
+        using (var tr = nguon.TransactionManager.StartTransaction())
+        {
+            var bt = (BlockTable)tr.GetObject(nguon.BlockTableId, OpenMode.ForRead);
+            foreach (var ten in tenBlock)
+            {
+                if (!bt.Has(ten))
+                {
+                    tr.Abort();
+                    throw new BlockManifestException(
+                        (laTepLe
+                            ? $"Tệp block thêm từ web không chứa định nghĩa \"{ten}\" tuy manifest có khai"
+                            : $"Tệp thư viện block không chứa định nghĩa \"{ten}\" tuy manifest có khai") +
+                        " — thư viện hỏng, tải lại bằng XBOSS_LOGIN hoặc phát hành lại trên web.");
+                }
+                ids.Add(bt[ten]);
+            }
+            tr.Commit();
+        }
+
+        using var anhXa = new IdMapping();
+        nguon.WblockCloneObjects(
+            ids, db.BlockTableId, anhXa,
+            ghiDe ? DuplicateRecordCloning.Replace : DuplicateRecordCloning.Ignore,
+            false);
+    }
+
+    /// <summary>Định nghĩa block đang có trong bản vẽ (chỉ đọc); ném khi không có.</summary>
+    internal static BlockTableRecord MoDinhNghia(Database db, Transaction tr, string tenBlock)
+    {
+        var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+        if (!bt.Has(tenBlock))
+        {
+            throw new BlockManifestException(
+                $"Không nhập được định nghĩa block \"{tenBlock}\" vào bản vẽ — thư viện hỏng hoặc bản vẽ bị khóa.");
+        }
+        return (BlockTableRecord)tr.GetObject(bt[tenBlock], OpenMode.ForRead);
+    }
+
+    /// <summary>
+    /// Đánh dấu định nghĩa block vừa nhập là "lấy từ thư viện version X" (AC7) và trả chính nó
+    /// để chèn khối. CHỈ gọi khi thật sự đã nhập/ghi đè từ thư viện — đánh dấu nhầm lên định nghĩa
+    /// sẵn có của bản vẽ sẽ khiến lần sau tưởng là block chuẩn và không hỏi nữa.
+    /// </summary>
+    internal static BlockTableRecord DanhDauDinhNghia(
+        Database db, Transaction tr, BlockDef def, string versionThuVien)
+    {
+        var btr = MoDinhNghia(db, tr, def.BlockName);
+        btr.UpgradeOpen();
+        VeXDataStore.Ghi(btr, new VeXDataInfo
+        {
+            VaiTro = VaiTroVe.DinhNghiaBlock,
+            BlockId = def.Id,
+            ThuVienVersion = versionThuVien,
+        });
+        return btr;
+    }
+
+    // ===== Chèn khối =====
+
+    /// <summary>
+    /// Chọn một block trong danh mục bằng keyword dòng lệnh (id viết liền, như chọn loại tuyến) —
+    /// dùng chung cho phụ kiện/thiết bị/giá đỡ/lỗ chờ.
+    /// </summary>
+    internal static BlockDef? HoiBlock(Editor ed, string nhan, IReadOnlyList<BlockDef> danhSach, string? macDinhId)
+    {
+        if (danhSach.Count == 0) return null;
+
+        var tuKhoa = new Dictionary<string, BlockDef>(StringComparer.OrdinalIgnoreCase);
+        foreach (var d in danhSach) tuKhoa.TryAdd(VeContext.TuKhoaCua(d.Id), d);
+
+        ed.WriteMessage($"\n[XBoss] {nhan}:\n");
+        foreach (var d in danhSach)
+            ed.WriteMessage($"[XBoss]   {VeContext.TuKhoaCua(d.Id)} = {d.Id} (block {d.BlockName})\n");
+
+        var hienCo = danhSach.FirstOrDefault(d => string.Equals(d.Id, macDinhId, StringComparison.Ordinal));
+        var hoi = new PromptKeywordOptions($"\n[XBoss] Chọn {nhan.ToLowerInvariant()}") { AllowNone = false };
+        foreach (var d in danhSach)
+        {
+            var tk = VeContext.TuKhoaCua(d.Id);
+            hoi.Keywords.Add(tk, tk, tk);
+        }
+        hoi.Keywords.Default = VeContext.TuKhoaCua((hienCo ?? danhSach[0]).Id);
+        var kq = ed.GetKeywords(hoi);
+        if (kq.Status != PromptStatus.OK) return null;
+        return tuKhoa.TryGetValue(kq.StringResult, out var chon) ? chon : null;
+    }
+
+    /// <summary>
+    /// Báo ngay tại chỗ việc <c>XBOSS_BOCKL</c> có đếm được loại block vừa chèn hay không
+    /// (M100 AC12/§6.8): rule pack phải có item <c>measure=count</c> khớp TÊN BLOCK. Rule pack v7
+    /// khai sẵn <c>support-hanger</c>/<c>sleeve-opening</c>; pack cũ thì chèn vẫn xong nhưng khối
+    /// lượng hụt hẳn hạng mục đó — kỹ sư phải biết ngay, không để phát hiện lúc trình QS.
+    /// Dùng chung cho giá đỡ (<c>XBOSS_VE_GIADO</c>) và lỗ chờ (<c>XBOSS_VE_LOCHO</c>).
+    /// </summary>
+    internal static void BaoItemDem(Editor ed, CadRulePack pack, BlockDef def, string tenViec)
+    {
+        var item = pack.Takeoff.Items.FirstOrDefault(
+            i => i.MeasureKind == TakeoffMeasure.Count &&
+                 i.BlockNameMatchAny is { Count: > 0 } &&
+                 TokenMatcher.MatchesAny(def.BlockName, i.BlockNameMatchAny));
+        if (item is not null)
+        {
+            ed.WriteMessage($"[XBoss] XBOSS_BOCKL sẽ đếm số {tenViec} vào item \"{item.Id}\".\n");
+            return;
+        }
+        ed.WriteMessage(
+            $"[XBoss] ⚠ Rule pack {pack.Version} chưa có item takeoff measure=count khớp block \"{def.BlockName}\" — " +
+            $"XBOSS_BOCKL sẽ KHÔNG đếm {tenViec}. Nâng lên rule pack v7 trở lên (M100 AC12/§6.8).\n");
+    }
+
+    /// <summary>Một khối chờ chèn: đã chốt vị trí/góc/tỉ lệ/layer/XData, chưa đụng bản vẽ.</summary>
+    internal sealed record KhoiChoChen(
+        Point3d Diem,
+        double Goc,
+        double TyLe,
+        string Layer,
+        VeXDataInfo XData,
+        Dictionary<string, string> ThuocTinh);
+
+    /// <summary>
+    /// Nhập định nghĩa block (hỏi khi trùng tên — AC7) rồi chèn toàn bộ khối đã chốt trong MỘT
+    /// transaction ⇒ một lần UNDO xóa sạch cả định nghĩa lẫn khối. Trả false khi kỹ sư hủy hoặc có
+    /// lỗi (đã in thông báo, bản vẽ nguyên trạng).
+    ///
+    /// Dùng CHUNG cho mọi lệnh chèn block của bộ lệnh vẽ (phụ kiện, thiết bị, giá đỡ, lỗ chờ) —
+    /// một đường chèn duy nhất, không sao chép lại ở từng lệnh.
+    /// </summary>
+    internal static bool ChenHangLoat(
+        Document doc,
+        Editor ed,
+        Database db,
+        BlockDef def,
+        BlockManifest thuVien,
+        IReadOnlyList<KhoiChoChen> muc)
+    {
+        // (a) Định nghĩa block trong bản vẽ đến từ đâu — hỏi NGOÀI transaction.
+        NguonDinhNghia nguon;
+        string? versionTrongBanVe;
+        using (var tr = db.TransactionManager.StartTransaction())
+        {
+            (nguon, versionTrongBanVe) = KiemTraDinhNghia(db, tr, def.BlockName, thuVien.Version);
+            tr.Commit();
+        }
+
+        var ghiDe = false;
+        if (nguon is NguonDinhNghia.ThuVienKhacVersion or NguonDinhNghia.KhongRoNguon)
+        {
+            var traLoi = HoiKhiTrungTen(ed, def, nguon, versionTrongBanVe, thuVien.Version);
+            if (traLoi is null)
+            {
+                ed.WriteMessage("\n[XBoss] Đã hủy — bản vẽ không thay đổi.\n");
+                return false;
+            }
+            ghiDe = traLoi.Value;
+            var lyDo = nguon == NguonDinhNghia.ThuVienKhacVersion
+                ? $"đã nhập từ thư viện version {versionTrongBanVe}"
+                : "có sẵn trong bản vẽ, không rõ nguồn";
+            VeContext.NhatKyPhien.Add(
+                $"Block \"{def.BlockName}\" trùng tên ({lyDo}) — kỹ sư chọn " +
+                $"{(ghiDe ? $"CẬP NHẬT theo thư viện {thuVien.Version}" : "GIỮ định nghĩa trong bản vẽ")}.");
+        }
+        var canNhap = nguon == NguonDinhNghia.ChuaCo || ghiDe;
+        var versionDaNhap = thuVien.Version;
+
+        using var khoa = doc.LockDocument();
+        try
+        {
+            // (b) Nhập định nghĩa từ tệp thư viện — WblockClone làm việc thẳng trên database nên
+            //     chạy ngoài transaction; vẫn cùng một lệnh ⇒ vẫn một lần UNDO. Nếu bước (c) hỏng
+            //     thì bản vẽ chỉ còn thừa một ĐỊNH NGHĨA block chưa dùng (vô hại, UNDO xóa nốt) —
+            //     không có khối/nhãn mồ côi nào (§6.11).
+            if (canNhap) versionDaNhap = NhapDinhNghia(db, [def], thuVien, ghiDe);
+        }
+        catch (BlockManifestException e)
+        {
+            ed.WriteMessage($"\n[XBoss] {e.Message}\n");
+            return false;
+        }
+        catch (Autodesk.AutoCAD.Runtime.Exception e)
+        {
+            ed.WriteMessage($"\n[XBoss] Không nhập được định nghĩa block \"{def.BlockName}\": {e.Message}\n");
+            return false;
+        }
+        catch (IOException e)
+        {
+            ed.WriteMessage($"\n[XBoss] Không đọc được tệp thư viện block: {e.Message}\n");
+            return false;
+        }
+
+        // (c) Chèn khối: một transaction cho cả lô.
+        using var tr2 = db.TransactionManager.StartTransaction();
+        try
+        {
+            VeXDataStore.DangKyApp(db, tr2);
+            var dinhNghia = canNhap
+                ? DanhDauDinhNghia(db, tr2, def, versionDaNhap)
+                : MoDinhNghia(db, tr2, def.BlockName);
+            var ms = (BlockTableRecord)tr2.GetObject(
+                SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+
+            foreach (var m in muc)
+            {
+                var khoi = new BlockReference(m.Diem, dinhNghia.ObjectId)
+                {
+                    Rotation = m.Goc,
+                    ScaleFactors = new Scale3d(m.TyLe),
+                };
+                ms.AppendEntity(khoi);
+                tr2.AddNewlyCreatedDBObject(khoi, true);
+                khoi.Layer = m.Layer; // đặt SAU khi vào database (như XBOSS_VE)
+                ThemThuocTinh(tr2, khoi, dinhNghia, m.ThuocTinh);
+                VeXDataStore.Ghi(khoi, m.XData);
+            }
+            tr2.Commit();
+            return true;
+        }
+        catch (BlockManifestException e)
+        {
+            tr2.Abort();
+            ed.WriteMessage($"\n[XBoss] {e.Message}\n");
+            return false;
+        }
+        catch (Autodesk.AutoCAD.Runtime.Exception e)
+        {
+            tr2.Abort();
+            ed.WriteMessage(
+                $"\n[XBoss] LỖI khi chèn block — đã rollback, bản vẽ nguyên trạng: {e.Message}\n" +
+                "[XBoss] Nếu layer đích đang khóa: chạy XBOSS_VE_NEN (hoặc mở khóa layer) rồi thử lại.\n");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Gắn các thuộc tính (attribute) của định nghĩa block vào khối vừa chèn: giá trị lấy từ
+    /// <paramref name="giaTri"/> theo TAG (không phân biệt hoa thường), thiếu thì giữ mặc định của
+    /// ATTDEF. Khối phải đã được thêm vào bản vẽ (cần BlockTransform).
+    /// </summary>
+    internal static void ThemThuocTinh(
+        Transaction tr, BlockReference khoi, BlockTableRecord dinhNghia, IDictionary<string, string> giaTri)
+    {
+        if (!dinhNghia.HasAttributeDefinitions) return;
+        foreach (ObjectId id in dinhNghia)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not AttributeDefinition attDef || attDef.Constant) continue;
+
+            var att = new AttributeReference();
+            att.SetAttributeFromBlock(attDef, khoi.BlockTransform);
+            if (giaTri.TryGetValue(attDef.Tag, out var v)) att.TextString = v;
+            khoi.AttributeCollection.AppendAttribute(att);
+            tr.AddNewlyCreatedDBObject(att, true);
+        }
+    }
+}

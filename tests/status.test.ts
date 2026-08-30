@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { toStatusSlug, parseProgress } from "@/lib/status";
+import { toStatusSlug, parseProgress } from "@/lib/tien-do/status";
 
 test("toStatusSlug: map chuỗi tiếng Việt (có dấu, hoa thường) → slug", () => {
   assert.equal(toStatusSlug("Chuẩn bị"), "chuan_bi");

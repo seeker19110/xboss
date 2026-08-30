@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { RISK_STATUSES, parseRiskBody, validateRiskInput, type RiskStatus } from "@/lib/risks";
+import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import {
+  RISK_STATUSES,
+  parseRiskBody,
+  validateRiskInput,
+  type RiskStatus,
+} from "@/lib/hien-truong/risks";
 
 export const dynamic = "force-dynamic";
 

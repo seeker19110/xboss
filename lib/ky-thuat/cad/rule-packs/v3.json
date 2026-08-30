@@ -1,0 +1,583 @@
+{
+  "version": "v3",
+  "description": "Rule pack v3 = v2 + fontMap.targetFont. Mở rộng THUẦN (chỉ thêm field) nên plugin đọc v2 vẫn chạy được với tệp này. Lý do phát hành v3: sửa chữ TCVN3/VNI sang Unicode mới chỉ đổi NỘI DUNG chuỗi, kiểu chữ vẫn trỏ font cũ (.VnTime/VNI-*) nên AutoCAD hiển thị vẫn sai — AC2 không đạt dù dữ liệu đúng (phát hiện khi chạy thật trên máy có AutoCAD 2026, 2026-08-25). targetFont khai font Unicode đích để plugin đổi luôn kiểu chữ. Đổi quy tắc = phát hành version mới, KHÔNG sửa version cũ.",
+  "layerMap": {
+    "source": "lib/cad/dxf-parser.ts :: normalizeCadLayers()",
+    "standard": "AIA / BS1192 / ISO 13567",
+    "matching": "token-boundary",
+    "matchingNote": "So khớp theo RANH GIỚI TOKEN, không phải substring thô. Một từ khóa chỉ khớp khi ký tự liền trước/sau nó (nếu có) không phải [A-Z0-9] — tương đương hàm `hasToken()`/`LAYER_WORD_CHAR = /[A-Z0-9]/` trong lib/cad/dxf-parser.ts (Việc 7.6, 2026-08-23). Ví dụ: layer 'THOAT' không được xem là khớp từ khóa 'OA' dù chứa substring 'OA' (trong 'TH-OA-T'), vì 'OA' không đứng độc lập giữa 2 ranh giới không-phải-chữ/số. Plugin AutoCAD .NET PHẢI cài lại đúng thuật toán này (không dùng String.Contains thô) để không trôi khỏi rule pack.",
+    "strategy": "first-match-ordered",
+    "orderNote": "Thứ tự nhóm trong `groups` PHẢI giữ nguyên: HVAC → ELECTRICAL → ELV → PIPING → FIREFIGHTING → STRUCTURAL → ANNOTATION (đúng thứ tự các nhánh if/else if trong normalizeCadLayers()). Điện/ELV phải kiểm TRƯỚC ống nước vì 'CAP' là token hợp lệ ở cả 2 nghĩa: 'cấp nước' (PIPING) và 'cáp điện' (trong 'MANG_CAP_DIEN', ELECTRICAL) — đổi thứ tự sẽ làm layer điện bị nhận nhầm thành ống nước.",
+    "fallback": "keep-original",
+    "knownIssues": [
+      "Không idempotent: áp lại lên tên đã chuẩn hóa cho kết quả khác đi (vd 'M-CHW-PIPE' chứa 'PIPE' nên rơi vào nhóm PIPING). Nợ kỹ thuật đã biết — xem PROGRESS.md 'Việc 7.6'.",
+      "Một số từ khóa khớp sai hệ do thứ tự nhóm: 'CHILLER' nằm ở matchAny của nhóm PIPING nhưng nhánh con dùng 'CHILL' nên vẫn ra M-CHW-PIPE; ngược lại các tên chỉ chứa 'CW' rơi về P-PIPE-DOMW. Ghi đúng hiện trạng, KHÔNG sửa ở PR1."
+    ],
+    "groups": [
+      {
+        "id": "HVAC",
+        "matchAny": ["DUCT", "GIO", "AHU", "FCU", "SA", "RA", "EA", "OA"],
+        "branches": [
+          {
+            "matchAny": ["RETN", "HOI", "RA"],
+            "target": "M-DUCT-RETN"
+          },
+          {
+            "matchAny": ["EXHAUST", "THAI", "EA"],
+            "target": "M-DUCT-EXHT"
+          },
+          {
+            "default": true,
+            "target": "M-DUCT-SUPP"
+          }
+        ]
+      },
+      {
+        "id": "ELECTRICAL",
+        "matchAny": ["ELEC", "TRAY", "DIEN", "PWR", "LTG"],
+        "branches": [
+          {
+            "matchAny": ["LTG", "CHIEU", "SANG"],
+            "target": "E-LTNG-CKTS"
+          },
+          {
+            "default": true,
+            "target": "E-TRAY-PWRR"
+          }
+        ]
+      },
+      {
+        "id": "ELV",
+        "matchAny": ["ELV", "TEL", "DATA", "LAN", "CCTV", "BMS"],
+        "branches": [
+          {
+            "default": true,
+            "target": "ELV-CABL-TRAY"
+          }
+        ]
+      },
+      {
+        "id": "PIPING",
+        "matchAny": ["PIPE", "NUOC", "SAN", "CAP", "THOAT", "CHILLER", "CW"],
+        "branches": [
+          {
+            "matchAny": ["DRAIN", "THOAT", "SAN"],
+            "target": "P-PIPE-SANR"
+          },
+          {
+            "matchAny": ["CHILL", "CHW", "LANH"],
+            "target": "M-CHW-PIPE"
+          },
+          {
+            "default": true,
+            "target": "P-PIPE-DOMW"
+          }
+        ]
+      },
+      {
+        "id": "FIREFIGHTING",
+        "matchAny": ["FIRE", "PCCC", "SPK", "HYDRANT"],
+        "branches": [
+          {
+            "default": true,
+            "target": "F-SPRN-PIPE"
+          }
+        ]
+      },
+      {
+        "id": "STRUCTURAL",
+        "matchAny": ["GRID", "TRUC", "DAM", "COT", "BEAM", "COL"],
+        "branches": [
+          {
+            "default": true,
+            "target": "S-GRID-COLS"
+          }
+        ]
+      },
+      {
+        "id": "ANNOTATION",
+        "matchAny": ["TEXT", "DIM", "GHI", "ANNO"],
+        "branches": [
+          {
+            "default": true,
+            "target": "G-ANNO-TEXT"
+          }
+        ]
+      }
+    ]
+  },
+  "fontMap": {
+    "source": "lib/cad/dxf-parser.ts :: TCVN3_MAP + VNI_PAIRS",
+    "tcvn3": {
+      "mode": "per-character",
+      "chars": {
+        "¸": "á",
+        "µ": "à",
+        "¶": "ả",
+        "·": "ã",
+        "¹": "ạ",
+        "¨": "ă",
+        "¾": "ắ",
+        "»": "ằ",
+        "¼": "ẳ",
+        "½": "ẵ",
+        "Æ": "ặ",
+        "©": "â",
+        "Ê": "ấ",
+        "Ç": "ầ",
+        "È": "ẩ",
+        "É": "ẫ",
+        "Ë": "ậ",
+        "Ð": "đ",
+        "®": "đ",
+        "Ì": "í",
+        "Í": "ì",
+        "Î": "ỉ",
+        "Ï": "ĩ",
+        "Ñ": "ị",
+        "Õ": "ế",
+        "Ò": "ề",
+        "Ó": "ể",
+        "Ö": "ệ",
+        "Ô": "ễ",
+        "ã": "ó",
+        "ß": "ò",
+        "á": "ỏ",
+        "â": "õ",
+        "ä": "ọ",
+        "«": "ô",
+        "è": "ố",
+        "å": "ồ",
+        "æ": "ổ",
+        "ç": "ỗ",
+        "é": "ộ",
+        "¬": "ơ",
+        "í": "ớ",
+        "ì": "ờ",
+        "î": "ở",
+        "ï": "ỡ",
+        "ñ": "ợ",
+        "ó": "ú",
+        "ò": "ù",
+        "ỏ": "ủ",
+        "õ": "ũ",
+        "ô": "ụ",
+        "­": "ư",
+        "ø": "ứ",
+        "ö": "ừ",
+        "÷": "ử",
+        "ù": "ữ",
+        "ú": "ự",
+        "Ý": "ý",
+        "ỳ": "ỳ",
+        "ỷ": "ỷ",
+        "ỹ": "ỹ",
+        "ỵ": "ỵ",
+        "¡": "Ă",
+        "¢": "Â",
+        "£": "Ê",
+        "¤": "Ô",
+        "¥": "Ơ",
+        "¦": "Ư",
+        "§": "Đ"
+      }
+    },
+    "vni": {
+      "mode": "ordered-replace-all",
+      "pairs": [
+        ["a1", "á"],
+        ["A1", "Á"],
+        ["e1", "é"],
+        ["E1", "É"],
+        ["i1", "í"],
+        ["I1", "Í"],
+        ["o1", "ó"],
+        ["O1", "Ó"],
+        ["u1", "ú"],
+        ["U1", "Ú"],
+        ["y1", "ý"],
+        ["Y1", "Ý"],
+        ["a2", "à"],
+        ["A2", "À"],
+        ["e2", "è"],
+        ["E2", "È"],
+        ["i2", "ì"],
+        ["I2", "Ì"],
+        ["o2", "ò"],
+        ["O2", "Ò"],
+        ["u2", "ù"],
+        ["U2", "Ù"],
+        ["y2", "ỳ"],
+        ["Y2", "Ỳ"],
+        ["a3", "ả"],
+        ["A3", "Ả"],
+        ["e3", "ẻ"],
+        ["E3", "Ẻ"],
+        ["i3", "ỉ"],
+        ["I3", "Ỉ"],
+        ["o3", "ỏ"],
+        ["O3", "Ỏ"],
+        ["u3", "ủ"],
+        ["U3", "Ủ"],
+        ["y3", "ỷ"],
+        ["Y3", "Ỷ"],
+        ["a4", "ã"],
+        ["A4", "Ã"],
+        ["e4", "ẽ"],
+        ["E4", "Ẽ"],
+        ["i4", "ĩ"],
+        ["I4", "Ĩ"],
+        ["o4", "õ"],
+        ["O4", "Õ"],
+        ["u4", "ũ"],
+        ["U4", "Ũ"],
+        ["y4", "ỹ"],
+        ["Y4", "Ỹ"],
+        ["a5", "ạ"],
+        ["A5", "Ạ"],
+        ["e5", "ẹ"],
+        ["E5", "Ẹ"],
+        ["i5", "ị"],
+        ["I5", "Ị"],
+        ["o5", "ọ"],
+        ["O5", "Ọ"],
+        ["u5", "ụ"],
+        ["U5", "Ụ"],
+        ["y5", "ỵ"],
+        ["Y5", "Ỵ"],
+        ["a61", "ấ"],
+        ["A61", "Ấ"],
+        ["a62", "ầ"],
+        ["A62", "Ầ"],
+        ["a63", "ẩ"],
+        ["A63", "Ẩ"],
+        ["a64", "ẫ"],
+        ["A64", "Ẫ"],
+        ["a65", "ậ"],
+        ["A65", "Ậ"],
+        ["a6", "â"],
+        ["A6", "Â"],
+        ["e61", "ế"],
+        ["E61", "Ế"],
+        ["e62", "ề"],
+        ["E62", "Ề"],
+        ["e63", "ể"],
+        ["E63", "Ể"],
+        ["e64", "ễ"],
+        ["E64", "Ễ"],
+        ["e65", "ệ"],
+        ["E65", "Ệ"],
+        ["e6", "ê"],
+        ["E6", "Ê"],
+        ["o61", "ố"],
+        ["O61", "Ố"],
+        ["o62", "ồ"],
+        ["O62", "Ồ"],
+        ["o63", "ổ"],
+        ["O63", "Ổ"],
+        ["o64", "ỗ"],
+        ["O64", "Ỗ"],
+        ["o65", "ộ"],
+        ["O65", "Ộ"],
+        ["o6", "ô"],
+        ["O6", "Ô"],
+        ["a81", "ắ"],
+        ["A81", "Ắ"],
+        ["a82", "ằ"],
+        ["A82", "Ằ"],
+        ["a83", "ẳ"],
+        ["A83", "Ẳ"],
+        ["a84", "ẵ"],
+        ["A84", "Ẵ"],
+        ["a85", "ặ"],
+        ["A85", "Ặ"],
+        ["a8", "ă"],
+        ["A8", "Ă"],
+        ["o71", "ớ"],
+        ["O71", "Ớ"],
+        ["o72", "ờ"],
+        ["O72", "Ờ"],
+        ["o73", "ở"],
+        ["O73", "Ở"],
+        ["o74", "ỡ"],
+        ["O74", "Ỡ"],
+        ["o75", "ợ"],
+        ["O75", "Ợ"],
+        ["o7", "ơ"],
+        ["O7", "Ơ"],
+        ["u71", "ứ"],
+        ["U71", "Ứ"],
+        ["u72", "ừ"],
+        ["U72", "Ừ"],
+        ["u73", "ử"],
+        ["U73", "Ử"],
+        ["u74", "ữ"],
+        ["U74", "Ữ"],
+        ["u75", "ự"],
+        ["U75", "Ự"],
+        ["u7", "ư"],
+        ["U7", "Ư"],
+        ["d9", "đ"],
+        ["D9", "Đ"]
+      ]
+    },
+    "cadSymbols": [
+      ["%%c", "Ø"],
+      ["%%p", "±"],
+      ["%%d", "°"]
+    ],
+    "normalization": "NFC",
+    "targetFont": {
+      "typeFace": "Arial",
+      "note": "Font Unicode đích cho kiểu chữ ĐÃ giải mã TCVN3/VNI. Plugin chỉ đổi font của kiểu chữ mà nó thực sự nhận ra là mã cũ (DetectFontKind != None) — kiểu chữ vốn đã Unicode giữ nguyên, không đụng tới. Chọn Arial vì có sẵn trên mọi máy Windows và phủ đủ dấu tiếng Việt."
+    }
+  },
+  "purgePolicy": {
+    "source": "lib/cad/dxf-parser.ts :: generateStandardizedAutocadScript() + app/engineering/chuan-hoa-ban-ve/page.tsx :: handleRunDeepPurge()/handleAutoHealAll()",
+    "autocadCommands": ["-PURGE LA * N", "-PURGE B * N", "AUDIT Y"],
+    "purgeUnusedLayers": true,
+    "purgeUnusedBlocks": true,
+    "audit": true,
+    "confirmEachItem": false,
+    "keepReferenced": true,
+    "deepPurge": {
+      "removeZeroLengthLines": true,
+      "zeroLengthToleranceMm": 1,
+      "removeDuplicateOverlappingLines": true,
+      "duplicateKeyRounding": "làm tròn toạ độ X/Y về số nguyên (mm), so cả chiều thuận lẫn chiều ngược",
+      "reportEmptyLayers": true,
+      "reportAnonymousBlocks": true
+    }
+  },
+  "lineweightMap": {
+    "source": "app/engineering/chuan-hoa-ban-ve/page.tsx :: ctbMappings (bảng nét in CTB) + lib/cad/dxf-parser.ts :: ACI_TO_HEX",
+    "unit": "mm",
+    "byAci": [
+      {
+        "aci": 1,
+        "colorName": "Color 1 (Red)",
+        "colorHex": "#ef4444",
+        "lineweightMm": 0.5,
+        "screeningPct": 100,
+        "purpose": "Nét cắt ống chính, dầm chịu lực, thiết bị chính"
+      },
+      {
+        "aci": 2,
+        "colorName": "Color 2 (Yellow)",
+        "colorHex": "#eab308",
+        "lineweightMm": 0.35,
+        "screeningPct": 100,
+        "purpose": "Nét ống nhánh, máng cáp, van khóa, phụ kiện"
+      },
+      {
+        "aci": 3,
+        "colorName": "Color 3 (Green)",
+        "colorHex": "#22c55e",
+        "lineweightMm": 0.25,
+        "screeningPct": 100,
+        "purpose": "Nét thiết bị phụ trợ, hộp chia gió, miệng gió"
+      },
+      {
+        "aci": 4,
+        "colorName": "Color 4 (Cyan)",
+        "colorHex": "#06b6d4",
+        "lineweightMm": 0.18,
+        "screeningPct": 100,
+        "purpose": "Nét tim ống, trục Centerline, đường bao khu vực"
+      },
+      {
+        "aci": 7,
+        "colorName": "Color 7 (White/Black)",
+        "colorHex": "#f4f4f5",
+        "lineweightMm": 0.18,
+        "screeningPct": 100,
+        "purpose": "Chữ ghi chú Text, Dimension, đường dóng"
+      },
+      {
+        "aci": 8,
+        "colorName": "Color 8 (Dark Gray)",
+        "colorHex": "#71717a",
+        "lineweightMm": 0.09,
+        "screeningPct": 50,
+        "purpose": "Nét tường kiến trúc nền, Hatch vật liệu (Mờ 50%)"
+      }
+    ],
+    "note": "Bảng ACI → lineweight/screening lấy đúng từ ctbMappings đang dùng để xuất tệp xboss_standard.ctb; các ACI khác (9, 10, 30, 40, 70, 140, 150, 170, 210) chỉ có màu hiển thị trong ACI_TO_HEX, KHÔNG có lineweight quy định — không bịa thêm."
+  },
+  "flattenPolicy": {
+    "source": "M99 §8 AC3 (FR4) — chuẩn đích cho plugin AutoCAD",
+    "targetElevation": 0,
+    "applyTo": "mọi thực thể (elevation + toạ độ Z)",
+    "preserveXyProjection": true,
+    "coordinateSystem": "WCS",
+    "unit": "mm",
+    "originAlignment": "Gốc toạ độ WCS 2D (X:0, Y:0) tại tim giao trục chính",
+    "note": "CHƯA CHẮC / chưa có triển khai thật phía server: không có hàm ép Z→0 nào trong lib/cad/dxf-parser.ts — exportDxf giữ nguyên Z của thực thể (chỉ $EXTMIN/$EXTMAX ghi Z=0), còn UI chuẩn hóa mới dừng ở việc đánh dấu wcsConfig.isAligned. Chính sách ghi ở đây là chuẩn đích theo AC3 để plugin (PR4) và tầng 3 cùng bám, không phải mô tả code hiện có."
+  },
+  "takeoff": {
+    "source": "M99 §6.5/§11 — quy tắc bóc tách khối lượng cho plugin AutoCAD (XBOSS_BOCKL)",
+    "drawingUnitAssumption": "mm",
+    "drawingUnitNote": "Số đo thô lấy theo đơn vị bản vẽ; plugin đọc INSUNITS và quy đổi về mm TRƯỚC khi nhân factor (M99 §6.7). INSUNITS=0 (Unitless) coi là mm kèm cảnh báo.",
+    "markColorAci": 92,
+    "markColorNote": "Màu tô đối tượng đã bóc (color override). Màu gốc trước khi bóc được lưu trong XData để XBOSS_BOCKL_XOA trả lại chính xác.",
+    "xdataAppName": "XBOSS_BOCKL",
+    "xdataNote": "XData trên đối tượng đã bóc: [itemId, rulePackVersion, ngày ISO, màu-trước-khi-bóc]. Trạng thái bóc sống trong DWG (FR16), không sống trong RAM plugin.",
+    "rounding": {
+      "length": 2,
+      "area": 2,
+      "count": 0
+    },
+    "roundingNote": "Số chữ số thập phân, chỉ làm tròn Ở TỔNG mỗi item — không làm tròn từng đối tượng.",
+    "matching": "first-match theo thứ tự items; layerMatchAny khớp token-boundary CÙNG thuật toán layerMap.matchingNote (một bộ matcher duy nhất); layerMatchAny rỗng = mọi layer (chỉ dùng cho item count có blockNameMatchAny); blockNameMatchAny (nếu khai) khớp token-boundary trên tên block gốc (dynamic block lấy tên DynamicBlockTableRecord).",
+    "boqCodeNote": "boqCode để trống khi mã tùy dự án — QS gán vào cột A của Excel xuất ra. Cần cố định mã theo dự án thì phát hành rule pack version mới.",
+    "items": [
+      {
+        "id": "duct-supp",
+        "group": "HVAC",
+        "name": "Ống gió cấp",
+        "spec": "Tôn tráng kẽm, đo theo tim tuyến",
+        "unit": "m",
+        "measure": "length",
+        "layerMatchAny": ["M-DUCT-SUPP"],
+        "factor": 0.001,
+        "boqCode": ""
+      },
+      {
+        "id": "duct-retn",
+        "group": "HVAC",
+        "name": "Ống gió hồi",
+        "spec": "Tôn tráng kẽm, đo theo tim tuyến",
+        "unit": "m",
+        "measure": "length",
+        "layerMatchAny": ["M-DUCT-RETN"],
+        "factor": 0.001,
+        "boqCode": ""
+      },
+      {
+        "id": "duct-exht",
+        "group": "HVAC",
+        "name": "Ống gió thải",
+        "spec": "Tôn tráng kẽm, đo theo tim tuyến",
+        "unit": "m",
+        "measure": "length",
+        "layerMatchAny": ["M-DUCT-EXHT"],
+        "factor": 0.001,
+        "boqCode": ""
+      },
+      {
+        "id": "chw-pipe",
+        "group": "HVAC",
+        "name": "Ống nước lạnh CHW",
+        "spec": "Đo theo tim tuyến",
+        "unit": "m",
+        "measure": "length",
+        "layerMatchAny": ["M-CHW-PIPE"],
+        "factor": 0.001,
+        "boqCode": ""
+      },
+      {
+        "id": "fcu-unit",
+        "group": "HVAC",
+        "name": "Thiết bị FCU",
+        "spec": "Đếm theo block",
+        "unit": "Bộ",
+        "measure": "count",
+        "layerMatchAny": [],
+        "blockNameMatchAny": ["FCU"],
+        "factor": 1,
+        "boqCode": ""
+      },
+      {
+        "id": "ahu-unit",
+        "group": "HVAC",
+        "name": "Thiết bị AHU",
+        "spec": "Đếm theo block",
+        "unit": "Bộ",
+        "measure": "count",
+        "layerMatchAny": [],
+        "blockNameMatchAny": ["AHU"],
+        "factor": 1,
+        "boqCode": ""
+      },
+      {
+        "id": "pipe-domw",
+        "group": "PIPING",
+        "name": "Ống cấp nước sinh hoạt",
+        "spec": "Đo theo tim tuyến",
+        "unit": "m",
+        "measure": "length",
+        "layerMatchAny": ["P-PIPE-DOMW"],
+        "factor": 0.001,
+        "boqCode": ""
+      },
+      {
+        "id": "pipe-sanr",
+        "group": "PIPING",
+        "name": "Ống thoát nước",
+        "spec": "Đo theo tim tuyến",
+        "unit": "m",
+        "measure": "length",
+        "layerMatchAny": ["P-PIPE-SANR"],
+        "factor": 0.001,
+        "boqCode": ""
+      },
+      {
+        "id": "sprn-pipe",
+        "group": "FIREFIGHTING",
+        "name": "Ống sprinkler PCCC",
+        "spec": "Đo theo tim tuyến",
+        "unit": "m",
+        "measure": "length",
+        "layerMatchAny": ["F-SPRN-PIPE"],
+        "factor": 0.001,
+        "boqCode": ""
+      },
+      {
+        "id": "spk-head",
+        "group": "FIREFIGHTING",
+        "name": "Đầu phun sprinkler",
+        "spec": "Đếm theo block",
+        "unit": "Cái",
+        "measure": "count",
+        "layerMatchAny": ["F-SPRN-PIPE"],
+        "blockNameMatchAny": ["SPK", "SPRINKLER"],
+        "factor": 1,
+        "boqCode": ""
+      },
+      {
+        "id": "tray-pwr",
+        "group": "ELECTRICAL",
+        "name": "Máng cáp điện",
+        "spec": "Đo theo tim tuyến",
+        "unit": "m",
+        "measure": "length",
+        "layerMatchAny": ["E-TRAY-PWRR"],
+        "factor": 0.001,
+        "boqCode": ""
+      },
+      {
+        "id": "tray-elv",
+        "group": "ELV",
+        "name": "Máng cáp ELV",
+        "spec": "Đo theo tim tuyến",
+        "unit": "m",
+        "measure": "length",
+        "layerMatchAny": ["ELV-CABL-TRAY"],
+        "factor": 0.001,
+        "boqCode": ""
+      }
+    ]
+  },
+  "inspectionPolicy": {
+    "source": "M99 §6.4 — chính sách kiểm tra XBOSS_KIEMTRA (chỉ kiểm, không sửa)",
+    "zToleranceMm": 0.001,
+    "zToleranceNote": "|Z| > dung sai ở bất kỳ đỉnh/elevation nào → tính là lệch Z (phép kiểm 2).",
+    "openPolyline": {
+      "checkLayersFromAreaTakeoff": true,
+      "extraLayersMatchAny": [],
+      "nearGapToleranceMm": 5,
+      "reportNearClosedOnAllLayers": true,
+      "note": "Polyline KHÔNG đóng trên layer đo diện tích (takeoff measure=area) + extraLayersMatchAny → báo hở; 2 đầu cách nhau ≤ nearGapToleranceMm → phân loại gần-kín (thường vẽ thiếu 1 cú click) và báo trên MỌI layer khi reportNearClosedOnAllLayers=true."
+    }
+  }
+}

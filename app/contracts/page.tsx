@@ -1,5 +1,6 @@
 "use client";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { todayISO } from "@/lib/nen/date";
 import {
   Plus,
   ChevronDown,
@@ -74,10 +75,6 @@ type SystemOption = { id: number; code: string; name: string };
 function fmtVND(n: number) {
   if (!n) return "—";
   return Math.round(n).toLocaleString("vi-VN") + " đ";
-}
-function todayISO() {
-  const iso = new Date().toISOString().slice(0, 10);
-  return iso;
 }
 
 export default function ContractsPage() {
@@ -191,7 +188,7 @@ export default function ContractsPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm hợp đồng"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm hợp đồng</span>
             </button>
@@ -199,28 +196,45 @@ export default function ContractsPage() {
         }
       />
 
-      <main className="p-4 sm:p-6 pb-24 space-y-4">
+      <main className="p-4 sm:p-6 pb-24 space-y-6 max-w-screen-2xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {(["nhan_thau", "giao_thau", "ncc"] as ContractKind[]).map((kind) => (
-            <div key={kind} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
-              <p className="text-xs text-zinc-400 uppercase tracking-wide">{KIND_LABEL[kind]}</p>
-              <p className="text-lg font-semibold mt-1">
-                <MaskedValue value={kindTotals[kind].total} format={fmtVND} />
-              </p>
-              <p className="text-xs text-zinc-400 mt-1">
-                Đã thanh toán: <MaskedValue value={kindTotals[kind].paid} format={fmtVND} />
-              </p>
-            </div>
-          ))}
+          {(["nhan_thau", "giao_thau", "ncc"] as ContractKind[]).map((kind) => {
+            const tot = kindTotals[kind].total;
+            const pd = kindTotals[kind].paid;
+            const pct = tot != null && tot > 0 && pd != null ? Math.round((pd / tot) * 100) : 0;
+            return (
+              <div key={kind} className="bento-card p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">
+                    {KIND_LABEL[kind]}
+                  </span>
+                  {tot != null && pd != null && tot > 0 && (
+                    <span className="text-xs font-bold font-mono text-emerald-400">
+                      {pct}% đã TT
+                    </span>
+                  )}
+                </div>
+                <p className="text-2xl font-bold font-mono tabular-nums text-zinc-100 mt-2">
+                  <MaskedValue value={tot} format={fmtVND} />
+                </p>
+                <div className="mt-2 pt-2 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-400">
+                  <span>Đã thanh toán:</span>
+                  <span className="font-mono font-semibold text-zinc-200">
+                    <MaskedValue value={pd} format={fmtVND} />
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {isAdmin && (
-          <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
+          <label className="inline-flex items-center gap-2 text-xs font-medium text-zinc-300 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={showDeleted}
               onChange={toggleShowDeleted}
-              className="rounded"
+              className="rounded border-zinc-700 bg-zinc-900 text-emerald-600 focus:ring-emerald-500"
             />
             Xem hợp đồng đã xoá
           </label>
@@ -239,7 +253,7 @@ export default function ContractsPage() {
             }
           />
         ) : (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="bento-card overflow-hidden">
             <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Bảng hợp đồng">
               <table className="w-full text-sm sm:min-w-[860px]">
                 <thead>
@@ -596,7 +610,7 @@ function AddContractModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo hợp đồng"}
         </button>
@@ -1009,7 +1023,7 @@ function ContractDetailModal({
                 <button
                   onClick={addAddendum}
                   disabled={savingAddendum || !addCode.trim()}
-                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-sm font-medium px-3 py-2 rounded-lg shrink-0"
+                  className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-sm font-medium px-3 py-2 rounded-lg shrink-0"
                 >
                   Thêm
                 </button>

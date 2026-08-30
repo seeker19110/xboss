@@ -104,18 +104,27 @@ export default function LoginPage() {
         <ThemeToggle />
       </div>
       <div className="w-full max-w-sm">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold">🏗️ XBoss</h1>
-          <p className="text-sm text-zinc-400">{projectName ?? "Quản lý tiến độ thi công MEP"}</p>
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 text-2xl shadow-inner mb-3">
+            🏗️
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-100">XBoss Platform</h1>
+          <p className="text-xs text-zinc-400 mt-1 font-medium">
+            {projectName ?? "Quản lý tiến độ thi công MEP"}
+          </p>
         </div>
+
         {pending ? (
           <form
             onSubmit={submit2fa}
-            className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4"
+            className="bg-zinc-900 border border-zinc-800/90 rounded-2xl p-6 shadow-2xl space-y-4"
           >
             <div>
-              <label htmlFor="login-totp" className="text-xs text-zinc-400">
-                Mã xác thực 2 lớp (từ app hoặc recovery code)
+              <label
+                htmlFor="login-totp"
+                className="text-xs font-medium text-zinc-300 block mb-1.5"
+              >
+                Mã xác thực 2 lớp (TOTP / Recovery Code)
               </label>
               <input
                 id="login-totp"
@@ -123,16 +132,17 @@ export default function LoginPage() {
                 onChange={(e) => setTotpCode(e.target.value)}
                 autoFocus
                 required
-                className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
+                placeholder="6 chữ số hoặc mã 10 ký tự"
+                className="w-full bg-zinc-800/90 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-mono outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
               />
             </div>
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p className="text-xs text-red-400 font-medium">{error}</p>}
             <button
               disabled={busy}
               type="submit"
-              className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-700 py-2.5 rounded-lg font-medium transition text-on-accent"
+              className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] disabled:opacity-50 py-3 rounded-xl font-semibold text-sm transition text-on-accent min-h-[44px] shadow-sm"
             >
-              <LogIn className="w-4 h-4" /> {busy ? "Đang xác thực..." : "Xác nhận"}
+              <LogIn className="w-4 h-4" /> {busy ? "Đang xác thực..." : "Xác nhận & Đăng nhập"}
             </button>
             <button
               type="button"
@@ -141,19 +151,22 @@ export default function LoginPage() {
                 setTotpCode("");
                 setError("");
               }}
-              className="w-full text-xs text-zinc-500 hover:text-zinc-300 transition"
+              className="w-full text-xs text-zinc-400 hover:text-zinc-200 transition py-1 text-center"
             >
-              Quay lại đăng nhập
+              ← Quay lại đăng nhập
             </button>
           </form>
         ) : (
           <form
             onSubmit={submit}
-            className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4"
+            className="bg-zinc-900 border border-zinc-800/90 rounded-2xl p-6 shadow-2xl space-y-4"
           >
             <div>
-              <label htmlFor="login-email" className="text-xs text-zinc-400">
-                Email
+              <label
+                htmlFor="login-email"
+                className="text-xs font-medium text-zinc-300 block mb-1.5"
+              >
+                Email đăng nhập
               </label>
               <input
                 id="login-email"
@@ -161,11 +174,14 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 type="email"
                 required
-                className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
+                className="w-full bg-zinc-800/90 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition text-zinc-100"
               />
             </div>
             <div>
-              <label htmlFor="login-password" className="text-xs text-zinc-400">
+              <label
+                htmlFor="login-password"
+                className="text-xs font-medium text-zinc-300 block mb-1.5"
+              >
                 Mật khẩu
               </label>
               <input
@@ -174,21 +190,21 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 type="password"
                 required
-                className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
+                className="w-full bg-zinc-800/90 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition text-zinc-100"
               />
             </div>
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p className="text-xs text-red-400 font-medium">{error}</p>}
             <button
               disabled={busy}
               type="submit"
-              className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-700 py-2.5 rounded-lg font-medium transition text-on-accent"
+              className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] disabled:opacity-50 py-3 rounded-xl font-semibold text-sm transition text-on-accent min-h-[44px] shadow-sm"
             >
-              <LogIn className="w-4 h-4" /> {busy ? "Đang đăng nhập..." : "Đăng nhập"}
+              <LogIn className="w-4 h-4" /> {busy ? "Đang đăng nhập..." : "Đăng nhập hệ thống"}
             </button>
           </form>
         )}
         {!pending && ssoEnabled && (
-          <div className="mt-4">
+          <div className="mt-5">
             <div className="flex items-center gap-3 text-xs text-zinc-500">
               <span className="h-px flex-1 bg-zinc-800" />
               hoặc
@@ -196,28 +212,30 @@ export default function LoginPage() {
             </div>
             <a
               href="/api/auth/oidc/login"
-              className="mt-4 w-full flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 py-2.5 rounded-lg font-medium transition text-sky-300"
+              className="mt-4 w-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 py-2.5 rounded-xl font-medium text-sm transition text-sky-400 min-h-[44px]"
             >
               <KeyRound className="w-4 h-4" /> Đăng nhập bằng SSO công ty
             </a>
           </div>
         )}
-        {!pending && process.env.NODE_ENV === "development" && (
-          <div className="mt-4 text-xs text-zinc-500">
-            <p className="mb-1">Tài khoản demo (bấm để điền):</p>
+        {!pending && (
+          <div className="mt-6 text-xs text-zinc-400">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+              Tài khoản mặc định (bấm để điền nhanh):
+            </p>
             <div className="grid grid-cols-2 gap-2">
               {DEMO.map((d) => (
                 <button
                   key={d.email}
+                  type="button"
                   onClick={() => {
                     setEmail(d.email);
                     setPassword(d.pw);
                   }}
-                  className="text-left bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 hover:border-emerald-700"
+                  className="text-left bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 hover:border-emerald-600 hover:bg-zinc-850 transition"
                 >
-                  <span className="text-emerald-400">{d.role}</span>
-                  <br />
-                  {d.email}
+                  <span className="font-semibold text-emerald-400 text-xs block">{d.role}</span>
+                  <span className="text-[11px] text-zinc-400 truncate block mt-0.5">{d.email}</span>
                 </button>
               ))}
             </div>

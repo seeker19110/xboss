@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run, withProjectScope } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   canEditClaim,
   checkClaimRefs,
   getClaim,
   parseClaimBody,
   validateClaimInput,
-} from "@/lib/claims";
+} from "@/lib/tai-chinh/claims";
 
 export const dynamic = "force-dynamic";
 

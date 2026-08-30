@@ -6,9 +6,12 @@ import AxeBuilder from "@axe-core/playwright";
 // (nhiều nút, select, cột) vẫn render — nơi thường có lỗi a11y (nút icon-only, tương phản).
 
 async function gotoMaterials(page: Page) {
-  await page.goto("/materials");
+  // Miền vật tư đã chuyển ĐÚNG sang hub /procurement ở đợt gom "7 Unified Hubs"
+  // (tab vẫn giữ đủ khả năng tạo/sửa, khác /site và /commercial). Neo vào tab của hub —
+  // phần tử ổn định — thay cho tiêu đề trang cũ đã không còn.
+  await page.goto("/procurement?tab=inventory");
   // Tab "Định Mức BOQ" render khi trang đã nạp xong.
-  await expect(page.getByRole("button", { name: /Định Mức BOQ/ })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("tab", { name: /Kho & Định Mức/ })).toBeVisible({ timeout: 15_000 });
 }
 
 test.describe("Vật tư (sau đăng nhập)", () => {
@@ -32,12 +35,12 @@ test.describe("Vật tư (sau đăng nhập)", () => {
   test("tab Yêu cầu mua (đề nghị vật tư) không có vi phạm a11y nghiêm trọng (axe)", async ({
     page,
   }) => {
-    await gotoMaterials(page);
-    await page.getByRole("button", { name: /Yêu cầu mua/ }).click();
-    // Tab đề nghị vật tư active (border emerald) → nội dung tab đã render.
-    await expect(page.getByRole("button", { name: /Yêu cầu mua/ })).toHaveClass(
-      /border-emerald-500/,
-    );
+    // "Yêu cầu mua" (PR) nay nằm trong tab "Đơn Hàng & PR" của hub /procurement,
+    // không còn là tab riêng trên trang vật tư cũ.
+    await page.goto("/procurement?tab=orders");
+    await expect(page.getByRole("tab", { name: /Đơn Hàng & PR/ })).toBeVisible({
+      timeout: 15_000,
+    });
 
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
