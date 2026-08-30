@@ -80,6 +80,22 @@ public static class Segment2D
         }
     }
 
+    /// <summary>
+    /// Hình chiếu vuông góc của điểm lên ĐOẠN (tham số kẹp trong [0;1]) — trả cả tham số lẫn tọa độ.
+    /// Đoạn suy biến (hai đầu trùng nhau) → (0, a).
+    ///
+    /// Dựng đồ thị tuyến (M115) cần chính THAM SỐ này để biết cắt đoạn ở đâu, không chỉ khoảng cách
+    /// như <see cref="KhoangCachDiemToiDoan"/>.
+    /// </summary>
+    public static (double T, (double X, double Y) Diem) ChieuLenDoan(
+        (double X, double Y) p, (double X, double Y) a, (double X, double Y) b)
+    {
+        var l2 = BinhPhuongKhoangCach(a, b);
+        if (l2 < 1e-18) return (0, a);
+        var t = Math.Clamp(((p.X - a.X) * (b.X - a.X) + (p.Y - a.Y) * (b.Y - a.Y)) / l2, 0, 1);
+        return (t, (a.X + t * (b.X - a.X), a.Y + t * (b.Y - a.Y)));
+    }
+
     /// <summary>Khoảng cách từ điểm tới đoạn (không phải tới đường thẳng vô hạn).</summary>
     public static double KhoangCachDiemToiDoan((double X, double Y) p, (double X, double Y) a, (double X, double Y) b)
     {

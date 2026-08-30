@@ -1,6 +1,6 @@
 {
   "_README": "M109 §9 — bộ đối chứng 2 tầng cho validator khối drawTools.crossingPolicy (rule pack v10, §5). Dữ liệu VÀO viết tay, sửa có chủ đích. Tầng 3 (TS): tests/cad-crossing-doi-chung.test.ts gọi kiemCrossingPolicy() của lib/ky-thuat/cad/rule-pack.ts. Tầng 2 (C#): XBoss.Cad.Tests/CrossingDoiChungTests.cs gọi DrawToolsConfig.ValidateCrossingPolicy(). Mỗi ca có ĐÚNG một lỗi (hoặc không lỗi) vì tầng C# ném RulePackException ngay ở lỗi đầu tiên — hai tầng đối chiếu được với nhau bằng khóa lỗi.",
-  "rulePackVersion": "v15",
+  "rulePackVersion": "v16",
   "systemIds": ["HVAC", "PIPING", "FIREFIGHTING", "ELECTRICAL", "ELV"],
   "cases": [
     {
