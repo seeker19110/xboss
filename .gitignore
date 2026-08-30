@@ -67,3 +67,6 @@ logs/
 # .NET build output của plugin AutoCAD (plugin-autocad/)
 plugin-autocad/**/bin/
 plugin-autocad/**/obj/
+
+# Bundle AutoCAD sinh bởi plugin-autocad/dong-goi.ps1 — artifact phát hành, không commit
+/dist/

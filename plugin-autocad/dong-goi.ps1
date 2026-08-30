@@ -106,7 +106,19 @@ Get-ChildItem $out -File |
     Where-Object { $_.Extension -in ".dll", ".json" -and $cuaAutoCad -notcontains $_.Name } |
     Copy-Item -Destination $noiDung
 
-$soTep = (Get-ChildItem $noiDung -File).Count
+# Thư viện MEPF offline tối thiểu đi CÙNG bundle để máy mới dùng được XBOSS_VE_PHUKIEN khi chưa
+# có server. Plugin chỉ seed cặp này khi cache hoàn toàn trống; cache tải từ server/nạp tay vẫn thắng.
+$thuVienNguon = Join-Path $PSScriptRoot "block-library"
+$manifestThuVien = Join-Path $thuVienNguon "manifest.json"
+$dwgThuVien = Join-Path $thuVienNguon "blocks.dwg"
+if (-not (Test-Path $manifestThuVien) -or -not (Test-Path $dwgThuVien)) {
+    throw "Thiếu thư viện MEPF đóng kèm: cần đủ '$manifestThuVien' và '$dwgThuVien'."
+}
+$thuVienDich = Join-Path $noiDung "BlockLibrary"
+New-Item -ItemType Directory -Path $thuVienDich -Force | Out-Null
+Copy-Item -LiteralPath $manifestThuVien, $dwgThuVien -Destination $thuVienDich
+
+$soTep = (Get-ChildItem $noiDung -File -Recurse).Count
 Write-Host "[XBoss] Đã tạo gói: $dich ($soTep tệp trong Contents, version $version)" -ForegroundColor Green
 
 if ($ChiDongGoi -and -not $KhongNen) {

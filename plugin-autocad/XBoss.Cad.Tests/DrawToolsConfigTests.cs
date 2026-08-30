@@ -105,8 +105,11 @@ public class DrawToolsConfigTests
     [Fact]
     public void Bat_loi_he_khong_co_trong_layerMap()
     {
-        var json = JsonHienHanh().Replace("\"id\": \"HVAC\",\n        \"name\": \"Điều hòa thông gió\"",
-            "\"id\": \"HVAC-CU\",\n        \"name\": \"Điều hòa thông gió\"");
+        var goc = JsonNode.Parse(JsonHienHanh())!.AsObject();
+        var systems = goc["drawTools"]!["systems"]!.AsArray();
+        var hvac = systems.Select(x => x!.AsObject()).Single(x => x["id"]!.GetValue<string>() == "HVAC");
+        hvac["id"] = "HVAC-CU";
+        var json = goc.ToJsonString();
         var loi = Assert.Throws<RulePackException>(() => DrawToolsConfig.Load(json));
         Assert.Contains("HVAC-CU", loi.Message);
         Assert.Contains("layerMap", loi.Message);

@@ -8,6 +8,8 @@ using XBoss.Cad.Core.Routing;
 
 // Bí danh vì `UseWindowsForms` kéo theo implicit using `System.Drawing` (xem MarkService.cs).
 using AcadColor = Autodesk.AutoCAD.Colors.Color;
+// AutoCAD thật có cả DatabaseServices.Polyline và GraphicsInterface.Polyline.
+using DbPolyline = Autodesk.AutoCAD.DatabaseServices.Polyline;
 
 namespace XBoss.Cad.Acad.Services;
 
@@ -30,7 +32,7 @@ internal sealed class NetTamXemTruoc : IDisposable
     private const short AciNetTam = 6;
 
     private readonly Editor _ed;
-    private readonly List<Polyline> _net = [];
+    private readonly List<DbPolyline> _net = [];
 
     internal NetTamXemTruoc(Editor ed) => _ed = ed;
 

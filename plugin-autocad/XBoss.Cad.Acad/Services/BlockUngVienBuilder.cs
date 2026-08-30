@@ -216,7 +216,12 @@ internal static class BlockUngVienBuilder
             Directory.CreateDirectory(thuMucTam);
             var duongDwg = Path.Combine(thuMucTam, "blocks.dwg");
             var duongDxf = Path.Combine(thuMucTam, "blocks.dxf");
-            File.Copy(BlockLibraryService.DwgPath, duongDwg);
+            using (BlockLibraryBootstrap.AcquireCacheLock(BlockLibraryService.ThuMucCache))
+            {
+                var manifest = BlockManifestLoader.Load(File.ReadAllText(BlockLibraryService.ManifestPath));
+                BlockManifestLoader.KiemTraHashTep(manifest, BlockLibraryService.DwgPath);
+                File.Copy(BlockLibraryService.DwgPath, duongDwg);
+            }
 
             using (var ungVien = new Database(buildDefaultDrawing: false, noDocument: true))
             {

@@ -852,6 +852,12 @@ namespace Autodesk.AutoCAD.GraphicsInterface
         public void Dispose() { }
     }
 
+    /// <summary>
+    /// API thật còn có kiểu GraphicsInterface.Polyline; khai stub để cổng CI bắt tên `Polyline`
+    /// nhập nhằng khi Adapter đồng thời import DatabaseServices và GraphicsInterface.
+    /// </summary>
+    public class Polyline : Drawable { }
+
     /// <summary>Tầng vẽ của đồ họa tạm; M114 dùng <c>DirectShortTerm</c> (nét xem trước, không lưu).</summary>
     public enum TransientDrawingMode
     {
