@@ -16,7 +16,7 @@
  * bundle client — đã kiểm bằng `npm run build` (không chunk client nào chứa `node:crypto`).
  */
 
-import rulePackV15 from "@/lib/ky-thuat/cad/rule-packs/v15.json";
+import rulePackV16 from "@/lib/ky-thuat/cad/rule-packs/v16.json";
 import { createHash } from "node:crypto";
 
 // ===== rule-pack-hien-hanh.ts =====
@@ -30,10 +30,10 @@ import { createHash } from "node:crypto";
  * tệp version cũ).
  */
 
-export type CadRulePack = typeof rulePackV15;
+export type CadRulePack = typeof rulePackV16;
 
 /** Rule pack đang phát hành cho plugin — mô tả từng version xem `getCurrentRulePack()`. */
-export const RULE_PACK_HIEN_HANH = rulePackV15;
+export const RULE_PACK_HIEN_HANH = rulePackV16;
 
 // ===== rule-pack.ts =====
 // Đọc rule pack, ETag cho plugin tải về, và các validator khối chính sách
@@ -92,6 +92,11 @@ export const CURRENT_RULE_PACK_VERSION = RULE_PACK_HIEN_HANH.version;
  * số hàm chi phí (α co, β độ đông, γ gom trục), phân tầng theo hệ, khe hở làn và thứ tự chạy hệ.
  * Mở rộng thuần và `enabled: false` mặc định nên v15 cho kết quả y hệt v14; 2 lệnh đi tuyến dừng
  * kèm hướng dẫn bật tới khi công ty bật khóa này (M114 AC14).
+ * v16 = v15 + khối `drawTools.completionPolicy` cho bộ lệnh hoàn thiện bản vẽ từ tuyến tim
+ * `XBOSS_TUYEN_DOTHI`/`XBOSS_HOANTHIEN` (M115 §7 FR5): dung sai gộp nút, bán kính chạm thiết bị,
+ * dung sai cao độ, góc tối thiểu coi là đổi hướng, bảng luật chọn phụ kiện tại nút theo
+ * hệ+cỡ+góc (`fittingRules`) và trạng thái tích sẵn của 8 giai đoạn hoàn thiện (`stageDefaults`).
+ * Mở rộng thuần, `enabled: false` và cả 8 giai đoạn `false` nên v16 cho kết quả y hệt v15 (AC5).
  */
 export function getCurrentRulePack(): CadRulePack {
   return RULE_PACK_HIEN_HANH;
@@ -381,6 +386,205 @@ export function kiemRoutingPolicy(drawTools: {
     loi.push(
       "drawTools.routingPolicy.corridorLayer trống trong khi enabled = true — " +
         "hành lang sẽ lẫn vào layer tuyến và lệnh đi tuyến không lọc lại được.",
+    );
+  }
+  return loi;
+}
+
+/**
+ * 8 giai đoạn của lệnh `XBOSS_HOANTHIEN` (M115 §6 bước 5) — THỨ TỰ ở đây là thứ tự chạy khóa cứng,
+ * không phải danh sách tự do. Bản TS của `CompletionPolicySection.TenGiaiDoan` bên plugin .NET.
+ */
+export const GIAI_DOAN_HOAN_THIEN = [
+  "netDoi",
+  "phuKienTaiNut",
+  "chiaDot",
+  "giaDo",
+  "loCho",
+  "ngatNet",
+  "tag",
+  "thongKe",
+] as const;
+
+/** Loại nút có bảng luật chọn phụ kiện (M115 §6 bước 3) — bản TS của enum `LoaiNutPhuKien`. */
+export const LOAI_NUT_PHU_KIEN = ["co", "cut", "te", "giam"] as const;
+
+/** Một dòng bảng chọn phụ kiện tại nút — `drawTools.completionPolicy.fittingRules[]`. */
+export type FittingRule = {
+  /** Id hệ theo `drawTools.systems[].id`. */
+  systemId: string;
+  /** `co` | `cut` | `te` | `giam`. */
+  nodeKind: string;
+  /** Ngưỡng cỡ: cạnh lớn max(W,H) hoặc số DN; `null` = bắt hết mọi cỡ. */
+  maxSizeMm: number | null;
+  minAngleDeg: number;
+  maxAngleDeg: number;
+  /** Id block trong `drawTools.systems[].fittings` của ĐÚNG hệ đó. */
+  blockId: string;
+  /** `kind` của block trong manifest thư viện — chỉ nhận `fitting`. */
+  blockKind: string;
+  name: string;
+};
+
+/** Khối `drawTools.completionPolicy` (M115 §7 FR5) — chính sách hoàn thiện bản vẽ từ tuyến tim. */
+export type CompletionPolicy = {
+  enabled: boolean;
+  nodeToleranceMm: number;
+  equipmentSnapMm: number;
+  elevationToleranceMm: number;
+  minTurnAngleDeg: number;
+  fittingRules: readonly FittingRule[];
+  stageDefaults: Readonly<Record<string, boolean>>;
+};
+
+/**
+ * Kiểm khối `completionPolicy` — tầng TS của validator 2 tầng (M115 §7 FR5; tầng C# là
+ * `CompletionPolicyConfig.Validate` trong `plugin-autocad/XBoss.Cad.Core/Draw/CompletionPolicy.cs`).
+ * Trả danh sách lỗi tiếng Việt, rỗng = hợp lệ.
+ *
+ * Rule pack cũ (≤ v15) không có khóa này → không lỗi: 2 lệnh mới chỉ đơn giản không chạy được,
+ * đúng luật "khóa mới mặc định không đổi hành vi".
+ *
+ * Khối đang TẮT vẫn kiểm đầy đủ: rule pack phát hành phải khai sẵn tham số dùng được ngay khi bật
+ * (cùng quy ước các khối chính sách v5–v15).
+ */
+export function kiemCompletionPolicy(drawTools: {
+  systems: readonly { id: string; fittings?: readonly string[] }[];
+  completionPolicy?: CompletionPolicy;
+}): string[] {
+  const cp = drawTools.completionPolicy;
+  if (!cp) return [];
+
+  const loi: string[] = [];
+  const G = "drawTools.completionPolicy";
+  const phuKienCuaHe = new Map(drawTools.systems.map((s) => [s.id, new Set(s.fittings ?? [])]));
+
+  for (const [ten, giaTri] of [
+    ["nodeToleranceMm", cp.nodeToleranceMm],
+    ["equipmentSnapMm", cp.equipmentSnapMm],
+  ] as const) {
+    if (!Number.isFinite(giaTri) || giaTri <= 0) {
+      loi.push(`${G}.${ten} = ${giaTri} phải là số dương.`);
+    }
+  }
+  // Tâm block thiết bị luôn lùi vào trong thân máy nên bán kính chạm phải rộng hơn dung sai gộp nút;
+  // ngược lại thì mọi đầu tuyến vào thiết bị đều bị báo là tuyến hở.
+  if (
+    Number.isFinite(cp.equipmentSnapMm) &&
+    Number.isFinite(cp.nodeToleranceMm) &&
+    cp.equipmentSnapMm < cp.nodeToleranceMm
+  ) {
+    loi.push(
+      `${G}.equipmentSnapMm = ${cp.equipmentSnapMm} nhỏ hơn nodeToleranceMm = ${cp.nodeToleranceMm} — ` +
+        "đầu tuyến đã gộp vào nút rồi mà vẫn ngoài bán kính chạm thiết bị, mọi kết nối thiết bị sẽ bị báo là tuyến hở.",
+    );
+  }
+  if (!Number.isFinite(cp.elevationToleranceMm) || cp.elevationToleranceMm < 0) {
+    loi.push(`${G}.elevationToleranceMm = ${cp.elevationToleranceMm} không được âm.`);
+  }
+  if (!Number.isFinite(cp.minTurnAngleDeg) || cp.minTurnAngleDeg <= 0 || cp.minTurnAngleDeg > 90) {
+    loi.push(
+      `${G}.minTurnAngleDeg = ${cp.minTurnAngleDeg} phải nằm trong khoảng (0; 90] — ` +
+        "đây là ngưỡng coi tuyến là thẳng, giá trị âm/NaN làm mọi đỉnh đều thành một cái co.",
+    );
+  }
+
+  // ===== fittingRules =====
+  // Khóa gom dải để bắt chồng lấn: cùng hệ + cùng loại nút + cùng ngưỡng cỡ thì 2 khoảng góc
+  // không được đè nhau (first-match làm luật đứng sau chết mà không ai biết).
+  const daiTheoKhoa = new Map<string, { min: number; max: number; ten: string }[]>();
+  for (const [i, r] of cp.fittingRules.entries()) {
+    const nhan = `${G}.fittingRules[${i}] ("${r.name || r.blockId}")`;
+
+    if (!phuKienCuaHe.has(r.systemId)) {
+      loi.push(
+        `${nhan}: systemId lạ "${r.systemId}" — phải là drawTools.systems[].id ` +
+          `(hợp lệ: ${[...phuKienCuaHe.keys()].join(", ")}).`,
+      );
+    } else if (!phuKienCuaHe.get(r.systemId)!.has(r.blockId)) {
+      loi.push(
+        `${nhan}: blockId "${r.blockId}" không có trong fittings của hệ "${r.systemId}" — ` +
+          "id phụ kiện đã trôi khỏi drawTools.systems[].fittings.",
+      );
+    }
+    if (!(LOAI_NUT_PHU_KIEN as readonly string[]).includes(r.nodeKind)) {
+      loi.push(
+        `${nhan}: nodeKind lạ "${r.nodeKind}" (chỉ nhận ${LOAI_NUT_PHU_KIEN.map((k) => `"${k}"`).join(", ")}).`,
+      );
+    }
+    if (r.blockKind !== "fitting") {
+      loi.push(
+        `${nhan}: blockKind "${r.blockKind}" — phụ kiện tại nút chỉ nhận kind "fitting" ` +
+          "(equipment/titleblock/annotation không bao giờ là phụ kiện tại nút).",
+      );
+    }
+    if (!r.name.trim()) {
+      loi.push(`${nhan}: name trống — bảng thống kê/danh sách duyệt ở bước 4 sẽ không đọc được.`);
+    }
+    if (r.maxSizeMm !== null && (!Number.isFinite(r.maxSizeMm) || r.maxSizeMm <= 0)) {
+      loi.push(`${nhan}: maxSizeMm = ${r.maxSizeMm} phải dương hoặc null (bắt hết mọi cỡ).`);
+    }
+
+    const gocHopLe =
+      Number.isFinite(r.minAngleDeg) &&
+      Number.isFinite(r.maxAngleDeg) &&
+      r.minAngleDeg >= 0 &&
+      r.minAngleDeg < r.maxAngleDeg &&
+      r.maxAngleDeg <= 180;
+    if (!gocHopLe) {
+      loi.push(
+        `${nhan}: khoảng góc [${r.minAngleDeg}; ${r.maxAngleDeg}) không hợp lệ — ` +
+          "phải có 0 ≤ minAngleDeg < maxAngleDeg ≤ 180.",
+      );
+      continue;
+    }
+    if ((r.nodeKind === "co" || r.nodeKind === "cut") && r.maxAngleDeg <= cp.minTurnAngleDeg) {
+      loi.push(
+        `${nhan}: maxAngleDeg = ${r.maxAngleDeg} không lớn hơn minTurnAngleDeg = ${cp.minTurnAngleDeg} — ` +
+          "mọi góc trong dải này đã bị coi là tuyến thẳng nên luật không bao giờ được xét.",
+      );
+    }
+
+    const khoa = `${r.systemId}|${r.nodeKind}|${r.maxSizeMm ?? "*"}`;
+    const dai = daiTheoKhoa.get(khoa) ?? [];
+    const de = dai.find((d) => d.min < r.maxAngleDeg && r.minAngleDeg < d.max);
+    if (de) {
+      loi.push(
+        `${nhan}: khoảng góc [${r.minAngleDeg}; ${r.maxAngleDeg}) chồng lấn "${de.ten}" ` +
+          `([${de.min}; ${de.max}), cùng hệ "${r.systemId}", cùng loại nút "${r.nodeKind}", cùng ngưỡng cỡ) — ` +
+          "first-match làm luật đứng sau không bao giờ được chọn.",
+      );
+    } else {
+      dai.push({ min: r.minAngleDeg, max: r.maxAngleDeg, ten: r.name || r.blockId });
+      daiTheoKhoa.set(khoa, dai);
+    }
+  }
+
+  // ===== stageDefaults — phải khai ĐỦ 8 khóa, không thiếu không thừa =====
+  const khoaDaKhai = Object.keys(cp.stageDefaults);
+  const thieu = GIAI_DOAN_HOAN_THIEN.filter((g) => !khoaDaKhai.includes(g));
+  const thua = khoaDaKhai.filter((k) => !(GIAI_DOAN_HOAN_THIEN as readonly string[]).includes(k));
+  if (thieu.length > 0) {
+    loi.push(
+      `${G}.stageDefaults thiếu giai đoạn: ${thieu.join(", ")} — ` +
+        "giai đoạn không khai sẽ lặng lẽ mặc định tắt và không ai biết.",
+    );
+  }
+  if (thua.length > 0) {
+    loi.push(
+      `${G}.stageDefaults khai giai đoạn lạ: ${thua.join(", ")} ` +
+        `(chỉ nhận ${GIAI_DOAN_HOAN_THIEN.join(", ")}).`,
+    );
+  }
+  for (const [khoa, giaTri] of Object.entries(cp.stageDefaults)) {
+    if (typeof giaTri !== "boolean") {
+      loi.push(`${G}.stageDefaults.${khoa} = ${giaTri} phải là true/false.`);
+    }
+  }
+  if (cp.enabled && !Object.values(cp.stageDefaults).some((v) => v === true)) {
+    loi.push(
+      `${G}.enabled = true nhưng cả 8 giai đoạn đều tắt — ` +
+        "XBOSS_HOANTHIEN sẽ chạy xong mà không làm gì.",
     );
   }
   return loi;

@@ -1,6 +1,6 @@
 {
   "_README": "M114 §10 — bộ đối chứng 2 tầng cho việc CẤP TẦNG/LÀN trong hành lang. Phần `cases[].vao` viết TAY (sửa có chủ đích); phần `cases[].mongDoi` SINH TỰ ĐỘNG từ tầng 3 (TS, planMultiTierCorridor trong lib/ky-thuat/engineering-cad-corridor.ts) bằng `npm run cad:doi-chung` — đổi thuật toán là tệp đổi theo và HIỆN RÕ TRONG DIFF. Tầng 3 kiểm ở tests/cad-routing-doi-chung.test.ts, tầng 2 (C#, CapPhatLanTang) kiểm ở XBoss.Cad.Tests/RoutingDoiChungTests.cs — hai bên đọc chung tệp này nên một bên trôi là đỏ ngay (rủi ro số 1 của M99).",
-  "rulePackVersion": "v15",
+  "rulePackVersion": "v16",
   "tierAnhXaTs": {
     "tier_1_top": "tier1",
     "tier_2_mid": "tier2",

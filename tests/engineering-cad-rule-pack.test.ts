@@ -18,9 +18,14 @@ import {
   kiemCrossingPolicy,
   kiemFloorPolicy,
   kiemRoutingPolicy,
+  kiemCompletionPolicy,
+  GIAI_DOAN_HOAN_THIEN,
+  LOAI_NUT_PHU_KIEN,
   CURRENT_RULE_PACK_VERSION,
   type CrossingPolicy,
   type RoutingPolicy,
+  type CompletionPolicy,
+  type FittingRule,
   kiemTraRevisionPolicy,
   soRevisionTheoMau,
 } from "@/lib/ky-thuat/cad/rule-pack";
@@ -32,7 +37,7 @@ import {
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8 + floorPolicy v12 + crossingPolicy v13 + revisionPolicy v14 + routingPolicy v15, version = v15", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8 + floorPolicy v12 + crossingPolicy v13 + revisionPolicy v14 + routingPolicy v15 + completionPolicy v16, version = v16", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -60,8 +65,9 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleM
   assert.ok("floorPolicy" in pack.drawTools, "Thiếu khối v12 drawTools.floorPolicy");
   assert.ok("revisionPolicy" in pack.drawTools, "Thiếu khối v14 drawTools.revisionPolicy");
   assert.ok("routingPolicy" in pack.drawTools, "Thiếu khối v15 drawTools.routingPolicy");
-  assert.equal(pack.version, "v15");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v15");
+  assert.ok("completionPolicy" in pack.drawTools, "Thiếu khối v16 drawTools.completionPolicy");
+  assert.equal(pack.version, "v16");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v16");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -1239,7 +1245,8 @@ test("v13: validator crossingPolicy bắt đủ 3 lỗi của M109 §5 + minAngl
 
 test("rule pack v15 là mở rộng thuần của v14: chỉ thêm drawTools.routingPolicy (M114 §6)", async () => {
   const v14 = (await import("@/lib/ky-thuat/cad/rule-packs/v14.json")).default;
-  const v15 = getCurrentRulePack();
+  // Đọc THẲNG v15.json: bản hiện hành nay là v16 (M115 gộp tiếp completionPolicy).
+  const v15 = (await import("@/lib/ky-thuat/cad/rule-packs/v15.json")).default;
 
   for (const field of [
     "layerMap",
@@ -1354,4 +1361,237 @@ test("v15: validator routingPolicy bắt đủ 4 lỗi của M114 §6", () => {
 
   // Rule pack cũ (≤ v14) chưa khai khóa này thì không phải lỗi.
   assert.deepEqual(kiemRoutingPolicy({ systems: goc.systems }), []);
+});
+
+// ===== v16 (M115 §7 FR5) — completionPolicy: hoàn thiện bản vẽ từ tuyến tim =====
+
+test("rule pack v16 là mở rộng thuần của v15: chỉ thêm drawTools.completionPolicy (M115 §7 FR5)", async () => {
+  const v15 = (await import("@/lib/ky-thuat/cad/rule-packs/v15.json")).default;
+  const v16 = getCurrentRulePack();
+
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "inspectionPolicy",
+    "styleMap",
+    "sheetSetup",
+    "xrefPolicy",
+    "hatchMap",
+    "layoutPolicy",
+    "polylineClosePolicy",
+    "blockMap",
+  ] as const) {
+    assert.deepEqual(
+      v16[field],
+      v15[field],
+      `Field ${field} của v16 lệch v15 — v16 phải là mở rộng thuần (M115 chỉ thêm completionPolicy)`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v16).filter((k) => !(k in v15)),
+    [],
+    "v16 không được thêm khối cấp cao nào — completionPolicy nằm trong drawTools",
+  );
+
+  const { completionPolicy: _bo, ...drawToolsV16 } = v16.drawTools;
+  assert.deepEqual(
+    drawToolsV16,
+    v15.drawTools,
+    "v16 đụng tham số drawTools ngoài completionPolicy",
+  );
+});
+
+test("v16: completionPolicy khai đủ tham số, mặc định TẮT và không giai đoạn nào bật (M115 AC5)", () => {
+  const pack = getCurrentRulePack();
+  const cp = pack.drawTools.completionPolicy;
+
+  assert.equal(
+    cp.enabled,
+    false,
+    "khối phải tắt mặc định — merge không được đổi hành vi máy kỹ sư",
+  );
+  assert.ok(cp.nodeToleranceMm > 0);
+  assert.ok(
+    cp.equipmentSnapMm >= cp.nodeToleranceMm,
+    "bán kính chạm thiết bị phải ≥ dung sai gộp nút",
+  );
+  assert.ok(cp.elevationToleranceMm >= 0);
+  assert.ok(cp.minTurnAngleDeg > 0 && cp.minTurnAngleDeg <= 90);
+
+  // Guardrail M115 §2(d): cả 8 giai đoạn hoàn thiện đều TẮT trong bản phát hành.
+  const stage: Record<string, boolean> = cp.stageDefaults;
+  assert.deepEqual(Object.keys(stage).sort(), [...GIAI_DOAN_HOAN_THIEN].sort());
+  for (const giaiDoan of GIAI_DOAN_HOAN_THIEN) {
+    assert.equal(stage[giaiDoan], false, `giai đoạn ${giaiDoan} phải tắt mặc định`);
+  }
+
+  // Mọi luật trỏ vào phụ kiện CÓ THẬT của đúng hệ đó, và mỗi hệ có đủ co/cút/tê.
+  assert.ok(cp.fittingRules.length > 0);
+  for (const he of pack.drawTools.systems) {
+    const cua = cp.fittingRules.filter((r) => r.systemId === he.id);
+    for (const r of cua) {
+      assert.ok(
+        (he.fittings as readonly string[]).includes(r.blockId),
+        `luật "${r.name}" trỏ vào blockId "${r.blockId}" không có trong fittings của hệ ${he.id}`,
+      );
+      assert.equal(r.blockKind, "fitting");
+      assert.ok((LOAI_NUT_PHU_KIEN as readonly string[]).includes(r.nodeKind));
+    }
+    for (const nodeKind of ["co", "cut", "te"] as const) {
+      assert.ok(
+        cua.some((r) => r.nodeKind === nodeKind),
+        `hệ ${he.id} thiếu luật "${nodeKind}" — nút loại đó sẽ luôn ra "chưa quyết"`,
+      );
+    }
+  }
+
+  assert.deepEqual(
+    kiemCompletionPolicy(pack.drawTools),
+    [],
+    "Rule pack phát hành phải qua validator",
+  );
+});
+
+test("v16: validator completionPolicy bắt đủ lỗi của M115 §7 FR5", () => {
+  const goc = getCurrentRulePack().drawTools;
+  const cpGoc: CompletionPolicy = goc.completionPolicy;
+  const voi = (chinh: Partial<CompletionPolicy>) => ({
+    systems: goc.systems,
+    completionPolicy: { ...cpGoc, ...chinh },
+  });
+  const luat = (chinh: Partial<FittingRule> = {}): FittingRule => ({
+    systemId: "HVAC",
+    nodeKind: "te",
+    maxSizeMm: null,
+    minAngleDeg: 0,
+    maxAngleDeg: 180,
+    blockId: "tee-duct",
+    blockKind: "fitting",
+    name: "Tê ống gió (mẫu test)",
+    ...chinh,
+  });
+
+  // (1) Ngưỡng khoảng cách/góc.
+  assert.match(kiemCompletionPolicy(voi({ nodeToleranceMm: 0 }))[0], /nodeToleranceMm/);
+  assert.match(kiemCompletionPolicy(voi({ equipmentSnapMm: -1 }))[0], /equipmentSnapMm/);
+  assert.match(
+    kiemCompletionPolicy(voi({ nodeToleranceMm: 100, equipmentSnapMm: 50 }))[0],
+    /equipmentSnapMm/,
+  );
+  assert.deepEqual(kiemCompletionPolicy(voi({ nodeToleranceMm: 50, equipmentSnapMm: 50 })), []);
+  assert.match(kiemCompletionPolicy(voi({ elevationToleranceMm: -1 }))[0], /elevationToleranceMm/);
+  assert.match(kiemCompletionPolicy(voi({ minTurnAngleDeg: 0 }))[0], /minTurnAngleDeg/);
+  assert.match(kiemCompletionPolicy(voi({ minTurnAngleDeg: 91 }))[0], /minTurnAngleDeg/);
+
+  // (2) Id hệ lạ + block phụ kiện trôi khỏi fittings của ĐÚNG hệ đó.
+  assert.match(
+    kiemCompletionPolicy(voi({ fittingRules: [luat({ systemId: "PLUMB" })] }))[0],
+    /PLUMB/,
+  );
+  assert.match(
+    kiemCompletionPolicy(voi({ fittingRules: [luat({ blockId: "tee-tray" })] }))[0],
+    /tee-tray/,
+  );
+
+  // (3) nodeKind/blockKind lạ.
+  assert.match(
+    kiemCompletionPolicy(voi({ fittingRules: [luat({ nodeKind: "chuyen_huong" })] }))[0],
+    /chuyen_huong/,
+  );
+  assert.match(
+    kiemCompletionPolicy(voi({ fittingRules: [luat({ blockKind: "equipment" })] }))[0],
+    /blockKind/,
+  );
+
+  // (4) Khoảng góc và ngưỡng cỡ.
+  for (const [min, max] of [
+    [60, 60],
+    [90, 45],
+    [-5, 90],
+    [0, 200],
+  ] as const) {
+    assert.match(
+      kiemCompletionPolicy(
+        voi({ fittingRules: [luat({ minAngleDeg: min, maxAngleDeg: max })] }),
+      )[0],
+      /khoảng góc/,
+    );
+  }
+  assert.match(
+    kiemCompletionPolicy(voi({ fittingRules: [luat({ maxSizeMm: 0 })] }))[0],
+    /maxSizeMm/,
+  );
+  // Dải cỡ dương là hợp lệ — validator sẵn sàng nhận phân dải ở version sau.
+  assert.deepEqual(kiemCompletionPolicy(voi({ fittingRules: [luat({ maxSizeMm: 450 })] })), []);
+
+  // (5) Luật co/cút nằm trọn dưới ngưỡng coi là tuyến thẳng → luật chết.
+  assert.match(
+    kiemCompletionPolicy(
+      voi({
+        minTurnAngleDeg: 10,
+        fittingRules: [
+          luat({ nodeKind: "co", blockId: "elbow-duct", minAngleDeg: 0, maxAngleDeg: 8 }),
+        ],
+      }),
+    )[0],
+    /minTurnAngleDeg/,
+  );
+
+  // (6) Hai luật cùng hệ + cùng loại nút + cùng ngưỡng cỡ chồng lấn khoảng góc.
+  const chongLan = kiemCompletionPolicy(
+    voi({
+      fittingRules: [
+        luat({
+          nodeKind: "cut",
+          blockId: "elbow-duct",
+          minAngleDeg: 30,
+          maxAngleDeg: 120,
+          name: "Cút A",
+        }),
+        luat({
+          nodeKind: "cut",
+          blockId: "elbow-duct",
+          minAngleDeg: 100,
+          maxAngleDeg: 180,
+          name: "Cút B",
+        }),
+      ],
+    }),
+  );
+  assert.match(chongLan[0], /chồng lấn/);
+  assert.match(chongLan[0], /Cút A/);
+  // Kề nhau (nửa mở) thì KHÔNG chồng.
+  assert.deepEqual(
+    kiemCompletionPolicy(
+      voi({
+        fittingRules: [
+          luat({ nodeKind: "cut", blockId: "elbow-duct", minAngleDeg: 30, maxAngleDeg: 100 }),
+          luat({ nodeKind: "cut", blockId: "elbow-duct", minAngleDeg: 100, maxAngleDeg: 180 }),
+        ],
+      }),
+    ),
+    [],
+  );
+
+  // (7) stageDefaults thiếu khóa / khóa lạ / bật khối mà không giai đoạn nào bật.
+  const { tag: _boTag, ...thieuTag } = cpGoc.stageDefaults;
+  assert.match(kiemCompletionPolicy(voi({ stageDefaults: thieuTag }))[0], /tag/);
+  assert.match(
+    kiemCompletionPolicy(voi({ stageDefaults: { ...cpGoc.stageDefaults, veThem: false } }))[0],
+    /veThem/,
+  );
+  assert.match(kiemCompletionPolicy(voi({ enabled: true }))[0], /cả 8 giai đoạn đều tắt/);
+  assert.deepEqual(
+    kiemCompletionPolicy(
+      voi({ enabled: true, stageDefaults: { ...cpGoc.stageDefaults, netDoi: true } }),
+    ),
+    [],
+  );
+
+  // Rule pack cũ (≤ v15) chưa khai khóa này thì không phải lỗi.
+  assert.deepEqual(kiemCompletionPolicy({ systems: goc.systems }), []);
 });
