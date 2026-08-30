@@ -168,6 +168,26 @@ Trạng thái lỗi/offline: bước 4 không đạt → không cho chạy bư�
 (zoom); mất mạng → dùng rule pack/thư viện block cache offline M113, không chặn. Xem đặc tả đầy đủ
 ở `docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md`.
 
+### Bộ lệnh Phối hợp xung đột 2D liên hệ (M116 — 3 lệnh)
+
+Phát hiện xung đột giữa các hệ MEPF trên bản vẽ combined services (giao cắt cùng cao độ, tranh
+chấp hành lang, khoảng cách quy phạm) rồi **đề xuất cách xử lý theo luật** — kỹ sư quyết, plugin
+**không bao giờ tự sửa tuyến**. Cần rule pack từ **v17** (khối `drawTools.coordinationPolicy`, mặc
+định **TẮT**). Tái dùng đồ thị/cao độ do M115 gán (`XBOSS_TUYEN_GAN` + `XBOSS_TUYEN_DOTHI`) và bảng
+ưu tiên trên–dưới `crossingPolicy.priority` (M109).
+
+| Lệnh                   | Chức năng                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `XBOSS_PHOIHOP`        | **Quét 3 lớp kiểm** (cả bản vẽ / vùng chọn / theo hành lang, kể cả tuyến trong xref chỉ đọc): giao cắt cùng cao độ (CỨNG), tranh chấp hành lang (MỀM), khoảng cách quy phạm (CẢNH BÁO). Hộp thoại M106 liệt kê + đề xuất xử lý (nhường cao độ theo `crossingPolicy.priority`, dịch làn, fitting vượt); kỹ sư đánh dấu chấp nhận/bỏ qua có lý do — trạng thái ghi vào marker layer `XBOSS-PHOIHOP`, chạy lại **idempotent** theo id ổn định |
+| `XBOSS_PHOIHOP_XOA`    | Gỡ sạch marker phối hợp trên layer `XBOSS-PHOIHOP`, trả bản vẽ về đúng trạng thái trước khi chạy `XBOSS_PHOIHOP` — tuyến và mọi đối tượng khác không bị đụng tới                                                                                                                                                                                                                                                                           |
+| `XBOSS_PHOIHOP_BAOCAO` | Quét lại phối hợp cả bản vẽ rồi xuất bảng xung đột ra Excel (`<dwg>.xboss-phoihop.xlsx`) + sidecar JSON máy-đọc-được (`<dwg>.xboss-phoihop.json`) — `XBOSS_UPLOAD` gửi kèm sidecar này (nếu có) để web hiện số liệu phối hợp trên bảng điều khiển `/engineering/chuan-hoa-ban-ve`                                                                                                                                                          |
+
+> **Rule pack v17 (M116)** khai khối `drawTools.coordinationPolicy` (khoảng bảo trì hành lang, cặp
+> hệ + khoảng cách quy phạm, `priorityFrom` trỏ về `crossingPolicy`) — **mặc định TẮT** nên merge
+> không đổi hành vi máy kỹ sư nào đang dùng rule pack cũ. `Core/Coordination/` (`QuetXungDot`,
+> `DeXuatXuLy`, `XungDotId`, `PhoiHopTomTat`) là phần THUẦN quét + tổng hợp, test xunit trên CI
+> Linux như mọi phần Core khác — không tham chiếu AutoCAD.
+
 ## Build
 
 ### Core + Tests (mọi HĐH — đây là phần CI chạy)

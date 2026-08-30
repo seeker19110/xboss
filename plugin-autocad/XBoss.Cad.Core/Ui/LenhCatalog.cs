@@ -189,6 +189,24 @@ public static class LenhCatalog
             "Bật/tắt hiển thị cloud theo từng revision (mỗi revision một layer con) — bản in nộp " +
             "thường chỉ khoanh lần sửa mới nhất, cloud cũ vẫn tra ngược được.",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 7, CanRulePack: true),
+        // M116 §6 — kiểm PHỐI HỢP giữa các hệ, chạy sau khi tuyến đã có hệ/cỡ/cao độ (M115) và
+        // trước khi phát hành hồ sơ: xếp cùng bước "Hồ sơ bản vẽ" với các bước kiểm/trình bày khác
+        // (ngắt nét, báo cáo phiên vẽ). Lệnh XÓA marker đứng ngoài dòng chảy chính như mọi lệnh
+        // *_XOA khác (nhóm Phụ trợ).
+        new("XBOSS_PHOIHOP", "Phối hợp liên hệ",
+            "Kiểm xung đột giữa các hệ trên bản vẽ combined (kể cả tuyến đọc từ xref): giao cắt cùng " +
+            "cao độ, tranh chấp bề rộng hành lang, khoảng cách quy phạm — mỗi xung đột kèm đề xuất xử " +
+            "lý theo rule pack, kỹ sư đánh dấu chấp nhận/bỏ qua; plugin không tự sửa tuyến.",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 9, CanRulePack: true),
+        new("XBOSS_PHOIHOP_BAOCAO", "Báo cáo phối hợp",
+            "Xuất bảng xung đột phối hợp ra Excel và đính vào báo cáo phiên để web hiện số liệu " +
+            "(đang hoàn thiện — hiện chỉ báo hướng dẫn).",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 10, CanRulePack: true),
+        new("XBOSS_PHOIHOP_XOA", "Xóa dấu phối hợp",
+            "Gỡ sạch marker xung đột phối hợp trên layer XBOSS-PHOIHOP, trả bản vẽ về trước khi chạy " +
+            "XBOSS_PHOIHOP — tuyến và mọi đối tượng khác không bị đụng tới.",
+            NhomLenh.VeShopDrawing, BuocQuyTrinh.PhuTro, 7),
+
         new("XBOSS_VE_BAOCAO", "Báo cáo phiên vẽ",
             "Chỉ đọc: tổng hợp số tuyến/block theo hệ + size ngoài danh mục, ghi JSON cạnh DWG.",
             NhomLenh.VeShopDrawing, BuocQuyTrinh.HoSoBanVe, 8, CanRulePack: true),

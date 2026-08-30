@@ -269,3 +269,56 @@ test("kiểm định fail → KHÔNG tạo revision (AC5)", S, async () => {
   );
   assert.equal(sau?.n, truoc?.n); // không thêm dòng nào
 });
+
+test(
+  "upload kèm sidecar phối hợp (M116 PR3) → lưu vào standardize_report.phoiHop; " +
+    "upload cũ không kèm vẫn chạy y nguyên",
+  S,
+  async () => {
+    const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/dashboard");
+    const { getCurrentRulePack } = await import("@/lib/ky-thuat/cad/rule-pack");
+    const { queryOne } = await import("@/lib/db");
+    const v = getCurrentRulePack().version;
+
+    const kq = await xuLyPluginUpload({
+      drawingId: DRAWING,
+      orgId: 1,
+      userId: U,
+      rev: "E",
+      rulePackVersion: v,
+      dwg: Buffer.from("gia-lap-noi-dung-dwg-kem-phoihop"),
+      dwgName: "T05.dwg",
+      dxfText: DXF_HOP_LE,
+      report: { cheDo: "chuan-hoa" },
+      phoiHop: { tongSo: 2, soCung: 1, soMem: 0, soCanhBao: 1, theoLop: [] },
+    });
+    assert.equal(kq.status, "created");
+    if (kq.status !== "created") return;
+
+    const row = await queryOne<{
+      standardize_report: { cheDo?: string; phoiHop?: { tongSo?: number } };
+    }>(`SELECT standardize_report FROM drawing_revisions WHERE id = ?`, kq.revisionId);
+    assert.equal(row?.standardize_report?.cheDo, "chuan-hoa");
+    assert.equal(row?.standardize_report?.phoiHop?.tongSo, 2);
+
+    // Upload cũ (không kèm phoiHop) — chạy y nguyên, không có khối "phoiHop" nào trong report.
+    const cu = await xuLyPluginUpload({
+      drawingId: DRAWING,
+      orgId: 1,
+      userId: U,
+      rev: "F",
+      rulePackVersion: v,
+      dwg: Buffer.from("gia-lap-noi-dung-dwg-khong-phoihop"),
+      dwgName: "T05.dwg",
+      dxfText: DXF_HOP_LE,
+      report: null,
+    });
+    assert.equal(cu.status, "created");
+    if (cu.status !== "created") return;
+    const rowCu = await queryOne<{ standardize_report: { phoiHop?: unknown } }>(
+      `SELECT standardize_report FROM drawing_revisions WHERE id = ?`,
+      cu.revisionId,
+    );
+    assert.equal(rowCu?.standardize_report?.phoiHop, undefined);
+  },
+);

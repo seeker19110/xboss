@@ -299,6 +299,15 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > (giao cắt cùng dải cao độ, tranh chấp hành lang, khoảng cách quy phạm giữa cặp hệ) trên tuyến
 > mang XData M115 kể cả qua xref; **chỉ phát hiện + đề xuất theo `coordinationPolicy`, kỹ sư
 > quyết** (ngã rẽ chốt 2026-08-28), marker layer riêng, báo cáo Excel + web. 3 PR. Sau M115.
+> **State: ✅ CODE XONG cả 3 PR (2026-08-30)** — rule pack `v17` khối `drawTools.coordinationPolicy`
+> (mặc định TẮT, bảng ưu tiên THAM CHIẾU `crossingPolicy.priority`) + validator 2 tầng (TS + C#) +
+> `Core/Coordination/` thuần (`QuetXungDot` 3 lớp kiểm, `XungDotId`, `DeXuatXuLy`, `PhoiHopTomTat`)
+> (PR1); `XBOSS_PHOIHOP`/`XBOSS_PHOIHOP_XOA` + hộp thoại + marker/XData idempotent (PR2);
+> `XBOSS_PHOIHOP_BAOCAO` (Excel + sidecar JSON), sidecar gửi kèm `XBOSS_UPLOAD` →
+> `standardize_report.phoiHop`, panel web `PhoiHopPanel.tsx` trên
+> `/engineering/chuan-hoa-ban-ve`, tài liệu + `VERIFY-VA-PHAT-HANH.md` mục C12 (PR3). **CÒN NỢ —
+> CHẶN phát hành rộng:** chưa verify tay trên AutoCAD 2026 thật (mục `C12`, 109–115) — xếp hàng sau
+> M111 §C9/M114 §C10/M115 §C11.
 > **`M117-ai-doc-so-do-nguyen-ly.md`** — mảnh cuối: upload DXF schematic lên web → tầng 1 luật
 > dựng graph, tầng 2 AI ngữ nghĩa bù phần `chua_quyet` (hợp đồng y hệt M108 qua `lib/nen/ai.ts`,
 > tắt được bằng `XBOSS_AI_BLOCK_CLASSIFY=0`), người duyệt graph trên web → plugin

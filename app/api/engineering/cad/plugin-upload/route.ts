@@ -122,6 +122,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // M116 PR3 §6 bước 5: sidecar tóm tắt phối hợp xung đột liên hệ (PhoiHopTomTat, gửi kèm bởi
+  // XBOSS_UPLOAD khi XBOSS_PHOIHOP_BAOCAO đã chạy) — TÙY CHỌN, không gửi vẫn upload y hệt trước M116.
+  const phoiHopRaw = form.get("phoiHop");
+  let phoiHop: Record<string, unknown> | null = null;
+  if (phoiHopRaw instanceof File) {
+    try {
+      phoiHop = JSON.parse(await phoiHopRaw.text());
+    } catch {
+      return NextResponse.json(
+        { error: "phoiHop (sidecar phối hợp) không phải JSON hợp lệ" },
+        { status: 400 },
+      );
+    }
+  }
+
   const job = await enqueueAsyncTask({
     projectId,
     taskType: "cad.plugin-upload",
@@ -160,6 +175,7 @@ export async function POST(req: NextRequest) {
       dxfText: await dxf.text(),
       report,
       takeoff,
+      phoiHop,
     });
 
     if (kq.status === "invalid") {

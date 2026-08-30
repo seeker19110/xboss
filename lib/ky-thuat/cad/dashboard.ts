@@ -50,6 +50,34 @@ export type LuotPluginUpload = {
   /** Các bước chuẩn hoá đã chạy (standardize_report.steps, sinh bởi StandardizeReport.cs) —
    * rỗng khi báo cáo không kèm hoặc không đúng dạng. */
   buoc: BuocChuanHoa[];
+  /** Tóm tắt phối hợp xung đột liên hệ gửi kèm khi upload (M116 PR3) — null khi tệp gửi không kèm
+   * sidecar (chưa chạy XBOSS_PHOIHOP_BAOCAO, hoặc rule pack chưa bật coordinationPolicy). */
+  phoiHop: TomTatPhoiHop | null;
+};
+
+/** Một dòng theo lớp kiểm trong tóm tắt phối hợp (khớp PhoiHopTomTatLop bên plugin). */
+export type TomTatPhoiHopLop = {
+  lop: string;
+  nhan: string;
+  tongSo: number;
+  soCung: number;
+  soMem: number;
+  soCanhBao: number;
+  soChuaXuLy: number;
+  soChapNhan: number;
+  soBoQua: number;
+};
+
+/** Tóm tắt phối hợp xung đột liên hệ của 1 revision (khớp PhoiHopTomTat bên plugin, M116 PR3). */
+export type TomTatPhoiHop = {
+  tongSo: number;
+  soCung: number;
+  soMem: number;
+  soCanhBao: number;
+  soChuaXuLy: number;
+  soChapNhan: number;
+  soBoQua: number;
+  theoLop: TomTatPhoiHopLop[];
 };
 
 /** Một dòng diff chuẩn hoá — khớp StepDiff bên plugin (buoc/hangMuc/truoc/sau/soLuong). */
@@ -99,6 +127,72 @@ export function docKlBocTuBaoCao(report: Record<string, unknown> | null): TomTat
     tongDong: lines.length,
     theoHe: [...gopHe.entries()].map(([nhan, khoiLuong]) => ({ nhan, khoiLuong })),
     theoVung: [...gopVung.entries()].map(([nhan, khoiLuong]) => ({ nhan, khoiLuong })),
+  };
+}
+
+type PhoiHopLopRaw = {
+  lop?: unknown;
+  nhan?: unknown;
+  tongSo?: unknown;
+  soCung?: unknown;
+  soMem?: unknown;
+  soCanhBao?: unknown;
+  soChuaXuLy?: unknown;
+  soChapNhan?: unknown;
+  soBoQua?: unknown;
+};
+
+/** Bóc tóm tắt phối hợp ra khỏi standardize_report.phoiHop (M116 PR3 — sidecar PhoiHopTomTat của
+ * plugin) — đọc phòng thủ (duck-typing), thiếu/sai dạng thì trả null thay vì sập cả trang
+ * (thuần — test đơn vị được, cùng khuôn docKlBocTuBaoCao/docBuocTuBaoCao). */
+export function docPhoiHopTuBaoCao(report: Record<string, unknown> | null): TomTatPhoiHop | null {
+  const ph = report?.phoiHop;
+  if (!ph || typeof ph !== "object") return null;
+  const o = ph as {
+    tongSo?: unknown;
+    soCung?: unknown;
+    soMem?: unknown;
+    soCanhBao?: unknown;
+    soChuaXuLy?: unknown;
+    soChapNhan?: unknown;
+    soBoQua?: unknown;
+    theoLop?: unknown;
+  };
+  if (typeof o.tongSo !== "number") return null;
+
+  const theoLop: TomTatPhoiHopLop[] = [];
+  if (Array.isArray(o.theoLop)) {
+    for (const raw of o.theoLop as PhoiHopLopRaw[]) {
+      if (
+        typeof raw?.lop !== "string" ||
+        typeof raw.nhan !== "string" ||
+        typeof raw.tongSo !== "number"
+      ) {
+        continue;
+      }
+      theoLop.push({
+        lop: raw.lop,
+        nhan: raw.nhan,
+        tongSo: raw.tongSo,
+        soCung: typeof raw.soCung === "number" ? raw.soCung : 0,
+        soMem: typeof raw.soMem === "number" ? raw.soMem : 0,
+        soCanhBao: typeof raw.soCanhBao === "number" ? raw.soCanhBao : 0,
+        soChuaXuLy: typeof raw.soChuaXuLy === "number" ? raw.soChuaXuLy : 0,
+        soChapNhan: typeof raw.soChapNhan === "number" ? raw.soChapNhan : 0,
+        soBoQua: typeof raw.soBoQua === "number" ? raw.soBoQua : 0,
+      });
+    }
+  }
+
+  return {
+    tongSo: o.tongSo,
+    soCung: typeof o.soCung === "number" ? o.soCung : 0,
+    soMem: typeof o.soMem === "number" ? o.soMem : 0,
+    soCanhBao: typeof o.soCanhBao === "number" ? o.soCanhBao : 0,
+    soChuaXuLy: typeof o.soChuaXuLy === "number" ? o.soChuaXuLy : 0,
+    soChapNhan: typeof o.soChapNhan === "number" ? o.soChapNhan : 0,
+    soBoQua: typeof o.soBoQua === "number" ? o.soBoQua : 0,
+    theoLop,
   };
 }
 
@@ -183,6 +277,7 @@ export async function layLichSuPluginUpload(
     kiemDinh: docKiemDinhTuBaoCao(r.standardize_report),
     klBoc: docKlBocTuBaoCao(r.standardize_report),
     buoc: docBuocTuBaoCao(r.standardize_report),
+    phoiHop: docPhoiHopTuBaoCao(r.standardize_report),
   }));
 }
 
@@ -612,6 +707,10 @@ export async function xuLyPluginUpload(input: {
    * nguyên vào standardize_report khối "takeoff". KHÔNG BAO GIỜ ghi vào bảng BOQ (đường ghi sổ
    * duy nhất giữ nguyên); upload không kèm khối này vẫn chạy y hệt trước PR5. */
   takeoff?: Record<string, unknown> | null;
+  /** M116 PR3 §6 bước 5: sidecar JSON tóm tắt phối hợp xung đột liên hệ (PhoiHopTomTat), TÙY CHỌN
+   * — lưu nguyên vào standardize_report khối "phoiHop". Upload không kèm khối này vẫn chạy y hệt
+   * trước M116 (chưa chạy XBOSS_PHOIHOP_BAOCAO, hoặc rule pack chưa bật coordinationPolicy). */
+  phoiHop?: Record<string, unknown> | null;
 }): Promise<PluginUploadKetQua> {
   const validation = kiemDinhPluginUpload(input.dxfText, input.rulePackVersion);
   if (!validation.ok) return { status: "invalid", validation };
@@ -659,6 +758,7 @@ export async function xuLyPluginUpload(input: {
     JSON.stringify({
       ...(input.report ?? {}),
       ...(input.takeoff ? { takeoff: input.takeoff } : {}),
+      ...(input.phoiHop ? { phoiHop: input.phoiHop } : {}),
       serverValidation: validation,
     }),
     hash,

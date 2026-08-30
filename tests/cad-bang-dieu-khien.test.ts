@@ -7,6 +7,7 @@ import {
   docKiemDinhTuBaoCao,
   docKlBocTuBaoCao,
   docBuocTuBaoCao,
+  docPhoiHopTuBaoCao,
 } from "@/lib/ky-thuat/cad/dashboard";
 import { CURRENT_RULE_PACK_VERSION } from "@/lib/ky-thuat/cad/rule-pack";
 
@@ -115,4 +116,68 @@ test("docBuocTuBaoCao đọc danh sách bước chuẩn hoá (standardize_report
     ],
   });
   assert.deepEqual(conLan, [{ buoc: "Layer", hangMuc: "OK", truoc: "a", sau: "b", soLuong: 1 }]);
+});
+
+// M116 PR3 §6 bước 5 — bóc tóm tắt phối hợp xung đột liên hệ (PhoiHopTomTat) gửi kèm
+// XBOSS_UPLOAD khi XBOSS_PHOIHOP_BAOCAO đã chạy trước đó.
+test("docPhoiHopTuBaoCao đọc tóm tắt phối hợp, khuyết khối phoiHop → null (upload trước M116)", () => {
+  assert.equal(docPhoiHopTuBaoCao(null), null);
+  assert.equal(docPhoiHopTuBaoCao({ cheDo: "chuan-hoa" }), null); // không có khối phoiHop — upload cũ
+  assert.equal(docPhoiHopTuBaoCao({ phoiHop: { theoLop: [] } }), null); // thiếu tongSo dạng số
+
+  const kq = docPhoiHopTuBaoCao({
+    phoiHop: {
+      tongSo: 3,
+      soCung: 1,
+      soMem: 1,
+      soCanhBao: 1,
+      soChuaXuLy: 2,
+      soChapNhan: 1,
+      soBoQua: 0,
+      theoLop: [
+        {
+          lop: "GiaoCatCaoDo",
+          nhan: "giao cắt cùng cao độ",
+          tongSo: 1,
+          soCung: 1,
+          soMem: 0,
+          soCanhBao: 0,
+          soChuaXuLy: 1,
+          soChapNhan: 0,
+          soBoQua: 0,
+        },
+        {
+          lop: "TranhChapHanhLang",
+          nhan: "tranh chấp hành lang",
+          tongSo: 2,
+          soCung: 0,
+          soMem: 1,
+          soCanhBao: 1,
+          soChuaXuLy: 1,
+          soChapNhan: 1,
+          soBoQua: 0,
+        },
+      ],
+    },
+  });
+  assert.equal(kq?.tongSo, 3);
+  assert.equal(kq?.soCung, 1);
+  assert.equal(kq?.theoLop.length, 2);
+  assert.equal(kq?.theoLop[0].nhan, "giao cắt cùng cao độ");
+
+  // Dòng lớp kiểm thiếu field bắt buộc (lop/nhan/tongSo) bị BỎ QUA, tổng cộng vẫn đọc được.
+  const conLan = docPhoiHopTuBaoCao({
+    phoiHop: {
+      tongSo: 1,
+      soCung: 0,
+      soMem: 0,
+      soCanhBao: 1,
+      soChuaXuLy: 1,
+      soChapNhan: 0,
+      soBoQua: 0,
+      theoLop: [{ nhan: "thiếu lop" }, null, "không phải object"],
+    },
+  });
+  assert.equal(conLan?.tongSo, 1);
+  assert.deepEqual(conLan?.theoLop, []);
 });

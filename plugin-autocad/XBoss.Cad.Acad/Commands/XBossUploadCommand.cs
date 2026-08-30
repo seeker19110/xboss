@@ -111,6 +111,13 @@ public sealed class XBossUploadCommand
         var duongTakeoff = db.Filename + XBossCommands.TenSidecarBocKL;
         if (File.Exists(duongTakeoff)) takeoffJson = File.ReadAllText(duongTakeoff);
 
+        // Tóm tắt phối hợp xung đột liên hệ (nếu XBOSS_PHOIHOP_BAOCAO đã chạy) — M116 PR3 §6 bước
+        // 5: gửi kèm để web hiện số liệu phối hợp trên bảng điều khiển. Thiếu sidecar → upload vẫn
+        // chạy y hệt trước M116, không chặn (chỉ là "kèm thêm nếu có").
+        string? phoiHopJson = null;
+        var duongPhoiHop = db.Filename + PhoiHopBaoCaoCommand.TenSidecarJson;
+        if (File.Exists(duongPhoiHop)) phoiHopJson = File.ReadAllText(duongPhoiHop);
+
         ed.WriteMessage($"\n[XBoss] Đang tải {tenDwg} ({new FileInfo(db.Filename).Length / 1024} KB) lên {baseUrl}…\n");
         try
         {
@@ -118,7 +125,7 @@ public sealed class XBossUploadCommand
             var kq = await client.UploadAsync(
                 token, banVe.Code ?? "", rev, pack.Version,
                 tenDwg, File.ReadAllBytes(db.Filename), dxfBytes, reportJson,
-                takeoffJson: takeoffJson, drawingId: banVe.Id);
+                takeoffJson: takeoffJson, drawingId: banVe.Id, phoiHopJson: phoiHopJson);
 
             if (!kq.DuocNhan)
             {
@@ -189,6 +196,7 @@ public sealed class XBossUploadCommand
         var ra = new List<string>();
         if (File.Exists(duongDanDwg + ".xboss-report.json")) ra.Add("báo cáo chuẩn hóa");
         if (File.Exists(duongDanDwg + XBossCommands.TenSidecarBocKL)) ra.Add("kết quả bóc khối lượng");
+        if (File.Exists(duongDanDwg + PhoiHopBaoCaoCommand.TenSidecarJson)) ra.Add("tóm tắt phối hợp xung đột liên hệ");
         return ra;
     }
 
