@@ -1,5 +1,28 @@
 # PROGRESS.md — Trạng thái dự án
 
+## Refactor gọn `XBoss.Cad.Core/Api/XBossApiClient.cs` — tách theo domain (2026-08-30, PR #452)
+
+Review chất lượng code plugin AutoCAD phát hiện `XBossApiClient.cs` (891 dòng) gộp ~10 route
+không liên quan (pairing/rule-pack/plugin-package/block-lib/block-proposals/BOQ/schematic/upload)
+vào một class — vi phạm SRP, khó điều hướng. Tách thành 8 file `partial class` cùng namespace
+`XBoss.Cad.Core.Api`, **giữ nguyên 100% chữ ký public** (đối chiếu bằng diff chữ ký trước/sau) nên
+KHÔNG cần sửa bất kỳ call site nào (Adapter, test):
+
+- `XBossApiClient.cs` — ctor + helper HTTP dùng chung (`GuiKemToken`/`NemNeuLoi`/`ThemPhan`/
+  `DocLoiTuChuoi`/`DocDanhSachDuAn`/`LoiTuServer`) + `XBossApiException`.
+- `.Pairing.cs`, `.RulePack.cs`, `.PluginPackage.cs`, `.BlockLibrary.cs`, `.BlockProposals.cs`
+  (phần lớn nhất — đề xuất + lô block), `.Boq.cs`, `.Schematic.cs`, `.Upload.cs`.
+
+Không đổi hành vi, không đổi API — thuần tổ chức lại file. Môi trường code không có .NET SDK nên
+không build/test cục bộ được; xác nhận qua CI job `plugin (dotnet Core/Tests)` (`dotnet test
+XBoss.Cad.Tests`) sau khi push.
+
+**Nợ còn lại (không làm đợt này — rủi ro cao hơn, cần máy Windows + ObjectARX SDK để verify
+build thật)**: `XBoss.Cad.Acad/Services/StandardizePipeline.cs` (1164 dòng) và
+`BlockLibraryService.cs` (1161 dòng) trong `XBoss.Cad.Acad` cũng là ứng viên tách theo bước xử lý,
+nhưng dùng API ObjectARX nên rủi ro refactor không build được cục bộ cao hơn nhiều so với Core
+thuần .NET — để dành cho đợt có môi trường Windows build thật.
+
 ## ✅ M116 — Phối hợp xung đột 2D liên hệ: rule pack v17 + `XBOSS_PHOIHOP*` — CODE XONG cả 3 PR (2026-08-30)
 
 `docs/nang-cap/M116-phoi-hop-xung-dot-lien-he.md`, mục thứ hai của đợt "tự động triển khai bản vẽ
