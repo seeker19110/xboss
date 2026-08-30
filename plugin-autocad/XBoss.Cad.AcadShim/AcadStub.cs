@@ -363,6 +363,11 @@ namespace Autodesk.AutoCAD.DatabaseServices
 
     public class BlockReference : Entity
     {
+        /// <summary>WinForms/ObjectARX thật: <c>AcDbBlockReference</c> có cả ctor rỗng lẫn ctor
+        /// (vị trí, định nghĩa khối) — <see cref="Table"/> kế thừa lớp này (xem ghi chú tại
+        /// <c>Table</c>) và không truyền tham số nào, nên phải có ctor rỗng ở đây.</summary>
+        public BlockReference() { }
+
         public BlockReference(Point3d position, ObjectId blockTableRecord) { }
         public Point3d Position { get; set; }
         public double Rotation { get; set; }
@@ -455,10 +460,19 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public Cell this[int row, int col] => new Cell();
     }
 
-    public class Table : Entity
+    /// <summary>
+    /// WinForms thật: <c>AcDbTable</c> kế thừa <c>AcDbBlockReference</c> (bảng là một khối chèn đặc
+    /// biệt mang định dạng) — KHÔNG kế thừa thẳng <c>Entity</c> như bản stub cũ. Sai chỗ này từng
+    /// lọt qua cổng CI (stub biên dịch được vì hai lớp coi như anh em) nhưng đỏ CS8120 thật trên máy
+    /// có AutoCAD: <c>VeThucThe.DiemBamCua</c> switch theo <c>BlockReference</c> trước <c>Table</c>,
+    /// và trình biên dịch C# thấy <c>case Table</c> không bao giờ tới được vì <c>Table</c> ĐÃ khớp
+    /// nhánh <c>BlockReference</c> phía trên (Table là BlockReference thật). Sửa đúng nguồn: cho
+    /// stub phản ánh đúng quan hệ kế thừa của API thật, và đổi thứ tự case trong VeThucThe (nhánh
+    /// con đứng trước nhánh cha).
+    /// </summary>
+    public class Table : BlockReference
     {
         public ObjectId TableStyle { get; set; }
-        public Point3d Position { get; set; }
         public int Rows => 0;
         public int Columns_ => 0;
         public CellsCollection Cells => new CellsCollection();
