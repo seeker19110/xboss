@@ -6,19 +6,20 @@ import dns from "node:dns";
 import http from "node:http";
 
 // Test webhook ra ngoài (M49 PR2). Tích hợp thật với TEST_DATABASE_URL — tự skip nếu không có
-// (giống recompute.test.ts). Mock globalThis.fetch để kiểm gửi/backoff/chữ ký mà không gọi mạng.
+// (giống recompute.test.ts). Mock `webhookHttp.fetch` để kiểm gửi/backoff/chữ ký mà không gọi mạng.
 
 type FetchCall = { url: string; init: RequestInit };
 
 // Cài mock fetch trả về status cố định, ghi lại mọi lời gọi. Trả hàm gỡ mock.
-function installFetchMock(status: number, calls: FetchCall[]): () => void {
-  const orig = globalThis.fetch;
-  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+async function installFetchMock(status: number, calls: FetchCall[]): Promise<() => void> {
+  const { webhookHttp } = await import("@/lib/bao-mat/webhooks");
+  const orig = webhookHttp.fetch;
+  webhookHttp.fetch = (async (url: unknown, init?: RequestInit) => {
     calls.push({ url: String(url), init: init ?? {} });
-    return { status } as Response;
-  }) as typeof fetch;
+    return { status };
+  }) as unknown as typeof webhookHttp.fetch;
   return () => {
-    globalThis.fetch = orig;
+    webhookHttp.fetch = orig;
   };
 }
 
@@ -124,7 +125,7 @@ test(
     // --- 2xx → ok ---
     await makeWebhook({ userId, projectId, events: ["ping"], url: "https://ok.test/h" });
     await emitWebhook("ping", projectId, { hello: 1 });
-    let restore = installFetchMock(200, []);
+    let restore = await installFetchMock(200, []);
     let res = await deliverDueWebhooks();
     restore();
     assert.equal(res.sent, 1);
@@ -147,7 +148,7 @@ test(
     for (let attempt = 1; attempt <= 4; attempt++) {
       // ép đến hạn lại để lượt gửi kế tiếp nhặt được
       await run(`UPDATE webhook_deliveries SET next_retry_at = now() WHERE id = ?`, deliveryId);
-      restore = installFetchMock(500, []);
+      restore = await installFetchMock(500, []);
       res = await deliverDueWebhooks();
       restore();
       assert.equal(res.failed, 1, `lần ${attempt} phải tính là thất bại`);
@@ -169,7 +170,7 @@ test(
 
     // Lần 5 vẫn lỗi → attempts=5 → status='failed' (dừng hẳn).
     await run(`UPDATE webhook_deliveries SET next_retry_at = now() WHERE id = ?`, deliveryId);
-    restore = installFetchMock(500, []);
+    restore = await installFetchMock(500, []);
     res = await deliverDueWebhooks();
     restore();
     const final = await queryOne<{ status: string; attempts: number }>(
@@ -181,7 +182,7 @@ test(
 
     // Đã 'failed' → lượt sau không nhặt lại nữa (dù ép next_retry_at về now).
     await run(`UPDATE webhook_deliveries SET next_retry_at = now() WHERE id = ?`, deliveryId);
-    restore = installFetchMock(200, []);
+    restore = await installFetchMock(200, []);
     res = await deliverDueWebhooks();
     restore();
     assert.equal(res.sent, 0);
@@ -202,7 +203,7 @@ test(
     await emitWebhook("ping", projectId, { k: "v", n: 42 });
 
     const calls: FetchCall[] = [];
-    const restore = installFetchMock(200, calls);
+    const restore = await installFetchMock(200, calls);
     await deliverDueWebhooks();
     restore();
 
@@ -221,7 +222,7 @@ test(
     const { run, queryOne } = await import("@/lib/db");
     await run(`DELETE FROM webhook_deliveries`);
     await emitWebhook("ping", projectId, { redirect: true });
-    const r2 = installFetchMock(302, []);
+    const r2 = await installFetchMock(302, []);
     const res = await deliverDueWebhooks();
     r2();
     assert.equal(res.sent, 0);
