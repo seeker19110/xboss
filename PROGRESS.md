@@ -31,6 +31,14 @@ chia đốt, giá đỡ, lỗ chờ, ngắt nét, tag, thống kê) bằng cách
   cho phần web; phần Adapter/Core vẫn theo cổng cũ của plugin (`XBoss.Cad.Tests` + `AcadShim`).
   **CHƯA phát hành rộng** — xếp hàng sau khi trả nợ verify tay các đợt AutoCAD 2026 trước (M111 §C9,
   M114 §C10 đang chặn theo `docs/nang-cap/README.md`) rồi mới tới lượt verify riêng M115 (mục C11).
+- **Nợ kỹ thuật ghi nhận qua review PR3 (không chặn, cân nhắc PR sau):** (1) `HoanThienPipeline.Chay`
+  không có try/catch bao ngoài vòng lặp 8 giai đoạn — lỗi .NET thường (không phải
+  `Autodesk.AutoCAD.Runtime.Exception`) giữa chừng sẽ bung khỏi lệnh, các giai đoạn trước đã
+  `tr.Commit()` không rollback theo (chấp nhận được vì mỗi giai đoạn tự idempotent, nhưng nên báo
+  lỗi rõ ràng hơn là để crash lệnh); (2) 4/8 giai đoạn ủy thác cho lệnh gốc (chia đốt, giá đỡ, ngắt
+  nét, thống kê) dùng cơ chế idempotent riêng theo handle tim, chưa có khái niệm `SuaTay` như 2 giai
+  đoạn do M115 tự sinh (phụ kiện, lỗ chờ) — chạy lại `XBOSS_HOANTHIEN` có thể ghi đè tinh chỉnh tay
+  của kỹ sư ở 4 giai đoạn đó.
 
 > Cập nhật sau mỗi mốc đáng kể. AI đọc file này để biết đang ở đâu.
 >
