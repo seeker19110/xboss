@@ -1519,6 +1519,133 @@
       </StackPanel>
     </DataTemplate>
 
+    <!-- ===== M115 §6 bước 2–4 — hoàn thiện bản vẽ từ tuyến tim ===== -->
+
+    <!-- XBOSS_TUYEN_GAN (FR1): một bộ thuộc tính áp cho toàn bộ tuyến đang chọn. Hệ được điền sẵn
+         theo layerMap nhưng KHÔNG khoá — dòng ghi chú nói rõ đó là gợi ý. Danh sách "còn thiếu"
+         mỗi dòng kèm nút Zoom tới, đúng khuôn XBOSS_VE_REV. -->
+    <DataTemplate DataType="{x:Type vm:TuyenGanDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Hệ" />
+        <ComboBox ItemsSource="{Binding CacHe}" SelectedItem="{Binding He, Mode=TwoWay}"
+                  DisplayMemberPath="Name" />
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaSuyHe}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Loại tuyến" />
+        <ComboBox ItemsSource="{Binding CacLoaiTuyen}" SelectedItem="{Binding Tuyen, Mode=TwoWay}"
+                  DisplayMemberPath="Name" />
+
+        <TextBlock Style="{StaticResource Nhan}"
+                   Text="Cỡ (chọn trong danh mục rule pack, hoặc gõ cỡ khác)" />
+        <ComboBox IsEditable="True" ItemsSource="{Binding CacSize}"
+                  Text="{Binding Size, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Cao độ tim tuyến (mm — nhập tay)" />
+        <TextBox Text="{Binding CaoDo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Kiểu nối (danh mục jointRules của loại tuyến)" />
+        <ComboBox IsEditable="True" ItemsSource="{Binding CacKieuNoi}"
+                  Text="{Binding KieuNoi, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Vật liệu (không bắt buộc)" />
+        <TextBox Text="{Binding VatLieu, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Cách nhiệt (không bắt buộc)" />
+        <TextBox Text="{Binding CachNhiet, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Tuyến còn thiếu thuộc tính bắt buộc" />
+        <TextBlock Foreground="{x:Static wpf:MauBangWpf.Chu}" Text="{Binding TomTat}" TextWrapping="Wrap" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="160" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding CacTuyenThieu}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding Nhan}" TextWrapping="Wrap"
+                               VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Margin="10,0,0,0" Padding="10,2" Content="Zoom tới"
+                            Command="{Binding DataContext.LenhZoom,
+                                      RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding MoTaViecSeLam}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- XBOSS_TUYEN_DOTHI (FR2, AC6): hai danh sách — lỗi chặn/cảnh báo và nút/phụ kiện suy ra.
+         Nút OK (= "Chốt đồ thị") tự mờ khi còn lỗi chặn: khung hộp thoại đã bind IsEnabled vào
+         CoTheOk, mà ViewModel khoá OK đúng bằng điều kiện KetQuaKiemTuyen.Dat — không có cửa sau. -->
+    <DataTemplate DataType="{x:Type vm:TuyenDoThiDialogViewModel}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Nhan}" Text="Lỗi chặn &amp; cảnh báo" />
+        <TextBlock Foreground="{x:Static wpf:MauBangWpf.Chu}" Text="{Binding TomTatLoi}" TextWrapping="Wrap" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding CacLoi}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding Nhan}" TextWrapping="Wrap"
+                               VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Margin="10,0,0,0" Padding="10,2" Content="Zoom tới"
+                            Command="{Binding DataContext.LenhZoomLoi,
+                                      RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+
+        <TextBlock Style="{StaticResource Nhan}" Text="Nút &amp; phụ kiện suy ra (sửa được từng dòng)" />
+        <TextBlock Foreground="{x:Static wpf:MauBangWpf.Chu}" Text="{Binding TomTatNut}" TextWrapping="Wrap" />
+        <Border Style="{StaticResource KhoiChiDoc}">
+          <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding CacNut}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Margin="0,0,0,8">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Grid.Column="0" Text="{Binding Nhan}" TextWrapping="Wrap"
+                                 VerticalAlignment="Center" />
+                      <Button Grid.Column="1" Margin="10,0,0,0" Padding="10,2" Content="Zoom tới"
+                              Command="{Binding DataContext.LenhZoomNut,
+                                        RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                              CommandParameter="{Binding}" />
+                    </Grid>
+                    <ComboBox Margin="0,3,0,0" ItemsSource="{Binding LuaChon}"
+                              SelectedItem="{Binding DangChon, Mode=TwoWay}"
+                              DisplayMemberPath="Nhan" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+
+        <TextBlock Style="{StaticResource GhiChu}" Text="{Binding GhiChu}" />
+      </StackPanel>
+    </DataTemplate>
+
     <!-- XBOSS_VE_REV_HIENTHI: tick revision cần HIỆN (mỗi revision một layer con). -->
     <DataTemplate DataType="{x:Type vm:HienThiRevisionDialogViewModel}">
       <StackPanel>
