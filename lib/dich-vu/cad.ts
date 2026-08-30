@@ -24,12 +24,24 @@ import {
   type UngVienBlock,
   locUngVien,
   nhanLoBlock,
+  tronThuVienBlock,
   TRAN_BLOCK_MOI_LO,
   type NhanLoKetQua,
   type UngVienLo,
 } from "@/lib/ky-thuat/cad/block";
 import { getCurrentRulePack } from "@/lib/ky-thuat/cad/rule-pack";
-import { query, withProjectScope } from "@/lib/db";
+import {
+  dungGraphSchematic,
+  docSizeTuChu,
+  thongKe as thongKeGraph,
+  PHIEN_BAN_GRAPH,
+  type CanhSchematic,
+  type GoiYNoiSchematic,
+  type GraphSchematic,
+  type NutSchematic,
+  type ThieuSot,
+} from "@/lib/ky-thuat/cad/schematic";
+import { insertId, query, queryOne, run, withProjectScope } from "@/lib/db";
 import {
   layMapBoqTheoDuAn,
   danhSachItemBocTach,
@@ -446,6 +458,552 @@ export async function laySnapshotBoqTheoDuAn(projectId: number): Promise<Snapsho
       };
     }),
   };
+}
+
+// ===== cad-schematic =====
+// M117 PR2 — TẦNG 2 (AI ngữ nghĩa) của đường đọc SƠ ĐỒ NGUYÊN LÝ + lớp lưu trữ graph.
+//
+// Ở tầng 5 vì phối hai miền: `ky-thuat/cad` (tầng 1 luật `schematic.ts`, thư viện block, rule pack)
+// với `nen/ai` (cửa duy nhất ra mô hình) và lớp DB. Hợp đồng Y HỆT khối `cad-block-phan-loai`
+// phía trên — cố ý lặp lại từng ràng buộc thay vì "tái dùng cho gọn", vì hai cỗ máy phân loại hai
+// thứ khác nhau nhưng phải chịu CÙNG các hàng rào:
+//   • Tầng 2 CHỈ đụng phần tử `nguon = "chua_quyet"`. AI không bao giờ lật kết quả của luật.
+//   • Giá trị ngoài enum (`LOAI_BLOCK`, hệ trong `drawTools.systems`, mẫu size) ⇒ GIỮ NGUYÊN
+//     `chua_quyet`, không "sửa cho gần đúng" (M117 §6 bước 3 / AC3).
+//   • `aiKhaDung()` false ⇒ bỏ tầng 2 êm, trả lại graph tầng 1 nguyên vẹn, KHÔNG throw (AC2).
+//   • Prompt chỉ mang TỪ VỰNG kỹ thuật (id hệ, loại block, tên block thư viện) và graph đã ẩn
+//     danh (id nút/cạnh, toạ độ) — không tên dự án, không dữ liệu tài chính (AC6).
+//   • AI không sinh hình học: đề xuất nối đầu hở nằm ở `graph.goiYNoi`, KHÔNG tự thêm cạnh.
+
+/** Dưới ngưỡng này thì phần tử do AI điền bị đánh dấu `canNguoiXem` (M117 §6 bước 3). */
+export const NGUONG_CAN_NGUOI_XEM = 0.8;
+
+/** Số phần tử `chua_quyet` gửi trong MỘT lượt gọi — chia mẻ để prompt không phình quá. */
+const MOI_ME_SCHEMATIC = 60;
+
+/** Trần số phần tử `chua_quyet` gửi AI cho MỘT graph — phần dư giữ nguyên `chua_quyet`. */
+export const TRAN_PHAN_TU_MOI_GRAPH = 300;
+
+export type KetQuaTang2Schematic = {
+  graph: GraphSchematic;
+  /** AI có thực sự chạy cho graph này không. */
+  aiDaChay: boolean;
+  /** Lý do AI không chạy, hiện thẳng trên UI (null khi AI có chạy). */
+  lyDoKhongChay: string | null;
+};
+
+const SCHEMA_SCHEMATIC = z.object({
+  nodes: z.array(
+    z.object({
+      id: z.string(),
+      // KHÔNG z.enum: một giá trị lạ sẽ làm hỏng CẢ MẺ. Nhận chuỗi rồi tự kiểm từng dòng để giá
+      // trị lạ chỉ làm hỏng đúng dòng đó (AC3) — y hệt `SCHEMA_DONG` của khối phân loại block.
+      kind: z.string(),
+      systemId: z.string().nullable(),
+      doTinCay: z.number(),
+      lyDo: z.string(),
+    }),
+  ),
+  edges: z.array(
+    z.object({
+      id: z.string(),
+      size: z.string().nullable(),
+      doTinCay: z.number(),
+      lyDo: z.string(),
+    }),
+  ),
+  noi: z.array(
+    z.object({
+      tu: z.string(),
+      den: z.string(),
+      doTinCay: z.number(),
+      lyDo: z.string(),
+    }),
+  ),
+});
+export type TraVeSchematic = z.infer<typeof SCHEMA_SCHEMATIC>;
+
+/**
+ * Phần chỉ dẫn **ổn định** (được prompt-cache) của tầng 2 schematic.
+ *
+ * Dữ liệu gửi ra ngoài (M117 §2d / AC6): chỉ id hệ của rule pack, danh sách loại block hợp lệ và
+ * TÊN BLOCK trong thư viện — không tên dự án, không dữ liệu tài chính, không tệp bản vẽ.
+ */
+export function chiDanSchematic(thuVien: readonly BlockManifestEntry[] = []): string {
+  const pack = getCurrentRulePack();
+  const he = pack.drawTools.systems.map((s) => s.id).join(", ");
+  const mau = thuVien
+    .slice(0, 200)
+    .map((b) => `- ${b.blockName} → ${b.kind}${b.system ? ` · hệ ${b.system}` : ""}`)
+    .join("\n");
+
+  return [
+    "Bạn giúp đọc SƠ ĐỒ NGUYÊN LÝ (schematic) của một dự án cơ điện (MEPF) Việt Nam.",
+    "Máy chủ đã dựng sẵn đồ thị kết nối bằng luật hình học; bạn CHỈ bù những phần luật chưa quyết được.",
+    "",
+    `LOẠI BLOCK hợp lệ (chỉ được chọn trong đây): ${LOAI_BLOCK.join(", ")}.`,
+    `HỆ hợp lệ: ${he}.`,
+    "",
+    "BLOCK ĐÃ CÓ trong thư viện, dùng làm mẫu đối chiếu cách đặt tên của dự án này:",
+    mau || "(thư viện chưa có block nào)",
+    "",
+    "QUY TẮC BẮT BUỘC:",
+    '1. KHÔNG ĐOÁN BỪA. Không đủ căn cứ thì trả kind = "chua_ro" (nút) hoặc size = null (cạnh).',
+    "2. size viết đúng một trong ba dạng: 600x300 (ống chữ nhật), DN100 hoặc Ø32 (ống tròn).",
+    "   Không đổi DN thành Ø hay ngược lại — đó là hai đại lượng khác nhau.",
+    "3. Chỉ đề xuất nối (noi) giữa hai đầu hở CÓ TRONG danh sách gửi kèm; không bịa nút mới,",
+    "   không đổi hai đầu của cạnh đã có, không sinh toạ độ.",
+    "4. doTinCay là con số thật từ 0 đến 1 phản ánh mức chắc chắn của chính bạn.",
+    "5. lyDo viết bằng TIẾNG VIỆT, một câu ngắn, nói rõ căn cứ.",
+  ].join("\n");
+}
+
+/**
+ * Phần **biến thiên** của một mẻ: mô tả các phần tử `chua_quyet` cần bù.
+ *
+ * Thuần và xuất ra để test quét được nội dung thật sự gửi lên mô hình (AC6).
+ */
+export function noiDungSchematic(
+  graph: GraphSchematic,
+  nutIds: readonly string[],
+  canhIds: readonly string[],
+): string {
+  const theoNut = new Map(graph.nodes.map((n) => [n.id, n] as const));
+  const theoCanh = new Map(graph.edges.map((e) => [e.id, e] as const));
+  const dong: string[] = [];
+
+  const nuts = nutIds.map((id) => theoNut.get(id)).filter((n): n is NutSchematic => !!n);
+  if (nuts.length > 0) {
+    dong.push("NÚT chưa quyết được (gán loại block và hệ):");
+    for (const n of nuts) {
+      dong.push(
+        `- ${n.id} · loại nút ${n.loai}` +
+          (n.blockName ? ` · tên khối "${n.blockName}"` : " · không có khối") +
+          (n.tag ? ` · mã hiệu "${n.tag}"` : "") +
+          ` · vị trí (${Math.round(n.x)}, ${Math.round(n.y)})`,
+      );
+    }
+    dong.push("");
+  }
+
+  const canhs = canhIds.map((id) => theoCanh.get(id)).filter((e): e is CanhSchematic => !!e);
+  const canhThieuSize = canhs.filter((e) => e.thieu.includes("size"));
+  if (canhThieuSize.length > 0) {
+    dong.push("CẠNH chưa đọc được kích thước (điền size, không chắc thì null):");
+    for (const e of canhThieuSize) {
+      dong.push(`- ${e.id} · nối ${e.from} ↔ ${e.to} · dài ${Math.round(doDaiCanh(e))} đơn vị vẽ`);
+    }
+    dong.push("");
+  }
+
+  const dauHo = nuts.filter((n) => n.loai === "dau_ho");
+  if (dauHo.length > 1) {
+    dong.push("ĐẦU HỞ (nhánh vẽ đứt) — đề xuất cặp nên nối với nhau, không chắc thì bỏ trống:");
+    for (const n of dauHo) dong.push(`- ${n.id} · vị trí (${Math.round(n.x)}, ${Math.round(n.y)})`);
+  }
+  return dong.join("\n").trim();
+}
+
+function doDaiCanh(e: CanhSchematic): number {
+  let d = 0;
+  for (let i = 0; i + 1 < e.diem.length; i++) {
+    d += Math.hypot(e.diem[i + 1][0] - e.diem[i][0], e.diem[i + 1][1] - e.diem[i][1]);
+  }
+  return d;
+}
+
+function kep(x: number): number {
+  return Math.min(1, Math.max(0, Number.isFinite(x) ? x : 0));
+}
+
+/**
+ * Hàng rào DUY NHẤT giữa đầu ra mô hình và graph sẽ ghi xuống DB — mọi giá trị đều kiểm lại ở đây.
+ *
+ * Sửa graph TẠI CHỖ, trả về số phần tử thực sự được điền. Chỉ đụng phần tử có `nguon="chua_quyet"`
+ * và nằm trong mẻ (`nutIds`/`canhIds`) — dòng mô hình trả thừa/bịa id đều bị bỏ qua.
+ */
+export function apKetQuaSchematic(
+  graph: GraphSchematic,
+  traVe: TraVeSchematic,
+  nutIds: readonly string[],
+  canhIds: readonly string[],
+): number {
+  const pack = getCurrentRulePack();
+  const heHopLe = new Set(pack.drawTools.systems.map((s) => s.id));
+  const trongMeNut = new Set(nutIds);
+  const trongMeCanh = new Set(canhIds);
+  const theoNut = new Map(graph.nodes.map((n) => [n.id, n] as const));
+  const theoCanh = new Map(graph.edges.map((e) => [e.id, e] as const));
+  let daDien = 0;
+
+  for (const d of traVe.nodes) {
+    const n = theoNut.get(d.id);
+    // AI chỉ được điền phần chưa quyết của chính mẻ này — không lật `luat` (M117 §6 bước 3).
+    if (!n || !trongMeNut.has(d.id) || n.nguon !== "chua_quyet") continue;
+    if (d.kind === "chua_ro") continue;
+    if (!(LOAI_BLOCK as readonly string[]).includes(d.kind)) continue; // ngoài enum ⇒ giữ chua_quyet
+    const doTinCay = kep(d.doTinCay);
+    n.kind = d.kind as LoaiBlock;
+    n.systemId = d.systemId && heHopLe.has(d.systemId) ? d.systemId : n.systemId;
+    n.nguon = "ngu_nghia";
+    n.doTinCay = doTinCay;
+    n.canNguoiXem = doTinCay < NGUONG_CAN_NGUOI_XEM;
+    n.lyDo = d.lyDo || "AI gán loại block cho nút này.";
+    daDien++;
+  }
+
+  for (const d of traVe.edges) {
+    const e = theoCanh.get(d.id);
+    if (!e || !trongMeCanh.has(d.id) || e.nguon !== "chua_quyet") continue;
+    if (!e.thieu.includes("size")) continue;
+    // Size phải đúng mẫu đã chuẩn hoá của tầng 1 — chuỗi lạ ("to", "ống chính") bị loại thẳng.
+    const size = d.size ? docSizeTuChu(d.size) : null;
+    if (!size) continue;
+    const doTinCay = kep(d.doTinCay);
+    e.size = size;
+    e.thieu = e.thieu.filter((t) => t !== "size");
+    // Còn thiếu mối nối thì cạnh vẫn `chua_quyet` — điền được một phần không phải là quyết xong.
+    e.nguon = e.thieu.length === 0 ? "ngu_nghia" : "chua_quyet";
+    e.doTinCay = doTinCay;
+    e.canNguoiXem = doTinCay < NGUONG_CAN_NGUOI_XEM;
+    e.lyDo = `${e.lyDo} AI đọc kích thước "${size}": ${d.lyDo}`.trim();
+    daDien++;
+  }
+
+  const goiY: GoiYNoiSchematic[] = graph.goiYNoi ?? [];
+  const daCo = new Set(goiY.map((g) => `${g.tu}|${g.den}`));
+  for (const d of traVe.noi) {
+    const a = theoNut.get(d.tu);
+    const b = theoNut.get(d.den);
+    // Chỉ nhận đề xuất giữa hai ĐẦU HỞ có thật trong mẻ — AI không được nối bừa vào nút đã chắc.
+    if (!a || !b || a.id === b.id) continue;
+    if (a.loai !== "dau_ho" || b.loai !== "dau_ho") continue;
+    if (!trongMeNut.has(a.id) || !trongMeNut.has(b.id)) continue;
+    const khoa = `${a.id}|${b.id}`;
+    if (daCo.has(khoa) || daCo.has(`${b.id}|${a.id}`)) continue;
+    daCo.add(khoa);
+    goiY.push({ tu: a.id, den: b.id, doTinCay: kep(d.doTinCay), lyDo: d.lyDo });
+    daDien++;
+  }
+  if (goiY.length > 0) graph.goiYNoi = goiY;
+
+  graph.thongKe = thongKeGraph(graph.nodes, graph.edges);
+  return daDien;
+}
+
+/**
+ * TẦNG 2 — bù phần `chua_quyet` của graph bằng AI, theo mẻ.
+ *
+ * Thiếu khoá AI / bị tắt / mô hình lỗi ⇒ trả graph tầng 1 nguyên vẹn, không ném lỗi (AC2).
+ */
+export async function chayTang2Schematic(
+  graph: GraphSchematic,
+  thuVien: readonly BlockManifestEntry[] = [],
+): Promise<KetQuaTang2Schematic> {
+  if (!aiKhaDung()) return { graph, aiDaChay: false, lyDoKhongChay: lyDoAiTat() };
+
+  const nutChuaQuyet = graph.nodes.filter((n) => n.nguon === "chua_quyet").map((n) => n.id);
+  const canhChuaQuyet = graph.edges
+    .filter((e) => e.nguon === "chua_quyet" && e.thieu.includes("size"))
+    .map((e) => e.id);
+  if (nutChuaQuyet.length === 0 && canhChuaQuyet.length === 0) {
+    return {
+      graph,
+      aiDaChay: false,
+      lyDoKhongChay: "Luật tất định đã dựng đủ, không cần gọi AI.",
+    };
+  }
+
+  // Trần theo graph: không im lặng cắt bớt — phần dư được nói ra trong `canhBao`.
+  const phanTu = [
+    ...nutChuaQuyet.map((id) => ({ loai: "nut" as const, id })),
+    ...canhChuaQuyet.map((id) => ({ loai: "canh" as const, id })),
+  ];
+  const dungTran = phanTu.slice(0, TRAN_PHAN_TU_MOI_GRAPH);
+  if (phanTu.length > dungTran.length) {
+    graph.canhBao.push(
+      `Graph có ${phanTu.length} phần tử chưa quyết, vượt trần ${TRAN_PHAN_TU_MOI_GRAPH} phần tử ` +
+        `gửi AI — ${phanTu.length - dungTran.length} phần tử còn lại giữ nguyên chờ người duyệt.`,
+    );
+  }
+
+  const chiDan = chiDanSchematic(thuVien);
+  let daGoi = false;
+  for (let d = 0; d < dungTran.length; d += MOI_ME_SCHEMATIC) {
+    const me = dungTran.slice(d, d + MOI_ME_SCHEMATIC);
+    const nutIds = me.filter((p) => p.loai === "nut").map((p) => p.id);
+    const canhIds = me.filter((p) => p.loai === "canh").map((p) => p.id);
+    const kq = await hoiCoCauTruc({
+      nhan: "schematic-ngu-nghia",
+      chiDanOnDinh: chiDan,
+      noiDungBienThien: noiDungSchematic(graph, nutIds, canhIds),
+      schema: SCHEMA_SCHEMATIC,
+    });
+    if (!kq) continue;
+    daGoi = true;
+    apKetQuaSchematic(graph, kq, nutIds, canhIds);
+  }
+
+  return {
+    graph,
+    aiDaChay: daGoi,
+    lyDoKhongChay: daGoi ? null : "Gọi AI không thành công — giữ kết quả của luật tất định.",
+  };
+}
+
+// ── Lớp lưu trữ graph (bảng `cad_schematic_graphs`, migration 0146) ──────────
+
+export type BanGhiSchematic = {
+  id: number;
+  projectId: number;
+  systemId: string;
+  filePath: string;
+  graph: GraphSchematic;
+  trangThai: "nhap" | "da_duyet";
+  duyetBoi: number | null;
+  duyetLuc: string | null;
+  createdBy: number;
+  createdAt: string;
+};
+
+/** Hệ hợp lệ = `drawTools.systems[].id` của rule pack đang phát hành (không FK được — §9). */
+export function heSchematicHopLe(systemId: unknown): systemId is string {
+  return (
+    typeof systemId === "string" &&
+    getCurrentRulePack().drawTools.systems.some((s) => s.id === systemId)
+  );
+}
+
+/**
+ * Thư viện block hiện hành đã TRỘN bộ toàn cục với bộ của dự án — đúng ba dòng mà route
+ * `/api/engineering/cad/block-lib` đang dùng (M113 §4), để tầng 1 đối chiếu tên khối.
+ */
+async function thuVienChoDuAn(projectId: number): Promise<BlockManifestEntry[]> {
+  const toanCuc = await layBlockLibHienHanh();
+  const cuaDuAn = await withProjectScope(projectId, () => layBlockLibHienHanh(projectId));
+  return tronThuVienBlock(toanCuc, cuaDuAn);
+}
+
+/**
+ * Đọc một tệp DXF schematic thành graph rồi GHI vào `cad_schematic_graphs` ở trạng thái `nhap`.
+ *
+ * Tầng 1 (luật) luôn chạy; tầng 2 (AI) chỉ chạy khi `aiKhaDung()` — tắt AI thì vẫn ra bản ghi đầy
+ * đủ, chỉ nhiều `chua_quyet` hơn (AC2). Không có HTTP nào ở đây: route chỉ đưa tệp vào rồi bọc lại.
+ */
+export async function taoGraphSchematic(input: {
+  projectId: number;
+  userId: number;
+  systemId: string;
+  filePath: string;
+  dxf: string | Buffer;
+}): Promise<{
+  id: number;
+  graph: GraphSchematic;
+  aiDaChay: boolean;
+  lyDoAiKhongChay: string | null;
+}> {
+  const thuVien = await thuVienChoDuAn(input.projectId);
+  const graphLuat = dungGraphSchematic(input.dxf, thuVien);
+  const { graph, aiDaChay, lyDoKhongChay } = await chayTang2Schematic(graphLuat, thuVien);
+
+  const id = await withProjectScope(
+    input.projectId,
+    () =>
+      insertId(
+        `INSERT INTO cad_schematic_graphs (project_id, system_id, file_path, graph, created_by)
+       VALUES (?, ?, ?, ?::jsonb, ?)`,
+        input.projectId,
+        input.systemId,
+        input.filePath,
+        JSON.stringify(graph),
+        input.userId,
+      ),
+    { readOnly: false },
+  );
+  return { id, graph, aiDaChay, lyDoAiKhongChay: lyDoKhongChay };
+}
+
+const COT_SCHEMATIC = `id, project_id AS "projectId", system_id AS "systemId", file_path AS "filePath",
+        graph, trang_thai AS "trangThai", duyet_boi AS "duyetBoi", duyet_luc AS "duyetLuc",
+        created_by AS "createdBy", created_at AS "createdAt"`;
+
+export async function layGraphSchematic(
+  projectId: number,
+  id: number,
+): Promise<BanGhiSchematic | null> {
+  const row = await withProjectScope(projectId, () =>
+    queryOne<BanGhiSchematic>(
+      `SELECT ${COT_SCHEMATIC} FROM cad_schematic_graphs WHERE id = ? AND project_id = ?`,
+      id,
+      projectId,
+    ),
+  );
+  return row ?? null;
+}
+
+// ── Sửa/duyệt graph (PATCH) ─────────────────────────────────────────────────
+
+export type SuaNut = {
+  id: string;
+  kind?: LoaiBlock | null;
+  systemId?: string | null;
+  tag?: string | null;
+};
+export type SuaCanh = { id: string; size?: string | null };
+export type SuaGraph = { nodes: SuaNut[]; edges: SuaCanh[] };
+
+/**
+ * Đọc phần `sua` của body PATCH — hàng rào ở CỬA, để giá trị lạ không bao giờ chạm cột `graph`.
+ * Trả `{ loi }` thay vì ném lỗi (cùng khuôn `docSuaDong` của khối nạp lô block).
+ */
+export function docSuaGraph(body: unknown): { sua: SuaGraph } | { loi: string } {
+  if (body === undefined || body === null) return { sua: { nodes: [], edges: [] } };
+  if (typeof body !== "object") return { loi: "Trường sua phải là một đối tượng" };
+  const b = body as { nodes?: unknown; edges?: unknown };
+  if (b.nodes !== undefined && !Array.isArray(b.nodes)) return { loi: "sua.nodes phải là mảng" };
+  if (b.edges !== undefined && !Array.isArray(b.edges)) return { loi: "sua.edges phải là mảng" };
+
+  const heHopLe = new Set(getCurrentRulePack().drawTools.systems.map((s) => s.id));
+  const nodes: SuaNut[] = [];
+  for (const dong of (b.nodes ?? []) as unknown[]) {
+    if (!dong || typeof dong !== "object") return { loi: "Mỗi dòng sua.nodes phải là đối tượng" };
+    const d = dong as Record<string, unknown>;
+    if (typeof d.id !== "string" || !d.id) return { loi: "sua.nodes thiếu id nút" };
+    const ra: SuaNut = { id: d.id };
+    if (d.kind !== undefined) {
+      if (d.kind !== null && !(LOAI_BLOCK as readonly string[]).includes(String(d.kind))) {
+        return { loi: `Loại block không hợp lệ: ${String(d.kind)}` };
+      }
+      ra.kind = d.kind === null ? null : (String(d.kind) as LoaiBlock);
+    }
+    if (d.systemId !== undefined) {
+      if (d.systemId !== null && !heHopLe.has(String(d.systemId))) {
+        return { loi: `Hệ không có trong rule pack: ${String(d.systemId)}` };
+      }
+      ra.systemId = d.systemId === null ? null : String(d.systemId);
+    }
+    if (d.tag !== undefined) {
+      if (d.tag !== null && typeof d.tag !== "string")
+        return { loi: "tag phải là chuỗi hoặc null" };
+      ra.tag = d.tag === null ? null : String(d.tag).trim().slice(0, 64);
+    }
+    nodes.push(ra);
+  }
+
+  const edges: SuaCanh[] = [];
+  for (const dong of (b.edges ?? []) as unknown[]) {
+    if (!dong || typeof dong !== "object") return { loi: "Mỗi dòng sua.edges phải là đối tượng" };
+    const d = dong as Record<string, unknown>;
+    if (typeof d.id !== "string" || !d.id) return { loi: "sua.edges thiếu id cạnh" };
+    const ra: SuaCanh = { id: d.id };
+    if (d.size !== undefined) {
+      if (d.size === null) ra.size = null;
+      else {
+        // Người sửa cũng đi qua đúng bộ chuẩn hoá của tầng 1 — không để hai nguồn size lệch mẫu.
+        const size = docSizeTuChu(String(d.size));
+        if (!size)
+          return { loi: `Kích thước không đúng mẫu (600x300 / DN100 / Ø32): ${String(d.size)}` };
+        ra.size = size;
+      }
+    }
+    edges.push(ra);
+  }
+  return { sua: { nodes, edges } };
+}
+
+/**
+ * Áp phần sửa của NGƯỜI vào graph (tại chỗ), trả số phần tử đã đổi.
+ *
+ * Người sửa đè lên mọi nguồn (kể cả `luat`) — đó là chốt duyệt cuối của M117 §6 bước 4; phần tử
+ * được đánh `nguon="nguoi_sua"`, bỏ `doTinCay`/`canNguoiXem` vì không còn là phỏng đoán của máy.
+ */
+export function apSuaGraph(graph: GraphSchematic, sua: SuaGraph): number {
+  const theoNut = new Map(graph.nodes.map((n) => [n.id, n] as const));
+  const theoCanh = new Map(graph.edges.map((e) => [e.id, e] as const));
+  let doi = 0;
+
+  for (const s of sua.nodes) {
+    const n = theoNut.get(s.id);
+    if (!n) continue;
+    if (s.kind !== undefined) n.kind = s.kind;
+    if (s.systemId !== undefined) n.systemId = s.systemId;
+    if (s.tag !== undefined) n.tag = s.tag;
+    n.nguon = "nguoi_sua";
+    n.doTinCay = null;
+    n.canNguoiXem = false;
+    n.lyDo = "Người duyệt sửa tay trên màn duyệt graph.";
+    doi++;
+  }
+  for (const s of sua.edges) {
+    const e = theoCanh.get(s.id);
+    if (!e) continue;
+    if (s.size !== undefined) {
+      e.size = s.size;
+      e.thieu = s.size
+        ? e.thieu.filter((t) => t !== "size")
+        : [...new Set<ThieuSot>([...e.thieu, "size"])];
+    }
+    e.nguon = "nguoi_sua";
+    e.doTinCay = null;
+    e.canNguoiXem = false;
+    e.lyDo = "Người duyệt sửa tay trên màn duyệt graph.";
+    doi++;
+  }
+  graph.thongKe = thongKeGraph(graph.nodes, graph.edges);
+  return doi;
+}
+
+export type KetQuaSuaSchematic =
+  | { status: "ok"; ban: BanGhiSchematic; soPhanTuDoi: number }
+  | { status: "not-found" }
+  | { status: "da-duyet" };
+
+/**
+ * Sửa và/hoặc duyệt một graph.
+ *
+ * Đã `da_duyet` thì KHOÁ: không sửa, không duyệt lại — graph đã chốt là nguồn sinh tuyến của
+ * plugin (M117 §6 bước 5), đổi sau lưng plugin là đúng lớp lỗi "dữ liệu đổi mà không ai biết".
+ * Audit đi qua cơ chế hiện hành: trigger `audit_row_change` gắn ở migration 0147 ghi cặp cũ→mới
+ * của chính UPDATE này vào `audit_log` (actor lấy từ `SET LOCAL app.user_id` của `lib/db`).
+ */
+export async function suaGraphSchematic(input: {
+  projectId: number;
+  id: number;
+  userId: number;
+  sua: SuaGraph;
+  duyet: boolean;
+}): Promise<KetQuaSuaSchematic> {
+  const ban = await layGraphSchematic(input.projectId, input.id);
+  if (!ban) return { status: "not-found" };
+  if (ban.trangThai === "da_duyet") return { status: "da-duyet" };
+
+  const graph: GraphSchematic = ban.graph;
+  if (graph.version !== PHIEN_BAN_GRAPH) return { status: "not-found" };
+  const soPhanTuDoi = apSuaGraph(graph, input.sua);
+
+  await withProjectScope(
+    input.projectId,
+    () =>
+      run(
+        `UPDATE cad_schematic_graphs
+          SET graph = ?::jsonb,
+              trang_thai = CASE WHEN ? THEN 'da_duyet' ELSE trang_thai END,
+              duyet_boi = CASE WHEN ? THEN ? ELSE duyet_boi END,
+              duyet_luc = CASE WHEN ? THEN now() ELSE duyet_luc END
+        WHERE id = ? AND project_id = ?`,
+        JSON.stringify(graph),
+        input.duyet,
+        input.duyet,
+        input.userId,
+        input.duyet,
+        input.id,
+        input.projectId,
+      ),
+    { readOnly: false },
+  );
+
+  const moi = await layGraphSchematic(input.projectId, input.id);
+  return moi ? { status: "ok", ban: moi, soPhanTuDoi } : { status: "not-found" };
 }
 
 // ===== cad-goi-y-anh-xa.ts =====

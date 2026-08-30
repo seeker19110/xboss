@@ -61,6 +61,11 @@ export type NutSchematic = {
   doTinCay: number | null;
   /** Một dòng tiếng Việt giải thích vì sao — hiện thẳng trên bảng duyệt, không phải log. */
   lyDo: string;
+  /**
+   * TUỲ CHỌN (M117 §6 bước 3, thêm ở PR2 — không phá hình dạng version 1): AI có điền nút này với
+   * `doTinCay` dưới ngưỡng không. `true` ⇒ màn duyệt phải bắt người xem lại, không tick sẵn.
+   */
+  canNguoiXem?: boolean;
 };
 
 export type CanhSchematic = {
@@ -75,6 +80,19 @@ export type CanhSchematic = {
   thieu: ThieuSot[];
   /** Đường gấp khúc thật của cạnh trên schematic — vẽ SVG (PR3) và đo khoảng cách tới chữ. */
   diem: Array<[number, number]>;
+  lyDo: string;
+  /** TUỲ CHỌN (PR2): AI điền với độ tin cậy dưới ngưỡng ⇒ cần người xem lại. */
+  canNguoiXem?: boolean;
+};
+
+/**
+ * TUỲ CHỌN (PR2, M117 §6 bước 3): đề xuất NỐI hai đầu hở do AI đưa ra. Cố ý KHÔNG sinh cạnh mới:
+ * AI không được vẽ hình học — người duyệt xem đề xuất rồi tự chấp nhận ở màn duyệt (PR3).
+ */
+export type GoiYNoiSchematic = {
+  tu: string;
+  den: string;
+  doTinCay: number;
   lyDo: string;
 };
 
@@ -96,6 +114,8 @@ export type GraphSchematic = {
   thongKe: ThongKeGraph;
   /** Ghi chú tiếng Việt về những gì tầng 1 cố ý bỏ qua — hiện cho người duyệt, không nuốt im lặng. */
   canhBao: string[];
+  /** TUỲ CHỌN (PR2): đề xuất nối đầu hở của tầng 2 — chưa phải cạnh, chờ người duyệt. */
+  goiYNoi?: GoiYNoiSchematic[];
 };
 
 // ── Tham số heuristic (tham số hoá theo yêu cầu M117 PR1) ────────────────────────────────────
