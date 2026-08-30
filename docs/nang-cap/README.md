@@ -336,14 +336,15 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > cảnh báo. 3 PR (`standard`/`spec`/`standard`), không migration, không khoá rule pack mới, không
 > đổi hành vi lệnh lẻ chạy tay; verify tay mục **C12** nối sau C9/C10/C11. Độc lập với M116/M117.
 
-> **`M119-thiet-ke-lai-giao-dien-plugin.md`** — ✅ **CODE XONG 2026-08-30** (nhánh
+> **`M119-thiet-ke-lai-giao-dien-plugin.md`** — ✅ **ĐÃ MERGE `main` 2026-08-30** (PR #448, nhánh
 > `claude/autocad-plugin-redesign-hfsc11`). Lượt thiết kế đầu tiên cho **lớp vẽ** của plugin sau
 > khi giao diện lớn dần qua M99→M118: bộ thành phần WinForms dùng chung mới (`Ui/ThanhPhan.cs`),
 > hai tab bảng XBoss vẽ lại theo **thẻ** kèm chip trạng thái, nút "Làm mới" ra thanh **dính đầu
 > tab**, nút phẳng khai đủ màu rê/nhấn (ADR-0010 — lỗi mảng sáng của `FlatStyle.Flat` còn sót ở
 > WinForms sau khi M106 PR4 đã sửa cho WPF), hộp thoại lệnh có dải tiêu đề + ký hiệu ⛔/⚠/✓ trong
 > vùng thông điệp. **Không đụng `XBoss.Cad.Core`** (1367 test giữ nguyên), không đổi nghiệp vụ/API.
-> Verify tay mục **C13** nối sau C12.
+> Verify tay mục **C15** trong `VERIFY-VA-PHAT-HANH.md`, xếp SAU C9–C14 (C13/C14 đã dùng cho M117/M118).
+> **Đã merge PR #448 vào `main` 2026-08-30** (commit `bf7763f`).
 
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 

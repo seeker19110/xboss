@@ -73,10 +73,14 @@ internal static class VeThucThe
                 return [new Diem2(l.StartPoint.X, l.StartPoint.Y), new Diem2(l.EndPoint.X, l.EndPoint.Y)];
             case MText t:
                 return [new Diem2(t.Location.X, t.Location.Y)];
-            case BlockReference br:
-                return [new Diem2(br.Position.X, br.Position.Y)];
+            // Table PHẢI đứng TRƯỚC BlockReference: AcDbTable kế thừa AcDbBlockReference (bảng là
+            // một khối chèn đặc biệt mang định dạng), nên nhánh con phải khớp trước nhánh cha —
+            // đảo thứ tự là CS8120 "case unreachable" thật trên máy có AutoCAD (không lộ qua cổng
+            // CI cũ vì stub từng khai hai lớp là anh em, xem ghi chú tại AcadStub.cs).
             case Table tb:
                 return [new Diem2(tb.Position.X, tb.Position.Y)];
+            case BlockReference br:
+                return [new Diem2(br.Position.X, br.Position.Y)];
             case Polyline pl:
                 return DinhCua(pl).Select(d => new Diem2(d.X, d.Y)).ToList();
             default:

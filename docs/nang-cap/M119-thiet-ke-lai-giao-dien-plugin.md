@@ -1,7 +1,8 @@
 # M119 — Thiết kế lại giao diện plugin AutoCAD
 
-**Trạng thái:** ✅ CODE XONG (2026-08-30). Chỉ chạm lớp VẼ của plugin; không đổi nghiệp vụ, không
-đổi API, không đổi lệnh nào.
+**Trạng thái:** ✅ ĐÃ MERGE `main` (2026-08-30, PR #448, squash, commit `bf7763f`). Chỉ chạm lớp
+VẼ của plugin; không đổi nghiệp vụ, không đổi API, không đổi lệnh nào. Còn nợ verify tay mục
+**C15** trong `VERIFY-VA-PHAT-HANH.md` (xếp SAU C9-C14).
 
 ## 1. Vì sao
 
