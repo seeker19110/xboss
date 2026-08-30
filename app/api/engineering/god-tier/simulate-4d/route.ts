@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { calculateGodTier4DSimulation, GodTierElementData } from "@/lib/engineering-god-tier";
+import { todayISO } from "@/lib/nen/date";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import {
+  calculateGodTier4DSimulation,
+  GodTierElementData,
+} from "@/lib/ky-thuat/engineering-god-tier";
 
 export const dynamic = "force-dynamic";
 
@@ -11,14 +16,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
 
+  if (!CAN.manageEngineeringGodTier(user.role)) {
+    return NextResponse.json(
+      { error: "Không có quyền thao tác mô phỏng 4D God-Tier" },
+      { status: 403 },
+    );
+  }
+
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-god-tier-studio", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }
 
   try {
     const body = await req.json();
-    const targetDate = body.targetDate || new Date().toISOString().split("T")[0];
+    const targetDate = body.targetDate || todayISO();
 
     const elements: GodTierElementData[] = Array.isArray(body.elements) ? body.elements : [];
     if (elements.length === 0) {

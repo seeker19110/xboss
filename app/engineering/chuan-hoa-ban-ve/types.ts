@@ -1,4 +1,4 @@
-import type { DxfLayerInfo } from "@/lib/cad/dxf-parser";
+import type { DxfLayerInfo } from "@/lib/ky-thuat/cad/dxf-parser";
 
 // ── Kiểu dữ liệu dùng chung giữa trang chuẩn hóa bản vẽ và các panel con ──
 
@@ -68,11 +68,9 @@ export type SourceMode = "design" | "upload" | "folder";
 
 export type FolderFilter = "all" | "cad" | "xref" | "ctb";
 
-export type Step1SubTab = "diagnostic_purge" | "layers_font" | "boq_dim_ctb" | "xref_diff_lisp";
+export type Step1SubTab = "diagnostic_purge" | "layers_font" | "boq_dim_ctb" | "xref_diff";
 
 export type Cad2dApprovalStatus = "in_progress" | "pending_approval" | "approved" | "rejected";
-
-export type LispTemplateType = "hanger" | "sleeve" | "duct_transition";
 
 // ── Thông tin chuyển đổi tệp tải lên sang .DXF ──
 
@@ -191,6 +189,37 @@ export interface FontSnippet {
 }
 
 // ── Bộ nạp/parse bản vẽ dùng chung ──
+
+// ── Đề xuất block vào thư viện từ AutoCAD (M103 — hàng chờ + duyệt) ──
+
+export type BlockProposalKind = "fitting" | "equipment" | "titleblock" | "support" | "sleeve";
+
+export type BlockProposalStatus = "pending" | "approved" | "rejected" | "stale" | "withdrawn";
+
+export interface BlockProposal {
+  id: number;
+  blockName: string;
+  kind: BlockProposalKind;
+  kindNhan: string;
+  systemId: string | null;
+  takeoffItemId: string | null;
+  paperSize: string | null;
+  note: string | null;
+  baseLibVersion: string;
+  previewSvg: string | null;
+  /** sha256 (64 hex) của tệp .dwg ứng viên — người duyệt đối chiếu với tệp tải qua route candidate. */
+  dwgSha256: string;
+  status: BlockProposalStatus;
+  statusNhan: string;
+  rejectReason: string | null;
+  publishedVersion: string | null;
+  nguoiDeXuat: string;
+  /** id người gửi đề xuất — để panel biết đề xuất nào là của chính mình (server vẫn kiểm lại). */
+  nguoiDeXuatId?: number;
+  nguoiQuyetDinh: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+}
 
 export interface RunDxfAnalysisOptions {
   drawingId?: number | null;

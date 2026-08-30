@@ -1,11 +1,11 @@
 // app/api/engineering/zero-error/challenge/route.ts — Dynamic Challenge Code API
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   generateFieldDynamicChallenge,
   verifyFieldProofChallenge,
-} from "@/lib/engineering-zero-error-tracker";
+} from "@/lib/ky-thuat/engineering-zero-error-tracker";
 
 export const dynamic = "force-dynamic";
 

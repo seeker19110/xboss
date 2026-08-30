@@ -17,7 +17,7 @@ Biến môi trường:
   ANTHROPIC_API_KEY     — API key Anthropic Claude (tuỳ chọn)
   OPENAI_API_KEY        — API key OpenAI (tuỳ chọn)
   MEPF_AGENT_SRC        — Đường dẫn thư mục src của MEPF-Agents
-                          (mặc định: /app/mepf-agent/src — khớp Dockerfile.mepf-worker)
+                          (mặc định: <repo>/mepf-worker/src — suy từ vị trí file này)
 """
 
 from __future__ import annotations
@@ -46,9 +46,15 @@ POLL_INTERVAL: float = float(os.environ.get("MEPF_POLL_INTERVAL", "3"))
 LEASE_MINUTES: int = int(os.environ.get("MEPF_LEASE_MINUTES", "10"))
 HEARTBEAT_INTERVAL: float = float(os.environ.get("MEPF_HEARTBEAT_INTERVAL", "30"))
 
-# Thư mục src của MEPF-Agents (gộp phẳng vào repo tại `mepf-worker/`, Dockerfile COPY sang
-# /app/mepf-agent/).
-AGENT_SRC: str = os.environ.get("MEPF_AGENT_SRC", "/app/mepf-agent/src")
+# Thư mục src của MEPF-Agents (gộp phẳng vào repo tại `mepf-worker/`).
+# Mặc định suy từ chính vị trí file này: scripts/mepf/worker_entry.py → <repo>/mepf-worker/src.
+# Trước đây mặc định là đường dẫn trong container (/app/mepf-agent/src) — XBoss nay chạy thẳng
+# bằng PM2 chứ không đóng gói Docker nữa (xem ecosystem.config.js), nên mặc định theo container
+# sẽ luôn trỏ vào thư mục không tồn tại và worker âm thầm rơi về dry-run.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+AGENT_SRC: str = os.environ.get(
+    "MEPF_AGENT_SRC", os.path.join(_REPO_ROOT, "mepf-worker", "src")
+)
 # Thư mục CHA của src — bắt buộc phải có trên sys.path: các module MEPF-Agents tự import
 # lẫn nhau bằng tiền tố gói `src.` (vd `agents.py`: `from src.state import ...`), chỉ phân
 # giải được khi thư mục cha nằm trên path (`src` là namespace package, không có __init__.py).
@@ -75,6 +81,7 @@ SUPPORTED_TASK_TYPES = [
     "mepf.hvac.calc",
     "mepf.cad.analyze",
     "mepf.cad.export_r2000",
+    "mepf.cad.health_check",
     "mepf.bim.clash.detect",
     "mepf.qs.takeoff",
     "mepf.ff.hydraulics",
@@ -355,6 +362,27 @@ def _run_cad_export_r2000(task: dict, report: Callable[[float], None]) -> dict:
         return _dry_run_handler(task, report)
 
 
+def _run_cad_health_check(task: dict, report: Callable[[float], None]) -> dict:
+    """Handler chẩn đoán sức khỏe 6D bản vẽ DXF bằng ezdxf (xác thực điểm số client)."""
+    try:
+        _ensure_agent_src_on_path()
+        from cad_health_check import compute_cad_health  # type: ignore
+        payload = task.get("payload", {})
+        report(10.0)
+
+        dxf_path = payload.get("filePath") or payload.get("dxf_path")
+        if not dxf_path:
+            return {"error": "Thiếu filePath trong payload"}
+
+        result = compute_cad_health(dxf_path)
+        report(90.0)
+
+        return {**result, "worker_id": WORKER_ID}
+    except ImportError:
+        log.warning("MEPF-Agents cad_health_check chưa cài — chạy dry_run.")
+        return _dry_run_handler(task, report)
+
+
 def _run_bim_clash(task: dict, report: Callable[[float], None]) -> dict:
     """Handler kiểm tra xung đột BIM/IFC."""
     try:
@@ -488,6 +516,7 @@ TASK_HANDLERS: dict[str, Callable[[dict, Callable[[float], None]], dict]] = {
     "mepf.hvac.calc": _run_hvac_calc,
     "mepf.cad.analyze": _run_cad_analyze,
     "mepf.cad.export_r2000": _run_cad_export_r2000,
+    "mepf.cad.health_check": _run_cad_health_check,
     "mepf.bim.clash.detect": _run_bim_clash,
     "mepf.qs.takeoff": _run_qs_takeoff,
     "mepf.ff.hydraulics": _run_ff_hydraulics,

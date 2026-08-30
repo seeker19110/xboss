@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { query } from "@/lib/db";
+import { taoHoSoThauPhu } from "@/lib/hien-truong/subcon-metrics";
 import {
   computeSubcontractorTrustScore,
   SubconProfile,
   SubconEvaluationResult,
-} from "@/lib/engineering-subcon-ai";
+} from "@/lib/ky-thuat/engineering-subcon-ai";
 
 export const dynamic = "force-dynamic";
 
@@ -18,82 +20,18 @@ export async function GET(req: Request) {
   }
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-subcon-ai", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }
 
   try {
-    // 1. Kiểm tra và auto-seed 4 hồ sơ thầu phụ mẫu nếu chưa có
-    const existing = await query(
-      `SELECT COUNT(*)::int as count FROM engineering_subcon_profiles WHERE project_id = $1`,
-      [projectId],
-    );
-
-    if (existing[0]?.count === 0) {
-      await query(
-        `INSERT INTO engineering_subcon_profiles (project_id, company_name, tax_code, primary_discipline, specialties, workforce_capacity, equipment_assets, certifications)
-         VALUES 
-         ($1, 'Công ty CP Cơ Điện Lạnh Hưng Phát', '0312345678', 'HVAC', '["Chiller", "VRV/VRF", "Ống gió kháng cháy"]'::jsonb, 45, '["Máy loe ống", "Máy lốc ống tròn", "Đồng hồ đo gió"]'::jsonb, '["ISO 9001:2015", "Chứng chỉ năng lực Hạng 1"]'::jsonb),
-         ($1, 'Công ty TNHH Kỹ Thuật Điện Quang Minh', '0319876543', 'ELECTRICAL', '["Trạm biến áp 22kV", "Tủ MSB", "Busway"]'::jsonb, 30, '["Máy ép cốt thủy lực", "Thiết bị đo Megomet"]'::jsonb, '["Chứng chỉ xây dựng Hạng 2"]'::jsonb),
-         ($1, 'Công ty CP PCCC & Cấp Thoát Nước Thăng Long', '0105678901', 'FIRE_FIGHTING', '["Hệ thống Sprinkler", "Bơm chữa cháy", "Khí FM200"]'::jsonb, 25, '["Máy ren ống", "Máy tạo rãnh Victaulic"]'::jsonb, '["Giấy xác nhận đủ điều kiện PCCC"]'::jsonb),
-         ($1, 'Công ty TNHH Dịch Vụ MEP Toàn Cầu', '0309998888', 'PLUMBING', '["Cấp thoát nước trục đứng", "Bơm chìm", "Xử lý nước thải"]'::jsonb, 15, '["Máy hàn nhiệt PPR", "Máy nội soi đường ống"]'::jsonb, '["Chứng chỉ Hạng 3"]'::jsonb)`,
-        [projectId],
-      );
-
-      // Seed chỉ số đánh giá tương ứng
-      const newProfiles = await query<any>(
-        `SELECT id, company_name as "company_name" FROM engineering_subcon_profiles WHERE project_id = $1 ORDER BY company_name ASC`,
-        [projectId],
-      );
-
-      for (const p of newProfiles) {
-        let metrics = {
-          onTimeCompletionRate: 92,
-          bbntPassRate: 96,
-          ncrIncidentCount: 0,
-          hseSafetyScore: 98,
-          costVarianceRate: 1.5,
-        };
-        if (p.company_name.includes("PCCC")) {
-          metrics = {
-            onTimeCompletionRate: 85,
-            bbntPassRate: 88,
-            ncrIncidentCount: 1,
-            hseSafetyScore: 92,
-            costVarianceRate: 3.0,
-          };
-        } else if (p.company_name.includes("Toàn Cầu")) {
-          metrics = {
-            onTimeCompletionRate: 65,
-            bbntPassRate: 72,
-            ncrIncidentCount: 3,
-            hseSafetyScore: 80,
-            costVarianceRate: 12.0,
-          };
-        }
-        const evalRes = computeSubcontractorTrustScore(metrics);
-
-        await query(
-          `INSERT INTO engineering_subcon_performance_metrics 
-           (project_id, profile_id, evaluation_period, on_time_completion_rate, bbnt_pass_rate, ncr_incident_count, hse_safety_score, cost_variance_rate, trust_score, tier_grade, ai_analysis_summary)
-           VALUES ($1, $2, '2026-08', $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [
-            projectId,
-            p.id,
-            metrics.onTimeCompletionRate,
-            metrics.bbntPassRate,
-            metrics.ncrIncidentCount,
-            metrics.hseSafetyScore,
-            metrics.costVarianceRate,
-            evalRes.trustScore,
-            evalRes.tierGrade,
-            evalRes.summary,
-          ],
-        );
-      }
-    }
-
-    // 2. Truy vấn danh sách kèm chỉ số đánh giá mới nhất
+    // Trước đây GET này TỰ CHÈN 4 hồ sơ thầu phụ bịa (kèm mã số thuế giả) và bộ chỉ số
+    // năng lực bịa vào dự án ngay lần xem đầu tiên — một request đọc lại ghi dữ liệu
+    // nghiệp vụ không có thật vào DB thật (audit 2026-08-25 §3.3). Đã bỏ hẳn: dự án chưa
+    // có hồ sơ nào thì trả danh sách rỗng, UI hiện trạng thái rỗng.
+    // Danh sách hồ sơ kèm chỉ số đánh giá mới nhất
     const rows = await query(
       `SELECT 
          p.id, p.project_id as "projectId", p.company_name as "companyName", p.tax_code as "taxCode",
@@ -113,7 +51,7 @@ export async function GET(req: Request) {
        ) m ON true
        WHERE p.project_id = $1
        ORDER BY m.trust_score DESC NULLS LAST, p.company_name ASC`,
-      [projectId],
+      projectId,
     );
 
     return NextResponse.json({
@@ -127,4 +65,37 @@ export async function GET(req: Request) {
       { status: 500 },
     );
   }
+}
+
+// POST /api/engineering/subcon-ai/scores { supplierId, primaryDiscipline, taxCode? } —
+// tạo hồ sơ thầu phụ M82 TỪ một nhà cung cấp đã có. Đây là đường tạo hồ sơ duy nhất; trước
+// đây module không có đường tạo nào nên GET tự seed 4 hồ sơ bịa (audit 2026-08-25 §3.3).
+// Tên công ty chép từ `suppliers`, không nhận từ client — danh tính chỉ có một nguồn.
+export async function POST(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.manageEngineeringSubconAi(user.role)) {
+    return NextResponse.json(
+      { error: "Không có quyền quản lý hồ sơ thầu phụ AI" },
+      { status: 403 },
+    );
+  }
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-subcon-ai", projectId);
+  if (blocked) return blocked;
+  if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+
+  const body = await req.json().catch(() => null);
+  const supplierId = Number(body?.supplierId);
+  if (!Number.isInteger(supplierId) || supplierId <= 0)
+    return NextResponse.json({ error: "Thiếu hoặc sai nhà cung cấp" }, { status: 422 });
+
+  const ket = await taoHoSoThauPhu(projectId, {
+    supplierId,
+    primaryDiscipline: String(body?.primaryDiscipline ?? ""),
+    taxCode: body?.taxCode == null ? null : String(body.taxCode),
+  });
+  if (!ket.ok) return NextResponse.json({ error: ket.error }, { status: ket.status });
+  return NextResponse.json({ id: ket.id }, { status: 201 });
 }

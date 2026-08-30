@@ -16,15 +16,19 @@ import {
   MousePointer,
   Loader2,
 } from "lucide-react";
-import { ACI_TO_HEX, DxfEntityRaw, DxfParseResult } from "@/lib/cad/dxf-parser";
+import { ACI_TO_HEX, DxfEntityRaw, DxfParseResult } from "@/lib/ky-thuat/cad/dxf-parser";
 import type { HoveredCadEntity, PurgeState } from "../types";
+import {
+  CAD_SYSTEM_LAYER_COLORS,
+  CAD_UNMATCHED_LAYER_COLOR,
+  CAD_LAYER_SWATCH_FALLBACK_COLOR,
+} from "./cad-layer-colors";
 
 // Studio đồ họa vector CAD 2D: khung nhìn tương tác (zoom/pan/hover),
 // bảng điểm sức khỏe 6D và bộ lọc hiển thị layer.
 
 interface CadViewportStudioProps {
   isAutoHealing: boolean;
-  healProgress: number;
   dxfData: DxfParseResult | null;
   canvasZoom: number;
   setCanvasZoom: Dispatch<SetStateAction<number>>;
@@ -59,7 +63,6 @@ interface CadViewportStudioProps {
 
 export default function CadViewportStudio({
   isAutoHealing,
-  healProgress,
   dxfData,
   canvasZoom,
   setCanvasZoom,
@@ -165,14 +168,14 @@ export default function CadViewportStudio({
             disabled={isAutoHealing}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-sm transition ${
               isAutoHealing
-                ? "bg-amber-500 text-zinc-950 opacity-90 cursor-wait animate-pulse"
-                : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-zinc-950"
+                ? "bg-amber-500 text-on-accent-dark opacity-90 cursor-wait animate-pulse"
+                : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-on-accent-dark"
             }`}
           >
             {isAutoHealing ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Đang Chuẩn Hóa {healProgress}%...</span>
+                <span>Đang Chuẩn Hóa...</span>
               </>
             ) : (
               <>
@@ -246,7 +249,7 @@ export default function CadViewportStudio({
 
           {/* Interactive Vector Canvas Area */}
           <div
-            className="w-full h-[430px] relative overflow-hidden bg-[#0a0d14] cursor-grab active:cursor-grabbing select-none"
+            className="w-full h-[430px] relative overflow-hidden bg-zinc-950 cursor-grab active:cursor-grabbing select-none"
             onMouseDown={(e) => {
               setIsDraggingCanvas(true);
               setDragStartPos({ x: e.clientX - canvasPan.x, y: e.clientY - canvasPan.y });
@@ -309,7 +312,7 @@ export default function CadViewportStudio({
             <div
               className="absolute inset-0 pointer-events-none opacity-20"
               style={{
-                backgroundImage: `linear-gradient(#38bdf8 1px, transparent 1px), linear-gradient(90deg, #38bdf8 1px, transparent 1px)`,
+                backgroundImage: `linear-gradient(var(--color-sky-400) 1px, transparent 1px), linear-gradient(90deg, var(--color-sky-400) 1px, transparent 1px)`,
                 backgroundSize: `${30 * canvasZoom}px ${30 * canvasZoom}px`,
                 backgroundPosition: `${canvasPan.x}px ${canvasPan.y}px`,
               }}
@@ -359,64 +362,21 @@ export default function CadViewportStudio({
                   if (layerInfo?.colorHex) return layerInfo.colorHex;
                   if (entityColor && ACI_TO_HEX[entityColor]) return ACI_TO_HEX[entityColor];
                   const upper = (layerName || "").toUpperCase();
-                  if (
-                    upper.includes("01_") ||
-                    upper.includes("DUCT") ||
-                    upper.includes("SUPP") ||
-                    upper.includes("-M-") ||
-                    upper.startsWith("M-")
-                  )
-                    return "#ef4444";
-                  if (upper.includes("02_") || upper.includes("RET")) return "#eab308";
-                  if (
-                    upper.includes("ELEC") ||
-                    upper.includes("TRAY") ||
-                    upper.includes("PWR") ||
-                    upper.includes("-E-") ||
-                    upper.startsWith("E-")
-                  )
-                    return "#d946ef";
-                  if (
-                    upper.includes("PLUMB") ||
-                    upper.includes("CHW") ||
-                    upper.includes("PPR") ||
-                    upper.includes("-P-") ||
-                    upper.startsWith("P-")
-                  )
-                    return "#06b6d4";
-                  if (upper.includes("DRAIN") || upper.includes("SAN") || upper.includes("THOAT"))
-                    return "#10b981";
-                  if (
-                    upper.includes("FIRE") ||
-                    upper.includes("SPRN") ||
-                    upper.includes("PCCC") ||
-                    upper.includes("-F-") ||
-                    upper.startsWith("F-")
-                  )
-                    return "#f87171";
-                  if (
-                    upper.includes("GRID") ||
-                    upper.includes("TRUC") ||
-                    upper.includes("-S-") ||
-                    upper.startsWith("S-")
-                  )
-                    return "#71717a";
-                  if (upper.includes("WALL") || upper.includes("-A-") || upper.startsWith("A-"))
-                    return "#a1a1aa";
-                  return "#e4e4e7";
+                  const matched = CAD_SYSTEM_LAYER_COLORS.find((c) => c.match(upper));
+                  return matched ? matched.hex : CAD_UNMATCHED_LAYER_COLOR;
                 };
 
                 return (
                   <g>
                     {/* WCS Origin Symbol (0,0) */}
                     <g transform={`translate(${toSvgX(0)}, ${toSvgY(0)})`} opacity="0.65">
-                      <circle cx="0" cy="0" r="5" fill="none" stroke="#eab308" strokeWidth="1.5" />
+                      <circle cx="0" cy="0" r="5" fill="none" stroke="var(--color-amber-400)" strokeWidth="1.5" />
                       <line
                         x1="-12"
                         y1="0"
                         x2="12"
                         y2="0"
-                        stroke="#eab308"
+                        stroke="var(--color-amber-400)"
                         strokeWidth="1"
                         strokeDasharray="3 2"
                       />
@@ -425,11 +385,11 @@ export default function CadViewportStudio({
                         y1="-12"
                         x2="0"
                         y2="12"
-                        stroke="#eab308"
+                        stroke="var(--color-amber-400)"
                         strokeWidth="1"
                         strokeDasharray="3 2"
                       />
-                      <text x="8" y="-6" fill="#eab308" fontSize="8" fontFamily="monospace">
+                      <text x="8" y="-6" fill="var(--color-amber-400)" fontSize="8" fontFamily="monospace">
                         WCS (0,0)
                       </text>
                     </g>
@@ -480,7 +440,7 @@ export default function CadViewportStudio({
                               y1={toSvgY(coords.start[1])}
                               x2={toSvgX(coords.end[0])}
                               y2={toSvgY(coords.end[1])}
-                              stroke={isHovered ? "#fbbf24" : strokeColor}
+                              stroke={isHovered ? "var(--color-amber-400)" : strokeColor}
                               strokeWidth={isSelected ? 3.5 : isHovered ? 2.8 : isGrid ? 1 : 1.8}
                               strokeDasharray={isGrid ? "4 3" : undefined}
                               strokeLinecap="round"
@@ -505,7 +465,7 @@ export default function CadViewportStudio({
                               key={ent.id || idx}
                               points={pointsStr}
                               fill="none"
-                              stroke={isHovered ? "#fbbf24" : strokeColor}
+                              stroke={isHovered ? "var(--color-amber-400)" : strokeColor}
                               strokeWidth={isSelected ? 3.5 : isHovered ? 2.8 : 1.8}
                               strokeLinecap="round"
                               strokeLinejoin="round"
@@ -527,7 +487,7 @@ export default function CadViewportStudio({
                               r={r}
                               fill={strokeColor}
                               fillOpacity="0.25"
-                              stroke={isHovered ? "#fbbf24" : strokeColor}
+                              stroke={isHovered ? "var(--color-amber-400)" : strokeColor}
                               strokeWidth={isSelected ? 3 : isHovered ? 2.5 : 1.5}
                               className="cursor-pointer transition-all"
                               onMouseEnter={handleEnter}
@@ -545,7 +505,7 @@ export default function CadViewportStudio({
                               cy={toSvgY(coords.center[1])}
                               r={r}
                               fill="none"
-                              stroke={isHovered ? "#fbbf24" : strokeColor}
+                              stroke={isHovered ? "var(--color-amber-400)" : strokeColor}
                               strokeWidth={1.5}
                               strokeDasharray="4 2"
                               className="cursor-pointer transition-all"
@@ -563,7 +523,7 @@ export default function CadViewportStudio({
                               key={ent.id || idx}
                               x={toSvgX(coords.center[0])}
                               y={toSvgY(coords.center[1])}
-                              fill={isHovered ? "#fbbf24" : strokeColor}
+                              fill={isHovered ? "var(--color-amber-400)" : strokeColor}
                               fontSize={Math.max(8.5, Math.min(12, 320 * sc))}
                               fontFamily="monospace"
                               fontWeight="bold"
@@ -593,14 +553,14 @@ export default function CadViewportStudio({
                                 height="20"
                                 fill={strokeColor}
                                 fillOpacity="0.25"
-                                stroke={isHovered ? "#fbbf24" : strokeColor}
+                                stroke={isHovered ? "var(--color-amber-400)" : strokeColor}
                                 strokeWidth={isSelected ? 2.5 : 1.5}
                                 rx="3"
                               />
                               <text
                                 x="0"
                                 y="3"
-                                fill="#f4f4f5"
+                                fill="var(--color-zinc-100)"
                                 fontSize="7"
                                 fontWeight="bold"
                                 textAnchor="middle"
@@ -619,7 +579,7 @@ export default function CadViewportStudio({
                         <text
                           x={svgW / 2}
                           y={svgH / 2 - 30}
-                          fill="#a1a1aa"
+                          fill="var(--color-zinc-400)"
                           textAnchor="middle"
                           fontSize="14"
                           fontWeight="bold"
@@ -630,7 +590,7 @@ export default function CadViewportStudio({
                         <text
                           x={svgW / 2}
                           y={svgH / 2}
-                          fill="#71717a"
+                          fill="var(--color-zinc-500)"
                           textAnchor="middle"
                           fontSize="11"
                           fontFamily="monospace"
@@ -640,12 +600,13 @@ export default function CadViewportStudio({
                         <text
                           x={svgW / 2}
                           y={svgH / 2 + 22}
-                          fill="#52525b"
+                          fill="var(--color-zinc-600)"
                           textAnchor="middle"
                           fontSize="10"
                           fontFamily="monospace"
                         >
-                          Hỗ trợ: AutoCAD 2000–2025 (.dwg), DXF R12–R2025, PDF
+                          Nhận: DXF mọi phiên bản (ASCII lẫn nhị phân), PDF — xuất ra DXF chuẩn
+                          AutoCAD 2007 (mở được từ bản 2007 tới nay)
                         </text>
                       </g>
                     )}
@@ -659,19 +620,19 @@ export default function CadViewportStudio({
                           width={120}
                           height={60}
                           fill="none"
-                          stroke="#f43f5e"
+                          stroke="var(--color-rose-400)"
                           strokeWidth="2"
                           strokeDasharray="4 2"
                         />
                         <text
                           x={offX + 100}
                           y={offY + 22}
-                          fill="#f43f5e"
+                          fill="var(--color-rose-400)"
                           fontSize="8"
                           textAnchor="middle"
                           fontWeight="bold"
                         >
-                          ⚠ Nét Trùng Đè ({purgeState.overlappingCount || 142})
+                          ⚠ Nét Trùng Đè ({purgeState.overlappingCount})
                         </text>
                       </g>
                     )}
@@ -687,7 +648,7 @@ export default function CadViewportStudio({
                   <span
                     className="w-2.5 h-2.5 rounded-xs"
                     style={{
-                      backgroundColor: layer.colorHex || ACI_TO_HEX[layer.colorNumber] || "#a1a1aa",
+                      backgroundColor: layer.colorHex || ACI_TO_HEX[layer.colorNumber] || CAD_LAYER_SWATCH_FALLBACK_COLOR,
                     }}
                   />
                   <span className="truncate max-w-[90px]">{layer.name}</span>
@@ -858,7 +819,7 @@ export default function CadViewportStudio({
             <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1 text-[11px]">
               {(dxfData?.layers || []).map((l) => {
                 const isVis = visibleLayers[l.name] ?? visibleLayers[l.standardName] ?? true;
-                const color = l.colorHex || ACI_TO_HEX[l.colorNumber] || "#a1a1aa";
+                const color = l.colorHex || ACI_TO_HEX[l.colorNumber] || CAD_LAYER_SWATCH_FALLBACK_COLOR;
                 return (
                   <button
                     key={l.name}

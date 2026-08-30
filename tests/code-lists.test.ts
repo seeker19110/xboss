@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 // bản ghi tham chiếu (đầu vào của guard 409 ở route DELETE /api/admin/code-lists).
 
 test("code_lists: seed migration đúng 6 nguyên nhân trễ", { skip: !HAS_TEST_DB }, async () => {
-  const { getList } = await import("@/lib/code-lists");
+  const { getList } = await import("@/lib/ha-tang/code-lists");
   const items = await getList("delay_reason", { includeInactive: true });
   assert.equal(items.length, 6);
   const codes = items.map((i) => i.code).sort();
@@ -22,7 +22,7 @@ test("code_lists: seed migration đúng 6 nguyên nhân trễ", { skip: !HAS_TES
 });
 
 test("code_lists: CRUD + cache version invalidate khi ghi", { skip: !HAS_TEST_DB }, async () => {
-  const cl = await import("@/lib/code-lists");
+  const cl = await import("@/lib/ha-tang/code-lists");
   const domain = "test_cache";
 
   // Đọc lần đầu (rỗng) → nạp cache.
@@ -61,7 +61,7 @@ test(
   "code_lists: countReferences chặn xoá khi còn task tham chiếu",
   { skip: !HAS_TEST_DB },
   async () => {
-    const cl = await import("@/lib/code-lists");
+    const cl = await import("@/lib/ha-tang/code-lists");
     const { insertId, run } = await import("@/lib/db");
 
     // Thêm 1 mã nguyên nhân trễ mới, chưa ai dùng → xoá được (0 tham chiếu).

@@ -28,7 +28,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { buildSodReport } = await import("@/lib/sod");
+    const { buildSodReport } = await import("@/lib/bao-mat/sod");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `SOD ${S}`);
     const mk = (role: string, tag: string) =>

@@ -74,7 +74,8 @@ test(
   "openApproval → duyệt sai role / SoD / view-only bị 403, đúng 2 bước → approved",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { openApproval, advanceApproval, pendingForUser } = await import("@/lib/approvals");
+    const { openApproval, advanceApproval, pendingForUser } =
+      await import("@/lib/tien-do/approvals");
     const { queryOne } = await import("@/lib/db");
     const seeded = await seed("variation");
     const { projectId, creator, pm, cdt, admin, flowId } = seeded;
@@ -197,7 +198,7 @@ test(
 );
 
 test("reject chốt request ngay tại bước hiện tại", { skip: !HAS_TEST_DB }, async () => {
-  const { openApproval, advanceApproval } = await import("@/lib/approvals");
+  const { openApproval, advanceApproval } = await import("@/lib/tien-do/approvals");
   const { queryOne } = await import("@/lib/db");
   const { projectId, creator, pm, cdt, admin, flowId } = await seed("payment_cert");
   const entityId = EID * 10 + 2;
@@ -238,7 +239,7 @@ test(
   "UNIQUE(request_id, step_seq) chặn duyệt trùng bước → 409",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { openApproval, advanceApproval } = await import("@/lib/approvals");
+    const { openApproval, advanceApproval } = await import("@/lib/tien-do/approvals");
     const { run } = await import("@/lib/db");
     const { projectId, creator, pm, cdt, admin, flowId } = await seed("proposal");
     const entityId = EID * 10 + 5;
@@ -283,7 +284,7 @@ test(
   "amount dưới mọi ngưỡng → không bước hiệu lực → auto-approved khi mở",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { openApproval } = await import("@/lib/approvals");
+    const { openApproval } = await import("@/lib/tien-do/approvals");
     const { insertId } = await import("@/lib/db");
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `APRV auto ${S}`);
     const creator = await insertId(
@@ -326,7 +327,7 @@ test(
   "không có flow → openApproval trả null (caller giữ hành vi cũ)",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { openApproval } = await import("@/lib/approvals");
+    const { openApproval } = await import("@/lib/tien-do/approvals");
     const { insertId } = await import("@/lib/db");
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `APRV noflow ${S}`);
     try {

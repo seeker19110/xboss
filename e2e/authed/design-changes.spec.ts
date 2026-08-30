@@ -8,10 +8,12 @@ import AxeBuilder from "@axe-core/playwright";
 // project desktop/mobile (cùng chia sẻ 1 DB test, chạy song song).
 
 async function gotoDesignChanges(page: Page) {
-  await page.goto("/ban-ve");
-  await expect(page.getByPlaceholder("Tìm mã, tên, hệ, tầng...")).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("button", { name: "Thay đổi thiết kế" }).click();
-  await expect(page.getByRole("button", { name: "Tất cả trạng thái" })).toBeVisible();
+  // M32 trước đây là TAB trong /drawings; commit fde16b8 (đổi route sang /ban-ve) làm rơi
+  // mất tab, nay khôi phục thành route riêng /design-changes.
+  await page.goto("/design-changes");
+  await expect(page.getByRole("button", { name: "Tất cả trạng thái" })).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 test.describe("Thay đổi thiết kế (sau đăng nhập)", () => {

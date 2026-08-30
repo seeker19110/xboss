@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { canDecideProposal, decideProposal, getProposal } from "@/lib/proposals";
-import { advanceApproval } from "@/lib/approvals";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { canDecideProposal, decideProposal, getProposal } from "@/lib/tai-chinh/proposals";
+import { advanceApproval } from "@/lib/tien-do/approvals";
 
 export const dynamic = "force-dynamic";
 

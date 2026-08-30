@@ -1,9 +1,9 @@
 // app/api/systems/[code]/upload-template/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { resolveSystemId } from "@/lib/systems";
-import { getCurrentProjectId } from "@/lib/projects";
-import { buildPlanTemplate, buildTrackingTemplate } from "@/lib/system-upload";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { resolveSystemId } from "@/lib/tien-do/systems";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { buildPlanTemplate, buildTrackingTemplate } from "@/lib/tien-do/system-upload";
 import { todayISO } from "@/lib/db";
 
 export const dynamic = "force-dynamic";

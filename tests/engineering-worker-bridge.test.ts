@@ -1,12 +1,12 @@
 import "@/tests/setup";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bridgeTaskResultToEngineering } from "@/lib/engineering-worker-bridge";
+import { bridgeTaskResultToEngineering } from "@/lib/ky-thuat/engineering-worker-bridge";
 import {
   enqueueAsyncTask,
   claimNextAsyncTask,
   completeAsyncTask,
-} from "@/lib/engineering-task-queue";
+} from "@/lib/ky-thuat/engineering-task-queue";
 
 const HAS_DB = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 
@@ -77,7 +77,10 @@ test(
     assert.ok(bridgeRes.sourceRevisionId, "Phải sinh sourceRevisionId");
     assert.equal(bridgeRes.createdObjectIds.length, 2, "Phải sinh đúng 2 objects");
     assert.ok(bridgeRes.suggestionId, "Phải sinh suggestionId");
-    assert.ok(bridgeRes.workflowId, "Phải sinh workflowId");
+    // Gate 0 (§8) cấm lập workflow từ đề xuất chưa được chấp nhận — đề xuất do worker sinh
+    // ra luôn ở trạng thái chờ duyệt, nên bridge KHÔNG tạo workflow ở bước này. Workflow
+    // được lập sau, khi người duyệt chấp nhận đề xuất (ENG-2).
+    assert.equal(bridgeRes.workflowId, null, "Chưa được lập workflow khi đề xuất chưa chấp nhận");
     assert.ok(bridgeRes.summary.includes("thành công"));
   },
 );

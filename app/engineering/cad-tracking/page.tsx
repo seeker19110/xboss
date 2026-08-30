@@ -26,16 +26,11 @@ import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { redirectToLogin } from "@/app/lib/me";
-import type { DxfParseResult, DxfEntityRaw, Extruded3dRoute } from "@/lib/cad/dxf-parser";
+import type { DxfParseResult, DxfEntityRaw, Extruded3dRoute } from "@/lib/ky-thuat/cad/dxf-parser";
 
 type SpoolStatus = "fabricated" | "delivered" | "installed" | "qc_passed" | "bbnt_approved";
 type SpoolDbDiscipline =
-  | "hvac"
-  | "plumbing"
-  | "electrical"
-  | "firefighting"
-  | "structure"
-  | "architecture";
+  "hvac" | "plumbing" | "electrical" | "firefighting" | "structure" | "architecture";
 
 interface DrawingOption {
   id: number;
@@ -167,10 +162,12 @@ export default function CadQtoTrackingPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (Array.isArray(d?.items))
-          setBoqOptions(d.items.map((i: { code: string; name: string }) => ({
-            code: i.code,
-            name: i.name,
-          })));
+          setBoqOptions(
+            d.items.map((i: { code: string; name: string }) => ({
+              code: i.code,
+              name: i.name,
+            })),
+          );
       })
       .catch(() => {});
   }, []);
@@ -441,7 +438,7 @@ export default function CadQtoTrackingPage() {
               onClick={() => setActiveTab("takeoff")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "takeoff"
-                  ? "bg-amber-500 text-zinc-950"
+                  ? "bg-amber-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -452,7 +449,7 @@ export default function CadQtoTrackingPage() {
               onClick={() => setActiveTab("floorplan")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "floorplan"
-                  ? "bg-amber-500 text-zinc-950"
+                  ? "bg-amber-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -463,7 +460,7 @@ export default function CadQtoTrackingPage() {
               onClick={() => setActiveTab("variance")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "variance"
-                  ? "bg-amber-500 text-zinc-950"
+                  ? "bg-amber-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -474,7 +471,7 @@ export default function CadQtoTrackingPage() {
               onClick={() => setActiveTab("bbnt")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "bbnt"
-                  ? "bg-amber-500 text-zinc-950"
+                  ? "bg-amber-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -536,7 +533,9 @@ export default function CadQtoTrackingPage() {
                   </label>
                   <select
                     value={selectedDrawingId ?? ""}
-                    onChange={(e) => setSelectedDrawingId(e.target.value ? Number(e.target.value) : null)}
+                    onChange={(e) =>
+                      setSelectedDrawingId(e.target.value ? Number(e.target.value) : null)
+                    }
                     className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   >
                     <option value="">— Chọn bản vẽ —</option>
@@ -571,7 +570,7 @@ export default function CadQtoTrackingPage() {
                 <button
                   onClick={handleAnalyzeDrawing}
                   disabled={parsing || !selectedDrawingId}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-zinc-950 transition-colors hover:bg-amber-400 disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-on-accent-dark transition-colors hover:bg-amber-400 disabled:opacity-50"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${parsing ? "animate-spin" : ""}`} />
                   {parsing ? "Đang phân tích..." : "Phân Tích Bản Vẽ (Auto-QTO)"}
@@ -598,7 +597,7 @@ export default function CadQtoTrackingPage() {
                 <button
                   onClick={handleCreateSpoolsFromReview}
                   disabled={creatingSpools || reviewRows.length === 0}
-                  className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3.5 py-2 text-xs font-bold text-on-accent transition-colors hover:bg-emerald-800 disabled:opacity-50"
                 >
                   <CheckCircle2 size={14} />
                   {creatingSpools ? "Đang tạo..." : "Tạo Spool CAD"}
@@ -1036,7 +1035,7 @@ export default function CadQtoTrackingPage() {
                 <button
                   onClick={handleGenerateBbnt}
                   disabled={selectedForBbnt.size === 0}
-                  className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-on-accent transition-colors hover:bg-emerald-800 disabled:opacity-50"
                 >
                   <FileText size={14} />
                   1-Click Tạo Phiếu Nghiệm Thu ({selectedForBbnt.size} Spools)
@@ -1285,7 +1284,11 @@ function CadMiniPreview({ data }: { data: DxfParseResult }) {
 
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full" preserveAspectRatio="xMidYMid meet">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-64 w-full"
+        preserveAspectRatio="xMidYMid meet"
+      >
         {renderable.map((e) => {
           const color = layerColor[e.layer] || "#71717a";
           if (e.type === "LINE" && e.coordinates.start && e.coordinates.end) {
@@ -1306,7 +1309,13 @@ function CadMiniPreview({ data }: { data: DxfParseResult }) {
           if (e.coordinates.points) {
             const pts = e.coordinates.points.map(([x, y]) => `${toSvgX(x)},${toSvgY(y)}`).join(" ");
             return (
-              <polyline key={e.id} points={pts} fill="none" stroke={color} strokeWidth={strokeWidth} />
+              <polyline
+                key={e.id}
+                points={pts}
+                fill="none"
+                stroke={color}
+                strokeWidth={strokeWidth}
+              />
             );
           }
           return null;

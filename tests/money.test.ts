@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseMoney, addMoney, mulRate, moneyToNumber, formatVnd } from "@/lib/money";
+import { parseMoney, addMoney, mulRate, moneyToNumber, formatVnd } from "@/lib/nen/money";
 
 test("parseMoney: chuỗi có/không phần thập phân", () => {
   assert.equal(parseMoney("1234.56"), 123456n);

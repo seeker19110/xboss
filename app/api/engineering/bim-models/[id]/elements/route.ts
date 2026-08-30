@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { query } from "@/lib/db";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   BimElement,
   filterElementsPropertySet,
   compute3DSectionCut,
-} from "@/lib/engineering-bim-viewer";
+} from "@/lib/ky-thuat/engineering-bim-viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   }
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-bim-models", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }
@@ -34,12 +37,13 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     `SELECT e.id, e.model_id, e.project_id, e.guid, e.element_type, e.system_type, e.name,
             e.geometry_data, e.properties, e.wbs_task_id, e.created_at,
             t.name as wbs_task_name, t.start_date as wbs_start_date, t.end_date as wbs_end_date,
-            t.progress as wbs_progress, t.status as wbs_status
+            t.progress_percent as wbs_progress, t.status as wbs_status
      FROM engineering_bim_elements e
      LEFT JOIN tasks t ON e.wbs_task_id = t.id
      WHERE e.model_id = ? AND e.project_id = ?
      ORDER BY e.created_at ASC`,
-    [modelId, projectId],
+    modelId,
+    projectId,
   );
 
   let elements: BimElement[] = rawElements.map(

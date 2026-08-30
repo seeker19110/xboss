@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { PREF_KEYS, type PrefKey, type Prefs } from "@/lib/notification-prefs";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { PREF_KEYS, type PrefKey, type Prefs } from "@/lib/van-hanh/notification-prefs";
 
 export const dynamic = "force-dynamic";
 

@@ -27,6 +27,7 @@ import {
   Sparkles,
   Scan,
   Scissors,
+  Ruler,
   Coins,
   ChevronDown,
   ChevronUp,
@@ -38,7 +39,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { ROLE_LABELS, type Role } from "@/lib/roles";
+import { ROLE_LABELS, type Role } from "@/lib/nen/roles";
 
 const NAV_COLLAPSED_KEY = "xboss_eng_nav_collapsed";
 const NAV_ROLE_FILTER_KEY = "xboss_eng_nav_role_filter";
@@ -148,6 +149,13 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "pm", "engineer"],
   },
   {
+    href: "/engineering/joint-segmentation",
+    label: "Chia đốt MEPF",
+    category: "spatial",
+    icon: Ruler,
+    roles: ["admin", "pm", "engineer", "subcon"],
+  },
+  {
     href: "/engineering/cad-nesting",
     label: "Tối ưu cắt phôi ống",
     category: "spatial",
@@ -189,6 +197,13 @@ const NAV_ITEMS: NavItem[] = [
     icon: Code,
     badge: "ISO 19650",
     roles: ["admin", "pm", "engineer", "bch"],
+  },
+  {
+    href: "/engineering/thiet-bi-cad",
+    label: "Thiết bị plugin AutoCAD",
+    category: "spatial",
+    icon: Code,
+    roles: ["admin", "pm", "engineer"],
   },
   {
     href: "/engineering/mepf-lifecycle",
@@ -583,7 +598,7 @@ export default function EngineeringNav() {
                     onClick={() => setSelectedCategory(cat.key)}
                     className={`min-h-[36px] whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-medium transition-all flex items-center gap-1.5 ${
                       selectedCategory === cat.key
-                        ? "bg-emerald-600 text-white shadow-sm font-semibold"
+                        ? "bg-emerald-700 text-on-accent shadow-sm font-semibold"
                         : "bg-zinc-900/90 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 border border-zinc-800/80"
                     }`}
                   >
@@ -615,11 +630,16 @@ export default function EngineeringNav() {
                   }
                   className={`flex min-h-[36px] items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition border ${
                     roleFilterOnly
-                      ? "bg-emerald-950/50 text-emerald-300 border-emerald-800/60"
+                      ? "bg-emerald-700 text-on-accent border-emerald-700"
                       : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-200"
                   }`}
                 >
-                  <UserCheck className="h-3.5 w-3.5 text-emerald-400" />
+                  {/* Nền -950/50 (đo tương phản 2.31:1 ở theme sáng, xem docs/audit.md §13 —
+                      nền trong suốt trộn với nền trang tuỳ theme, không nằm trong bảng đã kiểm)
+                      đổi sang bg-emerald-700 + text-on-accent: đúng cặp §13.3 (5.48:1 mọi theme). */}
+                  <UserCheck
+                    className={`h-3.5 w-3.5 ${roleFilterOnly ? "text-on-accent" : "text-emerald-400"}`}
+                  />
                   <span className="hidden sm:inline">
                     {roleFilterOnly ? (ROLE_LABELS[userRole] ?? userRole) : "Mọi vai trò"}
                   </span>

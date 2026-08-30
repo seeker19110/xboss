@@ -18,7 +18,7 @@ import EmptyState from "@/app/components/EmptyState";
 import { Skeleton, PageSkeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { ROLE_LABELS, type Role } from "@/lib/roles";
+import { ROLE_LABELS, type Role } from "@/lib/nen/roles";
 import { PERM_GROUP_ORDER, permMeta } from "@/app/lib/permissionMeta";
 
 type ProjectOption = { id: number; name: string };
@@ -176,8 +176,13 @@ export default function PermissionsPage() {
             className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl"
             role="tablist"
           >
+            {/* role="tab" là BẮT BUỘC với con trực tiếp của role="tablist" — thiếu thì axe
+                báo vi phạm mức critical (aria-required-children) và trình đọc màn hình
+                không hiểu đây là bộ tab. Các trang tab khác trong repo đã làm đúng. */}
             <button
               type="button"
+              role="tab"
+              aria-selected={tab === "matrix"}
               onClick={() => setTab("matrix")}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
                 tab === "matrix"
@@ -189,6 +194,8 @@ export default function PermissionsPage() {
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={tab === "sod"}
               onClick={() => setTab("sod")}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
                 tab === "sod"

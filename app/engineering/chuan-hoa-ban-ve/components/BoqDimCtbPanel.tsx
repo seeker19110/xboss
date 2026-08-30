@@ -121,7 +121,7 @@ export default function BoqDimCtbPanel({
           {dimOverrides.length > 0 && (
             <button
               onClick={handleFixAllDims}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-sm transition shrink-0"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-on-accent-dark font-bold text-xs shadow-sm transition shrink-0"
             >
               <Check className="w-3.5 h-3.5" />
               <span>Khôi Phục Tất Cả Về Đo Thực Tế</span>
@@ -185,7 +185,7 @@ export default function BoqDimCtbPanel({
                       {!dim.fixed ? (
                         <button
                           onClick={() => handleFixDimOverride(dim.id)}
-                          className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-emerald-600 hover:text-white text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
+                          className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-emerald-600 hover:text-on-accent text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
                         >
                           Sửa về số đo thật
                         </button>
@@ -217,7 +217,7 @@ export default function BoqDimCtbPanel({
 
           <button
             onClick={handleDownloadCtb}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-sm transition shrink-0"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-on-accent font-bold text-xs shadow-sm transition shrink-0"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Xuất File Cấu Hình In xboss_standard.ctb</span>
@@ -262,13 +262,13 @@ export default function BoqDimCtbPanel({
       <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
         <div className="text-xs text-zinc-300">
           <span className="font-bold text-amber-300">Bước tiếp theo:</span> Quản lý cây liên kết
-          XREF, so sánh chênh lệch phiên bản (CAD 2D Diff) và trình sinh mã AutoLISP 2D.
+          XREF và so sánh chênh lệch phiên bản (CAD 2D Diff).
         </div>
         <button
-          onClick={() => setStep1SubTab("xref_diff_lisp")}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
+          onClick={() => setStep1SubTab("xref_diff")}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs transition"
         >
-          <span>Chuyển Sang Mục 4: Cây XREF, Diff & AutoLISP 2D</span>
+          <span>Chuyển Sang Mục 4: Cây XREF & Diff</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>

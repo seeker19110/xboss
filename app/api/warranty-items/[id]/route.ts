@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withProjectScope } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getWarrantyItem, parseWarrantyItemBody, validateWarrantyInput } from "@/lib/warranty";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import {
+  getWarrantyItem,
+  parseWarrantyItemBody,
+  validateWarrantyInput,
+} from "@/lib/hien-truong/warranty";
 
 export const dynamic = "force-dynamic";
 

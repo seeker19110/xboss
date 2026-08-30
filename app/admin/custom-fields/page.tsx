@@ -487,7 +487,7 @@ function DefModal({
         <button
           onClick={save}
           disabled={saving}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : mode === "create" ? "Thêm trường" : "Lưu thay đổi"}
         </button>

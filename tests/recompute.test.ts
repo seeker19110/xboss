@@ -1,7 +1,7 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { deriveStatus, progressFromChecks } from "@/lib/recompute";
+import { deriveStatus, progressFromChecks } from "@/lib/tien-do/recompute";
 
 const YESTERDAY = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
 const TOMORROW = new Date(Date.now() + 86400_000).toISOString().slice(0, 10);
@@ -51,7 +51,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, queryOne } = await import("@/lib/db");
-    const { recomputePackage } = await import("@/lib/recompute");
+    const { recomputePackage } = await import("@/lib/tien-do/recompute");
 
     // Bộ số lấy từ nhóm OGHL H6 của file gốc: trung bình thập phân đúng bằng 0.715
     // (10.01/14) → làm tròn half-up phải ra 0.72. Cộng dồn kiểu float ra
@@ -100,7 +100,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { recomputeTask } = await import("@/lib/recompute");
+    const { recomputeTask } = await import("@/lib/tien-do/recompute");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test recompute')`);
     const towerId = await insertId(
@@ -171,7 +171,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { recomputeTask, recomputeTasksInheritingDates } = await import("@/lib/recompute");
+    const { recomputeTask, recomputeTasksInheritingDates } =
+      await import("@/lib/tien-do/recompute");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test date inherit')`);
     const towerId = await insertId(
@@ -234,7 +235,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { recomputePackage } = await import("@/lib/recompute");
+    const { recomputePackage } = await import("@/lib/tien-do/recompute");
 
     const projectId = await insertId(
       `INSERT INTO projects (name) VALUES ('Test recompute empty pkg')`,

@@ -9,9 +9,9 @@ import {
   validatePermOverride,
   type Role,
   type PermKey,
-} from "@/lib/auth";
+} from "@/lib/bao-mat/auth";
 import { queryOne, query } from "@/lib/db";
-import { listPermissionOverrides, setPermissionOverride } from "@/lib/permissions";
+import { listPermissionOverrides, setPermissionOverride } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 

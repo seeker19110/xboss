@@ -37,7 +37,7 @@ import { Modal, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { Skeleton } from "@/app/components/Skeleton";
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from "@/app/components/SpreadsheetGrid";
 import CustomFieldsSection from "@/app/components/CustomFieldsSection";
-import { formatDateTimeVN } from "@/lib/date";
+import { formatDateTimeVN } from "@/lib/nen/date";
 
 export type Material = {
   id: number;
@@ -575,7 +575,7 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
           {canEdit && (
             <button
               onClick={addBlankRow}
-              className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-zinc-950 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition shrink-0 shadow h-10"
+              className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-on-accent-dark rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition shrink-0 shadow h-10"
             >
               <Plus className="w-4 h-4" /> Thêm Dòng
             </button>

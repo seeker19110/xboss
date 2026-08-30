@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import * as XLSX from "xlsx";
-import { importWorkbook, analyzeWorkbook } from "@/lib/import";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { log } from "@/lib/log";
-import { isContentTooLarge } from "@/lib/photos";
+import { importWorkbook, analyzeWorkbook } from "@/lib/tien-do/import";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { log } from "@/lib/nen/log";
+import { isContentTooLarge } from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 

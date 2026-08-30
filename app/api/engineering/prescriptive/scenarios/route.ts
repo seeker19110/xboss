@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getPrescriptiveScenarios } from "@/lib/engineering-prescriptive";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { getPrescriptiveScenarios } from "@/lib/ky-thuat/engineering-prescriptive";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,8 @@ export async function GET(req: Request) {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-prescriptive", projectId);
+  if (blocked) return blocked;
 
   try {
     const { searchParams } = new URL(req.url);

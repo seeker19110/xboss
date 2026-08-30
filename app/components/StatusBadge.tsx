@@ -1,4 +1,4 @@
-import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
+import { STATUS_LABEL, type StatusSlug } from "@/lib/tien-do/status";
 
 // Chip trạng thái task dùng chung — gom bảng màu + nhãn về một chỗ (trước đây mỗi trang
 // tự khai lại). Nền chip "-950" + chữ "-200" CỐ Ý không đảo theo theme (xem globals.css)

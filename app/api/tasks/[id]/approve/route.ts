@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
-import { deriveStatus, recomputePackage } from "@/lib/recompute";
-import { requiredInspectionMissing } from "@/lib/qaqc";
-import { getActiveFlow, openApproval, advanceApproval } from "@/lib/approvals";
-import { emitWebhook } from "@/lib/webhooks";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { deriveStatus, recomputePackage } from "@/lib/tien-do/recompute";
+import { requiredInspectionMissing } from "@/lib/ky-thuat/qaqc";
+import { getActiveFlow, openApproval, advanceApproval } from "@/lib/tien-do/approvals";
+import { emitWebhook } from "@/lib/bao-mat/webhooks";
 
 export const dynamic = "force-dynamic";
 

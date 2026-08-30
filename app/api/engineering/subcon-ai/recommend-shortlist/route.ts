@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { query } from "@/lib/db";
 import {
   recommendShortlistForPackage,
@@ -8,7 +9,7 @@ import {
   SubconProfile,
   SubconEvaluationResult,
   SubconTier,
-} from "@/lib/engineering-subcon-ai";
+} from "@/lib/ky-thuat/engineering-subcon-ai";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
 
+  if (!CAN.manageEngineeringSubconAi(user.role)) {
+    return NextResponse.json(
+      { error: "Không có quyền thao tác đề xuất mời thầu" },
+      { status: 403 },
+    );
+  }
+
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-subcon-ai", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }
@@ -41,7 +51,7 @@ export async function POST(req: Request) {
          equipment_assets as "equipmentAssets", certifications
        FROM engineering_subcon_profiles
        WHERE project_id = $1`,
-      [projectId],
+      projectId,
     );
 
     const profiles: SubconProfile[] = profilesRows.map((r: any) => ({
@@ -66,23 +76,62 @@ export async function POST(req: Request) {
        FROM engineering_subcon_performance_metrics
        WHERE project_id = $1
        ORDER BY profile_id, evaluated_at DESC`,
-      [projectId],
+      projectId,
     );
 
     const metricsMap = new Map<string, SubconEvaluationResult>();
+    const hoSoThieuDuLieu: { profileId: string; companyName: string; reason: string }[] = [];
+
     for (const m of metricsRows) {
+      const reasons: string[] = [];
+
+      // Kiểm từng metric, nếu thiếu ghi vào lý do.
+      if (m.onTimeRate == null) reasons.push("onTimeRate");
+      if (m.bbntPassRate == null) reasons.push("bbntPassRate");
+      if (m.hseScore == null) reasons.push("hseScore");
+      // ncrCount không có nguồn dữ liệu (chưa liên kết NCR với nhà thầu phụ)
+      if (m.ncrCount == null) reasons.push("ncrCount");
+      // costVarianceRate không có nguồn dữ liệu (chưa liên kết chi phí với nhà thầu phụ)
+      if (m.costVarianceRate == null) reasons.push("costVarianceRate");
+
+      if (reasons.length > 0) {
+        const profileName =
+          profiles.find((p) => p.id === m.profileId)?.companyName || `Hồ sơ ${m.profileId}`;
+        hoSoThieuDuLieu.push({
+          profileId: m.profileId,
+          companyName: profileName,
+          reason: `Thiếu dữ liệu: ${reasons.join(", ")}`,
+        });
+        continue; // Loại khỏi danh sách chấm điểm
+      }
+
       metricsMap.set(m.profileId, {
         trustScore: Number(m.trustScore),
         tierGrade: m.tierGrade as SubconTier,
         componentScores: {
-          scheduleScore: Number(m.onTimeRate ?? 80),
-          qualityScore: Number(m.bbntPassRate ?? 80),
-          ncrPenaltyScore: Math.max(0, 100 - Number(m.ncrCount ?? 0) * 15),
-          hseScore: Number(m.hseScore ?? 80),
-          costControlScore: Math.max(0, 100 - Math.max(0, Number(m.costVarianceRate ?? 0)) * 3),
+          scheduleScore: Number(m.onTimeRate),
+          qualityScore: Number(m.bbntPassRate),
+          ncrPenaltyScore: Math.max(0, 100 - Number(m.ncrCount) * 15),
+          hseScore: Number(m.hseScore),
+          costControlScore: Math.max(0, 100 - Math.max(0, Number(m.costVarianceRate)) * 3),
         },
         summary: m.summary || "",
       });
+    }
+
+    // Nếu toàn bộ hồ sơ bị loại (không có hồ sơ đủ dữ liệu), báo lại.
+    if (metricsMap.size === 0 && hoSoThieuDuLieu.length > 0) {
+      return NextResponse.json(
+        {
+          error: "Không có hồ sơ nào đủ dữ liệu để xếp hạng",
+          reason:
+            "Các metric cần thiết (tiến độ, chất lượng, HSE, chi phí, NCR) chưa có đủ dữ liệu. " +
+            "Nguyên nhân có thể: (a) hệ thống chưa ghi nhận chi phí/NCR cho nhà thầu phụ, " +
+            "(b) chưa có đánh giá định kỳ, (c) hồ sơ chưa được gắn supplier_id.",
+          hoSoThieuDuLieu,
+        },
+        { status: 400 },
+      );
     }
 
     // 3. Chạy Matchmaker AI
@@ -103,15 +152,14 @@ export async function POST(req: Request) {
       `INSERT INTO engineering_subcon_bidding_recommendations
        (project_id, package_name, discipline, estimated_budget, required_capacity, recommended_profiles, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        projectId,
-        packageName,
-        discipline,
-        estimatedBudget || 0,
-        requiredCapacity || 10,
-        JSON.stringify(candidates),
-        user.id,
-      ],
+
+      projectId,
+      packageName,
+      discipline,
+      estimatedBudget || 0,
+      requiredCapacity || 10,
+      JSON.stringify(candidates),
+      user.id,
     );
 
     return NextResponse.json({
@@ -119,6 +167,7 @@ export async function POST(req: Request) {
       data: {
         package: { packageName, discipline, estimatedBudget, requiredCapacity },
         candidates,
+        hoSoThieuDuLieu,
       },
     });
   } catch (error: any) {

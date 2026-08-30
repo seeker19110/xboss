@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { NORM_OVER_THRESHOLD_PCT, overNormItems } from "@/lib/norms";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { NORM_OVER_THRESHOLD_PCT, overNormItems } from "@/lib/khoi-luong/norms";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 

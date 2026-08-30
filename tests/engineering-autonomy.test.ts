@@ -14,7 +14,7 @@ test(
       authorizeExecutionRequest,
       executeExecutionRequest,
       toggleKillSwitch,
-    } = await import("@/lib/engineering-autonomy");
+    } = await import("@/lib/ky-thuat/engineering-autonomy");
 
     const projId = await insertId(`INSERT INTO projects (name) VALUES ('Autonomy Proj A')`);
     const userId = await insertId(

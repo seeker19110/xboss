@@ -5,7 +5,7 @@ import { UserPlus, Trash2, KeyRound, Users, LogOut } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { appConfirm, appPrompt } from "@/app/components/dialogs";
 import { fetchMe } from "@/app/lib/me";
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_LABELS } from "@/lib/nen/roles";
 
 type User = { id: number; name: string; email: string; role: string; createdAt: string };
 const ROLE_LABEL: Record<string, string> = ROLE_LABELS;
@@ -199,7 +199,7 @@ export default function UsersPage() {
             <button
               onClick={createUser}
               disabled={busy || !form.name || !form.email || !form.password}
-              className="bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] disabled:bg-zinc-800 disabled:text-zinc-500 disabled:opacity-50 text-white rounded-xl px-4 py-2 text-xs sm:text-sm font-semibold transition shadow-sm h-10 md:h-auto"
+              className="bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] disabled:bg-zinc-800 disabled:text-zinc-500 disabled:opacity-50 text-on-accent rounded-xl px-4 py-2 text-xs sm:text-sm font-semibold transition shadow-sm h-10 md:h-auto"
             >
               {busy ? "Đang tạo..." : "Thêm mới"}
             </button>
@@ -226,7 +226,7 @@ export default function UsersPage() {
                   <td className="p-3.5 font-medium text-zinc-200">
                     {u.name}
                     {me?.id === u.id && (
-                      <span className="ml-2 text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-1.5 py-0.5 rounded-md">
+                      <span className="ml-2 text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded-md">
                         (bạn)
                       </span>
                     )}

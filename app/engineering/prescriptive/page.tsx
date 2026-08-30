@@ -26,6 +26,7 @@ import {
   Cell,
 } from "recharts";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -262,6 +263,7 @@ export default function PrescriptiveAndCompliancePage() {
       <div className="min-h-screen bg-zinc-950 text-zinc-100">
         <AppHeader />
         <main className="mx-auto max-w-7xl px-4 py-8">
+          <ThuNghiemBanner moduleKey="engineering-prescriptive" />
           <EngineeringNav />
           <PageSkeleton />
         </main>
@@ -292,6 +294,7 @@ export default function PrescriptiveAndCompliancePage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader />
       <main className="mx-auto max-w-7xl px-4 py-8">
+        <ThuNghiemBanner moduleKey="engineering-prescriptive" />
         <EngineeringNav />
 
         {/* Title and Action Bar */}
@@ -316,7 +319,7 @@ export default function PrescriptiveAndCompliancePage() {
             </button>
             <button
               onClick={() => setShowSimModal(true)}
-              className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-400"
+              className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-on-accent-dark hover:bg-amber-400"
             >
               <Plus size={16} />
               Mô phỏng Kịch bản What-If
@@ -325,7 +328,7 @@ export default function PrescriptiveAndCompliancePage() {
         </div>
 
         {error && (
-          <div className="mb-6 rounded-lg border border-rose-900/50 bg-rose-950/40 p-4 text-sm text-rose-300">
+          <div className="mb-6 rounded-lg border border-rose-900/50 bg-rose-400/10 p-4 text-sm text-rose-300">
             {error}
           </div>
         )}
@@ -443,7 +446,7 @@ export default function PrescriptiveAndCompliancePage() {
                         <button
                           disabled={approvingId === selectedScenario.id}
                           onClick={() => handleApprove(selectedScenario.id)}
-                          className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
+                          className="flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-semibold text-on-accent hover:bg-emerald-800"
                         >
                           <CheckCircle2 size={16} />
                           Phê duyệt phương án đề xuất
@@ -717,7 +720,7 @@ export default function PrescriptiveAndCompliancePage() {
                 <button
                   disabled={scanning}
                   onClick={handleBatchScan}
-                  className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-400"
+                  className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-on-accent-dark hover:bg-amber-400"
                 >
                   <Play size={16} />
                   {scanning ? "Đang quét..." : "Quét tuân thủ toàn dự án"}
@@ -968,7 +971,7 @@ export default function PrescriptiveAndCompliancePage() {
                   <button
                     type="submit"
                     disabled={simulating}
-                    className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-400"
+                    className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-on-accent-dark hover:bg-amber-400"
                   >
                     {simulating ? "Đang giải..." : "Chạy mô phỏng Pareto"}
                   </button>

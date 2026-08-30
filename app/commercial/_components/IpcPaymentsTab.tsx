@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN } from "@/lib/nen/date";
 
 type SubSection = "ipc" | "payments" | "proposals";
 
@@ -70,7 +70,7 @@ export default function IpcPaymentsTab() {
             onClick={() => setActiveSection("ipc")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               activeSection === "ipc"
-                ? "bg-emerald-600 text-white shadow"
+                ? "bg-emerald-700 text-on-accent shadow"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -81,7 +81,7 @@ export default function IpcPaymentsTab() {
             onClick={() => setActiveSection("payments")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               activeSection === "payments"
-                ? "bg-emerald-600 text-white shadow"
+                ? "bg-emerald-700 text-on-accent shadow"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -92,7 +92,7 @@ export default function IpcPaymentsTab() {
             onClick={() => setActiveSection("proposals")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               activeSection === "proposals"
-                ? "bg-emerald-600 text-white shadow"
+                ? "bg-emerald-700 text-on-accent shadow"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >

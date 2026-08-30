@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { todayISO } from "@/lib/nen/date";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   analyzeFidicTiaClaim,
   saveFidicTiaClaim,
   listFidicTiaClaims,
   FidicTiaInput,
-} from "@/lib/engineering-fidic-tia-claim";
+} from "@/lib/ky-thuat/engineering-fidic-claim";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,8 @@ export async function GET() {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-nextgen-apex", projectId);
+  if (blocked) return blocked;
 
   try {
     const claims = await listFidicTiaClaims(projectId);
@@ -40,6 +44,8 @@ export async function POST(req: NextRequest) {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-nextgen-apex", projectId);
+  if (blocked) return blocked;
 
   try {
     const body = await req.json();
@@ -47,7 +53,7 @@ export async function POST(req: NextRequest) {
       claimCode: body.claimCode || `CLAIM-TIA-${Date.now().toString(36).toUpperCase()}`,
       delayEventTitle: body.delayEventTitle || "Chậm bàn giao mặt bằng Tầng 12 từ CĐT",
       eventCategory: body.eventCategory || "EMPLOYER_DELAY",
-      delayStartDate: body.delayStartDate || new Date().toISOString().slice(0, 10),
+      delayStartDate: body.delayStartDate || todayISO(),
       delayEndDate:
         body.delayEndDate ||
         new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),

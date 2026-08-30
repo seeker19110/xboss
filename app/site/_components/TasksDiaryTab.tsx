@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN } from "@/lib/nen/date";
 
 type SubSection = "diary" | "attendance" | "resources";
 
@@ -110,7 +110,7 @@ export default function TasksDiaryTab() {
             onClick={() => setActiveSection("diary")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               activeSection === "diary"
-                ? "bg-amber-600 text-zinc-950 shadow"
+                ? "bg-amber-600 text-on-accent-dark shadow"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -121,7 +121,7 @@ export default function TasksDiaryTab() {
             onClick={() => setActiveSection("attendance")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               activeSection === "attendance"
-                ? "bg-amber-600 text-zinc-950 shadow"
+                ? "bg-amber-600 text-on-accent-dark shadow"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -132,7 +132,7 @@ export default function TasksDiaryTab() {
             onClick={() => setActiveSection("resources")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               activeSection === "resources"
-                ? "bg-amber-600 text-zinc-950 shadow"
+                ? "bg-amber-600 text-on-accent-dark shadow"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >

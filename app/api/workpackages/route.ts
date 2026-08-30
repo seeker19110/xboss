@@ -1,7 +1,7 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { boqTakenBy } from "@/lib/boq";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { boqTakenBy } from "@/lib/khoi-luong/boq";
 
 export const dynamic = "force-dynamic";
 

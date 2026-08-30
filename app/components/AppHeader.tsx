@@ -27,8 +27,8 @@ import {
   type DashNode,
   type DashCluster,
 } from "@/app/lib/dashboardTree";
-import { MODULES } from "@/lib/modules";
-import { ROLE_LABELS, type Role } from "@/lib/roles";
+import { MODULES } from "@/lib/nen/modules";
+import { ROLE_LABELS, type Role } from "@/lib/nen/roles";
 
 type Me = { id: number; name: string; email: string; role: string };
 
@@ -163,8 +163,8 @@ export default function AppHeader({
         aria-current={itemActive ? "page" : undefined}
         className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
           itemActive
-            ? "bg-zinc-800 text-white font-medium border-emerald-400"
-            : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
+            ? "bg-emerald-500/10 text-emerald-300 font-semibold border-emerald-400"
+            : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60 border-transparent"
         }`}
       >
         <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
@@ -189,8 +189,8 @@ export default function AppHeader({
             aria-current={path === `/hub/${dash.id}` ? "page" : undefined}
             className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
               path === `/hub/${dash.id}`
-                ? "bg-zinc-800 text-white font-medium border-emerald-400"
-                : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
+                ? "bg-emerald-500/10 text-emerald-300 font-semibold border-emerald-400"
+                : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60 border-transparent"
             }`}
           >
             <LayoutDashboard className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
@@ -327,7 +327,7 @@ export default function AppHeader({
       )}
 
       {/* ── Topbar ── */}
-      <header className="sticky top-0 z-30 bg-zinc-950 border-b border-zinc-800 safe-top print:hidden">
+      <header className="sticky top-0 z-30 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-800 safe-top print:hidden">
         <div className="flex items-center gap-2 px-3 sm:px-6 h-12 min-w-0">
           <button
             onClick={() => setMobileOpen(true)}
@@ -353,6 +353,12 @@ export default function AppHeader({
               <p className="text-[11px] text-zinc-400 truncate leading-none">{subtitle}</p>
             )}
           </div>
+
+          {search && (
+            <div className="hidden md:block w-full max-w-xs shrink">
+              <GlobalSearch placement="top" />
+            </div>
+          )}
 
           <div className="flex items-center gap-1.5 shrink-0 ml-1">
             {children}
@@ -391,10 +397,16 @@ export default function AppHeader({
           hành động riêng của trang (Excel/PDF/Import…) ở trang có truyền bottomActions.
           .app-bottombar tự bù chiều rộng sidebar trên desktop (xem globals.css). */}
       {(isHome || bottomActions) && (
-        <div className="app-bottombar fixed bottom-0 inset-x-0 z-30 bg-zinc-950 border-t border-zinc-800 safe-bottom print:hidden">
+        <div
+          className={`app-bottombar fixed bottom-0 inset-x-0 z-30 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800 safe-bottom print:hidden ${
+            // Chỉ có ô tìm kiếm (trang chủ, không nút riêng) → ẩn hẳn trên desktop vì ô
+            // tìm kiếm đã nằm trên topbar; giữ lại trên mobile.
+            bottomActions ? "" : "md:hidden"
+          }`}
+        >
           <div className="flex items-center gap-2 px-3 sm:px-6 py-2 overflow-x-auto scrollbar-none">
             {search && isHome && (
-              <div className="flex-1 min-w-[140px]">
+              <div className="flex-1 min-w-[140px] md:hidden">
                 <GlobalSearch />
               </div>
             )}

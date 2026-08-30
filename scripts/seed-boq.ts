@@ -3,8 +3,8 @@
 import "./env";
 import path from "path";
 import * as XLSX from "xlsx";
-import { queryOne, run } from "../lib/db";
-import { parseBoqWorkbook, commitBoqImport } from "../lib/boq-import";
+import { queryOne, run } from "@/lib/db";
+import { parseBoqWorkbook, commitBoqImport } from "@/lib/khoi-luong/boq-import";
 
 async function main() {
   const filePath = path.join(process.cwd(), "attachments", "MAU-KHOI-LUONG-BOQ.xlsx");

@@ -93,7 +93,7 @@ const DECISIONS: { value: string; label: string; cls: string }[] = [
   {
     value: "accepted",
     label: "Chấp nhận",
-    cls: "bg-emerald-700 hover:bg-emerald-600 text-on-accent",
+    cls: "bg-emerald-700 hover:bg-emerald-800 text-on-accent",
   },
   { value: "modified", label: "Điều chỉnh", cls: "bg-sky-800 hover:bg-sky-700 text-on-accent" },
   { value: "deferred", label: "Tạm hoãn", cls: "bg-zinc-700 hover:bg-zinc-600 text-zinc-100" },

@@ -171,7 +171,7 @@ function SystemUploadSection({ systemCode, kind, title, icon, canUpload }: Secti
             <button
               type="submit"
               disabled={uploading}
-              className="inline-flex items-center space-x-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-800/50 text-on-accent text-xs font-semibold rounded-lg transition-colors disabled:cursor-not-allowed"
+              className="inline-flex items-center space-x-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-800/50 text-on-accent text-xs font-semibold rounded-lg transition-colors disabled:cursor-not-allowed"
             >
               <Upload className="w-3.5 h-3.5" />
               <span>{uploading ? "Đang gửi..." : "Gửi"}</span>

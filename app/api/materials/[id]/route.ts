@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
-import { getCurrentUser, type Role } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
-import { boqTakenBy } from "@/lib/boq";
-import { validateCustom } from "@/lib/custom-fields";
-import { log } from "@/lib/log";
+import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { boqTakenBy } from "@/lib/khoi-luong/boq";
+import { validateCustom } from "@/lib/ha-tang/custom-fields";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 

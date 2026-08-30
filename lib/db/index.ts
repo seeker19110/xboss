@@ -3,10 +3,10 @@
 // placeholder viết dạng `?` và được chuyển tự động sang $1..$n.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Pool, PoolClient, types } from "pg";
-import { getServerEnv } from "@/lib/env";
-import { getRequestContext } from "@/lib/request-context";
-import { log } from "@/lib/log";
-import { runMigrations } from "./migrate";
+import { getServerEnv } from "@/lib/nen/env";
+import { getRequestContext } from "@/lib/nen/request-context";
+import { log } from "@/lib/nen/log";
+import { runMigrations } from "@/lib/db/migrate";
 
 // DATE (oid 1082) → giữ nguyên chuỗi 'YYYY-MM-DD' (code so sánh ngày dạng chuỗi).
 types.setTypeParser(1082, (v) => v);
@@ -51,6 +51,11 @@ export function getPool(): Pool {
       connectionString: url,
       max,
       connectionTimeoutMillis: 10_000,
+      // Chỉ bật trong test (tests/setup.ts đặt biến này). Mặc định `pg` giữ connection rỗi
+      // thêm 10s, khiến mỗi tiến trình test treo ~10 giây sau khi đã chạy xong — nhân với
+      // ~127 file chạm DB là ~21 phút chờ rỗng mỗi lần chạy full suite. Production KHÔNG
+      // đặt biến này: server chạy dài hạn, giữ connection rỗi lại là điều mong muốn.
+      allowExitOnIdle: process.env.XBOSS_PG_ALLOW_EXIT_ON_IDLE === "1",
       options: `-c statement_timeout=${stmtTimeoutMs} -c idle_in_transaction_session_timeout=15000`,
     });
   }
@@ -233,4 +238,4 @@ export async function withProjectScope<T>(
 
 // todayISO/daysFromTodayISO chuyển sang lib/date.ts (thuần, không phụ thuộc pg)
 // để dùng lại được ở client — re-export ở đây cho code server hiện có.
-export { todayISO, daysFromTodayISO } from "@/lib/date";
+export { todayISO, daysFromTodayISO } from "@/lib/nen/date";

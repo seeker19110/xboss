@@ -9,7 +9,7 @@ import AxeBuilder from "@axe-core/playwright";
 // (CI render kịp → bắt lỗi; máy nhanh có thể quét trước khi panel load → bỏ sót).
 async function gotoDashboard(page: Page) {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Tổng quan tiến độ/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Tổng quan dự án/ })).toBeVisible();
   // S-curve là panel lazy phụ thuộc dữ liệu sâu nhất → xuất hiện = hydrate + chunk + fetch xong.
   await expect(page.getByRole("heading", { name: /S-curve/ })).toBeVisible({ timeout: 15_000 });
 }

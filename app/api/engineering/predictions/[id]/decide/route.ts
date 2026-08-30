@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { decidePrediction } from "@/lib/engineering-predictions";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { decidePrediction } from "@/lib/ky-thuat/engineering-predictions";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-predictions", projectId);
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({}));
   const decision = body?.decision as "accepted" | "dismissed";

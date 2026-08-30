@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { withUniqueRetry } from "@/lib/seqcode";
-import { openApproval } from "@/lib/approvals";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { withUniqueRetry } from "@/lib/ha-tang/seqcode";
+import { openApproval } from "@/lib/tien-do/approvals";
 import {
   PROPOSAL_KINDS,
   PROPOSAL_STATUSES,
@@ -15,7 +15,7 @@ import {
   validateProposalInput,
   type ProposalKind,
   type ProposalStatus,
-} from "@/lib/proposals";
+} from "@/lib/tai-chinh/proposals";
 
 export const dynamic = "force-dynamic";
 

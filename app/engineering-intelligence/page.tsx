@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Brain,
@@ -53,36 +53,52 @@ function IntelligenceSkeleton() {
 }
 
 function EngineeringIntelligenceContent() {
+  // Dải KPI khởi tạo bằng "—" và CHỈ đổi khi API trả về thật. Trước đây khởi tạo bằng số
+  // cắm cứng ("1.420 Items", "11 Agents", "Niêm Phong") mà trang không gọi API bao giờ
+  // (audit 2026-08-25 §3.2). Nguồn nào 403/lỗi/module đang tắt thì giữ "—", không đoán.
   const [stats, setStats] = useState<HubStat[]>([
-    {
-      label: "Đối Tượng Kỹ Thuật (ENG-1)",
-      value: "1,420 Items",
-      change: "100% Gắn mã SHA-256",
-      isPositive: true,
-      icon: Boxes,
-    },
-    {
-      label: "Đề Xuất AI Chờ Duyệt",
-      value: "5 Đề Xuất",
-      change: "Gate 0 Kiểm Định",
-      isPositive: true,
-      icon: Lightbulb,
-    },
-    {
-      label: "Tác Tử Swarm Hoạt Động",
-      value: "11 Agents",
-      change: "Đồng thuận ≥ 0.80",
-      isPositive: true,
-      icon: Network,
-    },
-    {
-      label: "Sổ Cái Merkle Mật Mã (M73)",
-      value: "Niêm Phong",
-      change: "Toàn vẹn 100%",
-      isPositive: true,
-      icon: Zap,
-    },
+    { label: "Đối Tượng Kỹ Thuật (ENG-1)", value: "—", icon: Boxes },
+    { label: "Đề Xuất AI Chờ Duyệt", value: "—", icon: Lightbulb },
+    { label: "Phiên Tranh Biện Swarm", value: "—", icon: Network },
+    { label: "Khối Merkle Đã Niêm Phong", value: "—", icon: Zap },
   ]);
+
+  useEffect(() => {
+    const get = (url: string) =>
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+
+    Promise.all([
+      get("/api/engineering/objects"),
+      get("/api/engineering/suggestions?status=open"),
+      get("/api/engineering/swarm/debates"),
+      get("/api/engineering/ledger/merkle"),
+    ]).then(([objects, suggestions, debates, merkle]) => {
+      setStats([
+        {
+          label: "Đối Tượng Kỹ Thuật (ENG-1)",
+          value: objects ? `${objects.objects?.length ?? 0} đối tượng` : "—",
+          icon: Boxes,
+        },
+        {
+          label: "Đề Xuất AI Chờ Duyệt",
+          value: suggestions ? `${suggestions.suggestions?.length ?? 0} đề xuất` : "—",
+          icon: Lightbulb,
+        },
+        {
+          label: "Phiên Tranh Biện Swarm",
+          value: Array.isArray(debates) ? `${debates.length} phiên` : "—",
+          icon: Network,
+        },
+        {
+          label: "Khối Merkle Đã Niêm Phong",
+          value: merkle ? `${merkle.totalCount ?? 0} khối` : "—",
+          icon: Zap,
+        },
+      ]);
+    });
+  }, []);
 
   // Tab 1: Omnichannel Field Copilot (Zalo & Telegram Voice)
   const copilotTab = (
@@ -106,7 +122,7 @@ function EngineeringIntelligenceContent() {
           <div className="pt-2">
             <Link
               href="/engineering/zalo-copilot"
-              className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+              className="px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-on-accent font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
             >
               <MessageSquare className="w-3.5 h-3.5" /> Mở Zalo Copilot Hub (M86)
             </Link>
@@ -157,7 +173,7 @@ function EngineeringIntelligenceContent() {
           <div className="flex items-center gap-2">
             <Link
               href="/engineering/workflows"
-              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-zinc-950 font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
+              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
             >
               <Workflow className="w-3.5 h-3.5" /> Luồng Phê Duyệt Gate 0
             </Link>
@@ -220,7 +236,7 @@ function EngineeringIntelligenceContent() {
           <div className="flex items-center gap-2 pt-2">
             <Link
               href="/engineering/swarm"
-              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+              className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-on-accent font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
             >
               <Network className="w-3.5 h-3.5" /> Swarm Debates (PIN-3)
             </Link>
@@ -290,7 +306,7 @@ function EngineeringIntelligenceContent() {
           <div className="pt-2">
             <Link
               href="/engineering/autonomy"
-              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-zinc-950 font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
             >
               <Sliders className="w-3.5 h-3.5" /> Bảng Điều Khiển Tự Trị (OS-4)
             </Link>
@@ -348,7 +364,7 @@ function EngineeringIntelligenceContent() {
           <div className="flex items-center gap-2">
             <Link
               href="/engineering/iot-telemetry"
-              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-zinc-950 font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
+              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
             >
               <Activity className="w-3.5 h-3.5" /> IoT Telemetry (M83)
             </Link>
@@ -423,7 +439,7 @@ function EngineeringIntelligenceContent() {
       id: "swarm",
       label: "AI Swarm & Merkle",
       icon: Network,
-      badge: "11 Agents",
+      badge: "Swarm",
       description:
         "Tranh luận đa tác tử, hàng đợi xử lý MEPF Worker và sổ cái mật mã Merkle Tree bất biến.",
       content: swarmTab,

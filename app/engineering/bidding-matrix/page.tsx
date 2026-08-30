@@ -348,7 +348,7 @@ export default function BiddingMatrixPage() {
                   <button
                     onClick={handleRunAnalysis}
                     disabled={analyzing || quotes.length === 0}
-                    className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1 text-xs font-medium text-on-accent hover:bg-emerald-800 disabled:opacity-50"
                   >
                     <Play size={12} /> Chạy Phân Tích Ma Trận
                   </button>

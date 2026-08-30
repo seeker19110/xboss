@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 test("OS-2: computeFreshness tính toán chính xác độ tươi mới dữ liệu hiện trường", async () => {
-  const { computeFreshness } = await import("@/lib/engineering-twin");
+  const { computeFreshness } = await import("@/lib/ky-thuat/engineering-twin");
 
   assert.equal(computeFreshness(null), "unknown");
   assert.equal(computeFreshness("invalid-date"), "unknown");
@@ -25,7 +25,7 @@ test(
   async () => {
     const { insertId, run, queryOne } = await import("@/lib/db");
     const { bindTwinTarget, recordTwinState, getTwinSnapshot, getTwinTimeline } =
-      await import("@/lib/engineering-twin");
+      await import("@/lib/ky-thuat/engineering-twin");
 
     const projId = await insertId(`INSERT INTO projects (name) VALUES ('Twin Proj A')`);
     const userId = await insertId(
@@ -115,7 +115,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run, queryOne } = await import("@/lib/db");
-    const { recordTwinState, getTwinImpactStatus } = await import("@/lib/engineering-twin");
+    const { recordTwinState, getTwinImpactStatus } =
+      await import("@/lib/ky-thuat/engineering-twin");
 
     const projA = await insertId(`INSERT INTO projects (name) VALUES ('Twin Impact A')`);
     const projB = await insertId(`INSERT INTO projects (name) VALUES ('Twin Impact B')`);

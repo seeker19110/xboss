@@ -12,7 +12,7 @@ import {
   aggregateQtoBySpatialHierarchy,
   generateApartmentKittingManifest,
   PipeSegmentInput,
-} from "@/lib/engineering-pipe-spooling-qto";
+} from "@/lib/ky-thuat/engineering-pipe-spooling-qto";
 
 describe("M74 / M90: Siêu Động Cơ Bóc Tách Khối Lượng Lắp Đặt & Chia Đốt Spool", () => {
   // ==========================================================================

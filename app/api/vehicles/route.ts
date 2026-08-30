@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
-import { getCurrentUser, type Role } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { listVehicles } from "@/lib/procurement";
+import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { listVehicles } from "@/lib/tai-chinh/procurement";
 
 export const dynamic = "force-dynamic";
 

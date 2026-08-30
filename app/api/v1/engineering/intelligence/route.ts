@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireApiKey } from "@/lib/api-keys";
+import { requireApiKey } from "@/lib/bao-mat/api-keys";
 import {
   intelligencePackageInputSchema,
   ingestIntelligencePackage,
   UnknownObjectKeyError,
-} from "@/lib/engineering-intel";
+} from "@/lib/ky-thuat/engineering-intel";
 
 export const dynamic = "force-dynamic";
 

@@ -21,6 +21,7 @@ import {
   FileCheck,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -31,7 +32,7 @@ import type {
   AutonomousTechnicalDraft,
   SwarmAgentRole,
   DebateStance,
-} from "@/lib/engineering-swarm";
+} from "@/lib/ky-thuat/engineering-swarm";
 
 export default function SwarmEngineeringPage() {
   const [debates, setDebates] = useState<SwarmDebateRecord[]>([]);
@@ -229,6 +230,7 @@ export default function SwarmEngineeringPage() {
       <div className="min-h-screen bg-zinc-950 text-zinc-100">
         <AppHeader />
         <main className="container mx-auto p-4 md:p-6">
+          <ThuNghiemBanner moduleKey="engineering-swarm" />
           <EngineeringNav />
           <PageSkeleton />
         </main>
@@ -240,6 +242,7 @@ export default function SwarmEngineeringPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader />
       <main className="container mx-auto p-4 md:p-6">
+        <ThuNghiemBanner moduleKey="engineering-swarm" />
         <EngineeringNav />
 
         {/* Header */}
@@ -265,7 +268,7 @@ export default function SwarmEngineeringPage() {
             </button>
             <button
               onClick={() => setShowNewDebateModal(true)}
-              className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-400"
+              className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-on-accent-dark transition-colors hover:bg-amber-400"
             >
               <Plus size={16} />
               Khởi tạo Tranh biện Swarm
@@ -373,7 +376,7 @@ export default function SwarmEngineeringPage() {
                     </div>
                     <button
                       onClick={handleGenerateDraft}
-                      className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-emerald-500"
+                      className="flex items-center gap-2 rounded-lg bg-emerald-700 px-3.5 py-1.5 text-xs font-bold text-on-accent transition-colors hover:bg-emerald-800"
                     >
                       <FileCheck size={14} />
                       Soạn thảo RFI / Hồ sơ Trình duyệt Tự động
@@ -458,7 +461,7 @@ export default function SwarmEngineeringPage() {
                           </span>
                         </div>
                       </div>
-                      <span className="rounded bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-zinc-950 uppercase">
+                      <span className="rounded bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-on-accent-dark uppercase">
                         SẴN SÀNG KÝ DUYỆT
                       </span>
                     </div>
@@ -541,7 +544,7 @@ export default function SwarmEngineeringPage() {
                   </button>
                   <button
                     type="submit"
-                    className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-amber-400"
+                    className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-on-accent-dark hover:bg-amber-400"
                   >
                     Bắt đầu Tranh biện
                   </button>

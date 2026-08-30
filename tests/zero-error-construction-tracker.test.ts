@@ -10,7 +10,7 @@ import {
   evaluateConcealedWorkCircuitBreaker,
   computeMerkleRoot,
   generateZeroErrorAuditCertificate,
-} from "@/lib/engineering-zero-error-tracker";
+} from "@/lib/ky-thuat/engineering-zero-error-tracker";
 
 test("Dynamic Challenge: Sinh mã và kiểm tra tính hợp lệ trong thời gian sống", () => {
   const t0 = 1755678000000;

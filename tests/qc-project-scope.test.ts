@@ -146,7 +146,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, query, queryOne } = await import("@/lib/db");
-    const { nextSeqCode, withUniqueRetry } = await import("@/lib/seqcode");
+    const { nextSeqCode, withUniqueRetry } = await import("@/lib/ha-tang/seqcode");
     const ids = await setupTwoProjects();
 
     const code1 = await withUniqueRetry(async () => {

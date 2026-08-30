@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { DOC_CATEGORY_LABEL, DOC_CATEGORIES, type DocCategory } from "@/lib/qaqc";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { DOC_CATEGORY_LABEL, DOC_CATEGORIES, type DocCategory } from "@/lib/ky-thuat/qaqc";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
-import { formatDateVN } from "@/lib/date";
+import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/nen/pdf-fonts";
+import { formatDateVN } from "@/lib/nen/date";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { normalizeCadLayers, convertTcvn3ToUnicode } from "@/lib/engineering-cad-skills";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { normalizeCadLayers, convertTcvn3ToUnicode } from "@/lib/ky-thuat/engineering-cad-skills";
 
 export const dynamic = "force-dynamic";
 

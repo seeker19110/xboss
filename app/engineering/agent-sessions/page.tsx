@@ -301,7 +301,7 @@ export default function AgentSessionsPage() {
                               type="button"
                               disabled={submitting}
                               onClick={() => resolve(c.id, c.proposal.method)}
-                              className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm text-on-accent hover:bg-emerald-600 disabled:opacity-50"
+                              className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm text-on-accent hover:bg-emerald-800 disabled:opacity-50"
                             >
                               {submitting ? "Đang lưu..." : "Chốt xung đột"}
                             </button>

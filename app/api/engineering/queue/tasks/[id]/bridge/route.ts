@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { bridgeTaskResultToEngineering } from "@/lib/engineering-worker-bridge";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { bridgeTaskResultToEngineering } from "@/lib/ky-thuat/engineering-worker-bridge";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   try {
     const body = await req.json().catch(() => ({}));
-    const projectId = Number(body.projectId || (user as any).projectId || 1);
+    // Không tin project_id client gửi — đối chiếu danh sách dự án user được thấy
+    // (xem chotProjectIdChoGhi trong lib/ha-tang/projects.ts).
+    const chotDuAn = await chotProjectIdChoGhi(
+      user,
+      body.projectId,
+      (await getCurrentProjectId(user)) || 1,
+    );
+    if (!chotDuAn.ok) {
+      return NextResponse.json(
+        { error: "Không có quyền thao tác trên dự án này" },
+        { status: 403 },
+      );
+    }
+    const projectId = chotDuAn.projectId;
 
     const result = await bridgeTaskResultToEngineering({
       taskId: id,

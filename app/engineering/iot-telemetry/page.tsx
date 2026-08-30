@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import { ComponentErrorBoundary } from "@/app/components/ComponentErrorBoundary";
 import {
@@ -140,6 +141,7 @@ export default function IotTelemetryPage() {
       <EngineeringNav />
 
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 lg:p-6 flex flex-col gap-6">
+        <ThuNghiemBanner moduleKey="engineering-iot-telemetry" />
         {/* Header Title */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
           <div className="flex items-center gap-3">
@@ -382,7 +384,7 @@ export default function IotTelemetryPage() {
                 <button
                   type="submit"
                   disabled={simulating}
-                  className="mt-2 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-teal-700 hover:bg-teal-600 font-semibold text-white transition shadow-lg shadow-teal-900/30"
+                  className="mt-2 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-teal-700 hover:bg-teal-800 font-semibold text-on-accent transition shadow-lg shadow-teal-900/30"
                 >
                   <PlusCircle className={`w-4 h-4 ${simulating ? "animate-spin" : ""}`} />
                   {simulating ? "Đang gửi..." : "Gửi Telemetry Mới"}

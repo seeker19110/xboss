@@ -23,7 +23,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, queryOne, run } = await import("@/lib/db");
-    const { openApproval, advanceApproval } = await import("@/lib/approvals");
+    const { openApproval, advanceApproval } = await import("@/lib/tien-do/approvals");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `VO-APRV ${S}`);
     const mk = (role: string) =>
@@ -124,8 +124,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, queryOne, run } = await import("@/lib/db");
-    const { openApproval, advanceApproval } = await import("@/lib/approvals");
-    const { certTotals } = await import("@/lib/paymentcerts");
+    const { openApproval, advanceApproval } = await import("@/lib/tien-do/approvals");
+    const { certTotals } = await import("@/lib/tai-chinh/paymentcerts");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `IPC-APRV ${S}`);
     const mk = (label: string, role: string) =>

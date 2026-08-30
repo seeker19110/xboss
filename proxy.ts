@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { TRAFFIC_TOKEN_HEADER, trafficToken } from "@/lib/traffic-token";
-import { COOKIE, parseToken } from "@/lib/session-token";
-import { isSameOrigin, needsSameOriginCheck } from "@/lib/csrf";
+import { TRAFFIC_TOKEN_HEADER, trafficToken } from "@/lib/bao-mat/traffic-token";
+import { COOKIE, parseToken } from "@/lib/bao-mat/session-token";
+import { isSameOrigin, needsSameOriginCheck } from "@/lib/bao-mat/csrf";
 
 // Proxy (middleware) của Next 16 LUÔN chạy Node.js runtime — chỉ intercept /api/ (trừ chính
 // endpoint traffic/ingest). Fire-and-forget POST đến ingest để ghi ring buffer.

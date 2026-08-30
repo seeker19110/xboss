@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   solve3DGenerativeRoute,
   saveGenerativeRoutingRun,
   listGenerativeRoutingRuns,
   GenerativeRoutingInput,
-} from "@/lib/engineering-generative-routing";
+} from "@/lib/ky-thuat/engineering-generative-routing";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,8 @@ export async function GET() {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-nextgen-apex", projectId);
+  if (blocked) return blocked;
 
   try {
     const runs = await listGenerativeRoutingRuns(projectId);
@@ -46,6 +49,8 @@ export async function POST(req: NextRequest) {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-nextgen-apex", projectId);
+  if (blocked) return blocked;
 
   try {
     const body = await req.json();

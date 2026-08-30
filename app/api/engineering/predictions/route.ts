@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { listPredictions, listPredictionModels } from "@/lib/engineering-predictions";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { listPredictions, listPredictionModels } from "@/lib/ky-thuat/engineering-predictions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,8 @@ export async function GET(req: Request) {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-predictions", projectId);
+  if (blocked) return blocked;
 
   const sp = new URL(req.url).searchParams;
   const status = sp.get("status") || undefined;

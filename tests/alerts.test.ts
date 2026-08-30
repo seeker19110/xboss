@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== M47 PR4 — Cảnh báo cấu hình được (alert_rules), lib/alerts.ts =====
 
 test("ALERT_METRICS: đủ 5 khoá, mỗi khoá có label/operator/defaultThreshold hợp lệ", async () => {
-  const { ALERT_METRICS } = await import("@/lib/alerts");
+  const { ALERT_METRICS } = await import("@/lib/van-hanh/alerts");
   const keys = Object.keys(ALERT_METRICS).sort();
   assert.deepEqual(keys, [
     "cpi_below",
@@ -23,7 +23,7 @@ test("ALERT_METRICS: đủ 5 khoá, mỗi khoá có label/operator/defaultThresh
 });
 
 test("isAlertMetric: chỉ nhận metric trong whitelist", async () => {
-  const { isAlertMetric } = await import("@/lib/alerts");
+  const { isAlertMetric } = await import("@/lib/van-hanh/alerts");
   assert.equal(isAlertMetric("due_soon_days"), true);
   assert.equal(isAlertMetric("khong_ton_tai"), false);
 });
@@ -34,7 +34,7 @@ test(
   async () => {
     const { insertId, run } = await import("@/lib/db");
     const { getAlertThreshold, ALERT_METRICS, upsertAlertRule, deleteAlertRule } =
-      await import("@/lib/alerts");
+      await import("@/lib/van-hanh/alerts");
 
     const p1 = await insertId(`INSERT INTO projects (name) VALUES ('M47 Alerts P1')`);
     const p2 = await insertId(`INSERT INTO projects (name) VALUES ('M47 Alerts P2')`);
@@ -79,7 +79,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { listAlertRules, upsertAlertRule, deleteAlertRule } = await import("@/lib/alerts");
+    const { listAlertRules, upsertAlertRule, deleteAlertRule } =
+      await import("@/lib/van-hanh/alerts");
 
     const p1 = await insertId(`INSERT INTO projects (name) VALUES ('M52 Alerts scope P1')`);
     const p2 = await insertId(`INSERT INTO projects (name) VALUES ('M52 Alerts scope P2')`);
@@ -134,7 +135,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run, queryOne } = await import("@/lib/db");
-    const { getAlertThreshold, upsertAlertRule, deleteAlertRule } = await import("@/lib/alerts");
+    const { getAlertThreshold, upsertAlertRule, deleteAlertRule } =
+      await import("@/lib/van-hanh/alerts");
 
     const p = await insertId(`INSERT INTO projects (name) VALUES ('M47 Alerts P3')`);
 
@@ -176,7 +178,7 @@ test(
   "upsertAlertRule: validate metric ngoài whitelist + threshold âm bị chặn",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { upsertAlertRule } = await import("@/lib/alerts");
+    const { upsertAlertRule } = await import("@/lib/van-hanh/alerts");
     const bad1 = await upsertAlertRule({
       projectId: null,
       metric: "khong_ton_tai",

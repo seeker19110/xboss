@@ -222,7 +222,7 @@ export default function CadNestingHydraulicStudioPage() {
               onClick={() => setActiveTab("pipe_1d")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "pipe_1d"
-                  ? "bg-emerald-500 text-zinc-950"
+                  ? "bg-emerald-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -233,7 +233,7 @@ export default function CadNestingHydraulicStudioPage() {
               onClick={() => setActiveTab("hydraulic")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "hydraulic"
-                  ? "bg-emerald-500 text-zinc-950"
+                  ? "bg-emerald-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -244,7 +244,7 @@ export default function CadNestingHydraulicStudioPage() {
               onClick={() => setActiveTab("qr_spool")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "qr_spool"
-                  ? "bg-emerald-500 text-zinc-950"
+                  ? "bg-emerald-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -378,7 +378,7 @@ export default function CadNestingHydraulicStudioPage() {
                               <div
                                 key={cIdx}
                                 style={{ width: `${widthPct}%` }}
-                                className="relative flex items-center justify-center border-r border-zinc-950 bg-emerald-600/80 px-1 text-[11px] font-bold text-white transition-all hover:bg-emerald-500"
+                                className="relative flex items-center justify-center border-r border-zinc-950 bg-emerald-700/80 px-1 text-[11px] font-bold text-on-accent transition-all hover:bg-emerald-800"
                                 title={`${cut.spoolCode}: ${cut.lengthMm}mm`}
                               >
                                 <span className="truncate">
@@ -524,7 +524,7 @@ export default function CadNestingHydraulicStudioPage() {
 
                     <button
                       onClick={handleRunHydraulic}
-                      className="w-full rounded-lg bg-emerald-500 py-2.5 text-xs font-bold text-zinc-950 hover:bg-emerald-400"
+                      className="w-full rounded-lg bg-emerald-500 py-2.5 text-xs font-bold text-on-accent-dark hover:bg-emerald-400"
                     >
                       Tính toán Thủy lực & Kiểm tra Vận tốc
                     </button>
@@ -635,7 +635,7 @@ export default function CadNestingHydraulicStudioPage() {
 
                   <button
                     onClick={handleGenerateQr}
-                    className="rounded-lg bg-emerald-500 py-2 px-4 text-xs font-bold text-zinc-950 hover:bg-emerald-400"
+                    className="rounded-lg bg-emerald-500 py-2 px-4 text-xs font-bold text-on-accent-dark hover:bg-emerald-400"
                   >
                     Tạo Chuỗi Tem Mã QR
                   </button>

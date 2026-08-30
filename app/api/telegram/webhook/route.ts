@@ -1,11 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processIncomingTelegramMessage } from "@/lib/engineering-site-bot";
+import { processIncomingTelegramMessage } from "@/lib/ky-thuat/engineering-site-bot";
+import { xacThucWebhookTelegram } from "@/lib/bao-mat/webhook-inbound";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 
 // POST /api/telegram/webhook
-// Endpoint nhận webhook trực tiếp từ Telegram Bot API
+// Endpoint nhận webhook trực tiếp từ Telegram Bot API.
+// Endpoint này KHÔNG có phiên đăng nhập — secret token trong header là ranh giới bảo mật duy
+// nhất, nên phải kiểm ngay dòng đầu, trước cả khi đọc body.
 export async function POST(req: NextRequest) {
+  let hopLe: boolean;
+  try {
+    hopLe = xacThucWebhookTelegram(req);
+  } catch (err) {
+    // Thiếu TELEGRAM_WEBHOOK_SECRET → fail-fast, KHÔNG xử lý tin nhắn. Chi tiết chỉ ghi log
+    // phía máy chủ, không trả ra ngoài (endpoint công khai).
+    log.error("Webhook Telegram thiếu cấu hình bảo mật", {
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json(
+      { error: "Webhook chưa được cấu hình bảo mật phía máy chủ" },
+      { status: 500 },
+    );
+  }
+  if (!hopLe) {
+    return NextResponse.json({ error: "Chữ ký webhook không hợp lệ" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const message = body.message || body.channel_post;

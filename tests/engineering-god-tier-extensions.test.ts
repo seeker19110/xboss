@@ -7,7 +7,7 @@ import {
   generatePipeSpoolCutList,
   GodTierElementData,
   GodTierClashRecord,
-} from "../lib/engineering-god-tier";
+} from "@/lib/ky-thuat/engineering-god-tier";
 
 test("God-Tier Extension 1: LiDAR Point Cloud RANSAC Deviation Analysis", () => {
   const elements: GodTierElementData[] = [

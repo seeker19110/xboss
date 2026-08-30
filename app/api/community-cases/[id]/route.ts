@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { todayISO } from "@/lib/date";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { todayISO } from "@/lib/nen/date";
 import {
   getCommunityCase,
   parseCommunityCaseBody,
   validateCommunityCaseInput,
-} from "@/lib/monitoring";
+} from "@/lib/hien-truong/monitoring";
 
 export const dynamic = "force-dynamic";
 

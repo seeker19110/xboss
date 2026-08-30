@@ -12,7 +12,7 @@ import {
   CheckCircle2,
   HelpCircle,
 } from "lucide-react";
-import { DxfLayerInfo } from "@/lib/cad/dxf-parser";
+import { DxfLayerInfo } from "@/lib/ky-thuat/cad/dxf-parser";
 import { showToast } from "@/app/components/Toast";
 import type { FontSnippet, Step1SubTab } from "../types";
 
@@ -29,7 +29,6 @@ interface LayersFontPanelProps {
   convertedText: string;
   sampleFontSnippets: FontSnippet[];
   handleConvertFont: (customText?: string) => void | Promise<void>;
-  handleDownloadScr: () => void;
   filteredLayers: DxfLayerInfo[];
 }
 
@@ -44,12 +43,11 @@ export default function LayersFontPanel({
   convertedText,
   sampleFontSnippets,
   handleConvertFont,
-  handleDownloadScr,
   filteredLayers,
 }: LayersFontPanelProps) {
   return (
     <div className="space-y-5">
-      {/* Phân đoạn 2.1: Chuẩn hóa Layer AIA & Kịch bản .SCR */}
+      {/* Phân đoạn 2.1: Chuẩn hóa Layer AIA */}
       <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1">
@@ -75,14 +73,6 @@ export default function LayersFontPanel({
                 className="pl-8 pr-3 py-1.5 text-xs bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-500 w-40 sm:w-52"
               />
             </div>
-
-            <button
-              onClick={handleDownloadScr}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Xuất Kịch Bản .SCR</span>
-            </button>
           </div>
         </div>
 
@@ -190,7 +180,7 @@ export default function LayersFontPanel({
           <div className="flex items-center gap-2">
             <button
               onClick={() => handleConvertFont()}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-on-accent font-semibold text-xs shadow-sm transition"
             >
               <Sparkles className="w-4 h-4" />
               <span>Chuyển Đổi Sang Unicode UTF-8</span>
@@ -256,7 +246,7 @@ export default function LayersFontPanel({
         </div>
         <button
           onClick={() => setStep1SubTab("boq_dim_ctb")}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs transition"
         >
           <span>Chuyển Sang Mục 3: Block BOQ, Dim & Nét In</span>
           <ArrowRight className="w-3.5 h-3.5" />

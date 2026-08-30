@@ -16,6 +16,7 @@ import {
   Eye,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -173,6 +174,7 @@ export default function EngineeringGraphPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader title="Knowledge Graph & Phả hệ kỹ thuật" />
       <main className="mx-auto max-w-7xl px-4 py-6">
+        <ThuNghiemBanner moduleKey="engineering-graph" />
         <EngineeringNav />
 
         {/* Search & Filter Bar */}
@@ -235,7 +237,7 @@ export default function EngineeringGraphPage() {
             <button
               type="submit"
               disabled={loading || !searchKey.trim()}
-              className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-on-accent hover:bg-amber-800 disabled:opacity-50"
             >
               <Network size={16} />
               <span>{loading ? "Đang tra cứu..." : "Truy vấn Graph"}</span>
@@ -243,7 +245,7 @@ export default function EngineeringGraphPage() {
           </form>
 
           {error && (
-            <div className="mt-3 flex items-center gap-2 rounded-lg border border-rose-800 bg-rose-950/40 p-3 text-xs text-rose-300">
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-rose-800 bg-rose-400/10 p-3 text-xs text-rose-300">
               <AlertTriangle size={15} />
               <span>{error}</span>
             </div>

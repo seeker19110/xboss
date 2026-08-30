@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   planMultiTierCorridor,
   calculateTrapezeHangerStructure,
@@ -9,12 +9,12 @@ import {
   saveTrapezeHanger,
   listTrapezeHangers,
   CorridorLayoutInput,
-} from "@/lib/engineering-cad-corridor";
+} from "@/lib/ky-thuat/engineering-cad-corridor";
 import {
   solveHydraulicNetwork,
   saveHydraulicNetwork,
   listHydraulicNetworks,
-} from "@/lib/engineering-cad-hydraulic-network";
+} from "@/lib/ky-thuat/engineering-cad-hydraulic-network";
 
 export const dynamic = "force-dynamic";
 

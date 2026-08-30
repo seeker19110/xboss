@@ -7,8 +7,8 @@
 ## 1. Vấn đề & Người dùng
 
 - **Vấn đề:** quản lý dự án xây dựng cho dự án **TT AVIO Tháp A**, khởi đầu từ tiến độ thi công MEP/ACMV đang dựa trên file Excel tracking — khó đồng bộ nhiều người, không có lịch sử thay đổi, không cảnh báo trễ hạn, không dùng tốt trên điện thoại tại công trường.
-- **Người dùng mục tiêu:** 7 vai trò (`lib/roles.ts`) — `admin`/`pm` (quản trị/QLDA, toàn quyền nghiệp vụ), `engineer` (kỹ sư hiện trường), `subcon` (thầu phụ, chỉ thao tác task được giao), `bch`/`cdt`/`viewer` (chỉ xem + bình luận, phạm vi thương mại khác nhau — xem `spec.md` §4). Kỹ sư/thầu phụ dùng chủ yếu trên **điện thoại tại công trường**; PM xem dashboard trên máy tính.
-- **Bằng chứng nhu cầu:** thay thế trực tiếp file Excel tracking đang dùng thật (import được file gốc OGTĐ/OGHL/OGCH/ODNN qua `lib/import.ts`).
+- **Người dùng mục tiêu:** 7 vai trò (`lib/nen/roles.ts`) — `admin`/`pm` (quản trị/QLDA, toàn quyền nghiệp vụ), `engineer` (kỹ sư hiện trường), `subcon` (thầu phụ, chỉ thao tác task được giao), `bch`/`cdt`/`viewer` (chỉ xem + bình luận, phạm vi thương mại khác nhau — xem `spec.md` §4). Kỹ sư/thầu phụ dùng chủ yếu trên **điện thoại tại công trường**; PM xem dashboard trên máy tính.
+- **Bằng chứng nhu cầu:** thay thế trực tiếp file Excel tracking đang dùng thật (import được file gốc OGTĐ/OGHL/OGCH/ODNN qua `lib/tien-do/import.ts`).
 - **Khác biệt:** đồng bộ đa người dùng thời gian thực, lịch sử tiến độ, cảnh báo trễ/đến hạn, nghiệm thu 2 bước có gate QA&QC, đồng bộ 2 chiều Google Sheet, PWA offline, đa dự án song song — những thứ Excel không có.
 
 ## 2. Phạm vi (đã hoàn thành — mở rộng từ MVP tracking sang toàn chuỗi qua M0–M42)
@@ -20,17 +20,17 @@
 ## 3. Yêu cầu phi chức năng
 
 - **Hiệu năng:** ngân sách Lighthouse CI chính thức (`lighthouserc.json`, đo trên `/login`, 3 lần chạy) — cả 4 category `performance`/`accessibility`/`best-practices`/`seo` đã siết ngưỡng `error` (0.9/0.9/0.9/0.8), chặn merge khi tụt điểm. Mục tiêu định hướng thêm: LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1.
-- **Bảo mật:** **API là ranh giới bảo mật duy nhất** — mọi route gọi `getCurrentUser()` + kiểm quyền `CAN`/`canTouchTask`. Phiên stateless HMAC; rate-limit login; SQL tham số hoá qua `lib/db`. **RLS Postgres là phòng tuyến thứ 2** (không thay tầng app): bật trên **11 bảng tài chính** (`0069` mở, `0077` khoá cửa), nhóm bảng theo tổ chức, **3 bảng Zalo Field Copilot** (`0119`), và **toàn bộ 15 bảng `engineering_*`** (`0092` — vào thẳng policy nghiêm ngặt, không có nhánh "thiếu ngữ cảnh → cho qua"). Chạy bằng role `xboss_app` NOBYPASSRLS — xem ADR-0005.
+- **Bảo mật:** **API là ranh giới bảo mật duy nhất** — mọi route gọi `getCurrentUser()` + kiểm quyền `CAN`/`canTouchTask`. Phiên stateless HMAC; rate-limit login; SQL tham số hoá qua `lib/db`. **RLS Postgres là phòng tuyến thứ 2** (không thay tầng app): bật trên **11 bảng tài chính** (`0069` mở, `0077` khoá cửa), nhóm bảng theo tổ chức, **3 bảng Zalo Field Copilot** (`0119`), **`cad_takeoff_boq_map`** (`0140` — map mã BOQ theo dự án của plugin AutoCAD), và **toàn bộ 15 bảng `engineering_*`** (`0092` — vào thẳng policy nghiêm ngặt, không có nhánh "thiếu ngữ cảnh → cho qua"). Chạy bằng role `xboss_app` NOBYPASSRLS — xem ADR-0005.
 - **Accessibility:** mục tiêu WCAG AA cả hai theme; **đã có** axe-core tự động qua Playwright (`e2e/authed/*.spec.ts`, desktop + mobile, mọi trang mới bắt buộc thêm case axe) — quy tắc tương phản + quy trình ground-truth ở `docs/audit.md` §13.
 - **Mobile-first:** vùng chạm ~40px, nav cuộn ngang `.scrollbar-none`, bảng dày sticky header + cuộn ngang.
 - **Theme:** **dark-first** với cơ chế đảo màu qua biến CSS (`app/globals.css`): các class `html.dark` / `html.light` / `html.kingblue` / `html.darkblue` / `html.navy`. **Không** dùng `styles/theme.css`/`data-theme` của khung (xem ADR nếu cần) — không hard-code hex, không dùng biến thể `dark:`.
 
 ## 4. Tech stack, thiết kế dữ liệu & kiến trúc
 
-Xem đầy đủ ở `spec.md` §3 (schema/migrate), §9 (tech stack) và `docs/ERD.md` (bảng/cột/FK) — không lặp lại ở đây để tránh 2 nguồn trôi khỏi nhau. Tóm tắt: Next.js 16.2 + React 19.2 + TypeScript strict + Tailwind 4.3, PostgreSQL qua `pg` raw SQL với hệ migrate nhẹ (ADR-0003, **không** auto-init/ORM/Supabase), **119 nhóm route** trong `app/api/*` (361 file `route.ts`), kiểm soát quyền ở tầng API (`CAN`/`canTouchTask`, `lib/auth.ts`) **cộng RLS Postgres làm phòng tuyến thứ 2** trên các bảng tài chính/tổ chức **và `engineering_*`** (ADR-0005, `lib/db/index.ts::withProjectScope`).
+Xem đầy đủ ở `spec.md` §3 (schema/migrate), §9 (tech stack) và `docs/ERD.md` (bảng/cột/FK) — không lặp lại ở đây để tránh 2 nguồn trôi khỏi nhau. Tóm tắt: Next.js 16.2 + React 19.2 + TypeScript strict + Tailwind 4.3, PostgreSQL qua `pg` raw SQL với hệ migrate nhẹ (ADR-0003, **không** auto-init/ORM/Supabase), **119 nhóm route** trong `app/api/*` (361 file `route.ts`), kiểm soát quyền ở tầng API (`CAN`/`canTouchTask`, `lib/bao-mat/auth.ts`) **cộng RLS Postgres làm phòng tuyến thứ 2** trên các bảng tài chính/tổ chức **và `engineering_*`** (ADR-0005, `lib/db/index.ts::withProjectScope`).
 
 - **Luồng:** client (`'use client'`) → `/api/*` (route handler, `force-dynamic`) → `lib/*` → `lib/db` → Postgres.
-- **Chuỗi tính toán:** tick dimension → `recomputeTask` → `deriveStatus` → `recomputePackage` → ghi `task_history` (`lib/recompute.ts`, xem `spec.md` §7).
+- **Chuỗi tính toán:** tick dimension → `recomputeTask` → `deriveStatus` → `recomputePackage` → ghi `task_history` (`lib/tien-do/recompute.ts`, xem `spec.md` §7).
 - **Đồng bộ real-time:** SSE `/api/events?sheet=` (watermark `sheetVersion`), fallback poll `/api/tasks/version`.
 
 ## 5. Luồng người dùng chính

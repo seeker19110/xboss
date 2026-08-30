@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { listProjects, listOrganizations } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { listProjects, listOrganizations } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 

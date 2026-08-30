@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN } from "@/lib/nen/date";
 
 type SubSection = "equipment" | "vehicles";
 
@@ -57,7 +57,7 @@ export default function EquipmentVehiclesTab() {
             onClick={() => setActiveSection("equipment")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               activeSection === "equipment"
-                ? "bg-amber-600 text-zinc-950 shadow"
+                ? "bg-amber-600 text-on-accent-dark shadow"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -68,7 +68,7 @@ export default function EquipmentVehiclesTab() {
             onClick={() => setActiveSection("vehicles")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               activeSection === "vehicles"
-                ? "bg-amber-600 text-zinc-950 shadow"
+                ? "bg-amber-600 text-on-accent-dark shadow"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >

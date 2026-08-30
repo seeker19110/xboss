@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { toggleKillSwitch } from "@/lib/engineering-autonomy";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { toggleKillSwitch } from "@/lib/ky-thuat/engineering-autonomy";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ export async function POST(req: Request) {
   }
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-autonomy", projectId);
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({}));
   const isActive = Boolean(body?.isActive);

@@ -10,7 +10,7 @@ import {
   listBiddingPackages,
   runBiddingAnalysis,
   BiddingLineItem,
-} from "@/lib/engineering-bidding-matrix";
+} from "@/lib/ky-thuat/engineering-bidding-matrix";
 
 const HAS_DB = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 

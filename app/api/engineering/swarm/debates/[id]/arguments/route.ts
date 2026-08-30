@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { addSwarmArgument, SwarmAgentRole, DebateStance } from "@/lib/engineering-swarm";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { addSwarmArgument, SwarmAgentRole, DebateStance } from "@/lib/ky-thuat/engineering-swarm";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,10 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
   if (!CAN.viewEngineeringAgentSessions(user.role)) {
     return NextResponse.json({ error: "Không có quyền thêm lập luận Swarm" }, { status: 403 });
   }
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-swarm", projectId);
+  if (blocked) return blocked;
 
   try {
     const body = await req.json();

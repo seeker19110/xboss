@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, queryOne } from "@/lib/db";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
-import { formatDateVN } from "@/lib/date";
-import { groupDelayedTasks } from "@/lib/delayed-groups";
-import { getGroupProgressMap } from "@/lib/group-progress";
-import { getCurrentProjectId } from "@/lib/projects";
+import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/nen/pdf-fonts";
+import { formatDateVN } from "@/lib/nen/date";
+import { groupDelayedTasks } from "@/lib/tien-do/delayed-groups";
+import { getGroupProgressMap } from "@/lib/tien-do/group-progress";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();

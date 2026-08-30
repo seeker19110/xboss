@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   analyzeScanVsBimDeviations,
   saveScanToBimRun,
   listScanToBimRuns,
   BimSpoolModel,
   ScannedPoint3D,
-} from "@/lib/engineering-scan-to-bim";
+} from "@/lib/ky-thuat/engineering-scan-to-bim";
 
 export const dynamic = "force-dynamic";
 

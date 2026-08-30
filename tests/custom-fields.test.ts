@@ -11,7 +11,7 @@ test(
   "custom-fields: validateCustom đúng type/options/required + chặn key lạ",
   { skip: !HAS_TEST_DB },
   async () => {
-    const cf = await import("@/lib/custom-fields");
+    const cf = await import("@/lib/ha-tang/custom-fields");
     const { run } = await import("@/lib/db");
 
     // Dọn + tạo 4 def áp mọi dự án cho entity 'task'.
@@ -72,7 +72,7 @@ test(
   "custom-fields: PATCH merge shallow không đè field khác + keyInUse",
   { skip: !HAS_TEST_DB },
   async () => {
-    const cf = await import("@/lib/custom-fields");
+    const cf = await import("@/lib/ha-tang/custom-fields");
     const { insertId, run, queryOne } = await import("@/lib/db");
 
     // Dựng chuỗi WBS tối thiểu để có 1 task thật.

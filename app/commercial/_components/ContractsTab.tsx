@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN } from "@/lib/nen/date";
 
 type SubSection = "contracts" | "costs" | "insurance";
 
@@ -74,7 +74,7 @@ export default function ContractsTab() {
             onClick={() => setActiveSection("contracts")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               activeSection === "contracts"
-                ? "bg-amber-600 text-zinc-950 shadow"
+                ? "bg-amber-600 text-on-accent-dark shadow"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -85,7 +85,7 @@ export default function ContractsTab() {
             onClick={() => setActiveSection("costs")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               activeSection === "costs"
-                ? "bg-amber-600 text-zinc-950 shadow"
+                ? "bg-amber-600 text-on-accent-dark shadow"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -96,7 +96,7 @@ export default function ContractsTab() {
             onClick={() => setActiveSection("insurance")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               activeSection === "insurance"
-                ? "bg-amber-600 text-zinc-950 shadow"
+                ? "bg-amber-600 text-on-accent-dark shadow"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >

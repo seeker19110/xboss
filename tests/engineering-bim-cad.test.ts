@@ -6,7 +6,7 @@ import {
   generateClashRerouteSolution,
   computeElementQto,
   BoundingBox3D,
-} from "@/lib/engineering-bim-cad";
+} from "@/lib/ky-thuat/engineering-bim-cad";
 
 test("BIM-CAD: checkAabbIntersection phát hiện chính xác va chạm cứng (Hard Clash)", () => {
   const boxA: BoundingBox3D = { min: [1000, 2000, 2800], max: [5000, 2500, 3100] };

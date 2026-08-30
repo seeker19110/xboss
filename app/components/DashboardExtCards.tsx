@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { ShieldAlert, FilePlus2, MapPinned, Inbox } from "lucide-react";
 import EditableText from "@/app/components/EditableText";
-import { systemColorClasses } from "@/lib/systemColors";
+import { systemColorClasses } from "@/lib/nen/systemColors";
 
 export type QualityBlock = {
   ncrOpen: number;
@@ -126,7 +126,7 @@ export default function DashboardExtCards({
                 <MapPinned className="w-4 h-4 text-emerald-400" /> Mặt bằng thi công
               </span>
               {workfront.waitingFloors > 0 && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-800/60">
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
                   {workfront.waitingFloors} tầng chờ
                 </span>
               )}

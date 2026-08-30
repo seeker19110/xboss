@@ -13,7 +13,7 @@ import {
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { fetchMe, invalidateMe, redirectToLogin } from "@/app/lib/me";
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_LABELS } from "@/lib/nen/roles";
 import TwoFactorSection from "@/app/components/TwoFactorSection";
 
 type Me = { id: number; name: string; email: string; role: string };

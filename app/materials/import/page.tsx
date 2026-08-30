@@ -193,7 +193,7 @@ export default function ImportMaterialsPage() {
 
       <main className="p-6 max-w-4xl mx-auto space-y-5">
         {/* Hướng dẫn ngắn */}
-        <div className="bg-emerald-950/20 border border-emerald-800/40 rounded-xl p-4 flex items-start gap-3 text-xs text-emerald-200/90 leading-relaxed">
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-start gap-3 text-xs text-emerald-300 leading-relaxed">
           <Layers className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold text-emerald-300 text-sm mb-0.5">
@@ -275,7 +275,7 @@ export default function ImportMaterialsPage() {
                     onClick={() => setSelectedExcelSheet(sName)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border ${
                       selectedExcelSheet === sName
-                        ? "bg-emerald-600 border-emerald-500 text-white shadow-sm"
+                        ? "bg-emerald-700 border-emerald-500 text-on-accent shadow-sm"
                         : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600"
                     }`}
                   >
@@ -343,8 +343,8 @@ export default function ImportMaterialsPage() {
                     ${
                       mode === opt.value
                         ? opt.value === "replace"
-                          ? "border-red-600 bg-red-950/40 text-red-200"
-                          : "border-emerald-600 bg-emerald-950/40 text-emerald-200"
+                          ? "border-red-500/50 bg-red-500/10 text-red-300"
+                          : "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
                         : "border-zinc-800 bg-zinc-950/40 hover:border-zinc-700 text-zinc-400"
                     }`}
                 >
@@ -374,7 +374,7 @@ export default function ImportMaterialsPage() {
             <button
               onClick={doImport}
               disabled={!file || !systemId || busy}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white rounded-xl px-6 py-2.5 text-sm font-semibold transition shadow-md shadow-emerald-950"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-800 disabled:text-zinc-500 text-on-accent rounded-xl px-6 py-2.5 text-sm font-semibold transition shadow-md shadow-emerald-950"
             >
               <Upload className="w-4 h-4" />
               {busy ? "Đang xử lý import..." : "Bắt đầu import"}

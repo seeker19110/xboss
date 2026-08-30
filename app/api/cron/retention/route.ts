@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN, checkCronSecret } from "@/lib/auth";
-import { runRetention, AUDIT_LOG_KHONG_XOA } from "@/lib/retention";
-import { log } from "@/lib/log";
+import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
+import { runRetention, AUDIT_LOG_KHONG_XOA } from "@/lib/ha-tang/retention";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 

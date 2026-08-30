@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { appConfirm, Modal } from "@/app/components/dialogs";
 import { fetchMe } from "@/app/lib/me";
-import { todayISO, formatDateVN } from "@/lib/date";
+import { todayISO, formatDateVN } from "@/lib/nen/date";
 import RatingModal from "@/app/procurement/_components/RatingModal";
 
 type PO = {
@@ -522,7 +522,7 @@ export default function OrdersTab() {
             onClick={() => setSubView("po")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               subView === "po"
-                ? "bg-amber-600 text-zinc-950 shadow"
+                ? "bg-amber-600 text-on-accent-dark shadow"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -536,7 +536,7 @@ export default function OrdersTab() {
             onClick={() => setSubView("pr")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               subView === "pr"
-                ? "bg-amber-600 text-zinc-950 shadow"
+                ? "bg-amber-600 text-on-accent-dark shadow"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -551,7 +551,7 @@ export default function OrdersTab() {
           {subView === "po" && canManage && (
             <button
               onClick={() => setShowCreatePO(true)}
-              className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-zinc-950 rounded-xl px-3.5 py-2 text-xs font-semibold transition shadow"
+              className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-on-accent-dark rounded-xl px-3.5 py-2 text-xs font-semibold transition shadow"
             >
               <Plus className="w-4 h-4" /> Lập Đơn Hàng PO
             </button>
@@ -560,7 +560,7 @@ export default function OrdersTab() {
           {subView === "pr" && (
             <button
               onClick={() => setShowAddPR(true)}
-              className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-zinc-950 rounded-xl px-3.5 py-2 text-xs font-semibold transition shadow"
+              className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-on-accent-dark rounded-xl px-3.5 py-2 text-xs font-semibold transition shadow"
             >
               <Plus className="w-4 h-4" /> Gửi Yêu Cầu PR
             </button>
@@ -711,7 +711,7 @@ export default function OrdersTab() {
                       {canManage && po.status === "draft" && (
                         <button
                           onClick={() => updatePOStatus(po.id, "confirmed")}
-                          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-zinc-950 font-semibold text-xs transition"
+                          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-on-accent font-semibold text-xs transition"
                         >
                           Xác Nhận Đơn
                         </button>
@@ -719,7 +719,7 @@ export default function OrdersTab() {
                       {canManage && po.status === "confirmed" && (
                         <button
                           onClick={() => updatePOStatus(po.id, "delivering")}
-                          className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-zinc-950 font-semibold text-xs transition"
+                          className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-on-accent-dark font-semibold text-xs transition"
                         >
                           Đang Vận Chuyển
                         </button>
@@ -727,7 +727,7 @@ export default function OrdersTab() {
                       {canManage && ["delivering", "partial"].includes(po.status) && (
                         <button
                           onClick={() => openReceive(po)}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-zinc-950 font-semibold text-xs transition flex items-center gap-1.5 shadow"
+                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-on-accent-dark font-semibold text-xs transition flex items-center gap-1.5 shadow"
                         >
                           <Package className="w-3.5 h-3.5" /> Nhận Hàng (GRN)
                         </button>
@@ -735,7 +735,7 @@ export default function OrdersTab() {
                       {canManage && po.status === "received" && (
                         <button
                           onClick={() => updatePOStatus(po.id, "reconciled")}
-                          className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-zinc-950 font-semibold text-xs transition"
+                          className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-on-accent-dark font-semibold text-xs transition"
                         >
                           Khớp & Đối Chiếu Xong
                         </button>
@@ -864,7 +864,7 @@ export default function OrdersTab() {
                                 setReviewPRModal(r);
                                 setReviewPRNote("");
                               }}
-                              className="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 text-zinc-950 font-semibold text-[11px] transition shadow"
+                              className="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-[11px] transition shadow"
                             >
                               Xét Duyệt
                             </button>
@@ -1028,7 +1028,7 @@ export default function OrdersTab() {
               <button
                 disabled={saving}
                 onClick={createPO}
-                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-zinc-950 font-semibold text-xs transition shadow disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-xs transition shadow disabled:opacity-50"
               >
                 {saving ? "Đang tạo..." : "Phát Hành Đơn Hàng"}
               </button>
@@ -1101,7 +1101,7 @@ export default function OrdersTab() {
               <button
                 disabled={saving}
                 onClick={submitReceive}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-zinc-950 font-semibold text-xs transition shadow disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-on-accent-dark font-semibold text-xs transition shadow disabled:opacity-50"
               >
                 {saving ? "Đang ghi nhận..." : "Xác Nhận Nhập Kho (GRN)"}
               </button>
@@ -1170,7 +1170,7 @@ export default function OrdersTab() {
               <button
                 disabled={saving}
                 onClick={submitPR}
-                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-zinc-950 font-semibold text-xs transition shadow disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-xs transition shadow disabled:opacity-50"
               >
                 {saving ? "Đang gửi..." : "Gửi Phê Duyệt PR"}
               </button>
@@ -1237,7 +1237,7 @@ export default function OrdersTab() {
               <button
                 disabled={saving}
                 onClick={() => handleReviewPR(reviewPRModal.id, "approved")}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-zinc-950 font-semibold text-xs transition shadow"
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-on-accent-dark font-semibold text-xs transition shadow"
               >
                 Phê Duyệt
               </button>

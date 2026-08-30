@@ -4,7 +4,7 @@
 // CI (.github/workflows/ci.yml) chạy script này sau bước test rồi
 // `git diff --exit-code docs/ERD.md` → ERD lệch schema là CI đỏ. Không sửa tay.
 import "./env";
-import { query } from "../lib/db";
+import { query } from "@/lib/db";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 

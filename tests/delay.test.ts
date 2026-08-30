@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DELAY_REASONS, DELAY_REASON_LABEL, isDelayReason } from "@/lib/delay";
+import { DELAY_REASONS, DELAY_REASON_LABEL, isDelayReason } from "@/lib/tien-do/delay";
 
 test("DELAY_REASONS: đúng 6 giá trị theo đúng thứ tự", () => {
   assert.deepEqual(DELAY_REASONS, [

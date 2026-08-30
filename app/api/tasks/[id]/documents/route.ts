@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/storage";
+import { storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
-import {
-  extForDocMime,
-  verifyFileMime,
-  newDocFileName,
-  MAX_DOC_BYTES,
-  sha256Hex,
-  isContentTooLarge,
-} from "@/lib/photos";
-import { DOC_CATEGORIES, type DocCategory } from "@/lib/qaqc";
-import { extractPdfText } from "@/lib/pdf-extract";
+import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { newDocFileName, MAX_DOC_BYTES, sha256Hex, parseUploadedFile } from "@/lib/nen/photos";
+import { DOC_CATEGORIES, type DocCategory } from "@/lib/ky-thuat/qaqc";
+import { extractPdfText } from "@/lib/nen/pdf-extract";
 
 export const dynamic = "force-dynamic";
 
@@ -78,37 +71,9 @@ export async function POST(
       { status: 403 },
     );
 
-  if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
-    return NextResponse.json(
-      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
-      { status: 413 },
-    );
-
-  const form = await req.formData().catch(() => null);
-  const file = form?.get("file");
-  if (!form || !(file instanceof File))
-    return NextResponse.json({ error: "Thiếu file (field 'file')" }, { status: 400 });
-
-  const ext = extForDocMime(file.type);
-  if (!ext)
-    return NextResponse.json(
-      {
-        error: `Chỉ nhận PDF hoặc ảnh (jpg/png/webp/gif/heic), nhận được: ${file.type || "không rõ"}`,
-      },
-      { status: 415 },
-    );
-  if (file.size > MAX_DOC_BYTES)
-    return NextResponse.json(
-      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
-      { status: 413 },
-    );
-
-  const fileBuf = Buffer.from(await file.arrayBuffer());
-  if (!verifyFileMime(fileBuf, file.type))
-    return NextResponse.json(
-      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
-      { status: 415 },
-    );
+  const up = await parseUploadedFile(req, { accept: "document", maxBytes: MAX_DOC_BYTES });
+  if (!up.ok) return NextResponse.json({ error: up.error }, { status: up.status });
+  const { form, file, ext, buf: fileBuf } = up;
 
   const caption = String(form.get("caption") ?? "").trim() || null;
   const docCategoryRaw = String(form.get("docCategory") ?? "").trim();

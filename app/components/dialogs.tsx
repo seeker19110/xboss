@@ -243,8 +243,8 @@ export default function AppDialogs() {
             autoFocus={current.kind !== "prompt"}
             className={`px-5 py-2 text-sm rounded-xl font-medium text-white transition active:scale-[0.98] min-h-[40px] shadow-sm ${
               current.kind === "confirm" && current.danger
-                ? "bg-red-600 hover:bg-red-700"
-                : "bg-emerald-600 hover:bg-emerald-700"
+                ? "bg-red-700 hover:bg-red-800"
+                : "bg-emerald-700 hover:bg-emerald-800"
             }`}
           >
             {current.kind === "confirm" ? (current.confirmLabel ?? "Đồng ý") : "OK"}

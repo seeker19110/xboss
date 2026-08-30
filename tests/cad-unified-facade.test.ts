@@ -2,9 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  // 1. Skills: Diff, Lisp, Font, Layer
+  // 1. Skills: Diff, Font, Layer
   computeCadVectorDiff,
-  generateAutoLispDetailScript,
   convertTcvn3ToUnicode,
   normalizeCadLayers,
   type CadEntity,
@@ -35,9 +34,9 @@ import {
   calculate6dCarbonLca,
   evaluateAssetHealthAndRul,
   exportDigitalTwinPassport,
-} from "@/lib/cad";
+} from "@/lib/ky-thuat/cad";
 
-test("CAD Unified Facade: 1. Vector Diffing & AutoLISP & Font Doctor", () => {
+test("CAD Unified Facade: 1. Vector Diffing & Font Doctor", () => {
   // Vector Diffing
   const base: CadEntity[] = [
     {
@@ -65,10 +64,6 @@ test("CAD Unified Facade: 1. Vector Diffing & AutoLISP & Font Doctor", () => {
   assert.equal(diff.totalBase, 1);
   assert.equal(diff.totalCompare, 2);
   assert.ok(diff.differences.length > 0);
-
-  // AutoLISP Generation
-  const lisp = generateAutoLispDetailScript("hanger", { widthMm: 600, heightMm: 400 });
-  assert.ok(lisp.includes("DRAW_TRAPEZE_HANGER"));
 
   // Font Repair
   const converted = convertTcvn3ToUnicode("XBoss §ång c¬");

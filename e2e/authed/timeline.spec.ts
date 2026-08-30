@@ -1,11 +1,13 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-// Trang Timeline tầng (/timeline) — bản đồ tiến độ theo tầng (ProgressMap), chỉ đọc.
+// Bản đồ tiến độ theo tầng (ProgressMap), chỉ đọc. Đã GỘP vào khối "Bản Đồ Tiến Độ Theo
+// Tầng & Hệ" trong tab "Lưới WBS & Kiểm Soát Trễ" của hub /schedule; route /timeline cũ
+// chỉ còn chuyển hướng sang đây (audit 2026-08-25 §3.4).
 
 async function gotoTimeline(page: Page) {
-  await page.goto("/timeline");
-  await expect(page.locator("header").getByText("Timeline tầng")).toBeVisible({
+  await page.goto("/schedule?tab=wbs");
+  await expect(page.getByText("Bản Đồ Tiến Độ Theo Tầng & Hệ")).toBeVisible({
     timeout: 15_000,
   });
 }
@@ -13,6 +15,14 @@ async function gotoTimeline(page: Page) {
 test.describe("Timeline tầng (sau đăng nhập)", () => {
   test("render nội dung chính", async ({ page }) => {
     await gotoTimeline(page);
+  });
+
+  test("route /timeline cũ chuyển hướng sang tab WBS của /schedule", async ({ page }) => {
+    await page.goto("/timeline");
+    await expect(page).toHaveURL(/\/schedule\?tab=wbs/, { timeout: 15_000 });
+    await expect(page.getByText("Bản Đồ Tiến Độ Theo Tầng & Hệ")).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {

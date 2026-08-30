@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   resolveConflict,
   RESOLUTION_METHODS,
   AgentSessionError,
   VoteNotAllowedError,
   type ResolutionMethod,
-} from "@/lib/engineering-agents";
+} from "@/lib/ky-thuat/engineering-agents";
 
 export const dynamic = "force-dynamic";
 

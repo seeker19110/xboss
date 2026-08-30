@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { todayISO } from "@/lib/date";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { todayISO } from "@/lib/nen/date";
 import {
   WARRANTY_CLAIM_SEVERITIES,
   WARRANTY_CLAIM_STATUSES,
@@ -11,7 +11,7 @@ import {
   validateClaimInput,
   type WarrantyClaimSeverity,
   type WarrantyClaimStatus,
-} from "@/lib/warranty";
+} from "@/lib/hien-truong/warranty";
 
 export const dynamic = "force-dynamic";
 

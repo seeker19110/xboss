@@ -26,6 +26,8 @@ import {
   ChevronUp,
   AlertCircle,
   ShieldCheck,
+  Cpu,
+  Undo2,
   type LucideIcon,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
@@ -38,7 +40,13 @@ import { fetchMe, type Me } from "@/app/lib/me";
 
 export type DrawingKind = "design" | "shop" | "asbuilt" | "bim" | "method";
 export type RevisionStatus =
-  "submitted" | "commented" | "approved" | "approved_with_comments" | "rejected" | "superseded";
+  | "submitted"
+  | "commented"
+  | "approved"
+  | "approved_with_comments"
+  | "rejected"
+  | "superseded"
+  | "withdrawn";
 
 export type TradeDiscipline = "all" | "M" | "E" | "P" | "F" | "ELV";
 
@@ -68,6 +76,7 @@ const STATUS_LABEL: Record<RevisionStatus, string> = {
   approved_with_comments: "Duyệt kèm ý kiến",
   rejected: "Từ chối",
   superseded: "Đã thay thế",
+  withdrawn: "Đã thu hồi",
 };
 
 const STATUS_BADGE: Record<RevisionStatus, string> = {
@@ -77,6 +86,7 @@ const STATUS_BADGE: Record<RevisionStatus, string> = {
   approved_with_comments: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
   rejected: "bg-rose-500/10 text-rose-400 border-rose-500/30",
   superseded: "bg-zinc-800 text-zinc-500 border-zinc-700 line-through",
+  withdrawn: "bg-zinc-800 text-zinc-400 border-zinc-700",
 };
 
 const STATUS_ICON: Record<RevisionStatus, LucideIcon> = {
@@ -86,6 +96,7 @@ const STATUS_ICON: Record<RevisionStatus, LucideIcon> = {
   approved_with_comments: CheckCircle2,
   rejected: XCircle,
   superseded: History,
+  withdrawn: Undo2,
 };
 
 export type DrawingRow = {
@@ -124,6 +135,15 @@ export type DrawingRevisionRow = {
   uploadedBy: number | null;
   uploaderName: string | null;
   createdAt: string;
+  // M99 PR5 — revision do plugin AutoCAD đẩy lên mang kèm ngữ cảnh chuẩn hóa; tải tay từ web
+  // (sourceTool = null) thì các trường này rỗng, chip "Từ plugin" tự ẩn.
+  sourceTool: string | null;
+  rulePackVersion: string | null;
+  kiemDinh: { ok: boolean; soLoi: number; soCanhBao: number; canhBao: string[] } | null;
+  contentSha256: string | null;
+  // Cờ server tính sẵn: chính chủ + còn ở trạng thái chưa quyết mới được tự thu hồi — không
+  // suy từ uploadedBy ở client (xem GET /api/drawings/:id).
+  canWithdraw?: boolean;
 };
 
 const fmtSize = (b: number) =>
@@ -450,9 +470,6 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
                 <span className="font-bold tracking-tight text-zinc-100 text-sm sm:text-base uppercase">
                   {pageTitle}
                 </span>
-                <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-400 border border-emerald-500/20">
-                  LOD 400 • TT AVIO
-                </span>
               </div>
               <span className="text-[11px] text-zinc-400 line-clamp-1">
                 Tiến độ: <b className="text-zinc-200">{stats.pct}%</b> ({stats.approved}/
@@ -466,7 +483,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm bản vẽ"
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-white shadow-sm h-10 min-h-[44px]"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10 min-h-[44px]"
             >
               <Plus className="w-4 h-4" /> <span>Thêm bản vẽ</span>
             </button>
@@ -483,7 +500,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               onClick={() => setViewTab("all")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
                 viewTab === "all"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -503,7 +520,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               onClick={() => setViewTab("design")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
                 viewTab === "design"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -525,7 +542,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               onClick={() => setViewTab("approved")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
                 viewTab === "approved"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -547,7 +564,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               onClick={() => setViewTab("submitted")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
                 viewTab === "submitted"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -569,7 +586,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               onClick={() => setViewTab("unapproved")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
                 viewTab === "unapproved"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -591,7 +608,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               onClick={() => setViewTab("rejected")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
                 viewTab === "rejected"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -1000,6 +1017,30 @@ function DrawingWorkspaceDetail({
     }
   }
 
+  async function withdraw(rev: DrawingRevisionRow) {
+    const ok = await appConfirm(
+      `Thu hồi Rev ${rev.rev} vừa gửi? Bản vẽ sẽ không còn nằm trong hàng chờ duyệt — bạn có thể tải lên bản khác sau.`,
+      { danger: true, confirmLabel: "Thu hồi" },
+    );
+    if (!ok) return;
+    setBusyRevId(rev.id);
+    try {
+      const res = await fetch(`/api/drawings/revisions/${rev.id}/withdraw`, { method: "POST" });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast(j?.error ?? "Không thu hồi được revision", "error");
+        return;
+      }
+      showToast("Đã thu hồi revision");
+      loadRevs({ fresh: true });
+      onChanged();
+    } catch {
+      showToast("Mất kết nối — kiểm tra mạng rồi thử lại", "error");
+    } finally {
+      setBusyRevId(null);
+    }
+  }
+
   function viewFile(revId: number) {
     window.open(`/api/drawings/revisions/${revId}/file`, "_blank", "noopener,noreferrer");
   }
@@ -1069,7 +1110,7 @@ function DrawingWorkspaceDetail({
         <button
           onClick={() => drawing.approvedRevisionId && viewFile(drawing.approvedRevisionId)}
           disabled={!drawing.approvedRevisionId}
-          className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition text-white shadow-md min-h-[44px]"
+          className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition text-on-accent shadow-md min-h-[44px]"
         >
           <ExternalLink className="w-4 h-4" />
           {drawing.approvedRevisionId
@@ -1211,6 +1252,28 @@ function DrawingWorkspaceDetail({
                     <b className="text-zinc-300">{r.uploaderName ?? "—"}</b>
                   </p>
 
+                  {/* M99 PR5 — nguồn plugin AutoCAD: rulepack + kết quả kiểm định server (chip có
+                      nhãn chữ, không truyền thông tin chỉ qua màu). */}
+                  {r.sourceTool === "plugin" && (
+                    <div className="mt-1.5">
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border bg-violet-950/60 border-violet-800 text-violet-300"
+                        title={
+                          r.contentSha256
+                            ? `Đẩy lên từ plugin AutoCAD — sha256 ${r.contentSha256.slice(0, 16)}…`
+                            : "Đẩy lên từ plugin AutoCAD"
+                        }
+                      >
+                        <Cpu className="w-3 h-3" />
+                        Từ plugin
+                        {r.rulePackVersion ? ` · rulepack ${r.rulePackVersion}` : ""}
+                        {r.kiemDinh
+                          ? ` · ${r.kiemDinh.soLoi} lỗi / ${r.kiemDinh.soCanhBao} cảnh báo`
+                          : ""}
+                      </span>
+                    </div>
+                  )}
+
                   {r.decisionNote && (
                     <p className="text-xs text-zinc-300 italic mt-1.5 p-2 rounded-lg bg-zinc-950 border border-zinc-800">
                       &ldquo;{r.decisionNote}&rdquo;
@@ -1223,7 +1286,7 @@ function DrawingWorkspaceDetail({
                       <button
                         disabled={isBusy}
                         onClick={() => decide(r, "approved")}
-                        className="flex items-center gap-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition min-h-[38px]"
+                        className="flex items-center gap-1 text-xs font-bold bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent px-3 py-1.5 rounded-lg transition min-h-[38px]"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" /> Duyệt
                       </button>
@@ -1247,6 +1310,21 @@ function DrawingWorkspaceDetail({
                         className="flex items-center gap-1 text-xs font-semibold bg-rose-950 hover:bg-rose-900 disabled:opacity-50 text-rose-200 border border-rose-800 px-2.5 py-1.5 rounded-lg transition min-h-[38px]"
                       >
                         <XCircle className="w-3.5 h-3.5" /> Từ Chối
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Chính người tải lên tự thu hồi bản gửi sai — cờ do server tính, không tin
+                      id ở client (xem GET /api/drawings/:id, canWithdraw). */}
+                  {r.canWithdraw && (
+                    <div className="mt-2.5 pt-2.5 border-t border-zinc-800">
+                      <button
+                        disabled={isBusy}
+                        onClick={() => withdraw(r)}
+                        aria-label={`Thu hồi Rev ${r.rev}`}
+                        className="flex items-center gap-1 text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 border border-zinc-700 px-2.5 py-1.5 rounded-lg transition min-h-[38px]"
+                      >
+                        <Undo2 className="w-3.5 h-3.5" /> Thu Hồi
                       </button>
                     </div>
                   )}
@@ -1428,7 +1506,7 @@ function DrawingFormModal({
           <button
             onClick={submit}
             disabled={!canSubmit || saving}
-            className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-xl font-bold text-white shadow-sm min-h-[44px]"
+            className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 rounded-xl font-bold text-on-accent shadow-sm min-h-[44px]"
           >
             {saving ? "Đang lưu..." : "Lưu"}
           </button>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, query, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { deriveStatus, recomputePackage } from "@/lib/recompute";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { deriveStatus, recomputePackage } from "@/lib/tien-do/recompute";
 
 export const dynamic = "force-dynamic";
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { withTransaction } from "@/lib/db";
-import { requireApiKey } from "@/lib/api-keys";
+import { requireApiKey } from "@/lib/bao-mat/api-keys";
 import {
   engineeringSourceExternalInputSchema,
   engineeringSourceRevisionExternalInputSchema,
@@ -14,7 +14,7 @@ import {
   upsertEngineeringRelationFromExternal,
   createEngineeringRelation,
   EngineeringContractError,
-} from "@/lib/engineering-kernel";
+} from "@/lib/ky-thuat/engineering-kernel";
 import {
   hashRequestBody,
   findIngestRequest,
@@ -22,7 +22,7 @@ import {
   MAX_OBJECTS,
   MAX_RELATIONS,
   MAX_BODY_BYTES,
-} from "@/lib/engineering-ingest";
+} from "@/lib/ky-thuat/engineering-ingest";
 
 export const dynamic = "force-dynamic";
 

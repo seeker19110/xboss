@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import {
   Settings,
   Landmark,
@@ -47,36 +47,58 @@ function GovernanceSkeleton() {
 }
 
 function GovernanceContent() {
+  // Dải KPI khởi tạo bằng "—" và CHỈ đổi khi API trả về thật. Trước đây khởi tạo bằng số
+  // cắm cứng ("486 Tài liệu", "24 Thành viên", "1.840 Records") mà trang không gọi API bao
+  // giờ, nên số bịa hiển thị như số thật (audit 2026-08-25 §3.2). Nguồn nào user không đủ
+  // quyền (403) hoặc lỗi thì giữ nguyên "—", không đoán.
   const [stats, setStats] = useState<HubStat[]>([
-    {
-      label: "Điều Kiện Khởi Công",
-      value: "8/8 Tiêu Chí",
-      change: "Đạt chuẩn Đ107",
-      isPositive: true,
-      icon: Landmark,
-    },
-    {
-      label: "Hồ Sơ CDE Lưu Trữ",
-      value: "486 Tài liệu",
-      change: "Phiên bản mới nhất",
-      isPositive: true,
-      icon: FolderOpen,
-    },
-    {
-      label: "Tài Khoản Đang Hoạt Động",
-      value: "24 Thành viên",
-      change: "7 Vai trò RBAC",
-      isPositive: true,
-      icon: Users,
-    },
-    {
-      label: "Nhật Ký Kiểm Toán",
-      value: "1,840 Records",
-      change: "Immutable Audit",
-      isPositive: true,
-      icon: History,
-    },
+    { label: "Checklist Huy Động", value: "—", icon: Landmark },
+    { label: "Hồ Sơ CDE Lưu Trữ", value: "—", icon: FolderOpen },
+    { label: "Tài Khoản Đang Hoạt Động", value: "—", icon: Users },
+    { label: "Nhật Ký Kiểm Toán", value: "—", icon: History },
   ]);
+
+  useEffect(() => {
+    // `r.ok ? json : null` — 401/403 (không đủ quyền xem người dùng/audit trail) rơi về
+    // null và ô giữ "—", không phải số 0 (0 là một khẳng định sai về dữ liệu).
+    const get = (url: string) =>
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+
+    Promise.all([
+      get("/api/mobilization"),
+      get("/api/documents-hub"),
+      get("/api/users"),
+      get("/api/admin/audit-log?limit=1"),
+    ]).then(([mob, docs, users, audit]) => {
+      const items: { status?: string }[] = mob?.items ?? [];
+      setStats([
+        {
+          label: "Checklist Huy Động",
+          value: mob
+            ? `${items.filter((i) => i.status === "done").length}/${items.length} mục`
+            : "—",
+          icon: Landmark,
+        },
+        {
+          label: "Hồ Sơ CDE Lưu Trữ",
+          value: docs ? `${docs.documents?.length ?? 0} tài liệu` : "—",
+          icon: FolderOpen,
+        },
+        {
+          label: "Tài Khoản Đang Hoạt Động",
+          value: users ? `${users.users?.length ?? 0} thành viên` : "—",
+          icon: Users,
+        },
+        {
+          label: "Nhật Ký Kiểm Toán",
+          value: audit ? `${audit.total ?? 0} bản ghi` : "—",
+          icon: History,
+        },
+      ]);
+    });
+  }, []);
 
   // Tab 1: Project Lifecycle (Kickoff & Handover)
   const lifecycleTab = (
@@ -172,7 +194,7 @@ function GovernanceContent() {
           </div>
           <a
             href="/documents"
-            className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-zinc-950 font-semibold text-xs transition-colors inline-flex items-center gap-1.5 shadow"
+            className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors inline-flex items-center gap-1.5 shadow"
           >
             <FolderOpen className="w-3.5 h-3.5" /> Mở Kho Hồ Sơ CDE
           </a>
@@ -238,7 +260,7 @@ function GovernanceContent() {
           <div className="pt-2">
             <a
               href="/environment"
-              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+              className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-on-accent font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
             >
               Hồ Sơ Môi Trường (M25)
             </a>
@@ -287,7 +309,7 @@ function GovernanceContent() {
           <div className="flex items-center gap-2">
             <a
               href="/users"
-              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-zinc-950 font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
+              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
             >
               <Users className="w-3.5 h-3.5" /> Quản Lý Tài Khoản
             </a>
@@ -419,7 +441,7 @@ function GovernanceContent() {
       id: "cde-meetings",
       label: "Hồ Sơ CDE & Công Văn",
       icon: FolderOpen,
-      badge: "486 Docs",
+      badge: "CDE",
       description:
         "Kho dữ liệu CDE, quản lý công văn đi/đến và biên bản cuộc họp giao ban công trường.",
       content: cdeTab,

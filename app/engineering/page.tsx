@@ -26,7 +26,7 @@ import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
-import type { ApexPulseRecord } from "@/lib/engineering-pinnacle-synergy";
+import type { ApexPulseRecord } from "@/lib/ky-thuat/engineering-pinnacle-synergy";
 
 type EngObject = {
   id: string;
@@ -262,7 +262,7 @@ export default function EngineeringApexCockpitPage() {
               <button
                 onClick={triggerPulseScan}
                 disabled={refreshing}
-                className="flex min-h-[44px] items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-emerald-700 active:scale-[0.98] shadow-sm disabled:opacity-50"
+                className="flex min-h-[44px] items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-semibold text-on-accent transition hover:bg-emerald-800 active:scale-[0.98] shadow-sm disabled:opacity-50"
               >
                 <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
                 <span>{refreshing ? "Đang quét toàn hệ..." : "Quét Đồng Bộ 5 Trục"}</span>
@@ -556,6 +556,13 @@ export default function EngineeringApexCockpitPage() {
                     className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
                   >
                     <span>Chuẩn Hóa Bản Vẽ CAD 2D (ISO 19650)</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
+                  </Link>
+                  <Link
+                    href="/engineering/joint-segmentation"
+                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+                  >
+                    <span>Chia Đốt MEPF Theo Kiểu Kết Nối (M105)</span>
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
                 </div>
@@ -893,7 +900,7 @@ export default function EngineeringApexCockpitPage() {
                         disabled={submitting}
                         onClick={() => review("approved")}
                         aria-label="Duyệt đối tượng kỹ thuật"
-                        className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm text-white hover:bg-emerald-600 disabled:opacity-50"
+                        className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm text-on-accent hover:bg-emerald-800 disabled:opacity-50"
                       >
                         <Check size={14} /> {submitting ? "Đang lưu..." : "Duyệt"}
                       </button>

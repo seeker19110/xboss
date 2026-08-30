@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { todayISO } from "@/lib/nen/date";
 import {
   Plus,
   X,
@@ -56,10 +57,6 @@ type Correspondence = {
   note: string | null;
   createdAt: string;
 };
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export default function CorrespondencesPage() {
   const [me, setMe] = useState<Me | null>(null);
@@ -124,7 +121,7 @@ export default function CorrespondencesPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm công văn"
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-white shadow-sm h-10"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm công văn</span>
             </button>
@@ -481,7 +478,7 @@ function AddCorrespondenceModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo công văn"}
         </button>
@@ -689,7 +686,7 @@ function CorrespondenceDetailModal({
                 <button
                   onClick={sendReply}
                   disabled={busy || !replyCode.trim() || !replySubject.trim()}
-                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
+                  className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
                 >
                   Gửi trả lời
                 </button>

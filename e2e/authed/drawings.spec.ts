@@ -16,8 +16,12 @@ test.describe("Bản vẽ (sau đăng nhập)", () => {
   }) => {
     await gotoDrawings(page);
     await expect(page.getByText("Chưa có bản vẽ nào")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Tất cả trạng thái" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Đã duyệt", exact: true })).toBeVisible();
+    // Chip trạng thái nay là "Tất cả" (không còn "Tất cả trạng thái") và tên khả truy cập
+    // của nút gồm cả số đếm ("Tất cả 0") nên khớp theo tiền tố.
+    await expect(page.getByRole("main").getByRole("button", { name: /^Tất cả/ })).toBeVisible();
+    await expect(
+      page.getByRole("main").getByRole("button", { name: /^Bản vẽ đã duyệt/ }),
+    ).toBeVisible();
     // Chọn loại giờ nằm ở cụm sidebar "Thiết kế & BPTC" — trang không còn chip loại.
     await expect(page.getByRole("main").getByRole("button", { name: "Tất cả loại" })).toHaveCount(
       0,
@@ -29,7 +33,8 @@ test.describe("Bản vẽ (sau đăng nhập)", () => {
   // trên khi 2 project cùng chạy (xem cùng convention ở contracts.spec.ts/quality.spec.ts).
   test("Admin mở được modal thêm bản vẽ", async ({ page }) => {
     await gotoDrawings(page);
-    await page.getByRole("button", { name: "Thêm bản vẽ" }).click();
+    // exact: trạng thái rỗng còn một nút "Thêm Bản Vẽ Mới" cũng khớp nếu không giới hạn.
+    await page.getByRole("button", { name: "Thêm bản vẽ", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Thêm bản vẽ" })).toBeVisible();
 
     await page.getByPlaceholder("ACMV-SD-T05-001").fill("E2E-DRW-001");

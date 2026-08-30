@@ -93,6 +93,8 @@ interface RouteOption {
 export default function MepfLifecyclePage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabMode>("floorplan");
+  // Tên dự án đọc từ DB — không hard-code tên dự án trong payload gửi lên API.
+  const [projectName, setProjectName] = useState<string>("");
   const [takeoffRuns, setTakeoffRuns] = useState<TakeoffRunItem[]>([]);
   const [tcMatrices, setTcMatrices] = useState<TcMatrixItem[]>([]);
   const [runningTakeoff, setRunningTakeoff] = useState(false);
@@ -189,6 +191,13 @@ export default function MepfLifecyclePage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/project")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setProjectName(j?.name ?? ""))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -356,7 +365,7 @@ export default function MepfLifecyclePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "fidic_claim",
-          projectName: "TT AVIO Tháp A (MEPF)",
+          projectName,
           claimCode: `CLM-FIDIC-${Date.now().toString(36).toUpperCase()}`,
           eventDescription:
             "Bổ sung 25.5m ống cứu hỏa DN100 do thay đổi thiết kế mặt bằng phân phòng Tầng 5",
@@ -938,7 +947,7 @@ export default function MepfLifecyclePage() {
                     <button
                       onClick={handleRunLod400Dfma}
                       disabled={runningLod400}
-                      className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition shadow flex items-center gap-2"
+                      className="px-4 py-2 bg-cyan-700 hover:bg-cyan-800 text-on-accent rounded-lg text-xs font-bold transition shadow flex items-center gap-2"
                     >
                       <Sparkles className={`w-3.5 h-3.5 ${runningLod400 ? "animate-spin" : ""}`} />
                       {runningLod400
@@ -1097,17 +1106,19 @@ export default function MepfLifecyclePage() {
                         className="px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg text-xs font-bold transition border border-neutral-700 flex items-center gap-1.5"
                       >
                         <FileText className="w-3.5 h-3.5 text-blue-400" />
-                        1-Click Hồ Sơ FIDIC / EOT
+                        Sinh Thử Hồ Sơ FIDIC (dữ liệu mẫu)
                       </button>
                       <button
                         onClick={handleRunBomExplosion}
                         disabled={runningBomExplosion}
-                        className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition shadow flex items-center gap-2"
+                        className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-on-accent rounded-lg text-xs font-bold transition shadow flex items-center gap-2"
                       >
                         <Sparkles
                           className={`w-3.5 h-3.5 ${runningBomExplosion ? "animate-spin" : ""}`}
                         />
-                        {runningBomExplosion ? "Đang Phân Tích..." : "Chạy Giải Mã Đơn Giá & BOM"}
+                        {runningBomExplosion
+                          ? "Đang Phân Tích..."
+                          : "Chạy Thử Giải Mã Đơn Giá (dữ liệu mẫu, có lưu)"}
                       </button>
                     </div>
                   </div>
@@ -1314,7 +1325,7 @@ export default function MepfLifecyclePage() {
                       <button
                         onClick={handleRunHydraulic}
                         disabled={runningHydraulic}
-                        className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded text-xs font-bold transition shadow flex items-center justify-center gap-2"
+                        className="w-full py-2.5 bg-sky-700 hover:bg-sky-800 text-on-accent rounded text-xs font-bold transition shadow flex items-center justify-center gap-2"
                       >
                         <Sparkles className={`w-4 h-4 ${runningHydraulic ? "animate-spin" : ""}`} />
                         {runningHydraulic
@@ -1520,7 +1531,7 @@ export default function MepfLifecyclePage() {
                     <button
                       onClick={handleRunVoiceInspection}
                       disabled={runningVoice}
-                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition shadow flex items-center justify-center gap-2"
+                      className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-on-accent rounded text-xs font-bold transition shadow flex items-center justify-center gap-2"
                     >
                       <Volume2 className={`w-4 h-4 ${runningVoice ? "animate-spin" : ""}`} />
                       {runningVoice ? "Đang Bóc Tách Thực Thể..." : "Phân Tích Ngữ Nghĩa Giọng Nói"}
@@ -1844,7 +1855,7 @@ export default function MepfLifecyclePage() {
                     <button
                       onClick={handleEvaluateHydrostatic}
                       disabled={runningTcEval}
-                      className="w-full py-2 bg-sky-600 hover:bg-sky-500 text-white rounded text-xs font-medium transition"
+                      className="w-full py-2 bg-sky-700 hover:bg-sky-800 text-on-accent rounded text-xs font-medium transition"
                     >
                       {runningTcEval ? "Đang Phân Tích..." : "Chạy Thuật Toán Đánh Giá Áp Lực"}
                     </button>

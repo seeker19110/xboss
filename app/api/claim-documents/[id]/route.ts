@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storageGet, storageDelete } from "@/lib/storage";
+import { storageGet, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run, withProjectScope } from "@/lib/db";
-import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getClaim } from "@/lib/claims";
-import { sha256Hex } from "@/lib/photos";
+import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getClaim } from "@/lib/tai-chinh/claims";
+import { sha256Hex } from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 

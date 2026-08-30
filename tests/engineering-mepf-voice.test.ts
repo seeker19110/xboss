@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseVoiceInspectionText, calculateProductivityIndex } from "@/lib/engineering-mepf-voice";
+import {
+  parseVoiceInspectionText,
+  calculateProductivityIndex,
+} from "@/lib/ky-thuat/engineering-mepf-voice";
 
 test("M68: parseVoiceInspectionText bóc tách chính xác vị trí, Spool ID và trạng thái tiến độ", () => {
   const text = "Tại Tầng 5 Zone A Căn 5.02, đoạn ống SP-FP-001 đã gác xong lên ty treo";

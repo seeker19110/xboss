@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { daysFromTodayISO, addDaysISO } from "@/lib/nen/date";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query } from "@/lib/db";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   BimElement,
   WbsTaskSnapshot,
   compute4DSimulationState,
   SimulationTimeStepResult,
-} from "@/lib/engineering-bim-viewer";
+} from "@/lib/ky-thuat/engineering-bim-viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +19,16 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
 
+  if (!CAN.manageEngineeringBim(user.role)) {
+    return NextResponse.json(
+      { error: "Không có quyền thao tác mô phỏng 4D mô hình BIM" },
+      { status: 403 },
+    );
+  }
+
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-bim-models", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }
@@ -34,7 +45,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
               geometry_data, properties, wbs_task_id
        FROM engineering_bim_elements
        WHERE model_id = ? AND project_id = ?`,
-      [modelId, projectId],
+      modelId,
+      projectId,
     );
 
     const elements: BimElement[] = rawElements.map((row) => ({
@@ -58,10 +70,20 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     if (taskIds.length > 0) {
       const placeholders = taskIds.map(() => "?").join(",");
       const tasks = await query<any>(
-        `SELECT id, start_date, end_date, progress, status, approved_at
-         FROM tasks
-         WHERE id IN (${placeholders}) AND project_id = ?`,
-        [...taskIds, projectId],
+        // Cột thật trong schema là `progress_percent`; `tasks` KHÔNG có cột thời điểm nghiệm
+        // thu — mốc đó nằm ở nhật ký `task_history` (status = 'nghiem_thu'), lấy lần ghi sớm
+        // nhất làm ngày nghiệm thu. `tasks` cũng KHÔNG có `project_id`: lọc theo dự án phải đi
+        // qua chuỗi work_packages → sheet_types → towers (cùng cách lib/tien-do/report.ts).
+        `SELECT t.id, t.start_date, t.end_date, t.progress_percent AS progress, t.status,
+                (SELECT MIN(h.changed_at) FROM task_history h
+                  WHERE h.task_id = t.id AND h.status = 'nghiem_thu') AS approved_at
+         FROM tasks t
+         JOIN work_packages wp ON t.package_id = wp.id
+         JOIN sheet_types st ON wp.sheet_type_id = st.id
+         JOIN towers tw ON tw.id = st.tower_id
+         WHERE t.id IN (${placeholders}) AND tw.project_id = ?`,
+        ...taskIds,
+        projectId,
       );
 
       for (const t of tasks) {
@@ -71,7 +93,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
           endDate: t.end_date ?? "2026-08-30",
           progress: Number(t.progress ?? 0),
           status: t.status ?? "chuan_bi",
-          approvedDate: t.approved_at ? t.approved_at.split("T")[0] : null,
+          approvedDate: t.approved_at ? new Date(t.approved_at).toISOString().split("T")[0] : null,
         });
       }
     }
@@ -88,19 +110,24 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       });
     }
 
-    // Tính cho cả chuỗi thời gian (Time-Lapse Series)
-    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 86400000);
-    const end = endDate ? new Date(endDate) : new Date(Date.now() + 30 * 86400000);
+    // Tính cho cả chuỗi thời gian (Time-Lapse Series).
+    // Toàn bộ mốc là CHUỖI ISO 'YYYY-MM-DD' theo giờ VN, không qua đối tượng Date:
+    // - biên mặc định ±30 ngày lấy từ daysFromTodayISO (UTC+7) — trước đây tính bằng
+    //   `Date.now() ± N*86400000` (UTC thuần) nên khoảng 0h–7h sáng cả chuỗi lệch 1 ngày
+    //   so với ngày bắt đầu/kết thúc của task mà compute4DSimulationState đem ra so;
+    // - bước nhảy dùng addDaysISO (cộng lịch thuần) thay cho Date.setDate/getDate vốn
+    //   theo giờ ĐỊA PHƯƠNG của tiến trình, lệch tiếp nếu máy chủ không chạy UTC.
+    const startISO = startDate ? String(startDate).slice(0, 10) : daysFromTodayISO(-30);
+    const endISO = endDate ? String(endDate).slice(0, 10) : daysFromTodayISO(30);
     const series: SimulationTimeStepResult[] = [];
 
-    const curr = new Date(start);
-    while (curr <= end) {
-      const dateISO = curr.toISOString().split("T")[0];
-      const stepRes = compute4DSimulationState(elements, dateISO, wbsMap, {
+    let curr = startISO;
+    while (curr <= endISO) {
+      const stepRes = compute4DSimulationState(elements, curr, wbsMap, {
         showGhostNotStarted: showGhost,
       });
       series.push(stepRes);
-      curr.setDate(curr.getDate() + Math.max(1, stepDays));
+      curr = addDaysISO(curr, Math.max(1, stepDays));
     }
 
     return NextResponse.json({

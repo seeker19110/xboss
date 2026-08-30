@@ -7,7 +7,7 @@ import {
   createEsignEnvelope,
   executeSignEnvelope,
   listEsignEnvelopes,
-} from "@/lib/engineering-esignature";
+} from "@/lib/ky-thuat/engineering-esignature";
 
 const HAS_DB = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 
@@ -34,6 +34,22 @@ test(
     const { insertId } = await import("@/lib/db");
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Esignature Proj')`);
 
+    // Mỗi bên ký phải gắn một tài khoản thật: `executeSignEnvelope` chỉ cho đúng chủ tài khoản ký.
+    const uid1 = await insertId(
+      `INSERT INTO users (email, name, role, password_hash) VALUES (?, ?, ?, ?)`,
+      `esign-1-${Date.now()}@x.test`,
+      "Kỹ Sư Nhà Thầu A",
+      "engineer",
+      "x",
+    );
+    const uid2 = await insertId(
+      `INSERT INTO users (email, name, role, password_hash) VALUES (?, ?, ?, ?)`,
+      `esign-2-${Date.now()}@x.test`,
+      "Tư Vấn Giám Sát B",
+      "engineer",
+      "x",
+    );
+
     const envelope = await createEsignEnvelope({
       projectId,
       title: "Nghiệm thu đường ống cấp nước trục đứng",
@@ -45,8 +61,18 @@ test(
         result: "PASS",
       },
       signatories: [
-        { signerName: "Kỹ Sư Nhà Thầu A", signerRole: "CONTRACTOR_ENGINEER", signingOrder: 1 },
-        { signerName: "Tư Vấn Giám Sát B", signerRole: "SUPERVISION_CONSULTANT", signingOrder: 2 },
+        {
+          userId: uid1,
+          signerName: "Kỹ Sư Nhà Thầu A",
+          signerRole: "CONTRACTOR_ENGINEER",
+          signingOrder: 1,
+        },
+        {
+          userId: uid2,
+          signerName: "Tư Vấn Giám Sát B",
+          signerRole: "SUPERVISION_CONSULTANT",
+          signingOrder: 2,
+        },
       ],
     });
 
@@ -63,6 +89,7 @@ test(
     // Ký bên thứ 1
     const signResult1 = await executeSignEnvelope({
       projectId,
+      userId: uid1,
       envelopeId: envelope.id,
       signatoryId: signer1.id,
       signatureData: "SIG_DATA_CONTRACTOR_01",
@@ -73,6 +100,7 @@ test(
     // Ký bên thứ 2 -> Hoàn tất hồ sơ & sinh chứng thư
     const signResult2 = await executeSignEnvelope({
       projectId,
+      userId: uid2,
       envelopeId: envelope.id,
       signatoryId: signer2.id,
       signatureData: "SIG_DATA_CONSULTANT_02",

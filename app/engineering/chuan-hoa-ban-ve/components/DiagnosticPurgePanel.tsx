@@ -1,8 +1,18 @@
 "use client";
 
-import { Dispatch, SetStateAction } from "react";
-import { Download, ArrowRight, CheckCircle2, Activity, Trash2, Crosshair } from "lucide-react";
-import { DxfParseResult } from "@/lib/cad/dxf-parser";
+import { Dispatch, SetStateAction, useEffect, useRef } from "react";
+import {
+  Download,
+  ArrowRight,
+  CheckCircle2,
+  Activity,
+  Trash2,
+  Crosshair,
+  ShieldCheck,
+  Loader2,
+} from "lucide-react";
+import { DxfParseResult } from "@/lib/ky-thuat/cad/dxf-parser";
+import { useCadServerVerification } from "../hooks/useCadServerVerification";
 import type { ManualLayerItem, PurgeState, Step1SubTab, WcsConfig } from "../types";
 
 // BƯỚC 1.1 — Chẩn đoán dị tật, dọn rác sâu (Purge/Overkill) & gốc tọa độ WCS 2D.
@@ -18,7 +28,6 @@ interface DiagnosticPurgePanelProps {
   handleAlignWcsOrigin: () => void;
   hasRealData: boolean;
   totalHealthScore: number;
-  handleDownloadScr: () => void;
 }
 
 export default function DiagnosticPurgePanel({
@@ -32,8 +41,30 @@ export default function DiagnosticPurgePanel({
   handleAlignWcsOrigin,
   hasRealData,
   totalHealthScore,
-  handleDownloadScr,
 }: DiagnosticPurgePanelProps) {
+  const serverVerifyInputRef = useRef<HTMLInputElement | null>(null);
+  const {
+    phase: verifyPhase,
+    result: verifyResult,
+    errorMessage: verifyError,
+    verifyWithServer,
+    showComparisonToast,
+  } = useCadServerVerification();
+
+  const handleServerVerifyFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    await verifyWithServer(file);
+  };
+
+  useEffect(() => {
+    if (verifyPhase === "done") {
+      showComparisonToast(totalHealthScore);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verifyPhase]);
+
   return (
     <div className="space-y-5">
       {/* Phân đoạn 1.1: Chẩn đoán & Health Score */}
@@ -51,15 +82,63 @@ export default function DiagnosticPurgePanel({
           </div>
 
           <div className="flex items-center gap-2">
+            <input
+              ref={serverVerifyInputRef}
+              type="file"
+              accept=".dxf,.dwg"
+              className="hidden"
+              onChange={handleServerVerifyFileChange}
+            />
             <button
-              onClick={handleDownloadScr}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition"
+              onClick={() => serverVerifyInputRef.current?.click()}
+              disabled={verifyPhase === "uploading" || verifyPhase === "processing"}
+              title="Gửi file lên mepf-worker, tính điểm sức khỏe bằng ezdxf thật — đối chiếu độc lập với điểm tính ngay trên trình duyệt"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 disabled:opacity-60 disabled:cursor-not-allowed text-on-accent font-bold text-xs shadow-sm transition"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Xuất Kịch Bản .SCR</span>
+              {verifyPhase === "uploading" || verifyPhase === "processing" ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <ShieldCheck className="w-3.5 h-3.5" />
+              )}
+              <span>
+                {verifyPhase === "uploading"
+                  ? "Đang gửi..."
+                  : verifyPhase === "processing"
+                    ? "Server đang chẩn đoán (ezdxf)..."
+                    : "Xác Thực Bằng ezdxf (Server)"}
+              </span>
             </button>
           </div>
         </div>
+
+        {(verifyResult || verifyError) && (
+          <div
+            className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+              verifyError
+                ? "bg-rose-500/10 border-rose-500/30 text-rose-300"
+                : "bg-sky-500/10 border-sky-500/30 text-sky-200"
+            }`}
+          >
+            {verifyError ? (
+              <p>⚠ Xác thực ezdxf thất bại: {verifyError}</p>
+            ) : verifyResult?.status === "error" ? (
+              <p>⚠ mepf-worker báo lỗi: {verifyResult.error}</p>
+            ) : (
+              <>
+                <p className="font-bold">
+                  Kết quả ezdxf (server): {verifyResult?.totalHealthScore ?? 0}/100 — client:{" "}
+                  {totalHealthScore}/100
+                </p>
+                <p className="text-[11px] text-sky-300/80">
+                  Layer {verifyResult?.layerScore}% · Font {verifyResult?.fontScore}% · Hình học{" "}
+                  {verifyResult?.geometryScore}% · Dim {verifyResult?.dimScore}% · Block{" "}
+                  {verifyResult?.blockScore}% · XREF {verifyResult?.xrefScore}% · (
+                  {verifyResult?.entityCount} thực thể)
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Health Score & Key Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -233,7 +312,7 @@ export default function DiagnosticPurgePanel({
 
           <button
             onClick={handleRunDeepPurge}
-            className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
+            className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Kích Hoạt Thuật Toán Deep Purge & Overkill</span>
@@ -271,6 +350,7 @@ export default function DiagnosticPurgePanel({
               </label>
               <input
                 type="text"
+                aria-label="Mốc tim trục tọa độ gốc công trình"
                 value={wcsConfig.gridAxisReference}
                 onChange={(e) =>
                   setWcsConfig((prev) => ({ ...prev, gridAxisReference: e.target.value }))
@@ -284,6 +364,7 @@ export default function DiagnosticPurgePanel({
                 <label className="text-[11px] text-zinc-400 block mb-1">Tọa Độ Gốc X (mm)</label>
                 <input
                   type="number"
+                  aria-label="Tọa độ gốc X (mm)"
                   value={wcsConfig.originX}
                   onChange={(e) =>
                     setWcsConfig((prev) => ({ ...prev, originX: Number(e.target.value) }))
@@ -295,6 +376,7 @@ export default function DiagnosticPurgePanel({
                 <label className="text-[11px] text-zinc-400 block mb-1">Tọa Độ Gốc Y (mm)</label>
                 <input
                   type="number"
+                  aria-label="Tọa độ gốc Y (mm)"
                   value={wcsConfig.originY}
                   onChange={(e) =>
                     setWcsConfig((prev) => ({ ...prev, originY: Number(e.target.value) }))
@@ -308,6 +390,7 @@ export default function DiagnosticPurgePanel({
               <div>
                 <label className="text-[11px] text-zinc-400 block mb-1">Đơn Vị Vẽ (Units):</label>
                 <select
+                  aria-label="Đơn vị vẽ"
                   value={wcsConfig.unit}
                   onChange={(e) =>
                     setWcsConfig((prev) => ({ ...prev, unit: e.target.value as any }))
@@ -322,6 +405,7 @@ export default function DiagnosticPurgePanel({
               <div>
                 <label className="text-[11px] text-zinc-400 block mb-1">Tỷ Lệ Model/Layout:</label>
                 <select
+                  aria-label="Tỷ lệ model/layout"
                   value={wcsConfig.scale}
                   onChange={(e) =>
                     setWcsConfig((prev) => ({ ...prev, scale: e.target.value as any }))
@@ -338,7 +422,7 @@ export default function DiagnosticPurgePanel({
 
           <button
             onClick={handleAlignWcsOrigin}
-            className="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
+            className="w-full py-2.5 rounded-xl bg-sky-700 hover:bg-sky-800 text-on-accent font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
           >
             <Crosshair className="w-3.5 h-3.5" />
             <span>Khóa Tọa Độ Chuẩn WCS 2D (X:0, Y:0) Cho Bản Vẽ</span>
@@ -354,7 +438,7 @@ export default function DiagnosticPurgePanel({
         </div>
         <button
           onClick={() => setStep1SubTab("layers_font")}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs transition"
         >
           <span>Chuyển Sang Mục 2: Layer AIA & Bác Sĩ Font</span>
           <ArrowRight className="w-3.5 h-3.5" />

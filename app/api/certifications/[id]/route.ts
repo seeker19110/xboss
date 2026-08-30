@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut, storageDelete } from "@/lib/storage";
+import { storagePut, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
-  extForDocMime,
-  verifyFileMime,
   newCertificationFileName,
   MAX_DOC_BYTES,
   isContentTooLarge,
-} from "@/lib/photos";
+  checkUploadedFile,
+} from "@/lib/nen/photos";
 import {
   parseCertificationBody,
   validateCertificationInput,
   type CertificationInput,
-} from "@/lib/hr";
+} from "@/lib/hien-truong/hr";
 
 export const dynamic = "force-dynamic";
 
@@ -144,24 +143,9 @@ export async function PATCH(
     sizeBytes: number | null;
   } | null = null;
   if (file) {
-    const ext = extForDocMime(file.type);
-    if (!ext)
-      return NextResponse.json(
-        { error: `Chỉ nhận PDF hoặc ảnh, nhận được: ${file.type || "không rõ"}` },
-        { status: 415 },
-      );
-    if (file.size > MAX_DOC_BYTES)
-      return NextResponse.json(
-        { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
-        { status: 413 },
-      );
-
-    const fileBuf = Buffer.from(await file.arrayBuffer());
-    if (!verifyFileMime(fileBuf, file.type))
-      return NextResponse.json(
-        { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
-        { status: 415 },
-      );
+    const checked = await checkUploadedFile(file, { accept: "document", maxBytes: MAX_DOC_BYTES });
+    if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: checked.status });
+    const fileBuf = checked.buf;
 
     if (existing.fileName) await storageDelete(user.orgId, existing.fileName);
 

@@ -39,7 +39,7 @@ export default function BoqBiddingTab() {
 
           <a
             href="/boq"
-            className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-zinc-950 font-semibold text-xs transition-colors inline-flex items-center gap-1.5 shadow shrink-0"
+            className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-xs transition-colors inline-flex items-center gap-1.5 shadow shrink-0"
           >
             <Calculator className="w-3.5 h-3.5" /> Mở Toàn Bộ Cây BOQ
           </a>
@@ -87,7 +87,7 @@ export default function BoqBiddingTab() {
           <div className="flex items-center gap-2 pt-2">
             <a
               href="/engineering/bidding-matrix"
-              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-zinc-950 font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
             >
               Ma Trận Đấu Thầu (M75) <ArrowUpRight className="w-3.5 h-3.5" />
             </a>

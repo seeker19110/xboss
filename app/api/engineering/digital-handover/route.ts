@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { todayISO } from "@/lib/nen/date";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   bundleDigitalHandoverPassport,
   saveDigitalHandoverPassport,
   listDigitalHandoverPassports,
   HandoverSummaryInput,
-} from "@/lib/engineering-digital-handover";
+} from "@/lib/ky-thuat/engineering-digital-handover";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
       body.passportCode || `PASS-LOD500-${Date.now().toString(36).toUpperCase()}`;
     const input: HandoverSummaryInput = {
       projectTitle: body.projectTitle || "TT AVIO Tháp A (MEPF)",
-      handoverDate: body.handoverDate || new Date().toISOString().slice(0, 10),
+      handoverDate: body.handoverDate || todayISO(),
       totalSpoolsCount: parseInt(body.totalSpoolsCount, 10) || 128,
       totalBbntCount: parseInt(body.totalBbntCount, 10) || 24,
       totalTcTestsPassed: parseInt(body.totalTcTestsPassed, 10) || 18,

@@ -24,7 +24,7 @@ import {
   // M72
   conductMultiAgentDebate,
   calculateEngineeringHealthIndex,
-} from "@/lib/engineering-suite";
+} from "@/lib/ky-thuat/engineering-suite";
 
 test("Engineering Suite Barrel Index: Tất cả 15 phân hệ từ M65 đến M72 đều được export đầy đủ và đồng bộ", () => {
   assert.equal(typeof computeCadVectorDiff, "function");

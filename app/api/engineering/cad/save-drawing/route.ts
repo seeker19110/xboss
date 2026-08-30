@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { todayISO } from "@/lib/nen/date";
 import { writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/dashboard";
 import { queryOne, insertId, run } from "@/lib/db";
+import { validateDxf } from "@/lib/ky-thuat/cad/dxf-parser";
+import { storagePut } from "@/lib/nen/storage";
+import { newStandardizedDrawingFileName } from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +25,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
     }
 
+    if (!CAN.manageDrawings(user.role)) {
+      return NextResponse.json({ error: "Không có quyền lưu bản vẽ" }, { status: 403 });
+    }
+
     const body = await req.json();
     const {
       projectId: inputProjectId,
@@ -30,7 +39,7 @@ export async function POST(req: NextRequest) {
       kind = "design", // 'design' | 'bim' | 'shop' | 'asbuilt'
       subFolder = "iso", // 'origin' | 'iso' (for design)
       name = "Bản_Vẽ_Chuẩn_Hóa",
-      date = new Date().toISOString().slice(0, 10).replace(/-/g, ""),
+      date = todayISO().replace(/-/g, ""),
       drawingVersions = "Rev01",
       fileContent = "",
       fileExtension = "dxf",
@@ -39,7 +48,47 @@ export async function POST(req: NextRequest) {
       approvalNotes = "Bản vẽ đã qua chuẩn hóa CAD 2D và kiểm tra chất lượng Gate 0.",
     } = body;
 
-    const projectId = inputProjectId || (await getCurrentProjectId(user)) || 1;
+    // Kiểm định cấu trúc DXF TRƯỚC mọi tác dụng phụ: sai cấu trúc thì không ghi tệp,
+    // không tạo bản ghi drawings/drawing_revisions (guardrail M98 §2).
+    // Cùng trần với đường nạp lên (xem GIOI_HAN_TEP_CAD). Đo trước validateDxf vì validateDxf
+    // tách cả tệp thành mảng dòng — với tệp khổng lồ thì chính bước kiểm đã làm tràn bộ nhớ.
+    const coCharPhepDo = typeof fileContent === "string" ? fileContent.length : 0;
+    if (coCharPhepDo > GIOI_HAN_TEP_CAD) {
+      return NextResponse.json(
+        {
+          error:
+            `Nội dung DXF lớn hơn giới hạn ${Math.round(GIOI_HAN_TEP_CAD / 1024 / 1024)} MB — ` +
+            `không lưu. Hãy tách bản vẽ theo tầng/hệ rồi lưu từng phần.`,
+        },
+        { status: 413 },
+      );
+    }
+
+    const validation = validateDxf(typeof fileContent === "string" ? fileContent : "");
+    if (!validation.valid) {
+      return NextResponse.json(
+        {
+          error: "Nội dung DXF không hợp lệ — không lưu bản vẽ",
+          errors: validation.errors,
+        },
+        { status: 422 },
+      );
+    }
+
+    // Không tin project_id client gửi — đối chiếu danh sách dự án user được thấy.
+    // Xem chotProjectIdChoGhi() để biết vì sao (lib/ha-tang/projects.ts).
+    const chotDuAn = await chotProjectIdChoGhi(
+      user,
+      inputProjectId,
+      (await getCurrentProjectId(user)) || 1,
+    );
+    if (!chotDuAn.ok) {
+      return NextResponse.json(
+        { error: "Không có quyền lưu bản vẽ vào dự án này" },
+        { status: 403 },
+      );
+    }
+    const projectId = chotDuAn.projectId;
 
     // Chuẩn hóa chuỗi an toàn cho tên file (không khoảng trắng, ký tự đặc biệt)
     const cleanStr = (s: string) =>
@@ -56,7 +105,7 @@ export async function POST(req: NextRequest) {
     const cKind = kind.toLowerCase();
     const cSub = cKind === "design" ? cleanStr(subFolder || "iso").toLowerCase() : "";
     const cName = cleanStr(name || "Ban_Ve");
-    const cDate = cleanStr(date || new Date().toISOString().slice(0, 10).replace(/-/g, ""));
+    const cDate = cleanStr(date || todayISO().replace(/-/g, ""));
     const cRev = cleanStr(drawingVersions || "Rev01");
     const cExt = cleanStr(fileExtension || "dxf").toLowerCase();
 
@@ -84,6 +133,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const isoRelativePath = join(relativeSubPath, standardFileName).replace(/\\/g, "/");
+
+    // Cây thư mục quy chuẩn ISO 19650 dựng bằng `npm run setup:drawing-tree` lúc triển khai,
+    // KHÔNG dựng lại ở mỗi request: đó là việc cấp phát môi trường (xem scripts/ensure-drawing-tree.ts).
+    // Route vẫn tự tạo đúng nhánh nó ghi ở ngay dưới, nên không phụ thuộc script đó.
+
     // 1. Ghi tệp vào data/uploads/drawings/
     const dataUploadsDir = join(process.cwd(), "data", "uploads", "drawings", relativeSubPath);
     if (!existsSync(dataUploadsDir)) {
@@ -100,7 +155,13 @@ export async function POST(req: NextRequest) {
     const fullRootPath = join(rootDrawingsDir, standardFileName);
     writeFileSync(fullRootPath, fileContent || ";; Standardized CAD Drawing by XBoss\n", "utf8");
 
-    // 3. Nếu đã phê duyệt chính thức, dọn sạch bản sao tạm trong thư mục temp (nếu có)
+    // 3. Ghi vào lớp lưu trữ dùng chung (S3/MinIO khi có cấu hình, không thì data/uploads/).
+    // Đây mới là bản đọc lại được bằng storageGet() ở route parse-dxf — hai bản ghi theo cây thư
+    // mục bên trên chỉ phục vụ bàn giao hồ sơ theo ISO 19650 và triển khai một máy chủ.
+    const storageFileName = newStandardizedDrawingFileName(cExt);
+    await storagePut(user.orgId, storageFileName, Buffer.from(fileContent || "", "utf8"));
+
+    // 4. Nếu đã phê duyệt chính thức, dọn sạch bản sao tạm trong thư mục temp (nếu có)
     if (isApproved) {
       const tempPathData = join(
         process.cwd(),
@@ -114,17 +175,23 @@ export async function POST(req: NextRequest) {
       if (existsSync(tempPathData)) {
         try {
           unlinkSync(tempPathData);
-        } catch {}
+        } catch (err) {
+          // Không chặn luồng lưu bản vẽ chính thức chỉ vì dọn tạm thất bại (vd đang bị khoá) —
+          // nhưng vẫn phải ghi log để biết còn rác trong thư mục temp/, không nuốt lỗi im lặng.
+          console.error("Không xoá được bản sao tạm (data/uploads/drawings):", tempPathData, err);
+        }
       }
       const tempPathRoot = join(process.cwd(), "drawings", cSys, "temp", standardFileName);
       if (existsSync(tempPathRoot)) {
         try {
           unlinkSync(tempPathRoot);
-        } catch {}
+        } catch (err) {
+          console.error("Không xoá được bản sao tạm (drawings/):", tempPathRoot, err);
+        }
       }
     }
 
-    // 4. Ghi nhận vào Cơ sở dữ liệu bảng drawings & drawing_revisions
+    // 5. Ghi nhận vào Cơ sở dữ liệu bảng drawings & drawing_revisions
     const drawingCode = `${cSys}-${kindTag}-${cRev}-${cDate.slice(-4)}`;
     const drawingTitle = `${name} (${kindTag} - ${cRev})`;
 
@@ -161,7 +228,7 @@ export async function POST(req: NextRequest) {
     );
 
     let revisionId = existingRev?.id;
-    const revStatus = isApproved ? "approved" : "pending";
+    const revStatus = isApproved ? "approved" : "submitted";
     const noteText = isApproved
       ? `[Phê duyệt Gate 0 - ${approverName}]: ${approvalNotes}`
       : `[Lưu Tạm Thời Chờ Duyệt - ${user.name || "Kỹ Sư"}]: ${approvalNotes}`;
@@ -169,12 +236,13 @@ export async function POST(req: NextRequest) {
     if (!revisionId && drawingId) {
       revisionId = await insertId(
         `INSERT INTO drawing_revisions (
-          drawing_id, rev, file_name, original_name, mime_type, size_bytes,
+          drawing_id, rev, file_name, iso_path, original_name, mime_type, size_bytes,
           status, submitted_at, decided_at, decision_note, uploaded_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_DATE, ${isApproved ? "CURRENT_DATE" : "NULL"}, ?, ?, NOW())`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_DATE, ${isApproved ? "CURRENT_DATE" : "NULL"}, ?, ?, NOW())`,
         drawingId,
         cRev,
-        join(relativeSubPath, standardFileName).replace(/\\/g, "/"),
+        storageFileName,
+        isoRelativePath,
         standardFileName,
         cExt === "dxf" ? "application/dxf" : "application/octet-stream",
         Buffer.byteLength(fileContent || "", "utf8"),
@@ -185,10 +253,11 @@ export async function POST(req: NextRequest) {
     } else if (revisionId) {
       await run(
         `UPDATE drawing_revisions 
-         SET status = ?, file_name = ?, decision_note = ?, decided_at = ${isApproved ? "CURRENT_DATE" : "NULL"}
+         SET status = ?, file_name = ?, iso_path = ?, decision_note = ?, decided_at = ${isApproved ? "CURRENT_DATE" : "NULL"}
          WHERE id = ?`,
         revStatus,
-        join(relativeSubPath, standardFileName).replace(/\\/g, "/"),
+        storageFileName,
+        isoRelativePath,
         noteText,
         revisionId,
       );
@@ -198,6 +267,8 @@ export async function POST(req: NextRequest) {
       success: true,
       isApproved,
       standardFileName,
+      storageFileName,
+      isoPath: isoRelativePath,
       relativeDirectory: join("drawings", relativeSubPath).replace(/\\/g, "/"),
       fullUploadPath: `data/uploads/drawings/${relativeSubPath}/${standardFileName}`.replace(
         /\\/g,

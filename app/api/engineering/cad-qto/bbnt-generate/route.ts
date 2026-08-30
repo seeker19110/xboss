@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { generateInspectionRequestForSpools } from "@/lib/engineering-cad-qto";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { generateInspectionRequestForSpools } from "@/lib/ky-thuat/engineering-cad-qto";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
     const result = await generateInspectionRequestForSpools(projectId, spoolIds, user.id, note);
     const { listCadSpools, generateElectronicBbntDocument } =
-      await import("@/lib/engineering-cad-qto");
+      await import("@/lib/ky-thuat/engineering-cad-qto");
     const spools = await listCadSpools(projectId);
     const selectedSpools = spools.filter((s) => spoolIds.includes(s.id));
     const electronicBbnt = generateElectronicBbntDocument("TT AVIO Tháp A (MEPF)", selectedSpools, {

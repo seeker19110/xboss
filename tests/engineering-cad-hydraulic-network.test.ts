@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import {
   autoSizePipeDiameter,
   solveHydraulicNetwork,
-} from "@/lib/engineering-cad-hydraulic-network";
+} from "@/lib/ky-thuat/engineering-cad-hydraulic-network";
 
 test("M76: autoSizePipeDiameter tự động chọn đường kính DN phù hợp vận tốc", () => {
   // Lưu lượng nhỏ 0.3 L/s (~1.08 m3/h) -> DN20 hoặc DN25

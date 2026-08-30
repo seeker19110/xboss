@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getSwarmDebateById } from "@/lib/engineering-swarm";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { getSwarmDebateById } from "@/lib/ky-thuat/engineering-swarm";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-swarm", projectId);
+  if (blocked) return blocked;
 
   try {
     const debate = await getSwarmDebateById(projectId, params.id);

@@ -8,7 +8,7 @@ import {
   convertToLod400Dfma,
   type PreliminarySegment,
   type StructuralBeam,
-} from "@/lib/engineering-shopdrawing-omnipotent";
+} from "@/lib/ky-thuat/engineering-shopdrawing-omnipotent";
 import {
   calculateDuctQtoM2,
   calculatePipeQtoM,
@@ -17,18 +17,21 @@ import {
   generateElectronicBbntDocument,
   type SpoolStatus,
   type CadSpoolRecord,
-} from "@/lib/engineering-cad-qto";
+} from "@/lib/ky-thuat/engineering-cad-qto";
 
 // Stage 3 & 4: Reality Scan-to-BIM & Tolerance Verification
 import {
   analyzeScanVsBimDeviations,
   type BimSpoolModel,
   type ScannedPoint3D,
-} from "@/lib/engineering-scan-to-bim";
+} from "@/lib/ky-thuat/engineering-scan-to-bim";
 
 // Stage 5 & 6: 3-Way e-Signature & LOD 500 Digital Handover Passport
-import { createDocumentEnvelopeHash, generateCertificateCode } from "@/lib/engineering-esignature";
-import { bundleDigitalHandoverPassport } from "@/lib/engineering-digital-handover";
+import {
+  createDocumentEnvelopeHash,
+  generateCertificateCode,
+} from "@/lib/ky-thuat/engineering-esignature";
+import { bundleDigitalHandoverPassport } from "@/lib/ky-thuat/engineering-digital-handover";
 
 // Helper: Vietnamese CAD Font Sanitizer (TCVN3 -> UTF-8)
 function sanitizeCadVietnameseText(rawText: string): string {

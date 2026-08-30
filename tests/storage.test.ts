@@ -3,7 +3,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { storagePut, storageGet, storageDelete, __resetStorageBackendCache } from "@/lib/storage";
+import {
+  storagePut,
+  storageGet,
+  storageDelete,
+  __resetStorageBackendCache,
+} from "@/lib/nen/storage";
 
 // Đảm bảo chạy trên backend LOCAL: xoá mọi S3 env + reset cache backend.
 for (const k of [

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { insertId, queryOne } from "@/lib/db";
-import { runHealthChecks } from "@/lib/healthcheck";
+import { runHealthChecks } from "@/lib/van-hanh/healthcheck";
 
 export const dynamic = "force-dynamic";
 

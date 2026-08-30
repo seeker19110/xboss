@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { COOKIE } from "@/lib/auth";
+import { COOKIE } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 

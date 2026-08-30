@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, verifyPassword } from "@/lib/auth";
+import { getCurrentUser, verifyPassword } from "@/lib/bao-mat/auth";
 import { query, queryOne, run } from "@/lib/db";
-import { decryptTotpSecret, verifyTotpCode } from "@/lib/totp";
+import { decryptTotpSecret, verifyTotpCode } from "@/lib/bao-mat/totp";
 
 export const dynamic = "force-dynamic";
 

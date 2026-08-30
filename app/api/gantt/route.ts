@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { todayISO } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { computeCpm } from "@/lib/cpm";
-import { resolveSystemId } from "@/lib/systems";
-import { getCpmData } from "@/lib/gantt-data";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { computeCpm } from "@/lib/tien-do/cpm";
+import { resolveSystemId } from "@/lib/tien-do/systems";
+import { getCpmData } from "@/lib/tien-do/gantt-data";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 

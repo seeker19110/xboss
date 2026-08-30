@@ -16,7 +16,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { canTouchTask } = await import("@/lib/auth");
+    const { canTouchTask } = await import("@/lib/bao-mat/auth");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('DA Scope Task')`);
     const towerId = await insertId(
@@ -76,7 +76,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { canTouchPackage } = await import("@/lib/auth");
+    const { canTouchPackage } = await import("@/lib/bao-mat/auth");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('DA Scope Pkg')`);
     const towerId = await insertId(

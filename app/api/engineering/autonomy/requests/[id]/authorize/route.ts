@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { authorizeExecutionRequest } from "@/lib/engineering-autonomy";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { authorizeExecutionRequest } from "@/lib/ky-thuat/engineering-autonomy";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ export async function POST(_req: Request, props: { params: Promise<{ id: string 
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-autonomy", projectId);
+  if (blocked) return blocked;
 
   try {
     const result = await authorizeExecutionRequest(projectId, id, user.id);

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
-import { boqTakenBy } from "@/lib/boq";
-import { recomputeTask, recomputePackage } from "@/lib/recompute";
-import { assignTask } from "@/lib/assignments";
-import { validateCustom } from "@/lib/custom-fields";
-import { storageDelete } from "@/lib/storage";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { boqTakenBy } from "@/lib/khoi-luong/boq";
+import { recomputeTask, recomputePackage } from "@/lib/tien-do/recompute";
+import { assignTask } from "@/lib/tien-do/assignments";
+import { validateCustom } from "@/lib/ha-tang/custom-fields";
+import { storageDelete } from "@/lib/nen/storage";
 
 export const dynamic = "force-dynamic";
 

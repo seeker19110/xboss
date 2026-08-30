@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { evaluatePressureHoldTest, evaluateFireInterlockMatrix } from "@/lib/engineering-mepf-tc";
+import {
+  evaluatePressureHoldTest,
+  evaluateFireInterlockMatrix,
+} from "@/lib/ky-thuat/engineering-mepf-tc";
 
 test("M67: evaluatePressureHoldTest đánh giá chính xác kết quả thử áp lực đạt chuẩn", () => {
   // Bơm 10.0 bar, ngâm 120 phút, còn 9.85 bar -> Sụt 0.15 bar <= 0.2 bar -> ĐẠT

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { APPROVAL_ENTITY_TYPES, createApprovalFlow, listApprovalFlows } from "@/lib/approvals";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import {
+  APPROVAL_ENTITY_TYPES,
+  createApprovalFlow,
+  listApprovalFlows,
+} from "@/lib/tien-do/approvals";
 
 export const dynamic = "force-dynamic";
 

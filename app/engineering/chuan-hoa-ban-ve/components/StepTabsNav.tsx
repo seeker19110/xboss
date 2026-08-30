@@ -7,14 +7,15 @@ import type { SaveConfig, Step1SubTab } from "../types";
 // Thanh điều hướng 2 bước (Bước 1 Studio chuẩn hóa / Bước 2 Đặt tên ISO 19650)
 // kèm 4 sub-tab của Bước 1.
 
+// Nhãn hiển thị chung khi đang xử lý chuẩn hóa (không còn thanh % giả lập)
+const HEALING_LABEL = "Đang xử lý…";
+
 interface StepTabsNavProps {
   activeStep: 1 | 2;
   setActiveStep: Dispatch<SetStateAction<1 | 2>>;
   step1SubTab: Step1SubTab;
   setStep1SubTab: Dispatch<SetStateAction<Step1SubTab>>;
   isAutoHealing: boolean;
-  healProgress: number;
-  healStatusMessage: string;
   healCompleted: boolean;
   saveConfig: SaveConfig;
   totalHealthScore: number;
@@ -27,8 +28,6 @@ export default function StepTabsNav({
   step1SubTab,
   setStep1SubTab,
   isAutoHealing,
-  healProgress,
-  healStatusMessage,
   healCompleted,
   saveConfig,
   totalHealthScore,
@@ -64,11 +63,11 @@ export default function StepTabsNav({
               <span
                 className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black transition-all shrink-0 ${
                   isAutoHealing
-                    ? "bg-amber-500 text-zinc-950 shadow-md animate-pulse"
+                    ? "bg-amber-500 text-on-accent-dark shadow-md animate-pulse"
                     : healCompleted || totalHealthScore >= 90
-                      ? "bg-emerald-500 text-zinc-950 shadow-sm"
+                      ? "bg-emerald-500 text-on-accent-dark shadow-sm"
                       : activeStep === 1
-                        ? "bg-amber-500 text-zinc-950 shadow-sm"
+                        ? "bg-amber-500 text-on-accent-dark shadow-sm"
                         : "bg-zinc-800 text-zinc-300"
                 }`}
               >
@@ -86,14 +85,14 @@ export default function StepTabsNav({
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold flex items-center gap-1 transition ${
                       isAutoHealing
-                        ? "bg-amber-500 text-zinc-950 shadow-sm animate-pulse"
+                        ? "bg-amber-500 text-on-accent-dark shadow-sm animate-pulse"
                         : "bg-amber-500/20 text-amber-400 group-hover:bg-amber-500/30"
                     }`}
                   >
                     {isAutoHealing ? (
                       <>
                         <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                        <span>Đang chạy {healProgress}%</span>
+                        <span>{HEALING_LABEL}</span>
                       </>
                     ) : (
                       <>
@@ -107,7 +106,7 @@ export default function StepTabsNav({
                   {isAutoHealing ? (
                     <span className="text-amber-400 font-medium flex items-center gap-1.5">
                       <Sparkles className="w-3 h-3 animate-spin shrink-0" />
-                      {healStatusMessage}
+                      {HEALING_LABEL}
                     </span>
                   ) : (
                     "Tự động dọn rác, WCS 2D (X,Y), sửa font UTF-8, layer AIA, sửa Dim đo thực & Block BOQ"
@@ -119,7 +118,7 @@ export default function StepTabsNav({
               {isAutoHealing ? (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/40 text-xs font-mono font-bold animate-pulse">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>{healProgress}%</span>
+                  <span>{HEALING_LABEL}</span>
                 </div>
               ) : (
                 <span
@@ -137,22 +136,13 @@ export default function StepTabsNav({
             </div>
           </div>
 
-          {/* Thanh chạy tiến độ % ngay phía dưới */}
+          {/* Trạng thái đang xử lý ngay phía dưới (không còn thanh % giả lập) */}
           {isAutoHealing && (
-            <div className="mt-3 pt-2.5 border-t border-amber-500/20 space-y-1.5 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between text-[11px] font-mono">
-                <span className="text-amber-300 font-medium flex items-center gap-1.5 truncate">
-                  <Sparkles className="w-3 h-3 text-amber-400 animate-spin shrink-0" />
-                  {healStatusMessage}
-                </span>
-                <span className="text-amber-400 font-bold ml-2 shrink-0">{healProgress}%</span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-zinc-950/80 overflow-hidden relative border border-amber-500/30">
-                <div
-                  className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-400 rounded-full transition-all duration-100 ease-out shadow-[0_0_12px_rgba(245,158,11,0.6)]"
-                  style={{ width: `${healProgress}%` }}
-                />
-              </div>
+            <div className="mt-3 pt-2.5 border-t border-amber-500/20 animate-in fade-in duration-200">
+              <span className="text-amber-300 font-medium flex items-center gap-1.5 text-[11px] font-mono">
+                <Sparkles className="w-3 h-3 text-amber-400 animate-spin shrink-0" />
+                {HEALING_LABEL}
+              </span>
             </div>
           )}
 
@@ -175,7 +165,7 @@ export default function StepTabsNav({
             <span
               className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black ${
                 activeStep === 2
-                  ? "bg-emerald-500 text-zinc-950 shadow-sm"
+                  ? "bg-emerald-500 text-on-accent-dark shadow-sm"
                   : "bg-zinc-800 text-zinc-300"
               }`}
             >
@@ -209,7 +199,7 @@ export default function StepTabsNav({
               onClick={() => setStep1SubTab("diagnostic_purge")}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
                 step1SubTab === "diagnostic_purge"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-xs"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-xs"
                   : "bg-zinc-800/70 text-zinc-300 hover:text-white"
               }`}
             >
@@ -221,7 +211,7 @@ export default function StepTabsNav({
               onClick={() => setStep1SubTab("layers_font")}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
                 step1SubTab === "layers_font"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-xs"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-xs"
                   : "bg-zinc-800/70 text-zinc-300 hover:text-white"
               }`}
             >
@@ -233,7 +223,7 @@ export default function StepTabsNav({
               onClick={() => setStep1SubTab("boq_dim_ctb")}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
                 step1SubTab === "boq_dim_ctb"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-xs"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-xs"
                   : "bg-zinc-800/70 text-zinc-300 hover:text-white"
               }`}
             >
@@ -242,15 +232,15 @@ export default function StepTabsNav({
             </button>
 
             <button
-              onClick={() => setStep1SubTab("xref_diff_lisp")}
+              onClick={() => setStep1SubTab("xref_diff")}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
-                step1SubTab === "xref_diff_lisp"
-                  ? "bg-sky-500 text-zinc-950 font-bold shadow-xs"
+                step1SubTab === "xref_diff"
+                  ? "bg-sky-500 text-on-accent-dark font-bold shadow-xs"
                   : "bg-zinc-800/70 text-zinc-300 hover:text-white"
               }`}
             >
               <Split className="w-3.5 h-3.5 text-sky-400" />
-              <span>4. Cây XREF, So Sánh Diff & AutoLISP 2D</span>
+              <span>4. Cây XREF & So Sánh Diff</span>
             </button>
           </div>
         </div>

@@ -7,9 +7,9 @@ import {
   isSecureCookie,
   COOKIE,
   COOKIE_MAX_AGE,
-} from "@/lib/auth";
-import { decryptTotpSecret, verifyTotpCode } from "@/lib/totp";
-import { hitRateLimit } from "@/lib/ratelimit";
+} from "@/lib/bao-mat/auth";
+import { decryptTotpSecret, verifyTotpCode } from "@/lib/bao-mat/totp";
+import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 
 export const dynamic = "force-dynamic";
 

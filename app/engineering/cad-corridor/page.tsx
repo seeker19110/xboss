@@ -33,17 +33,17 @@ import type {
   CorridorLayoutResult,
   TrapezeHangerCalcResult,
   CorridorSystemAssignment,
-} from "@/lib/engineering-cad-corridor";
-import type { HydraulicNetworkResult } from "@/lib/engineering-cad-hydraulic-network";
+} from "@/lib/ky-thuat/engineering-cad-corridor";
+import type { HydraulicNetworkResult } from "@/lib/ky-thuat/engineering-cad-hydraulic-network";
 import type {
   SpoolIsometricResult,
   GeneticNestingResult,
-} from "@/lib/engineering-cad-dfma-isometric";
+} from "@/lib/ky-thuat/engineering-cad-dfma-isometric";
 import type {
   CarbonLcaSummary,
   LivingDigitalTwinPassport,
   evaluateAssetHealthAndRul,
-} from "@/lib/engineering-cad-carbon-lifecycle";
+} from "@/lib/ky-thuat/engineering-cad-carbon-lifecycle";
 
 export default function CadCorridorApexStudioPage() {
   const [activeTab, setActiveTab] = useState<
@@ -596,7 +596,7 @@ export default function CadCorridorApexStudioPage() {
                   </div>
                   <button
                     onClick={runCorridorPlan}
-                    className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-semibold transition"
+                    className="w-full py-2 bg-amber-700 hover:bg-amber-800 text-on-accent rounded-lg text-sm font-semibold transition"
                   >
                     Tối ưu Quy hoạch Đa tầng
                   </button>
@@ -808,7 +808,7 @@ export default function CadCorridorApexStudioPage() {
 
                 <button
                   onClick={runTrapezeCalculation}
-                  className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-semibold transition"
+                  className="w-full py-2 bg-amber-700 hover:bg-amber-800 text-on-accent rounded-lg text-sm font-semibold transition"
                 >
                   Kiểm tra Kết cấu & Sinh LISP
                 </button>
@@ -1124,7 +1124,7 @@ export default function CadCorridorApexStudioPage() {
                               <div
                                 key={idx}
                                 style={{ width: `${(c.lengthMm / bar.stockLengthMm) * 100}%` }}
-                                className="bg-amber-600 border-r border-slate-900 text-[9px] text-white flex items-center justify-center font-mono font-bold"
+                                className="bg-amber-700 border-r border-slate-900 text-[9px] text-on-accent flex items-center justify-center font-mono font-bold"
                                 title={`${c.spoolCode}: ${c.lengthMm}mm`}
                               >
                                 {c.spoolCode}

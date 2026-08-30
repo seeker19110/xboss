@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { scanReceiveQrTag, reconcileShipmentReceiving } from "@/lib/engineering-qr-logistics";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
+import {
+  scanReceiveQrTag,
+  reconcileShipmentReceiving,
+} from "@/lib/ky-thuat/engineering-qr-logistics";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +18,20 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const projectId = Number(body.projectId || (user as any).projectId || 1);
+    // Không tin project_id client gửi — đối chiếu danh sách dự án user được thấy
+    // (xem chotProjectIdChoGhi trong lib/ha-tang/projects.ts).
+    const chotDuAn = await chotProjectIdChoGhi(
+      user,
+      body.projectId,
+      (await getCurrentProjectId(user)) || 1,
+    );
+    if (!chotDuAn.ok) {
+      return NextResponse.json(
+        { error: "Không có quyền thao tác trên dự án này" },
+        { status: 403 },
+      );
+    }
+    const projectId = chotDuAn.projectId;
     const { qrCode, locationNote, manifest = [] } = body;
 
     if (!qrCode) {

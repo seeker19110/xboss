@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   bundleDigitalHandoverPassport,
   HandoverSummaryInput,
-} from "@/lib/engineering-digital-handover";
+} from "@/lib/ky-thuat/engineering-digital-handover";
 
 test("M71: bundleDigitalHandoverPassport đóng gói trọn bộ hồ sơ hoàn công số LOD 500 kèm mã băm SHA-256", () => {
   const input: HandoverSummaryInput = {

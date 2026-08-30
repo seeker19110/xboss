@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   generateInstancedMeshGroups,
   calculateMerkleRootHex,
   GodTierElementData,
-} from "@/lib/engineering-god-tier";
-import { listGodTierModels, saveGodTierModel } from "@/lib/engineering-god-tier-db";
+} from "@/lib/ky-thuat/engineering-god-tier";
+import { listGodTierModels, saveGodTierModel } from "@/lib/ky-thuat/engineering-god-tier-db";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
 
+  if (!CAN.viewEngineeringGodTier(user.role)) {
+    return NextResponse.json({ error: "Không có quyền xem mô hình God-Tier" }, { status: 403 });
+  }
+
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-god-tier-studio", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }
@@ -31,7 +38,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
 
+  if (!CAN.manageEngineeringGodTier(user.role)) {
+    return NextResponse.json(
+      { error: "Không có quyền thao tác mô hình God-Tier" },
+      { status: 403 },
+    );
+  }
+
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-god-tier-studio", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }

@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import AppHeader from "@/app/components/AppHeader";
+import { useCanvasHiDPI } from "@/app/components/useCanvasHiDPI";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import {
   Layers,
   Sparkles,
@@ -32,8 +34,8 @@ import {
   CncGCodeResult,
   PipeSpoolCutItem,
   generateAsBuiltStamp,
-} from "@/lib/engineering-god-tier";
-import { DefectDiagnosticReport } from "@/lib/engineering-local-ai";
+} from "@/lib/ky-thuat/engineering-god-tier";
+import { DefectDiagnosticReport } from "@/lib/ky-thuat/engineering-local-ai";
 
 type StudioTab = "viewport" | "clashes" | "ai" | "esign" | "lidar" | "bcf" | "cnc";
 
@@ -51,6 +53,8 @@ export default function GodTierStudioPage() {
 
   // 3D Canvas Camera State
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Canvas theo devicePixelRatio + co giãn theo container (audit 2026-08-25 §3.7).
+  const { size: canvasSize } = useCanvasHiDPI(canvasRef, { width: 800, height: 480 });
   const [cameraAngle, setCameraAngle] = useState<{ yaw: number; pitch: number; zoom: number }>({
     yaw: 45,
     pitch: 30,
@@ -146,8 +150,8 @@ export default function GodTierStudioPage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const width = canvas.width;
-    const height = canvas.height;
+    const width = canvasSize.width;
+    const height = canvasSize.height;
     ctx.clearRect(0, 0, width, height);
 
     // Vẽ lưới tọa độ không gian 3D nền
@@ -246,7 +250,7 @@ export default function GodTierStudioPage() {
       ctx.font = "10px Inter, sans-serif";
       ctx.fillText(`● ${statusLabel}`, px - sizeW / 2, py + sizeH / 2 + 14);
     });
-  }, [cameraAngle, timelineStep, modelElements, activeTab, pointCloudResult]);
+  }, [cameraAngle, timelineStep, modelElements, activeTab, pointCloudResult, canvasSize]);
 
   useEffect(() => {
     draw3DScene();
@@ -451,6 +455,7 @@ export default function GodTierStudioPage() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+        <ThuNghiemBanner moduleKey="engineering-god-tier-studio" />
         {/* Top Header Card */}
         <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-5 shadow-lg backdrop-blur-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -490,7 +495,7 @@ export default function GodTierStudioPage() {
             </button>
             <button
               onClick={() => setActiveTab("esign")}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-on-accent text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1.5"
             >
               <FileCheck2 className="w-4 h-4" /> Ký Số Hoàn Công (NĐ 06)
             </button>
@@ -579,8 +584,6 @@ export default function GodTierStudioPage() {
               <div className="relative bg-zinc-900/90 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl h-[480px]">
                 <canvas
                   ref={canvasRef}
-                  width={800}
-                  height={480}
                   onMouseDown={handleMouseDown}
                   onMouseMove={handleMouseMove}
                   onMouseUp={handleMouseUp}
@@ -639,7 +642,7 @@ export default function GodTierStudioPage() {
                         onClick={() => setTimelineSpeed(spd)}
                         className={`px-2 py-1 text-xs font-mono rounded ${
                           timelineSpeed === spd
-                            ? "bg-sky-600 text-white font-bold"
+                            ? "bg-sky-700 text-on-accent font-bold"
                             : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
                         }`}
                       >
@@ -725,7 +728,7 @@ export default function GodTierStudioPage() {
                   <button
                     disabled={isScanningLidar}
                     onClick={handleRunLidarScan}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1.5"
+                    className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-800 text-on-accent text-xs font-semibold rounded-lg transition flex items-center gap-1.5"
                   >
                     <Scan className="w-4 h-4" />{" "}
                     {isScanningLidar ? "Đang quét..." : "Quét Lại Đám Mây Điểm"}
@@ -736,8 +739,6 @@ export default function GodTierStudioPage() {
                 <div className="relative bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden h-[340px]">
                   <canvas
                     ref={canvasRef}
-                    width={700}
-                    height={340}
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
@@ -908,12 +909,6 @@ export default function GodTierStudioPage() {
                   BlenderBIM.
                 </p>
               </div>
-              <button
-                onClick={() => alert("Đang xuất gói BCF-XML ZIP chuẩn buildingSMART...")}
-                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1.5"
-              >
-                <Download className="w-4 h-4" /> Xuất File BCF-ZIP
-              </button>
             </div>
 
             <div className="space-y-3">
@@ -1152,7 +1147,7 @@ export default function GodTierStudioPage() {
 
               <button
                 onClick={handleGenerateAutoLisp}
-                className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs rounded-lg transition"
+                className="w-full py-2.5 bg-sky-700 hover:bg-sky-800 text-on-accent font-semibold text-xs rounded-lg transition"
               >
                 Sinh Mã AutoCAD LISP Cục Bộ
               </button>
@@ -1253,7 +1248,7 @@ export default function GodTierStudioPage() {
                   onClick={() =>
                     alert("Đã ký số 3 bên và niêm phong mã băm Merkle Tree thành công!")
                   }
-                  className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-semibold text-xs rounded-lg shadow-sm transition"
+                  className="flex-1 py-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-800 disabled:text-zinc-600 text-on-accent font-semibold text-xs rounded-lg shadow-sm transition"
                 >
                   Niêm Phong Mật Mã & Bàn Giao LOD 500
                 </button>

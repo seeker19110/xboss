@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   convertToLod400Dfma,
   detectStructuralSleevePenetrations,
@@ -11,7 +11,7 @@ import {
   listLod400Runs,
   PreliminarySegment,
   StructuralBeam,
-} from "@/lib/engineering-shopdrawing-omnipotent";
+} from "@/lib/ky-thuat/engineering-shopdrawing-omnipotent";
 
 export const dynamic = "force-dynamic";
 

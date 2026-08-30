@@ -4,8 +4,11 @@ import AxeBuilder from "@axe-core/playwright";
 // Trang Đơn đặt hàng / PO (/materials/purchase-orders) — stepper vòng đời PO, đánh giá NCC.
 
 async function gotoPurchaseOrders(page: Page) {
-  await page.goto("/materials/purchase-orders");
-  await expect(page.getByRole("heading", { name: "Đơn đặt hàng (PO)" })).toBeVisible({
+  // Miền vật tư đã chuyển ĐÚNG sang hub /procurement ở đợt gom "7 Unified Hubs"
+  // (tab vẫn giữ đủ khả năng tạo/sửa, khác /site và /commercial). Neo vào tab của hub —
+  // phần tử ổn định — thay cho tiêu đề trang cũ đã không còn.
+  await page.goto("/procurement?tab=orders");
+  await expect(page.getByRole("tab", { name: /Đơn Hàng & PR/ })).toBeVisible({
     timeout: 15_000,
   });
 }

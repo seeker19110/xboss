@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getSpatialDeviations, recordSpatialDeviation } from "@/lib/engineering-twin-pinnacle";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import {
+  getSpatialDeviations,
+  recordSpatialDeviation,
+} from "@/lib/ky-thuat/engineering-twin-pinnacle";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +22,8 @@ export async function GET(req: Request) {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-twin", projectId);
+  if (blocked) return blocked;
 
   const { searchParams } = new URL(req.url);
   const severity = searchParams.get("severity") || undefined;
@@ -42,6 +48,8 @@ export async function POST(req: Request) {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-twin", projectId);
+  if (blocked) return blocked;
 
   try {
     const body = await req.json();

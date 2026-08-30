@@ -5,14 +5,12 @@ import AxeBuilder from "@axe-core/playwright";
 // thông tin liên hệ, giá chào, trạng thái.
 
 async function gotoSuppliers(page: Page) {
-  await page.goto("/materials/suppliers");
+  // Miền vật tư đã chuyển ĐÚNG sang hub /procurement ở đợt gom "7 Unified Hubs"
+  // (tab vẫn giữ đủ khả năng tạo/sửa, khác /site và /commercial). Neo vào tab của hub —
+  // phần tử ổn định — thay cho tiêu đề trang cũ đã không còn.
+  await page.goto("/procurement?tab=suppliers");
   // Danh sách hoặc empty state render khi API đã về.
-  await expect(
-    page
-      .getByRole("heading", { level: 1 })
-      .filter({ hasText: /Nhà cung cấp|Suppliers/ })
-      .first(),
-  ).toBeVisible({
+  await expect(page.getByRole("tab", { name: /Nhà Cung Cấp/ })).toBeVisible({
     timeout: 15_000,
   });
 }

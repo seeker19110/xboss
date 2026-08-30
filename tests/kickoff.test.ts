@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateLegalInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateLegalInput } = await import("@/lib/kickoff");
+  const { validateLegalInput } = await import("@/lib/hien-truong/kickoff");
 
   const base = {
     kind: "giay_phep_xd" as const,
@@ -33,7 +33,7 @@ test("validateLegalInput: đủ ca hợp lệ/không hợp lệ", async () => {
 });
 
 test("validateMobilizationInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateMobilizationInput } = await import("@/lib/kickoff");
+  const { validateMobilizationInput } = await import("@/lib/hien-truong/kickoff");
 
   const base = {
     category: "mat_bang" as const,
@@ -61,8 +61,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { expiringLegalDocs } = await import("@/lib/kickoff");
-    const { todayISO, daysFromTodayISO } = await import("@/lib/date");
+    const { expiringLegalDocs } = await import("@/lib/hien-truong/kickoff");
+    const { todayISO, daysFromTodayISO } = await import("@/lib/nen/date");
 
     const soonId = await insertId(
       `INSERT INTO legal_documents (kind, title, status, expiry_date)
@@ -129,7 +129,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { kickoffReadiness } = await import("@/lib/kickoff");
+    const { kickoffReadiness } = await import("@/lib/hien-truong/kickoff");
 
     const p1 = await insertId(
       `INSERT INTO projects (name, code) VALUES ('DA Kickoff 1', 'PJT-KO1')`,
@@ -184,8 +184,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { expiringLegalDocs } = await import("@/lib/kickoff");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { expiringLegalDocs } = await import("@/lib/hien-truong/kickoff");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const userId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Test Notif Legal', 'notiflegal@test.local', 'x', 'admin')`,

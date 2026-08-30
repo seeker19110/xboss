@@ -6,8 +6,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoUsers(page: Page) {
   await page.goto("/users");
-  // Form tạo tài khoản render khi trang đã nạp xong.
-  await expect(page.getByRole("button", { name: /^Tạo/ })).toBeVisible({ timeout: 15_000 });
+  // Form tạo tài khoản render khi trang đã nạp xong. Nhãn nút đã đổi "Tạo…" → "Thêm mới";
+  // nút bị disabled tới khi nhập đủ tên/email/mật khẩu, nhưng vẫn hiển thị nên đủ để chờ.
+  await expect(page.getByRole("button", { name: "Thêm mới" })).toBeVisible({ timeout: 15_000 });
 }
 
 test.describe("Quản lý tài khoản (sau đăng nhập)", () => {

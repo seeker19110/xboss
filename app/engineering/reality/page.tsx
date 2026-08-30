@@ -228,7 +228,7 @@ export default function LivingTwinRealityPage() {
             </button>
             <button
               onClick={() => setShowCaptureModal(true)}
-              className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-amber-400"
+              className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-on-accent-dark hover:bg-amber-400"
             >
               <Plus size={16} />
               Nạp Reality Capture
@@ -237,7 +237,7 @@ export default function LivingTwinRealityPage() {
         </div>
 
         {error && (
-          <div className="mb-6 rounded-lg border border-rose-900/50 bg-rose-950/40 p-4 text-sm text-rose-300">
+          <div className="mb-6 rounded-lg border border-rose-900/50 bg-rose-400/10 p-4 text-sm text-rose-300">
             {error}
           </div>
         )}
@@ -626,7 +626,7 @@ export default function LivingTwinRealityPage() {
                   </button>
                   <button
                     type="submit"
-                    className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-400"
+                    className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-on-accent-dark hover:bg-amber-400"
                   >
                     Nạp dữ liệu
                   </button>

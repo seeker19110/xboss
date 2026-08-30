@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -126,6 +127,7 @@ export default function PredictionsPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader title="Predictive OS (Dự báo rủi ro có kiểm soát)" />
       <main className="mx-auto max-w-7xl px-4 py-6">
+        <ThuNghiemBanner moduleKey="engineering-predictions" />
         <EngineeringNav />
 
         {/* Action Header & Model Trigger */}
@@ -159,7 +161,7 @@ export default function PredictionsPage() {
                 type="button"
                 onClick={handleRunPrediction}
                 disabled={running}
-                className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-500 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg bg-amber-700 px-4 py-2 text-xs font-semibold text-on-accent hover:bg-amber-800 disabled:opacity-50"
               >
                 <Play size={14} />
                 <span>{running ? "Đang suy luận..." : "Chạy dự báo mới"}</span>
@@ -247,7 +249,7 @@ export default function PredictionsPage() {
                           <button
                             type="button"
                             onClick={() => handleDecide(p.id, "accepted")}
-                            className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
+                            className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-emerald-800"
                           >
                             <CheckCircle2 size={13} /> Tiếp nhận
                           </button>

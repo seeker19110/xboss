@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calculateEmbodiedCarbonLCA, MaterialLcaItem } from "@/lib/engineering-carbon-lca";
+import { calculateEmbodiedCarbonLCA, MaterialLcaItem } from "@/lib/ky-thuat/engineering-carbon-lca";
 
 test("M71: calculateEmbodiedCarbonLCA tính toán đúng tổng phát thải và điểm LEED công trình xanh", () => {
   const materials: MaterialLcaItem[] = [

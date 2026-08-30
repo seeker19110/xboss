@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("isValidPoTransition: đi đúng thứ tự 6 bước, chặn nhảy cóc, cho phép huỷ đúng chỗ", async () => {
-  const { isValidPoTransition } = await import("@/lib/procurement");
+  const { isValidPoTransition } = await import("@/lib/tai-chinh/procurement");
 
   // Tiến đúng thứ tự.
   assert.equal(isValidPoTransition("draft", "confirmed"), true);
@@ -34,7 +34,7 @@ test("isValidPoTransition: đi đúng thứ tự 6 bước, chặn nhảy cóc, 
 });
 
 test("nextVehicleStatus: đúng thứ tự Duyệt→Vào→Ra, idempotent, chặn nhảy cóc", async () => {
-  const { nextVehicleStatus } = await import("@/lib/procurement");
+  const { nextVehicleStatus } = await import("@/lib/tai-chinh/procurement");
 
   assert.equal(nextVehicleStatus("approve", "registered"), "approved");
   assert.equal(nextVehicleStatus("enter", "registered"), "entered");
@@ -60,7 +60,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, daysFromTodayISO } = await import("@/lib/db");
-    const { poLateList } = await import("@/lib/procurement");
+    const { poLateList } = await import("@/lib/tai-chinh/procurement");
 
     const supplierId = await insertId(`INSERT INTO suppliers (name) VALUES ('NCC Test Late')`);
     const poLateId = await insertId(
@@ -95,7 +95,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { vehicleLateList } = await import("@/lib/procurement");
+    const { vehicleLateList } = await import("@/lib/tai-chinh/procurement");
 
     const lateId = await insertId(
       `INSERT INTO vehicle_logs (plate, expected_at, status) VALUES ('LATE-01', NOW() - INTERVAL '3 hours', 'registered')`,
@@ -158,7 +158,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { supplierSummary } = await import("@/lib/procurement");
+    const { supplierSummary } = await import("@/lib/tai-chinh/procurement");
 
     const supplierId = await insertId(`INSERT INTO suppliers (name) VALUES ('NCC Test Summary')`);
     const matId = await insertId(
@@ -217,7 +217,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listPurchaseOrders, listVehicles } = await import("@/lib/procurement");
+    const { listPurchaseOrders, listVehicles } = await import("@/lib/tai-chinh/procurement");
 
     const p1 = await insertId(
       `INSERT INTO projects (name, code) VALUES ('DA Mua hàng 1', 'PJT-PO1')`,

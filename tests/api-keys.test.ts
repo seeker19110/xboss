@@ -32,7 +32,7 @@ function reqOf(path: string, key?: string, ip?: string): NextRequest {
 before(async () => {
   if (!HAS_TEST_DB) return;
   const { insertId } = await import("@/lib/db");
-  const { generateApiKey, hashApiKey } = await import("@/lib/api-keys");
+  const { generateApiKey, hashApiKey } = await import("@/lib/bao-mat/api-keys");
 
   U = await insertId(
     `INSERT INTO users (name, email, role, password_hash) VALUES ('APIKeyTest','apikey-test@x.vn','admin','x')`,
@@ -203,7 +203,7 @@ test(
 
 // (4) vượt giới hạn → 429 kèm Retry-After. Test helper trực tiếp cho ngưỡng, +1 ca route.
 test("api-keys: hitRateLimit đếm-trước-chặn-sau + route trả 429 + Retry-After", S, async () => {
-  const { hitRateLimit } = await import("@/lib/ratelimit");
+  const { hitRateLimit } = await import("@/lib/bao-mat/ratelimit");
   const { run } = await import("@/lib/db");
   const key = `api:test-${Date.now()}`;
 
@@ -227,9 +227,9 @@ test("api-keys: hitRateLimit đếm-trước-chặn-sau + route trả 429 + Retr
 
 // (5) last_used_at cập nhật có throttle (chỉ ghi khi chưa dùng hoặc cách > 60s).
 test("api-keys: last_used_at cập nhật có throttle", S, async () => {
-  const { verifyApiKey } = await import("@/lib/api-keys");
+  const { verifyApiKey } = await import("@/lib/bao-mat/api-keys");
   const { queryOne, run } = await import("@/lib/db");
-  const { hashApiKey } = await import("@/lib/api-keys");
+  const { hashApiKey } = await import("@/lib/bao-mat/api-keys");
   const hash = hashApiKey(keyReadA);
 
   await run(`UPDATE api_keys SET last_used_at = NULL WHERE key_hash = ?`, hash);

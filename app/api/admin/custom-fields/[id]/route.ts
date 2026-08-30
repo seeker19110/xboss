@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { queryOne, run } from "@/lib/db";
 import {
   isCustomFieldType,
   keyInUse,
   type CustomEntityType,
   type CustomFieldType,
-} from "@/lib/custom-fields";
+} from "@/lib/ha-tang/custom-fields";
 
 export const dynamic = "force-dynamic";
 

@@ -40,7 +40,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, query, insertId } = await import("@/lib/db");
-    const { boqTakenBy } = await import("@/lib/boq");
+    const { boqTakenBy } = await import("@/lib/khoi-luong/boq");
 
     // org 1 = tổ chức mặc định (migration tạo). Tạo thêm org 2.
     const suffix = Date.now().toString(36);

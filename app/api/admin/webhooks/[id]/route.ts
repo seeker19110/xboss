@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { queryOne, run } from "@/lib/db";
-import { WEBHOOK_EVENTS, validateWebhookUrl } from "@/lib/webhooks";
+import { WEBHOOK_EVENTS, validateWebhookUrl } from "@/lib/bao-mat/webhooks";
 
 export const dynamic = "force-dynamic";
 

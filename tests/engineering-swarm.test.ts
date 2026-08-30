@@ -5,7 +5,7 @@ import {
   generateAutonomousTechnicalDraft,
   SwarmAgentRole,
   DebateStance,
-} from "@/lib/engineering-swarm";
+} from "@/lib/ky-thuat/engineering-swarm";
 
 test("PIN-3: calculateSwarmConsensus xác định đồng thuận tuyệt đối (Unanimous)", () => {
   const args = [

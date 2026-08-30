@@ -1,13 +1,13 @@
 import { HAS_TEST_DB } from "./setup";
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { query, queryOne, insertId } from "../lib/db";
+import { query, queryOne, insertId } from "@/lib/db";
 import {
   buildPlanTemplate,
   buildTrackingTemplate,
   parsePlanUpload,
   parseTrackingUpload,
-} from "../lib/system-upload";
+} from "@/lib/tien-do/system-upload";
 import ExcelJS from "exceljs";
 
 // Test tự tạo project/tower/sheet_type/work_package riêng (KHÔNG phụ thuộc dữ liệu có

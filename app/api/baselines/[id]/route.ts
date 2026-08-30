@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 
 // DELETE /api/baselines/:id → xoá baseline (Admin/PM). baseline_tasks xoá theo CASCADE.
-export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  _req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });

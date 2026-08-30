@@ -8,7 +8,7 @@ import BottomBarSpacer from "@/app/components/BottomBarSpacer";
 
 export const metadata: Metadata = {
   title: "XBoss — ACMV Tracking",
-  description: "Quản lý tiến độ thi công ACMV — TT AVIO Tháp A",
+  description: "Quản lý tiến độ thi công MEP/ACMV",
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icon.svg", apple: "/icon-192.png" },
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "XBoss" },

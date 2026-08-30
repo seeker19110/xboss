@@ -29,8 +29,8 @@ import SCurveChart from "@/app/components/SCurveChart";
 import ProgressMap from "@/app/components/ProgressMap";
 import { LookaheadTable } from "@/app/components/LookaheadTable";
 import SystemFilter from "@/app/components/SystemFilter";
-import { formatDateVN } from "@/lib/date";
-import type { CriticalRow } from "@/lib/schedule-control";
+import { formatDateVN, todayISO } from "@/lib/nen/date";
+import type { CriticalRow } from "@/lib/tien-do/schedule-control";
 
 export default function ScheduleControlHubPage() {
   return (
@@ -114,6 +114,15 @@ function ScheduleControlContent() {
   const [lookaheadData, setLookaheadData] = useState<LookaheadData | null>(null);
   const [lookaheadLoading, setLookaheadLoading] = useState<boolean>(false);
 
+  // Tiến độ tổng & SPI — số THẬT từ /api/dashboard (bình quân có trọng số theo số công
+  // việc, cùng công thức Dashboard dùng) và /api/dashboard/evm. Trước đây hai ô này cắm
+  // cứng "68.4%" và "0.98", không bao giờ đổi theo dữ liệu (audit 2026-08-25 §3.2).
+  const [overallPct, setOverallPct] = useState<number | null>(null);
+  const [spi, setSpi] = useState<number | null>(null);
+  const [plannedPct, setPlannedPct] = useState<number | null>(null);
+  // Tên dự án đọc từ DB — quy ước dự án: không hard-code tên dự án trong UI/export.
+  const [projectName, setProjectName] = useState<string | null>(null);
+
   // Gantt State
   const [ganttBars, setGanttBars] = useState<GanttBar[]>([]);
   const [ganttDeps, setGanttDeps] = useState<GanttDep[]>([]);
@@ -143,6 +152,35 @@ function ScheduleControlContent() {
       .finally(() => setLookaheadLoading(false));
   }, [lookaheadDays, system]);
 
+  // Fetch tiến độ tổng (KPI theo trang) + SPI (EVM)
+  useEffect(() => {
+    fetch("/api/dashboard")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const kpi: { total: number; avgProgress: number | null }[] = data?.kpi ?? [];
+        const totalTasks = kpi.reduce((sum, k) => sum + k.total, 0);
+        if (totalTasks > 0) {
+          const done = kpi.reduce((sum, k) => sum + (k.avgProgress ?? 0) * k.total, 0);
+          setOverallPct(Math.round((done / totalTasks) * 1000) / 10);
+        }
+      })
+      .catch(() => {});
+    fetch("/api/dashboard/evm")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (typeof data?.summary?.spi === "number") setSpi(data.summary.spi);
+        const { pv, bac } = data?.summary ?? {};
+        if (typeof pv === "number" && typeof bac === "number" && bac > 0) {
+          setPlannedPct(Math.round((pv / bac) * 1000) / 10);
+        }
+      })
+      .catch(() => {});
+    fetch("/api/project")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setProjectName(data?.name ?? null))
+      .catch(() => {});
+  }, []);
+
   // Fetch Gantt Data
   useEffect(() => {
     setGanttLoading(true);
@@ -163,34 +201,30 @@ function ScheduleControlContent() {
     () => [
       {
         label: "Tiến Độ Tổng Thể",
-        value: "68.4%",
-        change: "+2.1% tuần này",
-        isPositive: true,
+        value: overallPct == null ? "—" : `${overallPct}%`,
         icon: TrendingUp,
       },
       {
         label: "Chỉ Số SPI (Schedule)",
-        value: "0.98",
-        change: "Bám sát tiến độ",
-        isPositive: true,
+        // SPI < 1 = chậm hơn kế hoạch — tô theo số thật, không mặc định "bám sát".
+        value: spi == null ? "—" : spi.toFixed(2),
+        isPositive: spi == null ? undefined : spi >= 1,
         icon: Clock,
       },
       {
         label: "Đường Găng CPM",
-        value: `${scheduleData?.critical?.length ?? 12} Nhóm`,
-        change: "4 Nhóm có rủi ro",
+        value: scheduleData ? `${scheduleData.critical?.length ?? 0} Nhóm` : "—",
         isPositive: false,
         icon: Activity,
       },
       {
         label: "Hạng Mục Chậm Trễ",
-        value: `${scheduleData?.delayed?.length ?? 0} Gói`,
-        change: "Cần can thiệp",
+        value: scheduleData ? `${scheduleData.delayed?.length ?? 0} Gói` : "—",
         isPositive: false,
         icon: AlertTriangle,
       },
     ],
-    [scheduleData],
+    [scheduleData, overallPct, spi],
   );
 
   // Tab 1: Lưới WBS Tracking & Phân Tích Trễ
@@ -352,7 +386,7 @@ function ScheduleControlContent() {
                 onClick={() => setLookaheadDays(d)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition ${
                   lookaheadDays === d
-                    ? "bg-amber-500 text-zinc-950 shadow-sm"
+                    ? "bg-amber-500 text-on-accent-dark shadow-sm"
                     : "bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
                 }`}
               >
@@ -463,53 +497,57 @@ function ScheduleControlContent() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => window.print()}
+            {/* Trước đây: window.print() ngay trên hub (in cả sidebar/tab) và một nút
+                alert("Đang xuất file Excel…") KHÔNG hề xuất gì. Nay trỏ vào hai đường
+                thật đã có: trang in A4 /report và /api/export/excel (audit §3.2). */}
+            <a
+              href="/report"
               className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition flex items-center gap-1.5"
             >
               <Printer className="w-3.5 h-3.5" /> In Báo Cáo (A4)
-            </button>
-            <button
-              onClick={() => alert("Đang xuất file Excel báo cáo tiến độ...")}
-              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow transition flex items-center gap-1.5"
+            </a>
+            <a
+              href="/api/export/excel"
+              className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-on-accent text-xs font-semibold shadow transition flex items-center gap-1.5"
             >
               <Download className="w-3.5 h-3.5" /> Xuất Excel Đa Tab
-            </button>
+            </a>
           </div>
         </div>
 
         {/* Printable Preview Sheet */}
         <div className="p-6 bg-zinc-900/50 rounded-xl border border-zinc-800 space-y-4">
           <div className="text-center space-y-1 border-b border-zinc-800 pb-4">
-            <div className="text-xs uppercase font-mono text-zinc-400">
-              BAN QUẢN LÝ DỰ ÁN METROPOLIS TOWER
-            </div>
+            <div className="text-xs uppercase font-mono text-zinc-400">{projectName ?? "—"}</div>
             <h2 className="text-base font-bold text-zinc-100 uppercase">
               BÁO CÁO TIẾN ĐỘ THI CÔNG & KIỂM SOÁT ĐƯỜNG GĂNG
             </h2>
             <div className="text-xs text-zinc-400 font-mono">
-              Kỳ báo cáo: Tuần 34/2026 • Ngày lập:{" "}
-              {formatDateVN(new Date().toISOString().slice(0, 10))}
+              Ngày lập: {formatDateVN(todayISO())}
             </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
             <div className="p-2.5 bg-zinc-950 rounded-lg border border-zinc-800">
               <span className="text-zinc-400 text-[10px]">Tiến Độ Kế Hoạch:</span>
-              <div className="font-bold text-zinc-200">70.5%</div>
+              <div className="font-bold text-zinc-200">
+                {plannedPct == null ? "—" : `${plannedPct}%`}
+              </div>
             </div>
             <div className="p-2.5 bg-zinc-950 rounded-lg border border-zinc-800">
               <span className="text-zinc-400 text-[10px]">Tiến Độ Thực Tế:</span>
-              <div className="font-bold text-emerald-400">68.4%</div>
+              <div className="font-bold text-emerald-400">
+                {overallPct == null ? "—" : `${overallPct}%`}
+              </div>
             </div>
             <div className="p-2.5 bg-zinc-950 rounded-lg border border-zinc-800">
               <span className="text-zinc-400 text-[10px]">Chỉ Số SPI:</span>
-              <div className="font-bold text-amber-300">0.98</div>
+              <div className="font-bold text-amber-300">{spi == null ? "—" : spi.toFixed(2)}</div>
             </div>
             <div className="p-2.5 bg-zinc-950 rounded-lg border border-zinc-800">
               <span className="text-zinc-400 text-[10px]">Đường Găng:</span>
               <div className="font-bold text-rose-400">
-                {scheduleData?.critical?.length ?? 12} Nhóm
+                {scheduleData ? `${scheduleData.critical?.length ?? 0} Nhóm` : "—"}
               </div>
             </div>
           </div>

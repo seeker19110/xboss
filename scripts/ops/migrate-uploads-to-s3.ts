@@ -15,8 +15,8 @@ import "../env";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { UPLOAD_DIR } from "../../lib/photos";
-import { storagePut, storageGet } from "../../lib/storage";
+import { UPLOAD_DIR } from "@/lib/nen/photos";
+import { storagePut, storageGet } from "@/lib/nen/storage";
 
 const DEFAULT_ORG_ID = 1;
 
