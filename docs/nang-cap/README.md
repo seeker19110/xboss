@@ -273,6 +273,37 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 >   `plugin-autocad/VERIFY-VA-PHAT-HANH.md` — AC1/AC3/AC6/AC8/AC10–AC13 trên một tầng thật của
 >   AVIO). Toàn bộ mã Adapter M114 mới chỉ được biên dịch bằng stub `XBoss.Cad.AcadShim`.
 
+## Đặc tả MỚI — đợt "tự động triển khai bản vẽ từ sơ đồ nguyên lý MEPF" (viết 2026-08-30, State Draft — chờ duyệt)
+
+> Sinh từ phiên nghiên cứu 2026-08-30: khảo sát thị trường tool auto-routing MEP có AI (Augmenta,
+> FireDesign.ai, MagiCAD, eVolve/SysQue, Firmus…) đối chiếu nền tảng M99→M114. **Hướng đi người
+> dùng chốt 2026-08-30:** kỹ sư vẽ line/pline tuyến tim từ nguồn tới thiết bị (kèm thuộc tính,
+> cao độ khi cần) — plugin tự hoàn thiện bản vẽ (nét đôi, tê/nhánh, co/cút, chia đốt, giá đỡ, lỗ
+> chờ, ngắt nét, tag, thống kê); **tích hợp thẳng vào plugin AutoCAD**, không tool rời; nguyên
+> tắc bất biến: *AI hiểu ngữ nghĩa, thuật toán vẽ hình học* — LLM không bao giờ sinh tọa độ.
+> Đợt này ĐÓNG nốt 2 hướng "chưa có đặc tả" ghi ở cuối mục M99→M102 phía trên (đồ thị kết nối
+> tuyến–thiết bị → M115; combined services → M116) + thêm mảnh AI schematic (M117).
+>
+> **`M115-hoan-thien-ban-ve-tu-tuyen-tim.md`** — lõi của hướng đã chốt: `XBOSS_TUYEN_GAN` (gán
+> thuộc tính hệ/size/cao độ vào XData), `XBOSS_TUYEN_DOTHI` (dựng đồ thị tuyến–thiết bị từ
+> line/pline: gộp nút, suy tê/co/cút/giảm, kiểm hở/thiếu size, kỹ sư duyệt), `XBOSS_HOANTHIEN`
+> (điều phối 8 giai đoạn chạy chuỗi lệnh `XBOSS_VE_*` sẵn có trên cả cụm tuyến, idempotent, không
+> bao giờ đụng tọa độ tuyến gốc). Rule pack +1 version `completionPolicy` mặc định TẮT; không
+> migration, không API mới. 4 PR. **Thi hành ĐẦU TIÊN của đợt.**
+> **`M116-phoi-hop-xung-dot-lien-he.md`** — combined services 2D: `XBOSS_PHOIHOP` quét 3 lớp
+> (giao cắt cùng dải cao độ, tranh chấp hành lang, khoảng cách quy phạm giữa cặp hệ) trên tuyến
+> mang XData M115 kể cả qua xref; **chỉ phát hiện + đề xuất theo `coordinationPolicy`, kỹ sư
+> quyết** (ngã rẽ chốt 2026-08-28), marker layer riêng, báo cáo Excel + web. 3 PR. Sau M115.
+> **`M117-ai-doc-so-do-nguyen-ly.md`** — mảnh cuối: upload DXF schematic lên web → tầng 1 luật
+> dựng graph, tầng 2 AI ngữ nghĩa bù phần `chua_quyet` (hợp đồng y hệt M108 qua `lib/nen/ai.ts`,
+> tắt được bằng `XBOSS_AI_BLOCK_CLASSIFY=0`), người duyệt graph trên web → plugin
+> `XBOSS_TUYEN_GOIY` ánh xạ thiết bị + sinh tuyến tim NHÁP bằng routing M114 → nhận vào quy trình
+> M115. Có migration `cad_schematic_graphs` (RLS project) + 4 API. 4 PR. **Điều kiện kích hoạt:
+> M115 verify + pilot ổn — không kéo lên trước.**
+>
+> **Thứ tự thi hành đợt: M115 → M116 → M117.** Cổng chung: trả nợ verify tay AutoCAD 2026 các đợt
+> trước (M111 đang chặn) trước khi phát hành rộng bất kỳ mục nào.
+
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 
 > **M62 (`M62-rls-khoa-cua.md`)** — đóng nốt RLS: `withProjectScope` đọc-ghi + bọc 3 route còn lại (`notifications`, `payments/bills`, `payments/floors`) rồi migration "khoá cửa" bỏ nhánh thiếu-ngữ-cảnh (2 PR, `route: spec`; PR2 có điều kiện tiên quyết vận hành). **Đã xong hoàn toàn 2026-07-20** — PR1 (nhánh `claude/plan-m62-m63-7osrkh`, 2026-07-19) và PR2 (`migrations/0077_rls_lock.sql`, PR #300) đều đã merge `main`; người dùng xác nhận cả 2 điều kiện tiên quyết vận hành đủ trước khi merge PR2. Xem `PROGRESS.md`. **M63 (`M63-webhook-ssrf-dns-pinning.md`)** — chống SSRF DNS rebinding cho webhook: resolve + pin IP qua undici `connect.lookup`, mở rộng `isPrivateIp` (1 PR, `route: spec`). **Đã xong 2026-07-19** (nhánh `claude/plan-m62-m63-7osrkh`). Cả 2 sinh từ đợt đánh giá chi tiết lần 8 (`PROGRESS.md`).

@@ -4,6 +4,26 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## 📐 Nghiên cứu + đặc tả đợt "tự động triển khai bản vẽ từ sơ đồ nguyên lý MEPF" (2026-08-30)
+
+Nhánh `claude/mepf-auto-deploy-plugin-6qsbq8`. Khảo sát thị trường tool auto-routing MEP có AI
+2024–2026 (Augmenta, FireDesign.ai, MagiCAD, Stabicad, eVolve/SysQue, Firmus/Kreo, Revit 2026…)
+đối chiếu nền tảng plugin M99→M114. **Người dùng chốt hướng:** kỹ sư vẽ line/pline tuyến tim từ
+nguồn tới thiết bị (kèm thuộc tính/cao độ) — plugin tự hoàn thiện bản vẽ (nét đôi, tê, co/cút,
+chia đốt, giá đỡ, lỗ chờ, ngắt nét, tag, thống kê), tích hợp thẳng vào plugin; nguyên tắc: *AI
+hiểu ngữ nghĩa, thuật toán vẽ hình học*. Viết 3 đặc tả mới (State **Draft — chờ duyệt**):
+
+- `docs/nang-cap/M115-hoan-thien-ban-ve-tu-tuyen-tim.md` — `XBOSS_TUYEN_GAN`/`_TUYEN_DOTHI`/
+  `_HOANTHIEN`, rule pack `completionPolicy`, không migration/API. Thi hành đầu tiên.
+- `docs/nang-cap/M116-phoi-hop-xung-dot-lien-he.md` — combined services 2D: phát hiện + đề xuất
+  (`coordinationPolicy`), kỹ sư quyết. Sau M115.
+- `docs/nang-cap/M117-ai-doc-so-do-nguyen-ly.md` — AI đọc schematic DXF → graph → tuyến tim nháp
+  (routing M114) → vào quy trình M115. Kích hoạt sau khi M115 pilot ổn.
+
+Đợt này đóng nốt 2 hướng "chưa có đặc tả" (đồ thị kết nối, combined services) trong
+`docs/nang-cap/README.md`. **Tiếp theo:** duyệt đặc tả M115 → thi hành 4 PR; cổng chung vẫn là
+trả nợ verify tay AutoCAD 2026 (M111 đang chặn phát hành rộng).
+
 ## ✅ Gộp module CAD/BIM: 23 tệp → 7 tệp (2026-08-30)
 
 Nhánh `claude/autocad-revit-module-consolidation-w643eb`. Refactor thuần **không đổi hành vi**: gộp
