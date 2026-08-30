@@ -8,6 +8,7 @@
  */
 
 import { BoundingBox3D, Point3D } from "@/lib/ky-thuat/engineering-bim-viewer";
+import { escapeXml } from "@/lib/nen/escape";
 import { todayISO } from "@/lib/nen/date";
 export type { BoundingBox3D, Point3D };
 
@@ -435,17 +436,17 @@ export function generateAsBuiltStamp(
     <rect x="2" y="2" width="476" height="40" fill="#ef4444" opacity="0.1"/>
     <text x="240" y="28" font-size="16" font-weight="bold" fill="#ef4444" text-anchor="middle">BẢN VẼ HOÀN CÔNG (NĐ 06/2021/NĐ-CP)</text>
     <line x1="2" y1="42" x2="478" y2="42" stroke="#ef4444" stroke-width="2"/>
-    <text x="12" y="62" font-size="12" fill="#ef4444">Nhà thầu: ${contractorName}</text>
-    <text x="320" y="62" font-size="12" fill="#ef4444">Mã: ${modelCode}</text>
+    <text x="12" y="62" font-size="12" fill="#ef4444">Nhà thầu: ${escapeXml(contractorName)}</text>
+    <text x="320" y="62" font-size="12" fill="#ef4444">Mã: ${escapeXml(modelCode)}</text>
     <line x1="2" y1="74" x2="478" y2="74" stroke="#ef4444" stroke-width="1.5"/>
     <line x1="240" y1="74" x2="240" y2="180" stroke="#ef4444" stroke-width="1.5"/>
     <text x="120" y="94" font-size="12" font-weight="bold" fill="#ef4444" text-anchor="middle">NGƯỜI LẬP BẢN VẼ</text>
     <text x="120" y="160" font-size="11" fill="#ef4444" text-anchor="middle">(Ký và ghi rõ họ tên)</text>
     <text x="360" y="94" font-size="12" font-weight="bold" fill="#ef4444" text-anchor="middle">CHỈ HUY TRƯỞNG</text>
-    <text x="360" y="160" font-size="11" fill="#ef4444" text-anchor="middle">${siteCommander}</text>
+    <text x="360" y="160" font-size="11" fill="#ef4444" text-anchor="middle">${escapeXml(siteCommander)}</text>
     <line x1="2" y1="180" x2="478" y2="180" stroke="#ef4444" stroke-width="1.5"/>
     <text x="240" y="200" font-size="12" font-weight="bold" fill="#ef4444" text-anchor="middle">TƯ VẤN GIÁM SÁT TRƯỞNG</text>
-    <text x="240" y="222" font-size="11" fill="#ef4444" text-anchor="middle">${supervisorLead} — Ngày: ${approvalDate}</text>
+    <text x="240" y="222" font-size="11" fill="#ef4444" text-anchor="middle">${escapeXml(supervisorLead)} — Ngày: ${escapeXml(approvalDate)}</text>
   </svg>
   `.trim();
 

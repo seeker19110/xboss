@@ -1,5 +1,6 @@
 // lib/engineering-scan-to-bim.ts — AI Reality Scan-to-BIM, Cylinder RANSAC & As-Built Redline Engine (M70 / M76 / M92)
 import { query, queryOne, run } from "@/lib/db";
+import { escapeXml } from "@/lib/nen/escape";
 import { createHash } from "crypto";
 
 export interface ScannedPoint3D {
@@ -335,7 +336,7 @@ export function generateAsBuiltRedlineAndStamp(
     const cy = 100 + Math.floor(idx / 3) * 100;
     return `<g stroke="#ef4444" fill="none" stroke-width="2">
       <path d="M ${cx} ${cy} q 10 -15 20 0 q 15 -10 20 10 q 15 10 0 20 q 10 15 -10 20 q -15 10 -20 -10 q -15 10 -20 -10 q 10 -15 -10 -20 Z" stroke-dasharray="4,2" />
-      <text x="${cx + 10}" y="${cy + 15}" fill="#ef4444" font-size="10" font-weight="bold">REV [${d.spoolCode} Δ=${d.euclideanDeviationMm}mm]</text>
+      <text x="${cx + 10}" y="${cy + 15}" fill="#ef4444" font-size="10" font-weight="bold">REV [${escapeXml(d.spoolCode)} Δ=${d.euclideanDeviationMm}mm]</text>
     </g>`;
   });
 
@@ -349,8 +350,8 @@ export function generateAsBuiltRedlineAndStamp(
         <rect width="140" height="90" fill="#18181b" stroke="#ef4444" stroke-width="2" rx="2" />
         <text x="70" y="16" fill="#ef4444" font-size="10" font-weight="bold" text-anchor="middle">BẢN VẼ HOÀN CÔNG</text>
         <line x1="0" y1="22" x2="140" y2="22" stroke="#ef4444" stroke-width="1" />
-        <text x="6" y="32" fill="#d4d4d8" font-size="7">Nhà thầu chính: ${contractorName}</text>
-        <text x="6" y="42" fill="#d4d4d8" font-size="7">Nhà thầu phụ: ${subcontractorName}</text>
+        <text x="6" y="32" fill="#d4d4d8" font-size="7">Nhà thầu chính: ${escapeXml(contractorName)}</text>
+        <text x="6" y="42" fill="#d4d4d8" font-size="7">Nhà thầu phụ: ${escapeXml(subcontractorName)}</text>
         <line x1="0" y1="46" x2="140" y2="46" stroke="#ef4444" stroke-width="0.5" />
         <text x="35" y="56" fill="#a1a1aa" font-size="6" text-anchor="middle">NGƯỜI LẬP</text>
         <text x="105" y="56" fill="#a1a1aa" font-size="6" text-anchor="middle">CHT THẦU PHỤ</text>
@@ -364,7 +365,7 @@ export function generateAsBuiltRedlineAndStamp(
         <rect width="140" height="70" fill="#18181b" stroke="#ef4444" stroke-width="2" rx="2" />
         <text x="70" y="16" fill="#ef4444" font-size="10" font-weight="bold" text-anchor="middle">BẢN VẼ HOÀN CÔNG</text>
         <line x1="0" y1="22" x2="140" y2="22" stroke="#ef4444" stroke-width="1" />
-        <text x="6" y="32" fill="#d4d4d8" font-size="7">Nhà thầu: ${contractorName}</text>
+        <text x="6" y="32" fill="#d4d4d8" font-size="7">Nhà thầu: ${escapeXml(contractorName)}</text>
         <line x1="0" y1="36" x2="140" y2="36" stroke="#ef4444" stroke-width="0.5" />
         <text x="35" y="46" fill="#a1a1aa" font-size="6" text-anchor="middle">NGƯỜI LẬP</text>
         <text x="105" y="46" fill="#a1a1aa" font-size="6" text-anchor="middle">CHỈ HUY TRƯỞNG</text>

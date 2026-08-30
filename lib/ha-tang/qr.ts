@@ -125,9 +125,6 @@ export async function resolveManyForLabels(
   return out;
 }
 
-export function escapeHtml(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
-  );
-}
+// Giữ tên cũ cho các chỗ đang dùng (tem QR); bản cài đặt thật đã chuyển xuống
+// lib/nen/escape.ts để dùng chung với các bản vẽ SVG ở lib/ky-thuat/* (DRY).
+export { escapeXml as escapeHtml } from "@/lib/nen/escape";

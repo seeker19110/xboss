@@ -154,6 +154,16 @@ test("God-Tier: generateAsBuiltStamp sinh khung dấu chuẩn NĐ 06/2021/NĐ-CP
   assert.ok(stamp.svgStampContent.includes("Trần Văn Giám Sát"));
 });
 
+test("God-Tier: generateAsBuiltStamp escape dữ liệu người dùng, không cho XSS lưu trữ qua SVG", () => {
+  // SVG này được render bằng dangerouslySetInnerHTML ở /engineering/god-tier-studio,
+  // nên mã do người dùng nhập phải bị escape trước khi nhúng vào markup.
+  const doc = '<img src=x onerror="alert(1)">';
+  const stamp = generateAsBuiltStamp(doc, doc, doc, doc, "2026-08-20");
+  assert.ok(!stamp.svgStampContent.includes("<img"), "không được lọt thẻ thô vào SVG");
+  assert.ok(!/onerror\s*=\s*"/.test(stamp.svgStampContent), "không được lọt attribute sự kiện");
+  assert.ok(stamp.svgStampContent.includes("&lt;img"), "phải escape thành thực thể XML");
+});
+
 test("God-Tier AI: diagnoseCadBimDefects chẩn đoán 12 dị tật và sinh kịch bản AutoLISP", async () => {
   const testData = {
     fileName: "TEST-DRAWING.dwg",
