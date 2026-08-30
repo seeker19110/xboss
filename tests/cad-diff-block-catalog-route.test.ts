@@ -15,7 +15,7 @@ import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE
 //     KHÔNG có nhánh "GUC rỗng thì cho qua" (khác 11 bảng của migrations/0069_rls.sql). Trước bản
 //     vá này, `listCadDiffSessions`/`saveCadDiffSession`/`listCadBlockCatalogs`
 //     (lib/ky-thuat/engineering-cad-skills.ts) gọi `query`/`queryOne` TRỰC TIẾP, KHÔNG bọc
-//     `withProjectScope` như lib/ky-thuat/cad/boq-map.ts đã làm đúng — trên production
+//     `withProjectScope` như lib/ky-thuat/cad/dashboard.ts đã làm đúng — trên production
 //     (DATABASE_URL trỏ role `xboss_app`, NOBYPASSRLS) nghĩa là GET /diff, GET /blocks luôn trả
 //     rỗng và INSERT của saveCadDiffSession luôn thất bại âm thầm. Ba hàm trên nay đã bọc
 //     `withProjectScope` (đặt `set_config('app.project_id', ...)` trong transaction trước khi
@@ -39,7 +39,10 @@ import { Pool } from "pg";
 const S = { skip: !HAS_TEST_DB };
 
 function nguon(...phan: string[]): string {
-  return readFileSync(join(process.cwd(), "app", "api", "engineering", "cad", ...phan, "route.ts"), "utf8");
+  return readFileSync(
+    join(process.cwd(), "app", "api", "engineering", "cad", ...phan, "route.ts"),
+    "utf8",
+  );
 }
 
 // ===== (1) Route-source =====
@@ -77,7 +80,10 @@ test("route diff: GET force-dynamic + viewEngineeringGraph, POST manageEngineeri
   // "B2 Fix" trong route) — try/catch bọc quanh saveCadDiffSession, không throw ra ngoài.
   const iSave = doanPost.indexOf("saveCadDiffSession(");
   const iCatchSau = doanPost.indexOf("catch {", iSave);
-  assert.ok(iSave >= 0 && iCatchSau >= 0, "POST /diff phải nuốt lỗi lưu phiên, không để hỏng response");
+  assert.ok(
+    iSave >= 0 && iCatchSau >= 0,
+    "POST /diff phải nuốt lỗi lưu phiên, không để hỏng response",
+  );
 });
 
 test("route blocks: GET force-dynamic + viewEngineeringGraph + 400 chưa chọn dự án", () => {
@@ -153,9 +159,8 @@ test(
   "computeCadVectorDiff → saveCadDiffSession → listCadDiffSessions: round-trip đúng dự án, mới nhất trước",
   S,
   async () => {
-    const { computeCadVectorDiff, saveCadDiffSession, listCadDiffSessions } = await import(
-      "@/lib/ky-thuat/engineering-cad-skills"
-    );
+    const { computeCadVectorDiff, saveCadDiffSession, listCadDiffSessions } =
+      await import("@/lib/ky-thuat/engineering-cad-skills");
 
     const base = [
       {
@@ -184,7 +189,11 @@ test(
 
     const dsA = await listCadDiffSessions(DU_AN_A);
     assert.ok(dsA.length >= 2);
-    assert.equal((dsA[0] as { id: string }).id, saved2.id, "mới nhất phải đứng đầu (created_at DESC)");
+    assert.equal(
+      (dsA[0] as { id: string }).id,
+      saved2.id,
+      "mới nhất phải đứng đầu (created_at DESC)",
+    );
 
     // Dự án khác không thấy phiên của dự án A.
     const dsB = await listCadDiffSessions(DU_AN_B);
@@ -233,7 +242,11 @@ test(
   async () => {
     const { run } = await import("@/lib/db");
     await run(`DELETE FROM engineering_cad_block_catalogs WHERE block_name LIKE 'RLS-PROBE-%'`);
-    await run(`DELETE FROM engineering_cad_diff_sessions WHERE project_id IN (?, ?)`, DU_AN_A, DU_AN_B);
+    await run(
+      `DELETE FROM engineering_cad_diff_sessions WHERE project_id IN (?, ?)`,
+      DU_AN_A,
+      DU_AN_B,
+    );
 
     const u = new URL(process.env.TEST_DATABASE_URL as string);
     u.username = "xboss_app";
@@ -346,7 +359,11 @@ test(
     }
 
     await run(`DELETE FROM engineering_cad_block_catalogs WHERE block_name LIKE 'RLS-PROBE-%'`);
-    await run(`DELETE FROM engineering_cad_diff_sessions WHERE project_id IN (?, ?)`, DU_AN_A, DU_AN_B);
+    await run(
+      `DELETE FROM engineering_cad_diff_sessions WHERE project_id IN (?, ?)`,
+      DU_AN_A,
+      DU_AN_B,
+    );
   },
 );
 

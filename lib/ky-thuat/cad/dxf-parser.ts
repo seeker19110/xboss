@@ -9,7 +9,7 @@
  * - 2D-to-3D Spatial Route generation with Multi-Tier Corridor allocation.
  * - Standardized DXF exporter & AutoCAD .SCR script generation.
  */
-import { RULE_PACK_HIEN_HANH } from "@/lib/ky-thuat/cad/rule-pack-hien-hanh";
+import { RULE_PACK_HIEN_HANH } from "@/lib/ky-thuat/cad/rule-pack";
 
 // Complete Vietnamese TCVN3 / ABC to Unicode character mapping (Upper & Lowercase)
 const TCVN3_MAP: Record<string, string> = {

@@ -84,7 +84,7 @@ export const TRAN_DANH_MUC_BOQ = 500;
  * những công tác nào", và mọi thứ liên quan tiền đều nằm ngoài phạm vi (quy ước M45).
  *
  * Lọc `project_id` ở tầng app dù đã bọc `withProjectScope` — cùng lý do đã ghi trong
- * `lib/dich-vu/cad-boq-snapshot.ts`: mã BOQ duy nhất TOÀN HỆ THỐNG nên thiếu điều kiện này là đọc
+ * `lib/dich-vu/cad.ts`: mã BOQ duy nhất TOÀN HỆ THỐNG nên thiếu điều kiện này là đọc
  * được công tác của dự án khác.
  *
  * `daCatBot` = true khi sổ dài hơn trần: người gọi phải nói ra cho người dùng biết, không được im.

@@ -47,14 +47,14 @@ test("route duyệt/từ chối dùng CAN.approve (hẹp hơn quyền nạp)", (
 // phủ lớp kiểm đầu vào mà route gọi xuống.
 
 test("docSuaDong: chặn loại block lạ ngay ở cửa, không để lọt xuống DB", async () => {
-  const { docSuaDong } = await import("@/lib/ky-thuat/cad/block-lo");
+  const { docSuaDong } = await import("@/lib/ky-thuat/cad/block");
   const kq = docSuaDong([{ id: 1, kind: "ống gió" }]);
   assert.ok("loi" in kq);
   assert.match(kq.loi, /ống gió/);
 });
 
 test("docSuaDong: nhận dạng hợp lệ, ép kiểu đúng, bỏ trường không khai", async () => {
-  const { docSuaDong } = await import("@/lib/ky-thuat/cad/block-lo");
+  const { docSuaDong } = await import("@/lib/ky-thuat/cad/block");
   const kq = docSuaDong([
     { id: 3, kind: "fitting", systemId: "HVAC", chon: 1 },
     { id: 4, kind: null },
@@ -69,7 +69,7 @@ test("docSuaDong: nhận dạng hợp lệ, ép kiểu đúng, bỏ trường kh
 });
 
 test("docSuaDong: body rác bị từ chối, không ném lỗi", async () => {
-  const { docSuaDong } = await import("@/lib/ky-thuat/cad/block-lo");
+  const { docSuaDong } = await import("@/lib/ky-thuat/cad/block");
   assert.deepEqual(docSuaDong(undefined), { sua: [] });
   assert.ok("loi" in docSuaDong("chuỗi"));
   assert.ok("loi" in docSuaDong([null]));

@@ -4,6 +4,41 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## ✅ Gộp module CAD/BIM: 23 tệp → 7 tệp (2026-08-30)
+
+Nhánh `claude/autocad-revit-module-consolidation-w643eb`. Refactor thuần **không đổi hành vi**: gộp
+họ module AutoCAD/Revit/CAD/BIM trong `lib/ky-thuat/cad/` và `lib/dich-vu/cad-*.ts` theo chức năng.
+Không có shim re-export — mọi nơi import được sửa thẳng. `plugin-autocad/` không đụng gì.
+
+- `lib/ky-thuat/cad/` 19 tệp → 5 tệp + thư mục `rule-packs/`:
+  - `rule-pack.ts` ← thêm `rule-pack-hien-hanh.ts` + `rule-pack-revision.ts`.
+  - `block.ts` (mới) ← `block-lib` + `block-phan-loai-luat` + `block-preview-svg` + `block-lo` +
+    `block-proposals` + `block-them-web` (thứ tự trong tệp = thứ tự phụ thuộc).
+  - `drawing.ts` (mới) ← `drawing-payload` + `drawing-tree` + `tim-ban-ve`.
+  - `dashboard.ts` (mới) ← `bang-dieu-khien` + `boq-map` + `gioi-han` + `plugin-package` +
+    `plugin-upload`.
+  - Giữ nguyên `index.ts` (facade không trỏ tới tệp nào bị gộp) và `dxf-parser.ts` (4.551 dòng).
+- `lib/dich-vu/cad.ts` (mới) ← `cad-block-phan-loai` + `cad-block-nap-lo` + `cad-boq-snapshot` +
+  `cad-goi-y-anh-xa`. Vẫn đúng ADR-0008: không tệp nào biết gì về HTTP.
+- Mỗi khối cũ giữ nguyên comment giải thích, mở đầu bằng `// ===== <tên tệp cũ> =====` để tra cứu
+  theo log/đặc tả cũ vẫn ra đúng chỗ. **Toàn bộ export public giữ nguyên tên** (đã đối chiếu bằng
+  script: không thiếu, không thừa một ký hiệu nào).
+- 182 lượt import trong 58 tệp (`app/`, `lib/`, `tests/`, `scripts/`) đổi sang đường dẫn mới.
+- 3 va chạm tên khi gộp: `SHA256_HEX`, `thuocTinhTuDxf`, `idTuTenBlock` **trùng khít từng ký tự** ở
+  2 tệp ⇒ bỏ bản sao (DRY). `DongDb` là 2 shape KHÁC nhau ⇒ đổi tên theo ngữ nghĩa
+  (`DongBlockLibDb` / `DongUngVienLoDb`), không hợp nhất bừa.
+- **Bẫy build đã xử lý:** gộp `drawing-tree` vào `drawing.ts` kéo `mkdirSync(join(baseDir, …))` vào
+  đồ thị import của route `parse-dxf`, làm Turbopack bật lại cảnh báo "Dynamic filesystem access
+  causes tracing of the whole project" (baseline 0 cảnh báo → 1). Chặn bằng `turbopackIgnore` ngay
+  tại lời gọi (hàm chỉ do `npm run setup:drawing-tree` và test gọi, không route nào gọi) — build
+  trở lại 0 cảnh báo. Ghi chú ở `scripts/ensure-drawing-tree.ts` cập nhật theo.
+- `tests/cad-goi-y-anh-xa.test.ts` (AC10/AC11 quét mã nguồn): đọc **đúng khối**
+  `cad-goi-y-anh-xa` trong tệp gộp thay vì cả tệp — khối `cad-boq-snapshot` có nhắc tên cột tiền
+  trong comment giải thích vì sao nó KHÔNG đọc cột đó. Logic assert giữ nguyên.
+- Cổng: `npm run lint`, `npm run typecheck`, `npm run check:lib-layers`, `npm run check:dead-code`,
+  `npm run build` (0 cảnh báo) xanh; `npm test` **255 tệp, 1482 ca pass, 0 fail, 1 skip cố ý**
+  (Postgres 16 ephemeral).
+
 ## ✅ Plugin AutoCAD — offline bootstrap + tích hợp M113/M114 sau rebase (2026-08-29)
 
 Nhánh `claude/mepf-blocklib-bootstrap-and-y-n-guard` đã rebase lên `origin/main`

@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { NextRequest } from "next/server";
-import type { BlockLibRow, BlockManifestEntry } from "@/lib/ky-thuat/cad/block-lib";
+import type { BlockLibRow, BlockManifestEntry } from "@/lib/ky-thuat/cad/block";
 
 const S = { skip: !HAS_TEST_DB };
 
@@ -47,7 +47,7 @@ function bo(id: number, version: string, blocks: BlockManifestEntry[]): BlockLib
 }
 
 test("kiemXungDotBlockName: cùng tên KHÁC id → lỗi nêu cả hai block; cùng id (đè) → không lỗi", async () => {
-  const { kiemXungDotBlockName } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { kiemXungDotBlockName } = await import("@/lib/ky-thuat/cad/block");
   const toanCuc = bo(1, "g1", [{ id: "titleblock-a1", blockName: "XB-TB-A1", kind: "titleblock" }]);
 
   const loi = kiemXungDotBlockName(
@@ -73,7 +73,7 @@ test("kiemXungDotBlockName: cùng tên KHÁC id → lỗi nêu cả hai block; c
 });
 
 test("etagBlockLibTron: đổi bộ nào trong cặp cũng đổi ETag (§4.6)", async () => {
-  const { etagBlockLibTron } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { etagBlockLibTron } = await import("@/lib/ky-thuat/cad/block");
   const gc = bo(1, "g1", []);
   const da = bo(2, "b1", []);
   const goc = etagBlockLibTron(gc, da);
@@ -150,7 +150,7 @@ after(async () => {
 
 /** Phát hành bộ toàn cục mẫu (một lần cho cả nhóm ca) và nhớ khoá tệp để dọn. */
 async function batBuocCoBoToanCuc() {
-  const { layBlockLibHienHanh, phatHanhBlockLib } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { layBlockLibHienHanh, phatHanhBlockLib } = await import("@/lib/ky-thuat/cad/block");
   let row = await layBlockLibHienHanh();
   if (!row) {
     const kq = await phatHanhBlockLib({
@@ -171,7 +171,7 @@ test(
   "AC4/AC5: hai dự án cùng nhãn 'b1' đều phát hành được; phát hành lại đúng tệp → idempotent",
   S,
   async () => {
-    const { phatHanhBlockLib, layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block-lib");
+    const { phatHanhBlockLib, layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block");
     const { withProjectScope } = await import("@/lib/db");
     await batBuocCoBoToanCuc();
 
@@ -217,7 +217,7 @@ test(
   "AC6: bộ dự án khai blockName trùng bộ toàn cục nhưng KHÁC id → từ chối lúc phát hành",
   S,
   async () => {
-    const { phatHanhBlockLib } = await import("@/lib/ky-thuat/cad/block-lib");
+    const { phatHanhBlockLib } = await import("@/lib/ky-thuat/cad/block");
     const { queryOne } = await import("@/lib/db");
     await batBuocCoBoToanCuc();
 
@@ -250,7 +250,7 @@ test(
     const { createCadToken } = await import("@/lib/bao-mat/cad-devices");
     const { GET } = await import("@/app/api/engineering/cad/block-lib/route");
     const { phatHanhBlockLib, layBlockLibHienHanh, etagBlockLibTron } =
-      await import("@/lib/ky-thuat/cad/block-lib");
+      await import("@/lib/ky-thuat/cad/block");
     const { withProjectScope } = await import("@/lib/db");
     const toanCuc = await batBuocCoBoToanCuc();
 
@@ -337,8 +337,8 @@ test(
   "themBlockTuWeb theo dự án: nền là bộ CỦA dự án, chặn tên đụng bộ toàn cục (§4)",
   S,
   async () => {
-    const { themBlockTuWeb } = await import("@/lib/ky-thuat/cad/block-them-web");
-    const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block-lib");
+    const { themBlockTuWeb } = await import("@/lib/ky-thuat/cad/block");
+    const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block");
     const { withProjectScope } = await import("@/lib/db");
     await batBuocCoBoToanCuc();
 

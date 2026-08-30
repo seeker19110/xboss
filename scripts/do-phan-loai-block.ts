@@ -8,8 +8,8 @@
 // CI. Đây là công cụ chạy tay khi cần đánh giá, đúng như đặc tả xếp nó vào §15.4 chứ không §15.1.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { phanLoaiLoTheoLuat } from "@/lib/ky-thuat/cad/block-phan-loai-luat";
-import { phanLoaiLo } from "@/lib/dich-vu/cad-block-phan-loai";
+import { phanLoaiLoTheoLuat } from "@/lib/ky-thuat/cad/block";
+import { phanLoaiLo } from "@/lib/dich-vu/cad";
 import { aiKhaDung, lyDoAiTat } from "@/lib/nen/ai";
 
 type Dong = {

@@ -1,6 +1,6 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
 // Test cho app/api/engineering/cad/takeoff-export/route.ts (chưa có test nào trước PR này) +
-// hàm dựng dòng dữ liệu layDongTakeoffChoExport trong lib/ky-thuat/cad/bang-dieu-khien.ts (~205-238).
+// hàm dựng dòng dữ liệu layDongTakeoffChoExport trong lib/ky-thuat/cad/dashboard.ts (~205-238).
 // (1) Route-source: force-dynamic, 401 chưa đăng nhập, phân quyền CAN.viewEngineeringGraph.
 // (2) Integration (TEST_DATABASE_URL, tự skip): layDongTakeoffChoExport dựng đúng từng dòng từ
 //     standardize_report.takeoff.lines của mọi revision plugin trong dự án, bỏ qua revision không
@@ -34,7 +34,10 @@ test("route takeoff-export: force-dynamic, 401 khi chưa đăng nhập, 403 theo
   const iAuth403 = src.indexOf("status: 403");
   const iQuery = src.indexOf("layDongTakeoffChoExport(");
   assert.ok(iAuth401 >= 0 && iAuth403 >= 0 && iQuery >= 0);
-  assert.ok(iAuth401 < iQuery && iAuth403 < iQuery, "kiểm quyền phải chạy trước khi truy vấn dữ liệu");
+  assert.ok(
+    iAuth401 < iQuery && iAuth403 < iQuery,
+    "kiểm quyền phải chạy trước khi truy vấn dữ liệu",
+  );
 });
 
 test("route takeoff-export: không đụng bảng BOQ, chỉ đọc lại dữ liệu đã lưu trong standardize_report", () => {
@@ -59,17 +62,63 @@ test("route takeoff-export: header Excel có đủ cột KL đo lẫn cột quy 
 // ===== (2) Integration =====
 
 const DXF_HOP_LE = [
-  "0", "SECTION", "2", "HEADER", "0", "ENDSEC",
-  "0", "SECTION", "2", "BLOCKS", "0", "ENDSEC",
-  "0", "SECTION", "2", "TABLES",
-  "0", "TABLE", "2", "LAYER",
-  "0", "LAYER", "2", "01_ONG_GIO_CAP", "62", "140", "6", "CONTINUOUS",
-  "0", "ENDTAB", "0", "ENDSEC",
-  "0", "SECTION", "2", "ENTITIES",
-  "0", "LINE", "8", "01_ONG_GIO_CAP",
-  "10", "0.0", "20", "0.0", "30", "0.0",
-  "11", "1000.0", "21", "0.0", "31", "0.0",
-  "0", "ENDSEC", "0", "EOF", "",
+  "0",
+  "SECTION",
+  "2",
+  "HEADER",
+  "0",
+  "ENDSEC",
+  "0",
+  "SECTION",
+  "2",
+  "BLOCKS",
+  "0",
+  "ENDSEC",
+  "0",
+  "SECTION",
+  "2",
+  "TABLES",
+  "0",
+  "TABLE",
+  "2",
+  "LAYER",
+  "0",
+  "LAYER",
+  "2",
+  "01_ONG_GIO_CAP",
+  "62",
+  "140",
+  "6",
+  "CONTINUOUS",
+  "0",
+  "ENDTAB",
+  "0",
+  "ENDSEC",
+  "0",
+  "SECTION",
+  "2",
+  "ENTITIES",
+  "0",
+  "LINE",
+  "8",
+  "01_ONG_GIO_CAP",
+  "10",
+  "0.0",
+  "20",
+  "0.0",
+  "30",
+  "0.0",
+  "11",
+  "1000.0",
+  "21",
+  "0.0",
+  "31",
+  "0.0",
+  "0",
+  "ENDSEC",
+  "0",
+  "EOF",
+  "",
 ].join("\n");
 
 let U = 0;
@@ -124,9 +173,9 @@ test(
     "standardize_report.takeoff.lines, bỏ qua revision không kèm takeoff, chỉ trong đúng dự án",
   S,
   async () => {
-    const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/plugin-upload");
+    const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/dashboard");
     const { getCurrentRulePack } = await import("@/lib/ky-thuat/cad/rule-pack");
-    const { layDongTakeoffChoExport } = await import("@/lib/ky-thuat/cad/bang-dieu-khien");
+    const { layDongTakeoffChoExport } = await import("@/lib/ky-thuat/cad/dashboard");
     const v = getCurrentRulePack().version;
 
     // Rev A của dự án 1 — CÓ takeoff.

@@ -26,7 +26,7 @@ const daLuu: string[] = [];
 // ── (1) Tầng 1 — phân loại tất định ──────────────────────────────────────────
 
 test("tầng 1: tên khớp blockNameMatchAny suy đủ loại, hệ và hạng mục bóc tách", async () => {
-  const { phanLoaiTheoLuat } = await import("@/lib/ky-thuat/cad/block-phan-loai-luat");
+  const { phanLoaiTheoLuat } = await import("@/lib/ky-thuat/cad/block");
   const kq = phanLoaiTheoLuat({ blockName: "FCU-01", layer: "M-DUCT-SUPP" });
   assert.equal(kq.kind, "equipment");
   assert.equal(kq.takeoffItemId, "fcu-unit");
@@ -36,7 +36,7 @@ test("tầng 1: tên khớp blockNameMatchAny suy đủ loại, hệ và hạng 
 });
 
 test("tầng 1: hạng mục ĐẾM giá đỡ/lỗ chờ (không nằm trong drawTools) vẫn suy được loại", async () => {
-  const { phanLoaiTheoLuat } = await import("@/lib/ky-thuat/cad/block-phan-loai-luat");
+  const { phanLoaiTheoLuat } = await import("@/lib/ky-thuat/cad/block");
   // `support-hanger`/`sleeve-opening` cố ý đứng ngoài drawTools (M100 PR7) — không được coi là
   // rule pack thiếu nhất quán.
   const sup = phanLoaiTheoLuat({ blockName: "XB-SUP-DUCT-01" });
@@ -48,7 +48,7 @@ test("tầng 1: hạng mục ĐẾM giá đỡ/lỗ chờ (không nằm trong dr
 });
 
 test("tầng 1: khung tên nhận theo sheetSetup.titleblockId, KHÔNG đoán khổ giấy", async () => {
-  const { phanLoaiTheoLuat } = await import("@/lib/ky-thuat/cad/block-phan-loai-luat");
+  const { phanLoaiTheoLuat } = await import("@/lib/ky-thuat/cad/block");
   const kq = phanLoaiTheoLuat({ blockName: "TITLEBLOCK-A1" });
   assert.equal(kq.kind, "titleblock");
   assert.equal(kq.systemId, null, "khung tên không thuộc hệ nào");
@@ -60,7 +60,7 @@ test("tầng 1: khung tên nhận theo sheetSetup.titleblockId, KHÔNG đoán kh
 });
 
 test("tầng 1 (AC5): tên vô nghĩa thì CHƯA QUYẾT, không bao giờ đoán một kind gần đúng", async () => {
-  const { phanLoaiTheoLuat } = await import("@/lib/ky-thuat/cad/block-phan-loai-luat");
+  const { phanLoaiTheoLuat } = await import("@/lib/ky-thuat/cad/block");
   for (const ten of ["BLOCK1", "A$C0123", "ABC-XYZ-99"]) {
     const kq = phanLoaiTheoLuat({ blockName: ten });
     assert.equal(kq.kind, null, `"${ten}" không được gán kind`);
@@ -70,7 +70,7 @@ test("tầng 1 (AC5): tên vô nghĩa thì CHƯA QUYẾT, không bao giờ đoá
 });
 
 test("tầng 1: layer chỉ suy được HỆ, không bao giờ suy loại block", async () => {
-  const { phanLoaiTheoLuat } = await import("@/lib/ky-thuat/cad/block-phan-loai-luat");
+  const { phanLoaiTheoLuat } = await import("@/lib/ky-thuat/cad/block");
   const kq = phanLoaiTheoLuat({ blockName: "BLOCK7", layer: "M-DUCT-SUPP" });
   assert.equal(kq.kind, null);
   assert.equal(kq.systemId, "HVAC", "layer HVAC cho biết hệ để người duyệt đỡ gõ lại");
@@ -78,8 +78,7 @@ test("tầng 1: layer chỉ suy được HỆ, không bao giờ suy loại block
 });
 
 test("tầng 1: thống kê đếm đúng phần quyết được / còn treo cho tầng 2-3", async () => {
-  const { phanLoaiLoTheoLuat, thongKePhanLoai } =
-    await import("@/lib/ky-thuat/cad/block-phan-loai-luat");
+  const { phanLoaiLoTheoLuat, thongKePhanLoai } = await import("@/lib/ky-thuat/cad/block");
   const kq = phanLoaiLoTheoLuat([
     { blockName: "FCU-01" },
     { blockName: "AHU-02" },
@@ -91,7 +90,7 @@ test("tầng 1: thống kê đếm đúng phần quyết được / còn treo ch
 // ── (2) Lọc ứng viên ─────────────────────────────────────────────────────────
 
 test("lọc ứng viên: bỏ block ẩn danh, layout, trùng tên trong cùng tệp — kèm lý do", async () => {
-  const { locUngVien } = await import("@/lib/ky-thuat/cad/block-lo");
+  const { locUngVien } = await import("@/lib/ky-thuat/cad/block");
   const { giuLai, boQua } = locUngVien([
     { blockName: "FCU-01" },
     { blockName: "*U12" },
@@ -128,7 +127,7 @@ async function donDep(): Promise<void> {
 }
 
 async function phatHanhNen(): Promise<string> {
-  const { phatHanhBlockLib, layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { phatHanhBlockLib, layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block");
   const kq = await phatHanhBlockLib({
     userId: pmId,
     manifestTho: JSON.parse(JSON.stringify(MANIFEST_MAU)),
@@ -167,7 +166,7 @@ after(async () => {
 test("AC6: nhận lô bỏ qua block trùng tên thư viện, giữ lại phần còn lại", S, async () => {
   await donDep();
   const nen = await phatHanhNen();
-  const { nhanLoBlock, layLo } = await import("@/lib/ky-thuat/cad/block-lo");
+  const { nhanLoBlock, layLo } = await import("@/lib/ky-thuat/cad/block");
 
   const kq = await nhanLoBlock({
     userId: pmId,
@@ -201,8 +200,8 @@ test("AC6: nhận lô bỏ qua block trùng tên thư viện, giữ lại phần
 test("AC7 + AC9: duyệt lô ra ĐÚNG MỘT version; bấm lại không sinh version thứ hai", S, async () => {
   await donDep();
   const nen = await phatHanhNen();
-  const { nhanLoBlock, layLo, duyetLo } = await import("@/lib/ky-thuat/cad/block-lo");
-  const { layBlockLibHienHanh, layLichSuBlockLib } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { nhanLoBlock, layLo, duyetLo } = await import("@/lib/ky-thuat/cad/block");
+  const { layBlockLibHienHanh, layLichSuBlockLib } = await import("@/lib/ky-thuat/cad/block");
 
   const nhan = await nhanLoBlock({
     userId: pmId,
@@ -267,7 +266,7 @@ test("AC7 + AC9: duyệt lô ra ĐÚNG MỘT version; bấm lại không sinh ve
 test("AC8: thư viện lên version khác trong lúc lô chờ → lô stale, chặn duyệt", S, async () => {
   await donDep();
   await phatHanhNen();
-  const { nhanLoBlock, duyetLo, layLo } = await import("@/lib/ky-thuat/cad/block-lo");
+  const { nhanLoBlock, duyetLo, layLo } = await import("@/lib/ky-thuat/cad/block");
 
   const nhan = await nhanLoBlock({
     userId: pmId,
@@ -296,8 +295,8 @@ test("AC8: thư viện lên version khác trong lúc lô chờ → lô stale, ch
 test("từ chối lô: ghi lý do, không đụng thư viện", S, async () => {
   await donDep();
   const nen = await phatHanhNen();
-  const { nhanLoBlock, tuChoiLo, layLo, duyetLo } = await import("@/lib/ky-thuat/cad/block-lo");
-  const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block-lib");
+  const { nhanLoBlock, tuChoiLo, layLo, duyetLo } = await import("@/lib/ky-thuat/cad/block");
+  const { layBlockLibHienHanh } = await import("@/lib/ky-thuat/cad/block");
 
   const nhan = await nhanLoBlock({
     userId: pmId,
@@ -321,7 +320,7 @@ test("từ chối lô: ghi lý do, không đụng thư viện", S, async () => {
 });
 
 test("trần lô + tệp rỗng bị từ chối kèm số đo thật", S, async () => {
-  const { nhanLoBlock, TRAN_BLOCK_MOI_LO } = await import("@/lib/ky-thuat/cad/block-lo");
+  const { nhanLoBlock, TRAN_BLOCK_MOI_LO } = await import("@/lib/ky-thuat/cad/block");
   const rong = await nhanLoBlock({ userId: pmId, nguon: "web", ungViens: [] });
   assert.equal(rong.status, "invalid");
 
@@ -340,7 +339,7 @@ test("trần lô + tệp rỗng bị từ chối kèm số đo thật", S, async
 });
 
 test("trần tính trên block NẠP ĐƯỢC, không phải số định nghĩa thô", S, async () => {
-  const { nhanLoBlock, TRAN_BLOCK_MOI_LO } = await import("@/lib/ky-thuat/cad/block-lo");
+  const { nhanLoBlock, TRAN_BLOCK_MOI_LO } = await import("@/lib/ky-thuat/cad/block");
   await donDep();
   await phatHanhNen();
 

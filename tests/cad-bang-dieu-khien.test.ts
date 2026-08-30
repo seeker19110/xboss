@@ -7,7 +7,7 @@ import {
   docKiemDinhTuBaoCao,
   docKlBocTuBaoCao,
   docBuocTuBaoCao,
-} from "@/lib/ky-thuat/cad/bang-dieu-khien";
+} from "@/lib/ky-thuat/cad/dashboard";
 import { CURRENT_RULE_PACK_VERSION } from "@/lib/ky-thuat/cad/rule-pack";
 
 test("tomTatRulePack trả đúng version đang phát hành kèm số nhóm layer và hạng mục bóc tách", () => {
@@ -75,13 +75,31 @@ test("docBuocTuBaoCao đọc danh sách bước chuẩn hoá (standardize_report
 
   const dungDang = docBuocTuBaoCao({
     steps: [
-      { buoc: "Layer", hangMuc: "01_ONG_GIO_CAP", truoc: "01-ONG-GIO", sau: "01_ONG_GIO_CAP", soLuong: 5 },
-      { buoc: "Layer", hangMuc: "02_ONG_NUOC", truoc: "02-ONG-NUOC", sau: "02_ONG_NUOC", soLuong: 2 },
+      {
+        buoc: "Layer",
+        hangMuc: "01_ONG_GIO_CAP",
+        truoc: "01-ONG-GIO",
+        sau: "01_ONG_GIO_CAP",
+        soLuong: 5,
+      },
+      {
+        buoc: "Layer",
+        hangMuc: "02_ONG_NUOC",
+        truoc: "02-ONG-NUOC",
+        sau: "02_ONG_NUOC",
+        soLuong: 2,
+      },
       { buoc: "Block", hangMuc: "VAN-COVA", truoc: "VanCoVa_old", sau: "VanCoVa", soLuong: 1 },
     ],
   });
   assert.deepEqual(dungDang, [
-    { buoc: "Layer", hangMuc: "01_ONG_GIO_CAP", truoc: "01-ONG-GIO", sau: "01_ONG_GIO_CAP", soLuong: 5 },
+    {
+      buoc: "Layer",
+      hangMuc: "01_ONG_GIO_CAP",
+      truoc: "01-ONG-GIO",
+      sau: "01_ONG_GIO_CAP",
+      soLuong: 5,
+    },
     { buoc: "Layer", hangMuc: "02_ONG_NUOC", truoc: "02-ONG-NUOC", sau: "02_ONG_NUOC", soLuong: 2 },
     { buoc: "Block", hangMuc: "VAN-COVA", truoc: "VanCoVa_old", sau: "VanCoVa", soLuong: 1 },
   ]);

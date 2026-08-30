@@ -13,7 +13,7 @@ import {
   ganMaBoqVaoItems,
   layMapBoqTheoDuAn,
   type MaBoqTheoItem,
-} from "@/lib/ky-thuat/cad/boq-map";
+} from "@/lib/ky-thuat/cad/dashboard";
 
 export const dynamic = "force-dynamic";
 

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { danhSachItemBocTach, ghiMapBoqTheoDuAn } from "@/lib/ky-thuat/cad/boq-map";
-import { laySnapshotBoqTheoDuAn } from "@/lib/dich-vu/cad-boq-snapshot";
+import { danhSachItemBocTach, ghiMapBoqTheoDuAn } from "@/lib/ky-thuat/cad/dashboard";
+import { laySnapshotBoqTheoDuAn } from "@/lib/dich-vu/cad";
 
 export const dynamic = "force-dynamic";
 

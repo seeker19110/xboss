@@ -16,7 +16,7 @@ import {
   SAI_SO_TONG_CHIEU_DAI_MM,
   type JointHardwareLine,
 } from "@/lib/ky-thuat/engineering-joint-segmentation";
-import { RULE_PACK_HIEN_HANH } from "@/lib/ky-thuat/cad/rule-pack-hien-hanh";
+import { RULE_PACK_HIEN_HANH } from "@/lib/ky-thuat/cad/rule-pack";
 
 export const dynamic = "force-dynamic";
 

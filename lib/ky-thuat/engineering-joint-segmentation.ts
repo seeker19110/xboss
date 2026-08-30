@@ -9,7 +9,7 @@
  * `plugin-autocad/testdata/joint-segmentation/*.json` (M105 NFR1/AC12) — sửa công thức ở đây thì
  * phải sửa cả bản C# và chạy lại đúng bộ vector đó.
  */
-import { RULE_PACK_HIEN_HANH } from "@/lib/ky-thuat/cad/rule-pack-hien-hanh";
+import { RULE_PACK_HIEN_HANH } from "@/lib/ky-thuat/cad/rule-pack";
 
 // ============================================================================
 // 1. KIỂU DỮ LIỆU (contract dùng chung với rule pack, API và bản C#)

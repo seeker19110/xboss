@@ -8,6 +8,18 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+/**
+ * Đọc đúng khối `cad-goi-y-anh-xa.ts` trong tệp gộp `lib/dich-vu/cad.ts` (mỗi khối mở đầu bằng
+ * `// ===== <tên tệp cũ> =====`). Quét cả tệp gộp sẽ soi nhầm sang khối khác — vd khối
+ * `cad-boq-snapshot.ts` có nhắc tên cột tiền trong comment giải thích vì sao nó KHÔNG đọc cột đó.
+ */
+function khoiGoiYAnhXa(): string {
+  const src = readFileSync(join(process.cwd(), "lib/dich-vu/cad.ts"), "utf8");
+  const dau = src.indexOf("// ===== cad-goi-y-anh-xa.ts =====");
+  assert.ok(dau > 0, "không tìm thấy khối cad-goi-y-anh-xa trong lib/dich-vu/cad.ts");
+  return src.slice(dau);
+}
+
 async function voiAiTat<T>(fn: () => Promise<T>): Promise<T> {
   const cu = process.env.ANTHROPIC_API_KEY;
   delete process.env.ANTHROPIC_API_KEY;
@@ -22,7 +34,7 @@ async function voiAiTat<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 test("layer đã đúng chuẩn thì không hỏi ai, không tốn một lượt gọi nào", async () => {
-  const { goiYLayerMap } = await import("@/lib/dich-vu/cad-goi-y-anh-xa");
+  const { goiYLayerMap } = await import("@/lib/dich-vu/cad");
   const { tapLayerDaChuan } = await import("@/lib/ky-thuat/cad/dxf-parser");
   const { getCurrentRulePack } = await import("@/lib/ky-thuat/cad/rule-pack");
   const daChuan = [...tapLayerDaChuan(getCurrentRulePack())].slice(0, 3);
@@ -34,7 +46,7 @@ test("layer đã đúng chuẩn thì không hỏi ai, không tốn một lượt
 });
 
 test("AI tắt → trả danh sách rỗng kèm lý do, không ném lỗi", async () => {
-  const { goiYLayerMap } = await import("@/lib/dich-vu/cad-goi-y-anh-xa");
+  const { goiYLayerMap } = await import("@/lib/dich-vu/cad");
   await voiAiTat(async () => {
     const kq = await goiYLayerMap(["LAYER-LA-HOAN-TOAN"]);
     assert.deepEqual(kq.goiY, []);
@@ -43,7 +55,7 @@ test("AI tắt → trả danh sách rỗng kèm lý do, không ném lỗi", asyn
 });
 
 test("AC10: không có đường nào trong luồng gợi ý ghi vào rule pack", () => {
-  const lib = readFileSync(join(process.cwd(), "lib/dich-vu/cad-goi-y-anh-xa.ts"), "utf8");
+  const lib = khoiGoiYAnhXa();
   const route = readFileSync(
     join(process.cwd(), "app/api/engineering/cad/layer-map-suggest/route.ts"),
     "utf8",
@@ -59,7 +71,7 @@ test("AC10: không có đường nào trong luồng gợi ý ghi vào rule pack"
 });
 
 test("AC11: luồng gợi ý mã BOQ không đọc một cột tiền nào", () => {
-  const lib = readFileSync(join(process.cwd(), "lib/dich-vu/cad-goi-y-anh-xa.ts"), "utf8");
+  const lib = khoiGoiYAnhXa();
   const boq = readFileSync(join(process.cwd(), "lib/khoi-luong/boq.ts"), "utf8");
   const danhMuc = boq.slice(boq.indexOf("export async function danhMucBoqTheoDuAn"));
   for (const cotTien of ["unit_price", "sub_unit_price", "amount", "thanh_tien"]) {

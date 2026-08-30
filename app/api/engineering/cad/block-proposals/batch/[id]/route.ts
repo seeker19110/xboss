@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import { layLo } from "@/lib/ky-thuat/cad/block-lo";
-import { NGUONG_CHON_SAN } from "@/lib/dich-vu/cad-block-phan-loai";
+import { layLo } from "@/lib/ky-thuat/cad/block";
+import { NGUONG_CHON_SAN } from "@/lib/dich-vu/cad";
 
 export const dynamic = "force-dynamic";
 

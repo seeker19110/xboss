@@ -1,11 +1,179 @@
+// lib/ky-thuat/cad/drawing.ts — Bản vẽ: payload lưu trữ, cây thư mục, dò tệp trên đĩa
+/**
+ * Gộp `drawing-payload` + `drawing-tree` + `tim-ban-ve` — cùng một họ "quản lý tệp bản vẽ":
+ * hình dạng payload đem đi lưu/khôi phục, gốc thư mục kho bản vẽ, và việc quét/tra tệp trên đĩa.
+ *
+ * Toàn bộ là hàm thuần + đọc hệ tệp, không chạm DB.
+ */
+
+import {
+  type DxfLayerInfo,
+  type DxfEntityRaw,
+  type DxfParseResult,
+} from "@/lib/ky-thuat/cad/dxf-parser";
+import { mkdirSync, readdirSync, existsSync } from "node:fs";
+import { join, basename, extname, normalize, resolve, sep } from "node:path";
+
+// ===== drawing-payload.ts =====
+/**
+ * Hợp đồng dữ liệu bản vẽ (drawing payload) — cầu nối giữa app (TypeScript)
+ * và worker Python (`export_dxf_r2000` dùng ezdxf) theo M98 PR2.
+ *
+ * Payload là JSON thuần, dựng từ kết quả parse DXF sẵn có nên app không phải
+ * đổi mô hình dữ liệu (FR1).
+ */
+
+export const DRAWING_PAYLOAD_VERSION = 1 as const;
+
+export interface DrawingPayloadV1 {
+  version: 1;
+  title: string;
+  units: "mm";
+  layers: DxfLayerInfo[];
+  entities: DxfEntityRaw[];
+}
+
+/** Các loại thực thể hợp lệ — bám đúng union `DxfEntityRaw["type"]`. */
+const ENTITY_TYPES: ReadonlyArray<DxfEntityRaw["type"]> = [
+  "LINE",
+  "LWPOLYLINE",
+  "POLYLINE",
+  "CIRCLE",
+  "ARC",
+  "TEXT",
+  "MTEXT",
+  "INSERT",
+  "DIMENSION",
+  "SPLINE",
+  "ELLIPSE",
+  "SOLID",
+  "3DFACE",
+  "HATCH",
+  "LEADER",
+  "MULTILEADER",
+];
+
+/** Chuyển kết quả parse (hoặc dữ liệu bản vẽ đang chỉnh trong UI) thành hợp đồng wire gửi cho worker. */
+export function buildDrawingPayload(result: DxfParseResult, title: string): DrawingPayloadV1 {
+  return {
+    version: DRAWING_PAYLOAD_VERSION,
+    title,
+    units: "mm",
+    layers: result.layers ?? [],
+    entities: result.entities ?? [],
+  };
+}
+
+/** Kiểm hợp lệ tối thiểu trước khi gửi worker — không kiểm hình học sâu (worker/ezdxf lo phần đó). */
+export function validateDrawingPayload(payload: unknown): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    return { valid: false, errors: ["Payload phải là một đối tượng JSON."] };
+  }
+  const p = payload as Record<string, unknown>;
+
+  if (p.version !== 1) {
+    errors.push("Phiên bản hợp đồng không hợp lệ: chỉ chấp nhận version = 1.");
+  }
+  if (typeof p.title !== "string" || p.title.trim() === "") {
+    errors.push("Thiếu tên bản vẽ (title) hoặc tên rỗng.");
+  }
+  if (p.units !== "mm") {
+    errors.push('Đơn vị bản vẽ không hợp lệ: chỉ chấp nhận units = "mm".');
+  }
+
+  if (!Array.isArray(p.layers)) {
+    errors.push("Trường layers phải là một mảng.");
+  } else {
+    p.layers.forEach((layer, i) => {
+      if (typeof layer !== "object" || layer === null || Array.isArray(layer)) {
+        errors.push(`Layer thứ ${i + 1}: phải là một đối tượng.`);
+        return;
+      }
+      const name = (layer as Record<string, unknown>).name;
+      if (typeof name !== "string" || name.trim() === "") {
+        errors.push(`Layer thứ ${i + 1}: thiếu tên layer (name) hoặc tên rỗng.`);
+      }
+    });
+  }
+
+  if (!Array.isArray(p.entities)) {
+    errors.push("Trường entities phải là một mảng.");
+  } else {
+    p.entities.forEach((entity, i) => {
+      if (typeof entity !== "object" || entity === null || Array.isArray(entity)) {
+        errors.push(`Thực thể thứ ${i + 1}: phải là một đối tượng.`);
+        return;
+      }
+      const e = entity as Record<string, unknown>;
+      if (typeof e.type !== "string" || !ENTITY_TYPES.includes(e.type as DxfEntityRaw["type"])) {
+        errors.push(`Thực thể thứ ${i + 1}: loại thực thể (type) không hợp lệ.`);
+      }
+      if (typeof e.layer !== "string") {
+        errors.push(`Thực thể thứ ${i + 1}: trường layer phải là chuỗi.`);
+      }
+    });
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+// ===== drawing-tree.ts =====
+// Cây thư mục quy chuẩn cho bản vẽ CAD (ISO 19650).
+//
+// Trước đây cấu trúc này chỉ tồn tại "tình cờ" trên máy đã từng lưu bản vẽ: route
+// save-drawing chỉ mkdir đúng nhánh nó cần lúc ghi. Trên checkout sạch (CI, máy mới)
+// cây không tồn tại — `drawings/` không được git track dòng nào và `data/uploads/`
+// nằm trong .gitignore, nên không thể "commit thư mục rỗng" để bù. Helper này là
+// nguồn duy nhất khai báo cấu trúc, được gọi lúc lưu bản vẽ và trong test.
+
+/** 5 phân hệ MEP/ACMV có thư mục bản vẽ riêng. */
+export const DRAWING_SYSTEMS = ["HVAC", "PLUMBING", "ELECTRICAL", "FIREFIGHTING", "ELV"] as const;
+
+/** Các nhóm con bắt buộc trong mỗi phân hệ (đường dẫn tương đối trong phân hệ đó). */
+export const DRAWING_SUBDIRS = [
+  join("design", "origin"),
+  join("design", "iso"),
+  "bim",
+  "shop",
+  "asbuilt",
+  "temp",
+] as const;
+
+/** Hai gốc lưu bản vẽ: bản làm việc trong repo và bản upload ngoài git. */
+export function drawingRoots(cwd: string = process.cwd()): string[] {
+  return [join(cwd, "drawings"), join(cwd, "data", "uploads", "drawings")];
+}
+
+/**
+ * Tạo đủ cây thư mục quy chuẩn dưới `baseDir` (idempotent — đã có thì bỏ qua).
+ *
+ * `turbopackIgnore` không phải để "tắt cảnh báo cho xong": `baseDir` là tham số nên Turbopack
+ * phân tích tĩnh ra "truy cập hệ tệp động" rồi trace TOÀN BỘ dự án vào output của mọi route có
+ * tệp này trong đồ thị import — build VPS vốn đã 20–23 phút (xem `scripts/ensure-drawing-tree.ts`).
+ * Hàm này chỉ được gọi từ script cấp phát môi trường (`npm run setup:drawing-tree`) và test, không
+ * route nào gọi, nên không có gì cần trace.
+ */
+export function ensureDrawingTree(baseDir: string): void {
+  for (const sys of DRAWING_SYSTEMS) {
+    for (const sub of DRAWING_SUBDIRS) {
+      mkdirSync(join(/*turbopackIgnore: true*/ baseDir, sys, sub), { recursive: true });
+    }
+  }
+}
+
+/** Tạo cây quy chuẩn ở cả hai gốc lưu bản vẽ. */
+export function ensureAllDrawingTrees(cwd: string = process.cwd()): void {
+  for (const root of drawingRoots(cwd)) ensureDrawingTree(root);
+}
+
+// ===== tim-ban-ve.ts =====
 // Tìm tệp bản vẽ trên đĩa cho đường chuẩn hoá CAD 2D.
 //
 // Nằm ở lib/ chứ không trong route: đây là logic nghiệp vụ (quyết định tệp nào ứng với mã bản vẽ
 // nào), route chỉ là ranh giới HTTP — ADR-0008. Tách ra cũng là điều kiện để test được: thư mục
 // gốc truyền vào tham số thay vì đọc `process.cwd()` lúc nạp module.
-
-import { readdirSync, existsSync } from "node:fs";
-import { join, basename, extname, normalize, resolve, sep } from "node:path";
 
 /**
  * Ghép đường dẫn tương đối do client gửi vào DRAWINGS_DIR, **chặn thoát thư mục**.

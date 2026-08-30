@@ -4,7 +4,7 @@ import { writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/gioi-han";
+import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/dashboard";
 import { queryOne, insertId, run } from "@/lib/db";
 import { validateDxf } from "@/lib/ky-thuat/cad/dxf-parser";
 import { storagePut } from "@/lib/nen/storage";
@@ -136,8 +136,7 @@ export async function POST(req: NextRequest) {
     const isoRelativePath = join(relativeSubPath, standardFileName).replace(/\\/g, "/");
 
     // Cây thư mục quy chuẩn ISO 19650 dựng bằng `npm run setup:drawing-tree` lúc triển khai,
-    // KHÔNG dựng lại ở mỗi request: đó là việc cấp phát môi trường, và giữ nó trong đồ thị
-    // import của route khiến Turbopack phải trace toàn bộ dự án (xem scripts/ensure-drawing-tree.ts).
+    // KHÔNG dựng lại ở mỗi request: đó là việc cấp phát môi trường (xem scripts/ensure-drawing-tree.ts).
     // Route vẫn tự tạo đúng nhánh nó ghi ở ngay dưới, nên không phụ thuộc script đó.
 
     // 1. Ghi tệp vào data/uploads/drawings/

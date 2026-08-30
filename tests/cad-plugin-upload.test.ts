@@ -94,7 +94,7 @@ before(async () => {
 });
 
 test("kiểm định thuần: rule pack cũ bị chặn (AC8), DXF hỏng cấu trúc bị chặn (FR10)", async () => {
-  const { kiemDinhPluginUpload } = await import("@/lib/ky-thuat/cad/plugin-upload");
+  const { kiemDinhPluginUpload } = await import("@/lib/ky-thuat/cad/dashboard");
   const { getCurrentRulePack } = await import("@/lib/ky-thuat/cad/rule-pack");
   const vHienHanh = getCurrentRulePack().version;
 
@@ -114,7 +114,7 @@ test(
   "upload đạt → tạo revision source_tool=plugin kèm báo cáo; cùng tệp lần 2 → idempotent",
   S,
   async () => {
-    const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/plugin-upload");
+    const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/dashboard");
     const { getCurrentRulePack } = await import("@/lib/ky-thuat/cad/rule-pack");
     const { queryOne } = await import("@/lib/db");
     const v = getCurrentRulePack().version;
@@ -186,7 +186,7 @@ test(
     "upload cũ không kèm KL vẫn chạy y nguyên",
   S,
   async () => {
-    const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/plugin-upload");
+    const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/dashboard");
     const { getCurrentRulePack } = await import("@/lib/ky-thuat/cad/rule-pack");
     const { queryOne } = await import("@/lib/db");
     const v = getCurrentRulePack().version;
@@ -245,7 +245,7 @@ test(
 );
 
 test("kiểm định fail → KHÔNG tạo revision (AC5)", S, async () => {
-  const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/plugin-upload");
+  const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/dashboard");
   const { queryOne } = await import("@/lib/db");
   const truoc = await queryOne<{ n: number }>(
     `SELECT COUNT(*)::int AS n FROM drawing_revisions WHERE drawing_id = ?`,

@@ -26,10 +26,36 @@ const TEN_BLOCK_MOI = "XB-KHEP-VONG";
 /** DXF ứng viên = DXF thư viện hiện hành + một định nghĩa block mới (đúng thứ plugin xuất ra). */
 function dxfThemBlock(goc: string, ten: string): string {
   const khoi = [
-    "0", "BLOCK", "2", ten, "70", "0", "10", "0.0", "20", "0.0", "30", "0.0",
-    "0", "LINE", "8", "M-DUCT-SUPP", "10", "0.0", "20", "0.0", "30", "0.0",
-    "11", "100.0", "21", "0.0", "31", "0.0",
-    "0", "ENDBLK",
+    "0",
+    "BLOCK",
+    "2",
+    ten,
+    "70",
+    "0",
+    "10",
+    "0.0",
+    "20",
+    "0.0",
+    "30",
+    "0.0",
+    "0",
+    "LINE",
+    "8",
+    "M-DUCT-SUPP",
+    "10",
+    "0.0",
+    "20",
+    "0.0",
+    "30",
+    "0.0",
+    "11",
+    "100.0",
+    "21",
+    "0.0",
+    "31",
+    "0.0",
+    "0",
+    "ENDBLK",
   ].join("\n");
   const iBlocks = goc.indexOf("\nBLOCKS\n");
   const iEnd = goc.indexOf("\n0\nENDSEC", iBlocks);
@@ -113,8 +139,8 @@ test(
   S,
   async () => {
     await donDep();
-    const { phatHanhBlockLib } = await import("@/lib/ky-thuat/cad/block-lib");
-    const { nhanDeXuat, duyetDeXuat } = await import("@/lib/ky-thuat/cad/block-proposals");
+    const { phatHanhBlockLib } = await import("@/lib/ky-thuat/cad/block");
+    const { nhanDeXuat, duyetDeXuat } = await import("@/lib/ky-thuat/cad/block");
     const { createCadToken } = await import("@/lib/bao-mat/cad-devices");
     const { GET } = await import("@/app/api/engineering/cad/block-lib/route");
 
@@ -135,7 +161,10 @@ test(
       }),
     );
     assert.equal(truoc.status, 200);
-    const manifestTruoc = (await truoc.json()) as { version: string; manifest: { blocks: { blockName: string }[] } };
+    const manifestTruoc = (await truoc.json()) as {
+      version: string;
+      manifest: { blocks: { blockName: string }[] };
+    };
     assert.equal(manifestTruoc.version, "b0-mau");
     assert.ok(!manifestTruoc.manifest.blocks.some((b) => b.blockName === TEN_BLOCK_MOI));
 
@@ -185,6 +214,9 @@ test(
     const shaThat = createHash("sha256").update(tepThat).digest("hex");
     assert.equal(shaThat, manifestSau.manifest.dwgSha256, "sha256 tệp thật phải khớp manifest");
     assert.equal(sauFile.headers.get("x-block-lib-sha256"), shaThat);
-    assert.ok(tepThat.equals(DWG_MAU), "tệp .dwg thư viện mới vẫn là DWG_MAU (đề xuất dùng chung DWG nền)");
+    assert.ok(
+      tepThat.equals(DWG_MAU),
+      "tệp .dwg thư viện mới vẫn là DWG_MAU (đề xuất dùng chung DWG nền)",
+    );
   },
 );

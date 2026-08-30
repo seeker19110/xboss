@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
-import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/gioi-han";
+import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/dashboard";
 import { isContentTooLarge } from "@/lib/nen/photos";
-import { themBlockTuWeb } from "@/lib/ky-thuat/cad/block-them-web";
+import { themBlockTuWeb } from "@/lib/ky-thuat/cad/block";
 
 export const dynamic = "force-dynamic";
 

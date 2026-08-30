@@ -2,7 +2,7 @@
 // `engineering_cad_diff_sessions` và `engineering_cad_block_catalogs` (migration 0099) bật
 // FORCE ROW LEVEL SECURITY với policy KHÔNG có nhánh "GUC rỗng thì cho qua" (khác 11 bảng của
 // migrations/0069_rls.sql) — mọi truy vấn 2 bảng này ở dưới BẮT BUỘC bọc `withProjectScope`
-// (đúng khuôn `lib/ky-thuat/cad/boq-map.ts`), nếu không role `xboss_app` (NOBYPASSRLS trên
+// (đúng khuôn `lib/ky-thuat/cad/dashboard.ts`), nếu không role `xboss_app` (NOBYPASSRLS trên
 // production) sẽ đọc rỗng/ghi thất bại âm thầm dù DB có dữ liệu — KHÔNG được gỡ ra.
 import { query, queryOne, withProjectScope } from "@/lib/db";
 

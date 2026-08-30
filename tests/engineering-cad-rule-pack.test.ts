@@ -21,13 +21,14 @@ import {
   CURRENT_RULE_PACK_VERSION,
   type CrossingPolicy,
   type RoutingPolicy,
+  kiemTraRevisionPolicy,
+  soRevisionTheoMau,
 } from "@/lib/ky-thuat/cad/rule-pack";
 import {
   normalizeCadLayers,
   convertTcvn3ToUnicode,
   convertVniToUnicode,
 } from "@/lib/ky-thuat/cad/dxf-parser";
-import { kiemTraRevisionPolicy, soRevisionTheoMau } from "@/lib/ky-thuat/cad/rule-pack-revision";
 
 // ===== (1) Cấu trúc & ETag =====
 
