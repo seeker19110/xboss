@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace XBoss.Cad.Core.Draw;
 
 /// <summary>
@@ -12,6 +14,15 @@ public static class BlockLibraryBootstrap
     private const string PendingFileName = ".cache-write.pending";
     private const string DwgBackupFileName = ".cache-write.dwg.bak";
     private const string ManifestBackupFileName = ".cache-write.manifest.bak";
+
+    /// <summary>Một tệp trong snapshot cache nhiều thành phần; null nghĩa là xóa khi publish.</summary>
+    public sealed record CacheSetEntry(string FileName, byte[]? Content);
+
+    private sealed record CacheSetJournalEntry(
+        string FileName, string TemporaryFileName, string BackupFileName, bool Existed, bool IsCommit);
+
+    private sealed record CacheSetJournal(
+        string TransactionName, IReadOnlyList<CacheSetJournalEntry> Entries);
 
     /// <summary>
     /// Khoá liên tiến trình dùng chung cho mọi writer của cặp manifest/DWG. Tệp khoá được giữ lại
@@ -48,6 +59,7 @@ public static class BlockLibraryBootstrap
             // Recovery chạy ngoài vòng retry contention: journal lỗi cố định phải thất bại ngay,
             // không đóng băng UI 10 giây bằng cách đọc lại cùng một lỗi hàng trăm lần.
             RecoverInterruptedWrite(cacheDirectory);
+            RecoverPendingCacheSets(cacheDirectory);
             return handle;
         }
         catch
@@ -153,6 +165,176 @@ public static class BlockLibraryBootstrap
             throw new ArgumentException("Đường dẫn tệp cache phải có thư mục cha.", nameof(path));
         Directory.CreateDirectory(directory);
         WriteDurableFile(path, content);
+    }
+
+    /// <summary>
+    /// Publish một snapshot cache nhiều tệp dưới khóa của <see cref="AcquireCacheLock"/>. Mọi tệp
+    /// cũ được backup trước khi journal xuất hiện; tệp commit publish cuối. Nếu process chết giữa
+    /// chừng, lần lấy khóa kế tiếp phục hồi nguyên snapshot cũ rồi mới cho reader/writer đi tiếp.
+    /// </summary>
+    public static void PublishCacheSet(
+        string cacheDirectory,
+        string transactionName,
+        IReadOnlyList<CacheSetEntry> entries,
+        string commitFileName,
+        Action<int>? afterPublish = null)
+    {
+        ValidateTransactionName(transactionName);
+        if (entries.Count == 0) throw new ArgumentException("Snapshot cache phải có ít nhất một tệp.", nameof(entries));
+        foreach (var entry in entries) ValidateCacheFileName(entry.FileName);
+        if (entries.Select(e => e.FileName).Distinct(StringComparer.Ordinal).Count() != entries.Count)
+            throw new ArgumentException("Snapshot cache không được khai trùng tên tệp.", nameof(entries));
+
+        var commit = entries.SingleOrDefault(e => string.Equals(e.FileName, commitFileName, StringComparison.Ordinal));
+        if (commit is null || commit.Content is null)
+            throw new ArgumentException("Tệp commit phải có mặt và không được là thao tác xóa.", nameof(commitFileName));
+
+        Directory.CreateDirectory(cacheDirectory);
+        var pendingPath = Path.Combine(cacheDirectory, $".cache-set-{transactionName}.pending");
+        if (File.Exists(pendingPath)) RecoverCacheSet(cacheDirectory, pendingPath);
+
+        var ordered = entries
+            .Where(e => !string.Equals(e.FileName, commitFileName, StringComparison.Ordinal))
+            .Append(commit)
+            .ToList();
+        var journalEntries = new List<CacheSetJournalEntry>(ordered.Count);
+        try
+        {
+            for (var i = 0; i < ordered.Count; i++)
+            {
+                var entry = ordered[i];
+                var destination = Path.Combine(cacheDirectory, entry.FileName);
+                var temporaryName = $".cache-set-{transactionName}-{i}-{Guid.NewGuid():N}.new";
+                var backupName = $".cache-set-{transactionName}-{i}.bak";
+                var temporary = Path.Combine(cacheDirectory, temporaryName);
+                var backup = Path.Combine(cacheDirectory, backupName);
+                if (entry.Content is not null) WriteDurableFile(temporary, entry.Content);
+                var existed = File.Exists(destination);
+                if (existed) WriteDurableFile(backup, File.ReadAllBytes(destination));
+                else TryDelete(backup);
+                journalEntries.Add(new(
+                    entry.FileName, temporaryName, backupName, existed,
+                    string.Equals(entry.FileName, commitFileName, StringComparison.Ordinal)));
+            }
+            WriteDurableFile(
+                pendingPath,
+                JsonSerializer.SerializeToUtf8Bytes(new CacheSetJournal(transactionName, journalEntries)));
+        }
+        catch
+        {
+            if (!File.Exists(pendingPath)) CleanupCacheSetFiles(cacheDirectory, journalEntries);
+            throw;
+        }
+
+        var published = 0;
+        foreach (var entry in journalEntries)
+        {
+            var destination = Path.Combine(cacheDirectory, entry.FileName);
+            var temporary = Path.Combine(cacheDirectory, entry.TemporaryFileName);
+            var content = ordered[published].Content;
+            if (content is null)
+            {
+                if (File.Exists(destination)) File.Delete(destination);
+            }
+            else
+            {
+                File.Move(temporary, destination, overwrite: true);
+            }
+            published++;
+            afterPublish?.Invoke(published);
+        }
+
+        // Journal deletion is the durable commit point. Crash before here => rollback snapshot cũ.
+        File.Delete(pendingPath);
+        CleanupCacheSetFiles(cacheDirectory, journalEntries);
+    }
+
+    private static void RecoverPendingCacheSets(string cacheDirectory)
+    {
+        foreach (var pending in Directory.GetFiles(cacheDirectory, ".cache-set-*.pending").Order(StringComparer.Ordinal))
+            RecoverCacheSet(cacheDirectory, pending);
+    }
+
+    private static void RecoverCacheSet(string cacheDirectory, string pendingPath)
+    {
+        CacheSetJournal? journal;
+        try
+        {
+            journal = JsonSerializer.Deserialize<CacheSetJournal>(File.ReadAllBytes(pendingPath));
+        }
+        catch (JsonException)
+        {
+            File.Delete(pendingPath);
+            return;
+        }
+        if (journal is null || journal.Entries.Count == 0)
+        {
+            File.Delete(pendingPath);
+            return;
+        }
+
+        try
+        {
+            ValidateTransactionName(journal.TransactionName);
+            foreach (var entry in journal.Entries)
+            {
+                ValidateCacheFileName(entry.FileName);
+                ValidateCacheFileName(entry.TemporaryFileName);
+                ValidateCacheFileName(entry.BackupFileName);
+            }
+        }
+        catch (ArgumentException)
+        {
+            File.Delete(pendingPath);
+            return;
+        }
+
+        // Backup thiếu là trạng thái ngoài giao thức (backup được flush trước journal). Fail closed:
+        // xóa tệp commit để bản trộn mất hiệu lực, dọn journal và để đường tải lại sửa cache.
+        if (journal.Entries.Any(e => e.Existed && !File.Exists(Path.Combine(cacheDirectory, e.BackupFileName))))
+        {
+            var commit = journal.Entries.SingleOrDefault(e => e.IsCommit);
+            if (commit is not null) TryDelete(Path.Combine(cacheDirectory, commit.FileName));
+            File.Delete(pendingPath);
+            CleanupCacheSetFiles(cacheDirectory, journal.Entries);
+            return;
+        }
+
+        foreach (var entry in journal.Entries)
+        {
+            var destination = Path.Combine(cacheDirectory, entry.FileName);
+            var backup = Path.Combine(cacheDirectory, entry.BackupFileName);
+            if (entry.Existed) Restore(cacheDirectory, backup, entry.FileName, existed: true);
+            else TryDelete(destination);
+        }
+        File.Delete(pendingPath);
+        CleanupCacheSetFiles(cacheDirectory, journal.Entries);
+    }
+
+    private static void CleanupCacheSetFiles(
+        string cacheDirectory, IEnumerable<CacheSetJournalEntry> entries)
+    {
+        foreach (var entry in entries)
+        {
+            TryDelete(Path.Combine(cacheDirectory, entry.TemporaryFileName));
+            TryDelete(Path.Combine(cacheDirectory, entry.BackupFileName));
+        }
+    }
+
+    private static void ValidateTransactionName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not '-' and not '_'))
+            throw new ArgumentException("Tên giao dịch cache chỉ nhận chữ, số, '-' và '_'.", nameof(name));
+    }
+
+    private static void ValidateCacheFileName(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName) ||
+            !string.Equals(Path.GetFileName(fileName), fileName, StringComparison.Ordinal) ||
+            fileName is "." or "..")
+        {
+            throw new ArgumentException("Tên tệp cache phải là tên tệp đơn, không được chứa đường dẫn.", nameof(fileName));
+        }
     }
 
     private static void WritePending(string path, bool hadDwg, bool hadManifest)

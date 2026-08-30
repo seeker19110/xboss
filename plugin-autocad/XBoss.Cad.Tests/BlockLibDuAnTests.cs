@@ -283,4 +283,55 @@ public class BlockLibDuAnTests
         Assert.Contains("catch (UnauthorizedAccessException e)", thanHam, StringComparison.Ordinal);
         Assert.Contains("Không có quyền đọc thư viện block bản trộn trong cache", thanHam, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Block_da_chon_phai_trung_nguon_version_va_tep_voi_manifest_hien_tai()
+    {
+        var sha = new string('a', 64);
+        var daChon = BlockManifestLoader.Load($$"""
+        {"version":"b1","dwgSha256":"{{ShaNen}}","blocks":[
+          {"id":"van","blockName":"VAN-01","kind":"fitting","nguon":"global","libVersion":"b1",
+           "fileKey":"van.dwg","fileSha256":"{{sha}}"}
+        ]}
+        """);
+        var hienTaiHopLe = BlockManifestLoader.Load($$"""
+        {"version":"b2","dwgSha256":"{{ShaNen}}","blocks":[
+          {"id":"van","blockName":"VAN-01","kind":"fitting","nguon":"global","libVersion":"b1",
+           "fileKey":"van.dwg","fileSha256":"{{sha}}"}
+        ]}
+        """);
+
+        var hienTai = BlockManifestLoader.KiemTraBlockKhongDoi(
+            daChon.TimTheoId("van")!, hienTaiHopLe);
+        Assert.Equal("VAN-01", hienTai.BlockName);
+
+        var biTraoNguon = BlockManifestLoader.Load($$"""
+        {"version":"b2","dwgSha256":"{{ShaNen}}","blocks":[
+          {"id":"van","blockName":"VAN-01","kind":"fitting","nguon":"project","libVersion":"p2",
+           "fileKey":"van-moi.dwg","fileSha256":"{{new string('b', 64)}}"}
+        ]}
+        """);
+        var loi = Assert.Throws<BlockManifestException>(() =>
+            BlockManifestLoader.KiemTraBlockKhongDoi(daChon.TimTheoId("van")!, biTraoNguon));
+        Assert.Contains("đã đổi", loi.Message);
+    }
+
+    [Fact]
+    public void Nhap_dinh_nghia_bind_lua_chon_voi_manifest_hien_tai_duoi_cung_khoa()
+    {
+        var pluginDir = Directory.GetParent(RepoPaths.DoiChungDir)!.FullName;
+        var service = File.ReadAllText(Path.Combine(
+            pluginDir, "XBoss.Cad.Acad", "Services", "BlockLibraryService.cs"));
+        var batDau = service.IndexOf("internal static string NhapDinhNghia(", StringComparison.Ordinal);
+        var ketThuc = service.IndexOf("private static void NhapTuTep(", batDau, StringComparison.Ordinal);
+        Assert.True(batDau >= 0 && ketThuc > batDau);
+        var thanHam = service[batDau..ketThuc];
+
+        var khoa = thanHam.IndexOf("BlockLibraryBootstrap.AcquireCacheLock", StringComparison.Ordinal);
+        var boTron = thanHam.IndexOf("BoTronDangDung()", StringComparison.Ordinal);
+        var doiChieu = thanHam.IndexOf("KiemTraBlockKhongDoi", StringComparison.Ordinal);
+        var banChup = thanHam.IndexOf("File.Copy", StringComparison.Ordinal);
+        Assert.True(khoa >= 0 && boTron > khoa && doiChieu > boTron && banChup > doiChieu);
+        Assert.Contains("BlockManifest manifestDaChon", thanHam, StringComparison.Ordinal);
+    }
 }

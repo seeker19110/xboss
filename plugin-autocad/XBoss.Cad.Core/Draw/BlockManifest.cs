@@ -208,6 +208,40 @@ public static class BlockManifestLoader
         return manifest;
     }
 
+    /// <summary>
+    /// Ràng buộc block người dùng đã chọn với entry hiện hành ngay trước lúc snapshot DWG. Nếu một
+    /// refresh đã đổi nguồn/version/tệp hoặc tham số block, từ chối để caller tải/chọn lại thay vì
+    /// clone bytes mới nhưng ghi provenance của lựa chọn cũ.
+    /// </summary>
+    public static BlockDef KiemTraBlockKhongDoi(BlockDef daChon, BlockManifest hienTai)
+    {
+        var moi = hienTai.TimTheoId(daChon.Id);
+        if (moi is null)
+            throw new BlockManifestException(
+                $"Block đã chọn \"{daChon.Id}\" không còn trong thư viện hiện hành — tải lại thư viện rồi chọn lại.");
+
+        var giong =
+            string.Equals(moi.BlockName, daChon.BlockName, StringComparison.Ordinal) &&
+            string.Equals(moi.Kind, daChon.Kind, StringComparison.Ordinal) &&
+            string.Equals(moi.System, daChon.System, StringComparison.Ordinal) &&
+            moi.ScaleBySize == daChon.ScaleBySize &&
+            moi.RotateToPath == daChon.RotateToPath &&
+            moi.Attributes.SequenceEqual(daChon.Attributes, StringComparer.Ordinal) &&
+            string.Equals(moi.TakeoffItemId, daChon.TakeoffItemId, StringComparison.Ordinal) &&
+            string.Equals(moi.Paper, daChon.Paper, StringComparison.Ordinal) &&
+            string.Equals(moi.FileKey, daChon.FileKey, StringComparison.Ordinal) &&
+            string.Equals(moi.FileSha256, daChon.FileSha256, StringComparison.Ordinal) &&
+            string.Equals(moi.Nguon, daChon.Nguon, StringComparison.Ordinal) &&
+            string.Equals(moi.LibVersion, daChon.LibVersion, StringComparison.Ordinal);
+        if (!giong)
+        {
+            throw new BlockManifestException(
+                $"Block đã chọn \"{daChon.Id}\" đã đổi nguồn/version/định nghĩa trong lúc lệnh đang chạy — " +
+                "tải lại thư viện rồi chọn lại để không ghi sai provenance.");
+        }
+        return moi;
+    }
+
     public static void Validate(BlockManifest manifest)
     {
         if (string.IsNullOrWhiteSpace(manifest.Version))

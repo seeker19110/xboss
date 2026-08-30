@@ -20,10 +20,16 @@ Nhánh `claude/mepf-blocklib-bootstrap-and-y-n-guard` đã rebase lên `origin/m
 - Build Adapter thật phát hiện lỗi M114 mà AcadShim cũ bỏ lọt: `Polyline` nhập nhằng giữa
   `DatabaseServices` và `GraphicsInterface` trong `NetTamXemTruoc`. Đã dùng alias `DbPolyline` và
   bổ sung đúng kiểu `GraphicsInterface.Polyline` vào stub để cổng CI tái hiện/chặn hồi quy.
-- Bằng chứng sau fix: targeted bootstrap + M113 **23/23**, full .NET **1150/1150**, **0 skip**;
-  AcadShim Release và Adapter thật Release đều **0 warning / 0 error**; `dong-goi.ps1 -ChiDongGoi`
-  tạo bundle **13 tệp**, ZIP SHA-256
-  `141e8e766ebe2f83eaa931e0af3fbbf7628a2935fc937c59bb84968bf8876ddb`.
+- **Vá hậu kiểm M113 (2026-08-29):** cache trộn nay là snapshot crash-transactional: journal lưu
+  backup của mọi DWG/manifest/ETag/metadata, `bo-tron.json` vẫn publish cuối nhưng **xóa journal mới
+  là commit point**; process chết giữa chừng thì lần lấy khóa kế tiếp phục hồi nguyên snapshot cũ.
+  Khi chèn block, selection → manifest hiện hành → hash → snapshot nằm trong **cùng một khóa** và
+  đối chiếu `id`/nguồn/`libVersion`/tệp/hash/thuộc tính; refresh hoặc đổi dự án chen giữa lệnh bị
+  từ chối thay vì clone bytes mới rồi ghi provenance cũ.
+- Bằng chứng sau fix: 3 regression mới (crash recovery + snapshot binding) **3/3**, full .NET
+  **1153/1153**, **0 skip**; AcadShim Release và Adapter thật Release đều **0 warning / 0 error**;
+  `dong-goi.ps1 -ChiDongGoi` tạo bundle **13 tệp**, ZIP SHA-256
+  `dc0149ae2856d75cdf51bc6020c3b095f4a221cbcf0207ffd9a00145aac53cf8`.
 - AutoCAD 2026 Core Console `NETLOAD` DLL trong bundle **exit 0**, có dòng plugin đã nạp; hash map
   cache `%APPDATA%\\XBoss\\block-lib` trước/sau trùng tuyệt đối. Chưa chạy lại toàn bộ ma trận lệnh
   GUI; verify Core Console này chỉ xác nhận load/runtime bootstrap không làm đổi cache hiện hữu.

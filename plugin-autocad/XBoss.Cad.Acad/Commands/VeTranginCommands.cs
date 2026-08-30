@@ -156,7 +156,7 @@ public sealed class VeTranginCommands
         // dưới, gọi giữa một transaction đang mở là nguồn lỗi khó lần.
         if (khungTen is not null && !CoDinhNghiaBlock(db, khungTen.BlockName))
         {
-            if (!NhapKhungTen(db, khungTen, canhBao) || !CoDinhNghiaBlock(db, khungTen.BlockName))
+            if (!NhapKhungTen(db, khungTen, thuVien!, canhBao) || !CoDinhNghiaBlock(db, khungTen.BlockName))
             {
                 canhBao.Add($"Chưa nhập được block khung tên \"{khungTen.BlockName}\" — chèn khung tên sau bằng INSERT.");
                 khungTen = null;
@@ -673,14 +673,15 @@ public sealed class VeTranginCommands
     /// ở đây chỉ chuyển lỗi thành cảnh báo, vì thiếu khung tên KHÔNG được chặn cả trang in
     /// (layout + viewport vẫn có giá trị, khung tên chèn sau).
     /// </summary>
-    private static bool NhapKhungTen(Database db, BlockDef khungTen, List<string> canhBao)
+    private static bool NhapKhungTen(
+        Database db, BlockDef khungTen, BlockManifest thuVien, List<string> canhBao)
     {
         var tenBlock = khungTen.BlockName;
         try
         {
             // Truyền cả BlockDef (không chỉ tên): khung tên thêm từ web nằm ở tệp .dwg riêng nên
             // dịch vụ cần "fileKey" mới biết lấy định nghĩa ở đâu (M104 §1).
-            BlockLibraryService.NhapDinhNghia(db, [khungTen], ghiDe: false);
+            BlockLibraryService.NhapDinhNghia(db, [khungTen], thuVien, ghiDe: false);
             return true;
         }
         catch (BlockManifestException e)

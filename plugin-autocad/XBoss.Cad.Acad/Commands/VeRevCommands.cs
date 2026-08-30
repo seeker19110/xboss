@@ -588,7 +588,8 @@ public sealed class VeRevCommands
 
         try
         {
-            BlockLibraryService.NhapDinhNghia(db, [def], ghiDe: false);
+            var versionDaNhap = BlockLibraryService.NhapDinhNghia(db, [def], thuVien, ghiDe: false);
+            return new TamGiacSanSang(def, versionDaNhap, DaNhap: true);
         }
         catch (BlockManifestException e)
         {
@@ -605,7 +606,7 @@ public sealed class VeRevCommands
             ed.WriteMessage($"\n[XBoss] Không đọc được tệp thư viện block: {e.Message}\n");
             return null;
         }
-        return new TamGiacSanSang(def, thuVien.Version, DaNhap: true);
+
     }
 
     /// <summary>

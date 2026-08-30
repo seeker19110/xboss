@@ -194,8 +194,49 @@ public sealed class BlockLibraryBootstrapTests : IDisposable
         var thanHam = service[batDau..ketThuc];
 
         Assert.Contains("BlockLibraryBootstrap.AcquireCacheLock(ThuMucCache)", thanHam, StringComparison.Ordinal);
-        Assert.Contains("BlockLibraryBootstrap.WriteAtomicFile", thanHam, StringComparison.Ordinal);
+        Assert.Contains("BlockLibraryBootstrap.PublishCacheSet", thanHam, StringComparison.Ordinal);
         Assert.DoesNotContain("File.WriteAllBytes(DwgTron", thanHam, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Cache_set_phuc_hoi_toan_bo_snapshot_cu_khi_crash_giua_luc_publish()
+    {
+        var cache = Path.Combine(_root, "cache-set");
+        Directory.CreateDirectory(cache);
+        File.WriteAllText(Path.Combine(cache, "global.dwg"), "global-cu");
+        File.WriteAllText(Path.Combine(cache, "project.dwg"), "project-cu");
+        File.WriteAllText(Path.Combine(cache, "manifest.json"), "manifest-cu");
+        File.WriteAllText(Path.Combine(cache, "meta.json"), "meta-cu");
+
+        using (BlockLibraryBootstrap.AcquireCacheLock(cache))
+        {
+            Assert.Throws<InvalidOperationException>(() => BlockLibraryBootstrap.PublishCacheSet(
+                cache,
+                "mixed",
+                [
+                    new("global.dwg", "global-moi"u8.ToArray()),
+                    new("project.dwg", "project-moi"u8.ToArray()),
+                    new("manifest.json", "manifest-moi"u8.ToArray()),
+                    new("meta.json", "meta-moi"u8.ToArray()),
+                ],
+                commitFileName: "meta.json",
+                afterPublish: soTep =>
+                {
+                    if (soTep == 1) throw new InvalidOperationException("mo-phong-crash");
+                }));
+        }
+
+        Assert.Equal("global-moi", File.ReadAllText(Path.Combine(cache, "global.dwg")));
+        Assert.True(Directory.GetFiles(cache, ".cache-set-*.pending").Length == 1);
+
+        // Lần lấy khóa kế tiếp mô phỏng process mới sau crash: phải phục hồi NGUYÊN snapshot cũ.
+        using (BlockLibraryBootstrap.AcquireCacheLock(cache)) { }
+
+        Assert.Equal("global-cu", File.ReadAllText(Path.Combine(cache, "global.dwg")));
+        Assert.Equal("project-cu", File.ReadAllText(Path.Combine(cache, "project.dwg")));
+        Assert.Equal("manifest-cu", File.ReadAllText(Path.Combine(cache, "manifest.json")));
+        Assert.Equal("meta-cu", File.ReadAllText(Path.Combine(cache, "meta.json")));
+        Assert.Empty(Directory.GetFiles(cache, ".cache-set-*"));
     }
 
     private static string Manifest(string sha256) => $$"""
