@@ -111,14 +111,8 @@ public sealed class DongXungDot : INotifyPropertyChanged
         _ => "CẢNH BÁO",
     };
 
-    /// <summary>Nhãn tiếng Việt của lớp kiểm.</summary>
-    public static string NhanLop(LopKiem lop) => lop switch
-    {
-        LopKiem.GiaoCatCaoDo => "giao cắt cùng cao độ",
-        LopKiem.TranhChapHanhLang => "tranh chấp hành lang",
-        LopKiem.KhoangCachQuyPham => "khoảng cách quy phạm",
-        _ => "giao cắt mặt bằng (thiếu cao độ)",
-    };
+    /// <summary>Nhãn tiếng Việt của lớp kiểm (nguồn chữ dùng chung: <see cref="NhanLopKiem"/>).</summary>
+    public static string NhanLop(LopKiem lop) => NhanLopKiem.Cua(lop);
 
     private void Bao(params string[] ten)
     {

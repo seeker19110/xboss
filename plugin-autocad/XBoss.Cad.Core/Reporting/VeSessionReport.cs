@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using XBoss.Cad.Core.Coordination;
 using XBoss.Cad.Core.Draw;
 
 namespace XBoss.Cad.Core.Reporting;
@@ -244,6 +245,15 @@ public sealed class VeSessionReport
     /// <summary>Số nút CHƯA QUYẾT được phụ kiện — plugin không chèn block gần đúng (M115 FR2).</summary>
     [JsonPropertyName("hoanThienNutChuaQuyet")] public int HoanThienNutChuaQuyet { get; init; }
 
+    /// <summary>
+    /// Mục phối hợp xung đột liên hệ (M116 PR3 §6 bước 5) — tổng cộng + chia theo lớp kiểm, dựng từ
+    /// kết quả quét <c>XBOSS_PHOIHOP</c>/<c>XBOSS_PHOIHOP_BAOCAO</c> hiện tại (không phải chỉ đếm
+    /// marker cũ, vì marker XData không mang lớp kiểm/mức). OPTIONAL, BACKWARD-COMPATIBLE: null khi
+    /// Adapter không truyền (bản vẽ chưa bật <c>coordinationPolicy</c>, hoặc không có xung đột nào)
+    /// — báo cáo dựng bằng mã cũ vẫn biên dịch được, phần in dòng lệnh tự bỏ qua mục này.
+    /// </summary>
+    [JsonPropertyName("phoiHop")] public PhoiHopTomTat? PhoiHop { get; init; }
+
     /// <summary>Nhật ký tương tác của phiên: đụng độ định nghĩa block và lựa chọn của kỹ sư (AC7).</summary>
     [JsonPropertyName("nhatKy")] public required IReadOnlyList<string> NhatKy { get; init; }
     [JsonPropertyName("canhBao")] public required IReadOnlyList<string> CanhBao { get; init; }
@@ -270,9 +280,16 @@ public sealed class VeSessionReport
     /// Đồ thị đã chốt của <c>XBOSS_TUYEN_DOTHI</c> (M115) — nguồn của hai con số "nút bỏ qua" và
     /// "nút chưa quyết". null = bản vẽ chưa chốt đồ thị lần nào.
     /// </param>
+    /// <param name="phoiHop">
+    /// Kết quả quét phối hợp hiện tại (M116 PR3 §6 bước 5), đã ghép trạng thái marker — Adapter
+    /// truyền vào bằng <c>PhoiHopCommands.QuetCaBanVe(...).Select(d =&gt; (d.XungDot, d.TrangThai))</c>.
+    /// null hoặc rỗng ⇒ <see cref="PhoiHop"/> = null (bản vẽ chưa bật <c>coordinationPolicy</c>,
+    /// hoặc không có xung đột nào — không phải lỗi).
+    /// </param>
     public static VeSessionReport Dung(
         IEnumerable<VeXDataInfo> doiTuong, VeSessionMeta meta, IReadOnlyList<string>? nhatKy = null,
-        Graph.DoThiChot? doThi = null)
+        Graph.DoThiChot? doThi = null,
+        IReadOnlyList<(XungDot XungDot, TrangThaiXungDot TrangThai)>? phoiHop = null)
     {
         var theoHe = new Dictionary<string, VeThongKeHe>(StringComparer.Ordinal);
         var sizeCustom = new Dictionary<(string He, string Item, string Size), int>();
@@ -580,6 +597,7 @@ public sealed class VeSessionReport
             HoanThienNutBoQua = doThi?.PhuKien.Count(p => p.BoQua) ?? 0,
             HoanThienNutChuaQuyet =
                 doThi?.PhuKien.Count(p => !p.BoQua && p.TrangThai == Graph.TrangThaiPhuKien.ChuaQuyet) ?? 0,
+            PhoiHop = phoiHop is { Count: > 0 } ? PhoiHopTomTat.Tu(phoiHop) : null,
             NhatKy = nhatKy is null ? [] : [.. nhatKy],
             CanhBao = canhBao,
         };
@@ -730,6 +748,18 @@ public sealed class VeSessionReport
                 sb.AppendLine(
                     $"  - {c.HeId}/{c.ItemId} {c.Size}: {c.SoDoiTuong} đối tượng" +
                     (c.SoDaoTay > 0 ? $" (trong đó {c.SoDaoTay} đảo tay)" : ""));
+            }
+        }
+        if (PhoiHop is { } ph)
+        {
+            sb.AppendLine(
+                $"Phối hợp xung đột liên hệ (XBOSS_PHOIHOP): {ph.TongSo} xung đột ({ph.SoCung} cứng, " +
+                $"{ph.SoMem} mềm, {ph.SoCanhBao} cảnh báo) — đã đánh dấu {ph.SoChapNhan} chấp nhận, " +
+                $"{ph.SoBoQua} bỏ qua, còn {ph.SoChuaXuLy} chưa xử lý:");
+            foreach (var l in ph.TheoLop)
+            {
+                sb.AppendLine(
+                    $"  - {l.Nhan}: {l.TongSo} xung đột ({l.SoCung} cứng, {l.SoMem} mềm, {l.SoCanhBao} cảnh báo)");
             }
         }
         if (NhatKy.Count > 0)

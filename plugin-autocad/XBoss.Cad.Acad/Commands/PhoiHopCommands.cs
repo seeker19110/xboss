@@ -169,14 +169,7 @@ public sealed class PhoiHopCommands
 
         // ===== (4) Đối chiếu với marker cũ — idempotent theo id (FR1/AC2) =====
 
-        var markerTheoId = new Dictionary<string, MarkerCu>(StringComparer.Ordinal);
-        foreach (var m in doc2.Marker) markerTheoId.TryAdd(m.XungDotId, m);
-
-        var dong = xungDot
-            .Select(x => markerTheoId.TryGetValue(x.Id, out var cu)
-                ? new DongXungDot(x, cu.TrangThai, cu.LyDo, daCoMarker: true)
-                : new DongXungDot(x))
-            .ToList();
+        var dong = GhepMarker(xungDot, doc2.Marker);
 
         // Marker của xung đột KHÔNG CÒN tồn tại: chỉ dọn khi quét CẢ BẢN VẼ — quét một vùng nhỏ mà
         // xóa marker của cả bản vẽ là làm mất kết quả phối hợp của các khu khác.
@@ -227,6 +220,9 @@ public sealed class PhoiHopCommands
                 }
 
                 // (b) Cập nhật marker đã có / thêm marker cho id mới — không bao giờ tạo trùng.
+                var markerTheoId = new Dictionary<string, MarkerCu>(StringComparer.Ordinal);
+                foreach (var m in doc2.Marker) markerTheoId.TryAdd(m.XungDotId, m);
+
                 var moi = new List<ObjectId>();
                 foreach (var d in daDanhDau)
                 {
@@ -322,6 +318,52 @@ public sealed class PhoiHopCommands
             "[XBoss] Tuyến và mọi đối tượng khác KHÔNG bị đụng tới — trạng thái xử lý xung đột nằm " +
             "trong marker nên cũng mất theo; chạy lại XBOSS_PHOIHOP sẽ quét lại từ đầu. " +
             "Hoàn tác cả lệnh: UNDO 1 lần.\n");
+    }
+
+    // ==========================================================================================
+    // Quét dùng chung (M116 PR3 §6 bước 5) — XBOSS_PHOIHOP_BAOCAO và mục phối hợp của
+    // XBOSS_VE_BAOCAO gọi CHỖ NÀY thay vì tự viết lại đọc bản vẽ + quét + ghép marker.
+    // ==========================================================================================
+
+    /// <summary>
+    /// Quét phối hợp CẢ BẢN VẼ (kể cả xref) rồi ghép với marker cũ — ĐÚNG logic của bước (2)-(4)
+    /// trong <see cref="PhoiHop"/> khi kỹ sư chọn phạm vi CABANVE, tách ra để
+    /// <c>XBOSS_PHOIHOP_BAOCAO</c> và mục phối hợp trong báo cáo phiên vẽ (<c>XBOSS_VE_BAOCAO</c>)
+    /// dùng lại thay vì mỗi lệnh tự đọc marker một kiểu. CHỈ ĐỌC (transaction bên trong tự commit
+    /// ngay, không ghi gì lên bản vẽ) — an toàn gọi từ lệnh chỉ báo cáo.
+    /// </summary>
+    internal static IReadOnlyList<DongXungDot> QuetCaBanVe(
+        Database db, DrawToolsPack pack, CoordinationPolicySection chinhSach)
+    {
+        var (toMm, _, _) = DrawingUnits.TuInsUnits((int)db.Insunits);
+        var donViTrenMm = toMm > 0 ? 1 / toMm : 1;
+
+        DuLieuDoc doc2;
+        using (var tr = db.TransactionManager.StartTransaction())
+        {
+            doc2 = Doc(db, tr, PhamViPhoiHop.CaBanVe, []);
+            tr.Commit();
+        }
+
+        var xungDot = QuetXungDot.Quet(
+            doc2.Tuyen, chinhSach, chinhSach.HangUuTien(pack.DrawTools.CrossingPolicy), donViTrenMm,
+            doc2.HanhLang);
+
+        return GhepMarker(xungDot, doc2.Marker);
+    }
+
+    /// <summary>Ghép kết quả quét với marker cũ theo id — trạng thái xử lý (FR4) không đổi giữa các lần chạy.</summary>
+    private static IReadOnlyList<DongXungDot> GhepMarker(
+        IReadOnlyList<XungDot> xungDot, IReadOnlyList<MarkerCu> marker)
+    {
+        var markerTheoId = new Dictionary<string, MarkerCu>(StringComparer.Ordinal);
+        foreach (var m in marker) markerTheoId.TryAdd(m.XungDotId, m);
+
+        return xungDot
+            .Select(x => markerTheoId.TryGetValue(x.Id, out var cu)
+                ? new DongXungDot(x, cu.TrangThai, cu.LyDo, daCoMarker: true)
+                : new DongXungDot(x))
+            .ToList();
     }
 
     // ==========================================================================================

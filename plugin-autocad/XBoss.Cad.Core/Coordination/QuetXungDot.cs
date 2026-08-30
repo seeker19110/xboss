@@ -38,6 +38,22 @@ public enum MucXungDot
 }
 
 /// <summary>
+/// Nhãn tiếng Việt của <see cref="LopKiem"/> — nguồn chữ DUY NHẤT, dùng chung bởi
+/// <c>DongXungDot.NhanLop</c> (hộp thoại M106) và <c>PhoiHopTomTat</c> (báo cáo M116 PR3) để hộp
+/// thoại và báo cáo không bao giờ gọi hai tên khác nhau cho cùng một lớp kiểm.
+/// </summary>
+public static class NhanLopKiem
+{
+    public static string Cua(LopKiem lop) => lop switch
+    {
+        LopKiem.GiaoCatCaoDo => "giao cắt cùng cao độ",
+        LopKiem.TranhChapHanhLang => "tranh chấp hành lang",
+        LopKiem.KhoangCachQuyPham => "khoảng cách quy phạm",
+        _ => "giao cắt mặt bằng (thiếu cao độ)",
+    };
+}
+
+/// <summary>
 /// Một TUYẾN đưa vào quét phối hợp — DTO thuần, Core KHÔNG đọc XData: Adapter điền các trường này
 /// (M116 PR2) từ XData M115 + kích thước rule pack, ở đây chỉ là dữ liệu vào.
 ///

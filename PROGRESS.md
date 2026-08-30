@@ -1,26 +1,40 @@
 # PROGRESS.md — Trạng thái dự án
 
-## 🚧 M116 — Phối hợp xung đột 2D liên hệ: rule pack v17 + `Core/Coordination/` — PR1 CODE XONG (2026-08-30)
+## ✅ M116 — Phối hợp xung đột 2D liên hệ: rule pack v17 + `XBOSS_PHOIHOP*` — CODE XONG cả 3 PR (2026-08-30)
 
 `docs/nang-cap/M116-phoi-hop-xung-dot-lien-he.md`, mục thứ hai của đợt "tự động triển khai bản vẽ
 MEPF" (sau M115). Bản vẽ combined services hiện phối hợp tay; sau M115 mọi tuyến đã mang XData
 hệ/size/cao độ nên đủ dữ liệu để **phát hiện + đề xuất** xung đột giữa các hệ ngay trên 2D —
 guardrail: plugin **không bao giờ tự sửa tuyến**, kỹ sư quyết từng dòng.
 
-- **PR1 (việc này)** rule pack `v17` khối `drawTools.coordinationPolicy` (**mặc định TẮT**, bảng
-  ưu tiên nhường đường **THAM CHIẾU** `crossingPolicy.priority` thay vì chép lại, bảng khoảng cách
-  quy phạm theo cặp hệ để rỗng, khoảng bảo trì hành lang) + validator 2 tầng (TS
+- **PR1** rule pack `v17` khối `drawTools.coordinationPolicy` (**mặc định TẮT**, bảng ưu tiên
+  nhường đường **THAM CHIẾU** `crossingPolicy.priority` thay vì chép lại, bảng khoảng cách quy
+  phạm theo cặp hệ để rỗng, khoảng bảo trì hành lang) + validator 2 tầng (TS
   `kiemCoordinationPolicy` / C# `CoordinationPolicyConfig`) + `XBoss.Cad.Core/Coordination/` thuần:
   `QuetXungDot` (lớp 1 giao cắt cùng cao độ ⇒ CỨNG, lớp 2 tranh chấp hành lang ⇒ MỀM, lớp 3 khoảng
   cách quy phạm ⇒ CẢNH BÁO; tuyến thiếu cao độ chỉ vào kiểm PHẲNG kèm nhãn "thiếu cao độ", không
   đoán), `XungDotId` (id băm ổn định ⇒ quét lại không nhân đôi), `DeXuatXuLy` (đề xuất CHỈ từ bảng
   luật rule pack). Tái dùng `Segment2D` (đúng bộ dò của phép kiểm 11 — **không đổi hành vi phép
   kiểm 11**) và `HanhLangDauVao` của M114; chỉ mục quét là sweep line theo X, không duyệt n² cặp.
-- **Còn lại:** PR2 (3 lệnh Adapter `XBOSS_PHOIHOP`/`_XOA`/`_BAOCAO` + hộp thoại + marker/XData),
-  PR3 (báo cáo Excel + hiển thị web + tài liệu + mục verify tay).
-- **Không migration, không API mới** (M116 §9) — số liệu đi trong báo cáo phiên upload sẵn có.
-- Cổng đã chạy: `dotnet test XBoss.Cad.Tests` (1298 ca xanh, +48 ca mới), `npm run lint` /
-  `typecheck` / `build` xanh, `npm test` xanh với Postgres thật (1489 ca pass, 0 fail).
+- **PR2** `XBOSS_PHOIHOP` (quét 3 lớp kiểm theo phạm vi cả bản vẽ/vùng chọn/hành lang, kể cả xref
+  chỉ đọc; hộp thoại M106 duyệt + đánh dấu chấp nhận/bỏ qua có lý do; ghi marker XData idempotent
+  trên layer riêng `XBOSS-PHOIHOP`) + `XBOSS_PHOIHOP_XOA` (gỡ sạch marker, không đụng tuyến).
+- **PR3 (việc này)** `XBOSS_PHOIHOP_BAOCAO` (quét lại cả bản vẽ qua hàm dùng chung
+  `PhoiHopCommands.QuetCaBanVe`, xuất Excel `<dwg>.xboss-phoihop.xlsx` +
+  `PhoiHopExcelWriter` + sidecar JSON `<dwg>.xboss-phoihop.json` qua `PhoiHopTomTat` — tổng hợp
+  DUY NHẤT dùng chung bởi Excel/sidecar/mục `phoiHop` mới trong `VeSessionReport`); `XBOSS_UPLOAD`
+  gửi kèm sidecar khi có (`XBossApiClient.UploadAsync` +optional `phoiHopJson`); server lưu vào
+  `standardize_report.phoiHop` (`xuLyPluginUpload`, JSONB thuần — không migration) và trang
+  `/engineering/chuan-hoa-ban-ve` có panel mới `PhoiHopPanel.tsx` (đếm theo lớp kiểm/mức/xử lý,
+  theo từng bản vẽ). Tài liệu: bảng lệnh trong `README.md`/`CAI-DAT.md`/`cai-dat-plugin/page.tsx`,
+  mục verify tay mới **C12** (109–115) trong `VERIFY-VA-PHAT-HANH.md`.
+- **Không migration, không API mới** (M116 §9) — số liệu đi trong `standardize_report` JSONB sẵn
+  có của `drawing_revisions`, đúng cách `takeoff` (M101 PR5) đã làm.
+- **Trạng thái: code xong cả 3 PR, nợ verify tay AutoCAD 2026** (xem mục C12 mới trong
+  `VERIFY-VA-PHAT-HANH.md` — xếp hàng sau M111 §C9/M114 §C10/M115 §C11 theo `docs/nang-cap/README.md`).
+- Cổng đã chạy: `dotnet test XBoss.Cad.Tests` (1317 ca xanh, +19 ca mới PR3), `dotnet build
+XBoss.Cad.AcadShim` xanh, `npm run lint`/`typecheck` xanh, `npx tsx --test` các file test liên
+  quan xanh (ca chạm DB skip — không có `TEST_DATABASE_URL` trong môi trường code).
 
 ## ✅ M115 — Hoàn thiện bản vẽ từ tuyến tim: rule pack v16 + `XBOSS_TUYEN_GAN`/`_TUYEN_DOTHI`/`_HOANTHIEN` — CODE XONG cả 4 PR (2026-08-30)
 
