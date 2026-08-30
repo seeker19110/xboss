@@ -1204,8 +1204,26 @@ namespace System.Windows.Forms
 
     public struct Padding
     {
-        public Padding(int all) { }
-        public Padding(int left, int top, int right, int bottom) { }
+        public Padding(int all) { Left = Right = Top = Bottom = all; }
+
+        public Padding(int left, int top, int right, int bottom)
+        {
+            Left = left;
+            Top = top;
+            Right = right;
+            Bottom = bottom;
+        }
+
+        public int Left { get; set; }
+        public int Top { get; set; }
+        public int Right { get; set; }
+        public int Bottom { get; set; }
+
+        /// <summary>WinForms thật: tổng lề TRÁI + PHẢI — mã Adapter dùng để hạ trần ngắt dòng theo
+        /// từng cấp control.</summary>
+        public int Horizontal => Left + Right;
+
+        public int Vertical => Top + Bottom;
     }
 
     public class Control : IDisposable
@@ -1236,6 +1254,9 @@ namespace System.Windows.Forms
         public Padding Margin { get; set; }
         public Padding Padding { get; set; }
         public System.Drawing.Size MaximumSize { get; set; }
+        public System.Drawing.Size MinimumSize { get; set; }
+        public int Height { get; set; }
+        public int Width { get; set; }
         public event EventHandler Click { add { } remove { } }
         public event EventHandler TextChanged { add { } remove { } }
         public void SuspendLayout() { }
@@ -1266,9 +1287,22 @@ namespace System.Windows.Forms
         void PerformClick();
     }
 
+    /// <summary>WinForms thật: <c>Button.FlatAppearance</c> — bộ màu 3 trạng thái của nút phẳng.
+    /// Không đặt bộ này thì WinForms vẽ trạng thái rê/nhấn bằng màu hệ thống (xanh nhạt) giữa bảng
+    /// tối, nên mã Adapter luôn đặt đủ — stub phải có, nếu không cổng CI đỏ giả.</summary>
+    public class FlatButtonAppearance
+    {
+        public int BorderSize { get; set; }
+        public System.Drawing.Color BorderColor { get; set; }
+        public System.Drawing.Color MouseOverBackColor { get; set; }
+        public System.Drawing.Color MouseDownBackColor { get; set; }
+    }
+
     public class Button : Control, IButtonControl
     {
         public FlatStyle FlatStyle { get; set; }
+        public FlatButtonAppearance FlatAppearance { get; } = new FlatButtonAppearance();
+        public bool UseVisualStyleBackColor { get; set; }
         public DialogResult DialogResult { get; set; }
         public void NotifyDefault(bool value) { }
         public void PerformClick() { }

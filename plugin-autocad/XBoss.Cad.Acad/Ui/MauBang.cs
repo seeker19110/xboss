@@ -46,6 +46,22 @@ internal static class MauBang
     /// <summary>Chữ trong control bị khóa.</summary>
     internal static readonly Color ChuKhoa = Color.FromArgb(140, 140, 146);
 
+
+    // ===== Tông của THẺ (card) — thêm ở đợt thiết kế lại giao diện bảng XBoss.
+    // Bảng cũ vẽ mọi thứ thẳng lên nền phẳng: nhãn nối nhãn, không có ranh giới khối, mắt phải tự
+    // gom nhóm. Nay mỗi khối/bước là một thẻ NỔI hơn nền + vệt màu trạng thái ở cạnh trái. Bám
+    // ADR-0009 của web: đúng HAI tông mặt (nổi / chìm), không đẻ thêm bậc xám thứ ba.
+
+    /// <summary>Mặt thẻ — nổi hơn <see cref="Nen"/> vừa đủ để thấy ranh giới, không chói.
+    /// Tương phản chữ <see cref="Chu"/> trên mặt này 9.3 : 1 (vượt xa AA).</summary>
+    internal static readonly Color NenThe = Color.FromArgb(50, 50, 54);
+
+    /// <summary>Vệt trái/viền của thẻ ở trạng thái trung tính — cùng tông với <see cref="Vien"/>
+    /// (3.44 : 1 với nền bảng, 1.8 : 1 với mặt thẻ). Đây là ranh giới TRANG TRÍ: trạng thái của
+    /// thẻ luôn được nói bằng chip chữ bên trong, nên vệt màu không phải mang tải thông tin và
+    /// không cần đạt ngưỡng 3:1 của thành phần đồ họa mang nghĩa.</summary>
+    internal static readonly Color VienThe = Color.FromArgb(125, 125, 133);
+
     /// <summary>Nút chính khi rê chuột — ĐẬM hơn (ADR-0010: nền accent sáng dần sẽ kéo tụt tương
     /// phản với chữ trắng; ở đây 5.24:1 → 7.16:1 khi rê).</summary>
     internal static readonly Color NutChinhRe = Color.FromArgb(12, 100, 71);

@@ -1757,16 +1757,30 @@
 
   </Window.Resources>
 
-  <Grid Margin="18,16,18,16">
+  <Grid Margin="18,14,18,16">
     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <!-- Câu dẫn là thứ ĐẦU TIÊN kỹ sư đọc → Chu, không để mờ như ghi chú phụ. -->
-    <TextBlock Grid.Row="0"
+    <!-- Đầu hộp thoại: tên lệnh + gạch phân cách. Thanh tiêu đề của Windows cũng mang chuỗi này,
+         NHƯNG nó nằm ngoài vùng mắt đọc (chữ nhỏ, sát mép, lẫn với chrome của AutoCAD) — kỹ sư mở
+         6-7 hộp thoại liền tay cần thấy NGAY đang ở lệnh nào. Cùng bậc chữ với tiêu đề thẻ trên
+         bảng XBoss (xem ThanhPhan.TieuDeThe). -->
+    <StackPanel Grid.Row="0" Margin="0,0,0,10">
+      <TextBlock Text="{Binding TieuDe}"
+                 Foreground="{x:Static wpf:MauBangWpf.Chu}"
+                 FontSize="15"
+                 FontWeight="SemiBold"
+                 TextWrapping="Wrap" />
+      <Border Margin="0,8,0,0" Height="1" Background="{x:Static wpf:MauBangWpf.Vien}" />
+    </StackPanel>
+
+    <!-- Câu dẫn là thứ ĐẦU TIÊN kỹ sư đọc trong phần thân → Chu, không để mờ như ghi chú phụ. -->
+    <TextBlock Grid.Row="1"
                Style="{StaticResource GhiChu}"
                Foreground="{x:Static wpf:MauBangWpf.Chu}"
                Margin="0,0,0,6"
@@ -1774,33 +1788,72 @@
 
     <!-- Cuộn được: form dài nhất (XBOSS_VE_TRANGIN, XBOSS_VE_MATCAT nhiều tuyến) vẫn vừa màn hình
          laptop 768px mà không phải bỏ trường nào. -->
-    <ScrollViewer Grid.Row="1" MaxHeight="560" VerticalScrollBarVisibility="Auto">
+    <ScrollViewer Grid.Row="2" MaxHeight="560" VerticalScrollBarVisibility="Auto">
       <ContentControl Content="{Binding}" />
     </ScrollViewer>
 
     <!-- Vùng lý do: nút OK khóa thì đây nói RÕ vì sao (FR2). Có viền để tách hẳn khỏi nền cửa sổ —
-         NenKhoi chỉ hơn Nen vài mức xám, không viền thì vùng này gần như vô hình. -->
-    <Border Grid.Row="2"
+         NenKhoi chỉ hơn Nen vài mức xám, không viền thì vùng này gần như vô hình. Vệt màu 3px ở
+         cạnh trái + KÝ HIỆU đứng trước câu (⛔/⚠/✓) để trạng thái không nằm riêng ở màu chữ:
+         cùng luật "không truyền tải thông tin chỉ bằng màu" mà bảng XBoss và web đang theo. -->
+    <Border Grid.Row="3"
             Margin="0,14,0,0"
-            Padding="10,8"
-            Background="{x:Static wpf:MauBangWpf.NenKhoi}"
             BorderBrush="{x:Static wpf:MauBangWpf.Vien}"
             BorderThickness="1">
-      <TextBlock Text="{Binding ThongDiep}" TextWrapping="Wrap">
-        <TextBlock.Style>
-          <Style TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.CanhBao}" />
+      <Border Padding="10,8" Background="{x:Static wpf:MauBangWpf.NenKhoi}">
+        <Border.Style>
+          <Style TargetType="Border">
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.CanhBao}" />
             <Style.Triggers>
               <DataTrigger Binding="{Binding MucDo}" Value="{x:Static vm:MucThongDiep.Tot}">
-                <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Tot}" />
+                <Setter Property="BorderBrush" Value="{x:Static wpf:MauBangWpf.Tot}" />
               </DataTrigger>
             </Style.Triggers>
           </Style>
-        </TextBlock.Style>
-      </TextBlock>
+        </Border.Style>
+        <!-- Grid 2 cột (KHÔNG StackPanel ngang): trong StackPanel ngang, phần tử được đo với bề
+             rộng vô hạn nên TextWrapping không bao giờ ăn — câu lý do dài chạy thẳng ra ngoài cửa
+             sổ rộng cố định 660 và bị cắt. -->
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Top">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.CanhBao}" />
+                <Setter Property="Text" Value="⚠" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding MucDo}" Value="{x:Static vm:MucThongDiep.Loi}">
+                    <Setter Property="Text" Value="⛔" />
+                  </DataTrigger>
+                  <DataTrigger Binding="{Binding MucDo}" Value="{x:Static vm:MucThongDiep.Tot}">
+                    <Setter Property="Text" Value="✓" />
+                    <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Tot}" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+          <TextBlock Grid.Column="1" Text="{Binding ThongDiep}" TextWrapping="Wrap">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.CanhBao}" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding MucDo}" Value="{x:Static vm:MucThongDiep.Tot}">
+                    <Setter Property="Foreground" Value="{x:Static wpf:MauBangWpf.Tot}" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+        </Grid>
+      </Border>
     </Border>
 
-    <StackPanel Grid.Row="3"
+    <StackPanel Grid.Row="4"
                 Margin="0,14,0,0"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right">
