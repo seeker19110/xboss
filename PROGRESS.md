@@ -1,5 +1,13 @@
 # PROGRESS.md — Trạng thái dự án
 
+## 📋 M120 — Nghiên cứu plugin Revit tự động hoàn thành bản vẽ (2026-09-01)
+
+Viết `docs/nang-cap/M120-nghien-cuu-plugin-revit-hoan-thien-ban-ve.md` — nghiên cứu (chưa duyệt,
+chưa code) về toàn bộ khả năng tự động hoàn thành bản vẽ Revit qua plugin: hiện trạng (chỉ có 1
+nút pyRevit Auto BOQ đọc model), đối chiếu chuỗi hoàn thiện M100→M119 sang Revit API, chọn con
+đường add-in .NET tái dùng `XBoss.Cad.Core`, lộ trình R1–R5 và 5 câu hỏi mở người dùng phải chốt
+trước khi viết đặc tả R1 (đăng ký trong `docs/nang-cap/README.md`). Chỉ tài liệu, không đổi code.
+
 ## Refactor gọn `XBoss.Cad.Core/Api/XBossApiClient.cs` — tách theo domain (2026-08-30, PR #452)
 
 Review chất lượng code plugin AutoCAD phát hiện `XBossApiClient.cs` (891 dòng) gộp ~10 route

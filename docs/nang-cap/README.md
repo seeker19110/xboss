@@ -323,6 +323,17 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > **Thứ tự thi hành đợt: M115 → M116 → M117.** Cổng chung: trả nợ verify tay AutoCAD 2026 các đợt
 > trước (M111 đang chặn) trước khi phát hành rộng bất kỳ mục nào.
 
+## Nghiên cứu — track plugin Revit (viết 2026-09-01, CHƯA duyệt)
+
+> **`M120-nghien-cuu-plugin-revit-hoan-thien-ban-ve.md`** — 📋 **NGHIÊN CỨU, chưa duyệt, chưa
+> code.** Khảo sát toàn diện khả năng tự động hoàn thành bản vẽ Revit qua plugin: đối chiếu từng
+> khâu chuỗi hoàn thiện AutoCAD (M100→M119) sang Revit API, so 4 con đường công nghệ (chọn add-in
+> .NET, giữ pyRevit vai phụ, loại Dynamo/APS theo ADR-0006 + M65), kiến trúc đề xuất tái dùng
+> `XBoss.Cad.Core` (graph M115, routing M114, rule packs) + adapter `XBoss.Revit.Addin`, neo dữ
+> liệu bằng shared parameter `XBOSS_BOQCODE`, lộ trình 5 giai đoạn R1–R5. **5 câu hỏi mở ở §8
+> (nhất là: đội có model Revit thật không, và nợ verify tay AutoCAD C9–C15 chưa trả) phải được
+> người dùng chốt trước khi viết đặc tả R1.**
+
 ## Đặc tả ĐÃ DUYỆT — đóng nợ kỹ thuật plugin sau M115 (viết + duyệt 2026-08-30)
 
 > **`M118-ben-vung-hoa-hoanthien-va-canh-bao-phien-ban.md`** — ✅ **CODE XONG cả 3 PR 2026-08-30**
