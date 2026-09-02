@@ -150,6 +150,9 @@ export async function POST(
         `Nghiệm thu bởi ${user.name}`,
         user.name,
       );
+      // Trong transaction (reentrant withTransaction) — trước đây gọi ngoài, để hở khoảng
+      // giữa COMMIT task và COMMIT package (xem audit "recomputePackage ngoài transaction").
+      await recomputePackage(task.package_id);
       return {
         kind: "final",
         packageId: task.package_id,
@@ -172,7 +175,6 @@ export async function POST(
     });
   if (result.kind === "rejected") return NextResponse.json({ id, rejected: true });
 
-  await recomputePackage(result.packageId);
   // Task vừa CHUYỂN sang nghiem_thu THẬT trong request này (kind 'final' gồm cả nhánh legacy
   // 1 bước lẫn bước cuối của engine M46). Không phát ở nhánh 'pending' (bước giữa) hay
   // 'rejected'; task đã nghiệm thu từ trước bị chặn 409 ở trên nên không tới đây → 1 emit/1
@@ -206,10 +208,9 @@ export async function DELETE(
 
   // FOR UPDATE để tránh 2 người cùng huỷ nghiệm thu đồng thời tạo duplicate audit record
   // (đối xứng với POST — cùng nguy cơ TOCTOU nếu bỏ transaction/lock).
-  let packageId: number;
   let status: string;
   try {
-    ({ packageId, status } = await withTransaction(async () => {
+    ({ status } = await withTransaction(async () => {
       const task = await queryOne<TaskRow>(
         `SELECT id, package_id, status, progress_percent, end_date, name FROM tasks WHERE id = ? FOR UPDATE`,
         id,
@@ -235,14 +236,13 @@ export async function DELETE(
         `Huỷ nghiệm thu bởi ${user.name}`,
         user.name,
       );
+      await recomputePackage(task.package_id);
       return { packageId: task.package_id, status: newStatus };
     }));
   } catch (err: unknown) {
     const e = err as { message?: string; status?: number };
     return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
   }
-
-  await recomputePackage(packageId);
 
   return NextResponse.json({ id, status });
 }

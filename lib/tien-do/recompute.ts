@@ -25,6 +25,16 @@ export function progressFromChecks(checked: number, total: number): number {
   return checked >= total ? 1 : Math.min(0.99, Math.round((checked / total) * 100) / 100);
 }
 
+// Bất biến "hoan_thanh ⇔ progress_percent >= 1" phải đúng ở MỌI đường ghi status thủ
+// công (PATCH /tasks/:id, /tasks/batch, /tasks/:id/progress) — không chỉ ở recomputeTask.
+// Trước đây các route này nhận status rời khỏi progress, cho phép set status='hoan_thanh'
+// dù progress còn dở (hoặc ngược lại) — vá theo mục audit 2026-07-21 (PROGRESS.md).
+// status='nghiem_thu' không đi qua hàm này (route riêng /approve tự kiểm 100%).
+export function statusConsistentWithProgress(status: StatusSlug, progressPercent: number): boolean {
+  if (progressPercent >= 1) return status === "hoan_thanh";
+  return status !== "hoan_thanh";
+}
+
 // Tính lại % của task từ dimensions (nếu có), cập nhật task + work package cha.
 // changedBy: tên người thao tác — nếu % thay đổi sẽ ghi vào task_history.
 export async function recomputeTask(
