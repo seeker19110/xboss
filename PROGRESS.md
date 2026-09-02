@@ -1,5 +1,49 @@
 # PROGRESS.md — Trạng thái dự án
 
+## Khoá bất biến `hoan_thanh ⇔ progress>=1` + audit trail đổi status thủ công (Giai đoạn 0 đợt rà soát tiến độ/tracking, 2026-09-02)
+
+Rà soát toàn diện mảng kế hoạch/lịch/lưới tracking (3 khảo sát song song: mô hình kế hoạch/CPM/
+EVM/S-curve, chuỗi recompute/lưới tick, tài liệu nợ kỹ thuật) phát hiện lỗ hở bất biến đã được ghi
+nhận từ audit 2026-07-21 (`PATCH /api/tasks/:id/progress` nhận `status` độc lập với `progress`,
+"Chờ người dùng chốt ý đồ, CHƯA sửa") cộng vài lỗ tương tự chưa từng được rà. Đợt này đóng phần
+"Giai đoạn 0" (khoá bất biến, không đổi schema, migration thuần thêm) của lộ trình cải thiện đã đề
+xuất — các giai đoạn sau (dữ liệu sự kiện theo ô, UX lưới, hợp nhất % kế hoạch, lập lịch thật) còn
+lại, cần đặc tả riêng.
+
+- **`statusConsistentWithProgress` (`lib/tien-do/recompute.ts`)** — hàm dùng chung mới, khoá bất
+  biến "status='hoan_thanh' ⇔ progress_percent>=1" (không đụng `nghiem_thu`, vẫn đi riêng qua
+  `/approve`). Áp dụng ở 3 cửa từng cho phép status rời khỏi progress:
+  - `PATCH /api/tasks/:id/progress` — chặn `status` client gửi mâu thuẫn với `progress` vừa tính,
+    thay vì tin thẳng client như trước (chính là bug audit 2026-07-21 nêu).
+  - `PATCH /api/tasks/:id` — route này không sửa `progress_percent`, nên đổi `status` thủ công giờ
+    kiểm khớp với % hiện có của task trước khi ghi.
+  - `PATCH /api/tasks/batch` — cùng kiểm tra, cộng thêm gate hold-point chuyển bước (M3) + biện
+    pháp thi công (M8) khi đặt `status='hoan_thanh'` hàng loạt (trước đây route batch bỏ qua 2 gate
+    này dù route đơn đã chặn từ lâu).
+- **Lỗ audit "đổi status thủ công không để lại vết"**: `PATCH /api/tasks/:id` và `PATCH
+/api/tasks/batch` giờ ghi `task_history` khi status đổi thủ công mà không kèm đổi ngày (trước đây
+  chỉ ghi khi `recomputeTask` chạy, tức chỉ khi đổi ngày) — `reconstructProgressAtDate`
+  (`lib/tien-do/report.ts`, dùng cho báo cáo tuần/theo ngày) phụ thuộc hoàn toàn vào bảng này nên
+  trước đây bị thiếu dữ liệu ở các lần đổi status không kèm đổi ngày.
+- **`recomputePackage` gọi ngoài transaction** (`app/api/tasks/[id]/approve/route.ts` 2 nhánh
+  duyệt/huỷ nghiệm thu, `app/api/tasks/[id]/progress/route.ts`) — chuyển vào trong cùng
+  transaction (hàm tự bọc `withTransaction` reentrant nên không đổi hành vi khoá), đóng khoảng hở
+  giữa COMMIT task và COMMIT package.
+- **`POST /api/dimensions/rename`** — trước đây không transaction, không bắt lỗi trùng UNIQUE
+  (`task_id, dimension_label`, ra 500 thô), và **không bump `sheet_versions`** (chỉ có trigger DB
+  trên `tasks`/`work_packages`, không có trên `progress_dimensions`, `migrations/0067`) nên client
+  khác không nhận được thông báo qua SSE khi đổi tên cột. Vá cả 3: bọc transaction, bắt mã lỗi
+  `23505` trả 409 rõ nghĩa, bump watermark thủ công trong cùng transaction.
+- Test mới: `statusConsistentWithProgress` (`tests/recompute.test.ts`) — 2 case biên
+  (progress=1 chỉ nhận hoan_thanh; progress&lt;1 không được là hoan_thanh).
+- **Chưa làm trong đợt này** (Giai đoạn 1+ của lộ trình, cần đặc tả riêng qua
+  `docs/nang-cap/M<xx>-*.md`): `installed_at`/`installed_by`/`qty` cho `progress_dimensions`; nối
+  UI vào `PATCH /api/dimensions/batch` + `/api/tasks/batch` (2 API đã có sẵn nhưng chưa có consumer
+  UI); hợp nhất 4 cách tính "% kế hoạch" song song (scurve/spi/evm/hub `/schedule`); `baselines`/
+  `construction_stages`/`floor_stage_fronts` thêm `project_id`; atomic hoá `DELETE
+.../dimensions/column?allGroups=true` (mỗi package hiện là 1 transaction riêng, lỗi giữa chừng để
+  sheet nửa xoá) — đã biết, chưa sửa đợt này.
+
 ## Refactor gọn `XBoss.Cad.Core/Api/XBossApiClient.cs` — tách theo domain (2026-08-30, PR #452)
 
 Review chất lượng code plugin AutoCAD phát hiện `XBossApiClient.cs` (891 dòng) gộp ~10 route

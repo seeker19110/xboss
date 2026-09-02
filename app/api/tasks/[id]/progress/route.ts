@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
-import { deriveStatus, recomputePackage } from "@/lib/tien-do/recompute";
+import {
+  deriveStatus,
+  recomputePackage,
+  statusConsistentWithProgress,
+} from "@/lib/tien-do/recompute";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
@@ -76,6 +80,16 @@ export async function PATCH(
           error: "Trạng thái không hợp lệ (nghiệm thu phải qua /approve)",
           httpStatus: 422,
         } as const;
+      // Bất biến hoan_thanh ⇔ progress>=1 phải đúng dù status do client chỉ định
+      // (xem statusConsistentWithProgress) — chặn ở đây thay vì tin client.
+      if (!statusConsistentWithProgress(body.status, progress))
+        return {
+          error:
+            progress >= 1
+              ? "Progress = 100% thì trạng thái phải là hoàn thành"
+              : "Trạng thái hoàn thành chỉ hợp lệ khi progress = 100%",
+          httpStatus: 422,
+        } as const;
       status = body.status;
     } else {
       status = deriveStatus(progress, task.end_date, task.status);
@@ -103,13 +117,15 @@ export async function PATCH(
       );
     }
 
-    return { packageId: task.package_id, status } as const;
+    // Trong transaction (reentrant withTransaction) — tránh khoảng hở giữa COMMIT task và
+    // COMMIT package nếu gọi ngoài (xem audit "recomputePackage ngoài transaction").
+    await recomputePackage(task.package_id);
+
+    return { status } as const;
   });
 
   if ("error" in result)
     return NextResponse.json({ error: result.error }, { status: result.httpStatus });
-
-  await recomputePackage(result.packageId);
 
   return NextResponse.json({ id, progressPercent: progress, status: result.status });
 }

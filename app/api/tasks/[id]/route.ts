@@ -4,7 +4,11 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
-import { recomputeTask, recomputePackage } from "@/lib/tien-do/recompute";
+import {
+  recomputeTask,
+  recomputePackage,
+  statusConsistentWithProgress,
+} from "@/lib/tien-do/recompute";
 import { assignTask } from "@/lib/tien-do/assignments";
 import { validateCustom } from "@/lib/ha-tang/custom-fields";
 import { storageDelete } from "@/lib/nen/storage";
@@ -125,14 +129,50 @@ export async function PATCH(
   // UPDATE + recomputeTask (nếu cần) trong cùng transaction: recomputeTask khoá row bằng
   // FOR UPDATE, phải nằm trong transaction để lock có tác dụng tới lúc ghi xong (chống lost update
   // khi có tick checkbox đồng thời — xem chú thích lib/recompute.ts).
-  await withTransaction(async () => {
+  const statusResult = await withTransaction(async () => {
+    // Khoá row trước khi validate/ghi — đối xứng với recomputeTask (FOR UPDATE).
+    const before = await queryOne<{ status: string | null; progress_percent: number | null }>(
+      `SELECT status, progress_percent FROM tasks WHERE id = ? FOR UPDATE`,
+      id,
+    );
+    if (!before) return { error: "Task không tồn tại", httpStatus: 404 } as const;
+    const progressPercent = before.progress_percent ?? 0;
+    // Route này không sửa progress_percent — đổi status thủ công phải khớp % hiện có
+    // (bất biến hoan_thanh ⇔ progress>=1, xem statusConsistentWithProgress).
+    if (body.status !== undefined && !statusConsistentWithProgress(body.status, progressPercent)) {
+      return {
+        error:
+          progressPercent >= 1
+            ? "Progress = 100% thì trạng thái phải là hoàn thành"
+            : "Trạng thái hoàn thành chỉ hợp lệ khi progress = 100%",
+        httpStatus: 422,
+      } as const;
+    }
     await run(
       `UPDATE tasks SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       ...vals,
     );
     // Đổi deadline có thể đổi trạng thái trễ (tre ⇄ dang_thi_cong) → tính lại.
     if (body.endDate !== undefined || body.startDate !== undefined) await recomputeTask(id);
+    // Đổi status thủ công (không kèm đổi ngày, nên recomputeTask ở trên không chạy) không
+    // để lại vết trong task_history — reconstructProgressAtDate (báo cáo tuần/theo ngày)
+    // dựa hoàn toàn vào bảng này nên phải ghi cả khi % không đổi.
+    else if (body.status !== undefined && body.status !== before.status) {
+      await run(
+        `INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        id,
+        progressPercent,
+        progressPercent,
+        body.status,
+        "Đổi trạng thái thủ công",
+        me.name,
+      );
+    }
+    return {} as const;
   });
+  if ("error" in statusResult)
+    return NextResponse.json({ error: statusResult.error }, { status: statusResult.httpStatus });
 
   const task = await queryOne(
     `SELECT id, code, name, status, boq_code AS "boqCode", drawing_url AS "drawingUrl" FROM tasks WHERE id = ?`,

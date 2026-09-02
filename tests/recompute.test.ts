@@ -1,7 +1,11 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { deriveStatus, progressFromChecks } from "@/lib/tien-do/recompute";
+import {
+  deriveStatus,
+  progressFromChecks,
+  statusConsistentWithProgress,
+} from "@/lib/tien-do/recompute";
 
 const YESTERDAY = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
 const TOMORROW = new Date(Date.now() + 86400_000).toISOString().slice(0, 10);
@@ -44,6 +48,24 @@ test("progressFromChecks: làm tròn 2 chữ số ở khoảng giữa", () => {
   assert.equal(progressFromChecks(1, 3), 0.33);
   assert.equal(progressFromChecks(2, 3), 0.67);
   assert.equal(progressFromChecks(1, 8), 0.13);
+});
+
+// ===== statusConsistentWithProgress: bất biến hoan_thanh ⇔ progress>=1, dùng ở mọi route
+// cho phép client tự đặt status thủ công (tasks/:id, tasks/batch, tasks/:id/progress) =====
+
+test("statusConsistentWithProgress: progress=1 chỉ chấp nhận hoan_thanh", () => {
+  assert.equal(statusConsistentWithProgress("hoan_thanh", 1), true);
+  assert.equal(statusConsistentWithProgress("chuan_bi", 1), false);
+  assert.equal(statusConsistentWithProgress("dang_thi_cong", 1), false);
+  assert.equal(statusConsistentWithProgress("tre", 1), false);
+});
+
+test("statusConsistentWithProgress: progress<1 không được là hoan_thanh", () => {
+  assert.equal(statusConsistentWithProgress("hoan_thanh", 0.99), false);
+  assert.equal(statusConsistentWithProgress("hoan_thanh", 0), false);
+  assert.equal(statusConsistentWithProgress("chuan_bi", 0), true);
+  assert.equal(statusConsistentWithProgress("dang_thi_cong", 0.5), true);
+  assert.equal(statusConsistentWithProgress("tre", 0.5), true);
 });
 
 test(
