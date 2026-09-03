@@ -496,10 +496,16 @@ test(
     // tests/cad-schematic-rls.test.ts bằng role xboss_app.
     const CAD = ["cad_takeoff_boq_map", "cad_block_libs", "cad_schematic_graphs"];
 
+    // 3 bảng kế hoạch/mặt trận vào trục dự án (M123 PR1, migration 0149): baselines +
+    // floor_stage_fronts dùng khuôn 3 nhánh của 0069 (project_id NOT NULL sau backfill);
+    // construction_stages có thêm nhánh `project_id IS NULL` = danh mục công tác dùng chung
+    // mọi dự án (7 công tác seed của 0046 giữ nguyên nghĩa — D1 của M123).
+    const KE_HOACH = ["baselines", "construction_stages", "floor_stage_fronts"];
+
     // Nhóm engineering: khai theo TIỀN TỐ chứ không liệt kê tay — thêm bảng engineering_* mới
     // mà quên bật RLS thì bị bắt ở assert bên dưới, không phải ở đây.
     const eng = thucTe.filter((t) => t.startsWith("engineering_"));
-    const khai = new Set([...TAI_CHINH, ...TO_CHUC, ...ZALO, ...CAD, ...eng]);
+    const khai = new Set([...TAI_CHINH, ...TO_CHUC, ...ZALO, ...CAD, ...KE_HOACH, ...eng]);
 
     const laKhaiThieu = thucTe.filter((t) => !khai.has(t));
     assert.deepEqual(
@@ -508,7 +514,9 @@ test(
       "Có bảng BẬT RLS nhưng chưa khai trong test/tài liệu — bổ sung vào danh sách trên và cập nhật PROJECT.md + ADR-0005",
     );
 
-    const matRls = [...TAI_CHINH, ...TO_CHUC, ...ZALO, ...CAD].filter((t) => !thucTe.includes(t));
+    const matRls = [...TAI_CHINH, ...TO_CHUC, ...ZALO, ...CAD, ...KE_HOACH].filter(
+      (t) => !thucTe.includes(t),
+    );
     assert.deepEqual(
       matRls,
       [],

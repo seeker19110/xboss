@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   allProjectFloors,
   listStages,
@@ -42,16 +43,20 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
+  // Dự án luôn suy từ phiên (cookie xboss_project), KHÔNG bao giờ nhận từ client.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+
   const floor = req.nextUrl.searchParams.get("floor");
   if (!floor) {
     const floors = await allProjectFloors();
     const stages = await listStages();
-    await ensureFloorStageFronts(floors);
+    await ensureFloorStageFronts(projectId, floors);
     const fronts = withPlannedDates(stages, await listFloorStageFronts(), floors);
     return NextResponse.json({ floors, stages, fronts });
   }
 
-  await ensureFloorStageFronts([floor]);
+  await ensureFloorStageFronts(projectId, [floor]);
   const stages = await listStages();
   const fronts = withPlannedDates(stages, await listFloorStageFronts(floor), [floor]);
   return NextResponse.json({ stages, fronts });
@@ -68,6 +73,9 @@ export async function PUT(req: NextRequest) {
       { error: "Bạn không có quyền cập nhật mặt bằng (chỉ Admin/PM/kỹ sư)" },
       { status: 403 },
     );
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object")
@@ -154,6 +162,7 @@ export async function PUT(req: NextRequest) {
     typeof body.incomingRepName === "string" ? body.incomingRepName.trim() || null : null;
 
   const id = await upsertFloorStageFront(
+    projectId,
     floorLabel,
     stageId,
     {

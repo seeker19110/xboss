@@ -72,15 +72,21 @@ export type FloorStageFrontRow = {
   updatedAt: string;
 };
 
-// Đảm bảo có đủ dòng floor_stage_fronts cho mọi (tầng, công tác active) — gọi lười lúc
-// GET vì tầng/công tác phát sinh dần, không seed 1 lần cố định. Số tầng + công tác nhỏ
-// (vài chục × vài chục) nên lặp run() theo từng floor là đủ, không cần tối ưu 1 câu SQL.
-export async function ensureFloorStageFronts(floorLabels: string[]): Promise<void> {
+// Đảm bảo có đủ dòng floor_stage_fronts cho mọi (tầng, công tác active) CỦA MỘT DỰ ÁN —
+// gọi lười lúc GET vì tầng/công tác phát sinh dần, không seed 1 lần cố định. Số tầng +
+// công tác nhỏ (vài chục × vài chục) nên lặp run() theo từng floor là đủ, không cần tối
+// ưu 1 câu SQL. projectId bắt buộc (M123): nhãn tầng là chuỗi tự do nên hai dự án cùng có
+// "T5" phải ra hai bộ ô độc lập — ON CONFLICT bám unique index uniq_floor_stage_fronts_project.
+export async function ensureFloorStageFronts(
+  projectId: number,
+  floorLabels: string[],
+): Promise<void> {
   for (const floor of floorLabels) {
     await run(
-      `INSERT INTO floor_stage_fronts (floor_label, stage_id)
-       SELECT ?, id FROM construction_stages WHERE active = TRUE
-       ON CONFLICT (floor_label, stage_id) DO NOTHING`,
+      `INSERT INTO floor_stage_fronts (project_id, floor_label, stage_id)
+       SELECT ?, ?, id FROM construction_stages WHERE active = TRUE
+       ON CONFLICT (COALESCE(project_id, 0), floor_label, stage_id) DO NOTHING`,
+      projectId,
       floor,
     );
   }
@@ -103,7 +109,11 @@ export async function listFloorStageFronts(floorLabel?: string): Promise<FloorSt
   );
 }
 
+// Ghi 1 ô mặt trận (tầng × công tác) của MỘT dự án — projectId bắt buộc (M123) và luôn do
+// route suy từ getCurrentProjectId(), không nhận từ client. ON CONFLICT bám unique index
+// uniq_floor_stage_fronts_project nên ô "T5" của dự án A không đè ô "T5" của dự án B.
 export async function upsertFloorStageFront(
+  projectId: number,
   floorLabel: string,
   stageId: number,
   input: {
@@ -121,11 +131,11 @@ export async function upsertFloorStageFront(
 ): Promise<number> {
   const row = await queryOne<{ id: number }>(
     `INSERT INTO floor_stage_fronts
-       (floor_label, stage_id, received_at, handed_over_at, planned_received_at, note,
+       (project_id, floor_label, stage_id, received_at, handed_over_at, planned_received_at, note,
         outgoing_supplier_id, incoming_supplier_id, transition_stage_id,
         outgoing_rep_name, incoming_rep_name, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (floor_label, stage_id) DO UPDATE
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (COALESCE(project_id, 0), floor_label, stage_id) DO UPDATE
        SET received_at = EXCLUDED.received_at, handed_over_at = EXCLUDED.handed_over_at,
            planned_received_at = EXCLUDED.planned_received_at, note = EXCLUDED.note,
            outgoing_supplier_id = EXCLUDED.outgoing_supplier_id,
@@ -135,6 +145,7 @@ export async function upsertFloorStageFront(
            incoming_rep_name = EXCLUDED.incoming_rep_name,
            updated_by = ?, updated_at = NOW()
      RETURNING id`,
+    projectId,
     floorLabel,
     stageId,
     input.receivedAt,

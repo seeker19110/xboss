@@ -1,4 +1,4 @@
-import "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load (constructionStages import lib/db)
+import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load (constructionStages import lib/db)
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { addDaysISO } from "@/lib/nen/date";
@@ -87,3 +87,126 @@ test("computePlannedDates: chỉ tính cho tầng được yêu cầu, không l�
   const planned11F = computePlannedDates(stages, fronts, "11F");
   assert.equal(planned11F.get(1)?.plannedReceivedAt, "2026-08-01");
 });
+
+// ===== Test tích hợp (cần Postgres riêng: đặt TEST_DATABASE_URL) — M123 PR1 =====
+
+// Dựng 2 dự án cùng nhãn tầng "T5" + 1 công tác riêng, trả kèm hàm dọn dẹp.
+async function dungHaiDuAn(nhan: string) {
+  const { run, insertId } = await import("@/lib/db");
+  const orgId = await insertId(`INSERT INTO organizations (name) VALUES (?)`, `Org ${nhan}`);
+  const projectA = await insertId(
+    `INSERT INTO projects (name, org_id) VALUES (?, ?)`,
+    `Dự án A ${nhan}`,
+    orgId,
+  );
+  const projectB = await insertId(
+    `INSERT INTO projects (name, org_id) VALUES (?, ?)`,
+    `Dự án B ${nhan}`,
+    orgId,
+  );
+  const userId = await insertId(
+    `INSERT INTO users (name, email, role, password_hash) VALUES (?, ?, 'pm', 'x')`,
+    `User ${nhan}`,
+    `m123-${nhan}@x.vn`,
+  );
+  // ensureFloorStageFronts sinh ô cho MỌI công tác active (kể cả 7 công tác seed dùng
+  // chung) nên mọi assert dưới đây lọc theo đúng stage của mình, còn dọn dẹp thì xoá
+  // theo project_id để không sót dòng của các công tác khác.
+  const stageId = await insertId(
+    `INSERT INTO construction_stages (name, sort_order, duration_days) VALUES (?, 9998, 1)`,
+    `Công tác ${nhan}`,
+  );
+  const donDep = async () => {
+    await run(`DELETE FROM floor_stage_fronts WHERE project_id IN (?, ?)`, projectA, projectB);
+    await run(`DELETE FROM construction_stages WHERE id = ?`, stageId);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, projectA, projectB);
+    await run(`DELETE FROM organizations WHERE id = ?`, orgId);
+    await run(`DELETE FROM users WHERE id = ?`, userId);
+  };
+  return { projectA, projectB, stageId, userId, donDep };
+}
+
+test(
+  "ensureFloorStageFronts: hai dự án cùng nhãn tầng 'T5' sinh 2 bộ ô độc lập + idempotent",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { query } = await import("@/lib/db");
+    const { ensureFloorStageFronts } = await import("@/lib/tien-do/constructionStages");
+    const { projectA, projectB, stageId, donDep } = await dungHaiDuAn("ensure");
+
+    try {
+      await ensureFloorStageFronts(projectA, ["T5"]);
+      await ensureFloorStageFronts(projectB, ["T5"]);
+      // Gọi lại lần 2 cùng dự án: không được nhân đôi dòng.
+      await ensureFloorStageFronts(projectA, ["T5"]);
+
+      const rows = await query<{ projectId: number }>(
+        `SELECT project_id AS "projectId" FROM floor_stage_fronts
+          WHERE stage_id = ? AND floor_label = 'T5' ORDER BY project_id`,
+        stageId,
+      );
+      assert.deepEqual(
+        rows.map((r) => r.projectId),
+        [projectA, projectB],
+      );
+    } finally {
+      await donDep();
+    }
+  },
+);
+
+test(
+  "upsertFloorStageFront: ghi ở dự án A không đổi dòng của dự án B (AC4)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { query, queryOne } = await import("@/lib/db");
+    const { ensureFloorStageFronts, upsertFloorStageFront } =
+      await import("@/lib/tien-do/constructionStages");
+    const { projectA, projectB, stageId, userId, donDep } = await dungHaiDuAn("upsert");
+
+    try {
+      await ensureFloorStageFronts(projectA, ["T5"]);
+      await ensureFloorStageFronts(projectB, ["T5"]);
+
+      const truoc = await queryOne<{ id: number }>(
+        `SELECT id FROM floor_stage_fronts WHERE stage_id = ? AND floor_label = 'T5' AND project_id = ?`,
+        stageId,
+        projectB,
+      );
+
+      const id = await upsertFloorStageFront(
+        projectA,
+        "T5",
+        stageId,
+        {
+          receivedAt: "2026-07-01",
+          handedOverAt: null,
+          plannedReceivedAt: null,
+          note: "ghi chú A",
+          outgoingSupplierId: null,
+          incomingSupplierId: null,
+          transitionStageId: null,
+          outgoingRepName: null,
+          incomingRepName: null,
+        },
+        userId,
+      );
+
+      // Vẫn đúng 2 dòng (upsert vào dòng sẵn có của A, không tạo dòng thứ 3).
+      const rows = await query<{ id: number; projectId: number; note: string | null }>(
+        `SELECT id, project_id AS "projectId", note FROM floor_stage_fronts
+          WHERE stage_id = ? AND floor_label = 'T5' ORDER BY project_id`,
+        stageId,
+      );
+      assert.equal(rows.length, 2);
+      assert.equal(rows[0].projectId, projectA);
+      assert.equal(rows[0].id, id);
+      assert.equal(rows[0].note, "ghi chú A");
+      // Dòng của B nguyên vẹn: cùng id cũ, không bị đè ghi chú/ngày nhận.
+      assert.equal(rows[1].id, truoc!.id);
+      assert.equal(rows[1].note, null);
+    } finally {
+      await donDep();
+    }
+  },
+);
