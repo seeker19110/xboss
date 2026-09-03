@@ -54,6 +54,19 @@ này gây ra hai lần** — thêm code đẩy file lên 1807 rồi 1833 dòng. 
 tách thêm file (`tickApi.ts`, `ODimension.tsx`) chứ **không nới ngưỡng test**. Mốc NFR5 cũng đã sửa
 từ "< 1500" xuống "< 1800" ngay trong đặc tả kèm lý do: 1500 là con số đặt ra **trước khi đo**.
 
+**Reviewer bắt 1 lỗi correctness trước khi merge, đã sửa trong đợt:** bấm Ctrl+Z liên tiếp lúc
+request đang chạy thì hai lần cùng đọc một `lichSu` cũ → gửi trùng lô rồi **pop hai mục** khỏi ngăn
+xếp trong khi chỉ hoàn tác một, làm mất một bước lịch sử. Nút bấm có `disabled` theo `dangGui`
+nhưng phím tắt thì không, và bản thân `dangGui` là state React (cập nhật bất đồng bộ) nên chặn
+không kịp. Sửa bằng khoá `useRef` đặt **trong hook** `useTickVung` để phủ mọi lối vào — nút, phím
+tắt, và cả lối thêm sau này.
+
+**Hạn chế đã biết, chấp nhận có chủ đích** (R3 §18): lô hoàn tác có thể gồm 2 lô con (ô vốn tick /
+vốn chưa tick); nếu mạng rớt đúng giữa hai request cách nhau vài chục ms thì một thao tác nằm nửa ở
+server nửa trong hàng đợi. Hàng đợi sẽ gửi nốt khi có sóng nên trạng thái cuối vẫn đúng (nhất quán
+sau cùng). Làm "tất cả hoặc không" cho nhiều lô con đòi endpoint nhận nhiều giá trị trong 1
+transaction — không đáng đổi ở đợt này.
+
 **Chưa làm (non-goals, ghi rõ để không hiểu nhầm):** copy/paste vùng tick sang/từ Excel (hàm TSV đã
 có sẵn nhưng ngữ nghĩa "dán 1/0 vào ô có id" cần đặc tả riêng); undo xuyên phiên; vùng chọn xuyên
 nhiều nhóm; bóc sâu hơn `TrackingGrid.tsx` (phần dư là ~30 handler quanh state chung + JSX, cần

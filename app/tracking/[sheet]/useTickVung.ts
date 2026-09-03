@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { showToast } from "@/app/components/Toast";
 import { useVungChon } from "@/app/components/grid/useVungChon";
 import {
@@ -31,6 +31,12 @@ export function useTickVung(opts: {
   const chon = useVungChon();
   const [lichSu, setLichSu] = useState<LichSuTick>(LICH_SU_RONG);
   const [dangGui, setDangGui] = useState(false);
+  // Khoá bằng ref, KHÔNG dựa vào `dangGui`: state React cập nhật bất đồng bộ nên hai lần bấm
+  // Ctrl+Z liên tiếp (hoặc double-click nút) vẫn lọt qua cửa `dangGui` — cả hai cùng đọc một
+  // `lichSu` cũ, gửi trùng lô rồi pop HAI mục khỏi ngăn xếp trong khi chỉ hoàn tác một, làm
+  // mất một bước lịch sử. Ref đổi ngay trong cùng vòng lặp sự kiện nên chặn được.
+  // Đặt ở hook (không ở nút bấm) để phủ mọi lối vào: nút, phím tắt, và cả lối thêm sau này.
+  const dangChay = useRef(false);
 
   // useMemo: `oDaChon` là dependency của các useCallback bên dưới — tính lại mỗi lần render sẽ
   // làm mọi callback đổi tham chiếu, kéo theo re-render thừa cả lưới.
@@ -68,12 +74,18 @@ export function useTickVung(opts: {
         return;
       }
       if (!lo.ids.length) return;
+      if (dangChay.current) return;
+      dangChay.current = true;
       // Giá trị TRƯỚC của từng ô — ghi lại ngay, vì sau khi `load()` dữ liệu đã là giá trị mới.
       const truoc = oDaChon.map((o) => o.installed);
       setDangGui(true);
-      const ok = await guiCacLo([{ dimIds: lo.ids, installed: value }]);
-      setDangGui(false);
-      if (ok) setLichSu((ls) => ghiThaoTac(ls, { dimIds: lo.ids, truoc, sau: value }));
+      try {
+        const ok = await guiCacLo([{ dimIds: lo.ids, installed: value }]);
+        if (ok) setLichSu((ls) => ghiThaoTac(ls, { dimIds: lo.ids, truoc, sau: value }));
+      } finally {
+        dangChay.current = false;
+        setDangGui(false);
+      }
       load();
       onChanged();
     },
@@ -82,23 +94,33 @@ export function useTickVung(opts: {
 
   const hoanTac = useCallback(async () => {
     const muc = mucDeHoanTac(lichSu);
-    if (!muc) return;
+    if (!muc || dangChay.current) return;
+    dangChay.current = true;
     setDangGui(true);
-    const ok = await guiCacLo(loDeHoanTac(muc));
-    setDangGui(false);
-    // Server từ chối → GIỮ mục trong ngăn hoàn tác để thử lại sau khi mở gate (FR5).
-    if (ok) setLichSu(xacNhanHoanTac);
+    try {
+      const ok = await guiCacLo(loDeHoanTac(muc));
+      // Server từ chối → GIỮ mục trong ngăn hoàn tác để thử lại sau khi mở gate (FR5).
+      if (ok) setLichSu(xacNhanHoanTac);
+    } finally {
+      dangChay.current = false;
+      setDangGui(false);
+    }
     load();
     onChanged();
   }, [lichSu, guiCacLo, load, onChanged]);
 
   const lamLai = useCallback(async () => {
     const muc = mucDeLamLai(lichSu);
-    if (!muc) return;
+    if (!muc || dangChay.current) return;
+    dangChay.current = true;
     setDangGui(true);
-    const ok = await guiCacLo(loDeLamLai(muc));
-    setDangGui(false);
-    if (ok) setLichSu(xacNhanLamLai);
+    try {
+      const ok = await guiCacLo(loDeLamLai(muc));
+      if (ok) setLichSu(xacNhanLamLai);
+    } finally {
+      dangChay.current = false;
+      setDangGui(false);
+    }
     load();
     onChanged();
   }, [lichSu, guiCacLo, load, onChanged]);
