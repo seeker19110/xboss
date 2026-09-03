@@ -346,6 +346,23 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > Verify tay mục **C15** trong `VERIFY-VA-PHAT-HANH.md`, xếp SAU C9–C14 (C13/C14 đã dùng cho M117/M118).
 > **Đã merge PR #448 vào `main` 2026-08-30** (commit `bf7763f`).
 
+## Đặc tả CHỜ DUYỆT — cải thiện kế hoạch/tiến độ/tracking (viết 2026-09-02)
+
+> **`M120-du-lieu-su-kien-theo-o.md`** — 📝 **Draft, chờ người dùng duyệt.** Giai đoạn 1 của lộ
+> trình rà soát mảng kế hoạch/tiến độ/tracking (Giai đoạn 0 — khoá bất biến
+> `hoan_thanh ⇔ progress>=1` + audit trail đổi status thủ công — đã xong ở PR #458, xem
+> `PROGRESS.md`). Nội dung: 4 cột sự kiện trên `progress_dimensions`
+> (`installed_at`/`installed_by`/`note`/`qty`) + 2 cột ngày thực tế trên `tasks`
+> (`actual_start_date`/`actual_end_date`, **suy tự động** trong `recomputeTask`, không nhập tay),
+> gắn ở cả 4 đường ghi ô tick (2 route dimension + import Excel + upload M64), trả ra 3 route GET,
+> tooltip "ai tick — ngày nào" trên lưới. `migrations/0148` thuần thêm cột NULL-able + 1 index →
+> đi thẳng production. **Cột `qty` chỉ THU THẬP, không vào công thức %** — đổi % sang trọng số là
+> việc của giai đoạn sau, cần quyết định riêng. 5 PR (`spec`/`spec`/`standard`/`standard`/`mechanical`);
+> PR1–PR2 chạm `lib/tien-do/recompute.ts` (vùng rủi ro cao `docs/audit.md`) nên bắt buộc qua
+> `reviewer`. **3 quyết định còn chờ người dùng chốt** (§18): D1 `actual_start_date` có tự xoá khi
+> progress về 0 không · D2 bỏ tick có xoá `installed_by`/`note` không · R1 có giữ `qty` trong M120
+> không hay tách sang đợt sau.
+
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 
 > **M62 (`M62-rls-khoa-cua.md`)** — đóng nốt RLS: `withProjectScope` đọc-ghi + bọc 3 route còn lại (`notifications`, `payments/bills`, `payments/floors`) rồi migration "khoá cửa" bỏ nhánh thiếu-ngữ-cảnh (2 PR, `route: spec`; PR2 có điều kiện tiên quyết vận hành). **Đã xong hoàn toàn 2026-07-20** — PR1 (nhánh `claude/plan-m62-m63-7osrkh`, 2026-07-19) và PR2 (`migrations/0077_rls_lock.sql`, PR #300) đều đã merge `main`; người dùng xác nhận cả 2 điều kiện tiên quyết vận hành đủ trước khi merge PR2. Xem `PROGRESS.md`. **M63 (`M63-webhook-ssrf-dns-pinning.md`)** — chống SSRF DNS rebinding cho webhook: resolve + pin IP qua undici `connect.lookup`, mở rộng `isPrivateIp` (1 PR, `route: spec`). **Đã xong 2026-07-19** (nhánh `claude/plan-m62-m63-7osrkh`). Cả 2 sinh từ đợt đánh giá chi tiết lần 8 (`PROGRESS.md`).
