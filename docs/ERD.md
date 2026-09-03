@@ -140,6 +140,8 @@
 | custom | jsonb |  | `'{}'::jsonb` |
 | import_batch_id | integer | ✓ |  |
 | dim_denominator_mode | text | ✓ |  |
+| actual_start_date | date | ✓ |  |
+| actual_end_date | date | ✓ |  |
 
 **Khóa ngoại:**
 - `assigned_to` → `users(id)`
@@ -172,11 +174,16 @@
 | value | float8 | ✓ |  |
 | sort_order | integer | ✓ | `0` |
 | updated_at | timestamptz | ✓ | `now()` |
+| installed_at | timestamptz | ✓ |  |
+| installed_by | integer | ✓ |  |
+| note | text | ✓ |  |
 
 **Khóa ngoại:**
+- `installed_by` → `users(id)`
 - `task_id` → `tasks(id)`
 
 **Index:**
+- `idx_dims_installed_at`: INDEX idx_dims_installed_at ON public.progress_dimensions USING btree (installed_at DESC) WHERE (installed_at IS NOT NULL)
 - `idx_dims_task`: INDEX idx_dims_task ON public.progress_dimensions USING btree (task_id)
 - `progress_dimensions_pkey`: UNIQUE INDEX progress_dimensions_pkey ON public.progress_dimensions USING btree (id)
 - `uq_progress_dimensions_task_label`: UNIQUE INDEX uq_progress_dimensions_task_label ON public.progress_dimensions USING btree (task_id, dimension_label)

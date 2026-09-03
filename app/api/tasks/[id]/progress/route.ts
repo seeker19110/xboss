@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import {
+  capNhatNgayThucTe,
   deriveStatus,
   recomputePackage,
   statusConsistentWithProgress,
@@ -101,6 +102,10 @@ export async function PATCH(
       status,
       id,
     );
+    // Ngày thực tế (M120 FR6) — dùng CHUNG hàm với recomputeTask để đường nhập % thủ công và
+    // đường tick lưới không cho ra 2 bộ ngày khác nhau. Task không có ô dimension nào (nhập %
+    // tay) chỉ có đường này, nên thiếu chỗ gọi ở đây là mất luôn ngày thực tế của cả nhóm đó.
+    await capNhatNgayThucTe(id, progress);
     // Chỉ ghi lịch sử khi % thực sự đổi — đối xứng với recomputeTask (lib/recompute.ts),
     // tránh nhân bản dòng lịch sử khi double-submit/offline-retry gửi lại cùng giá trị.
     const oldProgress = task.progress_percent ?? 0;
