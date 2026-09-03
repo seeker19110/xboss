@@ -8,6 +8,8 @@ import {
   shouldAttempt,
   shouldRetry,
   tickDedupeIds,
+  tickBatchDedupeIds,
+  biTuChoi,
   diaryDedupeIds,
   wouldExceedPhotoQuota,
   photoQueueBytes,
@@ -280,4 +282,114 @@ test("clear làm rỗng hàng đợi (bất biến bảo mật logout)", async (
   assert.equal((await store.getAll()).length, 2);
   await store.clear();
   assert.deepEqual(await store.getAll(), []);
+});
+
+// ===== M121: tick theo LÔ (tick_batch) =====
+// Cả vùng chọn / cả hàng đi trong MỘT op — nếu tách thành N op `tick` thì khi có mạng lại sẽ
+// bắn N request, đúng cái M121 đang bỏ đi, và mất tính nguyên tử của lô.
+
+async function enqueueTickBatch(store: MemoryQueueStore, dimIds: number[], installed: boolean) {
+  const ops = await store.getAll();
+  for (const id of tickBatchDedupeIds(ops, dimIds)) await store.remove(id);
+  await store.add({ kind: "tick_batch", payload: { dimIds, installed }, queuedAt: 0, tries: 0 });
+}
+
+test("AC7: tick vùng 9 ô khi mất mạng → đúng 1 op trong hàng đợi, không phải 9", async () => {
+  const store = new MemoryQueueStore();
+  const ids = [11, 12, 13, 21, 22, 23, 31, 32, 33];
+  await enqueueTickBatch(store, ids, true);
+
+  const ops = await store.getAll();
+  assert.equal(ops.length, 1);
+  assert.equal(ops[0].kind, "tick_batch");
+  assert.deepEqual(ops[0].kind === "tick_batch" ? ops[0].payload.dimIds : [], ids);
+});
+
+test("tick_batch: gửi tới /api/dimensions/batch, không phải route ô đơn lẻ", async () => {
+  const store = new MemoryQueueStore();
+  await enqueueTickBatch(store, [7, 8], false);
+  const [op] = await store.getAll();
+  assert.deepEqual(opEndpoint(op), { url: "/api/dimensions/batch", method: "PATCH" });
+});
+
+test("AC8: lô mới nuốt các op tick đơn lẻ trùng ô — không gửi 2 giá trị mâu thuẫn", async () => {
+  const store = new MemoryQueueStore();
+  await enqueueTick(store, 5, true); // tick lẻ ô 5
+  await enqueueTick(store, 99, true); // ô ngoài lô — phải GIỮ
+  await enqueueTickBatch(store, [5, 6], false); // lô sau phủ ô 5
+
+  const ops = await store.getAll();
+  assert.equal(ops.length, 2, "op tick ô 5 phải bị thay, op ô 99 giữ nguyên");
+  assert.ok(
+    ops.some((o) => o.kind === "tick" && o.payload.dimId === 99),
+    "ô ngoài lô không được xoá lây",
+  );
+  assert.ok(ops.some((o) => o.kind === "tick_batch"));
+});
+
+test("AC8: lô trùng HOÀN TOÀN bị thay; lô trùng MỘT PHẦN thì giữ (không mất ô ngoài phần giao)", async () => {
+  const store = new MemoryQueueStore();
+  await enqueueTickBatch(store, [1, 2], true);
+  await enqueueTickBatch(store, [2, 1], false); // cùng tập ô (khác thứ tự) → thay
+  let ops = await store.getAll();
+  assert.equal(ops.length, 1);
+  assert.equal(ops[0].kind === "tick_batch" && ops[0].payload.installed, false);
+
+  // Lô mới chỉ giao một phần: giữ cả hai, FIFO đảm bảo lô sau thắng ở ô giao.
+  await enqueueTickBatch(store, [2, 3], true);
+  ops = await store.getAll();
+  assert.equal(ops.length, 2, "xoá lô cũ sẽ mất ô 1 mà người dùng đã tick");
+});
+
+test("tick lẻ sau lô 1 ô: thao tác sau thắng, không để lại lô cũ mâu thuẫn", async () => {
+  const store = new MemoryQueueStore();
+  await enqueueTickBatch(store, [42], true);
+  await enqueueTick(store, 42, false);
+  const ops = await store.getAll();
+  assert.equal(ops.length, 1);
+  assert.equal(ops[0].kind, "tick");
+});
+
+test("AC9: op bị server từ chối (4xx) trả về kèm lý do — không biến mất im lặng", async () => {
+  const store = new MemoryQueueStore();
+  await enqueueTickBatch(store, [1, 2, 3], true);
+  await enqueueTick(store, 9, true);
+
+  const r = await flushQueue(store, async (op) =>
+    op.kind === "tick_batch"
+      ? { status: 409, error: "Chờ biên bản chuyển bước: T5 — Lắp đặt ống" }
+      : { status: 200 },
+  );
+
+  assert.equal(r.remaining, 0, "vẫn xoá khỏi hàng đợi để không kẹt retry vô hạn");
+  assert.equal(r.tuChoi.length, 1, "chỉ op bị từ chối mới được báo, op thành công thì không");
+  assert.equal(r.tuChoi[0].soO, 3, "đếm theo SỐ Ô để nói đúng '3 thao tác bị từ chối'");
+  assert.match(r.tuChoi[0].lyDo ?? "", /chuyển bước/);
+});
+
+test("AC9: lỗi 5xx/mất mạng KHÔNG bị coi là từ chối — giữ lại thử tiếp, không báo nhầm", async () => {
+  const store = new MemoryQueueStore();
+  await enqueueTickBatch(store, [1], true);
+
+  const r = await flushQueue(store, async () => ({ status: 503 }));
+  assert.equal(r.tuChoi.length, 0);
+  assert.equal(r.retried, 1);
+  assert.equal(r.remaining, 1);
+
+  const r2 = await flushQueue(
+    store,
+    async () => ({ networkError: true }),
+    () => 10 ** 9,
+  );
+  assert.equal(r2.tuChoi.length, 0);
+  assert.equal(r2.remaining, 1);
+});
+
+test("biTuChoi: chỉ 4xx là từ chối; 2xx/5xx/mất mạng thì không", () => {
+  assert.equal(biTuChoi({ status: 403 }), true);
+  assert.equal(biTuChoi({ status: 409 }), true);
+  assert.equal(biTuChoi({ status: 422 }), true);
+  assert.equal(biTuChoi({ status: 200 }), false);
+  assert.equal(biTuChoi({ status: 500 }), false);
+  assert.equal(biTuChoi({ networkError: true }), false);
 });

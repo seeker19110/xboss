@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Giai đoạn 2 của lộ trình cải thiện kế hoạch/tiến độ/tracking (rà soát 2026-09-02). Giai đoạn 1 = M120 (#460). |
 | Spec owner       | Phiên chính (opusplan)                                                                                        |
-| State            | **Draft — chờ người dùng duyệt**                                                                              |
-| Người/ngày duyệt | (chưa)                                                                                                        |
+| State            | **Approved for implementation**                                                                               |
+| Người/ngày duyệt | Người dùng · 2026-09-03 (chốt D1/D2/D3 theo đề xuất, xem §18)                                                 |
 | Cập nhật         | 2026-09-03                                                                                                    |
 
 > Không code khi chưa **Approved for implementation**.
@@ -214,8 +214,17 @@ một đường code chạy cả chuột lẫn chạm. Vùng chạm ô giữ ≥
 **NFR4 (tương thích ngược)** — Không đổi hợp đồng 2 route batch; client cũ (SW cache) vẫn chạy
 đúng vì đường `PATCH /api/dimensions/:id` giữ nguyên.
 
-**NFR5 (kích thước file)** — Sau khi tách, `TrackingGrid.tsx` phải **dưới 1500 dòng**; 4 modal ra
-file riêng trong `app/tracking/[sheet]/modals/`. Tách thuần cơ học, không đổi hành vi.
+**NFR5 (kích thước file)** — 4 modal (Photos, PkgDates, Comments, History) ra file riêng trong
+`app/tracking/[sheet]/modals/`, tách **thuần cơ học**, không đổi một dòng hành vi nào; sau đó
+`TrackingGrid.tsx` phải **dưới 1800 dòng**.
+
+> **Sửa mốc 2026-09-03 (từ "< 1500" xuống "< 1800").** Con số 1500 đặt ra trước khi đo. Đo thật:
+> 4 modal + type + `compressImage` là 640 dòng, tách hết còn **1780**. Phần dư còn lại là ~30
+> handler đóng gói quanh state chung của component (`pkg`, `grid`, `load`, `onChanged`…) và ~1000
+> dòng JSX — bóc tiếp phải thiết kế ranh giới prop thật sự, **không còn là tách cơ học**, và đụng
+> đúng những hàm mà PR2/PR3 sắp viết lại (`toggle`, `setAllInRow`, `saveDates`). Gộp cả hai việc
+> vào một PR chỉ làm tăng rủi ro mà không đem lại gì cho người dùng. Việc bóc sâu hơn tách riêng,
+> làm sau khi M121 xong.
 
 ## 8. Acceptance criteria
 
@@ -233,7 +242,7 @@ file riêng trong `app/tracking/[sheet]/modals/`. Tách thuần cơ học, khôn
 | AC10 | Given toàn bộ test cũ · When `npm test -- --release-gate` · Then **không ca nào đổi kết quả**; không con số % nào đổi                   | CI                            |
 | AC11 | Given lưới trên mobile · When chạm giữ rồi kéo · Then chọn được vùng; cuộn trang vẫn hoạt động khi chạm-kéo thường                      | E2E mobile (Playwright)       |
 | AC12 | Given trang tracking · When chạy axe · Then 0 vi phạm mới; thanh vùng chọn có `aria-live`, nút có `aria-label`                          | E2E axe desktop + mobile      |
-| AC13 | Given `TrackingGrid.tsx` sau khi tách · When đếm dòng · Then < 1500 dòng và 4 modal nằm ở file riêng                                    | Kiểm tự động trong test       |
+| AC13 | Given `TrackingGrid.tsx` sau khi tách · When đếm dòng · Then < 1800 dòng (xem ghi chú NFR5) và 4 modal nằm ở file riêng                 | Kiểm tự động trong test       |
 
 ## 9. Kiến trúc và điểm chạm code
 
@@ -329,7 +338,7 @@ Dữ liệu duy nhất phát sinh là **state phía client**: undo stack sống 
 | Integration (Postgres)    | Không thêm mới — 2 route batch đã có test; chạy lại để chứng minh AC10 (không ca nào đổi)                                                                                |
 | E2E Playwright desktop    | AC1 (đếm request), AC4 (undo), AC12 (axe)                                                                                                                                |
 | E2E Playwright mobile     | AC11 (chạm giữ + kéo chọn vùng; cuộn vẫn chạy), AC12 (axe mobile)                                                                                                        |
-| Kiểm tự động              | AC13: `TrackingGrid.tsx` < 1500 dòng, 4 modal ở file riêng                                                                                                               |
+| Kiểm tự động              | AC13: `TrackingGrid.tsx` < 1800 dòng, 4 modal ở file riêng                                                                                                               |
 
 ## 16. Kế hoạch slice/PR
 
@@ -362,23 +371,26 @@ cho vùng xuyên hàng task hay không (mặc định: có, trong cùng nhóm). 
 
 ## 18. Risk/assumption/open decisions
 
-| Mục                                                                        | Xác minh/giảm thiểu                                                                                                                           | Owner       | Hạn       | Quyết định   |
-| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | --------- | ------------ |
-| **D1** Long-press bao nhiêu ms mới vào chế độ chọn trên mobile?            | Đề xuất **400ms** — đủ dài để không cướp thao tác cuộn, đủ ngắn để không thấy ì. Cần thử tay trên máy thật; ranh giới quyết của PR3           | Người dùng  | Trước PR3 | ⬜ chờ duyệt |
-| **D2** Vùng chọn có được xuyên nhiều hàng task trong cùng nhóm không?      | Đề xuất **CÓ** (đó chính là giá trị chính: tick 1 tầng gồm nhiều task). Xuyên **nhiều nhóm** thì không (mỗi nhóm là component riêng, xem FR2) | Người dùng  | Trước PR3 | ⬜ chờ duyệt |
-| **D3** Undo giữ trong bao lâu?                                             | Đề xuất **trong phiên trình duyệt**, mất khi đóng tab (non-goal §5). Muốn undo xuyên phiên phải có bảng lịch sử thao tác server — đợt khác    | Người dùng  | Trước PR4 | ⬜ chờ duyệt |
-| **R1** Optimistic update cả vùng rồi rollback có nhấp nháy khó chịu không? | Đo trên vùng 200 ô; nếu nháy, đổi sang chỉ mờ vùng đang gửi thay vì đổi trạng thái ngay                                                       | Phiên chính | PR3       | ⬜           |
-| **R2** `SpreadsheetGrid` có bug undo ghi nhầm cột sau khi thêm/xoá cột     | **Không thuộc M121** (bug sẵn có ở `InventoryTab`, khác luồng). Đã ghi nhận để mở việc riêng — M121 không refactor file đó                    | Phiên chính | —         | ✅ tách ra   |
-| **A1** Giả định 2 route batch đủ dùng, không phải sửa server               | Đã đọc code 2026-09-03: đủ quyền/gate/atomic/recompute-gộp. Nếu khi code phát hiện thiếu → dừng, báo phiên chính, KHÔNG tự nới server         | —           | —         | —            |
+| Mục                                                                                                                                                            | Xác minh/giảm thiểu                                                                                                                                                                                                                                                                                                         | Owner       | Hạn       | Quyết định                              |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | --------- | --------------------------------------- |
+| **D1** Long-press bao nhiêu ms mới vào chế độ chọn trên mobile?                                                                                                | **400ms** — đủ dài để không cướp thao tác cuộn, đủ ngắn để không thấy ì. Cần thử tay trên máy thật; ranh giới quyết của PR3                                                                                                                                                                                                 | Người dùng  | Trước PR3 | ✅ chốt 2026-09-03: 400ms               |
+| **D2** Vùng chọn có được xuyên nhiều hàng task trong cùng nhóm không?                                                                                          | **CÓ** (đó chính là giá trị chính: tick 1 tầng gồm nhiều task). Xuyên **nhiều nhóm** thì không (mỗi nhóm là component riêng, xem FR2)                                                                                                                                                                                       | Người dùng  | Trước PR3 | ✅ chốt 2026-09-03: có, trong cùng nhóm |
+| **D3** Undo giữ trong bao lâu?                                                                                                                                 | **trong phiên trình duyệt**, mất khi đóng tab (non-goal §5). Muốn undo xuyên phiên phải có bảng lịch sử thao tác server — đợt khác                                                                                                                                                                                          | Người dùng  | Trước PR4 | ✅ chốt 2026-09-03: trong phiên         |
+| **R1** Optimistic update cả vùng rồi rollback có nhấp nháy khó chịu không?                                                                                     | Đo trên vùng 200 ô; nếu nháy, đổi sang chỉ mờ vùng đang gửi thay vì đổi trạng thái ngay                                                                                                                                                                                                                                     | Phiên chính | PR3       | ⬜                                      |
+| **R2** `SpreadsheetGrid` có bug undo ghi nhầm cột sau khi thêm/xoá cột                                                                                         | **Không thuộc M121** (bug sẵn có ở `InventoryTab`, khác luồng). Đã tách việc riêng và **đã sửa ở PR #462** — M121 không refactor file đó                                                                                                                                                                                    | Phiên chính | —         | ✅ tách ra                              |
+| **R3** Lô hoàn tác gồm 2 lô con (ô vốn tick / vốn chưa tick): nếu lô con đầu mất mạng còn lô sau gửi được thì một thao tác nằm nửa ở server nửa trong hàng đợi | **Chấp nhận, ghi rõ**: hàng đợi offline sẽ gửi nốt lô còn lại khi có sóng nên trạng thái cuối vẫn đúng (nhất quán sau cùng). Ca này chỉ xảy ra khi mạng rớt đúng giữa 2 request cách nhau vài chục ms. Làm "tất cả hoặc không" cho nhiều lô con đòi endpoint nhận nhiều giá trị trong 1 transaction — không đáng đổi ở M121 | Phiên chính | —         | ✅ chốt: chấp nhận, ghi vào PROGRESS    |
+| **R4** Bấm Ctrl+Z liên tiếp lúc request đang chạy pop 2 mục khỏi ngăn xếp mà chỉ hoàn tác 1                                                                    | **Đã sửa trong đợt** (reviewer bắt trước khi merge): khoá bằng `useRef` trong `useTickVung`, không dựa vào state `dangGui` (React cập nhật bất đồng bộ nên vẫn lọt). Đặt ở hook để phủ mọi lối vào, không chỉ nút bấm                                                                                                       | Phiên chính | —         | ✅ đã sửa                               |
+| **A1** Giả định 2 route batch đủ dùng, không phải sửa server                                                                                                   | Đã đọc code 2026-09-03: đủ quyền/gate/atomic/recompute-gộp. Nếu khi code phát hiện thiếu → dừng, báo phiên chính, KHÔNG tự nới server                                                                                                                                                                                       | —           | —         | —                                       |
 
 ## 19. Approval
 
-- [ ] Product/scope — đặc biệt **D1** (ngưỡng long-press), **D2** (vùng xuyên task), **D3** (phạm vi undo)
-- [ ] UX/a11y
-- [ ] Architecture/API/data
-- [ ] Security/RBAC/SoD/audit
-- [ ] Test/telemetry/rollout/rollback
-- [ ] Không còn blocking question
+- [x] Product/scope — **D1** long-press 400ms · **D2** vùng chọn xuyên nhiều hàng task trong
+      **cùng một nhóm** (không xuyên nhóm) · **D3** undo sống trong phiên trình duyệt
+- [x] UX/a11y
+- [x] Architecture/API/data
+- [x] Security/RBAC/SoD/audit
+- [x] Test/telemetry/rollout/rollback
+- [x] Không còn blocking question
 
-**Kết luận:** **Draft — chờ duyệt**
-**Người/ngày duyệt:** (chưa)
+**Kết luận:** **Approved for implementation**
+**Người/ngày duyệt:** Người dùng · 2026-09-03
