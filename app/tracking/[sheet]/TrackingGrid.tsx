@@ -20,7 +20,6 @@ import {
   FileText,
   Lock,
   ShieldAlert,
-  StickyNote,
 } from "lucide-react";
 import { Modal, appAlert, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
@@ -35,26 +34,9 @@ import { HistoryModal } from "./modals/HistoryModal";
 import type { Pkg, Cell, GridTask, Grid } from "./types";
 import { dungLoTick } from "./tick";
 import { guiLoTick, guiNgayHangLoat } from "./tickApi";
-
-// Mô tả sự kiện tick của 1 ô (M120) — dùng cho cả `title` (rê chuột) lẫn `aria-label`
-// (bàn phím/đọc màn hình), nên phải là chuỗi thuần, không phải JSX.
-// Ô chưa tick → chuỗi rỗng (không có gì để nói). Ô tick TRƯỚC khi M120 triển khai không có
-// dữ liệu sự kiện — nói thẳng "Không rõ người tick" thay vì bịa hoặc để trống khó hiểu.
-export function moTaSuKienO(cell: Cell): string {
-  if (!cell.installed) return "";
-  const phan: string[] = [];
-  if (cell.installedByName || cell.installedAt) {
-    phan.push(
-      `Tick bởi ${cell.installedByName ?? "không rõ"}${
-        cell.installedAt ? ` · ${formatDateVN(cell.installedAt)}` : ""
-      }`,
-    );
-  } else {
-    phan.push("Không rõ người tick");
-  }
-  if (cell.note) phan.push(`Ghi chú: ${cell.note}`);
-  return phan.join(" · ");
-}
+import { useTickVung } from "./useTickVung";
+import { ThanhVungChon } from "./ThanhVungChon";
+import { ODimension } from "./ODimension";
 
 // Ngày rút gọn d/M cho dòng task (đỡ chiếm chỗ trên lưới).
 const fmtShortDate = (d: string | null) => {
@@ -192,6 +174,29 @@ export function TrackingGrid({
   useEffect(() => {
     if (expanded) load();
   }, [load, refreshKey, expanded]);
+
+  // Chọn vùng + hoàn tác (M121). Logic nằm trong hook để file này chỉ còn dựng giao diện.
+  const vungChon = useTickVung({ grid, load, onChanged, onOfflineTickBatch });
+
+  // Đóng nhóm hoặc đổi dữ liệu → bỏ vùng chọn: giữ lại sẽ trỏ tới ô đã unmount.
+  useEffect(() => {
+    if (!expanded) vungChon.boChon();
+  }, [expanded, vungChon]);
+
+  // Ctrl+Z / Ctrl+Shift+Z (Cmd trên máy Mac). Bắt ở window nhưng bỏ qua khi đang gõ trong ô
+  // nhập liệu — nếu không sẽ cướp mất undo của chính ô nhập đó.
+  useEffect(() => {
+    if (!expanded || !editMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return;
+      const el = e.target as HTMLElement | null;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      e.preventDefault();
+      void (e.shiftKey ? vungChon.lamLai() : vungChon.hoanTac());
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expanded, editMode, vungChon]);
 
   // ── Hàm thao tác nhóm (pkg) ──────────────────────────────────────────────
 
@@ -418,6 +423,9 @@ export function TrackingGrid({
         showToast(j?.error ?? "Không cập nhật được ô này", "error");
         return;
       }
+      // Tick lẻ cũng vào lịch sử để Ctrl+Z hoàn tác được — người dùng không phân biệt "tick 1 ô"
+      // với "tick cả vùng", họ chỉ muốn undo thao tác vừa rồi (M121 FR4).
+      vungChon.ghiTickLe(cell.id, cell.installed, !cell.installed);
       if (j?.task)
         setGrid(
           (g) =>
@@ -446,11 +454,15 @@ export function TrackingGrid({
       return;
     }
     if (!lo.ids.length) return; // hàng chưa có ô nào — không gửi request rỗng
+    // Giá trị TRƯỚC của từng ô, lấy NGAY trước khi gửi: sau `load()` dữ liệu đã là giá trị mới,
+    // không dựng lại được. Một hàng có thể trộn ô đang tick và chưa tick nên phải lưu từng ô.
+    const truoc = Object.values(task.cells).map((c) => c.installed);
     const kq = await guiLoTick(lo.ids, value);
     // Mất mạng → xếp cả lô vào hàng đợi offline, KHÔNG báo lỗi: người dùng công trường vẫn
     // tick tiếp được, lô sẽ tự gửi khi có sóng.
     if (kq.trangThai === "mangLoi") onOfflineTickBatch(lo.ids, value);
     else if (kq.trangThai === "tuChoi") showToast(kq.loi, "error");
+    else vungChon.ghiThaoTacLo(lo.ids, truoc, value);
     load();
     onChanged();
   }
@@ -1648,46 +1660,30 @@ export function TrackingGrid({
                       </>
                     );
                   })()}
-                  {visibleColumns.map((col) => {
-                    const cell = t.cells[col];
-                    return (
-                      <td
-                        key={col}
-                        className={`border-b border-zinc-800/60 text-center align-middle p-0${hiddenPrintCols.has(col) ? " print-hidden-col" : ""}`}
-                      >
-                        {cell ? (
-                          <label
-                            className={`relative flex items-center justify-center w-full h-full min-h-[44px] ${editMode ? "cursor-pointer" : "cursor-default"}`}
-                            title={moTaSuKienO(cell)}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={cell.installed}
-                              onChange={() => editMode && toggle(cell, t, col)}
-                              disabled={!editMode}
-                              // Dữ liệu sự kiện đưa thẳng vào aria-label thay vì chỉ `title`:
-                              // `title` chỉ hiện khi rê chuột, người dùng bàn phím/đọc màn
-                              // hình sẽ không bao giờ nghe được (M120 NFR3).
-                              aria-label={`${col} · ${t.name}${cell.installed ? ` · ${moTaSuKienO(cell)}` : ""}`}
-                              className={`w-4 h-4 accent-emerald-500 ${editMode ? "cursor-pointer" : "cursor-default opacity-60"}`}
-                            />
-                            {cell.note ? (
-                              // Ô có ghi chú: đánh dấu bằng ICON, không chỉ bằng màu (NFR3).
-                              // aria-hidden vì nội dung ghi chú đã nằm trong aria-label ở trên.
-                              <StickyNote
-                                className="absolute top-0.5 right-0.5 w-3 h-3 text-amber-400"
-                                aria-hidden="true"
-                              />
-                            ) : null}
-                          </label>
-                        ) : (
-                          <span className="flex items-center justify-center min-h-[44px] text-zinc-700">
-                            ·
-                          </span>
-                        )}
-                      </td>
-                    );
-                  })}
+                  {visibleColumns.map((col, ci) => (
+                    <ODimension
+                      key={col}
+                      cell={t.cells[col]}
+                      nhanCot={col}
+                      tenTask={t.name}
+                      editMode={editMode}
+                      daChon={vungChon.oTrongVung(ti, ci)}
+                      anKhiIn={hiddenPrintCols.has(col)}
+                      onToggle={() => {
+                        const cell = t.cells[col];
+                        if (cell) toggle(cell, t, col);
+                      }}
+                      onPointerDown={(e) => {
+                        // Chỉ bật chọn vùng ở chế độ sửa — lúc chỉ xem thì kéo tay phải để
+                        // cuộn trang, không được cướp thao tác cuộn của người dùng.
+                        if (!editMode || e.button === 2) return;
+                        if (e.shiftKey) vungChon.moRongToi(ti, ci);
+                        else vungChon.batDau(ti, ci);
+                      }}
+                      onPointerEnter={() => editMode && vungChon.keoToi(ti, ci)}
+                      onPointerUp={() => vungChon.ketThucKeo()}
+                    />
+                  ))}
                   {(ce || hasVariants) && (
                     <td className="border-b border-zinc-800/60 text-center align-middle p-1 w-[88px] min-w-[88px]">
                       {ce && (
@@ -1732,6 +1728,20 @@ export function TrackingGrid({
           </tbody>
         )}
       </table>
+
+      {ce && vungChon.vung && (
+        <ThanhVungChon
+          soO={vungChon.soODaChon}
+          dangGui={vungChon.dangGui}
+          coTheHoanTac={vungChon.coTheHoanTac}
+          coTheLamLai={vungChon.coTheLamLai}
+          onTick={() => void vungChon.tickVung(true)}
+          onBoTick={() => void vungChon.tickVung(false)}
+          onBoChon={vungChon.boChon}
+          onHoanTac={() => void vungChon.hoanTac()}
+          onLamLai={() => void vungChon.lamLai()}
+        />
+      )}
 
       {historyTask && <HistoryModal task={historyTask} onClose={() => setHistoryTask(null)} />}
       {photosTask && (
