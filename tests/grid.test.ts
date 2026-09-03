@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { serializeTSV, parseTSV, normalizeRect, spreadPaste } from "@/lib/tien-do/grid";
+import {
+  serializeTSV,
+  parseTSV,
+  normalizeRect,
+  spreadPaste,
+  resolveUndoBatch,
+} from "@/lib/tien-do/grid";
 
 test("serializeTSV: ma trận thường → cột TAB, dòng LF", () => {
   assert.equal(
@@ -74,5 +80,56 @@ test("spreadPaste: trải ma trận từ ô neo, sinh toạ độ tuyệt đối
     { r: 2, c: 4, raw: "b" },
     { r: 3, c: 3, raw: "c" },
     { r: 3, c: 4, raw: "d" },
+  ]);
+});
+
+// --- Ngăn xếp Undo/Redo: định vị ô theo khoá dòng/cột ---
+
+test("resolveUndoBatch: tra khoá dòng/cột → chỉ số hiện tại", () => {
+  assert.deepEqual(
+    resolveUndoBatch(
+      [
+        { rowKey: 7, colKey: "name", raw: "cũ" },
+        { rowKey: 9, colKey: "qty", raw: "3" },
+      ],
+      [5, 7, 9],
+      ["boqCode", "name", "qty"],
+    ),
+    [
+      { r: 1, c: 1, raw: "cũ" },
+      { r: 2, c: 2, raw: "3" },
+    ],
+  );
+});
+
+test("resolveUndoBatch: cột đổi thứ tự vẫn trỏ đúng ô (không ghi nhầm cột)", () => {
+  // Lúc ghi stack cột là [boqCode, name, qty]; giờ đã thành [qty, name, boqCode].
+  assert.deepEqual(
+    resolveUndoBatch([{ rowKey: 7, colKey: "qty", raw: "3" }], [5, 7], ["qty", "name", "boqCode"]),
+    [{ r: 1, c: 0, raw: "3" }],
+  );
+});
+
+test("resolveUndoBatch: bỏ qua ô có cột đã bị xoá", () => {
+  assert.deepEqual(
+    resolveUndoBatch(
+      [
+        { rowKey: 7, colKey: "note", raw: "x" },
+        { rowKey: 7, colKey: "name", raw: "y" },
+      ],
+      [7],
+      ["name"],
+    ),
+    [{ r: 0, c: 0, raw: "y" }],
+  );
+});
+
+test("resolveUndoBatch: bỏ qua ô có dòng đã bị xoá", () => {
+  assert.deepEqual(resolveUndoBatch([{ rowKey: 99, colKey: "name", raw: "x" }], [7], ["name"]), []);
+});
+
+test("resolveUndoBatch: khoá dòng dạng chuỗi và số coi là một", () => {
+  assert.deepEqual(resolveUndoBatch([{ rowKey: "7", colKey: "name", raw: "x" }], [7], ["name"]), [
+    { r: 0, c: 0, raw: "x" },
   ]);
 });

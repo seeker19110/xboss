@@ -1,5 +1,22 @@
 # PROGRESS.md — Trạng thái dự án
 
+## Sửa lỗi ghi nhầm cột khi Hoàn tác trong `SpreadsheetGrid` (2026-09-03)
+
+Ngăn xếp Undo/Redo của `app/components/SpreadsheetGrid.tsx` định vị ô theo **chỉ số cột** (`c`).
+Nếu mảng `columns` đổi giữa lúc ghi stack và lúc hoàn tác (thêm/xoá/đổi thứ tự cột), chỉ số cũ trỏ
+sang cột khác → Ctrl+Z **gọi API thật** (`recommit` → `commitCells` → `onCommit`) và ghi giá trị cũ
+xuống **nhầm cột** trong DB mà người dùng không hay.
+
+Sửa: mục trong stack lưu `colKey` (`columns[c].key`) thay cho `c`; lúc hoàn tác tra ngược khoá →
+chỉ số hiện tại bằng helper thuần `resolveUndoBatch` (`lib/tien-do/grid.ts`), cột/dòng không còn
+tồn tại thì bỏ qua ô đó (đối xứng với cách cũ đã bỏ dòng đã xoá). Test logic stack ở
+`tests/grid.test.ts` (đổi thứ tự cột, xoá cột, xoá dòng, khoá dòng số/chuỗi).
+
+Phạm vi hồi quy hẹp: `SpreadsheetGrid` hiện chỉ dùng ở `app/procurement/_components/InventoryTab.tsx`
+(tab "Kho & Định Mức"). Lỗi phát hiện khi khảo sát tái dùng component cho lưới tracking
+(`docs/nang-cap/M121-luoi-tick-theo-vung.md` §4, rủi ro R2 §18) — M121 đã chốt KHÔNG tái dùng nên
+tách ra làm việc riêng.
+
 ## ✅ M120 — Dữ liệu sự kiện theo ô tick & ngày thực tế của task (Giai đoạn 1, 2026-09-03, PR #460)
 
 `docs/nang-cap/M120-du-lieu-su-kien-theo-o.md` (Approved 2026-09-03). Giai đoạn 1 của lộ trình rà

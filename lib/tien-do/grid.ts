@@ -103,6 +103,41 @@ export function normalizeRect(a: { r: number; c: number }, b: { r: number; c: nu
   };
 }
 
+// Một ô trong ngăn xếp Undo/Redo của lưới: định vị theo **khoá** dòng/cột chứ
+// không theo chỉ số, để còn đúng ô sau khi cấu hình cột đổi (thêm/xoá/đổi thứ tự)
+// hoặc dòng bị lọc/xoá.
+export type GridUndoCell = {
+  rowKey: number | string;
+  colKey: string;
+  oldRaw: string;
+  newRaw: string;
+};
+
+// Tra ngược khoá dòng/cột → chỉ số hiện tại. Ô có dòng hoặc cột không còn tồn tại
+// thì bỏ qua (thà hoàn tác thiếu còn hơn ghi nhầm sang cột khác).
+export function resolveUndoBatch(
+  batch: { rowKey: number | string; colKey: string; raw: string }[],
+  rowKeys: (number | string)[],
+  colKeys: string[],
+): { r: number; c: number; raw: string }[] {
+  const rowIdx = new Map<string, number>();
+  rowKeys.forEach((k, i) => {
+    if (!rowIdx.has(String(k))) rowIdx.set(String(k), i);
+  });
+  const colIdx = new Map<string, number>();
+  colKeys.forEach((k, i) => {
+    if (!colIdx.has(k)) colIdx.set(k, i);
+  });
+  const out: { r: number; c: number; raw: string }[] = [];
+  for (const { rowKey, colKey, raw } of batch) {
+    const r = rowIdx.get(String(rowKey));
+    const c = colIdx.get(colKey);
+    if (r === undefined || c === undefined) continue;
+    out.push({ r, c, raw });
+  }
+  return out;
+}
+
 // Lát ma trận dán vào vùng bắt đầu từ (anchorR, anchorC): với mỗi ô đích trả về
 // giá trị chuỗi nguồn. Excel lặp lại nguồn nếu vùng đích lớn hơn (chỉ khi nguồn
 // là 1 ô hoặc 1 hàng/cột) — ở đây giữ đơn giản: dán đúng kích thước nguồn, không

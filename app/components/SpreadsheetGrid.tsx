@@ -12,7 +12,15 @@
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { todayISO } from "@/lib/nen/date";
 import { Loader2, ChevronUp, ChevronDown, ListFilter } from "lucide-react";
-import { serializeTSV, parseTSV, normalizeRect, spreadPaste, type Rect } from "@/lib/tien-do/grid";
+import {
+  serializeTSV,
+  parseTSV,
+  normalizeRect,
+  spreadPaste,
+  resolveUndoBatch,
+  type Rect,
+  type GridUndoCell,
+} from "@/lib/tien-do/grid";
 import { Modal } from "@/app/components/dialogs";
 
 export type GridColumn<Row> = {
@@ -95,13 +103,11 @@ export default function SpreadsheetGrid<Row>({
   const [alignOverride, setAlignOverride] = useState<Record<number, "left" | "center" | "right">>(
     {},
   );
-  // Ngăn xếp Undo/Redo: mỗi mục là lô ô đã đổi kèm giá trị cũ + mới (theo rowKey).
-  const [undoStack, setUndoStack] = useState<
-    { rowKey: number | string; c: number; oldRaw: string; newRaw: string }[][]
-  >([]);
-  const [redoStack, setRedoStack] = useState<
-    { rowKey: number | string; c: number; oldRaw: string; newRaw: string }[][]
-  >([]);
+  // Ngăn xếp Undo/Redo: mỗi mục là lô ô đã đổi kèm giá trị cũ + mới, định vị theo
+  // **khoá** dòng (rowKey) + khoá cột (column.key) — không theo chỉ số, vì cột có
+  // thể được thêm/xoá/đổi thứ tự giữa lúc ghi stack và lúc hoàn tác.
+  const [undoStack, setUndoStack] = useState<GridUndoCell[][]>([]);
+  const [redoStack, setRedoStack] = useState<GridUndoCell[][]>([]);
   const [pinned, setPinned] = useState<Set<string>>(new Set()); // rowKey các dòng được ghim
   const [wrap, setWrap] = useState(true); // xuống dòng (wrap text) trong ô
   const [extraRects, setExtraRects] = useState<Rect[]>([]); // các vùng chọn rời (Ctrl/Cmd+click)
@@ -210,8 +216,7 @@ export default function SpreadsheetGrid<Row>({
       const byRow = new Map<string, Record<string, unknown>>();
       const rowIdMap = new Map<string, number | string>(); // key → original id
       const touched: string[] = [];
-      const undoCells: { rowKey: number | string; c: number; oldRaw: string; newRaw: string }[] =
-        [];
+      const undoCells: GridUndoCell[] = [];
       for (const { r, c, raw } of cells) {
         const col = columns[c];
         const row = rows[r];
@@ -220,7 +225,7 @@ export default function SpreadsheetGrid<Row>({
         if (!patch) continue;
         const id = rowKey(row);
         const k = String(id);
-        undoCells.push({ rowKey: id, c, oldRaw: rawOf(c, row), newRaw: raw });
+        undoCells.push({ rowKey: id, colKey: col.key, oldRaw: rawOf(c, row), newRaw: raw });
         byRow.set(k, { ...(byRow.get(k) ?? {}), ...patch });
         rowIdMap.set(k, id);
         touched.push(keyOf(r, c));
@@ -371,26 +376,25 @@ export default function SpreadsheetGrid<Row>({
     commitCells(selectedCells().map(({ r, c }) => ({ r, c, raw: "" })));
   }, [selectedCells, commitCells]);
 
-  // Re-commit 1 lô ô theo rowKey (dùng cho undo/redo); không ghi lại lịch sử.
+  // Re-commit 1 lô ô theo khoá dòng + khoá cột (dùng cho undo/redo); không ghi lại
+  // lịch sử. Dòng đã xoá/cột không còn tồn tại thì bỏ qua ô đó.
   const recommit = useCallback(
-    (batch: { rowKey: number | string; c: number; raw: string }[]) => {
-      const cells = batch
-        .map(({ rowKey: id, c, raw }) => ({
-          r: rows.findIndex((row) => rowKey(row) === id),
-          c,
-          raw,
-        }))
-        .filter(({ r }) => r >= 0);
+    (batch: { rowKey: number | string; colKey: string; raw: string }[]) => {
+      const cells = resolveUndoBatch(
+        batch,
+        rows.map((row) => rowKey(row)),
+        columns.map((col) => col.key),
+      );
       if (cells.length) commitCells(cells, false);
     },
-    [rows, rowKey, commitCells],
+    [rows, rowKey, columns, commitCells],
   );
 
   const undo = useCallback(() => {
     setUndoStack((stack) => {
       if (!stack.length) return stack;
       const batch = stack[stack.length - 1];
-      recommit(batch.map((b) => ({ rowKey: b.rowKey, c: b.c, raw: b.oldRaw })));
+      recommit(batch.map((b) => ({ rowKey: b.rowKey, colKey: b.colKey, raw: b.oldRaw })));
       setRedoStack((r) => [...r, batch]);
       return stack.slice(0, -1);
     });
@@ -400,7 +404,7 @@ export default function SpreadsheetGrid<Row>({
     setRedoStack((stack) => {
       if (!stack.length) return stack;
       const batch = stack[stack.length - 1];
-      recommit(batch.map((b) => ({ rowKey: b.rowKey, c: b.c, raw: b.newRaw })));
+      recommit(batch.map((b) => ({ rowKey: b.rowKey, colKey: b.colKey, raw: b.newRaw })));
       setUndoStack((u) => [...u.slice(-49), batch]);
       return stack.slice(0, -1);
     });
