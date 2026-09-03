@@ -263,7 +263,9 @@ BEGIN
   FOR c IN
     SELECT con.conname FROM pg_constraint con
     WHERE con.conrelid = 'floor_stage_fronts'::regclass AND con.contype = 'u'
-      AND (SELECT array_agg(att.attname ORDER BY att.attname)
+      -- attname kiểu `name` → phải ép ::text mới so được với ARRAY[...] (text[]), nếu không
+      -- Postgres báo "operator does not exist: name[] = text[]" (đính chính 2026-09-03, PR1).
+      AND (SELECT array_agg(att.attname::text ORDER BY att.attname::text)
            FROM unnest(con.conkey) k JOIN pg_attribute att
              ON att.attrelid = con.conrelid AND att.attnum = k)
           = ARRAY['floor_label','stage_id']

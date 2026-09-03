@@ -32,7 +32,10 @@ test(
       `INSERT INTO sheet_types (code, name, slug) VALUES ('D9-WF', 'Sheet test D9 WF', 'd9-wf')`,
     );
     const frontId = await insertId(
-      `INSERT INTO floor_stage_fronts (floor_label, stage_id) VALUES ('9F', ?)`,
+      // project_id suy từ MIN(projects) (M123 PR1): DB test có dự án thì cột đã NOT NULL,
+      // DB trống thì vẫn NULL hợp lệ — không phụ thuộc thứ tự migrate/seed.
+      `INSERT INTO floor_stage_fronts (project_id, floor_label, stage_id)
+       VALUES ((SELECT MIN(id) FROM projects), '9F', ?)`,
       stageId,
     );
     const wpId = await insertId(

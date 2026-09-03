@@ -1,6 +1,6 @@
 # PROGRESS.md — Trạng thái dự án
 
-## 📝 M123 — `project_id` cho baseline, danh mục công tác và mặt trận theo tầng (Giai đoạn 4, đặc tả chờ duyệt, 2026-09-03)
+## 🚧 M123 — `project_id` cho baseline, danh mục công tác và mặt trận theo tầng (Giai đoạn 4, đang làm)
 
 `docs/nang-cap/M123-project-id-cho-baseline-va-mat-tran.md` — **Draft, chờ người dùng duyệt.**
 Chọn làm Giai đoạn 4 vì M122 PR3/PR4 đang bị chặn ở cổng độ phủ BOQ (cần số production), còn việc
@@ -36,7 +36,44 @@ lỗi runtime ngay ⇒ migration + 2 chỗ sửa đó **bắt buộc cùng PR1**
 **Open decision chờ chốt lúc duyệt:** ai được sửa công tác dùng chung (`project_id IS NULL`) — đặc
 tả đề xuất chỉ Admin.
 
-**Tiếp theo:** người dùng duyệt đặc tả → lập `PLAN.md` → giao coordinator thi hành 4 PR.
+**Đặc tả đã duyệt 2026-09-03** (PR #468), kèm chốt **D3**: công tác dùng chung (`project_id IS NULL`)
+chỉ Admin sửa/xoá, PM chỉ tạo/sửa công tác của dự án mình.
+
+**PR1 (xong, chờ CI):** `migrations/0149_baseline_stage_project.sql` — 3 cột `project_id` + backfill
+(`MIN(projects.id)`) + `SET NOT NULL` cho `baselines`/`floor_stage_fronts` + đổi `UNIQUE
+(floor_label, stage_id)` → unique index `(COALESCE(project_id,0), floor_label, stage_id)` + RLS cả
+3 bảng. `ensureFloorStageFronts`/`upsertFloorStageFront` nhận `projectId` bắt buộc; route
+`/api/floor-stage-fronts` suy dự án qua `getCurrentProjectId()` (không nhận từ client), trả 400 khi
+chưa chọn dự án. Test tích hợp: 2 dự án cùng nhãn tầng "T5" ra 2 bộ ô độc lập (AC4) + idempotent.
+Đã kiểm trên Postgres 16 thật: migration chạy 3 lần không lỗi, ràng buộc UNIQUE cũ biến mất, DB
+`projects` rỗng thì bỏ qua `SET NOT NULL` (R3).
+
+**Đính chính đặc tả (§11):** snippet DDL trong đặc tả so `array_agg(att.attname)` (kiểu `name[]`)
+với `ARRAY['floor_label','stage_id']` (`text[]`) → Postgres báo lỗi toán tử và migration chết ngay.
+Bản thi hành ép `att.attname::text`. Đặc tả §11 cần sửa theo (ghi lại ở đây để không lặp ở PR sau).
+
+**Phát sinh so với §16:** `tests/rls.test.ts` có assert "bảng BẬT RLS nhưng chưa khai" nên bật RLS
+làm nó đỏ **ngay ở PR1**, không đợi PR4 — đã khai nhóm `KE_HOACH`. Assert đó còn đòi cập nhật
+`PROJECT.md` + `docs/adr/0005-rls.md`: **bổ sung vào phạm vi PR4**.
+
+**⚠️ Ràng buộc thứ tự deploy:** PR1 làm `floor_stage_fronts.project_id` NOT NULL trên DB đã có dự
+án. Các đường đọc còn lại (`listFloorStageFronts`, `allProjectFloors`, `listStages`, baselines) vẫn
+chưa lọc dự án — đó là PR2/PR3. **Không deploy staging/production khi PR3 chưa vào.**
+
+**PR2 (xong, cùng PR #469):** `GET /api/baselines` chỉ trả baseline của dự án hiện tại; `POST` đếm
+task và snapshot `baseline_tasks` qua JOIN `tasks → work_packages → sheet_types → towers` lọc theo
+dự án (trước đây `INSERT ... SELECT ... FROM tasks` **không có WHERE**), ghi `project_id`, và bọc 2
+INSERT trong `withTransaction` (trước đây INSERT thứ 2 lỗi thì để lại baseline rỗng); `DELETE` trả
+404 khi baseline thuộc dự án khác. Thêm `tests/baselines.test.ts` (AC2/AC3) và **gỡ mục whitelist
+`baselines`** trong `tests/project-scope-invariant.test.ts` (sớm hơn PR4 vì test tự báo "mục thừa").
+
+**Bài học CI (PR1):** job `test (Postgres)` có bước cuối **"Kiểm ERD khớp schema"** (`npm run gen:erd`
+
+- `git diff --exit-code docs/ERD.md`) — mọi PR chạm schema phải sinh lại `docs/ERD.md` **ngay trong
+  PR đó**, không để sang PR tài liệu. Đã sinh lại. Toàn bộ 1580 ca test vẫn pass, chỉ bước ERD đỏ.
+
+**Tiếp theo:** PR3 (`construction_stages` + `floor_stage_fronts`
+đọc theo dự án, D3) → PR4 (gỡ whitelist, ERD, `PROJECT.md` + ADR-0005, tài liệu).
 
 ## 🚧 M122 — Hợp nhất "% kế hoạch" + trọng số theo giá trị BOQ (Giai đoạn 3, đang làm)
 

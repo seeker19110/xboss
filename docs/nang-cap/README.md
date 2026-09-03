@@ -415,7 +415,7 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > thị khối `trongSo` mà PR3 mới sinh ra, nên cùng nằm sau cổng dừng §17.2. Việc mở khoá: deploy,
 > mở `/boq`, đọc "Độ phủ ánh xạ BOQ", rồi chốt ngưỡng D1.
 
-> **`M123-project-id-cho-baseline-va-mat-tran.md`** — 📝 **Draft, CHỜ DUYỆT** (viết 2026-09-03).
+> **`M123-project-id-cho-baseline-va-mat-tran.md`** — 🚧 **Approved 2026-09-03 (PR #468), ĐANG TRIỂN KHAI** — PR1 (migration `0149` + `projectId` cho 2 hàm ghi mặt trận + RLS) đã xong; còn PR2/PR3/PR4.
 > Giai đoạn 4: đưa **3 bảng cuối của mảng kế hoạch vào trục dự án** — `baselines`,
 > `construction_stages`, `floor_stage_fronts`. Nợ này đã được ghi nhận chính thức trong whitelist
 > của `tests/project-scope-invariant.test.ts:70,79`. Ba lỗi thật đang mở: (a) `POST /api/baselines`
@@ -433,8 +433,8 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > `lib/tien-do/constructionStages.ts:83,127` **lỗi runtime ngay** ⇒ migration và 2 chỗ sửa đó phải
 > nằm **cùng PR1**. Migration đụng dữ liệu (`SET NOT NULL` + DROP UNIQUE) ⇒ **bắt buộc qua staging**.
 > Guardrail AC7: trên DB 1 dự án, số đếm 4 bảng và mọi số trên dashboard **không đổi**.
-> **Open decision chờ chốt lúc duyệt:** ai được sửa công tác dùng chung (`project_id IS NULL`) —
-> đề xuất chỉ Admin.
+> **D3 (chốt lúc duyệt):** công tác dùng chung (`project_id IS NULL`) chỉ **Admin** sửa/xoá; PM chỉ
+> tạo/sửa công tác của dự án mình.
 
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 

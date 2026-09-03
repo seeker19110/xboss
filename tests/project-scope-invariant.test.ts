@@ -67,7 +67,6 @@ const WHITELIST: Record<string, string> = {
 
   // --- Dữ liệu tracking gắn sheet_types (chưa tách project_id — nợ đa dự án đã biết) ---
   tasks: "lưới tracking scope theo sheet (?sheet=slug), nợ đa dự án đã biết",
-  baselines: "baseline gắn theo sheet/tracking, nợ đa dự án đã biết",
   approvals: "nhóm nghiệm thu theo sheet × tầng",
   lookahead: "kế hoạch ngắn hạn theo sheet/tracking",
   "my-tasks": "task theo assigned_to của người dùng hiện tại",
