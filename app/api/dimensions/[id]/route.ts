@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run, withTransaction } from "@/lib/db";
+import { queryOne, withTransaction } from "@/lib/db";
 import { recomputeTask } from "@/lib/tien-do/recompute";
+import { ghiDauVetTick } from "@/lib/tien-do/dimension-events";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { handoverBlocked, methodStatementBlocked } from "@/lib/ky-thuat/qaqc";
 
 export const dynamic = "force-dynamic";
+
+// Giới hạn độ dài ghi chú theo ô (M120 §12) — ghi chú là gợi ý ngắn tại hiện trường
+// ("chờ vật tư", "lệch cao độ"), nội dung dài thuộc về bình luận task.
+const MAX_NOTE_LEN = 500;
 
 // PATCH /api/dimensions/:id  body: { installed: boolean }  → toggle + tính lại % task/package.
 // Bọc trong transaction: update dimension + recompute phải atomic để tránh
@@ -32,6 +37,17 @@ export async function PATCH(
   const body = await req.json().catch(() => ({}));
   const installed = body.installed ? 1 : 0;
 
+  // Ghi chú theo ô (M120 FR3): trim, rỗng → NULL, tối đa 500 ký tự (chặn ở đây để không
+  // để Postgres từ chối thành lỗi 500). Bỏ tick thì ghi chú bị xoá cùng dấu vết lắp (D2),
+  // nên `note` client gửi kèm installed=false không có tác dụng.
+  let note: string | null = null;
+  if (body.note !== undefined && body.note !== null) {
+    const t = String(body.note).trim();
+    if (t.length > MAX_NOTE_LEN)
+      return NextResponse.json({ error: `Ghi chú tối đa ${MAX_NOTE_LEN} ký tự` }, { status: 422 });
+    note = t || null;
+  }
+
   const dim = await queryOne<{ task_id: number; package_id: number }>(
     `SELECT pd.task_id, t.package_id
        FROM progress_dimensions pd JOIN tasks t ON t.id = pd.task_id
@@ -56,12 +72,9 @@ export async function PATCH(
   }
 
   const result = await withTransaction(async () => {
-    await run(
-      `UPDATE progress_dimensions SET installed = ?, value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      installed,
-      installed,
-      id,
-    );
+    // Dữ liệu sự kiện theo ô (M120 FR1) — luật ai/lúc nào/ghi chú nằm trong lib dùng chung,
+    // route chỉ là ranh giới HTTP (ADR-0008). `installedAt`/`installedBy` client gửi bị bỏ qua.
+    await ghiDauVetTick([id], !!installed, { userId: user.id, note });
     return recomputeTask(dim.task_id, user.name);
   });
 

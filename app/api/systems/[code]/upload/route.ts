@@ -69,7 +69,7 @@ export async function POST(
     if (kind === "ke_hoach") {
       result = await parsePlanUpload(systemId, projectId, buffer, user.name);
     } else {
-      result = await parseTrackingUpload(systemId, projectId, buffer, user.name);
+      result = await parseTrackingUpload(systemId, projectId, buffer, user.name, user.id);
     }
 
     // Lưu file gốc
