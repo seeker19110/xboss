@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, run, withTransaction } from "@/lib/db";
+import { query, withTransaction } from "@/lib/db";
 import { recomputeTask } from "@/lib/tien-do/recompute";
+import { ghiDauVetTick } from "@/lib/tien-do/dimension-events";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
@@ -72,13 +73,10 @@ export async function PATCH(req: NextRequest) {
 
   const dimIds = dims.map((d) => d.id);
   await withTransaction(async () => {
-    const ph = dimIds.map(() => "?").join(", ");
-    await run(
-      `UPDATE progress_dimensions SET installed = ?, value = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${ph})`,
-      installed,
-      installed,
-      ...dimIds,
-    );
+    // Dữ liệu sự kiện (M120 FR2) — cùng lib dùng chung với PATCH đơn. Không truyền `note`:
+    // ghi chú là việc của từng ô, gán chung cả vùng chọn sẽ ra dữ liệu vô nghĩa (ghi chú cũ
+    // của các ô được giữ nguyên khi tick, và bị xoá cùng dấu vết lắp khi bỏ tick).
+    await ghiDauVetTick(dimIds, !!installed, { userId: user.id });
     for (const tid of taskIds) await recomputeTask(tid, user.name);
   });
 

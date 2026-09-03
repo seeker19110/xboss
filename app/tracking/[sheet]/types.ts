@@ -35,7 +35,15 @@ export type Data = {
 };
 export type UserItem = { id: number; name: string; role: string };
 
-export type Cell = { id: number; installed: boolean };
+// Ô lưới + dữ liệu sự kiện tick (M120). 3 trường sau NULL với ô chưa tick và với ô đã tick
+// TRƯỚC khi M120 triển khai — UI phải chịu được NULL, không giả định luôn có người/ngày.
+export type Cell = {
+  id: number;
+  installed: boolean;
+  installedAt?: string | null;
+  installedByName?: string | null;
+  note?: string | null;
+};
 export type GridTask = {
   id: number;
   code: string;
@@ -49,6 +57,9 @@ export type GridTask = {
   delayReason: string | null;
   startDate: string | null;
   endDate: string | null;
+  // Ngày thực tế suy từ chuỗi tick (M120) — chỉ đọc, không sửa được từ UI.
+  actualStartDate?: string | null;
+  actualEndDate?: string | null;
   custom: Record<string, unknown>;
   cells: Record<string, Cell>;
 };

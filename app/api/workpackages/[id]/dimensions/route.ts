@@ -20,8 +20,23 @@ type TaskRow = {
   startDate: string | null;
   endDate: string | null;
   custom: Record<string, unknown>;
+  // Ngày thực tế (M120) — suy tự động từ chuỗi tick, chỉ đọc ở UI. NULL với task chưa bắt
+  // đầu và với task đã xong TRƯỚC khi M120 triển khai (không có nguồn để backfill).
+  actualStartDate: string | null;
+  actualEndDate: string | null;
 };
-type DimRow = { id: number; taskId: number; label: string; installed: number };
+type DimRow = {
+  id: number;
+  taskId: number;
+  label: string;
+  installed: number;
+  // Dữ liệu sự kiện theo ô (M120) — NULL với ô chưa tick và với ô đã tick TRƯỚC khi M120
+  // triển khai (không backfill được: không có nguồn dữ liệu nào cho ai/lúc nào).
+  installedAt: string | null;
+  installedBy: number | null;
+  installedByName: string | null;
+  note: string | null;
+};
 
 // GET /api/workpackages/:id/dimensions → ma trận sub-task × dimension (kiểu lưới Excel).
 export async function GET(
@@ -42,6 +57,7 @@ export async function GET(
             t.boq_code AS "boqCode", t.drawing_url AS "drawingUrl",
             t.assigned_to AS "assignedTo", u.name AS "assigneeName", t.delay_reason AS "delayReason",
             t.start_date AS "startDate", t.end_date AS "endDate", t.custom,
+            t.actual_start_date AS "actualStartDate", t.actual_end_date AS "actualEndDate",
             COALESCE(pc.cnt, 0) AS "photoCount",
             COALESCE(cc.cnt, 0) AS "commentCount"
        FROM tasks t
@@ -52,10 +68,16 @@ export async function GET(
     pkgId,
   );
 
+  // LEFT JOIN users: tên người tick để hiện tooltip ngay trên lưới, không phải gọi thêm
+  // route lẻ mỗi lần rê chuột. LEFT (không INNER) vì `installed_by` NULL với ô chưa tick,
+  // ô tick trước M120, và ô do import/seed ghi khi không có người dùng.
   const dims = await query<DimRow>(
-    `SELECT pd.id, pd.task_id AS "taskId", pd.dimension_label AS label, pd.installed
+    `SELECT pd.id, pd.task_id AS "taskId", pd.dimension_label AS label, pd.installed,
+            pd.installed_at AS "installedAt", pd.installed_by AS "installedBy",
+            u.name AS "installedByName", pd.note
        FROM progress_dimensions pd
        JOIN tasks t ON pd.task_id = t.id
+       LEFT JOIN users u ON u.id = pd.installed_by
       WHERE t.package_id = ?
       ORDER BY pd.sort_order, pd.id`,
     pkgId,
@@ -70,10 +92,25 @@ export async function GET(
       columns.push(d.label);
     }
 
-  const byTask = new Map<number, Record<string, { id: number; installed: boolean }>>();
+  type Cell = {
+    id: number;
+    installed: boolean;
+    installedAt: string | null;
+    installedByName: string | null;
+    note: string | null;
+  };
+  const byTask = new Map<number, Record<string, Cell>>();
   for (const d of dims) {
     if (!byTask.has(d.taskId)) byTask.set(d.taskId, {});
-    byTask.get(d.taskId)![d.label] = { id: d.id, installed: !!d.installed };
+    // Không trả `installedBy` (id) ra lưới: UI chỉ cần TÊN để hiện tooltip, id không dùng
+    // tới và là dữ liệu người dùng thừa trên đường truyền (M120 §12 privacy).
+    byTask.get(d.taskId)![d.label] = {
+      id: d.id,
+      installed: !!d.installed,
+      installedAt: d.installedAt,
+      installedByName: d.installedByName,
+      note: d.note,
+    };
   }
 
   const rows = tasks.map((t) => ({ ...t, cells: byTask.get(t.id) ?? {} }));

@@ -348,20 +348,22 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 
 ## Đặc tả CHỜ DUYỆT — cải thiện kế hoạch/tiến độ/tracking (viết 2026-09-02)
 
-> **`M120-du-lieu-su-kien-theo-o.md`** — 📝 **Draft, chờ người dùng duyệt.** Giai đoạn 1 của lộ
-> trình rà soát mảng kế hoạch/tiến độ/tracking (Giai đoạn 0 — khoá bất biến
-> `hoan_thanh ⇔ progress>=1` + audit trail đổi status thủ công — đã xong ở PR #458, xem
-> `PROGRESS.md`). Nội dung: 4 cột sự kiện trên `progress_dimensions`
-> (`installed_at`/`installed_by`/`note`/`qty`) + 2 cột ngày thực tế trên `tasks`
-> (`actual_start_date`/`actual_end_date`, **suy tự động** trong `recomputeTask`, không nhập tay),
-> gắn ở cả 4 đường ghi ô tick (2 route dimension + import Excel + upload M64), trả ra 3 route GET,
-> tooltip "ai tick — ngày nào" trên lưới. `migrations/0148` thuần thêm cột NULL-able + 1 index →
-> đi thẳng production. **Cột `qty` chỉ THU THẬP, không vào công thức %** — đổi % sang trọng số là
-> việc của giai đoạn sau, cần quyết định riêng. 5 PR (`spec`/`spec`/`standard`/`standard`/`mechanical`);
-> PR1–PR2 chạm `lib/tien-do/recompute.ts` (vùng rủi ro cao `docs/audit.md`) nên bắt buộc qua
-> `reviewer`. **3 quyết định còn chờ người dùng chốt** (§18): D1 `actual_start_date` có tự xoá khi
-> progress về 0 không · D2 bỏ tick có xoá `installed_by`/`note` không · R1 có giữ `qty` trong M120
-> không hay tách sang đợt sau.
+> **`M120-du-lieu-su-kien-theo-o.md`** — ✅ **Approved 2026-09-03 và ĐÃ TRIỂN KHAI XONG** (PR
+> #460). Giai đoạn 1 của lộ trình rà soát mảng kế hoạch/tiến độ/tracking (Giai đoạn 0 — khoá bất
+> biến `hoan_thanh ⇔ progress>=1` + audit trail đổi status thủ công — đã xong ở PR #458). Đã làm:
+> 3 cột sự kiện trên `progress_dimensions` (`installed_at`/`installed_by`/`note`) + 2 cột ngày
+> thực tế trên `tasks` (`actual_start_date`/`actual_end_date`, **suy tự động** qua
+> `capNhatNgayThucTe`, không nhập tay) — `migrations/0148` thuần thêm cột NULL-able + 1 index;
+> `lib/tien-do/dimension-events.ts::ghiDauVetTick` là nơi duy nhất quyết định 3 cột sự kiện, dùng
+> chung ở cả 4 đường ghi ô (2 route dimension + import Excel + upload M64); 3 route GET trả trường
+> mới; tooltip "ai tick — ngày nào" + icon ghi chú trên lưới; ngày thực tế trong `DateEditModal`.
+> **3 quyết định đã chốt** (§18): D1 `actual_start_date` KHÔNG bao giờ tự xoá kể cả progress về 0 ·
+> D2 bỏ tick XOÁ `installed_by`/`note` (cần lịch sử từng lần toggle → bảng sự kiện riêng, đợt sau) ·
+> R1 cột `qty` TÁCH khỏi M120, để Giai đoạn 3 quyết cùng công thức % có trọng số.
+> **Giai đoạn 2+ của lộ trình chưa làm** (mỗi giai đoạn cần đặc tả riêng): nối UI vào 2 API bulk
+> đã có (`/api/dimensions/batch`, `/api/tasks/batch`), chọn vùng + Undo trên lưới, hợp nhất 4 cách
+> tính "% kế hoạch", `project_id` cho `baselines`/`construction_stages`/`floor_stage_fronts`, và
+> chuyển từ theo dõi tiến độ sang lập lịch thật (phụ thuộc cấp task, lag, lịch làm việc, milestone).
 
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 

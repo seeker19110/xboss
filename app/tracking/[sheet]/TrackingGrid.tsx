@@ -22,6 +22,7 @@ import {
   Lock,
   ShieldAlert,
   WifiOff,
+  StickyNote,
 } from "lucide-react";
 import { enqueuePhoto, offlineQueue } from "@/app/components/offlineQueue";
 import CustomFieldsSection from "@/app/components/CustomFieldsSection";
@@ -31,10 +32,30 @@ import { DELAY_REASON_LABEL } from "@/lib/tien-do/delay";
 import { ROLE_LABELS } from "@/lib/nen/roles";
 import { fetchMe } from "@/app/lib/me";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/tien-do/status";
-import { formatDateTimeVN } from "@/lib/nen/date";
+import { formatDateTimeVN, formatDateVN } from "@/lib/nen/date";
 import { StatusBadge } from "@/app/components/StatusBadge";
 import { DateEditModal } from "./DateEditModal";
 import type { Pkg, Cell, GridTask, Grid } from "./types";
+
+// Mô tả sự kiện tick của 1 ô (M120) — dùng cho cả `title` (rê chuột) lẫn `aria-label`
+// (bàn phím/đọc màn hình), nên phải là chuỗi thuần, không phải JSX.
+// Ô chưa tick → chuỗi rỗng (không có gì để nói). Ô tick TRƯỚC khi M120 triển khai không có
+// dữ liệu sự kiện — nói thẳng "Không rõ người tick" thay vì bịa hoặc để trống khó hiểu.
+export function moTaSuKienO(cell: Cell): string {
+  if (!cell.installed) return "";
+  const phan: string[] = [];
+  if (cell.installedByName || cell.installedAt) {
+    phan.push(
+      `Tick bởi ${cell.installedByName ?? "không rõ"}${
+        cell.installedAt ? ` · ${formatDateVN(cell.installedAt)}` : ""
+      }`,
+    );
+  } else {
+    phan.push("Không rõ người tick");
+  }
+  if (cell.note) phan.push(`Ghi chú: ${cell.note}`);
+  return phan.join(" · ");
+}
 
 // Ngày rút gọn d/M cho dòng task (đỡ chiếm chỗ trên lưới).
 const fmtShortDate = (d: string | null) => {
@@ -128,6 +149,9 @@ export function TrackingGrid({
   const [datesTarget, setDatesTarget] = useState<{
     ids: number[];
     init: { start: string; end: string };
+    // Ngày thực tế (M120) — chỉ hiện để đối chiếu với ngày kế hoạch đang sửa, không sửa
+    // được. Bỏ trống khi sửa hàng loạt (mỗi task một bộ ngày thực tế khác nhau).
+    actual?: { start: string | null; end: string | null };
   } | null>(null);
   const drawingInputRef = useRef<HTMLInputElement>(null);
   const bbntInputRef = useRef<HTMLInputElement>(null);
@@ -1593,6 +1617,7 @@ export function TrackingGrid({
                       setDatesTarget({
                         ids: [t.id],
                         init: { start: t.startDate ?? "", end: t.endDate ?? "" },
+                        actual: { start: t.actualStartDate ?? null, end: t.actualEndDate ?? null },
                       });
                     const baseCell = `border-b border-r border-zinc-800 px-1 py-1 text-center align-middle text-[10px] whitespace-nowrap`;
                     const dateCls = `${baseCell} ${inherited ? "text-zinc-600 italic" : "text-zinc-400"} ${ce ? "cursor-pointer hover:bg-zinc-800" : ""}`;
@@ -1642,16 +1667,28 @@ export function TrackingGrid({
                       >
                         {cell ? (
                           <label
-                            className={`flex items-center justify-center w-full h-full min-h-[44px] ${editMode ? "cursor-pointer" : "cursor-default"}`}
+                            className={`relative flex items-center justify-center w-full h-full min-h-[44px] ${editMode ? "cursor-pointer" : "cursor-default"}`}
+                            title={moTaSuKienO(cell)}
                           >
                             <input
                               type="checkbox"
                               checked={cell.installed}
                               onChange={() => editMode && toggle(cell, t, col)}
                               disabled={!editMode}
-                              aria-label={`${col} · ${t.name}`}
+                              // Dữ liệu sự kiện đưa thẳng vào aria-label thay vì chỉ `title`:
+                              // `title` chỉ hiện khi rê chuột, người dùng bàn phím/đọc màn
+                              // hình sẽ không bao giờ nghe được (M120 NFR3).
+                              aria-label={`${col} · ${t.name}${cell.installed ? ` · ${moTaSuKienO(cell)}` : ""}`}
                               className={`w-4 h-4 accent-emerald-500 ${editMode ? "cursor-pointer" : "cursor-default opacity-60"}`}
                             />
+                            {cell.note ? (
+                              // Ô có ghi chú: đánh dấu bằng ICON, không chỉ bằng màu (NFR3).
+                              // aria-hidden vì nội dung ghi chú đã nằm trong aria-label ở trên.
+                              <StickyNote
+                                className="absolute top-0.5 right-0.5 w-3 h-3 text-amber-400"
+                                aria-hidden="true"
+                              />
+                            ) : null}
                           </label>
                         ) : (
                           <span className="flex items-center justify-center min-h-[44px] text-zinc-700">

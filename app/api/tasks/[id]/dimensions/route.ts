@@ -24,9 +24,15 @@ export async function GET(
   if (!(await canTouchTask(user, id)))
     return NextResponse.json({ error: "Không có quyền xem dimension task này" }, { status: 403 });
 
+  // Kèm dữ liệu sự kiện theo ô (M120) — cùng bộ trường với lưới nhóm để client dùng chung
+  // một kiểu dữ liệu. LEFT JOIN users vì `installed_by` NULL ở ô chưa tick / tick trước M120.
   const dimensions = await query(
-    `SELECT id, dimension_label AS label, installed, value
-       FROM progress_dimensions WHERE task_id = ? ORDER BY id`,
+    `SELECT pd.id, pd.dimension_label AS label, pd.installed, pd.value,
+            pd.installed_at AS "installedAt", pd.installed_by AS "installedBy",
+            u.name AS "installedByName", pd.note
+       FROM progress_dimensions pd
+       LEFT JOIN users u ON u.id = pd.installed_by
+      WHERE pd.task_id = ? ORDER BY pd.sort_order, pd.id`,
     id,
   );
 

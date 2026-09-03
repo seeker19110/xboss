@@ -1,5 +1,62 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ M120 — Dữ liệu sự kiện theo ô tick & ngày thực tế của task (Giai đoạn 1, 2026-09-03, PR #460)
+
+`docs/nang-cap/M120-du-lieu-su-kien-theo-o.md` (Approved 2026-09-03). Giai đoạn 1 của lộ trình rà
+soát mảng kế hoạch/tiến độ/tracking; Giai đoạn 0 đã xong ở PR #458. Trước M120 lưới tracking chỉ
+lưu `installed` 0/1 — không trả lời được "ô này ai tick, lúc nào", và không có ngày thực tế nào để
+so với ngày kế hoạch (SPI chỉ dựa vào % tại thời điểm).
+
+**3 quyết định người dùng chốt trước khi code** (đặc tả §18):
+
+- **D1** — `actual_start_date` **không bao giờ tự xoá**, kể cả khi progress về 0: công việc đã từng
+  bắt đầu là sự thật lịch sử, bỏ tick là sửa sai chứ không phải "chưa từng làm".
+- **D2** — bỏ tick **xoá** `installed_at`/`installed_by`/`note`: ô không ở trạng thái đã lắp thì
+  không giữ dấu vết lắp. Đây là mất dấu vết **có chủ đích**; muốn lịch sử đầy đủ từng lần toggle
+  thì phải sang phương án bảng sự kiện riêng (scope gấp ~3), để đợt sau.
+- **R1** — cột `qty` (khối lượng theo ô) **tách khỏi M120**: chỉ có nghĩa khi đi kèm đổi công thức
+  % sang trọng số = Giai đoạn 3. Tạo trước sẽ thành cột chết thứ hai bên cạnh `value`.
+
+**Đã làm (4 commit trên nhánh `claude/m120-trien-khai`):**
+
+- `migrations/0148_dimension_events.sql` — thuần thêm: `progress_dimensions.installed_at/
+installed_by/note`, `tasks.actual_start_date/actual_end_date`, index một phần
+  `idx_dims_installed_at`. Không `UPDATE`/backfill dòng nào → đi thẳng production.
+- `capNhatNgayThucTe` (`lib/tien-do/recompute.ts`) — suy ngày thực tế từ % vừa ghi: >0 đặt ngày bắt
+  đầu, =1 đặt ngày kết thúc, tụt <1 xoá ngày kết thúc, ngày bắt đầu giữ vĩnh viễn (D1). Điều kiện
+  nằm trong `WHERE` nên không thêm lần ghi thừa nào. Gọi từ `recomputeTask` (trong cùng transaction,
+  dưới cùng khoá `FOR UPDATE`) **và** từ `PATCH /api/tasks/:id/progress` — task không có ô dimension
+  chỉ đi đường thứ hai, thiếu chỗ đó là mất ngày thực tế của cả nhóm task nhập % tay.
+- `lib/tien-do/dimension-events.ts::ghiDauVetTick` (mới) — **nơi duy nhất** quyết định 3 cột sự
+  kiện, dùng chung ở 3 đường ghi ô (`PATCH /api/dimensions/:id`, `/api/dimensions/batch`,
+  `parseTrackingUpload` của M64); đường thứ 4 (import Excel) đóng dấu ngay trong câu `INSERT` lưới
+  bằng `source.importedBy` sẵn có. Gom về một chỗ vì 2 bản SQL song song là cách chắc chắn nhất để
+  luật trôi khỏi nhau. `installed_at`/`installed_by` **luôn do server đặt** — body có gửi cũng bị
+  bỏ qua (chống giả mạo mốc thời gian/người tick), có test khoá.
+- `PATCH /api/dimensions/:id` nhận thêm `note` (≤500 ký tự → 422, trim, rỗng → NULL).
+- 3 route GET trả trường mới; lưới hiện tooltip "Tick bởi X · dd/MM/yyyy" (+ ghi chú) đặt vào **cả**
+  `title` lẫn `aria-label` (title một mình thì người dùng bàn phím/đọc màn hình không nghe được),
+  icon `StickyNote` cho ô có ghi chú (không truyền tin chỉ bằng màu), `DateEditModal` hiện 2 ngày
+  thực tế chỉ đọc cạnh ô nhập ngày kế hoạch.
+- Test: `tests/dimension-events.test.ts` (7 ca — AC1/AC2/AC3/AC8 + no-op danh sách rỗng + ca chặn
+  hồi quy "còn `UPDATE progress_dimensions SET installed` rời rạc ngoài lib") và 2 ca AC4–AC7 trong
+  `tests/recompute.test.ts`. **1540 ca pass trên Postgres 16 thật, 0 fail** (dựng cụm Postgres cục
+  bộ để chạy đủ phần tích hợp, không dựa vào CI phát hiện hộ).
+
+**Hạn chế đã biết, ghi rõ để không hiểu nhầm:**
+
+- Ô đã tick **trước** M120 giữ NULL cả 3 cột — không backfill được vì không có nguồn dữ liệu nào cho
+  "ai tick, lúc nào". UI hiện "Không rõ người tick" cho các ô này.
+- Tick offline mang **giờ đồng bộ**, không phải giờ tick thật (R2 §18: nhận `clientTickedAt` là mở
+  đường giả mạo mốc thời gian, chỉ làm khi có nhu cầu thật kèm cách chống giả mạo).
+
+**Giai đoạn 2+ của lộ trình chưa làm** (mỗi giai đoạn cần đặc tả riêng): nối UI vào 2 API bulk đã có
+sẵn nhưng chưa có consumer (`/api/dimensions/batch`, `/api/tasks/batch`) + chọn vùng/Undo trên lưới;
+hợp nhất 4 cách tính "% kế hoạch" song song (scurve/spi/evm/hub `/schedule`) và quyết định trọng số;
+`project_id` cho `baselines`/`construction_stages`/`floor_stage_fronts`; atomic hoá `DELETE
+.../dimensions/column?allGroups=true`; và chuyển từ **theo dõi tiến độ** sang **lập lịch thật**
+(phụ thuộc cấp task, lag/loại quan hệ, lịch làm việc/ngày nghỉ, milestone, CPM biết tiến độ thực).
+
 ## Khoá bất biến `hoan_thanh ⇔ progress>=1` + audit trail đổi status thủ công (Giai đoạn 0 đợt rà soát tiến độ/tracking, 2026-09-02)
 
 Rà soát toàn diện mảng kế hoạch/lịch/lưới tracking (3 khảo sát song song: mô hình kế hoạch/CPM/

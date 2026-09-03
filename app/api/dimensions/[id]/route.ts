@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run, withTransaction } from "@/lib/db";
+import { queryOne, withTransaction } from "@/lib/db";
 import { recomputeTask } from "@/lib/tien-do/recompute";
+import { chuanHoaGhiChuO, ghiDauVetTick } from "@/lib/tien-do/dimension-events";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
@@ -8,7 +9,8 @@ import { handoverBlocked, methodStatementBlocked } from "@/lib/ky-thuat/qaqc";
 
 export const dynamic = "force-dynamic";
 
-// PATCH /api/dimensions/:id  body: { installed: boolean }  → toggle + tính lại % task/package.
+// PATCH /api/dimensions/:id  body: { installed: boolean, note?: string | null }
+//   → toggle + tính lại % task/package.
 // Bọc trong transaction: update dimension + recompute phải atomic để tránh
 // 2 tick đồng thời tính sai % (đọc cùng snapshot rồi cả 2 cùng ghi).
 export async function PATCH(
@@ -31,6 +33,13 @@ export async function PATCH(
 
   const body = await req.json().catch(() => ({}));
   const installed = body.installed ? 1 : 0;
+
+  // Ghi chú theo ô (M120 FR3) — chuẩn hoá bằng lib dùng chung (ADR-0008: route chỉ là ranh
+  // giới HTTP). Bỏ tick thì ghi chú bị xoá cùng dấu vết lắp (D2) nên `note` gửi kèm
+  // installed=false không có tác dụng.
+  const gc = chuanHoaGhiChuO(body.note);
+  if (!gc.ok) return NextResponse.json({ error: gc.error }, { status: 422 });
+  const note = gc.note;
 
   const dim = await queryOne<{ task_id: number; package_id: number }>(
     `SELECT pd.task_id, t.package_id
@@ -56,12 +65,9 @@ export async function PATCH(
   }
 
   const result = await withTransaction(async () => {
-    await run(
-      `UPDATE progress_dimensions SET installed = ?, value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      installed,
-      installed,
-      id,
-    );
+    // Dữ liệu sự kiện theo ô (M120 FR1) — luật ai/lúc nào/ghi chú nằm trong lib dùng chung,
+    // route chỉ là ranh giới HTTP (ADR-0008). `installedAt`/`installedBy` client gửi bị bỏ qua.
+    await ghiDauVetTick([id], !!installed, { userId: user.id, note });
     return recomputeTask(dim.task_id, user.name);
   });
 

@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
 import { query, queryOne, withTransaction } from "@/lib/db";
 import { recomputeTask } from "@/lib/tien-do/recompute";
+import { ghiDauVetTick } from "@/lib/tien-do/dimension-events";
 import {
   buildTrackingTab,
   safeTabName,
@@ -269,6 +270,9 @@ export async function parseTrackingUpload(
   projectId: number | null,
   buffer: Buffer,
   changedBy: string,
+  // id người tải file — dùng làm `installed_by` cho ô được đánh dấu đã lắp (M120 FR4).
+  // Tuỳ chọn để đường gọi cũ (test/script) không phải sửa; NULL thì ô chỉ có mốc thời gian.
+  uploadedBy?: number | null,
 ): Promise<UploadResult> {
   const wb = XLSX.read(buffer, { type: "buffer", cellDates: true, raw: true });
   if (wb.SheetNames.length === 0) {
@@ -363,13 +367,9 @@ export async function parseTrackingUpload(
             continue;
           }
 
-          const installedVal = isInstalled ? 1 : 0;
-          await query(
-            `UPDATE progress_dimensions SET installed = ?, value = ? WHERE id = ?`,
-            installedVal,
-            installedVal,
-            dimId,
-          );
+          // Dữ liệu sự kiện (M120 FR4) — cùng lib dùng chung với tick từ lưới: đã lắp thì
+          // đóng dấu thời điểm upload + người upload, chưa lắp thì xoá sạch dấu vết lắp (D2).
+          await ghiDauVetTick([dimId], isInstalled, { userId: uploadedBy ?? null });
         }
 
         // recompute cho task (nó tự cascade cập nhật work package progress)

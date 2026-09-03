@@ -4,9 +4,9 @@
 | ---------------- | ----------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Giai đoạn 1 của lộ trình cải thiện kế hoạch/tiến độ/tracking (rà soát 2026-09-02). Giai đoạn 0 đã xong ở PR #458. |
 | Spec owner       | Phiên chính (opusplan)                                                                                            |
-| State            | **Draft — chờ người dùng duyệt**                                                                                  |
-| Người/ngày duyệt | (chưa)                                                                                                            |
-| Cập nhật         | 2026-09-02                                                                                                        |
+| State            | **Approved for implementation**                                                                                   |
+| Người/ngày duyệt | Người dùng · 2026-09-03 (chốt D1/D2/R1 theo đề xuất, xem §18)                                                     |
+| Cập nhật         | 2026-09-03                                                                                                        |
 
 > Không code khi chưa **Approved for implementation**.
 
@@ -55,8 +55,8 @@ thời gian thực** mà hệ chưa có — đây là lý do OS-3 bị khoá b�
 **Guardrail (dừng/rollback nếu vi phạm):**
 
 - Tick đơn / batch không được chậm thêm quá 50ms p95 → nếu vượt, revert.
-- Không đổi bất kỳ con số `progress_percent` / `work_packages.progress` nào đang có: cột `qty`
-  chỉ **thu thập**, KHÔNG tham gia công thức % trong M120 (xem §5 non-goals).
+- Không đổi bất kỳ con số `progress_percent` / `work_packages.progress` nào đang có: M120 chỉ
+  **thêm dữ liệu sự kiện**, không đụng công thức % (xem §5 non-goals).
 - Migration phải thuần thêm (`ADD COLUMN`/`CREATE INDEX`) → đi thẳng production theo
   `CLAUDE.md`; không `UPDATE`/backfill dữ liệu hiện có.
 
@@ -99,12 +99,12 @@ trên `progress_dimensions` (kiểm bằng grep `0049`, `0147`).
 
 ## 4. Phương án
 
-| Phương án                                                                                                                | Lợi ích                                                                                                         | Chi phí/rủi ro                                                                                                                                       | Kết luận                                                     |
-| ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| **Không làm**                                                                                                            | 0 rủi ro                                                                                                        | Vĩnh viễn không trả lời được "ai tick, lúc nào"; khoá cứng mọi phân tích năng suất và OS-3                                                           | Bác                                                          |
-| **A. Thêm cột trên `progress_dimensions`** (`installed_at`, `installed_by`, `note`, `qty`) + suy `actual_*` trên `tasks` | Rẻ nhất; 1 migration thuần thêm; không đổi công thức %; đọc trong cùng câu SELECT sẵn có (không thêm JOIN nặng) | Chỉ giữ được **trạng thái hiện tại** của ô (bỏ tick → mất mốc cũ), không có lịch sử đầy đủ từng lần tick                                             | **Chọn**                                                     |
-| **B. Bảng sự kiện riêng `dimension_events`** (append-only, mỗi tick 1 dòng)                                              | Lịch sử đầy đủ, không mất khi bỏ tick; nền cho phân tích năng suất sâu                                          | Bảng lớn nhanh (200 ô × N task × mỗi lần toggle); phải thêm retention; đọc lưới cần JOIN/aggregate → chạm đúng đường nóng nhất của app; scope gấp ~3 | Hoãn — mở lại khi có nhu cầu thật về lịch sử từng lần toggle |
-| **C. Gắn trigger `audit_row_change()` (0049) lên `progress_dimensions`**                                                 | Gần như 0 dòng code                                                                                             | Ghi audit cho MỌI thay đổi kể cả `sort_order` khi thêm cột → phình bảng audit; không phục vụ được UI (không đọc ra để hiện tooltip được)             | Bác                                                          |
+| Phương án                                                                                                         | Lợi ích                                                                                                         | Chi phí/rủi ro                                                                                                                                       | Kết luận                                                     |
+| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Không làm**                                                                                                     | 0 rủi ro                                                                                                        | Vĩnh viễn không trả lời được "ai tick, lúc nào"; khoá cứng mọi phân tích năng suất và OS-3                                                           | Bác                                                          |
+| **A. Thêm cột trên `progress_dimensions`** (`installed_at`, `installed_by`, `note`) + suy `actual_*` trên `tasks` | Rẻ nhất; 1 migration thuần thêm; không đổi công thức %; đọc trong cùng câu SELECT sẵn có (không thêm JOIN nặng) | Chỉ giữ được **trạng thái hiện tại** của ô (bỏ tick → mất mốc cũ), không có lịch sử đầy đủ từng lần tick                                             | **Chọn**                                                     |
+| **B. Bảng sự kiện riêng `dimension_events`** (append-only, mỗi tick 1 dòng)                                       | Lịch sử đầy đủ, không mất khi bỏ tick; nền cho phân tích năng suất sâu                                          | Bảng lớn nhanh (200 ô × N task × mỗi lần toggle); phải thêm retention; đọc lưới cần JOIN/aggregate → chạm đúng đường nóng nhất của app; scope gấp ~3 | Hoãn — mở lại khi có nhu cầu thật về lịch sử từng lần toggle |
+| **C. Gắn trigger `audit_row_change()` (0049) lên `progress_dimensions`**                                          | Gần như 0 dòng code                                                                                             | Ghi audit cho MỌI thay đổi kể cả `sort_order` khi thêm cột → phình bảng audit; không phục vụ được UI (không đọc ra để hiện tooltip được)             | Bác                                                          |
 
 **Lý do chọn A:** phần lớn giá trị nghiệp vụ nằm ở "ô này ai tick, ngày nào" (trạng thái hiện
 tại), không phải ở "ô này từng bị toggle 7 lần". Bỏ tick là thao tác sửa sai hiếm; khi đó mốc
@@ -115,7 +115,7 @@ sau này mà không phải sửa A (cột vẫn đúng nghĩa "lần tick hiện
 
 **Trong scope:**
 
-1. 4 cột mới trên `progress_dimensions`: `installed_at`, `installed_by`, `note`, `qty`.
+1. 3 cột mới trên `progress_dimensions`: `installed_at`, `installed_by`, `note`.
 2. 2 cột mới trên `tasks`: `actual_start_date`, `actual_end_date` — suy **tự động**, không nhập tay.
 3. Gắn dữ liệu sự kiện ở cả 4 đường ghi (§3).
 4. Trả các trường mới trong 2 route GET dimension + route GET task.
@@ -124,8 +124,10 @@ sau này mà không phải sửa A (cột vẫn đúng nghĩa "lần tick hiện
 
 **Non-goals (nói rõ để không bị nhặt thêm khi code):**
 
-- ❌ **`qty` KHÔNG tham gia công thức %** trong M120 — chỉ thu thập. Đổi % sang trọng số khối
-  lượng là Giai đoạn 3 (hợp nhất 4 cách tính "% kế hoạch"), cần quyết định riêng của người dùng.
+- ❌ **Không tạo cột `qty`** (khối lượng theo ô) — quyết định R1 (§18, chốt 2026-09-03). `qty`
+  chỉ có nghĩa khi đi kèm đổi công thức % sang trọng số khối lượng = Giai đoạn 3 (hợp nhất 4
+  cách tính "% kế hoạch"); tạo cột trước sẽ thành cột chết thứ hai bên cạnh `value`.
+- ❌ **Không đổi công thức %** — M120 không đụng `progressFromChecks`/`recomputePackage`.
 - ❌ Không backfill `installed_at`/`installed_by` cho ô đã tick trước đây (không có nguồn dữ liệu).
 - ❌ Không sửa `value` (cột chết) — giữ nguyên hành vi, đánh dấu deprecated trong comment migration.
 - ❌ Không lưu **thời điểm tick thật khi offline** (dùng giờ server lúc đồng bộ — xem §18 R2).
@@ -190,7 +192,7 @@ transaction** theo đúng 3 luật:
 qua hàm dùng chung — hai đường ghi % không được cho ra 2 kết quả ngày thực tế khác nhau.
 
 **FR7** — `GET /api/workpackages/:id/dimensions` và `GET /api/tasks/:id/dimensions` trả thêm
-`installedAt`, `installedBy` (id), `installedByName` (JOIN `users.name`), `note`, `qty`.
+`installedAt`, `installedBy` (id), `installedByName` (JOIN `users.name`), `note`.
 
 **FR8** — `GET /api/tasks/:id` (và câu SELECT task trong route PATCH) trả thêm
 `actualStartDate`, `actualEndDate`.
@@ -300,7 +302,6 @@ Giữ nguyên `MAX_IDS = 1000` và mọi mã lỗi hiện có.
   "installedBy": 4,
   "installedByName": "Nguyễn Văn A",
   "note": null,
-  "qty": null,
 }
 ```
 
@@ -326,16 +327,15 @@ lỗi mạng chỉ làm mốc lệch vài giây.
 ```sql
 -- 0148_dimension_events.sql — M120: dữ liệu sự kiện theo ô tick + ngày thực tế của task.
 -- Thuần thêm cột NULL-able + 1 index → không đụng dòng dữ liệu hiện có, không đổi bất kỳ
--- con số progress_percent/work_packages.progress nào (cột qty CHỈ thu thập, chưa vào công thức).
+-- con số progress_percent/work_packages.progress nào (M120 không sửa công thức %).
 -- Cột `value DOUBLE PRECISION` (0001) là cột CHẾT từ lâu (mọi đường ghi set = installed, không
--- đường nào đọc) — KHÔNG dùng lại cho qty để tránh đổi nghĩa dữ liệu cũ; giữ nguyên, deprecated.
+-- đường nào đọc) — giữ nguyên, deprecated; KHÔNG đổi nghĩa để tránh làm hỏng dữ liệu cũ.
+-- KHÔNG tạo cột `qty` ở đây: quyết định R1 (§18) tách sang Giai đoạn 3, nơi đổi công thức %
+-- sang trọng số khối lượng — tạo trước sẽ thành cột chết thứ hai bên cạnh `value`.
 
 ALTER TABLE progress_dimensions ADD COLUMN IF NOT EXISTS installed_at TIMESTAMPTZ;
 ALTER TABLE progress_dimensions ADD COLUMN IF NOT EXISTS installed_by INTEGER REFERENCES users(id);
 ALTER TABLE progress_dimensions ADD COLUMN IF NOT EXISTS note TEXT;
--- qty: khối lượng vật lý ô này đại diện (vd 6.5 m ống). NULL = ô nhị phân như hiện nay.
--- M120 chỉ LƯU, không tính vào %; đổi công thức % là việc của giai đoạn sau (cần quyết định riêng).
-ALTER TABLE progress_dimensions ADD COLUMN IF NOT EXISTS qty NUMERIC(12,3);
 
 -- Ngày thực tế của task — SUY TỰ ĐỘNG từ chuỗi tick trong recomputeTask, không nhập tay.
 -- Kiểu DATE (không TIMESTAMPTZ) để đồng bộ với start_date/end_date: lib/db parse DATE thành
@@ -378,7 +378,7 @@ Vì cột chỉ thêm, rollback code mà không rollback migration cũng an toà
   Body có `installedBy`/`installedAt` bị bỏ qua hoàn toàn — AC3 khoá bằng test.
 - **SQL:** mọi câu qua helper `lib/db` placeholder `?`; không nối chuỗi.
 - **Validate:** `note` trim + giới hạn 500 ký tự → 422 (không để Postgres từ chối thành 500).
-  `qty` (nếu client gửi ở giai đoạn sau) phải `>= 0` — M120 **không** nhận `qty` từ API, chỉ tạo cột.
+  M120 **không** có cột/trường `qty` (R1 §18) nên không có gì phải validate cho nó.
 - **XSS:** `note` render bằng text node React (không `dangerouslySetInnerHTML`) — cùng cách
   `tasks.note` đang làm.
 - **Cross-project:** không thêm đường đọc mới nào ngoài phạm vi task người dùng đã có quyền
@@ -455,23 +455,24 @@ trước khi phiên chính duyệt.
 
 ## 18. Risk/assumption/open decisions
 
-| Mục                                                                                 | Xác minh/giảm thiểu                                                                                                                                                                  | Owner       | Hạn       | Quyết định               |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- | --------- | ------------------------ |
-| **D1** `actual_start_date` có tự xoá khi progress về 0 không?                       | Đề xuất: **KHÔNG xoá** — công việc đã từng bắt đầu là sự thật lịch sử; bỏ tick là sửa sai chứ không phải "chưa từng làm"                                                             | Người dùng  | Trước PR1 | ⬜ chờ duyệt             |
-| **D2** Bỏ tick có xoá `installed_by`/`note` không?                                  | Đề xuất: **CÓ xoá** (§4 A) — ô không ở trạng thái đã lắp thì không giữ dấu vết lắp. Ai muốn lịch sử đầy đủ → phương án B sau này                                                     | Người dùng  | Trước PR2 | ⬜ chờ duyệt             |
-| **R1** `qty` tạo cột nhưng chưa dùng → nguy cơ thành "cột chết thứ hai" như `value` | Giảm thiểu: ghi rõ trong comment migration là **chuẩn bị cho giai đoạn sau**; nếu 2 đợt nữa vẫn không dùng thì `DROP`. Có thể tách `qty` khỏi M120 nếu người dùng muốn scope hẹp hơn | Phiên chính | PR1       | ⬜                       |
-| **R2** Tick offline mang giờ đồng bộ, không phải giờ tick thật                      | Chấp nhận trong M120 (§5). Nhận `clientTickedAt` là mở đường giả mạo mốc thời gian → chỉ làm khi có nhu cầu thật, kèm cách chống giả mạo                                             | Phiên chính | —         | ✅ chốt: dùng giờ server |
-| **R3** Thêm `LEFT JOIN users` vào GET lưới (đường nóng nhất) làm chậm               | Đo trước/sau trên nhóm 200 ô; nếu chậm > 15ms p95 thì bỏ `installedByName` khỏi payload lưới, chỉ trả khi mở tooltip (thêm route lẻ)                                                 | Phiên chính | PR3       | ⬜                       |
-| **A1** Giả định: mọi tick đều đi qua 4 đường ở §3                                   | Đã grep toàn repo 2026-09-02; nếu phát sinh đường thứ 5 khi code → dừng, báo phiên chính                                                                                             | —           | —         | —                        |
+| Mục                                                                                 | Xác minh/giảm thiểu                                                                                                                                           | Owner       | Hạn       | Quyết định                    |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | --------- | ----------------------------- |
+| **D1** `actual_start_date` có tự xoá khi progress về 0 không?                       | **KHÔNG xoá** — công việc đã từng bắt đầu là sự thật lịch sử; bỏ tick là sửa sai chứ không phải "chưa từng làm"                                               | Người dùng  | Trước PR1 | ✅ chốt 2026-09-03: không xoá |
+| **D2** Bỏ tick có xoá `installed_by`/`note` không?                                  | **CÓ xoá** (§4 A) — ô không ở trạng thái đã lắp thì không giữ dấu vết lắp. Cần lịch sử đầy đủ từng lần toggle → phương án B (bảng sự kiện riêng), đợt sau     | Người dùng  | Trước PR2 | ✅ chốt 2026-09-03: có xoá    |
+| **R1** `qty` tạo cột nhưng chưa dùng → nguy cơ thành "cột chết thứ hai" như `value` | **TÁCH khỏi M120**: không tạo cột `qty` đợt này. `qty` chỉ có nghĩa khi đi kèm đổi công thức % sang có trọng số (Giai đoạn 3) — tạo trước là cột chết thứ hai | Người dùng  | PR1       | ✅ chốt 2026-09-03: tách ra   |
+| **R2** Tick offline mang giờ đồng bộ, không phải giờ tick thật                      | Chấp nhận trong M120 (§5). Nhận `clientTickedAt` là mở đường giả mạo mốc thời gian → chỉ làm khi có nhu cầu thật, kèm cách chống giả mạo                      | Phiên chính | —         | ✅ chốt: dùng giờ server      |
+| **R3** Thêm `LEFT JOIN users` vào GET lưới (đường nóng nhất) làm chậm               | Đo trước/sau trên nhóm 200 ô; nếu chậm > 15ms p95 thì bỏ `installedByName` khỏi payload lưới, chỉ trả khi mở tooltip (thêm route lẻ)                          | Phiên chính | PR3       | ⬜                            |
+| **A1** Giả định: mọi tick đều đi qua 4 đường ở §3                                   | Đã grep toàn repo 2026-09-02; nếu phát sinh đường thứ 5 khi code → dừng, báo phiên chính                                                                      | —           | —         | —                             |
 
 ## 19. Approval
 
-- [ ] Product/scope — đặc biệt **D1**, **D2**, và có giữ `qty` trong M120 không (**R1**)
-- [ ] UX/a11y
-- [ ] Architecture/API/data
-- [ ] Security/RBAC/SoD/audit
-- [ ] Test/telemetry/rollout/rollback
-- [ ] Không còn blocking question
+- [x] Product/scope — **D1** không xoá `actual_start_date`; **D2** bỏ tick xoá dấu vết lắp;
+      **R1** `qty` TÁCH khỏi M120 (để Giai đoạn 3 quyết cùng công thức % có trọng số)
+- [x] UX/a11y
+- [x] Architecture/API/data
+- [x] Security/RBAC/SoD/audit
+- [x] Test/telemetry/rollout/rollback
+- [x] Không còn blocking question
 
-**Kết luận:** **Draft — chờ duyệt**
-**Người/ngày duyệt:** (chưa)
+**Kết luận:** **Approved for implementation**
+**Người/ngày duyệt:** Người dùng · 2026-09-03

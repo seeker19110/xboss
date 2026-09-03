@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { Modal } from "@/app/components/dialogs";
+import { formatDateVN } from "@/lib/nen/date";
 
 // Sửa ngày bắt đầu/kết thúc — dùng cho 1 task hoặc nhiều task cùng lúc (bulk).
 export function DateEditModal({
@@ -8,7 +9,11 @@ export function DateEditModal({
   onSave,
   onClose,
 }: {
-  target: { ids: number[]; init: { start: string; end: string } };
+  target: {
+    ids: number[];
+    init: { start: string; end: string };
+    actual?: { start: string | null; end: string | null };
+  };
   onSave: (ids: number[], start: string, end: string) => void;
   onClose: () => void;
 }) {
@@ -53,6 +58,15 @@ export function DateEditModal({
           />
         </div>
         {invalid && <p className="text-xs text-red-400">Ngày kết thúc phải sau ngày bắt đầu.</p>}
+        {!bulk && target.actual && (target.actual.start || target.actual.end) && (
+          // Ngày THỰC TẾ (M120) — suy tự động từ chuỗi tick, không sửa được ở đây. Đặt cạnh
+          // ô nhập ngày kế hoạch để PM thấy ngay độ lệch kế hoạch ⇄ thực tế lúc dời ngày.
+          <div className="rounded-lg bg-zinc-800/60 px-3 py-2 text-xs text-zinc-400 space-y-1">
+            <p className="font-medium text-zinc-300">Ngày thực tế (tự suy từ tiến độ)</p>
+            <p>Bắt đầu: {formatDateVN(target.actual.start)}</p>
+            <p>Kết thúc: {formatDateVN(target.actual.end)}</p>
+          </div>
+        )}
         <div className="flex gap-2 pt-1">
           <button
             onClick={() => {

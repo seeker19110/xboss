@@ -301,3 +301,153 @@ test(
     await run(`DELETE FROM projects WHERE id = ?`, projectId);
   },
 );
+
+// ===== M120: ngày thực tế của task (actual_start_date / actual_end_date) =====
+// Bảng chân lý FR5 + quyết định D1 (actual_start_date KHÔNG BAO GIỜ tự xoá). Chạy qua
+// recomputeTask (đường tick lưới) và PATCH progress (đường nhập tay) đều phải cho cùng kết quả
+// — vì vậy cả 2 gọi chung capNhatNgayThucTe.
+
+test(
+  "capNhatNgayThucTe: AC4/AC5/AC6 — bắt đầu khi >0, kết thúc khi =1, xoá ngày KT khi tụt <1 nhưng GIỮ ngày BĐ",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, queryOne } = await import("@/lib/db");
+    const { recomputeTask } = await import("@/lib/tien-do/recompute");
+
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test ngay thuc te')`);
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp NTT')`,
+      projectId,
+    );
+    const stId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'NTT', 'Sheet ngày thực tế')`,
+      towerId,
+    );
+    const pkgId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'NTT1', 'Nhóm NTT')`,
+      stId,
+    );
+    const taskId = await insertId(
+      `INSERT INTO tasks (package_id, code, name, end_date) VALUES (?, 'NTT1,01', 'Task ngày thực tế', ?)`,
+      pkgId,
+      TOMORROW,
+    );
+
+    const dims: number[] = [];
+    for (let i = 1; i <= 3; i++) {
+      dims.push(
+        await insertId(
+          `INSERT INTO progress_dimensions (task_id, dimension_label, installed) VALUES (?, ?, 0)`,
+          taskId,
+          `Ô ${i}`,
+        ),
+      );
+    }
+    const ngayThucTe = () =>
+      queryOne<{ actual_start_date: string | null; actual_end_date: string | null }>(
+        `SELECT actual_start_date, actual_end_date FROM tasks WHERE id = ?`,
+        taskId,
+      );
+    const homNay = new Date().toISOString().slice(0, 10);
+
+    // Chưa tick ô nào → chưa có ngày thực tế nào.
+    await recomputeTask(taskId);
+    let t = await ngayThucTe();
+    assert.equal(t?.actual_start_date, null, "0% → chưa có ngày bắt đầu thực tế");
+    assert.equal(t?.actual_end_date, null);
+
+    // AC4: tick 1/3 ô → có ngày bắt đầu, chưa có ngày kết thúc.
+    await run(`UPDATE progress_dimensions SET installed = 1 WHERE id = ?`, dims[0]);
+    await recomputeTask(taskId);
+    t = await ngayThucTe();
+    assert.equal(t?.actual_start_date, homNay, "AC4: >0% → đặt ngày bắt đầu thực tế = hôm nay");
+    assert.equal(t?.actual_end_date, null, "AC4: chưa 100% → chưa có ngày kết thúc");
+
+    // AC5: tick nốt 2 ô còn lại → 100% → có ngày kết thúc.
+    await run(`UPDATE progress_dimensions SET installed = 1 WHERE id IN (?, ?)`, dims[1], dims[2]);
+    await recomputeTask(taskId);
+    t = await ngayThucTe();
+    assert.equal(t?.actual_end_date, homNay, "AC5: 100% → đặt ngày kết thúc thực tế");
+
+    // AC6: bỏ tick 1 ô → mất ngày kết thúc, NHƯNG giữ ngày bắt đầu (quyết định D1).
+    await run(`UPDATE progress_dimensions SET installed = 0 WHERE id = ?`, dims[2]);
+    await recomputeTask(taskId);
+    t = await ngayThucTe();
+    assert.equal(t?.actual_end_date, null, "AC6: tụt dưới 100% → xoá ngày kết thúc thực tế");
+    assert.equal(t?.actual_start_date, homNay, "AC6/D1: ngày bắt đầu thực tế KHÔNG bị xoá");
+
+    // D1 chặt hơn: về đúng 0% vẫn giữ ngày bắt đầu.
+    await run(`UPDATE progress_dimensions SET installed = 0 WHERE task_id = ?`, taskId);
+    await recomputeTask(taskId);
+    t = await ngayThucTe();
+    assert.equal(t?.actual_start_date, homNay, "D1: về 0% vẫn giữ ngày bắt đầu thực tế");
+    assert.equal(t?.actual_end_date, null);
+
+    // Dọn dữ liệu test.
+    await run(`DELETE FROM task_history WHERE task_id = ?`, taskId);
+    await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, taskId);
+    await run(`DELETE FROM tasks WHERE id = ?`, taskId);
+    await run(`DELETE FROM work_packages WHERE id = ?`, pkgId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, stId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
+  },
+);
+
+test(
+  "capNhatNgayThucTe: AC7 — task KHÔNG có ô dimension (nhập % tay) vẫn có ngày thực tế",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, queryOne } = await import("@/lib/db");
+    const { capNhatNgayThucTe } = await import("@/lib/tien-do/recompute");
+
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test ngay tay')`);
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp NT')`,
+      projectId,
+    );
+    const stId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'NT', 'Sheet nhập tay')`,
+      towerId,
+    );
+    const pkgId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'NT1', 'Nhóm NT')`,
+      stId,
+    );
+    const taskId = await insertId(
+      `INSERT INTO tasks (package_id, code, name) VALUES (?, 'NT1,01', 'Task nhập tay')`,
+      pkgId,
+    );
+    const homNay = new Date().toISOString().slice(0, 10);
+    const ngayThucTe = () =>
+      queryOne<{ actual_start_date: string | null; actual_end_date: string | null }>(
+        `SELECT actual_start_date, actual_end_date FROM tasks WHERE id = ?`,
+        taskId,
+      );
+
+    // Đường nhập % thủ công (FR6) — cùng hàm với đường tick lưới.
+    await capNhatNgayThucTe(taskId, 1);
+    let t = await ngayThucTe();
+    assert.equal(t?.actual_start_date, homNay, "AC7: 100% nhập tay → có cả ngày bắt đầu");
+    assert.equal(t?.actual_end_date, homNay, "AC7: 100% nhập tay → có ngày kết thúc");
+
+    // Hạ % xuống → mất ngày kết thúc, giữ ngày bắt đầu (cùng luật với đường lưới).
+    await capNhatNgayThucTe(taskId, 0.4);
+    t = await ngayThucTe();
+    assert.equal(t?.actual_end_date, null);
+    assert.equal(t?.actual_start_date, homNay);
+
+    // Lũy đẳng: gọi lại nhiều lần không đổi kết quả (offline retry gửi lại cùng giá trị).
+    await capNhatNgayThucTe(taskId, 0.4);
+    t = await ngayThucTe();
+    assert.equal(t?.actual_start_date, homNay);
+    assert.equal(t?.actual_end_date, null);
+
+    // Dọn dữ liệu test.
+    await run(`DELETE FROM tasks WHERE id = ?`, taskId);
+    await run(`DELETE FROM work_packages WHERE id = ?`, pkgId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, stId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
+  },
+);

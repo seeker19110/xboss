@@ -584,16 +584,22 @@ export async function importWorkbook(
             // File tracking thật có ~2.000 task × ~16 ô = ~32.000 lượt gọi DB cho mỗi lần
             // import — đó là lý do import mất hàng phút. Gộp lại giữ nguyên kết quả, chỉ
             // đổi số lần đi/về mạng.
+            // Dữ liệu sự kiện (M120 FR4): ô đánh dấu ĐÃ LẮP trong file mang mốc thời điểm
+            // import + người chạy import (nguồn sự thật duy nhất có được — file Excel không
+            // chứa ngày tick từng ô). Ô chưa lắp để NULL cả 3 cột, giữ bất biến "installed=0
+            // ⇒ không có dấu vết lắp". `importedBy` có thể NULL (npm run db:seed, test).
+            const importedBy = options.source?.importedBy ?? null;
             const values: unknown[] = [];
             const cho: string[] = [];
             for (const d of rowDims) {
               const checked = isChecked(row[d.col]) ? 1 : 0;
-              cho.push(`(?, ?, ?, ?)`);
-              values.push(taskId, d.label, checked, checked);
+              cho.push(`(?, ?, ?, ?, CASE WHEN ? = 1 THEN NOW() ELSE NULL END, ?)`);
+              values.push(taskId, d.label, checked, checked, checked, checked ? importedBy : null);
               stats.dimensions++;
             }
             await run(
-              `INSERT INTO progress_dimensions (task_id, dimension_label, installed, value)
+              `INSERT INTO progress_dimensions
+                 (task_id, dimension_label, installed, value, installed_at, installed_by)
                VALUES ${cho.join(", ")}`,
               ...values,
             );

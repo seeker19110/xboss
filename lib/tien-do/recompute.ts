@@ -35,6 +35,44 @@ export function statusConsistentWithProgress(status: StatusSlug, progressPercent
   return status !== "hoan_thanh";
 }
 
+// Ngày thực tế của task (M120) — SUY TỰ ĐỘNG từ % vừa ghi, không ai nhập tay. Dùng chung cho
+// MỌI đường ghi % (recomputeTask từ lưới checkbox lẫn PATCH /api/tasks/:id/progress nhập tay),
+// nếu không 2 đường sẽ cho ra 2 bộ ngày khác nhau trên cùng dữ liệu (bài học từ progressFromChecks).
+//
+// 3 luật (M120 §7 FR5, quyết định D1 chốt 2026-09-03):
+//   1. progress > 0  và actual_start_date NULL     → đặt = CURRENT_DATE (mốc bắt đầu thật).
+//   2. progress >= 1 và actual_end_date NULL       → đặt = CURRENT_DATE (mốc xong thật).
+//   3. progress < 1  và actual_end_date NOT NULL   → xoá về NULL (xong hụt: bỏ tick/thêm cột
+//      làm tăng mẫu số → task không còn xong, ngày kết thúc thực tế không còn đúng).
+// actual_start_date một khi đã đặt thì KHÔNG BAO GIỜ tự xoá kể cả progress về 0 (D1): công việc
+// đã từng bắt đầu là sự thật lịch sử; bỏ tick là sửa sai chứ không phải "chưa từng làm".
+//
+// Chỉ chạy UPDATE khi thực sự có gì đổi (điều kiện nằm trong WHERE) — không thêm round-trip
+// ghi vô ích ở đường nóng nhất của app (NFR1). CURRENT_DATE lấy theo TZ của phiên Postgres,
+// đồng bộ với cách todayISO() so sánh ngày ở tầng app.
+export async function capNhatNgayThucTe(taskId: number, progress: number): Promise<void> {
+  if (progress > 0) {
+    await run(
+      `UPDATE tasks SET actual_start_date = CURRENT_DATE
+        WHERE id = ? AND actual_start_date IS NULL`,
+      taskId,
+    );
+  }
+  if (progress >= 1) {
+    await run(
+      `UPDATE tasks SET actual_end_date = CURRENT_DATE
+        WHERE id = ? AND actual_end_date IS NULL`,
+      taskId,
+    );
+  } else {
+    await run(
+      `UPDATE tasks SET actual_end_date = NULL
+        WHERE id = ? AND actual_end_date IS NOT NULL`,
+      taskId,
+    );
+  }
+}
+
 // Tính lại % của task từ dimensions (nếu có), cập nhật task + work package cha.
 // changedBy: tên người thao tác — nếu % thay đổi sẽ ghi vào task_history.
 export async function recomputeTask(
@@ -80,6 +118,9 @@ export async function recomputeTask(
     status,
     taskId,
   );
+  // Ngày thực tế (M120) — trong CÙNG transaction với việc ghi %, dưới cùng khoá FOR UPDATE ở
+  // trên, để không có cửa sổ nào % và ngày thực tế lệch nhau.
+  await capNhatNgayThucTe(taskId, progress);
 
   const old = task.progress_percent ?? 0;
   if (progress !== old) {
