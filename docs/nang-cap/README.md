@@ -360,10 +360,31 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > **3 quyết định đã chốt** (§18): D1 `actual_start_date` KHÔNG bao giờ tự xoá kể cả progress về 0 ·
 > D2 bỏ tick XOÁ `installed_by`/`note` (cần lịch sử từng lần toggle → bảng sự kiện riêng, đợt sau) ·
 > R1 cột `qty` TÁCH khỏi M120, để Giai đoạn 3 quyết cùng công thức % có trọng số.
-> **Giai đoạn 2+ của lộ trình chưa làm** (mỗi giai đoạn cần đặc tả riêng): nối UI vào 2 API bulk
-> đã có (`/api/dimensions/batch`, `/api/tasks/batch`), chọn vùng + Undo trên lưới, hợp nhất 4 cách
-> tính "% kế hoạch", `project_id` cho `baselines`/`construction_stages`/`floor_stage_fronts`, và
-> chuyển từ theo dõi tiến độ sang lập lịch thật (phụ thuộc cấp task, lag, lịch làm việc, milestone).
+> **Giai đoạn 2 → `M121` bên dưới. Giai đoạn 3+ chưa có đặc tả** (mỗi giai đoạn cần đặc tả riêng):
+> hợp nhất 4 cách tính "% kế hoạch" + quyết định trọng số, `project_id` cho `baselines`/
+> `construction_stages`/`floor_stage_fronts`, và chuyển từ theo dõi tiến độ sang lập lịch thật
+> (phụ thuộc cấp task, lag/loại quan hệ, lịch làm việc/ngày nghỉ, milestone, CPM biết tiến độ thực).
+
+> **`M121-luoi-tick-theo-vung.md`** — 📝 **Draft, chờ người dùng duyệt** (viết 2026-09-03). Giai
+> đoạn 2: **UX lưới tracking**. Ba vấn đề đo được: (a) "tick cả hàng" bắn N request song song, mỗi
+> request 1 transaction + 1 `recomputeTask` + 1 `recomputePackage` (hàng 30 cột = 30 lần tính lại
+> cùng một task); (b) 2 API bulk `PATCH /api/dimensions/batch` (`MAX_IDS=1000`, gộp recompute
+> 1 lần/task, atomic) và `PATCH /api/tasks/batch` đã xây đủ quyền/gate/test nhưng **chưa có
+> consumer UI nào**; (c) không có chọn vùng, không có hoàn tác — tick nhầm 20 ô phải bấm lại 20
+> lần. Nội dung: nối UI vào 2 route batch (tick cả hàng/vùng = **1 request**, đặt ngày hàng loạt =
+> 1 request atomic), chọn vùng bằng **Pointer Events** (chạy cả chuột lẫn chạm), undo/redo 50 bước,
+> hàng đợi offline gộp op `tick_batch` + **báo lý do khi op bị server từ chối** (nay đang bỏ im
+> lặng ở `logic.ts:85-88`), và tách `TrackingGrid.tsx` (2424 dòng) xuống dưới 1500 dòng.
+> **Không migration, không đổi schema, không đụng `lib/tien-do/recompute.ts`.**
+> Quyết định kiến trúc đã chốt trong đặc tả (§4, từ khảo sát 2026-09-03): **KHÔNG** nhét
+> `TrackingGrid` vào `SpreadsheetGrid` — component đó giả định lưới phẳng không có id ô, gom mọi ô
+> cùng hàng thành 1 patch theo `rowKey`, undo stack lưu chỉ số cột nên ghi nhầm cột sau khi
+> thêm/xoá cột, không có touch, và theme "giấy trắng" xung đột dark. Chỉ tái dùng **hàm thuần**
+> (`normalizeRect`, `Rect`, TSV) + viết hook chọn vùng mới dùng chung. 6 PR
+> (`mechanical`/`standard`/`complex`/`standard`/`standard`/`mechanical`).
+> **3 quyết định chờ người dùng chốt** (§18): D1 ngưỡng long-press vào chế độ chọn trên mobile
+> (đề xuất 400ms) · D2 vùng chọn có xuyên nhiều hàng task trong cùng nhóm không (đề xuất có) ·
+> D3 phạm vi undo (đề xuất: trong phiên trình duyệt, mất khi đóng tab).
 
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 
