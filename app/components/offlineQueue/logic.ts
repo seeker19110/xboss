@@ -5,9 +5,13 @@
 
 // 3 loại thao tác offline đợt M58 PR2. `tick` di trú nguyên hành vi từ khung cũ;
 // `photo`/`diary_note` để PR3 nối UI thật vào (API enqueue phải ổn định từ giờ).
-export type QueueKind = "tick" | "photo" | "diary_note";
+export type QueueKind = "tick" | "photo" | "diary_note" | "tick_batch";
 
 export type TickPayload = { dimId: number; installed: boolean };
+// Tick theo lô (M121): cả vùng chọn / cả hàng đi trong MỘT op, gửi lên
+// `PATCH /api/dimensions/batch`. Không tách thành N op `tick` vì như vậy khi có mạng lại sẽ
+// bắn N request — đúng cái M121 đang bỏ đi — và mất tính nguyên tử của lô.
+export type TickBatchPayload = { dimIds: number[]; installed: boolean };
 export type PhotoPayload = {
   taskId: number;
   caption: string;
@@ -33,6 +37,7 @@ export type DiaryNotePayload = {
 // Discriminated union theo `kind` — payload gắn đúng kiểu, tránh `any`.
 type OpBody =
   | { kind: "tick"; payload: TickPayload }
+  | { kind: "tick_batch"; payload: TickBatchPayload }
   | { kind: "photo"; payload: PhotoPayload }
   | { kind: "diary_note"; payload: DiaryNotePayload };
 
@@ -90,7 +95,36 @@ export function shouldRetry(outcome: { networkError?: boolean; status?: number }
 // Mỗi dimension chỉ giữ thao tác tick MỚI NHẤT — trả về id các tick cũ cùng dimId cần
 // xoá trước khi thêm tick mới (giữ đúng hành vi dedup của khung cũ).
 export function tickDedupeIds(ops: QueuedOp[], dimId: number): number[] {
-  return ops.filter((o) => o.kind === "tick" && o.payload.dimId === dimId).map((o) => o.id);
+  return ops
+    .filter(
+      (o) =>
+        (o.kind === "tick" && o.payload.dimId === dimId) ||
+        // Lô cũ chứa đúng ô này cũng phải nhường: thao tác sau thắng. Chỉ xoá khi lô CHỈ có ô
+        // đó — lô nhiều ô mà xoá cả thì mất luôn các ô khác người dùng đã tick.
+        (o.kind === "tick_batch" && o.payload.dimIds.length === 1 && o.payload.dimIds[0] === dimId),
+    )
+    .map((o) => o.id);
+}
+
+// Op nào cần xoá trước khi thêm một lô tick mới (M121 FR7). Cùng luật "thao tác sau thắng":
+// mọi op `tick` đơn lẻ có ô nằm trong lô mới đều thừa (lô mới đã quyết định trạng thái ô đó),
+// và lô cũ trùng HOÀN TOÀN tập ô cũng thừa.
+//
+// Lô cũ chỉ TRÙNG MỘT PHẦN thì GIỮ LẠI: xoá đi sẽ mất các ô ngoài phần giao mà người dùng đã
+// tick; giữ lại thì ô giao bị ghi 2 lần theo đúng thứ tự FIFO, lần sau thắng — đúng ý người dùng.
+export function tickBatchDedupeIds(ops: QueuedOp[], dimIds: number[]): number[] {
+  const trongLo = new Set(dimIds);
+  return ops
+    .filter((o) => {
+      if (o.kind === "tick") return trongLo.has(o.payload.dimId);
+      if (o.kind === "tick_batch")
+        return (
+          o.payload.dimIds.length === trongLo.size &&
+          o.payload.dimIds.every((id) => trongLo.has(id))
+        );
+      return false;
+    })
+    .map((o) => o.id);
 }
 
 // Mỗi ngày chỉ giữ 1 bản nhật ký offline MỚI NHẤT — PUT /api/diaries/:date là full-replace
@@ -118,6 +152,8 @@ export function opEndpoint(op: QueuedOp): { url: string; method: string } {
   switch (op.kind) {
     case "tick":
       return { url: `/api/dimensions/${op.payload.dimId}`, method: "PATCH" };
+    case "tick_batch":
+      return { url: `/api/dimensions/batch`, method: "PATCH" };
     case "photo":
       return { url: `/api/tasks/${op.payload.taskId}/photos`, method: "POST" };
     case "diary_note":
@@ -133,7 +169,9 @@ export function computeStats(ops: QueuedOp[]): QueueStats {
   return { total: ops.length, pending: ops.length - failed, failed };
 }
 
-export type SendOutcome = { networkError?: boolean; status?: number };
+// `error`: thông điệp server trả kèm khi từ chối (4xx) — dùng để nói cho người dùng biết vì
+// sao thao tác offline của họ không vào được, thay vì xoá im lặng (M121 FR8).
+export type SendOutcome = { networkError?: boolean; status?: number; error?: string };
 export type SendFn = (op: QueuedOp) => Promise<SendOutcome>;
 
 // Vòng gửi hàng đợi — THUẦN (chỉ phụ thuộc store + hàm gửi + đồng hồ). Duyệt FIFO,
@@ -143,10 +181,14 @@ export async function flushQueue(
   store: QueueStore,
   send: SendFn,
   now: () => number = Date.now,
-): Promise<{ removed: number; retried: number; remaining: number }> {
+): Promise<{ removed: number; retried: number; remaining: number; tuChoi: OpTuChoi[] }> {
   const ops = await store.getAll();
   let removed = 0;
   let retried = 0;
+  // Op bị server TỪ CHỐI (4xx) — trước đây bị xoá im lặng, người dùng chỉ thấy badge về 0 mà
+  // không biết mình vừa mất thao tác nào (M121 FR8). Vẫn xoá khỏi hàng đợi để không kẹt retry
+  // vô hạn, nhưng trả lý do lên để lớp UI báo cho người dùng biết mà làm lại.
+  const tuChoi: OpTuChoi[] = [];
   for (const op of ops) {
     if (!shouldAttempt(op, now())) continue;
     const outcome = await send(op);
@@ -154,12 +196,29 @@ export async function flushQueue(
       await store.update({ ...op, tries: op.tries + 1, lastTriedAt: now() });
       retried++;
     } else {
+      if (biTuChoi(outcome)) tuChoi.push({ kind: op.kind, soO: soOCuaOp(op), lyDo: outcome.error });
       await store.remove(op.id);
       removed++;
     }
   }
   const remaining = (await store.getAll()).length;
-  return { removed, retried, remaining };
+  return { removed, retried, remaining, tuChoi };
+}
+
+export type OpTuChoi = { kind: QueueKind; soO: number; lyDo?: string };
+
+// Gửi xong mà server trả 4xx = bị từ chối (mất quyền, hold-point chưa mở, ô đã bị xoá…).
+// Khác với thành công (2xx) và khác với lỗi tạm (5xx/mất mạng — đã giữ lại để thử tiếp).
+export function biTuChoi(outcome: SendOutcome): boolean {
+  const s = outcome.status ?? 0;
+  return s >= 400 && s < 500;
+}
+
+// Số ô một op đại diện — để thông điệp nói "3 thao tác bị từ chối" thay vì "1 op".
+function soOCuaOp(op: QueuedOp): number {
+  if (op.kind === "tick") return 1;
+  if (op.kind === "tick_batch") return op.payload.dimIds.length;
+  return 1;
 }
 
 // Hiện thực trong bộ nhớ cho unit test — cùng interface với IndexedDB store.

@@ -6,11 +6,13 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { IdbQueueStore, migrateFromLocalStorage, OLD_LS_KEY } from "./store";
 import { compressImage } from "./image";
+import { showToast } from "@/app/components/Toast";
 import {
   computeStats,
   flushQueue,
   opEndpoint,
   tickDedupeIds,
+  tickBatchDedupeIds,
   diaryDedupeIds,
   wouldExceedPhotoQuota,
   FLUSH_INTERVAL_MS,
@@ -41,6 +43,12 @@ async function sendOp(op: QueuedOp): Promise<SendOutcome> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ installed: op.payload.installed }),
       });
+    } else if (op.kind === "tick_batch") {
+      res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: op.payload.dimIds, installed: op.payload.installed }),
+      });
     } else {
       // Nhật ký: gửi TOÀN BỘ payload trừ `date` (đã nằm trên URL) — PUT full-replace.
       const { date: _d, ...body } = op.payload;
@@ -50,6 +58,12 @@ async function sendOp(op: QueuedOp): Promise<SendOutcome> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+    }
+    // Đọc kèm lý do khi server TỪ CHỐI (4xx) để báo lại cho người dùng (M121 FR8) — không
+    // đọc body ở ca thành công/5xx: 2xx không có gì để nói, 5xx sẽ được thử lại.
+    if (res.status >= 400 && res.status < 500) {
+      const error = (await res.json().catch(() => null))?.error;
+      return { status: res.status, error: typeof error === "string" ? error : undefined };
     }
     return { status: res.status };
   } catch {
@@ -166,7 +180,15 @@ class OfflineQueueManager {
     this.hadItems = true;
     this.setSnap({ sending: true });
     try {
-      await flushQueue(this.store, sendOp);
+      const { tuChoi } = await flushQueue(this.store, sendOp);
+      // Op bị server từ chối phải được BÁO, không biến mất im lặng (M121 FR8): người dùng
+      // tick cả buổi lúc mất sóng, đến khi có mạng mà hold-point chưa mở thì phải biết mà
+      // làm lại, chứ không chỉ thấy badge về 0.
+      if (tuChoi.length) {
+        const soO = tuChoi.reduce((s, t) => s + t.soO, 0);
+        const lyDo = tuChoi.find((t) => t.lyDo)?.lyDo;
+        showToast(`${soO} thao tác ngoại tuyến bị từ chối${lyDo ? `: ${lyDo}` : ""}`, "error");
+      }
     } finally {
       this.flushing = false;
       await this.refreshStats({ sending: false });
@@ -175,6 +197,21 @@ class OfflineQueueManager {
         for (const l of this.flushedListeners) l();
       }
     }
+  }
+
+  // Xếp tick theo LÔ (M121) — cả vùng chọn / cả hàng đi trong 1 op, khi có mạng lại gửi
+  // đúng 1 request `PATCH /api/dimensions/batch` thay vì N request.
+  async enqueueTickBatch(dimIds: number[], installed: boolean): Promise<void> {
+    if (!dimIds.length) return;
+    const ops = await this.store.getAll();
+    for (const id of tickBatchDedupeIds(ops, dimIds)) await this.store.remove(id);
+    await this.store.add({
+      kind: "tick_batch",
+      payload: { dimIds, installed },
+      queuedAt: Date.now(),
+      tries: 0,
+    });
+    await this.refreshStats();
   }
 
   // Xếp tick — mỗi dimension chỉ giữ thao tác mới nhất (dedup, hành vi cũ giữ nguyên).
@@ -340,7 +377,11 @@ export function useOfflineTickQueue(onFlushed?: () => void) {
   const enqueue = useCallback((dimId: number, installed: boolean) => {
     void offlineQueue.enqueueTick(dimId, installed);
   }, []);
-  return { pending: snap.total, online: snap.online, enqueue };
+  // Xếp cả lô (M121) — 1 op cho cả vùng chọn/cả hàng, thay vì N op tick đơn lẻ.
+  const enqueueBatch = useCallback((dimIds: number[], installed: boolean) => {
+    void offlineQueue.enqueueTickBatch(dimIds, installed);
+  }, []);
+  return { pending: snap.total, online: snap.online, enqueue, enqueueBatch };
 }
 
 // Hook trạng thái hàng đợi cho badge AppHeader (mọi trang).

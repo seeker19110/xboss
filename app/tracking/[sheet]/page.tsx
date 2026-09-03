@@ -60,6 +60,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
     offlinePending,
     online,
     enqueue,
+    enqueueBatch,
   } = useTrackingData(sheet);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [query, setQuery] = useState("");
@@ -537,6 +538,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
                   isMobile={isMobile}
                   onChanged={load}
                   onOfflineTick={enqueue}
+                  onOfflineTickBatch={enqueueBatch}
                   hiddenPrintCols={hiddenPrintCols}
                   onColsLoaded={handleColsLoaded}
                   sheetCols={allSheetCols}

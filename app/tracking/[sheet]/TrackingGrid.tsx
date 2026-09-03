@@ -33,6 +33,8 @@ import { PkgDatesModal } from "./modals/PkgDatesModal";
 import { CommentsModal } from "./modals/CommentsModal";
 import { HistoryModal } from "./modals/HistoryModal";
 import type { Pkg, Cell, GridTask, Grid } from "./types";
+import { dungLoTick } from "./tick";
+import { guiLoTick, guiNgayHangLoat } from "./tickApi";
 
 // Mô tả sự kiện tick của 1 ô (M120) — dùng cho cả `title` (rê chuột) lẫn `aria-label`
 // (bàn phím/đọc màn hình), nên phải là chuỗi thuần, không phải JSX.
@@ -111,6 +113,7 @@ export function TrackingGrid({
   isMobile,
   onChanged,
   onOfflineTick,
+  onOfflineTickBatch,
   hiddenPrintCols,
   onColsLoaded,
   sheetCols,
@@ -128,6 +131,7 @@ export function TrackingGrid({
   isMobile: boolean;
   onChanged: () => void;
   onOfflineTick: (dimId: number, installed: boolean) => void;
+  onOfflineTickBatch: (dimIds: number[], installed: boolean) => void;
   hiddenPrintCols: Set<string>;
   onColsLoaded: (cols: string[]) => void;
   sheetCols: string[];
@@ -432,26 +436,21 @@ export function TrackingGrid({
     onChanged();
   }
 
+  // Tick/bỏ tick cả hàng bằng MỘT request (M121 FR1). Trước đây bắn N request song song, mỗi
+  // request là 1 transaction + 1 recomputeTask + 1 recomputePackage riêng — hàng 30 cột là 30
+  // lần tính lại % của cùng một task. Route batch gộp recompute 1 lần/task và atomic cả lô.
   async function setAllInRow(task: GridTask, value: boolean) {
-    const cells = Object.values(task.cells);
-    const results = await Promise.all(
-      cells.map((c) =>
-        fetch(`/api/dimensions/${c.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ installed: value }),
-        })
-          .then(async (res) =>
-            res.ok ? null : ((await res.json().catch(() => null))?.error ?? "Lỗi"),
-          )
-          .catch(() => {
-            onOfflineTick(c.id, value);
-            return null;
-          }),
-      ),
-    );
-    const firstError = results.find((r) => r);
-    if (firstError) showToast(firstError, "error");
+    const lo = dungLoTick(Object.values(task.cells));
+    if (!lo.ok) {
+      showToast(lo.loi, "error");
+      return;
+    }
+    if (!lo.ids.length) return; // hàng chưa có ô nào — không gửi request rỗng
+    const kq = await guiLoTick(lo.ids, value);
+    // Mất mạng → xếp cả lô vào hàng đợi offline, KHÔNG báo lỗi: người dùng công trường vẫn
+    // tick tiếp được, lô sẽ tự gửi khi có sóng.
+    if (kq.trangThai === "mangLoi") onOfflineTickBatch(lo.ids, value);
+    else if (kq.trangThai === "tuChoi") showToast(kq.loi, "error");
     load();
     onChanged();
   }
@@ -505,19 +504,13 @@ export function TrackingGrid({
       setDatesTarget(null);
       return;
     }
-    const results = await Promise.all(
-      ids.map((id) =>
-        fetch(`/api/tasks/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        })
-          .then((r) => r.ok)
-          .catch(() => false),
-      ),
-    );
-    const failed = results.filter((ok) => !ok).length;
-    if (failed) appAlert(`Không lưu được ngày cho ${failed}/${ids.length} task — thử lại sau.`);
+    // Nhiều task → MỘT request atomic (M121 FR6). Trước đây loop N request: lỗi giữa chừng để
+    // lại lô nửa chừng (một số task đã đổi ngày, một số chưa) mà không nói được task nào. Nay
+    // cả lô hoặc không lô nào, nên thông điệp cũng nói vậy — bỏ kiểu đếm "thất bại N/M" cũ.
+    const kq = await guiNgayHangLoat(ids, body);
+    if (kq.trangThai === "tuChoi") appAlert(kq.loi);
+    else if (kq.trangThai === "mangLoi")
+      appAlert("Mất kết nối — chưa lưu được ngày, thử lại khi có mạng");
     setDatesTarget(null);
     load();
     onChanged();
