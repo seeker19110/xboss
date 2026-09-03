@@ -116,7 +116,11 @@ test(
       assert.equal(last.pv, 20_000_000);
 
       // Baseline chốt ngày T2 về quá khứ → PV = 20tr, SPI = 0.25 (đo lệch so kế hoạch gốc)
-      blId = await insertId(`INSERT INTO baselines (name) VALUES ('BL EVM ${RUN}')`);
+      blId = await insertId(
+        `INSERT INTO baselines (name, project_id) VALUES (?, ?)`,
+        `BL EVM ${RUN}`,
+        projectId,
+      );
       await run(
         `INSERT INTO baseline_tasks (baseline_id, task_id, start_date, end_date, progress_percent) VALUES (?, ?, ?, ?, 0)`,
         blId,
