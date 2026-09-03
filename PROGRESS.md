@@ -1,5 +1,29 @@
 # PROGRESS.md — Trạng thái dự án
 
+## 🚧 M122 — Hợp nhất "% kế hoạch" + trọng số theo giá trị BOQ (Giai đoạn 3, đang làm)
+
+`docs/nang-cap/M122-hop-nhat-phan-tram-ke-hoach.md` (Approved 2026-09-03, spec merge ở PR #465).
+Giai đoạn 3 của lộ trình rà soát mảng kế hoạch/tiến độ/tracking.
+
+**PR1 — đo độ phủ ánh xạ BOQ (xong, đang chờ merge):**
+
+- `lib/khoi-luong/boq-coverage.ts` — `doPhuBoq()` (độ phủ tổng + theo hệ + danh sách dòng BOQ có
+  Σweight ≠ 1) và `doPhuGon()` (3 con số cho lớp biểu đồ ở PR3).
+- `GET /api/boq/coverage` + khối "Độ phủ ánh xạ BOQ" trên `/boq` (AC6).
+- Đếm bằng `EXISTS`, **không** `JOIN`: một task map nhiều dòng BOQ vẫn chỉ tính là một task đã
+  map — nếu JOIN thì độ phủ vượt 100%. Chỉ trả **số đếm/tỷ lệ**, không trả tiền (§12).
+
+**⛔ Cổng dừng bắt buộc (spec §17.2): PR3 — bật trọng số theo giá trị — CHƯA làm được.**
+Ngưỡng độ phủ tối thiểu (quyết định D1) cố ý bỏ trống trong đặc tả vì phụ thuộc số thật. Phải
+deploy PR1 lên production, đọc độ phủ thực tế, rồi mới chốt ngưỡng. Lý do: `boq_task_map` là
+đường DUY NHẤT tới giá trị BOQ (`tasks.boq_code` không hề được join với `boq_items`), `weight`
+luôn nhập tay và không script nào sinh tự động; task chưa map được gán trọng số = trung bình
+task đã map. Nên nếu độ phủ ~0% thì "trọng số theo giá trị" **thoái hoá im lặng về đúng bình
+quân số task cũ** trong khi giao diện lại ghi "theo giá trị BOQ" — tức là nói sai.
+
+**Còn lại:** PR2 (gom `plannedRatio` về một bản, `scurve`/`spi` cùng dùng — không đổi dữ liệu),
+PR3 (chờ cổng trên), PR4 (nhãn độ phủ trên `SCurveChart`/`SpiCards`), PR5 (tài liệu).
+
 ## ✅ M121 — Tick theo vùng, hoàn tác, gộp lô trên lưới tracking (Giai đoạn 2, 2026-09-03)
 
 `docs/nang-cap/M121-luoi-tick-theo-vung.md` (Approved 2026-09-03). Giai đoạn 2 của lộ trình rà

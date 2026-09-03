@@ -4,8 +4,8 @@
 | ---------------- | ---------------------------------------------------------------------------------------- |
 | Issue / Goal     | Giai đoạn 3 của lộ trình cải thiện kế hoạch/tiến độ/tracking. Giai đoạn 2 = M121 (#464). |
 | Spec owner       | Phiên chính (opusplan)                                                                   |
-| State            | **Draft — chờ người dùng duyệt**                                                         |
-| Người/ngày duyệt | (chưa)                                                                                   |
+| State            | **Approved for implementation**                                                          |
+| Người/ngày duyệt | Người dùng · 2026-09-03 (chốt hướng trọng số BOQ; D1 ngưỡng chờ số thật sau PR1)         |
 | Cập nhật         | 2026-09-03                                                                               |
 
 > Không code khi chưa **Approved for implementation**.
