@@ -415,6 +415,27 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > thị khối `trongSo` mà PR3 mới sinh ra, nên cùng nằm sau cổng dừng §17.2. Việc mở khoá: deploy,
 > mở `/boq`, đọc "Độ phủ ánh xạ BOQ", rồi chốt ngưỡng D1.
 
+> **`M123-project-id-cho-baseline-va-mat-tran.md`** — 📝 **Draft, CHỜ DUYỆT** (viết 2026-09-03).
+> Giai đoạn 4: đưa **3 bảng cuối của mảng kế hoạch vào trục dự án** — `baselines`,
+> `construction_stages`, `floor_stage_fronts`. Nợ này đã được ghi nhận chính thức trong whitelist
+> của `tests/project-scope-invariant.test.ts:70,79`. Ba lỗi thật đang mở: (a) `POST /api/baselines`
+> chốt baseline bằng `INSERT ... SELECT ... FROM tasks` **không có WHERE** ⇒ PM dự án A chụp luôn
+> task của dự án B, và selector baseline trên S-curve/EVM hiện baseline của dự án khác; (b)
+> `floor_stage_fronts` khoá `UNIQUE (floor_label, stage_id)` **không có dự án**, mà `floor_label`
+> là chuỗi tự do ⇒ hai dự án cùng có tầng "T5" **ghi đè lẫn nhau** ngày bàn giao/nhà thầu/tài liệu,
+> im lặng tuyệt đối vì `ON CONFLICT ... DO NOTHING`; (c) `construction_stages` là danh mục toàn hệ,
+> không có lối tách. Cả 3 bảng **chưa có RLS** trong khi 10 migration khác đã áp policy
+> `app.project_id`. **2 quyết định đã chốt với người dùng 2026-09-03** (§18): D1 `construction_stages`
+> dùng mô hình **lai** (`project_id` NULL = dùng chung mọi dự án, có giá trị = riêng dự án — 7 công
+> tác seed giữ NULL) · D2 baseline cũ **backfill về `MIN(projects.id)`** theo khuôn `0027`/`0069`.
+> 4 PR tuần tự (`spec`/`standard`/`spec`/`mechanical`). **Điểm chết người ghi rõ trong đặc tả:**
+> DROP ràng buộc UNIQUE cũ làm `ON CONFLICT (floor_label, stage_id)` ở
+> `lib/tien-do/constructionStages.ts:83,127` **lỗi runtime ngay** ⇒ migration và 2 chỗ sửa đó phải
+> nằm **cùng PR1**. Migration đụng dữ liệu (`SET NOT NULL` + DROP UNIQUE) ⇒ **bắt buộc qua staging**.
+> Guardrail AC7: trên DB 1 dự án, số đếm 4 bảng và mọi số trên dashboard **không đổi**.
+> **Open decision chờ chốt lúc duyệt:** ai được sửa công tác dùng chung (`project_id IS NULL`) —
+> đề xuất chỉ Admin.
+
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 
 > **M62 (`M62-rls-khoa-cua.md`)** — đóng nốt RLS: `withProjectScope` đọc-ghi + bọc 3 route còn lại (`notifications`, `payments/bills`, `payments/floors`) rồi migration "khoá cửa" bỏ nhánh thiếu-ngữ-cảnh (2 PR, `route: spec`; PR2 có điều kiện tiên quyết vận hành). **Đã xong hoàn toàn 2026-07-20** — PR1 (nhánh `claude/plan-m62-m63-7osrkh`, 2026-07-19) và PR2 (`migrations/0077_rls_lock.sql`, PR #300) đều đã merge `main`; người dùng xác nhận cả 2 điều kiện tiên quyết vận hành đủ trước khi merge PR2. Xem `PROGRESS.md`. **M63 (`M63-webhook-ssrf-dns-pinning.md`)** — chống SSRF DNS rebinding cho webhook: resolve + pin IP qua undici `connect.lookup`, mở rộng `isPrivateIp` (1 PR, `route: spec`). **Đã xong 2026-07-19** (nhánh `claude/plan-m62-m63-7osrkh`). Cả 2 sinh từ đợt đánh giá chi tiết lần 8 (`PROGRESS.md`).
