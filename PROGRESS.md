@@ -7310,6 +7310,22 @@ Verify hạ tầng: Postgres 16 local (`pg_ctlcluster`, đã có sẵn trong má
 - `docs/adr/0002-node-test-runner.md` — `node:test` qua `tsx` thay vì vitest/jest.
 - Theme đảo màu qua class CSS (`app/globals.css`) thay vì `styles/theme.css`/`data-theme` của khung.
 
+## Bẫy môi trường làm việc (đọc trước khi đi debug lỗi lạ)
+
+- **`node_modules` trong worktree có thể cũ hơn `package.json`** — worktree mới (hoặc worktree tạo
+  trước một PR bump dependency) không tự cài lại. Triệu chứng: `npm run build` báo
+  `Module not found: Can't resolve '@anthropic-ai/sdk'`, `npm run typecheck` đỏ hàng loạt
+  `TS7006 implicitly has an 'any' type` ở `app/components/LookaheadTable.tsx` (kiểu
+  `@tanstack/react-table` v8 vs v9) — **trong khi CI xanh và `main` không hề lỗi**. Đã mất một vòng
+  điều tra vì tưởng là nợ có sẵn (2026-09-03, PR #462). **Chạy `npm install` trước khi kết luận bất
+  kỳ lỗi typecheck/build "có sẵn" nào**, nhất là khi lỗi nằm ở file mình không đụng tới; đối chiếu
+  với CI của `main` trước khi ghi vào tài liệu là nợ kỹ thuật.
+- **Job CI `metadata` bắt buộc PR body có đủ 6 mục** (`## Thay đổi gì`, `## Issue / Goal`,
+  `## Research / Spec`, `## Validation`, `## Ảnh hưởng, rollout và rollback`,
+  `## Definition of Done`) và tiêu đề theo Conventional Commits; PR `feat:` còn phải liên kết spec
+  `docs/nang-cap/*.md` kèm chữ "Approved for implementation". Thiếu mục là check đỏ ngay từ đầu,
+  không liên quan chất lượng code.
+
 ## Nợ kỹ thuật (chỗ "làm tạm" cần quay lại)
 
 - ~~**[Thấp] `app/error.tsx` (error boundary route segment) không giữ được `AppHeader`/nav khi lỗi xảy ra**~~ → **đã đóng hoàn toàn (2026-08-20, Module M81)**: Triển khai Resilient Error Boundary `app/error.tsx` tích hợp sẵn Fallback Header & Emergency Quick Nav Bar (truy cập nhanh Dashboard, Lưới tiến độ, BBNT Nghiệm thu, Vật tư, Tài chính), hộp chẩn đoán lỗi Digest/Stack kèm nút sao chép cho IT, nút Emergency Cache Clear & Hard Reload. Đồng thời bổ sung `ComponentErrorBoundary` (`app/components/ComponentErrorBoundary.tsx`) cô lập sự cố của các widget con (3D Viewer, Charts, Spreadsheets) tránh sập toàn bộ trang. Test `tests/app-shell-resilience.test.ts` pass 100%.
