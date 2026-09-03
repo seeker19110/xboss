@@ -60,7 +60,19 @@ làm nó đỏ **ngay ở PR1**, không đợi PR4 — đã khai nhóm `KE_HOACH
 án. Các đường đọc còn lại (`listFloorStageFronts`, `allProjectFloors`, `listStages`, baselines) vẫn
 chưa lọc dự án — đó là PR2/PR3. **Không deploy staging/production khi PR3 chưa vào.**
 
-**Tiếp theo:** PR2 (lọc dự án cho baselines) → PR3 (`construction_stages` + `floor_stage_fronts`
+**PR2 (xong, cùng PR #469):** `GET /api/baselines` chỉ trả baseline của dự án hiện tại; `POST` đếm
+task và snapshot `baseline_tasks` qua JOIN `tasks → work_packages → sheet_types → towers` lọc theo
+dự án (trước đây `INSERT ... SELECT ... FROM tasks` **không có WHERE**), ghi `project_id`, và bọc 2
+INSERT trong `withTransaction` (trước đây INSERT thứ 2 lỗi thì để lại baseline rỗng); `DELETE` trả
+404 khi baseline thuộc dự án khác. Thêm `tests/baselines.test.ts` (AC2/AC3) và **gỡ mục whitelist
+`baselines`** trong `tests/project-scope-invariant.test.ts` (sớm hơn PR4 vì test tự báo "mục thừa").
+
+**Bài học CI (PR1):** job `test (Postgres)` có bước cuối **"Kiểm ERD khớp schema"** (`npm run gen:erd`
+
+- `git diff --exit-code docs/ERD.md`) — mọi PR chạm schema phải sinh lại `docs/ERD.md` **ngay trong
+  PR đó**, không để sang PR tài liệu. Đã sinh lại. Toàn bộ 1580 ca test vẫn pass, chỉ bước ERD đỏ.
+
+**Tiếp theo:** PR3 (`construction_stages` + `floor_stage_fronts`
 đọc theo dự án, D3) → PR4 (gỡ whitelist, ERD, `PROJECT.md` + ADR-0005, tài liệu).
 
 ## 🚧 M122 — Hợp nhất "% kế hoạch" + trọng số theo giá trị BOQ (Giai đoạn 3, đang làm)
