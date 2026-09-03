@@ -1,9 +1,9 @@
 # PROGRESS.md — Trạng thái dự án
 
-## 🚧 M123 — `project_id` cho baseline, danh mục công tác và mặt trận theo tầng (Giai đoạn 4, đang làm)
+## ✅ M123 — `project_id` cho baseline, danh mục công tác và mặt trận theo tầng (Giai đoạn 4, 2026-09-03)
 
-`docs/nang-cap/M123-project-id-cho-baseline-va-mat-tran.md` — **Draft, chờ người dùng duyệt.**
-Chọn làm Giai đoạn 4 vì M122 PR3/PR4 đang bị chặn ở cổng độ phủ BOQ (cần số production), còn việc
+`docs/nang-cap/M123-project-id-cho-baseline-va-mat-tran.md` — **Approved 2026-09-03** (spec merge ở
+PR #468), đã triển khai xong cả 4 PR. Chọn làm Giai đoạn 4 vì M122 PR3/PR4 đang bị chặn ở cổng độ phủ BOQ (cần số production), còn việc
 này độc lập hoàn toàn.
 
 **Ba lỗi thật đã xác minh trong mã nguồn (khảo sát 2026-09-03):**
@@ -72,8 +72,35 @@ INSERT trong `withTransaction` (trước đây INSERT thứ 2 lỗi thì để l
 - `git diff --exit-code docs/ERD.md`) — mọi PR chạm schema phải sinh lại `docs/ERD.md` **ngay trong
   PR đó**, không để sang PR tài liệu. Đã sinh lại. Toàn bộ 1580 ca test vẫn pass, chỉ bước ERD đỏ.
 
-**Tiếp theo:** PR3 (`construction_stages` + `floor_stage_fronts`
-đọc theo dự án, D3) → PR4 (gỡ whitelist, ERD, `PROJECT.md` + ADR-0005, tài liệu).
+**PR3 (xong):** 6 hàm trong `lib/tien-do/constructionStages.ts` nhận `projectId` bắt buộc —
+`listStages` trả công tác dùng chung (`project_id IS NULL`) + riêng dự án hiện tại (D1),
+`createStage` tính `sort_order` trên tập công tác dự án đó nhìn thấy chứ không phải MAX toàn bảng,
+`listFloorStageFronts`/`allProjectFloors` lọc theo dự án (`allProjectFloors` trước đây tên là
+"allProject" nhưng **không lọc gì**). `pendingStageFloors`/`stageMissingList` đổi từ join-theo-chuỗi
+`wp.floor_label = fsf.floor_label` sang lọc thẳng `fsf.project_id` (F6). Route
+`construction-stages` (GET/POST/PATCH) và `work-fronts/report` suy dự án qua `getCurrentProjectId`.
+**D3 áp ở PATCH:** công tác dự án khác → 404; công tác dùng chung mà không phải Admin → 403.
+Gỡ nốt whitelist `floor-stage-fronts`.
+
+**PR4 (xong):** `docs/adr/0005-rls.md` thêm mục cho migration `0149` — ghi rõ đợt này dùng khuôn
+**chuyển tiếp 3 nhánh của `0069`** (không phải khuôn nghiêm ngặt 2 nhánh của `0140`/`0146`) vì là
+bảng có dữ liệu production sẵn và còn đường đọc chưa bọc `withProjectScope`; việc "khoá cửa" (bỏ
+nhánh GUC-rỗng) để đợt sau, đúng cách `0069 → 0077` đã làm với 11 bảng tài chính. `PROJECT.md` bổ
+sung 3 bảng vào phạm vi RLS. `docs/ERD.md` đã sinh lại từ PR1.
+
+**Nợ còn lại của M123** (ghi rõ để không tưởng đã xong): (a) **khoá cửa RLS** — bỏ nhánh "GUC rỗng
+→ cho qua" cho 3 bảng sau khi mọi đường đọc bọc `withProjectScope`; (b) `floor_label` vẫn là **chuỗi
+tự do**, sau M123 thì "T5" của 2 dự án là 2 dòng khác nhau nhưng vẫn không có gì đảm bảo "T5" là
+tầng có thật của dự án đó — cần bảng `floors` thật, việc riêng; (c) chưa có **UI quản lý danh mục
+công tác riêng dự án** (DDL đã mở đường, D3 đã chốt quyền).
+
+**⚠️ Deploy:** migration `0149` đụng dữ liệu (backfill + `SET NOT NULL` + DROP CONSTRAINT) ⇒ chạy
+`bash deploy.sh --staging` + `npm run db:migrate -- --dry-run` trước, rồi mới production. Nay PR3 đã
+vào nên ràng buộc "không deploy khi chưa có PR3" đã gỡ.
+
+**Tiếp theo (Giai đoạn 5, chưa có đặc tả):** chuyển từ theo dõi tiến độ sang **lập lịch thật** —
+phụ thuộc cấp task, lag/loại quan hệ, lịch làm việc/ngày nghỉ, milestone, CPM biết tiến độ thực.
+Và M122 PR3/PR4 vẫn chờ số độ phủ BOQ từ production.
 
 ## 🚧 M122 — Hợp nhất "% kế hoạch" + trọng số theo giá trị BOQ (Giai đoạn 3, đang làm)
 

@@ -3,6 +3,7 @@ import { queryOne } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/nen/pdf-fonts";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { stageMissingList, type StageMissingItem } from "@/lib/tien-do/constructionStages";
 import { formatDateVN, todayISO } from "@/lib/nen/date";
 
@@ -95,7 +96,11 @@ export async function GET() {
   if (user.role !== "admin" && user.role !== "pm")
     return NextResponse.json({ error: "Chỉ Admin/PM được xuất báo cáo mặt bằng" }, { status: 403 });
 
-  const items = await stageMissingList();
+  // Dự án luôn suy từ phiên, KHÔNG nhận từ client (M123).
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+
+  const items = await stageMissingList(projectId);
   const project = (await queryOne<{ name: string }>(
     `SELECT name FROM projects ORDER BY id LIMIT 1`,
   )) ?? { name: "XBoss" };

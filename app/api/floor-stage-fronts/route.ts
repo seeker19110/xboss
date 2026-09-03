@@ -49,16 +49,16 @@ export async function GET(req: NextRequest) {
 
   const floor = req.nextUrl.searchParams.get("floor");
   if (!floor) {
-    const floors = await allProjectFloors();
-    const stages = await listStages();
+    const floors = await allProjectFloors(projectId);
+    const stages = await listStages(projectId);
     await ensureFloorStageFronts(projectId, floors);
-    const fronts = withPlannedDates(stages, await listFloorStageFronts(), floors);
+    const fronts = withPlannedDates(stages, await listFloorStageFronts(projectId), floors);
     return NextResponse.json({ floors, stages, fronts });
   }
 
   await ensureFloorStageFronts(projectId, [floor]);
-  const stages = await listStages();
-  const fronts = withPlannedDates(stages, await listFloorStageFronts(floor), [floor]);
+  const stages = await listStages(projectId);
+  const fronts = withPlannedDates(stages, await listFloorStageFronts(projectId, floor), [floor]);
   return NextResponse.json({ stages, fronts });
 }
 
@@ -87,9 +87,11 @@ export async function PUT(req: NextRequest) {
   const stageId = Number(body.stageId);
   if (!Number.isInteger(stageId))
     return NextResponse.json({ error: "Công tác không hợp lệ" }, { status: 422 });
+  // Chỉ nhận công tác dự án đang chọn nhìn thấy: dùng chung hoặc riêng dự án (M123 · D1).
   const stage = await queryOne<{ id: number }>(
-    `SELECT id FROM construction_stages WHERE id = ?`,
+    `SELECT id FROM construction_stages WHERE id = ? AND (project_id IS NULL OR project_id = ?)`,
     stageId,
+    projectId,
   );
   if (!stage) return NextResponse.json({ error: "Không tìm thấy công tác" }, { status: 404 });
 
@@ -110,7 +112,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Ngày bắt đầu kế hoạch không hợp lệ" }, { status: 422 });
   if (plannedReceivedAt) {
     // listStages() đã ORDER BY sort_order, id nên phần tử đầu chính là công tác đầu tiên.
-    const [firstStage] = await listStages();
+    const [firstStage] = await listStages(projectId);
     if (!firstStage || firstStage.id !== stageId)
       return NextResponse.json(
         { error: "Chỉ đặt được ngày bắt đầu kế hoạch cho công tác đầu tiên" },
