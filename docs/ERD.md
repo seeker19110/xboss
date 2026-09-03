@@ -219,12 +219,15 @@
 | note | text | ✓ |  |
 | created_by | integer | ✓ |  |
 | created_at | timestamptz | ✓ | `now()` |
+| project_id | integer | ✓ |  |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
+- `project_id` → `projects(id)`
 
 **Index:**
 - `baselines_pkey`: UNIQUE INDEX baselines_pkey ON public.baselines USING btree (id)
+- `idx_baselines_project`: INDEX idx_baselines_project ON public.baselines USING btree (project_id)
 
 ### baseline_tasks
 
@@ -279,9 +282,14 @@
 | active | boolean |  | `true` |
 | created_at | timestamptz | ✓ | `now()` |
 | duration_days | integer |  | `1` |
+| project_id | integer | ✓ |  |
+
+**Khóa ngoại:**
+- `project_id` → `projects(id)`
 
 **Index:**
 - `construction_stages_pkey`: UNIQUE INDEX construction_stages_pkey ON public.construction_stages USING btree (id)
+- `idx_construction_stages_project`: INDEX idx_construction_stages_project ON public.construction_stages USING btree (project_id)
 
 ### system_uploads
 
@@ -2278,18 +2286,21 @@
 | transition_stage_id | integer | ✓ |  |
 | outgoing_rep_name | text | ✓ |  |
 | incoming_rep_name | text | ✓ |  |
+| project_id | integer | ✓ |  |
 
 **Khóa ngoại:**
 - `incoming_supplier_id` → `suppliers(id)`
 - `outgoing_supplier_id` → `suppliers(id)`
+- `project_id` → `projects(id)`
 - `stage_id` → `construction_stages(id)`
 - `transition_stage_id` → `construction_stages(id)`
 - `updated_by` → `users(id)`
 
 **Index:**
-- `floor_stage_fronts_floor_label_stage_id_key`: UNIQUE INDEX floor_stage_fronts_floor_label_stage_id_key ON public.floor_stage_fronts USING btree (floor_label, stage_id)
 - `floor_stage_fronts_pkey`: UNIQUE INDEX floor_stage_fronts_pkey ON public.floor_stage_fronts USING btree (id)
+- `idx_floor_stage_fronts_project`: INDEX idx_floor_stage_fronts_project ON public.floor_stage_fronts USING btree (project_id)
 - `idx_floor_stage_fronts_stage`: INDEX idx_floor_stage_fronts_stage ON public.floor_stage_fronts USING btree (stage_id)
+- `uniq_floor_stage_fronts_project`: UNIQUE INDEX uniq_floor_stage_fronts_project ON public.floor_stage_fronts USING btree (COALESCE(project_id, 0), floor_label, stage_id)
 
 ### floor_stage_front_documents
 
