@@ -4,11 +4,11 @@
 | ---------------- | --------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Giai đoạn 4 của lộ trình cải thiện kế hoạch/tiến độ/tracking. Giai đoạn 3 = M122 (#465–#467). |
 | Spec owner       | Phiên chính (opusplan)                                                                        |
-| State            | Draft — **chờ duyệt**                                                                         |
-| Người/ngày duyệt | (chưa duyệt) — 2 quyết định nghiệp vụ đã chốt với người dùng 2026-09-03, xem §18              |
+| State            | **Approved for implementation**                                                               |
+| Người/ngày duyệt | Người dùng · 2026-09-03 (duyệt trọn gói, kèm chốt open decision §18 thành D3)                 |
 | Cập nhật         | 2026-09-03                                                                                    |
 
-> Không code khi chưa **Approved for implementation**.
+> Đã duyệt — thi hành theo §16.
 
 ## 1. Problem, vai trò và bằng chứng
 
@@ -215,15 +215,15 @@ Tuân ADR-0007: `constructionStages.ts` ở `lib/tien-do/` (tầng 4) được p
 **Không thêm/xoá endpoint nào, không đổi hình dạng request/response.** Thay đổi duy nhất là **tập
 dữ liệu trả về bị thu hẹp theo dự án đang chọn**, và `DELETE /api/baselines/:id` thêm nhánh 404.
 
-| Endpoint                             | Trước                | Sau                                                                 |
-| ------------------------------------ | -------------------- | ------------------------------------------------------------------- |
-| `GET /api/baselines`                 | mọi baseline         | baseline của dự án hiện tại                                         |
-| `POST /api/baselines`                | snapshot mọi task    | snapshot task của dự án hiện tại                                    |
-| `DELETE /api/baselines/:id`          | xoá bất kỳ           | 404 nếu khác dự án                                                  |
-| `GET /api/construction-stages`       | mọi công tác         | `project_id IS NULL OR = current`                                   |
-| `POST /api/construction-stages`      | tạo công tác toàn hệ | tạo với `project_id = current` (công tác riêng dự án)               |
-| `PATCH /api/construction-stages/:id` | sửa bất kỳ           | 404 nếu công tác thuộc dự án khác; công tác NULL sửa được bởi Admin |
-| `GET/PUT /api/floor-stage-fronts`    | theo `floor_label`   | theo `(project_id hiện tại, floor_label)`                           |
+| Endpoint                             | Trước                | Sau                                                                                                       |
+| ------------------------------------ | -------------------- | --------------------------------------------------------------------------------------------------------- |
+| `GET /api/baselines`                 | mọi baseline         | baseline của dự án hiện tại                                                                               |
+| `POST /api/baselines`                | snapshot mọi task    | snapshot task của dự án hiện tại                                                                          |
+| `DELETE /api/baselines/:id`          | xoá bất kỳ           | 404 nếu khác dự án                                                                                        |
+| `GET /api/construction-stages`       | mọi công tác         | `project_id IS NULL OR = current`                                                                         |
+| `POST /api/construction-stages`      | tạo công tác toàn hệ | tạo với `project_id = current` (công tác riêng dự án)                                                     |
+| `PATCH /api/construction-stages/:id` | sửa bất kỳ           | 404 nếu công tác thuộc dự án khác; công tác dùng chung (`project_id IS NULL`) **chỉ Admin** sửa được (D3) |
+| `GET/PUT /api/floor-stage-fronts`    | theo `floor_label`   | theo `(project_id hiện tại, floor_label)`                                                                 |
 
 ## 11. Data contract và DDL
 
@@ -363,10 +363,10 @@ song song.
 - **R3 (thấp).** DB `projects` rỗng lúc khởi tạo → migration bỏ qua `SET NOT NULL`; cột để
   nullable. Chấp nhận: `ensureSchema()` chạy trước khi seed dự án đầu tiên là đường hợp lệ.
 
-**Open decision (cần chốt lúc duyệt):** ai được sửa công tác `project_id IS NULL` (dùng chung)?
-Đề xuất: **chỉ Admin**; PM chỉ sửa/tạo công tác của dự án mình. Ghi vào §10 khi duyệt.
+**D3 (chốt lúc duyệt 2026-09-03) — chỉ Admin sửa công tác dùng chung.** Công tác `project_id IS NULL`
+chỉ Admin được sửa/xoá; PM chỉ tạo/sửa công tác của dự án mình. Đã phản ánh vào bảng §10.
 
 ## 19. Approval
 
-Chờ người dùng duyệt. Sau khi duyệt: cập nhật State = **Approved for implementation**, ghi
-người/ngày duyệt, rồi lập `PLAN.md` giao coordinator thi hành 4 PR theo §16.
+**Đã duyệt 2026-09-03** (người dùng: "duyệt đặc tả, làm luôn PR1"), kèm chốt D3. Thi hành 4 PR
+tuần tự theo §16, bắt đầu từ PR1 (migration `0149_` + 2 chỗ `ON CONFLICT`).
