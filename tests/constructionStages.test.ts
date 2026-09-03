@@ -210,3 +210,100 @@ test(
     }
   },
 );
+
+// ===== Test tích hợp M123 PR3 — lọc theo dự án đường ĐỌC =====
+
+test(
+  "listStages: trả công tác dùng chung + riêng dự án hiện tại, không trả của dự án khác (AC5)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listStages } = await import("@/lib/tien-do/constructionStages");
+    const { projectA, projectB, stageId: stageChung, donDep } = await dungHaiDuAn("liststages");
+
+    const stageA = await insertId(
+      `INSERT INTO construction_stages (project_id, name, sort_order, duration_days)
+       VALUES (?, 'Công tác riêng A', 9999, 1)`,
+      projectA,
+    );
+    const stageB = await insertId(
+      `INSERT INTO construction_stages (project_id, name, sort_order, duration_days)
+       VALUES (?, 'Công tác riêng B', 9999, 1)`,
+      projectB,
+    );
+    try {
+      const idsA = (await listStages(projectA)).map((s) => s.id);
+      assert.ok(idsA.includes(stageChung), "phải thấy công tác dùng chung (project_id NULL)");
+      assert.ok(idsA.includes(stageA), "phải thấy công tác riêng của dự án A");
+      assert.ok(!idsA.includes(stageB), "không được thấy công tác riêng của dự án B");
+
+      const idsB = (await listStages(projectB)).map((s) => s.id);
+      assert.ok(idsB.includes(stageChung));
+      assert.ok(idsB.includes(stageB));
+      assert.ok(!idsB.includes(stageA));
+    } finally {
+      await run(`DELETE FROM construction_stages WHERE id IN (?, ?)`, stageA, stageB);
+      await donDep();
+    }
+  },
+);
+
+test(
+  "listFloorStageFronts + allProjectFloors: không rò dữ liệu dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { ensureFloorStageFronts, listFloorStageFronts, allProjectFloors } =
+      await import("@/lib/tien-do/constructionStages");
+    const { projectA, projectB, stageId, donDep } = await dungHaiDuAn("doc");
+
+    // Mỗi dự án 1 tháp × 1 sheet × 1 nhóm để allProjectFloors có nguồn nhãn tầng.
+    const towerA = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp A')`,
+      projectA,
+    );
+    const towerB = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp B')`,
+      projectB,
+    );
+    const sheetA = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name, slug) VALUES (?, 'M123A', 'Sheet A', 'm123-doc-a')`,
+      towerA,
+    );
+    const sheetB = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name, slug) VALUES (?, 'M123B', 'Sheet B', 'm123-doc-b')`,
+      towerB,
+    );
+    await run(
+      `INSERT INTO work_packages (sheet_type_id, code, name, floor_label) VALUES (?, 'A1', 'Nhóm A', 'T5')`,
+      sheetA,
+    );
+    await run(
+      `INSERT INTO work_packages (sheet_type_id, code, name, floor_label) VALUES (?, 'A1', 'Nhóm B', 'T9')`,
+      sheetB,
+    );
+
+    try {
+      await ensureFloorStageFronts(projectA, ["T5"]);
+      await ensureFloorStageFronts(projectB, ["T5"]);
+
+      // allProjectFloors: chỉ tầng của dự án mình.
+      assert.deepEqual(await allProjectFloors(projectA), ["T5"]);
+      assert.deepEqual(await allProjectFloors(projectB), ["T9"]);
+
+      // listFloorStageFronts: ô của dự án A không lẫn ô của B (cùng nhãn tầng "T5").
+      const frontsA = (await listFloorStageFronts(projectA)).filter((f) => f.stageId === stageId);
+      const frontsB = (await listFloorStageFronts(projectB, "T5")).filter(
+        (f) => f.stageId === stageId,
+      );
+      assert.equal(frontsA.length, 1);
+      assert.equal(frontsB.length, 1);
+      assert.notEqual(frontsA[0].id, frontsB[0].id);
+    } finally {
+      await run(`DELETE FROM work_packages WHERE sheet_type_id IN (?, ?)`, sheetA, sheetB);
+      await run(`DELETE FROM sheet_types WHERE id IN (?, ?)`, sheetA, sheetB);
+      await run(`DELETE FROM towers WHERE id IN (?, ?)`, towerA, towerB);
+      await donDep();
+    }
+  },
+);

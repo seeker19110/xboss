@@ -13,23 +13,40 @@ export type StageRow = {
   durationDays: number;
 };
 
-export async function listStages(): Promise<StageRow[]> {
+// Danh mục công tác mà MỘT dự án nhìn thấy (M123 · D1): project_id NULL = công tác dùng
+// chung mọi dự án (7 công tác seed của migrations/0046), có giá trị = công tác riêng dự án.
+export async function listStages(projectId: number): Promise<StageRow[]> {
   return query<StageRow>(
     `SELECT id, name, sort_order AS "sortOrder", active, duration_days AS "durationDays"
-       FROM construction_stages WHERE active = TRUE ORDER BY sort_order, id`,
+       FROM construction_stages
+      WHERE active = TRUE AND (project_id IS NULL OR project_id = ?)
+      ORDER BY sort_order, id`,
+    projectId,
   );
 }
 
-export async function createStage(name: string, durationDays: number): Promise<number> {
+// Tạo công tác RIÊNG của dự án (project_id luôn do route suy từ getCurrentProjectId, không
+// nhận từ client). sort_order tính trên các công tác dự án đó nhìn thấy (chung + riêng).
+export async function createStage(
+  projectId: number,
+  name: string,
+  durationDays: number,
+): Promise<number> {
   return insertId(
-    `INSERT INTO construction_stages (name, sort_order, duration_days)
-     VALUES (?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM construction_stages), ?)`,
+    `INSERT INTO construction_stages (project_id, name, sort_order, duration_days)
+     VALUES (?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM construction_stages
+                     WHERE project_id IS NULL OR project_id = ?), ?)`,
+    projectId,
     name,
+    projectId,
     durationDays,
   );
 }
 
+// Sửa công tác mà dự án đó nhìn thấy (chung + riêng). Luật quyền D3 (chỉ Admin được sửa
+// công tác dùng chung) kiểm ở route PATCH — ở đây chỉ chặn sửa công tác của dự án khác.
 export async function updateStage(
+  projectId: number,
   id: number,
   patch: { name?: string; active?: boolean; sortOrder?: number; durationDays?: number },
 ): Promise<void> {
@@ -52,8 +69,12 @@ export async function updateStage(
     args.push(patch.durationDays);
   }
   if (sets.length === 0) return;
-  args.push(id);
-  await run(`UPDATE construction_stages SET ${sets.join(", ")} WHERE id = ?`, ...args);
+  args.push(id, projectId);
+  await run(
+    `UPDATE construction_stages SET ${sets.join(", ")}
+      WHERE id = ? AND (project_id IS NULL OR project_id = ?)`,
+    ...args,
+  );
 }
 
 export type FloorStageFrontRow = {
@@ -92,7 +113,12 @@ export async function ensureFloorStageFronts(
   }
 }
 
-export async function listFloorStageFronts(floorLabel?: string): Promise<FloorStageFrontRow[]> {
+// Các ô mặt trận của MỘT dự án (M123) — projectId bắt buộc vì floor_label là chuỗi tự do,
+// hai dự án cùng có "T5" là hai bộ ô độc lập.
+export async function listFloorStageFronts(
+  projectId: number,
+  floorLabel?: string,
+): Promise<FloorStageFrontRow[]> {
   return query<FloorStageFrontRow>(
     `SELECT id, floor_label AS "floorLabel", stage_id AS "stageId",
             handed_over_at AS "handedOverAt", received_at AS "receivedAt",
@@ -102,9 +128,10 @@ export async function listFloorStageFronts(floorLabel?: string): Promise<FloorSt
             transition_stage_id AS "transitionStageId",
             outgoing_rep_name AS "outgoingRepName", incoming_rep_name AS "incomingRepName",
             updated_at AS "updatedAt"
-       FROM floor_stage_fronts
-      ${floorLabel ? "WHERE floor_label = ?" : ""}
+       FROM floor_stage_fronts fsf
+      WHERE fsf.project_id = ?${floorLabel ? " AND fsf.floor_label = ?" : ""}
       ORDER BY floor_label, stage_id`,
+    projectId,
     ...(floorLabel ? [floorLabel] : []),
   );
 }
@@ -192,13 +219,15 @@ export function computePlannedDates(
 
 // Toàn bộ tầng đang có trong dự án (kể cả tầng chưa từng có work_package/task) — dùng
 // làm danh sách hàng của lưới mặt bằng, copy đúng nguồn dữ liệu của /api/timeline.
-export async function allProjectFloors(): Promise<string[]> {
+export async function allProjectFloors(projectId: number): Promise<string[]> {
   const rows = await query<{ floorLabel: string }>(
     `SELECT DISTINCT wp.floor_label AS "floorLabel"
        FROM work_packages wp
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-       LEFT JOIN tasks t ON t.package_id = wp.id
-      WHERE wp.floor_label IS NOT NULL AND wp.floor_label != ''`,
+       JOIN towers tw ON tw.id = st.tower_id
+      WHERE wp.floor_label IS NOT NULL AND wp.floor_label != ''
+        AND tw.project_id = ?`,
+    projectId,
   );
   return rows.map((r) => r.floorLabel).sort(sortFloorsDesc);
 }
@@ -213,9 +242,8 @@ export type StageMissingItem = {
 
 // Tầng "chưa sẵn sàng" = công tác cuối cùng theo sort_order (trong các stage active) của
 // tầng đó còn handed_over_at NULL — áp dụng chung mọi hệ (khác model cũ tách theo sheet).
-// projectId lọc qua chain work_packages → sheet_types → towers (floor_label không phải
-// FK nên JOIN theo giá trị, giống stageMissingList/allProjectFloors) — tránh 2 dự án
-// trùng nhãn tầng (vd cả 2 đều có "T5") lẫn dữ liệu "chưa sẵn sàng" của nhau.
+// projectId lọc thẳng theo cột fsf.project_id (M123 · F6 — trước đây phải suy dự án qua
+// chuỗi wp.floor_label = fsf.floor_label vì bảng chưa có cột dự án).
 export async function pendingStageFloors(projectId?: number): Promise<Set<string>> {
   const conds = [
     "cs.active = TRUE",
@@ -224,9 +252,7 @@ export async function pendingStageFloors(projectId?: number): Promise<Set<string
   ];
   const args: unknown[] = [];
   if (projectId != null) {
-    conds.push(
-      "EXISTS (SELECT 1 FROM work_packages wp JOIN sheet_types st ON st.id = wp.sheet_type_id JOIN towers tw ON tw.id = st.tower_id WHERE wp.floor_label = fsf.floor_label AND tw.project_id = ?)",
-    );
+    conds.push("fsf.project_id = ?");
     args.push(projectId);
   }
   const rows = await query<{ floorLabel: string }>(
@@ -240,10 +266,10 @@ export async function pendingStageFloors(projectId?: number): Promise<Set<string
 }
 
 // Tầng chưa sẵn sàng (như trên) có ít nhất 1 task với start_date ≤3 ngày tới (hoặc đã
-// quá) — nguồn notification + báo cáo EOT + dashboard. projectId lọc qua chain
-// work_packages → sheet_types → towers (floor_label không phải FK nên JOIN theo giá trị,
-// giống cách allProjectFloors() suy tầng). Copy tinh thần frontMissingList() cũ trong
-// lib/workfronts.ts nhưng bỏ trục sheet.
+// quá) — nguồn notification + báo cáo EOT + dashboard. projectId lọc thẳng theo cột
+// fsf.project_id (M123 · F6); JOIN work_packages/tasks vẫn giữ vì cần ngày bắt đầu của
+// task trên tầng đó. Copy tinh thần frontMissingList() cũ trong lib/workfronts.ts nhưng
+// bỏ trục sheet.
 export async function stageMissingList(projectId?: number): Promise<StageMissingItem[]> {
   const soon = daysFromTodayISO(3);
   const today = todayISO();
@@ -258,7 +284,7 @@ export async function stageMissingList(projectId?: number): Promise<StageMissing
   ];
   const args: unknown[] = [soon];
   if (projectId != null) {
-    conds.push("tw.project_id = ?");
+    conds.push("fsf.project_id = ?");
     args.push(projectId);
   }
   const rows = await query<{
@@ -273,7 +299,6 @@ export async function stageMissingList(projectId?: number): Promise<StageMissing
        JOIN construction_stages cs ON cs.id = fsf.stage_id
        JOIN work_packages wp ON wp.floor_label = fsf.floor_label
        JOIN sheet_types st ON st.id = wp.sheet_type_id
-       LEFT JOIN towers tw ON tw.id = st.tower_id
        JOIN tasks t ON t.package_id = wp.id
       WHERE ${conds.join(" AND ")}
       GROUP BY fsf.id, fsf.floor_label, cs.name`,

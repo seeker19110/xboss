@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { updateStage } from "@/lib/tien-do/constructionStages";
 
 export const dynamic = "force-dynamic";
 
 // PATCH /api/construction-stages/:id { name?, active? } — đổi tên/ẩn công tác (Admin/PM).
 // Không cho sửa sortOrder qua route này (nằm ngoài phạm vi kéo-thả sắp xếp).
+// M123 · D3: công tác dùng chung (project_id NULL) chỉ Admin được sửa; công tác của dự án
+// khác trả 404 (không xác nhận sự tồn tại).
 export async function PATCH(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -21,6 +25,23 @@ export async function PATCH(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+
+  // Dự án đang chọn chỉ nhìn thấy công tác dùng chung + công tác riêng của mình.
+  const stage = await queryOne<{ projectId: number | null }>(
+    `SELECT project_id AS "projectId" FROM construction_stages
+      WHERE id = ? AND (project_id IS NULL OR project_id = ?)`,
+    id,
+    projectId,
+  );
+  if (!stage) return NextResponse.json({ error: "Không tìm thấy công tác" }, { status: 404 });
+  if (stage.projectId === null && user.role !== "admin")
+    return NextResponse.json(
+      { error: "Công tác dùng chung — chỉ Admin được sửa" },
+      { status: 403 },
+    );
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object")
@@ -44,6 +65,6 @@ export async function PATCH(
     patch.durationDays = durationDays;
   }
 
-  await updateStage(id, patch);
+  await updateStage(projectId, id, patch);
   return NextResponse.json({ updated: id });
 }

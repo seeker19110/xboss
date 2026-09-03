@@ -71,7 +71,6 @@ const WHITELIST: Record<string, string> = {
   lookahead: "kế hoạch ngắn hạn theo sheet/tracking",
   "my-tasks": "task theo assigned_to của người dùng hiện tại",
   timeline: "dòng thời gian theo sheet/tracking",
-  "floor-stage-fronts": "mặt trận theo tầng/giai đoạn của sheet",
 };
 
 function walkRoutes(dir: string, base = ""): string[] {

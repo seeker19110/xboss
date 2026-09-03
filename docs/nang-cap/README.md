@@ -415,7 +415,7 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > thị khối `trongSo` mà PR3 mới sinh ra, nên cùng nằm sau cổng dừng §17.2. Việc mở khoá: deploy,
 > mở `/boq`, đọc "Độ phủ ánh xạ BOQ", rồi chốt ngưỡng D1.
 
-> **`M123-project-id-cho-baseline-va-mat-tran.md`** — 🚧 **Approved 2026-09-03 (PR #468), ĐANG TRIỂN KHAI** — PR1 (migration `0149` + `projectId` cho 2 hàm ghi mặt trận + RLS) đã xong; còn PR2/PR3/PR4.
+> **`M123-project-id-cho-baseline-va-mat-tran.md`** — ✅ **Approved 2026-09-03 (PR #468) và ĐÃ TRIỂN KHAI XONG cả 4 PR** (PR1+PR2 ở #469, PR3+PR4 ở PR kế tiếp). Migration `0149` + 3 cột `project_id` + unique index `(COALESCE(project_id,0), floor_label, stage_id)` + RLS 3 bảng; baselines/danh mục công tác/mặt trận theo tầng đều lọc theo dự án đang chọn. **Nợ còn lại:** khoá cửa RLS (bỏ nhánh GUC-rỗng), `floor_label` vẫn là chuỗi tự do (cần bảng `floors` thật), chưa có UI quản lý công tác riêng dự án.
 > Giai đoạn 4: đưa **3 bảng cuối của mảng kế hoạch vào trục dự án** — `baselines`,
 > `construction_stages`, `floor_stage_fronts`. Nợ này đã được ghi nhận chính thức trong whitelist
 > của `tests/project-scope-invariant.test.ts:70,79`. Ba lỗi thật đang mở: (a) `POST /api/baselines`
