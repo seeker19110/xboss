@@ -21,8 +21,12 @@ luôn nhập tay và không script nào sinh tự động; task chưa map đư�
 task đã map. Nên nếu độ phủ ~0% thì "trọng số theo giá trị" **thoái hoá im lặng về đúng bình
 quân số task cũ** trong khi giao diện lại ghi "theo giá trị BOQ" — tức là nói sai.
 
-**Còn lại:** PR2 (gom `plannedRatio` về một bản, `scurve`/`spi` cùng dùng — không đổi dữ liệu),
-PR3 (chờ cổng trên), PR4 (nhãn độ phủ trên `SCurveChart`/`SpiCards`), PR5 (tài liệu).
+**PR2 — gom `plannedRatio` về một bản (xong, chờ merge):** trước đây có 2 bản sao chép
+(`spi/route.ts` và một bản inline trong `scurve/route.ts`); nay cả hai import từ
+`lib/tien-do/evm.ts`. **Không đổi một con số nào** — hai bản vốn trùng công thức. Thêm ca test
+quét mã nguồn khoá lại: hai route phải import, không được tự định nghĩa/nội suy tại chỗ.
+
+**Còn lại:** PR3 (chờ cổng trên), PR4 (nhãn độ phủ trên `SCurveChart`/`SpiCards`), PR5 (tài liệu).
 
 ## ✅ M121 — Tick theo vùng, hoàn tác, gộp lô trên lưới tracking (Giai đoạn 2, 2026-09-03)
 

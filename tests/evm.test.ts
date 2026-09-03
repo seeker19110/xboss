@@ -218,3 +218,31 @@ test(
     }
   },
 );
+
+// ===== FR2 (M122 PR2): "% kế hoạch" chỉ còn MỘT công thức =====
+// Trước M122 có 2 bản `plannedRatio` sao chép (spi/route.ts và một bản inline trong
+// scurve/route.ts) — hai bản trùng nhau nên không ai phát hiện, nhưng sửa một bản mà quên
+// bản kia thì S-curve và SPI sẽ nói hai chuyện khác nhau về cùng một dự án. Ca này khoá
+// lại: hai route phải IMPORT hàm chung, không được tự định nghĩa lại.
+test("plannedRatio: scurve/spi dùng chung một bản, không sao chép công thức", async () => {
+  const { readFileSync } = await import("node:fs");
+  for (const f of ["app/api/dashboard/scurve/route.ts", "app/api/dashboard/spi/route.ts"]) {
+    const src = readFileSync(f, "utf8");
+    assert.match(
+      src,
+      /import \{ plannedRatio \} from "@\/lib\/tien-do\/evm"/,
+      `${f} phải import plannedRatio từ lib/tien-do/evm`,
+    );
+    assert.doesNotMatch(
+      src,
+      /function plannedRatio/,
+      `${f} không được tự định nghĩa lại plannedRatio`,
+    );
+    // Công thức nội suy viết tay (dấu hiệu của một bản sao inline mới).
+    assert.doesNotMatch(
+      src,
+      /Math\.min\(1, Math\.max\(0, \(ms - s\)/,
+      `${f} không được nội suy kế hoạch tại chỗ — gọi plannedRatio`,
+    );
+  }
+});

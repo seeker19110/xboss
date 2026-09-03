@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { resolveSystemId } from "@/lib/tien-do/systems";
+import { plannedRatio } from "@/lib/tien-do/evm";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
@@ -198,11 +199,7 @@ export async function GET(req: NextRequest) {
     let plannedPct: number | null = null;
     if (planned.length > 0) {
       let sum = 0;
-      for (const t of planned) {
-        const s = toDate(t.startDate!),
-          e = toDate(t.endDate!);
-        sum += e <= s ? (ms >= e ? 1 : 0) : Math.min(1, Math.max(0, (ms - s) / (e - s)));
-      }
+      for (const t of planned) sum += plannedRatio(t.startDate!, t.endDate!, ms);
       plannedPct = sum / planned.length;
     }
 
