@@ -26,7 +26,10 @@ quân số task cũ** trong khi giao diện lại ghi "theo giá trị BOQ" — 
 `lib/tien-do/evm.ts`. **Không đổi một con số nào** — hai bản vốn trùng công thức. Thêm ca test
 quét mã nguồn khoá lại: hai route phải import, không được tự định nghĩa/nội suy tại chỗ.
 
-**Còn lại:** PR3 (chờ cổng trên), PR4 (nhãn độ phủ trên `SCurveChart`/`SpiCards`), PR5 (tài liệu).
+**Còn lại — CẢ HAI đều nằm sau cổng dừng:** PR3 (bật trọng số) và PR4 (nhãn độ phủ trên
+`SCurveChart`/`SpiCards`). PR4 hiển thị khối `trongSo` mà PR3 mới sinh ra, và nhãn "theo giá trị
+BOQ" chỉ có nghĩa khi biểu đồ thật sự đang dùng trọng số — nên không tách ra làm trước được.
+Việc mở khoá: deploy, mở `/boq`, đọc "Độ phủ ánh xạ BOQ", rồi chốt ngưỡng D1.
 
 ## ✅ M121 — Tick theo vùng, hoàn tác, gộp lô trên lưới tracking (Giai đoạn 2, 2026-09-03)
 
