@@ -387,6 +387,28 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > **Non-goals ghi rõ trong đặc tả** (chưa làm, không phải bỏ sót): copy/paste vùng tick sang/từ
 > Excel, undo xuyên phiên, vùng chọn xuyên nhiều nhóm, bóc sâu hơn `TrackingGrid.tsx`.
 
+> **`M122-hop-nhat-phan-tram-ke-hoach.md`** — 📝 **Draft, chờ người dùng duyệt** (viết 2026-09-03).
+> Giai đoạn 3: **hợp nhất "% kế hoạch" + trọng số theo giá trị BOQ** (người dùng đã chốt hướng
+> trọng số 2026-09-03). Hiện có **4 cách tính "% kế hoạch" song song** (`scurve` và `spi` mỗi nơi
+> một bản `plannedRatio` sao chép + bình quân số task · `evm.ts` trọng số giá trị BOQ · hub
+> `/schedule` suy `pv/bac`), nên hub hiện **cùng lúc hiện hai SPI khác nhau** mà không ai đối chiếu.
+> **Phạm vi đã cân nhắc kỹ (§4 phương án B): CHỈ đổi lớp phân tích** (S-curve/SPI/EVM/hub), **KHÔNG
+> đụng lớp vận hành** (`tasks.progress_percent`, `work_packages.progress`, `recomputeTask/Package`,
+> trần 0.99). Lý do bác phương án đổi toàn bộ: % vận hành nuôi gate nghiệm thu `progress >= 1`, gate
+> "blocked" của Gantt/CPM, định nghĩa "trễ" (lặp ~14 chỗ), và số tiền trên `/api/payments` — đổi nó
+> là đổi **hành vi**, và trần 0.99 (chốt an toàn chống mở khoá nghiệm thu sai) sẽ mất tác dụng.
+> Hai khái niệm % tồn tại song song **có chủ đích**, đặt tên rõ trên giao diện: **% thi công** (vận
+> hành) vs **% giá trị** (phân tích).
+> **Phát hiện quan trọng khi khảo sát:** `boq_task_map` là đường **DUY NHẤT** tới giá trị BOQ —
+> `tasks.boq_code` không hề được join với `boq_items` ở bất kỳ đâu (đã grep toàn repo), `weight`
+> luôn nhập tay, hai script backfill hiện có không đụng bảng này, và **chưa có cách nào đo độ phủ**.
+> Task chưa map đang được gán trọng số = trung bình task đã map (`evm.ts:152-161`) ⇒ nếu độ phủ ~0%
+> thì công thức **thoái hoá im lặng về bình quân cũ** trong khi nhãn nói "theo giá trị BOQ".
+> Vì vậy **PR1 (đo độ phủ) là cổng bắt buộc trước PR3 (bật trọng số)**, và ngưỡng độ phủ tối thiểu
+> (D1 §18) chỉ chốt được **sau khi có số thật từ production**. 5 PR
+> (`standard`/`mechanical`/`spec`/`standard`/`mechanical`). Không migration đụng dữ liệu; số đã lưu
+> lịch sử (`payment_bills.progress_snapshot`, `baseline_tasks`, `mv_progress_daily`) giữ nguyên.
+
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 
 > **M62 (`M62-rls-khoa-cua.md`)** — đóng nốt RLS: `withProjectScope` đọc-ghi + bọc 3 route còn lại (`notifications`, `payments/bills`, `payments/floors`) rồi migration "khoá cửa" bỏ nhánh thiếu-ngữ-cảnh (2 PR, `route: spec`; PR2 có điều kiện tiên quyết vận hành). **Đã xong hoàn toàn 2026-07-20** — PR1 (nhánh `claude/plan-m62-m63-7osrkh`, 2026-07-19) và PR2 (`migrations/0077_rls_lock.sql`, PR #300) đều đã merge `main`; người dùng xác nhận cả 2 điều kiện tiên quyết vận hành đủ trước khi merge PR2. Xem `PROGRESS.md`. **M63 (`M63-webhook-ssrf-dns-pinning.md`)** — chống SSRF DNS rebinding cho webhook: resolve + pin IP qua undici `connect.lookup`, mở rộng `isPrivateIp` (1 PR, `route: spec`). **Đã xong 2026-07-19** (nhánh `claude/plan-m62-m63-7osrkh`). Cả 2 sinh từ đợt đánh giá chi tiết lần 8 (`PROGRESS.md`).
