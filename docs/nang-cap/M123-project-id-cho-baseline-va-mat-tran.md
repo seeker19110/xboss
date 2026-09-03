@@ -13,7 +13,7 @@
 ## 1. Problem, vai trò và bằng chứng
 
 XBoss đã đa dự án từ M27 (`migrations/0027_multi_project.sql`, ADR-0004) và đã bật RLS theo dự án
-từ M?/`migrations/0069_rls.sql` (ADR-0005). Nhưng **ba bảng của mảng kế hoạch/mặt trận vẫn nằm
+từ `migrations/0069_rls.sql` (ADR-0005). Nhưng **ba bảng của mảng kế hoạch/mặt trận vẫn nằm
 ngoài trục dự án**, và nợ này đã được ghi nhận chính thức trong whitelist của
 `tests/project-scope-invariant.test.ts:70,79` (`baselines: "nợ đa dự án đã biết"`,
 `"floor-stage-fronts": "mặt trận theo tầng/giai đoạn của sheet"`).
