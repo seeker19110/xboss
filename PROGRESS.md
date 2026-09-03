@@ -1,5 +1,43 @@
 # PROGRESS.md — Trạng thái dự án
 
+## 📝 M123 — `project_id` cho baseline, danh mục công tác và mặt trận theo tầng (Giai đoạn 4, đặc tả chờ duyệt, 2026-09-03)
+
+`docs/nang-cap/M123-project-id-cho-baseline-va-mat-tran.md` — **Draft, chờ người dùng duyệt.**
+Chọn làm Giai đoạn 4 vì M122 PR3/PR4 đang bị chặn ở cổng độ phủ BOQ (cần số production), còn việc
+này độc lập hoàn toàn.
+
+**Ba lỗi thật đã xác minh trong mã nguồn (khảo sát 2026-09-03):**
+
+- `app/api/baselines/route.ts:42-51` chốt baseline bằng `INSERT INTO baseline_tasks SELECT ... FROM
+tasks` **không có mệnh đề WHERE** ⇒ chốt baseline ở dự án A chụp luôn task của dự án B; danh sách
+  baseline (`:12-19`) cũng không lọc nên selector trên `SCurveChart`/`EvmChart` hiện baseline dự án khác.
+- `floor_stage_fronts` có `UNIQUE (floor_label, stage_id)` (`migrations/0046:23`) **không có dự án**,
+  mà `floor_label` chỉ là chuỗi tự do ⇒ hai dự án cùng tầng "T5" ghi đè nhau ngày bàn giao/nhà thầu/
+  tài liệu, im lặng vì `ON CONFLICT ... DO NOTHING` (`lib/tien-do/constructionStages.ts:83`).
+  `allProjectFloors()` (`:182-190`) tên là "allProject" nhưng không lọc `project_id`.
+- `construction_stages` là danh mục toàn hệ (seed 7 công tác), không có lối tách theo dự án.
+
+Cả 3 bảng **chưa có RLS**, khác với 10 migration đã áp policy `app.project_id`. Nợ này đã nằm sẵn
+trong whitelist `tests/project-scope-invariant.test.ts:70,79` — M123 sẽ **gỡ 2 mục đó** (test có
+assert "WHITELIST có mục thừa" nên không thể quên).
+
+**2 quyết định nghiệp vụ đã chốt với người dùng 2026-09-03:** D1 — `construction_stages` dùng mô
+hình **lai** (`project_id` NULLABLE: NULL = dùng chung mọi dự án, có giá trị = riêng dự án; 7 công
+tác seed giữ NULL), bác phương án nhân bản NOT NULL vì migration đụng dữ liệu nặng hơn. D2 —
+baseline cũ backfill về `MIN(projects.id)` theo khuôn `0027_multi_project.sql`/`0069_rls.sql`.
+
+**4 PR tuần tự** (`spec`/`standard`/`spec`/`mechanical`), migration mới `0149_`. **Điểm chết người:**
+DROP ràng buộc UNIQUE cũ làm `ON CONFLICT (floor_label, stage_id)` ở `constructionStages.ts:83,127`
+lỗi runtime ngay ⇒ migration + 2 chỗ sửa đó **bắt buộc cùng PR1**. Migration đụng dữ liệu
+(`SET NOT NULL` + DROP UNIQUE) ⇒ **phải qua staging** trước production (DoD trong `CLAUDE.md`).
+**Guardrail AC7:** trên DB 1 dự án thật, số đếm 4 bảng và mọi số trên dashboard/schedule/work-fronts
+**không được đổi**.
+
+**Open decision chờ chốt lúc duyệt:** ai được sửa công tác dùng chung (`project_id IS NULL`) — đặc
+tả đề xuất chỉ Admin.
+
+**Tiếp theo:** người dùng duyệt đặc tả → lập `PLAN.md` → giao coordinator thi hành 4 PR.
+
 ## 🚧 M122 — Hợp nhất "% kế hoạch" + trọng số theo giá trị BOQ (Giai đoạn 3, đang làm)
 
 `docs/nang-cap/M122-hop-nhat-phan-tram-ke-hoach.md` (Approved 2026-09-03, spec merge ở PR #465).
