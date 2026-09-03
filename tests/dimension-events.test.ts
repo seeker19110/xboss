@@ -190,6 +190,40 @@ test(
   },
 );
 
+// ===== chuanHoaGhiChuO: hồi quy lỗi bắt trong review M120 =====
+// Route từng gộp "client không gửi note" vào `null`, nên MỌI lần tick không kèm ghi chú
+// (chính là cái `toggle`/`setAllInRow` của lưới gửi) rơi vào nhánh ghi đè và xoá sạch ghi chú.
+// "Tick cả hàng" PATCH luôn cả ô ĐANG tick ⇒ mất ghi chú cả hàng dù không ai đụng tới.
+
+test("chuanHoaGhiChuO: không gửi field → undefined (giữ ghi chú cũ), KHÔNG phải null", async () => {
+  const { chuanHoaGhiChuO } = await import("@/lib/tien-do/dimension-events");
+  const r = chuanHoaGhiChuO(undefined);
+  assert.equal(r.ok, true);
+  assert.equal(r.ok && r.note, undefined, "vắng mặt field = giữ nguyên, không được thành null");
+});
+
+test("chuanHoaGhiChuO: null và chuỗi rỗng/trắng → null (xoá có chủ đích)", async () => {
+  const { chuanHoaGhiChuO } = await import("@/lib/tien-do/dimension-events");
+  for (const v of [null, "", "   "]) {
+    const r = chuanHoaGhiChuO(v);
+    assert.equal(r.ok, true);
+    assert.equal(r.ok && r.note, null, `${JSON.stringify(v)} phải thành null`);
+  }
+});
+
+test("chuanHoaGhiChuO: chuỗi được trim; AC12 — quá 500 ký tự trả lỗi 422 tiếng Việt", async () => {
+  const { chuanHoaGhiChuO, MAX_NOTE_LEN } = await import("@/lib/tien-do/dimension-events");
+  const ok = chuanHoaGhiChuO("  chờ vật tư  ");
+  assert.equal(ok.ok && ok.note, "chờ vật tư");
+
+  const vua = chuanHoaGhiChuO("x".repeat(MAX_NOTE_LEN));
+  assert.equal(vua.ok, true, "đúng 500 ký tự vẫn hợp lệ");
+
+  const qua = chuanHoaGhiChuO("x".repeat(MAX_NOTE_LEN + 1));
+  assert.equal(qua.ok, false, "AC12: 501 ký tự phải bị từ chối");
+  assert.match(!qua.ok ? qua.error : "", /Ghi chú tối đa 500 ký tự/);
+});
+
 test("ghiDauVetTick: danh sách rỗng là no-op, không dựng SQL `IN ()` hỏng", async () => {
   const { ghiDauVetTick } = await import("@/lib/tien-do/dimension-events");
   await ghiDauVetTick([], true, { userId: 1 }); // không được throw, không chạm DB

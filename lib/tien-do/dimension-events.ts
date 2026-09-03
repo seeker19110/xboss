@@ -1,5 +1,28 @@
 import { run } from "@/lib/db";
 
+// Giới hạn độ dài ghi chú theo ô (M120 §12) — ghi chú là gợi ý ngắn tại hiện trường
+// ("chờ vật tư", "lệch cao độ"); nội dung dài thuộc về bình luận task.
+export const MAX_NOTE_LEN = 500;
+
+// Chuẩn hoá `note` client gửi lên thành giá trị cho `ghiDauVetTick`.
+//
+// PHẢI phân biệt 3 trạng thái, không gộp làm 2:
+//   - field vắng mặt (`undefined`) → `undefined` = GIỮ NGUYÊN ghi chú đang có;
+//   - `null` hoặc chuỗi rỗng      → `null`      = xoá có chủ đích;
+//   - chuỗi                        → chuỗi đã trim = ghi đè.
+// Gộp "không gửi" vào `null` là bug đã bắt trong review M120: `toggle`/`setAllInRow` của lưới
+// chỉ gửi `{ installed }`, mà "tick cả hàng" PATCH luôn cả các ô ĐANG tick — gộp nhầm thì cả
+// hàng mất sạch ghi chú dù người dùng không đụng tới ghi chú nào.
+export function chuanHoaGhiChuO(
+  raw: unknown,
+): { ok: true; note: string | null | undefined } | { ok: false; error: string } {
+  if (raw === undefined) return { ok: true, note: undefined };
+  if (raw === null) return { ok: true, note: null };
+  const t = String(raw).trim();
+  if (t.length > MAX_NOTE_LEN) return { ok: false, error: `Ghi chú tối đa ${MAX_NOTE_LEN} ký tự` };
+  return { ok: true, note: t || null };
+}
+
 // Dữ liệu sự kiện theo ô tick (M120) — ai lắp / lúc nào / ghi chú tại ô.
 //
 // Đây là NƠI DUY NHẤT quyết định 3 cột `installed_at`/`installed_by`/`note` mang giá trị gì,
