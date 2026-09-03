@@ -17,6 +17,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
+import DoPhuBoqCard from "./_components/DoPhuBoqCard";
 
 type NormResourceType = "material" | "labor" | "equipment";
 const NORM_RESOURCE_TYPE_LABEL: Record<NormResourceType, string> = {
@@ -242,6 +243,8 @@ export default function BoqPage() {
             </div>
           </div>
         )}
+
+        {items.length > 0 && <DoPhuBoqCard />}
 
         <div className="flex items-center justify-between">
           <label className="inline-flex items-center gap-2 text-xs font-medium text-zinc-300 cursor-pointer select-none">
