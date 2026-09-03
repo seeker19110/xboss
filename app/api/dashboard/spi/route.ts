@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { resolveSystemId } from "@/lib/tien-do/systems";
+import { plannedRatio } from "@/lib/tien-do/evm";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
@@ -13,16 +14,7 @@ type Row = {
   progress: number;
 };
 
-const DAY_MS = 86400_000;
 const toDate = (iso: string) => new Date(iso + "T00:00:00Z").getTime();
-
-// Tỉ lệ thời gian đã trôi của 1 task tại hôm nay (kế hoạch tuyến tính start→end), clamp 0..1.
-function plannedRatio(start: string, end: string, today: number): number {
-  const s = toDate(start),
-    e = toDate(end);
-  if (e <= s) return today >= e ? 1 : 0;
-  return Math.min(1, Math.max(0, (today - s) / (e - s)));
-}
 
 // GET /api/dashboard/spi?system=<code>
 // SPI (Schedule Performance Index) = % thực tế / % kế hoạch tại hôm nay, theo từng hệ + tổng dự án.

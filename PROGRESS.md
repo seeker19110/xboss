@@ -5,7 +5,7 @@
 `docs/nang-cap/M122-hop-nhat-phan-tram-ke-hoach.md` (Approved 2026-09-03, spec merge ở PR #465).
 Giai đoạn 3 của lộ trình rà soát mảng kế hoạch/tiến độ/tracking.
 
-**PR1 — đo độ phủ ánh xạ BOQ (xong, đang chờ merge):**
+**PR1 — đo độ phủ ánh xạ BOQ (xong, PR #466 đã merge):**
 
 - `lib/khoi-luong/boq-coverage.ts` — `doPhuBoq()` (độ phủ tổng + theo hệ + danh sách dòng BOQ có
   Σweight ≠ 1) và `doPhuGon()` (3 con số cho lớp biểu đồ ở PR3).
@@ -21,8 +21,15 @@ luôn nhập tay và không script nào sinh tự động; task chưa map đư�
 task đã map. Nên nếu độ phủ ~0% thì "trọng số theo giá trị" **thoái hoá im lặng về đúng bình
 quân số task cũ** trong khi giao diện lại ghi "theo giá trị BOQ" — tức là nói sai.
 
-**Còn lại:** PR2 (gom `plannedRatio` về một bản, `scurve`/`spi` cùng dùng — không đổi dữ liệu),
-PR3 (chờ cổng trên), PR4 (nhãn độ phủ trên `SCurveChart`/`SpiCards`), PR5 (tài liệu).
+**PR2 — gom `plannedRatio` về một bản (xong, chờ merge — PR #467):** trước đây có 2 bản sao chép
+(`spi/route.ts` và một bản inline trong `scurve/route.ts`); nay cả hai import từ
+`lib/tien-do/evm.ts`. **Không đổi một con số nào** — hai bản vốn trùng công thức. Thêm ca test
+quét mã nguồn khoá lại: hai route phải import, không được tự định nghĩa/nội suy tại chỗ.
+
+**Còn lại — CẢ HAI đều nằm sau cổng dừng:** PR3 (bật trọng số) và PR4 (nhãn độ phủ trên
+`SCurveChart`/`SpiCards`). PR4 hiển thị khối `trongSo` mà PR3 mới sinh ra, và nhãn "theo giá trị
+BOQ" chỉ có nghĩa khi biểu đồ thật sự đang dùng trọng số — nên không tách ra làm trước được.
+Việc mở khoá: deploy, mở `/boq`, đọc "Độ phủ ánh xạ BOQ", rồi chốt ngưỡng D1.
 
 ## ✅ M121 — Tick theo vùng, hoàn tác, gộp lô trên lưới tracking (Giai đoạn 2, 2026-09-03)
 
