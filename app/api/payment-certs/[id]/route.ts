@@ -8,6 +8,7 @@ import {
   validateCertItems,
   checkCertLinesBelongToContract,
   saveCertItems,
+  dongVuotHopDong,
   type CertLineInput,
 } from "@/lib/tai-chinh/paymentcerts";
 import { getEntityApprovalStatus } from "@/lib/tien-do/approvals";
@@ -56,16 +57,18 @@ export async function GET(
     // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho loại
     // "payment_cert" (hành xử dormant, không đổi UI cũ).
     const approvalStatus = await getEntityApprovalStatus("payment_cert", id);
-    return { cert, totals, approvalStatus };
+    // Dòng vượt khối lượng hợp đồng — CẢNH BÁO, không chặn (xem dongVuotHopDong).
+    const vuotHopDong = await dongVuotHopDong(id);
+    return { cert, totals, approvalStatus, vuotHopDong };
   });
   if (!detail)
     return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
-  const { cert, totals, approvalStatus } = detail;
+  const { cert, totals, approvalStatus, vuotHopDong } = detail;
   // M50 PR2: che đơn giá dòng KL + tổng tiền đợt cho user thiếu viewPayments (phòng thủ
   // — gate route hiện cũng là viewPayments).
   const [maskedCert] = stripSensitive("paymentCert", [cert], user);
   const [maskedTotals] = stripSensitive("certTotals", [totals], user);
-  return NextResponse.json({ cert: maskedCert, totals: maskedTotals, approvalStatus });
+  return NextResponse.json({ cert: maskedCert, totals: maskedTotals, approvalStatus, vuotHopDong });
 }
 
 // PATCH /api/payment-certs/:id { items: [{boqItemId, qtyPeriod}], periodLabel? }
@@ -120,5 +123,8 @@ export async function PATCH(
     );
   }
 
-  return NextResponse.json({ updated: id });
+  // Lưu xong mới soát: người lập vẫn ghi được (quyết định "cảnh báo, không chặn"), nhưng
+  // phải nhìn thấy ngay dòng nào đang vượt khối lượng hợp đồng trước khi trình duyệt.
+  const vuotHopDong = await dongVuotHopDong(id);
+  return NextResponse.json({ updated: id, vuotHopDong });
 }

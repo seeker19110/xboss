@@ -1,5 +1,70 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Đợt 2 chiến dịch coverage — mở khoá test THỰC THI route, phủ 10 cụm (2026-09-04)
+
+**Rào chắn của đợt này không phải công sức mà là hạ tầng.** 453/482 route (đã trừ CAD) chưa có
+test nào chạm tới, và hai cách test route đang có trong repo **đều không thực thi route**:
+(1) tái hiện lại câu SQL của route trong chính test; (2) `assert.match` trên MÃ NGUỒN route
+(grep chuỗi `"status: 403"`). Không cách nào đóng góp coverage cho hơn 450 file route, và cách
+(2) còn mục ruỗng âm thầm — grep vẫn xanh khi logic đã sai. Lý do kỹ thuật: route gọi
+`getCurrentUser()`, hàm này đọc cookie qua `next/headers`, mà ngoài request scope của Next thì
+`cookies()` ném lỗi.
+
+**`tests/helpers/phien.ts`** mock `next/headers` một lần cho cả tiến trình và ký cookie phiên
+THẬT bằng chính `makeToken()` của sản phẩm — toàn bộ đường xác thực (HMAC, pwFrag,
+session_version, orgId) vẫn chạy như production, chỉ thay đúng lớp vận chuyển cookie. Ca "sửa
+một ký tự trong chữ ký cookie → 401" chứng minh điều đó.
+
+**10 cụm route, 646 ca test mới:** bản vẽ/hồ sơ 88 · quản trị 89 · tài chính 86 · tiến độ 73 ·
+hiện trường 68 · mua sắm 68 · BOQ/vật tư 71 · dashboard 25 · xác thực 15 · baselines 7 ·
+seqcode 4. Rất nhiều route đạt lines 100%.
+
+Tổng: **232 file / 88.09% lines → 290 file / 90.08%**; 1741 → **2336 ca test**.
+
+### 5 BUG THẬT lộ ra ở đợt này (đều đã sửa)
+
+1. **RÒ RỈ TÀI LIỆU XUYÊN DỰ ÁN** (`/api/documents/:id`, GET + DELETE) — route chỉ tra
+   `WHERE id = ?` rồi xét quyền qua `canTouchTask`/`canTouchFloor`. Hai hàm đó chỉ trả lời câu
+   "subcon này có được giao việc không" và trả **TRUE NGAY cho mọi vai trò khác** — không hề so
+   dự án. Bất kỳ user không phải subcon ở dự án A, biết id một tài liệu của dự án B là **tải
+   được nguyên văn file** hoặc **xoá được nó**; id là số nguyên tăng dần nên đoán được. Nay suy
+   dự án qua `tasks→work_packages→sheet_types→towers` (hoặc `floor_approvals→…`) và trả **404**
+   (không phải 403 — 403 vẫn xác nhận tài liệu tồn tại).
+2. **`nextSeqCode` hỏng bộ đếm mã của 9 loại chứng từ** (PR/PO/WR, VO, IPC, hợp đồng, gói thầu,
+   claim, rủi ro, thay đổi thiết kế, YCNT) — đúng hai lỗi đã sửa cho `nextBoqSeq` ở đợt 1 nhưng
+   còn sót: so CHUỖI thay vì SỐ, và không lọc đuôi phi số. Chỉ cần MỘT mã nhập tay lệch định
+   dạng (`PO-KHAN-CAP`, dữ liệu import cũ) là `parseInt` trả NaN → mã thành `VO-NaN` → lần sau
+   lại NaN → đụng UNIQUE → `withUniqueRetry` thử đủ 5 lần rồi bỏ cuộc: **cấp mã cho toàn bộ
+   loại chứng từ đó hỏng vĩnh viễn, không tự khỏi**. Chỉ bộ test ĐẦY ĐỦ mới dựng lại được (chạy
+   riêng từng file không thấy). Viết test còn lộ lỗi thứ ba: `LIKE ${prefix}%` khiến prefix
+   chứa `_` kéo nhầm mã loại khác vào bộ đếm.
+3. **Ba handler nhầm 401 thành 403** (`DELETE /api/materials/:id`, `PATCH`+`DELETE`
+   `/api/users/:id`) — gộp `if (!user || !CAN...)`. Client không phân biệt được "phiên hết hạn,
+   đăng nhập lại" với "không đủ quyền"; người bị đăng xuất ngầm thấy "bạn không có quyền" thay
+   vì được đưa về trang đăng nhập.
+4. **500 thô khi lập nhật ký** (`PUT /api/diaries/:date`) — `photoIds` trỏ tới ảnh đã bị xoá làm
+   lỗi khoá ngoại của Postgres lọt thẳng ra ngoài. Đó là lỗi ĐẦU VÀO, nay trả 422 tiếng Việt và
+   không lộ tên bảng/ràng buộc.
+5. **Khối lượng IPC không bị chặn trần** — không lớp nào so khối lượng luỹ kế với khối lượng hợp
+   đồng (`validateCertItems` chỉ kiểm qty ≥ 0; `saveCertItems` ghi thẳng; `overContractCerts`
+   chỉ so tiền cả hợp đồng và không được route gọi). Nhập gấp 10 lần vẫn lưu, không dấu hiệu
+   nào. **Quyết định người dùng: cảnh báo, KHÔNG chặn** — thi công vượt trong khi VO/phụ lục
+   chờ duyệt là tình huống thật. GET/PATCH trả kèm `vuotHopDong`, trang IPC hiện khối cảnh báo
+   đỏ từng dòng. Test khoá cả hai mặt: có cảnh báo khi vượt, và IM khi đúng hạn mức.
+
+Cộng thêm: xoá nhánh chết `createFidicClaim` (tham chiếu 5 cột không tồn tại) và vá `created_by`
+luôn null trong nhánh đang chạy.
+
+### Bài học hạ tầng test
+
+`visibleProjectIds` chỉ trả "mọi dự án" khi bảng `user_projects` RỖNG. Nhiều file test chèn vào
+bảng đó mà không dọn ⇒ file khác **xanh khi chạy riêng, đỏ trong bộ đầy đủ**, với thông báo
+chẳng liên quan gì tới thứ đang test. Đã hợp nhất `dangNhapDuAn` vào `tests/helpers/phien.ts`
+(gán thẳng user vào dự án) và áp cho mọi file test route. Mỗi worker phải chạy bước kiểm chứng:
+chèn nhiễu vào `user_projects` rồi chạy lại, phải vẫn xanh.
+
+**Đợt sau:** phần còn lại của `app/api/**`. 290 file đang đo trên 660 file trong phạm vi.
+
 ## ✅ Đợt 1 chiến dịch coverage — phủ 9 module lib/ chưa từng có test (2026-09-04)
 
 Mục tiêu người dùng chốt: nâng coverage lên 100%, **trừ** các tính năng AutoCAD/Revit; làm dần

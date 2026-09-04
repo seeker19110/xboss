@@ -225,6 +225,41 @@ export async function saveCertItems(
   }
 }
 
+/** Một dòng IPC có khối lượng luỹ kế vượt khối lượng hợp đồng của chính dòng BOQ đó. */
+export type DongVuotHopDong = {
+  boqItemId: number;
+  code: string;
+  name: string;
+  unit: string;
+  qtyContract: number;
+  qtyCumulative: number;
+};
+
+/**
+ * Các dòng của một đợt IPC có luỹ kế vượt khối lượng hợp đồng.
+ *
+ * CẢNH BÁO, KHÔNG CHẶN (quyết định người dùng 2026-09-04): vượt khối lượng là tình huống
+ * nghiệp vụ THẬT — nhà thầu thi công vượt trong khi VO/phụ lục còn đang chờ duyệt — nên chặn
+ * cứng sẽ cản quy trình. Nhưng im lặng cho qua thì người ký duyệt IPC không có cách nào biết,
+ * và đây là tiền thật. Vì vậy route trả kèm danh sách này để UI nêu rõ từng dòng.
+ *
+ * Trước đợt này KHÔNG có lớp nào so khối lượng với hợp đồng: `validateCertItems` chỉ kiểm
+ * qty >= 0 và không trùng dòng; `saveCertItems` ghi thẳng; `overContractCerts` chỉ so GIÁ TRỊ
+ * TIỀN của cả hợp đồng và không được route gọi. Nhập gấp 10 lần khối lượng hợp đồng vẫn lưu
+ * được, không một dấu hiệu nào.
+ */
+export async function dongVuotHopDong(certId: number): Promise<DongVuotHopDong[]> {
+  return query<DongVuotHopDong>(
+    `SELECT i.boq_item_id AS "boqItemId", b.code, b.name, b.unit,
+            b.qty_contract AS "qtyContract", i.qty_cumulative AS "qtyCumulative"
+       FROM payment_cert_items i
+       JOIN boq_items b ON b.id = i.boq_item_id
+      WHERE i.cert_id = ? AND i.qty_cumulative > b.qty_contract
+      ORDER BY b.code`,
+    certId,
+  );
+}
+
 export type CertTotals = {
   periodValue: number;
   cumulativeValue: number;

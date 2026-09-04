@@ -16,4 +16,16 @@ regexes = [
   # tests/log.test.ts (C4 §6 — redact log) — JWT mẫu công khai của jwt.io dùng làm fixture
   # kiểm redaction, không phải bí mật thật; rule "jwt" của gitleaks báo nhầm vì đúng cấu trúc.
   '''SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c''',
+  # tests/route-auth.test.ts — mật khẩu của tài khoản test dựng trong DB ephemeral để kiểm
+  # đường đăng nhập thật (sai/đúng mật khẩu, rate-limit, đổi mật khẩu vô hiệu phiên cũ).
+  # Không phải bí mật thật; rule generic-api-key báo nhầm vì nằm cạnh trường "password".
+  '''mk-test-xboss-khong-bi-mat''',
+  '''mk-test-xboss-doi-moi''',
+  '''mk-test-xboss-sai''',
+  # Giá trị của bản nháp ĐẦU của cùng file test, vẫn nằm trong lịch sử commit của nhánh.
+  # gitleaks quét cả lịch sử nên allowlist phải phủ chúng, đúng như ghi chú ở đầu file này.
+  '''mat-khau-dung-123''',
+  '''mat-khau-cu-123''',
+  '''mat-khau-moi-456''',
+  '''sai-mat-khau''',
 ]

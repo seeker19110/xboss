@@ -11,7 +11,10 @@ export async function PATCH(
 ) {
   const params = await paramsP;
   const me = await getCurrentUser();
-  if (!me || !CAN.manageUsers(me.role))
+  // Tách 401 khỏi 403 như quy ước chung của dự án: gộp chung khiến client không phân biệt
+  // được "phiên hết hạn, đăng nhập lại" với "tài khoản không đủ quyền".
+  if (!me) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.manageUsers(me.role))
     return NextResponse.json({ error: "Chỉ Admin được sửa người dùng" }, { status: 403 });
 
   const id = parseInt(params.id);
@@ -74,7 +77,8 @@ export async function DELETE(
 ) {
   const params = await paramsP;
   const me = await getCurrentUser();
-  if (!me || !CAN.manageUsers(me.role))
+  if (!me) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.manageUsers(me.role))
     return NextResponse.json({ error: "Chỉ Admin được xoá người dùng" }, { status: 403 });
 
   const id = parseInt(params.id);
