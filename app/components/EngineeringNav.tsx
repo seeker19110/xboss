@@ -15,7 +15,6 @@ import {
   ShieldAlert,
   Radio,
   Sliders,
-  Code,
   Layers,
   Zap,
   Route,
@@ -25,9 +24,6 @@ import {
   Activity,
   Search,
   Sparkles,
-  Scan,
-  Scissors,
-  Ruler,
   Coins,
   ChevronDown,
   ChevronUp,
@@ -45,12 +41,12 @@ const NAV_COLLAPSED_KEY = "xboss_eng_nav_collapsed";
 const NAV_ROLE_FILTER_KEY = "xboss_eng_nav_role_filter";
 
 export type NavCategory =
-  "all" | "unified" | "spatial" | "copilot" | "commercial" | "twin" | "governance";
+  "all" | "unified" | "spatial" | "copilot" | "commercial" | "ledger" | "governance";
 
 export interface NavItem {
   href: string;
   label: string;
-  category: "unified" | "spatial" | "copilot" | "commercial" | "twin" | "governance";
+  category: "unified" | "spatial" | "copilot" | "commercial" | "ledger" | "governance";
   icon: typeof Boxes;
   badge?: string;
   roles?: Role[];
@@ -58,24 +54,16 @@ export interface NavItem {
 
 const CATEGORIES: { key: NavCategory; label: string }[] = [
   { key: "all", label: "Tất cả" },
-  { key: "unified", label: "🏛️ 7 Đại Trung Tâm Hợp Nhất" },
+  { key: "unified", label: "🏛️ 6 Đại Trung Tâm Hợp Nhất" },
   { key: "spatial", label: "📐 MEPF & Không Gian" },
   { key: "copilot", label: "🤖 AI & Hiện Trường" },
   { key: "commercial", label: "💼 Thương Mại & Pháp Lý" },
-  { key: "twin", label: "⚡ Digital Twin & Sổ Cái" },
+  { key: "ledger", label: "⚡ Sổ Cái & Tri Thức" },
   { key: "governance", label: "🛡️ Quản Trị & Quy Trình" },
 ];
 
 const NAV_ITEMS: NavItem[] = [
   // ── Unified Cockpits & Master Hubs ──
-  {
-    href: "/engineering/god-tier-studio",
-    label: "MEPF CAD/BIM Studio",
-    category: "unified",
-    icon: Sparkles,
-    badge: "Studio Tổng",
-    roles: ["admin", "pm", "engineer", "subcon", "bch", "cdt", "viewer"],
-  },
   {
     href: "/site",
     label: "Chỉ Huy Tác Nghiệp Hiện Trường & HSE",
@@ -125,56 +113,13 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
   },
 
-  // ── Spatial & BIM/CAD ──
-  {
-    href: "/engineering/bim-viewer",
-    label: "Mô phỏng 3D BIM & 4D",
-    category: "spatial",
-    icon: Boxes,
-    roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
-  },
-  {
-    href: "/engineering/auto-routing",
-    label: "Tự động nắn tuyến 3D",
-    category: "spatial",
-    icon: Route,
-    badge: "Xử lý va chạm",
-    roles: ["admin", "pm", "engineer"],
-  },
-  {
-    href: "/engineering/cad-corridor",
-    label: "Hành lang kỹ thuật & Giá đỡ",
-    category: "spatial",
-    icon: Layers,
-    roles: ["admin", "pm", "engineer"],
-  },
-  {
-    href: "/engineering/joint-segmentation",
-    label: "Chia đốt MEPF",
-    category: "spatial",
-    icon: Ruler,
-    roles: ["admin", "pm", "engineer", "subcon"],
-  },
-  {
-    href: "/engineering/cad-nesting",
-    label: "Tối ưu cắt phôi ống",
-    category: "spatial",
-    icon: Scissors,
-    roles: ["admin", "pm", "engineer", "subcon"],
-  },
+  // ── MEPF & Không gian ──
   {
     href: "/engineering/pipe-stash-hunter",
     label: "Tối ưu ống tồn kho",
     category: "spatial",
     icon: Scale,
     roles: ["admin", "pm", "engineer", "subcon"],
-  },
-  {
-    href: "/engineering/scan-to-bim",
-    label: "Scan-to-BIM Đám mây điểm",
-    category: "spatial",
-    icon: Scan,
-    roles: ["admin", "pm", "engineer"],
   },
   {
     href: "/engineering/spatial-viewer",
@@ -184,40 +129,11 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
   },
   {
-    href: "/engineering/cad-tracking",
-    label: "Bóc tách khối lượng CAD",
-    category: "spatial",
-    icon: Layers,
-    roles: ["admin", "pm", "engineer", "bch"],
-  },
-  {
-    href: "/engineering/chuan-hoa-ban-ve",
-    label: "Chuẩn hóa bản vẽ CAD 2D",
-    category: "spatial",
-    icon: Code,
-    badge: "ISO 19650",
-    roles: ["admin", "pm", "engineer", "bch"],
-  },
-  {
-    href: "/engineering/thiet-bi-cad",
-    label: "Thiết bị plugin AutoCAD",
-    category: "spatial",
-    icon: Code,
-    roles: ["admin", "pm", "engineer"],
-  },
-  {
     href: "/engineering/mepf-lifecycle",
     label: "Vòng đời thiết bị MEPF",
     category: "spatial",
     icon: Cpu,
     roles: ["admin", "pm", "engineer"],
-  },
-  {
-    href: "/engineering/bim",
-    label: "Mô hình BIM 5D",
-    category: "spatial",
-    icon: Boxes,
-    roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
   },
 
   // ── AI & Copilots ──
@@ -257,13 +173,6 @@ const NAV_ITEMS: NavItem[] = [
     label: "Phiên hòa giải Đa tác tử",
     category: "copilot",
     icon: Bot,
-    roles: ["admin", "pm", "engineer"],
-  },
-  {
-    href: "/engineering/mepf-studio",
-    label: "Xử lý tác vụ MEPF",
-    category: "copilot",
-    icon: Cpu,
     roles: ["admin", "pm", "engineer"],
   },
 
@@ -306,42 +215,28 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "pm", "bch"],
   },
 
-  // ── Digital Twin & Merkle Ledger ──
+  // ── Sổ cái Merkle & Tri thức kỹ thuật ──
   {
     href: "/engineering/quantum-hub",
     label: "Sổ cái Merkle Bất biến",
-    category: "twin",
+    category: "ledger",
     icon: Zap,
     badge: "Toàn vẹn",
     roles: ["admin", "pm", "engineer", "bch"],
   },
   {
-    href: "/engineering/reality",
-    label: "Bản sao số Hiện trường",
-    category: "twin",
-    icon: Radio,
-    roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
-  },
-  {
     href: "/engineering/prescriptive",
     label: "Tối ưu Quy chuẩn & NCR",
-    category: "twin",
+    category: "ledger",
     icon: Sliders,
     roles: ["admin", "pm", "engineer", "bch"],
   },
   {
     href: "/engineering/memory",
     label: "Ngân hàng Tri thức Kỹ thuật",
-    category: "twin",
+    category: "ledger",
     icon: Cpu,
     roles: ["admin", "pm", "engineer"],
-  },
-  {
-    href: "/engineering/twin",
-    label: "Mô hình số Digital Twin",
-    category: "twin",
-    icon: Cpu,
-    roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
   },
 
   // ── Governance & Workflows ──

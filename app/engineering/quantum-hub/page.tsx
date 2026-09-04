@@ -6,21 +6,21 @@ import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import {
   Zap,
-  Layers,
   Database,
   ShieldCheck,
   Play,
   RotateCcw,
   CheckCircle2,
   Clock,
-  Ban,
   Activity,
   Maximize2,
   Box,
 } from "lucide-react";
 
+// Tab "Hàng đợi tác vụ phân tán" đã gỡ cùng cụm `/api/engineering/queue/**` — hàng đợi đó chỉ có
+// daemon Python `mepf-worker` tiêu thụ, worker bị xoá thì tác vụ nạp vào nằm `pending` vĩnh viễn.
 export default function QuantumHubPage() {
-  const [activeTab, setActiveTab] = useState<"spatial" | "queue" | "merkle">("spatial");
+  const [activeTab, setActiveTab] = useState<"spatial" | "merkle">("spatial");
 
   // State Tab 1: Spatial Compute
   const [computeType, setComputeType] = useState<
@@ -29,30 +29,11 @@ export default function QuantumHubPage() {
   const [spatialResult, setSpatialResult] = useState<Record<string, unknown> | null>(null);
   const [spatialLoading, setSpatialLoading] = useState(false);
 
-  // State Tab 2: Task Queue
-  const [tasks, setTasks] = useState<Array<Record<string, unknown>>>([]);
-  const [queueLoading, setQueueLoading] = useState(false);
-  const [creatingTask, setCreatingTask] = useState(false);
-
-  // State Tab 3: Merkle Ledger
+  // State Tab 2: Merkle Ledger
   const [merkleRoots, setMerkleRoots] = useState<Array<Record<string, unknown>>>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [sealingBatch, setSealingBatch] = useState(false);
   const [verifyResult, setVerifyResult] = useState<Record<string, unknown> | null>(null);
-
-  // Load Task Queue
-  const fetchTasks = async () => {
-    setQueueLoading(true);
-    try {
-      const res = await fetch("/api/engineering/queue/tasks");
-      const data = await res.json();
-      if (data.tasks) setTasks(data.tasks);
-    } catch {
-      // Ignored
-    } finally {
-      setQueueLoading(false);
-    }
-  };
 
   // Load Merkle Roots
   const fetchMerkleRoots = async () => {
@@ -69,7 +50,6 @@ export default function QuantumHubPage() {
   };
 
   useEffect(() => {
-    if (activeTab === "queue") fetchTasks();
     if (activeTab === "merkle") fetchMerkleRoots();
   }, [activeTab]);
 
@@ -88,39 +68,6 @@ export default function QuantumHubPage() {
       // Ignored
     } finally {
       setSpatialLoading(false);
-    }
-  };
-
-  // Enqueue New Task
-  const handleEnqueueTask = async (taskType: string) => {
-    setCreatingTask(true);
-    try {
-      await fetch("/api/engineering/queue/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType,
-          priority: 15,
-          payload: { batchId: `BATCH-${Date.now().toString(36)}`, itemCount: 250 },
-        }),
-      });
-      fetchTasks();
-    } catch {
-      // Ignored
-    } finally {
-      setCreatingTask(false);
-    }
-  };
-
-  // Cancel Task
-  const handleCancelTask = async (taskId: string) => {
-    try {
-      await fetch(`/api/engineering/queue/tasks/${taskId}/cancel`, {
-        method: "POST",
-      });
-      fetchTasks();
-    } catch {
-      // Ignored
     }
   };
 
@@ -215,17 +162,6 @@ export default function QuantumHubPage() {
             <span>1. Siêu Tính Toán Không Gian (WASM)</span>
           </button>
           <button
-            onClick={() => setActiveTab("queue")}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-              activeTab === "queue"
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
-            }`}
-          >
-            <Layers size={16} />
-            <span>2. Hàng Đợi Tác Vụ Phân Tán (Queue)</span>
-          </button>
-          <button
             onClick={() => setActiveTab("merkle")}
             className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
               activeTab === "merkle"
@@ -234,7 +170,7 @@ export default function QuantumHubPage() {
             }`}
           >
             <Database size={16} />
-            <span>3. Sổ Cái Merkle Bất Biến (Ledger)</span>
+            <span>2. Sổ Cái Merkle Bất Biến (Ledger)</span>
           </button>
         </div>
 
@@ -372,129 +308,7 @@ export default function QuantumHubPage() {
           </div>
         )}
 
-        {/* TAB 2: DISTRIBUTED TASK QUEUE */}
-        {activeTab === "queue" && (
-          <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-              <div>
-                <h3 className="text-base font-semibold text-zinc-100">
-                  Bảng Giám Sát Hàng Đợi Tác Vụ Kỹ Thuật Nền
-                </h3>
-                <p className="text-xs text-zinc-400">
-                  Tác vụ nặng được phân tán vào hàng đợi với cơ chế Atomic Lock, tự động retry và
-                  báo cáo tiến độ %.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => handleEnqueueTask("batch_spatial_clash_analysis")}
-                  disabled={creatingTask}
-                  className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-medium text-on-accent-dark hover:bg-amber-400 disabled:opacity-50"
-                >
-                  + Tác Vụ Soát Va Chạm Lô
-                </button>
-                <button
-                  onClick={() => handleEnqueueTask("generate_omnipotent_spools")}
-                  disabled={creatingTask}
-                  className="rounded-lg bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
-                >
-                  + Tác Vụ Bung Spool DfMA
-                </button>
-                <button
-                  onClick={fetchTasks}
-                  disabled={queueLoading}
-                  className="rounded-lg border border-zinc-700 p-2 text-zinc-400 hover:text-zinc-200"
-                >
-                  <RotateCcw size={14} className={queueLoading ? "animate-spin" : ""} />
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-zinc-800 bg-zinc-950/80 text-zinc-400">
-                  <tr>
-                    <th className="p-3">Mã Tác Vụ</th>
-                    <th className="p-3">Loại Công Việc</th>
-                    <th className="p-3">Ưu Tiên</th>
-                    <th className="p-3">Trạng Thái</th>
-                    <th className="p-3">Tiến Độ %</th>
-                    <th className="p-3">Retry</th>
-                    <th className="p-3">Hành Động</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800/60 font-mono">
-                  {tasks.length > 0 ? (
-                    tasks.map((t) => (
-                      <tr key={String(t.id)} className="hover:bg-zinc-800/30">
-                        <td className="p-3 text-amber-300 font-semibold truncate max-w-[120px]">
-                          {String(t.id).slice(0, 8)}...
-                        </td>
-                        <td className="p-3 text-zinc-200 font-sans">{String(t.task_type)}</td>
-                        <td className="p-3">
-                          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">
-                            {String(t.priority)}
-                          </span>
-                        </td>
-                        <td className="p-3">
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-sans font-medium ${
-                              t.status === "completed"
-                                ? "bg-emerald-500/20 text-emerald-300"
-                                : t.status === "processing"
-                                  ? "bg-sky-500/20 text-sky-300 animate-pulse"
-                                  : t.status === "failed"
-                                    ? "bg-rose-500/20 text-rose-300"
-                                    : t.status === "cancelled"
-                                      ? "bg-zinc-700 text-zinc-400"
-                                      : "bg-amber-500/20 text-amber-300"
-                            }`}
-                          >
-                            {String(t.status)}
-                          </span>
-                        </td>
-                        <td className="p-3 font-sans">
-                          <div className="flex items-center gap-2">
-                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-zinc-800">
-                              <div
-                                className="h-full bg-amber-400"
-                                style={{ width: `${Number(t.progress_percent || 0)}%` }}
-                              />
-                            </div>
-                            <span>{String(t.progress_percent || 0)}%</span>
-                          </div>
-                        </td>
-                        <td className="p-3 text-zinc-400">
-                          {String(t.retry_count)}/{String(t.max_retries)}
-                        </td>
-                        <td className="p-3">
-                          {(t.status === "pending" || t.status === "processing") && (
-                            <button
-                              onClick={() => handleCancelTask(String(t.id))}
-                              className="flex items-center gap-1 rounded px-2 py-1 text-[10px] font-sans text-rose-400 hover:bg-rose-500/10"
-                            >
-                              <Ban size={12} />
-                              <span>Hủy</span>
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={7} className="p-8 text-center font-sans text-zinc-500">
-                        Hàng đợi hiện tại đang trống. Hãy tạo tác vụ mới để trải nghiệm.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: IMMUTABLE MERKLE LEDGER */}
+        {/* TAB 2: IMMUTABLE MERKLE LEDGER */}
         {activeTab === "merkle" && (
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">

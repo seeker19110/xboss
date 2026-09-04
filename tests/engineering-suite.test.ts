@@ -1,9 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  // M65
-  computeCadVectorDiff,
-  // M66
+  // M66 (còn lại sau khi gỡ cụm CAD/BIM: công thức đo bóc nằm ở engineering-mepf-takeoff)
   calculatePipeQtoM,
   // M67
   inferFittingsFromSegments,
@@ -15,7 +13,6 @@ import {
   convertToLod400Dfma,
   reverseBreakdownUnitRate,
   // M70
-  analyzeScanVsBimDeviations,
   syncSpoolToWbsAndPayment,
   // M71
   calculateAssetReliabilityAndRul,
@@ -26,8 +23,7 @@ import {
   calculateEngineeringHealthIndex,
 } from "@/lib/ky-thuat/engineering-suite";
 
-test("Engineering Suite Barrel Index: Tất cả 15 phân hệ từ M65 đến M72 đều được export đầy đủ và đồng bộ", () => {
-  assert.equal(typeof computeCadVectorDiff, "function");
+test("Engineering Suite Barrel Index: các phân hệ còn lại từ M66 đến M72 đều được export đầy đủ và đồng bộ", () => {
   assert.equal(typeof calculatePipeQtoM, "function");
   assert.equal(typeof inferFittingsFromSegments, "function");
   assert.equal(typeof autoSizePipeDiameter, "function");
@@ -35,7 +31,6 @@ test("Engineering Suite Barrel Index: Tất cả 15 phân hệ từ M65 đến M
   assert.equal(typeof parseVoiceInspectionText, "function");
   assert.equal(typeof convertToLod400Dfma, "function");
   assert.equal(typeof reverseBreakdownUnitRate, "function");
-  assert.equal(typeof analyzeScanVsBimDeviations, "function");
   assert.equal(typeof syncSpoolToWbsAndPayment, "function");
   assert.equal(typeof calculateAssetReliabilityAndRul, "function");
   assert.equal(typeof calculateEmbodiedCarbonLCA, "function");

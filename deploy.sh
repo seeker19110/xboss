@@ -109,13 +109,6 @@ echo "==> 4/7 Áp migration DB còn thiếu (idempotent, dừng deploy nếu l�
 # npm run db:migrate -- --dry-run
 npm run db:migrate
 
-echo "==> 4.7/7 Dựng cây thư mục bản vẽ quy chuẩn ISO 19650 (idempotent)"
-# Việc cấp phát môi trường, làm một lần lúc triển khai — KHÔNG làm trong route lúc người dùng
-# bấm Lưu. Để nó trong đồ thị import của route khiến Turbopack phải trace toàn bộ dự án khi
-# build ("Dynamic filesystem access causes tracing of the whole project"), mà build trên VPS
-# vốn đã 20-23 phút. Xem scripts/ensure-drawing-tree.ts.
-npm run setup:drawing-tree
-
 if [ "$BUILD_LOCAL" = true ]; then
   echo "==> 5/7 Build app tại chỗ vào thư mục tạm ($BUILD_DIR) — không đụng \".next\" đang phục vụ"
   rm -rf "$BUILD_DIR"
@@ -170,20 +163,6 @@ mv "$BUILD_DIR" .next
 
 echo "==> 7/7 Reload app qua PM2 (graceful, kèm nạp lại biến môi trường) — process \"$PM2_NAME\""
 pm2 reload "$PM2_NAME" --update-env
-
-# MEPF worker (daemon Python, xem ecosystem.config.js) chạy song song app và cũng đọc code từ
-# chính thư mục này, nên phải reload theo — nếu không, worker vẫn chạy code cũ sau khi deploy.
-# Chỉ làm ở chế độ production: staging dùng chung DB hàng đợi sẽ tranh chấp tác vụ với prod, và
-# reload nhầm worker prod từ thư mục staging là đúng thứ cần tránh (xem docs/ops/staging.md).
-# Bỏ qua im lặng nếu VPS này không chạy worker — nhiều VPS chỉ cần app.
-if [ "$STAGING" = false ]; then
-  if pm2 describe mepf-worker > /dev/null 2>&1; then
-    echo "==> 7.5/7 Reload MEPF worker (daemon Python)"
-    pm2 reload mepf-worker --update-env
-  else
-    echo "==> 7.5/7 Bỏ qua MEPF worker — không thấy process \"mepf-worker\" trong PM2"
-  fi
-fi
 
 echo "==> Health-check sau reload (tối đa 5 lần, cách nhau 3 giây) — endpoint /api/health"
 # Đọc cổng app từ file env đang dùng ($ENV_FILE — biến "PORT", mặc định 3000 nếu không đặt,

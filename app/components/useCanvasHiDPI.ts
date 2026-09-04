@@ -2,9 +2,8 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
 /**
- * Chuẩn hoá phần thiết lập `<canvas>` dùng chung cho các trình xem 2D/CAD
- * (`/engineering/bim-viewer`, `/engineering/spatial-viewer`,
- * `/engineering/god-tier-studio`) — audit 2026-08-25 §3.7, đề xuất #8.
+ * Chuẩn hoá phần thiết lập `<canvas>` dùng chung cho các trình xem 2D
+ * (`/engineering/spatial-viewer`) — audit 2026-08-25 §3.7, đề xuất #8.
  *
  * VÌ SAO không gộp thành một component viewer chung: ba trang vẽ ba thứ khác hẳn nhau
  * (đẳng trục 3D xoay/zoom, mặt bằng 2D pan/zoom cắm ghim, camera yaw/pitch). Phần thật sự

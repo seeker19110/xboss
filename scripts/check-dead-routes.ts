@@ -2,8 +2,8 @@
 //
 // VÌ SAO: audit 2026-08-25 (docs/audit-2026-08-25-tinh-nang-theo-vong-doi.md §3.5) đếm được
 // 25 trong 505 route API mà không một dòng mã nào trong repo gọi tới. Phần lớn KHÔNG phải
-// rác — cron gọi từ ngoài, API mở /api/v1 cho hệ ngoài, endpoint plugin AutoCAD gọi bằng
-// C# — nên script này KHÔNG đòi xoá; nó chỉ chặn tập đó **phình thêm** trong im lặng.
+// rác — cron gọi từ ngoài, API mở /api/v1 cho hệ ngoài — nên script này KHÔNG đòi xoá; nó
+// chỉ chặn tập đó **phình thêm** trong im lặng.
 //
 // `check:dead-code` không thay được: nó dựng đồ thị import, mà route handler luôn là
 // entrypoint của Next (không ai import) nên với nó route nào cũng "sống".
@@ -18,20 +18,9 @@ import { execFileSync } from "node:child_process";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-// Nơi một lời gọi route có thể nằm: mã app/lib, script, test, e2e, plugin AutoCAD (C#),
-// worker, service worker và proxy. KHÔNG tính tài liệu (.md) — nhắc trong tài liệu không
-// phải là lời gọi.
-const CALLER_DIRS = [
-  "app",
-  "lib",
-  "scripts",
-  "e2e",
-  "tests",
-  "plugin-autocad",
-  "mepf-worker",
-  "public",
-  "proxy.ts",
-];
+// Nơi một lời gọi route có thể nằm: mã app/lib, script, test, e2e, service worker và proxy.
+// KHÔNG tính tài liệu (.md) — nhắc trong tài liệu không phải là lời gọi.
+const CALLER_DIRS = ["app", "lib", "scripts", "e2e", "tests", "public", "proxy.ts"];
 /** Chính file allowlist nằm trong `scripts/` nên nó khớp mọi route được khai trong đó —
  *  không tính là người gọi, nếu không mỗi mục allowlist tự làm route của nó "sống". */
 const NOT_A_CALLER = "scripts/dead-routes-allowlist.json";
@@ -67,8 +56,17 @@ for (const file of routeFiles) {
       cwd: root,
       encoding: "utf8",
     });
-  } catch {
-    hits = ""; // grep thoát 1 khi không khớp gì
+  } catch (err) {
+    // grep thoát 1 khi không khớp gì (bình thường). Thoát ≥2 là lỗi thật (vd một thư mục
+    // trong CALLER_DIRS không còn tồn tại) — không được nuốt, vì nó khiến MỌI route bị
+    // báo "chết" sai (đã xảy ra thật khi plugin-autocad/ bị xoá nhưng còn trong danh sách).
+    const status = (err as { status?: number }).status;
+    if (status !== 1) {
+      console.error(`\n[LỖI] grep thất bại khi dò lời gọi của ${routePath} (exit ${status}):`);
+      console.error((err as { stderr?: string }).stderr ?? err);
+      process.exit(2);
+    }
+    hits = "";
   }
   const callers = hits
     .trim()

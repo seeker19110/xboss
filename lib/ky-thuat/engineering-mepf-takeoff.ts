@@ -1,6 +1,27 @@
 // lib/engineering-mepf-takeoff.ts — Autonomous MEPF Takeoff & QS Engine (M67)
 import { query, queryOne, run } from "@/lib/db";
-import { calculateDuctQtoM2, calculatePipeQtoM } from "@/lib/ky-thuat/engineering-cad-qto";
+
+// Hai công thức đo bóc hình học dưới đây trước nằm ở `engineering-cad-qto.ts`; module đó đã bị gỡ
+// cùng cụm CAD/BIM nên chuyển về đây — nơi duy nhất còn dùng. Công thức giữ nguyên.
+
+/** Diện tích tôn ống gió (m²) = chu vi × chiều dài, cộng dư bích theo tỷ lệ. */
+export function calculateDuctQtoM2(
+  widthMm: number,
+  heightMm: number,
+  lengthM: number,
+  flangeBufferPercent = 0.05,
+): number {
+  if (widthMm <= 0 || heightMm <= 0 || lengthM <= 0) return 0;
+  const perimeterM = (2 * (widthMm + heightMm)) / 1000;
+  const rawArea = perimeterM * lengthM;
+  const totalArea = rawArea * (1 + flangeBufferPercent);
+  return Math.round(totalArea * 1000) / 1000;
+}
+
+/** Chiều dài ống tròn/ống nước (m), làm tròn 3 chữ số và không cho âm. */
+export function calculatePipeQtoM(lengthM: number): number {
+  return Math.max(0, Math.round(lengthM * 1000) / 1000);
+}
 
 export type MepfDiscipline = "hvac" | "plumbing" | "electrical" | "firefighting" | "all";
 

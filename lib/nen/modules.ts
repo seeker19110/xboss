@@ -44,14 +44,13 @@ export type ModuleDef = {
   thuNghiem?: boolean;
 };
 
-// Ghi chú độ phủ (tính đến M52 PR3, cập nhật thêm cad-plugin ở đợt "nâng tầm dự án" GĐ2):
+// Ghi chú độ phủ (tính đến M52 PR3):
 //  - ĐÃ đưa vào registry: 4 module cắt ngang (tracking, field, materials, documents) +
 //    module vận hành (ops, M44) + 5 module quản trị mới nhất M43–M50 (audit, approval-flows,
-//    alert-rules, integrations, permissions) + module `cad-plugin` (M99–M104, bảng điều
-//    khiển chuẩn hóa bản vẽ + thiết bị AutoCAD). Nhóm này phủ ĐỦ cả 4 loại notification thật
+//    alert-rules, integrations, permissions). Nhóm này phủ ĐỦ cả 4 loại notification thật
 //    (delayed/due_soon/comment/material_over) lẫn các path loại trừ cache thật của sw.js
-//    (/api/photos/, /api/events, /api/documents/, /api/health, /api/engineering/cad/*) — đủ
-//    để cơ chế + cổng CI chạy thật, không rỗng.
+//    (/api/photos/, /api/events, /api/documents/, /api/health) — đủ để cơ chế + cổng CI
+//    chạy thật, không rỗng.
 //  - CHƯA đưa vào: phần lớn module nghiệp vụ đời đầu M01–M42 (chi phí/hợp đồng, chất lượng,
 //    HSE, thiết bị, đấu thầu, môi trường, họp/công văn, bàn giao, nhân sự, khởi động, bản
 //    vẽ, tài chính...). Bổ sung dần theo các PR sau — dashboardTree/CAN vẫn là nguồn chạy
@@ -302,27 +301,24 @@ export const MODULES: ModuleDef[] = [
     routePrefix: ["/api/engineering", "/api/v1/engineering"],
   },
 
-  // ── W3 (đợt "nâng tầm dự án" GĐ2) — 12 module con của app/api/engineering/** đóng
+  // ── W3 (đợt "nâng tầm dự án" GĐ2) — các module con của app/api/engineering/** đóng
   // băng bằng `thuNghiem: true`. Registry gốc chỉ có 1 module "engineering" phủ CẢ
   // `/api/engineering/**` (routePrefix rộng) — các entry dưới đây có prefix DÀI HƠN nên
   // `findModuleByRoute` (khớp tiền tố dài nhất) ưu tiên chọn chúng thay vì "engineering"
   // khi route khớp, mà KHÔNG đổi `routePrefix` của "engineering" (không ảnh hưởng phần
   // còn lại: ingest ENG-1, review objects, suggestions, workflows, agent-sessions...).
   //
-  // Tiêu chí (a) — vượt cổng roadmap, nhóm OS-phase (ENG-0 #10): autonomy/twin/
-  // predictions/graph/prescriptive. Tiêu chí (b) — chưa từng chạy được (lỗi tham số SQL,
-  // W1) hoặc mô phỏng rõ rệt: bim-models(-viewer)/iot-telemetry/subcon-ai/god-tier-studio/
-  // quantum-hub/swarm/nextgen-apex.
+  // Tiêu chí (a) — vượt cổng roadmap, nhóm OS-phase (ENG-0 #10): autonomy/predictions/
+  // graph/prescriptive. Tiêu chí (b) — chưa từng chạy được (lỗi tham số SQL, W1) hoặc mô
+  // phỏng rõ rệt: iot-telemetry/subcon-ai/quantum-hub/swarm/nextgen-apex.
+  // (Các module twin/bim-models/god-tier-studio/cad-plugin của nhóm này đã bị gỡ khỏi sản
+  // phẩm cùng toàn bộ cụm CAD/BIM.)
   //
   // KHÔNG gán routePrefix cho routes DÙNG CHUNG với trang khác chưa bị đánh dấu (đọc kỹ
   // trước khi mở rộng prefix — tắt nhầm route đang phục vụ tính năng thật là hồi quy
   // nặng, xem PLAN.md việc W3):
-  //   - `/api/engineering/bim-routing` dùng chung bởi `bim-viewer` (thuộc (b), dưới đây)
-  //     LẪN `auto-routing` (module thật, KHÔNG đánh dấu) → cố tình KHÔNG đưa vào
-  //     `engineering-bim-models`, chỉ gate `/api/engineering/bim-models`.
-  //   - Trang `quantum-hub` gọi `/api/engineering/queue`, `/api/engineering/ledger`,
-  //     `/api/engineering/spatial` — cả 3 tiền tố này dùng chung với `mepf-studio`,
-  //     `chuan-hoa-ban-ve`, `spatial-viewer` (đều là module thật, KHÔNG đánh dấu) →
+  //   - Trang `quantum-hub` gọi `/api/engineering/ledger` và `/api/engineering/spatial` — cả 2
+  //     tiền tố này dùng chung với `spatial-viewer` (module thật, KHÔNG đánh dấu) →
   //     KHÔNG có tiền tố API nào an toàn để gate riêng `quantum-hub`; `routePrefix: []`
   //     có chủ đích (module vẫn `thuNghiem: true` cho mục đích cờ mặc định/nav/cảnh báo
   //     UI, nhưng không chặn API vì sẽ tắt nhầm 3 trang thật kể trên).
@@ -333,15 +329,6 @@ export const MODULES: ModuleDef[] = [
     nav: [],
     permKeys: [],
     routePrefix: ["/api/engineering/autonomy"],
-    thuNghiem: true,
-  },
-  {
-    // OS-phase (a) — Digital Twin L0–L3, gồm cả trang "reality" (reality-capture/
-    // deviations/sensors đều nằm dưới tiền tố /api/engineering/twin).
-    key: "engineering-twin",
-    nav: [],
-    permKeys: [],
-    routePrefix: ["/api/engineering/twin"],
     thuNghiem: true,
   },
   {
@@ -369,22 +356,6 @@ export const MODULES: ModuleDef[] = [
     thuNghiem: true,
   },
   {
-    // (b) — 3D BIM & 4D Sim: W1 xác nhận `/api/engineering/bim-models/**` (3 route) sai
-    // tham số SQL, chưa từng chạy được lần nào trước khi W1 vá.
-    key: "engineering-bim-models",
-    nav: [
-      {
-        group: "Hệ thống",
-        label: "3D BIM & 4D Sim",
-        href: "/engineering/bim-viewer",
-        icon: "Building2",
-      },
-    ],
-    permKeys: [],
-    routePrefix: ["/api/engineering/bim-models"],
-    thuNghiem: true,
-  },
-  {
     // (b) — IoT Telemetry: W1 xác nhận cả 3 route devices/alerts/telemetry sai tham số SQL.
     key: "engineering-iot-telemetry",
     nav: [],
@@ -399,22 +370,6 @@ export const MODULES: ModuleDef[] = [
     nav: [],
     permKeys: [],
     routePrefix: ["/api/engineering/subcon-ai"],
-    thuNghiem: true,
-  },
-  {
-    // (b) — MEPF CAD/BIM Studio: mô phỏng rõ rệt (AI diagnose/CNC export/point-cloud),
-    // chưa dùng dữ liệu thật.
-    key: "engineering-god-tier-studio",
-    nav: [
-      {
-        group: "Hệ thống",
-        label: "MEPF CAD/BIM Studio",
-        href: "/engineering/god-tier-studio",
-        icon: "Sparkles",
-      },
-    ],
-    permKeys: [],
-    routePrefix: ["/api/engineering/god-tier"],
     thuNghiem: true,
   },
   {
@@ -454,36 +409,6 @@ export const MODULES: ModuleDef[] = [
       "/api/engineering/fidic-tia",
     ],
     thuNghiem: true,
-  },
-  {
-    // Plugin AutoCAD (M99–M104) — bảng điều khiển chuẩn hóa bản vẽ 2D + rule pack/thư
-    // viện block phục vụ Adapter, và trang ghép/quản lý token thiết bị (XBOSS_LOGIN).
-    // `routePrefix` DÀI HƠN "engineering" (routePrefix ["/api/engineering", ...]) nên
-    // `findModuleByRoute` (khớp tiền tố dài nhất) ưu tiên chọn module này cho các route
-    // /api/engineering/cad/** — không ảnh hưởng phần còn lại của module "engineering".
-    key: "cad-plugin",
-    nav: [
-      {
-        group: "Thiết Kế-BIM-Shopdrawings",
-        label: "Chuẩn hóa bản vẽ",
-        href: "/engineering/chuan-hoa-ban-ve",
-        icon: "PencilRuler",
-      },
-      {
-        group: "Thiết Kế-BIM-Shopdrawings",
-        label: "Thiết bị AutoCAD",
-        href: "/engineering/thiet-bi-cad",
-        icon: "MonitorSmartphone",
-      },
-    ],
-    permKeys: ["viewEngineeringGraph", "manageDrawings", "manageIntegrations"],
-    notificationTypes: [],
-    // 1 prefix chung loại trừ cả cụm — khớp CHÍNH XÁC literal trong public/sw.js (cổng CI
-    // scripts/check-sw-exclude.ts so khớp nguyên văn, không phải chỉ prefix-of-prefix).
-    // Trước đây thiếu → rule pack/thư viện block/kết quả bóc khối lượng (nhị phân/động,
-    // đổi theo mỗi lần chuẩn hóa) bị stale-while-revalidate cache như API tĩnh khác.
-    swExclude: ["/api/engineering/cad/"],
-    routePrefix: ["/api/engineering/cad", "/api/devices/pair", "/api/tokens"],
   },
   {
     // (audit 2026-08-25 §3.6) Trang "Combine" là BẢN MÔ PHỎNG: danh sách va chạm, phương án

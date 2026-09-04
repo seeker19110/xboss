@@ -1,11 +1,8 @@
 // lib/engineering-suite.ts — Centralized Barrel Index for XBoss Engineering OS (M65 – M72)
 // Cung cấp một điểm truy cập duy nhất (Single Point of Entry) cho toàn bộ hệ sinh thái MEPF AI & Engineering
 
-// 1. CAD Studio & Vector Diffing (M65)
-export * from "@/lib/ky-thuat/engineering-cad-skills";
-
-// 2. CAD 5D QTO & Electronic BBNT (M66)
-export * from "@/lib/ky-thuat/engineering-cad-qto";
+// (1) CAD Studio & Vector Diffing (M65) và (2) CAD 5D QTO & BBNT điện tử (M66) đã được gỡ khỏi
+// sản phẩm cùng toàn bộ cụm CAD/BIM — xem PROGRESS.md.
 
 // 3. Autonomous MEPF Lifecycle & Smart T&C (M67)
 export * from "@/lib/ky-thuat/engineering-mepf-takeoff";
@@ -26,8 +23,7 @@ export * from "@/lib/ky-thuat/engineering-shopdrawing-omnipotent";
 // 8. 5D QS Cost Engineering & FIDIC Claim Defense (M69)
 export * from "@/lib/ky-thuat/engineering-qs-omnipotent";
 
-// 9. AI Reality Scan-to-BIM & Deviation Mesh (M70)
-export * from "@/lib/ky-thuat/engineering-scan-to-bim";
+// (9) AI Reality Scan-to-BIM & Deviation Mesh (M70) đã được gỡ cùng cụm CAD/BIM.
 
 // 10. Closed-Loop WBS & Payment Sync (M70)
 export * from "@/lib/ky-thuat/engineering-closed-loop-sync";
@@ -50,14 +46,15 @@ export * from "@/lib/ky-thuat/engineering-project-health";
 // 16. Hyper-Spatial WASM Geometry & Cache (M73)
 export * from "@/lib/ky-thuat/engineering-spatial-wasm";
 
-// 17. Distributed Engineering Task Queue (M73)
-export * from "@/lib/ky-thuat/engineering-task-queue";
+// (17) Distributed Engineering Task Queue (M73) đã được gỡ cùng trang `/engineering/mepf-studio`
+// và route `/api/engineering/queue/**` — hàng đợi này chỉ có daemon Python `mepf-worker` tiêu thụ,
+// xoá worker rồi thì tác vụ nạp vào sẽ nằm `pending` vĩnh viễn.
 
 // 18. Merkle Tree Provenance Ledger (M73)
 export * from "@/lib/ky-thuat/engineering-merkle-ledger";
 
-// 19. MEPF Worker Closed-Loop Bridge (PR2)
-export * from "@/lib/ky-thuat/engineering-worker-bridge";
+// (19) MEPF Worker Closed-Loop Bridge (PR2) đã được gỡ cùng thư mục `mepf-worker/` — cầu nối này
+// chỉ phục vụ daemon Python MEPF-Agents, không còn nơi gọi sau khi hệ 9-agent bị xoá.
 
 // 20. Spatial Viewer & Field Pinning Engine (M74)
 export * from "@/lib/ky-thuat/engineering-spatial-pinning";
@@ -68,8 +65,8 @@ export * from "@/lib/ky-thuat/engineering-bidding-matrix";
 // 22. Site Telegram Gateway & Voice Copilot (M76)
 export * from "@/lib/ky-thuat/engineering-site-bot";
 
-// 23. AI Auto-Routing & Beam Sleeve Matrix (M77)
-export * from "@/lib/ky-thuat/engineering-auto-routing";
+// (23) AI Auto-Routing & Beam Sleeve Matrix (M77) đã được gỡ cùng cụm CAD/BIM — giao diện duy
+// nhất dùng nó là trang /engineering/auto-routing (chạy trên phần tử BIM).
 
 // 24. Smart Materials QR Logistics & Mobile Scanner (M78)
 export * from "@/lib/ky-thuat/engineering-qr-logistics";

@@ -142,7 +142,14 @@ export interface SmartIpcGateContext {
   };
 }
 
-/** Gate 1 — Scan-to-BIM: sai lệch hình học lớn nhất của lượt quét tham chiếu. */
+/**
+ * Gate 1 — Scan-to-BIM: sai lệch hình học lớn nhất của lượt quét tham chiếu.
+ *
+ * LƯU Ý sau khi gỡ cụm CAD/BIM: bảng `engineering_scan_to_bim_runs` vẫn còn (migration là
+ * append-only) nhưng KHÔNG còn nơi nào ghi vào nó, nên cổng này luôn trả `available: false`
+ * với dữ liệu mới. Cố ý KHÔNG xoá nhánh đọc: dữ liệu lịch sử đã ghi vẫn đọc được, và bỏ một
+ * cổng của chuỗi IPC là thay đổi nghiệp vụ tài chính, không phải việc dọn dẹp.
+ */
 async function fetchGate1Context(
   projectId: number,
   scanCode?: string,

@@ -43,7 +43,6 @@ import {
   FilePlus2,
   Receipt,
   Gavel,
-  PencilRuler,
   Mail,
   FolderOpen,
   LandPlot,
@@ -75,20 +74,15 @@ import {
   SlidersHorizontal,
   KeyRound,
   ToggleRight,
-  Boxes,
   Lightbulb,
   Sparkles,
-  Scissors,
   Brain,
   Split,
   LayoutGrid,
-  Scan,
-  Route,
   QrCode,
   Bot,
   TrendingUp,
   Layers,
-  MonitorSmartphone,
 } from "lucide-react";
 import type { Role } from "@/lib/nen/roles";
 
@@ -118,16 +112,10 @@ export type DashCluster = {
 };
 
 export const DASHBOARD_TREE: DashCluster[] = [
-  // Cụm 1: 7 Đại Trung Tâm Điều Hành Hợp Nhất (7 Unified Cockpits & Command Centers)
+  // Cụm 1: 6 Đại Trung Tâm Điều Hành Hợp Nhất (6 Unified Cockpits & Command Centers)
   {
-    label: "🏛️ 7 Đại Trung Tâm Điều Hành (Unified Hubs)",
+    label: "🏛️ 6 Đại Trung Tâm Điều Hành (Unified Hubs)",
     dashboards: [
-      {
-        id: "dash.mepf-cad-bim-studio",
-        href: "/engineering/god-tier-studio",
-        label: "MEPF CAD/BIM Studio",
-        icon: Sparkles,
-      },
       {
         id: "dash.site-command",
         href: "/site",
@@ -171,40 +159,10 @@ export const DASHBOARD_TREE: DashCluster[] = [
     label: "Kỹ thuật Không gian & AI (Engineering OS)",
     dashboards: [
       {
-        id: "dash.god-tier-studio",
-        href: "/engineering/god-tier-studio",
-        label: "MEPF CAD/BIM Studio (M96)",
-        icon: Sparkles,
-      },
-      {
         id: "dash.apex-cockpit",
         href: "/engineering",
         label: "Apex Cockpit (M88)",
         icon: Sparkles,
-      },
-      {
-        id: "dash.bim-viewer",
-        href: "/engineering/bim-viewer",
-        label: "3D BIM & 4D Sim (M80)",
-        icon: Building2,
-      },
-      {
-        id: "dash.cad-nesting",
-        href: "/engineering/cad-nesting",
-        label: "Fabrication Nesting (M89)",
-        icon: Scissors,
-      },
-      {
-        id: "dash.auto-routing",
-        href: "/engineering/auto-routing",
-        label: "Auto-Routing 3D (M77)",
-        icon: Route,
-      },
-      {
-        id: "dash.scan-to-bim",
-        href: "/engineering/scan-to-bim",
-        label: "Scan-to-BIM (M70)",
-        icon: Scan,
       },
       {
         id: "dash.spatial-viewer",
@@ -375,20 +333,6 @@ export const DASHBOARD_TREE: DashCluster[] = [
         href: "/ban-ve-thiet-ke",
         label: "Thiết kế",
         icon: Compass,
-      },
-      {
-        id: "dash.chuan-hoa-ban-ve",
-        href: "/engineering/chuan-hoa-ban-ve",
-        label: "Chuẩn hóa bản vẽ",
-        icon: PencilRuler,
-      },
-      {
-        // Ghép/quản lý token thiết bị plugin AutoCAD (M99 PR2) — trang riêng, có lối
-        // sang từ bảng điều khiển plugin trên /engineering/chuan-hoa-ban-ve.
-        id: "dash.thiet-bi-cad",
-        href: "/engineering/thiet-bi-cad",
-        label: "Thiết bị AutoCAD",
-        icon: MonitorSmartphone,
       },
       { id: "dash.bim", href: "/mo-hinh-bim", label: "Mô hình BIM", icon: Box },
       { id: "dash.combine", href: "/combine", label: "Combine", icon: Split },

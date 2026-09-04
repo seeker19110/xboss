@@ -129,49 +129,42 @@ const HUBS: {
   colSpan?: string;
 }[] = [
   {
-    title: "1. MEPF CAD/BIM Studio",
-    desc: "3D/4D BIM WebGPU, LiDAR Scan-to-BIM, BCF 3.0, CNC G-Code & Auto-Routing",
-    href: "/engineering/god-tier-studio",
-    icon: Sparkles,
-    color: "text-amber-300",
-  },
-  {
-    title: "2. Chỉ huy hiện trường & An toàn",
+    title: "1. Chỉ huy hiện trường & An toàn",
     desc: "Việc của tôi, Nhật ký TT06, Nghiệm thu, Mặt bằng & AI HSE",
     href: "/site",
     icon: HardHat,
     color: "text-emerald-300",
   },
   {
-    title: "3. Kế hoạch & Tiến độ WBS",
+    title: "2. Kế hoạch & Tiến độ WBS",
     desc: "Lưới 6 hệ, CPM Gantt, Lookahead, EVM SPI/CPI & Báo cáo A4",
     href: "/schedule",
     icon: CalendarCheck,
     color: "text-sky-300",
   },
   {
-    title: "4. Chuỗi cung ứng & Vật tư",
+    title: "3. Chuỗi cung ứng & Vật tư",
     desc: "Định mức BOQ, Đấu thầu Vendor, Đơn hàng PO & QR GRN",
     href: "/procurement",
     icon: Package,
     color: "text-blue-300",
   },
   {
-    title: "5. Hợp đồng, Chi phí & FIDIC",
+    title: "4. Hợp đồng, Chi phí & FIDIC",
     desc: "Hợp đồng A-B, Chứng chỉ IPC, Phát sinh VO, Claims & Dòng tiền",
     href: "/commercial",
     icon: Coins,
     color: "text-violet-300",
   },
   {
-    title: "6. Trí tuệ AI & Digital Twin",
+    title: "5. Trí tuệ AI & Digital Twin",
     desc: "Zalo/Voice Copilot, Gate 0, AI Swarm Debates & IoT Telemetry",
     href: "/engineering-intelligence",
     icon: Brain,
     color: "text-rose-300",
   },
   {
-    title: "7. Quản trị dự án & Hệ thống",
+    title: "6. Quản trị dự án & Hệ thống",
     desc: "Khởi công Đ107, Bàn giao Đ24, CDE Hồ sơ, Nhân sự & Audit Log",
     href: "/governance",
     icon: Landmark,
@@ -190,8 +183,8 @@ const LIFECYCLE = [
   {
     stage: "GĐ 1",
     title: "Kỹ thuật không gian",
-    desc: "3D BIM · Routing · Nesting",
-    href: "/engineering/god-tier-studio",
+    desc: "Xem không gian · Vòng đời thiết bị MEPF",
+    href: "/engineering/spatial-viewer",
   },
   {
     stage: "GĐ 2",

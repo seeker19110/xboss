@@ -1,5 +1,159 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Gỡ toàn bộ cụm CAD/BIM khỏi sản phẩm — đợt 3 (2026-09-04)
+
+Đợt cuối của loạt dọn CAD/BIM: **xoá hết phần còn lại** của cụm CAD · BIM · Digital Twin ·
+God-Tier · Scan-to-BIM · plugin AutoCAD. **587 tệp xoá, 40 tệp sửa**, không thêm migration nào.
+
+### Đã xoá
+
+- **Trang:** `app/engineering/{bim, bim-viewer, cad-corridor, cad-nesting, cad-tracking,
+god-tier-studio, scan-to-bim, thiet-bi-cad, twin, chuan-hoa-ban-ve, cai-dat-plugin,
+joint-segmentation, auto-routing, reality}`.
+- **Route API:** `app/api/engineering/{bim, bim-models, bim-routing, cad, cad-carbon-lifecycle,
+cad-corridor, cad-isometric, cad-nesting, cad-qto, god-tier, scan-to-bim, twin,
+joint-segmentation, routing}` + `app/api/devices` (ghép thiết bị AutoCAD) + `app/api/tokens`
+  (token scope `cad`).
+- **`lib/`:** `ky-thuat/cad/` (kể cả `dxf-parser.ts` + 17 rule pack), `ky-thuat/bim/`,
+  `dich-vu/cad.ts`, `bao-mat/cad-devices.ts`, `nen/ai.ts` (cửa duy nhất ra LLM — người dùng duy
+  nhất là gợi ý phân loại block M108), và các module `ky-thuat/engineering-*`: `bim-cad`,
+  `bim-routing`, `bim-viewer`, `cad-carbon-lifecycle`, `cad-corridor`, `cad-dfma-isometric`,
+  `cad-hydraulic-network`, `cad-nesting`, `cad-qto`, `cad-skills`, `god-tier`, `god-tier-db`,
+  `scan-to-bim`, `twin`, `twin-pinnacle`, `joint-segmentation`, `joint-segmentation-store`,
+  `local-ai`, `auto-routing`.
+- **Plugin AutoCAD:** trọn thư mục `plugin-autocad/` (4 project .NET + hơn 1.300 ca xunit + thư
+  viện block + dữ liệu đối chứng), 2 job CI `plugin`/`plugin_shim`, job đóng gói trong
+  `release.yml`, 3 bước static CAD trong `ci.yml`, `scripts/check-plugin-bundle.ts`,
+  `scripts/sinh-doi-chung-cad.ts`, `scripts/sinh-mau-ban-ve-cad.ts`,
+  `scripts/do-phan-loai-block.ts`, `scripts/ensure-drawing-tree.ts` (+ bước 4.7/7 của
+  `deploy.sh`), skill `.agents/skills/cad-bim-dfma-master/`.
+- **Test:** 55 tệp `tests/` của cụm + `tests/fixtures/cad/`; e2e `thiet-bi-cad`,
+  `schematic-graph`, `chuan-hoa-ban-ve`.
+- **Đặc tả:** `docs/nang-cap/` M65, M66, M70, M77, M96, M98, M99, M100–M119, OS-2,
+  RESEARCH-CAD-QTO-TRACKING, RESEARCH-AUTO-ROUTING-MEPF; `docs/ops/` verify tay plugin +
+  kiểm thử plugin không cần server.
+
+### Quyết định đã cân nhắc (không chỉ xoá máy móc)
+
+1. **Migration giữ nguyên** (`migrations/` append-only): 17 migration của cụm vẫn nằm đó, bảng còn
+   trong DB nhưng không còn mã nào đọc/ghi. Xoá bảng là thao tác đụng dữ liệu, phải qua staging và
+   phải do chủ dự án quyết.
+2. **`engineering-smart-ipc.ts` giữ nguyên nhánh đọc `engineering_scan_to_bim_runs`** — cổng 1 của
+   chuỗi IPC. Không còn ai ghi bảng đó nên cổng luôn `available: false`, nhưng bỏ hẳn một cổng của
+   chuỗi thanh toán là **thay đổi nghiệp vụ tài chính**, không phải dọn dẹp. Đã ghi rõ bằng chú
+   thích tại chỗ.
+3. **`/mo-hinh-bim` + `kind: "bim"` của sổ bản vẽ GIỮ LẠI** — đó là một **loại hồ sơ** trong
+   drawing register (G06), không phải công cụ BIM; xoá sẽ làm các dòng `drawings` hiện có mất nhãn.
+4. **Tab BIM của `/tech` GIỮ LẠI** — chỉ là sổ link viewer ngoài (Autodesk/Revizto), không có mã
+   CAD/BIM nào phía sau.
+5. **Quyền `CAN.manageEngineeringTwin` GIỮ TÊN** — 14 route không-CAD đang dùng; đổi tên khoá quyền
+   làm hỏng các dòng override đã lưu trong `role_permissions` (khoá lưu theo tên). Ngược lại, 4
+   khoá `view/manageEngineeringBim` và `view/manageEngineeringGodTier` **đã xoá** vì route của
+   chúng không còn — để lại sẽ hiện thành dòng ma trên `/admin/permissions`.
+6. **`engineering-mepf-takeoff` / `engineering-mepf-voice` GIỮ LẠI, chuyển phần dùng chung về chỗ
+   mới:** 2 công thức đo bóc (`calculateDuctQtoM2`, `calculatePipeQtoM`) và kiểu `SpoolStatus` vốn
+   nằm ở `engineering-cad-qto.ts` nay khai tại chính module còn dùng — giữ nguyên công thức.
+7. **Auto-routing 3D (M77) xoá theo** — giao diện duy nhất gọi nó là `/engineering/auto-routing`
+   (chạy trên phần tử BIM). Giữ lại thì `check:dead-routes` đỏ và code không có đường vào.
+8. **`mepf-worker/` + `scripts/mepf/worker_entry.py`** — ban đầu để lại chờ quyết riêng (hệ Python
+   multi-agent 9 bộ phận, không thuộc cụm CAD/BIM của web app). **Người dùng đã chốt xoá hết** —
+   xem mục "Bổ sung cùng đợt" bên dưới.
+9. **`CLAUDE.md` đã cập nhật tay** — bỏ mô tả `XBOSS_PLUGIN_URL`, `XBOSS_PLUGIN_SHA256`,
+   `ANTHROPIC_API_KEY`/`XBOSS_AI_BLOCK_CLASSIFY` và bỏ `cad/`, `bim/` khỏi bảng miền `lib/`.
+10. **Tài liệu lịch sử giữ nguyên**: ADR-0006 chỉ đánh dấu **ĐÃ HUỶ HIỆU LỰC** (ADR là sổ quyết
+    định, không xoá); các bản audit/nghiên cứu theo ngày giữ nguyên văn.
+
+### Dọn kèm (hệ quả trực tiếp)
+
+Nav (`EngineeringNav` — nhóm `twin` đổi tên thành `ledger`; `dashboardTree` — cụm "7 Đại Trung Tâm"
+còn **6**), `GlobalSearch`, `lib/nen/modules.ts` (bỏ 4 module `engineering-twin`,
+`engineering-bim-models`, `engineering-god-tier-studio`, `cad-plugin`), `public/sw.js` (bỏ loại trừ
+`/api/engineering/cad/`, `CACHE` lên `xboss-v16`), `lib/ky-thuat/drawings.ts` + `app/ban-ve/page.tsx`
+(bỏ trường `kiemDinh` và chip "Từ plugin" của revision), whitelist của `check-route-perms` /
+`project-scope-invariant` / `dead-routes-allowlist`, `lib/nen/photos.ts` (2 helper tên tệp CAD).
+
+**Bug cổng CI phát hiện khi xoá:** `scripts/check-dead-routes.ts` truyền thẳng danh sách thư mục cho
+`grep -rlE`; thiếu MỘT thư mục (`plugin-autocad`) làm grep thoát 2 → `catch` nuốt lỗi → **mọi route
+đều bị coi là chết**. Đã bỏ thư mục không còn tồn tại; bẫy vẫn còn nguyên cho lần sau.
+
+### Bổ sung cùng đợt — xoá `mepf-worker/` (hệ Python multi-agent)
+
+Người dùng chốt xoá luôn cả hệ Python, không giữ lại phần MEPF ngoài CAD/BIM của nó.
+**234 tệp: 233 xoá, còn lại sửa** (219 tệp trong `mepf-worker/`), không thêm migration nào.
+
+- **Xoá:** trọn `mepf-worker/` (app Python riêng: `app.py`, `main.py`, `src/` — 9 "bộ phận"
+  HVAC/điện/nước/PCCC/QS/CAD/BIM/agent, `tests/`, `docs/`, `autocad/`, `revit/`, `drafts/`,
+  `Dockerfile`, `docker-compose.yml`, `pyproject.toml`, `uv.lock`, các `README*.md`, workflow CI
+  lồng bên trong); `scripts/mepf/` (`worker_entry.py` + `requirements-worker.txt` — daemon PM2
+  poll `engineering_async_tasks`, mọi handler đều import module trong `mepf-worker/src`);
+  `lib/ky-thuat/engineering-worker-bridge.ts`; route
+  `app/api/engineering/queue/tasks/[id]/bridge`; `tests/engineering-worker-bridge.test.ts`.
+- **Dọn kèm:** `engineering-suite.ts` (bỏ `export *` mục 19), `/engineering/mepf-studio` (bỏ nút
+  "Chuyển thành Đối tượng Kỹ thuật & Trình Duyệt Gate 0", state `bridgingId`, `handleBridge`, huy
+  hiệu "Đã chuyển Gate 0" + 4 icon/`Link` hết dùng), `ecosystem.config.js` (bỏ app PM2
+  `mepf-worker`), `deploy.sh` (bỏ bước 7.5/7 reload worker), `eslint.config.mjs` (bỏ ignore
+  `mepf-worker/**`), `.gitignore` (bỏ khối artifact Python — repo không còn tệp `.py` nào),
+  `scripts/check-dead-routes.ts` + `scripts/check-dead-code.ts` (bỏ `mepf-worker` khỏi
+  `CALLER_DIRS`/`SCAN_DIRS`; liệt kê thư mục không tồn tại là đúng lớp bug đã gặp ở đợt 3),
+  `DEPLOY.md` (mục 3 nay là hướng dẫn `pm2 delete mepf-worker` gỡ khỏi VPS cũ + bỏ dòng RAM
+  "+ MEPF worker").
+- **Quyết định (đã bị THAY THẾ, xem mục kế tiếp):** ban đầu để **hàng đợi
+  `engineering_async_tasks` + trang `/engineering/mepf-studio` GIỮ NGUYÊN** vì brief chỉ yêu cầu
+  gỡ nhánh cầu nối. Người dùng sau đó chốt xoá luôn cụm hàng đợi — xem "Bổ sung cùng đợt — xoá
+  cụm hàng đợi mepf-studio mồ côi".
+- **Vận hành:** VPS đang chạy `pm2 mepf-worker` phải `pm2 delete mepf-worker && pm2 save` một lần
+  (đã ghi trong `DEPLOY.md`) — `deploy.sh` không còn reload tiến trình đó.
+
+### Bổ sung cùng đợt — xoá cụm hàng đợi mepf-studio mồ côi
+
+Xoá `mepf-worker/` xong thì **không còn tiến trình nào tiêu thụ `engineering_async_tasks`**: mọi
+tác vụ nạp vào nằm `pending` vĩnh viễn, UI hiện progress bar 0% không bao giờ nhúc nhích. Người
+dùng chốt xoá hẳn cụm này. **9 tệp xoá, 8 tệp sửa**, không thêm migration nào.
+
+- **Xoá:** `app/engineering/mepf-studio/` (trang gửi tác vụ + bảng hàng đợi); trọn
+  `app/api/engineering/queue/**` — `tasks` (GET/POST), `tasks/[id]/cancel`,
+  `tasks/[id]/progress`, `upload` (nhận DXF/IFC/JSON/XLSX vào `data/uploads/mepf`);
+  `lib/ky-thuat/engineering-task-queue.ts`; `tests/engineering-task-queue.test.ts`.
+- **Dọn kèm:** `engineering-suite.ts` (bỏ `export *` mục 17), `EngineeringNav` (bỏ mục "Xử lý tác
+  vụ MEPF"), `app/engineering/page.tsx` + `app/engineering-intelligence/page.tsx` (bỏ 2 thẻ liên
+  kết + sửa 3 câu mô tả nhắc "MEPF Studio"/"Skip Locked"), `tests/project-scope-invariant.test.ts`
+  (bỏ mục whitelist `queue/tasks/[id]/progress` — ca "whitelist không có mục thừa" sẽ đỏ nếu để
+  lại), `e2e/authed/luoi-quet-axe.spec.ts` (bỏ trang khỏi lưới quét axe),
+  `lib/nen/modules.ts` + `scripts/lib/project-scope-scan.ts` (chú thích nhắc tiền tố API đã xoá).
+- **`/engineering/quantum-hub` mất tab 2 "Hàng Đợi Tác Vụ Phân Tán":** đây là **nơi thứ hai** gọi
+  `/api/engineering/queue/tasks` (nút "+ Tác Vụ Soát Va Chạm Lô" / "+ Tác Vụ Bung Spool DfMA").
+  Trang GIỮ LẠI vì 2 tab còn lại (spatial compute, sổ cái Merkle) chạy trên API khác và vẫn sống;
+  chỉ tab hàng đợi bị gỡ, tab Merkle đánh số lại thành 2. Nếu để nguyên thì 3 nút của tab đó gọi
+  route 404 mà `catch {}` nuốt lỗi — người dùng bấm không thấy gì xảy ra.
+- **Quyết định về bảng `engineering_async_tasks`: GIỮ BẢNG, KHÔNG thêm migration `DROP TABLE`.**
+  Đã kiểm: không migration nào `REFERENCES engineering_async_tasks` (bảng chỉ trỏ RA
+  `projects`/`users`), nên xoá về mặt kỹ thuật là an toàn. Vẫn giữ vì `DROP TABLE` là **migration
+  đụng dữ liệu** — theo DoD phải chạy staging trước rồi mới lên production, tức biến một PR dọn
+  dẹp rủi ro-0 thành PR chờ cổng vận hành, đổi lại lợi ích bằng 0 (bảng rỗng không tốn gì, RLS
+  vẫn nguyên). Ngược lại, giữ bảng còn khớp `docs/ERD.md` (sinh từ DB thật qua `npm run gen:erd`
+  — drop mà không regen được sẽ làm ERD sai). Muốn thu hồi sau này chỉ cần 1 dòng
+  `DROP TABLE IF EXISTS engineering_async_tasks;` trong migration mới, chạy qua staging.
+- **Cổng đã chạy (đợt bổ sung này):** `npm run lint` · `npm run typecheck` · `npm run build` xanh;
+  `npm test` với Postgres 16 ephemeral **222 tệp, 1808 ca pass, 1 ca fail, 1 ca skip có lý do** —
+  ca fail là `tests/backfill-0137-0138.test.ts`, đối chiếu bằng `git stash` thì **đỏ y hệt khi
+  chưa có diff này** (đỏ sẵn, không liên quan). 9 cổng static xanh: `check:dead-code`,
+  `check:dead-routes`, `check:lib-layers`, `check:migrations`, `check:sw-exclude`,
+  `check:route-perms`, `check:project-scope`, `check:db-params`, `check:engineering-danh-tinh`.
+
+### Cổng đã chạy
+
+`npm run lint` xanh · `npm run typecheck` xanh · `npm run build` xanh · `npm test` với Postgres 16
+ephemeral: **224 tệp, 1812 ca pass, 1 ca fail** — ca fail duy nhất là
+`tests/backfill-0137-0138.test.ts`, **đã đỏ sẵn trên `main` trước đợt này** (đối chiếu bằng
+`git stash`). Cổng static: `check:dead-code`, `check:dead-routes`, `check:lib-layers`,
+`check:sw-exclude`, `check:migrations`, `check:engineering-danh-tinh`, `check:route-perms`,
+`check:project-scope`, `check:db-params`, `check:mau-accent`, `check:contrast` — đều xanh.
+
+Chạy lại toàn bộ sau khi xoá `mepf-worker/`: lint · typecheck · build xanh; `npm test` với
+Postgres 16 ephemeral **223 tệp, 1811 ca pass, 0 ca fail, 1 ca skip có lý do** (`health.test.ts`,
+ca cố ý đảo điều kiện khi KHÔNG có DB) — kể cả `tests/backfill-0137-0138.test.ts` cũng xanh ở lần
+chạy này; 11 cổng static ở trên đều xanh.
+
 ## ✅ Đợt 3 chiến dịch coverage — 6 cụm route còn lại, loại trừ cả BIM (2026-09-04)
 
 Tiếp nối Đợt 2, mở rộng phạm vi loại trừ từ "AutoCAD/Revit" sang **cả BIM** (`engineering/twin`,

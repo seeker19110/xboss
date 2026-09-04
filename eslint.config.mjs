@@ -6,8 +6,6 @@ const config = [
   { ignores: ["_framework-dropins/**"] },
   // Worktree tạm của agent (chứa build artifact .next riêng) — không lint, xem .gitignore
   { ignores: [".claude/**"] },
-  // MEPF-Agents đã gộp phẳng vào repo (Python project + React app riêng) — không lint
-  { ignores: ["mepf-worker/**"] },
   ...nextConfig,
   {
     // ESLint 10: eslint-plugin-react tự dò phiên bản React bằng API cũ

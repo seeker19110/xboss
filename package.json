@@ -27,8 +27,6 @@
     "changelog": "node scripts/gen-changelog.mjs",
     "prepare": "husky || true",
     "test:mutation": "node scripts/mutation-check.mjs",
-    "cad:doi-chung": "tsx scripts/sinh-doi-chung-cad.ts",
-    "cad:mau-ban-ve": "tsx scripts/sinh-mau-ban-ve-cad.ts",
     "check:dead-code": "tsx scripts/check-dead-code.ts",
     "check:dead-routes": "tsx scripts/check-dead-routes.ts",
     "check:engineering-danh-tinh": "tsx scripts/check-engineering-danh-tinh.ts",
@@ -39,9 +37,7 @@
     "check:coverage": "tsx scripts/check-coverage.ts",
     "check:route-perms": "tsx scripts/check-route-perms.ts",
     "check:project-scope": "tsx scripts/check-project-scope.ts",
-    "check:db-params": "tsx scripts/check-db-params.ts",
-    "check:plugin-bundle": "tsx scripts/check-plugin-bundle.ts",
-    "setup:drawing-tree": "tsx scripts/ensure-drawing-tree.ts"
+    "check:db-params": "tsx scripts/check-db-params.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.121.0",

@@ -103,12 +103,12 @@ const STAGES: StageData[] = [
     index: 1,
     stageCode: "GĐ 1",
     name: "Kỹ Thuật Không Gian",
-    shortDesc: "3D BIM • Routing • Nesting",
+    shortDesc: "Xem không gian 3D • Vòng đời thiết bị",
     statusBadge: "LOD 400",
     statusColor: "text-amber-400",
     statusBg: "bg-amber-500/10",
     statusBorder: "border-amber-500/30",
-    href: "/engineering/god-tier-studio",
+    href: "/engineering/spatial-viewer",
     durationEst: "4-6 Tuần",
     milestoneKey: "Approved for Construction (AFC)",
   },
@@ -155,7 +155,7 @@ const STAGES: StageData[] = [
     index: 5,
     stageCode: "GĐ 5",
     name: "Hoàn Công & Bàn Giao",
-    shortDesc: "T&C • Điều 24 • Digital Twin",
+    shortDesc: "T&C • Điều 24 • Bàn giao số",
     statusBadge: "Chuẩn bị",
     statusColor: "text-zinc-300",
     statusBg: "bg-zinc-900",
@@ -977,19 +977,11 @@ const MASTER_STEPS: StepItem[] = [
   },
 ];
 
-// ── 7 ĐẠI TRUNG TÂM ĐIỀU HÀNH THU GỌN ──
+// ── 6 ĐẠI TRUNG TÂM ĐIỀU HÀNH THU GỌN ──
 
 const UNIFIED_COCKPITS = [
   {
     num: "1",
-    title: "MEPF CAD/BIM Studio",
-    sub: "MEPF Core",
-    desc: "3D/4D BIM WebGPU, Scan-to-BIM, BCF 3.0, CNC G-Code",
-    href: "/engineering/god-tier-studio",
-    icon: Sparkles,
-  },
-  {
-    num: "2",
     title: "Chỉ Huy Hiện Trường & An Toàn",
     sub: "5 Trạm",
     desc: "Việc của tôi, Nhật ký TT06, Nghiệm thu, Mặt bằng & AI HSE",
@@ -997,7 +989,7 @@ const UNIFIED_COCKPITS = [
     icon: HardHat,
   },
   {
-    num: "3",
+    num: "2",
     title: "Kế Hoạch & Tiến Độ WBS",
     sub: "4 Trụ Cột",
     desc: "Lưới 6 hệ, CPM Gantt, Lookahead, EVM SPI/CPI",
@@ -1005,7 +997,7 @@ const UNIFIED_COCKPITS = [
     icon: CalendarCheck,
   },
   {
-    num: "4",
+    num: "3",
     title: "Chuỗi Cung Ứng & Vật Tư",
     sub: "4 Khâu",
     desc: "Định mức BOQ, Đấu thầu Vendor, Đơn hàng PO & QR GRN",
@@ -1013,7 +1005,7 @@ const UNIFIED_COCKPITS = [
     icon: Package,
   },
   {
-    num: "5",
+    num: "4",
     title: "Hợp Đồng, Chi Phí & FIDIC",
     sub: "4 Khối",
     desc: "Hợp đồng A-B, Chứng chỉ IPC, Phát sinh VO, Claims",
@@ -1021,15 +1013,15 @@ const UNIFIED_COCKPITS = [
     icon: Coins,
   },
   {
-    num: "6",
-    title: "Trí Tuệ AI & Digital Twin",
+    num: "5",
+    title: "Trí Tuệ AI & IoT",
     sub: "AI Apex",
     desc: "Zalo Copilot, Gate 0, AI Swarm Debates & IoT Telemetry",
     href: "/engineering-intelligence",
     icon: Brain,
   },
   {
-    num: "7",
+    num: "6",
     title: "Quản Trị Dự Án & Hệ Thống",
     sub: "Governance",
     desc: "Khởi công Đ107, Bàn giao Đ24, CDE Hồ sơ & Audit Log",
@@ -1240,7 +1232,7 @@ export default function CleanMepfProcessPage() {
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
-              <Sparkles className="w-3.5 h-3.5" />7 Đại Trung Tâm
+              <Sparkles className="w-3.5 h-3.5" />6 Đại Trung Tâm
             </button>
             <button
               onClick={() => setActiveView("audit")}

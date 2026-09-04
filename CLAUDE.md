@@ -83,10 +83,6 @@ Danh sách **đầy đủ** (kèm biến bắt buộc/tuỳ chọn và luật va
 - `GOOGLE_SERVICE_ACCOUNT_JSON` (hoặc cặp `GOOGLE_SA_EMAIL` + `GOOGLE_SA_PRIVATE_KEY`) + `GOOGLE_SHEET_ID` + `GOOGLE_SHEET_TAB` — (tuỳ chọn) đồng bộ hai chiều bảng vật tư ↔ Google Sheet. Thiếu cấu hình → `lib/vat-tu/google-sheets.ts` throw fail-fast khi gọi sync (build vẫn chạy).
 - `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` (+ `OIDC_ROLE_CLAIM`, `OIDC_DEFAULT_ROLE`, cần cả `APP_URL`) — (tuỳ chọn) đăng nhập SSO OIDC (`lib/bao-mat/oidc.ts`). Thiếu bất kỳ biến bắt buộc → nút SSO tự ẩn, đăng nhập mật khẩu như cũ.
 - `S3_ENDPOINT` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_BUCKET` (+ `S3_REGION`, `S3_FORCE_PATH_STYLE`) — (tuỳ chọn) lưu file upload lên MinIO/S3 qua `lib/nen/storage.ts`. Thiếu ≥1 trong 4 biến bắt buộc → dùng đĩa cục bộ `data/uploads/` (hành vi mặc định).
-- `XBOSS_PLUGIN_URL` — (tuỳ chọn) đường tải gói cài plugin AutoCAD, hiện thành nút "Tải Gói Cài Plugin" trên bảng điều khiển `/engineering/chuan-hoa-ban-ve` (M99 PR6). Thiếu → nút thay bằng hướng dẫn cài trên trang `/engineering/cai-dat-plugin` (gói nhị phân không nằm trong repo).
-- `XBOSS_PLUGIN_SHA256` — (tuỳ chọn, đi kèm `XBOSS_PLUGIN_URL`) sha256 của gói `.zip` đang phát hành (64 hex, do `plugin-autocad/dong-goi.ps1` sinh cạnh gói) để kỹ sư đối chiếu tệp tải về trên trang `/engineering/cai-dat-plugin`. Thiếu/sai định dạng → ẩn, trang hướng dẫn tự kiểm bằng `Get-FileHash`.
-- `ANTHROPIC_API_KEY` — (tuỳ chọn) gợi ý phân loại block/ánh xạ bằng AI (M108: tầng 2 ngữ nghĩa + tầng 3 hình học của `lib/dich-vu/cad.ts`, gợi ý `layerMap`/`boqCode`). Cửa duy nhất ra mô hình là `lib/nen/ai.ts`. Thiếu → **tự tắt tầng 2/3**, hệ thống chạy bằng luật tất định, **không throw** (khác `XBOSS_SECRET`: thiếu AI thì mất tiện ích, thiếu khoá ký phiên thì mất an toàn).
-- `XBOSS_AI_BLOCK_CLASSIFY` — (tuỳ chọn) công tắc **dừng khẩn** cho toàn bộ gợi ý AI: đặt `0` là tắt ngay, không cần deploy lại. Mặc định bật khi có khoá.
 - `SENTRY_DSN` — (tuỳ chọn) theo dõi lỗi production qua Sentry (`instrumentation.ts` + `sentry.server.config.ts`/`sentry.edge.config.ts`, xem `docs/audit.md` §10). Thiếu → SDK tự `enabled: false`, không gửi gì, không ảnh hưởng build/dev.
 
 ## Kiến trúc
@@ -108,7 +104,7 @@ chéo nhau nhưng **không được tạo chu trình**. `npm run check:lib-layer
 | 4    | `lib/tai-chinh/`   | finance, cost, contracts, claims, vo, paymentcerts, procurement, tender…                                   |
 | 4    | `lib/vat-tu/`      | material-sync, google-sheets, resources, equipment                                                         |
 | 4    | `lib/hien-truong/` | hse, diary, hr, subcontractors, meetings, handover, warranty, risks…                                       |
-| 4    | `lib/ky-thuat/`    | toàn bộ `engineering-*`, `bim/`, `cad/`, drawings, qaqc, tech                                              |
+| 4    | `lib/ky-thuat/`    | toàn bộ `engineering-*`, drawings, qaqc, tech                                                              |
 | 4    | `lib/van-hanh/`    | alerts, push, notification-prefs, health                                                                   |
 | 5    | `lib/dich-vu/`     | Logic **phối hợp từ 2 miền trở lên** (ADR-0008) — không phải sọt rác cho code khó xếp                      |
 

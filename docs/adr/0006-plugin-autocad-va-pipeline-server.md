@@ -1,8 +1,11 @@
 # ADR-0006: Chuẩn hóa bản vẽ bằng plugin AutoCAD (.NET) + pipeline server, bỏ hướng script .SCR/AutoLISP
 
-- **Trạng thái:** Đã chấp nhận
-- **Ngày:** 2026-08-22
-- **Liên quan:** `docs/nang-cap/M99-plugin-autocad-chuan-hoa.md` (đặc tả tầng 2), `docs/nang-cap/M98-dxf-r2000-va-dwg.md` (tầng 3)
+- **Trạng thái:** ĐÃ HUỶ HIỆU LỰC (2026-09-04) — toàn bộ cụm CAD/BIM, kể cả plugin AutoCAD và
+  pipeline chuẩn hoá bản vẽ, đã được **gỡ khỏi sản phẩm**. Quyết định dưới đây giữ lại làm **hồ sơ
+  lịch sử** (ADR là sổ ghi quyết định, không xoá), KHÔNG mô tả hệ thống đang chạy. Chi tiết đợt gỡ:
+  `PROGRESS.md`.
+- **Ngày:** 2026-08-22 (huỷ hiệu lực 2026-09-04)
+- **Liên quan:** đặc tả `M99`/`M98` đã bị xoá cùng đợt gỡ — xem ghi chú đầu `docs/nang-cap/README.md`.
 
 ## Bối cảnh
 

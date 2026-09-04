@@ -243,8 +243,8 @@ export default function EngineeringApexCockpitPage() {
                 Pinnacle Multi-Agent Synergy Cockpit
               </h1>
               <p className="text-xs text-zinc-400 max-w-2xl leading-relaxed">
-                Đồng bộ ma trận 5 chiều: Không gian CAD/BIM — Dòng tiền & Chi phí — Pháp lý & Ký số
-                — An toàn HSE — Khối tác tử Merkle Tree bất biến.
+                Đồng bộ ma trận 5 chiều: Không gian 3D — Dòng tiền & Chi phí — Pháp lý & Ký số — An
+                toàn HSE — Khối tác tử Merkle Tree bất biến.
               </p>
             </div>
 
@@ -272,10 +272,10 @@ export default function EngineeringApexCockpitPage() {
 
           {/* 5-Axis Radar Cards */}
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {/* Axis 1: Spatial & BIM */}
+            {/* Trục 1: Không gian 3D */}
             <div className="bento-card p-4">
               <div className="flex items-center justify-between text-zinc-400">
-                <span className="text-xs font-semibold">1. Không gian & BIM</span>
+                <span className="text-xs font-semibold">1. Không gian 3D</span>
                 <Boxes className="h-4 w-4 text-sky-400" />
               </div>
               <div className="mt-2 font-mono text-2xl font-bold text-zinc-100 tabular-nums">
@@ -496,73 +496,31 @@ export default function EngineeringApexCockpitPage() {
                     <span>Swarm Debates & RFI Generator (PIN-3)</span>
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
-                  <Link
-                    href="/engineering/mepf-studio"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>MEPF Background Worker Studio</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
                 </div>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-800/80 text-[11px] text-zinc-400">
-                8 tác tử đồng bộ thời gian thực qua Webhook & SKIP LOCKED.
+                Các tác tử hiện trường đồng bộ thời gian thực qua Webhook.
               </div>
             </div>
 
-            {/* Bento Item 2: Kỹ thuật Không gian & CAD/BIM */}
+            {/* Bento Item 2: Kỹ thuật Không gian MEPF */}
             <div className="bento-card p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
                   <div className="flex items-center gap-2 text-sm font-bold text-zinc-100">
                     <Boxes className="h-4 w-4 text-sky-400" />
-                    <span>Kỹ thuật Không gian & CAD/BIM</span>
+                    <span>Kỹ thuật Không gian MEPF</span>
                   </div>
                   <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] text-sky-400 border border-sky-500/20 font-mono">
-                    Auto-Routing 3D
+                    WebGL
                   </span>
                 </div>
                 <div className="mt-4 space-y-2.5">
-                  <Link
-                    href="/engineering/bim-viewer"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>3D BIM & 4D Progress Simulation (M80)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                  <Link
-                    href="/engineering/auto-routing"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>Auto-Routing & Beam Sleeve Clash (M77)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
                   <Link
                     href="/engineering/spatial-viewer"
                     className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
                   >
                     <span>WebGL Spatial Annotation Pinning (M74)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                  <Link
-                    href="/engineering/cad-tracking"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>CAD 5D Auto-QTO & Variance (M66)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                  <Link
-                    href="/engineering/chuan-hoa-ban-ve"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>Chuẩn Hóa Bản Vẽ CAD 2D (ISO 19650)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                  <Link
-                    href="/engineering/joint-segmentation"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>Chia Đốt MEPF Theo Kiểu Kết Nối (M105)</span>
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
                 </div>
@@ -627,7 +585,7 @@ export default function EngineeringApexCockpitPage() {
               </div>
             </div>
 
-            {/* Bento Item 4: Siêu Tính toán, Digital Twin & Merkle Ledger */}
+            {/* Bento Item 4: Siêu Tính toán & Merkle Ledger */}
             <div className="bento-card p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
@@ -645,13 +603,6 @@ export default function EngineeringApexCockpitPage() {
                     className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
                   >
                     <span>Quantum Spatial WASM & Merkle Ledger (M73)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                  <Link
-                    href="/engineering/reality"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>Living Twin Reality & IoT Capture (L4–L6)</span>
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
                   <Link
@@ -763,7 +714,7 @@ export default function EngineeringApexCockpitPage() {
               <EmptyState
                 icon={Boxes}
                 title="Chưa nhận đối tượng kỹ thuật nào"
-                message="Kết nối MEP-Agents hoặc gửi tác vụ từ MEPF Studio để tiếp nhận đối tượng kỹ thuật."
+                message="Nạp dữ liệu qua cổng tiếp nhận ENG-1 để có đối tượng kỹ thuật hiển thị ở đây."
               />
             ) : (
               <div className="overflow-x-auto rounded-xl border border-zinc-800">

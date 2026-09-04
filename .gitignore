@@ -54,13 +54,6 @@ xboss.tar.gz
 /playwright/.auth/
 .lighthouseci/
 
-# Artifact Python — worker MEPF (`scripts/mepf/`, `mepf-worker/`) chạy bằng Python.
-# `mepf-worker/.gitignore` chỉ phủ cây con của nó, không phủ `scripts/mepf/`.
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.venv/
-
 # Log do PM2 sinh (ecosystem.config.js)
 logs/
 

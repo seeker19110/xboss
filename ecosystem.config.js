@@ -5,8 +5,7 @@
 // và một lớp trừu tượng giữa lỗi production với người sửa.
 //
 // Dùng:
-//   pm2 start ecosystem.config.js              # chạy cả app lẫn worker
-//   pm2 start ecosystem.config.js --only xboss # chỉ chạy app (VPS không cần worker AI)
+//   pm2 start ecosystem.config.js              # chạy app
 //   pm2 save && pm2 startup                    # tự bật lại sau khi máy reboot
 //
 // Các lần cập nhật sau dùng `bash deploy.sh` (build vào thư mục tạm → swap atomic → reload →
@@ -18,10 +17,8 @@ const { join } = require("node:path");
 /**
  * Đọc file .env kiểu dotenv thành object.
  *
- * Cần thiết vì hai tiến trình lấy biến môi trường theo hai đường khác nhau: Next.js TỰ đọc
- * `.env.local`, còn `scripts/mepf/worker_entry.py` đọc thẳng `os.environ["DATABASE_URL"]` và
- * **ném KeyError ngay khi khởi động** nếu thiếu. Chạy bằng Docker thì compose truyền biến vào
- * container nên không lộ ra; chuyển sang PM2 thì phải tự nạp, nếu không worker chết ngay.
+ * Cần thiết vì `next start` lấy `PORT` từ biến môi trường THẬT của tiến trình, không từ
+ * `.env.local` (Next.js chỉ nạp file đó cho code ứng dụng) — xem chú thích ở app `xboss`.
  */
 function docEnv(duongDan) {
   if (!existsSync(duongDan)) return {};
@@ -100,52 +97,6 @@ module.exports = {
 
       out_file: "logs/xboss-out.log",
       error_file: "logs/xboss-error.log",
-      merge_logs: true,
-      time: true,
-    },
-
-    {
-      // ── MEPF worker (daemon Python xử lý tác vụ AI kỹ thuật ngầm) ─────────
-      // Poll hàng đợi `engineering_async_tasks` bằng SKIP LOCKED — không cần Redis/Celery.
-      // Thiếu ANTHROPIC_API_KEY/OPENAI_API_KEY thì worker tự chạy dry-run.
-      name: "mepf-worker",
-      script: "scripts/mepf/worker_entry.py",
-      interpreter: "python3",
-      cwd: __dirname,
-      instances: 1,
-      exec_mode: "fork",
-
-      env: {
-        // Worker đọc thẳng os.environ, không tự nạp file env — phải truyền vào tận nơi
-        DATABASE_URL: bien("DATABASE_URL", ""),
-        ANTHROPIC_API_KEY: bien("ANTHROPIC_API_KEY", ""),
-        OPENAI_API_KEY: bien("OPENAI_API_KEY", ""),
-
-        // BẮT BUỘC có CẢ thư mục cha lẫn thư mục src trong PYTHONPATH: MEPF-Agents tự import
-        // theo kiểu `from src.state import ...` (cần thư mục cha) lẫn kiểu phẳng (cần src).
-        // Thiếu thư mục cha thì `from src.state` ném ModuleNotFoundError và worker ÂM THẦM rơi
-        // về dry-run — không báo lỗi, chỉ là mọi tác vụ AI đều trả kết quả giả.
-        PYTHONPATH: `${__dirname}/mepf-worker:${__dirname}/mepf-worker/src:${__dirname}`,
-        // Đường dẫn src của MEPF-Agents (worker_entry.py mặc định trỏ vào đường dẫn trong
-        // container cũ, phải khai lại khi chạy thẳng trên máy).
-        MEPF_AGENT_SRC: `${__dirname}/mepf-worker/src`,
-        // Không đệm stdout, nếu không log chỉ hiện ra khi worker thoát
-        PYTHONUNBUFFERED: "1",
-
-        MEPF_WORKER_ID: bien("MEPF_WORKER_ID", "mepf-worker-1"),
-        MEPF_WORKER_CONCURRENCY: bien("MEPF_WORKER_CONCURRENCY", "2"),
-        MEPF_DRY_RUN: bien("MEPF_DRY_RUN", "false"),
-        MEPF_POLL_INTERVAL: bien("MEPF_POLL_INTERVAL", "3"),
-        MEPF_LEASE_MINUTES: bien("MEPF_LEASE_MINUTES", "10"),
-      },
-
-      kill_timeout: 15000,
-      max_restarts: 10,
-      max_memory_restart: "1G",
-      watch: false,
-
-      out_file: "logs/mepf-worker-out.log",
-      error_file: "logs/mepf-worker-error.log",
       merge_logs: true,
       time: true,
     },
