@@ -27,6 +27,7 @@ type DoPhu = {
   tyLe: number;
   theoHe: DoPhuTheoHe[];
   weightLech: DongWeightLech[];
+  coMaBoq: number;
 };
 
 function pct(x: number) {
@@ -86,6 +87,17 @@ export default function DoPhuBoqCard() {
             </li>
           ))}
         </ul>
+      )}
+
+      {duLieu.coMaBoq > duLieu.daMap && (
+        <p className="text-[11px] text-amber-400/90 flex gap-1.5">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+          <span>
+            {duLieu.coMaBoq} công việc có ghi mã BOQ, nhưng mã đó chỉ là mã định danh — nó không nối
+            công việc với dòng khối lượng nào. Chỉ ánh xạ tỷ trọng ở bảng dưới mới tạo ra giá trị
+            hợp đồng cho công việc.
+          </span>
+        </p>
       )}
 
       {duLieu.weightLech.length > 0 && (

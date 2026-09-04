@@ -1,5 +1,50 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Vá chuỗi BOQ → tracking → nghiệm thu → thanh toán (rà soát 2026-09-04)
+
+Đợt rà soát toàn chuỗi từ BOQ tới hết giai đoạn tracking. Sáu lỗ hổng correctness được vá; các
+mục còn lại đã có chỗ đứng riêng, ghi rõ ở cuối để không tưởng nhầm là đã xong.
+
+**Đã vá**
+
+- **Σ tỷ trọng > 1 nay bị CHẶN** ở `PUT /api/boq/:id/map` (422) thay vì chỉ cảnh báo. Σ < 1 vẫn
+  chỉ cảnh báo (map dần từng công việc là hợp lệ). Luật tách thành hàm thuần
+  `kiemTraTongTyTrong` (`lib/khoi-luong/boq-coverage.ts`) để route chỉ còn là ranh giới HTTP.
+- **`boqExecutedQty` kẹp trần `qty_contract`** (`LEAST`). Dữ liệu cũ vi phạm Σweight vẫn nằm
+  nguyên trong DB (không migration nào dọn), mà con số này chảy thẳng vào gợi ý khối lượng IPC —
+  hai lớp chặn cố ý chồng nhau.
+- **`nextBoqSeq` (import BOQ) sửa 3 lỗi**: so SỐ thay vì so CHUỖI (mã `ACMV-9` từng làm mã kế
+  tiếp đâm vào dãy `ACMV-0010+`), chỉ nhận đuôi toàn chữ số (mã nhập tay phi số từng sinh
+  `ACMV-NaN`), và lọc đúng `org_id` qua sổ `boq_codes`. Thêm `pg_advisory_xact_lock` theo prefix
+  để hai lần import cùng hệ không đọc cùng một số kế tiếp.
+  ⚠️ Bẫy SQL đã dính thật: `substring(code FROM ?)` với tham số không định kiểu bị Postgres hiểu
+  là **substring dạng regex**, phải viết `?::int`.
+- **`scripts/backfill-boq.ts`**: kiểm trùng trên sổ `boq_codes` theo đúng `org_id` (bản cũ chỉ
+  tra `tasks`+`work_packages`, bỏ qua `materials`/`boq_items` và không lọc org → vỡ ở trigger
+  giữa chừng), bọc toàn bộ trong một transaction, kiểm cuối đổi sang "còn hàng nào chưa có mã".
+- **Nói thẳng rằng mã BOQ trên công việc KHÔNG nối tới dòng BOQ.** Sổ `boq_codes` cấm hai dòng
+  khác bảng cùng giữ một mã, nên một task và một `boq_item` **không thể** mang cùng mã — đối
+  chiếu kiểu "mã mồ côi" sẽ báo động 100% số task và vô nghĩa (đã thử, test khoá lại sự thật
+  này). Thay bằng số đếm `coMaBoq` trong `/api/boq/coverage` + cảnh báo trên thẻ "Độ phủ ánh xạ
+  BOQ": có ghi mã ≠ đã gắn giá trị hợp đồng. Đường duy nhất là `boq_task_map`.
+- **Trang IPC nói rõ nguồn khối lượng**: KL đợt này suy từ tiến độ tick × tỷ trọng BOQ trừ luỹ
+  kế đã duyệt, **không** phải khối lượng lấy từ biên bản nghiệm thu (`approve` không ghi khối
+  lượng nào) — người duyệt phải tự đối chiếu hồ sơ.
+
+**Test**: `tests/boq-khoi-luong-bat-bien.test.ts` (7 ca) khoá: luật Σ tỷ trọng hai chiều, kẹp
+trần khối lượng thực hiện trên dữ liệu Σweight = 1.6, bất biến "task không thể mang mã của dòng
+BOQ", và thứ tự số của `nextBoqSeq`.
+
+**KHÔNG làm đợt này (mỗi mục cần đặc tả/cổng riêng, không phải quên):**
+
+- Trọng số theo giá trị BOQ cho S-curve/SPI — **M122 PR3/PR4 vẫn nằm sau cổng dừng §17.2**: phải
+  deploy, đọc độ phủ thật rồi mới chốt ngưỡng D1. Đợt này chỉ làm cho con số độ phủ trung thực hơn.
+- Hợp nhất hai đường import Excel (`lib/tien-do/import.ts` hard-code 5 sheet ACMV vs
+  `lib/tien-do/system-upload.ts` của M64) — thay đổi kiến trúc, cần đặc tả riêng.
+- Preview diff/hoàn tác cho upload kế hoạch M64 (hiện ghi đè toàn bộ ngày cũ) — tính năng mới.
+- Dọn cột chết `progress_dimensions.value`, bảng `floors` thật thay `floor_label` chuỗi tự do,
+  khoá cửa RLS 3 bảng M123 — đều là migration đụng dữ liệu, phải qua staging.
+
 ## ✅ M123 — `project_id` cho baseline, danh mục công tác và mặt trận theo tầng (Giai đoạn 4, 2026-09-03)
 
 `docs/nang-cap/M123-project-id-cho-baseline-va-mat-tran.md` — **Approved 2026-09-03** (spec merge ở

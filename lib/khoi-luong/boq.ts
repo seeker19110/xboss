@@ -58,9 +58,20 @@ export async function boqTakenBy(
 
 // KL thực hiện của 1 dòng BOQ = qty_contract × Σ(weight × task.progress_percent) qua
 // các task đã map (boq_task_map). Tách hàm để M2 (chi phí) / M6 (phát sinh) tái dùng.
+//
+// KẸP TRẦN qty_contract (LEAST): `weight` luôn nhập tay và Σweight của một dòng BOQ chỉ được
+// canh bằng cảnh báo mềm ở PUT /api/boq/:id/map, nên dữ liệu cũ (có trước lúc route chặn
+// Σweight > 1) vẫn có thể cho Σ(weight × progress) > 1. Con số này chảy thẳng vào gợi ý khối
+// lượng IPC (lib/tai-chinh/paymentcerts.ts) và định mức (lib/khoi-luong/norms.ts) — thanh toán
+// vượt khối lượng hợp đồng là lỗi tiền thật, nên kẹp ở đây, nơi mọi người dùng đi qua, thay vì
+// trông vào việc mọi nơi gọi đều tự nhớ kẹp. Dòng BOQ có qty_contract < 0 (không hợp lệ) thì
+// LEAST vẫn giữ đúng dấu, không tự bịa số 0.
 export async function boqExecutedQty(boqItemId: number): Promise<number> {
   const row = await queryOne<{ executed: number }>(
-    `SELECT COALESCE(bi.qty_contract * SUM(m.weight * COALESCE(t.progress_percent, 0)), 0) AS executed
+    `SELECT LEAST(
+              bi.qty_contract,
+              COALESCE(bi.qty_contract * SUM(m.weight * COALESCE(t.progress_percent, 0)), 0)
+            ) AS executed
        FROM boq_items bi
        LEFT JOIN boq_task_map m ON m.boq_item_id = bi.id
        LEFT JOIN tasks t ON t.id = m.task_id

@@ -2,12 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { kiemTraTongTyTrong } from "@/lib/khoi-luong/boq-coverage";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 
 export const dynamic = "force-dynamic";
 
 // PUT /api/boq/:id/map — ghi đè toàn bộ map task ↔ dòng BOQ + weight (Admin/PM).
-// Weight LUÔN nhập tay (không tự chia đều) — chỉ cảnh báo khi Σweight ≠ 1, không chặn cứng.
+// Weight LUÔN nhập tay (không tự chia đều). Hai chiều lệch KHÔNG đối xứng nhau:
+//   - Σweight > 1 → CHẶN (422). Σ(weight × progress) là đường duy nhất sinh khối lượng thực
+//     hiện (boqExecutedQty), và khối lượng đó chảy thẳng vào gợi ý IPC — Σweight > 1 nghĩa là
+//     nghiệm thu/thanh toán được nhiều hơn khối lượng hợp đồng, luôn sai, không có ca dùng hợp lệ.
+//   - Σweight < 1 → chỉ CẢNH BÁO. Đây là trạng thái bình thường lúc PM đang map dần từng task;
+//     chặn cứng sẽ không cho lưu nửa chừng.
+// Dữ liệu CŨ vi phạm vẫn nằm nguyên trong DB (không migration nào dọn) — vì vậy boqExecutedQty
+// còn kẹp trần qty_contract một lần nữa ở tầng đọc; hai lớp này cố ý chồng nhau.
 // body: { map: [{ taskId, weight }] }
 export async function PUT(
   req: NextRequest,
@@ -53,6 +61,10 @@ export async function PUT(
     entries.push({ taskId, weight });
   }
 
+  // Chặn TRƯỚC khi ghi (không phải sau) — nếu không, lô sai đã nằm trong DB rồi mới báo lỗi.
+  const { tong: sumWeight, loi, canhBao } = kiemTraTongTyTrong(entries.map((e) => e.weight));
+  if (loi) return NextResponse.json({ error: loi }, { status: 422 });
+
   if (entries.length > 0) {
     const existingTasks = await query<{ id: number }>(
       `SELECT id FROM tasks WHERE id IN (${entries.map(() => "?").join(",")})`,
@@ -79,11 +91,5 @@ export async function PUT(
     }
   });
 
-  const sumWeight = entries.reduce((s, e) => s + e.weight, 0);
-  const warning =
-    entries.length > 0 && Math.abs(sumWeight - 1) > 0.01
-      ? `Tổng weight (${sumWeight.toFixed(4)}) khác 1 — kiểm tra lại tỷ trọng phân bổ.`
-      : null;
-
-  return NextResponse.json({ ok: true, sumWeight, warning });
+  return NextResponse.json({ ok: true, sumWeight, warning: canhBao });
 }

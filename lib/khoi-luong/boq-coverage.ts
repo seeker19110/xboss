@@ -35,11 +35,45 @@ export type DoPhuBoq = {
   tyLe: number;
   theoHe: DoPhuTheoHe[];
   weightLech: DongWeightLech[];
+  /** Số công việc có ghi mã BOQ. Mã đó KHÔNG nối công việc với dòng BOQ nào — xem ghi chú
+   *  ở đầu file. Đo để UI nói thẳng ra, vì cột "Mã BOQ" trên lưới rất dễ bị hiểu ngược. */
+  coMaBoq: number;
 };
 
 /** Lệch quá mức này mới coi là bất thường — cùng ngưỡng với cảnh báo lúc PUT map
  *  (app/api/boq/[id]/map/route.ts), để hai chỗ không nói hai chuyện khác nhau. */
 export const NGUONG_LECH_WEIGHT = 0.01;
+
+/**
+ * Luật tổng tỷ trọng của MỘT dòng BOQ, tách thành hàm thuần để route chỉ còn là ranh giới HTTP
+ * (ADR-0008) và để luật này test được mà không cần dựng phiên/DB.
+ *
+ * Hai chiều lệch KHÔNG đối xứng:
+ *  - Σ > 1 → chặn. Khối lượng thực hiện = qty_contract × Σ(weight × progress); Σweight > 1 nghĩa
+ *    là dòng BOQ có thể thanh toán vượt khối lượng hợp đồng. Không có ca dùng hợp lệ.
+ *  - Σ < 1 → chỉ cảnh báo. Đó là trạng thái bình thường khi PM đang map dần từng công việc.
+ * Dung sai hai chiều dùng chung NGUONG_LECH_WEIGHT để cảnh báo và chặn không nói hai chuyện khác nhau.
+ */
+export function kiemTraTongTyTrong(weights: number[]): {
+  tong: number;
+  loi: string | null;
+  canhBao: string | null;
+} {
+  const tong = weights.reduce((s, w) => s + w, 0);
+  if (tong - 1 > NGUONG_LECH_WEIGHT)
+    return {
+      tong,
+      loi: `Tổng tỷ trọng (${tong.toFixed(4)}) vượt 1 — khối lượng thực hiện sẽ vượt khối lượng hợp đồng. Giảm tỷ trọng các công việc trước khi lưu.`,
+      canhBao: null,
+    };
+  if (weights.length > 0 && 1 - tong > NGUONG_LECH_WEIGHT)
+    return {
+      tong,
+      loi: null,
+      canhBao: `Tổng tỷ trọng (${tong.toFixed(4)}) chưa đủ 1 — dòng BOQ này mới gắn được một phần khối lượng.`,
+    };
+  return { tong, loi: null, canhBao: null };
+}
 
 // Đếm task đã map, nhóm theo hệ. Phạm vi = đúng phần người dùng đang xem: `projectId` NULL
 // nghĩa là không chọn dự án nào → trả rỗng thay vì đếm chéo mọi dự án.
@@ -48,7 +82,15 @@ export async function doPhuBoq(opts: {
   systemCode?: string | null;
 }): Promise<DoPhuBoq> {
   const { projectId, systemCode = null } = opts;
-  if (projectId == null) return { tong: 0, daMap: 0, tyLe: 0, theoHe: [], weightLech: [] };
+  if (projectId == null)
+    return {
+      tong: 0,
+      daMap: 0,
+      tyLe: 0,
+      theoHe: [],
+      weightLech: [],
+      coMaBoq: 0,
+    };
 
   const conds = ["tw.project_id = ?"];
   const args: unknown[] = [projectId];
@@ -102,7 +144,33 @@ export async function doPhuBoq(opts: {
     ),
   );
 
-  return { tong, daMap, tyLe: tong > 0 ? daMap / tong : 0, theoHe, weightLech };
+  // Đếm công việc CÓ ghi mã BOQ. Cố ý KHÔNG đối chiếu mã đó với `boq_items.code`: sổ đăng ký
+  // `boq_codes` (PK (org_id, code), trigger trên cả 4 bảng) cấm hai dòng khác bảng cùng giữ một
+  // mã, nên một task và một dòng BOQ KHÔNG BAO GIỜ mang cùng mã được. Nói cách khác cột
+  // `tasks.boq_code` về bản chất không thể là con trỏ tới dòng BOQ — đối chiếu kiểu "mã mồ côi"
+  // sẽ báo động 100% số task và chẳng nói lên điều gì. Đường duy nhất nối công việc với giá trị
+  // hợp đồng là `boq_task_map`; con số này chỉ để UI cảnh tỉnh người đang nhầm hai thứ đó.
+  const coMa = await withProjectScope(projectId, () =>
+    queryOne<{ n: number }>(
+      `SELECT COUNT(*)::int AS n
+         FROM tasks t
+         JOIN work_packages wp ON wp.id = t.package_id
+         JOIN sheet_types st ON st.id = wp.sheet_type_id
+         JOIN towers tw ON tw.id = st.tower_id
+         LEFT JOIN systems d ON d.id = st.system_id
+         ${where} AND t.boq_code IS NOT NULL`,
+      ...args,
+    ),
+  );
+
+  return {
+    tong,
+    daMap,
+    tyLe: tong > 0 ? daMap / tong : 0,
+    theoHe,
+    weightLech,
+    coMaBoq: Number(coMa?.n ?? 0),
+  };
 }
 
 // Độ phủ gọn cho lớp phân tích (S-curve/SPI) — chỉ cần 3 con số, không cần chi tiết theo hệ.

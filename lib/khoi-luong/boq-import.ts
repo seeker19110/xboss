@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { queryOne, insertId, withTransaction } from "@/lib/db";
+import { queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
 
 // Parser cho Bảng khối lượng BOQ dự toán & kiểm soát đặt hàng:
@@ -279,15 +279,37 @@ export function parseBoqWorkbook(workbook: XLSX.WorkBook): BoqParseResult {
   };
 }
 
-// File không có cột mã (BOQCODE) — tự sinh mã tuần tự "<PREFIX>-NNNN" theo mã lớn
-// nhất hiện có trong boq_items cho prefix đó (giống lib/seqcode.ts nhưng pad rộng
+// File không có cột mã (BOQCODE) — tự sinh mã tuần tự "<PREFIX>-NNNN" theo số lớn
+// nhất hiện có trong boq_items cho prefix đó (giống lib/nen/seqcode.ts nhưng pad rộng
 // hơn vì 1 lần import có thể tới hàng trăm dòng).
-async function nextBoqSeq(prefix: string): Promise<number> {
-  const last = await queryOne<{ code: string }>(
-    `SELECT code FROM boq_items WHERE code LIKE ? ORDER BY code DESC LIMIT 1`,
-    `${prefix}%`,
+//
+// Ba điểm cố ý, đều là lỗi đã có ở bản cũ (`ORDER BY code DESC LIMIT 1` + `parseInt`):
+//  1. So SỐ, không so CHUỖI. Sắp chuỗi thì "ACMV-9" đứng sau "ACMV-0010", nên mã kế tiếp
+//     tính từ số 9 và đâm thẳng vào dãy 0010+ đang có (import fail hàng loạt vì trùng).
+//  2. Chỉ nhận phần đuôi TOÀN CHỮ SỐ (`~ '^[0-9]+$'`). Mã nhập tay kiểu "ACMV-A1" từng
+//     làm parseInt trả NaN và sinh ra mã "ACMV-NaN".
+//  3. Lọc theo ĐÚNG org. Mã BOQ duy nhất trong phạm vi org (lib/khoi-luong/boq.ts), nên
+//     đếm cả mã của org khác vừa lộ dữ liệu tenant khác vừa làm nhảy số vô cớ.
+// `left(code, n) = prefix` thay cho LIKE để không phải escape `%`/`_` trong mã hệ.
+async function nextBoqSeq(prefix: string, orgId: number): Promise<number> {
+  const len = prefix.length;
+  const row = await queryOne<{ maxSeq: number | null }>(
+    // `::int` là BẮT BUỘC: tham số không định kiểu làm Postgres chọn nhánh
+    // substring(text FROM text) — tức là khớp REGEX chứ không cắt từ vị trí, và
+    // "TESTSEQ-0010" với tham số 9 trả về đúng chuỗi "9". Đã dính thật khi viết test.
+    `SELECT MAX(CAST(substring(b.code FROM ?::int) AS bigint)) AS "maxSeq"
+       FROM boq_items b
+       JOIN boq_codes bc ON bc.table_name = 'boq_items' AND bc.row_id = b.id
+      WHERE bc.org_id = ?
+        AND left(b.code, ?::int) = ?
+        AND substring(b.code FROM ?::int) ~ '^[0-9]+$'`,
+    len + 1,
+    orgId,
+    len,
+    prefix,
+    len + 1,
   );
-  return last?.code ? parseInt(last.code.slice(prefix.length), 10) + 1 : 1;
+  return Number(row?.maxSeq ?? 0) + 1;
 }
 
 export type BoqImportPreviewRow = ParsedBoqRow & {
@@ -303,7 +325,7 @@ export async function previewBoqImport(
   orgId: number,
 ): Promise<BoqImportPreviewRow[]> {
   const prefix = `${systemCode.toUpperCase()}-`;
-  let seq = await nextBoqSeq(prefix);
+  let seq = await nextBoqSeq(prefix, orgId);
   const out: BoqImportPreviewRow[] = [];
   const seenCodes = new Set<string>();
 
@@ -349,7 +371,12 @@ export async function commitBoqImport(
 ): Promise<BoqImportResult> {
   const prefix = `${systemCode.toUpperCase()}-`;
   return withTransaction(async () => {
-    let seq = await nextBoqSeq(prefix);
+    // Chuỗi hoá theo prefix: hai lần import cùng hệ chạy song song đọc cùng một số kế tiếp
+    // rồi cùng ghi. Unique + trigger boq_codes vẫn bắt được, nhưng bắt bằng cách cho cả
+    // transaction đổ vỡ giữa chừng — khoá ở đây để lần thứ hai đọc được số đã tăng. Khoá
+    // cấp transaction nên tự nhả khi COMMIT/ROLLBACK, không cần dọn tay.
+    await run(`SELECT pg_advisory_xact_lock(hashtext(?))`, `boq_seq:${orgId}:${prefix}`);
+    let seq = await nextBoqSeq(prefix, orgId);
     let inserted = 0;
     const errors: string[] = [];
     const seenCodes = new Set<string>();

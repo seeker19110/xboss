@@ -531,6 +531,14 @@ function CertDetailModal({
           </div>
         )}
 
+        {/* Nói rõ khối lượng gợi ý đến từ đâu: người duyệt IPC rất dễ mặc định đây là khối
+            lượng đã nghiệm thu, trong khi nó suy ra từ tiến độ tick trên lưới. */}
+        <p className="text-[11px] text-zinc-500">
+          KL đợt này được gợi ý từ <strong className="text-zinc-400">tiến độ thi công</strong> (tỷ
+          lệ ô đã tick × tỷ trọng BOQ), trừ luỹ kế các đợt đã duyệt — không phải khối lượng lấy từ
+          biên bản nghiệm thu. Đối chiếu với hồ sơ nghiệm thu trước khi trình duyệt.
+        </p>
+
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
