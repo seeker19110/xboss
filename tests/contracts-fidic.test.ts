@@ -561,44 +561,43 @@ test(
   },
 );
 
-test(
-  "createFidicClaim (dạng tham số vị trí projectId/claimCode/dossier): nhánh chết — không nơi nào trong code gọi tới, và INSERT vào cột không tồn tại trong schema hiện hành",
-  { skip: !HAS_TEST_DB },
-  async () => {
-    // Ghi chú quan trọng (không phải để "vá" mà để KHOÁ hành vi hiện tại): migration
-    // 0113_fidic_delay_claims.sql định nghĩa bảng engineering_fidic_claims với cột
-    // title/executive_summary/eot_days_requested/cost_claim_amount/dossier_markdown
-    // KHÔNG tồn tại, và UNIQUE constraint chỉ có (claim_code) chứ không phải
-    // (project_id, claim_code) như ON CONFLICT của nhánh này giả định. Toàn bộ codebase
-    // (grep app/api + tests) chỉ gọi createFidicClaim() dạng object (nhánh trên) — nhánh
-    // tham số vị trí này là code chết. Test này CHỦ ĐỘNG gọi nó để đạt coverage và khoá
-    // đúng hành vi thật: gọi vào DB thật hiện nay sẽ LỖI, không được âm thầm nuốt lỗi.
-    const { insertId, run } = await import("@/lib/db");
-    const projectId = await insertId(
-      `INSERT INTO projects (name) VALUES ('FIDIC Claim Dead Branch Proj')`,
+test("createFidicClaim: ghi ĐÚNG người lập vào created_by", { skip: !HAS_TEST_DB }, async () => {
+  // Trước đây hàm đọc `input.userId` trong khi route (đường gọi DUY NHẤT) truyền
+  // `createdBy` — nên cột created_by luôn nhận null và hồ sơ khiếu nại không biết ai lập.
+  // Với hồ sơ FIDIC (chứng cứ pháp lý khi tranh chấp EOT/chi phí) thì mất dấu vết người
+  // lập là mất giá trị của chính hồ sơ.
+  //
+  // Ghi chú lịch sử: hàm này từng có thêm một nhánh nhận 4 tham số vị trí
+  // (projectId, claimCode, dossier, userId). Nhánh đó là code chết — không nơi nào gọi,
+  // và câu INSERT tham chiếu 5 cột không tồn tại trong `engineering_fidic_claims` nên gọi
+  // vào là ném lỗi. Đã xoá cùng đợt này; chữ ký nhờ đó bỏ được `any`.
+  const { insertId, queryOne, run } = await import("@/lib/db");
+  const projectId = await insertId(
+    `INSERT INTO projects (name) VALUES ('FIDIC Claim created_by Proj')`,
+  );
+  const userId = await insertId(
+    `INSERT INTO users (name, email, password_hash, role) VALUES ('Người lập FIDIC', ?, 'x', 'pm')`,
+    `fidic-createdby-${projectId}@test.local`,
+  );
+  try {
+    const claim = await createFidicClaim({
+      projectId,
+      claimCode: `CLM-CB-${projectId}`,
+      eventTitle: "Chậm bàn giao mặt bằng",
+      eventDate: "2026-01-10",
+      noticeDate: "2026-01-20",
+      eotDaysClaimed: 12,
+      costClaimedVnd: 5_000_000,
+      createdBy: userId,
+    });
+    const row = await queryOne<{ created_by: number | null }>(
+      `SELECT created_by FROM engineering_fidic_claims WHERE id = ?`,
+      claim.id,
     );
-
-    await assert.rejects(() =>
-      createFidicClaim(projectId, `CLM-DEAD-${projectId}`, "Hồ sơ dạng chuỗi thô", 5),
-    );
-
-    // Nhánh dossier là object (thay vì string) vẫn đi cùng một câu SQL sai cột — vẫn
-    // phải reject, không được vô tình "sửa hộ" nhánh chết này.
-    await assert.rejects(() =>
-      createFidicClaim(projectId, `CLM-DEAD2-${projectId}`, {
-        documentTitle: "Tiêu đề hồ sơ",
-        executiveSummary: "Tóm tắt điều hành",
-        totalEotDaysRequested: 10,
-        totalCostClaimVnd: 1_000_000,
-        claimDossierMarkdown: "# nội dung",
-      }),
-    );
-
-    // Dossier object nhưng THIẾU mọi field -> phải rơi hết vào các fallback `||`
-    // (documentTitle/executiveSummary/totalEotDaysRequested/totalCostClaimVnd/
-    // claimDossierMarkdown) trước khi lệnh INSERT được gửi đi và bị DB từ chối.
-    await assert.rejects(() => createFidicClaim(projectId, `CLM-DEAD3-${projectId}`, {}));
-
+    assert.equal(Number(row!.created_by), userId);
+  } finally {
+    await run(`DELETE FROM engineering_fidic_claims WHERE project_id = ?`, projectId);
+    await run(`DELETE FROM users WHERE id = ?`, userId);
     await run(`DELETE FROM projects WHERE id = ?`, projectId);
-  },
-);
+  }
+});

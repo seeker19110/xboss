@@ -434,20 +434,44 @@ export async function listFidicTiaClaims(
 // 5. GENERAL FIDIC CLAIM DATABASE PERSISTENCE
 // ============================================================================
 
+/** Dữ liệu lập khiếu nại FIDIC — khớp thân request của POST /api/engineering/fidic/claims. */
+export type FidicClaimInput = {
+  projectId: number;
+  claimCode: string;
+  contractType?: string | null;
+  eventType?: string;
+  eventTitle?: string;
+  eventDate: string;
+  noticeDate: string;
+  eotDaysClaimed?: number;
+  costClaimedVnd?: number;
+  evidences?: unknown[];
+  createdBy?: number | null;
+  /** Chỉ dùng để dựng hồ sơ (generateFidicClaimDossier), không ghi thẳng vào cột nào. */
+  projectName?: string;
+  contractorName?: string;
+};
+
+/**
+ * Lập (hoặc cập nhật) một khiếu nại FIDIC.
+ *
+ * Trước đây hàm này nhận HAI dạng đối số: một object (nhánh đang chạy thật), hoặc bốn tham số
+ * vị trí (projectId, claimCode, dossier, userId). Nhánh tham số vị trí là CODE CHẾT theo cả hai
+ * nghĩa: không nơi nào trong repo gọi tới nó, và câu INSERT của nó tham chiếu năm cột không tồn
+ * tại trong `engineering_fidic_claims` (`title`, `executive_summary`, `eot_days_requested`,
+ * `cost_claim_amount`, `dossier_markdown`) cùng một `ON CONFLICT (project_id, claim_code)` không
+ * khớp ràng buộc thật (bảng chỉ có UNIQUE đơn trên `claim_code`) — nghĩa là gọi vào là ném lỗi.
+ * Giữ lại chỉ là cái bẫy cho người đọc sau, nên đã xoá; chữ ký nhờ đó bỏ được `any`.
+ */
 export async function createFidicClaim(
-  inputOrProjectId: any,
-  claimCodeArg?: string,
-  dossierArg?: any,
-  userIdArg?: number | null,
+  input: FidicClaimInput,
 ): Promise<{ id: string; claimCode: string; [key: string]: unknown }> {
-  if (typeof inputOrProjectId === "object") {
-    const input = inputOrProjectId;
-    const dossierMd = generateFidicClaimDossier(input);
-    // Tên cột bám đúng migrations/0113: event_title/eot_days_claimed/cost_claimed_vnd/
-    // dossier_content (không có executive_summary). event_date/notice_date là NOT NULL.
-    // claim_code UNIQUE đơn nên ON CONFLICT chỉ theo claim_code.
-    const row = await queryOne<{ id: string }>(
-      `INSERT INTO engineering_fidic_claims (
+  const dossierMd = generateFidicClaimDossier(input);
+  // Tên cột bám đúng migrations/0113: event_title/eot_days_claimed/cost_claimed_vnd/
+  // dossier_content (không có executive_summary). event_date/notice_date là NOT NULL.
+  // claim_code UNIQUE đơn nên ON CONFLICT chỉ theo claim_code.
+  const row = await queryOne<{ id: string }>(
+    `INSERT INTO engineering_fidic_claims (
         project_id, claim_code, contract_type, event_title, event_date, notice_date,
         eot_days_claimed, cost_claimed_vnd, dossier_content, created_by
       ) VALUES (
@@ -463,53 +487,19 @@ export async function createFidicClaim(
         dossier_content = EXCLUDED.dossier_content,
         updated_at = NOW()
       RETURNING id`,
-      input.projectId,
-      input.claimCode,
-      input.contractType ?? null,
-      input.eventTitle || `Khiếu nại ${input.claimCode}`,
-      input.eventDate,
-      input.noticeDate,
-      input.eotDaysClaimed || 0,
-      input.costClaimedVnd || 0,
-      dossierMd,
-      input.userId ?? null,
-    );
-    if (!row) throw new Error("Failed to save FIDIC claim");
-    return { ...row, claimCode: input.claimCode };
-  }
-
-  const projectId = inputOrProjectId;
-  const claimCode = claimCodeArg!;
-  const dossier = dossierArg;
-  const row = await queryOne<{ id: string }>(
-    `INSERT INTO engineering_fidic_claims (
-      project_id, claim_code, title, executive_summary,
-      eot_days_requested, cost_claim_amount, dossier_markdown, created_by
-    ) VALUES (
-      ?, ?, ?, ?,
-      ?, ?, ?, ?
-    )
-    ON CONFLICT (project_id, claim_code) DO UPDATE SET
-      title = EXCLUDED.title,
-      executive_summary = EXCLUDED.executive_summary,
-      eot_days_requested = EXCLUDED.eot_days_requested,
-      cost_claim_amount = EXCLUDED.cost_claim_amount,
-      dossier_markdown = EXCLUDED.dossier_markdown
-    RETURNING id`,
-
-    projectId,
-    claimCode,
-    typeof dossier === "string"
-      ? `Hồ sơ Khiếu nại ${claimCode}`
-      : dossier.documentTitle || `Hồ sơ ${claimCode}`,
-    typeof dossier === "string" ? `Hồ sơ Khiếu nại ${claimCode}` : dossier.executiveSummary || "",
-    typeof dossier === "string" ? 0 : dossier.totalEotDaysRequested || 0,
-    typeof dossier === "string" ? 0 : dossier.totalCostClaimVnd || 0,
-    typeof dossier === "string" ? dossier : dossier.claimDossierMarkdown || "",
-    userIdArg ?? null,
+    input.projectId,
+    input.claimCode,
+    input.contractType ?? null,
+    input.eventTitle || `Khiếu nại ${input.claimCode}`,
+    input.eventDate,
+    input.noticeDate,
+    input.eotDaysClaimed || 0,
+    input.costClaimedVnd || 0,
+    dossierMd,
+    input.createdBy ?? null,
   );
-  if (!row) throw new Error("Failed to save FIDIC claim");
-  return { ...row, claimCode };
+  if (!row) throw new Error("Không lưu được khiếu nại FIDIC");
+  return { ...row, claimCode: input.claimCode };
 }
 
 export async function listFidicClaims(projectId: number): Promise<Array<Record<string, unknown>>> {
