@@ -41,7 +41,15 @@ export async function POST(
     decidedBy: user.id,
     projectId,
   });
-  if (typeof result === "string") return NextResponse.json({ error: result }, { status: 409 });
+  if (typeof result === "string")
+    return NextResponse.json(
+      { error: result },
+      // "Không tìm thấy" (bản ghi không tồn tại / thuộc dự án khác) phải là 404, không
+      // phải 409 — cùng khuôn với /api/proposals/:id/decide. Trước đây mọi lỗi (kể cả
+      // xuyên dự án) đều trả 409, khiến việc "không tìm thấy" (nên vô hại) bị lẫn với
+      // xung đột trạng thái thật.
+      { status: result === "Không tìm thấy thay đổi thiết kế" ? 404 : 409 },
+    );
 
   return NextResponse.json({ ok: true, status: decision });
 }

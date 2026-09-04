@@ -85,6 +85,12 @@ export async function GET(req: NextRequest) {
       };
 
       await check();
+      // Client đã huỷ (cancel()/abort) ngay trong lúc `check()` đầu tiên đang chờ DB —
+      // trước đây vẫn tạo `timer` ở đây dù `closed` đã true, và `close()` no-op khi gọi
+      // lần 2 (dòng `if (closed) return`) nên KHÔNG BAO GIỜ clearInterval: một
+      // setInterval chạy DB mỗi 3s vĩnh viễn dù stream đã đóng (rò rỉ, giữ tiến trình
+      // sống mãi — lộ ra khi test gọi `body.cancel()` ngay sau GET).
+      if (closed) return;
       timer = setInterval(check, CHECK_MS);
       req.signal.addEventListener("abort", close);
     },
