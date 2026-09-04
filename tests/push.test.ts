@@ -60,6 +60,10 @@ function moPushService(status: number): Promise<{ server: Server; url: string }>
 
 const dongServer = (server: Server) => new Promise((r) => server.close(r));
 
+// Không cần nạp lại module giữa các ca: `pushConfigured()` đọc process.env ở MỖI lần gọi,
+// nên đổi biến môi trường là đủ. (Trạng thái module duy nhất là cờ `vapidReady` — đã set
+// rồi thì thôi, và server giả không kiểm chữ ký VAPID nên không ảnh hưởng ca nào.)
+
 // Chứng chỉ tự ký ở trên sẽ bị Node từ chối; nới đúng trong tiến trình test này (không phải
 // mã sản phẩm) để web-push nói chuyện được với server giả.
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -69,8 +73,7 @@ test("pushConfigured + gửi khi CHƯA cấu hình VAPID: no-op, trả 0", async
   delete process.env.VAPID_PUBLIC_KEY;
   delete process.env.VAPID_PRIVATE_KEY;
   try {
-    const { pushConfigured, sendPushToUsers, sendPushToAll } =
-      await import("@/lib/van-hanh/push?chua-cau-hinh");
+    const { pushConfigured, sendPushToUsers, sendPushToAll } = await import("@/lib/van-hanh/push");
     assert.equal(pushConfigured(), false);
     // Không chạm DB, không throw — kể cả khi có danh sách người nhận.
     assert.equal(await sendPushToUsers([1, 2], { title: "t", body: "b" }), 0);
@@ -86,7 +89,7 @@ test("sendPushToUsers: danh sách người nhận rỗng là no-op ngay cả khi
   const keys = webpush.generateVAPIDKeys();
   process.env.VAPID_PUBLIC_KEY = keys.publicKey;
   process.env.VAPID_PRIVATE_KEY = keys.privateKey;
-  const { pushConfigured, sendPushToUsers } = await import("@/lib/van-hanh/push?rong");
+  const { pushConfigured, sendPushToUsers } = await import("@/lib/van-hanh/push");
   assert.equal(pushConfigured(), true);
   assert.equal(await sendPushToUsers([], { title: "t", body: "b" }), 0);
 });
@@ -102,7 +105,7 @@ test(
     process.env.VAPID_SUBJECT = "mailto:test@xboss.vn";
 
     const { insertId, queryOne, run } = await import("@/lib/db");
-    const { sendPushToUsers } = await import("@/lib/van-hanh/push?that");
+    const { sendPushToUsers } = await import("@/lib/van-hanh/push");
 
     const userId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Push Test', ?, 'x', 'pm')`,
@@ -168,7 +171,7 @@ test(
     process.env.VAPID_PRIVATE_KEY = keys.privateKey;
 
     const { insertId, run } = await import("@/lib/db");
-    const { sendPushToAll } = await import("@/lib/van-hanh/push?all");
+    const { sendPushToAll } = await import("@/lib/van-hanh/push");
 
     await run(`DELETE FROM push_subscriptions`);
     const ok = await moPushService(201);
