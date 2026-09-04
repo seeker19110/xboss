@@ -2,7 +2,7 @@
 // ba, tai nạn LĐ) + bảo lãnh (thực hiện HĐ, tạm ứng, bảo hành), gắn hợp đồng (nullable)
 // + cảnh báo sắp hết hiệu lực. Xem docs/nang-cap/M28-bao-hiem-bao-lanh.md.
 import { query, queryOne } from "@/lib/db";
-import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
+import { todayISO, daysFromTodayISO, isValidDateISO } from "@/lib/nen/date";
 
 export const INSURANCE_KINDS = [
   "car",
@@ -158,8 +158,6 @@ export type InsuranceInput = {
   note: string | null;
 };
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
 // Validate thuần (không chạm DB) — trả thông điệp lỗi tiếng Việt hoặc null khi hợp lệ.
 export function validateInsuranceInput(input: InsuranceInput): string | null {
   if (!input.title.trim()) return "Thiếu tên bảo hiểm/bảo lãnh";
@@ -171,7 +169,7 @@ export function validateInsuranceInput(input: InsuranceInput): string | null {
     ["Ngày cấp", input.issuedDate],
     ["Ngày hết hạn", input.expiryDate],
   ] as const) {
-    if (d != null && !DATE_RE.test(d)) return `${label} không đúng định dạng YYYY-MM-DD`;
+    if (d != null && !isValidDateISO(d)) return `${label} không đúng định dạng YYYY-MM-DD`;
   }
   if (input.issuedDate && input.expiryDate && input.issuedDate > input.expiryDate)
     return "Ngày cấp phải trước hoặc bằng ngày hết hạn";

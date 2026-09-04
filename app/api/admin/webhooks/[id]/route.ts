@@ -59,11 +59,16 @@ export async function PATCH(
   if (sets.length === 0)
     return NextResponse.json({ error: "Không có trường nào để cập nhật" }, { status: 400 });
 
-  const existing = await queryOne<{ id: number }>(`SELECT id FROM webhooks WHERE id = ?`, id);
+  // M54 GĐ1 PR2 (đồng bộ GET/POST): cô lập tenant — chỉ sửa webhook thuộc org người gọi.
+  const existing = await queryOne<{ id: number }>(
+    `SELECT id FROM webhooks WHERE id = ? AND org_id = ?`,
+    id,
+    user.orgId,
+  );
   if (!existing) return NextResponse.json({ error: "Không tìm thấy webhook" }, { status: 404 });
 
-  vals.push(id);
-  await run(`UPDATE webhooks SET ${sets.join(", ")} WHERE id = ?`, ...vals);
+  vals.push(id, user.orgId);
+  await run(`UPDATE webhooks SET ${sets.join(", ")} WHERE id = ? AND org_id = ?`, ...vals);
   return NextResponse.json({ id });
 }
 
@@ -81,9 +86,14 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<{ id: number }>(`SELECT id FROM webhooks WHERE id = ?`, id);
+  // M54 GĐ1 PR2 (đồng bộ GET/POST): cô lập tenant — chỉ xoá webhook thuộc org người gọi.
+  const existing = await queryOne<{ id: number }>(
+    `SELECT id FROM webhooks WHERE id = ? AND org_id = ?`,
+    id,
+    user.orgId,
+  );
   if (!existing) return NextResponse.json({ error: "Không tìm thấy webhook" }, { status: 404 });
 
-  await run(`DELETE FROM webhooks WHERE id = ?`, id);
+  await run(`DELETE FROM webhooks WHERE id = ? AND org_id = ?`, id, user.orgId);
   return NextResponse.json({ ok: true });
 }
