@@ -22,7 +22,14 @@ export async function POST(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const target = await queryOne<{ id: number }>(`SELECT id FROM users WHERE id = ?`, id);
+  // M54 GĐ1 PR2: cô lập tenant — chỉ thu hồi phiên của user cùng org (khớp lọc org_id
+  // của GET /api/users cùng cụm; route này chạy ngoài withTransaction nên RLS không tự
+  // áp được, phải lọc tường minh).
+  const target = await queryOne<{ id: number }>(
+    `SELECT id FROM users WHERE id = ? AND org_id = ?`,
+    id,
+    me.orgId,
+  );
   if (!target) return NextResponse.json({ error: "Không tìm thấy người dùng" }, { status: 404 });
 
   await run(`UPDATE users SET session_version = session_version + 1 WHERE id = ?`, id);

@@ -12,7 +12,13 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const row = await queryOne<{ ui_texts: string | null }>(`SELECT ui_texts FROM projects LIMIT 1`);
+  // ORDER BY id: "LIMIT 1" không kèm ORDER BY không đảm bảo trả cùng 1 dòng giữa các lần
+  // gọi khác nhau (kế hoạch truy vấn có thể đổi theo thời gian, đặc biệt sau UPDATE/VACUUM)
+  // — từng gây GET và PATCH nhắm vào 2 dự án khác nhau khi DB có nhiều dự án. Khoá cứng
+  // "dự án đầu tiên theo id" để GET luôn đọc đúng dòng PATCH vừa ghi.
+  const row = await queryOne<{ ui_texts: string | null }>(
+    `SELECT ui_texts FROM projects ORDER BY id LIMIT 1`,
+  );
   let texts: Record<string, string> = {};
   try {
     texts = JSON.parse(row?.ui_texts ?? "{}") ?? {};
@@ -35,7 +41,9 @@ export async function PATCH(req: NextRequest) {
   const value = typeof body.value === "string" ? body.value.trim() : "";
   if (!key) return NextResponse.json({ error: "Thiếu key" }, { status: 400 });
 
-  const row = await queryOne<{ ui_texts: string | null }>(`SELECT ui_texts FROM projects LIMIT 1`);
+  const row = await queryOne<{ ui_texts: string | null }>(
+    `SELECT ui_texts FROM projects ORDER BY id LIMIT 1`,
+  );
   let texts: Record<string, string> = {};
   try {
     texts = JSON.parse(row?.ui_texts ?? "{}") ?? {};
@@ -47,7 +55,7 @@ export async function PATCH(req: NextRequest) {
   else delete texts[key];
 
   await run(
-    `UPDATE projects SET ui_texts = ? WHERE id = (SELECT id FROM projects LIMIT 1)`,
+    `UPDATE projects SET ui_texts = ? WHERE id = (SELECT id FROM projects ORDER BY id LIMIT 1)`,
     JSON.stringify(texts),
   );
   return NextResponse.json({ ok: true, texts });
