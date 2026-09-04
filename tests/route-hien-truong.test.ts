@@ -1111,3 +1111,26 @@ test("PATCH /api/equipment/:id: sửa thành công (merge field không gửi gi�
   assert.equal(row?.condition, "broken");
   assert.equal(row?.name, "Máy bơm"); // field không gửi giữ nguyên
 });
+
+test(
+  "PUT /api/diaries/:date: photoIds trỏ tới ảnh không tồn tại → 422, không phải 500 thô",
+  S,
+  async () => {
+    // Client gửi id ảnh đã bị xoá (tab mở lâu, ảnh bị người khác xoá) là lỗi ĐẦU VÀO. Trước
+    // đây route để lỗi khoá ngoại của Postgres lọt ra thành 500 kèm thông báo thô — vừa không
+    // giúp người dùng sửa được gì, vừa lộ tên bảng/ràng buộc ra ngoài.
+    const projectId = await taoDuAn("fk");
+    const pm = await taoUser("pm", "fk");
+    await dangNhapDuAn(pm, projectId);
+    const { PUT } = await import("@/app/api/diaries/[date]/route");
+    const res = await PUT(
+      jreq("/api/diaries/2026-03-03", { photoIds: [999999999], manpower: [] }, "PUT"),
+      { params: Promise.resolve({ date: "2026-03-03" }) },
+    );
+    assert.equal(res.status, 422, "lỗi đầu vào phải là 422");
+    const body = await res.json();
+    assert.match(body.error, /không tồn tại/);
+    // Không được lộ chi tiết nội bộ của Postgres ra ngoài.
+    assert.equal(/violates foreign key|diary_photos|constraint/i.test(body.error), false);
+  },
+);
