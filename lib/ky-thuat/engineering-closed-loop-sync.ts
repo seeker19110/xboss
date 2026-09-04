@@ -1,5 +1,5 @@
 // lib/engineering-closed-loop-sync.ts — Closed-Loop Autonomous WBS & Payment Sync Engine (M70)
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { query, queryOne, run } from "@/lib/db";
 
 export interface SyncPayload {
@@ -31,7 +31,12 @@ export async function syncSpoolToWbsAndPayment(
   projectId: number,
   payload: SyncPayload,
 ): Promise<SyncResult> {
-  const syncCode = `SYNC-LOOP-${Date.now().toString(36).toUpperCase()}`;
+  // Mã đồng bộ phải duy nhất theo (project_id, sync_code) — có UNIQUE trong DB (0104).
+  // Chỉ dùng Date.now() là KHÔNG đủ: hai lần đồng bộ của cùng một dự án rơi vào cùng một
+  // mili giây sẽ sinh trùng mã và lần thứ hai vỡ ở ràng buộc. Không phải tình huống lý
+  // thuyết — đồng bộ hàng loạt nhiều spool là đường dùng bình thường, và CI (máy nhanh hơn)
+  // đã dựng lại được ngay. Thêm 4 byte ngẫu nhiên để mã duy nhất cả trong cùng mili giây.
+  const syncCode = `SYNC-LOOP-${Date.now().toString(36).toUpperCase()}-${randomBytes(4).toString("hex").toUpperCase()}`;
   const totalAmountVnd = Math.round(payload.calculatedQty * payload.unitRateVnd);
 
   const rawToken = `${projectId}:${payload.spoolId}:${totalAmountVnd}:${Date.now()}`;

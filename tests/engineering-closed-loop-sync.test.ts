@@ -44,7 +44,7 @@ test(
       assert.equal(kq.syncedQty, 12.5);
       assert.equal(kq.spoolId, "SPOOL-A01");
       assert.equal(kq.wbsTaskId, null);
-      assert.match(kq.syncCode, /^SYNC-LOOP-[0-9A-Z]+$/);
+      assert.match(kq.syncCode, /^SYNC-LOOP-[0-9A-Z]+-[0-9A-F]{8}$/);
       // Token bằng chứng ký từ sha256 — đúng tiền tố + đủ 24 ký tự hex viết hoa.
       assert.match(kq.provenanceToken, /^SIG-PAY-[0-9A-F]{24}$/);
       assert.match(kq.message, /12\.5 m/);
@@ -296,3 +296,36 @@ test("listClosedLoopSyncLogs: trả log của ĐÚNG dự án, mới nhất trư
     );
   }
 });
+
+test(
+  "syncSpoolToWbsAndPayment: hai lần đồng bộ liên tiếp KHÔNG trùng mã, kể cả trong cùng mili giây",
+  S,
+  async () => {
+    // `sync_code` có UNIQUE (project_id, sync_code) trong DB. Bản cũ sinh mã chỉ từ
+    // Date.now() nên đồng bộ hàng loạt — đường dùng bình thường — làm lần thứ hai vỡ ở
+    // ràng buộc. CI (máy nhanh hơn máy dev) dựng lại được ngay, nên ca này chạy một loạt
+    // lời gọi sát nhau và đòi mọi mã phải khác nhau.
+    const { syncSpoolToWbsAndPayment } =
+      await import("@/lib/ky-thuat/engineering-closed-loop-sync");
+    const { run } = await import("@/lib/db");
+
+    const projectId = await taoDuAn("Test CLS ma duy nhat");
+    try {
+      const ma = new Set<string>();
+      for (let i = 0; i < 10; i++) {
+        const kq = await syncSpoolToWbsAndPayment(projectId, {
+          spoolId: `SPOOL-DUP-${i}`,
+          wbsTaskId: null,
+          discipline: "hvac",
+          calculatedQty: 1,
+          unit: "m",
+          unitRateVnd: 1000,
+        });
+        ma.add(kq.syncCode);
+      }
+      assert.equal(ma.size, 10, "10 lần đồng bộ phải cho 10 mã khác nhau");
+    } finally {
+      await run(`DELETE FROM engineering_closed_loop_sync_logs WHERE project_id = ?`, projectId);
+    }
+  },
+);
