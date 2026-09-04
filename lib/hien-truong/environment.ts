@@ -2,7 +2,7 @@
 // quan trắc môi trường theo kỳ (ngưỡng, đạt/không), quản lý chất thải. Xem
 // docs/nang-cap/M25-moi-truong-giay-phep.md.
 import { query } from "@/lib/db";
-import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
+import { todayISO, daysFromTodayISO, isValidDateISO } from "@/lib/nen/date";
 
 export const ENV_PERMIT_KINDS = ["dtm", "giay_phep_mt", "giay_phep_xa_thai", "khac"] as const;
 export type EnvPermitKind = (typeof ENV_PERMIT_KINDS)[number];
@@ -41,8 +41,6 @@ export const WASTE_TYPE_LABEL: Record<WasteType, string> = {
   nuoc_thai: "Nước thải",
   khac: "Khác",
 };
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // ===== Giấy phép môi trường =====
 
@@ -145,7 +143,7 @@ export function validateEnvPermitInput(input: EnvPermitInput): string | null {
     ["Ngày cấp", input.issuedDate],
     ["Ngày hết hạn", input.expiryDate],
   ] as const) {
-    if (d != null && !DATE_RE.test(d)) return `${label} không đúng định dạng YYYY-MM-DD`;
+    if (d != null && !isValidDateISO(d)) return `${label} không đúng định dạng YYYY-MM-DD`;
   }
   if (input.issuedDate && input.expiryDate && input.issuedDate > input.expiryDate)
     return "Ngày cấp phải trước hoặc bằng ngày hết hạn";
@@ -268,7 +266,7 @@ export function validateMonitoringInput(input: EnvMonitoringInput): {
   error: string | null;
   passed: boolean | null;
 } {
-  if (!DATE_RE.test(input.measuredAt))
+  if (!isValidDateISO(input.measuredAt))
     return { error: "Ngày quan trắc không đúng định dạng YYYY-MM-DD", passed: null };
   if (!ENV_MONITORING_CATEGORIES.includes(input.category))
     return { error: "Nhóm quan trắc không hợp lệ", passed: null };
@@ -354,7 +352,7 @@ export type WasteLogInput = {
 };
 
 export function validateWasteInput(input: WasteLogInput): string | null {
-  if (!DATE_RE.test(input.logDate)) return "Ngày ghi nhận không đúng định dạng YYYY-MM-DD";
+  if (!isValidDateISO(input.logDate)) return "Ngày ghi nhận không đúng định dạng YYYY-MM-DD";
   if (!WASTE_TYPES.includes(input.wasteType)) return "Loại chất thải không hợp lệ";
   if (input.quantity != null && input.quantity < 0) return "Khối lượng không được âm";
   return null;

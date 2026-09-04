@@ -154,6 +154,61 @@ Postgres 16 ephemeral **223 tệp, 1811 ca pass, 0 ca fail, 1 ca skip có lý do
 ca cố ý đảo điều kiện khi KHÔNG có DB) — kể cả `tests/backfill-0137-0138.test.ts` cũng xanh ở lần
 chạy này; 11 cổng static ở trên đều xanh.
 
+## ✅ Đợt 3 chiến dịch coverage — 6 cụm route còn lại, loại trừ cả BIM (2026-09-04)
+
+Tiếp nối Đợt 2, mở rộng phạm vi loại trừ từ "AutoCAD/Revit" sang **cả BIM** (`engineering/twin`,
+`engineering/god-tier`, `engineering/scan-to-bim`, mọi thứ dưới `engineering/cad`/`engineering/bim`).
+Cùng hạ tầng `tests/helpers/phien.ts` (`dangNhapDuAn` bắt buộc mọi ca có dự án).
+
+**6 file test mới, ~410 ca:** WBS còn lại (workpackages/tasks di chuyển-sao chép/bình luận/lịch sử,
+58 ca) · tài chính cụm 2 (claims/bảo hiểm/pháp lý/môi trường/chứng chỉ, 71 ca) · cron (8 route, tự
+viết, 43 ca) · QC & đề xuất (checklists/inspections/proposals/design-changes/punch-list, 95 ca) · tổ
+chức & thầu phụ (subcontractors/meetings/crews/vehicles/saved-reports, 69 ca) · admin (feature-flags/
+role-permissions/webhooks/integrations/code-lists/custom-fields/alert-rules/approval-flows, 109 ca).
+
+Mỗi file đã tự kiểm chứng độc lập (chạy lại trên DB riêng + `tsc --noEmit` + `eslint` + kiểm chứng
+chống nhiễu `user_projects`) trước khi gộp. Toàn bộ suite (293 file) chạy sạch trên Postgres tạo mới
+hoàn toàn: **0 file fail, 2781 ca pass** (một vài lần chạy lại trên DB tái sử dụng bị fail do dữ liệu
+tồn dư giữa các lần thao tác thủ công của phiên này — không phải lỗi code, xem "Bài học hạ tầng test"
+Đợt 2, cùng lớp `user_projects`/FK webhooks/users chưa dọn).
+
+Tổng: **290 file / 90.08% lines → 351 file / 89.89%** (branches 85.37→84.87%, funcs 84.83→85.04%) —
+số file trong bảng coverage tăng mạnh (nhiều file `lib/`/`app/api/` trước đây chưa có test nào chạm
+tới nay đã có), số trung bình theo file gần như đứng yên (lines/branches lệch dưới 1 điểm % — trong
+ngưỡng đệm `check:coverage`, funcs tăng nhẹ); đã cập nhật `coverage-baseline.json` theo mốc mới.
+
+### 3 BUG THẬT lộ ra ở đợt này (đều đã sửa)
+
+1. **Webhooks — `PATCH`/`DELETE`/`test` theo `:id` KHÔNG lọc `org_id`**, trong khi `GET`/`POST` đã cô
+   lập tenant (M54 GĐ1 PR2). Admin tổ chức B đoán/biết id webhook của tổ chức A (lộ qua thứ tự tăng
+   dần) vẫn sửa/xoá/test được. Đã thêm điều kiện `AND org_id = ?` vào cả 3 route
+   (`app/api/admin/webhooks/[id]/route.ts`, `.../test/route.ts`), id thuộc org khác nay trả 404.
+2. **`custom-fields/[id]/route.ts` cùng lỗi** (`PATCH`/`DELETE` không lọc `org_id`, trong khi `GET`
+   đã lọc) — vá cùng cách.
+3. **`DATE_RE` dùng chung ở 4 module chỉ kiểm HÌNH DẠNG ngày, không kiểm ngày có thật**
+   (`lib/hien-truong/kickoff.ts`, `environment.ts`, `hr.ts`, `lib/tai-chinh/insurance.ts`) — chuỗi
+   như `"2026-13-40"` khớp regex `/^\d{4}-\d{2}-\d{2}$/` nhưng không phải ngày thật, lọt qua validate
+   rồi Postgres ném lỗi `22008` thô khi INSERT/UPDATE. Thêm `isValidDateISO()` dùng chung trong
+   `lib/nen/date.ts` (parse lại 3 phần sau khi qua `Date` để bắt tràn tháng/ngày), thay `DATE_RE.test`
+   ở cả 4 nơi.
+
+### Ghi nhận, chưa sửa (báo cáo để rà diện rộng sau, không thuộc phạm vi 1 PR nhỏ)
+
+- `code_lists`/`alert_rules`/`approval_flows` không lọc `org_id` ở tầng đọc/sửa/xoá dù bảng đã có cột
+  này (di dân M54/0078) — thiết kế hiện tại là "toàn hệ", cần quyết định kiến trúc nếu multi-org là
+  biên bảo mật thật.
+- `GET /api/admin/feature-flags` dựa `visibleProjectIds` không lọc org cho vai trò admin (admin luôn
+  thấy mọi dự án mọi tổ chức) — gốc rễ nằm ở `lib/ha-tang/projects.ts`, ảnh hưởng rộng hơn 1 route.
+- `saved-reports/[id]` không lọc `org_id` khi PATCH/DELETE theo id, không bọc `withProjectScope`.
+- `design-changes/route.ts` GET và `qc/inspections/route.ts` GET thiếu guard `projectId != null`
+  trước khi lọc — nếu `getCurrentProjectId` trả `null` (hiếm), có thể trả dữ liệu xuyên dự án.
+
+**Đợt sau:** còn khoảng 50-60 route `engineering/*` phi-BIM (fidic, cashflow, compliance, bidding,
+subcon-ai, autonomy, queue, zero-error, workflows, memory, agent-sessions, spatial, prescriptive,
+predictions, objects, iot, routing, logistics, ledger, hse-vision, data-quality, taxonomy…) và các cụm
+nhỏ (work-fronts, progress-albums, monitoring-points, devices, waste-logs, warranty-*, purchase-
+requests, zalo, telegram, tech-links, tech, tokens, v1…) chưa có test.
+
 ## ✅ Đợt 2 chiến dịch coverage — mở khoá test THỰC THI route, phủ 10 cụm (2026-09-04)
 
 **Rào chắn của đợt này không phải công sức mà là hạ tầng.** 453/482 route (đã trừ CAD) chưa có
