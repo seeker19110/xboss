@@ -164,7 +164,11 @@ export async function DELETE(
 ) {
   const params = await paramsP;
   const user = await getCurrentUser();
-  if (!user || user.role !== "admin")
+  // Tách 401 khỏi 403 như mọi route khác của dự án (kể cả DELETE /api/boq/:id ngay cạnh):
+  // gộp chung thành 403 khiến client không phân biệt được "phiên hết hạn, đăng nhập lại"
+  // với "tài khoản này không đủ quyền" — hai tình huống cần hai cách xử lý khác hẳn.
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (user.role !== "admin")
     return NextResponse.json({ error: "Chỉ Admin được xoá vật tư" }, { status: 403 });
 
   const id = parseInt(params.id);
