@@ -18,6 +18,11 @@ hoàn toàn: **0 file fail, 2781 ca pass** (một vài lần chạy lại trên 
 tồn dư giữa các lần thao tác thủ công của phiên này — không phải lỗi code, xem "Bài học hạ tầng test"
 Đợt 2, cùng lớp `user_projects`/FK webhooks/users chưa dọn).
 
+Tổng: **290 file / 90.08% lines → 351 file / 89.89%** (branches 85.37→84.87%, funcs 84.83→85.04%) —
+số file trong bảng coverage tăng mạnh (nhiều file `lib/`/`app/api/` trước đây chưa có test nào chạm
+tới nay đã có), số trung bình theo file gần như đứng yên (lines/branches lệch dưới 1 điểm % — trong
+ngưỡng đệm `check:coverage`, funcs tăng nhẹ); đã cập nhật `coverage-baseline.json` theo mốc mới.
+
 ### 3 BUG THẬT lộ ra ở đợt này (đều đã sửa)
 
 1. **Webhooks — `PATCH`/`DELETE`/`test` theo `:id` KHÔNG lọc `org_id`**, trong khi `GET`/`POST` đã cô
