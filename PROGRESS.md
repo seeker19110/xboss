@@ -55,10 +55,9 @@ joint-segmentation, routing}` + `app/api/devices` (ghép thiết bị AutoCAD) +
    nằm ở `engineering-cad-qto.ts` nay khai tại chính module còn dùng — giữ nguyên công thức.
 7. **Auto-routing 3D (M77) xoá theo** — giao diện duy nhất gọi nó là `/engineering/auto-routing`
    (chạy trên phần tử BIM). Giữ lại thì `check:dead-routes` đỏ và code không có đường vào.
-8. **`mepf-worker/` + `scripts/mepf/worker_entry.py` KHÔNG đụng** — đó là hệ Python multi-agent
-   riêng (9 bộ phận: HVAC/điện/nước/PCCC/QS/CAD/BIM/…), không thuộc cụm CAD/BIM của web app; xoá
-   `cad_*.py`/`bim_tools.py` sẽ làm hỏng đồ thị agent của nó và không cổng npm nào kiểm được.
-   **Cần phiên chính quyết riêng.**
+8. **`mepf-worker/` + `scripts/mepf/worker_entry.py`** — ban đầu để lại chờ quyết riêng (hệ Python
+   multi-agent 9 bộ phận, không thuộc cụm CAD/BIM của web app). **Người dùng đã chốt xoá hết** —
+   xem mục "Bổ sung cùng đợt" bên dưới.
 9. **`CLAUDE.md` KHÔNG sửa** (agent không được phép sửa tệp cấu hình này) — hiện còn mô tả
    `XBOSS_PLUGIN_URL`, `XBOSS_PLUGIN_SHA256`, `ANTHROPIC_API_KEY`/`XBOSS_AI_BLOCK_CLASSIFY` và
    nhắc `cad/`, `bim/` trong bảng miền `lib/`. **Cần cập nhật tay.**
@@ -78,6 +77,35 @@ còn **6**), `GlobalSearch`, `lib/nen/modules.ts` (bỏ 4 module `engineering-tw
 `grep -rlE`; thiếu MỘT thư mục (`plugin-autocad`) làm grep thoát 2 → `catch` nuốt lỗi → **mọi route
 đều bị coi là chết**. Đã bỏ thư mục không còn tồn tại; bẫy vẫn còn nguyên cho lần sau.
 
+### Bổ sung cùng đợt — xoá `mepf-worker/` (hệ Python multi-agent)
+
+Người dùng chốt xoá luôn cả hệ Python, không giữ lại phần MEPF ngoài CAD/BIM của nó.
+**234 tệp: 233 xoá, còn lại sửa** (219 tệp trong `mepf-worker/`), không thêm migration nào.
+
+- **Xoá:** trọn `mepf-worker/` (app Python riêng: `app.py`, `main.py`, `src/` — 9 "bộ phận"
+  HVAC/điện/nước/PCCC/QS/CAD/BIM/agent, `tests/`, `docs/`, `autocad/`, `revit/`, `drafts/`,
+  `Dockerfile`, `docker-compose.yml`, `pyproject.toml`, `uv.lock`, các `README*.md`, workflow CI
+  lồng bên trong); `scripts/mepf/` (`worker_entry.py` + `requirements-worker.txt` — daemon PM2
+  poll `engineering_async_tasks`, mọi handler đều import module trong `mepf-worker/src`);
+  `lib/ky-thuat/engineering-worker-bridge.ts`; route
+  `app/api/engineering/queue/tasks/[id]/bridge`; `tests/engineering-worker-bridge.test.ts`.
+- **Dọn kèm:** `engineering-suite.ts` (bỏ `export *` mục 19), `/engineering/mepf-studio` (bỏ nút
+  "Chuyển thành Đối tượng Kỹ thuật & Trình Duyệt Gate 0", state `bridgingId`, `handleBridge`, huy
+  hiệu "Đã chuyển Gate 0" + 4 icon/`Link` hết dùng), `ecosystem.config.js` (bỏ app PM2
+  `mepf-worker`), `deploy.sh` (bỏ bước 7.5/7 reload worker), `eslint.config.mjs` (bỏ ignore
+  `mepf-worker/**`), `.gitignore` (bỏ khối artifact Python — repo không còn tệp `.py` nào),
+  `scripts/check-dead-routes.ts` + `scripts/check-dead-code.ts` (bỏ `mepf-worker` khỏi
+  `CALLER_DIRS`/`SCAN_DIRS`; liệt kê thư mục không tồn tại là đúng lớp bug đã gặp ở đợt 3),
+  `DEPLOY.md` (mục 3 nay là hướng dẫn `pm2 delete mepf-worker` gỡ khỏi VPS cũ + bỏ dòng RAM
+  "+ MEPF worker").
+- **Quyết định:** **hàng đợi `engineering_async_tasks` + trang `/engineering/mepf-studio` GIỮ
+  NGUYÊN** — brief chỉ yêu cầu gỡ nhánh cầu nối, không gỡ hàng đợi; các route
+  `/api/engineering/queue/*` còn nguyên và vẫn kiểm quyền như cũ. Hệ quả cần biết: **không còn
+  tiến trình nào xử lý hàng đợi**, task gửi lên sẽ nằm `pending` cho tới khi có worker mới. Gỡ
+  hẳn cụm hàng đợi là quyết định sản phẩm, để phiên chính chốt riêng.
+- **Vận hành:** VPS đang chạy `pm2 mepf-worker` phải `pm2 delete mepf-worker && pm2 save` một lần
+  (đã ghi trong `DEPLOY.md`) — `deploy.sh` không còn reload tiến trình đó.
+
 ### Cổng đã chạy
 
 `npm run lint` xanh · `npm run typecheck` xanh · `npm run build` xanh · `npm test` với Postgres 16
@@ -86,6 +114,11 @@ ephemeral: **224 tệp, 1812 ca pass, 1 ca fail** — ca fail duy nhất là
 `git stash`). Cổng static: `check:dead-code`, `check:dead-routes`, `check:lib-layers`,
 `check:sw-exclude`, `check:migrations`, `check:engineering-danh-tinh`, `check:route-perms`,
 `check:project-scope`, `check:db-params`, `check:mau-accent`, `check:contrast` — đều xanh.
+
+Chạy lại toàn bộ sau khi xoá `mepf-worker/`: lint · typecheck · build xanh; `npm test` với
+Postgres 16 ephemeral **223 tệp, 1811 ca pass, 0 ca fail, 1 ca skip có lý do** (`health.test.ts`,
+ca cố ý đảo điều kiện khi KHÔNG có DB) — kể cả `tests/backfill-0137-0138.test.ts` cũng xanh ở lần
+chạy này; 11 cổng static ở trên đều xanh.
 
 ## ✅ Đợt 2 chiến dịch coverage — mở khoá test THỰC THI route, phủ 10 cụm (2026-09-04)
 

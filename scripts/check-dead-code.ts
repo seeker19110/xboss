@@ -19,7 +19,7 @@ import { execFileSync } from "node:child_process";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Thư mục được quét. Ngoài các thư mục này thì coi như không thuộc đồ thị. */
-const SCAN_DIRS = ["app", "lib", "tests", "e2e", "scripts", "types", "mepf-worker"];
+const SCAN_DIRS = ["app", "lib", "tests", "e2e", "scripts", "types"];
 /** File gốc ở thư mục root do công cụ tự nạp (không ai import). */
 const ROOT_ENTRIES = [
   "instrumentation.ts",
@@ -76,7 +76,7 @@ const NEXT_SPECIAL =
   /^(page|layout|route|error|global-error|loading|not-found|template|default|robots|sitemap|opengraph-image|icon)\.tsx?$/;
 const isEntry = (f: string) =>
   (f.startsWith("app/") && NEXT_SPECIAL.test(f.slice(f.lastIndexOf("/") + 1))) ||
-  ["tests/", "e2e/", "scripts/", "types/", "mepf-worker/"].some((d) => f.startsWith(d)) ||
+  ["tests/", "e2e/", "scripts/", "types/"].some((d) => f.startsWith(d)) ||
   !f.includes("/");
 
 const reached = new Set<string>();

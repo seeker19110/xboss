@@ -22,11 +22,7 @@ import {
   ChevronDown,
   ChevronUp,
   UploadCloud,
-  Layers,
-  ArrowRight,
-  ShieldCheck,
 } from "lucide-react";
-import Link from "next/link";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,7 +46,6 @@ interface MepfTask {
   status: TaskStatus;
   progressPercent: number;
   workerId: string | null;
-  payload: Record<string, any>;
   result: Record<string, unknown> | null;
   errorMessage: string | null;
   createdAt: string;
@@ -209,32 +204,20 @@ function TaskCard({
   task,
   taskLabel,
   onCancel,
-  onBridge,
-  bridging,
 }: {
   task: MepfTask;
   taskLabel: string;
   onCancel: (id: string) => void;
-  onBridge: (id: string) => void;
-  bridging: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const cfg = STATUS_CONFIG[task.status];
-  const bridgedInfo = task.payload?.bridged;
 
   return (
     <div className="rounded-xl border border-zinc-700 bg-zinc-800/60 p-4">
       {/* Header */}
       <div className="mb-2 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-medium text-zinc-100">{taskLabel}</p>
-            {bridgedInfo && (
-              <span className="inline-flex items-center gap-1 rounded bg-violet-900/60 px-1.5 py-0.5 text-[10px] font-medium text-violet-300 border border-violet-700/50">
-                <ShieldCheck size={11} /> Đã chuyển Gate 0
-              </span>
-            )}
-          </div>
+          <p className="truncate text-sm font-medium text-zinc-100">{taskLabel}</p>
           <p className="mt-0.5 font-mono text-[10px] text-zinc-500">{task.id}</p>
         </div>
         <div className={`flex shrink-0 items-center gap-1 text-xs ${cfg.color}`}>
@@ -281,40 +264,6 @@ function TaskCard({
         </div>
       )}
 
-      {/* Bridge & Workflow Action */}
-      {task.status === "completed" && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-zinc-700/60 pt-3">
-          {!bridgedInfo ? (
-            <button
-              onClick={() => onBridge(task.id)}
-              disabled={bridging}
-              className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-2.5 py-1.5 text-xs font-medium text-on-accent transition hover:bg-emerald-800 disabled:opacity-50"
-            >
-              {bridging ? <Loader2 size={13} className="animate-spin" /> : <Layers size={13} />}
-              Chuyển thành Đối tượng Kỹ thuật & Trình Duyệt Gate 0
-            </button>
-          ) : (
-            <div className="flex items-center gap-3 text-xs text-zinc-300">
-              <span className="text-[11px] text-zinc-400">
-                {bridgedInfo.objectCount} đối tượng đã tạo
-              </span>
-              <Link
-                href="/engineering/workflows"
-                className="flex items-center gap-1 text-violet-400 hover:text-violet-300"
-              >
-                Xem luồng duyệt <ArrowRight size={12} />
-              </Link>
-              <Link
-                href="/engineering/suggestions"
-                className="flex items-center gap-1 text-sky-400 hover:text-sky-300"
-              >
-                Xem đề xuất <ArrowRight size={12} />
-              </Link>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Cancel button */}
       {(task.status === "pending" || task.status === "processing") && (
         <button
@@ -342,7 +291,6 @@ export default function MepfStudioPage() {
   const [tasks, setTasks] = useState<MepfTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [bridgingId, setBridgingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -464,25 +412,6 @@ export default function MepfStudioPage() {
     }
   };
 
-  const handleBridge = async (taskId: string) => {
-    setBridgingId(taskId);
-    try {
-      const res = await fetch(`/api/engineering/queue/tasks/${taskId}/bridge`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error || "Chuyển đổi thất bại");
-      await fetchTasks();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(msg);
-    } finally {
-      setBridgingId(null);
-    }
-  };
-
   const handleCancel = async (taskId: string) => {
     try {
       await fetch(`/api/engineering/queue/tasks/${taskId}/cancel`, {
@@ -513,8 +442,7 @@ export default function MepfStudioPage() {
           <div>
             <h1 className="text-xl font-bold text-zinc-100">MEPF Studio</h1>
             <p className="text-sm text-zinc-400">
-              Điều phối AI Agent kỹ thuật & Khép kín luồng duyệt Gate 0 — HVAC · Điện · Nước · PCCC
-              · CAD · BIM · QS
+              Điều phối tác vụ AI kỹ thuật — HVAC · Điện · Nước · PCCC · QS
             </p>
           </div>
         </div>
@@ -714,8 +642,6 @@ export default function MepfStudioPage() {
                       task={task}
                       taskLabel={def?.label ?? task.taskType}
                       onCancel={handleCancel}
-                      onBridge={handleBridge}
-                      bridging={bridgingId === task.id}
                     />
                   );
                 })}
@@ -735,8 +661,6 @@ export default function MepfStudioPage() {
                         task={task}
                         taskLabel={def?.label ?? task.taskType}
                         onCancel={handleCancel}
-                        onBridge={handleBridge}
-                        bridging={bridgingId === task.id}
                       />
                     );
                   })}

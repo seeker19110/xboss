@@ -20,12 +20,11 @@ khởi động lần đầu**, hoặc chủ động chạy `npm run db:migrate` 
 > `next build` là tiến trình Node ngốn RAM nhất trong vòng đời deploy, nặng hơn hẳn lúc
 > `next start` phục vụ request.
 
-| Cấu hình                    | RAM                 | Ổ đĩa | Ghi chú                                                                                                                                                                                                                                                                                                                         |
-| --------------------------- | ------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Tối thiểu**               | 2 GB                | 20 GB | **Bắt buộc bật swap** (xem dưới) — 2 GB RAM thuần rất dễ **OOM-kill ngay giữa `next build`** trên VPS 1-2 vCPU, vì lúc đó RAM phải gánh cả tiến trình build lẫn app `xboss` (và `mepf-worker` nếu có) đang chạy song song. Nếu build vẫn OOM dù đã bật swap, build ở nơi khác rồi rsync sang (xem mục "Build ở máy khác" dưới). |
-| **Khuyến nghị**             | 4 GB                | 40 GB | Đủ chỗ cho build lẫn app chạy êm, không cần bật swap trong điều kiện bình thường (swap vẫn nên bật như lưới an toàn).                                                                                                                                                                                                           |
-| **+ MEPF worker**           | +1 GB               | —     | `ecosystem.config.js` đặt `max_memory_restart: "1G"` riêng cho tiến trình `mepf-worker` (ngoài 1G của app `xboss`) — cộng thêm nếu bật tính năng tác vụ AI kỹ thuật.                                                                                                                                                            |
-| **Postgres tách máy riêng** | tuỳ số dòng dữ liệu | tuỳ   | Xem [`docs/ops/backup.md`](./docs/ops/backup.md) — dù DB nằm máy nào, mất máy chạy app vẫn cần backup đẩy ra ngoài VPS mới phục hồi được.                                                                                                                                                                                       |
+| Cấu hình                    | RAM                 | Ổ đĩa | Ghi chú                                                                                                                                                                                                                                                                                               |
+| --------------------------- | ------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tối thiểu**               | 2 GB                | 20 GB | **Bắt buộc bật swap** (xem dưới) — 2 GB RAM thuần rất dễ **OOM-kill ngay giữa `next build`** trên VPS 1-2 vCPU, vì lúc đó RAM phải gánh cả tiến trình build lẫn app `xboss` đang chạy song song. Nếu build vẫn OOM dù đã bật swap, build ở nơi khác rồi rsync sang (xem mục "Build ở máy khác" dưới). |
+| **Khuyến nghị**             | 4 GB                | 40 GB | Đủ chỗ cho build lẫn app chạy êm, không cần bật swap trong điều kiện bình thường (swap vẫn nên bật như lưới an toàn).                                                                                                                                                                                 |
+| **Postgres tách máy riêng** | tuỳ số dòng dữ liệu | tuỳ   | Xem [`docs/ops/backup.md`](./docs/ops/backup.md) — dù DB nằm máy nào, mất máy chạy app vẫn cần backup đẩy ra ngoài VPS mới phục hồi được.                                                                                                                                                             |
 
 Con số 2 GB/4 GB ở trên là **ước lượng dựa trên ràng buộc đã biết trong repo** (kích thước
 `node_modules`/`.next`, ngưỡng `max_memory_restart` của PM2), **không phải benchmark đo thật**
@@ -119,27 +118,17 @@ pm2 save && pm2 startup          # tự khởi động lại khi reboot
 
 Truy cập: `http://<IP-server>:3000`. Đổi cổng bằng biến `PORT` trong `.env.local`.
 
-### 3. MEPF worker (tuỳ chọn — chỉ khi dùng tác vụ AI kỹ thuật)
+### 3. Gỡ MEPF worker khỏi VPS cũ (chỉ làm một lần)
 
-Daemon Python poll hàng đợi `engineering_async_tasks`. VPS không cần tính năng này thì bỏ qua
-hẳn phần dưới (app chạy độc lập, chỉ các tác vụ AI nằm chờ trong hàng đợi).
+Daemon Python `mepf-worker` (hệ MEPF-Agents) **đã bị gỡ khỏi repo**. VPS nào từng cài nó thì
+dọn một lần cho khỏi còn tiến trình chạy code đã xoá:
 
 ```bash
-sudo apt install -y python3 python3-pip
-pip3 install -r scripts/mepf/requirements-worker.txt
-pip3 install ./mepf-worker           # MEPF-Agents + ezdxf, LangGraph…
-
-pm2 start ecosystem.config.js --only mepf-worker
+pm2 delete mepf-worker 2>/dev/null   # bỏ qua nếu báo không tìm thấy process
 pm2 save
 ```
 
-Khai `ANTHROPIC_API_KEY` hoặc `OPENAI_API_KEY` trong `.env.local` để worker gọi agent thật;
-thiếu cả hai thì worker tự chạy dry-run (trả kết quả giả lập, không gọi LLM).
-
-> `scripts/mepf/worker_entry.py` đọc thẳng `os.environ["DATABASE_URL"]` và **thoát ngay nếu
-> thiếu** — `ecosystem.config.js` tự nạp biến từ `.env.local`/`.env` rồi truyền vào, nên đừng
-> khởi động worker bằng `pm2 start scripts/mepf/worker_entry.py` trực tiếp (sẽ thiếu biến, và
-> thiếu cả `PYTHONPATH` khiến worker âm thầm rơi về dry-run).
+App Next.js không phụ thuộc worker này — không cài Python trên VPS vẫn chạy đủ.
 
 ### Chuyển từ bản cài Docker hoặc PM2 kiểu cũ sang `ecosystem.config.js`
 

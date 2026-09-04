@@ -52,8 +52,8 @@ export * from "@/lib/ky-thuat/engineering-task-queue";
 // 18. Merkle Tree Provenance Ledger (M73)
 export * from "@/lib/ky-thuat/engineering-merkle-ledger";
 
-// 19. MEPF Worker Closed-Loop Bridge (PR2)
-export * from "@/lib/ky-thuat/engineering-worker-bridge";
+// (19) MEPF Worker Closed-Loop Bridge (PR2) đã được gỡ cùng thư mục `mepf-worker/` — cầu nối này
+// chỉ phục vụ daemon Python MEPF-Agents, không còn nơi gọi sau khi hệ 9-agent bị xoá.
 
 // 20. Spatial Viewer & Field Pinning Engine (M74)
 export * from "@/lib/ky-thuat/engineering-spatial-pinning";

@@ -164,20 +164,6 @@ mv "$BUILD_DIR" .next
 echo "==> 7/7 Reload app qua PM2 (graceful, kèm nạp lại biến môi trường) — process \"$PM2_NAME\""
 pm2 reload "$PM2_NAME" --update-env
 
-# MEPF worker (daemon Python, xem ecosystem.config.js) chạy song song app và cũng đọc code từ
-# chính thư mục này, nên phải reload theo — nếu không, worker vẫn chạy code cũ sau khi deploy.
-# Chỉ làm ở chế độ production: staging dùng chung DB hàng đợi sẽ tranh chấp tác vụ với prod, và
-# reload nhầm worker prod từ thư mục staging là đúng thứ cần tránh (xem docs/ops/staging.md).
-# Bỏ qua im lặng nếu VPS này không chạy worker — nhiều VPS chỉ cần app.
-if [ "$STAGING" = false ]; then
-  if pm2 describe mepf-worker > /dev/null 2>&1; then
-    echo "==> 7.5/7 Reload MEPF worker (daemon Python)"
-    pm2 reload mepf-worker --update-env
-  else
-    echo "==> 7.5/7 Bỏ qua MEPF worker — không thấy process \"mepf-worker\" trong PM2"
-  fi
-fi
-
 echo "==> Health-check sau reload (tối đa 5 lần, cách nhau 3 giây) — endpoint /api/health"
 # Đọc cổng app từ file env đang dùng ($ENV_FILE — biến "PORT", mặc định 3000 nếu không đặt,
 # xem DEPLOY.md). "/api/health" public, không cần đăng nhập (xem app/api/health/route.ts).
