@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne } from "@/lib/db";
+import { queryOne, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
@@ -88,10 +88,12 @@ export async function PUT(req: NextRequest) {
   if (!Number.isInteger(stageId))
     return NextResponse.json({ error: "Công tác không hợp lệ" }, { status: 422 });
   // Chỉ nhận công tác dự án đang chọn nhìn thấy: dùng chung hoặc riêng dự án (M123 · D1).
-  const stage = await queryOne<{ id: number }>(
-    `SELECT id FROM construction_stages WHERE id = ? AND (project_id IS NULL OR project_id = ?)`,
-    stageId,
-    projectId,
+  const stage = await withProjectScope(projectId, () =>
+    queryOne<{ id: number }>(
+      `SELECT id FROM construction_stages WHERE id = ? AND (project_id IS NULL OR project_id = ?)`,
+      stageId,
+      projectId,
+    ),
   );
   if (!stage) return NextResponse.json({ error: "Không tìm thấy công tác" }, { status: 404 });
 

@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, run, insertId, todayISO, withTransaction } from "@/lib/db";
+import {
+  query,
+  queryOne,
+  run,
+  insertId,
+  todayISO,
+  withProjectScope,
+  withTransaction,
+} from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
@@ -14,14 +22,19 @@ export async function GET() {
   const projectId = await getCurrentProjectId(user);
   if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
 
-  const baselines = await query(
-    `SELECT b.id, b.name, b.note, b.created_at AS "createdAt", u.name AS "createdBy",
+  // withProjectScope đặt GUC app.project_id để RLS của `baselines` (0149) thật sự áp được.
+  // Hôm nay policy còn nhánh "GUC rỗng → cho qua" nên thiếu bọc vẫn chạy, nhưng đó đúng là
+  // lý do RLS chưa có hiệu lực: bọc trước, khoá cửa sau (khuôn M62 PR1 → PR2).
+  const baselines = await withProjectScope(projectId, () =>
+    query(
+      `SELECT b.id, b.name, b.note, b.created_at AS "createdAt", u.name AS "createdBy",
             (SELECT COUNT(*) FROM baseline_tasks bt WHERE bt.baseline_id = b.id) AS "taskCount"
        FROM baselines b
        LEFT JOIN users u ON b.created_by = u.id
       WHERE b.project_id = ?
       ORDER BY b.id DESC`,
-    projectId,
+      projectId,
+    ),
   );
   return NextResponse.json({ baselines });
 }
@@ -57,27 +70,34 @@ export async function POST(req: NextRequest) {
       { status: 422 },
     );
 
-  const id = await withTransaction(async () => {
-    const baselineId = await insertId(
-      `INSERT INTO baselines (name, note, created_by, project_id) VALUES (?, ?, ?, ?)`,
-      name,
-      note,
-      user.id,
-      projectId,
-    );
-    await run(
-      `INSERT INTO baseline_tasks (baseline_id, task_id, start_date, end_date, progress_percent)
+  // readOnly: false — đây là đường GHI (INSERT baselines + baseline_tasks) trong cùng
+  // transaction có GUC.
+  const id = await withProjectScope(
+    projectId,
+    () =>
+      withTransaction(async () => {
+        const baselineId = await insertId(
+          `INSERT INTO baselines (name, note, created_by, project_id) VALUES (?, ?, ?, ?)`,
+          name,
+          note,
+          user.id,
+          projectId,
+        );
+        await run(
+          `INSERT INTO baseline_tasks (baseline_id, task_id, start_date, end_date, progress_percent)
        SELECT ?, t.id, t.start_date, t.end_date, t.progress_percent
          FROM tasks t
          JOIN work_packages wp ON wp.id = t.package_id
          JOIN sheet_types st ON st.id = wp.sheet_type_id
          JOIN towers tw ON tw.id = st.tower_id
         WHERE tw.project_id = ?`,
-      baselineId,
-      projectId,
-    );
-    return baselineId;
-  });
+          baselineId,
+          projectId,
+        );
+        return baselineId;
+      }),
+    { readOnly: false },
+  );
 
   return NextResponse.json({ id, name, taskCount: Number(taskCount.n) }, { status: 201 });
 }

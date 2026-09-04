@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
@@ -24,13 +24,23 @@ export async function DELETE(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   // Baseline thuộc dự án khác → 404 (không phải 403, để không tiết lộ baseline có tồn tại).
-  const b = await queryOne<{ id: number }>(
-    `SELECT id FROM baselines WHERE id = ? AND project_id = ?`,
-    id,
+  // Kiểm và xoá trong CÙNG một withProjectScope (readOnly: false vì có DELETE): GUC
+  // app.project_id phải có mặt thì RLS của `baselines` (0149) mới là phòng tuyến thật, và
+  // hai câu lệnh phải thấy cùng một phạm vi dự án.
+  const deleted = await withProjectScope(
     projectId,
+    async () => {
+      const b = await queryOne<{ id: number }>(
+        `SELECT id FROM baselines WHERE id = ? AND project_id = ?`,
+        id,
+        projectId,
+      );
+      if (!b) return false;
+      await run(`DELETE FROM baselines WHERE id = ?`, id);
+      return true;
+    },
+    { readOnly: false },
   );
-  if (!b) return NextResponse.json({ error: "Không tìm thấy baseline" }, { status: 404 });
-
-  await run(`DELETE FROM baselines WHERE id = ?`, id);
+  if (!deleted) return NextResponse.json({ error: "Không tìm thấy baseline" }, { status: 404 });
   return NextResponse.json({ deleted: id });
 }
