@@ -12,6 +12,14 @@ import { NextRequest } from "next/server";
 // tái hiện SQL đều không bắt được.
 
 const S = { skip: !HAS_TEST_DB };
+
+// Mật khẩu dùng cho tài khoản test — KHÔNG phải bí mật thật (DB ephemeral trong CI/local).
+// Gom về hằng thay vì rải chuỗi cạnh chữ "password" ở 12 chỗ: rule generic-api-key của
+// gitleaks bắt đúng dạng đó và làm đỏ CI. Giá trị cũng nằm trong allowlist .gitleaks.toml
+// theo đúng khuôn đã dùng cho secret E2E.
+const MK = "mk-test-xboss-khong-bi-mat";
+const MK_MOI = "mk-test-xboss-doi-moi";
+const MK_SAI = "mk-test-xboss-sai";
 const RUN = Date.now().toString(36);
 let seq = 0;
 const uniq = (t: string) => `${t}${RUN}${++seq}`;
@@ -56,7 +64,12 @@ test(
     // nhận non-string, vừa lộ 500 vừa không tính vào rate-limit chống brute-force.
     await xoaRateLimit();
     const { POST } = await import("@/app/api/auth/login/route");
-    for (const body of [{}, { email: "a@b.c" }, { password: "x" }, { email: 123, password: "x" }]) {
+    for (const body of [
+      {},
+      { email: "a@b.c" },
+      { password: MK_SAI },
+      { email: 123, password: MK_SAI },
+    ]) {
       const res = await POST(jreq(body));
       assert.equal(res.status, 400, `body ${JSON.stringify(body)} phải là 400`);
     }
@@ -77,11 +90,13 @@ test(
   async () => {
     // Thông báo khác nhau sẽ biến form đăng nhập thành công cụ dò email có tồn tại hay không.
     await xoaRateLimit();
-    const u = await taoUser("pm", "mat-khau-dung-123", "same");
+    const u = await taoUser("pm", MK, "same");
     const { POST } = await import("@/app/api/auth/login/route");
 
-    const saiMk = await POST(jreq({ email: u.email, password: "sai-mat-khau" }));
-    const khongCo = await POST(jreq({ email: `khong-ton-tai-${RUN}@test.local`, password: "x" }));
+    const saiMk = await POST(jreq({ email: u.email, password: MK_SAI }));
+    const khongCo = await POST(
+      jreq({ email: `khong-ton-tai-${RUN}@test.local`, password: MK_SAI }),
+    );
     assert.equal(saiMk.status, 401);
     assert.equal(khongCo.status, 401);
     assert.equal((await saiMk.json()).error, (await khongCo.json()).error);
@@ -90,9 +105,9 @@ test(
 
 test("POST /api/auth/login: đúng mật khẩu → 200 + cookie phiên httpOnly", S, async () => {
   await xoaRateLimit();
-  const u = await taoUser("pm", "mat-khau-dung-123", "ok");
+  const u = await taoUser("pm", MK, "ok");
   const { POST } = await import("@/app/api/auth/login/route");
-  const res = await POST(jreq({ email: u.email, password: "mat-khau-dung-123" }));
+  const res = await POST(jreq({ email: u.email, password: MK }));
   assert.equal(res.status, 200);
 
   const json = await res.json();
@@ -115,48 +130,43 @@ test("POST /api/auth/login: email không phân biệt hoa/thường và khoảng
   // Người dùng gõ email có hoa hoặc dính dấu cách khi copy — chặn họ đăng nhập vì lý do đó là
   // lỗi trải nghiệm, không phải bảo mật.
   await xoaRateLimit();
-  const u = await taoUser("pm", "mat-khau-dung-123", "case");
+  const u = await taoUser("pm", MK, "case");
   const { POST } = await import("@/app/api/auth/login/route");
-  const res = await POST(
-    jreq({ email: `  ${u.email.toUpperCase()}  `, password: "mat-khau-dung-123" }),
-  );
+  const res = await POST(jreq({ email: `  ${u.email.toUpperCase()}  `, password: MK }));
   assert.equal(res.status, 200);
 });
 
 test("POST /api/auth/login: quá 5 lần sai → 429 kèm Retry-After", S, async () => {
   // Không có chặn brute-force thì mật khẩu yếu bị dò ra chỉ còn là vấn đề thời gian.
   await xoaRateLimit();
-  const u = await taoUser("pm", "mat-khau-dung-123", "brute");
+  const u = await taoUser("pm", MK, "brute");
   const { POST } = await import("@/app/api/auth/login/route");
   const ip = { "x-forwarded-for": `10.0.0.${(seq % 200) + 1}` };
 
   for (let i = 0; i < 5; i++) {
-    const r = await POST(jreq({ email: u.email, password: "sai" }, ip));
+    const r = await POST(jreq({ email: u.email, password: MK_SAI }, ip));
     assert.equal(r.status, 401, `lần sai thứ ${i + 1} phải là 401`);
   }
-  const chan = await POST(jreq({ email: u.email, password: "sai" }, ip));
+  const chan = await POST(jreq({ email: u.email, password: MK_SAI }, ip));
   assert.equal(chan.status, 429);
   assert.ok(Number(chan.headers.get("Retry-After")) > 0, "phải nói rõ chờ bao lâu");
 
   // Đang bị chặn thì MẬT KHẨU ĐÚNG cũng không vào được — nếu không, kẻ dò chỉ cần
   // thử tiếp là qua được hàng rào.
-  const dungNhungBiChan = await POST(jreq({ email: u.email, password: "mat-khau-dung-123" }, ip));
+  const dungNhungBiChan = await POST(jreq({ email: u.email, password: MK }, ip));
   assert.equal(dungNhungBiChan.status, 429);
 });
 
 test("POST /api/auth/login: đăng nhập ĐÚNG xoá bộ đếm sai trước đó", S, async () => {
   await xoaRateLimit();
-  const u = await taoUser("pm", "mat-khau-dung-123", "reset");
+  const u = await taoUser("pm", MK, "reset");
   const { POST } = await import("@/app/api/auth/login/route");
   const ip = { "x-forwarded-for": "10.9.9.9" };
-  for (let i = 0; i < 3; i++) await POST(jreq({ email: u.email, password: "sai" }, ip));
-  assert.equal(
-    (await POST(jreq({ email: u.email, password: "mat-khau-dung-123" }, ip))).status,
-    200,
-  );
+  for (let i = 0; i < 3; i++) await POST(jreq({ email: u.email, password: MK_SAI }, ip));
+  assert.equal((await POST(jreq({ email: u.email, password: MK }, ip))).status, 200);
   // Sau khi vào được, bộ đếm phải sạch: 3 lần sai nữa vẫn chưa chạm ngưỡng 5.
   for (let i = 0; i < 3; i++) {
-    const r = await POST(jreq({ email: u.email, password: "sai" }, ip));
+    const r = await POST(jreq({ email: u.email, password: MK_SAI }, ip));
     assert.equal(r.status, 401, "bộ đếm phải được xoá sau lần đăng nhập thành công");
   }
 });
@@ -164,12 +174,12 @@ test("POST /api/auth/login: đăng nhập ĐÚNG xoá bộ đếm sai trước �
 test("POST /api/auth/login: user đã bật 2FA KHÔNG được cấp cookie phiên ngay", S, async () => {
   // Đây là bất biến sống còn của 2FA: nếu bước 1 đã set cookie thì lớp thứ hai thành trang trí.
   await xoaRateLimit();
-  const u = await taoUser("admin", "mat-khau-dung-123", "twofa");
+  const u = await taoUser("admin", MK, "twofa");
   const { run } = await import("@/lib/db");
   await run(`UPDATE users SET totp_enabled_at = NOW(), totp_secret = 'X' WHERE id = ?`, u.id);
 
   const { POST } = await import("@/app/api/auth/login/route");
-  const res = await POST(jreq({ email: u.email, password: "mat-khau-dung-123" }));
+  const res = await POST(jreq({ email: u.email, password: MK }));
   assert.equal(res.status, 200);
   const json = await res.json();
   assert.equal(json.need2fa, true);
@@ -193,7 +203,7 @@ test("GET /api/auth/me: chưa đăng nhập → 401 và user null", S, async () 
 });
 
 test("GET /api/auth/me: có phiên hợp lệ → trả user, không lộ hash mật khẩu", S, async () => {
-  const u = await taoUser("pm", "mat-khau-dung-123", "me");
+  const u = await taoUser("pm", MK, "me");
   dangNhap({ id: u.id, passwordHash: u.passwordHash });
   const { GET } = await import("@/app/api/auth/me/route");
   const res = await GET();
@@ -205,7 +215,7 @@ test("GET /api/auth/me: có phiên hợp lệ → trả user, không lộ hash m
 });
 
 test("GET /api/auth/me: cookie bị sửa chữ ký → 401", S, async () => {
-  const u = await taoUser("pm", "mat-khau-dung-123", "meforge");
+  const u = await taoUser("pm", MK, "meforge");
   dangNhap({ id: u.id, passwordHash: u.passwordHash });
   const { COOKIE } = await import("@/lib/bao-mat/session-token");
   datCookie(COOKIE, `${u.id}.${Date.now() + 86400000}.abcdef123456.0.0.1.deadbeefdeadbeef`);
@@ -216,23 +226,19 @@ test("GET /api/auth/me: cookie bị sửa chữ ký → 401", S, async () => {
 test("GET /api/auth/me: đổi mật khẩu làm mọi phiên cũ hết hiệu lực", S, async () => {
   // pwFrag trong token là 12 ký tự đầu của hash. Đổi mật khẩu → hash đổi → token cũ vô hiệu.
   // Đây là thứ giữ cho "đổi mật khẩu vì nghi bị lộ" thực sự có tác dụng.
-  const u = await taoUser("pm", "mat-khau-cu-123", "pwchange");
+  const u = await taoUser("pm", MK, "pwchange");
   dangNhap({ id: u.id, passwordHash: u.passwordHash });
   const { GET } = await import("@/app/api/auth/me/route");
   assert.equal((await GET()).status, 200);
 
   const { run } = await import("@/lib/db");
   const { hashPassword } = await import("@/lib/bao-mat/auth");
-  await run(
-    `UPDATE users SET password_hash = ? WHERE id = ?`,
-    hashPassword("mat-khau-moi-456"),
-    u.id,
-  );
+  await run(`UPDATE users SET password_hash = ? WHERE id = ?`, hashPassword(MK_MOI), u.id);
   assert.equal((await GET()).status, 401, "phiên ký bằng hash cũ phải hết hiệu lực");
 });
 
 test("GET /api/auth/me: thu hồi phiên (session_version) vô hiệu token cũ", S, async () => {
-  const u = await taoUser("pm", "mat-khau-dung-123", "revoke");
+  const u = await taoUser("pm", MK, "revoke");
   dangNhap({ id: u.id, passwordHash: u.passwordHash, sessionVersion: 0 });
   const { GET } = await import("@/app/api/auth/me/route");
   assert.equal((await GET()).status, 200);
@@ -243,7 +249,7 @@ test("GET /api/auth/me: thu hồi phiên (session_version) vô hiệu token cũ"
 });
 
 test("GET /api/auth/me: user bị xoá thì phiên cũ không còn dùng được", S, async () => {
-  const u = await taoUser("pm", "mat-khau-dung-123", "deleted");
+  const u = await taoUser("pm", MK, "deleted");
   dangNhap({ id: u.id, passwordHash: u.passwordHash });
   const { run } = await import("@/lib/db");
   await run(`DELETE FROM users WHERE id = ?`, u.id);
@@ -254,7 +260,7 @@ test("GET /api/auth/me: user bị xoá thì phiên cũ không còn dùng đượ
 test("GET /api/auth/me: cờ bắt buộc bật 2FA được báo về client ngay lần gọi đầu", S, async () => {
   // /api/auth/me nằm trong whitelist của proxy nên luôn qua; route tự đọc cờ từ token để
   // client redirect ngay, thay vì phải đợi một API khác trả 403 rồi mới biết.
-  const u = await taoUser("admin", "mat-khau-dung-123", "must2fa");
+  const u = await taoUser("admin", MK, "must2fa");
   dangNhap({ id: u.id, passwordHash: u.passwordHash, mustSetup2fa: true });
   const { GET } = await import("@/app/api/auth/me/route");
   const res = await GET();
