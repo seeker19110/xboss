@@ -58,9 +58,8 @@ joint-segmentation, routing}` + `app/api/devices` (ghép thiết bị AutoCAD) +
 8. **`mepf-worker/` + `scripts/mepf/worker_entry.py`** — ban đầu để lại chờ quyết riêng (hệ Python
    multi-agent 9 bộ phận, không thuộc cụm CAD/BIM của web app). **Người dùng đã chốt xoá hết** —
    xem mục "Bổ sung cùng đợt" bên dưới.
-9. **`CLAUDE.md` KHÔNG sửa** (agent không được phép sửa tệp cấu hình này) — hiện còn mô tả
-   `XBOSS_PLUGIN_URL`, `XBOSS_PLUGIN_SHA256`, `ANTHROPIC_API_KEY`/`XBOSS_AI_BLOCK_CLASSIFY` và
-   nhắc `cad/`, `bim/` trong bảng miền `lib/`. **Cần cập nhật tay.**
+9. **`CLAUDE.md` đã cập nhật tay** — bỏ mô tả `XBOSS_PLUGIN_URL`, `XBOSS_PLUGIN_SHA256`,
+   `ANTHROPIC_API_KEY`/`XBOSS_AI_BLOCK_CLASSIFY` và bỏ `cad/`, `bim/` khỏi bảng miền `lib/`.
 10. **Tài liệu lịch sử giữ nguyên**: ADR-0006 chỉ đánh dấu **ĐÃ HUỶ HIỆU LỰC** (ADR là sổ quyết
     định, không xoá); các bản audit/nghiên cứu theo ngày giữ nguyên văn.
 
