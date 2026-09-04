@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne } from "@/lib/db";
+import { queryOne, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { updateStage } from "@/lib/tien-do/constructionStages";
@@ -30,11 +30,13 @@ export async function PATCH(
   if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
 
   // Dự án đang chọn chỉ nhìn thấy công tác dùng chung + công tác riêng của mình.
-  const stage = await queryOne<{ projectId: number | null }>(
-    `SELECT project_id AS "projectId" FROM construction_stages
+  const stage = await withProjectScope(projectId, () =>
+    queryOne<{ projectId: number | null }>(
+      `SELECT project_id AS "projectId" FROM construction_stages
       WHERE id = ? AND (project_id IS NULL OR project_id = ?)`,
-    id,
-    projectId,
+      id,
+      projectId,
+    ),
   );
   if (!stage) return NextResponse.json({ error: "Không tìm thấy công tác" }, { status: 404 });
   if (stage.projectId === null && user.role !== "admin")

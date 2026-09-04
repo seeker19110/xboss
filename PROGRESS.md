@@ -1,5 +1,42 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Bọc ngữ cảnh dự án cho mảng kế hoạch/mặt trận + vá 2 lỗ hổng phạm vi tài liệu (2026-09-04)
+
+Trả **phần đầu** nợ "khoá cửa RLS" của M123. Khảo sát trước khi viết migration cho thấy **không
+một đường nào** trong 10 file chạm `baselines` / `construction_stages` / `floor_stage_fronts` bọc
+`withProjectScope` — RLS của `0149` hiện chỉ "chạy được" nhờ nhánh _GUC rỗng → cho qua_. Khoá cửa
+lúc này sẽ làm baseline và trang mặt trận **trả rỗng sạch** trên production. Nên đợt này làm đúng
+khuôn M62: **PR1 bọc ngữ cảnh trước, PR2 khoá cửa sau**.
+
+**Đã làm**
+
+- **Bọc `withProjectScope`** cho mọi đường đọc/ghi 3 bảng: `app/api/baselines/route.ts` (GET + POST
+  ghi, `readOnly: false`), `app/api/baselines/[id]/route.ts` (kiểm + xoá trong CÙNG một scope),
+  `app/api/construction-stages/[id]/route.ts`, `app/api/floor-stage-fronts/route.ts`.
+- **`lib/tien-do/constructionStages.ts`: bọc ở tầng LIB, không ở từng route** — cả 8 hàm chạm DB
+  (`listStages`, `createStage`, `updateStage`, `ensureFloorStageFronts`, `listFloorStageFronts`,
+  `upsertFloorStageFront`, `pendingStageFloors`, `stageMissingList`). Mọi người gọi (trang mặt
+  bằng, cron thông báo, báo cáo EOT) có ngữ cảnh mà không ai phải nhớ. Hàm nhận `projectId` tuỳ
+  chọn thì thiếu nó = ngữ cảnh xuyên dự án hợp lệ → `'*'`.
+- **Vá 2 lỗ hổng phạm vi dự án** phát hiện trong lúc rà (đây là lỗi tầng app, RLS chỉ là phòng
+  tuyến 2):
+  - `/api/floor-stage-fronts/:id/documents` (GET + POST) chỉ tra `WHERE id = ?` → biết id là **đọc
+    được và upload đè được** biên bản bàn giao của dự án khác.
+  - `/api/floor-stage-front-documents/:id` (GET + DELETE) cũng vậy → **tải và xoá được** tài liệu
+    của dự án khác. Bảng này không có `project_id` nên phải JOIN ngược qua `floor_stage_fronts`.
+  - Cả hai trả **404** (không phải 403) cho tài nguyên dự án khác, để không tiết lộ nó tồn tại.
+    Nhãn tầng là chuỗi tự do nên id ô của dự án khác hoàn toàn đoán được — đây là rò rỉ thật.
+
+**Test**: `tests/mat-tran-pham-vi-du-an.test.ts` (2 ca) khoá: tài liệu chỉ truy được trong đúng dự
+án chứa ô mặt trận (cả hai mệnh đề lọc mà route dùng), và hai dự án cùng nhãn tầng "T5" ra hai bộ ô
+độc lập khi đọc qua lib đã bọc ngữ cảnh.
+
+**CÒN NỢ — bước "khoá cửa" (bỏ nhánh GUC-rỗng trong policy `0149`) CHƯA làm, có chủ đích.** Khuôn
+`0077_rls_lock.sql` đặt 2 điều kiện tiên quyết vận hành, và điều kiện thứ hai chưa thể đủ: bản bọc
+ngữ cảnh này phải **chạy ổn trên production ≥ ~1 tuần** trước đã (M62 PR2 ngày đó cũng do người
+dùng xác nhận đủ điều kiện rồi mới merge). Khoá sớm là đổi một lỗ hổng lấy một sự cố. Migration
+`0150` chỉ nên viết sau khi mốc đó qua.
+
 ## ✅ Vá chuỗi BOQ → tracking → nghiệm thu → thanh toán (rà soát 2026-09-04)
 
 Đợt rà soát toàn chuỗi từ BOQ tới hết giai đoạn tracking. Sáu lỗ hổng correctness được vá; các

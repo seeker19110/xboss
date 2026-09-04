@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storagePut } from "@/lib/nen/storage";
-import { query, queryOne, insertId } from "@/lib/db";
+import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { newFloorStageFrontFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
 
@@ -8,6 +9,22 @@ export const dynamic = "force-dynamic";
 
 const DOC_KINDS = ["handover", "completion", "debris", "other"] as const;
 type DocKind = (typeof DOC_KINDS)[number];
+
+// Ô mặt trận (tầng × công tác) phải thuộc ĐÚNG dự án đang chọn. Trước đây cả GET lẫn POST
+// chỉ tra `WHERE id = ?`: biết id là đọc được — và upload đè được — tài liệu mặt bằng của
+// dự án khác. Nhãn tầng là chuỗi tự do nên id ô của dự án khác hoàn toàn đoán được.
+// Kiểm ở tầng app (API là ranh giới bảo mật duy nhất); GUC cho RLS `floor_stage_fronts`
+// (0149) là phòng tuyến thứ hai, không thay thế kiểm này.
+async function frontTrongDuAn(frontId: number, projectId: number): Promise<boolean> {
+  const front = await withProjectScope(projectId, () =>
+    queryOne<{ id: number }>(
+      `SELECT id FROM floor_stage_fronts WHERE id = ? AND project_id = ?`,
+      frontId,
+      projectId,
+    ),
+  );
+  return !!front;
+}
 
 // GET /api/floor-stage-fronts/:id/documents — biên bản bàn giao/ảnh hoàn thiện của 1 ô
 // (tầng × công tác) trong trang mặt bằng bản mới.
@@ -21,6 +38,12 @@ export async function GET(
 
   const frontId = parseInt(params.id);
   if (isNaN(frontId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  // Ô của dự án khác → 404 (không phải 403), để không tiết lộ ô đó có tồn tại.
+  if (!(await frontTrongDuAn(frontId, projectId)))
+    return NextResponse.json({ error: "Không tìm thấy mặt bằng" }, { status: 404 });
 
   const documents = await query(
     `SELECT d.id, d.file_name AS "fileName", d.mime, d.doc_kind AS "docKind",
@@ -49,11 +72,11 @@ export async function POST(
 
   const frontId = parseInt(params.id);
   if (isNaN(frontId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
-  const front = await queryOne<{ id: number }>(
-    `SELECT id FROM floor_stage_fronts WHERE id = ?`,
-    frontId,
-  );
-  if (!front) return NextResponse.json({ error: "Không tìm thấy mặt bằng" }, { status: 404 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  if (!(await frontTrongDuAn(frontId, projectId)))
+    return NextResponse.json({ error: "Không tìm thấy mặt bằng" }, { status: 404 });
 
   const up = await parseUploadedFile(req, { accept: "document", maxBytes: MAX_DOC_BYTES });
   if (!up.ok) return NextResponse.json({ error: up.error }, { status: up.status });

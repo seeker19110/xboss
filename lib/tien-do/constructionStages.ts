@@ -1,7 +1,22 @@
 // Trang "Mặt bằng thi công" bản mới (M46) — trục tầng × công tác thi công (Trắc đạc →
 // MEP layout → Xây thô → MEP âm tường → Tô trám → …) thay cho trục tầng × sheet-type cũ.
 // Bảng cũ (work_fronts, xem lib/workfronts.ts) vẫn giữ nguyên, không đụng tới.
-import { query, queryOne, run, insertId, todayISO, daysFromTodayISO } from "@/lib/db";
+import {
+  query,
+  queryOne,
+  run,
+  insertId,
+  todayISO,
+  daysFromTodayISO,
+  withProjectScope,
+} from "@/lib/db";
+
+// GUC app.project_id được đặt NGAY TRONG các hàm này, không phải ở từng route: cả
+// `construction_stages` lẫn `floor_stage_fronts` đều bật RLS từ migration 0149, và policy
+// chỉ áp được khi GUC có mặt. Bọc ở tầng lib nghĩa là mọi người gọi (route mặt bằng, cron
+// thông báo, báo cáo EOT) đều có ngữ cảnh mà không ai phải nhớ — điều kiện tiên quyết để
+// sau này "khoá cửa" (bỏ nhánh GUC-rỗng-cho-qua) mà không làm trang mặt trận trả rỗng.
+// Hàm nào nhận projectId tuỳ chọn thì thiếu nó = ngữ cảnh xuyên dự án hợp lệ → '*'.
 import { sortFloorsDesc } from "@/lib/tien-do/floors";
 import { addDaysISO } from "@/lib/nen/date";
 
@@ -16,12 +31,14 @@ export type StageRow = {
 // Danh mục công tác mà MỘT dự án nhìn thấy (M123 · D1): project_id NULL = công tác dùng
 // chung mọi dự án (7 công tác seed của migrations/0046), có giá trị = công tác riêng dự án.
 export async function listStages(projectId: number): Promise<StageRow[]> {
-  return query<StageRow>(
-    `SELECT id, name, sort_order AS "sortOrder", active, duration_days AS "durationDays"
+  return withProjectScope(projectId, () =>
+    query<StageRow>(
+      `SELECT id, name, sort_order AS "sortOrder", active, duration_days AS "durationDays"
        FROM construction_stages
       WHERE active = TRUE AND (project_id IS NULL OR project_id = ?)
       ORDER BY sort_order, id`,
-    projectId,
+      projectId,
+    ),
   );
 }
 
@@ -32,14 +49,19 @@ export async function createStage(
   name: string,
   durationDays: number,
 ): Promise<number> {
-  return insertId(
-    `INSERT INTO construction_stages (project_id, name, sort_order, duration_days)
+  return withProjectScope(
+    projectId,
+    () =>
+      insertId(
+        `INSERT INTO construction_stages (project_id, name, sort_order, duration_days)
      VALUES (?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM construction_stages
                      WHERE project_id IS NULL OR project_id = ?), ?)`,
-    projectId,
-    name,
-    projectId,
-    durationDays,
+        projectId,
+        name,
+        projectId,
+        durationDays,
+      ),
+    { readOnly: false },
   );
 }
 
@@ -70,10 +92,15 @@ export async function updateStage(
   }
   if (sets.length === 0) return;
   args.push(id, projectId);
-  await run(
-    `UPDATE construction_stages SET ${sets.join(", ")}
+  await withProjectScope(
+    projectId,
+    () =>
+      run(
+        `UPDATE construction_stages SET ${sets.join(", ")}
       WHERE id = ? AND (project_id IS NULL OR project_id = ?)`,
-    ...args,
+        ...args,
+      ),
+    { readOnly: false },
   );
 }
 
@@ -102,15 +129,21 @@ export async function ensureFloorStageFronts(
   projectId: number,
   floorLabels: string[],
 ): Promise<void> {
-  for (const floor of floorLabels) {
-    await run(
-      `INSERT INTO floor_stage_fronts (project_id, floor_label, stage_id)
+  await withProjectScope(
+    projectId,
+    async () => {
+      for (const floor of floorLabels) {
+        await run(
+          `INSERT INTO floor_stage_fronts (project_id, floor_label, stage_id)
        SELECT ?, ?, id FROM construction_stages WHERE active = TRUE
        ON CONFLICT (COALESCE(project_id, 0), floor_label, stage_id) DO NOTHING`,
-      projectId,
-      floor,
-    );
-  }
+          projectId,
+          floor,
+        );
+      }
+    },
+    { readOnly: false },
+  );
 }
 
 // Các ô mặt trận của MỘT dự án (M123) — projectId bắt buộc vì floor_label là chuỗi tự do,
@@ -119,8 +152,9 @@ export async function listFloorStageFronts(
   projectId: number,
   floorLabel?: string,
 ): Promise<FloorStageFrontRow[]> {
-  return query<FloorStageFrontRow>(
-    `SELECT id, floor_label AS "floorLabel", stage_id AS "stageId",
+  return withProjectScope(projectId, () =>
+    query<FloorStageFrontRow>(
+      `SELECT id, floor_label AS "floorLabel", stage_id AS "stageId",
             handed_over_at AS "handedOverAt", received_at AS "receivedAt",
             planned_received_at AS "plannedReceivedAt", note,
             outgoing_supplier_id AS "outgoingSupplierId",
@@ -131,8 +165,9 @@ export async function listFloorStageFronts(
        FROM floor_stage_fronts fsf
       WHERE fsf.project_id = ?${floorLabel ? " AND fsf.floor_label = ?" : ""}
       ORDER BY floor_label, stage_id`,
-    projectId,
-    ...(floorLabel ? [floorLabel] : []),
+      projectId,
+      ...(floorLabel ? [floorLabel] : []),
+    ),
   );
 }
 
@@ -156,8 +191,11 @@ export async function upsertFloorStageFront(
   },
   userId: number,
 ): Promise<number> {
-  const row = await queryOne<{ id: number }>(
-    `INSERT INTO floor_stage_fronts
+  const row = await withProjectScope(
+    projectId,
+    () =>
+      queryOne<{ id: number }>(
+        `INSERT INTO floor_stage_fronts
        (project_id, floor_label, stage_id, received_at, handed_over_at, planned_received_at, note,
         outgoing_supplier_id, incoming_supplier_id, transition_stage_id,
         outgoing_rep_name, incoming_rep_name, updated_by)
@@ -172,20 +210,22 @@ export async function upsertFloorStageFront(
            incoming_rep_name = EXCLUDED.incoming_rep_name,
            updated_by = ?, updated_at = NOW()
      RETURNING id`,
-    projectId,
-    floorLabel,
-    stageId,
-    input.receivedAt,
-    input.handedOverAt,
-    input.plannedReceivedAt,
-    input.note,
-    input.outgoingSupplierId,
-    input.incomingSupplierId,
-    input.transitionStageId,
-    input.outgoingRepName,
-    input.incomingRepName,
-    userId,
-    userId,
+        projectId,
+        floorLabel,
+        stageId,
+        input.receivedAt,
+        input.handedOverAt,
+        input.plannedReceivedAt,
+        input.note,
+        input.outgoingSupplierId,
+        input.incomingSupplierId,
+        input.transitionStageId,
+        input.outgoingRepName,
+        input.incomingRepName,
+        userId,
+        userId,
+      ),
+    { readOnly: false },
   );
   return row!.id;
 }
@@ -255,12 +295,14 @@ export async function pendingStageFloors(projectId?: number): Promise<Set<string
     conds.push("fsf.project_id = ?");
     args.push(projectId);
   }
-  const rows = await query<{ floorLabel: string }>(
-    `SELECT fsf.floor_label AS "floorLabel"
+  const rows = await withProjectScope(projectId ?? "*", () =>
+    query<{ floorLabel: string }>(
+      `SELECT fsf.floor_label AS "floorLabel"
        FROM floor_stage_fronts fsf
        JOIN construction_stages cs ON cs.id = fsf.stage_id
       WHERE ${conds.join(" AND ")}`,
-    ...args,
+      ...args,
+    ),
   );
   return new Set(rows.map((r) => r.floorLabel));
 }
@@ -287,13 +329,14 @@ export async function stageMissingList(projectId?: number): Promise<StageMissing
     conds.push("fsf.project_id = ?");
     args.push(projectId);
   }
-  const rows = await query<{
-    floorStageFrontId: number;
-    floorLabel: string;
-    stageName: string;
-    earliestStart: string;
-  }>(
-    `SELECT fsf.id AS "floorStageFrontId", fsf.floor_label AS "floorLabel", cs.name AS "stageName",
+  const rows = await withProjectScope(projectId ?? "*", () =>
+    query<{
+      floorStageFrontId: number;
+      floorLabel: string;
+      stageName: string;
+      earliestStart: string;
+    }>(
+      `SELECT fsf.id AS "floorStageFrontId", fsf.floor_label AS "floorLabel", cs.name AS "stageName",
             MIN(COALESCE(t.start_date, wp.start_date)) AS "earliestStart"
        FROM floor_stage_fronts fsf
        JOIN construction_stages cs ON cs.id = fsf.stage_id
@@ -302,7 +345,8 @@ export async function stageMissingList(projectId?: number): Promise<StageMissing
        JOIN tasks t ON t.package_id = wp.id
       WHERE ${conds.join(" AND ")}
       GROUP BY fsf.id, fsf.floor_label, cs.name`,
-    ...args,
+      ...args,
+    ),
   );
   return rows.map((r) => {
     const waitingDays = Math.max(
