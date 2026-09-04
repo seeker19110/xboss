@@ -2,7 +2,7 @@
 // thuần, query danh sách họp kèm action, action quá hạn (nguồn notification
 // action_overdue). Xem docs/nang-cap/M13-hop-rui-ro.md.
 import { query, queryOne, run } from "@/lib/db";
-import { todayISO } from "@/lib/nen/date";
+import { todayISO, isValidDateISO } from "@/lib/nen/date";
 
 export const MEETING_KINDS = ["weekly", "client", "subcon", "other"] as const;
 export type MeetingKind = (typeof MEETING_KINDS)[number];
@@ -20,8 +20,6 @@ export const MEETING_ACTION_STATUS_LABEL: Record<MeetingActionStatus, string> = 
   done: "Đã xong",
   cancelled: "Đã huỷ",
 };
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type MeetingInput = {
   meetingDate: string;
@@ -43,7 +41,7 @@ export function parseMeetingBody(body: Record<string, unknown>): MeetingInput {
 }
 
 export function validateMeetingInput(input: MeetingInput): string | null {
-  if (!DATE_RE.test(input.meetingDate)) return "Ngày họp không đúng định dạng YYYY-MM-DD";
+  if (!isValidDateISO(input.meetingDate)) return "Ngày họp không đúng định dạng YYYY-MM-DD";
   if (!MEETING_KINDS.includes(input.kind)) return "Loại họp không hợp lệ";
   if (!input.title) return "Thiếu tiêu đề cuộc họp";
   return null;
@@ -68,7 +66,7 @@ export function parseMeetingActionBody(body: Record<string, unknown>): MeetingAc
 
 export function validateMeetingActionInput(input: MeetingActionInput): string | null {
   if (!input.content) return "Thiếu nội dung việc cần làm";
-  if (input.dueDate != null && !DATE_RE.test(input.dueDate))
+  if (input.dueDate != null && !isValidDateISO(input.dueDate))
     return "Hạn hoàn thành không đúng định dạng YYYY-MM-DD";
   return null;
 }

@@ -4,7 +4,7 @@
 // khác giai đoạn/quyền), thư viện tài liệu hướng dẫn vận hành & bảo trì (pattern
 // task_documents). Xem docs/nang-cap/M30-bao-hanh-bao-tri.md.
 import { query, queryOne } from "@/lib/db";
-import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
+import { todayISO, daysFromTodayISO, isValidDateISO } from "@/lib/nen/date";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -148,7 +148,7 @@ export function parseWarrantyItemBody(body: Record<string, unknown>): WarrantyIt
 export function validateWarrantyInput(input: WarrantyItemInput): string | null {
   if (!input.title.trim()) return "Thiếu tên hạng mục bảo hành";
   if (!WARRANTY_ITEM_STATUSES.includes(input.status)) return "Trạng thái không hợp lệ";
-  if (input.warrantyFrom != null && !DATE_RE.test(input.warrantyFrom))
+  if (input.warrantyFrom != null && !isValidDateISO(input.warrantyFrom))
     return "Ngày bắt đầu bảo hành không đúng định dạng YYYY-MM-DD";
   if (input.warrantyMonths != null && input.warrantyMonths < 0)
     return "Số tháng bảo hành không hợp lệ";
@@ -354,7 +354,7 @@ export function validateClaimInput(input: WarrantyClaimInput): string | null {
     ["Hạn xử lý", input.dueDate],
     ["Ngày đóng", input.closedDate],
   ] as const) {
-    if (d != null && !DATE_RE.test(d)) return `${label} không đúng định dạng YYYY-MM-DD`;
+    if (d != null && !isValidDateISO(d)) return `${label} không đúng định dạng YYYY-MM-DD`;
   }
   return null;
 }
