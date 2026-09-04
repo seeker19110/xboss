@@ -140,6 +140,33 @@ dùng chốt xoá hẳn cụm này. **9 tệp xoá, 8 tệp sửa**, không thê
   `check:dead-routes`, `check:lib-layers`, `check:migrations`, `check:sw-exclude`,
   `check:route-perms`, `check:project-scope`, `check:db-params`, `check:engineering-danh-tinh`.
 
+### Bổ sung cùng đợt — dọn vết sót ở tệp cấu hình gốc repo
+
+Rà lại sau khi #476 vào `main`: 6 chỗ ngoài `lib/`/`app/` vẫn trỏ tới thứ đã xoá. Không đụng code
+ứng dụng, không migration.
+
+- **Xoá:** `.gitattributes` (toàn bộ nội dung chỉ phục vụ fixture băm sha256 + tệp `.dwg` của
+  plugin — repo không còn tệp CAD nào); `dogfood-output/manual-2026-08-30/` (10 tệp, 2,3 MB ảnh
+  chụp + `.dwg` là bằng chứng verify tay plugin M119 — plugin không còn thì bằng chứng verify của
+  nó cũng không còn giá trị, khác với ADR/audit là sổ quyết định nên giữ).
+- **Sửa:** `.env.example` bỏ khối "MEPF-Agents Worker" (`ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/
+  `MEPF_*` — schema `lib/nen/env.ts` chưa từng khai các biến này, để lại chỉ khiến người deploy
+  tưởng còn service phải cấu hình); `.gitignore` bỏ `plugin-autocad/**/bin|obj` + `/dist/` (bundle
+  `dong-goi.ps1` đã xoá, không script nào ghi `dist/`); `.prettierignore` bỏ 2 đối chứng
+  `plugin-autocad/doi-chung/*.json`.
+- **`PLAN.md` viết lại thành khung mẫu:** nội dung cũ là kế hoạch M115→M118 (4 pha, 14 việc) cho
+  plugin AutoCAD đã xoá, đầu tệp còn ghi "CHƯA KÍCH HOẠT — người dùng sẽ ra lệnh thi hành sau" —
+  để nguyên thì `coordinator` có thể nhận nhầm một kế hoạch không còn thi hành được. `CLAUDE.md`
+  vẫn tham chiếu "mẫu `PLAN.md`" nên tệp giữ lại dưới dạng **khung** (header · ràng buộc cứng · Pha/
+  Việc kèm `route:` · thứ tự phụ thuộc) + ghi chú hết hiệu lực trỏ về mục này.
+- **Giữ nguyên có chủ đích:** các chú thích lịch sử "trước đây plugin AutoCAD ghi…" trong
+  `lib/ky-thuat/drawings.ts`, `lib/ha-tang/projects.ts`, `lib/bao-mat/api-keys.ts`,
+  `tests/rls.test.ts` (giải thích vì sao cột/policy có hình dạng hiện tại); hướng dẫn
+  `pm2 delete mepf-worker` trong `DEPLOY.md` (VPS cũ vẫn cần); `docs/adr/0006` (đã đánh dấu huỷ).
+- **Cổng đã chạy:** `npm run lint` · `npm run typecheck` · `check:dead-code` · `check:dead-routes`
+  xanh; `tests/project-scope-invariant.test.ts` pass. `npm run format:check` đỏ 38 tệp nhưng
+  **không tệp nào thuộc diff này** và CI không chạy cổng đó (nợ format có sẵn trên `main`).
+
 ### Cổng đã chạy
 
 `npm run lint` xanh · `npm run typecheck` xanh · `npm run build` xanh · `npm test` với Postgres 16
