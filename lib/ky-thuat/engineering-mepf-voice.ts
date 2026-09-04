@@ -1,6 +1,13 @@
 // lib/engineering-mepf-voice.ts — AI Voice-to-WBS Field Inspection Logger (M68)
 import { query, queryOne } from "@/lib/db";
-import { SpoolStatus } from "@/lib/ky-thuat/engineering-cad-qto";
+
+/**
+ * 5 mốc trạng thái chế tạo/lắp đặt nhận ra được từ lời đọc hiện trường.
+ *
+ * Trước đây kiểu này khai ở `engineering-cad-qto.ts` (bảng spool bóc từ bản vẽ); module đó đã bị
+ * gỡ cùng cụm CAD/BIM nên khai tại chỗ — bộ nhận dạng giọng nói không phụ thuộc CAD.
+ */
+export type SpoolStatus = "fabricated" | "delivered" | "installed" | "qc_passed" | "bbnt_approved";
 
 export interface ParsedVoiceEntity {
   rawText: string;

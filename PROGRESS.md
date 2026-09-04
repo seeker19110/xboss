@@ -1,5 +1,92 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Gỡ toàn bộ cụm CAD/BIM khỏi sản phẩm — đợt 3 (2026-09-04)
+
+Đợt cuối của loạt dọn CAD/BIM: **xoá hết phần còn lại** của cụm CAD · BIM · Digital Twin ·
+God-Tier · Scan-to-BIM · plugin AutoCAD. **587 tệp xoá, 40 tệp sửa**, không thêm migration nào.
+
+### Đã xoá
+
+- **Trang:** `app/engineering/{bim, bim-viewer, cad-corridor, cad-nesting, cad-tracking,
+god-tier-studio, scan-to-bim, thiet-bi-cad, twin, chuan-hoa-ban-ve, cai-dat-plugin,
+joint-segmentation, auto-routing, reality}`.
+- **Route API:** `app/api/engineering/{bim, bim-models, bim-routing, cad, cad-carbon-lifecycle,
+cad-corridor, cad-isometric, cad-nesting, cad-qto, god-tier, scan-to-bim, twin,
+joint-segmentation, routing}` + `app/api/devices` (ghép thiết bị AutoCAD) + `app/api/tokens`
+  (token scope `cad`).
+- **`lib/`:** `ky-thuat/cad/` (kể cả `dxf-parser.ts` + 17 rule pack), `ky-thuat/bim/`,
+  `dich-vu/cad.ts`, `bao-mat/cad-devices.ts`, `nen/ai.ts` (cửa duy nhất ra LLM — người dùng duy
+  nhất là gợi ý phân loại block M108), và các module `ky-thuat/engineering-*`: `bim-cad`,
+  `bim-routing`, `bim-viewer`, `cad-carbon-lifecycle`, `cad-corridor`, `cad-dfma-isometric`,
+  `cad-hydraulic-network`, `cad-nesting`, `cad-qto`, `cad-skills`, `god-tier`, `god-tier-db`,
+  `scan-to-bim`, `twin`, `twin-pinnacle`, `joint-segmentation`, `joint-segmentation-store`,
+  `local-ai`, `auto-routing`.
+- **Plugin AutoCAD:** trọn thư mục `plugin-autocad/` (4 project .NET + hơn 1.300 ca xunit + thư
+  viện block + dữ liệu đối chứng), 2 job CI `plugin`/`plugin_shim`, job đóng gói trong
+  `release.yml`, 3 bước static CAD trong `ci.yml`, `scripts/check-plugin-bundle.ts`,
+  `scripts/sinh-doi-chung-cad.ts`, `scripts/sinh-mau-ban-ve-cad.ts`,
+  `scripts/do-phan-loai-block.ts`, `scripts/ensure-drawing-tree.ts` (+ bước 4.7/7 của
+  `deploy.sh`), skill `.agents/skills/cad-bim-dfma-master/`.
+- **Test:** 55 tệp `tests/` của cụm + `tests/fixtures/cad/`; e2e `thiet-bi-cad`,
+  `schematic-graph`, `chuan-hoa-ban-ve`.
+- **Đặc tả:** `docs/nang-cap/` M65, M66, M70, M77, M96, M98, M99, M100–M119, OS-2,
+  RESEARCH-CAD-QTO-TRACKING, RESEARCH-AUTO-ROUTING-MEPF; `docs/ops/` verify tay plugin +
+  kiểm thử plugin không cần server.
+
+### Quyết định đã cân nhắc (không chỉ xoá máy móc)
+
+1. **Migration giữ nguyên** (`migrations/` append-only): 17 migration của cụm vẫn nằm đó, bảng còn
+   trong DB nhưng không còn mã nào đọc/ghi. Xoá bảng là thao tác đụng dữ liệu, phải qua staging và
+   phải do chủ dự án quyết.
+2. **`engineering-smart-ipc.ts` giữ nguyên nhánh đọc `engineering_scan_to_bim_runs`** — cổng 1 của
+   chuỗi IPC. Không còn ai ghi bảng đó nên cổng luôn `available: false`, nhưng bỏ hẳn một cổng của
+   chuỗi thanh toán là **thay đổi nghiệp vụ tài chính**, không phải dọn dẹp. Đã ghi rõ bằng chú
+   thích tại chỗ.
+3. **`/mo-hinh-bim` + `kind: "bim"` của sổ bản vẽ GIỮ LẠI** — đó là một **loại hồ sơ** trong
+   drawing register (G06), không phải công cụ BIM; xoá sẽ làm các dòng `drawings` hiện có mất nhãn.
+4. **Tab BIM của `/tech` GIỮ LẠI** — chỉ là sổ link viewer ngoài (Autodesk/Revizto), không có mã
+   CAD/BIM nào phía sau.
+5. **Quyền `CAN.manageEngineeringTwin` GIỮ TÊN** — 14 route không-CAD đang dùng; đổi tên khoá quyền
+   làm hỏng các dòng override đã lưu trong `role_permissions` (khoá lưu theo tên). Ngược lại, 4
+   khoá `view/manageEngineeringBim` và `view/manageEngineeringGodTier` **đã xoá** vì route của
+   chúng không còn — để lại sẽ hiện thành dòng ma trên `/admin/permissions`.
+6. **`engineering-mepf-takeoff` / `engineering-mepf-voice` GIỮ LẠI, chuyển phần dùng chung về chỗ
+   mới:** 2 công thức đo bóc (`calculateDuctQtoM2`, `calculatePipeQtoM`) và kiểu `SpoolStatus` vốn
+   nằm ở `engineering-cad-qto.ts` nay khai tại chính module còn dùng — giữ nguyên công thức.
+7. **Auto-routing 3D (M77) xoá theo** — giao diện duy nhất gọi nó là `/engineering/auto-routing`
+   (chạy trên phần tử BIM). Giữ lại thì `check:dead-routes` đỏ và code không có đường vào.
+8. **`mepf-worker/` + `scripts/mepf/worker_entry.py` KHÔNG đụng** — đó là hệ Python multi-agent
+   riêng (9 bộ phận: HVAC/điện/nước/PCCC/QS/CAD/BIM/…), không thuộc cụm CAD/BIM của web app; xoá
+   `cad_*.py`/`bim_tools.py` sẽ làm hỏng đồ thị agent của nó và không cổng npm nào kiểm được.
+   **Cần phiên chính quyết riêng.**
+9. **`CLAUDE.md` KHÔNG sửa** (agent không được phép sửa tệp cấu hình này) — hiện còn mô tả
+   `XBOSS_PLUGIN_URL`, `XBOSS_PLUGIN_SHA256`, `ANTHROPIC_API_KEY`/`XBOSS_AI_BLOCK_CLASSIFY` và
+   nhắc `cad/`, `bim/` trong bảng miền `lib/`. **Cần cập nhật tay.**
+10. **Tài liệu lịch sử giữ nguyên**: ADR-0006 chỉ đánh dấu **ĐÃ HUỶ HIỆU LỰC** (ADR là sổ quyết
+    định, không xoá); các bản audit/nghiên cứu theo ngày giữ nguyên văn.
+
+### Dọn kèm (hệ quả trực tiếp)
+
+Nav (`EngineeringNav` — nhóm `twin` đổi tên thành `ledger`; `dashboardTree` — cụm "7 Đại Trung Tâm"
+còn **6**), `GlobalSearch`, `lib/nen/modules.ts` (bỏ 4 module `engineering-twin`,
+`engineering-bim-models`, `engineering-god-tier-studio`, `cad-plugin`), `public/sw.js` (bỏ loại trừ
+`/api/engineering/cad/`, `CACHE` lên `xboss-v16`), `lib/ky-thuat/drawings.ts` + `app/ban-ve/page.tsx`
+(bỏ trường `kiemDinh` và chip "Từ plugin" của revision), whitelist của `check-route-perms` /
+`project-scope-invariant` / `dead-routes-allowlist`, `lib/nen/photos.ts` (2 helper tên tệp CAD).
+
+**Bug cổng CI phát hiện khi xoá:** `scripts/check-dead-routes.ts` truyền thẳng danh sách thư mục cho
+`grep -rlE`; thiếu MỘT thư mục (`plugin-autocad`) làm grep thoát 2 → `catch` nuốt lỗi → **mọi route
+đều bị coi là chết**. Đã bỏ thư mục không còn tồn tại; bẫy vẫn còn nguyên cho lần sau.
+
+### Cổng đã chạy
+
+`npm run lint` xanh · `npm run typecheck` xanh · `npm run build` xanh · `npm test` với Postgres 16
+ephemeral: **224 tệp, 1812 ca pass, 1 ca fail** — ca fail duy nhất là
+`tests/backfill-0137-0138.test.ts`, **đã đỏ sẵn trên `main` trước đợt này** (đối chiếu bằng
+`git stash`). Cổng static: `check:dead-code`, `check:dead-routes`, `check:lib-layers`,
+`check:sw-exclude`, `check:migrations`, `check:engineering-danh-tinh`, `check:route-perms`,
+`check:project-scope`, `check:db-params`, `check:mau-accent`, `check:contrast` — đều xanh.
+
 ## ✅ Đợt 2 chiến dịch coverage — mở khoá test THỰC THI route, phủ 10 cụm (2026-09-04)
 
 **Rào chắn của đợt này không phải công sức mà là hạ tầng.** 453/482 route (đã trừ CAD) chưa có

@@ -26,8 +26,7 @@ import AxeBuilder from "@axe-core/playwright";
 // badge/nút RIÊNG cùng kiểu "-950/50 + accent-300" ở code của chính trang đó (không phải
 // EngineeringNav) vẫn còn đỏ — sửa từng cái là việc lẻ theo trang, ngoài phạm vi ở đây.
 //
-// `.sidebar-label` (ProjectSwitcher/AppHeader, vd /engineering/cad-corridor,
-// /engineering/zero-error) — đo tương phản 1,02:1 (fg #f1f5f9 / bg #f6f7f9) trên span
+// `.sidebar-label` (ProjectSwitcher/AppHeader, vd /engineering/zero-error) — đo tương phản 1,02:1 (fg #f1f5f9 / bg #f6f7f9) trên span
 // KHÔNG có class màu chữ tường minh, chỉ kế thừa `color`. Đã kiểm computed style qua CDP ở
 // trạng thái ổn định: `--foreground`/`--color-zinc-100` của html.light đúng
 // (#14171d/#232833), span kế thừa màu ĐÚNG — không tái hiện được #f1f5f9 khi soi thủ công
@@ -72,8 +71,8 @@ async function scanRoute(page: Page, path: string) {
 
 type Route = { path: string; name: string };
 
-// ── 25 trang XANH thật — chạy thật, chờ nội dung, quét axe, assert rỗng (không fixme). ──
-// 10 trang gốc + 15 trang tự xanh sau khi sửa badge EngineeringNav (xem comment đầu file).
+// ── 21 trang XANH thật — chạy thật, chờ nội dung, quét axe, assert rỗng (không fixme). ──
+// 10 trang gốc + 11 trang tự xanh sau khi sửa badge EngineeringNav (xem comment đầu file).
 const OK_ROUTES: Route[] = [
   { path: "/site", name: "Hub Hiện trường (site)" },
   { path: "/commercial", name: "Hub Thương mại (commercial)" },
@@ -86,21 +85,17 @@ const OK_ROUTES: Route[] = [
   { path: "/ban-ve-thiet-ke", name: "Bản vẽ thiết kế" },
   { path: "/bien-phap-thi-cong", name: "Biện pháp thi công" },
   { path: "/engineering/mepf-lifecycle", name: "Vòng đời MEPF" },
-  // 15 trang chuyển từ fixme → xanh thật sau khi sửa badge EngineeringNav (24-08-2026):
+  // 11 trang chuyển từ fixme → xanh thật sau khi sửa badge EngineeringNav (24-08-2026):
   { path: "/engineering/agent-sessions", name: "Phiên AI Agent" },
   { path: "/engineering/autonomy", name: "Quyền tự chủ AI (autonomy)" },
-  { path: "/engineering/bim-viewer", name: "BIM Viewer" },
   { path: "/engineering/data-quality", name: "Chất lượng dữ liệu" },
   { path: "/engineering/graph", name: "Đồ thị tri thức (graph)" },
   { path: "/engineering/memory", name: "Bộ nhớ AI (memory)" },
   { path: "/engineering/predictions", name: "Dự đoán (predictions)" },
   { path: "/engineering/prescriptive", name: "Kê đơn (prescriptive)" },
   { path: "/engineering/quantum-hub", name: "Quantum Hub" },
-  { path: "/engineering/reality", name: "Thực tế hỗn hợp (reality)" },
-  { path: "/engineering/scan-to-bim", name: "Scan-to-BIM" },
   { path: "/engineering/suggestions", name: "Gợi ý AI (suggestions)" },
   { path: "/engineering/swarm", name: "Swarm" },
-  { path: "/engineering/twin", name: "Digital Twin" },
   { path: "/engineering/workflows", name: "Quy trình tự động (workflows)" },
 ];
 
@@ -148,52 +143,16 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
 
   const ENG_FIXME: { path: string; name: string; violations: string }[] = [
     {
-      path: "/engineering/auto-routing",
-      name: "Định tuyến ống tự động",
-      violations:
-        "button-name x1 (icon-button không có accessible name) + color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav, còn 1 node riêng của trang) + label x11 (input số không có <label>) + select-name x2 (select không có <label>).",
-    },
-    {
       path: "/engineering/bidding-matrix",
       name: "Ma trận đấu thầu",
       violations:
         "color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav) + select-name x1 (select thiếu <label>).",
     },
     {
-      path: "/engineering/bim",
-      name: "BIM",
-      violations:
-        "select-name x2 (select thiếu <label>) — color-contrast (badge EngineeringNav) đã hết sau khi sửa, chỉ còn select-name.",
-    },
-    {
-      path: "/engineering/cad-corridor",
-      name: "Hành lang CAD",
-      violations:
-        "color-contrast x21 (đã giảm từ x37 sau khi sửa badge EngineeringNav) — RIÊNG, KHÔNG phải badge nav: '.sidebar-label' (AppHeader/ProjectSwitcher) chữ #f1f5f9 trên nền #f6f7f9 = 1.02:1 (gần vô hình). Đã kiểm computed style qua CDP ở trạng thái ổn định — CSS var đúng, không tái hiện được khi soi thủ công — nghi lỗi thoáng qua lúc hydrate ProjectSwitcher, KHÔNG sửa gọn được (xem comment đầu file) + label x4 (input số thiếu <label>).",
-    },
-    {
-      path: "/engineering/cad-nesting",
-      name: "Xếp hình CAD (nesting)",
-      violations:
-        'aria-prohibited-attr x1 (div[aria-label="Đang tải"] — PageSkeleton dùng aria-label trên div không có role hợp lệ, xem app/components/Skeleton.tsx) — color-contrast (badge EngineeringNav) đã hết sau khi sửa.',
-    },
-    {
-      path: "/engineering/cad-tracking",
-      name: "Theo dõi CAD",
-      violations:
-        "color-contrast x2 (đã giảm từ x3 sau khi sửa badge EngineeringNav) + select-name x1 (select thiếu <label>).",
-    },
-    {
       path: "/engineering/cashflow",
       name: "Dòng tiền động",
       violations:
         "color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav) — bg-amber-950/80, chữ #92400e trên nền #694533 = 1.18:1 + label x5 (input text thiếu <label>).",
-    },
-    {
-      path: "/engineering/chuan-hoa-ban-ve",
-      name: "Chuẩn hoá bản vẽ (đối chiếu — đã có spec chuan-hoa-ban-ve.spec.ts riêng)",
-      violations:
-        "color-contrast x1 — badge viền zinc-700, chữ #67707c trên nền #dde2ea = 3.85:1 (cần 4,5:1). KHÔNG liên quan badge EngineeringNav. Đưa vào lưới chung để cùng 1 mốc so sánh; spec riêng có phạm vi kiểm khác, KHÔNG trùng lặp.",
     },
     {
       path: "/engineering/esign",
@@ -206,12 +165,6 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
       name: "Khiếu nại FIDIC",
       violations:
         "color-contrast x2 (đã giảm từ x3 sau khi sửa badge EngineeringNav) + label x6 (input thiếu <label>) + select-name x2.",
-    },
-    {
-      path: "/engineering/god-tier-studio",
-      name: "God-tier Studio",
-      violations:
-        "button-name x1 (bg-sky-600, icon-button không có tên) + label x1 (input thiếu <label>). KHÔNG liên quan badge EngineeringNav.",
     },
     {
       path: "/engineering/hse-vision",
@@ -271,7 +224,7 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
       path: "/engineering/zero-error",
       name: "Zero Error",
       violations:
-        "color-contrast x32 (không đổi đáng kể — không phải badge EngineeringNav) — cùng lỗi '.sidebar-label' như /engineering/cad-corridor (1.02:1, xem comment đầu file) + label x4.",
+        "color-contrast x32 (không đổi đáng kể — không phải badge EngineeringNav) — cùng lỗi '.sidebar-label' (1.02:1, xem comment đầu file) + label x4.",
     },
   ];
 

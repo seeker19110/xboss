@@ -39,9 +39,8 @@ vẫn OOM ở mức RAM khuyến nghị, hạ xuống phương án build-ở-nơ
   khi health-check qua — xem bước 6/7 và 7/7 trong `deploy.sh`), nên cần dư ít nhất bằng một bản
   `.next` nữa so với mức tối thiểu.
 - **`data/uploads/` là thứ hết chỗ trước tiên**, không phải code: ảnh hiện trường tối đa 10MB/ảnh
-  và biên bản nghiệm thu tối đa 20MB/tệp (`lib/nen/photos.ts`), cộng thêm bản vẽ DWG/DXF do
-  plugin AutoCAD tải lên — thư mục này **phình dần theo thời gian sử dụng**, không cố định như
-  code. Cần theo dõi dung lượng định kỳ (`du -sh data/uploads`) và tính vào kế hoạch mở rộng ổ
+  và biên bản nghiệm thu tối đa 20MB/tệp (`lib/nen/photos.ts`), cộng thêm bản vẽ đính kèm hồ sơ —
+  thư mục này **phình dần theo thời gian sử dụng**, không cố định như code. Cần theo dõi dung lượng định kỳ (`du -sh data/uploads`) và tính vào kế hoạch mở rộng ổ
   đĩa, không chỉ tính theo dung lượng lúc mới cài.
 
 **Bật swap trên Ubuntu** (khuyến nghị mọi mức RAM, bắt buộc nếu RAM tối thiểu 2 GB):
@@ -189,9 +188,9 @@ chạy chỉ bị dọn (`rm -rf .next-old`) khi health-check pass.
 
 **Hai chế độ lấy bản build:**
 
-| Lệnh                          | Bản build lấy từ đâu                    | Dùng khi                                                      |
-| ----------------------------- | --------------------------------------- | ------------------------------------------------------------- |
-| `bash deploy.sh`              | Gói `.next-ci.tar.gz` GitHub Actions gửi | Mặc định — chính là đường auto-deploy chạy sau mỗi lần CI xanh |
+| Lệnh                           | Bản build lấy từ đâu                     | Dùng khi                                                       |
+| ------------------------------ | ---------------------------------------- | -------------------------------------------------------------- |
+| `bash deploy.sh`               | Gói `.next-ci.tar.gz` GitHub Actions gửi | Mặc định — chính là đường auto-deploy chạy sau mỗi lần CI xanh |
 | `bash deploy.sh --build-local` | Tự `npm run build` trên VPS              | Dự phòng: GitHub Actions không dùng được, hoặc deploy khẩn cấp |
 | `bash deploy.sh --staging`     | Tự build tại chỗ (luôn luôn)             | Staging deploy tay — không có workflow nào gửi gói sang        |
 

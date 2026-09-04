@@ -37,11 +37,6 @@ const CAP: { nghiepVu: string; bangGoc: string[]; engineering: string[] }[] = [
     engineering: ["engineering_hse_vision_scans", "engineering_hse_detected_hazards"],
   },
   {
-    nghiepVu: "BIM / bản vẽ",
-    bangGoc: ["drawings"],
-    engineering: ["engineering_bim_models", "engineering_bim_elements"],
-  },
-  {
     nghiepVu: "Rủi ro / dự báo",
     bangGoc: ["risks"],
     engineering: ["engineering_prediction_runs", "engineering_prediction_outputs"],

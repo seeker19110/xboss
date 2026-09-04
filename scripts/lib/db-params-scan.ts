@@ -145,7 +145,7 @@ export function timLoiGoiSaiKieu(
       // Lượt 1 chỉ bắt mảng LITERAL và chỉ khi tham số đầu là chuỗi SQL literal. Mẫu rất phổ
       // biến `let sql = ...; const params: unknown[] = [...]; query(sql, params)` lọt qua CẢ
       // HAI điều kiện đó — 5 chỗ như vậy đã chết 500 lúc chạy thật, phát hiện khi kiểm
-      // /engineering/bim-viewer trên trình duyệt (audit 2026-08-25 §3.7).
+      // /engineering/spatial-viewer trên trình duyệt (audit 2026-08-25 §3.7).
       MAU_GOI.lastIndex = 0;
       while ((m = MAU_GOI.exec(src)) !== null) {
         const mo = m.index + m[0].length - 1;

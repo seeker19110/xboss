@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   Split,
   Box,
-  Layers,
   ShieldCheck,
   AlertTriangle,
   CheckCircle2,
@@ -407,13 +406,6 @@ export default function CombinePage() {
             >
               <Box className="w-3.5 h-3.5 text-sky-400" />
               <span>Mô hình BIM 3D</span>
-            </Link>
-            <Link
-              href="/engineering/chuan-hoa-ban-ve"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
-            >
-              <Layers className="w-3.5 h-3.5 text-amber-400" />
-              <span>Chuẩn Hóa Bản Vẽ</span>
             </Link>
           </div>
         }

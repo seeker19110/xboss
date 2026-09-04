@@ -60,14 +60,6 @@
     "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
   },
   {
-    "route": "/api/engineering/bim-models/[id]/link-wbs",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
-    "route": "/api/engineering/god-tier/simulate-4d",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
     "route": "/api/engineering/closed-loop-sync",
     "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
   },
@@ -77,14 +69,6 @@
   },
   {
     "route": "/api/engineering/pipe-spool-tracking",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
-    "route": "/api/engineering/cad/convert-to-dxf",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
-    "route": "/api/engineering/cad/diff",
     "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
   },
   {
@@ -161,10 +145,6 @@
   },
   {
     "route": "/api/engineering/swarm/debates/[id]/synthesize",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
-    "route": "/api/engineering/bim/clashes/[id]/reroute",
     "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
   },
   {

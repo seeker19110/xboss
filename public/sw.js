@@ -3,7 +3,7 @@
 // Mất mạng (hầm, tầng kỹ thuật) vẫn xem được dữ liệu tracking đã tải lần cuối.
 // App Shell: precache /offline + asset tĩnh cốt lõi lúc cài đặt (M0) — trang HTML chưa
 // từng ghé mà mất mạng hoàn toàn sẽ thấy /offline thay vì lỗi mạng mặc định của trình duyệt.
-const CACHE = "xboss-v15";
+const CACHE = "xboss-v16";
 const SHELL_URLS = [
   "/offline",
   "/manifest.webmanifest",
@@ -107,10 +107,7 @@ self.addEventListener("fetch", (e) => {
   // Trừ: ảnh/tài liệu (cache riêng bởi browser), SSE /api/events (stream), /api/health
   // (uptime monitor cần kết quả ping DB thật mỗi lần, không phải bản cache cũ), và
   // /api/r/ + /api/qr/ (M58 PR1 — route điều hướng QR/tem in, luôn cần dữ liệu mới nhất,
-  // không được phục vụ bản cache cũ). Cụm plugin AutoCAD (/api/engineering/cad/*, module
-  // `cad-plugin` trong lib/nen/modules.ts): rule pack/thư viện block/kết quả bóc khối
-  // lượng đổi liên tục theo mỗi lần chuẩn hóa — phục vụ bản cache cũ khiến kỹ sư nạp
-  // nhầm rule pack lỗi thời hoặc tải nhầm file DWG/xlsx cũ.
+  // không được phục vụ bản cache cũ).
   if (url.pathname.startsWith("/api/")) {
     if (
       url.pathname.startsWith("/api/photos/") ||
@@ -121,8 +118,7 @@ self.addEventListener("fetch", (e) => {
       url.pathname.startsWith("/api/r/") ||
       url.pathname.startsWith("/api/qr/") ||
       url.pathname.startsWith("/api/system-uploads/") ||
-      url.pathname.startsWith("/api/systems/") ||
-      url.pathname.startsWith("/api/engineering/cad/")
+      url.pathname.startsWith("/api/systems/")
     )
       return;
     e.respondWith(

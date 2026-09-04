@@ -2,13 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { enqueueAsyncTask } from "@/lib/ky-thuat/engineering-task-queue";
-import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/dashboard";
 import { isContentTooLarge } from "@/lib/nen/photos";
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Trần dung lượng tệp bản vẽ/mô hình gửi vào hàng đợi tác vụ MEPF (150MB).
+ *
+ * Trước đây hằng này ở `lib/ky-thuat/cad/dashboard.ts`; module đó đã bị gỡ cùng cụm CAD/BIM nên
+ * chuyển về đúng nơi duy nhất còn dùng. Căn cứ giữ nguyên: bản vẽ MEPF thật của dự án đo được
+ * ~50MB (người dùng xác nhận 2026-08-24) nên để 3× dư địa — đây là van an toàn chống tràn bộ
+ * nhớ máy chủ, không phải chính sách nghiệp vụ.
+ */
+const GIOI_HAN_TEP_LON = 150 * 1024 * 1024;
 
 // POST /api/engineering/queue/upload
 // Tải lên tệp bản vẽ/dữ liệu kỹ thuật (DXF, IFC, JSON, XLSX...) và tự động đẩy vào hàng đợi tác vụ MEPF
@@ -22,10 +31,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Chặn sớm các file vượt giới hạn dung lượng ở mức header, trước khi đọc body
-  if (isContentTooLarge(req.headers.get("content-length"), GIOI_HAN_TEP_CAD)) {
+  if (isContentTooLarge(req.headers.get("content-length"), GIOI_HAN_TEP_LON)) {
     return NextResponse.json(
       {
-        error: `Tệp tin vượt quá dung lượng tối đa cho phép (${Math.floor(GIOI_HAN_TEP_CAD / (1024 * 1024))}MB)`,
+        error: `Tệp tin vượt quá dung lượng tối đa cho phép (${Math.floor(GIOI_HAN_TEP_LON / (1024 * 1024))}MB)`,
       },
       { status: 413 },
     );
@@ -55,11 +64,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Vui lòng chọn tệp tin cần tải lên" }, { status: 400 });
     }
 
-    // Tác vụ CAD dùng chung trần dung lượng với các route CAD khác (150MB, xem
-    // lib/ky-thuat/cad/dashboard.ts) — bản vẽ MEPF thật đo được tới ~65MB, vượt trần 50MB
-    // mặc định của route này. Tác vụ không phải CAD giữ nguyên trần 50MB cũ.
-    const isCadTask = taskType.startsWith("mepf.cad.");
-    const maxSize = isCadTask ? GIOI_HAN_TEP_CAD : 50 * 1024 * 1024;
+    // Tác vụ bản vẽ của worker MEPF dùng trần lớn (150MB) — bản vẽ MEPF thật đo được tới ~65MB,
+    // vượt trần 50MB mặc định của route này. Tác vụ còn lại giữ nguyên trần 50MB cũ.
+    const laTacVuBanVe = taskType.startsWith("mepf.cad.");
+    const maxSize = laTacVuBanVe ? GIOI_HAN_TEP_LON : 50 * 1024 * 1024;
     if (file.size > maxSize) {
       return NextResponse.json(
         {

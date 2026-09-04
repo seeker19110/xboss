@@ -3,29 +3,12 @@ name: Release
 on:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
-  # Đóng gói plugin AutoCAD KHÔNG chạy tự động theo tag — job `dong-goi-plugin` bên dưới đòi
-  # DLL Adapter đã build sẵn (xem lý do trong job đó) nên phải kích thủ công, cấp thêm run id.
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Tag GitHub Release đã tồn tại để đính gói plugin vào (vd v1.0.0)"
-        required: true
-        type: string
-      build_run_id:
-        description: >-
-          run id của 1 lần chạy workflow KHÁC (trên máy Windows có ObjectARX SDK 2026 hợp lệ,
-          vd self-hosted runner) đã dùng actions/upload-artifact để đăng artifact tên
-          'xboss-cad-acad-release' chứa toàn bộ nội dung XBoss.Cad.Acad/bin/Release sau khi
-          `dotnet build -c Release`. Repo hiện KHÔNG có runner như vậy — xem ghi chú trong job.
-        required: true
-        type: string
 
 permissions:
   contents: write
 
 jobs:
   github-release:
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Tạo GitHub Release
@@ -34,55 +17,3 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: gh release create "$TAG" --repo "$REPOSITORY" --verify-tag --generate-notes --title "$TAG"
-
-  # Đóng gói + đính gói cài plugin AutoCAD (.zip + .sha256) vào 1 Release đã có.
-  #
-  # ĐIỀU KIỆN CÒN THIẾU ĐỂ CHẠY TỰ ĐỘNG THEO TAG (ghi rõ, không bịa job xanh giả):
-  # XBoss.Cad.Acad (Adapter) chỉ build được khi có ObjectARX SDK 2026 của Autodesk
-  # (thư viện acdbmgd.dll/acmgd.dll/accoremgd.dll + AdWindows.dll — xem
-  # XBoss.Cad.Acad/XBoss.Cad.Acad.csproj, biến AcadSdkDir). SDK này:
-  #   - KHÔNG có trên NuGet công khai hay bất kỳ nguồn tải tự động nào;
-  #   - chỉ lấy được qua tài khoản Autodesk Developer Network đã đăng ký, hoặc từ máy có cài
-  #     AutoCAD 2026 thật (bản quyền);
-  #   - điều khoản cấp phép ObjectARX không cho phép đóng gói lại/tái phân phối SDK.
-  # → runner hosted của GitHub (windows-latest) KHÔNG có và KHÔNG được phép tự tải SDK này,
-  #   nên job `plugin`/`plugin_shim` trong ci.yml chỉ build Core/Tests + biên dịch thử bằng
-  #   stub, KHÔNG build Adapter thật (xem comment trong ci.yml). Cách hợp pháp duy nhất để có
-  #   DLL Adapter build sẵn là build tay/qua self-hosted runner có bản quyền AutoCAD 2026 rồi
-  #   đăng artifact 'xboss-cad-acad-release' — job này chỉ ĐÓNG GÓI từ artifact đó, không build.
-  #
-  # Cách phát hành thật khi đã có artifact:
-  #   1. Trên máy Windows có AutoCAD 2026/ObjectARX SDK: chạy workflow riêng (hoặc tay) build
-  #      Release rồi `actions/upload-artifact@v4` thư mục XBoss.Cad.Acad/bin/Release với tên
-  #      'xboss-cad-acad-release'. Ghi lại run id của lần chạy đó.
-  #   2. Đảm bảo tag Release đích đã tồn tại (job github-release ở trên, hoặc `gh release
-  #      create` tay).
-  #   3. Chạy workflow này bằng workflow_dispatch, điền `tag` + `build_run_id`.
-  #   4. Sau khi chạy xong: đặt XBOSS_PLUGIN_URL trỏ tới asset .zip vừa đính, dạng
-  #      https://github.com/<owner>/<repo>/releases/download/<tag>/XBoss.bundle-<version>.zip
-  #      (đọc từ .env.local / biến môi trường server, xem CLAUDE.md mục "Biến môi trường").
-  dong-goi-plugin:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Tải artifact DLL Adapter đã build sẵn
-        uses: actions/download-artifact@v8
-        with:
-          name: xboss-cad-acad-release
-          path: plugin-autocad/XBoss.Cad.Acad/bin/Release
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.build_run_id }}
-
-      - name: Đóng gói (bỏ qua build — dùng DLL đã tải)
-        shell: pwsh
-        run: plugin-autocad/dong-goi.ps1 -ChiDongGoi -BoQuaBuild
-
-      - name: Đính gói vào GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          TAG: ${{ inputs.tag }}
-        shell: bash
-        run: gh release upload "$TAG" dist/*.zip dist/*.zip.sha256 --repo "$REPOSITORY" --clobber

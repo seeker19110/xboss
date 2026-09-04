@@ -1,5 +1,20 @@
 # Bộ đặc tả nâng cấp XBoss — theo nhóm module (đã triển khai xong M0–M52)
 
+> ## ⛔ ĐÃ GỠ KHỎI SẢN PHẨM — toàn bộ cụm CAD/BIM (2026-09-04, đợt 3)
+>
+> Cụm CAD/BIM/Digital-Twin và plugin AutoCAD **không còn trong codebase**. Các tệp đặc tả sau đã
+> bị xoá cùng đợt, **mọi mục nhắc tới chúng ở dưới chỉ còn giá trị lịch sử**, không mô tả tính
+> năng đang chạy:
+>
+> - Plugin AutoCAD giai đoạn 1–3: `M99` … `M119`, `M98` (DXF R2000/DWG), `M102-plugin-ui.md`.
+> - CAD/QTO/BIM/Twin: `M65` (CAD engineering skills), `M66` (CAD 5D QTO tracking),
+>   `M70` (Scan-to-BIM closed loop), `M77` (auto-routing & beam sleeve), `M96` (God-Tier
+>   CAD/BIM apex), `OS-2` (Digital Twin), `RESEARCH-CAD-QTO-TRACKING.md`,
+>   `RESEARCH-AUTO-ROUTING-MEPF.md`.
+>
+> Migration của cụm này **giữ nguyên** (`migrations/` là append-only): bảng còn đó nhưng không
+> còn mã ứng dụng nào đọc/ghi. Chi tiết những gì đã xoá: xem `PROGRESS.md`.
+
 > **Trạng thái (cập nhật 2026-07-18): ĐÃ TRIỂN KHAI XONG M0–M52 (đợt "lên tầm ERP" P0–P2) + M56 (TOTP self-service PR1 + bắt buộc 2FA theo vai trò PR2).** File `M<xx>-*.md` gốc của M0–M42 (viết TRƯỚC khi code, dùng để giao việc subagent) đã được **gộp theo nhóm nghiệp vụ** thành các file `G<nn>-*.md` dưới đây — cô đọng còn lại phần tra cứu (schema/API/quyết định), bỏ phần "Chia PR"/kế hoạch giao việc không còn cần thiết sau khi đã code xong. Đặc tả M43–M52 giữ nguyên file `M<xx>-*.md` (chưa gộp). Lịch sử PR/quyết định chi tiết từng đợt vẫn nằm ở `PROGRESS.md`.
 >
 > **Cập nhật 2026-08-30 (rà lại code thật):** toàn bộ hàng đợi của bảng "Đặc tả chờ triển khai" bên dưới nay **đã xong** — M53 (4 PR), M54 GĐ1 (4 PR, `migrations/0078_org_axis.sql` + `0080_org_rls.sql` + `lib/nen/storage.ts` + `orgId` trong token phiên), M55, M56 (2 PR), M57 (PR1+PR2), M58 (3 PR), M59, M61, M62, M63, M64, M51 GĐ0. **Không còn mục nào ở trạng thái "chưa triển khai"** trong bảng đó; phần còn nợ là việc **vận hành**, không phải code (khoá cửa RLS org sau khi theo dõi production, chạy script di trú `data/uploads/` → MinIO/S3). Một số việc **hoãn có chủ đích** (M49 PR3 SSO OIDC merge nhưng flag tắt, M60 major deps) — xem `PROGRESS.md` mục "Việc tạm hoãn".

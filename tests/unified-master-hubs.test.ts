@@ -10,15 +10,14 @@ import {
   type DashNode,
 } from "@/app/lib/dashboardTree";
 
-test("Unified Master Hubs: DASHBOARD_TREE chứa cụm 7 Đại Trung Tâm Điều Hành Hợp Nhất", () => {
+test("Unified Master Hubs: DASHBOARD_TREE chứa cụm 6 Đại Trung Tâm Điều Hành Hợp Nhất", () => {
   const hubsCluster = DASHBOARD_TREE.find(
-    (c) => c.label === "🏛️ 7 Đại Trung Tâm Điều Hành (Unified Hubs)",
+    (c) => c.label === "🏛️ 6 Đại Trung Tâm Điều Hành (Unified Hubs)",
   );
-  assert.ok(hubsCluster, "Phải có cụm 7 Đại Trung Tâm Điều Hành trên Sidebar AppShell");
-  assert.equal(hubsCluster.dashboards.length, 7, "Cụm phải có đúng 7 Đại Trung Tâm Điều Hành");
+  assert.ok(hubsCluster, "Phải có cụm 6 Đại Trung Tâm Điều Hành trên Sidebar AppShell");
+  assert.equal(hubsCluster.dashboards.length, 6, "Cụm phải có đúng 6 Đại Trung Tâm Điều Hành");
 
   const expectedHubs = [
-    { href: "/engineering/god-tier-studio", label: "MEPF CAD/BIM Studio" },
     { href: "/site", label: "Chỉ Huy Tác Nghiệp Hiện Trường & HSE" },
     { href: "/schedule", label: "Quản Trị Kế Hoạch & Tiến Độ WBS" },
     { href: "/procurement", label: "Chuỗi Cung Ứng, Mua Sắm & Kho Vận" },
@@ -37,9 +36,8 @@ test("Unified Master Hubs: DASHBOARD_TREE chứa cụm 7 Đại Trung Tâm Đi�
   }
 });
 
-test("Unified Master Hubs: findActiveNav định tuyến chính xác cho cả 7 Đại Trung Tâm", () => {
+test("Unified Master Hubs: findActiveNav định tuyến chính xác cho cả 6 Đại Trung Tâm", () => {
   const hubPaths = [
-    { path: "/engineering/god-tier-studio", expectedLabel: "MEPF CAD/BIM Studio" },
     { path: "/site", expectedLabel: "Chỉ Huy Tác Nghiệp Hiện Trường & HSE" },
     { path: "/schedule", expectedLabel: "Quản Trị Kế Hoạch & Tiến Độ WBS" },
     { path: "/procurement", expectedLabel: "Chuỗi Cung Ứng, Mua Sắm & Kho Vận" },
@@ -55,28 +53,27 @@ test("Unified Master Hubs: findActiveNav định tuyến chính xác cho cả 7 
   }
 });
 
-test("Unified Master Hubs: resolveVisibleTree hiển thị đầy đủ 7 Hubs cho mọi vai trò", () => {
+test("Unified Master Hubs: resolveVisibleTree hiển thị đầy đủ 6 Hubs cho mọi vai trò", () => {
   const roles = ["admin", "pm", "engineer", "subcon", "bch", "cdt", "viewer"] as const;
   const emptySettings = new Map<string, boolean>();
 
   for (const role of roles) {
     const visibleTree = resolveVisibleTree(DASHBOARD_TREE, role, emptySettings);
     const hubsCluster = visibleTree.find(
-      (c) => c.label === "🏛️ 7 Đại Trung Tâm Điều Hành (Unified Hubs)",
+      (c) => c.label === "🏛️ 6 Đại Trung Tâm Điều Hành (Unified Hubs)",
     );
-    assert.ok(hubsCluster, `Vai trò ${role} phải thấy cụm 7 Đại Trung Tâm Điều Hành`);
+    assert.ok(hubsCluster, `Vai trò ${role} phải thấy cụm 6 Đại Trung Tâm Điều Hành`);
     assert.equal(
       hubsCluster?.dashboards.length,
-      7,
-      `Vai trò ${role} phải thấy đủ 7 Đại Trung Tâm Điều Hành`,
+      6,
+      `Vai trò ${role} phải thấy đủ 6 Đại Trung Tâm Điều Hành`,
     );
   }
 });
 
-test("Unified Master Hubs: flattenDashboards bao gồm đầy đủ 7 Hubs", () => {
+test("Unified Master Hubs: flattenDashboards bao gồm đầy đủ 6 Hubs", () => {
   const flat = flattenDashboards();
   const hubIds = [
-    "dash.mepf-cad-bim-studio",
     "dash.site-command",
     "dash.schedule-control",
     "dash.procurement-hub",

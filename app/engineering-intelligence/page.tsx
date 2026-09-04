@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   Zap,
   Activity,
-  Radio,
   Sparkles,
   ArrowUpRight,
   Send,
@@ -346,19 +345,19 @@ function EngineeringIntelligenceContent() {
     </div>
   );
 
-  // Tab 5: Living Digital Twin & IoT Telemetry
-  const digitalTwinTab = (
+  // Tab 5: IoT Telemetry & Bảo trì dự báo
+  const iotTelemetryTab = (
     <div className="space-y-4">
       <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
               <Cpu className="w-4 h-4 text-amber-400" />
-              Living Digital Twin (L0-L6), IoT Telemetry & Bảo Trì Dự Báo
+              IoT Telemetry & Bảo Trì Dự Báo
             </h3>
             <p className="text-xs text-zinc-400 mt-1">
-              Mô hình tài sản số LOD 500, tiếp nhận luồng cảm biến IoT thời gian thực và thuật toán
-              Weibull tính toán MTBF/RUL dự báo hư hỏng sớm.
+              Tiếp nhận luồng cảm biến IoT thời gian thực và thuật toán Weibull tính toán MTBF/RUL
+              dự báo hư hỏng sớm.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -367,18 +366,6 @@ function EngineeringIntelligenceContent() {
               className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
             >
               <Activity className="w-3.5 h-3.5" /> IoT Telemetry (M83)
-            </Link>
-            <Link
-              href="/engineering/twin"
-              className="px-3.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs border border-zinc-700 transition-colors flex items-center gap-1.5"
-            >
-              <Radio className="w-3.5 h-3.5" /> Digital Twin (L0-L3)
-            </Link>
-            <Link
-              href="/engineering/reality"
-              className="px-3.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs border border-zinc-700 transition-colors flex items-center gap-1.5"
-            >
-              Living Twin (L4-L6)
             </Link>
           </div>
         </div>
@@ -454,20 +441,19 @@ function EngineeringIntelligenceContent() {
       content: autonomyDataTab,
     },
     {
-      id: "digital-twin",
-      label: "Digital Twin & IoT",
+      id: "iot-telemetry",
+      label: "IoT & Bảo trì dự báo",
       icon: Cpu,
       badge: "LOD 500",
-      description:
-        "Mô hình tài sản số Living Twin, cảm biến IoT Telemetry và dự báo hỏng hóc thiết bị MTBF/RUL.",
-      content: digitalTwinTab,
+      description: "Cảm biến IoT Telemetry và dự báo hỏng hóc thiết bị MTBF/RUL.",
+      content: iotTelemetryTab,
     },
   ];
 
   return (
     <HubShell
-      title="Trung Tâm Trí Tuệ Kỹ Thuật AI & Digital Twin"
-      subtitle="Phân hệ hợp nhất 19 công cụ Trợ lý Copilot, Thẩm định Gate 0, AI Swarm, Digital Twin và IoT Telemetry"
+      title="Trung Tâm Trí Tuệ Kỹ Thuật AI"
+      subtitle="Phân hệ hợp nhất Trợ lý Copilot, Thẩm định Gate 0, AI Swarm và IoT Telemetry"
       icon={Brain}
       badge="Engineering Intelligence"
       tabs={tabs}

@@ -2,8 +2,8 @@
 //
 // VÌ SAO: audit 2026-08-25 (docs/audit-2026-08-25-tinh-nang-theo-vong-doi.md §3.5) đếm được
 // 25 trong 505 route API mà không một dòng mã nào trong repo gọi tới. Phần lớn KHÔNG phải
-// rác — cron gọi từ ngoài, API mở /api/v1 cho hệ ngoài, endpoint plugin AutoCAD gọi bằng
-// C# — nên script này KHÔNG đòi xoá; nó chỉ chặn tập đó **phình thêm** trong im lặng.
+// rác — cron gọi từ ngoài, API mở /api/v1 cho hệ ngoài — nên script này KHÔNG đòi xoá; nó
+// chỉ chặn tập đó **phình thêm** trong im lặng.
 //
 // `check:dead-code` không thay được: nó dựng đồ thị import, mà route handler luôn là
 // entrypoint của Next (không ai import) nên với nó route nào cũng "sống".
@@ -18,20 +18,9 @@ import { execFileSync } from "node:child_process";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-// Nơi một lời gọi route có thể nằm: mã app/lib, script, test, e2e, plugin AutoCAD (C#),
-// worker, service worker và proxy. KHÔNG tính tài liệu (.md) — nhắc trong tài liệu không
-// phải là lời gọi.
-const CALLER_DIRS = [
-  "app",
-  "lib",
-  "scripts",
-  "e2e",
-  "tests",
-  "plugin-autocad",
-  "mepf-worker",
-  "public",
-  "proxy.ts",
-];
+// Nơi một lời gọi route có thể nằm: mã app/lib, script, test, e2e, worker, service worker
+// và proxy. KHÔNG tính tài liệu (.md) — nhắc trong tài liệu không phải là lời gọi.
+const CALLER_DIRS = ["app", "lib", "scripts", "e2e", "tests", "mepf-worker", "public", "proxy.ts"];
 /** Chính file allowlist nằm trong `scripts/` nên nó khớp mọi route được khai trong đó —
  *  không tính là người gọi, nếu không mỗi mục allowlist tự làm route của nó "sống". */
 const NOT_A_CALLER = "scripts/dead-routes-allowlist.json";

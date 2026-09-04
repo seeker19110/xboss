@@ -12,7 +12,7 @@
 // gửi — nhiều chỗ còn đưa chính giá trị đó vào `withProjectScope` nên RLS coi như được hợp
 // thức hoá. Trái quy ước ghi ngay đầu `lib/ha-tang/projects.ts`: "Route KHÔNG tin project_id
 // client gửi qua body/query". Cùng lớp lỗi đã xảy ra thật ở /api/payment-certs và
-// /api/engineering/cad/save-drawing.
+// /api/engineering/queue/upload.
 //
 // Heuristic TĨNH (đọc source, không cần DB): file route chứa `body.projectId`,
 // `formData.get("projectId")` hoặc `searchParams.get("projectId")` PHẢI đồng thời chốt giá trị

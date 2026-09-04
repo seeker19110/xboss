@@ -25,8 +25,6 @@ const WHITELIST: Record<string, string> = {
   projects: "danh sách dự án — bản thân là nguồn của project_id",
   users: "danh bạ người dùng dùng chung mọi dự án",
   "auth/totp": "trạng thái 2FA của user hiện tại (theo user_id, không theo dự án)",
-  tokens:
-    "token thiết bị AutoCAD của chính user (M99 PR2 — scope theo created_by + org_id, không theo dự án)",
   suppliers: "danh mục NCC dùng chung mọi dự án",
   "ui-texts": "nhãn UI cấu hình toàn hệ",
   "notifications/prefs": "tuỳ chọn thông báo theo người dùng, không theo dự án",
@@ -63,7 +61,6 @@ const WHITELIST: Record<string, string> = {
   "suppliers/[id]/summary": "tổng hợp theo supplier id",
   "work-fronts/[id]/documents": "scope theo work-front id",
   "engineering/queue/tasks/[id]/progress": "scope theo async task id (UUID)",
-  "engineering/cad/plugin-upload/[jobId]": "job scope theo created_by = chính người gọi (M99 PR5)",
 
   // --- Dữ liệu tracking gắn sheet_types (chưa tách project_id — nợ đa dự án đã biết) ---
   tasks: "lưới tracking scope theo sheet (?sheet=slug), nợ đa dự án đã biết",
