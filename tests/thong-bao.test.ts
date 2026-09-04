@@ -46,10 +46,11 @@ async function mkUser(role: Role): Promise<TestUser> {
   return { id, name: `${PFX} ${role}`, email, role, orgId: 0 };
 }
 
-// Gọi syncAndListNotifications bọc trong ngữ cảnh request đã có sẵn projectId — bắt buộc
-// vì design_change_pending/claim_pending gọi getCurrentProjectId(user), hàm này đọc
-// cookies() thật nếu request-context CHƯA có projectId cache sẵn (throw ngoài request
-// Next.js thật). Truyền cache sẵn thì hàm trả ngay, không đụng cookies().
+// Gọi syncAndListNotifications bọc trong ngữ cảnh request cho giống đường chạy thật.
+// (Trước đây bọc là BẮT BUỘC: hai khối design_change_pending/claim_pending tự gọi
+// getCurrentProjectId(user) → đọc cookies() → throw ngoài request Next.js thật. Lỗi đó đã
+// được sửa cùng đợt này — cả hai nay dùng `projectId` nhận từ tham số — và ca cuối file
+// khoá lại điều đó bằng cách gọi KHÔNG có ngữ cảnh nào.)
 async function sync(user: TestUser, limit = 200) {
   const { syncAndListNotifications } = await import("@/lib/dich-vu/thong-bao");
   const { runWithRequestContext } = await import("@/lib/nen/request-context");
@@ -1844,5 +1845,21 @@ test(
     );
     await run(`DELETE FROM notifications WHERE task_id = ANY(?)`, taskIds);
     await run(`DELETE FROM tasks WHERE id = ANY(?)`, taskIds);
+  },
+);
+
+test(
+  "Gọi được NGOÀI request scope: admin, chưa chọn dự án — không đọc cookie, không ném lỗi",
+  S,
+  async () => {
+    // Hai khối design_change_pending/claim_pending từng tự gọi getCurrentProjectId(user),
+    // khai biến cùng tên che mất tham số `projectId` của hàm. Hệ quả: mọi lời gọi từ ngoài
+    // request Next.js (cron, script) đều chết tại đó, và nếu người gọi truyền một dự án
+    // khác với dự án trong cookie thì đúng hai khối đó lọc sai dự án. Ca này chạy KHÔNG bọc
+    // runWithRequestContext và với projectId = null — đường mà bản cũ chắc chắn ném lỗi.
+    const { syncAndListNotifications } = await import("@/lib/dich-vu/thong-bao");
+    const kq = await syncAndListNotifications(users.admin, null, 5);
+    assert.ok(Array.isArray(kq.notifications));
+    assert.equal(typeof kq.unread, "number");
   },
 );

@@ -30,7 +30,6 @@ import { alarmingPoints } from "@/lib/hien-truong/monitoring";
 import { overduePunch } from "@/lib/hien-truong/handover";
 import { expiringWarranties, overdueClaims } from "@/lib/hien-truong/warranty";
 import { advanceOverdueList, ADVANCE_OVERDUE_DAYS } from "@/lib/tai-chinh/finance";
-import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { EXPIRY_WARN_DAYS } from "@/lib/tai-chinh/contracts";
 import { CERT_PENDING_DAYS } from "@/lib/tai-chinh/paymentcerts";
 import { VO_PENDING_DAYS } from "@/lib/tai-chinh/vo";
@@ -57,6 +56,11 @@ export async function syncAndListNotifications(
   projectId: number | null,
   limit: number,
 ) {
+  // MỌI khối bên dưới phải lọc theo `projectId` NHẬN TỪ THAM SỐ. Trước đây hai khối
+  // (`design_change_pending`, `claim_pending`) tự gọi `getCurrentProjectId(user)` và khai
+  // biến cùng tên che mất tham số — ba hệ quả: đọc cookie thừa mỗi lần đồng bộ; hàm không
+  // gọi được ngoài request scope của Next (cron/script sẽ throw ngay tại đó); và nếu người
+  // gọi truyền một dự án khác với dự án trong cookie thì đúng hai khối này lọc sai dự án.
   const today = todayISO();
 
   // Task đang trễ mà user này chưa có thông báo → tạo mới (UNIQUE chặn trùng).
@@ -624,7 +628,6 @@ export async function syncAndListNotifications(
 
   // Thay đổi thiết kế đã trình quá hạn chưa được quyết định → nhắc Admin/PM (M32).
   if (isAdminOrPm(user.role)) {
-    const projectId = await getCurrentProjectId(user);
     const pendingDc = await pendingDesignChanges(undefined, projectId);
     if (pendingDc.length > 0) {
       const values = pendingDc.map(() => `(?, ?, 'design_change_pending', ?)`).join(", ");
@@ -651,7 +654,6 @@ export async function syncAndListNotifications(
 
   // Claim chi phí/EOT đang mở quá hạn xử lý → nhắc Admin/PM (M34, mirror vo_pending).
   if (isAdminOrPm(user.role)) {
-    const projectId = await getCurrentProjectId(user);
     const pendingClaimsList = await pendingClaims(undefined, projectId);
     if (pendingClaimsList.length > 0) {
       const values = pendingClaimsList.map(() => `(?, ?, 'claim_pending', ?)`).join(", ");
