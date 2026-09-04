@@ -21,6 +21,7 @@
 import { readFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import { cpus } from "node:os";
+import { CO_MOCK_MODULE } from "./test-flags.mjs";
 
 /** File có chạm DB không — quyết định gộp chung tiến trình hay tách riêng + cấp DB riêng. */
 function chamDb(file) {
@@ -82,7 +83,12 @@ export async function chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua }) {
   // Không có DB → mọi test tích hợp tự skip (tests/setup.ts). Gộp TẤT CẢ vào 1 tiến trình:
   // nhanh nhất và không có rủi ro gì vì chẳng file nào chạm DB thật.
   if (!baseUrl) {
-    const { out, status } = chayDongBo([`--import=${tsxLoader}`, "--test", ...files]);
+    const { out, status } = chayDongBo([
+      CO_MOCK_MODULE,
+      `--import=${tsxLoader}`,
+      "--test",
+      ...files,
+    ]);
     thuKetQua(`${files.length} file (không có TEST_DATABASE_URL — gộp 1 tiến trình)`, out, status);
     return;
   }
@@ -92,7 +98,12 @@ export async function chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua }) {
 
   // --- Nhóm thuần: 1 tiến trình cho tất cả ---
   if (fileThuan.length) {
-    const { out, status } = chayDongBo([`--import=${tsxLoader}`, "--test", ...fileThuan]);
+    const { out, status } = chayDongBo([
+      CO_MOCK_MODULE,
+      `--import=${tsxLoader}`,
+      "--test",
+      ...fileThuan,
+    ]);
     thuKetQua(`${fileThuan.length} file không chạm DB (gộp 1 tiến trình)`, out, status);
   }
 
@@ -136,12 +147,15 @@ export async function chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua }) {
       const k = idx++;
       if (k >= fileDb.length) return;
       const file = fileDb[k];
-      const { out, status } = await chayBatDongBo([`--import=${tsxLoader}`, "--test", file], {
-        TEST_DATABASE_URL: url,
-        DATABASE_URL: url,
-        // N worker × pool mặc định 10 sẽ vượt max_connections (mặc định 100). Ghim thấp.
-        XBOSS_PG_POOL_MAX: process.env.XBOSS_PG_POOL_MAX ?? "3",
-      });
+      const { out, status } = await chayBatDongBo(
+        [CO_MOCK_MODULE, `--import=${tsxLoader}`, "--test", file],
+        {
+          TEST_DATABASE_URL: url,
+          DATABASE_URL: url,
+          // N worker × pool mặc định 10 sẽ vượt max_connections (mặc định 100). Ghim thấp.
+          XBOSS_PG_POOL_MAX: process.env.XBOSS_PG_POOL_MAX ?? "3",
+        },
+      );
       ketQua[k] = { file, out, status };
     }
   }

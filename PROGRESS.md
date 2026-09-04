@@ -1,5 +1,71 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Đợt 1 chiến dịch coverage — phủ 9 module lib/ chưa từng có test (2026-09-04)
+
+Mục tiêu người dùng chốt: nâng coverage lên 100%, **trừ** các tính năng AutoCAD/Revit; làm dần
+theo đợt, `lib/` trước.
+
+**Hiện trạng đo được trước khi bắt tay** (quan trọng, vì nó giải thích vì sao con số cũ trông đẹp
+hơn thực tế): phạm vi đo là `lib/**` + `app/api/**` = **728 file** (trừ CAD/BIM còn 660), nhưng mốc
+chỉ có **202–229 file**. Chênh lệch không phải do file được miễn — mà do **file nào không có test
+nào chạm tới thì không xuất hiện trong bảng coverage**, nên không kéo trung bình xuống. Trong
+`lib/` (ngoài CAD/BIM) có 13 file như vậy.
+
+**Đã phủ (9 module, tất cả đạt lines 100%)**
+
+| Module                                       | lines | branches | funcs |
+| -------------------------------------------- | ----- | -------- | ----- |
+| `dich-vu/thong-bao.ts` (1134 dòng)           | 100   | 92.25    | 98.99 |
+| `tai-chinh/contracts-fidic.ts`               | 100   | 95.12    | 95.45 |
+| `ky-thuat/drawings-scan.ts`                  | 100   | 96.63    | 90.91 |
+| `ky-thuat/engineering-swarm-orchestrator.ts` | 100   | 90.63    | 93.75 |
+| `ky-thuat/engineering-closed-loop-sync.ts`   | 100   | 88.89    | 80.00 |
+| `bao-mat/merkle-audit-ledger.ts`             | 100   | 95.31    | 95.00 |
+| `vat-tu/google-sheets.ts`                    | 100   | 97.56    | 92.86 |
+| `van-hanh/push.ts`                           | 100   | 84.00    | 90.00 |
+| `nen/escape.ts`                              | 100   | 83.33    | 75.00 |
+
+Tổng: **229 file / 86.90% lines → 232 file / 88.09% lines**; 1592 → **1741 ca test**.
+
+**3 BUG THẬT lộ ra nhờ viết test cho code chưa ai chạm** (đều đã sửa cùng đợt):
+
+1. `engineering-closed-loop-sync.ts` — `UPDATE tasks` tham chiếu hai cột KHÔNG TỒN TẠI
+   (`tasks.progress`, `tasks.project_id`). Nhánh đồng bộ tiến độ WBS luôn ném lỗi. Sửa kèm cả
+   thang đo (0..1, không phải 0..100) và enum slug (`hoan_thanh`/`dang_thi_cong`, không phải
+   `done`/`in_progress`), giữ `nghiem_thu` không bị hạ cấp, kiểm phạm vi dự án bằng JOIN.
+2. `engineering-closed-loop-sync.ts` — `listClosedLoopSyncLogs` truyền `[projectId]` vào
+   `query(sql, ...params)` (rest) → `$1` nhận mảng Postgres, câu SELECT luôn lỗi. Hai lỗi này
+   làm **route `/api/engineering/closed-loop-sync` hỏng ở cả GET lẫn POST**.
+3. `dich-vu/thong-bao.ts` — hai khối `design_change_pending`/`claim_pending` tự gọi
+   `getCurrentProjectId(user)` và khai biến che mất tham số `projectId`: đọc cookie thừa, hàm
+   không gọi được ngoài request scope (cron/script throw), và lọc sai dự án nếu người gọi truyền
+   dự án khác. Sửa xong, branch của module lên 92.25% (từ 79.84%) vì nhánh "chưa chọn dự án"
+   trước đó không thể chạm tới.
+
+Ngoài ra `tests/engineering-closed-loop-sync.test.ts` cũ là **test giả**: tự tính lại công thức
+sha256 mà không hề import module. Đã thay bằng test thật.
+
+**Hạ tầng**: bật `--experimental-test-module-mocks` cho mọi tiến trình test
+(`scripts/test-flags.mjs`) — cần vì `google-auth-library` đi thẳng ra mạng bằng http của Node,
+không qua `fetch` toàn cục.
+
+**TRẦN ĐO LƯỜNG — 100% cả ba chỉ số là KHÔNG đạt được với công cụ hiện tại.** Bằng chứng: cùng một
+logic và cùng bộ test, file JS thuần cho **100/100/100**, còn TS qua `tsx` chỉ **100/83.33/75**
+(`nen/escape.ts` — 15 dòng, một hàm, đã test kiệt mọi đầu vào). Coverage của `node:test` đếm cả
+nhánh/hàm do trình biên dịch sinh ra. Vì vậy mục tiêu thực tế của các đợt sau là **lines 100%,
+branches/funcs đẩy cao nhất có thể**. Muốn số thật cho cả ba phải đổi sang c8 — trái với ghi chú
+cố ý không thêm công cụ ngoài trong `scripts/coverage-summary.mjs`.
+
+**Còn nợ của đợt này:** `tai-chinh/contracts-fidic.ts` có một nhánh `createFidicClaim` (dạng tham
+số vị trí) là **code chết** tham chiếu 5 cột không tồn tại trong `engineering_fidic_claims`; test
+đang ghim đúng hành vi "luôn ném lỗi". Sửa cần quyết định: xoá nhánh, hay bổ sung cột.
+
+**Loại khỏi phạm vi (AutoCAD/Revit)**: `joint-segmentation-store.ts` (M105 plugin AutoCAD),
+`engineering-god-tier-db.ts` (M96 CAD/BIM), `engineering-dfma-spooling.ts` (bóc tách từ CAD).
+
+**Đợt sau**: `app/api/**` — khoảng 430 route chưa có test nào chạm tới, là phần lớn khoảng cách
+giữa 232 file đang đo và 660 file trong phạm vi.
+
 ## ✅ Bọc ngữ cảnh dự án cho mảng kế hoạch/mặt trận + vá 2 lỗ hổng phạm vi tài liệu (2026-09-04)
 
 Trả **phần đầu** nợ "khoá cửa RLS" của M123. Khảo sát trước khi viết migration cho thấy **không
