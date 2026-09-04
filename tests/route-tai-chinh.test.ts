@@ -14,6 +14,27 @@ import { NextRequest } from "next/server";
 //   - app/api/variations/[id]/decide/route.ts    (POST quyết định VO)
 
 const S = { skip: !HAS_TEST_DB };
+
+// PHỤ THUỘC CHÉO GIỮA CÁC FILE TEST — đã dính thật: `visibleProjectIds` (lib/ha-tang/projects.ts)
+// chỉ trả "mọi dự án" khi bảng `user_projects` RỖNG; hễ bảng đó có dòng thì user không được gán
+// sẽ không thấy dự án nào, và route trả "Hợp đồng không tồn tại" thay vì lỗi nghiệp vụ đang kiểm.
+// Nhiều file test khác chèn `user_projects` mà không dọn, nên file này xanh khi chạy riêng và đỏ
+// trong bộ đầy đủ. Thay vì phụ thuộc vào trạng thái toàn cục đó, mỗi user ở đây được GÁN THẲNG
+// vào dự án của nó (dangNhapDuAn) — test tự chủ, chạy đúng ở mọi thứ tự.
+async function dangNhapDuAn(
+  user: { id: number; passwordHash: string },
+  projectId: number | null,
+): Promise<void> {
+  if (projectId != null) {
+    const { run } = await import("@/lib/db");
+    await run(
+      `INSERT INTO user_projects (user_id, project_id) VALUES (?, ?) ON CONFLICT DO NOTHING`,
+      user.id,
+      projectId,
+    );
+  }
+  dangNhap(user, projectId);
+}
 const RUN = Date.now().toString(36);
 let seq = 0;
 /** Hậu tố tăng dần trong 1 lần chạy — chống trùng mã/email khi nhiều test tạo dữ liệu. */
@@ -114,7 +135,7 @@ test("GET /api/payment-certs: vai trò không xem được thanh toán (engineer
   // của cụm tài chính: phải bị chặn TỪ SERVER, không chỉ ẩn trên UI.
   const projectId = await taoDuAn("eng403");
   const eng = await taoUser("engineer", "eng403");
-  dangNhap(eng, projectId);
+  await dangNhapDuAn(eng, projectId);
   const { GET } = await import("@/app/api/payment-certs/route");
   const res = await GET(jreq("/api/payment-certs?contractId=1", undefined, "GET"));
   assert.equal(res.status, 403);
@@ -124,7 +145,7 @@ test("GET /api/payment-certs: vai trò không xem được thanh toán (engineer
 test("GET /api/payment-certs: thiếu contractId → 422", S, async () => {
   const projectId = await taoDuAn("noct");
   const pm = await taoUser("pm", "noct");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/payment-certs/route");
   const res = await GET(jreq("/api/payment-certs", undefined, "GET"));
   assert.equal(res.status, 422);
@@ -135,7 +156,7 @@ test("GET /api/payment-certs: hợp đồng thuộc dự án KHÁC → 422 (các
   const projectB = await taoDuAn("ipcB");
   const contractB = await taoHopDong(projectB, "ipcB");
   const pmA = await taoUser("pm", "ipcA");
-  dangNhap(pmA, projectA);
+  await dangNhapDuAn(pmA, projectA);
   const { GET } = await import("@/app/api/payment-certs/route");
   const res = await GET(jreq(`/api/payment-certs?contractId=${contractB}`, undefined, "GET"));
   assert.equal(res.status, 422);
@@ -152,7 +173,7 @@ test("POST /api/payment-certs: chưa đăng nhập → 401", S, async () => {
 test("POST /api/payment-certs: vai trò không được lập đợt (engineer) → 403", S, async () => {
   const projectId = await taoDuAn("post403");
   const eng = await taoUser("engineer", "post403");
-  dangNhap(eng, projectId);
+  await dangNhapDuAn(eng, projectId);
   const { POST } = await import("@/app/api/payment-certs/route");
   const res = await POST(jreq("/api/payment-certs", { contractId: 1 }));
   assert.equal(res.status, 403);
@@ -162,7 +183,7 @@ test("POST /api/payment-certs: vai trò không được lập đợt (engineer) 
 test("POST /api/payment-certs: thiếu contractId → 422", S, async () => {
   const projectId = await taoDuAn("nocid");
   const pm = await taoUser("pm", "nocid");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/payment-certs/route");
   const res = await POST(jreq("/api/payment-certs", {}));
   assert.equal(res.status, 422);
@@ -173,7 +194,7 @@ test("POST /api/payment-certs: hợp đồng thuộc dự án khác → 422", S,
   const projectB = await taoDuAn("crossB");
   const contractB = await taoHopDong(projectB, "crossB");
   const pmA = await taoUser("pm", "crossA");
-  dangNhap(pmA, projectA);
+  await dangNhapDuAn(pmA, projectA);
   const { POST } = await import("@/app/api/payment-certs/route");
   const res = await POST(jreq("/api/payment-certs", { contractId: contractB }));
   assert.equal(res.status, 422);
@@ -187,7 +208,7 @@ test(
     const projectId = await taoDuAn("noboq");
     const pm = await taoUser("pm", "noboq");
     const contractId = await taoHopDong(projectId, "noboq");
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/payment-certs/route");
     const res = await POST(jreq("/api/payment-certs", { contractId }));
     assert.equal(res.status, 422);
@@ -203,7 +224,7 @@ test(
     const pm = await taoUser("pm", "2dot");
     const contractId = await taoHopDong(projectId, "2dot");
     await taoBoqItem(contractId, "2dot");
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { POST, GET } = await import("@/app/api/payment-certs/route");
 
     const dot1 = await POST(jreq("/api/payment-certs", { contractId, periodLabel: "Đợt 1" }));
@@ -231,7 +252,7 @@ test(
     const projectId = await taoDuAn("isolist");
     const pm = await taoUser("pm", "isolist");
     const contractId = await taoHopDong(projectId, "isolist");
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { GET } = await import("@/app/api/payment-certs/route");
     const res = await GET(jreq(`/api/payment-certs?contractId=${contractId}`, undefined, "GET"));
     assert.equal(res.status, 200);
@@ -253,7 +274,7 @@ test("GET /api/payment-certs/:id: chưa đăng nhập → 401", S, async () => {
 test("GET /api/payment-certs/:id: engineer không có quyền xem → 403", S, async () => {
   const projectId = await taoDuAn("g403");
   const eng = await taoUser("engineer", "g403");
-  dangNhap(eng, projectId);
+  await dangNhapDuAn(eng, projectId);
   const { GET } = await import("@/app/api/payment-certs/[id]/route");
   const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: "1" }) });
   assert.equal(res.status, 403);
@@ -262,7 +283,7 @@ test("GET /api/payment-certs/:id: engineer không có quyền xem → 403", S, a
 test("GET /api/payment-certs/:id: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("gbad");
   const pm = await taoUser("pm", "gbad");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/payment-certs/[id]/route");
   const res = await GET(jreq("/x", undefined, "GET"), {
     params: Promise.resolve({ id: "abc" }),
@@ -277,12 +298,12 @@ test("GET /api/payment-certs/:id: đợt thuộc hợp đồng dự án khác �
   const pmB = await taoUser("pm", "gisoB");
   const contractB = await taoHopDong(projectB, "gisoB");
   await taoBoqItem(contractB, "gisoB");
-  dangNhap(pmB, projectB);
+  await dangNhapDuAn(pmB, projectB);
   const { POST } = await import("@/app/api/payment-certs/route");
   const created = await POST(jreq("/api/payment-certs", { contractId: contractB }));
   const { id: certId } = await created.json();
 
-  dangNhap(pmA, projectA);
+  await dangNhapDuAn(pmA, projectA);
   const { GET } = await import("@/app/api/payment-certs/[id]/route");
   const res = await GET(jreq("/x", undefined, "GET"), {
     params: Promise.resolve({ id: String(certId) }),
@@ -301,7 +322,7 @@ test(
     const pm = await taoUser("pm", "tien");
     const contractId = await taoHopDong(projectId, "tien", { advancePct: 10, retentionPct: 5 });
     const boqId = await taoBoqItem(contractId, "tien", { qtyContract: 100, unitPrice: 1000000 });
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/payment-certs/route");
     const created = await POST(jreq("/api/payment-certs", { contractId }));
     const { id: certId } = await created.json();
@@ -338,7 +359,7 @@ test("PATCH /api/payment-certs/:id: chưa đăng nhập → 401", S, async () =>
 test("PATCH /api/payment-certs/:id: engineer không được sửa (chỉ Admin/PM) → 403", S, async () => {
   const projectId = await taoDuAn("p403");
   const eng = await taoUser("engineer", "p403");
-  dangNhap(eng, projectId);
+  await dangNhapDuAn(eng, projectId);
   const { PATCH } = await import("@/app/api/payment-certs/[id]/route");
   const res = await PATCH(jreq("/x", {}, "PATCH"), { params: Promise.resolve({ id: "1" }) });
   assert.equal(res.status, 403);
@@ -347,7 +368,7 @@ test("PATCH /api/payment-certs/:id: engineer không được sửa (chỉ Admin/
 test("PATCH /api/payment-certs/:id: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("pbad");
   const pm = await taoUser("pm", "pbad");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { PATCH } = await import("@/app/api/payment-certs/[id]/route");
   const res = await PATCH(jreq("/x", {}, "PATCH"), { params: Promise.resolve({ id: "abc" }) });
   assert.equal(res.status, 400);
@@ -359,7 +380,7 @@ test(
   async () => {
     const projectId = await taoDuAn("p404");
     const pm = await taoUser("pm", "p404");
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { PATCH } = await import("@/app/api/payment-certs/[id]/route");
     const res = await PATCH(jreq("/x", {}, "PATCH"), {
       params: Promise.resolve({ id: "999999999" }),
@@ -374,7 +395,7 @@ test("PATCH /api/payment-certs/:id: đợt đã trình (không còn nháp) → 4
   const pm = await taoUser("pm", "p409");
   const contractId = await taoHopDong(projectId, "p409");
   await taoBoqItem(contractId, "p409");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/payment-certs/route");
   const created = await POST(jreq("/api/payment-certs", { contractId }));
   const { id: certId } = await created.json();
@@ -393,7 +414,7 @@ test("PATCH /api/payment-certs/:id: body không phải object → 400", S, async
   const pm = await taoUser("pm", "pbody");
   const contractId = await taoHopDong(projectId, "pbody");
   await taoBoqItem(contractId, "pbody");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/payment-certs/route");
   const created = await POST(jreq("/api/payment-certs", { contractId }));
   const { id: certId } = await created.json();
@@ -411,7 +432,7 @@ test("PATCH /api/payment-certs/:id: dòng KL không hợp lệ (qty âm) → 422
   const pm = await taoUser("pm", "pinv");
   const contractId = await taoHopDong(projectId, "pinv");
   const boqId = await taoBoqItem(contractId, "pinv");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/payment-certs/route");
   const created = await POST(jreq("/api/payment-certs", { contractId }));
   const { id: certId } = await created.json();
@@ -433,7 +454,7 @@ test(
     const contractB = await taoHopDong(projectId, "pxrefB");
     await taoBoqItem(contractA, "pxrefA");
     const boqB = await taoBoqItem(contractB, "pxrefB");
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/payment-certs/route");
     const created = await POST(jreq("/api/payment-certs", { contractId: contractA }));
     const { id: certId } = await created.json();
@@ -448,30 +469,69 @@ test(
 );
 
 test(
-  "BUG (ghi nhận, không sửa): PATCH KL luỹ kế vượt khối lượng hợp đồng vẫn được lưu (200), không có validate chặn ở tầng IPC",
+  "PATCH /api/payment-certs/:id: KL vượt khối lượng hợp đồng vẫn LƯU nhưng phải CẢNH BÁO rõ từng dòng",
   S,
   async () => {
-    // Đặc tả yêu cầu "khối lượng luỹ kế không được vượt khối lượng hợp đồng" nhưng
-    // validateCertItems (lib/tai-chinh/paymentcerts.ts) chỉ kiểm qty ≥ 0 + không trùng
-    // dòng; saveCertItems ghi thẳng không so với boqQtyContract. overContractCerts chỉ so
-    // sánh GIÁ TRỊ (tiền) toàn hợp đồng cho mục đích cảnh báo (notification), không được
-    // route PATCH/POST payment-certs gọi để CHẶN ghi. Test này khoá đúng hành vi HIỆN TẠI
-    // (200 OK dù vượt 10x KL hợp đồng) — không phải hành vi mong muốn.
+    // Quyết định nghiệp vụ (người dùng, 2026-09-04): cảnh báo chứ KHÔNG chặn. Thi công vượt
+    // khối lượng trong khi phụ lục/VO còn chờ duyệt là tình huống thật, chặn cứng sẽ cản quy
+    // trình. Nhưng im lặng cho qua thì người ký duyệt IPC không có cách nào biết — mà đây là
+    // tiền thật. Trước đợt này KHÔNG lớp nào so khối lượng với hợp đồng: validateCertItems chỉ
+    // kiểm qty >= 0 và không trùng dòng, saveCertItems ghi thẳng, overContractCerts chỉ so giá
+    // trị tiền cả hợp đồng và không được route gọi. Nhập gấp 10 lần vẫn lưu, không dấu hiệu nào.
     const projectId = await taoDuAn("pover");
     const pm = await taoUser("pm", "pover");
     const contractId = await taoHopDong(projectId, "pover");
     const boqId = await taoBoqItem(contractId, "pover", { qtyContract: 10, unitPrice: 1000 });
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/payment-certs/route");
+    const created = await POST(jreq("/api/payment-certs", { contractId }));
+    const { id: certId } = await created.json();
+
+    const { PATCH, GET } = await import("@/app/api/payment-certs/[id]/route");
+    const res = await PATCH(
+      jreq("/x", { items: [{ boqItemId: boqId, qtyPeriod: 100 }] }, "PATCH"),
+      { params: Promise.resolve({ id: String(certId) }) },
+    );
+    assert.equal(res.status, 200, "vẫn lưu được — cảnh báo chứ không chặn");
+
+    const jsonPatch = await res.json();
+    assert.equal(jsonPatch.vuotHopDong.length, 1, "PATCH phải trả kèm dòng vượt");
+    assert.equal(jsonPatch.vuotHopDong[0].boqItemId, boqId);
+    assert.equal(Number(jsonPatch.vuotHopDong[0].qtyCumulative), 100);
+    assert.equal(Number(jsonPatch.vuotHopDong[0].qtyContract), 10);
+
+    // GET cũng phải trả cảnh báo — người ký duyệt thường mở lại đợt để xem, không phải người lập.
+    const chiTiet = await GET(jreq(`/api/payment-certs/${certId}`), {
+      params: Promise.resolve({ id: String(certId) }),
+    });
+    const jsonGet = await chiTiet.json();
+    assert.equal(jsonGet.vuotHopDong.length, 1);
+    assert.equal(jsonGet.vuotHopDong[0].code, jsonPatch.vuotHopDong[0].code);
+  },
+);
+
+test(
+  "PATCH /api/payment-certs/:id: KL trong hạn mức hợp đồng thì KHÔNG có cảnh báo nào",
+  S,
+  async () => {
+    // Mặt còn lại của bất biến: cảnh báo phải im khi mọi thứ bình thường, nếu không người
+    // dùng sẽ học cách phớt lờ nó và cảnh báo thật cũng chìm theo.
+    const projectId = await taoDuAn("punder");
+    const pm = await taoUser("pm", "punder");
+    const contractId = await taoHopDong(projectId, "punder");
+    const boqId = await taoBoqItem(contractId, "punder", { qtyContract: 10, unitPrice: 1000 });
+    await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/payment-certs/route");
     const created = await POST(jreq("/api/payment-certs", { contractId }));
     const { id: certId } = await created.json();
 
     const { PATCH } = await import("@/app/api/payment-certs/[id]/route");
-    const res = await PATCH(
-      jreq("/x", { items: [{ boqItemId: boqId, qtyPeriod: 100 }] }, "PATCH"),
-      { params: Promise.resolve({ id: String(certId) }) },
-    );
-    assert.equal(res.status, 200, "hành vi hiện tại: không chặn KL vượt hợp đồng (BUG)");
+    const res = await PATCH(jreq("/x", { items: [{ boqItemId: boqId, qtyPeriod: 10 }] }, "PATCH"), {
+      params: Promise.resolve({ id: String(certId) }),
+    });
+    assert.equal(res.status, 200);
+    // Đúng bằng khối lượng hợp đồng vẫn là hợp lệ — chỉ VƯỢT mới cảnh báo.
+    assert.deepEqual((await res.json()).vuotHopDong, []);
   },
 );
 
@@ -481,7 +541,7 @@ test("PATCH /api/payment-certs/:id: sửa periodLabel thành công (không đụ
   const pm = await taoUser("pm", "plabel");
   const contractId = await taoHopDong(projectId, "plabel");
   await taoBoqItem(contractId, "plabel");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/payment-certs/route");
   const created = await POST(jreq("/api/payment-certs", { contractId }));
   const { id: certId } = await created.json();
@@ -523,7 +583,7 @@ test("GET /api/contracts: chưa đăng nhập → 401", S, async () => {
 test("GET /api/contracts: engineer không có quyền xem hợp đồng → 403", S, async () => {
   const projectId = await taoDuAn("c403");
   const eng = await taoUser("engineer", "c403");
-  dangNhap(eng, projectId);
+  await dangNhapDuAn(eng, projectId);
   const { GET } = await import("@/app/api/contracts/route");
   const res = await GET(jreq("/api/contracts", undefined, "GET"));
   assert.equal(res.status, 403);
@@ -532,7 +592,7 @@ test("GET /api/contracts: engineer không có quyền xem hợp đồng → 403"
 test("GET /api/contracts: kind không hợp lệ → 422", S, async () => {
   const projectId = await taoDuAn("ckind");
   const pm = await taoUser("pm", "ckind");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/contracts/route");
   const res = await GET(jreq("/api/contracts?kind=khong_ton_tai", undefined, "GET"));
   assert.equal(res.status, 422);
@@ -543,7 +603,7 @@ test("GET /api/contracts: cách ly dự án — không thấy hợp đồng củ
   const projectB = await taoDuAn("cisoB");
   const pmA = await taoUser("pm", "cisoA");
   await taoHopDong(projectB, "cisoB");
-  dangNhap(pmA, projectA);
+  await dangNhapDuAn(pmA, projectA);
   const { GET } = await import("@/app/api/contracts/route");
   const res = await GET(jreq("/api/contracts", undefined, "GET"));
   assert.equal(res.status, 200);
@@ -561,12 +621,12 @@ test(
     const contractId = await taoHopDong(projectId, "cdel");
     await run(`UPDATE contracts SET deleted_at = now() WHERE id = ?`, contractId);
 
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { GET } = await import("@/app/api/contracts/route");
     const asPm = await GET(jreq("/api/contracts?includeDeleted=1", undefined, "GET"));
     assert.deepEqual((await asPm.json()).contracts, []);
 
-    dangNhap(admin, projectId);
+    await dangNhapDuAn(admin, projectId);
     const asAdmin = await GET(jreq("/api/contracts?includeDeleted=1", undefined, "GET"));
     const { contracts } = await asAdmin.json();
     assert.equal(contracts.length, 1);
@@ -584,7 +644,7 @@ test("POST /api/contracts: chưa đăng nhập → 401", S, async () => {
 test("POST /api/contracts: engineer không được tạo hợp đồng (chỉ Admin/PM) → 403", S, async () => {
   const projectId = await taoDuAn("cp403");
   const eng = await taoUser("engineer", "cp403");
-  dangNhap(eng, projectId);
+  await dangNhapDuAn(eng, projectId);
   const { POST } = await import("@/app/api/contracts/route");
   const res = await POST(jreq("/api/contracts", {}));
   assert.equal(res.status, 403);
@@ -593,7 +653,7 @@ test("POST /api/contracts: engineer không được tạo hợp đồng (chỉ A
 test("POST /api/contracts: body rỗng → 400", S, async () => {
   const projectId = await taoDuAn("cbody");
   const pm = await taoUser("pm", "cbody");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/contracts/route");
   const res = await POST(
     new NextRequest("http://localhost/api/contracts", { method: "POST", body: "x" }),
@@ -604,7 +664,7 @@ test("POST /api/contracts: body rỗng → 400", S, async () => {
 test("POST /api/contracts: thiếu số hợp đồng → 422 (validateContractInput)", S, async () => {
   const projectId = await taoDuAn("cval");
   const pm = await taoUser("pm", "cval");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/contracts/route");
   const res = await POST(
     jreq("/api/contracts", { kind: "nhan_thau", title: "HĐ thiếu số", partyName: "CĐT" }),
@@ -618,7 +678,7 @@ test(
   async () => {
     const projectId = await taoDuAn("cref");
     const pm = await taoUser("pm", "cref");
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/contracts/route");
     const res = await POST(
       jreq("/api/contracts", {
@@ -640,7 +700,7 @@ test(
     const { queryOne } = await import("@/lib/db");
     const projectId = await taoDuAn("cok");
     const pm = await taoUser("pm", "cok");
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const code = `HD-${uniq("cok")}`;
     const { POST } = await import("@/app/api/contracts/route");
     const res = await POST(
@@ -671,7 +731,7 @@ test("POST /api/contracts: trùng số hợp đồng → 409", S, async () => {
   const pm = await taoUser("pm", "cdup");
   const code = `HD-${uniq("cdup")}`;
   await taoHopDong(projectId, "cdupSetup"); // hợp đồng nền, không dùng cùng code
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/contracts/route");
   const first = await POST(
     jreq("/api/contracts", { code, kind: "nhan_thau", title: "A", partyName: "CĐT" }),
@@ -692,7 +752,7 @@ test(
     // giả trùng mã mà phải để lỗi lộ ra (nuốt nhầm lỗi sẽ che mất sự cố thật ở DB).
     const projectId = await taoDuAn("coverr");
     const pm = await taoUser("pm", "coverr");
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/contracts/route");
     await assert.rejects(() =>
       POST(
@@ -722,7 +782,7 @@ test("GET /api/contracts/:id: chưa đăng nhập → 401", S, async () => {
 test("GET /api/contracts/:id: engineer không có quyền → 403", S, async () => {
   const projectId = await taoDuAn("gid403");
   const eng = await taoUser("engineer", "gid403");
-  dangNhap(eng, projectId);
+  await dangNhapDuAn(eng, projectId);
   const { GET } = await import("@/app/api/contracts/[id]/route");
   const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: "1" }) });
   assert.equal(res.status, 403);
@@ -731,7 +791,7 @@ test("GET /api/contracts/:id: engineer không có quyền → 403", S, async () 
 test("GET /api/contracts/:id: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("gidbad");
   const pm = await taoUser("pm", "gidbad");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/contracts/[id]/route");
   const res = await GET(jreq("/x", undefined, "GET"), {
     params: Promise.resolve({ id: "abc" }),
@@ -744,7 +804,7 @@ test("GET /api/contracts/:id: hợp đồng của dự án khác → 404", S, as
   const projectB = await taoDuAn("gidisoB");
   const pmA = await taoUser("pm", "gidisoA");
   const contractB = await taoHopDong(projectB, "gidisoB");
-  dangNhap(pmA, projectA);
+  await dangNhapDuAn(pmA, projectA);
   const { GET } = await import("@/app/api/contracts/[id]/route");
   const res = await GET(jreq("/x", undefined, "GET"), {
     params: Promise.resolve({ id: String(contractB) }),
@@ -759,7 +819,7 @@ test(
     const projectId = await taoDuAn("gidok");
     const pm = await taoUser("pm", "gidok");
     const contractId = await taoHopDong(projectId, "gidok", { value: 100 });
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { GET } = await import("@/app/api/contracts/[id]/route");
     const res = await GET(jreq("/x", undefined, "GET"), {
       params: Promise.resolve({ id: String(contractId) }),
@@ -785,7 +845,7 @@ test("PATCH /api/contracts/:id: chưa đăng nhập → 401", S, async () => {
 test("PATCH /api/contracts/:id: engineer không được sửa → 403", S, async () => {
   const projectId = await taoDuAn("pid403");
   const eng = await taoUser("engineer", "pid403");
-  dangNhap(eng, projectId);
+  await dangNhapDuAn(eng, projectId);
   const { PATCH } = await import("@/app/api/contracts/[id]/route");
   const res = await PATCH(jreq("/x", {}, "PATCH"), { params: Promise.resolve({ id: "1" }) });
   assert.equal(res.status, 403);
@@ -794,7 +854,7 @@ test("PATCH /api/contracts/:id: engineer không được sửa → 403", S, asyn
 test("PATCH /api/contracts/:id: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("pidbad");
   const pm = await taoUser("pm", "pidbad");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { PATCH } = await import("@/app/api/contracts/[id]/route");
   const res = await PATCH(jreq("/x", {}, "PATCH"), { params: Promise.resolve({ id: "abc" }) });
   assert.equal(res.status, 400);
@@ -805,7 +865,7 @@ test("PATCH /api/contracts/:id: không tìm thấy (dự án khác) → 404", S,
   const projectB = await taoDuAn("pidisoB");
   const pmA = await taoUser("pm", "pidisoA");
   const contractB = await taoHopDong(projectB, "pidisoB");
-  dangNhap(pmA, projectA);
+  await dangNhapDuAn(pmA, projectA);
   const { PATCH } = await import("@/app/api/contracts/[id]/route");
   const res = await PATCH(jreq("/x", {}, "PATCH"), {
     params: Promise.resolve({ id: String(contractB) }),
@@ -817,7 +877,7 @@ test("PATCH /api/contracts/:id: body không phải object → 400", S, async () 
   const projectId = await taoDuAn("pidbody");
   const pm = await taoUser("pm", "pidbody");
   const contractId = await taoHopDong(projectId, "pidbody");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { PATCH } = await import("@/app/api/contracts/[id]/route");
   const res = await PATCH(new NextRequest("http://localhost/x", { method: "PATCH", body: "x" }), {
     params: Promise.resolve({ id: String(contractId) }),
@@ -832,7 +892,7 @@ test(
     const projectId = await taoDuAn("pidcustombad");
     const pm = await taoUser("pm", "pidcustombad");
     const contractId = await taoHopDong(projectId, "pidcustombad");
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { PATCH } = await import("@/app/api/contracts/[id]/route");
     const res = await PATCH(jreq("/x", { custom: { truong_la: "x" } }, "PATCH"), {
       params: Promise.resolve({ id: String(contractId) }),
@@ -849,7 +909,7 @@ test(
     const projectId = await taoDuAn("pidok");
     const pm = await taoUser("pm", "pidok");
     const contractId = await taoHopDong(projectId, "pidok", { value: 100 });
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { PATCH } = await import("@/app/api/contracts/[id]/route");
     const res = await PATCH(jreq("/x", { value: 999, custom: {} }, "PATCH"), {
       params: Promise.resolve({ id: String(contractId) }),
@@ -880,7 +940,7 @@ test("PATCH /api/contracts/:id: đổi số hợp đồng trùng số khác → 
     codeB,
     projectId,
   );
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { PATCH } = await import("@/app/api/contracts/[id]/route");
   const res = await PATCH(jreq("/x", { code: codeB }, "PATCH"), {
     params: Promise.resolve({ id: String(contractA) }),
@@ -900,7 +960,7 @@ test("DELETE /api/contracts/:id: chưa đăng nhập → 401", S, async () => {
 test("DELETE /api/contracts/:id: chỉ Admin được xoá — PM bị 403", S, async () => {
   const projectId = await taoDuAn("del403");
   const pm = await taoUser("pm", "del403");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { DELETE } = await import("@/app/api/contracts/[id]/route");
   const res = await DELETE(jreq("/x", undefined, "DELETE"), {
     params: Promise.resolve({ id: "1" }),
@@ -912,7 +972,7 @@ test("DELETE /api/contracts/:id: chỉ Admin được xoá — PM bị 403", S, 
 test("DELETE /api/contracts/:id: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("delbad");
   const admin = await taoUser("admin", "delbad");
-  dangNhap(admin, projectId);
+  await dangNhapDuAn(admin, projectId);
   const { DELETE } = await import("@/app/api/contracts/[id]/route");
   const res = await DELETE(jreq("/x", undefined, "DELETE"), {
     params: Promise.resolve({ id: "abc" }),
@@ -925,7 +985,7 @@ test("DELETE /api/contracts/:id: không tìm thấy (dự án khác) → 404", S
   const projectB = await taoDuAn("deliso404B");
   const adminA = await taoUser("admin", "deliso404A", 1);
   const contractB = await taoHopDong(projectB, "deliso404B");
-  dangNhap(adminA, projectA);
+  await dangNhapDuAn(adminA, projectA);
   const { DELETE } = await import("@/app/api/contracts/[id]/route");
   const res = await DELETE(jreq("/x", undefined, "DELETE"), {
     params: Promise.resolve({ id: String(contractB) }),
@@ -941,7 +1001,7 @@ test(
     const admin = await taoUser("admin", "dellinked");
     const contractId = await taoHopDong(projectId, "dellinked");
     await taoBoqItem(contractId, "dellinked");
-    dangNhap(admin, projectId);
+    await dangNhapDuAn(admin, projectId);
     const { DELETE } = await import("@/app/api/contracts/[id]/route");
     const res = await DELETE(jreq("/x", undefined, "DELETE"), {
       params: Promise.resolve({ id: String(contractId) }),
@@ -955,7 +1015,7 @@ test("DELETE /api/contracts/:id: thành công → soft-delete (deleted_at đư�
   const projectId = await taoDuAn("delok");
   const admin = await taoUser("admin", "delok");
   const contractId = await taoHopDong(projectId, "delok");
-  dangNhap(admin, projectId);
+  await dangNhapDuAn(admin, projectId);
   const { DELETE } = await import("@/app/api/contracts/[id]/route");
   const res = await DELETE(jreq("/x", undefined, "DELETE"), {
     params: Promise.resolve({ id: String(contractId) }),
@@ -982,7 +1042,7 @@ test("GET /api/variations: chưa đăng nhập → 401", S, async () => {
 test("GET /api/variations: subcon không có quyền xem phát sinh/VO → 403", S, async () => {
   const projectId = await taoDuAn("v403");
   const sub = await taoUser("subcon", "v403");
-  dangNhap(sub, projectId);
+  await dangNhapDuAn(sub, projectId);
   const { GET } = await import("@/app/api/variations/route");
   const res = await GET(jreq("/api/variations", undefined, "GET"));
   assert.equal(res.status, 403);
@@ -994,7 +1054,7 @@ test(
   async () => {
     const projectId = await taoDuAn("vstatus");
     const pm = await taoUser("pm", "vstatus");
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { GET } = await import("@/app/api/variations/route");
     const res = await GET(jreq("/api/variations?status=khong_hop_le", undefined, "GET"));
     assert.equal(res.status, 200);
@@ -1006,7 +1066,7 @@ test("GET /api/variations: cách ly dự án — không thấy VO của dự án
   const projectB = await taoDuAn("visoB");
   const pmA = await taoUser("pm", "visoA");
   const pmB = await taoUser("pm", "visoB");
-  dangNhap(pmB, projectB);
+  await dangNhapDuAn(pmB, projectB);
   const { POST, GET } = await import("@/app/api/variations/route");
   await POST(
     jreq("/api/variations", {
@@ -1015,7 +1075,7 @@ test("GET /api/variations: cách ly dự án — không thấy VO của dự án
       lines: [{ code: `VOC-${uniq("visoB")}`, name: "Dòng", unit: "m", qty: 1, unitPrice: 100 }],
     }),
   );
-  dangNhap(pmA, projectA);
+  await dangNhapDuAn(pmA, projectA);
   const res = await GET(jreq("/api/variations", undefined, "GET"));
   assert.equal(res.status, 200);
   assert.deepEqual((await res.json()).items, []);
@@ -1028,7 +1088,7 @@ test(
     const projectId = await taoDuAn("vmask");
     const pm = await taoUser("pm", "vmask");
     const eng = await taoUser("engineer", "vmask");
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/variations/route");
     const created = await POST(
       jreq("/api/variations", {
@@ -1050,7 +1110,7 @@ test(
     assert.equal(Number(itemsPm[0].lines[0].unitPrice), 20000);
 
     // engineer thấy được VO nhưng proposedValue/approvedValue/lines.unitPrice bị che null.
-    dangNhap(eng, projectId);
+    await dangNhapDuAn(eng, projectId);
     const asEng = await GET(jreq("/api/variations", undefined, "GET"));
     assert.equal(asEng.status, 200);
     const itemsEng = (await asEng.json()).items;
@@ -1076,7 +1136,7 @@ test(
   async () => {
     const projectId = await taoDuAn("vp403");
     const bch = await taoUser("bch", "vp403");
-    dangNhap(bch, projectId);
+    await dangNhapDuAn(bch, projectId);
     const { POST } = await import("@/app/api/variations/route");
     const res = await POST(jreq("/api/variations", {}));
     assert.equal(res.status, 403);
@@ -1092,7 +1152,7 @@ test("POST /api/variations: chưa có dự án nào → 422", S, async () => {
   // dự án nào (cùng kỹ thuật với route-baselines.test.ts).
   await run(`INSERT INTO user_projects (user_id, project_id) VALUES (?, ?)`, other.id, projectId);
   try {
-    dangNhap(pm, null);
+    await dangNhapDuAn(pm, null);
     const { POST } = await import("@/app/api/variations/route");
     const res = await POST(jreq("/api/variations", {}));
     assert.equal(res.status, 422);
@@ -1106,7 +1166,7 @@ test("POST /api/variations: chưa có dự án nào → 422", S, async () => {
 test("POST /api/variations: body rỗng → 422", S, async () => {
   const projectId = await taoDuAn("vbody");
   const pm = await taoUser("pm", "vbody");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/variations/route");
   const res = await POST(
     new NextRequest("http://localhost/api/variations", { method: "POST", body: "x" }),
@@ -1117,7 +1177,7 @@ test("POST /api/variations: body rỗng → 422", S, async () => {
 test("POST /api/variations: thiếu dòng khối lượng → 422 (validateVoInput)", S, async () => {
   const projectId = await taoDuAn("vval");
   const pm = await taoUser("pm", "vval");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/variations/route");
   const res = await POST(
     jreq("/api/variations", { title: "Thiếu dòng", reason: "other", lines: [] }),
@@ -1128,7 +1188,7 @@ test("POST /api/variations: thiếu dòng khối lượng → 422 (validateVoInp
 test("POST /api/variations: hệ (systemId) không tồn tại → 422", S, async () => {
   const projectId = await taoDuAn("vsysbad");
   const pm = await taoUser("pm", "vsysbad");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/variations/route");
   const res = await POST(
     jreq("/api/variations", {
@@ -1150,7 +1210,7 @@ test(
     const pm = await taoUser("pm", "vtaken");
     const code = `VOT-${uniq("vtaken")}`;
     // Tạo VO đầu tiên chiếm mã (trigger boq_codes_sync tự đăng ký boq_items.code).
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/variations/route");
     const first = await POST(
       jreq("/api/variations", {
@@ -1182,7 +1242,7 @@ test(
     // nhầm thành 409 "trùng mã do tạo đồng thời".
     const projectId = await taoDuAn("voverr");
     const pm = await taoUser("pm", "voverr");
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/variations/route");
     await assert.rejects(() =>
       POST(
@@ -1203,7 +1263,7 @@ test(
     const { queryOne } = await import("@/lib/db");
     const projectId = await taoDuAn("vok");
     const pm = await taoUser("pm", "vok");
-    dangNhap(pm, projectId);
+    await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/variations/route");
     const res = await POST(
       jreq("/api/variations", {
@@ -1243,7 +1303,7 @@ async function taoVoDaTrinh(
   ten: string,
   overrides: { qty?: number; unitPrice?: number } = {},
 ): Promise<{ id: number; code: string }> {
-  dangNhap(nguoiTao, projectId);
+  await dangNhapDuAn(nguoiTao, projectId);
   const { POST } = await import("@/app/api/variations/route");
   const res = await POST(
     jreq("/api/variations", {
@@ -1277,7 +1337,7 @@ test("POST /api/variations/:id/decide: chưa đăng nhập → 401", S, async ()
 test("POST /api/variations/:id/decide: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("dbad");
   const pm = await taoUser("pm", "dbad");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/variations/[id]/decide/route");
   const res = await POST(jreq("/x", { decision: "approved" }), {
     params: Promise.resolve({ id: "abc" }),
@@ -1288,7 +1348,7 @@ test("POST /api/variations/:id/decide: ID không phải số → 400", S, async 
 test("POST /api/variations/:id/decide: decision không hợp lệ → 422", S, async () => {
   const projectId = await taoDuAn("ddec422");
   const pm = await taoUser("pm", "ddec422");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/variations/[id]/decide/route");
   const res = await POST(jreq("/x", { decision: "huh" }), {
     params: Promise.resolve({ id: "1" }),
@@ -1302,7 +1362,7 @@ test("POST /api/variations/:id/decide: VO thuộc dự án khác → 404", S, as
   const pmA = await taoUser("pm", "d404A");
   const pmB = await taoUser("pm", "d404B");
   const vo = await taoVoDaTrinh(projectB, pmB, "d404");
-  dangNhap(pmA, projectA);
+  await dangNhapDuAn(pmA, projectA);
   const { POST } = await import("@/app/api/variations/[id]/decide/route");
   const res = await POST(jreq("/x", { decision: "approved" }), {
     params: Promise.resolve({ id: String(vo.id) }),
@@ -1313,7 +1373,7 @@ test("POST /api/variations/:id/decide: VO thuộc dự án khác → 404", S, as
 test("POST /api/variations/:id/decide: VO còn nháp (chưa trình) → 409", S, async () => {
   const projectId = await taoDuAn("d409");
   const pm = await taoUser("pm", "d409");
-  dangNhap(pm, projectId);
+  await dangNhapDuAn(pm, projectId);
   const { POST: createVo } = await import("@/app/api/variations/route");
   const created = await createVo(
     jreq("/api/variations", {
@@ -1338,7 +1398,7 @@ test(
     const pm = await taoUser("pm", "d403eng");
     const eng = await taoUser("engineer", "d403eng");
     const vo = await taoVoDaTrinh(projectId, pm, "d403eng");
-    dangNhap(eng, projectId);
+    await dangNhapDuAn(eng, projectId);
     const { POST } = await import("@/app/api/variations/[id]/decide/route");
     const res = await POST(jreq("/x", { decision: "approved" }), {
       params: Promise.resolve({ id: String(vo.id) }),
@@ -1357,7 +1417,7 @@ test(
     const pm = await taoUser("pm", "drej");
     const pm2 = await taoUser("pm", "drej2");
     const vo = await taoVoDaTrinh(projectId, pm, "drej");
-    dangNhap(pm2, projectId);
+    await dangNhapDuAn(pm2, projectId);
     const { POST } = await import("@/app/api/variations/[id]/decide/route");
     const res = await POST(jreq("/x", { decision: "rejected" }), {
       params: Promise.resolve({ id: String(vo.id) }),
@@ -1385,7 +1445,7 @@ test(
     const pm = await taoUser("pm", "dapp");
     const pm2 = await taoUser("pm", "dapp2"); // SoD: người quyết khác người tạo
     const vo = await taoVoDaTrinh(projectId, pm, "dapp", { qty: 7 });
-    dangNhap(pm2, projectId);
+    await dangNhapDuAn(pm2, projectId);
     const { POST } = await import("@/app/api/variations/[id]/decide/route");
     const res = await POST(jreq("/x", { decision: "approved" }), {
       params: Promise.resolve({ id: String(vo.id) }),
@@ -1410,7 +1470,7 @@ test(
     const pm = await taoUser("pm", "dpartmiss");
     const pm2 = await taoUser("pm", "dpartmiss2");
     const vo = await taoVoDaTrinh(projectId, pm, "dpartmiss");
-    dangNhap(pm2, projectId);
+    await dangNhapDuAn(pm2, projectId);
     const { POST } = await import("@/app/api/variations/[id]/decide/route");
     const res = await POST(jreq("/x", { decision: "partially_approved", lines: [] }), {
       params: Promise.resolve({ id: String(vo.id) }),
@@ -1430,7 +1490,7 @@ test(
     const pm2 = await taoUser("pm", "dpartover2");
     const vo = await taoVoDaTrinh(projectId, pm, "dpartover", { qty: 10 });
     const line = await queryOne<{ id: number }>(`SELECT id FROM boq_items WHERE vo_id = ?`, vo.id);
-    dangNhap(pm2, projectId);
+    await dangNhapDuAn(pm2, projectId);
     const { POST } = await import("@/app/api/variations/[id]/decide/route");
     const res = await POST(
       jreq("/x", {
@@ -1454,7 +1514,7 @@ test(
     const pm2 = await taoUser("pm", "dpartok2");
     const vo = await taoVoDaTrinh(projectId, pm, "dpartok", { qty: 10 });
     const line = await queryOne<{ id: number }>(`SELECT id FROM boq_items WHERE vo_id = ?`, vo.id);
-    dangNhap(pm2, projectId);
+    await dangNhapDuAn(pm2, projectId);
     const { POST } = await import("@/app/api/variations/[id]/decide/route");
     const res = await POST(
       jreq("/x", {
@@ -1487,7 +1547,7 @@ test(
     const pm2 = await taoUser("pm", "dnoline2");
     const vo = await taoVoDaTrinh(projectId, pm, "dnoline");
     await run(`DELETE FROM boq_items WHERE vo_id = ?`, vo.id);
-    dangNhap(pm2, projectId);
+    await dangNhapDuAn(pm2, projectId);
     const { POST } = await import("@/app/api/variations/[id]/decide/route");
     const res = await POST(jreq("/x", { decision: "approved" }), {
       params: Promise.resolve({ id: String(vo.id) }),
@@ -1521,7 +1581,7 @@ test(
     const vo = await taoVoDaTrinh(projectId, creator, "dflow");
 
     // Bước 1: engineer khác người tạo duyệt → còn pending, chuyển seq=2/nextRole=pm.
-    dangNhap(approverEng, projectId);
+    await dangNhapDuAn(approverEng, projectId);
     const { POST } = await import("@/app/api/variations/[id]/decide/route");
     const step1 = await POST(jreq("/x", { decision: "approved" }), {
       params: Promise.resolve({ id: String(vo.id) }),
@@ -1544,7 +1604,7 @@ test(
     assert.equal(midLine?.qty_approved, null);
 
     // Bước 2 (cuối): pm duyệt → domain logic chạy thật, VO chuyển approved.
-    dangNhap(approverPm, projectId);
+    await dangNhapDuAn(approverPm, projectId);
     const step2 = await POST(jreq("/x", { decision: "approved" }), {
       params: Promise.resolve({ id: String(vo.id) }),
     });

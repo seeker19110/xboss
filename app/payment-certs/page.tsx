@@ -67,6 +67,16 @@ function fmtVND(n: number) {
   return Math.round(n).toLocaleString("vi-VN") + " đ";
 }
 
+/** Dòng IPC có khối lượng luỹ kế vượt khối lượng hợp đồng (route trả kèm, chỉ để cảnh báo). */
+type DongVuot = {
+  boqItemId: number;
+  code: string;
+  name: string;
+  unit: string;
+  qtyContract: number;
+  qtyCumulative: number;
+};
+
 export default function PaymentCertsPage() {
   return (
     <Suspense fallback={<PageSkeleton />}>
@@ -390,11 +400,18 @@ function CertDetailModal({
   // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho "payment_cert",
   // giữ UI y hệt trước (không hiện badge/lịch sử) đúng nguyên tắc "dormant" của M46.
   const [approvalStatus, setApprovalStatus] = useState<EntityApprovalStatus | null>(null);
+  // Dòng có khối lượng luỹ kế VƯỢT khối lượng hợp đồng. Route cố ý không chặn (thi công vượt
+  // trong khi VO/phụ lục còn chờ duyệt là tình huống thật), nhưng người ký duyệt phải nhìn
+  // thấy — trước đợt này không có lớp nào so khối lượng với hợp đồng, nhập gấp 10 lần vẫn lưu.
+  const [vuotHopDong, setVuotHopDong] = useState<DongVuot[]>([]);
 
   useEffect(() => {
     fetch(`/api/payment-certs/${cert.id}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setApprovalStatus(j?.approvalStatus ?? null));
+      .then((j) => {
+        setApprovalStatus(j?.approvalStatus ?? null);
+        setVuotHopDong(j?.vuotHopDong ?? []);
+      });
   }, [cert.id]);
 
   const canEdit = canManage && cert.status === "draft";
@@ -528,6 +545,29 @@ function CertDetailModal({
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {vuotHopDong.length > 0 && (
+          <div className="bento-card border-rose-900/60 bg-rose-950/20 px-4 py-3 text-xs text-rose-200 space-y-1.5">
+            <p className="font-semibold">
+              {vuotHopDong.length} dòng có khối lượng luỹ kế VƯỢT khối lượng hợp đồng
+            </p>
+            <ul className="space-y-1">
+              {vuotHopDong.map((d) => (
+                <li key={d.boqItemId} className="flex gap-2">
+                  <span className="font-mono shrink-0">{d.code}</span>
+                  <span className="truncate flex-1">{d.name}</span>
+                  <span className="font-mono tabular-nums shrink-0">
+                    {d.qtyCumulative}/{d.qtyContract} {d.unit}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-rose-300/80">
+              Chỉ là cảnh báo — đợt vẫn lưu được, vì thi công vượt khối lượng trong khi phụ lục/VO
+              còn chờ duyệt là tình huống thật. Đối chiếu phụ lục trước khi trình duyệt.
+            </p>
           </div>
         )}
 
