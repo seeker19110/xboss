@@ -16,6 +16,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { parseCoverageTable, mergeCoverageMaps, aggregate } from "./coverage-summary.mjs";
+import { CO_MOCK_MODULE } from "./test-flags.mjs";
 
 const TEST_DIR = "tests";
 const tsxLoader = "./" + join("node_modules", "tsx", "dist", "loader.mjs");
@@ -97,6 +98,7 @@ if (coverageMode) {
   for (const file of files) {
     const { out, status } = chayDongBo([
       "--experimental-test-coverage",
+      CO_MOCK_MODULE,
       `--import=${tsxLoader}`,
       "--test",
       file,
