@@ -10,8 +10,3 @@ data/uploads
 
 # ERD sinh tự động (npm run gen:erd) — CI so khớp bằng git diff, không để prettier canh lại bảng
 docs/ERD.md
-
-# Đối chứng 2 tầng CAD sinh tự động (npm run cad:doi-chung) — cổng CI so khớp từng byte với
-# script, không để prettier định dạng lại rồi báo đỏ nhầm.
-plugin-autocad/doi-chung/ket-qua-mong-doi.json
-plugin-autocad/doi-chung/routing-doi-chung.json
