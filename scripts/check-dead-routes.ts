@@ -56,8 +56,17 @@ for (const file of routeFiles) {
       cwd: root,
       encoding: "utf8",
     });
-  } catch {
-    hits = ""; // grep thoát 1 khi không khớp gì
+  } catch (err) {
+    // grep thoát 1 khi không khớp gì (bình thường). Thoát ≥2 là lỗi thật (vd một thư mục
+    // trong CALLER_DIRS không còn tồn tại) — không được nuốt, vì nó khiến MỌI route bị
+    // báo "chết" sai (đã xảy ra thật khi plugin-autocad/ bị xoá nhưng còn trong danh sách).
+    const status = (err as { status?: number }).status;
+    if (status !== 1) {
+      console.error(`\n[LỖI] grep thất bại khi dò lời gọi của ${routePath} (exit ${status}):`);
+      console.error((err as { stderr?: string }).stderr ?? err);
+      process.exit(2);
+    }
+    hits = "";
   }
   const callers = hits
     .trim()
