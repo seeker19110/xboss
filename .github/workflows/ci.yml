@@ -45,8 +45,22 @@ jobs:
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
+      # Retry với backoff: endpoint advisories của npm registry thỉnh thoảng 503/timeout
+      # (sự cố phía npm, không phải lỗi dependency) — đã gặp thật nhiều lần ở CI, làm đỏ
+      # oan không liên quan gì tới code. `--fetch-timeout` rút ngắn để mỗi lần thử fail
+      # nhanh (mặc định npm chờ tới ~5 phút mới báo timeout). Vẫn FAIL job nếu cả 3 lần
+      # đều lỗi (không nuốt lỗi audit thật — chỉ chịu qua lỗi mạng thoáng qua).
       - name: Kiểm tra lỗ hổng dependencies (production)
-        run: npm audit --omit=dev --audit-level=high
+        run: |
+          for i in 1 2 3; do
+            if npm audit --omit=dev --audit-level=high --fetch-timeout=30000; then
+              exit 0
+            fi
+            echo "npm audit lần $i thất bại, thử lại sau $((i * 20))s…" >&2
+            sleep $((i * 20))
+          done
+          echo "npm audit thất bại cả 3 lần." >&2
+          exit 1
 
       - name: Lint
         run: npm run lint
