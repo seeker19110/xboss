@@ -2,7 +2,7 @@
 // chính...) + checklist huy động công trường (bàn giao mặt bằng, khảo sát, trắc đạc,
 // huy động). Xem docs/nang-cap/M23-khoi-dong-phap-ly.md.
 import { query, queryOne } from "@/lib/db";
-import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
+import { todayISO, daysFromTodayISO, isValidDateISO } from "@/lib/nen/date";
 
 export const LEGAL_KINDS = [
   "giay_phep_xd",
@@ -181,8 +181,6 @@ export type LegalInput = {
   note: string | null;
 };
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
 // Validate thuần (không chạm DB) — trả thông điệp lỗi tiếng Việt hoặc null khi hợp lệ.
 export function validateLegalInput(input: LegalInput): string | null {
   if (!input.title.trim()) return "Thiếu tên hồ sơ";
@@ -192,7 +190,7 @@ export function validateLegalInput(input: LegalInput): string | null {
     ["Ngày cấp", input.issuedDate],
     ["Ngày hết hạn", input.expiryDate],
   ] as const) {
-    if (d != null && !DATE_RE.test(d)) return `${label} không đúng định dạng YYYY-MM-DD`;
+    if (d != null && !isValidDateISO(d)) return `${label} không đúng định dạng YYYY-MM-DD`;
   }
   if (input.issuedDate && input.expiryDate && input.issuedDate > input.expiryDate)
     return "Ngày cấp phải trước hoặc bằng ngày hết hạn";
@@ -228,7 +226,7 @@ export function validateMobilizationInput(input: MobilizationInput): string | nu
   if (!input.title.trim()) return "Thiếu tên hạng mục";
   if (!MOBILIZATION_CATEGORIES.includes(input.category)) return "Nhóm không hợp lệ";
   if (!MOBILIZATION_STATUSES.includes(input.status)) return "Trạng thái không hợp lệ";
-  if (input.dueDate != null && !DATE_RE.test(input.dueDate))
+  if (input.dueDate != null && !isValidDateISO(input.dueDate))
     return "Hạn hoàn thành không đúng định dạng YYYY-MM-DD";
   return null;
 }

@@ -20,9 +20,11 @@ export async function POST(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // M54 GĐ1 PR2 (đồng bộ GET/POST/PATCH/DELETE): cô lập tenant — chỉ test webhook thuộc org người gọi.
   const wh = await queryOne<{ id: number; projectId: number | null }>(
-    `SELECT id, project_id AS "projectId" FROM webhooks WHERE id = ?`,
+    `SELECT id, project_id AS "projectId" FROM webhooks WHERE id = ? AND org_id = ?`,
     id,
+    user.orgId,
   );
   if (!wh) return NextResponse.json({ error: "Không tìm thấy webhook" }, { status: 404 });
 

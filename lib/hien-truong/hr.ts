@@ -3,7 +3,7 @@
 // & chứng chỉ (certifications, cảnh báo hết hạn) + ma trận RACI. Xem
 // docs/nang-cap/M24-nhan-su-to-chuc.md.
 import { query, queryOne } from "@/lib/db";
-import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
+import { todayISO, daysFromTodayISO, isValidDateISO } from "@/lib/nen/date";
 
 export const PERSONNEL_STATUSES = ["active", "inactive"] as const;
 export type PersonnelStatus = (typeof PERSONNEL_STATUSES)[number];
@@ -179,12 +179,10 @@ export type AttendanceInput = {
   note: string | null;
 };
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
 // Validate thuần — phải có crew hoặc personnel; chấm gộp (personnelId null) bắt buộc
 // headcount > 0; chấm theo người thì headcount không dùng.
 export function validateAttendanceInput(input: AttendanceInput): string | null {
-  if (!DATE_RE.test(input.workDate)) return "Ngày chấm công không đúng định dạng YYYY-MM-DD";
+  if (!isValidDateISO(input.workDate)) return "Ngày chấm công không đúng định dạng YYYY-MM-DD";
   if (input.crewId == null && input.personnelId == null)
     return "Phải chọn tổ đội hoặc nhân sự để chấm công";
   if (input.personnelId == null) {
@@ -410,7 +408,7 @@ export function validateCertificationInput(input: CertificationInput): string | 
     ["Ngày cấp", input.issuedDate],
     ["Ngày hết hạn", input.expiryDate],
   ] as const) {
-    if (d != null && !DATE_RE.test(d)) return `${label} không đúng định dạng YYYY-MM-DD`;
+    if (d != null && !isValidDateISO(d)) return `${label} không đúng định dạng YYYY-MM-DD`;
   }
   if (input.issuedDate && input.expiryDate && input.issuedDate > input.expiryDate)
     return "Ngày cấp phải trước hoặc bằng ngày hết hạn";

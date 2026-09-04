@@ -15,6 +15,17 @@ export function addDaysISO(iso: string, days: number): string {
   return new Date(Date.parse(iso + "T00:00:00Z") + days * 86400_000).toISOString().slice(0, 10);
 }
 
+// Kiểm chuỗi có đúng định dạng 'YYYY-MM-DD' VÀ là ngày có thật (vd "2026-13-40" khớp
+// định dạng nhưng không phải ngày thật — Date tự chuẩn hoá tràn tháng/ngày nên phải so
+// lại 3 phần sau khi parse). Dùng thay regex hình dạng đơn thuần trước khi INSERT/UPDATE
+// cột DATE, tránh 500 thô do Postgres ném lỗi 22008 khi ngày sai lịch lọt qua.
+export function isValidDateISO(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
 // Số ngày trễ = hôm nay - hạn (endDate), cả hai dạng ISO 'YYYY-MM-DD' — ép giờ UTC 00:00
 // tránh lệch múi giờ khi trừ. Dùng cho cột "Trễ (ngày)" ở các bảng danh sách trễ.
 export function daysOverdue(endDate: string, today: string = todayISO()): number {

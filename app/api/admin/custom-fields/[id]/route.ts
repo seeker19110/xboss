@@ -25,11 +25,16 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // M54 GĐ1 PR2 (đồng bộ GET): cô lập tenant — chỉ sửa định nghĩa thuộc org người gọi.
   const def = await queryOne<{
     entity_type: CustomEntityType;
     key: string;
     type: CustomFieldType;
-  }>(`SELECT entity_type, key, type FROM custom_field_defs WHERE id = ?`, id);
+  }>(
+    `SELECT entity_type, key, type FROM custom_field_defs WHERE id = ? AND org_id = ?`,
+    id,
+    user.orgId,
+  );
   if (!def) return NextResponse.json({ error: "Không tìm thấy định nghĩa" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
@@ -95,8 +100,8 @@ export async function PATCH(
   if (!sets.length)
     return NextResponse.json({ error: "Không có trường để cập nhật" }, { status: 400 });
 
-  vals.push(id);
-  await run(`UPDATE custom_field_defs SET ${sets.join(", ")} WHERE id = ?`, ...vals);
+  vals.push(id, user.orgId);
+  await run(`UPDATE custom_field_defs SET ${sets.join(", ")} WHERE id = ? AND org_id = ?`, ...vals);
   return NextResponse.json({ updated: id });
 }
 
@@ -115,7 +120,8 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const r = await run(`DELETE FROM custom_field_defs WHERE id = ?`, id);
+  // M54 GĐ1 PR2 (đồng bộ GET): cô lập tenant — chỉ xoá định nghĩa thuộc org người gọi.
+  const r = await run(`DELETE FROM custom_field_defs WHERE id = ? AND org_id = ?`, id, user.orgId);
   if (r.changes === 0)
     return NextResponse.json({ error: "Không tìm thấy định nghĩa" }, { status: 404 });
   return NextResponse.json({ deleted: id });
