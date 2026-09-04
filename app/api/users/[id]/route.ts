@@ -20,9 +20,14 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // M54 GĐ1 PR2 / V10: cô lập tenant — chỉ sửa user cùng org với người gọi (khớp lọc org_id
+  // của GET /api/users cùng cụm; route này chạy ngoài withTransaction nên RLS không tự áp
+  // được, phải lọc tường minh). Thiếu điều kiện này thì admin org A đoán ID đổi được vai
+  // trò/mật khẩu/2FA của user org B — chiếm quyền tài khoản xuyên tổ chức.
   const target = await queryOne<{ id: number; role: Role }>(
-    `SELECT id, role FROM users WHERE id = ?`,
+    `SELECT id, role FROM users WHERE id = ? AND org_id = ?`,
     id,
+    me.orgId,
   );
   if (!target) return NextResponse.json({ error: "Không tìm thấy người dùng" }, { status: 404 });
 
@@ -40,33 +45,43 @@ export async function PATCH(
       if (Number(admins?.n) <= 1)
         return NextResponse.json({ error: "Không thể hạ cấp Admin cuối cùng" }, { status: 400 });
     }
-    await run(`UPDATE users SET role = ? WHERE id = ?`, role, id);
+    await run(`UPDATE users SET role = ? WHERE id = ? AND org_id = ?`, role, id, me.orgId);
   }
 
   if (body.name !== undefined) {
     const name = String(body.name).trim();
     if (!name) return NextResponse.json({ error: "Tên không được trống" }, { status: 400 });
-    await run(`UPDATE users SET name = ? WHERE id = ?`, name, id);
+    await run(`UPDATE users SET name = ? WHERE id = ? AND org_id = ?`, name, id, me.orgId);
   }
 
   if (body.password !== undefined) {
     const pw = String(body.password);
     if (pw.length < 6)
       return NextResponse.json({ error: "Mật khẩu tối thiểu 6 ký tự" }, { status: 400 });
-    await run(`UPDATE users SET password_hash = ? WHERE id = ?`, hashPassword(pw), id);
+    await run(
+      `UPDATE users SET password_hash = ? WHERE id = ? AND org_id = ?`,
+      hashPassword(pw),
+      id,
+      me.orgId,
+    );
   }
 
   // Admin tắt 2FA hộ user khác (M56 PR1) — đường thoát khi user mất máy xác thực.
   // Ghi audit qua trigger sẵn có trên bảng users, không cần log riêng.
   if (body.disable2fa === true) {
     await run(
-      `UPDATE users SET totp_secret = NULL, totp_enabled_at = NULL, totp_last_step = NULL WHERE id = ?`,
+      `UPDATE users SET totp_secret = NULL, totp_enabled_at = NULL, totp_last_step = NULL WHERE id = ? AND org_id = ?`,
       id,
+      me.orgId,
     );
     await run(`DELETE FROM totp_recovery_codes WHERE user_id = ?`, id);
   }
 
-  const user = await queryOne(`SELECT id, name, email, role FROM users WHERE id = ?`, id);
+  const user = await queryOne(
+    `SELECT id, name, email, role FROM users WHERE id = ? AND org_id = ?`,
+    id,
+    me.orgId,
+  );
   return NextResponse.json({ user });
 }
 
@@ -89,9 +104,14 @@ export async function DELETE(
       { status: 400 },
     );
 
+  // M54 GĐ1 PR2 / V10: cô lập tenant — chỉ xoá user cùng org với người gọi (khớp lọc org_id
+  // của GET /api/users cùng cụm; route này chạy ngoài withTransaction nên RLS không tự áp
+  // được, phải lọc tường minh). Thiếu điều kiện này thì admin org A đoán ID xoá được thẳng
+  // user org B.
   const target = await queryOne<{ id: number; role: Role }>(
-    `SELECT id, role FROM users WHERE id = ?`,
+    `SELECT id, role FROM users WHERE id = ? AND org_id = ?`,
     id,
+    me.orgId,
   );
   if (!target) return NextResponse.json({ error: "Không tìm thấy người dùng" }, { status: 404 });
 
@@ -106,7 +126,7 @@ export async function DELETE(
   // Gỡ liên kết trước khi xoá (giữ lịch sử/thông báo sạch FK).
   await run(`UPDATE tasks SET assigned_to = NULL WHERE assigned_to = ?`, id);
   await run(`DELETE FROM notifications WHERE user_id = ?`, id);
-  await run(`DELETE FROM users WHERE id = ?`, id);
+  await run(`DELETE FROM users WHERE id = ? AND org_id = ?`, id, me.orgId);
 
   return NextResponse.json({ ok: true });
 }
