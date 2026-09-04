@@ -496,17 +496,10 @@ export default function EngineeringApexCockpitPage() {
                     <span>Swarm Debates & RFI Generator (PIN-3)</span>
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
-                  <Link
-                    href="/engineering/mepf-studio"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>MEPF Background Worker Studio</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
                 </div>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-800/80 text-[11px] text-zinc-400">
-                8 tác tử đồng bộ thời gian thực qua Webhook & SKIP LOCKED.
+                Các tác tử hiện trường đồng bộ thời gian thực qua Webhook.
               </div>
             </div>
 
@@ -721,7 +714,7 @@ export default function EngineeringApexCockpitPage() {
               <EmptyState
                 icon={Boxes}
                 title="Chưa nhận đối tượng kỹ thuật nào"
-                message="Kết nối MEP-Agents hoặc gửi tác vụ từ MEPF Studio để tiếp nhận đối tượng kỹ thuật."
+                message="Nạp dữ liệu qua cổng tiếp nhận ENG-1 để có đối tượng kỹ thuật hiển thị ở đây."
               />
             ) : (
               <div className="overflow-x-auto rounded-xl border border-zinc-800">

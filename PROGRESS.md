@@ -97,13 +97,48 @@ Người dùng chốt xoá luôn cả hệ Python, không giữ lại phần MEP
   `CALLER_DIRS`/`SCAN_DIRS`; liệt kê thư mục không tồn tại là đúng lớp bug đã gặp ở đợt 3),
   `DEPLOY.md` (mục 3 nay là hướng dẫn `pm2 delete mepf-worker` gỡ khỏi VPS cũ + bỏ dòng RAM
   "+ MEPF worker").
-- **Quyết định:** **hàng đợi `engineering_async_tasks` + trang `/engineering/mepf-studio` GIỮ
-  NGUYÊN** — brief chỉ yêu cầu gỡ nhánh cầu nối, không gỡ hàng đợi; các route
-  `/api/engineering/queue/*` còn nguyên và vẫn kiểm quyền như cũ. Hệ quả cần biết: **không còn
-  tiến trình nào xử lý hàng đợi**, task gửi lên sẽ nằm `pending` cho tới khi có worker mới. Gỡ
-  hẳn cụm hàng đợi là quyết định sản phẩm, để phiên chính chốt riêng.
+- **Quyết định (đã bị THAY THẾ, xem mục kế tiếp):** ban đầu để **hàng đợi
+  `engineering_async_tasks` + trang `/engineering/mepf-studio` GIỮ NGUYÊN** vì brief chỉ yêu cầu
+  gỡ nhánh cầu nối. Người dùng sau đó chốt xoá luôn cụm hàng đợi — xem "Bổ sung cùng đợt — xoá
+  cụm hàng đợi mepf-studio mồ côi".
 - **Vận hành:** VPS đang chạy `pm2 mepf-worker` phải `pm2 delete mepf-worker && pm2 save` một lần
   (đã ghi trong `DEPLOY.md`) — `deploy.sh` không còn reload tiến trình đó.
+
+### Bổ sung cùng đợt — xoá cụm hàng đợi mepf-studio mồ côi
+
+Xoá `mepf-worker/` xong thì **không còn tiến trình nào tiêu thụ `engineering_async_tasks`**: mọi
+tác vụ nạp vào nằm `pending` vĩnh viễn, UI hiện progress bar 0% không bao giờ nhúc nhích. Người
+dùng chốt xoá hẳn cụm này. **9 tệp xoá, 8 tệp sửa**, không thêm migration nào.
+
+- **Xoá:** `app/engineering/mepf-studio/` (trang gửi tác vụ + bảng hàng đợi); trọn
+  `app/api/engineering/queue/**` — `tasks` (GET/POST), `tasks/[id]/cancel`,
+  `tasks/[id]/progress`, `upload` (nhận DXF/IFC/JSON/XLSX vào `data/uploads/mepf`);
+  `lib/ky-thuat/engineering-task-queue.ts`; `tests/engineering-task-queue.test.ts`.
+- **Dọn kèm:** `engineering-suite.ts` (bỏ `export *` mục 17), `EngineeringNav` (bỏ mục "Xử lý tác
+  vụ MEPF"), `app/engineering/page.tsx` + `app/engineering-intelligence/page.tsx` (bỏ 2 thẻ liên
+  kết + sửa 3 câu mô tả nhắc "MEPF Studio"/"Skip Locked"), `tests/project-scope-invariant.test.ts`
+  (bỏ mục whitelist `queue/tasks/[id]/progress` — ca "whitelist không có mục thừa" sẽ đỏ nếu để
+  lại), `e2e/authed/luoi-quet-axe.spec.ts` (bỏ trang khỏi lưới quét axe),
+  `lib/nen/modules.ts` + `scripts/lib/project-scope-scan.ts` (chú thích nhắc tiền tố API đã xoá).
+- **`/engineering/quantum-hub` mất tab 2 "Hàng Đợi Tác Vụ Phân Tán":** đây là **nơi thứ hai** gọi
+  `/api/engineering/queue/tasks` (nút "+ Tác Vụ Soát Va Chạm Lô" / "+ Tác Vụ Bung Spool DfMA").
+  Trang GIỮ LẠI vì 2 tab còn lại (spatial compute, sổ cái Merkle) chạy trên API khác và vẫn sống;
+  chỉ tab hàng đợi bị gỡ, tab Merkle đánh số lại thành 2. Nếu để nguyên thì 3 nút của tab đó gọi
+  route 404 mà `catch {}` nuốt lỗi — người dùng bấm không thấy gì xảy ra.
+- **Quyết định về bảng `engineering_async_tasks`: GIỮ BẢNG, KHÔNG thêm migration `DROP TABLE`.**
+  Đã kiểm: không migration nào `REFERENCES engineering_async_tasks` (bảng chỉ trỏ RA
+  `projects`/`users`), nên xoá về mặt kỹ thuật là an toàn. Vẫn giữ vì `DROP TABLE` là **migration
+  đụng dữ liệu** — theo DoD phải chạy staging trước rồi mới lên production, tức biến một PR dọn
+  dẹp rủi ro-0 thành PR chờ cổng vận hành, đổi lại lợi ích bằng 0 (bảng rỗng không tốn gì, RLS
+  vẫn nguyên). Ngược lại, giữ bảng còn khớp `docs/ERD.md` (sinh từ DB thật qua `npm run gen:erd`
+  — drop mà không regen được sẽ làm ERD sai). Muốn thu hồi sau này chỉ cần 1 dòng
+  `DROP TABLE IF EXISTS engineering_async_tasks;` trong migration mới, chạy qua staging.
+- **Cổng đã chạy (đợt bổ sung này):** `npm run lint` · `npm run typecheck` · `npm run build` xanh;
+  `npm test` với Postgres 16 ephemeral **222 tệp, 1808 ca pass, 1 ca fail, 1 ca skip có lý do** —
+  ca fail là `tests/backfill-0137-0138.test.ts`, đối chiếu bằng `git stash` thì **đỏ y hệt khi
+  chưa có diff này** (đỏ sẵn, không liên quan). 9 cổng static xanh: `check:dead-code`,
+  `check:dead-routes`, `check:lib-layers`, `check:migrations`, `check:sw-exclude`,
+  `check:route-perms`, `check:project-scope`, `check:db-params`, `check:engineering-danh-tinh`.
 
 ### Cổng đã chạy
 

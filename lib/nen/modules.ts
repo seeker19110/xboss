@@ -317,9 +317,8 @@ export const MODULES: ModuleDef[] = [
   // KHÔNG gán routePrefix cho routes DÙNG CHUNG với trang khác chưa bị đánh dấu (đọc kỹ
   // trước khi mở rộng prefix — tắt nhầm route đang phục vụ tính năng thật là hồi quy
   // nặng, xem PLAN.md việc W3):
-  //   - Trang `quantum-hub` gọi `/api/engineering/queue`, `/api/engineering/ledger`,
-  //     `/api/engineering/spatial` — cả 3 tiền tố này dùng chung với `mepf-studio` và
-  //     `spatial-viewer` (đều là module thật, KHÔNG đánh dấu) →
+  //   - Trang `quantum-hub` gọi `/api/engineering/ledger` và `/api/engineering/spatial` — cả 2
+  //     tiền tố này dùng chung với `spatial-viewer` (module thật, KHÔNG đánh dấu) →
   //     KHÔNG có tiền tố API nào an toàn để gate riêng `quantum-hub`; `routePrefix: []`
   //     có chủ đích (module vẫn `thuNghiem: true` cho mục đích cờ mặc định/nav/cảnh báo
   //     UI, nhưng không chặn API vì sẽ tắt nhầm 3 trang thật kể trên).

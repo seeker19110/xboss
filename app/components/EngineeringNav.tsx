@@ -175,13 +175,6 @@ const NAV_ITEMS: NavItem[] = [
     icon: Bot,
     roles: ["admin", "pm", "engineer"],
   },
-  {
-    href: "/engineering/mepf-studio",
-    label: "Xử lý tác vụ MEPF",
-    category: "copilot",
-    icon: Cpu,
-    roles: ["admin", "pm", "engineer"],
-  },
 
   // ── Commercial & Contracts ──
   {

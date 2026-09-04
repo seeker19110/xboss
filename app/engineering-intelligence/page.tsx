@@ -252,13 +252,13 @@ function EngineeringIntelligenceContent() {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-400" />
-              Sổ Cái Mật Mã Merkle Tree & Hàng Đợi MEPF Worker (M73)
+              Sổ Cái Mật Mã Merkle Tree (M73)
             </h3>
             <span className="text-[11px] font-mono text-zinc-400">Merkle Proof SHA-256</span>
           </div>
           <p className="text-xs text-zinc-400 leading-relaxed">
-            Niêm phong cây băm Merkle Tree SHA-256 bất biến cho mọi giao dịch điều chỉnh kỹ thuật,
-            truy xuất Memory Bank ngữ cảnh và quản trị hàng đợi bất đồng bộ PostgreSQL Skip Locked.
+            Niêm phong cây băm Merkle Tree SHA-256 bất biến cho mọi giao dịch điều chỉnh kỹ thuật và
+            truy xuất Memory Bank ngữ cảnh.
           </p>
           <div className="flex items-center gap-2 pt-2">
             <Link
@@ -272,12 +272,6 @@ function EngineeringIntelligenceContent() {
               className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs transition-colors inline-flex items-center gap-2"
             >
               Memory Bank (PIN-4)
-            </Link>
-            <Link
-              href="/engineering/mepf-studio"
-              className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs transition-colors inline-flex items-center gap-2"
-            >
-              MEPF Worker
             </Link>
           </div>
         </div>

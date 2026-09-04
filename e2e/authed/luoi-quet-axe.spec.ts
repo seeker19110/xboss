@@ -179,12 +179,6 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
         "color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav) + label x1 + select-name x1.",
     },
     {
-      path: "/engineering/mepf-studio",
-      name: "MEPF Studio",
-      violations:
-        "color-contrast x5 — bg-violet-600, chữ #14171d trên #7f22fe = 3.04:1 (cần 4,5:1) + label x2. KHÔNG liên quan badge EngineeringNav (không đổi trước/sau).",
-    },
-    {
       path: "/engineering/nextgen-apex",
       name: "Nextgen Apex",
       violations:

@@ -46,8 +46,9 @@ export * from "@/lib/ky-thuat/engineering-project-health";
 // 16. Hyper-Spatial WASM Geometry & Cache (M73)
 export * from "@/lib/ky-thuat/engineering-spatial-wasm";
 
-// 17. Distributed Engineering Task Queue (M73)
-export * from "@/lib/ky-thuat/engineering-task-queue";
+// (17) Distributed Engineering Task Queue (M73) đã được gỡ cùng trang `/engineering/mepf-studio`
+// và route `/api/engineering/queue/**` — hàng đợi này chỉ có daemon Python `mepf-worker` tiêu thụ,
+// xoá worker rồi thì tác vụ nạp vào sẽ nằm `pending` vĩnh viễn.
 
 // 18. Merkle Tree Provenance Ledger (M73)
 export * from "@/lib/ky-thuat/engineering-merkle-ledger";
