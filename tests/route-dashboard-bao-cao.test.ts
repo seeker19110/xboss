@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangNhap, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangNhap, dangNhapDuAn, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -15,25 +15,6 @@ import { NextRequest } from "next/server";
 //   - app/api/search/route.ts             (tìm kiếm toàn cục)
 
 const S = { skip: !HAS_TEST_DB };
-
-// PHỤ THUỘC CHÉO GIỮA CÁC FILE TEST — đã dính thật: `visibleProjectIds` (lib/ha-tang/projects.ts)
-// chỉ trả "mọi dự án" khi bảng `user_projects` RỖNG; hễ bảng đó có dòng thì user không được gán
-// sẽ không thấy dự án nào. Mỗi user ở đây được GÁN THẲNG vào dự án của nó (dangNhapDuAn) — test
-// tự chủ, chạy đúng ở mọi thứ tự, không phụ thuộc trạng thái toàn cục do file khác để lại.
-async function dangNhapDuAn(
-  user: { id: number; passwordHash: string },
-  projectId: number | null,
-): Promise<void> {
-  if (projectId != null) {
-    const { run } = await import("@/lib/db");
-    await run(
-      `INSERT INTO user_projects (user_id, project_id) VALUES (?, ?) ON CONFLICT DO NOTHING`,
-      user.id,
-      projectId,
-    );
-  }
-  dangNhap(user, projectId);
-}
 
 const RUN = Date.now().toString(36);
 let seq = 0;

@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangNhap, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangNhap, dangNhapDuAn, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -17,26 +17,6 @@ import { NextRequest } from "next/server";
 // ngoài phạm vi việc này.
 
 const S = { skip: !HAS_TEST_DB };
-
-// PHỤ THUỘC CHÉO GIỮA CÁC FILE TEST — đã dính thật ở tests/route-tai-chinh.test.ts:
-// `visibleProjectIds` (lib/ha-tang/projects.ts) chỉ trả "mọi dự án" khi bảng
-// `user_projects` RỖNG; hễ bảng đó có dòng thì user không được gán sẽ không thấy dự án
-// nào. Thay vì phụ thuộc trạng thái toàn cục đó, mỗi user ở đây được GÁN THẲNG vào dự
-// án của nó (dangNhapDuAn) — test tự chủ, chạy đúng ở mọi thứ tự/kèm test khác.
-async function dangNhapDuAn(
-  user: { id: number; passwordHash: string },
-  projectId: number | null,
-): Promise<void> {
-  if (projectId != null) {
-    const { run } = await import("@/lib/db");
-    await run(
-      `INSERT INTO user_projects (user_id, project_id) VALUES (?, ?) ON CONFLICT DO NOTHING`,
-      user.id,
-      projectId,
-    );
-  }
-  dangNhap(user, projectId);
-}
 
 const RUN = Date.now().toString(36);
 let seq = 0;
@@ -1003,19 +983,18 @@ test("GET /api/documents/:id: link_url scheme lạ (javascript:) → 400", S, as
 });
 
 test(
-  "GET /api/documents/:id: [BUG ĐÃ XÁC NHẬN — KHÔNG cách ly dự án] PM dự án A tải được " +
-    "tài liệu của task thuộc dự án B chỉ bằng cách đoán id",
+  "GET /api/documents/:id: PM dự án A KHÔNG tải được tài liệu của dự án B dù biết id",
   S,
   async () => {
-    // Route chỉ `SELECT ... FROM task_documents WHERE id = ?` (không lọc project), rồi
-    // xét quyền qua canTouchTask(user, doc.task_id) — nhưng canTouchTask (lib/bao-mat/
-    // auth.ts) trả `true` NGAY LẬP TỨC cho MỌI vai trò khác subcon, không so sánh project
-    // của task với dự án đang chọn của người gọi. Kết quả: bất kỳ user không phải subcon
-    // (pm/engineer/admin/bch/cdt/viewer) đăng nhập vào dự án A, biết (hoặc đoán) id của
-    // 1 document thuộc dự án B, đều tải được NỘI DUNG THẬT — đúng lớp lỗi "route chỉ tra
-    // WHERE id = ?" đã tìm thấy trước đây ở tài liệu mặt bằng. Test này GHI LẠI hành vi
-    // THỰC TẾ hiện có (200 + đúng nội dung — KHÔNG PHẢI hành vi mong muốn) để không đỏ
-    // giả — xem đề xuất vá lỗi trong BÁO CÁO CUỐI (không được tự sửa app/lib ở đây).
+    // LỖ HỔNG THẬT đã vá cùng đợt này. Route chỉ `SELECT ... FROM task_documents WHERE id = ?`
+    // rồi xét quyền qua canTouchTask(user, doc.task_id) — nhưng canTouchTask chỉ trả lời câu
+    // "subcon này có được giao task không" và trả `true` NGAY cho MỌI vai trò khác, không hề
+    // so dự án. Nên bất kỳ user không phải subcon (pm/engineer/admin/bch/cdt/viewer) ở dự án A
+    // chỉ cần biết id một tài liệu của dự án B là TẢI ĐƯỢC NGUYÊN VĂN FILE. Id là số nguyên
+    // tăng dần nên đoán được — không cần biết trước.
+    //
+    // Ca này dựng đúng kịch bản đó với nội dung file nhận dạng được, và đòi 404 (không phải
+    // 403 — 403 vẫn xác nhận tài liệu tồn tại).
     const { storagePut } = await import("@/lib/nen/storage");
     const projectA = await taoDuAn("dgcrossA");
     const projectB = await taoDuAn("dgcrossB");
@@ -1023,24 +1002,41 @@ test(
     const pmB = await taoUser("pm", "dgcrossB");
     const taskB = await taoTask(projectB, "dgcrossB");
     const noiDungBiMat = Buffer.from("%PDF-1.4\nNOI DUNG MAT CUA DU AN B\n%%EOF");
-    const fileName = `bug-cross-project-${uniq("dgcross")}.pdf`;
+    const fileName = `cross-project-${uniq("dgcross")}.pdf`;
     await storagePut(1, fileName, noiDungBiMat);
     const docId = await taoTaiLieu(taskB, pmB.id, { fileName });
 
     await dangNhapDuAn(pmA, projectA);
-    const { GET } = await import("@/app/api/documents/[id]/route");
+    const { GET, DELETE } = await import("@/app/api/documents/[id]/route");
     const res = await GET(jreq("/x", undefined, "GET"), {
       params: Promise.resolve({ id: String(docId) }),
     });
-    // HÀNH VI ĐÚNG PHẢI LÀ 404 (không tìm thấy, cách ly dự án) — hiện route trả 200 và
-    // lộ nguyên nội dung file. Assert đúng thực tế 200 để test này XANH (bug được ghi lại
-    // bằng bình luận + BÁO CÁO CUỐI, không phải bằng 1 ca đỏ trong bộ test).
-    assert.equal(res.status, 200, "BUG: route KHÔNG cách ly dự án — trả 200 thay vì 404");
-    const noiDungDoc = Buffer.from(await res.arrayBuffer());
-    assert.ok(
-      noiDungDoc.includes("NOI DUNG MAT CUA DU AN B"),
-      "BUG: PM dự án A đọc được nguyên văn nội dung tài liệu của dự án B",
+    assert.equal(res.status, 404, "tài liệu dự án khác phải như không tồn tại");
+    const body = await res.text();
+    assert.equal(
+      body.includes("NOI DUNG MAT CUA DU AN B"),
+      false,
+      "không được lộ một byte nào của nội dung",
     );
+
+    // Xoá cũng phải bị chặn — rò rỉ đọc đã tệ, xoá dữ liệu dự án khác còn tệ hơn.
+    const xoa = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(docId) }),
+    });
+    assert.equal(xoa.status, 404);
+    const { queryOne } = await import("@/lib/db");
+    assert.ok(
+      await queryOne(`SELECT id FROM task_documents WHERE id = ?`, docId),
+      "tài liệu của dự án B phải còn nguyên",
+    );
+
+    // Và chủ thật của nó vẫn dùng được bình thường — bản vá không được chặn nhầm người đúng.
+    await dangNhapDuAn(pmB, projectB);
+    const cuaMinh = await GET(jreq("/x", undefined, "GET"), {
+      params: Promise.resolve({ id: String(docId) }),
+    });
+    assert.equal(cuaMinh.status, 200);
+    assert.ok(Buffer.from(await cuaMinh.arrayBuffer()).includes("NOI DUNG MAT CUA DU AN B"));
   },
 );
 
@@ -1051,6 +1047,17 @@ test("DELETE /api/documents/:id: chưa đăng nhập → 401", S, async () => {
     params: Promise.resolve({ id: "1" }),
   });
   assert.equal(res.status, 401);
+});
+
+test("DELETE /api/documents/:id: ID không phải số → 400", S, async () => {
+  const projectId = await taoDuAn("ddbad");
+  const pm = await taoUser("pm", "ddbad");
+  await dangNhapDuAn(pm, projectId);
+  const { DELETE } = await import("@/app/api/documents/[id]/route");
+  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+    params: Promise.resolve({ id: "abc" }),
+  });
+  assert.equal(res.status, 400);
 });
 
 test("DELETE /api/documents/:id: không tìm thấy → 404", S, async () => {
@@ -1099,6 +1106,28 @@ test(
     assert.equal(res.status, 200);
     const row = await queryOne(`SELECT id FROM task_documents WHERE id = ?`, docId);
     assert.equal(row, undefined);
+  },
+);
+
+test(
+  "DELETE /api/documents/:id: có file vật lý thật trên đĩa → xoá luôn file (storageDelete)",
+  S,
+  async () => {
+    const { storagePut, storageGet } = await import("@/lib/nen/storage");
+    const projectId = await taoDuAn("ddphysical");
+    const eng = await taoUser("engineer", "ddphysical");
+    const taskId = await taoTask(projectId, "ddphysical");
+    const fileName = `delete-real-${uniq("ddphysical")}.pdf`;
+    await storagePut(1, fileName, PDF_BYTES);
+    const docId = await taoTaiLieu(taskId, eng.id, { fileName });
+    await dangNhapDuAn(eng, projectId);
+    const { DELETE } = await import("@/app/api/documents/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(docId) }),
+    });
+    assert.equal(res.status, 200);
+    const conLai = await storageGet(1, fileName);
+    assert.equal(conLai, null, "file vật lý phải bị xoá khỏi kho lưu trữ");
   },
 );
 

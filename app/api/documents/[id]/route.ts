@@ -2,9 +2,53 @@ import { NextRequest, NextResponse } from "next/server";
 import { storageGet, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, canTouchTask, canTouchFloor, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { sha256Hex } from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Tài liệu này có thuộc dự án đang chọn không.
+ *
+ * PHẢI kiểm riêng, KHÔNG dựa vào `canTouchTask`/`canTouchFloor`: hai hàm đó chỉ trả lời câu
+ * "subcon này có được giao việc đó không" và trả `true` NGAY cho mọi vai trò khác — chúng
+ * không hề so dự án. Route lại chỉ tra `WHERE id = ?`, nên trước bản vá này bất kỳ người dùng
+ * không phải subcon (pm/engineer/admin/bch/cdt/viewer) đang ở dự án A chỉ cần biết id một tài
+ * liệu của dự án B là TẢI ĐƯỢC NGUYÊN VĂN FILE (GET) hoặc XOÁ ĐƯỢC nó (DELETE). Id là số
+ * nguyên tăng dần nên đoán được.
+ *
+ * Tài liệu gắn task → suy dự án qua tasks → work_packages → sheet_types → towers.
+ * Tài liệu là biên bản nghiệm thu tầng → suy qua floor_approvals → sheet_types → towers.
+ */
+async function thuocDuAnDangChon(
+  doc: { task_id: number | null; floor_approval_id: number | null },
+  projectId: number,
+): Promise<boolean> {
+  if (doc.floor_approval_id != null) {
+    const row = await queryOne<{ n: number }>(
+      `SELECT 1 AS n
+         FROM floor_approvals fa
+         JOIN sheet_types st ON st.id = fa.sheet_type_id
+         JOIN towers tw ON tw.id = st.tower_id
+        WHERE fa.id = ? AND tw.project_id = ?`,
+      doc.floor_approval_id,
+      projectId,
+    );
+    return !!row;
+  }
+  if (doc.task_id == null) return false;
+  const row = await queryOne<{ n: number }>(
+    `SELECT 1 AS n
+       FROM tasks t
+       JOIN work_packages wp ON wp.id = t.package_id
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       JOIN towers tw ON tw.id = st.tower_id
+      WHERE t.id = ? AND tw.project_id = ?`,
+    doc.task_id,
+    projectId,
+  );
+  return !!row;
+}
 
 type DocRow = {
   id: number;
@@ -36,6 +80,11 @@ export async function GET(
     id,
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+
+  // Tài liệu của dự án khác → 404 (không phải 403), để không tiết lộ nó có tồn tại.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null || !(await thuocDuAnDangChon(doc, projectId)))
+    return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   if (doc.floor_approval_id != null) {
     const approval = await queryOne<{ sheetTypeId: number; floorLabel: string }>(
@@ -96,10 +145,14 @@ export async function DELETE(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const doc = await queryOne<DocRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by, floor_approval_id FROM task_documents WHERE id = ?`,
+    `SELECT id, file_name, mime_type, original_name, uploaded_by, floor_approval_id, task_id FROM task_documents WHERE id = ?`,
     id,
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null || !(await thuocDuAnDangChon(doc, projectId)))
+    return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   if (doc.uploaded_by !== user.id && !CAN.editStructure(user.role))
     return NextResponse.json(

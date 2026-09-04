@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangNhap, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangNhap, dangNhapDuAn, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -14,25 +14,6 @@ import { NextRequest } from "next/server";
 //   - app/api/equipment/[id]/route.ts   (GET/PATCH thiết bị)
 
 const S = { skip: !HAS_TEST_DB };
-
-// PHỤ THUỘC CHÉO GIỮA CÁC FILE TEST — xem tests/route-tai-chinh.test.ts: `visibleProjectIds`
-// chỉ trả "mọi dự án" khi bảng `user_projects` RỖNG. Nhiều file test khác chèn vào bảng đó
-// mà không dọn, nên nếu dùng dangNhap trần, file này xanh khi chạy riêng nhưng ĐỎ trong bộ
-// đầy đủ. Gán thẳng user vào đúng dự án của nó để test tự chủ, chạy đúng ở mọi thứ tự.
-async function dangNhapDuAn(
-  user: { id: number; passwordHash: string },
-  projectId: number | null,
-): Promise<void> {
-  if (projectId != null) {
-    const { run } = await import("@/lib/db");
-    await run(
-      `INSERT INTO user_projects (user_id, project_id) VALUES (?, ?) ON CONFLICT DO NOTHING`,
-      user.id,
-      projectId,
-    );
-  }
-  dangNhap(user, projectId);
-}
 
 const RUN = Date.now().toString(36);
 let seq = 0;

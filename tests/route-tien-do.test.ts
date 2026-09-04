@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangNhap, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangNhap, dangNhapDuAn, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -114,7 +114,7 @@ test("PATCH /api/tasks/:id: chưa đăng nhập → 401", S, async () => {
 
 test("PATCH /api/tasks/:id: vai trò engineer không được sửa cấu trúc task → 403", S, async () => {
   const ctx = await dungDuLieu("engineer", `eng${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/tasks/[id]/route");
   const res = await PATCH(req(`/api/tasks/${ctx.taskId}`, { name: "Đổi tên" }), {
     params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -129,7 +129,7 @@ test(
     // Bất biến: nghiệm thu CHỈ đặt được qua POST /api/tasks/:id/approve (có audit +
     // kiểm 100%) — PATCH task thường phải chặn cứng dù caller đúng vai trò Admin/PM.
     const ctx = await dungDuLieu("pm", `nt${RUN}`);
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/tasks/[id]/route");
     const res = await PATCH(req(`/api/tasks/${ctx.taskId}`, { status: "nghiem_thu" }), {
       params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -141,7 +141,7 @@ test(
 
 test("PATCH /api/tasks/:id: status không nằm trong danh sách hợp lệ → 422", S, async () => {
   const ctx = await dungDuLieu("pm", `badst${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/tasks/[id]/route");
   const res = await PATCH(req(`/api/tasks/${ctx.taskId}`, { status: "linh_tinh" }), {
     params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -151,7 +151,7 @@ test("PATCH /api/tasks/:id: status không nằm trong danh sách hợp lệ → 
 
 test("PATCH /api/tasks/:id: ngày sai định dạng → 422", S, async () => {
   const ctx = await dungDuLieu("pm", `badday${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/tasks/[id]/route");
   const res = await PATCH(req(`/api/tasks/${ctx.taskId}`, { startDate: "01/01/2026" }), {
     params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -161,7 +161,7 @@ test("PATCH /api/tasks/:id: ngày sai định dạng → 422", S, async () => {
 
 test("PATCH /api/tasks/:id: tên rỗng → 422", S, async () => {
   const ctx = await dungDuLieu("pm", `emptyname${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/tasks/[id]/route");
   const res = await PATCH(req(`/api/tasks/${ctx.taskId}`, { name: "   " }), {
     params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -174,7 +174,7 @@ test(
   S,
   async () => {
     const ctx = await dungDuLieu("pm", `xss${RUN}`);
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/tasks/[id]/route");
     const res = await PATCH(
       req(`/api/tasks/${ctx.taskId}`, { drawingUrl: "javascript:alert(1)" }),
@@ -186,7 +186,7 @@ test(
 
 test("PATCH /api/tasks/:id: link bản vẽ http hợp lệ → 200, lưu đúng URL", S, async () => {
   const ctx = await dungDuLieu("pm", `okurl${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/tasks/[id]/route");
   const res = await PATCH(
     req(`/api/tasks/${ctx.taskId}`, { drawingUrl: "https://example.com/a.pdf" }),
@@ -206,7 +206,7 @@ test("PATCH /api/tasks/:id: mã BOQ trùng với task khác → 409", S, async (
     `INSERT INTO tasks (package_id, code, name) VALUES (?, 'T1,02', 'Task 2')`,
     ctx.packageId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/tasks/[id]/route");
   const res = await PATCH(req(`/api/tasks/${taskId2}`, { boqCode: `BOQ-${RUN}` }), {
     params: Promise.resolve({ id: String(taskId2) }),
@@ -216,7 +216,7 @@ test("PATCH /api/tasks/:id: mã BOQ trùng với task khác → 409", S, async (
 
 test("PATCH /api/tasks/:id: không có trường nào để cập nhật → 400", S, async () => {
   const ctx = await dungDuLieu("pm", `nofield${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/tasks/[id]/route");
   const res = await PATCH(req(`/api/tasks/${ctx.taskId}`, {}), {
     params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -234,7 +234,7 @@ test(
       `INSERT INTO users (name, email, password_hash, role, org_id) VALUES ('Nguoi Duoc Gan', ?, 'x', 'engineer', 1)`,
       `gan-${RUN}@test.local`,
     );
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/tasks/[id]/route");
     const res = await PATCH(req(`/api/tasks/${ctx.taskId}`, { assignedTo: nguoiDuocGan }), {
       params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -251,7 +251,7 @@ test(
     // status='hoan_thanh' thủ công khi % còn dở phải bị chặn — nếu không, dashboard đếm
     // "hoàn thành" sai số so với % thật.
     const ctx = await dungDuLieu("pm", `mismatch${RUN}`, { progress: 0.5 });
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/tasks/[id]/route");
     const res = await PATCH(req(`/api/tasks/${ctx.taskId}`, { status: "hoan_thanh" }), {
       params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -267,7 +267,7 @@ test(
     const ctx = await dungDuLieu("pm", `histst${RUN}`, { progress: 0.5 });
     const { run } = await import("@/lib/db");
     await run(`UPDATE tasks SET status = 'chuan_bi' WHERE id = ?`, ctx.taskId);
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/tasks/[id]/route");
     const res = await PATCH(req(`/api/tasks/${ctx.taskId}`, { status: "dang_thi_cong" }), {
       params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -287,7 +287,7 @@ test(
   S,
   async () => {
     const ctx = await dungDuLieu("pm", `deadline${RUN}`, { progress: 0.5 });
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/tasks/[id]/route");
     const res = await PATCH(req(`/api/tasks/${ctx.taskId}`, { endDate: "2000-01-01" }), {
       params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -299,7 +299,7 @@ test(
 
 test("PATCH /api/tasks/:id: task không tồn tại → 404", S, async () => {
   const ctx = await dungDuLieu("pm", `notfound${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/tasks/[id]/route");
   const res = await PATCH(req(`/api/tasks/999999999`, { name: "x" }), {
     params: Promise.resolve({ id: "999999999" }),
@@ -309,7 +309,7 @@ test("PATCH /api/tasks/:id: task không tồn tại → 404", S, async () => {
 
 test("PATCH /api/tasks/:id: ID không hợp lệ → 400", S, async () => {
   const ctx = await dungDuLieu("pm", `badid${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/tasks/[id]/route");
   const res = await PATCH(req(`/api/tasks/abc`, { name: "x" }), {
     params: Promise.resolve({ id: "abc" }),
@@ -322,7 +322,7 @@ test(
   S,
   async () => {
     const ctx = await dungDuLieu("pm", `custom${RUN}`);
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/tasks/[id]/route");
     const res = await PATCH(req(`/api/tasks/${ctx.taskId}`, { custom: { hang_muc: "ống nước" } }), {
       params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -344,7 +344,7 @@ test("DELETE /api/tasks/:id: chưa đăng nhập → 401", S, async () => {
 
 test("DELETE /api/tasks/:id: engineer không được xoá task → 403", S, async () => {
   const ctx = await dungDuLieu("engineer", `delteng${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/tasks/[id]/route");
   const res = await DELETE(req(`/api/tasks/${ctx.taskId}`, undefined, "DELETE"), {
     params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -354,7 +354,7 @@ test("DELETE /api/tasks/:id: engineer không được xoá task → 403", S, asy
 
 test("DELETE /api/tasks/:id: ID không hợp lệ → 400", S, async () => {
   const ctx = await dungDuLieu("pm", `deltbadid${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/tasks/[id]/route");
   const res = await DELETE(req(`/api/tasks/abc`, undefined, "DELETE"), {
     params: Promise.resolve({ id: "abc" }),
@@ -364,7 +364,7 @@ test("DELETE /api/tasks/:id: ID không hợp lệ → 400", S, async () => {
 
 test("DELETE /api/tasks/:id: task không tồn tại → 404", S, async () => {
   const ctx = await dungDuLieu("pm", `deltnf${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/tasks/[id]/route");
   const res = await DELETE(req(`/api/tasks/999999993`, undefined, "DELETE"), {
     params: Promise.resolve({ id: "999999993" }),
@@ -378,7 +378,7 @@ test(
   async () => {
     const ctx = await dungDuLieu("pm", `deltok${RUN}`);
     await themDimensions(ctx.taskId, 2);
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { DELETE } = await import("@/app/api/tasks/[id]/route");
     const res = await DELETE(req(`/api/tasks/${ctx.taskId}`, undefined, "DELETE"), {
       params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -411,7 +411,7 @@ test("POST /api/tasks/:id/approve: chưa đăng nhập → 401", S, async () => 
 
 test("POST /api/tasks/:id/approve: engineer không được duyệt nghiệm thu → 403", S, async () => {
   const ctx = await dungDuLieu("engineer", `appreng${RUN}`, { progress: 1 });
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/tasks/[id]/approve/route");
   const res = await POST(req(`/api/tasks/${ctx.taskId}/approve`, {}, "POST"), {
     params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -427,7 +427,7 @@ test(
     // đặt nghiem_thu khi tiến độ thi công thật còn dở — đây là chốt chặn quan trọng nhất
     // của toàn hệ thống nghiệm thu.
     const ctx = await dungDuLieu("pm", `chua100${RUN}`, { progress: 0.9 });
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { POST } = await import("@/app/api/tasks/[id]/approve/route");
     const res = await POST(req(`/api/tasks/${ctx.taskId}/approve`, {}, "POST"), {
       params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -442,7 +442,7 @@ test(
   S,
   async () => {
     const ctx = await dungDuLieu("pm", `du100${RUN}`, { progress: 1 });
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { POST } = await import("@/app/api/tasks/[id]/approve/route");
     const res = await POST(req(`/api/tasks/${ctx.taskId}/approve`, {}, "POST"), {
       params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -465,7 +465,7 @@ test(
 
 test("POST /api/tasks/:id/approve: task đã nghiệm thu rồi → 409 (không duyệt lại)", S, async () => {
   const ctx = await dungDuLieu("pm", `dupapprove${RUN}`, { progress: 1 });
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/tasks/[id]/approve/route");
   const p1 = { params: Promise.resolve({ id: String(ctx.taskId) }) };
   assert.equal((await POST(req(`/api/tasks/${ctx.taskId}/approve`, {}, "POST"), p1)).status, 200);
@@ -475,7 +475,7 @@ test("POST /api/tasks/:id/approve: task đã nghiệm thu rồi → 409 (không 
 
 test("POST /api/tasks/:id/approve: task không tồn tại → 404", S, async () => {
   const ctx = await dungDuLieu("pm", `apnf${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/tasks/[id]/approve/route");
   const res = await POST(req(`/api/tasks/999999998/approve`, {}, "POST"), {
     params: Promise.resolve({ id: "999999998" }),
@@ -485,7 +485,7 @@ test("POST /api/tasks/:id/approve: task không tồn tại → 404", S, async ()
 
 test("POST /api/tasks/:id/approve: ID không hợp lệ → 400", S, async () => {
   const ctx = await dungDuLieu("pm", `apbadid${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/tasks/[id]/approve/route");
   const res = await POST(req(`/api/tasks/abc/approve`, {}, "POST"), {
     params: Promise.resolve({ id: "abc" }),
@@ -495,7 +495,7 @@ test("POST /api/tasks/:id/approve: ID không hợp lệ → 400", S, async () =>
 
 test("POST /api/tasks/:id/approve: decision=reject không có yêu cầu chờ → 409", S, async () => {
   const ctx = await dungDuLieu("pm", `reject${RUN}`, { progress: 1 });
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/tasks/[id]/approve/route");
   const res = await POST(
     req(`/api/tasks/${ctx.taskId}/approve`, { decision: "reject", note: "sai" }, "POST"),
@@ -506,7 +506,7 @@ test("POST /api/tasks/:id/approve: decision=reject không có yêu cầu chờ �
 
 test("POST /api/tasks/:id/approve: decision=reject thiếu note → 422", S, async () => {
   const ctx = await dungDuLieu("pm", `rejectnote${RUN}`, { progress: 1 });
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/tasks/[id]/approve/route");
   const res = await POST(req(`/api/tasks/${ctx.taskId}/approve`, { decision: "reject" }, "POST"), {
     params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -525,7 +525,7 @@ test("DELETE /api/tasks/:id/approve: chưa đăng nhập → 401", S, async () =
 
 test("DELETE /api/tasks/:id/approve: engineer không được huỷ nghiệm thu → 403", S, async () => {
   const ctx = await dungDuLieu("engineer", `delappreng${RUN}`, { progress: 1 });
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/tasks/[id]/approve/route");
   const res = await DELETE(req(`/api/tasks/${ctx.taskId}/approve`, undefined, "DELETE"), {
     params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -535,7 +535,7 @@ test("DELETE /api/tasks/:id/approve: engineer không được huỷ nghiệm thu
 
 test("DELETE /api/tasks/:id/approve: task chưa nghiệm thu → 409", S, async () => {
   const ctx = await dungDuLieu("pm", `delnotap${RUN}`, { progress: 0.5 });
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/tasks/[id]/approve/route");
   const res = await DELETE(req(`/api/tasks/${ctx.taskId}/approve`, undefined, "DELETE"), {
     params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -548,7 +548,7 @@ test(
   S,
   async () => {
     const ctx = await dungDuLieu("pm", `delok${RUN}`, { progress: 1 });
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { POST, DELETE } = await import("@/app/api/tasks/[id]/approve/route");
     const p = { params: Promise.resolve({ id: String(ctx.taskId) }) };
     assert.equal((await POST(req(`/api/tasks/${ctx.taskId}/approve`, {}, "POST"), p)).status, 200);
@@ -561,7 +561,7 @@ test(
 
 test("DELETE /api/tasks/:id/approve: task không tồn tại → 404", S, async () => {
   const ctx = await dungDuLieu("pm", `delnf${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/tasks/[id]/approve/route");
   const res = await DELETE(req(`/api/tasks/999999997/approve`, undefined, "DELETE"), {
     params: Promise.resolve({ id: "999999997" }),
@@ -571,7 +571,7 @@ test("DELETE /api/tasks/:id/approve: task không tồn tại → 404", S, async 
 
 test("DELETE /api/tasks/:id/approve: ID không hợp lệ → 400", S, async () => {
   const ctx = await dungDuLieu("pm", `delbadid${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/tasks/[id]/approve/route");
   const res = await DELETE(req(`/api/tasks/abc/approve`, undefined, "DELETE"), {
     params: Promise.resolve({ id: "abc" }),
@@ -597,7 +597,7 @@ test(
   S,
   async () => {
     const ctx = await dungDuLieu("viewer", `viewerprog${RUN}`);
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
     const res = await PATCH(req(`/api/tasks/${ctx.taskId}/progress`, { progress: 0.5 }), {
       params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -611,7 +611,7 @@ test(
   S,
   async () => {
     const ctx = await dungDuLieu("subcon", `subconkhac${RUN}`); // task KHÔNG gán cho subcon này
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
     const res = await PATCH(req(`/api/tasks/${ctx.taskId}/progress`, { progress: 0.5 }), {
       params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -634,7 +634,7 @@ test("PATCH /api/tasks/:id/progress: subcon được giao task → cập nhật 
     `SELECT password_hash FROM users WHERE id = ?`,
     subconId,
   );
-  dangNhap({ id: subconId, passwordHash: u!.password_hash }, ctx.projectId);
+  await dangNhapDuAn({ id: subconId, passwordHash: u!.password_hash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
   const res = await PATCH(req(`/api/tasks/${ctx.taskId}/progress`, { progress: 0.7 }), {
     params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -645,7 +645,7 @@ test("PATCH /api/tasks/:id/progress: subcon được giao task → cập nhật 
 
 test("PATCH /api/tasks/:id/progress: thiếu progress → 400", S, async () => {
   const ctx = await dungDuLieu("pm", `noprog${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
   const res = await PATCH(req(`/api/tasks/${ctx.taskId}/progress`, {}), {
     params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -655,7 +655,7 @@ test("PATCH /api/tasks/:id/progress: thiếu progress → 400", S, async () => {
 
 test("PATCH /api/tasks/:id/progress: progress ngoài khoảng bị ghim về [0,1]", S, async () => {
   const ctx = await dungDuLieu("pm", `clamp${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
   const res = await PATCH(req(`/api/tasks/${ctx.taskId}/progress`, { progress: 5 }), {
     params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -672,7 +672,7 @@ test(
     // thì subcon/engineer (được phép sửa tiến độ) sẽ tự nghiệm thu được, bỏ qua toàn bộ
     // gate CAN.approve + kiểm 100% + audit riêng của /approve.
     const ctx = await dungDuLieu("engineer", `progappr${RUN}`, { progress: 1 });
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
     const res = await PATCH(
       req(`/api/tasks/${ctx.taskId}/progress`, { progress: 1, status: "nghiem_thu" }),
@@ -687,7 +687,7 @@ test(
   S,
   async () => {
     const ctx = await dungDuLieu("engineer", `progmismatch${RUN}`);
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
     const res = await PATCH(
       req(`/api/tasks/${ctx.taskId}/progress`, { progress: 1, status: "dang_thi_cong" }),
@@ -699,7 +699,7 @@ test(
 
 test("PATCH /api/tasks/:id/progress: task không tồn tại → 404", S, async () => {
   const ctx = await dungDuLieu("pm", `prognf${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
   const res = await PATCH(req(`/api/tasks/999999996/progress`, { progress: 0.5 }), {
     params: Promise.resolve({ id: "999999996" }),
@@ -712,7 +712,7 @@ test(
   S,
   async () => {
     const ctx = await dungDuLieu("pm", `full${RUN}`, { progress: 0.5 });
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
     const res = await PATCH(req(`/api/tasks/${ctx.taskId}/progress`, { progress: 1 }), {
       params: Promise.resolve({ id: String(ctx.taskId) }),
@@ -733,7 +733,7 @@ test(
   S,
   async () => {
     const ctx = await dungDuLieu("pm", `dup${RUN}`, { progress: 0.4 });
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
     const p = { params: Promise.resolve({ id: String(ctx.taskId) }) };
     await PATCH(req(`/api/tasks/${ctx.taskId}/progress`, { progress: 0.4 }), p);
@@ -761,7 +761,7 @@ test("PATCH /api/dimensions/:id: chưa đăng nhập → 401", S, async () => {
 
 test("PATCH /api/dimensions/:id: vai trò chỉ-xem (bch) không được tick → 403", S, async () => {
   const ctx = await dungDuLieu("bch", `bchdim${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/dimensions/[id]/route");
   const res = await PATCH(req(`/api/dimensions/1`, { installed: true }), {
     params: Promise.resolve({ id: "1" }),
@@ -771,7 +771,7 @@ test("PATCH /api/dimensions/:id: vai trò chỉ-xem (bch) không được tick �
 
 test("PATCH /api/dimensions/:id: dimension không tồn tại → 404", S, async () => {
   const ctx = await dungDuLieu("pm", `dimnf${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/dimensions/[id]/route");
   const res = await PATCH(req(`/api/dimensions/999999995`, { installed: true }), {
     params: Promise.resolve({ id: "999999995" }),
@@ -782,7 +782,7 @@ test("PATCH /api/dimensions/:id: dimension không tồn tại → 404", S, async
 test("PATCH /api/dimensions/:id: ghi chú quá dài → 422", S, async () => {
   const ctx = await dungDuLieu("pm", `notelen${RUN}`);
   const [dimId] = await themDimensions(ctx.taskId, 1);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/dimensions/[id]/route");
   const res = await PATCH(
     req(`/api/dimensions/${dimId}`, { installed: true, note: "x".repeat(501) }),
@@ -794,7 +794,7 @@ test("PATCH /api/dimensions/:id: ghi chú quá dài → 422", S, async () => {
 test("PATCH /api/dimensions/:id: subcon không được giao task chứa ô này → 403", S, async () => {
   const ctx = await dungDuLieu("subcon", `dimsubkhac${RUN}`);
   const [dimId] = await themDimensions(ctx.taskId, 1);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/dimensions/[id]/route");
   const res = await PATCH(req(`/api/dimensions/${dimId}`, { installed: true }), {
     params: Promise.resolve({ id: String(dimId) }),
@@ -810,7 +810,7 @@ test(
     // cho mọi ca chưa đủ, tránh mở khoá nghiệm thu sai khi làm tròn 199/200 lên 1.00.
     const ctx = await dungDuLieu("pm", `half${RUN}`, { progress: 0 });
     const [d1] = await themDimensions(ctx.taskId, 2);
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/dimensions/[id]/route");
     const res = await PATCH(req(`/api/dimensions/${d1}`, { installed: true, note: "ghi chú" }), {
       params: Promise.resolve({ id: String(d1) }),
@@ -828,7 +828,7 @@ test(
   async () => {
     const ctx = await dungDuLieu("pm", `allticked${RUN}`, { progress: 0 });
     const [d1] = await themDimensions(ctx.taskId, 1);
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/dimensions/[id]/route");
     const res = await PATCH(req(`/api/dimensions/${d1}`, { installed: true }), {
       params: Promise.resolve({ id: String(d1) }),
@@ -846,7 +846,7 @@ test(
   async () => {
     const ctx = await dungDuLieu("pm", `untick${RUN}`, { progress: 0 });
     const [d1] = await themDimensions(ctx.taskId, 1);
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/dimensions/[id]/route");
     const p = { params: Promise.resolve({ id: String(d1) }) };
     await PATCH(req(`/api/dimensions/${d1}`, { installed: true, note: "sẽ bị xoá" }), p);
@@ -875,7 +875,7 @@ test("PATCH /api/dimensions/batch: chưa đăng nhập → 401", S, async () => 
 
 test("PATCH /api/dimensions/batch: vai trò chỉ-xem (cdt) không được tick → 403", S, async () => {
   const ctx = await dungDuLieu("cdt", `cdtbatch${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/dimensions/batch/route");
   const res = await PATCH(req("/api/dimensions/batch", { ids: [1], installed: true }));
   assert.equal(res.status, 403);
@@ -883,7 +883,7 @@ test("PATCH /api/dimensions/batch: vai trò chỉ-xem (cdt) không được tick
 
 test("PATCH /api/dimensions/batch: thiếu ids → 400", S, async () => {
   const ctx = await dungDuLieu("pm", `nobatch${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/dimensions/batch/route");
   const res = await PATCH(req("/api/dimensions/batch", { ids: [], installed: true }));
   assert.equal(res.status, 400);
@@ -891,7 +891,7 @@ test("PATCH /api/dimensions/batch: thiếu ids → 400", S, async () => {
 
 test("PATCH /api/dimensions/batch: quá 1000 ô mỗi lần → 422", S, async () => {
   const ctx = await dungDuLieu("pm", `toomany${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/dimensions/batch/route");
   const ids = Array.from({ length: 1001 }, (_, i) => i + 1);
   const res = await PATCH(req("/api/dimensions/batch", { ids, installed: true }));
@@ -900,7 +900,7 @@ test("PATCH /api/dimensions/batch: quá 1000 ô mỗi lần → 422", S, async (
 
 test("PATCH /api/dimensions/batch: không tìm thấy dimension nào → 404", S, async () => {
   const ctx = await dungDuLieu("pm", `nonefound${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/dimensions/batch/route");
   const res = await PATCH(req("/api/dimensions/batch", { ids: [999999994], installed: true }));
   assert.equal(res.status, 404);
@@ -912,7 +912,7 @@ test(
   async () => {
     const ctx = await dungDuLieu("subcon", `batchsubkhac${RUN}`);
     const dimIds = await themDimensions(ctx.taskId, 2);
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/dimensions/batch/route");
     const res = await PATCH(req("/api/dimensions/batch", { ids: dimIds, installed: true }));
     assert.equal(res.status, 403);
@@ -928,7 +928,7 @@ test(
     // được từ bên ngoài (mọi ghi đều trong 1 transaction).
     const ctx = await dungDuLieu("pm", `atomic${RUN}`, { progress: 0 });
     const dimIds = await themDimensions(ctx.taskId, 3);
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/dimensions/batch/route");
     const res = await PATCH(req("/api/dimensions/batch", { ids: dimIds, installed: true }));
     assert.equal(res.status, 200);
@@ -954,7 +954,7 @@ test(
 test("PATCH /api/dimensions/batch: id trùng lặp trong body chỉ tính 1 lần (dedup)", S, async () => {
   const ctx = await dungDuLieu("pm", `dedupbatch${RUN}`, { progress: 0 });
   const [d1] = await themDimensions(ctx.taskId, 1);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/dimensions/batch/route");
   const res = await PATCH(req("/api/dimensions/batch", { ids: [d1, d1, d1], installed: true }));
   assert.equal(res.status, 200);
@@ -974,7 +974,7 @@ test("GET /api/approvals: chưa đăng nhập → 401", S, async () => {
 
 test("GET /api/approvals: liệt kê tầng chờ duyệt, canApprove theo vai trò", S, async () => {
   const ctx = await dungDuLieu("engineer", `getappr${RUN}`, { progress: 1, floorLabel: "T5" });
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { GET } = await import("@/app/api/approvals/route");
   const res = await GET();
   assert.equal(res.status, 200);
@@ -992,7 +992,7 @@ test("POST /api/approvals: chưa đăng nhập → 401", S, async () => {
 
 test("POST /api/approvals: engineer không được duyệt nghiệm thu theo lô → 403", S, async () => {
   const ctx = await dungDuLieu("engineer", `postappreng${RUN}`, { progress: 1, floorLabel: "T5" });
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/approvals/route");
   const res = await POST(
     req("/api/approvals", { sheetTypeId: ctx.sheetTypeId, floorLabel: "T5" }, "POST"),
@@ -1002,7 +1002,7 @@ test("POST /api/approvals: engineer không được duyệt nghiệm thu theo l�
 
 test("POST /api/approvals: thiếu sheetTypeId/floorLabel → 400", S, async () => {
   const ctx = await dungDuLieu("pm", `postmissing${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/approvals/route");
   const res = await POST(req("/api/approvals", { sheetTypeId: null, floorLabel: "" }, "POST"));
   assert.equal(res.status, 400);
@@ -1010,7 +1010,7 @@ test("POST /api/approvals: thiếu sheetTypeId/floorLabel → 400", S, async () 
 
 test("POST /api/approvals: tầng không có task nào → 404", S, async () => {
   const ctx = await dungDuLieu("pm", `emptyfloor${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/approvals/route");
   const res = await POST(
     req(
@@ -1029,7 +1029,7 @@ test(
     // Bất biến duyệt theo lô: 1 task dở dang cũng đủ chặn TOÀN BỘ tầng — không được
     // nghiệm thu "gần đủ", tránh lọt task chưa xong vào trạng thái nghiem_thu.
     const ctx = await dungDuLieu("pm", `floorpartial${RUN}`, { progress: 0.5, floorLabel: "T9" });
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { POST } = await import("@/app/api/approvals/route");
     const res = await POST(
       req("/api/approvals", { sheetTypeId: ctx.sheetTypeId, floorLabel: "T9" }, "POST"),
@@ -1043,7 +1043,7 @@ test(
   S,
   async () => {
     const ctx = await dungDuLieu("pm", `floorok${RUN}`, { progress: 1, floorLabel: "T10" });
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { POST } = await import("@/app/api/approvals/route");
     const res = await POST(
       req("/api/approvals", { sheetTypeId: ctx.sheetTypeId, floorLabel: "T10" }, "POST"),
@@ -1062,7 +1062,7 @@ test(
 
 test("POST /api/approvals: tầng đã nghiệm thu rồi → 409 (không duyệt lại)", S, async () => {
   const ctx = await dungDuLieu("pm", `floordup${RUN}`, { progress: 1, floorLabel: "T11" });
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/approvals/route");
   const body = { sheetTypeId: ctx.sheetTypeId, floorLabel: "T11" };
   assert.equal((await POST(req("/api/approvals", body, "POST"))).status, 200);

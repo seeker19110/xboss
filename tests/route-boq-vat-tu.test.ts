@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangNhap, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangNhap, dangNhapDuAn, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -101,7 +101,7 @@ test("GET /api/boq: chỉ thấy dòng BOQ của đúng dự án đang chọn �
     b.projectId,
   );
 
-  dangNhap({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
+  await dangNhapDuAn({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
   const { GET } = await import("@/app/api/boq/route");
   const resA = await GET(req("http://localhost/api/boq", undefined, "GET"));
   assert.equal(resA.status, 200);
@@ -111,7 +111,7 @@ test("GET /api/boq: chỉ thấy dòng BOQ của đúng dự án đang chọn �
 
   // Dự án B không được thấy dòng của A — bất biến cách ly dự án chỉ kiểm được thật khi
   // route thực sự chạy dưới phiên B.
-  dangNhap({ id: b.userId, passwordHash: b.pwHash }, b.projectId);
+  await dangNhapDuAn({ id: b.userId, passwordHash: b.pwHash }, b.projectId);
   const resB = await GET(req("http://localhost/api/boq", undefined, "GET"));
   const jsonB = await resB.json();
   assert.equal(jsonB.items.length, 1);
@@ -140,7 +140,7 @@ test(
       ctx.taskId,
     );
 
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { GET } = await import("@/app/api/boq/route");
     const res = await GET(req(`http://localhost/api/boq?system=HDBV${RUN}`, undefined, "GET"));
     assert.equal(res.status, 200);
@@ -158,7 +158,7 @@ test(
 
 test("POST /api/boq: vai trò không phải Admin/PM → 403", S, async () => {
   const ctx = await dungDuLieu("engineer", `post403${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/boq/route");
   const res = await POST(
     req("http://localhost/api/boq", { code: `X-${RUN}`, name: "X", unit: "m" }),
@@ -168,7 +168,7 @@ test("POST /api/boq: vai trò không phải Admin/PM → 403", S, async () => {
 
 test("POST /api/boq: thiếu mã/tên/đơn vị → 422", S, async () => {
   const ctx = await dungDuLieu("pm", `post422${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/boq/route");
   const res = await POST(req("http://localhost/api/boq", { code: "", name: "", unit: "" }));
   assert.equal(res.status, 422);
@@ -176,7 +176,7 @@ test("POST /api/boq: thiếu mã/tên/đơn vị → 422", S, async () => {
 
 test("POST /api/boq: hệ (systemId) không tồn tại → 422", S, async () => {
   const ctx = await dungDuLieu("pm", `postsys${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/boq/route");
   const res = await POST(
     req("http://localhost/api/boq", {
@@ -197,7 +197,7 @@ test("POST /api/boq: trùng BOQCODE với TASK đã có → 409, không tạo d�
   const maTrung = `TRUNGTASK-${RUN}`;
   await run(`UPDATE tasks SET boq_code = ? WHERE id = ?`, maTrung, ctx.taskId);
 
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/boq/route");
   const res = await POST(req("http://localhost/api/boq", { code: maTrung, name: "X", unit: "m" }));
   assert.equal(res.status, 409);
@@ -206,7 +206,7 @@ test("POST /api/boq: trùng BOQCODE với TASK đã có → 409, không tạo d�
 
 test("POST /api/boq: PM tạo dòng BOQ hợp lệ → 201", S, async () => {
   const ctx = await dungDuLieu("pm", `posok${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/boq/route");
   const res = await POST(
     req("http://localhost/api/boq", {
@@ -243,7 +243,7 @@ test(
         `SELECT password_hash FROM users WHERE id = ?`,
         ctx.userId,
       );
-      dangNhap({ id: ctx.userId, passwordHash: u!.password_hash }, null);
+      await dangNhapDuAn({ id: ctx.userId, passwordHash: u!.password_hash }, null);
       const { GET } = await import("@/app/api/boq/route");
       const res = await GET(req("http://localhost/api/boq", undefined, "GET"));
       assert.equal(res.status, 200);
@@ -263,7 +263,7 @@ test(
     // lưới an toàn cuối cùng khi có race giữa 2 request đồng thời.
     const ctx = await dungDuLieu("pm", `caserace${RUN}`);
     const ma = `CASE-${RUN}`;
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { POST } = await import("@/app/api/boq/route");
     const r1 = await POST(req("http://localhost/api/boq", { code: ma, name: "X", unit: "m" }));
     assert.equal(r1.status, 201);
@@ -291,7 +291,7 @@ test("POST /api/boq: chưa có dự án nào để chọn → 422 (user không t
       `SELECT password_hash FROM users WHERE id = ?`,
       ctx.userId,
     );
-    dangNhap({ id: ctx.userId, passwordHash: u!.password_hash }, null);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: u!.password_hash }, null);
     const { POST } = await import("@/app/api/boq/route");
     const res = await POST(
       req("http://localhost/api/boq", { code: `NODU-${RUN}`, name: "X", unit: "m" }),
@@ -317,7 +317,7 @@ test("PATCH /api/boq/:id: chưa đăng nhập → 401", { ...S }, async () => {
 
 test("PATCH /api/boq/:id: vai trò không phải Admin/PM → 403", S, async () => {
   const ctx = await dungDuLieu("subcon", `pat403${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/boq/[id]/route");
   const res = await PATCH(req("http://localhost/api/boq/1", { name: "x" }), {
     params: Promise.resolve({ id: "1" }),
@@ -327,7 +327,7 @@ test("PATCH /api/boq/:id: vai trò không phải Admin/PM → 403", S, async () 
 
 test("PATCH /api/boq/:id: id không phải số → 400", S, async () => {
   const ctx = await dungDuLieu("pm", `patnan${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/boq/[id]/route");
   const res = await PATCH(req("http://localhost/api/boq/abc", { name: "x" }), {
     params: Promise.resolve({ id: "abc" }),
@@ -345,7 +345,7 @@ test("PATCH /api/boq/:id: dòng BOQ của dự án KHÁC → 404 (cách ly dự 
     b.projectId,
   );
   // A cố sửa dòng BOQ của B.
-  dangNhap({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
+  await dangNhapDuAn({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
   const { PATCH } = await import("@/app/api/boq/[id]/route");
   const res = await PATCH(req(`http://localhost/api/boq/${boqIdB}`, { name: "Hack" }), {
     params: Promise.resolve({ id: String(boqIdB) }),
@@ -366,7 +366,7 @@ test("PATCH /api/boq/:id: đổi code trùng với dòng BOQ khác → 409", S, 
     `DUPB-${RUN}`,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/boq/[id]/route");
   const res = await PATCH(req(`http://localhost/api/boq/${target}`, { code: `DUPA-${RUN}` }), {
     params: Promise.resolve({ id: String(target) }),
@@ -383,7 +383,7 @@ test("PATCH /api/boq/:id: code rỗng / hệ không hợp lệ / số âm → 42
     `V422-${RUN}`,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/boq/[id]/route");
 
   assert.equal(
@@ -451,7 +451,7 @@ test(
       `OKPAT-${RUN}`,
       ctx.projectId,
     );
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/boq/[id]/route");
     // Trước tiên gán một hệ HỢP LỆ + đổi khối lượng/đơn giá — bao phủ nhánh systemId số hợp
     // lệ và nhánh qty/unitPrice >= 0 hợp lệ (không chỉ nhánh lỗi âm ở ca khác).
@@ -493,7 +493,7 @@ test("DELETE /api/boq/:id: chưa đăng nhập → 401", { ...S }, async () => {
 
 test("DELETE /api/boq/:id: vai trò không phải Admin/PM → 403", S, async () => {
   const ctx = await dungDuLieu("engineer", `del403${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/boq/[id]/route");
   const res = await DELETE(req("http://localhost/api/boq/1", undefined, "DELETE"), {
     params: Promise.resolve({ id: "1" }),
@@ -503,7 +503,7 @@ test("DELETE /api/boq/:id: vai trò không phải Admin/PM → 403", S, async ()
 
 test("DELETE /api/boq/:id: id không phải số → 400", S, async () => {
   const ctx = await dungDuLieu("pm", `delnan${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/boq/[id]/route");
   const res = await DELETE(req("http://localhost/api/boq/abc", undefined, "DELETE"), {
     params: Promise.resolve({ id: "abc" }),
@@ -513,7 +513,7 @@ test("DELETE /api/boq/:id: id không phải số → 400", S, async () => {
 
 test("DELETE /api/boq/:id: không tìm thấy (đã xoá/dự án khác) → 404", S, async () => {
   const ctx = await dungDuLieu("pm", `del404${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/boq/[id]/route");
   const res = await DELETE(req("http://localhost/api/boq/999999999", undefined, "DELETE"), {
     params: Promise.resolve({ id: "999999999" }),
@@ -534,7 +534,7 @@ test("DELETE /api/boq/:id: xoá thành công (cascade map) → 200", S, async ()
     boqId,
     ctx.taskId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/boq/[id]/route");
   const res = await DELETE(req(`http://localhost/api/boq/${boqId}`, undefined, "DELETE"), {
     params: Promise.resolve({ id: String(boqId) }),
@@ -559,7 +559,7 @@ test("PUT /api/boq/:id/map: chưa đăng nhập → 401", { ...S }, async () => 
 
 test("PUT /api/boq/:id/map: vai trò không phải Admin/PM → 403", S, async () => {
   const ctx = await dungDuLieu("engineer", `map403${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PUT } = await import("@/app/api/boq/[id]/map/route");
   const res = await PUT(req("http://localhost/api/boq/1/map", { map: [] }, "PUT"), {
     params: Promise.resolve({ id: "1" }),
@@ -569,7 +569,7 @@ test("PUT /api/boq/:id/map: vai trò không phải Admin/PM → 403", S, async (
 
 test("PUT /api/boq/:id/map: id không phải số → 400", S, async () => {
   const ctx = await dungDuLieu("pm", `mapnan${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PUT } = await import("@/app/api/boq/[id]/map/route");
   const res = await PUT(req("http://localhost/api/boq/abc/map", { map: [] }, "PUT"), {
     params: Promise.resolve({ id: "abc" }),
@@ -586,7 +586,7 @@ test("PUT /api/boq/:id/map: dòng BOQ của dự án khác → 404", S, async ()
     `MAPISOB-${RUN}`,
     b.projectId,
   );
-  dangNhap({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
+  await dangNhapDuAn({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
   const { PUT } = await import("@/app/api/boq/[id]/map/route");
   const res = await PUT(
     req(
@@ -607,7 +607,7 @@ test("PUT /api/boq/:id/map: taskId không hợp lệ / weight ≤ 0 → 422", S,
     `MAPVAL-${RUN}`,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PUT } = await import("@/app/api/boq/[id]/map/route");
 
   const res1 = await PUT(
@@ -650,7 +650,7 @@ test("PUT /api/boq/:id/map: task không tồn tại → 422", S, async () => {
     `MAPMISS-${RUN}`,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PUT } = await import("@/app/api/boq/[id]/map/route");
   const res = await PUT(
     req(
@@ -676,7 +676,7 @@ test(
       `MAPOVER-${RUN}`,
       ctx.projectId,
     );
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PUT } = await import("@/app/api/boq/[id]/map/route");
     const res = await PUT(
       req(
@@ -709,7 +709,7 @@ test(
       `MAPWARN-${RUN}`,
       ctx.projectId,
     );
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PUT } = await import("@/app/api/boq/[id]/map/route");
     const res = await PUT(
       req(
@@ -734,7 +734,7 @@ test("PUT /api/boq/:id/map: Σ tỷ trọng = 1 → 200, không warning, ghi đ�
     `MAPEXACT-${RUN}`,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PUT } = await import("@/app/api/boq/[id]/map/route");
 
   const res1 = await PUT(
@@ -791,7 +791,7 @@ test("GET /api/boq/coverage: chỉ trả số đếm/tỷ lệ, TUYỆT ĐỐI k
     boqId,
     ctx.taskId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { GET } = await import("@/app/api/boq/coverage/route");
   const res = await GET(req("http://localhost/api/boq/coverage", undefined, "GET"));
   assert.equal(res.status, 200);
@@ -808,7 +808,7 @@ test("GET /api/boq/coverage: chỉ trả số đếm/tỷ lệ, TUYỆT ĐỐI k
 test("GET /api/boq/coverage: cách ly dự án — dự án khác không cộng vào tổng", S, async () => {
   const a = await dungDuLieu("viewer", `covisoA${RUN}`);
   const b = await dungDuLieu("viewer", `covisoB${RUN}`);
-  dangNhap({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
+  await dangNhapDuAn({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
   const { GET } = await import("@/app/api/boq/coverage/route");
   const resA = await GET(req("http://localhost/api/boq/coverage", undefined, "GET"));
   const jsonA = await resA.json();
@@ -847,7 +847,7 @@ test(
         `SELECT password_hash FROM users WHERE id = ?`,
         ctx.userId,
       );
-      dangNhap({ id: ctx.userId, passwordHash: u!.password_hash }, null);
+      await dangNhapDuAn({ id: ctx.userId, passwordHash: u!.password_hash }, null);
       const { GET } = await import("@/app/api/materials/route");
       const res = await GET(req("http://localhost/api/materials", undefined, "GET"));
       assert.equal(res.status, 200);
@@ -872,7 +872,7 @@ test("GET /api/materials: cách ly dự án + lọc theo sheetTypeId", S, async 
     b.sheetTypeId,
     b.projectId,
   );
-  dangNhap({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
+  await dangNhapDuAn({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
   const { GET } = await import("@/app/api/materials/route");
   const res = await GET(
     req(`http://localhost/api/materials?sheetTypeId=${a.sheetTypeId}`, undefined, "GET"),
@@ -900,7 +900,7 @@ test("GET /api/materials: lọc theo systemId và theo mã hệ (?system=)", S, 
     ctx.sheetTypeId,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { GET } = await import("@/app/api/materials/route");
 
   const byId = await GET(
@@ -920,7 +920,7 @@ test("GET /api/materials: lọc theo systemId và theo mã hệ (?system=)", S, 
 
 test("POST /api/materials: vai trò không được thêm (subcon/viewer) → 403", S, async () => {
   const ctx = await dungDuLieu("subcon", `matpost403${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/materials/route");
   const res = await POST(
     req("http://localhost/api/materials", { name: "X", sheetTypeId: ctx.sheetTypeId }),
@@ -930,7 +930,7 @@ test("POST /api/materials: vai trò không được thêm (subcon/viewer) → 40
 
 test("POST /api/materials: thiếu tên hoặc sheet → 400", S, async () => {
   const ctx = await dungDuLieu("engineer", `matpost400${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/materials/route");
   const r1 = await POST(
     req("http://localhost/api/materials", { name: "", sheetTypeId: ctx.sheetTypeId }),
@@ -949,7 +949,7 @@ test("POST /api/materials: trùng BOQCODE với dòng BOQ đã có → 409", S, 
     maTrung,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/materials/route");
   const res = await POST(
     req("http://localhost/api/materials", {
@@ -969,7 +969,7 @@ test("POST /api/materials: afterId hợp lệ → chèn đúng vị trí (dịch
     ctx.sheetTypeId,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/materials/route");
   const res = await POST(
     req("http://localhost/api/materials", {
@@ -988,7 +988,7 @@ test("POST /api/materials: afterId hợp lệ → chèn đúng vị trí (dịch
 
 test("POST /api/materials: afterId không hợp lệ → 400", S, async () => {
   const ctx = await dungDuLieu("engineer", `matafterbad${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/materials/route");
   const res = await POST(
     req("http://localhost/api/materials", {
@@ -1002,7 +1002,7 @@ test("POST /api/materials: afterId không hợp lệ → 400", S, async () => {
 
 test("POST /api/materials: tạo hợp lệ không afterId → 201, sort_order cuối", S, async () => {
   const ctx = await dungDuLieu("admin", `matok${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/materials/route");
   const res = await POST(
     req("http://localhost/api/materials", {
@@ -1032,7 +1032,7 @@ test("PATCH /api/materials/:id: chưa đăng nhập → 401", { ...S }, async ()
 
 test("PATCH /api/materials/:id: vai trò không được sửa → 403", S, async () => {
   const ctx = await dungDuLieu("subcon", `matpat403${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/materials/[id]/route");
   const res = await PATCH(req("http://localhost/api/materials/1", { name: "x" }), {
     params: Promise.resolve({ id: "1" }),
@@ -1042,7 +1042,7 @@ test("PATCH /api/materials/:id: vai trò không được sửa → 403", S, asyn
 
 test("PATCH /api/materials/:id: id không phải số → 400", S, async () => {
   const ctx = await dungDuLieu("pm", `matpatnan${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/materials/[id]/route");
   const res = await PATCH(req("http://localhost/api/materials/abc", { name: "x" }), {
     params: Promise.resolve({ id: "abc" }),
@@ -1059,7 +1059,7 @@ test("PATCH /api/materials/:id: dự án khác → 404 (cách ly dự án)", S, 
     b.sheetTypeId,
     b.projectId,
   );
-  dangNhap({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
+  await dangNhapDuAn({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
   const { PATCH } = await import("@/app/api/materials/[id]/route");
   const res = await PATCH(req(`http://localhost/api/materials/${matIdB}`, { name: "Hack" }), {
     params: Promise.resolve({ id: String(matIdB) }),
@@ -1075,7 +1075,7 @@ test("PATCH /api/materials/:id: trạng thái không hợp lệ → 400", S, asy
     ctx.sheetTypeId,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/materials/[id]/route");
   const res = await PATCH(
     req(`http://localhost/api/materials/${matId}`, { status: "khong_hop_le" }),
@@ -1099,7 +1099,7 @@ test("PATCH /api/materials/:id: đổi boqCode trùng → 409", S, async () => {
     ctx.sheetTypeId,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/materials/[id]/route");
   const res = await PATCH(req(`http://localhost/api/materials/${target}`, { boqCode: maTrung }), {
     params: Promise.resolve({ id: String(target) }),
@@ -1115,7 +1115,7 @@ test("PATCH /api/materials/:id: không có trường nào để cập nhật →
     ctx.sheetTypeId,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/materials/[id]/route");
   const res = await PATCH(req(`http://localhost/api/materials/${matId}`, {}), {
     params: Promise.resolve({ id: String(matId) }),
@@ -1134,7 +1134,7 @@ test(
       ctx.sheetTypeId,
       ctx.projectId,
     );
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/materials/[id]/route");
     const res = await PATCH(req(`http://localhost/api/materials/${matId}`, { qtyUsed: 25 }), {
       params: Promise.resolve({ id: String(matId) }),
@@ -1160,7 +1160,7 @@ test(
       ctx.sheetTypeId,
       ctx.projectId,
     );
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/materials/[id]/route");
     const res = await PATCH(req(`http://localhost/api/materials/${matId}`, { qtyStock: 20 }), {
       params: Promise.resolve({ id: String(matId) }),
@@ -1186,7 +1186,7 @@ test(
       ctx.sheetTypeId,
       ctx.projectId,
     );
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/materials/[id]/route");
     const res = await PATCH(req(`http://localhost/api/materials/${matId}`, { qtyUsed: 10 }), {
       params: Promise.resolve({ id: String(matId) }),
@@ -1208,7 +1208,7 @@ test(
       ctx.sheetTypeId,
       ctx.projectId,
     );
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/materials/[id]/route");
     // Chưa định nghĩa trường tuỳ biến nào cho "material" trong dự án này → khoá lạ bị từ chối.
     const res = await PATCH(
@@ -1227,7 +1227,7 @@ test("PATCH /api/materials/:id: cập nhật hợp lệ → 200, trả lại mat
     ctx.sheetTypeId,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { PATCH } = await import("@/app/api/materials/[id]/route");
   const res = await PATCH(
     req(`http://localhost/api/materials/${matId}`, { name: "Đổi tên", note: "ghi chú" }),
@@ -1251,7 +1251,7 @@ test("DELETE /api/materials/:id: chưa đăng nhập → 401", { ...S }, async (
 
 test("DELETE /api/materials/:id: không phải Admin → 403", S, async () => {
   const ctx = await dungDuLieu("pm", `matdel403${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/materials/[id]/route");
   const res = await DELETE(req("http://localhost/api/materials/1", undefined, "DELETE"), {
     params: Promise.resolve({ id: "1" }),
@@ -1261,7 +1261,7 @@ test("DELETE /api/materials/:id: không phải Admin → 403", S, async () => {
 
 test("DELETE /api/materials/:id: id không phải số → 400", S, async () => {
   const ctx = await dungDuLieu("admin", `matdelnan${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/materials/[id]/route");
   const res = await DELETE(req("http://localhost/api/materials/abc", undefined, "DELETE"), {
     params: Promise.resolve({ id: "abc" }),
@@ -1278,7 +1278,7 @@ test("DELETE /api/materials/:id: không tìm thấy (dự án khác) → 404", S
     b.sheetTypeId,
     b.projectId,
   );
-  dangNhap({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
+  await dangNhapDuAn({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
   const { DELETE } = await import("@/app/api/materials/[id]/route");
   const res = await DELETE(req(`http://localhost/api/materials/${matIdB}`, undefined, "DELETE"), {
     params: Promise.resolve({ id: String(matIdB) }),
@@ -1294,7 +1294,7 @@ test("DELETE /api/materials/:id: Admin xoá thành công → 200", S, async () =
     ctx.sheetTypeId,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { DELETE } = await import("@/app/api/materials/[id]/route");
   const res = await DELETE(req(`http://localhost/api/materials/${matId}`, undefined, "DELETE"), {
     params: Promise.resolve({ id: String(matId) }),
@@ -1317,7 +1317,7 @@ test("GET /api/materials/:id/transactions: chưa đăng nhập → 401", { ...S 
 
 test("GET /api/materials/:id/transactions: id không phải số → 400", S, async () => {
   const ctx = await dungDuLieu("pm", `txnan${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { GET } = await import("@/app/api/materials/[id]/transactions/route");
   const res = await GET(req("http://localhost/api/materials/abc/transactions", undefined, "GET"), {
     params: Promise.resolve({ id: "abc" }),
@@ -1337,7 +1337,7 @@ test(
       b.sheetTypeId,
       b.projectId,
     );
-    dangNhap({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
+    await dangNhapDuAn({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
     const { GET } = await import("@/app/api/materials/[id]/transactions/route");
     const res = await GET(
       req(`http://localhost/api/materials/${matIdB}/transactions`, undefined, "GET"),
@@ -1365,7 +1365,7 @@ test("GET /api/materials/:id/transactions: liệt kê đúng lịch sử, mới 
     matId,
     ctx.userId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { GET } = await import("@/app/api/materials/[id]/transactions/route");
   const res = await GET(
     req(`http://localhost/api/materials/${matId}/transactions`, undefined, "GET"),
@@ -1385,7 +1385,7 @@ test("POST /api/materials/:id/transactions: vai trò không được ghi → 403
     ctx.sheetTypeId,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/materials/[id]/transactions/route");
   const res = await POST(
     req(`http://localhost/api/materials/${matId}/transactions`, { delta: 5 }, "POST"),
@@ -1402,7 +1402,7 @@ test("POST /api/materials/:id/transactions: delta = 0 hoặc không phải số 
     ctx.sheetTypeId,
     ctx.projectId,
   );
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/materials/[id]/transactions/route");
   const r1 = await POST(
     req(`http://localhost/api/materials/${matId}/transactions`, { delta: 0 }, "POST"),
@@ -1425,7 +1425,7 @@ test("POST /api/materials/:id/transactions: vật tư dự án khác → 404", S
     b.sheetTypeId,
     b.projectId,
   );
-  dangNhap({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
+  await dangNhapDuAn({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
   const { POST } = await import("@/app/api/materials/[id]/transactions/route");
   const res = await POST(
     req(`http://localhost/api/materials/${matIdB}/transactions`, { delta: 5 }, "POST"),
@@ -1445,7 +1445,7 @@ test(
       ctx.sheetTypeId,
       ctx.projectId,
     );
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { POST } = await import("@/app/api/materials/[id]/transactions/route");
     const res = await POST(
       req(
@@ -1481,7 +1481,7 @@ test(
       ctx.sheetTypeId,
       ctx.projectId,
     );
-    dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { POST } = await import("@/app/api/materials/[id]/transactions/route");
     const res = await POST(
       req(`http://localhost/api/materials/${matId}/transactions`, { delta: -20 }, "POST"),

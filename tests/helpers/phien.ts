@@ -85,3 +85,26 @@ export function datCookie(ten: string, gia: string): void {
 export function datHeader(ten: string, gia: string): void {
   headerHienTai.set(ten.toLowerCase(), gia);
 }
+
+/**
+ * Đăng nhập VÀ gán user vào dự án — dùng cái này thay `dangNhap` ở mọi test route có dự án.
+ *
+ * VÌ SAO CẦN (lỗi đã xảy ra thật hai lần): `visibleProjectIds` (lib/ha-tang/projects.ts) chỉ
+ * trả "mọi dự án" khi bảng `user_projects` RỖNG. Hễ bảng đó có một dòng — do BẤT KỲ file test
+ * nào khác chèn vào mà không dọn — thì user không được gán sẽ không thấy dự án nào, và route
+ * trả "không tìm thấy" thay vì lỗi nghiệp vụ đang kiểm. Hệ quả: file test xanh khi chạy riêng
+ * và ĐỎ trong bộ đầy đủ, với thông báo chẳng liên quan gì tới thứ đang test.
+ *
+ * Gán thẳng user vào dự án làm test tự chủ, không phụ thuộc trạng thái toàn cục của bảng đó.
+ */
+export async function dangNhapDuAn(user: NguoiDungTest, projectId: number | null): Promise<void> {
+  if (projectId != null) {
+    const { run } = await import("@/lib/db");
+    await run(
+      `INSERT INTO user_projects (user_id, project_id) VALUES (?, ?) ON CONFLICT DO NOTHING`,
+      user.id,
+      projectId,
+    );
+  }
+  dangNhap(user, projectId);
+}

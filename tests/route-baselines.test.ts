@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangNhap, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangNhap, dangNhapDuAn, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -75,6 +75,10 @@ test(
     // (ca dưới), chứ không phải cho lần đăng nhập đầu chưa kịp chọn. Ghi lại đúng như vậy để
     // sau này không ai "sửa" nhầm theo kỳ vọng sai.
     const ctx = await dungDuLieu("pm", `nodu${RUN}`);
+    // Gán dự án TRƯỚC rồi mới đăng nhập KHÔNG kèm cookie chọn dự án: đúng kịch bản "user có
+    // dự án nhưng chưa chọn". (Gán qua dangNhapDuAn với projectId rồi xoá cookie — nếu chỉ
+    // truyền null thì user không được gán dự án nào và rơi vào nhánh 400 của ca kế tiếp.)
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, null);
     const { GET } = await import("@/app/api/baselines/route");
     const res = await GET();
@@ -103,7 +107,7 @@ test("GET /api/baselines: user không được gán dự án nào → 400 'Chưa
       `SELECT password_hash FROM users WHERE id = ?`,
       ctx.userId,
     );
-    dangNhap({ id: ctx.userId, passwordHash: u!.password_hash }, null);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: u!.password_hash }, null);
     const { GET } = await import("@/app/api/baselines/route");
     const res = await GET();
     assert.equal(res.status, 400);
@@ -115,7 +119,7 @@ test("GET /api/baselines: user không được gán dự án nào → 400 'Chưa
 
 test("POST /api/baselines: vai trò không được chốt baseline → 403", S, async () => {
   const ctx = await dungDuLieu("engineer", `ky${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { POST } = await import("@/app/api/baselines/route");
   const res = await POST(req({ name: "Không được phép" }));
   assert.equal(res.status, 403);
@@ -130,7 +134,7 @@ test(
     const b = await dungDuLieu("pm", `pmB${RUN}`);
 
     // PM của dự án A chốt baseline.
-    dangNhap({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
+    await dangNhapDuAn({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
     const { POST, GET } = await import("@/app/api/baselines/route");
     const tao = await POST(req({ name: "Baseline A", note: "ghi chú" }));
     assert.equal(tao.status, 201);
@@ -147,7 +151,7 @@ test(
 
     // PM của dự án B KHÔNG được thấy baseline của A — đây là bất biến cách ly dự án, và nó
     // chỉ kiểm được thật khi route thực sự chạy với phiên của B.
-    dangNhap({ id: b.userId, passwordHash: b.pwHash }, b.projectId);
+    await dangNhapDuAn({ id: b.userId, passwordHash: b.pwHash }, b.projectId);
     const dsB = await GET();
     assert.deepEqual((await dsB.json()).baselines, []);
   },
@@ -164,7 +168,7 @@ test("POST /api/baselines: dự án chưa có task nào → 422, không tạo ba
     `SELECT password_hash FROM users WHERE id = ?`,
     userId,
   );
-  dangNhap({ id: userId, passwordHash: u!.password_hash }, projectId);
+  await dangNhapDuAn({ id: userId, passwordHash: u!.password_hash }, projectId);
   const { POST } = await import("@/app/api/baselines/route");
   const res = await POST(req({}));
   assert.equal(res.status, 422);
@@ -173,7 +177,7 @@ test("POST /api/baselines: dự án chưa có task nào → 422, không tạo ba
 
 test("GET /api/baselines: cookie phiên bị sửa chữ ký → 401", S, async () => {
   const ctx = await dungDuLieu("pm", `giamao${RUN}`);
-  dangNhap({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+  await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
   const { datCookie } = await import("./helpers/phien");
   const { COOKIE } = await import("@/lib/bao-mat/session-token");
   // Đổi một ký tự trong phần chữ ký — toàn bộ đường xác thực THẬT vẫn chạy, nên phải bị từ chối.
