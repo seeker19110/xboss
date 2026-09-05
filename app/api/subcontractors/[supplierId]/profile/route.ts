@@ -24,7 +24,13 @@ export async function PATCH(
   const supplierId = parseInt(params.supplierId);
   if (isNaN(supplierId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const supplier = await queryOne(`SELECT id FROM suppliers WHERE id = ?`, supplierId);
+  // Cách ly tổ chức (vá W7, Đợt 5) — trước đây không lọc org_id, admin/pm tổ chức A sửa
+  // được hồ sơ NTP tổ chức B qua đoán supplierId. Cùng ranh giới GET /api/suppliers.
+  const supplier = await queryOne(
+    `SELECT id FROM suppliers WHERE id = ? AND org_id = ?`,
+    supplierId,
+    user.orgId,
+  );
   if (!supplier)
     return NextResponse.json({ error: "Không tìm thấy nhà cung cấp" }, { status: 404 });
 
