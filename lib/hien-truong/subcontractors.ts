@@ -283,7 +283,14 @@ export type SubcontractorDetail = {
   debt: SubcontractorDebt;
 };
 
-export async function getSubcontractor(supplierId: number): Promise<SubcontractorDetail | null> {
+// orgId (vá W7, Đợt 5) — suppliers.org_id NOT NULL từ migrations/0078_org_axis.sql; route
+// anh em GET /api/suppliers đã lọc org_id nhưng getSubcontractor() thì không, để lộ hồ sơ
+// (công nợ/đánh giá/hồ sơ năng lực) của NCC tổ chức khác qua đoán supplierId. Cùng ranh
+// giới đã áp cho suppliers/:id/ratings + suppliers/:id/summary.
+export async function getSubcontractor(
+  supplierId: number,
+  orgId: number,
+): Promise<SubcontractorDetail | null> {
   const supplier = await queryOne<{
     id: number;
     name: string;
@@ -291,7 +298,11 @@ export async function getSubcontractor(supplierId: number): Promise<Subcontracto
     email: string | null;
     address: string | null;
     note: string | null;
-  }>(`SELECT id, name, phone, email, address, note FROM suppliers WHERE id = ?`, supplierId);
+  }>(
+    `SELECT id, name, phone, email, address, note FROM suppliers WHERE id = ? AND org_id = ?`,
+    supplierId,
+    orgId,
+  );
   if (!supplier) return null;
 
   const systemRows = await query<SubcontractorSystem>(

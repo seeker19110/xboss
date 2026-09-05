@@ -9,6 +9,7 @@ import { assignTask } from "@/lib/tien-do/assignments";
 import { handoverBlocked, methodStatementBlocked } from "@/lib/ky-thuat/qaqc";
 import { log } from "@/lib/nen/log";
 import type { StatusSlug } from "@/lib/tien-do/status";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,11 @@ export async function PATCH(req: NextRequest) {
           id,
         );
         if (!exists) throw new Error(`Không tìm thấy task #${id}`);
+        // Cách ly dự án (vá W7, Đợt 5) — kiểm TỪNG task trong vùng chọn trước khi ghi, cùng
+        // lỗi generic "Không tìm thấy" như task không tồn tại (không xác nhận task tồn tại
+        // ở dự án khác).
+        if (projectId == null || (await taskProjectId(id)) !== projectId)
+          throw new Error(`Không tìm thấy task #${id}`);
         const progressPercent = exists.progress_percent ?? 0;
 
         if (patch.status === "nghiem_thu")
