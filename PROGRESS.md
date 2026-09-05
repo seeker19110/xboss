@@ -1,5 +1,104 @@
 # PROGRESS.md — Trạng thái dự án
 
+## 🟡 Đợt 6 — trả nợ "ghi nhận, chưa sửa" + quét cụm lỗ hổng tham chiếu (2026-09-05, ĐANG CHẠY)
+
+Khác Đợt 1–5 (chiến dịch _phủ test_), Đợt 6 là chiến dịch **sửa tính năng đang hỏng**: sau 5 đợt chỉ
+còn 8/451 route chưa có test thực thi, nhưng danh sách "Ghi nhận, chưa sửa" đã tích 5 mục, trong đó
+2 mục là tính năng **chưa từng chạy đúng lần nào** ở vùng rủi ro cao. PR #480.
+
+**Đã xong và đã gộp (6/9 việc):**
+
+- **Việc A — kill switch của Safe Execution Engine ghi lệnh huỷ BỀN.** `executeExecutionRequest`
+  (`lib/ky-thuat/engineering-autonomy.ts`) ghi `UPDATE ... status='killed'` rồi `throw` ngay sau, cả
+  hai trong CÙNG một transaction (`withProjectScope` bọc `withTransaction`) ⇒ rollback xoá luôn lệnh
+  huỷ. Bản ghi ở lại `authorized` với `approval_token` còn hạn 15 phút, nên **kill switch bật rồi tắt
+  lại trong cửa sổ đó thì yêu cầu lẽ ra đã huỷ vẫn thực thi THẬT** — ca test chứng minh điều này đỏ
+  trên code cũ (`Missing expected rejection`). Vá: nhánh huỷ không throw từ trong transaction mà ghi
+  ở transaction thứ hai; NULL hoá `approval_token`; thêm `AND project_id = ?`; đóng race bằng
+  `SELECT ... FOR UPDATE` + `UPDATE ... AND status='authorized' AND approval_token = ?` kèm kiểm số
+  dòng đổi. Đóng luôn lỗi tiềm ẩn thứ hai: `return updated!` trả `null` như "thành công".
+  **Giới hạn còn lại:** `withTransaction` reentrant — gọi hàm này từ TRONG một transaction sẵn có thì
+  rollback của cha vẫn xoá lệnh huỷ. Đường vào duy nhất hiện nay gọi ngoài mọi transaction; đã ghi
+  cảnh báo bằng comment thay vì thêm guard runtime (guard phải export thêm API từ `lib/db`).
+- **Việc C — phủ 8 route cuối cùng** (`diaries`, `handover-items`, `inspection-requests`, `project`,
+  `qc/documents`, `tasks`, `variations/[id]`, `v1/engineering/agent-sessions/[id]/claims`) +
+  vá `tasks/:id/move` nối chuỗi `cur.sort_order` vào SQL. **Reviewer bác bỏ kết luận "không phát hiện
+  bug" của worker và tìm ra 2 lỗ hổng thật** (lần thứ 5–6 reviewer đúng): `POST /api/inspection-requests`
+  nhận `taskIds` chỉ kiểm tồn tại trong khi GET cùng file lọc chặt — phiếu mang dự án người gọi nhưng
+  liên kết task dự án khác; `POST /api/handover-items` kiểm `workPackageId` chỉ bằng tồn tại, mà
+  `listHandoverItems` LEFT JOIN `work_packages` để hiển thị ⇒ rò tên/mã nhóm việc dự án khác.
+- **Việc F — chấm điểm tín nhiệm thầu phụ chạy được LẦN ĐẦU.** `POST /api/engineering/subcon-ai/evaluate`
+  **luôn trả 422** vì 2/5 chỉ số bắt buộc bị gán cứng `null`. Theo quyết định chủ dự án: bỏ hẳn
+  `ncrIncidentCount` + `costVarianceRate`, chuẩn hoá trọng số 3 chỉ số còn lại `30/70 · 25/70 · 15/70`.
+  Điều kiện 422 **thu hẹp** chứ không bỏ (hồ sơ chưa gắn `supplier_id`/chưa có kỳ đánh giá vẫn 422).
+  Ghi `NULL` tường minh cho 2 cột đã bỏ vì schema đặt `DEFAULT 0` — để mặc định sẽ **bịa** "0 vụ NCR".
+- **Việc G — quét cụm "kiểm tồn tại theo id nhưng thiếu lọc dự án/tổ chức": 18 điểm vá.**
+  Lớp lỗi: đường GHI nhận id thực thể từ body rồi chỉ kiểm `SELECT id FROM <bảng> WHERE id = ?`, id là
+  số nguyên tuần tự nên đoán được. Nặng nhất: `POST /api/tenders` (kéo dòng BOQ dự án khác vào gói
+  thầu), `POST /api/purchase-requests` (vật tư dự án khác), `DELETE /api/suppliers/:id` (**không kiểm
+  gì trước khi xoá**), cộng `suppliers`/`users` thiếu `org_id` ở crews/personnel/bids/risks/
+  warranty-claims/meetings/sheets. 36 ca test, 18 ca tấn công đều đỏ trên code cũ.
+  Bản vá `tenders` còn lộ ra 2 helper test cũ tạo `boq_items` KHÔNG gán `project_id` — sửa helper +
+  35 điểm gọi thay vì nới lỏng bản vá.
+- **Việc H — `/api/project` theo dự án đang chọn.** Route thao tác trên dòng `projects` **id nhỏ nhất
+  toàn DB**, PATCH chỉ kiểm `isAdminOrPm` ⇒ Admin/PM của bất kỳ dự án nào ghi đè được logo + tiêu đề
+  heatmap của dự án đó. GET giữ public + fallback cho trang `/login`. **Kèm vá rò qua CDN:** sau khi
+  GET đọc theo phiên, thân phản hồi phụ thuộc cookie dự án nhưng header vẫn `public, s-maxage=60` —
+  app deploy sau CDN (Vercel) nên CDN có thể phục vụ tên/logo dự án của user này cho user khác;
+  nhánh có phiên nay trả `private, no-store`.
+- **Vá thêm khi tích hợp:** `PATCH /api/meetings/:id/actions/:aid` ghi thẳng `task_id` không kiểm gì
+  trong khi POST cùng cụm đã đối chiếu dự án (bộ quét theo route bỏ sót vì chỉ liệt kê dòng `users`).
+
+- **Việc I — `admin/assignments` scope theo dự án** ở cả GET lẫn POST. Khác các lỗ hổng khác đợt này
+  (đọc lọc đúng, ghi quên lọc), route này **thiếu scope cả hai chiều**: GET liệt kê toàn bộ WBS hệ
+  thống, POST kiểm tồn tại bằng `SELECT id FROM <bảng> WHERE id = ?`. Kèm theo, `userWorkloads()`
+  (`lib/tien-do/assignments.ts`) **đếm task xuyên mọi dự án** — cột "khối lượng công việc" trên trang
+  phân công lâu nay cộng cả task dự án khác vào tổng của từng người, tức **hiển thị số SAI cho PM**,
+  không chỉ là vấn đề cách ly. 11 ca test, 6 ca đỏ trên code cũ. UI không phải sửa (đã xác minh bằng
+  grep: `app/admin/page.tsx` chỉ gán thẳng dữ liệu API vào state).
+
+**Còn lại (3/9 việc, đang chạy):** B (98 chỗ cụm `engineering` ép lỗi nghiệp vụ về 500), D (cổng CI
+quét id khoá ngoại gán cứng trong test), E (Gate 4 Smart IPC → cảnh báo). Ba việc này sẽ đi trong
+PR tiếp theo vì PR #480 đã merge trước khi chúng xong.
+
+### Quyết định nghiệp vụ của chủ dự án (2026-09-05)
+
+- **Gate 4 Smart IPC → hạ thành cảnh báo**, bỏ khỏi điều kiện tự động thông qua (Việc E).
+  Nền: `fetchGate4Context` đối soát kho bằng `materials.boq_code = boq_items.code`, mà
+  `migrations/0029_boq_codes.sql` gắn trigger registry BOQCODE lên **cả 4 bảng** (`tasks`,
+  `work_packages`, `materials`, `boq_items`) với khoá chính là `code` ⇒ hai bảng không bao giờ cùng
+  giữ một mã, `warehouseUsedQty` **cấu trúc mà nói luôn bằng 0**. **Hệ quả phải ghi rõ:** nửa
+  "khối lượng nghiệm thu ≤ hạn mức BOQ" của Gate 4 **vốn chạy đúng** và là một chốt kiểm soát tiền
+  thật; hạ cả cổng thành cảnh báo làm nửa đó cũng thành cảnh báo. Chỉ nửa đối soát kho là bất khả thi.
+- **Chấm điểm thầu phụ → 3 chỉ số** có dữ liệu thật (Việc F, đã xong).
+- **`/api/project` → làm thành việc riêng**, sửa đúng theo dự án thay vì vá quyền tạm bợ (Việc H, đã xong).
+- **`admin/assignments` → scope theo dự án đang chọn** ở cả GET lẫn POST (Việc I).
+
+### Bài học
+
+- **Reviewer lại bác bỏ kết luận của worker và lại đúng** (lần 5–6 liên tiếp qua 3 đợt). Luật "mọi
+  mục _ghi nhận, chưa sửa_ phải kèm bằng chứng ĐỌC route anh em" tiếp tục sinh lợi. Việc G áp đúng
+  luật này theo chiều ngược lại: kết luận "`projects/[id]` không phải lỗ hổng" kèm trích
+  `lib/bao-mat/auth.ts:266` + `lib/ha-tang/projects.ts:15-18,210` chứng minh admin xuyên tổ chức là
+  thiết kế có chủ đích, và đường đọc đã cho admin thấy y hệt tập hợp đó.
+- **Lớp lỗi "giả định trạng thái toàn cục" lần này rơi vào TEST CŨ.** `tests/projects.test.ts` khẳng
+  định `user_projects` rỗng **toàn hệ thống**, mà `visibleProjectIds` quyết định fallback bằng
+  `COUNT(*)` toàn cục và `node:test` chạy các file **song song** — mọi ca dùng `dangNhapDuAn` đều chèn
+  một dòng. Ca này lâu nay xanh do may mắn về thứ tự; thêm file test mới là đỏ. Đã sửa thành đọc
+  trạng thái thật rồi khẳng định đúng luật tương ứng (cả hai nhánh đều là khẳng định thật).
+  **Củng cố lý do tồn tại của Việc D.**
+- **Xung đột chỉ lộ lúc GỘP, không lộ trong worktree riêng.** Việc C viết ca test khẳng định
+  `PATCH /api/project` sửa dòng đầu tiên — đúng hành vi lúc đó; Việc H đổi chính hành vi đó. Cả hai
+  xanh trong worktree của mình, chỉ đỏ khi gộp. ⇒ **phải chạy full suite sau MỖI lần gộp**, không tin
+  kết quả xanh của từng worktree.
+- **Sự cố hạ tầng do phiên chính gây ra:** khởi động lại Postgres mà quên giữ `-p 5433` khiến nó chạy
+  ở 5432, mọi worker mất kết nối ~20 phút; và `git add -A` trong worktree commit nhầm **symlink**
+  `node_modules` vì `.gitignore` ghi `node_modules/` (có dấu `/` cuối) chỉ khớp THƯ MỤC. Đã ghim
+  `port = 5433` vào `postgresql.conf` và bỏ dấu `/` trong `.gitignore`. **DB tái dùng sau sự cố cho
+  kết quả đỏ giả** — luôn dựng DB mới khi xác minh.
+
+---
+
 ## ✅ Đợt 5 chiến dịch coverage — phủ `engineering/**` + lần ra chuỗi lỗ hổng cách ly (2026-09-05)
 
 Tiếp nối Đợt 4. Hai mục tiêu: phủ test THỰC THI cho **91 route `app/api/engineering/**`** chưa
