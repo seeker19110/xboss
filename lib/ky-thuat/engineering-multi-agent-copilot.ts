@@ -137,6 +137,6 @@ export async function listAgentDebateSessions(
 ): Promise<Array<Record<string, unknown>>> {
   return query<Record<string, unknown>>(
     `SELECT * FROM engineering_agent_debate_sessions WHERE project_id = $1 ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }

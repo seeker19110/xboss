@@ -371,6 +371,6 @@ export async function saveLod400Run(
 export async function listLod400Runs(projectId: number): Promise<Array<Record<string, unknown>>> {
   return query<Record<string, unknown>>(
     `SELECT * FROM engineering_shopdrawing_lod400_runs WHERE project_id = $1 ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }
