@@ -44,14 +44,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Không tìm thấy hồ sơ thầu phụ" }, { status: 404 });
     }
 
-    // Thiếu bất kỳ chỉ số nào → KHÔNG chấm điểm, KHÔNG ghi dòng nào. Trả nguyên trạng
-    // chỉ số (null) + lý do để người dùng biết cần bổ sung dữ liệu gì.
+    // Thiếu bất kỳ chỉ số nào TRONG CÔNG THỨC → KHÔNG chấm điểm, KHÔNG ghi dòng nào. Trả
+    // nguyên trạng chỉ số (null) + lý do để người dùng biết cần bổ sung dữ liệu gì.
+    // V4 (2026-09-05): công thức chỉ còn 3 chỉ số, nên 422 giờ đúng cho trường hợp hồ sơ
+    // chưa gắn `supplier_id` hoặc chưa có kỳ đánh giá định kỳ nào.
     if (
       chiSo.onTimeCompletionRate == null ||
       chiSo.bbntPassRate == null ||
-      chiSo.hseSafetyScore == null ||
-      chiSo.ncrIncidentCount == null ||
-      chiSo.costVarianceRate == null
+      chiSo.hseSafetyScore == null
     ) {
       return NextResponse.json(
         {
@@ -66,18 +66,18 @@ export async function POST(req: Request) {
     const evalRes = computeSubcontractorTrustScore({
       onTimeCompletionRate: chiSo.onTimeCompletionRate,
       bbntPassRate: chiSo.bbntPassRate,
-      ncrIncidentCount: chiSo.ncrIncidentCount,
       hseSafetyScore: chiSo.hseSafetyScore,
-      costVarianceRate: chiSo.costVarianceRate,
     });
 
     const now = new Date();
     const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
+    // Hai cột `ncr_incident_count`/`cost_variance_rate` vẫn còn trong bảng nhưng KHÔNG còn
+    // được chấm — ghi NULL thay vì để DEFAULT 0 (0 nghĩa là "không có NCR nào", một số bịa).
     const insertRes = await query(
       `INSERT INTO engineering_subcon_performance_metrics 
        (project_id, profile_id, evaluation_period, on_time_completion_rate, bbnt_pass_rate, ncr_incident_count, hse_safety_score, cost_variance_rate, trust_score, tier_grade, ai_analysis_summary)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       VALUES ($1, $2, $3, $4, $5, NULL, $6, NULL, $7, $8, $9)
        RETURNING *`,
 
       projectId,
@@ -85,9 +85,7 @@ export async function POST(req: Request) {
       period,
       chiSo.onTimeCompletionRate,
       chiSo.bbntPassRate,
-      chiSo.ncrIncidentCount,
       chiSo.hseSafetyScore,
-      chiSo.costVarianceRate,
       evalRes.trustScore,
       evalRes.tierGrade,
       evalRes.summary,

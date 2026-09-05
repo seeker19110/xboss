@@ -19,7 +19,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
   // BUG THẬT (Đợt 5, W3): route này trước đây không kiểm quyền gì — mọi user đăng nhập
-  // (kể cả subcon) đều đọc được bảng điểm tín nhiệm + chỉ số thương mại (costVarianceRate)
+  // (kể cả subcon) đều đọc được bảng điểm tín nhiệm + toàn bộ chỉ số năng lực
   // của TẤT CẢ thầu phụ trong dự án, trong khi POST cùng file đã đúng dùng
   // `CAN.manageEngineeringSubconAi`. Bám khuôn `viewEngineeringSubconAi` đã khai sẵn trong
   // lib/bao-mat/auth.ts (view mở tới BCH, loại subcon) nhưng chưa route nào gọi tới.
@@ -49,8 +49,7 @@ export async function GET(req: Request) {
          p.primary_discipline as "primaryDiscipline", p.specialties, p.workforce_capacity as "workforceCapacity",
          p.equipment_assets as "equipmentAssets", p.certifications,
          m.on_time_completion_rate as "onTimeRate", m.bbnt_pass_rate as "bbntPassRate",
-         m.ncr_incident_count as "ncrCount", m.hse_safety_score as "hseScore",
-         m.cost_variance_rate as "costVarianceRate", m.trust_score as "trustScore",
+         m.hse_safety_score as "hseScore", m.trust_score as "trustScore",
          m.tier_grade as "tierGrade", m.ai_analysis_summary as "summary",
          m.evaluated_at as "evaluatedAt"
        FROM engineering_subcon_profiles p

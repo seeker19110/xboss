@@ -71,8 +71,7 @@ export async function POST(req: Request) {
       `SELECT DISTINCT ON (profile_id)
          profile_id as "profileId", trust_score as "trustScore", tier_grade as "tierGrade",
          on_time_completion_rate as "onTimeRate", bbnt_pass_rate as "bbntPassRate",
-         ncr_incident_count as "ncrCount", hse_safety_score as "hseScore",
-         cost_variance_rate as "costVarianceRate", ai_analysis_summary as "summary"
+         hse_safety_score as "hseScore", ai_analysis_summary as "summary"
        FROM engineering_subcon_performance_metrics
        WHERE project_id = $1
        ORDER BY profile_id, evaluated_at DESC`,
@@ -89,10 +88,6 @@ export async function POST(req: Request) {
       if (m.onTimeRate == null) reasons.push("onTimeRate");
       if (m.bbntPassRate == null) reasons.push("bbntPassRate");
       if (m.hseScore == null) reasons.push("hseScore");
-      // ncrCount không có nguồn dữ liệu (chưa liên kết NCR với nhà thầu phụ)
-      if (m.ncrCount == null) reasons.push("ncrCount");
-      // costVarianceRate không có nguồn dữ liệu (chưa liên kết chi phí với nhà thầu phụ)
-      if (m.costVarianceRate == null) reasons.push("costVarianceRate");
 
       if (reasons.length > 0) {
         const profileName =
@@ -111,9 +106,7 @@ export async function POST(req: Request) {
         componentScores: {
           scheduleScore: Number(m.onTimeRate),
           qualityScore: Number(m.bbntPassRate),
-          ncrPenaltyScore: Math.max(0, 100 - Number(m.ncrCount) * 15),
           hseScore: Number(m.hseScore),
-          costControlScore: Math.max(0, 100 - Math.max(0, Number(m.costVarianceRate)) * 3),
         },
         summary: m.summary || "",
       });
@@ -125,9 +118,9 @@ export async function POST(req: Request) {
         {
           error: "Không có hồ sơ nào đủ dữ liệu để xếp hạng",
           reason:
-            "Các metric cần thiết (tiến độ, chất lượng, HSE, chi phí, NCR) chưa có đủ dữ liệu. " +
-            "Nguyên nhân có thể: (a) hệ thống chưa ghi nhận chi phí/NCR cho nhà thầu phụ, " +
-            "(b) chưa có đánh giá định kỳ, (c) hồ sơ chưa được gắn supplier_id.",
+            "Các metric cần thiết (tiến độ, chất lượng BBNT, HSE) chưa có đủ dữ liệu. " +
+            "Nguyên nhân có thể: (a) chưa có đánh giá định kỳ, " +
+            "(b) hồ sơ chưa được gắn supplier_id.",
           hoSoThieuDuLieu,
         },
         { status: 400 },
