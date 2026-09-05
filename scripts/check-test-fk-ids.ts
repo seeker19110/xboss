@@ -11,7 +11,14 @@ import { GOC_MAC_DINH, quetTests } from "./lib/test-fk-ids-scan";
 // đọc dòng đó trước khi thêm, không whitelist cho tiện. ĐỪNG thêm mục mới với lý do "id này
 // không thật sự bị xoá" hay "chạy một mình vẫn xanh" — đó chính xác là lập luận đã gây ra lỗi
 // 2 lần (Đợt 4, Đợt 5). Sửa file test (dùng id từ hàm `tao*()`) thay vì whitelist.
-const WHITELIST: Record<string, string> = {};
+const WHITELIST: Record<string, string> = {
+  // Hai dòng này nằm TRONG chuỗi fixture của chính ca test chứng minh cổng đỏ — chúng cố ý vi
+  // phạm để bộ quét bắt được, không phải mã test thật chạy trên DB. Bộ quét đọc văn bản thô nên
+  // không phân biệt được chuỗi với mã. Whitelist báo lỗi khi mục thừa, nên nếu fixture đổi dòng
+  // thì cổng sẽ tự nhắc cập nhật chỗ này.
+  "tests/check-test-fk-ids.test.ts:106": "fixture cố ý vi phạm trong ca chứng minh cổng đỏ",
+  "tests/check-test-fk-ids.test.ts:112": "fixture cố ý vi phạm trong ca chứng minh cổng đỏ",
+};
 
 console.log("=== Kiểm id khoá ngoại gán cứng trong test (tests/**/*.test.ts) ===");
 
