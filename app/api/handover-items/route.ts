@@ -9,6 +9,7 @@ import {
   validateHandoverItemInput,
   type HandoverItemStatus,
 } from "@/lib/hien-truong/handover";
+import { packageProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Hệ không tồn tại" }, { status: 422 });
   }
   if (input.workPackageId != null) {
-    if (!(await queryOne(`SELECT id FROM work_packages WHERE id = ?`, input.workPackageId)))
+    // Nhóm công việc phải thuộc dự án đang chọn (suy qua sheet_type → tower), không chỉ kiểm
+    // tồn tại — chặn gắn work package dự án khác vào hạng mục bàn giao dự án này (M22).
+    if ((await packageProjectId(input.workPackageId)) !== projectId)
       return NextResponse.json({ error: "Nhóm công việc không tồn tại" }, { status: 422 });
   }
 

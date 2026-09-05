@@ -81,9 +81,29 @@ export async function POST(req: NextRequest) {
 
   const note = typeof body?.note === "string" ? body.note.trim() || null : null;
 
+  // Dự án của phiếu suy từ dự án đang chọn của người tạo (cùng helper getCurrentProjectId các
+  // route khác dùng, không suy lại từ nội bộ thực thể) — để lọc webhook theo dự án.
+  const projectId = await getCurrentProjectId(user);
+
+  // Lọc task theo dự án đang chọn (suy qua work_packages → sheet_types → towers, cùng chuỗi
+  // join GET đang dùng) để chặn gắn task dự án khác vào phiếu YCNT dự án này (M22). Task
+  // không thuộc dự án rơi vào đúng nhánh "task không tồn tại" bên dưới — không lộ tồn tại.
+  // Không dùng "? IS NULL OR tw.project_id = ?" — Postgres không suy được kiểu tham số đứng
+  // riêng — nên dựng điều kiện động như GET ở trên.
+  const taskConds = ["t.id = ANY(?)"];
+  const taskValues: unknown[] = [taskIds];
+  if (projectId != null) {
+    taskConds.push("tw.project_id = ?");
+    taskValues.push(projectId);
+  }
   const tasks = await query<{ id: number; progressPercent: number }>(
-    `SELECT id, progress_percent AS "progressPercent" FROM tasks WHERE id = ANY(?)`,
-    taskIds,
+    `SELECT t.id, t.progress_percent AS "progressPercent"
+       FROM tasks t
+       JOIN work_packages wp ON wp.id = t.package_id
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       LEFT JOIN towers tw ON tw.id = st.tower_id
+      WHERE ${taskConds.join(" AND ")}`,
+    ...taskValues,
   );
   if (tasks.length !== taskIds.length)
     return NextResponse.json({ error: "Có task không tồn tại" }, { status: 404 });
@@ -93,10 +113,6 @@ export async function POST(req: NextRequest) {
       { error: `${notDone.length} task chưa đạt 100% tiến độ — chỉ gửi YCNT khi đã hoàn thành` },
       { status: 422 },
     );
-
-  // Dự án của phiếu suy từ dự án đang chọn của người tạo (cùng helper getCurrentProjectId các
-  // route khác dùng, không suy lại từ nội bộ thực thể) — để lọc webhook theo dự án.
-  const projectId = await getCurrentProjectId(user);
 
   const id = await withUniqueRetry(() =>
     withTransaction(async () => {
