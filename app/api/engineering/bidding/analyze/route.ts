@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { runBiddingAnalysis } from "@/lib/ky-thuat/engineering-bidding-matrix";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -40,12 +41,8 @@ export async function POST(req: NextRequest) {
     const result = await runBiddingAnalysis(projectId, body.packageId, user.id);
     return NextResponse.json({ success: true, data: result });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    // "Không tìm thấy" (gói thầu không tồn tại HOẶC thuộc dự án khác — `runBiddingAnalysis`
-    // đã lọc `project_id` trong SELECT) phải là 404, không phải 500: đây là kết quả nghiệp vụ
-    // bình thường, không phải sự cố hệ thống. Bám đúng khuôn route anh em cùng thư mục
-    // (`graph`, `lineage/[id]`, `impact/[id]`, `compliance/audit-element`).
-    const status = msg.includes("Không tìm thấy") ? 404 : 500;
-    return NextResponse.json({ error: msg }, { status });
+    // Hàm lib ném LoiNghiepVu mang sẵn mã (404 khi bản ghi không tồn tại/thuộc dự án
+    // khác) — không còn dò chuỗi thông điệp; lỗi hệ thống thật vẫn ra 500.
+    return phanHoiLoi(err);
   }
 }

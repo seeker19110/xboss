@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { createFidicClaim, listFidicClaims } from "@/lib/ky-thuat/engineering-fidic-claim";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +21,7 @@ export async function GET() {
     const claims = await listFidicClaims(projectId);
     return NextResponse.json({ success: true, data: claims });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -73,7 +73,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: claim });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

@@ -3,6 +3,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { toggleKillSwitch } from "@/lib/ky-thuat/engineering-autonomy";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,6 @@ export async function POST(req: Request) {
     const res = await toggleKillSwitch(projectId, capabilityKey, isActive, reason, user.id);
     return NextResponse.json({ killSwitch: res });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

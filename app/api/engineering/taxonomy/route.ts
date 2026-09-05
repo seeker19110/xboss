@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getTaxonomy } from "@/lib/ky-thuat/engineering-graph";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,6 @@ export async function GET() {
     const taxonomy = await getTaxonomy();
     return NextResponse.json(taxonomy);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

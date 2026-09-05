@@ -5,6 +5,7 @@ import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { query } from "@/lib/db";
 import { computeSubcontractorTrustScore } from "@/lib/ky-thuat/engineering-subcon-ai";
 import { tinhChiSoThauPhu } from "@/lib/hien-truong/subcon-metrics";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -96,8 +97,8 @@ export async function POST(req: Request) {
       data: insertRes[0],
       evaluation: evalRes,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Subcon AI Evaluate POST]", error);
-    return NextResponse.json({ error: error.message || "Lỗi chấm điểm thầu phụ" }, { status: 500 });
+    return phanHoiLoi(error, "Lỗi chấm điểm thầu phụ");
   }
 }

@@ -2,6 +2,7 @@
 // Đặc tả: docs/nang-cap/OS-4-controlled-autonomy.md
 import crypto from "crypto";
 import { query, queryOne, run, withProjectScope } from "@/lib/db";
+import { loiXungDot } from "@/lib/nen/loi";
 
 export type AutonomyLevel = "A0" | "A1" | "A2";
 export type RiskClass = "low" | "medium" | "high" | "critical";
@@ -261,7 +262,10 @@ export async function authorizeExecutionRequest(
       );
 
       if ((res.changes ?? 0) === 0) {
-        throw new Error("Yêu cầu không ở trạng thái hợp lệ để cấp quyền phê duyệt");
+        // 409: một câu UPDATE lọc cả `project_id` lẫn `status` nên không phân biệt được
+        // "không tồn tại/thuộc dự án khác" với "sai trạng thái" — giữ chung một thông điệp
+        // không xác nhận sự tồn tại của bản ghi (không lộ dữ liệu dự án khác).
+        throw loiXungDot("Yêu cầu không ở trạng thái hợp lệ để cấp quyền phê duyệt");
       }
 
       return { token, expiresAt };

@@ -134,57 +134,66 @@ test.after(() => dangXuat());
 // GET — chỉ trả sheets/packages/tasks/workload của dự án đang chọn
 // ============================================================================
 
-test("GET /api/admin/assignments: chỉ trả WBS của dự án đang chọn, không lộ dự án khác", S, async () => {
-  const a = await dungSheet("getA");
-  const b = await dungSheet("getB");
-  const pkgA = await taoNhom(a.sheetTypeId, uniq("PKA"));
-  const taskA = await taoTask(pkgA, uniq("TA"));
-  const pkgB = await taoNhom(b.sheetTypeId, uniq("PKB"));
-  const taskB = await taoTask(pkgB, uniq("TB"));
+test(
+  "GET /api/admin/assignments: chỉ trả WBS của dự án đang chọn, không lộ dự án khác",
+  S,
+  async () => {
+    const a = await dungSheet("getA");
+    const b = await dungSheet("getB");
+    const pkgA = await taoNhom(a.sheetTypeId, uniq("PKA"));
+    const taskA = await taoTask(pkgA, uniq("TA"));
+    const pkgB = await taoNhom(b.sheetTypeId, uniq("PKB"));
+    const taskB = await taoTask(pkgB, uniq("TB"));
 
-  const workerB = await taoUser("engineer", "workerB");
-  const { run } = await import("@/lib/db");
-  await run(`UPDATE tasks SET assigned_to = ? WHERE id = ?`, workerB.id, taskB);
+    const workerB = await taoUser("engineer", "workerB");
+    const { run } = await import("@/lib/db");
+    await run(`UPDATE tasks SET assigned_to = ? WHERE id = ?`, workerB.id, taskB);
 
-  const pmA = await taoUser("pm", "pmA");
-  await dangNhapDuAn(pmA, a.projectId);
+    const pmA = await taoUser("pm", "pmA");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { GET } = await import("@/app/api/admin/assignments/route");
-  const res = await GET(jreq("/api/admin/assignments", undefined, "GET"));
-  assert.equal(res.status, 200);
-  const data = await res.json();
+    const { GET } = await import("@/app/api/admin/assignments/route");
+    const res = await GET(jreq("/api/admin/assignments", undefined, "GET"));
+    assert.equal(res.status, 200);
+    const data = await res.json();
 
-  assert.ok(
-    data.sheets.some((s: { id: number }) => s.id === a.sheetTypeId),
-    "phải có sheet dự án A",
-  );
-  assert.ok(
-    !data.sheets.some((s: { id: number }) => s.id === b.sheetTypeId),
-    "KHÔNG được có sheet dự án B",
-  );
-  assert.ok(
-    !data.packages.some((p: { id: number }) => p.id === pkgB),
-    "KHÔNG được có package dự án B",
-  );
-  assert.ok(
-    !data.tasks.some((t: { id: number }) => t.id === taskB),
-    "KHÔNG được có task dự án B",
-  );
-  assert.ok(
-    data.tasks.some((t: { id: number }) => t.id === taskA),
-    "phải có task dự án A",
-  );
-  assert.equal(
-    data.workload[workerB.id],
-    undefined,
-    "workload KHÔNG được đếm task của dự án B",
-  );
+    assert.ok(
+      data.sheets.some((s: { id: number }) => s.id === a.sheetTypeId),
+      "phải có sheet dự án A",
+    );
+    assert.ok(
+      !data.sheets.some((s: { id: number }) => s.id === b.sheetTypeId),
+      "KHÔNG được có sheet dự án B",
+    );
+    assert.ok(
+      !data.packages.some((p: { id: number }) => p.id === pkgB),
+      "KHÔNG được có package dự án B",
+    );
+    assert.ok(
+      !data.tasks.some((t: { id: number }) => t.id === taskB),
+      "KHÔNG được có task dự án B",
+    );
+    assert.ok(
+      data.tasks.some((t: { id: number }) => t.id === taskA),
+      "phải có task dự án A",
+    );
+    assert.equal(data.workload[workerB.id], undefined, "workload KHÔNG được đếm task của dự án B");
 
-  await don([a.projectId, b.projectId], [workerB.id, pmA.id]);
-});
+    await don([a.projectId, b.projectId], [workerB.id, pmA.id]);
+  },
+);
 
 test("GET /api/admin/assignments: chưa chọn dự án → trả danh sách rỗng, KHÔNG lỗi", S, async () => {
   const pmNoProj = await taoUser("pm", "pmNoProj");
+  // Cùng lý do như ca POST 422 bên dưới: `visibleProjectIds` có fallback "bảng user_projects
+  // RỖNG toàn hệ → mọi user thấy hết". Chạy toàn bộ test suite, bảng này có thể rỗng đúng lúc
+  // ca chạy ⇒ PM thấy dự án đầu tiên ⇒ projectId khác null ⇒ route trả WBS thật và ca đỏ ngẫu
+  // nhiên (đã đỏ thật trong CI). Chèn một dòng cho user KHÁC để bảng chắc chắn không rỗng.
+  const { run } = await import("@/lib/db");
+  const duAnMoc = await taoDuAn("getNoProjMoc");
+  const userMoc = await taoUser("engineer", "getNoProjMoc");
+  await run(`INSERT INTO user_projects (user_id, project_id) VALUES (?, ?)`, userMoc.id, duAnMoc);
+
   dangXuat();
   const { dangNhap } = await import("./helpers/phien");
   dangNhap(pmNoProj, null);
@@ -195,89 +204,105 @@ test("GET /api/admin/assignments: chưa chọn dự án → trả danh sách r�
   const data = await res.json();
   assert.deepEqual(data, { sheets: [], packages: [], tasks: [], workload: {} });
 
-  await don([], [pmNoProj.id]);
+  await don([duAnMoc], [pmNoProj.id, userMoc.id]);
 });
 
 // ============================================================================
 // POST — id tham chiếu từ body phải thuộc dự án đang chọn
 // ============================================================================
 
-test("POST /api/admin/assignments: gán task thuộc dự án khác → 404, KHÔNG đổi assigned_to", S, async () => {
-  const a = await dungSheet("postTaskA");
-  const b = await dungSheet("postTaskB");
-  const pkgB = await taoNhom(b.sheetTypeId, uniq("PKB"));
-  const taskB = await taoTask(pkgB, uniq("TB"));
+test(
+  "POST /api/admin/assignments: gán task thuộc dự án khác → 404, KHÔNG đổi assigned_to",
+  S,
+  async () => {
+    const a = await dungSheet("postTaskA");
+    const b = await dungSheet("postTaskB");
+    const pkgB = await taoNhom(b.sheetTypeId, uniq("PKB"));
+    const taskB = await taoTask(pkgB, uniq("TB"));
 
-  const pmA = await taoUser("pm", "postTaskPmA");
-  const target = await taoUser("engineer", "postTaskTarget");
-  await dangNhapDuAn(pmA, a.projectId);
+    const pmA = await taoUser("pm", "postTaskPmA");
+    const target = await taoUser("engineer", "postTaskTarget");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { POST } = await import("@/app/api/admin/assignments/route");
-  const res = await POST(jreq("/api/admin/assignments", { level: "task", id: taskB, userId: target.id }));
-  assert.equal(res.status, 404);
-  const data = await res.json();
-  assert.equal(data.error, "Đối tượng không tồn tại");
+    const { POST } = await import("@/app/api/admin/assignments/route");
+    const res = await POST(
+      jreq("/api/admin/assignments", { level: "task", id: taskB, userId: target.id }),
+    );
+    assert.equal(res.status, 404);
+    const data = await res.json();
+    assert.equal(data.error, "Đối tượng không tồn tại");
 
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ assignedTo: number | null }>(
-    `SELECT assigned_to AS "assignedTo" FROM tasks WHERE id = ?`,
-    taskB,
-  );
-  assert.equal(row?.assignedTo, null, "task dự án B không được đổi assigned_to");
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ assignedTo: number | null }>(
+      `SELECT assigned_to AS "assignedTo" FROM tasks WHERE id = ?`,
+      taskB,
+    );
+    assert.equal(row?.assignedTo, null, "task dự án B không được đổi assigned_to");
 
-  await don([a.projectId, b.projectId], [pmA.id, target.id]);
-});
+    await don([a.projectId, b.projectId], [pmA.id, target.id]);
+  },
+);
 
-test("POST /api/admin/assignments: gán package thuộc dự án khác → 404, KHÔNG đổi assigned_to", S, async () => {
-  const a = await dungSheet("postPkgA");
-  const b = await dungSheet("postPkgB");
-  const pkgB = await taoNhom(b.sheetTypeId, uniq("PKB2"));
+test(
+  "POST /api/admin/assignments: gán package thuộc dự án khác → 404, KHÔNG đổi assigned_to",
+  S,
+  async () => {
+    const a = await dungSheet("postPkgA");
+    const b = await dungSheet("postPkgB");
+    const pkgB = await taoNhom(b.sheetTypeId, uniq("PKB2"));
 
-  const pmA = await taoUser("pm", "postPkgPmA");
-  const target = await taoUser("engineer", "postPkgTarget");
-  await dangNhapDuAn(pmA, a.projectId);
+    const pmA = await taoUser("pm", "postPkgPmA");
+    const target = await taoUser("engineer", "postPkgTarget");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { POST } = await import("@/app/api/admin/assignments/route");
-  const res = await POST(jreq("/api/admin/assignments", { level: "package", id: pkgB, userId: target.id }));
-  assert.equal(res.status, 404);
-  const data = await res.json();
-  assert.equal(data.error, "Đối tượng không tồn tại");
+    const { POST } = await import("@/app/api/admin/assignments/route");
+    const res = await POST(
+      jreq("/api/admin/assignments", { level: "package", id: pkgB, userId: target.id }),
+    );
+    assert.equal(res.status, 404);
+    const data = await res.json();
+    assert.equal(data.error, "Đối tượng không tồn tại");
 
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ assignedTo: number | null }>(
-    `SELECT assigned_to AS "assignedTo" FROM work_packages WHERE id = ?`,
-    pkgB,
-  );
-  assert.equal(row?.assignedTo, null, "package dự án B không được đổi assigned_to");
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ assignedTo: number | null }>(
+      `SELECT assigned_to AS "assignedTo" FROM work_packages WHERE id = ?`,
+      pkgB,
+    );
+    assert.equal(row?.assignedTo, null, "package dự án B không được đổi assigned_to");
 
-  await don([a.projectId, b.projectId], [pmA.id, target.id]);
-});
+    await don([a.projectId, b.projectId], [pmA.id, target.id]);
+  },
+);
 
-test("POST /api/admin/assignments: gán sheet thuộc dự án khác → 404, KHÔNG đổi manager_id", S, async () => {
-  const a = await dungSheet("postSheetA");
-  const b = await dungSheet("postSheetB");
+test(
+  "POST /api/admin/assignments: gán sheet thuộc dự án khác → 404, KHÔNG đổi manager_id",
+  S,
+  async () => {
+    const a = await dungSheet("postSheetA");
+    const b = await dungSheet("postSheetB");
 
-  const pmA = await taoUser("pm", "postSheetPmA");
-  const target = await taoUser("engineer", "postSheetTarget");
-  await dangNhapDuAn(pmA, a.projectId);
+    const pmA = await taoUser("pm", "postSheetPmA");
+    const target = await taoUser("engineer", "postSheetTarget");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { POST } = await import("@/app/api/admin/assignments/route");
-  const res = await POST(
-    jreq("/api/admin/assignments", { level: "sheet", id: b.sheetTypeId, userId: target.id }),
-  );
-  assert.equal(res.status, 404);
-  const data = await res.json();
-  assert.equal(data.error, "Đối tượng không tồn tại");
+    const { POST } = await import("@/app/api/admin/assignments/route");
+    const res = await POST(
+      jreq("/api/admin/assignments", { level: "sheet", id: b.sheetTypeId, userId: target.id }),
+    );
+    assert.equal(res.status, 404);
+    const data = await res.json();
+    assert.equal(data.error, "Đối tượng không tồn tại");
 
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ managerId: number | null }>(
-    `SELECT manager_id AS "managerId" FROM sheet_types WHERE id = ?`,
-    b.sheetTypeId,
-  );
-  assert.equal(row?.managerId, null, "sheet dự án B không được đổi manager_id");
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ managerId: number | null }>(
+      `SELECT manager_id AS "managerId" FROM sheet_types WHERE id = ?`,
+      b.sheetTypeId,
+    );
+    assert.equal(row?.managerId, null, "sheet dự án B không được đổi manager_id");
 
-  await don([a.projectId, b.projectId], [pmA.id, target.id]);
-});
+    await don([a.projectId, b.projectId], [pmA.id, target.id]);
+  },
+);
 
 test("POST /api/admin/assignments: gán task đúng dự án của mình → 200, ghi đúng", S, async () => {
   const a = await dungSheet("postOkA");
@@ -289,7 +314,9 @@ test("POST /api/admin/assignments: gán task đúng dự án của mình → 200
   await dangNhapDuAn(pmA, a.projectId);
 
   const { POST } = await import("@/app/api/admin/assignments/route");
-  const res = await POST(jreq("/api/admin/assignments", { level: "task", id: taskA, userId: target.id }));
+  const res = await POST(
+    jreq("/api/admin/assignments", { level: "task", id: taskA, userId: target.id }),
+  );
   assert.equal(res.status, 200);
 
   const { queryOne } = await import("@/lib/db");
@@ -305,13 +332,25 @@ test("POST /api/admin/assignments: gán task đúng dự án của mình → 200
 test("POST /api/admin/assignments: chưa chọn dự án → 422", S, async () => {
   const pmNoProj = await taoUser("pm", "postNoProj");
   const target = await taoUser("engineer", "postNoProjTarget");
+  // `visibleProjectIds` có fallback "bảng user_projects RỖNG toàn hệ → mọi user thấy hết". Nếu
+  // không chặn nhánh đó, PM này sẽ thấy dự án đầu tiên ⇒ projectId khác null ⇒ route không đi
+  // vào nhánh 422 và ca test đỏ ngẫu nhiên tuỳ DB worker. Chèn một dòng cho user KHÁC để bảng
+  // chắc chắn không rỗng, khi đó PM này mới thật sự "chưa có dự án nào".
+  const { insertId, run } = await import("@/lib/db");
+  const duAnMoc = await taoDuAn("postNoProjMoc");
+  const userMoc = await taoUser("engineer", "postNoProjMoc");
+  await run(`INSERT INTO user_projects (user_id, project_id) VALUES (?, ?)`, userMoc.id, duAnMoc);
+  void insertId;
+
   dangXuat();
   const { dangNhap } = await import("./helpers/phien");
   dangNhap(pmNoProj, null);
 
   const { POST } = await import("@/app/api/admin/assignments/route");
-  const res = await POST(jreq("/api/admin/assignments", { level: "task", id: 1, userId: target.id }));
+  const res = await POST(
+    jreq("/api/admin/assignments", { level: "task", id: 1, userId: target.id }),
+  );
   assert.equal(res.status, 422);
 
-  await don([], [pmNoProj.id, target.id]);
+  await don([duAnMoc], [pmNoProj.id, target.id, userMoc.id]);
 });

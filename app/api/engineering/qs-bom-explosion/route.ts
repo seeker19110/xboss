@@ -9,6 +9,7 @@ import {
   saveQsBomExplosion,
   listQsBomExplosions,
 } from "@/lib/ky-thuat/engineering-qs-omnipotent";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +28,7 @@ export async function GET() {
     const list = await listQsBomExplosions(projectId);
     return NextResponse.json({ items: list, totalCount: list.length });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -124,7 +124,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: `Hành động ${action} không hợp lệ` }, { status: 400 });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

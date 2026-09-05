@@ -10,6 +10,7 @@
 // đúng nguyên tắc #1/#2/#9 của track ENG (ENG-0 mục 3): LLM không phải nguồn sự thật.
 import { z } from "zod";
 import { query, queryOne, run, withProjectScope, withTransaction } from "@/lib/db";
+import { loiKhongTimThay } from "@/lib/nen/loi";
 
 // --- §2.1 — 8 lớp suggestion (A–H) ---
 export const SUGGESTION_CLASSES = [
@@ -433,7 +434,7 @@ export async function decideSuggestion(
     id,
     projectId,
   );
-  if (!current) throw new Error("Đề xuất không tồn tại hoặc không thuộc dự án đang chọn");
+  if (!current) throw loiKhongTimThay("Đề xuất không tồn tại hoặc không thuộc dự án đang chọn");
   await run(
     `UPDATE engineering_suggestions
         SET status = ?, decided_by = ?, decided_at = NOW(), decision_note = ?, updated_at = NOW()

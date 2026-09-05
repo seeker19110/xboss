@@ -7,6 +7,7 @@ import {
   listAgentDebateSessions,
   DebateTopicInput,
 } from "@/lib/ky-thuat/engineering-multi-agent-copilot";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +26,7 @@ export async function GET() {
     const list = await listAgentDebateSessions(projectId);
     return NextResponse.json({ sessions: list, totalCount: list.length });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -63,7 +63,6 @@ export async function POST(req: NextRequest) {
       resolution,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

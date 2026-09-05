@@ -9,6 +9,7 @@ import {
   listSmartIpcRecords,
   validateSmartIpcPostBody,
 } from "@/lib/ky-thuat/engineering-smart-ipc";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +33,7 @@ export async function GET() {
     const list = await listSmartIpcRecords(projectId);
     return NextResponse.json({ ipcs: list, totalCount: list.length });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -78,7 +78,6 @@ export async function POST(req: NextRequest) {
       result,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
