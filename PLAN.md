@@ -46,7 +46,7 @@ chỉ còn **8/451 route** chưa từng được test thực thi chạm tới, n
 
 ---
 
-# Pha 1 — 6 việc song song
+# Pha 1 — 8 việc song song
 
 ## Việc A — Kill switch của Safe Execution Engine: làm cho lệnh huỷ có tính bền — `route: complex`
 
@@ -337,6 +337,62 @@ chưa gắn `supplier_id` → vẫn 422.
 
 **Tiêu chí chấp nhận:** toàn bộ `tests/engineering-subcon-ai.test.ts` xanh; ca 200 mới xanh (kèm
 output chứng minh nó ra 422 trên code cũ); `typecheck` + `eslint` + `npm run check:lib-layers` xanh.
+
+---
+
+## Việc H — `/api/project` hoạt động theo dự án đang chọn — `route: spec`
+
+**Quyết định của chủ dự án (2026-09-05):** làm thành việc riêng (không vá quyền tạm bợ).
+
+**Lỗi (đã đọc code xác nhận):** `app/api/project/route.ts` thao tác trên **dòng `projects` có id nhỏ
+nhất toàn DB**, không theo dự án của người gọi:
+
+```ts
+// GET (dòng ~18)
+`SELECT name, code, heatmap_title, investor, contractor, logo FROM projects ORDER BY id LIMIT 1`
+// PATCH (dòng ~60 và ~68)
+`UPDATE projects SET logo = ? WHERE id = (SELECT id FROM projects ORDER BY id LIMIT 1)``UPDATE projects SET heatmap_title = ? WHERE id = (SELECT id FROM projects ORDER BY id LIMIT 1)`;
+```
+
+PATCH chỉ kiểm `isAdminOrPm(user.role)` ⇒ Admin/PM của **bất kỳ dự án nào** ghi đè được logo và
+tiêu đề heatmap của dự án đầu tiên. Route viết như cấu hình singleton "1 app 1 dự án", có trước trục
+đa dự án (M22) và đa tổ chức (`org_id`, M54).
+
+**Việc này NHỎ hơn vẻ ngoài** vì hạ tầng đã có sẵn: `getCurrentProjectId(user)`
+(`lib/ha-tang/projects.ts:47`) **đã tự đối chiếu `visibleProjectIds` VÀ đối chiếu `org_id`** —
+user đoán id dự án của org khác qua cookie thì hàm trả `null` (không throw). Vậy chỉ cần dùng đúng
+hàm này, **không cần tự viết kiểm quyền**.
+
+**Yêu cầu:**
+
+1. **PATCH**: lấy `projectId = await getCurrentProjectId(user)`; `null` → **422** kèm thông điệp
+   tiếng Việt (bám khuôn `app/api/handover-items/route.ts` dòng ~47–52: "Chưa có dự án nào để …").
+   Hai câu `UPDATE` đổi `WHERE id = (SELECT ... LIMIT 1)` thành `WHERE id = ?` với `projectId`.
+2. **GET vẫn PUBLIC** (trang `/login` gọi nó khi chưa đăng nhập — `app/login/page.tsx:34`). Logic mới:
+   gọi `getCurrentUser()`; **có** phiên và `getCurrentProjectId` ra id → đọc đúng dự án đó; **không**
+   có phiên, hoặc chưa chọn dự án → giữ **nguyên hành vi cũ** `ORDER BY id LIMIT 1` (fallback công
+   khai, và `CLAUDE.md` ghi rõ route này phải có fallback khi DB trống). Không thêm tham số
+   `?projectId=` — sẽ biến endpoint public thành chỗ dò tên dự án theo id.
+3. **UI không cần đổi**: mọi trang tiêu thụ đều fetch `/api/project` sau khi đã đăng nhập
+   (`ProgressMap`, `lookahead`, `report`, `schedule`, `mepf-lifecycle`, `payments/print`), nên tự
+   nhận đúng dự án. **Chỉ** `app/login/page.tsx` chạy ở trạng thái chưa đăng nhập — dùng fallback.
+   Xác minh lại bằng `grep -rn "/api/project\"" app/` trước khi kết luận không phải sửa gì.
+4. Không thêm migration, không đổi hình dạng JSON trả về, không đổi mã trạng thái của GET.
+
+**Test:** file MỚI `tests/route-project-theo-du-an.test.ts`. Tối thiểu:
+
+- PATCH: PM dự án A đổi `heatmapTitle` → **chỉ** dòng dự án A đổi; **khẳng định dòng dự án B KHÔNG
+  đổi trong DB** (ca này ĐỎ trên code hiện tại nếu A không phải dự án id nhỏ nhất — dựng dữ liệu
+  đúng thứ tự id để nó thật sự bắt lỗi; chạy trước khi sửa để chứng minh).
+- PATCH: user chưa chọn dự án → 422, không dòng nào đổi.
+- PATCH: vẫn 401 chưa đăng nhập, 403 sai vai trò (giữ nguyên hành vi cũ).
+- GET **không** phiên → vẫn 200, trả dự án đầu tiên (fallback không vỡ — đây là ca chống hồi quy
+  trang `/login`).
+- GET **có** phiên đang chọn dự án B → trả tên/mã của B, không phải A.
+
+**Tiêu chí chấp nhận:** các ca trên xanh; `typecheck` + `eslint` + `check:route-perms` +
+`check:project-scope` xanh; chạy lại mọi file test cũ nhắc `/api/project` (`grep -rl`); báo cáo có
+output chứng minh ca PATCH đỏ trước khi sửa.
 
 ---
 
