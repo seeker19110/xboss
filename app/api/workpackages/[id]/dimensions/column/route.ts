@@ -3,21 +3,9 @@ import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { recomputeTask, recomputePackage } from "@/lib/tien-do/recompute";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { packageProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
-
-// Dự án của 1 nhóm việc — suy qua sheet_type_id → towers.project_id (vá W0).
-async function packageProjectId(id: number): Promise<number | null> {
-  const row = await queryOne<{ projectId: number | null }>(
-    `SELECT tw.project_id AS "projectId"
-       FROM work_packages wp
-       JOIN sheet_types st ON st.id = wp.sheet_type_id
-       LEFT JOIN towers tw ON tw.id = st.tower_id
-      WHERE wp.id = ?`,
-    id,
-  );
-  return row?.projectId ?? null;
-}
 
 // POST /api/workpackages/:id/dimensions/column
 // body: { label, afterLabel? }

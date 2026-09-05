@@ -2,20 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { sheetTypeProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
-
-// Dự án của 1 sheet — suy qua sheet_types.tower_id → towers.project_id (vá W0).
-async function sheetTypeProjectId(id: number): Promise<number | null> {
-  const row = await queryOne<{ projectId: number | null }>(
-    `SELECT tw.project_id AS "projectId"
-       FROM sheet_types st
-       LEFT JOIN towers tw ON tw.id = st.tower_id
-      WHERE st.id = ?`,
-    id,
-  );
-  return row?.projectId ?? null;
-}
 
 // POST /api/workpackages/:id/copy
 // Tạo bản sao nhóm cùng tất cả tasks và cấu trúc cột (checkbox reset về unchecked).

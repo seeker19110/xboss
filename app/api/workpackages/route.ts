@@ -3,21 +3,9 @@ import { query, queryOne, insertId, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { sheetTypeProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
-
-// Dự án của 1 sheet — suy qua sheet_types.tower_id → towers.project_id (vá W0, cùng khuôn
-// packageProjectId ở packages/:id/dependencies). LEFT JOIN để sheet chưa gán tower ra null.
-async function sheetTypeProjectId(id: number): Promise<number | null> {
-  const row = await queryOne<{ projectId: number | null }>(
-    `SELECT tw.project_id AS "projectId"
-       FROM sheet_types st
-       LEFT JOIN towers tw ON tw.id = st.tower_id
-      WHERE st.id = ?`,
-    id,
-  );
-  return row?.projectId ?? null;
-}
 
 // POST /api/workpackages
 // body: { sheetTypeId, code, name, floorLabel?, boqCode?, afterId? }

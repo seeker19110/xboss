@@ -4,22 +4,12 @@ import { getCurrentUser, CAN, canTouchPackage } from "@/lib/bao-mat/auth";
 import { newBbntFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
 import { storagePut, storageGet, storageDelete } from "@/lib/nen/storage";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { packageProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
-// Dự án của 1 nhóm việc — suy qua sheet_type_id → towers.project_id (vá W0). canTouchPackage
-// chỉ kiểm subcon có được GÁN nhóm không, không kiểm dự án — Admin/PM vẫn cần chặn riêng.
-async function packageProjectId(id: number): Promise<number | null> {
-  const row = await queryOne<{ projectId: number | null }>(
-    `SELECT tw.project_id AS "projectId"
-       FROM work_packages wp
-       JOIN sheet_types st ON st.id = wp.sheet_type_id
-       LEFT JOIN towers tw ON tw.id = st.tower_id
-      WHERE wp.id = ?`,
-    id,
-  );
-  return row?.projectId ?? null;
-}
+// canTouchPackage (lib/bao-mat/auth.ts) chỉ kiểm subcon có được GÁN nhóm không (trả `true` vô
+// điều kiện cho mọi vai trò khác) — không kiểm dự án, nên vẫn cần packageProjectId() chặn riêng.
 
 type WP = {
   id: number;
