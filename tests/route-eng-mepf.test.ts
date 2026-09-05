@@ -263,27 +263,23 @@ test(
   },
 );
 
-test(
-  "POST /api/engineering/mepf-takeoff: action=generative_route đủ toạ độ → 200",
-  S,
-  async () => {
-    const projectId = await taoDuAn("tkoffgen");
-    const eng = await taoUser("engineer", "tkoffgen");
-    await dangNhapDuAn(eng, projectId);
-    const { POST } = await import("@/app/api/engineering/mepf-takeoff/route");
-    const res = await POST(
-      jreq("/x", {
-        action: "generative_route",
-        startPoint: { x: 0, y: 0, z: 3000 },
-        endPoint: { x: 1000, y: 0, z: 3000 },
-      }),
-    );
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.success, true);
-    assert.ok(body.solution);
-  },
-);
+test("POST /api/engineering/mepf-takeoff: action=generative_route đủ toạ độ → 200", S, async () => {
+  const projectId = await taoDuAn("tkoffgen");
+  const eng = await taoUser("engineer", "tkoffgen");
+  await dangNhapDuAn(eng, projectId);
+  const { POST } = await import("@/app/api/engineering/mepf-takeoff/route");
+  const res = await POST(
+    jreq("/x", {
+      action: "generative_route",
+      startPoint: { x: 0, y: 0, z: 3000 },
+      endPoint: { x: 1000, y: 0, z: 3000 },
+    }),
+  );
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.success, true);
+  assert.ok(body.solution);
+});
 
 test(
   "POST rồi GET /api/engineering/mepf-takeoff: bóc tách khối lượng AI & tra lại danh sách",
@@ -492,7 +488,11 @@ test(
     const { POST } = await import("@/app/api/engineering/pipe-mass-balance/route");
 
     const resPhantom = await POST(
-      jreq("/x", { action: "check_phantom_breaker", claimedInstallM: 100, totalStockIssuedToSubconM: 60 }),
+      jreq("/x", {
+        action: "check_phantom_breaker",
+        claimedInstallM: 100,
+        totalStockIssuedToSubconM: 60,
+      }),
     );
     assert.equal(resPhantom.status, 200);
     assert.equal((await resPhantom.json()).success, true);
@@ -704,17 +704,21 @@ test("POST /api/engineering/iot/telemetry: thiếu deviceId/metricValue → 400"
   assert.equal(res.status, 400);
 });
 
-test("POST /api/engineering/iot/telemetry: deviceId không tồn tại trong dự án → 404", S, async () => {
-  const projectId = await taoDuAn("telem404");
-  const pm = await taoUser("pm", "telem404");
-  await batModule("engineering-iot-telemetry", projectId);
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/iot/telemetry/route");
-  const res = await POST(
-    jreq("/x", { deviceId: "00000000-0000-0000-0000-000000000000", metricValue: 10 }),
-  );
-  assert.equal(res.status, 404);
-});
+test(
+  "POST /api/engineering/iot/telemetry: deviceId không tồn tại trong dự án → 404",
+  S,
+  async () => {
+    const projectId = await taoDuAn("telem404");
+    const pm = await taoUser("pm", "telem404");
+    await batModule("engineering-iot-telemetry", projectId);
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/iot/telemetry/route");
+    const res = await POST(
+      jreq("/x", { deviceId: "00000000-0000-0000-0000-000000000000", metricValue: 10 }),
+    );
+    assert.equal(res.status, 404);
+  },
+);
 
 test(
   "POST /api/engineering/iot/telemetry: ghi giá trị NORMAL không sinh cảnh báo; ghi giá trị " +
@@ -815,36 +819,40 @@ test(
   },
 );
 
-test("GET rồi PATCH /api/engineering/iot/alerts: xử lý cảnh báo trong đúng dự án → 200", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("alertok");
-  const pm = await taoUser("pm", "alertok");
-  await batModule("engineering-iot-telemetry", projectId);
-  await dangNhapDuAn(pm, projectId);
-  const deviceId = await taoThietBiIot(projectId, "GAS_LEAK", 25);
-  const { POST: POST_TELEM } = await import("@/app/api/engineering/iot/telemetry/route");
-  const resTelem = await POST_TELEM(jreq("/x", { deviceId, metricValue: 60 }));
-  const { alert } = await resTelem.json();
-  assert.ok(alert);
+test(
+  "GET rồi PATCH /api/engineering/iot/alerts: xử lý cảnh báo trong đúng dự án → 200",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("alertok");
+    const pm = await taoUser("pm", "alertok");
+    await batModule("engineering-iot-telemetry", projectId);
+    await dangNhapDuAn(pm, projectId);
+    const deviceId = await taoThietBiIot(projectId, "GAS_LEAK", 25);
+    const { POST: POST_TELEM } = await import("@/app/api/engineering/iot/telemetry/route");
+    const resTelem = await POST_TELEM(jreq("/x", { deviceId, metricValue: 60 }));
+    const { alert } = await resTelem.json();
+    assert.ok(alert);
 
-  const { GET, PATCH } = await import("@/app/api/engineering/iot/alerts/route");
-  const resGet = await GET(jreq("/x", undefined, "GET"));
-  assert.equal(resGet.status, 200);
-  assert.ok((await resGet.json()).data.some((a: any) => a.id === alert.id));
+    const { GET, PATCH } = await import("@/app/api/engineering/iot/alerts/route");
+    const resGet = await GET(jreq("/x", undefined, "GET"));
+    assert.equal(resGet.status, 200);
+    assert.ok((await resGet.json()).data.some((a: any) => a.id === alert.id));
 
-  const resPatch = await PATCH(jreq("/x", { alertId: alert.id, isResolved: true }, "PATCH"));
-  assert.equal(resPatch.status, 200);
-  const bodyPatch = await resPatch.json();
-  // Route trả nguyên `RETURNING *` (snake_case), không alias camelCase.
-  assert.equal(bodyPatch.data.is_resolved, true);
+    const resPatch = await PATCH(jreq("/x", { alertId: alert.id, isResolved: true }, "PATCH"));
+    assert.equal(resPatch.status, 200);
+    const bodyPatch = await resPatch.json();
+    // Route trả nguyên `RETURNING *` (snake_case), không alias camelCase.
+    assert.equal(bodyPatch.data.is_resolved, true);
 
-  const row = await queryOne<{ is_resolved: boolean; resolved_by: number }>(
-    `SELECT is_resolved, resolved_by FROM engineering_iot_threshold_alerts WHERE id = ?`,
-    alert.id,
-  );
-  assert.equal(row?.is_resolved, true);
-  assert.equal(row?.resolved_by, pm.id);
-});
+    const row = await queryOne<{ is_resolved: boolean; resolved_by: number }>(
+      `SELECT is_resolved, resolved_by FROM engineering_iot_threshold_alerts WHERE id = ?`,
+      alert.id,
+    );
+    assert.equal(row?.is_resolved, true);
+    assert.equal(row?.resolved_by, pm.id);
+  },
+);
 
 // ============================================================================
 // POST /api/engineering/spatial/compute
@@ -1097,17 +1105,55 @@ test(
   },
 );
 
-test("DELETE /api/engineering/spatial/annotations/:id: xoá trong đúng dự án → 200, hết trong DB", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("annotdok");
-  const pm = await taoUser("pm", "annotdok");
-  const id = await taoAnnotation(pm, projectId, "dok");
-  const { DELETE } = await import("@/app/api/engineering/spatial/annotations/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), { params: Promise.resolve({ id }) });
-  assert.equal(res.status, 200);
-  const row = await queryOne(`SELECT id FROM engineering_spatial_annotations WHERE id = ?`, id);
-  assert.equal(row, undefined);
-});
+test(
+  "DELETE /api/engineering/spatial/annotations/:id: xoá trong đúng dự án → 200, hết trong DB",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("annotdok");
+    const pm = await taoUser("pm", "annotdok");
+    const id = await taoAnnotation(pm, projectId, "dok");
+    const { DELETE } = await import("@/app/api/engineering/spatial/annotations/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), { params: Promise.resolve({ id }) });
+    assert.equal(res.status, 200);
+    const row = await queryOne(`SELECT id FROM engineering_spatial_annotations WHERE id = ?`, id);
+    assert.equal(row, undefined);
+  },
+);
+
+// Hai ca dưới khoá bản vá "không báo thành công khống": trước đây PATCH/DELETE bỏ qua giá trị
+// trả về của lib (lib ĐÃ tự tính đúng "có đụng dòng nào không") và luôn trả `success: true`,
+// nên thao tác lên điểm ghim không tồn tại/đã xoá vẫn báo thành công — client không phân biệt
+// được "đã xử lý" với "chưa từng có".
+test(
+  "DELETE /api/engineering/spatial/annotations/:id: id hợp lệ nhưng không tồn tại → 404",
+  S,
+  async () => {
+    const projectId = await taoDuAn("annotdmiss");
+    const pm = await taoUser("pm", "annotdmiss");
+    await dangNhapDuAn(pm, projectId);
+    const { DELETE } = await import("@/app/api/engineering/spatial/annotations/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: "00000000-0000-4000-8000-000000000000" }),
+    });
+    assert.equal(res.status, 404);
+  },
+);
+
+test(
+  "PATCH /api/engineering/spatial/annotations/:id: id hợp lệ nhưng không tồn tại → 404",
+  S,
+  async () => {
+    const projectId = await taoDuAn("annotpmiss");
+    const pm = await taoUser("pm", "annotpmiss");
+    await dangNhapDuAn(pm, projectId);
+    const { PATCH } = await import("@/app/api/engineering/spatial/annotations/[id]/route");
+    const res = await PATCH(jreq("/x", { status: "resolved" }, "PATCH"), {
+      params: Promise.resolve({ id: "00000000-0000-4000-8000-000000000000" }),
+    });
+    assert.equal(res.status, 404);
+  },
+);
 
 // ============================================================================
 // GET/POST /api/engineering/logistics/shipments
@@ -1161,29 +1207,41 @@ test(
   },
 );
 
-test("POST rồi GET /api/engineering/logistics/shipments: tạo lô hàng & lọc theo status", S, async () => {
-  const projectId = await taoDuAn("shipok");
-  const pm = await taoUser("pm", "shipok");
-  await dangNhapDuAn(pm, projectId);
-  const { POST, GET } = await import("@/app/api/engineering/logistics/shipments/route");
-  const shipmentCode = `SHP-${uniq("code")}`;
-  const res = await POST(
-    jreq("/x", {
-      shipmentCode,
-      doNumber: "DO-99",
-      poNumber: "PO-99",
-      supplierName: "NCC Test",
-      manifest: [{ itemCode: "PIPE-100", itemName: "Ống 100", orderedQty: 10, deliveredQty: 10, unit: "cây" }],
-    }),
-  );
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.data.status, "dispatched");
+test(
+  "POST rồi GET /api/engineering/logistics/shipments: tạo lô hàng & lọc theo status",
+  S,
+  async () => {
+    const projectId = await taoDuAn("shipok");
+    const pm = await taoUser("pm", "shipok");
+    await dangNhapDuAn(pm, projectId);
+    const { POST, GET } = await import("@/app/api/engineering/logistics/shipments/route");
+    const shipmentCode = `SHP-${uniq("code")}`;
+    const res = await POST(
+      jreq("/x", {
+        shipmentCode,
+        doNumber: "DO-99",
+        poNumber: "PO-99",
+        supplierName: "NCC Test",
+        manifest: [
+          {
+            itemCode: "PIPE-100",
+            itemName: "Ống 100",
+            orderedQty: 10,
+            deliveredQty: 10,
+            unit: "cây",
+          },
+        ],
+      }),
+    );
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.data.status, "dispatched");
 
-  const resGet = await GET(jreq("/x?status=dispatched", undefined, "GET"));
-  assert.equal(resGet.status, 200);
-  assert.ok((await resGet.json()).data.some((s: any) => s.shipmentCode === shipmentCode));
-});
+    const resGet = await GET(jreq("/x?status=dispatched", undefined, "GET"));
+    assert.equal(resGet.status, 200);
+    assert.ok((await resGet.json()).data.some((s: any) => s.shipmentCode === shipmentCode));
+  },
+);
 
 // ============================================================================
 // POST /api/engineering/logistics/scan-receive
@@ -1250,7 +1308,9 @@ test(
     const pm = await taoUser("pm", "scanbadqr");
     await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/engineering/logistics/scan-receive/route");
-    const res = await POST(jreq("/x", { qrCode: "XB-MAT|v1|P1|ITEM|B1|Tmaterial_unit|Q1|CHKdeadbeef" }));
+    const res = await POST(
+      jreq("/x", { qrCode: "XB-MAT|v1|P1|ITEM|B1|Tmaterial_unit|Q1|CHKdeadbeef" }),
+    );
     assert.equal(res.status, 500);
   },
 );
@@ -1370,14 +1430,18 @@ test("POST /api/engineering/ledger/verify-proof: subcon không có quyền → 4
   assert.equal(res.status, 403);
 });
 
-test("POST /api/engineering/ledger/verify-proof: thiếu leafHash và expectedRoot → 400", S, async () => {
-  const projectId = await taoDuAn("verifyval");
-  const pm = await taoUser("pm", "verifyval");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/ledger/verify-proof/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 400);
-});
+test(
+  "POST /api/engineering/ledger/verify-proof: thiếu leafHash và expectedRoot → 400",
+  S,
+  async () => {
+    const projectId = await taoDuAn("verifyval");
+    const pm = await taoUser("pm", "verifyval");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/ledger/verify-proof/route");
+    const res = await POST(jreq("/x", {}));
+    assert.equal(res.status, 400);
+  },
+);
 
 test(
   "POST /api/engineering/ledger/verify-proof: bằng chứng hợp lệ → isValid=true (PASS); " +
@@ -1388,11 +1452,8 @@ test(
     const projectId = await taoDuAn("verifyok");
     const pm = await taoUser("pm", "verifyok");
     await dangNhapDuAn(pm, projectId);
-    const {
-      hashLeafRecord,
-      buildMerkleTree,
-      generateMerkleProof,
-    } = await import("@/lib/bao-mat/merkle-audit-ledger");
+    const { hashLeafRecord, buildMerkleTree, generateMerkleProof } =
+      await import("@/lib/bao-mat/merkle-audit-ledger");
 
     const records = [
       { event: "A", n: 1 },
@@ -1434,17 +1495,14 @@ test(
     const projectId = await taoDuAn("verifyrec");
     const pm = await taoUser("pm", "verifyrec");
     await dangNhapDuAn(pm, projectId);
-    const { hashLeafRecord, buildMerkleTree, generateMerkleProof } = await import(
-      "@/lib/bao-mat/merkle-audit-ledger"
-    );
+    const { hashLeafRecord, buildMerkleTree, generateMerkleProof } =
+      await import("@/lib/bao-mat/merkle-audit-ledger");
     const records = [{ event: "X" }, { event: "Y" }];
     const tree = buildMerkleTree(records.map((r) => hashLeafRecord(r)));
     const proof = generateMerkleProof(0, tree.treeLevels);
 
     const { POST } = await import("@/app/api/engineering/ledger/verify-proof/route");
-    const res = await POST(
-      jreq("/x", { leafRecord: records[0], proof, expectedRoot: tree.root }),
-    );
+    const res = await POST(jreq("/x", { leafRecord: records[0], proof, expectedRoot: tree.root }));
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.isValid, true);
@@ -1580,14 +1638,18 @@ test("GET /api/engineering/edge-vision-tracking: subcon không có quyền → 4
   assert.equal(res.status, 403);
 });
 
-test("GET /api/engineering/edge-vision-tracking: module engineering-nextgen-apex mặc định TẮT → 404", S, async () => {
-  const projectId = await taoDuAn("edgeoff");
-  const pm = await taoUser("pm", "edgeoff");
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/engineering/edge-vision-tracking/route");
-  const res = await GET(jreq("/x", undefined, "GET"));
-  assert.equal(res.status, 404);
-});
+test(
+  "GET /api/engineering/edge-vision-tracking: module engineering-nextgen-apex mặc định TẮT → 404",
+  S,
+  async () => {
+    const projectId = await taoDuAn("edgeoff");
+    const pm = await taoUser("pm", "edgeoff");
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/engineering/edge-vision-tracking/route");
+    const res = await GET(jreq("/x", undefined, "GET"));
+    assert.equal(res.status, 404);
+  },
+);
 
 test(
   "POST rồi GET /api/engineering/edge-vision-tracking: audit cốt thép trước đổ bê tông & " +
@@ -1642,14 +1704,18 @@ test("GET /api/engineering/generative-routing: subcon không có quyền → 403
   assert.equal(res.status, 403);
 });
 
-test("GET /api/engineering/generative-routing: module engineering-nextgen-apex mặc định TẮT → 404", S, async () => {
-  const projectId = await taoDuAn("genroff");
-  const pm = await taoUser("pm", "genroff");
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/engineering/generative-routing/route");
-  const res = await GET();
-  assert.equal(res.status, 404);
-});
+test(
+  "GET /api/engineering/generative-routing: module engineering-nextgen-apex mặc định TẮT → 404",
+  S,
+  async () => {
+    const projectId = await taoDuAn("genroff");
+    const pm = await taoUser("pm", "genroff");
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/engineering/generative-routing/route");
+    const res = await GET();
+    assert.equal(res.status, 404);
+  },
+);
 
 test(
   "POST rồi GET /api/engineering/generative-routing: giải tuyến 3D A* & tra lại lịch sử " +
@@ -1680,7 +1746,11 @@ test(
 
 async function taoWbsTask(projectId: number, ten: string): Promise<number> {
   const { insertId } = await import("@/lib/db");
-  const towerId = await insertId(`INSERT INTO towers (project_id, name) VALUES (?, ?)`, projectId, `Tháp ${uniq(ten)}`);
+  const towerId = await insertId(
+    `INSERT INTO towers (project_id, name) VALUES (?, ?)`,
+    projectId,
+    `Tháp ${uniq(ten)}`,
+  );
   const sheetTypeId = await insertId(
     `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, ?, ?)`,
     towerId,
