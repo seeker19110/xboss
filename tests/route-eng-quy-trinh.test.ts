@@ -649,7 +649,10 @@ test(
     await dangNhapDuAn(pmA, projectA);
     const { POST } = await import("@/app/api/engineering/autonomy/requests/[id]/authorize/route");
     const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: reqId }) });
-    assert.equal(res.status, 500); // route cụm này catch-all lỗi nghiệp vụ về 500 — khoá mã thật, không chỉ "khác 200"
+    // 409 (không còn 500): `authorizeExecutionRequest` ném LoiNghiepVu — một câu UPDATE lọc cả
+    // project_id lẫn status nên không tách được "thuộc dự án khác" khỏi "sai trạng thái", cùng
+    // chung thông điệp không xác nhận bản ghi có tồn tại.
+    assert.equal(res.status, 409);
     // Yêu cầu vẫn KHÔNG được cấp token — xác nhận dữ liệu dự án B không đổi.
     const { queryOne } = await import("@/lib/db");
     const row = await queryOne<{ approval_token: string | null; status: string }>(
@@ -690,7 +693,9 @@ test("POST .../requests/:id/execute: token sai → thất bại, không hoàn t�
   const res = await POST(jreq("/x", { token: "tok_sai" }), {
     params: Promise.resolve({ id: reqId }),
   });
-  assert.equal(res.status, 500); // route cụm này catch-all lỗi nghiệp vụ về 500 — khoá mã thật, không chỉ "khác 200"
+  // Vẫn 500: các throw trong `executeExecutionRequest` chưa đổi sang LoiNghiepVu (hàm đó do
+  // việc "kill switch bền" sở hữu — xem báo cáo Đợt 6 Việc B). Khoá mã thật, không chỉ "khác 200".
+  assert.equal(res.status, 500);
   const { queryOne } = await import("@/lib/db");
   const row = await queryOne<{ status: string }>(
     `SELECT status FROM engineering_execution_requests WHERE id = ?`,
@@ -748,7 +753,8 @@ test(
     const res = await POST(jreq("/x", { token }), { params: Promise.resolve({ id: reqId }) });
     // Chặn thực thi thật (không rơi vào 'completed') — đây là bất biến an toàn quan trọng
     // nhất và ĐÃ đúng.
-    assert.equal(res.status, 500); // route cụm này catch-all lỗi nghiệp vụ về 500 — khoá mã thật, không chỉ "khác 200"
+    // Vẫn 500 vì lỗi này ném từ `executeExecutionRequest` (hàm chưa đổi sang LoiNghiepVu).
+    assert.equal(res.status, 500);
     const body = await res.json();
     assert.match(body.error, /Kill Switch/);
     const { queryOne } = await import("@/lib/db");
@@ -897,6 +903,51 @@ test("POST /api/engineering/objects/:id/review: object thuộc dự án khác �
   );
   assert.equal(row?.status, "pending_review");
 });
+
+test(
+  "POST /api/engineering/objects/:id/review: đối tượng đã xoá mềm (void) → 409, không phải 404 " +
+    "(bản ghi CÓ tồn tại, chỉ đang ở trạng thái không cho duyệt)",
+  S,
+  async () => {
+    const { run } = await import("@/lib/db");
+    const projectId = await taoDuAn("obrvvoid");
+    const pm = await taoUser("pm", "obrvvoid");
+    const objId = await taoObject(projectId, pm.id, "obrvvoid");
+    await run(`UPDATE engineering_objects SET status = 'void' WHERE id = ?`, objId);
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/objects/[id]/review/route");
+    const res = await POST(jreq("/x", { decision: "approved" }), {
+      params: Promise.resolve({ id: objId }),
+    });
+    assert.equal(res.status, 409);
+    assert.match((await res.json()).error, /xoá mềm/);
+    // Không được đổi trạng thái bản ghi.
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ status: string }>(
+      `SELECT status FROM engineering_objects WHERE id = ?`,
+      objId,
+    );
+    assert.equal(row?.status, "void");
+  },
+);
+
+test(
+  "POST /api/engineering/objects/:id/review: LỖI HỆ THỐNG THẬT vẫn ra 500 — id không phải UUID " +
+    "làm Postgres ném 22P02; phanHoiLoi KHÔNG được hạ lỗi hệ thống xuống 4xx",
+  S,
+  async () => {
+    const projectId = await taoDuAn("obrv500");
+    const pm = await taoUser("pm", "obrv500");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/objects/[id]/review/route");
+    const res = await POST(jreq("/x", { decision: "approved" }), {
+      params: Promise.resolve({ id: "khong-phai-uuid" }),
+    });
+    assert.equal(res.status, 500);
+    // Hình dạng thân phản hồi không đổi: vẫn { error: "<thông điệp>" }.
+    assert.ok(typeof (await res.json()).error === "string");
+  },
+);
 
 test("POST /api/engineering/objects/:id/review: duyệt thành công, ghi revision", S, async () => {
   const { query } = await import("@/lib/db");
@@ -1324,7 +1375,9 @@ test(
     await dangNhapDuAn(pmA, projectA);
     const { POST } = await import("@/app/api/engineering/swarm/debates/[id]/synthesize/route");
     const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: debateB }) });
-    assert.equal(res.status, 500); // route cụm này catch-all lỗi nghiệp vụ về 500 — khoá mã thật, không chỉ "khác 200"
+    // 404 (không còn 500): `synthesizeSwarmDebate` ném loiKhongTimThay — phiên của dự án khác
+    // coi như không tồn tại, không xác nhận sự tồn tại bằng 403.
+    assert.equal(res.status, 404);
     const { queryOne } = await import("@/lib/db");
     const row = await queryOne<{ status: string }>(
       `SELECT status FROM engineering_swarm_debates WHERE id = ?`,

@@ -891,6 +891,27 @@ test("POST /api/engineering/spatial/compute: computeType không hợp lệ → 4
 });
 
 test(
+  "POST /api/engineering/spatial/compute: polyline chỉ 1 điểm → 422 (đúng cú pháp nhưng " +
+    "không đủ dữ liệu để quét thể tích — trước đây cả cụm ép về 500)",
+  S,
+  async () => {
+    const projectId = await taoDuAn("spatial422");
+    const pm = await taoUser("pm", "spatial422");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/spatial/compute/route");
+    const res = await POST(
+      jreq("/x", {
+        computeType: "sweep_volume",
+        cacheKey: `SPATIAL-${uniq("p1")}`,
+        points: [{ x: 0, y: 0, z: 3200 }],
+      }),
+    );
+    assert.equal(res.status, 422);
+    assert.match((await res.json()).error, /ít nhất 2 điểm/);
+  },
+);
+
+test(
   "POST /api/engineering/spatial/compute: sweep_volume, voxel_clashes, sheet_nesting — " +
     "gọi lại đúng cacheKey + input thì fromCache=true (bộ đệm hoạt động đúng)",
   S,
@@ -1307,8 +1328,8 @@ test(
 );
 
 test(
-  "POST /api/engineering/logistics/scan-receive: mã QR sai checksum → lỗi (route trả 500 vì " +
-    "bắt Error chung — hành vi nhất quán với toàn bộ cụm route này, không phải lỗi riêng)",
+  "POST /api/engineering/logistics/scan-receive: mã QR sai checksum → 400 (lỗi đầu vào của " +
+    "người quét, KHÔNG phải sự cố máy chủ — trước đây cả cụm ép về 500)",
   S,
   async () => {
     const projectId = await taoDuAn("scanbadqr");
@@ -1318,7 +1339,9 @@ test(
     const res = await POST(
       jreq("/x", { qrCode: "XB-MAT|v1|P1|ITEM|B1|Tmaterial_unit|Q1|CHKdeadbeef" }),
     );
-    assert.equal(res.status, 500);
+    assert.equal(res.status, 400);
+    // Hình dạng thân phản hồi KHÔNG đổi: vẫn { error: "<thông điệp tiếng Việt>" }.
+    assert.match((await res.json()).error, /Mã QR không hợp lệ/);
   },
 );
 
