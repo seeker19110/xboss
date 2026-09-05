@@ -195,14 +195,18 @@ test("POST /api/engineering/predictions/run: chưa đăng nhập → 401", S, as
   assert.equal(res.status, 401);
 });
 
-test("POST /api/engineering/predictions/run: engineer không có quyền (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("predrun403");
-  const eng = await taoUser("engineer", "predrun403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/engineering/predictions/run/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/engineering/predictions/run: engineer không có quyền (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("predrun403");
+    const eng = await taoUser("engineer", "predrun403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/engineering/predictions/run/route");
+    const res = await POST(jreq("/x", {}));
+    assert.equal(res.status, 403);
+  },
+);
 
 test(
   "POST /api/engineering/predictions/run: chạy pipeline schedule_risk trên task trễ hạn → " +
@@ -251,30 +255,34 @@ test(
   },
 );
 
-test("POST /api/engineering/predictions/run: useCase clash_priority chạy trên engineering_objects đang pending_review", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("predclash");
-  const pm = await taoUser("pm", "predclash");
-  await batTinhNang("engineering-predictions", projectId);
-  const objRow = await queryOne<{ id: string }>(
-    `INSERT INTO engineering_objects
+test(
+  "POST /api/engineering/predictions/run: useCase clash_priority chạy trên engineering_objects đang pending_review",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("predclash");
+    const pm = await taoUser("pm", "predclash");
+    await batTinhNang("engineering-predictions", projectId);
+    const objRow = await queryOne<{ id: string }>(
+      `INSERT INTO engineering_objects
        (project_id, external_key, object_type, discipline, status, created_by, updated_by)
      VALUES (?, ?, 'pipe', 'hvac', 'pending_review', ?, ?) RETURNING id`,
-    projectId,
-    `OBJ-${uniq("predclash")}`,
-    pm.id,
-    pm.id,
-  );
-  const objId = objRow!.id;
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/predictions/run/route");
-  const res = await POST(jreq("/x", { useCase: "clash_priority" }));
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.outputsCount, 1);
-  assert.equal(body.outputs[0].entityId, objId);
-  assert.equal(body.outputs[0].entityType, "object");
-});
+      projectId,
+      `OBJ-${uniq("predclash")}`,
+      pm.id,
+      pm.id,
+    );
+    const objId = objRow!.id;
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/predictions/run/route");
+    const res = await POST(jreq("/x", { useCase: "clash_priority" }));
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.outputsCount, 1);
+    assert.equal(body.outputs[0].entityId, objId);
+    assert.equal(body.outputs[0].entityType, "object");
+  },
+);
 
 test("POST /api/engineering/predictions/[id]/decide: decision không hợp lệ → 400", S, async () => {
   const projectId = await taoDuAn("preddecval");
@@ -337,14 +345,18 @@ test("GET /api/engineering/prescriptive/scenarios: chưa đăng nhập → 401",
   assert.equal(res.status, 401);
 });
 
-test("GET /api/engineering/prescriptive/scenarios: subcon không có quyền xem → 403", S, async () => {
-  const projectId = await taoDuAn("presview403");
-  const u = await taoUser("subcon", "presview403");
-  await dangNhapDuAn(u, projectId);
-  const { GET } = await import("@/app/api/engineering/prescriptive/scenarios/route");
-  const res = await GET(jreq("/x", undefined, "GET"));
-  assert.equal(res.status, 403);
-});
+test(
+  "GET /api/engineering/prescriptive/scenarios: subcon không có quyền xem → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("presview403");
+    const u = await taoUser("subcon", "presview403");
+    await dangNhapDuAn(u, projectId);
+    const { GET } = await import("@/app/api/engineering/prescriptive/scenarios/route");
+    const res = await GET(jreq("/x", undefined, "GET"));
+    assert.equal(res.status, 403);
+  },
+);
 
 test("GET /api/engineering/prescriptive/scenarios: module đang tắt → 404", S, async () => {
   const projectId = await taoDuAn("presoff");
@@ -362,14 +374,18 @@ test("POST /api/engineering/prescriptive/simulate: chưa đăng nhập → 401",
   assert.equal(res.status, 401);
 });
 
-test("POST /api/engineering/prescriptive/simulate: engineer không được kích hoạt (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("pressim403");
-  const eng = await taoUser("engineer", "pressim403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/engineering/prescriptive/simulate/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/engineering/prescriptive/simulate: engineer không được kích hoạt (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("pressim403");
+    const eng = await taoUser("engineer", "pressim403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/engineering/prescriptive/simulate/route");
+    const res = await POST(jreq("/x", {}));
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/engineering/prescriptive/simulate: thiếu trường bắt buộc → 400", S, async () => {
   const projectId = await taoDuAn("pressimval");
@@ -413,9 +429,8 @@ test(
     assert.equal(listBody.length, 1);
     assert.equal(listBody[0].id, scenarioId);
 
-    const { POST: APPROVE } = await import(
-      "@/app/api/engineering/prescriptive/scenarios/[id]/approve/route"
-    );
+    const { POST: APPROVE } =
+      await import("@/app/api/engineering/prescriptive/scenarios/[id]/approve/route");
     const approveRes = await APPROVE(jreq("/x", {}), {
       params: Promise.resolve({ id: scenarioId }),
     });
@@ -458,9 +473,8 @@ test(
     const scenarioId = (await simRes.json()).scenario.id;
 
     await dangNhapDuAn(pmA, projectA);
-    const { POST: APPROVE } = await import(
-      "@/app/api/engineering/prescriptive/scenarios/[id]/approve/route"
-    );
+    const { POST: APPROVE } =
+      await import("@/app/api/engineering/prescriptive/scenarios/[id]/approve/route");
     const approveRes = await APPROVE(jreq("/x", {}), {
       params: Promise.resolve({ id: scenarioId }),
     });
@@ -675,14 +689,18 @@ test("POST /api/engineering/fidic/claims/generate-dossier: chưa đăng nhập �
   assert.equal(res.status, 401);
 });
 
-test("POST /api/engineering/fidic/claims/generate-dossier: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("fcgen403");
-  const u = await taoUser("subcon", "fcgen403");
-  await dangNhapDuAn(u, projectId);
-  const { POST } = await import("@/app/api/engineering/fidic/claims/generate-dossier/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/engineering/fidic/claims/generate-dossier: subcon không có quyền → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("fcgen403");
+    const u = await taoUser("subcon", "fcgen403");
+    await dangNhapDuAn(u, projectId);
+    const { POST } = await import("@/app/api/engineering/fidic/claims/generate-dossier/route");
+    const res = await POST(jreq("/x", {}));
+    assert.equal(res.status, 403);
+  },
+);
 
 test(
   "POST /api/engineering/fidic/claims/generate-dossier: sinh hồ sơ TIA đúng số ngày sự kiện " +
@@ -756,14 +774,18 @@ test("GET /api/engineering/fidic-tia: module đang tắt → 404", S, async () =
   assert.equal(res.status, 404);
 });
 
-test("POST /api/engineering/fidic-tia: bch không có quyền tạo (chỉ Admin/PM/Engineer) → 403", S, async () => {
-  const projectId = await taoDuAn("ftpost403");
-  const u = await taoUser("bch", "ftpost403");
-  await dangNhapDuAn(u, projectId);
-  const { POST } = await import("@/app/api/engineering/fidic-tia/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/engineering/fidic-tia: bch không có quyền tạo (chỉ Admin/PM/Engineer) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("ftpost403");
+    const u = await taoUser("bch", "ftpost403");
+    await dangNhapDuAn(u, projectId);
+    const { POST } = await import("@/app/api/engineering/fidic-tia/route");
+    const res = await POST(jreq("/x", {}));
+    assert.equal(res.status, 403);
+  },
+);
 
 test(
   "POST /api/engineering/fidic-tia: phân tích + lưu hồ sơ TIA → merkleProofHash & deadline " +
@@ -782,9 +804,7 @@ test(
         eventCategory: "EMPLOYER_DELAY",
         delayStartDate: "2026-02-01",
         delayEndDate: "2026-02-11",
-        impactedTasks: [
-          { taskId: 1, taskName: "T1", originalDurationDays: 10, delayDays: 10 },
-        ],
+        impactedTasks: [{ taskId: 1, taskName: "T1", originalDurationDays: 10, delayDays: 10 }],
         dailyOverheadCostVnd: 20_000_000,
       }),
     );
@@ -947,7 +967,11 @@ test(
     const analyzeBody = await analyzeRes.json();
     assert.equal(analyzeBody.data.quotesCount, 2);
     assert.equal(analyzeBody.data.rankings.length, 2);
-    assert.equal(analyzeBody.data.rankings[0].vendorName, "NCC rẻ", "giá thấp hơn xếp hạng cao hơn");
+    assert.equal(
+      analyzeBody.data.rankings[0].vendorName,
+      "NCC rẻ",
+      "giá thấp hơn xếp hạng cao hơn",
+    );
     assert.match(analyzeBody.data.provenanceToken, /^BID-ANALYTICS-[0-9A-F]{16}$/);
   },
 );
@@ -960,6 +984,27 @@ test("POST /api/engineering/bidding/analyze: thiếu packageId → 400", S, asyn
   const res = await POST(jreq("/x", {}));
   assert.equal(res.status, 400);
 });
+
+test(
+  "POST /api/engineering/bidding/analyze: gói thầu thuộc dự án khác → 404 (không phải 500)",
+  S,
+  async () => {
+    // Trước đây catch chung ép mọi lỗi về 500, kể cả "Không tìm thấy" — client không phân biệt
+    // được "gói thầu không thuộc dự án này" (kết quả nghiệp vụ bình thường) với sự cố hệ thống.
+    // Dữ liệu KHÔNG lộ ở cả hai bản (runBiddingAnalysis đã lọc project_id trong SELECT), đây
+    // thuần là mã lỗi. Nay bám khuôn route anh em cùng thư mục (graph/lineage/impact).
+    const projectA = await taoDuAn("banalyzeisoA");
+    const projectB = await taoDuAn("banalyzeisoB");
+    const pmB = await taoUser("pm", "banalyzeisoB");
+    await dangNhapDuAn(pmB, projectB);
+    const pkgB = await taoGoiThau(pmB, projectB, "banalyzeisoB");
+    const pmA = await taoUser("pm", "banalyzeisoA");
+    await dangNhapDuAn(pmA, projectA);
+    const { POST } = await import("@/app/api/engineering/bidding/analyze/route");
+    const res = await POST(jreq("/x", { packageId: pkgB }));
+    assert.equal(res.status, 404);
+  },
+);
 
 // ============================================================================
 // GET/POST /api/engineering/subcon-ai/scores + evaluate + recommend-shortlist
@@ -994,14 +1039,18 @@ test("POST /api/engineering/subcon-ai/scores: chưa đăng nhập → 401", S, a
   assert.equal(res.status, 401);
 });
 
-test("POST /api/engineering/subcon-ai/scores: engineer không có quyền (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("sapost403");
-  const eng = await taoUser("engineer", "sapost403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/engineering/subcon-ai/scores/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/engineering/subcon-ai/scores: engineer không có quyền (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("sapost403");
+    const eng = await taoUser("engineer", "sapost403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/engineering/subcon-ai/scores/route");
+    const res = await POST(jreq("/x", {}));
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/engineering/subcon-ai/scores: module đang tắt → 404", S, async () => {
   const projectId = await taoDuAn("saoff");
@@ -1142,24 +1191,32 @@ test("POST /api/engineering/subcon-ai/recommend-shortlist: chưa đăng nhập �
   assert.equal(res.status, 401);
 });
 
-test("POST /api/engineering/subcon-ai/recommend-shortlist: engineer không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("sasl403");
-  const eng = await taoUser("engineer", "sasl403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/engineering/subcon-ai/recommend-shortlist/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/engineering/subcon-ai/recommend-shortlist: engineer không có quyền → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("sasl403");
+    const eng = await taoUser("engineer", "sasl403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/engineering/subcon-ai/recommend-shortlist/route");
+    const res = await POST(jreq("/x", {}));
+    assert.equal(res.status, 403);
+  },
+);
 
-test("POST /api/engineering/subcon-ai/recommend-shortlist: thiếu tên gói/chuyên ngành → 400", S, async () => {
-  const projectId = await taoDuAn("saslval");
-  const pm = await taoUser("pm", "saslval");
-  await batTinhNang("engineering-subcon-ai", projectId);
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/subcon-ai/recommend-shortlist/route");
-  const res = await POST(jreq("/x", { packageName: "Gói A" }));
-  assert.equal(res.status, 400);
-});
+test(
+  "POST /api/engineering/subcon-ai/recommend-shortlist: thiếu tên gói/chuyên ngành → 400",
+  S,
+  async () => {
+    const projectId = await taoDuAn("saslval");
+    const pm = await taoUser("pm", "saslval");
+    await batTinhNang("engineering-subcon-ai", projectId);
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/subcon-ai/recommend-shortlist/route");
+    const res = await POST(jreq("/x", { packageName: "Gói A" }));
+    assert.equal(res.status, 400);
+  },
+);
 
 test(
   "POST /api/engineering/subcon-ai/recommend-shortlist: đề xuất danh sách với hồ sơ chưa từng " +
@@ -1205,14 +1262,18 @@ test("GET /api/engineering/carbon-lca: subcon không có quyền → 403", S, as
   assert.equal(res.status, 403);
 });
 
-test("POST /api/engineering/carbon-lca: bch không có quyền thực thi (chỉ Admin/PM/Engineer) → 403", S, async () => {
-  const projectId = await taoDuAn("clcpost403");
-  const u = await taoUser("bch", "clcpost403");
-  await dangNhapDuAn(u, projectId);
-  const { POST } = await import("@/app/api/engineering/carbon-lca/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/engineering/carbon-lca: bch không có quyền thực thi (chỉ Admin/PM/Engineer) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("clcpost403");
+    const u = await taoUser("bch", "clcpost403");
+    await dangNhapDuAn(u, projectId);
+    const { POST } = await import("@/app/api/engineering/carbon-lca/route");
+    const res = await POST(jreq("/x", {}));
+    assert.equal(res.status, 403);
+  },
+);
 
 test(
   "POST /api/engineering/carbon-lca: tính phát thải Carbon từ danh mục vật liệu tuỳ chỉnh → " +
@@ -1271,23 +1332,31 @@ test("GET /api/engineering/qs-bom-explosion: chưa đăng nhập → 401", S, as
   assert.equal(res.status, 401);
 });
 
-test("POST /api/engineering/qs-bom-explosion: bch không có quyền (chỉ manageDrawings) → 403", S, async () => {
-  const projectId = await taoDuAn("qsbom403");
-  const u = await taoUser("bch", "qsbom403");
-  await dangNhapDuAn(u, projectId);
-  const { POST } = await import("@/app/api/engineering/qs-bom-explosion/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/engineering/qs-bom-explosion: bch không có quyền (chỉ manageDrawings) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("qsbom403");
+    const u = await taoUser("bch", "qsbom403");
+    await dangNhapDuAn(u, projectId);
+    const { POST } = await import("@/app/api/engineering/qs-bom-explosion/route");
+    const res = await POST(jreq("/x", {}));
+    assert.equal(res.status, 403);
+  },
+);
 
-test("POST /api/engineering/qs-bom-explosion: action explode_bom thiếu tham số → 422", S, async () => {
-  const projectId = await taoDuAn("qsbomval");
-  const pm = await taoUser("pm", "qsbomval");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/qs-bom-explosion/route");
-  const res = await POST(jreq("/x", { action: "explode_bom" }));
-  assert.equal(res.status, 422);
-});
+test(
+  "POST /api/engineering/qs-bom-explosion: action explode_bom thiếu tham số → 422",
+  S,
+  async () => {
+    const projectId = await taoDuAn("qsbomval");
+    const pm = await taoUser("pm", "qsbomval");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/qs-bom-explosion/route");
+    const res = await POST(jreq("/x", { action: "explode_bom" }));
+    assert.equal(res.status, 422);
+  },
+);
 
 test("POST /api/engineering/qs-bom-explosion: action lạ → 400", S, async () => {
   const projectId = await taoDuAn("qsbombad");
@@ -1328,14 +1397,18 @@ test(
   },
 );
 
-test("POST /api/engineering/qs-bom-explosion: action fidic_claim thiếu tham số → 422", S, async () => {
-  const projectId = await taoDuAn("qsfidval");
-  const pm = await taoUser("pm", "qsfidval");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/qs-bom-explosion/route");
-  const res = await POST(jreq("/x", { action: "fidic_claim" }));
-  assert.equal(res.status, 422);
-});
+test(
+  "POST /api/engineering/qs-bom-explosion: action fidic_claim thiếu tham số → 422",
+  S,
+  async () => {
+    const projectId = await taoDuAn("qsfidval");
+    const pm = await taoUser("pm", "qsfidval");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/qs-bom-explosion/route");
+    const res = await POST(jreq("/x", { action: "fidic_claim" }));
+    assert.equal(res.status, 422);
+  },
+);
 
 test(
   "POST /api/engineering/qs-bom-explosion: action fidic_claim hợp lệ → sinh hồ sơ bảo vệ VO",
@@ -1382,14 +1455,18 @@ test("POST /api/engineering/shopdrawing-lod400: bch không có quyền → 403",
   assert.equal(res.status, 403);
 });
 
-test("POST /api/engineering/shopdrawing-lod400: convert_lod400 thiếu segments → 400", S, async () => {
-  const projectId = await taoDuAn("sd400val");
-  const pm = await taoUser("pm", "sd400val");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/shopdrawing-lod400/route");
-  const res = await POST(jreq("/x", { action: "convert_lod400" }));
-  assert.equal(res.status, 400);
-});
+test(
+  "POST /api/engineering/shopdrawing-lod400: convert_lod400 thiếu segments → 400",
+  S,
+  async () => {
+    const projectId = await taoDuAn("sd400val");
+    const pm = await taoUser("pm", "sd400val");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/shopdrawing-lod400/route");
+    const res = await POST(jreq("/x", { action: "convert_lod400" }));
+    assert.equal(res.status, 400);
+  },
+);
 
 test("POST /api/engineering/shopdrawing-lod400: action lạ → 400", S, async () => {
   const projectId = await taoDuAn("sd400bad");
@@ -1438,34 +1515,42 @@ test(
   },
 );
 
-test("POST /api/engineering/shopdrawing-lod400: action plenum_clearance trả kết quả phân tích", S, async () => {
-  const projectId = await taoDuAn("sd400plenum");
-  const pm = await taoUser("pm", "sd400plenum");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/shopdrawing-lod400/route");
-  const res = await POST(
-    jreq("/x", {
-      action: "plenum_clearance",
-      beamBottomElevationMm: 2800,
-      ceilingElevationMm: 2350,
-      originalDuct: { widthMm: 600, heightMm: 400 },
-    }),
-  );
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.ok(body.analysis);
-});
+test(
+  "POST /api/engineering/shopdrawing-lod400: action plenum_clearance trả kết quả phân tích",
+  S,
+  async () => {
+    const projectId = await taoDuAn("sd400plenum");
+    const pm = await taoUser("pm", "sd400plenum");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/shopdrawing-lod400/route");
+    const res = await POST(
+      jreq("/x", {
+        action: "plenum_clearance",
+        beamBottomElevationMm: 2800,
+        ceilingElevationMm: 2350,
+        originalDuct: { widthMm: 600, heightMm: 400 },
+      }),
+    );
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(body.analysis);
+  },
+);
 
-test("POST /api/engineering/shopdrawing-lod400: action spatial_hierarchy trả kết quả phân cấp", S, async () => {
-  const projectId = await taoDuAn("sd400hier");
-  const pm = await taoUser("pm", "sd400hier");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/shopdrawing-lod400/route");
-  const res = await POST(jreq("/x", { action: "spatial_hierarchy", discipline: "hvac" }));
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.ok(body.hierarchy);
-});
+test(
+  "POST /api/engineering/shopdrawing-lod400: action spatial_hierarchy trả kết quả phân cấp",
+  S,
+  async () => {
+    const projectId = await taoDuAn("sd400hier");
+    const pm = await taoUser("pm", "sd400hier");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/shopdrawing-lod400/route");
+    const res = await POST(jreq("/x", { action: "spatial_hierarchy", discipline: "hvac" }));
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(body.hierarchy);
+  },
+);
 
 // ============================================================================
 // GET/POST /api/engineering/multi-agent-copilot
