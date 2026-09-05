@@ -41,6 +41,9 @@ export async function GET(
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
+  // Chủ đích: chưa chọn dự án nào (projectId == null) thì KHÔNG cho tải tài liệu VO —
+  // chặt hơn contract-documents/[id] (dùng "*" cho phép xem xuyên toàn hệ khi không có
+  // dự án đang chọn); ở đây ưu tiên an toàn, không nới lỏng.
   const projectId = await getCurrentProjectId(user);
   const vo =
     projectId != null
@@ -86,8 +89,15 @@ export async function DELETE(
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
+  // withProjectScope (readOnly: false vì DELETE là thao tác ghi) đặt GUC app.project_id
+  // — lớp phòng thủ RLS thứ hai, nhất quán với nhánh GET ở trên.
   const projectId = await getCurrentProjectId(user);
-  const vo = projectId != null ? await getVariation(doc.vo_id, projectId) : undefined;
+  const vo =
+    projectId != null
+      ? await withProjectScope(projectId, () => getVariation(doc.vo_id, projectId), {
+          readOnly: false,
+        })
+      : undefined;
   if (!vo) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   if (doc.uploaded_by !== user.id && !isAdminOrPm(user.role))
