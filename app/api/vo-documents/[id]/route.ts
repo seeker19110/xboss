@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storageGet, storageDelete } from "@/lib/nen/storage";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getVariation } from "@/lib/tai-chinh/vo";
 import { sha256Hex } from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 
 type VoDocRow = {
   id: number;
+  vo_id: number;
   file_name: string;
   mime_type: string;
   original_name: string | null;
@@ -15,7 +18,10 @@ type VoDocRow = {
   sha256: string | null;
 };
 
-// GET /api/vo-documents/:id — stream file đính kèm phát sinh/VO.
+// GET /api/vo-documents/:id — stream file đính kèm phát sinh/VO. Kiểm VO cha thuộc
+// đúng dự án đang chọn (M22) — LỖ HỔNG THẬT đã vá cùng đợt này: trước đây route chỉ
+// tra `WHERE id = ?` không hề so dự án, nên bất kỳ vai trò có viewVariations ở dự án
+// A biết id là tải/xoá được file VO của dự án B (cùng lớp lỗi đã vá ở /api/documents/:id).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -30,10 +36,20 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const doc = await queryOne<VoDocRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by, sha256 FROM vo_documents WHERE id = ?`,
+    `SELECT id, vo_id, file_name, mime_type, original_name, uploaded_by, sha256 FROM vo_documents WHERE id = ?`,
     id,
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+
+  // Chủ đích: chưa chọn dự án nào (projectId == null) thì KHÔNG cho tải tài liệu VO —
+  // chặt hơn contract-documents/[id] (dùng "*" cho phép xem xuyên toàn hệ khi không có
+  // dự án đang chọn); ở đây ưu tiên an toàn, không nới lỏng.
+  const projectId = await getCurrentProjectId(user);
+  const vo =
+    projectId != null
+      ? await withProjectScope(projectId, () => getVariation(doc.vo_id, projectId))
+      : undefined;
+  if (!vo) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   const buf = await storageGet(user.orgId, doc.file_name);
   if (!buf) return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
@@ -68,10 +84,21 @@ export async function DELETE(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const doc = await queryOne<VoDocRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by FROM vo_documents WHERE id = ?`,
+    `SELECT id, vo_id, file_name, mime_type, original_name, uploaded_by FROM vo_documents WHERE id = ?`,
     id,
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+
+  // withProjectScope (readOnly: false vì DELETE là thao tác ghi) đặt GUC app.project_id
+  // — lớp phòng thủ RLS thứ hai, nhất quán với nhánh GET ở trên.
+  const projectId = await getCurrentProjectId(user);
+  const vo =
+    projectId != null
+      ? await withProjectScope(projectId, () => getVariation(doc.vo_id, projectId), {
+          readOnly: false,
+        })
+      : undefined;
+  if (!vo) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   if (doc.uploaded_by !== user.id && !isAdminOrPm(user.role))
     return NextResponse.json(

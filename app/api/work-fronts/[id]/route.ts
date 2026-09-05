@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getCurrentProjectId, visibleProjectIds } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   parseWorkFrontUpdateBody,
   updateWorkFrontStatus,
   validateWorkFrontUpdate,
+  workFrontProjectId,
 } from "@/lib/tien-do/workfronts";
 
 export const dynamic = "force-dynamic";
@@ -33,8 +33,11 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<{ id: number }>(`SELECT id FROM work_fronts WHERE id = ?`, id);
-  if (!existing) return NextResponse.json({ error: "Không tìm thấy mặt bằng" }, { status: 404 });
+  // Chống ghi xuyên dự án: mặt bằng suy dự án qua sheet_type → tower (vá V9).
+  const visible = await visibleProjectIds(user);
+  const pid = await workFrontProjectId(id);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Không tìm thấy mặt bằng" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object")
@@ -44,7 +47,7 @@ export async function PATCH(
   const invalid = validateWorkFrontUpdate(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  const result = await updateWorkFrontStatus(id, input, user.id, user.role === "admin");
+  const result = await updateWorkFrontStatus(id, input, user.id, user.role === "admin", visible);
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: 409 });
 
   return NextResponse.json({ updated: id });

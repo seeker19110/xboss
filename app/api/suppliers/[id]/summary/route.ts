@@ -18,7 +18,14 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const supplier = await queryOne(`SELECT id FROM suppliers WHERE id = ?`, id);
+  // Lọc theo org_id (M22/multi-org) — cùng ranh giới với GET /api/suppliers. Thiếu điều
+  // kiện này thì user tổ chức A đoán supplierId của tổ chức B vẫn đọc được điểm đánh
+  // giá/công nợ/lịch sử của NCC tổ chức khác (BUG THẬT đã vá).
+  const supplier = await queryOne(
+    `SELECT id FROM suppliers WHERE id = ? AND org_id = ?`,
+    id,
+    user.orgId,
+  );
   if (!supplier)
     return NextResponse.json({ error: "Không tìm thấy nhà cung cấp" }, { status: 404 });
 

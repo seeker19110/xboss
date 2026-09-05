@@ -3,6 +3,7 @@
 // ghi) + khiếu nại/quan hệ cộng đồng (tiếp nhận → xử lý → đóng).
 // Xem docs/nang-cap/M26-quan-he-quan-trac.md.
 import { query, queryOne } from "@/lib/db";
+import { isValidDateISO } from "@/lib/nen/date";
 
 export const MONITORING_KINDS = ["lun", "chuyen_vi", "nghieng", "lan_can", "khac"] as const;
 export type MonitoringKind = (typeof MONITORING_KINDS)[number];
@@ -36,8 +37,6 @@ export const COMMUNITY_CASE_STATUS_LABEL: Record<CommunityCaseStatus, string> = 
   handling: "Đang xử lý",
   closed: "Đã đóng",
 };
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // ===== Mốc quan trắc =====
 
@@ -181,7 +180,7 @@ export function parseReadingBody(body: Record<string, unknown>): MonitoringReadi
 
 // Validate thuần (không chạm DB).
 export function validateReadingInput(input: MonitoringReadingInput): string | null {
-  if (!DATE_RE.test(input.measuredAt)) return "Ngày đo không đúng định dạng YYYY-MM-DD";
+  if (!isValidDateISO(input.measuredAt)) return "Ngày đo không đúng định dạng YYYY-MM-DD";
   if (!Number.isFinite(input.value)) return "Giá trị đo không hợp lệ";
   if (input.cumulative != null && !Number.isFinite(input.cumulative))
     return "Giá trị luỹ kế không hợp lệ";
@@ -331,7 +330,7 @@ export function validateCommunityCaseInput(input: CommunityCaseInput): string | 
     ["Ngày tiếp nhận", input.receivedDate],
     ["Ngày đóng", input.closedDate],
   ] as const) {
-    if (d != null && !DATE_RE.test(d)) return `${label} không đúng định dạng YYYY-MM-DD`;
+    if (d != null && !isValidDateISO(d)) return `${label} không đúng định dạng YYYY-MM-DD`;
   }
   return null;
 }

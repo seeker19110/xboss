@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storagePut } from "@/lib/nen/storage";
-import { query, queryOne, insertId } from "@/lib/db";
+import { query, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getCurrentProjectId, visibleProjectIds } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { newWorkFrontFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
+import { workFrontProjectId } from "@/lib/tien-do/workfronts";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,12 @@ export async function GET(
 
   const workFrontId = parseInt(params.id);
   if (isNaN(workFrontId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Chống đọc xuyên dự án (vá V9).
+  const visible = await visibleProjectIds(user);
+  const pid = await workFrontProjectId(workFrontId);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Không tìm thấy mặt bằng" }, { status: 404 });
 
   const documents = await query(
     `SELECT d.id, d.file_name AS "fileName", d.mime, d.created_at AS "createdAt",
@@ -54,11 +61,12 @@ export async function POST(
 
   const workFrontId = parseInt(params.id);
   if (isNaN(workFrontId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
-  const workFront = await queryOne<{ id: number }>(
-    `SELECT id FROM work_fronts WHERE id = ?`,
-    workFrontId,
-  );
-  if (!workFront) return NextResponse.json({ error: "Không tìm thấy mặt bằng" }, { status: 404 });
+
+  // Chống ghi xuyên dự án (vá V9).
+  const visible = await visibleProjectIds(user);
+  const pid = await workFrontProjectId(workFrontId);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Không tìm thấy mặt bằng" }, { status: 404 });
 
   const up = await parseUploadedFile(req, { accept: "document", maxBytes: MAX_DOC_BYTES });
   if (!up.ok) return NextResponse.json({ error: up.error }, { status: up.status });

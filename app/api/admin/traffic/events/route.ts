@@ -8,9 +8,8 @@ export const dynamic = "force-dynamic";
 // Gửi snapshot ban đầu rồi đẩy từng entry mới khi chúng đến.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user || user.role !== "admin") {
-    return new Response("Không có quyền", { status: 403 });
-  }
+  if (!user) return new Response("Chưa đăng nhập", { status: 401 });
+  if (user.role !== "admin") return new Response("Không có quyền", { status: 403 });
 
   const sinceParam = req.nextUrl.searchParams.get("since");
   const since = sinceParam ? parseInt(sinceParam, 10) : undefined;

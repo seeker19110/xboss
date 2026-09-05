@@ -2,7 +2,7 @@
 // mục bàn giao CĐT, punch list (tồn tại khi bàn giao), giải thể công trường (demob),
 // bài học kinh nghiệm. Xem docs/nang-cap/M29-ban-giao-ket-thuc.md.
 import { query, queryOne } from "@/lib/db";
-import { todayISO } from "@/lib/nen/date";
+import { todayISO, isValidDateISO } from "@/lib/nen/date";
 
 // ===== Commissioning (T&C) =====
 
@@ -377,8 +377,6 @@ export async function handoverProgress(projectId?: number): Promise<HandoverProg
 
 // ===== Input parsing/validate thuần =====
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
 export type CommissioningInput = {
   code: string | null;
   systemName: string;
@@ -406,7 +404,7 @@ export function parseCommissioningBody(body: Record<string, unknown>): Commissio
 export function validateCommissioningInput(input: CommissioningInput): string | null {
   if (!input.systemName.trim()) return "Thiếu tên hệ thống";
   if (!COMMISSIONING_RESULTS.includes(input.result)) return "Kết quả không hợp lệ";
-  if (input.testedAt != null && !DATE_RE.test(input.testedAt))
+  if (input.testedAt != null && !isValidDateISO(input.testedAt))
     return "Ngày chạy thử không đúng định dạng YYYY-MM-DD";
   if (!validateCommissioningItems(input.checklist)) return "Checklist chạy thử không hợp lệ";
   return null;
@@ -435,7 +433,7 @@ export function parseHandoverItemBody(body: Record<string, unknown>): HandoverIt
 export function validateHandoverItemInput(input: HandoverItemInput): string | null {
   if (!input.title.trim()) return "Thiếu tên hạng mục";
   if (!HANDOVER_ITEM_STATUSES.includes(input.status)) return "Trạng thái không hợp lệ";
-  if (input.handoverDate != null && !DATE_RE.test(input.handoverDate))
+  if (input.handoverDate != null && !isValidDateISO(input.handoverDate))
     return "Ngày bàn giao không đúng định dạng YYYY-MM-DD";
   return null;
 }
@@ -467,7 +465,7 @@ export function validatePunchInput(input: PunchInput): string | null {
   if (input.severity != null && !PUNCH_SEVERITIES.includes(input.severity))
     return "Mức độ không hợp lệ";
   if (!PUNCH_STATUSES.includes(input.status)) return "Trạng thái không hợp lệ";
-  if (input.dueDate != null && !DATE_RE.test(input.dueDate))
+  if (input.dueDate != null && !isValidDateISO(input.dueDate))
     return "Hạn xử lý không đúng định dạng YYYY-MM-DD";
   return null;
 }

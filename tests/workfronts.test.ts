@@ -48,8 +48,15 @@ test(
     const { run, insertId, queryOne } = await import("@/lib/db");
     const { updateWorkFrontStatus } = await import("@/lib/tien-do/workfronts");
 
+    // Cần tower gắn project_id thật để updateWorkFrontStatus (vá V9) kiểm được dự án nhìn thấy.
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('WF Test Project')`);
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'WF Test Tower')`,
+      projectId,
+    );
     const sheetId = await insertId(
-      `INSERT INTO sheet_types (code, name, slug) VALUES ('WF-TEST', 'Sheet Test WF', 'wf-test')`,
+      `INSERT INTO sheet_types (tower_id, code, name, slug) VALUES (?, 'WF-TEST', 'Sheet Test WF', 'wf-test')`,
+      towerId,
     );
     const userId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('WF Test', 'wf-test@xboss.vn', 'x', 'admin')`,
@@ -70,6 +77,7 @@ test(
       },
       userId,
       false,
+      [projectId],
     );
     assert.ok("ok" in step1);
 
@@ -85,6 +93,7 @@ test(
       { status: "pending", handedOverAt: null, returnedAt: null, blocker: null, note: null },
       userId,
       false,
+      [projectId],
     );
     assert.ok("error" in blocked);
 
@@ -94,12 +103,15 @@ test(
       { status: "pending", handedOverAt: null, returnedAt: null, blocker: null, note: null },
       userId,
       true,
+      [projectId],
     );
     assert.ok("ok" in allowed);
 
     await run(`DELETE FROM work_fronts WHERE id = ?`, frontId);
     await run(`DELETE FROM users WHERE id = ?`, userId);
     await run(`DELETE FROM sheet_types WHERE id = ?`, sheetId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
   },
 );
 
