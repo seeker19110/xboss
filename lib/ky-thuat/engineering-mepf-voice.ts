@@ -199,6 +199,6 @@ export async function saveVoiceLog(
 export async function listVoiceLogs(projectId: number): Promise<Array<Record<string, unknown>>> {
   return query<Record<string, unknown>>(
     `SELECT * FROM engineering_mepf_voice_logs WHERE project_id = $1 ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }

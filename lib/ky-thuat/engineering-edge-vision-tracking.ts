@@ -159,7 +159,8 @@ export async function listEdgeVisionDetections(
       `SELECT * FROM engineering_edge_vision_detections
        WHERE project_id = ? AND video_session_id = ?
        ORDER BY frame_timestamp_sec ASC`,
-      [projectId, videoSessionId],
+      projectId,
+      videoSessionId,
     );
   }
   return query<Record<string, unknown>>(
@@ -167,7 +168,7 @@ export async function listEdgeVisionDetections(
      WHERE project_id = ?
      ORDER BY created_at DESC
      LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }
 
@@ -227,6 +228,6 @@ export async function listPrePourRebarAudits(
      WHERE project_id = ?
      ORDER BY audited_at DESC
      LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }

@@ -87,13 +87,21 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const projectId = chotDuAn.projectId;
 
   try {
-    await withProjectScope(projectId, async () => {
-      await query(
-        `DELETE FROM engineering_spatial_annotations WHERE id = ? AND project_id = ?`,
-        id,
-        projectId,
-      );
-    });
+    // BUG THẬT: thiếu { readOnly: false } — withProjectScope mặc định readOnly=true nên mọi
+    // lời gọi DELETE luôn ném "cannot execute DELETE in a read-only transaction" (500), xoá
+    // điểm ghim chưa từng chạy được. PATCH cùng file đã đúng vì updateAnnotationStatus/
+    // linkAnnotationToEntity (lib/ky-thuat/engineering-spatial-pinning.ts) tự truyền cờ này.
+    await withProjectScope(
+      projectId,
+      async () => {
+        await query(
+          `DELETE FROM engineering_spatial_annotations WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        );
+      },
+      { readOnly: false },
+    );
 
     return NextResponse.json({
       success: true,
