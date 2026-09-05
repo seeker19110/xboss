@@ -36,17 +36,49 @@ export type WorkFrontRow = {
   updatedAt: string;
 };
 
-export async function listWorkFronts(sheetTypeId?: number): Promise<WorkFrontRow[]> {
+// projectIds (vá V9): work_fronts không có cột project_id riêng — suy qua
+// sheet_types.tower_id → towers.project_id (chain 2 join, giống frontMissingList).
+// undefined = không lọc (chỉ dùng nội bộ khi caller đã tự đảm bảo phạm vi).
+export async function listWorkFronts(
+  sheetTypeId?: number,
+  projectIds?: number[],
+): Promise<WorkFrontRow[]> {
+  const conds: string[] = [];
+  const args: unknown[] = [];
+  if (sheetTypeId) {
+    conds.push("wf.sheet_type_id = ?");
+    args.push(sheetTypeId);
+  }
+  if (projectIds) {
+    conds.push("tw.project_id = ANY(?)");
+    args.push(projectIds);
+  }
   return query<WorkFrontRow>(
     `SELECT wf.id, wf.sheet_type_id AS "sheetTypeId", st.code AS "sheetCode",
             wf.floor_label AS "floorLabel", wf.status,
             wf.handed_over_at AS "handedOverAt", wf.returned_at AS "returnedAt",
             wf.blocker, wf.note, wf.updated_at AS "updatedAt"
-       FROM work_fronts wf JOIN sheet_types st ON st.id = wf.sheet_type_id
-      ${sheetTypeId ? "WHERE wf.sheet_type_id = ?" : ""}
+       FROM work_fronts wf
+       JOIN sheet_types st ON st.id = wf.sheet_type_id
+       LEFT JOIN towers tw ON tw.id = st.tower_id
+      ${conds.length ? "WHERE " + conds.join(" AND ") : ""}
       ORDER BY st.code, wf.floor_label`,
-    ...(sheetTypeId ? [sheetTypeId] : []),
+    ...args,
   );
+}
+
+// Dự án của 1 mặt bằng thi công (vá V9) — dùng để kiểm quyền trước khi ghi/xoá theo :id.
+// null = không xác định được dự án (tower_id/project_id rỗng) → route coi như không thấy được.
+export async function workFrontProjectId(id: number): Promise<number | null> {
+  const row = await queryOne<{ projectId: number | null }>(
+    `SELECT tw.project_id AS "projectId"
+       FROM work_fronts wf
+       JOIN sheet_types st ON st.id = wf.sheet_type_id
+       LEFT JOIN towers tw ON tw.id = st.tower_id
+      WHERE wf.id = ?`,
+    id,
+  );
+  return row?.projectId ?? null;
 }
 
 // Đảm bảo có đủ dòng work_fronts cho mọi (sheet, tầng) đang tồn tại trong work_packages —
@@ -87,18 +119,26 @@ export function validateWorkFrontUpdate(input: WorkFrontUpdateInput): string | n
 
 // Đổi trạng thái + ghi lịch sử trong 1 transaction. `allowBackward` cho Admin nhảy ngược
 // (sửa sai) — role khác chỉ được đi tới hoặc đứng yên.
+// visibleProjIds (vá V9): mặt bằng không thuộc dự án user thấy được → coi như không tồn tại
+// (404 ở route), tránh lộ/ghi đè trạng thái mặt bằng của dự án khác qua id đoán được.
 export async function updateWorkFrontStatus(
   id: number,
   input: WorkFrontUpdateInput,
   userId: number,
   allowBackward: boolean,
+  visibleProjIds: number[],
 ): Promise<{ error: string } | { ok: true }> {
   return withTransaction(async () => {
-    const current = await queryOne<{ status: WorkFrontStatus }>(
-      `SELECT status FROM work_fronts WHERE id = ? FOR UPDATE`,
+    const current = await queryOne<{ status: WorkFrontStatus; projectId: number | null }>(
+      `SELECT wf.status, tw.project_id AS "projectId"
+         FROM work_fronts wf
+         JOIN sheet_types st ON st.id = wf.sheet_type_id
+         LEFT JOIN towers tw ON tw.id = st.tower_id
+        WHERE wf.id = ? FOR UPDATE OF wf`,
       id,
     );
-    if (!current) return { error: "Không tìm thấy mặt bằng" };
+    if (!current || !visibleProjIds.includes(current.projectId as number))
+      return { error: "Không tìm thấy mặt bằng" };
     if (!allowBackward && !isForwardTransition(current.status, input.status))
       return { error: "Không thể chuyển ngược trạng thái (chỉ Admin)" };
 

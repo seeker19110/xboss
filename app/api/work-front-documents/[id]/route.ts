@@ -2,10 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { storageGet, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 
-type DocRow = { id: number; file_name: string; mime: string; uploaded_by: number | null };
+type DocRow = {
+  id: number;
+  file_name: string;
+  mime: string;
+  uploaded_by: number | null;
+  projectId: number | null;
+};
+
+// Chống đọc/xoá xuyên dự án: suy dự án qua work_front → sheet_type → tower (vá V9).
+const DOC_SELECT = `SELECT d.id, d.file_name, d.mime, d.uploaded_by, tw.project_id AS "projectId"
+   FROM work_front_documents d
+   JOIN work_fronts wf ON wf.id = d.work_front_id
+   JOIN sheet_types st ON st.id = wf.sheet_type_id
+   LEFT JOIN towers tw ON tw.id = st.tower_id
+  WHERE d.id = ?`;
 
 // GET /api/work-front-documents/:id — stream biên bản/ảnh mặt bằng.
 export async function GET(
@@ -19,11 +34,12 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const doc = await queryOne<DocRow>(
-    `SELECT id, file_name, mime, uploaded_by FROM work_front_documents WHERE id = ?`,
-    id,
-  );
+  const doc = await queryOne<DocRow>(DOC_SELECT, id);
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+
+  const visible = await visibleProjectIds(user);
+  if (!visible.includes(doc.projectId as number))
+    return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   const buf = await storageGet(user.orgId, doc.file_name);
   if (!buf) return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
@@ -49,11 +65,12 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const doc = await queryOne<DocRow>(
-    `SELECT id, file_name, mime, uploaded_by FROM work_front_documents WHERE id = ?`,
-    id,
-  );
+  const doc = await queryOne<DocRow>(DOC_SELECT, id);
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+
+  const visible = await visibleProjectIds(user);
+  if (!visible.includes(doc.projectId as number))
+    return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   if (doc.uploaded_by !== user.id && !CAN.manageWorkFronts(user.role))
     return NextResponse.json(
