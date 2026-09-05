@@ -30,11 +30,7 @@ async function taoToChuc(ten: string): Promise<number> {
 
 async function taoDuAn(ten: string, orgId = 1): Promise<number> {
   const { insertId } = await import("@/lib/db");
-  return insertId(
-    `INSERT INTO projects (name, org_id) VALUES (?, ?)`,
-    `CLTR ${uniq(ten)}`,
-    orgId,
-  );
+  return insertId(`INSERT INTO projects (name, org_id) VALUES (?, ?)`, `CLTR ${uniq(ten)}`, orgId);
 }
 
 async function taoUser(
@@ -118,11 +114,7 @@ async function taoVatTu(projectId: number, ten: string): Promise<number> {
 
 async function taoNhaCungCap(ten: string, orgId = 1): Promise<number> {
   const { insertId } = await import("@/lib/db");
-  return insertId(
-    `INSERT INTO suppliers (name, org_id) VALUES (?, ?)`,
-    `NCC ${uniq(ten)}`,
-    orgId,
-  );
+  return insertId(`INSERT INTO suppliers (name, org_id) VALUES (?, ?)`, `NCC ${uniq(ten)}`, orgId);
 }
 
 async function taoGoiThau(projectId: number, ten: string): Promise<number> {
@@ -174,36 +166,32 @@ const jreq = (url: string, body?: unknown, method = "POST") =>
 // POST /api/tenders — boq_items phải thuộc đúng dự án đang chọn
 // ============================================================================
 
-test(
-  "POST /api/tenders: dòng BOQ thuộc dự án khác → 422, KHÔNG tạo gói thầu",
-  S,
-  async () => {
-    const a = await dungSheet("tenderA");
-    const b = await dungSheet("tenderB");
-    const boqB = await taoBoqItem(b.projectId, "tenderHack");
-    const pmA = await taoUser("pm", "tenderA");
-    await dangNhapDuAn(pmA, a.projectId);
+test("POST /api/tenders: dòng BOQ thuộc dự án khác → 422, KHÔNG tạo gói thầu", S, async () => {
+  const a = await dungSheet("tenderA");
+  const b = await dungSheet("tenderB");
+  const boqB = await taoBoqItem(b.projectId, "tenderHack");
+  const pmA = await taoUser("pm", "tenderA");
+  await dangNhapDuAn(pmA, a.projectId);
 
-    const tenGoi = `Gói thầu hack ${uniq("tender")}`;
-    const { POST } = await import("@/app/api/tenders/route");
-    const res = await POST(
-      jreq("/api/tenders", {
-        name: tenGoi,
-        items: [{ boqItemId: boqB, qty: 1 }],
-      }),
-    );
-    assert.equal(res.status, 422);
+  const tenGoi = `Gói thầu hack ${uniq("tender")}`;
+  const { POST } = await import("@/app/api/tenders/route");
+  const res = await POST(
+    jreq("/api/tenders", {
+      name: tenGoi,
+      items: [{ boqItemId: boqB, qty: 1 }],
+    }),
+  );
+  assert.equal(res.status, 422);
 
-    const { queryOne } = await import("@/lib/db");
-    const tender = await queryOne(`SELECT id FROM tender_packages WHERE name = ?`, tenGoi);
-    assert.equal(tender, undefined, "không được tạo gói thầu tham chiếu BOQ dự án khác");
-    const boqRow = await queryOne<{ projectId: number }>(
-      `SELECT project_id AS "projectId" FROM boq_items WHERE id = ?`,
-      boqB,
-    );
-    assert.equal(boqRow?.projectId, b.projectId, "dòng BOQ dự án B không đổi chủ");
-  },
-);
+  const { queryOne } = await import("@/lib/db");
+  const tender = await queryOne(`SELECT id FROM tender_packages WHERE name = ?`, tenGoi);
+  assert.equal(tender, undefined, "không được tạo gói thầu tham chiếu BOQ dự án khác");
+  const boqRow = await queryOne<{ projectId: number }>(
+    `SELECT project_id AS "projectId" FROM boq_items WHERE id = ?`,
+    boqB,
+  );
+  assert.equal(boqRow?.projectId, b.projectId, "dòng BOQ dự án B không đổi chủ");
+});
 
 test("POST /api/tenders: dòng BOQ đúng dự án của mình → 201, tạo thành công", S, async () => {
   const a = await dungSheet("tenderOk");
@@ -244,16 +232,11 @@ test(
     await dangNhapDuAn(pmA, a.projectId);
 
     const { POST } = await import("@/app/api/purchase-requests/route");
-    const res = await POST(
-      jreq("/api/purchase-requests", { materialId: vatTuB, qtyRequested: 5 }),
-    );
+    const res = await POST(jreq("/api/purchase-requests", { materialId: vatTuB, qtyRequested: 5 }));
     assert.equal(res.status, 404);
 
     const { queryOne } = await import("@/lib/db");
-    const pr = await queryOne(
-      `SELECT id FROM purchase_requests WHERE material_id = ?`,
-      vatTuB,
-    );
+    const pr = await queryOne(`SELECT id FROM purchase_requests WHERE material_id = ?`, vatTuB);
     assert.equal(pr, undefined, "không được tạo yêu cầu mua vật tư dự án khác");
   },
 );
@@ -268,9 +251,7 @@ test(
     await dangNhapDuAn(pmA, a.projectId);
 
     const { POST } = await import("@/app/api/purchase-requests/route");
-    const res = await POST(
-      jreq("/api/purchase-requests", { materialId: vatTuA, qtyRequested: 5 }),
-    );
+    const res = await POST(jreq("/api/purchase-requests", { materialId: vatTuA, qtyRequested: 5 }));
     assert.equal(res.status, 201);
 
     const { queryOne } = await import("@/lib/db");
@@ -287,50 +268,42 @@ test(
 // POST /api/tenders/:id/bids — suppliers phải thuộc đúng tổ chức
 // ============================================================================
 
-test(
-  "POST /api/tenders/:id/bids: NCC thuộc tổ chức khác → 422, KHÔNG tạo báo giá",
-  S,
-  async () => {
-    const a = await dungSheet("bidA");
-    const goiThauA = await taoGoiThau(a.projectId, "bidA");
-    const orgB = await taoToChuc("bidOrgB");
-    const supplierB = await taoNhaCungCap("bidB", orgB);
-    const pmA = await taoUser("pm", "bidA", 1);
-    await dangNhapDuAn(pmA, a.projectId);
+test("POST /api/tenders/:id/bids: NCC thuộc tổ chức khác → 422, KHÔNG tạo báo giá", S, async () => {
+  const a = await dungSheet("bidA");
+  const goiThauA = await taoGoiThau(a.projectId, "bidA");
+  const orgB = await taoToChuc("bidOrgB");
+  const supplierB = await taoNhaCungCap("bidB", orgB);
+  const pmA = await taoUser("pm", "bidA", 1);
+  await dangNhapDuAn(pmA, a.projectId);
 
-    const { POST } = await import("@/app/api/tenders/[id]/bids/route");
-    const res = await POST(jreq("/x", { supplierId: supplierB, lumpSum: 1000 }), {
-      params: Promise.resolve({ id: String(goiThauA) }),
-    });
-    assert.equal(res.status, 422);
+  const { POST } = await import("@/app/api/tenders/[id]/bids/route");
+  const res = await POST(jreq("/x", { supplierId: supplierB, lumpSum: 1000 }), {
+    params: Promise.resolve({ id: String(goiThauA) }),
+  });
+  assert.equal(res.status, 422);
 
-    const { queryOne } = await import("@/lib/db");
-    const bid = await queryOne(
-      `SELECT id FROM tender_bids WHERE tender_id = ? AND supplier_id = ?`,
-      goiThauA,
-      supplierB,
-    );
-    assert.equal(bid, undefined, "không được tạo báo giá của NCC tổ chức khác");
-  },
-);
+  const { queryOne } = await import("@/lib/db");
+  const bid = await queryOne(
+    `SELECT id FROM tender_bids WHERE tender_id = ? AND supplier_id = ?`,
+    goiThauA,
+    supplierB,
+  );
+  assert.equal(bid, undefined, "không được tạo báo giá của NCC tổ chức khác");
+});
 
-test(
-  "POST /api/tenders/:id/bids: NCC đúng tổ chức của mình → 201, tạo thành công",
-  S,
-  async () => {
-    const a = await dungSheet("bidOk");
-    const goiThauA = await taoGoiThau(a.projectId, "bidOk");
-    const supplierA = await taoNhaCungCap("bidOk", 1);
-    const pmA = await taoUser("pm", "bidOk", 1);
-    await dangNhapDuAn(pmA, a.projectId);
+test("POST /api/tenders/:id/bids: NCC đúng tổ chức của mình → 201, tạo thành công", S, async () => {
+  const a = await dungSheet("bidOk");
+  const goiThauA = await taoGoiThau(a.projectId, "bidOk");
+  const supplierA = await taoNhaCungCap("bidOk", 1);
+  const pmA = await taoUser("pm", "bidOk", 1);
+  await dangNhapDuAn(pmA, a.projectId);
 
-    const { POST } = await import("@/app/api/tenders/[id]/bids/route");
-    const res = await POST(jreq("/x", { supplierId: supplierA, lumpSum: 1000 }), {
-      params: Promise.resolve({ id: String(goiThauA) }),
-    });
-    assert.equal(res.status, 201);
-  },
-);
+  const { POST } = await import("@/app/api/tenders/[id]/bids/route");
+  const res = await POST(jreq("/x", { supplierId: supplierA, lumpSum: 1000 }), {
+    params: Promise.resolve({ id: String(goiThauA) }),
+  });
+  assert.equal(res.status, 201);
+});
 
 // ============================================================================
 // POST /api/crews — suppliers phải thuộc đúng tổ chức
@@ -453,9 +426,7 @@ test("POST /api/personnel: NCC đúng tổ chức của mình → 201, tạo th�
   await dangNhapDuAn(pmA, a.projectId);
 
   const { POST } = await import("@/app/api/personnel/route");
-  const res = await POST(
-    jreq("/x", { fullName: "Người hợp lệ", supplierId: supplierA }),
-  );
+  const res = await POST(jreq("/x", { fullName: "Người hợp lệ", supplierId: supplierA }));
   assert.equal(res.status, 201);
 });
 
@@ -533,7 +504,10 @@ test("PATCH /api/suppliers/:id: NCC thuộc tổ chức khác → 404, KHÔNG đ
   assert.equal(res.status, 404);
 
   const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ name: string }>(`SELECT name FROM suppliers WHERE id = ?`, supplierB);
+  const row = await queryOne<{ name: string }>(
+    `SELECT name FROM suppliers WHERE id = ?`,
+    supplierB,
+  );
   assert.notEqual(row?.name, "Tên hack", "tên NCC tổ chức khác không bị đổi nhầm");
 });
 
@@ -591,32 +565,26 @@ test("DELETE /api/suppliers/:id: NCC đúng tổ chức của mình → 200, xo�
 // POST /api/admin/assignments — users phải thuộc đúng tổ chức
 // ============================================================================
 
-test(
-  "POST /api/admin/assignments: user thuộc tổ chức khác → 404, KHÔNG gán",
-  S,
-  async () => {
-    const a = await dungSheet("assignA");
-    const pkgA = await taoNhom(a.sheetTypeId, "AsgA1");
-    const taskA = await taoTask(pkgA, "AsgA1,01");
-    const orgB = await taoToChuc("assignOrgB");
-    const userB = await taoUser("engineer", "assignB", orgB);
-    const pmA = await taoUser("pm", "assignA", 1);
-    await dangNhapDuAn(pmA, a.projectId);
+test("POST /api/admin/assignments: user thuộc tổ chức khác → 404, KHÔNG gán", S, async () => {
+  const a = await dungSheet("assignA");
+  const pkgA = await taoNhom(a.sheetTypeId, "AsgA1");
+  const taskA = await taoTask(pkgA, "AsgA1,01");
+  const orgB = await taoToChuc("assignOrgB");
+  const userB = await taoUser("engineer", "assignB", orgB);
+  const pmA = await taoUser("pm", "assignA", 1);
+  await dangNhapDuAn(pmA, a.projectId);
 
-    const { POST } = await import("@/app/api/admin/assignments/route");
-    const res = await POST(
-      jreq("/x", { level: "task", id: taskA, userId: userB.id }),
-    );
-    assert.equal(res.status, 404);
+  const { POST } = await import("@/app/api/admin/assignments/route");
+  const res = await POST(jreq("/x", { level: "task", id: taskA, userId: userB.id }));
+  assert.equal(res.status, 404);
 
-    const { queryOne } = await import("@/lib/db");
-    const row = await queryOne<{ assignedTo: number | null }>(
-      `SELECT assigned_to AS "assignedTo" FROM tasks WHERE id = ?`,
-      taskA,
-    );
-    assert.equal(row?.assignedTo, null, "task không bị gán nhầm cho user tổ chức khác");
-  },
-);
+  const { queryOne } = await import("@/lib/db");
+  const row = await queryOne<{ assignedTo: number | null }>(
+    `SELECT assigned_to AS "assignedTo" FROM tasks WHERE id = ?`,
+    taskA,
+  );
+  assert.equal(row?.assignedTo, null, "task không bị gán nhầm cho user tổ chức khác");
+});
 
 test(
   "POST /api/admin/assignments: user đúng tổ chức của mình → 200, gán thành công",
@@ -630,9 +598,7 @@ test(
     await dangNhapDuAn(pmA, a.projectId);
 
     const { POST } = await import("@/app/api/admin/assignments/route");
-    const res = await POST(
-      jreq("/x", { level: "task", id: taskA, userId: userA.id }),
-    );
+    const res = await POST(jreq("/x", { level: "task", id: taskA, userId: userA.id }));
     assert.equal(res.status, 200);
 
     const { queryOne } = await import("@/lib/db");
@@ -660,10 +626,9 @@ test(
     await dangNhapDuAn(pmA, a.projectId);
 
     const { POST } = await import("@/app/api/meetings/[id]/actions/route");
-    const res = await POST(
-      jreq("/x", { content: "Việc hack assignee", assignee: userB.id }),
-      { params: Promise.resolve({ id: String(meetingA) }) },
-    );
+    const res = await POST(jreq("/x", { content: "Việc hack assignee", assignee: userB.id }), {
+      params: Promise.resolve({ id: String(meetingA) }),
+    });
     assert.equal(res.status, 422);
 
     const { queryOne } = await import("@/lib/db");
@@ -688,10 +653,9 @@ test(
     await dangNhapDuAn(pmA, a.projectId);
 
     const { POST } = await import("@/app/api/meetings/[id]/actions/route");
-    const res = await POST(
-      jreq("/x", { content: "Việc hack task", taskId: taskB }),
-      { params: Promise.resolve({ id: String(meetingA) }) },
-    );
+    const res = await POST(jreq("/x", { content: "Việc hack task", taskId: taskB }), {
+      params: Promise.resolve({ id: String(meetingA) }),
+    });
     assert.equal(res.status, 422);
 
     const { queryOne } = await import("@/lib/db");
@@ -703,26 +667,22 @@ test(
   },
 );
 
-test(
-  "POST /api/meetings/:id/actions: assignee + task đúng phạm vi của mình → 201",
-  S,
-  async () => {
-    const a = await dungSheet("actOk");
-    const meetingA = await taoCuocHop(a.projectId, "actOk");
-    const pkgA = await taoNhom(a.sheetTypeId, "ActOk1");
-    const taskA = await taoTask(pkgA, "ActOk1,01");
-    const userA = await taoUser("engineer", "actOk", 1);
-    const pmA = await taoUser("pm", "actOkPm", 1);
-    await dangNhapDuAn(pmA, a.projectId);
+test("POST /api/meetings/:id/actions: assignee + task đúng phạm vi của mình → 201", S, async () => {
+  const a = await dungSheet("actOk");
+  const meetingA = await taoCuocHop(a.projectId, "actOk");
+  const pkgA = await taoNhom(a.sheetTypeId, "ActOk1");
+  const taskA = await taoTask(pkgA, "ActOk1,01");
+  const userA = await taoUser("engineer", "actOk", 1);
+  const pmA = await taoUser("pm", "actOkPm", 1);
+  await dangNhapDuAn(pmA, a.projectId);
 
-    const { POST } = await import("@/app/api/meetings/[id]/actions/route");
-    const res = await POST(
-      jreq("/x", { content: "Việc hợp lệ", assignee: userA.id, taskId: taskA }),
-      { params: Promise.resolve({ id: String(meetingA) }) },
-    );
-    assert.equal(res.status, 201);
-  },
-);
+  const { POST } = await import("@/app/api/meetings/[id]/actions/route");
+  const res = await POST(
+    jreq("/x", { content: "Việc hợp lệ", assignee: userA.id, taskId: taskA }),
+    { params: Promise.resolve({ id: String(meetingA) }) },
+  );
+  assert.equal(res.status, 201);
+});
 
 // ============================================================================
 // PATCH /api/meetings/:id/actions/:aid — assignee phải thuộc đúng tổ chức
@@ -750,10 +710,9 @@ test(
     await dangNhapDuAn(pmA, a.projectId);
 
     const { PATCH } = await import("@/app/api/meetings/[id]/actions/[aid]/route");
-    const res = await PATCH(
-      jreq("/x", { content: "Nội dung mới", assignee: userB.id }, "PATCH"),
-      { params: Promise.resolve({ id: String(meetingA), aid: String(actionA) }) },
-    );
+    const res = await PATCH(jreq("/x", { content: "Nội dung mới", assignee: userB.id }, "PATCH"), {
+      params: Promise.resolve({ id: String(meetingA), aid: String(actionA) }),
+    });
     assert.equal(res.status, 422);
 
     const { queryOne } = await import("@/lib/db");
@@ -766,31 +725,57 @@ test(
 );
 
 test(
-  "PATCH /api/meetings/:id/actions/:aid: assignee đúng tổ chức của mình → 200",
+  "PATCH /api/meetings/:id/actions/:aid: task liên kết thuộc dự án khác → 422, KHÔNG đổi",
   S,
   async () => {
-    const a = await dungSheet("actPatchOk");
-    const meetingA = await taoCuocHop(a.projectId, "actPatchOk");
-    const actionA = await taoViecSauHop(meetingA, "actPatchOk");
-    const userA = await taoUser("engineer", "actPatchOk", 1);
-    const pmA = await taoUser("pm", "actPatchOkPm", 1);
+    // Nhánh PATCH trước đây ghi thẳng `task_id` mà KHÔNG kiểm gì, trong khi POST cùng cụm đã
+    // đối chiếu dự án — cùng lớp lỗi, chỉ khác động từ HTTP nên bộ quét theo route bỏ sót.
+    const a = await dungSheet("actPatchTaskA");
+    const b = await dungSheet("actPatchTaskB");
+    const meetingA = await taoCuocHop(a.projectId, "actPatchTaskA");
+    const actionA = await taoViecSauHop(meetingA, "actPatchTaskA");
+    const pkgB = await taoNhom(b.sheetTypeId, "ActPTB1");
+    const taskB = await taoTask(pkgB, "ActPTB1,01");
+    const pmA = await taoUser("pm", "actPatchTaskA", 1);
     await dangNhapDuAn(pmA, a.projectId);
 
     const { PATCH } = await import("@/app/api/meetings/[id]/actions/[aid]/route");
     const res = await PATCH(
-      jreq("/x", { content: "Nội dung mới", assignee: userA.id }, "PATCH"),
+      jreq("/x", { content: "Gán task dự án khác", taskId: taskB }, "PATCH"),
       { params: Promise.resolve({ id: String(meetingA), aid: String(actionA) }) },
     );
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 422);
 
     const { queryOne } = await import("@/lib/db");
-    const row = await queryOne<{ assignee: number | null }>(
-      `SELECT assignee FROM meeting_actions WHERE id = ?`,
+    const row = await queryOne<{ task_id: number | null }>(
+      `SELECT task_id FROM meeting_actions WHERE id = ?`,
       actionA,
     );
-    assert.equal(row?.assignee, userA.id);
+    assert.equal(row?.task_id ?? null, null, "task_id không được gán sang task dự án khác");
   },
 );
+
+test("PATCH /api/meetings/:id/actions/:aid: assignee đúng tổ chức của mình → 200", S, async () => {
+  const a = await dungSheet("actPatchOk");
+  const meetingA = await taoCuocHop(a.projectId, "actPatchOk");
+  const actionA = await taoViecSauHop(meetingA, "actPatchOk");
+  const userA = await taoUser("engineer", "actPatchOk", 1);
+  const pmA = await taoUser("pm", "actPatchOkPm", 1);
+  await dangNhapDuAn(pmA, a.projectId);
+
+  const { PATCH } = await import("@/app/api/meetings/[id]/actions/[aid]/route");
+  const res = await PATCH(jreq("/x", { content: "Nội dung mới", assignee: userA.id }, "PATCH"), {
+    params: Promise.resolve({ id: String(meetingA), aid: String(actionA) }),
+  });
+  assert.equal(res.status, 200);
+
+  const { queryOne } = await import("@/lib/db");
+  const row = await queryOne<{ assignee: number | null }>(
+    `SELECT assignee FROM meeting_actions WHERE id = ?`,
+    actionA,
+  );
+  assert.equal(row?.assignee, userA.id);
+});
 
 // ============================================================================
 // PATCH /api/risks/:id — owner phải thuộc đúng tổ chức
@@ -896,9 +881,7 @@ test(
     await dangNhapDuAn(pmA, a.projectId);
 
     const { POST } = await import("@/app/api/warranty-claims/route");
-    const res = await POST(
-      jreq("/x", { description: "Claim hợp lệ", assignee: userA.id }),
-    );
+    const res = await POST(jreq("/x", { description: "Claim hợp lệ", assignee: userA.id }));
     assert.equal(res.status, 201);
   },
 );
@@ -907,44 +890,36 @@ test(
 // POST /api/sheets — copyFromId phải thuộc dự án người gọi thấy được
 // ============================================================================
 
-test(
-  "POST /api/sheets: copyFromId thuộc dự án khác → 400, KHÔNG tạo sheet",
-  S,
-  async () => {
-    const a = await dungSheet("sheetCopyA");
-    const b = await dungSheet("sheetCopyB");
-    const pmA = await taoUser("pm", "sheetCopyA", 1);
-    await dangNhapDuAn(pmA, a.projectId);
+test("POST /api/sheets: copyFromId thuộc dự án khác → 400, KHÔNG tạo sheet", S, async () => {
+  const a = await dungSheet("sheetCopyA");
+  const b = await dungSheet("sheetCopyB");
+  const pmA = await taoUser("pm", "sheetCopyA", 1);
+  await dangNhapDuAn(pmA, a.projectId);
 
-    const tenSheet = `Sheet hack ${uniq("copy")}`;
-    const { POST } = await import("@/app/api/sheets/route");
-    const res = await POST(jreq("/x", { name: tenSheet, copyFromId: b.sheetTypeId }));
-    assert.equal(res.status, 400);
+  const tenSheet = `Sheet hack ${uniq("copy")}`;
+  const { POST } = await import("@/app/api/sheets/route");
+  const res = await POST(jreq("/x", { name: tenSheet, copyFromId: b.sheetTypeId }));
+  assert.equal(res.status, 400);
 
-    const { queryOne } = await import("@/lib/db");
-    const row = await queryOne(`SELECT id FROM sheet_types WHERE name = ?`, tenSheet);
-    assert.equal(row, undefined, "không được tạo sheet copy từ dự án không thấy được");
-  },
-);
+  const { queryOne } = await import("@/lib/db");
+  const row = await queryOne(`SELECT id FROM sheet_types WHERE name = ?`, tenSheet);
+  assert.equal(row, undefined, "không được tạo sheet copy từ dự án không thấy được");
+});
 
-test(
-  "POST /api/sheets: copyFromId thuộc dự án của mình → 201, tạo thành công",
-  S,
-  async () => {
-    const a = await dungSheet("sheetCopyOk");
-    const pkgA = await taoNhom(a.sheetTypeId, "SC1");
-    await taoTask(pkgA, "SC1,01");
-    const pmA = await taoUser("pm", "sheetCopyOk", 1);
-    await dangNhapDuAn(pmA, a.projectId);
+test("POST /api/sheets: copyFromId thuộc dự án của mình → 201, tạo thành công", S, async () => {
+  const a = await dungSheet("sheetCopyOk");
+  const pkgA = await taoNhom(a.sheetTypeId, "SC1");
+  await taoTask(pkgA, "SC1,01");
+  const pmA = await taoUser("pm", "sheetCopyOk", 1);
+  await dangNhapDuAn(pmA, a.projectId);
 
-    const tenSheet = `Sheet hợp lệ ${uniq("copy")}`;
-    const { POST } = await import("@/app/api/sheets/route");
-    const res = await POST(jreq("/x", { name: tenSheet, copyFromId: a.sheetTypeId }));
-    assert.equal(res.status, 201);
-    const { copiedTasks } = await res.json();
-    assert.equal(copiedTasks, 1);
-  },
-);
+  const tenSheet = `Sheet hợp lệ ${uniq("copy")}`;
+  const { POST } = await import("@/app/api/sheets/route");
+  const res = await POST(jreq("/x", { name: tenSheet, copyFromId: a.sheetTypeId }));
+  assert.equal(res.status, 201);
+  const { copiedTasks } = await res.json();
+  assert.equal(copiedTasks, 1);
+});
 
 // ============================================================================
 // PATCH /api/sheets/:id — managerId phải thuộc đúng tổ chức
@@ -971,25 +946,29 @@ test("PATCH /api/sheets/:id: managerId thuộc tổ chức khác → 400, KHÔNG
   assert.equal(row?.managerId, null, "manager_id không bị đổi nhầm sang user tổ chức khác");
 });
 
-test("PATCH /api/sheets/:id: managerId đúng tổ chức của mình → 200, đổi thành công", S, async () => {
-  const a = await dungSheet("sheetMgrOk");
-  const userA = await taoUser("engineer", "sheetMgrOk", 1);
-  const pmA = await taoUser("pm", "sheetMgrOkPm", 1);
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "PATCH /api/sheets/:id: managerId đúng tổ chức của mình → 200, đổi thành công",
+  S,
+  async () => {
+    const a = await dungSheet("sheetMgrOk");
+    const userA = await taoUser("engineer", "sheetMgrOk", 1);
+    const pmA = await taoUser("pm", "sheetMgrOkPm", 1);
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { PATCH } = await import("@/app/api/sheets/[id]/route");
-  const res = await PATCH(jreq("/x", { managerId: userA.id }, "PATCH"), {
-    params: Promise.resolve({ id: String(a.sheetTypeId) }),
-  });
-  assert.equal(res.status, 200);
+    const { PATCH } = await import("@/app/api/sheets/[id]/route");
+    const res = await PATCH(jreq("/x", { managerId: userA.id }, "PATCH"), {
+      params: Promise.resolve({ id: String(a.sheetTypeId) }),
+    });
+    assert.equal(res.status, 200);
 
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ managerId: number | null }>(
-    `SELECT manager_id AS "managerId" FROM sheet_types WHERE id = ?`,
-    a.sheetTypeId,
-  );
-  assert.equal(row?.managerId, userA.id);
-});
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ managerId: number | null }>(
+      `SELECT manager_id AS "managerId" FROM sheet_types WHERE id = ?`,
+      a.sheetTypeId,
+    );
+    assert.equal(row?.managerId, userA.id);
+  },
+);
 
 // ============================================================================
 // PATCH /api/handover-items/:id — work_packages phải thuộc đúng dự án

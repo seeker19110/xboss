@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 import {
   MEETING_ACTION_STATUSES,
   getMeetingAction,
@@ -65,6 +66,14 @@ export async function PATCH(
       user.orgId,
     );
     if (!u) return NextResponse.json({ error: "Người được giao không tồn tại" }, { status: 422 });
+  }
+  if (input.taskId != null) {
+    // Cách ly dự án (Đợt 6) — nhánh PATCH này trước đây ghi thẳng `task_id` mà KHÔNG kiểm gì,
+    // trong khi POST cùng cụm (app/api/meetings/[id]/actions/route.ts) đã đối chiếu dự án.
+    // Id task là số nguyên tuần tự nên đoán được: thiếu kiểm là gắn được task dự án khác vào
+    // việc sau họp. Cùng khuôn, cùng mã lỗi với route anh em.
+    if ((await taskProjectId(input.taskId)) !== projectId)
+      return NextResponse.json({ error: "Task liên kết không tồn tại" }, { status: 422 });
   }
 
   await run(
