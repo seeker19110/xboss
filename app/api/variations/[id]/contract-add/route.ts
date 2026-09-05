@@ -3,6 +3,7 @@ import { insertId, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getVariation } from "@/lib/tai-chinh/vo";
+import { isValidDateISO } from "@/lib/nen/date";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,8 @@ export async function POST(
   if (!Number.isInteger(contractId))
     return NextResponse.json({ error: "Thiếu hợp đồng" }, { status: 422 });
   if (!addendaCode) return NextResponse.json({ error: "Thiếu mã phụ lục" }, { status: 422 });
+  if (signedDate && !isValidDateISO(signedDate))
+    return NextResponse.json({ error: "Ngày ký không đúng định dạng YYYY-MM-DD" }, { status: 422 });
 
   const projectId = await getCurrentProjectId(user);
   const vo = projectId != null ? await getVariation(id, projectId) : undefined;

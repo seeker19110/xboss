@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { isValidDateISO } from "@/lib/nen/date";
 
 export const dynamic = "force-dynamic";
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // POST /api/contracts/:id/addenda — thêm phụ lục (Admin/PM). Giá trị âm được
 // (phụ lục giảm giá trị HĐ). UNIQUE(contract_id, code) chống trùng số phụ lục.
@@ -45,7 +44,7 @@ export async function POST(
     return NextResponse.json({ error: "Giá trị phụ lục không hợp lệ" }, { status: 422 });
   const signedDate =
     typeof body?.signedDate === "string" && body.signedDate.trim() ? body.signedDate.trim() : null;
-  if (signedDate && !DATE_RE.test(signedDate))
+  if (signedDate && !isValidDateISO(signedDate))
     return NextResponse.json({ error: "Ngày ký không đúng định dạng YYYY-MM-DD" }, { status: 422 });
   const title = typeof body?.title === "string" ? body.title.trim() || null : null;
   const note = typeof body?.note === "string" ? body.note.trim() || null : null;
