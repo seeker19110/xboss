@@ -43,7 +43,18 @@ export async function GET() {
         logo: project?.logo ?? null,
         project: { heatmapTitle: project?.heatmap_title ?? null },
       },
-      { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } },
+      {
+        headers: {
+          // Thân phản hồi giờ PHỤ THUỘC PHIÊN (cookie dự án) ở nhánh có `projectId` — để nguyên
+          // `public, s-maxage=60` thì CDN/proxy dùng chung có thể phục vụ tên/logo dự án của
+          // user này cho user khác. App deploy sau CDN (Vercel) nên đây là rủi ro thật, không
+          // phải lý thuyết. Chỉ nhánh fallback ẩn danh (dùng cho trang /login) mới cache được.
+          "Cache-Control":
+            projectId != null
+              ? "private, no-store"
+              : "public, s-maxage=60, stale-while-revalidate=300",
+        },
+      },
     );
   } catch {
     return NextResponse.json({ name: null, code: null, tower: null, project: null });
@@ -75,19 +86,11 @@ export async function PATCH(req: Request) {
         { error: "Logo không hợp lệ (chỉ nhận ảnh ≤ 2MB)" },
         { status: 400 },
       );
-    await run(
-      `UPDATE projects SET logo = ? WHERE id = ?`,
-      logo,
-      projectId,
-    );
+    await run(`UPDATE projects SET logo = ? WHERE id = ?`, logo, projectId);
     return NextResponse.json({ ok: true });
   }
 
   const { heatmapTitle } = body;
-  await run(
-    `UPDATE projects SET heatmap_title = ? WHERE id = ?`,
-    heatmapTitle ?? null,
-    projectId,
-  );
+  await run(`UPDATE projects SET heatmap_title = ? WHERE id = ?`, heatmapTitle ?? null, projectId);
   return NextResponse.json({ ok: true });
 }

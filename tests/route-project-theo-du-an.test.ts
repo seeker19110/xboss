@@ -67,30 +67,34 @@ async function docDuAn(id: number): Promise<{ heatmap_title: string | null; logo
 
 // ── PATCH ────────────────────────────────────────────────────────────────────────────────
 
-test("PATCH /api/project: PM dự án A đổi heatmapTitle → chỉ dòng A đổi, dòng B nguyên vẹn", S, async () => {
-  // B tạo TRƯỚC A nên id(B) < id(A): trên code chưa vá, UPDATE rơi vào dự án id nhỏ nhất
-  // toàn DB (không bao giờ là A) ⇒ ca này ĐỎ.
-  const duAnB = await taoDuAn("B");
-  const duAnA = await taoDuAn("A");
-  const truocB = await docDuAn(duAnB);
-  const pm = await taoUser("pm", "pmA");
-  await dangNhapDuAn(pm, duAnA);
+test(
+  "PATCH /api/project: PM dự án A đổi heatmapTitle → chỉ dòng A đổi, dòng B nguyên vẹn",
+  S,
+  async () => {
+    // B tạo TRƯỚC A nên id(B) < id(A): trên code chưa vá, UPDATE rơi vào dự án id nhỏ nhất
+    // toàn DB (không bao giờ là A) ⇒ ca này ĐỎ.
+    const duAnB = await taoDuAn("B");
+    const duAnA = await taoDuAn("A");
+    const truocB = await docDuAn(duAnB);
+    const pm = await taoUser("pm", "pmA");
+    await dangNhapDuAn(pm, duAnA);
 
-  const { PATCH } = await import("@/app/api/project/route");
-  const tieuDe = `Tiêu đề mới ${uniq("t")}`;
-  const res = await PATCH(
-    new Request("http://localhost/api/project", {
-      method: "PATCH",
-      body: JSON.stringify({ heatmapTitle: tieuDe }),
-    }),
-  );
-  assert.equal(res.status, 200);
+    const { PATCH } = await import("@/app/api/project/route");
+    const tieuDe = `Tiêu đề mới ${uniq("t")}`;
+    const res = await PATCH(
+      new Request("http://localhost/api/project", {
+        method: "PATCH",
+        body: JSON.stringify({ heatmapTitle: tieuDe }),
+      }),
+    );
+    assert.equal(res.status, 200);
 
-  const sauA = await docDuAn(duAnA);
-  const sauB = await docDuAn(duAnB);
-  assert.equal(sauA.heatmap_title, tieuDe);
-  assert.equal(sauB.heatmap_title, truocB.heatmap_title);
-});
+    const sauA = await docDuAn(duAnA);
+    const sauB = await docDuAn(duAnB);
+    assert.equal(sauA.heatmap_title, tieuDe);
+    assert.equal(sauB.heatmap_title, truocB.heatmap_title);
+  },
+);
 
 test("PATCH /api/project: PM dự án A đổi logo → chỉ dòng A đổi", S, async () => {
   const duAnB = await taoDuAn("B2");
@@ -176,47 +180,80 @@ test("PATCH /api/project: sai vai trò (engineer) → 403", S, async () => {
 
 // ── GET ──────────────────────────────────────────────────────────────────────────────────
 
-test("GET /api/project: KHÔNG phiên → vẫn 200, trả dự án đầu tiên (fallback cho /login)", S, async () => {
-  await taoDuAn("Get1");
-  dangXuat();
-  const { queryOne } = await import("@/lib/db");
-  const dau = await queryOne<{ name: string }>(`SELECT name FROM projects ORDER BY id LIMIT 1`);
+test(
+  "GET /api/project: KHÔNG phiên → vẫn 200, trả dự án đầu tiên (fallback cho /login)",
+  S,
+  async () => {
+    await taoDuAn("Get1");
+    dangXuat();
+    const { queryOne } = await import("@/lib/db");
+    const dau = await queryOne<{ name: string }>(`SELECT name FROM projects ORDER BY id LIMIT 1`);
 
-  const { GET } = await import("@/app/api/project/route");
-  const res = await GET();
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.name, dau!.name);
-});
+    const { GET } = await import("@/app/api/project/route");
+    const res = await GET();
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.name, dau!.name);
+    // Nhánh ẩn danh KHÔNG phụ thuộc phiên nên vẫn được phép cache dùng chung.
+    assert.match(res.headers.get("cache-control") ?? "", /public/);
+  },
+);
 
-test("GET /api/project: có phiên đang chọn dự án B → trả tên/mã của B, không phải A", S, async () => {
-  const duAnA = await taoDuAn("GetA");
-  const duAnB = await taoDuAn("GetB");
-  const pm = await taoUser("pm", "pmGet");
-  await dangNhapDuAn(pm, duAnA); // gán cả A và B cho user, rồi chọn B
-  await dangNhapDuAn(pm, duAnB);
+test(
+  "GET /api/project: đường CÓ phiên không được cache dùng chung (chống rò xuyên user qua CDN)",
+  S,
+  async () => {
+    const duAn = await taoDuAn("GetCache");
+    const pm = await taoUser("pm");
+    await dangNhapDuAn(pm, duAn);
 
-  const { queryOne } = await import("@/lib/db");
-  const b = await queryOne<{ name: string; code: string | null; heatmap_title: string | null }>(
-    `SELECT name, code, heatmap_title FROM projects WHERE id = ?`,
-    duAnB,
-  );
+    const { GET } = await import("@/app/api/project/route");
+    const res = await GET();
+    assert.equal(res.status, 200);
+    // Thân phản hồi phụ thuộc cookie dự án ⇒ tuyệt đối không được `public`, nếu không CDN
+    // (app deploy trên Vercel) có thể phục vụ tên/logo dự án của user này cho user khác.
+    const cc = res.headers.get("cache-control") ?? "";
+    assert.doesNotMatch(cc, /public/, `Cache-Control phải riêng tư khi có phiên, đang là: ${cc}`);
+    assert.match(cc, /private|no-store/);
+  },
+);
 
-  const { GET } = await import("@/app/api/project/route");
-  const body = await (await GET()).json();
-  assert.equal(body.name, b!.name);
-  assert.equal(body.code, b!.code);
-  assert.equal(body.project.heatmapTitle, b!.heatmap_title);
-});
+test(
+  "GET /api/project: có phiên đang chọn dự án B → trả tên/mã của B, không phải A",
+  S,
+  async () => {
+    const duAnA = await taoDuAn("GetA");
+    const duAnB = await taoDuAn("GetB");
+    const pm = await taoUser("pm", "pmGet");
+    await dangNhapDuAn(pm, duAnA); // gán cả A và B cho user, rồi chọn B
+    await dangNhapDuAn(pm, duAnB);
 
-test("GET /api/project: có phiên nhưng chưa chọn được dự án → fallback dự án đầu tiên", S, async () => {
-  const orgKhac = await taoTem();
-  const pm = await taoUser("pm", "pmGetOrg", orgKhac);
-  dangNhap(pm); // không cookie dự án
-  const { queryOne } = await import("@/lib/db");
-  const dau = await queryOne<{ name: string }>(`SELECT name FROM projects ORDER BY id LIMIT 1`);
+    const { queryOne } = await import("@/lib/db");
+    const b = await queryOne<{ name: string; code: string | null; heatmap_title: string | null }>(
+      `SELECT name, code, heatmap_title FROM projects WHERE id = ?`,
+      duAnB,
+    );
 
-  const { GET } = await import("@/app/api/project/route");
-  const body = await (await GET()).json();
-  assert.equal(body.name, dau!.name);
-});
+    const { GET } = await import("@/app/api/project/route");
+    const body = await (await GET()).json();
+    assert.equal(body.name, b!.name);
+    assert.equal(body.code, b!.code);
+    assert.equal(body.project.heatmapTitle, b!.heatmap_title);
+  },
+);
+
+test(
+  "GET /api/project: có phiên nhưng chưa chọn được dự án → fallback dự án đầu tiên",
+  S,
+  async () => {
+    const orgKhac = await taoTem();
+    const pm = await taoUser("pm", "pmGetOrg", orgKhac);
+    dangNhap(pm); // không cookie dự án
+    const { queryOne } = await import("@/lib/db");
+    const dau = await queryOne<{ name: string }>(`SELECT name FROM projects ORDER BY id LIMIT 1`);
+
+    const { GET } = await import("@/app/api/project/route");
+    const body = await (await GET()).json();
+    assert.equal(body.name, dau!.name);
+  },
+);
