@@ -11,6 +11,9 @@ import { NextRequest } from "next/server";
 // app/api/work-fronts/[id]/route.ts). Mỗi route có cả ca xuyên dự án (404 + dữ liệu dự án B
 // không đổi) lẫn ca hoạt động đúng trong dự án của mình:
 //   - app/api/workpackages/route.ts                              (POST tạo nhóm)
+//   - app/api/workpackages/[id]/route.ts                         (PATCH/DELETE sửa/xoá nhóm —
+//     bổ sung sau khi coordinator tự đọc lại code: lời gọi getCurrentProjectId ở route này chỉ
+//     phục vụ validateCustom body.custom, KHÔNG kiểm quyền/dự án — cùng lớp lỗi với 8 route kia)
 //   - app/api/workpackages/[id]/tasks/route.ts                   (POST tạo task dưới nhóm)
 //   - app/api/workpackages/[id]/move/route.ts                    (PATCH đổi thứ tự nhóm)
 //   - app/api/workpackages/[id]/copy/route.ts                    (POST copy nhóm)
@@ -150,6 +153,85 @@ test("POST /api/workpackages: đúng dự án của mình → 201, tạo thành 
     jreq("/api/workpackages", { sheetTypeId: a.sheetTypeId, code: "OK1", name: "Nhóm hợp lệ" }),
   );
   assert.equal(res.status, 201);
+});
+
+// ============================================================================
+// PATCH/DELETE /api/workpackages/:id
+// ============================================================================
+
+test("PATCH /api/workpackages/:id: nhóm thuộc dự án khác → 404, tên KHÔNG đổi", S, async () => {
+  const a = await dungSheet("wpIdPatchA");
+  const b = await dungSheet("wpIdPatchB");
+  const pkgB = await taoNhom(b.sheetTypeId, "B1");
+  const pmA = await taoUser("pm", "wpIdPatchA");
+  await dangNhapDuAn(pmA, a.projectId);
+
+  const { queryOne } = await import("@/lib/db");
+  const before = await queryOne<{ name: string }>(
+    `SELECT name FROM work_packages WHERE id = ?`,
+    pkgB,
+  );
+
+  const { PATCH } = await import("@/app/api/workpackages/[id]/route");
+  const res = await PATCH(jreq("/x", { name: "Tên hack" }, "PATCH"), {
+    params: Promise.resolve({ id: String(pkgB) }),
+  });
+  assert.equal(res.status, 404);
+
+  const after = await queryOne<{ name: string }>(
+    `SELECT name FROM work_packages WHERE id = ?`,
+    pkgB,
+  );
+  assert.equal(after!.name, before!.name, "tên nhóm dự án B không được đổi");
+});
+
+test("PATCH /api/workpackages/:id: đúng dự án của mình → 200, đổi tên thành công", S, async () => {
+  const a = await dungSheet("wpIdPatchOk");
+  const pkgA = await taoNhom(a.sheetTypeId, "A1");
+  const pmA = await taoUser("pm", "wpIdPatchOk");
+  await dangNhapDuAn(pmA, a.projectId);
+
+  const { PATCH } = await import("@/app/api/workpackages/[id]/route");
+  const res = await PATCH(jreq("/x", { name: "Tên đã sửa" }, "PATCH"), {
+    params: Promise.resolve({ id: String(pkgA) }),
+  });
+  assert.equal(res.status, 200);
+  const { workPackage } = await res.json();
+  assert.equal(workPackage.name, "Tên đã sửa");
+});
+
+test("DELETE /api/workpackages/:id: nhóm thuộc dự án khác → 404, KHÔNG bị xoá", S, async () => {
+  const a = await dungSheet("wpIdDelA");
+  const b = await dungSheet("wpIdDelB");
+  const pkgB = await taoNhom(b.sheetTypeId, "B1");
+  const pmA = await taoUser("pm", "wpIdDelA");
+  await dangNhapDuAn(pmA, a.projectId);
+
+  const { DELETE } = await import("@/app/api/workpackages/[id]/route");
+  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+    params: Promise.resolve({ id: String(pkgB) }),
+  });
+  assert.equal(res.status, 404);
+
+  const { queryOne } = await import("@/lib/db");
+  const still = await queryOne(`SELECT id FROM work_packages WHERE id = ?`, pkgB);
+  assert.ok(still, "nhóm dự án B vẫn còn nguyên");
+});
+
+test("DELETE /api/workpackages/:id: đúng dự án của mình → 200, xoá thành công", S, async () => {
+  const a = await dungSheet("wpIdDelOk");
+  const pkgA = await taoNhom(a.sheetTypeId, "A1");
+  const pmA = await taoUser("pm", "wpIdDelOk");
+  await dangNhapDuAn(pmA, a.projectId);
+
+  const { DELETE } = await import("@/app/api/workpackages/[id]/route");
+  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+    params: Promise.resolve({ id: String(pkgA) }),
+  });
+  assert.equal(res.status, 200);
+  const { queryOne } = await import("@/lib/db");
+  const still = await queryOne(`SELECT id FROM work_packages WHERE id = ?`, pkgA);
+  assert.equal(still, undefined);
 });
 
 // ============================================================================
