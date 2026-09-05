@@ -3,8 +3,23 @@ import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchPackage } from "@/lib/bao-mat/auth";
 import { newBbntFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
 import { storagePut, storageGet, storageDelete } from "@/lib/nen/storage";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
+
+// Dự án của 1 nhóm việc — suy qua sheet_type_id → towers.project_id (vá W0). canTouchPackage
+// chỉ kiểm subcon có được GÁN nhóm không, không kiểm dự án — Admin/PM vẫn cần chặn riêng.
+async function packageProjectId(id: number): Promise<number | null> {
+  const row = await queryOne<{ projectId: number | null }>(
+    `SELECT tw.project_id AS "projectId"
+       FROM work_packages wp
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       LEFT JOIN towers tw ON tw.id = st.tower_id
+      WHERE wp.id = ?`,
+    id,
+  );
+  return row?.projectId ?? null;
+}
 
 type WP = {
   id: number;
@@ -32,6 +47,10 @@ export async function GET(
     id,
   );
   if (!wp) return NextResponse.json({ error: "Không tìm thấy nhóm" }, { status: 404 });
+  const visible = await visibleProjectIds(user);
+  const pid = await packageProjectId(id);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Không tìm thấy nhóm" }, { status: 404 });
   if (!(await canTouchPackage(user, id)))
     return NextResponse.json(
       { error: "Bạn chỉ được thao tác trên nhóm được giao cho mình" },
@@ -88,6 +107,10 @@ export async function POST(
     id,
   );
   if (!wp) return NextResponse.json({ error: "Không tìm thấy nhóm" }, { status: 404 });
+  const visiblePost = await visibleProjectIds(user);
+  const pidPost = await packageProjectId(id);
+  if (pidPost == null || !visiblePost.includes(pidPost))
+    return NextResponse.json({ error: "Không tìm thấy nhóm" }, { status: 404 });
   if (!(await canTouchPackage(user, id)))
     return NextResponse.json(
       { error: "Bạn chỉ được thao tác trên nhóm được giao cho mình" },
@@ -130,16 +153,24 @@ export async function DELETE(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
-  if (!(await canTouchPackage(user, id)))
-    return NextResponse.json(
-      { error: "Bạn chỉ được thao tác trên nhóm được giao cho mình" },
-      { status: 403 },
-    );
 
   const wp = await queryOne<{ bbntFileName: string | null }>(
     `SELECT bbnt_file_name AS "bbntFileName" FROM work_packages WHERE id = ?`,
     id,
   );
+  // Nhóm THẬT SỰ không tồn tại: giữ nguyên hành vi cũ (xoá idempotent, không lỗi). Nhóm CÓ tồn
+  // tại nhưng thuộc dự án khác (vá W0): không được lộ/xoá — 404 như đã tồn tại được.
+  if (wp) {
+    const visibleDel = await visibleProjectIds(user);
+    const pidDel = await packageProjectId(id);
+    if (pidDel == null || !visibleDel.includes(pidDel))
+      return NextResponse.json({ error: "Không tìm thấy nhóm" }, { status: 404 });
+  }
+  if (!(await canTouchPackage(user, id)))
+    return NextResponse.json(
+      { error: "Bạn chỉ được thao tác trên nhóm được giao cho mình" },
+      { status: 403 },
+    );
 
   await run(
     `UPDATE work_packages SET bbnt_url = NULL, bbnt_file_name = NULL, bbnt_original_name = NULL WHERE id = ?`,

@@ -4,8 +4,23 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
 import { inheritedAssigneeFor } from "@/lib/tien-do/assignments";
 import { recomputePackage } from "@/lib/tien-do/recompute";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
+
+// Dự án của 1 nhóm việc — suy qua sheet_type_id → towers.project_id (vá W0, cùng khuôn
+// packageProjectId ở packages/:id/dependencies).
+async function packageProjectId(id: number): Promise<number | null> {
+  const row = await queryOne<{ projectId: number | null }>(
+    `SELECT tw.project_id AS "projectId"
+       FROM work_packages wp
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       LEFT JOIN towers tw ON tw.id = st.tower_id
+      WHERE wp.id = ?`,
+    id,
+  );
+  return row?.projectId ?? null;
+}
 
 // POST /api/workpackages/:id/tasks
 // body: { code, name, boqCode?, afterId? }
@@ -25,6 +40,12 @@ export async function POST(
 
   const pkg = await queryOne<{ id: number }>(`SELECT id FROM work_packages WHERE id = ?`, pkgId);
   if (!pkg) return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
+
+  // Chống tạo task xuyên dự án (vá W0).
+  const visible = await visibleProjectIds(user);
+  const pid = await packageProjectId(pkgId);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
   const code = String(body.code ?? "").trim();

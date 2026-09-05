@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
 import { getCurrentUser, canTouchPackage } from "@/lib/bao-mat/auth";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
+
+// Dự án của 1 nhóm việc — suy qua sheet_type_id → towers.project_id (vá W0). canTouchPackage
+// chỉ kiểm subcon có được GÁN nhóm không, không kiểm dự án — Admin/PM vẫn cần chặn riêng.
+async function packageProjectId(id: number): Promise<number | null> {
+  const row = await queryOne<{ projectId: number | null }>(
+    `SELECT tw.project_id AS "projectId"
+       FROM work_packages wp
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       LEFT JOIN towers tw ON tw.id = st.tower_id
+      WHERE wp.id = ?`,
+    id,
+  );
+  return row?.projectId ?? null;
+}
 
 type TaskRow = {
   id: number;
@@ -49,6 +64,10 @@ export async function GET(
 
   const pkgId = parseInt(params.id);
   if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+  const visible = await visibleProjectIds(user);
+  const pid = await packageProjectId(pkgId);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Không tìm thấy nhóm" }, { status: 404 });
   if (!(await canTouchPackage(user, pkgId)))
     return NextResponse.json({ error: "Không có quyền xem nhóm công việc này" }, { status: 403 });
 

@@ -2,8 +2,22 @@
 import { query, queryOne, insertId, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
+
+// Dự án của 1 sheet — suy qua sheet_types.tower_id → towers.project_id (vá W0, cùng khuôn
+// packageProjectId ở packages/:id/dependencies). LEFT JOIN để sheet chưa gán tower ra null.
+async function sheetTypeProjectId(id: number): Promise<number | null> {
+  const row = await queryOne<{ projectId: number | null }>(
+    `SELECT tw.project_id AS "projectId"
+       FROM sheet_types st
+       LEFT JOIN towers tw ON tw.id = st.tower_id
+      WHERE st.id = ?`,
+    id,
+  );
+  return row?.projectId ?? null;
+}
 
 // POST /api/workpackages
 // body: { sheetTypeId, code, name, floorLabel?, boqCode?, afterId? }
@@ -23,6 +37,12 @@ export async function POST(req: NextRequest) {
   const name = String(body.name ?? "").trim();
   if (isNaN(sheetTypeId) || !code || !name)
     return NextResponse.json({ error: "Thiáº¿u sheetTypeId / code / name" }, { status: 400 });
+
+  // Chống tạo xuyên dự án: sheetTypeId phải thuộc dự án user thấy được (vá W0).
+  const visible = await visibleProjectIds(user);
+  const sheetProjectId = await sheetTypeProjectId(sheetTypeId);
+  if (sheetProjectId == null || !visible.includes(sheetProjectId))
+    return NextResponse.json({ error: "sheetTypeId không tồn tại" }, { status: 404 });
 
   // Kiá»ƒm trÃ¹ng code trong sheet.
   const dup = await queryOne(

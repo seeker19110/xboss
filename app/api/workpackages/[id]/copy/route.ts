@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
+
+// Dự án của 1 sheet — suy qua sheet_types.tower_id → towers.project_id (vá W0).
+async function sheetTypeProjectId(id: number): Promise<number | null> {
+  const row = await queryOne<{ projectId: number | null }>(
+    `SELECT tw.project_id AS "projectId"
+       FROM sheet_types st
+       LEFT JOIN towers tw ON tw.id = st.tower_id
+      WHERE st.id = ?`,
+    id,
+  );
+  return row?.projectId ?? null;
+}
 
 // POST /api/workpackages/:id/copy
 // Tạo bản sao nhóm cùng tất cả tasks và cấu trúc cột (checkbox reset về unchecked).
@@ -38,6 +51,12 @@ export async function POST(
     srcId,
   );
   if (!src) return NextResponse.json({ error: "Nhóm gốc không tồn tại" }, { status: 404 });
+
+  // Chống sao chép xuyên dự án (vá W0).
+  const visible = await visibleProjectIds(user);
+  const srcPid = await sheetTypeProjectId(src.sheet_type_id);
+  if (srcPid == null || !visible.includes(srcPid))
+    return NextResponse.json({ error: "Nhóm gốc không tồn tại" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
   const newCode = String(body.code ?? `${src.code}_copy`).trim();
