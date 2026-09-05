@@ -46,7 +46,7 @@ chỉ còn **8/451 route** chưa từng được test thực thi chạm tới, n
 
 ---
 
-# Pha 1 — 4 việc song song
+# Pha 1 — 6 việc song song
 
 ## Việc A — Kill switch của Safe Execution Engine: làm cho lệnh huỷ có tính bền — `route: complex`
 
@@ -242,6 +242,104 @@ mục 2 — chúng là tiêu chí chấp nhận cứng.
 
 ---
 
+## Việc E — Hạ Gate 4 của Smart IPC thành cảnh báo (không còn chặn tự động thông qua) — `route: complex`
+
+**Quyết định nghiệp vụ của chủ dự án (2026-09-05):** bỏ Gate 4 khỏi **điều kiện tự động thông qua**,
+vẫn hiển thị số liệu cho người duyệt xem. Ba cổng còn lại quyết định auto-approve.
+
+**Nền (đã đọc code xác nhận):** `lib/ky-thuat/engineering-smart-ipc.ts`.
+
+- `fetchGate4Context` (dòng ~241) đối soát kho bằng `SELECT SUM(qty_used) FROM materials WHERE
+project_id = ? AND boq_code = ?` trong khi hạn mức lấy từ `boq_items WHERE lower(code) = lower(?)`.
+  `migrations/0029_boq_codes.sql` gắn trigger `boq_codes_sync` lên **cả 4 bảng** `tasks`,
+  `work_packages`, `materials`, `boq_items` với một registry `boq_codes` khoá chính là `code` ⇒ hai
+  bảng KHÔNG BAO GIỜ cùng giữ một mã (trigger `RAISE EXCEPTION ... 23505`). Vậy `warehouseUsedQty`
+  **cấu trúc mà nói luôn bằng 0**, không phải "chưa có dữ liệu".
+- `danhGia...` (dòng ~351–365): `gate4` ghép vào `gates` rồi `allGatesCleared = gates.every(passed)`.
+
+**Yêu cầu:**
+
+1. `allGatesCleared` tính từ **gate1..gate3**. Gate 4 vẫn được tính và vẫn trả về đầy đủ trong kết
+   quả (status + reason) để UI hiển thị, nhưng không tham gia quyết định thông qua.
+2. `blockedGateReasons` chỉ liệt kê cổng **chặn** (1–3). Gate 4 nếu không đạt thì đưa vào một trường
+   **riêng** mang nghĩa cảnh báo (worker tự đặt tên, tiếng Việt hoặc bám phong cách file) — không
+   trộn vào danh sách lý do chặn, vì người duyệt sẽ hiểu nhầm là hồ sơ bị chặn vì kho.
+3. **Không bịa số 0.** Vì liên kết kho là bất khả thi về cấu trúc, `warehouseUsedQty` phải trả `null`
+   kèm lý do rõ ràng bằng tiếng Việt (khuôn `thieuDuLieu` trong `lib/hien-truong/subcon-metrics.ts`
+   là mẫu tốt: chỉ số nào chưa có nguồn thì trả `null` kèm lý do, tuyệt đối không thay bằng mặc
+   định). Gate 4 khi thiếu dữ liệu kho → `status: "khong_du_du_lieu"` (đã có sẵn trong enum
+   `SmartIpcGateStatus`), KHÔNG phải `"failed"` — "failed" nói sai rằng hồ sơ có vấn đề.
+4. Cột DB `gate4_quad_reconcile_passed` và `all_gates_cleared` vẫn ghi như cũ nhưng **ý nghĩa của
+   `all_gates_cleared` đổi** (giờ là 3 cổng). Thêm comment giải thích ngay tại chỗ ghi; **không**
+   thêm migration, **không** đổi tên cột.
+5. Kiểm UI: `app/engineering/**` chỗ nào hiển thị 4 cổng phải nói rõ gate 4 là **cảnh báo, không
+   chặn** — tìm bằng `grep -rn "gate4\|allGatesCleared" app/`.
+
+**Ghi vào báo cáo (bắt buộc, để phiên chính đưa lên `PROGRESS.md`):** nửa "khối lượng ≤ hạn mức BOQ"
+của gate 4 (`claimedQty <= approvedBoqQty`) **vốn chạy đúng** và là một chốt kiểm soát tiền thật;
+theo quyết định trên nó cũng trở thành cảnh báo. Chỉ nửa đối soát kho là bất khả thi. Ghi rõ hệ quả
+này, đừng lặng lẽ bỏ qua.
+
+**Ranh giới được phép quyết:** tên trường cảnh báo mới; cách diễn đạt lý do tiếng Việt; có tách
+`fetchGate4Context` thành hàm nhỏ hơn hay không.
+
+**Test:** bổ sung vào file test sẵn có của Smart IPC (tìm bằng `grep -rl smart-ipc tests/`). Tối
+thiểu: hồ sơ đạt gate 1–3 nhưng gate 4 không đủ dữ liệu → **`allGatesCleared === true`** (ca này ĐỎ
+trên code hiện tại — chạy trước khi sửa để chứng minh); gate 4 trả `warehouseUsedQty === null` +
+`status === "khong_du_du_lieu"` + có lý do; một cổng trong 1–3 hỏng → vẫn chặn như cũ.
+
+**Tiêu chí chấp nhận:** các ca trên xanh; chạy lại toàn bộ file test nhắc tới smart-ipc; `typecheck`
+
+- `eslint` xanh; báo cáo có output chứng minh ca số 1 đỏ trước khi sửa.
+
+## Việc F — Chấm điểm thầu phụ trên 3 chỉ số có dữ liệu thật — `route: spec`
+
+**Quyết định nghiệp vụ của chủ dự án (2026-09-05):** bỏ hẳn `ncrIncidentCount` và `costVarianceRate`
+khỏi công thức, chuẩn hoá lại trọng số cho 3 chỉ số đang có dữ liệu thật. Không thêm migration.
+
+**Nền (đã đọc code xác nhận):** `lib/ky-thuat/engineering-subcon-ai.ts`
+`computeSubcontractorTrustScore` hiện dùng trọng số: tiến độ 30%, chất lượng BBNT 25%, NCR 20%,
+HSE 15%, chi phí 10%. Hai chỉ số bị bỏ chiếm 30%; 3 chỉ số còn lại chiếm 70%.
+
+**Trọng số MỚI (chuẩn hoá theo tỷ lệ, chốt sẵn — không tự đổi):**
+
+- `scheduleScore` (từ `onTimeCompletionRate`): **30/70 = 0,428571…**
+- `qualityScore` (từ `bbntPassRate`): **25/70 = 0,357142…**
+- `hseScore` (từ `hseSafetyScore`): **15/70 = 0,214285…**
+
+Dùng phân số `30/70`, `25/70`, `15/70` trong code (đừng gõ số thập phân cụt), giữ nguyên
+`.toFixed(2)` như hiện tại. Tổng đúng bằng 1 nên thang điểm 0–100 không đổi.
+
+**Điểm chạm code (đủ, đã liệt kê bằng `grep -rn "ncrIncidentCount\|costVarianceRate"`):**
+
+- `lib/ky-thuat/engineering-subcon-ai.ts` — bỏ 2 trường khỏi `SubconMetricsInput`, bỏ
+  `ncrPenaltyScore`/`costControlScore` khỏi công thức và khỏi `componentScores`.
+- `lib/hien-truong/subcon-metrics.ts` — bỏ 2 trường khỏi `ChiSoThauPhu` và bỏ 2 mục tương ứng khỏi
+  `thieuDuLieu` (chúng không còn là chỉ số thiếu, mà là chỉ số **không dùng nữa**). Giữ nguyên cơ
+  chế `thieuDuLieu` cho 3 chỉ số còn lại khi hồ sơ chưa gắn `supplier_id` — đó vẫn là thiếu dữ liệu thật.
+- `app/api/engineering/subcon-ai/evaluate/route.ts` — điều kiện trả **422** (dòng ~56) hiện dựa trên
+  việc 2 chỉ số kia `null`; sau thay đổi, 422 chỉ còn đúng khi **3 chỉ số còn lại** thiếu dữ liệu
+  (hồ sơ chưa gắn `supplier_id`, hoặc chưa có kỳ đánh giá nào). Đọc kỹ điều kiện hiện tại rồi sửa
+  cho khớp — **đừng bỏ hẳn 422**, nó vẫn đúng cho trường hợp hồ sơ trống.
+- `app/api/engineering/subcon-ai/recommend-shortlist/route.ts` và
+  `app/api/engineering/subcon-ai/scores/route.ts` — bỏ chỗ truyền/mặc định 2 chỉ số.
+- `app/engineering/subcon-ai/page.tsx` — bỏ 2 chỉ số khỏi UI; phần mô tả trọng số (nếu có hiển thị)
+  cập nhật theo trọng số mới. Tuân thủ mục "Thiết kế giao diện (UI/UX)" của `CLAUDE.md`
+  (không hardcode hex, không dùng biến thể `dark:`, dùng component trong `app/components/ui/`).
+- `tests/engineering-subcon-ai.test.ts` — cập nhật mọi ca khẳng định điểm số/thành phần. **Tính lại
+  giá trị kỳ vọng bằng tay theo trọng số mới**, đừng chép số máy in ra.
+- Comment đầu file `lib/hien-truong/subcon-metrics.ts` (dòng 1–10) đang mô tả 5 chỉ số — cập nhật.
+
+**Test bổ sung:** ca chứng minh `POST /api/engineering/subcon-ai/evaluate` với hồ sơ đã gắn
+`supplier_id` + có kỳ đánh giá → **200 kèm `trustScore` tính từ 3 chỉ số** (trước đây luôn 422; đây
+là ca chứng minh tính năng chạy được lần đầu — chạy trên code cũ trước để thấy 422). Và ca hồ sơ
+chưa gắn `supplier_id` → vẫn 422.
+
+**Tiêu chí chấp nhận:** toàn bộ `tests/engineering-subcon-ai.test.ts` xanh; ca 200 mới xanh (kèm
+output chứng minh nó ra 422 trên code cũ); `typecheck` + `eslint` + `npm run check:lib-layers` xanh.
+
+---
+
 # Pha 2 — sau khi Pha 1 xong
 
 `reviewer` soát diff từng việc (skill `code-review`). **Yêu cầu bổ sung từ bài học Đợt 5:** với Việc
@@ -253,10 +351,12 @@ Sau đó phiên chính: chạy `npm run check:coverage` đầy đủ trên Node 
 
 ---
 
-# NGOÀI phạm vi Đợt 6 — chờ người dùng chốt nghiệp vụ
+# Phân tích nền của Việc E và Việc F (giữ lại để đối chiếu)
 
-Hai mục còn lại của "Ghi nhận, chưa sửa" **không** đưa vào kế hoạch này vì cần quyết định nghiệp vụ
-của chủ dự án, không phải quyết định kỹ thuật (luật cứng `CLAUDE.md`: thiếu đặc tả thì HỎI, không đoán):
+Hai mục dưới đây ban đầu để ngoài phạm vi vì cần quyết định nghiệp vụ, không phải quyết định kỹ
+thuật (luật cứng `CLAUDE.md`: thiếu đặc tả thì HỎI, không đoán). **Chủ dự án đã chốt ngày
+2026-09-05**, nên cả hai đã vào kế hoạch thành Việc E và Việc F ở trên. Giữ lại phần phân tích nền
+dưới đây để đối chiếu:
 
 - **Gate 4 Smart IPC** (`lib/ky-thuat/engineering-smart-ipc.ts` `fetchGate4Context`): đối soát kho
   bằng `materials.boq_code = boq_items.code`, mà cả `materials` lẫn `boq_items` **đều nằm trong
