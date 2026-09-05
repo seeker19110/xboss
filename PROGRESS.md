@@ -1,5 +1,165 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Đợt 4 chiến dịch coverage — 7 cụm route phi-engineering + 2 đợt vá bảo mật (2026-09-05)
+
+Tiếp nối Đợt 1–3. Phạm vi: **304 route `app/api/**` chưa có test nào chạm tới**, đã trừ toàn bộ
+`app/api/engineering/**` (để Đợt 5). Thi hành qua mô hình 3 tầng: 7 việc song song V1–V7, mỗi việc
+1 worktree + 1 file test + 1 DB Postgres riêng; `reviewer` soát từng diff trước khi tích hợp. Hai
+việc phát sinh (V9, V10) là **vá bảo mật** do reviewer bác bỏ đánh giá "ghi nhận, chưa sửa" của
+worker — xem mục "Bài học điều phối" cuối.
+
+**9 file test mới + 2 file test cũ sửa, 1.163 ca:**
+
+| Việc | File test                 | Ca  | Route                                                      |
+| ---- | ------------------------- | --- | ---------------------------------------------------------- |
+| V1   | `route-tai-chinh-3a`      | 158 | 18 (tạm ứng/quỹ/hoá đơn/lương/thanh toán/chi phí)          |
+| V2   | `route-tai-chinh-3b`      | 184 | 22 (hợp đồng/claim/VO/đấu thầu/bảo lãnh/NCC)               |
+| V3   | `route-tien-do-3`         | 205 | 31 (giai đoạn/mặt trận/nghiệm thu tầng/phụ thuộc/lưới)     |
+| V4   | `route-hien-truong-2`     | 182 | 44 (nhân sự/huy động/môi trường/bảo hành/rủi ro/quan trắc) |
+| V5   | `route-quan-tri-2`        | 152 | 33 (API key/audit/SoD/thông báo/TOTP/dự án)                |
+| V6   | `route-vat-tu-2`          | 121 | 28 (BOQ/vật tư/mua sắm + API v1)                           |
+| V7   | `route-ho-so-bot`         | 141 | 27 (bản vẽ/hồ sơ/QC + bot Telegram-Zalo + dashboard)       |
+| V9   | `route-wbs-cach-ly-du-an` | 24  | vá cách ly dự án tầng WBS                                  |
+| V10  | `route-users-cach-ly-org` | 14  | vá cách ly tổ chức ở `/api/users/:id`                      |
+
+Tổng bộ test: **228 file / 2.253 ca → 237 file / 3.434 ca**.
+
+### 7 LỖ HỔNG CÁCH LY DỮ LIỆU (đều đã vá, đều có test khoá)
+
+Tất cả cùng MỘT khuôn: **đường đọc danh sách đã lọc đúng phạm vi, đường thao tác theo `:id` thì
+quên lọc**; id là số nguyên tuần tự nên đoán được. Ghi rõ khuôn này để đợt sau soát trước theo dấu
+hiệu đó thay vì dò từng route.
+
+1. **`/api/users/:id` PATCH+DELETE không lọc `org_id`** (V10) — nặng nhất: admin tổ chức A đoán ID
+   là **đổi vai trò, đổi mật khẩu, tắt 2FA hộ** (`disable2fa` xoá `totp_secret` + recovery codes),
+   hoặc **xoá thẳng** user tổ chức B. Chiếm quyền tài khoản xuyên tổ chức. `GET /api/users` đã lọc
+   `org_id` từ M54 GĐ1 PR2 — chỉ đường ghi bị bỏ quên.
+2. **Guard "Admin cuối cùng" đếm toàn hệ thống** (V10, phát hiện khi tự soát bản vá 1): tổ chức A
+   chỉ có 1 admin vẫn bị hạ quyền/xoá được vì tổ chức B còn admin nên `COUNT(*) > 1` — tổ chức A
+   mất sạch quyền quản trị. Nay đếm theo `org_id`. Nhánh này trong `DELETE` là **mã chết** (không
+   có đường API chạm tới, đã ghi sẵn ở `tests/route-quan-tri.test.ts`) nhưng **giữ lại** làm phòng
+   thủ chiều sâu — invariant "org không được mất admin cuối" không nên dựa vào suy luận liên-guard.
+3. **Tầng WBS: `towers/:id`, `sheets/:id`, `work-fronts/**`, `packages/:id/dependencies`,
+   `package-dependencies/:id`** (V9) — sửa/xoá được tháp, sheet, mặt bằng thi công và quan hệ phụ
+   thuộc của **dự án khác**. `GET /api/work-fronts` còn liệt kê toàn bộ mặt bằng **mọi dự án**.
+   Suy dự án qua `towers.project_id` (trực tiếp) hoặc chuỗi `sheet_type_id → tower_id →
+project_id`; dùng `LEFT JOIN` để dòng chưa gán tower ra `projectId = null` → 404, không bị mất
+   khỏi kết quả.
+4. **`/api/vo-documents/:id` GET+DELETE không so dự án** (V2) — tải/xoá được file đính kèm lệnh
+   thay đổi thiết kế của dự án khác, trong khi `contract-documents/:id`, `claim-documents/:id` đã
+   lọc đúng.
+5. **`/api/suppliers/:id/ratings` + `/summary` không lọc `org_id`** (V2, sau review) — ghi được
+   đánh giá cho NCC tổ chức khác và đọc được điểm/công nợ của họ.
+6. **`/api/admin/api-keys/:id` DELETE không lọc `org_id`** (V5) — thu hồi được API key tổ chức khác.
+7. **`/api/users/:id/revoke-sessions` không lọc `org_id`** (V5) — đăng xuất cưỡng bức user tổ chức khác.
+
+### 7 LỖI KHÁC (đều đã vá)
+
+1. **`/api/events` rò rỉ `setInterval` vĩnh viễn** (V7) — client huỷ SSE ngay lúc `check()` đầu còn
+   chờ DB thì `close()` chạy trước khi `timer` được gán, mà `close()` no-op ở lần gọi sau ⇒ **không
+   ai `clearInterval`**: một vòng lặp query DB mỗi 3s chạy mãi, giữ tiến trình sống vô hạn. Lộ ra
+   đúng vì test SSE gọi `body.cancel()` ngay sau `GET` — không có bug này thì `node --test` không
+   bao giờ thoát.
+2. **Validate ngày chỉ kiểm HÌNH DẠNG, không kiểm ngày có thật** — `2026-02-30` lọt validate rồi
+   Postgres ném `22008`, route trả **500 thay vì 422**. 4 module `lib/hien-truong/` (V4) +
+   `contracts/:id/addenda` (V2); `variations/:id/contract-add` thì **không validate gì cả**. Nay
+   đều dùng `isValidDateISO` — đúng lớp lỗi đã vá ở Đợt 2 cho `kickoff/environment/hr/insurance`.
+3. **`/api/design-changes/:id/decide` ép cứng mọi lỗi thành 409** (V7) — kể cả "không tìm thấy"
+   (id sai hoặc thuộc dự án khác). Nay 404/409 tách đúng, cùng khuôn `proposals/:id/decide`.
+4. **SSE `/api/admin/traffic/events` gộp `!user || role !== admin` → 403** (V5) — chưa đăng nhập
+   cũng nhận 403, client không phân biệt được "hết phiên" với "không đủ quyền".
+5. **`/api/ui-texts` dùng `LIMIT 1` không `ORDER BY`** (V5) — GET và PATCH có thể nhắm **2 dòng
+   `projects` khác nhau**, override ghi xong đọc lại mất. Nay khoá `ORDER BY id` ở cả 3 truy vấn.
+6. **`vo-documents/:id` DELETE thiếu `withProjectScope`** (V2, sau review) — mất lớp RLS thứ hai mà
+   chính nhánh GET vừa được thêm.
+7. **`package-dependencies/:id` DELETE chỉ kiểm một đầu quan hệ** (sau review V9) — `POST` ép hai
+   đầu cùng dự án nên dữ liệu sinh qua API luôn khớp, nhưng dòng lệch dự án vẫn lọt vào bảng qua
+   import/backfill/sửa tay, và đúng những dòng đó lại xoá được xuyên dự án. Nay kiểm cả hai đầu để
+   bản vá không phụ thuộc bất biến của route khác.
+
+### Ghi nhận, CHƯA sửa (cần quyết định, không tự làm)
+
+- **`workpackages/:id/**` (bbnt, dimensions, drawing, copy, move, tasks) + `work-fronts/report`**
+  cùng lớp lỗi cách ly dự án với mục 3 ở trên, reviewer đã đọc code xác nhận có thật. Để nguyên vì
+  ngoài phạm vi đợt — **nên là việc đầu tiên của đợt sau**, ưu tiên ngang V9.
+- **12 chỗ `SELECT ... FROM users WHERE id = ?` không lọc `org_id`** (`admin/assignments`,
+  `meetings/:id/actions*`, `risks/:id`, `subcontractors`, `sheets/:id`, `warranty-claims*`,
+  `punch-list*`, `mobilization*`) — đều chỉ kiểm "user tồn tại" để gán người phụ trách, không đọc/
+  ghi dữ liệu nhạy cảm của user đó, nên rủi ro thấp hơn hẳn; vẫn cho phép chọn người thuộc tổ chức
+  khác nếu đoán trúng ID.
+- **`projects/:id/clone-config` không kiểm `org_id` dự án nguồn** — nhưng `visibleProjectIds()` cố
+  ý cho admin thấy mọi dự án **xuyên org** (thiết kế hiện tại). Sửa riêng route này sẽ không nhất
+  quán với phần còn lại; câu hỏi thật là "admin có nên bị giới hạn theo org không" — cần chủ dự án
+  quyết.
+- **`tasks/batch` và `PATCH /tasks/:id` không validate `endDate >= startDate`** — gap có sẵn của cả
+  miền `tasks`, là lỗi toàn vẹn dữ liệu (task kết thúc trước khi bắt đầu làm sai CPM/Gantt/S-curve),
+  không phải bảo mật. Sửa cần gộp ngày cũ/mới nên không phải một dòng.
+- **`telegram/zalo/simulate-*` không kiểm vai trò** — mọi user đăng nhập gọi được (comment trong
+  route ghi "kỹ sư thử nghiệm"). Chức năng chỉ tự-bind tài khoản của chính người gọi, nhưng có nên
+  giới hạn Admin/PM không là quyết định thiết kế.
+
+### Bài học hạ tầng test (2 lỗi do CHÍNH đợt này gây ra, đã sửa)
+
+Full suite lộ ra 2 file **xanh khi chạy riêng, đỏ trong bộ đầy đủ** — đúng lớp lỗi đã ghi ở Đợt 2:
+
+- `route-vat-tu-2`: 5 chỗ gán cứng `created_by = 1` cho `boq_norms`. Chạy riêng thì user id 1 còn,
+  chạy cả bộ thì file khác đã xoá ⇒ vỡ khoá ngoại. Nay tự tạo user thật và dùng id của nó.
+- `route-ho-so-bot`: khẳng định cứng thư mục `data/uploads/drawings` **chưa tồn tại** để đòi 404,
+  trong khi đó là trạng thái toàn cục **trên đĩa** — file test khác upload bản vẽ là nó xuất hiện.
+  Nay đọc trạng thái thật rồi kiểm đúng nhánh; cả hai nhánh vẫn assert thật, không nới lỏng.
+
+**Quy tắc rút ra:** test không được giả định BẤT KỲ trạng thái toàn cục nào nó không tự dựng — kể
+cả id bản ghi seed sẵn lẫn thư mục trên đĩa.
+
+### ⚠️ Hai sai lệch MÔI TRƯỜNG đã truy ra (không phải lỗi code, nhưng làm sai lệch kết quả tự kiểm)
+
+1. **Node 22 vs Node 24.** CI và `.nvmrc` dùng **Node 24**; môi trường phiên này mặc định Node
+   22.22.2. Node 22 **crash khi in bảng coverage** (`TypeError: String.prototype.split called on
+null or undefined` tại `printCoverageBodyTree`) với một số file test ⇒ `npm run test:coverage`
+   thoát khác 0 và số đo sai. Dưới Node 24 không crash. **Luôn dùng đúng Node 24 khi tự kiểm**,
+   nếu không sẽ đuổi theo lỗi không tồn tại (đã mất một vòng ở đợt này).
+2. **Locale Postgres.** `tests/backfill-0137-0138.test.ts` đỏ ở môi trường này nhưng xanh trên CI.
+   Nguyên nhân: cụm Postgres dựng bằng `initdb` mặc định (locale **C**), mà backfill `0137` khớp
+   tên NCC bằng `lower(...)` — locale C **không hạ chữ hoa có dấu tiếng Việt**
+   (`lower('CÔNG TY') = 'cÔng ty'`) nên không khớp. Dựng DB bằng
+   `CREATE DATABASE ... LOCALE_PROVIDER icu ICU_LOCALE 'vi-VN' TEMPLATE template0 ENCODING UTF8`
+   thì ca đó xanh ngay. Đã đối chứng: **`origin/main` nguyên bản cũng đỏ đúng file này** trong môi
+   trường C-locale ⇒ không phải do đợt này. Bài học: DB test cho dự án tiếng Việt phải có collation
+   UTF-8/ICU, không dùng locale C.
+
+### Bài học điều phối (đáng giá nhất đợt này)
+
+**Reviewer bác bỏ "ghi nhận, chưa sửa" của worker 3 lần, cả 3 lần reviewer đúng** — và đó chính là
+3 trong 7 lỗ hổng bảo mật ở trên (V2 suppliers, V3→V9 tầng WBS, V5→V10 `users/:id`). Khuôn sai lặp
+lại: worker suy luận "cả cụm vốn thiết kế toàn hệ nên không lọc là đúng" mà **không đọc route anh
+em để kiểm chứng** — trong khi route anh em đã lọc đúng. Vì vậy: mọi mục "ghi nhận, chưa sửa" phải
+kèm **bằng chứng đọc code của route anh em cùng cụm**, không được chỉ nêu lập luận.
+
+### Cổng đã chạy
+
+`npm run lint` · `npm run typecheck` · `npm run check:lib-layers` xanh. Full suite `--release-gate`
+trên Postgres 16 + Node 24, DB tạo mới hoàn toàn: **237 file, 3.434 ca pass, 1 ca fail, 1 ca skip
+có lý do** (`health.test.ts`, ca cố ý đảo điều kiện khi KHÔNG có DB). Ca fail duy nhất là
+`backfill-0137-0138` — **đỏ do locale C của cụm Postgres cục bộ, không phải do đợt này**: đối chứng
+`origin/main` nguyên bản trong cùng môi trường cũng đỏ đúng ca đó (228 file, 1 file fail), và chạy
+riêng ca đó trên DB dựng bằng ICU/vi-VN thì **xanh**. Xem mục "sai lệch MÔI TRƯỜNG" bên trên.
+
+Coverage đo cùng điều kiện (Node 24), so `origin/main` với nhánh này:
+
+|                    | `origin/main` | Đợt 4  |
+| ------------------ | ------------- | ------ |
+| File trong phạm vi | 300           | 504    |
+| lines              | 90,30%        | 91,75% |
+| branches           | 85,09%        | 84,99% |
+| funcs              | 91,92%        | 93,89% |
+
+`coverage-baseline.json` cập nhật theo mốc mới. Branches lệch −0,10 điểm (trong ngưỡng đệm 1 điểm
+của `check:coverage`): số file đo tăng 68% nên mẫu số đổi hẳn, nhiều file route mới vào bảng còn
+nhánh lỗi hiếm chưa phủ.
+
+**Đợt sau:** `app/api/engineering/**` (~100 route) + mục đầu tiên của "Ghi nhận, chưa sửa"
+(`workpackages/:id/**` cùng lớp lỗi cách ly dự án).
+
 ## ✅ Gỡ toàn bộ cụm CAD/BIM khỏi sản phẩm — đợt 3 (2026-09-04)
 
 Đợt cuối của loạt dọn CAD/BIM: **xoá hết phần còn lại** của cụm CAD · BIM · Digital Twin ·
@@ -230,7 +390,8 @@ ngưỡng đệm `check:coverage`, funcs tăng nhẹ); đã cập nhật `covera
 - `design-changes/route.ts` GET và `qc/inspections/route.ts` GET thiếu guard `projectId != null`
   trước khi lọc — nếu `getCurrentProjectId` trả `null` (hiếm), có thể trả dữ liệu xuyên dự án.
 
-**Đợt sau:** còn khoảng 50-60 route `engineering/*` phi-BIM (fidic, cashflow, compliance, bidding,
+**Đợt sau (ĐÃ LÀM — xem "Đợt 4 chiến dịch coverage" đầu tệp):** còn khoảng 50-60 route
+`engineering/*` phi-BIM (fidic, cashflow, compliance, bidding,
 subcon-ai, autonomy, queue, zero-error, workflows, memory, agent-sessions, spatial, prescriptive,
 predictions, objects, iot, routing, logistics, ledger, hse-vision, data-quality, taxonomy…) và các cụm
 nhỏ (work-fronts, progress-albums, monitoring-points, devices, waste-logs, warranty-*, purchase-
