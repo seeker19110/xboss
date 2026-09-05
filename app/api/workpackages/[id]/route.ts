@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getCurrentProjectId, visibleProjectIds } from "@/lib/ha-tang/projects";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
 import { validateCustom } from "@/lib/ha-tang/custom-fields";
 import { recomputePackage, recomputeTasksInheritingDates } from "@/lib/tien-do/recompute";
+import { packageProjectId } from "@/lib/tien-do/workpackages";
 import { storageDelete } from "@/lib/nen/storage";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,13 @@ export async function PATCH(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Chống ghi xuyên dự án (vá W0) — id đoán được, đường đọc lưới tracking đã lọc theo dự án
+  // nhưng PATCH/DELETE theo :id trước đây không kiểm gì.
+  const visible = await visibleProjectIds(user);
+  const pid = await packageProjectId(id);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
 
@@ -90,9 +98,18 @@ export async function PATCH(
   if (!sets.length)
     return NextResponse.json({ error: "Không có trường để cập nhật" }, { status: 400 });
 
-  vals.push(id);
+  // Lớp phòng thủ thứ hai (vá W0): dù đã kiểm dự án ở trên, câu UPDATE tự nó cũng ràng buộc
+  // lại — nhóm phải nằm trong 1 sheet của đúng dự án `pid` mới bị sửa.
+  vals.push(id, pid);
   await withTransaction(async () => {
-    await run(`UPDATE work_packages SET ${sets.join(", ")} WHERE id = ?`, ...vals);
+    await run(
+      `UPDATE work_packages SET ${sets.join(", ")}
+        WHERE id = ? AND sheet_type_id IN (
+          SELECT st.id FROM sheet_types st LEFT JOIN towers tw ON tw.id = st.tower_id
+           WHERE tw.project_id = ?
+        )`,
+      ...vals,
+    );
     // Đổi deadline có thể đổi trạng thái trễ (tre ⇄ dang_thi_cong) của nhóm → tính lại.
     if (body.endDate !== undefined || body.startDate !== undefined) {
       await recomputePackage(id);
@@ -129,6 +146,12 @@ export async function DELETE(
   const pkg = await queryOne<{ id: number }>(`SELECT id FROM work_packages WHERE id = ?`, id);
   if (!pkg) return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
 
+  // Chống xoá xuyên dự án (vá W0) — id đoán được, tương tự PATCH.
+  const visible = await visibleProjectIds(user);
+  const pid = await packageProjectId(id);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
+
   const tasks = await query<{ id: number }>(`SELECT id FROM tasks WHERE package_id = ?`, id);
   if (tasks.length > 0) {
     const taskIds = tasks.map((t) => t.id);
@@ -154,6 +177,16 @@ export async function DELETE(
     await run(`DELETE FROM tasks WHERE package_id = ?`, id);
   }
 
-  await run(`DELETE FROM work_packages WHERE id = ?`, id);
+  // Lớp phòng thủ thứ hai (vá W0): dù đã kiểm dự án ở trên, câu DELETE tự nó cũng ràng buộc
+  // lại — nhóm phải nằm trong 1 sheet của đúng dự án `pid` mới bị xoá.
+  await run(
+    `DELETE FROM work_packages
+      WHERE id = ? AND sheet_type_id IN (
+        SELECT st.id FROM sheet_types st LEFT JOIN towers tw ON tw.id = st.tower_id
+         WHERE tw.project_id = ?
+      )`,
+    id,
+    pid,
+  );
   return NextResponse.json({ deleted: id });
 }

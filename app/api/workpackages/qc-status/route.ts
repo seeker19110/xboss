@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { sheetTypeProjectId } from "@/lib/tien-do/workpackages";
 import { packagesWithQcBlock } from "@/lib/ky-thuat/qaqc";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +19,12 @@ export async function GET(req: NextRequest) {
   if (!raw || !Number.isFinite(sheetTypeId)) {
     return NextResponse.json({ error: "sheetTypeId không hợp lệ" }, { status: 422 });
   }
+
+  // Chống dò thông tin QC xuyên dự án (vá W0).
+  const visible = await visibleProjectIds(user);
+  const pid = await sheetTypeProjectId(sheetTypeId);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
 
   const blocked = await packagesWithQcBlock(sheetTypeId);
   return NextResponse.json({ blocked });

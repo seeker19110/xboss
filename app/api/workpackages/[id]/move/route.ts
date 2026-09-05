@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { sheetTypeProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,12 @@ export async function PATCH(
     id,
   );
   if (!cur) return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
+
+  // Chống di chuyển xuyên dự án (vá W0).
+  const visible = await visibleProjectIds(user);
+  const pid = await sheetTypeProjectId(cur.sheet_type_id);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
 
   const neighbor = await queryOne<{ id: number; sort_order: number }>(
     dir === "up"

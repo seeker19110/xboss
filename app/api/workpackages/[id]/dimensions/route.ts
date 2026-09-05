@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getCurrentUser, canTouchPackage } from "@/lib/bao-mat/auth";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { packageProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
+
+// canTouchPackage (lib/bao-mat/auth.ts) chỉ kiểm subcon có được GÁN nhóm không (trả `true` vô
+// điều kiện cho mọi vai trò khác) — không kiểm dự án, nên vẫn cần packageProjectId() chặn riêng.
 
 type TaskRow = {
   id: number;
@@ -49,6 +54,10 @@ export async function GET(
 
   const pkgId = parseInt(params.id);
   if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+  const visible = await visibleProjectIds(user);
+  const pid = await packageProjectId(pkgId);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Không tìm thấy nhóm" }, { status: 404 });
   if (!(await canTouchPackage(user, pkgId)))
     return NextResponse.json({ error: "Không có quyền xem nhóm công việc này" }, { status: 403 });
 

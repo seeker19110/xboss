@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { sheetTypeProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +40,12 @@ export async function POST(
     srcId,
   );
   if (!src) return NextResponse.json({ error: "Nhóm gốc không tồn tại" }, { status: 404 });
+
+  // Chống sao chép xuyên dự án (vá W0).
+  const visible = await visibleProjectIds(user);
+  const srcPid = await sheetTypeProjectId(src.sheet_type_id);
+  if (srcPid == null || !visible.includes(srcPid))
+    return NextResponse.json({ error: "Nhóm gốc không tồn tại" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
   const newCode = String(body.code ?? `${src.code}_copy`).trim();
