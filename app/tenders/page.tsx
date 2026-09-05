@@ -436,12 +436,21 @@ function TenderDetailModal({
     )
       return;
     setBusy(true);
-    const res = await fetch(`/api/tenders/${tender.id}/award`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bidId }),
-    });
-    setBusy(false);
+    // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
+    // "Đang lưu..." mà không báo gì (audit 2026-09-05).
+    let res: Response;
+    try {
+      res = await fetch(`/api/tenders/${tender.id}/award`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bidId }),
+      });
+    } catch {
+      appAlert("Mất kết nối — chưa lưu được, thử lại khi có mạng");
+      return;
+    } finally {
+      setBusy(false);
+    }
     if (!res.ok) {
       appAlert((await res.json().catch(() => null))?.error ?? "Trao thầu thất bại");
       return;

@@ -16,7 +16,7 @@ const PROJECT_DEFAULT_COORDS = { lat: 10.7769, lon: 106.7009 };
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.viewEngineeringGraph(user.role)) {
+  if (!CAN.manageEngineeringGraph(user.role)) {
     return NextResponse.json({ error: "Không có quyền thực hiện kiểm tra này" }, { status: 403 });
   }
 

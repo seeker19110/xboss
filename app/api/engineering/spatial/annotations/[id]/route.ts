@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
-  if (!CAN.viewEngineeringGraph(user.role)) {
+  if (!CAN.manageEngineeringGraph(user.role)) {
     return NextResponse.json(
       { error: "Không có quyền cập nhật điểm ghim không gian" },
       { status: 403 },
@@ -79,7 +79,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
-  if (!CAN.viewEngineeringGraph(user.role)) {
+  if (!CAN.manageEngineeringGraph(user.role)) {
     return NextResponse.json({ error: "Không có quyền xoá điểm ghim không gian" }, { status: 403 });
   }
 

@@ -3,6 +3,7 @@
 // giao thầu — contracts, M16). Xem docs/nang-cap/M07-dau-thau.md.
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { nextSeqCode } from "@/lib/ha-tang/seqcode";
+import { parseMoney, moneyToNumber } from "@/lib/nen/money";
 
 export const TENDER_STATUSES = ["draft", "open", "closed", "awarded", "cancelled"] as const;
 export type TenderStatus = (typeof TENDER_STATUSES)[number];
@@ -161,10 +162,19 @@ export async function comparisonTable(
     const prices: Record<number, number> = {};
     for (const p of priceRows) prices[p.boqItemId] = Number(p.unitPrice);
 
-    const lineTotal = items.reduce(
-      (sum, it) => sum + (prices[it.boqItemId] != null ? prices[it.boqItemId] * it.qty : 0),
-      0,
+    // Tổng tiền chào tính TRONG SQL (M45 PR1: NUMERIC về JS là float, cấm nhân/cộng tiền
+    // trên float). Con số này dùng để XẾP HẠNG nhà thầu — sai lệch nhỏ đủ đảo thứ hạng khi
+    // 2 giá sát nhau. Chỉ cộng dòng đã chào, đúng như trước (JOIN loại dòng thiếu giá).
+    const lineTotalRow = await queryOne<{ total: string }>(
+      `SELECT COALESCE(SUM(bp.unit_price * ti.qty), 0)::text AS total
+         FROM tender_bid_prices bp
+         JOIN tender_items ti
+           ON ti.tender_id = ? AND ti.boq_item_id = bp.boq_item_id
+        WHERE bp.bid_id = ?`,
+      tenderId,
+      b.bidId,
     );
+    const lineTotal = moneyToNumber(parseMoney(lineTotalRow?.total ?? 0));
     result.push({
       ...b,
       lumpSum: b.lumpSum != null ? Number(b.lumpSum) : null,

@@ -680,7 +680,11 @@ export default function SpatialViewerPage() {
                 <h3 className="text-xs font-semibold text-zinc-200">
                   Danh sách Điểm Ghim ({annotations.length})
                 </h3>
-                <button onClick={fetchAnnotations} className="text-zinc-500 hover:text-zinc-300">
+                <button
+                  aria-label="Làm mới"
+                  onClick={fetchAnnotations}
+                  className="text-zinc-500 hover:text-zinc-300"
+                >
                   <RefreshCw size={12} />
                 </button>
               </div>
@@ -755,6 +759,7 @@ export default function SpatialViewerPage() {
                               </button>
                             )}
                             <button
+                              aria-label="Xoá"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteAnnotation(annot.id);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { queryTransferredLessons } from "@/lib/ky-thuat/engineering-memory-bank";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.viewEngineeringGraph(user.role)) {
+  if (!CAN.manageEngineeringGraph(user.role)) {
     return NextResponse.json(
       { error: "Không có quyền tra cứu chuyển giao tri thức" },
       { status: 403 },
@@ -26,6 +27,7 @@ export async function POST(req: Request) {
     const results = await queryTransferredLessons({
       category,
       workPackageCode,
+      projectIds: await visibleProjectIds(user),
     });
 
     return NextResponse.json(results);

@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
-  if (!CAN.viewEngineeringGraph(user.role)) {
+  if (!CAN.manageEngineeringGraph(user.role)) {
     return NextResponse.json({ error: "Không có quyền tạo điểm ghim không gian" }, { status: 403 });
   }
 

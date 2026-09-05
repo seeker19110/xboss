@@ -1,6 +1,118 @@
 # PROGRESS.md — Trạng thái dự án
 
-## 🟡 Đợt 6 — trả nợ "ghi nhận, chưa sửa" + quét cụm lỗ hổng tham chiếu (2026-09-05, ĐANG CHẠY)
+## 🔎 Đợt audit toàn dự án — 2026-09-05 (audit sâu, 3 miền song song)
+
+Chạy theo `docs/audit.md` §9: 3 agent độc lập (A bảo mật+logic, B UI/UX+vận hành/offline,
+C hiệu năng/dependency/CI/tài liệu) đọc code thật, rồi sửa trong cùng lượt theo yêu cầu
+người dùng. Cổng cơ sở TRƯỚC khi sửa đã xanh (lint/typecheck/test 249 file/build).
+
+### Bảo mật & phân quyền (§3)
+
+- **[Cao] Vai trò chỉ-xem `bch` ghi được qua ~20 handler engineering.** `CAN.viewEngineeringGraph`
+  (mở cho `bch` — `VIEW_ONLY_ROLES`) bị dùng làm cổng cho POST/PATCH/DELETE ở bidding, spatial,
+  logistics, esign, zero-error, memory, cashflow, hse-vision, drawings/scan-local… Đúng lớp lỗi
+  đã vá riêng cho e-sign (`signEngineeringEsign`, audit 2026-08-24) nhưng chưa quét hết.
+  **Sửa:** thêm `CAN.manageEngineeringGraph` (admin/pm/engineer) và đổi toàn bộ 20 handler ghi.
+- **[Cao] `DELETE /api/floor-approvals/:id` thiếu cách ly dự án.** 3 route anh em đều kiểm
+  `sheetTypeProjectId`; route này chỉ kiểm vai trò → Admin/PM dự án A đoán `id` là huỷ được
+  nghiệm thu tầng của dự án B (kèm bulk UPDATE `tasks.status` + `task_history` sai dự án).
+  **Sửa:** thêm `getCurrentProjectId` + `sheetTypeProjectId` → 404.
+- **[Cao] Rò rỉ dữ liệu xuyên tổ chức ở `engineering_cross_project_lessons`.**
+  `listCrossProjectLessons` không có điều kiện dự án nào và bảng chưa bật RLS → mọi user đọc
+  được sự cố/nguyên nhân gốc + tên dự án của tổ chức khác (qua `memory/lessons`, `memory/transfer`).
+  **Sửa:** tham số `projectIds` BẮT BUỘC, lọc `source_project_id IN (...)`, rỗng → trả rỗng.
+- **[TB] `POST memory/lessons` lấy thẳng `sourceProjectId` từ body** → gán bài học vào dự án
+  bất kỳ. **Sửa:** `chotProjectIdChoGhi` (mẫu đúng của `engineering/bidding/packages`).
+- **[TB] `GET /api/suppliers/:id/summary` trả công nợ NCC cho mọi vai trò** (`subcon`/`viewer`/
+  `cdt` đọc được `totalOrdered`/`totalPaid`/`debt`) và cộng gộp PO/bill của **mọi dự án** trong
+  tổ chức. **Sửa:** khối tiền gate `CAN.viewPayments` (trả `null` khi không có quyền, UI ẩn),
+  `supplierSummary` nhận `projectId` bắt buộc và lọc `po.project_id`/`payment_bills.project_id`.
+- **[Thấp] Nội suy giá trị vào SQL** ở `workpackages/:id/dimensions/column/move` (`sort_order ${op}`)
+  → đưa giá trị về placeholder `?`, chỉ giữ toán tử/chiều sắp xếp là hằng trong code.
+- **[Thấp] Lệch quy ước placeholder**: 6 route/lib nhánh engineering dùng `$1..$n` → đổi về `?`.
+  Riêng `iot/alerts` PATCH GIỮ `$n` (dùng lại `$1` 3 lần trong `CASE WHEN`, `?` không biểu diễn
+  được) — có comment giải thích tại chỗ.
+
+### Logic nghiệp vụ & toàn vẹn dữ liệu (§4)
+
+- **[Cao] Huỷ nghiệm thu tầng không có transaction.** Chuỗi `UPDATE floor_approvals` → bulk
+  `UPDATE tasks` → `INSERT task_history` → `recomputePackage` chạy rời, không `FOR UPDATE`
+  (trong khi đường DUYỆT `/api/approvals` đã bọc đủ) → lỗi giữa chừng để lại trạng thái nửa
+  vời, race với tick checkbox. **Sửa:** bọc `withTransaction` + `FOR UPDATE`, kiểm lại
+  `is_approved` bên trong khoá (409 nếu đã bị huỷ bởi request khác).
+- **[TB] Tiền tính trên float JS** (vi phạm M45 PR1): `tender.ts` nhân đơn giá × khối lượng
+  bằng JS để **xếp hạng nhà thầu** (sai lệch đủ đảo thứ hạng khi 2 giá sát nhau);
+  `procurement.ts` (`debt = totalOrdered − totalPaid`), `finance.ts` (`netVat`).
+  **Sửa:** tổng làm trong SQL + `::text`, hiệu làm trên bigint của `lib/nen/money.ts`.
+- **[Thấp] Mốc "hôm nay" theo UTC máy chủ** ở `engineering-mepf-predictive.ts`
+  (`nextMaintenanceDate`) và `subcon-ai/evaluate` (kỳ `YYYY-MM` — khoá logic của bảng metrics,
+  ghi nhầm kỳ trước trong khung 0h–7h sáng giờ VN). **Sửa:** `daysFromTodayISO`/`todayISO`.
+
+### UI/UX & vận hành (§5, §7)
+
+- **[Cao] Nút kẹt "Đang lưu..." + nuốt lỗi** ở 3 luồng người dùng chạm nhiều nhất:
+  `TrackingGrid.savePkgDates`/`savePkgName` (không kiểm `res.ok`, không bắt lỗi mạng — server
+  từ chối vẫn đóng modal khiến PM tưởng đã lưu ngày), `/payments` PATCH giá trị hợp đồng theo
+  tầng (**dữ liệu tiền** — hiện số mới dù server từ chối), `/login` (màn hình đầu tiên, mất
+  sóng là phải tải lại trang). **Sửa:** `try/catch` + kiểm `res.ok` + thông điệp tiếng Việt;
+  `PkgDatesModal.onSave` trả `Promise<boolean>` để mở khoá nút khi lưu hỏng.
+- **[TB] `ProgressMap`**: 3 hàm ghi (đổi tên bản đồ/tháp, thêm tháp) bỏ qua `res.ok` trong khi
+  `deleteTower` cùng file kiểm đúng → gom về helper `guiGhi`; `if (loading) return null` →
+  `Skeleton` (bỏ màn trắng nhảy layout).
+- **[TB] 38 nút icon-only thiếu `aria-label`** (gồm nút đóng modal của lưới tracking, nút xoá
+  dòng ở `/payments`, `/procurement`) → thêm nhãn tiếng Việt đúng ngữ cảnh ("Đóng"/"Xoá dòng"/
+  "Sửa"/"Lưu"/"Huỷ sửa tên").
+- **[TB] Hardcode `[color-scheme:dark]`** ở 4 input ngày (2 modal tracking) → lịch chọn ngày
+  native vẫn tối ở theme sáng. **Sửa:** bỏ, để kế thừa `color-scheme` của `:root`.
+- **[TB] Bảng dày bọc `overflow-hidden`** (`/users`, tab "Lịch sử phân công" của `/admin`) →
+  không cuộn ngang được trên điện thoại. **Sửa:** `overflow-x-auto` + `min-w`.
+- **[TB] Form thiếu `finally`** (10 chỗ: tenders, suppliers, ban-ve, payment-certs, variations,
+  SCurveChart, reports) → mất mạng là kẹt trạng thái gửi. **Sửa:** `try/catch/finally`.
+- **[Thấp] SSE không bao giờ thử lại** sau lần rớt đầu (`useTrackingData`): một lần rớt 4G là
+  mất đồng bộ ~3s cả phiên. **Sửa:** thử mở lại sau 2 phút, `open` thì dừng poll.
+
+### Hiệu năng / dependency / CI (§6)
+
+- **[TB] Mốc coverage lệch 3 nơi** (`coverage-baseline.json` 92.61 vs `docs/audit.md` 87.12 vs
+  `PROGRESS.md` 68.12). **Sửa:** chốt `coverage-baseline.json` là nguồn sự thật duy nhất, 2 tài
+  liệu trỏ tới nó thay vì chép số.
+- **[TB] `npm run test:mutation` không chạy trong CI** → thêm bước ở job `test`, chỉ chạy trên
+  push `main` (tốn runner, không cần mỗi PR).
+- **[TB] `npm audit` chỉ quét `--omit=dev`** → thêm bước quét cả dev, chặn mức `critical`.
+- **[Thấp] `format:check` không chạy trong CI** (chỉ có husky, bỏ qua được bằng `--no-verify`).
+  **CHƯA bật cổng**: đo thực tế trên `main` sạch thì đã có **56 file lệch prettier** từ trước,
+  bật ngay là CI đỏ. Cần 1 commit `prettier --write` toàn repo (thuần format) rồi mới thêm bước
+  `npm run format:check` vào job `static` — tách riêng để diff audit này còn đọc được.
+- **[Thấp] Index thừa `idx_history_task(task_id)`** bị bao trọn bởi
+  `idx_task_history_task_changed(task_id, changed_at DESC)` — chi phí ghi thuần trên bảng nóng
+  nhất. **Sửa:** `migrations/0150_drop_dup_task_history_index.sql` (chỉ DROP INDEX → đi thẳng
+  production, cùng tiền lệ 0081).
+- **[Thấp] Chuỗi giống API key thật** `xbk_live_…` trong `scripts/run-c2-pilot.ts` (nhiễu
+  gitleaks) → đổi tiền tố `xbk_test_`.
+
+### Test hồi quy
+
+`tests/audit-2026-09-05-guards.test.ts` — 7 ca, chạy được không cần DB: quyền ghi engineering
+loại hết vai trò chỉ-xem; **quét toàn bộ `app/api` khẳng định không handler ghi nào còn gate
+bằng quyền XEM** (chống tái phát lớp lỗi này ở route mới); cách ly dự án + transaction ở
+floor-approvals; lọc dự án của bài học xuyên dự án; gate tiền của công nợ NCC; tiền tính trong
+SQL; mốc "hôm nay" theo giờ VN. `tests/procurement.test.ts` bổ sung ca `keemTien`.
+
+### Ghi nhận, chưa sửa (nợ kỹ thuật — xem mục Nợ kỹ thuật)
+
+- Thiếu **trạng thái LỖI** ở ~40 trang (`fetch().then(r => r.ok ? r.json() : null)` không
+  `.catch`): mất mạng/500 hiển thị thành "chưa có dữ liệu" — nguy hiểm ở công trường vì kỹ sư
+  tưởng chưa ai nhập. Cần helper fetch dùng chung + component `LoadError`, làm theo đợt.
+- Hardcode mã hex trong 3 trang `engineering/*` (SVG + canvas `ctx.strokeStyle`) → nét/nhãn
+  gần như biến mất ở theme sáng; `check:contrast` không đọc được màu inline SVG/canvas.
+- `engineering_cross_project_lessons` **chưa bật RLS** (đã vá ở tầng ứng dụng); bật RLS là
+  migration đụng dữ liệu → phải qua staging.
+- Huỷ nghiệm thu tầng vẫn hạ luôn task từng được duyệt RIÊNG LẺ (schema chưa có cờ phân biệt
+  nguồn duyệt) — có comment tại chỗ, cần quyết định đặc tả trước khi đổi hành vi.
+- Cỡ chữ input < 16px (iOS auto-zoom) — cần đo thật trên thiết bị trước khi kết luận.
+- Lighthouse chỉ chạy trên `pull_request`, không chạy trên push `main`.
+
+## 🟡 Đợt 6 — trả nợ "ghi nhận, chưa sửa" + quét cụm lỗ hổng tham chiếu (2026-09-05, PR #480 ĐÃ MERGE — còn 3 việc)
 
 Khác Đợt 1–5 (chiến dịch _phủ test_), Đợt 6 là chiến dịch **sửa tính năng đang hỏng**: sau 5 đợt chỉ
 còn 8/451 route chưa có test thực thi, nhưng danh sách "Ghi nhận, chưa sửa" đã tích 5 mục, trong đó
@@ -7874,8 +7986,12 @@ Trước khi audit, bổ sung `docs/audit.md` (rà thật trong code, không suy
 
 Theo `docs/audit.md` §6 (mục "Độ phủ test — định lượng"): thêm script `npm run test:coverage` (`node --experimental-test-coverage scripts/run-tests.mjs`) đo coverage built-in của `node:test` (Node 22), chỉ tính phạm vi `lib/**` + `app/api/**` (không tính component UI). Đây là mốc **ratchet** đầu tiên — lần sau đo lại không được tệ hơn số này khi không có lý do chính đáng; thêm test mới thì nâng dần.
 
-- **Ngày đo:** 2026-07-19.
-- **Số liệu (81 file trong phạm vi `lib/**`/`app/api/**` được ít nhất 1 test chạm tới):**
+- **MỐC HIỆN TẠI KHÔNG NẰM Ở ĐÂY** (sửa 2026-09-05): nguồn sự thật duy nhất là
+  `coverage-baseline.json` ở gốc repo — cổng `npm run check:coverage` đọc thẳng file đó.
+  Số chép tay trong tài liệu đã lệch 3 nơi (68.12 / 87.12 / 92.61) nên bỏ hẳn cách chép số;
+  phần dưới giữ lại vì mô tả **cách đo** và các giới hạn của con số, vẫn còn đúng.
+- **Ngày đo (lần đầu, để đối chiếu lịch sử):** 2026-07-19.
+- **Số liệu lần đầu (81 file trong phạm vi `lib/**`/`app/api/**` được ít nhất 1 test chạm tới):**
   - `lines`: 68.12%
   - `branches`: 86.35%
   - `funcs`: 56.52%
@@ -8422,6 +8538,34 @@ Verify hạ tầng: Postgres 16 local (`pg_ctlcluster`, đã có sẵn trong má
 
 ## Nợ kỹ thuật (chỗ "làm tạm" cần quay lại)
 
+- **[TB, mới 2026-09-05 — đợt audit sâu] ~40 trang thiếu TRẠNG THÁI LỖI**: mẫu
+  `fetch(url).then(r => r.ok ? r.json() : null)` không `.catch`, không state lỗi → mất mạng
+  hoặc API 500 hiển thị thành trang RỖNG ("Chưa có dữ liệu…"). Ở công trường điều này khiến
+  kỹ sư tưởng chưa ai nhập dữ liệu. Mẫu đúng đã có: `loadError`/`loadErrorMessage` trong
+  `app/tracking/[sheet]/useTrackingData.ts`. Cần helper fetch dùng chung trả `{data, error}` +
+  component `LoadError` có nút "Thử lại", áp dần ưu tiên `hse`, `diary`, `my-tasks`,
+  `approvals`, `boq`. Chưa làm trong đợt này vì diện rộng, nên tách PR riêng.
+- **[TB, mới 2026-09-05] Hardcode mã hex trong 3 trang `app/engineering/*`**
+  (`mepf-lifecycle` 22 chỗ, `spatial-viewer` 17 chỗ gồm `ctx.strokeStyle` trên canvas,
+  `prescriptive` 5 chỗ) → ở theme sáng các nét/nhãn gần như biến mất. `npm run check:contrast`
+  không đọc được màu inline SVG/canvas nên CI không bắt. Cần đọc màu từ CSS variable
+  (`getComputedStyle`) cho canvas và `currentColor`/class token cho SVG.
+- **[TB, mới 2026-09-05] `engineering_cross_project_lessons` chưa bật RLS**: đợt audit đã vá ở
+  TẦNG ỨNG DỤNG (`listCrossProjectLessons` bắt buộc nhận `projectIds`), nhưng bảng vẫn không có
+  policy trong khi các bảng lân cận của `migrations/0098` đều có. Bật RLS là migration đụng dữ
+  liệu → phải qua staging (`bash deploy.sh --staging`) trước.
+- **[TB, mới 2026-09-05] Huỷ nghiệm thu tầng hạ luôn task đã duyệt RIÊNG LẺ**:
+  `DELETE /api/floor-approvals/:id` gọi `deriveStatus(..., null)` — cố ý (truyền trạng thái
+  hiện tại vào thì nút huỷ không làm gì, vì sau khi duyệt tầng mọi task đều `nghiem_thu`), nhưng
+  schema chưa có cờ phân biệt nguồn duyệt nên task từng duyệt riêng cũng bị huỷ theo. Đổi hành
+  vi cần quyết định đặc tả + cột mới, không tự chế trong lượt audit.
+- **[Thấp, mới 2026-09-05] Cổng `format:check` chưa bật trong CI**: `main` đang có 56 file lệch
+  prettier từ trước nên bật ngay là CI đỏ. Cần 1 commit `prettier --write` toàn repo (thuần
+  format, không đổi hành vi) rồi thêm bước vào job `static`.
+- **[Thấp, mới 2026-09-05] Lighthouse chỉ chạy trên `pull_request`**, không chạy khi push `main`
+  và `deploy.yml` không phụ thuộc nó → commit vào main không qua PR không có cổng hiệu năng.
+- **[Thấp, mới 2026-09-05] Cỡ chữ input < 16px** ở nhiều form (`text-xs`/`text-sm`) →
+  iOS Safari auto-zoom khi focus. Chưa coi là lỗi đã xác nhận: cần đo thật trên thiết bị.
 - ~~**[Thấp] `app/error.tsx` (error boundary route segment) không giữ được `AppHeader`/nav khi lỗi xảy ra**~~ → **đã đóng hoàn toàn (2026-08-20, Module M81)**: Triển khai Resilient Error Boundary `app/error.tsx` tích hợp sẵn Fallback Header & Emergency Quick Nav Bar (truy cập nhanh Dashboard, Lưới tiến độ, BBNT Nghiệm thu, Vật tư, Tài chính), hộp chẩn đoán lỗi Digest/Stack kèm nút sao chép cho IT, nút Emergency Cache Clear & Hard Reload. Đồng thời bổ sung `ComponentErrorBoundary` (`app/components/ComponentErrorBoundary.tsx`) cô lập sự cố của các widget con (3D Viewer, Charts, Spreadsheets) tránh sập toàn bộ trang. Test `tests/app-shell-resilience.test.ts` pass 100%.
 - ~~**[Cao] `payments`/`payments/bills`/`payments/floors` chưa scope theo `projectId` (M22)**~~ → **đã đóng, tài liệu lệch code** (xác nhận lại 2026-07-19, đợt audit lần 7): đọc thẳng `app/api/payments/bills/[id]/route.ts` — `PATCH`/`DELETE` đã có `billBelongsToProject()` (404 khi bill không thuộc dự án đang chọn) từ PR #263 (2026-07-18, đúng như "Đợt audit toàn dự án lần 6" ghi "ĐÃ SỬA"); `GET /api/payments` cũng đã JOIN `towers`/lọc `projectId`; `tests/project-scope-invariant.test.ts` không còn nhắc `payments` trong whitelist. Mục nợ này bị bỏ sót không gỡ khỏi "Nợ kỹ thuật" sau khi PR #263 merge — bài học: luôn gỡ nợ khỏi danh sách này trong cùng PR đóng nợ, không tách riêng.
 - ~~**[Trung] `materials/:id/issue` và `.../return` — hạ tầng idempotency "chết" trên đường thực thi (client không gửi header)**~~ → **đã đóng (2026-07-19)**: `app/materials/page.tsx` — sinh `crypto.randomUUID()` lúc mở modal xuất/hoàn kho (`issueKey`), gửi qua header `Idempotency-Key`; thêm `issueSubmitting` chặn double-submit + disable 2 nút (submit/huỷ) + hiện "Đang lưu..." lúc gửi; bọc `try/catch/finally` báo lỗi mất mạng thay vì kẹt trạng thái. Không đổi route/migration (đã đúng từ trước).

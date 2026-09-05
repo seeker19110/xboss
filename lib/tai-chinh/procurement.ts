@@ -2,6 +2,7 @@
 // cảnh báo PO trễ giao + xe NCC quá giờ. Logic tách khỏi route để test tích hợp trực tiếp
 // (cùng pattern lib/cost.ts, lib/qaqc.ts). Xem docs/nang-cap/M04-ncc-don-hang.md.
 import { query, queryOne, run, todayISO } from "@/lib/db";
+import { parseMoney, moneyToNumber } from "@/lib/nen/money";
 
 // Trạng thái PO là cột TEXT không CHECK constraint (giữ tương thích dữ liệu cũ) — thứ tự
 // tiến (không nhảy cóc) validate ở đây. "partial"/"received" do route /receive tự set theo
@@ -231,9 +232,10 @@ export type SupplierSummary = {
   avgQuality: number | null;
   avgDelivery: number | null;
   avgPrice: number | null;
-  totalOrdered: number;
-  totalPaid: number;
-  debt: number;
+  // null = người xem không có quyền xem tiền (CAN.viewPayments)
+  totalOrdered: number | null;
+  totalPaid: number | null;
+  debt: number | null;
   ratings: {
     id: number;
     poId: number | null;
@@ -249,7 +251,14 @@ export type SupplierSummary = {
 
 // Điểm TB 3 tiêu chí + công nợ (Σ giá trị PO chưa huỷ − Σ payment_bills đã trả cho NCC đó,
 // khớp qua payment_bills.responsible_supplier_id — backfill ở M2).
-export async function supplierSummary(supplierId: number): Promise<SupplierSummary> {
+// `projectId`: lọc công nợ theo dự án đang chọn — thiếu thì cộng gộp PO/bill của MỌI dự án
+// trong tổ chức, kể cả dự án người xem không thuộc (audit 2026-09-05).
+// `keemTien = true`: bỏ hẳn khối tiền khỏi kết quả cho vai trò không có CAN.viewPayments.
+export async function supplierSummary(
+  supplierId: number,
+  projectId: number,
+  keemTien = false,
+): Promise<SupplierSummary> {
   const agg = await queryOne<{
     ratingsCount: number;
     avgQuality: number | null;
@@ -262,17 +271,21 @@ export async function supplierSummary(supplierId: number): Promise<SupplierSumma
     supplierId,
   );
 
-  const ordered = await queryOne<{ total: number }>(
-    `SELECT COALESCE(SUM(poi.qty_ordered * COALESCE(poi.unit_price, 0)), 0) AS total
+  // ::text — NUMERIC qua parser oid 1700 thành float JS, cấm cộng/trừ tiền trên float
+  // (M45 PR1). Tổng làm trong SQL, hiệu `debt` làm trên bigint của lib/nen/money.ts.
+  const ordered = await queryOne<{ total: string }>(
+    `SELECT COALESCE(SUM(poi.qty_ordered * COALESCE(poi.unit_price, 0)), 0)::text AS total
        FROM po_items poi
        JOIN purchase_orders po ON po.id = poi.po_id
-      WHERE po.supplier_id = ? AND po.status <> 'cancelled'`,
+      WHERE po.supplier_id = ? AND po.status <> 'cancelled' AND po.project_id = ?`,
     supplierId,
+    projectId,
   );
-  const paid = await queryOne<{ total: number }>(
-    `SELECT COALESCE(SUM(amount), 0) AS total
-       FROM payment_bills WHERE responsible_supplier_id = ?`,
+  const paid = await queryOne<{ total: string }>(
+    `SELECT COALESCE(SUM(amount), 0)::text AS total
+       FROM payment_bills WHERE responsible_supplier_id = ? AND project_id = ?`,
     supplierId,
+    projectId,
   );
 
   const ratings = await query<SupplierSummary["ratings"][number]>(
@@ -287,16 +300,16 @@ export async function supplierSummary(supplierId: number): Promise<SupplierSumma
     supplierId,
   );
 
-  const totalOrdered = ordered?.total ?? 0;
-  const totalPaid = paid?.total ?? 0;
+  const orderedMoney = parseMoney(ordered?.total ?? 0);
+  const paidMoney = parseMoney(paid?.total ?? 0);
   return {
     ratingsCount: agg?.ratingsCount ?? 0,
     avgQuality: agg?.avgQuality != null ? Number(agg.avgQuality) : null,
     avgDelivery: agg?.avgDelivery != null ? Number(agg.avgDelivery) : null,
     avgPrice: agg?.avgPrice != null ? Number(agg.avgPrice) : null,
-    totalOrdered,
-    totalPaid,
-    debt: totalOrdered - totalPaid,
+    totalOrdered: keemTien ? null : moneyToNumber(orderedMoney),
+    totalPaid: keemTien ? null : moneyToNumber(paidMoney),
+    debt: keemTien ? null : moneyToNumber(orderedMoney - paidMoney),
     ratings,
   };
 }

@@ -13,7 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
-import { appConfirm } from "@/app/components/dialogs";
+import { appConfirm, appAlert } from "@/app/components/dialogs";
 import { formatDateVN } from "@/lib/nen/date";
 
 export type Supplier = {
@@ -285,9 +285,9 @@ type SupplierSummary = {
   avgQuality: number | null;
   avgDelivery: number | null;
   avgPrice: number | null;
-  totalOrdered: number;
-  totalPaid: number;
-  debt: number;
+  totalOrdered: number | null;
+  totalPaid: number | null;
+  debt: number | null;
   ratings: SupplierRatingItem[];
 };
 
@@ -340,11 +340,14 @@ function SupplierSummaryPanel({ supplierId }: { supplierId: number }) {
           Giá <Stars value={summary.avgPrice} />
         </span>
         <span className="text-zinc-400">({summary.ratingsCount} đánh giá)</span>
-        <span
-          className={`ml-auto font-medium ${summary.debt > 0 ? "text-rose-400" : "text-zinc-400"}`}
-        >
-          Công nợ: {summary.debt.toLocaleString("vi-VN")} ₫
-        </span>
+        {/* debt = null: vai trò không có quyền xem tiền (API không trả về) → ẩn hẳn */}
+        {summary.debt != null && (
+          <span
+            className={`ml-auto font-medium ${summary.debt > 0 ? "text-rose-400" : "text-zinc-400"}`}
+          >
+            Công nợ: {summary.debt.toLocaleString("vi-VN")} ₫
+          </span>
+        )}
       </button>
       {expanded && (
         <div className="mt-2 space-y-1">
@@ -456,12 +459,21 @@ export default function SuppliersTab({ role }: { role: string }) {
       return;
     }
     setSaving(true);
-    const r = await fetch(`/api/suppliers/${editing}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(draft),
-    });
-    setSaving(false);
+    // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
+    // "Đang lưu..." mà không báo gì (audit 2026-09-05).
+    let r: Response;
+    try {
+      r = await fetch(`/api/suppliers/${editing}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+    } catch {
+      appAlert("Mất kết nối — chưa lưu được, thử lại khi có mạng");
+      return;
+    } finally {
+      setSaving(false);
+    }
     if (r.ok) {
       setEditing(null);
       load();
@@ -477,12 +489,21 @@ export default function SuppliersTab({ role }: { role: string }) {
       return;
     }
     setSaving(true);
-    const r = await fetch("/api/suppliers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(addDraft),
-    });
-    setSaving(false);
+    // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
+    // "Đang lưu..." mà không báo gì (audit 2026-09-05).
+    let r: Response;
+    try {
+      r = await fetch("/api/suppliers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(addDraft),
+      });
+    } catch {
+      appAlert("Mất kết nối — chưa lưu được, thử lại khi có mạng");
+      return;
+    } finally {
+      setSaving(false);
+    }
     if (r.ok) {
       setShowAdd(false);
       setAddDraft({ ...EMPTY_DRAFT });
@@ -609,6 +630,7 @@ export default function SuppliersTab({ role }: { role: string }) {
                     className="flex-1 bg-zinc-700 border border-emerald-600 rounded px-2 py-0.5 text-sm font-semibold text-zinc-100 outline-none"
                   />
                   <button
+                    aria-label="Lưu"
                     onClick={() => saveTitle(s.id)}
                     className="text-emerald-400 hover:text-emerald-300"
                   >

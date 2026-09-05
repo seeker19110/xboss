@@ -109,12 +109,20 @@ export default function SCurveChart({ system }: { system?: string }) {
     });
     if (name === null) return;
     setSaving(true);
-    const res = await fetch("/api/baselines", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    setSaving(false);
+    // try/catch: mất mạng thì nút "Chốt baseline" phải mở lại, không kẹt "Đang lưu...".
+    let res: Response;
+    try {
+      res = await fetch("/api/baselines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+    } catch {
+      appAlert("Mất kết nối — chưa chốt được baseline, thử lại khi có mạng");
+      return;
+    } finally {
+      setSaving(false);
+    }
     if (!res.ok) {
       const j = await res.json().catch(() => null);
       appAlert(j?.error ?? "Không chốt được baseline");

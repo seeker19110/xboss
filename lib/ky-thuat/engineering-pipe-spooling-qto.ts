@@ -1879,11 +1879,11 @@ export async function saveSpoolFabricationRun(
         tower_label, floor_label, shaft_label, zone_label, apartment_label, pipeline_code,
         qr_fabrication_token, isometric_data, status
       ) VALUES (
-        $1, $2, $3, $4, $5,
-        $6, $7, $8, $9,
-        $10, $11, $12, $13, $14,
-        $15, $16, $17, $18, $19, $20,
-        $21, $22::jsonb, $23
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
+        ?, ?::jsonb, ?
       )
       ON CONFLICT (project_id, spool_code) DO UPDATE SET
         cut_length_mm = EXCLUDED.cut_length_mm,
@@ -1940,7 +1940,7 @@ export async function saveSpoolFabricationRun(
           `INSERT INTO engineering_pipe_spool_fittings (
             project_id, spool_id, fitting_code, fitting_type,
             nominal_dia_primary_mm, take_off_mm, is_field_installed
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 
           projectId,
           spoolId,
@@ -1961,7 +1961,7 @@ export async function saveSpoolFabricationRun(
         spec, quantity, unit, unit_cost_vnd, total_cost_vnd,
         is_kitted, kitting_box_code, tower_label, floor_label,
         shaft_label, zone_label, apartment_label, pipeline_code
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 
       projectId,
       b.levelTier,
@@ -2001,10 +2001,10 @@ export async function saveSpatialQtoSummaries(
         fittings_count_by_type, consumables_summary, supports_summary,
         total_cost_vnd, kitting_box_code, updated_at
       ) VALUES (
-        $1, $2, $3, $4::jsonb,
-        $5, $6, $7::jsonb,
-        $8::jsonb, $9::jsonb, $10::jsonb,
-        $11, $12, NOW()
+        ?, ?, ?, ?::jsonb,
+        ?, ?, ?::jsonb,
+        ?::jsonb, ?::jsonb, ?::jsonb,
+        ?, ?, NOW()
       )
       ON CONFLICT (project_id, dimension_type, dimension_key) DO UPDATE SET
         total_spools_count = EXCLUDED.total_spools_count,
@@ -2037,7 +2037,7 @@ export async function saveSpatialQtoSummaries(
 
 export async function listPipeSpools(projectId: number): Promise<Array<Record<string, unknown>>> {
   return query<Record<string, unknown>>(
-    `SELECT * FROM engineering_pipe_spools WHERE project_id = $1 ORDER BY created_at DESC LIMIT 100`,
+    `SELECT * FROM engineering_pipe_spools WHERE project_id = ? ORDER BY created_at DESC LIMIT 100`,
     projectId,
   );
 }
@@ -2046,7 +2046,7 @@ export async function listRemnantInventory(
   projectId: number,
 ): Promise<Array<Record<string, unknown>>> {
   return query<Record<string, unknown>>(
-    `SELECT * FROM engineering_pipe_remnant_inventory WHERE project_id = $1 AND status = 'available' ORDER BY remaining_length_mm ASC`,
+    `SELECT * FROM engineering_pipe_remnant_inventory WHERE project_id = ? AND status = 'available' ORDER BY remaining_length_mm ASC`,
     projectId,
   );
 }
@@ -2057,13 +2057,13 @@ export async function listSpatialQtoSummaries(
 ): Promise<Array<Record<string, unknown>>> {
   if (dimensionType) {
     return query<Record<string, unknown>>(
-      `SELECT * FROM engineering_pipe_spatial_qto_summaries WHERE project_id = $1 AND dimension_type = $2 ORDER BY dimension_key ASC`,
+      `SELECT * FROM engineering_pipe_spatial_qto_summaries WHERE project_id = ? AND dimension_type = ? ORDER BY dimension_key ASC`,
       projectId,
       dimensionType,
     );
   }
   return query<Record<string, unknown>>(
-    `SELECT * FROM engineering_pipe_spatial_qto_summaries WHERE project_id = $1 ORDER BY dimension_type ASC, dimension_key ASC`,
+    `SELECT * FROM engineering_pipe_spatial_qto_summaries WHERE project_id = ? ORDER BY dimension_type ASC, dimension_key ASC`,
     projectId,
   );
 }

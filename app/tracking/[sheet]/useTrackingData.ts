@@ -3,6 +3,8 @@ import { useOfflineTickQueue } from "@/app/components/offlineQueue";
 import { redirectToLogin } from "@/app/lib/me";
 import type { Data } from "./types";
 
+// Thử mở lại SSE sau khi rớt (fallback poll vẫn chạy trong lúc chờ).
+const SSE_RETRY_MS = 120_000;
 const SYNC_POLL_MS = 10_000;
 
 // Fetch dữ liệu sheet tracking + đồng bộ đa người dùng (SSE/poll) + hàng đợi tick offline.
@@ -122,8 +124,23 @@ export function useTrackingData(sheet: string) {
       }, SYNC_POLL_MS);
     };
 
-    if (typeof EventSource !== "undefined") {
+    // Sau khi SSE rớt, client chuyển sang poll 10s. Trước đây KHÔNG bao giờ thử lại SSE cho
+    // tới khi remount: một lần rớt sóng 4G là mất luôn đồng bộ ~3s cả phiên. Nay thử kết nối
+    // lại sau 2 phút; kết nối lại được thì dừng poll.
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const stopPolling = () => {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
+    };
+
+    const moKetNoi = () => {
+      if (stopped || typeof EventSource === "undefined") {
+        startPolling();
+        return;
+      }
       es = new EventSource(`/api/events?sheet=${sheet}`);
+      es.addEventListener("open", stopPolling);
       es.addEventListener("version", (e) => {
         try {
           applyVersion(JSON.parse((e as MessageEvent).data).v);
@@ -135,14 +152,20 @@ export function useTrackingData(sheet: string) {
         es?.close();
         es = null;
         startPolling();
+        if (!stopped && !retryTimer)
+          retryTimer = setTimeout(() => {
+            retryTimer = null;
+            moKetNoi();
+          }, SSE_RETRY_MS);
       };
-    } else {
-      startPolling();
-    }
+    };
+
+    moKetNoi();
 
     return () => {
       stopped = true;
       es?.close();
+      if (retryTimer) clearTimeout(retryTimer);
       if (pollTimer) clearInterval(pollTimer);
     };
   }, [sheet, load]);

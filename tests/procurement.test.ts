@@ -129,7 +129,7 @@ test(
 
     const supplierId = await insertId(`INSERT INTO suppliers (name) VALUES ('NCC Test Rating')`);
     const poId = await insertId(
-      `INSERT INTO purchase_orders (supplier_id, status) VALUES (?, 'received')`,
+      `INSERT INTO purchase_orders (supplier_id, status, project_id) VALUES (?, 'received', 1)`,
       supplierId,
     );
 
@@ -175,7 +175,7 @@ test(
       matId,
     );
     const poCancelledId = await insertId(
-      `INSERT INTO purchase_orders (supplier_id, status) VALUES (?, 'cancelled')`,
+      `INSERT INTO purchase_orders (supplier_id, status, project_id) VALUES (?, 'cancelled', 1)`,
       supplierId,
     );
     await run(
@@ -184,8 +184,8 @@ test(
       matId,
     );
     await run(
-      `INSERT INTO payment_bills (responsible, type, amount, paid_date, responsible_supplier_id)
-       VALUES ('Test', 'bill', 4000, CURRENT_DATE, ?)`,
+      `INSERT INTO payment_bills (responsible, type, amount, paid_date, responsible_supplier_id, project_id)
+       VALUES ('Test', 'bill', 4000, CURRENT_DATE, ?, 1)`,
       supplierId,
     );
     await insertId(
@@ -194,7 +194,7 @@ test(
       poOkId,
     );
 
-    const summary = await supplierSummary(supplierId);
+    const summary = await supplierSummary(supplierId, 1);
     assert.equal(summary.ratingsCount, 1);
     assert.equal(summary.avgQuality, 4);
     assert.equal(summary.avgDelivery, 5);
@@ -202,6 +202,14 @@ test(
     assert.equal(summary.totalOrdered, 10_000); // PO huỷ (100 x 999) không tính
     assert.equal(summary.totalPaid, 4_000);
     assert.equal(summary.debt, 6_000);
+
+    // Vai trò không có CAN.viewPayments (subcon/viewer/cdt): API truyền keemTien=true —
+    // khối tiền phải là null, điểm đánh giá vẫn xem được (audit 2026-09-05).
+    const keem = await supplierSummary(supplierId, 1, true);
+    assert.equal(keem.totalOrdered, null);
+    assert.equal(keem.totalPaid, null);
+    assert.equal(keem.debt, null);
+    assert.equal(keem.ratingsCount, 1);
 
     await run(`DELETE FROM supplier_ratings WHERE supplier_id = ?`, supplierId);
     await run(`DELETE FROM payment_bills WHERE responsible_supplier_id = ?`, supplierId);

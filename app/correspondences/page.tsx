@@ -193,6 +193,7 @@ export default function CorrespondencesPage() {
             />
             {q && (
               <button
+                aria-label="Xoá dòng"
                 onClick={() => setQ("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
               >

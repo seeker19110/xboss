@@ -47,7 +47,7 @@ export async function GET(req: Request) {
          ORDER BY measured_at DESC
          LIMIT 1
        ) l ON true
-       WHERE d.project_id = $1
+       WHERE d.project_id = ?
        ORDER BY d.created_at ASC`,
       projectId,
     );

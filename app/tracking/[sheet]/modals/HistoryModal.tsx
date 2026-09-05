@@ -38,7 +38,11 @@ export function HistoryModal({ task, onClose }: { task: GridTask; onClose: () =>
             {task.code} · hiện tại {pct(task.progressPercent)}
           </p>
         </div>
-        <button onClick={onClose} className="ml-auto text-zinc-400 hover:text-white">
+        <button
+          aria-label="Đóng"
+          onClick={onClose}
+          className="ml-auto text-zinc-400 hover:text-white"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>

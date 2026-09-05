@@ -552,8 +552,17 @@ function VoDetailModal({
   async function submitVo() {
     if (!(await appConfirm(`Trình phát sinh ${vo.code} lên CĐT/TVGS?`))) return;
     setBusy(true);
-    const res = await fetch(`/api/variations/${vo.id}/submit`, { method: "POST" });
-    setBusy(false);
+    // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
+    // "Đang lưu..." mà không báo gì (audit 2026-09-05).
+    let res: Response;
+    try {
+      res = await fetch(`/api/variations/${vo.id}/submit`, { method: "POST" });
+    } catch {
+      showToast("Mất kết nối — chưa lưu được, thử lại khi có mạng", "error");
+      return;
+    } finally {
+      setBusy(false);
+    }
     if (!res.ok) {
       showToast((await res.json().catch(() => null))?.error ?? "Trình thất bại", "error");
       return;
@@ -578,12 +587,21 @@ function VoDetailModal({
     const body: { decision: string; lines?: { id: number; qtyApproved: number }[] } = { decision };
     if (decision === "partially_approved")
       body.lines = vo.lines.map((l) => ({ id: l.id, qtyApproved: Number(approvals[l.id]) || 0 }));
-    const res = await fetch(`/api/variations/${vo.id}/decide`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setBusy(false);
+    // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
+    // "Đang lưu..." mà không báo gì (audit 2026-09-05).
+    let res: Response;
+    try {
+      res = await fetch(`/api/variations/${vo.id}/decide`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      showToast("Mất kết nối — chưa lưu được, thử lại khi có mạng", "error");
+      return;
+    } finally {
+      setBusy(false);
+    }
     if (!res.ok) {
       showToast((await res.json().catch(() => null))?.error ?? "Quyết định thất bại", "error");
       return;
@@ -595,12 +613,21 @@ function VoDetailModal({
   async function contractAdd() {
     if (!addendaContractId || !addendaCode.trim()) return;
     setBusy(true);
-    const res = await fetch(`/api/variations/${vo.id}/contract-add`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contractId: addendaContractId, addendaCode: addendaCode.trim() }),
-    });
-    setBusy(false);
+    // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
+    // "Đang lưu..." mà không báo gì (audit 2026-09-05).
+    let res: Response;
+    try {
+      res = await fetch(`/api/variations/${vo.id}/contract-add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contractId: addendaContractId, addendaCode: addendaCode.trim() }),
+      });
+    } catch {
+      showToast("Mất kết nối — chưa lưu được, thử lại khi có mạng", "error");
+      return;
+    } finally {
+      setBusy(false);
+    }
     if (!res.ok) {
       showToast((await res.json().catch(() => null))?.error ?? "Thất bại", "error");
       return;

@@ -589,6 +589,7 @@ export default function OrdersTab() {
           />
           {search && (
             <button
+              aria-label="Xoá dòng"
               onClick={() => setSearch("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
             >
@@ -886,6 +887,7 @@ export default function OrdersTab() {
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-base text-zinc-100">Lập Đơn Đặt Hàng Mới (PO)</h3>
             <button
+              aria-label="Đóng"
               onClick={() => setShowCreatePO(false)}
               className="text-zinc-400 hover:text-white"
             >
@@ -992,6 +994,7 @@ export default function OrdersTab() {
 
                     {newPO.items.length > 1 && (
                       <button
+                        aria-label="Xoá dòng"
                         type="button"
                         onClick={() => {
                           const updated = newPO.items.filter((_, i) => i !== idx);
@@ -1047,7 +1050,11 @@ export default function OrdersTab() {
                 {showReceive.poCode} – {showReceive.supplierName}
               </p>
             </div>
-            <button onClick={() => setShowReceive(null)} className="text-zinc-400 hover:text-white">
+            <button
+              aria-label="Đóng"
+              onClick={() => setShowReceive(null)}
+              className="text-zinc-400 hover:text-white"
+            >
               <X size={18} />
             </button>
           </div>
@@ -1115,7 +1122,11 @@ export default function OrdersTab() {
         <Modal onClose={() => setShowAddPR(false)} className="max-w-md p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-base text-zinc-100">Gửi Yêu Cầu Mua Sắm Vật Tư (PR)</h3>
-            <button onClick={() => setShowAddPR(false)} className="text-zinc-400 hover:text-white">
+            <button
+              aria-label="Đóng"
+              onClick={() => setShowAddPR(false)}
+              className="text-zinc-400 hover:text-white"
+            >
               <X size={18} />
             </button>
           </div>
@@ -1190,6 +1201,7 @@ export default function OrdersTab() {
               </p>
             </div>
             <button
+              aria-label="Đóng"
               onClick={() => setReviewPRModal(null)}
               className="text-zinc-400 hover:text-white"
             >
