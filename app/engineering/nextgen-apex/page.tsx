@@ -29,6 +29,13 @@ import EngineeringNav from "@/app/components/EngineeringNav";
 
 type ActiveTab = "generative_routing" | "edge_vision_rebar" | "smart_ipc" | "fidic_tia";
 
+/** Nhãn tiếng Việt cho `SmartIpcGateStatus` — "khong_du_du_lieu" khác hẳn "không đạt". */
+const NHAN_TRANG_THAI_GATE: Record<string, string> = {
+  passed: "ĐẠT",
+  failed: "KHÔNG ĐẠT",
+  khong_du_du_lieu: "CHƯA ĐỦ DỮ LIỆU ĐỂ ĐỐI SOÁT",
+};
+
 export default function NextGenApexEngineeringPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("generative_routing");
 
@@ -651,7 +658,10 @@ export default function NextGenApexEngineeringPage() {
                   <span className="font-mono text-emerald-400">{iotPressureDrop} bar (2.5h)</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-zinc-300">Gate 4: Khối lượng BOQ (Hợp đồng):</span>
+                  <span className="text-zinc-300">
+                    Gate 4: Khối lượng BOQ (Hợp đồng){" "}
+                    <span className="text-amber-400">— cảnh báo, không chặn</span>:
+                  </span>
                   <span className="font-mono text-zinc-200">
                     {claimedQty} / {approvedBoqQty} m
                   </span>
@@ -696,7 +706,9 @@ export default function NextGenApexEngineeringPage() {
                   </div>
 
                   <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg text-xs space-y-1.5">
-                    <div className="font-bold text-zinc-300 mb-1">Kết quả kiểm tra 4 cổng:</div>
+                    <div className="font-bold text-zinc-300 mb-1">
+                      Kết quả kiểm tra 4 cổng — chỉ Gate 1–3 quyết định tự động thông qua:
+                    </div>
                     <div className="flex items-center gap-2 text-zinc-300">
                       {smartIpcResult.gate1GeometryPassed ? (
                         <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -724,14 +736,28 @@ export default function NextGenApexEngineeringPage() {
                       Gate 3 (Viễn trắc IoT Thử áp thủy tĩnh):{" "}
                       {smartIpcResult.gate3HydroIotPassed ? "ĐẠT" : "KHÔNG ĐẠT"}
                     </div>
-                    <div className="flex items-center gap-2 text-zinc-300">
+                    {/* Gate 4 là CẢNH BÁO, không chặn (quyết định nghiệp vụ 2026-09-05): dùng
+                        màu amber thay vì rose để không báo động sai, và luôn kèm chữ giải thích
+                        vì chỉ dùng màu là chưa đủ. */}
+                    <div className="flex items-start gap-2 text-zinc-300">
                       {smartIpcResult.gate4QuadReconcilePassed ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
                       ) : (
-                        <AlertTriangle className="w-4 h-4 text-rose-400" />
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
                       )}
-                      Gate 4 (Đối soát định lượng BOQ):{" "}
-                      {smartIpcResult.gate4QuadReconcilePassed ? "ĐẠT" : "KHÔNG ĐẠT"}
+                      <div className="space-y-0.5">
+                        <div>
+                          Gate 4 (Đối soát định lượng BOQ){" "}
+                          <span className="text-amber-400">— cảnh báo, không chặn giải ngân</span>:{" "}
+                          {NHAN_TRANG_THAI_GATE[smartIpcResult.gateStatuses?.gate4 as string] ??
+                            "KHÔNG ĐẠT"}
+                        </div>
+                        {(smartIpcResult.gate4WarningReasons ?? []).map((lyDo: string) => (
+                          <div key={lyDo} className="text-amber-400">
+                            {lyDo}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
 

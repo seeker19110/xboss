@@ -8,6 +8,17 @@
 // `khong_du_du_lieu` và CHẶN giải ngân (không bao giờ mặc định pass). Số tài khoản ngân hàng
 // hardcode đã bị xoá — hệ thống hiện chưa có cột lưu thông tin ngân hàng nhà thầu nên để trống
 // kèm ghi chú "chưa cấu hình", không bịa số.
+//
+// ⚠️ GATE 4 CHỈ CÒN LÀ CẢNH BÁO (Đợt 6, quyết định nghiệp vụ của chủ dự án 2026-09-05):
+// `allGatesCleared` nay tính từ gate 1–3; gate 4 vẫn được thẩm định và trả về đầy đủ cho người
+// duyệt xem nhưng KHÔNG tham gia quyết định tự động thông qua, và lý do của nó nằm ở trường
+// riêng `gate4WarningReasons` (không trộn vào `blockedGateReasons` để người duyệt khỏi hiểu
+// nhầm hồ sơ bị chặn vì kho). Lý do: nửa "đối soát kho" của gate 4 là BẤT KHẢ THI về cấu trúc —
+// `migrations/0029_boq_codes.sql` giữ một registry BOQCODE duy nhất XUYÊN BẢNG (tasks,
+// work_packages, materials, boq_items), nên `materials.boq_code` không bao giờ trùng được
+// `boq_items.code` (trigger `boq_codes_sync` raise 23505). Nửa "khối lượng ≤ hạn mức BOQ" thì
+// VẪN chạy đúng và vẫn là một chốt kiểm soát tiền thật — theo quyết định trên nó cũng thành
+// cảnh báo, người duyệt phải tự kiểm trước khi phê duyệt.
 import { query, queryOne } from "@/lib/db";
 import { createHash } from "node:crypto";
 import { parseMoney, mulRate, moneyToNumber } from "@/lib/nen/money";
@@ -138,7 +149,14 @@ export interface SmartIpcGateContext {
     available: boolean;
     claimedQty: number | null;
     approvedBoqQty: number | null;
+    /** Luôn `null`: hệ thống chưa có liên kết dữ liệu để tính khối lượng xuất kho theo mã BOQ. */
     warehouseUsedQty: number | null;
+    /**
+     * Chỉ số của gate 4 chưa có nguồn dữ liệu thật, kèm lý do hiển thị nguyên văn cho người
+     * duyệt (bám khuôn `thieuDuLieu` của `lib/hien-truong/subcon-metrics.ts`: chỉ số nào chưa
+     * có nguồn thì trả `null` kèm lý do, TUYỆT ĐỐI không thay bằng số mặc định như 0).
+     */
+    thieuDuLieu: { chiSo: string; lyDo: string }[];
   };
 }
 
@@ -237,7 +255,30 @@ async function fetchGate3Context(
   return { available: true, pressureDropBar, durationHours, requiredHours };
 }
 
-/** Gate 4 — Đối soát định lượng: KL xin thanh toán so với hợp đồng (BOQ) và vật tư đã xuất kho. */
+/**
+ * Lý do cố định vì sao chỉ số "vật tư đã xuất kho theo mã BOQ" chưa có nguồn dữ liệu thật.
+ *
+ * Trước đây hàm này chạy `SELECT SUM(qty_used) FROM materials WHERE boq_code = ?` với chính mã
+ * lấy từ `boq_items.code` — câu truy vấn hợp lệ nhưng KHÔNG BAO GIỜ khớp dòng nào, vì
+ * `migrations/0029_boq_codes.sql` gắn trigger registry BOQCODE lên cả 4 bảng (tasks,
+ * work_packages, materials, boq_items) với khoá chính là `code`: hai bảng không thể cùng giữ
+ * một mã. `COALESCE(..., 0)` biến "không khớp dòng nào" thành số 0 — một con số BỊA, khiến mọi
+ * khối lượng dương đều trượt cổng. Nay trả thẳng `null` kèm lý do thay vì 0.
+ */
+const LY_DO_THIEU_DU_LIEU_KHO =
+  "Chưa có nguồn dữ liệu: khối lượng vật tư đã xuất kho không tra được theo mã BOQ vì registry " +
+  "BOQCODE (migrations/0029_boq_codes.sql) coi mã là duy nhất xuyên bảng tasks/work_packages/" +
+  "materials/boq_items, nên materials.boq_code không bao giờ trùng boq_items.code";
+
+/** Một mục `thieuDuLieu` mới cho chỉ số kho (hàm, không hằng dùng chung — tránh chia sẻ mảng). */
+function thieuDuLieuKho(): { chiSo: string; lyDo: string }[] {
+  return [{ chiSo: "warehouseUsedQty", lyDo: LY_DO_THIEU_DU_LIEU_KHO }];
+}
+
+/**
+ * Gate 4 — Đối soát định lượng: KL xin thanh toán so với hạn mức hợp đồng (BOQ).
+ * Nửa "đối soát kho" luôn thiếu dữ liệu (xem `LY_DO_THIEU_DU_LIEU_KHO`) nên trả `null`.
+ */
 async function fetchGate4Context(
   projectId: number,
   boqCode: string | undefined,
@@ -249,6 +290,13 @@ async function fetchGate4Context(
       claimedQty: claimedQty ?? null,
       approvedBoqQty: null,
       warehouseUsedQty: null,
+      thieuDuLieu: [
+        {
+          chiSo: "approvedBoqQty",
+          lyDo: "Hồ sơ chưa khai mã BOQ hoặc khối lượng xin thanh toán để đối soát hạn mức",
+        },
+        ...thieuDuLieuKho(),
+      ],
     };
   }
 
@@ -259,21 +307,27 @@ async function fetchGate4Context(
     projectId,
   );
   if (!boq) {
-    return { available: false, claimedQty, approvedBoqQty: null, warehouseUsedQty: null };
+    return {
+      available: false,
+      claimedQty,
+      approvedBoqQty: null,
+      warehouseUsedQty: null,
+      thieuDuLieu: [
+        {
+          chiSo: "approvedBoqQty",
+          lyDo: `Không tìm thấy dòng BOQ mã "${boqCode}" trong dự án đang giải ngân`,
+        },
+        ...thieuDuLieuKho(),
+      ],
+    };
   }
-
-  const usedRow = await queryOne<{ qtyUsed: string }>(
-    `SELECT COALESCE(SUM(qty_used), 0)::text AS "qtyUsed"
-     FROM materials WHERE project_id = ? AND boq_code = ?`,
-    projectId,
-    boqCode,
-  );
 
   return {
     available: true,
     claimedQty,
     approvedBoqQty: Number(boq.qtyContract),
-    warehouseUsedQty: usedRow ? Number(usedRow.qtyUsed) : 0,
+    warehouseUsedQty: null,
+    thieuDuLieu: thieuDuLieuKho(),
   };
 }
 
@@ -307,8 +361,12 @@ export interface SmartIpcGateEvaluation {
   gate2: SmartIpcGateOutcome;
   gate3: SmartIpcGateOutcome;
   gate4: SmartIpcGateOutcome;
+  /** CHỈ tính từ gate 1–3 — gate 4 là cảnh báo, không chặn (quyết định nghiệp vụ 2026-09-05). */
   allGatesCleared: boolean;
+  /** Lý do của các cổng THỰC SỰ chặn giải ngân (gate 1–3). Không bao giờ chứa lý do gate 4. */
   blockedGateReasons: string[];
+  /** Lý do gate 4 chưa đạt — hiển thị cho người duyệt dưới dạng CẢNH BÁO, không phải lý do chặn. */
+  gate4WarningReasons: string[];
 }
 
 const KHONG_DU_DU_LIEU: (label: string) => SmartIpcGateOutcome = (label) => ({
@@ -347,22 +405,67 @@ export function evaluateSmartIpcGates(ctx: SmartIpcGateContext): SmartIpcGateEva
           reason: `Gate 3 thất bại: Thử áp thủy tĩnh IoT không đạt (sụt áp ${ctx.gate3.pressureDropBar} bar, thời gian ${ctx.gate3.durationHours}h)`,
         };
 
-  // Gate 4: Đối soát định lượng không vượt hạn mức BOQ và vật tư thực tế đã xuất kho
-  const gate4: SmartIpcGateOutcome = !ctx.gate4.available
-    ? KHONG_DU_DU_LIEU("Gate 4 (đối soát BOQ/kho)")
-    : ctx.gate4.claimedQty! <= ctx.gate4.approvedBoqQty! &&
-        ctx.gate4.claimedQty! <= ctx.gate4.warehouseUsedQty!
-      ? { status: "passed" }
-      : {
-          status: "failed",
-          reason: `Gate 4 thất bại: Khối lượng vượt hạn mức BOQ (${ctx.gate4.claimedQty} > ${ctx.gate4.approvedBoqQty}) hoặc vượt vật tư kho (${ctx.gate4.claimedQty} > ${ctx.gate4.warehouseUsedQty})`,
-        };
+  // Gate 4: Đối soát định lượng — CẢNH BÁO, KHÔNG CHẶN (xem ghi chú đầu file).
+  const gate4 = danhGiaGate4(ctx.gate4);
 
-  const gates = [gate1, gate2, gate3, gate4];
-  const allGatesCleared = gates.every((g) => g.status === "passed");
-  const blockedGateReasons = gates.filter((g) => g.status !== "passed").map((g) => g.reason!);
+  // Chỉ gate 1–3 quyết định tự động thông qua. Gate 4 vẫn trả về đầy đủ (status + reason) để
+  // UI hiển thị, nhưng lý do của nó đi vào `gate4WarningReasons` — trộn vào `blockedGateReasons`
+  // sẽ khiến người duyệt hiểu nhầm hồ sơ bị chặn vì kho.
+  const gatesChan = [gate1, gate2, gate3];
+  const allGatesCleared = gatesChan.every((g) => g.status === "passed");
+  const blockedGateReasons = gatesChan.filter((g) => g.status !== "passed").map((g) => g.reason!);
+  const gate4WarningReasons = gate4.status === "passed" ? [] : [gate4.reason!];
 
-  return { gate1, gate2, gate3, gate4, allGatesCleared, blockedGateReasons };
+  return {
+    gate1,
+    gate2,
+    gate3,
+    gate4,
+    allGatesCleared,
+    blockedGateReasons,
+    gate4WarningReasons,
+  };
+}
+
+/** Tiền tố chung để mọi lý do gate 4 tự nói rõ nó là cảnh báo, không phải lý do chặn hồ sơ. */
+const CANH_BAO_GATE4 = "Gate 4 (đối soát BOQ/kho) — cảnh báo, KHÔNG chặn giải ngân";
+
+/**
+ * Thẩm định gate 4. Tách riêng vì nó có 2 nửa với số phận khác hẳn nhau:
+ *  - Nửa "khối lượng ≤ hạn mức BOQ" VỐN CHẠY ĐÚNG và là chốt kiểm soát tiền thật → vượt hạn
+ *    mức vẫn kết luận `failed` để người duyệt thấy sai lệch (chỉ khác: không còn chặn tự động).
+ *  - Nửa "đối soát kho" bất khả thi về cấu trúc → `khong_du_du_lieu` kèm lý do, KHÔNG phải
+ *    `failed` ("failed" nói sai rằng hồ sơ có vấn đề), và tuyệt đối không quy về số 0.
+ */
+function danhGiaGate4(g4: SmartIpcGateContext["gate4"]): SmartIpcGateOutcome {
+  const lyDoThieu = g4.thieuDuLieu.map((t) => t.lyDo).join("; ");
+
+  if (!g4.available || g4.claimedQty == null || g4.approvedBoqQty == null) {
+    return { status: "khong_du_du_lieu", reason: `${CANH_BAO_GATE4}: ${lyDoThieu}` };
+  }
+
+  if (g4.claimedQty > g4.approvedBoqQty) {
+    return {
+      status: "failed",
+      reason: `${CANH_BAO_GATE4}: Khối lượng xin thanh toán vượt hạn mức BOQ (${g4.claimedQty} > ${g4.approvedBoqQty}) — người duyệt phải tự kiểm tra trước khi phê duyệt`,
+    };
+  }
+
+  if (g4.warehouseUsedQty == null) {
+    return {
+      status: "khong_du_du_lieu",
+      reason: `${CANH_BAO_GATE4}: Khối lượng ${g4.claimedQty} nằm trong hạn mức BOQ ${g4.approvedBoqQty}, nhưng chưa đối soát được với kho. ${lyDoThieu}`,
+    };
+  }
+
+  if (g4.claimedQty > g4.warehouseUsedQty) {
+    return {
+      status: "failed",
+      reason: `${CANH_BAO_GATE4}: Khối lượng xin thanh toán vượt vật tư đã xuất kho (${g4.claimedQty} > ${g4.warehouseUsedQty})`,
+    };
+  }
+
+  return { status: "passed" };
 }
 
 // ============================================================================
@@ -412,8 +515,11 @@ export interface SmartIpcResult {
     gate3: SmartIpcGateStatus;
     gate4: SmartIpcGateStatus;
   };
+  /** CHỈ tính từ gate 1–3 (gate 4 là cảnh báo) — cũng là giá trị ghi vào cột `all_gates_cleared`. */
   allGatesCleared: boolean;
   blockedGateReasons: string[];
+  /** Cảnh báo gate 4 cho người duyệt xem — KHÔNG phải lý do hồ sơ bị chặn. */
+  gate4WarningReasons: string[];
   merkleSealHash: string;
   bankingPaymentPayload: Record<string, unknown>;
   paymentStatus: "released" | "held_by_gates";
@@ -471,6 +577,7 @@ export function processSmartIpcRelease(
     },
     allGatesCleared: evaluation.allGatesCleared,
     blockedGateReasons: evaluation.blockedGateReasons,
+    gate4WarningReasons: evaluation.gate4WarningReasons,
     merkleSealHash,
     bankingPaymentPayload,
     paymentStatus: evaluation.allGatesCleared ? "released" : "held_by_gates",
@@ -482,6 +589,15 @@ export function processSmartIpcRelease(
 // 6. LƯU TRỮ & TRUY VẤN
 // ============================================================================
 
+/**
+ * Lưu bản ghi Smart IPC.
+ *
+ * ⚠️ Ý NGHĨA CỘT ĐÃ ĐỔI (Đợt 6, 2026-09-05) — tên cột giữ nguyên (không migration, không đổi
+ * tên cột): `all_gates_cleared` nay là kết luận của **3 cổng** (gate 1–3), không còn là 4.
+ * `gate4_quad_reconcile_passed` vẫn ghi đúng trạng thái thật của gate 4 (chỉ `true` khi
+ * `status === "passed"`), nhưng nó chỉ là số liệu tham khảo/cảnh báo cho người duyệt, không
+ * tham gia quyết định giải ngân. Đọc dữ liệu lịch sử cần lưu ý mốc thời gian này.
+ */
 export async function saveSmartIpcRecord(
   projectId: number,
   result: SmartIpcResult,
