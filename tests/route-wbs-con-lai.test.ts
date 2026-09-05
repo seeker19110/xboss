@@ -665,6 +665,68 @@ test("PATCH /api/tasks/:id/move: hoán đổi 2 task liền kề đúng nhóm", 
   assert.equal(r2?.sort_order, 1);
 });
 
+// Đợt 6, Việc C — vá nối chuỗi SQL ở app/api/tasks/[id]/move/route.ts (cur.sort_order
+// nối thẳng vào câu SQL thay vì dùng placeholder `?`). Ca này dựng 3 task liền kề, di
+// chuyển "lên" rồi "xuống" và so khớp TOÀN BỘ thứ tự (3 sort_order) trước/sau — chạy
+// xanh y hệt trên cả bản trước và sau khi sửa chứng minh KHÔNG đổi hành vi.
+test(
+  "PATCH /api/tasks/:id/move: 3 task liền kề — di chuyển lên rồi xuống giữ đúng thứ tự",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("tmv3");
+    const pm = await taoUser("pm", "tmv3");
+    const pkgId = await taoNhom(sheetTypeId, "T3");
+    const a = await taoTask(pkgId, "T3,01", { sortOrder: 10 });
+    const b = await taoTask(pkgId, "T3,02", { sortOrder: 20 });
+    const c = await taoTask(pkgId, "T3,03", { sortOrder: 30 });
+    await dangNhapDuAn(pm, projectId);
+    const { PATCH } = await import("@/app/api/tasks/[id]/move/route");
+    const { query } = await import("@/lib/db");
+
+    const thuTu = async () => {
+      const rows = await query<{ id: number; sort_order: number }>(
+        `SELECT id, sort_order FROM tasks WHERE package_id = ? ORDER BY sort_order`,
+        pkgId,
+      );
+      return rows.map((r) => r.id);
+    };
+
+    assert.deepEqual(await thuTu(), [a, b, c]);
+
+    // b "lên" → hoán đổi với a (10 <-> 20).
+    let res = await PATCH(jreq("/x", { direction: "up" }, "PATCH"), {
+      params: Promise.resolve({ id: String(b) }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).ok, true);
+    assert.deepEqual(await thuTu(), [b, a, c]);
+
+    // b (giờ sort_order=10) "xuống" → hoán đổi với a (10 <-> 20) — về lại thứ tự gốc.
+    res = await PATCH(jreq("/x", { direction: "down" }, "PATCH"), {
+      params: Promise.resolve({ id: String(b) }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).ok, true);
+    assert.deepEqual(await thuTu(), [a, b, c]);
+
+    // a (sort_order=10) "lên" → đã ở đầu, không đổi gì.
+    res = await PATCH(jreq("/x", { direction: "up" }, "PATCH"), {
+      params: Promise.resolve({ id: String(a) }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).ok, false);
+    assert.deepEqual(await thuTu(), [a, b, c]);
+
+    // c (sort_order=30) "xuống" → đã ở cuối, không đổi gì.
+    res = await PATCH(jreq("/x", { direction: "down" }, "PATCH"), {
+      params: Promise.resolve({ id: String(c) }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).ok, false);
+    assert.deepEqual(await thuTu(), [a, b, c]);
+  },
+);
+
 // ============================================================================
 // POST /api/tasks/:id/copy
 // ============================================================================
