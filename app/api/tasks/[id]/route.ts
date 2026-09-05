@@ -12,6 +12,7 @@ import {
 import { assignTask } from "@/lib/tien-do/assignments";
 import { validateCustom } from "@/lib/ha-tang/custom-fields";
 import { storageDelete } from "@/lib/nen/storage";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,12 @@ export async function PATCH(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Cách ly dự án (vá W7, Đợt 5) — id đoán được (số nguyên tăng dần); route này chỉ dựa
+  // CAN.editStructure (vai trò) chứ không so dự án nên Admin/PM dự án A sửa được task dự án
+  // B. Kiểm TRƯỚC mọi thao tác ghi, 404 (không phải 403) để không xác nhận task tồn tại.
+  if (projectId == null || (await taskProjectId(id)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
 
@@ -198,6 +205,12 @@ export async function DELETE(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Cách ly dự án (vá W7, Đợt 5) — id đoán được; kiểm TRƯỚC bất kỳ đọc/xoá dữ liệu con nào
+  // (cascade xoá photos/documents/comments/history/materials/dimensions rồi file vật lý) để
+  // không lỡ xoá dữ liệu dự án khác rồi mới phát hiện sai dự án. 404, không phải 403.
+  if (projectId == null || (await taskProjectId(id)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
 
   const task = await queryOne<{ id: number; package_id: number }>(
     `SELECT id, package_id FROM tasks WHERE id = ?`,

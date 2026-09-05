@@ -3,6 +3,7 @@ import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,11 @@ export async function PATCH(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Cách ly dự án (vá W7, Đợt 5) — id đoán được, route chỉ dựa CAN.editStructure. Task lân
+  // cận (neighbor) luôn cùng package_id với task nguồn nên chỉ cần kiểm 1 đầu.
+  if (projectId == null || (await taskProjectId(id)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
   const dir = String(body.direction ?? "");

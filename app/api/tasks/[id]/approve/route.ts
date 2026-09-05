@@ -7,6 +7,7 @@ import { deriveStatus, recomputePackage } from "@/lib/tien-do/recompute";
 import { requiredInspectionMissing } from "@/lib/ky-thuat/qaqc";
 import { getActiveFlow, openApproval, advanceApproval } from "@/lib/tien-do/approvals";
 import { emitWebhook } from "@/lib/bao-mat/webhooks";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,13 @@ export async function POST(
     return NextResponse.json({ error: "Cần nhập lý do từ chối" }, { status: 422 });
 
   const projectId = await getCurrentProjectId(user);
+
+  // Cách ly dự án (vá W7, Đợt 5) — CAN.approve chỉ so vai trò, không so dự án; id task đoán
+  // được nên Admin/PM dự án A nghiệm thu được task dự án B, ghi audit xuyên dự án. 404 để
+  // không xác nhận task tồn tại.
+  if (projectId == null || (await taskProjectId(id)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
+
   const blocked = await assertModuleEnabled("tracking", projectId);
   if (blocked) return blocked;
 
@@ -200,11 +208,16 @@ export async function DELETE(
     return NextResponse.json({ error: "Chỉ Admin/PM được huỷ nghiệm thu" }, { status: 403 });
 
   const projectId = await getCurrentProjectId(user);
-  const blocked = await assertModuleEnabled("tracking", projectId);
-  if (blocked) return blocked;
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Cách ly dự án (vá W7, Đợt 5) — cùng lý do như POST ở trên.
+  if (projectId == null || (await taskProjectId(id)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
+
+  const blocked = await assertModuleEnabled("tracking", projectId);
+  if (blocked) return blocked;
 
   // FOR UPDATE để tránh 2 người cùng huỷ nghiệm thu đồng thời tạo duplicate audit record
   // (đối xứng với POST — cùng nguy cơ TOCTOU nếu bỏ transaction/lock).
