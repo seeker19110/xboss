@@ -271,15 +271,41 @@ export async function authorizeExecutionRequest(
 }
 
 // 6. Execute Request (Safe Execution & Postcondition Check)
+//
+// RANH GIỚI TRANSACTION (vá Đợt 6 — lệnh huỷ của kill switch phải BỀN):
+// Trước đây cả thân hàm nằm trong MỘT `withProjectScope(..., { readOnly: false })` — vốn bọc
+// `withTransaction` — còn nhánh huỷ ghi `UPDATE ... status='killed'` rồi `throw` ngay sau, nên
+// ROLLBACK xoá luôn chính lệnh huỷ đó. Bản ghi ở lại `authorized` với `approval_token` còn hạn
+// 15 phút ⇒ bật kill switch rồi tắt lại trong cửa sổ đó thì yêu cầu lẽ ra đã bị huỷ vẫn thực
+// thi được thật.
+//
+// Cách vá: giữ NGUYÊN một transaction cho đường thành công (đọc → thẩm định → ghi `completed`
+// vẫn nguyên tử), còn nhánh huỷ KHÔNG throw từ trong transaction mà trả về giá trị đánh dấu;
+// lệnh huỷ ghi ở transaction THỨ HAI bên ngoài rồi mới `throw`. Chọn hướng này thay vì tách
+// hẳn pha đọc/thẩm định ra một transaction read-only riêng vì tách như vậy sẽ mở thêm một cửa
+// sổ đua mới giữa lúc thẩm định và lúc ghi, đúng thứ đang phải bịt.
+//
+// ĐUA (race): đường thành công khoá dòng bằng `SELECT ... FOR UPDATE` CỘNG điều kiện
+// `AND status = 'authorized' AND approval_token = ?` ở `UPDATE` hoàn tất, rồi kiểm dòng thật sự
+// đổi — không có dòng nào nghĩa là một lời gọi khác đã tiêu thụ token trước, phải ném lỗi thay
+// vì báo thành công. Nhánh huỷ cũng chỉ ghi khi dòng còn `authorized`, để không đè lên kết quả
+// của lời gọi đã hoàn tất trước đó.
+//
+// LƯU Ý: `withTransaction` là reentrant — gọi hàm này từ BÊN TRONG một transaction có sẵn thì
+// cả hai `withProjectScope` dưới đây tái dùng transaction cha và rollback của cha vẫn xoá lệnh
+// huỷ. Đường vào duy nhất hiện nay (route `.../requests/[id]/execute`) gọi ngoài mọi
+// transaction; đừng gọi hàm này lồng trong transaction khác.
 export async function executeExecutionRequest(
   projectId: number,
   requestId: string,
   token: string,
   userRole?: string,
 ): Promise<ExecutionRequest> {
-  return withProjectScope(
+  type KetQuaThucThi = { huy: string; request: null } | { huy: null; request: ExecutionRequest };
+
+  const ketQua = await withProjectScope(
     projectId,
-    async () => {
+    async (): Promise<KetQuaThucThi> => {
       const req = await queryOne<ExecutionRequest>(
         `SELECT id, project_id AS "projectId", capability_key AS "capabilityKey",
                 autonomy_level AS "autonomyLevel", intent, dry_run_diff AS "dryRunDiff",
@@ -287,7 +313,8 @@ export async function executeExecutionRequest(
                 token_expires_at AS "tokenExpiresAt", execution_result AS "executionResult",
                 created_by AS "createdBy", created_at AS "createdAt"
          FROM engineering_execution_requests
-         WHERE id = ? AND project_id = ?`,
+         WHERE id = ? AND project_id = ?
+         FOR UPDATE`,
         requestId,
         projectId,
       );
@@ -309,11 +336,8 @@ export async function executeExecutionRequest(
         userRole,
       );
       if (!allowance.allowed) {
-        await run(
-          `UPDATE engineering_execution_requests SET status = 'killed' WHERE id = ?`,
-          requestId,
-        );
-        throw new Error(`Thực thi bị hủy bỏ: ${allowance.reason}`);
+        // Không ghi cũng không throw ở đây: transaction này COMMIT sạch, lệnh huỷ ghi bên dưới.
+        return { huy: allowance.reason ?? "Không được phép thực thi", request: null };
       }
 
       // Execute typed action
@@ -323,25 +347,48 @@ export async function executeExecutionRequest(
         auditDetails: `Hoàn tất thực thi an toàn theo Intent: ${req.intent}`,
       };
 
-      const updated =
-        (await queryOne<ExecutionRequest>(
-          `UPDATE engineering_execution_requests
+      const updated = await queryOne<ExecutionRequest>(
+        `UPDATE engineering_execution_requests
          SET status = 'completed', execution_result = ?, approval_token = NULL
-         WHERE id = ? AND project_id = ?
+         WHERE id = ? AND project_id = ? AND status = 'authorized' AND approval_token = ?
          RETURNING id, project_id AS "projectId", capability_key AS "capabilityKey",
                    autonomy_level AS "autonomyLevel", intent, dry_run_diff AS "dryRunDiff",
                    risk_class AS "riskClass", status, approval_token AS "approvalToken",
                    token_expires_at AS "tokenExpiresAt", execution_result AS "executionResult",
                    created_by AS "createdBy", created_at AS "createdAt"`,
-          JSON.stringify(executionResult),
-          requestId,
-          projectId,
-        )) ?? null;
+        JSON.stringify(executionResult),
+        requestId,
+        projectId,
+        token,
+      );
 
-      return updated!;
+      if (!updated) throw new Error("Yêu cầu đã được thực thi bởi một tiến trình khác");
+
+      return { huy: null, request: updated };
     },
     { readOnly: false },
   );
+
+  if (ketQua.huy !== null) {
+    // Transaction THỨ HAI: ghi lệnh huỷ (không bị `throw` bên dưới cuốn theo) và đóng luôn cửa
+    // sổ token — yêu cầu đã huỷ không thực thi lại được kể cả khi kill switch được tắt ngay sau.
+    await withProjectScope(
+      projectId,
+      async () => {
+        await run(
+          `UPDATE engineering_execution_requests
+           SET status = 'killed', approval_token = NULL
+           WHERE id = ? AND project_id = ? AND status = 'authorized'`,
+          requestId,
+          projectId,
+        );
+      },
+      { readOnly: false },
+    );
+    throw new Error(`Thực thi bị hủy bỏ: ${ketQua.huy}`);
+  }
+
+  return ketQua.request;
 }
 
 // 7. Toggle Kill Switch
