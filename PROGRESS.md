@@ -1,5 +1,147 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Đợt 5 chiến dịch coverage — phủ `engineering/**` + lần ra chuỗi lỗ hổng cách ly (2026-09-05)
+
+Tiếp nối Đợt 4. Hai mục tiêu: phủ test THỰC THI cho **91 route `app/api/engineering/**`** chưa
+từng có test, và trả nợ mục đầu "Ghi nhận, chưa sửa" của Đợt 4 (`workpackages/:id/**`). Mục thứ
+hai **kéo ra một chuỗi lỗ hổng lớn hơn nhiều dự tính** — xem "Chuỗi lỗ hổng" bên dưới.
+
+**7 file test mới, 537 ca. 33 commit, 70 tệp đổi, 60 tệp route/lib được vá.**
+
+| Việc | File test                     | Ca  | Nội dung                                                  |
+| ---- | ----------------------------- | --- | --------------------------------------------------------- |
+| W0   | `route-workpackages-cach-ly`  | 34  | vá cách ly dự án 11 route `workpackages/**` (19 endpoint) |
+| W1   | `route-eng-quy-trinh`         | 120 | 24 route quy trình & duyệt                                |
+| W2   | `route-eng-zero-error`        | 101 | 22 route zero-error/tuân thủ/tri thức                     |
+| W3   | `route-eng-du-bao`            | 94  | 22 route dự báo/đấu thầu/tài chính                        |
+| W4   | `route-eng-mepf`              | 106 | 23 route MEPF & hiện trường số                            |
+| W6   | `route-tien-do-cach-ly-du-an` | 45  | vá 12 route chỉ dựa `canTouchTask`/`canTouchFloor`        |
+| W7   | `route-task-cach-ly`          | 38  | vá đường sửa/xoá task + rò rỉ NCC xuyên tổ chức           |
+
+### CHUỖI LỖ HỔNG CÁCH LY — lần ra theo từng bước, không đoán
+
+Đợt 4 để lại một dòng "ghi nhận, chưa sửa": `workpackages/:id/**` cùng lớp lỗi cách ly dự án.
+Vá nó xong thì mỗi lượt review lại lộ ra một tầng sâu hơn:
+
+1. **W0 — 19 endpoint `workpackages/**`.** Tạo nhóm việc, tạo task, đổi thứ tự, sao chép, sửa
+   lưới dimension, tải/xoá biên bản nghiệm thu và bản vẽ của **dự án khác** bằng cách đoán id.
+   Kèm phát hiện: `workpackages/[id]/route.ts` mà chính kế hoạch của phiên chính xếp là "route
+   anh em ĐÃ lọc đúng" thực ra **không lọc** — lời gọi `getCurrentProjectId` duy nhất trong file
+   chỉ phục vụ `validateCustom` cho trường tuỳ biến, không dùng phân quyền. Phiên chính khảo sát
+   bằng `grep` tên hàm nên kết luận sai; worker đọc code mới thấy. **Bài học: grep tên hàm không
+   thay được đọc code — hàm có mặt không có nghĩa nó đang được dùng để kiểm quyền.**
+2. **Review W0 → NGUYÊN NHÂN GỐC.** `lib/bao-mat/auth.ts`: `canTouchTask`, `canTouchPackage`,
+   `canTouchFloor`, `canTouchVehicle`, `canViewSubcontractor` đều mở đầu
+   `if (user.role !== "subcon") return true;` — trả `true` **vô điều kiện** cho
+   admin/pm/engineer/bch/cdt/viewer và **không so dự án**. Chúng chỉ trả lời câu hỏi hẹp "subcon
+   này có được giao việc đó không". ⇒ Mọi route chỉ dựa vào chúng thì với mọi vai trò không phải
+   thầu phụ **coi như không có cách ly dự án**.
+3. **W6 — 12 route, gồm ĐƯỜNG GHI TIẾN ĐỘ LÕI.** `PATCH /api/dimensions/:id` (tick ô — tính năng
+   trung tâm của sản phẩm), `dimensions/batch` (tick hàng loạt), `tasks/:id/progress`. Cả ba đều
+   có gọi `getCurrentProjectId` nhưng **chỉ dùng cho `assertModuleEnabled`** (kiểm cờ bật module),
+   không dùng phân quyền; truy vấn tra theo `WHERE pd.id = ?`. Cộng 9 route đọc/ghi theo id task
+   (bình luận, ảnh, tài liệu, lịch sử, lý do trễ) và 2 route nghiệm thu tầng.
+4. **Review W6 → W7 — ĐƯỜNG XOÁ DỮ LIỆU VĨNH VIỄN.** `DELETE /api/tasks/:id` tra task theo id rồi
+   xoá theo tầng `notifications`, `baseline_tasks`, `task_photos`, `task_documents`,
+   `task_comments`, `task_history`, `materials`/`material_transactions`, `progress_dimensions`,
+   xoá task, rồi `storageDelete` **tệp vật lý trên đĩa** — không một điểm chặn dự án nào. Đây là
+   chỗ duy nhất trong cả chuỗi **phá huỷ dữ liệu không hồi phục**. Cùng lớp: `tasks/:id` PATCH,
+   `tasks/:id/approve`, `tasks/batch`, `tasks/:id/move`, `tasks/:id/copy`.
+5. **W7 phần 2 — rò rỉ xuyên TỔ CHỨC.** `getSubcontractor()` tra `suppliers` theo id không lọc
+   `org_id`, trong khi `GET /api/suppliers` đã lọc. Đọc được hồ sơ, tài liệu, đánh giá NCC của tổ
+   chức khác; `subcon-documents/:id` DELETE trước đó **không kiểm gì cả**.
+
+**Khuôn vá thống nhất:** suy dự án qua `tasks.package_id → work_packages.sheet_type_id →
+sheet_types.tower_id → towers.project_id` (dùng `LEFT JOIN towers` để dòng chưa gán tower ra
+`null` rồi bị chặn, không biến mất khỏi kết quả); không thuộc dự án → **404** (không phải 403 —
+403 xác nhận bản ghi tồn tại); kiểm **trước** mọi thao tác ghi và trước lớp `canTouchTask` (để
+subcon cùng dự án vẫn nhận 403 đúng ngữ nghĩa). Helper gom một chỗ ở `lib/tien-do/workpackages.ts`
+(`taskProjectId`/`packageProjectId`/`sheetTypeProjectId`) thay vì chép rải rác.
+
+### TÍNH NĂNG CHƯA TỪNG CHẠY ĐƯỢC (lộ ra vì lần đầu có test thực thi route)
+
+Cụm `engineering` chưa từng có test gọi route thật. Hệ quả:
+
+1. **16 route GET luôn trả 500 kể từ ngày viết** — `query(sql, [projectId])` bọc thừa một lớp
+   mảng vào tham số rest, Postgres nhận `{"1"}` thay vì `1` rồi ném `22P02` ngay câu đầu. Gồm
+   `smart-ipc`, `digital-handover`, `project-health`, `carbon-lca`, `qs-bom-explosion`,
+   `shopdrawing-lod400`, `multi-agent-copilot`, 5 route `mepf-*`, `generative-routing`,
+   `pipe-stash-hunter`, `edge-vision-tracking`, `duct-diffuser-alignment`, `pipe-spooling-qto`.
+2. **`DELETE /api/engineering/spatial/annotations/:id` luôn 500** — `withProjectScope` mặc định
+   `readOnly: true` phát `SET TRANSACTION READ ONLY`, thiếu `{ readOnly: false }` nên xoá điểm
+   ghim chưa từng chạy được.
+3. **3 lỗ hổng phân quyền**: `GET subcon-ai/scores` không kiểm quyền nào (thầu phụ đọc được điểm
+   tín nhiệm + tỷ lệ vượt chi của **mọi** thầu phụ khác — có thể là đối thủ); `GET iot/devices`
+   thiếu `CAN.viewEngineeringIot` trong khi 2 route anh em cùng cụm đều có; `POST swarm/debates/
+:id/arguments` ghi được lập luận vào phiên tranh biện của dự án khác.
+4. Mã lỗi sai: `compliance/audit-element` và `bidding/analyze` ép "không tìm thấy" thành 500;
+   `spatial/annotations/:id` PATCH/DELETE luôn báo `success: true` kể cả khi bản ghi không tồn tại.
+
+### ⚠️ CỔNG CI ĐƯỢC VIẾT ĐÚNG NHƯNG BỊ MÙ — bài học đắt nhất đợt này
+
+Repo **đã có sẵn** `npm run check:db-params` (`scripts/lib/db-params-scan.ts`), viết riêng để chặn
+đúng lớp lỗi ở mục 1 trên, kèm ghi chú lịch sử rằng lỗi này từng làm **43 file** không chạy được.
+Cổng vẫn báo `[OK]` suốt thời gian đó.
+
+Nguyên nhân: phần generic của regex viết `(<[^<>]*>)?` — cấm dấu ngoặc nhọn lồng, nên **không khớp
+được `query<Record<string, unknown>>(`**, đúng cách viết của toàn bộ `lib/ky-thuat/engineering-*`.
+Regex không khớp thì bộ quét bỏ qua **trọn lời gọi**, không chỉ bỏ qua phần tham số. Đã kiểm chứng
+bằng thực nghiệm: gọi thẳng `timLoiGoiSaiKieu()` lên file lỗi trước khi vá → trả về mảng rỗng.
+
+Đổi sang `(<[^(]*>)?` (cấm dấu mở ngoặc thay vì cấm ngoặc nhọn — generic của `query<T>` không bao
+giờ chứa `(`) thì cổng phát hiện đúng **20 vi phạm thật**, nay đã vá hết.
+
+**Bài học ghi lại cho các đợt sau: một cổng static chỉ đáng tin khi có test chứng minh nó BẮT ĐƯỢC
+lỗi thật.** Cổng này tồn tại, được chạy trong CI, có tài liệu giải thích — và vẫn im lặng suốt
+nhiều tháng. Khi thêm cổng mới, phải kèm ca test cố ý vi phạm để chứng minh cổng đỏ.
+
+### Ghi nhận, CHƯA sửa (cần quyết định, không tự làm)
+
+- **Gate 4 của Smart IPC gần như luôn `failed`** (`lib/ky-thuat/engineering-smart-ipc.ts`
+  `fetchGate4Context`): đối soát kho bằng `materials.boq_code = boq_items.code`, nhưng registry
+  `boq_codes` (`migrations/0029`) coi BOQCODE là **duy nhất xuyên bảng** — trigger chặn `23505`
+  nếu hai bảng cùng giữ một mã ⇒ hai giá trị đó **không bao giờ trùng được**, `warehouseUsedQty`
+  luôn 0, mọi khối lượng dương đều trượt cổng. Hướng lỗi là **fail-safe** (chặn nhầm hồ sơ hợp lệ,
+  không cho qua nhầm hồ sơ sai) nên không thất thoát tiền, nhưng tính năng "4 cổng tự động thông
+  qua thanh toán" **chưa từng tự thông qua** lần nào. Sửa đúng cần đổi sang liên kết qua
+  `boq_norms`/`material_transactions` — quyết định nghiệp vụ, cần chủ dự án chốt.
+- **Kill switch của Safe Execution Engine không có tính bền**
+  (`lib/ky-thuat/engineering-autonomy.ts` `executeExecutionRequest`): `UPDATE status='killed'` rồi
+  `throw` ngay sau, cả hàm nằm trong `withProjectScope(..., {readOnly:false})` vốn bọc
+  `withTransaction` ⇒ rollback xoá luôn UPDATE đó. Không chỉ sai nhật ký: bản ghi giữ nguyên
+  `authorized` với thẻ uỷ quyền còn hạn 15 phút, nên nếu kill switch được bật rồi **tắt lại** trong
+  cửa sổ đó, chính yêu cầu lẽ ra đã bị huỷ vẫn gọi lại được và lần này thực thi thật. Sửa cần tách
+  ghi audit ra khỏi transaction sắp rollback + soát race condition.
+- **`subcon-ai/evaluate` luôn 422, `recommend-shortlist` luôn dùng điểm mặc định**: 2 trong 5 chỉ
+  số bắt buộc (`ncrIncidentCount`, `costVarianceRate`) được gán cứng `null` trong
+  `lib/hien-truong/subcon-metrics.ts` vì chưa có bảng nguồn gắn NCR/chi phí với thầu phụ. Tính năng
+  chấm điểm theo hiệu suất thật chưa từng chạy. Không bịa dữ liệu để né — đã ghi caveat trong
+  `summary` trả về.
+- **Toàn cụm `engineering` ép mọi lỗi nghiệp vụ về 500** (>20 route cùng idiom `catch → 500`), nên
+  QR sai checksum, quá hạn, sai trạng thái… đều thành 500. Sửa đúng phải đổi đồng loạt cả cụm.
+- **`tasks/:id/move` nối chuỗi `cur.sort_order` vào SQL** thay vì placeholder `?` — không khai thác
+  được (số nguyên đọc từ DB, không phải input người dùng) nhưng lệch quy ước "luôn dùng `?`".
+
+### Bài học quy trình
+
+- **Reviewer bác bỏ đánh giá của worker 4 lần, cả 4 lần reviewer đúng** — và chính 4 lần đó dẫn ra
+  toàn bộ chuỗi lỗ hổng ở trên. Luật mới đặt ra đầu Đợt 5 ("mọi mục _ghi nhận, chưa sửa_ phải kèm
+  **bằng chứng đọc route anh em**, không được lập luận suông") chứng minh giá trị ngay lượt đầu.
+  Bổ sung cho Đợt 6: reviewer nên **revert thử từng bản vá rồi chạy lại** để chứng minh lỗi có
+  thật — reviewer W4 làm vậy và đó là bằng chứng chắc nhất cả đợt.
+- **Commit `PLAN.md` TRƯỚC khi tạo worktree.** Đợt này phiên chính tạo 5 worktree trước khi commit
+  kế hoạch, nên cả 5 nhận `PLAN.md` của đợt cũ; 2 worker dừng lại báo thiếu đặc tả (đúng luật cứng
+  của `CLAUDE.md`) và danh sách route họ suy đoán lệch thật — thiếu 1 cụm, lấn 3 cụm của worker
+  khác. Nếu họ tự đoán thì hai worker đã giẫm chân nhau.
+- **Môi trường (lặp lại từ Đợt 4, vẫn đúng):** phải dùng **Node 24** (Node 22 crash khi in bảng
+  coverage) và DB dựng bằng **ICU/vi-VN** (locale C làm `lower()` không hạ chữ hoa có dấu →
+  `backfill-0137` đỏ giả). Thêm: **tên database không được có dấu gạch ngang** — `createdb` thất
+  bại im lặng và sinh lỗi "database does not exist" gây hiểu nhầm là test hỏng.
+
+**Đợt sau:** phần còn lại của `app/api/**` chưa có test (`v1/**`, các cụm nhỏ), và 5 mục "Ghi nhận,
+chưa sửa" ở trên — ưu tiên Gate 4 Smart IPC (chuỗi thanh toán) và kill switch (Safe Execution
+Engine) vì cả hai đều là tính năng đang hỏng ở vùng rủi ro cao.
+
 ## ✅ Đợt 4 chiến dịch coverage — 7 cụm route phi-engineering + 2 đợt vá bảo mật (2026-09-05)
 
 Tiếp nối Đợt 1–3. Phạm vi: **304 route `app/api/**` chưa có test nào chạm tới**, đã trừ toàn bộ
@@ -163,8 +305,9 @@ Coverage đo cùng điều kiện (Node 24), so `origin/main` với nhánh này:
 của `check:coverage`): số file đo tăng 68% nên mẫu số đổi hẳn, nhiều file route mới vào bảng còn
 nhánh lỗi hiếm chưa phủ.
 
-**Đợt sau:** `app/api/engineering/**` (~100 route) + mục đầu tiên của "Ghi nhận, chưa sửa"
-(`workpackages/:id/**` cùng lớp lỗi cách ly dự án).
+**Đợt sau (ĐÃ LÀM — xem "Đợt 5" đầu tệp):** `app/api/engineering/**` (~100 route) + mục đầu tiên
+của "Ghi nhận, chưa sửa" (`workpackages/:id/**` cùng lớp lỗi cách ly dự án). Mục thứ hai kéo ra
+cả một chuỗi lỗ hổng sâu hơn — đọc mục "Chuỗi lỗ hổng cách ly" của Đợt 5.
 
 ## ✅ Gỡ toàn bộ cụm CAD/BIM khỏi sản phẩm — đợt 3 (2026-09-04)
 
