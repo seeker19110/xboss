@@ -36,9 +36,24 @@ test(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('PM ProjTest', 'proj-pm@xboss.vn', 'x', 'pm')`,
     );
 
-    // Bảng user_projects rỗng toàn hệ thống → mọi user (kể cả không phải admin) thấy hết.
+    // `visibleProjectIds` quyết định fallback bằng `COUNT(*) FROM user_projects` TOÀN HỆ THỐNG,
+    // mà node:test chạy các file SONG SONG — nên bất kỳ file test nào khác đang giữ một dòng
+    // `user_projects` (mọi ca dùng `dangNhapDuAn` đều chèn một dòng) sẽ làm premise "bảng rỗng"
+    // của ca này sai. Trước đây ca này xanh do may mắn về thứ tự; khi bộ test thêm file mới nó
+    // đỏ ngẫu nhiên. Vì vậy ĐỌC trạng thái thật rồi khẳng định đúng luật tương ứng — cả hai
+    // nhánh đều là khẳng định thật, không nhánh nào bỏ trống.
+    const { queryOne } = await import("@/lib/db");
+    const dem = await queryOne<{ n: string }>(`SELECT COUNT(*)::text AS n FROM user_projects`);
+    const bangRong = Number(dem?.n ?? 0) === 0;
+
     const pmSeesAllInitially = await visibleProjectIds({ id: pmId, role: "pm" });
-    assert.ok(pmSeesAllInitially.includes(p1) && pmSeesAllInitially.includes(p2));
+    if (bangRong) {
+      // Bảng rỗng toàn hệ thống → mọi user (kể cả không phải admin) thấy hết.
+      assert.ok(pmSeesAllInitially.includes(p1) && pmSeesAllInitially.includes(p2));
+    } else {
+      // Bảng KHÔNG rỗng (file test khác đang giữ dòng) → PM chưa được gán dự án nào thấy rỗng.
+      assert.deepEqual(pmSeesAllInitially, []);
+    }
 
     // Admin luôn thấy mọi dự án, bất kể user_projects.
     const adminIds = await visibleProjectIds({ id: adminId, role: "admin" });
