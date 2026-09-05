@@ -271,6 +271,51 @@ test("POST /api/handover-items: tradeId (system) không tồn tại → 422", S,
   assert.equal(res.status, 422);
 });
 
+test(
+  "POST /api/handover-items: workPackageId thuộc dự án khác → 422, không tạo hạng mục xuyên dự án",
+  S,
+  async () => {
+    const { query } = await import("@/lib/db");
+    const ctxA = await dungSheet("higxA");
+    const ctxB = await dungSheet("higxB");
+    const pkgB = await taoNhom(ctxB.sheetTypeId, "HIGX");
+    const eng = await taoUser("engineer", "higxA");
+    await dangNhapDuAn(eng, ctxA.projectId);
+    const { POST } = await import("@/app/api/handover-items/route");
+    const res = await POST(jreq("/x", { title: "Hạng mục", workPackageId: pkgB }));
+    assert.equal(res.status, 422);
+    const body = await res.json();
+    assert.equal(body.error, "Nhóm công việc không tồn tại");
+    // Dữ liệu dự án B không bị đổi: không có hạng mục bàn giao nào được tạo gắn với pkgB.
+    const rows = await query(
+      `SELECT id FROM handover_items WHERE work_package_id = ?`,
+      pkgB,
+    );
+    assert.equal(rows.length, 0);
+  },
+);
+
+test(
+  "POST /api/handover-items: workPackageId thuộc dự án đang chọn vẫn tạo được bình thường",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const { projectId, sheetTypeId } = await dungSheet("higok");
+    const pkgId = await taoNhom(sheetTypeId, "HIGOK");
+    const eng = await taoUser("engineer", "higok");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/handover-items/route");
+    const res = await POST(jreq("/x", { title: "Hạng mục", workPackageId: pkgId }));
+    assert.equal(res.status, 201);
+    const { id } = await res.json();
+    const row = await queryOne<{ workPackageId: number | null }>(
+      `SELECT work_package_id AS "workPackageId" FROM handover_items WHERE id = ?`,
+      id,
+    );
+    assert.equal(row?.workPackageId, pkgId);
+  },
+);
+
 // ============================================================================
 // GET/POST /api/inspection-requests
 // ============================================================================
@@ -395,6 +440,60 @@ test("POST /api/inspection-requests: tạo thành công, ghi đúng task + creat
   assert.equal(links.length, 1);
 });
 
+test(
+  "POST /api/inspection-requests: task thuộc dự án khác → 404, không tạo phiếu xuyên dự án",
+  S,
+  async () => {
+    const { query } = await import("@/lib/db");
+    const ctxA = await dungSheet("irxA");
+    const ctxB = await dungSheet("irxB");
+    const pkgB = await taoNhom(ctxB.sheetTypeId, "IRX");
+    const taskB = await taoTask(pkgB, "IRX,01", { progress: 1 });
+    const pm = await taoUser("pm", "irxA");
+    await dangNhapDuAn(pm, ctxA.projectId);
+    const { POST } = await import("@/app/api/inspection-requests/route");
+    const res = await POST(
+      jreq("/x", { scheduledAt: "2026-05-01T08:00:00Z", taskIds: [taskB] }),
+    );
+    // Task thuộc dự án khác phải rơi vào đúng nhánh "task không tồn tại" (404) — không lộ
+    // sự tồn tại của task dự án B bằng thông báo riêng.
+    assert.equal(res.status, 404);
+    const body = await res.json();
+    assert.equal(body.error, "Có task không tồn tại");
+    // Dữ liệu dự án B không bị đổi: không có phiếu YCNT nào được tạo gắn với taskB.
+    const links = await query(
+      `SELECT task_id FROM inspection_request_tasks WHERE task_id = ?`,
+      taskB,
+    );
+    assert.equal(links.length, 0);
+  },
+);
+
+test(
+  "POST /api/inspection-requests: task cùng dự án đang chọn vẫn tạo được bình thường",
+  S,
+  async () => {
+    const { query } = await import("@/lib/db");
+    const { projectId, sheetTypeId } = await dungSheet("irxok");
+    const pkgId = await taoNhom(sheetTypeId, "IRXOK");
+    const taskId = await taoTask(pkgId, "IRXOK,01", { progress: 1 });
+    const pm = await taoUser("pm", "irxok");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/inspection-requests/route");
+    const res = await POST(
+      jreq("/x", { scheduledAt: "2026-05-01T08:00:00Z", taskIds: [taskId] }),
+    );
+    assert.equal(res.status, 201);
+    const { id } = await res.json();
+    const links = await query(
+      `SELECT task_id FROM inspection_request_tasks WHERE request_id = ?`,
+      id,
+    );
+    assert.equal(links.length, 1);
+    assert.equal(links[0].task_id, taskId);
+  },
+);
+
 // ============================================================================
 // GET/PATCH /api/project (public + Admin/PM)
 // ============================================================================
@@ -507,7 +606,7 @@ test(
       `INSERT INTO task_documents (task_id, file_name, doc_category) VALUES (?, 'a.pdf', 'material')`,
       taskA,
     );
-    await insertId(
+    const docB = await insertId(
       `INSERT INTO task_documents (task_id, file_name, doc_category) VALUES (?, 'b.pdf', 'material')`,
       taskB,
     );
@@ -519,6 +618,7 @@ test(
     const { documents } = await res.json();
     const ids = documents.map((d: { id: number }) => d.id);
     assert.ok(ids.includes(docA));
+    assert.ok(!ids.includes(docB));
   },
 );
 
