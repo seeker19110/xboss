@@ -345,7 +345,7 @@ export async function listMassBalanceAudits(
      WHERE project_id = ?
      ORDER BY audited_at DESC
      LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }
 
