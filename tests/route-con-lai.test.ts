@@ -28,10 +28,7 @@ async function taoDuAn(ten: string): Promise<number> {
   return insertId(`INSERT INTO projects (name) VALUES (?)`, `CONLAI ${uniq(ten)}`);
 }
 
-async function taoUser(
-  role: string,
-  ten: string,
-): Promise<{ id: number; passwordHash: string }> {
+async function taoUser(role: string, ten: string): Promise<{ id: number; passwordHash: string }> {
   const { insertId, queryOne } = await import("@/lib/db");
   const email = `conlai-${uniq(ten)}@test.local`;
   const id = await insertId(
@@ -180,31 +177,27 @@ test("GET /api/handover-items: status không hợp lệ → 422", S, async () =>
   assert.equal(res.status, 422);
 });
 
-test(
-  "GET /api/handover-items: liệt kê đúng dự án đang chọn, cách ly dự án khác",
-  S,
-  async () => {
-    const { insertId } = await import("@/lib/db");
-    const projectA = await taoDuAn("higlistA");
-    const projectB = await taoDuAn("higlistB");
-    const hA = await insertId(
-      `INSERT INTO handover_items (project_id, title, status) VALUES (?, 'Hạng mục A', 'pending')`,
-      projectA,
-    );
-    await insertId(
-      `INSERT INTO handover_items (project_id, title, status) VALUES (?, 'Hạng mục B', 'pending')`,
-      projectB,
-    );
-    const eng = await taoUser("engineer", "higlist");
-    await dangNhapDuAn(eng, projectA);
-    const { GET } = await import("@/app/api/handover-items/route");
-    const res = await GET(greq("/x"));
-    assert.equal(res.status, 200);
-    const { items } = await res.json();
-    assert.equal(items.length, 1);
-    assert.equal(items[0].id, hA);
-  },
-);
+test("GET /api/handover-items: liệt kê đúng dự án đang chọn, cách ly dự án khác", S, async () => {
+  const { insertId } = await import("@/lib/db");
+  const projectA = await taoDuAn("higlistA");
+  const projectB = await taoDuAn("higlistB");
+  const hA = await insertId(
+    `INSERT INTO handover_items (project_id, title, status) VALUES (?, 'Hạng mục A', 'pending')`,
+    projectA,
+  );
+  await insertId(
+    `INSERT INTO handover_items (project_id, title, status) VALUES (?, 'Hạng mục B', 'pending')`,
+    projectB,
+  );
+  const eng = await taoUser("engineer", "higlist");
+  await dangNhapDuAn(eng, projectA);
+  const { GET } = await import("@/app/api/handover-items/route");
+  const res = await GET(greq("/x"));
+  assert.equal(res.status, 200);
+  const { items } = await res.json();
+  assert.equal(items.length, 1);
+  assert.equal(items[0].id, hA);
+});
 
 test("POST /api/handover-items: chưa đăng nhập → 401", S, async () => {
   dangXuat();
@@ -287,10 +280,7 @@ test(
     const body = await res.json();
     assert.equal(body.error, "Nhóm công việc không tồn tại");
     // Dữ liệu dự án B không bị đổi: không có hạng mục bàn giao nào được tạo gắn với pkgB.
-    const rows = await query(
-      `SELECT id FROM handover_items WHERE work_package_id = ?`,
-      pkgB,
-    );
+    const rows = await query(`SELECT id FROM handover_items WHERE work_package_id = ?`, pkgB);
     assert.equal(rows.length, 0);
   },
 );
@@ -411,9 +401,7 @@ test("POST /api/inspection-requests: task chưa đạt 100% → 422", S, async (
   const pm = await taoUser("pm", "irpnotdone");
   await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/inspection-requests/route");
-  const res = await POST(
-    jreq("/x", { scheduledAt: "2026-05-01T08:00:00Z", taskIds: [taskId] }),
-  );
+  const res = await POST(jreq("/x", { scheduledAt: "2026-05-01T08:00:00Z", taskIds: [taskId] }));
   assert.equal(res.status, 422);
 });
 
@@ -436,7 +424,10 @@ test("POST /api/inspection-requests: tạo thành công, ghi đúng task + creat
   );
   assert.equal(row?.createdBy, pm.id);
   assert.match(row?.code ?? "", /^YCNT-/);
-  const links = await query(`SELECT task_id FROM inspection_request_tasks WHERE request_id = ?`, id);
+  const links = await query(
+    `SELECT task_id FROM inspection_request_tasks WHERE request_id = ?`,
+    id,
+  );
   assert.equal(links.length, 1);
 });
 
@@ -452,9 +443,7 @@ test(
     const pm = await taoUser("pm", "irxA");
     await dangNhapDuAn(pm, ctxA.projectId);
     const { POST } = await import("@/app/api/inspection-requests/route");
-    const res = await POST(
-      jreq("/x", { scheduledAt: "2026-05-01T08:00:00Z", taskIds: [taskB] }),
-    );
+    const res = await POST(jreq("/x", { scheduledAt: "2026-05-01T08:00:00Z", taskIds: [taskB] }));
     // Task thuộc dự án khác phải rơi vào đúng nhánh "task không tồn tại" (404) — không lộ
     // sự tồn tại của task dự án B bằng thông báo riêng.
     assert.equal(res.status, 404);
@@ -480,9 +469,7 @@ test(
     const pm = await taoUser("pm", "irxok");
     await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/inspection-requests/route");
-    const res = await POST(
-      jreq("/x", { scheduledAt: "2026-05-01T08:00:00Z", taskIds: [taskId] }),
-    );
+    const res = await POST(jreq("/x", { scheduledAt: "2026-05-01T08:00:00Z", taskIds: [taskId] }));
     assert.equal(res.status, 201);
     const { id } = await res.json();
     const links = await query(
@@ -546,13 +533,15 @@ test("PATCH /api/project: logo không hợp lệ (không phải data URL ảnh) 
 
 test("PATCH /api/project: Admin/PM cập nhật heatmapTitle thành công", S, async () => {
   const { queryOne, insertId } = await import("@/lib/db");
-  // Route thao tác trên dòng `projects` ĐẦU TIÊN (ORDER BY id LIMIT 1) — không lọc theo
-  // dự án đang chọn (cấu hình toàn cục, đúng comment route). Dựng dự án riêng và kiểm
-  // dòng đầu tiên hiện có trong DB test bị đổi đúng giá trị, không giả định id cụ thể.
+  // Route ghi vào ĐÚNG DỰ ÁN ĐANG CHỌN (Việc H, Đợt 6) — trước đây nó sửa dòng `projects`
+  // đầu tiên toàn DB nên Admin/PM của bất kỳ dự án nào cũng ghi đè được dự án đó. Kiểm cả
+  // hai chiều: dự án đang chọn ĐỔI, và dòng đầu tiên (nếu là dự án khác) KHÔNG đổi.
   const projectId = await taoDuAn("prjpok");
   const pm = await taoUser("pm", "prjpok");
   await dangNhapDuAn(pm, projectId);
-  const first = await queryOne<{ id: number }>(`SELECT id FROM projects ORDER BY id LIMIT 1`);
+  const first = await queryOne<{ id: number; heatmap_title: string | null }>(
+    `SELECT id, heatmap_title FROM projects ORDER BY id LIMIT 1`,
+  );
   const title = `Tiêu đề ${uniq("hm")}`;
   const { PATCH } = await import("@/app/api/project/route");
   const res = await PATCH(
@@ -564,9 +553,16 @@ test("PATCH /api/project: Admin/PM cập nhật heatmapTitle thành công", S, a
   assert.equal(res.status, 200);
   const row = await queryOne<{ heatmap_title: string }>(
     `SELECT heatmap_title FROM projects WHERE id = ?`,
-    first!.id,
+    projectId,
   );
   assert.equal(row?.heatmap_title, title);
+  if (first && first.id !== projectId) {
+    const khac = await queryOne<{ heatmap_title: string | null }>(
+      `SELECT heatmap_title FROM projects WHERE id = ?`,
+      first.id,
+    );
+    assert.equal(khac?.heatmap_title ?? null, first.heatmap_title ?? null);
+  }
   // Dọn lại để không ảnh hưởng ca khác đọc GET /api/project (route lấy dòng đầu tiên).
   await insertId(`UPDATE projects SET heatmap_title = NULL WHERE id = ? RETURNING id`, first!.id);
 });
@@ -591,36 +587,32 @@ test("GET /api/qc/documents: category không hợp lệ → 422", S, async () =>
   assert.equal(res.status, 422);
 });
 
-test(
-  "GET /api/qc/documents: liệt kê đúng dự án đang chọn, cách ly dự án khác",
-  S,
-  async () => {
-    const { insertId } = await import("@/lib/db");
-    const ctxA = await dungSheet("qcdlistA");
-    const ctxB = await dungSheet("qcdlistB");
-    const pkgA = await taoNhom(ctxA.sheetTypeId, "QCA");
-    const pkgB = await taoNhom(ctxB.sheetTypeId, "QCB");
-    const taskA = await taoTask(pkgA, "QCA,01");
-    const taskB = await taoTask(pkgB, "QCB,01");
-    const docA = await insertId(
-      `INSERT INTO task_documents (task_id, file_name, doc_category) VALUES (?, 'a.pdf', 'material')`,
-      taskA,
-    );
-    const docB = await insertId(
-      `INSERT INTO task_documents (task_id, file_name, doc_category) VALUES (?, 'b.pdf', 'material')`,
-      taskB,
-    );
-    const eng = await taoUser("engineer", "qcdlist");
-    await dangNhapDuAn(eng, ctxA.projectId);
-    const { GET } = await import("@/app/api/qc/documents/route");
-    const res = await GET(greq("/x"));
-    assert.equal(res.status, 200);
-    const { documents } = await res.json();
-    const ids = documents.map((d: { id: number }) => d.id);
-    assert.ok(ids.includes(docA));
-    assert.ok(!ids.includes(docB));
-  },
-);
+test("GET /api/qc/documents: liệt kê đúng dự án đang chọn, cách ly dự án khác", S, async () => {
+  const { insertId } = await import("@/lib/db");
+  const ctxA = await dungSheet("qcdlistA");
+  const ctxB = await dungSheet("qcdlistB");
+  const pkgA = await taoNhom(ctxA.sheetTypeId, "QCA");
+  const pkgB = await taoNhom(ctxB.sheetTypeId, "QCB");
+  const taskA = await taoTask(pkgA, "QCA,01");
+  const taskB = await taoTask(pkgB, "QCB,01");
+  const docA = await insertId(
+    `INSERT INTO task_documents (task_id, file_name, doc_category) VALUES (?, 'a.pdf', 'material')`,
+    taskA,
+  );
+  const docB = await insertId(
+    `INSERT INTO task_documents (task_id, file_name, doc_category) VALUES (?, 'b.pdf', 'material')`,
+    taskB,
+  );
+  const eng = await taoUser("engineer", "qcdlist");
+  await dangNhapDuAn(eng, ctxA.projectId);
+  const { GET } = await import("@/app/api/qc/documents/route");
+  const res = await GET(greq("/x"));
+  assert.equal(res.status, 200);
+  const { documents } = await res.json();
+  const ids = documents.map((d: { id: number }) => d.id);
+  assert.ok(ids.includes(docA));
+  assert.ok(!ids.includes(docB));
+});
 
 // ============================================================================
 // GET /api/tasks?sheet=
@@ -648,38 +640,32 @@ test("GET /api/tasks: sheet thuộc dự án khác → 404 (không lộ tồn t�
   const eng = await taoUser("engineer", "tskisoA");
   await dangNhapDuAn(eng, ctxA.projectId);
   const { GET } = await import("@/app/api/tasks/route");
-  const st = await (await import("@/lib/db")).queryOne<{ slug: string }>(
-    `SELECT slug FROM sheet_types WHERE id = ?`,
-    ctxB.sheetTypeId,
-  );
+  const st = await (
+    await import("@/lib/db")
+  ).queryOne<{ slug: string }>(`SELECT slug FROM sheet_types WHERE id = ?`, ctxB.sheetTypeId);
   const res = await GET(greq(`/x?sheet=${st!.slug}`));
   assert.equal(res.status, 404);
 });
 
-test(
-  "GET /api/tasks: trả đúng packages + tasks lồng nhau của sheet",
-  S,
-  async () => {
-    const ctx = await dungSheet("tskok");
-    const pkgId = await taoNhom(ctx.sheetTypeId, "TSK1");
-    const taskId = await taoTask(pkgId, "TSK1,01");
-    const eng = await taoUser("engineer", "tskok");
-    await dangNhapDuAn(eng, ctx.projectId);
-    const { GET } = await import("@/app/api/tasks/route");
-    const st = await (await import("@/lib/db")).queryOne<{ slug: string }>(
-      `SELECT slug FROM sheet_types WHERE id = ?`,
-      ctx.sheetTypeId,
-    );
-    const res = await GET(greq(`/x?sheet=${st!.slug}`));
-    assert.equal(res.status, 200);
-    const { sheet, packages } = await res.json();
-    assert.equal(sheet.id, ctx.sheetTypeId);
-    assert.equal(packages.length, 1);
-    assert.equal(packages[0].id, pkgId);
-    assert.equal(packages[0].tasks.length, 1);
-    assert.equal(packages[0].tasks[0].id, taskId);
-  },
-);
+test("GET /api/tasks: trả đúng packages + tasks lồng nhau của sheet", S, async () => {
+  const ctx = await dungSheet("tskok");
+  const pkgId = await taoNhom(ctx.sheetTypeId, "TSK1");
+  const taskId = await taoTask(pkgId, "TSK1,01");
+  const eng = await taoUser("engineer", "tskok");
+  await dangNhapDuAn(eng, ctx.projectId);
+  const { GET } = await import("@/app/api/tasks/route");
+  const st = await (
+    await import("@/lib/db")
+  ).queryOne<{ slug: string }>(`SELECT slug FROM sheet_types WHERE id = ?`, ctx.sheetTypeId);
+  const res = await GET(greq(`/x?sheet=${st!.slug}`));
+  assert.equal(res.status, 200);
+  const { sheet, packages } = await res.json();
+  assert.equal(sheet.id, ctx.sheetTypeId);
+  assert.equal(packages.length, 1);
+  assert.equal(packages[0].id, pkgId);
+  assert.equal(packages[0].tasks.length, 1);
+  assert.equal(packages[0].tasks[0].id, taskId);
+});
 
 // ============================================================================
 // GET/PATCH /api/variations/:id
@@ -869,9 +855,7 @@ async function taoPhienChoClaims(projectId: number): Promise<string> {
 }
 
 test("POST .../agent-sessions/:id/claims: thiếu/sai API key → 401", S, async () => {
-  const { POST } = await import(
-    "@/app/api/v1/engineering/agent-sessions/[id]/claims/route"
-  );
+  const { POST } = await import("@/app/api/v1/engineering/agent-sessions/[id]/claims/route");
   const res = await POST(ingestClaimsReq("xbk_sai", { claims: [] }), {
     params: Promise.resolve({ id: "x" }),
   });
@@ -881,9 +865,7 @@ test("POST .../agent-sessions/:id/claims: thiếu/sai API key → 401", S, async
 test("POST .../agent-sessions/:id/claims: key thiếu scope engineering → 403", S, async () => {
   const projectId = await taoDuAn("clm403");
   const { key } = await taoApiKey(projectId, ["read"]);
-  const { POST } = await import(
-    "@/app/api/v1/engineering/agent-sessions/[id]/claims/route"
-  );
+  const { POST } = await import("@/app/api/v1/engineering/agent-sessions/[id]/claims/route");
   const res = await POST(ingestClaimsReq(key, { claims: [] }), {
     params: Promise.resolve({ id: "x" }),
   });
@@ -893,67 +875,69 @@ test("POST .../agent-sessions/:id/claims: key thiếu scope engineering → 403"
 test("POST .../agent-sessions/:id/claims: body sai schema (claims rỗng) → 422", S, async () => {
   const projectId = await taoDuAn("clmval");
   const { key } = await taoApiKey(projectId, ["engineering"]);
-  const { POST } = await import(
-    "@/app/api/v1/engineering/agent-sessions/[id]/claims/route"
-  );
+  const { POST } = await import("@/app/api/v1/engineering/agent-sessions/[id]/claims/route");
   const res = await POST(ingestClaimsReq(key, { claims: [] }), {
     params: Promise.resolve({ id: "x" }),
   });
   assert.equal(res.status, 422);
 });
 
-test("POST .../agent-sessions/:id/claims: phiên thuộc dự án khác → 422 (không lộ dữ liệu)", S, async () => {
-  const projectA = await taoDuAn("clmisoA");
-  const projectB = await taoDuAn("clmisoB");
-  const sessionId = await taoPhienChoClaims(projectB);
-  const { key } = await taoApiKey(projectA, ["engineering"]);
-  const { POST } = await import(
-    "@/app/api/v1/engineering/agent-sessions/[id]/claims/route"
-  );
-  const res = await POST(
-    ingestClaimsReq(key, {
-      claims: [
-        {
-          agentRole: "specialist",
-          agentName: "mep-v2",
-          topic: "duong-kinh-ong",
-          claim: "DN150",
-        },
-      ],
-    }),
-    { params: Promise.resolve({ id: sessionId }) },
-  );
-  assert.equal(res.status, 422);
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ roundCount: number }>(
-    `SELECT round_count AS "roundCount" FROM engineering_agent_sessions WHERE id = ?`,
-    sessionId,
-  );
-  assert.equal(row?.roundCount, 1); // không tăng — claim của dự án khác không lọt qua được
-});
+test(
+  "POST .../agent-sessions/:id/claims: phiên thuộc dự án khác → 422 (không lộ dữ liệu)",
+  S,
+  async () => {
+    const projectA = await taoDuAn("clmisoA");
+    const projectB = await taoDuAn("clmisoB");
+    const sessionId = await taoPhienChoClaims(projectB);
+    const { key } = await taoApiKey(projectA, ["engineering"]);
+    const { POST } = await import("@/app/api/v1/engineering/agent-sessions/[id]/claims/route");
+    const res = await POST(
+      ingestClaimsReq(key, {
+        claims: [
+          {
+            agentRole: "specialist",
+            agentName: "mep-v2",
+            topic: "duong-kinh-ong",
+            claim: "DN150",
+          },
+        ],
+      }),
+      { params: Promise.resolve({ id: sessionId }) },
+    );
+    assert.equal(res.status, 422);
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ roundCount: number }>(
+      `SELECT round_count AS "roundCount" FROM engineering_agent_sessions WHERE id = ?`,
+      sessionId,
+    );
+    assert.equal(row?.roundCount, 1); // không tăng — claim của dự án khác không lọt qua được
+  },
+);
 
-test("POST .../agent-sessions/:id/claims: thêm claim thành công, tăng round + ghi nhận xung đột", S, async () => {
-  const projectId = await taoDuAn("clmok");
-  const sessionId = await taoPhienChoClaims(projectId);
-  const { key } = await taoApiKey(projectId, ["engineering"]);
-  const { POST } = await import(
-    "@/app/api/v1/engineering/agent-sessions/[id]/claims/route"
-  );
-  const res = await POST(
-    ingestClaimsReq(key, {
-      claims: [
-        {
-          agentRole: "specialist",
-          agentName: "mep-v2",
-          topic: "duong-kinh-ong",
-          claim: "DN150",
-        },
-      ],
-    }),
-    { params: Promise.resolve({ id: sessionId }) },
-  );
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.roundCount, 2);
-  assert.equal(body.consensus, "conflict_requires_review");
-});
+test(
+  "POST .../agent-sessions/:id/claims: thêm claim thành công, tăng round + ghi nhận xung đột",
+  S,
+  async () => {
+    const projectId = await taoDuAn("clmok");
+    const sessionId = await taoPhienChoClaims(projectId);
+    const { key } = await taoApiKey(projectId, ["engineering"]);
+    const { POST } = await import("@/app/api/v1/engineering/agent-sessions/[id]/claims/route");
+    const res = await POST(
+      ingestClaimsReq(key, {
+        claims: [
+          {
+            agentRole: "specialist",
+            agentName: "mep-v2",
+            topic: "duong-kinh-ong",
+            claim: "DN150",
+          },
+        ],
+      }),
+      { params: Promise.resolve({ id: sessionId }) },
+    );
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.roundCount, 2);
+    assert.equal(body.consensus, "conflict_requires_review");
+  },
+);
