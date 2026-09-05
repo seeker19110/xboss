@@ -2038,7 +2038,7 @@ export async function saveSpatialQtoSummaries(
 export async function listPipeSpools(projectId: number): Promise<Array<Record<string, unknown>>> {
   return query<Record<string, unknown>>(
     `SELECT * FROM engineering_pipe_spools WHERE project_id = $1 ORDER BY created_at DESC LIMIT 100`,
-    [projectId],
+    projectId,
   );
 }
 
@@ -2047,7 +2047,7 @@ export async function listRemnantInventory(
 ): Promise<Array<Record<string, unknown>>> {
   return query<Record<string, unknown>>(
     `SELECT * FROM engineering_pipe_remnant_inventory WHERE project_id = $1 AND status = 'available' ORDER BY remaining_length_mm ASC`,
-    [projectId],
+    projectId,
   );
 }
 
@@ -2058,11 +2058,12 @@ export async function listSpatialQtoSummaries(
   if (dimensionType) {
     return query<Record<string, unknown>>(
       `SELECT * FROM engineering_pipe_spatial_qto_summaries WHERE project_id = $1 AND dimension_type = $2 ORDER BY dimension_key ASC`,
-      [projectId, dimensionType],
+      projectId,
+      dimensionType,
     );
   }
   return query<Record<string, unknown>>(
     `SELECT * FROM engineering_pipe_spatial_qto_summaries WHERE project_id = $1 ORDER BY dimension_type ASC, dimension_key ASC`,
-    [projectId],
+    projectId,
   );
 }

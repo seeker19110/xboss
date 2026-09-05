@@ -79,7 +79,15 @@ function timDauDong(src: string, batDau: number): number {
 }
 
 // `[^.\w$]` phía trước: loại `client.query(`, `pool.query(`, `this.run(`...
-const MAU_GOI = /(^|[^.\w$])(query|queryOne|run|insertId)\s*(<[^<>]*>)?\s*\(/g;
+//
+// ĐIỂM MÙ ĐÃ VÁ (Đợt 5): phần generic trước đây viết `(<[^<>]*>)?` — cấm dấu `<`/`>` bên trong
+// nên KHÔNG khớp được generic LỒNG. Mà `query<Record<string, unknown>>(` chính là cách viết phổ
+// biến nhất trong `lib/ky-thuat/engineering-*.ts`: regex fail-match tại đó làm bộ quét bỏ qua
+// TRỌN lời gọi, nên cổng báo [OK] trong khi còn 20 vi phạm thật — 16 route GET luôn trả 500 kể
+// từ ngày viết mà không ai biết (xem PROGRESS.md "Đợt 5"). Nay dùng `[^(]*` (cấm dấu `(` thay vì
+// cấm `<`/`>`): generic của `query<T>` không bao giờ chứa `(`, nên vẫn dừng đúng ở dấu mở ngoặc
+// của lời gọi mà bao được mọi mức lồng.
+const MAU_GOI = /(^|[^.\w$])(query|queryOne|run|insertId)\s*(<[^(]*>)?\s*\(/g;
 
 export type LoiGoiSaiKieu = { tep: string; dong: number; ham: string };
 
