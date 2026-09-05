@@ -1,23 +1,37 @@
 import { NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/project → tên/mã dự án + tháp đầu tiên + tiêu đề heatmap.
 // Public (chỉ trả tên hiển thị) — dùng cho header, trang login, báo cáo.
+// Có phiên + đã chọn dự án → đọc đúng dự án đang chọn (getCurrentProjectId đã tự đối chiếu
+// quyền xem + org). Không phiên / chưa chọn dự án → giữ fallback công khai "dự án đầu tiên"
+// (trang /login gọi route này khi chưa đăng nhập). Không nhận `?projectId=` để endpoint public
+// không thành chỗ dò tên dự án theo id.
 export async function GET() {
   try {
-    const project = await queryOne<{
+    const user = await getCurrentUser();
+    const projectId = user ? await getCurrentProjectId(user) : null;
+    type DongDuAn = {
       name: string;
       code: string | null;
       heatmap_title: string | null;
       investor: string | null;
       contractor: string | null;
       logo: string | null;
-    }>(
-      `SELECT name, code, heatmap_title, investor, contractor, logo FROM projects ORDER BY id LIMIT 1`,
-    );
+    };
+    const project =
+      projectId != null
+        ? await queryOne<DongDuAn>(
+            `SELECT name, code, heatmap_title, investor, contractor, logo FROM projects WHERE id = ?`,
+            projectId,
+          )
+        : await queryOne<DongDuAn>(
+            `SELECT name, code, heatmap_title, investor, contractor, logo FROM projects ORDER BY id LIMIT 1`,
+          );
     const tower = await queryOne<{ name: string }>(`SELECT name FROM towers ORDER BY id LIMIT 1`);
     return NextResponse.json(
       {
@@ -43,6 +57,10 @@ export async function PATCH(req: Request) {
   if (!isAdminOrPm(user.role))
     return NextResponse.json({ error: "Không có quyền" }, { status: 403 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để cập nhật" }, { status: 422 });
+
   const body = await req.json();
 
   // Cập nhật logo (data URL ảnh, tối đa ~2MB) — gửi chuỗi rỗng/null để xoá.
@@ -58,16 +76,18 @@ export async function PATCH(req: Request) {
         { status: 400 },
       );
     await run(
-      `UPDATE projects SET logo = ? WHERE id = (SELECT id FROM projects ORDER BY id LIMIT 1)`,
+      `UPDATE projects SET logo = ? WHERE id = ?`,
       logo,
+      projectId,
     );
     return NextResponse.json({ ok: true });
   }
 
   const { heatmapTitle } = body;
   await run(
-    `UPDATE projects SET heatmap_title = ? WHERE id = (SELECT id FROM projects ORDER BY id LIMIT 1)`,
+    `UPDATE projects SET heatmap_title = ? WHERE id = ?`,
     heatmapTitle ?? null,
+    projectId,
   );
   return NextResponse.json({ ok: true });
 }
