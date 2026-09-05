@@ -37,7 +37,8 @@
     "check:coverage": "tsx scripts/check-coverage.ts",
     "check:route-perms": "tsx scripts/check-route-perms.ts",
     "check:project-scope": "tsx scripts/check-project-scope.ts",
-    "check:db-params": "tsx scripts/check-db-params.ts"
+    "check:db-params": "tsx scripts/check-db-params.ts",
+    "check:test-fk-ids": "tsx scripts/check-test-fk-ids.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.121.0",

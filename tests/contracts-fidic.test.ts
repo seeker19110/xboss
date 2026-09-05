@@ -428,6 +428,13 @@ test(
     const { insertId, run, queryOne } = await import("@/lib/db");
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('TIA Claim Proj')`);
     const claimCode = `CLM-TIA-DB-${projectId}`;
+    // Id thật của DB (không hằng số cứng) — created_by REFERENCES users(id), gán hằng số như
+    // `7` XANH khi chạy riêng file này nhưng ĐỎ khi chạy cả bộ vì file test khác có thể đã
+    // xoá đúng user đó (xem PLAN.md Đợt 6 Việc D + PROGRESS.md "Đợt 5 chiến dịch coverage").
+    const userId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role) VALUES ('Người lập TIA Claim', ?, 'x', 'pm')`,
+      `tia-claim-${projectId}@test.local`,
+    );
 
     const kq1 = analyzeFidicTiaClaim({
       claimCode,
@@ -450,7 +457,7 @@ test(
       delayEndDate: "2026-08-20",
       impactedTasks: [{ taskId: 1, taskName: "Task A", originalDurationDays: 10, delayDays: 19 }],
     });
-    const saved2 = await saveFidicTiaClaim(projectId, kq2, 7);
+    const saved2 = await saveFidicTiaClaim(projectId, kq2, userId);
     assert.equal(saved2.id, saved1.id, "cùng claim_code phải cùng 1 dòng (UPSERT)");
 
     const list = await listFidicTiaClaims(projectId);
@@ -458,6 +465,7 @@ test(
     assert.equal((list[0] as { calculated_eot_days: number }).calculated_eot_days, 19);
 
     await run(`DELETE FROM projects WHERE id = ?`, projectId);
+    await run(`DELETE FROM users WHERE id = ?`, userId);
   },
 );
 
