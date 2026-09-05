@@ -204,7 +204,7 @@ test(
   S,
   async () => {
     const duAn = await taoDuAn("GetCache");
-    const pm = await taoUser("pm");
+    const pm = await taoUser("pm", "PmCache");
     await dangNhapDuAn(pm, duAn);
 
     const { GET } = await import("@/app/api/project/route");
