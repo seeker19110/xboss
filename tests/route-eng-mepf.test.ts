@@ -78,10 +78,17 @@ async function taoUser(
   return { id, passwordHash: u!.password_hash, orgId };
 }
 
-/** Bật module `thuNghiem` (mặc định TẮT) cho 1 dự án — dùng cho cụm iot/edge-vision/generative-routing. */
-async function batModule(moduleKey: string, projectId: number): Promise<void> {
+/**
+ * Bật module `thuNghiem` (mặc định TẮT) cho 1 dự án — dùng cho cụm iot/edge-vision/generative-routing.
+ *
+ * `actorId` BẮT BUỘC là id user CÓ THẬT: `feature_flags.updated_by` có khoá ngoại tới `users`.
+ * Trước đây helper gán cứng `1` — chạy riêng thì xanh (user seed id=1 còn), chạy cả bộ thì file
+ * test khác đã xoá user đó ⇒ vỡ khoá ngoại, 11 ca đỏ. Đúng lớp lỗi "giả định trạng thái toàn cục"
+ * đã ghi ở Đợt 4 (PROGRESS.md, mục "Bài học hạ tầng test").
+ */
+async function batModule(moduleKey: string, projectId: number, actorId: number): Promise<void> {
   const { setFlag } = await import("@/lib/ha-tang/feature-flags");
-  await setFlag(moduleKey, projectId, true, 1, 1);
+  await setFlag(moduleKey, projectId, true, actorId, 1);
 }
 
 const jreq = (url: string, body?: unknown, method = "POST") =>
@@ -618,7 +625,7 @@ test(
     const { insertId, run } = await import("@/lib/db");
     const projectId = await taoDuAn("iotdevon");
     const pm = await taoUser("pm", "iotdevon");
-    await batModule("engineering-iot-telemetry", projectId);
+    await batModule("engineering-iot-telemetry", projectId, pm.id);
     await dangNhapDuAn(pm, projectId);
 
     const deviceRows = await run(
@@ -671,7 +678,7 @@ test("GET /api/engineering/iot/telemetry: chưa đăng nhập → 401", S, async
 test("GET /api/engineering/iot/telemetry: subcon không có quyền → 403", S, async () => {
   const projectId = await taoDuAn("telem403");
   const sub = await taoUser("subcon", "telem403");
-  await batModule("engineering-iot-telemetry", projectId);
+  await batModule("engineering-iot-telemetry", projectId, sub.id);
   await dangNhapDuAn(sub, projectId);
   const { GET } = await import("@/app/api/engineering/iot/telemetry/route");
   const res = await GET(jreq("/x", undefined, "GET"));
@@ -697,7 +704,7 @@ test("POST /api/engineering/iot/telemetry: chưa chọn dự án → 400", S, as
 test("POST /api/engineering/iot/telemetry: thiếu deviceId/metricValue → 400", S, async () => {
   const projectId = await taoDuAn("telemval");
   const pm = await taoUser("pm", "telemval");
-  await batModule("engineering-iot-telemetry", projectId);
+  await batModule("engineering-iot-telemetry", projectId, pm.id);
   await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/engineering/iot/telemetry/route");
   const res = await POST(jreq("/x", {}));
@@ -710,7 +717,7 @@ test(
   async () => {
     const projectId = await taoDuAn("telem404");
     const pm = await taoUser("pm", "telem404");
-    await batModule("engineering-iot-telemetry", projectId);
+    await batModule("engineering-iot-telemetry", projectId, pm.id);
     await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/engineering/iot/telemetry/route");
     const res = await POST(
@@ -727,7 +734,7 @@ test(
   async () => {
     const projectId = await taoDuAn("telemflow");
     const pm = await taoUser("pm", "telemflow");
-    await batModule("engineering-iot-telemetry", projectId);
+    await batModule("engineering-iot-telemetry", projectId, pm.id);
     await dangNhapDuAn(pm, projectId);
     const deviceId = await taoThietBiIot(projectId, "AIR_QUALITY", 50);
     const { POST } = await import("@/app/api/engineering/iot/telemetry/route");
@@ -767,7 +774,7 @@ test("GET /api/engineering/iot/alerts: chưa đăng nhập → 401", S, async ()
 test("PATCH /api/engineering/iot/alerts: subcon không có quyền → 403", S, async () => {
   const projectId = await taoDuAn("alert403");
   const sub = await taoUser("subcon", "alert403");
-  await batModule("engineering-iot-telemetry", projectId);
+  await batModule("engineering-iot-telemetry", projectId, sub.id);
   await dangNhapDuAn(sub, projectId);
   const { PATCH } = await import("@/app/api/engineering/iot/alerts/route");
   const res = await PATCH(jreq("/x", { alertId: "x" }, "PATCH"));
@@ -777,7 +784,7 @@ test("PATCH /api/engineering/iot/alerts: subcon không có quyền → 403", S, 
 test("PATCH /api/engineering/iot/alerts: thiếu alertId → 400", S, async () => {
   const projectId = await taoDuAn("alertval");
   const pm = await taoUser("pm", "alertval");
-  await batModule("engineering-iot-telemetry", projectId);
+  await batModule("engineering-iot-telemetry", projectId, pm.id);
   await dangNhapDuAn(pm, projectId);
   const { PATCH } = await import("@/app/api/engineering/iot/alerts/route");
   const res = await PATCH(jreq("/x", {}, "PATCH"));
@@ -792,10 +799,10 @@ test(
     const { queryOne } = await import("@/lib/db");
     const projectA = await taoDuAn("alertisoA");
     const projectB = await taoDuAn("alertisoB");
-    await batModule("engineering-iot-telemetry", projectA);
-    await batModule("engineering-iot-telemetry", projectB);
     const pmA = await taoUser("pm", "alertisoA");
     const pmB = await taoUser("pm", "alertisoB");
+    await batModule("engineering-iot-telemetry", projectA, pmA.id);
+    await batModule("engineering-iot-telemetry", projectB, pmB.id);
 
     // Sinh 1 cảnh báo thật trong dự án B qua chính route telemetry.
     await dangNhapDuAn(pmB, projectB);
@@ -826,7 +833,7 @@ test(
     const { queryOne } = await import("@/lib/db");
     const projectId = await taoDuAn("alertok");
     const pm = await taoUser("pm", "alertok");
-    await batModule("engineering-iot-telemetry", projectId);
+    await batModule("engineering-iot-telemetry", projectId, pm.id);
     await dangNhapDuAn(pm, projectId);
     const deviceId = await taoThietBiIot(projectId, "GAS_LEAK", 25);
     const { POST: POST_TELEM } = await import("@/app/api/engineering/iot/telemetry/route");
@@ -1658,7 +1665,7 @@ test(
   async () => {
     const projectId = await taoDuAn("edgeok");
     const pm = await taoUser("pm", "edgeok");
-    await batModule("engineering-nextgen-apex", projectId);
+    await batModule("engineering-nextgen-apex", projectId, pm.id);
     await dangNhapDuAn(pm, projectId);
     const { POST, GET } = await import("@/app/api/engineering/edge-vision-tracking/route");
 
@@ -1724,7 +1731,7 @@ test(
   async () => {
     const projectId = await taoDuAn("genrok");
     const pm = await taoUser("pm", "genrok");
-    await batModule("engineering-nextgen-apex", projectId);
+    await batModule("engineering-nextgen-apex", projectId, pm.id);
     await dangNhapDuAn(pm, projectId);
     const { POST, GET } = await import("@/app/api/engineering/generative-routing/route");
     const routingCode = `ROUTE-${uniq("code")}`;
