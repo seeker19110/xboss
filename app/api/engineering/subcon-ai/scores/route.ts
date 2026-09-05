@@ -18,6 +18,17 @@ export async function GET(req: Request) {
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
+  // BUG THẬT (Đợt 5, W3): route này trước đây không kiểm quyền gì — mọi user đăng nhập
+  // (kể cả subcon) đều đọc được bảng điểm tín nhiệm + chỉ số thương mại (costVarianceRate)
+  // của TẤT CẢ thầu phụ trong dự án, trong khi POST cùng file đã đúng dùng
+  // `CAN.manageEngineeringSubconAi`. Bám khuôn `viewEngineeringSubconAi` đã khai sẵn trong
+  // lib/bao-mat/auth.ts (view mở tới BCH, loại subcon) nhưng chưa route nào gọi tới.
+  if (!CAN.viewEngineeringSubconAi(user.role)) {
+    return NextResponse.json(
+      { error: "Không có quyền xem bảng điểm thầu phụ" },
+      { status: 403 },
+    );
+  }
 
   const projectId = await getCurrentProjectId(user);
   const blocked = await assertModuleEnabled("engineering-subcon-ai", projectId);
