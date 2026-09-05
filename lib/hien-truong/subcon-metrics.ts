@@ -8,6 +8,12 @@
 // Nguồn thật hiện có: bảng đánh giá định kỳ NTP `subcon_evaluations` (M33) — do PM/BCH
 // chấm theo thang 1–5 cho an toàn/chất lượng/tiến độ. Chỉ số nào CHƯA có nguồn dữ liệu
 // thật thì trả `null` kèm lý do, TUYỆT ĐỐI không thay bằng số mặc định.
+//
+// V4 (quyết định nghiệp vụ 2026-09-05): công thức chấm điểm chỉ còn 3 chỉ số
+// (`onTimeCompletionRate`, `bbntPassRate`, `hseSafetyScore`). Hai chỉ số `ncrIncidentCount`
+// và `costVarianceRate` đã bị BỎ HẲN — chúng chưa từng có bảng nguồn, luôn `null`, làm route
+// chấm điểm luôn trả 422. Chúng không còn là "chỉ số thiếu dữ liệu" mà là "chỉ số không dùng
+// nữa", nên cũng rời khỏi `thieuDuLieu`.
 import { query, queryOne } from "@/lib/db";
 
 export type ChiSoThauPhu = {
@@ -17,11 +23,6 @@ export type ChiSoThauPhu = {
   bbntPassRate: number | null;
   // Điểm an toàn HSE (suy từ safety_score 1–5)
   hseSafetyScore: number | null;
-  // Số NCR quy trách nhiệm cho nhà thầu phụ — chưa có nguồn (bảng `ncrs` không có cột
-  // nhà thầu/nhà cung cấp, chỉ gắn task + người được giao).
-  ncrIncidentCount: number | null;
-  // % phát sinh chi phí ngoài hợp đồng — chưa có nguồn gắn với hồ sơ thầu phụ M82.
-  costVarianceRate: number | null;
   // Danh sách chỉ số thiếu dữ liệu, kèm lý do (hiển thị nguyên văn cho người dùng).
   thieuDuLieu: { chiSo: string; lyDo: string }[];
   // Số kỳ đánh giá định kỳ đã dùng để tính (0 = chưa có đánh giá nào).
@@ -50,16 +51,7 @@ export async function tinhChiSoThauPhu(
   );
   if (!profile) return null;
 
-  const thieuDuLieu: { chiSo: string; lyDo: string }[] = [
-    {
-      chiSo: "ncrIncidentCount",
-      lyDo: "Bảng ncrs chưa có trường quy trách nhiệm cho nhà thầu phụ nên không đếm được.",
-    },
-    {
-      chiSo: "costVarianceRate",
-      lyDo: "Chưa có nguồn gắn phát sinh chi phí với hồ sơ thầu phụ.",
-    },
-  ];
+  const thieuDuLieu: { chiSo: string; lyDo: string }[] = [];
 
   if (profile.supplierId == null) {
     thieuDuLieu.unshift(
@@ -80,8 +72,6 @@ export async function tinhChiSoThauPhu(
       onTimeCompletionRate: null,
       bbntPassRate: null,
       hseSafetyScore: null,
-      ncrIncidentCount: null,
-      costVarianceRate: null,
       thieuDuLieu,
       soKyDanhGia: 0,
     };
@@ -119,8 +109,6 @@ export async function tinhChiSoThauPhu(
     onTimeCompletionRate: doi(agg?.schedule, "onTimeCompletionRate"),
     bbntPassRate: doi(agg?.quality, "bbntPassRate"),
     hseSafetyScore: doi(agg?.safety, "hseSafetyScore"),
-    ncrIncidentCount: null,
-    costVarianceRate: null,
     thieuDuLieu,
     soKyDanhGia,
   };

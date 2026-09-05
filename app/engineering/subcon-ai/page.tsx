@@ -32,9 +32,7 @@ interface SubconScoreItem {
   workforceCapacity: number;
   onTimeRate: number;
   bbntPassRate: number;
-  ncrCount: number;
   hseScore: number;
-  costVarianceRate: number;
   trustScore: number;
   tierGrade: string;
   summary?: string;
@@ -155,8 +153,9 @@ export default function SubconAiPage() {
                 </span>
               </div>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Chấm điểm tín nhiệm nhà thầu phụ đa chiều (WBS, NCR, BBNT, HSE) & tự động đề xuất
-                danh sách mời thầu tối ưu
+                Chấm điểm tín nhiệm nhà thầu phụ từ 3 chỉ số có dữ liệu thật — tiến độ WBS
+                (30/70), BBNT đạt (25/70), an toàn HSE (15/70) — & tự động đề xuất danh sách mời
+                thầu tối ưu
               </p>
             </div>
           </div>
@@ -399,7 +398,6 @@ export default function SubconAiPage() {
                     <th className="p-3 text-center">Nhân lực</th>
                     <th className="p-3 text-center">Tiến độ WBS</th>
                     <th className="p-3 text-center">BBNT Đạt</th>
-                    <th className="p-3 text-center">Lỗi NCR</th>
                     <th className="p-3 text-center">An toàn HSE</th>
                     <th className="p-3 text-center">Trust Score</th>
                     <th className="p-3 text-center">Phân Hạng</th>
@@ -408,13 +406,13 @@ export default function SubconAiPage() {
                 <tbody className="divide-y divide-zinc-800/60 text-zinc-300">
                   {loading ? (
                     <tr>
-                      <td colSpan={9} className="p-8 text-center text-zinc-500">
+                      <td colSpan={8} className="p-8 text-center text-zinc-500">
                         Đang tải danh sách nhà thầu phụ...
                       </td>
                     </tr>
                   ) : filteredSubcons.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="p-8 text-center text-zinc-500">
+                      <td colSpan={8} className="p-8 text-center text-zinc-500">
                         Không tìm thấy nhà thầu nào phù hợp bộ lọc.
                       </td>
                     </tr>
@@ -451,15 +449,6 @@ export default function SubconAiPage() {
                             }
                           >
                             {s.bbntPassRate}%
-                          </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <span
-                            className={
-                              s.ncrCount === 0 ? "text-zinc-400" : "text-rose-400 font-bold"
-                            }
-                          >
-                            {s.ncrCount} vụ
                           </span>
                         </td>
                         <td className="p-3 text-center text-sky-400 font-medium">

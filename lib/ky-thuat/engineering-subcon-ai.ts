@@ -24,9 +24,7 @@ export interface SubconProfile {
 export interface SubconMetricsInput {
   onTimeCompletionRate: number; // 0 - 100%
   bbntPassRate: number; // 0 - 100%
-  ncrIncidentCount: number; // Số biên bản không phù hợp
   hseSafetyScore: number; // 0 - 100
-  costVarianceRate: number; // % phát sinh chi phí
 }
 
 export interface SubconEvaluationResult {
@@ -35,9 +33,7 @@ export interface SubconEvaluationResult {
   componentScores: {
     scheduleScore: number;
     qualityScore: number;
-    ncrPenaltyScore: number;
     hseScore: number;
-    costControlScore: number;
   };
   summary: string;
 }
@@ -62,23 +58,20 @@ export interface ShortlistCandidate {
 
 /**
  * Tính toán điểm tín nhiệm tổng hợp AI Trust Score (0 - 100)
- * Trọng số: Tiến độ (30%), Chất lượng BBNT (25%), Không vi phạm NCR (20%), HSE (15%), Chi phí (10%)
+ *
+ * Quyết định nghiệp vụ 2026-09-05: bỏ hẳn hai chỉ số `ncrIncidentCount` và `costVarianceRate`
+ * khỏi công thức vì chưa có bảng nguồn gắn NCR/chi phí với thầu phụ (chúng luôn `null`, khiến
+ * cả tính năng chấm điểm không chạy được lần nào). Trọng số cũ 30/25/20/15/10 được chuẩn hoá
+ * lại theo tỷ lệ cho 3 chỉ số còn dữ liệu thật — tổng vẫn bằng 1 nên thang điểm 0–100 không đổi.
+ * Trọng số: Tiến độ (30/70), Chất lượng BBNT (25/70), HSE (15/70).
  */
 export function computeSubcontractorTrustScore(input: SubconMetricsInput): SubconEvaluationResult {
   const scheduleScore = Math.max(0, Math.min(100, input.onTimeCompletionRate));
   const qualityScore = Math.max(0, Math.min(100, input.bbntPassRate));
-  const ncrPenaltyScore = Math.max(0, 100 - input.ncrIncidentCount * 15);
   const hseScore = Math.max(0, Math.min(100, input.hseSafetyScore));
-  const costControlScore = Math.max(0, 100 - Math.max(0, input.costVarianceRate) * 3);
 
   const trustScore = Number(
-    (
-      scheduleScore * 0.3 +
-      qualityScore * 0.25 +
-      ncrPenaltyScore * 0.2 +
-      hseScore * 0.15 +
-      costControlScore * 0.1
-    ).toFixed(2),
+    (scheduleScore * (30 / 70) + qualityScore * (25 / 70) + hseScore * (15 / 70)).toFixed(2),
   );
 
   const tierGrade = classifySubconTier(trustScore);
@@ -89,9 +82,9 @@ export function computeSubcontractorTrustScore(input: SubconMetricsInput): Subco
   } else if (tierGrade === "TIER_B") {
     summary = "Nhà thầu đạt chuẩn: Đáp ứng tốt yêu cầu kỹ thuật, phát sinh không đáng kể.";
   } else if (tierGrade === "TIER_C") {
-    summary = "Cần giám sát: Có phát sinh NCR hoặc chậm tiến độ cục bộ, cần theo dõi chặt.";
+    summary = "Cần giám sát: Chất lượng nghiệm thu hoặc tiến độ chưa ổn định, cần theo dõi chặt.";
   } else {
-    summary = "Cảnh báo rủi ro cao: Vi phạm NCR hoặc chậm tiến độ nghiêm trọng. Hạn chế mời thầu.";
+    summary = "Cảnh báo rủi ro cao: Chậm tiến độ hoặc nghiệm thu trượt nhiều. Hạn chế mời thầu.";
   }
 
   return {
@@ -100,9 +93,7 @@ export function computeSubcontractorTrustScore(input: SubconMetricsInput): Subco
     componentScores: {
       scheduleScore,
       qualityScore,
-      ncrPenaltyScore,
       hseScore,
-      costControlScore,
     },
     summary,
   };
@@ -135,9 +126,7 @@ export function recommendShortlistForPackage(
       componentScores: {
         scheduleScore: 75,
         qualityScore: 75,
-        ncrPenaltyScore: 85,
         hseScore: 80,
-        costControlScore: 80,
       },
       summary: "Chưa có đủ dữ liệu lịch sử thi công",
     };
