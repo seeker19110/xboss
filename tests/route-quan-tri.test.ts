@@ -50,7 +50,7 @@ async function dungDuAn(ten: string, orgId = 1): Promise<number> {
 async function dungSheetDayDu(
   ten: string,
   projectId?: number,
-): Promise<{ sheetId: number; towerId: number; taskId: number }> {
+): Promise<{ sheetId: number; towerId: number; taskId: number; projectId: number }> {
   const { insertId, run } = await import("@/lib/db");
   const pid = projectId ?? (await dungDuAn(`sheet-${ten}`));
   const towerId = await insertId(
@@ -75,7 +75,7 @@ async function dungSheetDayDu(
     `INSERT INTO progress_dimensions (task_id, dimension_label, installed) VALUES (?, 'D1', 0)`,
     taskId,
   );
-  return { sheetId, towerId, taskId };
+  return { sheetId, towerId, taskId, projectId: pid };
 }
 
 // ============================================================================
@@ -1041,8 +1041,8 @@ test("PATCH /api/sheets/:id: không tồn tại → 404", S, async () => {
 
 test("PATCH /api/sheets/:id: body không hợp lệ (null) → 400", S, async () => {
   const pm = await dungUser("pm", `pmsheetpatchnull${RUN}`);
-  const { sheetId } = await dungSheetDayDu(`shpatchnull-${RUN}`);
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  const { sheetId, projectId } = await dungSheetDayDu(`shpatchnull-${RUN}`);
+  await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, projectId);
   const { PATCH } = await import("@/app/api/sheets/[id]/route");
   const res = await PATCH(
     new NextRequest(`http://localhost/api/sheets/${sheetId}`, {
@@ -1056,8 +1056,8 @@ test("PATCH /api/sheets/:id: body không hợp lệ (null) → 400", S, async ()
 
 test("PATCH /api/sheets/:id: tên rỗng → 400", S, async () => {
   const pm = await dungUser("pm", `pmsheetpatchname${RUN}`);
-  const { sheetId } = await dungSheetDayDu(`shpatchname-${RUN}`);
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  const { sheetId, projectId } = await dungSheetDayDu(`shpatchname-${RUN}`);
+  await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, projectId);
   const { PATCH } = await import("@/app/api/sheets/[id]/route");
   const res = await PATCH(req(`http://localhost/api/sheets/${sheetId}`, "PATCH", { name: " " }), {
     params: Promise.resolve({ id: String(sheetId) }),
@@ -1068,13 +1068,13 @@ test("PATCH /api/sheets/:id: tên rỗng → 400", S, async () => {
 test("PATCH /api/sheets/:id: mã trùng sheet khác → 409", S, async () => {
   const pm = await dungUser("pm", `pmsheetpatchdup${RUN}`);
   const a = await dungSheetDayDu(`shpatchdupA-${RUN}`);
-  const b = await dungSheetDayDu(`shpatchdupB-${RUN}`);
+  const b = await dungSheetDayDu(`shpatchdupB-${RUN}`, a.projectId);
   const { queryOne } = await import("@/lib/db");
   const codeA = (await queryOne<{ code: string }>(
     `SELECT code FROM sheet_types WHERE id = ?`,
     a.sheetId,
   ))!.code;
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, a.projectId);
   const { PATCH } = await import("@/app/api/sheets/[id]/route");
   const res = await PATCH(
     req(`http://localhost/api/sheets/${b.sheetId}`, "PATCH", { code: codeA }),
@@ -1087,8 +1087,8 @@ test("PATCH /api/sheets/:id: mã trùng sheet khác → 409", S, async () => {
 
 test("PATCH /api/sheets/:id: slug không hợp lệ → 400", S, async () => {
   const pm = await dungUser("pm", `pmsheetpatchslugbad${RUN}`);
-  const { sheetId } = await dungSheetDayDu(`shpatchslugbad-${RUN}`);
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  const { sheetId, projectId } = await dungSheetDayDu(`shpatchslugbad-${RUN}`);
+  await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, projectId);
   const { PATCH } = await import("@/app/api/sheets/[id]/route");
   const res = await PATCH(
     req(`http://localhost/api/sheets/${sheetId}`, "PATCH", { slug: "Slug Sai!" }),
@@ -1100,13 +1100,13 @@ test("PATCH /api/sheets/:id: slug không hợp lệ → 400", S, async () => {
 test("PATCH /api/sheets/:id: slug trùng sheet khác → 409", S, async () => {
   const pm = await dungUser("pm", `pmsheetpatchslugdup${RUN}`);
   const a = await dungSheetDayDu(`shpatchslugdupA-${RUN}`);
-  const b = await dungSheetDayDu(`shpatchslugdupB-${RUN}`);
+  const b = await dungSheetDayDu(`shpatchslugdupB-${RUN}`, a.projectId);
   const { queryOne } = await import("@/lib/db");
   const slugA = (await queryOne<{ slug: string }>(
     `SELECT slug FROM sheet_types WHERE id = ?`,
     a.sheetId,
   ))!.slug;
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, a.projectId);
   const { PATCH } = await import("@/app/api/sheets/[id]/route");
   const res = await PATCH(
     req(`http://localhost/api/sheets/${b.sheetId}`, "PATCH", { slug: slugA }),
@@ -1119,8 +1119,8 @@ test("PATCH /api/sheets/:id: slug trùng sheet khác → 409", S, async () => {
 
 test("PATCH /api/sheets/:id: managerId không tồn tại → 400", S, async () => {
   const pm = await dungUser("pm", `pmsheetpatchmgr${RUN}`);
-  const { sheetId } = await dungSheetDayDu(`shpatchmgr-${RUN}`);
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  const { sheetId, projectId } = await dungSheetDayDu(`shpatchmgr-${RUN}`);
+  await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, projectId);
   const { PATCH } = await import("@/app/api/sheets/[id]/route");
   const res = await PATCH(
     req(`http://localhost/api/sheets/${sheetId}`, "PATCH", { managerId: 999999992 }),
@@ -1131,8 +1131,8 @@ test("PATCH /api/sheets/:id: managerId không tồn tại → 400", S, async () 
 
 test("PATCH /api/sheets/:id: không có gì để cập nhật → 400", S, async () => {
   const pm = await dungUser("pm", `pmsheetpatchempty${RUN}`);
-  const { sheetId } = await dungSheetDayDu(`shpatchempty-${RUN}`);
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  const { sheetId, projectId } = await dungSheetDayDu(`shpatchempty-${RUN}`);
+  await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, projectId);
   const { PATCH } = await import("@/app/api/sheets/[id]/route");
   const res = await PATCH(req(`http://localhost/api/sheets/${sheetId}`, "PATCH", {}), {
     params: Promise.resolve({ id: String(sheetId) }),
@@ -1142,8 +1142,8 @@ test("PATCH /api/sheets/:id: không có gì để cập nhật → 400", S, asyn
 
 test("PATCH /api/sheets/:id: sửa đủ trường thành công", S, async () => {
   const pm = await dungUser("pm", `pmsheetpatchok${RUN}`);
-  const { sheetId } = await dungSheetDayDu(`shpatchok-${RUN}`);
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  const { sheetId, projectId } = await dungSheetDayDu(`shpatchok-${RUN}`);
+  await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, projectId);
   const { PATCH } = await import("@/app/api/sheets/[id]/route");
   const res = await PATCH(
     req(`http://localhost/api/sheets/${sheetId}`, "PATCH", {
@@ -1206,7 +1206,7 @@ test(
   S,
   async () => {
     const pm = await dungUser("pm", `pmsheetdelok${RUN}`);
-    const { sheetId, taskId } = await dungSheetDayDu(`shdelok-${RUN}`);
+    const { sheetId, taskId, projectId } = await dungSheetDayDu(`shdelok-${RUN}`);
     const { insertId, queryOne } = await import("@/lib/db");
     await insertId(`INSERT INTO task_photos (task_id, file_name) VALUES (?, 'a.jpg')`, taskId);
     await insertId(
@@ -1223,7 +1223,7 @@ test(
       `INSERT INTO materials (sheet_type_id, name) VALUES (?, 'Vật tư sheet')`,
       sheetId,
     );
-    dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+    await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, projectId);
     const { DELETE } = await import("@/app/api/sheets/[id]/route");
     const res = await DELETE(req(`http://localhost/api/sheets/${sheetId}`, "DELETE"), {
       params: Promise.resolve({ id: String(sheetId) }),
