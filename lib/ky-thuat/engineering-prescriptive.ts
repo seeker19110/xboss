@@ -1,4 +1,5 @@
 import { query, queryOne } from "@/lib/db";
+import { loiKhongTimThay } from "@/lib/nen/loi";
 
 export type TargetMetricType =
   | "schedule_compression"
@@ -547,7 +548,7 @@ export async function auditEngineeringElement(
     projectId,
   );
   if (!element) {
-    throw new Error("Không tìm thấy đối tượng kỹ thuật");
+    throw loiKhongTimThay("Không tìm thấy đối tượng kỹ thuật");
   }
 
   const rule = await queryOne<ComplianceRuleRecord>(
@@ -555,7 +556,7 @@ export async function auditEngineeringElement(
     ruleId,
   );
   if (!rule) {
-    throw new Error("Không tìm thấy quy chuẩn kỹ thuật");
+    throw loiKhongTimThay("Không tìm thấy quy chuẩn kỹ thuật");
   }
 
   const { isCompliant, findingDetails, evidence } = evaluateElementCompliance(element, rule);

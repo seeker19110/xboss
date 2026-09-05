@@ -10,6 +10,7 @@ import {
   SubconEvaluationResult,
   SubconTier,
 } from "@/lib/ky-thuat/engineering-subcon-ai";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -170,11 +171,8 @@ export async function POST(req: Request) {
         hoSoThieuDuLieu,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Subcon AI Recommend Shortlist POST]", error);
-    return NextResponse.json(
-      { error: error.message || "Lỗi tạo đề xuất mời thầu" },
-      { status: 500 },
-    );
+    return phanHoiLoi(error, "Lỗi tạo đề xuất mời thầu");
   }
 }

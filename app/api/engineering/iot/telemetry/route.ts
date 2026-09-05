@@ -4,6 +4,7 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { query } from "@/lib/db";
 import { evaluateTelemetryStatus, IotDeviceType } from "@/lib/ky-thuat/engineering-iot-telemetry";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -56,12 +57,9 @@ export async function GET(req: Request) {
       success: true,
       data: rows,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[IoT Telemetry GET]", error);
-    return NextResponse.json(
-      { error: error.message || "Lỗi lấy nhật ký telemetry" },
-      { status: 500 },
-    );
+    return phanHoiLoi(error, "Lỗi lấy nhật ký telemetry");
   }
 }
 
@@ -155,8 +153,8 @@ export async function POST(req: Request) {
       data: logRows[0],
       alert: alertCreated,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[IoT Telemetry POST]", error);
-    return NextResponse.json({ error: error.message || "Lỗi ghi nhận telemetry" }, { status: 500 });
+    return phanHoiLoi(error, "Lỗi ghi nhận telemetry");
   }
 }

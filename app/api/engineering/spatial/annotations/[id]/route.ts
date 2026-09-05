@@ -6,6 +6,7 @@ import {
 } from "@/lib/ky-thuat/engineering-spatial-pinning";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { run, withProjectScope } from "@/lib/db";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -68,8 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       updated: true,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -127,7 +127,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       deleted: true,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

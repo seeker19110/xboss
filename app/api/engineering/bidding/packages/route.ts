@@ -5,6 +5,7 @@ import {
   createBiddingPackage,
   listBiddingPackages,
 } from "@/lib/ky-thuat/engineering-bidding-matrix";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -26,8 +27,7 @@ export async function GET(req: NextRequest) {
     const packages = await listBiddingPackages(projectId, { discipline, status });
     return NextResponse.json({ success: true, data: packages });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -75,7 +75,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: pkg });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

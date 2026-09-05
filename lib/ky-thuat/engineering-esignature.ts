@@ -1,5 +1,6 @@
 import { query, queryOne, withProjectScope, withTransaction } from "@/lib/db";
 import { todayISO } from "@/lib/nen/date";
+import { LoiNghiepVu } from "@/lib/nen/loi";
 import crypto from "crypto";
 
 export type EsignDocumentType =
@@ -163,12 +164,11 @@ export async function generateSignerOtp(
 }
 
 // Lỗi ký có mã HTTP kèm theo để route trả đúng 403/409/422 thay vì gộp hết về 500.
-export class EsignSignError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
+// Kế thừa `LoiNghiepVu` (lớp lỗi chung ở lib/nen/loi.ts) để `phanHoiLoi` của route nhận ra
+// mà không cần nhánh `instanceof` riêng — giữ tên lớp cũ cho code/log đang dựa vào nó.
+export class EsignSignError extends LoiNghiepVu {
+  constructor(message: string, status: number) {
+    super(message, status);
     this.name = "EsignSignError";
   }
 }
