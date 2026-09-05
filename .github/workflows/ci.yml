@@ -121,6 +121,12 @@ jobs:
       - name: Kiểm tham số lib/db (chặn query(sql, [a, b]))
         run: npm run check:db-params
 
+      # Đợt 6 Việc D: chặn hằng số nguyên nhỏ gán cứng vào vị trí id khoá ngoại tới `users`
+      # trong test (created_by/updated_by/actorId...) — lớp lỗi đã làm đỏ bộ test ở CẢ Đợt 4
+      # lẫn Đợt 5 dù đã ghi thành ràng buộc cứng trong kế hoạch. Static, không cần DB.
+      - name: Kiểm id khoá ngoại gán cứng trong test
+        run: npm run check:test-fk-ids
+
   # ── Test đơn vị + tích hợp trên Postgres thật ──
   test:
     name: test (Postgres)
