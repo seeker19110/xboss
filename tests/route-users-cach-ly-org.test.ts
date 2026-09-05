@@ -174,6 +174,128 @@ test(
   },
 );
 
+// ============================================================================
+// Guard "Admin cuối cùng" — phải đếm THEO ORG, không toàn hệ thống
+// ============================================================================
+//
+// VÌ SAO CẦN org A/B RIÊNG (không dùng org_id=1 mặc định): rất nhiều test khác trong bộ
+// cũng tạo admin ở org_id=1, nên "org A chỉ có đúng 1 admin" không đảm bảo được nếu dùng
+// chung org mặc định. Tạo tổ chức mới bằng taoToChuc() cho cả A lẫn B để phép đếm admin
+// chỉ tính đúng phạm vi test này.
+
+test(
+  "PATCH /api/users/:id: BUG THẬT (đã sửa) — hạ cấp admin duy nhất của org vẫn bị chặn dù org khác có admin",
+  S,
+  async () => {
+    const orgA = await taoToChuc("lastadmin-patch-A");
+    const projectA = await taoDuAn("lastadmin-patch-A", orgA);
+    const adminA = await taoUser("admin", "lastadmin-patch-A", { orgId: orgA });
+
+    // Org B có admin riêng — trước bản vá, COUNT(*) toàn hệ thống > 1 khiến guard cho qua.
+    const orgB = await taoToChuc("lastadmin-patch-B");
+    await taoUser("admin", "lastadmin-patch-B", { orgId: orgB });
+
+    await dangNhapDuAn(adminA, projectA);
+    const { PATCH } = await import("@/app/api/users/[id]/route");
+    const res = await PATCH(jreq("/x", { role: "pm" }), {
+      params: Promise.resolve({ id: String(adminA.id) }),
+    });
+    assert.equal(res.status, 400);
+    const { error } = await res.json();
+    assert.equal(error, "Không thể hạ cấp Admin cuối cùng");
+
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ role: string }>(`SELECT role FROM users WHERE id = ?`, adminA.id);
+    assert.equal(row?.role, "admin", "vai trò admin duy nhất của org A không bị hạ nhầm");
+  },
+);
+
+// GHI NHẬN (không tự sửa, đã xác nhận đúng nhận định có sẵn ở tests/route-quan-tri.test.ts
+// dòng ~446-454): nhánh "Không thể xoá Admin cuối cùng" trong DELETE về mặt lý thuyết
+// KHÔNG THỂ chạm tới qua API dù đếm theo org hay toàn hệ — muốn rơi vào đó cần
+// target.role==='admin' VÀ org của target chỉ còn <=1 admin, nhưng người gọi DELETE bắt
+// buộc cũng phải là admin CÙNG org (V10 đã lọc org_id ở SELECT target); nếu người gọi
+// CHÍNH LÀ target thì bị chặn sớm hơn bởi check "không thể tự xoá tài khoản đang đăng
+// nhập" (đứng trước trong route); nếu người gọi là admin KHÁC cùng org thì org đó đã có
+// >=2 admin, không rơi vào <=1. Bản vá org_id cho COUNT trong DELETE vẫn đúng/cần thiết
+// (phòng thủ theo chiều sâu, nhất quán với PATCH và với SELECT target đã lọc org_id) —
+// chỉ là không có kịch bản API hợp lệ nào để chứng minh riêng nó chặn được kẻ tấn công,
+// vì 2 lớp chặn khác (tự xoá mình + lọc org_id ở SELECT target) đã đóng đường tấn công
+// trước khi chạm tới COUNT. Ca dưới đây kiểm đúng hành vi THẬT của DELETE khi org A chỉ
+// còn 1 admin: tự xoá mình bị chặn bởi lớp "tự xoá" (400, khác thông điệp "Admin cuối
+// cùng" nhưng cùng hệ quả — không ai xoá được admin duy nhất của org A).
+test(
+  "DELETE /api/users/:id: org chỉ có 1 admin — admin đó không tự xoá được mình (lớp chặn khác, cùng hệ quả)",
+  S,
+  async () => {
+    const orgA = await taoToChuc("lastadmin-del-A");
+    const projectA = await taoDuAn("lastadmin-del-A", orgA);
+    const adminA = await taoUser("admin", "lastadmin-del-A", { orgId: orgA });
+
+    const orgB = await taoToChuc("lastadmin-del-B");
+    await taoUser("admin", "lastadmin-del-B", { orgId: orgB });
+
+    await dangNhapDuAn(adminA, projectA);
+    const { DELETE } = await import("@/app/api/users/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(adminA.id) }),
+    });
+    assert.equal(res.status, 400);
+
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ id: number }>(`SELECT id FROM users WHERE id = ?`, adminA.id);
+    assert.ok(row, "admin duy nhất của org A không bị xoá nhầm");
+  },
+);
+
+test(
+  "DELETE /api/users/:id: org có 2 admin (kèm admin org khác gây nhiễu) → xoá 1 người vẫn chạy được",
+  S,
+  async () => {
+    const orgA = await taoToChuc("twoadmin-del");
+    const projectA = await taoDuAn("twoadmin-del", orgA);
+    const admin1 = await taoUser("admin", "twoadmin-del1", { orgId: orgA });
+    const admin2 = await taoUser("admin", "twoadmin-del2", { orgId: orgA });
+
+    // Admin org khác gây nhiễu — trước bản vá, COUNT(*) toàn hệ thống bị cộng dồn qua org.
+    const orgB = await taoToChuc("twoadmin-del-B");
+    await taoUser("admin", "twoadmin-del-B", { orgId: orgB });
+
+    await dangNhapDuAn(admin1, projectA);
+    const { DELETE } = await import("@/app/api/users/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(admin2.id) }),
+    });
+    assert.equal(res.status, 200);
+
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ id: number }>(`SELECT id FROM users WHERE id = ?`, admin2.id);
+    assert.equal(row, undefined, "vẫn xoá được vì org A còn admin khác (admin1)");
+  },
+);
+
+test(
+  "PATCH /api/users/:id: org có 2 admin → hạ cấp 1 người vẫn chạy được (không chặn nhầm)",
+  S,
+  async () => {
+    const orgA = await taoToChuc("twoadmin-patch");
+    const projectA = await taoDuAn("twoadmin-patch", orgA);
+    const admin1 = await taoUser("admin", "twoadmin-patch1", { orgId: orgA });
+    const admin2 = await taoUser("admin", "twoadmin-patch2", { orgId: orgA });
+
+    await dangNhapDuAn(admin1, projectA);
+    const { PATCH } = await import("@/app/api/users/[id]/route");
+    const res = await PATCH(jreq("/x", { role: "pm" }), {
+      params: Promise.resolve({ id: String(admin2.id) }),
+    });
+    assert.equal(res.status, 200);
+
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ role: string }>(`SELECT role FROM users WHERE id = ?`, admin2.id);
+    assert.equal(row?.role, "pm");
+  },
+);
+
 test("PATCH /api/users/:id: cùng org → sửa thành công như cũ", S, async () => {
   const projectId = await taoDuAn("patch-ok");
   const admin = await taoUser("admin", "patch-ok");

@@ -37,10 +37,13 @@ export async function PATCH(
     const role = String(body.role) as Role;
     if (!ROLES.includes(role))
       return NextResponse.json({ error: "Vai trò không hợp lệ" }, { status: 400 });
-    // Không cho hạ cấp admin cuối cùng (kể cả tự hạ mình).
+    // Không cho hạ cấp admin cuối cùng (kể cả tự hạ mình). Đếm THEO ORG — nếu đếm toàn hệ
+    // thống, tổ chức khác có admin sẽ khiến guard cho qua dù tổ chức này chỉ còn 1 admin,
+    // làm tổ chức đó mất khả năng tự quản trị.
     if (target.role === "admin" && role !== "admin") {
       const admins = await queryOne<{ n: number }>(
-        `SELECT COUNT(*) AS n FROM users WHERE role = 'admin'`,
+        `SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND org_id = ?`,
+        me.orgId,
       );
       if (Number(admins?.n) <= 1)
         return NextResponse.json({ error: "Không thể hạ cấp Admin cuối cùng" }, { status: 400 });
@@ -115,9 +118,12 @@ export async function DELETE(
   );
   if (!target) return NextResponse.json({ error: "Không tìm thấy người dùng" }, { status: 404 });
 
+  // Đếm THEO ORG cùng lý do như nhánh PATCH ở trên — đừng để admin của tổ chức khác che lấp
+  // việc tổ chức này chỉ còn đúng 1 admin.
   if (target.role === "admin") {
     const admins = await queryOne<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM users WHERE role = 'admin'`,
+      `SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND org_id = ?`,
+      me.orgId,
     );
     if (Number(admins?.n) <= 1)
       return NextResponse.json({ error: "Không thể xoá Admin cuối cùng" }, { status: 400 });
