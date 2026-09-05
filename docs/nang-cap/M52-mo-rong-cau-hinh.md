@@ -58,12 +58,12 @@ ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS custom JSONB NOT NULL DEFAULT
 - `lib/modules.ts` (mới): mảng `MODULES: ModuleDef[]`:
   ```ts
   type ModuleDef = {
-    key: string;                  // 'finance', 'hse', ...
+    key: string; // 'finance', 'hse', ...
     nav: { group: string; label: string; href: string; icon: string }[];
-    permKeys: string[];           // perm thuộc module (đối chiếu ma trận M50)
+    permKeys: string[]; // perm thuộc module (đối chiếu ma trận M50)
     notificationTypes?: string[];
-    swExclude?: string[];         // path loại trừ cache
-    routePrefix: string[];        // '/api/finance', ... (dùng cho feature flag PR4)
+    swExclude?: string[]; // path loại trừ cache
+    routePrefix: string[]; // '/api/finance', ... (dùng cho feature flag PR4)
   };
   ```
 - `dashboardTree`/sidebar, trang `/admin/permissions` (M50), đăng ký notification đọc từ registry; script `scripts/check-sw-exclude.ts` chạy trong CI đối chiếu `swExclude` với `public/sw.js` (sw.js là file tĩnh — không sinh tự động, chỉ kiểm).

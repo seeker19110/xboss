@@ -153,7 +153,7 @@ export default function DocumentsPage() {
               value={floorFilter}
               onChange={(e) => setFloorFilter(e.target.value)}
               aria-label="Lọc theo tầng"
-              className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 h-10 transition"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 h-10 transition"
             >
               <option value="">Mọi tầng</option>
               {floors.map((f) => (
@@ -187,7 +187,7 @@ export default function DocumentsPage() {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Tìm tên hồ sơ…"
             aria-label="Tìm kiếm hồ sơ"
-            className="flex-1 min-w-[200px] bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 h-10 transition"
+            className="flex-1 min-w-[200px] bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 h-10 transition"
           />
         </div>
 

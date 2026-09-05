@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS remote_links (
 ```ts
 export type Adapter = {
   provider: string;
-  pushEntities: string[];            // entity đẩy đi
-  push(entity: string, rows: Row[], cfg: Config): Promise<PushResult>;   // trả remote_key từng dòng
+  pushEntities: string[]; // entity đẩy đi
+  push(entity: string, rows: Row[], cfg: Config): Promise<PushResult>; // trả remote_key từng dòng
   pullStatus?(entity: string, links: Link[], cfg: Config): Promise<StatusUpdate[]>;
 };
 export async function runSync(provider: string, projectId: number): Promise<RunSummary>;

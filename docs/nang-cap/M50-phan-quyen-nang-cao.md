@@ -35,10 +35,10 @@ CREATE TABLE IF NOT EXISTS role_permissions (
   ```ts
   // entity → danh sách trường nhạy cảm + perm cần có để xem
   export const SENSITIVE: Record<string, { fields: string[]; perm: string }[]> = {
-    variation:    [{ fields: ["amount"], perm: "viewPayment" }],
-    contract:     [{ fields: ["value", "retention_pct"], perm: "viewPayment" }],
+    variation: [{ fields: ["amount"], perm: "viewPayment" }],
+    contract: [{ fields: ["value", "retention_pct"], perm: "viewPayment" }],
     payment_cert: [{ fields: ["amount", "deduction", "net"], perm: "viewPayment" }],
-    payroll:      [{ fields: ["rate", "gross", "deductions", "net"], perm: "viewPayroll" }], // perm mới, mặc định admin/pm
+    payroll: [{ fields: ["rate", "gross", "deductions", "net"], perm: "viewPayroll" }], // perm mới, mặc định admin/pm
   };
   export function stripSensitive<T>(entity: string, rows: T[], user): T[]; // thay giá trị bằng null
   ```

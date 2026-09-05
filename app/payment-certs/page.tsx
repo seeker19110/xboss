@@ -203,7 +203,7 @@ function PaymentCertsInner() {
                     setContractId(Number(e.target.value));
                     setSelectedId(null);
                   }}
-                  className="min-w-[260px] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 h-10 transition"
+                  className="min-w-[260px] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 h-10 transition"
                 >
                   {contracts.map((c) => (
                     <option key={c.id} value={c.id}>

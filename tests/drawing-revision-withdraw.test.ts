@@ -25,21 +25,18 @@ function nguon(): string {
   );
 }
 
-test(
-  "route withdraw: force-dynamic, getCurrentUser, CAN., đủ 400/401/403/404/409, uỷ quyền withdrawRevision",
-  () => {
-    const src = nguon();
-    assert.match(src, /export const dynamic = "force-dynamic"/);
-    assert.match(src, /getCurrentUser\(\)/);
-    assert.match(src, /CAN\./, "route ghi dữ liệu phải kiểm quyền qua CAN.");
-    assert.match(src, /status: 400/);
-    assert.match(src, /status: 401/);
-    assert.match(src, /status: 403/);
-    assert.match(src, /status: 404/);
-    assert.match(src, /status: 409/);
-    assert.match(src, /withdrawRevision/, "route phải uỷ quyền logic cho lib withdrawRevision");
-  },
-);
+test("route withdraw: force-dynamic, getCurrentUser, CAN., đủ 400/401/403/404/409, uỷ quyền withdrawRevision", () => {
+  const src = nguon();
+  assert.match(src, /export const dynamic = "force-dynamic"/);
+  assert.match(src, /getCurrentUser\(\)/);
+  assert.match(src, /CAN\./, "route ghi dữ liệu phải kiểm quyền qua CAN.");
+  assert.match(src, /status: 400/);
+  assert.match(src, /status: 401/);
+  assert.match(src, /status: 403/);
+  assert.match(src, /status: 404/);
+  assert.match(src, /status: 409/);
+  assert.match(src, /withdrawRevision/, "route phải uỷ quyền logic cho lib withdrawRevision");
+});
 
 // ===== (2) Integration — hành vi thật của lib mà route uỷ quyền =====
 
@@ -138,17 +135,13 @@ test(
   },
 );
 
-test(
-  "withdrawRevision: chính chủ + commented → withdrawn được (chưa quyết định)",
-  S,
-  async () => {
-    await xoaSach();
-    const id = await taoRevision("commented", ownerId, "A");
-    const { withdrawRevision } = await import("@/lib/ky-thuat/drawings");
-    const kq = await withdrawRevision(id, ownerId);
-    assert.equal(kq.status, "withdrawn");
-  },
-);
+test("withdrawRevision: chính chủ + commented → withdrawn được (chưa quyết định)", S, async () => {
+  await xoaSach();
+  const id = await taoRevision("commented", ownerId, "A");
+  const { withdrawRevision } = await import("@/lib/ky-thuat/drawings");
+  const kq = await withdrawRevision(id, ownerId);
+  assert.equal(kq.status, "withdrawn");
+});
 
 test(
   "withdrawRevision: rev đã duyệt/từ chối → conflict (route trả 409), không thu hồi được, rev khác của cùng drawing không bị ảnh hưởng",

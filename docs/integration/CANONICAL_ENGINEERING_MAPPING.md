@@ -2,26 +2,26 @@
 
 This document defines the first integration contract. It intentionally maps concepts rather than copying implementation details.
 
-| MEP-Agents capability/concept | XBoss canonical target | Ownership | Migration action |
-|---|---|---|---|
-| CAD drawing | `EngineeringObject` + source/revision refs | XBoss Kernel | ADAPT |
-| CAD entity/geometry | Engineering object geometry payload/ref | Engineering service | ADAPT |
-| BIM element | `EngineeringObject` with discipline/type metadata | Engineering service | ADAPT |
-| MEP component | `EngineeringObject` (`equipment`/`component`/`system`) | Engineering domain | ADAPT |
-| Drawing revision | `engineering_revisions` + provenance | XBoss Kernel | ADAPT |
-| CAD diff | revision comparison evidence | Engineering service | KEEP/ADAPT |
-| Clash | engineering issue/evidence | Engineering service + XBoss issue workflow | ADAPT |
-| Quantity takeoff | deterministic quantity result + evidence | Engineering service | ADAPT |
-| BOQ diff | XBoss BOQ revision/variation semantics | XBoss Commercial | ADAPT |
-| BOQ cost | XBoss cost/BOQ | XBoss Commercial | DO NOT duplicate |
-| Project/session | XBoss Project | XBoss Core | REWRITE |
-| JWT auth | XBoss identity/authorization | XBoss Core | REWRITE |
-| Agent state | XBoss Agent Run / workflow context | XBoss AI | ADAPT |
-| Supervisor | XBoss Agent Fabric planner/router | XBoss AI | ADAPT |
-| Reviewer | XBoss policy/HITL reviewer | XBoss Workflow | ADAPT |
-| Standards/RAG | XBoss Knowledge + Provenance | XBoss Knowledge | ADAPT |
-| Usage/cost | XBoss AI observability | XBoss Platform | ADAPT |
-| Streamlit app | XBoss Engineering UI | XBoss App | DEPRECATE after replacement |
+| MEP-Agents capability/concept | XBoss canonical target                                 | Ownership                                  | Migration action            |
+| ----------------------------- | ------------------------------------------------------ | ------------------------------------------ | --------------------------- |
+| CAD drawing                   | `EngineeringObject` + source/revision refs             | XBoss Kernel                               | ADAPT                       |
+| CAD entity/geometry           | Engineering object geometry payload/ref                | Engineering service                        | ADAPT                       |
+| BIM element                   | `EngineeringObject` with discipline/type metadata      | Engineering service                        | ADAPT                       |
+| MEP component                 | `EngineeringObject` (`equipment`/`component`/`system`) | Engineering domain                         | ADAPT                       |
+| Drawing revision              | `engineering_revisions` + provenance                   | XBoss Kernel                               | ADAPT                       |
+| CAD diff                      | revision comparison evidence                           | Engineering service                        | KEEP/ADAPT                  |
+| Clash                         | engineering issue/evidence                             | Engineering service + XBoss issue workflow | ADAPT                       |
+| Quantity takeoff              | deterministic quantity result + evidence               | Engineering service                        | ADAPT                       |
+| BOQ diff                      | XBoss BOQ revision/variation semantics                 | XBoss Commercial                           | ADAPT                       |
+| BOQ cost                      | XBoss cost/BOQ                                         | XBoss Commercial                           | DO NOT duplicate            |
+| Project/session               | XBoss Project                                          | XBoss Core                                 | REWRITE                     |
+| JWT auth                      | XBoss identity/authorization                           | XBoss Core                                 | REWRITE                     |
+| Agent state                   | XBoss Agent Run / workflow context                     | XBoss AI                                   | ADAPT                       |
+| Supervisor                    | XBoss Agent Fabric planner/router                      | XBoss AI                                   | ADAPT                       |
+| Reviewer                      | XBoss policy/HITL reviewer                             | XBoss Workflow                             | ADAPT                       |
+| Standards/RAG                 | XBoss Knowledge + Provenance                           | XBoss Knowledge                            | ADAPT                       |
+| Usage/cost                    | XBoss AI observability                                 | XBoss Platform                             | ADAPT                       |
+| Streamlit app                 | XBoss Engineering UI                                   | XBoss App                                  | DEPRECATE after replacement |
 
 ## Canonical engineering object minimum
 

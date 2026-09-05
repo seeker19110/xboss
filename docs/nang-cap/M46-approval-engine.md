@@ -62,16 +62,31 @@ CREATE TABLE IF NOT EXISTS approval_actions (
 
 ```ts
 // Bước hiệu lực của request = các step của flow có min_amount IS NULL hoặc <= amount, theo seq.
-export async function getActiveFlow(entityType: string, projectId: number): Promise<Flow | undefined>;
-export async function openApproval(opts: { entityType; entityId; projectId; amount?; user }): Promise<Request | null>;
-  // null nếu không có flow (caller giữ hành vi cũ). Bọc withTransaction. Không có bước hiệu lực → auto-approved.
-export async function advanceApproval(opts: { entityType; entityId; user; decision; note? }): Promise<Result>;
-  // - SELECT request FOR UPDATE; 404 nếu không pending.
-  // - Quyền: user.role === step.role hiện tại, HOẶC admin. VIEW_ONLY_ROLES luôn 403.
-  // - SoD: actor_id === created_by → 403 "Người tạo không được tự duyệt".
-  // - reject → status=rejected, chốt. approve → bước hiệu lực kế tiếp hoặc status=approved.
-export async function pendingForUser(user, projectId): Promise<PendingItem[]>;  // hộp thư "chờ tôi duyệt"
-export function decideNext(steps, amount, currentSeq): Step | null;             // logic thuần — unit test
+export async function getActiveFlow(
+  entityType: string,
+  projectId: number,
+): Promise<Flow | undefined>;
+export async function openApproval(opts: {
+  entityType;
+  entityId;
+  projectId;
+  amount?;
+  user;
+}): Promise<Request | null>;
+// null nếu không có flow (caller giữ hành vi cũ). Bọc withTransaction. Không có bước hiệu lực → auto-approved.
+export async function advanceApproval(opts: {
+  entityType;
+  entityId;
+  user;
+  decision;
+  note?;
+}): Promise<Result>;
+// - SELECT request FOR UPDATE; 404 nếu không pending.
+// - Quyền: user.role === step.role hiện tại, HOẶC admin. VIEW_ONLY_ROLES luôn 403.
+// - SoD: actor_id === created_by → 403 "Người tạo không được tự duyệt".
+// - reject → status=rejected, chốt. approve → bước hiệu lực kế tiếp hoặc status=approved.
+export async function pendingForUser(user, projectId): Promise<PendingItem[]>; // hộp thư "chờ tôi duyệt"
+export function decideNext(steps, amount, currentSeq): Step | null; // logic thuần — unit test
 ```
 
 ## PR2 — Áp cho VO + IPC (payment_certs)

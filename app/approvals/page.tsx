@@ -15,7 +15,8 @@ import {
 import AppHeader from "@/app/components/AppHeader";
 import { Modal, appAlert, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import { redirectToLogin } from "@/app/lib/me";
+import { ErrorState } from "@/app/components/ErrorState";
+import { taiJson } from "@/app/lib/taiDuLieu";
 import { formatDateVN } from "@/lib/nen/date";
 import { formatVnd } from "@/lib/nen/money";
 import { sortFloorsAsc } from "@/lib/tien-do/floors";
@@ -131,6 +132,7 @@ function ApprovalsPageInner() {
   const [approved, setApproved] = useState<FloorGroup[]>([]);
   const [canApprove, setCanApprove] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loi, setLoi] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [inbox, setInbox] = useState<PendingApproval[]>([]);
   const [inboxBusy, setInboxBusy] = useState<number | null>(null);
@@ -142,28 +144,30 @@ function ApprovalsPageInner() {
   const fileRef = useRef<HTMLInputElement>(null);
   const uploadApprovalRef = useRef<number | null>(null);
 
+  // Lỗi tải hiện thành trạng thái LỖI có nút thử lại (audit 2026-09-05) — trước đây chỉ bật
+  // hộp thoại rồi để trang rỗng, và mất mạng thì kẹt skeleton vĩnh viễn (không có catch).
   const load = useCallback(async () => {
-    const r = await fetch("/api/approvals");
-    if (r.status === 401) {
-      redirectToLogin();
-      return;
-    }
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({ error: `Lỗi server (${r.status})` }));
-      appAlert(err.error ?? `Lỗi server (${r.status})`);
+    const kq = await taiJson<{
+      pending?: FloorGroup[];
+      approved?: FloorGroup[];
+      canApprove?: boolean;
+    }>("/api/approvals");
+    if (!kq.ok) {
+      setLoi(kq.loi);
       setLoading(false);
       return;
     }
-    const j = await r.json();
-    setPending(j.pending ?? []);
-    setApproved(j.approved ?? []);
-    setCanApprove(!!j.canApprove);
+    setPending(kq.data.pending ?? []);
+    setApproved(kq.data.approved ?? []);
+    setCanApprove(!!kq.data.canApprove);
+    setLoi(null);
     setLoading(false);
   }, []);
 
   const loadInbox = useCallback(async () => {
-    const r = await fetch("/api/approvals/inbox");
-    if (r.ok) setInbox((await r.json()).items ?? []);
+    // Hộp thư duyệt là phần phụ — hỏng thì không chặn cả trang.
+    const kq = await taiJson<{ items?: PendingApproval[] }>("/api/approvals/inbox");
+    if (kq.ok) setInbox(kq.data.items ?? []);
   }, []);
 
   useEffect(() => {
@@ -417,6 +421,18 @@ function ApprovalsPageInner() {
   const floorSort = [{ key: "floor", label: "Tầng", compare: compareFloorGroup }];
 
   if (loading) return <PageSkeleton />;
+  if (loi)
+    return (
+      <ErrorState
+        message={loi}
+        onRetry={() => {
+          setLoading(true);
+          setLoi(null);
+          void load();
+          void loadInbox();
+        }}
+      />
+    );
 
   function row(g: FloorGroup, isPending: boolean, query = "") {
     const key = `${g.sheetTypeId}-${g.floorLabel}`;

@@ -480,7 +480,7 @@ export default function PrescriptiveAndCompliancePage() {
                               dataKey="days"
                               name="Ngày rút ngắn"
                               unit=" ngày"
-                              stroke="#71717a"
+                              stroke="var(--color-zinc-500)"
                               fontSize={12}
                             />
                             <YAxis
@@ -488,7 +488,7 @@ export default function PrescriptiveAndCompliancePage() {
                               dataKey="costTriệu"
                               name="Chi phí bù"
                               unit=" tr"
-                              stroke="#71717a"
+                              stroke="var(--color-zinc-500)"
                               fontSize={12}
                             />
                             <ZAxis type="number" dataKey="risk" range={[60, 200]} name="Rủi ro" />
@@ -522,10 +522,10 @@ export default function PrescriptiveAndCompliancePage() {
                             />
                             <Scatter name="Mô phỏng What-If" data={scatterData}>
                               {scatterData.map((entry, index) => {
-                                let fill = "#52525b"; // zinc-600 (dominated)
+                                let fill = "var(--color-zinc-600)"; // zinc-600 (dominated)
                                 if (entry.isRecommended)
-                                  fill = "#f59e0b"; // amber-500 (recommended knee)
-                                else if (entry.isPareto) fill = "#38bdf8"; // sky-400 (pareto frontier)
+                                  fill = "var(--color-amber-400)"; // amber-500 (recommended knee)
+                                else if (entry.isPareto) fill = "var(--color-sky-400)"; // sky-400 (pareto frontier)
                                 return <Cell key={`cell-${index}`} fill={fill} />;
                               })}
                             </Scatter>

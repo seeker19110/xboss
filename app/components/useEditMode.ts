@@ -1,12 +1,12 @@
-'use client';
-import { useState, useCallback } from 'react';
+"use client";
+import { useState, useCallback } from "react";
 
 export function useEditMode(canEdit: boolean) {
   const [editMode, setEditMode] = useState(false);
 
   const toggle = useCallback(() => {
     if (!canEdit) return;
-    setEditMode(v => !v);
+    setEditMode((v) => !v);
   }, [canEdit]);
 
   const lock = useCallback(() => setEditMode(false), []);

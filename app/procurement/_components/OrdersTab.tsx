@@ -585,7 +585,7 @@ export default function OrdersTab() {
             placeholder={
               subView === "po" ? "Tìm mã PO, nhà cung cấp, ghi chú..." : "Tìm mã PR, tên vật tư..."
             }
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-8 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition h-10"
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-8 py-2 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition h-10"
           />
           {search && (
             <button

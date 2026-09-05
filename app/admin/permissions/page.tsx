@@ -233,7 +233,7 @@ export default function PermissionsPage() {
                 onChange={(e) =>
                   setScopeProjectId(e.target.value === "" ? null : Number(e.target.value))
                 }
-                className="min-w-[12rem] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 transition"
+                className="min-w-[12rem] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-base sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 transition"
               >
                 <option value="">Toàn hệ thống</option>
                 {(data?.projects ?? []).map((p) => (

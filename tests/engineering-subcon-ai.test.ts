@@ -205,7 +205,7 @@ test(
     const pm = await taoUser("pm", "pm-ok");
     const duAn = await taoDuAn("ok");
     await batModule(duAn, pm.id);
-  await batModule(duAn, pm.id);
+    await batModule(duAn, pm.id);
     const ncc = await taoNhaCungCap("ok");
     const hoSo = await taoHoSo(duAn, ncc);
     // Thang 1–5 → %: schedule 5 → 100%, quality 4 → 75%, safety 3 → 50%.

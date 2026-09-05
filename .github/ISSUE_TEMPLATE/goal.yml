@@ -7,23 +7,23 @@ body:
     id: outcome
     attributes:
       label: Outcome và vai trò người dùng
-    validations: {required: true}
+    validations: { required: true }
   - type: textarea
     id: metrics
     attributes:
       label: Baseline, target, cửa sổ đo và guardrails
-    validations: {required: true}
+    validations: { required: true }
   - type: textarea
     id: complete
     attributes:
       label: Definition of Goal Complete
       description: Tiêu chí có thể xác minh, không dùng “code xong”.
-    validations: {required: true}
+    validations: { required: true }
   - type: textarea
     id: scope
     attributes:
       label: Scope và non-goals
-    validations: {required: true}
+    validations: { required: true }
   - type: checkboxes
     id: authority
     attributes:
@@ -38,4 +38,4 @@ body:
     id: stop
     attributes:
       label: Quyết định/điều kiện phải dừng
-    validations: {required: true}
+    validations: { required: true }

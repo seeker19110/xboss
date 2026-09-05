@@ -63,6 +63,10 @@ export async function DELETE(
          FROM tasks t
          JOIN work_packages wp ON t.package_id = wp.id
         WHERE wp.sheet_type_id = ? AND wp.floor_label = ?
+          -- Chừa task được duyệt RIÊNG LẺ (0151): huỷ nghiệm thu TẦNG chỉ huỷ đúng phần
+          -- mình đã duyệt. COALESCE(...,'floor'): task nghiệm thu từ trước migration không
+          -- biết nguồn → coi như duyệt-theo-tầng, giữ nguyên hành vi cũ cho dữ liệu cũ.
+          AND COALESCE(t.approval_source, 'floor') <> 'task'
         FOR UPDATE OF t`,
       approval.sheet_type_id,
       approval.floor_label,
@@ -76,16 +80,15 @@ export async function DELETE(
 
     // Đặt lại trạng thái task — bulk UPDATE + bulk INSERT audit history để tránh N+1.
     // `deriveStatus(..., null)` cố ý bỏ qua trạng thái hiện tại: đây là hành vi huỷ do
-    // Admin/PM chủ động (không phải hạ cấp TỰ ĐỘNG), và sau khi duyệt tầng thì mọi task
-    // trong tầng đều đang `nghiem_thu` — truyền trạng thái hiện tại vào sẽ khiến nút huỷ
-    // không làm gì cả. Đánh đổi đã biết: task từng được duyệt riêng lẻ trước đó cũng bị
-    // huỷ theo (schema chưa có cờ phân biệt nguồn duyệt) — ghi nợ trong PROGRESS.md.
+    // Admin/PM chủ động (không phải hạ cấp TỰ ĐỘNG), và mọi task còn lại trong danh sách
+    // đều là task được duyệt THEO TẦNG — truyền trạng thái hiện tại vào sẽ khiến nút huỷ
+    // không làm gì cả. Task duyệt riêng lẻ đã bị loại khỏi truy vấn ở trên.
     if (tasks.length > 0) {
       const statuses = tasks.map((t) => deriveStatus(t.progress_percent ?? 0, t.end_date, null));
       const updatePh = tasks.map(() => "(?::int, ?::text)").join(", ");
       const updateVals = tasks.flatMap((t, i) => [t.id, statuses[i]]);
       await run(
-        `UPDATE tasks t SET status = v.status, updated_at = CURRENT_TIMESTAMP
+        `UPDATE tasks t SET status = v.status, approval_source = NULL, updated_at = CURRENT_TIMESTAMP
            FROM (VALUES ${updatePh}) AS v(id, status)
           WHERE t.id = v.id`,
         ...updateVals,

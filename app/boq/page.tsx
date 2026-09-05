@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Plus,
   ChevronDown,
@@ -14,6 +14,8 @@ import {
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
+import { ErrorState } from "@/app/components/ErrorState";
+import { taiJson } from "@/app/lib/taiDuLieu";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
@@ -89,6 +91,8 @@ export default function BoqPage() {
   const [totals, setTotals] = useState({ contractValue: 0, subValue: 0, executedValue: 0 });
   const [systems, setSystems] = useState<SystemOption[]>([]);
   const [loading, setLoading] = useState(true);
+  // Lỗi tải ≠ rỗng (audit 2026-09-05).
+  const [loi, setLoi] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<BoqItem | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -97,29 +101,57 @@ export default function BoqPage() {
 
   const canManage = me?.role === "admin" || me?.role === "pm";
 
-  function load(withVo: boolean, fresh = false) {
+  type BoqData = { items?: BoqItem[]; totals?: typeof totals };
+
+  async function load(withVo: boolean, fresh = false) {
     const url = `/api/boq?includeVo=${withVo ? 1 : 0}`;
-    return (fresh ? fetchFresh(url) : fetch(url)).then((r) => (r.ok ? r.json() : null));
+    // fetchFresh bỏ qua cache của service worker (dữ liệu vừa sửa) — giữ nguyên đường cũ.
+    if (fresh) {
+      try {
+        const r = await fetchFresh(url);
+        if (!r.ok) return { ok: false as const, loi: `Không tải được BOQ (lỗi ${r.status})` };
+        return { ok: true as const, data: (await r.json()) as BoqData };
+      } catch {
+        return { ok: false as const, loi: "Mất kết nối — kiểm tra mạng rồi thử lại" };
+      }
+    }
+    const kq = await taiJson<BoqData>(url);
+    return kq.ok ? { ok: true as const, data: kq.data } : { ok: false as const, loi: kq.loi };
   }
 
-  useEffect(() => {
-    Promise.all([
+  const taiLai = useCallback(async () => {
+    setLoading(true);
+    setLoi(null);
+    const [meData, boq, sys] = await Promise.all([
       fetchMe(),
       load(includeVo),
-      fetch("/api/systems").then((r) => (r.ok ? r.json() : null)),
-    ])
-      .then(([meData, boq, sys]) => {
-        if (!meData) return;
-        setMe(meData);
-        setItems(boq?.items ?? []);
-        setTotals(boq?.totals ?? { contractValue: 0, subValue: 0, executedValue: 0 });
-        setSystems(sys?.systems ?? []);
-      })
-      .finally(() => setLoading(false));
+      taiJson<{ systems?: SystemOption[] }>("/api/systems"),
+    ]);
+    if (meData) setMe(meData);
+    if (!boq.ok) {
+      setLoi(boq.loi);
+      setLoading(false);
+      return;
+    }
+    setItems(boq.data.items ?? []);
+    setTotals(boq.data.totals ?? { contractValue: 0, subValue: 0, executedValue: 0 });
+    // Danh sách hệ chỉ để lọc — hỏng thì vẫn xem được BOQ, không chặn cả trang.
+    if (sys.ok) setSystems(sys.data.systems ?? []);
+    setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [includeVo]);
 
+  useEffect(() => {
+    void taiLai();
+  }, [taiLai]);
+
   async function refresh() {
-    const boq = await load(includeVo, true);
+    const kq = await load(includeVo, true);
+    if (!kq.ok) {
+      appAlert(kq.loi);
+      return;
+    }
+    const boq = kq.data;
     setItems(boq?.items ?? []);
     setTotals(boq?.totals ?? { contractValue: 0, subValue: 0, executedValue: 0 });
     setSelected((sel) =>
@@ -165,6 +197,7 @@ export default function BoqPage() {
   }
 
   if (loading) return <PageSkeleton />;
+  if (loi) return <ErrorState message={loi} onRetry={() => void taiLai()} />;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">

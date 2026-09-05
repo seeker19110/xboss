@@ -4,6 +4,7 @@ on:
   pull_request:
     types: [opened, edited, synchronize, reopened, ready_for_review]
 
+# Least-privilege ở mức workflow; job nào cần ghi thì tự khai thêm (xem `copilot_review`).
 permissions:
   contents: read
   pull-requests: read
@@ -33,4 +34,50 @@ jobs:
               if (!/Approved for implementation/i.test(body)) {
                 core.setFailed("PR feat phải xác nhận spec đã Approved for implementation.");
               }
+            }
+
+  # Tự xin Copilot review cho mỗi PR mở/đánh dấu sẵn sàng — lớp soát tự động thứ hai bên cạnh
+  # CI, hợp với quy ước "merge ngay khi CI xanh" của dự án (trách nhiệm chất lượng dồn vào
+  # cổng tự động, không chờ người duyệt).
+  #
+  # KHÔNG làm đỏ CI khi không xin được: Copilot review phụ thuộc gói GitHub của tổ chức và
+  # thiết lập repo — thiếu quyền thì chỉ cảnh báo, vì đây là bước hỗ trợ, không phải cổng chặn
+  # (cùng tinh thần với CodeQL đang bị chặn do repo private, xem SECURITY.md).
+  copilot_review:
+    name: xin Copilot review
+    runs-on: ubuntu-latest
+    # Bỏ qua PR nháp: review khi còn đang sửa dở là nhiễu.
+    if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Yêu cầu Copilot review
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            // Copilot đã được xin review rồi (vd sự kiện `synchronize` của lần push sau) thì
+            // không xin lại — tránh spam thông báo cho người theo dõi PR.
+            const daXin = (pr.requested_reviewers ?? []).some((r) =>
+              String(r.login).startsWith("copilot"),
+            );
+            if (daXin) {
+              core.info("Copilot đã nằm trong danh sách reviewer — bỏ qua.");
+              return;
+            }
+            try {
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                reviewers: ["copilot-pull-request-reviewer[bot]"],
+              });
+              core.info(`Đã xin Copilot review cho PR #${pr.number}.`);
+            } catch (e) {
+              core.warning(
+                `Không xin được Copilot review (${e.status ?? "?"}: ${e.message}). ` +
+                  "Thường do gói GitHub của tổ chức chưa bật Copilot code review, " +
+                  "hoặc token workflow không đủ quyền. Bỏ qua, KHÔNG chặn PR.",
+              );
             }
