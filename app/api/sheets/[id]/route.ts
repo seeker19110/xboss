@@ -89,7 +89,13 @@ export async function PATCH(
   }
   if (body.managerId !== undefined) {
     const mid = body.managerId === null ? null : Number(body.managerId);
-    if (mid !== null && (isNaN(mid) || !(await queryOne(`SELECT id FROM users WHERE id = ?`, mid))))
+    // Cách ly tổ chức (Đợt 6, Việc G): users.org_id — cùng lớp lỗi đã vá ở
+    // app/api/users/[id]/route.ts (Đợt 5, M54 GĐ1 PR2).
+    if (
+      mid !== null &&
+      (isNaN(mid) ||
+        !(await queryOne(`SELECT id FROM users WHERE id = ? AND org_id = ?`, mid, user.orgId)))
+    )
       return NextResponse.json({ error: "Người dùng không tồn tại" }, { status: 400 });
     sets.push("manager_id = ?");
     vals.push(mid);

@@ -45,7 +45,14 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const s = await queryOne(`SELECT id FROM suppliers WHERE id = ?`, id);
+  // Cách ly tổ chức (Đợt 6, Việc G): suppliers.org_id NOT NULL (migrations/0078) — thiếu lọc
+  // thì admin/PM tổ chức A sửa được nhà cung cấp của tổ chức B (id đoán được), cùng lớp lỗi
+  // đã vá ở GET /api/suppliers (vá W7, Đợt 5).
+  const s = await queryOne(
+    `SELECT id FROM suppliers WHERE id = ? AND org_id = ?`,
+    id,
+    user.orgId,
+  );
   if (!s) return NextResponse.json({ error: "Không tìm thấy nhà cung cấp" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
@@ -91,6 +98,15 @@ export async function DELETE(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Cách ly tổ chức (Đợt 6, Việc G): DELETE trước đây không kiểm tồn tại/tổ chức gì cả trước
+  // khi xoá — admin tổ chức A xoá thẳng được nhà cung cấp của tổ chức B bằng id đoán được.
+  const s = await queryOne(
+    `SELECT id FROM suppliers WHERE id = ? AND org_id = ?`,
+    id,
+    user.orgId,
+  );
+  if (!s) return NextResponse.json({ error: "Không tìm thấy nhà cung cấp" }, { status: 404 });
 
   const used = await queryOne(`SELECT id FROM purchase_orders WHERE supplier_id = ? LIMIT 1`, id);
   if (used)

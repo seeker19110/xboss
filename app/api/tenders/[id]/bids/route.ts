@@ -50,7 +50,14 @@ export async function POST(
   const supplierId = Number(body.supplierId);
   if (!Number.isInteger(supplierId))
     return NextResponse.json({ error: "Thiếu nhà thầu" }, { status: 422 });
-  const supplier = await queryOne(`SELECT id FROM suppliers WHERE id = ?`, supplierId);
+  // Cách ly tổ chức (Đợt 6, Việc G): suppliers.org_id NOT NULL (migrations/0078) — thiếu lọc
+  // thì báo giá của tổ chức A gán được nhà thầu thuộc tổ chức B (id đoán được), cùng lớp lỗi
+  // đã vá ở GET /api/suppliers và lib/hien-truong/subcontractors.ts (vá W7, Đợt 5).
+  const supplier = await queryOne(
+    `SELECT id FROM suppliers WHERE id = ? AND org_id = ?`,
+    supplierId,
+    user.orgId,
+  );
   if (!supplier) return NextResponse.json({ error: "Nhà thầu không tồn tại" }, { status: 422 });
 
   const lumpSum = body.lumpSum != null ? Number(body.lumpSum) : null;

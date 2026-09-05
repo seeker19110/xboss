@@ -3,6 +3,7 @@ import { storagePut, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { packageProjectId } from "@/lib/tien-do/workpackages";
 import {
   newHandoverMinutesFileName,
   MAX_DOC_BYTES,
@@ -132,7 +133,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Hệ không tồn tại" }, { status: 422 });
   }
   if (input.workPackageId != null) {
-    if (!(await queryOne(`SELECT id FROM work_packages WHERE id = ?`, input.workPackageId)))
+    // Cách ly dự án (Đợt 6, Việc G): work_packages không có cột dự án trực tiếp — suy qua
+    // sheet_type_id → towers.project_id (lib/tien-do/workpackages.ts, tái dùng khuôn vá W6).
+    if ((await packageProjectId(input.workPackageId)) !== projectId)
       return NextResponse.json({ error: "Nhóm công việc không tồn tại" }, { status: 422 });
   }
 

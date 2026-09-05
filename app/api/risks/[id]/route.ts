@@ -58,7 +58,13 @@ export async function PATCH(
   const invalid = validateRiskInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
   if (input.owner != null) {
-    const u = await queryOne(`SELECT id FROM users WHERE id = ?`, input.owner);
+    // Cách ly tổ chức (Đợt 6, Việc G): users.org_id — cùng lớp lỗi đã vá ở
+    // app/api/users/[id]/route.ts (Đợt 5, M54 GĐ1 PR2).
+    const u = await queryOne(
+      `SELECT id FROM users WHERE id = ? AND org_id = ?`,
+      input.owner,
+      user.orgId,
+    );
     if (!u) return NextResponse.json({ error: "Người phụ trách không tồn tại" }, { status: 422 });
   }
 

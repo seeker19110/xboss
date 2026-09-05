@@ -934,8 +934,11 @@ test(
   S,
   async () => {
     const pm = await dungUser("pm", `pmsheetcopyok${RUN}`);
-    const { sheetId } = await dungSheetDayDu(`copysrc${RUN}`);
-    dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+    const { sheetId, projectId } = await dungSheetDayDu(`copysrc${RUN}`);
+    // Đợt 6, Việc G: POST /api/sheets giờ lọc copyFromId theo visibleProjectIds — pm phải
+    // được gán vào dự án chứa sheet nguồn (dangNhapDuAn), `dangNhap` trần không đủ nữa vì
+    // bảng user_projects không còn rỗng khi chạy cả bộ test.
+    await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, projectId);
     const { POST } = await import("@/app/api/sheets/route");
     const res = await POST(
       req("http://localhost/api/sheets", "POST", {
