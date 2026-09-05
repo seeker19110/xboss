@@ -539,6 +539,6 @@ export async function listSmartIpcRecords(
      WHERE project_id = ?
      ORDER BY created_at DESC
      LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }

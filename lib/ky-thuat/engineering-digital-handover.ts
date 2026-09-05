@@ -121,6 +121,6 @@ export async function listDigitalHandoverPassports(
 ): Promise<Array<Record<string, unknown>>> {
   return query<Record<string, unknown>>(
     `SELECT * FROM engineering_digital_handover_passports WHERE project_id = $1 ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }
