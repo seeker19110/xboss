@@ -7,6 +7,7 @@ import {
   listPredictiveAssets,
   MepfAssetInput,
 } from "@/lib/ky-thuat/engineering-mepf-predictive";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +26,7 @@ export async function GET() {
     const list = await listPredictiveAssets(projectId);
     return NextResponse.json({ assets: list, totalCount: list.length });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -64,7 +64,6 @@ export async function POST(req: NextRequest) {
       evaluation,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

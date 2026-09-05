@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { analyzeObjectImpact } from "@/lib/ky-thuat/engineering-graph";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -34,8 +35,8 @@ export async function GET(req: Request, props: { params: Promise<{ id: string }>
     const impact = await analyzeObjectImpact(projectId, id, { depth, relationTypes });
     return NextResponse.json(impact);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    const status = msg.includes("Không tìm thấy") ? 404 : 500;
-    return NextResponse.json({ error: msg }, { status });
+    // Hàm lib ném LoiNghiepVu mang sẵn mã (404 khi bản ghi không tồn tại/thuộc dự án
+    // khác) — không còn dò chuỗi thông điệp; lỗi hệ thống thật vẫn ra 500.
+    return phanHoiLoi(err);
   }
 }

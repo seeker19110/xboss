@@ -7,6 +7,7 @@ import {
   createSwarmDebate,
   SwarmAgentRole,
 } from "@/lib/ky-thuat/engineering-swarm";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +31,7 @@ export async function GET() {
     const debates = await listSwarmDebates(projectId);
     return NextResponse.json(debates);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -65,7 +65,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json(created, { status: 201 });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

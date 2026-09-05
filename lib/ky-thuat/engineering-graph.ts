@@ -1,6 +1,7 @@
 // lib/engineering-graph.ts — Phase OS-1 Engineering Knowledge Graph & System of Record Engine
 // Đặc tả: docs/nang-cap/OS-1-engineering-system-of-record.md
 import { query, queryOne, run, withProjectScope } from "@/lib/db";
+import { loiKhongTimThay } from "@/lib/nen/loi";
 
 export type GraphDirection = "out" | "in" | "both";
 
@@ -161,7 +162,7 @@ export async function traverseGraph(
     }
 
     if (!rootObj) {
-      throw new Error("Không tìm thấy đối tượng gốc trong dự án");
+      throw loiKhongTimThay("Không tìm thấy đối tượng gốc trong dự án");
     }
 
     // Traversal sử dụng BFS trên mảng nodes
@@ -267,7 +268,7 @@ export async function getObjectLineage(
     );
 
     if (!object) {
-      throw new Error("Không tìm thấy đối tượng trong dự án");
+      throw loiKhongTimThay("Không tìm thấy đối tượng trong dự án");
     }
 
     // Source info

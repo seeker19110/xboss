@@ -5,6 +5,7 @@ import {
   createMaterialShipment,
   listMaterialShipments,
 } from "@/lib/ky-thuat/engineering-qr-logistics";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +26,7 @@ export async function GET(req: NextRequest) {
     const shipments = await listMaterialShipments(projectId, status);
     return NextResponse.json({ success: true, data: shipments });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -83,7 +83,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: shipment });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

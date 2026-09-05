@@ -9,6 +9,7 @@ import {
   SubconProfile,
   SubconEvaluationResult,
 } from "@/lib/ky-thuat/engineering-subcon-ai";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -68,12 +69,9 @@ export async function GET(req: Request) {
       success: true,
       data: rows,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Subcon AI Scores GET]", error);
-    return NextResponse.json(
-      { error: error.message || "Lỗi tải bảng điểm thầu phụ" },
-      { status: 500 },
-    );
+    return phanHoiLoi(error, "Lỗi tải bảng điểm thầu phụ");
   }
 }
 

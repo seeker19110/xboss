@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { query, queryOne, run, withProjectScope, withTransaction } from "@/lib/db";
+import { loiKhongTimThay, loiXungDot } from "@/lib/nen/loi";
 
 export const engineeringObjectTypeSchema = z.string().trim().min(1).max(80);
 export const disciplineSchema = z.string().trim().max(80).nullable().optional();
@@ -605,9 +606,10 @@ export async function reviewEngineeringObject(
       projectId,
     );
     if (!current)
-      throw new Error("Đối tượng kỹ thuật không tồn tại hoặc không thuộc dự án đang chọn");
+      throw loiKhongTimThay("Đối tượng kỹ thuật không tồn tại hoặc không thuộc dự án đang chọn");
+    // 409 chứ không 422: đầu vào hợp lệ, chỉ là bản ghi đang ở trạng thái không cho duyệt.
     if (current.status === "void")
-      throw new Error("Đối tượng đã bị xoá mềm, không thể duyệt/từ chối");
+      throw loiXungDot("Đối tượng đã bị xoá mềm, không thể duyệt/từ chối");
     await run(
       `UPDATE engineering_objects SET status = ?, updated_by = ?, updated_at = NOW() WHERE id = ?`,
       decision,

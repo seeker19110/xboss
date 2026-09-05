@@ -3,6 +3,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { query } from "@/lib/db";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -45,12 +46,9 @@ export async function GET(req: Request) {
       success: true,
       data: rows,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[IoT Alerts GET]", error);
-    return NextResponse.json(
-      { error: error.message || "Lỗi tải danh sách cảnh báo" },
-      { status: 500 },
-    );
+    return phanHoiLoi(error, "Lỗi tải danh sách cảnh báo");
   }
 }
 
@@ -104,8 +102,8 @@ export async function PATCH(req: Request) {
       success: true,
       data: rows[0],
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[IoT Alerts PATCH]", error);
-    return NextResponse.json({ error: error.message || "Lỗi cập nhật cảnh báo" }, { status: 500 });
+    return phanHoiLoi(error, "Lỗi cập nhật cảnh báo");
   }
 }

@@ -5,6 +5,7 @@ import {
   createSpatialAnnotation,
   listSpatialAnnotations,
 } from "@/lib/ky-thuat/engineering-spatial-pinning";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +45,7 @@ export async function GET(req: NextRequest) {
       data: annotations,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -112,7 +112,6 @@ export async function POST(req: NextRequest) {
       data: annotation,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

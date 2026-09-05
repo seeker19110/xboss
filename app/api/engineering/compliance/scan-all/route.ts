@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { scanAllElementsCompliance } from "@/lib/ky-thuat/engineering-prescriptive";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,6 @@ export async function POST() {
     const result = await scanAllElementsCompliance(projectId);
     return NextResponse.json({ success: true, ...result });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { listCashflowForecasts } from "@/lib/ky-thuat/engineering-cashflow";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,6 @@ export async function GET() {
     const forecasts = await listCashflowForecasts(projectId);
     return NextResponse.json({ success: true, data: forecasts });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

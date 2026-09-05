@@ -9,6 +9,7 @@ import {
   listFidicTiaClaims,
   FidicTiaInput,
 } from "@/lib/ky-thuat/engineering-fidic-claim";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -29,8 +30,7 @@ export async function GET() {
     const claims = await listFidicTiaClaims(projectId);
     return NextResponse.json({ claims, totalCount: claims.length });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -83,7 +83,6 @@ export async function POST(req: NextRequest) {
       result,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

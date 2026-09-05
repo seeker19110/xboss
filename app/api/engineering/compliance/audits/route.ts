@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getComplianceAudits } from "@/lib/ky-thuat/engineering-prescriptive";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,6 @@ export async function GET(req: Request) {
     const audits = await getComplianceAudits(projectId, { status, domain, limit });
     return NextResponse.json(audits);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { todayISO } from "@/lib/nen/date";
 import { query, queryOne, withProjectScope, withTransaction } from "@/lib/db";
+import { loiDauVao } from "@/lib/nen/loi";
 
 export interface MaterialQrPayload {
   version: string;
@@ -231,7 +232,9 @@ export async function scanReceiveQrTag(params: {
       return withTransaction(async () => {
         const parsed = parseMaterialQrCode(qrCode);
         if (!parsed) {
-          throw new Error("Mã QR không hợp lệ hoặc sai định dạng XBoss");
+          // 400: chuỗi QR sai cú pháp/sai checksum — lỗi đầu vào của người quét, không phải
+          // sự cố máy chủ (trước đây route ép về 500, lẫn với lỗi hệ thống thật).
+          throw loiDauVao("Mã QR không hợp lệ hoặc sai định dạng XBoss");
         }
 
         // Upsert Tag vào bảng QR Tags
