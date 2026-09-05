@@ -193,7 +193,17 @@ const apiReq = (url: string, key?: string) =>
  * header — xem lib/khoi-luong/boq-import.ts). */
 function xlsxBoqBuffer(code: string, qty: number): Buffer {
   const aoa = [
-    ["Mã BOQ", "STT", "Mô tả", "Quy cách", "Đơn vị", "Khối lượng BOQ Tháp A", "Định mức Shop", "", "Ghi chú"],
+    [
+      "Mã BOQ",
+      "STT",
+      "Mô tả",
+      "Quy cách",
+      "Đơn vị",
+      "Khối lượng BOQ Tháp A",
+      "Định mức Shop",
+      "",
+      "Ghi chú",
+    ],
     [code, "1", `Hạng mục test ${code}`, "", "m", qty, 0, "", "Ghi chú test"],
   ];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -250,12 +260,13 @@ test("PATCH /api/boq-norms/:id: dự án khác → 404 (cách ly)", S, async () 
   const projectA = await taoDuAn("norm-isoA");
   const projectB = await taoDuAn("norm-isoB");
   const boqB = await taoBoqItem(projectB, "norm-isoB");
+  const pmA = await taoUser("pm", "norm-isoA");
   const normId = await insertId(
     `INSERT INTO boq_norms (boq_item_id, resource_type, resource_name, qty_per_unit, unit_label, created_by)
-     VALUES (?, 'labor', 'Thợ hàn', 1, 'công', 1)`,
+     VALUES (?, 'labor', 'Thợ hàn', 1, 'công', ?)`,
     boqB,
+    pmA.id,
   );
-  const pmA = await taoUser("pm", "norm-isoA");
   await dangNhapDuAn(pmA, projectA);
   const { PATCH } = await import("@/app/api/boq-norms/[id]/route");
   const res = await PATCH(jreq("/x", { qtyPerUnit: 2 }, "PATCH"), {
@@ -268,12 +279,13 @@ test("PATCH /api/boq-norms/:id: sửa hợp lệ → 200, ghi đúng DB", S, asy
   const { insertId, queryOne } = await import("@/lib/db");
   const projectId = await taoDuAn("norm-ok");
   const boqId = await taoBoqItem(projectId, "norm-ok");
+  const pm = await taoUser("pm", "norm-ok");
   const normId = await insertId(
     `INSERT INTO boq_norms (boq_item_id, resource_type, resource_name, qty_per_unit, unit_label, created_by)
-     VALUES (?, 'labor', 'Thợ hàn', 1, 'công', 1)`,
+     VALUES (?, 'labor', 'Thợ hàn', 1, 'công', ?)`,
     boqId,
+    pm.id,
   );
-  const pm = await taoUser("pm", "norm-ok");
   await dangNhapDuAn(pm, projectId);
   const { PATCH } = await import("@/app/api/boq-norms/[id]/route");
   const res = await PATCH(jreq("/x", { qtyPerUnit: 5 }, "PATCH"), {
@@ -291,12 +303,13 @@ test("PATCH /api/boq-norms/:id: qtyPerUnit <= 0 → 422", S, async () => {
   const { insertId } = await import("@/lib/db");
   const projectId = await taoDuAn("norm-422");
   const boqId = await taoBoqItem(projectId, "norm-422");
+  const pm = await taoUser("pm", "norm-422");
   const normId = await insertId(
     `INSERT INTO boq_norms (boq_item_id, resource_type, resource_name, qty_per_unit, unit_label, created_by)
-     VALUES (?, 'labor', 'Thợ hàn', 1, 'công', 1)`,
+     VALUES (?, 'labor', 'Thợ hàn', 1, 'công', ?)`,
     boqId,
+    pm.id,
   );
-  const pm = await taoUser("pm", "norm-422");
   await dangNhapDuAn(pm, projectId);
   const { PATCH } = await import("@/app/api/boq-norms/[id]/route");
   const res = await PATCH(jreq("/x", { qtyPerUnit: 0 }, "PATCH"), {
@@ -309,12 +322,13 @@ test("DELETE /api/boq-norms/:id: xoá hợp lệ → 200, mất khỏi DB", S, a
   const { insertId, queryOne } = await import("@/lib/db");
   const projectId = await taoDuAn("norm-del");
   const boqId = await taoBoqItem(projectId, "norm-del");
+  const pm = await taoUser("pm", "norm-del");
   const normId = await insertId(
     `INSERT INTO boq_norms (boq_item_id, resource_type, resource_name, qty_per_unit, unit_label, created_by)
-     VALUES (?, 'labor', 'Thợ hàn', 1, 'công', 1)`,
+     VALUES (?, 'labor', 'Thợ hàn', 1, 'công', ?)`,
     boqId,
+    pm.id,
   );
-  const pm = await taoUser("pm", "norm-del");
   await dangNhapDuAn(pm, projectId);
   const { DELETE } = await import("@/app/api/boq-norms/[id]/route");
   const res = await DELETE(jreq("/x", undefined, "DELETE"), {
@@ -405,7 +419,12 @@ test("POST /api/boq/:id/norms: tạo hợp lệ → 201, GET thấy đúng dòng
   await dangNhapDuAn(pm, projectId);
   const { POST, GET } = await import("@/app/api/boq/[id]/norms/route");
   const created = await POST(
-    jreq("/x", { resourceType: "labor", resourceName: "Thợ hàn", qtyPerUnit: 2, unitLabel: "công" }),
+    jreq("/x", {
+      resourceType: "labor",
+      resourceName: "Thợ hàn",
+      qtyPerUnit: 2,
+      unitLabel: "công",
+    }),
     { params: Promise.resolve({ id: String(boqId) }) },
   );
   assert.equal(created.status, 201);
@@ -442,12 +461,13 @@ test("GET /api/boq/:id/norm-usage: trả mảng usage đúng định mức đã 
   const { insertId } = await import("@/lib/db");
   const projectId = await taoDuAn("normusage-ok");
   const boqId = await taoBoqItem(projectId, "normusage-ok", { qtyContract: 10 });
+  const pm = await taoUser("pm", "normusage-ok");
   await insertId(
     `INSERT INTO boq_norms (boq_item_id, resource_type, resource_name, qty_per_unit, unit_label, created_by)
-     VALUES (?, 'labor', 'Thợ hàn', 2, 'công', 1)`,
+     VALUES (?, 'labor', 'Thợ hàn', 2, 'công', ?)`,
     boqId,
+    pm.id,
   );
-  const pm = await taoUser("pm", "normusage-ok");
   await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/boq/[id]/norm-usage/route");
   const res = await GET(getreq("/x"), { params: Promise.resolve({ id: String(boqId) }) });
@@ -564,7 +584,10 @@ test("POST /api/boq/import: preview (không commit) → 200, không ghi DB", S, 
   const acmv = await heId("acmv");
   const code = uniq("BOQ-PRV");
   const form = new FormData();
-  form.set("file", new File([new Uint8Array(xlsxBoqBuffer(code, 7))], "a.xlsx", { type: XLSX_MIME }));
+  form.set(
+    "file",
+    new File([new Uint8Array(xlsxBoqBuffer(code, 7))], "a.xlsx", { type: XLSX_MIME }),
+  );
   form.set("systemId", String(acmv));
   const { POST } = await import("@/app/api/boq/import/route");
   const res = await POST(formReq("/api/boq/import", form));
@@ -584,7 +607,10 @@ test("POST /api/boq/import: commit=1 → 201/200 ghi vào boq_items", S, async (
   const acmv = await heId("acmv");
   const code = uniq("BOQ-CMT");
   const form = new FormData();
-  form.set("file", new File([new Uint8Array(xlsxBoqBuffer(code, 8))], "a.xlsx", { type: XLSX_MIME }));
+  form.set(
+    "file",
+    new File([new Uint8Array(xlsxBoqBuffer(code, 8))], "a.xlsx", { type: XLSX_MIME }),
+  );
   form.set("systemId", String(acmv));
   const { POST } = await import("@/app/api/boq/import/route");
   const res = await POST(formReq("/api/boq/import?commit=1", form));
@@ -647,7 +673,9 @@ test("POST /api/materials/:id/issue: số lượng không hợp lệ → 400", S
   const eng = await taoUser("engineer", "issue-400");
   await dangNhapDuAn(eng, projectId);
   const { POST } = await import("@/app/api/materials/[id]/issue/route");
-  const res = await POST(jreq("/x", { qty: 0 }), { params: Promise.resolve({ id: String(matId) }) });
+  const res = await POST(jreq("/x", { qty: 0 }), {
+    params: Promise.resolve({ id: String(matId) }),
+  });
   assert.equal(res.status, 400);
 });
 
@@ -668,7 +696,9 @@ test("POST /api/materials/:id/issue: vượt tồn kho → 409", S, async () => 
   const eng = await taoUser("engineer", "issue-409");
   await dangNhapDuAn(eng, projectId);
   const { POST } = await import("@/app/api/materials/[id]/issue/route");
-  const res = await POST(jreq("/x", { qty: 10 }), { params: Promise.resolve({ id: String(matId) }) });
+  const res = await POST(jreq("/x", { qty: 10 }), {
+    params: Promise.resolve({ id: String(matId) }),
+  });
   assert.equal(res.status, 409);
 });
 
@@ -698,33 +728,37 @@ test(
   },
 );
 
-test("POST /api/materials/:id/issue: cùng Idempotency-Key gọi 2 lần → chỉ ghi 1 giao dịch", S, async () => {
-  const { query } = await import("@/lib/db");
-  const projectId = await taoDuAn("issue-idem");
-  const matId = await taoMaterial(projectId, "issue-idem", { qtyStock: 50 });
-  const eng = await taoUser("engineer", "issue-idem");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/materials/[id]/issue/route");
-  const req1 = new NextRequest("http://localhost/x", {
-    method: "POST",
-    body: JSON.stringify({ qty: 5 }),
-    headers: { "Idempotency-Key": "key-issue-1" },
-  });
-  const res1 = await POST(req1, { params: Promise.resolve({ id: String(matId) }) });
-  assert.equal(res1.status, 200);
-  const req2 = new NextRequest("http://localhost/x", {
-    method: "POST",
-    body: JSON.stringify({ qty: 5 }),
-    headers: { "Idempotency-Key": "key-issue-1" },
-  });
-  const res2 = await POST(req2, { params: Promise.resolve({ id: String(matId) }) });
-  assert.equal(res2.status, 200);
-  const txs = await query(
-    `SELECT id FROM material_transactions WHERE material_id = ? AND type = 'xuat_cong_truong'`,
-    matId,
-  );
-  assert.equal(txs.length, 1);
-});
+test(
+  "POST /api/materials/:id/issue: cùng Idempotency-Key gọi 2 lần → chỉ ghi 1 giao dịch",
+  S,
+  async () => {
+    const { query } = await import("@/lib/db");
+    const projectId = await taoDuAn("issue-idem");
+    const matId = await taoMaterial(projectId, "issue-idem", { qtyStock: 50 });
+    const eng = await taoUser("engineer", "issue-idem");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/materials/[id]/issue/route");
+    const req1 = new NextRequest("http://localhost/x", {
+      method: "POST",
+      body: JSON.stringify({ qty: 5 }),
+      headers: { "Idempotency-Key": "key-issue-1" },
+    });
+    const res1 = await POST(req1, { params: Promise.resolve({ id: String(matId) }) });
+    assert.equal(res1.status, 200);
+    const req2 = new NextRequest("http://localhost/x", {
+      method: "POST",
+      body: JSON.stringify({ qty: 5 }),
+      headers: { "Idempotency-Key": "key-issue-1" },
+    });
+    const res2 = await POST(req2, { params: Promise.resolve({ id: String(matId) }) });
+    assert.equal(res2.status, 200);
+    const txs = await query(
+      `SELECT id FROM material_transactions WHERE material_id = ? AND type = 'xuat_cong_truong'`,
+      matId,
+    );
+    assert.equal(txs.length, 1);
+  },
+);
 
 // ============================================================================
 // PATCH /api/materials/:id/move
@@ -840,7 +874,9 @@ test("POST /api/materials/:id/return: số đã dùng không đủ để hoàn �
   const eng = await taoUser("engineer", "return-409");
   await dangNhapDuAn(eng, projectId);
   const { POST } = await import("@/app/api/materials/[id]/return/route");
-  const res = await POST(jreq("/x", { qty: 10 }), { params: Promise.resolve({ id: String(matId) }) });
+  const res = await POST(jreq("/x", { qty: 10 }), {
+    params: Promise.resolve({ id: String(matId) }),
+  });
   assert.equal(res.status, 409);
 });
 
@@ -940,18 +976,22 @@ test("PATCH /api/materials/batch: mảng updates rỗng → 400", S, async () =>
   assert.equal(res.status, 400);
 });
 
-test("PATCH /api/materials/batch: vật tư không thuộc dự án đang chọn → lỗi 422 (transaction rollback)", S, async () => {
-  const projectA = await taoDuAn("batch-isoA");
-  const projectB = await taoDuAn("batch-isoB");
-  const matB = await taoMaterial(projectB, "batch-isoB");
-  const pmA = await taoUser("pm", "batch-isoA");
-  await dangNhapDuAn(pmA, projectA);
-  const { PATCH } = await import("@/app/api/materials/batch/route");
-  const res = await PATCH(
-    jreq("/x", { updates: [{ id: matB, patch: { name: "Đổi trộm" } }] }, "PATCH"),
-  );
-  assert.equal(res.status, 422);
-});
+test(
+  "PATCH /api/materials/batch: vật tư không thuộc dự án đang chọn → lỗi 422 (transaction rollback)",
+  S,
+  async () => {
+    const projectA = await taoDuAn("batch-isoA");
+    const projectB = await taoDuAn("batch-isoB");
+    const matB = await taoMaterial(projectB, "batch-isoB");
+    const pmA = await taoUser("pm", "batch-isoA");
+    await dangNhapDuAn(pmA, projectA);
+    const { PATCH } = await import("@/app/api/materials/batch/route");
+    const res = await PATCH(
+      jreq("/x", { updates: [{ id: matB, patch: { name: "Đổi trộm" } }] }, "PATCH"),
+    );
+    assert.equal(res.status, 422);
+  },
+);
 
 test(
   "PATCH /api/materials/batch: sửa qtyUsed hàng loạt → ghi material_transactions, cả lô thành công",
@@ -989,26 +1029,30 @@ test(
   },
 );
 
-test("PATCH /api/materials/batch: boqCode trùng đã dùng nơi khác → lỗi 422, không ghi lô", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("batch-boqdup");
-  const boqCode = uniq("BOQ-BATCHDUP");
-  const matTaken = await taoMaterial(projectId, "batch-boqdup-taken", { boqCode });
-  const matTarget = await taoMaterial(projectId, "batch-boqdup-target");
-  const pm = await taoUser("pm", "batch-boqdup");
-  await dangNhapDuAn(pm, projectId);
-  const { PATCH } = await import("@/app/api/materials/batch/route");
-  const res = await PATCH(
-    jreq("/x", { updates: [{ id: matTarget, patch: { boqCode } }] }, "PATCH"),
-  );
-  assert.equal(res.status, 422);
-  void matTaken;
-  const row = await queryOne<{ boq_code: string | null }>(
-    `SELECT boq_code FROM materials WHERE id = ?`,
-    matTarget,
-  );
-  assert.equal(row?.boq_code, null);
-});
+test(
+  "PATCH /api/materials/batch: boqCode trùng đã dùng nơi khác → lỗi 422, không ghi lô",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("batch-boqdup");
+    const boqCode = uniq("BOQ-BATCHDUP");
+    const matTaken = await taoMaterial(projectId, "batch-boqdup-taken", { boqCode });
+    const matTarget = await taoMaterial(projectId, "batch-boqdup-target");
+    const pm = await taoUser("pm", "batch-boqdup");
+    await dangNhapDuAn(pm, projectId);
+    const { PATCH } = await import("@/app/api/materials/batch/route");
+    const res = await PATCH(
+      jreq("/x", { updates: [{ id: matTarget, patch: { boqCode } }] }, "PATCH"),
+    );
+    assert.equal(res.status, 422);
+    void matTaken;
+    const row = await queryOne<{ boq_code: string | null }>(
+      `SELECT boq_code FROM materials WHERE id = ?`,
+      matTarget,
+    );
+    assert.equal(row?.boq_code, null);
+  },
+);
 
 // ============================================================================
 // GET/PATCH /api/materials/columns
@@ -1078,29 +1122,33 @@ test("POST /api/materials/sync: engineer không có quyền đồng bộ → 403
   assert.equal(res.status, 403);
 });
 
-test("POST /api/materials/sync: thiếu cấu hình Google Sheets → 500 với lỗi rõ ràng, KHÔNG gọi mạng", S, async () => {
-  // Chặn mạng bằng cách đảm bảo GOOGLE_* KHÔNG được cấu hình (fail-fast trong
-  // lib/vat-tu/google-sheets.ts trước khi có bất kỳ lời gọi HTTP nào ra ngoài).
-  const savedVars = [
-    "GOOGLE_SERVICE_ACCOUNT_JSON",
-    "GOOGLE_SA_EMAIL",
-    "GOOGLE_SA_PRIVATE_KEY",
-    "GOOGLE_SHEET_ID",
-  ].map((k) => [k, process.env[k]] as const);
-  for (const [k] of savedVars) delete process.env[k];
-  try {
-    const projectId = await taoDuAn("sync-500");
-    const pm = await taoUser("pm", "sync-500");
-    await dangNhapDuAn(pm, projectId);
-    const { POST } = await import("@/app/api/materials/sync/route");
-    const res = await POST();
-    assert.equal(res.status, 500);
-    const body = await res.json();
-    assert.match(body.error, /Thiếu cấu hình Google Sheets|GOOGLE_SERVICE_ACCOUNT_JSON/);
-  } finally {
-    for (const [k, v] of savedVars) if (v !== undefined) process.env[k] = v;
-  }
-});
+test(
+  "POST /api/materials/sync: thiếu cấu hình Google Sheets → 500 với lỗi rõ ràng, KHÔNG gọi mạng",
+  S,
+  async () => {
+    // Chặn mạng bằng cách đảm bảo GOOGLE_* KHÔNG được cấu hình (fail-fast trong
+    // lib/vat-tu/google-sheets.ts trước khi có bất kỳ lời gọi HTTP nào ra ngoài).
+    const savedVars = [
+      "GOOGLE_SERVICE_ACCOUNT_JSON",
+      "GOOGLE_SA_EMAIL",
+      "GOOGLE_SA_PRIVATE_KEY",
+      "GOOGLE_SHEET_ID",
+    ].map((k) => [k, process.env[k]] as const);
+    for (const [k] of savedVars) delete process.env[k];
+    try {
+      const projectId = await taoDuAn("sync-500");
+      const pm = await taoUser("pm", "sync-500");
+      await dangNhapDuAn(pm, projectId);
+      const { POST } = await import("@/app/api/materials/sync/route");
+      const res = await POST();
+      assert.equal(res.status, 500);
+      const body = await res.json();
+      assert.match(body.error, /Thiếu cấu hình Google Sheets|GOOGLE_SERVICE_ACCOUNT_JSON/);
+    } finally {
+      for (const [k, v] of savedVars) if (v !== undefined) process.env[k] = v;
+    }
+  },
+);
 
 // ============================================================================
 // GET /api/materials/template
@@ -1245,64 +1293,76 @@ test("PATCH /api/purchase-requests/:id: engineer không được duyệt → 403
   assert.equal(res.status, 403);
 });
 
-test("PATCH /api/purchase-requests/:id: duyệt hợp lệ → 200, không thể duyệt lần 2 (409)", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("pr2-ok");
-  const matId = await taoMaterial(projectId, "pr2-ok");
-  const pm = await taoUser("pm", "pr2-ok");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/purchase-requests/route");
-  const created = await POST(jreq("/x", { materialId: matId, qtyRequested: 3 }));
-  const { id: prId } = await created.json();
-  const { PATCH } = await import("@/app/api/purchase-requests/[id]/route");
-  const res1 = await PATCH(jreq("/x", { action: "approve" }, "PATCH"), {
-    params: Promise.resolve({ id: String(prId) }),
-  });
-  assert.equal(res1.status, 200);
-  const row = await queryOne<{ status: string }>(
-    `SELECT status FROM purchase_requests WHERE id = ?`,
-    prId,
-  );
-  assert.equal(row?.status, "approved");
-  const res2 = await PATCH(jreq("/x", { action: "approve" }, "PATCH"), {
-    params: Promise.resolve({ id: String(prId) }),
-  });
-  assert.equal(res2.status, 409);
-});
+test(
+  "PATCH /api/purchase-requests/:id: duyệt hợp lệ → 200, không thể duyệt lần 2 (409)",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("pr2-ok");
+    const matId = await taoMaterial(projectId, "pr2-ok");
+    const pm = await taoUser("pm", "pr2-ok");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/purchase-requests/route");
+    const created = await POST(jreq("/x", { materialId: matId, qtyRequested: 3 }));
+    const { id: prId } = await created.json();
+    const { PATCH } = await import("@/app/api/purchase-requests/[id]/route");
+    const res1 = await PATCH(jreq("/x", { action: "approve" }, "PATCH"), {
+      params: Promise.resolve({ id: String(prId) }),
+    });
+    assert.equal(res1.status, 200);
+    const row = await queryOne<{ status: string }>(
+      `SELECT status FROM purchase_requests WHERE id = ?`,
+      prId,
+    );
+    assert.equal(row?.status, "approved");
+    const res2 = await PATCH(jreq("/x", { action: "approve" }, "PATCH"), {
+      params: Promise.resolve({ id: String(prId) }),
+    });
+    assert.equal(res2.status, 409);
+  },
+);
 
-test("DELETE /api/purchase-requests/:id: đã đặt hàng (ordered) → 409, không xoá được", S, async () => {
-  const { run } = await import("@/lib/db");
-  const projectId = await taoDuAn("pr2-del409");
-  const matId = await taoMaterial(projectId, "pr2-del409");
-  const pm = await taoUser("pm", "pr2-del409");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/purchase-requests/route");
-  const created = await POST(jreq("/x", { materialId: matId, qtyRequested: 3 }));
-  const { id: prId } = await created.json();
-  await run(`UPDATE purchase_requests SET status = 'ordered' WHERE id = ?`, prId);
-  const { DELETE } = await import("@/app/api/purchase-requests/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(prId) }),
-  });
-  assert.equal(res.status, 409);
-});
+test(
+  "DELETE /api/purchase-requests/:id: đã đặt hàng (ordered) → 409, không xoá được",
+  S,
+  async () => {
+    const { run } = await import("@/lib/db");
+    const projectId = await taoDuAn("pr2-del409");
+    const matId = await taoMaterial(projectId, "pr2-del409");
+    const pm = await taoUser("pm", "pr2-del409");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/purchase-requests/route");
+    const created = await POST(jreq("/x", { materialId: matId, qtyRequested: 3 }));
+    const { id: prId } = await created.json();
+    await run(`UPDATE purchase_requests SET status = 'ordered' WHERE id = ?`, prId);
+    const { DELETE } = await import("@/app/api/purchase-requests/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(prId) }),
+    });
+    assert.equal(res.status, 409);
+  },
+);
 
-test("DELETE /api/purchase-requests/:id: người khác (không phải người tạo/Admin/PM) không xoá được → 403", S, async () => {
-  const projectId = await taoDuAn("pr2-del403");
-  const matId = await taoMaterial(projectId, "pr2-del403");
-  const eng1 = await taoUser("engineer", "pr2-del403a");
-  await dangNhapDuAn(eng1, projectId);
-  const { POST } = await import("@/app/api/purchase-requests/route");
-  const created = await POST(jreq("/x", { materialId: matId, qtyRequested: 3 }));
-  const { id: prId } = await created.json();
-  const eng2 = await taoUser("engineer", "pr2-del403b");
-  await dangNhapDuAn(eng2, projectId);
-  const { DELETE } = await import("@/app/api/purchase-requests/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(prId) }),
-  });
-  assert.equal(res.status, 403);
-});
+test(
+  "DELETE /api/purchase-requests/:id: người khác (không phải người tạo/Admin/PM) không xoá được → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("pr2-del403");
+    const matId = await taoMaterial(projectId, "pr2-del403");
+    const eng1 = await taoUser("engineer", "pr2-del403a");
+    await dangNhapDuAn(eng1, projectId);
+    const { POST } = await import("@/app/api/purchase-requests/route");
+    const created = await POST(jreq("/x", { materialId: matId, qtyRequested: 3 }));
+    const { id: prId } = await created.json();
+    const eng2 = await taoUser("engineer", "pr2-del403b");
+    await dangNhapDuAn(eng2, projectId);
+    const { DELETE } = await import("@/app/api/purchase-requests/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(prId) }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 // ============================================================================
 // GET /api/resources
@@ -1339,16 +1399,20 @@ test("GET /api/resources?view=equipment: trả thêm equipmentUsage", S, async (
   assert.ok(Array.isArray(body.equipmentUsage));
 });
 
-test("GET /api/resources?view=conflicts: subcon chỉ thấy tải/xung đột của chính mình", S, async () => {
-  const projectId = await taoDuAn("res-sub");
-  const sub = await taoUser("subcon", "res-sub");
-  await dangNhapDuAn(sub, projectId);
-  const { GET } = await import("@/app/api/resources/route");
-  const res = await GET(getreq("/x?view=conflicts"));
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.ok(Array.isArray(body.conflicts));
-});
+test(
+  "GET /api/resources?view=conflicts: subcon chỉ thấy tải/xung đột của chính mình",
+  S,
+  async () => {
+    const projectId = await taoDuAn("res-sub");
+    const sub = await taoUser("subcon", "res-sub");
+    await dangNhapDuAn(sub, projectId);
+    const { GET } = await import("@/app/api/resources/route");
+    const res = await GET(getreq("/x?view=conflicts"));
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(Array.isArray(body.conflicts));
+  },
+);
 
 // ============================================================================
 // GET /api/qr/labels
@@ -1622,16 +1686,22 @@ test("GET /api/systems/:code/upload-template: kind không hợp lệ → 400", S
   assert.equal(res.status, 400);
 });
 
-test("GET /api/systems/:code/upload-template: kind=ke_hoach hợp lệ → trả xlsx (magic PK)", S, async () => {
-  const projectId = await taoDuAn("sysuptpl-ok");
-  const pm = await taoUser("pm", "sysuptpl-ok");
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/systems/[code]/upload-template/route");
-  const res = await GET(getreq("/x?kind=ke_hoach"), { params: Promise.resolve({ code: "acmv" }) });
-  assert.equal(res.status, 200);
-  const buf = Buffer.from(await res.arrayBuffer());
-  assert.equal(buf.slice(0, 2).toString(), "PK");
-});
+test(
+  "GET /api/systems/:code/upload-template: kind=ke_hoach hợp lệ → trả xlsx (magic PK)",
+  S,
+  async () => {
+    const projectId = await taoDuAn("sysuptpl-ok");
+    const pm = await taoUser("pm", "sysuptpl-ok");
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/systems/[code]/upload-template/route");
+    const res = await GET(getreq("/x?kind=ke_hoach"), {
+      params: Promise.resolve({ code: "acmv" }),
+    });
+    assert.equal(res.status, 200);
+    const buf = Buffer.from(await res.arrayBuffer());
+    assert.equal(buf.slice(0, 2).toString(), "PK");
+  },
+);
 
 // ============================================================================
 // GET /api/systems/:code/uploads

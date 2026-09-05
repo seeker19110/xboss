@@ -126,7 +126,8 @@ async function taoRevision(
     PDF_BYTES.length,
     uploadedBy,
   );
-  if (overrides.status) await run(`UPDATE drawing_revisions SET status = ? WHERE id = ?`, overrides.status, id);
+  if (overrides.status)
+    await run(`UPDATE drawing_revisions SET status = ? WHERE id = ?`, overrides.status, id);
   return id;
 }
 
@@ -162,35 +163,43 @@ test("GET /api/drawings/revisions/:id/file: ID không phải số → 400", S, a
   assert.equal(res.status, 400);
 });
 
-test("GET /api/drawings/revisions/:id/file: revision dự án khác → 404 (cách ly dự án)", S, async () => {
-  const projectA = await taoDuAn("fileisoA");
-  const projectB = await taoDuAn("fileisoB");
-  const pmB = await taoUser("pm", "fileisoB");
-  const drawingB = await taoDrawing(projectB, "fileisoB");
-  const revB = await taoRevision(drawingB, pmB.id, "fileisoB");
+test(
+  "GET /api/drawings/revisions/:id/file: revision dự án khác → 404 (cách ly dự án)",
+  S,
+  async () => {
+    const projectA = await taoDuAn("fileisoA");
+    const projectB = await taoDuAn("fileisoB");
+    const pmB = await taoUser("pm", "fileisoB");
+    const drawingB = await taoDrawing(projectB, "fileisoB");
+    const revB = await taoRevision(drawingB, pmB.id, "fileisoB");
 
-  const pmA = await taoUser("pm", "fileisoA");
-  await dangNhapDuAn(pmA, projectA);
-  const { GET } = await import("@/app/api/drawings/revisions/[id]/file/route");
-  const res = await GET(getReq("/x"), { params: Promise.resolve({ id: String(revB) }) });
-  assert.equal(res.status, 404);
-});
+    const pmA = await taoUser("pm", "fileisoA");
+    await dangNhapDuAn(pmA, projectA);
+    const { GET } = await import("@/app/api/drawings/revisions/[id]/file/route");
+    const res = await GET(getReq("/x"), { params: Promise.resolve({ id: String(revB) }) });
+    assert.equal(res.status, 404);
+  },
+);
 
-test("GET /api/drawings/revisions/:id/file: subcon vẫn xem được + byte khớp file đã lưu", S, async () => {
-  const projectId = await taoDuAn("fileok");
-  const pm = await taoUser("pm", "fileok");
-  const sub = await taoUser("subcon", "fileok");
-  const drawingId = await taoDrawing(projectId, "fileok");
-  const revId = await taoRevision(drawingId, pm.id, "fileok");
+test(
+  "GET /api/drawings/revisions/:id/file: subcon vẫn xem được + byte khớp file đã lưu",
+  S,
+  async () => {
+    const projectId = await taoDuAn("fileok");
+    const pm = await taoUser("pm", "fileok");
+    const sub = await taoUser("subcon", "fileok");
+    const drawingId = await taoDrawing(projectId, "fileok");
+    const revId = await taoRevision(drawingId, pm.id, "fileok");
 
-  await dangNhapDuAn(sub, projectId);
-  const { GET } = await import("@/app/api/drawings/revisions/[id]/file/route");
-  const res = await GET(getReq("/x"), { params: Promise.resolve({ id: String(revId) }) });
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get("content-type"), "application/pdf");
-  const buf = Buffer.from(await res.arrayBuffer());
-  assert.ok(buf.equals(PDF_BYTES));
-});
+    await dangNhapDuAn(sub, projectId);
+    const { GET } = await import("@/app/api/drawings/revisions/[id]/file/route");
+    const res = await GET(getReq("/x"), { params: Promise.resolve({ id: String(revId) }) });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "application/pdf");
+    const buf = Buffer.from(await res.arrayBuffer());
+    assert.ok(buf.equals(PDF_BYTES));
+  },
+);
 
 test("GET /api/drawings/revisions/:id/file: file không còn trên đĩa → 404", S, async () => {
   const { insertId } = await import("@/lib/db");
@@ -239,64 +248,80 @@ test("POST /api/drawings/revisions/:id/withdraw: ID không phải số → 400",
   assert.equal(res.status, 400);
 });
 
-test("POST /api/drawings/revisions/:id/withdraw: revision dự án khác → 404 (cách ly dự án)", S, async () => {
-  const projectA = await taoDuAn("wdisoA");
-  const projectB = await taoDuAn("wdisoB");
-  const pmB = await taoUser("pm", "wdisoB");
-  const drawingB = await taoDrawing(projectB, "wdisoB");
-  const revB = await taoRevision(drawingB, pmB.id, "wdisoB");
+test(
+  "POST /api/drawings/revisions/:id/withdraw: revision dự án khác → 404 (cách ly dự án)",
+  S,
+  async () => {
+    const projectA = await taoDuAn("wdisoA");
+    const projectB = await taoDuAn("wdisoB");
+    const pmB = await taoUser("pm", "wdisoB");
+    const drawingB = await taoDrawing(projectB, "wdisoB");
+    const revB = await taoRevision(drawingB, pmB.id, "wdisoB");
 
-  const pmA = await taoUser("pm", "wdisoA");
-  await dangNhapDuAn(pmA, projectA);
-  const { POST } = await import("@/app/api/drawings/revisions/[id]/withdraw/route");
-  const res = await POST(jreq("/x"), { params: Promise.resolve({ id: String(revB) }) });
-  assert.equal(res.status, 404);
-});
+    const pmA = await taoUser("pm", "wdisoA");
+    await dangNhapDuAn(pmA, projectA);
+    const { POST } = await import("@/app/api/drawings/revisions/[id]/withdraw/route");
+    const res = await POST(jreq("/x"), { params: Promise.resolve({ id: String(revB) }) });
+    assert.equal(res.status, 404);
+  },
+);
 
-test("POST /api/drawings/revisions/:id/withdraw: người khác (không phải chủ rev) → 403", S, async () => {
-  const projectId = await taoDuAn("wdforbid");
-  const eng = await taoUser("engineer", "wdforbid");
-  const eng2 = await taoUser("engineer", "wdforbid2");
-  const drawingId = await taoDrawing(projectId, "wdforbid");
-  const revId = await taoRevision(drawingId, eng.id, "wdforbid");
+test(
+  "POST /api/drawings/revisions/:id/withdraw: người khác (không phải chủ rev) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("wdforbid");
+    const eng = await taoUser("engineer", "wdforbid");
+    const eng2 = await taoUser("engineer", "wdforbid2");
+    const drawingId = await taoDrawing(projectId, "wdforbid");
+    const revId = await taoRevision(drawingId, eng.id, "wdforbid");
 
-  await dangNhapDuAn(eng2, projectId);
-  const { POST } = await import("@/app/api/drawings/revisions/[id]/withdraw/route");
-  const res = await POST(jreq("/x"), { params: Promise.resolve({ id: String(revId) }) });
-  assert.equal(res.status, 403);
-});
+    await dangNhapDuAn(eng2, projectId);
+    const { POST } = await import("@/app/api/drawings/revisions/[id]/withdraw/route");
+    const res = await POST(jreq("/x"), { params: Promise.resolve({ id: String(revId) }) });
+    assert.equal(res.status, 403);
+  },
+);
 
-test("POST /api/drawings/revisions/:id/withdraw: rev đã duyệt (không còn thu hồi được) → 409", S, async () => {
-  const projectId = await taoDuAn("wdconflict");
-  const eng = await taoUser("engineer", "wdconflict");
-  const drawingId = await taoDrawing(projectId, "wdconflict");
-  const revId = await taoRevision(drawingId, eng.id, "wdconflict", { status: "approved" });
+test(
+  "POST /api/drawings/revisions/:id/withdraw: rev đã duyệt (không còn thu hồi được) → 409",
+  S,
+  async () => {
+    const projectId = await taoDuAn("wdconflict");
+    const eng = await taoUser("engineer", "wdconflict");
+    const drawingId = await taoDrawing(projectId, "wdconflict");
+    const revId = await taoRevision(drawingId, eng.id, "wdconflict", { status: "approved" });
 
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/drawings/revisions/[id]/withdraw/route");
-  const res = await POST(jreq("/x"), { params: Promise.resolve({ id: String(revId) }) });
-  assert.equal(res.status, 409);
-});
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/drawings/revisions/[id]/withdraw/route");
+    const res = await POST(jreq("/x"), { params: Promise.resolve({ id: String(revId) }) });
+    assert.equal(res.status, 409);
+  },
+);
 
-test("POST /api/drawings/revisions/:id/withdraw: chính chủ thu hồi thành công → 200", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("wdok");
-  const eng = await taoUser("engineer", "wdok");
-  const drawingId = await taoDrawing(projectId, "wdok");
-  const revId = await taoRevision(drawingId, eng.id, "wdok");
+test(
+  "POST /api/drawings/revisions/:id/withdraw: chính chủ thu hồi thành công → 200",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("wdok");
+    const eng = await taoUser("engineer", "wdok");
+    const drawingId = await taoDrawing(projectId, "wdok");
+    const revId = await taoRevision(drawingId, eng.id, "wdok");
 
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/drawings/revisions/[id]/withdraw/route");
-  const res = await POST(jreq("/x"), { params: Promise.resolve({ id: String(revId) }) });
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.status, "withdrawn");
-  const row = await queryOne<{ status: string }>(
-    `SELECT status FROM drawing_revisions WHERE id = ?`,
-    revId,
-  );
-  assert.equal(row?.status, "withdrawn");
-});
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/drawings/revisions/[id]/withdraw/route");
+    const res = await POST(jreq("/x"), { params: Promise.resolve({ id: String(revId) }) });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.status, "withdrawn");
+    const row = await queryOne<{ status: string }>(
+      `SELECT status FROM drawing_revisions WHERE id = ?`,
+      revId,
+    );
+    assert.equal(row?.status, "withdrawn");
+  },
+);
 
 // ============================================================================
 // POST /api/drawings/scan-local
@@ -318,14 +343,35 @@ test("POST /api/drawings/scan-local: subcon không có quyền → 403", S, asyn
   assert.equal(res.status, 403);
 });
 
-test("POST /api/drawings/scan-local: thư mục data/uploads/drawings chưa tồn tại → 404 (ghi nhận: DRAWINGS_DIR là hằng cứng, không đổi được trong test)", S, async () => {
-  const projectId = await taoDuAn("scanok");
-  const pm = await taoUser("pm", "scanok");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/drawings/scan-local/route");
-  const res = await POST(jreq("/x"));
-  assert.equal(res.status, 404);
-});
+// `DRAWINGS_DIR` là hằng cứng (`process.cwd()/data/uploads/drawings`), không trỏ được sang
+// thư mục tạm trong test. Nó lại là trạng thái TOÀN CỤC trên đĩa: file test khác upload bản vẽ
+// là thư mục xuất hiện. Nên KHÔNG được khẳng định cứng "chưa tồn tại → 404" — chạy riêng thì
+// xanh, chạy cả bộ thì đỏ vì file khác đã tạo thư mục (đúng lớp lỗi đã ghi trong PROGRESS.md).
+// Ở đây đọc trạng thái thật rồi kiểm đúng nhánh tương ứng: cả hai nhánh đều là hành vi hợp lệ
+// của route, và ca vẫn bắt được lỗi thật (vd 500 do quét hỏng, hay 404 khi thư mục có thật).
+test(
+  "POST /api/drawings/scan-local: quét đúng nhánh theo trạng thái thật của thư mục",
+  S,
+  async () => {
+    const { existsSync } = await import("node:fs");
+    const { DRAWINGS_DIR } = await import("@/lib/ky-thuat/drawings-scan");
+    const coThuMuc = existsSync(DRAWINGS_DIR);
+    const projectId = await taoDuAn("scanok");
+    const pm = await taoUser("pm", "scanok");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/drawings/scan-local/route");
+    const res = await POST(jreq("/x"));
+    if (coThuMuc) {
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.ok, true);
+      assert.equal(typeof body.totalFilesOnDisk, "number");
+      assert.equal(typeof body.newlySyncedRevisions, "number");
+    } else {
+      assert.equal(res.status, 404);
+    }
+  },
+);
 
 // ============================================================================
 // GET /api/documents-hub
@@ -347,29 +393,33 @@ test("GET /api/documents-hub: source không hợp lệ → 422", S, async () => 
   assert.equal(res.status, 422);
 });
 
-test("GET /api/documents-hub: thành công — thấy tài liệu dự án (project_documents)", S, async () => {
-  const { insertId } = await import("@/lib/db");
-  const { storagePut } = await import("@/lib/nen/storage");
-  const projectId = await taoDuAn("hubok");
-  const pm = await taoUser("pm", "hubok");
-  const fileName = `hub-${uniq("hubok")}.pdf`;
-  await storagePut(1, fileName, PDF_BYTES);
-  await insertId(
-    `INSERT INTO project_documents (title, file_name, original_name, mime_type, size_bytes, uploaded_by, project_id)
+test(
+  "GET /api/documents-hub: thành công — thấy tài liệu dự án (project_documents)",
+  S,
+  async () => {
+    const { insertId } = await import("@/lib/db");
+    const { storagePut } = await import("@/lib/nen/storage");
+    const projectId = await taoDuAn("hubok");
+    const pm = await taoUser("pm", "hubok");
+    const fileName = `hub-${uniq("hubok")}.pdf`;
+    await storagePut(1, fileName, PDF_BYTES);
+    await insertId(
+      `INSERT INTO project_documents (title, file_name, original_name, mime_type, size_bytes, uploaded_by, project_id)
      VALUES (?, ?, 'a.pdf', 'application/pdf', ?, ?, ?)`,
-    "Hồ sơ chung",
-    fileName,
-    PDF_BYTES.length,
-    pm.id,
-    projectId,
-  );
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/documents-hub/route");
-  const res = await GET(getReq("/api/documents-hub?source=project"));
-  assert.equal(res.status, 200);
-  const { documents } = await res.json();
-  assert.ok(documents.some((d: { title: string }) => d.title === "Hồ sơ chung"));
-});
+      "Hồ sơ chung",
+      fileName,
+      PDF_BYTES.length,
+      pm.id,
+      projectId,
+    );
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/documents-hub/route");
+    const res = await GET(getReq("/api/documents-hub?source=project"));
+    assert.equal(res.status, 200);
+    const { documents } = await res.json();
+    assert.ok(documents.some((d: { title: string }) => d.title === "Hồ sơ chung"));
+  },
+);
 
 // ============================================================================
 // GET/DELETE /api/project-documents/:id
@@ -460,38 +510,46 @@ test("DELETE /api/project-documents/:id: chưa đăng nhập → 401", S, async 
   assert.equal(res.status, 401);
 });
 
-test("DELETE /api/project-documents/:id: không phải người upload và không phải Admin/PM → 403", S, async () => {
-  const projectId = await taoDuAn("pdforbid");
-  const eng = await taoUser("engineer", "pdforbid");
-  const other = await taoUser("engineer", "pdforbidOther");
-  const docId = await taoProjectDoc(projectId, other.id, "pdforbid");
-  await dangNhapDuAn(eng, projectId);
-  const { DELETE } = await import("@/app/api/project-documents/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(docId) }),
-  });
-  assert.equal(res.status, 403);
-});
+test(
+  "DELETE /api/project-documents/:id: không phải người upload và không phải Admin/PM → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("pdforbid");
+    const eng = await taoUser("engineer", "pdforbid");
+    const other = await taoUser("engineer", "pdforbidOther");
+    const docId = await taoProjectDoc(projectId, other.id, "pdforbid");
+    await dangNhapDuAn(eng, projectId);
+    const { DELETE } = await import("@/app/api/project-documents/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(docId) }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
-test("DELETE /api/project-documents/:id: Admin/PM xoá được dù không phải người upload → xoá cả file vật lý", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const { storageGet } = await import("@/lib/nen/storage");
-  const projectId = await taoDuAn("pdadmin");
-  const eng = await taoUser("engineer", "pdadmin");
-  const pm = await taoUser("pm", "pdadminPm");
-  const fileName = `pd-del-${uniq("pdadmin")}.pdf`;
-  const docId = await taoProjectDoc(projectId, eng.id, "pdadmin", { fileName });
-  const { storagePut } = await import("@/lib/nen/storage");
-  await storagePut(1, fileName, PDF_BYTES);
-  await dangNhapDuAn(pm, projectId);
-  const { DELETE } = await import("@/app/api/project-documents/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(docId) }),
-  });
-  assert.equal(res.status, 200);
-  assert.equal(await queryOne(`SELECT id FROM project_documents WHERE id = ?`, docId), undefined);
-  assert.equal(await storageGet(1, fileName), null);
-});
+test(
+  "DELETE /api/project-documents/:id: Admin/PM xoá được dù không phải người upload → xoá cả file vật lý",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const { storageGet } = await import("@/lib/nen/storage");
+    const projectId = await taoDuAn("pdadmin");
+    const eng = await taoUser("engineer", "pdadmin");
+    const pm = await taoUser("pm", "pdadminPm");
+    const fileName = `pd-del-${uniq("pdadmin")}.pdf`;
+    const docId = await taoProjectDoc(projectId, eng.id, "pdadmin", { fileName });
+    const { storagePut } = await import("@/lib/nen/storage");
+    await storagePut(1, fileName, PDF_BYTES);
+    await dangNhapDuAn(pm, projectId);
+    const { DELETE } = await import("@/app/api/project-documents/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(docId) }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal(await queryOne(`SELECT id FROM project_documents WHERE id = ?`, docId), undefined);
+    assert.equal(await storageGet(1, fileName), null);
+  },
+);
 
 // ============================================================================
 // GET/POST /api/correspondences/:id/files
@@ -534,18 +592,22 @@ test("GET /api/correspondences/:id/files: ID không phải số → 400", S, asy
   assert.equal(res.status, 400);
 });
 
-test("GET /api/correspondences/:id/files: công văn dự án khác → 404 (cách ly dự án)", S, async () => {
-  const projectA = await taoDuAn("cvfisoA");
-  const projectB = await taoDuAn("cvfisoB");
-  const pmB = await taoUser("pm", "cvfisoB");
-  const cvB = await taoCongVan(projectB, pmB.id, "cvfisoB");
+test(
+  "GET /api/correspondences/:id/files: công văn dự án khác → 404 (cách ly dự án)",
+  S,
+  async () => {
+    const projectA = await taoDuAn("cvfisoA");
+    const projectB = await taoDuAn("cvfisoB");
+    const pmB = await taoUser("pm", "cvfisoB");
+    const cvB = await taoCongVan(projectB, pmB.id, "cvfisoB");
 
-  const pmA = await taoUser("pm", "cvfisoA");
-  await dangNhapDuAn(pmA, projectA);
-  const { GET } = await import("@/app/api/correspondences/[id]/files/route");
-  const res = await GET(getReq("/x"), { params: Promise.resolve({ id: String(cvB) }) });
-  assert.equal(res.status, 404);
-});
+    const pmA = await taoUser("pm", "cvfisoA");
+    await dangNhapDuAn(pmA, projectA);
+    const { GET } = await import("@/app/api/correspondences/[id]/files/route");
+    const res = await GET(getReq("/x"), { params: Promise.resolve({ id: String(cvB) }) });
+    assert.equal(res.status, 404);
+  },
+);
 
 test("POST /api/correspondences/:id/files: chưa đăng nhập → 401", S, async () => {
   dangXuat();
@@ -576,22 +638,26 @@ test("POST /api/correspondences/:id/files: thiếu file → 400", S, async () =>
   assert.equal(res.status, 400);
 });
 
-test("POST /api/correspondences/:id/files: upload thành công → 201, xem lại thấy trong danh sách", S, async () => {
-  const projectId = await taoDuAn("cvfok");
-  const pm = await taoUser("pm", "cvfok");
-  const cvId = await taoCongVan(projectId, pm.id, "cvfok");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/correspondences/[id]/files/route");
-  const form = new FormData();
-  form.set("file", new File([PDF_BYTES], "scan.pdf", { type: "application/pdf" }));
-  const res = await POST(formReq("/x", form), { params: Promise.resolve({ id: String(cvId) }) });
-  assert.equal(res.status, 201);
+test(
+  "POST /api/correspondences/:id/files: upload thành công → 201, xem lại thấy trong danh sách",
+  S,
+  async () => {
+    const projectId = await taoDuAn("cvfok");
+    const pm = await taoUser("pm", "cvfok");
+    const cvId = await taoCongVan(projectId, pm.id, "cvfok");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/correspondences/[id]/files/route");
+    const form = new FormData();
+    form.set("file", new File([PDF_BYTES], "scan.pdf", { type: "application/pdf" }));
+    const res = await POST(formReq("/x", form), { params: Promise.resolve({ id: String(cvId) }) });
+    assert.equal(res.status, 201);
 
-  const { GET } = await import("@/app/api/correspondences/[id]/files/route");
-  const listRes = await GET(getReq("/x"), { params: Promise.resolve({ id: String(cvId) }) });
-  const { files } = await listRes.json();
-  assert.equal(files.length, 1);
-});
+    const { GET } = await import("@/app/api/correspondences/[id]/files/route");
+    const listRes = await GET(getReq("/x"), { params: Promise.resolve({ id: String(cvId) }) });
+    const { files } = await listRes.json();
+    assert.equal(files.length, 1);
+  },
+);
 
 // ============================================================================
 // GET/DELETE /api/correspondence-files/:id
@@ -655,37 +721,45 @@ test("GET /api/correspondence-files/:id: thành công → byte khớp", S, async
   assert.ok(buf.equals(PDF_BYTES));
 });
 
-test("DELETE /api/correspondence-files/:id: người upload xoá được dù không phải Admin/PM", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("cvffdel");
-  const eng = await taoUser("engineer", "cvffdel");
-  const cvId = await taoCongVan(projectId, eng.id, "cvffdel");
-  const fileId = await taoFileCongVan(cvId, eng.id, "cvffdel");
-  await dangNhapDuAn(eng, projectId);
-  const { DELETE } = await import("@/app/api/correspondence-files/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(fileId) }),
-  });
-  assert.equal(res.status, 200);
-  assert.equal(
-    await queryOne(`SELECT id FROM correspondence_files WHERE id = ?`, fileId),
-    undefined,
-  );
-});
+test(
+  "DELETE /api/correspondence-files/:id: người upload xoá được dù không phải Admin/PM",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("cvffdel");
+    const eng = await taoUser("engineer", "cvffdel");
+    const cvId = await taoCongVan(projectId, eng.id, "cvffdel");
+    const fileId = await taoFileCongVan(cvId, eng.id, "cvffdel");
+    await dangNhapDuAn(eng, projectId);
+    const { DELETE } = await import("@/app/api/correspondence-files/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(fileId) }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal(
+      await queryOne(`SELECT id FROM correspondence_files WHERE id = ?`, fileId),
+      undefined,
+    );
+  },
+);
 
-test("DELETE /api/correspondence-files/:id: người khác không phải Admin/PM/kỹ sư → 403", S, async () => {
-  const projectId = await taoDuAn("cvffforbid");
-  const bch = await taoUser("bch", "cvffforbid");
-  const pm = await taoUser("pm", "cvffforbidPm");
-  const cvId = await taoCongVan(projectId, pm.id, "cvffforbid");
-  const fileId = await taoFileCongVan(cvId, pm.id, "cvffforbid");
-  await dangNhapDuAn(bch, projectId);
-  const { DELETE } = await import("@/app/api/correspondence-files/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(fileId) }),
-  });
-  assert.equal(res.status, 403);
-});
+test(
+  "DELETE /api/correspondence-files/:id: người khác không phải Admin/PM/kỹ sư → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("cvffforbid");
+    const bch = await taoUser("bch", "cvffforbid");
+    const pm = await taoUser("pm", "cvffforbidPm");
+    const cvId = await taoCongVan(projectId, pm.id, "cvffforbid");
+    const fileId = await taoFileCongVan(cvId, pm.id, "cvffforbid");
+    await dangNhapDuAn(bch, projectId);
+    const { DELETE } = await import("@/app/api/correspondence-files/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(fileId) }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 // ============================================================================
 // POST /api/proposals/:id/decide, /submit, /documents, /documents/:did
@@ -781,37 +855,48 @@ test("POST /api/proposals/:id/decide: đề xuất còn nháp (chưa trình) →
   assert.equal(res.status, 409);
 });
 
-test("POST /api/proposals/:id/decide: từ chối thiếu lý do → 409 (rejectReason bắt buộc)", S, async () => {
-  const projectId = await taoDuAn("dxdnoreason");
-  const pm = await taoUser("pm", "dxdnoreason");
-  const dxId = await taoDeXuat(projectId, pm.id, "dxdnoreason", { status: "submitted" });
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/proposals/[id]/decide/route");
-  const res = await POST(jreq("/x", { decision: "rejected" }), {
-    params: Promise.resolve({ id: String(dxId) }),
-  });
-  assert.equal(res.status, 409);
-});
+test(
+  "POST /api/proposals/:id/decide: từ chối thiếu lý do → 409 (rejectReason bắt buộc)",
+  S,
+  async () => {
+    const projectId = await taoDuAn("dxdnoreason");
+    const pm = await taoUser("pm", "dxdnoreason");
+    const dxId = await taoDeXuat(projectId, pm.id, "dxdnoreason", { status: "submitted" });
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/proposals/[id]/decide/route");
+    const res = await POST(jreq("/x", { decision: "rejected" }), {
+      params: Promise.resolve({ id: String(dxId) }),
+    });
+    assert.equal(res.status, 409);
+  },
+);
 
-test("POST /api/proposals/:id/decide: duyệt thành công → 200, quyết lần 2 → 409 (không đè)", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("dxdok");
-  const pm = await taoUser("pm", "dxdok");
-  const dxId = await taoDeXuat(projectId, pm.id, "dxdok", { status: "submitted" });
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/proposals/[id]/decide/route");
-  const res = await POST(jreq("/x", { decision: "approved" }), {
-    params: Promise.resolve({ id: String(dxId) }),
-  });
-  assert.equal(res.status, 200);
-  const row = await queryOne<{ status: string }>(`SELECT status FROM proposals WHERE id = ?`, dxId);
-  assert.equal(row?.status, "approved");
+test(
+  "POST /api/proposals/:id/decide: duyệt thành công → 200, quyết lần 2 → 409 (không đè)",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("dxdok");
+    const pm = await taoUser("pm", "dxdok");
+    const dxId = await taoDeXuat(projectId, pm.id, "dxdok", { status: "submitted" });
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/proposals/[id]/decide/route");
+    const res = await POST(jreq("/x", { decision: "approved" }), {
+      params: Promise.resolve({ id: String(dxId) }),
+    });
+    assert.equal(res.status, 200);
+    const row = await queryOne<{ status: string }>(
+      `SELECT status FROM proposals WHERE id = ?`,
+      dxId,
+    );
+    assert.equal(row?.status, "approved");
 
-  const res2 = await POST(jreq("/x", { decision: "approved" }), {
-    params: Promise.resolve({ id: String(dxId) }),
-  });
-  assert.equal(res2.status, 409, "đã quyết rồi — không được quyết lại/đè");
-});
+    const res2 = await POST(jreq("/x", { decision: "approved" }), {
+      params: Promise.resolve({ id: String(dxId) }),
+    });
+    assert.equal(res2.status, 409, "đã quyết rồi — không được quyết lại/đè");
+  },
+);
 
 test("POST /api/proposals/:id/submit: chưa đăng nhập → 401", S, async () => {
   dangXuat();
@@ -901,16 +986,20 @@ test("GET /api/proposals/:id/documents: đề xuất dự án khác → 404 (cá
   assert.equal(res.status, 404);
 });
 
-test("GET /api/proposals/:id/documents: người không liên quan và không thấy hết đề xuất → 403", S, async () => {
-  const projectId = await taoDuAn("dxddocforbid");
-  const eng = await taoUser("engineer", "dxddocforbid");
-  const other = await taoUser("engineer", "dxddocforbidOther");
-  const dxId = await taoDeXuat(projectId, other.id, "dxddocforbid");
-  await dangNhapDuAn(eng, projectId);
-  const { GET } = await import("@/app/api/proposals/[id]/documents/route");
-  const res = await GET(getReq("/x"), { params: Promise.resolve({ id: String(dxId) }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "GET /api/proposals/:id/documents: người không liên quan và không thấy hết đề xuất → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("dxddocforbid");
+    const eng = await taoUser("engineer", "dxddocforbid");
+    const other = await taoUser("engineer", "dxddocforbidOther");
+    const dxId = await taoDeXuat(projectId, other.id, "dxddocforbid");
+    await dangNhapDuAn(eng, projectId);
+    const { GET } = await import("@/app/api/proposals/[id]/documents/route");
+    const res = await GET(getReq("/x"), { params: Promise.resolve({ id: String(dxId) }) });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/proposals/:id/documents: thiếu file → 400", S, async () => {
   const projectId = await taoDuAn("dxdocnofile");
@@ -923,44 +1012,52 @@ test("POST /api/proposals/:id/documents: thiếu file → 400", S, async () => {
   assert.equal(res.status, 400);
 });
 
-test("POST /api/proposals/:id/documents: đề xuất đã trình (không còn nháp) → 403 (canEditProposal)", S, async () => {
-  const projectId = await taoDuAn("dxdocsubmitted");
-  const pm = await taoUser("pm", "dxdocsubmitted");
-  const dxId = await taoDeXuat(projectId, pm.id, "dxdocsubmitted", { status: "submitted" });
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/proposals/[id]/documents/route");
-  const form = new FormData();
-  form.set("file", new File([PDF_BYTES], "a.pdf", { type: "application/pdf" }));
-  const res = await POST(formReq("/x", form), { params: Promise.resolve({ id: String(dxId) }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/proposals/:id/documents: đề xuất đã trình (không còn nháp) → 403 (canEditProposal)",
+  S,
+  async () => {
+    const projectId = await taoDuAn("dxdocsubmitted");
+    const pm = await taoUser("pm", "dxdocsubmitted");
+    const dxId = await taoDeXuat(projectId, pm.id, "dxdocsubmitted", { status: "submitted" });
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/proposals/[id]/documents/route");
+    const form = new FormData();
+    form.set("file", new File([PDF_BYTES], "a.pdf", { type: "application/pdf" }));
+    const res = await POST(formReq("/x", form), { params: Promise.resolve({ id: String(dxId) }) });
+    assert.equal(res.status, 403);
+  },
+);
 
-test("POST /api/proposals/:id/documents: upload thành công khi còn nháp → 201, xem lại & tải lại được", S, async () => {
-  const projectId = await taoDuAn("dxdocok");
-  const pm = await taoUser("pm", "dxdocok");
-  const dxId = await taoDeXuat(projectId, pm.id, "dxdocok");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/proposals/[id]/documents/route");
-  const form = new FormData();
-  form.set("file", new File([PDF_BYTES], "a.pdf", { type: "application/pdf" }));
-  form.set("caption", "Chú thích");
-  const res = await POST(formReq("/x", form), { params: Promise.resolve({ id: String(dxId) }) });
-  assert.equal(res.status, 201);
-  const { id: docId } = await res.json();
+test(
+  "POST /api/proposals/:id/documents: upload thành công khi còn nháp → 201, xem lại & tải lại được",
+  S,
+  async () => {
+    const projectId = await taoDuAn("dxdocok");
+    const pm = await taoUser("pm", "dxdocok");
+    const dxId = await taoDeXuat(projectId, pm.id, "dxdocok");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/proposals/[id]/documents/route");
+    const form = new FormData();
+    form.set("file", new File([PDF_BYTES], "a.pdf", { type: "application/pdf" }));
+    form.set("caption", "Chú thích");
+    const res = await POST(formReq("/x", form), { params: Promise.resolve({ id: String(dxId) }) });
+    assert.equal(res.status, 201);
+    const { id: docId } = await res.json();
 
-  const { GET: GETLIST } = await import("@/app/api/proposals/[id]/documents/route");
-  const listRes = await GETLIST(getReq("/x"), { params: Promise.resolve({ id: String(dxId) }) });
-  const { documents } = await listRes.json();
-  assert.equal(documents.length, 1);
+    const { GET: GETLIST } = await import("@/app/api/proposals/[id]/documents/route");
+    const listRes = await GETLIST(getReq("/x"), { params: Promise.resolve({ id: String(dxId) }) });
+    const { documents } = await listRes.json();
+    assert.equal(documents.length, 1);
 
-  const { GET: GETONE } = await import("@/app/api/proposals/[id]/documents/[did]/route");
-  const oneRes = await GETONE(getReq("/x"), {
-    params: Promise.resolve({ id: String(dxId), did: String(docId) }),
-  });
-  assert.equal(oneRes.status, 200);
-  const buf = Buffer.from(await oneRes.arrayBuffer());
-  assert.ok(buf.equals(PDF_BYTES));
-});
+    const { GET: GETONE } = await import("@/app/api/proposals/[id]/documents/[did]/route");
+    const oneRes = await GETONE(getReq("/x"), {
+      params: Promise.resolve({ id: String(dxId), did: String(docId) }),
+    });
+    assert.equal(oneRes.status, 200);
+    const buf = Buffer.from(await oneRes.arrayBuffer());
+    assert.ok(buf.equals(PDF_BYTES));
+  },
+);
 
 test("GET /api/proposals/:id/documents/:did: ID không hợp lệ → 400", S, async () => {
   const projectId = await taoDuAn("dxdidbad");
@@ -971,50 +1068,65 @@ test("GET /api/proposals/:id/documents/:did: ID không hợp lệ → 400", S, a
   assert.equal(res.status, 400);
 });
 
-test("GET /api/proposals/:id/documents/:did: tài liệu không thuộc đề xuất này → 404", S, async () => {
-  const projectId = await taoDuAn("dxdidmismatch");
-  const pm = await taoUser("pm", "dxdidmismatch");
-  const dx1 = await taoDeXuat(projectId, pm.id, "dxdidmismatch1");
-  const dx2 = await taoDeXuat(projectId, pm.id, "dxdidmismatch2");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/proposals/[id]/documents/route");
-  const form = new FormData();
-  form.set("file", new File([PDF_BYTES], "a.pdf", { type: "application/pdf" }));
-  const uploaded = await POST(formReq("/x", form), { params: Promise.resolve({ id: String(dx1) }) });
-  const { id: docId } = await uploaded.json();
+test(
+  "GET /api/proposals/:id/documents/:did: tài liệu không thuộc đề xuất này → 404",
+  S,
+  async () => {
+    const projectId = await taoDuAn("dxdidmismatch");
+    const pm = await taoUser("pm", "dxdidmismatch");
+    const dx1 = await taoDeXuat(projectId, pm.id, "dxdidmismatch1");
+    const dx2 = await taoDeXuat(projectId, pm.id, "dxdidmismatch2");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/proposals/[id]/documents/route");
+    const form = new FormData();
+    form.set("file", new File([PDF_BYTES], "a.pdf", { type: "application/pdf" }));
+    const uploaded = await POST(formReq("/x", form), {
+      params: Promise.resolve({ id: String(dx1) }),
+    });
+    const { id: docId } = await uploaded.json();
 
-  const { GET } = await import("@/app/api/proposals/[id]/documents/[did]/route");
-  const res = await GET(getReq("/x"), {
-    params: Promise.resolve({ id: String(dx2), did: String(docId) }),
-  });
-  assert.equal(res.status, 404);
-});
+    const { GET } = await import("@/app/api/proposals/[id]/documents/[did]/route");
+    const res = await GET(getReq("/x"), {
+      params: Promise.resolve({ id: String(dx2), did: String(docId) }),
+    });
+    assert.equal(res.status, 404);
+  },
+);
 
-test("DELETE /api/proposals/:id/documents/:did: xoá thành công khi còn nháp → 200, mất file vật lý", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const { storageGet } = await import("@/lib/nen/storage");
-  const projectId = await taoDuAn("dxdiddel");
-  const pm = await taoUser("pm", "dxdiddel");
-  const dxId = await taoDeXuat(projectId, pm.id, "dxdiddel");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/proposals/[id]/documents/route");
-  const form = new FormData();
-  form.set("file", new File([PDF_BYTES], "a.pdf", { type: "application/pdf" }));
-  const uploaded = await POST(formReq("/x", form), { params: Promise.resolve({ id: String(dxId) }) });
-  const { id: docId } = await uploaded.json();
-  const rowBefore = await queryOne<{ file_name: string }>(
-    `SELECT file_name FROM proposal_documents WHERE id = ?`,
-    docId,
-  );
+test(
+  "DELETE /api/proposals/:id/documents/:did: xoá thành công khi còn nháp → 200, mất file vật lý",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const { storageGet } = await import("@/lib/nen/storage");
+    const projectId = await taoDuAn("dxdiddel");
+    const pm = await taoUser("pm", "dxdiddel");
+    const dxId = await taoDeXuat(projectId, pm.id, "dxdiddel");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/proposals/[id]/documents/route");
+    const form = new FormData();
+    form.set("file", new File([PDF_BYTES], "a.pdf", { type: "application/pdf" }));
+    const uploaded = await POST(formReq("/x", form), {
+      params: Promise.resolve({ id: String(dxId) }),
+    });
+    const { id: docId } = await uploaded.json();
+    const rowBefore = await queryOne<{ file_name: string }>(
+      `SELECT file_name FROM proposal_documents WHERE id = ?`,
+      docId,
+    );
 
-  const { DELETE } = await import("@/app/api/proposals/[id]/documents/[did]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(dxId), did: String(docId) }),
-  });
-  assert.equal(res.status, 200);
-  assert.equal(await queryOne(`SELECT id FROM proposal_documents WHERE id = ?`, docId), undefined);
-  assert.equal(await storageGet(1, rowBefore!.file_name), null);
-});
+    const { DELETE } = await import("@/app/api/proposals/[id]/documents/[did]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(dxId), did: String(docId) }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal(
+      await queryOne(`SELECT id FROM proposal_documents WHERE id = ?`, docId),
+      undefined,
+    );
+    assert.equal(await storageGet(1, rowBefore!.file_name), null);
+  },
+);
 
 // ============================================================================
 // POST /api/design-changes/:id/decide
@@ -1083,35 +1195,43 @@ test("POST /api/design-changes/:id/decide: thuộc dự án khác → 404 (cách
   assert.equal(res.status, 404);
 });
 
-test("POST /api/design-changes/:id/decide: có tác động chi phí mà duyệt không ghi chú → 409", S, async () => {
-  const projectId = await taoDuAn("dcnoimpact");
-  const pm = await taoUser("pm", "dcnoimpact");
-  const dcId = await taoDcThietKe(projectId, "dcnoimpact", { impactCost: "Tăng 10tr" });
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/design-changes/[id]/decide/route");
-  const res = await POST(jreq("/x", { decision: "approved" }), {
-    params: Promise.resolve({ id: String(dcId) }),
-  });
-  assert.equal(res.status, 409);
-});
+test(
+  "POST /api/design-changes/:id/decide: có tác động chi phí mà duyệt không ghi chú → 409",
+  S,
+  async () => {
+    const projectId = await taoDuAn("dcnoimpact");
+    const pm = await taoUser("pm", "dcnoimpact");
+    const dcId = await taoDcThietKe(projectId, "dcnoimpact", { impactCost: "Tăng 10tr" });
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/design-changes/[id]/decide/route");
+    const res = await POST(jreq("/x", { decision: "approved" }), {
+      params: Promise.resolve({ id: String(dcId) }),
+    });
+    assert.equal(res.status, 409);
+  },
+);
 
-test("POST /api/design-changes/:id/decide: từ chối thành công (không cần ghi chú dù có tác động) → 200", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("dcreject");
-  const pm = await taoUser("pm", "dcreject");
-  const dcId = await taoDcThietKe(projectId, "dcreject", { impactCost: "Tăng 10tr" });
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/design-changes/[id]/decide/route");
-  const res = await POST(jreq("/x", { decision: "rejected" }), {
-    params: Promise.resolve({ id: String(dcId) }),
-  });
-  assert.equal(res.status, 200);
-  const row = await queryOne<{ status: string }>(
-    `SELECT status FROM design_changes WHERE id = ?`,
-    dcId,
-  );
-  assert.equal(row?.status, "rejected");
-});
+test(
+  "POST /api/design-changes/:id/decide: từ chối thành công (không cần ghi chú dù có tác động) → 200",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("dcreject");
+    const pm = await taoUser("pm", "dcreject");
+    const dcId = await taoDcThietKe(projectId, "dcreject", { impactCost: "Tăng 10tr" });
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/design-changes/[id]/decide/route");
+    const res = await POST(jreq("/x", { decision: "rejected" }), {
+      params: Promise.resolve({ id: String(dcId) }),
+    });
+    assert.equal(res.status, 200);
+    const row = await queryOne<{ status: string }>(
+      `SELECT status FROM design_changes WHERE id = ?`,
+      dcId,
+    );
+    assert.equal(row?.status, "rejected");
+  },
+);
 
 test("POST /api/design-changes/:id/decide: đã quyết rồi (không còn pending) → 409", S, async () => {
   const projectId = await taoDuAn("dcdup");
@@ -1154,47 +1274,51 @@ test("GET /api/qc/documents/export/zip: category không hợp lệ → 422", S, 
   assert.equal(res.status, 422);
 });
 
-test("GET /api/qc/documents/export/zip: thành công → trả zip chứa đúng file đã upload (magic PK), cách ly dự án", S, async () => {
-  const projectA = await taoDuAn("qczipokA");
-  const projectB = await taoDuAn("qczipokB");
-  const pmA = await taoUser("pm", "qczipokA");
-  const pmB = await taoUser("pm", "qczipokB");
-  const { insertId } = await import("@/lib/db");
-  const { storagePut } = await import("@/lib/nen/storage");
+test(
+  "GET /api/qc/documents/export/zip: thành công → trả zip chứa đúng file đã upload (magic PK), cách ly dự án",
+  S,
+  async () => {
+    const projectA = await taoDuAn("qczipokA");
+    const projectB = await taoDuAn("qczipokB");
+    const pmA = await taoUser("pm", "qczipokA");
+    const pmB = await taoUser("pm", "qczipokB");
+    const { insertId } = await import("@/lib/db");
+    const { storagePut } = await import("@/lib/nen/storage");
 
-  const taskA = await taoTask(projectA, "qczipokA");
-  const fileNameA = `qc-${uniq("qczipokA")}.pdf`;
-  await storagePut(1, fileNameA, PDF_BYTES);
-  await insertId(
-    `INSERT INTO task_documents (task_id, file_name, original_name, mime_type, uploaded_by, doc_category)
+    const taskA = await taoTask(projectA, "qczipokA");
+    const fileNameA = `qc-${uniq("qczipokA")}.pdf`;
+    await storagePut(1, fileNameA, PDF_BYTES);
+    await insertId(
+      `INSERT INTO task_documents (task_id, file_name, original_name, mime_type, uploaded_by, doc_category)
      VALUES (?, ?, 'a.pdf', 'application/pdf', ?, 'vat_lieu')`,
-    taskA,
-    fileNameA,
-    pmA.id,
-  );
+      taskA,
+      fileNameA,
+      pmA.id,
+    );
 
-  const taskB = await taoTask(projectB, "qczipokB");
-  const fileNameB = `qc-${uniq("qczipokB")}.pdf`;
-  await storagePut(1, fileNameB, Buffer.from("%PDF-1.4\nKHAC DU AN\n%%EOF"));
-  await insertId(
-    `INSERT INTO task_documents (task_id, file_name, original_name, mime_type, uploaded_by, doc_category)
+    const taskB = await taoTask(projectB, "qczipokB");
+    const fileNameB = `qc-${uniq("qczipokB")}.pdf`;
+    await storagePut(1, fileNameB, Buffer.from("%PDF-1.4\nKHAC DU AN\n%%EOF"));
+    await insertId(
+      `INSERT INTO task_documents (task_id, file_name, original_name, mime_type, uploaded_by, doc_category)
      VALUES (?, ?, 'b.pdf', 'application/pdf', ?, 'vat_lieu')`,
-    taskB,
-    fileNameB,
-    pmB.id,
-  );
+      taskB,
+      fileNameB,
+      pmB.id,
+    );
 
-  await dangNhapDuAn(pmA, projectA);
-  const { GET } = await import("@/app/api/qc/documents/export/zip/route");
-  const res = await GET(getReq("/api/qc/documents/export/zip"));
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get("content-type"), "application/zip");
-  const buf = Buffer.from(await res.arrayBuffer());
-  assert.equal(buf.subarray(0, 2).toString(), "PK");
-  const text = buf.toString("latin1");
-  assert.ok(text.includes("a.pdf"), "phải chứa file của dự án A");
-  assert.ok(!text.includes("KHAC DU AN"), "không được lẫn nội dung file dự án B");
-});
+    await dangNhapDuAn(pmA, projectA);
+    const { GET } = await import("@/app/api/qc/documents/export/zip/route");
+    const res = await GET(getReq("/api/qc/documents/export/zip"));
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "application/zip");
+    const buf = Buffer.from(await res.arrayBuffer());
+    assert.equal(buf.subarray(0, 2).toString(), "PK");
+    const text = buf.toString("latin1");
+    assert.ok(text.includes("a.pdf"), "phải chứa file của dự án A");
+    assert.ok(!text.includes("KHAC DU AN"), "không được lẫn nội dung file dự án B");
+  },
+);
 
 // ============================================================================
 // GET/POST /api/tech-links, GET/PATCH/DELETE /api/tech-links/:id
@@ -1222,9 +1346,7 @@ test("GET /api/tech-links: cách ly dự án — không thấy link dự án kh�
   const pmB = await taoUser("pm", "tlisoB");
   await dangNhapDuAn(pmB, projectB);
   const { POST } = await import("@/app/api/tech-links/route");
-  await POST(
-    jreq("/x", { category: "bim", title: "BIM B", url: "https://viewer.autodesk.com/x" }),
-  );
+  await POST(jreq("/x", { category: "bim", title: "BIM B", url: "https://viewer.autodesk.com/x" }));
 
   const pmA = await taoUser("pm", "tlisoA");
   await dangNhapDuAn(pmA, projectA);
@@ -1290,7 +1412,11 @@ test("GET /api/tech-links/:id: ID không phải số → 400", S, async () => {
   assert.equal(res.status, 400);
 });
 
-async function taoTechLink(projectId: number, pm: { id: number; passwordHash: string }, ten: string) {
+async function taoTechLink(
+  projectId: number,
+  pm: { id: number; passwordHash: string },
+  ten: string,
+) {
   await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/tech-links/route");
   const res = await POST(
@@ -1313,23 +1439,27 @@ test("GET /api/tech-links/:id: link dự án khác → 404 (cách ly dự án)",
   assert.equal(res.status, 404);
 });
 
-test("PATCH /api/tech-links/:id: sửa thành công (merge — field không gửi giữ nguyên)", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("tlpatchok");
-  const pm = await taoUser("pm", "tlpatchok");
-  const linkId = await taoTechLink(projectId, pm, "tlpatchok");
-  const { PATCH } = await import("@/app/api/tech-links/[id]/route");
-  const res = await PATCH(jreq("/x", { title: "Tên mới" }, "PATCH"), {
-    params: Promise.resolve({ id: String(linkId) }),
-  });
-  assert.equal(res.status, 200);
-  const row = await queryOne<{ title: string; category: string }>(
-    `SELECT title, category FROM tech_links WHERE id = ?`,
-    linkId,
-  );
-  assert.equal(row?.title, "Tên mới");
-  assert.equal(row?.category, "bim");
-});
+test(
+  "PATCH /api/tech-links/:id: sửa thành công (merge — field không gửi giữ nguyên)",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("tlpatchok");
+    const pm = await taoUser("pm", "tlpatchok");
+    const linkId = await taoTechLink(projectId, pm, "tlpatchok");
+    const { PATCH } = await import("@/app/api/tech-links/[id]/route");
+    const res = await PATCH(jreq("/x", { title: "Tên mới" }, "PATCH"), {
+      params: Promise.resolve({ id: String(linkId) }),
+    });
+    assert.equal(res.status, 200);
+    const row = await queryOne<{ title: string; category: string }>(
+      `SELECT title, category FROM tech_links WHERE id = ?`,
+      linkId,
+    );
+    assert.equal(row?.title, "Tên mới");
+    assert.equal(row?.category, "bim");
+  },
+);
 
 test("PATCH /api/tech-links/:id: engineer không có quyền → 403", S, async () => {
   const projectId = await taoDuAn("tlpatchforbid");
@@ -1388,19 +1518,23 @@ test("GET /api/tech/health-check: PM không được xem (chỉ Admin) → 403",
   assert.equal(res.status, 403);
 });
 
-test("GET /api/tech/health-check: Admin xem thành công → 200, ghi vào health_check_runs", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("hcadmin");
-  const admin = await taoUser("admin", "hcadmin");
-  await dangNhapDuAn(admin, projectId);
-  const { GET } = await import("@/app/api/tech/health-check/route");
-  const res = await GET();
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.ok(typeof body.runId === "number");
-  const row = await queryOne(`SELECT id FROM health_check_runs WHERE id = ?`, body.runId);
-  assert.ok(row);
-});
+test(
+  "GET /api/tech/health-check: Admin xem thành công → 200, ghi vào health_check_runs",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("hcadmin");
+    const admin = await taoUser("admin", "hcadmin");
+    await dangNhapDuAn(admin, projectId);
+    const { GET } = await import("@/app/api/tech/health-check/route");
+    const res = await GET();
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(typeof body.runId === "number");
+    const row = await queryOne(`SELECT id FROM health_check_runs WHERE id = ?`, body.runId);
+    assert.ok(row);
+  },
+);
 
 test("GET /api/tech/system-status: chưa đăng nhập → 401", S, async () => {
   dangXuat();
@@ -1438,30 +1572,38 @@ test("POST /api/telegram/link-otp: chưa đăng nhập → 401", S, async () => 
   assert.equal(res.status, 401);
 });
 
-test("POST /api/telegram/link-otp: sinh OTP mới thay thế OTP cũ (1 user 1 OTP sống)", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("tgotp");
-  const eng = await taoUser("engineer", "tgotp");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/telegram/link-otp/route");
-  const res1 = await POST(jreq("/x"));
-  assert.equal(res1.status, 200);
-  const body1 = await res1.json();
-  assert.match(body1.otp, /^\d{6}$/);
+test(
+  "POST /api/telegram/link-otp: sinh OTP mới thay thế OTP cũ (1 user 1 OTP sống)",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("tgotp");
+    const eng = await taoUser("engineer", "tgotp");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/telegram/link-otp/route");
+    const res1 = await POST(jreq("/x"));
+    assert.equal(res1.status, 200);
+    const body1 = await res1.json();
+    assert.match(body1.otp, /^\d{6}$/);
 
-  const res2 = await POST(jreq("/x"));
-  const body2 = await res2.json();
-  assert.equal(res2.status, 200);
+    const res2 = await POST(jreq("/x"));
+    const body2 = await res2.json();
+    assert.equal(res2.status, 200);
 
-  const rows = await queryOne<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM telegram_user_bindings WHERE user_id = ?`,
-    eng.id,
-  );
-  assert.equal(rows?.count, "1", "chỉ 1 dòng binding chưa xác thực cho user này (upsert, không tạo mới)");
-  // OTP không nhất thiết khác nhau về giá trị hiển thị (ngẫu nhiên có thể trùng), nhưng cả
-  // hai lần đều phải trả OTP hợp lệ.
-  assert.match(body2.otp, /^\d{6}$/);
-});
+    const rows = await queryOne<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM telegram_user_bindings WHERE user_id = ?`,
+      eng.id,
+    );
+    assert.equal(
+      rows?.count,
+      "1",
+      "chỉ 1 dòng binding chưa xác thực cho user này (upsert, không tạo mới)",
+    );
+    // OTP không nhất thiết khác nhau về giá trị hiển thị (ngẫu nhiên có thể trùng), nhưng cả
+    // hai lần đều phải trả OTP hợp lệ.
+    assert.match(body2.otp, /^\d{6}$/);
+  },
+);
 
 test("GET /api/telegram/simulate-voice: chưa đăng nhập → 401", S, async () => {
   dangXuat();
@@ -1470,15 +1612,19 @@ test("GET /api/telegram/simulate-voice: chưa đăng nhập → 401", S, async (
   assert.equal(res.status, 401);
 });
 
-test("GET /api/telegram/simulate-voice: dự án không được phép truy cập qua query → 403", S, async () => {
-  const projectA = await taoDuAn("tgsimA");
-  const projectB = await taoDuAn("tgsimB");
-  const eng = await taoUser("engineer", "tgsim");
-  await dangNhapDuAn(eng, projectA);
-  const { GET } = await import("@/app/api/telegram/simulate-voice/route");
-  const res = await GET(getReq(`/api/telegram/simulate-voice?projectId=${projectB}`));
-  assert.equal(res.status, 403);
-});
+test(
+  "GET /api/telegram/simulate-voice: dự án không được phép truy cập qua query → 403",
+  S,
+  async () => {
+    const projectA = await taoDuAn("tgsimA");
+    const projectB = await taoDuAn("tgsimB");
+    const eng = await taoUser("engineer", "tgsim");
+    await dangNhapDuAn(eng, projectA);
+    const { GET } = await import("@/app/api/telegram/simulate-voice/route");
+    const res = await GET(getReq(`/api/telegram/simulate-voice?projectId=${projectB}`));
+    assert.equal(res.status, 403);
+  },
+);
 
 test("GET /api/telegram/simulate-voice: thành công → trả logs rỗng ban đầu", S, async () => {
   const projectId = await taoDuAn("tgsimok");
@@ -1508,22 +1654,26 @@ test("POST /api/telegram/simulate-voice: dự án không được phép → 403"
   assert.equal(res.status, 403);
 });
 
-test("POST /api/telegram/simulate-voice: gửi lệnh giả lập thành công → 200, tự tạo binding xác thực", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("tgsimpok");
-  const eng = await taoUser("engineer", "tgsimpok");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/telegram/simulate-voice/route");
-  const res = await POST(jreq("/x", { text: "xin chao" }));
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.success, true);
-  const row = await queryOne<{ is_verified: boolean }>(
-    `SELECT is_verified FROM telegram_user_bindings WHERE user_id = ?`,
-    eng.id,
-  );
-  assert.equal(row?.is_verified, true);
-});
+test(
+  "POST /api/telegram/simulate-voice: gửi lệnh giả lập thành công → 200, tự tạo binding xác thực",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("tgsimpok");
+    const eng = await taoUser("engineer", "tgsimpok");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/telegram/simulate-voice/route");
+    const res = await POST(jreq("/x", { text: "xin chao" }));
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    const row = await queryOne<{ is_verified: boolean }>(
+      `SELECT is_verified FROM telegram_user_bindings WHERE user_id = ?`,
+      eng.id,
+    );
+    assert.equal(row?.is_verified, true);
+  },
+);
 
 // ============================================================================
 // POST /api/zalo/link-otp, /api/zalo/simulate-action
@@ -1575,27 +1725,31 @@ test("POST /api/zalo/link-otp: verify sai mã → 400", S, async () => {
   assert.equal(res.status, 400);
 });
 
-test("POST /api/zalo/link-otp: generate rồi verify đúng mã → 200 liên kết thành công", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("zlok");
-  const eng = await taoUser("engineer", "zlok");
-  await dangNhapDuAn(eng, projectId);
-  const zaloUserId = `ZID_${uniq("zlok")}`;
-  const { POST } = await import("@/app/api/zalo/link-otp/route");
-  const genRes = await POST(jreq("/x", { action: "generate", zaloUserId }));
-  assert.equal(genRes.status, 200);
-  const { data } = await genRes.json();
+test(
+  "POST /api/zalo/link-otp: generate rồi verify đúng mã → 200 liên kết thành công",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("zlok");
+    const eng = await taoUser("engineer", "zlok");
+    await dangNhapDuAn(eng, projectId);
+    const zaloUserId = `ZID_${uniq("zlok")}`;
+    const { POST } = await import("@/app/api/zalo/link-otp/route");
+    const genRes = await POST(jreq("/x", { action: "generate", zaloUserId }));
+    assert.equal(genRes.status, 200);
+    const { data } = await genRes.json();
 
-  const verifyRes = await POST(
-    jreq("/x", { action: "verify", zaloUserId, otpCode: data.otpCode }),
-  );
-  assert.equal(verifyRes.status, 200);
-  const row = await queryOne<{ is_verified: boolean }>(
-    `SELECT is_verified FROM zalo_user_bindings WHERE zalo_user_id = ?`,
-    zaloUserId,
-  );
-  assert.equal(row?.is_verified, true);
-});
+    const verifyRes = await POST(
+      jreq("/x", { action: "verify", zaloUserId, otpCode: data.otpCode }),
+    );
+    assert.equal(verifyRes.status, 200);
+    const row = await queryOne<{ is_verified: boolean }>(
+      `SELECT is_verified FROM zalo_user_bindings WHERE zalo_user_id = ?`,
+      zaloUserId,
+    );
+    assert.equal(row?.is_verified, true);
+  },
+);
 
 test("POST /api/zalo/link-otp: zaloUserId đã liên kết tài khoản khác → 409", S, async () => {
   const projectId = await taoDuAn("zldup");
@@ -1640,23 +1794,27 @@ test("POST /api/zalo/simulate-action: nội dung rỗng → 400", S, async () =>
   assert.equal(res.status, 400);
 });
 
-test("POST /api/zalo/simulate-action: gửi lệnh giả lập thành công → 200, tự tạo binding xác thực", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("zlsimok");
-  const eng = await taoUser("engineer", "zlsimok");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/zalo/simulate-action/route");
-  const res = await POST(jreq("/x", { text: "xin chao" }));
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.success, true);
-  const row = await queryOne<{ is_verified: boolean }>(
-    `SELECT is_verified FROM zalo_user_bindings WHERE project_id = ? AND user_id = ?`,
-    projectId,
-    eng.id,
-  );
-  assert.equal(row?.is_verified, true);
-});
+test(
+  "POST /api/zalo/simulate-action: gửi lệnh giả lập thành công → 200, tự tạo binding xác thực",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("zlsimok");
+    const eng = await taoUser("engineer", "zlsimok");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/zalo/simulate-action/route");
+    const res = await POST(jreq("/x", { text: "xin chao" }));
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    const row = await queryOne<{ is_verified: boolean }>(
+      `SELECT is_verified FROM zalo_user_bindings WHERE project_id = ? AND user_id = ?`,
+      projectId,
+      eng.id,
+    );
+    assert.equal(row?.is_verified, true);
+  },
+);
 
 // ============================================================================
 // GET /api/saved-reports/:id/data
@@ -1705,28 +1863,36 @@ test("GET /api/saved-reports/:id/data: không tìm thấy → 404", S, async () 
   assert.equal(res.status, 404);
 });
 
-test("GET /api/saved-reports/:id/data: không phải chủ, không chia sẻ, không phải admin → 403", S, async () => {
-  const projectId = await taoDuAn("srforbid");
-  const owner = await taoUser("pm", "srforbidOwner");
-  const other = await taoUser("engineer", "srforbid");
-  const reportId = await taoBaoCaoDaLuu(projectId, owner.id, "srforbid", { shared: false });
-  await dangNhapDuAn(other, projectId);
-  const { GET } = await import("@/app/api/saved-reports/[id]/data/route");
-  const res = await GET(getReq("/x"), { params: Promise.resolve({ id: String(reportId) }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "GET /api/saved-reports/:id/data: không phải chủ, không chia sẻ, không phải admin → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("srforbid");
+    const owner = await taoUser("pm", "srforbidOwner");
+    const other = await taoUser("engineer", "srforbid");
+    const reportId = await taoBaoCaoDaLuu(projectId, owner.id, "srforbid", { shared: false });
+    await dangNhapDuAn(other, projectId);
+    const { GET } = await import("@/app/api/saved-reports/[id]/data/route");
+    const res = await GET(getReq("/x"), { params: Promise.resolve({ id: String(reportId) }) });
+    assert.equal(res.status, 403);
+  },
+);
 
-test("GET /api/saved-reports/:id/data: chủ sở hữu nhưng nguồn dữ liệu chặn vai trò (subcon) → 403", S, async () => {
-  const projectId = await taoDuAn("srsrcforbid");
-  const sub = await taoUser("subcon", "srsrcforbid");
-  const reportId = await taoBaoCaoDaLuu(projectId, sub.id, "srsrcforbid", {
-    source: "cost_by_month",
-  });
-  await dangNhapDuAn(sub, projectId);
-  const { GET } = await import("@/app/api/saved-reports/[id]/data/route");
-  const res = await GET(getReq("/x"), { params: Promise.resolve({ id: String(reportId) }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "GET /api/saved-reports/:id/data: chủ sở hữu nhưng nguồn dữ liệu chặn vai trò (subcon) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("srsrcforbid");
+    const sub = await taoUser("subcon", "srsrcforbid");
+    const reportId = await taoBaoCaoDaLuu(projectId, sub.id, "srsrcforbid", {
+      source: "cost_by_month",
+    });
+    await dangNhapDuAn(sub, projectId);
+    const { GET } = await import("@/app/api/saved-reports/[id]/data/route");
+    const res = await GET(getReq("/x"), { params: Promise.resolve({ id: String(reportId) }) });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("GET /api/saved-reports/:id/data: chia sẻ → người khác xem được (JSON)", S, async () => {
   const projectId = await taoDuAn("srshared");
@@ -1748,7 +1914,9 @@ test("GET /api/saved-reports/:id/data?export=excel: trả file xlsx (magic PK)",
   const reportId = await taoBaoCaoDaLuu(projectId, pm.id, "srexcel");
   await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/saved-reports/[id]/data/route");
-  const res = await GET(getReq(`/x?export=excel`), { params: Promise.resolve({ id: String(reportId) }) });
+  const res = await GET(getReq(`/x?export=excel`), {
+    params: Promise.resolve({ id: String(reportId) }),
+  });
   assert.equal(res.status, 200);
   assert.equal(
     res.headers.get("content-type"),
@@ -1940,13 +2108,17 @@ test("GET /api/events: thiếu tham số sheet → 400", S, async () => {
   assert.equal(res.status, 400);
 });
 
-test("GET /api/events: mở stream thành công → content-type text/event-stream (huỷ ngay, không chờ tick)", S, async () => {
-  const projectId = await taoDuAn("evok");
-  const pm = await taoUser("pm", "evok");
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/events/route");
-  const res = await GET(getReq("/api/events?sheet=ogtd"));
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get("content-type"), "text/event-stream");
-  await res.body?.cancel();
-});
+test(
+  "GET /api/events: mở stream thành công → content-type text/event-stream (huỷ ngay, không chờ tick)",
+  S,
+  async () => {
+    const projectId = await taoDuAn("evok");
+    const pm = await taoUser("pm", "evok");
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/events/route");
+    const res = await GET(getReq("/api/events?sheet=ogtd"));
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "text/event-stream");
+    await res.body?.cancel();
+  },
+);
