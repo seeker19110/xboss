@@ -1,12 +1,12 @@
 # PROGRESS.md — Trạng thái dự án
 
-## 🟡 Đợt 6 — trả nợ "ghi nhận, chưa sửa" + quét cụm lỗ hổng tham chiếu (2026-09-05, ĐANG CHẠY)
+## ✅ Đợt 6 — trả nợ "ghi nhận, chưa sửa" + quét cụm lỗ hổng tham chiếu (2026-09-05)
 
 Khác Đợt 1–5 (chiến dịch _phủ test_), Đợt 6 là chiến dịch **sửa tính năng đang hỏng**: sau 5 đợt chỉ
 còn 8/451 route chưa có test thực thi, nhưng danh sách "Ghi nhận, chưa sửa" đã tích 5 mục, trong đó
 2 mục là tính năng **chưa từng chạy đúng lần nào** ở vùng rủi ro cao. PR #480.
 
-**Đã xong và đã gộp (6/9 việc):**
+**Đủ 9/9 việc, gộp qua 2 PR (#480 và PR tiếp theo):**
 
 - **Việc A — kill switch của Safe Execution Engine ghi lệnh huỷ BỀN.** `executeExecutionRequest`
   (`lib/ky-thuat/engineering-autonomy.ts`) ghi `UPDATE ... status='killed'` rồi `throw` ngay sau, cả
@@ -57,9 +57,25 @@ còn 8/451 route chưa có test thực thi, nhưng danh sách "Ghi nhận, chưa
   không chỉ là vấn đề cách ly. 11 ca test, 6 ca đỏ trên code cũ. UI không phải sửa (đã xác minh bằng
   grep: `app/admin/page.tsx` chỉ gán thẳng dữ liệu API vào state).
 
-**Còn lại (3/9 việc, đang chạy):** B (98 chỗ cụm `engineering` ép lỗi nghiệp vụ về 500), D (cổng CI
-quét id khoá ngoại gán cứng trong test), E (Gate 4 Smart IPC → cảnh báo). Ba việc này sẽ đi trong
-PR tiếp theo vì PR #480 đã merge trước khi chúng xong.
+- **Việc B — cụm `engineering` không còn ép mọi lỗi nghiệp vụ về 500.** Thêm lớp lỗi tầng 0
+  `lib/nen/loi.ts` + helper ánh xạ lỗi → response; đổi các `throw new Error(...)` trong
+  `lib/ky-thuat/*` sang lớp lỗi mang mã trạng thái đúng ngữ nghĩa (404/400/403/409/422). Lỗi hệ
+  thống thật (vd lỗi DB) **vẫn ra 500** — có ca test chứng minh, vì nuốt lỗi hệ thống thành 4xx còn
+  nguy hiểm hơn bệnh đang chữa. 94 file đổi.
+- **Việc D — cổng CI `check:test-fk-ids`** quét `tests/**` tìm hằng số nguyên truyền vào vị trí id
+  khoá ngoại tới `users`, bắt được **cả hai ca thật** đã xảy ra (hằng trong chuỗi SQL kiểu
+  `boq_norms.created_by`, và hằng truyền vào tham số `actorId` của `setFlag`). Kèm ca test gọi thẳng
+  hàm quét trên đoạn vi phạm dựng sẵn để **chứng minh cổng ĐỎ** — bài học từ `check:db-params` báo
+  `[OK]` suốt nhiều tháng trong khi 20 vi phạm thật đang tồn tại. Whitelist bắt buộc kèm lý do và
+  **báo lỗi khi có mục thừa** (đã kiểm chứng cơ chế này hoạt động).
+- **Việc E — Gate 4 Smart IPC hạ thành cảnh báo**, không còn chặn tự động thông qua (theo quyết định
+  chủ dự án — xem phần quyết định bên dưới, gồm cả hệ quả với nửa "KL ≤ hạn mức BOQ").
+
+**Lỗi tích hợp phát hiện khi gộp 3 việc cuối:** ca `POST /api/admin/assignments: chưa chọn dự án →
+422` của Việc I đỏ ngẫu nhiên — **lần thứ BA trong cùng một đợt** của lớp lỗi "giả định trạng thái
+toàn cục": `visibleProjectIds` có fallback "bảng `user_projects` RỖNG toàn hệ → mọi user thấy hết",
+nên trong DB worker mà bảng đó tình cờ rỗng thì PM vẫn thấy dự án đầu tiên ⇒ route không đi vào
+nhánh 422. Sửa bằng cách chèn một dòng cho user KHÁC để bảng chắc chắn không rỗng.
 
 ### Quyết định nghiệp vụ của chủ dự án (2026-09-05)
 
