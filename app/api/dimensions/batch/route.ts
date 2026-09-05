@@ -6,6 +6,7 @@ import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { handoverBlocked, methodStatementBlocked } from "@/lib/ky-thuat/qaqc";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,16 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Không tìm thấy dimension" }, { status: 404 });
 
   const taskIds = [...new Set(dims.map((d) => d.task_id))];
+
+  // Cách ly dự án (vá W6, Đợt 5) — canTouchTask không so dự án (xem ghi chú ở
+  // app/api/dimensions/[id]/route.ts). Kiểm TỪNG task trong vùng chọn: chỉ cần 1 ô thuộc
+  // dự án khác là chặn nguyên request (id đoán được, "Không tìm thấy dimension" — không lộ
+  // dòng nào thuộc dự án khác tồn tại).
+  for (const tid of taskIds) {
+    if (projectId == null || (await taskProjectId(tid)) !== projectId)
+      return NextResponse.json({ error: "Không tìm thấy dimension" }, { status: 404 });
+  }
+
   for (const tid of taskIds) {
     if (!(await canTouchTask(user, tid)))
       return NextResponse.json(

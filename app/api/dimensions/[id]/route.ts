@@ -6,6 +6,7 @@ import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { handoverBlocked, methodStatementBlocked } from "@/lib/ky-thuat/qaqc";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,12 @@ export async function PATCH(
     id,
   );
   if (!dim) return NextResponse.json({ error: "Không tìm thấy dimension" }, { status: 404 });
+
+  // Cách ly dự án (vá W6, Đợt 5) — canTouchTask chỉ trả lời "subcon có được giao task này
+  // không" và trả `true` vô điều kiện cho mọi vai trò khác, KHÔNG so dự án. Không kiểm riêng
+  // thì mọi vai trò không phải subcon ở dự án A tick được ô của dự án B (id đoán được).
+  if (projectId == null || (await taskProjectId(dim.task_id)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy dimension" }, { status: 404 });
 
   if (!(await canTouchTask(user, dim.task_id)))
     return NextResponse.json(

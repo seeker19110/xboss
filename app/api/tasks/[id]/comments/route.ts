@@ -4,6 +4,7 @@ import { getCurrentUser, canTouchTask } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { sendPushToUsers } from "@/lib/van-hanh/push";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,11 @@ export async function GET(
   const projectId = await getCurrentProjectId(user);
   const blocked = await assertModuleEnabled("tracking", projectId);
   if (blocked) return blocked;
+
+  // Cách ly dự án (vá W6, Đợt 5) — canTouchTask không so dự án, xem ghi chú ở
+  // app/api/dimensions/[id]/route.ts.
+  if (projectId == null || (await taskProjectId(taskId)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
   if (!(await canTouchTask(user, taskId)))
     return NextResponse.json({ error: "Không có quyền xem bình luận này" }, { status: 403 });
 
@@ -58,6 +64,10 @@ export async function POST(
     assigned_to: number | null;
   }>(`SELECT id, code, name, assigned_to FROM tasks WHERE id = ?`, taskId);
   if (!task) return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
+
+  // Cách ly dự án (vá W6, Đợt 5) — canTouchTask không so dự án.
+  if (projectId == null || (await taskProjectId(taskId)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
   if (!(await canTouchTask(user, taskId)))
     return NextResponse.json(
       { error: "Bạn chỉ được bình luận task được giao cho mình" },

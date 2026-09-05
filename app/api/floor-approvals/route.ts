@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchFloor } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { sheetTypeProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,15 @@ export async function POST(req: NextRequest) {
   const floorLabel = String(body?.floorLabel ?? "").trim();
   if (isNaN(sheetTypeId) || !floorLabel)
     return NextResponse.json({ error: "Thiếu sheetTypeId hoặc floorLabel" }, { status: 400 });
+
+  // Cách ly dự án (vá W6, Đợt 5) — canTouchFloor chỉ trả lời "subcon có được giao nhóm
+  // công việc ở tầng này không" và trả `true` VÔ ĐIỀU KIỆN cho mọi vai trò khác, KHÔNG so
+  // dự án. Không kiểm riêng thì mọi vai trò không phải subcon get-or-create được bản ghi
+  // floor_approval của sheetTypeId thuộc dự án khác (id đoán được).
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null || (await sheetTypeProjectId(sheetTypeId)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
+
   // Sub-con chỉ được đụng tới tầng có nhóm công việc được giao cho mình.
   if (!(await canTouchFloor(user, sheetTypeId, floorLabel)))
     return NextResponse.json({ error: "Không có quyền với tầng này" }, { status: 403 });

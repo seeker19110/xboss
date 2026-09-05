@@ -10,6 +10,7 @@ import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { handoverBlocked, methodStatementBlocked } from "@/lib/ky-thuat/qaqc";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 import type { StatusSlug } from "@/lib/tien-do/status";
 
 export const dynamic = "force-dynamic";
@@ -37,13 +38,20 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
+
+  // Cách ly dự án (vá W6, Đợt 5) — canTouchTask chỉ trả lời "subcon có được giao task này
+  // không" và trả `true` vô điều kiện cho mọi vai trò khác, KHÔNG so dự án. Kiểm TRƯỚC
+  // canTouchTask để không lộ progress task dự án khác qua thông báo lỗi khác nhau.
+  if (projectId == null || (await taskProjectId(id)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
+
   if (!(await canTouchTask(user, id)))
     return NextResponse.json(
       { error: "Bạn chỉ được cập nhật task được giao cho mình" },
       { status: 403 },
     );
 
-  const projectId = await getCurrentProjectId(user);
   const blocked = await assertModuleEnabled("tracking", projectId);
   if (blocked) return blocked;
 
