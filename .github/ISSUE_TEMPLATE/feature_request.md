@@ -1,7 +1,7 @@
 ---
 name: Đề xuất tính năng
 about: Đề xuất một tính năng hoặc cải tiến
-title: 'feat: '
+title: "feat: "
 labels: enhancement
 ---
 

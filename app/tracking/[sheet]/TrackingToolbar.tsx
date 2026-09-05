@@ -36,7 +36,7 @@ export function TrackingToolbar({
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder="Tìm công việc / tầng..."
           aria-label="Tìm kiếm trong bảng tracking"
-          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition h-10"
+          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition h-10"
         />
       </div>
 
@@ -45,7 +45,7 @@ export function TrackingToolbar({
           value={floorFilter}
           onChange={(e) => onFloorFilterChange(e.target.value)}
           aria-label="Lọc theo tầng"
-          className="bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 text-xs sm:text-sm outline-none focus:border-emerald-500 transition h-10"
+          className="bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 text-base sm:text-sm outline-none focus:border-emerald-500 transition h-10"
         >
           <option value="">Tất cả tầng ({floors.length})</option>
           {floors.map((f) => (
@@ -59,7 +59,7 @@ export function TrackingToolbar({
           value={statusFilter}
           onChange={(e) => onStatusFilterChange(e.target.value)}
           aria-label="Lọc theo trạng thái"
-          className="bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 text-xs sm:text-sm outline-none focus:border-emerald-500 transition h-10"
+          className="bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 text-base sm:text-sm outline-none focus:border-emerald-500 transition h-10"
         >
           <option value="">Tất cả trạng thái</option>
           {Object.entries(STATUS_LABEL).map(([k, v]) => (

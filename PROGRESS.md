@@ -1,5 +1,33 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Trả nợ kỹ thuật sau đợt audit sâu — 2026-09-05
+
+Đóng **7/7 mục nợ** ghi ở "Đợt audit toàn dự án — 2026-09-05" (chi tiết từng mục nằm trong
+mục **Nợ kỹ thuật** bên dưới, đã gạch ngang tại chỗ theo đúng bài học "gỡ nợ trong cùng PR
+đóng nợ"). Hai quyết định cần người dùng chốt trước khi làm (đã hỏi, đã chốt):
+
+1. **Nghiệm thu**: thêm cột phân biệt nguồn duyệt (`migrations/0151`) — không backfill dữ liệu cũ.
+2. **RLS bảng bài học** (`migrations/0152`): viết migration + test, **chạy staging trước** rồi mới lên production.
+
+Tóm tắt việc đã làm:
+
+| Nợ                                      | Cách đóng                                                                               |
+| --------------------------------------- | --------------------------------------------------------------------------------------- |
+| Trạng thái LỖI ở các trang              | `app/lib/taiDuLieu.ts` + `ErrorState` cho 4 trang ưu tiên                               |
+| Hex hardcode 3 trang engineering        | 44 chỗ → token theme + `app/lib/mauTheme.ts`; **cổng CI `check:hex-hardcode`**          |
+| RLS `engineering_cross_project_lessons` | `0152` (ranh giới **org**, không phải project) + `tests/lessons-rls.test.ts`            |
+| Huỷ nghiệm thu tầng hạ task duyệt riêng | `0151` + `tasks.approval_source` + test 3 nguồn duyệt                                   |
+| Cổng `format:check`                     | `prettier --write` toàn repo (56 file) + bước CI ở job `static`                         |
+| Lighthouse không chạy trên push main    | thêm `push: branches: [main]`                                                           |
+| Cỡ chữ input < 16px                     | **đo thật** bằng `e2e/authed/input-zoom-mobile.spec.ts` → chỉ 2/10 trang dính, sửa 26 ô |
+
+**Bài học lặp lại (§1 `docs/audit.md`)**: mục "cỡ chữ input < 16px ở nhiều form" khi đo thật
+chỉ còn 2 trang — ước đoán từ grep tiếp tục thổi phồng phạm vi. Spec đo giữ lại làm cổng.
+
+Verify: lint / typecheck / format / 8 cổng `check:*` xanh; `npm test -- --release-gate` với
+Postgres 16 → **251 file, 4098 ca pass, 0 fail**; `npx playwright test` đủ 3 project →
+**485 pass, 0 fail**; `npm run build` xanh; `docs/ERD.md` sinh lại theo schema thật.
+
 ## 🔎 Đợt audit toàn dự án — 2026-09-05 (audit sâu, 3 miền song song)
 
 Chạy theo `docs/audit.md` §9: 3 agent độc lập (A bảo mật+logic, B UI/UX+vận hành/offline,
@@ -8538,34 +8566,55 @@ Verify hạ tầng: Postgres 16 local (`pg_ctlcluster`, đã có sẵn trong má
 
 ## Nợ kỹ thuật (chỗ "làm tạm" cần quay lại)
 
-- **[TB, mới 2026-09-05 — đợt audit sâu] ~40 trang thiếu TRẠNG THÁI LỖI**: mẫu
-  `fetch(url).then(r => r.ok ? r.json() : null)` không `.catch`, không state lỗi → mất mạng
-  hoặc API 500 hiển thị thành trang RỖNG ("Chưa có dữ liệu…"). Ở công trường điều này khiến
-  kỹ sư tưởng chưa ai nhập dữ liệu. Mẫu đúng đã có: `loadError`/`loadErrorMessage` trong
-  `app/tracking/[sheet]/useTrackingData.ts`. Cần helper fetch dùng chung trả `{data, error}` +
-  component `LoadError` có nút "Thử lại", áp dần ưu tiên `hse`, `diary`, `my-tasks`,
-  `approvals`, `boq`. Chưa làm trong đợt này vì diện rộng, nên tách PR riêng.
-- **[TB, mới 2026-09-05] Hardcode mã hex trong 3 trang `app/engineering/*`**
-  (`mepf-lifecycle` 22 chỗ, `spatial-viewer` 17 chỗ gồm `ctx.strokeStyle` trên canvas,
-  `prescriptive` 5 chỗ) → ở theme sáng các nét/nhãn gần như biến mất. `npm run check:contrast`
-  không đọc được màu inline SVG/canvas nên CI không bắt. Cần đọc màu từ CSS variable
-  (`getComputedStyle`) cho canvas và `currentColor`/class token cho SVG.
-- **[TB, mới 2026-09-05] `engineering_cross_project_lessons` chưa bật RLS**: đợt audit đã vá ở
-  TẦNG ỨNG DỤNG (`listCrossProjectLessons` bắt buộc nhận `projectIds`), nhưng bảng vẫn không có
-  policy trong khi các bảng lân cận của `migrations/0098` đều có. Bật RLS là migration đụng dữ
-  liệu → phải qua staging (`bash deploy.sh --staging`) trước.
-- **[TB, mới 2026-09-05] Huỷ nghiệm thu tầng hạ luôn task đã duyệt RIÊNG LẺ**:
-  `DELETE /api/floor-approvals/:id` gọi `deriveStatus(..., null)` — cố ý (truyền trạng thái
-  hiện tại vào thì nút huỷ không làm gì, vì sau khi duyệt tầng mọi task đều `nghiem_thu`), nhưng
-  schema chưa có cờ phân biệt nguồn duyệt nên task từng duyệt riêng cũng bị huỷ theo. Đổi hành
-  vi cần quyết định đặc tả + cột mới, không tự chế trong lượt audit.
-- **[Thấp, mới 2026-09-05] Cổng `format:check` chưa bật trong CI**: `main` đang có 56 file lệch
-  prettier từ trước nên bật ngay là CI đỏ. Cần 1 commit `prettier --write` toàn repo (thuần
-  format, không đổi hành vi) rồi thêm bước vào job `static`.
-- **[Thấp, mới 2026-09-05] Lighthouse chỉ chạy trên `pull_request`**, không chạy khi push `main`
-  và `deploy.yml` không phụ thuộc nó → commit vào main không qua PR không có cổng hiệu năng.
-- **[Thấp, mới 2026-09-05] Cỡ chữ input < 16px** ở nhiều form (`text-xs`/`text-sm`) →
-  iOS Safari auto-zoom khi focus. Chưa coi là lỗi đã xác nhận: cần đo thật trên thiết bị.
+- ~~**[TB, 2026-09-05] ~40 trang thiếu TRẠNG THÁI LỖI**~~ → **đã đóng phần ưu tiên
+  (2026-09-05, đợt trả nợ sau audit)**: thêm `app/lib/taiDuLieu.ts` (`taiJson` trả
+  `{ok,data}` / `{ok:false,loi,mangLoi}` — phân biệt được lỗi mạng, lỗi server và dữ liệu
+  rỗng; 401 đi qua `redirectToLogin` sẵn có của `app/lib/me` để vẫn dọn hàng đợi offline +
+  cache SW). Áp cho 4 trang ưu tiên `hse`/`my-tasks`/`approvals`/`boq` (trang `diary` đã có
+  `ErrorState` từ trước), dùng lại component `ErrorState` có nút "Thử lại". **Còn lại**: các
+  trang khác vẫn dùng mẫu cũ — chuyển dần khi đụng tới từng trang, không đổi hàng loạt trong
+  một PR để diff còn review được.
+- ~~**[TB, 2026-09-05] Hardcode mã hex trong 3 trang `app/engineering/*`**~~ → **đã đóng
+  (2026-09-05)**: 44 chỗ đổi sang token theme — SVG/recharts dùng `var(--color-…)` (cùng mẫu
+  `SCurveChart`), canvas 2D dùng `mauToken()`/`bangMau()` mới trong `app/lib/mauTheme.ts` (đọc
+  `getComputedStyle` của `:root`, vì canvas không nhận `var()`). `TYPE_CONFIG` của
+  spatial-viewer nay mang cả `token` (cho canvas) lẫn `color` (cho DOM); nền mờ đổi từ mẹo nối
+  `"15"` vào mã hex sang `color-mix`. Kèm **cổng CI mới** `npm run check:hex-hardcode`
+  (`scripts/check-hex-hardcode.ts`) chặn hex bò lại: chỉ soi hex ở vị trí MÀU thật (thuộc tính
+  fill/stroke/style, `bg-[#…]`), miễn trừ `app/api/**` (PDF không đọc được CSS variable), khối
+  `@media print` và `<meta theme-color>`. Đã thử phá (chèn `color: "#123456"`) để xác nhận cổng
+  đỏ đúng, rồi hoàn tác.
+- ~~**[TB, 2026-09-05] `engineering_cross_project_lessons` chưa bật RLS**~~ → **đã đóng
+  (2026-09-05)**: `migrations/0152_lessons_rls.sql`. **Ranh giới là TỔ CHỨC, không phải dự án**
+  — tính năng vốn là "bài học xuyên dự án" nên policy so một `app.project_id` sẽ giết chính
+  tính năng; bảng không có `org_id` nên suy qua `projects.org_id`. Khuôn 3 nhánh của
+  `0080_org_rls.sql`, còn nhánh chuyển tiếp "GUC rỗng → cho qua" (đường đọc chưa bọc
+  `withTransaction`); khoá cửa là việc riêng sau khi theo dõi production, như tiền lệ M62 PR2.
+  Test hành vi thật `tests/lessons-rls.test.ts` chạy bằng role `xboss_app` (NOBYPASSRLS):
+  cùng org xuyên dự án vẫn đọc được, xuyên org bị chặn cả ĐỌC lẫn GHI (WITH CHECK).
+  **[Người dùng] cần chạy `bash deploy.sh --staging` xác nhận trước khi lên production.**
+- ~~**[TB, 2026-09-05] Huỷ nghiệm thu tầng hạ luôn task đã duyệt RIÊNG LẺ**~~ → **đã đóng
+  (2026-09-05)**: `migrations/0151_task_approval_source.sql` thêm cột `tasks.approval_source`
+  (`'task'` | `'floor'` | NULL). `POST /api/tasks/:id/approve` ghi `'task'`,
+  `POST /api/approvals` (duyệt cả tầng) ghi `'floor'`, hai đường huỷ đều xoá về NULL;
+  `DELETE /api/floor-approvals/:id` loại task `approval_source = 'task'` khỏi danh sách hạ.
+  **CỐ Ý KHÔNG BACKFILL**: dữ liệu cũ không có thông tin để suy ra nguồn thật, đoán mò là ghi
+  dữ liệu sai — code đọc `COALESCE(approval_source, 'floor')` nên task nghiệm thu cũ giữ
+  nguyên hành vi trước đây, chỉ task duyệt riêng lẻ TỪ NAY mới được bảo vệ. Chỉ ADD COLUMN +
+  CREATE INDEX → đi thẳng production theo DoD. Test hồi quy 3 nguồn duyệt (riêng lẻ / theo
+  tầng / dữ liệu cũ NULL) trong `tests/route-tien-do-3.test.ts`.
+- ~~**[Thấp, 2026-09-05] Cổng `format:check` chưa bật trong CI**~~ → **đã đóng (2026-09-05)**:
+  chạy `prettier --write` toàn repo (56 file lệch từ trước, thuần format) rồi thêm bước
+  `npm run format:check` vào job `static`.
+- ~~**[Thấp, 2026-09-05] Lighthouse chỉ chạy trên `pull_request`**~~ → **đã đóng (2026-09-05)**:
+  `lighthouse-ci.yml` thêm `push: branches: [main]`.
+- ~~**[Thấp, 2026-09-05] Cỡ chữ input < 16px (iOS auto-zoom)**~~ → **đã đóng (2026-09-05), ĐO
+  THẬT trước khi sửa**: spec mới `e2e/authed/input-zoom-mobile.spec.ts` chạy trên project
+  `authed-mobile` (Pixel 5) đọc `getComputedStyle().fontSize` của mọi ô nhập thật trên 10
+  trang. Kết quả đo: 8/10 trang đã đạt, chỉ `/procurement` và `/users` có ô 12px — tức nghi
+  ngờ "nhiều form" trong báo cáo audit là ƯỚC ĐOÁN quá tay, đúng như §1 của `docs/audit.md`
+  cảnh báo. Sửa 26 ô có mẫu `text-xs sm:text-sm` thành `text-base sm:text-sm` (mobile 16px,
+  desktop giữ nguyên 14px); spec ở lại làm cổng chống hồi quy.
 - ~~**[Thấp] `app/error.tsx` (error boundary route segment) không giữ được `AppHeader`/nav khi lỗi xảy ra**~~ → **đã đóng hoàn toàn (2026-08-20, Module M81)**: Triển khai Resilient Error Boundary `app/error.tsx` tích hợp sẵn Fallback Header & Emergency Quick Nav Bar (truy cập nhanh Dashboard, Lưới tiến độ, BBNT Nghiệm thu, Vật tư, Tài chính), hộp chẩn đoán lỗi Digest/Stack kèm nút sao chép cho IT, nút Emergency Cache Clear & Hard Reload. Đồng thời bổ sung `ComponentErrorBoundary` (`app/components/ComponentErrorBoundary.tsx`) cô lập sự cố của các widget con (3D Viewer, Charts, Spreadsheets) tránh sập toàn bộ trang. Test `tests/app-shell-resilience.test.ts` pass 100%.
 - ~~**[Cao] `payments`/`payments/bills`/`payments/floors` chưa scope theo `projectId` (M22)**~~ → **đã đóng, tài liệu lệch code** (xác nhận lại 2026-07-19, đợt audit lần 7): đọc thẳng `app/api/payments/bills/[id]/route.ts` — `PATCH`/`DELETE` đã có `billBelongsToProject()` (404 khi bill không thuộc dự án đang chọn) từ PR #263 (2026-07-18, đúng như "Đợt audit toàn dự án lần 6" ghi "ĐÃ SỬA"); `GET /api/payments` cũng đã JOIN `towers`/lọc `projectId`; `tests/project-scope-invariant.test.ts` không còn nhắc `payments` trong whitelist. Mục nợ này bị bỏ sót không gỡ khỏi "Nợ kỹ thuật" sau khi PR #263 merge — bài học: luôn gỡ nợ khỏi danh sách này trong cùng PR đóng nợ, không tách riêng.
 - ~~**[Trung] `materials/:id/issue` và `.../return` — hạ tầng idempotency "chết" trên đường thực thi (client không gửi header)**~~ → **đã đóng (2026-07-19)**: `app/materials/page.tsx` — sinh `crypto.randomUUID()` lúc mở modal xuất/hoàn kho (`issueKey`), gửi qua header `Idempotency-Key`; thêm `issueSubmitting` chặn double-submit + disable 2 nút (submit/huỷ) + hiện "Đang lưu..." lúc gửi; bọc `try/catch/finally` báo lỗi mất mạng thay vì kẹt trạng thái. Không đổi route/migration (đã đúng từ trước).

@@ -42,7 +42,10 @@ CREATE POLICY p_costs_project ON costs
 
 - `lib/db/index.ts` thêm:
   ```ts
-  export async function withProjectScope<T>(projectId: number | '*', fn: () => Promise<T>): Promise<T>;
+  export async function withProjectScope<T>(
+    projectId: number | "*",
+    fn: () => Promise<T>,
+  ): Promise<T>;
   // = withTransaction + set_config('app.project_id', ...) — transaction read-only nếu chỉ đọc.
   ```
 - Chuyển các route GET tài chính (nhóm bảng đợt 1) sang bọc `withProjectScope(await getCurrentProjectId(user))` — cơ học, giao `mechanical` theo lô, mỗi lô chạy test tích hợp.

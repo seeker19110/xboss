@@ -131,28 +131,32 @@ test("GET /api/admin/api-keys: PM không có quyền (chỉ Admin) → 403", S, 
   assert.equal(res.status, 403);
 });
 
-test("GET /api/admin/api-keys: cô lập tenant — org khác không thấy key của org này", S, async () => {
-  const projectId1 = await taoDuAn("keys-iso1", 1);
-  const admin1 = await taoUser("admin", "keys-iso1", { orgId: 1 });
-  await dangNhapDuAn(admin1, projectId1);
-  const { POST } = await import("@/app/api/admin/api-keys/route");
-  const created = await POST(jreq("/x", { name: `Key ${uniq("keysiso")}` }));
-  assert.equal(created.status, 201);
+test(
+  "GET /api/admin/api-keys: cô lập tenant — org khác không thấy key của org này",
+  S,
+  async () => {
+    const projectId1 = await taoDuAn("keys-iso1", 1);
+    const admin1 = await taoUser("admin", "keys-iso1", { orgId: 1 });
+    await dangNhapDuAn(admin1, projectId1);
+    const { POST } = await import("@/app/api/admin/api-keys/route");
+    const created = await POST(jreq("/x", { name: `Key ${uniq("keysiso")}` }));
+    assert.equal(created.status, 201);
 
-  const org2 = await taoToChuc("keysiso2");
-  const projectId2 = await taoDuAn("keys-iso2", org2);
-  const admin2 = await taoUser("admin", "keys-iso2", { orgId: org2 });
-  await dangNhapDuAn(admin2, projectId2);
-  const { GET } = await import("@/app/api/admin/api-keys/route");
-  const res = await GET();
-  assert.equal(res.status, 200);
-  const { keys } = await res.json();
-  const { id: createdId } = await created.json();
-  assert.equal(
-    keys.some((k: { id: number }) => k.id === createdId),
-    false,
-  );
-});
+    const org2 = await taoToChuc("keysiso2");
+    const projectId2 = await taoDuAn("keys-iso2", org2);
+    const admin2 = await taoUser("admin", "keys-iso2", { orgId: org2 });
+    await dangNhapDuAn(admin2, projectId2);
+    const { GET } = await import("@/app/api/admin/api-keys/route");
+    const res = await GET();
+    assert.equal(res.status, 200);
+    const { keys } = await res.json();
+    const { id: createdId } = await created.json();
+    assert.equal(
+      keys.some((k: { id: number }) => k.id === createdId),
+      false,
+    );
+  },
+);
 
 test("POST /api/admin/api-keys: thiếu tên → 400", S, async () => {
   const projectId = await taoDuAn("keys-noname");
@@ -324,9 +328,7 @@ test("GET /api/admin/assignments?unassignedOnly=1: chỉ trả task chưa gán",
   const { taskId } = await dungWbs("asg-unassigned", projectId);
   await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/admin/assignments/route");
-  const res = await GET(
-    jreq("/api/admin/assignments?unassignedOnly=1", undefined, "GET"),
-  );
+  const res = await GET(jreq("/api/admin/assignments?unassignedOnly=1", undefined, "GET"));
   assert.equal(res.status, 200);
   const { tasks } = await res.json();
   assert.ok(tasks.some((t: { id: number }) => t.id === taskId));
@@ -539,18 +541,22 @@ test("GET /api/admin/sod-report: PM không có quyền → 403", S, async () => 
   assert.equal(res.status, 403);
 });
 
-test("GET /api/admin/sod-report: Admin → trả mảng rule, days lạ rơi về mặc định 90", S, async () => {
-  const projectId = await taoDuAn("sod-ok");
-  const admin = await taoUser("admin", "sod-ok");
-  await dangNhapDuAn(admin, projectId);
-  const { GET } = await import("@/app/api/admin/sod-report/route");
-  const res = await GET(jreq("/api/admin/sod-report?days=999", undefined, "GET"));
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.ok(Array.isArray(body));
-  assert.ok(body.length > 0);
-  assert.ok("rule" in body[0] && "violations" in body[0]);
-});
+test(
+  "GET /api/admin/sod-report: Admin → trả mảng rule, days lạ rơi về mặc định 90",
+  S,
+  async () => {
+    const projectId = await taoDuAn("sod-ok");
+    const admin = await taoUser("admin", "sod-ok");
+    await dangNhapDuAn(admin, projectId);
+    const { GET } = await import("@/app/api/admin/sod-report/route");
+    const res = await GET(jreq("/api/admin/sod-report?days=999", undefined, "GET"));
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(Array.isArray(body));
+    assert.ok(body.length > 0);
+    assert.ok("rule" in body[0] && "violations" in body[0]);
+  },
+);
 
 // ============================================================================
 // GET /api/admin/storage
@@ -625,12 +631,9 @@ test("GET /api/admin/traffic/events: Admin → stream SSE đúng content-type", 
 test("POST /api/admin/traffic/ingest: sai token nội bộ → 401", S, async () => {
   const { POST } = await import("@/app/api/admin/traffic/ingest/route");
   const res = await POST(
-    jreq(
-      "/api/admin/traffic/ingest",
-      { method: "GET", path: "/x" },
-      "POST",
-      { "x-traffic-token": "sai-token" },
-    ),
+    jreq("/api/admin/traffic/ingest", { method: "GET", path: "/x" }, "POST", {
+      "x-traffic-token": "sai-token",
+    }),
   );
   assert.equal(res.status, 401);
 });
@@ -837,9 +840,7 @@ test("PUT /api/user-projects: thay toàn bộ danh sách dự án của 1 user",
   const target = await taoUser("engineer", "up-putokTarget");
   await dangNhapDuAn(pm, projectA);
   const { PUT } = await import("@/app/api/user-projects/route");
-  const res = await PUT(
-    jreq("/x", { userId: target.id, projectIds: [projectA, projectB] }, "PUT"),
-  );
+  const res = await PUT(jreq("/x", { userId: target.id, projectIds: [projectA, projectB] }, "PUT"));
   assert.equal(res.status, 200);
   const rows = await query<{ project_id: number }>(
     `SELECT project_id FROM user_projects WHERE user_id = ? ORDER BY project_id`,
@@ -974,10 +975,9 @@ test("POST /api/projects/:id/clone-config: thành công → tạo dự án mới
   const admin = await taoUser("admin", "clone-ok");
   await dangNhapDuAn(admin, projectId);
   const { POST } = await import("@/app/api/projects/[id]/clone-config/route");
-  const res = await POST(
-    jreq("/x", { name: `Dự án sao chép ${uniq("cloneok")}` }),
-    { params: Promise.resolve({ id: String(projectId) }) },
-  );
+  const res = await POST(jreq("/x", { name: `Dự án sao chép ${uniq("cloneok")}` }), {
+    params: Promise.resolve({ id: String(projectId) }),
+  });
   assert.equal(res.status, 201);
   const { id } = await res.json();
   assert.ok(id);
@@ -1023,9 +1023,7 @@ test("PATCH /api/auth/password: mật khẩu mới quá ngắn → 400", S, asyn
   const u = await taoUserMatKhau("pm", "pwshort", "matkhaucu123");
   dangNhap({ id: u.id, passwordHash: u.passwordHash });
   const { PATCH } = await import("@/app/api/auth/password/route");
-  const res = await PATCH(
-    jreq("/x", { oldPassword: "matkhaucu123", newPassword: "123" }, "PATCH"),
-  );
+  const res = await PATCH(jreq("/x", { oldPassword: "matkhaucu123", newPassword: "123" }, "PATCH"));
   assert.equal(res.status, 400);
 });
 
@@ -1154,36 +1152,40 @@ test("POST /api/auth/totp/confirm: mã sai → 401", S, async () => {
   assert.equal(res.status, 401);
 });
 
-test("POST /api/auth/totp/confirm: mã đúng → bật 2FA, cấp lại cookie mustSetup2fa=false", S, async () => {
-  const { decryptTotpSecret } = await import("@/lib/bao-mat/totp");
-  const { queryOne } = await import("@/lib/db");
-  const u = await taoUser("admin", "totp-confirmok");
-  dangNhap({ id: u.id, passwordHash: u.passwordHash, mustSetup2fa: true });
-  const { POST: setupPost } = await import("@/app/api/auth/totp/setup/route");
-  await setupPost();
-  const row = await queryOne<{ totp_secret: string }>(
-    `SELECT totp_secret FROM users WHERE id = ?`,
-    u.id,
-  );
-  const secret = decryptTotpSecret(row!.totp_secret);
-  const code = await sinhMaTotp(secret);
+test(
+  "POST /api/auth/totp/confirm: mã đúng → bật 2FA, cấp lại cookie mustSetup2fa=false",
+  S,
+  async () => {
+    const { decryptTotpSecret } = await import("@/lib/bao-mat/totp");
+    const { queryOne } = await import("@/lib/db");
+    const u = await taoUser("admin", "totp-confirmok");
+    dangNhap({ id: u.id, passwordHash: u.passwordHash, mustSetup2fa: true });
+    const { POST: setupPost } = await import("@/app/api/auth/totp/setup/route");
+    await setupPost();
+    const row = await queryOne<{ totp_secret: string }>(
+      `SELECT totp_secret FROM users WHERE id = ?`,
+      u.id,
+    );
+    const secret = decryptTotpSecret(row!.totp_secret);
+    const code = await sinhMaTotp(secret);
 
-  const { POST } = await import("@/app/api/auth/totp/confirm/route");
-  const res = await POST(jreq("/x", { code }));
-  assert.equal(res.status, 200);
+    const { POST } = await import("@/app/api/auth/totp/confirm/route");
+    const res = await POST(jreq("/x", { code }));
+    assert.equal(res.status, 200);
 
-  const { COOKIE, parseToken } = await import("@/lib/bao-mat/session-token");
-  const cookie = res.cookies.get(COOKIE);
-  assert.ok(cookie);
-  const parsed = parseToken(cookie!.value);
-  assert.equal(parsed?.mustSetup2fa, false);
+    const { COOKIE, parseToken } = await import("@/lib/bao-mat/session-token");
+    const cookie = res.cookies.get(COOKIE);
+    assert.ok(cookie);
+    const parsed = parseToken(cookie!.value);
+    assert.equal(parsed?.mustSetup2fa, false);
 
-  const after = await queryOne<{ totp_enabled_at: string | null }>(
-    `SELECT totp_enabled_at FROM users WHERE id = ?`,
-    u.id,
-  );
-  assert.ok(after?.totp_enabled_at != null);
-});
+    const after = await queryOne<{ totp_enabled_at: string | null }>(
+      `SELECT totp_enabled_at FROM users WHERE id = ?`,
+      u.id,
+    );
+    assert.ok(after?.totp_enabled_at != null);
+  },
+);
 
 test("DELETE /api/auth/totp: chưa đăng nhập → 401", S, async () => {
   dangXuat();
@@ -1255,9 +1257,7 @@ test("DELETE /api/auth/totp: dùng recovery code hợp lệ → tắt 2FA", S, a
   );
   dangNhap({ id: u.id, passwordHash: u.passwordHash });
   const { DELETE } = await import("@/app/api/auth/totp/route");
-  const res = await DELETE(
-    jreq("/x", { password: "matkhaudel123", code: recoveryRaw }, "DELETE"),
-  );
+  const res = await DELETE(jreq("/x", { password: "matkhaudel123", code: recoveryRaw }, "DELETE"));
   assert.equal(res.status, 200);
 });
 
@@ -1499,9 +1499,7 @@ test("GET /api/custom-fields: entityType không hợp lệ → 400", S, async ()
   const eng = await taoUser("engineer", "cf-400");
   await dangNhapDuAn(eng, projectId);
   const { GET } = await import("@/app/api/custom-fields/route");
-  const res = await GET(
-    jreq("/api/custom-fields?entityType=khong_ton_tai", undefined, "GET"),
-  );
+  const res = await GET(jreq("/api/custom-fields?entityType=khong_ton_tai", undefined, "GET"));
   assert.equal(res.status, 400);
 });
 
@@ -1554,7 +1552,11 @@ test("GET /api/raci: có dự án và dữ liệu → trả đúng dòng đã l�
   const res = await GET();
   assert.equal(res.status, 200);
   const { items } = await res.json();
-  assert.ok(items.some((i: { scope: string; roleLabel: string }) => i.scope === scope && i.roleLabel === "PM"));
+  assert.ok(
+    items.some(
+      (i: { scope: string; roleLabel: string }) => i.scope === scope && i.roleLabel === "PM",
+    ),
+  );
 });
 
 test("PUT /api/raci: thiếu tên vai trò trong 1 dòng → 422", S, async () => {
@@ -1645,16 +1647,18 @@ test("PUT /api/raci: thay toàn bộ dòng của 1 scope, không đụng scope k
   const { PUT } = await import("@/app/api/raci/route");
   const scopeA = `Quy trình A ${uniq("raci")}`;
   const scopeB = `Quy trình B ${uniq("raci")}`;
-  await PUT(
-    jreq("/x", { scope: scopeA, rows: [{ roleLabel: "PM", raci: "A" }] }, "PUT"),
-  );
-  await PUT(
-    jreq("/x", { scope: scopeB, rows: [{ roleLabel: "KS", raci: "R" }] }, "PUT"),
-  );
+  await PUT(jreq("/x", { scope: scopeA, rows: [{ roleLabel: "PM", raci: "A" }] }, "PUT"));
+  await PUT(jreq("/x", { scope: scopeB, rows: [{ roleLabel: "KS", raci: "R" }] }, "PUT"));
   const res = await PUT(
     jreq(
       "/x",
-      { scope: scopeA, rows: [{ roleLabel: "PM", raci: "C" }, { roleLabel: "QS", raci: "I" }] },
+      {
+        scope: scopeA,
+        rows: [
+          { roleLabel: "PM", raci: "C" },
+          { roleLabel: "QS", raci: "I" },
+        ],
+      },
       "PUT",
     ),
   );
@@ -1886,15 +1890,19 @@ test("GET /api/notifications/feed: PM (fullAccess) → trả đủ cấu trúc f
   assert.ok(Array.isArray(body.recentActivity));
 });
 
-test("GET /api/notifications/feed: subcon chỉ thấy task được giao (fullAccess=false)", S, async () => {
-  const projectId = await taoDuAn("feed-subcon");
-  const sub = await taoUser("subcon", "feed-subcon");
-  await dangNhapDuAn(sub, projectId);
-  const { GET } = await import("@/app/api/notifications/feed/route");
-  const res = await GET();
-  assert.equal(res.status, 200);
-  assert.equal((await res.json()).fullAccess, false);
-});
+test(
+  "GET /api/notifications/feed: subcon chỉ thấy task được giao (fullAccess=false)",
+  S,
+  async () => {
+    const projectId = await taoDuAn("feed-subcon");
+    const sub = await taoUser("subcon", "feed-subcon");
+    await dangNhapDuAn(sub, projectId);
+    const { GET } = await import("@/app/api/notifications/feed/route");
+    const res = await GET();
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).fullAccess, false);
+  },
+);
 
 test("GET /api/notifications/feed: tắt hết prefs → mọi mục rỗng, không lỗi", S, async () => {
   const { run } = await import("@/lib/db");
@@ -2067,22 +2075,26 @@ test("GET /api/import/batches: engineer không có quyền (chỉ Admin/PM) → 
   assert.equal(res.status, 403);
 });
 
-test("GET /api/import/batches: cách ly dự án — không thấy sổ import của dự án khác", S, async () => {
-  const { insertId } = await import("@/lib/db");
-  const projectA = await taoDuAn("imp-isoA");
-  const projectB = await taoDuAn("imp-isoB");
-  const pmA = await taoUser("pm", "imp-isoA");
-  await insertId(
-    `INSERT INTO import_batches (project_id, source_name, source_sha256, dim_denominator_mode)
+test(
+  "GET /api/import/batches: cách ly dự án — không thấy sổ import của dự án khác",
+  S,
+  async () => {
+    const { insertId } = await import("@/lib/db");
+    const projectA = await taoDuAn("imp-isoA");
+    const projectB = await taoDuAn("imp-isoB");
+    const pmA = await taoUser("pm", "imp-isoA");
+    await insertId(
+      `INSERT INTO import_batches (project_id, source_name, source_sha256, dim_denominator_mode)
      VALUES (?, 'file.xlsx', 'abc123', 'columns')`,
-    projectB,
-  );
-  await dangNhapDuAn(pmA, projectA);
-  const { GET } = await import("@/app/api/import/batches/route");
-  const res = await GET(jreq("/api/import/batches", undefined, "GET"));
-  assert.equal(res.status, 200);
-  assert.deepEqual((await res.json()).batches, []);
-});
+      projectB,
+    );
+    await dangNhapDuAn(pmA, projectA);
+    const { GET } = await import("@/app/api/import/batches/route");
+    const res = await GET(jreq("/api/import/batches", undefined, "GET"));
+    assert.equal(res.status, 200);
+    assert.deepEqual((await res.json()).batches, []);
+  },
+);
 
 test("GET /api/import/batches: thấy đúng sổ import của dự án mình", S, async () => {
   const { insertId } = await import("@/lib/db");

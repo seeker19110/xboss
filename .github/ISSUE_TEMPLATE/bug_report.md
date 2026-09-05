@@ -1,7 +1,7 @@
 ---
 name: Báo lỗi
 about: Báo một lỗi để giúp dự án tốt hơn
-title: 'fix: '
+title: "fix: "
 labels: bug
 ---
 

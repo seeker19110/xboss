@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import AppHeader from "@/app/components/AppHeader";
+import { bangMau, mauToken } from "@/app/lib/mauTheme";
 import { useCanvasHiDPI } from "@/app/components/useCanvasHiDPI";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import { Skeleton } from "@/app/components/Skeleton";
@@ -47,12 +48,39 @@ interface SpatialAnnotation {
   createdAt: string;
 }
 
+// `token`: tên biến CSS của theme (dùng cho canvas qua mauToken — canvas không nhận var()).
+// `color`: chuỗi var() dùng thẳng cho style của DOM. Không hardcode hex ở cả hai đường.
 const TYPE_CONFIG = {
-  progress_pin: { label: "Tiến độ WBS", color: "#10b981", icon: CheckCircle2 },
-  ncr_issue: { label: "Lỗi NCR / Hiện trường", color: "#ef4444", icon: AlertTriangle },
-  bbnt_request: { label: "Nghiệm thu BBNT", color: "#3b82f6", icon: FileCheck },
-  rfi_markup: { label: "Ghi chú RFI", color: "#f59e0b", icon: MessageSquare },
-  general_note: { label: "Ghi chú chung", color: "#8b5cf6", icon: MapPin },
+  progress_pin: {
+    label: "Tiến độ WBS",
+    token: "--color-emerald-400",
+    color: "var(--color-emerald-400)",
+    icon: CheckCircle2,
+  },
+  ncr_issue: {
+    label: "Lỗi NCR / Hiện trường",
+    token: "--color-red-400",
+    color: "var(--color-red-400)",
+    icon: AlertTriangle,
+  },
+  bbnt_request: {
+    label: "Nghiệm thu BBNT",
+    token: "--color-sky-400",
+    color: "var(--color-sky-400)",
+    icon: FileCheck,
+  },
+  rfi_markup: {
+    label: "Ghi chú RFI",
+    token: "--color-amber-400",
+    color: "var(--color-amber-400)",
+    icon: MessageSquare,
+  },
+  general_note: {
+    label: "Ghi chú chung",
+    token: "--color-violet-400",
+    color: "var(--color-violet-400)",
+    icon: MapPin,
+  },
 };
 
 export default function SpatialViewerPage() {
@@ -127,6 +155,21 @@ export default function SpatialViewerPage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Màu đọc từ token của theme đang bật (audit 2026-09-05) — canvas không nhận `var(--…)`
+    // nên trước đây hardcode hex tối, sang theme sáng thì nét vẽ/nhãn gần như biến mất.
+    const mau = bangMau({
+      luoi: "--color-zinc-800",
+      nhan: "--color-zinc-500",
+      ong: "--color-sky-400",
+      ongDam: "--color-sky-400",
+      thietBi: "--color-emerald-400",
+      canhBao: "--color-amber-400",
+      loi: "--color-red-400",
+      loiDam: "--color-red-400",
+      nen: "--color-on-accent",
+      ghiChu: "--color-violet-400",
+    });
+
     // Reset & Fill Background
     ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
     ctx.save();
@@ -137,7 +180,7 @@ export default function SpatialViewerPage() {
 
     // 1. Vẽ Hệ Lưới Trục Toạ Độ (Grid & Axes)
     if (layers.GRID) {
-      ctx.strokeStyle = "#27272a";
+      ctx.strokeStyle = mau.luoi;
       ctx.lineWidth = 0.5;
       for (let x = -200; x <= 1400; x += 100) {
         ctx.beginPath();
@@ -153,7 +196,7 @@ export default function SpatialViewerPage() {
       }
 
       // Trục toạ độ và nhãn lưới
-      ctx.fillStyle = "#71717a";
+      ctx.fillStyle = mau.nhan;
       ctx.font = "10px monospace";
       ["X1", "X2", "X3", "X4", "X5", "X6"].forEach((lbl, idx) => {
         ctx.fillText(lbl, idx * 180 + 50, -10);
@@ -165,7 +208,7 @@ export default function SpatialViewerPage() {
 
     // 2. Vẽ Mạng Ống Gió HVAC
     if (layers.HVAC) {
-      ctx.strokeStyle = "#38bdf8";
+      ctx.strokeStyle = mau.ong;
       ctx.fillStyle = "rgba(56, 189, 248, 0.15)";
       ctx.lineWidth = 14;
       ctx.beginPath();
@@ -176,7 +219,7 @@ export default function SpatialViewerPage() {
       ctx.stroke();
 
       // Cửa gió Supply Diffusers
-      ctx.fillStyle = "#0284c7";
+      ctx.fillStyle = mau.ongDam;
       [180, 320, 480, 640, 780].forEach((pos) => {
         ctx.fillRect(pos - 15, 105, 30, 30);
       });
@@ -184,7 +227,7 @@ export default function SpatialViewerPage() {
 
     // 3. Vẽ Tuyến Ống Cấp Thoát Nước (Plumbing)
     if (layers.PLUMBING) {
-      ctx.strokeStyle = "#34d399";
+      ctx.strokeStyle = mau.thietBi;
       ctx.lineWidth = 6;
       ctx.beginPath();
       ctx.moveTo(120, 80);
@@ -195,7 +238,7 @@ export default function SpatialViewerPage() {
 
     // 4. Vẽ Tuyến Cáp Điện (Electrical Tray)
     if (layers.ELECTRICAL) {
-      ctx.strokeStyle = "#facc15";
+      ctx.strokeStyle = mau.canhBao;
       ctx.lineWidth = 4;
       ctx.setLineDash([8, 4]);
       ctx.beginPath();
@@ -207,7 +250,7 @@ export default function SpatialViewerPage() {
 
     // 5. Vẽ Tuyến PCCC Sprinkler
     if (layers.FIREFIGHTING) {
-      ctx.strokeStyle = "#f87171";
+      ctx.strokeStyle = mau.loi;
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(100, 280);
@@ -215,7 +258,7 @@ export default function SpatialViewerPage() {
       ctx.stroke();
 
       // Đầu phun Sprinkler Heads
-      ctx.fillStyle = "#ef4444";
+      ctx.fillStyle = mau.loiDam;
       [150, 300, 450, 600, 750].forEach((px) => {
         ctx.beginPath();
         ctx.arc(px, 280, 6, 0, Math.PI * 2);
@@ -231,17 +274,17 @@ export default function SpatialViewerPage() {
         ctx.translate(annot.coordX, annot.coordY);
 
         // Vòng tròn định vị
-        ctx.fillStyle = cfg.color;
+        ctx.fillStyle = mauToken(cfg.token);
         ctx.beginPath();
         ctx.arc(0, 0, 8, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.strokeStyle = "#ffffff";
+        ctx.strokeStyle = mau.nen;
         ctx.lineWidth = 2;
         ctx.stroke();
 
         // Nhãn Pin
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = mau.nen;
         ctx.font = "bold 9px sans-serif";
         ctx.fillText(annot.title.slice(0, 16), 12, 4);
 
@@ -251,11 +294,11 @@ export default function SpatialViewerPage() {
 
     // Preview New Pin Drop
     if (newPinCoord) {
-      ctx.fillStyle = "#a855f7";
+      ctx.fillStyle = mau.ghiChu;
       ctx.beginPath();
       ctx.arc(newPinCoord.x, newPinCoord.y, 10, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = "#ffffff";
+      ctx.strokeStyle = mau.nen;
       ctx.lineWidth = 2;
       ctx.stroke();
     }
@@ -718,7 +761,11 @@ export default function SpatialViewerPage() {
                         <div className="flex items-start justify-between gap-2">
                           <span
                             className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
-                            style={{ color: cfg.color, backgroundColor: `${cfg.color}15` }}
+                            // Nền mờ: color-mix thay cho mẹo nối "15" vào mã hex (không dùng được với var()).
+                            style={{
+                              color: cfg.color,
+                              backgroundColor: `color-mix(in oklab, ${cfg.color} 12%, transparent)`,
+                            }}
                           >
                             {cfg.label}
                           </span>

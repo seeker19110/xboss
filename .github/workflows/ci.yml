@@ -72,6 +72,12 @@ jobs:
       - name: Kiểm lỗ hổng dependencies (gồm dev, chỉ chặn critical)
         run: npm audit --audit-level=critical --fetch-timeout=30000 || test $? -ne 1
 
+      # Cổng format: husky/lint-staged chỉ chạy ở máy dev và bị bỏ qua khi commit
+      # `--no-verify` (hoặc commit tạo từ web/agent) — CI là chốt chặn cuối. Bật được sau khi
+      # đợt 2026-09-05 chạy `prettier --write` toàn repo (56 file lệch từ trước).
+      - name: Kiểm format (prettier)
+        run: npm run format:check
+
       - name: Lint
         run: npm run lint
 
@@ -89,6 +95,11 @@ jobs:
 
       # Chặn code chết bò lên lại: dựng đồ thị import toàn repo, duyệt từ entrypoint thật
       # của Next.js. tsc/eslint KHÔNG bắt được file không ai import. Static, không cần DB.
+      # Chặn hardcode mã hex bò lại vào component: màu viết thẳng không đảo theo theme, và
+      # check:contrast không nhìn thấy màu nằm trong thuộc tính SVG/lời gọi canvas.
+      - name: Kiểm hardcode màu hex trong component
+        run: npm run check:hex-hardcode
+
       - name: Kiểm code chết (module không ai với tới được)
         run: npm run check:dead-code
 

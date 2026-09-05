@@ -189,7 +189,7 @@ export default function CorrespondencesPage() {
               onChange={(e) => setQ(e.target.value)}
               placeholder="Tìm số VB / trích yếu…"
               aria-label="Tìm kiếm công văn"
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-3 pr-8 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition h-10"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-3 pr-8 py-2 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition h-10"
             />
             {q && (
               <button

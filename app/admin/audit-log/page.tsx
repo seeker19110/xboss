@@ -208,7 +208,7 @@ export default function AuditLogPage() {
                 value={entity}
                 onChange={(e) => setEntity(e.target.value)}
                 aria-label="Lọc theo loại thực thể"
-                className="mt-1 block w-44 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 transition"
+                className="mt-1 block w-44 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 transition"
               >
                 <option value="">Tất cả</option>
                 {AUDIT_ENTITY_TYPES.map((t) => (
@@ -226,7 +226,7 @@ export default function AuditLogPage() {
                 inputMode="numeric"
                 placeholder="vd: 12"
                 aria-label="Lọc theo ID thực thể"
-                className="mt-1 block w-24 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 transition"
+                className="mt-1 block w-24 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 transition"
               />
             </label>
             <label className="text-xs font-semibold text-zinc-300">
@@ -237,7 +237,7 @@ export default function AuditLogPage() {
                 inputMode="numeric"
                 placeholder="vd: 3"
                 aria-label="Lọc theo ID người thực hiện"
-                className="mt-1 block w-28 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 transition"
+                className="mt-1 block w-28 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 transition"
               />
             </label>
             <label className="text-xs font-semibold text-zinc-300">
@@ -247,7 +247,7 @@ export default function AuditLogPage() {
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
                 aria-label="Từ ngày"
-                className="mt-1 block bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 transition"
+                className="mt-1 block bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 transition"
               />
             </label>
             <label className="text-xs font-semibold text-zinc-300">
@@ -257,7 +257,7 @@ export default function AuditLogPage() {
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
                 aria-label="Đến ngày"
-                className="mt-1 block bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 transition"
+                className="mt-1 block bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 transition"
               />
             </label>
           </div>

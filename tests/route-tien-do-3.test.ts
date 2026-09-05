@@ -187,28 +187,30 @@ test("GET /api/construction-stages: chưa đăng nhập → 401", S, async () =>
   assert.equal(res.status, 401);
 });
 
-test("GET /api/construction-stages: thấy công tác dùng chung (seed) + không thấy riêng dự án khác", S, async () => {
-  const projectA = await taoDuAn("csA");
-  const projectB = await taoDuAn("csB");
-  const pmA = await taoUser("pm", "csA");
-  const pmB = await taoUser("pm", "csB");
-  await dangNhapDuAn(pmB, projectB);
-  const { POST } = await import("@/app/api/construction-stages/route");
-  const created = await POST(
-    jreq("/x", { name: `Riêng B ${uniq("cs")}`, durationDays: 3 }),
-  );
-  assert.equal(created.status, 201);
-  const { name: labelB } = (await created.json()) as { name?: string };
-  void labelB;
+test(
+  "GET /api/construction-stages: thấy công tác dùng chung (seed) + không thấy riêng dự án khác",
+  S,
+  async () => {
+    const projectA = await taoDuAn("csA");
+    const projectB = await taoDuAn("csB");
+    const pmA = await taoUser("pm", "csA");
+    const pmB = await taoUser("pm", "csB");
+    await dangNhapDuAn(pmB, projectB);
+    const { POST } = await import("@/app/api/construction-stages/route");
+    const created = await POST(jreq("/x", { name: `Riêng B ${uniq("cs")}`, durationDays: 3 }));
+    assert.equal(created.status, 201);
+    const { name: labelB } = (await created.json()) as { name?: string };
+    void labelB;
 
-  await dangNhapDuAn(pmA, projectA);
-  const { GET } = await import("@/app/api/construction-stages/route");
-  const res = await GET();
-  assert.equal(res.status, 200);
-  const { stages } = await res.json();
-  assert.ok(stages.length >= 7, "thấy được 7 công tác seed dùng chung");
-  assert.ok(!stages.some((s: { name: string }) => s.name.startsWith("Riêng B")));
-});
+    await dangNhapDuAn(pmA, projectA);
+    const { GET } = await import("@/app/api/construction-stages/route");
+    const res = await GET();
+    assert.equal(res.status, 200);
+    const { stages } = await res.json();
+    assert.ok(stages.length >= 7, "thấy được 7 công tác seed dùng chung");
+    assert.ok(!stages.some((s: { name: string }) => s.name.startsWith("Riêng B")));
+  },
+);
 
 test("POST /api/construction-stages: chưa đăng nhập → 401", S, async () => {
   dangXuat();
@@ -217,14 +219,18 @@ test("POST /api/construction-stages: chưa đăng nhập → 401", S, async () =
   assert.equal(res.status, 401);
 });
 
-test("POST /api/construction-stages: engineer không được thêm (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("cs403");
-  const eng = await taoUser("engineer", "cs403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/construction-stages/route");
-  const res = await POST(jreq("/x", { name: "x", durationDays: 1 }));
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/construction-stages: engineer không được thêm (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("cs403");
+    const eng = await taoUser("engineer", "cs403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/construction-stages/route");
+    const res = await POST(jreq("/x", { name: "x", durationDays: 1 }));
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/construction-stages: thiếu tên → 422", S, async () => {
   const projectId = await taoDuAn("csval");
@@ -309,20 +315,24 @@ test("PATCH /api/construction-stages/:id: công tác RIÊNG của dự án khác
   assert.equal(res.status, 404);
 });
 
-test("PATCH /api/construction-stages/:id: công tác dùng chung — PM không được sửa (chỉ Admin) → 403", S, async () => {
-  const projectId = await taoDuAn("cspshared");
-  const pm = await taoUser("pm", "cspshared");
-  const { queryOne } = await import("@/lib/db");
-  const shared = await queryOne<{ id: number }>(
-    `SELECT id FROM construction_stages WHERE project_id IS NULL LIMIT 1`,
-  );
-  await dangNhapDuAn(pm, projectId);
-  const { PATCH } = await import("@/app/api/construction-stages/[id]/route");
-  const res = await PATCH(jreq("/x", { name: "trộm chung" }, "PATCH"), {
-    params: Promise.resolve({ id: String(shared!.id) }),
-  });
-  assert.equal(res.status, 403);
-});
+test(
+  "PATCH /api/construction-stages/:id: công tác dùng chung — PM không được sửa (chỉ Admin) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("cspshared");
+    const pm = await taoUser("pm", "cspshared");
+    const { queryOne } = await import("@/lib/db");
+    const shared = await queryOne<{ id: number }>(
+      `SELECT id FROM construction_stages WHERE project_id IS NULL LIMIT 1`,
+    );
+    await dangNhapDuAn(pm, projectId);
+    const { PATCH } = await import("@/app/api/construction-stages/[id]/route");
+    const res = await PATCH(jreq("/x", { name: "trộm chung" }, "PATCH"), {
+      params: Promise.resolve({ id: String(shared!.id) }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("PATCH /api/construction-stages/:id: tên rỗng → 422", S, async () => {
   const projectId = await taoDuAn("cspempty");
@@ -533,11 +543,7 @@ test("PUT /api/floor-stage-fronts: nhà thầu bàn giao không tồn tại → 
   await dangNhapDuAn(pm, projectId);
   const { PUT } = await import("@/app/api/floor-stage-fronts/route");
   const res = await PUT(
-    jreq(
-      "/x",
-      { floorLabel: "T01", stageId: shared!.id, outgoingSupplierId: 999999999 },
-      "PUT",
-    ),
+    jreq("/x", { floorLabel: "T01", stageId: shared!.id, outgoingSupplierId: 999999999 }, "PUT"),
   );
   assert.equal(res.status, 404);
 });
@@ -640,20 +646,24 @@ test("GET /api/floor-stage-fronts/:id/documents: ô của dự án khác → 404
   assert.equal(res.status, 404);
 });
 
-test("GET /api/floor-stage-fronts/:id/documents: thành công → danh sách rỗng khi chưa upload", S, async () => {
-  const projectId = await taoDuAn("fsfdocgetok");
-  const pm = await taoUser("pm", "fsfdocgetok");
-  const stageId = await stageDungChung();
-  const frontId = await taoFront(projectId, "T01", stageId);
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/floor-stage-fronts/[id]/documents/route");
-  const res = await GET(jreq("/x", undefined, "GET"), {
-    params: Promise.resolve({ id: String(frontId) }),
-  });
-  assert.equal(res.status, 200);
-  const { documents } = await res.json();
-  assert.deepEqual(documents, []);
-});
+test(
+  "GET /api/floor-stage-fronts/:id/documents: thành công → danh sách rỗng khi chưa upload",
+  S,
+  async () => {
+    const projectId = await taoDuAn("fsfdocgetok");
+    const pm = await taoUser("pm", "fsfdocgetok");
+    const stageId = await stageDungChung();
+    const frontId = await taoFront(projectId, "T01", stageId);
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/floor-stage-fronts/[id]/documents/route");
+    const res = await GET(jreq("/x", undefined, "GET"), {
+      params: Promise.resolve({ id: String(frontId) }),
+    });
+    assert.equal(res.status, 200);
+    const { documents } = await res.json();
+    assert.deepEqual(documents, []);
+  },
+);
 
 test("POST /api/floor-stage-fronts/:id/documents: ô mặt trận không tồn tại → 404", S, async () => {
   const projectId = await taoDuAn("fsfdocpost404");
@@ -666,18 +676,22 @@ test("POST /api/floor-stage-fronts/:id/documents: ô mặt trận không tồn t
   assert.equal(res.status, 404);
 });
 
-test("POST /api/floor-stage-fronts/:id/documents: subcon không có quyền upload → 403", S, async () => {
-  const projectId = await taoDuAn("fsfdocpost403");
-  const sub = await taoUser("subcon", "fsfdocpost403");
-  const stageId = await stageDungChung();
-  const frontId = await taoFront(projectId, "T01", stageId);
-  await dangNhapDuAn(sub, projectId);
-  const { POST } = await import("@/app/api/floor-stage-fronts/[id]/documents/route");
-  const res = await POST(formReq(`/x`, pdfForm()), {
-    params: Promise.resolve({ id: String(frontId) }),
-  });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/floor-stage-fronts/:id/documents: subcon không có quyền upload → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("fsfdocpost403");
+    const sub = await taoUser("subcon", "fsfdocpost403");
+    const stageId = await stageDungChung();
+    const frontId = await taoFront(projectId, "T01", stageId);
+    await dangNhapDuAn(sub, projectId);
+    const { POST } = await import("@/app/api/floor-stage-fronts/[id]/documents/route");
+    const res = await POST(formReq(`/x`, pdfForm()), {
+      params: Promise.resolve({ id: String(frontId) }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 test(
   "POST /api/floor-stage-fronts/:id/documents: thành công → GET/:id trả đúng byte đã upload",
@@ -737,48 +751,56 @@ test("GET /api/floor-stage-front-documents/:id: tài liệu của dự án khác
   assert.equal(res.status, 404);
 });
 
-test("DELETE /api/floor-stage-front-documents/:id: người khác không phải uploader/quản lý → 403", S, async () => {
-  const projectId = await taoDuAn("fsfddel403");
-  const pm = await taoUser("pm", "fsfddel403");
-  const sub = await taoUser("subcon", "fsfddel403sub");
-  const stageId = await stageDungChung();
-  const frontId = await taoFront(projectId, "T01", stageId);
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/floor-stage-fronts/[id]/documents/route");
-  const created = await POST(formReq(`/x`, pdfForm()), {
-    params: Promise.resolve({ id: String(frontId) }),
-  });
-  const { id: docId } = await created.json();
+test(
+  "DELETE /api/floor-stage-front-documents/:id: người khác không phải uploader/quản lý → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("fsfddel403");
+    const pm = await taoUser("pm", "fsfddel403");
+    const sub = await taoUser("subcon", "fsfddel403sub");
+    const stageId = await stageDungChung();
+    const frontId = await taoFront(projectId, "T01", stageId);
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/floor-stage-fronts/[id]/documents/route");
+    const created = await POST(formReq(`/x`, pdfForm()), {
+      params: Promise.resolve({ id: String(frontId) }),
+    });
+    const { id: docId } = await created.json();
 
-  await dangNhapDuAn(sub, projectId);
-  const { DELETE } = await import("@/app/api/floor-stage-front-documents/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(docId) }),
-  });
-  assert.equal(res.status, 403);
-});
+    await dangNhapDuAn(sub, projectId);
+    const { DELETE } = await import("@/app/api/floor-stage-front-documents/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(docId) }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
-test("DELETE /api/floor-stage-front-documents/:id: người upload xoá được chính mình", S, async () => {
-  const projectId = await taoDuAn("fsfddelok");
-  const pm = await taoUser("pm", "fsfddelok");
-  const stageId = await stageDungChung();
-  const frontId = await taoFront(projectId, "T01", stageId);
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/floor-stage-fronts/[id]/documents/route");
-  const created = await POST(formReq(`/x`, pdfForm()), {
-    params: Promise.resolve({ id: String(frontId) }),
-  });
-  const { id: docId } = await created.json();
+test(
+  "DELETE /api/floor-stage-front-documents/:id: người upload xoá được chính mình",
+  S,
+  async () => {
+    const projectId = await taoDuAn("fsfddelok");
+    const pm = await taoUser("pm", "fsfddelok");
+    const stageId = await stageDungChung();
+    const frontId = await taoFront(projectId, "T01", stageId);
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/floor-stage-fronts/[id]/documents/route");
+    const created = await POST(formReq(`/x`, pdfForm()), {
+      params: Promise.resolve({ id: String(frontId) }),
+    });
+    const { id: docId } = await created.json();
 
-  const { DELETE } = await import("@/app/api/floor-stage-front-documents/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(docId) }),
-  });
-  assert.equal(res.status, 200);
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne(`SELECT id FROM floor_stage_front_documents WHERE id = ?`, docId);
-  assert.equal(row, undefined);
-});
+    const { DELETE } = await import("@/app/api/floor-stage-front-documents/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(docId) }),
+    });
+    assert.equal(res.status, 200);
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne(`SELECT id FROM floor_stage_front_documents WHERE id = ?`, docId);
+    assert.equal(row, undefined);
+  },
+);
 
 // ============================================================================
 // POST /api/floor-approvals · DELETE /api/floor-approvals/:id · documents
@@ -846,16 +868,20 @@ test("DELETE /api/floor-approvals/:id: chưa đăng nhập → 401", S, async ()
   assert.equal(res.status, 401);
 });
 
-test("DELETE /api/floor-approvals/:id: engineer không được huỷ (chỉ Admin/PM) → 403", S, async () => {
-  const { projectId } = await dungSheet("fadel403");
-  const eng = await taoUser("engineer", "fadel403");
-  await dangNhapDuAn(eng, projectId);
-  const { DELETE } = await import("@/app/api/floor-approvals/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: "1" }),
-  });
-  assert.equal(res.status, 403);
-});
+test(
+  "DELETE /api/floor-approvals/:id: engineer không được huỷ (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const { projectId } = await dungSheet("fadel403");
+    const eng = await taoUser("engineer", "fadel403");
+    await dangNhapDuAn(eng, projectId);
+    const { DELETE } = await import("@/app/api/floor-approvals/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: "1" }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("DELETE /api/floor-approvals/:id: id không phải số → 400", S, async () => {
   const { projectId } = await dungSheet("fadelbad");
@@ -927,9 +953,72 @@ test(
       id,
     );
     assert.equal(approval?.isApproved, false);
-    const task = await queryOne<{ status: string }>(`SELECT status FROM tasks WHERE id = ?`, taskId);
+    const task = await queryOne<{ status: string }>(
+      `SELECT status FROM tasks WHERE id = ?`,
+      taskId,
+    );
     // progress=1, end_date NULL → deriveStatus trả hoan_thanh (không còn "tre"/"nghiem_thu").
     assert.equal(task?.status, "hoan_thanh");
+  },
+);
+
+test(
+  "DELETE /api/floor-approvals/:id: task duyệt RIÊNG LẺ giữ nguyên nghiem_thu, task duyệt theo tầng bị hạ",
+  S,
+  async () => {
+    // Nợ kỹ thuật đóng ngày 2026-09-05 (migration 0151 + cột tasks.approval_source): trước
+    // đây huỷ nghiệm thu TẦNG hạ luôn task từng duyệt riêng lẻ qua /api/tasks/:id/approve.
+    const { projectId, sheetTypeId } = await dungSheet("fadelsrc");
+    const pm = await taoUser("pm", "fadelsrc");
+    const pkgId = await taoNhom(sheetTypeId, "P1", { floorLabel: "T01" });
+    const taskRieng = await taoTask(pkgId, "T-RIENG", { progress: 1, status: "nghiem_thu" });
+    const taskTang = await taoTask(pkgId, "T-TANG", { progress: 1, status: "nghiem_thu" });
+    const taskCu = await taoTask(pkgId, "T-CU", { progress: 1, status: "nghiem_thu" });
+    await dangNhapDuAn(pm, projectId);
+
+    const { run, queryOne } = await import("@/lib/db");
+    // 3 nguồn duyệt: riêng lẻ / theo tầng / dữ liệu CŨ trước migration (approval_source NULL).
+    await run(`UPDATE tasks SET approval_source = 'task' WHERE id = ?`, taskRieng);
+    await run(`UPDATE tasks SET approval_source = 'floor' WHERE id = ?`, taskTang);
+    await run(`UPDATE tasks SET approval_source = NULL WHERE id = ?`, taskCu);
+
+    const { POST } = await import("@/app/api/floor-approvals/route");
+    const created = await POST(jreq("/x", { sheetTypeId, floorLabel: "T01" }));
+    const { id } = await created.json();
+    await run(
+      `UPDATE floor_approvals SET is_approved = TRUE, approved_by = ?, approved_by_name = ?, approved_at = NOW() WHERE id = ?`,
+      pm.id,
+      "PM Test",
+      id,
+    );
+
+    const { DELETE } = await import("@/app/api/floor-approvals/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(id) }),
+    });
+    assert.equal(res.status, 200);
+    const { taskCount } = await res.json();
+    assert.equal(
+      taskCount,
+      2,
+      "chỉ 2 task (theo tầng + dữ liệu cũ) bị hạ, task riêng lẻ được chừa",
+    );
+
+    const doc = (tid: number) =>
+      queryOne<{ status: string; src: string | null }>(
+        `SELECT status, approval_source AS "src" FROM tasks WHERE id = ?`,
+        tid,
+      );
+    assert.equal(
+      (await doc(taskRieng))?.status,
+      "nghiem_thu",
+      "task duyệt riêng lẻ phải còn nguyên",
+    );
+    assert.equal((await doc(taskRieng))?.src, "task");
+    assert.equal((await doc(taskTang))?.status, "hoan_thanh");
+    assert.equal((await doc(taskTang))?.src, null, "hạ xong phải xoá dấu nguồn duyệt");
+    // Dữ liệu CŨ (NULL) giữ nguyên hành vi trước migration: bị hạ theo tầng.
+    assert.equal((await doc(taskCu))?.status, "hoan_thanh");
   },
 );
 
@@ -951,21 +1040,27 @@ test("GET /api/floor-approvals/:id/documents: không tìm thấy → 404", S, as
   assert.equal(res.status, 404);
 });
 
-test("GET /api/floor-approvals/:id/documents: subcon với tầng KHÔNG được giao → 403", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("fadocssub403");
-  const pm = await taoUser("pm", "fadocssub403");
-  const sub = await taoUser("subcon", "fadocssub403sub");
-  await taoNhom(sheetTypeId, "P1", { floorLabel: "T01", assignedTo: null });
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/floor-approvals/route");
-  const created = await POST(jreq("/x", { sheetTypeId, floorLabel: "T01" }));
-  const { id } = await created.json();
+test(
+  "GET /api/floor-approvals/:id/documents: subcon với tầng KHÔNG được giao → 403",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("fadocssub403");
+    const pm = await taoUser("pm", "fadocssub403");
+    const sub = await taoUser("subcon", "fadocssub403sub");
+    await taoNhom(sheetTypeId, "P1", { floorLabel: "T01", assignedTo: null });
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/floor-approvals/route");
+    const created = await POST(jreq("/x", { sheetTypeId, floorLabel: "T01" }));
+    const { id } = await created.json();
 
-  await dangNhapDuAn(sub, projectId);
-  const { GET } = await import("@/app/api/floor-approvals/[id]/documents/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(id) }) });
-  assert.equal(res.status, 403);
-});
+    await dangNhapDuAn(sub, projectId);
+    const { GET } = await import("@/app/api/floor-approvals/[id]/documents/route");
+    const res = await GET(jreq("/x", undefined, "GET"), {
+      params: Promise.resolve({ id: String(id) }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/floor-approvals/:id/documents: URL không hợp lệ → 400", S, async () => {
   const { projectId, sheetTypeId } = await dungSheet("fadocspostbad");
@@ -1020,7 +1115,9 @@ test("POST /api/floor-approvals/:id/documents: upload file → 201", S, async ()
   assert.equal(res.status, 201);
 
   const { GET } = await import("@/app/api/floor-approvals/[id]/documents/route");
-  const list = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(id) }) });
+  const list = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: String(id) }),
+  });
   const { documents } = await list.json();
   assert.equal(documents.length, 1); // 1 file upload duy nhất cho bản ghi nghiệm thu này
 });
@@ -1036,17 +1133,21 @@ test("GET /api/work-fronts: chưa đăng nhập → 401", S, async () => {
   assert.equal(res.status, 401);
 });
 
-test("GET /api/work-fronts: thành công → tự tạo work_front còn thiếu, lọc theo sheetTypeId", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("wfget");
-  const pm = await taoUser("pm", "wfget");
-  await taoNhom(sheetTypeId, "P1", { floorLabel: "T02" });
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/work-fronts/route");
-  const res = await GET(jreq(`/api/work-fronts?sheetTypeId=${sheetTypeId}`, undefined, "GET"));
-  assert.equal(res.status, 200);
-  const { workFronts } = await res.json();
-  assert.ok(workFronts.some((w: { floorLabel: string }) => w.floorLabel === "T02"));
-});
+test(
+  "GET /api/work-fronts: thành công → tự tạo work_front còn thiếu, lọc theo sheetTypeId",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("wfget");
+    const pm = await taoUser("pm", "wfget");
+    await taoNhom(sheetTypeId, "P1", { floorLabel: "T02" });
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/work-fronts/route");
+    const res = await GET(jreq(`/api/work-fronts?sheetTypeId=${sheetTypeId}`, undefined, "GET"));
+    assert.equal(res.status, 200);
+    const { workFronts } = await res.json();
+    assert.ok(workFronts.some((w: { floorLabel: string }) => w.floorLabel === "T02"));
+  },
+);
 
 test("PATCH /api/work-fronts/:id: chưa đăng nhập → 401", S, async () => {
   dangXuat();
@@ -1307,16 +1408,20 @@ test("DELETE /api/package-dependencies/:id: chưa đăng nhập → 401", S, asy
   assert.equal(res.status, 401);
 });
 
-test("DELETE /api/package-dependencies/:id: engineer không được sửa phụ thuộc → 403", S, async () => {
-  const { projectId } = await dungSheet("pdel403");
-  const eng = await taoUser("engineer", "pdel403");
-  await dangNhapDuAn(eng, projectId);
-  const { DELETE } = await import("@/app/api/package-dependencies/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: "1" }),
-  });
-  assert.equal(res.status, 403);
-});
+test(
+  "DELETE /api/package-dependencies/:id: engineer không được sửa phụ thuộc → 403",
+  S,
+  async () => {
+    const { projectId } = await dungSheet("pdel403");
+    const eng = await taoUser("engineer", "pdel403");
+    await dangNhapDuAn(eng, projectId);
+    const { DELETE } = await import("@/app/api/package-dependencies/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: "1" }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("DELETE /api/package-dependencies/:id: id không phải số → 400", S, async () => {
   const { projectId } = await dungSheet("pdelbad");
@@ -1364,25 +1469,35 @@ test("GET /api/packages/:id/dependencies: trả đúng predecessors/successors",
   await POST(jreq("/x", { predecessorId: a }), { params: Promise.resolve({ id: String(b) }) });
 
   const { GET } = await import("@/app/api/packages/[id]/dependencies/route");
-  const resB = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(b) }) });
+  const resB = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: String(b) }),
+  });
   const { predecessors } = await resB.json();
   assert.equal(predecessors.length, 1);
   assert.equal(predecessors[0].id, a);
 
-  const resA = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(a) }) });
+  const resA = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: String(a) }),
+  });
   const { successors } = await resA.json();
   assert.equal(successors.length, 1);
   assert.equal(successors[0].id, b);
 });
 
-test("POST /api/packages/:id/dependencies: engineer không được sửa phụ thuộc → 403", S, async () => {
-  const { projectId } = await dungSheet("pdep403");
-  const eng = await taoUser("engineer", "pdep403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
-  const res = await POST(jreq("/x", { predecessorId: 1 }), { params: Promise.resolve({ id: "2" }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/packages/:id/dependencies: engineer không được sửa phụ thuộc → 403",
+  S,
+  async () => {
+    const { projectId } = await dungSheet("pdep403");
+    const eng = await taoUser("engineer", "pdep403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
+    const res = await POST(jreq("/x", { predecessorId: 1 }), {
+      params: Promise.resolve({ id: "2" }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/packages/:id/dependencies: tự phụ thuộc chính nó → 422", S, async () => {
   const { projectId, sheetTypeId } = await dungSheet("pdepself");
@@ -1423,25 +1538,29 @@ test("POST /api/packages/:id/dependencies: tạo vòng lặp → 422", S, async 
   assert.equal(res.status, 422);
 });
 
-test("POST /api/packages/:id/dependencies: tạo trùng → trả lại bản ghi đã có (existed)", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("pdepdup");
-  const pm = await taoUser("pm", "pdepdup");
-  const a = await taoNhom(sheetTypeId, "A1");
-  const b = await taoNhom(sheetTypeId, "B1");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
-  const first = await POST(jreq("/x", { predecessorId: a }), {
-    params: Promise.resolve({ id: String(b) }),
-  });
-  const second = await POST(jreq("/x", { predecessorId: a }), {
-    params: Promise.resolve({ id: String(b) }),
-  });
-  assert.equal(second.status, 200);
-  const body = await second.json();
-  assert.equal(body.existed, true);
-  const { id: id1 } = await first.json();
-  assert.equal(body.id, id1);
-});
+test(
+  "POST /api/packages/:id/dependencies: tạo trùng → trả lại bản ghi đã có (existed)",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("pdepdup");
+    const pm = await taoUser("pm", "pdepdup");
+    const a = await taoNhom(sheetTypeId, "A1");
+    const b = await taoNhom(sheetTypeId, "B1");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
+    const first = await POST(jreq("/x", { predecessorId: a }), {
+      params: Promise.resolve({ id: String(b) }),
+    });
+    const second = await POST(jreq("/x", { predecessorId: a }), {
+      params: Promise.resolve({ id: String(b) }),
+    });
+    assert.equal(second.status, 200);
+    const body = await second.json();
+    assert.equal(body.existed, true);
+    const { id: id1 } = await first.json();
+    assert.equal(body.id, id1);
+  },
+);
 
 // ============================================================================
 // PATCH /api/tasks/batch
@@ -1472,56 +1591,68 @@ test("PATCH /api/tasks/batch: không có cập nhật → 400", S, async () => {
   assert.equal(res.status, 400);
 });
 
-test("PATCH /api/tasks/batch: task không tồn tại trong lô → 422, atomic (không đổi task hợp lệ khác)", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("tbatomic");
-  const pm = await taoUser("pm", "tbatomic");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  const taskId = await taoTask(pkgId, "T1", { progress: 0 });
-  await dangNhapDuAn(pm, projectId);
-  const { PATCH } = await import("@/app/api/tasks/batch/route");
-  const res = await PATCH(
-    jreq(
-      "/x",
-      {
-        updates: [
-          { id: taskId, patch: { name: "Đổi tên" } },
-          { id: 999999999, patch: { name: "x" } },
-        ],
-      },
-      "PATCH",
-    ),
-  );
-  assert.equal(res.status, 422);
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ name: string }>(`SELECT name FROM tasks WHERE id = ?`, taskId);
-  assert.equal(row?.name, "Task T1"); // KHÔNG bị đổi — cả lô rollback.
-});
+test(
+  "PATCH /api/tasks/batch: task không tồn tại trong lô → 422, atomic (không đổi task hợp lệ khác)",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("tbatomic");
+    const pm = await taoUser("pm", "tbatomic");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    const taskId = await taoTask(pkgId, "T1", { progress: 0 });
+    await dangNhapDuAn(pm, projectId);
+    const { PATCH } = await import("@/app/api/tasks/batch/route");
+    const res = await PATCH(
+      jreq(
+        "/x",
+        {
+          updates: [
+            { id: taskId, patch: { name: "Đổi tên" } },
+            { id: 999999999, patch: { name: "x" } },
+          ],
+        },
+        "PATCH",
+      ),
+    );
+    assert.equal(res.status, 422);
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ name: string }>(`SELECT name FROM tasks WHERE id = ?`, taskId);
+    assert.equal(row?.name, "Task T1"); // KHÔNG bị đổi — cả lô rollback.
+  },
+);
 
-test("PATCH /api/tasks/batch: đặt status=nghiem_thu qua batch → 422 (phải qua approve)", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("tbnt");
-  const pm = await taoUser("pm", "tbnt");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  const taskId = await taoTask(pkgId, "T1", { progress: 1 });
-  await dangNhapDuAn(pm, projectId);
-  const { PATCH } = await import("@/app/api/tasks/batch/route");
-  const res = await PATCH(
-    jreq("/x", { updates: [{ id: taskId, patch: { status: "nghiem_thu" } }] }, "PATCH"),
-  );
-  assert.equal(res.status, 422);
-});
+test(
+  "PATCH /api/tasks/batch: đặt status=nghiem_thu qua batch → 422 (phải qua approve)",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("tbnt");
+    const pm = await taoUser("pm", "tbnt");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    const taskId = await taoTask(pkgId, "T1", { progress: 1 });
+    await dangNhapDuAn(pm, projectId);
+    const { PATCH } = await import("@/app/api/tasks/batch/route");
+    const res = await PATCH(
+      jreq("/x", { updates: [{ id: taskId, patch: { status: "nghiem_thu" } }] }, "PATCH"),
+    );
+    assert.equal(res.status, 422);
+  },
+);
 
-test("PATCH /api/tasks/batch: status thủ công không khớp % (statusConsistentWithProgress) → 422", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("tbinconsist");
-  const pm = await taoUser("pm", "tbinconsist");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  const taskId = await taoTask(pkgId, "T1", { progress: 0 });
-  await dangNhapDuAn(pm, projectId);
-  const { PATCH } = await import("@/app/api/tasks/batch/route");
-  const res = await PATCH(
-    jreq("/x", { updates: [{ id: taskId, patch: { status: "hoan_thanh" } }] }, "PATCH"),
-  );
-  assert.equal(res.status, 422);
-});
+test(
+  "PATCH /api/tasks/batch: status thủ công không khớp % (statusConsistentWithProgress) → 422",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("tbinconsist");
+    const pm = await taoUser("pm", "tbinconsist");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    const taskId = await taoTask(pkgId, "T1", { progress: 0 });
+    await dangNhapDuAn(pm, projectId);
+    const { PATCH } = await import("@/app/api/tasks/batch/route");
+    const res = await PATCH(
+      jreq("/x", { updates: [{ id: taskId, patch: { status: "hoan_thanh" } }] }, "PATCH"),
+    );
+    assert.equal(res.status, 422);
+  },
+);
 
 test("PATCH /api/tasks/batch: ngày sai định dạng → 422", S, async () => {
   const { projectId, sheetTypeId } = await dungSheet("tbdate");
@@ -1543,7 +1674,9 @@ test("PATCH /api/tasks/batch: tên rỗng → 422", S, async () => {
   const taskId = await taoTask(pkgId, "T1");
   await dangNhapDuAn(pm, projectId);
   const { PATCH } = await import("@/app/api/tasks/batch/route");
-  const res = await PATCH(jreq("/x", { updates: [{ id: taskId, patch: { name: "  " } }] }, "PATCH"));
+  const res = await PATCH(
+    jreq("/x", { updates: [{ id: taskId, patch: { name: "  " } }] }, "PATCH"),
+  );
   assert.equal(res.status, 422);
 });
 
@@ -1583,13 +1716,15 @@ test("PATCH /api/tasks/batch: mã BOQ đã dùng bởi task khác → 422", S, a
   const pkgId = await taoNhom(sheetTypeId, "P1");
   const boqCode = `BOQ-${uniq("tbboq")}`;
   const { run } = await import("@/lib/db");
-  await run(`INSERT INTO tasks (package_id, code, name, boq_code) VALUES (?, 'TX', 'x', ?)`, pkgId, boqCode);
+  await run(
+    `INSERT INTO tasks (package_id, code, name, boq_code) VALUES (?, 'TX', 'x', ?)`,
+    pkgId,
+    boqCode,
+  );
   const taskId = await taoTask(pkgId, "T1", { progress: 0 });
   await dangNhapDuAn(pm, projectId);
   const { PATCH } = await import("@/app/api/tasks/batch/route");
-  const res = await PATCH(
-    jreq("/x", { updates: [{ id: taskId, patch: { boqCode } }] }, "PATCH"),
-  );
+  const res = await PATCH(jreq("/x", { updates: [{ id: taskId, patch: { boqCode } }] }, "PATCH"));
   assert.equal(res.status, 422);
 });
 
@@ -1736,18 +1871,22 @@ test("GET /api/tasks/:id/documents: subcon KHÔNG được giao task → 403", S
   assert.equal(res.status, 403);
 });
 
-test("POST /api/tasks/:id/documents: viewer không có quyền (CAN.editProgress) → 403", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("tdocpost403");
-  const viewer = await taoUser("viewer", "tdocpost403");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  const taskId = await taoTask(pkgId, "T1");
-  await dangNhapDuAn(viewer, projectId);
-  const { POST } = await import("@/app/api/tasks/[id]/documents/route");
-  const res = await POST(formReq("/x", pdfForm()), {
-    params: Promise.resolve({ id: String(taskId) }),
-  });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/tasks/:id/documents: viewer không có quyền (CAN.editProgress) → 403",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("tdocpost403");
+    const viewer = await taoUser("viewer", "tdocpost403");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    const taskId = await taoTask(pkgId, "T1");
+    await dangNhapDuAn(viewer, projectId);
+    const { POST } = await import("@/app/api/tasks/[id]/documents/route");
+    const res = await POST(formReq("/x", pdfForm()), {
+      params: Promise.resolve({ id: String(taskId) }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/tasks/:id/documents: task không tồn tại → 404", S, async () => {
   const { projectId } = await dungSheet("tdocpost404");
@@ -1773,24 +1912,28 @@ test("POST /api/tasks/:id/documents: loại hồ sơ (docCategory) không hợp 
   assert.equal(res.status, 422);
 });
 
-test("POST /api/tasks/:id/documents: subcon upload tài liệu cho task ĐƯỢC giao → 201", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("tdocsubok");
-  const sub = await taoUser("subcon", "tdocsubok");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  const taskId = await taoTask(pkgId, "T1", { assignedTo: sub.id });
-  await dangNhapDuAn(sub, projectId);
-  const { POST } = await import("@/app/api/tasks/[id]/documents/route");
-  const res = await POST(formReq("/x", pdfForm()), {
-    params: Promise.resolve({ id: String(taskId) }),
-  });
-  assert.equal(res.status, 201);
-  const { GET } = await import("@/app/api/tasks/[id]/documents/route");
-  const list = await GET(jreq("/x", undefined, "GET"), {
-    params: Promise.resolve({ id: String(taskId) }),
-  });
-  const { documents } = await list.json();
-  assert.equal(documents.length, 1);
-});
+test(
+  "POST /api/tasks/:id/documents: subcon upload tài liệu cho task ĐƯỢC giao → 201",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("tdocsubok");
+    const sub = await taoUser("subcon", "tdocsubok");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    const taskId = await taoTask(pkgId, "T1", { assignedTo: sub.id });
+    await dangNhapDuAn(sub, projectId);
+    const { POST } = await import("@/app/api/tasks/[id]/documents/route");
+    const res = await POST(formReq("/x", pdfForm()), {
+      params: Promise.resolve({ id: String(taskId) }),
+    });
+    assert.equal(res.status, 201);
+    const { GET } = await import("@/app/api/tasks/[id]/documents/route");
+    const list = await GET(jreq("/x", undefined, "GET"), {
+      params: Promise.resolve({ id: String(taskId) }),
+    });
+    const { documents } = await list.json();
+    assert.equal(documents.length, 1);
+  },
+);
 
 // ============================================================================
 // GET/POST /api/tasks/:id/photos · GET/DELETE /api/photos/:id
@@ -1876,26 +2019,30 @@ test("POST /api/tasks/:id/photos: task không tồn tại → 404", S, async () 
   assert.equal(res.status, 404);
 });
 
-test("POST /api/tasks/:id/photos: thành công, upload lại cùng ảnh trong 24h → dedup", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("tphotook");
-  const pm = await taoUser("pm", "tphotook");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  const taskId = await taoTask(pkgId, "T1");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/tasks/[id]/photos/route");
-  const first = await POST(formReq("/x", pngForm()), {
-    params: Promise.resolve({ id: String(taskId) }),
-  });
-  assert.equal(first.status, 201);
-  const { id: id1 } = await first.json();
-  const second = await POST(formReq("/x", pngForm()), {
-    params: Promise.resolve({ id: String(taskId) }),
-  });
-  assert.equal(second.status, 200);
-  const body2 = await second.json();
-  assert.equal(body2.deduped, true);
-  assert.equal(body2.id, id1);
-});
+test(
+  "POST /api/tasks/:id/photos: thành công, upload lại cùng ảnh trong 24h → dedup",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("tphotook");
+    const pm = await taoUser("pm", "tphotook");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    const taskId = await taoTask(pkgId, "T1");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/tasks/[id]/photos/route");
+    const first = await POST(formReq("/x", pngForm()), {
+      params: Promise.resolve({ id: String(taskId) }),
+    });
+    assert.equal(first.status, 201);
+    const { id: id1 } = await first.json();
+    const second = await POST(formReq("/x", pngForm()), {
+      params: Promise.resolve({ id: String(taskId) }),
+    });
+    assert.equal(second.status, 200);
+    const body2 = await second.json();
+    assert.equal(body2.deduped, true);
+    assert.equal(body2.id, id1);
+  },
+);
 
 test("GET /api/photos/:id: chưa đăng nhập → 401", S, async () => {
   dangXuat();
@@ -2002,7 +2149,11 @@ test("DELETE /api/photos/:id: người upload xoá được ảnh của mình", 
 // DELETE /api/comments/:id
 // ============================================================================
 
-async function taoComment(taskId: number, userId: number, body = "Bình luận test"): Promise<number> {
+async function taoComment(
+  taskId: number,
+  userId: number,
+  body = "Bình luận test",
+): Promise<number> {
   const { insertId } = await import("@/lib/db");
   return insertId(
     `INSERT INTO task_comments (task_id, user_id, body) VALUES (?, ?, ?)`,
@@ -2120,40 +2271,48 @@ test("POST /api/dimensions/rename: tên cột mới rỗng → 400", S, async ()
   assert.equal(res.status, 400);
 });
 
-test("POST /api/dimensions/rename: đổi trùng nhãn đã có ở task khác trong sheet → 409", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("drndup");
-  const pm = await taoUser("pm", "drndup");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  const t1 = await taoTask(pkgId, "T1");
-  await taoDim(t1, "Ø100");
-  await taoDim(t1, "Ø200");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/dimensions/rename/route");
-  const res = await POST(jreq("/x", { packageId: pkgId, oldLabel: "Ø100", newLabel: "Ø200" }));
-  assert.equal(res.status, 409);
-});
+test(
+  "POST /api/dimensions/rename: đổi trùng nhãn đã có ở task khác trong sheet → 409",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("drndup");
+    const pm = await taoUser("pm", "drndup");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    const t1 = await taoTask(pkgId, "T1");
+    await taoDim(t1, "Ø100");
+    await taoDim(t1, "Ø200");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/dimensions/rename/route");
+    const res = await POST(jreq("/x", { packageId: pkgId, oldLabel: "Ø100", newLabel: "Ø200" }));
+    assert.equal(res.status, 409);
+  },
+);
 
-test("POST /api/dimensions/rename: thành công → đổi tên cột toàn sheet + bump watermark", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("drnok");
-  const pm = await taoUser("pm", "drnok");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  const t1 = await taoTask(pkgId, "T1");
-  await taoDim(t1, "Ø100");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/dimensions/rename/route");
-  const res = await POST(jreq("/x", { packageId: pkgId, oldLabel: "Ø100", newLabel: "Ø150" }));
-  assert.equal(res.status, 200);
-  const { updated } = await res.json();
-  assert.equal(updated, 1);
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ version: number }>(
-    `SELECT version FROM sheet_versions WHERE sheet_type_id = ?`,
-    sheetTypeId,
-  );
-  // Trigger bump_sheet_version (migration 0067) đã bump 2 lần trước đó (tạo nhóm +
-  // tạo task) — rename bump thêm 1 lần nữa qua code trong route.
-  assert.equal(row?.version, 3);
-});
+test(
+  "POST /api/dimensions/rename: thành công → đổi tên cột toàn sheet + bump watermark",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("drnok");
+    const pm = await taoUser("pm", "drnok");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    const t1 = await taoTask(pkgId, "T1");
+    await taoDim(t1, "Ø100");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/dimensions/rename/route");
+    const res = await POST(jreq("/x", { packageId: pkgId, oldLabel: "Ø100", newLabel: "Ø150" }));
+    assert.equal(res.status, 200);
+    const { updated } = await res.json();
+    assert.equal(updated, 1);
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ version: number }>(
+      `SELECT version FROM sheet_versions WHERE sheet_type_id = ?`,
+      sheetTypeId,
+    );
+    // Trigger bump_sheet_version (migration 0067) đã bump 2 lần trước đó (tạo nhóm +
+    // tạo task) — rename bump thêm 1 lần nữa qua code trong route.
+    assert.equal(row?.version, 3);
+  },
+);
 
 // ============================================================================
 // GET/POST/DELETE /api/workpackages/:id/bbnt
@@ -2212,16 +2371,20 @@ test("POST /api/workpackages/:id/bbnt: nhóm không tồn tại → 404", S, asy
   assert.equal(res.status, 404);
 });
 
-test("DELETE /api/workpackages/:id/bbnt: nhóm không tồn tại vẫn xoá được (không lỗi)", S, async () => {
-  const { projectId } = await dungSheet("bbntdel404");
-  const pm = await taoUser("pm", "bbntdel404");
-  await dangNhapDuAn(pm, projectId);
-  const { DELETE } = await import("@/app/api/workpackages/[id]/bbnt/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: "999999999" }),
-  });
-  assert.equal(res.status, 200);
-});
+test(
+  "DELETE /api/workpackages/:id/bbnt: nhóm không tồn tại vẫn xoá được (không lỗi)",
+  S,
+  async () => {
+    const { projectId } = await dungSheet("bbntdel404");
+    const pm = await taoUser("pm", "bbntdel404");
+    await dangNhapDuAn(pm, projectId);
+    const { DELETE } = await import("@/app/api/workpackages/[id]/bbnt/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: "999999999" }),
+    });
+    assert.equal(res.status, 200);
+  },
+);
 
 test("POST /api/workpackages/:id/bbnt: viewer không có quyền → 403", S, async () => {
   const { projectId, sheetTypeId } = await dungSheet("bbntpost403");
@@ -2229,7 +2392,9 @@ test("POST /api/workpackages/:id/bbnt: viewer không có quyền → 403", S, as
   const pkgId = await taoNhom(sheetTypeId, "P1");
   await dangNhapDuAn(viewer, projectId);
   const { POST } = await import("@/app/api/workpackages/[id]/bbnt/route");
-  const res = await POST(formReq("/x", pdfForm()), { params: Promise.resolve({ id: String(pkgId) }) });
+  const res = await POST(formReq("/x", pdfForm()), {
+    params: Promise.resolve({ id: String(pkgId) }),
+  });
   assert.equal(res.status, 403);
 });
 
@@ -2382,32 +2547,40 @@ test("POST /api/workpackages/:id/dimensions/column: nhóm chưa có task → 400
   assert.equal(res.status, 400);
 });
 
-test("POST /api/workpackages/:id/dimensions/column: afterLabel không tồn tại → 400", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("colpafterbad");
-  const pm = await taoUser("pm", "colpafterbad");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  await taoTask(pkgId, "T1");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
-  const res = await POST(jreq("/x", { label: "Ø100", afterLabel: "khong_co" }), {
-    params: Promise.resolve({ id: String(pkgId) }),
-  });
-  assert.equal(res.status, 400);
-});
+test(
+  "POST /api/workpackages/:id/dimensions/column: afterLabel không tồn tại → 400",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("colpafterbad");
+    const pm = await taoUser("pm", "colpafterbad");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    await taoTask(pkgId, "T1");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
+    const res = await POST(jreq("/x", { label: "Ø100", afterLabel: "khong_co" }), {
+      params: Promise.resolve({ id: String(pkgId) }),
+    });
+    assert.equal(res.status, 400);
+  },
+);
 
-test("POST /api/workpackages/:id/dimensions/column: cột đã tồn tại ở mọi task → 409", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("colpdup");
-  const pm = await taoUser("pm", "colpdup");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  const t1 = await taoTask(pkgId, "T1");
-  await taoDim(t1, "Ø100");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
-  const res = await POST(jreq("/x", { label: "Ø100" }), {
-    params: Promise.resolve({ id: String(pkgId) }),
-  });
-  assert.equal(res.status, 409);
-});
+test(
+  "POST /api/workpackages/:id/dimensions/column: cột đã tồn tại ở mọi task → 409",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("colpdup");
+    const pm = await taoUser("pm", "colpdup");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    const t1 = await taoTask(pkgId, "T1");
+    await taoDim(t1, "Ø100");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
+    const res = await POST(jreq("/x", { label: "Ø100" }), {
+      params: Promise.resolve({ id: String(pkgId) }),
+    });
+    assert.equal(res.status, 409);
+  },
+);
 
 test(
   "POST /api/workpackages/:id/dimensions/column: thành công → thêm cột mới sau afterLabel, đẩy cột sau",
@@ -2513,19 +2686,23 @@ test("PATCH /api/workpackages/:id/dimensions/column: action không hợp lệ �
   assert.equal(res.status, 400);
 });
 
-test("PATCH /api/workpackages/:id/dimensions/column: cột gốc (label) không tồn tại → 404", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("colcsrc404");
-  const pm = await taoUser("pm", "colcsrc404");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  await taoTask(pkgId, "T1");
-  await dangNhapDuAn(pm, projectId);
-  const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
-  const res = await PATCH(
-    jreq("/x", { action: "copy", label: "khong_co", newLabel: "Ø999" }, "PATCH"),
-    { params: Promise.resolve({ id: String(pkgId) }) },
-  );
-  assert.equal(res.status, 404);
-});
+test(
+  "PATCH /api/workpackages/:id/dimensions/column: cột gốc (label) không tồn tại → 404",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("colcsrc404");
+    const pm = await taoUser("pm", "colcsrc404");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    await taoTask(pkgId, "T1");
+    await dangNhapDuAn(pm, projectId);
+    const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
+    const res = await PATCH(
+      jreq("/x", { action: "copy", label: "khong_co", newLabel: "Ø999" }, "PATCH"),
+      { params: Promise.resolve({ id: String(pkgId) }) },
+    );
+    assert.equal(res.status, 404);
+  },
+);
 
 test(
   "PATCH /api/workpackages/:id/dimensions/column: copy thành công → cột mới reset unchecked",
@@ -2563,16 +2740,20 @@ test("PATCH /api/workpackages/:id/dimensions/column/move: chưa đăng nhập �
   assert.equal(res.status, 401);
 });
 
-test("PATCH /api/workpackages/:id/dimensions/column/move: engineer không có quyền → 403", S, async () => {
-  const { projectId } = await dungSheet("colmv403");
-  const eng = await taoUser("engineer", "colmv403");
-  await dangNhapDuAn(eng, projectId);
-  const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/move/route");
-  const res = await PATCH(jreq("/x", { label: "x", direction: "left" }, "PATCH"), {
-    params: Promise.resolve({ id: "1" }),
-  });
-  assert.equal(res.status, 403);
-});
+test(
+  "PATCH /api/workpackages/:id/dimensions/column/move: engineer không có quyền → 403",
+  S,
+  async () => {
+    const { projectId } = await dungSheet("colmv403");
+    const eng = await taoUser("engineer", "colmv403");
+    await dangNhapDuAn(eng, projectId);
+    const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/move/route");
+    const res = await PATCH(jreq("/x", { label: "x", direction: "left" }, "PATCH"), {
+      params: Promise.resolve({ id: "1" }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("PATCH /api/workpackages/:id/dimensions/column/move: direction sai → 400", S, async () => {
   const { projectId, sheetTypeId } = await dungSheet("colmvval");
@@ -2586,17 +2767,21 @@ test("PATCH /api/workpackages/:id/dimensions/column/move: direction sai → 400"
   assert.equal(res.status, 400);
 });
 
-test("PATCH /api/workpackages/:id/dimensions/column/move: nhóm không có task → 400", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("colmvnotask");
-  const pm = await taoUser("pm", "colmvnotask");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  await dangNhapDuAn(pm, projectId);
-  const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/move/route");
-  const res = await PATCH(jreq("/x", { label: "Ø100", direction: "left" }, "PATCH"), {
-    params: Promise.resolve({ id: String(pkgId) }),
-  });
-  assert.equal(res.status, 400);
-});
+test(
+  "PATCH /api/workpackages/:id/dimensions/column/move: nhóm không có task → 400",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("colmvnotask");
+    const pm = await taoUser("pm", "colmvnotask");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    await dangNhapDuAn(pm, projectId);
+    const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/move/route");
+    const res = await PATCH(jreq("/x", { label: "Ø100", direction: "left" }, "PATCH"), {
+      params: Promise.resolve({ id: String(pkgId) }),
+    });
+    assert.equal(res.status, 400);
+  },
+);
 
 test("PATCH /api/workpackages/:id/dimensions/column/move: cột không tồn tại → 404", S, async () => {
   const { projectId, sheetTypeId } = await dungSheet("colmv404");
@@ -2611,43 +2796,51 @@ test("PATCH /api/workpackages/:id/dimensions/column/move: cột không tồn t�
   assert.equal(res.status, 404);
 });
 
-test("PATCH /api/workpackages/:id/dimensions/column/move: đã ở vị trí đầu → không đổi", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("colmvedge");
-  const pm = await taoUser("pm", "colmvedge");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  const t1 = await taoTask(pkgId, "T1");
-  await taoDim(t1, "Ø100", 1);
-  await taoDim(t1, "Ø200", 2);
-  await dangNhapDuAn(pm, projectId);
-  const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/move/route");
-  const res = await PATCH(jreq("/x", { label: "Ø100", direction: "left" }, "PATCH"), {
-    params: Promise.resolve({ id: String(pkgId) }),
-  });
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.ok, false);
-});
+test(
+  "PATCH /api/workpackages/:id/dimensions/column/move: đã ở vị trí đầu → không đổi",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("colmvedge");
+    const pm = await taoUser("pm", "colmvedge");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    const t1 = await taoTask(pkgId, "T1");
+    await taoDim(t1, "Ø100", 1);
+    await taoDim(t1, "Ø200", 2);
+    await dangNhapDuAn(pm, projectId);
+    const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/move/route");
+    const res = await PATCH(jreq("/x", { label: "Ø100", direction: "left" }, "PATCH"), {
+      params: Promise.resolve({ id: String(pkgId) }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.ok, false);
+  },
+);
 
-test("PATCH /api/workpackages/:id/dimensions/column/move: thành công → hoán đổi vị trí 2 cột", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("colmvok");
-  const pm = await taoUser("pm", "colmvok");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  const t1 = await taoTask(pkgId, "T1");
-  await taoDim(t1, "Ø100", 1);
-  await taoDim(t1, "Ø200", 2);
-  await dangNhapDuAn(pm, projectId);
-  const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/move/route");
-  const res = await PATCH(jreq("/x", { label: "Ø200", direction: "left" }, "PATCH"), {
-    params: Promise.resolve({ id: String(pkgId) }),
-  });
-  assert.equal(res.status, 200);
-  const { GET } = await import("@/app/api/workpackages/[id]/dimensions/route");
-  const list = await GET(jreq("/x", undefined, "GET"), {
-    params: Promise.resolve({ id: String(pkgId) }),
-  });
-  const { columns } = await list.json();
-  assert.deepEqual(columns, ["Ø200", "Ø100"]);
-});
+test(
+  "PATCH /api/workpackages/:id/dimensions/column/move: thành công → hoán đổi vị trí 2 cột",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("colmvok");
+    const pm = await taoUser("pm", "colmvok");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    const t1 = await taoTask(pkgId, "T1");
+    await taoDim(t1, "Ø100", 1);
+    await taoDim(t1, "Ø200", 2);
+    await dangNhapDuAn(pm, projectId);
+    const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/move/route");
+    const res = await PATCH(jreq("/x", { label: "Ø200", direction: "left" }, "PATCH"), {
+      params: Promise.resolve({ id: String(pkgId) }),
+    });
+    assert.equal(res.status, 200);
+    const { GET } = await import("@/app/api/workpackages/[id]/dimensions/route");
+    const list = await GET(jreq("/x", undefined, "GET"), {
+      params: Promise.resolve({ id: String(pkgId) }),
+    });
+    const { columns } = await list.json();
+    assert.deepEqual(columns, ["Ø200", "Ø100"]);
+  },
+);
 
 // ============================================================================
 // GET/POST/DELETE /api/workpackages/:id/drawing
@@ -2694,16 +2887,20 @@ test("POST /api/workpackages/:id/drawing: nhóm không tồn tại → 404", S, 
   assert.equal(res.status, 404);
 });
 
-test("DELETE /api/workpackages/:id/drawing: nhóm không tồn tại vẫn xoá được (không lỗi)", S, async () => {
-  const { projectId } = await dungSheet("drawdel404");
-  const pm = await taoUser("pm", "drawdel404");
-  await dangNhapDuAn(pm, projectId);
-  const { DELETE } = await import("@/app/api/workpackages/[id]/drawing/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: "999999999" }),
-  });
-  assert.equal(res.status, 200);
-});
+test(
+  "DELETE /api/workpackages/:id/drawing: nhóm không tồn tại vẫn xoá được (không lỗi)",
+  S,
+  async () => {
+    const { projectId } = await dungSheet("drawdel404");
+    const pm = await taoUser("pm", "drawdel404");
+    await dangNhapDuAn(pm, projectId);
+    const { DELETE } = await import("@/app/api/workpackages/[id]/drawing/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: "999999999" }),
+    });
+    assert.equal(res.status, 200);
+  },
+);
 
 test("POST /api/workpackages/:id/drawing: viewer không có quyền → 403", S, async () => {
   const { projectId, sheetTypeId } = await dungSheet("drawpost403");
@@ -2901,19 +3098,23 @@ test("GET /api/workpackages/qc-status: thiếu sheetTypeId → 422", S, async ()
   assert.equal(res.status, 422);
 });
 
-test("GET /api/workpackages/qc-status: thành công → mảng rỗng khi không nhóm nào bị chặn", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("qcstatok");
-  const pm = await taoUser("pm", "qcstatok");
-  await taoNhom(sheetTypeId, "P1");
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/workpackages/qc-status/route");
-  const res = await GET(
-    jreq(`/api/workpackages/qc-status?sheetTypeId=${sheetTypeId}`, undefined, "GET"),
-  );
-  assert.equal(res.status, 200);
-  const { blocked } = await res.json();
-  assert.deepEqual(blocked, []);
-});
+test(
+  "GET /api/workpackages/qc-status: thành công → mảng rỗng khi không nhóm nào bị chặn",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("qcstatok");
+    const pm = await taoUser("pm", "qcstatok");
+    await taoNhom(sheetTypeId, "P1");
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/workpackages/qc-status/route");
+    const res = await GET(
+      jreq(`/api/workpackages/qc-status?sheetTypeId=${sheetTypeId}`, undefined, "GET"),
+    );
+    assert.equal(res.status, 200);
+    const { blocked } = await res.json();
+    assert.deepEqual(blocked, []);
+  },
+);
 
 // ============================================================================
 // GET /api/my-tasks
@@ -2926,24 +3127,28 @@ test("GET /api/my-tasks: chưa đăng nhập → 401", S, async () => {
   assert.equal(res.status, 401);
 });
 
-test("GET /api/my-tasks: chỉ trả task được giao cho CHÍNH mình, lọc theo dự án đang chọn", S, async () => {
-  const { projectId, sheetTypeId } = await dungSheet("mytasks");
-  const me = await taoUser("engineer", "mytasks");
-  const other = await taoUser("engineer", "mytasksOther");
-  const pkgId = await taoNhom(sheetTypeId, "P1");
-  await taoTask(pkgId, "T1", { assignedTo: me.id, progress: 0, endDate: "2020-01-01" }); // trễ
-  await taoTask(pkgId, "T2", { assignedTo: me.id, progress: 1 }); // xong
-  await taoTask(pkgId, "T3", { assignedTo: other.id });
-  await dangNhapDuAn(me, projectId);
-  const { GET } = await import("@/app/api/my-tasks/route");
-  const res = await GET();
-  assert.equal(res.status, 200);
-  const { tasks, summary } = await res.json();
-  assert.equal(tasks.length, 2);
-  assert.equal(summary.total, 2);
-  assert.equal(summary.delayed, 1);
-  assert.equal(summary.done, 1);
-});
+test(
+  "GET /api/my-tasks: chỉ trả task được giao cho CHÍNH mình, lọc theo dự án đang chọn",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("mytasks");
+    const me = await taoUser("engineer", "mytasks");
+    const other = await taoUser("engineer", "mytasksOther");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    await taoTask(pkgId, "T1", { assignedTo: me.id, progress: 0, endDate: "2020-01-01" }); // trễ
+    await taoTask(pkgId, "T2", { assignedTo: me.id, progress: 1 }); // xong
+    await taoTask(pkgId, "T3", { assignedTo: other.id });
+    await dangNhapDuAn(me, projectId);
+    const { GET } = await import("@/app/api/my-tasks/route");
+    const res = await GET();
+    assert.equal(res.status, 200);
+    const { tasks, summary } = await res.json();
+    assert.equal(tasks.length, 2);
+    assert.equal(summary.total, 2);
+    assert.equal(summary.delayed, 1);
+    assert.equal(summary.done, 1);
+  },
+);
 
 // ============================================================================
 // PATCH/DELETE /api/towers/:id

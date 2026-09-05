@@ -464,7 +464,7 @@ export default function AdminPage() {
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
         aria-label={label}
-        className="bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 w-[210px] shrink-0 transition"
+        className="bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-base sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 w-[210px] shrink-0 transition"
       >
         <option value="">— Kế thừa / chưa gán —</option>
         {users.map((u) => {

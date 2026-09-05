@@ -29,17 +29,17 @@
 
 ## Tổng quan 9 giai đoạn
 
-| GĐ | Tên | Thời gian (solo) | Cổng để qua |
-|----|-----|------------------|-------------|
-| 0 | Ý tưởng & Xác thực | 3–7 ngày | Có bằng chứng nhu cầu thật |
-| 1 | Lập kế hoạch & Phạm vi | 2–4 ngày | MVP + tiêu chí chấp nhận + DoD rõ ràng |
-| 2 | Thiết kế | 3–7 ngày | Schema CSDL + kiến trúc + API contract được duyệt |
-| 3 | Thiết lập môi trường | 1–2 ngày | Hàng rào tự động hoạt động, deploy thử OK |
-| 4 | Phát triển | 60–70% thời gian | Tính năng đạt tiêu chí chấp nhận |
-| 5 | Kiểm thử | Đan xen GĐ 4 | Test xanh, qua các loại kiểm thử bắt buộc |
-| 6 | Triển khai | 1–2 ngày | Cổng CI/CD đạt, backup & rollback sẵn sàng |
-| 7 | Ra mắt | ~1 tuần | Checklist pháp lý/SEO/onboarding đủ |
-| 8 | Sau ra mắt | Liên tục | Quy trình giám sát & cải tiến vận hành |
+| GĐ  | Tên                    | Thời gian (solo) | Cổng để qua                                       |
+| --- | ---------------------- | ---------------- | ------------------------------------------------- |
+| 0   | Ý tưởng & Xác thực     | 3–7 ngày         | Có bằng chứng nhu cầu thật                        |
+| 1   | Lập kế hoạch & Phạm vi | 2–4 ngày         | MVP + tiêu chí chấp nhận + DoD rõ ràng            |
+| 2   | Thiết kế               | 3–7 ngày         | Schema CSDL + kiến trúc + API contract được duyệt |
+| 3   | Thiết lập môi trường   | 1–2 ngày         | Hàng rào tự động hoạt động, deploy thử OK         |
+| 4   | Phát triển             | 60–70% thời gian | Tính năng đạt tiêu chí chấp nhận                  |
+| 5   | Kiểm thử               | Đan xen GĐ 4     | Test xanh, qua các loại kiểm thử bắt buộc         |
+| 6   | Triển khai             | 1–2 ngày         | Cổng CI/CD đạt, backup & rollback sẵn sàng        |
+| 7   | Ra mắt                 | ~1 tuần          | Checklist pháp lý/SEO/onboarding đủ               |
+| 8   | Sau ra mắt             | Liên tục         | Quy trình giám sát & cải tiến vận hành            |
 
 ---
 
@@ -48,6 +48,7 @@
 **Mục tiêu:** Chắc chắn vấn đề có thật và có người cần, trước khi viết dòng code nào.
 
 **Việc cần làm:**
+
 - [ ] Phát biểu vấn đề trong 1–2 câu rõ ràng (ai, khi nào, đau ở đâu).
 - [ ] Xác định người dùng mục tiêu cụ thể (không "mọi người").
 - [ ] Phân tích đối thủ có dẫn chứng: họ thiếu gì, mình khác ở đâu.
@@ -66,15 +67,17 @@
 **Mục tiêu:** Định nghĩa MVP nhỏ nhất nhưng đủ dùng.
 
 **Việc cần làm:**
+
 - [ ] Liệt kê mọi tính năng, rồi phân loại **MoSCoW** (Must / Should / Could / Won't).
 - [ ] Viết **tiêu chí chấp nhận** đo được cho từng tính năng Must (thế nào là "đúng").
-- [ ] Viết user story: *"Là [ai], tôi muốn [làm gì] để [mục đích gì]."*
+- [ ] Viết user story: _"Là [ai], tôi muốn [làm gì] để [mục đích gì]."_
 - [ ] Vẽ luồng người dùng chính (user flow).
 - [ ] Liệt kê **yêu cầu phi chức năng**: tốc độ mục tiêu, mức bảo mật, accessibility, thiết bị hỗ trợ.
 - [ ] Chốt tech stack **theo KHUNG 3** (nghiên cứu, cân bằng phổ biến ↔ năng lực, **phiên bản ổn định đã xác minh**, ghi ADR).
 - [ ] **Đóng băng phạm vi MVP** — ý tưởng mới đi vào danh sách chờ.
 
 **Định nghĩa "Done" (DoD) — một tính năng chỉ XONG khi:**
+
 - Chạy đúng tiêu chí chấp nhận.
 - Qua lint, format, type-check, build.
 - Có test cho logic quan trọng và test xanh.
@@ -95,6 +98,7 @@
 **Mục tiêu:** Hình dung sản phẩm trước khi xây.
 
 **Cơ sở dữ liệu (khó sửa nhất — làm kỹ):**
+
 - [ ] Chuẩn hóa hợp lý; phi chuẩn hóa có chủ đích nếu cần tốc độ.
 - [ ] Ràng buộc đầy đủ: `NOT NULL`, `UNIQUE`, kiểu chặt, khóa ngoại + hành vi `ON DELETE`.
 - [ ] Index cho cột hay lọc/sắp xếp/join.
@@ -102,11 +106,13 @@
 - [ ] Thời gian dùng UTC; tiền tệ tránh số thực (float).
 
 **Kiến trúc & API:**
+
 - [ ] "Hợp đồng API" rõ: đầu vào, đầu ra, mã lỗi cho mỗi endpoint.
 - [ ] Phân định rạch ròi client vs server; logic nhạy cảm luôn ở server.
 - [ ] Mô hình mối đe dọa đơn giản: ai tấn công ở đâu (lạm dụng input, vượt quyền, lộ dữ liệu).
 
 **Giao diện:**
+
 - [ ] Design tokens nhất quán (màu, khoảng cách, font) — không "màu tùy hứng".
 - [ ] **Theme: nền Dark blue mặc định + chế độ Light** (xem `BO-SUNG-chat-luong.md` PHẦN 3).
 - [ ] Mobile-first; responsive (checklist cụ thể: `docs/audit.md` §5 — UI/UX & Accessibility).
@@ -123,6 +129,7 @@
 **Mục tiêu:** Dựng sẵn "hàng rào tự động" TRƯỚC khi viết code nghiệp vụ. (Cấu hình cụ thể: xem file hướng dẫn pre-commit + CI.)
 
 **Bắt buộc:**
+
 - [ ] TypeScript `strict` toàn phần.
 - [ ] ESLint (nghiêm) + Prettier.
 - [ ] **Pre-commit hooks** (Husky + lint-staged): chặn commit nếu lint/format/type-check fail.
@@ -145,17 +152,20 @@
 **Trình tự:** CSDL → xác thực người dùng → tính năng lõi (theo ưu tiên) → giao diện → xử lý lỗi/biên.
 
 **Tiêu chuẩn code:**
+
 - [ ] Không bỏ qua cảnh báo nào của linter/type-checker.
 - [ ] Mọi đầu vào người dùng/API được validate (ví dụ Zod) trước khi dùng.
 - [ ] Mọi thao tác có thể fail đều có nhánh xử lý lỗi.
 - [ ] Không "số/chuỗi ma thuật"; hàm nhỏ làm một việc; tên tự giải thích; không lặp logic.
 
 **Bảo mật khi code:**
+
 - [ ] Truy vấn tham số hóa (chống SQL injection).
 - [ ] Escape dữ liệu hiển thị ra HTML (chống XSS).
 - [ ] Kiểm tra quyền phía server cho mọi thao tác nhạy cảm.
 
 **Git:**
+
 - [ ] Mỗi tính năng/sửa lỗi một nhánh riêng.
 - [ ] Commit nhỏ; dùng **conventional commits** (`feat`, `fix`, `refactor`, `docs`...).
 - [ ] Mọi merge vào nhánh chính qua PR (kể cả làm một mình — để tự review).
@@ -173,6 +183,7 @@
 **Kim tự tháp kiểm thử:** nhiều unit test → ít hơn integration test → ít e2e cho luồng quan trọng nhất. Ưu tiên phủ **đường đi quan trọng + trường hợp biên**, không chạy theo con số phần trăm máy móc.
 
 **Loại kiểm thử bắt buộc:**
+
 - [ ] Trường hợp biên: ô trống, dữ liệu cực dài, số âm, ký tự lạ, nhấn nút liên tục, mất mạng giữa chừng.
 - [ ] Bảo mật cơ bản: thử truy cập dữ liệu người khác, thử vượt kiểm tra phía client.
 - [ ] Accessibility: điều hướng bằng bàn phím, trình đọc màn hình, tương phản; **tự động** bằng `jsx-a11y` + axe (Nhóm 2 mục 3).
@@ -192,11 +203,13 @@
 **Mục tiêu:** Đưa lên production an toàn.
 
 **Cổng chất lượng CI/CD (phải đạt trước khi lên production):**
+
 - [ ] Toàn bộ test xanh (gồm **E2E Playwright**), build OK, không lỗi type/lint.
 - [ ] **Lighthouse CI xanh** — ngân sách hiệu năng (Performance/A11y/Best-Practices/SEO ≥ 90; CWV trong ngưỡng) là **cổng tự động** trên PR (xem `lighthouserc.json` + Nhóm 2 mục 2).
 - [ ] Audit bảo mật: không còn lỗ hổng nghiêm trọng.
 
 **Vận hành:**
+
 - [ ] Migration CSDL có phiên bản, chạy được và **rollback được**.
 - [ ] Row Level Security đã bật và đã test trước khi mở cho người ngoài.
 - [ ] Giám sát + theo dõi lỗi (Sentry) + cảnh báo đã hoạt động.
@@ -215,6 +228,7 @@
 **Mục tiêu:** Đưa sản phẩm đến người dùng thật và bắt đầu thu phản hồi.
 
 **Checklist trước khi công khai:**
+
 - [ ] Pháp lý: privacy policy + terms (đặc biệt nếu thu thập dữ liệu).
 - [ ] SEO cơ bản: meta, title, Open Graph, sitemap, robots.txt.
 - [ ] Analytics đã cài.
@@ -236,6 +250,7 @@
 **Mục tiêu:** Cải tiến liên tục dựa trên dữ liệu thật.
 
 **Vận hành liên tục:**
+
 - [ ] Quy trình xử lý sự cố (incident response) rõ ràng.
 - [ ] Giám sát liên tục: lỗi, tốc độ, thời gian phản hồi.
 - [ ] Cập nhật phụ thuộc đều đặn (Dependabot) — vá bảo mật kịp thời.

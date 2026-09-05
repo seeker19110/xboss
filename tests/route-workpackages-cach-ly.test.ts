@@ -238,23 +238,27 @@ test("DELETE /api/workpackages/:id: đúng dự án của mình → 200, xoá th
 // POST /api/workpackages/:id/tasks
 // ============================================================================
 
-test("POST /api/workpackages/:id/tasks: nhóm thuộc dự án khác → 404, KHÔNG tạo task", S, async () => {
-  const a = await dungSheet("wpTaskA");
-  const b = await dungSheet("wpTaskB");
-  const pkgB = await taoNhom(b.sheetTypeId, "B1");
-  const pmA = await taoUser("pm", "wpTaskA");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "POST /api/workpackages/:id/tasks: nhóm thuộc dự án khác → 404, KHÔNG tạo task",
+  S,
+  async () => {
+    const a = await dungSheet("wpTaskA");
+    const b = await dungSheet("wpTaskB");
+    const pkgB = await taoNhom(b.sheetTypeId, "B1");
+    const pmA = await taoUser("pm", "wpTaskA");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { POST } = await import("@/app/api/workpackages/[id]/tasks/route");
-  const res = await POST(jreq("/x", { code: "T1", name: "Task hack" }), {
-    params: Promise.resolve({ id: String(pkgB) }),
-  });
-  assert.equal(res.status, 404);
+    const { POST } = await import("@/app/api/workpackages/[id]/tasks/route");
+    const res = await POST(jreq("/x", { code: "T1", name: "Task hack" }), {
+      params: Promise.resolve({ id: String(pkgB) }),
+    });
+    assert.equal(res.status, 404);
 
-  const { queryOne } = await import("@/lib/db");
-  const t = await queryOne(`SELECT id FROM tasks WHERE package_id = ? AND code = ?`, pkgB, "T1");
-  assert.equal(t, undefined, "không được tạo task ở nhóm dự án khác");
-});
+    const { queryOne } = await import("@/lib/db");
+    const t = await queryOne(`SELECT id FROM tasks WHERE package_id = ? AND code = ?`, pkgB, "T1");
+    assert.equal(t, undefined, "không được tạo task ở nhóm dự án khác");
+  },
+);
 
 test("POST /api/workpackages/:id/tasks: đúng dự án của mình → 201, tạo thành công", S, async () => {
   const a = await dungSheet("wpTaskOk");
@@ -273,88 +277,104 @@ test("POST /api/workpackages/:id/tasks: đúng dự án của mình → 201, t�
 // PATCH /api/workpackages/:id/move
 // ============================================================================
 
-test("PATCH /api/workpackages/:id/move: nhóm thuộc dự án khác → 404, sort_order KHÔNG đổi", S, async () => {
-  const a = await dungSheet("wpMoveA");
-  const b = await dungSheet("wpMoveB");
-  const pkgB1 = await taoNhom(b.sheetTypeId, "B1", { sortOrder: 1 });
-  await taoNhom(b.sheetTypeId, "B2", { sortOrder: 2 });
-  const pmA = await taoUser("pm", "wpMoveA");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "PATCH /api/workpackages/:id/move: nhóm thuộc dự án khác → 404, sort_order KHÔNG đổi",
+  S,
+  async () => {
+    const a = await dungSheet("wpMoveA");
+    const b = await dungSheet("wpMoveB");
+    const pkgB1 = await taoNhom(b.sheetTypeId, "B1", { sortOrder: 1 });
+    await taoNhom(b.sheetTypeId, "B2", { sortOrder: 2 });
+    const pmA = await taoUser("pm", "wpMoveA");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { PATCH } = await import("@/app/api/workpackages/[id]/move/route");
-  const res = await PATCH(jreq("/x", { direction: "down" }, "PATCH"), {
-    params: Promise.resolve({ id: String(pkgB1) }),
-  });
-  assert.equal(res.status, 404);
+    const { PATCH } = await import("@/app/api/workpackages/[id]/move/route");
+    const res = await PATCH(jreq("/x", { direction: "down" }, "PATCH"), {
+      params: Promise.resolve({ id: String(pkgB1) }),
+    });
+    assert.equal(res.status, 404);
 
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ sort_order: number }>(
-    `SELECT sort_order FROM work_packages WHERE id = ?`,
-    pkgB1,
-  );
-  assert.equal(row?.sort_order, 1, "sort_order nhóm dự án B không được đổi");
-});
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ sort_order: number }>(
+      `SELECT sort_order FROM work_packages WHERE id = ?`,
+      pkgB1,
+    );
+    assert.equal(row?.sort_order, 1, "sort_order nhóm dự án B không được đổi");
+  },
+);
 
-test("PATCH /api/workpackages/:id/move: đúng dự án của mình → 200, hoán đổi thành công", S, async () => {
-  const a = await dungSheet("wpMoveOk");
-  const p1 = await taoNhom(a.sheetTypeId, "A1", { sortOrder: 1 });
-  const p2 = await taoNhom(a.sheetTypeId, "A2", { sortOrder: 2 });
-  const pmA = await taoUser("pm", "wpMoveOk");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "PATCH /api/workpackages/:id/move: đúng dự án của mình → 200, hoán đổi thành công",
+  S,
+  async () => {
+    const a = await dungSheet("wpMoveOk");
+    const p1 = await taoNhom(a.sheetTypeId, "A1", { sortOrder: 1 });
+    const p2 = await taoNhom(a.sheetTypeId, "A2", { sortOrder: 2 });
+    const pmA = await taoUser("pm", "wpMoveOk");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { PATCH } = await import("@/app/api/workpackages/[id]/move/route");
-  const res = await PATCH(jreq("/x", { direction: "down" }, "PATCH"), {
-    params: Promise.resolve({ id: String(p1) }),
-  });
-  assert.equal(res.status, 200);
-  assert.equal((await res.json()).ok, true);
+    const { PATCH } = await import("@/app/api/workpackages/[id]/move/route");
+    const res = await PATCH(jreq("/x", { direction: "down" }, "PATCH"), {
+      params: Promise.resolve({ id: String(p1) }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).ok, true);
 
-  const { queryOne } = await import("@/lib/db");
-  const r1 = await queryOne<{ sort_order: number }>(
-    `SELECT sort_order FROM work_packages WHERE id = ?`,
-    p1,
-  );
-  const r2 = await queryOne<{ sort_order: number }>(
-    `SELECT sort_order FROM work_packages WHERE id = ?`,
-    p2,
-  );
-  assert.equal(r1?.sort_order, 2);
-  assert.equal(r2?.sort_order, 1);
-});
+    const { queryOne } = await import("@/lib/db");
+    const r1 = await queryOne<{ sort_order: number }>(
+      `SELECT sort_order FROM work_packages WHERE id = ?`,
+      p1,
+    );
+    const r2 = await queryOne<{ sort_order: number }>(
+      `SELECT sort_order FROM work_packages WHERE id = ?`,
+      p2,
+    );
+    assert.equal(r1?.sort_order, 2);
+    assert.equal(r2?.sort_order, 1);
+  },
+);
 
 // ============================================================================
 // POST /api/workpackages/:id/copy
 // ============================================================================
 
-test("POST /api/workpackages/:id/copy: nhóm gốc thuộc dự án khác → 404, KHÔNG tạo bản sao", S, async () => {
-  const a = await dungSheet("wpCopyA");
-  const b = await dungSheet("wpCopyB");
-  const pkgB = await taoNhom(b.sheetTypeId, "B1");
-  const pmA = await taoUser("pm", "wpCopyA");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "POST /api/workpackages/:id/copy: nhóm gốc thuộc dự án khác → 404, KHÔNG tạo bản sao",
+  S,
+  async () => {
+    const a = await dungSheet("wpCopyA");
+    const b = await dungSheet("wpCopyB");
+    const pkgB = await taoNhom(b.sheetTypeId, "B1");
+    const pmA = await taoUser("pm", "wpCopyA");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { POST } = await import("@/app/api/workpackages/[id]/copy/route");
-  const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: String(pkgB) }) });
-  assert.equal(res.status, 404);
+    const { POST } = await import("@/app/api/workpackages/[id]/copy/route");
+    const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: String(pkgB) }) });
+    assert.equal(res.status, 404);
 
-  const { queryOne } = await import("@/lib/db");
-  const copy = await queryOne(
-    `SELECT id FROM work_packages WHERE sheet_type_id = ? AND code = 'B1_copy'`,
-    b.sheetTypeId,
-  );
-  assert.equal(copy, undefined, "không được sao chép nhóm dự án khác");
-});
+    const { queryOne } = await import("@/lib/db");
+    const copy = await queryOne(
+      `SELECT id FROM work_packages WHERE sheet_type_id = ? AND code = 'B1_copy'`,
+      b.sheetTypeId,
+    );
+    assert.equal(copy, undefined, "không được sao chép nhóm dự án khác");
+  },
+);
 
-test("POST /api/workpackages/:id/copy: đúng dự án của mình → 201, sao chép thành công", S, async () => {
-  const a = await dungSheet("wpCopyOk");
-  const pkgA = await taoNhom(a.sheetTypeId, "A1");
-  const pmA = await taoUser("pm", "wpCopyOk");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "POST /api/workpackages/:id/copy: đúng dự án của mình → 201, sao chép thành công",
+  S,
+  async () => {
+    const a = await dungSheet("wpCopyOk");
+    const pkgA = await taoNhom(a.sheetTypeId, "A1");
+    const pmA = await taoUser("pm", "wpCopyOk");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { POST } = await import("@/app/api/workpackages/[id]/copy/route");
-  const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: String(pkgA) }) });
-  assert.equal(res.status, 201);
-});
+    const { POST } = await import("@/app/api/workpackages/[id]/copy/route");
+    const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: String(pkgA) }) });
+    assert.equal(res.status, 201);
+  },
+);
 
 // ============================================================================
 // GET/POST/DELETE /api/workpackages/:id/bbnt
@@ -374,54 +394,62 @@ test("GET /api/workpackages/:id/bbnt: nhóm thuộc dự án khác → 404", S, 
   assert.equal(res.status, 404);
 });
 
-test("POST /api/workpackages/:id/bbnt: nhóm thuộc dự án khác → 404, KHÔNG lưu file", S, async () => {
-  const a = await dungSheet("wpBbntPostA");
-  const b = await dungSheet("wpBbntPostB");
-  const pkgB = await taoNhom(b.sheetTypeId, "B1");
-  const pmA = await taoUser("pm", "wpBbntPostA");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "POST /api/workpackages/:id/bbnt: nhóm thuộc dự án khác → 404, KHÔNG lưu file",
+  S,
+  async () => {
+    const a = await dungSheet("wpBbntPostA");
+    const b = await dungSheet("wpBbntPostB");
+    const pkgB = await taoNhom(b.sheetTypeId, "B1");
+    const pmA = await taoUser("pm", "wpBbntPostA");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { POST } = await import("@/app/api/workpackages/[id]/bbnt/route");
-  const res = await POST(formReq("/x", pdfForm()), {
-    params: Promise.resolve({ id: String(pkgB) }),
-  });
-  assert.equal(res.status, 404);
+    const { POST } = await import("@/app/api/workpackages/[id]/bbnt/route");
+    const res = await POST(formReq("/x", pdfForm()), {
+      params: Promise.resolve({ id: String(pkgB) }),
+    });
+    assert.equal(res.status, 404);
 
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ bbntFileName: string | null }>(
-    `SELECT bbnt_file_name AS "bbntFileName" FROM work_packages WHERE id = ?`,
-    pkgB,
-  );
-  assert.equal(row?.bbntFileName, null, "không được ghi file biên bản cho nhóm dự án khác");
-});
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ bbntFileName: string | null }>(
+      `SELECT bbnt_file_name AS "bbntFileName" FROM work_packages WHERE id = ?`,
+      pkgB,
+    );
+    assert.equal(row?.bbntFileName, null, "không được ghi file biên bản cho nhóm dự án khác");
+  },
+);
 
-test("DELETE /api/workpackages/:id/bbnt: nhóm thuộc dự án khác → 404, KHÔNG bị xoá", S, async () => {
-  const a = await dungSheet("wpBbntDelA");
-  const b = await dungSheet("wpBbntDelB");
-  const pkgB = await taoNhom(b.sheetTypeId, "B1");
-  const pmB = await taoUser("pm", "wpBbntDelBUp");
-  await dangNhapDuAn(pmB, b.projectId);
-  const { POST } = await import("@/app/api/workpackages/[id]/bbnt/route");
-  const uploaded = await POST(formReq("/x", pdfForm()), {
-    params: Promise.resolve({ id: String(pkgB) }),
-  });
-  assert.equal(uploaded.status, 201);
+test(
+  "DELETE /api/workpackages/:id/bbnt: nhóm thuộc dự án khác → 404, KHÔNG bị xoá",
+  S,
+  async () => {
+    const a = await dungSheet("wpBbntDelA");
+    const b = await dungSheet("wpBbntDelB");
+    const pkgB = await taoNhom(b.sheetTypeId, "B1");
+    const pmB = await taoUser("pm", "wpBbntDelBUp");
+    await dangNhapDuAn(pmB, b.projectId);
+    const { POST } = await import("@/app/api/workpackages/[id]/bbnt/route");
+    const uploaded = await POST(formReq("/x", pdfForm()), {
+      params: Promise.resolve({ id: String(pkgB) }),
+    });
+    assert.equal(uploaded.status, 201);
 
-  const pmA = await taoUser("pm", "wpBbntDelA");
-  await dangNhapDuAn(pmA, a.projectId);
-  const { DELETE } = await import("@/app/api/workpackages/[id]/bbnt/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(pkgB) }),
-  });
-  assert.equal(res.status, 404);
+    const pmA = await taoUser("pm", "wpBbntDelA");
+    await dangNhapDuAn(pmA, a.projectId);
+    const { DELETE } = await import("@/app/api/workpackages/[id]/bbnt/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(pkgB) }),
+    });
+    assert.equal(res.status, 404);
 
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ bbntFileName: string | null }>(
-    `SELECT bbnt_file_name AS "bbntFileName" FROM work_packages WHERE id = ?`,
-    pkgB,
-  );
-  assert.ok(row?.bbntFileName, "file biên bản của nhóm dự án B vẫn còn nguyên");
-});
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ bbntFileName: string | null }>(
+      `SELECT bbnt_file_name AS "bbntFileName" FROM work_packages WHERE id = ?`,
+      pkgB,
+    );
+    assert.ok(row?.bbntFileName, "file biên bản của nhóm dự án B vẫn còn nguyên");
+  },
+);
 
 test(
   "DELETE /api/workpackages/:id/bbnt: nhóm THẬT SỰ không tồn tại → vẫn 200 (idempotent, giữ hành vi cũ)",
@@ -487,54 +515,62 @@ test("GET /api/workpackages/:id/drawing: nhóm thuộc dự án khác → 404", 
   assert.equal(res.status, 404);
 });
 
-test("POST /api/workpackages/:id/drawing: nhóm thuộc dự án khác → 404, KHÔNG lưu file", S, async () => {
-  const a = await dungSheet("wpDrawPostA");
-  const b = await dungSheet("wpDrawPostB");
-  const pkgB = await taoNhom(b.sheetTypeId, "B1");
-  const pmA = await taoUser("pm", "wpDrawPostA");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "POST /api/workpackages/:id/drawing: nhóm thuộc dự án khác → 404, KHÔNG lưu file",
+  S,
+  async () => {
+    const a = await dungSheet("wpDrawPostA");
+    const b = await dungSheet("wpDrawPostB");
+    const pkgB = await taoNhom(b.sheetTypeId, "B1");
+    const pmA = await taoUser("pm", "wpDrawPostA");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { POST } = await import("@/app/api/workpackages/[id]/drawing/route");
-  const res = await POST(formReq("/x", pdfForm()), {
-    params: Promise.resolve({ id: String(pkgB) }),
-  });
-  assert.equal(res.status, 404);
+    const { POST } = await import("@/app/api/workpackages/[id]/drawing/route");
+    const res = await POST(formReq("/x", pdfForm()), {
+      params: Promise.resolve({ id: String(pkgB) }),
+    });
+    assert.equal(res.status, 404);
 
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ drawingFileName: string | null }>(
-    `SELECT drawing_file_name AS "drawingFileName" FROM work_packages WHERE id = ?`,
-    pkgB,
-  );
-  assert.equal(row?.drawingFileName, null, "không được ghi file bản vẽ cho nhóm dự án khác");
-});
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ drawingFileName: string | null }>(
+      `SELECT drawing_file_name AS "drawingFileName" FROM work_packages WHERE id = ?`,
+      pkgB,
+    );
+    assert.equal(row?.drawingFileName, null, "không được ghi file bản vẽ cho nhóm dự án khác");
+  },
+);
 
-test("DELETE /api/workpackages/:id/drawing: nhóm thuộc dự án khác → 404, KHÔNG bị xoá", S, async () => {
-  const a = await dungSheet("wpDrawDelA");
-  const b = await dungSheet("wpDrawDelB");
-  const pkgB = await taoNhom(b.sheetTypeId, "B1");
-  const pmB = await taoUser("pm", "wpDrawDelBUp");
-  await dangNhapDuAn(pmB, b.projectId);
-  const { POST } = await import("@/app/api/workpackages/[id]/drawing/route");
-  const uploaded = await POST(formReq("/x", pdfForm()), {
-    params: Promise.resolve({ id: String(pkgB) }),
-  });
-  assert.equal(uploaded.status, 201);
+test(
+  "DELETE /api/workpackages/:id/drawing: nhóm thuộc dự án khác → 404, KHÔNG bị xoá",
+  S,
+  async () => {
+    const a = await dungSheet("wpDrawDelA");
+    const b = await dungSheet("wpDrawDelB");
+    const pkgB = await taoNhom(b.sheetTypeId, "B1");
+    const pmB = await taoUser("pm", "wpDrawDelBUp");
+    await dangNhapDuAn(pmB, b.projectId);
+    const { POST } = await import("@/app/api/workpackages/[id]/drawing/route");
+    const uploaded = await POST(formReq("/x", pdfForm()), {
+      params: Promise.resolve({ id: String(pkgB) }),
+    });
+    assert.equal(uploaded.status, 201);
 
-  const pmA = await taoUser("pm", "wpDrawDelA");
-  await dangNhapDuAn(pmA, a.projectId);
-  const { DELETE } = await import("@/app/api/workpackages/[id]/drawing/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(pkgB) }),
-  });
-  assert.equal(res.status, 404);
+    const pmA = await taoUser("pm", "wpDrawDelA");
+    await dangNhapDuAn(pmA, a.projectId);
+    const { DELETE } = await import("@/app/api/workpackages/[id]/drawing/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(pkgB) }),
+    });
+    assert.equal(res.status, 404);
 
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ drawingFileName: string | null }>(
-    `SELECT drawing_file_name AS "drawingFileName" FROM work_packages WHERE id = ?`,
-    pkgB,
-  );
-  assert.ok(row?.drawingFileName, "file bản vẽ của nhóm dự án B vẫn còn nguyên");
-});
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ drawingFileName: string | null }>(
+      `SELECT drawing_file_name AS "drawingFileName" FROM work_packages WHERE id = ?`,
+      pkgB,
+    );
+    assert.ok(row?.drawingFileName, "file bản vẽ của nhóm dự án B vẫn còn nguyên");
+  },
+);
 
 test(
   "POST+GET+DELETE /api/workpackages/:id/drawing: đúng dự án của mình → hoạt động bình thường",
@@ -605,28 +641,32 @@ test("GET /api/workpackages/:id/dimensions: đúng dự án của mình → 200"
 // POST/DELETE/PATCH /api/workpackages/:id/dimensions/column
 // ============================================================================
 
-test("POST /api/workpackages/:id/dimensions/column: nhóm thuộc dự án khác → 404, KHÔNG tạo cột", S, async () => {
-  const a = await dungSheet("wpColPostA");
-  const b = await dungSheet("wpColPostB");
-  const pkgB = await taoNhom(b.sheetTypeId, "B1");
-  await taoTask(pkgB, "B1,01");
-  const pmA = await taoUser("pm", "wpColPostA");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "POST /api/workpackages/:id/dimensions/column: nhóm thuộc dự án khác → 404, KHÔNG tạo cột",
+  S,
+  async () => {
+    const a = await dungSheet("wpColPostA");
+    const b = await dungSheet("wpColPostB");
+    const pkgB = await taoNhom(b.sheetTypeId, "B1");
+    await taoTask(pkgB, "B1,01");
+    const pmA = await taoUser("pm", "wpColPostA");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { POST } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
-  const res = await POST(jreq("/x", { label: "Ø100" }), {
-    params: Promise.resolve({ id: String(pkgB) }),
-  });
-  assert.equal(res.status, 404);
+    const { POST } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
+    const res = await POST(jreq("/x", { label: "Ø100" }), {
+      params: Promise.resolve({ id: String(pkgB) }),
+    });
+    assert.equal(res.status, 404);
 
-  const { queryOne } = await import("@/lib/db");
-  const dim = await queryOne(
-    `SELECT pd.id FROM progress_dimensions pd JOIN tasks t ON pd.task_id = t.id
+    const { queryOne } = await import("@/lib/db");
+    const dim = await queryOne(
+      `SELECT pd.id FROM progress_dimensions pd JOIN tasks t ON pd.task_id = t.id
       WHERE t.package_id = ? AND pd.dimension_label = 'Ø100'`,
-    pkgB,
-  );
-  assert.equal(dim, undefined, "không được tạo cột cho nhóm dự án khác");
-});
+      pkgB,
+    );
+    assert.equal(dim, undefined, "không được tạo cột cho nhóm dự án khác");
+  },
+);
 
 test("POST /api/workpackages/:id/dimensions/column: đúng dự án của mình → 201", S, async () => {
   const a = await dungSheet("wpColPostOk");
@@ -642,101 +682,117 @@ test("POST /api/workpackages/:id/dimensions/column: đúng dự án của mình 
   assert.equal(res.status, 201);
 });
 
-test("DELETE /api/workpackages/:id/dimensions/column: nhóm thuộc dự án khác → 404, KHÔNG xoá cột", S, async () => {
-  const a = await dungSheet("wpColDelA");
-  const b = await dungSheet("wpColDelB");
-  const pkgB = await taoNhom(b.sheetTypeId, "B1");
-  const t1 = await taoTask(pkgB, "B1,01");
-  const { insertId } = await import("@/lib/db");
-  await insertId(
-    `INSERT INTO progress_dimensions (task_id, dimension_label, sort_order) VALUES (?, 'Ø100', 1)`,
-    t1,
-  );
-  const pmA = await taoUser("pm", "wpColDelA");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "DELETE /api/workpackages/:id/dimensions/column: nhóm thuộc dự án khác → 404, KHÔNG xoá cột",
+  S,
+  async () => {
+    const a = await dungSheet("wpColDelA");
+    const b = await dungSheet("wpColDelB");
+    const pkgB = await taoNhom(b.sheetTypeId, "B1");
+    const t1 = await taoTask(pkgB, "B1,01");
+    const { insertId } = await import("@/lib/db");
+    await insertId(
+      `INSERT INTO progress_dimensions (task_id, dimension_label, sort_order) VALUES (?, 'Ø100', 1)`,
+      t1,
+    );
+    const pmA = await taoUser("pm", "wpColDelA");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { DELETE } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
-  const res = await DELETE(jreq("/x?label=Ø100", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(pkgB) }),
-  });
-  assert.equal(res.status, 404);
+    const { DELETE } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
+    const res = await DELETE(jreq("/x?label=Ø100", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(pkgB) }),
+    });
+    assert.equal(res.status, 404);
 
-  const { queryOne } = await import("@/lib/db");
-  const dim = await queryOne(
-    `SELECT id FROM progress_dimensions WHERE task_id = ? AND dimension_label = 'Ø100'`,
-    t1,
-  );
-  assert.ok(dim, "cột của nhóm dự án B vẫn còn nguyên");
-});
+    const { queryOne } = await import("@/lib/db");
+    const dim = await queryOne(
+      `SELECT id FROM progress_dimensions WHERE task_id = ? AND dimension_label = 'Ø100'`,
+      t1,
+    );
+    assert.ok(dim, "cột của nhóm dự án B vẫn còn nguyên");
+  },
+);
 
-test("DELETE /api/workpackages/:id/dimensions/column: đúng dự án của mình → 200, xoá thành công", S, async () => {
-  const a = await dungSheet("wpColDelOk");
-  const pkgA = await taoNhom(a.sheetTypeId, "A1");
-  const t1 = await taoTask(pkgA, "A1,01");
-  const { insertId } = await import("@/lib/db");
-  await insertId(
-    `INSERT INTO progress_dimensions (task_id, dimension_label, sort_order) VALUES (?, 'Ø100', 1)`,
-    t1,
-  );
-  const pmA = await taoUser("pm", "wpColDelOk");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "DELETE /api/workpackages/:id/dimensions/column: đúng dự án của mình → 200, xoá thành công",
+  S,
+  async () => {
+    const a = await dungSheet("wpColDelOk");
+    const pkgA = await taoNhom(a.sheetTypeId, "A1");
+    const t1 = await taoTask(pkgA, "A1,01");
+    const { insertId } = await import("@/lib/db");
+    await insertId(
+      `INSERT INTO progress_dimensions (task_id, dimension_label, sort_order) VALUES (?, 'Ø100', 1)`,
+      t1,
+    );
+    const pmA = await taoUser("pm", "wpColDelOk");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { DELETE } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
-  const res = await DELETE(jreq("/x?label=Ø100", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(pkgA) }),
-  });
-  assert.equal(res.status, 200);
-  const { deleted } = await res.json();
-  assert.equal(deleted, 1);
-});
+    const { DELETE } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
+    const res = await DELETE(jreq("/x?label=Ø100", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(pkgA) }),
+    });
+    assert.equal(res.status, 200);
+    const { deleted } = await res.json();
+    assert.equal(deleted, 1);
+  },
+);
 
-test("PATCH /api/workpackages/:id/dimensions/column (copy): nhóm thuộc dự án khác → 404", S, async () => {
-  const a = await dungSheet("wpColCopyA");
-  const b = await dungSheet("wpColCopyB");
-  const pkgB = await taoNhom(b.sheetTypeId, "B1");
-  const t1 = await taoTask(pkgB, "B1,01");
-  const { insertId } = await import("@/lib/db");
-  await insertId(
-    `INSERT INTO progress_dimensions (task_id, dimension_label, sort_order) VALUES (?, 'Ø100', 1)`,
-    t1,
-  );
-  const pmA = await taoUser("pm", "wpColCopyA");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "PATCH /api/workpackages/:id/dimensions/column (copy): nhóm thuộc dự án khác → 404",
+  S,
+  async () => {
+    const a = await dungSheet("wpColCopyA");
+    const b = await dungSheet("wpColCopyB");
+    const pkgB = await taoNhom(b.sheetTypeId, "B1");
+    const t1 = await taoTask(pkgB, "B1,01");
+    const { insertId } = await import("@/lib/db");
+    await insertId(
+      `INSERT INTO progress_dimensions (task_id, dimension_label, sort_order) VALUES (?, 'Ø100', 1)`,
+      t1,
+    );
+    const pmA = await taoUser("pm", "wpColCopyA");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
-  const res = await PATCH(
-    jreq("/x", { action: "copy", label: "Ø100", newLabel: "Ø150" }, "PATCH"),
-    { params: Promise.resolve({ id: String(pkgB) }) },
-  );
-  assert.equal(res.status, 404);
+    const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
+    const res = await PATCH(
+      jreq("/x", { action: "copy", label: "Ø100", newLabel: "Ø150" }, "PATCH"),
+      { params: Promise.resolve({ id: String(pkgB) }) },
+    );
+    assert.equal(res.status, 404);
 
-  const { queryOne } = await import("@/lib/db");
-  const dim = await queryOne(
-    `SELECT id FROM progress_dimensions WHERE task_id = ? AND dimension_label = 'Ø150'`,
-    t1,
-  );
-  assert.equal(dim, undefined, "không được copy cột cho nhóm dự án khác");
-});
+    const { queryOne } = await import("@/lib/db");
+    const dim = await queryOne(
+      `SELECT id FROM progress_dimensions WHERE task_id = ? AND dimension_label = 'Ø150'`,
+      t1,
+    );
+    assert.equal(dim, undefined, "không được copy cột cho nhóm dự án khác");
+  },
+);
 
-test("PATCH /api/workpackages/:id/dimensions/column (copy): đúng dự án của mình → 201", S, async () => {
-  const a = await dungSheet("wpColCopyOk");
-  const pkgA = await taoNhom(a.sheetTypeId, "A1");
-  const t1 = await taoTask(pkgA, "A1,01");
-  const { insertId } = await import("@/lib/db");
-  await insertId(
-    `INSERT INTO progress_dimensions (task_id, dimension_label, sort_order) VALUES (?, 'Ø100', 1)`,
-    t1,
-  );
-  const pmA = await taoUser("pm", "wpColCopyOk");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "PATCH /api/workpackages/:id/dimensions/column (copy): đúng dự án của mình → 201",
+  S,
+  async () => {
+    const a = await dungSheet("wpColCopyOk");
+    const pkgA = await taoNhom(a.sheetTypeId, "A1");
+    const t1 = await taoTask(pkgA, "A1,01");
+    const { insertId } = await import("@/lib/db");
+    await insertId(
+      `INSERT INTO progress_dimensions (task_id, dimension_label, sort_order) VALUES (?, 'Ø100', 1)`,
+      t1,
+    );
+    const pmA = await taoUser("pm", "wpColCopyOk");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
-  const res = await PATCH(
-    jreq("/x", { action: "copy", label: "Ø100", newLabel: "Ø150" }, "PATCH"),
-    { params: Promise.resolve({ id: String(pkgA) }) },
-  );
-  assert.equal(res.status, 201);
-});
+    const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
+    const res = await PATCH(
+      jreq("/x", { action: "copy", label: "Ø100", newLabel: "Ø150" }, "PATCH"),
+      { params: Promise.resolve({ id: String(pkgA) }) },
+    );
+    assert.equal(res.status, 201);
+  },
+);
 
 // ============================================================================
 // PATCH /api/workpackages/:id/dimensions/column/move
@@ -763,10 +819,9 @@ test(
     await dangNhapDuAn(pmA, a.projectId);
 
     const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/move/route");
-    const res = await PATCH(
-      jreq("/x", { label: "Ø100", direction: "right" }, "PATCH"),
-      { params: Promise.resolve({ id: String(pkgB) }) },
-    );
+    const res = await PATCH(jreq("/x", { label: "Ø100", direction: "right" }, "PATCH"), {
+      params: Promise.resolve({ id: String(pkgB) }),
+    });
     assert.equal(res.status, 404);
 
     const { queryOne } = await import("@/lib/db");
@@ -798,10 +853,9 @@ test(
     await dangNhapDuAn(pmA, a.projectId);
 
     const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/move/route");
-    const res = await PATCH(
-      jreq("/x", { label: "Ø100", direction: "right" }, "PATCH"),
-      { params: Promise.resolve({ id: String(pkgA) }) },
-    );
+    const res = await PATCH(jreq("/x", { label: "Ø100", direction: "right" }, "PATCH"), {
+      params: Promise.resolve({ id: String(pkgA) }),
+    });
     assert.equal(res.status, 200);
     assert.equal((await res.json()).ok, true);
 

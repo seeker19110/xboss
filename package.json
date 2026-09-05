@@ -34,6 +34,7 @@
     "check:lib-layers": "tsx scripts/check-lib-layers.ts",
     "check:mau-accent": "tsx scripts/check-mau-accent.ts",
     "check:contrast": "tsx scripts/check-contrast.ts",
+    "check:hex-hardcode": "tsx scripts/check-hex-hardcode.ts",
     "check:coverage": "tsx scripts/check-coverage.ts",
     "check:route-perms": "tsx scripts/check-route-perms.ts",
     "check:project-scope": "tsx scripts/check-project-scope.ts",

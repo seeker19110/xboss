@@ -11,7 +11,13 @@
   ```ts
   export type EvmPoint = { date: string; pv: number; ev: number; ac: number };
   export type EvmSummary = { pv; ev; ac; sv; cv; spi; cpi; bac; eac; etc; vac }; // EAC = AC + (BAC−EV)/CPI
-  export async function getEvmSeries(opts: { projectId; baselineId; systemId?; from?; to? }): Promise<{ series: EvmPoint[]; summary: EvmSummary }>;
+  export async function getEvmSeries(opts: {
+    projectId;
+    baselineId;
+    systemId?;
+    from?;
+    to?;
+  }): Promise<{ series: EvmPoint[]; summary: EvmSummary }>;
   ```
   - PV(t): nội suy tuyến tính start→end từng task trong baseline × trọng số (cùng cách nội suy với S-curve hiện có — tái dùng logic, tách hàm chung nếu tiện).
   - EV(t): tái dựng từ `task_history` (pattern `/api/dashboard/scurve` sẵn có) × trọng số.
