@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { packageProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,12 @@ export async function PATCH(
 
   const pkgId = parseInt(params.id);
   if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Chống di chuyển cột xuyên dự án (vá W0).
+  const visible = await visibleProjectIds(user);
+  const pid = await packageProjectId(pkgId);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
   const label = String(body.label ?? "").trim();

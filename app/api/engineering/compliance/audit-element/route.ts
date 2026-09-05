@@ -32,6 +32,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, audit }, { status: 201 });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    // Đối tượng/quy chuẩn không tồn tại (kể cả xuyên dự án) là lỗi nghiệp vụ 404, không phải
+    // lỗi máy chủ — bám đúng khuôn route anh em graph/lineage/impact cùng cụm engineering.
+    const status = msg.includes("Không tìm thấy") ? 404 : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 }

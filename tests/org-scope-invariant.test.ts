@@ -55,9 +55,16 @@ const WHITELIST: Record<string, string> = {
   "export/excel": "export theo dự án/sheet; JOIN users hiển thị người phụ trách + đọc code dự án",
 
   // --- Scope theo id thực thể trên đường dẫn (không liệt kê master data org) ---
-  "subcontractors/[supplierId]/documents": "scope theo supplier id trên đường dẫn",
-  "subcontractors/[supplierId]/evaluations": "scope theo supplier id trên đường dẫn",
-  "suppliers/[id]/summary": "tổng hợp theo supplier id trên đường dẫn",
+  //
+  // CẢNH BÁO cho người đọc sau: lý do CŨ của 3 mục này ghi "scope theo supplier id trên đường
+  // dẫn" — đúng chính là lập luận SAI đã sinh ra lỗ hổng rò rỉ xuyên tổ chức (Đợt 4 + Đợt 5):
+  // id trên đường dẫn là số nguyên tuần tự nên đoán được, tự nó KHÔNG cách ly gì cả. Cả 3 route
+  // nay đã lọc `org_id` tường minh trong SQL; whitelist giữ lại chỉ vì bộ quét TĨNH của test này
+  // không nhìn thấy lớp lọc nằm trong hàm lib (`getSubcontractor`) hay trong JOIN qua bảng cha.
+  // Đừng thêm mục mới vào đây với lý do "đã scope theo id trên đường dẫn".
+  "subcontractors/[supplierId]/documents": "đã lọc org_id trong SQL (bộ quét tĩnh không thấy)",
+  "subcontractors/[supplierId]/evaluations": "đã lọc org_id trong SQL (bộ quét tĩnh không thấy)",
+  "suppliers/[id]/summary": "đã lọc org_id trong SQL (bộ quét tĩnh không thấy)",
 
   // --- Theo user hiện tại (WHERE id = user.id) ---
   "auth/totp": "trạng thái 2FA của chính user (WHERE id = user.id)",

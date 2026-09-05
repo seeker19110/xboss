@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchFloor } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { sheetTypeProjectId } from "@/lib/tien-do/workpackages";
 import { newFloorDocFileName, MAX_DOC_BYTES, sha256Hex, parseUploadedFile } from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +25,12 @@ export async function GET(
     approvalId,
   );
   if (!approval)
+    return NextResponse.json({ error: "Không tìm thấy bản ghi nghiệm thu" }, { status: 404 });
+
+  // Cách ly dự án (vá W6, Đợt 5) — canTouchFloor không so dự án, xem ghi chú ở
+  // app/api/floor-approvals/route.ts.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null || (await sheetTypeProjectId(approval.sheetTypeId)) !== projectId)
     return NextResponse.json({ error: "Không tìm thấy bản ghi nghiệm thu" }, { status: 404 });
   // Sub-con chỉ được xem biên bản của tầng có nhóm công việc được giao cho mình.
   if (!(await canTouchFloor(user, approval.sheetTypeId, approval.floorLabel)))
@@ -61,6 +69,11 @@ export async function POST(
     approvalId,
   );
   if (!approval)
+    return NextResponse.json({ error: "Không tìm thấy bản ghi nghiệm thu" }, { status: 404 });
+
+  // Cách ly dự án (vá W6, Đợt 5) — canTouchFloor không so dự án.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null || (await sheetTypeProjectId(approval.sheetTypeId)) !== projectId)
     return NextResponse.json({ error: "Không tìm thấy bản ghi nghiệm thu" }, { status: 404 });
   // Sub-con chỉ được nộp biên bản cho tầng có nhóm công việc được giao cho mình.
   if (!(await canTouchFloor(user, approval.sheetTypeId, approval.floorLabel)))

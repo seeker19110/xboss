@@ -308,6 +308,6 @@ export async function listGenerativeRoutingRuns(
      WHERE project_id = ?
      ORDER BY created_at DESC
      LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }

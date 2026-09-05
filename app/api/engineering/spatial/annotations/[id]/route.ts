@@ -5,7 +5,7 @@ import {
   linkAnnotationToEntity,
 } from "@/lib/ky-thuat/engineering-spatial-pinning";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { query, withProjectScope } from "@/lib/db";
+import { run, withProjectScope } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -44,12 +44,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     const projectId = chotDuAn.projectId;
 
+    // Hai hàm lib ĐÃ tự tính sẵn boolean "có đụng được dòng nào không" (chúng lọc `project_id`
+    // trong WHERE và trả false khi không khớp) — trước đây route bỏ qua giá trị đó và luôn trả
+    // `success: true`, nên PATCH một điểm ghim không tồn tại (hoặc đã xoá) vẫn báo thành công.
+    let daDung = false;
     if (body.status) {
-      await updateAnnotationStatus(projectId, id, body.status, body.resolutionNote);
+      daDung = await updateAnnotationStatus(projectId, id, body.status, body.resolutionNote);
     }
 
     if (body.entityRefType && body.entityRefId) {
-      await linkAnnotationToEntity(projectId, id, body.entityRefType, body.entityRefId);
+      daDung = (await linkAnnotationToEntity(projectId, id, body.entityRefType, body.entityRefId))
+        ? true
+        : daDung;
+    }
+
+    if (!daDung) {
+      return NextResponse.json({ error: "Không tìm thấy điểm ghim" }, { status: 404 });
     }
 
     return NextResponse.json({
@@ -87,13 +97,29 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const projectId = chotDuAn.projectId;
 
   try {
-    await withProjectScope(projectId, async () => {
-      await query(
-        `DELETE FROM engineering_spatial_annotations WHERE id = ? AND project_id = ?`,
-        id,
-        projectId,
-      );
-    });
+    // BUG THẬT: thiếu { readOnly: false } — withProjectScope mặc định readOnly=true nên mọi
+    // lời gọi DELETE luôn ném "cannot execute DELETE in a read-only transaction" (500), xoá
+    // điểm ghim chưa từng chạy được. PATCH cùng file đã đúng vì updateAnnotationStatus/
+    // linkAnnotationToEntity (lib/ky-thuat/engineering-spatial-pinning.ts) tự truyền cờ này.
+    // `run` (không phải `query`) để đọc được số dòng thật sự bị xoá: trước đây route luôn trả
+    // `deleted: true` kể cả khi id không tồn tại — client không phân biệt được "đã xoá" với
+    // "chưa từng có". WHERE vẫn lọc `project_id` nên điểm ghim dự án khác không bao giờ bị đụng.
+    const soDongXoa = await withProjectScope(
+      projectId,
+      async () => {
+        const kq = await run(
+          `DELETE FROM engineering_spatial_annotations WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        );
+        return kq.changes;
+      },
+      { readOnly: false },
+    );
+
+    if (!soDongXoa) {
+      return NextResponse.json({ error: "Không tìm thấy điểm ghim" }, { status: 404 });
+    }
 
     return NextResponse.json({
       success: true,

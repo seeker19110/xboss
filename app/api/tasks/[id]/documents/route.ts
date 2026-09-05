@@ -7,6 +7,7 @@ import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { newDocFileName, MAX_DOC_BYTES, sha256Hex, parseUploadedFile } from "@/lib/nen/photos";
 import { DOC_CATEGORIES, type DocCategory } from "@/lib/ky-thuat/qaqc";
 import { extractPdfText } from "@/lib/nen/pdf-extract";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,11 @@ export async function GET(
   const projectId = await getCurrentProjectId(user);
   const blocked = await assertModuleEnabled("tracking", projectId);
   if (blocked) return blocked;
+
+  // Cách ly dự án (vá W6, Đợt 5) — canTouchTask không so dự án, xem ghi chú ở
+  // app/api/dimensions/[id]/route.ts.
+  if (projectId == null || (await taskProjectId(taskId)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
   if (!(await canTouchTask(user, taskId)))
     return NextResponse.json(
       { error: "Bạn chỉ được xem tài liệu của task được giao cho mình" },
@@ -65,6 +71,10 @@ export async function POST(
 
   const task = await queryOne<{ id: number }>(`SELECT id FROM tasks WHERE id = ?`, taskId);
   if (!task) return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
+
+  // Cách ly dự án (vá W6, Đợt 5) — canTouchTask không so dự án.
+  if (projectId == null || (await taskProjectId(taskId)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
   if (!(await canTouchTask(user, taskId)))
     return NextResponse.json(
       { error: "Bạn chỉ được upload tài liệu cho task được giao cho mình" },

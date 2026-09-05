@@ -4,6 +4,8 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
 import { inheritedAssigneeFor } from "@/lib/tien-do/assignments";
 import { recomputePackage } from "@/lib/tien-do/recompute";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { packageProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,12 @@ export async function POST(
 
   const pkg = await queryOne<{ id: number }>(`SELECT id FROM work_packages WHERE id = ?`, pkgId);
   if (!pkg) return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
+
+  // Chống tạo task xuyên dự án (vá W0).
+  const visible = await visibleProjectIds(user);
+  const pid = await packageProjectId(pkgId);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
   const code = String(body.code ?? "").trim();

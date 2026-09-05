@@ -138,6 +138,6 @@ export async function listProjectHealthSnapshots(
 ): Promise<Array<Record<string, unknown>>> {
   return query<Record<string, unknown>>(
     `SELECT * FROM engineering_project_health_snapshots WHERE project_id = $1 ORDER BY snapshot_date DESC LIMIT 30`,
-    [projectId],
+    projectId,
   );
 }

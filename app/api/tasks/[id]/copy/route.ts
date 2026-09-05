@@ -4,6 +4,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { recomputePackage } from "@/lib/tien-do/recompute";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,12 @@ export async function POST(
 
   const srcId = parseInt(params.id);
   if (isNaN(srcId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Cách ly dự án (vá W7, Đợt 5) — id đoán được, route chỉ dựa CAN.editStructure. Task đích
+  // afterId (nếu có) luôn được truy vấn ràng buộc theo src.package_id ở dưới (`WHERE id = ?
+  // AND package_id = ?`) nên tự động cùng dự án với task nguồn — chỉ cần kiểm 1 đầu ở đây.
+  if (projectId == null || (await taskProjectId(srcId)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
 
   const src = await queryOne<{
     id: number;

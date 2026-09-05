@@ -670,7 +670,7 @@ export async function savePlenumFabricationRun(
 export async function listPlenumBoxes(projectId: number): Promise<Array<Record<string, unknown>>> {
   return query<Record<string, unknown>>(
     `SELECT * FROM engineering_duct_plenum_boxes WHERE project_id = $1 ORDER BY created_at DESC LIMIT 100`,
-    [projectId],
+    projectId,
   );
 }
 
@@ -679,6 +679,6 @@ export async function listDiffuserAlignments(
 ): Promise<Array<Record<string, unknown>>> {
   return query<Record<string, unknown>>(
     `SELECT * FROM engineering_duct_diffuser_alignments WHERE project_id = $1 ORDER BY created_at DESC LIMIT 100`,
-    [projectId],
+    projectId,
   );
 }

@@ -19,6 +19,18 @@ export async function GET(
 
   const supplierId = parseInt(params.supplierId);
   if (isNaN(supplierId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Cách ly tổ chức (vá W7, Đợt 5) — canViewSubcontractor chỉ so "subcon có đúng NTP của
+  // mình không", trả `true` vô điều kiện cho mọi vai trò khác, KHÔNG so org. Kiểm org
+  // TRƯỚC (404, không xác nhận NTP tồn tại) rồi mới tới lớp canViewSubcontractor (403).
+  const supplier = await queryOne(
+    `SELECT id FROM suppliers WHERE id = ? AND org_id = ?`,
+    supplierId,
+    user.orgId,
+  );
+  if (!supplier)
+    return NextResponse.json({ error: "Không tìm thấy nhà cung cấp" }, { status: 404 });
+
   if (!(await canViewSubcontractor(user, supplierId)))
     return NextResponse.json(
       { error: "Bạn chỉ được xem hồ sơ nhà thầu phụ của mình" },
@@ -47,7 +59,12 @@ export async function POST(
   const supplierId = parseInt(params.supplierId);
   if (isNaN(supplierId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const supplier = await queryOne(`SELECT id FROM suppliers WHERE id = ?`, supplierId);
+  // Cách ly tổ chức (vá W7, Đợt 5) — cùng lý do GET ở trên.
+  const supplier = await queryOne(
+    `SELECT id FROM suppliers WHERE id = ? AND org_id = ?`,
+    supplierId,
+    user.orgId,
+  );
   if (!supplier)
     return NextResponse.json({ error: "Không tìm thấy nhà cung cấp" }, { status: 404 });
 

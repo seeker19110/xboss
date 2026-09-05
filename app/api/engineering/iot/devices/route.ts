@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { query } from "@/lib/db";
@@ -11,6 +11,12 @@ export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  }
+  // Route anh em (telemetry/alerts) đều kiểm CAN.viewEngineeringIot — route này trước đây
+  // thiếu, cho phép subcon xem toàn bộ thiết bị + trị đo mới nhất của dự án dù không có
+  // quyền xem IoT ở 2 route còn lại. Bổ sung cho nhất quán.
+  if (!CAN.viewEngineeringIot(user.role)) {
+    return NextResponse.json({ error: "Không có quyền xem thiết bị IoT" }, { status: 403 });
   }
 
   const projectId = await getCurrentProjectId(user);

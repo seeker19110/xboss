@@ -23,7 +23,7 @@ export async function GET(
       { status: 403 },
     );
 
-  const detail = await getSubcontractor(supplierId);
+  const detail = await getSubcontractor(supplierId, user.orgId);
   if (!detail) return NextResponse.json({ error: "Không tìm thấy nhà thầu phụ" }, { status: 404 });
 
   return NextResponse.json({ item: detail });

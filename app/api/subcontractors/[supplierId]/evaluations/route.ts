@@ -27,6 +27,17 @@ export async function GET(
 
   const supplierId = parseInt(params.supplierId);
   if (isNaN(supplierId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Cách ly tổ chức (vá W7, Đợt 5) — canViewSubcontractor không so org, xem ghi chú ở
+  // app/api/subcontractors/[supplierId]/documents/route.ts.
+  const supplier = await queryOne(
+    `SELECT id FROM suppliers WHERE id = ? AND org_id = ?`,
+    supplierId,
+    user.orgId,
+  );
+  if (!supplier)
+    return NextResponse.json({ error: "Không tìm thấy nhà cung cấp" }, { status: 404 });
+
   if (!(await canViewSubcontractor(user, supplierId)))
     return NextResponse.json(
       { error: "Bạn chỉ được xem hồ sơ nhà thầu phụ của mình" },
@@ -55,7 +66,12 @@ export async function POST(
   const supplierId = parseInt(params.supplierId);
   if (isNaN(supplierId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const supplier = await queryOne(`SELECT id FROM suppliers WHERE id = ?`, supplierId);
+  // Cách ly tổ chức (vá W7, Đợt 5) — cùng lý do GET ở trên.
+  const supplier = await queryOne(
+    `SELECT id FROM suppliers WHERE id = ? AND org_id = ?`,
+    supplierId,
+    user.orgId,
+  );
   if (!supplier)
     return NextResponse.json({ error: "Không tìm thấy nhà cung cấp" }, { status: 404 });
 

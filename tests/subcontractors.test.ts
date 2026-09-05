@@ -181,7 +181,7 @@ test(
       contractId,
     );
 
-    const detail = await getSubcontractor(supplierId);
+    const detail = await getSubcontractor(supplierId, 1);
     assert.ok(detail);
     assert.equal(detail!.debt.contractValue, 1000000);
     assert.equal(detail!.debt.paid, 300000);
@@ -201,7 +201,7 @@ test(
       ),
     );
 
-    const detail2 = await getSubcontractor(supplierId);
+    const detail2 = await getSubcontractor(supplierId, 1);
     assert.equal(detail2!.evaluations.length, 1);
     assert.equal(detail2!.evaluationAverage.latestPeriod, "2026-Q3");
     assert.equal(detail2!.evaluationAverage.avgScore, 5);

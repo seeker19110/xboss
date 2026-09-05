@@ -27,9 +27,16 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // Cách ly tổ chức (vá W7, Đợt 5) — subcon_documents không có cột org_id riêng, tổ chức
+  // suy qua suppliers.org_id; JOIN lọc ngay ở câu SELECT để tài liệu tổ chức khác coi như
+  // không tồn tại (404) thay vì lộ qua canViewSubcontractor (vốn không so org).
   const doc = await queryOne<SubconDocRow>(
-    `SELECT id, supplier_id, file_name, mime_type, original_name, uploaded_by FROM subcon_documents WHERE id = ?`,
+    `SELECT d.id, d.supplier_id, d.file_name, d.mime_type, d.original_name, d.uploaded_by
+       FROM subcon_documents d
+       JOIN suppliers s ON s.id = d.supplier_id
+      WHERE d.id = ? AND s.org_id = ?`,
     id,
+    user.orgId,
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
   if (!(await canViewSubcontractor(user, doc.supplier_id)))
@@ -60,9 +67,16 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // Cách ly tổ chức (vá W7, Đợt 5) — cùng lý do GET ở trên; trước đây không lọc org chút
+  // nào (kể cả không có canViewSubcontractor) nên Admin/PM tổ chức A xoá được tài liệu NTP
+  // tổ chức B qua đoán id.
   const doc = await queryOne<SubconDocRow>(
-    `SELECT id, supplier_id, file_name, mime_type, original_name, uploaded_by FROM subcon_documents WHERE id = ?`,
+    `SELECT d.id, d.supplier_id, d.file_name, d.mime_type, d.original_name, d.uploaded_by
+       FROM subcon_documents d
+       JOIN suppliers s ON s.id = d.supplier_id
+      WHERE d.id = ? AND s.org_id = ?`,
     id,
+    user.orgId,
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 

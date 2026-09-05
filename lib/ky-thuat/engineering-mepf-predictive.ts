@@ -136,6 +136,6 @@ export async function listPredictiveAssets(
 ): Promise<Array<Record<string, unknown>>> {
   return query<Record<string, unknown>>(
     `SELECT * FROM engineering_mepf_predictive_assets WHERE project_id = $1 ORDER BY health_score_percent ASC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }

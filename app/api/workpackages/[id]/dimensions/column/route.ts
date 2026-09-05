@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { recomputeTask, recomputePackage } from "@/lib/tien-do/recompute";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { packageProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,12 @@ export async function POST(
 
   const pkgId = parseInt(params.id);
   if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Chống sửa cấu trúc cột xuyên dự án (vá W0).
+  const visible = await visibleProjectIds(user);
+  const pid = await packageProjectId(pkgId);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
   const label = String(body.label ?? "").trim();
@@ -122,6 +130,13 @@ export async function DELETE(
   const pkgId = parseInt(params.id);
   if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // Chống xoá cột xuyên dự án (vá W0). allGroups vẫn an toàn vì chỉ mở rộng tới các nhóm
+  // cùng sheet_type_id với pkgId (đã được kiểm nằm trong dự án nhìn thấy được).
+  const visibleDel = await visibleProjectIds(user);
+  const pidDel = await packageProjectId(pkgId);
+  if (pidDel == null || !visibleDel.includes(pidDel))
+    return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
+
   const label = req.nextUrl.searchParams.get("label");
   if (!label) return NextResponse.json({ error: "Thiếu tham số label" }, { status: 400 });
 
@@ -180,6 +195,12 @@ export async function PATCH(
 
   const pkgId = parseInt(params.id);
   if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Chống copy cột xuyên dự án (vá W0).
+  const visiblePatch = await visibleProjectIds(user);
+  const pidPatch = await packageProjectId(pkgId);
+  if (pidPatch == null || !visiblePatch.includes(pidPatch))
+    return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
   if (body.action !== "copy")
