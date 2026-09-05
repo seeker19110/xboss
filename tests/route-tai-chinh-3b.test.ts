@@ -49,7 +49,7 @@ async function taoUser(
   role: string,
   ten: string,
   orgId = 1,
-): Promise<{ id: number; passwordHash: string }> {
+): Promise<{ id: number; passwordHash: string; orgId: number }> {
   const { insertId, queryOne } = await import("@/lib/db");
   const email = `tc3b-${uniq(ten)}@test.local`;
   const id = await insertId(
@@ -63,7 +63,7 @@ async function taoUser(
     `SELECT password_hash FROM users WHERE id = ?`,
     id,
   );
-  return { id, passwordHash: u!.password_hash };
+  return { id, passwordHash: u!.password_hash, orgId };
 }
 
 async function taoHopDong(
@@ -87,6 +87,12 @@ async function taoHopDong(
 async function taoNCC(ten: string, orgId = 1): Promise<number> {
   const { insertId } = await import("@/lib/db");
   return insertId(`INSERT INTO suppliers (name, org_id) VALUES (?, ?)`, `NCC ${uniq(ten)}`, orgId);
+}
+
+async function taoOrg(ten: string): Promise<number> {
+  const { insertId } = await import("@/lib/db");
+  const slug = `org-${uniq(ten)}`;
+  return insertId(`INSERT INTO organizations (name, slug) VALUES (?, ?)`, `Org ${slug}`, slug);
 }
 
 async function taoBoqItem(ten: string): Promise<number> {
@@ -2672,6 +2678,55 @@ test("POST /api/suppliers/:id/ratings: NCC không tồn tại → 404", S, async
   assert.equal(res.status, 404);
 });
 
+test(
+  "POST /api/suppliers/:id/ratings: NCC thuộc tổ chức KHÁC → 404, không lộ ghi được đánh giá " +
+    "(BUG THẬT đã vá cùng đợt này — route trước đây chỉ `WHERE id = ?`, không so org_id, khác " +
+    "hẳn GET /api/suppliers gốc vốn đã lọc `s.org_id = ?` đúng)",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const orgA = await taoOrg("rateorgA");
+    const orgB = await taoOrg("rateorgB");
+    const projectId = await taoDuAn("rateorg");
+    const pmA = await taoUser("pm", "rateorgA", orgA);
+    const supplierB = await taoNCC("rateorgB", orgB);
+    await dangNhapDuAn(pmA, projectId);
+    const { POST } = await import("@/app/api/suppliers/[id]/ratings/route");
+    const res = await POST(jreq("/x", { poId: 1, quality: 5 }), {
+      params: Promise.resolve({ id: String(supplierB) }),
+    });
+    assert.equal(res.status, 404);
+    const count = await queryOne<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM supplier_ratings WHERE supplier_id = ?`,
+      supplierB,
+    );
+    assert.equal(count?.n, 0, "không được ghi thêm đánh giá nào cho NCC tổ chức khác");
+  },
+);
+
+test(
+  "POST /api/suppliers/:id/ratings: NCC CÙNG tổ chức vẫn đánh giá được bình thường (đối chứng)",
+  S,
+  async () => {
+    // Dùng org mặc định (1) cho cả user lẫn NCC — dự án tạo bằng taoDuAn() không gán
+    // org_id nên chỉ khớp org của user khi user cũng ở org mặc định (getCurrentProjectId
+    // đối chiếu project.org_id === user.orgId, xem lib/ha-tang/projects.ts).
+    const { run } = await import("@/lib/db");
+    const projectId = await taoDuAn("rateorgok");
+    const pmA = await taoUser("pm", "rateorgokA");
+    const supplierA = await taoNCC("rateorgokA");
+    const matId = await taoVatTu("rateorgok", projectId);
+    const poId = await taoPO(pmA, projectId, matId, supplierA);
+    await run(`UPDATE purchase_orders SET status = 'confirmed' WHERE id = ?`, poId);
+    await dangNhapDuAn(pmA, projectId);
+    const { POST } = await import("@/app/api/suppliers/[id]/ratings/route");
+    const res = await POST(jreq("/x", { poId, quality: 5 }), {
+      params: Promise.resolve({ id: String(supplierA) }),
+    });
+    assert.equal(res.status, 201);
+  },
+);
+
 test("POST /api/suppliers/:id/ratings: thiếu poId → 400", S, async () => {
   const projectId = await taoDuAn("ratenopo");
   const pm = await taoUser("pm", "ratenopo");
@@ -2809,6 +2864,42 @@ test("GET /api/suppliers/:id/summary: NCC không tồn tại → 404", S, async 
   const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: "999999999" }) });
   assert.equal(res.status, 404);
 });
+
+test(
+  "GET /api/suppliers/:id/summary: NCC thuộc tổ chức KHÁC → 404, không lộ điểm/công nợ " +
+    "(BUG THẬT đã vá cùng đợt này — cùng lớp lỗi org_id như POST ratings)",
+  S,
+  async () => {
+    const orgA = await taoOrg("sumorgA");
+    const orgB = await taoOrg("sumorgB");
+    const projectId = await taoDuAn("sumorg");
+    const pmA = await taoUser("pm", "sumorgA", orgA);
+    const supplierB = await taoNCC("sumorgB", orgB);
+    await dangNhapDuAn(pmA, projectId);
+    const { GET } = await import("@/app/api/suppliers/[id]/summary/route");
+    const res = await GET(jreq("/x", undefined, "GET"), {
+      params: Promise.resolve({ id: String(supplierB) }),
+    });
+    assert.equal(res.status, 404);
+  },
+);
+
+test(
+  "GET /api/suppliers/:id/summary: NCC CÙNG tổ chức vẫn xem được bình thường (đối chứng)",
+  S,
+  async () => {
+    const orgA = await taoOrg("sumorgokA");
+    const projectId = await taoDuAn("sumorgok");
+    const pmA = await taoUser("pm", "sumorgokA", orgA);
+    const supplierA = await taoNCC("sumorgokA", orgA);
+    await dangNhapDuAn(pmA, projectId);
+    const { GET } = await import("@/app/api/suppliers/[id]/summary/route");
+    const res = await GET(jreq("/x", undefined, "GET"), {
+      params: Promise.resolve({ id: String(supplierA) }),
+    });
+    assert.equal(res.status, 200);
+  },
+);
 
 test(
   "GET /api/suppliers/:id/summary: tổng hợp đúng điểm TB + tổng đã đặt hàng sau khi có đánh giá",
