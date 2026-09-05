@@ -137,6 +137,33 @@ nhiều tháng. Khi thêm cổng mới, phải kèm ca test cố ý vi phạm đ
   coverage) và DB dựng bằng **ICU/vi-VN** (locale C làm `lower()` không hạ chữ hoa có dấu →
   `backfill-0137` đỏ giả). Thêm: **tên database không được có dấu gạch ngang** — `createdb` thất
   bại im lặng và sinh lỗi "database does not exist" gây hiểu nhầm là test hỏng.
+- **Lớp lỗi "giả định trạng thái toàn cục" LẶP LẠI dù đã ghi ở Đợt 4 và đưa vào ràng buộc cứng của
+  `PLAN.md` Đợt 5.** Helper `batModule` trong `tests/route-eng-mepf.test.ts` gán cứng `actorId = 1`
+  cho `feature_flags.updated_by` (có khoá ngoại tới `users`): chạy riêng xanh, chạy cả bộ thì file
+  test khác đã xoá user đó ⇒ vỡ khoá ngoại, **11 ca đỏ** — chỉ lộ ra ở lần chạy full suite cuối
+  cùng. Hai file test engineering còn lại (`route-eng-quy-trinh`, `route-eng-zero-error`) vốn đã
+  truyền `actorId` thật, nên đây là sai sót lẻ chứ không phải hiểu nhầm chung. **Ghi rõ vào đây vì
+  viết luật vào `PLAN.md` là chưa đủ** — đợt sau nên có cổng tự động: quét test tìm hằng số id
+  cứng (`, 1,` ở vị trí khoá ngoại) hoặc bắt buộc mọi id trong test đến từ hàm `tao*()`.
+
+### Cổng đã chạy
+
+`npm run check:coverage` (chạy full suite rồi mới đo) trên **Node 24** + Postgres 16 dựng bằng
+**ICU/vi-VN**, DB tạo mới hoàn toàn: **244 file, 0 file fail, 3.973 ca pass, 0 ca fail, 1 ca skip
+có lý do** (`health.test.ts`, ca cố ý đảo điều kiện khi KHÔNG có DB); cổng coverage **ĐẠT**, thoát 0.
+Kèm `npm run lint` · `typecheck` · `check:lib-layers` · `check:db-params` · `check:project-scope` ·
+`check:route-perms` xanh.
+
+Coverage đo cùng điều kiện, so mốc Đợt 4 với Đợt 5:
+
+|                    | Đợt 4  | Đợt 5  |
+| ------------------ | ------ | ------ |
+| File trong phạm vi | 504    | 596    |
+| lines              | 91,75% | 92,61% |
+| branches           | 84,99% | 85,36% |
+| funcs              | 93,89% | 95,48% |
+
+Bộ test: **237 file / 3.435 ca → 244 file / 3.973 ca**. `coverage-baseline.json` cập nhật theo mốc mới.
 
 **Đợt sau:** phần còn lại của `app/api/**` chưa có test (`v1/**`, các cụm nhỏ), và 5 mục "Ghi nhận,
 chưa sửa" ở trên — ưu tiên Gate 4 Smart IPC (chuỗi thanh toán) và kill switch (Safe Execution
