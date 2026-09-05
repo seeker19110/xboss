@@ -1,185 +1,430 @@
-# PLAN.md — Đợt 5 chiến dịch coverage: phủ `app/api/engineering/**` + vá nốt lỗ hổng cách ly dự án tầng WBS
+# PLAN.md — Đợt 6: trả nợ "Ghi nhận, chưa sửa" + phủ nốt route + cổng chống hồi quy test
 
-**Cập nhật:** 2026-09-05 · **Nguồn:** `PROGRESS.md` mục "Đợt 4 chiến dịch coverage" (2026-09-05) —
-phần "Đợt sau" và mục đầu của "Ghi nhận, chưa sửa". Khuôn test đã chốt ở `tests/helpers/phien.ts`
-và 9 file `tests/route-*.test.ts` của Đợt 4.
-**Nhánh nền:** `claude/tiep-tuc-yu4ib7` — đã đồng bộ lên `origin/main` sau khi PR #478 merge
-(`2fb5aa04`). Base MỌI worktree trên nhánh này.
-**Trạng thái thi hành:** ĐANG THI HÀNH.
+**Cập nhật:** 2026-09-05 · **Nguồn:** `PROGRESS.md` mục "Đợt 5 chiến dịch coverage" — phần
+"Đợt sau", "Ghi nhận, CHƯA sửa" (5 mục) và "Bài học quy trình" (mục cuối: cần cổng tự động).
+**Nhánh nền:** `claude/tiep-tuc-yu4ib7` — đồng bộ lên `origin/main` sau khi PR #479 merge.
+Base MỌI worktree trên nhánh này.
+**Trạng thái thi hành:** CHỜ THI HÀNH.
+
+Khác Đợt 1–5 (chiến dịch _phủ test_), Đợt 6 là chiến dịch **sửa tính năng đang hỏng**: sau 5 đợt,
+chỉ còn **8/451 route** chưa từng được test thực thi chạm tới, nhưng danh sách "ghi nhận, chưa sửa"
+đã tích 5 mục, trong đó 2 mục là **tính năng chưa từng chạy đúng lần nào** ở vùng rủi ro cao.
 
 ## Bối cảnh & ràng buộc CỨNG cho mọi việc
 
-- Worker không thấy hội thoại. Bắt buộc đọc trước: `CLAUDE.md`; `tests/helpers/phien.ts` (toàn bộ
-  comment đầu file); file mẫu cùng khuôn `tests/route-tai-chinh-3b.test.ts` (route `[id]`, upload,
-  cách ly dự án + tổ chức) và `tests/route-wbs-cach-ly-du-an.test.ts` (khuôn ca xuyên dự án);
-  `PROGRESS.md` mục "Đợt 4 chiến dịch coverage" — **đọc kỹ 3 phần**: "7 LỖ HỔNG CÁCH LY DỮ LIỆU",
-  "Bài học hạ tầng test", "Bài học điều phối".
-- **Test phải THỰC THI route handler thật** (import `@/app/api/.../route`, gọi `GET/POST/...` với
-  `NextRequest`), KHÔNG tái hiện SQL trong test, KHÔNG `assert.match` trên mã nguồn route. Mỗi
-  handler trong phạm vi tối thiểu: 401 chưa đăng nhập (`dangXuat()`), 403 sai vai trò (nếu route
-  kiểm `CAN`), ca hạnh phúc 200/201 **kiểm dữ liệu trả về/ghi DB**, validate 400/422, 404 xuyên
-  dự án/tổ chức khi route có lọc, và ca ranh giới nghiệp vụ riêng của route.
-- **Mọi ca có dự án dùng `dangNhapDuAn(user, projectId)`** (không `dangNhap` trần). Trước khi báo
-  xong: chèn 1 dòng lạ vào `user_projects` rồi chạy lại file — phải vẫn xanh; xong thì xoá dòng đó.
-- **KHÔNG giả định BẤT KỲ trạng thái toàn cục nào test không tự dựng** — bài học Đợt 4: gán cứng
-  `created_by = 1` (file khác xoá user ⇒ vỡ khoá ngoại) và khẳng định cứng một thư mục trên đĩa
-  chưa tồn tại (file khác upload ⇒ nó xuất hiện). Cả hai đều xanh khi chạy riêng, đỏ trong bộ đầy
-  đủ. Tự tạo mọi dữ liệu mình cần, hậu tố duy nhất (`uniq()` như file mẫu). Không
-  `DELETE`/`TRUNCATE` bảng dùng chung; không sửa `tests/setup.ts`/`tests/helpers/phien.ts`.
+- Worker không thấy hội thoại. Bắt buộc đọc trước: `CLAUDE.md`; `PROGRESS.md` mục "Đợt 5 chiến dịch
+  coverage" (đọc kỹ "Ghi nhận, CHƯA sửa" + "Bài học quy trình"); `tests/helpers/phien.ts` (toàn bộ
+  comment đầu file); file test mẫu `tests/route-eng-quy-trinh.test.ts`.
+- **Test phải THỰC THI code thật** (import route/hàm lib, gọi với `NextRequest`), KHÔNG tái hiện SQL
+  trong test, KHÔNG `assert.match` trên mã nguồn.
+- **Mọi ca có dự án dùng `dangNhapDuAn(user, projectId)`** (không `dangNhap` trần).
+- **KHÔNG giả định BẤT KỲ trạng thái toàn cục nào test không tự dựng.** Lớp lỗi này đã LẶP LẠI ở cả
+  Đợt 4 lẫn Đợt 5 dù đã ghi thành ràng buộc cứng: gán cứng `created_by = 1` / `actorId = 1` cho cột
+  có khoá ngoại tới `users` — xanh khi chạy riêng, ĐỎ trong bộ đầy đủ vì file test khác đã xoá user
+  đó. **Mọi id khoá ngoại trong test phải đến từ hàm `tao*()` của chính file test.** Việc D dựng cổng
+  tự động chặn lớp lỗi này; các việc còn lại vẫn phải tự tuân thủ (cổng chưa merge lúc họ code).
 - File test: đầu file `import { HAS_TEST_DB } from "./setup"` rồi `import ... from "./helpers/phien"`
-  TRƯỚC mọi import route; `const S = { skip: !HAS_TEST_DB }` cho mọi `test(...)`. Comment đầu file
-  liệt kê đủ route được phủ.
-- **Môi trường (đọc kỹ — Đợt 4 mất một vòng vì hai sai lệch này):**
-  - **Node 24** — CI và `.nvmrc` dùng Node 24; máy này mặc định Node 22, mà Node 22 **crash khi in
-    bảng coverage**. Dùng `export PATH=/tmp/claude-0/-home-user-xboss/7b19723b-25f4-5aaa-854f-2342694afe35/scratchpad/node24/bin:$PATH`
-    (kiểm `node --version` ra v24.x trước khi chạy gì).
-  - **DB phải dựng bằng ICU/vi-VN**, KHÔNG dùng `createdb` trần (locale C làm `lower()` không hạ
-    chữ hoa có dấu ⇒ đỏ giả):
+  TRƯỚC mọi import route; `const S = { skip: !HAS_TEST_DB }` cho mọi `test(...)`.
+- **Môi trường (đọc kỹ — đã mất một vòng ở cả Đợt 4 lẫn Đợt 5):**
+  - **Node 24** (Node 22 crash khi in bảng coverage):
+    `export PATH=/tmp/claude-0/-home-user-xboss/7b19723b-25f4-5aaa-854f-2342694afe35/scratchpad/node24/bin:$PATH`
+    — kiểm `node --version` ra v24.x trước khi chạy gì.
+  - **DB dựng bằng ICU/vi-VN**, KHÔNG `createdb` trần (locale C làm `lower()` không hạ chữ hoa có
+    dấu ⇒ đỏ giả ở `backfill-0137`), và **tên DB không được có dấu gạch ngang** (`createdb` thất bại
+    im lặng, sinh lỗi "database does not exist" gây hiểu nhầm là test hỏng):
     `psql -h 127.0.0.1 -p 5433 -U postgres -c "CREATE DATABASE <ten> LOCALE_PROVIDER icu ICU_LOCALE 'vi-VN' TEMPLATE template0 ENCODING UTF8;"`
   - Postgres ở `127.0.0.1:5433`, user `postgres`, không mật khẩu. Lệnh chạy 1 file (BẮT BUỘC cờ mock):
     `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5433/<ten> node --experimental-test-module-mocks --import ./node_modules/tsx/dist/loader.mjs --test tests/<file>.test.ts`
   - **Worktree**: symlink `ln -s /home/user/xboss/node_modules <worktree>/node_modules`, KHÔNG `npm ci`.
-- **Khi test lộ BUG THẬT trong route** (lớp lỗi đã gặp: 401 gộp thành 403; thao tác theo `:id`
-  không lọc `project_id`/`org_id` trong khi đường đọc danh sách đã lọc; validate ngày không kiểm
-  ngày có thật — dùng `isValidDateISO` ở `lib/nen/date.ts`): **sửa tối thiểu ngay trong route cùng
-  nhánh**, bám khuôn route anh em đã đúng, viết ca test chứng minh (kiểm cả **dữ liệu bên kia
-  không đổi trong DB**, không chỉ mã trạng thái), ghi rõ trong báo cáo.
-- **LUẬT MỚI (bài học Đợt 4 — reviewer bác bỏ "ghi nhận, chưa sửa" 3 lần và cả 3 lần đều đúng):**
-  mọi mục "ghi nhận, chưa sửa" **BẮT BUỘC kèm bằng chứng đã ĐỌC route anh em cùng cụm** và trích
-  dòng code cho thấy nó cũng không lọc. Không được kết luận "cụm này vốn thiết kế toàn hệ" bằng
-  suy luận suông — Đợt 4 đã sai đúng kiểu đó 3 lần, mỗi lần giấu một lỗ hổng thật.
+- **LUẬT (giữ từ Đợt 5, đã chứng minh giá trị 4 lần):** mọi mục "ghi nhận, chưa sửa" **BẮT BUỘC kèm
+  bằng chứng đã ĐỌC code anh em** và trích dòng code. Không kết luận bằng suy luận suông.
 - **Không** đụng `lib/tien-do/recompute.ts`, `lib/bao-mat/auth.ts`, `lib/khoi-luong/boq.ts`,
-  `lib/vat-tu/material-sync.ts`. Không thêm migration. Không đổi hình dạng JSON trả về.
-- Route gọi ra ngoài (LLM/email/Telegram/Zalo/push/S3) → test phải chặn mạng bằng thiếu biến môi
-  trường hoặc `mock.module`; **không được để test gọi mạng thật**. Cụm `engineering` có nhiều route
-  tên gợi ý AI — đọc code xác nhận chúng là hàm xác định (ENG-2 ghi rõ "không gọi LLM"), nếu route
-  nào thật sự gọi ra ngoài thì phải chặn và ghi rõ cách chặn trong báo cáo.
-- Tiếng Việt toàn bộ tên ca test/comment/commit. Worker KHÔNG push — commit trong worktree (tách
-  commit `test:` và `fix:`).
-- **Cổng mỗi việc**: file test xanh trên DB ICU vừa dựng mới; kiểm chứng chống nhiễu `user_projects`;
-  `npx eslint <file test> <route đã sửa>` xanh; `npm run typecheck` xanh; nếu sửa route thì chạy lại
-  mọi file test cũ nhắc tới route đó (`grep -l`).
+  `lib/vat-tu/material-sync.ts`. Không thêm migration trừ khi việc nói rõ được phép.
+- Tiếng Việt toàn bộ tên ca test/comment/commit. Worker KHÔNG push — commit trong worktree.
+- **Cổng mỗi việc**: file test xanh trên DB ICU vừa dựng mới; `npx eslint <file đã sửa>` xanh;
+  `npm run typecheck` xanh; chạy lại mọi file test cũ nhắc tới file đã sửa (`grep -l`).
 
 ---
 
-# Pha 1 — 5 việc song song
+# Pha 1 — 8 việc song song
 
-## Việc W0 — Vá lỗ hổng cách ly dự án ở `workpackages/**` — `route: standard` (ƯU TIÊN CAO NHẤT)
+## Việc A — Kill switch của Safe Execution Engine: làm cho lệnh huỷ có tính bền — `route: complex`
 
-Nợ đã ghi ở Đợt 4, reviewer đã đọc code xác nhận. Đo lại 2026-09-05: **8 route không có bất kỳ
-`visibleProjectIds`/`getCurrentProjectId`/`withProjectScope` nào**, trong khi `workpackages/[id]/route.ts`
-(anh em cùng thư mục) ĐÃ lọc đúng:
+**File:** `lib/ky-thuat/engineering-autonomy.ts`, hàm `executeExecutionRequest` (khoảng dòng 274–342).
 
-- `app/api/workpackages/route.ts` (POST tạo gói việc — chỉ kiểm `sheet_type_id` tồn tại)
-- `app/api/workpackages/[id]/tasks/route.ts` (POST tạo task dưới gói việc bất kỳ)
-- `app/api/workpackages/[id]/move/route.ts` (PATCH đổi thứ tự gói việc dự án khác)
-- `app/api/workpackages/[id]/copy/route.ts`
-- `app/api/workpackages/[id]/bbnt/route.ts`
-- `app/api/workpackages/[id]/drawing/route.ts`
-- `app/api/workpackages/[id]/dimensions/route.ts`, `.../dimensions/column/route.ts`,
-  `.../dimensions/column/move/route.ts`
-- `app/api/workpackages/qc-status/route.ts`
+**Lỗi (đã đọc code xác nhận 2026-09-05):** cả thân hàm nằm trong
+`withProjectScope(projectId, async () => {...}, { readOnly: false })` — mà `withProjectScope` bọc
+`withTransaction`. Khi kill switch bật, code chạy:
 
-Suy dự án qua `work_packages.sheet_type_id → sheet_types.tower_id → towers.project_id` — **dùng
-`LEFT JOIN towers`** để dòng chưa gán tower ra `projectId = null` rồi bị 404, không biến mất khỏi
-kết quả (khuôn V9 đã dùng, xem `app/api/work-fronts/[id]/route.ts` và `lib/tien-do/workfronts.ts`).
-Không thuộc dự án nhìn thấy được → **404**. Route trả danh sách thì **lọc**, không trả 404.
+```ts
+if (!allowance.allowed) {
+  await run(`UPDATE engineering_execution_requests SET status = 'killed' WHERE id = ?`, requestId);
+  throw new Error(`Thực thi bị hủy bỏ: ${allowance.reason}`);
+}
+```
 
-File test MỚI: `tests/route-workpackages-cach-ly.test.ts`. Mỗi route vá cần **cả hai chiều**: ca
-xuyên dự án → 404 (hoặc không xuất hiện trong danh sách) **kèm kiểm dữ liệu dự án B không đổi trong
-DB**; và ca thao tác hợp lệ trong dự án của mình → 200/201, dữ liệu đổi đúng.
+`throw` làm transaction rollback ⇒ **`UPDATE` đó bị xoá luôn**. Hậu quả không chỉ là mất nhật ký:
+bản ghi ở lại trạng thái `authorized` với `approval_token` còn nguyên và `token_expires_at` còn hạn
+(15 phút). Nếu kill switch được bật rồi **tắt lại** trong cửa sổ đó, chính yêu cầu lẽ ra đã bị huỷ
+vẫn gọi `executeExecutionRequest` được và lần này **thực thi thật**.
 
-**Ranh giới:** chỉ 8 route trên + file test. Thấy route khác cùng lớp lỗi → ghi nhận kèm trích code,
-không sửa.
-**Tiêu chí chấp nhận:** cổng chung; `tests/route-tien-do-3.test.ts` và `tests/route-wbs-con-lai.test.ts`
-(đã phủ chính các route này ở Đợt 3/4) **vẫn xanh** — nếu đỏ, phân tích xem ca đó có đang khoá hành
-vi thiếu cách ly không, sửa cho đúng và ghi rõ.
+**Yêu cầu:**
 
-## Việc W1 — Engineering: quy trình & duyệt — `route: standard`
+1. Lệnh huỷ phải **bền** — trạng thái `killed` phải còn trong DB sau khi hàm ném lỗi.
+2. Cùng lúc phải **đóng cửa sổ token**: khi huỷ, `approval_token` về `NULL` (bám đúng cách đường
+   thành công đã làm: `SET status = 'completed', execution_result = ?, approval_token = NULL`).
+   Yêu cầu đã bị huỷ không được phép thực thi lại kể cả khi kill switch tắt trong 15 phút.
+3. `UPDATE` huỷ phải lọc `AND project_id = ?` như mọi câu lệnh khác trong hàm (câu hiện tại chỉ có
+   `WHERE id = ?` — thiếu lọc dự án, dù ngữ cảnh đã ở trong `withProjectScope`).
+4. Hợp đồng ném lỗi ra ngoài **không đổi**: caller vẫn nhận `Error` với đúng thông điệp
+   `Thực thi bị hủy bỏ: <lý do>` (route đang bắt và trả 500 — Việc B sẽ đổi mã trạng thái, đừng làm
+   trùng phần đó ở đây).
 
-File: `tests/route-eng-quy-trinh.test.ts`. Phạm vi (24 route): `agent-sessions` (3, gồm
-`[id]/conflicts/[conflictId]/resolve`), `autonomy` (5: kill-switch, policies, requests,
-requests/[id]/authorize, requests/[id]/execute), `objects` (3, gồm `[id]/review`), `suggestions`
-(3, gồm `[id]/decide`), `swarm` (5: debates, debates/[id], debates/[id]/arguments,
-debates/[id]/synthesize, drafts), `workflows` (5: route, [id], [id]/submit, [id]/transition,
-[id]/gates/[seq]).
+**Ranh giới được phép quyết (đây là lý do route `complex`, không phải `spec`):**
 
-Đọc trước `docs/nang-cap/ENG-3-engineering-workflow-os.md` và `ENG-4-multi-agent-engineering-os.md`
-để biết bất biến: **Gate 0 chặn thật**, 5 approval profile A–E, separation of duties, phân xử
-xung đột **không dùng majority vote**, `no_consensus` là kết quả hợp lệ. Test phải khoá đúng các
-bất biến đó (vd người submit không tự duyệt được; gate chưa qua thì không transition được).
+- **Cách tách ghi huỷ ra khỏi transaction sắp rollback** là quyết định của worker. Hai hướng đều
+  chấp nhận được, chọn hướng nào cũng phải giải thích trong comment code:
+  (a) tách hàm thành 2 pha — pha đọc/thẩm định trong một `withProjectScope` read-only, pha ghi
+  (huỷ **hoặc** hoàn tất) trong một `withProjectScope` ghi riêng sau đó; hoặc
+  (b) giữ 1 transaction cho đường thành công, còn nhánh huỷ thì **không throw từ trong transaction**
+  mà trả về một giá trị đánh dấu, ghi huỷ ở transaction thứ hai bên ngoài rồi mới `throw`.
+- **Xử lý race condition** — nếu chọn hướng (a), giữa pha thẩm định và pha ghi có khoảng trống cho
+  hai lời gọi đồng thời cùng token cùng qua được thẩm định. Bắt buộc đóng bằng ít nhất một trong hai:
+  `SELECT ... FOR UPDATE` khi đọc bản ghi, **và/hoặc** thêm điều kiện `AND status = 'authorized'`
+  (kèm `AND approval_token = ?`) vào `UPDATE` hoàn tất rồi kiểm số dòng thật sự đổi — 0 dòng nghĩa
+  là ai đó đã chạy trước, phải ném lỗi thay vì báo thành công. Worker chọn cách, nhưng **phải có**
+  một cơ chế và phải có ca test chứng minh nó chặn được lời gọi thứ hai.
+- **Không** đổi schema, **không** thêm migration, **không** đổi hình dạng JSON route trả về.
 
-**Tiêu chí chấp nhận:** cổng chung; 24 route được chạm.
+**File test MỚI:** `tests/engineering-autonomy-kill-switch.test.ts`. Tối thiểu các ca:
 
-## Việc W2 — Engineering: zero-error, tuân thủ & tri thức — `route: standard`
+- Kill switch bật → `executeExecutionRequest` ném lỗi **VÀ** đọc lại DB thấy `status = 'killed'`,
+  `approval_token IS NULL` (ca này ĐỎ trên code hiện tại — chạy thử trước khi sửa để chứng minh).
+- Kill switch bật rồi **tắt** → gọi lại đúng requestId + token cũ phải **thất bại** (không còn
+  `authorized`, token đã NULL). Đây là ca chứng minh lỗ hổng thật sự được đóng.
+- Hai lời gọi tuần tự cùng token trên yêu cầu hợp lệ: lần 1 thành công (`completed`), lần 2 thất bại.
+- Đường hạnh phúc không hồi quy: `authorized` + token đúng + kill switch tắt → `completed`, kết quả
+  `executionResult.success === true`.
+- Cách ly dự án: gọi với `projectId` khác → "Không tìm thấy yêu cầu thực thi".
 
-File: `tests/route-eng-zero-error.test.ts`. Phạm vi (22 route): `zero-error` (5: challenge,
-issue-certificate, pour-permits, reconcile-quad, verify-photo), `compliance` (4: rules, audits,
-audit-element, scan-all), `data-quality` (2, gồm `[id]/resolve`), `memory` (3: lessons, patterns,
-transfer), `esign/envelopes`, `digital-handover`, `smart-ipc`, `project-health`, `graph`,
-`taxonomy`, `lineage/[id]`, `impact/[id]`.
+**Tiêu chí chấp nhận:** 5 nhóm ca trên xanh; chạy lại toàn bộ file test cũ nhắc tới
+`engineering-autonomy` (`grep -rl engineering-autonomy tests/`) vẫn xanh; `typecheck` + `eslint` xanh;
+trong báo cáo ghi rõ **đã chọn hướng nào và vì sao**, kèm output chứng minh ca số 1 ĐỎ trước khi sửa.
 
-Lưu ý: `smart-ipc` là **cổng chuỗi thanh toán** — `PROGRESS.md` ghi rõ cổng 1 đọc bảng
-`engineering_scan_to_bim_runs` nay không còn ai ghi nên luôn `available: false`; test phải phản ánh
-đúng hành vi thật đó, KHÔNG sửa. `verify-photo`/`issue-certificate` đụng lưu trữ file — dùng byte
-ảnh thật tối thiểu như file mẫu.
+## Việc B — Cụm `engineering` không được ép mọi lỗi nghiệp vụ về 500 — `route: complex`
 
-**Tiêu chí chấp nhận:** cổng chung; 22 route được chạm.
+**Phạm vi đo lại 2026-09-05:** `grep -rln 'status: 500' app/api/engineering/` → **72 file**, trong đó
+**98 chỗ** dùng đúng một idiom:
 
-## Việc W3 — Engineering: dự báo, đấu thầu & tài chính — `route: standard`
+```ts
+} catch (err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return NextResponse.json({ error: msg }, { status: 500 });
+}
+```
 
-File: `tests/route-eng-du-bao.test.ts`. Phạm vi (22 route): `predictions` (3, gồm `[id]/decide`,
-`run`), `prescriptive` (3: scenarios, scenarios/[id]/approve, simulate), `cashflow` (2: forecasts,
-simulate), `fidic/claims` + `fidic/claims/generate-dossier`, `fidic-tia`, `bidding` (3: packages,
-quotes, analyze), `subcon-ai` (3: scores, evaluate, recommend-shortlist), `carbon-lca`,
-`qs-bom-explosion`, `shopdrawing-lod400`, `multi-agent-copilot`, `pinnacle/pulse`.
+Hậu quả: mọi lỗi nghiệp vụ do hàm `lib/ky-thuat/*` ném ra (QR sai checksum, thẻ quá hạn, sai trạng
+thái, không tìm thấy bản ghi…) đều tới client dưới dạng **500**, lẫn với lỗi hệ thống thật. Client
+không phân biệt được "bạn gửi sai" với "server hỏng", và log/Sentry ngập 500 giả.
 
-Lưu ý **tiền tệ (M45 PR1)**: cụm này có route tính tiền — không cộng/nhân tiền bằng float JS trong
-test để suy kết quả kỳ vọng; dùng hằng số tính tay hoặc đọc thẳng từ DB. Route "AI" ở đây là hàm
-xác định (ENG-2) — xác nhận bằng đọc code, nếu có lời gọi mạng thật thì chặn và ghi rõ.
+**Yêu cầu:**
 
-**Tiêu chí chấp nhận:** cổng chung; 22 route được chạm.
+1. Thêm lớp lỗi nghiệp vụ ở **tầng 0** — `lib/nen/loi.ts` (ADR-0007: `nen/` là tiện ích thuần, không
+   chạm DB; mọi tầng đều import xuống được). Tối thiểu: một lớp mang `status: number` + `message`,
+   kèm vài hàm tạo tiện dụng cho các mã hay dùng (400/403/404/409/422). Đặt tên tiếng Việt bám phong
+   cách repo (`lib/nen/money.ts`, `lib/nen/date.ts`… đều đặt tên hàm tiếng Việt hoặc tiếng Anh ngắn
+   — chọn cho nhất quán với file xung quanh, giải thích lựa chọn trong comment đầu file).
+2. Một helper dùng chung để route ánh xạ lỗi → response, đặt cạnh lớp lỗi, để 98 chỗ `catch` rút gọn
+   còn **một lời gọi**. Lỗi KHÔNG phải lỗi nghiệp vụ vẫn ra **500** (không được nuốt lỗi hệ thống
+   thành 4xx — đó là hồi quy nguy hiểm hơn cả bệnh đang chữa).
+3. Đổi các `throw new Error(...)` trong `lib/ky-thuat/*` sang lớp lỗi mới **theo đúng ngữ nghĩa**:
+   không tìm thấy → 404; sai đầu vào/định dạng → 400; sai quyền → 403; sai trạng thái/vi phạm bất
+   biến nghiệp vụ → 409; dữ liệu hợp lệ về cú pháp nhưng không thoả điều kiện nghiệp vụ → 422.
 
-## Việc W4 — Engineering: MEPF & hiện trường số — `route: standard`
+**Ranh giới được phép quyết:** worker tự chọn tên lớp/hàm, tự quyết ranh giới 409 vs 422 cho từng
+lỗi cụ thể, và **tự quyết phạm vi đổi `throw` trong lib** — không bắt buộc đổi hết 100% trong một
+việc. Ưu tiên theo thứ tự: (1) các lỗi mà test hiện có đã chạm tới, (2) `lib/ky-thuat/engineering-
+smart-ipc.ts` + `engineering-autonomy.ts` + các module QR/scan (đây là chỗ lỗi nghiệp vụ dày nhất),
+(3) phần còn lại. Chỗ nào chưa đổi thì vẫn ra 500 như cũ — **không hồi quy**, và ghi rõ trong báo cáo
+danh sách file đã đổi / chưa đổi.
 
-File: `tests/route-eng-mepf.test.ts`. Phạm vi (23 route): `mepf-*` (6: hydraulic, nesting,
-predictive, takeoff, tc, voice), `pipe-mass-balance`, `pipe-spool-tracking`, `iot` (3: devices,
-telemetry, alerts), `spatial` (3: compute, annotations, annotations/[id]), `logistics` (2:
-shipments, scan-receive), `ledger` (2: merkle, verify-proof), `hse-vision` (2: scan, scans),
-`edge-vision-tracking`, `generative-routing`, `closed-loop-sync`.
+**Ràng buộc chống hồi quy — đây là phần dễ hỏng nhất của việc này:**
 
-Lưu ý: `ledger/merkle` + `verify-proof` là sổ cái băm — test phải kiểm **bằng chứng hợp lệ thì
-verify PASS, sửa một byte thì FAIL** (đây là bất biến đáng giá nhất cụm này, đừng chỉ kiểm 200).
-`mepf-voice` có thể chạm nhận dạng giọng nói — đọc code, nếu gọi ra ngoài thì chặn.
-`closed-loop-sync` từng có test giả ở Đợt 1 (tự tính lại sha256 mà không import module) — lần này
-phải gọi module thật.
+- **Không đổi hình dạng JSON**: thân phản hồi vẫn là `{ error: "<thông điệp tiếng Việt>" }`.
+- Nhiều test hiện có đang khẳng định `res.status === 500` cho chính các lỗi này. **Phải chạy lại
+  TOÀN BỘ bộ test** (không chỉ file liên quan) và cập nhật các khẳng định đó sang mã mới — mỗi lần
+  sửa một khẳng định phải đọc ca test để chắc mã mới đúng ngữ nghĩa, không phải sửa cho xanh.
+- Việc A cũng đụng `engineering-autonomy.ts`. **Đừng đổi `executeExecutionRequest`** — để Việc A làm;
+  nếu cần lớp lỗi ở đó, ghi vào báo cáo để phiên chính gộp sau.
 
-**Tiêu chí chấp nhận:** cổng chung; 23 route được chạm.
+**Test:** bổ sung ca vào file test sẵn có của các route đã đổi (đừng tạo file mới trùng phạm vi) —
+mỗi mã trạng thái mới cần ít nhất 1 ca chứng minh, **và** ít nhất 1 ca chứng minh lỗi hệ thống thật
+(vd lỗi DB) vẫn ra 500.
+
+**Tiêu chí chấp nhận:** `npm test` toàn bộ xanh; `npm run check:lib-layers` xanh (lớp lỗi ở tầng 0
+không được import ngược lên); `typecheck` + `eslint` xanh; báo cáo liệt kê file đã đổi/chưa đổi và
+số khẳng định test đã cập nhật.
+
+## Việc C — Phủ nốt 8 route chưa có test + vá `tasks/:id/move` nối chuỗi SQL — `route: standard`
+
+**8 route CHƯA có test nào chạm tới** (đo 2026-09-05 bằng cách quét `tests/` tìm chuỗi
+`app/api/<key>/route`; đây là toàn bộ phần còn lại của `app/api/**` sau 5 đợt):
+
+- `app/api/diaries/route.ts`
+- `app/api/handover-items/route.ts`
+- `app/api/inspection-requests/route.ts`
+- `app/api/project/route.ts`
+- `app/api/qc/documents/route.ts`
+- `app/api/tasks/route.ts`
+- `app/api/variations/[id]/route.ts`
+- `app/api/v1/engineering/agent-sessions/[id]/claims/route.ts`
+
+File test MỚI: `tests/route-con-lai.test.ts`. Mỗi handler tối thiểu: 401 chưa đăng nhập
+(`dangXuat()`), 403 sai vai trò (nếu route kiểm `CAN`), ca hạnh phúc 200/201 **kiểm dữ liệu trả về
+và/hoặc ghi DB**, validate 400/422, và 404/lọc xuyên dự án nếu route có lọc dự án.
+Lưu ý `app/api/project/route.ts` là route **public có fallback khi DB trống** — đọc code trước, đừng
+áp khuôn 401 máy móc.
+
+**Vá kèm — `app/api/tasks/[id]/move/route.ts` nối chuỗi vào SQL** (dòng 47–50):
+
+```ts
+const op = dir === "up" ? `< ${cur.sort_order} ORDER BY sort_order DESC`
+                        : `> ${cur.sort_order} ORDER BY sort_order ASC`;
+const neighbor = await queryOne<...>(
+  `SELECT id, sort_order FROM tasks WHERE package_id = ? AND sort_order ${op} LIMIT 1`, ...);
+```
+
+`cur.sort_order` là số nguyên đọc từ DB nên **không khai thác được** — nhưng lệch quy ước cứng của
+`CLAUDE.md` ("SQL luôn dùng helper `lib/db` với placeholder `?` — không nối chuỗi để chèn giá trị").
+Sửa: đưa `cur.sort_order` thành tham số `?`, chỉ giữ toán tử `<`/`>` và `ASC`/`DESC` là literal
+(chúng đến từ enum `dir` đã kiểm, không phải input tự do). **Không đổi hành vi** — ca test phải
+chứng minh thứ tự trước/sau khi move giống hệt code cũ (viết ca test trước, chạy xanh trên code cũ,
+rồi sửa, chạy lại vẫn xanh).
+
+**Tiêu chí chấp nhận:** file test mới xanh; ca move xanh **cả trước lẫn sau** khi sửa (dán output cả
+hai lần vào báo cáo); `npm run check:db-params` xanh; `typecheck` + `eslint` xanh.
+
+## Việc D — Cổng CI chặn id khoá ngoại gán cứng trong test — `route: standard`
+
+**Vì sao:** lớp lỗi "giả định trạng thái toàn cục" đã làm đỏ bộ test ở **cả Đợt 4 lẫn Đợt 5**, dù
+Đợt 5 đã ghi nó thành ràng buộc cứng trong `PLAN.md` kèm ví dụ chính xác. Kết luận ghi trong
+`PROGRESS.md`: **viết luật vào kế hoạch là chưa đủ, phải có cổng tự động.** Cả hai lần đều cùng dạng:
+một hằng số id (`1`) được truyền vào cột có khoá ngoại tới `users` (`created_by`, `updated_by`,
+`actorId`), xanh khi chạy riêng, đỏ khi chạy cả bộ vì file test khác đã xoá user đó.
+
+**Yêu cầu:**
+
+1. Script mới `scripts/check-test-fk-ids.ts` + npm script `check:test-fk-ids`, thêm vào cùng chỗ
+   các cổng tĩnh khác đang chạy trong CI (`.github/workflows/ci.yml`, job `static` — đọc
+   `package.json` + workflow để bám đúng khuôn `check:db-params` / `check:project-scope`).
+2. Quét `tests/**/*.test.ts` tìm **hằng số nguyên nhỏ truyền vào vị trí id khoá ngoại**. Mẫu tối
+   thiểu phải bắt được cả hai ca thật đã xảy ra:
+   - `INSERT INTO boq_norms (..., created_by) VALUES (..., 1)` — hằng trong chuỗi SQL của test;
+   - `await setFlag(moduleKey, projectId, true, 1, 1)` — hằng truyền vào tham số `actorId` của hàm lib.
+3. **Có đường thoát tường minh**: whitelist theo `file:dòng` kèm **lý do bắt buộc** (khuôn giống
+   `WHITELIST` trong `tests/org-scope-invariant.test.ts` — đọc file đó trước, kể cả phần comment cảnh
+   báo "đừng thêm mục mới với lý do …"), và cổng phải **báo lỗi khi whitelist có mục thừa** (không
+   còn ứng với dòng nào) để nó không mục ruỗng theo thời gian.
+4. **BẮT BUỘC: kèm ca test chứng minh cổng ĐỎ** khi cố ý vi phạm — bài học Đợt 5 ghi rõ:
+   `check:db-params` đã báo `[OK]` suốt nhiều tháng trong khi 20 vi phạm thật đang tồn tại, vì regex
+   của nó không khớp nổi phong cách gọi phổ biến nhất của repo. Không lặp lại: file
+   `tests/check-test-fk-ids.test.ts` phải gọi thẳng hàm quét trên một đoạn mã vi phạm dựng sẵn và
+   khẳng định nó **tìm ra**, cộng một đoạn hợp lệ và khẳng định nó **bỏ qua**.
+5. Chạy cổng trên `tests/` hiện tại → **phải xanh** (Đợt 5 đã sửa 2 ca thật). Nếu nó tìm ra vi phạm
+   còn sót, sửa file test đó (dùng id từ hàm `tao*()`) thay vì whitelist.
+
+**Ranh giới:** worker tự chọn heuristic (chấp nhận false-negative để tránh nhiễu, giống
+`project-scope-invariant`), nhưng **không được** chấp nhận false-negative trên đúng hai ca thật ở
+mục 2 — chúng là tiêu chí chấp nhận cứng.
+
+**Tiêu chí chấp nhận:** `npm run check:test-fk-ids` xanh trên `tests/` hiện tại; test chứng minh cổng
+đỏ khi vi phạm xanh; workflow CI đã thêm bước; `typecheck` + `eslint` xanh.
 
 ---
 
-# Pha 2 — Tích hợp & đo lại
+## Việc E — Hạ Gate 4 của Smart IPC thành cảnh báo (không còn chặn tự động thông qua) — `route: complex`
 
-## Việc W5 — Chạy full suite, cập nhật baseline + PROGRESS — `route: standard`
+**Quyết định nghiệp vụ của chủ dự án (2026-09-05):** bỏ Gate 4 khỏi **điều kiện tự động thông qua**,
+vẫn hiển thị số liệu cho người duyệt xem. Ba cổng còn lại quyết định auto-approve.
 
-Sau khi W0–W4 qua reviewer và đã tích hợp vào nhánh nền.
+**Nền (đã đọc code xác nhận):** `lib/ky-thuat/engineering-smart-ipc.ts`.
 
-1. Dựng DB ICU mới, chạy `npm run check:coverage` **dưới Node 24** → phải **0 file fail** và cổng
-   ĐẠT. Đỏ ở file không thuộc đợt → đối chứng trên `origin/main` trước khi kết luận.
-2. Cập nhật `coverage-baseline.json` theo số đo mới (`measuredAt` = hôm nay).
-3. `npm run lint` · `typecheck` · `check:lib-layers` · `check:dead-code` · `check:route-perms` ·
-   `check:project-scope` xanh.
-4. `PROGRESS.md`: thêm mục `## ✅ Đợt 5 chiến dịch coverage` **trên cùng**, đúng khuôn mục Đợt 4
-   (bảng từng việc + số ca; "BUG THẬT lộ ra"; "Ghi nhận, chưa sửa" kèm bằng chứng đọc code;
-   coverage cũ → mới; "Đợt sau"). Cập nhật câu "Đợt sau" của mục Đợt 4.
+- `fetchGate4Context` (dòng ~241) đối soát kho bằng `SELECT SUM(qty_used) FROM materials WHERE
+project_id = ? AND boq_code = ?` trong khi hạn mức lấy từ `boq_items WHERE lower(code) = lower(?)`.
+  `migrations/0029_boq_codes.sql` gắn trigger `boq_codes_sync` lên **cả 4 bảng** `tasks`,
+  `work_packages`, `materials`, `boq_items` với một registry `boq_codes` khoá chính là `code` ⇒ hai
+  bảng KHÔNG BAO GIỜ cùng giữ một mã (trigger `RAISE EXCEPTION ... 23505`). Vậy `warehouseUsedQty`
+  **cấu trúc mà nói luôn bằng 0**, không phải "chưa có dữ liệu".
+- `danhGia...` (dòng ~351–365): `gate4` ghép vào `gates` rồi `allGatesCleared = gates.every(passed)`.
 
-**Tiêu chí chấp nhận:** full suite 0 fail dưới Node 24 + DB ICU; prettier sạch cho md/json đã sửa.
+**Yêu cầu:**
+
+1. `allGatesCleared` tính từ **gate1..gate3**. Gate 4 vẫn được tính và vẫn trả về đầy đủ trong kết
+   quả (status + reason) để UI hiển thị, nhưng không tham gia quyết định thông qua.
+2. `blockedGateReasons` chỉ liệt kê cổng **chặn** (1–3). Gate 4 nếu không đạt thì đưa vào một trường
+   **riêng** mang nghĩa cảnh báo (worker tự đặt tên, tiếng Việt hoặc bám phong cách file) — không
+   trộn vào danh sách lý do chặn, vì người duyệt sẽ hiểu nhầm là hồ sơ bị chặn vì kho.
+3. **Không bịa số 0.** Vì liên kết kho là bất khả thi về cấu trúc, `warehouseUsedQty` phải trả `null`
+   kèm lý do rõ ràng bằng tiếng Việt (khuôn `thieuDuLieu` trong `lib/hien-truong/subcon-metrics.ts`
+   là mẫu tốt: chỉ số nào chưa có nguồn thì trả `null` kèm lý do, tuyệt đối không thay bằng mặc
+   định). Gate 4 khi thiếu dữ liệu kho → `status: "khong_du_du_lieu"` (đã có sẵn trong enum
+   `SmartIpcGateStatus`), KHÔNG phải `"failed"` — "failed" nói sai rằng hồ sơ có vấn đề.
+4. Cột DB `gate4_quad_reconcile_passed` và `all_gates_cleared` vẫn ghi như cũ nhưng **ý nghĩa của
+   `all_gates_cleared` đổi** (giờ là 3 cổng). Thêm comment giải thích ngay tại chỗ ghi; **không**
+   thêm migration, **không** đổi tên cột.
+5. Kiểm UI: `app/engineering/**` chỗ nào hiển thị 4 cổng phải nói rõ gate 4 là **cảnh báo, không
+   chặn** — tìm bằng `grep -rn "gate4\|allGatesCleared" app/`.
+
+**Ghi vào báo cáo (bắt buộc, để phiên chính đưa lên `PROGRESS.md`):** nửa "khối lượng ≤ hạn mức BOQ"
+của gate 4 (`claimedQty <= approvedBoqQty`) **vốn chạy đúng** và là một chốt kiểm soát tiền thật;
+theo quyết định trên nó cũng trở thành cảnh báo. Chỉ nửa đối soát kho là bất khả thi. Ghi rõ hệ quả
+này, đừng lặng lẽ bỏ qua.
+
+**Ranh giới được phép quyết:** tên trường cảnh báo mới; cách diễn đạt lý do tiếng Việt; có tách
+`fetchGate4Context` thành hàm nhỏ hơn hay không.
+
+**Test:** bổ sung vào file test sẵn có của Smart IPC (tìm bằng `grep -rl smart-ipc tests/`). Tối
+thiểu: hồ sơ đạt gate 1–3 nhưng gate 4 không đủ dữ liệu → **`allGatesCleared === true`** (ca này ĐỎ
+trên code hiện tại — chạy trước khi sửa để chứng minh); gate 4 trả `warehouseUsedQty === null` +
+`status === "khong_du_du_lieu"` + có lý do; một cổng trong 1–3 hỏng → vẫn chặn như cũ.
+
+**Tiêu chí chấp nhận:** các ca trên xanh; chạy lại toàn bộ file test nhắc tới smart-ipc; `typecheck`
+
+- `eslint` xanh; báo cáo có output chứng minh ca số 1 đỏ trước khi sửa.
+
+## Việc F — Chấm điểm thầu phụ trên 3 chỉ số có dữ liệu thật — `route: spec`
+
+**Quyết định nghiệp vụ của chủ dự án (2026-09-05):** bỏ hẳn `ncrIncidentCount` và `costVarianceRate`
+khỏi công thức, chuẩn hoá lại trọng số cho 3 chỉ số đang có dữ liệu thật. Không thêm migration.
+
+**Nền (đã đọc code xác nhận):** `lib/ky-thuat/engineering-subcon-ai.ts`
+`computeSubcontractorTrustScore` hiện dùng trọng số: tiến độ 30%, chất lượng BBNT 25%, NCR 20%,
+HSE 15%, chi phí 10%. Hai chỉ số bị bỏ chiếm 30%; 3 chỉ số còn lại chiếm 70%.
+
+**Trọng số MỚI (chuẩn hoá theo tỷ lệ, chốt sẵn — không tự đổi):**
+
+- `scheduleScore` (từ `onTimeCompletionRate`): **30/70 = 0,428571…**
+- `qualityScore` (từ `bbntPassRate`): **25/70 = 0,357142…**
+- `hseScore` (từ `hseSafetyScore`): **15/70 = 0,214285…**
+
+Dùng phân số `30/70`, `25/70`, `15/70` trong code (đừng gõ số thập phân cụt), giữ nguyên
+`.toFixed(2)` như hiện tại. Tổng đúng bằng 1 nên thang điểm 0–100 không đổi.
+
+**Điểm chạm code (đủ, đã liệt kê bằng `grep -rn "ncrIncidentCount\|costVarianceRate"`):**
+
+- `lib/ky-thuat/engineering-subcon-ai.ts` — bỏ 2 trường khỏi `SubconMetricsInput`, bỏ
+  `ncrPenaltyScore`/`costControlScore` khỏi công thức và khỏi `componentScores`.
+- `lib/hien-truong/subcon-metrics.ts` — bỏ 2 trường khỏi `ChiSoThauPhu` và bỏ 2 mục tương ứng khỏi
+  `thieuDuLieu` (chúng không còn là chỉ số thiếu, mà là chỉ số **không dùng nữa**). Giữ nguyên cơ
+  chế `thieuDuLieu` cho 3 chỉ số còn lại khi hồ sơ chưa gắn `supplier_id` — đó vẫn là thiếu dữ liệu thật.
+- `app/api/engineering/subcon-ai/evaluate/route.ts` — điều kiện trả **422** (dòng ~56) hiện dựa trên
+  việc 2 chỉ số kia `null`; sau thay đổi, 422 chỉ còn đúng khi **3 chỉ số còn lại** thiếu dữ liệu
+  (hồ sơ chưa gắn `supplier_id`, hoặc chưa có kỳ đánh giá nào). Đọc kỹ điều kiện hiện tại rồi sửa
+  cho khớp — **đừng bỏ hẳn 422**, nó vẫn đúng cho trường hợp hồ sơ trống.
+- `app/api/engineering/subcon-ai/recommend-shortlist/route.ts` và
+  `app/api/engineering/subcon-ai/scores/route.ts` — bỏ chỗ truyền/mặc định 2 chỉ số.
+- `app/engineering/subcon-ai/page.tsx` — bỏ 2 chỉ số khỏi UI; phần mô tả trọng số (nếu có hiển thị)
+  cập nhật theo trọng số mới. Tuân thủ mục "Thiết kế giao diện (UI/UX)" của `CLAUDE.md`
+  (không hardcode hex, không dùng biến thể `dark:`, dùng component trong `app/components/ui/`).
+- `tests/engineering-subcon-ai.test.ts` — cập nhật mọi ca khẳng định điểm số/thành phần. **Tính lại
+  giá trị kỳ vọng bằng tay theo trọng số mới**, đừng chép số máy in ra.
+- Comment đầu file `lib/hien-truong/subcon-metrics.ts` (dòng 1–10) đang mô tả 5 chỉ số — cập nhật.
+
+**Test bổ sung:** ca chứng minh `POST /api/engineering/subcon-ai/evaluate` với hồ sơ đã gắn
+`supplier_id` + có kỳ đánh giá → **200 kèm `trustScore` tính từ 3 chỉ số** (trước đây luôn 422; đây
+là ca chứng minh tính năng chạy được lần đầu — chạy trên code cũ trước để thấy 422). Và ca hồ sơ
+chưa gắn `supplier_id` → vẫn 422.
+
+**Tiêu chí chấp nhận:** toàn bộ `tests/engineering-subcon-ai.test.ts` xanh; ca 200 mới xanh (kèm
+output chứng minh nó ra 422 trên code cũ); `typecheck` + `eslint` + `npm run check:lib-layers` xanh.
 
 ---
 
-## Thứ tự & phụ thuộc toàn đợt
+## Việc H — `/api/project` hoạt động theo dự án đang chọn — `route: spec`
 
-W0 ‖ W1 ‖ W2 ‖ W3 ‖ W4 (song song, khác file test, khác DB; chỉ có thể trùng ở route được sửa bug
-— trùng thì dừng, báo phiên chính) → tích hợp tuần tự W0→W4 → W5. Mỗi việc 1 worktree tại
-`/home/user/xboss-wt/<ma>`, nhánh `claude/cov5-<ma>`, DB `xboss_c5_<ma>` dựng bằng ICU/vi-VN.
-`reviewer` soát từng việc trước khi tích hợp. Coordinator/worker KHÔNG push, KHÔNG mở PR.
+**Quyết định của chủ dự án (2026-09-05):** làm thành việc riêng (không vá quyền tạm bợ).
+
+**Lỗi (đã đọc code xác nhận):** `app/api/project/route.ts` thao tác trên **dòng `projects` có id nhỏ
+nhất toàn DB**, không theo dự án của người gọi:
+
+```ts
+// GET (dòng ~18)
+`SELECT name, code, heatmap_title, investor, contractor, logo FROM projects ORDER BY id LIMIT 1`
+// PATCH (dòng ~60 và ~68)
+`UPDATE projects SET logo = ? WHERE id = (SELECT id FROM projects ORDER BY id LIMIT 1)``UPDATE projects SET heatmap_title = ? WHERE id = (SELECT id FROM projects ORDER BY id LIMIT 1)`;
+```
+
+PATCH chỉ kiểm `isAdminOrPm(user.role)` ⇒ Admin/PM của **bất kỳ dự án nào** ghi đè được logo và
+tiêu đề heatmap của dự án đầu tiên. Route viết như cấu hình singleton "1 app 1 dự án", có trước trục
+đa dự án (M22) và đa tổ chức (`org_id`, M54).
+
+**Việc này NHỎ hơn vẻ ngoài** vì hạ tầng đã có sẵn: `getCurrentProjectId(user)`
+(`lib/ha-tang/projects.ts:47`) **đã tự đối chiếu `visibleProjectIds` VÀ đối chiếu `org_id`** —
+user đoán id dự án của org khác qua cookie thì hàm trả `null` (không throw). Vậy chỉ cần dùng đúng
+hàm này, **không cần tự viết kiểm quyền**.
+
+**Yêu cầu:**
+
+1. **PATCH**: lấy `projectId = await getCurrentProjectId(user)`; `null` → **422** kèm thông điệp
+   tiếng Việt (bám khuôn `app/api/handover-items/route.ts` dòng ~47–52: "Chưa có dự án nào để …").
+   Hai câu `UPDATE` đổi `WHERE id = (SELECT ... LIMIT 1)` thành `WHERE id = ?` với `projectId`.
+2. **GET vẫn PUBLIC** (trang `/login` gọi nó khi chưa đăng nhập — `app/login/page.tsx:34`). Logic mới:
+   gọi `getCurrentUser()`; **có** phiên và `getCurrentProjectId` ra id → đọc đúng dự án đó; **không**
+   có phiên, hoặc chưa chọn dự án → giữ **nguyên hành vi cũ** `ORDER BY id LIMIT 1` (fallback công
+   khai, và `CLAUDE.md` ghi rõ route này phải có fallback khi DB trống). Không thêm tham số
+   `?projectId=` — sẽ biến endpoint public thành chỗ dò tên dự án theo id.
+3. **UI không cần đổi**: mọi trang tiêu thụ đều fetch `/api/project` sau khi đã đăng nhập
+   (`ProgressMap`, `lookahead`, `report`, `schedule`, `mepf-lifecycle`, `payments/print`), nên tự
+   nhận đúng dự án. **Chỉ** `app/login/page.tsx` chạy ở trạng thái chưa đăng nhập — dùng fallback.
+   Xác minh lại bằng `grep -rn "/api/project\"" app/` trước khi kết luận không phải sửa gì.
+4. Không thêm migration, không đổi hình dạng JSON trả về, không đổi mã trạng thái của GET.
+
+**Test:** file MỚI `tests/route-project-theo-du-an.test.ts`. Tối thiểu:
+
+- PATCH: PM dự án A đổi `heatmapTitle` → **chỉ** dòng dự án A đổi; **khẳng định dòng dự án B KHÔNG
+  đổi trong DB** (ca này ĐỎ trên code hiện tại nếu A không phải dự án id nhỏ nhất — dựng dữ liệu
+  đúng thứ tự id để nó thật sự bắt lỗi; chạy trước khi sửa để chứng minh).
+- PATCH: user chưa chọn dự án → 422, không dòng nào đổi.
+- PATCH: vẫn 401 chưa đăng nhập, 403 sai vai trò (giữ nguyên hành vi cũ).
+- GET **không** phiên → vẫn 200, trả dự án đầu tiên (fallback không vỡ — đây là ca chống hồi quy
+  trang `/login`).
+- GET **có** phiên đang chọn dự án B → trả tên/mã của B, không phải A.
+
+**Tiêu chí chấp nhận:** các ca trên xanh; `typecheck` + `eslint` + `check:route-perms` +
+`check:project-scope` xanh; chạy lại mọi file test cũ nhắc `/api/project` (`grep -rl`); báo cáo có
+output chứng minh ca PATCH đỏ trước khi sửa.
+
+---
+
+# Pha 2 — sau khi Pha 1 xong
+
+`reviewer` soát diff từng việc (skill `code-review`). **Yêu cầu bổ sung từ bài học Đợt 5:** với Việc
+A và Việc B, reviewer phải **revert thử bản vá rồi chạy lại test** để chứng minh ca test thật sự bắt
+được lỗi — đây là bằng chứng chắc nhất và đã được dùng hiệu quả ở Đợt 5 (reviewer W4).
+
+Sau đó phiên chính: chạy `npm run check:coverage` đầy đủ trên Node 24 + DB ICU, cập nhật
+`coverage-baseline.json`, cập nhật `PROGRESS.md`, mở PR, merge khi CI xanh.
+
+---
+
+# Phân tích nền của Việc E và Việc F (giữ lại để đối chiếu)
+
+Hai mục dưới đây ban đầu để ngoài phạm vi vì cần quyết định nghiệp vụ, không phải quyết định kỹ
+thuật (luật cứng `CLAUDE.md`: thiếu đặc tả thì HỎI, không đoán). **Chủ dự án đã chốt ngày
+2026-09-05**, nên cả hai đã vào kế hoạch thành Việc E và Việc F ở trên. Giữ lại phần phân tích nền
+dưới đây để đối chiếu:
+
+- **Gate 4 Smart IPC** (`lib/ky-thuat/engineering-smart-ipc.ts` `fetchGate4Context`): đối soát kho
+  bằng `materials.boq_code = boq_items.code`, mà cả `materials` lẫn `boq_items` **đều nằm trong
+  registry BOQCODE dùng chung** (`migrations/0029_boq_codes.sql` gắn trigger lên đúng 4 bảng:
+  `tasks`, `work_packages`, `materials`, `boq_items`) — trigger `RAISE EXCEPTION ... 23505` nếu hai
+  bảng cùng giữ một mã, nên hai giá trị đó **không bao giờ trùng được**. `warehouseUsedQty` luôn 0,
+  mọi khối lượng dương đều trượt cổng ⇒ "4 cổng tự động thông qua thanh toán" chưa từng tự thông qua
+  lần nào. Hướng lỗi là fail-safe (chặn nhầm hồ sơ hợp lệ, không cho qua nhầm hồ sơ sai) nên không
+  thất thoát tiền. Liên kết đúng đã có sẵn trong schema: `boq_items.id → boq_norms.boq_item_id`
+  (`resource_type = 'material'`) `→ boq_norms.material_id → materials.id`, kèm `qty_per_unit` để quy
+  đổi đơn vị — nhưng **quy tắc đối soát là quyết định nghiệp vụ**, không suy ra được từ code.
+- **`subcon-ai/evaluate` luôn 422** (`lib/hien-truong/subcon-metrics.ts`): 2/5 chỉ số bắt buộc
+  (`ncrIncidentCount`, `costVarianceRate`) gán cứng `null` vì **chưa có bảng nguồn** gắn NCR và chi
+  phí với thầu phụ. Cần chốt lấy dữ liệu từ đâu (thêm cột liên kết vào bảng NCR/chi phí hiện có? bỏ
+  2 chỉ số này khỏi công thức? hạ chúng thành tuỳ chọn?) trước khi code.

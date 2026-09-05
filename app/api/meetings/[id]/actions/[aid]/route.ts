@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 import {
   MEETING_ACTION_STATUSES,
   getMeetingAction,
@@ -57,8 +58,22 @@ export async function PATCH(
   const invalid = validateMeetingActionInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
   if (input.assignee != null) {
-    const u = await queryOne(`SELECT id FROM users WHERE id = ?`, input.assignee);
+    // Cách ly tổ chức (Đợt 6, Việc G): users.org_id — cùng lớp lỗi đã vá ở
+    // app/api/users/[id]/route.ts (Đợt 5, M54 GĐ1 PR2).
+    const u = await queryOne(
+      `SELECT id FROM users WHERE id = ? AND org_id = ?`,
+      input.assignee,
+      user.orgId,
+    );
     if (!u) return NextResponse.json({ error: "Người được giao không tồn tại" }, { status: 422 });
+  }
+  if (input.taskId != null) {
+    // Cách ly dự án (Đợt 6) — nhánh PATCH này trước đây ghi thẳng `task_id` mà KHÔNG kiểm gì,
+    // trong khi POST cùng cụm (app/api/meetings/[id]/actions/route.ts) đã đối chiếu dự án.
+    // Id task là số nguyên tuần tự nên đoán được: thiếu kiểm là gắn được task dự án khác vào
+    // việc sau họp. Cùng khuôn, cùng mã lỗi với route anh em.
+    if ((await taskProjectId(input.taskId)) !== projectId)
+      return NextResponse.json({ error: "Task liên kết không tồn tại" }, { status: 422 });
   }
 
   await run(

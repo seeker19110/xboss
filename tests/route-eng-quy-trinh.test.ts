@@ -718,10 +718,7 @@ test("POST .../requests/:id/execute: đủ chu trình authorize → execute → 
 
 test(
   "POST .../requests/:id/execute: kill switch bật ngay trước khi thực thi → chặn thực thi " +
-    "(GHI NHẬN CHƯA SỬA: lib/ky-thuat/engineering-autonomy.ts::executeExecutionRequest ghi " +
-    "status='killed' RỒI throw TRONG CÙNG transaction withProjectScope(...,{readOnly:false}) " +
-    "→ withTransaction rollback xoá luôn UPDATE đó, request thực tế vẫn nằm ở 'authorized' " +
-    "thay vì 'killed' như comment code mô tả — xem mục cuối file)",
+    "và ghi BỀN status='killed' (Đợt 6 đã vá ranh giới transaction — xem mục cuối file)",
   S,
   async () => {
     const projectId = await taoDuAn("aexecks");
@@ -756,10 +753,8 @@ test(
       `SELECT status FROM engineering_execution_requests WHERE id = ?`,
       reqId,
     );
-    // Hành vi THẬT hiện tại (không phải hành vi ĐÚNG mong muốn — xem ghi nhận cuối file):
-    // status vẫn "authorized" vì UPDATE ... SET status='killed' bị rollback cùng transaction
-    // với throw ngay sau đó.
-    assert.equal(row?.status, "authorized");
+    // Sau bản vá Đợt 6: lệnh huỷ được ghi ở transaction riêng nên KHÔNG bị throw cuốn theo.
+    assert.equal(row?.status, "killed");
   },
 );
 
@@ -2045,33 +2040,18 @@ test(
 );
 
 // ============================================================================
-// GHI NHẬN, CHƯA SỬA (không phải bug ở route — đòi cân nhắc lại ranh giới transaction ở
-// tầng lib, ngoài phạm vi "sửa tối thiểu route" của W1)
+// ĐÃ VÁ Ở ĐỢT 6 (Việc A) — giữ lại ghi chú để không ai "sửa lùi" về khuôn cũ
 // ============================================================================
 //
-// lib/ky-thuat/engineering-autonomy.ts::executeExecutionRequest (đọc dòng ~304-317):
+// lib/ky-thuat/engineering-autonomy.ts::executeExecutionRequest trước đây ghi
+// `UPDATE ... SET status='killed'` rồi `throw` NGAY SAU, cả hai trong cùng một
+// `withProjectScope(projectId, ..., { readOnly: false })` — vốn bọc `withTransaction`
+// (lib/db/index.ts) — nên ROLLBACK xoá luôn lệnh huỷ vừa ghi. Bản ghi ở lại `authorized` với
+// `approval_token` còn hạn 15 phút: bật kill switch rồi tắt lại trong cửa sổ đó thì đúng yêu
+// cầu lẽ ra đã bị huỷ vẫn thực thi được thật.
 //
-//   const allowance = await checkAutonomyAllowance(projectId, req.capabilityKey, req.autonomyLevel, userRole);
-//   if (!allowance.allowed) {
-//     await run(
-//       `UPDATE engineering_execution_requests SET status = 'killed' WHERE id = ?`,
-//       requestId,
-//     );
-//     throw new Error(`Thực thi bị hủy bỏ: ${allowance.reason}`);
-//   }
-//
-// Toàn bộ hàm chạy TRONG `withProjectScope(projectId, async () => {...}, { readOnly: false })`
-// (dòng ~280), mà `withProjectScope` bọc `withTransaction` (lib/db/index.ts:216-237) — throw
-// ngay sau UPDATE khiến `withTransaction` ROLLBACK, xoá luôn chính UPDATE vừa ghi. Kết quả đo
-// được (test trên): bật kill switch giữa lúc chờ execute → route trả lỗi đúng (chặn thực thi
-// thật, KHÔNG có completed — bất biến an toàn cốt lõi vẫn giữ), nhưng cột `status` của request
-// vẫn dừng ở "authorized" thay vì "killed" như tên trạng thái/comment code mô tả — audit trail
-// bị mất, và một lần cấp token cũ (`approval_token` vẫn còn) về lý thuyết có thể bị thử lại
-// (dù sẽ bị kill switch chặn lại lần nữa, không có lỗ hổng thực thi trái phép — chỉ là dữ liệu
-// trạng thái sai). Route `app/api/engineering/autonomy/requests/[id]/execute/route.ts` chỉ
-// forward lỗi, không có gì để sửa ở route. Sửa đúng cần tách UPDATE 'killed' ra khỏi transaction
-// sắp rollback (vd ghi ở một `withProjectScope` riêng SAU khi biết allowance thất bại, trước khi
-// throw) — đây là quyết định về ranh giới transaction/atomicity của Safe Execution Engine (OS-4),
-// không phải lỗi lọc dự án/vai trò đơn giản như các lớp lỗi đã liệt kê trong PLAN.md, nên KHÔNG
-// tự sửa ở đây; test đã đo đúng hành vi HIỆN TẠI (không phải hành vi ĐÚNG mong muốn) để không
-// khoá nhầm một bug thành "spec".
+// Bản vá giữ một transaction cho đường thành công, còn nhánh huỷ trả về giá trị đánh dấu rồi
+// ghi `status='killed', approval_token = NULL` ở một transaction THỨ HAI trước khi `throw`;
+// kèm `SELECT ... FOR UPDATE` + `UPDATE ... AND status='authorized' AND approval_token = ?`
+// để đóng cửa sổ đua. Ca ở trên vì thế nay khẳng định `status = 'killed'` (không còn
+// 'authorized'). Phủ đầy đủ bất biến: tests/engineering-autonomy-kill-switch.test.ts.

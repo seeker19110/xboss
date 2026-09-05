@@ -263,7 +263,7 @@ test(
       worker,
     );
 
-    const workloads = await userWorkloads();
+    const workloads = await userWorkloads(ids.projectId);
     const w = workloads.get(worker);
     assert.ok(w, "phải có bản ghi workload cho worker");
     assert.equal(w!.total, 2); // t3 đã hoàn thành nên bị loại khỏi workload (status IN hoan_thanh/nghiem_thu)

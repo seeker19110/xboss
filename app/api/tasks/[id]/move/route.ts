@@ -42,13 +42,13 @@ export async function PATCH(
   );
   if (!cur) return NextResponse.json({ error: "Task không tồn tại" }, { status: 404 });
 
-  const op =
-    dir === "up"
-      ? `< ${cur.sort_order} ORDER BY sort_order DESC`
-      : `> ${cur.sort_order} ORDER BY sort_order ASC`;
+  // cur.sort_order đưa vào tham số `?` thay vì nối chuỗi (quy ước CLAUDE.md) — chỉ toán tử
+  // </> và ASC/DESC là literal, đến từ enum `dir` đã kiểm ở trên chứ không phải input tự do.
+  const op = dir === "up" ? "< ? ORDER BY sort_order DESC" : "> ? ORDER BY sort_order ASC";
   const neighbor = await queryOne<{ id: number; sort_order: number }>(
     `SELECT id, sort_order FROM tasks WHERE package_id = ? AND sort_order ${op} LIMIT 1`,
     cur.package_id,
+    cur.sort_order,
   );
 
   if (!neighbor) return NextResponse.json({ ok: false, message: "Đã ở đầu/cuối danh sách" });

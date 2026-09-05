@@ -55,7 +55,15 @@ export async function PATCH(
       return NextResponse.json({ error: "Hệ thi công không tồn tại" }, { status: 422 });
   }
   if (input.supplierId != null) {
-    if (!(await queryOne(`SELECT id FROM suppliers WHERE id = ?`, input.supplierId)))
+    // Cách ly tổ chức (Đợt 6, Việc G): suppliers.org_id NOT NULL — cùng lớp lỗi đã vá ở
+    // GET /api/suppliers (vá W7, Đợt 5).
+    if (
+      !(await queryOne(
+        `SELECT id FROM suppliers WHERE id = ? AND org_id = ?`,
+        input.supplierId,
+        user.orgId,
+      ))
+    )
       return NextResponse.json({ error: "Nhà thầu phụ không tồn tại" }, { status: 422 });
   }
   if (input.leaderId != null) {

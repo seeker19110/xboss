@@ -95,12 +95,15 @@ async function taoOrg(ten: string): Promise<number> {
   return insertId(`INSERT INTO organizations (name, slug) VALUES (?, ?)`, `Org ${slug}`, slug);
 }
 
-async function taoBoqItem(ten: string): Promise<number> {
+// projectId: BẮT BUỘC (Đợt 6, Việc G — POST /api/tenders giờ lọc boq_items.project_id, vá lỗ
+// hổng "kiểm tồn tại không lọc dự án"). Dòng BOQ project_id NULL không khớp bất kỳ dự án nào.
+async function taoBoqItem(ten: string, projectId: number): Promise<number> {
   const { insertId } = await import("@/lib/db");
   return insertId(
-    `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price) VALUES (?, ?, 'm', 100, 1000)`,
+    `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price, project_id) VALUES (?, ?, 'm', 100, 1000, ?)`,
     `BOQ-${uniq(ten)}`,
     `Dòng BOQ ${ten}`,
+    projectId,
   );
 }
 
@@ -1877,7 +1880,7 @@ test("POST /api/tenders/:id/bids: gói thầu thuộc dự án khác → 404", S
   const projectB = await taoDuAn("bidisoB");
   const pmA = await taoUser("pm", "bidisoA");
   const pmB = await taoUser("pm", "bidisoB");
-  const boqId = await taoBoqItem("bidisoB");
+  const boqId = await taoBoqItem("bidisoB", projectB);
   const tender = await taoGoiThau(pmB, projectB, "bidisoB", boqId);
   await dangNhapDuAn(pmA, projectA);
   const { POST } = await import("@/app/api/tenders/[id]/bids/route");
@@ -1890,7 +1893,7 @@ test("POST /api/tenders/:id/bids: gói thầu thuộc dự án khác → 404", S
 test("POST /api/tenders/:id/bids: thiếu nhà thầu (supplierId) → 422", S, async () => {
   const projectId = await taoDuAn("bidnosupp");
   const pm = await taoUser("pm", "bidnosupp");
-  const boqId = await taoBoqItem("bidnosupp");
+  const boqId = await taoBoqItem("bidnosupp", projectId);
   const tender = await taoGoiThau(pm, projectId, "bidnosupp", boqId);
   const { POST } = await import("@/app/api/tenders/[id]/bids/route");
   const res = await POST(jreq("/x", { lumpSum: 100 }), {
@@ -1902,7 +1905,7 @@ test("POST /api/tenders/:id/bids: thiếu nhà thầu (supplierId) → 422", S, 
 test("POST /api/tenders/:id/bids: nhà thầu không tồn tại → 422", S, async () => {
   const projectId = await taoDuAn("bidsuppbad");
   const pm = await taoUser("pm", "bidsuppbad");
-  const boqId = await taoBoqItem("bidsuppbad");
+  const boqId = await taoBoqItem("bidsuppbad", projectId);
   const tender = await taoGoiThau(pm, projectId, "bidsuppbad", boqId);
   const { POST } = await import("@/app/api/tenders/[id]/bids/route");
   const res = await POST(jreq("/x", { supplierId: 999999999, lumpSum: 100 }), {
@@ -1914,7 +1917,7 @@ test("POST /api/tenders/:id/bids: nhà thầu không tồn tại → 422", S, as
 test("POST /api/tenders/:id/bids: thiếu cả lumpSum lẫn dòng giá → 422", S, async () => {
   const projectId = await taoDuAn("bidempty");
   const pm = await taoUser("pm", "bidempty");
-  const boqId = await taoBoqItem("bidempty");
+  const boqId = await taoBoqItem("bidempty", projectId);
   const supplierId = await taoNCC("bidempty");
   const tender = await taoGoiThau(pm, projectId, "bidempty", boqId);
   const { POST } = await import("@/app/api/tenders/[id]/bids/route");
@@ -1927,8 +1930,8 @@ test("POST /api/tenders/:id/bids: thiếu cả lumpSum lẫn dòng giá → 422"
 test("POST /api/tenders/:id/bids: dòng giá không thuộc phạm vi mời thầu → 422", S, async () => {
   const projectId = await taoDuAn("bidoutscope");
   const pm = await taoUser("pm", "bidoutscope");
-  const boqId = await taoBoqItem("bidoutscope");
-  const boqNgoai = await taoBoqItem("bidoutscopeX");
+  const boqId = await taoBoqItem("bidoutscope", projectId);
+  const boqNgoai = await taoBoqItem("bidoutscopeX", projectId);
   const supplierId = await taoNCC("bidoutscope");
   const tender = await taoGoiThau(pm, projectId, "bidoutscope", boqId);
   const { POST } = await import("@/app/api/tenders/[id]/bids/route");
@@ -1943,7 +1946,7 @@ test("POST /api/tenders/:id/bids: nhập báo giá thành công", S, async () =>
   const { queryOne } = await import("@/lib/db");
   const projectId = await taoDuAn("bidok");
   const pm = await taoUser("pm", "bidok");
-  const boqId = await taoBoqItem("bidok");
+  const boqId = await taoBoqItem("bidok", projectId);
   const supplierId = await taoNCC("bidok");
   const tender = await taoGoiThau(pm, projectId, "bidok", boqId);
   const { POST } = await import("@/app/api/tenders/[id]/bids/route");
@@ -1964,7 +1967,7 @@ test("POST /api/tenders/:id/bids: nhập báo giá thành công", S, async () =>
 test("POST /api/tenders/:id/bids: NCC đã có báo giá cho gói thầu này → 409", S, async () => {
   const projectId = await taoDuAn("biddup");
   const pm = await taoUser("pm", "biddup");
-  const boqId = await taoBoqItem("biddup");
+  const boqId = await taoBoqItem("biddup", projectId);
   const supplierId = await taoNCC("biddup");
   const tender = await taoGoiThau(pm, projectId, "biddup", boqId);
   const { POST } = await import("@/app/api/tenders/[id]/bids/route");
@@ -1982,7 +1985,7 @@ test("POST /api/tenders/:id/bids: gói thầu đã trao thầu → 409", S, asyn
   const { run } = await import("@/lib/db");
   const projectId = await taoDuAn("bidawarded");
   const pm = await taoUser("pm", "bidawarded");
-  const boqId = await taoBoqItem("bidawarded");
+  const boqId = await taoBoqItem("bidawarded", projectId);
   const supplierId = await taoNCC("bidawarded");
   const tender = await taoGoiThau(pm, projectId, "bidawarded", boqId);
   await run(`UPDATE tender_packages SET status = 'awarded' WHERE id = ?`, tender.id);
@@ -2052,7 +2055,7 @@ test("PATCH /api/tenders/:id/bids/:bidId: báo giá thuộc gói thầu dự án
   const projectB = await taoDuAn("bidpisoB");
   const pmA = await taoUser("pm", "bidpisoA");
   const pmB = await taoUser("pm", "bidpisoB");
-  const boqId = await taoBoqItem("bidpisoB");
+  const boqId = await taoBoqItem("bidpisoB", projectB);
   const supplierId = await taoNCC("bidpisoB");
   const tender = await taoGoiThau(pmB, projectB, "bidpisoB", boqId);
   const bidId = await taoBaoGia(pmB, projectB, tender.id, supplierId);
@@ -2067,7 +2070,7 @@ test("PATCH /api/tenders/:id/bids/:bidId: báo giá thuộc gói thầu dự án
 test("PATCH /api/tenders/:id/bids/:bidId: body không phải object → 400", S, async () => {
   const projectId = await taoDuAn("bidpbody");
   const pm = await taoUser("pm", "bidpbody");
-  const boqId = await taoBoqItem("bidpbody");
+  const boqId = await taoBoqItem("bidpbody", projectId);
   const supplierId = await taoNCC("bidpbody");
   const tender = await taoGoiThau(pm, projectId, "bidpbody", boqId);
   const bidId = await taoBaoGia(pm, projectId, tender.id, supplierId);
@@ -2083,7 +2086,7 @@ test("PATCH /api/tenders/:id/bids/:bidId: sửa giá chào thành công", S, asy
   const { queryOne } = await import("@/lib/db");
   const projectId = await taoDuAn("bidpok");
   const pm = await taoUser("pm", "bidpok");
-  const boqId = await taoBoqItem("bidpok");
+  const boqId = await taoBoqItem("bidpok", projectId);
   const supplierId = await taoNCC("bidpok");
   const tender = await taoGoiThau(pm, projectId, "bidpok", boqId);
   const bidId = await taoBaoGia(pm, projectId, tender.id, supplierId, { lumpSum: 1000 });
@@ -2105,7 +2108,7 @@ test("PATCH /api/tenders/:id/bids/:bidId: gói thầu đã trao thầu → 409 (
   const { run } = await import("@/lib/db");
   const projectId = await taoDuAn("bidplock");
   const pm = await taoUser("pm", "bidplock");
-  const boqId = await taoBoqItem("bidplock");
+  const boqId = await taoBoqItem("bidplock", projectId);
   const supplierId = await taoNCC("bidplock");
   const tender = await taoGoiThau(pm, projectId, "bidplock", boqId);
   const bidId = await taoBaoGia(pm, projectId, tender.id, supplierId);
@@ -2154,7 +2157,7 @@ test("DELETE /api/tenders/:id/bids/:bidId: báo giá thuộc gói thầu dự á
   const projectB = await taoDuAn("bidddisoB");
   const pmA = await taoUser("pm", "bidddisoA");
   const pmB = await taoUser("pm", "bidddisoB");
-  const boqId = await taoBoqItem("bidddisoB");
+  const boqId = await taoBoqItem("bidddisoB", projectB);
   const supplierId = await taoNCC("bidddisoB");
   const tender = await taoGoiThau(pmB, projectB, "bidddisoB", boqId);
   const bidId = await taoBaoGia(pmB, projectB, tender.id, supplierId);
@@ -2170,7 +2173,7 @@ test("DELETE /api/tenders/:id/bids/:bidId: gói thầu đã trao thầu → 409 
   const { run } = await import("@/lib/db");
   const projectId = await taoDuAn("biddlock");
   const pm = await taoUser("pm", "biddlock");
-  const boqId = await taoBoqItem("biddlock");
+  const boqId = await taoBoqItem("biddlock", projectId);
   const supplierId = await taoNCC("biddlock");
   const tender = await taoGoiThau(pm, projectId, "biddlock", boqId);
   const bidId = await taoBaoGia(pm, projectId, tender.id, supplierId);
@@ -2187,7 +2190,7 @@ test("DELETE /api/tenders/:id/bids/:bidId: xoá thành công", S, async () => {
   const { queryOne } = await import("@/lib/db");
   const projectId = await taoDuAn("biddok");
   const pm = await taoUser("pm", "biddok");
-  const boqId = await taoBoqItem("biddok");
+  const boqId = await taoBoqItem("biddok", projectId);
   const supplierId = await taoNCC("biddok");
   const tender = await taoGoiThau(pm, projectId, "biddok", boqId);
   const bidId = await taoBaoGia(pm, projectId, tender.id, supplierId);
@@ -2239,7 +2242,7 @@ test("GET /api/tenders/:id/bids/:bidId/file: ID không phải số → 400", S, 
 test("GET /api/tenders/:id/bids/:bidId/file: chưa có file đính kèm → 404", S, async () => {
   const projectId = await taoDuAn("bidfnone");
   const pm = await taoUser("pm", "bidfnone");
-  const boqId = await taoBoqItem("bidfnone");
+  const boqId = await taoBoqItem("bidfnone", projectId);
   const supplierId = await taoNCC("bidfnone");
   const tender = await taoGoiThau(pm, projectId, "bidfnone", boqId);
   const bidId = await taoBaoGia(pm, projectId, tender.id, supplierId);
@@ -2256,7 +2259,7 @@ test("GET /api/tenders/:id/bids/:bidId/file: báo giá thuộc gói thầu dự 
   const projectB = await taoDuAn("bidfgisoB");
   const pmA = await taoUser("pm", "bidfgisoA");
   const pmB = await taoUser("pm", "bidfgisoB");
-  const boqId = await taoBoqItem("bidfgisoB");
+  const boqId = await taoBoqItem("bidfgisoB", projectB);
   const supplierId = await taoNCC("bidfgisoB");
   const tender = await taoGoiThau(pmB, projectB, "bidfgisoB", boqId);
   const bidId = await taoBaoGia(pmB, projectB, tender.id, supplierId);
@@ -2291,7 +2294,7 @@ test("POST /api/tenders/:id/bids/:bidId/file: báo giá không tồn tại (dự
   const projectB = await taoDuAn("bidfisoB");
   const pmA = await taoUser("pm", "bidfisoA");
   const pmB = await taoUser("pm", "bidfisoB");
-  const boqId = await taoBoqItem("bidfisoB");
+  const boqId = await taoBoqItem("bidfisoB", projectB);
   const supplierId = await taoNCC("bidfisoB");
   const tender = await taoGoiThau(pmB, projectB, "bidfisoB", boqId);
   const bidId = await taoBaoGia(pmB, projectB, tender.id, supplierId);
@@ -2311,7 +2314,7 @@ test(
   async () => {
     const projectId = await taoDuAn("bidfok");
     const pm = await taoUser("pm", "bidfok");
-    const boqId = await taoBoqItem("bidfok");
+    const boqId = await taoBoqItem("bidfok", projectId);
     const supplierId = await taoNCC("bidfok");
     const tender = await taoGoiThau(pm, projectId, "bidfok", boqId);
     const bidId = await taoBaoGia(pm, projectId, tender.id, supplierId);
@@ -2405,7 +2408,7 @@ test("POST /api/tenders/:id/award: gói thầu thuộc dự án khác → 404", 
   const projectB = await taoDuAn("awisoB");
   const pmA = await taoUser("pm", "awisoA");
   const pmB = await taoUser("pm", "awisoB");
-  const boqId = await taoBoqItem("awisoB");
+  const boqId = await taoBoqItem("awisoB", projectB);
   const supplierId = await taoNCC("awisoB");
   const tender = await taoGoiThau(pmB, projectB, "awisoB", boqId);
   const bidId = await taoBaoGia(pmB, projectB, tender.id, supplierId);
@@ -2418,8 +2421,8 @@ test("POST /api/tenders/:id/award: gói thầu thuộc dự án khác → 404", 
 test("POST /api/tenders/:id/award: báo giá không thuộc gói thầu này → 422", S, async () => {
   const projectId = await taoDuAn("awbidwrong");
   const pm = await taoUser("pm", "awbidwrong");
-  const boqId1 = await taoBoqItem("awbidwrong1");
-  const boqId2 = await taoBoqItem("awbidwrong2");
+  const boqId1 = await taoBoqItem("awbidwrong1", projectId);
+  const boqId2 = await taoBoqItem("awbidwrong2", projectId);
   const supplierId = await taoNCC("awbidwrong");
   const tender1 = await taoGoiThau(pm, projectId, "awbidwrong1", boqId1);
   const tender2 = await taoGoiThau(pm, projectId, "awbidwrong2", boqId2);
@@ -2439,7 +2442,7 @@ test(
     const { queryOne } = await import("@/lib/db");
     const projectId = await taoDuAn("awok");
     const pm = await taoUser("pm", "awok");
-    const boqId = await taoBoqItem("awok");
+    const boqId = await taoBoqItem("awok", projectId);
     const supplierId = await taoNCC("awok");
     const tender = await taoGoiThau(pm, projectId, "awok", boqId);
     const bidId = await taoBaoGia(pm, projectId, tender.id, supplierId, {
@@ -2472,7 +2475,7 @@ test(
 test("POST /api/tenders/:id/award: gói thầu đã trao thầu rồi → 409, không trao lại", S, async () => {
   const projectId = await taoDuAn("awtwice");
   const pm = await taoUser("pm", "awtwice");
-  const boqId = await taoBoqItem("awtwice");
+  const boqId = await taoBoqItem("awtwice", projectId);
   const supplierId = await taoNCC("awtwice");
   const tender = await taoGoiThau(pm, projectId, "awtwice", boqId);
   const bidId = await taoBaoGia(pm, projectId, tender.id, supplierId);

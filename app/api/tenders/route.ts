@@ -59,7 +59,14 @@ export async function POST(req: NextRequest) {
   if (validationErr) return NextResponse.json({ error: validationErr }, { status: 422 });
 
   for (const it of items) {
-    const exists = await queryOne(`SELECT id FROM boq_items WHERE id = ?`, it.boqItemId);
+    // Cách ly dự án (Đợt 6, Việc G): boq_items.project_id (migrations/0027) — thiếu lọc thì
+    // gói thầu dự án A kéo được dòng BOQ của dự án B vào (id đoán được), lộ khối lượng BOQ
+    // dự án khác vào hồ sơ mời thầu vừa gán project_id = projectId của người gọi bên dưới.
+    const exists = await queryOne(
+      `SELECT id FROM boq_items WHERE id = ? AND project_id = ?`,
+      it.boqItemId,
+      projectId,
+    );
     if (!exists)
       return NextResponse.json(
         { error: `Dòng BOQ #${it.boqItemId} không tồn tại` },

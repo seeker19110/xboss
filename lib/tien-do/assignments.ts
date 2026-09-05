@@ -239,9 +239,13 @@ export async function inheritedAssigneeFor(packageId: number): Promise<number | 
   return r?.assigned_to ?? null;
 }
 
-// Thống kê khối lượng cho mỗi user (dùng cho dropdown workload).
+// Thống kê khối lượng cho mỗi user (dùng cho dropdown workload), scoped theo dự án đang
+// chọn (Đợt 6, Việc I) — trước đó đếm xuyên mọi dự án, làm sai cột "khối lượng công việc"
+// trên trang phân công khi hệ thống có nhiều dự án.
 // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm (lib/recompute.ts).
-export async function userWorkloads(): Promise<Map<number, { total: number; delayed: number }>> {
+export async function userWorkloads(
+  projectId: number,
+): Promise<Map<number, { total: number; delayed: number }>> {
   const rows = await query<{ userId: number; total: number; delayed: number }>(
     `SELECT t.assigned_to AS "userId",
             COUNT(*) AS total,
@@ -250,10 +254,14 @@ export async function userWorkloads(): Promise<Map<number, { total: number; dela
                                     AND t.status NOT IN ('hoan_thanh','nghiem_thu')) AS delayed
        FROM tasks t
        JOIN work_packages wp ON wp.id = t.package_id
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       JOIN towers tw ON tw.id = st.tower_id
       WHERE t.assigned_to IS NOT NULL
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')
+        AND tw.project_id = ?
       GROUP BY t.assigned_to`,
     todayISO(),
+    projectId,
   );
   const m = new Map<number, { total: number; delayed: number }>();
   for (const r of rows)

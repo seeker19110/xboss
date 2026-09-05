@@ -77,12 +77,15 @@ async function taoNCC(ten: string, orgId = 1): Promise<number> {
   return insertId(`INSERT INTO suppliers (name, org_id) VALUES (?, ?)`, `NCC ${uniq(ten)}`, orgId);
 }
 
-async function taoBoqItem(ten: string): Promise<number> {
+// projectId: BẮT BUỘC (Đợt 6, Việc G — POST /api/tenders giờ lọc boq_items.project_id, vá lỗ
+// hổng "kiểm tồn tại không lọc dự án"). Dòng BOQ project_id NULL không khớp bất kỳ dự án nào.
+async function taoBoqItem(ten: string, projectId: number): Promise<number> {
   const { insertId } = await import("@/lib/db");
   return insertId(
-    `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price) VALUES (?, ?, 'm', 100, 1000)`,
+    `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price, project_id) VALUES (?, ?, 'm', 100, 1000, ?)`,
     `BOQ-${uniq(ten)}`,
     `Dòng BOQ ${ten}`,
+    projectId,
   );
 }
 
@@ -875,7 +878,7 @@ test("GET /api/tenders: cách ly dự án — không thấy gói thầu của d�
   const projectB = await taoDuAn("tisoB");
   const pmA = await taoUser("pm", "tisoA");
   const pmB = await taoUser("pm", "tisoB");
-  const boqB = await taoBoqItem("tisoB");
+  const boqB = await taoBoqItem("tisoB", projectB);
   await dangNhapDuAn(pmB, projectB);
   const { POST } = await import("@/app/api/tenders/route");
   await POST(jreq("/api/tenders", { name: "Gói thầu B", items: [{ boqItemId: boqB, qty: 10 }] }));
@@ -962,7 +965,7 @@ test(
     const { queryOne } = await import("@/lib/db");
     const projectId = await taoDuAn("tok");
     const pm = await taoUser("pm", "tok");
-    const boqId = await taoBoqItem("tok");
+    const boqId = await taoBoqItem("tok", projectId);
     await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/tenders/route");
     const res = await POST(
@@ -1010,7 +1013,7 @@ test("GET /api/tenders/:id: gói thầu của dự án khác → 404", S, async 
   const projectB = await taoDuAn("tgisoB");
   const pmA = await taoUser("pm", "tgisoA");
   const pmB = await taoUser("pm", "tgisoB");
-  const boqB = await taoBoqItem("tgisoB");
+  const boqB = await taoBoqItem("tgisoB", projectB);
   await dangNhapDuAn(pmB, projectB);
   const { POST } = await import("@/app/api/tenders/route");
   const created = await POST(
@@ -1032,7 +1035,7 @@ test(
   async () => {
     const projectId = await taoDuAn("tgok");
     const pm = await taoUser("pm", "tgok");
-    const boqId = await taoBoqItem("tgok");
+    const boqId = await taoBoqItem("tgok", projectId);
     await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/tenders/route");
     const created = await POST(
@@ -1073,7 +1076,7 @@ test("PATCH /api/tenders/:id: không tìm thấy (dự án khác) → 404", S, a
   const projectB = await taoDuAn("tpisoB");
   const pmA = await taoUser("pm", "tpisoA");
   const pmB = await taoUser("pm", "tpisoB");
-  const boqB = await taoBoqItem("tpisoB");
+  const boqB = await taoBoqItem("tpisoB", projectB);
   await dangNhapDuAn(pmB, projectB);
   const { POST } = await import("@/app/api/tenders/route");
   const created = await POST(
@@ -1092,7 +1095,7 @@ test("PATCH /api/tenders/:id: không tìm thấy (dự án khác) → 404", S, a
 test("PATCH /api/tenders/:id: body không phải object → 400", S, async () => {
   const projectId = await taoDuAn("tpbody");
   const pm = await taoUser("pm", "tpbody");
-  const boqId = await taoBoqItem("tpbody");
+  const boqId = await taoBoqItem("tpbody", projectId);
   await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/tenders/route");
   const created = await POST(
@@ -1109,7 +1112,7 @@ test("PATCH /api/tenders/:id: body không phải object → 400", S, async () =>
 test("PATCH /api/tenders/:id: thiếu tên (xoá trắng) → 422", S, async () => {
   const projectId = await taoDuAn("tpname");
   const pm = await taoUser("pm", "tpname");
-  const boqId = await taoBoqItem("tpname");
+  const boqId = await taoBoqItem("tpname", projectId);
   await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/tenders/route");
   const created = await POST(
@@ -1127,7 +1130,7 @@ test("PATCH /api/tenders/:id: đã trao thầu (awarded) → 409, không sửa �
   const { run } = await import("@/lib/db");
   const projectId = await taoDuAn("tawarded");
   const pm = await taoUser("pm", "tawarded");
-  const boqId = await taoBoqItem("tawarded");
+  const boqId = await taoBoqItem("tawarded", projectId);
   await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/tenders/route");
   const created = await POST(
@@ -1150,7 +1153,7 @@ test(
     const { queryOne } = await import("@/lib/db");
     const projectId = await taoDuAn("tpok");
     const pm = await taoUser("pm", "tpok");
-    const boqId = await taoBoqItem("tpok");
+    const boqId = await taoBoqItem("tpok", projectId);
     await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/tenders/route");
     const created = await POST(
@@ -1185,7 +1188,7 @@ test(
     const { queryOne } = await import("@/lib/db");
     const projectId = await taoDuAn("tpbadstatus");
     const pm = await taoUser("pm", "tpbadstatus");
-    const boqId = await taoBoqItem("tpbadstatus");
+    const boqId = await taoBoqItem("tpbadstatus", projectId);
     await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/tenders/route");
     const created = await POST(
