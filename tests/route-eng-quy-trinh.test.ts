@@ -132,11 +132,7 @@ async function taoPhienXungDot(
   return { sessionId, conflictId: conflict!.id };
 }
 
-async function taoObject(
-  projectId: number,
-  userId: number,
-  ten: string,
-): Promise<string> {
+async function taoObject(projectId: number, userId: number, ten: string): Promise<string> {
   const { createEngineeringObject } = await import("@/lib/ky-thuat/engineering-kernel");
   const obj = await createEngineeringObject(
     {
@@ -169,7 +165,9 @@ async function taoSuggestion(
         priority: (overrides.priority as never) ?? "quality",
         severity: "medium",
         confidenceSignals: {},
-        evidence: [{ kind: overrides.evidenceKind ?? "fact", statement: "Ghi nhận tại hiện trường" }],
+        evidence: [
+          { kind: overrides.evidenceKind ?? "fact", statement: "Ghi nhận tại hiện trường" },
+        ],
       },
     ],
   } as never);
@@ -276,21 +274,25 @@ test("GET /api/engineering/agent-sessions/:id: phiên thuộc dự án khác →
   assert.equal(res.status, 404);
 });
 
-test("GET /api/engineering/agent-sessions/:id: chi tiết đủ claim + xung đột + đề xuất phân xử", S, async () => {
-  const projectId = await taoDuAn("asdgok");
-  const { sessionId } = await taoPhienXungDot(projectId);
-  const pm = await taoUser("pm", "asdgok");
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/engineering/agent-sessions/[id]/route");
-  const res = await GET(greq("/x"), { params: Promise.resolve({ id: sessionId }) });
-  assert.equal(res.status, 200);
-  const { session, claims, conflicts } = await res.json();
-  assert.equal(session.consensus, "conflict_requires_review");
-  assert.equal(claims.length, 2);
-  assert.equal(conflicts.length, 1);
-  assert.ok(conflicts[0].proposal);
-  assert.equal(conflicts[0].proposal.needsHuman, true);
-});
+test(
+  "GET /api/engineering/agent-sessions/:id: chi tiết đủ claim + xung đột + đề xuất phân xử",
+  S,
+  async () => {
+    const projectId = await taoDuAn("asdgok");
+    const { sessionId } = await taoPhienXungDot(projectId);
+    const pm = await taoUser("pm", "asdgok");
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/engineering/agent-sessions/[id]/route");
+    const res = await GET(greq("/x"), { params: Promise.resolve({ id: sessionId }) });
+    assert.equal(res.status, 200);
+    const { session, claims, conflicts } = await res.json();
+    assert.equal(session.consensus, "conflict_requires_review");
+    assert.equal(claims.length, 2);
+    assert.equal(conflicts.length, 1);
+    assert.ok(conflicts[0].proposal);
+    assert.equal(conflicts[0].proposal.needsHuman, true);
+  },
+);
 
 // ============================================================================
 // POST /api/engineering/agent-sessions/:id/conflicts/:conflictId/resolve
@@ -298,36 +300,37 @@ test("GET /api/engineering/agent-sessions/:id: chi tiết đủ claim + xung đ�
 
 test("POST .../conflicts/:cid/resolve: chưa đăng nhập → 401", S, async () => {
   dangXuat();
-  const { POST } = await import(
-    "@/app/api/engineering/agent-sessions/[id]/conflicts/[conflictId]/resolve/route"
-  );
+  const { POST } =
+    await import("@/app/api/engineering/agent-sessions/[id]/conflicts/[conflictId]/resolve/route");
   const res = await POST(jreq("/x", {}), {
     params: Promise.resolve({ id: "x", conflictId: "y" }),
   });
   assert.equal(res.status, 401);
 });
 
-test("POST .../conflicts/:cid/resolve: engineer xem được nhưng không được chốt → 403", S, async () => {
-  const projectId = await taoDuAn("ares403");
-  const eng = await taoUser("engineer", "ares403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import(
-    "@/app/api/engineering/agent-sessions/[id]/conflicts/[conflictId]/resolve/route"
-  );
-  const res = await POST(jreq("/x", {}), {
-    params: Promise.resolve({ id: "x", conflictId: "y" }),
-  });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST .../conflicts/:cid/resolve: engineer xem được nhưng không được chốt → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("ares403");
+    const eng = await taoUser("engineer", "ares403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } =
+      await import("@/app/api/engineering/agent-sessions/[id]/conflicts/[conflictId]/resolve/route");
+    const res = await POST(jreq("/x", {}), {
+      params: Promise.resolve({ id: "x", conflictId: "y" }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST .../conflicts/:cid/resolve: thiếu resolution/method → 422", S, async () => {
   const projectId = await taoDuAn("aresval");
   const pm = await taoUser("pm", "aresval");
   const { sessionId, conflictId } = await taoPhienXungDot(projectId);
   await dangNhapDuAn(pm, projectId);
-  const { POST } = await import(
-    "@/app/api/engineering/agent-sessions/[id]/conflicts/[conflictId]/resolve/route"
-  );
+  const { POST } =
+    await import("@/app/api/engineering/agent-sessions/[id]/conflicts/[conflictId]/resolve/route");
   const res = await POST(jreq("/x", {}), {
     params: Promise.resolve({ id: sessionId, conflictId }),
   });
@@ -340,13 +343,11 @@ test("POST .../conflicts/:cid/resolve: phiên thuộc dự án khác → 404", S
   const { sessionId, conflictId } = await taoPhienXungDot(projectB);
   const pmA = await taoUser("pm", "aresisoA");
   await dangNhapDuAn(pmA, projectA);
-  const { POST } = await import(
-    "@/app/api/engineering/agent-sessions/[id]/conflicts/[conflictId]/resolve/route"
-  );
-  const res = await POST(
-    jreq("/x", { resolution: "Chọn DN150", method: "evidence_comparison" }),
-    { params: Promise.resolve({ id: sessionId, conflictId }) },
-  );
+  const { POST } =
+    await import("@/app/api/engineering/agent-sessions/[id]/conflicts/[conflictId]/resolve/route");
+  const res = await POST(jreq("/x", { resolution: "Chọn DN150", method: "evidence_comparison" }), {
+    params: Promise.resolve({ id: sessionId, conflictId }),
+  });
   assert.equal(res.status, 404);
 });
 
@@ -359,9 +360,8 @@ test(
     const pm = await taoUser("pm", "aresvote");
     const { sessionId, conflictId } = await taoPhienXungDot(projectId);
     await dangNhapDuAn(pm, projectId);
-    const { POST } = await import(
-      "@/app/api/engineering/agent-sessions/[id]/conflicts/[conflictId]/resolve/route"
-    );
+    const { POST } =
+      await import("@/app/api/engineering/agent-sessions/[id]/conflicts/[conflictId]/resolve/route");
     const res = await POST(
       jreq("/x", { resolution: "Chọn theo đa số", method: "preference_vote" }),
       { params: Promise.resolve({ id: sessionId, conflictId }) },
@@ -376,11 +376,13 @@ test("POST .../conflicts/:cid/resolve: chốt thành công, ghi resolved_by + me
   const pm = await taoUser("pm", "aresok");
   const { sessionId, conflictId } = await taoPhienXungDot(projectId);
   await dangNhapDuAn(pm, projectId);
-  const { POST } = await import(
-    "@/app/api/engineering/agent-sessions/[id]/conflicts/[conflictId]/resolve/route"
-  );
+  const { POST } =
+    await import("@/app/api/engineering/agent-sessions/[id]/conflicts/[conflictId]/resolve/route");
   const res = await POST(
-    jreq("/x", { resolution: "Chọn DN150 theo bản vẽ rev B mới hơn", method: "evidence_comparison" }),
+    jreq("/x", {
+      resolution: "Chọn DN150 theo bản vẽ rev B mới hơn",
+      method: "evidence_comparison",
+    }),
     { params: Promise.resolve({ id: sessionId, conflictId }) },
   );
   assert.equal(res.status, 200);
@@ -389,7 +391,10 @@ test("POST .../conflicts/:cid/resolve: chốt thành công, ghi resolved_by + me
     resolution_method: string;
     resolved_by: number;
     stage: string;
-  }>(`SELECT resolution, resolution_method, resolved_by, stage FROM engineering_conflicts WHERE id = ?`, conflictId);
+  }>(
+    `SELECT resolution, resolution_method, resolved_by, stage FROM engineering_conflicts WHERE id = ?`,
+    conflictId,
+  );
   assert.equal(row?.resolution_method, "evidence_comparison");
   assert.equal(row?.resolved_by, pm.id);
   assert.equal(row?.stage, "verified");
@@ -450,14 +455,18 @@ test("GET /api/engineering/autonomy/policies: chưa đăng nhập → 401", S, a
   assert.equal(res.status, 401);
 });
 
-test("GET /api/engineering/autonomy/policies: engineer/bch không có quyền → chỉ subcon 403", S, async () => {
-  const projectId = await taoDuAn("apo403");
-  const sub = await taoUser("subcon", "apo403");
-  await dangNhapDuAn(sub, projectId);
-  const { GET } = await import("@/app/api/engineering/autonomy/policies/route");
-  const res = await GET();
-  assert.equal(res.status, 403);
-});
+test(
+  "GET /api/engineering/autonomy/policies: engineer/bch không có quyền → chỉ subcon 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("apo403");
+    const sub = await taoUser("subcon", "apo403");
+    await dangNhapDuAn(sub, projectId);
+    const { GET } = await import("@/app/api/engineering/autonomy/policies/route");
+    const res = await GET();
+    assert.equal(res.status, 403);
+  },
+);
 
 test("GET /api/engineering/autonomy/policies: chưa chọn dự án → 400", S, async () => {
   const eng = await taoUser("engineer", "aponoproj");
@@ -476,18 +485,22 @@ test("GET /api/engineering/autonomy/policies: module tắt mặc định → 404
   assert.equal(res.status, 404);
 });
 
-test("GET /api/engineering/autonomy/policies: bật module → trả danh mục capability", S, async () => {
-  const projectId = await taoDuAn("apook");
-  const pm = await taoUser("pm", "apook");
-  await batModule("engineering-autonomy", projectId, pm.id);
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/engineering/autonomy/policies/route");
-  const res = await GET();
-  assert.equal(res.status, 200);
-  const { capabilities, policies } = await res.json();
-  assert.ok(capabilities.some((c: { key: string }) => c.key === "cap_sync_twin_state"));
-  assert.deepEqual(policies, []);
-});
+test(
+  "GET /api/engineering/autonomy/policies: bật module → trả danh mục capability",
+  S,
+  async () => {
+    const projectId = await taoDuAn("apook");
+    const pm = await taoUser("pm", "apook");
+    await batModule("engineering-autonomy", projectId, pm.id);
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/engineering/autonomy/policies/route");
+    const res = await GET();
+    assert.equal(res.status, 200);
+    const { capabilities, policies } = await res.json();
+    assert.ok(capabilities.some((c: { key: string }) => c.key === "cap_sync_twin_state"));
+    assert.deepEqual(policies, []);
+  },
+);
 
 // ============================================================================
 // GET/POST /api/engineering/autonomy/requests
@@ -636,7 +649,7 @@ test(
     await dangNhapDuAn(pmA, projectA);
     const { POST } = await import("@/app/api/engineering/autonomy/requests/[id]/authorize/route");
     const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: reqId }) });
-    assert.notEqual(res.status, 200);
+    assert.equal(res.status, 500); // route cụm này catch-all lỗi nghiệp vụ về 500 — khoá mã thật, không chỉ "khác 200"
     // Yêu cầu vẫn KHÔNG được cấp token — xác nhận dữ liệu dự án B không đổi.
     const { queryOne } = await import("@/lib/db");
     const row = await queryOne<{ approval_token: string | null; status: string }>(
@@ -670,15 +683,14 @@ test("POST .../requests/:id/execute: token sai → thất bại, không hoàn t�
   const pm = await taoUser("pm", "aexecbad");
   const reqId = await taoExecutionRequest(pm, projectId);
   await dangNhapDuAn(pm, projectId);
-  const { POST: authorize } = await import(
-    "@/app/api/engineering/autonomy/requests/[id]/authorize/route"
-  );
+  const { POST: authorize } =
+    await import("@/app/api/engineering/autonomy/requests/[id]/authorize/route");
   await authorize(jreq("/x", {}), { params: Promise.resolve({ id: reqId }) });
   const { POST } = await import("@/app/api/engineering/autonomy/requests/[id]/execute/route");
   const res = await POST(jreq("/x", { token: "tok_sai" }), {
     params: Promise.resolve({ id: reqId }),
   });
-  assert.notEqual(res.status, 200);
+  assert.equal(res.status, 500); // route cụm này catch-all lỗi nghiệp vụ về 500 — khoá mã thật, không chỉ "khác 200"
   const { queryOne } = await import("@/lib/db");
   const row = await queryOne<{ status: string }>(
     `SELECT status FROM engineering_execution_requests WHERE id = ?`,
@@ -692,9 +704,8 @@ test("POST .../requests/:id/execute: đủ chu trình authorize → execute → 
   const pm = await taoUser("pm", "aexecok");
   const reqId = await taoExecutionRequest(pm, projectId);
   await dangNhapDuAn(pm, projectId);
-  const { POST: authorize } = await import(
-    "@/app/api/engineering/autonomy/requests/[id]/authorize/route"
-  );
+  const { POST: authorize } =
+    await import("@/app/api/engineering/autonomy/requests/[id]/authorize/route");
   const authRes = await authorize(jreq("/x", {}), { params: Promise.resolve({ id: reqId }) });
   const { token } = await authRes.json();
   const { POST } = await import("@/app/api/engineering/autonomy/requests/[id]/execute/route");
@@ -717,9 +728,8 @@ test(
     const pm = await taoUser("pm", "aexecks");
     const reqId = await taoExecutionRequest(pm, projectId);
     await dangNhapDuAn(pm, projectId);
-    const { POST: authorize } = await import(
-      "@/app/api/engineering/autonomy/requests/[id]/authorize/route"
-    );
+    const { POST: authorize } =
+      await import("@/app/api/engineering/autonomy/requests/[id]/authorize/route");
     const authRes = await authorize(jreq("/x", {}), { params: Promise.resolve({ id: reqId }) });
     const { token } = await authRes.json();
 
@@ -727,14 +737,18 @@ test(
     const admin = await taoUser("admin", "aexecks");
     await dangNhapDuAn(admin, projectId);
     const ksRes = await killSwitch(jreq("/x", { isActive: true, reason: "Khẩn cấp" }));
-    assert.equal(ksRes.status, 200, `bật kill switch thất bại: ${JSON.stringify(await ksRes.json())}`);
+    assert.equal(
+      ksRes.status,
+      200,
+      `bật kill switch thất bại: ${JSON.stringify(await ksRes.json())}`,
+    );
 
     await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/engineering/autonomy/requests/[id]/execute/route");
     const res = await POST(jreq("/x", { token }), { params: Promise.resolve({ id: reqId }) });
     // Chặn thực thi thật (không rơi vào 'completed') — đây là bất biến an toàn quan trọng
     // nhất và ĐÃ đúng.
-    assert.notEqual(res.status, 200);
+    assert.equal(res.status, 500); // route cụm này catch-all lỗi nghiệp vụ về 500 — khoá mã thật, không chỉ "khác 200"
     const body = await res.json();
     assert.match(body.error, /Kill Switch/);
     const { queryOne } = await import("@/lib/db");
@@ -895,7 +909,10 @@ test("POST /api/engineering/objects/:id/review: duyệt thành công, ghi revisi
     params: Promise.resolve({ id: objId }),
   });
   assert.equal(res.status, 200);
-  const revs = await query(`SELECT id FROM engineering_object_revisions WHERE object_id = ?`, objId);
+  const revs = await query(
+    `SELECT id FROM engineering_object_revisions WHERE object_id = ?`,
+    objId,
+  );
   assert.equal(revs.length, 1);
 });
 
@@ -1013,40 +1030,52 @@ test("POST /api/engineering/suggestions/:id/decide: decision không hợp lệ �
   const sId = await taoSuggestion(projectId, "sgdval");
   await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/engineering/suggestions/[id]/decide/route");
-  const res = await POST(jreq("/x", { decision: "maybe" }), { params: Promise.resolve({ id: sId }) });
+  const res = await POST(jreq("/x", { decision: "maybe" }), {
+    params: Promise.resolve({ id: sId }),
+  });
   assert.equal(res.status, 422);
 });
 
-test("POST /api/engineering/suggestions/:id/decide: đề xuất thuộc dự án khác → 404", S, async () => {
-  const projectA = await taoDuAn("sgdisoA");
-  const projectB = await taoDuAn("sgdisoB");
-  const sB = await taoSuggestion(projectB, "sgdisoB");
-  const pmA = await taoUser("pm", "sgdisoA");
-  await dangNhapDuAn(pmA, projectA);
-  const { POST } = await import("@/app/api/engineering/suggestions/[id]/decide/route");
-  const res = await POST(jreq("/x", { decision: "accepted" }), { params: Promise.resolve({ id: sB }) });
-  assert.equal(res.status, 404);
-});
+test(
+  "POST /api/engineering/suggestions/:id/decide: đề xuất thuộc dự án khác → 404",
+  S,
+  async () => {
+    const projectA = await taoDuAn("sgdisoA");
+    const projectB = await taoDuAn("sgdisoB");
+    const sB = await taoSuggestion(projectB, "sgdisoB");
+    const pmA = await taoUser("pm", "sgdisoA");
+    await dangNhapDuAn(pmA, projectA);
+    const { POST } = await import("@/app/api/engineering/suggestions/[id]/decide/route");
+    const res = await POST(jreq("/x", { decision: "accepted" }), {
+      params: Promise.resolve({ id: sB }),
+    });
+    assert.equal(res.status, 404);
+  },
+);
 
-test("POST /api/engineering/suggestions/:id/decide: chấp nhận thành công, ghi decidedBy/note", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("sgdok");
-  const pm = await taoUser("pm", "sgdok");
-  const sId = await taoSuggestion(projectId, "sgdok");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/suggestions/[id]/decide/route");
-  const res = await POST(jreq("/x", { decision: "accepted", note: "Đồng ý áp dụng" }), {
-    params: Promise.resolve({ id: sId }),
-  });
-  assert.equal(res.status, 200);
-  const row = await queryOne<{ status: string; decided_by: number; decision_note: string }>(
-    `SELECT status, decided_by, decision_note FROM engineering_suggestions WHERE id = ?`,
-    sId,
-  );
-  assert.equal(row?.status, "accepted");
-  assert.equal(row?.decided_by, pm.id);
-  assert.equal(row?.decision_note, "Đồng ý áp dụng");
-});
+test(
+  "POST /api/engineering/suggestions/:id/decide: chấp nhận thành công, ghi decidedBy/note",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("sgdok");
+    const pm = await taoUser("pm", "sgdok");
+    const sId = await taoSuggestion(projectId, "sgdok");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/suggestions/[id]/decide/route");
+    const res = await POST(jreq("/x", { decision: "accepted", note: "Đồng ý áp dụng" }), {
+      params: Promise.resolve({ id: sId }),
+    });
+    assert.equal(res.status, 200);
+    const row = await queryOne<{ status: string; decided_by: number; decision_note: string }>(
+      `SELECT status, decided_by, decision_note FROM engineering_suggestions WHERE id = ?`,
+      sId,
+    );
+    assert.equal(row?.status, "accepted");
+    assert.equal(row?.decided_by, pm.id);
+    assert.equal(row?.decision_note, "Đồng ý áp dụng");
+  },
+);
 
 // ============================================================================
 // GET/POST /api/engineering/swarm/debates
@@ -1109,23 +1138,27 @@ async function taoDebate(
   return json.id as string;
 }
 
-test("POST /api/engineering/swarm/debates: tạo thành công → GET liệt kê đúng dự án", S, async () => {
-  const projectA = await taoDuAn("swplistA");
-  const projectB = await taoDuAn("swplistB");
-  const pmA = await taoUser("pm", "swplistA");
-  const pmB = await taoUser("pm", "swplistB");
-  const idA = await taoDebate(pmA, projectA, "swplistA");
-  await taoDebate(pmB, projectB, "swplistB");
+test(
+  "POST /api/engineering/swarm/debates: tạo thành công → GET liệt kê đúng dự án",
+  S,
+  async () => {
+    const projectA = await taoDuAn("swplistA");
+    const projectB = await taoDuAn("swplistB");
+    const pmA = await taoUser("pm", "swplistA");
+    const pmB = await taoUser("pm", "swplistB");
+    const idA = await taoDebate(pmA, projectA, "swplistA");
+    await taoDebate(pmB, projectB, "swplistB");
 
-  await batModule("engineering-swarm", projectA, pmA.id);
-  await dangNhapDuAn(pmA, projectA);
-  const { GET } = await import("@/app/api/engineering/swarm/debates/route");
-  const res = await GET();
-  assert.equal(res.status, 200);
-  const debates = await res.json();
-  assert.equal(debates.length, 1);
-  assert.equal(debates[0].id, idA);
-});
+    await batModule("engineering-swarm", projectA, pmA.id);
+    await dangNhapDuAn(pmA, projectA);
+    const { GET } = await import("@/app/api/engineering/swarm/debates/route");
+    const res = await GET();
+    assert.equal(res.status, 200);
+    const debates = await res.json();
+    assert.equal(debates.length, 1);
+    assert.equal(debates[0].id, idA);
+  },
+);
 
 // ============================================================================
 // GET /api/engineering/swarm/debates/:id
@@ -1223,25 +1256,36 @@ test(
     );
     assert.equal(res.status, 404);
     const { query } = await import("@/lib/db");
-    const rows = await query(`SELECT id FROM engineering_swarm_arguments WHERE debate_id = ?`, debateB);
+    const rows = await query(
+      `SELECT id FROM engineering_swarm_arguments WHERE debate_id = ?`,
+      debateB,
+    );
     assert.equal(rows.length, 0, "dự án B không được có lập luận nào bị ghi trái phép");
   },
 );
 
-test("POST .../debates/:id/arguments: thêm lập luận thành công, đúng trọng số uy quyền", S, async () => {
-  const projectId = await taoDuAn("swagok");
-  const pm = await taoUser("pm", "swagok");
-  const debateId = await taoDebate(pm, projectId, "swagok");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/swarm/debates/[id]/arguments/route");
-  const res = await POST(
-    jreq("/x", { agentRole: "agent_safety", stance: "object", argumentText: "Vi phạm khoảng cách an toàn" }),
-    { params: Promise.resolve({ id: debateId }) },
-  );
-  assert.equal(res.status, 201);
-  const arg = await res.json();
-  assert.equal(arg.authority_weight, 2.0);
-});
+test(
+  "POST .../debates/:id/arguments: thêm lập luận thành công, đúng trọng số uy quyền",
+  S,
+  async () => {
+    const projectId = await taoDuAn("swagok");
+    const pm = await taoUser("pm", "swagok");
+    const debateId = await taoDebate(pm, projectId, "swagok");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/swarm/debates/[id]/arguments/route");
+    const res = await POST(
+      jreq("/x", {
+        agentRole: "agent_safety",
+        stance: "object",
+        argumentText: "Vi phạm khoảng cách an toàn",
+      }),
+      { params: Promise.resolve({ id: debateId }) },
+    );
+    assert.equal(res.status, 201);
+    const arg = await res.json();
+    assert.equal(arg.authority_weight, 2.0);
+  },
+);
 
 // ============================================================================
 // POST /api/engineering/swarm/debates/:id/synthesize
@@ -1254,33 +1298,41 @@ test("POST .../debates/:id/synthesize: chưa đăng nhập → 401", S, async ()
   assert.equal(res.status, 401);
 });
 
-test("POST .../debates/:id/synthesize: engineer không có quyền hoà giải (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("swsy403");
-  const eng = await taoUser("engineer", "swsy403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/engineering/swarm/debates/[id]/synthesize/route");
-  const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: "x" }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST .../debates/:id/synthesize: engineer không có quyền hoà giải (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("swsy403");
+    const eng = await taoUser("engineer", "swsy403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/engineering/swarm/debates/[id]/synthesize/route");
+    const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: "x" }) });
+    assert.equal(res.status, 403);
+  },
+);
 
-test("POST .../debates/:id/synthesize: phiên thuộc dự án khác → lỗi, không hoà giải nhầm", S, async () => {
-  const projectA = await taoDuAn("swsyisoA");
-  const projectB = await taoDuAn("swsyisoB");
-  const pmB = await taoUser("pm", "swsyisoB");
-  const debateB = await taoDebate(pmB, projectB, "swsyisoB");
-  const pmA = await taoUser("pm", "swsyisoA");
-  await batModule("engineering-swarm", projectA, pmA.id);
-  await dangNhapDuAn(pmA, projectA);
-  const { POST } = await import("@/app/api/engineering/swarm/debates/[id]/synthesize/route");
-  const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: debateB }) });
-  assert.notEqual(res.status, 200);
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ status: string }>(
-    `SELECT status FROM engineering_swarm_debates WHERE id = ?`,
-    debateB,
-  );
-  assert.equal(row?.status, "open");
-});
+test(
+  "POST .../debates/:id/synthesize: phiên thuộc dự án khác → lỗi, không hoà giải nhầm",
+  S,
+  async () => {
+    const projectA = await taoDuAn("swsyisoA");
+    const projectB = await taoDuAn("swsyisoB");
+    const pmB = await taoUser("pm", "swsyisoB");
+    const debateB = await taoDebate(pmB, projectB, "swsyisoB");
+    const pmA = await taoUser("pm", "swsyisoA");
+    await batModule("engineering-swarm", projectA, pmA.id);
+    await dangNhapDuAn(pmA, projectA);
+    const { POST } = await import("@/app/api/engineering/swarm/debates/[id]/synthesize/route");
+    const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: debateB }) });
+    assert.equal(res.status, 500); // route cụm này catch-all lỗi nghiệp vụ về 500 — khoá mã thật, không chỉ "khác 200"
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ status: string }>(
+      `SELECT status FROM engineering_swarm_debates WHERE id = ?`,
+      debateB,
+    );
+    assert.equal(row?.status, "open");
+  },
+);
 
 test("POST .../debates/:id/synthesize: đồng thuận tuyệt đối khi mọi agent concur", S, async () => {
   const projectId = await taoDuAn("swsyok1");
@@ -1300,30 +1352,26 @@ test("POST .../debates/:id/synthesize: đồng thuận tuyệt đối khi mọi 
   assert.equal(updated.consensus_level, "unanimous");
 });
 
-test(
-  "POST .../debates/:id/synthesize: cần người quyết khi phản đối áp đảo",
-  S,
-  async () => {
-    const projectId = await taoDuAn("swsyok2");
-    const pm = await taoUser("pm", "swsyok2");
-    const debateId = await taoDebate(pm, projectId, "swsyok2");
-    await dangNhapDuAn(pm, projectId);
-    const { POST: addArg } = await import("@/app/api/engineering/swarm/debates/[id]/arguments/route");
-    await addArg(
-      jreq("/x", { agentRole: "agent_safety", stance: "object", argumentText: "Không an toàn" }),
-      { params: Promise.resolve({ id: debateId }) },
-    );
-    await addArg(
-      jreq("/x", { agentRole: "agent_reviewer", stance: "concur", argumentText: "Vẫn ổn" }),
-      { params: Promise.resolve({ id: debateId }) },
-    );
-    const { POST } = await import("@/app/api/engineering/swarm/debates/[id]/synthesize/route");
-    const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: debateId }) });
-    assert.equal(res.status, 200);
-    const updated = await res.json();
-    assert.equal(updated.consensus_level, "human_escalation_required");
-  },
-);
+test("POST .../debates/:id/synthesize: cần người quyết khi phản đối áp đảo", S, async () => {
+  const projectId = await taoDuAn("swsyok2");
+  const pm = await taoUser("pm", "swsyok2");
+  const debateId = await taoDebate(pm, projectId, "swsyok2");
+  await dangNhapDuAn(pm, projectId);
+  const { POST: addArg } = await import("@/app/api/engineering/swarm/debates/[id]/arguments/route");
+  await addArg(
+    jreq("/x", { agentRole: "agent_safety", stance: "object", argumentText: "Không an toàn" }),
+    { params: Promise.resolve({ id: debateId }) },
+  );
+  await addArg(
+    jreq("/x", { agentRole: "agent_reviewer", stance: "concur", argumentText: "Vẫn ổn" }),
+    { params: Promise.resolve({ id: debateId }) },
+  );
+  const { POST } = await import("@/app/api/engineering/swarm/debates/[id]/synthesize/route");
+  const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: debateId }) });
+  assert.equal(res.status, 200);
+  const updated = await res.json();
+  assert.equal(updated.consensus_level, "human_escalation_required");
+});
 
 // ============================================================================
 // POST /api/engineering/swarm/drafts
@@ -1345,36 +1393,44 @@ test("POST /api/engineering/swarm/drafts: subcon không có quyền → 403", S,
   assert.equal(res.status, 403);
 });
 
-test("POST /api/engineering/swarm/drafts: thiếu draftType/title/topic/synthesis → 422", S, async () => {
-  const projectId = await taoDuAn("swdrval");
-  const pm = await taoUser("pm", "swdrval");
-  await batModule("engineering-swarm", projectId, pm.id);
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/swarm/drafts/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 422);
-});
+test(
+  "POST /api/engineering/swarm/drafts: thiếu draftType/title/topic/synthesis → 422",
+  S,
+  async () => {
+    const projectId = await taoDuAn("swdrval");
+    const pm = await taoUser("pm", "swdrval");
+    await batModule("engineering-swarm", projectId, pm.id);
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/swarm/drafts/route");
+    const res = await POST(jreq("/x", {}));
+    assert.equal(res.status, 422);
+  },
+);
 
-test("POST /api/engineering/swarm/drafts: soạn thảo thành công kèm token dùng 1 lần", S, async () => {
-  const projectId = await taoDuAn("swdrok");
-  const pm = await taoUser("pm", "swdrok");
-  await batModule("engineering-swarm", projectId, pm.id);
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/swarm/drafts/route");
-  const res = await POST(
-    jreq("/x", {
-      draftType: "rfi",
-      title: "RFI thay đổi tuyến ống",
-      topic: "Tuyến ống trục kỹ thuật tầng 5",
-      synthesis: "Đồng thuận dời tuyến ống 200mm",
-    }),
-  );
-  assert.equal(res.status, 201);
-  const draft = await res.json();
-  assert.ok(draft.singleUseToken.startsWith("TKN-"));
-  assert.equal(draft.isAuthorized, false);
-  assert.ok(draft.provenanceHash.length > 0);
-});
+test(
+  "POST /api/engineering/swarm/drafts: soạn thảo thành công kèm token dùng 1 lần",
+  S,
+  async () => {
+    const projectId = await taoDuAn("swdrok");
+    const pm = await taoUser("pm", "swdrok");
+    await batModule("engineering-swarm", projectId, pm.id);
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/swarm/drafts/route");
+    const res = await POST(
+      jreq("/x", {
+        draftType: "rfi",
+        title: "RFI thay đổi tuyến ống",
+        topic: "Tuyến ống trục kỹ thuật tầng 5",
+        synthesis: "Đồng thuận dời tuyến ống 200mm",
+      }),
+    );
+    assert.equal(res.status, 201);
+    const draft = await res.json();
+    assert.ok(draft.singleUseToken.startsWith("TKN-"));
+    assert.equal(draft.isAuthorized, false);
+    assert.ok(draft.provenanceHash.length > 0);
+  },
+);
 
 // ============================================================================
 // GET/POST /api/engineering/workflows
@@ -1431,7 +1487,10 @@ test(
     const pm = await taoUser("pm", "wfg0");
     await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/engineering/workflows/route");
-    const before = await query(`SELECT id FROM engineering_workflows WHERE project_id = ?`, projectId);
+    const before = await query(
+      `SELECT id FROM engineering_workflows WHERE project_id = ?`,
+      projectId,
+    );
     const res = await POST(
       jreq("/x", { title: "Đổi kích thước ống chính", riskInputs: { reversible: false } }),
     );
@@ -1442,7 +1501,10 @@ test(
       body.gate0.checks.some((c: { ok: boolean }) => !c.ok),
       true,
     );
-    const after = await query(`SELECT id FROM engineering_workflows WHERE project_id = ?`, projectId);
+    const after = await query(
+      `SELECT id FROM engineering_workflows WHERE project_id = ?`,
+      projectId,
+    );
     assert.equal(after.length, before.length);
   },
 );
@@ -1586,23 +1648,27 @@ test("POST /api/engineering/workflows/:id/submit: subcon không có quyền → 
   assert.equal(res.status, 403);
 });
 
-test("POST /api/engineering/workflows/:id/submit: workflow thuộc dự án khác → 422 (không lộ/không đổi)", S, async () => {
-  const projectA = await taoDuAn("wfsisoA");
-  const projectB = await taoDuAn("wfsisoB");
-  const pmB = await taoUser("pm", "wfsisoB");
-  const wfB = await taoWorkflow(pmB, projectB, "wfsisoB", {});
-  const pmA = await taoUser("pm", "wfsisoA");
-  await dangNhapDuAn(pmA, projectA);
-  const { POST } = await import("@/app/api/engineering/workflows/[id]/submit/route");
-  const res = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: wfB.id }) });
-  assert.equal(res.status, 422);
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ state: string }>(
-    `SELECT state FROM engineering_workflows WHERE id = ?`,
-    wfB.id,
-  );
-  assert.equal(row?.state, "draft");
-});
+test(
+  "POST /api/engineering/workflows/:id/submit: workflow thuộc dự án khác → 422 (không lộ/không đổi)",
+  S,
+  async () => {
+    const projectA = await taoDuAn("wfsisoA");
+    const projectB = await taoDuAn("wfsisoB");
+    const pmB = await taoUser("pm", "wfsisoB");
+    const wfB = await taoWorkflow(pmB, projectB, "wfsisoB", {});
+    const pmA = await taoUser("pm", "wfsisoA");
+    await dangNhapDuAn(pmA, projectA);
+    const { POST } = await import("@/app/api/engineering/workflows/[id]/submit/route");
+    const res = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: wfB.id }) });
+    assert.equal(res.status, 422);
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ state: string }>(
+      `SELECT state FROM engineering_workflows WHERE id = ?`,
+      wfB.id,
+    );
+    assert.equal(row?.state, "draft");
+  },
+);
 
 test(
   "POST /api/engineering/workflows/:id/submit: PROFILE-A (không side effect) tự duyệt luôn",
@@ -1624,17 +1690,21 @@ test(
   },
 );
 
-test("POST /api/engineering/workflows/:id/submit: trình duyệt xong không trình lại được → 422", S, async () => {
-  const projectId = await taoDuAn("wfstwice");
-  const pm = await taoUser("pm", "wfstwice");
-  const wf = await taoWorkflow(pm, projectId, "wfstwice", {});
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/workflows/[id]/submit/route");
-  const first = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: wf.id }) });
-  assert.equal(first.status, 200);
-  const second = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: wf.id }) });
-  assert.equal(second.status, 422);
-});
+test(
+  "POST /api/engineering/workflows/:id/submit: trình duyệt xong không trình lại được → 422",
+  S,
+  async () => {
+    const projectId = await taoDuAn("wfstwice");
+    const pm = await taoUser("pm", "wfstwice");
+    const wf = await taoWorkflow(pm, projectId, "wfstwice", {});
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/workflows/[id]/submit/route");
+    const first = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: wf.id }) });
+    assert.equal(first.status, 200);
+    const second = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: wf.id }) });
+    assert.equal(second.status, 422);
+  },
+);
 
 // ============================================================================
 // POST /api/engineering/workflows/:id/gates/:seq — ký gate + SoD
@@ -1767,36 +1837,40 @@ test(
   },
 );
 
-test("POST .../gates/:seq: từ chối ở gate đầu → workflow rejected ngay, gate sau không cần ký", S, async () => {
-  const projectId = await taoDuAn("gtsreject");
-  const creator = await taoUser("pm", "gtsreject");
-  const wf = await taoWorkflow(creator, projectId, "gtsreject", {
-    riskInputs: { crossDiscipline: true, reversible: true },
-  });
-  await dangNhapDuAn(creator, projectId);
-  const { POST: submit } = await import("@/app/api/engineering/workflows/[id]/submit/route");
-  await submit(jreq("/x", undefined), { params: Promise.resolve({ id: wf.id }) });
+test(
+  "POST .../gates/:seq: từ chối ở gate đầu → workflow rejected ngay, gate sau không cần ký",
+  S,
+  async () => {
+    const projectId = await taoDuAn("gtsreject");
+    const creator = await taoUser("pm", "gtsreject");
+    const wf = await taoWorkflow(creator, projectId, "gtsreject", {
+      riskInputs: { crossDiscipline: true, reversible: true },
+    });
+    await dangNhapDuAn(creator, projectId);
+    const { POST: submit } = await import("@/app/api/engineering/workflows/[id]/submit/route");
+    await submit(jreq("/x", undefined), { params: Promise.resolve({ id: wf.id }) });
 
-  const eng = await taoUser("engineer", "gtsreject");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/engineering/workflows/[id]/gates/[seq]/route");
-  const g1 = await POST(jreq("/x", { decision: "rejected", comments: "Không đạt" }), {
-    params: Promise.resolve({ id: wf.id, seq: "1" }),
-  });
-  assert.equal(g1.status, 200);
+    const eng = await taoUser("engineer", "gtsreject");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/engineering/workflows/[id]/gates/[seq]/route");
+    const g1 = await POST(jreq("/x", { decision: "rejected", comments: "Không đạt" }), {
+      params: Promise.resolve({ id: wf.id, seq: "1" }),
+    });
+    assert.equal(g1.status, 200);
 
-  const { queryOne } = await import("@/lib/db");
-  const wfRow = await queryOne<{ state: string }>(
-    `SELECT state FROM engineering_workflows WHERE id = ?`,
-    wf.id,
-  );
-  assert.equal(wfRow?.state, "rejected");
-  const gate2 = await queryOne<{ decision: string | null }>(
-    `SELECT decision FROM engineering_workflow_gates WHERE workflow_id = ? AND seq = 2`,
-    wf.id,
-  );
-  assert.equal(gate2?.decision, null);
-});
+    const { queryOne } = await import("@/lib/db");
+    const wfRow = await queryOne<{ state: string }>(
+      `SELECT state FROM engineering_workflows WHERE id = ?`,
+      wf.id,
+    );
+    assert.equal(wfRow?.state, "rejected");
+    const gate2 = await queryOne<{ decision: string | null }>(
+      `SELECT decision FROM engineering_workflow_gates WHERE workflow_id = ? AND seq = 2`,
+      wf.id,
+    );
+    assert.equal(gate2?.decision, null);
+  },
+);
 
 test(
   "POST .../gates/:seq: risk cao — một người không được ký 2 gate trong cùng workflow",
@@ -1837,18 +1911,22 @@ test(
   },
 );
 
-test("POST .../gates/:seq: ký khi workflow chưa 'awaiting_approval' (còn draft) → 422", S, async () => {
-  const projectId = await taoDuAn("gtsdraft");
-  const creator = await taoUser("pm", "gtsdraft");
-  const wf = await taoWorkflow(creator, projectId, "gtsdraft", {});
-  const eng = await taoUser("engineer", "gtsdraft");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/engineering/workflows/[id]/gates/[seq]/route");
-  const res = await POST(jreq("/x", { decision: "approved" }), {
-    params: Promise.resolve({ id: wf.id, seq: "1" }),
-  });
-  assert.equal(res.status, 422);
-});
+test(
+  "POST .../gates/:seq: ký khi workflow chưa 'awaiting_approval' (còn draft) → 422",
+  S,
+  async () => {
+    const projectId = await taoDuAn("gtsdraft");
+    const creator = await taoUser("pm", "gtsdraft");
+    const wf = await taoWorkflow(creator, projectId, "gtsdraft", {});
+    const eng = await taoUser("engineer", "gtsdraft");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/engineering/workflows/[id]/gates/[seq]/route");
+    const res = await POST(jreq("/x", { decision: "approved" }), {
+      params: Promise.resolve({ id: wf.id, seq: "1" }),
+    });
+    assert.equal(res.status, 422);
+  },
+);
 
 // ============================================================================
 // POST /api/engineering/workflows/:id/transition
@@ -1870,14 +1948,20 @@ test("POST /api/engineering/workflows/:id/transition: subcon không có quyền 
   assert.equal(res.status, 403);
 });
 
-test("POST /api/engineering/workflows/:id/transition: trạng thái đích không hợp lệ → 422", S, async () => {
-  const projectId = await taoDuAn("wftval");
-  const pm = await taoUser("pm", "wftval");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/workflows/[id]/transition/route");
-  const res = await POST(jreq("/x", { to: "khong_ton_tai" }), { params: Promise.resolve({ id: "x" }) });
-  assert.equal(res.status, 422);
-});
+test(
+  "POST /api/engineering/workflows/:id/transition: trạng thái đích không hợp lệ → 422",
+  S,
+  async () => {
+    const projectId = await taoDuAn("wftval");
+    const pm = await taoUser("pm", "wftval");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/engineering/workflows/[id]/transition/route");
+    const res = await POST(jreq("/x", { to: "khong_ton_tai" }), {
+      params: Promise.resolve({ id: "x" }),
+    });
+    assert.equal(res.status, 422);
+  },
+);
 
 test(
   "POST /api/engineering/workflows/:id/transition: chuyển bậy draft→completed bị chặn (state machine)",
@@ -1888,7 +1972,9 @@ test(
     const wf = await taoWorkflow(pm, projectId, "wftbad", {});
     await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/engineering/workflows/[id]/transition/route");
-    const res = await POST(jreq("/x", { to: "completed" }), { params: Promise.resolve({ id: wf.id }) });
+    const res = await POST(jreq("/x", { to: "completed" }), {
+      params: Promise.resolve({ id: wf.id }),
+    });
     assert.equal(res.status, 422);
   },
 );
@@ -1904,7 +1990,9 @@ test(
     const pmA = await taoUser("pm", "wftisoA");
     await dangNhapDuAn(pmA, projectA);
     const { POST } = await import("@/app/api/engineering/workflows/[id]/transition/route");
-    const res = await POST(jreq("/x", { to: "cancelled" }), { params: Promise.resolve({ id: wfB.id }) });
+    const res = await POST(jreq("/x", { to: "cancelled" }), {
+      params: Promise.resolve({ id: wfB.id }),
+    });
     assert.equal(res.status, 422);
     const { queryOne } = await import("@/lib/db");
     const row = await queryOne<{ state: string }>(
@@ -1946,7 +2034,12 @@ test(
     const detail = await GET(greq("/x"), { params: Promise.resolve({ id: wf.id }) });
     const { workflow, events } = await detail.json();
     assert.equal(workflow.state, "completed");
-    assert.ok(events.some((e: { toState: string; reason: string | null }) => e.toState === "executing" && e.reason === "Đang thi công thật"));
+    assert.ok(
+      events.some(
+        (e: { toState: string; reason: string | null }) =>
+          e.toState === "executing" && e.reason === "Đang thi công thật",
+      ),
+    );
     assert.ok(events.some((e: { toState: string }) => e.toState === "completed"));
   },
 );
