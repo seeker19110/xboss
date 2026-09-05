@@ -78,7 +78,14 @@ export async function POST(req: NextRequest) {
   if (!qtyRequested || qtyRequested <= 0)
     return NextResponse.json({ error: "Số lượng không hợp lệ" }, { status: 400 });
 
-  const mat = await queryOne(`SELECT id FROM materials WHERE id = ?`, materialId);
+  // Cách ly dự án (Đợt 6, Việc G): materials.project_id (migrations/0027) — thiếu lọc thì yêu
+  // cầu mua vật tư của dự án A tạo được cho vật tư dự án B (id đoán được), trong khi ngay dưới
+  // đây INSERT lại gán project_id = dự án của người gọi — trộn dữ liệu 2 dự án.
+  const mat = await queryOne(
+    `SELECT id FROM materials WHERE id = ? AND project_id = ?`,
+    materialId,
+    projectId,
+  );
   if (!mat) return NextResponse.json({ error: "Vật tư không tồn tại" }, { status: 404 });
 
   // Sinh mã PR: PR-YYYYMM-NNN — retry nếu đụng mã do tạo đồng thời.

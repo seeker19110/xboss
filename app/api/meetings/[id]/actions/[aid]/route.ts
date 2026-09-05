@@ -57,7 +57,13 @@ export async function PATCH(
   const invalid = validateMeetingActionInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
   if (input.assignee != null) {
-    const u = await queryOne(`SELECT id FROM users WHERE id = ?`, input.assignee);
+    // Cách ly tổ chức (Đợt 6, Việc G): users.org_id — cùng lớp lỗi đã vá ở
+    // app/api/users/[id]/route.ts (Đợt 5, M54 GĐ1 PR2).
+    const u = await queryOne(
+      `SELECT id FROM users WHERE id = ? AND org_id = ?`,
+      input.assignee,
+      user.orgId,
+    );
     if (!u) return NextResponse.json({ error: "Người được giao không tồn tại" }, { status: 422 });
   }
 

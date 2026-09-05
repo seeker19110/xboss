@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, insertId, withTransaction, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { toSlug, SLUG_RE } from "@/lib/nen/sheets";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -70,11 +71,21 @@ export async function POST(req: NextRequest) {
   // Sheet nguồn để copy cấu trúc (kiểm tra trước khi tạo để không để lại sheet rỗng khi lỗi).
   const copyFromId = body?.copyFromId ? Number(body.copyFromId) : null;
   if (copyFromId !== null) {
-    if (
-      !Number.isInteger(copyFromId) ||
-      !(await queryOne(`SELECT id FROM sheet_types WHERE id = ?`, copyFromId))
-    )
-      return NextResponse.json({ error: "Sheet nguồn để copy không tồn tại" }, { status: 400 });
+    // Cách ly dự án (Đợt 6, Việc G): sheet_types không có cột dự án trực tiếp — suy qua
+    // tower_id → towers.project_id. Thiếu lọc thì copy được nguyên cấu trúc (tên nhóm/task/
+    // cột checkbox) của một sheet thuộc dự án người gọi không thấy được (id đoán được).
+    const visible = await visibleProjectIds(user);
+    const src =
+      Number.isInteger(copyFromId) && visible.length > 0
+        ? await queryOne<{ id: number }>(
+            `SELECT st.id FROM sheet_types st
+               JOIN towers tw ON tw.id = st.tower_id
+              WHERE st.id = ? AND tw.project_id = ANY(?)`,
+            copyFromId,
+            visible,
+          )
+        : null;
+    if (!src) return NextResponse.json({ error: "Sheet nguồn để copy không tồn tại" }, { status: 400 });
   }
 
   const responsible =

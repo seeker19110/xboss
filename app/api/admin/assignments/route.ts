@@ -106,7 +106,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "userId không hợp lệ" }, { status: 400 });
 
   if (userId !== null) {
-    const u = await queryOne(`SELECT id FROM users WHERE id = ?`, userId);
+    // Cách ly tổ chức (Đợt 6, Việc G): users.org_id — thiếu lọc thì gán được người dùng
+    // của tổ chức khác làm quản lý hệ/nhóm/task (id đoán được), cùng lớp lỗi đã vá ở
+    // app/api/users/[id]/route.ts (Đợt 5, M54 GĐ1 PR2).
+    const u = await queryOne(`SELECT id FROM users WHERE id = ? AND org_id = ?`, userId, me.orgId);
     if (!u) return NextResponse.json({ error: "Người dùng không tồn tại" }, { status: 404 });
   }
 

@@ -75,7 +75,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Hạng mục bảo hành không tồn tại" }, { status: 422 });
   }
   if (input.assignee != null) {
-    if (!(await queryOne(`SELECT id FROM users WHERE id = ?`, input.assignee)))
+    // Cách ly tổ chức (Đợt 6, Việc G): users.org_id — cùng lớp lỗi đã vá ở
+    // app/api/users/[id]/route.ts (Đợt 5, M54 GĐ1 PR2).
+    if (
+      !(await queryOne(
+        `SELECT id FROM users WHERE id = ? AND org_id = ?`,
+        input.assignee,
+        user.orgId,
+      ))
+    )
       return NextResponse.json({ error: "Người được gán không tồn tại" }, { status: 422 });
   }
 
