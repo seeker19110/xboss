@@ -76,6 +76,9 @@ còn 8/451 route chưa có test thực thi, nhưng danh sách "Ghi nhận, chưa
 toàn cục": `visibleProjectIds` có fallback "bảng `user_projects` RỖNG toàn hệ → mọi user thấy hết",
 nên trong DB worker mà bảng đó tình cờ rỗng thì PM vẫn thấy dự án đầu tiên ⇒ route không đi vào
 nhánh 422. Sửa bằng cách chèn một dòng cho user KHÁC để bảng chắc chắn không rỗng.
+**Lần thứ TƯ (CI của #481):** đúng lớp lỗi đó, lần này ở ca `GET /api/admin/assignments: chưa chọn
+dự án → trả danh sách rỗng` — CI đỏ vì PM thấy dự án đầu tiên nên GET trả WBS thật thay vì rỗng.
+Đã áp cùng cách sửa (chèn dòng `user_projects` mốc cho user khác) cho ca GET.
 
 ### Quyết định nghiệp vụ của chủ dự án (2026-09-05)
 

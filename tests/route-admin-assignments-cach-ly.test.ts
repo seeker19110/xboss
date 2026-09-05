@@ -185,6 +185,15 @@ test(
 
 test("GET /api/admin/assignments: chưa chọn dự án → trả danh sách rỗng, KHÔNG lỗi", S, async () => {
   const pmNoProj = await taoUser("pm", "pmNoProj");
+  // Cùng lý do như ca POST 422 bên dưới: `visibleProjectIds` có fallback "bảng user_projects
+  // RỖNG toàn hệ → mọi user thấy hết". Chạy toàn bộ test suite, bảng này có thể rỗng đúng lúc
+  // ca chạy ⇒ PM thấy dự án đầu tiên ⇒ projectId khác null ⇒ route trả WBS thật và ca đỏ ngẫu
+  // nhiên (đã đỏ thật trong CI). Chèn một dòng cho user KHÁC để bảng chắc chắn không rỗng.
+  const { run } = await import("@/lib/db");
+  const duAnMoc = await taoDuAn("getNoProjMoc");
+  const userMoc = await taoUser("engineer", "getNoProjMoc");
+  await run(`INSERT INTO user_projects (user_id, project_id) VALUES (?, ?)`, userMoc.id, duAnMoc);
+
   dangXuat();
   const { dangNhap } = await import("./helpers/phien");
   dangNhap(pmNoProj, null);
@@ -195,7 +204,7 @@ test("GET /api/admin/assignments: chưa chọn dự án → trả danh sách r�
   const data = await res.json();
   assert.deepEqual(data, { sheets: [], packages: [], tasks: [], workload: {} });
 
-  await don([], [pmNoProj.id]);
+  await don([duAnMoc], [pmNoProj.id, userMoc.id]);
 });
 
 // ============================================================================
