@@ -137,12 +137,18 @@ kèm **bằng chứng đọc code của route anh em cùng cụm**, không đư�
 
 ### Cổng đã chạy
 
-`npm run lint` · `npm run typecheck` · `npm run check:lib-layers` xanh. Full suite `--release-gate`
-trên Postgres 16 + Node 24, DB tạo mới hoàn toàn: **237 file, 3.434 ca pass, 1 ca fail, 1 ca skip
-có lý do** (`health.test.ts`, ca cố ý đảo điều kiện khi KHÔNG có DB). Ca fail duy nhất là
-`backfill-0137-0138` — **đỏ do locale C của cụm Postgres cục bộ, không phải do đợt này**: đối chứng
-`origin/main` nguyên bản trong cùng môi trường cũng đỏ đúng ca đó (228 file, 1 file fail), và chạy
-riêng ca đó trên DB dựng bằng ICU/vi-VN thì **xanh**. Xem mục "sai lệch MÔI TRƯỜNG" bên trên.
+`npm run lint` · `npm run typecheck` · `npm run check:lib-layers` xanh.
+
+**Lần chạy chốt** — `npm run check:coverage` (chạy full suite rồi mới đo) trên **Node 24** +
+Postgres 16 dựng bằng **ICU/vi-VN**, DB tạo mới hoàn toàn: **237 file, 0 file fail, 3.435 ca pass,
+0 ca fail, 1 ca skip có lý do** (`health.test.ts`, ca cố ý đảo điều kiện khi KHÔNG có DB); cổng
+coverage **ĐẠT**, thoát 0.
+
+Trước đó, cùng bộ code nhưng chạy trên DB locale **C** thì `backfill-0137-0138` đỏ. Đã truy tận
+gốc và đối chứng đủ ba chiều: (a) `origin/main` nguyên bản trong cùng môi trường C cũng đỏ đúng ca
+đó (228 file, 1 file fail); (b) chạy riêng ca đó trên DB ICU/vi-VN thì xanh; (c) `lower('CÔNG TY')`
+trả `cÔng ty` dưới locale C. ⇒ Sai lệch môi trường, không phải lỗi code — xem mục "sai lệch MÔI
+TRƯỜNG" bên trên.
 
 Coverage đo cùng điều kiện (Node 24), so `origin/main` với nhánh này:
 
