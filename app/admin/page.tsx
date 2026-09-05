@@ -1033,8 +1033,15 @@ export default function AdminPage() {
               Toàn bộ thay đổi phân công — ai gán ai, lúc nào. Tổng:{" "}
               <b className="text-white">{auditTotal}</b> bản ghi.
             </p>
-            {/* overflow-x-auto + min-w: bảng 6 cột phải cuộn ngang được trên điện thoại. */}
-            <div className="rounded-lg border border-zinc-800 overflow-x-auto">
+            {/* overflow-x-auto + min-w: bảng 6 cột phải cuộn ngang được trên điện thoại.
+                tabIndex/role: vùng cuộn phải focus được bằng bàn phím (axe
+                scrollable-region-focusable, mức serious) — cuộn chuột không phải cách duy nhất. */}
+            <div
+              className="rounded-lg border border-zinc-800 overflow-x-auto"
+              tabIndex={0}
+              role="region"
+              aria-label="Bảng lịch sử phân công (cuộn ngang được)"
+            >
               <table className="w-full text-sm min-w-[760px]">
                 <thead className="bg-zinc-900 text-zinc-400 text-xs uppercase">
                   <tr>

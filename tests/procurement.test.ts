@@ -129,7 +129,7 @@ test(
 
     const supplierId = await insertId(`INSERT INTO suppliers (name) VALUES ('NCC Test Rating')`);
     const poId = await insertId(
-      `INSERT INTO purchase_orders (supplier_id, status, project_id) VALUES (?, 'received', 1)`,
+      `INSERT INTO purchase_orders (supplier_id, status) VALUES (?, 'received')`,
       supplierId,
     );
 
@@ -160,14 +160,19 @@ test(
     const { run, insertId } = await import("@/lib/db");
     const { supplierSummary } = await import("@/lib/tai-chinh/procurement");
 
+    // Công nợ nay lọc theo dự án (audit 2026-09-05) → cần một dự án THẬT, không hard-code id.
+    const projectId = await insertId(
+      `INSERT INTO projects (name) VALUES ('Dự án test supplierSummary')`,
+    );
     const supplierId = await insertId(`INSERT INTO suppliers (name) VALUES ('NCC Test Summary')`);
     const matId = await insertId(
       `INSERT INTO materials (name, unit) VALUES ('VT test summary', 'cái')`,
     );
 
     const poOkId = await insertId(
-      `INSERT INTO purchase_orders (supplier_id, status) VALUES (?, 'received')`,
+      `INSERT INTO purchase_orders (supplier_id, status, project_id) VALUES (?, 'received', ?)`,
       supplierId,
+      projectId,
     );
     await run(
       `INSERT INTO po_items (po_id, material_id, qty_ordered, unit_price) VALUES (?, ?, 10, 1000)`,
@@ -175,8 +180,9 @@ test(
       matId,
     );
     const poCancelledId = await insertId(
-      `INSERT INTO purchase_orders (supplier_id, status, project_id) VALUES (?, 'cancelled', 1)`,
+      `INSERT INTO purchase_orders (supplier_id, status, project_id) VALUES (?, 'cancelled', ?)`,
       supplierId,
+      projectId,
     );
     await run(
       `INSERT INTO po_items (po_id, material_id, qty_ordered, unit_price) VALUES (?, ?, 100, 999)`,
@@ -185,8 +191,9 @@ test(
     );
     await run(
       `INSERT INTO payment_bills (responsible, type, amount, paid_date, responsible_supplier_id, project_id)
-       VALUES ('Test', 'bill', 4000, CURRENT_DATE, ?, 1)`,
+       VALUES ('Test', 'bill', 4000, CURRENT_DATE, ?, ?)`,
       supplierId,
+      projectId,
     );
     await insertId(
       `INSERT INTO supplier_ratings (supplier_id, po_id, quality, delivery, price) VALUES (?, ?, 4, 5, 3)`,
@@ -194,7 +201,7 @@ test(
       poOkId,
     );
 
-    const summary = await supplierSummary(supplierId, 1);
+    const summary = await supplierSummary(supplierId, projectId);
     assert.equal(summary.ratingsCount, 1);
     assert.equal(summary.avgQuality, 4);
     assert.equal(summary.avgDelivery, 5);
@@ -205,7 +212,7 @@ test(
 
     // Vai trò không có CAN.viewPayments (subcon/viewer/cdt): API truyền keemTien=true —
     // khối tiền phải là null, điểm đánh giá vẫn xem được (audit 2026-09-05).
-    const keem = await supplierSummary(supplierId, 1, true);
+    const keem = await supplierSummary(supplierId, projectId, true);
     assert.equal(keem.totalOrdered, null);
     assert.equal(keem.totalPaid, null);
     assert.equal(keem.debt, null);
@@ -217,6 +224,7 @@ test(
     await run(`DELETE FROM purchase_orders WHERE id IN (?, ?)`, poOkId, poCancelledId);
     await run(`DELETE FROM materials WHERE id = ?`, matId);
     await run(`DELETE FROM suppliers WHERE id = ?`, supplierId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
   },
 );
 

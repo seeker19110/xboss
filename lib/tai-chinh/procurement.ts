@@ -252,13 +252,16 @@ export type SupplierSummary = {
 // Điểm TB 3 tiêu chí + công nợ (Σ giá trị PO chưa huỷ − Σ payment_bills đã trả cho NCC đó,
 // khớp qua payment_bills.responsible_supplier_id — backfill ở M2).
 // `projectId`: lọc công nợ theo dự án đang chọn — thiếu thì cộng gộp PO/bill của MỌI dự án
-// trong tổ chức, kể cả dự án người xem không thuộc (audit 2026-09-05).
-// `keemTien = true`: bỏ hẳn khối tiền khỏi kết quả cho vai trò không có CAN.viewPayments.
+// trong tổ chức, kể cả dự án người xem không thuộc (audit 2026-09-05). `projectId = null`
+// (người dùng chưa có ngữ cảnh dự án nào) → KHÔNG cộng gộp toàn tổ chức mà bỏ luôn khối
+// tiền, giống `keemTien`: điểm đánh giá vẫn xem được, công nợ trả `null`.
+// `keemTien = true`: bỏ khối tiền cho vai trò không có CAN.viewPayments.
 export async function supplierSummary(
   supplierId: number,
-  projectId: number,
+  projectId: number | null,
   keemTien = false,
 ): Promise<SupplierSummary> {
+  const boTien = keemTien || projectId == null;
   const agg = await queryOne<{
     ratingsCount: number;
     avgQuality: number | null;
@@ -279,13 +282,13 @@ export async function supplierSummary(
        JOIN purchase_orders po ON po.id = poi.po_id
       WHERE po.supplier_id = ? AND po.status <> 'cancelled' AND po.project_id = ?`,
     supplierId,
-    projectId,
+    projectId ?? 0,
   );
   const paid = await queryOne<{ total: string }>(
     `SELECT COALESCE(SUM(amount), 0)::text AS total
        FROM payment_bills WHERE responsible_supplier_id = ? AND project_id = ?`,
     supplierId,
-    projectId,
+    projectId ?? 0,
   );
 
   const ratings = await query<SupplierSummary["ratings"][number]>(
@@ -307,9 +310,9 @@ export async function supplierSummary(
     avgQuality: agg?.avgQuality != null ? Number(agg.avgQuality) : null,
     avgDelivery: agg?.avgDelivery != null ? Number(agg.avgDelivery) : null,
     avgPrice: agg?.avgPrice != null ? Number(agg.avgPrice) : null,
-    totalOrdered: keemTien ? null : moneyToNumber(orderedMoney),
-    totalPaid: keemTien ? null : moneyToNumber(paidMoney),
-    debt: keemTien ? null : moneyToNumber(orderedMoney - paidMoney),
+    totalOrdered: boTien ? null : moneyToNumber(orderedMoney),
+    totalPaid: boTien ? null : moneyToNumber(paidMoney),
+    debt: boTien ? null : moneyToNumber(orderedMoney - paidMoney),
     ratings,
   };
 }

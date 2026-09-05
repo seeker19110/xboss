@@ -32,9 +32,9 @@ export async function GET(
   if (!supplier)
     return NextResponse.json({ error: "Không tìm thấy nhà cung cấp" }, { status: 404 });
 
+  // Không có ngữ cảnh dự án → vẫn trả điểm đánh giá (200), chỉ bỏ khối tiền: thà thiếu số
+  // còn hơn cộng gộp công nợ của dự án người xem không thuộc.
   const projectId = await getCurrentProjectId(user);
-  if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
-
   const summary = await supplierSummary(id, projectId, !CAN.viewPayments(user.role));
   return NextResponse.json(summary);
 }
