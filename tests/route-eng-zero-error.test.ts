@@ -1144,14 +1144,14 @@ test("POST /smart-ipc: hạnh phúc → thiếu tham chiếu cả 4 cổng → h
   assert.equal(data.result.netPayableVnd, 0);
 });
 
-test("POST /smart-ipc: Gate 4 đối soát BOQ thật từ DB — không có vật tư đã xuất kho → failed", S, async () => {
-  // LƯU Ý (xem "Ghi nhận, chưa sửa" trong báo cáo): `materials.boq_code` KHÔNG BAO GIỜ trùng
-  // được với `boq_items.code` vì registry `boq_codes` (migrations/0029_boq_codes.sql) coi mã
-  // BOQ là duy nhất XUYÊN BẢNG tasks/work_packages/materials/boq_items — gán cùng mã cho cả
-  // materials lẫn boq_items sẽ bị trigger `boq_codes_sync()` chặn 23505. Vì vậy
-  // `fetchGate4Context` (WHERE materials.boq_code = refs.boqCode = mã của chính boq_items đó)
-  // sẽ LUÔN thấy `warehouseUsedQty = 0` trong thực tế — Gate 4 gần như luôn `failed` với bất kỳ
-  // claimedQty dương nào. Test dưới đây phản ánh đúng hành vi thật đó, không cố ép nó "passed".
+test("POST /smart-ipc: Gate 4 — khối lượng VƯỢT hạn mức BOQ → failed nhưng chỉ là cảnh báo", S, async () => {
+  // Đợt 6 (Việc E): nửa "đối soát kho" của Gate 4 đã bị gỡ vì bất khả thi về cấu trúc —
+  // `materials.boq_code` KHÔNG BAO GIỜ trùng được với `boq_items.code` do registry `boq_codes`
+  // (migrations/0029_boq_codes.sql) coi mã BOQ là duy nhất XUYÊN BẢNG tasks/work_packages/
+  // materials/boq_items (trigger `boq_codes_sync()` chặn 23505). Nửa "khối lượng ≤ hạn mức BOQ"
+  // thì vẫn chạy đúng: dưới đây claimedQty 60 > qty_contract 50 nên Gate 4 vẫn kết luận
+  // `failed` — nhưng theo quyết định nghiệp vụ 2026-09-05 nó chỉ còn là CẢNH BÁO, lý do nằm ở
+  // `gate4WarningReasons` chứ không trộn vào `blockedGateReasons`.
   const projectId = await taoDuAn("ipcgate4");
   const pm = await taoUser("pm", "ipcgate4");
   await dangNhapDuAn(pm, projectId);
@@ -1179,6 +1179,45 @@ test("POST /smart-ipc: Gate 4 đối soát BOQ thật từ DB — không có v�
   const data = await res.json();
   assert.equal(data.result.gateStatuses.gate4, "failed");
   assert.equal(data.result.gate4QuadReconcilePassed, false);
+  assert.equal(data.result.gate4WarningReasons.length, 1);
+  assert.ok(
+    !data.result.blockedGateReasons.some((r: string) => r.includes("Gate 4")),
+    "lý do Gate 4 không được trộn vào danh sách cổng chặn",
+  );
+});
+
+test("POST /smart-ipc: Gate 4 — trong hạn mức BOQ nhưng chưa đối soát được kho → khong_du_du_lieu", S, async () => {
+  // "failed" sẽ nói sai rằng hồ sơ có vấn đề: khối lượng nằm trong hạn mức hợp đồng, chỉ là
+  // hệ thống chưa có nguồn dữ liệu kho theo mã BOQ. Trạng thái đúng là `khong_du_du_lieu`.
+  const projectId = await taoDuAn("ipcgate4kho");
+  const pm = await taoUser("pm", "ipcgate4kho");
+  await dangNhapDuAn(pm, projectId);
+  await batModule("engineering-nextgen-apex", projectId, pm.id);
+  const { insertId } = await import("@/lib/db");
+  const boqCode = uniq("BOQ-IPCKHO");
+  await insertId(
+    `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price, project_id) VALUES (?, ?, 'm', 50, 1000, ?)`,
+    boqCode,
+    "Dòng BOQ IPC trong hạn mức",
+    projectId,
+  );
+  const { POST } = await import("@/app/api/engineering/smart-ipc/route");
+  const res = await POST(
+    jreq("/x", {
+      ipcNumber: uniq("IPC4KHO"),
+      periodMonth: "2026-09",
+      contractorName: "Nhà thầu Test",
+      grossClaimedVnd: "500000000",
+      refs: { boqCode, claimedQty: 40 },
+    }),
+  );
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.result.gateStatuses.gate4, "khong_du_du_lieu");
+  assert.equal(data.result.gate4QuadReconcilePassed, false);
+  // Gate 1–3 vẫn thiếu tham chiếu trong ca này nên hồ sơ vẫn bị chặn — nhưng CHỈ vì 3 cổng đó.
+  assert.equal(data.result.blockedGateReasons.length, 3);
+  assert.equal(data.result.allGatesCleared, false);
 });
 
 test("POST /smart-ipc: gọi lại cùng ipcNumber → cập nhật (ON CONFLICT), không tạo dòng mới", S, async () => {
