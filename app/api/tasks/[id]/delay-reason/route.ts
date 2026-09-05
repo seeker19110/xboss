@@ -4,6 +4,7 @@ import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { isDelayReason } from "@/lib/tien-do/delay";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,11 @@ export async function POST(
 
   const task = await queryOne<{ id: number }>(`SELECT id FROM tasks WHERE id = ?`, id);
   if (!task) return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
+
+  // Cách ly dự án (vá W6, Đợt 5) — canTouchTask không so dự án, xem ghi chú ở
+  // app/api/dimensions/[id]/route.ts.
+  if (projectId == null || (await taskProjectId(id)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
   if (!(await canTouchTask(user, id)))
     return NextResponse.json(
       { error: "Bạn chỉ được gán lý do cho task được giao cho mình" },

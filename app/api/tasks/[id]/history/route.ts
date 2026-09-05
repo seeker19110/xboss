@@ -3,6 +3,7 @@ import { query, queryOne } from "@/lib/db";
 import { getCurrentUser, canTouchTask } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,11 @@ export async function GET(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // Cách ly dự án (vá W6, Đợt 5) — canTouchTask không so dự án, xem ghi chú ở
+  // app/api/dimensions/[id]/route.ts. Kiểm TRƯỚC canTouchTask.
+  if (projectId == null || (await taskProjectId(id)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
   if (!(await canTouchTask(user, id)))
     return NextResponse.json({ error: "Không có quyền xem lịch sử task này" }, { status: 403 });
 
