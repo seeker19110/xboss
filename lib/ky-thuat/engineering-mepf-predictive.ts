@@ -1,5 +1,6 @@
 // lib/engineering-mepf-predictive.ts — AI Predictive Maintenance & MTBF/RUL Engine (M71)
 import { query, queryOne } from "@/lib/db";
+import { daysFromTodayISO } from "@/lib/nen/date";
 
 export interface MepfAssetInput {
   assetCode: string;
@@ -54,10 +55,9 @@ export function calculateAssetReliabilityAndRul(
   const remainingHours = Math.max(0, mtbf - t);
   const remainingUsefulLifeDays = Math.round(remainingHours / 16);
 
-  // Ngày bảo dưỡng kế tiếp
-  const nextMaint = new Date();
-  nextMaint.setDate(nextMaint.getDate() + Math.min(remainingUsefulLifeDays, 90));
-  const nextMaintenanceDate = nextMaint.toISOString().slice(0, 10);
+  // Ngày bảo dưỡng kế tiếp — theo giờ VN (daysFromTodayISO), không phải UTC của máy chủ:
+  // `new Date().toISOString()` lệch 1 ngày trong khung 0h–7h sáng giờ Việt Nam.
+  const nextMaintenanceDate = daysFromTodayISO(Math.min(remainingUsefulLifeDays, 90));
 
   let riskLevel: PredictiveAssetResult["riskLevel"] = "low";
   let action = "Thiết bị hoạt động ổn định. Duy trì bôi trơn định kỳ.";

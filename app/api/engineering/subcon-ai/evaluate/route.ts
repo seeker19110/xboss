@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
-import { query } from "@/lib/db";
+import { query, todayISO } from "@/lib/db";
 import { computeSubcontractorTrustScore } from "@/lib/ky-thuat/engineering-subcon-ai";
 import { tinhChiSoThauPhu } from "@/lib/hien-truong/subcon-metrics";
 
@@ -69,15 +69,16 @@ export async function POST(req: Request) {
       hseSafetyScore: chiSo.hseSafetyScore,
     });
 
-    const now = new Date();
-    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    // Kỳ đánh giá 'YYYY-MM' theo giờ VN — `new Date()` trên máy chủ UTC ghi nhầm kỳ
+    // TRƯỚC trong khung 0h–7h sáng ngày 1 hằng tháng, mà kỳ là khoá logic của bảng metrics.
+    const period = todayISO().slice(0, 7);
 
     // Hai cột `ncr_incident_count`/`cost_variance_rate` vẫn còn trong bảng nhưng KHÔNG còn
     // được chấm — ghi NULL thay vì để DEFAULT 0 (0 nghĩa là "không có NCR nào", một số bịa).
     const insertRes = await query(
       `INSERT INTO engineering_subcon_performance_metrics 
        (project_id, profile_id, evaluation_period, on_time_completion_rate, bbnt_pass_rate, ncr_incident_count, hse_safety_score, cost_variance_rate, trust_score, tier_grade, ai_analysis_summary)
-       VALUES ($1, $2, $3, $4, $5, NULL, $6, NULL, $7, $8, $9)
+       VALUES (?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?)
        RETURNING *`,
 
       projectId,

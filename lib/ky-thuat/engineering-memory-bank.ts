@@ -143,9 +143,16 @@ export async function upsertKnowledgePattern(params: {
   return row;
 }
 
+// "Cross-project" = xuyên DỰ ÁN trong phạm vi người dùng được thấy, KHÔNG phải xuyên tổ
+// chức: bảng này chưa bật RLS nên nếu không lọc ở đây thì mọi user (kể cả vai trò chỉ-xem)
+// đọc được sự cố + nguyên nhân gốc + tên dự án của tổ chức khác (audit 2026-09-05).
+// `projectIds` rỗng = không thấy dự án nào → trả rỗng, không trả toàn bộ bảng.
 export async function listCrossProjectLessons(
-  workPackageCode?: string,
+  workPackageCode: string | undefined,
+  projectIds: number[],
 ): Promise<CrossProjectLessonRecord[]> {
+  if (projectIds.length === 0) return [];
+
   let sql = `
     SELECT
       l.*,
@@ -154,11 +161,12 @@ export async function listCrossProjectLessons(
     FROM engineering_cross_project_lessons l
     LEFT JOIN projects p ON p.id = l.source_project_id
     LEFT JOIN engineering_knowledge_patterns kp ON kp.id = l.pattern_id
+    WHERE l.source_project_id IN (${projectIds.map(() => "?").join(", ")})
   `;
 
-  const params: unknown[] = [];
+  const params: unknown[] = [...projectIds];
   if (workPackageCode) {
-    sql += ` WHERE l.work_package_code = ?`;
+    sql += ` AND l.work_package_code = ?`;
     params.push(workPackageCode);
   }
 
@@ -197,9 +205,11 @@ export async function addCrossProjectLesson(lesson: {
 export async function queryTransferredLessons(params: {
   category: string;
   workPackageCode?: string;
+  // Danh sách dự án người gọi được thấy — bắt buộc, xem `listCrossProjectLessons`.
+  projectIds: number[];
 }): Promise<LessonTransferResult[]> {
   const patterns = await listKnowledgePatterns();
-  const allLessons = await listCrossProjectLessons(params.workPackageCode);
+  const allLessons = await listCrossProjectLessons(params.workPackageCode, params.projectIds);
 
   const results: LessonTransferResult[] = [];
 

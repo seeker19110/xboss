@@ -207,8 +207,16 @@ export default function UsersPage() {
         </div>
 
         {/* Danh sách */}
-        <div className="bento-card overflow-hidden">
-          <table className="w-full text-sm">
+        {/* overflow-x-auto: bảng 6 cột, trên điện thoại 360px phải cuộn ngang được thay vì
+            bị cắt (overflow-hidden cũ không cho cuộn) — §5 bảng dày. tabIndex/role: vùng cuộn
+            phải focus được bằng bàn phím (axe scrollable-region-focusable, mức serious). */}
+        <div
+          className="bento-card overflow-x-auto"
+          tabIndex={0}
+          role="region"
+          aria-label="Bảng người dùng (cuộn ngang được)"
+        >
+          <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="text-xs font-semibold text-zinc-400 border-b border-zinc-800">
                 <th className="text-left p-3.5">Họ tên</th>

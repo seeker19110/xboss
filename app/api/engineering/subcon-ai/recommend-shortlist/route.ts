@@ -50,7 +50,7 @@ export async function POST(req: Request) {
          primary_discipline as "primaryDiscipline", specialties, workforce_capacity as "workforceCapacity",
          equipment_assets as "equipmentAssets", certifications
        FROM engineering_subcon_profiles
-       WHERE project_id = $1`,
+       WHERE project_id = ?`,
       projectId,
     );
 
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
          on_time_completion_rate as "onTimeRate", bbnt_pass_rate as "bbntPassRate",
          hse_safety_score as "hseScore", ai_analysis_summary as "summary"
        FROM engineering_subcon_performance_metrics
-       WHERE project_id = $1
+       WHERE project_id = ?
        ORDER BY profile_id, evaluated_at DESC`,
       projectId,
     );
@@ -144,7 +144,7 @@ export async function POST(req: Request) {
     await query(
       `INSERT INTO engineering_subcon_bidding_recommendations
        (project_id, package_name, discipline, estimated_budget, required_capacity, recommended_profiles, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
 
       projectId,
       packageName,

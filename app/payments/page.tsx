@@ -22,7 +22,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
-import { appConfirm } from "@/app/components/dialogs";
+import { appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { formatDateDMY, todayISO } from "@/lib/nen/date";
 
@@ -295,12 +295,25 @@ export default function PaymentsPage() {
       .filter(Boolean) as { sheetTypeId: number; floorLabel: string; contractValue: number }[];
     if (!updates.length) return;
     setSaving(true);
-    await fetch("/api/payments", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ updates }),
-    });
-    setSaving(false);
+    // Dữ liệu TIỀN: chỉ cập nhật màn hình khi server đã nhận thật. Trước đây bỏ qua kết quả
+    // PATCH nên server từ chối (quyền/validate) hay mất mạng vẫn hiện số mới như đã lưu.
+    try {
+      const res = await fetch("/api/payments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates }),
+      });
+      if (!res.ok) {
+        const loi = (await res.json().catch(() => null))?.error;
+        appAlert(typeof loi === "string" ? loi : "Không lưu được giá trị hợp đồng");
+        return;
+      }
+    } catch {
+      appAlert("Mất kết nối — chưa lưu được giá trị hợp đồng, thử lại khi có mạng");
+      return;
+    } finally {
+      setSaving(false);
+    }
     setData((prev) => {
       if (!prev) return prev;
       const valMap = new Map(
@@ -1053,6 +1066,7 @@ function BillsSection({
                         {canEdit && (
                           <td className="px-1 py-1.5 text-center">
                             <button
+                              aria-label="Xoá"
                               onClick={() => onDelete(b.id)}
                               className="text-zinc-700 hover:text-red-400"
                             >
@@ -1214,6 +1228,7 @@ function BillsSection({
                       {canEdit && (
                         <td className="px-1 py-1 text-center">
                           <button
+                            aria-label="Xoá dòng"
                             onClick={() => setDraftA((p) => p.filter((r) => r.key !== d.key))}
                           >
                             <X className="w-3.5 h-3.5 text-zinc-600 hover:text-red-400" />
@@ -1300,7 +1315,7 @@ function BillsSection({
                     </td>
                     {canEdit && (
                       <td className="px-1 py-1.5 text-center">
-                        <button onClick={() => onDelete(b.id)}>
+                        <button aria-label="Xoá" onClick={() => onDelete(b.id)}>
                           <Trash2 className="w-3.5 h-3.5 text-zinc-700 hover:text-red-400" />
                         </button>
                       </td>
@@ -1343,7 +1358,10 @@ function BillsSection({
                     <td />
                     {canEdit && (
                       <td className="px-1 py-1 text-center">
-                        <button onClick={() => setDraftTU((p) => p.filter((r) => r.key !== d.key))}>
+                        <button
+                          aria-label="Xoá dòng"
+                          onClick={() => setDraftTU((p) => p.filter((r) => r.key !== d.key))}
+                        >
                           <X className="w-3.5 h-3.5 text-zinc-600 hover:text-red-400" />
                         </button>
                       </td>
@@ -1411,7 +1429,7 @@ function BillsSection({
                     </td>
                     {canEdit && (
                       <td className="px-1 py-1.5 text-center">
-                        <button onClick={() => onDelete(b.id)}>
+                        <button aria-label="Xoá" onClick={() => onDelete(b.id)}>
                           <Trash2 className="w-3.5 h-3.5 text-zinc-700 hover:text-red-400" />
                         </button>
                       </td>
@@ -1454,7 +1472,10 @@ function BillsSection({
                     <td />
                     {canEdit && (
                       <td className="px-1 py-1 text-center">
-                        <button onClick={() => setDraftB((p) => p.filter((r) => r.key !== d.key))}>
+                        <button
+                          aria-label="Xoá dòng"
+                          onClick={() => setDraftB((p) => p.filter((r) => r.key !== d.key))}
+                        >
                           <X className="w-3.5 h-3.5 text-zinc-600 hover:text-red-400" />
                         </button>
                       </td>

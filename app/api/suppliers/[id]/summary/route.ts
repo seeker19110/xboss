@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { supplierSummary } from "@/lib/tai-chinh/procurement";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/suppliers/:id/summary → điểm TB 3 tiêu chí + công nợ + lịch sử đánh giá.
-// Cùng ranh giới quyền với GET /api/suppliers (chỉ cần đăng nhập, không riêng vai trò).
+// Điểm đánh giá cùng ranh giới với GET /api/suppliers (chỉ cần đăng nhập), nhưng khối
+// TIỀN (totalOrdered/totalPaid/debt) gate riêng bằng CAN.viewPayments — trước đây subcon/
+// viewer/cdt đọc được công nợ NCC (audit 2026-09-05). Công nợ cũng lọc theo dự án đang chọn.
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -29,6 +32,9 @@ export async function GET(
   if (!supplier)
     return NextResponse.json({ error: "Không tìm thấy nhà cung cấp" }, { status: 404 });
 
-  const summary = await supplierSummary(id);
+  // Không có ngữ cảnh dự án → vẫn trả điểm đánh giá (200), chỉ bỏ khối tiền: thà thiếu số
+  // còn hơn cộng gộp công nợ của dự án người xem không thuộc.
+  const projectId = await getCurrentProjectId(user);
+  const summary = await supplierSummary(id, projectId, !CAN.viewPayments(user.role));
   return NextResponse.json(summary);
 }

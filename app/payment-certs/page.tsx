@@ -7,7 +7,7 @@ import MaskedValue from "@/app/components/MaskedValue";
 import { mSum, mMul, mSumBy } from "@/app/lib/masked";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import { Modal, appConfirm, appPrompt } from "@/app/components/dialogs";
+import { Modal, appConfirm, appPrompt, appAlert } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import type { EntityApprovalStatus } from "@/lib/tien-do/approvals";
@@ -446,8 +446,17 @@ function CertDetailModal({
   async function submitCert() {
     if (!(await appConfirm(`Trình đợt ${cert.code} lên CĐT/TVGS?`))) return;
     setBusy(true);
-    const res = await fetch(`/api/payment-certs/${cert.id}/submit`, { method: "POST" });
-    setBusy(false);
+    // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
+    // "Đang lưu..." mà không báo gì (audit 2026-09-05).
+    let res: Response;
+    try {
+      res = await fetch(`/api/payment-certs/${cert.id}/submit`, { method: "POST" });
+    } catch {
+      appAlert("Mất kết nối — chưa lưu được, thử lại khi có mạng");
+      return;
+    } finally {
+      setBusy(false);
+    }
     if (!res.ok) {
       showToast((await res.json().catch(() => null))?.error ?? "Trình thất bại", "error");
       return;
@@ -480,12 +489,21 @@ function CertDetailModal({
       if (!(await appConfirm(label, { danger: wouldBeOver }))) return;
     }
     setBusy(true);
-    const res = await fetch(`/api/payment-certs/${cert.id}/decide`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision, rejectReason }),
-    });
-    setBusy(false);
+    // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
+    // "Đang lưu..." mà không báo gì (audit 2026-09-05).
+    let res: Response;
+    try {
+      res = await fetch(`/api/payment-certs/${cert.id}/decide`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, rejectReason }),
+      });
+    } catch {
+      appAlert("Mất kết nối — chưa lưu được, thử lại khi có mạng");
+      return;
+    } finally {
+      setBusy(false);
+    }
     if (!res.ok) {
       showToast((await res.json().catch(() => null))?.error ?? "Quyết định thất bại", "error");
       return;

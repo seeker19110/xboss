@@ -506,6 +506,7 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
             />
             {search && (
               <button
+                aria-label="Xoá dòng"
                 onClick={() => setSearch("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
               >

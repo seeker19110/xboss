@@ -64,6 +64,14 @@ jobs:
           echo "npm audit thất bại cả 6 lần." >&2
           exit 1
 
+      # Lỗ hổng ở dev-dependency (toolchain build, playwright, eslint…) là bề mặt
+      # supply-chain thật của runner CI nhưng bước audit trên chỉ quét --omit=dev. Ở đây
+      # quét CẢ dev, chỉ chặn mức `critical` để không nhiễu vì lỗ hổng dev mức high
+      # thường không khai thác được trong CI. Lỗi mạng không làm đỏ job (audit đã có
+      # bước quét production ở trên với retry).
+      - name: Kiểm lỗ hổng dependencies (gồm dev, chỉ chặn critical)
+        run: npm audit --audit-level=critical --fetch-timeout=30000 || test $? -ne 1
+
       - name: Lint
         run: npm run lint
 
@@ -178,6 +186,15 @@ jobs:
       # thuộc bước Test ở trên) — cần Postgres thật nên đặt ở job `test`, không phải `static`.
       - name: Kiểm coverage không tụt quá ngưỡng đệm so với mốc
         run: npm run check:coverage
+        env:
+          TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
+
+      # Cổng chống "test rỗng" (C4 §4): cố ý phá 9 bất biến rồi ĐÒI test phải đỏ. Trước
+      # đây chỉ chạy tay nên dễ trôi — chạy trên PUSH main (không chạy ở mỗi PR vì tốn
+      # runner), đủ để bắt lúc một đợt sửa làm test mất khả năng phát hiện lỗi.
+      - name: Kiểm test thật sự bắt lỗi (mutation)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: npm run test:mutation
         env:
           TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
 

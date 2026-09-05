@@ -38,7 +38,7 @@ export async function GET(req: Request) {
         d.device_type as "deviceType", d.unit, d.location_area as "locationArea"
       FROM engineering_iot_telemetry_logs l
       JOIN engineering_iot_devices d ON l.device_id = d.id
-      WHERE l.project_id = $1
+      WHERE l.project_id = ?
     `;
     const params: any[] = [projectId];
 
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
 
     // Lấy thông tin thiết bị
     const devRows = await query<any>(
-      `SELECT device_type, threshold_max, unit, device_name FROM engineering_iot_devices WHERE id = $1 AND project_id = $2`,
+      `SELECT device_type, threshold_max, unit, device_name FROM engineering_iot_devices WHERE id = ? AND project_id = ?`,
       deviceId,
       projectId,
     );
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
     // Ghi log telemetry
     const logRows = await query(
       `INSERT INTO engineering_iot_telemetry_logs (project_id, device_id, metric_value, status, raw_payload)
-       VALUES ($1, $2, $3, $4, $5)
+       VALUES (?, ?, ?, ?, ?)
        RETURNING *`,
       projectId,
       deviceId,
@@ -134,7 +134,7 @@ export async function POST(req: Request) {
       const alertRows = await query(
         `INSERT INTO engineering_iot_threshold_alerts
          (project_id, device_id, severity, alert_title, alert_message, standard_reference, triggered_value)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (device_id) WHERE is_resolved = false DO NOTHING
          RETURNING *`,
 

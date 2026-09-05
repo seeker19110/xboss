@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import {
+  visibleProjectIds,
+  getCurrentProjectId,
+  chotProjectIdChoGhi,
+} from "@/lib/ha-tang/projects";
+import {
   listCrossProjectLessons,
   addCrossProjectLesson,
 } from "@/lib/ky-thuat/engineering-memory-bank";
@@ -19,7 +24,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const workPackageCode = searchParams.get("workPackageCode") || undefined;
 
-    const lessons = await listCrossProjectLessons(workPackageCode);
+    const lessons = await listCrossProjectLessons(workPackageCode, await visibleProjectIds(user));
     return NextResponse.json(lessons);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -54,8 +59,15 @@ export async function POST(req: Request) {
       );
     }
 
+    // Dự án nguồn phải nằm trong danh sách user được thấy — không tin thẳng body, kẻo
+    // gán bài học vào dự án của tổ chức khác (mẫu đúng: engineering/bidding/packages).
+    const projectId = await getCurrentProjectId(user);
+    if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+    const chot = await chotProjectIdChoGhi(user, sourceProjectId, projectId);
+    if (!chot.ok) return NextResponse.json({ error: "Dự án không hợp lệ" }, { status: 403 });
+
     const created = await addCrossProjectLesson({
-      source_project_id: sourceProjectId ? Number(sourceProjectId) : undefined,
+      source_project_id: chot.projectId,
       pattern_id: patternId || undefined,
       work_package_code: workPackageCode || undefined,
       observed_problem: observedProblem,

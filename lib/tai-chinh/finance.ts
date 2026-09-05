@@ -218,19 +218,25 @@ export async function vatSummary(period: string, projectId?: number): Promise<Va
     conds.push("project_id = ?");
     args.push(projectId);
   }
-  const rows = await query<{ direction: "in" | "out"; total: number }>(
-    `SELECT direction, COALESCE(SUM(vat_amount), 0) AS total
+  // ::text + bigint của lib/nen/money.ts — hiệu 2 khoản tiền không tính trên float JS
+  // (M45 PR1); JS chỉ đổi về number ở bước hiển thị cuối.
+  const rows = await query<{ direction: "in" | "out"; total: string }>(
+    `SELECT direction, COALESCE(SUM(vat_amount), 0)::text AS total
        FROM invoices WHERE ${conds.join(" AND ")}
       GROUP BY direction`,
     ...args,
   );
-  let vatIn = 0;
-  let vatOut = 0;
+  let vatIn = 0n;
+  let vatOut = 0n;
   for (const r of rows) {
-    if (r.direction === "in") vatIn = Number(r.total);
-    else vatOut = Number(r.total);
+    if (r.direction === "in") vatIn = parseMoney(r.total);
+    else vatOut = parseMoney(r.total);
   }
-  return { vatIn, vatOut, netVat: vatOut - vatIn };
+  return {
+    vatIn: moneyToNumber(vatIn),
+    vatOut: moneyToNumber(vatOut),
+    netVat: moneyToNumber(vatOut - vatIn),
+  };
 }
 
 // --- Lương (bảng có từ PR1, gắn attendance M24 + API ở PR3) -------------------------

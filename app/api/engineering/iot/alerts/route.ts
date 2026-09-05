@@ -36,7 +36,7 @@ export async function GET(req: Request) {
          d.location_area as "locationArea", d.unit
        FROM engineering_iot_threshold_alerts a
        JOIN engineering_iot_devices d ON a.device_id = d.id
-       WHERE a.project_id = $1
+       WHERE a.project_id = ?
        ORDER BY a.is_resolved ASC, a.created_at DESC`,
       projectId,
     );
@@ -84,6 +84,9 @@ export async function PATCH(req: Request) {
     }
 
     const rows = await query(
+      // Giữ placeholder kiểu $n ở ĐÚNG câu này: $1 được dùng lại 3 lần (CASE WHEN), không
+      // biểu diễn được bằng `?` của lib/db (mỗi `?` là một tham số mới). Các câu SQL còn lại
+      // trong nhánh engineering đã đổi về `?` theo quy ước dự án (audit 2026-09-05).
       `UPDATE engineering_iot_threshold_alerts
        SET is_resolved = $1,
            resolved_at = CASE WHEN $1 THEN NOW() ELSE NULL END,
