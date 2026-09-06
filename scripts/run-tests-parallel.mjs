@@ -77,13 +77,19 @@ function chayBatDongBo(args, env) {
   });
 }
 
-export async function chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua }) {
+// `nodeArgs`: cờ Node thêm cho MỌI tiến trình con (ví dụ --experimental-test-coverage).
+// Trước đây chế độ coverage đi đường tuần tự riêng trong run-tests.mjs (1 process/file) vì
+// "cần gộp bảng theo từng tiến trình" — nhưng bảng coverage nằm trong stdout của từng tiến
+// trình, gộp bằng max theo file, nên chạy song song không đổi cách gộp. Đo trên CI: đường
+// tuần tự 347 s so với 144 s song song cho cùng bộ test.
+export async function chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua, nodeArgs = [] }) {
   const baseUrl = process.env.TEST_DATABASE_URL;
 
   // Không có DB → mọi test tích hợp tự skip (tests/setup.ts). Gộp TẤT CẢ vào 1 tiến trình:
   // nhanh nhất và không có rủi ro gì vì chẳng file nào chạm DB thật.
   if (!baseUrl) {
     const { out, status } = chayDongBo([
+      ...nodeArgs,
       CO_MOCK_MODULE,
       `--import=${tsxLoader}`,
       "--test",
@@ -99,6 +105,7 @@ export async function chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua }) {
   // --- Nhóm thuần: 1 tiến trình cho tất cả ---
   if (fileThuan.length) {
     const { out, status } = chayDongBo([
+      ...nodeArgs,
       CO_MOCK_MODULE,
       `--import=${tsxLoader}`,
       "--test",
@@ -148,7 +155,7 @@ export async function chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua }) {
       if (k >= fileDb.length) return;
       const file = fileDb[k];
       const { out, status } = await chayBatDongBo(
-        [CO_MOCK_MODULE, `--import=${tsxLoader}`, "--test", file],
+        [...nodeArgs, CO_MOCK_MODULE, `--import=${tsxLoader}`, "--test", file],
         {
           TEST_DATABASE_URL: url,
           DATABASE_URL: url,
