@@ -192,14 +192,6 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
 
-      # Ratchet coverage (W6.2): chặn tụt coverage âm thầm so với coverage-baseline.json.
-      # Chạy lại toàn bộ test có --experimental-test-coverage (script tự đo, không phụ
-      # thuộc bước Test ở trên) — cần Postgres thật nên đặt ở job `test`, không phải `static`.
-      - name: Kiểm coverage không tụt quá ngưỡng đệm so với mốc
-        run: npm run check:coverage
-        env:
-          TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
-
       # Cổng chống "test rỗng" (C4 §4): cố ý phá 9 bất biến rồi ĐÒI test phải đỏ. Trước
       # đây chỉ chạy tay nên dễ trôi — chạy trên PUSH main (không chạy ở mỗi PR vì tốn
       # runner), đủ để bắt lúc một đợt sửa làm test mất khả năng phát hiện lỗi.
@@ -217,6 +209,56 @@ jobs:
           git diff --exit-code docs/ERD.md
         env:
           DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
+
+  # ── Ratchet coverage (W6.2): chặn tụt coverage âm thầm so với coverage-baseline.json ──
+  #
+  # Vì sao là job riêng: check:coverage chạy LẠI toàn bộ test có --experimental-test-coverage
+  # (script tự đo, không dùng kết quả bước Test). Trước đây nó nằm cuối job `test` nên job đó
+  # = test (144 s) + coverage (347 s, vì đường coverage chạy tuần tự) = 521 s — bước dài nhất
+  # của cả CI, dài hơn cả E2E. Nay coverage chạy song song (scripts/run-tests-parallel.mjs
+  # nhận nodeArgs) VÀ tách ra runner riêng chạy cùng lúc với `test`; `ci` gom cả hai.
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: xboss_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: node24-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Cài dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Kiểm coverage không tụt quá ngưỡng đệm so với mốc
+        run: npm run check:coverage
+        env:
+          TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
 
   # ── Build production ──
   build:
@@ -247,15 +289,17 @@ jobs:
           # Build không kết nối DB (Pool khởi tạo lazy) — chỉ cần biến tồn tại.
           DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
 
-  # ── E2E, chia 3 shard chạy song song ──
+  # ── E2E, chia 4 shard chạy song song ──
   #
   # Vì sao shard: đo trên run 1210, bước `npm run test:e2e` một mình chiếm 4 phút 48 giây
   # trong tổng 7 phút của cả CI — đây là đường găng thật. Playwright chia đều spec theo
-  # `--shard=i/N` nên 3 runner song song rút bước này còn ~1/3. Mỗi shard có container
+  # `--shard=i/N` nên N runner song song rút bước này còn ~1/N. 3 → 4 shard (2026-09-06): sau khi
+  # tách coverage khỏi `test`, E2E lại thành đường găng (~210 s/shard, trong đó chạy E2E 128 s);
+  # 4 shard đưa phần chạy về ~96 s, ngang job `test`. Mỗi shard có container
   # Postgres RIÊNG (khai trong `services` bên dưới, GitHub dựng một bộ cho mỗi job của
   # matrix) nên các shard không dùng chung dữ liệu, không cần đồng bộ gì với nhau.
   e2e_shard:
-    name: e2e ${{ matrix.shard }}/3
+    name: e2e ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
 
     strategy:
@@ -263,7 +307,7 @@ jobs:
       # lượt, không phải sửa từng cái rồi chờ lượt sau lộ ra cái tiếp theo.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
 
     # Postgres test cho nhánh sau-auth (seed dữ liệu mẫu + tạo admin khi login).
     services:
@@ -327,7 +371,7 @@ jobs:
         run: npm run build
 
       - name: Chạy E2E (desktop + mobile, gồm nhánh sau đăng nhập)
-        run: npm run test:e2e -- --shard=${{ matrix.shard }}/3
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
 
       - name: Lưu báo cáo khi lỗi
         if: failure()
@@ -349,14 +393,15 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-latest
-    needs: [static, test, build]
+    needs: [static, test, coverage, build]
     if: always()
     steps:
       - name: Tổng hợp kết quả
         run: |
-          echo "static=${{ needs.static.result }} test=${{ needs.test.result }} build=${{ needs.build.result }}"
+          echo "static=${{ needs.static.result }} test=${{ needs.test.result }} coverage=${{ needs.coverage.result }} build=${{ needs.build.result }}"
           [ "${{ needs.static.result }}" = "success" ] || exit 1
           [ "${{ needs.test.result }}" = "success" ] || exit 1
+          [ "${{ needs.coverage.result }}" = "success" ] || exit 1
           [ "${{ needs.build.result }}" = "success" ] || exit 1
 
   e2e:

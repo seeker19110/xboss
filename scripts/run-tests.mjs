@@ -16,7 +16,6 @@ import { readdirSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { parseCoverageTable, mergeCoverageMaps, aggregate } from "./coverage-summary.mjs";
-import { CO_MOCK_MODULE } from "./test-flags.mjs";
 
 const TEST_DIR = "tests";
 const tsxLoader = "./" + join("node_modules", "tsx", "dist", "loader.mjs");
@@ -92,24 +91,26 @@ function chayDongBo(args, env) {
   return { out: res.stdout ?? "", status: res.status };
 }
 
-if (coverageMode) {
-  // Chế độ coverage giữ nguyên đường cũ: tuần tự, 1 process/file. Coverage cần gộp bảng
-  // theo từng tiến trình nên không song song hoá ở đây (chạy thủ công, không nằm trên CI).
-  for (const file of files) {
-    const { out, status } = chayDongBo([
-      "--experimental-test-coverage",
-      CO_MOCK_MODULE,
-      `--import=${tsxLoader}`,
-      "--test",
-      file,
-    ]);
-    if (out) coverageMaps.push(parseCoverageTable(out));
-    thuKetQua(file, out, status);
-  }
-} else {
-  const { chayNhanh } = await import("./run-tests-parallel.mjs");
-  await chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua });
-}
+// Chế độ coverage đi CÙNG đường song song với chế độ thường, chỉ thêm cờ Node cho từng tiến
+// trình con và nhặt bảng coverage từ stdout của mỗi tiến trình. Bản trước đi đường tuần tự riêng
+// (1 process/file) vì tưởng coverage cần thế: trên CI bước check:coverage mất 347 s trong khi
+// cùng bộ test chạy song song hết 144 s — nó là bước dài nhất của cả pipeline (đo run PR #483).
+// Gộp bằng max theo file (coverage-summary.mjs) nên nhóm "không chạm DB" chạy chung 1 tiến trình
+// cho số ≥ đo từng file — ratchet chỉ chặn TỤT nên không đỏ oan; mốc có thể nhích lên, cập nhật
+// coverage-baseline.json khi tiện.
+const { chayNhanh } = await import("./run-tests-parallel.mjs");
+await chayNhanh({
+  files,
+  tsxLoader,
+  chayDongBo,
+  thuKetQua: coverageMode
+    ? (nhan, out, status) => {
+        if (out) coverageMaps.push(parseCoverageTable(out));
+        thuKetQua(nhan, out, status);
+      }
+    : thuKetQua,
+  nodeArgs: coverageMode ? ["--experimental-test-coverage"] : [],
+});
 
 process.stdout.write(
   `\n=== Tổng: ${files.length} file, ${failed} file fail ` +
