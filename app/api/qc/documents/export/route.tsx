@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { DOC_CATEGORY_LABEL, DOC_CATEGORIES, type DocCategory } from "@/lib/ky-thuat/qaqc";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/nen/pdf-fonts";
@@ -99,8 +100,12 @@ export async function GET(req: NextRequest) {
   if (category && !DOC_CATEGORIES.includes(category as DocCategory))
     return NextResponse.json({ error: "Loại hồ sơ không hợp lệ" }, { status: 422 });
 
-  const conds: string[] = ["d.task_id IS NOT NULL"];
-  const values: unknown[] = [];
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án hiện tại" }, { status: 404 });
+
+  const conds: string[] = ["d.task_id IS NOT NULL", "tw.project_id = ?"];
+  const values: unknown[] = [projectId];
   let sheetTypeCode: string | null = null;
   if (sheetTypeId) {
     conds.push("wp.sheet_type_id = ?");
@@ -108,8 +113,11 @@ export async function GET(req: NextRequest) {
     sheetTypeCode =
       (
         await queryOne<{ code: string }>(
-          `SELECT code FROM sheet_types WHERE id = ?`,
+          `SELECT st.code FROM sheet_types st
+            JOIN towers tw ON tw.id = st.tower_id
+           WHERE st.id = ? AND tw.project_id = ?`,
           parseInt(sheetTypeId),
+          projectId,
         )
       )?.code ?? null;
   }
@@ -128,14 +136,19 @@ export async function GET(req: NextRequest) {
             d.created_at AS "createdAt"
        FROM task_documents d
        JOIN tasks t ON t.id = d.task_id
-       LEFT JOIN work_packages wp ON wp.id = t.package_id
+       JOIN work_packages wp ON wp.id = t.package_id
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       JOIN towers tw ON tw.id = st.tower_id
        LEFT JOIN users u ON u.id = d.uploaded_by
       WHERE ${conds.join(" AND ")}
       ORDER BY t.code`,
     ...values,
   );
 
-  const project = await queryOne<{ name: string }>(`SELECT name FROM projects ORDER BY id LIMIT 1`);
+  const project = await queryOne<{ name: string }>(
+    `SELECT name FROM projects WHERE id = ?`,
+    projectId,
+  );
   const today = formatDateVN(new Date());
 
   const stream = await ReactPDF.renderToStream(

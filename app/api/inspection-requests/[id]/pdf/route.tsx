@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/nen/pdf-fonts";
 import { formatDateVN, formatDateTimeVN } from "@/lib/nen/date";
@@ -154,12 +155,25 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy phiếu YCNT" }, { status: 404 });
+
   const reqRow = await queryOne<ReqDetail>(
     `SELECT r.code, r.scheduled_at AS "scheduledAt", r.note, cu.name AS "createdByName"
        FROM inspection_requests r
        LEFT JOIN users cu ON cu.id = r.created_by
-      WHERE r.id = ?`,
+      WHERE r.id = ?
+        AND EXISTS (
+          SELECT 1 FROM inspection_request_tasks rt2
+          JOIN tasks t2 ON t2.id = rt2.task_id
+          JOIN work_packages wp2 ON wp2.id = t2.package_id
+          JOIN sheet_types st2 ON st2.id = wp2.sheet_type_id
+          JOIN towers tw2 ON tw2.id = st2.tower_id
+          WHERE rt2.request_id = r.id AND tw2.project_id = ?
+        )`,
     id,
+    projectId,
   );
   if (!reqRow) return NextResponse.json({ error: "Không tìm thấy phiếu YCNT" }, { status: 404 });
 
@@ -167,14 +181,17 @@ export async function GET(
     `SELECT t.code, t.name, st.code AS "sheetType"
        FROM inspection_request_tasks rt
        JOIN tasks t ON t.id = rt.task_id
-       LEFT JOIN work_packages wp ON wp.id = t.package_id
-       LEFT JOIN sheet_types st ON st.id = wp.sheet_type_id
-      WHERE rt.request_id = ? ORDER BY t.code`,
+       JOIN work_packages wp ON wp.id = t.package_id
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       JOIN towers tw ON tw.id = st.tower_id
+      WHERE rt.request_id = ? AND tw.project_id = ? ORDER BY t.code`,
     id,
+    projectId,
   );
 
   const project = (await queryOne<Project>(
-    `SELECT name, investor, contractor FROM projects ORDER BY id LIMIT 1`,
+    `SELECT name, investor, contractor FROM projects WHERE id = ?`,
+    projectId,
   )) ?? { name: "XBoss", investor: null, contractor: null };
 
   const today = formatDateVN(new Date());
