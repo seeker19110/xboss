@@ -1,5 +1,36 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Bỏ cụm sidebar "6 Đại Trung Tâm Điều Hành (Unified Hubs)" — 2026-09-21
+
+Xoá toàn bộ cụm 6 mục (`dash.site-command`, `dash.schedule-control`, `dash.procurement-hub`,
+`dash.commercial-cockpit`, `dash.engineering-intelligence-hub`, `dash.governance-hub`) khỏi
+`app/lib/dashboardTree.ts` theo yêu cầu người dùng. Dọn icon `Brain` không còn dùng; các trang
+đích (`/site`, `/schedule`, `/procurement`, `/commercial`, `/engineering-intelligence`,
+`/governance`) vẫn tồn tại và vẫn truy cập được qua các mục sidebar khác đã trỏ tới cùng route.
+
+**Fix CI đỏ (PR #488):** xoá `tests/unified-master-hubs.test.ts` (test riêng cho cụm vừa bị xoá,
+không còn ý nghĩa) và sửa `tests/route-quan-tri-2.test.ts` — 5 chỗ dùng `nodeKey` cứng
+`dash.site-command`/`dash.schedule-control` (đã xoá khỏi cây) cho API `/api/nav-settings`, đổi
+sang `dash.dashboard`/`dash.mepf-process` (vẫn tồn tại) để test không phụ thuộc vào 1 node cụ thể
+sắp bị xoá trong tương lai. Vòng CI kế tiếp lộ thêm 1 file test cũ khác cũng khẳng định cụm
+"Kỹ thuật Không gian & AI (Engineering OS)" tồn tại: xoá đoạn test đó khỏi
+`tests/engineering-apex-pinnacle.test.ts` (giữ lại test `computeApexScore` không liên quan sidebar).
+Vòng CI thứ 3 lộ tiếp bất biến `tests/modules.test.ts` ("mọi nav href phải khớp DASHBOARD_TREE"):
+4 href trong `lib/nen/modules.ts` (module `engineering`/`engineering-quantum-hub`) trỏ tới
+`/engineering`, `/engineering/suggestions`, `/engineering/workflows`, `/engineering/quantum-hub` —
+không còn trong cây sau khi xoá cụm. Khai 4 href này vào `NGOAI_LE` của test (cùng mẫu với
+`/engineering/agent-sessions` đã có sẵn) kèm lý do, thay vì xoá module hay khôi phục sidebar.
+
+## ✅ Bỏ cụm sidebar "Kỹ thuật Không gian & AI (Engineering OS)" — 2026-09-21
+
+Xoá toàn bộ cụm `dash.apex-cockpit`/`dash.spatial-viewer`/`dash.hse-vision`/`dash.zalo-copilot`/
+`dash.dynamic-cashflow`/`dash.esign-protocol`/`dash.fidic-claims`/`dash.qr-logistics`/
+`dash.quantum-hub`/`dash.gate0-workflows`/`dash.ai-suggestions` khỏi `app/lib/dashboardTree.ts`
+(nguồn duy nhất sidebar AppShell) theo yêu cầu người dùng — các mục này không còn hiển thị trong
+sidebar. Dọn theo các icon `lucide-react` không còn dùng (`Sparkles`/`Layers`/`Bot`/`TrendingUp`/
+`Lightbulb`); các trang `app/engineering/*` và route `/procurement?tab=qr-logistics` vẫn tồn tại,
+chỉ không còn link trực tiếp trong sidebar.
+
 ## ✅ Chép có chọn lọc từ `seeker19110/projects-template` — 2026-09-21
 
 Đối chiếu repo khung `seeker19110/projects-template` (bộ khung quy trình/chất lượng tổng quát đa
