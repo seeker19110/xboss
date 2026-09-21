@@ -1,5 +1,37 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Xoá 7 route "Lớp Engineering OS" dead code (đóng M-03) — 2026-09-21
+
+Chốt hướng cho cụm 13 route "chờ chốt hướng ở đề xuất #6 audit 2026-08-25" (mở đầu từ đợt
+`/maintain`). Đánh giá giá trị + rà kỹ dependency trước khi xoá, phát hiện 3 route thực ra là
+mắt xích còn thiếu của tính năng **đang sống** (không phải dead code):
+
+- **Giữ nguyên chờ gắn UI** (giá trị cao — nối vào vòng lặp tiến độ/WBS/thanh toán hoặc phòng
+  rủi ro thi công): `zero-error/pour-permits`, `pipe-spool-tracking`, `closed-loop-sync`.
+- **Giữ nguyên vì đang là mắt xích thiếu của tính năng có UI thật** (xoá sẽ làm gãy tính năng
+  đang chạy, không phải dọn rác): `workflows/[id]/transition` (cách duy nhất đưa workflow đã
+  duyệt qua executing→completed, trang `/engineering/workflows` chưa gọi), `swarm/debates/[id]/
+{arguments,synthesize}` (cách duy nhất thêm lập luận/tổng hợp cho debate, trang
+  `/engineering/swarm` tạo debate được nhưng không tự sinh lập luận).
+- **Xác nhận thật là dead code, đã xoá** (backend xong, không route/UI/lib nào khác gọi tới):
+  `digital-handover`, `project-health`, `multi-agent-copilot`, `mepf-predictive`, `carbon-lca`
+  (mỗi cái xoá cả route + `lib/ky-thuat/engineering-*.ts` riêng + test riêng), `compliance/
+audit-element` (chỉ xoá hàm `auditEngineeringElement` — module `engineering-prescriptive.ts`
+  giữ lại vì `scanAllElementsCompliance` vẫn cần), `taxonomy` (chỉ xoá hàm `getTaxonomy` — module
+  `engineering-graph.ts` giữ lại vì `traverseGraph`/lineage/impact vẫn cần).
+
+**File chạm:** 7 route + 5 lib module riêng bị xoá; `lib/ky-thuat/engineering-{graph,prescriptive,
+suite}.ts` sửa surgical (chỉ bỏ phần liên quan, giữ phần dùng chung); `scripts/dead-routes-
+allowlist.json` bỏ 7 mục; test liên quan (`route-eng-{du-bao,mepf,zero-error}.test.ts`,
+`engineering-{graph,prescriptive,suite}.test.ts`, `audit-2026-09-05-guards.test.ts`) sửa/xoá theo.
+Một test khác (`GET /compliance/audits: hạnh phúc`) từng dùng route `audit-element` để seed dữ
+liệu mẫu — đổi sang chèn DB trực tiếp (cùng khuôn đã dùng cho dự án B trong chính test đó).
+
+**Verify:** lint/typecheck/build xanh; `check:dead-code`/`check:dead-routes`/`check:route-perms`/
+`check:project-scope`/`check:migrations`/`check:hex-hardcode`/`check:lib-layers`/`format:check`
+xanh; `npm test -- --release-gate` với Postgres 16 thật → **245 file, 4057 ca pass, 0 fail, 1 skip
+có chủ đích** (giảm đúng 6 file/41 ca so với trước do xoá test riêng của 5 module).
+
 ## ✅ Đợt bảo trì `/maintain` đầu tiên — 2026-09-21
 
 Chạy thử `/maintain` (agent `maintainer` quét, kế hoạch `docs/ops/MAINTENANCE-PLAN.md` cho người

@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     // "Không tìm thấy" (gói thầu không tồn tại HOẶC thuộc dự án khác — `runBiddingAnalysis`
     // đã lọc `project_id` trong SELECT) phải là 404, không phải 500: đây là kết quả nghiệp vụ
     // bình thường, không phải sự cố hệ thống. Bám đúng khuôn route anh em cùng thư mục
-    // (`graph`, `lineage/[id]`, `impact/[id]`, `compliance/audit-element`).
+    // (`graph`, `lineage/[id]`, `impact/[id]`).
     const status = msg.includes("Không tìm thấy") ? 404 : 500;
     return NextResponse.json({ error: msg }, { status });
   }

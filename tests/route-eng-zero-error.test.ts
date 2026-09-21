@@ -13,7 +13,6 @@ import { NextRequest } from "next/server";
 //   - app/api/engineering/zero-error/verify-photo/route.ts        (POST xác thực ảnh hiện trường)
 //   - app/api/engineering/compliance/rules/route.ts                (GET danh mục quy chuẩn)
 //   - app/api/engineering/compliance/audits/route.ts               (GET biên bản kiểm định)
-//   - app/api/engineering/compliance/audit-element/route.ts        (POST đối soát 1 đối tượng)
 //   - app/api/engineering/compliance/scan-all/route.ts             (POST quét toàn bộ đối tượng)
 //   - app/api/engineering/data-quality/route.ts                    (GET vấn đề chất lượng dữ liệu)
 //   - app/api/engineering/data-quality/[id]/resolve/route.ts       (POST xử lý vấn đề)
@@ -21,13 +20,13 @@ import { NextRequest } from "next/server";
 //   - app/api/engineering/memory/patterns/route.ts                 (GET/POST mẫu quy luật tri thức)
 //   - app/api/engineering/memory/transfer/route.ts                 (POST chuyển giao tri thức)
 //   - app/api/engineering/esign/envelopes/route.ts                 (GET/POST hồ sơ trình ký)
-//   - app/api/engineering/digital-handover/route.ts                (GET/POST passport bàn giao số)
 //   - app/api/engineering/smart-ipc/route.ts                       (GET/POST Smart IPC 4 cổng)
-//   - app/api/engineering/project-health/route.ts                  (GET/POST chỉ số sức khỏe dự án)
 //   - app/api/engineering/graph/route.ts                           (GET đồ thị quan hệ kỹ thuật)
-//   - app/api/engineering/taxonomy/route.ts                        (GET danh mục taxonomy)
 //   - app/api/engineering/lineage/[id]/route.ts                    (GET phả hệ đối tượng)
 //   - app/api/engineering/impact/[id]/route.ts                     (GET phân tích tác động)
+//
+// (compliance/audit-element, digital-handover, project-health, taxonomy đã bị xoá 2026-09-21 —
+// backend xong nhưng chưa từng có route/UI nào gọi tới, xem PROGRESS.md.)
 //
 // Lưu ý đã đọc code xác nhận (ghi trong báo cáo cuối, không lặp lại ở đây):
 //   - `smart-ipc`/`graph` nằm sau `assertModuleEnabled` với module `engineering-nextgen-apex`/
@@ -490,11 +489,15 @@ test("GET /compliance/audits: hạnh phúc → chỉ thấy audit của đúng d
   );
 
   await dangNhapDuAn(eng, projA);
-  const { POST: auditElementPOST } =
-    await import("@/app/api/engineering/compliance/audit-element/route");
-  await auditElementPOST(jreq("/x", { objectId: objA, ruleId: rule!.id }));
-  // ghi 1 bản ghi cho dự án B trực tiếp qua DB để kiểm cách ly
+  // Chèn thẳng qua DB cho cả 2 dự án (audit-element route đã bị xoá 2026-09-21 — scan-all thay thế).
   const { run } = await import("@/lib/db");
+  await run(
+    `INSERT INTO engineering_compliance_audits (project_id, object_id, rule_id, compliance_status, finding_details, evidence_snapshot)
+     VALUES (?, ?, ?, 'non_compliant', 'x', '{}'::jsonb)`,
+    projA,
+    objA,
+    rule!.id,
+  );
   await run(
     `INSERT INTO engineering_compliance_audits (project_id, object_id, rule_id, compliance_status, finding_details, evidence_snapshot)
      VALUES (?, ?, ?, 'non_compliant', 'x', '{}'::jsonb)`,
@@ -511,84 +514,6 @@ test("GET /compliance/audits: hạnh phúc → chỉ thấy audit của đúng d
   assert.ok(data.every((a: { object_id: string }) => a.object_id !== objB));
   assert.ok(data.some((a: { object_id: string }) => a.object_id === objA));
 });
-
-// ============================================================================
-// POST /api/engineering/compliance/audit-element
-// ============================================================================
-
-test("POST /compliance/audit-element: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { POST } = await import("@/app/api/engineering/compliance/audit-element/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 401);
-});
-
-test("POST /compliance/audit-element: bch (chỉ xem) không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("ae403");
-  const bch = await taoUser("bch", "ae403");
-  await dangNhapDuAn(bch, projectId);
-  const { POST } = await import("@/app/api/engineering/compliance/audit-element/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
-
-test("POST /compliance/audit-element: thiếu objectId/ruleId → 400", S, async () => {
-  const projectId = await taoDuAn("aemiss");
-  const eng = await taoUser("engineer", "aemiss");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/engineering/compliance/audit-element/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 400);
-});
-
-test(
-  "POST /compliance/audit-element: đối tượng thuộc dự án khác → 404 (đã vá, trước đây 500)",
-  S,
-  async () => {
-    const projA = await taoDuAn("aeA");
-    const projB = await taoDuAn("aeB");
-    const eng = await taoUser("engineer", "ae404");
-    const objB = await taoEngObj(projB, eng.id, "aeB");
-    const { queryOne } = await import("@/lib/db");
-    const rule = await queryOne<{ id: string }>(
-      `SELECT id FROM engineering_compliance_rules WHERE standard_code = 'TCVN 9385:2012'`,
-    );
-    await dangNhapDuAn(eng, projA);
-    const { POST } = await import("@/app/api/engineering/compliance/audit-element/route");
-    const res = await POST(jreq("/x", { objectId: objB, ruleId: rule!.id }));
-    assert.equal(res.status, 404);
-
-    // Dữ liệu dự án B không đổi: không có audit nào được tạo cho objB
-    const count = await queryOne<{ n: string }>(
-      `SELECT COUNT(*)::text AS n FROM engineering_compliance_audits WHERE object_id = ?`,
-      objB,
-    );
-    assert.equal(Number(count!.n), 0);
-  },
-);
-
-test(
-  "POST /compliance/audit-element: hạnh phúc → non_compliant khi vi phạm điện trở nối đất",
-  S,
-  async () => {
-    const projectId = await taoDuAn("aeok");
-    const eng = await taoUser("engineer", "aeok");
-    const obj = await taoEngObj(projectId, eng.id, "aeok", {
-      discipline: "electrical",
-      properties: { grounding_resistance_ohm: 20 },
-    });
-    const { queryOne } = await import("@/lib/db");
-    const rule = await queryOne<{ id: string }>(
-      `SELECT id FROM engineering_compliance_rules WHERE standard_code = 'TCVN 9385:2012'`,
-    );
-    await dangNhapDuAn(eng, projectId);
-    const { POST } = await import("@/app/api/engineering/compliance/audit-element/route");
-    const res = await POST(jreq("/x", { objectId: obj, ruleId: rule!.id }));
-    assert.equal(res.status, 201);
-    const data = await res.json();
-    assert.equal(data.audit.compliance_status, "non_compliant");
-  },
-);
 
 // ============================================================================
 // POST /api/engineering/compliance/scan-all
@@ -1059,71 +984,6 @@ test(
 );
 
 // ============================================================================
-// GET/POST /api/engineering/digital-handover
-// ============================================================================
-
-test("GET /digital-handover: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/digital-handover/route");
-  const res = await GET();
-  assert.equal(res.status, 401);
-});
-
-test("GET /digital-handover: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("dh403");
-  const sub = await taoUser("subcon", "dh403");
-  await dangNhapDuAn(sub, projectId);
-  const { GET } = await import("@/app/api/engineering/digital-handover/route");
-  const res = await GET();
-  assert.equal(res.status, 403);
-});
-
-test("GET /digital-handover: chưa chọn dự án → 400", S, async () => {
-  const pm = await taoUser("pm", "dhnoproj");
-  await dangNhapDuAn(pm, null);
-  const { GET } = await import("@/app/api/engineering/digital-handover/route");
-  const res = await GET();
-  assert.equal(res.status, 400);
-});
-
-test("POST /digital-handover: bch (chỉ xem) không có quyền ghi → 403", S, async () => {
-  const projectId = await taoDuAn("dh403b");
-  const bch = await taoUser("bch", "dh403b");
-  await dangNhapDuAn(bch, projectId);
-  const { POST } = await import("@/app/api/engineering/digital-handover/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
-
-test(
-  "POST /digital-handover + GET: hạnh phúc → đóng gói passport LOD 500, đọc lại được",
-  S,
-  async () => {
-    const projectId = await taoDuAn("dhok");
-    const pm = await taoUser("pm", "dhok");
-    await dangNhapDuAn(pm, projectId);
-    const passportCode = uniq("PASS-TEST");
-    const { POST } = await import("@/app/api/engineering/digital-handover/route");
-    const res = await POST(jreq("/x", { passportCode, totalSpoolsCount: 10 }));
-    assert.equal(res.status, 200);
-    const data = await res.json();
-    assert.equal(data.success, true);
-    assert.equal(data.passport.passportCode, passportCode);
-
-    // Trước khi vá `listDigitalHandoverPassports` (query(sql, [projectId]) thay vì
-    // query(sql, projectId)) route này 500 "invalid input syntax for type integer" — nay đọc lại
-    // được danh sách đúng dự án.
-    const { GET } = await import("@/app/api/engineering/digital-handover/route");
-    const res2 = await GET();
-    assert.equal(res2.status, 200);
-    const data2 = await res2.json();
-    assert.ok(
-      data2.passports.some((p: { passport_code: string }) => p.passport_code === passportCode),
-    );
-  },
-);
-
-// ============================================================================
 // GET/POST /api/engineering/smart-ipc
 // ============================================================================
 
@@ -1273,62 +1133,6 @@ test(
 );
 
 // ============================================================================
-// GET/POST /api/engineering/project-health
-// ============================================================================
-
-test("GET /project-health: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/project-health/route");
-  const res = await GET();
-  assert.equal(res.status, 401);
-});
-
-test("GET /project-health: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("ph403");
-  const sub = await taoUser("subcon", "ph403");
-  await dangNhapDuAn(sub, projectId);
-  const { GET } = await import("@/app/api/engineering/project-health/route");
-  const res = await GET();
-  assert.equal(res.status, 403);
-});
-
-test("GET /project-health: chưa chọn dự án → 400", S, async () => {
-  const pm = await taoUser("pm", "phnoproj");
-  await dangNhapDuAn(pm, null);
-  const { GET } = await import("@/app/api/engineering/project-health/route");
-  const res = await GET();
-  assert.equal(res.status, 400);
-});
-
-test("POST /project-health: bch (chỉ xem) không có quyền ghi → 403", S, async () => {
-  const projectId = await taoDuAn("ph403b");
-  const bch = await taoUser("bch", "ph403b");
-  await dangNhapDuAn(bch, projectId);
-  const { POST } = await import("@/app/api/engineering/project-health/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
-
-test("POST /project-health + GET: hạnh phúc → tính EHI, lưu và đọc lại đúng dự án", S, async () => {
-  const projectId = await taoDuAn("phok");
-  const pm = await taoUser("pm", "phok");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/project-health/route");
-  const res = await POST(jreq("/x", { spiIndex: 1.05, cpiIndex: 1.02 }));
-  assert.equal(res.status, 200);
-  const data = await res.json();
-  assert.equal(data.success, true);
-  assert.ok(data.snapshot.healthIndexPercent >= 0);
-
-  // Trước khi vá `listProjectHealthSnapshots` (cùng lớp lỗi tham số mảng), route này 500.
-  const { GET } = await import("@/app/api/engineering/project-health/route");
-  const res2 = await GET();
-  assert.equal(res2.status, 200);
-  const data2 = await res2.json();
-  assert.equal(data2.totalCount, 1);
-});
-
-// ============================================================================
 // GET /api/engineering/graph
 // ============================================================================
 
@@ -1392,38 +1196,6 @@ test("GET /graph: hạnh phúc → duyệt đồ thị quan hệ 2 đối tượ
   assert.equal(data.rootId, a);
   assert.ok(data.nodes.some((n: { id: string }) => n.id === b));
   assert.ok(data.edges.length >= 1);
-});
-
-// ============================================================================
-// GET /api/engineering/taxonomy
-// ============================================================================
-
-test("GET /taxonomy: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/taxonomy/route");
-  const res = await GET();
-  assert.equal(res.status, 401);
-});
-
-test("GET /taxonomy: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("tx403");
-  const sub = await taoUser("subcon", "tx403");
-  await dangNhapDuAn(sub, projectId);
-  const { GET } = await import("@/app/api/engineering/taxonomy/route");
-  const res = await GET();
-  assert.equal(res.status, 403);
-});
-
-test("GET /taxonomy: hạnh phúc → danh mục loại đối tượng và quan hệ đã seed", S, async () => {
-  const projectId = await taoDuAn("txok");
-  const bch = await taoUser("bch", "txok");
-  await dangNhapDuAn(bch, projectId);
-  const { GET } = await import("@/app/api/engineering/taxonomy/route");
-  const res = await GET();
-  assert.equal(res.status, 200);
-  const data = await res.json();
-  assert.ok(data.objectTypes.some((t: { key: string }) => t.key === "equipment"));
-  assert.ok(data.relationTypes.some((t: { key: string }) => t.key === "CONNECTED_TO"));
 });
 
 // ============================================================================
