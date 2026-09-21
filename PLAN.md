@@ -2,7 +2,7 @@
 
 **Cập nhật:** 2026-09-21 · **Đặc tả:** `docs/nang-cap/M124-bo-cuc-man-hinh-chung-tu.md` (Approved) ·
 **Mockup:** https://claude.ai/artifact/2kcKEuoLSb1udqkGKgb79w
-**Nhánh làm việc:** `claude/sleepy-planck-hvfnva` (đang bằng `origin/main` @ `b6d9b29c`). Worker code
+**Nhánh làm việc:** `claude/sleepy-planck-hvfnva` (= `origin/main` @ `b6d9b29c` + commit đặc tả `5d0da4a5`). Worker code
 **thẳng trên nhánh này** (1 việc tuần tự, không worktree). **Trạng thái:** CHỜ THI HÀNH.
 
 ## Ràng buộc CỨNG
