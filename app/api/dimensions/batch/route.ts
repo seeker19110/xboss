@@ -41,8 +41,13 @@ export async function PATCH(req: NextRequest) {
 
   // Lấy task_id + package_id của từng dimension để kiểm quyền + gộp recompute + hold point.
   const placeholders = ids.map(() => "?").join(", ");
-  const dims = await query<{ id: number; task_id: number; package_id: number }>(
-    `SELECT pd.id, pd.task_id, t.package_id
+  const dims = await query<{
+    id: number;
+    task_id: number;
+    package_id: number;
+    status: string | null;
+  }>(
+    `SELECT pd.id, pd.task_id, t.package_id, t.status
        FROM progress_dimensions pd JOIN tasks t ON t.id = pd.task_id
       WHERE pd.id IN (${placeholders})`,
     ...ids,
@@ -68,6 +73,17 @@ export async function PATCH(req: NextRequest) {
         { status: 403 },
       );
   }
+
+  // Bất biến nghiệm thu (L2, audit 2026-09-22): bỏ tick ô của task đã nghiệm thu kéo % xuống
+  // dưới 1 trong khi status vẫn nghiem_thu — phá bất biến "nghiem_thu ⇒ progress = 1". Chỉ cần
+  // MỘT task trong vùng chọn đã nghiệm thu là chặn nguyên lô (lô atomic, không ghi gì).
+  if (!installed && dims.some((d) => d.status === "nghiem_thu"))
+    return NextResponse.json(
+      {
+        error: "Task đã nghiệm thu — huỷ nghiệm thu (DELETE /api/tasks/:id/approve) trước khi sửa",
+      },
+      { status: 409 },
+    );
 
   // Hold point chuyển bước (M3) + gate biện pháp thi công (M8): chỉ chặn khi TICK —
   // kiểm từng package liên quan (dedup).

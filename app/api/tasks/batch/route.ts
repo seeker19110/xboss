@@ -78,6 +78,13 @@ export async function PATCH(req: NextRequest) {
 
         if (patch.status === "nghiem_thu")
           throw new Error("Dùng duyệt nghiệm thu để đặt trạng thái này");
+        // Bất biến nghiệm thu (L1, audit 2026-09-22) — cùng luật với PATCH đơn: task ĐANG
+        // nghiem_thu không đổi trạng thái qua route thường (kể cả hoan_thanh), phải huỷ
+        // nghiệm thu trước. Cả lô atomic nên 1 task vướng là dừng nguyên lô.
+        if (exists.status === "nghiem_thu" && patch.status !== undefined)
+          throw new Error(
+            `Task #${id} đã nghiệm thu — huỷ nghiệm thu (DELETE /api/tasks/:id/approve) trước khi sửa`,
+          );
         // Cùng quy tắc validate với PATCH đơn: status là slug hợp lệ, ngày đúng dạng.
         if (
           patch.status !== undefined &&

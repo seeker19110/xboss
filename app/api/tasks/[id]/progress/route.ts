@@ -69,6 +69,17 @@ export async function PATCH(
     );
     if (!task) return { error: "Không tìm thấy task", httpStatus: 404 } as const;
 
+    // Bất biến nghiệm thu (L1, audit 2026-09-22): task đã nghiệm thu thì không được hạ %
+    // (nghiem_thu ⇒ progress = 1) cũng không được đổi trạng thái qua route này — cả hai chỉ
+    // đi qua DELETE /api/tasks/:id/approve. Gửi lại đúng progress = 1 không kèm status vẫn
+    // cho qua để replay hàng đợi offline không bị kẹt (không đổi gì, idempotent).
+    if (task.status === "nghiem_thu" && (progress !== 1 || body.status !== undefined)) {
+      return {
+        error: "Task đã nghiệm thu — huỷ nghiệm thu (DELETE /api/tasks/:id/approve) trước khi sửa",
+        httpStatus: 409,
+      } as const;
+    }
+
     // Hold point chuyển bước (M3) + gate biện pháp thi công (M8): chỉ chặn khi tiến độ
     // TĂNG (thi công thêm) — hạ tiến độ để sửa sai không cần mở khoá.
     if (progress > (task.progress_percent ?? 0)) {
