@@ -29,6 +29,19 @@ Thêm biến `DEAD_CODE_LIST_ORPHANS=1` để in danh sách đầy đủ khi c�
 chặn CI qua allowlist như file unreachable). Đây là nợ kỹ thuật tiếp theo, để đợt sau.
 Đã kiểm `lint`/`typecheck` xanh sau khi sửa script.
 
+## ✅ Rút gọn hub `/engineering-intelligence` — chỉ giữ tab Trợ Lý Đa Kênh — 2026-09-21
+
+Theo yêu cầu người dùng: xoá 4 trong 5 tab của hub điều hướng `/engineering-intelligence`
+(`app/engineering-intelligence/page.tsx`) — "Gate 0 & Đề Xuất AI", "AI Swarm & Merkle", "Tự Trị
+& Dữ Liệu", "IoT & Bảo trì dự báo" — chỉ giữ lại tab "Trợ Lý Đa Kênh" (Zalo Field Copilot M86 +
+Telegram Voice Copilot M76). Dọn theo import icon `lucide-react` không còn dùng và sửa lại
+`subtitle` của `HubShell` cho khớp nội dung còn lại. **Chỉ đụng lớp điều hướng của trang hub** —
+không xoá/đổi các trang con nghiệp vụ thật (`/engineering/swarm`, `/engineering/workflows`,
+`/engineering/autonomy`, `/engineering/data-quality`, `/engineering/iot-telemetry`,
+`/engineering/predictions`, `/engineering/prescriptive`...) hay các API/lib nền (`lib/ky-thuat/*`)
+phía sau — các phân hệ đó vẫn hoạt động, chỉ không còn lối vào từ hub này. 4 chỉ số KPI đầu trang
+(đối tượng kỹ thuật/đề xuất AI/phiên swarm/khối Merkle) vẫn giữ nguyên.
+
 ## ✅ Audit tổng quát — xoá `/api/import/batches`, sửa ghi chú lỗi thời — 2026-09-21
 
 Audit diện rộng tìm tính năng thừa. Kết luận: repo khá sạch, hầu hết ứng viên "trông thừa"
