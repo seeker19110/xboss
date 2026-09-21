@@ -1,5 +1,21 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Đợt bảo trì `/maintain` đầu tiên — 2026-09-21
+
+Chạy thử `/maintain` (agent `maintainer` quét, kế hoạch `docs/ops/MAINTENANCE-PLAN.md` cho người
+dùng duyệt). Kết quả: repo khá sạch, không có lỗi nghiêm trọng.
+
+- **M-01 (xong)**: xác nhận thật `npm test -- --release-gate` với Postgres 16 thật → **251 file,
+  4098 ca pass, 0 fail, 1 skip có chủ đích** — 4 mục `scripts/test-skip-allowlist.json` vẫn đúng
+  lý do.
+- **M-02 (xong)**: sửa bug thật trong `scripts/maintenance-sweep.sh` — `npm outdated` cố ý thoát
+  mã 1 khi có package lỗi thời, kết hợp `set -o pipefail` khiến `|| echo 0` chạy thêm ngoài ý
+  muốn, in dòng "0" thừa; tách `npm outdated` ra khỏi pipe trước khi đưa vào `node -e`.
+- **M-03 (hoãn)**: 13 route "Lớp Engineering OS" (`scripts/dead-routes-allowlist.json`) vẫn "chờ
+  chốt hướng ở đề xuất #6 audit 2026-08-25" — người dùng quyết giữ nguyên, chưa gắn UI/xoá đợt này.
+- **M-04 (hoãn)**: nâng major `nodemailer` 9→10 + `google-auth-library` 10→11 — không phải lỗ hổng
+  bảo mật khẩn, người dùng quyết không nâng lúc này.
+
 ## ✅ Bỏ cụm sidebar "6 Đại Trung Tâm Điều Hành (Unified Hubs)" — 2026-09-21
 
 Xoá toàn bộ cụm 6 mục (`dash.site-command`, `dash.schedule-control`, `dash.procurement-hub`,
