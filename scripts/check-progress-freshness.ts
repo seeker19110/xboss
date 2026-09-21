@@ -25,15 +25,11 @@ try {
 }
 
 if (!parentExists) {
-  console.log(
-    "OK — không có commit cha (checkout nông hoặc commit đầu tiên), bỏ qua kiểm tra.",
-  );
+  console.log("OK — không có commit cha (checkout nông hoặc commit đầu tiên), bỏ qua kiểm tra.");
   process.exit(0);
 }
 
-const changed = git("diff", "--name-only", "HEAD~1", "HEAD")
-  .split("\n")
-  .filter(Boolean);
+const changed = git("diff", "--name-only", "HEAD~1", "HEAD").split("\n").filter(Boolean);
 
 if (changed.length === 0) {
   console.log("OK — commit này không đổi file nào.");
@@ -45,15 +41,15 @@ const touchedProgress = changed.includes("PROGRESS.md");
 // Thư mục coi là "nghiệp vụ có ý nghĩa" — đổi ở đây mà không cập nhật PROGRESS.md là lỗi thời.
 // Cố ý loại trừ test/docs/scripts thuần kiểm tra để không báo oan mọi commit nhỏ.
 const SIGNIFICANT_PREFIXES = ["app/", "lib/", "migrations/"];
-const significant = changed.filter((f) =>
-  SIGNIFICANT_PREFIXES.some((p) => f.startsWith(p)),
-);
+const significant = changed.filter((f) => SIGNIFICANT_PREFIXES.some((p) => f.startsWith(p)));
 
 console.log(`Commit: ${git("log", "-1", "--format=%h %s", "HEAD")}`);
 console.log(`Số file đổi: ${changed.length} (nghiệp vụ: ${significant.length})`);
 
 if (significant.length === 0) {
-  console.log("OK — không đổi thư mục nghiệp vụ (app/lib/migrations), không bắt buộc cập nhật PROGRESS.md.");
+  console.log(
+    "OK — không đổi thư mục nghiệp vụ (app/lib/migrations), không bắt buộc cập nhật PROGRESS.md.",
+  );
   process.exit(0);
 }
 
