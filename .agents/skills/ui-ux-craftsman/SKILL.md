@@ -29,8 +29,8 @@ Bộ Skill này đóng gói toàn bộ tri thức thiết kế giao diện cao c
    - Mọi trang/component có tải dữ liệu bắt buộc phải hoàn thiện đủ 5 trạng thái: (1) Empty State, (2) Skeleton Loading (`animate-pulse` khớp $100\%$ bố cục), (3) Data Loaded, (4) Error/Offline State kèm nút Thử lại, (5) Field-level Validation feedback.
    - Điểm giật bố cục khi tải trang Cumulative Layout Shift $CLS < 0.1$.
 
-5. **Bất biến Tương Phản Màu WCAG 2.2 AA Trên 5 Themes (Contrast Ratio $\ge 4.5:1$):**
-   - Nút hành động chữ trắng (`--on-accent`): Luôn dùng accent cấp `-600` hoặc `-700` (`bg-emerald-600 hover:bg-emerald-700`, `bg-blue-600`, `bg-rose-700`) để đảm bảo tỷ lệ tương phản $\ge 4.5:1$ trên cả 5 theme (`dark`, `light`, `kingblue`, `darkblue`, `navy`).
+5. **Bất biến Tương Phản Màu WCAG 2.2 AA Trên 2 Themes (Contrast Ratio $\ge 4.5:1$):**
+   - Nút hành động chữ trắng (`--on-accent`): Luôn dùng accent cấp `-600` hoặc `-700` (`bg-emerald-600 hover:bg-emerald-700`, `bg-blue-600`, `bg-rose-700`) để đảm bảo tỷ lệ tương phản $\ge 4.5:1$ trên cả 2 theme (`light`, `darkblue`).
 
 6. **Bất biến Định Dạng Số & Tiền Tệ (Mono Tabular-Nums Invariant):**
    - Toàn bộ số liệu tiến độ $\%$, khối lượng, đơn giá, số tiền VND và mã hiệu WBS bắt buộc sử dụng font chữ `font-mono tabular-nums` và căn lề phải (`text-right`) trong bảng biểu để các chữ số thẳng hàng dọc dễ so sánh.
@@ -66,20 +66,17 @@ Bộ Skill này đóng gói toàn bộ tri thức thiết kế giao diện cao c
 
 ### 3.1. [Cẩm nang kỹ thuật] wcag-contrast-matrix-and-tokens
 
-# CẨM NANG BẢNG MA TRẬN TƯƠNG PHẢN WCAG 2.2 AA TRÊN 5 THEMES
+# CẨM NANG BẢNG MA TRẬN TƯƠNG PHẢN WCAG 2.2 AA TRÊN 2 THEMES
 
 ## 1. QUY TẮC TƯƠNG PHẢN BODY TEXT THANG ZINC
 
 | Theme        | `text-zinc-400` trên nền Thẻ (`bg-zinc-950` / `bg-zinc-900`) |  Kết luận WCAG 2.2 AA  |
 | :----------- | :----------------------------------------------------------: | :--------------------: |
-| **dark**     |        $7.72:1 - 6.91:1$ (Ngưỡng yêu cầu $\ge 4.5:1$)        | **PASS (Rất an toàn)** |
-| **light**    |                      $7.73:1 - 7.03:1$                       | **PASS (Rất an toàn)** |
-| **kingblue** |                      $6.93:1 - 5.35:1$                       |   **PASS (An toàn)**   |
+| **light**    |        $7.73:1 - 7.03:1$ (Ngưỡng yêu cầu $\ge 4.5:1$)        | **PASS (Rất an toàn)** |
 | **darkblue** |                      $7.33:1 - 5.99:1$                       |   **PASS (An toàn)**   |
-| **navy**     |                      $7.66:1 - 6.64:1$                       |   **PASS (An toàn)**   |
 
 ---
 
 ## 4. CÔNG CỤ THỰC THI (SCRIPTS)
 
-- [scripts/ui_ux_validator.ts](file:///c:/Users/liend/xboss/.agents/skills/ui-ux-craftsman/scripts/ui_ux_validator.ts): Bộ kịch bản CLI kiểm tra tự động tỷ lệ tương phản WCAG 2.2 AA của hệ token trên 5 theme và xác thực 5 trạng thái UI.
+- [scripts/ui_ux_validator.ts](file:///c:/Users/liend/xboss/.agents/skills/ui-ux-craftsman/scripts/ui_ux_validator.ts): Bộ kịch bản CLI kiểm tra tự động tỷ lệ tương phản WCAG 2.2 AA của hệ token trên 2 theme và xác thực 5 trạng thái UI.

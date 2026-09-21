@@ -23,7 +23,7 @@
 - **Bảo mật:** **API là ranh giới bảo mật duy nhất** — mọi route gọi `getCurrentUser()` + kiểm quyền `CAN`/`canTouchTask`. Phiên stateless HMAC; rate-limit login; SQL tham số hoá qua `lib/db`. **RLS Postgres là phòng tuyến thứ 2** (không thay tầng app): bật trên **11 bảng tài chính** (`0069` mở, `0077` khoá cửa), nhóm bảng theo tổ chức, **3 bảng Zalo Field Copilot** (`0119`), **3 bảng kế hoạch/mặt trận** (`0149` — `baselines`/`construction_stages`/`floor_stage_fronts`; riêng `construction_stages` có thêm nhánh `project_id IS NULL` = danh mục công tác dùng chung mọi dự án), và **toàn bộ 15 bảng `engineering_*`** (`0092` — vào thẳng policy nghiêm ngặt, không có nhánh "thiếu ngữ cảnh → cho qua"). Chạy bằng role `xboss_app` NOBYPASSRLS — xem ADR-0005.
 - **Accessibility:** mục tiêu WCAG AA cả hai theme; **đã có** axe-core tự động qua Playwright (`e2e/authed/*.spec.ts`, desktop + mobile, mọi trang mới bắt buộc thêm case axe) — quy tắc tương phản + quy trình ground-truth ở `docs/audit.md` §13.
 - **Mobile-first:** vùng chạm ~40px, nav cuộn ngang `.scrollbar-none`, bảng dày sticky header + cuộn ngang.
-- **Theme:** **dark-first** với cơ chế đảo màu qua biến CSS (`app/globals.css`): các class `html.dark` / `html.light` / `html.kingblue` / `html.darkblue` / `html.navy`. **Không** dùng `styles/theme.css`/`data-theme` của khung (xem ADR nếu cần) — không hard-code hex, không dùng biến thể `dark:`.
+- **Theme:** **dark-first** với cơ chế đảo màu qua biến CSS (`app/globals.css`): các class `html.light` / `html.darkblue`. **Không** dùng `styles/theme.css`/`data-theme` của khung (xem ADR nếu cần) — không hard-code hex, không dùng biến thể `dark:`.
 
 ## 4. Tech stack, thiết kế dữ liệu & kiến trúc
 
