@@ -45,3 +45,20 @@ Coordinator gọi `reviewer` soát diff theo `docs/audit.md` mục UI/UX & a11y 
 Lỗi nhỏ (lint/typo/class lệch ADR) → giao lại worker sửa; lệch đặc tả → dừng, báo phiên chính.
 Báo cáo cuối: danh sách file, kết quả từng cổng, ảnh chụp (nếu chạy được `npm run dev` +
 Playwright screenshot 1280px và 390px), điểm còn nợ.
+
+## Việc B — Trang chủ mạch lạc (M125) — `route: complex` — CHẠY SAU Việc A (dùng `DocToolbar`/`Kbd`, chung file docs)
+
+**Đặc tả:** `docs/nang-cap/M125-bo-cuc-trang-chu.md` (Approved). Mockup:
+https://claude.ai/artifact/8BR2JgohGtsPbcTZq5PvCX. Ràng buộc CỨNG như trên (đọc thêm
+`app/page.tsx` toàn bộ, `app/components/ui/DocToolbar.tsx` do Việc A tạo, e2e trang chủ).
+
+**Brief:** sắp xếp lại `app/page.tsx` theo §5 của M125, thêm `Tabs` (FR1), `ProgressRow` (FR2),
+`HomeRail`; thay nút viết tay bằng `Button`/`ButtonLink` (FR3). **Không đổi** bất kỳ panel
+component nào, không đổi API. Tiêu chí AC1–AC6.
+
+**Ranh giới được phép quyết:** tab mặc định (phải giữ e2e xanh), thứ tự `SpiCards`/`ForecastCards`
+trong rail, cách lưu tab (URL bắt buộc, localStorage tuỳ chọn), khoảng cách. **Không được quyết:**
+thêm KPI cần API mới, sửa panel con, sửa spec e2e.
+
+**Commit:** `feat(ui): M125 — trang chủ mạch lạc: toolbar + dải số liệu + thân 2 cột, thẻ tiến độ có tab`.
+Cập nhật `PROGRESS.md`, `docs/nang-cap/README.md`, ADR-0009 (mục Tabs) cùng commit.
