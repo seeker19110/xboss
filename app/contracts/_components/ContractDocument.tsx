@@ -303,6 +303,9 @@ export function useContractDocument({
 
   const saveInfo = useCallback(async () => {
     if (!contract) return;
+    // Chặn gọi lặp khi cùng action render ở nhiều vị trí (toolbar/khối inline/thanh đáy)
+    // và bị bấm rất nhanh 2 nơi trước khi React kịp re-render `disabled={busy}`.
+    if (busy) return;
     setBusy(true);
     setInfoErr("");
     try {
@@ -332,7 +335,7 @@ export function useContractDocument({
     } finally {
       setBusy(false);
     }
-  }, [contract, form, onSaved, loadDetail]);
+  }, [contract, busy, form, onSaved, loadDetail]);
 
   const addAddendum = useCallback(async () => {
     if (!contract || !addCode.trim()) return;
@@ -455,6 +458,9 @@ export function useContractDocument({
       // vẫn mở hộp thoại lưu file.
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
+        // Có modal con (Add*Modal/appConfirm) đang mở thì chỉ chặn hộp lưu trang mặc định,
+        // không lưu nhầm bản ghi nền phía sau.
+        if (document.querySelector('[role="dialog"]')) return;
         if (!canManage || tab !== "info" || busy || !dirty) return;
         void saveInfo();
         return;

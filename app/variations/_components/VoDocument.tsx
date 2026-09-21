@@ -271,6 +271,9 @@ export function useVoDocument({
 
   const submitVo = useCallback(async () => {
     if (!vo) return;
+    // Chặn gọi lặp khi cùng action render ở nhiều vị trí (toolbar/khối inline/thanh đáy)
+    // và bị bấm rất nhanh 2 nơi trước khi React kịp re-render `disabled={busy}`.
+    if (busy) return;
     if (!(await appConfirm(`Trình phát sinh ${vo.code} lên CĐT/TVGS?`))) return;
     setBusy(true);
     // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
@@ -289,11 +292,14 @@ export function useVoDocument({
       return;
     }
     await onSaved();
-  }, [vo, onSaved]);
+  }, [vo, busy, onSaved]);
 
   const decide = useCallback(
     async (decision: "approved" | "partially_approved" | "rejected") => {
       if (!vo) return;
+      // Chặn gọi lặp khi cùng action render ở nhiều vị trí (toolbar/khối inline/thanh đáy)
+      // và bị bấm rất nhanh 2 nơi trước khi React kịp re-render `disabled={busy}`.
+      if (busy) return;
       // Tiền: mMul/mSumBy để giá trị dẫn xuất từ đơn giá bị che cũng "bị che", không ngầm
       // thành 0 trong câu hỏi xác nhận (M50 PR2).
       const value =
@@ -335,7 +341,7 @@ export function useVoDocument({
       }
       await onSaved();
     },
-    [vo, approvals, onSaved],
+    [vo, busy, approvals, onSaved],
   );
 
   const contractAdd = useCallback(async () => {
@@ -422,6 +428,9 @@ export function useVoDocument({
       // vẫn mở hộp thoại lưu file.
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
+        // Có modal con (Add*Modal/appConfirm) đang mở thì chỉ chặn hộp lưu trang mặc định,
+        // không duyệt nhầm bản ghi nền phía sau.
+        if (document.querySelector('[role="dialog"]')) return;
         if (!canDecide || busy || !dirty) return;
         void decide("partially_approved");
         return;

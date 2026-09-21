@@ -211,6 +211,9 @@ export function useClaimDocument({
 
   const settle = useCallback(async () => {
     if (!claim || !isOpen || !isAdminOrPm) return;
+    // Chặn gọi lặp khi cùng action render ở nhiều vị trí (toolbar/khối inline/thanh đáy)
+    // và bị bấm rất nhanh 2 nơi trước khi React kịp re-render `disabled={busy}`.
+    if (busy) return;
     if (!oChotHopLe) {
       showToast(
         claim.kind === "cost"
@@ -246,10 +249,13 @@ export function useClaimDocument({
     }
     showToast(`Đã chốt claim ${claim.code}`, "success");
     await onSaved();
-  }, [claim, isOpen, isAdminOrPm, oChotHopLe, giaTriChot, soNgayChot, ghiChu, onSaved]);
+  }, [claim, isOpen, isAdminOrPm, busy, oChotHopLe, giaTriChot, soNgayChot, ghiChu, onSaved]);
 
   const reject = useCallback(async () => {
     if (!claim || !isOpen || !isAdminOrPm) return;
+    // Chặn gọi lặp khi cùng action render ở nhiều vị trí (toolbar/khối inline/thanh đáy)
+    // và bị bấm rất nhanh 2 nơi trước khi React kịp re-render `disabled={busy}`.
+    if (busy) return;
     // Route trả 422 khi thiếu lý do — chặn sớm ở đây kèm đúng câu nhắc của server.
     if (!ghiChu.trim()) {
       showToast("Từ chối claim cần ghi rõ lý do — nhập vào ô Ghi chú", "error");
@@ -275,7 +281,7 @@ export function useClaimDocument({
       return;
     }
     await onSaved();
-  }, [claim, isOpen, isAdminOrPm, ghiChu, onSaved]);
+  }, [claim, isOpen, isAdminOrPm, busy, ghiChu, onSaved]);
 
   const uploadFile = useCallback(
     async (file: File) => {
@@ -339,6 +345,9 @@ export function useClaimDocument({
       // mở hộp thoại lưu file.
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
+        // Có modal con (Add*Modal/appConfirm) đang mở thì chỉ chặn hộp lưu trang mặc định,
+        // không chốt nhầm bản ghi nền phía sau.
+        if (document.querySelector('[role="dialog"]')) return;
         if (!coTheChot || busy) return;
         void settle();
         return;
