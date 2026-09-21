@@ -56,10 +56,10 @@ export default function ClaimsTab() {
           </p>
           <div className="pt-2">
             <Link
-              href="/engineering/fidic-claims"
+              href="/engineering/nextgen-apex"
               className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-xs transition inline-flex items-center gap-1.5 shadow"
             >
-              <Scale className="w-3.5 h-3.5" /> Mở Studio Khiếu Nại FIDIC (M79){" "}
+              <Scale className="w-3.5 h-3.5" /> Mở Phân Tích Tác Động Tiến Độ FIDIC (TIA){" "}
               <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
           </div>

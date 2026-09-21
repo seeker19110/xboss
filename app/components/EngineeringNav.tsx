@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   Boxes,
   Brain,
-  Lightbulb,
   GitBranch,
   Bot,
   Network,
@@ -14,14 +13,12 @@ import {
   TrendingUp,
   ShieldAlert,
   Radio,
-  Sliders,
   Layers,
   Zap,
   Route,
   QrCode,
   Scale,
   Users,
-  Activity,
   Search,
   Sparkles,
   Coins,
@@ -122,13 +119,6 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "pm", "engineer", "subcon"],
   },
   {
-    href: "/engineering/spatial-viewer",
-    label: "Không gian WebGL",
-    category: "spatial",
-    icon: Layers,
-    roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
-  },
-  {
     href: "/engineering/mepf-lifecycle",
     label: "Vòng đời thiết bị MEPF",
     category: "spatial",
@@ -144,29 +134,6 @@ const NAV_ITEMS: NavItem[] = [
     icon: Bot,
     badge: "Zalo OTP",
     roles: ["admin", "pm", "engineer", "subcon", "bch"],
-  },
-  {
-    href: "/engineering/hse-vision",
-    label: "Thị giác An toàn HSE AI",
-    category: "copilot",
-    icon: ShieldAlert,
-    badge: "AI Vision",
-    roles: ["admin", "pm", "engineer", "subcon", "bch", "cdt", "viewer"],
-  },
-  {
-    href: "/engineering/site-copilot",
-    label: "Telegram & Khẩu lệnh Voice",
-    category: "copilot",
-    icon: Bot,
-    roles: ["admin", "pm", "engineer", "subcon", "bch"],
-  },
-  {
-    href: "/engineering/swarm",
-    label: "Hòa giải Tranh biện & RFI",
-    category: "copilot",
-    icon: Network,
-    badge: "Đa tác tử",
-    roles: ["admin", "pm", "engineer", "bch"],
   },
   {
     href: "/engineering/agent-sessions",
@@ -194,13 +161,6 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "pm", "engineer", "subcon", "bch", "cdt"],
   },
   {
-    href: "/engineering/fidic-claims",
-    label: "Hồ sơ Khiếu nại FIDIC",
-    category: "commercial",
-    icon: Scale,
-    roles: ["admin", "pm", "engineer", "bch"],
-  },
-  {
     href: "/procurement?tab=qr-logistics",
     label: "Quản lý QR Vật tư",
     category: "commercial",
@@ -213,30 +173,6 @@ const NAV_ITEMS: NavItem[] = [
     category: "commercial",
     icon: Layers,
     roles: ["admin", "pm", "bch"],
-  },
-
-  // ── Sổ cái Merkle & Tri thức kỹ thuật ──
-  {
-    href: "/engineering/quantum-hub",
-    label: "Sổ cái Merkle Bất biến",
-    category: "ledger",
-    icon: Zap,
-    badge: "Toàn vẹn",
-    roles: ["admin", "pm", "engineer", "bch"],
-  },
-  {
-    href: "/engineering/prescriptive",
-    label: "Tối ưu Quy chuẩn & NCR",
-    category: "ledger",
-    icon: Sliders,
-    roles: ["admin", "pm", "engineer", "bch"],
-  },
-  {
-    href: "/engineering/memory",
-    label: "Ngân hàng Tri thức Kỹ thuật",
-    category: "ledger",
-    icon: Cpu,
-    roles: ["admin", "pm", "engineer"],
   },
 
   // ── Governance & Workflows ──
@@ -264,13 +200,6 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "pm", "engineer", "bch"],
   },
   {
-    href: "/engineering/suggestions",
-    label: "Đề xuất Kỹ thuật AI",
-    category: "governance",
-    icon: Lightbulb,
-    roles: ["admin", "pm", "engineer"],
-  },
-  {
     href: "/engineering/predictions",
     label: "Dự báo Rủi ro Kỹ thuật",
     category: "governance",
@@ -283,13 +212,6 @@ const NAV_ITEMS: NavItem[] = [
     category: "governance",
     icon: Users,
     roles: ["admin", "pm", "bch"],
-  },
-  {
-    href: "/engineering/iot-telemetry",
-    label: "Cảm biến Đo xa IoT",
-    category: "governance",
-    icon: Activity,
-    roles: ["admin", "pm", "engineer"],
   },
   {
     href: "/engineering/graph",

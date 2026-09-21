@@ -23,8 +23,6 @@ import { NextRequest } from "next/server";
 //   - app/api/tech-links/[id]/route.ts                      (GET/PATCH/DELETE 1 link)
 //   - app/api/tech/health-check/route.ts                    (GET kiểm tra hệ thống)
 //   - app/api/tech/system-status/route.ts                   (GET trạng thái hệ thống)
-//   - app/api/telegram/link-otp/route.ts                    (POST sinh OTP liên kết)
-//   - app/api/telegram/simulate-voice/route.ts              (GET/POST mô phỏng bot)
 //   - app/api/zalo/link-otp/route.ts                        (POST sinh/xác thực OTP)
 //   - app/api/zalo/simulate-action/route.ts                 (POST mô phỏng bot)
 //   - app/api/saved-reports/[id]/data/route.ts              (GET chạy báo cáo đã lưu)
@@ -1560,120 +1558,6 @@ test("GET /api/tech/system-status: Admin xem thành công → 200", S, async () 
   const res = await GET();
   assert.equal(res.status, 200);
 });
-
-// ============================================================================
-// POST /api/telegram/link-otp, GET/POST /api/telegram/simulate-voice
-// ============================================================================
-
-test("POST /api/telegram/link-otp: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { POST } = await import("@/app/api/telegram/link-otp/route");
-  const res = await POST(jreq("/x"));
-  assert.equal(res.status, 401);
-});
-
-test(
-  "POST /api/telegram/link-otp: sinh OTP mới thay thế OTP cũ (1 user 1 OTP sống)",
-  S,
-  async () => {
-    const { queryOne } = await import("@/lib/db");
-    const projectId = await taoDuAn("tgotp");
-    const eng = await taoUser("engineer", "tgotp");
-    await dangNhapDuAn(eng, projectId);
-    const { POST } = await import("@/app/api/telegram/link-otp/route");
-    const res1 = await POST(jreq("/x"));
-    assert.equal(res1.status, 200);
-    const body1 = await res1.json();
-    assert.match(body1.otp, /^\d{6}$/);
-
-    const res2 = await POST(jreq("/x"));
-    const body2 = await res2.json();
-    assert.equal(res2.status, 200);
-
-    const rows = await queryOne<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM telegram_user_bindings WHERE user_id = ?`,
-      eng.id,
-    );
-    assert.equal(
-      rows?.count,
-      "1",
-      "chỉ 1 dòng binding chưa xác thực cho user này (upsert, không tạo mới)",
-    );
-    // OTP không nhất thiết khác nhau về giá trị hiển thị (ngẫu nhiên có thể trùng), nhưng cả
-    // hai lần đều phải trả OTP hợp lệ.
-    assert.match(body2.otp, /^\d{6}$/);
-  },
-);
-
-test("GET /api/telegram/simulate-voice: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/telegram/simulate-voice/route");
-  const res = await GET(getReq("/api/telegram/simulate-voice"));
-  assert.equal(res.status, 401);
-});
-
-test(
-  "GET /api/telegram/simulate-voice: dự án không được phép truy cập qua query → 403",
-  S,
-  async () => {
-    const projectA = await taoDuAn("tgsimA");
-    const projectB = await taoDuAn("tgsimB");
-    const eng = await taoUser("engineer", "tgsim");
-    await dangNhapDuAn(eng, projectA);
-    const { GET } = await import("@/app/api/telegram/simulate-voice/route");
-    const res = await GET(getReq(`/api/telegram/simulate-voice?projectId=${projectB}`));
-    assert.equal(res.status, 403);
-  },
-);
-
-test("GET /api/telegram/simulate-voice: thành công → trả logs rỗng ban đầu", S, async () => {
-  const projectId = await taoDuAn("tgsimok");
-  const eng = await taoUser("engineer", "tgsimok");
-  await dangNhapDuAn(eng, projectId);
-  const { GET } = await import("@/app/api/telegram/simulate-voice/route");
-  const res = await GET(getReq("/api/telegram/simulate-voice"));
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.ok(Array.isArray(body.data));
-});
-
-test("POST /api/telegram/simulate-voice: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { POST } = await import("@/app/api/telegram/simulate-voice/route");
-  const res = await POST(jreq("/x", { text: "xin chao" }));
-  assert.equal(res.status, 401);
-});
-
-test("POST /api/telegram/simulate-voice: dự án không được phép → 403", S, async () => {
-  const projectA = await taoDuAn("tgsimpA");
-  const projectB = await taoDuAn("tgsimpB");
-  const eng = await taoUser("engineer", "tgsimp");
-  await dangNhapDuAn(eng, projectA);
-  const { POST } = await import("@/app/api/telegram/simulate-voice/route");
-  const res = await POST(jreq("/x", { text: "xin chao", projectId: projectB }));
-  assert.equal(res.status, 403);
-});
-
-test(
-  "POST /api/telegram/simulate-voice: gửi lệnh giả lập thành công → 200, tự tạo binding xác thực",
-  S,
-  async () => {
-    const { queryOne } = await import("@/lib/db");
-    const projectId = await taoDuAn("tgsimpok");
-    const eng = await taoUser("engineer", "tgsimpok");
-    await dangNhapDuAn(eng, projectId);
-    const { POST } = await import("@/app/api/telegram/simulate-voice/route");
-    const res = await POST(jreq("/x", { text: "xin chao" }));
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.success, true);
-    const row = await queryOne<{ is_verified: boolean }>(
-      `SELECT is_verified FROM telegram_user_bindings WHERE user_id = ?`,
-      eng.id,
-    );
-    assert.equal(row?.is_verified, true);
-  },
-);
 
 // ============================================================================
 // POST /api/zalo/link-otp, /api/zalo/simulate-action

@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { hashOtp, kiemOtp, sinhOtp, OTP_DO_DAI, OTP_HAN_PHUT } from "@/lib/bao-mat/otp";
 import { xacThucWebhookTelegram, xacThucWebhookZalo } from "@/lib/bao-mat/webhook-inbound";
-import { POST as postTelegramWebhook } from "@/app/api/telegram/webhook/route";
 import { POST as postZaloWebhook } from "@/app/api/zalo/webhook/route";
 
 const HAS_DB = Boolean(process.env.TEST_DATABASE_URL);
@@ -146,27 +145,6 @@ test("V1/Webhook: Zalo — thiếu ZALO_OA_SECRET thì throw fail-fast", async (
 // ===== Route: chặn 401 TRƯỚC khi chạm DB =====
 // Không cần Postgres: tests/setup.ts đã xoá DATABASE_URL, nên nếu route lỡ chạm DB thì lời gọi
 // sẽ throw thay vì trả 401 — chính điều đó chứng minh "không ghi bất kỳ dòng DB nào".
-
-test("V1/Route: POST /api/telegram/webhook không kèm secret → 401, không chạm DB", async () => {
-  const body = JSON.stringify({ message: { chat: { id: 123 }, text: "/link 111111" } });
-  await voiEnv({ TELEGRAM_WEBHOOK_SECRET: BI_MAT_TG }, async () => {
-    for (const headers of [
-      {} as Record<string, string>,
-      { "X-Telegram-Bot-Api-Secret-Token": "sai-secret" },
-    ]) {
-      const res = await postTelegramWebhook(
-        new Request("http://x/api/telegram/webhook", {
-          method: "POST",
-          body,
-          headers,
-        }) as never,
-      );
-      assert.equal(res.status, 401);
-      const json = (await res.json()) as { error?: string };
-      assert.match(String(json.error), /Chữ ký webhook không hợp lệ/);
-    }
-  });
-});
 
 test("V1/Route: POST /api/zalo/webhook sai chữ ký → 401; body.projectId bị bỏ qua", async () => {
   // projectId 999 do "kẻ tấn công" đưa vào — trước bản vá nó đi thẳng vào withProjectScope.

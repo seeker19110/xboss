@@ -1,13 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import {
-  ShieldAlert,
   AlertTriangle,
-  Camera,
   Plus,
-  ArrowUpRight,
   ShieldCheck,
   CheckCircle2,
   Sparkles,
@@ -37,33 +33,8 @@ export default function HseSafetyTab() {
 
   return (
     <div className="space-y-6">
-      {/* HSE AI Computer Vision Banner Card */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-rose-400" />
-              HSE AI Computer Vision Sentinel (QCVN 18:2021/BXD)
-            </h3>
-            <span className="text-[10px] font-mono text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-              AI Vision M87
-            </span>
-          </div>
-          <p className="text-xs text-zinc-400 leading-relaxed">
-            Camera AI tự động quét ảnh chụp hiện trường phát hiện không đội mũ bảo hộ, thiếu áo phản
-            quang, không đeo dây an toàn khi làm việc trên cao và mép sàn thiếu lan can chắn.
-          </p>
-          <div className="pt-2">
-            <Link
-              href="/engineering/hse-vision"
-              className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs transition inline-flex items-center gap-1.5 shadow"
-            >
-              <Camera className="w-3.5 h-3.5" /> Mở HSE AI Vision Cockpit (M87){" "}
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </div>
-
+      {/* HSE Safety Score Card */}
+      <div className="grid grid-cols-1 gap-4">
         <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">

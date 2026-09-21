@@ -1,5 +1,65 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Xoá 10 phân hệ Engineering Đỉnh cao theo yêu cầu người dùng — 2026-09-21
+
+Theo yêu cầu người dùng, đã xoá HOÀN TOÀN 10 tính năng khỏi Apex Cockpit (`/engineering`):
+HSE AI Vision Sentinel (M87), Site Telegram 2-Way & Voice Copilot (M76), Swarm Debates & RFI
+Generator (PIN-3), WebGL Spatial Annotation Pinning (M74), FIDIC 28-day EOT Claims Dossier
+(M79), Quantum Spatial WASM & Merkle Ledger (M73), Prescriptive Pareto Frontier & NCR (O3+),
+Cross-Project Knowledge Memory Bank (PIN-4), Đề xuất Kỹ thuật Thông minh — trang list (ENG-2),
+Giám sát Cảm biến IoT Telemetry (M83).
+
+Phạm vi xoá: route page (`app/engineering/<slug>/`), route API riêng, lib nghiệp vụ riêng
+(`lib/ky-thuat/engineering-{hse-vision,site-bot,swarm,swarm-orchestrator,spatial-pinning,
+spatial-wasm,prescriptive,memory-bank}.ts`), test file riêng, entry trong bento grid
+`app/engineering/page.tsx` + `EngineeringNav.tsx` + `GlobalSearch.tsx` + `HomeRail.tsx` +
+`mepf-process` + `commercial/ClaimsTab` + `engineering-intelligence` (2 tab nguyên: "AI Swarm &
+Merkle", "IoT & Bảo trì dự báo" — xoá cả tab vì phần lớn nội dung thuộc tính năng đã xoá) +
+`site/HseSafetyTab` + `site/TasksDiaryTab` (đổi link sang Zalo Copilot còn sống) +
+`engineering/predictions` (bỏ link suggestions), và 4 key registry `lib/nen/modules.ts`
+(`engineering-prescriptive`, `engineering-iot-telemetry`, `engineering-quantum-hub`,
+`engineering-swarm`) + nav entry `/engineering/suggestions` trong module `engineering` gốc.
+
+**Giữ nguyên phần dùng chung** (đã kiểm kỹ trước khi xoá, tránh xoá nhầm code tính năng
+khác đang dùng):
+- `lib/tai-chinh/contracts-fidic.ts` + facade `lib/ky-thuat/engineering-fidic-claim.ts`: chỉ xoá
+  các hàm riêng của FIDIC Claims Dossier (`mapDelayEventToFidicClause`, `checkNoticeCompliance`,
+  `calculateTimeImpactAnalysis`, `generateFidicClaimDossier`, `createFidicClaim`,
+  `listFidicClaims`), GIỮ nguyên FIDIC TIA Claim Engine (M94, `analyzeFidicTiaClaim` +
+  `/api/engineering/fidic-tia`, dùng bởi `/engineering/nextgen-apex`).
+- `lib/ky-thuat/engineering-intel.ts`: chỉ xoá `listSuggestions`/`getSuggestion` (phục vụ trang
+  suggestions đã xoá), GIỮ `decideSuggestion`/`ingestIntelligencePackage`/`computeConfidence`
+  (vẫn dùng bởi Gate 0 Workflow ENG-3, xác nhận qua `tests/engineering-workflow.test.ts` +
+  `tests/route-eng-quy-trinh.test.ts`).
+- `app/api/engineering/ledger/merkle`, `/ledger/verify-proof`, `lib/ky-thuat/engineering-merkle-
+  ledger.ts`: dùng chung với `/engineering-intelligence` (không xoá), dù trang quantum-hub gọi
+  route này cũng bị xoá cùng trang.
+- `app/api/engineering/spatial/compute` (quantum-hub) và `app/api/engineering/spatial/
+  annotations` (spatial-viewer) là 2 route con độc lập cùng thư mục `spatial/` — chỉ xoá đúng
+  route con của từng tính năng.
+
+**Migration:** KHÔNG xoá các file `migrations/000N_*.sql` đã tạo bảng cho các tính năng này
+(append-only theo ADR-0003) — các bảng `engineering_hse_vision_*`, `telegram_*`,
+`engineering_swarm_*`, `engineering_spatial_annotations`, `engineering_fidic_claims*`,
+`engineering_spatial_compute_cache`, `engineering_prescriptive_scenarios`,
+`engineering_compliance_*`, `engineering_knowledge_patterns`, `engineering_cross_project_
+lessons`, `engineering_suggestions` (bảng, không phải toàn bộ tính năng suggestion — hàm ghi
+`ingestIntelligencePackage`/`decideSuggestion` vẫn còn dùng bảng này), `engineering_iot_*` vẫn
+còn trong schema nhưng không còn route/UI nào đọc/ghi (trừ `engineering_suggestions` vẫn được
+Gate 0 dùng). Chưa viết migration DROP TABLE — để ngỏ, cân nhắc dọn riêng nếu cần.
+
+**Test:** dọn 9 file test trộn lẫn tính năng còn sống/đã xoá (`route-eng-du-bao`,
+`route-eng-mepf`, `route-eng-quy-trinh`, `audit-2026-09-05-guards`, `feature-flags`, `modules`,
+`route-eng-zero-error`, `route-ho-so-bot`, `webhook-inbound`) — xoá đúng block test của route đã
+xoá, giữ nguyên phần test route còn sống (ENG-3 Gate 0, ENG-1 objects, Zalo Copilot, FIDIC TIA,
+zero-error, agent-sessions, autonomy...). 9 file test riêng (1-1 với lib đã xoá) bị xoá thẳng.
+
+**Chưa làm** (ngoài phạm vi yêu cầu, ghi nợ nếu cần sau): chưa build/lint/typecheck được trong
+phiên này (môi trường không có `node_modules`) — đã rà bằng grep toàn repo xác nhận không còn
+import/href/route nào trỏ tới 10 tính năng đã xoá, nhưng CHƯA xác minh bằng trình biên dịch
+thật; cần chạy `npm run lint && npm run typecheck && npm test && npm run build` trước khi coi là
+xong hẳn theo Definition of Done.
+
 ## ✅ Audit tổng quát — xoá `/api/import/batches`, sửa ghi chú lỗi thời — 2026-09-21
 
 Audit diện rộng tìm tính năng thừa. Kết luận: repo khá sạch, hầu hết ứng viên "trông thừa"

@@ -10,9 +10,7 @@ import {
   Clock,
   Sparkles,
   BarChart3,
-  ExternalLink,
 } from "lucide-react";
-import Link from "next/link";
 import AppHeader from "@/app/components/AppHeader";
 import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
@@ -228,18 +226,6 @@ export default function PredictionsPage() {
                       </div>
 
                       <p className="mt-2 text-sm text-zinc-200">{p.explanation}</p>
-
-                      {p.suggestionId && (
-                        <div className="mt-2">
-                          <Link
-                            href="/engineering/suggestions"
-                            className="inline-flex items-center gap-1 text-xs text-sky-400 hover:underline"
-                          >
-                            <ExternalLink size={12} />
-                            <span>Xem đề xuất kỹ thuật liên kết (ENG-2)</span>
-                          </Link>
-                        </div>
-                      )}
                     </div>
 
                     {/* Actions */}

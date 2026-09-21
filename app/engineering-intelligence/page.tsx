@@ -6,17 +6,14 @@ import {
   Bot,
   Workflow,
   Network,
-  Cpu,
   Boxes,
   Lightbulb,
   ShieldCheck,
   Zap,
-  Activity,
   Sparkles,
   ArrowUpRight,
   Send,
   MessageSquare,
-  Volume2,
   GitBranch,
   KeyRound,
   ShieldAlert,
@@ -57,8 +54,6 @@ function EngineeringIntelligenceContent() {
   // (audit 2026-08-25 §3.2). Nguồn nào 403/lỗi/module đang tắt thì giữ "—", không đoán.
   const [stats, setStats] = useState<HubStat[]>([
     { label: "Đối Tượng Kỹ Thuật (ENG-1)", value: "—", icon: Boxes },
-    { label: "Đề Xuất AI Chờ Duyệt", value: "—", icon: Lightbulb },
-    { label: "Phiên Tranh Biện Swarm", value: "—", icon: Network },
     { label: "Khối Merkle Đã Niêm Phong", value: "—", icon: Zap },
   ]);
 
@@ -68,41 +63,28 @@ function EngineeringIntelligenceContent() {
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null);
 
-    Promise.all([
-      get("/api/engineering/objects"),
-      get("/api/engineering/suggestions?status=open"),
-      get("/api/engineering/swarm/debates"),
-      get("/api/engineering/ledger/merkle"),
-    ]).then(([objects, suggestions, debates, merkle]) => {
-      setStats([
-        {
-          label: "Đối Tượng Kỹ Thuật (ENG-1)",
-          value: objects ? `${objects.objects?.length ?? 0} đối tượng` : "—",
-          icon: Boxes,
-        },
-        {
-          label: "Đề Xuất AI Chờ Duyệt",
-          value: suggestions ? `${suggestions.suggestions?.length ?? 0} đề xuất` : "—",
-          icon: Lightbulb,
-        },
-        {
-          label: "Phiên Tranh Biện Swarm",
-          value: Array.isArray(debates) ? `${debates.length} phiên` : "—",
-          icon: Network,
-        },
-        {
-          label: "Khối Merkle Đã Niêm Phong",
-          value: merkle ? `${merkle.totalCount ?? 0} khối` : "—",
-          icon: Zap,
-        },
-      ]);
-    });
+    Promise.all([get("/api/engineering/objects"), get("/api/engineering/ledger/merkle")]).then(
+      ([objects, merkle]) => {
+        setStats([
+          {
+            label: "Đối Tượng Kỹ Thuật (ENG-1)",
+            value: objects ? `${objects.objects?.length ?? 0} đối tượng` : "—",
+            icon: Boxes,
+          },
+          {
+            label: "Khối Merkle Đã Niêm Phong",
+            value: merkle ? `${merkle.totalCount ?? 0} khối` : "—",
+            icon: Zap,
+          },
+        ]);
+      },
+    );
   }, []);
 
-  // Tab 1: Omnichannel Field Copilot (Zalo & Telegram Voice)
+  // Tab 1: Omnichannel Field Copilot (Zalo)
   const copilotTab = (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
@@ -124,29 +106,6 @@ function EngineeringIntelligenceContent() {
               className="px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-on-accent font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
             >
               <MessageSquare className="w-3.5 h-3.5" /> Mở Zalo Copilot Hub (M86)
-            </Link>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-              <Bot className="w-4 h-4 text-amber-400" />
-              Trợ Lý Hiện Trường Telegram 2 Chiều & Voice Copilot (M76)
-            </h3>
-            <span className="text-[11px] font-mono text-zinc-400">Voice-to-Action</span>
-          </div>
-          <p className="text-xs text-zinc-400 leading-relaxed">
-            Giao tiếp bằng giọng nói ngoài hiện trường, chuyển đổi khẩu lệnh âm thanh tiếng Việt
-            thành phiếu nhật ký thi công Thông tư 06/2021/TT-BXD và phát cảnh báo trễ hạn tức thì về
-            nhóm chat dự án.
-          </p>
-          <div className="pt-2">
-            <Link
-              href="/engineering/site-copilot"
-              className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs transition-colors inline-flex items-center gap-2"
-            >
-              <Volume2 className="w-3.5 h-3.5 text-amber-400" /> Mở Telegram Voice Hub (M76)
             </Link>
           </div>
         </div>
@@ -177,10 +136,10 @@ function EngineeringIntelligenceContent() {
               <Workflow className="w-3.5 h-3.5" /> Luồng Phê Duyệt Gate 0
             </Link>
             <Link
-              href="/engineering/suggestions"
+              href="/engineering/agent-sessions"
               className="px-3.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs border border-zinc-700 transition-colors flex items-center gap-1.5"
             >
-              <Lightbulb className="w-3.5 h-3.5 text-amber-400" /> Đề Xuất AI (ENG-2)
+              <Network className="w-3.5 h-3.5 text-amber-400" /> Phiên Hòa Giải (ENG-4)
             </Link>
           </div>
         </div>
@@ -208,72 +167,6 @@ function EngineeringIntelligenceContent() {
               </div>
             );
           })}
-        </div>
-      </div>
-    </div>
-  );
-
-  // Tab 3: Multi-Agent Swarm Debates & Merkle Ledger
-  const swarmTab = (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-              <Network className="w-4 h-4 text-emerald-400" />
-              AI Swarm Debates & Hòa Giải Tranh Chấp 7 Bước (PIN-3/ENG-4)
-            </h3>
-            <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              11 Agents Swarm
-            </span>
-          </div>
-          <p className="text-xs text-zinc-400 leading-relaxed">
-            Kích hoạt phiên tranh biện tự động giữa các Persona Agent (Lead MEPF Engineer, Chief QS,
-            Site Commander, QA/QC Sentinel) để giải quyết xung đột kỹ thuật, tối ưu hóa Pareto đa
-            mục tiêu và sinh nghị quyết đồng thuận.
-          </p>
-          <div className="flex items-center gap-2 pt-2">
-            <Link
-              href="/engineering/swarm"
-              className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-on-accent font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
-            >
-              <Network className="w-3.5 h-3.5" /> Swarm Debates (PIN-3)
-            </Link>
-            <Link
-              href="/engineering/agent-sessions"
-              className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs transition-colors inline-flex items-center gap-2"
-            >
-              Phiên Hòa Giải (ENG-4)
-            </Link>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-400" />
-              Sổ Cái Mật Mã Merkle Tree (M73)
-            </h3>
-            <span className="text-[11px] font-mono text-zinc-400">Merkle Proof SHA-256</span>
-          </div>
-          <p className="text-xs text-zinc-400 leading-relaxed">
-            Niêm phong cây băm Merkle Tree SHA-256 bất biến cho mọi giao dịch điều chỉnh kỹ thuật và
-            truy xuất Memory Bank ngữ cảnh.
-          </p>
-          <div className="flex items-center gap-2 pt-2">
-            <Link
-              href="/engineering/quantum-hub"
-              className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs transition-colors inline-flex items-center gap-2"
-            >
-              <Zap className="w-3.5 h-3.5 text-amber-400" /> Sổ Cái Merkle (M73)
-            </Link>
-            <Link
-              href="/engineering/memory"
-              className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs transition-colors inline-flex items-center gap-2"
-            >
-              Memory Bank (PIN-4)
-            </Link>
-          </div>
         </div>
       </div>
     </div>
@@ -339,64 +232,6 @@ function EngineeringIntelligenceContent() {
     </div>
   );
 
-  // Tab 5: IoT Telemetry & Bảo trì dự báo
-  const iotTelemetryTab = (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-amber-400" />
-              IoT Telemetry & Bảo Trì Dự Báo
-            </h3>
-            <p className="text-xs text-zinc-400 mt-1">
-              Tiếp nhận luồng cảm biến IoT thời gian thực và thuật toán Weibull tính toán MTBF/RUL
-              dự báo hư hỏng sớm.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/engineering/iot-telemetry"
-              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
-            >
-              <Activity className="w-3.5 h-3.5" /> IoT Telemetry (M83)
-            </Link>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-          <Link
-            href="/engineering/predictions"
-            className="p-3.5 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 text-xs block group transition-all"
-          >
-            <div className="text-zinc-400">Dự Báo Rủi Ro Kỹ Thuật (OS-3)</div>
-            <div className="font-bold text-zinc-100 mt-1 flex items-center justify-between">
-              <span>Predictive Engineering Risk</span>
-              <ArrowUpRight className="w-3.5 h-3.5 text-zinc-500 group-hover:text-amber-400" />
-            </div>
-            <p className="text-[11px] text-zinc-500 mt-1">
-              Cảnh báo sớm xung đột tiến độ và hư hỏng thiết bị
-            </p>
-          </Link>
-
-          <Link
-            href="/engineering/prescriptive"
-            className="p-3.5 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 text-xs block group transition-all"
-          >
-            <div className="text-zinc-400">Quy Chuẩn & Khuyến Nghị Tối Ưu (O3+)</div>
-            <div className="font-bold text-zinc-100 mt-1 flex items-center justify-between">
-              <span>Prescriptive Engine</span>
-              <ArrowUpRight className="w-3.5 h-3.5 text-zinc-500 group-hover:text-amber-400" />
-            </div>
-            <p className="text-[11px] text-zinc-500 mt-1">
-              Khuyến nghị giải pháp kỹ thuật theo TCVN/QCVN
-            </p>
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-
   const tabs: HubTab[] = [
     {
       id: "copilot",
@@ -417,15 +252,6 @@ function EngineeringIntelligenceContent() {
       content: gate0Tab,
     },
     {
-      id: "swarm",
-      label: "AI Swarm & Merkle",
-      icon: Network,
-      badge: "Swarm",
-      description:
-        "Tranh luận đa tác tử, hàng đợi xử lý MEPF Worker và sổ cái mật mã Merkle Tree bất biến.",
-      content: swarmTab,
-    },
-    {
       id: "autonomy-data",
       label: "Tự Trị & Dữ Liệu",
       icon: ShieldAlert,
@@ -434,20 +260,12 @@ function EngineeringIntelligenceContent() {
         "Cấp độ tự trị Controlled Autonomy A0-A2, ranh giới an toàn và Data Quality Sentinel.",
       content: autonomyDataTab,
     },
-    {
-      id: "iot-telemetry",
-      label: "IoT & Bảo trì dự báo",
-      icon: Cpu,
-      badge: "LOD 500",
-      description: "Cảm biến IoT Telemetry và dự báo hỏng hóc thiết bị MTBF/RUL.",
-      content: iotTelemetryTab,
-    },
   ];
 
   return (
     <HubShell
       title="Trung Tâm Trí Tuệ Kỹ Thuật AI"
-      subtitle="Phân hệ hợp nhất Trợ lý Copilot, Thẩm định Gate 0, AI Swarm và IoT Telemetry"
+      subtitle="Phân hệ hợp nhất Trợ lý Copilot, Thẩm định Gate 0, Tự trị & Chất lượng dữ liệu"
       icon={Brain}
       badge="Engineering Intelligence"
       tabs={tabs}

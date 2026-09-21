@@ -65,11 +65,7 @@ test("MODULES: mọi nav href phải khớp một entry trong DASHBOARD_TREE", a
     "/engineering":
       "Cụm sidebar 'Kỹ thuật Không gian & AI (Engineering OS)' đã bị bỏ khỏi sidebar toàn cục " +
       "theo yêu cầu người dùng (2026-09-21) — trang vẫn tồn tại, chỉ không còn link trực tiếp.",
-    "/engineering/suggestions":
-      "Cùng lý do với /engineering — cụm sidebar Engineering OS đã bị bỏ.",
     "/engineering/workflows": "Cùng lý do với /engineering — cụm sidebar Engineering OS đã bị bỏ.",
-    "/engineering/quantum-hub":
-      "Cùng lý do với /engineering — cụm sidebar Engineering OS đã bị bỏ.",
   };
 
   const treeHrefs = new Set<string>();

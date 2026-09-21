@@ -475,58 +475,10 @@ export default function EngineeringApexCockpitPage() {
                     <span>Zalo Field Copilot Gateway (M86)</span>
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
-                  <Link
-                    href="/engineering/hse-vision"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>HSE AI Vision Sentinel (M87)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                  <Link
-                    href="/engineering/site-copilot"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>Site Telegram 2-Way & Voice (M76)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                  <Link
-                    href="/engineering/swarm"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>Swarm Debates & RFI Generator (PIN-3)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
                 </div>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-800/80 text-[11px] text-zinc-400">
                 Các tác tử hiện trường đồng bộ thời gian thực qua Webhook.
-              </div>
-            </div>
-
-            {/* Bento Item 2: Kỹ thuật Không gian MEPF */}
-            <div className="bento-card p-5 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
-                  <div className="flex items-center gap-2 text-sm font-bold text-zinc-100">
-                    <Boxes className="h-4 w-4 text-sky-400" />
-                    <span>Kỹ thuật Không gian MEPF</span>
-                  </div>
-                  <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] text-sky-400 border border-sky-500/20 font-mono">
-                    WebGL
-                  </span>
-                </div>
-                <div className="mt-4 space-y-2.5">
-                  <Link
-                    href="/engineering/spatial-viewer"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>WebGL Spatial Annotation Pinning (M74)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                </div>
-              </div>
-              <div className="mt-4 pt-3 border-t border-zinc-800/80 text-[11px] text-zinc-400">
-                Tuân thủ nghiêm ngặt QCVN 06, TCVN 5687 & Invariant dốc trọng lực.
               </div>
             </div>
 
@@ -558,13 +510,6 @@ export default function EngineeringApexCockpitPage() {
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
                   <Link
-                    href="/engineering/fidic-claims"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>FIDIC 28-day EOT Claims Dossier (M79)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                  <Link
                     href="/procurement?tab=qr-logistics"
                     className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
                   >
@@ -582,47 +527,6 @@ export default function EngineeringApexCockpitPage() {
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-800/80 text-[11px] text-zinc-400">
                 Toàn vẹn số liệu tài chính trên BigInt đơn vị nhỏ, chống trượt số float.
-              </div>
-            </div>
-
-            {/* Bento Item 4: Siêu Tính toán & Merkle Ledger */}
-            <div className="bento-card p-5 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
-                  <div className="flex items-center gap-2 text-sm font-bold text-zinc-100">
-                    <Zap className="h-4 w-4 text-amber-400" />
-                    <span>Siêu Tính toán & Sổ cái Merkle</span>
-                  </div>
-                  <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400 border border-amber-500/20 font-mono">
-                    Immutable
-                  </span>
-                </div>
-                <div className="mt-4 space-y-2.5">
-                  <Link
-                    href="/engineering/quantum-hub"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>Quantum Spatial WASM & Merkle Ledger (M73)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                  <Link
-                    href="/engineering/prescriptive"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>Prescriptive Pareto Frontier & NCR (O3+)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                  <Link
-                    href="/engineering/memory"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>Cross-Project Knowledge Memory Bank (PIN-4)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                </div>
-              </div>
-              <div className="mt-4 pt-3 border-t border-zinc-800/80 text-[11px] text-zinc-400">
-                Mật mã băm Merkle Tree SHA-256 bảo vệ chuỗi cung ứng và nhật ký.
               </div>
             </div>
 
@@ -647,24 +551,10 @@ export default function EngineeringApexCockpitPage() {
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
                   <Link
-                    href="/engineering/suggestions"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>Đề xuất Kỹ thuật Thông minh (ENG-2)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                  <Link
                     href="/engineering/subcon-ai"
                     className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
                   >
                     <span>Đánh giá Thầu phụ AI Subcon Trust (M82)</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                  </Link>
-                  <Link
-                    href="/engineering/iot-telemetry"
-                    className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                  >
-                    <span>Giám sát Cảm biến IoT Telemetry (M83)</span>
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
                 </div>
