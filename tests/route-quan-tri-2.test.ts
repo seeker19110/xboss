@@ -1288,7 +1288,7 @@ test("PATCH /api/nav-settings: engineer không có quyền → 403", S, async ()
   const eng = await taoUser("engineer", "nav-403");
   await dangNhapDuAn(eng, projectId);
   const { PATCH } = await import("@/app/api/nav-settings/route");
-  const res = await PATCH(jreq("/x", { nodeKey: "dash.site-command", enabled: false }, "PATCH"));
+  const res = await PATCH(jreq("/x", { nodeKey: "dash.dashboard", enabled: false }, "PATCH"));
   assert.equal(res.status, 403);
 });
 
@@ -1311,7 +1311,7 @@ test("PATCH /api/nav-settings: scope=project mà chưa có dự án nào → 422
     await dangNhapDuAn(pm, null);
     const { PATCH } = await import("@/app/api/nav-settings/route");
     const res = await PATCH(
-      jreq("/x", { nodeKey: "dash.site-command", enabled: false, scope: "project" }, "PATCH"),
+      jreq("/x", { nodeKey: "dash.dashboard", enabled: false, scope: "project" }, "PATCH"),
     );
     assert.equal(res.status, 422);
   } finally {
@@ -1324,11 +1324,11 @@ test("PATCH /api/nav-settings: PM tắt 1 mục — ghi DB thành công", S, asy
   const pm = await taoUser("pm", "nav-ok");
   await dangNhapDuAn(pm, projectId);
   const { PATCH } = await import("@/app/api/nav-settings/route");
-  const res = await PATCH(jreq("/x", { nodeKey: "dash.site-command", enabled: false }, "PATCH"));
+  const res = await PATCH(jreq("/x", { nodeKey: "dash.dashboard", enabled: false }, "PATCH"));
   assert.equal(res.status, 200);
   const { GET } = await import("@/app/api/nav-settings/route");
   const after = await (await GET()).json();
-  assert.equal(after.settings["dash.site-command"], false);
+  assert.equal(after.settings["dash.dashboard"], false);
 });
 
 test(
@@ -1339,7 +1339,7 @@ test(
     const projectId = await taoDuAn("nav-notify");
     const admin = await taoUser("admin", "nav-notify");
     const pm = await taoUser("pm", "nav-notifyPm");
-    const nodeKey = "dash.schedule-control";
+    const nodeKey = "dash.mepf-process";
     await dangNhapDuAn(admin, projectId);
     const { PATCH } = await import("@/app/api/nav-settings/route");
     // Tắt trước để đảm bảo chuyển đúng chiều false→true (wasEnabled=false) kích hoạt thông báo.

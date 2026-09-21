@@ -74,15 +74,9 @@ import {
   SlidersHorizontal,
   KeyRound,
   ToggleRight,
-  Lightbulb,
-  Sparkles,
-  Brain,
   Split,
   LayoutGrid,
   QrCode,
-  Bot,
-  TrendingUp,
-  Layers,
 } from "lucide-react";
 import type { Role } from "@/lib/nen/roles";
 
@@ -112,120 +106,6 @@ export type DashCluster = {
 };
 
 export const DASHBOARD_TREE: DashCluster[] = [
-  // Cụm 1: 6 Đại Trung Tâm Điều Hành Hợp Nhất (6 Unified Cockpits & Command Centers)
-  {
-    label: "🏛️ 6 Đại Trung Tâm Điều Hành (Unified Hubs)",
-    dashboards: [
-      {
-        id: "dash.site-command",
-        href: "/site",
-        label: "Chỉ Huy Tác Nghiệp Hiện Trường & HSE",
-        icon: HardHat,
-      },
-      {
-        id: "dash.schedule-control",
-        href: "/schedule",
-        label: "Quản Trị Kế Hoạch & Tiến Độ WBS",
-        icon: CalendarCheck,
-      },
-      {
-        id: "dash.procurement-hub",
-        href: "/procurement",
-        label: "Chuỗi Cung Ứng, Mua Sắm & Kho Vận",
-        icon: Package,
-      },
-      {
-        id: "dash.commercial-cockpit",
-        href: "/commercial",
-        label: "Hợp Đồng, Chi Phí & Pháp Lý FIDIC",
-        icon: Coins,
-      },
-      {
-        id: "dash.engineering-intelligence-hub",
-        href: "/engineering-intelligence",
-        label: "Trí Tuệ Kỹ Thuật AI & Digital Twin",
-        icon: Brain,
-      },
-      {
-        id: "dash.governance-hub",
-        href: "/governance",
-        label: "Quản Trị Dự Án, Bàn Giao & Cấu Hình",
-        icon: Landmark,
-      },
-    ],
-  },
-  // Cụm 2: Kỹ thuật Không gian & AI (Engineering OS) — Đỉnh cao công nghệ XBoss
-  {
-    label: "Kỹ thuật Không gian & AI (Engineering OS)",
-    dashboards: [
-      {
-        id: "dash.apex-cockpit",
-        href: "/engineering",
-        label: "Apex Cockpit (M88)",
-        icon: Sparkles,
-      },
-      {
-        id: "dash.spatial-viewer",
-        href: "/engineering/spatial-viewer",
-        label: "Spatial Viewer (M74)",
-        icon: Layers,
-      },
-      {
-        id: "dash.hse-vision",
-        href: "/engineering/hse-vision",
-        label: "HSE AI Vision (M87)",
-        icon: ShieldAlert,
-      },
-      {
-        id: "dash.zalo-copilot",
-        href: "/engineering/zalo-copilot",
-        label: "Zalo Copilot (M86)",
-        icon: Bot,
-      },
-      {
-        id: "dash.dynamic-cashflow",
-        href: "/engineering/cashflow",
-        label: "Dynamic Cashflow (M85)",
-        icon: TrendingUp,
-      },
-      {
-        id: "dash.esign-protocol",
-        href: "/engineering/esign",
-        label: "Smart e-Sign (M84)",
-        icon: ShieldCheck,
-      },
-      {
-        id: "dash.fidic-claims",
-        href: "/engineering/fidic-claims",
-        label: "FIDIC Claims & EOT (M79)",
-        icon: Scale,
-      },
-      {
-        id: "dash.qr-logistics",
-        href: "/procurement?tab=qr-logistics",
-        label: "QR Logistics (M78)",
-        icon: QrCode,
-      },
-      {
-        id: "dash.quantum-hub",
-        href: "/engineering/quantum-hub",
-        label: "Quantum & Merkle (M73)",
-        icon: Zap,
-      },
-      {
-        id: "dash.gate0-workflows",
-        href: "/engineering/workflows",
-        label: "Workflow Gate 0 (ENG-3)",
-        icon: Workflow,
-      },
-      {
-        id: "dash.ai-suggestions",
-        href: "/engineering/suggestions",
-        label: "Đề xuất AI (ENG-2)",
-        icon: Lightbulb,
-      },
-    ],
-  },
   // Cụm 3: Kế hoạch & Tiến độ WBS — Gộp Dashboard tổng quan, Báo cáo & 6 Phân hệ thi công
   {
     label: "Kế hoạch & Tiến độ",
