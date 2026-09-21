@@ -35,8 +35,7 @@ export * from "@/lib/ky-thuat/engineering-closed-loop-sync";
 // nhưng chưa từng có route/UI nào gọi tới (dead-routes-allowlist "chờ chốt hướng ở đề xuất #6
 // audit 2026-08-25" — người dùng quyết định xoá thay vì gắn UI, xem PROGRESS.md).
 
-// 16. Hyper-Spatial WASM Geometry & Cache (M73)
-export * from "@/lib/ky-thuat/engineering-spatial-wasm";
+// (16) Hyper-Spatial WASM Geometry & Cache (M73) đã bị xoá cùng trang /engineering/quantum-hub.
 
 // (17) Distributed Engineering Task Queue (M73) đã được gỡ cùng trang `/engineering/mepf-studio`
 // và route `/api/engineering/queue/**` — hàng đợi này chỉ có daemon Python `mepf-worker` tiêu thụ,
@@ -48,14 +47,12 @@ export * from "@/lib/ky-thuat/engineering-merkle-ledger";
 // (19) MEPF Worker Closed-Loop Bridge (PR2) đã được gỡ cùng thư mục `mepf-worker/` — cầu nối này
 // chỉ phục vụ daemon Python MEPF-Agents, không còn nơi gọi sau khi hệ 9-agent bị xoá.
 
-// 20. Spatial Viewer & Field Pinning Engine (M74)
-export * from "@/lib/ky-thuat/engineering-spatial-pinning";
+// (20) Spatial Viewer & Field Pinning Engine (M74) đã bị xoá cùng trang /engineering/spatial-viewer.
 
 // 21. Smart Bidding & Subcon Procurement Matrix (M75)
 export * from "@/lib/ky-thuat/engineering-bidding-matrix";
 
-// 22. Site Telegram Gateway & Voice Copilot (M76)
-export * from "@/lib/ky-thuat/engineering-site-bot";
+// (22) Site Telegram Gateway & Voice Copilot (M76) đã bị xoá cùng trang /engineering/site-copilot.
 
 // (23) AI Auto-Routing & Beam Sleeve Matrix (M77) đã được gỡ cùng cụm CAD/BIM — giao diện duy
 // nhất dùng nó là trang /engineering/auto-routing (chạy trên phần tử BIM).

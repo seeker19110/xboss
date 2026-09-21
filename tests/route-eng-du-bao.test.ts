@@ -9,13 +9,8 @@ import { NextRequest } from "next/server";
 //   - app/api/engineering/predictions/route.ts                        (GET danh sách dự báo)
 //   - app/api/engineering/predictions/[id]/decide/route.ts            (POST chấp nhận/bỏ qua dự báo)
 //   - app/api/engineering/predictions/run/route.ts                    (POST chạy pipeline dự báo)
-//   - app/api/engineering/prescriptive/scenarios/route.ts             (GET danh sách kịch bản)
-//   - app/api/engineering/prescriptive/scenarios/[id]/approve/route.ts (POST phê duyệt kịch bản)
-//   - app/api/engineering/prescriptive/simulate/route.ts              (POST mô phỏng What-If)
 //   - app/api/engineering/cashflow/forecasts/route.ts                 (GET danh sách dự báo dòng tiền)
 //   - app/api/engineering/cashflow/simulate/route.ts                  (POST mô phỏng dòng tiền)
-//   - app/api/engineering/fidic/claims/route.ts                       (GET/POST khiếu nại FIDIC)
-//   - app/api/engineering/fidic/claims/generate-dossier/route.ts      (POST sinh hồ sơ khiếu nại)
 //   - app/api/engineering/fidic-tia/route.ts                          (GET/POST TIA claim)
 //   - app/api/engineering/bidding/packages/route.ts                   (GET/POST gói thầu)
 //   - app/api/engineering/bidding/quotes/route.ts                     (GET/POST báo giá NCC)
@@ -27,14 +22,13 @@ import { NextRequest } from "next/server";
 //   - app/api/engineering/shopdrawing-lod400/route.ts                 (GET/POST Shopdrawing LOD400)
 //   - app/api/engineering/pinnacle/pulse/route.ts                     (GET/POST Apex Pulse)
 //
-// (carbon-lca, multi-agent-copilot đã bị xoá 2026-09-21 — backend xong nhưng chưa từng có route/UI
-// nào gọi tới, xem PROGRESS.md.)
+// (carbon-lca, multi-agent-copilot, prescriptive, fidic/claims đã bị xoá 2026-09-21, xem PROGRESS.md.)
 //
 // Xác nhận (đọc code): không route nào trong cụm này gọi mạng ra ngoài — mọi hàm "AI"/dự báo là
 // hàm xác định (deterministic), không `fetch`/LLM/HTTP client nào trong các module
-// lib/ky-thuat/engineering-{predictions,prescriptive,cashflow,bidding-matrix,subcon-ai,
-// qs-omnipotent,shopdrawing-omnipotent,pinnacle-synergy}.ts và
-// lib/tai-chinh/contracts-fidic.ts (đã `grep` không thấy `fetch(`/`http`/`openai`/`anthropic`).
+// lib/ky-thuat/engineering-{predictions,cashflow,bidding-matrix,subcon-ai,
+// qs-omnipotent,shopdrawing-omnipotent,pinnacle-synergy}.ts (đã `grep` không thấy
+// `fetch(`/`http`/`openai`/`anthropic`).
 
 const S = { skip: !HAS_TEST_DB };
 
@@ -336,160 +330,6 @@ test(
 );
 
 // ============================================================================
-// GET /api/engineering/prescriptive/scenarios + POST simulate + POST [id]/approve
-// ============================================================================
-
-test("GET /api/engineering/prescriptive/scenarios: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/prescriptive/scenarios/route");
-  const res = await GET(jreq("/x", undefined, "GET"));
-  assert.equal(res.status, 401);
-});
-
-test(
-  "GET /api/engineering/prescriptive/scenarios: subcon không có quyền xem → 403",
-  S,
-  async () => {
-    const projectId = await taoDuAn("presview403");
-    const u = await taoUser("subcon", "presview403");
-    await dangNhapDuAn(u, projectId);
-    const { GET } = await import("@/app/api/engineering/prescriptive/scenarios/route");
-    const res = await GET(jreq("/x", undefined, "GET"));
-    assert.equal(res.status, 403);
-  },
-);
-
-test("GET /api/engineering/prescriptive/scenarios: module đang tắt → 404", S, async () => {
-  const projectId = await taoDuAn("presoff");
-  const pm = await taoUser("pm", "presoff");
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/engineering/prescriptive/scenarios/route");
-  const res = await GET(jreq("/x", undefined, "GET"));
-  assert.equal(res.status, 404);
-});
-
-test("POST /api/engineering/prescriptive/simulate: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { POST } = await import("@/app/api/engineering/prescriptive/simulate/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 401);
-});
-
-test(
-  "POST /api/engineering/prescriptive/simulate: engineer không được kích hoạt (chỉ Admin/PM) → 403",
-  S,
-  async () => {
-    const projectId = await taoDuAn("pressim403");
-    const eng = await taoUser("engineer", "pressim403");
-    await dangNhapDuAn(eng, projectId);
-    const { POST } = await import("@/app/api/engineering/prescriptive/simulate/route");
-    const res = await POST(jreq("/x", {}));
-    assert.equal(res.status, 403);
-  },
-);
-
-test("POST /api/engineering/prescriptive/simulate: thiếu trường bắt buộc → 400", S, async () => {
-  const projectId = await taoDuAn("pressimval");
-  const pm = await taoUser("pm", "pressimval");
-  await batTinhNang("engineering-prescriptive", projectId);
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/prescriptive/simulate/route");
-  const res = await POST(jreq("/x", { scenarioCode: "SC1" }));
-  assert.equal(res.status, 400);
-});
-
-test(
-  "POST /api/engineering/prescriptive/simulate: mô phỏng thành công → 201, Pareto Frontier " +
-    "khác rỗng; GET liệt kê lại đúng; POST [id]/approve chuyển trạng thái approved",
-  S,
-  async () => {
-    const { queryOne } = await import("@/lib/db");
-    const projectId = await taoDuAn("pressimok");
-    const pm = await taoUser("pm", "pressimok");
-    await batTinhNang("engineering-prescriptive", projectId);
-    await dangNhapDuAn(pm, projectId);
-
-    const { POST: SIM } = await import("@/app/api/engineering/prescriptive/simulate/route");
-    const simRes = await SIM(
-      jreq("/x", {
-        scenarioCode: `SC-${uniq("pressimok")}`,
-        triggerReason: "Chậm tiến độ trục MEPF Zone A",
-        baselineScheduleDays: 90,
-        baselineCostVnd: 5_000_000_000,
-      }),
-    );
-    assert.equal(simRes.status, 201);
-    const simBody = await simRes.json();
-    assert.equal(simBody.success, true);
-    assert.ok(simBody.scenario.pareto_frontier.length > 0);
-    const scenarioId = simBody.scenario.id;
-
-    const { GET } = await import("@/app/api/engineering/prescriptive/scenarios/route");
-    const listRes = await GET(jreq("/x", undefined, "GET"));
-    const listBody = await listRes.json();
-    assert.equal(listBody.length, 1);
-    assert.equal(listBody[0].id, scenarioId);
-
-    const { POST: APPROVE } =
-      await import("@/app/api/engineering/prescriptive/scenarios/[id]/approve/route");
-    const approveRes = await APPROVE(jreq("/x", {}), {
-      params: Promise.resolve({ id: scenarioId }),
-    });
-    assert.equal(approveRes.status, 200);
-    const approveBody = await approveRes.json();
-    assert.equal(approveBody.scenario.status, "approved");
-    assert.equal(approveBody.scenario.approved_by, pm.id);
-
-    const row = await queryOne<{ status: string }>(
-      `SELECT status FROM engineering_prescriptive_scenarios WHERE id = ?`,
-      scenarioId,
-    );
-    assert.equal(row?.status, "approved");
-  },
-);
-
-test(
-  "POST /api/engineering/prescriptive/scenarios/[id]/approve: kịch bản thuộc dự án khác → " +
-    "404, dữ liệu dự án B không đổi",
-  S,
-  async () => {
-    const { queryOne } = await import("@/lib/db");
-    const projectA = await taoDuAn("presisoA");
-    const projectB = await taoDuAn("presisoB");
-    const pmA = await taoUser("pm", "presisoA");
-    const pmB = await taoUser("pm", "presisoB");
-    await batTinhNang("engineering-prescriptive", projectA);
-    await batTinhNang("engineering-prescriptive", projectB);
-
-    await dangNhapDuAn(pmB, projectB);
-    const { POST: SIM } = await import("@/app/api/engineering/prescriptive/simulate/route");
-    const simRes = await SIM(
-      jreq("/x", {
-        scenarioCode: `SC-${uniq("presisoB")}`,
-        triggerReason: "lý do B",
-        baselineScheduleDays: 60,
-        baselineCostVnd: 2_000_000_000,
-      }),
-    );
-    const scenarioId = (await simRes.json()).scenario.id;
-
-    await dangNhapDuAn(pmA, projectA);
-    const { POST: APPROVE } =
-      await import("@/app/api/engineering/prescriptive/scenarios/[id]/approve/route");
-    const approveRes = await APPROVE(jreq("/x", {}), {
-      params: Promise.resolve({ id: scenarioId }),
-    });
-    assert.equal(approveRes.status, 404);
-
-    const row = await queryOne<{ status: string }>(
-      `SELECT status FROM engineering_prescriptive_scenarios WHERE id = ?`,
-      scenarioId,
-    );
-    assert.equal(row?.status, "simulated", "kịch bản dự án B không bị đổi trạng thái");
-  },
-);
-
-// ============================================================================
 // GET /api/engineering/cashflow/forecasts + POST simulate
 // ============================================================================
 
@@ -589,160 +429,6 @@ test(
       }),
     );
     assert.equal(res.status, 403);
-  },
-);
-
-// ============================================================================
-// GET/POST /api/engineering/fidic/claims + POST generate-dossier
-// ============================================================================
-
-test("GET /api/engineering/fidic/claims: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/fidic/claims/route");
-  const res = await GET();
-  assert.equal(res.status, 401);
-});
-
-test("GET /api/engineering/fidic/claims: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("fcview403");
-  const u = await taoUser("subcon", "fcview403");
-  await dangNhapDuAn(u, projectId);
-  const { GET } = await import("@/app/api/engineering/fidic/claims/route");
-  const res = await GET();
-  assert.equal(res.status, 403);
-});
-
-test("POST /api/engineering/fidic/claims: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { POST } = await import("@/app/api/engineering/fidic/claims/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 401);
-});
-
-test("POST /api/engineering/fidic/claims: thiếu trường bắt buộc → 422", S, async () => {
-  const projectId = await taoDuAn("fcval");
-  const pm = await taoUser("pm", "fcval");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/engineering/fidic/claims/route");
-  const res = await POST(jreq("/x", { claimCode: "CLM-1" }));
-  assert.equal(res.status, 422);
-});
-
-test(
-  "POST /api/engineering/fidic/claims: lập khiếu nại thành công → GET liệt kê lại đúng dossier",
-  S,
-  async () => {
-    const projectId = await taoDuAn("fcok");
-    const pm = await taoUser("pm", "fcok");
-    await dangNhapDuAn(pm, projectId);
-    const { POST } = await import("@/app/api/engineering/fidic/claims/route");
-    const res = await POST(
-      jreq("/x", {
-        claimCode: `CLM-${uniq("fcok")}`,
-        eventType: "ACCESS_DELAY",
-        eventTitle: "Chậm bàn giao mặt bằng trục A",
-        eventDate: "2026-01-01",
-        noticeDate: "2026-01-10",
-        eotDaysClaimed: 14,
-        costClaimedVnd: 500_000_000,
-      }),
-    );
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.success, true);
-    assert.ok(body.data.id);
-
-    const { GET } = await import("@/app/api/engineering/fidic/claims/route");
-    const listRes = await GET();
-    const listBody = await listRes.json();
-    assert.equal(listBody.data.length, 1);
-    assert.equal(listBody.data[0].eot_days_claimed, 14);
-    assert.ok(listBody.data[0].dossier_content.includes("EXTENSION OF TIME"));
-  },
-);
-
-test(
-  "POST /api/engineering/fidic/claims: gửi projectId dự án không thuộc quyền → 403",
-  S,
-  async () => {
-    const projectA = await taoDuAn("fcidorA");
-    const projectB = await taoDuAn("fcidorB");
-    const pmA = await taoUser("pm", "fcidorA");
-    await dangNhapDuAn(pmA, projectA);
-    const { POST } = await import("@/app/api/engineering/fidic/claims/route");
-    const res = await POST(
-      jreq("/x", {
-        projectId: projectB,
-        claimCode: `CLM-${uniq("fcidor")}`,
-        eventTitle: "x",
-        eventDate: "2026-01-01",
-        noticeDate: "2026-01-05",
-      }),
-    );
-    assert.equal(res.status, 403);
-  },
-);
-
-test("POST /api/engineering/fidic/claims/generate-dossier: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { POST } = await import("@/app/api/engineering/fidic/claims/generate-dossier/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 401);
-});
-
-test(
-  "POST /api/engineering/fidic/claims/generate-dossier: subcon không có quyền → 403",
-  S,
-  async () => {
-    const projectId = await taoDuAn("fcgen403");
-    const u = await taoUser("subcon", "fcgen403");
-    await dangNhapDuAn(u, projectId);
-    const { POST } = await import("@/app/api/engineering/fidic/claims/generate-dossier/route");
-    const res = await POST(jreq("/x", {}));
-    assert.equal(res.status, 403);
-  },
-);
-
-test(
-  "POST /api/engineering/fidic/claims/generate-dossier: sinh hồ sơ TIA đúng số ngày sự kiện " +
-    "trên đường găng (critical path)",
-  S,
-  async () => {
-    const projectId = await taoDuAn("fcgenok");
-    const pm = await taoUser("pm", "fcgenok");
-    await dangNhapDuAn(pm, projectId);
-    const { POST } = await import("@/app/api/engineering/fidic/claims/generate-dossier/route");
-    const res = await POST(
-      jreq("/x", {
-        claimCode: "CLM-TIA-1",
-        eventDate: "2026-01-01",
-        noticeDate: "2026-01-05",
-        dailyOverheadVnd: 10_000_000,
-        events: [
-          {
-            title: "Chậm bàn giao",
-            eventType: "ACCESS_DELAY",
-            startDate: "2026-01-01",
-            endDate: "2026-01-10",
-            isOnCriticalPath: true,
-            directDelayDays: 9,
-          },
-          {
-            title: "Sự kiện không trên đường găng",
-            eventType: "OTHER",
-            startDate: "2026-01-01",
-            endDate: "2026-01-03",
-            isOnCriticalPath: false,
-            directDelayDays: 2,
-          },
-        ],
-      }),
-    );
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.data.tia.eotDaysRecommended, 9, "chỉ tính sự kiện trên đường găng");
-    assert.equal(body.data.tia.prolongationCostVnd, 9 * 10_000_000);
-    assert.equal(body.data.compliance.isCompliant, true);
   },
 );
 

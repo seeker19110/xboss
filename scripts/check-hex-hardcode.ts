@@ -8,7 +8,9 @@
 //
 // THAY BẰNG GÌ:
 //  - SVG / thư viện biểu đồ nhận chuỗi CSS  → `var(--color-…)` (mẫu: app/components/SCurveChart.tsx)
-//  - canvas 2D (ctx.fillStyle/strokeStyle)  → `mauToken("--color-…")` (app/lib/mauTheme.ts)
+//  - canvas 2D (ctx.fillStyle/strokeStyle)  → đọc token CSS bằng `getComputedStyle` (mẫu cũ
+//    `app/lib/mauTheme.ts` đã bị xoá cùng trang duy nhất dùng nó, /engineering/spatial-viewer,
+//    2026-09-21 — viết lại hàm tương tự nếu cần trang canvas mới)
 //
 // KHÔNG áp cho:
 //  - app/globals.css (chính là nơi ĐỊNH NGHĨA bảng token)

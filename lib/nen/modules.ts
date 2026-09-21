@@ -270,12 +270,6 @@ export const MODULES: ModuleDef[] = [
       { group: "Hệ thống", label: "Đối tượng kỹ thuật (AI)", href: "/engineering", icon: "Boxes" },
       {
         group: "Hệ thống",
-        label: "Đề xuất kỹ thuật (AI)",
-        href: "/engineering/suggestions",
-        icon: "Lightbulb",
-      },
-      {
-        group: "Hệ thống",
         label: "Workflow kỹ thuật",
         href: "/engineering/workflows",
         icon: "Workflow",
@@ -308,20 +302,12 @@ export const MODULES: ModuleDef[] = [
   // khi route khớp, mà KHÔNG đổi `routePrefix` của "engineering" (không ảnh hưởng phần
   // còn lại: ingest ENG-1, review objects, suggestions, workflows, agent-sessions...).
   //
-  // Tiêu chí (a) — vượt cổng roadmap, nhóm OS-phase (ENG-0 #10): autonomy/predictions/
-  // graph/prescriptive. Tiêu chí (b) — chưa từng chạy được (lỗi tham số SQL, W1) hoặc mô
-  // phỏng rõ rệt: iot-telemetry/subcon-ai/quantum-hub/swarm/nextgen-apex.
+  // Tiêu chí (a) — vượt cổng roadmap, nhóm OS-phase (ENG-0 #10): autonomy/predictions/graph.
+  // Tiêu chí (b) — chưa từng chạy được (lỗi tham số SQL, W1) hoặc mô phỏng rõ rệt: subcon-ai/
+  // nextgen-apex.
   // (Các module twin/bim-models/god-tier-studio/cad-plugin của nhóm này đã bị gỡ khỏi sản
-  // phẩm cùng toàn bộ cụm CAD/BIM.)
-  //
-  // KHÔNG gán routePrefix cho routes DÙNG CHUNG với trang khác chưa bị đánh dấu (đọc kỹ
-  // trước khi mở rộng prefix — tắt nhầm route đang phục vụ tính năng thật là hồi quy
-  // nặng, xem PLAN.md việc W3):
-  //   - Trang `quantum-hub` gọi `/api/engineering/ledger` và `/api/engineering/spatial` — cả 2
-  //     tiền tố này dùng chung với `spatial-viewer` (module thật, KHÔNG đánh dấu) →
-  //     KHÔNG có tiền tố API nào an toàn để gate riêng `quantum-hub`; `routePrefix: []`
-  //     có chủ đích (module vẫn `thuNghiem: true` cho mục đích cờ mặc định/nav/cảnh báo
-  //     UI, nhưng không chặn API vì sẽ tắt nhầm 3 trang thật kể trên).
+  // phẩm cùng toàn bộ cụm CAD/BIM; prescriptive/iot-telemetry/quantum-hub/swarm đã bị xoá
+  // hoàn toàn khỏi sản phẩm — không còn route/UI nào tham chiếu.)
   {
     // OS-4 (a) — Controlled Autonomy: thực thi workflow A0–A2 tự động; OS-4 đòi phê duyệt
     // riêng từng workflow A3+ từ người dùng nên module này BẮT BUỘC phải đóng băng.
@@ -348,52 +334,12 @@ export const MODULES: ModuleDef[] = [
     thuNghiem: true,
   },
   {
-    // OS-phase (a) — Prescriptive: mô phỏng phương án + đề xuất quyết định tự động.
-    key: "engineering-prescriptive",
-    nav: [],
-    permKeys: [],
-    routePrefix: ["/api/engineering/prescriptive"],
-    thuNghiem: true,
-  },
-  {
-    // (b) — IoT Telemetry: W1 xác nhận cả 3 route devices/alerts/telemetry sai tham số SQL.
-    key: "engineering-iot-telemetry",
-    nav: [],
-    permKeys: [],
-    routePrefix: ["/api/engineering/iot"],
-    thuNghiem: true,
-  },
-  {
     // (b) — Subcon AI Scoring: W1 xác nhận cả 3 route (scores/evaluate/recommend-shortlist)
     // sai tham số SQL, chưa từng chạy được.
     key: "engineering-subcon-ai",
     nav: [],
     permKeys: [],
     routePrefix: ["/api/engineering/subcon-ai"],
-    thuNghiem: true,
-  },
-  {
-    // (b) — Quantum & Merkle: mô phỏng rõ rệt (WASM giả lập). routePrefix CỐ Ý rỗng —
-    // xem ghi chú đầu nhóm W3: API của trang này dùng chung với các trang thật khác.
-    key: "engineering-quantum-hub",
-    nav: [
-      {
-        group: "Hệ thống",
-        label: "Quantum & Merkle",
-        href: "/engineering/quantum-hub",
-        icon: "Zap",
-      },
-    ],
-    permKeys: [],
-    routePrefix: [],
-    thuNghiem: true,
-  },
-  {
-    // (b) — Swarm debate/synthesize giữa các AI agent: mô phỏng rõ rệt.
-    key: "engineering-swarm",
-    nav: [],
-    permKeys: [],
-    routePrefix: ["/api/engineering/swarm"],
     thuNghiem: true,
   },
   {

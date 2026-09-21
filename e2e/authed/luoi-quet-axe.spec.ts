@@ -71,8 +71,10 @@ async function scanRoute(page: Page, path: string) {
 
 type Route = { path: string; name: string };
 
-// ── 21 trang XANH thật — chạy thật, chờ nội dung, quét axe, assert rỗng (không fixme). ──
+// ── Trang XANH thật — chạy thật, chờ nội dung, quét axe, assert rỗng (không fixme). ──
 // 10 trang gốc + 11 trang tự xanh sau khi sửa badge EngineeringNav (xem comment đầu file).
+// (5 trong số 11 — memory/prescriptive/quantum-hub/suggestions/swarm — đã bị xoá khỏi sản
+// phẩm cùng route/UI của chúng, nên đã bỏ khỏi danh sách dưới đây.)
 const OK_ROUTES: Route[] = [
   { path: "/site", name: "Hub Hiện trường (site)" },
   { path: "/commercial", name: "Hub Thương mại (commercial)" },
@@ -90,12 +92,7 @@ const OK_ROUTES: Route[] = [
   { path: "/engineering/autonomy", name: "Quyền tự chủ AI (autonomy)" },
   { path: "/engineering/data-quality", name: "Chất lượng dữ liệu" },
   { path: "/engineering/graph", name: "Đồ thị tri thức (graph)" },
-  { path: "/engineering/memory", name: "Bộ nhớ AI (memory)" },
   { path: "/engineering/predictions", name: "Dự đoán (predictions)" },
-  { path: "/engineering/prescriptive", name: "Kê đơn (prescriptive)" },
-  { path: "/engineering/quantum-hub", name: "Quantum Hub" },
-  { path: "/engineering/suggestions", name: "Gợi ý AI (suggestions)" },
-  { path: "/engineering/swarm", name: "Swarm" },
   { path: "/engineering/workflows", name: "Quy trình tự động (workflows)" },
 ];
 
@@ -161,24 +158,6 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
         "color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav) — bg-emerald-950/80, #065f46 trên #31554d = 1.07:1 + label x2 + select-name x1.",
     },
     {
-      path: "/engineering/fidic-claims",
-      name: "Khiếu nại FIDIC",
-      violations:
-        "color-contrast x2 (đã giảm từ x3 sau khi sửa badge EngineeringNav) + label x6 (input thiếu <label>) + select-name x2.",
-    },
-    {
-      path: "/engineering/hse-vision",
-      name: "HSE Vision (AI an toàn)",
-      violations:
-        "color-contrast x2 (đã giảm từ x3 sau khi sửa badge EngineeringNav) — bg-rose-950/80, #be123c trên #6f3345 = 1.49:1 + label x3 (input thiếu <label>).",
-    },
-    {
-      path: "/engineering/iot-telemetry",
-      name: "IoT Telemetry",
-      violations:
-        "color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav) + label x1 + select-name x1.",
-    },
-    {
       path: "/engineering/nextgen-apex",
       name: "Nextgen Apex",
       violations:
@@ -189,18 +168,6 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
       name: "Pipe Stash Hunter",
       violations:
         "color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav) + label x9 (nhiều input số thiếu <label>) + select-name x1.",
-    },
-    {
-      path: "/engineering/site-copilot",
-      name: "Site Copilot",
-      violations:
-        "button-name x2 (icon-button thiếu tên) + color-contrast x1 (bg-violet-600, #14171d trên #7f22fe = 3.04:1). KHÔNG liên quan badge EngineeringNav (không đổi trước/sau).",
-    },
-    {
-      path: "/engineering/spatial-viewer",
-      name: "Spatial Viewer",
-      violations:
-        "button-name x4 (icon-button thiếu tên) + color-contrast x2 (đã giảm từ x3 sau khi sửa badge EngineeringNav) + select-name x1.",
     },
     {
       path: "/engineering/subcon-ai",

@@ -80,7 +80,7 @@ export default function TasksDiaryTab() {
         </a>
 
         <Link
-          href="/engineering/site-copilot"
+          href="/engineering/zalo-copilot"
           className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 hover:border-sky-500/50 flex items-center justify-between group transition"
         >
           <div className="flex items-center gap-3">
@@ -91,12 +91,10 @@ export default function TasksDiaryTab() {
               <div className="font-bold text-sm text-zinc-100 flex items-center gap-1.5">
                 Trợ Lý Hiện Trường NLP Copilot
                 <span className="text-[10px] bg-sky-500/10 text-sky-400 px-1.5 py-0.5 rounded font-mono">
-                  Telegram/Zalo
+                  Zalo
                 </span>
               </div>
-              <div className="text-xs text-zinc-400">
-                Nhập nhật ký bằng giọng nói & tra cứu kho tức thì
-              </div>
+              <div className="text-xs text-zinc-400">Báo cáo & tra cứu kho tức thì qua Zalo</div>
             </div>
           </div>
           <ArrowUpRight className="w-4 h-4 text-zinc-500 group-hover:text-sky-400 transition-colors" />

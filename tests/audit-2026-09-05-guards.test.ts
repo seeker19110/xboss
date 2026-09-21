@@ -12,9 +12,8 @@ import { VIEW_ONLY_ROLES } from "@/lib/nen/roles";
 //      quyền XEM có cả `bch` (VIEW_ONLY_ROLES) → vai trò chỉ-xem ghi được dữ liệu.
 //   2. DELETE /api/floor-approvals/:id thiếu cách ly dự án (3 route anh em đều có).
 //   3. Cùng route: chuỗi huỷ nghiệm thu không bọc transaction + FOR UPDATE.
-//   4. listCrossProjectLessons không lọc dự án → rò rỉ bài học xuyên tổ chức.
-//   5. POST memory/lessons lấy thẳng sourceProjectId từ body.
 //   8. GET /api/suppliers/:id/summary trả công nợ cho mọi vai trò, không lọc dự án.
+// (Ca 4/5 kiểm app/api/engineering/memory/** đã bị xoá cùng route 2026-09-21, xem PROGRESS.md.)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const goc = new URL("../", import.meta.url).pathname;
@@ -69,28 +68,6 @@ describe("audit 2026-09-05 — cổng quyền & cách ly dữ liệu", () => {
     assert.ok(src.includes("getCurrentProjectId"), "phải lấy dự án đang chọn");
     assert.ok(src.includes("withTransaction"), "chuỗi huỷ phải nằm trong 1 transaction");
     assert.ok(/FOR UPDATE/.test(src), "phải khoá bản ghi trước khi đọc-sửa-ghi");
-  });
-
-  it("ca 4 — bài học xuyên dự án luôn phải lọc theo danh sách dự án được thấy", () => {
-    const lib = doc("lib/ky-thuat/engineering-memory-bank.ts");
-    assert.ok(
-      /export async function listCrossProjectLessons\([\s\S]*?projectIds: number\[\]/.test(lib),
-      "listCrossProjectLessons phải nhận projectIds (bắt buộc, không tuỳ chọn)",
-    );
-    assert.ok(
-      lib.includes("if (projectIds.length === 0) return [];"),
-      "không thấy dự án nào → trả rỗng, không trả toàn bộ bảng",
-    );
-    for (const p of [
-      "app/api/engineering/memory/lessons/route.ts",
-      "app/api/engineering/memory/transfer/route.ts",
-    ]) {
-      assert.ok(doc(p).includes("visibleProjectIds"), `${p} phải truyền dự án được thấy`);
-    }
-    assert.ok(
-      doc("app/api/engineering/memory/lessons/route.ts").includes("chotProjectIdChoGhi"),
-      "POST không được tin sourceProjectId từ body",
-    );
   });
 
   it("ca 5 — công nợ NCC gate bằng CAN.viewPayments và lọc theo dự án", () => {

@@ -1,5 +1,66 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Xoá 10 phân hệ Engineering Đỉnh cao theo yêu cầu người dùng — 2026-09-21
+
+Theo yêu cầu người dùng, đã xoá HOÀN TOÀN 10 tính năng khỏi Apex Cockpit (`/engineering`):
+HSE AI Vision Sentinel (M87), Site Telegram 2-Way & Voice Copilot (M76), Swarm Debates & RFI
+Generator (PIN-3), WebGL Spatial Annotation Pinning (M74), FIDIC 28-day EOT Claims Dossier
+(M79), Quantum Spatial WASM & Merkle Ledger (M73), Prescriptive Pareto Frontier & NCR (O3+),
+Cross-Project Knowledge Memory Bank (PIN-4), Đề xuất Kỹ thuật Thông minh — trang list (ENG-2),
+Giám sát Cảm biến IoT Telemetry (M83).
+
+Phạm vi xoá: route page (`app/engineering/<slug>/`), route API riêng, lib nghiệp vụ riêng
+(`lib/ky-thuat/engineering-{hse-vision,site-bot,swarm,swarm-orchestrator,spatial-pinning,
+spatial-wasm,prescriptive,memory-bank}.ts`), test file riêng, entry trong bento grid
+`app/engineering/page.tsx` + `EngineeringNav.tsx` + `GlobalSearch.tsx` + `HomeRail.tsx` +
+`mepf-process` + `commercial/ClaimsTab` + `engineering-intelligence` (2 tab nguyên: "AI Swarm &
+Merkle", "IoT & Bảo trì dự báo" — xoá cả tab vì phần lớn nội dung thuộc tính năng đã xoá) +
+`site/HseSafetyTab` + `site/TasksDiaryTab` (đổi link sang Zalo Copilot còn sống) +
+`engineering/predictions` (bỏ link suggestions), và 4 key registry `lib/nen/modules.ts`
+(`engineering-prescriptive`, `engineering-iot-telemetry`, `engineering-quantum-hub`,
+`engineering-swarm`) + nav entry `/engineering/suggestions` trong module `engineering` gốc.
+
+**Giữ nguyên phần dùng chung** (đã kiểm kỹ trước khi xoá, tránh xoá nhầm code tính năng
+khác đang dùng):
+
+- `lib/tai-chinh/contracts-fidic.ts` + facade `lib/ky-thuat/engineering-fidic-claim.ts`: chỉ xoá
+  các hàm riêng của FIDIC Claims Dossier (`mapDelayEventToFidicClause`, `checkNoticeCompliance`,
+  `calculateTimeImpactAnalysis`, `generateFidicClaimDossier`, `createFidicClaim`,
+  `listFidicClaims`), GIỮ nguyên FIDIC TIA Claim Engine (M94, `analyzeFidicTiaClaim` +
+  `/api/engineering/fidic-tia`, dùng bởi `/engineering/nextgen-apex`).
+- `lib/ky-thuat/engineering-intel.ts`: chỉ xoá `listSuggestions`/`getSuggestion` (phục vụ trang
+  suggestions đã xoá), GIỮ `decideSuggestion`/`ingestIntelligencePackage`/`computeConfidence`
+  (vẫn dùng bởi Gate 0 Workflow ENG-3, xác nhận qua `tests/engineering-workflow.test.ts` +
+  `tests/route-eng-quy-trinh.test.ts`).
+- `app/api/engineering/ledger/merkle`, `/ledger/verify-proof`, `lib/ky-thuat/engineering-merkle-
+ledger.ts`: dùng chung với `/engineering-intelligence` (không xoá), dù trang quantum-hub gọi
+  route này cũng bị xoá cùng trang.
+- `app/api/engineering/spatial/compute` (quantum-hub) và `app/api/engineering/spatial/
+annotations` (spatial-viewer) là 2 route con độc lập cùng thư mục `spatial/` — chỉ xoá đúng
+  route con của từng tính năng.
+
+**Migration:** KHÔNG xoá các file `migrations/000N_*.sql` đã tạo bảng cho các tính năng này
+(append-only theo ADR-0003) — các bảng `engineering_hse_vision_*`, `telegram_*`,
+`engineering_swarm_*`, `engineering_spatial_annotations`, `engineering_fidic_claims*`,
+`engineering_spatial_compute_cache`, `engineering_prescriptive_scenarios`,
+`engineering_compliance_*`, `engineering_knowledge_patterns`, `engineering_cross_project_
+lessons`, `engineering_suggestions` (bảng, không phải toàn bộ tính năng suggestion — hàm ghi
+`ingestIntelligencePackage`/`decideSuggestion` vẫn còn dùng bảng này), `engineering_iot_*` vẫn
+còn trong schema nhưng không còn route/UI nào đọc/ghi (trừ `engineering_suggestions` vẫn được
+Gate 0 dùng). Chưa viết migration DROP TABLE — để ngỏ, cân nhắc dọn riêng nếu cần.
+
+**Test:** dọn 9 file test trộn lẫn tính năng còn sống/đã xoá (`route-eng-du-bao`,
+`route-eng-mepf`, `route-eng-quy-trinh`, `audit-2026-09-05-guards`, `feature-flags`, `modules`,
+`route-eng-zero-error`, `route-ho-so-bot`, `webhook-inbound`) — xoá đúng block test của route đã
+xoá, giữ nguyên phần test route còn sống (ENG-3 Gate 0, ENG-1 objects, Zalo Copilot, FIDIC TIA,
+zero-error, agent-sessions, autonomy...). 9 file test riêng (1-1 với lib đã xoá) bị xoá thẳng.
+
+**Chưa làm** (ngoài phạm vi yêu cầu, ghi nợ nếu cần sau): chưa build/lint/typecheck được trong
+phiên này (môi trường không có `node_modules`) — đã rà bằng grep toàn repo xác nhận không còn
+import/href/route nào trỏ tới 10 tính năng đã xoá, nhưng CHƯA xác minh bằng trình biên dịch
+thật; cần chạy `npm run lint && npm run typecheck && npm test && npm run build` trước khi coi là
+xong hẳn theo Definition of Done.
+
 ## ✅ Rà tay đợt 1/N export orphan còn lại (3/625) — 2026-09-21
 
 Bắt đầu rà tay 625 export orphan từ `check:dead-code` (đợt trước). Ưu tiên nhóm rủi ro thấp
@@ -124,6 +185,14 @@ không xoá/đổi các trang con nghiệp vụ thật (`/engineering/swarm`, `/
 `/engineering/predictions`, `/engineering/prescriptive`...) hay các API/lib nền (`lib/ky-thuat/*`)
 phía sau — các phân hệ đó vẫn hoạt động, chỉ không còn lối vào từ hub này. 4 chỉ số KPI đầu trang
 (đối tượng kỹ thuật/đề xuất AI/phiên swarm/khối Merkle) vẫn giữ nguyên.
+
+(Ghi chú khi hợp nhất với đợt xoá 10 phân hệ ở trên: các trang `/engineering/swarm`,
+`/engineering/suggestions`, `/engineering/prescriptive`, `/engineering/quantum-hub`,
+`/engineering/memory`, `/engineering/iot-telemetry`, `/engineering/hse-vision`,
+`/engineering/site-copilot`, `/engineering/spatial-viewer`, `/engineering/fidic-claims` nhắc ở
+đây với vai trò "vẫn hoạt động, chỉ mất lối vào từ hub" — đã bị xoá HẲN theo yêu cầu người dùng
+sau đó; hub `/engineering-intelligence` cũng được sửa lại `stats`/tab Trợ Lý Đa Kênh cho khớp
+route còn sống.)
 
 ## ✅ Audit tổng quát — xoá `/api/import/batches`, sửa ghi chú lỗi thời — 2026-09-21
 
@@ -295,7 +364,7 @@ Theo yêu cầu người dùng, thêm cả phần **review** và **maintain**:
 5. **`/review`** (`.claude/commands/review.md`) — slash command tường minh cho quy trình rà soát
    diff trước khi mở PR (gọi skill `code-review` + `security-review` khi chạm vùng nhạy cảm), bổ
    sung cho agent `reviewer` đã có sẵn.
-6. **`/maintain`** + agent `maintainer`** — vòng bảo trì định kỳ nhẹ (không phải audit sâu):
+6. **`/maintain`** + agent `maintainer`\*\* — vòng bảo trì định kỳ nhẹ (không phải audit sâu):
    `scripts/maintenance-sweep.sh` quét git/dependency/`PROGRESS.md`/allowlist rồi
    `maintainer` viết `docs/ops/MAINTENANCE-PLAN.md` (🔴/🟡/DỪNG&HỎI) cho người dùng duyệt trước khi
    thực thi — không tự sửa source khi chưa duyệt.
@@ -646,7 +715,7 @@ dự án → trả danh sách rỗng` — CI đỏ vì PM thấy dự án đầu
 
 Tiếp nối Đợt 4. Hai mục tiêu: phủ test THỰC THI cho **91 route `app/api/engineering/**`** chưa
 từng có test, và trả nợ mục đầu "Ghi nhận, chưa sửa" của Đợt 4 (`workpackages/:id/**`). Mục thứ
-hai **kéo ra một chuỗi lỗ hổng lớn hơn nhiều dự tính** — xem "Chuỗi lỗ hổng" bên dưới.
+hai **kéo ra một chuỗi lỗ hổng lớn hơn nhiều dự tính\*\* — xem "Chuỗi lỗ hổng" bên dưới.
 
 **7 file test mới, 537 ca. 33 commit, 70 tệp đổi, 60 tệp route/lib được vá.**
 
@@ -667,10 +736,10 @@ Vá nó xong thì mỗi lượt review lại lộ ra một tầng sâu hơn:
 
 1. **W0 — 19 endpoint `workpackages/**`.** Tạo nhóm việc, tạo task, đổi thứ tự, sao chép, sửa
    lưới dimension, tải/xoá biên bản nghiệm thu và bản vẽ của **dự án khác** bằng cách đoán id.
-   Kèm phát hiện: `workpackages/[id]/route.ts` mà chính kế hoạch của phiên chính xếp là "route
-   anh em ĐÃ lọc đúng" thực ra **không lọc** — lời gọi `getCurrentProjectId` duy nhất trong file
-   chỉ phục vụ `validateCustom` cho trường tuỳ biến, không dùng phân quyền. Phiên chính khảo sát
-   bằng `grep` tên hàm nên kết luận sai; worker đọc code mới thấy. **Bài học: grep tên hàm không
+   Kèm phát hiện: `workpackages/[id]/route.ts`mà chính kế hoạch của phiên chính xếp là "route
+   anh em ĐÃ lọc đúng" thực ra **không lọc** — lời gọi`getCurrentProjectId`duy nhất trong file
+   chỉ phục vụ`validateCustom`cho trường tuỳ biến, không dùng phân quyền. Phiên chính khảo sát
+   bằng`grep` tên hàm nên kết luận sai; worker đọc code mới thấy. **Bài học: grep tên hàm không
    thay được đọc code — hàm có mặt không có nghĩa nó đang được dùng để kiểm quyền.**
 2. **Review W0 → NGUYÊN NHÂN GỐC.** `lib/bao-mat/auth.ts`: `canTouchTask`, `canTouchPackage`,
    `canTouchFloor`, `canTouchVehicle`, `canViewSubcontractor` đều mở đầu
@@ -813,10 +882,9 @@ Engine) vì cả hai đều là tính năng đang hỏng ở vùng rủi ro cao.
 
 ## ✅ Đợt 4 chiến dịch coverage — 7 cụm route phi-engineering + 2 đợt vá bảo mật (2026-09-05)
 
-Tiếp nối Đợt 1–3. Phạm vi: **304 route `app/api/**` chưa có test nào chạm tới**, đã trừ toàn bộ
-`app/api/engineering/**` (để Đợt 5). Thi hành qua mô hình 3 tầng: 7 việc song song V1–V7, mỗi việc
-1 worktree + 1 file test + 1 DB Postgres riêng; `reviewer` soát từng diff trước khi tích hợp. Hai
-việc phát sinh (V9, V10) là **vá bảo mật** do reviewer bác bỏ đánh giá "ghi nhận, chưa sửa" của
+Tiếp nối Đợt 1–3. Phạm vi: **304 route `app/api/**`chưa có test nào chạm tới**, đã trừ toàn bộ`app/api/engineering/**`(để Đợt 5). Thi hành qua mô hình 3 tầng: 7 việc song song V1–V7, mỗi việc
+1 worktree + 1 file test + 1 DB Postgres riêng;`reviewer` soát từng diff trước khi tích hợp. Hai
+việc phát sinh (V9, V10) là **vá bảo mật\*\* do reviewer bác bỏ đánh giá "ghi nhận, chưa sửa" của
 worker — xem mục "Bài học điều phối" cuối.
 
 **9 file test mới + 2 file test cũ sửa, 1.163 ca:**
@@ -852,9 +920,9 @@ hiệu đó thay vì dò từng route.
    thủ chiều sâu — invariant "org không được mất admin cuối" không nên dựa vào suy luận liên-guard.
 3. **Tầng WBS: `towers/:id`, `sheets/:id`, `work-fronts/**`, `packages/:id/dependencies`,
    `package-dependencies/:id`** (V9) — sửa/xoá được tháp, sheet, mặt bằng thi công và quan hệ phụ
-   thuộc của **dự án khác**. `GET /api/work-fronts` còn liệt kê toàn bộ mặt bằng **mọi dự án**.
-   Suy dự án qua `towers.project_id` (trực tiếp) hoặc chuỗi `sheet_type_id → tower_id →
-project_id`; dùng `LEFT JOIN` để dòng chưa gán tower ra `projectId = null` → 404, không bị mất
+   thuộc của **dự án khác**. `GET /api/work-fronts`còn liệt kê toàn bộ mặt bằng **mọi dự án**.
+   Suy dự án qua`towers.project_id`(trực tiếp) hoặc chuỗi`sheet_type_id → tower_id →
+project_id`; dùng `LEFT JOIN`để dòng chưa gán tower ra`projectId = null` → 404, không bị mất
    khỏi kết quả.
 4. **`/api/vo-documents/:id` GET+DELETE không so dự án** (V2) — tải/xoá được file đính kèm lệnh
    thay đổi thiết kế của dự án khác, trong khi `contract-documents/:id`, `claim-documents/:id` đã
@@ -890,9 +958,9 @@ project_id`; dùng `LEFT JOIN` để dòng chưa gán tower ra `projectId = null
 
 ### Ghi nhận, CHƯA sửa (cần quyết định, không tự làm)
 
-- **`workpackages/:id/**` (bbnt, dimensions, drawing, copy, move, tasks) + `work-fronts/report`**
+- **`workpackages/:id/**`(bbnt, dimensions, drawing, copy, move, tasks) +`work-fronts/report`**
   cùng lớp lỗi cách ly dự án với mục 3 ở trên, reviewer đã đọc code xác nhận có thật. Để nguyên vì
-  ngoài phạm vi đợt — **nên là việc đầu tiên của đợt sau**, ưu tiên ngang V9.
+  ngoài phạm vi đợt — **nên là việc đầu tiên của đợt sau\*\*, ưu tiên ngang V9.
 - **12 chỗ `SELECT ... FROM users WHERE id = ?` không lọc `org_id`** (`admin/assignments`,
   `meetings/:id/actions*`, `risks/:id`, `subcontractors`, `sheets/:id`, `warranty-claims*`,
   `punch-list*`, `mobilization*`) — đều chỉ kiểm "user tồn tại" để gán người phụ trách, không đọc/
@@ -1212,7 +1280,7 @@ ngưỡng đệm `check:coverage`, funcs tăng nhẹ); đã cập nhật `covera
 `engineering/*` phi-BIM (fidic, cashflow, compliance, bidding,
 subcon-ai, autonomy, queue, zero-error, workflows, memory, agent-sessions, spatial, prescriptive,
 predictions, objects, iot, routing, logistics, ledger, hse-vision, data-quality, taxonomy…) và các cụm
-nhỏ (work-fronts, progress-albums, monitoring-points, devices, waste-logs, warranty-*, purchase-
+nhỏ (work-fronts, progress-albums, monitoring-points, devices, waste-logs, warranty-\*, purchase-
 requests, zalo, telegram, tech-links, tech, tokens, v1…) chưa có test.
 
 ## ✅ Đợt 2 chiến dịch coverage — mở khoá test THỰC THI route, phủ 10 cụm (2026-09-04)

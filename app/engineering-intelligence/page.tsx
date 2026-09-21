@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { Brain, Bot, Network, Boxes, Lightbulb, Zap, MessageSquare, Volume2 } from "lucide-react";
+import { Brain, Bot, Boxes, Zap, MessageSquare } from "lucide-react";
 import HubShell, { type HubTab, type HubStat } from "@/app/components/HubShell";
 import { Skeleton } from "@/app/components/Skeleton";
 
@@ -33,8 +33,6 @@ function EngineeringIntelligenceContent() {
   // (audit 2026-08-25 §3.2). Nguồn nào 403/lỗi/module đang tắt thì giữ "—", không đoán.
   const [stats, setStats] = useState<HubStat[]>([
     { label: "Đối Tượng Kỹ Thuật (ENG-1)", value: "—", icon: Boxes },
-    { label: "Đề Xuất AI Chờ Duyệt", value: "—", icon: Lightbulb },
-    { label: "Phiên Tranh Biện Swarm", value: "—", icon: Network },
     { label: "Khối Merkle Đã Niêm Phong", value: "—", icon: Zap },
   ]);
 
@@ -44,41 +42,28 @@ function EngineeringIntelligenceContent() {
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null);
 
-    Promise.all([
-      get("/api/engineering/objects"),
-      get("/api/engineering/suggestions?status=open"),
-      get("/api/engineering/swarm/debates"),
-      get("/api/engineering/ledger/merkle"),
-    ]).then(([objects, suggestions, debates, merkle]) => {
-      setStats([
-        {
-          label: "Đối Tượng Kỹ Thuật (ENG-1)",
-          value: objects ? `${objects.objects?.length ?? 0} đối tượng` : "—",
-          icon: Boxes,
-        },
-        {
-          label: "Đề Xuất AI Chờ Duyệt",
-          value: suggestions ? `${suggestions.suggestions?.length ?? 0} đề xuất` : "—",
-          icon: Lightbulb,
-        },
-        {
-          label: "Phiên Tranh Biện Swarm",
-          value: Array.isArray(debates) ? `${debates.length} phiên` : "—",
-          icon: Network,
-        },
-        {
-          label: "Khối Merkle Đã Niêm Phong",
-          value: merkle ? `${merkle.totalCount ?? 0} khối` : "—",
-          icon: Zap,
-        },
-      ]);
-    });
+    Promise.all([get("/api/engineering/objects"), get("/api/engineering/ledger/merkle")]).then(
+      ([objects, merkle]) => {
+        setStats([
+          {
+            label: "Đối Tượng Kỹ Thuật (ENG-1)",
+            value: objects ? `${objects.objects?.length ?? 0} đối tượng` : "—",
+            icon: Boxes,
+          },
+          {
+            label: "Khối Merkle Đã Niêm Phong",
+            value: merkle ? `${merkle.totalCount ?? 0} khối` : "—",
+            icon: Zap,
+          },
+        ]);
+      },
+    );
   }, []);
 
-  // Tab 1: Omnichannel Field Copilot (Zalo & Telegram Voice)
+  // Tab 1: Omnichannel Field Copilot (Zalo)
   const copilotTab = (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
@@ -103,29 +88,6 @@ function EngineeringIntelligenceContent() {
             </Link>
           </div>
         </div>
-
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-              <Bot className="w-4 h-4 text-amber-400" />
-              Trợ Lý Hiện Trường Telegram 2 Chiều & Voice Copilot (M76)
-            </h3>
-            <span className="text-[11px] font-mono text-zinc-400">Voice-to-Action</span>
-          </div>
-          <p className="text-xs text-zinc-400 leading-relaxed">
-            Giao tiếp bằng giọng nói ngoài hiện trường, chuyển đổi khẩu lệnh âm thanh tiếng Việt
-            thành phiếu nhật ký thi công Thông tư 06/2021/TT-BXD và phát cảnh báo trễ hạn tức thì về
-            nhóm chat dự án.
-          </p>
-          <div className="pt-2">
-            <Link
-              href="/engineering/site-copilot"
-              className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs transition-colors inline-flex items-center gap-2"
-            >
-              <Volume2 className="w-3.5 h-3.5 text-amber-400" /> Mở Telegram Voice Hub (M76)
-            </Link>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -135,9 +97,8 @@ function EngineeringIntelligenceContent() {
       id: "copilot",
       label: "Trợ Lý Đa Kênh",
       icon: Bot,
-      badge: "Zalo / Voice",
-      description:
-        "Trợ lý hiện trường Zalo Copilot, Telegram Voice và bóc tách khẩu lệnh tiếng Việt ra WBS/NCR.",
+      badge: "Zalo",
+      description: "Trợ lý hiện trường Zalo Copilot, bóc tách khẩu lệnh tiếng Việt ra WBS/NCR.",
       content: copilotTab,
     },
   ];
@@ -145,7 +106,7 @@ function EngineeringIntelligenceContent() {
   return (
     <HubShell
       title="Trung Tâm Trí Tuệ Kỹ Thuật AI"
-      subtitle="Trợ lý hiện trường Zalo Copilot & Telegram Voice Copilot"
+      subtitle="Trợ lý hiện trường Zalo Copilot"
       icon={Brain}
       badge="Engineering Intelligence"
       tabs={tabs}

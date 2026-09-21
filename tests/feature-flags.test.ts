@@ -119,7 +119,7 @@ test("feature-flags: findModuleByRoute khớp đúng tiền tố dài nhất", S
     ff.findModuleByRoute("/api/engineering/autonomy/kill-switch"),
     "engineering-autonomy",
   );
-  assert.equal(ff.findModuleByRoute("/api/engineering/suggestions"), "engineering");
+  assert.equal(ff.findModuleByRoute("/api/engineering/objects"), "engineering");
 });
 
 test(

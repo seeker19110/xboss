@@ -75,8 +75,8 @@ const LIFECYCLE = [
   {
     stage: "GĐ 1",
     title: "Kỹ thuật không gian",
-    desc: "Xem không gian · Vòng đời thiết bị MEPF",
-    href: "/engineering/spatial-viewer",
+    desc: "Vòng đời thiết bị MEPF",
+    href: "/engineering/mepf-lifecycle",
   },
   {
     stage: "GĐ 2",

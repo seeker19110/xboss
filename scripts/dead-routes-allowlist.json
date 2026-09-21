@@ -108,14 +108,6 @@
     "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
   },
   {
-    "route": "/api/engineering/swarm/debates/[id]/arguments",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
-    "route": "/api/engineering/swarm/debates/[id]/synthesize",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
     "route": "/api/advances/[id]",
     "ly_do": "Chi tiết/sửa/xoá tạm ứng — UI tài chính mới gắn danh sách."
   },
