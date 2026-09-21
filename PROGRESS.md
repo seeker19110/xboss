@@ -8785,6 +8785,27 @@ Verify hạ tầng: Postgres 16 local (`pg_ctlcluster`, đã có sẵn trong má
   `docs/nang-cap/*.md` kèm chữ "Approved for implementation". Thiếu mục là check đỏ ngay từ đầu,
   không liên quan chất lượng code.
 
+## Đợt audit sâu 2026-09-08 — route xuất PDF/Excel và cách ly dự án
+
+- **[Cao — đã sửa] Ba route xuất tài liệu rò dữ liệu chéo dự án qua ID/bộ lọc:**
+  `GET /api/payment-certs/:id/pdf` đọc IPC trực tiếp bằng `getCert(id)`; PDF phiếu YCNT
+  đọc `inspection_requests`/task không lọc dự án và lấy tên dự án đầu tiên trong DB; PDF
+  danh mục hồ sơ chất lượng cũng liệt kê toàn bộ `task_documents` và dùng tên dự án đầu
+  tiên. Người có quyền tương ứng có thể đoán ID hoặc gọi export để xem dữ liệu của dự án
+  khác. Đã thêm `getCertForProject()` fail-closed dùng chung cho PDF/Excel IPC; hai route
+  QAQC nay suy dự án qua `task → work_package → sheet_type → tower`, lọc cả bản ghi cha,
+  task con, sheet và tên dự án theo `getCurrentProjectId(user)`.
+- **Test hồi quy:** `tests/claim-documents-scope.test.ts` gọi trực tiếp helper IPC mới;
+  `tests/qc-project-scope.test.ts` neo đủ ba lớp scope của hai PDF QAQC. Targeted test không
+  DB: 17 pass, 5 skip đúng vì thiếu `TEST_DATABASE_URL`. `npm run lint` và
+  `npm run typecheck` và `npm run build` xanh trên Node 24. Full test không DB: 740 pass, 3.351 skip; 6 fail
+  đều do test guard cũ ghép sai đường dẫn `C:\\C:\\...` khi chạy Node Windows từ WSL,
+  không liên quan diff; chưa xác minh bộ test đầy đủ trên CI Linux cho bản vá này. `npm audit`: 0 lỗ hổng.
+- **Phạm vi audit:** route permission/project-scope/db-params/lib-layer/dead-code/migration/SW
+  gates đều xanh khi chạy trên runtime Linux phù hợp; rà riêng toàn bộ route PDF/Excel phát
+  hiện ba lỗi trên. Chưa chạy E2E/Postgres disposable trong phiên này vì môi trường không có
+  dịch vụ PostgreSQL; CI Linux có Postgres 16 phải là cổng xác nhận cuối.
+
 ## Nợ kỹ thuật (chỗ "làm tạm" cần quay lại)
 
 - ~~**[TB, 2026-09-05] ~40 trang thiếu TRẠNG THÁI LỖI**~~ → **đã đóng phần ưu tiên
