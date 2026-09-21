@@ -1,5 +1,32 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ M126 — DocShell cho `/claims`, `/variations`, `/contracts` — 2026-09-21
+
+Đặc tả `docs/nang-cap/M126-docshell-contracts-variations-claims.md` (Approved). Đóng non-goal của
+M124: 3 trang tài chính còn lại chuyển từ "bảng + Modal" sang master–detail cùng mẫu
+`/payment-certs` (danh sách trái, chứng từ toàn trang phải, `?id=` trong URL, `DocToolbar` +
+`bottomActions`, `Chip`/`DocField`/`DocTotals`/`StatCard`/`Button`). Modal **tạo mới** giữ nguyên
+(text/label/aria neo bởi e2e), chỉ tách sang `_components/Add<X>Modal.tsx`.
+
+- **`/claims`** (803 → 354 dòng): 2 StatCard đầu trang + filter loại (giữ `role="group"` +
+  `aria-pressed`); khối "Quyết định" inline thay chuỗi `appPrompt` cũ (ô Chốt/Ghi chú + nút
+  Chốt/Từ chối); `DocTotals` phân nhánh theo `kind` (cost: tiền, eot: số ngày).
+- **`/variations`** (946 → 267 dòng): 4 StatCard theo trạng thái đứng trước danh sách (giữ
+  `.first()` của e2e); lưới dòng có ô "KL duyệt" sửa inline khi `canDecide`; khối "Đưa vào phụ lục
+  hợp đồng" giữ nguyên logic.
+- **`/contracts`** (1200 → 404 dòng): 3 StatCard theo `kind` + nhóm gập/mở giữ ở danh sách trái;
+  chứng từ dùng `Tabs` (M125) cho 5 nhóm nội dung (`info/addenda/documents/links/ipc`, URL
+  `?tab=`); bản ghi đã xoá **không** mở chứng từ (EmptyState nhắc khôi phục trước), đúng nguyên
+  tắc M124 giữ nguyên hành vi soft-delete.
+- Che tiền/`MaskedValue` áp cho cả 3 trang; `/variations` đổi giá trị quyết định trong `decide()`
+  sang `mMul/mSumBy` (trước là cộng dồn float JS).
+- Xác thực bằng route thật trên Postgres ephemeral (tạo → trình/quyết định/upload/xoá-khôi phục
+  đều 200/201 đúng body cũ) cho cả 3 trang; `npm test` (4098 ca, Postgres thật) và bộ cổng UI
+  (`lint/typecheck/build/check:contrast/check:mau-accent/check:hex-hardcode/format:check`) xanh.
+  E2E Playwright chưa chạy được tại chỗ (proxy chặn tải Chromium) — chờ CI xác nhận
+  `contracts.spec.ts`/`variations.spec.ts`/`claims.spec.ts`/`input-zoom-mobile.spec.ts`.
+- Không đổi API/lib/migration/`CustomFieldsSection`.
+
 ## ✅ Xoá 7 route "Lớp Engineering OS" dead code (đóng M-03) — 2026-09-21
 
 Chốt hướng cho cụm 13 route "chờ chốt hướng ở đề xuất #6 audit 2026-08-25" (mở đầu từ đợt
