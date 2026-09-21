@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ChevronLeft,
@@ -333,23 +333,50 @@ export function useCertDocument({
 
   // Phím tắt (FR7): Ctrl/⌘+S lưu KL, Esc đóng chứng từ. Bỏ qua khi đang mở hộp thoại
   // xác nhận (appConfirm/appPrompt tự xử lý Esc của nó) để không đóng nhầm 2 lớp.
+  //
+  // Pattern "latest ref": handler đọc state mới nhất qua ref thay vì qua closure — effect
+  // chỉ gắn listener MỘT LẦN thay vì gỡ/gắn lại mỗi lần `saveItems` đổi (đổi mỗi phím gõ
+  // vì phụ thuộc `qtys`), tránh mất/nhân đôi phím tắt lúc đang gõ dở.
+  const latestRef = useRef({ cert, canEdit, busy, dirty, saveItems, onClose });
+  latestRef.current = { cert, canEdit, busy, dirty, saveItems, onClose };
+
   useEffect(() => {
-    if (!cert) return;
     function onKeyDown(e: KeyboardEvent) {
+      const { cert, canEdit, busy, dirty, saveItems, onClose } = latestRef.current;
+      if (!cert) return;
+      // Ctrl/⌘+S phải luôn chặn hành vi mặc định của trình duyệt (mở hộp "Lưu trang"),
+      // kể cả lúc chưa được sửa/đang bận — nếu return sớm trước preventDefault, trình
+      // duyệt vẫn mở hộp thoại lưu file.
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        if (!canEdit || busy) return;
         e.preventDefault();
+        if (!canEdit || busy) return;
         void saveItems();
         return;
       }
       if (e.key === "Escape") {
         if (document.querySelector('[role="dialog"]')) return;
+        // Đang gõ dở trong 1 ô nhập thì Esc chỉ thoát focus ô đó (hành vi quen thuộc),
+        // không đóng luôn cả chứng từ.
+        const active = document.activeElement;
+        if (
+          active instanceof HTMLElement &&
+          active.matches("input, textarea, select, [contenteditable]")
+        ) {
+          active.blur();
+          return;
+        }
+        if (dirty) {
+          void (async () => {
+            if (await appConfirm("Còn thay đổi chưa lưu — đóng và bỏ thay đổi?")) onClose();
+          })();
+          return;
+        }
         onClose();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [cert, canEdit, busy, saveItems, onClose]);
+  }, []);
 
   return {
     cert,
@@ -506,14 +533,17 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
       value: <MaskedValue value={totals?.cumulativeValue ?? null} format={fmtVND} />,
     },
     {
+      // Dấu "−" gắn trong `format` của MaskedValue (chỉ gọi khi giá trị không bị che) —
+      // không đặt `negative: true` để DocTotals không tự thêm một dấu "−" nữa, tránh
+      // hiện "−••• đ" khi người xem không có quyền (giá trị bị che vẫn phải là "••• đ" sạch).
       label: "Khấu trừ tạm ứng",
-      value: <MaskedValue value={totals?.advanceDeduct ?? null} format={fmtVND} />,
-      negative: true,
+      value: <MaskedValue value={totals?.advanceDeduct ?? null} format={(n) => `−${fmtVND(n)}`} />,
     },
     {
       label: "Giữ lại bảo hành",
-      value: <MaskedValue value={totals?.retentionDeduct ?? null} format={fmtVND} />,
-      negative: true,
+      value: (
+        <MaskedValue value={totals?.retentionDeduct ?? null} format={(n) => `−${fmtVND(n)}`} />
+      ),
     },
   ];
 
