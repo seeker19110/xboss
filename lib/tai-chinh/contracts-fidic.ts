@@ -18,7 +18,10 @@ export interface FidicTiaInput {
   claimCode: string;
   delayEventTitle: string;
   eventCategory:
-    "EMPLOYER_DELAY" | "FORCE_MAJEURE_WEATHER" | "DESIGN_CHANGE_VARIATION" | "UNFORESEEN_PHYSICAL";
+    | "EMPLOYER_DELAY"
+    | "FORCE_MAJEURE_WEATHER"
+    | "DESIGN_CHANGE_VARIATION"
+    | "UNFORESEEN_PHYSICAL";
   delayStartDate: string;
   delayEndDate: string;
   impactedTasks: Array<{

@@ -22,6 +22,7 @@ Merkle", "IoT & Bảo trì dự báo" — xoá cả tab vì phần lớn nội d
 
 **Giữ nguyên phần dùng chung** (đã kiểm kỹ trước khi xoá, tránh xoá nhầm code tính năng
 khác đang dùng):
+
 - `lib/tai-chinh/contracts-fidic.ts` + facade `lib/ky-thuat/engineering-fidic-claim.ts`: chỉ xoá
   các hàm riêng của FIDIC Claims Dossier (`mapDelayEventToFidicClause`, `checkNoticeCompliance`,
   `calculateTimeImpactAnalysis`, `generateFidicClaimDossier`, `createFidicClaim`,
@@ -32,10 +33,10 @@ khác đang dùng):
   (vẫn dùng bởi Gate 0 Workflow ENG-3, xác nhận qua `tests/engineering-workflow.test.ts` +
   `tests/route-eng-quy-trinh.test.ts`).
 - `app/api/engineering/ledger/merkle`, `/ledger/verify-proof`, `lib/ky-thuat/engineering-merkle-
-  ledger.ts`: dùng chung với `/engineering-intelligence` (không xoá), dù trang quantum-hub gọi
+ledger.ts`: dùng chung với `/engineering-intelligence` (không xoá), dù trang quantum-hub gọi
   route này cũng bị xoá cùng trang.
 - `app/api/engineering/spatial/compute` (quantum-hub) và `app/api/engineering/spatial/
-  annotations` (spatial-viewer) là 2 route con độc lập cùng thư mục `spatial/` — chỉ xoá đúng
+annotations` (spatial-viewer) là 2 route con độc lập cùng thư mục `spatial/` — chỉ xoá đúng
   route con của từng tính năng.
 
 **Migration:** KHÔNG xoá các file `migrations/000N_*.sql` đã tạo bảng cho các tính năng này
@@ -363,7 +364,7 @@ Theo yêu cầu người dùng, thêm cả phần **review** và **maintain**:
 5. **`/review`** (`.claude/commands/review.md`) — slash command tường minh cho quy trình rà soát
    diff trước khi mở PR (gọi skill `code-review` + `security-review` khi chạm vùng nhạy cảm), bổ
    sung cho agent `reviewer` đã có sẵn.
-6. **`/maintain`** + agent `maintainer`** — vòng bảo trì định kỳ nhẹ (không phải audit sâu):
+6. **`/maintain`** + agent `maintainer`\*\* — vòng bảo trì định kỳ nhẹ (không phải audit sâu):
    `scripts/maintenance-sweep.sh` quét git/dependency/`PROGRESS.md`/allowlist rồi
    `maintainer` viết `docs/ops/MAINTENANCE-PLAN.md` (🔴/🟡/DỪNG&HỎI) cho người dùng duyệt trước khi
    thực thi — không tự sửa source khi chưa duyệt.
@@ -714,7 +715,7 @@ dự án → trả danh sách rỗng` — CI đỏ vì PM thấy dự án đầu
 
 Tiếp nối Đợt 4. Hai mục tiêu: phủ test THỰC THI cho **91 route `app/api/engineering/**`** chưa
 từng có test, và trả nợ mục đầu "Ghi nhận, chưa sửa" của Đợt 4 (`workpackages/:id/**`). Mục thứ
-hai **kéo ra một chuỗi lỗ hổng lớn hơn nhiều dự tính** — xem "Chuỗi lỗ hổng" bên dưới.
+hai **kéo ra một chuỗi lỗ hổng lớn hơn nhiều dự tính\*\* — xem "Chuỗi lỗ hổng" bên dưới.
 
 **7 file test mới, 537 ca. 33 commit, 70 tệp đổi, 60 tệp route/lib được vá.**
 
@@ -734,11 +735,11 @@ hai **kéo ra một chuỗi lỗ hổng lớn hơn nhiều dự tính** — xem 
 Vá nó xong thì mỗi lượt review lại lộ ra một tầng sâu hơn:
 
 1. **W0 — 19 endpoint `workpackages/**`.** Tạo nhóm việc, tạo task, đổi thứ tự, sao chép, sửa
-   lưới dimension, tải/xoá biên bản nghiệm thu và bản vẽ của **dự án khác** bằng cách đoán id.
-   Kèm phát hiện: `workpackages/[id]/route.ts` mà chính kế hoạch của phiên chính xếp là "route
-   anh em ĐÃ lọc đúng" thực ra **không lọc** — lời gọi `getCurrentProjectId` duy nhất trong file
-   chỉ phục vụ `validateCustom` cho trường tuỳ biến, không dùng phân quyền. Phiên chính khảo sát
-   bằng `grep` tên hàm nên kết luận sai; worker đọc code mới thấy. **Bài học: grep tên hàm không
+lưới dimension, tải/xoá biên bản nghiệm thu và bản vẽ của **dự án khác** bằng cách đoán id.
+Kèm phát hiện: `workpackages/[id]/route.ts`mà chính kế hoạch của phiên chính xếp là "route
+anh em ĐÃ lọc đúng" thực ra **không lọc** — lời gọi`getCurrentProjectId`duy nhất trong file
+chỉ phục vụ`validateCustom`cho trường tuỳ biến, không dùng phân quyền. Phiên chính khảo sát
+bằng`grep` tên hàm nên kết luận sai; worker đọc code mới thấy. **Bài học: grep tên hàm không
    thay được đọc code — hàm có mặt không có nghĩa nó đang được dùng để kiểm quyền.**
 2. **Review W0 → NGUYÊN NHÂN GỐC.** `lib/bao-mat/auth.ts`: `canTouchTask`, `canTouchPackage`,
    `canTouchFloor`, `canTouchVehicle`, `canViewSubcontractor` đều mở đầu
@@ -881,10 +882,9 @@ Engine) vì cả hai đều là tính năng đang hỏng ở vùng rủi ro cao.
 
 ## ✅ Đợt 4 chiến dịch coverage — 7 cụm route phi-engineering + 2 đợt vá bảo mật (2026-09-05)
 
-Tiếp nối Đợt 1–3. Phạm vi: **304 route `app/api/**` chưa có test nào chạm tới**, đã trừ toàn bộ
-`app/api/engineering/**` (để Đợt 5). Thi hành qua mô hình 3 tầng: 7 việc song song V1–V7, mỗi việc
-1 worktree + 1 file test + 1 DB Postgres riêng; `reviewer` soát từng diff trước khi tích hợp. Hai
-việc phát sinh (V9, V10) là **vá bảo mật** do reviewer bác bỏ đánh giá "ghi nhận, chưa sửa" của
+Tiếp nối Đợt 1–3. Phạm vi: **304 route `app/api/**`chưa có test nào chạm tới**, đã trừ toàn bộ`app/api/engineering/**`(để Đợt 5). Thi hành qua mô hình 3 tầng: 7 việc song song V1–V7, mỗi việc
+1 worktree + 1 file test + 1 DB Postgres riêng;`reviewer` soát từng diff trước khi tích hợp. Hai
+việc phát sinh (V9, V10) là **vá bảo mật\*\* do reviewer bác bỏ đánh giá "ghi nhận, chưa sửa" của
 worker — xem mục "Bài học điều phối" cuối.
 
 **9 file test mới + 2 file test cũ sửa, 1.163 ca:**
@@ -919,10 +919,10 @@ hiệu đó thay vì dò từng route.
    có đường API chạm tới, đã ghi sẵn ở `tests/route-quan-tri.test.ts`) nhưng **giữ lại** làm phòng
    thủ chiều sâu — invariant "org không được mất admin cuối" không nên dựa vào suy luận liên-guard.
 3. **Tầng WBS: `towers/:id`, `sheets/:id`, `work-fronts/**`, `packages/:id/dependencies`,
-   `package-dependencies/:id`** (V9) — sửa/xoá được tháp, sheet, mặt bằng thi công và quan hệ phụ
-   thuộc của **dự án khác**. `GET /api/work-fronts` còn liệt kê toàn bộ mặt bằng **mọi dự án**.
-   Suy dự án qua `towers.project_id` (trực tiếp) hoặc chuỗi `sheet_type_id → tower_id →
-project_id`; dùng `LEFT JOIN` để dòng chưa gán tower ra `projectId = null` → 404, không bị mất
+`package-dependencies/:id`** (V9) — sửa/xoá được tháp, sheet, mặt bằng thi công và quan hệ phụ
+thuộc của **dự án khác**. `GET /api/work-fronts`còn liệt kê toàn bộ mặt bằng **mọi dự án**.
+Suy dự án qua`towers.project_id`(trực tiếp) hoặc chuỗi`sheet_type_id → tower_id →
+   project_id`; dùng `LEFT JOIN`để dòng chưa gán tower ra`projectId = null` → 404, không bị mất
    khỏi kết quả.
 4. **`/api/vo-documents/:id` GET+DELETE không so dự án** (V2) — tải/xoá được file đính kèm lệnh
    thay đổi thiết kế của dự án khác, trong khi `contract-documents/:id`, `claim-documents/:id` đã
@@ -958,9 +958,9 @@ project_id`; dùng `LEFT JOIN` để dòng chưa gán tower ra `projectId = null
 
 ### Ghi nhận, CHƯA sửa (cần quyết định, không tự làm)
 
-- **`workpackages/:id/**` (bbnt, dimensions, drawing, copy, move, tasks) + `work-fronts/report`**
+- **`workpackages/:id/**`(bbnt, dimensions, drawing, copy, move, tasks) +`work-fronts/report`**
   cùng lớp lỗi cách ly dự án với mục 3 ở trên, reviewer đã đọc code xác nhận có thật. Để nguyên vì
-  ngoài phạm vi đợt — **nên là việc đầu tiên của đợt sau**, ưu tiên ngang V9.
+  ngoài phạm vi đợt — **nên là việc đầu tiên của đợt sau\*\*, ưu tiên ngang V9.
 - **12 chỗ `SELECT ... FROM users WHERE id = ?` không lọc `org_id`** (`admin/assignments`,
   `meetings/:id/actions*`, `risks/:id`, `subcontractors`, `sheets/:id`, `warranty-claims*`,
   `punch-list*`, `mobilization*`) — đều chỉ kiểm "user tồn tại" để gán người phụ trách, không đọc/
@@ -1280,7 +1280,7 @@ ngưỡng đệm `check:coverage`, funcs tăng nhẹ); đã cập nhật `covera
 `engineering/*` phi-BIM (fidic, cashflow, compliance, bidding,
 subcon-ai, autonomy, queue, zero-error, workflows, memory, agent-sessions, spatial, prescriptive,
 predictions, objects, iot, routing, logistics, ledger, hse-vision, data-quality, taxonomy…) và các cụm
-nhỏ (work-fronts, progress-albums, monitoring-points, devices, waste-logs, warranty-*, purchase-
+nhỏ (work-fronts, progress-albums, monitoring-points, devices, waste-logs, warranty-\*, purchase-
 requests, zalo, telegram, tech-links, tech, tokens, v1…) chưa có test.
 
 ## ✅ Đợt 2 chiến dịch coverage — mở khoá test THỰC THI route, phủ 10 cụm (2026-09-04)

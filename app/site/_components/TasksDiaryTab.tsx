@@ -94,9 +94,7 @@ export default function TasksDiaryTab() {
                   Zalo
                 </span>
               </div>
-              <div className="text-xs text-zinc-400">
-                Báo cáo & tra cứu kho tức thì qua Zalo
-              </div>
+              <div className="text-xs text-zinc-400">Báo cáo & tra cứu kho tức thì qua Zalo</div>
             </div>
           </div>
           <ArrowUpRight className="w-4 h-4 text-zinc-500 group-hover:text-sky-400 transition-colors" />
