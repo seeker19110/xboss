@@ -119,3 +119,25 @@ Khác M124 một điểm: **thanh đáy của trang chủ là `md:hidden`** (des
 với đủ bộ nút). `AppHeader` chỉ tự ẩn thanh đáy dưới `md` khi trang **không** truyền
 `bottomActions`, nên trang chủ chỉ truyền bộ nút khi màn hẹp (`matchMedia`) thay vì sửa
 `AppHeader`.
+
+## Bổ sung: DocShell cho `/claims`, `/variations`, `/contracts` — M126 (2026-09-21)
+
+Đóng non-goal của M124: 3 trang tài chính còn lại (mẫu "bảng + Modal") chuyển sang master–detail
+cùng khuôn `/payment-certs` (đặc tả: `docs/nang-cap/M126-docshell-contracts-variations-claims.md`).
+Không thêm component nền mới — dùng lại `DocToolbar`/`DocField`/`DocTotals`/`Kbd`/`Chip`/`Tabs`
+của M124/M125. Modal **tạo mới** của cả 3 trang giữ nguyên nội dung (e2e neo text/label/aria vào
+đó), chỉ tách file sang `_components/Add<X>Modal.tsx`.
+
+Hai điểm khác biệt đáng ghi lại cho lần áp DocShell tiếp theo:
+
+1. **Bản ghi soft-delete không mở chứng từ.** `/contracts` và `/claims` có xoá mềm + khôi phục;
+   khi đang xem danh sách "đã xoá", chọn một dòng chỉ hiện nút Khôi phục ở hàng đó (không phải
+   trong chứng từ) và cột phải hiện `EmptyState` nhắc khôi phục trước — tránh vừa vi phạm
+   "chứng từ đã xoá không sửa được" vừa phải giấu code chết trong `CertDocument`-tương-tự.
+2. **StatCard/segmented-filter phải render trước danh sách trong DOM khi e2e dùng `.first()`
+   không scope.** `/variations` có 4 StatCard tên trùng với nhãn trạng thái ("Nháp"/"Đã trình"…)
+   cũng xuất hiện trong `Chip` của từng dòng — giữ đúng thứ tự DOM (StatCard trước) để không vỡ
+   `getByText(...).first()` của spec cũ.
+
+Cả 3 trang giữ nguyên toàn bộ lời gọi API cũ; chỉ `/variations` nâng cách tính giá trị quyết định
+trong `decide()` từ cộng dồn float JS sang `mMul/mSumBy` (cùng chuẩn tiền M45 PR1).
