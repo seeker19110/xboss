@@ -12,7 +12,9 @@ Xoá toàn bộ cụm 6 mục (`dash.site-command`, `dash.schedule-control`, `da
 không còn ý nghĩa) và sửa `tests/route-quan-tri-2.test.ts` — 5 chỗ dùng `nodeKey` cứng
 `dash.site-command`/`dash.schedule-control` (đã xoá khỏi cây) cho API `/api/nav-settings`, đổi
 sang `dash.dashboard`/`dash.mepf-process` (vẫn tồn tại) để test không phụ thuộc vào 1 node cụ thể
-sắp bị xoá trong tương lai.
+sắp bị xoá trong tương lai. Vòng CI kế tiếp lộ thêm 1 file test cũ khác cũng khẳng định cụm
+"Kỹ thuật Không gian & AI (Engineering OS)" tồn tại: xoá đoạn test đó khỏi
+`tests/engineering-apex-pinnacle.test.ts` (giữ lại test `computeApexScore` không liên quan sidebar).
 
 ## ✅ Bỏ cụm sidebar "Kỹ thuật Không gian & AI (Engineering OS)" — 2026-09-21
 
