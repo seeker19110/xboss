@@ -87,39 +87,6 @@ export interface DataQualityIssue {
   resolutionNote: string | null;
 }
 
-// 1. Taxonomy Registry
-export async function getTaxonomy() {
-  const objectTypes = await query<{
-    key: string;
-    label: string;
-    discipline: string | null;
-    schemaVersion: string;
-    isActive: boolean;
-  }>(`
-    SELECT key, label, discipline, schema_version AS "schemaVersion", is_active AS "isActive"
-    FROM engineering_object_types
-    WHERE is_active = TRUE
-    ORDER BY key ASC
-  `);
-
-  const relationTypes = await query<{
-    key: string;
-    label: string;
-    allowedFromTypes: string[];
-    allowedToTypes: string[];
-    isDirected: boolean;
-    isAcyclic: boolean;
-    description: string | null;
-  }>(`
-    SELECT key, label, allowed_from_types AS "allowedFromTypes", allowed_to_types AS "allowedToTypes",
-           is_directed AS "isDirected", is_acyclic AS "isAcyclic", description
-    FROM engineering_relation_types
-    ORDER BY key ASC
-  `);
-
-  return { objectTypes, relationTypes };
-}
-
 // 2. Recursive Graph Traversal (PostgreSQL BFS Traversal)
 export async function traverseGraph(
   projectId: number,

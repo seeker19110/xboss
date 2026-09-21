@@ -474,6 +474,14 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > sách hệ thi công để ngoài tab (đường vào duy nhất tới `/system/[code]`), `SpiCards`/`ForecastCards`
 > để ở cột chính (breakpoint theo viewport nên vỡ lưới trong rail 320px), tab mặc định `scurve`.
 
+> **`M126-docshell-contracts-variations-claims.md`** — ✅ **Approved 2026-09-21 và ĐÃ TRIỂN KHAI
+> XONG**. Đóng nốt "Còn lại" của M124: `/claims`, `/variations`, `/contracts` chuyển sang
+> master–detail cùng khuôn `/payment-certs`, không thêm component nền mới (dùng lại
+> `DocToolbar`/`DocField`/`DocTotals`/`Kbd`/`Chip`/`Tabs`). Modal tạo mới của cả 3 trang giữ
+> nguyên (e2e neo text/label/aria), chỉ tách file. Số dòng `page.tsx`: claims 803→354,
+> variations 946→267, contracts 1200→404. **Không đổi** API/schema/`lib/`/`CustomFieldsSection`.
+> Quy ước chốt trong ADR-0009 mục "DocShell cho `/claims`, `/variations`, `/contracts` — M126".
+
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 
 > **M62 (`M62-rls-khoa-cua.md`)** — đóng nốt RLS: `withProjectScope` đọc-ghi + bọc 3 route còn lại (`notifications`, `payments/bills`, `payments/floors`) rồi migration "khoá cửa" bỏ nhánh thiếu-ngữ-cảnh (2 PR, `route: spec`; PR2 có điều kiện tiên quyết vận hành). **Đã xong hoàn toàn 2026-07-20** — PR1 (nhánh `claude/plan-m62-m63-7osrkh`, 2026-07-19) và PR2 (`migrations/0077_rls_lock.sql`, PR #300) đều đã merge `main`; người dùng xác nhận cả 2 điều kiện tiên quyết vận hành đủ trước khi merge PR2. Xem `PROGRESS.md`. **M63 (`M63-webhook-ssrf-dns-pinning.md`)** — chống SSRF DNS rebinding cho webhook: resolve + pin IP qua undici `connect.lookup`, mở rộng `isPrivateIp` (1 PR, `route: spec`). **Đã xong 2026-07-19** (nhánh `claude/plan-m62-m63-7osrkh`). Cả 2 sinh từ đợt đánh giá chi tiết lần 8 (`PROGRESS.md`).

@@ -20,6 +20,81 @@ Các ứng viên khác đã xét nhưng **không** dọn vì không đủ bằng
 - `tailwindcss`, `@commitlint/*`, `lint-staged`, `@types/react-dom` bị depcheck báo unused — false
   positive kinh điển (dùng qua file config, depcheck không parse), giữ nguyên.
 
+## ✅ M126 — DocShell cho `/claims`, `/variations`, `/contracts` — 2026-09-21
+
+Đặc tả `docs/nang-cap/M126-docshell-contracts-variations-claims.md` (Approved). Đóng non-goal của
+M124: 3 trang tài chính còn lại chuyển từ "bảng + Modal" sang master–detail cùng mẫu
+`/payment-certs` (danh sách trái, chứng từ toàn trang phải, `?id=` trong URL, `DocToolbar` +
+`bottomActions`, `Chip`/`DocField`/`DocTotals`/`StatCard`/`Button`). Modal **tạo mới** giữ nguyên
+(text/label/aria neo bởi e2e), chỉ tách sang `_components/Add<X>Modal.tsx`.
+
+- **`/claims`** (803 → 354 dòng): 2 StatCard đầu trang + filter loại (giữ `role="group"` +
+  `aria-pressed`); khối "Quyết định" inline thay chuỗi `appPrompt` cũ (ô Chốt/Ghi chú + nút
+  Chốt/Từ chối); `DocTotals` phân nhánh theo `kind` (cost: tiền, eot: số ngày).
+- **`/variations`** (946 → 267 dòng): 4 StatCard theo trạng thái đứng trước danh sách (giữ
+  `.first()` của e2e); lưới dòng có ô "KL duyệt" sửa inline khi `canDecide`; khối "Đưa vào phụ lục
+  hợp đồng" giữ nguyên logic.
+- **`/contracts`** (1200 → 404 dòng): 3 StatCard theo `kind` + nhóm gập/mở giữ ở danh sách trái;
+  chứng từ dùng `Tabs` (M125) cho 5 nhóm nội dung (`info/addenda/documents/links/ipc`, URL
+  `?tab=`); bản ghi đã xoá **không** mở chứng từ (EmptyState nhắc khôi phục trước), đúng nguyên
+  tắc M124 giữ nguyên hành vi soft-delete.
+- Che tiền/`MaskedValue` áp cho cả 3 trang; `/variations` đổi giá trị quyết định trong `decide()`
+  sang `mMul/mSumBy` (trước là cộng dồn float JS).
+- Xác thực bằng route thật trên Postgres ephemeral (tạo → trình/quyết định/upload/xoá-khôi phục
+  đều 200/201 đúng body cũ) cho cả 3 trang; `npm test` (4098 ca, Postgres thật) và bộ cổng UI
+  (`lint/typecheck/build/check:contrast/check:mau-accent/check:hex-hardcode/format:check`) xanh.
+  E2E Playwright chưa chạy được tại chỗ (proxy chặn tải Chromium) — chờ CI xác nhận
+  `contracts.spec.ts`/`variations.spec.ts`/`claims.spec.ts`/`input-zoom-mobile.spec.ts`.
+- Không đổi API/lib/migration/`CustomFieldsSection`.
+
+## ✅ Xoá 7 route "Lớp Engineering OS" dead code (đóng M-03) — 2026-09-21
+
+Chốt hướng cho cụm 13 route "chờ chốt hướng ở đề xuất #6 audit 2026-08-25" (mở đầu từ đợt
+`/maintain`). Đánh giá giá trị + rà kỹ dependency trước khi xoá, phát hiện 3 route thực ra là
+mắt xích còn thiếu của tính năng **đang sống** (không phải dead code):
+
+- **Giữ nguyên chờ gắn UI** (giá trị cao — nối vào vòng lặp tiến độ/WBS/thanh toán hoặc phòng
+  rủi ro thi công): `zero-error/pour-permits`, `pipe-spool-tracking`, `closed-loop-sync`.
+- **Giữ nguyên vì đang là mắt xích thiếu của tính năng có UI thật** (xoá sẽ làm gãy tính năng
+  đang chạy, không phải dọn rác): `workflows/[id]/transition` (cách duy nhất đưa workflow đã
+  duyệt qua executing→completed, trang `/engineering/workflows` chưa gọi), `swarm/debates/[id]/
+{arguments,synthesize}` (cách duy nhất thêm lập luận/tổng hợp cho debate, trang
+  `/engineering/swarm` tạo debate được nhưng không tự sinh lập luận).
+- **Xác nhận thật là dead code, đã xoá** (backend xong, không route/UI/lib nào khác gọi tới):
+  `digital-handover`, `project-health`, `multi-agent-copilot`, `mepf-predictive`, `carbon-lca`
+  (mỗi cái xoá cả route + `lib/ky-thuat/engineering-*.ts` riêng + test riêng), `compliance/
+audit-element` (chỉ xoá hàm `auditEngineeringElement` — module `engineering-prescriptive.ts`
+  giữ lại vì `scanAllElementsCompliance` vẫn cần), `taxonomy` (chỉ xoá hàm `getTaxonomy` — module
+  `engineering-graph.ts` giữ lại vì `traverseGraph`/lineage/impact vẫn cần).
+
+**File chạm:** 7 route + 5 lib module riêng bị xoá; `lib/ky-thuat/engineering-{graph,prescriptive,
+suite}.ts` sửa surgical (chỉ bỏ phần liên quan, giữ phần dùng chung); `scripts/dead-routes-
+allowlist.json` bỏ 7 mục; test liên quan (`route-eng-{du-bao,mepf,zero-error}.test.ts`,
+`engineering-{graph,prescriptive,suite}.test.ts`, `audit-2026-09-05-guards.test.ts`) sửa/xoá theo.
+Một test khác (`GET /compliance/audits: hạnh phúc`) từng dùng route `audit-element` để seed dữ
+liệu mẫu — đổi sang chèn DB trực tiếp (cùng khuôn đã dùng cho dự án B trong chính test đó).
+
+**Verify:** lint/typecheck/build xanh; `check:dead-code`/`check:dead-routes`/`check:route-perms`/
+`check:project-scope`/`check:migrations`/`check:hex-hardcode`/`check:lib-layers`/`format:check`
+xanh; `npm test -- --release-gate` với Postgres 16 thật → **245 file, 4057 ca pass, 0 fail, 1 skip
+có chủ đích** (giảm đúng 6 file/41 ca so với trước do xoá test riêng của 5 module).
+
+## ✅ Đợt bảo trì `/maintain` đầu tiên — 2026-09-21
+
+Chạy thử `/maintain` (agent `maintainer` quét, kế hoạch `docs/ops/MAINTENANCE-PLAN.md` cho người
+dùng duyệt). Kết quả: repo khá sạch, không có lỗi nghiêm trọng.
+
+- **M-01 (xong)**: xác nhận thật `npm test -- --release-gate` với Postgres 16 thật → **251 file,
+  4098 ca pass, 0 fail, 1 skip có chủ đích** — 4 mục `scripts/test-skip-allowlist.json` vẫn đúng
+  lý do.
+- **M-02 (xong)**: sửa bug thật trong `scripts/maintenance-sweep.sh` — `npm outdated` cố ý thoát
+  mã 1 khi có package lỗi thời, kết hợp `set -o pipefail` khiến `|| echo 0` chạy thêm ngoài ý
+  muốn, in dòng "0" thừa; tách `npm outdated` ra khỏi pipe trước khi đưa vào `node -e`.
+- **M-03 (hoãn)**: 13 route "Lớp Engineering OS" (`scripts/dead-routes-allowlist.json`) vẫn "chờ
+  chốt hướng ở đề xuất #6 audit 2026-08-25" — người dùng quyết giữ nguyên, chưa gắn UI/xoá đợt này.
+- **M-04 (hoãn)**: nâng major `nodemailer` 9→10 + `google-auth-library` 10→11 — không phải lỗ hổng
+  bảo mật khẩn, người dùng quyết không nâng lúc này.
+
 ## ✅ Bỏ cụm sidebar "6 Đại Trung Tâm Điều Hành (Unified Hubs)" — 2026-09-21
 
 Xoá toàn bộ cụm 6 mục (`dash.site-command`, `dash.schedule-control`, `dash.procurement-hub`,
@@ -8729,6 +8804,27 @@ Verify hạ tầng: Postgres 16 local (`pg_ctlcluster`, đã có sẵn trong má
   `## Definition of Done`) và tiêu đề theo Conventional Commits; PR `feat:` còn phải liên kết spec
   `docs/nang-cap/*.md` kèm chữ "Approved for implementation". Thiếu mục là check đỏ ngay từ đầu,
   không liên quan chất lượng code.
+
+## Đợt audit sâu 2026-09-08 — route xuất PDF/Excel và cách ly dự án
+
+- **[Cao — đã sửa] Ba route xuất tài liệu rò dữ liệu chéo dự án qua ID/bộ lọc:**
+  `GET /api/payment-certs/:id/pdf` đọc IPC trực tiếp bằng `getCert(id)`; PDF phiếu YCNT
+  đọc `inspection_requests`/task không lọc dự án và lấy tên dự án đầu tiên trong DB; PDF
+  danh mục hồ sơ chất lượng cũng liệt kê toàn bộ `task_documents` và dùng tên dự án đầu
+  tiên. Người có quyền tương ứng có thể đoán ID hoặc gọi export để xem dữ liệu của dự án
+  khác. Đã thêm `getCertForProject()` fail-closed dùng chung cho PDF/Excel IPC; hai route
+  QAQC nay suy dự án qua `task → work_package → sheet_type → tower`, lọc cả bản ghi cha,
+  task con, sheet và tên dự án theo `getCurrentProjectId(user)`.
+- **Test hồi quy:** `tests/claim-documents-scope.test.ts` gọi trực tiếp helper IPC mới;
+  `tests/qc-project-scope.test.ts` neo đủ ba lớp scope của hai PDF QAQC. Targeted test không
+  DB: 17 pass, 5 skip đúng vì thiếu `TEST_DATABASE_URL`. `npm run lint` và
+  `npm run typecheck` và `npm run build` xanh trên Node 24. Full test không DB: 740 pass, 3.351 skip; 6 fail
+  đều do test guard cũ ghép sai đường dẫn `C:\\C:\\...` khi chạy Node Windows từ WSL,
+  không liên quan diff; chưa xác minh bộ test đầy đủ trên CI Linux cho bản vá này. `npm audit`: 0 lỗ hổng.
+- **Phạm vi audit:** route permission/project-scope/db-params/lib-layer/dead-code/migration/SW
+  gates đều xanh khi chạy trên runtime Linux phù hợp; rà riêng toàn bộ route PDF/Excel phát
+  hiện ba lỗi trên. Chưa chạy E2E/Postgres disposable trong phiên này vì môi trường không có
+  dịch vụ PostgreSQL; CI Linux có Postgres 16 phải là cổng xác nhận cuối.
 
 ## Nợ kỹ thuật (chỗ "làm tạm" cần quay lại)
 

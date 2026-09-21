@@ -71,7 +71,10 @@ else
     line "- 🔴 \`npm audit\` (production) có lỗ hổng — chạy \`npm audit --omit=dev\` để xem chi tiết."
   fi
 
-  outdated_count="$(npm outdated --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{try{console.log(Object.keys(JSON.parse(s||"{}")).length)}catch{console.log(0)}})' 2>/dev/null || echo 0)"
+  # `npm outdated` cố ý thoát mã 1 khi CÓ package lỗi thời — tách khỏi pipe trước khi đưa vào
+  # node, nếu không `set -o pipefail` coi cả pipe là lỗi và in thêm dòng "0" thừa từ `|| echo 0`.
+  outdated_json="$(npm outdated --json 2>/dev/null || true)"
+  outdated_count="$(printf '%s' "$outdated_json" | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{try{console.log(Object.keys(JSON.parse(s||"{}")).length)}catch{console.log(0)}})' 2>/dev/null || echo 0)"
   line "- Số package lỗi thời (\`npm outdated\`): ${outdated_count:-0}."
 fi
 
