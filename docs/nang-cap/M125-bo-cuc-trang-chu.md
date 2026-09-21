@@ -35,7 +35,7 @@ mới tới bảng trễ — thứ PM cần nhất mỗi sáng. Nút Excel/PDF/I
 ## 3. Hiện trạng liên quan
 
 - Dữ liệu: `GET /api/dashboard` → `{kpi[], totalDelayed, delayedTasks[], groupProgress, quality,
-  vo, workfront, bySystem, approvals: {pendingProposals, pendingPurchaseRequests} | null}`;
+vo, workfront, bySystem, approvals: {pendingProposals, pendingPurchaseRequests} | null}`;
   `GET /api/sheets`, `GET /api/systems`, `GET /api/code-lists?domain=delay_reason`.
 - `overview` (dòng 284–293): `pct`, `totalTasks`, `delayed`.
 - Thanh đáy: `AppHeader bottomActions` (chỉ hiện trên mobile khi không có nút riêng — ở trang chủ có
@@ -58,6 +58,7 @@ Thanh đáy (`bottomActions`) giữ cùng bộ Import/Excel/PDF nhưng qua `Butt
 (desktop đã có toolbar).
 
 **Z1 — Dải số liệu** (`grid grid-cols-2 lg:grid-cols-4 gap-3`, `StatCard`):
+
 1. Tiến độ tổng — `overview.pct` %, thanh progress (như hiện tại).
 2. Hạng mục trễ — `totalDelayed`, phụ đề "`delayedTasks.length` công tác"; bấm cuộn tới
    `#delayed-table`. Tông cảnh báo khi > 0.
@@ -67,7 +68,8 @@ Thanh đáy (`bottomActions`) giữ cùng bộ Import/Excel/PDF nhưng qua `Butt
 
 **Z2 — Thân 2 cột** `grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start`.
 
-*Cột trái (chính), theo thứ tự:*
+_Cột trái (chính), theo thứ tự:_
+
 - **Thẻ "Tiến độ" có tab** (`Card raised` + `Tabs`), tab lưu URL `?tab=` (mặc định `sheets`):
   `sheets` Trang tracking (danh sách hàng: tên sheet · thanh tiến độ · % · Chip "n trễ"/"Đúng tiến
   độ"; giữ kéo thả + link tới `/tracking/<slug>`), `systems` Hệ thi công (cùng kiểu hàng từ
@@ -78,7 +80,8 @@ Thanh đáy (`bottomActions`) giữ cùng bộ Import/Excel/PDF nhưng qua `Butt
 - **Bảng trễ** `id="delayed-table"`: `Section` + bộ lọc + bảng hiện có, nguyên trạng.
 - `DashboardExtCards`, `BlockedPanel`, `NormsOverPanel` (điều kiện role như cũ) — nguyên trạng.
 
-*Cột phải (rail 320px, `lg:sticky lg:top-4`):*
+_Cột phải (rail 320px, `lg:sticky lg:top-4`):_
+
 - **Trung tâm điều hành** (`Card raised`): 7 mục `HUBS` dạng hàng gọn 44px (icon 32px nền mờ màu
   phân hệ · tên · mô tả 1 dòng `truncate`), link giữ nguyên `href`. Không badge số (chưa có API).
   Dưới cùng: dải `LIFECYCLE` 6 đoạn (giữ logic giai đoạn hiện tại, thu thành thanh mảnh + nhãn).

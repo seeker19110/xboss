@@ -1,12 +1,12 @@
 # M124 — Bố cục màn hình "chứng từ" (DocShell) + áp cho trang Thanh toán khối lượng
 
-| Thuộc tính       | Giá trị                                                                                   |
-| ---------------- | ----------------------------------------------------------------------------------------- |
-| Issue / Goal     | Chuẩn hoá màn hình nhập/duyệt chứng từ tài chính theo mẫu tổng hợp từ 2 app Kế toán Access |
-| Spec owner       | Phiên chính (opusplan)                                                                    |
-| State            | **Approved for implementation**                                                           |
+| Thuộc tính       | Giá trị                                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Issue / Goal     | Chuẩn hoá màn hình nhập/duyệt chứng từ tài chính theo mẫu tổng hợp từ 2 app Kế toán Access                          |
+| Spec owner       | Phiên chính (opusplan)                                                                                              |
+| State            | **Approved for implementation**                                                                                     |
 | Người/ngày duyệt | Người dùng · 2026-09-21 (chốt phạm vi "1 trang tài chính làm mẫu" + "toolbar trên & thanh đáy, đáy ưu tiên mobile") |
-| Cập nhật         | 2026-09-21                                                                                |
+| Cập nhật         | 2026-09-21                                                                                                          |
 
 > Mockup đã duyệt: artifact "XBoss Chứng từ" (https://claude.ai/artifact/2kcKEuoLSb1udqkGKgb79w). Đặc tả này là nguồn sự thật khi mockup và chữ lệch nhau.
 
@@ -55,12 +55,12 @@ dòng, tổng hợp, đính kèm/ghi chú/trạng thái, toolbar trên + thanh h
 
 ## 4. Phương án
 
-| Phương án                                       | Lợi ích                              | Chi phí/rủi ro                         | Kết luận |
-| ----------------------------------------------- | ------------------------------------ | -------------------------------------- | -------- |
-| Không làm                                       | 0                                    | Modal chật, không nhất quán            | Loại     |
-| A. Chép nguyên mẫu Access (nền trắng/đỏ, chữ nhỏ, ribbon) | Giống ảnh                    | Vỡ theme/ADR-0009/0010, không mobile   | Loại     |
-| **B. DocShell trên hệ token XBoss, áp 1 trang mẫu** | Nhất quán, mở rộng dần được       | Phải viết 4 component nhỏ               | **Chọn** |
-| C. Đổi cả nhóm tài chính một lượt               | Đồng bộ ngay                         | Diff khổng lồ, rủi ro cao               | Đợt sau  |
+| Phương án                                                 | Lợi ích                     | Chi phí/rủi ro                       | Kết luận |
+| --------------------------------------------------------- | --------------------------- | ------------------------------------ | -------- |
+| Không làm                                                 | 0                           | Modal chật, không nhất quán          | Loại     |
+| A. Chép nguyên mẫu Access (nền trắng/đỏ, chữ nhỏ, ribbon) | Giống ảnh                   | Vỡ theme/ADR-0009/0010, không mobile | Loại     |
+| **B. DocShell trên hệ token XBoss, áp 1 trang mẫu**       | Nhất quán, mở rộng dần được | Phải viết 4 component nhỏ            | **Chọn** |
+| C. Đổi cả nhóm tài chính một lượt                         | Đồng bộ ngay                | Diff khổng lồ, rủi ro cao            | Đợt sau  |
 
 ## 5. Scope / non-goals
 
@@ -92,14 +92,15 @@ trước/sau + vị trí "n / N"). Có `DocToolbar.Sep` (vạch ngăn `w-px h-6 
 dùng `readOnly` → viền `border-dashed` nền trong suốt. Kèm `DocFieldGroup` = 2 cột
 `grid md:grid-cols-[1.4fr_1fr] gap-x-7 gap-y-3`.
 **FR3 — `DocTotals`** (`app/components/ui/DocTotals.tsx`): `rows: {label, value: ReactNode, negative?}[]`
-+ `total: {label, value}`; số `tabular-nums`, dòng âm hiển thị dấu "−"; tổng cuối
-`text-2xl font-bold text-emerald-300`. Không tính toán — nhận giá trị đã format.
-**FR4 — `Kbd`** (`app/components/ui/Kbd.tsx`): chip phím tắt `text-[10px] border border-zinc-700
+
+- `total: {label, value}`; số `tabular-nums`, dòng âm hiển thị dấu "−"; tổng cuối
+  `text-2xl font-bold text-emerald-300`. Không tính toán — nhận giá trị đã format.
+  **FR4 — `Kbd`** (`app/components/ui/Kbd.tsx`): chip phím tắt `text-[10px] border border-zinc-700
 rounded px-1 text-zinc-400`, `hidden md:inline` (điện thoại không có bàn phím). Trên nút primary
-dùng `border-white/40 text-white/80` qua prop `onAccent`.
-**FR5 — Export** cả 4 qua `app/components/ui/index.ts`.
-**FR6 — `/payment-certs`:** bố cục §6. Khối chứng từ (`app/payment-certs/_components/CertDocument.tsx`)
-gồm, theo thứ tự dọc:
+  dùng `border-white/40 text-white/80` qua prop `onAccent`.
+  **FR5 — Export** cả 4 qua `app/components/ui/index.ts`.
+  **FR6 — `/payment-certs`:** bố cục §6. Khối chứng từ (`app/payment-certs/_components/CertDocument.tsx`)
+  gồm, theo thứ tự dọc:
   1. `DocToolbar`: [Lưu KL (draft, canManage)] [Trình lên CĐT/TVGS (draft)] · Sep · [Duyệt] [Từ chối]
      (submitted, canDecide) · Sep · [PDF] [Excel] (approved) · trailing: ‹ › đổi đợt + "đợt k / N".
   2. Tiêu đề: `h2` mã đợt (font-mono) + `Chip` trạng thái (tone: draft neutral / submitted warning /
@@ -126,13 +127,13 @@ gồm, theo thứ tự dọc:
      Lưu + "Đóng `Esc`" (mobile: quay về danh sách; desktop: bỏ chọn). Thanh đáy hiện ở **mọi**
      breakpoint khi có đợt đang chọn (đáy ưu tiên mobile theo quyết định người dùng); không có đợt
      chọn thì không truyền `bottomActions`.
-**FR7 — Phím tắt:** `Ctrl/⌘+S` → Lưu KL (khi canEdit, preventDefault); `Esc` → Đóng. Đăng ký
-trong `CertDocument` bằng `useEffect` keydown trên `window`, gỡ khi unmount.
-**FR8 — Danh sách trái:** giữ 3 StatCard hợp đồng (chuyển sang `StatCard` của ui nếu props khớp,
-nếu không giữ nguyên) ở **trên** cả 2 cột; bảng đợt rút gọn còn Mã · Đợt · Trạng thái (`Chip`),
-dòng đang chọn `bg-emerald-500/10 border-l-2 border-emerald-500`.
-**NFR1** — mọi nút qua `Button` (≥40px), không class nút viết tay mới. **NFR2** — không `dark:`,
-không hex. **NFR3** — `MaskedValue` cho mọi số tiền. **NFR4** — e2e sẵn có xanh không sửa.
+     **FR7 — Phím tắt:** `Ctrl/⌘+S` → Lưu KL (khi canEdit, preventDefault); `Esc` → Đóng. Đăng ký
+     trong `CertDocument` bằng `useEffect` keydown trên `window`, gỡ khi unmount.
+     **FR8 — Danh sách trái:** giữ 3 StatCard hợp đồng (chuyển sang `StatCard` của ui nếu props khớp,
+     nếu không giữ nguyên) ở **trên** cả 2 cột; bảng đợt rút gọn còn Mã · Đợt · Trạng thái (`Chip`),
+     dòng đang chọn `bg-emerald-500/10 border-l-2 border-emerald-500`.
+     **NFR1** — mọi nút qua `Button` (≥40px), không class nút viết tay mới. **NFR2** — không `dark:`,
+     không hex. **NFR3** — `MaskedValue` cho mọi số tiền. **NFR4** — e2e sẵn có xanh không sửa.
 
 ## 8. Acceptance criteria
 
