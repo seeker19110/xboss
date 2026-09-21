@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { Skeleton } from "@/app/components/Skeleton";
 import {
   Layers,
   TrendingUp,
@@ -263,13 +264,36 @@ export default function ProgressMap({
       });
   }, []);
 
+  // Gọi API ghi và báo lỗi đúng cách — 3 hàm dưới trước đây bỏ qua kết quả rồi vẫn cập nhật
+  // UI/reload như đã lưu thành công (server từ chối hoặc mất mạng đều im lặng). Đối chiếu
+  // `deleteTower` trong chính file này vốn đã kiểm đúng.
+  async function guiGhi(url: string, init: RequestInit, loiMacDinh: string): Promise<boolean> {
+    try {
+      const res = await fetch(url, init);
+      if (!res.ok) {
+        const loi = (await res.json().catch(() => null))?.error;
+        appAlert(typeof loi === "string" ? loi : loiMacDinh);
+        return false;
+      }
+      return true;
+    } catch {
+      appAlert("Mất kết nối — chưa lưu được, thử lại khi có mạng");
+      return false;
+    }
+  }
+
   async function saveTitle() {
     const val = titleDraft.trim();
-    await fetch("/api/project", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ heatmapTitle: val || null }),
-    });
+    const ok = await guiGhi(
+      "/api/project",
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ heatmapTitle: val || null }),
+      },
+      "Không đổi được tiêu đề bản đồ",
+    );
+    if (!ok) return;
     setTitle(val || DEFAULT_TITLE);
     setEditingTitle(false);
   }
@@ -279,11 +303,16 @@ export default function ProgressMap({
       setEditId(null);
       return;
     }
-    await fetch(`/api/towers/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName }),
-    });
+    const ok = await guiGhi(
+      `/api/towers/${id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editName }),
+      },
+      "Không đổi được tên tháp",
+    );
+    if (!ok) return;
     setEditId(null);
     reload();
   }
@@ -307,17 +336,23 @@ export default function ProgressMap({
 
   async function addTower() {
     if (!newName.trim()) return;
-    await fetch("/api/towers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName }),
-    });
+    const ok = await guiGhi(
+      "/api/towers",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName }),
+      },
+      "Không thêm được tháp",
+    );
+    if (!ok) return;
     setAdding(false);
     setNewName("");
     reload();
   }
 
-  if (loading) return null;
+  // Đang tải: khung xương thay vì màn trắng nhảy layout (§5 — 4 trạng thái màn hình).
+  if (loading) return <Skeleton className="h-64 rounded-xl" />;
   if (!data || data.floors.length === 0) return null;
 
   const currentMap = new Map<string, CurrentCell>();
@@ -365,10 +400,15 @@ export default function ProgressMap({
                 }}
                 className="bg-zinc-900 border border-emerald-500 rounded-xl px-2.5 py-1 text-sm font-bold text-zinc-100 outline-none w-64"
               />
-              <button onClick={saveTitle} className="text-emerald-400 hover:text-emerald-300 p-1">
+              <button
+                aria-label="Lưu"
+                onClick={saveTitle}
+                className="text-emerald-400 hover:text-emerald-300 p-1"
+              >
                 <Check className="w-4 h-4" />
               </button>
               <button
+                aria-label="Xoá dòng"
                 onClick={() => setEditingTitle(false)}
                 className="text-zinc-400 hover:text-zinc-200 p-1"
               >
@@ -421,10 +461,15 @@ export default function ProgressMap({
               placeholder="Tên tháp mới (vd: Tháp B)"
               className="bg-zinc-900 border border-emerald-500 rounded-xl px-3 py-1.5 text-sm text-zinc-100 outline-none w-48"
             />
-            <button onClick={addTower} className="text-emerald-400 hover:text-emerald-300 p-1">
+            <button
+              aria-label="Lưu"
+              onClick={addTower}
+              className="text-emerald-400 hover:text-emerald-300 p-1"
+            >
               <Check className="w-4 h-4" />
             </button>
             <button
+              aria-label="Xoá dòng"
               onClick={() => setAdding(false)}
               className="text-zinc-400 hover:text-zinc-200 p-1"
             >
@@ -520,10 +565,18 @@ export default function ProgressMap({
                               }}
                               className="bg-zinc-800 border border-emerald-600 rounded px-2 py-0.5 text-xs outline-none w-28 font-semibold"
                             />
-                            <button onClick={() => saveName(tr!.id)} className="text-emerald-400">
+                            <button
+                              aria-label="Lưu"
+                              onClick={() => saveName(tr!.id)}
+                              className="text-emerald-400"
+                            >
                               <Check className="w-3.5 h-3.5" />
                             </button>
-                            <button onClick={() => setEditId(null)} className="text-zinc-500">
+                            <button
+                              aria-label="Huỷ sửa tên"
+                              onClick={() => setEditId(null)}
+                              className="text-zinc-500"
+                            >
                               <X className="w-3.5 h-3.5" />
                             </button>
                           </>

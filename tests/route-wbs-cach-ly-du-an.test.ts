@@ -115,7 +115,10 @@ test("PATCH /api/towers/:id: tháp thuộc dự án khác → 404, tên KHÔNG �
   await dangNhapDuAn(pmA, a.projectId);
 
   const { queryOne } = await import("@/lib/db");
-  const before = await queryOne<{ name: string }>(`SELECT name FROM towers WHERE id = ?`, b.towerId);
+  const before = await queryOne<{ name: string }>(
+    `SELECT name FROM towers WHERE id = ?`,
+    b.towerId,
+  );
 
   const { PATCH } = await import("@/app/api/towers/[id]/route");
   const res = await PATCH(jreq("/x", { name: "Tên hack" }, "PATCH"), {
@@ -162,23 +165,27 @@ test("DELETE /api/towers/:id: tháp thuộc dự án khác → 404, tháp KHÔNG
   assert.ok(still, "tháp dự án B vẫn còn nguyên");
 });
 
-test("DELETE /api/towers/:id: đúng dự án của mình, tháp trống → 200, xoá thành công", S, async () => {
-  const projectId = await taoDuAn("towerDelOk");
-  const { insertId, queryOne } = await import("@/lib/db");
-  const towerId = await insertId(
-    `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp trống')`,
-    projectId,
-  );
-  const pm = await taoUser("pm", "towerDelOk");
-  await dangNhapDuAn(pm, projectId);
-  const { DELETE } = await import("@/app/api/towers/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(towerId) }),
-  });
-  assert.equal(res.status, 200);
-  const still = await queryOne(`SELECT id FROM towers WHERE id = ?`, towerId);
-  assert.equal(still, undefined);
-});
+test(
+  "DELETE /api/towers/:id: đúng dự án của mình, tháp trống → 200, xoá thành công",
+  S,
+  async () => {
+    const projectId = await taoDuAn("towerDelOk");
+    const { insertId, queryOne } = await import("@/lib/db");
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp trống')`,
+      projectId,
+    );
+    const pm = await taoUser("pm", "towerDelOk");
+    await dangNhapDuAn(pm, projectId);
+    const { DELETE } = await import("@/app/api/towers/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(towerId) }),
+    });
+    assert.equal(res.status, 200);
+    const still = await queryOne(`SELECT id FROM towers WHERE id = ?`, towerId);
+    assert.equal(still, undefined);
+  },
+);
 
 // ============================================================================
 // PATCH/DELETE /api/sheets/:id
@@ -292,49 +299,57 @@ test("GET /api/work-fronts: vẫn thấy mặt trận của đúng dự án mìn
 // PATCH /api/work-fronts/:id
 // ============================================================================
 
-test("PATCH /api/work-fronts/:id: mặt trận thuộc dự án khác → 404, trạng thái KHÔNG đổi", S, async () => {
-  const a = await dungSheet("wfPatchA");
-  const b = await dungSheet("wfPatchB");
-  const frontB = await taoWorkFront(b.sheetTypeId, "T01");
-  const pmA = await taoUser("pm", "wfPatchA");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "PATCH /api/work-fronts/:id: mặt trận thuộc dự án khác → 404, trạng thái KHÔNG đổi",
+  S,
+  async () => {
+    const a = await dungSheet("wfPatchA");
+    const b = await dungSheet("wfPatchB");
+    const frontB = await taoWorkFront(b.sheetTypeId, "T01");
+    const pmA = await taoUser("pm", "wfPatchA");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { queryOne } = await import("@/lib/db");
-  const before = await queryOne<{ status: string }>(
-    `SELECT status FROM work_fronts WHERE id = ?`,
-    frontB,
-  );
+    const { queryOne } = await import("@/lib/db");
+    const before = await queryOne<{ status: string }>(
+      `SELECT status FROM work_fronts WHERE id = ?`,
+      frontB,
+    );
 
-  const { PATCH } = await import("@/app/api/work-fronts/[id]/route");
-  const res = await PATCH(jreq("/x", { status: "handed_over" }, "PATCH"), {
-    params: Promise.resolve({ id: String(frontB) }),
-  });
-  assert.equal(res.status, 404);
+    const { PATCH } = await import("@/app/api/work-fronts/[id]/route");
+    const res = await PATCH(jreq("/x", { status: "handed_over" }, "PATCH"), {
+      params: Promise.resolve({ id: String(frontB) }),
+    });
+    assert.equal(res.status, 404);
 
-  const after = await queryOne<{ status: string }>(
-    `SELECT status FROM work_fronts WHERE id = ?`,
-    frontB,
-  );
-  assert.equal(after!.status, before!.status, "trạng thái mặt trận dự án B không được đổi");
-});
+    const after = await queryOne<{ status: string }>(
+      `SELECT status FROM work_fronts WHERE id = ?`,
+      frontB,
+    );
+    assert.equal(after!.status, before!.status, "trạng thái mặt trận dự án B không được đổi");
+  },
+);
 
-test("PATCH /api/work-fronts/:id: đúng dự án của mình → 200, đổi trạng thái thành công", S, async () => {
-  const a = await dungSheet("wfPatchOk");
-  const frontA = await taoWorkFront(a.sheetTypeId, "T01");
-  const pmA = await taoUser("pm", "wfPatchOk");
-  await dangNhapDuAn(pmA, a.projectId);
-  const { PATCH } = await import("@/app/api/work-fronts/[id]/route");
-  const res = await PATCH(jreq("/x", { status: "handed_over" }, "PATCH"), {
-    params: Promise.resolve({ id: String(frontA) }),
-  });
-  assert.equal(res.status, 200);
-  const { queryOne } = await import("@/lib/db");
-  const after = await queryOne<{ status: string }>(
-    `SELECT status FROM work_fronts WHERE id = ?`,
-    frontA,
-  );
-  assert.equal(after!.status, "handed_over");
-});
+test(
+  "PATCH /api/work-fronts/:id: đúng dự án của mình → 200, đổi trạng thái thành công",
+  S,
+  async () => {
+    const a = await dungSheet("wfPatchOk");
+    const frontA = await taoWorkFront(a.sheetTypeId, "T01");
+    const pmA = await taoUser("pm", "wfPatchOk");
+    await dangNhapDuAn(pmA, a.projectId);
+    const { PATCH } = await import("@/app/api/work-fronts/[id]/route");
+    const res = await PATCH(jreq("/x", { status: "handed_over" }, "PATCH"), {
+      params: Promise.resolve({ id: String(frontA) }),
+    });
+    assert.equal(res.status, 200);
+    const { queryOne } = await import("@/lib/db");
+    const after = await queryOne<{ status: string }>(
+      `SELECT status FROM work_fronts WHERE id = ?`,
+      frontA,
+    );
+    assert.equal(after!.status, "handed_over");
+  },
+);
 
 // ============================================================================
 // GET/POST /api/work-fronts/:id/documents · GET/DELETE /api/work-front-documents/:id
@@ -354,23 +369,30 @@ test("GET /api/work-fronts/:id/documents: mặt trận thuộc dự án khác �
   assert.equal(res.status, 404);
 });
 
-test("POST /api/work-fronts/:id/documents: mặt trận thuộc dự án khác → 404, không tạo tài liệu", S, async () => {
-  const a = await dungSheet("wfDocPostA");
-  const b = await dungSheet("wfDocPostB");
-  const frontB = await taoWorkFront(b.sheetTypeId, "T01");
-  const pmA = await taoUser("pm", "wfDocPostA");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "POST /api/work-fronts/:id/documents: mặt trận thuộc dự án khác → 404, không tạo tài liệu",
+  S,
+  async () => {
+    const a = await dungSheet("wfDocPostA");
+    const b = await dungSheet("wfDocPostB");
+    const frontB = await taoWorkFront(b.sheetTypeId, "T01");
+    const pmA = await taoUser("pm", "wfDocPostA");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { POST } = await import("@/app/api/work-fronts/[id]/documents/route");
-  const res = await POST(formReq("/x", pdfForm()), {
-    params: Promise.resolve({ id: String(frontB) }),
-  });
-  assert.equal(res.status, 404);
+    const { POST } = await import("@/app/api/work-fronts/[id]/documents/route");
+    const res = await POST(formReq("/x", pdfForm()), {
+      params: Promise.resolve({ id: String(frontB) }),
+    });
+    assert.equal(res.status, 404);
 
-  const { queryOne } = await import("@/lib/db");
-  const doc = await queryOne(`SELECT id FROM work_front_documents WHERE work_front_id = ?`, frontB);
-  assert.equal(doc, undefined, "không được tạo tài liệu cho mặt trận dự án khác");
-});
+    const { queryOne } = await import("@/lib/db");
+    const doc = await queryOne(
+      `SELECT id FROM work_front_documents WHERE work_front_id = ?`,
+      frontB,
+    );
+    assert.equal(doc, undefined, "không được tạo tài liệu cho mặt trận dự án khác");
+  },
+);
 
 test(
   "POST /api/work-fronts/:id/documents: đúng dự án mình → 201, GET list + stream đúng byte",
@@ -421,52 +443,62 @@ test("GET /api/work-front-documents/:id: tài liệu thuộc dự án khác → 
   const pmA = await taoUser("pm", "wfDocStreamA");
   await dangNhapDuAn(pmA, a.projectId);
   const { GET } = await import("@/app/api/work-front-documents/[id]/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(docId) }) });
-  assert.equal(res.status, 404);
-});
-
-test("DELETE /api/work-front-documents/:id: tài liệu thuộc dự án khác → 404, KHÔNG bị xoá", S, async () => {
-  const a = await dungSheet("wfDocDelA");
-  const b = await dungSheet("wfDocDelB");
-  const frontB = await taoWorkFront(b.sheetTypeId, "T01");
-  const pmB = await taoUser("pm", "wfDocDelBUp");
-  await dangNhapDuAn(pmB, b.projectId);
-  const { POST } = await import("@/app/api/work-fronts/[id]/documents/route");
-  const created = await POST(formReq("/x", pdfForm()), {
-    params: Promise.resolve({ id: String(frontB) }),
-  });
-  const { id: docId } = await created.json();
-
-  const pmA = await taoUser("pm", "wfDocDelA");
-  await dangNhapDuAn(pmA, a.projectId);
-  const { DELETE } = await import("@/app/api/work-front-documents/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+  const res = await GET(jreq("/x", undefined, "GET"), {
     params: Promise.resolve({ id: String(docId) }),
   });
   assert.equal(res.status, 404);
-
-  const { queryOne } = await import("@/lib/db");
-  const still = await queryOne(`SELECT id FROM work_front_documents WHERE id = ?`, docId);
-  assert.ok(still, "tài liệu dự án B vẫn còn nguyên");
 });
 
-test("DELETE /api/work-front-documents/:id: đúng dự án mình (uploader) → 200, xoá thành công", S, async () => {
-  const a = await dungSheet("wfDocDelOk");
-  const frontA = await taoWorkFront(a.sheetTypeId, "T01");
-  const pmA = await taoUser("pm", "wfDocDelOk");
-  await dangNhapDuAn(pmA, a.projectId);
-  const { POST } = await import("@/app/api/work-fronts/[id]/documents/route");
-  const created = await POST(formReq("/x", pdfForm()), {
-    params: Promise.resolve({ id: String(frontA) }),
-  });
-  const { id: docId } = await created.json();
+test(
+  "DELETE /api/work-front-documents/:id: tài liệu thuộc dự án khác → 404, KHÔNG bị xoá",
+  S,
+  async () => {
+    const a = await dungSheet("wfDocDelA");
+    const b = await dungSheet("wfDocDelB");
+    const frontB = await taoWorkFront(b.sheetTypeId, "T01");
+    const pmB = await taoUser("pm", "wfDocDelBUp");
+    await dangNhapDuAn(pmB, b.projectId);
+    const { POST } = await import("@/app/api/work-fronts/[id]/documents/route");
+    const created = await POST(formReq("/x", pdfForm()), {
+      params: Promise.resolve({ id: String(frontB) }),
+    });
+    const { id: docId } = await created.json();
 
-  const { DELETE } = await import("@/app/api/work-front-documents/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(docId) }),
-  });
-  assert.equal(res.status, 200);
-});
+    const pmA = await taoUser("pm", "wfDocDelA");
+    await dangNhapDuAn(pmA, a.projectId);
+    const { DELETE } = await import("@/app/api/work-front-documents/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(docId) }),
+    });
+    assert.equal(res.status, 404);
+
+    const { queryOne } = await import("@/lib/db");
+    const still = await queryOne(`SELECT id FROM work_front_documents WHERE id = ?`, docId);
+    assert.ok(still, "tài liệu dự án B vẫn còn nguyên");
+  },
+);
+
+test(
+  "DELETE /api/work-front-documents/:id: đúng dự án mình (uploader) → 200, xoá thành công",
+  S,
+  async () => {
+    const a = await dungSheet("wfDocDelOk");
+    const frontA = await taoWorkFront(a.sheetTypeId, "T01");
+    const pmA = await taoUser("pm", "wfDocDelOk");
+    await dangNhapDuAn(pmA, a.projectId);
+    const { POST } = await import("@/app/api/work-fronts/[id]/documents/route");
+    const created = await POST(formReq("/x", pdfForm()), {
+      params: Promise.resolve({ id: String(frontA) }),
+    });
+    const { id: docId } = await created.json();
+
+    const { DELETE } = await import("@/app/api/work-front-documents/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(docId) }),
+    });
+    assert.equal(res.status, 200);
+  },
+);
 
 // ============================================================================
 // GET/POST /api/packages/:id/dependencies · DELETE /api/package-dependencies/:id
@@ -480,117 +512,139 @@ test("GET /api/packages/:id/dependencies: nhóm việc thuộc dự án khác �
   await dangNhapDuAn(pmA, a.projectId);
 
   const { GET } = await import("@/app/api/packages/[id]/dependencies/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(pkgB) }) });
-  assert.equal(res.status, 404);
-});
-
-test("POST /api/packages/:id/dependencies: predecessor ở dự án khác → 404, KHÔNG tạo quan hệ", S, async () => {
-  const a = await dungSheet("pdepPostA");
-  const b = await dungSheet("pdepPostB");
-  const pkgA = await taoNhom(a.sheetTypeId, "A1");
-  const pkgB = await taoNhom(b.sheetTypeId, "B1");
-  const pmA = await taoUser("pm", "pdepPostA");
-  await dangNhapDuAn(pmA, a.projectId);
-
-  const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
-  const res = await POST(jreq("/x", { predecessorId: pkgB }), {
-    params: Promise.resolve({ id: String(pkgA) }),
-  });
-  assert.equal(res.status, 404);
-
-  const { queryOne } = await import("@/lib/db");
-  const dep = await queryOne(
-    `SELECT id FROM package_dependencies WHERE predecessor_id = ? AND successor_id = ?`,
-    pkgB,
-    pkgA,
-  );
-  assert.equal(dep, undefined, "không được tạo quan hệ phụ thuộc xuyên dự án");
-});
-
-test("POST /api/packages/:id/dependencies: successor thuộc dự án khác → 404 (id trong URL đoán được)", S, async () => {
-  const a = await dungSheet("pdepPostSuccA");
-  const b = await dungSheet("pdepPostSuccB");
-  const pkgA = await taoNhom(a.sheetTypeId, "A1");
-  const pkgB = await taoNhom(b.sheetTypeId, "B1");
-  const pmA = await taoUser("pm", "pdepPostSuccA");
-  await dangNhapDuAn(pmA, a.projectId);
-
-  const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
-  // pmA đang ở dự án A nhưng đoán id nhóm việc B trong URL — cả predecessor lẫn successor
-  // đều phải nằm trong dự án nhìn thấy được.
-  const res = await POST(jreq("/x", { predecessorId: pkgA }), {
+  const res = await GET(jreq("/x", undefined, "GET"), {
     params: Promise.resolve({ id: String(pkgB) }),
   });
   assert.equal(res.status, 404);
 });
 
-test("GET+POST /api/packages/:id/dependencies: đúng dự án của mình → hoạt động bình thường", S, async () => {
-  const a = await dungSheet("pdepOk");
-  const pkgA1 = await taoNhom(a.sheetTypeId, "A1");
-  const pkgA2 = await taoNhom(a.sheetTypeId, "A2");
-  const pmA = await taoUser("pm", "pdepOk");
-  await dangNhapDuAn(pmA, a.projectId);
+test(
+  "POST /api/packages/:id/dependencies: predecessor ở dự án khác → 404, KHÔNG tạo quan hệ",
+  S,
+  async () => {
+    const a = await dungSheet("pdepPostA");
+    const b = await dungSheet("pdepPostB");
+    const pkgA = await taoNhom(a.sheetTypeId, "A1");
+    const pkgB = await taoNhom(b.sheetTypeId, "B1");
+    const pmA = await taoUser("pm", "pdepPostA");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
-  const created = await POST(jreq("/x", { predecessorId: pkgA1 }), {
-    params: Promise.resolve({ id: String(pkgA2) }),
-  });
-  assert.equal(created.status, 201);
+    const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
+    const res = await POST(jreq("/x", { predecessorId: pkgB }), {
+      params: Promise.resolve({ id: String(pkgA) }),
+    });
+    assert.equal(res.status, 404);
 
-  const { GET } = await import("@/app/api/packages/[id]/dependencies/route");
-  const res = await GET(jreq("/x", undefined, "GET"), {
-    params: Promise.resolve({ id: String(pkgA2) }),
-  });
-  assert.equal(res.status, 200);
-  const { predecessors } = await res.json();
-  assert.equal(predecessors.length, 1);
-  assert.equal(predecessors[0].id, pkgA1);
-});
+    const { queryOne } = await import("@/lib/db");
+    const dep = await queryOne(
+      `SELECT id FROM package_dependencies WHERE predecessor_id = ? AND successor_id = ?`,
+      pkgB,
+      pkgA,
+    );
+    assert.equal(dep, undefined, "không được tạo quan hệ phụ thuộc xuyên dự án");
+  },
+);
 
-test("DELETE /api/package-dependencies/:id: quan hệ thuộc dự án khác → 404, KHÔNG bị xoá", S, async () => {
-  const a = await dungSheet("pdelIsoA");
-  const b = await dungSheet("pdelIsoB");
-  const pkgB1 = await taoNhom(b.sheetTypeId, "B1");
-  const pkgB2 = await taoNhom(b.sheetTypeId, "B2");
-  const pmB = await taoUser("pm", "pdelIsoBOwn");
-  await dangNhapDuAn(pmB, b.projectId);
-  const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
-  const created = await POST(jreq("/x", { predecessorId: pkgB1 }), {
-    params: Promise.resolve({ id: String(pkgB2) }),
-  });
-  const { id: depId } = await created.json();
+test(
+  "POST /api/packages/:id/dependencies: successor thuộc dự án khác → 404 (id trong URL đoán được)",
+  S,
+  async () => {
+    const a = await dungSheet("pdepPostSuccA");
+    const b = await dungSheet("pdepPostSuccB");
+    const pkgA = await taoNhom(a.sheetTypeId, "A1");
+    const pkgB = await taoNhom(b.sheetTypeId, "B1");
+    const pmA = await taoUser("pm", "pdepPostSuccA");
+    await dangNhapDuAn(pmA, a.projectId);
 
-  const pmA = await taoUser("pm", "pdelIsoA");
-  await dangNhapDuAn(pmA, a.projectId);
-  const { DELETE } = await import("@/app/api/package-dependencies/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(depId) }),
-  });
-  assert.equal(res.status, 404);
+    const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
+    // pmA đang ở dự án A nhưng đoán id nhóm việc B trong URL — cả predecessor lẫn successor
+    // đều phải nằm trong dự án nhìn thấy được.
+    const res = await POST(jreq("/x", { predecessorId: pkgA }), {
+      params: Promise.resolve({ id: String(pkgB) }),
+    });
+    assert.equal(res.status, 404);
+  },
+);
 
-  const { queryOne } = await import("@/lib/db");
-  const still = await queryOne(`SELECT id FROM package_dependencies WHERE id = ?`, depId);
-  assert.ok(still, "quan hệ phụ thuộc dự án B vẫn còn nguyên");
-});
+test(
+  "GET+POST /api/packages/:id/dependencies: đúng dự án của mình → hoạt động bình thường",
+  S,
+  async () => {
+    const a = await dungSheet("pdepOk");
+    const pkgA1 = await taoNhom(a.sheetTypeId, "A1");
+    const pkgA2 = await taoNhom(a.sheetTypeId, "A2");
+    const pmA = await taoUser("pm", "pdepOk");
+    await dangNhapDuAn(pmA, a.projectId);
 
-test("DELETE /api/package-dependencies/:id: đúng dự án của mình → 200, xoá thành công", S, async () => {
-  const a = await dungSheet("pdelIsoOk");
-  const pkgA1 = await taoNhom(a.sheetTypeId, "A1");
-  const pkgA2 = await taoNhom(a.sheetTypeId, "A2");
-  const pmA = await taoUser("pm", "pdelIsoOk");
-  await dangNhapDuAn(pmA, a.projectId);
-  const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
-  const created = await POST(jreq("/x", { predecessorId: pkgA1 }), {
-    params: Promise.resolve({ id: String(pkgA2) }),
-  });
-  const { id: depId } = await created.json();
+    const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
+    const created = await POST(jreq("/x", { predecessorId: pkgA1 }), {
+      params: Promise.resolve({ id: String(pkgA2) }),
+    });
+    assert.equal(created.status, 201);
 
-  const { DELETE } = await import("@/app/api/package-dependencies/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(depId) }),
-  });
-  assert.equal(res.status, 200);
-  const { queryOne } = await import("@/lib/db");
-  const still = await queryOne(`SELECT id FROM package_dependencies WHERE id = ?`, depId);
-  assert.equal(still, undefined);
-});
+    const { GET } = await import("@/app/api/packages/[id]/dependencies/route");
+    const res = await GET(jreq("/x", undefined, "GET"), {
+      params: Promise.resolve({ id: String(pkgA2) }),
+    });
+    assert.equal(res.status, 200);
+    const { predecessors } = await res.json();
+    assert.equal(predecessors.length, 1);
+    assert.equal(predecessors[0].id, pkgA1);
+  },
+);
+
+test(
+  "DELETE /api/package-dependencies/:id: quan hệ thuộc dự án khác → 404, KHÔNG bị xoá",
+  S,
+  async () => {
+    const a = await dungSheet("pdelIsoA");
+    const b = await dungSheet("pdelIsoB");
+    const pkgB1 = await taoNhom(b.sheetTypeId, "B1");
+    const pkgB2 = await taoNhom(b.sheetTypeId, "B2");
+    const pmB = await taoUser("pm", "pdelIsoBOwn");
+    await dangNhapDuAn(pmB, b.projectId);
+    const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
+    const created = await POST(jreq("/x", { predecessorId: pkgB1 }), {
+      params: Promise.resolve({ id: String(pkgB2) }),
+    });
+    const { id: depId } = await created.json();
+
+    const pmA = await taoUser("pm", "pdelIsoA");
+    await dangNhapDuAn(pmA, a.projectId);
+    const { DELETE } = await import("@/app/api/package-dependencies/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(depId) }),
+    });
+    assert.equal(res.status, 404);
+
+    const { queryOne } = await import("@/lib/db");
+    const still = await queryOne(`SELECT id FROM package_dependencies WHERE id = ?`, depId);
+    assert.ok(still, "quan hệ phụ thuộc dự án B vẫn còn nguyên");
+  },
+);
+
+test(
+  "DELETE /api/package-dependencies/:id: đúng dự án của mình → 200, xoá thành công",
+  S,
+  async () => {
+    const a = await dungSheet("pdelIsoOk");
+    const pkgA1 = await taoNhom(a.sheetTypeId, "A1");
+    const pkgA2 = await taoNhom(a.sheetTypeId, "A2");
+    const pmA = await taoUser("pm", "pdelIsoOk");
+    await dangNhapDuAn(pmA, a.projectId);
+    const { POST } = await import("@/app/api/packages/[id]/dependencies/route");
+    const created = await POST(jreq("/x", { predecessorId: pkgA1 }), {
+      params: Promise.resolve({ id: String(pkgA2) }),
+    });
+    const { id: depId } = await created.json();
+
+    const { DELETE } = await import("@/app/api/package-dependencies/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(depId) }),
+    });
+    assert.equal(res.status, 200);
+    const { queryOne } = await import("@/lib/db");
+    const still = await queryOne(`SELECT id FROM package_dependencies WHERE id = ?`, depId);
+    assert.equal(still, undefined);
+  },
+);

@@ -22,18 +22,18 @@ Mỗi trục theo khung: **Hiện trạng** (bám code, có đường dẫn file
 
 ### Khoảng cách với ERP
 
-| Vấn đề | ERP chuyên nghiệp |
-| --- | --- |
-| Danh mục (lý do trễ, đơn vị, loại tài liệu…) hard-code trong `lib/*.ts` | Danh mục cấu hình được, Admin sửa không cần deploy |
+| Vấn đề                                                                      | ERP chuyên nghiệp                                        |
+| --------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Danh mục (lý do trễ, đơn vị, loại tài liệu…) hard-code trong `lib/*.ts`     | Danh mục cấu hình được, Admin sửa không cần deploy       |
 | Không có master-data dùng chung giữa dự án (NCC, catalog vật tư, cost code) | Master-data tập trung, mã hoá thống nhất (CSI/Uniformat) |
-| `docs/ERD.md` cập nhật tay, đã ghi nợ trôi schema | Từ điển dữ liệu sinh tự động từ DB |
-| Xoá là xoá thật (trừ vài bảng `*_history`) | Soft-delete/temporal cho thực thể hợp đồng-tài chính |
-| NUMERIC → float JS khi ra khỏi DB | Tiền tính toàn trình bằng số chính xác |
-| Ít `CHECK` ràng buộc miền giá trị | `%∈[0,1]`, `qty≥0`, enum bằng CHECK |
+| `docs/ERD.md` cập nhật tay, đã ghi nợ trôi schema                           | Từ điển dữ liệu sinh tự động từ DB                       |
+| Xoá là xoá thật (trừ vài bảng `*_history`)                                  | Soft-delete/temporal cho thực thể hợp đồng-tài chính     |
+| NUMERIC → float JS khi ra khỏi DB                                           | Tiền tính toàn trình bằng số chính xác                   |
+| Ít `CHECK` ràng buộc miền giá trị                                           | `%∈[0,1]`, `qty≥0`, enum bằng CHECK                      |
 
 ### Đề xuất
 
-1. **ERD tự sinh** — `scripts/gen-erd.ts` đọc `information_schema` → sinh `docs/ERD.md` (bảng, cột, FK, index); thêm bước CI so khớp để chặn trôi. *Quick win, 1 PR nhỏ.*
+1. **ERD tự sinh** — `scripts/gen-erd.ts` đọc `information_schema` → sinh `docs/ERD.md` (bảng, cột, FK, index); thêm bước CI so khớp để chặn trôi. _Quick win, 1 PR nhỏ._
 2. **`code_lists` danh mục mềm**: `code_lists(id, domain, code, label, sort, active, meta jsonb, UNIQUE(domain, code))`. Chuyển dần các enum-mềm (lý do trễ, loại tài liệu, nhóm chi phí) sang bảng này, giữ enum cứng cho status có logic (`lib/status.ts`). API `/api/admin/code-lists` (Admin), cache in-memory + version.
 3. **Cost code chuẩn** làm chiều phân tích xuyên suốt BOQ ↔ chi phí ↔ hợp đồng ↔ vật tư: bảng `cost_codes(code, name, parent_code, level)` (cây), cột `cost_code` trên `costs`, `boq_norms`, `purchase_orders`. Đây là xương sống cho BI trục 5.
 4. **Tiền chính xác**: giữ NUMERIC ở DB; sửa parser oid 1700 chỉ parse float cho cột thống kê, còn tiền trả về string + helper `money.ts` (cộng/nhân bằng số nguyên đồng). Tối thiểu: quy ước "mọi phép cộng tiền làm trong SQL (`SUM`), JS chỉ hiển thị" + lint rule.
@@ -161,7 +161,7 @@ Dashboard KPI, S-curve (tái dựng từ `task_history`), `lib/dashboardext.ts` 
    - PV: nội suy baseline (`baseline_tasks`) × trọng số giá trị BOQ/cost code;
    - EV: `progress_percent` hiện tại × trọng số;
    - AC: `costs`/`cash_transactions` theo cost code.
-   → `lib/evm.ts` tính SPI/CPI/EAC/ETC cấp dự án + hệ; card trên Dashboard + tab trong `/report`. Đây là ngôn ngữ chuẩn khi báo cáo CĐT/tư vấn.
+     → `lib/evm.ts` tính SPI/CPI/EAC/ETC cấp dự án + hệ; card trên Dashboard + tab trong `/report`. Đây là ngôn ngữ chuẩn khi báo cáo CĐT/tư vấn.
 2. **Materialized views** cho độ đo nặng lặp lại (`mv_progress_by_system_week`, `mv_cost_by_code`), `REFRESH MATERIALIZED VIEW CONCURRENTLY` qua cron sẵn có — tách đọc-nặng khỏi bảng giao dịch.
 3. **Report builder tối giản**: `saved_reports(id, owner_id, project_id, name, config jsonb)` — config = {nguồn view, filter, group by, cột}; 1 trang render bảng + export. Không OLAP, không kéo-thả phức tạp.
 4. **Cảnh báo cấu hình được**: `alert_rules(metric, operator, threshold, channel, project_id)` thay ngưỡng hard-code trong `/api/notifications` (due_soon ≤3 ngày, progress <70%… thành dữ liệu).
@@ -242,12 +242,12 @@ Sentry scaffold xong (chờ DSN), `deploy.sh` swap `.next` atomic + pm2 reload, 
 
 ## Lộ trình ưu tiên
 
-| Ưu tiên | Hạng mục | Lý do | Quy mô |
-| --- | --- | --- | --- |
-| **P0 — bảo vệ & nền** | Audit trail toàn hệ (4) · backup/DR + health + Sentry DSN (9) · test bất biến scoping (7.1) · ERD tự sinh (1.1) | Dữ liệu tiền thật cần truy vết + sao lưu; rủi ro cao nếu chậm; toàn quick-win kỹ thuật | 3–4 PR |
-| **P1 — khác biệt ERP** | Approval Engine (2) · EVM (5.1) · HĐĐT + kế toán API (6.1–6.2) | Đóng 2 khoảng cách lớn nhất (workflow + tài chính); EVM tận dụng CPM/baseline sẵn có | 3–4 PR mỗi mục |
-| **P2 — mở rộng bền** | Quyền dữ liệu-hoá + field-level (3) · RLS phòng tuyến 2 (7.2, cần ADR) · master-data/code_lists + cost code (1.2–1.3) · money helper (1.4) | Giảm lớp lỗi lặp lại, mở đường cấu hình | vừa |
-| **P3 — trải nghiệm & scale** | Report builder + alert rules (5.3–5.4) · custom fields + module registry + feature flags (8) · SSO + API keys/webhook (6.3–6.4) · organization/đa pháp nhân (7.3) | Giá trị cao nhưng phụ thuộc nền P0–P2 | lớn, làm dần |
+| Ưu tiên                      | Hạng mục                                                                                                                                                          | Lý do                                                                                  | Quy mô         |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | -------------- |
+| **P0 — bảo vệ & nền**        | Audit trail toàn hệ (4) · backup/DR + health + Sentry DSN (9) · test bất biến scoping (7.1) · ERD tự sinh (1.1)                                                   | Dữ liệu tiền thật cần truy vết + sao lưu; rủi ro cao nếu chậm; toàn quick-win kỹ thuật | 3–4 PR         |
+| **P1 — khác biệt ERP**       | Approval Engine (2) · EVM (5.1) · HĐĐT + kế toán API (6.1–6.2)                                                                                                    | Đóng 2 khoảng cách lớn nhất (workflow + tài chính); EVM tận dụng CPM/baseline sẵn có   | 3–4 PR mỗi mục |
+| **P2 — mở rộng bền**         | Quyền dữ liệu-hoá + field-level (3) · RLS phòng tuyến 2 (7.2, cần ADR) · master-data/code_lists + cost code (1.2–1.3) · money helper (1.4)                        | Giảm lớp lỗi lặp lại, mở đường cấu hình                                                | vừa            |
+| **P3 — trải nghiệm & scale** | Report builder + alert rules (5.3–5.4) · custom fields + module registry + feature flags (8) · SSO + API keys/webhook (6.3–6.4) · organization/đa pháp nhân (7.3) | Giá trị cao nhưng phụ thuộc nền P0–P2                                                  | lớn, làm dần   |
 
 **Nguyên tắc thực thi** (theo CLAUDE.md): mỗi hạng mục viết đặc tả `docs/nang-cap/G<nn>-*.md` (schema DDL, API, điểm chạm, chia PR) trước khi code; uỷ thác `coder` khi đặc tả đã rõ; RLS và organization cần ADR mới trước khi làm.
 
@@ -257,39 +257,39 @@ Thang 1–5: 1–2 thiếu/sơ khai · 2.5–3 có nhưng cứng · 3.5–4 vữ
 
 ### 9 trục năng lực ERP
 
-| Trục | XBoss | Procore | SAP EC&O | FastCons | Khoảng cách chính của XBoss |
-| --- | :-: | :-: | :-: | :-: | --- |
-| 1. Mô hình dữ liệu | 3.5 | 4.0 | 5.0 | 3.0 | Thiếu master-data/cost code chuẩn, danh mục cấu hình được; NUMERIC → parseFloat |
-| 2. Workflow/phê duyệt | 2.0 | 4.5 | 5.0 | 3.5 | Gate chắc nhưng hard-code; không chuỗi duyệt nhiều cấp/ngưỡng/SLA |
-| 3. Phân quyền | 3.0 | 4.5 | 5.0 | 3.0 | RBAC vững; thiếu quyền theo trường/hạn mức, SoD, vai trò cấu hình được |
-| 4. Audit/tuân thủ | 2.0 | 4.0 | 5.0 | 3.0 | 7 bảng history rời rạc; chưa audit_log thống nhất, immutable, ký số |
-| 5. Báo cáo/BI | 3.0 | 4.0 | 4.5 | 3.0 | Có S-curve+CPM+baseline; thiếu EVM chuẩn, report builder, alert cấu hình |
-| 6. Tích hợp | 2.0 | 5.0 | 5.0 | 3.5 | Không API mở/webhook/SSO/kế toán/HĐĐT |
-| 7. Đa dự án | 3.5 | 5.0 | 5.0 | 4.0 | Scoping thủ công từng route (từng lộ lỗi); chưa đa pháp nhân |
-| 8. Kiến trúc & mở rộng | 3.0 | 4.0 | 4.0 | 3.0 | Mở rộng = viết code; chưa custom fields/feature flags/module registry |
-| 9. Vận hành | 2.5 | 5.0 | 4.5 | 4.0 | Chưa backup/DR chính thức, health, metrics, staging |
-| **Trung bình** | **2.7** | **4.6** | **4.8** | **3.3** | |
+| Trục                   |  XBoss  | Procore | SAP EC&O | FastCons | Khoảng cách chính của XBoss                                                     |
+| ---------------------- | :-----: | :-----: | :------: | :------: | ------------------------------------------------------------------------------- |
+| 1. Mô hình dữ liệu     |   3.5   |   4.0   |   5.0    |   3.0    | Thiếu master-data/cost code chuẩn, danh mục cấu hình được; NUMERIC → parseFloat |
+| 2. Workflow/phê duyệt  |   2.0   |   4.5   |   5.0    |   3.5    | Gate chắc nhưng hard-code; không chuỗi duyệt nhiều cấp/ngưỡng/SLA               |
+| 3. Phân quyền          |   3.0   |   4.5   |   5.0    |   3.0    | RBAC vững; thiếu quyền theo trường/hạn mức, SoD, vai trò cấu hình được          |
+| 4. Audit/tuân thủ      |   2.0   |   4.0   |   5.0    |   3.0    | 7 bảng history rời rạc; chưa audit_log thống nhất, immutable, ký số             |
+| 5. Báo cáo/BI          |   3.0   |   4.0   |   4.5    |   3.0    | Có S-curve+CPM+baseline; thiếu EVM chuẩn, report builder, alert cấu hình        |
+| 6. Tích hợp            |   2.0   |   5.0   |   5.0    |   3.5    | Không API mở/webhook/SSO/kế toán/HĐĐT                                           |
+| 7. Đa dự án            |   3.5   |   5.0   |   5.0    |   4.0    | Scoping thủ công từng route (từng lộ lỗi); chưa đa pháp nhân                    |
+| 8. Kiến trúc & mở rộng |   3.0   |   4.0   |   4.0    |   3.0    | Mở rộng = viết code; chưa custom fields/feature flags/module registry           |
+| 9. Vận hành            |   2.5   |   5.0   |   4.5    |   4.0    | Chưa backup/DR chính thức, health, metrics, staging                             |
+| **Trung bình**         | **2.7** | **4.6** | **4.8**  | **3.3**  |                                                                                 |
 
 ### 3 trục XBoss thắng ERP đóng gói
 
-| Trục | XBoss | Procore | SAP EC&O | FastCons |
-| --- | :-: | :-: | :-: | :-: |
-| Hiện trường mobile/offline (PWA queue, SSE, mobile-first) | 4.5 | 4.0 | 2.5 | 3.5 |
-| Bản địa hoá VN & nghiệp vụ MEP/ACMV | 5.0 | 1.5 | 2.0 | 4.5 |
-| Chi phí & chủ quyền dữ liệu (tự host, không license/user) | 5.0 | 2.0 | 1.5 | 3.0 |
+| Trục                                                      | XBoss | Procore | SAP EC&O | FastCons |
+| --------------------------------------------------------- | :---: | :-----: | :------: | :------: |
+| Hiện trường mobile/offline (PWA queue, SSE, mobile-first) |  4.5  |   4.0   |   2.5    |   3.5    |
+| Bản địa hoá VN & nghiệp vụ MEP/ACMV                       |  5.0  |   1.5   |   2.0    |   4.5    |
+| Chi phí & chủ quyền dữ liệu (tự host, không license/user) |  5.0  |   2.0   |   1.5    |   3.0    |
 
 ### Chất lượng nội tại codebase (tham chiếu ISO 25010)
 
-| Phương diện | Điểm | Bằng chứng | Điểm yếu chính |
-| --- | :-: | --- | --- |
-| Chất lượng code & DevEx | 4.0 | TS strict, SQL tham số hoá, 46 file test, CI đầy đủ, 5 ADR, nợ ghi công khai | File tracking ~3000 dòng |
-| Bảo mật | 3.5 | Session HMAC, rate-limit DB, API boundary duy nhất, checklist audit.md | Chưa SSO/2FA; audit rời rạc |
-| Toàn vẹn dữ liệu | 3.5 | withTransaction, advisory lock, trigger BOQCODE, idempotent, sync_locks | NUMERIC→float JS; ít CHECK; xoá cứng |
-| Độ tin cậy & offline | 4.0 | PWA queue tự xả, SSE fallback, deploy atomic, fail-fast | Chưa health/giám sát ngoài |
-| Hiệu năng | 3.0 | Index chủ đích, Lighthouse gate, pool giới hạn | Chưa MV; dashboard tính lại mỗi request |
-| UI/UX & a11y | 4.5 | Token dark-first, axe e2e, Lighthouse CI, mobile-first, in sạch | Phụ thuộc kỷ luật khi thêm module |
-| Vận hành | 2.5 | Runbook, Sentry scaffold, deploy tự động | Chưa backup kiểm chứng/staging/metrics |
-| **Tổng hợp** | **3.6** | | |
+| Phương diện             |  Điểm   | Bằng chứng                                                                   | Điểm yếu chính                          |
+| ----------------------- | :-----: | ---------------------------------------------------------------------------- | --------------------------------------- |
+| Chất lượng code & DevEx |   4.0   | TS strict, SQL tham số hoá, 46 file test, CI đầy đủ, 5 ADR, nợ ghi công khai | File tracking ~3000 dòng                |
+| Bảo mật                 |   3.5   | Session HMAC, rate-limit DB, API boundary duy nhất, checklist audit.md       | Chưa SSO/2FA; audit rời rạc             |
+| Toàn vẹn dữ liệu        |   3.5   | withTransaction, advisory lock, trigger BOQCODE, idempotent, sync_locks      | NUMERIC→float JS; ít CHECK; xoá cứng    |
+| Độ tin cậy & offline    |   4.0   | PWA queue tự xả, SSE fallback, deploy atomic, fail-fast                      | Chưa health/giám sát ngoài              |
+| Hiệu năng               |   3.0   | Index chủ đích, Lighthouse gate, pool giới hạn                               | Chưa MV; dashboard tính lại mỗi request |
+| UI/UX & a11y            |   4.5   | Token dark-first, axe e2e, Lighthouse CI, mobile-first, in sạch              | Phụ thuộc kỷ luật khi thêm module       |
+| Vận hành                |   2.5   | Runbook, Sentry scaffold, deploy tự động                                     | Chưa backup kiểm chứng/staging/metrics  |
+| **Tổng hợp**            | **3.6** |                                                                              |                                         |
 
 **Đọc bảng điểm**: chất lượng nội tại (3.6) cao hơn hẳn độ phủ năng lực ERP (2.7) — khoảng cách không nằm ở chất lượng code mà ở năng lực nền tảng chưa xây (workflow, audit, tích hợp, vận hành). Nền móng đủ vững để xây tiếp, không phải làm lại. Ba việc "rẻ nhất trên mỗi điểm tăng thêm": audit trail (trục 4, tận dụng withTransaction), Approval Engine (trục 2), backup+health (trục 9); EVM (trục 5) là lợi thế sẵn có chỉ còn thiếu ~30%.
 

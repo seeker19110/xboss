@@ -1,5 +1,366 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ M126 — DocShell cho `/claims`, `/variations`, `/contracts` — 2026-09-21
+
+Đặc tả `docs/nang-cap/M126-docshell-contracts-variations-claims.md` (Approved). Đóng non-goal của
+M124: 3 trang tài chính còn lại chuyển từ "bảng + Modal" sang master–detail cùng mẫu
+`/payment-certs` (danh sách trái, chứng từ toàn trang phải, `?id=` trong URL, `DocToolbar` +
+`bottomActions`, `Chip`/`DocField`/`DocTotals`/`StatCard`/`Button`). Modal **tạo mới** giữ nguyên
+(text/label/aria neo bởi e2e), chỉ tách sang `_components/Add<X>Modal.tsx`.
+
+- **`/claims`** (803 → 354 dòng): 2 StatCard đầu trang + filter loại (giữ `role="group"` +
+  `aria-pressed`); khối "Quyết định" inline thay chuỗi `appPrompt` cũ (ô Chốt/Ghi chú + nút
+  Chốt/Từ chối); `DocTotals` phân nhánh theo `kind` (cost: tiền, eot: số ngày).
+- **`/variations`** (946 → 267 dòng): 4 StatCard theo trạng thái đứng trước danh sách (giữ
+  `.first()` của e2e); lưới dòng có ô "KL duyệt" sửa inline khi `canDecide`; khối "Đưa vào phụ lục
+  hợp đồng" giữ nguyên logic.
+- **`/contracts`** (1200 → 404 dòng): 3 StatCard theo `kind` + nhóm gập/mở giữ ở danh sách trái;
+  chứng từ dùng `Tabs` (M125) cho 5 nhóm nội dung (`info/addenda/documents/links/ipc`, URL
+  `?tab=`); bản ghi đã xoá **không** mở chứng từ (EmptyState nhắc khôi phục trước), đúng nguyên
+  tắc M124 giữ nguyên hành vi soft-delete.
+- Che tiền/`MaskedValue` áp cho cả 3 trang; `/variations` đổi giá trị quyết định trong `decide()`
+  sang `mMul/mSumBy` (trước là cộng dồn float JS).
+- Xác thực bằng route thật trên Postgres ephemeral (tạo → trình/quyết định/upload/xoá-khôi phục
+  đều 200/201 đúng body cũ) cho cả 3 trang; `npm test` (4098 ca, Postgres thật) và bộ cổng UI
+  (`lint/typecheck/build/check:contrast/check:mau-accent/check:hex-hardcode/format:check`) xanh.
+  E2E Playwright chưa chạy được tại chỗ (proxy chặn tải Chromium) — chờ CI xác nhận
+  `contracts.spec.ts`/`variations.spec.ts`/`claims.spec.ts`/`input-zoom-mobile.spec.ts`.
+- Không đổi API/lib/migration/`CustomFieldsSection`.
+
+## ✅ Xoá 7 route "Lớp Engineering OS" dead code (đóng M-03) — 2026-09-21
+
+Chốt hướng cho cụm 13 route "chờ chốt hướng ở đề xuất #6 audit 2026-08-25" (mở đầu từ đợt
+`/maintain`). Đánh giá giá trị + rà kỹ dependency trước khi xoá, phát hiện 3 route thực ra là
+mắt xích còn thiếu của tính năng **đang sống** (không phải dead code):
+
+- **Giữ nguyên chờ gắn UI** (giá trị cao — nối vào vòng lặp tiến độ/WBS/thanh toán hoặc phòng
+  rủi ro thi công): `zero-error/pour-permits`, `pipe-spool-tracking`, `closed-loop-sync`.
+- **Giữ nguyên vì đang là mắt xích thiếu của tính năng có UI thật** (xoá sẽ làm gãy tính năng
+  đang chạy, không phải dọn rác): `workflows/[id]/transition` (cách duy nhất đưa workflow đã
+  duyệt qua executing→completed, trang `/engineering/workflows` chưa gọi), `swarm/debates/[id]/
+{arguments,synthesize}` (cách duy nhất thêm lập luận/tổng hợp cho debate, trang
+  `/engineering/swarm` tạo debate được nhưng không tự sinh lập luận).
+- **Xác nhận thật là dead code, đã xoá** (backend xong, không route/UI/lib nào khác gọi tới):
+  `digital-handover`, `project-health`, `multi-agent-copilot`, `mepf-predictive`, `carbon-lca`
+  (mỗi cái xoá cả route + `lib/ky-thuat/engineering-*.ts` riêng + test riêng), `compliance/
+audit-element` (chỉ xoá hàm `auditEngineeringElement` — module `engineering-prescriptive.ts`
+  giữ lại vì `scanAllElementsCompliance` vẫn cần), `taxonomy` (chỉ xoá hàm `getTaxonomy` — module
+  `engineering-graph.ts` giữ lại vì `traverseGraph`/lineage/impact vẫn cần).
+
+**File chạm:** 7 route + 5 lib module riêng bị xoá; `lib/ky-thuat/engineering-{graph,prescriptive,
+suite}.ts` sửa surgical (chỉ bỏ phần liên quan, giữ phần dùng chung); `scripts/dead-routes-
+allowlist.json` bỏ 7 mục; test liên quan (`route-eng-{du-bao,mepf,zero-error}.test.ts`,
+`engineering-{graph,prescriptive,suite}.test.ts`, `audit-2026-09-05-guards.test.ts`) sửa/xoá theo.
+Một test khác (`GET /compliance/audits: hạnh phúc`) từng dùng route `audit-element` để seed dữ
+liệu mẫu — đổi sang chèn DB trực tiếp (cùng khuôn đã dùng cho dự án B trong chính test đó).
+
+**Verify:** lint/typecheck/build xanh; `check:dead-code`/`check:dead-routes`/`check:route-perms`/
+`check:project-scope`/`check:migrations`/`check:hex-hardcode`/`check:lib-layers`/`format:check`
+xanh; `npm test -- --release-gate` với Postgres 16 thật → **245 file, 4057 ca pass, 0 fail, 1 skip
+có chủ đích** (giảm đúng 6 file/41 ca so với trước do xoá test riêng của 5 module).
+
+## ✅ Đợt bảo trì `/maintain` đầu tiên — 2026-09-21
+
+Chạy thử `/maintain` (agent `maintainer` quét, kế hoạch `docs/ops/MAINTENANCE-PLAN.md` cho người
+dùng duyệt). Kết quả: repo khá sạch, không có lỗi nghiêm trọng.
+
+- **M-01 (xong)**: xác nhận thật `npm test -- --release-gate` với Postgres 16 thật → **251 file,
+  4098 ca pass, 0 fail, 1 skip có chủ đích** — 4 mục `scripts/test-skip-allowlist.json` vẫn đúng
+  lý do.
+- **M-02 (xong)**: sửa bug thật trong `scripts/maintenance-sweep.sh` — `npm outdated` cố ý thoát
+  mã 1 khi có package lỗi thời, kết hợp `set -o pipefail` khiến `|| echo 0` chạy thêm ngoài ý
+  muốn, in dòng "0" thừa; tách `npm outdated` ra khỏi pipe trước khi đưa vào `node -e`.
+- **M-03 (hoãn)**: 13 route "Lớp Engineering OS" (`scripts/dead-routes-allowlist.json`) vẫn "chờ
+  chốt hướng ở đề xuất #6 audit 2026-08-25" — người dùng quyết giữ nguyên, chưa gắn UI/xoá đợt này.
+- **M-04 (hoãn)**: nâng major `nodemailer` 9→10 + `google-auth-library` 10→11 — không phải lỗ hổng
+  bảo mật khẩn, người dùng quyết không nâng lúc này.
+
+## ✅ Bỏ cụm sidebar "6 Đại Trung Tâm Điều Hành (Unified Hubs)" — 2026-09-21
+
+Xoá toàn bộ cụm 6 mục (`dash.site-command`, `dash.schedule-control`, `dash.procurement-hub`,
+`dash.commercial-cockpit`, `dash.engineering-intelligence-hub`, `dash.governance-hub`) khỏi
+`app/lib/dashboardTree.ts` theo yêu cầu người dùng. Dọn icon `Brain` không còn dùng; các trang
+đích (`/site`, `/schedule`, `/procurement`, `/commercial`, `/engineering-intelligence`,
+`/governance`) vẫn tồn tại và vẫn truy cập được qua các mục sidebar khác đã trỏ tới cùng route.
+
+**Fix CI đỏ (PR #488):** xoá `tests/unified-master-hubs.test.ts` (test riêng cho cụm vừa bị xoá,
+không còn ý nghĩa) và sửa `tests/route-quan-tri-2.test.ts` — 5 chỗ dùng `nodeKey` cứng
+`dash.site-command`/`dash.schedule-control` (đã xoá khỏi cây) cho API `/api/nav-settings`, đổi
+sang `dash.dashboard`/`dash.mepf-process` (vẫn tồn tại) để test không phụ thuộc vào 1 node cụ thể
+sắp bị xoá trong tương lai. Vòng CI kế tiếp lộ thêm 1 file test cũ khác cũng khẳng định cụm
+"Kỹ thuật Không gian & AI (Engineering OS)" tồn tại: xoá đoạn test đó khỏi
+`tests/engineering-apex-pinnacle.test.ts` (giữ lại test `computeApexScore` không liên quan sidebar).
+Vòng CI thứ 3 lộ tiếp bất biến `tests/modules.test.ts` ("mọi nav href phải khớp DASHBOARD_TREE"):
+4 href trong `lib/nen/modules.ts` (module `engineering`/`engineering-quantum-hub`) trỏ tới
+`/engineering`, `/engineering/suggestions`, `/engineering/workflows`, `/engineering/quantum-hub` —
+không còn trong cây sau khi xoá cụm. Khai 4 href này vào `NGOAI_LE` của test (cùng mẫu với
+`/engineering/agent-sessions` đã có sẵn) kèm lý do, thay vì xoá module hay khôi phục sidebar.
+
+## ✅ Bỏ cụm sidebar "Kỹ thuật Không gian & AI (Engineering OS)" — 2026-09-21
+
+Xoá toàn bộ cụm `dash.apex-cockpit`/`dash.spatial-viewer`/`dash.hse-vision`/`dash.zalo-copilot`/
+`dash.dynamic-cashflow`/`dash.esign-protocol`/`dash.fidic-claims`/`dash.qr-logistics`/
+`dash.quantum-hub`/`dash.gate0-workflows`/`dash.ai-suggestions` khỏi `app/lib/dashboardTree.ts`
+(nguồn duy nhất sidebar AppShell) theo yêu cầu người dùng — các mục này không còn hiển thị trong
+sidebar. Dọn theo các icon `lucide-react` không còn dùng (`Sparkles`/`Layers`/`Bot`/`TrendingUp`/
+`Lightbulb`); các trang `app/engineering/*` và route `/procurement?tab=qr-logistics` vẫn tồn tại,
+chỉ không còn link trực tiếp trong sidebar.
+
+## ✅ Chép có chọn lọc từ `seeker19110/projects-template` — 2026-09-21
+
+Đối chiếu repo khung `seeker19110/projects-template` (bộ khung quy trình/chất lượng tổng quát đa
+stack). Phần lõi (điều phối 3 tầng, ADR, `PROGRESS.md`, checklist audit) XBoss đã có tương đương
+từ trước — không chép lại. Chỉ chép 4 việc genuinely mới, right-sized cho 1 dự án Next.js/Postgres
+cố định (bỏ máy móc đa-stack/đa-harness của khung: telemetry AI, spec-compiler, arch-health-radar,
+dispatch multi-harness, `dev-task.sh` tự dò stack):
+
+1. **Hooks thực thi luật** (`.claude/hooks/`): `block-dangerous-git.sh` (chặn force-push main,
+   `reset --hard`, `clean -f`, `merge/rebase --abort` — PreToolUse, exit 2 khi chặn),
+   `pre-commit-gate.sh` (chặn `git commit` nếu `npm run lint`/`typecheck` đỏ, cấm `--no-verify`),
+   `session-resume.sh` (SessionStart, nạp tóm tắt git + đầu `PROGRESS.md` vào ngữ cảnh phiên mới).
+   Nối vào `.claude/settings.json` kèm `deny`/`ask` cho các lệnh git nguy hiểm.
+2. **`TRAPS.md`** (gốc repo) — sổ bẫy đã mắc thật, seed 4 mục đầu từ nội dung đã biết (nhánh lỗi
+   thời gây trùng số migration M32/M33/M34, `--release-gate` thiếu làm SKIP giả trang thành xanh,
+   route ghi thiếu kiểm quyền/phạm vi dự án, truyền mảng sai cho helper `lib/db`).
+3. **`CODEMAP.md`** (gốc repo) — bảng "muốn đổi X thì sửa ở đâu, chạy gì" cho XBoss.
+4. **`npm run check:progress-freshness`** (`scripts/check-progress-freshness.ts`) — cổng CI mới
+   (job `progress-freshness`, chỉ chạy khi push vào `main`, cần `fetch-depth: 2`): chặn commit đổi
+   `app/`/`lib/`/`migrations/` mà quên cập nhật `PROGRESS.md` cùng lúc.
+
+Theo yêu cầu người dùng, thêm cả phần **review** và **maintain**:
+
+5. **`/review`** (`.claude/commands/review.md`) — slash command tường minh cho quy trình rà soát
+   diff trước khi mở PR (gọi skill `code-review` + `security-review` khi chạm vùng nhạy cảm), bổ
+   sung cho agent `reviewer` đã có sẵn.
+6. **`/maintain`** + agent `maintainer`** — vòng bảo trì định kỳ nhẹ (không phải audit sâu):
+   `scripts/maintenance-sweep.sh` quét git/dependency/`PROGRESS.md`/allowlist rồi
+   `maintainer` viết `docs/ops/MAINTENANCE-PLAN.md` (🔴/🟡/DỪNG&HỎI) cho người dùng duyệt trước khi
+   thực thi — không tự sửa source khi chưa duyệt.
+
+Xác thực: `npx tsx scripts/check-progress-freshness.ts` chạy đúng trên nhánh hiện tại (không báo
+oan); `bash scripts/maintenance-sweep.sh --no-deps` chạy hết, sinh `docs/ops/MAINTENANCE-REPORT.md`
+(đã gitignore); `bash -n` sạch cho cả 3 hook + script bảo trì; `python3 -m json.tool` xác nhận
+`.claude/settings.json` vẫn là JSON hợp lệ. lint/typecheck không chạy được trong sandbox review
+này (`node_modules` thiếu `eslint-config-next`/`@types/node` — lỗi môi trường, xác nhận bằng cách
+so với các file `check:*` cũ sẵn có cũng báo lỗi y hệt) — cần CI thật hoặc máy dev đầy đủ dependency
+xác nhận lại trước khi merge.
+
+## ✅ M125 — trang chủ mạch lạc (toolbar + dải số liệu + thân 2 cột) — 2026-09-21
+
+Đặc tả `docs/nang-cap/M125-bo-cuc-trang-chu.md` (Approved). Trang chủ trước đây xếp dọc 15 khối
+với 5 kiểu lưới khác nhau, phải cuộn ~6 màn hình mới tới bảng trễ. Nay đọc theo một nhịp:
+**ngữ cảnh → số liệu → việc cần làm**.
+
+- **Z0 toolbar** (`DocToolbar` của M124, `hidden md:flex`): Import Excel · Excel · Báo cáo PDF ·
+  Nghiệm thu · Lookahead · Thêm trang, trailing "Cập nhật HH:mm". Thanh đáy giữ Import/Excel/PDF
+  qua `ButtonLink` nhưng **chỉ ở màn hẹp** (`matchMedia`, không sửa `AppHeader`).
+- **Z1 dải 4 `StatCard`**: Tiến độ tổng · Hạng mục trễ (bấm cuộn tới `#delayed-table`) · Chờ duyệt
+  (ẩn thẻ + lưới còn 3 cột khi `approvals` null) · Công tác theo dõi.
+- **Z2 thân 2 cột** `lg:grid-cols-[minmax(0,1fr)_320px]`: cột chính = thẻ "Tiến độ" có tab →
+  Theo hệ thi công → Đường găng → **bảng trễ** → khối M9/BlockedPanel/NormsOverPanel → SPI + dự báo;
+  cột phải (`HomeRail`) = Trung tâm điều hành dạng hàng 44px + dải vòng đời 6 giai đoạn + Pareto.
+- **2 component nền mới**: `app/components/ui/Tabs.tsx` (+ `TabPanel`, `role=tablist/tab`, ←/→ và
+  Home/End, roving tabindex, tab chưa mở **không mount** → panel nặng không tự fetch) và
+  `app/components/ProgressRow.tsx` (hàng tên · thanh · % · chip, dùng chung cho danh sách trang
+  tracking và danh sách hệ). Tab đang mở ghi vào URL `?tab=` (khuôn `HubShell`), mặc định `scurve`.
+- Kéo thả thứ tự trang tracking, modal "Thêm trang" (tách ra `NewSheetModal`), bộ lọc bảng trễ và
+  Pareto-lọc-bảng giữ nguyên hành vi. `app/page.tsx` **994 → 769 dòng**.
+
+**Lệch đặc tả có chủ đích (cần phiên chính duyệt):** (1) danh sách **hệ thi công để ngoài thẻ tab**
+— đây là đường vào duy nhất còn lại tới `/system/[code]` từ trang chủ (`e2e/authed/system.spec.ts`
+bấm `a[href="/system/acmv"]` ngay trên `/`), giấu sau tab thành ngõ cụt; (2) **`SpiCards`/
+`ForecastCards` để ở cột chính** thay vì cột phải — hai panel này dùng breakpoint theo **viewport**
+(`lg:grid-cols-5`), nhét vào rail 320px sẽ vỡ lưới mà sửa panel thì phạm guardrail "không đổi panel";
+(3) tab mặc định `scurve` (không phải `sheets`) để e2e trang chủ còn thấy heading "S-curve".
+
+**File chạm:** `app/page.tsx`; mới `app/components/ui/Tabs.tsx`, `app/components/ProgressRow.tsx`,
+`app/components/HomeRail.tsx`, `app/components/NewSheetModal.tsx`; `app/components/ui/index.ts`;
+`docs/adr/0009-bo-component-ui-nen.md`, `docs/nang-cap/README.md`. **Không** đụng `lib/`,
+`app/api/`, `migrations/`, `AppHeader`, các component panel.
+
+**Verify:** lint / typecheck / build / `check:contrast` / `check:mau-accent` / `check:lib-layers` /
+`check:hex-hardcode` / `format:check` xanh; `npm test` với Postgres 16 ephemeral → **251 file,
+4098 ca pass, 0 fail**; `next start` trên DB seed mẫu: `/`, `/?tab=sheets`, `/?tab=evm` đều 200,
+`/api/dashboard|sheets|systems` trả đúng dữ liệu; markup `Tabs`/`TabPanel`/`ProgressRow`/`HomeRail`
+soi bằng `react-dom/server` (ARIA `tablist`/`tab`/`tabpanel` + `aria-controls`/`aria-labelledby`
+đúng cặp). **E2E Playwright KHÔNG chạy được** trong môi trường này (proxy chặn tải Chromium) —
+cần chạy lại ở CI.
+
+## ✅ M124 — bố cục màn hình chứng từ (DocShell) + `/payment-certs` master–detail — 2026-09-21
+
+Đặc tả `docs/nang-cap/M124-bo-cuc-man-hinh-chung-tu.md` (Approved). Chuẩn hoá **mẫu màn hình
+chứng từ** cho nhóm trang tài chính và áp cho trang Thanh toán khối lượng làm trang mẫu.
+
+- **4 component nền mới** trong `app/components/ui/`: `DocToolbar` (+ `DocToolbar.Sep`),
+  `DocField` (+ `DocFieldGroup`), `DocTotals`, `Kbd` — export qua `app/components/ui/index.ts`.
+  Quy ước hình thức ghi vào `docs/adr/0009-bo-component-ui-nen.md` (mục "Màn hình chứng từ — M124"):
+  toolbar trên `hidden md:flex`, thanh hành động **đáy hiện ở mọi breakpoint** qua `bottomActions`
+  của `AppHeader`, `Kbd` ẩn dưới `md`.
+- **`/payment-certs` bỏ Modal, chuyển master–detail**: danh sách đợt cột trái 320px (Mã · Đợt ·
+  Chip trạng thái, dòng đang chọn viền emerald), chứng từ toàn chiều rộng cột phải; đợt đang mở
+  ghi vào URL `?contractId=&id=` nên reload/chia sẻ link giữ nguyên. Dưới `lg` chỉ hiện một trong
+  hai. Chi tiết đợt tách ra `app/payment-certs/_components/CertDocument.tsx` (giữ nguyên
+  `saveItems`/`submitCert`/`decide` cùng các chú thích audit 2026-09-05 và M46/M50).
+- **Số tiền tổng nay lấy từ `totals` của API** (`periodValue`/`cumulativeValue`/`advanceDeduct`/
+  `retentionDeduct`/`approvedValue` — SQL tính, quy ước M45) thay vì chỉ có một dòng "tạm tính"
+  cộng ở JS; dòng tạm tính giữ lại nhưng chỉ hiện khi còn KL chưa lưu. Mọi ô tiền vẫn qua
+  `MaskedValue` (M50 PR2 — user bị che thấy "•••", không thấy 0).
+- **Phím tắt** `Ctrl/⌘+S` lưu KL, `Esc` đóng chứng từ (bỏ qua khi đang mở hộp thoại xác nhận).
+- Lưới dòng KL: `text-sm`, header dính, cột STT + BOQCODE dính trái, ô nhập KL `w-24 min-h-10`
+  (trước là 80px, `text-xs`), thêm cột KL HĐ và Thành tiền.
+
+**File chạm:** `app/components/ui/DocToolbar.tsx`, `DocField.tsx`, `DocTotals.tsx`, `Kbd.tsx`,
+`index.ts`; `app/payment-certs/page.tsx`; `app/payment-certs/_components/CertDocument.tsx`;
+`docs/adr/0009-bo-component-ui-nen.md`; `docs/nang-cap/README.md`. **Không** đụng `lib/`,
+`app/api/`, `migrations/`, `AppHeader`.
+
+**Verify:** lint / typecheck / build / `check:contrast` / `check:mau-accent` / `check:lib-layers` /
+`check:hex-hardcode` xanh; `npm test` với Postgres 16 ephemeral → **251 file, 4098 ca pass, 0 fail**;
+chạy `next start` trên DB thật (seed mẫu + 1 hợp đồng + 3 dòng BOQ): lập đợt → PATCH
+`{items, periodLabel}` → `GET /api/payment-certs/1` trả `totals` đúng (77.500.000 / −7.750.000 /
+−3.875.000 / 65.875.000) → submit → approve đều 200. **E2E Playwright KHÔNG chạy được** trong môi
+trường này (proxy chặn `cdn.playwright.dev`, không có Chromium hệ thống) — cần chạy lại ở CI.
+
+## ✅ Trả nợ kỹ thuật sau đợt audit sâu — 2026-09-05
+
+Đóng **7/7 mục nợ** ghi ở "Đợt audit toàn dự án — 2026-09-05" (chi tiết từng mục nằm trong
+mục **Nợ kỹ thuật** bên dưới, đã gạch ngang tại chỗ theo đúng bài học "gỡ nợ trong cùng PR
+đóng nợ"). Hai quyết định cần người dùng chốt trước khi làm (đã hỏi, đã chốt):
+
+1. **Nghiệm thu**: thêm cột phân biệt nguồn duyệt (`migrations/0151`) — không backfill dữ liệu cũ.
+2. **RLS bảng bài học** (`migrations/0152`): viết migration + test, **chạy staging trước** rồi mới lên production.
+
+Tóm tắt việc đã làm:
+
+| Nợ                                      | Cách đóng                                                                               |
+| --------------------------------------- | --------------------------------------------------------------------------------------- |
+| Trạng thái LỖI ở các trang              | `app/lib/taiDuLieu.ts` + `ErrorState` cho 4 trang ưu tiên                               |
+| Hex hardcode 3 trang engineering        | 44 chỗ → token theme + `app/lib/mauTheme.ts`; **cổng CI `check:hex-hardcode`**          |
+| RLS `engineering_cross_project_lessons` | `0152` (ranh giới **org**, không phải project) + `tests/lessons-rls.test.ts`            |
+| Huỷ nghiệm thu tầng hạ task duyệt riêng | `0151` + `tasks.approval_source` + test 3 nguồn duyệt                                   |
+| Cổng `format:check`                     | `prettier --write` toàn repo (56 file) + bước CI ở job `static`                         |
+| Lighthouse không chạy trên push main    | thêm `push: branches: [main]`                                                           |
+| Cỡ chữ input < 16px                     | **đo thật** bằng `e2e/authed/input-zoom-mobile.spec.ts` → chỉ 2/10 trang dính, sửa 26 ô |
+
+**Bài học lặp lại (§1 `docs/audit.md`)**: mục "cỡ chữ input < 16px ở nhiều form" khi đo thật
+chỉ còn 2 trang — ước đoán từ grep tiếp tục thổi phồng phạm vi. Spec đo giữ lại làm cổng.
+
+Verify: lint / typecheck / format / 8 cổng `check:*` xanh; `npm test -- --release-gate` với
+Postgres 16 → **251 file, 4098 ca pass, 0 fail**; `npx playwright test` đủ 3 project →
+**485 pass, 0 fail**; `npm run build` xanh; `docs/ERD.md` sinh lại theo schema thật.
+
+## 🔎 Đợt audit toàn dự án — 2026-09-05 (audit sâu, 3 miền song song)
+
+Chạy theo `docs/audit.md` §9: 3 agent độc lập (A bảo mật+logic, B UI/UX+vận hành/offline,
+C hiệu năng/dependency/CI/tài liệu) đọc code thật, rồi sửa trong cùng lượt theo yêu cầu
+người dùng. Cổng cơ sở TRƯỚC khi sửa đã xanh (lint/typecheck/test 249 file/build).
+
+### Bảo mật & phân quyền (§3)
+
+- **[Cao] Vai trò chỉ-xem `bch` ghi được qua ~20 handler engineering.** `CAN.viewEngineeringGraph`
+  (mở cho `bch` — `VIEW_ONLY_ROLES`) bị dùng làm cổng cho POST/PATCH/DELETE ở bidding, spatial,
+  logistics, esign, zero-error, memory, cashflow, hse-vision, drawings/scan-local… Đúng lớp lỗi
+  đã vá riêng cho e-sign (`signEngineeringEsign`, audit 2026-08-24) nhưng chưa quét hết.
+  **Sửa:** thêm `CAN.manageEngineeringGraph` (admin/pm/engineer) và đổi toàn bộ 20 handler ghi.
+- **[Cao] `DELETE /api/floor-approvals/:id` thiếu cách ly dự án.** 3 route anh em đều kiểm
+  `sheetTypeProjectId`; route này chỉ kiểm vai trò → Admin/PM dự án A đoán `id` là huỷ được
+  nghiệm thu tầng của dự án B (kèm bulk UPDATE `tasks.status` + `task_history` sai dự án).
+  **Sửa:** thêm `getCurrentProjectId` + `sheetTypeProjectId` → 404.
+- **[Cao] Rò rỉ dữ liệu xuyên tổ chức ở `engineering_cross_project_lessons`.**
+  `listCrossProjectLessons` không có điều kiện dự án nào và bảng chưa bật RLS → mọi user đọc
+  được sự cố/nguyên nhân gốc + tên dự án của tổ chức khác (qua `memory/lessons`, `memory/transfer`).
+  **Sửa:** tham số `projectIds` BẮT BUỘC, lọc `source_project_id IN (...)`, rỗng → trả rỗng.
+- **[TB] `POST memory/lessons` lấy thẳng `sourceProjectId` từ body** → gán bài học vào dự án
+  bất kỳ. **Sửa:** `chotProjectIdChoGhi` (mẫu đúng của `engineering/bidding/packages`).
+- **[TB] `GET /api/suppliers/:id/summary` trả công nợ NCC cho mọi vai trò** (`subcon`/`viewer`/
+  `cdt` đọc được `totalOrdered`/`totalPaid`/`debt`) và cộng gộp PO/bill của **mọi dự án** trong
+  tổ chức. **Sửa:** khối tiền gate `CAN.viewPayments` (trả `null` khi không có quyền, UI ẩn),
+  `supplierSummary` nhận `projectId` bắt buộc và lọc `po.project_id`/`payment_bills.project_id`.
+- **[Thấp] Nội suy giá trị vào SQL** ở `workpackages/:id/dimensions/column/move` (`sort_order ${op}`)
+  → đưa giá trị về placeholder `?`, chỉ giữ toán tử/chiều sắp xếp là hằng trong code.
+- **[Thấp] Lệch quy ước placeholder**: 6 route/lib nhánh engineering dùng `$1..$n` → đổi về `?`.
+  Riêng `iot/alerts` PATCH GIỮ `$n` (dùng lại `$1` 3 lần trong `CASE WHEN`, `?` không biểu diễn
+  được) — có comment giải thích tại chỗ.
+
+### Logic nghiệp vụ & toàn vẹn dữ liệu (§4)
+
+- **[Cao] Huỷ nghiệm thu tầng không có transaction.** Chuỗi `UPDATE floor_approvals` → bulk
+  `UPDATE tasks` → `INSERT task_history` → `recomputePackage` chạy rời, không `FOR UPDATE`
+  (trong khi đường DUYỆT `/api/approvals` đã bọc đủ) → lỗi giữa chừng để lại trạng thái nửa
+  vời, race với tick checkbox. **Sửa:** bọc `withTransaction` + `FOR UPDATE`, kiểm lại
+  `is_approved` bên trong khoá (409 nếu đã bị huỷ bởi request khác).
+- **[TB] Tiền tính trên float JS** (vi phạm M45 PR1): `tender.ts` nhân đơn giá × khối lượng
+  bằng JS để **xếp hạng nhà thầu** (sai lệch đủ đảo thứ hạng khi 2 giá sát nhau);
+  `procurement.ts` (`debt = totalOrdered − totalPaid`), `finance.ts` (`netVat`).
+  **Sửa:** tổng làm trong SQL + `::text`, hiệu làm trên bigint của `lib/nen/money.ts`.
+- **[Thấp] Mốc "hôm nay" theo UTC máy chủ** ở `engineering-mepf-predictive.ts`
+  (`nextMaintenanceDate`) và `subcon-ai/evaluate` (kỳ `YYYY-MM` — khoá logic của bảng metrics,
+  ghi nhầm kỳ trước trong khung 0h–7h sáng giờ VN). **Sửa:** `daysFromTodayISO`/`todayISO`.
+
+### UI/UX & vận hành (§5, §7)
+
+- **[Cao] Nút kẹt "Đang lưu..." + nuốt lỗi** ở 3 luồng người dùng chạm nhiều nhất:
+  `TrackingGrid.savePkgDates`/`savePkgName` (không kiểm `res.ok`, không bắt lỗi mạng — server
+  từ chối vẫn đóng modal khiến PM tưởng đã lưu ngày), `/payments` PATCH giá trị hợp đồng theo
+  tầng (**dữ liệu tiền** — hiện số mới dù server từ chối), `/login` (màn hình đầu tiên, mất
+  sóng là phải tải lại trang). **Sửa:** `try/catch` + kiểm `res.ok` + thông điệp tiếng Việt;
+  `PkgDatesModal.onSave` trả `Promise<boolean>` để mở khoá nút khi lưu hỏng.
+- **[TB] `ProgressMap`**: 3 hàm ghi (đổi tên bản đồ/tháp, thêm tháp) bỏ qua `res.ok` trong khi
+  `deleteTower` cùng file kiểm đúng → gom về helper `guiGhi`; `if (loading) return null` →
+  `Skeleton` (bỏ màn trắng nhảy layout).
+- **[TB] 38 nút icon-only thiếu `aria-label`** (gồm nút đóng modal của lưới tracking, nút xoá
+  dòng ở `/payments`, `/procurement`) → thêm nhãn tiếng Việt đúng ngữ cảnh ("Đóng"/"Xoá dòng"/
+  "Sửa"/"Lưu"/"Huỷ sửa tên").
+- **[TB] Hardcode `[color-scheme:dark]`** ở 4 input ngày (2 modal tracking) → lịch chọn ngày
+  native vẫn tối ở theme sáng. **Sửa:** bỏ, để kế thừa `color-scheme` của `:root`.
+- **[TB] Bảng dày bọc `overflow-hidden`** (`/users`, tab "Lịch sử phân công" của `/admin`) →
+  không cuộn ngang được trên điện thoại. **Sửa:** `overflow-x-auto` + `min-w`.
+- **[TB] Form thiếu `finally`** (10 chỗ: tenders, suppliers, ban-ve, payment-certs, variations,
+  SCurveChart, reports) → mất mạng là kẹt trạng thái gửi. **Sửa:** `try/catch/finally`.
+- **[Thấp] SSE không bao giờ thử lại** sau lần rớt đầu (`useTrackingData`): một lần rớt 4G là
+  mất đồng bộ ~3s cả phiên. **Sửa:** thử mở lại sau 2 phút, `open` thì dừng poll.
+
+### Hiệu năng / dependency / CI (§6)
+
+- **[TB] Mốc coverage lệch 3 nơi** (`coverage-baseline.json` 92.61 vs `docs/audit.md` 87.12 vs
+  `PROGRESS.md` 68.12). **Sửa:** chốt `coverage-baseline.json` là nguồn sự thật duy nhất, 2 tài
+  liệu trỏ tới nó thay vì chép số.
+- **[TB] `npm run test:mutation` không chạy trong CI** → thêm bước ở job `test`, chỉ chạy trên
+  push `main` (tốn runner, không cần mỗi PR).
+- **[TB] `npm audit` chỉ quét `--omit=dev`** → thêm bước quét cả dev, chặn mức `critical`.
+- **[Thấp] `format:check` không chạy trong CI** (chỉ có husky, bỏ qua được bằng `--no-verify`).
+  **CHƯA bật cổng**: đo thực tế trên `main` sạch thì đã có **56 file lệch prettier** từ trước,
+  bật ngay là CI đỏ. Cần 1 commit `prettier --write` toàn repo (thuần format) rồi mới thêm bước
+  `npm run format:check` vào job `static` — tách riêng để diff audit này còn đọc được.
+- **[Thấp] Index thừa `idx_history_task(task_id)`** bị bao trọn bởi
+  `idx_task_history_task_changed(task_id, changed_at DESC)` — chi phí ghi thuần trên bảng nóng
+  nhất. **Sửa:** `migrations/0150_drop_dup_task_history_index.sql` (chỉ DROP INDEX → đi thẳng
+  production, cùng tiền lệ 0081).
+- **[Thấp] Chuỗi giống API key thật** `xbk_live_…` trong `scripts/run-c2-pilot.ts` (nhiễu
+  gitleaks) → đổi tiền tố `xbk_test_`.
+
+### Test hồi quy
+
+`tests/audit-2026-09-05-guards.test.ts` — 7 ca, chạy được không cần DB: quyền ghi engineering
+loại hết vai trò chỉ-xem; **quét toàn bộ `app/api` khẳng định không handler ghi nào còn gate
+bằng quyền XEM** (chống tái phát lớp lỗi này ở route mới); cách ly dự án + transaction ở
+floor-approvals; lọc dự án của bài học xuyên dự án; gate tiền của công nợ NCC; tiền tính trong
+SQL; mốc "hôm nay" theo giờ VN. `tests/procurement.test.ts` bổ sung ca `keemTien`.
+
+### Ghi nhận, chưa sửa (nợ kỹ thuật — xem mục Nợ kỹ thuật)
+
+- Thiếu **trạng thái LỖI** ở ~40 trang (`fetch().then(r => r.ok ? r.json() : null)` không
+  `.catch`): mất mạng/500 hiển thị thành "chưa có dữ liệu" — nguy hiểm ở công trường vì kỹ sư
+  tưởng chưa ai nhập. Cần helper fetch dùng chung + component `LoadError`, làm theo đợt.
+- Hardcode mã hex trong 3 trang `engineering/*` (SVG + canvas `ctx.strokeStyle`) → nét/nhãn
+  gần như biến mất ở theme sáng; `check:contrast` không đọc được màu inline SVG/canvas.
+- `engineering_cross_project_lessons` **chưa bật RLS** (đã vá ở tầng ứng dụng); bật RLS là
+  migration đụng dữ liệu → phải qua staging.
+- Huỷ nghiệm thu tầng vẫn hạ luôn task từng được duyệt RIÊNG LẺ (schema chưa có cờ phân biệt
+  nguồn duyệt) — có comment tại chỗ, cần quyết định đặc tả trước khi đổi hành vi.
+- Cỡ chữ input < 16px (iOS auto-zoom) — cần đo thật trên thiết bị trước khi kết luận.
+- Lighthouse chỉ chạy trên `pull_request`, không chạy trên push `main`.
+
 ## ✅ Đợt 6 — trả nợ "ghi nhận, chưa sửa" + quét cụm lỗ hổng tham chiếu (2026-09-05)
 
 Khác Đợt 1–5 (chiến dịch _phủ test_), Đợt 6 là chiến dịch **sửa tính năng đang hỏng**: sau 5 đợt chỉ
@@ -7893,8 +8254,12 @@ Trước khi audit, bổ sung `docs/audit.md` (rà thật trong code, không suy
 
 Theo `docs/audit.md` §6 (mục "Độ phủ test — định lượng"): thêm script `npm run test:coverage` (`node --experimental-test-coverage scripts/run-tests.mjs`) đo coverage built-in của `node:test` (Node 22), chỉ tính phạm vi `lib/**` + `app/api/**` (không tính component UI). Đây là mốc **ratchet** đầu tiên — lần sau đo lại không được tệ hơn số này khi không có lý do chính đáng; thêm test mới thì nâng dần.
 
-- **Ngày đo:** 2026-07-19.
-- **Số liệu (81 file trong phạm vi `lib/**`/`app/api/**` được ít nhất 1 test chạm tới):**
+- **MỐC HIỆN TẠI KHÔNG NẰM Ở ĐÂY** (sửa 2026-09-05): nguồn sự thật duy nhất là
+  `coverage-baseline.json` ở gốc repo — cổng `npm run check:coverage` đọc thẳng file đó.
+  Số chép tay trong tài liệu đã lệch 3 nơi (68.12 / 87.12 / 92.61) nên bỏ hẳn cách chép số;
+  phần dưới giữ lại vì mô tả **cách đo** và các giới hạn của con số, vẫn còn đúng.
+- **Ngày đo (lần đầu, để đối chiếu lịch sử):** 2026-07-19.
+- **Số liệu lần đầu (81 file trong phạm vi `lib/**`/`app/api/**` được ít nhất 1 test chạm tới):**
   - `lines`: 68.12%
   - `branches`: 86.35%
   - `funcs`: 56.52%
@@ -8439,8 +8804,78 @@ Verify hạ tầng: Postgres 16 local (`pg_ctlcluster`, đã có sẵn trong má
   `docs/nang-cap/*.md` kèm chữ "Approved for implementation". Thiếu mục là check đỏ ngay từ đầu,
   không liên quan chất lượng code.
 
+## Đợt audit sâu 2026-09-08 — route xuất PDF/Excel và cách ly dự án
+
+- **[Cao — đã sửa] Ba route xuất tài liệu rò dữ liệu chéo dự án qua ID/bộ lọc:**
+  `GET /api/payment-certs/:id/pdf` đọc IPC trực tiếp bằng `getCert(id)`; PDF phiếu YCNT
+  đọc `inspection_requests`/task không lọc dự án và lấy tên dự án đầu tiên trong DB; PDF
+  danh mục hồ sơ chất lượng cũng liệt kê toàn bộ `task_documents` và dùng tên dự án đầu
+  tiên. Người có quyền tương ứng có thể đoán ID hoặc gọi export để xem dữ liệu của dự án
+  khác. Đã thêm `getCertForProject()` fail-closed dùng chung cho PDF/Excel IPC; hai route
+  QAQC nay suy dự án qua `task → work_package → sheet_type → tower`, lọc cả bản ghi cha,
+  task con, sheet và tên dự án theo `getCurrentProjectId(user)`.
+- **Test hồi quy:** `tests/claim-documents-scope.test.ts` gọi trực tiếp helper IPC mới;
+  `tests/qc-project-scope.test.ts` neo đủ ba lớp scope của hai PDF QAQC. Targeted test không
+  DB: 17 pass, 5 skip đúng vì thiếu `TEST_DATABASE_URL`. `npm run lint` và
+  `npm run typecheck` và `npm run build` xanh trên Node 24. Full test không DB: 740 pass, 3.351 skip; 6 fail
+  đều do test guard cũ ghép sai đường dẫn `C:\\C:\\...` khi chạy Node Windows từ WSL,
+  không liên quan diff; chưa xác minh bộ test đầy đủ trên CI Linux cho bản vá này. `npm audit`: 0 lỗ hổng.
+- **Phạm vi audit:** route permission/project-scope/db-params/lib-layer/dead-code/migration/SW
+  gates đều xanh khi chạy trên runtime Linux phù hợp; rà riêng toàn bộ route PDF/Excel phát
+  hiện ba lỗi trên. Chưa chạy E2E/Postgres disposable trong phiên này vì môi trường không có
+  dịch vụ PostgreSQL; CI Linux có Postgres 16 phải là cổng xác nhận cuối.
+
 ## Nợ kỹ thuật (chỗ "làm tạm" cần quay lại)
 
+- ~~**[TB, 2026-09-05] ~40 trang thiếu TRẠNG THÁI LỖI**~~ → **đã đóng phần ưu tiên
+  (2026-09-05, đợt trả nợ sau audit)**: thêm `app/lib/taiDuLieu.ts` (`taiJson` trả
+  `{ok,data}` / `{ok:false,loi,mangLoi}` — phân biệt được lỗi mạng, lỗi server và dữ liệu
+  rỗng; 401 đi qua `redirectToLogin` sẵn có của `app/lib/me` để vẫn dọn hàng đợi offline +
+  cache SW). Áp cho 4 trang ưu tiên `hse`/`my-tasks`/`approvals`/`boq` (trang `diary` đã có
+  `ErrorState` từ trước), dùng lại component `ErrorState` có nút "Thử lại". **Còn lại**: các
+  trang khác vẫn dùng mẫu cũ — chuyển dần khi đụng tới từng trang, không đổi hàng loạt trong
+  một PR để diff còn review được.
+- ~~**[TB, 2026-09-05] Hardcode mã hex trong 3 trang `app/engineering/*`**~~ → **đã đóng
+  (2026-09-05)**: 44 chỗ đổi sang token theme — SVG/recharts dùng `var(--color-…)` (cùng mẫu
+  `SCurveChart`), canvas 2D dùng `mauToken()`/`bangMau()` mới trong `app/lib/mauTheme.ts` (đọc
+  `getComputedStyle` của `:root`, vì canvas không nhận `var()`). `TYPE_CONFIG` của
+  spatial-viewer nay mang cả `token` (cho canvas) lẫn `color` (cho DOM); nền mờ đổi từ mẹo nối
+  `"15"` vào mã hex sang `color-mix`. Kèm **cổng CI mới** `npm run check:hex-hardcode`
+  (`scripts/check-hex-hardcode.ts`) chặn hex bò lại: chỉ soi hex ở vị trí MÀU thật (thuộc tính
+  fill/stroke/style, `bg-[#…]`), miễn trừ `app/api/**` (PDF không đọc được CSS variable), khối
+  `@media print` và `<meta theme-color>`. Đã thử phá (chèn `color: "#123456"`) để xác nhận cổng
+  đỏ đúng, rồi hoàn tác.
+- ~~**[TB, 2026-09-05] `engineering_cross_project_lessons` chưa bật RLS**~~ → **đã đóng
+  (2026-09-05)**: `migrations/0152_lessons_rls.sql`. **Ranh giới là TỔ CHỨC, không phải dự án**
+  — tính năng vốn là "bài học xuyên dự án" nên policy so một `app.project_id` sẽ giết chính
+  tính năng; bảng không có `org_id` nên suy qua `projects.org_id`. Khuôn 3 nhánh của
+  `0080_org_rls.sql`, còn nhánh chuyển tiếp "GUC rỗng → cho qua" (đường đọc chưa bọc
+  `withTransaction`); khoá cửa là việc riêng sau khi theo dõi production, như tiền lệ M62 PR2.
+  Test hành vi thật `tests/lessons-rls.test.ts` chạy bằng role `xboss_app` (NOBYPASSRLS):
+  cùng org xuyên dự án vẫn đọc được, xuyên org bị chặn cả ĐỌC lẫn GHI (WITH CHECK).
+  **[Người dùng] cần chạy `bash deploy.sh --staging` xác nhận trước khi lên production.**
+- ~~**[TB, 2026-09-05] Huỷ nghiệm thu tầng hạ luôn task đã duyệt RIÊNG LẺ**~~ → **đã đóng
+  (2026-09-05)**: `migrations/0151_task_approval_source.sql` thêm cột `tasks.approval_source`
+  (`'task'` | `'floor'` | NULL). `POST /api/tasks/:id/approve` ghi `'task'`,
+  `POST /api/approvals` (duyệt cả tầng) ghi `'floor'`, hai đường huỷ đều xoá về NULL;
+  `DELETE /api/floor-approvals/:id` loại task `approval_source = 'task'` khỏi danh sách hạ.
+  **CỐ Ý KHÔNG BACKFILL**: dữ liệu cũ không có thông tin để suy ra nguồn thật, đoán mò là ghi
+  dữ liệu sai — code đọc `COALESCE(approval_source, 'floor')` nên task nghiệm thu cũ giữ
+  nguyên hành vi trước đây, chỉ task duyệt riêng lẻ TỪ NAY mới được bảo vệ. Chỉ ADD COLUMN +
+  CREATE INDEX → đi thẳng production theo DoD. Test hồi quy 3 nguồn duyệt (riêng lẻ / theo
+  tầng / dữ liệu cũ NULL) trong `tests/route-tien-do-3.test.ts`.
+- ~~**[Thấp, 2026-09-05] Cổng `format:check` chưa bật trong CI**~~ → **đã đóng (2026-09-05)**:
+  chạy `prettier --write` toàn repo (56 file lệch từ trước, thuần format) rồi thêm bước
+  `npm run format:check` vào job `static`.
+- ~~**[Thấp, 2026-09-05] Lighthouse chỉ chạy trên `pull_request`**~~ → **đã đóng (2026-09-05)**:
+  `lighthouse-ci.yml` thêm `push: branches: [main]`.
+- ~~**[Thấp, 2026-09-05] Cỡ chữ input < 16px (iOS auto-zoom)**~~ → **đã đóng (2026-09-05), ĐO
+  THẬT trước khi sửa**: spec mới `e2e/authed/input-zoom-mobile.spec.ts` chạy trên project
+  `authed-mobile` (Pixel 5) đọc `getComputedStyle().fontSize` của mọi ô nhập thật trên 10
+  trang. Kết quả đo: 8/10 trang đã đạt, chỉ `/procurement` và `/users` có ô 12px — tức nghi
+  ngờ "nhiều form" trong báo cáo audit là ƯỚC ĐOÁN quá tay, đúng như §1 của `docs/audit.md`
+  cảnh báo. Sửa 26 ô có mẫu `text-xs sm:text-sm` thành `text-base sm:text-sm` (mobile 16px,
+  desktop giữ nguyên 14px); spec ở lại làm cổng chống hồi quy.
 - ~~**[Thấp] `app/error.tsx` (error boundary route segment) không giữ được `AppHeader`/nav khi lỗi xảy ra**~~ → **đã đóng hoàn toàn (2026-08-20, Module M81)**: Triển khai Resilient Error Boundary `app/error.tsx` tích hợp sẵn Fallback Header & Emergency Quick Nav Bar (truy cập nhanh Dashboard, Lưới tiến độ, BBNT Nghiệm thu, Vật tư, Tài chính), hộp chẩn đoán lỗi Digest/Stack kèm nút sao chép cho IT, nút Emergency Cache Clear & Hard Reload. Đồng thời bổ sung `ComponentErrorBoundary` (`app/components/ComponentErrorBoundary.tsx`) cô lập sự cố của các widget con (3D Viewer, Charts, Spreadsheets) tránh sập toàn bộ trang. Test `tests/app-shell-resilience.test.ts` pass 100%.
 - ~~**[Cao] `payments`/`payments/bills`/`payments/floors` chưa scope theo `projectId` (M22)**~~ → **đã đóng, tài liệu lệch code** (xác nhận lại 2026-07-19, đợt audit lần 7): đọc thẳng `app/api/payments/bills/[id]/route.ts` — `PATCH`/`DELETE` đã có `billBelongsToProject()` (404 khi bill không thuộc dự án đang chọn) từ PR #263 (2026-07-18, đúng như "Đợt audit toàn dự án lần 6" ghi "ĐÃ SỬA"); `GET /api/payments` cũng đã JOIN `towers`/lọc `projectId`; `tests/project-scope-invariant.test.ts` không còn nhắc `payments` trong whitelist. Mục nợ này bị bỏ sót không gỡ khỏi "Nợ kỹ thuật" sau khi PR #263 merge — bài học: luôn gỡ nợ khỏi danh sách này trong cùng PR đóng nợ, không tách riêng.
 - ~~**[Trung] `materials/:id/issue` và `.../return` — hạ tầng idempotency "chết" trên đường thực thi (client không gửi header)**~~ → **đã đóng (2026-07-19)**: `app/materials/page.tsx` — sinh `crypto.randomUUID()` lúc mở modal xuất/hoàn kho (`issueKey`), gửi qua header `Idempotency-Key`; thêm `issueSubmitting` chặn double-submit + disable 2 nút (submit/huỷ) + hiện "Đang lưu..." lúc gửi; bọc `try/catch/finally` báo lỗi mất mạng thay vì kẹt trạng thái. Không đổi route/migration (đã đúng từ trước).

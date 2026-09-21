@@ -292,17 +292,23 @@ function CreateModal({
     setSaving(true);
     const cleanFilters: Record<string, string> = {};
     for (const [k, v] of Object.entries(filters)) if (v) cleanFilters[k] = v;
-    const res = await fetch("/api/saved-reports", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: name.trim(),
-        source: sourceKey,
-        config: { filters: cleanFilters },
-        shared,
-      }),
-    });
-    setSaving(false);
+    let res: Response;
+    try {
+      res = await fetch("/api/saved-reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          source: sourceKey,
+          config: { filters: cleanFilters },
+          shared,
+        }),
+      });
+    } catch {
+      return alert("Mất kết nối — chưa lưu được báo cáo, thử lại khi có mạng");
+    } finally {
+      setSaving(false);
+    }
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
       return alert(j.error ?? "Không lưu được báo cáo");

@@ -106,6 +106,15 @@ export async function getCert(id: number): Promise<PaymentCertRow | undefined> {
   return (await fetchCerts("WHERE c.id = ?", id))[0];
 }
 
+/** Đọc một đợt IPC trong đúng dự án đang chọn; projectId rỗng luôn fail-closed. */
+export async function getCertForProject(
+  id: number,
+  projectId: number | null,
+): Promise<PaymentCertRow | undefined> {
+  if (projectId == null) return undefined;
+  return (await fetchCerts("WHERE c.id = ? AND ct.project_id = ?", id, projectId))[0];
+}
+
 export async function nextPeriodNo(contractId: number): Promise<number> {
   const row = await queryOne<{ maxNo: number }>(
     `SELECT COALESCE(MAX(period_no), 0) AS "maxNo" FROM payment_certs WHERE contract_id = ?`,

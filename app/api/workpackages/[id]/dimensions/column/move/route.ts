@@ -49,13 +49,16 @@ export async function PATCH(
   );
   if (!cur) return NextResponse.json({ error: "Cột không tồn tại" }, { status: 404 });
 
-  const op =
-    dir === "left"
-      ? `< ${cur.sort_order} ORDER BY sort_order DESC`
-      : `> ${cur.sort_order} ORDER BY sort_order ASC`;
+  // Chỉ toán tử/chiều sắp xếp được nội suy (hằng cố định trong code); GIÁ TRỊ sort_order đi
+  // qua placeholder `?` theo luật của dự án — không nối chuỗi để chèn giá trị.
+  const op = dir === "left" ? "<" : ">";
+  const huong = dir === "left" ? "DESC" : "ASC";
   const neighbor = await queryOne<{ dimension_label: string; sort_order: number }>(
-    `SELECT dimension_label, sort_order FROM progress_dimensions WHERE task_id = ? AND sort_order ${op} LIMIT 1`,
+    `SELECT dimension_label, sort_order FROM progress_dimensions
+      WHERE task_id = ? AND sort_order ${op} ?
+      ORDER BY sort_order ${huong} LIMIT 1`,
     firstTask.id,
+    cur.sort_order,
   );
 
   if (!neighbor) return NextResponse.json({ ok: false, message: "Đã ở vị trí đầu/cuối" });

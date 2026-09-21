@@ -11,10 +11,10 @@
 - Quy ước mới (ghi vào CLAUDE.md mục Quy ước): **mọi phép cộng/nhân tiền làm trong SQL** (`SUM`, `* rate`), JS chỉ hiển thị. Cột tiền lấy về JS để tính tiếp phải cast `::text` trong SELECT rồi xử lý qua helper.
 - `lib/money.ts` (mới, thuần — unit test được):
   ```ts
-  export function parseMoney(v: string | number): bigint;      // "1234.56" → 123456 (xu/đồng×100)
+  export function parseMoney(v: string | number): bigint; // "1234.56" → 123456 (xu/đồng×100)
   export function addMoney(...vs: bigint[]): bigint;
   export function mulRate(v: bigint, rate: number, dp?: number): bigint; // round half-up
-  export function formatVnd(v: bigint | string | number): string;        // "1.234.567 ₫"
+  export function formatVnd(v: bigint | string | number): string; // "1.234.567 ₫"
   ```
 - Rà + sửa các điểm JS đang cộng tiền (grep `reduce` / `+=` trong `lib/finance.ts`, `lib/paymentcerts.ts`, `lib/cost.ts`, `lib/dashboardext.ts`, route invoices/advances/payroll): chuyển về SUM trong SQL hoặc qua `lib/money.ts`. Liệt kê cụ thể trong PR, mỗi chỗ 1 dòng ghi chú.
 

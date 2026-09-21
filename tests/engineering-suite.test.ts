@@ -14,16 +14,9 @@ import {
   reverseBreakdownUnitRate,
   // M70
   syncSpoolToWbsAndPayment,
-  // M71
-  calculateAssetReliabilityAndRul,
-  calculateEmbodiedCarbonLCA,
-  bundleDigitalHandoverPassport,
-  // M72
-  conductMultiAgentDebate,
-  calculateEngineeringHealthIndex,
 } from "@/lib/ky-thuat/engineering-suite";
 
-test("Engineering Suite Barrel Index: các phân hệ còn lại từ M66 đến M72 đều được export đầy đủ và đồng bộ", () => {
+test("Engineering Suite Barrel Index: các phân hệ còn lại từ M66 đến M70 đều được export đầy đủ và đồng bộ", () => {
   assert.equal(typeof calculatePipeQtoM, "function");
   assert.equal(typeof inferFittingsFromSegments, "function");
   assert.equal(typeof autoSizePipeDiameter, "function");
@@ -32,9 +25,4 @@ test("Engineering Suite Barrel Index: các phân hệ còn lại từ M66 đến
   assert.equal(typeof convertToLod400Dfma, "function");
   assert.equal(typeof reverseBreakdownUnitRate, "function");
   assert.equal(typeof syncSpoolToWbsAndPayment, "function");
-  assert.equal(typeof calculateAssetReliabilityAndRul, "function");
-  assert.equal(typeof calculateEmbodiedCarbonLCA, "function");
-  assert.equal(typeof bundleDigitalHandoverPassport, "function");
-  assert.equal(typeof conductMultiAgentDebate, "function");
-  assert.equal(typeof calculateEngineeringHealthIndex, "function");
 });

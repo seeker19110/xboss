@@ -86,93 +86,85 @@ test("PATCH /api/users/:id: PM không có quyền (chỉ Admin) → 403", S, asy
 // PATCH /api/users/:id — BUG THẬT (đã sửa): cô lập tenant
 // ============================================================================
 
-test(
-  "PATCH /api/users/:id: BUG THẬT (đã sửa) — org khác không đổi role được",
-  S,
-  async () => {
-    const projectId1 = await taoDuAn("patch-iso1", 1);
-    const admin1 = await taoUser("admin", "patch-iso1", { orgId: 1 });
-    const target1 = await taoUser("engineer", "patch-iso1Target", { orgId: 1 });
-    await dangNhapDuAn(admin1, projectId1);
+test("PATCH /api/users/:id: BUG THẬT (đã sửa) — org khác không đổi role được", S, async () => {
+  const projectId1 = await taoDuAn("patch-iso1", 1);
+  const admin1 = await taoUser("admin", "patch-iso1", { orgId: 1 });
+  const target1 = await taoUser("engineer", "patch-iso1Target", { orgId: 1 });
+  await dangNhapDuAn(admin1, projectId1);
 
-    const org2 = await taoToChuc("patchiso2");
-    const projectId2 = await taoDuAn("patch-iso2", org2);
-    const admin2 = await taoUser("admin", "patch-iso2", { orgId: org2 });
-    await dangNhapDuAn(admin2, projectId2);
+  const org2 = await taoToChuc("patchiso2");
+  const projectId2 = await taoDuAn("patch-iso2", org2);
+  const admin2 = await taoUser("admin", "patch-iso2", { orgId: org2 });
+  await dangNhapDuAn(admin2, projectId2);
 
-    const { PATCH } = await import("@/app/api/users/[id]/route");
-    const res = await PATCH(jreq("/x", { role: "pm" }), {
-      params: Promise.resolve({ id: String(target1.id) }),
-    });
-    assert.equal(res.status, 404);
+  const { PATCH } = await import("@/app/api/users/[id]/route");
+  const res = await PATCH(jreq("/x", { role: "pm" }), {
+    params: Promise.resolve({ id: String(target1.id) }),
+  });
+  assert.equal(res.status, 404);
 
-    const { queryOne } = await import("@/lib/db");
-    const row = await queryOne<{ role: string }>(`SELECT role FROM users WHERE id = ?`, target1.id);
-    assert.equal(row?.role, "engineer", "vai trò của user org khác không bị đổi nhầm");
-  },
-);
+  const { queryOne } = await import("@/lib/db");
+  const row = await queryOne<{ role: string }>(`SELECT role FROM users WHERE id = ?`, target1.id);
+  assert.equal(row?.role, "engineer", "vai trò của user org khác không bị đổi nhầm");
+});
 
-test(
-  "PATCH /api/users/:id: BUG THẬT (đã sửa) — org khác không tắt 2FA hộ được",
-  S,
-  async () => {
-    const projectId1 = await taoDuAn("patch-2fa-iso1", 1);
-    const admin1 = await taoUser("admin", "patch-2fa-iso1", { orgId: 1 });
-    const target1 = await taoUser("engineer", "patch-2fa-iso1Target", { orgId: 1 });
-    const { run, queryOne } = await import("@/lib/db");
-    await run(
-      `UPDATE users SET totp_secret = 'ma-hoa-gia-lap', totp_enabled_at = now() WHERE id = ?`,
-      target1.id,
-    );
-    await dangNhapDuAn(admin1, projectId1);
+test("PATCH /api/users/:id: BUG THẬT (đã sửa) — org khác không tắt 2FA hộ được", S, async () => {
+  const projectId1 = await taoDuAn("patch-2fa-iso1", 1);
+  const admin1 = await taoUser("admin", "patch-2fa-iso1", { orgId: 1 });
+  const target1 = await taoUser("engineer", "patch-2fa-iso1Target", { orgId: 1 });
+  const { run, queryOne } = await import("@/lib/db");
+  await run(
+    `UPDATE users SET totp_secret = 'ma-hoa-gia-lap', totp_enabled_at = now() WHERE id = ?`,
+    target1.id,
+  );
+  await dangNhapDuAn(admin1, projectId1);
 
-    const org2 = await taoToChuc("patch2faiso2");
-    const projectId2 = await taoDuAn("patch-2fa-iso2", org2);
-    const admin2 = await taoUser("admin", "patch-2fa-iso2", { orgId: org2 });
-    await dangNhapDuAn(admin2, projectId2);
+  const org2 = await taoToChuc("patch2faiso2");
+  const projectId2 = await taoDuAn("patch-2fa-iso2", org2);
+  const admin2 = await taoUser("admin", "patch-2fa-iso2", { orgId: org2 });
+  await dangNhapDuAn(admin2, projectId2);
 
-    const { PATCH } = await import("@/app/api/users/[id]/route");
-    const res = await PATCH(jreq("/x", { disable2fa: true }), {
-      params: Promise.resolve({ id: String(target1.id) }),
-    });
-    assert.equal(res.status, 404);
+  const { PATCH } = await import("@/app/api/users/[id]/route");
+  const res = await PATCH(jreq("/x", { disable2fa: true }), {
+    params: Promise.resolve({ id: String(target1.id) }),
+  });
+  assert.equal(res.status, 404);
 
-    const row = await queryOne<{ totp_secret: string | null }>(
-      `SELECT totp_secret FROM users WHERE id = ?`,
-      target1.id,
-    );
-    assert.equal(row?.totp_secret, "ma-hoa-gia-lap", "2FA của user org khác không bị tắt nhầm");
-  },
-);
+  const row = await queryOne<{ totp_secret: string | null }>(
+    `SELECT totp_secret FROM users WHERE id = ?`,
+    target1.id,
+  );
+  assert.equal(row?.totp_secret, "ma-hoa-gia-lap", "2FA của user org khác không bị tắt nhầm");
+});
 
-test(
-  "PATCH /api/users/:id: BUG THẬT (đã sửa) — org khác không đổi mật khẩu được",
-  S,
-  async () => {
-    const projectId1 = await taoDuAn("patch-pw-iso1", 1);
-    const admin1 = await taoUser("admin", "patch-pw-iso1", { orgId: 1 });
-    const target1 = await taoUser("engineer", "patch-pw-iso1Target", { orgId: 1 });
-    await dangNhapDuAn(admin1, projectId1);
+test("PATCH /api/users/:id: BUG THẬT (đã sửa) — org khác không đổi mật khẩu được", S, async () => {
+  const projectId1 = await taoDuAn("patch-pw-iso1", 1);
+  const admin1 = await taoUser("admin", "patch-pw-iso1", { orgId: 1 });
+  const target1 = await taoUser("engineer", "patch-pw-iso1Target", { orgId: 1 });
+  await dangNhapDuAn(admin1, projectId1);
 
-    const org2 = await taoToChuc("patchpwiso2");
-    const projectId2 = await taoDuAn("patch-pw-iso2", org2);
-    const admin2 = await taoUser("admin", "patch-pw-iso2", { orgId: org2 });
-    await dangNhapDuAn(admin2, projectId2);
+  const org2 = await taoToChuc("patchpwiso2");
+  const projectId2 = await taoDuAn("patch-pw-iso2", org2);
+  const admin2 = await taoUser("admin", "patch-pw-iso2", { orgId: org2 });
+  await dangNhapDuAn(admin2, projectId2);
 
-    const { PATCH } = await import("@/app/api/users/[id]/route");
-    const res = await PATCH(jreq("/x", { password: "mat-khau-moi-123" }), {
-      params: Promise.resolve({ id: String(target1.id) }),
-    });
-    assert.equal(res.status, 404);
+  const { PATCH } = await import("@/app/api/users/[id]/route");
+  const res = await PATCH(jreq("/x", { password: "mat-khau-moi-123" }), {
+    params: Promise.resolve({ id: String(target1.id) }),
+  });
+  assert.equal(res.status, 404);
 
-    const { queryOne } = await import("@/lib/db");
-    const row = await queryOne<{ password_hash: string }>(
-      `SELECT password_hash FROM users WHERE id = ?`,
-      target1.id,
-    );
-    assert.equal(row?.password_hash, target1.passwordHash, "mật khẩu của user org khác không đổi nhầm");
-  },
-);
+  const { queryOne } = await import("@/lib/db");
+  const row = await queryOne<{ password_hash: string }>(
+    `SELECT password_hash FROM users WHERE id = ?`,
+    target1.id,
+  );
+  assert.equal(
+    row?.password_hash,
+    target1.passwordHash,
+    "mật khẩu của user org khác không đổi nhầm",
+  );
+});
 
 // ============================================================================
 // Guard "Admin cuối cùng" — phải đếm THEO ORG, không toàn hệ thống
@@ -339,31 +331,27 @@ test("DELETE /api/users/:id: PM không có quyền (chỉ Admin) → 403", S, as
   assert.equal(res.status, 403);
 });
 
-test(
-  "DELETE /api/users/:id: BUG THẬT (đã sửa) — org khác không xoá được",
-  S,
-  async () => {
-    const projectId1 = await taoDuAn("del-iso1", 1);
-    const admin1 = await taoUser("admin", "del-iso1", { orgId: 1 });
-    const target1 = await taoUser("engineer", "del-iso1Target", { orgId: 1 });
-    await dangNhapDuAn(admin1, projectId1);
+test("DELETE /api/users/:id: BUG THẬT (đã sửa) — org khác không xoá được", S, async () => {
+  const projectId1 = await taoDuAn("del-iso1", 1);
+  const admin1 = await taoUser("admin", "del-iso1", { orgId: 1 });
+  const target1 = await taoUser("engineer", "del-iso1Target", { orgId: 1 });
+  await dangNhapDuAn(admin1, projectId1);
 
-    const org2 = await taoToChuc("deliso2");
-    const projectId2 = await taoDuAn("del-iso2", org2);
-    const admin2 = await taoUser("admin", "del-iso2", { orgId: org2 });
-    await dangNhapDuAn(admin2, projectId2);
+  const org2 = await taoToChuc("deliso2");
+  const projectId2 = await taoDuAn("del-iso2", org2);
+  const admin2 = await taoUser("admin", "del-iso2", { orgId: org2 });
+  await dangNhapDuAn(admin2, projectId2);
 
-    const { DELETE } = await import("@/app/api/users/[id]/route");
-    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-      params: Promise.resolve({ id: String(target1.id) }),
-    });
-    assert.equal(res.status, 404);
+  const { DELETE } = await import("@/app/api/users/[id]/route");
+  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+    params: Promise.resolve({ id: String(target1.id) }),
+  });
+  assert.equal(res.status, 404);
 
-    const { queryOne } = await import("@/lib/db");
-    const row = await queryOne<{ id: number }>(`SELECT id FROM users WHERE id = ?`, target1.id);
-    assert.ok(row, "user của org khác không bị xoá nhầm");
-  },
-);
+  const { queryOne } = await import("@/lib/db");
+  const row = await queryOne<{ id: number }>(`SELECT id FROM users WHERE id = ?`, target1.id);
+  assert.ok(row, "user của org khác không bị xoá nhầm");
+});
 
 test("DELETE /api/users/:id: cùng org → xoá thành công như cũ", S, async () => {
   const projectId = await taoDuAn("del-ok");

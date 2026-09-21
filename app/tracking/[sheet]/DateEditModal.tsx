@@ -29,7 +29,11 @@ export function DateEditModal({
         <h3 className="font-semibold text-sm">
           📅 {bulk ? `Đặt ngày cho ${target.ids.length} task` : "Sửa ngày bắt đầu / kết thúc"}
         </h3>
-        <button onClick={onClose} className="ml-auto text-zinc-400 hover:text-white">
+        <button
+          aria-label="Đóng"
+          onClick={onClose}
+          className="ml-auto text-zinc-400 hover:text-white"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -45,7 +49,7 @@ export function DateEditModal({
             type="date"
             value={start}
             onChange={(e) => setStart(e.target.value)}
-            className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 [color-scheme:dark]"
+            className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
           />
         </div>
         <div>
@@ -54,7 +58,7 @@ export function DateEditModal({
             type="date"
             value={end}
             onChange={(e) => setEnd(e.target.value)}
-            className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 [color-scheme:dark]"
+            className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
           />
         </div>
         {invalid && <p className="text-xs text-red-400">Ngày kết thúc phải sau ngày bắt đầu.</p>}

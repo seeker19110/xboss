@@ -720,7 +720,7 @@ export default function MepfLifecyclePage() {
                             <path
                               d="M 40 0 L 0 0 0 40"
                               fill="none"
-                              stroke="#262626"
+                              stroke="var(--color-zinc-800)"
                               strokeWidth="0.5"
                             />
                           </pattern>
@@ -732,7 +732,7 @@ export default function MepfLifecyclePage() {
                           y1="50"
                           x2="700"
                           y2="50"
-                          stroke="#404040"
+                          stroke="var(--color-zinc-700)"
                           strokeDasharray="4 4"
                           strokeWidth="1"
                         />
@@ -741,7 +741,7 @@ export default function MepfLifecyclePage() {
                           y1="350"
                           x2="700"
                           y2="350"
-                          stroke="#404040"
+                          stroke="var(--color-zinc-700)"
                           strokeDasharray="4 4"
                           strokeWidth="1"
                         />
@@ -750,7 +750,7 @@ export default function MepfLifecyclePage() {
                           y1="50"
                           x2="100"
                           y2="350"
-                          stroke="#404040"
+                          stroke="var(--color-zinc-700)"
                           strokeDasharray="4 4"
                           strokeWidth="1"
                         />
@@ -759,7 +759,7 @@ export default function MepfLifecyclePage() {
                           y1="50"
                           x2="400"
                           y2="350"
-                          stroke="#404040"
+                          stroke="var(--color-zinc-700)"
                           strokeDasharray="4 4"
                           strokeWidth="1"
                         />
@@ -768,7 +768,7 @@ export default function MepfLifecyclePage() {
                           y1="50"
                           x2="700"
                           y2="350"
-                          stroke="#404040"
+                          stroke="var(--color-zinc-700)"
                           strokeDasharray="4 4"
                           strokeWidth="1"
                         />
@@ -778,13 +778,19 @@ export default function MepfLifecyclePage() {
                           y="50"
                           width="40"
                           height="300"
-                          fill="#3f3f46"
+                          fill="var(--color-zinc-700)"
                           fillOpacity="0.3"
-                          stroke="#71717a"
+                          stroke="var(--color-zinc-500)"
                           strokeWidth="1"
                           strokeDasharray="2 2"
                         />
-                        <text x="385" y="70" fill="#a1a1aa" fontSize="10" fontFamily="monospace">
+                        <text
+                          x="385"
+                          y="70"
+                          fill="var(--color-zinc-400)"
+                          fontSize="10"
+                          fontFamily="monospace"
+                        >
                           Dầm D400x600
                         </text>
 
@@ -808,12 +814,18 @@ export default function MepfLifecyclePage() {
                             y="120"
                             width="520"
                             height="24"
-                            fill="#0284c7"
+                            fill="var(--color-sky-400)"
                             fillOpacity="0.4"
-                            stroke="#38bdf8"
+                            stroke="var(--color-sky-400)"
                             strokeWidth="2"
                           />
-                          <text x="250" y="136" fill="#e0f2fe" fontSize="11" fontFamily="monospace">
+                          <text
+                            x="250"
+                            y="136"
+                            fill="var(--color-sky-400)"
+                            fontSize="11"
+                            fontFamily="monospace"
+                          >
                             DUCT 600x400 (SP-HVAC-T5-01)
                           </text>
                         </g>
@@ -838,42 +850,48 @@ export default function MepfLifecyclePage() {
                             y1="220"
                             x2="650"
                             y2="220"
-                            stroke="#ef4444"
+                            stroke="var(--color-red-400)"
                             strokeWidth="4"
                           />
                           <circle
                             cx="200"
                             cy="220"
                             r="6"
-                            fill="#f87171"
-                            stroke="#ffffff"
+                            fill="var(--color-red-400)"
+                            stroke="var(--color-on-accent)"
                             strokeWidth="1"
                           />
                           <circle
                             cx="350"
                             cy="220"
                             r="6"
-                            fill="#f87171"
-                            stroke="#ffffff"
+                            fill="var(--color-red-400)"
+                            stroke="var(--color-on-accent)"
                             strokeWidth="1"
                           />
                           <circle
                             cx="500"
                             cy="220"
                             r="6"
-                            fill="#f87171"
-                            stroke="#ffffff"
+                            fill="var(--color-red-400)"
+                            stroke="var(--color-on-accent)"
                             strokeWidth="1"
                           />
                           <circle
                             cx="650"
                             cy="220"
                             r="6"
-                            fill="#f87171"
-                            stroke="#ffffff"
+                            fill="var(--color-red-400)"
+                            stroke="var(--color-on-accent)"
                             strokeWidth="1"
                           />
-                          <text x="220" y="210" fill="#fca5a5" fontSize="11" fontFamily="monospace">
+                          <text
+                            x="220"
+                            y="210"
+                            fill="var(--color-red-400)"
+                            fontSize="11"
+                            fontFamily="monospace"
+                          >
                             FP-DN100 Main Header
                           </text>
                         </g>

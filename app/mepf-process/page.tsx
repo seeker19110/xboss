@@ -1858,6 +1858,7 @@ export default function CleanMepfProcessPage() {
                 <h3 className="text-sm font-bold text-zinc-100 mt-1">{activeStep.title}</h3>
               </div>
               <button
+                aria-label="Đóng"
                 onClick={() => setShowRejectModal(false)}
                 className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"
               >

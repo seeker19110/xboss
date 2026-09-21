@@ -25,10 +25,7 @@ export async function GET(req: Request) {
   // `CAN.manageEngineeringSubconAi`. Bám khuôn `viewEngineeringSubconAi` đã khai sẵn trong
   // lib/bao-mat/auth.ts (view mở tới BCH, loại subcon) nhưng chưa route nào gọi tới.
   if (!CAN.viewEngineeringSubconAi(user.role)) {
-    return NextResponse.json(
-      { error: "Không có quyền xem bảng điểm thầu phụ" },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: "Không có quyền xem bảng điểm thầu phụ" }, { status: 403 });
   }
 
   const projectId = await getCurrentProjectId(user);
@@ -60,7 +57,7 @@ export async function GET(req: Request) {
          ORDER BY evaluated_at DESC 
          LIMIT 1
        ) m ON true
-       WHERE p.project_id = $1
+       WHERE p.project_id = ?
        ORDER BY m.trust_score DESC NULLS LAST, p.company_name ASC`,
       projectId,
     );

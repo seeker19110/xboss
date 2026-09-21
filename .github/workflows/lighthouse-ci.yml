@@ -1,9 +1,15 @@
 name: Lighthouse CI
 
-# Đo hiệu năng/a11y/best-practices/SEO trên /login mỗi PR (xem lighthouserc.json).
+# Đo hiệu năng/a11y/best-practices/SEO trên /login (xem lighthouserc.json).
 # Chặn merge: cả 4 category đều assertion 'error' (đo thật 2026-07-06, dư nhiều ngưỡng).
+#
+# Chạy CẢ trên push main, không chỉ PR (đóng nợ kỹ thuật đợt audit 2026-09-05): commit vào
+# main không qua PR — hoặc hồi quy chỉ lộ ra sau khi gộp hai PR xanh — trước đây không có
+# cổng hiệu năng nào bắt được.
 on:
   pull_request:
+    branches: [main]
+  push:
     branches: [main]
 
 # Least-privilege: workflow chỉ cần đọc code, không cần ghi gì lên GitHub.

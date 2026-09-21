@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/nen/pdf-fonts";
 import {
-  getCert,
+  getCertForProject,
   certTotals,
   type PaymentCertRow,
   type CertTotals,
@@ -173,9 +175,15 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const cert = await getCert(id);
-  if (!cert) return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
-  const totals = await certTotals(id);
+  const projectId = await getCurrentProjectId(user);
+  const detail = await withProjectScope(projectId ?? "*", async () => {
+    const cert = await getCertForProject(id, projectId);
+    if (!cert) return null;
+    return { cert, totals: await certTotals(id) };
+  });
+  if (!detail)
+    return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
+  const { cert, totals } = detail;
   const today = formatDateVN(new Date());
 
   const stream = await ReactPDF.renderToStream(

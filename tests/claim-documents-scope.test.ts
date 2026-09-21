@@ -2,7 +2,7 @@ import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-// Hồi quy cho lỗ hổng M22: /api/claim-documents/:id và /api/payment-certs/:id/excel
+// Hồi quy cho lỗ hổng M22: /api/claim-documents/:id và các route xuất IPC
 // thiếu lọc theo dự án đang chọn — user thuộc dự án B đọc/xoá được tài liệu của dự án A.
 // File này test trực tiếp logic scoping (không dựng HTTP server), đúng cách các route đã sửa dùng.
 
@@ -43,10 +43,11 @@ test(
 );
 
 test(
-  "payment-certs excel: query scoping (JOIN contracts ON project_id) — chặn xuất Excel đợt thanh toán thuộc dự án khác",
+  "payment-certs PDF/Excel: getCertForProject chặn xuất IPC thuộc dự án khác",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { run, insertId, queryOne } = await import("@/lib/db");
+    const { run, insertId } = await import("@/lib/db");
+    const { getCertForProject } = await import("@/lib/tai-chinh/paymentcerts");
 
     const projA = await insertId(`INSERT INTO projects (name) VALUES ('Dự án IPC-scope A')`);
     const projB = await insertId(`INSERT INTO projects (name) VALUES ('Dự án IPC-scope B')`);
@@ -64,24 +65,15 @@ test(
       contractId,
     );
 
-    // Logic scoping y hệt certInProject() trong app/api/payment-certs/[id]/excel/route.ts.
-    async function certInProject(id: number, projectId: number | null) {
-      if (projectId == null) return undefined;
-      return queryOne<{ status: string; contractId: number }>(
-        `SELECT c.status, c.contract_id AS "contractId"
-           FROM payment_certs c JOIN contracts ct ON ct.id = c.contract_id
-          WHERE c.id = ? AND ct.project_id = ?`,
-        id,
-        projectId,
-      );
-    }
-
     // User đang chọn dự án B không thấy đợt thanh toán của hợp đồng thuộc dự án A.
-    const scopedForB = await certInProject(certId, projB);
+    const scopedForB = await getCertForProject(certId, projB);
     assert.equal(scopedForB, undefined);
 
+    // Không có dự án hiện tại cũng phải fail-closed, không rơi về đọc toàn hệ thống.
+    assert.equal(await getCertForProject(certId, null), undefined);
+
     // User đang chọn dự án A thấy đúng đợt thanh toán.
-    const scopedForA = await certInProject(certId, projA);
+    const scopedForA = await getCertForProject(certId, projA);
     assert.ok(scopedForA);
     assert.equal(scopedForA!.contractId, contractId);
 

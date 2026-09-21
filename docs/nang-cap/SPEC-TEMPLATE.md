@@ -1,12 +1,12 @@
 # <M/Gxx> — Đặc tả <Tên capability>
 
-| Thuộc tính | Giá trị |
-| --- | --- |
-| Issue / Goal | |
-| Spec owner | |
-| State | Draft / In review / **Approved for implementation** |
-| Người/ngày duyệt | |
-| Cập nhật | YYYY-MM-DD |
+| Thuộc tính       | Giá trị                                             |
+| ---------------- | --------------------------------------------------- |
+| Issue / Goal     |                                                     |
+| Spec owner       |                                                     |
+| State            | Draft / In review / **Approved for implementation** |
+| Người/ngày duyệt |                                                     |
+| Cập nhật         | YYYY-MM-DD                                          |
 
 > Không code khi chưa **Approved for implementation**.
 
@@ -27,10 +27,10 @@ export/report và vùng audit liên quan.
 ## 4. Phương án
 
 | Phương án | Lợi ích | Chi phí/rủi ro | Kết luận |
-| --- | --- | --- | --- |
-| Không làm | | | |
-| A | | | |
-| B | | | |
+| --------- | ------- | -------------- | -------- |
+| Không làm |         |                |          |
+| A         |         |                |          |
+| B         |         |                |          |
 
 ## 5. Scope / non-goals
 
@@ -87,8 +87,8 @@ Staging, backup/restore check, canary, go/no-go, migration order, revert/reconci
 ## 18. Risk/assumption/open decisions
 
 | Mục | Xác minh/giảm thiểu | Owner | Hạn | Quyết định |
-| --- | --- | --- | --- | --- |
-| | | | | |
+| --- | ------------------- | ----- | --- | ---------- |
+|     |                     |       |     |            |
 
 ## 19. Approval
 

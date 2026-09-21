@@ -83,7 +83,11 @@ export function CommentsModal({
           <h3 className="font-semibold text-sm truncate">Trao đổi — {task.name}</h3>
           <p className="text-xs text-zinc-500 font-mono">{task.code}</p>
         </div>
-        <button onClick={onClose} className="ml-auto text-zinc-400 hover:text-white">
+        <button
+          aria-label="Đóng"
+          onClick={onClose}
+          className="ml-auto text-zinc-400 hover:text-white"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>

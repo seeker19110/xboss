@@ -3,12 +3,12 @@
 > **Một file thay cho 4 tài liệu bổ sung** (Nhóm 1, Nhóm 2, Theme, Nâng cao). Đọc đúng PHẦN cần —
 > không nạp cả file mỗi phiên. Tham chiếu cũ kiểu "Nhóm 1/Nhóm 2 mục X" vẫn đúng (giữ nguyên số mục).
 
-| PHẦN | Nội dung |
-|------|----------|
-| 1 — Nhóm 1 | env validation, migration, PR template, ADR, npm audit, Vercel staging, DoR |
-| 2 — Nhóm 2 | **đã gộp vào `docs/audit.md`** (mobile/UI/UX/a11y §5 · hiệu năng/coverage §6 · chống lỗi logic §4 · observability §7 · tương phản màu §13) |
-| 3 — Theme | Dark blue mặc định + Light, design tokens, no-flash |
-| 4 — Nâng cao | i18n · PWA · Sentry · SEO · Analytics |
+| PHẦN         | Nội dung                                                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 — Nhóm 1   | env validation, migration, PR template, ADR, npm audit, Vercel staging, DoR                                                                |
+| 2 — Nhóm 2   | **đã gộp vào `docs/audit.md`** (mobile/UI/UX/a11y §5 · hiệu năng/coverage §6 · chống lỗi logic §4 · observability §7 · tương phản màu §13) |
+| 3 — Theme    | Dark blue mặc định + Light, design tokens, no-flash                                                                                        |
+| 4 — Nâng cao | i18n · PWA · Sentry · SEO · Analytics                                                                                                      |
 
 ===============================================================================
 
@@ -19,15 +19,15 @@
 
 ## Các bổ sung gắn vào khung ở đâu
 
-| Bổ sung | Lấp lỗ hổng | Liên quan giai đoạn |
-|---------|-------------|---------------------|
-| Xác thực biến môi trường (`lib/env.ts`) | "Type safety" chưa che biến môi trường thiếu/sai | GĐ 3 — Thiết lập |
-| PR template (`.github/pull_request_template.md`) | DoD/cổng chưa được GitHub ép hiển thị | GĐ 4 — mọi merge |
-| Quy trình migration Supabase | "Migration có phiên bản" chưa nói *làm sao* | GĐ 2 & 6 |
-| ADR (`docs/adr/`) | Nguyên tắc "tài liệu hóa tại sao" chưa có công cụ | Xuyên suốt |
-| CI thêm `npm audit` | "Audit bảo mật" chưa nằm trong pipeline | GĐ 6 |
-| Vercel Preview làm staging | "Có staging" tưởng tốn công, thực ra miễn phí | GĐ 6 |
-| Definition of Ready | Bổ trợ cho Definition of Done | GĐ 1 & 4 |
+| Bổ sung                                          | Lấp lỗ hổng                                       | Liên quan giai đoạn |
+| ------------------------------------------------ | ------------------------------------------------- | ------------------- |
+| Xác thực biến môi trường (`lib/env.ts`)          | "Type safety" chưa che biến môi trường thiếu/sai  | GĐ 3 — Thiết lập    |
+| PR template (`.github/pull_request_template.md`) | DoD/cổng chưa được GitHub ép hiển thị             | GĐ 4 — mọi merge    |
+| Quy trình migration Supabase                     | "Migration có phiên bản" chưa nói _làm sao_       | GĐ 2 & 6            |
+| ADR (`docs/adr/`)                                | Nguyên tắc "tài liệu hóa tại sao" chưa có công cụ | Xuyên suốt          |
+| CI thêm `npm audit`                              | "Audit bảo mật" chưa nằm trong pipeline           | GĐ 6                |
+| Vercel Preview làm staging                       | "Có staging" tưởng tốn công, thực ra miễn phí     | GĐ 6                |
+| Definition of Ready                              | Bổ trợ cho Definition of Done                     | GĐ 1 & 4            |
 
 ---
 
@@ -42,7 +42,7 @@ npm install zod
 **Cách dùng:** thay vì gọi `process.env.X` rải rác khắp nơi, hãy import từ file này:
 
 ```ts
-import { clientEnv, serverEnv } from '@/lib/env';
+import { clientEnv, serverEnv } from "@/lib/env";
 
 // Ở client (component, hook):
 const url = clientEnv.NEXT_PUBLIC_SUPABASE_URL;
@@ -51,7 +51,7 @@ const url = clientEnv.NEXT_PUBLIC_SUPABASE_URL;
 const key = serverEnv.SUPABASE_SERVICE_ROLE_KEY;
 ```
 
-**Lợi ích:** nếu thiếu hoặc sai một biến, app dừng *ngay khi khởi động* với thông báo rõ ràng, thay vì lỗi khó hiểu lúc người dùng đang thao tác. Nhớ đổi tên biến trong file cho khớp dự án.
+**Lợi ích:** nếu thiếu hoặc sai một biến, app dừng _ngay khi khởi động_ với thông báo rõ ràng, thay vì lỗi khó hiểu lúc người dùng đang thao tác. Nhớ đổi tên biến trong file cho khớp dự án.
 
 ---
 
@@ -60,6 +60,7 @@ const key = serverEnv.SUPABASE_SERVICE_ROLE_KEY;
 Cụ thể hóa yêu cầu "migration có phiên bản, rollback được" của khung.
 
 **Cài đặt một lần:**
+
 ```bash
 npm install --save-dev supabase
 npx supabase login
@@ -68,12 +69,15 @@ npx supabase link --project-ref <mã-project-của-bạn>
 ```
 
 **Phát triển trên CSDL local** (cần Docker Desktop đang chạy):
+
 ```bash
 npx supabase start         # chạy Postgres + Studio local
 ```
+
 > Nếu không cài được Docker, có thể tạo một Supabase project riêng cho "dev" và làm việc trên đó, tách khỏi production.
 
 **Tạo một migration mới:**
+
 ```bash
 # Cách 1: viết SQL tay
 npx supabase migration new ten_thay_doi
@@ -84,11 +88,13 @@ npx supabase db diff -f ten_thay_doi
 ```
 
 **Áp dụng & kiểm tra local:**
+
 ```bash
 npx supabase db reset      # chạy lại toàn bộ migration trên CSDL local (sạch)
 ```
 
 **Đẩy lên production (sau khi đã test kỹ local):**
+
 ```bash
 npx supabase db push
 ```
@@ -96,7 +102,8 @@ npx supabase db push
 **Luôn commit thư mục `supabase/migrations/` vào Git** — đây chính là "phiên bản" của CSDL.
 
 **Về rollback (quan trọng, cần hiểu đúng):** Supabase chạy migration theo chiều tiến, không tự lùi. "Rollback được" nghĩa là:
-- Viết một migration *bù trừ* để hoàn tác thay đổi (ví dụ thêm cột thì viết migration xóa cột đó), **hoặc**
+
+- Viết một migration _bù trừ_ để hoàn tác thay đổi (ví dụ thêm cột thì viết migration xóa cột đó), **hoặc**
 - Khôi phục từ backup / Point-in-Time Recovery của Supabase.
 
 → Vì vậy: trước mỗi migration đụng dữ liệu thật, đảm bảo đã có backup và đã nghĩ sẵn đường lùi.
@@ -115,7 +122,7 @@ File mẫu kèm theo: đặt tại `docs/adr/0000-template.md`. Mỗi quyết đ
 
 **Khi nào viết ADR?** Khi chọn giữa các phương án có đánh đổi đáng kể: chọn thư viện chính, cấu trúc dữ liệu cốt lõi, kiến trúc xác thực, cách tổ chức cache TTS... Không cần viết cho quyết định nhỏ.
 
-**Đặc biệt giá trị với bạn:** vì bạn dùng AI nhiều, ADR giúp một phiên Claude Code mới (hoặc chính bạn vài tháng sau) hiểu *tại sao* mọi thứ như hiện tại, tránh vô tình lật ngược quyết định cũ. Nên trỏ `CLAUDE.md` đọc `docs/adr/` trước khi đề xuất thay đổi lớn về kiến trúc.
+**Đặc biệt giá trị với bạn:** vì bạn dùng AI nhiều, ADR giúp một phiên Claude Code mới (hoặc chính bạn vài tháng sau) hiểu _tại sao_ mọi thứ như hiện tại, tránh vô tình lật ngược quyết định cũ. Nên trỏ `CLAUDE.md` đọc `docs/adr/` trước khi đề xuất thay đổi lớn về kiến trúc.
 
 ---
 
@@ -124,11 +131,11 @@ File mẫu kèm theo: đặt tại `docs/adr/0000-template.md`. Mỗi quyết đ
 Trong file `.github/workflows/ci.yml`, thêm một bước sau bước "Cài đặt":
 
 ```yaml
-      - name: Quét bảo mật phụ thuộc
-        run: npm audit --audit-level=high
+- name: Quét bảo mật phụ thuộc
+  run: npm audit --audit-level=high
 ```
 
-> `--audit-level=high` chỉ fail khi có lỗ hổng mức *cao* trở lên, tránh nhiễu. Nếu lúc đầu gặp lỗ hổng không có bản vá khiến CI đỏ liên tục, tạm hạ xuống `--audit-level=critical` hoặc thêm `continue-on-error: true` cho riêng bước này, rồi xử lý dần.
+> `--audit-level=high` chỉ fail khi có lỗ hổng mức _cao_ trở lên, tránh nhiễu. Nếu lúc đầu gặp lỗ hổng không có bản vá khiến CI đỏ liên tục, tạm hạ xuống `--audit-level=critical` hoặc thêm `continue-on-error: true` cho riêng bước này, rồi xử lý dần.
 
 ---
 
@@ -137,6 +144,7 @@ Trong file `.github/workflows/ci.yml`, thêm một bước sau bước "Cài đ�
 Khung yêu cầu "có môi trường staging giống production". Tin tốt: **Vercel tự tạo một bản preview cho mỗi nhánh / mỗi Pull Request**, với URL riêng — bạn không phải dựng gì thêm.
 
 Cách tận dụng:
+
 - Mỗi PR sẽ có link preview tự động → dùng nó để smoke test trước khi merge.
 - Trong Vercel dashboard, đặt biến môi trường **riêng cho Preview**, trỏ tới một Supabase project (hoặc nhánh CSDL) "staging", **không** đụng dữ liệu production.
 - Chỉ nhánh `main` mới deploy lên domain production.
@@ -147,9 +155,10 @@ Cách tận dụng:
 
 ## 7. Bổ sung quy trình: Definition of Ready (DoR)
 
-Khung đã có Definition of Done (khi nào một việc *xong*). Bổ sung đối trọng: Definition of Ready — khi nào một việc *sẵn sàng để bắt đầu*. Tránh lao vào việc còn mơ hồ rồi phải làm lại.
+Khung đã có Definition of Done (khi nào một việc _xong_). Bổ sung đối trọng: Definition of Ready — khi nào một việc _sẵn sàng để bắt đầu_. Tránh lao vào việc còn mơ hồ rồi phải làm lại.
 
 **Một task chỉ nên BẮT ĐẦU khi:**
+
 - [ ] Có tiêu chí chấp nhận rõ ràng, đo được.
 - [ ] Không còn câu hỏi mở quan trọng nào.
 - [ ] Đã xác định các phần phụ thuộc (cần gì xong trước).
@@ -157,7 +166,6 @@ Khung đã có Definition of Done (khi nào một việc *xong*). Bổ sung đ�
 - [ ] Phạm vi đủ nhỏ để gói gọn trong một PR.
 
 → Nên thêm DoR này vào KHUNG 1, ngay cạnh DoD ở Giai đoạn 1. Trong `CLAUDE.md`, có thể yêu cầu AI kiểm tra DoR trước khi bắt đầu một task: nếu chưa đủ "ready", AI phải hỏi cho rõ trước, thay vì code ngay.
-
 
 ===============================================================================
 
@@ -180,9 +188,10 @@ Khung đã có Definition of Done (khi nào một việc *xong*). Bổ sung đ�
 > File tokens kèm theo: `styles/theme.css` (ở gốc repo).
 
 ## Nguyên tắc
+
 - **Dùng biến (design tokens), không hard-code màu** trong component → một nguồn sự thật, đổi theme là cả app đổi.
-- **Tương phản đạt WCAG AA** ở *cả hai* chế độ (đã chọn màu trong `styles/theme.css` để đạt; vẫn kiểm lại bằng axe — xem Nhóm 2).
-- **Không "nháy" theme sai khi tải trang** (no flash of wrong theme): đặt theme *trước khi* trang vẽ.
+- **Tương phản đạt WCAG AA** ở _cả hai_ chế độ (đã chọn màu trong `styles/theme.css` để đạt; vẫn kiểm lại bằng axe — xem Nhóm 2).
+- **Không "nháy" theme sai khi tải trang** (no flash of wrong theme): đặt theme _trước khi_ trang vẽ.
 - **Mặc định Dark blue**, kể cả khi máy người dùng đang để Light (trừ khi bạn bật khối tùy chọn trong `theme.css`).
 
 ## Bước 1 — Nạp tokens
@@ -191,14 +200,14 @@ Import `styles/theme.css` ở layout gốc (Next App Router: `app/layout.tsx` ho
 
 ```css
 /* app/globals.css */
-@import 'tailwindcss';
-@import '../styles/theme.css';
+@import "tailwindcss";
+@import "../styles/theme.css";
 ```
 
 ## Bước 2 — Nối tokens vào Tailwind (v4)
 
 Tailwind v4 cấu hình theme bằng CSS. Thêm khối `@theme inline` để các tiện ích Tailwind
-(`bg-background`, `text-foreground`, `border-border`...) trỏ tới biến *chạy theo theme*:
+(`bg-background`, `text-foreground`, `border-border`...) trỏ tới biến _chạy theo theme_:
 
 ```css
 /* app/globals.css — sau hai dòng @import ở trên */
@@ -226,6 +235,7 @@ Tailwind v4 cấu hình theme bằng CSS. Thêm khối `@theme inline` để cá
 > trỏ `'background': 'var(--background)'` trong `tailwind.config`.)
 
 Giờ viết UI bằng token, ví dụ:
+
 ```tsx
 <div className="bg-background text-foreground">
   <button className="bg-primary text-primary-foreground rounded-lg px-4 py-2">Lưu</button>
@@ -267,47 +277,47 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 ## Bước 4 — Nút chuyển theme
 
 ```tsx
-'use client';
-import { useEffect, useState } from 'react';
+"use client";
+import { useEffect, useState } from "react";
 
-type Theme = 'light' | 'dark';
+type Theme = "light" | "dark";
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>('dark'); // mặc định Dark blue
+  const [theme, setTheme] = useState<Theme>("dark"); // mặc định Dark blue
 
   useEffect(() => {
-    const saved = localStorage.getItem('theme');
-    if (saved === 'light' || saved === 'dark') setTheme(saved);
+    const saved = localStorage.getItem("theme");
+    if (saved === "light" || saved === "dark") setTheme(saved);
   }, []);
 
   function toggle() {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    const next: Theme = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("theme", next);
   }
 
   return (
     <button
       type="button"
       onClick={toggle}
-      aria-label={theme === 'dark' ? 'Chuyển sang nền sáng' : 'Chuyển sang nền tối'}
+      aria-label={theme === "dark" ? "Chuyển sang nền sáng" : "Chuyển sang nền tối"}
       className="border-border text-foreground rounded-lg border px-3 py-2"
     >
-      {theme === 'dark' ? '☀️ Sáng' : '🌙 Tối'}
+      {theme === "dark" ? "☀️ Sáng" : "🌙 Tối"}
     </button>
   );
 }
 ```
 
 ## Checklist khi làm UI có theme
+
 - [ ] Không hard-code mã màu (`#fff`, `bg-blue-500`...) cho nền/chữ — dùng token (`bg-background`, `text-foreground`...).
 - [ ] Thử **cả hai** chế độ: không có chữ "tàng hình", không mất viền, ảnh/biểu đồ vẫn đọc được.
 - [ ] Tương phản đạt **AA** ở cả hai chế độ (axe + kiểm tay phần tử quan trọng).
 - [ ] Viền focus (`--ring`) thấy rõ ở cả hai chế độ (a11y bàn phím).
 - [ ] Không "nháy" theme khi tải lại trang (đã có script no-flash).
 - [ ] Lựa chọn theme được **nhớ** giữa các lần truy cập (localStorage).
-
 
 ===============================================================================
 
@@ -317,14 +327,14 @@ export function ThemeToggle() {
 > (2026-06-29)** và file drop-in (nếu có). Bật mục nào tùy nhu cầu dự án (KHUNG 3 PHẦN A sẽ nhắc bạn quyết).
 > Chạy theo nguyên tắc research-first: **xác minh lại phiên bản** khi khởi tạo.
 
-| Năng lực | Gói (phiên bản 2026-06-29) | File drop-in kèm theo |
-|----------|----------------------------|------------------------|
-| Đa ngôn ngữ (i18n) | `next-intl` 4.x | `i18n/request.ts`, `messages/*.json` |
-| PWA / offline | `@serwist/next` 9.x + `serwist` | `app/sw.ts`, `app/manifest.ts` |
-| Theo dõi lỗi | `@sentry/nextjs` 10.x | (tạo bằng wizard) |
-| SEO | (Next có sẵn) | `app/sitemap.ts`, `app/robots.ts` |
-| Trang lỗi thân thiện | (Next có sẵn) | `app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx` |
-| Analytics | (chọn theo nhu cầu — mục 7) | (đặt khóa qua env) |
+| Năng lực             | Gói (phiên bản 2026-06-29)      | File drop-in kèm theo                                        |
+| -------------------- | ------------------------------- | ------------------------------------------------------------ |
+| Đa ngôn ngữ (i18n)   | `next-intl` 4.x                 | `i18n/request.ts`, `messages/*.json`                         |
+| PWA / offline        | `@serwist/next` 9.x + `serwist` | `app/sw.ts`, `app/manifest.ts`                               |
+| Theo dõi lỗi         | `@sentry/nextjs` 10.x           | (tạo bằng wizard)                                            |
+| SEO                  | (Next có sẵn)                   | `app/sitemap.ts`, `app/robots.ts`                            |
+| Trang lỗi thân thiện | (Next có sẵn)                   | `app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx` |
+| Analytics            | (chọn theo nhu cầu — mục 7)     | (đặt khóa qua env)                                           |
 
 ---
 
@@ -342,8 +352,8 @@ Thông điệp ở `messages/vi.json`, `messages/en.json` (đã kèm).
 **Bọc Provider ở `app/layout.tsx`:**
 
 ```tsx
-import { NextIntlClientProvider } from 'next-intl';
-import { getLocale, getMessages } from 'next-intl/server';
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale();
@@ -359,10 +369,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 ```
 
 **Dùng trong component:**
+
 ```tsx
-import { useTranslations } from 'next-intl';
-const t = useTranslations('home');
-return <h1>{t('title')}</h1>;
+import { useTranslations } from "next-intl";
+const t = useTranslations("home");
+return <h1>{t("title")}</h1>;
 ```
 
 **Đổi ngôn ngữ:** đặt cookie `locale` (qua server action) rồi `router.refresh()`. Định dạng ngày/số/tiền
@@ -396,6 +407,7 @@ npx @sentry/wizard@latest -i nextjs
 
 Wizard sẽ tạo/sửa: `instrumentation.ts`, `instrumentation-client.ts`, cấu hình server/edge, và **bọc
 `next.config` bằng `withSentryConfig`**. Sau khi cài:
+
 - [ ] Đặt `SENTRY_DSN` qua biến môi trường (đã khai trong `lib/env.ts` + `.env.example`) — không hard-code.
 - [ ] `environment: process.env.NODE_ENV` để tách lỗi dev/staging/prod.
 - [ ] Lọc dữ liệu nhạy cảm trong `beforeSend` (đừng gửi token/PII).
@@ -426,17 +438,17 @@ Không phơi chi tiết kỹ thuật ra người dùng; log để theo dõi. Dù
 create-next-app tạo sẵn `next.config.ts` — **sửa** nó để bọc các plugin bạn dùng (bỏ plugin không cần):
 
 ```ts
-import type { NextConfig } from 'next';
-import createNextIntlPlugin from 'next-intl/plugin';
-import withSerwistInit from '@serwist/next';
-import { withSentryConfig } from '@sentry/nextjs';
+import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
+import withSerwistInit from "@serwist/next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const withNextIntl = createNextIntlPlugin();
 
 const withSerwist = withSerwistInit({
-  swSrc: 'app/sw.ts',
-  swDest: 'public/sw.js',
-  disable: process.env.NODE_ENV === 'development',
+  swSrc: "app/sw.ts",
+  swDest: "public/sw.js",
+  disable: process.env.NODE_ENV === "development",
 });
 
 const nextConfig: NextConfig = {
@@ -461,14 +473,15 @@ nhu cầu (quyền riêng tư, ngân sách, độ sâu phân tích). Chọn theo
 
 **Ứng viên (cân nhắc theo nhu cầu — xác minh lại lúc dùng):**
 
-| Lựa chọn | Hợp khi | Lưu ý |
-|----------|---------|-------|
-| **Vercel Web Analytics** (`@vercel/analytics`) | đã deploy Vercel, cần nhanh & nhẹ | tích hợp 1 dòng; không cookie; số liệu cơ bản |
-| **Plausible / Umami** | ưu tiên **quyền riêng tư**, không cookie, GDPR nhẹ | nhẹ; Umami tự host được |
-| **PostHog** | cần **product analytics** sâu (funnel, session, feature flag) | nặng hơn; cẩn thận PII |
-| **GA4** | cần hệ sinh thái Google/quảng cáo | cần cookie consent; phức tạp về quyền riêng tư |
+| Lựa chọn                                       | Hợp khi                                                       | Lưu ý                                          |
+| ---------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------- |
+| **Vercel Web Analytics** (`@vercel/analytics`) | đã deploy Vercel, cần nhanh & nhẹ                             | tích hợp 1 dòng; không cookie; số liệu cơ bản  |
+| **Plausible / Umami**                          | ưu tiên **quyền riêng tư**, không cookie, GDPR nhẹ            | nhẹ; Umami tự host được                        |
+| **PostHog**                                    | cần **product analytics** sâu (funnel, session, feature flag) | nặng hơn; cẩn thận PII                         |
+| **GA4**                                        | cần hệ sinh thái Google/quảng cáo                             | cần cookie consent; phức tạp về quyền riêng tư |
 
 **Nguyên tắc bất biến khi gắn analytics:**
+
 - [ ] Đặt khóa/ID qua **biến môi trường** (vd `NEXT_PUBLIC_ANALYTICS_ID`) — không hard-code; thêm vào `lib/env.ts` + `.env.example`.
 - [ ] **Quyền riêng tư:** nếu thu thập dữ liệu cá nhân/cookie → cần **consent banner** + cập nhật privacy policy
       (KHUNG 3 PHẦN A mục 6: GDPR / Nghị định 13 VN).
@@ -476,12 +489,14 @@ nhu cầu (quyền riêng tư, ngân sách, độ sâu phân tích). Chọn theo
 - [ ] Tôn trọng `Do Not Track` / lựa chọn từ chối của người dùng nếu khả thi.
 
 **Ví dụ nhanh (Vercel Analytics):**
+
 ```bash
 npm install @vercel/analytics
 ```
+
 ```tsx
 // app/layout.tsx
-import { Analytics } from '@vercel/analytics/next';
+import { Analytics } from "@vercel/analytics/next";
 // ... <body>{children}<Analytics /></body>
 ```
 

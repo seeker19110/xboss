@@ -1,9 +1,11 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, X, ShieldAlert, Camera, Download, CheckCircle2, AlertTriangle } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
+import { ErrorState } from "@/app/components/ErrorState";
+import { taiJson } from "@/app/lib/taiDuLieu";
 import { Modal } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
@@ -61,29 +63,40 @@ export default function HsePage() {
   const [me, setMe] = useState<Me | null>(null);
   const [records, setRecords] = useState<HseRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  // Lỗi tải ≠ rỗng (audit 2026-09-05): mất mạng/500 phải nói là lỗi, không hiện "chưa có dữ liệu".
+  const [loi, setLoi] = useState<string | null>(null);
   const [tab, setTab] = useState<HseKind>("incident");
   const [addOpen, setAddOpen] = useState(false);
 
   const canManage = me?.role === "admin" || me?.role === "pm" || me?.role === "engineer";
   const canCreate = me != null && me.role !== "cdt" && me.role !== "viewer" && me.role !== "bch";
 
-  function load() {
-    return fetch("/api/hse").then((r) => (r.ok ? r.json() : null));
-  }
-
-  useEffect(() => {
-    Promise.all([fetchMe(), load()])
-      .then(([meData, r]) => {
-        if (!meData) return;
-        setMe(meData);
-        setRecords(r?.records ?? []);
-      })
-      .finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    const kq = await taiJson<{ records?: HseRecord[] }>("/api/hse");
+    if (!kq.ok) {
+      setLoi(kq.loi);
+      return false;
+    }
+    setRecords(kq.data.records ?? []);
+    setLoi(null);
+    return true;
   }, []);
 
+  const taiLai = useCallback(async () => {
+    setLoading(true);
+    setLoi(null);
+    const meData = await fetchMe();
+    if (meData) setMe(meData);
+    await load();
+    setLoading(false);
+  }, [load]);
+
+  useEffect(() => {
+    void taiLai();
+  }, [taiLai]);
+
   async function refresh() {
-    const r = await load();
-    setRecords(r?.records ?? []);
+    await load();
   }
 
   const filtered = useMemo(() => records.filter((r) => r.kind === tab), [records, tab]);
@@ -131,6 +144,7 @@ export default function HsePage() {
   }
 
   if (loading) return <PageSkeleton />;
+  if (loi) return <ErrorState message={loi} onRetry={() => void taiLai()} />;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">

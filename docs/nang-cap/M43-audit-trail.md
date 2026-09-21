@@ -16,7 +16,12 @@
 ```ts
 // AsyncLocalStorage giữ ngữ cảnh request: userId/role sau getCurrentUser(),
 // projectId sau getCurrentProjectId(), requestId từ header x-request-id.
-export type RequestContext = { userId?: number; role?: string; projectId?: number; requestId?: string };
+export type RequestContext = {
+  userId?: number;
+  role?: string;
+  projectId?: number;
+  requestId?: string;
+};
 export function runWithRequestContext<T>(ctx: RequestContext, fn: () => T): T;
 export function getRequestContext(): RequestContext | undefined;
 export function patchRequestContext(patch: Partial<RequestContext>): void; // getCurrentUser/getCurrentProjectId gọi

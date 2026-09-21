@@ -153,9 +153,8 @@ export default function SubconAiPage() {
                 </span>
               </div>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Chấm điểm tín nhiệm nhà thầu phụ từ 3 chỉ số có dữ liệu thật — tiến độ WBS
-                (30/70), BBNT đạt (25/70), an toàn HSE (15/70) — & tự động đề xuất danh sách mời
-                thầu tối ưu
+                Chấm điểm tín nhiệm nhà thầu phụ từ 3 chỉ số có dữ liệu thật — tiến độ WBS (30/70),
+                BBNT đạt (25/70), an toàn HSE (15/70) — & tự động đề xuất danh sách mời thầu tối ưu
               </p>
             </div>
           </div>

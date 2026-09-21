@@ -85,7 +85,8 @@ export async function POST(req: NextRequest) {
             visible,
           )
         : null;
-    if (!src) return NextResponse.json({ error: "Sheet nguồn để copy không tồn tại" }, { status: 400 });
+    if (!src)
+      return NextResponse.json({ error: "Sheet nguồn để copy không tồn tại" }, { status: 400 });
   }
 
   const responsible =

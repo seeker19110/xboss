@@ -33,7 +33,13 @@ import { CommentsModal } from "./modals/CommentsModal";
 import { HistoryModal } from "./modals/HistoryModal";
 import type { Pkg, Cell, GridTask, Grid } from "./types";
 import { dungLoTick } from "./tick";
-import { guiLoTick, guiNgayHangLoat } from "./tickApi";
+import {
+  guiLoTick,
+  guiNgayHangLoat,
+  guiSuaNhom,
+  xoaNgayRiengTaskCon,
+  baoLoiSuaNhom,
+} from "./tickApi";
 import { useTickVung } from "./useTickVung";
 import { ThanhVungChon } from "./ThanhVungChon";
 import { ODimension } from "./ODimension";
@@ -299,57 +305,45 @@ export function TrackingGrid({
     const end = new Date(pkg.startDate);
     end.setDate(end.getDate() + n - 1);
     const endDate = end.toISOString().slice(0, 10);
-    await fetch(`/api/workpackages/${pkg.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endDate }),
-    });
+    const kq = await guiSuaNhom(pkg.id, { endDate });
+    if (kq.trangThai !== "ok") return appAlert(baoLoiSuaNhom(kq, "Chưa lưu được số ngày"));
     setEditDays(null);
     onChanged();
   }
 
   async function savePkgFloor(floor: string) {
-    await fetch(`/api/workpackages/${pkg.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ floorLabel: floor.trim() || null }),
-    });
+    const kq = await guiSuaNhom(pkg.id, { floorLabel: floor.trim() || null });
+    if (kq.trangThai !== "ok") return appAlert(baoLoiSuaNhom(kq, "Chưa đổi được tầng"));
     setEditFloor(null);
     onChanged();
   }
 
   async function savePkgName(name: string) {
-    await fetch(`/api/workpackages/${pkg.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
+    const kq = await guiSuaNhom(pkg.id, { name });
+    if (kq.trangThai !== "ok") return appAlert(baoLoiSuaNhom(kq, "Chưa đổi được tên nhóm"));
     setEditName(null);
     onChanged();
   }
 
-  async function savePkgDates(start: string, end: string, syncTasks: boolean) {
-    await fetch(`/api/workpackages/${pkg.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ startDate: start || null, endDate: end || null }),
-    });
-    // Đồng bộ toàn bộ task con về ngày nhóm: xoá ngày riêng để task kế thừa
-    // ngày của nhóm (từ đó về sau sửa ngày nhóm sẽ tự cập nhật mọi task).
+  // Trả true khi đã lưu THẬT → modal mới tắt được "Đang lưu..." (audit 2026-09-05).
+  async function savePkgDates(start: string, end: string, syncTasks: boolean): Promise<boolean> {
+    const kq = await guiSuaNhom(pkg.id, { startDate: start || null, endDate: end || null });
+    if (kq.trangThai !== "ok") {
+      appAlert(baoLoiSuaNhom(kq, "Chưa lưu được ngày"));
+      return false;
+    }
+    // Xoá ngày riêng của task con để chúng kế thừa ngày nhóm.
     if (syncTasks) {
-      await Promise.all(
-        pkg.tasks.map((t) =>
-          fetch(`/api/tasks/${t.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ startDate: null, endDate: null }),
-          }).catch(() => {}),
-        ),
-      );
+      const hong = await xoaNgayRiengTaskCon(pkg.tasks.map((t) => t.id));
+      if (hong)
+        appAlert(
+          `Đã lưu ngày nhóm, nhưng ${hong}/${pkg.tasks.length} task con chưa đồng bộ được ngày — thử lại khi có mạng`,
+        );
     }
     setShowDatesModal(false);
     load();
     onChanged();
+    return true;
   }
 
   async function copyPkg() {
@@ -842,10 +836,18 @@ export function TrackingGrid({
                     className="bg-zinc-800 border border-emerald-600 rounded px-1 py-0.5 text-xs w-full text-center outline-none font-mono"
                   />
                   <span className="flex gap-1">
-                    <button onClick={() => savePkgFloor(editFloor)} className="text-emerald-400">
+                    <button
+                      aria-label="Lưu"
+                      onClick={() => savePkgFloor(editFloor)}
+                      className="text-emerald-400"
+                    >
                       <Check className="w-3 h-3" />
                     </button>
-                    <button onClick={() => setEditFloor(null)} className="text-zinc-500">
+                    <button
+                      aria-label="Đóng"
+                      onClick={() => setEditFloor(null)}
+                      className="text-zinc-500"
+                    >
                       <X className="w-3 h-3" />
                     </button>
                   </span>
@@ -941,10 +943,18 @@ export function TrackingGrid({
                   >
                     T
                   </button>
-                  <button onClick={() => savePkgName(editName)} className="text-emerald-400">
+                  <button
+                    aria-label="Lưu"
+                    onClick={() => savePkgName(editName)}
+                    className="text-emerald-400"
+                  >
                     <Check className="w-4 h-4" />
                   </button>
-                  <button onClick={() => setEditName(null)} className="text-zinc-500">
+                  <button
+                    aria-label="Đóng"
+                    onClick={() => setEditName(null)}
+                    className="text-zinc-500"
+                  >
                     <X className="w-4 h-4" />
                   </button>
                 </span>
@@ -1404,6 +1414,7 @@ export function TrackingGrid({
                             </a>
                             {ce && (
                               <button
+                                aria-label="Sửa"
                                 onClick={() => editTaskDrawing(t)}
                                 className="text-zinc-600 hover:text-emerald-400"
                               >
@@ -1485,6 +1496,7 @@ export function TrackingGrid({
                           T
                         </button>
                         <button
+                          aria-label="Lưu"
                           onClick={() => saveTaskName(t.id, editTask.value)}
                           className="text-emerald-400"
                         >
@@ -1498,6 +1510,7 @@ export function TrackingGrid({
                         </span>
                         {ce && (
                           <button
+                            aria-label="Sửa"
                             onClick={() => setEditTask({ id: t.id, value: t.name })}
                             className="shrink-0 text-zinc-600 hover:text-emerald-400"
                           >

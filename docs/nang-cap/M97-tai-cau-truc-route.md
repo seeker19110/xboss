@@ -17,38 +17,39 @@
 
 **(a) 26 trang "shim chuyển tiếp" client-side** — mỗi trang ~40 dòng UI chỉ để `router.replace(...)`. Đây chính là loại redirect người dùng yêu cầu bỏ:
 
-| Trang shim | Trỏ tới |
-| --- | --- |
-| `/attendance` | `/site?tab=tasks-diary&sub=attendance` |
-| `/claims` | `/commercial?tab=fidic-claims` |
-| `/contracts` | `/commercial?tab=contracts` |
-| `/costs` | `/commercial?tab=contracts&sub=costs` |
-| `/diary` | `/site?tab=tasks-diary&sub=diary` |
-| `/engineering/qr-logistics` | `/procurement?tab=qr-logistics` |
-| `/equipment` | `/site?tab=equipment&sub=equipment` |
-| `/finance` | `/commercial?tab=cashflow-esign` |
-| `/hse` | `/site?tab=hse-safety` |
-| `/insurance` | `/commercial?tab=contracts&sub=insurance` |
-| `/materials` | `/procurement?tab=inventory` |
-| `/materials/order-form` | `/procurement?tab=orders` |
-| `/materials/purchase-orders` | `/procurement?tab=orders` |
-| `/materials/suppliers` | `/procurement?tab=suppliers` |
-| `/payment-certs` | `/commercial?tab=ipc-payments&sub=ipc` |
-| `/payments` | `/commercial?tab=ipc-payments&sub=payments` |
-| `/proposals` | `/commercial?tab=ipc-payments&sub=proposals` |
-| `/quality` | `/site?tab=approvals-qc&sub=ncr` |
-| `/resources` | `/site?tab=tasks-diary&sub=resources` |
-| `/risks` | `/site?tab=hse-safety` |
-| `/schedule-control` | `/schedule?tab=wbs` |
-| `/scurve` | `/schedule?tab=scurve` |
-| `/timeline` | `/schedule?tab=wbs` |
-| `/variations` | `/commercial?tab=vo-variations` |
-| `/vehicles` | `/site?tab=equipment&sub=vehicles` |
-| `/work-fronts` | `/site?tab=work-fronts` |
+| Trang shim                   | Trỏ tới                                      |
+| ---------------------------- | -------------------------------------------- |
+| `/attendance`                | `/site?tab=tasks-diary&sub=attendance`       |
+| `/claims`                    | `/commercial?tab=fidic-claims`               |
+| `/contracts`                 | `/commercial?tab=contracts`                  |
+| `/costs`                     | `/commercial?tab=contracts&sub=costs`        |
+| `/diary`                     | `/site?tab=tasks-diary&sub=diary`            |
+| `/engineering/qr-logistics`  | `/procurement?tab=qr-logistics`              |
+| `/equipment`                 | `/site?tab=equipment&sub=equipment`          |
+| `/finance`                   | `/commercial?tab=cashflow-esign`             |
+| `/hse`                       | `/site?tab=hse-safety`                       |
+| `/insurance`                 | `/commercial?tab=contracts&sub=insurance`    |
+| `/materials`                 | `/procurement?tab=inventory`                 |
+| `/materials/order-form`      | `/procurement?tab=orders`                    |
+| `/materials/purchase-orders` | `/procurement?tab=orders`                    |
+| `/materials/suppliers`       | `/procurement?tab=suppliers`                 |
+| `/payment-certs`             | `/commercial?tab=ipc-payments&sub=ipc`       |
+| `/payments`                  | `/commercial?tab=ipc-payments&sub=payments`  |
+| `/proposals`                 | `/commercial?tab=ipc-payments&sub=proposals` |
+| `/quality`                   | `/site?tab=approvals-qc&sub=ncr`             |
+| `/resources`                 | `/site?tab=tasks-diary&sub=resources`        |
+| `/risks`                     | `/site?tab=hse-safety`                       |
+| `/schedule-control`          | `/schedule?tab=wbs`                          |
+| `/scurve`                    | `/schedule?tab=scurve`                       |
+| `/timeline`                  | `/schedule?tab=wbs`                          |
+| `/variations`                | `/commercial?tab=vo-variations`              |
+| `/vehicles`                  | `/site?tab=equipment&sub=vehicles`           |
+| `/work-fronts`               | `/site?tab=work-fronts`                      |
 
 Thêm `/order` (server `redirect()` → `/procurement?tab=orders`).
 
 **(b) 7 trang re-export cùng một component:**
+
 - `/ban-ve-thiet-ke`, `/ban-ve-hoan-cong`, `/bien-phap-thi-cong`, `/mo-hinh-bim`, `/shopdrawings` — mỗi trang 6 dòng, render `@/app/ban-ve/page` với prop `fixedKind` khác nhau.
 - `/cad-bim` và `/mepf-cad-bim-studio` — cả hai `export { default } from "@/app/engineering/god-tier-studio/page"`. **Ba URL cho một trang**, và `/mepf-cad-bim-studio` mới là mục có trong nav.
 
@@ -94,15 +95,15 @@ Ràng buộc còn lại thuần nội bộ: mọi link trong `app/**` và `lib/*
 
 ### 2.1. Bản đồ URL đích
 
-| Hub | Route con |
-| --- | --- |
-| `/site` | `/site` (tổng quan) · `/site/tasks` · `/site/diary` · `/site/attendance` · `/site/resources` · `/site/approvals` · `/site/qc` · `/site/ncr` · `/site/work-fronts` · `/site/work-fronts/[floor]` · `/site/hse` · `/site/risks` · `/site/equipment` · `/site/vehicles` |
-| `/schedule` | `/schedule` · `/schedule/wbs` · `/schedule/tracking/[sheet]` · `/schedule/gantt` · `/schedule/lookahead` · `/schedule/scurve` · `/schedule/baselines` · `/schedule/reports` · `/schedule/report` (bản in) |
-| `/procurement` | `/procurement` · `/procurement/inventory` · `/procurement/orders` · `/procurement/purchase-requests` · `/procurement/qr` · `/procurement/suppliers` · `/procurement/subcontractors` · `/procurement/boq` · `/procurement/tenders` · `/procurement/reports` · `/procurement/import` |
-| `/commercial` | `/commercial` · `/commercial/contracts` · `/commercial/costs` · `/commercial/insurance` · `/commercial/payments` · `/commercial/payment-certs` · `/commercial/payments/print` · `/commercial/proposals` · `/commercial/variations` · `/commercial/claims` · `/commercial/finance` |
-| `/governance` | `/governance` · `/governance/kickoff` · `/governance/handover` · `/governance/warranty` · `/governance/documents` · `/governance/correspondences` · `/governance/meetings` · `/governance/environment` · `/governance/monitoring` · `/governance/org` · `/governance/personnel` · `/governance/users` · `/governance/import` · `/governance/admin/*` (giữ nguyên 9 trang con của `/admin`) |
-| `/engineering` | giữ nguyên 35 trang con hiện có; hub launcher `/engineering-intelligence` gộp vào `/engineering` |
-| Ngoài hub (đúng đắn khi ở top-level) | `/` · `/login` · `/password` · `/account` · `/offline` · `/notifications` · `/notifications/all` · `/my-tasks` · `/portfolio` · `/ban-ve` · `/tech` · `/mepf-process` · `/hub/[id]` · `/r/[kind]/[id]` · `/system/[code]` · `/progress/[system]` |
+| Hub                                  | Route con                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/site`                              | `/site` (tổng quan) · `/site/tasks` · `/site/diary` · `/site/attendance` · `/site/resources` · `/site/approvals` · `/site/qc` · `/site/ncr` · `/site/work-fronts` · `/site/work-fronts/[floor]` · `/site/hse` · `/site/risks` · `/site/equipment` · `/site/vehicles`                                                                                                                       |
+| `/schedule`                          | `/schedule` · `/schedule/wbs` · `/schedule/tracking/[sheet]` · `/schedule/gantt` · `/schedule/lookahead` · `/schedule/scurve` · `/schedule/baselines` · `/schedule/reports` · `/schedule/report` (bản in)                                                                                                                                                                                  |
+| `/procurement`                       | `/procurement` · `/procurement/inventory` · `/procurement/orders` · `/procurement/purchase-requests` · `/procurement/qr` · `/procurement/suppliers` · `/procurement/subcontractors` · `/procurement/boq` · `/procurement/tenders` · `/procurement/reports` · `/procurement/import`                                                                                                         |
+| `/commercial`                        | `/commercial` · `/commercial/contracts` · `/commercial/costs` · `/commercial/insurance` · `/commercial/payments` · `/commercial/payment-certs` · `/commercial/payments/print` · `/commercial/proposals` · `/commercial/variations` · `/commercial/claims` · `/commercial/finance`                                                                                                          |
+| `/governance`                        | `/governance` · `/governance/kickoff` · `/governance/handover` · `/governance/warranty` · `/governance/documents` · `/governance/correspondences` · `/governance/meetings` · `/governance/environment` · `/governance/monitoring` · `/governance/org` · `/governance/personnel` · `/governance/users` · `/governance/import` · `/governance/admin/*` (giữ nguyên 9 trang con của `/admin`) |
+| `/engineering`                       | giữ nguyên 35 trang con hiện có; hub launcher `/engineering-intelligence` gộp vào `/engineering`                                                                                                                                                                                                                                                                                           |
+| Ngoài hub (đúng đắn khi ở top-level) | `/` · `/login` · `/password` · `/account` · `/offline` · `/notifications` · `/notifications/all` · `/my-tasks` · `/portfolio` · `/ban-ve` · `/tech` · `/mepf-process` · `/hub/[id]` · `/r/[kind]/[id]` · `/system/[code]` · `/progress/[system]`                                                                                                                                           |
 
 ---
 
@@ -164,23 +165,23 @@ Mỗi việc = 1 nhánh/worktree riêng, 1 PR draft. Thứ tự bắt buộc: **
 
 ## 4. Rủi ro & cách chặn
 
-| Rủi ro | Chặn bằng |
-| --- | --- |
+| Rủi ro                                                          | Chặn bằng                                                                                                                                                                                                                                                                           |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Link nội bộ sót lại sau khi xoá/di chuyển trang ⇒ 404 trong app | `grep -rn` toàn bộ `app/**` và `lib/**` (kể cả URL tuyệt đối trong `lib/push.ts`, cron report, nhãn QR, `app/api/r/[kind]/[id]` — chưa gửi ra ngoài nhưng vẫn phải đúng) là bước cuối của mọi việc. Vì chưa có người dùng, đây là rủi ro sửa được ngay, không phải rủi ro vận hành. |
-| `useSearchParams` không bọc `Suspense` ⇒ build fail | `npm run build` là tiêu chí đạt của mọi việc, không chỉ lint/typecheck |
-| Service worker cache URL cũ ⇒ người dùng cũ thấy 404 dai dẳng | Tăng `CACHE` trong `public/sw.js` ở V6 và một lần nữa ở V8 |
-| Di trú đồng thời nhiều hub ⇒ xung đột `HubShell` | V3 phải merge trước khi mở V4–V7; mỗi việc một worktree riêng, `git fetch origin` trước khi tạo nhánh |
-| Mất phân quyền khi copy trang sang thư mục mới | V5/V7 rà theo `docs/audit.md` mục "Vùng rủi ro cao" |
+| `useSearchParams` không bọc `Suspense` ⇒ build fail             | `npm run build` là tiêu chí đạt của mọi việc, không chỉ lint/typecheck                                                                                                                                                                                                              |
+| Service worker cache URL cũ ⇒ người dùng cũ thấy 404 dai dẳng   | Tăng `CACHE` trong `public/sw.js` ở V6 và một lần nữa ở V8                                                                                                                                                                                                                          |
+| Di trú đồng thời nhiều hub ⇒ xung đột `HubShell`                | V3 phải merge trước khi mở V4–V7; mỗi việc một worktree riêng, `git fetch origin` trước khi tạo nhánh                                                                                                                                                                               |
+| Mất phân quyền khi copy trang sang thư mục mới                  | V5/V7 rà theo `docs/audit.md` mục "Vùng rủi ro cao"                                                                                                                                                                                                                                 |
 
 ## 5. Ước lượng
 
-| Việc | Route | Quy mô |
-| --- | --- | --- |
-| V1 | `mechanical` | ~30 file xoá, ~2400 dòng giảm |
-| V2 | `standard` | 5 file xoá, 1 file sửa |
-| V3 | `complex` | `HubShell` + 1 layout + 5 route con |
-| V4 | `spec` | ~12 route con, 4 thư mục xoá |
-| V5 | `spec` | ~10 route con |
-| V6 | `spec` | ~9 route con + sw.js + offline queue |
-| V7 | `spec` | ~22 route con |
-| V8 | `standard` | nav + tài liệu |
+| Việc | Route        | Quy mô                               |
+| ---- | ------------ | ------------------------------------ |
+| V1   | `mechanical` | ~30 file xoá, ~2400 dòng giảm        |
+| V2   | `standard`   | 5 file xoá, 1 file sửa               |
+| V3   | `complex`    | `HubShell` + 1 layout + 5 route con  |
+| V4   | `spec`       | ~12 route con, 4 thư mục xoá         |
+| V5   | `spec`       | ~10 route con                        |
+| V6   | `spec`       | ~9 route con + sw.js + offline queue |
+| V7   | `spec`       | ~22 route con                        |
+| V8   | `standard`   | nav + tài liệu                       |

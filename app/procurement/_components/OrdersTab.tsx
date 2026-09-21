@@ -585,10 +585,11 @@ export default function OrdersTab() {
             placeholder={
               subView === "po" ? "Tìm mã PO, nhà cung cấp, ghi chú..." : "Tìm mã PR, tên vật tư..."
             }
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-8 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition h-10"
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-8 py-2 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition h-10"
           />
           {search && (
             <button
+              aria-label="Xoá dòng"
               onClick={() => setSearch("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
             >
@@ -886,6 +887,7 @@ export default function OrdersTab() {
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-base text-zinc-100">Lập Đơn Đặt Hàng Mới (PO)</h3>
             <button
+              aria-label="Đóng"
               onClick={() => setShowCreatePO(false)}
               className="text-zinc-400 hover:text-white"
             >
@@ -992,6 +994,7 @@ export default function OrdersTab() {
 
                     {newPO.items.length > 1 && (
                       <button
+                        aria-label="Xoá dòng"
                         type="button"
                         onClick={() => {
                           const updated = newPO.items.filter((_, i) => i !== idx);
@@ -1047,7 +1050,11 @@ export default function OrdersTab() {
                 {showReceive.poCode} – {showReceive.supplierName}
               </p>
             </div>
-            <button onClick={() => setShowReceive(null)} className="text-zinc-400 hover:text-white">
+            <button
+              aria-label="Đóng"
+              onClick={() => setShowReceive(null)}
+              className="text-zinc-400 hover:text-white"
+            >
               <X size={18} />
             </button>
           </div>
@@ -1115,7 +1122,11 @@ export default function OrdersTab() {
         <Modal onClose={() => setShowAddPR(false)} className="max-w-md p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-base text-zinc-100">Gửi Yêu Cầu Mua Sắm Vật Tư (PR)</h3>
-            <button onClick={() => setShowAddPR(false)} className="text-zinc-400 hover:text-white">
+            <button
+              aria-label="Đóng"
+              onClick={() => setShowAddPR(false)}
+              className="text-zinc-400 hover:text-white"
+            >
               <X size={18} />
             </button>
           </div>
@@ -1190,6 +1201,7 @@ export default function OrdersTab() {
               </p>
             </div>
             <button
+              aria-label="Đóng"
               onClick={() => setReviewPRModal(null)}
               className="text-zinc-400 hover:text-white"
             >

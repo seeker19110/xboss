@@ -1,6 +1,29 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+test("PDF phiếu YCNT giữ đủ ba lớp scope: phiếu, task và tên dự án", () => {
+  const src = readFileSync(
+    new URL("../app/api/inspection-requests/[id]/pdf/route.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(src, /getCurrentProjectId\(user\)/);
+  assert.match(src, /rt2\.request_id = r\.id AND tw2\.project_id = \?/);
+  assert.match(src, /rt\.request_id = \? AND tw\.project_id = \?/);
+  assert.match(src, /FROM projects WHERE id = \?/);
+});
+
+test("PDF danh mục hồ sơ chất lượng lọc dữ liệu và nhãn theo dự án hiện tại", () => {
+  const src = readFileSync(
+    new URL("../app/api/qc/documents/export/route.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(src, /getCurrentProjectId\(user\)/);
+  assert.match(src, /"tw\.project_id = \?"/);
+  assert.match(src, /JOIN towers tw ON tw\.id = st\.tower_id/);
+  assert.match(src, /FROM projects WHERE id = \?/);
+});
 
 // M22 — scoping đa dự án cho QC (qc_inspections, task_documents) và phiếu YCNT
 // (inspection_requests). Các bảng này không có cột project_id riêng (ADR-0004) —

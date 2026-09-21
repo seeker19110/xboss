@@ -142,6 +142,7 @@
 | dim_denominator_mode | text | ✓ |  |
 | actual_start_date | date | ✓ |  |
 | actual_end_date | date | ✓ |  |
+| approval_source | text | ✓ |  |
 
 **Khóa ngoại:**
 - `assigned_to` → `users(id)`
@@ -149,6 +150,7 @@
 - `package_id` → `work_packages(id)`
 
 **Index:**
+- `idx_tasks_approval_source`: INDEX idx_tasks_approval_source ON public.tasks USING btree (approval_source) WHERE (approval_source IS NOT NULL)
 - `idx_tasks_assigned`: INDEX idx_tasks_assigned ON public.tasks USING btree (assigned_to)
 - `idx_tasks_boq_lower`: INDEX idx_tasks_boq_lower ON public.tasks USING btree (lower(boq_code)) WHERE (boq_code IS NOT NULL)
 - `idx_tasks_code_lower`: INDEX idx_tasks_code_lower ON public.tasks USING btree (lower(code))
@@ -206,7 +208,6 @@
 
 **Index:**
 - `idx_history_changed_at`: INDEX idx_history_changed_at ON public.task_history USING btree (changed_at DESC)
-- `idx_history_task`: INDEX idx_history_task ON public.task_history USING btree (task_id)
 - `idx_task_history_task_changed`: INDEX idx_task_history_task_changed ON public.task_history USING btree (task_id, changed_at DESC)
 - `task_history_pkey`: UNIQUE INDEX task_history_pkey ON public.task_history USING btree (id)
 
@@ -4380,6 +4381,7 @@
 
 **Index:**
 - `engineering_cross_project_lessons_pkey`: UNIQUE INDEX engineering_cross_project_lessons_pkey ON public.engineering_cross_project_lessons USING btree (id)
+- `idx_eng_cross_lessons_source_project`: INDEX idx_eng_cross_lessons_source_project ON public.engineering_cross_project_lessons USING btree (source_project_id)
 
 ### engineering_data_quality_issues
 

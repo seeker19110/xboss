@@ -455,11 +455,7 @@ export function dungBanDoThamSoFk(gocLib: string, cotFkThat: Set<string>): BanDo
 }
 
 /** Lượt 2: lời gọi hàm trong `banDo` với đối số ở đúng vị trí FK là số nguyên literal. */
-export function timViPhamGoi(
-  tepTuongDoi: string,
-  src: string,
-  banDo: BanDoThamSoFk,
-): ViPhamFkId[] {
+export function timViPhamGoi(tepTuongDoi: string, src: string, banDo: BanDoThamSoFk): ViPhamFkId[] {
   const viPham: ViPhamFkId[] = [];
   for (const [ten, viTriList] of banDo) {
     const RE = new RegExp(`(^|[^.\\w$])${ten}\\s*\\(`, "g");

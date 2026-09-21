@@ -364,7 +364,9 @@ export default function WebhookSection({ canManage }: { canManage: boolean }) {
                               aria-label="Gửi thử"
                               className="inline-flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 px-2 py-1.5 rounded-lg text-xs font-medium transition"
                             >
-                              <Send className={`w-3.5 h-3.5 ${testingId === w.id ? "animate-pulse" : ""}`} />
+                              <Send
+                                className={`w-3.5 h-3.5 ${testingId === w.id ? "animate-pulse" : ""}`}
+                              />
                               Gửi thử
                             </button>
                             <button

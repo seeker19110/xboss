@@ -34,8 +34,7 @@ export async function GET(
   // + còn ở trạng thái chưa quyết (xem WITHDRAWABLE_STATUSES trong lib/ky-thuat/drawings.ts).
   const revisionsWithFlags = revisions.map((r) => ({
     ...r,
-    canWithdraw:
-      r.uploadedBy === user.id && (r.status === "submitted" || r.status === "commented"),
+    canWithdraw: r.uploadedBy === user.id && (r.status === "submitted" || r.status === "commented"),
   }));
   return NextResponse.json({ drawing, revisions: revisionsWithFlags });
 }

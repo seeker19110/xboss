@@ -218,7 +218,11 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
             }}
           />
         </label>
-        <button onClick={onClose} className="text-zinc-400 hover:text-white shrink-0">
+        <button
+          aria-label="Đóng"
+          onClick={onClose}
+          className="text-zinc-400 hover:text-white shrink-0"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>

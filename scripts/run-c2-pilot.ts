@@ -39,7 +39,7 @@ console.log("-------------------------------------------------------------------
 console.log("📡 KỊCH BẢN P0: CONNECTIVITY, AUTHENTICATION & HEADERS VERIFICATION");
 console.log("--------------------------------------------------------------------------------");
 
-const mockApiKey = "xbk_live_c2_pilot_demo_key_7788";
+const mockApiKey = "xbk_test_c2_pilot_demo_key_7788";
 const correlationId = `corr-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
 const projectExternalKey = "PRJ-AVIO-TOWER-A";
 

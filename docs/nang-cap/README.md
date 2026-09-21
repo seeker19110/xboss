@@ -451,6 +451,37 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > **D3 (chốt lúc duyệt):** công tác dùng chung (`project_id IS NULL`) chỉ **Admin** sửa/xoá; PM chỉ
 > tạo/sửa công tác của dự án mình.
 
+> **`M124-bo-cuc-man-hinh-chung-tu.md`** — ✅ **Approved 2026-09-21 và ĐÃ TRIỂN KHAI XONG**. Mẫu
+> màn hình "chứng từ" (DocShell) cho nhóm trang tài chính + áp cho `/payment-certs` làm trang mẫu:
+> 4 component nền mới `DocToolbar`/`DocField`(+`DocFieldGroup`)/`DocTotals`/`Kbd` trong
+> `app/components/ui/`, trang chuyển **master–detail** (danh sách đợt trái 320px + chứng từ phải,
+> URL `?contractId=&id=`), bỏ hẳn `Modal` chi tiết đợt, tổng tiền lấy từ `totals` của API (SQL
+> tính — quy ước M45), phím tắt `Ctrl/⌘+S`/`Esc`, thanh hành động đáy qua `bottomActions` của
+> `AppHeader` (hiện ở mọi breakpoint — quyết định người dùng "đáy ưu tiên mobile"). **Không đổi**
+> API/schema/`lib/`. Quy ước hình thức chốt trong ADR-0009 mục "Màn hình chứng từ — M124".
+> **Còn lại:** các trang tài chính khác (`/contracts`, `/variations`, `/claims`) vẫn ở mẫu
+> "bảng + Modal", chuyển dần theo nguyên tắc "trang nào đụng tới thì đổi trang đó"; khối "Đính kèm"
+> cho IPC cố ý **không** làm ở M124 (chưa có bảng tài liệu cho đợt thanh toán).
+
+> **`M125-bo-cuc-trang-chu.md`** — ✅ **Approved 2026-09-21 và ĐÃ TRIỂN KHAI XONG**. Trang chủ
+> `/` sắp xếp lại theo một nhịp **ngữ cảnh → số liệu → việc cần làm**: toolbar `DocToolbar`
+> (`hidden md:flex`, thanh đáy `md:hidden`) + dải 4 `StatCard` + thân 2 cột
+> `lg:grid-cols-[minmax(0,1fr)_320px]` (cột chính: thẻ "Tiến độ" có tab → hệ thi công → đường găng
+> → bảng trễ; cột phải `HomeRail`: Trung tâm điều hành hàng 44px + dải vòng đời + Pareto). **2
+> component nền mới** `Tabs`(+`TabPanel`) và `ProgressRow`; tab ghi vào URL `?tab=`, tab chưa mở
+> **không mount** nên panel nặng không tự fetch. **Không đổi** API/`lib/`/panel con. Quy ước hình
+> thức chốt trong ADR-0009 mục "Hàng tab + hàng tiến độ — M125". **Lệch đặc tả có chủ đích:** danh
+> sách hệ thi công để ngoài tab (đường vào duy nhất tới `/system/[code]`), `SpiCards`/`ForecastCards`
+> để ở cột chính (breakpoint theo viewport nên vỡ lưới trong rail 320px), tab mặc định `scurve`.
+
+> **`M126-docshell-contracts-variations-claims.md`** — ✅ **Approved 2026-09-21 và ĐÃ TRIỂN KHAI
+> XONG**. Đóng nốt "Còn lại" của M124: `/claims`, `/variations`, `/contracts` chuyển sang
+> master–detail cùng khuôn `/payment-certs`, không thêm component nền mới (dùng lại
+> `DocToolbar`/`DocField`/`DocTotals`/`Kbd`/`Chip`/`Tabs`). Modal tạo mới của cả 3 trang giữ
+> nguyên (e2e neo text/label/aria), chỉ tách file. Số dòng `page.tsx`: claims 803→354,
+> variations 946→267, contracts 1200→404. **Không đổi** API/schema/`lib/`/`CustomFieldsSection`.
+> Quy ước chốt trong ADR-0009 mục "DocShell cho `/claims`, `/variations`, `/contracts` — M126".
+
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 
 > **M62 (`M62-rls-khoa-cua.md`)** — đóng nốt RLS: `withProjectScope` đọc-ghi + bọc 3 route còn lại (`notifications`, `payments/bills`, `payments/floors`) rồi migration "khoá cửa" bỏ nhánh thiếu-ngữ-cảnh (2 PR, `route: spec`; PR2 có điều kiện tiên quyết vận hành). **Đã xong hoàn toàn 2026-07-20** — PR1 (nhánh `claude/plan-m62-m63-7osrkh`, 2026-07-19) và PR2 (`migrations/0077_rls_lock.sql`, PR #300) đều đã merge `main`; người dùng xác nhận cả 2 điều kiện tiên quyết vận hành đủ trước khi merge PR2. Xem `PROGRESS.md`. **M63 (`M63-webhook-ssrf-dns-pinning.md`)** — chống SSRF DNS rebinding cho webhook: resolve + pin IP qua undici `connect.lookup`, mở rộng `isPrivateIp` (1 PR, `route: spec`). **Đã xong 2026-07-19** (nhánh `claude/plan-m62-m63-7osrkh`). Cả 2 sinh từ đợt đánh giá chi tiết lần 8 (`PROGRESS.md`).

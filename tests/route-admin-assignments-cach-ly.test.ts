@@ -92,6 +92,34 @@ const jreq = (url: string, body?: unknown, method = "POST") =>
  * users` toàn bộ trong 1 transaction, vỡ FK nếu còn task/nhóm nào gán cho user do file này
  * tạo mà chưa xoá (đã thấy thật khi chạy `npm test` toàn bộ trước khi thêm hàm này).
  */
+/**
+ * Dựng đúng tình huống "người dùng KHÔNG thuộc dự án nào".
+ *
+ * Vì sao cần: `visibleProjectIds` có nhánh bootstrap — bảng `user_projects` RỖNG thì mọi
+ * người dùng thấy MỌI dự án (hệ chưa phân quyền dự án lần nào). Nên chỉ `dangNhap(u, null)`
+ * là chưa đủ: nếu DB của worker chưa có dòng `user_projects` nào mà lại đã có project (do
+ * test khác chạy trước trong cùng database), user vẫn "thấy" dự án đầu tiên → route trả 404
+ * thay vì 422. Đây chính là ca đỏ ngẫu nhiên ở CI 2026-09-05 (cục bộ xanh vì DB sạch chưa có
+ * project nào). Gắn một người dùng KHÁC vào một dự án để bảng không rỗng → user đang test
+ * thật sự không thấy dự án nào, không phụ thuộc thứ tự chạy.
+ */
+async function dungNguoiDungKhongCoDuAn(ten: string): Promise<{
+  user: Awaited<ReturnType<typeof taoUser>>;
+  projectId: number;
+  nguoiKhac: Awaited<ReturnType<typeof taoUser>>;
+}> {
+  const { run } = await import("@/lib/db");
+  const user = await taoUser("pm", ten);
+  const nguoiKhac = await taoUser("pm", `${ten}Khac`);
+  const projectId = await taoDuAn(ten);
+  await run(
+    `INSERT INTO user_projects (user_id, project_id) VALUES (?, ?) ON CONFLICT DO NOTHING`,
+    nguoiKhac.id,
+    projectId,
+  );
+  return { user, projectId, nguoiKhac };
+}
+
 async function don(projectIds: number[], userIds: number[]): Promise<void> {
   const { run } = await import("@/lib/db");
   // assignment_log FK tới users (changed_by/prev_user_id/new_user_id) — dọn trước khi xoá user
@@ -184,16 +212,11 @@ test(
 );
 
 test("GET /api/admin/assignments: chưa chọn dự án → trả danh sách rỗng, KHÔNG lỗi", S, async () => {
-  const pmNoProj = await taoUser("pm", "pmNoProj");
-  // Cùng lý do như ca POST 422 bên dưới: `visibleProjectIds` có fallback "bảng user_projects
-  // RỖNG toàn hệ → mọi user thấy hết". Chạy toàn bộ test suite, bảng này có thể rỗng đúng lúc
-  // ca chạy ⇒ PM thấy dự án đầu tiên ⇒ projectId khác null ⇒ route trả WBS thật và ca đỏ ngẫu
-  // nhiên (đã đỏ thật trong CI). Chèn một dòng cho user KHÁC để bảng chắc chắn không rỗng.
-  const { run } = await import("@/lib/db");
-  const duAnMoc = await taoDuAn("getNoProjMoc");
-  const userMoc = await taoUser("engineer", "getNoProjMoc");
-  await run(`INSERT INTO user_projects (user_id, project_id) VALUES (?, ?)`, userMoc.id, duAnMoc);
-
+  // `visibleProjectIds` có fallback "bảng user_projects RỖNG toàn hệ → mọi user thấy hết".
+  // Chạy cả bộ test, bảng này có thể rỗng đúng lúc ca chạy ⇒ PM thấy dự án đầu tiên ⇒
+  // projectId khác null ⇒ route trả WBS thật và ca đỏ ngẫu nhiên (đã đỏ thật trong CI).
+  // Helper chèn sẵn một dòng cho user KHÁC để bảng chắc chắn không rỗng.
+  const { user: pmNoProj, projectId, nguoiKhac } = await dungNguoiDungKhongCoDuAn("pmNoProj");
   dangXuat();
   const { dangNhap } = await import("./helpers/phien");
   dangNhap(pmNoProj, null);
@@ -204,7 +227,7 @@ test("GET /api/admin/assignments: chưa chọn dự án → trả danh sách r�
   const data = await res.json();
   assert.deepEqual(data, { sheets: [], packages: [], tasks: [], workload: {} });
 
-  await don([duAnMoc], [pmNoProj.id, userMoc.id]);
+  await don([projectId], [pmNoProj.id, nguoiKhac.id]);
 });
 
 // ============================================================================
@@ -330,18 +353,12 @@ test("POST /api/admin/assignments: gán task đúng dự án của mình → 200
 });
 
 test("POST /api/admin/assignments: chưa chọn dự án → 422", S, async () => {
-  const pmNoProj = await taoUser("pm", "postNoProj");
+  const { user: pmNoProj, projectId, nguoiKhac } = await dungNguoiDungKhongCoDuAn("postNoProj");
   const target = await taoUser("engineer", "postNoProjTarget");
   // `visibleProjectIds` có fallback "bảng user_projects RỖNG toàn hệ → mọi user thấy hết". Nếu
   // không chặn nhánh đó, PM này sẽ thấy dự án đầu tiên ⇒ projectId khác null ⇒ route không đi
-  // vào nhánh 422 và ca test đỏ ngẫu nhiên tuỳ DB worker. Chèn một dòng cho user KHÁC để bảng
-  // chắc chắn không rỗng, khi đó PM này mới thật sự "chưa có dự án nào".
-  const { insertId, run } = await import("@/lib/db");
-  const duAnMoc = await taoDuAn("postNoProjMoc");
-  const userMoc = await taoUser("engineer", "postNoProjMoc");
-  await run(`INSERT INTO user_projects (user_id, project_id) VALUES (?, ?)`, userMoc.id, duAnMoc);
-  void insertId;
-
+  // vào nhánh 422 và ca test đỏ ngẫu nhiên tuỳ DB worker. Helper đã chèn một dòng cho user
+  // KHÁC để bảng chắc chắn không rỗng, khi đó PM này mới thật sự "chưa có dự án nào".
   dangXuat();
   const { dangNhap } = await import("./helpers/phien");
   dangNhap(pmNoProj, null);
@@ -352,5 +369,5 @@ test("POST /api/admin/assignments: chưa chọn dự án → 422", S, async () =
   );
   assert.equal(res.status, 422);
 
-  await don([duAnMoc], [pmNoProj.id, target.id, userMoc.id]);
+  await don([projectId], [pmNoProj.id, target.id, nguoiKhac.id]);
 });

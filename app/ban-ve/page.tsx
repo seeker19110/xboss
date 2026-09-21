@@ -663,6 +663,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
                 />
                 {search && (
                   <button
+                    aria-label="Xoá dòng"
                     onClick={() => setSearch("")}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white p-1"
                   >
@@ -1521,12 +1522,21 @@ function MethodGateSection({
 
   async function assignPackage(pkgId: number) {
     setBusy(true);
-    const res = await fetch(`/api/drawings/${drawing.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workPackageId: pkgId }),
-    });
-    setBusy(false);
+    // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
+    // "Đang lưu..." mà không báo gì (audit 2026-09-05).
+    let res: Response;
+    try {
+      res = await fetch(`/api/drawings/${drawing.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workPackageId: pkgId }),
+      });
+    } catch {
+      appAlert("Mất kết nối — chưa lưu được, thử lại khi có mạng");
+      return;
+    } finally {
+      setBusy(false);
+    }
     const j = await res.json().catch(() => null);
     if (!res.ok) {
       showToast(j?.error ?? "Không gán được nhóm công việc", "error");
@@ -1541,12 +1551,21 @@ function MethodGateSection({
   async function toggleRequired(next: boolean) {
     if (!drawing.workPackageId) return;
     setBusy(true);
-    const res = await fetch(`/api/workpackages/${drawing.workPackageId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requiresMethodStatement: next }),
-    });
-    setBusy(false);
+    // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
+    // "Đang lưu..." mà không báo gì (audit 2026-09-05).
+    let res: Response;
+    try {
+      res = await fetch(`/api/workpackages/${drawing.workPackageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requiresMethodStatement: next }),
+      });
+    } catch {
+      appAlert("Mất kết nối — chưa lưu được, thử lại khi có mạng");
+      return;
+    } finally {
+      setBusy(false);
+    }
     const j = await res.json().catch(() => null);
     if (!res.ok) {
       showToast(j?.error ?? "Không cập nhật được", "error");

@@ -5,10 +5,10 @@ import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 
 // Test THỰC THI route handler thật cho cụm ENGINEERING — MEPF & hiện trường số
-// (Đợt 5 chiến dịch coverage — Việc W4). Route (23):
+// (Đợt 5 chiến dịch coverage — Việc W4). Route (22 — mepf-predictive đã bị xoá 2026-09-21, xem
+// PROGRESS.md):
 //   - app/api/engineering/mepf-hydraulic/route.ts            (GET lịch sử / POST tính thủy lực)
 //   - app/api/engineering/mepf-nesting/route.ts               (GET lịch sử / POST tối ưu cắt phôi)
-//   - app/api/engineering/mepf-predictive/route.ts            (GET lịch sử / POST bảo trì tiên đoán)
 //   - app/api/engineering/mepf-takeoff/route.ts                (GET lịch sử / POST bóc tách KL AI)
 //   - app/api/engineering/mepf-tc/route.ts                     (GET ma trận T&C / POST tạo·log·đánh giá)
 //   - app/api/engineering/mepf-voice/route.ts                  (GET nhật ký / POST phân tích giọng nói)
@@ -193,47 +193,6 @@ test(
     assert.equal(resGet.status, 200);
     const bodyGet = await resGet.json();
     assert.ok(bodyGet.plans.some((p: any) => p.plan_code === planCode));
-  },
-);
-
-// ============================================================================
-// GET/POST /api/engineering/mepf-predictive
-// ============================================================================
-
-test("GET /api/engineering/mepf-predictive: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/mepf-predictive/route");
-  const res = await GET();
-  assert.equal(res.status, 401);
-});
-
-test("POST /api/engineering/mepf-predictive: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("predict403");
-  const sub = await taoUser("subcon", "predict403");
-  await dangNhapDuAn(sub, projectId);
-  const { POST } = await import("@/app/api/engineering/mepf-predictive/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
-
-test(
-  "POST rồi GET /api/engineering/mepf-predictive: tính MTBF/RUL & tra lại danh sách",
-  S,
-  async () => {
-    const projectId = await taoDuAn("predictok");
-    const eng = await taoUser("engineer", "predictok");
-    await dangNhapDuAn(eng, projectId);
-    const { POST, GET } = await import("@/app/api/engineering/mepf-predictive/route");
-    const assetCode = `PUMP-${uniq("code")}`;
-    const res = await POST(jreq("/x", { assetCode, operatingHoursTotal: 5000 }));
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.evaluation.assetCode, assetCode);
-
-    const resGet = await GET();
-    assert.equal(resGet.status, 200);
-    const bodyGet = await resGet.json();
-    assert.ok(bodyGet.assets.some((a: any) => a.asset_code === assetCode));
   },
 );
 

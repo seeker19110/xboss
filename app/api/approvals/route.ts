@@ -208,7 +208,7 @@ export async function POST(req: NextRequest) {
       // Đặt toàn bộ task thành nghiem_thu — bulk UPDATE để tránh N+1 sequential queries.
       const taskIds = tasks.map((t) => t.id);
       await run(
-        `UPDATE tasks SET status = 'nghiem_thu', updated_at = CURRENT_TIMESTAMP WHERE id = ANY(?)`,
+        `UPDATE tasks SET status = 'nghiem_thu', approval_source = 'floor', updated_at = CURRENT_TIMESTAMP WHERE id = ANY(?)`,
         taskIds,
       );
 

@@ -464,7 +464,7 @@ export default function AdminPage() {
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
         aria-label={label}
-        className="bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 w-[210px] shrink-0 transition"
+        className="bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-base sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 w-[210px] shrink-0 transition"
       >
         <option value="">— Kế thừa / chưa gán —</option>
         {users.map((u) => {
@@ -1033,8 +1033,16 @@ export default function AdminPage() {
               Toàn bộ thay đổi phân công — ai gán ai, lúc nào. Tổng:{" "}
               <b className="text-white">{auditTotal}</b> bản ghi.
             </p>
-            <div className="rounded-lg border border-zinc-800 overflow-hidden">
-              <table className="w-full text-sm">
+            {/* overflow-x-auto + min-w: bảng 6 cột phải cuộn ngang được trên điện thoại.
+                tabIndex/role: vùng cuộn phải focus được bằng bàn phím (axe
+                scrollable-region-focusable, mức serious) — cuộn chuột không phải cách duy nhất. */}
+            <div
+              className="rounded-lg border border-zinc-800 overflow-x-auto"
+              tabIndex={0}
+              role="region"
+              aria-label="Bảng lịch sử phân công (cuộn ngang được)"
+            >
+              <table className="w-full text-sm min-w-[760px]">
                 <thead className="bg-zinc-900 text-zinc-400 text-xs uppercase">
                   <tr>
                     <th className="px-4 py-2 text-left">Thời gian</th>

@@ -167,7 +167,7 @@ export default function AttendancePage() {
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 h-10 transition"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 h-10 transition"
               aria-label="Chọn ngày chấm công"
             />
           </label>

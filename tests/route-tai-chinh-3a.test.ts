@@ -219,29 +219,33 @@ test("POST /api/advances: số tiền ≤ 0 → 422", S, async () => {
   assert.equal(res.status, 422);
 });
 
-test("POST /api/advances: thành công → project_id do SERVER suy, status mặc định 'open'", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("adv-ok");
-  const pm = await taoUser("pm", "adv-ok");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/advances/route");
-  const res = await POST(
-    jreq("/api/advances", {
-      amount: 5_000_000,
-      recipient: "Anh Ok",
-      advanceDate: "2026-09-01",
-      projectId: 999999,
-    }),
-  );
-  assert.equal(res.status, 201);
-  const { id } = await res.json();
-  const row = await queryOne<{ project_id: number; status: string }>(
-    `SELECT project_id, status FROM advances WHERE id = ?`,
-    id,
-  );
-  assert.equal(row?.project_id, projectId);
-  assert.equal(row?.status, "open");
-});
+test(
+  "POST /api/advances: thành công → project_id do SERVER suy, status mặc định 'open'",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("adv-ok");
+    const pm = await taoUser("pm", "adv-ok");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/advances/route");
+    const res = await POST(
+      jreq("/api/advances", {
+        amount: 5_000_000,
+        recipient: "Anh Ok",
+        advanceDate: "2026-09-01",
+        projectId: 999999,
+      }),
+    );
+    assert.equal(res.status, 201);
+    const { id } = await res.json();
+    const row = await queryOne<{ project_id: number; status: string }>(
+      `SELECT project_id, status FROM advances WHERE id = ?`,
+      id,
+    );
+    assert.equal(row?.project_id, projectId);
+    assert.equal(row?.status, "open");
+  },
+);
 
 // ============================================================================
 // GET/PATCH/DELETE /api/advances/:id
@@ -290,26 +294,22 @@ test("PATCH /api/advances/:id: chưa đăng nhập → 401", S, async () => {
   assert.equal(res.status, 401);
 });
 
-test(
-  "PATCH /api/advances/:id: action=settle vượt quá số tiền còn lại → 422",
-  S,
-  async () => {
-    const projectId = await taoDuAn("advid-settleover");
-    const pm = await taoUser("pm", "advid-settleover");
-    await dangNhapDuAn(pm, projectId);
-    const { POST } = await import("@/app/api/advances/route");
-    const created = await POST(
-      jreq("/api/advances", { amount: 1000, recipient: "x", advanceDate: "2026-09-01" }),
-    );
-    const { id: advId } = await created.json();
+test("PATCH /api/advances/:id: action=settle vượt quá số tiền còn lại → 422", S, async () => {
+  const projectId = await taoDuAn("advid-settleover");
+  const pm = await taoUser("pm", "advid-settleover");
+  await dangNhapDuAn(pm, projectId);
+  const { POST } = await import("@/app/api/advances/route");
+  const created = await POST(
+    jreq("/api/advances", { amount: 1000, recipient: "x", advanceDate: "2026-09-01" }),
+  );
+  const { id: advId } = await created.json();
 
-    const { PATCH } = await import("@/app/api/advances/[id]/route");
-    const res = await PATCH(jreq("/x", { action: "settle", settleAmount: 2000 }, "PATCH"), {
-      params: Promise.resolve({ id: String(advId) }),
-    });
-    assert.equal(res.status, 422);
-  },
-);
+  const { PATCH } = await import("@/app/api/advances/[id]/route");
+  const res = await PATCH(jreq("/x", { action: "settle", settleAmount: 2000 }, "PATCH"), {
+    params: Promise.resolve({ id: String(advId) }),
+  });
+  assert.equal(res.status, 422);
+});
 
 test(
   "PATCH /api/advances/:id: action=settle từng phần → status 'partially_settled', hoàn hết → 'settled', hoàn tiếp → 409",
@@ -470,16 +470,20 @@ test("POST /api/cash-transactions: chưa đăng nhập → 401", S, async () => 
   assert.equal(res.status, 401);
 });
 
-test("POST /api/cash-transactions: engineer không được ghi quỹ (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("ct-eng403");
-  const eng = await taoUser("engineer", "ct-eng403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/cash-transactions/route");
-  const res = await POST(
-    jreq("/api/cash-transactions", { txDate: "2026-09-01", direction: "in", amount: 1000 }),
-  );
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/cash-transactions: engineer không được ghi quỹ (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("ct-eng403");
+    const eng = await taoUser("engineer", "ct-eng403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/cash-transactions/route");
+    const res = await POST(
+      jreq("/api/cash-transactions", { txDate: "2026-09-01", direction: "in", amount: 1000 }),
+    );
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/cash-transactions: ngày sai định dạng → 422", S, async () => {
   const projectId = await taoDuAn("ct-badate");
@@ -568,14 +572,18 @@ test("PATCH /api/cash-transactions/:id: chưa đăng nhập → 401", S, async (
   assert.equal(res.status, 401);
 });
 
-test("PATCH /api/cash-transactions/:id: engineer không được sửa (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("ctid-eng403");
-  const eng = await taoUser("engineer", "ctid-eng403");
-  await dangNhapDuAn(eng, projectId);
-  const { PATCH } = await import("@/app/api/cash-transactions/[id]/route");
-  const res = await PATCH(jreq("/x", {}, "PATCH"), { params: Promise.resolve({ id: "1" }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "PATCH /api/cash-transactions/:id: engineer không được sửa (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("ctid-eng403");
+    const eng = await taoUser("engineer", "ctid-eng403");
+    await dangNhapDuAn(eng, projectId);
+    const { PATCH } = await import("@/app/api/cash-transactions/[id]/route");
+    const res = await PATCH(jreq("/x", {}, "PATCH"), { params: Promise.resolve({ id: "1" }) });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("PATCH /api/cash-transactions/:id: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("ctid-bad");
@@ -586,25 +594,29 @@ test("PATCH /api/cash-transactions/:id: ID không phải số → 400", S, async
   assert.equal(res.status, 400);
 });
 
-test("PATCH /api/cash-transactions/:id: giao dịch thuộc dự án khác → 404 (cách ly)", S, async () => {
-  const projectA = await taoDuAn("ctid-patchisoA");
-  const projectB = await taoDuAn("ctid-patchisoB");
-  const pmB = await taoUser("pm", "ctid-patchisoB");
-  await dangNhapDuAn(pmB, projectB);
-  const { POST } = await import("@/app/api/cash-transactions/route");
-  const created = await POST(
-    jreq("/api/cash-transactions", { txDate: "2026-09-01", direction: "in", amount: 1000 }),
-  );
-  const { id: ctId } = await created.json();
+test(
+  "PATCH /api/cash-transactions/:id: giao dịch thuộc dự án khác → 404 (cách ly)",
+  S,
+  async () => {
+    const projectA = await taoDuAn("ctid-patchisoA");
+    const projectB = await taoDuAn("ctid-patchisoB");
+    const pmB = await taoUser("pm", "ctid-patchisoB");
+    await dangNhapDuAn(pmB, projectB);
+    const { POST } = await import("@/app/api/cash-transactions/route");
+    const created = await POST(
+      jreq("/api/cash-transactions", { txDate: "2026-09-01", direction: "in", amount: 1000 }),
+    );
+    const { id: ctId } = await created.json();
 
-  const pmA = await taoUser("pm", "ctid-patchisoA");
-  await dangNhapDuAn(pmA, projectA);
-  const { PATCH } = await import("@/app/api/cash-transactions/[id]/route");
-  const res = await PATCH(jreq("/x", { direction: "in" }, "PATCH"), {
-    params: Promise.resolve({ id: String(ctId) }),
-  });
-  assert.equal(res.status, 404);
-});
+    const pmA = await taoUser("pm", "ctid-patchisoA");
+    await dangNhapDuAn(pmA, projectA);
+    const { PATCH } = await import("@/app/api/cash-transactions/[id]/route");
+    const res = await PATCH(jreq("/x", { direction: "in" }, "PATCH"), {
+      params: Promise.resolve({ id: String(ctId) }),
+    });
+    assert.equal(res.status, 404);
+  },
+);
 
 test("PATCH /api/cash-transactions/:id: body không phải object → 400", S, async () => {
   const projectId = await taoDuAn("ctid-badbody");
@@ -616,10 +628,9 @@ test("PATCH /api/cash-transactions/:id: body không phải object → 400", S, a
   );
   const { id: ctId } = await created.json();
   const { PATCH } = await import("@/app/api/cash-transactions/[id]/route");
-  const res = await PATCH(
-    new NextRequest("http://localhost/x", { method: "PATCH", body: "x" }),
-    { params: Promise.resolve({ id: String(ctId) }) },
-  );
+  const res = await PATCH(new NextRequest("http://localhost/x", { method: "PATCH", body: "x" }), {
+    params: Promise.resolve({ id: String(ctId) }),
+  });
   assert.equal(res.status, 400);
 });
 
@@ -672,16 +683,20 @@ test("DELETE /api/cash-transactions/:id: chưa đăng nhập → 401", S, async 
   assert.equal(res.status, 401);
 });
 
-test("DELETE /api/cash-transactions/:id: engineer không được xoá (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("ctid-deleng403");
-  const eng = await taoUser("engineer", "ctid-deleng403");
-  await dangNhapDuAn(eng, projectId);
-  const { DELETE } = await import("@/app/api/cash-transactions/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: "1" }),
-  });
-  assert.equal(res.status, 403);
-});
+test(
+  "DELETE /api/cash-transactions/:id: engineer không được xoá (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("ctid-deleng403");
+    const eng = await taoUser("engineer", "ctid-deleng403");
+    await dangNhapDuAn(eng, projectId);
+    const { DELETE } = await import("@/app/api/cash-transactions/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: "1" }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("DELETE /api/cash-transactions/:id: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("ctid-delbad");
@@ -694,25 +709,29 @@ test("DELETE /api/cash-transactions/:id: ID không phải số → 400", S, asyn
   assert.equal(res.status, 400);
 });
 
-test("DELETE /api/cash-transactions/:id: giao dịch thuộc dự án khác → 404 (cách ly)", S, async () => {
-  const projectA = await taoDuAn("ctid-delisoA");
-  const projectB = await taoDuAn("ctid-delisoB");
-  const pmB = await taoUser("pm", "ctid-delisoB");
-  await dangNhapDuAn(pmB, projectB);
-  const { POST } = await import("@/app/api/cash-transactions/route");
-  const created = await POST(
-    jreq("/api/cash-transactions", { txDate: "2026-09-01", direction: "in", amount: 1000 }),
-  );
-  const { id: ctId } = await created.json();
+test(
+  "DELETE /api/cash-transactions/:id: giao dịch thuộc dự án khác → 404 (cách ly)",
+  S,
+  async () => {
+    const projectA = await taoDuAn("ctid-delisoA");
+    const projectB = await taoDuAn("ctid-delisoB");
+    const pmB = await taoUser("pm", "ctid-delisoB");
+    await dangNhapDuAn(pmB, projectB);
+    const { POST } = await import("@/app/api/cash-transactions/route");
+    const created = await POST(
+      jreq("/api/cash-transactions", { txDate: "2026-09-01", direction: "in", amount: 1000 }),
+    );
+    const { id: ctId } = await created.json();
 
-  const pmA = await taoUser("pm", "ctid-delisoA");
-  await dangNhapDuAn(pmA, projectA);
-  const { DELETE } = await import("@/app/api/cash-transactions/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(ctId) }),
-  });
-  assert.equal(res.status, 404);
-});
+    const pmA = await taoUser("pm", "ctid-delisoA");
+    await dangNhapDuAn(pmA, projectA);
+    const { DELETE } = await import("@/app/api/cash-transactions/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(ctId) }),
+    });
+    assert.equal(res.status, 404);
+  },
+);
 
 test("DELETE /api/cash-transactions/:id: xoá thành công", S, async () => {
   const { queryOne } = await import("@/lib/db");
@@ -778,23 +797,29 @@ test("GET /api/invoices: cách ly dự án — không thấy hoá đơn dự án
   assert.deepEqual((await res.json()).invoices, []);
 });
 
-test("GET /api/invoices: mặc định chỉ thấy hoá đơn còn sống, không thấy đã xoá mềm", S, async () => {
-  const projectId = await taoDuAn("inv-nodel");
-  const pm = await taoUser("pm", "inv-nodel");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/invoices/route");
-  const created = await POST(
-    jreq("/api/invoices", { direction: "out", netAmount: 1000, vatAmount: 100 }),
-  );
-  const { id: invId } = await created.json();
-  const { DELETE } = await import("@/app/api/invoices/[id]/route");
-  await DELETE(jreq("/x", undefined, "DELETE"), { params: Promise.resolve({ id: String(invId) }) });
+test(
+  "GET /api/invoices: mặc định chỉ thấy hoá đơn còn sống, không thấy đã xoá mềm",
+  S,
+  async () => {
+    const projectId = await taoDuAn("inv-nodel");
+    const pm = await taoUser("pm", "inv-nodel");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/invoices/route");
+    const created = await POST(
+      jreq("/api/invoices", { direction: "out", netAmount: 1000, vatAmount: 100 }),
+    );
+    const { id: invId } = await created.json();
+    const { DELETE } = await import("@/app/api/invoices/[id]/route");
+    await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(invId) }),
+    });
 
-  const { GET } = await import("@/app/api/invoices/route");
-  const res = await GET(jreq("/api/invoices", undefined, "GET"));
-  const { invoices } = await res.json();
-  assert.ok(!invoices.some((i: { id: number }) => i.id === invId));
-});
+    const { GET } = await import("@/app/api/invoices/route");
+    const res = await GET(jreq("/api/invoices", undefined, "GET"));
+    const { invoices } = await res.json();
+    assert.ok(!invoices.some((i: { id: number }) => i.id === invId));
+  },
+);
 
 test("POST /api/invoices: chưa đăng nhập → 401", S, async () => {
   dangXuat();
@@ -940,10 +965,9 @@ test("PATCH /api/invoices/:id: body không phải object → 400", S, async () =
   );
   const { id: invId } = await created.json();
   const { PATCH } = await import("@/app/api/invoices/[id]/route");
-  const res = await PATCH(
-    new NextRequest("http://localhost/x", { method: "PATCH", body: "x" }),
-    { params: Promise.resolve({ id: String(invId) }) },
-  );
+  const res = await PATCH(new NextRequest("http://localhost/x", { method: "PATCH", body: "x" }), {
+    params: Promise.resolve({ id: String(invId) }),
+  });
   assert.equal(res.status, 400);
 });
 
@@ -1037,28 +1061,32 @@ test("DELETE /api/invoices/:id: hoá đơn thuộc dự án khác → 404 (cách
   assert.equal(res.status, 404);
 });
 
-test("DELETE /api/invoices/:id: xoá mềm — deleted_at được set, bản ghi vẫn còn trong DB", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("invid-del");
-  const pm = await taoUser("pm", "invid-del");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/invoices/route");
-  const created = await POST(
-    jreq("/api/invoices", { direction: "out", netAmount: 1000, vatAmount: 100 }),
-  );
-  const { id: invId } = await created.json();
+test(
+  "DELETE /api/invoices/:id: xoá mềm — deleted_at được set, bản ghi vẫn còn trong DB",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("invid-del");
+    const pm = await taoUser("pm", "invid-del");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/invoices/route");
+    const created = await POST(
+      jreq("/api/invoices", { direction: "out", netAmount: 1000, vatAmount: 100 }),
+    );
+    const { id: invId } = await created.json();
 
-  const { DELETE } = await import("@/app/api/invoices/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(invId) }),
-  });
-  assert.equal(res.status, 200);
-  const row = await queryOne<{ deleted_at: string | null }>(
-    `SELECT deleted_at FROM invoices WHERE id = ?`,
-    invId,
-  );
-  assert.ok(row?.deleted_at != null);
-});
+    const { DELETE } = await import("@/app/api/invoices/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(invId) }),
+    });
+    assert.equal(res.status, 200);
+    const row = await queryOne<{ deleted_at: string | null }>(
+      `SELECT deleted_at FROM invoices WHERE id = ?`,
+      invId,
+    );
+    assert.ok(row?.deleted_at != null);
+  },
+);
 
 test("POST /api/invoices/:id/restore: chưa đăng nhập → 401", S, async () => {
   dangXuat();
@@ -1080,24 +1108,28 @@ test("POST /api/invoices/:id/restore: PM (không phải Admin) → 403", S, asyn
   assert.equal(res.status, 403);
 });
 
-test("POST /api/invoices/:id/restore: hoá đơn chưa xoá → 404 (chỉ khôi phục bản đã xoá)", S, async () => {
-  const projectId = await taoDuAn("invid-restorenodel");
-  const pm = await taoUser("pm", "invid-restorenodel");
-  const admin = await taoUser("admin", "invid-restorenodelA");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/invoices/route");
-  const created = await POST(
-    jreq("/api/invoices", { direction: "out", netAmount: 1000, vatAmount: 100 }),
-  );
-  const { id: invId } = await created.json();
+test(
+  "POST /api/invoices/:id/restore: hoá đơn chưa xoá → 404 (chỉ khôi phục bản đã xoá)",
+  S,
+  async () => {
+    const projectId = await taoDuAn("invid-restorenodel");
+    const pm = await taoUser("pm", "invid-restorenodel");
+    const admin = await taoUser("admin", "invid-restorenodelA");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/invoices/route");
+    const created = await POST(
+      jreq("/api/invoices", { direction: "out", netAmount: 1000, vatAmount: 100 }),
+    );
+    const { id: invId } = await created.json();
 
-  await dangNhapDuAn(admin, projectId);
-  const { POST: restorePOST } = await import("@/app/api/invoices/[id]/restore/route");
-  const res = await restorePOST(jreq("/x", undefined, "POST"), {
-    params: Promise.resolve({ id: String(invId) }),
-  });
-  assert.equal(res.status, 404);
-});
+    await dangNhapDuAn(admin, projectId);
+    const { POST: restorePOST } = await import("@/app/api/invoices/[id]/restore/route");
+    const res = await restorePOST(jreq("/x", undefined, "POST"), {
+      params: Promise.resolve({ id: String(invId) }),
+    });
+    assert.equal(res.status, 404);
+  },
+);
 
 test("POST /api/invoices/:id/restore: hoá đơn dự án khác đã xoá → 404 (cách ly)", S, async () => {
   const projectA = await taoDuAn("invid-restoreisoA");
@@ -1121,32 +1153,38 @@ test("POST /api/invoices/:id/restore: hoá đơn dự án khác đã xoá → 40
   assert.equal(res.status, 404);
 });
 
-test("POST /api/invoices/:id/restore: Admin khôi phục hoá đơn đã xoá đúng dự án → 200", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("invid-restoreok");
-  const pm = await taoUser("pm", "invid-restoreok");
-  const admin = await taoUser("admin", "invid-restoreokA");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/invoices/route");
-  const created = await POST(
-    jreq("/api/invoices", { direction: "out", netAmount: 1000, vatAmount: 100 }),
-  );
-  const { id: invId } = await created.json();
-  const { DELETE } = await import("@/app/api/invoices/[id]/route");
-  await DELETE(jreq("/x", undefined, "DELETE"), { params: Promise.resolve({ id: String(invId) }) });
+test(
+  "POST /api/invoices/:id/restore: Admin khôi phục hoá đơn đã xoá đúng dự án → 200",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("invid-restoreok");
+    const pm = await taoUser("pm", "invid-restoreok");
+    const admin = await taoUser("admin", "invid-restoreokA");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/invoices/route");
+    const created = await POST(
+      jreq("/api/invoices", { direction: "out", netAmount: 1000, vatAmount: 100 }),
+    );
+    const { id: invId } = await created.json();
+    const { DELETE } = await import("@/app/api/invoices/[id]/route");
+    await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(invId) }),
+    });
 
-  await dangNhapDuAn(admin, projectId);
-  const { POST: restorePOST } = await import("@/app/api/invoices/[id]/restore/route");
-  const res = await restorePOST(jreq("/x", undefined, "POST"), {
-    params: Promise.resolve({ id: String(invId) }),
-  });
-  assert.equal(res.status, 200);
-  const row = await queryOne<{ deleted_at: string | null }>(
-    `SELECT deleted_at FROM invoices WHERE id = ?`,
-    invId,
-  );
-  assert.equal(row?.deleted_at, null);
-});
+    await dangNhapDuAn(admin, projectId);
+    const { POST: restorePOST } = await import("@/app/api/invoices/[id]/restore/route");
+    const res = await restorePOST(jreq("/x", undefined, "POST"), {
+      params: Promise.resolve({ id: String(invId) }),
+    });
+    assert.equal(res.status, 200);
+    const row = await queryOne<{ deleted_at: string | null }>(
+      `SELECT deleted_at FROM invoices WHERE id = ?`,
+      invId,
+    );
+    assert.equal(row?.deleted_at, null);
+  },
+);
 
 // ============================================================================
 // GET/PATCH /api/payments (giá trị HĐ theo tầng × hệ)
@@ -1195,14 +1233,18 @@ test("PATCH /api/payments: chưa đăng nhập → 401", S, async () => {
   assert.equal(res.status, 401);
 });
 
-test("PATCH /api/payments: engineer không được sửa giá trị HĐ (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("pay-patch403");
-  const eng = await taoUser("engineer", "pay-patch403");
-  await dangNhapDuAn(eng, projectId);
-  const { PATCH } = await import("@/app/api/payments/route");
-  const res = await PATCH(jreq("/api/payments", { updates: [] }));
-  assert.equal(res.status, 403);
-});
+test(
+  "PATCH /api/payments: engineer không được sửa giá trị HĐ (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("pay-patch403");
+    const eng = await taoUser("engineer", "pay-patch403");
+    await dangNhapDuAn(eng, projectId);
+    const { PATCH } = await import("@/app/api/payments/route");
+    const res = await PATCH(jreq("/api/payments", { updates: [] }));
+    assert.equal(res.status, 403);
+  },
+);
 
 test("PATCH /api/payments: upsert giá trị HĐ theo tầng × hệ thành công", S, async () => {
   const { queryOne } = await import("@/lib/db");
@@ -1243,28 +1285,35 @@ test("GET /api/payments/bills: engineer không có quyền → 403", S, async ()
   assert.equal(res.status, 403);
 });
 
-test("GET /api/payments/bills: trả đúng danh sách bill đã ghi (kèm dữ liệu tầng/hệ)", S, async () => {
-  const projectId = await taoDuAn("bill-getok");
-  const pm = await taoUser("pm", "bill-getok");
-  const { sheetTypeId, floorLabel } = await taoTangHe(projectId, "billgetok");
-  const { insertId } = await import("@/lib/db");
-  const billId = await insertId(
-    `INSERT INTO payment_bills (responsible, type, amount, paid_date, sheet_type_id, floor_label, project_id)
+test(
+  "GET /api/payments/bills: trả đúng danh sách bill đã ghi (kèm dữ liệu tầng/hệ)",
+  S,
+  async () => {
+    const projectId = await taoDuAn("bill-getok");
+    const pm = await taoUser("pm", "bill-getok");
+    const { sheetTypeId, floorLabel } = await taoTangHe(projectId, "billgetok");
+    const { insertId } = await import("@/lib/db");
+    const billId = await insertId(
+      `INSERT INTO payment_bills (responsible, type, amount, paid_date, sheet_type_id, floor_label, project_id)
      VALUES ('Anh Get', 'advance', 5000, CURRENT_DATE, ?, ?, ?)`,
-    sheetTypeId,
-    floorLabel,
-    projectId,
-  );
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/payments/bills/route");
-  const res = await GET(jreq("/api/payments/bills", undefined, "GET"));
-  assert.equal(res.status, 200);
-  const { bills } = await res.json();
-  const row = bills.find((b: { id: number }) => b.id === billId);
-  assert.ok(row != null, "phải thấy bill vừa tạo");
-  assert.equal(Number(row?.amount), 5000);
-  assert.ok(row?.workPackageName?.startsWith("Nhóm"), "phải JOIN đúng tên work package theo tầng/hệ");
-});
+      sheetTypeId,
+      floorLabel,
+      projectId,
+    );
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/payments/bills/route");
+    const res = await GET(jreq("/api/payments/bills", undefined, "GET"));
+    assert.equal(res.status, 200);
+    const { bills } = await res.json();
+    const row = bills.find((b: { id: number }) => b.id === billId);
+    assert.ok(row != null, "phải thấy bill vừa tạo");
+    assert.equal(Number(row?.amount), 5000);
+    assert.ok(
+      row?.workPackageName?.startsWith("Nhóm"),
+      "phải JOIN đúng tên work package theo tầng/hệ",
+    );
+  },
+);
 
 test("POST /api/payments/bills: chưa đăng nhập → 401", S, async () => {
   dangXuat();
@@ -1284,76 +1333,84 @@ test("POST /api/payments/bills: thiếu người phụ trách → 400", S, async
   assert.equal(res.status, 400);
 });
 
-test("POST /api/payments/bills: type=bill gắn tầng vượt quá 100% đã thanh toán → 400", S, async () => {
-  const projectId = await taoDuAn("bill-over100");
-  const pm = await taoUser("pm", "bill-over100");
-  const { sheetTypeId, floorLabel } = await taoTangHe(projectId, "billover100");
-  const { run } = await import("@/lib/db");
-  await run(
-    `INSERT INTO floor_contracts (sheet_type_id, floor_label, contract_value) VALUES (?, ?, ?)`,
-    sheetTypeId,
-    floorLabel,
-    1_000_000,
-  );
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/payments/bills/route");
-  const first = await POST(
-    jreq("/api/payments/bills", {
-      responsible: "Anh A",
-      type: "bill",
-      paidDate: "2026-09-01",
+test(
+  "POST /api/payments/bills: type=bill gắn tầng vượt quá 100% đã thanh toán → 400",
+  S,
+  async () => {
+    const projectId = await taoDuAn("bill-over100");
+    const pm = await taoUser("pm", "bill-over100");
+    const { sheetTypeId, floorLabel } = await taoTangHe(projectId, "billover100");
+    const { run } = await import("@/lib/db");
+    await run(
+      `INSERT INTO floor_contracts (sheet_type_id, floor_label, contract_value) VALUES (?, ?, ?)`,
       sheetTypeId,
       floorLabel,
-      pctThisPeriod: 0.7,
-    }),
-  );
-  assert.equal(first.status, 200);
-  const second = await POST(
-    jreq("/api/payments/bills", {
-      responsible: "Anh A",
-      type: "bill",
-      paidDate: "2026-09-02",
-      sheetTypeId,
-      floorLabel,
-      pctThisPeriod: 0.5,
-    }),
-  );
-  assert.equal(second.status, 400);
-});
+      1_000_000,
+    );
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/payments/bills/route");
+    const first = await POST(
+      jreq("/api/payments/bills", {
+        responsible: "Anh A",
+        type: "bill",
+        paidDate: "2026-09-01",
+        sheetTypeId,
+        floorLabel,
+        pctThisPeriod: 0.7,
+      }),
+    );
+    assert.equal(first.status, 200);
+    const second = await POST(
+      jreq("/api/payments/bills", {
+        responsible: "Anh A",
+        type: "bill",
+        paidDate: "2026-09-02",
+        sheetTypeId,
+        floorLabel,
+        pctThisPeriod: 0.5,
+      }),
+    );
+    assert.equal(second.status, 400);
+  },
+);
 
-test("POST /api/payments/bills: type=bill tính amount = contractValue × pct, ghi project_id", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("bill-calc");
-  const pm = await taoUser("pm", "bill-calc");
-  const { sheetTypeId, floorLabel } = await taoTangHe(projectId, "billcalc");
-  const { run } = await import("@/lib/db");
-  await run(
-    `INSERT INTO floor_contracts (sheet_type_id, floor_label, contract_value) VALUES (?, ?, ?)`,
-    sheetTypeId,
-    floorLabel,
-    1_000_000,
-  );
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/payments/bills/route");
-  const res = await POST(
-    jreq("/api/payments/bills", {
-      responsible: "Anh B",
-      type: "bill",
-      paidDate: "2026-09-01",
+test(
+  "POST /api/payments/bills: type=bill tính amount = contractValue × pct, ghi project_id",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("bill-calc");
+    const pm = await taoUser("pm", "bill-calc");
+    const { sheetTypeId, floorLabel } = await taoTangHe(projectId, "billcalc");
+    const { run } = await import("@/lib/db");
+    await run(
+      `INSERT INTO floor_contracts (sheet_type_id, floor_label, contract_value) VALUES (?, ?, ?)`,
       sheetTypeId,
       floorLabel,
-      pctThisPeriod: 0.3,
-    }),
-  );
-  assert.equal(res.status, 200);
-  const { id, amount } = await res.json();
-  assert.equal(Number(amount), 300_000);
-  const row = await queryOne<{ project_id: number }>(
-    `SELECT project_id FROM payment_bills WHERE id = ?`,
-    id,
-  );
-  assert.equal(row?.project_id, projectId);
-});
+      1_000_000,
+    );
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/payments/bills/route");
+    const res = await POST(
+      jreq("/api/payments/bills", {
+        responsible: "Anh B",
+        type: "bill",
+        paidDate: "2026-09-01",
+        sheetTypeId,
+        floorLabel,
+        pctThisPeriod: 0.3,
+      }),
+    );
+    assert.equal(res.status, 200);
+    const { id, amount } = await res.json();
+    assert.equal(Number(amount), 300_000);
+    const row = await queryOne<{ project_id: number }>(
+      `SELECT project_id FROM payment_bills WHERE id = ?`,
+      id,
+    );
+    assert.equal(row?.project_id, projectId);
+  },
+);
 
 // ============================================================================
 // PATCH/DELETE /api/payments/bills/:id
@@ -1395,10 +1452,9 @@ test("PATCH /api/payments/bills/:id: body không phải object → 400", S, asyn
   );
   await dangNhapDuAn(pm, projectId);
   const { PATCH } = await import("@/app/api/payments/bills/[id]/route");
-  const res = await PATCH(
-    new NextRequest("http://localhost/x", { method: "PATCH", body: "x" }),
-    { params: Promise.resolve({ id: String(billId) }) },
-  );
+  const res = await PATCH(new NextRequest("http://localhost/x", { method: "PATCH", body: "x" }), {
+    params: Promise.resolve({ id: String(billId) }),
+  });
   assert.equal(res.status, 400);
 });
 
@@ -1469,16 +1525,20 @@ test("DELETE /api/payments/bills/:id: chưa đăng nhập → 401", S, async () 
   assert.equal(res.status, 401);
 });
 
-test("DELETE /api/payments/bills/:id: engineer không được xoá (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("billid-deleng403");
-  const eng = await taoUser("engineer", "billid-deleng403");
-  await dangNhapDuAn(eng, projectId);
-  const { DELETE } = await import("@/app/api/payments/bills/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: "1" }),
-  });
-  assert.equal(res.status, 403);
-});
+test(
+  "DELETE /api/payments/bills/:id: engineer không được xoá (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("billid-deleng403");
+    const eng = await taoUser("engineer", "billid-deleng403");
+    await dangNhapDuAn(eng, projectId);
+    const { DELETE } = await import("@/app/api/payments/bills/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: "1" }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("DELETE /api/payments/bills/:id: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("billid-delbad");
@@ -1558,37 +1618,41 @@ test("GET /api/payments/floors: thiếu person → trả rỗng", S, async () =>
   assert.deepEqual((await res.json()).floors, []);
 });
 
-test("GET /api/payments/floors: trả tầng × hệ kèm lịch sử thanh toán của người phụ trách", S, async () => {
-  const projectId = await taoDuAn("floors-ok");
-  const pm = await taoUser("pm", "floors-ok");
-  const responsible = `Người ${uniq("floorsok")}`;
-  const { sheetTypeId, floorLabel } = await taoTangHe(projectId, "floorsok", { responsible });
-  const { run } = await import("@/lib/db");
-  await run(
-    `INSERT INTO floor_contracts (sheet_type_id, floor_label, contract_value) VALUES (?, ?, ?)`,
-    sheetTypeId,
-    floorLabel,
-    1_000_000,
-  );
-  await run(
-    `INSERT INTO payment_bills (responsible, type, amount, paid_date, sheet_type_id, floor_label, pct_this_period, project_id)
+test(
+  "GET /api/payments/floors: trả tầng × hệ kèm lịch sử thanh toán của người phụ trách",
+  S,
+  async () => {
+    const projectId = await taoDuAn("floors-ok");
+    const pm = await taoUser("pm", "floors-ok");
+    const responsible = `Người ${uniq("floorsok")}`;
+    const { sheetTypeId, floorLabel } = await taoTangHe(projectId, "floorsok", { responsible });
+    const { run } = await import("@/lib/db");
+    await run(
+      `INSERT INTO floor_contracts (sheet_type_id, floor_label, contract_value) VALUES (?, ?, ?)`,
+      sheetTypeId,
+      floorLabel,
+      1_000_000,
+    );
+    await run(
+      `INSERT INTO payment_bills (responsible, type, amount, paid_date, sheet_type_id, floor_label, pct_this_period, project_id)
      VALUES (?, 'bill', 300000, CURRENT_DATE, ?, ?, 0.3, ?)`,
-    responsible,
-    sheetTypeId,
-    floorLabel,
-    projectId,
-  );
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/payments/floors/route");
-  const res = await GET(
-    jreq(`/api/payments/floors?person=${encodeURIComponent(responsible)}`, undefined, "GET"),
-  );
-  assert.equal(res.status, 200);
-  const { floors } = await res.json();
-  assert.equal(floors.length, 1);
-  assert.equal(floors[0].history.length, 1);
-  assert.equal(floors[0].pctPaid, 0.3);
-});
+      responsible,
+      sheetTypeId,
+      floorLabel,
+      projectId,
+    );
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/payments/floors/route");
+    const res = await GET(
+      jreq(`/api/payments/floors?person=${encodeURIComponent(responsible)}`, undefined, "GET"),
+    );
+    assert.equal(res.status, 200);
+    const { floors } = await res.json();
+    assert.equal(floors.length, 1);
+    assert.equal(floors[0].history.length, 1);
+    assert.equal(floors[0].pctPaid, 0.3);
+  },
+);
 
 // ============================================================================
 // GET/POST /api/payroll
@@ -1742,35 +1806,39 @@ test("POST /api/payroll: nhân sự không tồn tại trong dự án → 422", 
   assert.equal(res.status, 422);
 });
 
-test("POST /api/payroll: thành công gắn nhân sự trong dự án → project_id do SERVER suy", S, async () => {
-  const { insertId, queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("pr-ok");
-  const pm = await taoUser("pm", "pr-ok");
-  const personnelId = await insertId(
-    `INSERT INTO personnel (project_id, full_name) VALUES (?, ?)`,
-    projectId,
-    `NV ${uniq("prok")}`,
-  );
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/payroll/route");
-  const res = await POST(
-    jreq("/api/payroll", {
-      period: "2026-09",
-      personnelId,
-      workdays: 22,
-      rate: 300000,
-      gross: 6_600_000,
-      net: 6_600_000,
-    }),
-  );
-  assert.equal(res.status, 201);
-  const { id } = await res.json();
-  const row = await queryOne<{ project_id: number }>(
-    `SELECT project_id FROM payroll WHERE id = ?`,
-    id,
-  );
-  assert.equal(row?.project_id, projectId);
-});
+test(
+  "POST /api/payroll: thành công gắn nhân sự trong dự án → project_id do SERVER suy",
+  S,
+  async () => {
+    const { insertId, queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("pr-ok");
+    const pm = await taoUser("pm", "pr-ok");
+    const personnelId = await insertId(
+      `INSERT INTO personnel (project_id, full_name) VALUES (?, ?)`,
+      projectId,
+      `NV ${uniq("prok")}`,
+    );
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/payroll/route");
+    const res = await POST(
+      jreq("/api/payroll", {
+        period: "2026-09",
+        personnelId,
+        workdays: 22,
+        rate: 300000,
+        gross: 6_600_000,
+        net: 6_600_000,
+      }),
+    );
+    assert.equal(res.status, 201);
+    const { id } = await res.json();
+    const row = await queryOne<{ project_id: number }>(
+      `SELECT project_id FROM payroll WHERE id = ?`,
+      id,
+    );
+    assert.equal(row?.project_id, projectId);
+  },
+);
 
 // ============================================================================
 // GET/PATCH/DELETE /api/payroll/:id
@@ -1864,10 +1932,9 @@ test("PATCH /api/payroll/:id: body không phải object → 400", S, async () =>
   );
   await dangNhapDuAn(pm, projectId);
   const { PATCH } = await import("@/app/api/payroll/[id]/route");
-  const res = await PATCH(
-    new NextRequest("http://localhost/x", { method: "PATCH", body: "x" }),
-    { params: Promise.resolve({ id: String(prId) }) },
-  );
+  const res = await PATCH(new NextRequest("http://localhost/x", { method: "PATCH", body: "x" }), {
+    params: Promise.resolve({ id: String(prId) }),
+  });
   assert.equal(res.status, 400);
 });
 
@@ -1912,10 +1979,7 @@ test(
       params: Promise.resolve({ id: String(prId) }),
     });
     assert.equal(res.status, 422);
-    const row = await queryOne<{ status: string }>(
-      `SELECT status FROM payroll WHERE id = ?`,
-      prId,
-    );
+    const row = await queryOne<{ status: string }>(`SELECT status FROM payroll WHERE id = ?`, prId);
     assert.equal(row?.status, "draft");
   },
 );
@@ -2055,14 +2119,18 @@ test("POST /api/payment-certs/:id/submit: chưa đăng nhập → 401", S, async
   assert.equal(res.status, 401);
 });
 
-test("POST /api/payment-certs/:id/submit: engineer không được trình (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("submit-403");
-  const eng = await taoUser("engineer", "submit-403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/payment-certs/[id]/submit/route");
-  const res = await POST(jreq("/x", undefined, "POST"), { params: Promise.resolve({ id: "1" }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/payment-certs/:id/submit: engineer không được trình (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("submit-403");
+    const eng = await taoUser("engineer", "submit-403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/payment-certs/[id]/submit/route");
+    const res = await POST(jreq("/x", undefined, "POST"), { params: Promise.resolve({ id: "1" }) });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/payment-certs/:id/submit: đợt thuộc dự án khác → 404 (cách ly)", S, async () => {
   const projectA = await taoDuAn("submit-isoA");
@@ -2145,18 +2213,22 @@ test("POST /api/payment-certs/:id/decide: reject thiếu lý do → 422", S, asy
   assert.equal(res.status, 422);
 });
 
-test("POST /api/payment-certs/:id/decide: engineer không được duyệt (không có flow SoD) → 403", S, async () => {
-  const projectId = await taoDuAn("decide-403");
-  const eng = await taoUser("engineer", "decide-403");
-  const contractId = await taoHopDong(projectId, "decide403");
-  const certId = await taoDotIPC(contractId, "decide403", { status: "submitted" });
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/payment-certs/[id]/decide/route");
-  const res = await POST(jreq("/x", { decision: "approved" }, "POST"), {
-    params: Promise.resolve({ id: String(certId) }),
-  });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/payment-certs/:id/decide: engineer không được duyệt (không có flow SoD) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("decide-403");
+    const eng = await taoUser("engineer", "decide-403");
+    const contractId = await taoHopDong(projectId, "decide403");
+    const certId = await taoDotIPC(contractId, "decide403", { status: "submitted" });
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/payment-certs/[id]/decide/route");
+    const res = await POST(jreq("/x", { decision: "approved" }, "POST"), {
+      params: Promise.resolve({ id: String(certId) }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/payment-certs/:id/decide: đợt thuộc dự án khác → 404 (cách ly)", S, async () => {
   const projectA = await taoDuAn("decide-isoA");
@@ -2172,18 +2244,22 @@ test("POST /api/payment-certs/:id/decide: đợt thuộc dự án khác → 404 
   assert.equal(res.status, 404);
 });
 
-test("POST /api/payment-certs/:id/decide: đợt chưa trình (không ở trạng thái 'submitted') → 409", S, async () => {
-  const projectId = await taoDuAn("decide-notsub");
-  const pm = await taoUser("pm", "decide-notsub");
-  const contractId = await taoHopDong(projectId, "decidenotsub");
-  const certId = await taoDotIPC(contractId, "decidenotsub", { status: "draft" });
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/payment-certs/[id]/decide/route");
-  const res = await POST(jreq("/x", { decision: "approved" }, "POST"), {
-    params: Promise.resolve({ id: String(certId) }),
-  });
-  assert.equal(res.status, 409);
-});
+test(
+  "POST /api/payment-certs/:id/decide: đợt chưa trình (không ở trạng thái 'submitted') → 409",
+  S,
+  async () => {
+    const projectId = await taoDuAn("decide-notsub");
+    const pm = await taoUser("pm", "decide-notsub");
+    const contractId = await taoHopDong(projectId, "decidenotsub");
+    const certId = await taoDotIPC(contractId, "decidenotsub", { status: "draft" });
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/payment-certs/[id]/decide/route");
+    const res = await POST(jreq("/x", { decision: "approved" }, "POST"), {
+      params: Promise.resolve({ id: String(certId) }),
+    });
+    assert.equal(res.status, 409);
+  },
+);
 
 test(
   "POST /api/payment-certs/:id/decide: reject thành công → status 'rejected', KHÔNG sinh payment_bills",
@@ -2257,41 +2333,45 @@ test(
   },
 );
 
-test("POST /api/payment-certs/:id/decide: quyết định lại đợt đã 'approved' → 409, không ghi đè", S, async () => {
-  const { insertId, run } = await import("@/lib/db");
-  const projectId = await taoDuAn("decide-twice");
-  const pm = await taoUser("pm", "decide-twice");
-  const contractId = await taoHopDong(projectId, "decidetwice");
-  const boqId = await insertId(
-    `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price, contract_id)
+test(
+  "POST /api/payment-certs/:id/decide: quyết định lại đợt đã 'approved' → 409, không ghi đè",
+  S,
+  async () => {
+    const { insertId, run } = await import("@/lib/db");
+    const projectId = await taoDuAn("decide-twice");
+    const pm = await taoUser("pm", "decide-twice");
+    const contractId = await taoHopDong(projectId, "decidetwice");
+    const boqId = await insertId(
+      `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price, contract_id)
      VALUES (?, 'Dòng', 'm', 100, 1000, ?)`,
-    `BOQ3A-${uniq("decidetwice")}`,
-    contractId,
-  );
-  const certId = await taoDotIPC(contractId, "decidetwice", { status: "submitted" });
-  await run(
-    `INSERT INTO payment_cert_items (cert_id, boq_item_id, qty_period, qty_cumulative, unit_price)
+      `BOQ3A-${uniq("decidetwice")}`,
+      contractId,
+    );
+    const certId = await taoDotIPC(contractId, "decidetwice", { status: "submitted" });
+    await run(
+      `INSERT INTO payment_cert_items (cert_id, boq_item_id, qty_period, qty_cumulative, unit_price)
      VALUES (?, ?, 10, 10, 1000)`,
-    certId,
-    boqId,
-  );
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/payment-certs/[id]/decide/route");
-  const first = await POST(jreq("/x", { decision: "approved" }, "POST"), {
-    params: Promise.resolve({ id: String(certId) }),
-  });
-  assert.equal(first.status, 200);
-  const second = await POST(jreq("/x", { decision: "approved" }, "POST"), {
-    params: Promise.resolve({ id: String(certId) }),
-  });
-  assert.equal(second.status, 409);
-  const { queryOne } = await import("@/lib/db");
-  const bills = await queryOne<{ count: number }>(
-    `SELECT COUNT(*)::int AS count FROM payment_bills WHERE payment_cert_id = ?`,
-    certId,
-  );
-  assert.equal(bills?.count, 1);
-});
+      certId,
+      boqId,
+    );
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/payment-certs/[id]/decide/route");
+    const first = await POST(jreq("/x", { decision: "approved" }, "POST"), {
+      params: Promise.resolve({ id: String(certId) }),
+    });
+    assert.equal(first.status, 200);
+    const second = await POST(jreq("/x", { decision: "approved" }, "POST"), {
+      params: Promise.resolve({ id: String(certId) }),
+    });
+    assert.equal(second.status, 409);
+    const { queryOne } = await import("@/lib/db");
+    const bills = await queryOne<{ count: number }>(
+      `SELECT COUNT(*)::int AS count FROM payment_bills WHERE payment_cert_id = ?`,
+      certId,
+    );
+    assert.equal(bills?.count, 1);
+  },
+);
 
 // ============================================================================
 // GET /api/costs
@@ -2385,14 +2465,18 @@ test("PATCH /api/costs/settings: bch không được sửa (chỉ Admin/PM) → 
   assert.equal(res.status, 403);
 });
 
-test("PATCH /api/costs/settings: ngưỡng vượt (overPct) nhỏ hơn cảnh báo (warnPct) → 422", S, async () => {
-  const projectId = await taoDuAn("costset-badrange");
-  const pm = await taoUser("pm", "costset-badrange");
-  await dangNhapDuAn(pm, projectId);
-  const { PATCH } = await import("@/app/api/costs/settings/route");
-  const res = await PATCH(jreq("/api/costs/settings", { warnPct: 90, overPct: 50 }));
-  assert.equal(res.status, 422);
-});
+test(
+  "PATCH /api/costs/settings: ngưỡng vượt (overPct) nhỏ hơn cảnh báo (warnPct) → 422",
+  S,
+  async () => {
+    const projectId = await taoDuAn("costset-badrange");
+    const pm = await taoUser("pm", "costset-badrange");
+    await dangNhapDuAn(pm, projectId);
+    const { PATCH } = await import("@/app/api/costs/settings/route");
+    const res = await PATCH(jreq("/api/costs/settings", { warnPct: 90, overPct: 50 }));
+    assert.equal(res.status, 422);
+  },
+);
 
 test("PATCH /api/costs/settings: cập nhật thành công", S, async () => {
   const projectId = await taoDuAn("costset-ok");

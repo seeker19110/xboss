@@ -46,11 +46,20 @@ export default function LoginPage() {
     e.preventDefault();
     setBusy(true);
     setError("");
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    // Sóng yếu ngoài công trường: không bắt lỗi mạng thì nút kẹt "Đang đăng nhập..." vĩnh viễn
+    // và người dùng phải tải lại trang mới thao tác được.
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+    } catch {
+      setError("Mất kết nối — thử lại khi có mạng");
+      setBusy(false);
+      return;
+    }
     const j = await res.json().catch(() => ({}));
     if (res.ok && j.need2fa) {
       setPending(j.pending);
@@ -84,11 +93,18 @@ export default function LoginPage() {
     e.preventDefault();
     setBusy(true);
     setError("");
-    const res = await fetch("/api/auth/login/2fa", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pending, code: totpCode }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/login/2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pending, code: totpCode }),
+      });
+    } catch {
+      setError("Mất kết nối — thử lại khi có mạng");
+      setBusy(false);
+      return;
+    }
     if (res.ok) {
       await onLoginOk();
     } else {

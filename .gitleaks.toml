@@ -28,4 +28,13 @@ regexes = [
   '''mat-khau-cu-123''',
   '''mat-khau-moi-456''',
   '''sai-mat-khau''',
+  # tests/route-quan-tri-2.test.ts và các file test quản trị khác — mật khẩu tài khoản test
+  # dựng trong DB ephemeral. Chuỗi vốn đã có từ trước nhưng nằm VẮT QUA 2 DÒNG nên rule
+  # generic-api-key không khớp; lần chạy `prettier --write` toàn repo (2026-09-05, đợt trả nợ
+  # cổng format) gộp lại 1 dòng và làm nó lộ ra. Không phải secret mới, không phải bí mật thật.
+  '''matkhaudel123''',
+  '''mat-khau-that-123''',
+  '''mat-khau-moi-123''',
+  '''matkhaumoi''',
+  '''matkhau123''',
 ]

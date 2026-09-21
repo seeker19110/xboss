@@ -142,14 +142,18 @@ test("POST /api/contracts/:id/addenda: chưa đăng nhập → 401", S, async ()
   assert.equal(res.status, 401);
 });
 
-test("POST /api/contracts/:id/addenda: engineer không được thêm (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("addn403");
-  const eng = await taoUser("engineer", "addn403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/contracts/[id]/addenda/route");
-  const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: "1" }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/contracts/:id/addenda: engineer không được thêm (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("addn403");
+    const eng = await taoUser("engineer", "addn403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/contracts/[id]/addenda/route");
+    const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: "1" }) });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/contracts/:id/addenda: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("addnbad");
@@ -239,7 +243,12 @@ test("POST /api/contracts/:id/addenda: tạo thành công (giá trị âm đư�
   await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/contracts/[id]/addenda/route");
   const res = await POST(
-    jreq("/x", { code: "PL01", title: "Giảm khối lượng", valueDelta: -50000, signedDate: "2026-05-01" }),
+    jreq("/x", {
+      code: "PL01",
+      title: "Giảm khối lượng",
+      valueDelta: -50000,
+      signedDate: "2026-05-01",
+    }),
     { params: Promise.resolve({ id: String(contractId) }) },
   );
   assert.equal(res.status, 201);
@@ -402,15 +411,19 @@ test("POST /api/contracts/:id/documents: chưa đăng nhập → 401", S, async 
   assert.equal(res.status, 401);
 });
 
-test("POST /api/contracts/:id/documents: engineer không được upload (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("cdp403");
-  const eng = await taoUser("engineer", "cdp403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/contracts/[id]/documents/route");
-  const form = new FormData();
-  const res = await POST(formReq("/x", form), { params: Promise.resolve({ id: "1" }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/contracts/:id/documents: engineer không được upload (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("cdp403");
+    const eng = await taoUser("engineer", "cdp403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/contracts/[id]/documents/route");
+    const form = new FormData();
+    const res = await POST(formReq("/x", form), { params: Promise.resolve({ id: "1" }) });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/contracts/:id/documents: hợp đồng thuộc dự án khác → 404", S, async () => {
   const projectA = await taoDuAn("cdpisoA");
@@ -421,7 +434,9 @@ test("POST /api/contracts/:id/documents: hợp đồng thuộc dự án khác �
   const { POST } = await import("@/app/api/contracts/[id]/documents/route");
   const form = new FormData();
   form.set("file", new File([PDF_BYTES], "a.pdf", { type: "application/pdf" }));
-  const res = await POST(formReq("/x", form), { params: Promise.resolve({ id: String(contractB) }) });
+  const res = await POST(formReq("/x", form), {
+    params: Promise.resolve({ id: String(contractB) }),
+  });
   assert.equal(res.status, 404);
 });
 
@@ -438,34 +453,30 @@ test("POST /api/contracts/:id/documents: thiếu file → 400", S, async () => {
   assert.equal(res.status, 400);
 });
 
-test(
-  "POST /api/contracts/:id/documents: upload thành công → GET liệt kê đúng",
-  S,
-  async () => {
-    const projectId = await taoDuAn("cdpok");
-    const pm = await taoUser("pm", "cdpok");
-    const contractId = await taoHopDong(projectId, "cdpok");
-    await dangNhapDuAn(pm, projectId);
-    const { POST } = await import("@/app/api/contracts/[id]/documents/route");
-    const form = new FormData();
-    form.set("file", new File([PDF_BYTES], "hd.pdf", { type: "application/pdf" }));
-    form.set("caption", "Bản gốc HĐ");
-    const res = await POST(formReq("/x", form), {
-      params: Promise.resolve({ id: String(contractId) }),
-    });
-    assert.equal(res.status, 201);
-    const body = await res.json();
-    assert.equal(body.caption, "Bản gốc HĐ");
+test("POST /api/contracts/:id/documents: upload thành công → GET liệt kê đúng", S, async () => {
+  const projectId = await taoDuAn("cdpok");
+  const pm = await taoUser("pm", "cdpok");
+  const contractId = await taoHopDong(projectId, "cdpok");
+  await dangNhapDuAn(pm, projectId);
+  const { POST } = await import("@/app/api/contracts/[id]/documents/route");
+  const form = new FormData();
+  form.set("file", new File([PDF_BYTES], "hd.pdf", { type: "application/pdf" }));
+  form.set("caption", "Bản gốc HĐ");
+  const res = await POST(formReq("/x", form), {
+    params: Promise.resolve({ id: String(contractId) }),
+  });
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  assert.equal(body.caption, "Bản gốc HĐ");
 
-    const { GET } = await import("@/app/api/contracts/[id]/documents/route");
-    const list = await GET(jreq("/x", undefined, "GET"), {
-      params: Promise.resolve({ id: String(contractId) }),
-    });
-    const { documents } = await list.json();
-    assert.equal(documents.length, 1);
-    assert.equal(documents[0].id, body.id);
-  },
-);
+  const { GET } = await import("@/app/api/contracts/[id]/documents/route");
+  const list = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: String(contractId) }),
+  });
+  const { documents } = await list.json();
+  assert.equal(documents.length, 1);
+  assert.equal(documents[0].id, body.id);
+});
 
 // ============================================================================
 // GET/DELETE /api/contract-documents/:id
@@ -536,7 +547,9 @@ test("GET /api/contract-documents/:id: tải đúng byte đã upload", S, async 
   const docId = await uploadHopDongDoc(pm, projectId, contractId);
   await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/contract-documents/[id]/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(docId) }) });
+  const res = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: String(docId) }),
+  });
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("content-type"), "application/pdf");
   const buf = Buffer.from(await res.arrayBuffer());
@@ -594,7 +607,9 @@ test("GET /api/contract-documents/:id: file không còn trên đĩa → 404", S,
 test("DELETE /api/contract-documents/:id: chưa đăng nhập → 401", S, async () => {
   dangXuat();
   const { DELETE } = await import("@/app/api/contract-documents/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), { params: Promise.resolve({ id: "1" }) });
+  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+    params: Promise.resolve({ id: "1" }),
+  });
   assert.equal(res.status, 401);
 });
 
@@ -603,7 +618,9 @@ test("DELETE /api/contract-documents/:id: ID không phải số → 400", S, asy
   const pm = await taoUser("pm", "cdddbad");
   await dangNhapDuAn(pm, projectId);
   const { DELETE } = await import("@/app/api/contract-documents/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), { params: Promise.resolve({ id: "abc" }) });
+  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+    params: Promise.resolve({ id: "abc" }),
+  });
   assert.equal(res.status, 400);
 });
 
@@ -636,22 +653,26 @@ test(
   },
 );
 
-test("DELETE /api/contract-documents/:id: Admin/PM xoá được dù không phải người upload", S, async () => {
-  const { queryOne } = await import("@/lib/db");
-  const projectId = await taoDuAn("cdddok");
-  const pm = await taoUser("pm", "cdddok");
-  const pm2 = await taoUser("pm", "cdddok2");
-  const contractId = await taoHopDong(projectId, "cdddok");
-  const docId = await uploadHopDongDoc(pm, projectId, contractId);
-  await dangNhapDuAn(pm2, projectId);
-  const { DELETE } = await import("@/app/api/contract-documents/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(docId) }),
-  });
-  assert.equal(res.status, 200);
-  const row = await queryOne(`SELECT id FROM contract_documents WHERE id = ?`, docId);
-  assert.equal(row, undefined);
-});
+test(
+  "DELETE /api/contract-documents/:id: Admin/PM xoá được dù không phải người upload",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("cdddok");
+    const pm = await taoUser("pm", "cdddok");
+    const pm2 = await taoUser("pm", "cdddok2");
+    const contractId = await taoHopDong(projectId, "cdddok");
+    const docId = await uploadHopDongDoc(pm, projectId, contractId);
+    await dangNhapDuAn(pm2, projectId);
+    const { DELETE } = await import("@/app/api/contract-documents/[id]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(docId) }),
+    });
+    assert.equal(res.status, 200);
+    const row = await queryOne(`SELECT id FROM contract_documents WHERE id = ?`, docId);
+    assert.equal(row, undefined);
+  },
+);
 
 // ============================================================================
 // POST /api/contracts/:id/restore
@@ -679,7 +700,9 @@ test("POST /api/contracts/:id/restore: hợp đồng chưa xoá → 404", S, asy
   const contractId = await taoHopDong(projectId, "crestnotdel");
   await dangNhapDuAn(admin, projectId);
   const { POST } = await import("@/app/api/contracts/[id]/restore/route");
-  const res = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: String(contractId) }) });
+  const res = await POST(jreq("/x", undefined), {
+    params: Promise.resolve({ id: String(contractId) }),
+  });
   assert.equal(res.status, 404);
 });
 
@@ -691,11 +714,15 @@ test("POST /api/contracts/:id/restore: hợp đồng đã xoá thuộc dự án 
   const contractB = await taoHopDong(projectB, "crestisoB");
   await dangNhapDuAn(adminB, projectB);
   const { DELETE } = await import("@/app/api/contracts/[id]/route");
-  await DELETE(jreq("/x", undefined, "DELETE"), { params: Promise.resolve({ id: String(contractB) }) });
+  await DELETE(jreq("/x", undefined, "DELETE"), {
+    params: Promise.resolve({ id: String(contractB) }),
+  });
 
   await dangNhapDuAn(adminA, projectA);
   const { POST } = await import("@/app/api/contracts/[id]/restore/route");
-  const res = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: String(contractB) }) });
+  const res = await POST(jreq("/x", undefined), {
+    params: Promise.resolve({ id: String(contractB) }),
+  });
   assert.equal(res.status, 404);
 });
 
@@ -712,7 +739,9 @@ test("POST /api/contracts/:id/restore: khôi phục thành công", S, async () =
   assert.equal(del.status, 200);
 
   const { POST } = await import("@/app/api/contracts/[id]/restore/route");
-  const res = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: String(contractId) }) });
+  const res = await POST(jreq("/x", undefined), {
+    params: Promise.resolve({ id: String(contractId) }),
+  });
   assert.equal(res.status, 200);
   const row = await queryOne<{ deleted_at: string | null }>(
     `SELECT deleted_at FROM contracts WHERE id = ?`,
@@ -760,14 +789,18 @@ test("POST /api/claims/:id/reject: chưa đăng nhập → 401", S, async () => 
   assert.equal(res.status, 401);
 });
 
-test("POST /api/claims/:id/reject: engineer không được từ chối (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("crj403");
-  const eng = await taoUser("engineer", "crj403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/claims/[id]/reject/route");
-  const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: "1" }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/claims/:id/reject: engineer không được từ chối (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("crj403");
+    const eng = await taoUser("engineer", "crj403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/claims/[id]/reject/route");
+    const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: "1" }) });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/claims/:id/reject: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("crjbad");
@@ -885,10 +918,9 @@ test("POST /api/claims/:id/settle: chốt thành công, ghi amountSettled/daysSe
   const claimId = await taoClaim(pm, projectId, "cstok", { kind: "cost", amountRequested: 1000 });
   await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/claims/[id]/settle/route");
-  const res = await POST(
-    jreq("/x", { amountSettled: 800, settlementNote: "Thống nhất 80%" }),
-    { params: Promise.resolve({ id: String(claimId) }) },
-  );
+  const res = await POST(jreq("/x", { amountSettled: 800, settlementNote: "Thống nhất 80%" }), {
+    params: Promise.resolve({ id: String(claimId) }),
+  });
   assert.equal(res.status, 200);
   const row = await queryOne<{ status: string; amount_settled: number }>(
     `SELECT status, amount_settled FROM claims WHERE id = ?`,
@@ -898,28 +930,32 @@ test("POST /api/claims/:id/settle: chốt thành công, ghi amountSettled/daysSe
   assert.equal(Number(row?.amount_settled), 800);
 });
 
-test("POST /api/claims/:id/settle: chốt 2 lần không ghi đè (idempotency ranh giới)", S, async () => {
-  const projectId = await taoDuAn("csttwice");
-  const pm = await taoUser("pm", "csttwice");
-  const claimId = await taoClaim(pm, projectId, "csttwice");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/claims/[id]/settle/route");
-  const first = await POST(jreq("/x", { amountSettled: 500 }), {
-    params: Promise.resolve({ id: String(claimId) }),
-  });
-  assert.equal(first.status, 200);
-  const second = await POST(jreq("/x", { amountSettled: 999 }), {
-    params: Promise.resolve({ id: String(claimId) }),
-  });
-  assert.equal(second.status, 409);
+test(
+  "POST /api/claims/:id/settle: chốt 2 lần không ghi đè (idempotency ranh giới)",
+  S,
+  async () => {
+    const projectId = await taoDuAn("csttwice");
+    const pm = await taoUser("pm", "csttwice");
+    const claimId = await taoClaim(pm, projectId, "csttwice");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/claims/[id]/settle/route");
+    const first = await POST(jreq("/x", { amountSettled: 500 }), {
+      params: Promise.resolve({ id: String(claimId) }),
+    });
+    assert.equal(first.status, 200);
+    const second = await POST(jreq("/x", { amountSettled: 999 }), {
+      params: Promise.resolve({ id: String(claimId) }),
+    });
+    assert.equal(second.status, 409);
 
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne<{ amount_settled: number }>(
-    `SELECT amount_settled FROM claims WHERE id = ?`,
-    claimId,
-  );
-  assert.equal(Number(row?.amount_settled), 500, "quyết định lần 2 không được đè lên lần 1");
-});
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ amount_settled: number }>(
+      `SELECT amount_settled FROM claims WHERE id = ?`,
+      claimId,
+    );
+    assert.equal(Number(row?.amount_settled), 500, "quyết định lần 2 không được đè lên lần 1");
+  },
+);
 
 // ============================================================================
 // GET/POST /api/claims/:id/documents
@@ -963,41 +999,41 @@ test("POST /api/claims/:id/documents: chưa đăng nhập → 401", S, async () 
   assert.equal(res.status, 401);
 });
 
-test("POST /api/claims/:id/documents: bch có viewClaims nhưng KHÔNG manageClaims → 403", S, async () => {
-  const projectId = await taoDuAn("clp403");
-  const bch = await taoUser("bch", "clp403");
-  await dangNhapDuAn(bch, projectId);
-  const { POST } = await import("@/app/api/claims/[id]/documents/route");
-  const form = new FormData();
-  const res = await POST(formReq("/x", form), { params: Promise.resolve({ id: "1" }) });
-  assert.equal(res.status, 403);
-});
-
 test(
-  "POST /api/claims/:id/documents: upload thành công → GET liệt kê đúng",
+  "POST /api/claims/:id/documents: bch có viewClaims nhưng KHÔNG manageClaims → 403",
   S,
   async () => {
-    const projectId = await taoDuAn("clpok");
-    const pm = await taoUser("pm", "clpok");
-    const claimId = await taoClaim(pm, projectId, "clpok");
-    await dangNhapDuAn(pm, projectId);
+    const projectId = await taoDuAn("clp403");
+    const bch = await taoUser("bch", "clp403");
+    await dangNhapDuAn(bch, projectId);
     const { POST } = await import("@/app/api/claims/[id]/documents/route");
     const form = new FormData();
-    form.set("file", new File([PDF_BYTES], "hoso.pdf", { type: "application/pdf" }));
-    form.set("title", "Biên bản định lượng");
-    const res = await POST(formReq("/x", form), { params: Promise.resolve({ id: String(claimId) }) });
-    assert.equal(res.status, 201);
-    const { id } = await res.json();
-
-    const { GET } = await import("@/app/api/claims/[id]/documents/route");
-    const list = await GET(jreq("/x", undefined, "GET"), {
-      params: Promise.resolve({ id: String(claimId) }),
-    });
-    const { documents } = await list.json();
-    assert.equal(documents.length, 1);
-    assert.equal(documents[0].id, id);
+    const res = await POST(formReq("/x", form), { params: Promise.resolve({ id: "1" }) });
+    assert.equal(res.status, 403);
   },
 );
+
+test("POST /api/claims/:id/documents: upload thành công → GET liệt kê đúng", S, async () => {
+  const projectId = await taoDuAn("clpok");
+  const pm = await taoUser("pm", "clpok");
+  const claimId = await taoClaim(pm, projectId, "clpok");
+  await dangNhapDuAn(pm, projectId);
+  const { POST } = await import("@/app/api/claims/[id]/documents/route");
+  const form = new FormData();
+  form.set("file", new File([PDF_BYTES], "hoso.pdf", { type: "application/pdf" }));
+  form.set("title", "Biên bản định lượng");
+  const res = await POST(formReq("/x", form), { params: Promise.resolve({ id: String(claimId) }) });
+  assert.equal(res.status, 201);
+  const { id } = await res.json();
+
+  const { GET } = await import("@/app/api/claims/[id]/documents/route");
+  const list = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: String(claimId) }),
+  });
+  const { documents } = await list.json();
+  assert.equal(documents.length, 1);
+  assert.equal(documents[0].id, id);
+});
 
 // ============================================================================
 // GET/DELETE /api/claim-documents/:id
@@ -1038,7 +1074,9 @@ test("GET /api/claim-documents/:id: không tìm thấy → 404", S, async () => 
   const pm = await taoUser("pm", "cldocgnf");
   await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/claim-documents/[id]/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: "999999999" }) });
+  const res = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: "999999999" }),
+  });
   assert.equal(res.status, 404);
 });
 
@@ -1051,7 +1089,9 @@ test("GET /api/claim-documents/:id: thuộc dự án khác → 404 (cách ly d�
   const docB = await uploadClaimDoc(pmB, projectB, claimB);
   await dangNhapDuAn(pmA, projectA);
   const { GET } = await import("@/app/api/claim-documents/[id]/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(docB) }) });
+  const res = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: String(docB) }),
+  });
   assert.equal(res.status, 404);
 });
 
@@ -1062,7 +1102,9 @@ test("GET /api/claim-documents/:id: tải đúng byte đã upload", S, async () 
   const docId = await uploadClaimDoc(pm, projectId, claimId);
   await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/claim-documents/[id]/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(docId) }) });
+  const res = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: String(docId) }),
+  });
   assert.equal(res.status, 200);
   const buf = Buffer.from(await res.arrayBuffer());
   assert.ok(buf.equals(PDF_BYTES));
@@ -1119,7 +1161,9 @@ test("GET /api/claim-documents/:id: file không còn trên đĩa → 404", S, as
 test("DELETE /api/claim-documents/:id: chưa đăng nhập → 401", S, async () => {
   dangXuat();
   const { DELETE } = await import("@/app/api/claim-documents/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), { params: Promise.resolve({ id: "1" }) });
+  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+    params: Promise.resolve({ id: "1" }),
+  });
   assert.equal(res.status, 401);
 });
 
@@ -1128,7 +1172,9 @@ test("DELETE /api/claim-documents/:id: ID không phải số → 400", S, async 
   const pm = await taoUser("pm", "cldocdbad");
   await dangNhapDuAn(pm, projectId);
   const { DELETE } = await import("@/app/api/claim-documents/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), { params: Promise.resolve({ id: "abc" }) });
+  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+    params: Promise.resolve({ id: "abc" }),
+  });
   assert.equal(res.status, 400);
 });
 
@@ -1204,7 +1250,9 @@ test("POST /api/claims/:id/restore: claim chưa xoá → 404", S, async () => {
   const claimId = await taoClaim(admin, projectId, "clrestnotdel");
   await dangNhapDuAn(admin, projectId);
   const { POST } = await import("@/app/api/claims/[id]/restore/route");
-  const res = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: String(claimId) }) });
+  const res = await POST(jreq("/x", undefined), {
+    params: Promise.resolve({ id: String(claimId) }),
+  });
   assert.equal(res.status, 404);
 });
 
@@ -1221,7 +1269,9 @@ test("POST /api/claims/:id/restore: khôi phục thành công", S, async () => {
   assert.equal(del.status, 200);
 
   const { POST } = await import("@/app/api/claims/[id]/restore/route");
-  const res = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: String(claimId) }) });
+  const res = await POST(jreq("/x", undefined), {
+    params: Promise.resolve({ id: String(claimId) }),
+  });
   assert.equal(res.status, 200);
   const row = await queryOne<{ deleted_at: string | null }>(
     `SELECT deleted_at FROM claims WHERE id = ?`,
@@ -1313,14 +1363,18 @@ test("POST /api/variations/:id/submit: chưa đăng nhập → 401", S, async ()
   assert.equal(res.status, 401);
 });
 
-test("POST /api/variations/:id/submit: engineer không được trình (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("vsub403");
-  const eng = await taoUser("engineer", "vsub403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/variations/[id]/submit/route");
-  const res = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: "1" }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/variations/:id/submit: engineer không được trình (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("vsub403");
+    const eng = await taoUser("engineer", "vsub403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/variations/[id]/submit/route");
+    const res = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: "1" }) });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/variations/:id/submit: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("vsubbad");
@@ -1365,9 +1419,13 @@ test("POST /api/variations/:id/submit: VO không còn ở trạng thái nháp �
   const vo = await taoVoNhap(pm, projectId, "vsubtwice");
   await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/variations/[id]/submit/route");
-  const first = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: String(vo.id) }) });
+  const first = await POST(jreq("/x", undefined), {
+    params: Promise.resolve({ id: String(vo.id) }),
+  });
   assert.equal(first.status, 200);
-  const second = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: String(vo.id) }) });
+  const second = await POST(jreq("/x", undefined), {
+    params: Promise.resolve({ id: String(vo.id) }),
+  });
   assert.equal(second.status, 409);
 });
 
@@ -1382,14 +1440,18 @@ test("POST /api/variations/:id/contract-add: chưa đăng nhập → 401", S, as
   assert.equal(res.status, 401);
 });
 
-test("POST /api/variations/:id/contract-add: engineer không được (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("vca403");
-  const eng = await taoUser("engineer", "vca403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/variations/[id]/contract-add/route");
-  const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: "1" }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/variations/:id/contract-add: engineer không được (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("vca403");
+    const eng = await taoUser("engineer", "vca403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/variations/[id]/contract-add/route");
+    const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: "1" }) });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/variations/:id/contract-add: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("vcabad");
@@ -1451,27 +1513,29 @@ test("POST /api/variations/:id/contract-add: VO thuộc dự án khác → 404",
   const vo = await taoVoNhap(pmB, projectB, "vcaisoB");
   await dangNhapDuAn(pmA, projectA);
   const { POST } = await import("@/app/api/variations/[id]/contract-add/route");
-  const res = await POST(
-    jreq("/x", { contractId: contractA, addendaCode: "PL01" }),
-    { params: Promise.resolve({ id: String(vo.id) }) },
-  );
+  const res = await POST(jreq("/x", { contractId: contractA, addendaCode: "PL01" }), {
+    params: Promise.resolve({ id: String(vo.id) }),
+  });
   assert.equal(res.status, 404);
 });
 
-test("POST /api/variations/:id/contract-add: VO chưa duyệt (còn draft/submitted) → 409", S, async () => {
-  const projectId = await taoDuAn("vca409");
-  const pm = await taoUser("pm", "vca409");
-  const contractId = await taoHopDong(projectId, "vca409");
-  const vo = await taoVoNhap(pm, projectId, "vca409");
-  await trinhVo(vo.id);
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/variations/[id]/contract-add/route");
-  const res = await POST(
-    jreq("/x", { contractId, addendaCode: "PL01" }),
-    { params: Promise.resolve({ id: String(vo.id) }) },
-  );
-  assert.equal(res.status, 409);
-});
+test(
+  "POST /api/variations/:id/contract-add: VO chưa duyệt (còn draft/submitted) → 409",
+  S,
+  async () => {
+    const projectId = await taoDuAn("vca409");
+    const pm = await taoUser("pm", "vca409");
+    const contractId = await taoHopDong(projectId, "vca409");
+    const vo = await taoVoNhap(pm, projectId, "vca409");
+    await trinhVo(vo.id);
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/variations/[id]/contract-add/route");
+    const res = await POST(jreq("/x", { contractId, addendaCode: "PL01" }), {
+      params: Promise.resolve({ id: String(vo.id) }),
+    });
+    assert.equal(res.status, 409);
+  },
+);
 
 test("POST /api/variations/:id/contract-add: hợp đồng đích không tồn tại → 422", S, async () => {
   const projectId = await taoDuAn("vcanoexist");
@@ -1481,10 +1545,9 @@ test("POST /api/variations/:id/contract-add: hợp đồng đích không tồn t
   await duyetVo(vo.id);
   await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/variations/[id]/contract-add/route");
-  const res = await POST(
-    jreq("/x", { contractId: 999999999, addendaCode: "PL01" }),
-    { params: Promise.resolve({ id: String(vo.id) }) },
-  );
+  const res = await POST(jreq("/x", { contractId: 999999999, addendaCode: "PL01" }), {
+    params: Promise.resolve({ id: String(vo.id) }),
+  });
   assert.equal(res.status, 422);
 });
 
@@ -1549,7 +1612,9 @@ test("GET /api/variations/:id/documents: VO thuộc dự án khác → 404", S, 
   const vo = await taoVoNhap(pmB, projectB, "vdgisoB");
   await dangNhapDuAn(pmA, projectA);
   const { GET } = await import("@/app/api/variations/[id]/documents/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(vo.id) }) });
+  const res = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: String(vo.id) }),
+  });
   assert.equal(res.status, 404);
 });
 
@@ -1657,7 +1722,9 @@ test("GET /api/vo-documents/:id: không tìm thấy → 404", S, async () => {
   const pm = await taoUser("pm", "vodocgnf");
   await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/vo-documents/[id]/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: "999999999" }) });
+  const res = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: "999999999" }),
+  });
   assert.equal(res.status, 404);
 });
 
@@ -1708,7 +1775,9 @@ test("GET /api/vo-documents/:id: tải đúng byte đã upload", S, async () => 
   const docId = await uploadVoDoc(pm, projectId, vo.id);
   await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/vo-documents/[id]/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(docId) }) });
+  const res = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: String(docId) }),
+  });
   assert.equal(res.status, 200);
   const buf = Buffer.from(await res.arrayBuffer());
   assert.ok(buf.equals(PDF_BYTES));
@@ -1765,7 +1834,9 @@ test("GET /api/vo-documents/:id: file không còn trên đĩa → 404", S, async
 test("DELETE /api/vo-documents/:id: chưa đăng nhập → 401", S, async () => {
   dangXuat();
   const { DELETE } = await import("@/app/api/vo-documents/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), { params: Promise.resolve({ id: "1" }) });
+  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+    params: Promise.resolve({ id: "1" }),
+  });
   assert.equal(res.status, 401);
 });
 
@@ -1774,7 +1845,9 @@ test("DELETE /api/vo-documents/:id: ID không phải số → 400", S, async () 
   const pm = await taoUser("pm", "vodocdbad");
   await dangNhapDuAn(pm, projectId);
   const { DELETE } = await import("@/app/api/vo-documents/[id]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), { params: Promise.resolve({ id: "abc" }) });
+  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+    params: Promise.resolve({ id: "abc" }),
+  });
   assert.equal(res.status, 400);
 });
 
@@ -1857,14 +1930,18 @@ test("POST /api/tenders/:id/bids: chưa đăng nhập → 401", S, async () => {
   assert.equal(res.status, 401);
 });
 
-test("POST /api/tenders/:id/bids: engineer không được nhập giá (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("bid403");
-  const eng = await taoUser("engineer", "bid403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/tenders/[id]/bids/route");
-  const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: "1" }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/tenders/:id/bids: engineer không được nhập giá (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("bid403");
+    const eng = await taoUser("engineer", "bid403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/tenders/[id]/bids/route");
+    const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: "1" }) });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/tenders/:id/bids: ID không phải số → 400", S, async () => {
   const projectId = await taoDuAn("bidbad");
@@ -2011,7 +2088,10 @@ async function taoBaoGia(
   const { POST } = await import("@/app/api/tenders/[id]/bids/route");
   const body: Record<string, unknown> =
     overrides.boqId != null
-      ? { supplierId, prices: [{ boqItemId: overrides.boqId, unitPrice: overrides.unitPrice ?? 100 }] }
+      ? {
+          supplierId,
+          prices: [{ boqItemId: overrides.boqId, unitPrice: overrides.unitPrice ?? 100 }],
+        }
       : { supplierId, lumpSum: overrides.lumpSum ?? 1000 };
   const res = await POST(jreq("/x", body), { params: Promise.resolve({ id: String(tenderId) }) });
   const json = await res.json();
@@ -2152,22 +2232,26 @@ test("DELETE /api/tenders/:id/bids/:bidId: ID không phải số → 400", S, as
   assert.equal(res.status, 400);
 });
 
-test("DELETE /api/tenders/:id/bids/:bidId: báo giá thuộc gói thầu dự án khác → 404", S, async () => {
-  const projectA = await taoDuAn("bidddisoA");
-  const projectB = await taoDuAn("bidddisoB");
-  const pmA = await taoUser("pm", "bidddisoA");
-  const pmB = await taoUser("pm", "bidddisoB");
-  const boqId = await taoBoqItem("bidddisoB", projectB);
-  const supplierId = await taoNCC("bidddisoB");
-  const tender = await taoGoiThau(pmB, projectB, "bidddisoB", boqId);
-  const bidId = await taoBaoGia(pmB, projectB, tender.id, supplierId);
-  await dangNhapDuAn(pmA, projectA);
-  const { DELETE } = await import("@/app/api/tenders/[id]/bids/[bidId]/route");
-  const res = await DELETE(jreq("/x", undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(tender.id), bidId: String(bidId) }),
-  });
-  assert.equal(res.status, 404);
-});
+test(
+  "DELETE /api/tenders/:id/bids/:bidId: báo giá thuộc gói thầu dự án khác → 404",
+  S,
+  async () => {
+    const projectA = await taoDuAn("bidddisoA");
+    const projectB = await taoDuAn("bidddisoB");
+    const pmA = await taoUser("pm", "bidddisoA");
+    const pmB = await taoUser("pm", "bidddisoB");
+    const boqId = await taoBoqItem("bidddisoB", projectB);
+    const supplierId = await taoNCC("bidddisoB");
+    const tender = await taoGoiThau(pmB, projectB, "bidddisoB", boqId);
+    const bidId = await taoBaoGia(pmB, projectB, tender.id, supplierId);
+    await dangNhapDuAn(pmA, projectA);
+    const { DELETE } = await import("@/app/api/tenders/[id]/bids/[bidId]/route");
+    const res = await DELETE(jreq("/x", undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(tender.id), bidId: String(bidId) }),
+    });
+    assert.equal(res.status, 404);
+  },
+);
 
 test("DELETE /api/tenders/:id/bids/:bidId: gói thầu đã trao thầu → 409 (khoá sửa)", S, async () => {
   const { run } = await import("@/lib/db");
@@ -2254,22 +2338,26 @@ test("GET /api/tenders/:id/bids/:bidId/file: chưa có file đính kèm → 404"
   assert.equal(res.status, 404);
 });
 
-test("GET /api/tenders/:id/bids/:bidId/file: báo giá thuộc gói thầu dự án khác → 404", S, async () => {
-  const projectA = await taoDuAn("bidfgisoA");
-  const projectB = await taoDuAn("bidfgisoB");
-  const pmA = await taoUser("pm", "bidfgisoA");
-  const pmB = await taoUser("pm", "bidfgisoB");
-  const boqId = await taoBoqItem("bidfgisoB", projectB);
-  const supplierId = await taoNCC("bidfgisoB");
-  const tender = await taoGoiThau(pmB, projectB, "bidfgisoB", boqId);
-  const bidId = await taoBaoGia(pmB, projectB, tender.id, supplierId);
-  await dangNhapDuAn(pmA, projectA);
-  const { GET } = await import("@/app/api/tenders/[id]/bids/[bidId]/file/route");
-  const res = await GET(jreq("/x", undefined, "GET"), {
-    params: Promise.resolve({ id: String(tender.id), bidId: String(bidId) }),
-  });
-  assert.equal(res.status, 404);
-});
+test(
+  "GET /api/tenders/:id/bids/:bidId/file: báo giá thuộc gói thầu dự án khác → 404",
+  S,
+  async () => {
+    const projectA = await taoDuAn("bidfgisoA");
+    const projectB = await taoDuAn("bidfgisoB");
+    const pmA = await taoUser("pm", "bidfgisoA");
+    const pmB = await taoUser("pm", "bidfgisoB");
+    const boqId = await taoBoqItem("bidfgisoB", projectB);
+    const supplierId = await taoNCC("bidfgisoB");
+    const tender = await taoGoiThau(pmB, projectB, "bidfgisoB", boqId);
+    const bidId = await taoBaoGia(pmB, projectB, tender.id, supplierId);
+    await dangNhapDuAn(pmA, projectA);
+    const { GET } = await import("@/app/api/tenders/[id]/bids/[bidId]/file/route");
+    const res = await GET(jreq("/x", undefined, "GET"), {
+      params: Promise.resolve({ id: String(tender.id), bidId: String(bidId) }),
+    });
+    assert.equal(res.status, 404);
+  },
+);
 
 test("POST /api/tenders/:id/bids/:bidId/file: chưa đăng nhập → 401", S, async () => {
   dangXuat();
@@ -2289,24 +2377,28 @@ test("POST /api/tenders/:id/bids/:bidId/file: engineer không được upload �
   assert.equal(res.status, 403);
 });
 
-test("POST /api/tenders/:id/bids/:bidId/file: báo giá không tồn tại (dự án khác) → 404", S, async () => {
-  const projectA = await taoDuAn("bidfisoA");
-  const projectB = await taoDuAn("bidfisoB");
-  const pmA = await taoUser("pm", "bidfisoA");
-  const pmB = await taoUser("pm", "bidfisoB");
-  const boqId = await taoBoqItem("bidfisoB", projectB);
-  const supplierId = await taoNCC("bidfisoB");
-  const tender = await taoGoiThau(pmB, projectB, "bidfisoB", boqId);
-  const bidId = await taoBaoGia(pmB, projectB, tender.id, supplierId);
-  await dangNhapDuAn(pmA, projectA);
-  const { POST } = await import("@/app/api/tenders/[id]/bids/[bidId]/file/route");
-  const form = new FormData();
-  form.set("file", new File([PDF_BYTES], "a.pdf", { type: "application/pdf" }));
-  const res = await POST(formReq("/x", form), {
-    params: Promise.resolve({ id: String(tender.id), bidId: String(bidId) }),
-  });
-  assert.equal(res.status, 404);
-});
+test(
+  "POST /api/tenders/:id/bids/:bidId/file: báo giá không tồn tại (dự án khác) → 404",
+  S,
+  async () => {
+    const projectA = await taoDuAn("bidfisoA");
+    const projectB = await taoDuAn("bidfisoB");
+    const pmA = await taoUser("pm", "bidfisoA");
+    const pmB = await taoUser("pm", "bidfisoB");
+    const boqId = await taoBoqItem("bidfisoB", projectB);
+    const supplierId = await taoNCC("bidfisoB");
+    const tender = await taoGoiThau(pmB, projectB, "bidfisoB", boqId);
+    const bidId = await taoBaoGia(pmB, projectB, tender.id, supplierId);
+    await dangNhapDuAn(pmA, projectA);
+    const { POST } = await import("@/app/api/tenders/[id]/bids/[bidId]/file/route");
+    const form = new FormData();
+    form.set("file", new File([PDF_BYTES], "a.pdf", { type: "application/pdf" }));
+    const res = await POST(formReq("/x", form), {
+      params: Promise.resolve({ id: String(tender.id), bidId: String(bidId) }),
+    });
+    assert.equal(res.status, 404);
+  },
+);
 
 test(
   "POST /api/tenders/:id/bids/:bidId/file: upload thành công → GET tải đúng byte, upload lần 2 thay thế file cũ",
@@ -2360,14 +2452,18 @@ test("POST /api/tenders/:id/award: chưa đăng nhập → 401", S, async () => 
   assert.equal(res.status, 401);
 });
 
-test("POST /api/tenders/:id/award: engineer không được trao thầu (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("aw403");
-  const eng = await taoUser("engineer", "aw403");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/tenders/[id]/award/route");
-  const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: "1" }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/tenders/:id/award: engineer không được trao thầu (chỉ Admin/PM) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("aw403");
+    const eng = await taoUser("engineer", "aw403");
+    await dangNhapDuAn(eng, projectId);
+    const { POST } = await import("@/app/api/tenders/[id]/award/route");
+    const res = await POST(jreq("/x", {}), { params: Promise.resolve({ id: "1" }) });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/tenders/:id/award: thiếu bidId → 422", S, async () => {
   const projectId = await taoDuAn("awnobid");
@@ -2414,7 +2510,9 @@ test("POST /api/tenders/:id/award: gói thầu thuộc dự án khác → 404", 
   const bidId = await taoBaoGia(pmB, projectB, tender.id, supplierId);
   await dangNhapDuAn(pmA, projectA);
   const { POST } = await import("@/app/api/tenders/[id]/award/route");
-  const res = await POST(jreq("/x", { bidId }), { params: Promise.resolve({ id: String(tender.id) }) });
+  const res = await POST(jreq("/x", { bidId }), {
+    params: Promise.resolve({ id: String(tender.id) }),
+  });
   assert.equal(res.status, 404);
 });
 
@@ -2456,10 +2554,11 @@ test(
     });
     assert.equal(res.status, 200);
     const { contractId } = await res.json();
-    const contract = await queryOne<{ kind: string; project_id: number; party_supplier_id: number }>(
-      `SELECT kind, project_id, party_supplier_id FROM contracts WHERE id = ?`,
-      contractId,
-    );
+    const contract = await queryOne<{
+      kind: string;
+      project_id: number;
+      party_supplier_id: number;
+    }>(`SELECT kind, project_id, party_supplier_id FROM contracts WHERE id = ?`, contractId);
     assert.equal(contract?.kind, "giao_thau");
     assert.equal(contract?.project_id, projectId);
     assert.equal(contract?.party_supplier_id, supplierId);
@@ -2472,20 +2571,28 @@ test(
   },
 );
 
-test("POST /api/tenders/:id/award: gói thầu đã trao thầu rồi → 409, không trao lại", S, async () => {
-  const projectId = await taoDuAn("awtwice");
-  const pm = await taoUser("pm", "awtwice");
-  const boqId = await taoBoqItem("awtwice", projectId);
-  const supplierId = await taoNCC("awtwice");
-  const tender = await taoGoiThau(pm, projectId, "awtwice", boqId);
-  const bidId = await taoBaoGia(pm, projectId, tender.id, supplierId);
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/tenders/[id]/award/route");
-  const first = await POST(jreq("/x", { bidId }), { params: Promise.resolve({ id: String(tender.id) }) });
-  assert.equal(first.status, 200);
-  const second = await POST(jreq("/x", { bidId }), { params: Promise.resolve({ id: String(tender.id) }) });
-  assert.equal(second.status, 409);
-});
+test(
+  "POST /api/tenders/:id/award: gói thầu đã trao thầu rồi → 409, không trao lại",
+  S,
+  async () => {
+    const projectId = await taoDuAn("awtwice");
+    const pm = await taoUser("pm", "awtwice");
+    const boqId = await taoBoqItem("awtwice", projectId);
+    const supplierId = await taoNCC("awtwice");
+    const tender = await taoGoiThau(pm, projectId, "awtwice", boqId);
+    const bidId = await taoBaoGia(pm, projectId, tender.id, supplierId);
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/tenders/[id]/award/route");
+    const first = await POST(jreq("/x", { bidId }), {
+      params: Promise.resolve({ id: String(tender.id) }),
+    });
+    assert.equal(first.status, 200);
+    const second = await POST(jreq("/x", { bidId }), {
+      params: Promise.resolve({ id: String(tender.id) }),
+    });
+    assert.equal(second.status, 409);
+  },
+);
 
 // ============================================================================
 // Helpers: insurance-bonds
@@ -2515,14 +2622,18 @@ test("GET /api/insurance-bonds/:id/file: chưa đăng nhập → 401", S, async 
   assert.equal(res.status, 401);
 });
 
-test("GET /api/insurance-bonds/:id/file: engineer không có quyền xem (viewPayments) → 403", S, async () => {
-  const projectId = await taoDuAn("ibf403");
-  const eng = await taoUser("engineer", "ibf403");
-  await dangNhapDuAn(eng, projectId);
-  const { GET } = await import("@/app/api/insurance-bonds/[id]/file/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: "1" }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "GET /api/insurance-bonds/:id/file: engineer không có quyền xem (viewPayments) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("ibf403");
+    const eng = await taoUser("engineer", "ibf403");
+    await dangNhapDuAn(eng, projectId);
+    const { GET } = await import("@/app/api/insurance-bonds/[id]/file/route");
+    const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: "1" }) });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("GET /api/insurance-bonds/:id/file: chưa có file đính kèm → 404", S, async () => {
   const projectId = await taoDuAn("ibfnone");
@@ -2530,7 +2641,9 @@ test("GET /api/insurance-bonds/:id/file: chưa có file đính kèm → 404", S,
   const bondId = await taoBaoHiem(pm, projectId, "ibfnone");
   await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/insurance-bonds/[id]/file/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(bondId) }) });
+  const res = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: String(bondId) }),
+  });
   assert.equal(res.status, 404);
 });
 
@@ -2542,7 +2655,9 @@ test("GET /api/insurance-bonds/:id/file: thuộc dự án khác → 404 (cách l
   const bondB = await taoBaoHiem(pmB, projectB, "ibfisoB");
   await dangNhapDuAn(pmA, projectA);
   const { GET } = await import("@/app/api/insurance-bonds/[id]/file/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(bondB) }) });
+  const res = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: String(bondB) }),
+  });
   assert.equal(res.status, 404);
 });
 
@@ -2561,7 +2676,9 @@ test("GET /api/insurance-bonds/:id/file: tải đúng byte đã lưu trên đĩa
   );
   await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/insurance-bonds/[id]/file/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(bondId) }) });
+  const res = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: String(bondId) }),
+  });
   assert.equal(res.status, 200);
   const buf = Buffer.from(await res.arrayBuffer());
   assert.ok(buf.equals(PDF_BYTES));
@@ -2579,14 +2696,18 @@ test("POST /api/insurance-bonds/:id/restore: chưa đăng nhập → 401", S, as
   assert.equal(res.status, 401);
 });
 
-test("POST /api/insurance-bonds/:id/restore: PM không được khôi phục (chỉ Admin) → 403", S, async () => {
-  const projectId = await taoDuAn("ibrest403");
-  const pm = await taoUser("pm", "ibrest403");
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/insurance-bonds/[id]/restore/route");
-  const res = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: "1" }) });
-  assert.equal(res.status, 403);
-});
+test(
+  "POST /api/insurance-bonds/:id/restore: PM không được khôi phục (chỉ Admin) → 403",
+  S,
+  async () => {
+    const projectId = await taoDuAn("ibrest403");
+    const pm = await taoUser("pm", "ibrest403");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/insurance-bonds/[id]/restore/route");
+    const res = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: "1" }) });
+    assert.equal(res.status, 403);
+  },
+);
 
 test("POST /api/insurance-bonds/:id/restore: chưa xoá → 404", S, async () => {
   const projectId = await taoDuAn("ibrestnotdel");
@@ -2594,7 +2715,9 @@ test("POST /api/insurance-bonds/:id/restore: chưa xoá → 404", S, async () =>
   const bondId = await taoBaoHiem(admin, projectId, "ibrestnotdel");
   await dangNhapDuAn(admin, projectId);
   const { POST } = await import("@/app/api/insurance-bonds/[id]/restore/route");
-  const res = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: String(bondId) }) });
+  const res = await POST(jreq("/x", undefined), {
+    params: Promise.resolve({ id: String(bondId) }),
+  });
   assert.equal(res.status, 404);
 });
 
@@ -2611,7 +2734,9 @@ test("POST /api/insurance-bonds/:id/restore: khôi phục thành công", S, asyn
   assert.equal(del.status, 200);
 
   const { POST } = await import("@/app/api/insurance-bonds/[id]/restore/route");
-  const res = await POST(jreq("/x", undefined), { params: Promise.resolve({ id: String(bondId) }) });
+  const res = await POST(jreq("/x", undefined), {
+    params: Promise.resolve({ id: String(bondId) }),
+  });
   assert.equal(res.status, 200);
   const row = await queryOne<{ deleted_at: string | null }>(
     `SELECT deleted_at FROM insurance_bonds WHERE id = ?`,
@@ -2736,7 +2861,9 @@ test("POST /api/suppliers/:id/ratings: thiếu poId → 400", S, async () => {
   const supplierId = await taoNCC("ratenopo");
   await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/suppliers/[id]/ratings/route");
-  const res = await POST(jreq("/x", { quality: 5 }), { params: Promise.resolve({ id: String(supplierId) }) });
+  const res = await POST(jreq("/x", { quality: 5 }), {
+    params: Promise.resolve({ id: String(supplierId) }),
+  });
   assert.equal(res.status, 400);
 });
 
@@ -2791,7 +2918,9 @@ test("POST /api/suppliers/:id/ratings: thiếu cả 3 tiêu chí (không sao nà
   await run(`UPDATE purchase_orders SET status = 'confirmed' WHERE id = ?`, poId);
   await dangNhapDuAn(pm, projectId);
   const { POST } = await import("@/app/api/suppliers/[id]/ratings/route");
-  const res = await POST(jreq("/x", { poId }), { params: Promise.resolve({ id: String(supplierId) }) });
+  const res = await POST(jreq("/x", { poId }), {
+    params: Promise.resolve({ id: String(supplierId) }),
+  });
   assert.equal(res.status, 400);
 });
 
@@ -2819,25 +2948,29 @@ test("POST /api/suppliers/:id/ratings: đánh giá thành công", S, async () =>
   assert.equal(row?.price, 3);
 });
 
-test("POST /api/suppliers/:id/ratings: PO đã được đánh giá rồi → 409 (1 đánh giá/PO)", S, async () => {
-  const { run } = await import("@/lib/db");
-  const projectId = await taoDuAn("ratetwice");
-  const pm = await taoUser("pm", "ratetwice");
-  const supplierId = await taoNCC("ratetwice");
-  const matId = await taoVatTu("ratetwice", projectId);
-  const poId = await taoPO(pm, projectId, matId, supplierId);
-  await run(`UPDATE purchase_orders SET status = 'confirmed' WHERE id = ?`, poId);
-  await dangNhapDuAn(pm, projectId);
-  const { POST } = await import("@/app/api/suppliers/[id]/ratings/route");
-  const first = await POST(jreq("/x", { poId, quality: 5 }), {
-    params: Promise.resolve({ id: String(supplierId) }),
-  });
-  assert.equal(first.status, 201);
-  const second = await POST(jreq("/x", { poId, quality: 4 }), {
-    params: Promise.resolve({ id: String(supplierId) }),
-  });
-  assert.equal(second.status, 409);
-});
+test(
+  "POST /api/suppliers/:id/ratings: PO đã được đánh giá rồi → 409 (1 đánh giá/PO)",
+  S,
+  async () => {
+    const { run } = await import("@/lib/db");
+    const projectId = await taoDuAn("ratetwice");
+    const pm = await taoUser("pm", "ratetwice");
+    const supplierId = await taoNCC("ratetwice");
+    const matId = await taoVatTu("ratetwice", projectId);
+    const poId = await taoPO(pm, projectId, matId, supplierId);
+    await run(`UPDATE purchase_orders SET status = 'confirmed' WHERE id = ?`, poId);
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/suppliers/[id]/ratings/route");
+    const first = await POST(jreq("/x", { poId, quality: 5 }), {
+      params: Promise.resolve({ id: String(supplierId) }),
+    });
+    assert.equal(first.status, 201);
+    const second = await POST(jreq("/x", { poId, quality: 4 }), {
+      params: Promise.resolve({ id: String(supplierId) }),
+    });
+    assert.equal(second.status, 409);
+  },
+);
 
 // ============================================================================
 // GET /api/suppliers/:id/summary
@@ -2864,7 +2997,9 @@ test("GET /api/suppliers/:id/summary: NCC không tồn tại → 404", S, async 
   const pm = await taoUser("pm", "sumnf");
   await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/suppliers/[id]/summary/route");
-  const res = await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: "999999999" }) });
+  const res = await GET(jreq("/x", undefined, "GET"), {
+    params: Promise.resolve({ id: "999999999" }),
+  });
   assert.equal(res.status, 404);
 });
 

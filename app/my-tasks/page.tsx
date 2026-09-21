@@ -30,6 +30,8 @@ import { PAYMENT_VIEW_ROLES, type Role } from "@/lib/nen/roles";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
+import { ErrorState } from "@/app/components/ErrorState";
+import { taiJson } from "@/app/lib/taiDuLieu";
 import { DELAY_REASON_LABEL } from "@/lib/tien-do/delay";
 import type { PrefKey, Prefs } from "@/lib/van-hanh/notification-prefs";
 
@@ -392,6 +394,8 @@ export default function MyTasksPage() {
   const [taskData, setTaskData] = useState<TaskData | null>(null);
   const [feed, setFeed] = useState<Feed | null>(null);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  // Lỗi tải ≠ rỗng (audit 2026-09-05): mất mạng/500 trước đây hiện ra như "không có task nào".
+  const [loiTasks, setLoiTasks] = useState<string | null>(null);
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [segment, setSegment] = useState<Segment>("tasks");
@@ -419,18 +423,19 @@ export default function MyTasksPage() {
     if (tab === "notifications") setSegment("notifications");
   }, []);
 
-  useEffect(() => {
-    fetch("/api/my-tasks")
-      .then(async (r) => {
-        if (r.status === 401) {
-          redirectToLogin();
-          return;
-        }
-        setTaskData(await r.json());
-      })
-      .finally(() => setLoadingTasks(false));
-    fetchMe().then((u) => setMyRole(u?.role ?? null));
+  const taiTasks = useCallback(async () => {
+    setLoadingTasks(true);
+    setLoiTasks(null);
+    const kq = await taiJson<TaskData>("/api/my-tasks");
+    if (kq.ok) setTaskData(kq.data);
+    else setLoiTasks(kq.loi);
+    setLoadingTasks(false);
   }, []);
+
+  useEffect(() => {
+    void taiTasks();
+    fetchMe().then((u) => setMyRole(u?.role ?? null));
+  }, [taiTasks]);
 
   const loadFeed = useCallback(async (silent = false) => {
     if (!silent) setLoadingFeed(true);
@@ -465,6 +470,7 @@ export default function MyTasksPage() {
   }
 
   if (loadingTasks) return <PageSkeleton />;
+  if (loiTasks) return <ErrorState message={loiTasks} onRetry={() => void taiTasks()} />;
 
   const s = taskData?.summary;
   const tasks = taskData?.tasks ?? [];

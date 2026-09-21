@@ -66,7 +66,7 @@ Ngoài 4 vai trò thao tác trên, hệ thống có thêm 3 vai trò chỉ-xem: 
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`                  | tuỳ chọn        | Gửi báo cáo trễ hạn qua Telegram (song song email SMTP)                            |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | tuỳ chọn        | Web Push; sinh bằng `npx web-push generate-vapid-keys`. Thiếu → nút bật push tự ẩn |
 | SMTP (`SMTP_HOST`...)                                      | tuỳ chọn        | Gửi email báo cáo hằng ngày / tuần                                                 |
-| `SENTRY_DSN`                                               | tuỳ chọn        | Theo dõi lỗi production (server + browser)                                        |
+| `SENTRY_DSN`                                               | tuỳ chọn        | Theo dõi lỗi production (server + browser)                                         |
 | `TEST_DATABASE_URL`                                        | tuỳ chọn        | Postgres test riêng cho test tích hợp (không có thì test tự skip)                  |
 
 Danh mục đầy đủ (kể cả biến của các module mở rộng như Google Sheet sync) → `spec.md` §8.
@@ -104,15 +104,15 @@ xboss/
 ## Scripts
 
 | Command                               | Mô tả                                                    |
-| -------------------------------------- | ---------------------------------------------------------- |
+| ------------------------------------- | -------------------------------------------------------- |
 | `npm run dev`                         | Chạy dev server (cần `.env.local`)                       |
 | `npm run build`                       | Build production (pool kết nối lazy — không cần DB thật) |
 | `npm run lint`                        | `next lint`                                              |
 | `npm run typecheck`                   | `tsc --noEmit`                                           |
-| `npm test`                            | `node:test` qua `tsx` — toàn bộ `tests/*.test.ts`         |
+| `npm test`                            | `node:test` qua `tsx` — toàn bộ `tests/*.test.ts`        |
 | `npx tsx --test tests/status.test.ts` | Chạy 1 file test                                         |
 | `npm run db:seed`                     | Seed từ Excel AVIO trong `attachments/`                  |
-| `npm run db:migrate`                  | Áp migration còn thiếu (chủ động, ngoài lúc boot)         |
+| `npm run db:migrate`                  | Áp migration còn thiếu (chủ động, ngoài lúc boot)        |
 
 Test tích hợp (`recompute.test.ts` và nhiều file khác) chỉ chạy khi đặt `TEST_DATABASE_URL`; không có thì tự skip. CI (`.github/workflows/ci.yml`) chạy `npm audit` → lint → typecheck → test (Postgres 16 service) → build trên mỗi push/PR.
 

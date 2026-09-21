@@ -130,7 +130,7 @@ export default function HseVisionPage() {
                     type="text"
                     value={scanName}
                     onChange={(e) => setScanName(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-rose-500 transition"
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-rose-500 transition"
                     required
                   />
                 </div>
@@ -142,7 +142,7 @@ export default function HseVisionPage() {
                     type="text"
                     value={imageUrl}
                     onChange={(e) => setImageUrl(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-rose-500 transition"
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-rose-500 transition"
                     required
                   />
                 </div>
@@ -154,7 +154,7 @@ export default function HseVisionPage() {
                     type="text"
                     value={assignedSubcon}
                     onChange={(e) => setAssignedSubcon(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-rose-500 transition"
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-rose-500 transition"
                     required
                   />
                 </div>

@@ -145,8 +145,10 @@ export async function POST(
         });
       }
 
+      // approval_source='task' (0151): đánh dấu đây là duyệt RIÊNG LẺ, để huỷ nghiệm thu
+      // cả tầng sau này không hạ nhầm task này.
       await run(
-        `UPDATE tasks SET status = 'nghiem_thu', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        `UPDATE tasks SET status = 'nghiem_thu', approval_source = 'task', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         id,
       );
       await run(
@@ -235,7 +237,7 @@ export async function DELETE(
       // Truyền current = null để deriveStatus không giữ lại nghiem_thu.
       const newStatus = deriveStatus(task.progress_percent ?? 0, task.end_date, null);
       await run(
-        `UPDATE tasks SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        `UPDATE tasks SET status = ?, approval_source = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         newStatus,
         id,
       );

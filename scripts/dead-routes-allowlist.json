@@ -44,39 +44,11 @@
     "ly_do": "Metadata cấu hình phân bổ vật tư, không theo dự án (xem tests/project-scope-invariant.test.ts)."
   },
   {
-    "route": "/api/engineering/digital-handover",
-    "ly_do": "Lớp Engineering OS xây vượt cổng roadmap (ENG-0 nguyên tắc #10) — backend xong, UI chưa gắn. Giữ, chờ chốt hướng ở đề xuất #6 của audit 2026-08-25."
-  },
-  {
-    "route": "/api/engineering/project-health",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn (xem lý do /api/engineering/digital-handover)."
-  },
-  {
-    "route": "/api/engineering/multi-agent-copilot",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
-    "route": "/api/engineering/compliance/audit-element",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
     "route": "/api/engineering/closed-loop-sync",
     "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
   },
   {
-    "route": "/api/engineering/mepf-predictive",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
     "route": "/api/engineering/pipe-spool-tracking",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
-    "route": "/api/engineering/carbon-lca",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
-    "route": "/api/engineering/taxonomy",
     "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
   },
   {

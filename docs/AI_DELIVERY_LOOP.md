@@ -28,11 +28,11 @@ dựa vào ký ức chat hoặc checklist cũ.
 
 ## 2. Cấu trúc mục tiêu
 
-| Tầng | Mục đích | Điều kiện xong |
-| --- | --- | --- |
-| Goal | Outcome lớn/Product Complete | Metric + guardrail + final audit |
-| Milestone | Capability phát hành/đo độc lập | Acceptance criteria |
-| Slice | Thay đổi review được | PR DoD + merged |
+| Tầng      | Mục đích                        | Điều kiện xong                   |
+| --------- | ------------------------------- | -------------------------------- |
+| Goal      | Outcome lớn/Product Complete    | Metric + guardrail + final audit |
+| Milestone | Capability phát hành/đo độc lập | Acceptance criteria              |
+| Slice     | Thay đổi review được            | PR DoD + merged                  |
 
 Mỗi goal dùng `docs/goals/<goal-id>.md`; mỗi feature dùng đặc tả `docs/nang-cap/Mxx-*.md`,
 `Gxx-*.md` hoặc template chuẩn. `PROGRESS.md` vẫn là tóm tắt trạng thái toàn dự án.

@@ -11,28 +11,28 @@ body:
     id: problem
     attributes:
       label: Vấn đề, vai trò và bằng chứng
-    validations: {required: true}
+    validations: { required: true }
   - type: textarea
     id: outcome
     attributes:
       label: Outcome, baseline, target và guardrails
-    validations: {required: true}
+    validations: { required: true }
   - type: textarea
     id: research
     attributes:
       label: Kế hoạch nghiên cứu
       description: Code/DB/permission/project scope/offline/a11y/ops và nguồn cần kiểm.
-    validations: {required: true}
+    validations: { required: true }
   - type: textarea
     id: options
     attributes:
       label: Phương án cần so sánh
-    validations: {required: true}
+    validations: { required: true }
   - type: textarea
     id: unknowns
     attributes:
       label: Giả định, câu hỏi và quyết định cần owner chốt
-    validations: {required: true}
+    validations: { required: true }
   - type: checkboxes
     id: gate
     attributes:

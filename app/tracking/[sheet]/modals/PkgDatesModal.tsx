@@ -15,7 +15,7 @@ export function PkgDatesModal({
 }: {
   pkg: Pkg;
   canEdit: boolean;
-  onSave: (start: string, end: string, syncTasks: boolean) => void;
+  onSave: (start: string, end: string, syncTasks: boolean) => Promise<boolean>;
   onClose: () => void;
 }) {
   const [start, setStart] = useState(pkg.startDate ?? "");
@@ -34,7 +34,11 @@ export function PkgDatesModal({
       <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
         <CalendarDays className="w-4 h-4 text-emerald-400" />
         <h3 className="font-semibold text-sm">Ngày thi công — {pkg.code}</h3>
-        <button onClick={onClose} className="ml-auto text-zinc-400 hover:text-white">
+        <button
+          aria-label="Đóng"
+          onClick={onClose}
+          className="ml-auto text-zinc-400 hover:text-white"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -45,7 +49,7 @@ export function PkgDatesModal({
             type="date"
             value={start}
             onChange={(e) => setStart(e.target.value)}
-            className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 [color-scheme:dark]"
+            className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
           />
         </div>
         <div>
@@ -54,7 +58,7 @@ export function PkgDatesModal({
             type="date"
             value={end}
             onChange={(e) => setEnd(e.target.value)}
-            className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 [color-scheme:dark]"
+            className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
           />
         </div>
         {days != null && (
@@ -89,9 +93,12 @@ export function PkgDatesModal({
         />
         <div className="flex gap-2 pt-1">
           <button
-            onClick={() => {
+            onClick={async () => {
               setSaving(true);
-              onSave(start, end, syncTasks);
+              // Lưu thất bại (server từ chối / mất mạng) thì mở khoá nút lại, không kẹt
+              // "Đang lưu..." vĩnh viễn — modal vẫn giữ nguyên dữ liệu đã nhập.
+              const ok = await onSave(start, end, syncTasks);
+              if (!ok) setSaving(false);
             }}
             disabled={saving || invalid}
             className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-lg py-2 text-sm font-medium transition"

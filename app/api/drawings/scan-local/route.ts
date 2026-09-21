@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function POST(_req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageDrawings(user.role) && !CAN.viewEngineeringGraph(user.role)) {
+  if (!CAN.manageDrawings(user.role) && !CAN.manageEngineeringGraph(user.role)) {
     return NextResponse.json({ error: "Bạn không có quyền đồng bộ bản vẽ" }, { status: 403 });
   }
 

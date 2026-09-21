@@ -1,9 +1,9 @@
 ---
 name: Sự cố (Incident)
 about: Ghi nhận một sự cố production để điều phối xử lý (xem docs/ops/incident-response.md)
-title: '[INCIDENT] '
+title: "[INCIDENT] "
 labels: incident
-assignees: ''
+assignees: ""
 ---
 
 > Mở ngay khi phát hiện sự cố. Cập nhật liên tục trong lúc xử lý. Sau khi đóng (SEV1/SEV2):
@@ -29,10 +29,10 @@ assignees: ''
 
 ## Dòng thời gian
 
-| Thời điểm (UTC) | Sự kiện |
-|-----------------|---------|
-| | Phát hiện |
-| | |
+| Thời điểm (UTC) | Sự kiện   |
+| --------------- | --------- |
+|                 | Phát hiện |
+|                 |           |
 
 ## Người điều phối
 

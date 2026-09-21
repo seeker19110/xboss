@@ -305,7 +305,11 @@ export default function SiteCopilotPage() {
                     Nhật Ký Lệnh Hiện Trường ({logs.length})
                   </h3>
                 </div>
-                <button onClick={fetchLogs} className="text-zinc-500 hover:text-zinc-300">
+                <button
+                  aria-label="Làm mới"
+                  onClick={fetchLogs}
+                  className="text-zinc-500 hover:text-zinc-300"
+                >
                   <RefreshCw size={12} />
                 </button>
               </div>

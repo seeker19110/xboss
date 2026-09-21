@@ -358,6 +358,11 @@ const CAN_DEFAULT = {
   // OS-1 Engineering Knowledge Graph & System of Record (docs/nang-cap/OS-1-engineering-system-of-record.md)
   viewEngineeringGraph: (r?: Role) =>
     r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  // Cổng GHI của track OS-1: `viewEngineeringGraph` mở cho `bch` (vai trò CHỈ-XEM theo
+  // VIEW_ONLY_ROLES) nên không được dùng lại làm cổng cho POST/PATCH/DELETE — cùng lớp lỗi
+  // đã vá riêng cho e-sign (`signEngineeringEsign`), audit 2026-09-05 quét nốt ~20 handler
+  // ghi còn lại. Loại VIEW_ONLY_ROLES (bch/cdt/viewer) và subcon.
+  manageEngineeringGraph: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
   manageEngineeringDataQuality: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
   // M84 e-Sign — KÝ là hành vi ghi có giá trị pháp lý, không được dùng chung quyền XEM
   // (`viewEngineeringGraph` cho cả `bch` — vai trò chỉ-xem — nên ký được, audit 2026-08-24).

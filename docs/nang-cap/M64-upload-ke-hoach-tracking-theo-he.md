@@ -65,7 +65,12 @@ import * as XLSX from "xlsx";
 
 export type UploadKind = "ke_hoach" | "tracking";
 
-export type PlanRow = { taskId: number; boqCode: string; startDate: string | null; endDate: string | null };
+export type PlanRow = {
+  taskId: number;
+  boqCode: string;
+  startDate: string | null;
+  endDate: string | null;
+};
 
 // Dựng workbook mẫu "kế hoạch": 1 tab, mỗi dòng 1 task thuộc hệ `systemId` (lọc thêm
 // projectId nếu có — cùng kiểu JOIN towers như app/api/export/excel/route.ts).
@@ -86,7 +91,12 @@ export async function buildTrackingTemplate(
   projectId?: number | null,
 ): Promise<ExcelJS.Workbook>;
 
-export type UploadResult = { rowCount: number; matched: number; unmatched: number; warnings: string[] };
+export type UploadResult = {
+  rowCount: number;
+  matched: number;
+  unmatched: number;
+  warnings: string[];
+};
 
 // Đọc file kế hoạch (xlsx, đọc bằng thư viện `xlsx` như lib/import.ts), khoá cột bằng
 // TÊN HEADER ở dòng 1 (không theo vị trí cố định — robust khi admin sắp xếp lại cột):
@@ -160,7 +170,7 @@ trong `app/api/export/excel/route.ts`).
   (kỹ sư cũng cần xem/tải để đối chiếu, chỉ upload mới giới hạn Admin).
 - `kind` không hợp lệ (khác 2 giá trị) → 400.
 - Trả file `.xlsx` (`Content-Type:
-  application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), tên file
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), tên file
   `KeHoach-<code>-<today>.xlsx` hoặc `Tracking-<code>-<today>.xlsx`.
 
 ### `POST /api/systems/[code]/upload?kind=ke_hoach|tracking` (multipart, field `file`)
@@ -179,7 +189,7 @@ trong `app/api/export/excel/route.ts`).
   mới `newSystemUploadFileName(systemId, kind, mime)` trong `lib/photos.ts` (theo đúng
   pattern `newDocFileName`/`newContractDocFileName` đã có).
 - `INSERT INTO system_uploads (system_id, kind, file_name, original_name, uploaded_by,
-  row_count, matched_count, unmatched_count, warnings) VALUES (...)`.
+row_count, matched_count, unmatched_count, warnings) VALUES (...)`.
 - Trả `{ rowCount, matched, unmatched, warnings, uploadId }`.
 
 ### `GET /api/systems/[code]/uploads?kind=ke_hoach|tracking` — lịch sử phiên bản
@@ -187,7 +197,7 @@ trong `app/api/export/excel/route.ts`).
 - Auth: `getCurrentUser()`, không giới hạn role (mọi vai trò xem được lịch sử để biết
   admin đã cập nhật kế hoạch/tracking khi nào).
 - Trả tối đa 20 bản gần nhất: `{ id, kind, originalName, uploadedBy: {id,name},
-  rowCount, matchedCount, unmatchedCount, warnings, createdAt }[]`.
+rowCount, matchedCount, unmatchedCount, warnings, createdAt }[]`.
 
 ### `GET /api/system-uploads/[id]/file` — tải lại file đã upload
 

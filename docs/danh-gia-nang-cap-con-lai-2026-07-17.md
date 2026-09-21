@@ -29,18 +29,18 @@ theo yêu cầu người dùng) vì hết giá trị tra cứu — nội dung qu
 
 ## Kết luận 2 — Trạng thái triển khai M43–M52
 
-| Module | Trạng thái | Ghi chú |
-| --- | --- | --- |
-| M43 Audit trail | ✅ Xong cả 3 PR | `PROGRESS.md` dòng ~35-113 |
-| M44 Vận hành | ✅ Xong (backup/health/logging/staging) | Sentry DSN chờ ops đặt tay (ngoài code) |
-| M45 Chất lượng dữ liệu | ✅ Xong | money.ts, CHECK, ERD tự sinh, soft-delete |
-| M46 Approval engine | ✅ Xong (dormant tới khi có flow thật) | |
-| M47 EVM & BI | ✅ Xong cả 4 PR | EVM/matviews/saved-reports/alert_rules |
-| M48 Tích hợp tài chính | ⏸ PR1 xong; PR2/PR3 khoá | Chờ công ty chốt NCC kế toán/HĐĐT thật — **không tự đoán** |
-| M49 API mở & SSO | ⏸ PR1/PR2 chưa thấy trong PROGRESS; PR3 code xong, PR #218 draft chưa merge | PR3 chờ verify tay với IdP thật; **PR1 (api keys/`/api/v1`) và PR2 (webhook ra ngoài) CHƯA triển khai — không nhắc tới trong PROGRESS.md dù đặc tả đã kín** |
-| M50 Phân quyền nâng cao | ✅ Xong cả 3 PR | |
-| **M51 Đa dự án cấp 2 (RLS)** | ❌ **Chưa triển khai** | Đặc tả kín, nhưng **PR1/PR2 đụng cấu hình production** (role Postgres mới, tách `MIGRATE_DATABASE_URL`, ADR-0005) — đợt kế hoạch M50 trước đã ghi rõ "không code khi chưa xác nhận sẵn sàng" |
-| **M52 Mở rộng cấu hình** | ❌ **Chưa triển khai** | Đặc tả kín, thuần code (không đụng production), độc lập |
+| Module                       | Trạng thái                                                                  | Ghi chú                                                                                                                                                                                      |
+| ---------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M43 Audit trail              | ✅ Xong cả 3 PR                                                             | `PROGRESS.md` dòng ~35-113                                                                                                                                                                   |
+| M44 Vận hành                 | ✅ Xong (backup/health/logging/staging)                                     | Sentry DSN chờ ops đặt tay (ngoài code)                                                                                                                                                      |
+| M45 Chất lượng dữ liệu       | ✅ Xong                                                                     | money.ts, CHECK, ERD tự sinh, soft-delete                                                                                                                                                    |
+| M46 Approval engine          | ✅ Xong (dormant tới khi có flow thật)                                      |                                                                                                                                                                                              |
+| M47 EVM & BI                 | ✅ Xong cả 4 PR                                                             | EVM/matviews/saved-reports/alert_rules                                                                                                                                                       |
+| M48 Tích hợp tài chính       | ⏸ PR1 xong; PR2/PR3 khoá                                                    | Chờ công ty chốt NCC kế toán/HĐĐT thật — **không tự đoán**                                                                                                                                   |
+| M49 API mở & SSO             | ⏸ PR1/PR2 chưa thấy trong PROGRESS; PR3 code xong, PR #218 draft chưa merge | PR3 chờ verify tay với IdP thật; **PR1 (api keys/`/api/v1`) và PR2 (webhook ra ngoài) CHƯA triển khai — không nhắc tới trong PROGRESS.md dù đặc tả đã kín**                                  |
+| M50 Phân quyền nâng cao      | ✅ Xong cả 3 PR                                                             |                                                                                                                                                                                              |
+| **M51 Đa dự án cấp 2 (RLS)** | ❌ **Chưa triển khai**                                                      | Đặc tả kín, nhưng **PR1/PR2 đụng cấu hình production** (role Postgres mới, tách `MIGRATE_DATABASE_URL`, ADR-0005) — đợt kế hoạch M50 trước đã ghi rõ "không code khi chưa xác nhận sẵn sàng" |
+| **M52 Mở rộng cấu hình**     | ❌ **Chưa triển khai**                                                      | Đặc tả kín, thuần code (không đụng production), độc lập                                                                                                                                      |
 
 ## Phát hiện thêm ngoài dự kiến: M49 PR1 + PR2 cũng chưa làm
 
