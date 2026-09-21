@@ -1,5 +1,111 @@
 # PROGRESS.md — Trạng thái dự án
 
+## 🔍 Đợt audit toàn dự án (5 trụ theo `docs/audit.md`) — 2026-09-22
+
+Chạy theo đúng quy trình §9: 4 subagent song song (bảo mật/phân quyền · logic & toàn vẹn dữ liệu ·
+UI/UX-a11y + vận hành/offline/xuất bản · hiệu năng/dependency/CI/test) đọc code thật + xác nhận
+ground-truth (Postgres 16 cục bộ `show timezone` = UTC, script quét 413 route). Phiên chính đã tự
+đọc lại code để xác nhận mọi phát hiện mức **Cao** trước khi ghi. **Đợt này chỉ audit, chưa sửa** —
+mọi phát hiện Cao/Trung bình ghi vào mục "Nợ kỹ thuật" bên dưới, chờ chốt thứ tự sửa.
+
+```
+=== BÁO CÁO AUDIT TOÀN DIỆN — 2026-09-22 06:30 (giờ VN) · nhánh claude/practical-davinci-fvlxpp · 2b5fa81 (= origin/main) ===
+
+CỔNG TỰ ĐỘNG (chặn)
+  lint ✅ | typecheck ✅ | test ✅ (236/236 file, 3862/3862 ca, 1 skip có lý do trong allowlist, --release-gate, Postgres thật) | build ✅
+  | prettier ✅ | check:contrast ✅ | check:mau-accent ✅ | check:lib-layers ✅ | check:dead-code ✅ | check:route-perms ✅
+  | check:project-scope ✅ | check:db-params ✅ | check:migrations ✅ (152 file) | check:sw-exclude ✅ | check:hex-hardcode ✅
+  | check:progress-freshness ✅ | npm audit: 0 lỗ hổng
+
+§3 BẢO MẬT & PHÂN QUYỀN
+  Route có getCurrentUser()+401 ✅ (413/413; 17 route không gọi đều có xác thực riêng: /api/v1 API key, webhook HMAC, OIDC, cron Bearer)
+  | CAN/canTouchTask/canTouchPackage đối xứng ❌ (S2) | scope projectId (M22) ❌ (S1, L4) | secret hardcode: 0 | .env track: chỉ .env.example ✅
+  | npm audit high/critical: 0 | cron Bearer-only ✅ (8/8) | rate-limit atomic ✅ (thiếu ở 2 endpoint TOTP — S4)
+  | cookie 3 cờ ✅ (trừ logout xoá cookie — S5) | CSRF same-origin toàn cục ở proxy.ts ✅ | SQL placeholder ✅ (mọi `${}` là hằng/whitelist)
+  | upload sniff magic byte ✅ | open-redirect/SSRF ✅ | PATCH users/:id đổi password_hash thật ✅
+
+§4 LOGIC & TOÀN VẸN DỮ LIỆU
+  Làm tròn % ✅ | FOR UPDATE trong transaction ✅ (ngoại lệ L6, L9) | race/idempotency ✅ (ngoại lệ L5, L6)
+  | tiền tính trong SQL ✅ | ngày Asia/Ho_Chi_Minh ❌ ở tầng SQL (L3: CURRENT_DATE chạy UTC) | nghiem_thu không tự hạ cấp ✅ nhưng hạ cấp THỦ CÔNG chưa chặn ❌ (L1, L2)
+  | Google Sheet snapshot sau ghi + đối chiếu BOQ trước tạo ✅ | BOQCODE unique ở DB (boq_codes + trigger) ✅ | migration append-only idempotent ✅ (3 file mới nhất)
+
+§5 UI/UX & A11Y
+  4 trạng thái màn hình ❌ (U4: costs/payments/account màn trắng khi lỗi) | axe: phủ 100% route ✅ nhưng 12 route + /work-fronts/[floor] còn test.fixme ❌ (U7)
+  | aria-label icon button ✅ (0 thiếu) / control không nhãn ❌ (U6: 26 select, 103 input, 5 textarea) | vùng chạm ≥40px ❌ (3 chỗ) / không cuộn ngang toàn trang ✅
+  | không chỉ-bằng-màu ✅ | dark:/hex/accent-500-600+text-white tường minh ✅ 0 — nhưng 3 nút bg-emerald-600 kế thừa text-white từ root lọt cổng ❌ (U5)
+  | chữ input ≥16px mobile ❌ (U3: không có luật toàn cục, ~500 control text-xs/sm) | fetch ghi không try/catch: 158/320 ❌ (U2)
+
+§6 HIỆU NĂNG / DEPENDENCY / CI
+  Lighthouse ≥ ngưỡng error ✅ | uses: pin SHA ✅ (6 workflow) | permissions tường minh ✅ | deploy needs CI success ✅ (kể cả e2e) nhưng không chờ Lighthouse CI ❌ (P3)
+  | index bảng lớn ✅ (ngoại lệ audit_log — P4) | Coverage baseline (2026-09-05): lines 92.61 / branches 85.36 / funcs 95.48 — ratchet chỉ tăng, chưa nới (=)
+  | Vùng thiếu test đề xuất: lib/nen/date.ts (không có file test riêng: todayISO 0h–7h, năm nhuận, addDaysISO qua năm); recompute.capNhatNgayThucTe 3 luật;
+    material-sync.runMaterialSync (chưa có test nào gọi: sheet rỗng/ID trùng/lock đang giữ/lỗi mạng giữa chừng); boq.danhMucBoqTheoDuAn trần 500; auth.computeMustSetup2fa/parseTotpPendingToken hết hạn
+
+§7 VẬN HÀNH / OFFLINE / XUẤT BẢN
+  SSE watermark+fallback ✅ | offline queue idempotent, bỏ 4xx ✅ | sw.js tăng CACHE version ✅ (v16) nhưng route export bị SWR cache ❌ (U1)
+  | PDF font VN ✅ (9/9 dùng pdf-fonts) + cột SQL Excel đúng ✅ (0 cột sai) | dedup notif ✅ (43 khối ON CONFLICT khớp index) | optimistic tick rollback + lý do ✅
+
+ĐỐI CHIẾU TÀI LIỆU & HẠ TẦNG
+  Git: ahead 0 / behind 0 | working tree ✅ | PROGRESS khớp thực tế ✅ (check:progress-freshness)
+  | Migration đụng dữ liệu chưa có ghi nhận đã qua staging: 0138 (3 UPDATE backfill), 0149 (UPDATE + SET NOT NULL + DROP CONSTRAINT) — cần tra schema_migrations production
+  | Nợ kỹ thuật cũ còn đúng: nav_settings/M25-M31 notification, admin xuyên org (PROGRESS dòng ~970) chưa chốt
+  | Hạn chế: repo là shallow clone (63 commit) → không chứng minh được "migration chưa từng bị sửa" trên lịch sử đầy đủ
+
+--- PHÂN LOẠI VIỆC ---
+  [AI] tự làm được: toàn bộ S1–S5, L1–L9, U1–U7, P1–P6 bên dưới (mỗi cụm 1 PR nhỏ kèm test hồi quy).
+  [Người dùng] cần thao tác tay / quyết định: (a) tra schema_migrations production xác nhận 0138/0149 đã áp và ghi vào PROGRESS;
+    (b) chốt thiết kế "admin thấy/ghi xuyên org?" (visibleProjectIds) — ảnh hưởng S1/S3; (c) HSTS ở Nginx nếu chưa; (d) nâng major typescript 7 / nodemailer 10.
+  Rủi ro/ảnh hưởng: S1 leo quyền dự án trong cùng org (PM); L1/L2 phá bất biến nghiệm thu (dữ liệu nghiệm thu sai âm thầm); L4 nghiệm thu cả tầng dự án khác;
+    U1 người dùng online tải Excel/PDF số liệu cũ từ cache.
+  Góp ý cải tiến: mở rộng check-route-perms (cổng 2: route có params.id thuộc task/package phải tham chiếu taskProjectId/getCurrentProjectId),
+    check-mau-accent (bắt nền -500/-600 trên <button> không khai class chữ), 1 rule CSS toàn cục font-size ≥16px cho control mobile.
+
+KẾT LUẬN: Cần xử lý — S1, L1, L2 (Cao) và S2, L3–L7, U1–U7, P1–P3 (Trung bình) trước; còn lại gộp PR vệ sinh.
+```
+
+### Nợ kỹ thuật — phát hiện đợt audit 2026-09-22 (chưa sửa, đã xác nhận bằng đọc code)
+
+**Bảo mật (S)**
+
+- **S1 [Cao]** `PUT /api/user-projects` (`app/api/user-projects/route.ts:26-55`): PM (`CAN.assign`) gán được bất kỳ `projectIds` cho bất kỳ `userId` — không đối chiếu `visibleProjectIds(user)` người gọi, không kiểm `userId`/project cùng org → PM tự cấp mình mọi dự án trong org, hoặc xoá quyền thấy của Admin/PM khác. Sửa: `projectIds ⊆ visibleProjectIds(caller)` với PM, `userId` cùng `org_id`, cân nhắc chỉ Admin.
+- **S2 [Trung bình]** `DELETE /api/comments/:id` (`app/api/comments/[id]/route.ts:20-33`): không cách ly dự án (route anh em `tasks/:id/comments` đã có `taskProjectId` + `getCurrentProjectId`) → đoán id xoá bình luận dự án/org khác. Sửa theo khuôn `photos/[id]`.
+- **S3 [Thấp]** `PATCH/DELETE /api/saved-reports/:id`: không lọc `org_id` (GET/POST cùng cụm đã lọc) → Admin xuyên org sửa/xoá. Phụ thuộc quyết định (b).
+- **S4 [Thấp]** `POST /api/auth/totp/confirm` + `DELETE /api/auth/totp` không `hitRateLimit` → kẻ chiếm phiên dò mã 6 số để tắt 2FA. Sửa: `hitRateLimit("totp-confirm:<uid>", 10, 15)`.
+- **S5 [Thấp]** `POST /api/auth/logout` xoá cookie thiếu `sameSite`/`secure`.
+- Khoảng trống script CI: `check-route-perms` chỉ kiểm "có nhắc cơ chế quyền", không kiểm cách ly dự án (S1/S2 đều lọt); `check-project-scope` không bắt "thiếu scope hoàn toàn".
+
+**Logic & toàn vẹn dữ liệu (L)**
+
+- **L1 [Cao]** `PATCH /api/tasks/:id`, `/tasks/batch`, `/tasks/:id/progress` chỉ chặn _đặt_ `status=nghiem_thu`, không chặn khi task **đang** `nghiem_thu` → ghi đè `hoan_thanh` thẳng, mất nghiệm thu không qua `DELETE /approve`, `approval_source` lệch, `task_history` ghi sai loại. Sửa: sau `FOR UPDATE`, `before.status === "nghiem_thu" && body.status !== undefined` → 409.
+- **L2 [Cao]** Task `nghiem_thu` vẫn bị giảm % qua bỏ tick (`dimensions/[id]`, `dimensions/batch`) hoặc nhập % tay (`progress` không kèm status) → tồn tại `nghiem_thu` với progress < 1, `actual_end_date` bị NULL, % nhóm/S-curve tụt nhưng badge vẫn "Đã nghiệm thu". Sửa: 409 ở 3 route khi task đang `nghiem_thu`.
+- **L3 [Trung bình]** `CURRENT_DATE` (13 chỗ, gồm `recompute.ts:56,63` `capNhatNgayThucTe`, handover, warranty, drawings, finance, materials/reports) chạy theo TZ phiên Postgres = UTC, trong khi `todayISO()` = UTC+7 → 0h–7h sáng VN lệch 1 ngày. Chính `tests/recompute.test.ts:351,421` phải dùng UTC để pass. Sửa 1 chỗ: `-c timezone=Asia/Ho_Chi_Minh` trong `options` Pool (`lib/db/index.ts`) + test `SELECT CURRENT_DATE::text = todayISO()`; thêm file test `lib/nen/date.ts`.
+- **L4 [Trung bình]** `GET/POST /api/approvals` (nghiệm thu tầng): chỉ lọc `sheet_type_id + floor_label`, không JOIN tới `projects` → PM gửi `sheetTypeId` dự án khác nghiệm thu cả tầng dự án đó; GET liệt kê mọi dự án. Sửa: JOIN towers/projects `WHERE p.id = ?` → 404.
+- **L5 [Trung bình]** `ghiDauVetTick` (`lib/tien-do/dimension-events.ts:59-71`) ghi đè `installed_at/installed_by` khi tick lại ô đã tick (replay offline, tick cả hàng) → mất dấu vết người lắp thật. Sửa: `CASE WHEN installed = 1 THEN installed_at ELSE NOW() END`.
+- **L6 [Trung bình]** `POST /api/materials/:id/transactions`: UPDATE + INSERT không transaction/FOR UPDATE/Idempotency-Key → 2 request đồng thời ghi delta audit sai, INSERT lỗi để `qty_used` đổi mà không có giao dịch. Sửa theo khuôn `purchase-orders/[id]/receive`.
+- **L7 [Trung bình]** `progress/route.ts:104` và `approve/route.ts:238` gọi `deriveStatus(progress, task.end_date)` thô, không `?? wp.end_date` như `recomputeTask` → task kế thừa ngày nhóm quá hạn nhập % tay ra `dang_thi_cong` thay vì `tre`.
+- **L8 [Thấp]** PO receive: `Idempotency-Key` tuỳ chọn (client API không gửi → 2 phiếu); `oldStatus`/`qty_after` đọc ngoài khoá.
+- **L9 [Thấp]** `variations/[id]/contract-add` không `FOR UPDATE`/không kiểm lại status trong transaction → 2 phụ lục mã khác nhau song song đội giá HĐ.
+- **L10 [Thấp]** `engineering/fidic-tia/route.ts:59` `delayEndDate` mặc định dùng `new Date().toISOString()` (UTC) → dùng `daysFromTodayISO(14)`. `material-sync.ts:390` `boqTakenBy(boqCode, 1)` hard-code org 1.
+
+**UI/UX, a11y, vận hành (U)**
+
+- **U1 [Trung bình]** `public/sw.js:111-140`: mọi GET `/api/*` ngoài danh sách loại trừ đi stale-while-revalidate → `/api/export/excel`, `/api/export/pdf`, PDF chứng chỉ/tender/quality, `audit-log/export` trả file **cũ từ cache** khi đang online + nhét blob MB vào Cache Storage. Sửa: thêm `/api/export/`, đường dẫn `*/pdf`, `*/excel` vào nhánh network-only + bump `CACHE` v17 + cập nhật `swExclude` registry.
+- **U2 [Cao cho hiện trường]** 158/320 fetch ghi không try/catch, 14 chỗ `setSaving/Busy(true)` không reset → mất sóng là nút kẹt vĩnh viễn: `CommentsModal.send/remove`, `approvals` decide (:190), `boq` addNorm (:1247), `PhotosModal:128`, `PkgDatesModal:97`, `notifications/all:109`, `payments:769`, `TwoFactorSection:46/57/85`; 2 form không disable khi submit (`engineering/bidding-matrix:363`, `esign:182`).
+- **U3 [Trung bình]** Không có luật toàn cục cỡ chữ ≥16px cho control trên mobile (~500 control `text-xs/sm`; spec `input-zoom-mobile` chỉ phủ 10 route) → iOS auto-zoom. Sửa gốc 1 rule trong `globals.css @layer base`.
+- **U4 [Trung bình]** `costs/page.tsx:62-104`, `payments/page.tsx:171-356`, `account/page.tsx:31-62`: lỗi/mất mạng → `return null` màn trắng hoặc kẹt Skeleton.
+- **U5 [Trung bình]** 3 nút `bg-emerald-600` không khai class chữ, kế thừa `text-white` từ root (3,77:1 ❌): `DateEditModal.tsx:81`, `PkgDatesModal.tsx:104`, `admin/integrations/page.tsx:620` — lọt `check:mau-accent`. Sửa: dùng `<Button>`; mở rộng script.
+- **U6 [Trung bình]** 26 `<select>` / 103 `<input>` / 5 `<textarea>` không nhãn khả truy cập; 1 link icon-only `my-tasks:808`; `text-zinc-600` body text 107 chỗ (payments 19, TrackingGrid 14); hover sáng dần 57 chỗ/12 file (trái ADR-0010).
+- **U7 [Trung bình]** 12 route `test.fixme` axe (`/mepf-process`, `/combine`, `/schedule`, `/engineering`, 8 `/engineering/*`) + `/work-fronts/[floor]` → cổng axe chưa cứng.
+
+**Hiệu năng / CI / test (P)**
+
+- **P1 [Trung bình]** Migration 0138, 0149 đụng dữ liệu — chưa có ghi nhận đã qua staging → [Người dùng] tra `schema_migrations`.
+- **P2 [Trung bình]** = L3 (timezone Pool).
+- **P3 [Trung bình]** `deploy.yml` chỉ `workflow_run: ["CI"]`, không chờ "Lighthouse CI" → hồi quy perf/a11y vẫn deploy.
+- **P4 [Thấp]** `audit_log` lọc `project_id`/`actor_id`/`at::date` không có index phù hợp (cast vô hiệu hoá `idx_audit_at`). `notifications` on-fetch sync ~35 khối INSERT+DELETE mỗi GET, không throttle. N+1 `system-upload.ts:250-257`.
+- **P5 [Thấp]** `MIGRATE_DATABASE_URL`, `XBOSS_PG_ALLOW_EXIT_ON_IDLE` dùng trực tiếp chưa khai trong `lib/nen/env.ts`; CSP `script-src 'unsafe-inline'` (2 inline script theme/sidebar); `@lhci/cli@0.15.x` chưa pin; mutation test chỉ chạy trên push main; CLAUDE.md ghi "3 nhánh e2e" nhưng ci.yml đã 4 shard.
+- **P6 [Thấp]** Dependency major lỗi thời: typescript 6→7, nodemailer 9→10, google-auth-library 10→11, dotenv 17→18.
+
 ## ✅ Xoá 10 phân hệ Engineering Đỉnh cao theo yêu cầu người dùng — 2026-09-21
 
 Theo yêu cầu người dùng, đã xoá HOÀN TOÀN 10 tính năng khỏi Apex Cockpit (`/engineering`):
