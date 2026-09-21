@@ -4256,48 +4256,6 @@
 - `idx_closed_loop_sync_proj`: INDEX idx_closed_loop_sync_proj ON public.engineering_closed_loop_sync_logs USING btree (project_id, spool_id)
 - `uq_closed_loop_sync_code`: UNIQUE INDEX uq_closed_loop_sync_code ON public.engineering_closed_loop_sync_logs USING btree (project_id, sync_code)
 
-### engineering_compliance_audits
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | integer |  |  |
-| object_id | uuid |  |  |
-| rule_id | uuid |  |  |
-| compliance_status | text |  |  |
-| finding_details | text | ✓ |  |
-| evidence_snapshot | jsonb |  | `'{}'::jsonb` |
-| audited_at | timestamptz |  | `now()` |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `object_id` → `engineering_objects(id)`
-- `project_id` → `projects(id)`
-- `rule_id` → `engineering_compliance_rules(id)`
-
-**Index:**
-- `engineering_compliance_audits_pkey`: UNIQUE INDEX engineering_compliance_audits_pkey ON public.engineering_compliance_audits USING btree (id)
-- `idx_compliance_audits_proj`: INDEX idx_compliance_audits_proj ON public.engineering_compliance_audits USING btree (project_id, compliance_status)
-
-### engineering_compliance_rules
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| standard_code | text |  |  |
-| standard_title | text |  |  |
-| section_clause | text |  |  |
-| domain | text |  |  |
-| rule_expression | jsonb |  |  |
-| severity | text |  |  |
-| description | text |  |  |
-| is_active | boolean |  | `true` |
-| created_at | timestamptz |  | `now()` |
-
-**Index:**
-- `engineering_compliance_rules_pkey`: UNIQUE INDEX engineering_compliance_rules_pkey ON public.engineering_compliance_rules USING btree (id)
-- `uq_compliance_rules_clause`: UNIQUE INDEX uq_compliance_rules_clause ON public.engineering_compliance_rules USING btree (standard_code, section_clause)
-
 ### engineering_conflicts
 
 | Cột | Kiểu | Null | Default |
@@ -4360,28 +4318,6 @@
 - `engineering_corridor_layouts_project_id_corridor_code_key`: UNIQUE INDEX engineering_corridor_layouts_project_id_corridor_code_key ON public.engineering_corridor_layouts USING btree (project_id, corridor_code)
 - `idx_corridor_layouts_project`: INDEX idx_corridor_layouts_project ON public.engineering_corridor_layouts USING btree (project_id, created_at DESC)
 - `idx_corridor_layouts_spatial`: INDEX idx_corridor_layouts_spatial ON public.engineering_corridor_layouts USING btree (project_id, tower_label, floor_label)
-
-### engineering_cross_project_lessons
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| source_project_id | integer | ✓ |  |
-| pattern_id | uuid | ✓ |  |
-| work_package_code | text | ✓ |  |
-| observed_problem | text |  |  |
-| root_cause | text |  |  |
-| prescribed_preventative_action | text |  |  |
-| effectiveness_score | numeric(5,4) | ✓ | `1.0000` |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `pattern_id` → `engineering_knowledge_patterns(id)`
-- `source_project_id` → `projects(id)`
-
-**Index:**
-- `engineering_cross_project_lessons_pkey`: UNIQUE INDEX engineering_cross_project_lessons_pkey ON public.engineering_cross_project_lessons USING btree (id)
-- `idx_eng_cross_lessons_source_project`: INDEX idx_eng_cross_lessons_source_project ON public.engineering_cross_project_lessons USING btree (source_project_id)
 
 ### engineering_data_quality_issues
 
@@ -4676,59 +4612,6 @@
 - `engineering_execution_requests_pkey`: UNIQUE INDEX engineering_execution_requests_pkey ON public.engineering_execution_requests USING btree (id)
 - `idx_eng_exec_requests_project`: INDEX idx_eng_exec_requests_project ON public.engineering_execution_requests USING btree (project_id, status, created_at DESC)
 
-### engineering_fidic_claim_evidences
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | integer |  |  |
-| claim_id | uuid |  |  |
-| evidence_type | text |  |  |
-| reference_code | text |  |  |
-| description | text | ✓ |  |
-| impact_days | integer |  | `0` |
-| metadata | jsonb |  | `'{}'::jsonb` |
-| created_at | timestamptz |  | `CURRENT_TIMESTAMP` |
-
-**Khóa ngoại:**
-- `claim_id` → `engineering_fidic_claims(id)`
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_fidic_claim_evidences_pkey`: UNIQUE INDEX engineering_fidic_claim_evidences_pkey ON public.engineering_fidic_claim_evidences USING btree (id)
-- `idx_claim_evidences_claim`: INDEX idx_claim_evidences_claim ON public.engineering_fidic_claim_evidences USING btree (project_id, claim_id)
-
-### engineering_fidic_claims
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | integer |  |  |
-| claim_code | text |  |  |
-| contract_type | text |  | `'FIDIC_RED_1999'::text` |
-| fidic_clause | text |  | `'8.4'::text` |
-| event_title | text |  |  |
-| event_date | date |  |  |
-| notice_date | date |  |  |
-| eot_days_claimed | integer |  | `0` |
-| cost_claimed_vnd | bigint |  | `0` |
-| is_time_bar_compliant | boolean |  | `true` |
-| status | text |  | `'draft'::text` |
-| tia_analysis_payload | jsonb |  | `'{}'::jsonb` |
-| dossier_content | text | ✓ |  |
-| created_by | integer | ✓ |  |
-| created_at | timestamptz |  | `CURRENT_TIMESTAMP` |
-| updated_at | timestamptz |  | `CURRENT_TIMESTAMP` |
-
-**Khóa ngoại:**
-- `created_by` → `users(id)`
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_fidic_claims_claim_code_key`: UNIQUE INDEX engineering_fidic_claims_claim_code_key ON public.engineering_fidic_claims USING btree (claim_code)
-- `engineering_fidic_claims_pkey`: UNIQUE INDEX engineering_fidic_claims_pkey ON public.engineering_fidic_claims USING btree (id)
-- `idx_fidic_claims_proj_code`: INDEX idx_fidic_claims_proj_code ON public.engineering_fidic_claims USING btree (project_id, claim_code, status)
-
 ### engineering_fidic_tia_claims
 
 | Cột | Kiểu | Null | Default |
@@ -4880,76 +4763,6 @@
 **Index:**
 - `engineering_goods_receipt_notes_pkey`: UNIQUE INDEX engineering_goods_receipt_notes_pkey ON public.engineering_goods_receipt_notes USING btree (id)
 - `idx_grn_proj_shipment`: INDEX idx_grn_proj_shipment ON public.engineering_goods_receipt_notes USING btree (project_id, shipment_id)
-
-### engineering_hse_action_tickets
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| scan_id | uuid |  |  |
-| hazard_id | uuid |  |  |
-| project_id | bigint |  |  |
-| ticket_code | text |  |  |
-| assigned_subcon | text |  |  |
-| fine_amount | numeric(12,2) |  | `0` |
-| deadline_hours | integer |  | `4` |
-| status | text |  | `'OPEN'::text` |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `hazard_id` → `engineering_hse_detected_hazards(id)`
-- `project_id` → `projects(id)`
-- `scan_id` → `engineering_hse_vision_scans(id)`
-
-**Index:**
-- `engineering_hse_action_tickets_pkey`: UNIQUE INDEX engineering_hse_action_tickets_pkey ON public.engineering_hse_action_tickets USING btree (id)
-- `engineering_hse_action_tickets_ticket_code_key`: UNIQUE INDEX engineering_hse_action_tickets_ticket_code_key ON public.engineering_hse_action_tickets USING btree (ticket_code)
-- `idx_engineering_hse_tickets_project`: INDEX idx_engineering_hse_tickets_project ON public.engineering_hse_action_tickets USING btree (project_id)
-
-### engineering_hse_detected_hazards
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| scan_id | uuid |  |  |
-| project_id | bigint |  |  |
-| hazard_type | text |  |  |
-| severity | text |  | `'MEDIUM'::text` |
-| confidence | numeric(5,2) |  | `90.00` |
-| bounding_box | jsonb |  | `'[0, 0, 100, 100]'::jsonb` |
-| description | text |  |  |
-| standard_violation | text | ✓ |  |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-- `scan_id` → `engineering_hse_vision_scans(id)`
-
-**Index:**
-- `engineering_hse_detected_hazards_pkey`: UNIQUE INDEX engineering_hse_detected_hazards_pkey ON public.engineering_hse_detected_hazards USING btree (id)
-- `idx_engineering_hse_hazards_project`: INDEX idx_engineering_hse_hazards_project ON public.engineering_hse_detected_hazards USING btree (project_id)
-- `idx_engineering_hse_hazards_scan`: INDEX idx_engineering_hse_hazards_scan ON public.engineering_hse_detected_hazards USING btree (scan_id)
-
-### engineering_hse_vision_scans
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | bigint |  |  |
-| scan_name | text |  |  |
-| image_url | text |  |  |
-| image_hash | text |  |  |
-| total_hazards_found | integer |  | `0` |
-| site_safety_score | numeric(5,2) |  | `100.00` |
-| risk_tier | text |  | `'SAFE'::text` |
-| analyzed_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_hse_vision_scans_pkey`: UNIQUE INDEX engineering_hse_vision_scans_pkey ON public.engineering_hse_vision_scans USING btree (id)
-- `idx_engineering_hse_scans_project`: INDEX idx_engineering_hse_scans_project ON public.engineering_hse_vision_scans USING btree (project_id)
 
 ### engineering_hydraulic_checks
 
@@ -5118,32 +4931,6 @@
 **Index:**
 - `engineering_iot_telemetry_logs_pkey`: UNIQUE INDEX engineering_iot_telemetry_logs_pkey ON public.engineering_iot_telemetry_logs USING btree (id)
 
-### engineering_iot_threshold_alerts
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | bigint |  |  |
-| device_id | uuid |  |  |
-| severity | text |  |  |
-| alert_title | text |  |  |
-| alert_message | text |  |  |
-| standard_reference | text | ✓ |  |
-| triggered_value | numeric(10,2) |  |  |
-| is_resolved | boolean |  | `false` |
-| resolved_at | timestamptz | ✓ |  |
-| resolved_by | bigint | ✓ |  |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `device_id` → `engineering_iot_devices(id)`
-- `project_id` → `projects(id)`
-- `resolved_by` → `users(id)`
-
-**Index:**
-- `engineering_iot_threshold_alerts_pkey`: UNIQUE INDEX engineering_iot_threshold_alerts_pkey ON public.engineering_iot_threshold_alerts USING btree (id)
-- `uq_iot_alert_dang_mo`: UNIQUE INDEX uq_iot_alert_dang_mo ON public.engineering_iot_threshold_alerts USING btree (device_id) WHERE (is_resolved = false)
-
 ### engineering_joint_pieces
 
 | Cột | Kiểu | Null | Default |
@@ -5193,27 +4980,6 @@
 - `engineering_joint_runs_drawing_id_run_key_key`: UNIQUE INDEX engineering_joint_runs_drawing_id_run_key_key ON public.engineering_joint_runs USING btree (drawing_id, run_key)
 - `engineering_joint_runs_pkey`: UNIQUE INDEX engineering_joint_runs_pkey ON public.engineering_joint_runs USING btree (id)
 - `idx_joint_runs_drawing`: INDEX idx_joint_runs_drawing ON public.engineering_joint_runs USING btree (drawing_id)
-
-### engineering_knowledge_patterns
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| pattern_type | text |  |  |
-| category | text |  |  |
-| fingerprint_hash | text |  |  |
-| pattern_metrics | jsonb |  | `'{}'::jsonb` |
-| confidence_score | numeric(5,4) |  | `0.5000` |
-| sample_size_projects | integer |  | `1` |
-| sample_size_observations | bigint |  | `1` |
-| lesson_learned | text |  |  |
-| created_at | timestamptz |  | `now()` |
-| updated_at | timestamptz |  | `now()` |
-
-**Index:**
-- `engineering_knowledge_patterns_fingerprint_hash_key`: UNIQUE INDEX engineering_knowledge_patterns_fingerprint_hash_key ON public.engineering_knowledge_patterns USING btree (fingerprint_hash)
-- `engineering_knowledge_patterns_pkey`: UNIQUE INDEX engineering_knowledge_patterns_pkey ON public.engineering_knowledge_patterns USING btree (id)
-- `idx_knowledge_patterns_type`: INDEX idx_knowledge_patterns_type ON public.engineering_knowledge_patterns USING btree (pattern_type, category)
 
 ### engineering_material_mass_balance_audits
 
@@ -5994,35 +5760,6 @@
 - `engineering_prediction_runs_pkey`: UNIQUE INDEX engineering_prediction_runs_pkey ON public.engineering_prediction_runs USING btree (id)
 - `idx_eng_pred_runs_project`: INDEX idx_eng_pred_runs_project ON public.engineering_prediction_runs USING btree (project_id, use_case, started_at DESC)
 
-### engineering_prescriptive_scenarios
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | integer |  |  |
-| scenario_code | text |  |  |
-| trigger_reason | text |  |  |
-| target_metric | text |  |  |
-| baseline_schedule_days | integer |  |  |
-| baseline_cost_vnd | numeric(18,2) |  |  |
-| status | text |  | `'simulated'::text` |
-| simulated_options | jsonb |  | `'[]'::jsonb` |
-| pareto_frontier | jsonb |  | `'[]'::jsonb` |
-| recommended_option_index | integer | ✓ |  |
-| approved_by | integer | ✓ |  |
-| approved_at | timestamptz | ✓ |  |
-| created_at | timestamptz |  | `now()` |
-| updated_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `approved_by` → `users(id)`
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_prescriptive_scenarios_pkey`: UNIQUE INDEX engineering_prescriptive_scenarios_pkey ON public.engineering_prescriptive_scenarios USING btree (id)
-- `idx_prescriptive_scenarios_proj`: INDEX idx_prescriptive_scenarios_proj ON public.engineering_prescriptive_scenarios USING btree (project_id, status)
-- `uq_prescriptive_scenarios_code`: UNIQUE INDEX uq_prescriptive_scenarios_code ON public.engineering_prescriptive_scenarios USING btree (project_id, scenario_code)
-
 ### engineering_project_health_snapshots
 
 | Cột | Kiểu | Null | Default |
@@ -6325,61 +6062,6 @@
 - `uq_engineering_sources_external`: UNIQUE INDEX uq_engineering_sources_external ON public.engineering_sources USING btree (project_id, external_key) WHERE (external_key IS NOT NULL)
 - `uq_engineering_sources_id_project`: UNIQUE INDEX uq_engineering_sources_id_project ON public.engineering_sources USING btree (id, project_id)
 
-### engineering_spatial_annotations
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | integer |  |  |
-| drawing_code | text |  |  |
-| floor_id | text | ✓ |  |
-| annot_type | text |  |  |
-| coord_x | numeric(12,4) |  |  |
-| coord_y | numeric(12,4) |  |  |
-| coord_z | numeric(12,4) | ✓ | `0` |
-| geom_payload | jsonb | ✓ | `'{}'::jsonb` |
-| entity_ref_type | text | ✓ |  |
-| entity_ref_id | text | ✓ |  |
-| title | text |  |  |
-| description | text | ✓ |  |
-| severity | text | ✓ | `'normal'::text` |
-| status | text | ✓ | `'open'::text` |
-| metadata | jsonb | ✓ | `'{}'::jsonb` |
-| created_by | integer | ✓ |  |
-| created_at | timestamptz |  | `CURRENT_TIMESTAMP` |
-| updated_at | timestamptz |  | `CURRENT_TIMESTAMP` |
-
-**Khóa ngoại:**
-- `created_by` → `users(id)`
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_spatial_annotations_pkey`: UNIQUE INDEX engineering_spatial_annotations_pkey ON public.engineering_spatial_annotations USING btree (id)
-- `idx_spatial_annot_entity_ref`: INDEX idx_spatial_annot_entity_ref ON public.engineering_spatial_annotations USING btree (project_id, entity_ref_type, entity_ref_id)
-- `idx_spatial_annot_proj_drawing`: INDEX idx_spatial_annot_proj_drawing ON public.engineering_spatial_annotations USING btree (project_id, drawing_code, status)
-
-### engineering_spatial_compute_cache
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | bigint |  |  |
-| cache_key | varchar(128) |  |  |
-| algorithm_version | varchar(32) |  |  |
-| input_hash | varchar(64) |  |  |
-| output_data | jsonb |  |  |
-| hit_count | bigint |  | `1` |
-| created_at | timestamptz |  | `CURRENT_TIMESTAMP` |
-| updated_at | timestamptz |  | `CURRENT_TIMESTAMP` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_spatial_compute_cache_pkey`: UNIQUE INDEX engineering_spatial_compute_cache_pkey ON public.engineering_spatial_compute_cache USING btree (id)
-- `idx_spatial_cache_lookup`: INDEX idx_spatial_cache_lookup ON public.engineering_spatial_compute_cache USING btree (project_id, cache_key)
-- `uq_spatial_cache_key`: UNIQUE INDEX uq_spatial_cache_key ON public.engineering_spatial_compute_cache USING btree (project_id, cache_key)
-
 ### engineering_spool_isometrics
 
 | Cột | Kiểu | Null | Default |
@@ -6530,48 +6212,6 @@
 - `idx_eng_sug_project_class`: INDEX idx_eng_sug_project_class ON public.engineering_suggestions USING btree (project_id, suggestion_class)
 - `idx_eng_sug_project_status`: INDEX idx_eng_sug_project_status ON public.engineering_suggestions USING btree (project_id, status)
 - `uq_engineering_suggestions_id_project`: UNIQUE INDEX uq_engineering_suggestions_id_project ON public.engineering_suggestions USING btree (id, project_id)
-
-### engineering_swarm_arguments
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| debate_id | uuid |  |  |
-| agent_role | text |  |  |
-| stance | text |  |  |
-| authority_weight | numeric(4,2) |  | `1.00` |
-| argument_text | text |  |  |
-| cited_clauses | jsonb |  | `'[]'::jsonb` |
-| impact_assessment | jsonb |  | `'{"risk_score": 0, "cost_delta_vnd": 0, "schedule_delta_days": 0}'::jsonb` |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `debate_id` → `engineering_swarm_debates(id)`
-
-**Index:**
-- `engineering_swarm_arguments_pkey`: UNIQUE INDEX engineering_swarm_arguments_pkey ON public.engineering_swarm_arguments USING btree (id)
-
-### engineering_swarm_debates
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | integer |  |  |
-| debate_topic | text |  |  |
-| trigger_event | text |  |  |
-| participating_agents | jsonb |  | `'["agent_structural", "agent_mepf", "agent_cost_qs", "agent_safety", "agent_contract"]'::jsonb` |
-| status | text |  | `'open'::text` |
-| synthesis_summary | text | ✓ |  |
-| consensus_level | text | ✓ |  |
-| created_at | timestamptz |  | `now()` |
-| updated_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_swarm_debates_pkey`: UNIQUE INDEX engineering_swarm_debates_pkey ON public.engineering_swarm_debates USING btree (id)
-- `idx_swarm_debates_proj`: INDEX idx_swarm_debates_proj ON public.engineering_swarm_debates USING btree (project_id, status)
 
 ### engineering_trapeze_hangers
 
@@ -6973,53 +6613,6 @@
 
 **Index:**
 - `sheet_versions_pkey`: UNIQUE INDEX sheet_versions_pkey ON public.sheet_versions USING btree (sheet_type_id)
-
-### telegram_bot_message_logs
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | integer | ✓ |  |
-| user_id | integer | ✓ |  |
-| chat_id | bigint |  |  |
-| message_type | text |  | `'text'::text` |
-| raw_payload | jsonb |  | `'{}'::jsonb` |
-| raw_text | text | ✓ |  |
-| parsed_intent | text | ✓ |  |
-| action_result | jsonb |  | `'{}'::jsonb` |
-| status | text |  | `'processed'::text` |
-| created_at | timestamptz |  | `CURRENT_TIMESTAMP` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-- `user_id` → `users(id)`
-
-**Index:**
-- `idx_telegram_logs_proj`: INDEX idx_telegram_logs_proj ON public.telegram_bot_message_logs USING btree (project_id, chat_id, created_at DESC)
-- `telegram_bot_message_logs_pkey`: UNIQUE INDEX telegram_bot_message_logs_pkey ON public.telegram_bot_message_logs USING btree (id)
-
-### telegram_user_bindings
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| user_id | integer |  |  |
-| telegram_chat_id | bigint | ✓ |  |
-| telegram_username | text | ✓ |  |
-| is_verified | boolean |  | `false` |
-| otp_code | text | ✓ |  |
-| otp_expires_at | timestamptz | ✓ |  |
-| created_at | timestamptz |  | `CURRENT_TIMESTAMP` |
-| updated_at | timestamptz |  | `CURRENT_TIMESTAMP` |
-
-**Khóa ngoại:**
-- `user_id` → `users(id)`
-
-**Index:**
-- `idx_telegram_user_chat`: INDEX idx_telegram_user_chat ON public.telegram_user_bindings USING btree (telegram_chat_id, is_verified)
-- `telegram_user_bindings_pkey`: UNIQUE INDEX telegram_user_bindings_pkey ON public.telegram_user_bindings USING btree (id)
-- `telegram_user_bindings_telegram_chat_id_key`: UNIQUE INDEX telegram_user_bindings_telegram_chat_id_key ON public.telegram_user_bindings USING btree (telegram_chat_id)
-- `uq_telegram_user_bindings_cho_lien_ket`: UNIQUE INDEX uq_telegram_user_bindings_cho_lien_ket ON public.telegram_user_bindings USING btree (user_id) WHERE (is_verified = false)
 
 ### totp_recovery_codes
 
