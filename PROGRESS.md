@@ -15,6 +15,11 @@ sang `dash.dashboard`/`dash.mepf-process` (vẫn tồn tại) để test không 
 sắp bị xoá trong tương lai. Vòng CI kế tiếp lộ thêm 1 file test cũ khác cũng khẳng định cụm
 "Kỹ thuật Không gian & AI (Engineering OS)" tồn tại: xoá đoạn test đó khỏi
 `tests/engineering-apex-pinnacle.test.ts` (giữ lại test `computeApexScore` không liên quan sidebar).
+Vòng CI thứ 3 lộ tiếp bất biến `tests/modules.test.ts` ("mọi nav href phải khớp DASHBOARD_TREE"):
+4 href trong `lib/nen/modules.ts` (module `engineering`/`engineering-quantum-hub`) trỏ tới
+`/engineering`, `/engineering/suggestions`, `/engineering/workflows`, `/engineering/quantum-hub` —
+không còn trong cây sau khi xoá cụm. Khai 4 href này vào `NGOAI_LE` của test (cùng mẫu với
+`/engineering/agent-sessions` đã có sẵn) kèm lý do, thay vì xoá module hay khôi phục sidebar.
 
 ## ✅ Bỏ cụm sidebar "Kỹ thuật Không gian & AI (Engineering OS)" — 2026-09-21
 
