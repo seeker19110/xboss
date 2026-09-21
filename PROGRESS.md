@@ -1,5 +1,44 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Chép có chọn lọc từ `seeker19110/projects-template` — 2026-09-21
+
+Đối chiếu repo khung `seeker19110/projects-template` (bộ khung quy trình/chất lượng tổng quát đa
+stack). Phần lõi (điều phối 3 tầng, ADR, `PROGRESS.md`, checklist audit) XBoss đã có tương đương
+từ trước — không chép lại. Chỉ chép 4 việc genuinely mới, right-sized cho 1 dự án Next.js/Postgres
+cố định (bỏ máy móc đa-stack/đa-harness của khung: telemetry AI, spec-compiler, arch-health-radar,
+dispatch multi-harness, `dev-task.sh` tự dò stack):
+
+1. **Hooks thực thi luật** (`.claude/hooks/`): `block-dangerous-git.sh` (chặn force-push main,
+   `reset --hard`, `clean -f`, `merge/rebase --abort` — PreToolUse, exit 2 khi chặn),
+   `pre-commit-gate.sh` (chặn `git commit` nếu `npm run lint`/`typecheck` đỏ, cấm `--no-verify`),
+   `session-resume.sh` (SessionStart, nạp tóm tắt git + đầu `PROGRESS.md` vào ngữ cảnh phiên mới).
+   Nối vào `.claude/settings.json` kèm `deny`/`ask` cho các lệnh git nguy hiểm.
+2. **`TRAPS.md`** (gốc repo) — sổ bẫy đã mắc thật, seed 4 mục đầu từ nội dung đã biết (nhánh lỗi
+   thời gây trùng số migration M32/M33/M34, `--release-gate` thiếu làm SKIP giả trang thành xanh,
+   route ghi thiếu kiểm quyền/phạm vi dự án, truyền mảng sai cho helper `lib/db`).
+3. **`CODEMAP.md`** (gốc repo) — bảng "muốn đổi X thì sửa ở đâu, chạy gì" cho XBoss.
+4. **`npm run check:progress-freshness`** (`scripts/check-progress-freshness.ts`) — cổng CI mới
+   (job `progress-freshness`, chỉ chạy khi push vào `main`, cần `fetch-depth: 2`): chặn commit đổi
+   `app/`/`lib/`/`migrations/` mà quên cập nhật `PROGRESS.md` cùng lúc.
+
+Theo yêu cầu người dùng, thêm cả phần **review** và **maintain**:
+
+5. **`/review`** (`.claude/commands/review.md`) — slash command tường minh cho quy trình rà soát
+   diff trước khi mở PR (gọi skill `code-review` + `security-review` khi chạm vùng nhạy cảm), bổ
+   sung cho agent `reviewer` đã có sẵn.
+6. **`/maintain`** + agent `maintainer`** — vòng bảo trì định kỳ nhẹ (không phải audit sâu):
+   `scripts/maintenance-sweep.sh` quét git/dependency/`PROGRESS.md`/allowlist rồi
+   `maintainer` viết `docs/ops/MAINTENANCE-PLAN.md` (🔴/🟡/DỪNG&HỎI) cho người dùng duyệt trước khi
+   thực thi — không tự sửa source khi chưa duyệt.
+
+Xác thực: `npx tsx scripts/check-progress-freshness.ts` chạy đúng trên nhánh hiện tại (không báo
+oan); `bash scripts/maintenance-sweep.sh --no-deps` chạy hết, sinh `docs/ops/MAINTENANCE-REPORT.md`
+(đã gitignore); `bash -n` sạch cho cả 3 hook + script bảo trì; `python3 -m json.tool` xác nhận
+`.claude/settings.json` vẫn là JSON hợp lệ. lint/typecheck không chạy được trong sandbox review
+này (`node_modules` thiếu `eslint-config-next`/`@types/node` — lỗi môi trường, xác nhận bằng cách
+so với các file `check:*` cũ sẵn có cũng báo lỗi y hệt) — cần CI thật hoặc máy dev đầy đủ dependency
+xác nhận lại trước khi merge.
+
 ## ✅ Trả nợ kỹ thuật sau đợt audit sâu — 2026-09-05
 
 Đóng **7/7 mục nợ** ghi ở "Đợt audit toàn dự án — 2026-09-05" (chi tiết từng mục nằm trong

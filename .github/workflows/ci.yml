@@ -140,6 +140,37 @@ jobs:
       - name: Kiểm tham số lib/db (chặn query(sql, [a, b]))
         run: npm run check:db-params
 
+  # ── Chặn PROGRESS.md lỗi thời so với commit vừa vào main (TRAPS.md mục 1) ──
+  # Chỉ chạy khi push thẳng vào main (sau khi một PR vừa merge) — lúc PR còn mở thì chưa có
+  # gì để đối chiếu. fetch-depth 2 để có commit cha, đủ cho diff HEAD~1..HEAD.
+  progress-freshness:
+    name: progress-freshness
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: node24-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Cài dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Kiểm PROGRESS.md không lỗi thời
+        run: npm run check:progress-freshness
+
   # ── Test đơn vị + tích hợp trên Postgres thật ──
   test:
     name: test (Postgres)
