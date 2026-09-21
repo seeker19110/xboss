@@ -1,5 +1,37 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Rà tay đợt 1/N export orphan còn lại (3/625) — 2026-09-21
+
+Bắt đầu rà tay 625 export orphan từ `check:dead-code` (đợt trước). Ưu tiên nhóm rủi ro thấp
+nhất trước: 40 `function`/`class` orphan trong `lib/*.ts` (bỏ qua 465 `type`/`interface` —
+ít giá trị hơn, thường là tài liệu API). Với mỗi ứng viên: verify KHÔNG dùng ở đâu (kể cả
+nội bộ trong chính file — phân biệt "chưa ai import" khỏi "chỉ dùng nội bộ nên export thừa"),
+và kiểm comment/JSDoc có gắn milestone `M<số>` cụ thể không (dấu hiệu tính năng backend đã
+ship, chờ route/UI gắn vào — mẫu đã lặp lại nhiều lần trong dự án này, KHÔNG được coi là rác).
+
+**Đã xoá 3 hàm xác nhận là rác thật** (không milestone, không dùng nội bộ, trùng lặp/thừa rõ
+ràng):
+
+- `lib/bao-mat/auth.ts :: permDefault` — trùng lặp thừa của `permDefaultsMatrix` (tính cùng
+  1 giá trị từ `CAN_DEFAULT`, không ai gọi bản đơn lẻ).
+- `lib/bao-mat/oidc.ts :: __resetOidcConfigCacheForTests` — hàm reset cache "chỉ dùng trong
+  test" nhưng `tests/oidc.test.ts` chưa từng gọi (khác bản song sinh
+  `_resetDefaultUsersCacheForTests` ở `auth.ts` — bản đó CÓ dùng thật, đã verify ở đợt viết
+  lại script).
+- `lib/ha-tang/feature-flags.ts :: featureFlagsVersion` — getter không ai đọc.
+
+**Đã xét nhưng KHÔNG xoá** (nghi backend-ahead-of-UI, để người quyết): `chotProjectIdChoDoc`
+(gắn M101 PR4, milestone AutoCAD plugin đã đóng — nhưng route chưa gọi biến thể "đọc" này,
+chỉ dùng bản "ghi" `chotProjectIdChoGhi`), `danhMucBoqTheoDuAn` (gắn M108 §6.5),
+`daysSinceLastIncident`/`getRisk`/`payrollTotals`/`pendingFrontKeys` (đều có JSDoc mô tả rõ
+mục đích dashboard/báo cáo cụ thể, không giống rác vô tình).
+
+625 → 622 orphan. Còn ~34 function orphan trong `lib/ky-thuat/engineering-*.ts` (cụm
+"Engineering OS" đã xác nhận nhiều lần là backend chủ đích đi trước UI — KHÔNG rà đợt này)
+
+- 120 const + 132 interface + 333 type chưa rà. Đã kiểm `lint`/`typecheck`/test liên quan
+  (`auth.test.ts`, `oidc.test.ts`) xanh.
+
 ## ✅ Viết lại `check:dead-code` bằng TypeScript Compiler API (đóng nợ kỹ thuật) — 2026-09-21
 
 Nợ kỹ thuật ghi ở đợt audit trước ("script hiện so khớp bằng regex tên hàm, không hiểu

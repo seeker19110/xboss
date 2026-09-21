@@ -18,10 +18,6 @@ export function bumpFeatureFlagsVersion(): void {
   version++;
 }
 
-export function featureFlagsVersion(): number {
-  return version;
-}
-
 async function getOverrides(projectId: number): Promise<Map<string, boolean>> {
   const cached = cache.get(projectId);
   if (cached && cached.v === version && Date.now() - cached.loadedAt < TTL_MS)
