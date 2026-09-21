@@ -8,24 +8,22 @@ import { ROLES, type Role } from "@/lib/nen/roles";
 // V3 (audit 2026-08-24, lỗ hổng Cao A4) — 14 route engineering ghi dữ liệu trước đây chỉ
 // kiểm đăng nhập, không kiểm quyền: giả telemetry IoT sinh cảnh báo HSE CRITICAL, thầu phụ
 // tự chấm điểm tín nhiệm của chính mình. (Hai cặp quyền BIM/God-Tier của đợt đó đã bỏ cùng
-// lúc gỡ cụm CAD/BIM khỏi sản phẩm.)
-// Test thuần (không cần DB): (1) ma trận quyền 7 vai trò cho các cặp quyền còn lại;
+// lúc gỡ cụm CAD/BIM khỏi sản phẩm; cặp quyền IoT — `viewEngineeringIot`/`manageEngineeringIot`
+// — đã bỏ cùng lúc xoá route/UI /engineering/iot-telemetry 2026-09-21, chỉ còn subcon-ai.)
+// Test thuần (không cần DB): (1) ma trận quyền 7 vai trò cho cặp quyền còn lại;
 // (2) mã nguồn route đại diện thật sự gọi đúng quyền; (3) bất biến "không còn route
 // engineering ghi dữ liệu nào thiếu CAN.".
 
 const GOC = path.join(process.cwd(), "app/api/engineering");
 
 // ── (1) Ma trận quyền 7 vai trò ────────────────────────────────────────────────
-test("CAN: ma trận 7 vai trò cho các cặp quyền engineering", async () => {
+test("CAN: ma trận 7 vai trò cho cặp quyền engineering còn lại", async () => {
   const { CAN } = await import("@/lib/bao-mat/auth");
 
   const xem: Role[] = ["admin", "pm", "engineer", "bch"];
-  const ghi: Role[] = ["admin", "pm", "engineer"];
   const ghiThauPhu: Role[] = ["admin", "pm"]; // ngoại lệ: engineer + subcon không được chấm
 
   const mongDoi: Record<string, Role[]> = {
-    viewEngineeringIot: xem,
-    manageEngineeringIot: ghi,
     viewEngineeringSubconAi: xem,
     manageEngineeringSubconAi: ghiThauPhu,
   };
@@ -40,19 +38,16 @@ test("CAN: ma trận 7 vai trò cho các cặp quyền engineering", async () =>
     assert.equal(fn(undefined), false, `${khoa} phải từ chối khi không có vai trò`);
   }
 
-  // Vai trò chỉ-xem và subcon KHÔNG được ghi ở cả 2 nhóm.
+  // Vai trò chỉ-xem và subcon KHÔNG được ghi.
   for (const role of ["bch", "cdt", "viewer", "subcon"] as Role[]) {
-    for (const khoa of ["manageEngineeringIot", "manageEngineeringSubconAi"]) {
-      const fn = (CAN as Record<string, (r?: Role) => boolean>)[khoa];
-      assert.equal(fn(role), false, `${khoa} không được mở cho ${role}`);
-    }
+    const fn = (CAN as Record<string, (r?: Role) => boolean>).manageEngineeringSubconAi;
+    assert.equal(fn(role), false, `manageEngineeringSubconAi không được mở cho ${role}`);
   }
 });
 
 // ── (2) Mã nguồn route đại diện gọi đúng quyền ─────────────────────────────────
-test("2 route đại diện (iot/subcon-ai) gọi đúng cặp quyền", () => {
+test("route đại diện (subcon-ai) gọi đúng cặp quyền", () => {
   const daiDien: Record<string, { view?: string; manage: string }> = {
-    "iot/telemetry/route.ts": { view: "viewEngineeringIot", manage: "manageEngineeringIot" },
     "subcon-ai/evaluate/route.ts": { manage: "manageEngineeringSubconAi" },
   };
 

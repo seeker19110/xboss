@@ -379,19 +379,12 @@ const CAN_DEFAULT = {
   viewEngineeringAutonomy: (r?: Role) =>
     r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   manageEngineeringAutonomy: (r?: Role) => r === "admin" || r === "pm",
-  // PIN-2 Prescriptive Engine & Standards Compliance (docs/nang-cap/PINNACLE-AUTONOMOUS-COGNITIVE-ENGINEERING-OS.md)
-  viewEngineeringPrescriptive: (r?: Role) =>
-    r === "admin" || r === "pm" || r === "engineer" || r === "bch" || r === "cdt" || r === "viewer",
-  manageEngineeringPrescriptive: (r?: Role) => r === "admin" || r === "pm",
-  viewEngineeringCompliance: (r?: Role) =>
-    r === "admin" || r === "pm" || r === "engineer" || r === "bch" || r === "cdt" || r === "viewer",
-  manageEngineeringCompliance: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
-  // V3 (audit 2026-08-24, lỗ hổng Cao A4) — các nhóm route engineering ghi dữ liệu trước
-  // đây chỉ kiểm đăng nhập, không kiểm quyền: IoT telemetry & cảnh báo HSE, chấm điểm thầu
-  // phụ (M82). (Cặp quyền BIM và God-Tier đã bỏ cùng lúc gỡ cụm CAD/BIM khỏi sản phẩm.)
-  // Quy tắc: view* mở tới BCH (theo dõi), manage* loại toàn bộ VIEW_ONLY_ROLES + subcon.
-  viewEngineeringIot: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
-  manageEngineeringIot: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // (PIN-2 Prescriptive Engine & Standards Compliance, và IoT telemetry & cảnh báo HSE của
+  // V3 (audit 2026-08-24, lỗ hổng Cao A4) — 6 cặp quyền view/manageEngineering{Prescriptive,
+  // Compliance,Iot} đã bỏ cùng lúc xoá các route/UI tương ứng 2026-09-21, xem PROGRESS.md.
+  // Cặp quyền BIM và God-Tier đã bỏ cùng lúc gỡ cụm CAD/BIM khỏi sản phẩm trước đó.)
+  // Quy tắc còn lại của nhóm V3: view* mở tới BCH (theo dõi), manage* loại toàn bộ
+  // VIEW_ONLY_ROLES + subcon.
   viewEngineeringSubconAi: (r?: Role) =>
     r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   // Ngoại lệ: chấm điểm tín nhiệm nhà thầu phụ là việc quản lý — subcon KHÔNG được tự
