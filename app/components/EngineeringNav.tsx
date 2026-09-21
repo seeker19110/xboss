@@ -38,13 +38,7 @@ const NAV_COLLAPSED_KEY = "xboss_eng_nav_collapsed";
 const NAV_ROLE_FILTER_KEY = "xboss_eng_nav_role_filter";
 
 export type NavCategory =
-  | "all"
-  | "unified"
-  | "spatial"
-  | "copilot"
-  | "commercial"
-  | "ledger"
-  | "governance";
+  "all" | "unified" | "spatial" | "copilot" | "commercial" | "ledger" | "governance";
 
 export interface NavItem {
   href: string;
