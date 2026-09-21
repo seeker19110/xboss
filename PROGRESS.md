@@ -1,5 +1,46 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ M125 — trang chủ mạch lạc (toolbar + dải số liệu + thân 2 cột) — 2026-09-21
+
+Đặc tả `docs/nang-cap/M125-bo-cuc-trang-chu.md` (Approved). Trang chủ trước đây xếp dọc 15 khối
+với 5 kiểu lưới khác nhau, phải cuộn ~6 màn hình mới tới bảng trễ. Nay đọc theo một nhịp:
+**ngữ cảnh → số liệu → việc cần làm**.
+
+- **Z0 toolbar** (`DocToolbar` của M124, `hidden md:flex`): Import Excel · Excel · Báo cáo PDF ·
+  Nghiệm thu · Lookahead · Thêm trang, trailing "Cập nhật HH:mm". Thanh đáy giữ Import/Excel/PDF
+  qua `ButtonLink` nhưng **chỉ ở màn hẹp** (`matchMedia`, không sửa `AppHeader`).
+- **Z1 dải 4 `StatCard`**: Tiến độ tổng · Hạng mục trễ (bấm cuộn tới `#delayed-table`) · Chờ duyệt
+  (ẩn thẻ + lưới còn 3 cột khi `approvals` null) · Công tác theo dõi.
+- **Z2 thân 2 cột** `lg:grid-cols-[minmax(0,1fr)_320px]`: cột chính = thẻ "Tiến độ" có tab →
+  Theo hệ thi công → Đường găng → **bảng trễ** → khối M9/BlockedPanel/NormsOverPanel → SPI + dự báo;
+  cột phải (`HomeRail`) = Trung tâm điều hành dạng hàng 44px + dải vòng đời 6 giai đoạn + Pareto.
+- **2 component nền mới**: `app/components/ui/Tabs.tsx` (+ `TabPanel`, `role=tablist/tab`, ←/→ và
+  Home/End, roving tabindex, tab chưa mở **không mount** → panel nặng không tự fetch) và
+  `app/components/ProgressRow.tsx` (hàng tên · thanh · % · chip, dùng chung cho danh sách trang
+  tracking và danh sách hệ). Tab đang mở ghi vào URL `?tab=` (khuôn `HubShell`), mặc định `scurve`.
+- Kéo thả thứ tự trang tracking, modal "Thêm trang" (tách ra `NewSheetModal`), bộ lọc bảng trễ và
+  Pareto-lọc-bảng giữ nguyên hành vi. `app/page.tsx` **994 → 769 dòng**.
+
+**Lệch đặc tả có chủ đích (cần phiên chính duyệt):** (1) danh sách **hệ thi công để ngoài thẻ tab**
+— đây là đường vào duy nhất còn lại tới `/system/[code]` từ trang chủ (`e2e/authed/system.spec.ts`
+bấm `a[href="/system/acmv"]` ngay trên `/`), giấu sau tab thành ngõ cụt; (2) **`SpiCards`/
+`ForecastCards` để ở cột chính** thay vì cột phải — hai panel này dùng breakpoint theo **viewport**
+(`lg:grid-cols-5`), nhét vào rail 320px sẽ vỡ lưới mà sửa panel thì phạm guardrail "không đổi panel";
+(3) tab mặc định `scurve` (không phải `sheets`) để e2e trang chủ còn thấy heading "S-curve".
+
+**File chạm:** `app/page.tsx`; mới `app/components/ui/Tabs.tsx`, `app/components/ProgressRow.tsx`,
+`app/components/HomeRail.tsx`, `app/components/NewSheetModal.tsx`; `app/components/ui/index.ts`;
+`docs/adr/0009-bo-component-ui-nen.md`, `docs/nang-cap/README.md`. **Không** đụng `lib/`,
+`app/api/`, `migrations/`, `AppHeader`, các component panel.
+
+**Verify:** lint / typecheck / build / `check:contrast` / `check:mau-accent` / `check:lib-layers` /
+`check:hex-hardcode` / `format:check` xanh; `npm test` với Postgres 16 ephemeral → **251 file,
+4098 ca pass, 0 fail**; `next start` trên DB seed mẫu: `/`, `/?tab=sheets`, `/?tab=evm` đều 200,
+`/api/dashboard|sheets|systems` trả đúng dữ liệu; markup `Tabs`/`TabPanel`/`ProgressRow`/`HomeRail`
+soi bằng `react-dom/server` (ARIA `tablist`/`tab`/`tabpanel` + `aria-controls`/`aria-labelledby`
+đúng cặp). **E2E Playwright KHÔNG chạy được** trong môi trường này (proxy chặn tải Chromium) —
+cần chạy lại ở CI.
+
 ## ✅ M124 — bố cục màn hình chứng từ (DocShell) + `/payment-certs` master–detail — 2026-09-21
 
 Đặc tả `docs/nang-cap/M124-bo-cuc-man-hinh-chung-tu.md` (Approved). Chuẩn hoá **mẫu màn hình

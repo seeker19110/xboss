@@ -90,3 +90,32 @@ Hai quy ước hình thức kèm theo:
 Áp dụng đầu tiên cho `/payment-certs` (master–detail: danh sách đợt trái 320px, chứng từ
 phải, `?contractId=&id=` trong URL). Các trang tài chính còn lại chuyển dần theo nguyên tắc
 "trang nào đụng tới thì đổi trang đó" như phần Hệ quả ở trên.
+
+## Bổ sung: hàng tab + hàng tiến độ — M125 (2026-09-21)
+
+Trang chủ trước M125 xếp dọc 15 khối với 5 kiểu lưới khác nhau (2/4, 2/3/4/5, 2/3/6,
+1/2/4, bảng): mắt không bám được nhịp và phải cuộn ~6 màn hình mới tới bảng trễ — thứ PM
+cần nhất mỗi sáng. M125 sắp xếp lại theo khuôn **toolbar → dải số liệu → thân 2 cột**
+(đặc tả: `docs/nang-cap/M125-bo-cuc-trang-chu.md`) và bổ sung 2 component nền:
+
+| Component                         | Vai trò                                                                                                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Tabs` (+ `TabPanel`) trong `ui/` | Hàng tab gom nhiều khối cùng chủ đề vào **một thẻ**; chỉ mount tab đang mở nên panel nặng không tự fetch khi chưa ai xem                               |
+| `ProgressRow` (`app/components/`) | Hàng "tên · thanh tiến độ · % · chip trạng thái" dùng chung cho mọi danh sách tiến độ (trang tracking, hệ thi công) — thay các lưới thẻ ngốn chiều dọc |
+
+Ba quy ước hình thức kèm theo:
+
+1. **Tab đang chọn dùng emerald** (`text-emerald-300` + `border-b-2 border-emerald-500`),
+   đúng luật màu nhấn ở mục Quyết định — không dùng amber như `HubShell` đời đầu.
+2. **Tab là trạng thái của URL**, không phải state ẩn: `?tab=<id>` để reload/chia sẻ link
+   giữ nguyên cách nhìn (khuôn `HubShell`: state cục bộ + `router.replace`, `scroll: false`).
+   Bàn phím ←/→ (kèm Home/End) đổi tab theo WAI-ARIA "tabs, automatic activation";
+   roving tabindex nên Tab chỉ dừng ở tab đang chọn.
+3. **Thứ gì là đường vào duy nhất tới một trang thì không giấu sau tab.** Danh sách hệ thi
+   công giữ ngoài thẻ tab vì đó là lối vào duy nhất còn lại tới `/system/[code]` từ trang
+   chủ (sidebar đã bỏ mục này) — giấu sau tab sẽ thành ngõ cụt điều hướng.
+
+Khác M124 một điểm: **thanh đáy của trang chủ là `md:hidden`** (desktop đã có toolbar trên
+với đủ bộ nút). `AppHeader` chỉ tự ẩn thanh đáy dưới `md` khi trang **không** truyền
+`bottomActions`, nên trang chủ chỉ truyền bộ nút khi màn hẹp (`matchMedia`) thay vì sửa
+`AppHeader`.
