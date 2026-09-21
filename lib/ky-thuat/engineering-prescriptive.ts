@@ -529,55 +529,6 @@ export function evaluateElementCompliance(
 }
 
 /**
- * 4. Audit kiểm tra đối tượng cụ thể với một quy chuẩn
- */
-export async function auditEngineeringElement(
-  projectId: number,
-  objectId: string,
-  ruleId: string,
-): Promise<ComplianceAuditRecord> {
-  const element = await queryOne<{
-    id: string;
-    name: string;
-    discipline: string;
-    metadata: Record<string, unknown>;
-  }>(
-    `SELECT id, name, discipline, properties AS metadata FROM engineering_objects WHERE id = ? AND project_id = ?`,
-    objectId,
-    projectId,
-  );
-  if (!element) {
-    throw new Error("Không tìm thấy đối tượng kỹ thuật");
-  }
-
-  const rule = await queryOne<ComplianceRuleRecord>(
-    `SELECT * FROM engineering_compliance_rules WHERE id = ?`,
-    ruleId,
-  );
-  if (!rule) {
-    throw new Error("Không tìm thấy quy chuẩn kỹ thuật");
-  }
-
-  const { isCompliant, findingDetails, evidence } = evaluateElementCompliance(element, rule);
-  const complianceStatus: ComplianceStatus = isCompliant ? "compliant" : "non_compliant";
-
-  const row = await queryOne<ComplianceAuditRecord>(
-    `INSERT INTO engineering_compliance_audits (
-      project_id, object_id, rule_id, compliance_status, finding_details, evidence_snapshot
-    ) VALUES (?, ?, ?, ?, ?, ?)
-    RETURNING *`,
-    projectId,
-    objectId,
-    ruleId,
-    complianceStatus,
-    findingDetails,
-    JSON.stringify(evidence),
-  );
-
-  return row!;
-}
-
-/**
  * 5. Tự động rà soát quy chuẩn theo lô toàn bộ đối tượng dự án (Batch Scan) và sinh NCR
  */
 export async function scanAllElementsCompliance(projectId: number): Promise<{

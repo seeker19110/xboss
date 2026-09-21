@@ -124,10 +124,8 @@ describe("audit 2026-09-05 — cổng quyền & cách ly dữ liệu", () => {
   });
 
   it("ca 7 — mốc 'hôm nay' của nhánh engineering theo giờ VN, không theo UTC máy chủ", () => {
-    assert.ok(
-      doc("lib/ky-thuat/engineering-mepf-predictive.ts").includes("daysFromTodayISO"),
-      "ngày bảo dưỡng kế tiếp phải dùng helper giờ VN",
-    );
+    // (engineering-mepf-predictive.ts đã bị xoá 2026-09-21 — không có route/UI nào gọi tới,
+    // xem PROGRESS.md — bớt vế kiểm daysFromTodayISO của nó.)
     const ev = doc("app/api/engineering/subcon-ai/evaluate/route.ts");
     assert.ok(ev.includes("todayISO().slice(0, 7)"), "kỳ đánh giá YYYY-MM phải theo giờ VN");
     assert.ok(!/now\.getFullYear\(\)/.test(ev), "không dựng kỳ từ giờ máy chủ");
