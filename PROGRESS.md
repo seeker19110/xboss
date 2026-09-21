@@ -1,5 +1,25 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Audit tối giản — gỡ 2 dependency thừa — 2026-09-21
+
+Rà toàn repo (dead-code scan, depcheck, grep thủ công) tìm phần không thực sự cần thiết để dọn.
+Gỡ 2 dependency không còn ai import ở đâu trong `app/`/`lib/`/`scripts/`/`tests/`:
+`@anthropic-ai/sdk` và `@tanstack/react-virtual` (khỏi `dependencies` trong `package.json`).
+Đã kiểm `lint`/`typecheck`/`build` xanh sau khi gỡ.
+
+Các ứng viên khác đã xét nhưng **không** dọn vì không đủ bằng chứng hoặc là false positive:
+
+- 544 export "orphan" từ `check:dead-code` — script hiện so khớp bằng regex tên hàm, không hiểu
+  re-export/type alias/generic nên sai nhiều (thử viết lại thuật toán độc lập ra 1836 kết quả khác
+  hẳn, và các file bị gắn cờ nhiều nhất lại là module nghiệp vụ chắc chắn đang dùng thật như
+  `lib/bao-mat/auth.ts`, `lib/tai-chinh/finance.ts`). Cần viết lại script bằng AST (ts-morph) trước
+  khi audit tay tiếp — ghi nợ kỹ thuật, chưa làm trong đợt này.
+- Toàn bộ route `app/engineering/*` (site-copilot, quantum-hub, zalo-copilot, hse-vision,
+  spatial-viewer, esign, fidic-claims, agent-sessions...) — ban đầu nghi là tàn dư cụm sidebar đã
+  xoá, nhưng có nav riêng (`EngineeringNav.tsx`), API + test riêng, không phải rác.
+- `tailwindcss`, `@commitlint/*`, `lint-staged`, `@types/react-dom` bị depcheck báo unused — false
+  positive kinh điển (dùng qua file config, depcheck không parse), giữ nguyên.
+
 ## ✅ Bỏ cụm sidebar "6 Đại Trung Tâm Điều Hành (Unified Hubs)" — 2026-09-21
 
 Xoá toàn bộ cụm 6 mục (`dash.site-command`, `dash.schedule-control`, `dash.procurement-hub`,
