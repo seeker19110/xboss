@@ -216,6 +216,8 @@ export default function ReportPrintable({
 
       <p className="text-xs text-zinc-600 mt-8">Xuất từ XBoss · Hệ thống quản lý thi công MEP</p>
 
+      {/* Hex cứng trong khối in dưới đây là CHỦ ĐÍCH — trang in luôn cần giấy trắng bất kể
+          theme, và @media print không đọc được biến CSS đã bị html.<theme> đảo. */}
       <style jsx global>{`
         @media print {
           body {

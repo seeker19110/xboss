@@ -77,7 +77,7 @@ function ratio(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/** Đọc các khai báo `--color-*` / `--background` trong một khối CSS (vd `html.navy { … }`). */
+/** Đọc các khai báo `--color-*` / `--background` trong một khối CSS (vd `html.darkblue { … }`). */
 function readBlock(css: string, selector: string): Record<string, string> {
   const start = css.indexOf(selector + " {");
   if (start === -1) throw new Error(`Không tìm thấy khối CSS "${selector}" trong globals.css`);
@@ -92,9 +92,8 @@ function readBlock(css: string, selector: string): Record<string, string> {
 
 const css = readFileSync(join(root, "app/globals.css"), "utf8");
 
-// `dark` không khai lại nền: --background của nó nằm ở :root (globals.css để dark là mặc định).
 const rootVars = readBlock(css, ":root");
-const THEMES = ["dark", "light", "kingblue", "darkblue", "navy"].map((name) => {
+const THEMES = ["light", "darkblue"].map((name) => {
   const vars = readBlock(css, `html.${name}`);
   return { name, vars: { background: rootVars.background, ...vars } };
 });

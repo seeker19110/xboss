@@ -256,7 +256,7 @@ export default function PrintPage() {
           style={{ borderCollapse: "collapse" }}
         >
           <thead>
-            <tr className="bg-[#4472c4] text-white text-center">
+            <tr className="paymentcert-header text-white text-center">
               <th className="border border-black px-1 py-2 w-10">STT</th>
               <th className="border border-black px-2 py-2 text-left">DIỄN GIẢI</th>
               <th className="border border-black px-1 py-2 w-14">ĐVT</th>
@@ -343,7 +343,7 @@ export default function PrintPage() {
 
             {/* ── Tạm ứng ── */}
             {advances.map((b, i) => (
-              <tr key={b.id} className="bg-[#fff2cc] text-black">
+              <tr key={b.id} className="paymentcert-highlight text-black">
                 <td className="border border-black px-1 py-1.5 text-center font-bold text-[11px]">
                   {i === 0 ? "(TU)" : ""}
                 </td>
@@ -418,7 +418,7 @@ export default function PrintPage() {
 
 function SectionHeader({ label, title }: { label: string; title: string }) {
   return (
-    <tr className="bg-[#d9e1f2] text-black">
+    <tr className="paymentcert-subheader text-black">
       <td className="border border-black px-1 py-1.5 text-center font-bold">{label}</td>
       <td className="border border-black px-2 py-1.5 font-bold" colSpan={6}>
         {title}
@@ -443,7 +443,7 @@ function SummaryRow({
   highlight?: boolean;
 }) {
   return (
-    <tr className={`${highlight ? "bg-[#e2efda]" : "bg-[#fff2cc]"} text-black`}>
+    <tr className={`${highlight ? "paymentcert-total" : "paymentcert-highlight"} text-black`}>
       <td
         className={`border border-black px-1 py-1.5 text-center text-[11px] ${bold ? "font-bold" : ""}`}
       >

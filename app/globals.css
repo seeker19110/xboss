@@ -16,6 +16,13 @@
      Chọn chữ theo ĐỘ SÁNG CỦA NỀN, không theo một luật chung: nền -700 trở lên (và
      red-600) thì ngược lại, phải dùng --on-accent (trắng). */
   --on-accent-dark: #09090b;
+  /* Lớp phủ tối (scrim) sau modal/dialog — CỐ ĐỊNH, không đảo theo theme. --color-black bị
+     html.light đảo thành #ffffff (phục vụ pattern text-black trên nền accent sáng), nên
+     bg-black/NN dùng làm scrim modal sẽ hoá thành lớp phủ TRẮNG ở light theme, vỡ hiệu ứng
+     làm tối nền phía sau. Không khai báo lại trong bất kỳ html.<theme> nào — phải luôn là
+     rgba đen. Dùng qua style={{ background: "var(--overlay-scrim)" }}, không dùng bg-black/*
+     cho scrim. */
+  --overlay-scrim: rgba(0, 0, 0, 0.7);
 }
 
 @theme inline {
@@ -23,62 +30,6 @@
   --color-foreground: var(--foreground);
   --color-on-accent: var(--on-accent);
   --color-on-accent-dark: var(--on-accent-dark);
-}
-
-/* Chế độ tối (mặc định) — script trong layout gắn class theo localStorage('xboss_theme') */
-html.dark {
-  color-scheme: dark;
-  /* zinc-500 gốc Tailwind (#71717a) dùng làm MÀU CHỮ trên mặt thẻ tối chỉ đạt 3,6-4,1:1
-     — dưới ngưỡng WCAG AA 4,5:1 (axe bắt hàng loạt "serious" khi trang có nhiều dữ liệu).
-     Cả 4 theme tối đều mắc, và `text-zinc-500` là màu chữ phụ dùng ở gần 700 chỗ nên sửa
-     ở TOKEN thay vì đổi tay từng class: giữ nguyên thứ bậc 3 mức chữ (300 > 400 > 500) mà
-     vẫn đạt AA. Giá trị chọn sao cho đạt ≥4,5:1 trên cả nền đậm nhất mà chữ phụ thực sự
-     nằm lên (zinc-800): 4,59:1 / zinc-900 5,46:1 / zinc-950 6,13:1.
-     `.sheet-stable` (vùng "giấy trắng") tự ghim lại #71717a nên không bị ảnh hưởng. */
-  --color-zinc-500: #8e8e98;
-}
-
-/* ─── Theme xanh dương (King Blue / Dark Blue / Navy) ───────────────────────
-   Cùng cơ chế như light mode: chỉ ghi đè thang `zinc` (nền/chữ/viền) sang
-   tông xanh + đổi --background/--foreground. Các màu nhấn -300/-400 (status,
-   biểu đồ) giữ nguyên độ tươi để hiển thị tốt trên nền tối. */
-
-/* King Blue — xanh hoàng gia rực rỡ, mặt thẻ xanh đậm nổi bật (theme chủ đạo) */
-html.kingblue {
-  color-scheme: dark;
-  --background: #0a1f4d;
-  --foreground: #eaf2ff;
-  --color-zinc-950: #0d2459;
-  --color-zinc-900: #123075;
-  --color-zinc-800: #1a3f94;
-  --color-zinc-700: #2451b5;
-  --color-zinc-600: #3a6bd0;
-  /* -500/-400 sáng hơn bảng gốc của theme: mặt thẻ King Blue (#123075/#1a3f94) sáng hơn
-     hẳn các theme tối khác nên hai mức chữ phụ cũ chỉ đạt 3,3-4,2:1. Giá trị mới đạt
-     ≥4,6:1 trên cả zinc-800/900/950 mà vẫn giữ thứ bậc 300 > 400 > 500. */
-  --color-zinc-500: #7eb7ff;
-  --color-zinc-400: #a8ccff;
-  --color-zinc-300: #b3c9f4;
-  --color-zinc-200: #d4e2fa;
-  --color-zinc-100: #e8f0fd;
-  --color-zinc-50: #f4f8fe;
-  /* Mặt thẻ King Blue sáng hơn hẳn các theme tối khác nên 8 màu nhấn dưới đây dùng làm
-     CHỮ chỉ đạt 3,1-4,4:1 ở mức -400. Đổi -400 sang đúng giá trị -400 của thang là không
-     đủ, nên lấy giá trị -300 (sáng hơn một bậc, đạt 4,8-5,8:1) — cùng cách html.light xử
-     lý theo hướng ngược lại. Ghi bằng hex CHỐT, không dùng var(--color-*-300): biến đó do
-     Tailwind chỉ phát sinh khi trong mã còn chỗ dùng shade -300, gỡ hết chỗ dùng là biến
-     biến mất và class -400 vỡ theo (im lặng). Các màu không liệt kê (amber/emerald/green/
-     teal/cyan/yellow) đã đạt AA sẵn nên GIỮ NGUYÊN -400 để không làm nhạt màu vô cớ.
-     Mức -400 chỉ dùng làm nền ở các chấm/thanh trang trí (không có chữ đặt lên) nên đổi
-     giá trị không ảnh hưởng tương phản ở đó. */
-  --color-red-400: #ffa2a2;
-  --color-rose-400: #ffa1ad;
-  --color-orange-400: #ffb86a;
-  --color-sky-400: #74d4ff;
-  --color-blue-400: #8ec5ff;
-  --color-indigo-400: #a3b3ff;
-  --color-violet-400: #c4b4ff;
-  --color-purple-400: #dab2ff;
 }
 
 /* Dark Blue — xanh dương slate dịu mắt, nhạt và mờ êm dịu */
@@ -91,39 +42,23 @@ html.darkblue {
   --color-zinc-800: #223554;
   --color-zinc-700: #2f466c;
   --color-zinc-600: #445e89;
-  /* Sáng hơn bảng gốc (#6582ab chỉ đạt 3,7-4,2:1 khi làm màu chữ) — xem ghi chú ở html.dark. */
+  /* zinc-500 gốc (#6582ab) dùng làm màu chữ trên mặt thẻ chỉ đạt 3,7-4,2:1 — dưới ngưỡng
+     WCAG AA 4,5:1. Đậm hơn để giữ thứ bậc 3 mức chữ (300 > 400 > 500) mà vẫn đạt AA trên
+     mọi mặt thẻ (zinc-800/900/950). `.sheet-stable` tự ghim lại giá trị gốc nên không ảnh
+     hưởng. */
   --color-zinc-500: #7da1d3;
   --color-zinc-400: #92a9cb;
   --color-zinc-300: #bcd0e8;
   --color-zinc-200: #dae6f4;
   --color-zinc-100: #ecf2fa;
   --color-zinc-50: #f6f9fd;
-  /* Cùng lý do như King Blue (xem ghi chú ở trên) nhưng mặt thẻ đỡ sáng hơn nên chỉ 5 màu
-     tím-đỏ hụt ngưỡng ở mức -400 (3,9-4,4:1); lấy giá trị -300 đưa lên 6,1-6,9:1. */
+  /* Mặt thẻ Dark Blue sáng hơn các theme tối khác nên 5 màu tím-đỏ dùng làm chữ hụt ngưỡng
+     ở mức -400 (3,9-4,4:1); lấy giá trị -300 đưa lên 6,1-6,9:1. */
   --color-red-400: #ffa2a2;
   --color-rose-400: #ffa1ad;
   --color-indigo-400: #a3b3ff;
   --color-violet-400: #c4b4ff;
   --color-purple-400: #dab2ff;
-}
-
-/* Navy — xanh hải quân thâm trầm nhất, tông slate xanh-xám */
-html.navy {
-  color-scheme: dark;
-  --background: #060b18;
-  --foreground: #e2e8f0;
-  --color-zinc-950: #0b1220;
-  --color-zinc-900: #111c30;
-  --color-zinc-800: #1c2a44;
-  --color-zinc-700: #2c3e5e;
-  --color-zinc-600: #475569;
-  /* Sáng hơn bảng gốc (#64748b chỉ đạt 3,5-3,9:1 khi làm màu chữ) — xem ghi chú ở html.dark. */
-  --color-zinc-500: #7f94b1;
-  --color-zinc-400: #94a3b8;
-  --color-zinc-300: #cbd5e1;
-  --color-zinc-200: #e2e8f0;
-  --color-zinc-100: #f1f5f9;
-  --color-zinc-50: #f8fafc;
 }
 
 /* Chế độ sáng (mặc định): đảo thang zinc + white/black để toàn bộ UI (viết theo dark)
@@ -143,7 +78,9 @@ html.light {
   --color-zinc-200: #363c47;
   --color-zinc-300: #4a5261;
   --color-zinc-400: #4a5261;
-  --color-zinc-500: #67707c;
+  /* #67707c đạt AA trên nền trang/thẻ nhưng chỉ 3,86:1 trên nền zinc-800 (control: ô nhập,
+     chip). Đậm thêm cho đạt ≥4,5:1 cả trên control. */
+  --color-zinc-500: #5c646e;
   --color-zinc-600: #99a1ad;
   --color-zinc-700: #c8cfda;
   --color-zinc-800: #dde2ea;
@@ -161,7 +98,8 @@ html.light {
   --color-amber-300: #92400e;
   --color-amber-400: #92400e;
   --color-violet-300: #6d28d9;
-  --color-violet-400: #7c3aed;
+  /* #7c3aed chỉ 4,38:1 trên nền control zinc-800 — đậm thêm cho đạt AA cả ở đó. */
+  --color-violet-400: #7838e6;
   --color-rose-300: #be123c;
   --color-rose-400: #be123c;
   --color-teal-300: #0f766e;
@@ -170,19 +108,24 @@ html.light {
   /* #dc2626 đạt 4,83:1 trên mặt thẻ trắng nhưng chỉ 4,34:1 trên DÒNG SỌC XEN KẼ của bảng
      (nền zebra zinc-800/20 phủ lên thẻ ra #f1f3f6) — mà chữ đỏ hầu như luôn nằm trong bảng
      (cột "trễ (ngày)"). Đậm thêm một bậc: 5,16:1 trên dòng sọc, 5,74:1 trên thẻ trắng. */
-  --color-red-400: #c81e1e;
+  /* #c81e1e chỉ 4,41:1 trên nền control zinc-800 — đậm thêm cho đạt AA cả ở đó. */
+  --color-red-400: #c41d1d;
   --color-blue-300: #1d4ed8;
-  --color-blue-400: #2563eb;
+  /* #2563eb chỉ 3,97:1 trên nền control zinc-800 — đậm thêm cho đạt AA cả ở đó. */
+  --color-blue-400: #225ad6;
   /* orange-800 thay vì -700: trên nền mờ cùng tông (bg-orange-500/10) shade -700 chỉ đạt
      3,8-4,4:1, dưới ngưỡng AA. -800 đưa lên 5,3-6,2:1. Không dùng làm nền ở đâu nên an toàn. */
   --color-orange-300: #9a3412;
   --color-orange-400: #9a3412;
-  --color-yellow-300: #a16207;
-  --color-yellow-400: #a16207;
-  --color-cyan-300: #0e7490;
-  --color-cyan-400: #0e7490;
+  /* #a16207 / #0e7490 chỉ đạt 3,78:1 / 4,12:1 trên nền control zinc-800 — đậm thêm cho đạt
+     AA cả ở đó (giữ -300 = -400 như thiết kế gốc). */
+  --color-yellow-300: #8f5706;
+  --color-yellow-400: #8f5706;
+  --color-cyan-300: #0d6c86;
+  --color-cyan-400: #0d6c86;
   --color-purple-300: #7e22ce;
-  --color-purple-400: #9333ea;
+  /* #9333ea chỉ 4,14:1 trên nền control zinc-800 — đậm thêm cho đạt AA cả ở đó. */
+  --color-purple-400: #8a30dc;
   --color-green-300: #15803d;
   --color-green-400: #15803d;
   --color-indigo-300: #4338ca;
@@ -268,6 +211,27 @@ body {
   --color-amber-400: #fbbf24;
   --color-red-300: #fca5a5;
   --color-red-400: #f87171;
+}
+
+/* Màu bảng chứng chỉ thanh toán (payments/print) mô phỏng ĐÚNG định dạng file Excel gốc —
+   cố ý KHÔNG đảo theo theme (giống .sheet-stable/.chart-vivid), tách thành class riêng thay
+   vì hex trực tiếp trong JSX để tuân luật "không hardcode hex trong component". */
+.paymentcert-header {
+  background: #4472c4;
+}
+.paymentcert-subheader {
+  background: #d9e1f2;
+}
+.paymentcert-highlight {
+  background: #fff2cc;
+}
+.paymentcert-total {
+  background: #e2efda;
+}
+
+/* Dải tiêu đề khi in trang tracking — luôn xám trung tính bất kể theme (chỉ hiện khi in). */
+.print-title-band {
+  background: #808080;
 }
 
 @layer base {

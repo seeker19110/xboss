@@ -1,28 +1,7 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  Brain,
-  Bot,
-  Workflow,
-  Network,
-  Boxes,
-  Lightbulb,
-  ShieldCheck,
-  Zap,
-  Sparkles,
-  ArrowUpRight,
-  Send,
-  MessageSquare,
-  GitBranch,
-  KeyRound,
-  ShieldAlert,
-  Sliders,
-  CheckCircle2,
-  Layers,
-  Database,
-  Search,
-} from "lucide-react";
+import { Brain, Bot, Boxes, Zap, MessageSquare } from "lucide-react";
 import HubShell, { type HubTab, type HubStat } from "@/app/components/HubShell";
 import { Skeleton } from "@/app/components/Skeleton";
 
@@ -113,159 +92,21 @@ function EngineeringIntelligenceContent() {
     </div>
   );
 
-  // Tab 2: Gate 0 & Evidence-Based AI Suggestions
-  const gate0Tab = (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-              <Workflow className="w-4 h-4 text-amber-400" />
-              Cổng Thẩm Định Trạm Gác Gate 0 & Đề Xuất Kỹ Thuật AI
-            </h3>
-            <p className="text-xs text-zinc-400 mt-1">
-              Ranh giới ủy quyền kỹ sư có kiểm soát (Controlled Autonomy A0-A2), kiểm định 5 trụ cột
-              và xếp hạng đề xuất có chứng cứ định lượng.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/engineering/workflows"
-              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
-            >
-              <Workflow className="w-3.5 h-3.5" /> Luồng Phê Duyệt Gate 0
-            </Link>
-            <Link
-              href="/engineering/agent-sessions"
-              className="px-3.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs border border-zinc-700 transition-colors flex items-center gap-1.5"
-            >
-              <Network className="w-3.5 h-3.5 text-amber-400" /> Phiên Hòa Giải (ENG-4)
-            </Link>
-          </div>
-        </div>
-
-        {/* 5 Gate 0 Pillars Checklist Strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 pt-2">
-          {[
-            { title: "1. Provenance Trace", desc: "Nguồn gốc SHA-256", icon: CheckCircle2 },
-            { title: "2. Role Authorization", desc: "Ủy quyền an toàn A1/A2", icon: ShieldCheck },
-            { title: "3. Evidence Sufficiency", desc: "Bằng chứng định lượng", icon: Lightbulb },
-            { title: "4. Conflict Resolution", desc: "Đồng thuận ≥ 0.80", icon: Network },
-            { title: "5. Merkle Sealing", desc: "Mã băm niêm phong M73", icon: Zap },
-          ].map((pillar, idx) => {
-            const PillarIcon = pillar.icon;
-            return (
-              <div
-                key={idx}
-                className="p-3 rounded-xl bg-zinc-900/70 border border-zinc-800 space-y-1"
-              >
-                <div className="flex items-center gap-1.5 text-amber-400">
-                  <PillarIcon className="w-3.5 h-3.5" />
-                  <span className="text-xs font-semibold text-zinc-200">{pillar.title}</span>
-                </div>
-                <p className="text-[11px] text-zinc-400">{pillar.desc}</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-
-  // Tab 4: Controlled Autonomy & Data Quality Sentinel
-  const autonomyDataTab = (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-amber-400" />
-              Cấp Độ Tự Trị Có Kiểm Soát (Controlled Autonomy A0-A2)
-            </h3>
-            <span className="text-[11px] font-mono text-zinc-400">OS-4 Safe Envelope</span>
-          </div>
-          <p className="text-xs text-zinc-400 leading-relaxed">
-            Thiết lập giới hạn an toàn tự trị: A0 (Hỗ trợ đọc/tính toán), A1 (Đề xuất có bằng
-            chứng), A2 (Ủy quyền tự động dưới ngưỡng rủi ro) và ngắt mạch an toàn khi phát hiện can
-            thiệp ngoài thẩm quyền.
-          </p>
-          <div className="pt-2">
-            <Link
-              href="/engineering/autonomy"
-              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
-            >
-              <Sliders className="w-3.5 h-3.5" /> Bảng Điều Khiển Tự Trị (OS-4)
-            </Link>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              Vệ Binh Toàn Vẹn Dữ Liệu & Uy Tín Thầu Phụ (ENG-1/M82)
-            </h3>
-            <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              Data Quality Sentinel
-            </span>
-          </div>
-          <p className="text-xs text-zinc-400 leading-relaxed">
-            Kiểm tra tính nhất quán dữ liệu 4 chiều (BIM - BOQ - PO - Field), phát hiện bất thường,
-            và chấm điểm tín nhiệm thầu phụ (Subcon Trust Score) phục vụ giao thầu thông minh.
-          </p>
-          <div className="flex items-center gap-2 pt-2">
-            <Link
-              href="/engineering/data-quality"
-              className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs transition-colors inline-flex items-center gap-2"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Data Quality Sentinel
-            </Link>
-            <Link
-              href="/engineering/subcon-ai"
-              className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs transition-colors inline-flex items-center gap-2"
-            >
-              Uy Tín Thầu Phụ (M82)
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   const tabs: HubTab[] = [
     {
       id: "copilot",
       label: "Trợ Lý Đa Kênh",
       icon: Bot,
-      badge: "Zalo / Voice",
-      description:
-        "Trợ lý hiện trường Zalo Copilot, Telegram Voice và bóc tách khẩu lệnh tiếng Việt ra WBS/NCR.",
+      badge: "Zalo",
+      description: "Trợ lý hiện trường Zalo Copilot, bóc tách khẩu lệnh tiếng Việt ra WBS/NCR.",
       content: copilotTab,
-    },
-    {
-      id: "gate0",
-      label: "Gate 0 & Đề Xuất AI",
-      icon: Workflow,
-      badge: "Gatekeeper",
-      description:
-        "Cổng thẩm định Gate 0 uỷ quyền kỹ sư có kiểm soát và xếp hạng đề xuất AI có bằng chứng.",
-      content: gate0Tab,
-    },
-    {
-      id: "autonomy-data",
-      label: "Tự Trị & Dữ Liệu",
-      icon: ShieldAlert,
-      badge: "Safe OS-4",
-      description:
-        "Cấp độ tự trị Controlled Autonomy A0-A2, ranh giới an toàn và Data Quality Sentinel.",
-      content: autonomyDataTab,
     },
   ];
 
   return (
     <HubShell
       title="Trung Tâm Trí Tuệ Kỹ Thuật AI"
-      subtitle="Phân hệ hợp nhất Trợ lý Copilot, Thẩm định Gate 0, Tự trị & Chất lượng dữ liệu"
+      subtitle="Trợ lý hiện trường Zalo Copilot"
       icon={Brain}
       badge="Engineering Intelligence"
       tabs={tabs}

@@ -275,7 +275,10 @@ export default function WorkflowsPage() {
       </main>
 
       {selectedId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "var(--overlay-scrim)" }}
+        >
           <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900 p-5">
             {detailLoading || !wf ? (
               <PageSkeleton />

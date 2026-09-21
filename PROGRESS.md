@@ -60,6 +60,139 @@ import/href/route nào trỏ tới 10 tính năng đã xoá, nhưng CHƯA xác m
 thật; cần chạy `npm run lint && npm run typecheck && npm test && npm run build` trước khi coi là
 xong hẳn theo Definition of Done.
 
+## ✅ Rà tay đợt 1/N export orphan còn lại (3/625) — 2026-09-21
+
+Bắt đầu rà tay 625 export orphan từ `check:dead-code` (đợt trước). Ưu tiên nhóm rủi ro thấp
+nhất trước: 40 `function`/`class` orphan trong `lib/*.ts` (bỏ qua 465 `type`/`interface` —
+ít giá trị hơn, thường là tài liệu API). Với mỗi ứng viên: verify KHÔNG dùng ở đâu (kể cả
+nội bộ trong chính file — phân biệt "chưa ai import" khỏi "chỉ dùng nội bộ nên export thừa"),
+và kiểm comment/JSDoc có gắn milestone `M<số>` cụ thể không (dấu hiệu tính năng backend đã
+ship, chờ route/UI gắn vào — mẫu đã lặp lại nhiều lần trong dự án này, KHÔNG được coi là rác).
+
+**Đã xoá 3 hàm xác nhận là rác thật** (không milestone, không dùng nội bộ, trùng lặp/thừa rõ
+ràng):
+
+- `lib/bao-mat/auth.ts :: permDefault` — trùng lặp thừa của `permDefaultsMatrix` (tính cùng
+  1 giá trị từ `CAN_DEFAULT`, không ai gọi bản đơn lẻ).
+- `lib/bao-mat/oidc.ts :: __resetOidcConfigCacheForTests` — hàm reset cache "chỉ dùng trong
+  test" nhưng `tests/oidc.test.ts` chưa từng gọi (khác bản song sinh
+  `_resetDefaultUsersCacheForTests` ở `auth.ts` — bản đó CÓ dùng thật, đã verify ở đợt viết
+  lại script).
+- `lib/ha-tang/feature-flags.ts :: featureFlagsVersion` — getter không ai đọc.
+
+**Đã xét nhưng KHÔNG xoá** (nghi backend-ahead-of-UI, để người quyết): `chotProjectIdChoDoc`
+(gắn M101 PR4, milestone AutoCAD plugin đã đóng — nhưng route chưa gọi biến thể "đọc" này,
+chỉ dùng bản "ghi" `chotProjectIdChoGhi`), `danhMucBoqTheoDuAn` (gắn M108 §6.5),
+`daysSinceLastIncident`/`getRisk`/`payrollTotals`/`pendingFrontKeys` (đều có JSDoc mô tả rõ
+mục đích dashboard/báo cáo cụ thể, không giống rác vô tình).
+
+625 → 622 orphan. Còn ~34 function orphan trong `lib/ky-thuat/engineering-*.ts` (cụm
+"Engineering OS" đã xác nhận nhiều lần là backend chủ đích đi trước UI — KHÔNG rà đợt này)
+
+- 120 const + 132 interface + 333 type chưa rà. Đã kiểm `lint`/`typecheck`/test liên quan
+  (`auth.test.ts`, `oidc.test.ts`) xanh.
+
+## ✅ Audit toàn diện chế độ sáng (light theme) — 2026-09-21
+
+Audit UI/UX + a11y tập trung vào `html.light`. Tìm và sửa 4 nhóm vấn đề:
+
+- **Nghiêm trọng — modal backdrop bị đảo trắng**: `app/components/dialogs.tsx` và ~12 chỗ tự
+  vẽ overlay riêng (`PhotosModal`, `mepf-process`, nhiều trang `engineering/*`, `reports`,
+  `vehicles`) dùng `bg-black/NN` làm lớp phủ — nhưng `--color-black` bị `html.light` đảo thành
+  `#ffffff` (phục vụ pattern `text-black` trên nền accent sáng), khiến scrim modal hoá thành
+  lớp phủ TRẮNG ở light theme thay vì làm tối nền phía sau. Thêm token cố định
+  `--overlay-scrim: rgba(0,0,0,.7)` (không khai lại trong `html.<theme>` nào, theo mẫu
+  `--on-accent`) và thay mọi `bg-black/NN` dùng làm scrim bằng
+  `style={{ background: "var(--overlay-scrim)" }}`.
+- **Trung bình — 9 cặp chữ/nền control dưới AA ở light**: `text-zinc-500`, `blue-400`,
+  `cyan-300/400`, `purple-400`, `red-400`, `violet-400`, `yellow-300/400` trên nền control
+  `zinc-800` (`#dde2ea`) chỉ đạt 3,78–4,41:1. Đậm thêm các token này trong khối `html.light`
+  của `globals.css` (ADR-0010 — sửa ở token, không sửa tay từng class); `npm run
+check:contrast` từ cảnh báo còn 9 cặp xuống 0.
+- **Trung bình — hex Excel cứng trong `app/payments/print/page.tsx`**: tách 4 màu mô phỏng
+  định dạng Excel (`#4472c4`/`#fff2cc`/`#d9e1f2`/`#e2efda`) thành class riêng
+  `.paymentcert-header/-subheader/-highlight/-total` trong `globals.css` (cố ý không đảo theo
+  theme, giống `.sheet-stable`/`.chart-vivid`) thay vì literal hex trong JSX. Tương tự,
+  `app/tracking/[sheet]/page.tsx` (dải tiêu đề khi in) đổi `bg-[#808080]` sang class
+  `.print-title-band`.
+- **Nhỏ — thiếu chú thích miễn trừ ở khối `@media print`**: 4 file
+  (`tracking/[sheet]/page.tsx`, `schedule-control/page.tsx`, `lookahead/page.tsx`,
+  `ReportPrintable.tsx`) viết hex `#fff`/`#000`... trực tiếp trong `<style jsx global>` — hợp
+  lệ (trang in luôn cần giấy trắng, `@media print` không đọc được biến CSS bị theme đảo) nhưng
+  thiếu ghi chú nên dễ bị nhầm là vi phạm khi audit sau. Thêm comment miễn trừ giống mẫu ở
+  `globals.css`.
+
+`npm run lint`/`typecheck`/`build` xanh sau khi sửa; `check:contrast`/`check:mau-accent` cả
+hai đều `[OK]`.
+
+## ✅ Viết lại `check:dead-code` bằng TypeScript Compiler API (đóng nợ kỹ thuật) — 2026-09-21
+
+Nợ kỹ thuật ghi ở đợt audit trước ("script hiện so khớp bằng regex tên hàm, không hiểu
+re-export/type alias/generic nên sai nhiều") nay đã đóng: phần dò "export không ai dùng
+ngoài file khai báo" trong `scripts/check-dead-code.ts` viết lại bằng TypeScript Compiler
+API (`ts.createProgram` + `TypeChecker`, dùng `typescript` sẵn có trong devDependencies —
+không thêm dependency mới như `ts-morph`) thay vì regex khớp CHỮ trên toàn văn bản file.
+
+Cách làm: 1 lượt duyệt AST toàn chương trình, resolve mỗi Identifier ra symbol thật (unwrap
+alias), gom `symbol → tập file đã dùng`; rồi với mỗi export trong `lib/*.ts`, tra symbol đó
+có file nào NGOÀI nó dùng không. Chính xác hơn regex vì không bị nhầm bởi tên trùng ở 2 nơi
+khác nhau hay text nằm trong comment/string.
+
+**Phát hiện + vá 1 bug thật trong lúc verify thủ công:** mẫu `const { a, b } = await
+import("@/lib/x")` (dùng RẤT nhiều trong `tests/` để lazy-load route/module) không đi qua
+`getSymbolAtLocation` bình thường — identifier trong `ObjectBindingPattern` resolve ra symbol
+biến cục bộ mới tạo, không phải symbol export gốc, gây báo sai 33 export (vd
+`_resetDefaultUsersCacheForTests`, `kickoffReadiness` — đều CÓ dùng thật qua đúng mẫu này).
+Đã vá bằng cách lấy type của biểu thức `await import(...)` rồi map property destructure
+sang đúng export symbol của module đích. Trước vá: 658 orphan; sau vá: **625**.
+
+Thêm biến `DEAD_CODE_LIST_ORPHANS=1` để in danh sách đầy đủ khi cần audit thủ công
+(`DEAD_CODE_LIST_ORPHANS=1 npx tsx scripts/check-dead-code.ts`).
+
+**Chưa xoá export nào trong đợt này** — 625 ứng viên (333 type + 132 interface + 127 const +
+65 function + 1 class) cần rà tay theo từng file trước khi xoá (script chỉ cảnh báo, không
+chặn CI qua allowlist như file unreachable). Đây là nợ kỹ thuật tiếp theo, để đợt sau.
+Đã kiểm `lint`/`typecheck` xanh sau khi sửa script.
+
+## ✅ Rút gọn còn 2 theme (Sáng / Dark Blue) — 2026-09-21
+
+Theo yêu cầu người dùng: bỏ 3 theme `dark` (Tối), `kingblue` (King Blue), `navy` (Navy) —
+chỉ giữ `light` (Sáng) và `darkblue` (Dark Blue). Sửa đồng bộ 3 điểm khai theme:
+
+- `app/components/ThemeToggle.tsx` — `Theme` type + mảng `THEMES`/`THEME_COLORS` chỉ còn 2 mục,
+  gỡ import icon `Moon/Crown/Anchor` không còn dùng.
+- `app/layout.tsx` — script `theme-init` (mảng `T`/`C`) khớp lại 2 theme.
+- `app/globals.css` — xoá các block `html.dark`/`html.kingblue`/`html.navy`; sửa 2 chú thích còn
+  trỏ tới `html.dark`/King Blue đã xoá.
+- `scripts/check-contrast.ts` — mảng `THEMES` chỉ đọc `light`/`darkblue` (trước đó sẽ throw vì
+  `html.dark` không còn tồn tại trong `globals.css`).
+
+Cập nhật tài liệu lệ thuộc số lượng theme: `PROJECT.md`, `docs/audit.md` (§5 checklist + bảng
+tương phản Phụ lục A §13.2), `.github/ISSUE_TEMPLATE/bug_report.md`,
+`.agents/skills/ui-ux-craftsman/SKILL.md` + `scripts/ui_ux_validator.ts` (self-test). Đã kiểm
+`npm run check:contrast`, `check:mau-accent`, `lint`, `typecheck` xanh.
+
+## ✅ Rút gọn hub `/engineering-intelligence` — chỉ giữ tab Trợ Lý Đa Kênh — 2026-09-21
+
+Theo yêu cầu người dùng: xoá 4 trong 5 tab của hub điều hướng `/engineering-intelligence`
+(`app/engineering-intelligence/page.tsx`) — "Gate 0 & Đề Xuất AI", "AI Swarm & Merkle", "Tự Trị
+& Dữ Liệu", "IoT & Bảo trì dự báo" — chỉ giữ lại tab "Trợ Lý Đa Kênh" (Zalo Field Copilot M86 +
+Telegram Voice Copilot M76). Dọn theo import icon `lucide-react` không còn dùng và sửa lại
+`subtitle` của `HubShell` cho khớp nội dung còn lại. **Chỉ đụng lớp điều hướng của trang hub** —
+không xoá/đổi các trang con nghiệp vụ thật (`/engineering/swarm`, `/engineering/workflows`,
+`/engineering/autonomy`, `/engineering/data-quality`, `/engineering/iot-telemetry`,
+`/engineering/predictions`, `/engineering/prescriptive`...) hay các API/lib nền (`lib/ky-thuat/*`)
+phía sau — các phân hệ đó vẫn hoạt động, chỉ không còn lối vào từ hub này. 4 chỉ số KPI đầu trang
+(đối tượng kỹ thuật/đề xuất AI/phiên swarm/khối Merkle) vẫn giữ nguyên.
+
+(Ghi chú khi hợp nhất với đợt xoá 10 phân hệ ở trên: các trang `/engineering/swarm`,
+`/engineering/suggestions`, `/engineering/prescriptive`, `/engineering/quantum-hub`,
+`/engineering/memory`, `/engineering/iot-telemetry`, `/engineering/hse-vision`,
+`/engineering/site-copilot`, `/engineering/spatial-viewer`, `/engineering/fidic-claims` nhắc ở
+đây với vai trò "vẫn hoạt động, chỉ mất lối vào từ hub" — đã bị xoá HẲN theo yêu cầu người dùng
+sau đó; hub `/engineering-intelligence` cũng được sửa lại `stats`/tab Trợ Lý Đa Kênh cho khớp
+route còn sống.)
+
 ## ✅ Audit tổng quát — xoá `/api/import/batches`, sửa ghi chú lỗi thời — 2026-09-21
 
 Audit diện rộng tìm tính năng thừa. Kết luận: repo khá sạch, hầu hết ứng viên "trông thừa"

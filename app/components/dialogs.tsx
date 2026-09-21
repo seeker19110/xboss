@@ -84,9 +84,10 @@ export function Modal({
 
   return (
     <div
-      className={`fixed inset-0 ${zIndex} bg-black/70 backdrop-blur-xs flex transition-opacity ${
+      className={`fixed inset-0 ${zIndex} backdrop-blur-xs flex transition-opacity ${
         drawer ? "items-stretch justify-start" : "items-center justify-center p-4"
       }`}
+      style={{ background: "var(--overlay-scrim)" }}
       role="dialog"
       aria-modal="true"
       onClick={onClose}

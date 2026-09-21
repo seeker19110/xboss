@@ -420,11 +420,6 @@ export const LOCKED_PERMS: PermKey[] = PERM_KEYS.filter(
 export const isWritePerm = (permKey: PermKey): boolean =>
   (LOCKED_PERMS as string[]).includes(permKey);
 
-// Giá trị mặc định của 1 quyền cho 1 vai trò (bỏ qua override) — cho trang ma trận.
-export function permDefault(role: Role, permKey: PermKey): boolean {
-  return CAN_DEFAULT[permKey](role);
-}
-
 // Ma trận mặc định đầy đủ (role × permKey) — trang /admin/permissions vẽ 3 trạng thái.
 export function permDefaultsMatrix(): Record<PermKey, Record<Role, boolean>> {
   const out = {} as Record<PermKey, Record<Role, boolean>>;

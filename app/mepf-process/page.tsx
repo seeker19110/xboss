@@ -1848,7 +1848,10 @@ export default function CleanMepfProcessPage() {
 
       {/* ── MODAL: TỪ CHỐI / LẬP PHIẾU NCR ── */}
       {showRejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-xs"
+          style={{ background: "var(--overlay-scrim)" }}
+        >
           <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-5 space-y-4 shadow-2xl">
             <div className="flex items-start justify-between border-b border-zinc-800 pb-3">
               <div>
