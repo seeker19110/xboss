@@ -7,6 +7,7 @@ import {
   listNestingPlans,
   RequiredPiece,
 } from "@/lib/ky-thuat/engineering-mepf-nesting";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +26,7 @@ export async function GET() {
     const plans = await listNestingPlans(projectId);
     return NextResponse.json({ plans, totalCount: plans.length });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -65,7 +65,6 @@ export async function POST(req: NextRequest) {
       plan,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { queryTransferredLessons } from "@/lib/ky-thuat/engineering-memory-bank";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json(results);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

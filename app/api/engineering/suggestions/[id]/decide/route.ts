@@ -6,6 +6,7 @@ import {
   SUGGESTION_DECISIONS,
   type SuggestionDecision,
 } from "@/lib/ky-thuat/engineering-intel";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -38,10 +39,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     await decideSuggestion(projectId, id, user.id, decision, note);
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Ghi quyết định thất bại" },
-      { status: 404 },
-    );
+    // `decideSuggestion` ném loiKhongTimThay khi đề xuất không tồn tại/khác dự án; lỗi hệ
+    // thống (DB) không còn bị nguỵ trang thành 404 nữa mà ra 500 đúng bản chất.
+    return phanHoiLoi(err);
   }
   return NextResponse.json({ ok: true });
 }

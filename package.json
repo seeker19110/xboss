@@ -39,6 +39,7 @@
     "check:route-perms": "tsx scripts/check-route-perms.ts",
     "check:project-scope": "tsx scripts/check-project-scope.ts",
     "check:db-params": "tsx scripts/check-db-params.ts",
+    "check:test-fk-ids": "tsx scripts/check-test-fk-ids.ts",
     "check:progress-freshness": "tsx scripts/check-progress-freshness.ts"
   },
   "dependencies": {

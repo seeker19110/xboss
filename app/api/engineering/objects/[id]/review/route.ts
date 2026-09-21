@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { reviewEngineeringObject } from "@/lib/ky-thuat/engineering-kernel";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +36,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     await reviewEngineeringObject(projectId, id, decision, user.id, note);
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Duyệt đối tượng thất bại" },
-      { status: 404 },
-    );
+    // Trước đây MỌI lỗi ở đây đều ra 404 — kể cả sự cố DB thật. Nay `reviewEngineeringObject`
+    // ném LoiNghiepVu mang sẵn mã (404 không tồn tại/khác dự án, 409 đối tượng đã xoá mềm),
+    // còn lỗi hệ thống rơi về 500 đúng bản chất.
+    return phanHoiLoi(err);
   }
 
   return NextResponse.json({ ok: true });

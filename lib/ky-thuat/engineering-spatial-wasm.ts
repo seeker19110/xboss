@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { query, queryOne, run } from "@/lib/db";
+import { loiKhongXuLyDuoc } from "@/lib/nen/loi";
 
 export interface Point3D {
   x: number;
@@ -83,7 +84,8 @@ export function computePolylineSweepVolume(
   crossSection: CrossSection,
 ): SweepVolumeResult {
   if (!points || points.length < 2) {
-    throw new Error("Polyline cần ít nhất 2 điểm tọa độ 3D.");
+    // 422: mảng điểm đúng cú pháp nhưng không đủ dữ liệu để quét thể tích.
+    throw loiKhongXuLyDuoc("Polyline cần ít nhất 2 điểm tọa độ 3D.");
   }
 
   let totalLengthM = 0;

@@ -3,6 +3,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { query } from "@/lib/db";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -56,8 +57,8 @@ export async function GET(req: Request) {
       success: true,
       data: rows,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[IoT Devices GET]", error);
-    return NextResponse.json({ error: error.message || "Lỗi tải thiết bị IoT" }, { status: 500 });
+    return phanHoiLoi(error, "Lỗi tải thiết bị IoT");
   }
 }

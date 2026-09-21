@@ -14,7 +14,13 @@ function ctxDayDu(): SmartIpcGateContext {
     gate1: { available: true, maxDeviationMm: 10, scanCode: "SCAN-1" },
     gate2: { available: true, signedCount: 3, totalCount: 3 },
     gate3: { available: true, pressureDropBar: 0, durationHours: 2.5, requiredHours: 2.0 },
-    gate4: { available: true, claimedQty: 90, approvedBoqQty: 100, warehouseUsedQty: 120 },
+    gate4: {
+      available: true,
+      claimedQty: 90,
+      approvedBoqQty: 100,
+      warehouseUsedQty: 120,
+      thieuDuLieu: [],
+    },
   };
 }
 
@@ -23,7 +29,13 @@ function ctxThieuDuLieu(): SmartIpcGateContext {
     gate1: { available: false, maxDeviationMm: null },
     gate2: { available: false, signedCount: 0, totalCount: 0 },
     gate3: { available: false, pressureDropBar: null, durationHours: null, requiredHours: 2.0 },
-    gate4: { available: false, claimedQty: null, approvedBoqQty: null, warehouseUsedQty: null },
+    gate4: {
+      available: false,
+      claimedQty: null,
+      approvedBoqQty: null,
+      warehouseUsedQty: null,
+      thieuDuLieu: [{ chiSo: "approvedBoqQty", lyDo: "test: chưa khai mã BOQ" }],
+    },
   };
 }
 
@@ -44,7 +56,9 @@ test("Smart IPC: thiếu dữ liệu tham chiếu ở CẢ 4 cổng → khong_du
   assert.equal(ev.gate3.status, "khong_du_du_lieu");
   assert.equal(ev.gate4.status, "khong_du_du_lieu");
   assert.equal(ev.allGatesCleared, false);
-  assert.equal(ev.blockedGateReasons.length, 4);
+  // Gate 4 KHÔNG còn nằm trong danh sách lý do chặn (Đợt 6 — nó chỉ là cảnh báo), nên chỉ còn 3.
+  assert.equal(ev.blockedGateReasons.length, 3);
+  assert.equal(ev.gate4WarningReasons.length, 1);
 });
 
 test("Smart IPC: chỉ 1 cổng thiếu dữ liệu cũng đủ để chặn giải ngân (không pass hết trừ cổng lỗi)", () => {
@@ -66,7 +80,13 @@ test("Smart IPC: BBNT có dữ liệu nhưng chưa đủ 3 bên ký → failed (
 
 test("Smart IPC: khối lượng xin thanh toán vượt hạn mức BOQ → gate4 failed", () => {
   const ctx = ctxDayDu();
-  ctx.gate4 = { available: true, claimedQty: 150, approvedBoqQty: 100, warehouseUsedQty: 200 };
+  ctx.gate4 = {
+    available: true,
+    claimedQty: 150,
+    approvedBoqQty: 100,
+    warehouseUsedQty: 200,
+    thieuDuLieu: [],
+  };
   const ev = evaluateSmartIpcGates(ctx);
   assert.equal(ev.gate4.status, "failed");
 });
@@ -141,4 +161,107 @@ test("Tiền: netPayableVnd = gross - retention khi đạt cổng, = 0 khi khôn
 
   const blocked = computeSmartIpcMoney("1000000", 5, false);
   assert.equal(blocked.netPayableVnd, 0);
+});
+
+// ============================================================================
+// Đợt 6 — Việc E: Gate 4 (đối soát BOQ/kho) hạ xuống mức CẢNH BÁO
+//
+// Quyết định nghiệp vụ của chủ dự án (2026-09-05): gate 4 không còn nằm trong điều kiện
+// tự động thông qua; ba cổng 1–3 quyết định `allGatesCleared`. Lý do kỹ thuật: nửa đối
+// soát kho của gate 4 là BẤT KHẢ THI về cấu trúc — `migrations/0029_boq_codes.sql` giữ
+// registry BOQCODE duy nhất XUYÊN BẢNG (tasks/work_packages/materials/boq_items) nên
+// `materials.boq_code` không bao giờ trùng `boq_items.code`.
+// ============================================================================
+
+test("Gate 4 cảnh báo: gate 1–3 đạt, gate 4 thiếu dữ liệu kho → vẫn allGatesCleared = true", () => {
+  const ctx = ctxDayDu();
+  // Đúng như thực tế đọc từ DB: không đối soát được kho → null, KHÔNG bịa số 0.
+  ctx.gate4 = {
+    available: true,
+    claimedQty: 90,
+    approvedBoqQty: 100,
+    warehouseUsedQty: null,
+    thieuDuLieu: [{ chiSo: "warehouseUsedQty", lyDo: "test" }],
+  };
+  const ev = evaluateSmartIpcGates(ctx);
+  assert.equal(ev.gate4.status, "khong_du_du_lieu");
+  assert.equal(ev.allGatesCleared, true, "gate 4 không được chặn tự động thông qua nữa");
+  assert.deepEqual(ev.blockedGateReasons, [], "lý do gate 4 KHÔNG được trộn vào danh sách chặn");
+  assert.equal(ev.gate4WarningReasons.length, 1, "lý do gate 4 nằm ở trường cảnh báo riêng");
+  assert.match(ev.gate4WarningReasons[0], /cảnh báo/i);
+});
+
+test("Gate 4 cảnh báo: thiếu tham chiếu BOQ → khong_du_du_lieu, không chặn giải ngân", () => {
+  const ctx = ctxDayDu();
+  ctx.gate4 = {
+    available: false,
+    claimedQty: null,
+    approvedBoqQty: null,
+    warehouseUsedQty: null,
+    thieuDuLieu: [{ chiSo: "boqCode", lyDo: "test" }],
+  };
+  const ev = evaluateSmartIpcGates(ctx);
+  assert.equal(ev.gate4.status, "khong_du_du_lieu");
+  assert.ok(ev.gate4.reason, "phải nêu lý do bằng tiếng Việt cho người duyệt");
+  assert.equal(ev.allGatesCleared, true);
+  assert.deepEqual(ev.blockedGateReasons, []);
+});
+
+test("Gate 4 cảnh báo: vượt hạn mức BOQ vẫn là 'failed' nhưng chỉ cảnh báo, không chặn", () => {
+  const ctx = ctxDayDu();
+  ctx.gate4 = {
+    available: true,
+    claimedQty: 150,
+    approvedBoqQty: 100,
+    warehouseUsedQty: null,
+    thieuDuLieu: [],
+  };
+  const ev = evaluateSmartIpcGates(ctx);
+  assert.equal(ev.gate4.status, "failed", "vượt hạn mức BOQ vẫn phải báo sai rõ ràng");
+  assert.match(ev.gate4.reason!, /hạn mức BOQ/);
+  assert.equal(ev.allGatesCleared, true);
+  assert.deepEqual(ev.blockedGateReasons, []);
+  assert.equal(ev.gate4WarningReasons.length, 1);
+});
+
+test("Gate 4 cảnh báo: một cổng trong 1–3 hỏng → vẫn chặn như cũ", () => {
+  const ctx = ctxDayDu();
+  ctx.gate3 = { available: true, pressureDropBar: 0.5, durationHours: 2.5, requiredHours: 2.0 };
+  ctx.gate4 = {
+    available: true,
+    claimedQty: 90,
+    approvedBoqQty: 100,
+    warehouseUsedQty: null,
+    thieuDuLieu: [],
+  };
+  const ev = evaluateSmartIpcGates(ctx);
+  assert.equal(ev.allGatesCleared, false);
+  assert.equal(ev.blockedGateReasons.length, 1);
+  assert.match(ev.blockedGateReasons[0], /Gate 3/);
+});
+
+test("Gate 4 cảnh báo: hồ sơ đạt gate 1–3 vẫn giải ngân dù gate 4 thiếu dữ liệu kho", () => {
+  const ctx = ctxDayDu();
+  ctx.gate4 = {
+    available: true,
+    claimedQty: 90,
+    approvedBoqQty: 100,
+    warehouseUsedQty: null,
+    thieuDuLieu: [{ chiSo: "warehouseUsedQty", lyDo: "test" }],
+  };
+  const result = processSmartIpcRelease(
+    {
+      ipcNumber: "IPC-GATE4",
+      periodMonth: "2026-09",
+      contractorName: "Công ty Test",
+      grossClaimedVnd: "1000000",
+      refs: {},
+    },
+    ctx,
+  );
+  assert.equal(result.allGatesCleared, true);
+  assert.equal(result.paymentStatus, "released");
+  assert.equal(result.gate4QuadReconcilePassed, false, "cột DB vẫn ghi đúng trạng thái thật");
+  assert.equal(result.gateStatuses.gate4, "khong_du_du_lieu");
+  assert.equal(result.gate4WarningReasons.length, 1);
 });

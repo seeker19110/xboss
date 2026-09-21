@@ -9,6 +9,7 @@ import {
   ExecutionRequest,
   AutonomyLevel,
 } from "@/lib/ky-thuat/engineering-autonomy";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +40,7 @@ export async function GET() {
     );
     return NextResponse.json({ requests });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -90,7 +90,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ request });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

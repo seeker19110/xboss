@@ -5,6 +5,7 @@ import {
   upsertKnowledgePattern,
   PatternType,
 } from "@/lib/ky-thuat/engineering-memory-bank";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,7 @@ export async function GET(req: Request) {
     const patterns = await listKnowledgePatterns(patternType || undefined);
     return NextResponse.json(patterns);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -57,7 +57,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json(pattern, { status: 201 });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

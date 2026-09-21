@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { EsignSignError, executeSignEnvelope } from "@/lib/ky-thuat/engineering-esignature";
+import { executeSignEnvelope } from "@/lib/ky-thuat/engineering-esignature";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -48,10 +49,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: result });
   } catch (err: unknown) {
-    if (err instanceof EsignSignError) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
-    }
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    // EsignSignError kế thừa LoiNghiepVu nên phanHoiLoi giữ nguyên 403/409/422 của nó.
+    return phanHoiLoi(err);
   }
 }

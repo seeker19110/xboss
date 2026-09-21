@@ -9,6 +9,7 @@ import {
   listCrossProjectLessons,
   addCrossProjectLesson,
 } from "@/lib/ky-thuat/engineering-memory-bank";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +28,7 @@ export async function GET(req: Request) {
     const lessons = await listCrossProjectLessons(workPackageCode, await visibleProjectIds(user));
     return NextResponse.json(lessons);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -78,7 +78,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json(created, { status: 201 });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

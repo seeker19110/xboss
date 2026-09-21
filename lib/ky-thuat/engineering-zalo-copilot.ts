@@ -1,6 +1,7 @@
 import { query, queryOne, run, withProjectScope, withTransaction } from "@/lib/db";
 import { hashOtp, kiemOtp, sinhOtp, OTP_HAN_PHUT } from "@/lib/bao-mat/otp";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
+import { loiXungDot } from "@/lib/nen/loi";
 
 /**
  * ⚠️ TRẠNG THÁI THỬ NGHIỆM (V5 — trung thực hoá dữ liệu hiển thị, 2026-08-24):
@@ -204,7 +205,7 @@ export async function generateZaloLinkOtp(
     { readOnly: false },
   );
 
-  if (!ghiDuoc) throw new Error(LOI_ZALO_DA_LIEN_KET);
+  if (!ghiDuoc) throw loiXungDot(LOI_ZALO_DA_LIEN_KET);
 
   return otpCode;
 }

@@ -7,6 +7,7 @@ import {
   getLatestApexSystemPulse,
   dispatchApexCommandAction,
 } from "@/lib/ky-thuat/engineering-pinnacle-synergy";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +33,7 @@ export async function GET() {
     }
     return NextResponse.json({ success: true, data: latest });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -79,7 +79,6 @@ export async function POST(req: NextRequest) {
     const newPulse = await recordApexSystemPulse(projectId, body.metrics);
     return NextResponse.json({ success: true, data: newPulse });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

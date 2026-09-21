@@ -12,6 +12,7 @@ import {
   PreliminarySegment,
   StructuralBeam,
 } from "@/lib/ky-thuat/engineering-shopdrawing-omnipotent";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +31,7 @@ export async function GET() {
     const list = await listLod400Runs(projectId);
     return NextResponse.json({ runs: list, totalCount: list.length });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -108,7 +108,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: `Hành động ${action} không hợp lệ` }, { status: 400 });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

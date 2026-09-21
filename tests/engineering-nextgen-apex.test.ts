@@ -123,7 +123,13 @@ test("5. Instant Smart IPC — All 4 Gates cleared with 5% retention release", (
     gate1: { available: true, maxDeviationMm: 12.0, scanCode: "SCAN-01" }, // <= 15mm (Gate 1 Pass)
     gate2: { available: true, signedCount: 3, totalCount: 3 }, // (Gate 2 Pass)
     gate3: { available: true, pressureDropBar: 0.0, durationHours: 2.5, requiredHours: 2.0 }, // (Gate 3 Pass)
-    gate4: { available: true, claimedQty: 100, approvedBoqQty: 100, warehouseUsedQty: 120 }, // (Gate 4 Pass)
+    gate4: {
+      available: true,
+      claimedQty: 100,
+      approvedBoqQty: 100,
+      warehouseUsedQty: 120,
+      thieuDuLieu: [],
+    }, // (Gate 4 Pass)
   };
   const input: SmartIpcCalculationInput = {
     ipcNumber: "IPC-TEST-01",
@@ -149,7 +155,13 @@ test("6. Instant Smart IPC — Blocked when Scan-to-BIM deviation > 15mm or unsi
     gate1: { available: true, maxDeviationMm: 28.0, scanCode: "SCAN-02" }, // > 15mm (Gate 1 Fail)
     gate2: { available: true, signedCount: 1, totalCount: 3 }, // (Gate 2 Fail)
     gate3: { available: true, pressureDropBar: 0.0, durationHours: 2.0, requiredHours: 2.0 },
-    gate4: { available: true, claimedQty: 100, approvedBoqQty: 100, warehouseUsedQty: 100 },
+    gate4: {
+      available: true,
+      claimedQty: 100,
+      approvedBoqQty: 100,
+      warehouseUsedQty: 100,
+      thieuDuLieu: [],
+    },
   };
   const input: SmartIpcCalculationInput = {
     ipcNumber: "IPC-TEST-02",
@@ -172,7 +184,13 @@ test("6b. Instant Smart IPC — thiếu dữ liệu tham chiếu (không phải 
     gate1: { available: false, maxDeviationMm: null },
     gate2: { available: false, signedCount: 0, totalCount: 0 },
     gate3: { available: false, pressureDropBar: null, durationHours: null, requiredHours: 2.0 },
-    gate4: { available: false, claimedQty: null, approvedBoqQty: null, warehouseUsedQty: null },
+    gate4: {
+      available: false,
+      claimedQty: null,
+      approvedBoqQty: null,
+      warehouseUsedQty: null,
+      thieuDuLieu: [{ chiSo: "approvedBoqQty", lyDo: "test: chưa khai mã BOQ" }],
+    },
   };
   const input: SmartIpcCalculationInput = {
     ipcNumber: "IPC-TEST-03",
@@ -186,7 +204,9 @@ test("6b. Instant Smart IPC — thiếu dữ liệu tham chiếu (không phải 
 
   assert.equal(result.allGatesCleared, false);
   assert.equal(result.paymentStatus, "held_by_gates");
-  assert.equal(result.blockedGateReasons.length, 4);
+  // Đợt 6: gate 4 hạ thành cảnh báo nên chỉ còn 3 lý do CHẶN; lý do gate 4 nằm ở trường riêng.
+  assert.equal(result.blockedGateReasons.length, 3);
+  assert.equal(result.gate4WarningReasons.length, 1);
   assert.equal(result.gateStatuses.gate1, "khong_du_du_lieu");
   assert.equal(result.gateStatuses.gate2, "khong_du_du_lieu");
   assert.equal(result.gateStatuses.gate3, "khong_du_du_lieu");

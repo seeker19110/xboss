@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { createEsignEnvelope, listEsignEnvelopes } from "@/lib/ky-thuat/engineering-esignature";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,7 @@ export async function GET() {
     const envelopes = await listEsignEnvelopes(projectId);
     return NextResponse.json({ success: true, data: envelopes });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -74,7 +74,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: envelope });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

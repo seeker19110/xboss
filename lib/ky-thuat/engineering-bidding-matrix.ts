@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { query, queryOne, withProjectScope, withTransaction } from "@/lib/db";
+import { loiKhongTimThay } from "@/lib/nen/loi";
 
 export interface BiddingLineItem {
   itemCode: string;
@@ -440,7 +441,7 @@ export async function runBiddingAnalysis(
         projectId,
       );
 
-      if (!pkg) throw new Error(`Không tìm thấy gói thầu ${packageId}`);
+      if (!pkg) throw loiKhongTimThay(`Không tìm thấy gói thầu ${packageId}`);
 
       const quotes = await listVendorQuotes(projectId, packageId);
       const targetItems = ((pkg.rfqSpecs?.lineItems as BiddingLineItem[]) ||

@@ -1,6 +1,7 @@
 // lib/engineering-swarm-orchestrator.ts — Unified Multi-Agent Swarm Orchestration, Gate 0 & Consensus Engine (PIN-3 / ENG-3 / ENG-4 / M92)
 import crypto from "crypto";
 import { query, queryOne, run, withProjectScope } from "@/lib/db";
+import { loiKhongTimThay } from "@/lib/nen/loi";
 
 export type SwarmAgentRole =
   | "agent_structural"
@@ -333,7 +334,7 @@ export async function synthesizeSwarmDebate(
 ): Promise<SwarmDebateRecord> {
   const debate = await getSwarmDebateById(projectId, debateId);
   if (!debate) {
-    throw new Error("Không tìm thấy phiên Swarm Debate.");
+    throw loiKhongTimThay("Không tìm thấy phiên Swarm Debate.");
   }
 
   const consensus = calculateSwarmConsensus(debate.arguments || []);

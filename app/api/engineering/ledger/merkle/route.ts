@@ -6,6 +6,7 @@ import {
   listMerkleRoots,
   getMerkleRoot,
 } from "@/lib/ky-thuat/engineering-merkle-ledger";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -33,8 +34,7 @@ export async function GET(req: NextRequest) {
     const roots = await listMerkleRoots(projectId, 50);
     return NextResponse.json({ roots, totalCount: roots.length });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -91,7 +91,6 @@ export async function POST(req: NextRequest) {
       treeLevelsCount: tree.treeLevels.length,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

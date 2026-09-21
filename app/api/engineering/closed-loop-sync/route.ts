@@ -5,6 +5,7 @@ import {
   syncSpoolToWbsAndPayment,
   listClosedLoopSyncLogs,
 } from "@/lib/ky-thuat/engineering-closed-loop-sync";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,7 @@ export async function GET() {
     const logs = await listClosedLoopSyncLogs(projectId);
     return NextResponse.json({ logs, totalCount: logs.length });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }
 
@@ -66,7 +66,6 @@ export async function POST(req: NextRequest) {
       ...result,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return phanHoiLoi(err);
   }
 }

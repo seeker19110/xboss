@@ -212,6 +212,10 @@ test(
 );
 
 test("GET /api/admin/assignments: chưa chọn dự án → trả danh sách rỗng, KHÔNG lỗi", S, async () => {
+  // `visibleProjectIds` có fallback "bảng user_projects RỖNG toàn hệ → mọi user thấy hết".
+  // Chạy cả bộ test, bảng này có thể rỗng đúng lúc ca chạy ⇒ PM thấy dự án đầu tiên ⇒
+  // projectId khác null ⇒ route trả WBS thật và ca đỏ ngẫu nhiên (đã đỏ thật trong CI).
+  // Helper chèn sẵn một dòng cho user KHÁC để bảng chắc chắn không rỗng.
   const { user: pmNoProj, projectId, nguoiKhac } = await dungNguoiDungKhongCoDuAn("pmNoProj");
   dangXuat();
   const { dangNhap } = await import("./helpers/phien");
@@ -351,6 +355,10 @@ test("POST /api/admin/assignments: gán task đúng dự án của mình → 200
 test("POST /api/admin/assignments: chưa chọn dự án → 422", S, async () => {
   const { user: pmNoProj, projectId, nguoiKhac } = await dungNguoiDungKhongCoDuAn("postNoProj");
   const target = await taoUser("engineer", "postNoProjTarget");
+  // `visibleProjectIds` có fallback "bảng user_projects RỖNG toàn hệ → mọi user thấy hết". Nếu
+  // không chặn nhánh đó, PM này sẽ thấy dự án đầu tiên ⇒ projectId khác null ⇒ route không đi
+  // vào nhánh 422 và ca test đỏ ngẫu nhiên tuỳ DB worker. Helper đã chèn một dòng cho user
+  // KHÁC để bảng chắc chắn không rỗng, khi đó PM này mới thật sự "chưa có dự án nào".
   dangXuat();
   const { dangNhap } = await import("./helpers/phien");
   dangNhap(pmNoProj, null);
