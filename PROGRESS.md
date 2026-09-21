@@ -18,6 +18,24 @@ tương phản Phụ lục A §13.2), `.github/ISSUE_TEMPLATE/bug_report.md`,
 `.agents/skills/ui-ux-craftsman/SKILL.md` + `scripts/ui_ux_validator.ts` (self-test). Đã kiểm
 `npm run check:contrast`, `check:mau-accent`, `lint`, `typecheck` xanh.
 
+## ✅ Audit tổng quát — xoá `/api/import/batches`, sửa ghi chú lỗi thời — 2026-09-21
+
+Audit diện rộng tìm tính năng thừa. Kết luận: repo khá sạch, hầu hết ứng viên "trông thừa"
+đã có ghi chú chủ đích trong `scripts/dead-routes-allowlist.json`. Ba route bị nghi "backend
+xong, UI chưa gắn" (`tasks/batch`, `dimensions/batch`, `import/batches`) được rà lại kỹ bằng
+grep import thật:
+
+- **`/api/tasks/batch`, `/api/dimensions/batch`**: ghi chú allowlist SAI/lỗi thời — thực ra
+  **đang được dùng thật** bởi `app/tracking/[sheet]/tickApi.ts` (tick hàng loạt) và
+  `app/components/offlineQueue/logic.ts` (hàng đợi offline). Đã sửa lại `ly_do` trong
+  allowlist cho khớp thực tế, **không xoá**.
+- **`/api/import/batches`**: xác nhận đúng là chưa có UI nào gọi. Đã xoá route
+  (`app/api/import/batches/route.ts`), test riêng (`tests/import-batches.test.ts`), và 4 test
+  case liên quan trong `tests/route-quan-tri-2.test.ts`. **Giữ nguyên** migration `0093` và
+  bảng `import_batches` — `lib/tien-do/import.ts` vẫn ghi sổ mỗi lần import (audit trail cho
+  `dim_denominator_mode`), chỉ bỏ endpoint đọc chưa ai dùng; dữ liệu vẫn tra được thẳng qua DB
+  khi cần. Đã xoá entry route này khỏi `scripts/dead-routes-allowlist.json`.
+
 ## ✅ Audit tối giản — gỡ 2 dependency thừa — 2026-09-21
 
 Rà toàn repo (dead-code scan, depcheck, grep thủ công) tìm phần không thực sự cần thiết để dọn.
