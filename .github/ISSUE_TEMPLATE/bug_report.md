@@ -25,7 +25,7 @@ labels: bug
 - Vai trò (admin/pm/engineer/subcon):
 - Thiết bị / trình duyệt:
 - Màn hình (mobile/desktop):
-- Theme (dark / light / kingblue / darkblue / navy):
+- Theme (light / darkblue):
 
 ## Ảnh chụp / log (nếu có)
 
