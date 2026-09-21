@@ -42,8 +42,8 @@ export async function PATCH(
   if (!gc.ok) return NextResponse.json({ error: gc.error }, { status: 422 });
   const note = gc.note;
 
-  const dim = await queryOne<{ task_id: number; package_id: number }>(
-    `SELECT pd.task_id, t.package_id
+  const dim = await queryOne<{ task_id: number; package_id: number; status: string | null }>(
+    `SELECT pd.task_id, t.package_id, t.status
        FROM progress_dimensions pd JOIN tasks t ON t.id = pd.task_id
       WHERE pd.id = ?`,
     id,
@@ -60,6 +60,18 @@ export async function PATCH(
     return NextResponse.json(
       { error: "Bạn chỉ được cập nhật task được giao cho mình" },
       { status: 403 },
+    );
+
+  // Bất biến nghiệm thu (L2, audit 2026-09-22): bỏ tick ô của task đã nghiệm thu sẽ kéo %
+  // xuống dưới 1 trong khi status vẫn nghiem_thu (deriveStatus giữ) — phá bất biến
+  // "nghiem_thu ⇒ progress = 1". Phải huỷ nghiệm thu trước. Tick (installed=true) vẫn cho
+  // vì không giảm %, replay hàng đợi offline không bị kẹt.
+  if (!installed && dim.status === "nghiem_thu")
+    return NextResponse.json(
+      {
+        error: "Task đã nghiệm thu — huỷ nghiệm thu (DELETE /api/tasks/:id/approve) trước khi sửa",
+      },
+      { status: 409 },
     );
 
   // Hold point chuyển bước (M3) + gate biện pháp thi công (M8): chỉ chặn khi TICK
