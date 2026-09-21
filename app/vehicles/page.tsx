@@ -352,7 +352,10 @@ export default function VehiclesPage() {
       </div>
 
       {showAdd && (
-        <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-4 overflow-y-auto">
+        <div
+          className="fixed inset-0 flex items-start justify-center z-50 p-4 overflow-y-auto"
+          style={{ background: "var(--overlay-scrim)" }}
+        >
           <div className="bg-zinc-800 border border-zinc-700 rounded-xl w-full max-w-md my-8 p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg">Đăng ký xe</h3>

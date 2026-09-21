@@ -282,7 +282,10 @@ export default function DataQualityPage() {
 
         {/* Modal Resolve */}
         {selectedIssue && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: "var(--overlay-scrim)" }}
+          >
             <div className="w-full max-w-lg rounded-xl border border-zinc-800 bg-zinc-900 p-5">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-base font-semibold text-zinc-100">

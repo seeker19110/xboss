@@ -1,5 +1,38 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Audit toàn diện chế độ sáng (light theme) — 2026-09-21
+
+Audit UI/UX + a11y tập trung vào `html.light`. Tìm và sửa 4 nhóm vấn đề:
+
+- **Nghiêm trọng — modal backdrop bị đảo trắng**: `app/components/dialogs.tsx` và ~12 chỗ tự
+  vẽ overlay riêng (`PhotosModal`, `mepf-process`, nhiều trang `engineering/*`, `reports`,
+  `vehicles`) dùng `bg-black/NN` làm lớp phủ — nhưng `--color-black` bị `html.light` đảo thành
+  `#ffffff` (phục vụ pattern `text-black` trên nền accent sáng), khiến scrim modal hoá thành
+  lớp phủ TRẮNG ở light theme thay vì làm tối nền phía sau. Thêm token cố định
+  `--overlay-scrim: rgba(0,0,0,.7)` (không khai lại trong `html.<theme>` nào, theo mẫu
+  `--on-accent`) và thay mọi `bg-black/NN` dùng làm scrim bằng
+  `style={{ background: "var(--overlay-scrim)" }}`.
+- **Trung bình — 9 cặp chữ/nền control dưới AA ở light**: `text-zinc-500`, `blue-400`,
+  `cyan-300/400`, `purple-400`, `red-400`, `violet-400`, `yellow-300/400` trên nền control
+  `zinc-800` (`#dde2ea`) chỉ đạt 3,78–4,41:1. Đậm thêm các token này trong khối `html.light`
+  của `globals.css` (ADR-0010 — sửa ở token, không sửa tay từng class); `npm run
+check:contrast` từ cảnh báo còn 9 cặp xuống 0.
+- **Trung bình — hex Excel cứng trong `app/payments/print/page.tsx`**: tách 4 màu mô phỏng
+  định dạng Excel (`#4472c4`/`#fff2cc`/`#d9e1f2`/`#e2efda`) thành class riêng
+  `.paymentcert-header/-subheader/-highlight/-total` trong `globals.css` (cố ý không đảo theo
+  theme, giống `.sheet-stable`/`.chart-vivid`) thay vì literal hex trong JSX. Tương tự,
+  `app/tracking/[sheet]/page.tsx` (dải tiêu đề khi in) đổi `bg-[#808080]` sang class
+  `.print-title-band`.
+- **Nhỏ — thiếu chú thích miễn trừ ở khối `@media print`**: 4 file
+  (`tracking/[sheet]/page.tsx`, `schedule-control/page.tsx`, `lookahead/page.tsx`,
+  `ReportPrintable.tsx`) viết hex `#fff`/`#000`... trực tiếp trong `<style jsx global>` — hợp
+  lệ (trang in luôn cần giấy trắng, `@media print` không đọc được biến CSS bị theme đảo) nhưng
+  thiếu ghi chú nên dễ bị nhầm là vi phạm khi audit sau. Thêm comment miễn trừ giống mẫu ở
+  `globals.css`.
+
+`npm run lint`/`typecheck`/`build` xanh sau khi sửa; `check:contrast`/`check:mau-accent` cả
+hai đều `[OK]`.
+
 ## ✅ Audit tổng quát — xoá `/api/import/batches`, sửa ghi chú lỗi thời — 2026-09-21
 
 Audit diện rộng tìm tính năng thừa. Kết luận: repo khá sạch, hầu hết ứng viên "trông thừa"

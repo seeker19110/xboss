@@ -157,6 +157,8 @@ export default function LookaheadPage() {
         </p>
       </div>
 
+      {/* Hex cứng trong khối in dưới đây là CHỦ ĐÍCH — trang in luôn cần giấy trắng bất kể
+          theme, và @media print không đọc được biến CSS đã bị html.<theme> đảo. */}
       <style jsx global>{`
         @media print {
           .no-print {

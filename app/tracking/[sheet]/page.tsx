@@ -498,7 +498,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
 
       {/* Tiêu đề chỉ hiện khi in */}
       {printTitle && (
-        <div className="hidden print:block w-full bg-[#808080] py-3 text-center">
+        <div className="hidden print:block w-full print-title-band py-3 text-center">
           <span className="text-white font-bold uppercase tracking-wide text-sm">{printTitle}</span>
         </div>
       )}
@@ -594,6 +594,10 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
       )}
 
       {/* Modal đổi tên / đường dẫn trang */}
+      {/* Hex cứng trong khối in dưới đây là CHỦ ĐÍCH, không phải vi phạm luật "không hardcode
+          hex trong component": trang in luôn cần nền giấy trắng bất kể theme đang chọn, và
+          @media print không đọc được biến CSS bị html.<theme> ghi đè nên không dùng .sheet-stable
+          ở đây được — xem ghi chú tương tự ở globals.css (khối .sheet-stable). */}
       <style>{`
         @media print {
           .no-print { display: none !important; }
