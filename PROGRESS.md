@@ -8,6 +8,12 @@ Xoá toàn bộ cụm 6 mục (`dash.site-command`, `dash.schedule-control`, `da
 đích (`/site`, `/schedule`, `/procurement`, `/commercial`, `/engineering-intelligence`,
 `/governance`) vẫn tồn tại và vẫn truy cập được qua các mục sidebar khác đã trỏ tới cùng route.
 
+**Fix CI đỏ (PR #488):** xoá `tests/unified-master-hubs.test.ts` (test riêng cho cụm vừa bị xoá,
+không còn ý nghĩa) và sửa `tests/route-quan-tri-2.test.ts` — 5 chỗ dùng `nodeKey` cứng
+`dash.site-command`/`dash.schedule-control` (đã xoá khỏi cây) cho API `/api/nav-settings`, đổi
+sang `dash.dashboard`/`dash.mepf-process` (vẫn tồn tại) để test không phụ thuộc vào 1 node cụ thể
+sắp bị xoá trong tương lai.
+
 ## ✅ Bỏ cụm sidebar "Kỹ thuật Không gian & AI (Engineering OS)" — 2026-09-21
 
 Xoá toàn bộ cụm `dash.apex-cockpit`/`dash.spatial-viewer`/`dash.hse-vision`/`dash.zalo-copilot`/
