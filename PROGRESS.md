@@ -33,6 +33,35 @@ check:contrast` từ cảnh báo còn 9 cặp xuống 0.
 `npm run lint`/`typecheck`/`build` xanh sau khi sửa; `check:contrast`/`check:mau-accent` cả
 hai đều `[OK]`.
 
+## ✅ Viết lại `check:dead-code` bằng TypeScript Compiler API (đóng nợ kỹ thuật) — 2026-09-21
+
+Nợ kỹ thuật ghi ở đợt audit trước ("script hiện so khớp bằng regex tên hàm, không hiểu
+re-export/type alias/generic nên sai nhiều") nay đã đóng: phần dò "export không ai dùng
+ngoài file khai báo" trong `scripts/check-dead-code.ts` viết lại bằng TypeScript Compiler
+API (`ts.createProgram` + `TypeChecker`, dùng `typescript` sẵn có trong devDependencies —
+không thêm dependency mới như `ts-morph`) thay vì regex khớp CHỮ trên toàn văn bản file.
+
+Cách làm: 1 lượt duyệt AST toàn chương trình, resolve mỗi Identifier ra symbol thật (unwrap
+alias), gom `symbol → tập file đã dùng`; rồi với mỗi export trong `lib/*.ts`, tra symbol đó
+có file nào NGOÀI nó dùng không. Chính xác hơn regex vì không bị nhầm bởi tên trùng ở 2 nơi
+khác nhau hay text nằm trong comment/string.
+
+**Phát hiện + vá 1 bug thật trong lúc verify thủ công:** mẫu `const { a, b } = await
+import("@/lib/x")` (dùng RẤT nhiều trong `tests/` để lazy-load route/module) không đi qua
+`getSymbolAtLocation` bình thường — identifier trong `ObjectBindingPattern` resolve ra symbol
+biến cục bộ mới tạo, không phải symbol export gốc, gây báo sai 33 export (vd
+`_resetDefaultUsersCacheForTests`, `kickoffReadiness` — đều CÓ dùng thật qua đúng mẫu này).
+Đã vá bằng cách lấy type của biểu thức `await import(...)` rồi map property destructure
+sang đúng export symbol của module đích. Trước vá: 658 orphan; sau vá: **625**.
+
+Thêm biến `DEAD_CODE_LIST_ORPHANS=1` để in danh sách đầy đủ khi cần audit thủ công
+(`DEAD_CODE_LIST_ORPHANS=1 npx tsx scripts/check-dead-code.ts`).
+
+**Chưa xoá export nào trong đợt này** — 625 ứng viên (333 type + 132 interface + 127 const +
+65 function + 1 class) cần rà tay theo từng file trước khi xoá (script chỉ cảnh báo, không
+chặn CI qua allowlist như file unreachable). Đây là nợ kỹ thuật tiếp theo, để đợt sau.
+Đã kiểm `lint`/`typecheck` xanh sau khi sửa script.
+
 ## ✅ Rút gọn còn 2 theme (Sáng / Dark Blue) — 2026-09-21
 
 Theo yêu cầu người dùng: bỏ 3 theme `dark` (Tối), `kingblue` (King Blue), `navy` (Navy) —
