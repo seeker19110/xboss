@@ -32,7 +32,6 @@ import { NextRequest } from "next/server";
 //   - app/api/notifications/feed/route.ts
 //   - app/api/notifications/prefs/route.ts
 //   - app/api/integrations/[provider]/sync/route.ts
-//   - app/api/import/batches/route.ts
 //   - app/api/approvals/inbox/route.ts
 
 const S = { skip: !HAS_TEST_DB };
@@ -2054,65 +2053,6 @@ test(
     assert.match(body.error, /chưa được bật/);
   },
 );
-
-// ============================================================================
-// GET /api/import/batches
-// ============================================================================
-
-test("GET /api/import/batches: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/import/batches/route");
-  const res = await GET(jreq("/api/import/batches", undefined, "GET"));
-  assert.equal(res.status, 401);
-});
-
-test("GET /api/import/batches: engineer không có quyền (chỉ Admin/PM) → 403", S, async () => {
-  const projectId = await taoDuAn("imp-403");
-  const eng = await taoUser("engineer", "imp-403");
-  await dangNhapDuAn(eng, projectId);
-  const { GET } = await import("@/app/api/import/batches/route");
-  const res = await GET(jreq("/api/import/batches", undefined, "GET"));
-  assert.equal(res.status, 403);
-});
-
-test(
-  "GET /api/import/batches: cách ly dự án — không thấy sổ import của dự án khác",
-  S,
-  async () => {
-    const { insertId } = await import("@/lib/db");
-    const projectA = await taoDuAn("imp-isoA");
-    const projectB = await taoDuAn("imp-isoB");
-    const pmA = await taoUser("pm", "imp-isoA");
-    await insertId(
-      `INSERT INTO import_batches (project_id, source_name, source_sha256, dim_denominator_mode)
-     VALUES (?, 'file.xlsx', 'abc123', 'columns')`,
-      projectB,
-    );
-    await dangNhapDuAn(pmA, projectA);
-    const { GET } = await import("@/app/api/import/batches/route");
-    const res = await GET(jreq("/api/import/batches", undefined, "GET"));
-    assert.equal(res.status, 200);
-    assert.deepEqual((await res.json()).batches, []);
-  },
-);
-
-test("GET /api/import/batches: thấy đúng sổ import của dự án mình", S, async () => {
-  const { insertId } = await import("@/lib/db");
-  const projectId = await taoDuAn("imp-ok");
-  const pm = await taoUser("pm", "imp-ok");
-  const batchId = await insertId(
-    `INSERT INTO import_batches (project_id, source_name, source_sha256, dim_denominator_mode, imported_by)
-     VALUES (?, 'file-ok.xlsx', 'sha-ok', 'row-nonempty', ?)`,
-    projectId,
-    pm.id,
-  );
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/import/batches/route");
-  const res = await GET(jreq("/api/import/batches", undefined, "GET"));
-  assert.equal(res.status, 200);
-  const { batches } = await res.json();
-  assert.ok(batches.some((b: { id: number }) => b.id === batchId));
-});
 
 // ============================================================================
 // GET /api/approvals/inbox

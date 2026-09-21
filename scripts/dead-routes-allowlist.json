@@ -29,15 +29,11 @@
   },
   {
     "route": "/api/tasks/batch",
-    "ly_do": "Sửa hàng loạt ô lưới tracking (cùng họ với /api/materials/batch đang dùng ở InventoryTab). Còn giữ vì lưới tracking sẽ gắn vào; có kiểm quyền + test. Xoá hay gắn UI: chờ chốt (audit 2026-08-25 §3.5)."
+    "ly_do": "Sửa hàng loạt ô lưới tracking — ĐANG dùng thật, gọi từ app/tracking/[sheet]/tickApi.ts (audit 2026-09-21 xác nhận lại, sửa ghi chú lỗi thời trước đó)."
   },
   {
     "route": "/api/dimensions/batch",
-    "ly_do": "Tick hàng loạt ô dimension — cùng lý do /api/tasks/batch."
-  },
-  {
-    "route": "/api/import/batches",
-    "ly_do": "Lịch sử lô import (migration 0093 + tests/import-batches.test.ts) — backend đã xong, UI chưa gắn."
+    "ly_do": "Tick hàng loạt ô dimension — ĐANG dùng thật, gọi từ app/tracking/[sheet]/tickApi.ts và app/components/offlineQueue/logic.ts (audit 2026-09-21 xác nhận lại, sửa ghi chú lỗi thời trước đó)."
   },
   {
     "route": "/api/materials/allocation-meta",
