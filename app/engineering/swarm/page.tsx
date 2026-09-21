@@ -501,7 +501,10 @@ export default function SwarmEngineeringPage() {
 
         {/* Modal Khởi tạo Phiên mới */}
         {showNewDebateModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+            style={{ background: "var(--overlay-scrim)" }}
+          >
             <div className="w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl">
               <h3 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
                 <Bot className="text-amber-400" size={20} />
