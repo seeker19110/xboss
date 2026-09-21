@@ -1,37 +1,51 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   AlertTriangle,
+  BarChart3,
+  CalendarCheck,
+  CalendarDays,
+  CheckCheck,
   Clock,
-  Upload,
-  ChevronRight,
   FileDown,
-  Printer,
+  GripVertical,
+  Gauge,
+  LineChart,
+  List,
+  ListChecks,
+  Map as MapIcon,
   Plus,
+  Printer,
   Trash2,
   TrendingDown,
-  GripVertical,
-  Sparkles,
-  HardHat,
-  CalendarCheck,
-  Package,
-  Coins,
-  Brain,
-  Landmark,
-  ArrowUpRight,
-  Gauge,
-  type LucideIcon,
+  TrendingUp,
+  Upload,
 } from "lucide-react";
-import { slugFromCode, toSlug } from "@/lib/nen/sheets";
+import { slugFromCode } from "@/lib/nen/sheets";
 import AppHeader from "@/app/components/AppHeader";
-import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
+import { appAlert, appConfirm } from "@/app/components/dialogs";
 import { PageSkeleton, Skeleton } from "@/app/components/Skeleton";
 import EditableText from "@/app/components/EditableText";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { sortFloorsDesc } from "@/lib/tien-do/floors";
 import DelayedGroupsTable from "@/app/components/DelayedGroupsTable";
-import { Button, Card, CardLink, Chip, Section, StatCard } from "@/app/components/ui";
+import HomeRail from "@/app/components/HomeRail";
+import NewSheetModal from "@/app/components/NewSheetModal";
+import ProgressRow from "@/app/components/ProgressRow";
+import {
+  Button,
+  ButtonLink,
+  Card,
+  Chip,
+  DocToolbar,
+  Section,
+  StatCard,
+  Tabs,
+  TabPanel,
+  type TabItem,
+} from "@/app/components/ui";
 import { systemColorClasses } from "@/lib/nen/systemColors";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/tien-do/status";
 import type {
@@ -116,103 +130,47 @@ type SystemCard = {
   delayed: number;
 };
 
-// 7 phân hệ hợp nhất + 6 giai đoạn vòng đời: dữ liệu điều hướng thuần (không phải số liệu
-// dự án) nên tách khỏi JSX cho gọn. Trước đây khai ngay trong render kèm các chip trạng thái
-// cắm cứng ("100% Khớp", "LOD 400", "Quyết toán kỳ 6") — số liệu giả, không đọc từ DB, dễ
-// khiến người xem tin nhầm là tình trạng thật; đã bỏ hẳn, chỉ giữ phần điều hướng.
-const HUBS: {
-  title: string;
-  desc: string;
-  href: string;
-  icon: LucideIcon;
-  color: string;
-  colSpan?: string;
-}[] = [
-  {
-    title: "1. Chỉ huy hiện trường & An toàn",
-    desc: "Việc của tôi, Nhật ký TT06, Nghiệm thu, Mặt bằng & AI HSE",
-    href: "/site",
-    icon: HardHat,
-    color: "text-emerald-300",
-  },
-  {
-    title: "2. Kế hoạch & Tiến độ WBS",
-    desc: "Lưới 6 hệ, CPM Gantt, Lookahead, EVM SPI/CPI & Báo cáo A4",
-    href: "/schedule",
-    icon: CalendarCheck,
-    color: "text-sky-300",
-  },
-  {
-    title: "3. Chuỗi cung ứng & Vật tư",
-    desc: "Định mức BOQ, Đấu thầu Vendor, Đơn hàng PO & QR GRN",
-    href: "/procurement",
-    icon: Package,
-    color: "text-blue-300",
-  },
-  {
-    title: "4. Hợp đồng, Chi phí & FIDIC",
-    desc: "Hợp đồng A-B, Chứng chỉ IPC, Phát sinh VO, Claims & Dòng tiền",
-    href: "/commercial",
-    icon: Coins,
-    color: "text-violet-300",
-  },
-  {
-    title: "5. Trí tuệ AI & Digital Twin",
-    desc: "Zalo/Voice Copilot, Gate 0, AI Swarm Debates & IoT Telemetry",
-    href: "/engineering-intelligence",
-    icon: Brain,
-    color: "text-rose-300",
-  },
-  {
-    title: "6. Quản trị dự án & Hệ thống",
-    desc: "Khởi công Đ107, Bàn giao Đ24, CDE Hồ sơ, Nhân sự & Audit Log",
-    href: "/governance",
-    icon: Landmark,
-    color: "text-zinc-300",
-    colSpan: "sm:col-span-2",
-  },
+// Thẻ "Tiến độ" gom 5 cách nhìn cùng một dữ liệu vào tab (M125) — mỗi lần chỉ mount tab
+// đang mở nên các panel nặng (bản đồ, S-curve, EVM) không còn tự fetch khi chưa ai xem.
+// Tab đang mở ghi vào URL `?tab=` để reload/chia sẻ link giữ nguyên.
+const TABS: TabItem[] = [
+  { id: "sheets", label: "Trang tracking", icon: List },
+  { id: "map", label: "Bản đồ", icon: MapIcon },
+  { id: "scurve", label: "S-curve", icon: TrendingUp },
+  { id: "evm", label: "EVM", icon: LineChart },
+  { id: "chart", label: "Biểu đồ", icon: BarChart3 },
 ];
+// Tab mặc định là S-curve: đây là cách nhìn "tiến độ toàn dự án" duy nhất trả lời ngay
+// câu hỏi "đang nhanh hay chậm so với kế hoạch", và cũng là panel e2e trang chủ dùng làm
+// mốc "đã hydrate + nạp xong dữ liệu" (`e2e/authed/dashboard.spec.ts`).
+const DEFAULT_TAB = "scurve";
 
-const LIFECYCLE = [
-  {
-    stage: "GĐ 0",
-    title: "Khởi động & Pháp lý",
-    desc: "Điều 107 · ĐTM · BOQ TT12",
-    href: "/governance?tab=lifecycle",
-  },
-  {
-    stage: "GĐ 1",
-    title: "Kỹ thuật không gian",
-    desc: "Xem không gian · Vòng đời thiết bị MEPF",
-    href: "/engineering/spatial-viewer",
-  },
-  {
-    stage: "GĐ 2",
-    title: "Cung ứng & Vật tư",
-    desc: "PO 6 bước · QR GRN cổng",
-    href: "/procurement",
-  },
-  {
-    stage: "GĐ 3",
-    title: "Hiện trường & HSE",
-    desc: "Nhật ký TT06 · AI Vision",
-    href: "/site",
-  },
-  {
-    stage: "GĐ 4",
-    title: "Nghiệm thu & IPC",
-    desc: "Ký số e-Sign · TT96 · FIDIC",
-    href: "/commercial",
-  },
-  {
-    stage: "GĐ 5",
-    title: "Hoàn công & Bàn giao",
-    desc: "T&C · Điều 24 · Digital Twin",
-    href: "/governance?tab=lifecycle",
-  },
-];
+// Thanh hành động đáy chỉ dành cho màn hẹp: desktop đã có `DocToolbar` ở đầu trang.
+// `AppHeader` tự ẩn thanh đáy dưới `md` KHI trang không truyền `bottomActions`, nên trang
+// chủ chỉ truyền bộ nút lúc màn hẹp — truyền cả ở desktop sẽ để lại thanh trống dính đáy.
+function useIsCompact() {
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const onChange = () => setCompact(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return compact;
+}
 
 export default function Dashboard() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <DashboardInner />
+    </Suspense>
+  );
+}
+
+function DashboardInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [data, setData] = useState<{
     delayedTasks: DelayedTask[];
     groupProgress: Record<string, number>;
@@ -225,25 +183,31 @@ export default function Dashboard() {
     approvals: ApprovalsBlock | null;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchedAt, setFetchedAt] = useState("");
   const [sheetFilter, setSheetFilter] = useState("");
   const [floorFilter, setFloorFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [reasonFilter, setReasonFilter] = useState("");
   const [me, setMe] = useState<Me | null>(null);
   const [sheets, setSheets] = useState<SheetNav[]>([]);
-  const [newSheet, setNewSheet] = useState<{
-    name: string;
-    slug: string;
-    code: string;
-    copyFromId: number | "";
-  } | null>(null);
-  const [newSheetErr, setNewSheetErr] = useState("");
+  const [newSheetOpen, setNewSheetOpen] = useState(false);
   const [kpiOrder, setKpiOrder] = useState<KPI[]>([]);
   const [systems, setSystems] = useState<SystemCard[]>([]);
   // Danh mục nguyên nhân trễ đọc từ code_lists (thay hằng DELAY_REASON_LABEL tĩnh).
   const [delayReasons, setDelayReasons] = useState<{ code: string; label: string }[]>([]);
   const dragIdx = useRef<number | null>(null);
   const dragOverIdx = useRef<number | null>(null);
+  const compact = useIsCompact();
+
+  // Tab đang mở: state cục bộ + ghi vào URL (cùng khuôn với `HubShell`) — đọc thẳng từ
+  // URL sẽ phụ thuộc vào việc điều hướng mềm có giữ được state của trang hay không.
+  const tabParam = searchParams.get("tab");
+  const [tab, setTab] = useState(() =>
+    TABS.some((t) => t.id === tabParam) ? (tabParam as string) : DEFAULT_TAB,
+  );
+  useEffect(() => {
+    if (tabParam && TABS.some((t) => t.id === tabParam)) setTab(tabParam);
+  }, [tabParam]);
 
   useEffect(() => {
     Promise.all([
@@ -265,6 +229,9 @@ export default function Dashboard() {
             code: i.code,
             label: i.label,
           })),
+        );
+        setFetchedAt(
+          new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
         );
       })
       .finally(() => setLoading(false));
@@ -346,6 +313,7 @@ export default function Dashboard() {
   if (loading) return <PageSkeleton />;
 
   const canImport = me?.role === "admin" || me?.role === "pm";
+  const approvals = data?.approvals ?? null;
 
   const trackingUrl = (t: DelayedTask) => {
     const slug = t.sheetSlug ?? slugFromCode(t.sheetType);
@@ -354,24 +322,11 @@ export default function Dashboard() {
       : null;
   };
 
-  async function createSheet() {
-    if (!newSheet?.name.trim()) return;
-    const res = await fetch("/api/sheets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: newSheet.name.trim(),
-        code: newSheet.code.trim() || undefined,
-        slug: newSheet.slug.trim() || undefined,
-        copyFromId: newSheet.copyFromId || undefined,
-      }),
-    });
-    const j = await res.json().catch(() => null);
-    if (!res.ok) {
-      setNewSheetErr(j?.error ?? "Không tạo được trang");
-      return;
-    }
-    window.location.href = `/tracking/${j.sheet.slug}`;
+  function selectTab(id: string) {
+    setTab(id);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", id);
+    router.replace(`?${params.toString()}`, { scroll: false });
   }
 
   async function deleteSheet(sheetId: number, sheetName: string) {
@@ -435,560 +390,380 @@ export default function Dashboard() {
     <div className="min-h-screen bg-zinc-950 text-white">
       <AppHeader
         bottomActions={
-          <div className="flex items-center gap-2 shrink-0">
-            {canImport && (
-              <a
-                href="/api/export/excel"
-                aria-label="Xuất Excel"
-                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition"
+          compact ? (
+            <div className="flex items-center gap-2 shrink-0">
+              {canImport && (
+                <ButtonLink
+                  href="/api/export/excel"
+                  icon={FileDown}
+                  labelOnDesktopOnly
+                  aria-label="Xuất Excel"
+                >
+                  Excel
+                </ButtonLink>
+              )}
+              <ButtonLink
+                href="/report"
+                icon={Printer}
+                labelOnDesktopOnly
+                aria-label="Xem báo cáo PDF"
               >
-                <FileDown className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
-              </a>
-            )}
-            <a
-              href="/report"
-              aria-label="Xem báo cáo PDF"
-              className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition"
-            >
-              <Printer className="w-4 h-4" /> <span className="hidden sm:inline">PDF</span>
-            </a>
-            {canImport && (
-              <a
-                href="/import"
-                aria-label="Import Excel"
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
-              >
-                <Upload className="w-4 h-4" />{" "}
-                <span className="hidden sm:inline">Import Excel</span>
-              </a>
-            )}
-          </div>
+                PDF
+              </ButtonLink>
+              {canImport && (
+                <ButtonLink
+                  href="/import"
+                  variant="primary"
+                  icon={Upload}
+                  labelOnDesktopOnly
+                  aria-label="Import Excel"
+                >
+                  Import
+                </ButtonLink>
+              )}
+            </div>
+          ) : undefined
         }
       />
 
-      {/* pb-24 chừa chỗ cho thanh cố định dưới đáy (tìm kiếm/Nghiệm thu/Excel/PDF/Import) */}
-      <main className="px-4 sm:px-6 py-6 pb-24 space-y-8 max-w-screen-xl mx-auto">
-        {/* ── Tổng quan nhanh — số liệu thật lên đầu trang, trước mọi khối điều hướng ── */}
+      {/* pb-24 chừa chỗ cho thanh cố định dưới đáy (tìm kiếm/Excel/PDF/Import trên mobile) */}
+      <main className="px-4 sm:px-6 py-6 pb-24 space-y-6 max-w-screen-xl mx-auto">
+        {/* ── Z0: thanh công cụ ngữ cảnh (desktop; mobile dùng thanh đáy) ── */}
+        <DocToolbar
+          trailing={
+            fetchedAt ? <span className="text-xs text-zinc-400">Cập nhật {fetchedAt}</span> : null
+          }
+        >
+          {canImport && (
+            <ButtonLink href="/import" variant="primary" icon={Upload}>
+              Import Excel
+            </ButtonLink>
+          )}
+          {canImport && (
+            <ButtonLink href="/api/export/excel" icon={FileDown}>
+              Excel
+            </ButtonLink>
+          )}
+          <ButtonLink href="/report" icon={Printer}>
+            Báo cáo PDF
+          </ButtonLink>
+          <DocToolbar.Sep />
+          <ButtonLink href="/approvals" icon={CheckCheck}>
+            Nghiệm thu
+          </ButtonLink>
+          <ButtonLink href="/lookahead" icon={CalendarDays}>
+            Lookahead
+          </ButtonLink>
+          {canImport && (
+            <>
+              <DocToolbar.Sep />
+              <Button icon={Plus} onClick={() => setNewSheetOpen(true)}>
+                Thêm trang
+              </Button>
+            </>
+          )}
+        </DocToolbar>
+
+        {/* ── Z1: dải số liệu hành động — mở trang là thấy ngay, không phải cuộn ── */}
         <Section
           title="Tổng quan dự án"
           description="Số liệu tổng hợp toàn bộ trang tracking đang theo dõi"
           actions={
             canImport && (
+              // Desktop có nút "Thêm trang" trong thanh công cụ; nút này dành cho màn hẹp.
               <Button
                 size="sm"
                 icon={Plus}
-                onClick={() => {
-                  setNewSheetErr("");
-                  setNewSheet({
-                    name: "",
-                    slug: "",
-                    code: "",
-                    copyFromId: sheets[sheets.length - 1]?.id ?? "",
-                  });
-                }}
+                onClick={() => setNewSheetOpen(true)}
+                className="md:hidden"
               >
                 Thêm trang
               </Button>
             )
           }
         >
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div
+            className={`grid grid-cols-2 gap-3 ${approvals ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}
+          >
             <StatCard
               label="Tiến độ tổng"
               value={overview.pct}
               unit="%"
               progress={overview.pct / 100}
               tone={overview.pct >= 80 ? "success" : overview.pct >= 50 ? "info" : "warning"}
-              hint={`${overview.totalTasks.toLocaleString("vi-VN")} công việc · ${kpiOrder.length} trang`}
+              hint="Bình quân có trọng số theo số công việc"
               icon={Gauge}
             />
             <StatCard
-              label="Đang trễ hạn"
+              label="Hạng mục trễ"
               value={overview.delayed}
-              unit="việc"
               tone={overview.delayed > 0 ? "danger" : "success"}
-              hint={overview.delayed > 0 ? "Bấm để xem danh sách" : "Toàn bộ đúng hạn"}
+              hint={
+                overview.delayed > 0
+                  ? `${allDelayed.length} công tác · bấm để xem danh sách`
+                  : "Toàn bộ đúng hạn"
+              }
               icon={TrendingDown}
               href={overview.delayed > 0 ? "#delayed-table" : undefined}
             />
+            {approvals && (
+              <StatCard
+                label="Chờ duyệt"
+                value={approvals.pendingProposals + approvals.pendingPurchaseRequests}
+                tone="neutral"
+                hint={`${approvals.pendingProposals} đề xuất · ${approvals.pendingPurchaseRequests} yêu cầu mua`}
+                icon={CalendarCheck}
+                href="/approvals"
+              />
+            )}
             <StatCard
-              label="NCR đang mở"
-              value={data?.quality.ncrOpen ?? 0}
-              tone={(data?.quality.ncrOverdue ?? 0) > 0 ? "warning" : "neutral"}
-              hint={
-                (data?.quality.ncrOverdue ?? 0) > 0
-                  ? `${data?.quality.ncrOverdue} phiếu quá hạn xử lý`
-                  : "Không có phiếu quá hạn"
-              }
-              icon={AlertTriangle}
-              href="/quality"
-            />
-            <StatCard
-              label="Chờ duyệt của tôi"
-              value={
-                (data?.approvals?.pendingProposals ?? 0) +
-                (data?.approvals?.pendingPurchaseRequests ?? 0)
-              }
+              label="Công tác theo dõi"
+              value={overview.totalTasks.toLocaleString("vi-VN")}
               tone="neutral"
-              hint={`${data?.approvals?.pendingProposals ?? 0} đề xuất · ${data?.approvals?.pendingPurchaseRequests ?? 0} yêu cầu mua`}
-              icon={CalendarCheck}
-              href="/approvals"
+              hint={`${sheets.length} trang tracking`}
+              icon={ListChecks}
             />
           </div>
         </Section>
 
-        {/* ── Tiến độ từng trang tracking — kéo thả để sắp xếp (Admin/PM) ── */}
-        <Section
-          title="Tiến độ theo trang tracking"
-          description={canImport ? "Kéo thả thẻ để đổi thứ tự hiển thị" : undefined}
-        >
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {kpiOrder.map((k, i) => {
-              const slug = k.sheetSlug ?? slugFromCode(k.sheetType);
-              const pct = Math.round((k.avgProgress ?? 0) * 100);
-              return (
-                <div
-                  key={k.sheetId}
-                  className="relative group/wrap"
-                  draggable={canImport}
-                  onDragStart={() => onDragStart(i)}
-                  onDragOver={(e) => onDragOver(e, i)}
-                  onDrop={onDrop}
-                >
-                  <StatCard
-                    label={k.sheetType}
-                    value={pct}
-                    unit="%"
-                    progress={pct / 100}
-                    tone={pct >= 80 ? "success" : pct >= 50 ? "info" : "warning"}
-                    hint={`${k.total} công việc`}
-                    href={slug ? `/tracking/${slug}` : undefined}
-                    badge={
-                      k.delayed > 0 ? (
-                        // Chừa chỗ cho nút xoá nổi ở góc phải khi được sửa (Admin/PM)
-                        <Chip
-                          tone="danger"
-                          icon={AlertTriangle}
-                          className={canImport ? "mr-8" : ""}
+        {/* ── Z2: thân 2 cột — cột chính (tiến độ → đường găng → bảng trễ) + cột phải ── */}
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+          <div className="min-w-0 space-y-6">
+            {/* Thẻ "Tiến độ" — 5 cách nhìn cùng dữ liệu, chỉ mount tab đang mở */}
+            <Card pad="none">
+              <Tabs
+                group="home-progress"
+                label="Cách nhìn tiến độ"
+                items={TABS}
+                value={tab}
+                onChange={selectTab}
+                className="px-2"
+              />
+              <TabPanel group="home-progress" value={tab} className="p-3">
+                {tab === "sheets" && (
+                  <div className="space-y-0.5">
+                    {canImport && (
+                      <p className="px-2 pb-1 text-[11px] text-zinc-400">
+                        Kéo thả hàng để đổi thứ tự hiển thị
+                      </p>
+                    )}
+                    {kpiOrder.map((k, i) => {
+                      const slug = k.sheetSlug ?? slugFromCode(k.sheetType);
+                      return (
+                        <div
+                          key={k.sheetId}
+                          draggable={canImport}
+                          onDragStart={() => onDragStart(i)}
+                          onDragOver={(e) => onDragOver(e, i)}
+                          onDrop={onDrop}
                         >
-                          <span className="tabular-nums">{k.delayed}</span>
-                          <span className="sr-only"> hạng mục đang trễ</span>
-                        </Chip>
-                      ) : undefined
-                    }
-                    className={canImport ? "pl-6" : undefined}
-                  />
-                  {canImport && (
-                    <>
-                      {/* Tay cầm kéo */}
-                      <div className="absolute top-4 left-2 text-zinc-700 group-hover/wrap:text-zinc-500 cursor-grab active:cursor-grabbing transition z-10 pointer-events-none">
-                        <GripVertical className="w-3.5 h-3.5" />
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          deleteSheet(k.sheetId, k.sheetType);
-                        }}
-                        title="Xoá trang tracking"
-                        aria-label={`Xoá trang ${k.sheetType}`}
-                        className="absolute top-3 right-2 p-1.5 rounded-lg bg-zinc-900/90 border border-zinc-800 text-zinc-500 hover:text-red-300 hover:bg-red-950/50 hover:border-red-800/60 opacity-100 sm:opacity-0 sm:group-hover/wrap:opacity-100 transition z-10"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Section>
-
-        {/* ── Card hệ (M15) — nhìn nhanh từng hệ, bấm vào trang hub riêng ── */}
-        {systems.length > 0 && (
-          <Section title="Theo hệ thi công" description={`${systems.length} hệ đang theo dõi`}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {systems.map((d) => {
-                const c = systemColorClasses(d.color);
-                const dpct = Math.round((d.avgProgress ?? 0) * 100);
-                return (
-                  <CardLink
-                    key={d.code}
-                    href={`/system/${d.code}`}
-                    tone="sunken"
-                    pad="sm"
-                    className={`flex flex-col justify-between border-l-4 ${c.border} group`}
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span
-                        className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`}
-                        aria-hidden="true"
-                      />
-                      <p className="text-xs font-semibold truncate text-zinc-200 group-hover:text-zinc-50 transition-colors">
-                        {d.name}
-                      </p>
-                    </div>
-                    <div className="mt-3">
-                      <p
-                        className={`text-2xl font-bold font-mono tabular-nums leading-none ${c.text}`}
-                      >
-                        {dpct}%
-                      </p>
-                      <div className="flex items-center justify-between mt-1.5 text-[11px]">
-                        <span className="text-zinc-400">{d.sheetCount} bảng</span>
-                        {d.delayed > 0 ? (
-                          <span className="font-semibold text-red-300">{d.delayed} trễ</span>
-                        ) : (
-                          <span className="text-emerald-300 font-medium">Đúng hạn</span>
-                        )}
-                      </div>
-                    </div>
-                  </CardLink>
-                );
-              })}
-            </div>
-          </Section>
-        )}
-
-        {/* ── Trung tâm điều hành: lối tắt tới 7 phân hệ hợp nhất + dải 6 giai đoạn vòng đời.
-            Đặt SAU các khối số liệu thật (điều hướng đầy đủ đã có ở sidebar) để trang chủ
-            mở ra là thấy ngay tiến độ/việc trễ thay vì hai khối điều hướng cỡ lớn. ── */}
-        <Section
-          title="Trung tâm điều hành"
-          description="7 phân hệ hợp nhất của XBoss — bấm để mở đúng cockpit"
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {HUBS.map((hub) => {
-              const HubIcon = hub.icon;
-              return (
-                <CardLink
-                  key={hub.href}
-                  href={hub.href}
-                  tone="sunken"
-                  pad="sm"
-                  className={`group flex items-start gap-3 ${hub.colSpan ?? ""}`}
-                >
-                  <span className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 shrink-0">
-                    <HubIcon
-                      className={`w-4 h-4 ${hub.color}`}
-                      strokeWidth={1.75}
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-zinc-100 truncate">
-                        {hub.title}
-                      </span>
-                      <ArrowUpRight
-                        className="w-3.5 h-3.5 shrink-0 text-zinc-600 group-hover:text-emerald-400 transition-colors"
-                        aria-hidden="true"
-                      />
-                    </span>
-                    <span className="mt-0.5 block text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
-                      {hub.desc}
-                    </span>
-                  </span>
-                </CardLink>
-              );
-            })}
-          </div>
-
-          {/* Dải 6 giai đoạn vòng đời — thuần điều hướng theo quy trình, cuộn ngang trên mobile */}
-          <div className="overflow-x-auto scrollbar-none">
-            <ol className="flex items-stretch gap-2 min-w-max sm:min-w-0">
-              {LIFECYCLE.map((stg, idx) => (
-                <li key={stg.stage} className="flex items-center gap-2 flex-1">
-                  <a
-                    href={stg.href}
-                    className="flex-1 min-w-[150px] rounded-lg border border-zinc-800 bg-zinc-950/70 px-3 py-2 hover:border-zinc-700 hover:bg-zinc-900/80 transition interactive-press"
-                  >
-                    <span className="block text-[10px] font-mono font-bold uppercase text-zinc-400">
-                      {stg.stage}
-                    </span>
-                    <span className="block text-xs font-semibold text-zinc-200 truncate">
-                      {stg.title}
-                    </span>
-                    <span className="block text-[11px] text-zinc-400 truncate">{stg.desc}</span>
-                  </a>
-                  {idx < LIFECYCLE.length - 1 && (
-                    <ChevronRight
-                      className="w-3.5 h-3.5 shrink-0 text-zinc-700 hidden sm:block"
-                      aria-hidden="true"
-                    />
-                  )}
-                </li>
-              ))}
-            </ol>
-          </div>
-        </Section>
-
-        {/* ── Bản đồ tiến độ Tháp A (tầng × hệ + lịch sử) ── */}
-        <ProgressMap />
-
-        {/* ── M9: KPI chất lượng + so sánh chéo hệ ── */}
-        {data && (
-          <DashboardExtCards
-            quality={data.quality}
-            vo={data.vo}
-            workfront={data.workfront}
-            bySystem={data.bySystem}
-            approvals={data.approvals}
-          />
-        )}
-
-        {/* ── Việc bị chặn (phụ thuộc chưa thông) ── */}
-        <BlockedPanel />
-
-        {/* ── M18: vật tư vượt định mức theo hạng mục ── */}
-        {me?.role !== "subcon" && <NormsOverPanel />}
-
-        {/* ── Chỉ số tiến độ (SPI) ── */}
-        <SpiCards />
-
-        {/* ── Dự báo hoàn thành ── */}
-        <ForecastCards />
-
-        {/* ── S-curve ── */}
-        <SCurveChart />
-
-        {/* ── M47: EVM (PV/EV/AC → SPI/CPI/EAC) — API tự chặn role không xem tiền ── */}
-        <EvmChart />
-
-        {/* ── Bar chart tiến độ ── */}
-        <DashboardBarChart data={chartData} />
-
-        {/* ── Đường găng (nhúng từ /schedule-control — panel tự fetch /api/schedule-control) ── */}
-        <ScheduleControlPanel />
-
-        {/* ── Pareto nguyên nhân trễ ── */}
-        {allDelayed.length > 0 && (reasonCounts.length > 0 || noReason > 0) && (
-          <Section
-            icon={AlertTriangle}
-            title={
-              <EditableText tkey="dashboard.pareto.title">Nguyên nhân trễ (Pareto)</EditableText>
-            }
-            description="Bấm thanh để lọc bảng trễ theo lý do"
-          >
-            <Card pad="lg" className="space-y-2">
-              {reasonCounts.map((r) => (
-                <button
-                  key={r.slug}
-                  onClick={() => setReasonFilter((f) => (f === r.slug ? "" : r.slug))}
-                  className={`w-full flex items-center gap-3 group transition ${reasonFilter === r.slug ? "opacity-100" : reasonFilter ? "opacity-40" : ""}`}
-                >
-                  <span
-                    className="text-xs text-zinc-400 w-24 sm:w-32 text-right shrink-0 truncate"
-                    title={r.label}
-                  >
-                    {r.label}
-                  </span>
-                  <div className="flex-1 bg-zinc-800 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="h-2 bg-amber-500/70 group-hover:bg-amber-400 rounded-full transition-all"
-                      style={{ width: `${(r.count / maxReason) * 100}%` }}
-                    />
+                          <ProgressRow
+                            href={slug ? `/tracking/${slug}` : undefined}
+                            label={k.sheetType}
+                            hint={`${k.total} công việc`}
+                            percent={(k.avgProgress ?? 0) * 100}
+                            badge={
+                              k.delayed > 0 ? (
+                                <Chip tone="danger" icon={AlertTriangle}>
+                                  <span className="tabular-nums">{k.delayed}</span> trễ
+                                </Chip>
+                              ) : (
+                                <Chip tone="success">Đúng tiến độ</Chip>
+                              )
+                            }
+                            leading={
+                              canImport ? (
+                                <GripVertical
+                                  className="w-3.5 h-3.5 shrink-0 text-zinc-700 cursor-grab active:cursor-grabbing"
+                                  aria-hidden="true"
+                                />
+                              ) : undefined
+                            }
+                            trailing={
+                              canImport ? (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  icon={Trash2}
+                                  title="Xoá trang tracking"
+                                  aria-label={`Xoá trang ${k.sheetType}`}
+                                  onClick={() => deleteSheet(k.sheetId, k.sheetType)}
+                                  className="shrink-0 hover:text-red-300"
+                                />
+                              ) : undefined
+                            }
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
-                  <span className="text-xs text-zinc-300 w-20 text-left shrink-0 tabular-nums">
-                    {r.count}{" "}
-                    <span className="text-zinc-400">
-                      ({Math.round((r.count / allDelayed.length) * 100)}%)
-                    </span>
-                  </span>
-                </button>
-              ))}
-              {noReason > 0 && (
-                <button
-                  onClick={() => setReasonFilter((f) => (f === "__none" ? "" : "__none"))}
-                  className={`w-full flex items-center gap-3 group transition ${reasonFilter === "__none" ? "opacity-100" : reasonFilter ? "opacity-40" : ""}`}
-                >
-                  <span className="text-xs text-zinc-400 w-24 sm:w-32 text-right shrink-0">
-                    Chưa gán lý do
-                  </span>
-                  <div className="flex-1 bg-zinc-800 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="h-2 bg-zinc-600 group-hover:bg-zinc-500 rounded-full transition-all"
-                      style={{ width: `${(noReason / maxReason) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-zinc-400 w-20 text-left shrink-0 tabular-nums">
-                    {noReason}{" "}
-                    <span className="text-zinc-400">
-                      ({Math.round((noReason / allDelayed.length) * 100)}%)
-                    </span>
-                  </span>
-                </button>
-              )}
+                )}
+                {tab === "map" && <ProgressMap />}
+                {tab === "scurve" && <SCurveChart />}
+                {tab === "evm" && <EvmChart />}
+                {tab === "chart" && <DashboardBarChart data={chartData} />}
+              </TabPanel>
             </Card>
-          </Section>
-        )}
 
-        {/* ── Bảng trễ ── */}
-        <Section
-          id="delayed-table"
-          icon={Clock}
-          title={<EditableText tkey="dashboard.delayed.title">Danh sách hạng mục trễ</EditableText>}
-          description={`${delayedGroupCount} hạng mục · ${delayed.length} công tác`}
-          actions={
-            <div className="flex flex-wrap gap-2">
-              {[
-                {
-                  value: sheetFilter,
-                  onChange: setSheetFilter,
-                  placeholder: "Tất cả sheet",
-                  options: data?.kpi.map((k) => ({ v: k.sheetType, l: k.sheetType })) ?? [],
-                },
-                {
-                  value: floorFilter,
-                  onChange: setFloorFilter,
-                  placeholder: "Tất cả tầng",
-                  options: floors.map((f) => ({ v: f, l: f })),
-                },
-                {
-                  value: statusFilter,
-                  onChange: setStatusFilter,
-                  placeholder: "Tất cả trạng thái",
-                  options: statuses.map((s) => ({ v: s, l: STATUS_LABEL[s as StatusSlug] ?? s })),
-                },
-              ].map((sel, i) => (
-                <select
-                  key={i}
-                  value={sel.value}
-                  onChange={(e) => sel.onChange(e.target.value)}
-                  aria-label={sel.placeholder}
-                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-zinc-500 transition"
-                >
-                  <option value="">{sel.placeholder}</option>
-                  {sel.options.map((o) => (
-                    <option key={o.v} value={o.v}>
-                      {o.l}
-                    </option>
-                  ))}
-                </select>
-              ))}
-            </div>
-          }
-        >
-          {/* Danh sách hạng mục trễ (cặp sheet + tầng) — bấm 1 hạng mục để mở ra các công
-              tác trễ bên trong. Cuộn ngang trên mobile. */}
-          <Card pad="none" className="overflow-hidden">
-            <DelayedGroupsTable
-              tasks={delayed}
-              sheetLabel={(s) => sheetNameByCode.get(s) ?? s}
-              taskHref={trackingUrl}
-              editReason={{ canEdit: !!me && me.role !== "subcon", onChange: setReason }}
-              delayReasons={delayReasons}
-              groupProgress={groupProgressMap}
-              emptyMessage={
-                <>
-                  Không có công việc trễ.{" "}
-                  {canImport && (
-                    <a href="/import" className="text-emerald-400 hover:underline">
-                      Import file Excel
-                    </a>
-                  )}
-                  {!canImport && "Hãy liên hệ Admin/PM để cập nhật dữ liệu."}
-                </>
+            {/* ── Theo hệ thi công (M15) — CỐ Ý để ngoài thẻ tab: đây là đường vào duy
+                nhất còn lại tới trang hệ /system/[code] từ trang chủ (sidebar đã bỏ mục
+                này), giấu sau một tab sẽ thành ngõ cụt điều hướng. ── */}
+            {systems.length > 0 && (
+              <Section title="Theo hệ thi công" description={`${systems.length} hệ đang theo dõi`}>
+                <Card pad="sm" className="grid sm:grid-cols-2 gap-x-3 gap-y-0.5">
+                  {systems.map((d) => {
+                    const c = systemColorClasses(d.color);
+                    return (
+                      <ProgressRow
+                        key={d.code}
+                        href={`/system/${d.code}`}
+                        label={d.name}
+                        hint={`${d.sheetCount} bảng`}
+                        percent={(d.avgProgress ?? 0) * 100}
+                        badge={
+                          d.delayed > 0 ? (
+                            <Chip tone="danger" icon={AlertTriangle}>
+                              <span className="tabular-nums">{d.delayed}</span> trễ
+                            </Chip>
+                          ) : (
+                            <Chip tone="success">Đúng hạn</Chip>
+                          )
+                        }
+                        leading={
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`}
+                            aria-hidden="true"
+                          />
+                        }
+                      />
+                    );
+                  })}
+                </Card>
+              </Section>
+            )}
+
+            {/* ── Đường găng (nhúng từ /schedule-control — panel tự fetch API riêng) ── */}
+            <ScheduleControlPanel />
+
+            {/* ── Bảng trễ ── */}
+            <Section
+              id="delayed-table"
+              icon={Clock}
+              title={
+                <EditableText tkey="dashboard.delayed.title">Danh sách hạng mục trễ</EditableText>
               }
+              description={`${delayedGroupCount} hạng mục · ${delayed.length} công tác`}
+              actions={
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    {
+                      value: sheetFilter,
+                      onChange: setSheetFilter,
+                      placeholder: "Tất cả sheet",
+                      options: data?.kpi.map((k) => ({ v: k.sheetType, l: k.sheetType })) ?? [],
+                    },
+                    {
+                      value: floorFilter,
+                      onChange: setFloorFilter,
+                      placeholder: "Tất cả tầng",
+                      options: floors.map((f) => ({ v: f, l: f })),
+                    },
+                    {
+                      value: statusFilter,
+                      onChange: setStatusFilter,
+                      placeholder: "Tất cả trạng thái",
+                      options: statuses.map((s) => ({
+                        v: s,
+                        l: STATUS_LABEL[s as StatusSlug] ?? s,
+                      })),
+                    },
+                  ].map((sel, i) => (
+                    <select
+                      key={i}
+                      value={sel.value}
+                      onChange={(e) => sel.onChange(e.target.value)}
+                      aria-label={sel.placeholder}
+                      className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-zinc-500 transition"
+                    >
+                      <option value="">{sel.placeholder}</option>
+                      {sel.options.map((o) => (
+                        <option key={o.v} value={o.v}>
+                          {o.l}
+                        </option>
+                      ))}
+                    </select>
+                  ))}
+                </div>
+              }
+            >
+              {/* Danh sách hạng mục trễ (cặp sheet + tầng) — bấm 1 hạng mục để mở ra các công
+                  tác trễ bên trong. Cuộn ngang trên mobile. */}
+              <Card pad="none" className="overflow-hidden">
+                <DelayedGroupsTable
+                  tasks={delayed}
+                  sheetLabel={(s) => sheetNameByCode.get(s) ?? s}
+                  taskHref={trackingUrl}
+                  editReason={{ canEdit: !!me && me.role !== "subcon", onChange: setReason }}
+                  delayReasons={delayReasons}
+                  groupProgress={groupProgressMap}
+                  emptyMessage={
+                    <>
+                      Không có công việc trễ.{" "}
+                      {canImport && (
+                        <a href="/import" className="text-emerald-400 hover:underline">
+                          Import file Excel
+                        </a>
+                      )}
+                      {!canImport && "Hãy liên hệ Admin/PM để cập nhật dữ liệu."}
+                    </>
+                  }
+                />
+              </Card>
+            </Section>
+
+            {/* ── M9: KPI chất lượng + so sánh chéo hệ ── */}
+            {data && (
+              <DashboardExtCards
+                quality={data.quality}
+                vo={data.vo}
+                workfront={data.workfront}
+                bySystem={data.bySystem}
+                approvals={data.approvals}
+              />
+            )}
+
+            {/* ── Việc bị chặn (phụ thuộc chưa thông) ── */}
+            <BlockedPanel />
+
+            {/* ── M18: vật tư vượt định mức theo hạng mục ── */}
+            {me?.role !== "subcon" && <NormsOverPanel />}
+
+            {/* ── Chỉ số tiến độ (SPI) + dự báo hoàn thành — để ở cột chính chứ không
+                phải cột phải: hai panel này chia lưới theo BREAKPOINT VIEWPORT
+                (`lg:grid-cols-5`), nhét vào rail 320px sẽ vỡ lưới mà sửa panel thì phạm
+                guardrail "không đổi component panel" của M125. ── */}
+            <SpiCards />
+            <ForecastCards />
+          </div>
+
+          {/* Cột phải: điều hướng phân hệ + Pareto nguyên nhân trễ */}
+          <div className="lg:sticky lg:top-4">
+            <HomeRail
+              pareto={{
+                rows: reasonCounts,
+                noReason,
+                max: maxReason,
+                total: allDelayed.length,
+                value: reasonFilter,
+                onToggle: (slug) => setReasonFilter((f) => (f === slug ? "" : slug)),
+              }}
             />
-          </Card>
-        </Section>
+          </div>
+        </div>
       </main>
 
-      {/* Modal tạo trang tracking mới */}
-      {newSheet && (
-        <Modal onClose={() => setNewSheet(null)}>
-          <div className="p-5">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <Plus className="w-4 h-4 text-emerald-400" /> Thêm trang tracking
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Tên trang</label>
-                <input
-                  autoFocus
-                  value={newSheet.name}
-                  onChange={(e) =>
-                    setNewSheet(
-                      (ns) =>
-                        ns && {
-                          ...ns,
-                          name: e.target.value,
-                          slug: toSlug(e.target.value),
-                          code: e.target.value,
-                        },
-                    )
-                  }
-                  placeholder="VD: Ống nước cấp Zone 3"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 transition"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Mã sheet</label>
-                <input
-                  value={newSheet.code}
-                  onChange={(e) => setNewSheet((ns) => ns && { ...ns, code: e.target.value })}
-                  placeholder="VD: ONC Z3"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 transition"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Đường dẫn</label>
-                <div className="flex items-center gap-1">
-                  <span className="text-sm text-zinc-400 shrink-0">/tracking/</span>
-                  <input
-                    value={newSheet.slug}
-                    onChange={(e) => setNewSheet((ns) => ns && { ...ns, slug: e.target.value })}
-                    placeholder="ong-nuoc-cap-zone-3"
-                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 font-mono transition"
-                  />
-                </div>
-                <p className="text-[11px] text-zinc-400 mt-1">
-                  Chỉ dùng chữ thường a–z, số và gạch nối.
-                </p>
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Sao chép cấu trúc từ</label>
-                <select
-                  value={newSheet.copyFromId}
-                  onChange={(e) =>
-                    setNewSheet(
-                      (ns) =>
-                        ns && { ...ns, copyFromId: e.target.value ? Number(e.target.value) : "" },
-                    )
-                  }
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 transition"
-                >
-                  <option value="">— Trang trống —</option>
-                  {sheets.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.code} — {s.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-zinc-400 mt-1">
-                  Copy nhóm + công việc, tiến độ reset về 0.
-                </p>
-              </div>
-            </div>
-            {newSheetErr && <p className="text-xs text-red-400 mt-3">{newSheetErr}</p>}
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => setNewSheet(null)}
-                className="px-4 py-2 text-sm bg-zinc-800 hover:bg-zinc-700 rounded-lg transition"
-              >
-                Huỷ
-              </button>
-              <button
-                onClick={createSheet}
-                disabled={!newSheet.name.trim()}
-                className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 rounded-lg font-semibold transition text-on-accent"
-              >
-                Tạo trang
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      {/* Hộp thoại tạo trang tracking mới (Admin/PM) */}
+      {newSheetOpen && <NewSheetModal sheets={sheets} onClose={() => setNewSheetOpen(false)} />}
     </div>
   );
 }

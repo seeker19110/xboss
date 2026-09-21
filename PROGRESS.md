@@ -1,5 +1,81 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ M125 — trang chủ mạch lạc (toolbar + dải số liệu + thân 2 cột) — 2026-09-21
+
+Đặc tả `docs/nang-cap/M125-bo-cuc-trang-chu.md` (Approved). Trang chủ trước đây xếp dọc 15 khối
+với 5 kiểu lưới khác nhau, phải cuộn ~6 màn hình mới tới bảng trễ. Nay đọc theo một nhịp:
+**ngữ cảnh → số liệu → việc cần làm**.
+
+- **Z0 toolbar** (`DocToolbar` của M124, `hidden md:flex`): Import Excel · Excel · Báo cáo PDF ·
+  Nghiệm thu · Lookahead · Thêm trang, trailing "Cập nhật HH:mm". Thanh đáy giữ Import/Excel/PDF
+  qua `ButtonLink` nhưng **chỉ ở màn hẹp** (`matchMedia`, không sửa `AppHeader`).
+- **Z1 dải 4 `StatCard`**: Tiến độ tổng · Hạng mục trễ (bấm cuộn tới `#delayed-table`) · Chờ duyệt
+  (ẩn thẻ + lưới còn 3 cột khi `approvals` null) · Công tác theo dõi.
+- **Z2 thân 2 cột** `lg:grid-cols-[minmax(0,1fr)_320px]`: cột chính = thẻ "Tiến độ" có tab →
+  Theo hệ thi công → Đường găng → **bảng trễ** → khối M9/BlockedPanel/NormsOverPanel → SPI + dự báo;
+  cột phải (`HomeRail`) = Trung tâm điều hành dạng hàng 44px + dải vòng đời 6 giai đoạn + Pareto.
+- **2 component nền mới**: `app/components/ui/Tabs.tsx` (+ `TabPanel`, `role=tablist/tab`, ←/→ và
+  Home/End, roving tabindex, tab chưa mở **không mount** → panel nặng không tự fetch) và
+  `app/components/ProgressRow.tsx` (hàng tên · thanh · % · chip, dùng chung cho danh sách trang
+  tracking và danh sách hệ). Tab đang mở ghi vào URL `?tab=` (khuôn `HubShell`), mặc định `scurve`.
+- Kéo thả thứ tự trang tracking, modal "Thêm trang" (tách ra `NewSheetModal`), bộ lọc bảng trễ và
+  Pareto-lọc-bảng giữ nguyên hành vi. `app/page.tsx` **994 → 769 dòng**.
+
+**Lệch đặc tả có chủ đích (cần phiên chính duyệt):** (1) danh sách **hệ thi công để ngoài thẻ tab**
+— đây là đường vào duy nhất còn lại tới `/system/[code]` từ trang chủ (`e2e/authed/system.spec.ts`
+bấm `a[href="/system/acmv"]` ngay trên `/`), giấu sau tab thành ngõ cụt; (2) **`SpiCards`/
+`ForecastCards` để ở cột chính** thay vì cột phải — hai panel này dùng breakpoint theo **viewport**
+(`lg:grid-cols-5`), nhét vào rail 320px sẽ vỡ lưới mà sửa panel thì phạm guardrail "không đổi panel";
+(3) tab mặc định `scurve` (không phải `sheets`) để e2e trang chủ còn thấy heading "S-curve".
+
+**File chạm:** `app/page.tsx`; mới `app/components/ui/Tabs.tsx`, `app/components/ProgressRow.tsx`,
+`app/components/HomeRail.tsx`, `app/components/NewSheetModal.tsx`; `app/components/ui/index.ts`;
+`docs/adr/0009-bo-component-ui-nen.md`, `docs/nang-cap/README.md`. **Không** đụng `lib/`,
+`app/api/`, `migrations/`, `AppHeader`, các component panel.
+
+**Verify:** lint / typecheck / build / `check:contrast` / `check:mau-accent` / `check:lib-layers` /
+`check:hex-hardcode` / `format:check` xanh; `npm test` với Postgres 16 ephemeral → **251 file,
+4098 ca pass, 0 fail**; `next start` trên DB seed mẫu: `/`, `/?tab=sheets`, `/?tab=evm` đều 200,
+`/api/dashboard|sheets|systems` trả đúng dữ liệu; markup `Tabs`/`TabPanel`/`ProgressRow`/`HomeRail`
+soi bằng `react-dom/server` (ARIA `tablist`/`tab`/`tabpanel` + `aria-controls`/`aria-labelledby`
+đúng cặp). **E2E Playwright KHÔNG chạy được** trong môi trường này (proxy chặn tải Chromium) —
+cần chạy lại ở CI.
+
+## ✅ M124 — bố cục màn hình chứng từ (DocShell) + `/payment-certs` master–detail — 2026-09-21
+
+Đặc tả `docs/nang-cap/M124-bo-cuc-man-hinh-chung-tu.md` (Approved). Chuẩn hoá **mẫu màn hình
+chứng từ** cho nhóm trang tài chính và áp cho trang Thanh toán khối lượng làm trang mẫu.
+
+- **4 component nền mới** trong `app/components/ui/`: `DocToolbar` (+ `DocToolbar.Sep`),
+  `DocField` (+ `DocFieldGroup`), `DocTotals`, `Kbd` — export qua `app/components/ui/index.ts`.
+  Quy ước hình thức ghi vào `docs/adr/0009-bo-component-ui-nen.md` (mục "Màn hình chứng từ — M124"):
+  toolbar trên `hidden md:flex`, thanh hành động **đáy hiện ở mọi breakpoint** qua `bottomActions`
+  của `AppHeader`, `Kbd` ẩn dưới `md`.
+- **`/payment-certs` bỏ Modal, chuyển master–detail**: danh sách đợt cột trái 320px (Mã · Đợt ·
+  Chip trạng thái, dòng đang chọn viền emerald), chứng từ toàn chiều rộng cột phải; đợt đang mở
+  ghi vào URL `?contractId=&id=` nên reload/chia sẻ link giữ nguyên. Dưới `lg` chỉ hiện một trong
+  hai. Chi tiết đợt tách ra `app/payment-certs/_components/CertDocument.tsx` (giữ nguyên
+  `saveItems`/`submitCert`/`decide` cùng các chú thích audit 2026-09-05 và M46/M50).
+- **Số tiền tổng nay lấy từ `totals` của API** (`periodValue`/`cumulativeValue`/`advanceDeduct`/
+  `retentionDeduct`/`approvedValue` — SQL tính, quy ước M45) thay vì chỉ có một dòng "tạm tính"
+  cộng ở JS; dòng tạm tính giữ lại nhưng chỉ hiện khi còn KL chưa lưu. Mọi ô tiền vẫn qua
+  `MaskedValue` (M50 PR2 — user bị che thấy "•••", không thấy 0).
+- **Phím tắt** `Ctrl/⌘+S` lưu KL, `Esc` đóng chứng từ (bỏ qua khi đang mở hộp thoại xác nhận).
+- Lưới dòng KL: `text-sm`, header dính, cột STT + BOQCODE dính trái, ô nhập KL `w-24 min-h-10`
+  (trước là 80px, `text-xs`), thêm cột KL HĐ và Thành tiền.
+
+**File chạm:** `app/components/ui/DocToolbar.tsx`, `DocField.tsx`, `DocTotals.tsx`, `Kbd.tsx`,
+`index.ts`; `app/payment-certs/page.tsx`; `app/payment-certs/_components/CertDocument.tsx`;
+`docs/adr/0009-bo-component-ui-nen.md`; `docs/nang-cap/README.md`. **Không** đụng `lib/`,
+`app/api/`, `migrations/`, `AppHeader`.
+
+**Verify:** lint / typecheck / build / `check:contrast` / `check:mau-accent` / `check:lib-layers` /
+`check:hex-hardcode` xanh; `npm test` với Postgres 16 ephemeral → **251 file, 4098 ca pass, 0 fail**;
+chạy `next start` trên DB thật (seed mẫu + 1 hợp đồng + 3 dòng BOQ): lập đợt → PATCH
+`{items, periodLabel}` → `GET /api/payment-certs/1` trả `totals` đúng (77.500.000 / −7.750.000 /
+−3.875.000 / 65.875.000) → submit → approve đều 200. **E2E Playwright KHÔNG chạy được** trong môi
+trường này (proxy chặn `cdn.playwright.dev`, không có Chromium hệ thống) — cần chạy lại ở CI.
+
 ## ✅ Trả nợ kỹ thuật sau đợt audit sâu — 2026-09-05
 
 Đóng **7/7 mục nợ** ghi ở "Đợt audit toàn dự án — 2026-09-05" (chi tiết từng mục nằm trong

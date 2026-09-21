@@ -1,57 +1,24 @@
 "use client";
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { Plus, X, FileDown, FileSpreadsheet, Receipt } from "lucide-react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus, Receipt } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import MaskedValue from "@/app/components/MaskedValue";
 import { mSum, mMul, mSumBy } from "@/app/lib/masked";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import { Modal, appConfirm, appPrompt, appAlert } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import type { EntityApprovalStatus } from "@/lib/tien-do/approvals";
+import { Button, Card, Chip, StatCard } from "@/app/components/ui";
+import CertDocument, {
+  CertBottomActions,
+  useCertDocument,
+  fmtVND,
+  STATUS_LABEL,
+  STATUS_TONE,
+  type Cert,
+} from "@/app/payment-certs/_components/CertDocument";
 
-type CertStatus = "draft" | "submitted" | "approved" | "rejected";
-const STATUS_LABEL: Record<CertStatus, string> = {
-  draft: "Nháp",
-  submitted: "Đã trình",
-  approved: "Được duyệt",
-  rejected: "Từ chối",
-};
-const STATUS_BADGE: Record<CertStatus, string> = {
-  draft: "bg-zinc-800 text-zinc-300",
-  submitted: "bg-amber-900 text-amber-200",
-  approved: "bg-emerald-900 text-emerald-200",
-  rejected: "bg-rose-900 text-rose-200",
-};
-
-type CertItem = {
-  id: number;
-  boqItemId: number;
-  boqCode: string;
-  boqName: string;
-  boqUnit: string;
-  boqQtyContract: number;
-  qtyPeriod: number;
-  qtyCumulative: number;
-  unitPrice: number;
-};
-type Cert = {
-  id: number;
-  code: string;
-  contractId: number;
-  contractCode: string;
-  contractTitle: string;
-  periodNo: number;
-  periodLabel: string | null;
-  status: CertStatus;
-  submittedAt: string | null;
-  decidedAt: string | null;
-  rejectReason: string | null;
-  createdByName: string | null;
-  items: CertItem[];
-};
 type Contract = {
   id: number;
   code: string;
@@ -62,21 +29,6 @@ type Contract = {
   paid: number;
 };
 
-function fmtVND(n: number) {
-  if (!n) return "—";
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
-}
-
-/** Dòng IPC có khối lượng luỹ kế vượt khối lượng hợp đồng (route trả kèm, chỉ để cảnh báo). */
-type DongVuot = {
-  boqItemId: number;
-  code: string;
-  name: string;
-  unit: string;
-  qtyContract: number;
-  qtyCumulative: number;
-};
-
 export default function PaymentCertsPage() {
   return (
     <Suspense fallback={<PageSkeleton />}>
@@ -85,16 +37,20 @@ export default function PaymentCertsPage() {
   );
 }
 
+// Bố cục master–detail (M124): danh sách đợt bên trái, chứng từ đang mở bên phải.
+// Dưới lg chỉ hiện một trong hai (chọn đợt → chứng từ toàn màn hình, thanh đáy để đóng).
 function PaymentCertsInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const preselectContractId = Number(searchParams.get("contractId")) || null;
+  // Đợt đang mở đọc THẲNG từ URL (`?id=`) — reload/chia sẻ link giữ nguyên chứng từ.
+  const selectedId = Number(searchParams.get("id")) || null;
 
   const [me, setMe] = useState<Me | null>(null);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [contractId, setContractId] = useState<number | "">("");
   const [certs, setCerts] = useState<Cert[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
 
   const canManage = me?.role === "admin" || me?.role === "pm";
@@ -114,19 +70,40 @@ function PaymentCertsInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function loadCerts(cid: number) {
+  const loadCerts = useCallback((cid: number) => {
     return fetch(`/api/payment-certs?contractId=${cid}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setCerts(j?.certs ?? []));
-  }
+  }, []);
 
   useEffect(() => {
     if (contractId) loadCerts(contractId);
-  }, [contractId]);
+  }, [contractId, loadCerts]);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (contractId) await loadCerts(contractId);
-  }
+  }, [contractId, loadCerts]);
+
+  /** Ghi hợp đồng/đợt đang chọn vào URL (không đẩy history, không nhảy về đầu trang). */
+  const capNhatUrl = useCallback(
+    (next: { contractId?: number | ""; id?: number | null }) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (next.contractId !== undefined) {
+        if (next.contractId) params.set("contractId", String(next.contractId));
+        else params.delete("contractId");
+      }
+      if (next.id !== undefined) {
+        if (next.id) params.set("id", String(next.id));
+        else params.delete("id");
+      }
+      const qs = params.toString();
+      router.replace(qs ? `?${qs}` : "/payment-certs", { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  const chonDot = useCallback((id: number | null) => capNhatUrl({ id }), [capNhatUrl]);
+  const dongDot = useCallback(() => capNhatUrl({ id: null }), [capNhatUrl]);
 
   const contract = contracts.find((c) => c.id === contractId) ?? null;
   // M50 PR2: value/addendaTotal/unitPrice có thể bị che (null) với user thiếu viewPayments
@@ -169,7 +146,7 @@ function PaymentCertsInner() {
         return;
       }
       await refresh();
-      setSelectedId(j.id);
+      chonDot(j.id);
     } catch {
       showToast("Mất kết nối — kiểm tra mạng rồi thử lại", "error");
     } finally {
@@ -178,12 +155,26 @@ function PaymentCertsInner() {
   }
 
   const selected = certs.find((c) => c.id === selectedId) ?? null;
+  const viTri = certs.findIndex((c) => c.id === selectedId);
+
+  const ctrl = useCertDocument({
+    cert: selected,
+    canManage,
+    canDecide: canManage,
+    contractValue,
+    onSaved: refresh,
+    onClose: dongDot,
+  });
 
   if (loading) return <PageSkeleton />;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <AppHeader title="Thanh toán khối lượng" subtitle="Nghiệm thu KL theo đợt (IPC)" />
+      <AppHeader
+        title="Thanh toán khối lượng"
+        subtitle="Nghiệm thu KL theo đợt (IPC)"
+        bottomActions={selected ? <CertBottomActions ctrl={ctrl} /> : undefined}
+      />
 
       <main className="p-4 sm:p-6 pb-24 space-y-4">
         {contracts.length === 0 ? (
@@ -200,8 +191,9 @@ function PaymentCertsInner() {
                 <select
                   value={contractId}
                   onChange={(e) => {
-                    setContractId(Number(e.target.value));
-                    setSelectedId(null);
+                    const cid = Number(e.target.value);
+                    setContractId(cid);
+                    capNhatUrl({ contractId: cid, id: null });
                   }}
                   className="min-w-[260px] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 h-10 transition"
                 >
@@ -213,63 +205,38 @@ function PaymentCertsInner() {
                 </select>
               </label>
               {canManage && (
-                <button
+                <Button
+                  icon={Plus}
+                  variant="primary"
                   onClick={createCert}
                   disabled={creating || !contractId}
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] disabled:opacity-50 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10"
                 >
-                  <Plus className="w-4 h-4" /> {creating ? "Đang lập…" : "Lập đợt mới"}
-                </button>
+                  {creating ? "Đang lập…" : "Lập đợt mới"}
+                </Button>
               )}
             </div>
 
             {contract && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bento-card p-4 flex flex-col justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                    Giá trị hợp đồng
-                  </span>
-                  <p className="text-2xl font-bold font-mono tabular-nums text-zinc-100 mt-2">
-                    <MaskedValue value={contractValue} format={fmtVND} />
-                  </p>
-                  <p className="text-[11px] text-zinc-500 mt-1">Bao gồm phụ lục bổ sung</p>
-                </div>
-                <div className="bento-card p-4 flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                      Luỹ kế đã duyệt
-                    </span>
-                    {pctUsed != null && (
-                      <span className="text-xs font-bold font-mono text-emerald-400">
-                        {pctUsed}%
-                      </span>
-                    )}
-                  </div>
-                  <p
-                    className={`text-2xl font-bold font-mono tabular-nums mt-2 ${overContract ? "text-rose-400" : "text-emerald-400"}`}
-                  >
-                    <MaskedValue value={approvedCumulative} format={fmtVND} />
-                  </p>
-                  <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden mt-2 border border-zinc-800">
-                    <div
-                      className={`h-full rounded-full transition-all ${overContract ? "bg-rose-500" : "bg-emerald-500"}`}
-                      style={{
-                        width: `${pctUsed != null ? Math.min(100, pctUsed) : 0}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-                <div className="bento-card p-4 flex flex-col justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                    Số đợt thanh toán
-                  </span>
-                  <p className="text-2xl font-bold font-mono tabular-nums text-sky-400 mt-2">
-                    {certs.length} đợt
-                  </p>
-                  <p className="text-[11px] text-zinc-500 mt-1">
-                    Đã duyệt: {certs.filter((c) => c.status === "approved").length}
-                  </p>
-                </div>
+                <StatCard
+                  label="Giá trị hợp đồng"
+                  value={<MaskedValue value={contractValue} format={fmtVND} />}
+                  hint="Bao gồm phụ lục bổ sung"
+                />
+                <StatCard
+                  label="Luỹ kế đã duyệt"
+                  value={<MaskedValue value={approvedCumulative} format={fmtVND} />}
+                  tone={overContract ? "danger" : "success"}
+                  progress={pctUsed == null ? undefined : Math.min(100, pctUsed) / 100}
+                  badge={pctUsed != null ? <Chip tone="neutral">{pctUsed}%</Chip> : undefined}
+                />
+                <StatCard
+                  label="Số đợt thanh toán"
+                  value={certs.length}
+                  unit="đợt"
+                  tone="info"
+                  hint={`Đã duyệt: ${certs.filter((c) => c.status === "approved").length}`}
+                />
               </div>
             )}
 
@@ -280,428 +247,80 @@ function PaymentCertsInner() {
               </div>
             )}
 
-            {certs.length === 0 ? (
-              <EmptyState
-                message='Chưa có đợt thanh toán nào. Bấm "Lập đợt mới" để bắt đầu.'
-                compact
-              />
-            ) : (
-              <div className="bento-card overflow-hidden">
-                <div
-                  className="overflow-x-auto"
-                  tabIndex={0}
-                  role="region"
-                  aria-label="Bảng đợt thanh toán"
-                >
-                  <table className="w-full text-sm sm:min-w-[640px]">
-                    <thead>
-                      <tr className="text-xs text-zinc-400 border-b border-zinc-800">
-                        <th className="text-left p-3">MÃ</th>
-                        <th className="text-left p-3">ĐỢT</th>
-                        <th className="text-left p-3 hidden sm:table-cell">NGƯỜI LẬP</th>
-                        <th className="text-left p-3">TRẠNG THÁI</th>
-                        <th className="text-right p-3"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {certs.map((c) => (
-                        <tr
-                          key={c.id}
-                          onClick={() => setSelectedId(c.id)}
-                          className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/40 cursor-pointer"
-                        >
-                          <td className="p-3 font-mono text-xs">{c.code}</td>
-                          <td className="p-3">
-                            Đợt {c.periodNo}
-                            {c.periodLabel && (
-                              <span className="text-zinc-400"> · {c.periodLabel}</span>
-                            )}
-                          </td>
-                          <td className="p-3 hidden sm:table-cell text-zinc-300">
-                            {c.createdByName ?? "—"}
-                          </td>
-                          <td className="p-3">
-                            <span
-                              className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[c.status]}`}
+            <div className="grid lg:grid-cols-[320px_1fr] gap-4 items-start">
+              {/* Cột trái — danh sách đợt; ẩn dưới lg khi đang mở một chứng từ. */}
+              <div className={selected ? "hidden lg:block" : "block"}>
+                {certs.length === 0 ? (
+                  <Card tone="sunken" pad="none">
+                    <EmptyState
+                      message='Chưa có đợt thanh toán nào. Bấm "Lập đợt mới" để bắt đầu.'
+                      compact
+                    />
+                  </Card>
+                ) : (
+                  <Card tone="raised" pad="none" className="overflow-hidden">
+                    <ul className="max-h-[70vh] overflow-y-auto divide-y divide-zinc-800/60">
+                      {certs.map((c) => {
+                        const dangChon = c.id === selectedId;
+                        return (
+                          <li key={c.id}>
+                            <button
+                              type="button"
+                              onClick={() => chonDot(c.id)}
+                              aria-current={dangChon ? "true" : undefined}
+                              className={`w-full min-h-[56px] px-3 py-2 flex items-center gap-2 text-left transition border-l-2 ${
+                                dangChon
+                                  ? "bg-emerald-500/10 border-emerald-500"
+                                  : "border-transparent hover:bg-zinc-800/40"
+                              }`}
                             >
-                              {STATUS_LABEL[c.status]}
-                            </span>
-                          </td>
-                          <td className="p-3 text-right">
-                            {c.status === "approved" && (
-                              <div className="flex justify-end gap-2">
-                                <a
-                                  href={`/api/payment-certs/${c.id}/pdf`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  aria-label={`Xuất PDF đợt ${c.periodNo}`}
-                                  className="text-zinc-400 hover:text-white"
-                                >
-                                  <FileDown className="w-4 h-4" />
-                                </a>
-                                <a
-                                  href={`/api/payment-certs/${c.id}/excel`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  aria-label={`Xuất Excel đợt ${c.periodNo}`}
-                                  className="text-zinc-400 hover:text-white"
-                                >
-                                  <FileSpreadsheet className="w-4 h-4" />
-                                </a>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                              <span className="min-w-0 flex-1">
+                                <span className="block font-mono text-xs text-zinc-200 truncate">
+                                  {c.code}
+                                </span>
+                                <span className="block text-xs text-zinc-400 truncate">
+                                  Đợt {c.periodNo}
+                                  {c.periodLabel ? ` · ${c.periodLabel}` : ""}
+                                </span>
+                              </span>
+                              <Chip tone={STATUS_TONE[c.status]} className="shrink-0">
+                                {STATUS_LABEL[c.status]}
+                              </Chip>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </Card>
+                )}
               </div>
-            )}
+
+              {/* Cột phải — chứng từ đang mở. */}
+              <div className={selected ? "block" : "hidden lg:block"}>
+                {selected ? (
+                  <CertDocument
+                    ctrl={ctrl}
+                    nav={{
+                      index: viTri,
+                      total: certs.length,
+                      onPrev: () => chonDot(certs[viTri - 1]?.id ?? null),
+                      onNext: () => chonDot(certs[viTri + 1]?.id ?? null),
+                      onBackToList: dongDot,
+                    }}
+                  />
+                ) : (
+                  <Card tone="sunken" pad="none">
+                    <EmptyState
+                      icon={Receipt}
+                      message="Chọn một đợt bên trái hoặc bấm “Lập đợt mới” để bắt đầu."
+                    />
+                  </Card>
+                )}
+              </div>
+            </div>
           </>
         )}
       </main>
-
-      {selected && (
-        <CertDetailModal
-          cert={selected}
-          canManage={canManage}
-          canDecide={!!(me?.role === "admin" || me?.role === "pm")}
-          contractValue={contractValue}
-          onClose={() => setSelectedId(null)}
-          onSaved={refresh}
-        />
-      )}
     </div>
-  );
-}
-
-function CertDetailModal({
-  cert,
-  canManage,
-  canDecide,
-  contractValue,
-  onClose,
-  onSaved,
-}: {
-  cert: Cert;
-  canManage: boolean;
-  canDecide: boolean;
-  contractValue: number | null; // null = bị che (thiếu viewPayments)
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [qtys, setQtys] = useState<Record<number, string>>(
-    Object.fromEntries(cert.items.map((it) => [it.id, String(it.qtyPeriod)])),
-  );
-  const [busy, setBusy] = useState(false);
-  // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho "payment_cert",
-  // giữ UI y hệt trước (không hiện badge/lịch sử) đúng nguyên tắc "dormant" của M46.
-  const [approvalStatus, setApprovalStatus] = useState<EntityApprovalStatus | null>(null);
-  // Dòng có khối lượng luỹ kế VƯỢT khối lượng hợp đồng. Route cố ý không chặn (thi công vượt
-  // trong khi VO/phụ lục còn chờ duyệt là tình huống thật), nhưng người ký duyệt phải nhìn
-  // thấy — trước đợt này không có lớp nào so khối lượng với hợp đồng, nhập gấp 10 lần vẫn lưu.
-  const [vuotHopDong, setVuotHopDong] = useState<DongVuot[]>([]);
-
-  useEffect(() => {
-    fetch(`/api/payment-certs/${cert.id}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        setApprovalStatus(j?.approvalStatus ?? null);
-        setVuotHopDong(j?.vuotHopDong ?? []);
-      });
-  }, [cert.id]);
-
-  const canEdit = canManage && cert.status === "draft";
-
-  // M50 PR2: unitPrice có thể bị che (null) — dùng mMul/mSumBy để tổng tạm tính cũng
-  // "bị che" (null) thay vì ngầm thành 0.
-  const totals = useMemo(
-    () => mSumBy(cert.items, (it) => mMul(Number(qtys[it.id]) || 0, it.unitPrice)),
-    [cert.items, qtys],
-  );
-
-  async function saveItems() {
-    setBusy(true);
-    const res = await fetch(`/api/payment-certs/${cert.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: cert.items.map((it) => ({
-          boqItemId: it.boqItemId,
-          qtyPeriod: Number(qtys[it.id]) || 0,
-        })),
-      }),
-    });
-    setBusy(false);
-    if (!res.ok) {
-      showToast((await res.json().catch(() => null))?.error ?? "Lưu thất bại", "error");
-      return;
-    }
-    onSaved();
-  }
-
-  async function submitCert() {
-    if (!(await appConfirm(`Trình đợt ${cert.code} lên CĐT/TVGS?`))) return;
-    setBusy(true);
-    // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
-    // "Đang lưu..." mà không báo gì (audit 2026-09-05).
-    let res: Response;
-    try {
-      res = await fetch(`/api/payment-certs/${cert.id}/submit`, { method: "POST" });
-    } catch {
-      appAlert("Mất kết nối — chưa lưu được, thử lại khi có mạng");
-      return;
-    } finally {
-      setBusy(false);
-    }
-    if (!res.ok) {
-      showToast((await res.json().catch(() => null))?.error ?? "Trình thất bại", "error");
-      return;
-    }
-    onSaved();
-    onClose();
-  }
-
-  async function decide(decision: "approved" | "rejected") {
-    let rejectReason: string | null = null;
-    if (decision === "rejected") {
-      rejectReason = await appPrompt("Lý do từ chối:");
-      if (!rejectReason?.trim()) return;
-    } else {
-      // qty_cumulative của mỗi dòng trong đợt này đã là luỹ kế tính tới hết đợt này —
-      // nếu duyệt, đây sẽ là luỹ kế mới của hợp đồng (thay cho luỹ kế đợt duyệt trước đó).
-      const projectedCumulative = mSumBy(cert.items, (it) =>
-        mMul(Number(it.qtyCumulative), it.unitPrice),
-      );
-      // Chỉ cảnh báo vượt khi cả hai vế xác định (không bị che) — duyệt là quyền admin/pm
-      // (có viewPayments) nên thực tế luôn xác định; guard để đúng kiểu + phòng thủ.
-      const wouldBeOver =
-        contractValue != null &&
-        projectedCumulative != null &&
-        contractValue > 0 &&
-        projectedCumulative > contractValue;
-      const label = wouldBeOver
-        ? `Duyệt đợt ${cert.code}? CẢNH BÁO: luỹ kế sẽ vượt giá trị hợp đồng.`
-        : `Duyệt đợt ${cert.code}?`;
-      if (!(await appConfirm(label, { danger: wouldBeOver }))) return;
-    }
-    setBusy(true);
-    // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
-    // "Đang lưu..." mà không báo gì (audit 2026-09-05).
-    let res: Response;
-    try {
-      res = await fetch(`/api/payment-certs/${cert.id}/decide`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, rejectReason }),
-      });
-    } catch {
-      appAlert("Mất kết nối — chưa lưu được, thử lại khi có mạng");
-      return;
-    } finally {
-      setBusy(false);
-    }
-    if (!res.ok) {
-      showToast((await res.json().catch(() => null))?.error ?? "Quyết định thất bại", "error");
-      return;
-    }
-    onSaved();
-    onClose();
-  }
-
-  return (
-    <Modal onClose={onClose} className="max-w-2xl">
-      <div className="p-5 space-y-4 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold font-mono text-sm">{cert.code}</h2>
-            <p className="text-sm text-zinc-300">
-              Đợt {cert.periodNo} — {cert.contractCode}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[cert.status]}`}
-            >
-              {STATUS_LABEL[cert.status]}
-            </span>
-            {approvalStatus && approvalStatus.status === "pending" && (
-              <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-amber-900 text-amber-200">
-                Chờ duyệt (bước {approvalStatus.currentSeq}/{approvalStatus.totalSteps})
-              </span>
-            )}
-            <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {cert.rejectReason && (
-          <p className="text-xs text-rose-300">Lý do từ chối: {cert.rejectReason}</p>
-        )}
-
-        {/* Lịch sử duyệt engine (M46 PR2) — ẩn hoàn toàn khi chưa có flow cấu hình cho
-            "payment_cert" (approvalStatus null), giữ UI y hệt trước đây. */}
-        {approvalStatus && approvalStatus.actions.length > 0 && (
-          <div className="border-t border-zinc-800 pt-3 space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              Lịch sử duyệt
-            </h3>
-            <ul className="space-y-1.5">
-              {approvalStatus.actions.map((a) => (
-                <li key={a.seq} className="text-xs text-zinc-300 flex flex-wrap gap-x-1.5">
-                  <span className="font-medium">{a.actorName ?? `#${a.actorId}`}</span>
-                  <span className={a.decision === "approve" ? "text-emerald-300" : "text-rose-300"}>
-                    {a.decision === "approve" ? "đã duyệt" : "đã từ chối"}
-                  </span>
-                  <span className="text-zinc-500">bước {a.seq}</span>
-                  {a.note && <span className="text-zinc-400">— {a.note}</span>}
-                  <span className="text-zinc-500">({a.at})</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {vuotHopDong.length > 0 && (
-          <div className="bento-card border-rose-900/60 bg-rose-950/20 px-4 py-3 text-xs text-rose-200 space-y-1.5">
-            <p className="font-semibold">
-              {vuotHopDong.length} dòng có khối lượng luỹ kế VƯỢT khối lượng hợp đồng
-            </p>
-            <ul className="space-y-1">
-              {vuotHopDong.map((d) => (
-                <li key={d.boqItemId} className="flex gap-2">
-                  <span className="font-mono shrink-0">{d.code}</span>
-                  <span className="truncate flex-1">{d.name}</span>
-                  <span className="font-mono tabular-nums shrink-0">
-                    {d.qtyCumulative}/{d.qtyContract} {d.unit}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-rose-300/80">
-              Chỉ là cảnh báo — đợt vẫn lưu được, vì thi công vượt khối lượng trong khi phụ lục/VO
-              còn chờ duyệt là tình huống thật. Đối chiếu phụ lục trước khi trình duyệt.
-            </p>
-          </div>
-        )}
-
-        {/* Nói rõ khối lượng gợi ý đến từ đâu: người duyệt IPC rất dễ mặc định đây là khối
-            lượng đã nghiệm thu, trong khi nó suy ra từ tiến độ tick trên lưới. */}
-        <p className="text-[11px] text-zinc-500">
-          KL đợt này được gợi ý từ <strong className="text-zinc-400">tiến độ thi công</strong> (tỷ
-          lệ ô đã tick × tỷ trọng BOQ), trừ luỹ kế các đợt đã duyệt — không phải khối lượng lấy từ
-          biên bản nghiệm thu. Đối chiếu với hồ sơ nghiệm thu trước khi trình duyệt.
-        </p>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-zinc-400 border-b border-zinc-800">
-                <th className="text-left p-1.5">Mã</th>
-                <th className="text-left p-1.5">Tên</th>
-                <th className="text-right p-1.5">Đơn giá</th>
-                <th className="text-right p-1.5">KL đợt này</th>
-                <th className="text-right p-1.5">Luỹ kế</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cert.items.map((it) => (
-                <tr key={it.id} className="border-b border-zinc-800/60 last:border-0">
-                  <td className="p-1.5 font-mono">{it.boqCode}</td>
-                  <td className="p-1.5">
-                    {it.boqName} <span className="text-zinc-500">({it.boqUnit})</span>
-                  </td>
-                  <td className="p-1.5 text-right">
-                    <MaskedValue value={it.unitPrice} format={fmtVND} />
-                  </td>
-                  <td className="p-1.5 text-right">
-                    {canEdit ? (
-                      <input
-                        type="number"
-                        value={qtys[it.id] ?? ""}
-                        onChange={(e) => setQtys((prev) => ({ ...prev, [it.id]: e.target.value }))}
-                        aria-label={`KL đợt này dòng ${it.boqCode}`}
-                        min={0}
-                        className="w-20 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white text-right"
-                      />
-                    ) : (
-                      it.qtyPeriod
-                    )}
-                  </td>
-                  <td className="p-1.5 text-right">{it.qtyCumulative}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex justify-end text-sm font-semibold">
-          Giá trị đợt này (tạm tính): <MaskedValue value={totals} format={fmtVND} />
-        </div>
-
-        <div className="flex flex-wrap gap-2 border-t border-zinc-800 pt-3">
-          {canEdit && (
-            <button
-              onClick={saveItems}
-              disabled={busy}
-              className="bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 rounded-lg"
-            >
-              Lưu khối lượng
-            </button>
-          )}
-          {canManage && cert.status === "draft" && (
-            <button
-              onClick={submitCert}
-              disabled={busy}
-              className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
-            >
-              Trình lên CĐT/TVGS
-            </button>
-          )}
-          {canDecide && cert.status === "submitted" && (
-            <>
-              <button
-                onClick={() => decide("approved")}
-                disabled={busy}
-                className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
-              >
-                Duyệt
-              </button>
-              <button
-                onClick={() => decide("rejected")}
-                disabled={busy}
-                className="bg-rose-800 hover:bg-rose-700 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
-              >
-                Từ chối
-              </button>
-            </>
-          )}
-          {cert.status === "approved" && (
-            <>
-              <a
-                href={`/api/payment-certs/${cert.id}/pdf`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium px-3 py-2 rounded-lg"
-              >
-                <FileDown className="w-3.5 h-3.5" /> PDF
-              </a>
-              <a
-                href={`/api/payment-certs/${cert.id}/excel`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium px-3 py-2 rounded-lg"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
-              </a>
-            </>
-          )}
-        </div>
-      </div>
-    </Modal>
   );
 }
