@@ -310,7 +310,8 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
       </div>
       {viewer && (
         <div
-          className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ background: "var(--overlay-scrim)" }}
           onClick={(e) => {
             e.stopPropagation();
             setViewer(null);
