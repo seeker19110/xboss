@@ -1,5 +1,23 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Rút gọn còn 2 theme (Sáng / Dark Blue) — 2026-09-21
+
+Theo yêu cầu người dùng: bỏ 3 theme `dark` (Tối), `kingblue` (King Blue), `navy` (Navy) —
+chỉ giữ `light` (Sáng) và `darkblue` (Dark Blue). Sửa đồng bộ 3 điểm khai theme:
+
+- `app/components/ThemeToggle.tsx` — `Theme` type + mảng `THEMES`/`THEME_COLORS` chỉ còn 2 mục,
+  gỡ import icon `Moon/Crown/Anchor` không còn dùng.
+- `app/layout.tsx` — script `theme-init` (mảng `T`/`C`) khớp lại 2 theme.
+- `app/globals.css` — xoá các block `html.dark`/`html.kingblue`/`html.navy`; sửa 2 chú thích còn
+  trỏ tới `html.dark`/King Blue đã xoá.
+- `scripts/check-contrast.ts` — mảng `THEMES` chỉ đọc `light`/`darkblue` (trước đó sẽ throw vì
+  `html.dark` không còn tồn tại trong `globals.css`).
+
+Cập nhật tài liệu lệ thuộc số lượng theme: `PROJECT.md`, `docs/audit.md` (§5 checklist + bảng
+tương phản Phụ lục A §13.2), `.github/ISSUE_TEMPLATE/bug_report.md`,
+`.agents/skills/ui-ux-craftsman/SKILL.md` + `scripts/ui_ux_validator.ts` (self-test). Đã kiểm
+`npm run check:contrast`, `check:mau-accent`, `lint`, `typecheck` xanh.
+
 ## ✅ Audit tối giản — gỡ 2 dependency thừa — 2026-09-21
 
 Rà toàn repo (dead-code scan, depcheck, grep thủ công) tìm phần không thực sự cần thiết để dọn.

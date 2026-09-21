@@ -65,7 +65,7 @@ Kế thừa quy trình ground-truth đã chứng minh hiệu quả (xem **Phụ 
 - [ ] Mọi `fetch` ghi dữ liệu quan trọng có `try/catch` — mất mạng công trường (bối cảnh thật của app) không được để nút kẹt "Đang lưu..." vĩnh viễn mà không báo lỗi (lớp lỗi thật đã lặp lại ở nhiều form: đổi mật khẩu, PO/PR, quản lý user...).
 - [ ] Form: nút submit **disable + hiện loading** khi đang gửi (chặn double-submit); thất bại thì **giữ nguyên dữ liệu người dùng đã nhập**; validate inline ngay cạnh ô lỗi, thông báo nói _cách sửa_ chứ không chỉ "sai".
 - [ ] Nút icon-only có `aria-label` tiếng Việt mô tả đúng hành động — đặc biệt nút xoá/đóng dữ liệu quan trọng.
-- [ ] Tương phản màu đạt AA ở **cả 5 theme** (`dark/light/kingblue/darkblue/navy`) — tra bảng quy tắc đã tính sẵn ở **Phụ lục A §13.2–13.3** trước khi thêm màu mới, không đoán bằng mắt.
+- [ ] Tương phản màu đạt AA ở **cả 2 theme** (`light/darkblue`) — tra bảng quy tắc đã tính sẵn ở **Phụ lục A §13.2–13.3** trước khi thêm màu mới, không đoán bằng mắt.
 - [ ] Trang/luồng mới bắt buộc có 1 spec axe (`e2e/authed/*.spec.ts`) chạy desktop + mobile, assert không vi phạm `serious`/`critical` — coi đây là **cổng merge**, không phải việc "nên làm thêm".
 - [ ] Vùng chạm ≥ 40px; bảng dày sticky header + cho cuộn ngang, giữ cột mã/tên dễ đọc; không có thanh cuộn ngang toàn trang ở breakpoint nào.
 - [ ] Mobile-first (đa số người dùng vào bằng điện thoại tại công trường): cỡ chữ input ≥ 16px (chống iOS auto-zoom); tôn trọng safe-area (`env(safe-area-inset-*)`) cho header/footer cố định; bàn phím ảo không che ô đang gõ / nút submit.
@@ -176,7 +176,7 @@ KẾT LUẬN: Sẵn sàng / Cần xử lý: [..]
 
 `grep "text-zinc-500\|text-zinc-600"` (~399 occurrences) và `bg-{accent}-500/600` (~109) chỉ là **ứng viên**, không phải lỗi. Hai tầng kiểm chứng:
 
-1. **Tính tỉ lệ tương phản WCAG** (`npm run check:contrast`) trên hex đã giải của thang `zinc` ở **cả 6 theme** (`dark/light/kingblue/darkblue/navy` + gốc) → biến "ứng viên" thành "khả năng lỗi cao" và cho ra **quy tắc thay thế đúng mọi theme** (đổi `zinc-500`→`zinc-400` chỉ đúng nếu pass ở _tất cả_ theme).
+1. **Tính tỉ lệ tương phản WCAG** (`npm run check:contrast`) trên hex đã giải của thang `zinc` ở **cả 2 theme** (`light/darkblue`) → biến "ứng viên" thành "khả năng lỗi cao" và cho ra **quy tắc thay thế đúng mọi theme** (đổi `zinc-500`→`zinc-400` chỉ đúng nếu pass ở _tất cả_ theme).
 2. **axe-core trên trình duyệt (ground-truth cuối)** — Playwright E2E trên **bản production** (`npm run start`). Chỉ axe thấy màu render thật (Tailwind v4 `oklch`), DOM xếp chồng, opacity, và phân biệt text thật vs icon/đồ hoạ.
 
 **Grep over-count vì 4 lý do** (không chạy `sed` thay thế hàng loạt): body-text tĩnh (✅ lỗi thật nếu < 4.5) vs hover/idle của icon (❌ thường không) vs code chỉ chạy dev — `NODE_ENV==='development'` (❌ production không render) vs accent đã đủ tương phản (❌, vd `text-white bg-red-600` = 4.83:1). ⇒ Mỗi trang: sửa ứng viên _body-text tĩnh_ theo §13.2/§13.3 rồi **bật axe cho trang đó** để chốt (§13.4).
@@ -187,31 +187,20 @@ Ngưỡng AA text thường = **4.5:1** (text lớn ≥18.66px bold / ≥24px = 
 
 | theme        | text       | trên `--bg` | `zinc-950` | `zinc-900` | `zinc-800` | `zinc-700` |
 | ------------ | ---------- | ----------- | ---------- | ---------- | ---------- | ---------- |
-| **dark**     | `zinc-600` | 2.56 ❌     | 2.57 ❌    | 2.29 ❌    | 1.93 ❌    | 1.35 ❌    |
-|              | `zinc-500` | 4.10 ❌     | 4.12 ❌    | 3.67 ❌    | 3.08 ❌    | 2.16 ❌    |
-|              | `zinc-400` | 7.72 ✅     | 7.76 ✅    | 6.91 ✅    | 5.81 ✅    | 4.07 ❌    |
-|              | `zinc-300` | 13.4 ✅     | 13.5 ✅    | 12.0 ✅    | 10.1 ✅    | 7.07 ✅    |
 | **light**    | `zinc-600` | 2.56 ❌     | 2.46 ❌    | 2.33 ❌    | 2.02 ❌    | 1.73 ❌    |
 |              | `zinc-500` | 4.83 ✅     | 4.63 ✅    | 4.40 ❌    | 3.81 ❌    | 3.27 ❌    |
 |              | `zinc-400` | 7.73 ✅     | 7.41 ✅    | 7.03 ✅    | 6.09 ✅    | 5.23 ✅    |
-| **kingblue** | `zinc-600` | 3.19 ❌     | 2.97 ❌    | 2.46 ❌    | 1.92 ❌    | 1.44 ❌    |
-|              | `zinc-500` | 4.55 ✅     | 4.23 ❌    | 3.51 ❌    | 2.74 ❌    | 2.05 ❌    |
-|              | `zinc-400` | 6.93 ✅     | 6.45 ✅    | 5.35 ✅    | 4.18 ❌    | 3.12 ❌    |
-|              | `zinc-300` | 9.56 ✅     | 8.90 ✅    | 7.38 ✅    | 5.76 ✅    | 4.31 ❌    |
 | **darkblue** | `zinc-600` | 2.70 ❌     | 2.51 ❌    | 2.21 ❌    | 1.78 ❌    | 1.35 ❌    |
 |              | `zinc-500` | 4.01 ❌     | 3.73 ❌    | 3.28 ❌    | 2.64 ❌    | 2.00 ❌    |
 |              | `zinc-400` | 7.33 ✅     | 6.81 ✅    | 5.99 ✅    | 4.83 ✅    | 3.66 ❌    |
-| **navy**     | `zinc-600` | 2.59 ❌     | 2.47 ❌    | 2.25 ❌    | 1.89 ❌    | 1.42 ❌    |
-|              | `zinc-500` | 4.13 ❌     | 3.93 ❌    | 3.58 ❌    | 3.01 ❌    | 2.25 ❌    |
-|              | `zinc-400` | 7.66 ✅     | 7.30 ✅    | 6.64 ✅    | 5.59 ✅    | 4.18 ❌    |
 
 **Quy tắc rút ra (đúng mọi theme):**
 
 - **`text-zinc-600` (body text): luôn FAIL** → thay bằng `zinc-400` (nền `≥ zinc-900`/`--bg`/`950`) hoặc `zinc-300` (nền sáng hơn `zinc-800`/`zinc-700`).
-- **`text-zinc-500` (body text): FAIL ở `dark`/`darkblue`/`navy`**; app **dark-first** → coi như **phải sửa** → `zinc-400`.
-- **`text-zinc-400`: an toàn** trên `--bg`/`950`/`900`/`800` mọi theme; **FAIL trên `zinc-700`** (và `zinc-800` ở kingblue) → dùng `zinc-300`.
+- **`text-zinc-500` (body text): FAIL ở `darkblue`**; app **dark-first** → coi như **phải sửa** → `zinc-400`.
+- **`text-zinc-400`: an toàn** trên `--bg`/`950`/`900`/`800` mọi theme; **FAIL trên `zinc-700`** → dùng `zinc-300`.
 - **`text-zinc-300`: an toàn** gần như tuyệt đối.
-- ⚠️ `dark/zinc-500` = 4.10 và `darkblue/navy/zinc-500-trên-bg` ≈ 4.0–4.1: **sát ngưỡng** — hex ở đây xấp xỉ v3, Tailwind v4 `oklch` có thể lệch nhẹ → **axe là trọng tài cuối** cho ca sát ngưỡng.
+- ⚠️ `darkblue/zinc-500-trên-bg` ≈ 4.0: **sát ngưỡng** — hex ở đây xấp xỉ v3, Tailwind v4 `oklch` có thể lệch nhẹ → **axe là trọng tài cuối** cho ca sát ngưỡng.
 
 ### 13.3 Nút accent chữ trắng (`text-white` trên `bg-{accent}-N`)
 
