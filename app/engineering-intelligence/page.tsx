@@ -1,16 +1,7 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  Brain,
-  Bot,
-  Network,
-  Boxes,
-  Lightbulb,
-  Zap,
-  MessageSquare,
-  Volume2,
-} from "lucide-react";
+import { Brain, Bot, Network, Boxes, Lightbulb, Zap, MessageSquare, Volume2 } from "lucide-react";
 import HubShell, { type HubTab, type HubStat } from "@/app/components/HubShell";
 import { Skeleton } from "@/app/components/Skeleton";
 
