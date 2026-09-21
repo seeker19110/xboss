@@ -1,5 +1,13 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Bỏ cụm sidebar "6 Đại Trung Tâm Điều Hành (Unified Hubs)" — 2026-09-21
+
+Xoá toàn bộ cụm 6 mục (`dash.site-command`, `dash.schedule-control`, `dash.procurement-hub`,
+`dash.commercial-cockpit`, `dash.engineering-intelligence-hub`, `dash.governance-hub`) khỏi
+`app/lib/dashboardTree.ts` theo yêu cầu người dùng. Dọn icon `Brain` không còn dùng; các trang
+đích (`/site`, `/schedule`, `/procurement`, `/commercial`, `/engineering-intelligence`,
+`/governance`) vẫn tồn tại và vẫn truy cập được qua các mục sidebar khác đã trỏ tới cùng route.
+
 ## ✅ Bỏ cụm sidebar "Kỹ thuật Không gian & AI (Engineering OS)" — 2026-09-21
 
 Xoá toàn bộ cụm `dash.apex-cockpit`/`dash.spatial-viewer`/`dash.hse-vision`/`dash.zalo-copilot`/
