@@ -1,5 +1,15 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Bỏ cụm sidebar "Kỹ thuật Không gian & AI (Engineering OS)" — 2026-09-21
+
+Xoá toàn bộ cụm `dash.apex-cockpit`/`dash.spatial-viewer`/`dash.hse-vision`/`dash.zalo-copilot`/
+`dash.dynamic-cashflow`/`dash.esign-protocol`/`dash.fidic-claims`/`dash.qr-logistics`/
+`dash.quantum-hub`/`dash.gate0-workflows`/`dash.ai-suggestions` khỏi `app/lib/dashboardTree.ts`
+(nguồn duy nhất sidebar AppShell) theo yêu cầu người dùng — các mục này không còn hiển thị trong
+sidebar. Dọn theo các icon `lucide-react` không còn dùng (`Sparkles`/`Layers`/`Bot`/`TrendingUp`/
+`Lightbulb`); các trang `app/engineering/*` và route `/procurement?tab=qr-logistics` vẫn tồn tại,
+chỉ không còn link trực tiếp trong sidebar.
+
 ## ✅ Chép có chọn lọc từ `seeker19110/projects-template` — 2026-09-21
 
 Đối chiếu repo khung `seeker19110/projects-template` (bộ khung quy trình/chất lượng tổng quát đa

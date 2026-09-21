@@ -74,15 +74,10 @@ import {
   SlidersHorizontal,
   KeyRound,
   ToggleRight,
-  Lightbulb,
-  Sparkles,
   Brain,
   Split,
   LayoutGrid,
   QrCode,
-  Bot,
-  TrendingUp,
-  Layers,
 } from "lucide-react";
 import type { Role } from "@/lib/nen/roles";
 
@@ -151,78 +146,6 @@ export const DASHBOARD_TREE: DashCluster[] = [
         href: "/governance",
         label: "Quản Trị Dự Án, Bàn Giao & Cấu Hình",
         icon: Landmark,
-      },
-    ],
-  },
-  // Cụm 2: Kỹ thuật Không gian & AI (Engineering OS) — Đỉnh cao công nghệ XBoss
-  {
-    label: "Kỹ thuật Không gian & AI (Engineering OS)",
-    dashboards: [
-      {
-        id: "dash.apex-cockpit",
-        href: "/engineering",
-        label: "Apex Cockpit (M88)",
-        icon: Sparkles,
-      },
-      {
-        id: "dash.spatial-viewer",
-        href: "/engineering/spatial-viewer",
-        label: "Spatial Viewer (M74)",
-        icon: Layers,
-      },
-      {
-        id: "dash.hse-vision",
-        href: "/engineering/hse-vision",
-        label: "HSE AI Vision (M87)",
-        icon: ShieldAlert,
-      },
-      {
-        id: "dash.zalo-copilot",
-        href: "/engineering/zalo-copilot",
-        label: "Zalo Copilot (M86)",
-        icon: Bot,
-      },
-      {
-        id: "dash.dynamic-cashflow",
-        href: "/engineering/cashflow",
-        label: "Dynamic Cashflow (M85)",
-        icon: TrendingUp,
-      },
-      {
-        id: "dash.esign-protocol",
-        href: "/engineering/esign",
-        label: "Smart e-Sign (M84)",
-        icon: ShieldCheck,
-      },
-      {
-        id: "dash.fidic-claims",
-        href: "/engineering/fidic-claims",
-        label: "FIDIC Claims & EOT (M79)",
-        icon: Scale,
-      },
-      {
-        id: "dash.qr-logistics",
-        href: "/procurement?tab=qr-logistics",
-        label: "QR Logistics (M78)",
-        icon: QrCode,
-      },
-      {
-        id: "dash.quantum-hub",
-        href: "/engineering/quantum-hub",
-        label: "Quantum & Merkle (M73)",
-        icon: Zap,
-      },
-      {
-        id: "dash.gate0-workflows",
-        href: "/engineering/workflows",
-        label: "Workflow Gate 0 (ENG-3)",
-        icon: Workflow,
-      },
-      {
-        id: "dash.ai-suggestions",
-        href: "/engineering/suggestions",
-        label: "Đề xuất AI (ENG-2)",
-        icon: Lightbulb,
       },
     ],
   },
