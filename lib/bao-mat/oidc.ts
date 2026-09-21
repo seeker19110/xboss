@@ -55,11 +55,6 @@ export async function getOidcConfig(): Promise<oidc.Configuration> {
   return config;
 }
 
-// Chỉ dùng trong test: xoá cache discovery giữa các ca.
-export function __resetOidcConfigCacheForTests(): void {
-  configCache = null;
-}
-
 // ===== Ánh xạ claims → quyết định user (THUẦN, không chạm DB) =====
 export type ResolvedSsoUser = { email: string; name: string; roleFromClaim: Role | null };
 export type SsoClaims = { email?: string; name?: string; [k: string]: unknown };
