@@ -239,52 +239,14 @@ test("ingest: scope read → 403", S, async () => {
   assert.equal(res.status, 403);
 });
 
-test("listSuggestions: sắp đúng ranking + cách ly đa dự án", S, async () => {
-  const { ingestIntelligencePackage, listSuggestions } =
-    await import("@/lib/ky-thuat/engineering-intel");
-
-  const { intelligencePackageInputSchema } = await import("@/lib/ky-thuat/engineering-intel");
-  await ingestIntelligencePackage(
-    pA,
-    null,
-    intelligencePackageInputSchema.parse({
-      objective: "Bộ hỗn hợp kiểm ranking",
-      suggestions: [
-        {
-          suggestionClass: "design",
-          title: "ZZ tối ưu",
-          priority: "optimization",
-          severity: "critical",
-          confidenceSignals: { sourceQuality: 1, extractionConfidence: 1, freshness: 1 },
-          evidence: [{ kind: "fact", statement: "f1" }],
-        },
-        {
-          suggestionClass: "risk",
-          title: "AA an toàn",
-          priority: "critical_safety",
-          severity: "low",
-          confidenceSignals: { sourceQuality: 0.6, extractionConfidence: 0.6, freshness: 0.6 },
-          evidence: [{ kind: "fact", statement: "f2" }],
-        },
-      ],
-    }),
-  );
-
-  const listA = await listSuggestions(pA);
-  // Mục an toàn phải đứng trước mục tối ưu hoá dù severity/confidence ngược chiều.
-  const idxSafety = listA.findIndex((s) => s.title === "AA an toàn");
-  const idxOpt = listA.findIndex((s) => s.title === "ZZ tối ưu");
-  assert.ok(idxSafety >= 0 && idxOpt >= 0);
-  assert.ok(idxSafety < idxOpt);
-
-  const listB = await listSuggestions(pB);
-  assert.equal(listB.length, 0);
-});
+// (listSuggestions đã bị xoá cùng route/UI /engineering/suggestions — bỏ test riêng cho nó;
+// ranking thuần vẫn được test qua rankSuggestion() ở khối "Thuần (không cần DB)" phía trên.)
 
 test("decideSuggestion: ghi quyết định + chặn dự án khác", S, async () => {
-  const { ingestIntelligencePackage, decideSuggestion, getSuggestion } =
+  const { ingestIntelligencePackage, decideSuggestion } =
     await import("@/lib/ky-thuat/engineering-intel");
   const { intelligencePackageInputSchema } = await import("@/lib/ky-thuat/engineering-intel");
+  const { queryOne } = await import("@/lib/db");
   const r = await ingestIntelligencePackage(
     pA,
     null,
@@ -305,10 +267,14 @@ test("decideSuggestion: ghi quyết định + chặn dự án khác", S, async (
   const id = r.suggestions[0].id;
 
   await decideSuggestion(pA, id, U, "accepted", "Đồng ý");
-  const got = await getSuggestion(pA, id);
-  assert.equal(got?.suggestion.status, "accepted");
-  assert.equal(got?.suggestion.decidedBy, U);
-  assert.equal(got?.suggestion.decisionNote, "Đồng ý");
+  const got = await queryOne<{ status: string; decidedBy: number; decisionNote: string }>(
+    `SELECT status, decided_by AS "decidedBy", decision_note AS "decisionNote"
+     FROM engineering_suggestions WHERE id = ?`,
+    id,
+  );
+  assert.equal(got?.status, "accepted");
+  assert.equal(got?.decidedBy, U);
+  assert.equal(got?.decisionNote, "Đồng ý");
 
   await assert.rejects(() => decideSuggestion(pB, id, U, "rejected"));
 });
