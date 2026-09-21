@@ -126,7 +126,6 @@ test(
       runPrescriptiveSimulation,
       getPrescriptiveScenarios,
       approvePrescriptiveScenario,
-      auditEngineeringElement,
       scanAllElementsCompliance,
       getComplianceAudits,
     } = await import("@/lib/ky-thuat/engineering-prescriptive");
@@ -182,17 +181,12 @@ test(
       );
       assert.ok(rule?.id);
 
-      // 5. Audit đối tượng đơn lẻ
-      const audit = await auditEngineeringElement(projId, obj!.id, rule!.id);
-      assert.equal(audit.compliance_status, "non_compliant");
-      assert.ok(audit.finding_details?.includes("không phù hợp"));
-
-      // 6. Quét toàn bộ dự án (Batch Scan)
+      // 5. Quét toàn bộ dự án (Batch Scan)
       const scanSummary = await scanAllElementsCompliance(projId);
       assert.ok(scanSummary.totalObjects >= 1);
       assert.ok(scanSummary.createdAudits >= 1);
 
-      // 7. Lấy danh sách hồ sơ NCR
+      // 6. Lấy danh sách hồ sơ NCR
       const ncrs = await getComplianceAudits(projId, { status: "non_compliant" });
       assert.ok(ncrs.length >= 1);
       assert.equal(ncrs[0].standard_code, "NFPA 13");

@@ -28,20 +28,12 @@ export * from "@/lib/ky-thuat/engineering-qs-omnipotent";
 // 10. Closed-Loop WBS & Payment Sync (M70)
 export * from "@/lib/ky-thuat/engineering-closed-loop-sync";
 
-// 11. Predictive Maintenance MTBF & RUL (M71)
-export * from "@/lib/ky-thuat/engineering-mepf-predictive";
-
-// 12. Embodied Carbon LCA & Green Building (M71)
-export * from "@/lib/ky-thuat/engineering-carbon-lca";
-
-// 13. LOD 500 Digital Handover Passport (M71)
-export * from "@/lib/ky-thuat/engineering-digital-handover";
-
-// 14. Multi-Agent Real-Time Debate Swarm (M72)
-export * from "@/lib/ky-thuat/engineering-multi-agent-copilot";
-
-// 15. Dynamic Project Health Cockpit & Monte Carlo (M72)
-export * from "@/lib/ky-thuat/engineering-project-health";
+// (11) Predictive Maintenance MTBF & RUL (M71), (12) Embodied Carbon LCA & Green Building (M71),
+// (13) LOD 500 Digital Handover Passport (M71), (14) Multi-Agent Real-Time Debate Swarm (M72,
+// route riêng /api/engineering/multi-agent-copilot — khác cụm Swarm Debate ở mục dưới) và
+// (15) Dynamic Project Health Cockpit & Monte Carlo (M72) đã bị xoá 2026-09-21: backend xong
+// nhưng chưa từng có route/UI nào gọi tới (dead-routes-allowlist "chờ chốt hướng ở đề xuất #6
+// audit 2026-08-25" — người dùng quyết định xoá thay vì gắn UI, xem PROGRESS.md).
 
 // 16. Hyper-Spatial WASM Geometry & Cache (M73)
 export * from "@/lib/ky-thuat/engineering-spatial-wasm";

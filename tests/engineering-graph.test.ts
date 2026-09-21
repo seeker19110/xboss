@@ -3,33 +3,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 test(
-  "OS-1: Taxonomy registry trả về đầy đủ loại đối tượng & quan hệ MEP chuẩn",
-  { skip: !HAS_TEST_DB },
-  async () => {
-    const { getTaxonomy } = await import("@/lib/ky-thuat/engineering-graph");
-    const taxonomy = await getTaxonomy();
-
-    assert.ok(taxonomy.objectTypes.length >= 7, "Phải có ít nhất 7 loại đối tượng chuẩn");
-    const objKeys = taxonomy.objectTypes.map((o) => o.key);
-    assert.ok(objKeys.includes("equipment"));
-    assert.ok(objKeys.includes("component"));
-    assert.ok(objKeys.includes("duct"));
-    assert.ok(objKeys.includes("pipe"));
-    assert.ok(objKeys.includes("cable_tray"));
-    assert.ok(objKeys.includes("space"));
-    assert.ok(objKeys.includes("system"));
-
-    assert.ok(taxonomy.relationTypes.length >= 5, "Phải có ít nhất 5 loại quan hệ chuẩn");
-    const relKeys = taxonomy.relationTypes.map((r) => r.key);
-    assert.ok(relKeys.includes("SERVES"));
-    assert.ok(relKeys.includes("CONTAINS"));
-    assert.ok(relKeys.includes("CONNECTED_TO"));
-    assert.ok(relKeys.includes("FEEDS"));
-    assert.ok(relKeys.includes("LOCATED_IN"));
-  },
-);
-
-test(
   "OS-1: Graph traversal BFS, lọc hướng, độ sâu và cô lập theo project",
   { skip: !HAS_TEST_DB },
   async () => {

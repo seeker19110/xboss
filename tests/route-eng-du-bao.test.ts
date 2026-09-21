@@ -23,16 +23,17 @@ import { NextRequest } from "next/server";
 //   - app/api/engineering/subcon-ai/scores/route.ts                   (GET/POST hồ sơ thầu phụ AI)
 //   - app/api/engineering/subcon-ai/evaluate/route.ts                 (POST chấm điểm tín nhiệm)
 //   - app/api/engineering/subcon-ai/recommend-shortlist/route.ts      (POST đề xuất mời thầu)
-//   - app/api/engineering/carbon-lca/route.ts                         (GET/POST LCA Carbon)
 //   - app/api/engineering/qs-bom-explosion/route.ts                   (GET/POST QS omnipotent)
 //   - app/api/engineering/shopdrawing-lod400/route.ts                 (GET/POST Shopdrawing LOD400)
-//   - app/api/engineering/multi-agent-copilot/route.ts                (GET/POST Co-Pilot đa agent)
 //   - app/api/engineering/pinnacle/pulse/route.ts                     (GET/POST Apex Pulse)
+//
+// (carbon-lca, multi-agent-copilot đã bị xoá 2026-09-21 — backend xong nhưng chưa từng có route/UI
+// nào gọi tới, xem PROGRESS.md.)
 //
 // Xác nhận (đọc code): không route nào trong cụm này gọi mạng ra ngoài — mọi hàm "AI"/dự báo là
 // hàm xác định (deterministic), không `fetch`/LLM/HTTP client nào trong các module
-// lib/ky-thuat/engineering-{predictions,prescriptive,cashflow,bidding-matrix,subcon-ai,carbon-lca,
-// qs-omnipotent,shopdrawing-omnipotent,multi-agent-copilot,pinnacle-synergy}.ts và
+// lib/ky-thuat/engineering-{predictions,prescriptive,cashflow,bidding-matrix,subcon-ai,
+// qs-omnipotent,shopdrawing-omnipotent,pinnacle-synergy}.ts và
 // lib/tai-chinh/contracts-fidic.ts (đã `grep` không thấy `fetch(`/`http`/`openai`/`anthropic`).
 
 const S = { skip: !HAS_TEST_DB };
@@ -1243,85 +1244,6 @@ test(
 );
 
 // ============================================================================
-// GET/POST /api/engineering/carbon-lca
-// ============================================================================
-
-test("GET /api/engineering/carbon-lca: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/carbon-lca/route");
-  const res = await GET();
-  assert.equal(res.status, 401);
-});
-
-test("GET /api/engineering/carbon-lca: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("clcview403");
-  const u = await taoUser("subcon", "clcview403");
-  await dangNhapDuAn(u, projectId);
-  const { GET } = await import("@/app/api/engineering/carbon-lca/route");
-  const res = await GET();
-  assert.equal(res.status, 403);
-});
-
-test(
-  "POST /api/engineering/carbon-lca: bch không có quyền thực thi (chỉ Admin/PM/Engineer) → 403",
-  S,
-  async () => {
-    const projectId = await taoDuAn("clcpost403");
-    const u = await taoUser("bch", "clcpost403");
-    await dangNhapDuAn(u, projectId);
-    const { POST } = await import("@/app/api/engineering/carbon-lca/route");
-    const res = await POST(jreq("/x", {}));
-    assert.equal(res.status, 403);
-  },
-);
-
-test(
-  "POST /api/engineering/carbon-lca: tính phát thải Carbon từ danh mục vật liệu tuỳ chỉnh → " +
-    "lưu báo cáo, GET liệt kê lại; gọi lại cùng reportCode → cập nhật (không tạo dòng mới)",
-  S,
-  async () => {
-    const { query } = await import("@/lib/db");
-    const projectId = await taoDuAn("clcok");
-    const pm = await taoUser("pm", "clcok");
-    await dangNhapDuAn(pm, projectId);
-    const reportCode = `LCA-${uniq("clcok")}`;
-    const { POST } = await import("@/app/api/engineering/carbon-lca/route");
-    const res = await POST(
-      jreq("/x", {
-        reportCode,
-        grossFloorAreaM2: 10000,
-        materials: [{ materialType: "steel_pipe", description: "Ống thép", weightKg: 1000 }],
-      }),
-    );
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.success, true);
-    assert.ok(body.result.totalEmbodiedCarbonKgCo2e > 0);
-
-    // Gọi lại lần 2 cùng reportCode nhưng đổi khối lượng — phải UPDATE, không tạo dòng thứ 2.
-    await POST(
-      jreq("/x", {
-        reportCode,
-        grossFloorAreaM2: 10000,
-        materials: [{ materialType: "steel_pipe", description: "Ống thép", weightKg: 2000 }],
-      }),
-    );
-    const rows = await query(
-      `SELECT * FROM engineering_carbon_lca_reports WHERE project_id = ? AND report_code = ?`,
-      projectId,
-      reportCode,
-    );
-    assert.equal(rows.length, 1, "ON CONFLICT phải cập nhật thay vì chèn thêm dòng");
-
-    const { GET } = await import("@/app/api/engineering/carbon-lca/route");
-    const listRes = await GET();
-    const listBody = await listRes.json();
-    assert.equal(listRes.status, 200);
-    assert.equal(listBody.totalCount, 1);
-  },
-);
-
-// ============================================================================
 // GET/POST /api/engineering/qs-bom-explosion
 // ============================================================================
 
@@ -1549,58 +1471,6 @@ test(
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.ok(body.hierarchy);
-  },
-);
-
-// ============================================================================
-// GET/POST /api/engineering/multi-agent-copilot
-// ============================================================================
-
-test("GET /api/engineering/multi-agent-copilot: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/multi-agent-copilot/route");
-  const res = await GET();
-  assert.equal(res.status, 401);
-});
-
-test("GET /api/engineering/multi-agent-copilot: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("macview403");
-  const u = await taoUser("subcon", "macview403");
-  await dangNhapDuAn(u, projectId);
-  const { GET } = await import("@/app/api/engineering/multi-agent-copilot/route");
-  const res = await GET();
-  assert.equal(res.status, 403);
-});
-
-test("POST /api/engineering/multi-agent-copilot: bch không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("macpost403");
-  const u = await taoUser("bch", "macpost403");
-  await dangNhapDuAn(u, projectId);
-  const { POST } = await import("@/app/api/engineering/multi-agent-copilot/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
-
-test(
-  "POST /api/engineering/multi-agent-copilot: khởi tạo phiên tranh luận → lưu, GET liệt kê lại",
-  S,
-  async () => {
-    const projectId = await taoDuAn("macok");
-    const pm = await taoUser("pm", "macok");
-    await dangNhapDuAn(pm, projectId);
-    const { POST } = await import("@/app/api/engineering/multi-agent-copilot/route");
-    const res = await POST(
-      jreq("/x", { sessionCode: `DEBATE-${uniq("macok")}`, discipline: "hvac" }),
-    );
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.success, true);
-    assert.ok(body.sessionId);
-
-    const { GET } = await import("@/app/api/engineering/multi-agent-copilot/route");
-    const listRes = await GET();
-    const listBody = await listRes.json();
-    assert.equal(listBody.totalCount, 1);
   },
 );
 

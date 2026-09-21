@@ -23,15 +23,33 @@ Nguồn: `docs/ops/MAINTENANCE-REPORT.md` (sinh lúc 2026-09-21T09:47:28Z, nhán
       vào `node -e`. Xác nhận lại: `bash scripts/maintenance-sweep.sh` (sau `npm ci`) in đúng một
       dòng `- Số package lỗi thời (\`npm outdated\`): 34.`.
 
-## 🟡 Hoãn — chưa chốt hướng (không code)
+## ✅ M-03 — chốt hướng (2026-09-21, cập nhật)
 
-- [ ] **M-03**: Cụm 13 route "Lớp Engineering OS" trong `scripts/dead-routes-allowlist.json`
-      (`digital-handover`, `project-health`, `multi-agent-copilot`, `compliance/audit-element`,
-      `closed-loop-sync`, `mepf-predictive`, `pipe-spool-tracking`, `carbon-lca`, `taxonomy`,
-      `zero-error/pour-permits`, `workflows/[id]/transition`, `swarm/debates/[id]/arguments`,
-      `swarm/debates/[id]/synthesize`) vẫn ghi "chờ chốt hướng ở đề xuất #6 của audit 2026-08-25".
-      **Người dùng đã quyết (2026-09-21): vẫn chưa chốt, giữ nguyên allowlist** — không giao code
-      đợt này. Rà lại ở đợt `/maintain` sau nếu vẫn còn treo.
+Rà lại kỹ hơn cụm 13 route: 3 route (`zero-error/pour-permits`, `pipe-spool-tracking`,
+`closed-loop-sync`) có giá trị nghiệp vụ cao nhất, giữ lại chờ gắn UI sau. Trong 10 route còn lại,
+phát hiện **3 route thực ra là mắt xích còn thiếu của tính năng đang sống** (không phải dead code
+thuần túy) nên KHÔNG xoá:
+
+- `workflows/[id]/transition` — sau khi workflow được duyệt qua `submit`/`gates`, đây là cách duy
+  nhất đưa nó qua `executing → validating_result → completed` (trang `/engineering/workflows` có
+  thật nhưng chưa gọi route này).
+- `swarm/debates/[id]/arguments` + `swarm/debates/[id]/synthesize` — trang `/engineering/swarm` có
+  thật, tạo debate được nhưng không tự sinh lập luận; đây là cách duy nhất thêm lập luận/tổng hợp.
+
+**7 route còn lại xác nhận thật là dead code** (backend xong, không route/UI/lib nào khác gọi tới)
+→ đã xoá cùng lib module riêng + test liên quan: `digital-handover`, `project-health`,
+`multi-agent-copilot`, `mepf-predictive`, `carbon-lca` (module độc lập, xoá cả file
+`lib/ky-thuat/engineering-*.ts` + test riêng); `compliance/audit-element` (hàm
+`auditEngineeringElement` trong `engineering-prescriptive.ts`, module dùng chung giữ lại vì
+`scanAllElementsCompliance` vẫn cần); `taxonomy` (hàm `getTaxonomy` trong `engineering-graph.ts`,
+module dùng chung giữ lại vì `traverseGraph`/`getImpactAnalysis`... vẫn cần). Cập nhật
+`lib/ky-thuat/engineering-suite.ts` (barrel export), `scripts/dead-routes-allowlist.json` (xoá 7
+mục), và toàn bộ test file liên quan (route-eng-du-bao/mepf/zero-error, engineering-graph,
+engineering-prescriptive, engineering-suite, audit-2026-09-05-guards).
+
+3 route giữ lại (`workflows/transition`, `swarm/arguments`, `swarm/synthesize`) vẫn nằm trong
+`dead-routes-allowlist.json` với lý do cũ — cân nhắc gắn nút UI gọi chúng ở đợt sau thay vì tiếp
+tục để "chờ chốt hướng".
 
 ## ⛔ Đã hỏi, người dùng từ chối lúc này
 
@@ -41,5 +59,5 @@ Nguồn: `docs/ops/MAINTENANCE-REPORT.md` (sinh lúc 2026-09-21T09:47:28Z, nhán
 
 ## Kết luận
 
-Không có 🔴 nào còn mở. Đóng kế hoạch này; M-03/M-04 để lại cho đợt bảo trì tiếp theo nếu người
-dùng đổi ý.
+Không có 🔴 nào còn mở. Đóng kế hoạch này; M-04 để lại cho đợt bảo trì tiếp theo nếu người dùng
+đổi ý; M-03 đã chốt hướng và xử lý xong (xoá 7 route dead code, giữ 3 route chờ gắn UI).
