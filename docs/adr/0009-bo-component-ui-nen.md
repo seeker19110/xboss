@@ -62,3 +62,31 @@ tự đảo (`zinc-*`, `-300/-400`), nền mờ ghép chữ `-300`, nền đặc
 - **Việc tiếp theo:** áp bộ component cho các nhóm trang nghiệp vụ còn lại theo từng đợt;
   cân nhắc thêm cổng CI chặn nút/thẻ viết tay mới (bắt `rounded-2xl` trên control,
   `py-0.5`/`py-1` trên nút) nếu tình trạng lệch chuẩn tái diễn.
+
+## Bổ sung: màn hình chứng từ — M124 (2026-09-21)
+
+Nhóm trang tài chính (IPC, hợp đồng, VO, claim) trước đây dùng chung mẫu "bảng + Modal":
+chi tiết chứng từ mở trong `Modal max-w-2xl`, nhập khối lượng nhiều dòng rất chật, nút
+hành động `py-2 text-xs` nằm dưới ngưỡng 40px. M124 chốt **mẫu màn hình chứng từ** và bổ
+sung 4 component nền (đặc tả: `docs/nang-cap/M124-bo-cuc-man-hinh-chung-tu.md`):
+
+| Component    | Vai trò                                                                                                            |
+| ------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `DocToolbar` | Thanh công cụ trên của chứng từ, `sticky top-0`, có `DocToolbar.Sep` ngăn nhóm nút và slot `trailing` (điều hướng) |
+| `DocField`   | Hàng "nhãn — giá trị" (+ `DocFieldGroup` 2 cột) cho phần đầu chứng từ; ô chỉ đọc dùng viền đứt nét                 |
+| `DocTotals`  | Khối tổng hợp tiền cuối chứng từ — **chỉ hiển thị**, nhận giá trị đã format (tiền vẫn do SQL tính, quy ước M45)    |
+| `Kbd`        | Chip phím tắt đi kèm nhãn nút                                                                                      |
+
+Hai quy ước hình thức kèm theo:
+
+1. **Toolbar trên là `hidden md:flex`, thanh hành động đáy hiện ở MỌI breakpoint.** Thanh
+   đáy đi qua prop `bottomActions` của `AppHeader` (đã có `.app-bottombar`), nên trên điện
+   thoại ngón tay luôn với tới hành động chính mà không phải cuộn lên đầu chứng từ; desktop
+   có cả hai (toolbar dính theo ngữ cảnh + thanh đáy cố định). Quyết định của người dùng
+   khi duyệt M124: "toolbar trên & thanh đáy, đáy ưu tiên mobile".
+2. **`Kbd` ẩn dưới `md`** (điện thoại công trường không có bàn phím) và dùng biến thể
+   `onAccent` khi đặt trên nút primary để không phá công thức màu nền accent của `Button`.
+
+Áp dụng đầu tiên cho `/payment-certs` (master–detail: danh sách đợt trái 320px, chứng từ
+phải, `?contractId=&id=` trong URL). Các trang tài chính còn lại chuyển dần theo nguyên tắc
+"trang nào đụng tới thì đổi trang đó" như phần Hệ quả ở trên.

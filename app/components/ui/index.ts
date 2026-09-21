@@ -5,3 +5,8 @@ export { default as Card, CardLink, cardClass } from "@/app/components/ui/Card";
 export { default as Chip } from "@/app/components/ui/Chip";
 export { default as Section } from "@/app/components/ui/Section";
 export { default as StatCard } from "@/app/components/ui/StatCard";
+// Bộ component "màn hình chứng từ" (M124) — xem ADR-0009 mục cùng tên.
+export { default as DocToolbar } from "@/app/components/ui/DocToolbar";
+export { default as DocField, DocFieldGroup } from "@/app/components/ui/DocField";
+export { default as DocTotals, type DocTotalRow } from "@/app/components/ui/DocTotals";
+export { default as Kbd } from "@/app/components/ui/Kbd";
