@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, run, withTransaction } from "@/lib/db";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,41 @@ export async function PUT(req: NextRequest) {
     projectIds.some((id: number) => !Number.isFinite(id))
   )
     return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 422 });
+
+  // Người bị gán phải tồn tại CÙNG org với người gọi — không lộ user org khác qua 403/200.
+  const target = await queryOne<{ id: number; role: string }>(
+    `SELECT id, role FROM users WHERE id = ? AND org_id = ?`,
+    userId,
+    user.orgId,
+  );
+  if (!target) return NextResponse.json({ error: "Không tìm thấy người dùng" }, { status: 404 });
+
+  // PM (không phải admin) chỉ được gán trong phạm vi dự án mình thấy, không tự gán mình,
+  // không đụng vào Admin — chặn đường leo quyền qua route này (audit 2026-09-22).
+  if (user.role !== "admin") {
+    if (userId === user.id)
+      return NextResponse.json({ error: "Không thể tự gán dự án cho chính mình" }, { status: 403 });
+    if (target.role === "admin")
+      return NextResponse.json(
+        { error: "Chỉ Admin mới gán được dự án cho Admin" },
+        { status: 403 },
+      );
+    const visible = await visibleProjectIds(user);
+    if (projectIds.some((id: number) => !visible.includes(id)))
+      return NextResponse.json({ error: "Chỉ gán được dự án bạn đang được thấy" }, { status: 403 });
+  }
+
+  // Mọi projectIds phải tồn tại thật, cùng org với người gọi — kể cả Admin (chặn gán vào
+  // dự án org khác/id ảo). Mảng rỗng hợp lệ (chủ động khoá user, xem comment PUT ở trên).
+  if (projectIds.length > 0) {
+    const rows = await query<{ id: number }>(
+      `SELECT id FROM projects WHERE id = ANY(?) AND org_id = ?`,
+      projectIds,
+      user.orgId,
+    );
+    if (rows.length !== new Set(projectIds).size)
+      return NextResponse.json({ error: "Dự án không tồn tại" }, { status: 422 });
+  }
 
   await withTransaction(async () => {
     await run(`DELETE FROM user_projects WHERE user_id = ?`, userId);

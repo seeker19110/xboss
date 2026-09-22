@@ -41,8 +41,13 @@ export async function PATCH(req: NextRequest) {
 
   // Lấy task_id + package_id của từng dimension để kiểm quyền + gộp recompute + hold point.
   const placeholders = ids.map(() => "?").join(", ");
-  const dims = await query<{ id: number; task_id: number; package_id: number }>(
-    `SELECT pd.id, pd.task_id, t.package_id
+  const dims = await query<{
+    id: number;
+    task_id: number;
+    package_id: number;
+    status: string | null;
+  }>(
+    `SELECT pd.id, pd.task_id, t.package_id, t.status
        FROM progress_dimensions pd JOIN tasks t ON t.id = pd.task_id
       WHERE pd.id IN (${placeholders})`,
     ...ids,
@@ -69,6 +74,17 @@ export async function PATCH(req: NextRequest) {
       );
   }
 
+  // Bất biến nghiệm thu (L2, audit 2026-09-22): bỏ tick ô của task đã nghiệm thu kéo % xuống
+  // dưới 1 trong khi status vẫn nghiem_thu — phá bất biến "nghiem_thu ⇒ progress = 1". Chỉ cần
+  // MỘT task trong vùng chọn đã nghiệm thu là chặn nguyên lô (lô atomic, không ghi gì).
+  if (!installed && dims.some((d) => d.status === "nghiem_thu"))
+    return NextResponse.json(
+      {
+        error: "Task đã nghiệm thu — huỷ nghiệm thu (DELETE /api/tasks/:id/approve) trước khi sửa",
+      },
+      { status: 409 },
+    );
+
   // Hold point chuyển bước (M3) + gate biện pháp thi công (M8): chỉ chặn khi TICK —
   // kiểm từng package liên quan (dedup).
   if (installed) {
@@ -83,13 +99,32 @@ export async function PATCH(req: NextRequest) {
   }
 
   const dimIds = dims.map((d) => d.id);
-  await withTransaction(async () => {
+  const taskPlaceholders = taskIds.map(() => "?").join(", ");
+  const result = await withTransaction(async () => {
+    // Kiểm lại nghiệm thu DƯỚI KHOÁ (review): kiểm ngoài ở trên chỉ để trả 409 sớm không tốn
+    // lock, nhưng giữa lúc đó và đây có thể có POST /approve chạy song song đặt nghiem_thu —
+    // FOR UPDATE cùng row với /approve nên các request tuần tự hoá, không còn race (TOCTOU).
+    const locked = await query<{ id: number; status: string | null }>(
+      `SELECT id, status FROM tasks WHERE id IN (${taskPlaceholders}) FOR UPDATE`,
+      ...taskIds,
+    );
+    if (!installed && locked.some((t) => t.status === "nghiem_thu")) {
+      return {
+        error: "Task đã nghiệm thu — huỷ nghiệm thu (DELETE /api/tasks/:id/approve) trước khi sửa",
+        httpStatus: 409,
+      } as const;
+    }
+
     // Dữ liệu sự kiện (M120 FR2) — cùng lib dùng chung với PATCH đơn. Không truyền `note`:
     // ghi chú là việc của từng ô, gán chung cả vùng chọn sẽ ra dữ liệu vô nghĩa (ghi chú cũ
     // của các ô được giữ nguyên khi tick, và bị xoá cùng dấu vết lắp khi bỏ tick).
     await ghiDauVetTick(dimIds, !!installed, { userId: user.id });
     for (const tid of taskIds) await recomputeTask(tid, user.name);
+    return { ok: true } as const;
   });
+
+  if ("error" in result)
+    return NextResponse.json({ error: result.error }, { status: result.httpStatus });
 
   return NextResponse.json({ ok: true, updated: dimIds.length, installed: !!installed });
 }

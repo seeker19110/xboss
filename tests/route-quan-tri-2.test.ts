@@ -832,12 +832,15 @@ test("PUT /api/user-projects: dữ liệu không hợp lệ → 422", S, async (
 });
 
 test("PUT /api/user-projects: thay toàn bộ danh sách dự án của 1 user", S, async () => {
+  // Dùng Admin gọi (thay vì PM) — từ S1 audit 2026-09-22, PM chỉ gán được dự án nằm trong
+  // tập mình đang thấy (projectB nằm ngoài tập PM thấy ở đây), nên happy-path "thay toàn bộ
+  // danh sách" giờ kiểm bằng Admin, không lẫn với ca PM bị chặn (đã có test riêng AC1-AC4).
   const { query } = await import("@/lib/db");
   const projectA = await taoDuAn("up-putokA");
   const projectB = await taoDuAn("up-putokB");
-  const pm = await taoUser("pm", "up-putok");
+  const admin = await taoUser("admin", "up-putok");
   const target = await taoUser("engineer", "up-putokTarget");
-  await dangNhapDuAn(pm, projectA);
+  await dangNhapDuAn(admin, projectA);
   const { PUT } = await import("@/app/api/user-projects/route");
   const res = await PUT(jreq("/x", { userId: target.id, projectIds: [projectA, projectB] }, "PUT"));
   assert.equal(res.status, 200);
@@ -849,6 +852,139 @@ test("PUT /api/user-projects: thay toàn bộ danh sách dự án của 1 user",
     rows.map((r) => r.project_id).sort((a, b) => a - b),
     [projectA, projectB].sort((a, b) => a - b),
   );
+});
+
+// PUT /api/user-projects — S1 audit 2026-09-22: PM leo quyền dự án qua route này.
+test(
+  "PUT /api/user-projects: PM tự gán thêm dự án cho chính mình → 403, giữ nguyên gán cũ",
+  S,
+  async () => {
+    const { query, run } = await import("@/lib/db");
+    const p1 = await taoDuAn("s1-ac1-p1");
+    const p2 = await taoDuAn("s1-ac1-p2");
+    const pm = await taoUser("pm", "s1-ac1");
+    await dangNhapDuAn(pm, p1);
+    const { PUT } = await import("@/app/api/user-projects/route");
+    const res = await PUT(jreq("/x", { userId: pm.id, projectIds: [p1, p2] }, "PUT"));
+    assert.equal(res.status, 403);
+    const rows = await query<{ project_id: number }>(
+      `SELECT project_id FROM user_projects WHERE user_id = ? ORDER BY project_id`,
+      pm.id,
+    );
+    assert.deepEqual(
+      rows.map((r) => r.project_id),
+      [p1],
+    );
+    await run(`DELETE FROM user_projects WHERE user_id = ?`, pm.id);
+  },
+);
+
+test(
+  "PUT /api/user-projects: PM gán dự án engineer sang dự án mình không thấy → 403",
+  S,
+  async () => {
+    const { query, run } = await import("@/lib/db");
+    const p1 = await taoDuAn("s1-ac2-p1");
+    const p2 = await taoDuAn("s1-ac2-p2"); // ngoài tập PM thấy
+    const pm = await taoUser("pm", "s1-ac2");
+    const eng = await taoUser("engineer", "s1-ac2Eng");
+    await dangNhapDuAn(pm, p1);
+    const { PUT } = await import("@/app/api/user-projects/route");
+    const res = await PUT(jreq("/x", { userId: eng.id, projectIds: [p2] }, "PUT"));
+    assert.equal(res.status, 403);
+    const rows = await query<{ project_id: number }>(
+      `SELECT project_id FROM user_projects WHERE user_id = ?`,
+      eng.id,
+    );
+    assert.equal(rows.length, 0);
+    await run(`DELETE FROM user_projects WHERE user_id = ?`, pm.id);
+  },
+);
+
+test("PUT /api/user-projects: PM gán dự án mình thấy cho engineer → 200", S, async () => {
+  const { query, run } = await import("@/lib/db");
+  const p1 = await taoDuAn("s1-ac3-p1");
+  const pm = await taoUser("pm", "s1-ac3");
+  const eng = await taoUser("engineer", "s1-ac3Eng");
+  await dangNhapDuAn(pm, p1);
+  const { PUT } = await import("@/app/api/user-projects/route");
+  const res = await PUT(jreq("/x", { userId: eng.id, projectIds: [p1] }, "PUT"));
+  assert.equal(res.status, 200);
+  const rows = await query<{ project_id: number }>(
+    `SELECT project_id FROM user_projects WHERE user_id = ?`,
+    eng.id,
+  );
+  assert.deepEqual(
+    rows.map((r) => r.project_id),
+    [p1],
+  );
+  await run(`DELETE FROM user_projects WHERE user_id IN (?, ?)`, pm.id, eng.id);
+});
+
+test("PUT /api/user-projects: PM gán dự án cho user admin → 403", S, async () => {
+  const { run } = await import("@/lib/db");
+  const p1 = await taoDuAn("s1-ac4-p1");
+  const pm = await taoUser("pm", "s1-ac4");
+  const otherAdmin = await taoUser("admin", "s1-ac4Admin");
+  await dangNhapDuAn(pm, p1);
+  const { PUT } = await import("@/app/api/user-projects/route");
+  const res = await PUT(jreq("/x", { userId: otherAdmin.id, projectIds: [p1] }, "PUT"));
+  assert.equal(res.status, 403);
+  await run(`DELETE FROM user_projects WHERE user_id = ?`, pm.id);
+});
+
+test("PUT /api/user-projects: Admin gán cho user org khác → 404", S, async () => {
+  const { run } = await import("@/lib/db");
+  const p1 = await taoDuAn("s1-ac5-p1");
+  const admin = await taoUser("admin", "s1-ac5");
+  const otherOrgId = await taoToChuc("s1-ac5-org");
+  const engOtherOrg = await taoUser("engineer", "s1-ac5Eng", { orgId: otherOrgId });
+  await dangNhapDuAn(admin, p1);
+  try {
+    const { PUT } = await import("@/app/api/user-projects/route");
+    const res = await PUT(jreq("/x", { userId: engOtherOrg.id, projectIds: [p1] }, "PUT"));
+    assert.equal(res.status, 404);
+  } finally {
+    // dangNhapDuAn chèn user_projects cho admin — dọn để không ảnh hưởng visibleProjectIds
+    // của test khác chạy song song (bảng toàn cục).
+    await run(`DELETE FROM user_projects WHERE user_id = ?`, admin.id);
+  }
+});
+
+test("PUT /api/user-projects: Admin gán projectIds có id không tồn tại → 422", S, async () => {
+  const { run } = await import("@/lib/db");
+  const p1 = await taoDuAn("s1-ac6-p1");
+  const admin = await taoUser("admin", "s1-ac6");
+  const eng = await taoUser("engineer", "s1-ac6Eng");
+  await dangNhapDuAn(admin, p1);
+  try {
+    const { PUT } = await import("@/app/api/user-projects/route");
+    const res = await PUT(jreq("/x", { userId: eng.id, projectIds: [999999999] }, "PUT"));
+    assert.equal(res.status, 422);
+  } finally {
+    await run(`DELETE FROM user_projects WHERE user_id = ?`, admin.id);
+  }
+});
+
+test("PUT /api/user-projects: Admin gán hợp lệ → 200, đúng 2 dòng", S, async () => {
+  const { query, run } = await import("@/lib/db");
+  const p1 = await taoDuAn("s1-ac7-p1");
+  const p2 = await taoDuAn("s1-ac7-p2");
+  const admin = await taoUser("admin", "s1-ac7");
+  const eng = await taoUser("engineer", "s1-ac7Eng");
+  await dangNhapDuAn(admin, p1);
+  const { PUT } = await import("@/app/api/user-projects/route");
+  const res = await PUT(jreq("/x", { userId: eng.id, projectIds: [p1, p2] }, "PUT"));
+  assert.equal(res.status, 200);
+  const rows = await query<{ project_id: number }>(
+    `SELECT project_id FROM user_projects WHERE user_id = ? ORDER BY project_id`,
+    eng.id,
+  );
+  assert.deepEqual(
+    rows.map((r) => r.project_id).sort((a, b) => a - b),
+    [p1, p2].sort((a, b) => a - b),
+  );
+  await run(`DELETE FROM user_projects WHERE user_id = ?`, eng.id);
 });
 
 // ============================================================================

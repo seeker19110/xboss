@@ -144,6 +144,17 @@ export async function PATCH(
     );
     if (!before) return { error: "Task không tồn tại", httpStatus: 404 } as const;
     const progressPercent = before.progress_percent ?? 0;
+    // Bất biến nghiệm thu (L1, audit 2026-09-22): task đang `nghiem_thu` chỉ đổi trạng thái
+    // qua POST/DELETE /api/tasks/:id/approve (có kiểm quyền + audit). Chặn TRƯỚC
+    // statusConsistentWithProgress vì `hoan_thanh` trên task 100% vẫn qua được kiểm đó,
+    // lại âm thầm hạ cấp nghiệm thu. Sửa trường khác (tên/ngày/BOQ/gán người) vẫn cho phép —
+    // recomputeTask khi đổi ngày giữ nguyên nghiem_thu (deriveStatus).
+    if (before.status === "nghiem_thu" && body.status !== undefined) {
+      return {
+        error: "Task đã nghiệm thu — huỷ nghiệm thu (DELETE /api/tasks/:id/approve) trước khi sửa",
+        httpStatus: 409,
+      } as const;
+    }
     // Route này không sửa progress_percent — đổi status thủ công phải khớp % hiện có
     // (bất biến hoan_thanh ⇔ progress>=1, xem statusConsistentWithProgress).
     if (body.status !== undefined && !statusConsistentWithProgress(body.status, progressPercent)) {
