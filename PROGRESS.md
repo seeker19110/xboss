@@ -1,11 +1,38 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Sửa 3 lỗi mức Cao từ đợt audit 2026-09-22 (S1, L1, L2) — 2026-09-22
+
+Thi hành theo `PLAN.md` (2 việc song song trên worktree riêng, reviewer soát diff, sửa 3 điểm review
+trước khi gộp). Chỉ sửa ở ranh giới route, không đổi schema/`recompute.ts`/`visibleProjectIds`.
+
+- **S1 — `PUT /api/user-projects`** (`app/api/user-projects/route.ts`): người bị gán phải cùng org
+  (404 nếu không); PM không tự gán mình, không gán cho Admin, `projectIds` phải ⊆
+  `visibleProjectIds(caller)` (403); mọi người gọi: `projectIds` phải tồn tại cùng org (422; mảng
+  rỗng vẫn hợp lệ = chủ động khoá user). Test AC1–AC7 thêm vào `tests/route-quan-tri-2.test.ts`; ca
+  cũ "thay toàn bộ danh sách" đổi actor PM → Admin vì nó vô tình kiểm đúng hành vi lỗ hổng.
+- **L1 — hạ cấp `nghiem_thu` thủ công**: `PATCH /api/tasks/:id`, `POST /api/tasks/batch`,
+  `PATCH /api/tasks/:id/progress` → task đang `nghiem_thu` mà gửi `status` (kể cả `hoan_thanh`) →
+  **409** (batch trả 422 theo cơ chế map lỗi sẵn có của route). Sửa trường khác (tên/ngày/BOQ/gán)
+  vẫn cho phép.
+- **L2 — giảm % task đã nghiệm thu**: `progress` < 1 qua route progress, bỏ tick qua
+  `PATCH /api/dimensions/:id` và `/api/dimensions/batch` → **409**. Tick lại `installed=true` hoặc gửi
+  lại `progress=1` vẫn 200 (idempotent, replay offline không kẹt). Ở 2 route dimensions kiểm 2 lần:
+  ngoài transaction để 409 sớm, và **dưới khoá `SELECT … FOR UPDATE`** trong transaction để chặn race
+  với `POST /approve` (phát hiện của reviewer).
+- Test hồi quy mới `tests/route-nghiem-thu-bat-bien.test.ts` (9 ca AC1–AC9, gồm 2 ca đối chứng và 1
+  ca sau `DELETE /approve` → sửa lại được); đã kiểm ngược: 5 ca đỏ khi chưa vá. Mọi ca đều dọn dữ liệu
+  trong `finally` (bảng `user_projects` là toàn cục, sót dòng làm `visibleProjectIds` của test khác
+  đổi hành vi).
+- Ghi chú vận hành: chạy suite 2 lần trên **cùng** DB test làm 3 file khác (`auth`, `import-real`,
+  `nav-settings`) đỏ vì dữ liệu sót từ lần trước — không phải lỗi code; CI luôn dùng DB mới. Chạy
+  cục bộ nên `DROP/CREATE DATABASE xboss_test` trước mỗi lần chạy toàn bộ.
+
 ## 🔍 Đợt audit toàn dự án (5 trụ theo `docs/audit.md`) — 2026-09-22
 
 Chạy theo đúng quy trình §9: 4 subagent song song (bảo mật/phân quyền · logic & toàn vẹn dữ liệu ·
 UI/UX-a11y + vận hành/offline/xuất bản · hiệu năng/dependency/CI/test) đọc code thật + xác nhận
 ground-truth (Postgres 16 cục bộ `show timezone` = UTC, script quét 413 route). Phiên chính đã tự
-đọc lại code để xác nhận mọi phát hiện mức **Cao** trước khi ghi. **Đợt này chỉ audit, chưa sửa** —
+đọc lại code để xác nhận mọi phát hiện mức **Cao** trước khi ghi. **Đợt này chỉ audit, chưa sửa** (S1/L1/L2 đã đóng ở mục ngay trên) —
 mọi phát hiện Cao/Trung bình ghi vào mục "Nợ kỹ thuật" bên dưới, chờ chốt thứ tự sửa.
 
 ```
@@ -67,7 +94,7 @@ KẾT LUẬN: Cần xử lý — S1, L1, L2 (Cao) và S2, L3–L7, U1–U7, P1�
 
 **Bảo mật (S)**
 
-- **S1 [Cao]** `PUT /api/user-projects` (`app/api/user-projects/route.ts:26-55`): PM (`CAN.assign`) gán được bất kỳ `projectIds` cho bất kỳ `userId` — không đối chiếu `visibleProjectIds(user)` người gọi, không kiểm `userId`/project cùng org → PM tự cấp mình mọi dự án trong org, hoặc xoá quyền thấy của Admin/PM khác. Sửa: `projectIds ⊆ visibleProjectIds(caller)` với PM, `userId` cùng `org_id`, cân nhắc chỉ Admin.
+- **S1 [Cao] ✅ đã sửa 2026-09-22 —** `PUT /api/user-projects` (`app/api/user-projects/route.ts:26-55`): PM (`CAN.assign`) gán được bất kỳ `projectIds` cho bất kỳ `userId` — không đối chiếu `visibleProjectIds(user)` người gọi, không kiểm `userId`/project cùng org → PM tự cấp mình mọi dự án trong org, hoặc xoá quyền thấy của Admin/PM khác. Sửa: `projectIds ⊆ visibleProjectIds(caller)` với PM, `userId` cùng `org_id`, cân nhắc chỉ Admin.
 - **S2 [Trung bình]** `DELETE /api/comments/:id` (`app/api/comments/[id]/route.ts:20-33`): không cách ly dự án (route anh em `tasks/:id/comments` đã có `taskProjectId` + `getCurrentProjectId`) → đoán id xoá bình luận dự án/org khác. Sửa theo khuôn `photos/[id]`.
 - **S3 [Thấp]** `PATCH/DELETE /api/saved-reports/:id`: không lọc `org_id` (GET/POST cùng cụm đã lọc) → Admin xuyên org sửa/xoá. Phụ thuộc quyết định (b).
 - **S4 [Thấp]** `POST /api/auth/totp/confirm` + `DELETE /api/auth/totp` không `hitRateLimit` → kẻ chiếm phiên dò mã 6 số để tắt 2FA. Sửa: `hitRateLimit("totp-confirm:<uid>", 10, 15)`.
@@ -76,8 +103,8 @@ KẾT LUẬN: Cần xử lý — S1, L1, L2 (Cao) và S2, L3–L7, U1–U7, P1�
 
 **Logic & toàn vẹn dữ liệu (L)**
 
-- **L1 [Cao]** `PATCH /api/tasks/:id`, `/tasks/batch`, `/tasks/:id/progress` chỉ chặn _đặt_ `status=nghiem_thu`, không chặn khi task **đang** `nghiem_thu` → ghi đè `hoan_thanh` thẳng, mất nghiệm thu không qua `DELETE /approve`, `approval_source` lệch, `task_history` ghi sai loại. Sửa: sau `FOR UPDATE`, `before.status === "nghiem_thu" && body.status !== undefined` → 409.
-- **L2 [Cao]** Task `nghiem_thu` vẫn bị giảm % qua bỏ tick (`dimensions/[id]`, `dimensions/batch`) hoặc nhập % tay (`progress` không kèm status) → tồn tại `nghiem_thu` với progress < 1, `actual_end_date` bị NULL, % nhóm/S-curve tụt nhưng badge vẫn "Đã nghiệm thu". Sửa: 409 ở 3 route khi task đang `nghiem_thu`.
+- **L1 [Cao] ✅ đã sửa 2026-09-22 —** `PATCH /api/tasks/:id`, `/tasks/batch`, `/tasks/:id/progress` chỉ chặn _đặt_ `status=nghiem_thu`, không chặn khi task **đang** `nghiem_thu` → ghi đè `hoan_thanh` thẳng, mất nghiệm thu không qua `DELETE /approve`, `approval_source` lệch, `task_history` ghi sai loại. Sửa: sau `FOR UPDATE`, `before.status === "nghiem_thu" && body.status !== undefined` → 409.
+- **L2 [Cao] ✅ đã sửa 2026-09-22 —** Task `nghiem_thu` vẫn bị giảm % qua bỏ tick (`dimensions/[id]`, `dimensions/batch`) hoặc nhập % tay (`progress` không kèm status) → tồn tại `nghiem_thu` với progress < 1, `actual_end_date` bị NULL, % nhóm/S-curve tụt nhưng badge vẫn "Đã nghiệm thu". Sửa: 409 ở 3 route khi task đang `nghiem_thu`.
 - **L3 [Trung bình]** `CURRENT_DATE` (13 chỗ, gồm `recompute.ts:56,63` `capNhatNgayThucTe`, handover, warranty, drawings, finance, materials/reports) chạy theo TZ phiên Postgres = UTC, trong khi `todayISO()` = UTC+7 → 0h–7h sáng VN lệch 1 ngày. Chính `tests/recompute.test.ts:351,421` phải dùng UTC để pass. Sửa 1 chỗ: `-c timezone=Asia/Ho_Chi_Minh` trong `options` Pool (`lib/db/index.ts`) + test `SELECT CURRENT_DATE::text = todayISO()`; thêm file test `lib/nen/date.ts`.
 - **L4 [Trung bình]** `GET/POST /api/approvals` (nghiệm thu tầng): chỉ lọc `sheet_type_id + floor_label`, không JOIN tới `projects` → PM gửi `sheetTypeId` dự án khác nghiệm thu cả tầng dự án đó; GET liệt kê mọi dự án. Sửa: JOIN towers/projects `WHERE p.id = ?` → 404.
 - **L5 [Trung bình]** `ghiDauVetTick` (`lib/tien-do/dimension-events.ts:59-71`) ghi đè `installed_at/installed_by` khi tick lại ô đã tick (replay offline, tick cả hàng) → mất dấu vết người lắp thật. Sửa: `CASE WHEN installed = 1 THEN installed_at ELSE NOW() END`.
