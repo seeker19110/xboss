@@ -1,11 +1,19 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Layers, Search, Trash2, X } from "lucide-react";
+import { History, Layers, Search, Trash2, X } from "lucide-react";
 import { Modal } from "@/app/components/dialogs";
 import { taiJson } from "@/app/lib/taiDuLieu";
 import { Button } from "@/app/components/ui";
+import { formatDateTimeVN } from "@/lib/nen/date";
 import NormsSection from "./NormsSection";
-import { NGUONG_TICK_SAN, type BoqItem, type TaskHit, type TaskTheoTang } from "./types";
+import {
+  LICH_SU_BOQ_FIELD_LABEL,
+  NGUONG_TICK_SAN,
+  type BoqItem,
+  type DongLichSuBoq,
+  type TaskHit,
+  type TaskTheoTang,
+} from "./types";
 
 export default function BoqDetailModal({
   item,
@@ -51,6 +59,28 @@ export default function BoqDetailModal({
   const [dangTaiTang, setDangTaiTang] = useState(false);
   const [loiTang, setLoiTang] = useState("");
   const [tickTang, setTickTang] = useState<Set<number>>(new Set());
+
+  // Lịch sử thay đổi (M124 việc 3): tải khi mở modal, không phụ thuộc canManage — mọi vai
+  // trò xem được BOQ đều xem được lịch sử.
+  const [lichSu, setLichSu] = useState<DongLichSuBoq[]>([]);
+  const [dangTaiLichSu, setDangTaiLichSu] = useState(true);
+  const [loiLichSu, setLoiLichSu] = useState("");
+
+  const taiLichSu = useCallback(async () => {
+    setDangTaiLichSu(true);
+    setLoiLichSu("");
+    const kq = await taiJson<{ rows: DongLichSuBoq[] }>(`/api/boq/${item.id}/history`);
+    setDangTaiLichSu(false);
+    if (!kq.ok) {
+      setLoiLichSu(kq.loi);
+      return;
+    }
+    setLichSu(kq.data.rows);
+  }, [item.id]);
+
+  useEffect(() => {
+    void taiLichSu();
+  }, [taiLichSu]);
 
   useEffect(() => {
     const term = q.trim();
@@ -487,6 +517,49 @@ export default function BoqDetailModal({
         </section>
 
         <NormsSection boqItemId={item.id} canManage={canManage} />
+
+        <section className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400 flex items-center gap-1.5">
+            <History className="w-3.5 h-3.5" />
+            Lịch sử thay đổi
+          </h3>
+          {dangTaiLichSu && <p className="text-xs text-zinc-400">Đang tải…</p>}
+          {!dangTaiLichSu && loiLichSu && (
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-rose-300 flex-1">{loiLichSu}</p>
+              <Button size="sm" onClick={() => void taiLichSu()}>
+                Thử lại
+              </Button>
+            </div>
+          )}
+          {!dangTaiLichSu && !loiLichSu && lichSu.length === 0 && (
+            <p className="text-xs text-zinc-500">Chưa có thay đổi nào được ghi nhận.</p>
+          )}
+          {!dangTaiLichSu && !loiLichSu && lichSu.length > 0 && (
+            <ul className="max-h-56 overflow-y-auto divide-y divide-zinc-800 border border-zinc-800 rounded-lg">
+              {lichSu.map((h, i) => (
+                <li key={i} className="px-3 py-2 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-zinc-200">
+                      {LICH_SU_BOQ_FIELD_LABEL[h.field] ?? h.field}
+                    </span>
+                    <span className="text-zinc-500 shrink-0">{formatDateTimeVN(h.changedAt)}</span>
+                  </div>
+                  <p className="text-zinc-400 mt-0.5">
+                    {h.field === "import" ? (
+                      <>Thêm mới từ import — mã {h.newValue ?? "—"}</>
+                    ) : (
+                      <>
+                        {h.oldValue ?? "(trống)"} → {h.newValue ?? "(trống)"}
+                      </>
+                    )}
+                    {h.changedByName ? ` · ${h.changedByName}` : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </Modal>
   );

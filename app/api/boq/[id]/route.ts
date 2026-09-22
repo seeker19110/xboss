@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
+import { ghiLichSuBoq, type ThayDoiBoq } from "@/lib/khoi-luong/boq-history";
 
 export const dynamic = "force-dynamic";
 
@@ -26,8 +27,22 @@ export async function PATCH(
   if (blocked) return blocked;
   const existing =
     projectId != null
-      ? await queryOne<{ id: number }>(
-          `SELECT id FROM boq_items WHERE id = ? AND project_id = ?`,
+      ? await queryOne<{
+          id: number;
+          code: string;
+          name: string;
+          unit: string;
+          systemId: number | null;
+          qtyContractText: string;
+          unitPriceText: string;
+          qtySubText: string | null;
+          subUnitPriceText: string | null;
+          note: string | null;
+        }>(
+          `SELECT id, code, name, unit, system_id AS "systemId",
+                  qty_contract::text AS "qtyContractText", unit_price::text AS "unitPriceText",
+                  qty_sub::text AS "qtySubText", sub_unit_price::text AS "subUnitPriceText", note
+             FROM boq_items WHERE id = ? AND project_id = ?`,
           id,
           projectId,
         )
@@ -37,6 +52,9 @@ export async function PATCH(
   const body = await req.json().catch(() => ({}));
   const fields: string[] = [];
   const values: unknown[] = [];
+  // Chỉ ghi lịch sử field THẬT SỰ đổi giá trị (so chuỗi với trường text, so Number() với
+  // trường NUMERIC — để "10" và "10.000" không bị coi là đổi).
+  const changes: ThayDoiBoq[] = [];
 
   if (body.code !== undefined) {
     const code = String(body.code).trim();
@@ -49,12 +67,16 @@ export async function PATCH(
       );
     fields.push("code = ?");
     values.push(code);
+    if (code !== existing.code)
+      changes.push({ field: "code", oldValue: existing.code, newValue: code });
   }
   if (body.name !== undefined) {
     const name = String(body.name).trim();
     if (!name) return NextResponse.json({ error: "Tên không được để trống" }, { status: 422 });
     fields.push("name = ?");
     values.push(name);
+    if (name !== existing.name)
+      changes.push({ field: "name", oldValue: existing.name, newValue: name });
   }
   if (body.unit !== undefined) {
     const unit = String(body.unit).trim();
@@ -62,11 +84,19 @@ export async function PATCH(
       return NextResponse.json({ error: "Đơn vị tính không được để trống" }, { status: 422 });
     fields.push("unit = ?");
     values.push(unit);
+    if (unit !== existing.unit)
+      changes.push({ field: "unit", oldValue: existing.unit, newValue: unit });
   }
   if (body.systemId !== undefined) {
     if (body.systemId === null) {
       fields.push("system_id = ?");
       values.push(null);
+      if (existing.systemId !== null)
+        changes.push({
+          field: "system_id",
+          oldValue: String(existing.systemId),
+          newValue: null,
+        });
     } else {
       const systemId = Number(body.systemId);
       if (
@@ -76,13 +106,19 @@ export async function PATCH(
         return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
       fields.push("system_id = ?");
       values.push(systemId);
+      if (existing.systemId !== systemId)
+        changes.push({
+          field: "system_id",
+          oldValue: existing.systemId === null ? null : String(existing.systemId),
+          newValue: String(systemId),
+        });
     }
   }
-  for (const [key, col] of [
-    ["qtyContract", "qty_contract"],
-    ["unitPrice", "unit_price"],
-    ["qtySub", "qty_sub"],
-    ["subUnitPrice", "sub_unit_price"],
+  for (const [key, col, oldText] of [
+    ["qtyContract", "qty_contract", existing.qtyContractText],
+    ["unitPrice", "unit_price", existing.unitPriceText],
+    ["qtySub", "qty_sub", existing.qtySubText],
+    ["subUnitPrice", "sub_unit_price", existing.subUnitPriceText],
   ] as const) {
     if (body[key] !== undefined) {
       const n = Number(body[key]);
@@ -90,11 +126,16 @@ export async function PATCH(
         return NextResponse.json({ error: `${key} phải là số không âm` }, { status: 422 });
       fields.push(`${col} = ?`);
       values.push(n);
+      if (oldText === null || Number(oldText) !== n)
+        changes.push({ field: col, oldValue: oldText, newValue: String(n) });
     }
   }
   if (body.note !== undefined) {
+    const note = typeof body.note === "string" ? body.note.trim() || null : null;
     fields.push("note = ?");
-    values.push(typeof body.note === "string" ? body.note.trim() || null : null);
+    values.push(note);
+    if (note !== existing.note)
+      changes.push({ field: "note", oldValue: existing.note, newValue: note });
   }
   if (body.sortOrder !== undefined) {
     const n = Number(body.sortOrder);
@@ -107,7 +148,10 @@ export async function PATCH(
   if (fields.length === 0) return NextResponse.json({ ok: true });
 
   try {
-    await run(`UPDATE boq_items SET ${fields.join(", ")} WHERE id = ?`, ...values, id);
+    await withTransaction(async () => {
+      await run(`UPDATE boq_items SET ${fields.join(", ")} WHERE id = ?`, ...values, id);
+      await ghiLichSuBoq(id, changes, user.id);
+    });
   } catch (err) {
     if ((err as { code?: string }).code === "23505")
       return NextResponse.json({ error: "Mã BOQ đã tồn tại" }, { status: 409 });
