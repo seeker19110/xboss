@@ -23,14 +23,6 @@ export interface GraphEdge {
   projectId: number;
 }
 
-export interface GraphTraversalResult {
-  rootId: string;
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  depthReached: number;
-  truncated: boolean;
-}
-
 export interface ObjectLineageResult {
   object: GraphNode | null;
   source: {
@@ -88,7 +80,11 @@ export interface DataQualityIssue {
   resolutionNote: string | null;
 }
 
-// 2. Recursive Graph Traversal (PostgreSQL BFS Traversal)
+// 2. Recursive Graph Traversal (PostgreSQL BFS Traversal) — dùng nội bộ bởi `analyzeObjectImpact`
+// (module "engineering" còn sống). Route GET /api/engineering/graph (module "engineering-graph")
+// từng gọi hàm này trực tiếp để trả kết quả traversal thô ra ngoài — route đó đã bị xoá
+// 2026-09-22 (module `thuNghiem: true` không ai bật, xem PROGRESS.md), hàm vẫn giữ vì
+// `analyzeObjectImpact` cần nó.
 export async function traverseGraph(
   projectId: number,
   params: {
@@ -99,7 +95,13 @@ export async function traverseGraph(
     depth?: number;
     maxNodes?: number;
   },
-): Promise<GraphTraversalResult> {
+): Promise<{
+  rootId: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  depthReached: number;
+  truncated: boolean;
+}> {
   return withProjectScope(projectId, async () => {
     const depthCap = Math.min(Math.max(params.depth ?? 2, 1), 5); // Tối đa 5 tầng
     const maxNodes = Math.min(Math.max(params.maxNodes ?? 100, 1), 500); // Tối đa 500 nodes

@@ -551,10 +551,10 @@ export default function EngineeringApexCockpitPage() {
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
                   <Link
-                    href="/engineering/subcon-ai"
+                    href="/engineering/data-quality"
                     className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
                   >
-                    <span>Đánh giá Thầu phụ AI Subcon Trust (M82)</span>
+                    <span>Chất lượng dữ liệu kỹ thuật (OS-1)</span>
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
                 </div>

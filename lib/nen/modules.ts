@@ -295,79 +295,17 @@ export const MODULES: ModuleDef[] = [
     routePrefix: ["/api/engineering", "/api/v1/engineering"],
   },
 
-  // ── W3 (đợt "nâng tầm dự án" GĐ2) — các module con của app/api/engineering/** đóng
-  // băng bằng `thuNghiem: true`. Registry gốc chỉ có 1 module "engineering" phủ CẢ
-  // `/api/engineering/**` (routePrefix rộng) — các entry dưới đây có prefix DÀI HƠN nên
-  // `findModuleByRoute` (khớp tiền tố dài nhất) ưu tiên chọn chúng thay vì "engineering"
-  // khi route khớp, mà KHÔNG đổi `routePrefix` của "engineering" (không ảnh hưởng phần
-  // còn lại: ingest ENG-1, review objects, suggestions, workflows, agent-sessions...).
-  //
-  // Tiêu chí (a) — vượt cổng roadmap, nhóm OS-phase (ENG-0 #10): autonomy/predictions/graph.
-  // Tiêu chí (b) — chưa từng chạy được (lỗi tham số SQL, W1) hoặc mô phỏng rõ rệt: subcon-ai/
-  // nextgen-apex.
+  // ── W3 (đợt "nâng tầm dự án" GĐ2) đóng băng 6 module con của app/api/engineering/**
+  // bằng `thuNghiem: true` (autonomy/predictions/graph — vượt cổng roadmap; subcon-ai/
+  // nextgen-apex — chưa từng chạy được hoặc mô phỏng rõ rệt; combine — bản mô phỏng thuần
+  // JSX). Audit 2026-09-22 xác nhận cả 6 vẫn tắt mặc định, không ai bật thủ công qua
+  // /admin/features từ lúc đóng băng → đã XOÁ HẲN khỏi sản phẩm (trang, route API, lib
+  // tương ứng), xem PROGRESS.md. `lib/ky-thuat/engineering-graph.ts` GIỮ NGUYÊN (không xoá
+  // file): `traverseGraph` hết route riêng (`GET /api/engineering/graph` đã xoá) nhưng vẫn
+  // được gọi NỘI BỘ bởi `analyzeObjectImpact` (route impact/[id], thuộc module "engineering"
+  // còn sống) — chỉ `getObjectLineage`/`detectDataQualityIssues`/`resolveDataQualityIssue`
+  // mới có route riêng thật sự dùng chung với module "engineering"/"data-quality".
   // (Các module twin/bim-models/god-tier-studio/cad-plugin của nhóm này đã bị gỡ khỏi sản
   // phẩm cùng toàn bộ cụm CAD/BIM; prescriptive/iot-telemetry/quantum-hub/swarm đã bị xoá
   // hoàn toàn khỏi sản phẩm — không còn route/UI nào tham chiếu.)
-  {
-    // OS-4 (a) — Controlled Autonomy: thực thi workflow A0–A2 tự động; OS-4 đòi phê duyệt
-    // riêng từng workflow A3+ từ người dùng nên module này BẮT BUỘC phải đóng băng.
-    key: "engineering-autonomy",
-    nav: [],
-    permKeys: [],
-    routePrefix: ["/api/engineering/autonomy"],
-    thuNghiem: true,
-  },
-  {
-    // OS-phase (a) — Predictive OS: dự báo rủi ro tự động, chưa có traffic thật ENG-1..4.
-    key: "engineering-predictions",
-    nav: [],
-    permKeys: [],
-    routePrefix: ["/api/engineering/predictions"],
-    thuNghiem: true,
-  },
-  {
-    // OS-phase (a) — Knowledge Graph & phả hệ kỹ thuật.
-    key: "engineering-graph",
-    nav: [],
-    permKeys: [],
-    routePrefix: ["/api/engineering/graph"],
-    thuNghiem: true,
-  },
-  {
-    // (b) — Subcon AI Scoring: W1 xác nhận cả 3 route (scores/evaluate/recommend-shortlist)
-    // sai tham số SQL, chưa từng chạy được.
-    key: "engineering-subcon-ai",
-    nav: [],
-    permKeys: [],
-    routePrefix: ["/api/engineering/subcon-ai"],
-    thuNghiem: true,
-  },
-  {
-    // (b) — Nextgen Apex: generative-routing/edge-vision-tracking/smart-ipc/fidic-tia,
-    // 4 tiền tố API chỉ dùng riêng bởi trang này (đã kiểm không dùng chung).
-    key: "engineering-nextgen-apex",
-    nav: [],
-    permKeys: [],
-    routePrefix: [
-      "/api/engineering/generative-routing",
-      "/api/engineering/edge-vision-tracking",
-      "/api/engineering/smart-ipc",
-      "/api/engineering/fidic-tia",
-    ],
-    thuNghiem: true,
-  },
-  {
-    // (audit 2026-08-25 §3.6) Trang "Combine" là BẢN MÔ PHỎNG: danh sách va chạm, phương án
-    // nắn tuyến và các chỉ số đều cắm cứng trong JSX, không đọc DB, không ghi đâu cả. Đưa
-    // vào registry với `thuNghiem: true` để mặc định TẮT cho mọi dự án (ẩn khỏi sidebar) —
-    // Admin bật thủ công qua /admin/features thì trang tự hiện ThuNghiemBanner. Không có
-    // route API riêng nên `routePrefix` rỗng.
-    key: "combine",
-    nav: [
-      { group: "Thiết Kế-BIM-Shopdrawings", label: "Combine", href: "/combine", icon: "Split" },
-    ],
-    permKeys: [],
-    routePrefix: [],
-    thuNghiem: true,
-  },
 ];

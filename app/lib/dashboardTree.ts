@@ -74,7 +74,6 @@ import {
   SlidersHorizontal,
   KeyRound,
   ToggleRight,
-  Split,
   LayoutGrid,
   QrCode,
 } from "lucide-react";
@@ -215,7 +214,6 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: Compass,
       },
       { id: "dash.bim", href: "/mo-hinh-bim", label: "Mô hình BIM", icon: Box },
-      { id: "dash.combine", href: "/combine", label: "Combine", icon: Split },
       {
         id: "dash.shop-drawing",
         href: "/shopdrawings",
