@@ -141,3 +141,32 @@ Hai điểm khác biệt đáng ghi lại cho lần áp DocShell tiếp theo:
 
 Cả 3 trang giữ nguyên toàn bộ lời gọi API cũ; chỉ `/variations` nâng cách tính giá trị quyết định
 trong `decide()` từ cộng dồn float JS sang `mMul/mSumBy` (cùng chuẩn tiền M45 PR1).
+
+## Bổ sung: Trang chủ 2 chế độ + `Select` — M127 (2026-09-22)
+
+`/` tách 2 chế độ theo vai trò (đặc tả `docs/nang-cap/M127-trang-chu-theo-vai-tro.md`):
+`app/components/home/HomeDieuHanh.tsx` (bố cục M125 cho quản lý) và `HomeHienTruong.tsx`
+("việc của tôi hôm nay" cho kỹ sư/thầu phụ) — `resolveHomeMode` (`app/lib/homeMode.ts`) chọn
+mặc định theo vai trò (`subcon` luôn Hiện trường, `engineer` nhớ lựa chọn qua
+`localStorage("xboss_home_mode")`, các vai trò còn lại luôn Điều hành) và chỉ kỹ sư có nút
+chuyển qua lại. Bốn quy ước hình thức mới:
+
+1. **`ui/Select`** thay `<select>` viết tay ở bộ lọc bảng trễ: cùng khuôn control của ADR này
+   (`rounded-lg`, `min-h-10`, viền `zinc-700`, focus `emerald-500`), props `value/onChange(string)/
+options: {v,l}[]`.
+2. **Dải `StatCard` 5 cột** (`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5`, co còn 4 cột khi
+   ẩn thẻ "Chờ duyệt" — vai trò không có quyền duyệt) thêm 2 thẻ mới so với M125: "Tiến độ tổng"
+   mang `badge` Chip Δ so với tuần trước (`weekDelta`, tone success/danger theo dấu, ẩn khi
+   `null`), và "Đến hạn ≤N ngày" (`dueSoon`, tone warning khi > 0) — N đọc từ `alert_rules`, không
+   hard-code.
+3. **`HomeRail` đổi thứ tự** Pareto (nếu có dữ liệu) → Trung tâm điều hành → Vòng đời (trước là
+   rail cố định 320px với Vòng đời cắt lên đầu). Dải "Vòng đời" **`flex flex-wrap` xuống dòng**,
+   **không** `overflow-x-auto` cuộn ngang — hàng chip `nowrap` cuộn ngang từng làm Chrome mobile
+   nới layout viewport theo bề rộng max-content (~984px), thu nhỏ toàn trang và làm e2e drawer bấm
+   lệch phần tử (sự cố thật, xem commit `df9d6939`, M127 việc 2). Bài học chung: **chip xếp hàng
+   trong trang chủ/hub luôn `flex-wrap`, không `overflow-x-auto`** trừ khi hàng đó chắc chắn không
+   bao giờ chạm mép viewport thật (vd tab cố định số lượng ít).
+4. Chế độ Hiện trường **không** import panel nặng (recharts) và chỉ gọi API mà thầu phụ được
+   phép (`/api/my-tasks`, `/api/notifications`, `/api/sheets`, `/api/project`) — trang phải mở
+   nhanh trên điện thoại sóng yếu; dữ liệu "việc hôm nay" tái dùng `ProgressRow`/`Chip` sẵn có,
+   không tự vẽ danh sách kiểu mới.
