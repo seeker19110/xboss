@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeRect, type Rect } from "@/lib/tien-do/grid";
 
 // Chọn vùng chữ nhật trên lưới (M121 FR2) — dùng chung, không biết gì về dữ liệu bên trong ô.
@@ -14,18 +14,55 @@ export type ViTri = { r: number; c: number };
 /** Chạm giữ bao lâu thì vào chế độ chọn trên cảm ứng (M121 D1, chốt 2026-09-03). */
 export const NGUONG_CHAM_GIU_MS = 400;
 
+// Mỗi nhóm/tầng tracking (`TrackingGrid`) dựng một instance `useVungChon` riêng, không có gì
+// ràng buộc chúng loại trừ lẫn nhau — bắt đầu chọn ở nhóm B trong khi nhóm A còn vùng cũ khiến
+// CẢ HAI cùng "có vùng chọn" một lúc. Vô hại với tick/hoàn tác cũ (chỉ tác dụng lên vùng của
+// từng nhóm), nhưng dán/copy toàn trang (M124 việc 5, bắt sự kiện ở `window`) sẽ trúng cả hai
+// nhóm cùng lúc — lỗi thật, phát hiện sau khi thêm dán/copy. Instance nào bắt đầu/mở rộng chọn
+// phát sự kiện kèm token riêng; mọi instance khác (token khác) tự bỏ vùng — đảm bảo tại một
+// thời điểm chỉ một nhóm giữ vùng chọn.
+const SU_KIEN_VUNG_CHON = "xboss:vung-chon";
+
 export function useVungChon() {
   const [neo, setNeo] = useState<ViTri | null>(null);
   const [dau, setDau] = useState<ViTri | null>(null);
   const [dangKeo, setDangKeo] = useState(false);
+  // Token danh tính riêng của instance — chỉ cần so sánh bằng tham chiếu (`!==`), không cần
+  // giá trị bên trong.
+  const token = useRef({});
 
   const vung: Rect | null = neo && dau ? normalizeRect(neo, dau) : null;
 
-  const batDau = useCallback((r: number, c: number) => {
-    setNeo({ r, c });
-    setDau({ r, c });
-    setDangKeo(true);
+  const boChon = useCallback(() => {
+    setNeo(null);
+    setDau(null);
+    setDangKeo(false);
   }, []);
+
+  // Nhóm khác vừa chiếm vùng chọn → bỏ vùng của mình.
+  useEffect(() => {
+    const onNhomKhacChon = (e: Event) => {
+      if ((e as CustomEvent).detail !== token.current) boChon();
+    };
+    window.addEventListener(SU_KIEN_VUNG_CHON, onNhomKhacChon);
+    return () => window.removeEventListener(SU_KIEN_VUNG_CHON, onNhomKhacChon);
+  }, [boChon]);
+
+  // Báo cho mọi instance khác biết mình vừa chiếm vùng chọn — gọi TRƯỚC khi đặt vùng của
+  // chính mình, vì listener ở trên so token nên tự bỏ qua chính nó.
+  const baoChiemVung = useCallback(() => {
+    window.dispatchEvent(new CustomEvent(SU_KIEN_VUNG_CHON, { detail: token.current }));
+  }, []);
+
+  const batDau = useCallback(
+    (r: number, c: number) => {
+      baoChiemVung();
+      setNeo({ r, c });
+      setDau({ r, c });
+      setDangKeo(true);
+    },
+    [baoChiemVung],
+  );
 
   // Kéo tới ô khác — chỉ có tác dụng khi đang trong một lượt kéo, để rê chuột ngang lưới lúc
   // không chọn gì không vô tình tạo vùng.
@@ -40,23 +77,25 @@ export function useVungChon() {
   const ketThucKeo = useCallback(() => setDangKeo(false), []);
 
   // Shift+click: giữ neo, dời đầu kia — mở rộng vùng đang có. Chưa có neo thì coi như bấm thường.
-  const moRongToi = useCallback((r: number, c: number) => {
-    setNeo((n) => n ?? { r, c });
-    setDau({ r, c });
-  }, []);
+  const moRongToi = useCallback(
+    (r: number, c: number) => {
+      baoChiemVung();
+      setNeo((n) => n ?? { r, c });
+      setDau({ r, c });
+    },
+    [baoChiemVung],
+  );
 
-  const chonTatCa = useCallback((soHang: number, soCot: number) => {
-    if (soHang <= 0 || soCot <= 0) return;
-    setNeo({ r: 0, c: 0 });
-    setDau({ r: soHang - 1, c: soCot - 1 });
-    setDangKeo(false);
-  }, []);
-
-  const boChon = useCallback(() => {
-    setNeo(null);
-    setDau(null);
-    setDangKeo(false);
-  }, []);
+  const chonTatCa = useCallback(
+    (soHang: number, soCot: number) => {
+      if (soHang <= 0 || soCot <= 0) return;
+      baoChiemVung();
+      setNeo({ r: 0, c: 0 });
+      setDau({ r: soHang - 1, c: soCot - 1 });
+      setDangKeo(false);
+    },
+    [baoChiemVung],
+  );
 
   const oTrongVung = useCallback(
     (r: number, c: number) =>
