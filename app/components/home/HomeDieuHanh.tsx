@@ -214,6 +214,17 @@ export default function HomeDieuHanh({
         bottomActions={
           compact ? (
             <div className="flex items-center gap-2 shrink-0">
+              {onSwitchMode && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={ClipboardList}
+                  onClick={onSwitchMode}
+                  aria-label="Việc của tôi"
+                >
+                  Việc của tôi
+                </Button>
+              )}
               {canImport && (
                 <ButtonLink
                   href="/api/export/excel"
@@ -409,8 +420,12 @@ export default function HomeDieuHanh({
             <ForecastCards />
           </div>
 
-          {/* Cột phải: điều hướng phân hệ + Pareto nguyên nhân trễ */}
-          <div className="lg:sticky lg:top-4">
+          {/* Cột phải: điều hướng phân hệ + Pareto nguyên nhân trễ.
+              `min-w-0` BẮT BUỘC: dưới `lg` lưới còn 1 cột dùng chung, track auto sẽ nới theo
+              bề rộng nội dung lớn nhất của ô này (461px) nếu ô không được phép co — Chrome
+              mobile khi đó nới cả layout viewport (393 → 477px), trang bị thu nhỏ và toạ độ bấm
+              lệch (e2e mobile bấm nút thanh đáy trúng SVG biểu đồ). */}
+          <div className="min-w-0 lg:sticky lg:top-4">
             <HomeRail
               pareto={{
                 rows: reasonCounts,

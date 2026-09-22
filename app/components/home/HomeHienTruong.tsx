@@ -189,9 +189,12 @@ export default function HomeHienTruong({
       >
         Thông báo
         {unread > 0 && (
-          <Chip tone="danger" className="ml-1">
+          <span
+            className="ml-1.5 bg-red-600 text-on-accent text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center tabular-nums"
+            aria-label={`${unread} thông báo chưa đọc`}
+          >
             {unread > 99 ? "99+" : unread}
-          </Chip>
+          </span>
         )}
       </ButtonLink>
     </>

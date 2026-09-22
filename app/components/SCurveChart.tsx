@@ -152,7 +152,10 @@ export default function SCurveChart({ system }: { system?: string }) {
           <TrendingUp className="w-4 h-4 text-emerald-400" />{" "}
           <EditableText tkey="scurve.title">S-curve: Kế hoạch vs Thực tế</EditableText>
         </h2>
-        <div className="ml-auto flex items-center gap-2">
+        {/* `flex-wrap` + `min-w-0`: trên điện thoại 393px hàng 2 select + nút này rộng ~396px, là
+            khối rộng nhất trang chủ → Chrome mobile nới layout viewport theo nó (477px), cả
+            trang bị thu nhỏ và toạ độ bấm lệch (e2e mobile bấm nút thanh đáy trúng SVG). */}
+        <div className="ml-auto flex items-center gap-2 flex-wrap min-w-0">
           <select
             value={baseline}
             onChange={(e) => setBaseline(e.target.value)}

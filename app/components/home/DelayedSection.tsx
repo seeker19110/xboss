@@ -100,6 +100,7 @@ export default function DelayedSection({
               aria-label={sel.placeholder}
               placeholder={sel.placeholder}
               options={sel.options}
+              className="min-w-0"
             />
           ))}
         </div>

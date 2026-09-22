@@ -39,7 +39,16 @@ export default function Section({
           </h2>
           {description && <p className="mt-1 text-xs text-zinc-400">{description}</p>}
         </div>
-        {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+        {/* `min-w-0 max-w-full` + `flex-wrap`: cụm hành động vẫn không bị kéo giãn (shrink-0)
+            nhưng ĐƯỢC PHÉP co/xuống dòng khi hẹp. Thiếu hai lớp này, min-content của cụm (vd 3
+            select lọc bảng trễ ~406px) ép min-content cả trang vượt bề rộng điện thoại 393px —
+            Chrome mobile nới layout viewport theo đó, trang bị thu nhỏ và toạ độ bấm lệch (e2e
+            mobile bấm nút thanh đáy trúng SVG biểu đồ phía trên). */}
+        {actions && (
+          <div className="flex flex-wrap items-center gap-2 shrink-0 min-w-0 max-w-full">
+            {actions}
+          </div>
+        )}
       </div>
       {children}
     </section>
