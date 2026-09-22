@@ -481,9 +481,9 @@ test(
     );
     const thucTe = rows.map((r) => r.t);
 
-    // 3 bảng Zalo Field Copilot (M86, migration 0119) — scope theo project_id, policy cùng
-    // dạng USING (project_id::text = current_setting('app.project_id', true) OR ... = '*').
-    const ZALO = ["zalo_field_action_dispatches", "zalo_site_message_logs", "zalo_user_bindings"];
+    // (3 bảng Zalo Field Copilot M86/migration 0119 đã bị DROP ở migrations/0155, cùng đợt xoá
+    // module engineering-zalo-copilot.ts ở PR #514, 2026-09-22 — xem PROGRESS.md.)
+    const ZALO: string[] = [];
 
     // Map mã BOQ theo dự án cho plugin AutoCAD (M101 PR4, migration 0140) — policy NGHIÊM NGẶT
     // 2 nhánh như 0077/0092 (không có nhánh "GUC rỗng → cho qua"), có WITH CHECK. Hành vi kiểm
