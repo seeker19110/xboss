@@ -32,3 +32,38 @@ export function locNhomTheoTask<T extends { tasks: { status: string }[] }>(
   if (!taskFilter) return packages;
   return packages.filter((p) => p.tasks.some((t) => taskKhopLoc(t.status, taskFilter)));
 }
+
+// Trần số nhóm được TỰ ĐỘNG mở khi lọc task (?task=). Đo trên sheet ODNN Zone 1 (nặng nhất):
+// 28 nhóm × 28 task × 22 cột dimension = 616 ô tick/nhóm, mỗi nhóm mở gọi riêng 1 request
+// GET /api/workpackages/:id/dimensions. Lọc một trạng thái phổ biến có thể khớp cả 28 nhóm →
+// nếu mở hết cùng lúc sẽ bắn 28 request song song + mount ~17.000 ô tick (~52.000 node DOM)
+// trên điện thoại ngoài công trường. Giới hạn số nhóm tự mở, phần còn lại người dùng tự bấm.
+export const GIOI_HAN_NHOM_TU_MO = 8;
+
+// Trong các nhóm khớp bộ lọc task, chọn tối đa `gioiHan` nhóm ĐANG GẬP để tự mở thêm — tính cả
+// những nhóm khớp lọc đã mở sẵn (do người dùng tự bấm trước đó) vào trần, để tổng số lưới nặng
+// hiển thị cùng lúc luôn bị chặn đúng `gioiHan`, không chỉ chặn phần tự động.
+export function nhomTuMoTheoLoc<T extends { id: number; tasks: { status: string }[] }>(
+  packages: T[],
+  taskFilter: string,
+  daMo: Record<number, boolean>,
+  gioiHan: number = GIOI_HAN_NHOM_TU_MO,
+): { moThem: number[]; boQua: number } {
+  if (!taskFilter) return { moThem: [], boQua: 0 };
+  const nhomKhop = packages.filter((p) => p.tasks.some((t) => taskKhopLoc(t.status, taskFilter)));
+  let dangMo = 0;
+  for (const p of nhomKhop) {
+    if (daMo[p.id]) dangMo++;
+  }
+  const moThem: number[] = [];
+  let boQua = 0;
+  for (const p of nhomKhop) {
+    if (daMo[p.id]) continue;
+    if (dangMo + moThem.length < gioiHan) {
+      moThem.push(p.id);
+    } else {
+      boQua++;
+    }
+  }
+  return { moThem, boQua };
+}
