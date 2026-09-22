@@ -1,11 +1,11 @@
 # M124 — Ánh xạ BOQ theo tầng + cải tiến trang BOQ và lưới tracking
 
-| Thuộc tính       | Giá trị                                                                                     |
-| ---------------- | ------------------------------------------------------------------------------------------- |
-| Issue / Goal     | Đề xuất cải tiến tracking & BOQ (khảo sát 2026-09-22). Tiếp nối M120/M121/M122.             |
-| Spec owner       | Phiên chính (opusplan)                                                                      |
-| State            | **Approved for implementation** — người dùng chốt 2026-09-22 ("ánh xạ theo tầng, còn đâu theo đề xuất") |
-| Cập nhật         | 2026-09-22                                                                                  |
+| Thuộc tính   | Giá trị                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------------------- |
+| Issue / Goal | Đề xuất cải tiến tracking & BOQ (khảo sát 2026-09-22). Tiếp nối M120/M121/M122.                         |
+| Spec owner   | Phiên chính (opusplan)                                                                                  |
+| State        | **Approved for implementation** — người dùng chốt 2026-09-22 ("ánh xạ theo tầng, còn đâu theo đề xuất") |
+| Cập nhật     | 2026-09-22                                                                                              |
 
 ## 1. Vấn đề và bằng chứng
 
@@ -42,14 +42,27 @@ virtualization lưới (chờ đo); đổi `PUT /api/boq/:id/map` (giữ nguyên
   đã có hàm bỏ dấu tương đương trong `lib/nen/`, tái dùng thay vì viết mới.
 - `lib/khoi-luong/boq-map-tang.ts`:
   ```ts
-  export type TaskTheoTang = { id:number; code:string; name:string; sheetName:string; pkgCode:string;
-    pkgName:string; progressPercent:number; daMapDongKhac:boolean; diemGiong:number };
-  export async function cacTangCuaHe(projectId:number, systemId:number|null): Promise<string[]>
-  export async function taskTheoTang(opts:{ projectId:number; systemId:number|null; floorLabel:string;
-    tenDongBoq:string }): Promise<TaskTheoTang[]>
+  export type TaskTheoTang = {
+    id: number;
+    code: string;
+    name: string;
+    sheetName: string;
+    pkgCode: string;
+    pkgName: string;
+    progressPercent: number;
+    daMapDongKhac: boolean;
+    diemGiong: number;
+  };
+  export async function cacTangCuaHe(projectId: number, systemId: number | null): Promise<string[]>;
+  export async function taskTheoTang(opts: {
+    projectId: number;
+    systemId: number | null;
+    floorLabel: string;
+    tenDongBoq: string;
+  }): Promise<TaskTheoTang[]>;
   ```
   - `cacTangCuaHe`: `SELECT DISTINCT wp.floor_label FROM work_packages wp JOIN sheet_types st … JOIN towers tw …
-    WHERE tw.project_id=? AND wp.floor_label IS NOT NULL AND (? IS NULL OR st.system_id = ?)`, sắp bằng
+WHERE tw.project_id=? AND wp.floor_label IS NOT NULL AND (? IS NULL OR st.system_id = ?)`, sắp bằng
     `sortFloorsDesc` (`lib/tien-do/floors.ts`). `systemId` null ⇒ mọi hệ.
   - `taskTheoTang`: task của các nhóm `floor_label = ?` cùng điều kiện hệ, kèm
     `daMapDongKhac = EXISTS(boq_task_map m WHERE m.task_id=t.id)`; bọc `withProjectScope`.
@@ -64,9 +77,9 @@ virtualization lưới (chờ đo); đổi `PUT /api/boq/:id/map` (giữ nguyên
   "Chia đều" ⇒ panel: `<select>` tầng (từ `floors`, có `aria-label="Chọn tầng"`), danh sách task có
   checkbox; mặc định **tick sẵn** task có `diemGiong ≥ 0.5` và chưa `daMapDongKhac`; task
   `daMapDongKhac` hiện chip "đã map dòng khác" (vẫn cho tick); task đã có trong `mapEntries` bị disable
-  + chip "đã có". Nút "Thêm N task" ⇒ thêm vào `mapEntries` với `weight = 1`, rồi tự gọi `splitEvenly()`
-  (chia đều toàn bộ map). Lưu vẫn qua nút "Lưu map" hiện có (không đổi `PUT`). Trạng thái rỗng: "Tầng
-  này chưa có task cùng hệ". Lỗi mạng: thông điệp + nút thử lại, không kẹt.
+  - chip "đã có". Nút "Thêm N task" ⇒ thêm vào `mapEntries` với `weight = 1`, rồi tự gọi `splitEvenly()`
+    (chia đều toàn bộ map). Lưu vẫn qua nút "Lưu map" hiện có (không đổi `PUT`). Trạng thái rỗng: "Tầng
+    này chưa có task cùng hệ". Lỗi mạng: thông điệp + nút thử lại, không kẹt.
 - AC: (1) GET không login 401; engineer 403; dòng BOQ dự án khác 404. (2) Dòng BOQ hệ A, tầng "5F" có
   2 nhóm hệ A và 1 nhóm hệ B ⇒ chỉ trả task hệ A; `systemId` null ⇒ cả hai. (3) Task đã map dòng BOQ
   khác có `daMapDongKhac=true`. (4) `diemGiongTen("Ống gió tầng 5","Lắp ống gió T5") > diemGiongTen("Ống gió tầng 5","Cáp điện")`.
