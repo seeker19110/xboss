@@ -35,6 +35,6 @@ test(
     const { runHealthChecks } = await import("@/lib/van-hanh/healthcheck");
     const report = await runHealthChecks();
     const db = report.items.find((i) => i.key === "database");
-    assert.equal(db?.status, "ok", db?.detail);
+    assert.equal(db?.status, "ok", db?.detail ?? "");
   },
 );

@@ -1,5 +1,30 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Nâng cấp dependency npm — 2026-09-22
+
+Cập nhật minor/patch trong range hiện có (`npm update`, ~25 gói: next 16.3.5, react/react-dom
+19.3.0, zod 4.6.5, eslint 10.11.0, @sentry/nextjs 10.75.1, lucide-react 1.47.0…) + nâng 4 gói
+vượt major sau khi rà breaking change đối chiếu code thật (không đổi cách gọi API):
+`google-auth-library` 10→11.1.0 (chỉ dùng `JWT` trong `lib/vat-tu/google-sheets.ts`),
+`nodemailer` 9→10.0.10 (chỉ `createTransport`/`sendMail` ở 3 route cron), `@types/node` 24→26.6.2,
+`dotenv` 17→18.0.2. **Không nâng `typescript`** (6→7): `@typescript-eslint/parser@8.70.1` hiện
+chỉ hỗ trợ `typescript <6.1.0`, nâng sẽ phá lint toolchain — giữ nguyên `^6.0.3`, chờ
+typescript-eslint hỗ trợ bản 7.
+
+Phát sinh 2 vấn đề phụ trong lúc nâng, đã xử lý:
+
+- `tests/healthcheck.test.ts` lỗi kiểu mới do `@types/node` 26 siết overload `assert.equal` (tham
+  số message không còn nhận `string | undefined`) — sửa `db?.detail` → `db?.detail ?? ""`.
+- `npm update` kéo `@react-pdf/renderer` lên 4.9.0 khiến `@react-pdf/textkit@6.4.2`/`7.0.1` (một
+  dependency transitively bởi cả `@react-pdf/layout` lẫn `@react-pdf/render`) đổi từ gói `hyphen`
+  sang `@react-pdf/hyphenate@0.1.0` — gói này thiếu điều kiện `require` trong `exports` map nên vỡ
+  `ERR_PACKAGE_PATH_NOT_EXPORTED` khi Node CJS resolve (`tests/pdf-fonts.test.ts` fail). Ghim
+  `@react-pdf/renderer` về `4.6.1` (bỏ dấu `^`) + `overrides."@react-pdf/textkit": "6.4.1"` trong
+  `package.json` — chờ upstream phát hành bản hyphenate có `require` export rồi gỡ ghim.
+
+`npm audit` 0 lỗ hổng trước và sau. Đã chạy đủ `lint` + `typecheck` + `build` + `test` (678 pass, 0
+fail) + `check:lib-layers`/`check:dead-code`/`check:contrast`/`check:mau-accent` — tất cả xanh.
+
 ## ✅ M127 — Trang chủ theo vai trò: "Điều hành" / "Hiện trường" — 2026-09-22
 
 Đặc tả `docs/nang-cap/M127-trang-chu-theo-vai-tro.md` (Approved 2026-09-22), mockup
