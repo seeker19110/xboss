@@ -360,9 +360,6 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
           )}
         </section>
 
-        {/* ── Upload kế hoạch & tracking ── */}
-        <SystemUploadPanel systemCode={system} canUpload={me?.role === "admin"} />
-
         {/* ── 2. Biểu đồ kế hoạch so với thực tế ── (SCurveChart tự có tiêu đề riêng) */}
         <section>
           <SCurveChart system={system} />
@@ -452,6 +449,9 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
             groupProgress={groupProgressMap}
           />
         </section>
+
+        {/* ── Upload kế hoạch & tracking ── */}
+        <SystemUploadPanel systemCode={system} canUpload={me?.role === "admin"} />
       </main>
 
       {/* Modal tạo hạng mục (sheet tracking) mới trong hệ này — cùng field tối thiểu với
