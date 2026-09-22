@@ -206,8 +206,11 @@ export default function HomeRail({
         </Card>
       </Section>
 
+      {/* Dải 6 giai đoạn vòng đời: xuống dòng thay vì cuộn ngang — hàng chip nowrap cuộn ngang
+          làm Chrome mobile nới layout viewport theo bề rộng max-content (~984px), trang bị thu
+          nhỏ và e2e drawer bấm lệch phần tử (CI M127 việc 2). */}
       <Section title="Vòng đời" description="6 giai đoạn quy trình dự án">
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1">
+        <div className="flex flex-wrap gap-1.5">
           {LIFECYCLE.map((stg) => (
             <a key={stg.stage} href={stg.href} title={stg.desc} className="shrink-0">
               <Chip className="whitespace-nowrap">
