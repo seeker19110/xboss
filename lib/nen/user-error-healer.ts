@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { removeVietnameseAccents, healVietnameseEncoding } from "@/lib/nen/van-ban";
 
 /**
  * USER ERROR HEALER — BỘ ĐỘNG CƠ TỰ CHỮA LÀNH LỖI NGƯỜI DÙNG ĐẲNG CẤP THƯỢNG THỪA
@@ -12,170 +13,11 @@ import crypto from "node:crypto";
 // 1. CHUYỂN ĐỔI BẢNG MÃ TIẾNG VIỆT & DỌN DẸP KÝ TỰ RÁC (ENCODING & CLEANING)
 // ============================================================================
 
-const TCVN3_SPECIFIC_MAP: Record<string, string> = {
-  "\xB8": "á",
-  "\xB5": "à",
-  "\xB6": "ả",
-  "\xB7": "ã",
-  "\xB9": "ạ",
-  "\xCA": "ă",
-  "\xBE": "ắ",
-  "\xBB": "ằ",
-  "\xBC": "ẳ",
-  "\xBD": "ẵ",
-  "\xC6": "ặ",
-  "\xC9": "â",
-  "\xC5": "ấ",
-  "\xC1": "ầ",
-  "\xC2": "ẩ",
-  "\xC3": "ẫ",
-  "\xC4": "ậ",
-  "\xD0": "é",
-  "\xCD": "è",
-  "\xCE": "ẻ",
-  "\xCF": "ẽ",
-  "\xD1": "ẹ",
-  "\xEE": "ê",
-  "\xEA": "ế",
-  "\xE5": "ề",
-  "\xE6": "ể",
-  "\xE7": "ễ",
-  "\xF3": "í",
-  "\xEF": "ì",
-  "\xF1": "ỉ",
-  "\xF2": "ĩ",
-  "\xF4": "ị",
-  "\xF8": "ó",
-  "\xF5": "ò",
-  "\xF6": "ỏ",
-  "\xF7": "õ",
-  "\xF9": "ọ",
-  "\xFD": "ô",
-  "\xFA": "ố",
-  "\xFB": "ồ",
-  "\xFC": "ổ",
-  "\xFE": "ỗ",
-  "\xDA": "ộ",
-  "\xAE": "ơ",
-  "\xAA": "ớ",
-  "\xA7": "ờ",
-  "\xA8": "ở",
-  "\xA9": "ỡ",
-  "\xAB": "ợ",
-  "\xDF": "ú",
-  "\xD9": "ù",
-  "\xDB": "ủ",
-  "\xDC": "ũ",
-  "\xF0": "ý",
-  "\xEB": "ỳ",
-  "\xEC": "ỷ",
-  "\xED": "ỹ",
-  "\xA4": "đ",
-  "\xA1": "Ă",
-  "\xA2": "Â",
-  "\xA3": "Đ",
-  "\xA5": "Ê",
-  "\xA6": "Ô",
-  "\xAC": "Ơ",
-  "\xAD": "Ư",
-};
-
-const VNI_SPECIFIC_MAP: Record<string, string> = {
-  aù: "á",
-  aú: "á",
-  aø: "à",
-  aû: "ả",
-  aõ: "ã",
-  aï: "ạ",
-  aê: "ă",
-  aé: "ắ",
-  aè: "ằ",
-  aẳ: "ẳ",
-  aẵ: "ẵ",
-  aë: "ặ",
-  aâ: "â",
-  eù: "é",
-  eú: "é",
-  eø: "è",
-  eû: "ẻ",
-  eõ: "ẽ",
-  eï: "ẹ",
-  eâ: "ê",
-  où: "ó",
-  oø: "ò",
-  oû: "ỏ",
-  oõ: "õ",
-  oï: "ọ",
-  oâ: "ô",
-  uù: "ú",
-  uø: "ù",
-  uû: "ủ",
-  uõ: "ũ",
-  uï: "ụ",
-  yù: "ý",
-  yø: "ỳ",
-  yû: "ỷ",
-  yõ: "ỹ",
-  ñ: "đ",
-  Ñ: "Đ",
-};
-
-// Regex nhận diện chuỗi đã là tiếng Việt Unicode chuẩn
-const UNICODE_VIETNAMESE_REGEX =
-  /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴĐ]/;
-
 /**
- * Tự chữa lành lỗi bảng mã Tiếng Việt (TCVN3, VNI, Decomposed NFD) và dọn sạch ký tự rác tàng hình.
+ * Re-export removeVietnameseAccents và healVietnameseEncoding từ van-ban.ts để giữ nguyên API.
+ * (Các hàm này đã được di chuyển sang van-ban.ts để tránh kéo node:crypto vào bundle client)
  */
-export function healVietnameseEncoding(input: unknown): string {
-  if (input === null || input === undefined) return "";
-  let str = String(input);
-
-  // 1. Dọn dẹp ký tự tàng hình
-  str = str.replace(/[\u200B\u200C\u200D\uFEFF]/g, "");
-  str = str.replace(/\u00A0/g, " ");
-
-  // 2. Chuyển đổi VNI nếu có mẫu đặc thù
-  const isVni =
-    /(aù|aú|aø|aû|aõ|aï|aê|eù|eú|eø|eû|eõ|eï|où|oø|oû|oõ|oï|uù|uø|uû|uõ|uï|yù|yø|yû|yõ|ñ|Ñ)/.test(
-      str,
-    );
-  if (isVni) {
-    for (const [vniChar, uniChar] of Object.entries(VNI_SPECIFIC_MAP)) {
-      str = str.replaceAll(vniChar, uniChar);
-    }
-  }
-
-  // 3. Chuyển đổi TCVN3 CHỈ KHI chuỗi chưa phải là Unicode tiếng Việt và có ký tự TCVN3 signature
-  const isPureUnicode = UNICODE_VIETNAMESE_REGEX.test(str);
-  if (!isPureUnicode) {
-    const isTcvn3Signature =
-      /[\xB5-\xB9\xBE\xBB\xBC\xBD\xCD\xCE\xCF\xD1\xEE\xEF\xF1\xF2\xF4\xF5\xF6\xF7\xF9\xFD\xFB\xFC\xFE\xDA\xAE\xAA\xA7\xA8\xA9\xAB\xDF\xD9\xDB\xDC\xF0\xEB\xEC\xED\xA4]/.test(
-        str,
-      );
-    if (isTcvn3Signature) {
-      for (const [tcvnChar, uniChar] of Object.entries(TCVN3_SPECIFIC_MAP)) {
-        str = str.replaceAll(tcvnChar, uniChar);
-      }
-    }
-  }
-
-  // 4. Chuẩn hóa về Unicode Dựng sẵn (NFC)
-  str = str.normalize("NFC");
-
-  return str.replace(/\s+/g, " ").trim();
-}
-
-/**
- * Bỏ dấu tiếng Việt để phục vụ so khớp mờ (Fuzzy match / Search index).
- */
-export function removeVietnameseAccents(str: string): string {
-  return healVietnameseEncoding(str)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[đĐ]/g, (m) => (m === "đ" ? "d" : "D"))
-    .toLowerCase();
-}
+export { removeVietnameseAccents, healVietnameseEncoding };
 
 // ============================================================================
 // 2. TỰ CHỮA LÀNH NGÀY THÁNG ĐA ĐỊNH DẠNG (DATE HEALING)
@@ -942,41 +784,29 @@ export function parseComplexFieldCommandWithContext(context: DeepContextInput): 
   const norm = healVietnameseEncoding(text);
   const unaccented = removeVietnameseAccents(norm);
 
-  const floorMatch = norm.match(/\b(t\u1EA7ng|t|f)\s*(\d+|h\u1EA7m\s*\d*|b\d*)\b/i);
-  const zoneMatch = norm.match(/\b(zone|ph\u00E2n khu|z)\s*(\d+|a|b|c)\b/i);
+  const floorMatch = norm.match(/\b(tầng|t|f)\s*(\d+|hầm\s*\d*|b\d*)\b/i);
+  const zoneMatch = norm.match(/\b(zone|phân khu|z)\s*(\d+|a|b|c)\b/i);
   const floor = floorMatch ? floorMatch[2] : null;
   const zone = zoneMatch ? zoneMatch[2] : null;
 
-  const qtyMatch = norm.match(
-    /(\d+([\.,]\d+)?)\s*(m2|m3|m|c\u00E2y|cu\u1ED9n|b\u1ED9|t\u1EA5n|kg|c\u00E1i)\b/i,
-  );
+  const qtyMatch = norm.match(/(\d+([\.,]\d+)?)\s*(m2|m3|m|cây|cuộn|bộ|tấn|kg|cái)\b/i);
   const quantity = qtyMatch ? Number(qtyMatch[1].replace(",", ".")) : null;
   const unit = qtyMatch ? qtyMatch[3] : null;
 
   const intents: DeepIntentResult["intents"] = [];
-  if (/(nghi\u1EC7m thu|bbnt|ki\u1EC3m tra|k\u00FD duy\u1EC7t)/i.test(norm)) {
+  if (/(nghiệm thu|bbnt|kiểm tra|ký duyệt)/i.test(norm)) {
     intents.push("request_inspection");
   }
-  if (
-    /(xong|ho\u00E0n th\u00E0nh|thi c\u00F4ng \u0111\u01B0\u1EE3c|ti\u1EBFn \u0111\u1ED9|\d+\s*(m|c\u00E2y|m2))/i.test(
-      norm,
-    )
-  ) {
+  if (/(xong|hoàn thành|thi công được|tiến độ|\d+\s*(m|cây|m2))/i.test(norm)) {
     intents.push("update_progress");
   }
-  if (
-    /(chuy\u1EC3n th\u1EE3|g\u00E1n|cho th\u1EE3|nh\u00E0 th\u1EA7u|t\u1ED5 \u0111\u1ED9i)/i.test(
-      norm,
-    )
-  ) {
+  if (/(chuyển thợ|gán|cho thợ|nhà thầu|tổ đội)/i.test(norm)) {
     intents.push("assign_worker");
   }
-  if (
-    /(ch\u1EADm|tr\u1EC5|v\u01B0\u1EDBng|k\u1EB9t|ch\u01B0a c\u00F3 m\u1EB7t b\u1EB1ng)/i.test(norm)
-  ) {
+  if (/(chậm|trễ|vướng|kẹt|chưa có mặt bằng)/i.test(norm)) {
     intents.push("report_delay");
   }
-  if (/(nh\u1EADp|v\u1EC1 h\u00E0ng|v\u1EADt t\u01B0 \u0111\u1EBFn)/i.test(norm)) {
+  if (/(nhập|về hàng|vật tư đến)/i.test(norm)) {
     intents.push("receive_material");
   }
 
@@ -1089,8 +919,7 @@ export function reconstructMatrixHierarchy(
     if (!code && !name) continue;
 
     const isGroupHeader =
-      (!code.includes(".") && !healed.quantity) ||
-      /^(nh\u00F3m|g\u00F3i|h\u1EC7 th\u1ED1ng|ph\u00E2n khu)/i.test(name);
+      (!code.includes(".") && !healed.quantity) || /^(nhóm|gói|hệ thống|phân khu)/i.test(name);
 
     if (isGroupHeader) {
       currentGroup = {
