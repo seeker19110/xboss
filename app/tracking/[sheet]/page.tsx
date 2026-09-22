@@ -25,11 +25,20 @@ import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
 import { ROLE_LABELS } from "@/lib/nen/roles";
 import { fetchMe } from "@/app/lib/me";
-import { sortFloorsDesc } from "@/lib/tien-do/floors";
+import { sortFloorsDesc } from "@/lib/nen/floors";
 import { useTrackingData } from "./useTrackingData";
 import { TrackingToolbar } from "./TrackingToolbar";
 import { TrackingGrid } from "./TrackingGrid";
+import { locNhomTheoTask, taskKhopLoc } from "./locTask";
 import type { UserItem } from "./types";
+
+// Đọc giá trị lọc ban đầu từ query string (vd mở link chia sẻ đã kèm bộ lọc). Chỉ dùng
+// làm giá trị khởi tạo useState — các lần đổi sau do người dùng thao tác trên UI, rồi
+// được ghi ngược lại URL qua effect bên dưới.
+function initTuUrl(key: string): string {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get(key) ?? "";
+}
 
 // Màn hẹp (điện thoại ngoài công trường): 4 cột sticky chiếm 526px sẽ nuốt hết
 // viewport — thu lại chỉ giữ cột tên task sticky để vẫn tick checkbox được.
@@ -63,15 +72,16 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
     enqueueBatch,
   } = useTrackingData(sheet);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
-  const [query, setQuery] = useState("");
+  // 4 bộ lọc đồng bộ 2 chiều với URL (?q=&floor=&status=&task=) — đọc lúc mount, ghi lại
+  // bằng history.replaceState mỗi khi đổi (xem effect bên dưới), không reload trang.
+  const [query, setQuery] = useState(() => initTuUrl("q"));
   const deferredQuery = useDeferredValue(query);
-  // ?floor=4F trên URL (từ heatmap Dashboard) → mở sẵn filter tầng.
-  const [floorFilter, setFloorFilter] = useState(() =>
-    typeof window !== "undefined"
-      ? (new URLSearchParams(window.location.search).get("floor") ?? "")
-      : "",
-  );
-  const [statusFilter, setStatusFilter] = useState("");
+  // ?floor=4F trên URL (từ heatmap Dashboard) → mở sẵn filter tầng — giữ tương thích tên
+  // tham số cũ, KHÔNG đổi thành khác dù gộp chung cơ chế đồng bộ URL với 3 filter kia.
+  const [floorFilter, setFloorFilter] = useState(() => initTuUrl("floor"));
+  const [statusFilter, setStatusFilter] = useState(() => initTuUrl("status"));
+  // Lọc cấp TASK trong nhóm (M124 việc 4) — khác statusFilter ở trên (lọc theo p.status).
+  const [taskFilter, setTaskFilter] = useState(() => initTuUrl("task"));
   const [canEdit, setCanEdit] = useState(false);
   const [canProgress, setCanProgress] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -122,6 +132,39 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
       return changed ? next : prev;
     });
   }, [floorFilter, data]);
+
+  // Chọn lọc task (?task=) → tự mở các nhóm còn task khớp, cùng lý do với effect tầng ở
+  // trên: người dùng lọc để TÌM đúng việc, không nên còn phải bấm mở nhóm thủ công nữa.
+  useEffect(() => {
+    if (!taskFilter || !data?.packages) return;
+    setExpanded((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const p of data.packages) {
+        if (!next[p.id] && p.tasks.some((t) => taskKhopLoc(t.status, taskFilter))) {
+          next[p.id] = true;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [taskFilter, data]);
+
+  // Ghi 4 bộ lọc vào URL (không reload) — giữ tương thích ?floor= đang được heatmap
+  // Dashboard trỏ vào; dùng replaceState để không phình lịch sử trình duyệt mỗi lần gõ.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const dat = (key: string, val: string) => {
+      if (val) url.searchParams.set(key, val);
+      else url.searchParams.delete(key);
+    };
+    dat("q", query);
+    dat("floor", floorFilter);
+    dat("status", statusFilter);
+    dat("task", taskFilter);
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }, [query, floorFilter, statusFilter, taskFilter]);
 
   useEffect(() => {
     fetchMe().then((user) => {
@@ -275,14 +318,17 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
     ...new Set((data?.packages ?? []).map((p) => p.floorLabel).filter((f): f is string => !!f)),
   ].sort(sortFloorsDesc);
   const q = deferredQuery.toLowerCase();
-  const packages = (data?.packages ?? []).filter(
-    (p) =>
-      (!q ||
-        p.code.toLowerCase().includes(q) ||
-        p.name.toLowerCase().includes(q) ||
-        (p.boqCode ?? "").toLowerCase().includes(q)) &&
-      (!floorFilter || p.floorLabel === floorFilter) &&
-      (!statusFilter || p.status === statusFilter),
+  const packages = locNhomTheoTask(
+    (data?.packages ?? []).filter(
+      (p) =>
+        (!q ||
+          p.code.toLowerCase().includes(q) ||
+          p.name.toLowerCase().includes(q) ||
+          (p.boqCode ?? "").toLowerCase().includes(q)) &&
+        (!floorFilter || p.floorLabel === floorFilter) &&
+        (!statusFilter || p.status === statusFilter),
+    ),
+    taskFilter,
   );
 
   return (
@@ -511,6 +557,8 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
         floors={floors}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
+        taskFilter={taskFilter}
+        onTaskFilterChange={setTaskFilter}
         showAddPkg={!!(canEdit && editMode && data?.sheet.id)}
         onAddPkg={() => {
           setAddPkgErr("");
@@ -544,6 +592,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
                   sheetCols={allSheetCols}
                   pendingFront={!!p.floorLabel && pendingFronts.has(p.floorLabel)}
                   qcReason={qcBlocked.get(p.id)}
+                  taskFilter={taskFilter}
                 />
               </Card>
             ))}

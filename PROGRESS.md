@@ -1,5 +1,40 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ M124 — Ánh xạ BOQ theo tầng + cải tiến trang BOQ và lưới tracking — 2026-09-22
+
+Đặc tả `docs/nang-cap/M124-anh-xa-boq-theo-tang-va-cai-tien-tracking.md` (người dùng chốt "ánh xạ theo
+tầng, còn đâu theo đề xuất"). Thi hành 6 việc trên 3 worktree song song, reviewer soát từng việc; phiên
+chính tự dispatch worker vì `coordinator` không spawn được subagent lồng nhau trong phiên này.
+
+- **Việc 1 — Map BOQ ↔ task theo tầng.** `lib/khoi-luong/boq-map-tang.ts` (`cacTangCuaHe`,
+  `taskTheoTang`: task của các nhóm cùng `floor_label` trong sheet **cùng hệ** với dòng BOQ, cờ
+  `daMapDongKhac`, xếp theo `diemGiongTen`), `lib/nen/van-ban.ts` (`boDauThuong`, `diemGiongTen` Jaccard
+  token), `GET /api/boq/:id/tasks-theo-tang?floor=`, panel "Thêm theo tầng" trong modal chi tiết (tick sẵn
+  task giống tên ≥0.5, chia đều tỷ trọng, lưu qua `PUT /map` cũ). **Không có map tự động theo mã**: registry
+  `boq_codes` cấm task và dòng BOQ cùng mã, nên `tasks.boq_code` không bao giờ trỏ được tới `boq_items`.
+  `lib/tien-do/floors.ts` hạ xuống `lib/nen/floors.ts` (tránh chu trình `khoi-luong → tien-do`).
+- **Việc 2 — Trang `/boq`.** Tách 4 modal ra `app/boq/_components/`; thanh tìm không dấu + lọc (chưa map / Σ
+  tỷ trọng lệch) + sắp xếp, ghi `?q=&loc=&sap=`; `GET /api/boq/export` xuất Excel (tiền tính trong SQL,
+  cột đơn giá/thành tiền `null` với vai trò ngoài `PAYMENT_VIEW_ROLES`, 422 khi chưa chọn dự án).
+  `removeVietnameseAccents` chuyển từ `user-error-healer.ts` (kéo `node:crypto`) sang `van-ban.ts` thuần.
+- **Việc 3 — Lịch sử dòng BOQ.** `migrations/0154_boq_item_history.sql` (thêm thuần), `lib/khoi-luong/boq-history.ts`,
+  ghi ở `PATCH /api/boq/:id` (đọc bản cũ dưới `FOR UPDATE` trong transaction, chỉ field thật sự đổi) và
+  `commitBoqImport` (dòng mới ⇒ `field='import'`; import vốn không cập nhật dòng trùng mã), `GET /api/boq/:id/history`,
+  mục "Lịch sử thay đổi" trong modal. `docs/ERD.md` sinh lại bằng `gen:erd`.
+- **Việc 4 — Lưới tracking.** 4 bộ lọc (`q/floor/status/task`) ghi/đọc URL; lọc mới cấp task theo trạng thái
+  (`app/tracking/[sheet]/locTask.ts`), ẩn hàng bằng `hidden`; **tắt chọn vùng khi đang lọc task** (vùng chọn
+  định vị theo chỉ số hàng gốc, để nguyên sẽ tick nhầm hàng ẩn).
+- **Việc 5 — Dán/copy với Excel.** `app/tracking/[sheet]/dan.ts` (`doiOSangTick`, `dungLoTuDan` fail-fast
+  `MAX_O_MOI_LO`), Ctrl+V dán ma trận TSV vào vùng chọn (tối đa 2 lô tick/bỏ tick, hoàn tác được, lô đã áp
+  trước lô bị từ chối vẫn vào lịch sử), Ctrl+C xuất "x"/"" TSV. `useVungChon` phát `xboss:vung-chon` để **chỉ
+  một nhóm giữ vùng chọn** tại một thời điểm (trước đó Ctrl+Z/V có thể trúng nhiều nhóm).
+- **Việc 6 — Nợ kỹ thuật.** `runMaterialSync(orgId, …)` thay hard-code org 1 (cron lấy org dự án đầu tiên —
+  tích hợp Sheet vẫn single-tenant); 14 `text-zinc-600` → `text-zinc-500` trên lưới; `addNorm` bọc try/catch.
+- **Điều hướng:** mục sidebar "Định mức BOQ" (`/procurement?tab=boq`) đổi thành **"Khối lượng / BOQ"** trỏ
+  thẳng `/boq` (sửa đồng bộ `dashboardTree` + `modules.nav` + spec e2e).
+- **Chưa làm (chờ quyết định/số đo):** cột `qty` trên ô dimension (R1), virtualization lưới.
+- Test mới: `boq-map-tang`, `route-boq-export`, `boq-history`, `tracking-loc-task`, `tracking-dan`.
+
 ## ✅ Sửa 3 lỗi mức Cao từ đợt audit 2026-09-22 (S1, L1, L2) — 2026-09-22
 
 Thi hành theo `PLAN.md` (2 việc song song trên worktree riêng, reviewer soát diff, sửa 3 điểm review

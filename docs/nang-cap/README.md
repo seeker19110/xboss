@@ -430,6 +430,13 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > thị khối `trongSo` mà PR3 mới sinh ra, nên cùng nằm sau cổng dừng §17.2. Việc mở khoá: deploy,
 > mở `/boq`, đọc "Độ phủ ánh xạ BOQ", rồi chốt ngưỡng D1.
 
+> **`M124-anh-xa-boq-theo-tang-va-cai-tien-tracking.md`** — ✅ **Approved 2026-09-22 và ĐÃ TRIỂN KHAI XONG**
+> (6 việc, 1 PR). Ánh xạ BOQ ↔ task **theo tầng** cùng hệ + gợi ý theo độ giống tên (không thể map tự động
+> theo mã vì registry `boq_codes` cấm task và dòng BOQ trùng mã); trang `/boq` tìm/lọc/sắp xếp/xuất Excel +
+> tách component; bảng `boq_item_history` (migration `0154`); lưới tracking lọc cấp task + URL, dán/copy vùng
+> tick với Excel, vùng chọn độc quyền một nhóm; nợ `material-sync` org 1 + tương phản lưới. Non-goal còn treo:
+> cột `qty` trên ô dimension (R1), virtualization lưới. Chi tiết `PROGRESS.md`.
+
 > **`M123-project-id-cho-baseline-va-mat-tran.md`** — ✅ **Approved 2026-09-03 (PR #468) và ĐÃ TRIỂN KHAI XONG cả 4 PR** (PR1+PR2 ở #469, PR3+PR4 ở PR kế tiếp). Migration `0149` + 3 cột `project_id` + unique index `(COALESCE(project_id,0), floor_label, stage_id)` + RLS 3 bảng; baselines/danh mục công tác/mặt trận theo tầng đều lọc theo dự án đang chọn. **Nợ còn lại:** khoá cửa RLS (bỏ nhánh GUC-rỗng), `floor_label` vẫn là chuỗi tự do (cần bảng `floors` thật), chưa có UI quản lý công tác riêng dự án.
 > Giai đoạn 4: đưa **3 bảng cuối của mảng kế hoạch vào trục dự án** — `baselines`,
 > `construction_stages`, `floor_stage_fronts`. Nợ này đã được ghi nhận chính thức trong whitelist

@@ -17,7 +17,7 @@ import {
 // thông báo, báo cáo EOT) đều có ngữ cảnh mà không ai phải nhớ — điều kiện tiên quyết để
 // sau này "khoá cửa" (bỏ nhánh GUC-rỗng-cho-qua) mà không làm trang mặt trận trả rỗng.
 // Hàm nào nhận projectId tuỳ chọn thì thiếu nó = ngữ cảnh xuyên dự án hợp lệ → '*'.
-import { sortFloorsDesc } from "@/lib/tien-do/floors";
+import { sortFloorsDesc } from "@/lib/nen/floors";
 import { addDaysISO } from "@/lib/nen/date";
 
 export type StageRow = {

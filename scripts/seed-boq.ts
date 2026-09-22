@@ -49,7 +49,7 @@ async function main() {
   console.log(
     `Bắt đầu import vào Dự án "${project.name}" (ID: ${project.id}), Hệ "${system.code}" (ID: ${system.id})...`,
   );
-  const result = await commitBoqImport(parsed.rows, system.id, system.code, project.id, 1);
+  const result = await commitBoqImport(parsed.rows, system.id, system.code, project.id, 1, null);
 
   console.log(
     `✅ Kết quả: Đã thêm ${result.inserted} dòng, bỏ qua ${result.skipped} dòng trùng mã.`,

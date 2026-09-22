@@ -43,6 +43,7 @@ import {
 import { useTickVung } from "./useTickVung";
 import { ThanhVungChon } from "./ThanhVungChon";
 import { ODimension } from "./ODimension";
+import { taskKhopLoc } from "./locTask";
 
 // Ngày rút gọn d/M cho dòng task (đỡ chiếm chỗ trên lưới).
 const fmtShortDate = (d: string | null) => {
@@ -107,6 +108,7 @@ export function TrackingGrid({
   sheetCols,
   pendingFront,
   qcReason,
+  taskFilter, // Lọc cấp task (M124 việc 4) — ẩn hàng task không khớp trạng thái đang lọc.
 }: {
   pkg: Pkg;
   pkgIdx: number;
@@ -125,6 +127,7 @@ export function TrackingGrid({
   sheetCols: string[];
   pendingFront: boolean;
   qcReason?: string;
+  taskFilter: string;
 }) {
   const [grid, setGrid] = useState<Grid | null>(null);
   const [editName, setEditName] = useState<string | null>(null);
@@ -181,13 +184,12 @@ export function TrackingGrid({
     if (expanded) load();
   }, [load, refreshKey, expanded]);
 
-  // Chọn vùng + hoàn tác (M121). Logic nằm trong hook để file này chỉ còn dựng giao diện.
-  const vungChon = useTickVung({ grid, load, onChanged, onOfflineTickBatch });
-
-  // Đóng nhóm hoặc đổi dữ liệu → bỏ vùng chọn: giữ lại sẽ trỏ tới ô đã unmount.
+  // Chọn vùng + hoàn tác + dán/copy Excel (M121, M124 V5) — logic nằm trong hook.
+  const vungChon = useTickVung({ grid, load, onChanged, onOfflineTickBatch, editMode });
+  // Đóng nhóm/đổi dữ liệu hoặc bật lọc task → bỏ vùng chọn (ô đã unmount/ẩn không còn hợp lệ).
   useEffect(() => {
-    if (!expanded) vungChon.boChon();
-  }, [expanded, vungChon]);
+    if (!expanded || taskFilter) vungChon.boChon();
+  }, [expanded, taskFilter, vungChon]);
 
   // Ctrl+Z / Ctrl+Shift+Z (Cmd trên máy Mac). Bắt ở window nhưng bỏ qua khi đang gõ trong ô
   // nhập liệu — nếu không sẽ cướp mất undo của chính ô nhập đó.
@@ -698,9 +700,9 @@ export function TrackingGrid({
     onChanged();
   }
 
-  // Chiều rộng cột — định nghĩa 1 chỗ, dùng chung cho hàng nhóm lẫn bảng task
-  // ce = canEdit && editMode — dùng để gate toàn bộ nút sửa trong lưới
+  // Chiều rộng cột dùng chung cho hàng nhóm lẫn bảng task; ce gate nút sửa, anHang ẩn hàng lọc task
   const ce = canEdit && editMode;
+  const anHang = (status: string) => !taskKhopLoc(status, taskFilter);
   const hpc = (col: string) => (hiddenPrintCols.has(col) ? " print-hidden-col" : "");
   const showBoq = canEdit; // BOQ chỉ hiển thị cho Admin/PM (luôn hiện, kể cả khi chỉ xem)
   const W_BOQ = showBoq ? 110 : 0;
@@ -878,7 +880,7 @@ export function TrackingGrid({
                         setEditFloor(pkg.floorLabel ?? "");
                       }}
                       title="Sửa tầng"
-                      className="opacity-100 sm:opacity-0 sm:group-hover/floor:opacity-100 text-zinc-600 hover:text-emerald-400"
+                      className="opacity-100 sm:opacity-0 sm:group-hover/floor:opacity-100 text-zinc-500 hover:text-emerald-400"
                     >
                       <Pencil className="w-2.5 h-2.5" />
                     </button>
@@ -1131,14 +1133,14 @@ export function TrackingGrid({
                         <button
                           onClick={() => drawingInputRef.current?.click()}
                           title="Upload PDF bản vẽ"
-                          className="text-zinc-600 hover:text-sky-400"
+                          className="text-zinc-500 hover:text-sky-400"
                         >
                           <Upload className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => editPkgDrawingLink()}
                           title="Gán link bản vẽ"
-                          className="text-zinc-600 hover:text-sky-400"
+                          className="text-zinc-500 hover:text-sky-400"
                         >
                           <Link2 className="w-3.5 h-3.5" />
                         </button>
@@ -1195,14 +1197,14 @@ export function TrackingGrid({
                         <button
                           onClick={() => bbntInputRef.current?.click()}
                           title="Upload biên bản nghiệm thu"
-                          className="text-zinc-600 hover:text-emerald-400"
+                          className="text-zinc-500 hover:text-emerald-400"
                         >
                           <Upload className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => editBbntLink()}
                           title="Gán link biên bản"
-                          className="text-zinc-600 hover:text-emerald-400"
+                          className="text-zinc-500 hover:text-emerald-400"
                         >
                           <Link2 className="w-3.5 h-3.5" />
                         </button>
@@ -1242,14 +1244,14 @@ export function TrackingGrid({
                     <button
                       onClick={() => copyPkg()}
                       title="Sao chép nhóm này"
-                      className="p-0.5 text-zinc-600 hover:text-sky-400"
+                      className="p-0.5 text-zinc-500 hover:text-sky-400"
                     >
                       <Copy className="w-[17px] h-[17px]" />
                     </button>
                     <button
                       onClick={() => deletePkg()}
                       title="Xoá nhóm này"
-                      className="p-0.5 text-zinc-600 hover:text-red-400"
+                      className="p-0.5 text-zinc-500 hover:text-red-400"
                     >
                       <Trash2 className="w-[17px] h-[17px]" />
                     </button>
@@ -1350,7 +1352,7 @@ export function TrackingGrid({
                     <button
                       onClick={() => addColumnAfter(grid.columns[grid.columns.length - 1] ?? null)}
                       title="Thêm cột mới vào cuối"
-                      className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-emerald-200 hover:bg-emerald-950 rounded"
+                      className="w-6 h-6 flex items-center justify-center text-zinc-500 hover:text-emerald-200 hover:bg-emerald-950 rounded"
                     >
                       <Columns className="w-3 h-3" />
                     </button>
@@ -1385,7 +1387,7 @@ export function TrackingGrid({
           <tbody>
             {grid.tasks.map((t, ti) => (
               <Fragment key={t.id}>
-                <tr className="hover:bg-zinc-800/30 transition-colors">
+                <tr className="hover:bg-zinc-800/30 transition-colors" hidden={anHang(t.status)}>
                   {showBoq && (
                     <td
                       className={`${stkBoq} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden${hpc("BOQ")}`}
@@ -1416,7 +1418,7 @@ export function TrackingGrid({
                               <button
                                 aria-label="Sửa"
                                 onClick={() => editTaskDrawing(t)}
-                                className="text-zinc-600 hover:text-emerald-400"
+                                className="text-zinc-500 hover:text-emerald-400"
                               >
                                 <Pencil className="w-2.5 h-2.5" />
                               </button>
@@ -1512,7 +1514,7 @@ export function TrackingGrid({
                           <button
                             aria-label="Sửa"
                             onClick={() => setEditTask({ id: t.id, value: t.name })}
-                            className="shrink-0 text-zinc-600 hover:text-emerald-400"
+                            className="shrink-0 text-zinc-500 hover:text-emerald-400"
                           >
                             <Pencil className="w-3 h-3" />
                           </button>
@@ -1539,14 +1541,14 @@ export function TrackingGrid({
                       <button
                         onClick={() => setHistoryTask(t)}
                         title="Lịch sử tiến độ"
-                        className="text-zinc-600 hover:text-emerald-400"
+                        className="text-zinc-500 hover:text-emerald-400"
                       >
                         <History className="w-3 h-3" />
                       </button>
                       <button
                         onClick={() => setPhotosTask(t)}
                         title="Ảnh hiện trường"
-                        className={`flex items-center gap-0.5 ${t.photoCount > 0 ? "text-sky-400 hover:text-sky-300" : "text-zinc-600 hover:text-sky-400"}`}
+                        className={`flex items-center gap-0.5 ${t.photoCount > 0 ? "text-sky-400 hover:text-sky-300" : "text-zinc-500 hover:text-sky-400"}`}
                       >
                         <Camera className="w-3 h-3" />
                         {t.photoCount > 0 && <span className="text-[10px]">{t.photoCount}</span>}
@@ -1554,7 +1556,7 @@ export function TrackingGrid({
                       <button
                         onClick={() => setCommentsTask(t)}
                         title="Bình luận / trao đổi"
-                        className={`flex items-center gap-0.5 ${t.commentCount > 0 ? "text-violet-400 hover:text-violet-300" : "text-zinc-600 hover:text-violet-400"}`}
+                        className={`flex items-center gap-0.5 ${t.commentCount > 0 ? "text-violet-400 hover:text-violet-300" : "text-zinc-500 hover:text-violet-400"}`}
                       >
                         <MessageSquare className="w-3 h-3" />
                         {t.commentCount > 0 && (
@@ -1635,7 +1637,7 @@ export function TrackingGrid({
                         actual: { start: t.actualStartDate ?? null, end: t.actualEndDate ?? null },
                       });
                     const baseCell = `border-b border-r border-zinc-800 px-1 py-1 text-center align-middle text-[10px] whitespace-nowrap`;
-                    const dateCls = `${baseCell} ${inherited ? "text-zinc-600 italic" : "text-zinc-400"} ${ce ? "cursor-pointer hover:bg-zinc-800" : ""}`;
+                    const dateCls = `${baseCell} ${inherited ? "text-zinc-500 italic" : "text-zinc-400"} ${ce ? "cursor-pointer hover:bg-zinc-800" : ""}`;
                     return (
                       <>
                         <td
@@ -1688,12 +1690,12 @@ export function TrackingGrid({
                       }}
                       onPointerDown={(e) => {
                         // Chỉ bật chọn vùng ở chế độ sửa — lúc chỉ xem thì kéo tay phải để
-                        // cuộn trang, không được cướp thao tác cuộn của người dùng.
-                        if (!editMode || e.button === 2) return;
+                        // cuộn trang, không được cướp thao tác cuộn; đang lọc task cũng tắt.
+                        if (!editMode || e.button === 2 || taskFilter) return;
                         if (e.shiftKey) vungChon.moRongToi(ti, ci);
                         else vungChon.batDau(ti, ci);
                       }}
-                      onPointerEnter={() => editMode && vungChon.keoToi(ti, ci)}
+                      onPointerEnter={() => editMode && !taskFilter && vungChon.keoToi(ti, ci)}
                       onPointerUp={() => vungChon.ketThucKeo()}
                     />
                   ))}

@@ -45,7 +45,7 @@ const MODULES: { title: string; tables: string[] }[] = [
   },
   {
     title: "BOQ & khối lượng",
-    tables: ["boq_items", "boq_norms", "boq_task_map", "boq_codes"],
+    tables: ["boq_items", "boq_item_history", "boq_norms", "boq_task_map", "boq_codes"],
   },
   {
     title: "Hợp đồng & tài chính",

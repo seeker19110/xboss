@@ -21,7 +21,7 @@ export async function POST() {
   if (blocked) return blocked;
 
   try {
-    const summary = await runMaterialSync();
+    const summary = await runMaterialSync(user.orgId);
     return NextResponse.json({ ok: true, summary });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Lỗi đồng bộ Google Sheet";
