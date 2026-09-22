@@ -252,7 +252,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Tổng quan Chuỗi cung ứng",
         icon: Package,
       },
-      { id: "dash.boq", href: "/procurement?tab=boq", label: "Định mức BOQ", icon: Calculator },
+      { id: "dash.boq", href: "/boq", label: "Khối lượng / BOQ", icon: Calculator },
       {
         id: "dash.vat-tu",
         href: "/procurement?tab=inventory",
