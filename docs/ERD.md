@@ -3618,51 +3618,6 @@
 - `idx_eng_as_project`: INDEX idx_eng_as_project ON public.engineering_agent_sessions USING btree (project_id, status)
 - `uq_engineering_agent_sessions_id_project`: UNIQUE INDEX uq_engineering_agent_sessions_id_project ON public.engineering_agent_sessions USING btree (id, project_id)
 
-### engineering_apex_command_actions
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | bigint |  |  |
-| action_type | text |  |  |
-| initiated_by | bigint | ✓ |  |
-| action_payload | jsonb |  | `'{}'::jsonb` |
-| result_status | text |  | `'COMPLETED'::text` |
-| result_summary | text | ✓ |  |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `initiated_by` → `users(id)`
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_apex_command_actions_pkey`: UNIQUE INDEX engineering_apex_command_actions_pkey ON public.engineering_apex_command_actions USING btree (id)
-- `idx_engineering_apex_actions_project`: INDEX idx_engineering_apex_actions_project ON public.engineering_apex_command_actions USING btree (project_id)
-
-### engineering_apex_system_pulses
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | bigint |  |  |
-| apex_index | numeric(5,2) |  | `95.00` |
-| spatial_score | numeric(5,2) |  | `95.00` |
-| financial_score | numeric(5,2) |  | `95.00` |
-| legal_score | numeric(5,2) |  | `95.00` |
-| site_score | numeric(5,2) |  | `95.00` |
-| agent_score | numeric(5,2) |  | `95.00` |
-| status_tier | text |  | `'OPTIMAL'::text` |
-| pulse_summary | jsonb |  | `'{}'::jsonb` |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_apex_system_pulses_pkey`: UNIQUE INDEX engineering_apex_system_pulses_pkey ON public.engineering_apex_system_pulses USING btree (id)
-- `idx_engineering_apex_pulses_created`: INDEX idx_engineering_apex_pulses_created ON public.engineering_apex_system_pulses USING btree (created_at DESC)
-- `idx_engineering_apex_pulses_project`: INDEX idx_engineering_apex_pulses_project ON public.engineering_apex_system_pulses USING btree (project_id)
-
 ### engineering_async_tasks
 
 | Cột | Kiểu | Null | Default |
@@ -4632,40 +4587,6 @@
 - `engineering_execution_requests_pkey`: UNIQUE INDEX engineering_execution_requests_pkey ON public.engineering_execution_requests USING btree (id)
 - `idx_eng_exec_requests_project`: INDEX idx_eng_exec_requests_project ON public.engineering_execution_requests USING btree (project_id, status, created_at DESC)
 
-### engineering_fidic_tia_claims
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | bigint |  |  |
-| claim_code | text |  |  |
-| delay_event_title | text |  |  |
-| event_category | text |  |  |
-| fidic_sub_clause | text |  | `'Clause 20.1 (1999) / 20.2 (2017)'::text` |
-| delay_start_date | date |  |  |
-| delay_end_date | date |  |  |
-| fragnet_duration_days | integer |  | `14` |
-| calculated_eot_days | integer |  | `14` |
-| daily_overhead_cost_vnd | numeric(14,2) |  | `15000000.00` |
-| total_prolongation_cost_vnd | numeric(16,2) |  | `210000000.00` |
-| impacted_critical_tasks | jsonb |  | `'[]'::jsonb` |
-| notice_letter_markdown | text |  |  |
-| time_bar_deadline_date | date |  |  |
-| status | text |  | `'submitted'::text` |
-| merkle_proof_hash | text |  |  |
-| created_by | bigint | ✓ |  |
-| created_at | timestamptz |  | `now()` |
-| updated_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `created_by` → `users(id)`
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_fidic_tia_claims_pkey`: UNIQUE INDEX engineering_fidic_tia_claims_pkey ON public.engineering_fidic_tia_claims USING btree (id)
-- `engineering_fidic_tia_claims_project_id_claim_code_key`: UNIQUE INDEX engineering_fidic_tia_claims_project_id_claim_code_key ON public.engineering_fidic_tia_claims USING btree (project_id, claim_code)
-- `idx_fidic_tia_project`: INDEX idx_fidic_tia_project ON public.engineering_fidic_tia_claims USING btree (project_id, created_at DESC)
-
 ### engineering_generative_routing_runs
 
 | Cột | Kiểu | Null | Default |
@@ -5001,44 +4922,6 @@
 - `engineering_joint_runs_pkey`: UNIQUE INDEX engineering_joint_runs_pkey ON public.engineering_joint_runs USING btree (id)
 - `idx_joint_runs_drawing`: INDEX idx_joint_runs_drawing ON public.engineering_joint_runs USING btree (drawing_id)
 
-### engineering_material_mass_balance_audits
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | bigint |  |  |
-| audit_code | text |  |  |
-| system_code | text |  |  |
-| nominal_dia_mm | numeric(8,2) |  |  |
-| total_bim_design_m | numeric(12,3) |  |  |
-| total_po_ordered_m | numeric(12,3) |  |  |
-| total_grn_received_m | numeric(12,3) |  |  |
-| total_installed_verified_m | numeric(12,3) |  |  |
-| total_staged_on_floors_m | numeric(12,3) |  |  |
-| total_in_central_warehouse_m | numeric(12,3) |  |  |
-| total_reusable_remnants_m | numeric(12,3) |  |  |
-| total_scrap_logged_m | numeric(12,3) |  |  |
-| delta_unaccounted_or_stash_m | numeric(12,3) |  |  |
-| remaining_to_install_m | numeric(12,3) |  |  |
-| remaining_to_procure_m | numeric(12,3) |  |  |
-| progress_percentage | numeric(6,2) |  |  |
-| stash_risk_status | text |  | `'CLEAN_BALANCED'::text` |
-| suspect_locations | jsonb |  | `'[]'::jsonb` |
-| audited_at | timestamptz |  | `now()` |
-| audited_by | bigint | ✓ |  |
-| merkle_seal_hash | text |  |  |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `audited_by` → `users(id)`
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_material_mass_balance_aud_project_id_audit_code_key`: UNIQUE INDEX engineering_material_mass_balance_aud_project_id_audit_code_key ON public.engineering_material_mass_balance_audits USING btree (project_id, audit_code)
-- `engineering_material_mass_balance_audits_pkey`: UNIQUE INDEX engineering_material_mass_balance_audits_pkey ON public.engineering_material_mass_balance_audits USING btree (id)
-- `idx_mass_balance_proj`: INDEX idx_mass_balance_proj ON public.engineering_material_mass_balance_audits USING btree (project_id, created_at DESC)
-- `idx_mass_balance_system`: INDEX idx_mass_balance_system ON public.engineering_material_mass_balance_audits USING btree (project_id, system_code)
-
 ### engineering_material_qr_tags
 
 | Cột | Kiểu | Null | Default |
@@ -5264,29 +5147,6 @@
 - `engineering_mepf_tc_matrices_pkey`: UNIQUE INDEX engineering_mepf_tc_matrices_pkey ON public.engineering_mepf_tc_matrices USING btree (id)
 - `idx_mepf_tc_matrices_proj`: INDEX idx_mepf_tc_matrices_proj ON public.engineering_mepf_tc_matrices USING btree (project_id, status)
 - `uq_mepf_tc_matrix_project_code`: UNIQUE INDEX uq_mepf_tc_matrix_project_code ON public.engineering_mepf_tc_matrices USING btree (project_id, matrix_code)
-
-### engineering_mepf_voice_logs
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | integer |  |  |
-| transcribed_text | text |  |  |
-| extracted_location | text |  |  |
-| extracted_spool_code | text | ✓ |  |
-| updated_stage | text | ✓ |  |
-| defect_created | boolean |  | `false` |
-| defect_description | text | ✓ |  |
-| created_by | integer | ✓ |  |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `created_by` → `users(id)`
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_mepf_voice_logs_pkey`: UNIQUE INDEX engineering_mepf_voice_logs_pkey ON public.engineering_mepf_voice_logs USING btree (id)
-- `idx_mepf_voice_proj`: INDEX idx_mepf_voice_proj ON public.engineering_mepf_voice_logs USING btree (project_id, created_at DESC)
 
 ### engineering_merkle_roots
 
@@ -5611,45 +5471,6 @@
 - `idx_spool_fittings_project`: INDEX idx_spool_fittings_project ON public.engineering_pipe_spool_fittings USING btree (project_id)
 - `idx_spool_fittings_spool`: INDEX idx_spool_fittings_spool ON public.engineering_pipe_spool_fittings USING btree (spool_id)
 
-### engineering_pipe_spool_tracking
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | bigint |  |  |
-| spool_code | text |  |  |
-| system_code | text |  |  |
-| nominal_dia_mm | numeric(8,2) |  |  |
-| material_type | text |  |  |
-| design_length_mm | numeric(10,2) |  |  |
-| cut_length_mm | numeric(10,2) |  |  |
-| tower_label | text |  | `'Tower-A'::text` |
-| floor_label | text |  | `'FL-12'::text` |
-| zone_label | text |  | `'Zone-01'::text` |
-| spatial_coords_start | jsonb |  | `'{"x": 0, "y": 0, "z": 0}'::jsonb` |
-| spatial_coords_end | jsonb |  | `'{"x": 0, "y": 0, "z": 0}'::jsonb` |
-| current_status | text |  | `'PO_ORDERED'::text` |
-| current_location_tag | text | ✓ | `'CENTRAL_YARD_BIN_A4'::text` |
-| staged_at | timestamptz | ✓ |  |
-| holding_time_hours | numeric(8,2) | ✓ | `0.00` |
-| installed_at | timestamptz | ✓ |  |
-| scan_deviation_mm | numeric(6,2) | ✓ |  |
-| assigned_subcon_id | bigint | ✓ |  |
-| qr_spool_token | text |  |  |
-| merkle_leaf_hash | text |  |  |
-| created_at | timestamptz |  | `now()` |
-| updated_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `assigned_subcon_id` → `suppliers(id)`
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_pipe_spool_tracking_pkey`: UNIQUE INDEX engineering_pipe_spool_tracking_pkey ON public.engineering_pipe_spool_tracking USING btree (id)
-- `engineering_pipe_spool_tracking_project_id_spool_code_key`: UNIQUE INDEX engineering_pipe_spool_tracking_project_id_spool_code_key ON public.engineering_pipe_spool_tracking USING btree (project_id, spool_code)
-- `idx_pipe_spool_track_loc`: INDEX idx_pipe_spool_track_loc ON public.engineering_pipe_spool_tracking USING btree (project_id, floor_label, zone_label)
-- `idx_pipe_spool_track_proj`: INDEX idx_pipe_spool_track_proj ON public.engineering_pipe_spool_tracking USING btree (project_id, current_status)
-
 ### engineering_pipe_spools
 
 | Cột | Kiểu | Null | Default |
@@ -5804,33 +5625,6 @@
 - `engineering_project_health_snapshots_pkey`: UNIQUE INDEX engineering_project_health_snapshots_pkey ON public.engineering_project_health_snapshots USING btree (id)
 - `idx_project_health_proj`: INDEX idx_project_health_proj ON public.engineering_project_health_snapshots USING btree (project_id, snapshot_date DESC)
 
-### engineering_qs_bom_explosions
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | integer |  |  |
-| item_code | text |  |  |
-| item_description | text |  |  |
-| unit | text |  |  |
-| contract_rate_vnd | numeric(15,2) |  |  |
-| breakdown_material_main_vnd | numeric(15,2) |  |  |
-| breakdown_material_aux_vnd | numeric(15,2) |  |  |
-| breakdown_labor_vnd | numeric(15,2) |  |  |
-| breakdown_machinery_vnd | numeric(15,2) |  |  |
-| breakdown_margin_vnd | numeric(15,2) |  |  |
-| target_subcon_rate_vnd | numeric(15,2) |  |  |
-| bom_level_items | jsonb |  | `'[]'::jsonb` |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_qs_bom_explosions_pkey`: UNIQUE INDEX engineering_qs_bom_explosions_pkey ON public.engineering_qs_bom_explosions USING btree (id)
-- `idx_qs_bom_proj`: INDEX idx_qs_bom_proj ON public.engineering_qs_bom_explosions USING btree (project_id, item_code)
-- `uq_qs_bom_code`: UNIQUE INDEX uq_qs_bom_code ON public.engineering_qs_bom_explosions USING btree (project_id, item_code)
-
 ### engineering_rebar_prepour_audits
 
 | Cột | Kiểu | Null | Default |
@@ -5930,30 +5724,6 @@
 - `engineering_scan_to_bim_runs_pkey`: UNIQUE INDEX engineering_scan_to_bim_runs_pkey ON public.engineering_scan_to_bim_runs USING btree (id)
 - `idx_scan_to_bim_proj`: INDEX idx_scan_to_bim_proj ON public.engineering_scan_to_bim_runs USING btree (project_id, created_at DESC)
 - `uq_scan_to_bim_code`: UNIQUE INDEX uq_scan_to_bim_code ON public.engineering_scan_to_bim_runs USING btree (project_id, scan_code)
-
-### engineering_shopdrawing_lod400_runs
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | integer |  |  |
-| run_code | text |  |  |
-| drawing_name | text |  |  |
-| total_spools_generated | integer |  | `0` |
-| slope_applied_percent | numeric(4,2) |  | `2.0` |
-| flange_pairs_inserted | integer |  | `0` |
-| insulation_spec | text | ✓ |  |
-| sleeves_count | integer |  | `0` |
-| sleeve_details | jsonb |  | `'[]'::jsonb` |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_shopdrawing_lod400_runs_pkey`: UNIQUE INDEX engineering_shopdrawing_lod400_runs_pkey ON public.engineering_shopdrawing_lod400_runs USING btree (id)
-- `idx_shopdrawing_lod400_proj`: INDEX idx_shopdrawing_lod400_proj ON public.engineering_shopdrawing_lod400_runs USING btree (project_id, created_at DESC)
-- `uq_shopdrawing_lod400_code`: UNIQUE INDEX uq_shopdrawing_lod400_code ON public.engineering_shopdrawing_lod400_runs USING btree (project_id, run_code)
 
 ### engineering_sleeve_schedules
 
@@ -6693,72 +6463,4 @@
 
 **Index:**
 - `webhooks_pkey`: UNIQUE INDEX webhooks_pkey ON public.webhooks USING btree (id)
-
-### zalo_field_action_dispatches
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | bigint |  |  |
-| zalo_user_id | text |  |  |
-| action_type | text |  |  |
-| payload | jsonb |  | `'{}'::jsonb` |
-| execution_status | text |  | `'SUCCESS'::text` |
-| result_summary | text | ✓ |  |
-| dispatched_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-
-**Index:**
-- `idx_zalo_action_dispatches_project`: INDEX idx_zalo_action_dispatches_project ON public.zalo_field_action_dispatches USING btree (project_id)
-- `zalo_field_action_dispatches_pkey`: UNIQUE INDEX zalo_field_action_dispatches_pkey ON public.zalo_field_action_dispatches USING btree (id)
-
-### zalo_site_message_logs
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | bigint |  |  |
-| zalo_user_id | text |  |  |
-| message_direction | text |  | `'INCOMING'::text` |
-| raw_text | text |  |  |
-| intent | text |  | `'UNKNOWN'::text` |
-| confidence | numeric(5,2) |  | `1.00` |
-| parsed_entities | jsonb |  | `'{}'::jsonb` |
-| response_text | text | ✓ |  |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-
-**Index:**
-- `idx_zalo_message_logs_project`: INDEX idx_zalo_message_logs_project ON public.zalo_site_message_logs USING btree (project_id)
-- `idx_zalo_message_logs_zid`: INDEX idx_zalo_message_logs_zid ON public.zalo_site_message_logs USING btree (zalo_user_id)
-- `zalo_site_message_logs_pkey`: UNIQUE INDEX zalo_site_message_logs_pkey ON public.zalo_site_message_logs USING btree (id)
-
-### zalo_user_bindings
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | bigint |  |  |
-| user_id | bigint | ✓ |  |
-| zalo_user_id | text |  |  |
-| zalo_display_name | text | ✓ |  |
-| phone_number | text | ✓ |  |
-| verification_otp | text | ✓ |  |
-| otp_expires_at | timestamptz | ✓ |  |
-| is_verified | boolean |  | `false` |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-- `user_id` → `users(id)`
-
-**Index:**
-- `idx_zalo_user_bindings_project`: INDEX idx_zalo_user_bindings_project ON public.zalo_user_bindings USING btree (project_id)
-- `idx_zalo_user_bindings_zid`: INDEX idx_zalo_user_bindings_zid ON public.zalo_user_bindings USING btree (zalo_user_id)
-- `uq_zalo_user_bindings_project_zid`: UNIQUE INDEX uq_zalo_user_bindings_project_zid ON public.zalo_user_bindings USING btree (project_id, zalo_user_id)
-- `zalo_user_bindings_pkey`: UNIQUE INDEX zalo_user_bindings_pkey ON public.zalo_user_bindings USING btree (id)
 
