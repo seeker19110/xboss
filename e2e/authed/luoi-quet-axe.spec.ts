@@ -26,7 +26,7 @@ import AxeBuilder from "@axe-core/playwright";
 // badge/nút RIÊNG cùng kiểu "-950/50 + accent-300" ở code của chính trang đó (không phải
 // EngineeringNav) vẫn còn đỏ — sửa từng cái là việc lẻ theo trang, ngoài phạm vi ở đây.
 //
-// `.sidebar-label` (ProjectSwitcher/AppHeader, vd /engineering/zero-error) — đo tương phản 1,02:1 (fg #f1f5f9 / bg #f6f7f9) trên span
+// `.sidebar-label` (ProjectSwitcher/AppHeader) — đo tương phản 1,02:1 (fg #f1f5f9 / bg #f6f7f9) trên span
 // KHÔNG có class màu chữ tường minh, chỉ kế thừa `color`. Đã kiểm computed style qua CDP ở
 // trạng thái ổn định: `--foreground`/`--color-zinc-100` của html.light đúng
 // (#14171d/#232833), span kế thừa màu ĐÚNG — không tái hiện được #f1f5f9 khi soi thủ công
@@ -147,24 +147,6 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
       name: "Chữ ký điện tử (esign)",
       violations:
         "color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav) — bg-emerald-950/80, #065f46 trên #31554d = 1.07:1 + label x2 + select-name x1.",
-    },
-    {
-      path: "/engineering/pipe-stash-hunter",
-      name: "Pipe Stash Hunter",
-      violations:
-        "color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav) + label x9 (nhiều input số thiếu <label>) + select-name x1.",
-    },
-    {
-      path: "/engineering/zalo-copilot",
-      name: "Zalo Copilot",
-      violations:
-        "color-contrast x3 — bg-blue-950/80, chữ #2563eb trên nền #434f76 = 1.55:1. KHÔNG liên quan badge EngineeringNav.",
-    },
-    {
-      path: "/engineering/zero-error",
-      name: "Zero Error",
-      violations:
-        "color-contrast x32 (không đổi đáng kể — không phải badge EngineeringNav) — cùng lỗi '.sidebar-label' (1.02:1, xem comment đầu file) + label x4.",
     },
   ];
 

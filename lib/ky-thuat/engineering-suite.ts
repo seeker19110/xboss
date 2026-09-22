@@ -14,14 +14,10 @@ export * from "@/lib/ky-thuat/engineering-mepf-hydraulic";
 // 5. 1D Cutting Stock Nesting Optimization (M68)
 export * from "@/lib/ky-thuat/engineering-mepf-nesting";
 
-// 6. AI Voice Field Logger & Productivity Index (M68)
-export * from "@/lib/ky-thuat/engineering-mepf-voice";
-
-// 7. Omnipotent Shopdrawing LOD 400 & Sleeve Matrix (M69)
-export * from "@/lib/ky-thuat/engineering-shopdrawing-omnipotent";
-
-// 8. 5D QS Cost Engineering & FIDIC Claim Defense (M69)
-export * from "@/lib/ky-thuat/engineering-qs-omnipotent";
+// (6) AI Voice Field Logger & Productivity Index (M68), (7) Omnipotent Shopdrawing LOD 400 &
+// Sleeve Matrix (M69) và (8) 5D QS Cost Engineering & FIDIC Claim Defense (M69) đã bị xoá
+// 2026-09-22 — không có giá trị nghiệp vụ đủ rõ so với chi phí bảo trì, UI duy nhất gọi tới là
+// 3 nút demo trên /engineering/mepf-lifecycle (xem PROGRESS.md).
 
 // (9) AI Reality Scan-to-BIM & Deviation Mesh (M70) đã được gỡ cùng cụm CAD/BIM.
 

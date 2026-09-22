@@ -44,14 +44,6 @@
     "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
   },
   {
-    "route": "/api/engineering/pipe-spool-tracking",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
-    "route": "/api/engineering/zero-error/pour-permits",
-    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
-  },
-  {
     "route": "/api/construction-stages/[id]",
     "ly_do": "PATCH giai đoạn thi công — UI /work-fronts chỉ gọi route danh sách, chưa gắn sửa từng giai đoạn."
   },

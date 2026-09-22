@@ -23,10 +23,8 @@ const WHITELIST: Record<string, string> = {
 
   // ── Webhook công khai: xác thực bằng secret/chữ ký riêng, không đi qua phiên đăng nhập
   // (đúng tiền lệ whitelist của tests/engineering-project-scope-invariant.test.ts).
-  // (telegram/webhook:POST đã bị xoá cùng route/UI /engineering/site-copilot 2026-09-21.)
-  "zalo/webhook:POST":
-    "Webhook công khai từ Zalo OA — xác thực bằng chữ ký HMAC qua xacThucWebhookZalo() " +
-    "(lib/bao-mat/webhook-inbound.ts), không có phiên đăng nhập.",
+  // (telegram/webhook:POST đã bị xoá cùng route/UI /engineering/site-copilot 2026-09-21;
+  // zalo/webhook:POST đã bị xoá cùng module Zalo Field Copilot 2026-09-22.)
   "admin/traffic/ingest:POST":
     "Endpoint nội bộ giữa Edge middleware và Node runtime (ghi ring buffer traffic) — xác " +
     "thực bằng header bí mật nội bộ qua safeEqual(token, trafficToken()), không dùng phiên.",
@@ -44,14 +42,8 @@ const WHITELIST: Record<string, string> = {
   "push/subscribe:DELETE":
     "Huỷ đăng ký — DELETE có WHERE endpoint = ? AND user_id = ?, chỉ thiết bị của chính mình.",
   // (telegram/link-otp:POST, telegram/simulate-voice:POST đã bị xoá cùng route/UI
-  // /engineering/site-copilot 2026-09-21.)
-  "zalo/link-otp:POST": "Sinh OTP liên kết Zalo cho chính tài khoản đang đăng nhập.",
-  "zalo/simulate-action:POST":
-    "Trang giả lập chạy dưới phiên đăng nhập thật, processIncomingZaloMessage() chỉ xử lý " +
-    "Zalo ID đã liên kết & xác thực của chính user gọi — không tác động tài khoản khác.",
-  "engineering/zero-error/challenge:POST":
-    "Xác minh mã thử thách do chính user sinh (challenge ràng buộc theo user.id trong " +
-    "generateFieldDynamicChallenge/verifyFieldProofChallenge) — không có đường leo quyền.",
+  // /engineering/site-copilot 2026-09-21; zalo/link-otp:POST, zalo/simulate-action:POST và
+  // engineering/zero-error/challenge:POST đã bị xoá cùng 7 module đầu cơ 2026-09-22.)
 
   // ── Đã kiểm quyền, chỉ khác tên hàm so với 4 mẫu chính thức của cổng này.
   "project/select:POST":

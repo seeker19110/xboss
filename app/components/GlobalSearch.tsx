@@ -1,7 +1,7 @@
 "use client";
 // Tìm kiếm toàn cục & Command Palette (M57 PR1 & Pinnacle): task/nhóm → nhảy tới sheet + tầng;
 // kho hồ sơ (hợp đồng/công văn/họp/nhật ký/NCR/vật tư/bản vẽ/tài liệu/bình luận);
-// 34 phân hệ Kỹ thuật Đỉnh cao (Engineering OS). Hỗ trợ phím tắt toàn cầu Ctrl+K / Cmd+K.
+// các phân hệ Kỹ thuật Đỉnh cao (Engineering OS). Hỗ trợ phím tắt toàn cầu Ctrl+K / Cmd+K.
 import { useEffect, useRef, useState } from "react";
 import {
   Search,
@@ -18,7 +18,6 @@ import {
   MessageSquare,
   Sparkles,
   QrCode,
-  Bot,
   TrendingUp,
   ShieldCheck,
   Workflow,
@@ -78,15 +77,6 @@ const STATIC_MODULE_HITS: ModuleHit[] = [
     subtitle: "Trung tâm hợp nhất 32+ siêu hệ thống kỹ thuật",
     url: "/engineering",
     icon: Sparkles,
-  },
-  {
-    kind: "module",
-    id: "mod-zalo",
-    code: "M86",
-    title: "Zalo Field Copilot Gateway",
-    subtitle: "Trợ lý hiện trường Zalo NLP 2 chiều",
-    url: "/engineering/zalo-copilot",
-    icon: Bot,
   },
   {
     kind: "module",

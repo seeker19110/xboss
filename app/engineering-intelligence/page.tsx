@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { Brain, Bot, Boxes, Zap, MessageSquare } from "lucide-react";
+import { Brain, Bot, Boxes, Zap, ArrowUpRight } from "lucide-react";
 import HubShell, { type HubTab, type HubStat } from "@/app/components/HubShell";
 import { Skeleton } from "@/app/components/Skeleton";
 
@@ -60,33 +60,45 @@ function EngineeringIntelligenceContent() {
     );
   }, []);
 
-  // Tab 1: Omnichannel Field Copilot (Zalo)
-  const copilotTab = (
+  // Tab 1: Đối tượng kỹ thuật & tác tử — 2 phân hệ AI còn lại sau đợt dọn 2026-09-22
+  // (tab "Trợ Lý Đa Kênh" đã gỡ cùng module Zalo Field Copilot, xem PROGRESS.md).
+  const cognitiveTab = (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-sky-400" />
-              Zalo Field Copilot & Tác Nghiệp Hiện Trường (M86)
-            </h3>
-            <span className="text-[11px] font-mono text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
-              OTP 15 Phút
-            </span>
-          </div>
+          <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+            <Boxes className="w-4 h-4 text-emerald-400" />
+            Đối Tượng Kỹ Thuật & Duyệt Gate 0 (ENG-1)
+          </h3>
           <p className="text-xs text-zinc-400 leading-relaxed">
-            Nhận diện ý định tiếng Việt từ tin nhắn Zalo (Báo cáo sản lượng hoàn thành, Tra cứu tồn
-            kho vật tư, Lập phiếu sự cố NCR, Yêu cầu nghiệm thu 2 bước) và tự động ghi nhận trực
-            tiếp vào CSDL.
+            Tiếp nhận, soát và duyệt đối tượng kỹ thuật (thiết bị, tuyến ống, ống gió) kèm quan hệ
+            và lịch sử phiên bản trong Trung Tâm Điều Hành Kỹ Thuật.
           </p>
-          <div className="pt-2">
-            <Link
-              href="/engineering/zalo-copilot"
-              className="px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-on-accent font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
-            >
-              <MessageSquare className="w-3.5 h-3.5" /> Mở Zalo Copilot Hub (M86)
-            </Link>
-          </div>
+          <Link
+            href="/engineering"
+            className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-on-accent font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+          >
+            Mở Trung Tâm Điều Hành Kỹ Thuật
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6 space-y-3">
+          <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+            <Bot className="w-4 h-4 text-sky-400" />
+            Phiên Hòa Giải Đa Tác Tử (Agent Sessions)
+          </h3>
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Theo dõi các phiên tác tử phân tích xung đột kỹ thuật và chốt phương án xử lý, kèm luận
+            cứ của từng tác tử.
+          </p>
+          <Link
+            href="/engineering/agent-sessions"
+            className="px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-on-accent font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+          >
+            Mở Phiên Đa Tác Tử
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
       </div>
     </div>
@@ -94,23 +106,22 @@ function EngineeringIntelligenceContent() {
 
   const tabs: HubTab[] = [
     {
-      id: "copilot",
-      label: "Trợ Lý Đa Kênh",
-      icon: Bot,
-      badge: "Zalo",
-      description: "Trợ lý hiện trường Zalo Copilot, bóc tách khẩu lệnh tiếng Việt ra WBS/NCR.",
-      content: copilotTab,
+      id: "cognitive",
+      label: "Đối Tượng & Tác Tử",
+      icon: Brain,
+      description: "Duyệt đối tượng kỹ thuật ENG-1 và theo dõi phiên hoà giải đa tác tử.",
+      content: cognitiveTab,
     },
   ];
 
   return (
     <HubShell
       title="Trung Tâm Trí Tuệ Kỹ Thuật AI"
-      subtitle="Trợ lý hiện trường Zalo Copilot"
+      subtitle="Đối tượng kỹ thuật, sổ cái Merkle & tác tử phân tích"
       icon={Brain}
       badge="Engineering Intelligence"
       tabs={tabs}
-      defaultTab="copilot"
+      defaultTab="cognitive"
       stats={stats}
     />
   );
