@@ -122,3 +122,32 @@ test("dungLoTuDan: vượt MAX_O_MOI_LO → lỗi rõ", () => {
   if (!("loi" in kq)) return;
   assert.match(kq.loi, new RegExp(`${MAX_O_MOI_LO}`));
 });
+
+test("dungLoTuDan: vượt trần dừng NGAY ở ô thứ MAX+1, không duyệt hết ma trận", () => {
+  // Lưới/ma trận dư MAX_O_MOI_LO + 5 ô — nếu hàm duyệt hết rồi mới báo lỗi, thông báo sẽ nêu
+  // MAX_O_MOI_LO + 5. Fail-fast đúng nghĩa phải dừng và báo NGAY tại MAX_O_MOI_LO + 1.
+  const soHang = MAX_O_MOI_LO + 5;
+  const cols = ["A"];
+  const tasks = Array.from({ length: soHang }, (_, r) => ({
+    id: r,
+    code: `T${r}`,
+    name: `Task ${r}`,
+    status: "dang_thi_cong",
+    progressPercent: 0,
+    boqCode: null,
+    drawingUrl: null,
+    photoCount: 0,
+    commentCount: 0,
+    delayReason: null,
+    startDate: null,
+    endDate: null,
+    custom: {},
+    cells: { A: { id: r, installed: false } },
+  }));
+  const grid: Grid = { columns: cols, tasks };
+  const matrix = Array.from({ length: soHang }, () => ["x"]);
+  const kq = dungLoTuDan(matrix, { r0: 0, c0: 0, r1: 0, c1: 0 }, grid);
+  assert.ok("loi" in kq);
+  if (!("loi" in kq)) return;
+  assert.match(kq.loi, new RegExp(`đang có ${MAX_O_MOI_LO + 1}\\b`));
+});

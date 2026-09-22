@@ -54,22 +54,28 @@ export function useTickVung(opts: {
     [grid, chon.vung],
   );
 
-  // Gửi nhiều lô tuần tự. Dừng ngay khi server từ chối: các lô sau thường cùng vùng, gửi tiếp
-  // chỉ nhân bản đúng một thông báo lỗi. Trả `false` nếu có lô không vào được.
+  // Gửi nhiều lô tuần tự. Dừng ngay khi server TỪ CHỐI (các lô sau thường cùng vùng, gửi tiếp
+  // chỉ nhân bản đúng một thông báo lỗi) — nhưng vẫn trả về đúng các lô đã gửi THÀNH CÔNG (kể cả
+  // lô mất mạng, coi như xong vì đã xếp hàng đợi offline). Lớp gọi phải ghi lịch sử/chuyển ngăn
+  // đúng phần THẬT SỰ đã áp trên server, không được coi cả loạt là thất bại chỉ vì lô sau (trong
+  // cùng lượt gửi) bị từ chối — nếu không, lô đầu đã áp xong nhưng Ctrl+Z lại không hoàn tác được.
   const guiCacLo = useCallback(
-    async (loList: LoDao[]): Promise<boolean> => {
+    async (loList: LoDao[]): Promise<LoDao[]> => {
+      const daGui: LoDao[] = [];
       for (const lo of loList) {
         const kq = await guiLoTick(lo.dimIds, lo.installed);
         if (kq.trangThai === "mangLoi") {
           onOfflineTickBatch(lo.dimIds, lo.installed);
-          continue; // mất mạng không phải từ chối — đã xếp hàng đợi, coi như xong
+          daGui.push(lo); // mất mạng không phải từ chối — đã xếp hàng đợi, coi như xong
+          continue;
         }
         if (kq.trangThai === "tuChoi") {
           showToast(kq.loi, "error");
-          return false;
+          break;
         }
+        daGui.push(lo);
       }
-      return true;
+      return daGui;
     },
     [onOfflineTickBatch],
   );
@@ -89,8 +95,8 @@ export function useTickVung(opts: {
       const truoc = oDaChon.map((o) => o.installed);
       setDangGui(true);
       try {
-        const ok = await guiCacLo([{ dimIds: lo.ids, installed: value }]);
-        if (ok) setLichSu((ls) => ghiThaoTac(ls, { dimIds: lo.ids, truoc, sau: value }));
+        const daGui = await guiCacLo([{ dimIds: lo.ids, installed: value }]);
+        if (daGui.length) setLichSu((ls) => ghiThaoTac(ls, { dimIds: lo.ids, truoc, sau: value }));
       } finally {
         dangChay.current = false;
         setDangGui(false);
@@ -107,9 +113,11 @@ export function useTickVung(opts: {
     dangChay.current = true;
     setDangGui(true);
     try {
-      const ok = await guiCacLo(loDeHoanTac(muc));
-      // Server từ chối → GIỮ mục trong ngăn hoàn tác để thử lại sau khi mở gate (FR5).
-      if (ok) setLichSu(xacNhanHoanTac);
+      const loList = loDeHoanTac(muc);
+      const daGui = await guiCacLo(loList);
+      // Chỉ chuyển ngăn khi CẢ loạt đã gửi xong — lô resend đã áp trước đó là idempotent nên
+      // giữ nguyên mục trong ngăn hoàn tác để thử lại sau khi mở gate (FR5) vẫn an toàn.
+      if (daGui.length === loList.length) setLichSu(xacNhanHoanTac);
     } finally {
       dangChay.current = false;
       setDangGui(false);
@@ -124,8 +132,9 @@ export function useTickVung(opts: {
     dangChay.current = true;
     setDangGui(true);
     try {
-      const ok = await guiCacLo(loDeLamLai(muc));
-      if (ok) setLichSu(xacNhanLamLai);
+      const loList = loDeLamLai(muc);
+      const daGui = await guiCacLo(loList);
+      if (daGui.length === loList.length) setLichSu(xacNhanLamLai);
     } finally {
       dangChay.current = false;
       setDangGui(false);
@@ -177,14 +186,23 @@ export function useTickVung(opts: {
       dangChay.current = true;
       setDangGui(true);
       try {
-        const ok = await guiCacLo(loList);
-        if (ok) {
-          for (const lo of loList) {
+        // Ghi lịch sử cho ĐÚNG các lô đã gửi thành công — kể cả khi lô sau (tick hoặc bỏ tick)
+        // bị server từ chối, lô trước đã áp rồi vẫn phải hoàn tác được bằng Ctrl+Z.
+        const daGui = await guiCacLo(loList);
+        if (daGui.length) {
+          for (const lo of daGui) {
             const truoc = lo.dimIds.map((id) => truocById.get(id) ?? !lo.installed);
             setLichSu((ls) => ghiThaoTac(ls, { dimIds: lo.dimIds, truoc, sau: lo.installed }));
           }
-          const tong = tick.length + boTick.length;
-          showToast(`Đã dán ${tong} ô${boQua ? ` (${boQua} bỏ qua)` : ""}`, "success");
+          const tongGui = daGui.reduce((s, lo) => s + lo.dimIds.length, 0);
+          const tongTong = tick.length + boTick.length;
+          const hauTo = boQua ? ` (${boQua} bỏ qua)` : "";
+          showToast(
+            tongGui === tongTong
+              ? `Đã dán ${tongGui} ô${hauTo}`
+              : `Đã dán ${tongGui}/${tongTong} ô${hauTo}`,
+            "success",
+          );
         }
       } finally {
         dangChay.current = false;
@@ -236,6 +254,8 @@ export function useTickVung(opts: {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "c") return;
       if (dangGoLieu(e.target) || !chon.vung) return;
+      e.preventDefault(); // vùng chọn của lưới không phải text selection — chặn copy mặc định
+      // của trình duyệt (có thể ghi đè clipboard bằng chuỗi rỗng) trước khi tự ghi TSV.
       saoChep();
     };
     window.addEventListener("keydown", onKey);

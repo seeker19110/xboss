@@ -38,12 +38,13 @@ export function dungLoTuDan(matrix: string[][], vung: Rect, grid: Grid): KetQuaD
       boQua++;
       continue;
     }
-    (gia ? tick : boTick).push(cell.id);
-  }
-  if (tick.length > MAX_O_MOI_LO || boTick.length > MAX_O_MOI_LO) {
-    return {
-      loi: `Chọn tối đa ${MAX_O_MOI_LO} ô mỗi lần (đang có ${Math.max(tick.length, boTick.length)})`,
-    };
+    const nhom = gia ? tick : boTick;
+    nhom.push(cell.id);
+    // Fail-fast NGAY khi vượt trần — ma trận dán từ Excel có thể rất lớn (cả nghìn dòng), không
+    // cần duyệt hết mới báo lỗi cho người dùng đợi vô ích.
+    if (nhom.length > MAX_O_MOI_LO) {
+      return { loi: `Chọn tối đa ${MAX_O_MOI_LO} ô mỗi lần (đang có ${nhom.length})` };
+    }
   }
   return { tick, boTick, boQua };
 }
