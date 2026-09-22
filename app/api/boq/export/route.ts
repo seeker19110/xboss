@@ -114,8 +114,11 @@ export async function GET() {
   ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 11 } };
 
   const project = await queryOne<{ name: string | null }>(
-    `SELECT name FROM projects WHERE id = ?`,
+    // Lọc thêm org_id: projectId đã qua getCurrentProjectId nhưng tên file không được lộ tên
+    // dự án org khác nếu cookie dự án bị giả (bất biến tests/org-scope-invariant).
+    `SELECT name FROM projects WHERE id = ? AND org_id = ?`,
     projectId,
+    user.orgId,
   );
   const fileTag = (project?.name ?? "XBoss").replace(/[^\wÀ-ỹ-]+/g, "-").slice(0, 60);
 
