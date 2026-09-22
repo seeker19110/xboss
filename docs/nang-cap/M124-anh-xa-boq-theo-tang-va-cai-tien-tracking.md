@@ -122,14 +122,14 @@ WHERE tw.project_id=? AND wp.floor_label IS NOT NULL AND (? IS NULL OR st.system
 - `lib/khoi-luong/boq-history.ts`: `ghiLichSuBoq(boqItemId, thayDoi:{field,oldValue,newValue}[], userId)`
   (1 INSERT nhiều VALUES; mảng rỗng ⇒ no-op) và `lichSuBoq(boqItemId, limit=100)` (join `users.name`).
 - Điểm ghi: `PATCH /api/boq/:id` — SELECT dòng cũ trước UPDATE, chỉ ghi field thật sự đổi (so chuỗi sau
-  `::text`); `commitBoqImport` (`lib/khoi-luong/boq-import.ts`) — dòng cập nhật ghi từng field đổi,
-  dòng thêm mới ghi 1 dòng `field='import'`, `new_value = code`. Cả hai trong cùng transaction với UPDATE.
+  `::text`); `commitBoqImport` (`lib/khoi-luong/boq-import.ts`) — dòng thêm mới ghi 1 dòng `field='import'`,
+  `new_value = code` (import **chỉ INSERT dòng mới**, mã trùng bị bỏ qua kèm lỗi — không có nhánh
+  cập nhật, xác nhận khi thi hành). Cả hai trong cùng transaction với UPDATE.
 - `GET /api/boq/:id/history` (auth 401, dự án 404, mọi vai trò xem được BOQ đều xem được) ⇒
   `{ rows:[{field,oldValue,newValue,changedBy,changedByName,changedAt}] }`.
 - UI: mục "Lịch sử thay đổi" cuối `BoqDetailModal` (tải khi mở, nhãn field tiếng Việt, tối đa 100 dòng).
 - AC: PATCH đổi `qtyContract` 10→12 sinh đúng 1 dòng (`old='10.000'`-tương-đương số, `new` tương đương 12);
-  PATCH gửi lại giá trị cũ ⇒ 0 dòng (idempotent); import commit cập nhật 1 dòng đổi `unit_price` ⇒ 1 dòng
-  lịch sử; xoá dòng BOQ ⇒ lịch sử cascade. Test: `tests/boq-history.test.ts`.
+  PATCH gửi lại giá trị cũ ⇒ 0 dòng (idempotent); import commit thêm 1 dòng mới ⇒ 1 dòng lịch sử `field='import'`; xoá dòng BOQ ⇒ lịch sử cascade. Test: `tests/boq-history.test.ts`.
 
 ### Việc 4 — Lưới tracking: lọc cấp task + URL
 
