@@ -404,11 +404,7 @@ export default function AppHeader({
             bottomActions ? "" : "md:hidden"
           }`}
         >
-          {/* `contain: inline-size`: hàng nút cuộn ngang KHÔNG được góp bề rộng max-content vào
-              trang — nếu không, Chrome mobile nới layout viewport theo bề rộng nội dung (đo được
-              477px thay vì 393px trên Pixel 5), cả trang bị thu nhỏ ~18% và toạ độ bấm lệch
-              (e2e mobile bấm nút thanh đáy trúng SVG biểu đồ phía trên). */}
-          <div className="flex items-center gap-2 px-3 sm:px-6 py-2 overflow-x-auto scrollbar-none [contain:inline-size]">
+          <div className="flex items-center gap-2 px-3 sm:px-6 py-2 overflow-x-auto scrollbar-none">
             {search && isHome && (
               <div className="flex-1 min-w-[140px] md:hidden">
                 <GlobalSearch />
