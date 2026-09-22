@@ -100,11 +100,6 @@ describe("audit 2026-09-05 — cổng quyền & cách ly dữ liệu", () => {
     }
   });
 
-  it("ca 7 — mốc 'hôm nay' của nhánh engineering theo giờ VN, không theo UTC máy chủ", () => {
-    // (engineering-mepf-predictive.ts đã bị xoá 2026-09-21 — không có route/UI nào gọi tới,
-    // xem PROGRESS.md — bớt vế kiểm daysFromTodayISO của nó.)
-    const ev = doc("app/api/engineering/subcon-ai/evaluate/route.ts");
-    assert.ok(ev.includes("todayISO().slice(0, 7)"), "kỳ đánh giá YYYY-MM phải theo giờ VN");
-    assert.ok(!/now\.getFullYear\(\)/.test(ev), "không dựng kỳ từ giờ máy chủ");
-  });
+  // (ca 7 kiểm app/api/engineering/subcon-ai/evaluate/route.ts đã bị xoá cùng route 2026-09-22
+  // — module `engineering-subcon-ai` (1/6 module `thuNghiem: true` không ai bật) — xem PROGRESS.md.)
 });

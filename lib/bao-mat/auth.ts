@@ -371,25 +371,11 @@ const CAN_DEFAULT = {
   // OS-2 Digital Twin theo cấp độ L0–L3 (docs/nang-cap/OS-2-digital-twin.md)
   viewEngineeringTwin: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   manageEngineeringTwin: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
-  // OS-3 Predictive OS (docs/nang-cap/OS-3-predictive-os.md)
-  viewEngineeringPredictions: (r?: Role) =>
-    r === "admin" || r === "pm" || r === "engineer" || r === "bch",
-  manageEngineeringPredictions: (r?: Role) => r === "admin" || r === "pm",
-  // OS-4 Controlled Autonomy (docs/nang-cap/OS-4-controlled-autonomy.md)
-  viewEngineeringAutonomy: (r?: Role) =>
-    r === "admin" || r === "pm" || r === "engineer" || r === "bch",
-  manageEngineeringAutonomy: (r?: Role) => r === "admin" || r === "pm",
-  // (PIN-2 Prescriptive Engine & Standards Compliance, và IoT telemetry & cảnh báo HSE của
-  // V3 (audit 2026-08-24, lỗ hổng Cao A4) — 6 cặp quyền view/manageEngineering{Prescriptive,
-  // Compliance,Iot} đã bỏ cùng lúc xoá các route/UI tương ứng 2026-09-21, xem PROGRESS.md.
-  // Cặp quyền BIM và God-Tier đã bỏ cùng lúc gỡ cụm CAD/BIM khỏi sản phẩm trước đó.)
-  // Quy tắc còn lại của nhóm V3: view* mở tới BCH (theo dõi), manage* loại toàn bộ
-  // VIEW_ONLY_ROLES + subcon.
-  viewEngineeringSubconAi: (r?: Role) =>
-    r === "admin" || r === "pm" || r === "engineer" || r === "bch",
-  // Ngoại lệ: chấm điểm tín nhiệm nhà thầu phụ là việc quản lý — subcon KHÔNG được tự
-  // chấm điểm mình, engineer cũng không (điểm này đi thẳng vào shortlist mời thầu).
-  manageEngineeringSubconAi: (r?: Role) => r === "admin" || r === "pm",
+  // (Cặp quyền OS-3 Predictive OS, OS-4 Controlled Autonomy, Subcon AI Scoring, PIN-2
+  // Prescriptive/Compliance/Iot và BIM/God-Tier đã bỏ cùng lúc xoá các route/UI tương ứng —
+  // đợt 2026-09-21 (Prescriptive/Compliance/Iot, BIM/God-Tier) và 2026-09-22 (Predictions/
+  // Autonomy/SubconAi, cùng module "engineering-graph"/"combine" trong lib/nen/modules.ts —
+  // 6 module `thuNghiem: true` audit xác nhận không ai bật, xem PROGRESS.md).)
 };
 
 // ===== M50 PR1 — Override quyền trong DB =====

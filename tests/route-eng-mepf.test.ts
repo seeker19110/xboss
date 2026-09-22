@@ -19,13 +19,14 @@ import { NextRequest } from "next/server";
 //   - app/api/engineering/logistics/scan-receive/route.ts       (POST quét nhận vật tư QR)
 //   - app/api/engineering/ledger/merkle/route.ts                (GET / POST sổ cái Merkle)
 //   - app/api/engineering/ledger/verify-proof/route.ts          (POST xác thực Merkle Proof)
-//   - app/api/engineering/edge-vision-tracking/route.ts          (GET / POST audit cốt thép·detection)
-//   - app/api/engineering/generative-routing/route.ts            (GET / POST giải tuyến 3D A*)
 //   - app/api/engineering/closed-loop-sync/route.ts               (GET / POST đồng bộ Spool→WBS→IPC)
+//
+// (route/lib edge-vision-tracking, generative-routing — module `engineering-nextgen-apex` — đã
+// bị xoá 2026-09-22, 1/6 module `thuNghiem: true` không ai bật, xem PROGRESS.md.)
 //
 // BUG THẬT lộ ra khi viết test này (đã sửa cùng nhánh):
 //   1) 9 hàm `list*` trong lib/ky-thuat/engineering-mepf-{hydraulic,nesting,predictive,takeoff,voice}.ts
-//      + engineering-{generative-routing,pipe-stash-hunter,edge-vision-tracking}.ts gọi
+//      + engineering-pipe-stash-hunter.ts gọi
 //      `query(sql, [projectId])` — TRUYỀN HẲN MỘT MẢNG làm 1 tham số REST thay vì spread —
 //      khiến Postgres nhận `$1` là giá trị mảng `{"<id>"}` thay vì số nguyên/bigint và luôn
 //      ném lỗi "invalid input syntax for type integer/bigint" → route GET tương ứng LUÔN 500,
@@ -67,19 +68,6 @@ async function taoUser(
     id,
   );
   return { id, passwordHash: u!.password_hash, orgId };
-}
-
-/**
- * Bật module `thuNghiem` (mặc định TẮT) cho 1 dự án — dùng cho cụm edge-vision/generative-routing.
- *
- * `actorId` BẮT BUỘC là id user CÓ THẬT: `feature_flags.updated_by` có khoá ngoại tới `users`.
- * Trước đây helper gán cứng `1` — chạy riêng thì xanh (user seed id=1 còn), chạy cả bộ thì file
- * test khác đã xoá user đó ⇒ vỡ khoá ngoại, 11 ca đỏ. Đúng lớp lỗi "giả định trạng thái toàn cục"
- * đã ghi ở Đợt 4 (PROGRESS.md, mục "Bài học hạ tầng test").
- */
-async function batModule(moduleKey: string, projectId: number, actorId: number): Promise<void> {
-  const { setFlag } = await import("@/lib/ha-tang/feature-flags");
-  await setFlag(moduleKey, projectId, true, actorId, 1);
 }
 
 const jreq = (url: string, body?: unknown, method = "POST") =>
@@ -883,128 +871,6 @@ test(
     const body = await res.json();
     assert.equal(body.isValid, true);
     assert.equal(body.leafHash, hashLeafRecord(records[0]));
-  },
-);
-
-// ============================================================================
-// GET/POST /api/engineering/edge-vision-tracking  (module `engineering-nextgen-apex` mặc định TẮT)
-// ============================================================================
-
-test("GET /api/engineering/edge-vision-tracking: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/edge-vision-tracking/route");
-  const res = await GET(jreq("/x", undefined, "GET"));
-  assert.equal(res.status, 401);
-});
-
-test("GET /api/engineering/edge-vision-tracking: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("edge403");
-  const sub = await taoUser("subcon", "edge403");
-  await dangNhapDuAn(sub, projectId);
-  const { GET } = await import("@/app/api/engineering/edge-vision-tracking/route");
-  const res = await GET(jreq("/x", undefined, "GET"));
-  assert.equal(res.status, 403);
-});
-
-test(
-  "GET /api/engineering/edge-vision-tracking: module engineering-nextgen-apex mặc định TẮT → 404",
-  S,
-  async () => {
-    const projectId = await taoDuAn("edgeoff");
-    const pm = await taoUser("pm", "edgeoff");
-    await dangNhapDuAn(pm, projectId);
-    const { GET } = await import("@/app/api/engineering/edge-vision-tracking/route");
-    const res = await GET(jreq("/x", undefined, "GET"));
-    assert.equal(res.status, 404);
-  },
-);
-
-test(
-  "POST rồi GET /api/engineering/edge-vision-tracking: audit cốt thép trước đổ bê tông & " +
-    "detection 360 (BUG THẬT: GET của cả 2 nhánh 500 trước khi sửa — xem chú thích đầu file)",
-  S,
-  async () => {
-    const projectId = await taoDuAn("edgeok");
-    const pm = await taoUser("pm", "edgeok");
-    await batModule("engineering-nextgen-apex", projectId, pm.id);
-    await dangNhapDuAn(pm, projectId);
-    const { POST, GET } = await import("@/app/api/engineering/edge-vision-tracking/route");
-
-    const auditCode = `REBAR-${uniq("code")}`;
-    const resRebar = await POST(jreq("/x", { action: "audit_rebar", auditCode }));
-    assert.equal(resRebar.status, 200);
-    assert.equal((await resRebar.json()).result.auditCode, auditCode);
-
-    const resGetRebar = await GET(jreq("/x?type=rebar", undefined, "GET"));
-    assert.equal(resGetRebar.status, 200);
-    const bodyGetRebar = await resGetRebar.json();
-    assert.ok(bodyGetRebar.rebarAudits.some((a: any) => a.audit_code === auditCode));
-
-    const detectionCode = `DET-${uniq("code")}`;
-    const resDet = await POST(jreq("/x", { action: "detect_360", detectionCode }));
-    assert.equal(resDet.status, 200);
-    assert.equal((await resDet.json()).detection.detectionCode, detectionCode);
-
-    const resGetDet = await GET(jreq("/x?type=detection", undefined, "GET"));
-    assert.equal(resGetDet.status, 200);
-    const bodyGetDet = await resGetDet.json();
-    assert.ok(bodyGetDet.detections.some((d: any) => d.detection_code === detectionCode));
-  },
-);
-
-// ============================================================================
-// GET/POST /api/engineering/generative-routing  (module `engineering-nextgen-apex` mặc định TẮT)
-// ============================================================================
-
-test("GET /api/engineering/generative-routing: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/generative-routing/route");
-  const res = await GET();
-  assert.equal(res.status, 401);
-});
-
-test("GET /api/engineering/generative-routing: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("genr403");
-  const sub = await taoUser("subcon", "genr403");
-  await dangNhapDuAn(sub, projectId);
-  const { GET } = await import("@/app/api/engineering/generative-routing/route");
-  const res = await GET();
-  assert.equal(res.status, 403);
-});
-
-test(
-  "GET /api/engineering/generative-routing: module engineering-nextgen-apex mặc định TẮT → 404",
-  S,
-  async () => {
-    const projectId = await taoDuAn("genroff");
-    const pm = await taoUser("pm", "genroff");
-    await dangNhapDuAn(pm, projectId);
-    const { GET } = await import("@/app/api/engineering/generative-routing/route");
-    const res = await GET();
-    assert.equal(res.status, 404);
-  },
-);
-
-test(
-  "POST rồi GET /api/engineering/generative-routing: giải tuyến 3D A* & tra lại lịch sử " +
-    "(BUG THẬT: GET này 500 trước khi sửa vì listGenerativeRoutingRuns truyền mảng thay vì spread)",
-  S,
-  async () => {
-    const projectId = await taoDuAn("genrok");
-    const pm = await taoUser("pm", "genrok");
-    await batModule("engineering-nextgen-apex", projectId, pm.id);
-    await dangNhapDuAn(pm, projectId);
-    const { POST, GET } = await import("@/app/api/engineering/generative-routing/route");
-    const routingCode = `ROUTE-${uniq("code")}`;
-    const res = await POST(jreq("/x", { routingCode }));
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.result.routingCode, routingCode);
-
-    const resGet = await GET();
-    assert.equal(resGet.status, 200);
-    const bodyGet = await resGet.json();
-    assert.ok(bodyGet.runs.some((r: any) => r.routing_code === routingCode));
   },
 );
 

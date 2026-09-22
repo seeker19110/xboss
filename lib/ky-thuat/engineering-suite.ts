@@ -60,5 +60,6 @@ export * from "@/lib/ky-thuat/engineering-bidding-matrix";
 // 24. Smart Materials QR Logistics & Mobile Scanner (M78)
 export * from "@/lib/ky-thuat/engineering-qr-logistics";
 
-// 25. AI FIDIC Contract Dispute & Delay Defense (M79)
-export * from "@/lib/ky-thuat/engineering-fidic-claim";
+// (25) AI FIDIC Contract Dispute & Delay Defense (M79, route /api/engineering/fidic-tia) đã bị
+// xoá 2026-09-22 cùng module `engineering-nextgen-apex` — 1/6 module `thuNghiem: true` không
+// ai bật, xem PROGRESS.md.

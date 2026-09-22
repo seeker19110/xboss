@@ -89,10 +89,7 @@ const OK_ROUTES: Route[] = [
   { path: "/engineering/mepf-lifecycle", name: "Vòng đời MEPF" },
   // 11 trang chuyển từ fixme → xanh thật sau khi sửa badge EngineeringNav (24-08-2026):
   { path: "/engineering/agent-sessions", name: "Phiên AI Agent" },
-  { path: "/engineering/autonomy", name: "Quyền tự chủ AI (autonomy)" },
   { path: "/engineering/data-quality", name: "Chất lượng dữ liệu" },
-  { path: "/engineering/graph", name: "Đồ thị tri thức (graph)" },
-  { path: "/engineering/predictions", name: "Dự đoán (predictions)" },
   { path: "/engineering/workflows", name: "Quy trình tự động (workflows)" },
 ];
 
@@ -117,12 +114,6 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
       name: "Quy trình MEPF",
       violations:
         "color-contrast x6 (đã giảm từ x8 sau khi sửa badge EngineeringNav — còn lại là badge/nút RIÊNG của trang này cùng kiểu -950/50+accent-300, không phải EngineeringNav) — vd .sm:inline, chữ #065f46 trên nền hiệu dụng #7b928d = 2.31:1 (cần 4,5:1).",
-    },
-    {
-      path: "/combine",
-      name: "Kết hợp mô hình (Combine/Clash)",
-      violations:
-        "color-contrast x7 — vd badge bg-rose-500/10 border-rose-500/20, chữ #cb4163 trên nền #fceaef = 4.05:1 (cần 4,5:1), cỡ chữ 10px in đậm. KHÔNG liên quan badge EngineeringNav (trang này không dùng EngineeringNav).",
     },
     {
       path: "/schedule",
@@ -158,22 +149,10 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
         "color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav) — bg-emerald-950/80, #065f46 trên #31554d = 1.07:1 + label x2 + select-name x1.",
     },
     {
-      path: "/engineering/nextgen-apex",
-      name: "Nextgen Apex",
-      violations:
-        "color-contrast x3 (đã giảm từ x4 sau khi sửa badge EngineeringNav) + label x2 + select-name x1.",
-    },
-    {
       path: "/engineering/pipe-stash-hunter",
       name: "Pipe Stash Hunter",
       violations:
         "color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav) + label x9 (nhiều input số thiếu <label>) + select-name x1.",
-    },
-    {
-      path: "/engineering/subcon-ai",
-      name: "Subcon AI",
-      violations:
-        "color-contrast x2 (đã giảm từ x3 sau khi sửa badge EngineeringNav) + label x3 + select-name x2.",
     },
     {
       path: "/engineering/zalo-copilot",

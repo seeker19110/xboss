@@ -1,5 +1,72 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Audit 2026-09-22 — Xoá 6 module `thuNghiem: true` không ai bật
+
+Người dùng yêu cầu audit phân loại tính năng theo mức độ cần thiết rồi xoá nhóm rủi ro cao
+nhất. Đo lại `docs/audit-2026-08-25-tinh-nang-theo-vong-doi.md` (§3.8: 12 module `thuNghiem`
+lúc đó) thấy 6 module còn tồn tại trong `lib/nen/modules.ts` vẫn tắt mặc định cho mọi dự án,
+không ai bật thủ công qua `/admin/features` từ lúc đóng băng → xoá hẳn khỏi sản phẩm thay vì
+tiếp tục treo:
+
+- **`engineering-autonomy`** (OS-4, vượt cổng roadmap) — trang `/engineering/autonomy`, route
+  `app/api/engineering/autonomy/**`, `lib/ky-thuat/engineering-autonomy.ts`.
+- **`engineering-predictions`** (OS-3, chưa có traffic thật) — trang `/engineering/predictions`,
+  route `app/api/engineering/predictions/**`, `lib/ky-thuat/engineering-predictions.ts`.
+- **`engineering-graph`** (OS-1 graph traversal, vượt cổng roadmap) — trang
+  `/engineering/graph`, route `GET /api/engineering/graph`. `lib/ky-thuat/engineering-graph.ts`
+  **giữ nguyên file**: `traverseGraph` hết route riêng nhưng vẫn được gọi nội bộ bởi
+  `analyzeObjectImpact` (route `/api/engineering/impact/[id]`, thuộc module "engineering" còn
+  sống) — chỉ xoá `GraphTraversalResult`/route, không xoá hàm.
+- **`engineering-subcon-ai`** (W1: 3 route sai tham số SQL, chưa từng chạy được) — trang
+  `/engineering/subcon-ai`, route `app/api/engineering/subcon-ai/**`,
+  `lib/ky-thuat/engineering-subcon-ai.ts`. Cặp quyền `view/manageEngineeringSubconAi` bỏ khỏi
+  `CAN` (chỉ route này dùng). `scripts/don-du-lieu-seed-bia.ts` (dọn dữ liệu bịa đã lỡ ghi vào
+  `engineering_subcon_profiles`) **giữ nguyên** — vẫn cần cho dự án đã từng mở trang cũ.
+- **`engineering-nextgen-apex`** (mô phỏng rõ rệt) — trang `/engineering/nextgen-apex`, 4 route
+  `generative-routing`/`edge-vision-tracking`/`smart-ipc`/`fidic-tia` +
+  `lib/ky-thuat/engineering-{generative-routing,edge-vision-tracking,smart-ipc,fidic-claim}.ts`.
+  Nút "Mở Phân Tích Tác Động Tiến Độ FIDIC (TIA)" trong `ClaimsTab.tsx` (`/commercial`) trỏ tới
+  trang đã xoá → bỏ cả 2 card FIDIC Sentinel tĩnh (không đọc/ghi DB), giữ bảng Claims Registry
+  thật (`/api/claims`).
+- **`combine`** (bản mô phỏng thuần JSX, không đọc/ghi DB) — trang `/combine`, mục nav
+  `dash.combine`. `app/components/ThuNghiemBanner.tsx` (chỉ trang này dùng) xoá theo, phát
+  hiện bởi `check:dead-code` sau khi xoá `/combine`.
+
+Cặp quyền `view/manageEngineeringPredictions`, `view/manageEngineeringAutonomy` cũng bỏ khỏi
+`CAN` (`lib/bao-mat/auth.ts`); `viewEngineeringGraph`/`manageEngineeringGraph` **giữ nguyên**
+(dùng chung bởi ~20 route engineering khác không liên quan tới module "engineering-graph").
+
+Sửa/xoá tương ứng: `app/lib/dashboardTree.ts`, `app/components/EngineeringNav.tsx`,
+`app/engineering/page.tsx` (đổi link Subcon AI → `/engineering/data-quality`),
+`lib/ky-thuat/engineering-suite.ts` (bỏ `export *` fidic-claim đã xoá),
+`e2e/authed/luoi-quet-axe.spec.ts` (bỏ 6 route khỏi danh sách quét a11y). 6 file test riêng
+xoá hẳn (`tests/engineering-{subcon-ai,predictions,autonomy,autonomy-kill-switch,
+nextgen-apex}.test.ts`, `tests/smart-ipc-{gate4-project-scope,gating,validate-body}.test.ts`);
+5 file test batch (`tests/route-eng-{du-bao,zero-error,quy-trinh,mepf}.test.ts`,
+`tests/engineering-graph.test.ts`) cắt bỏ đúng phần liên quan, giữ phần còn lại (cashflow/
+bidding/qs-bom-explosion/shopdrawing-lod400/pinnacle, agent-sessions/objects/workflows,
+lineage/impact/data-quality, mepf-*/logistics/ledger/closed-loop-sync).
+`tests/feature-flags.test.ts`: không còn module `thuNghiem` thật nào để test cơ chế chung
+(`isModuleEnabled`/`assertModuleEnabled`/`findModuleByRoute`) — `mock.module("@/lib/nen/
+modules", …)` với 1 module giả `module-thu-nghiem-gia` (pattern `tests/google-sheets.test.ts`).
+`tests/engineering-route-perms.test.ts` (toàn bộ về subcon-ai) rút còn bất biến chung "route
+engineering ghi dữ liệu phải có CAN.". `tests/audit-2026-09-05-guards.test.ts` bỏ ca 7
+(kiểm route subcon-ai/evaluate đã xoá), giữ ca 1/2/3/5/6.
+
+**Không đụng DB**: bảng `engineering_autonomy_*`/`engineering_predictions_*`/
+`engineering_subcon_profiles`/`engineering_object_relations` v.v. giữ nguyên trong migration
+(append-only theo quy ước, orphaned nhưng vô hại) — chỉ xoá code truy cập.
+
+Đã qua đủ `npm run lint` + `npm run typecheck` + `npm run build` + `npm test` (0 fail) +
+`check:dead-code`/`check:dead-routes`/`check:lib-layers`/`check:sw-exclude`/`check:route-perms`/
+`check:project-scope`/`check:db-params`/`check:engineering-danh-tinh`/`check:hex-hardcode`/
+`check:migrations`/`check:test-fk-ids`/`check:mau-accent`/`check:contrast` — tất cả xanh.
+
+**Còn treo lại từ audit** (không thuộc phạm vi lần này, `docs/audit-2026-08-25-tinh-nang-theo-
+vong-doi.md` §3.3): 6 cặp "stack song song" cùng nghiệp vụ (claim/EOT, đấu thầu, dòng tiền,
+HSE, BIM, rủi ro) giữa bản nghiệp vụ thật và bản `/engineering` — cần đặc tả riêng cho từng
+cặp, không tự quyết gộp/xoá.
+
 ## ✅ M124 — Ánh xạ BOQ theo tầng + cải tiến trang BOQ và lưới tracking — 2026-09-22
 
 Đặc tả `docs/nang-cap/M124-anh-xa-boq-theo-tang-va-cai-tien-tracking.md` (người dùng chốt "ánh xạ theo

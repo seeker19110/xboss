@@ -3,66 +3,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { ROLES, type Role } from "@/lib/nen/roles";
 
-// V3 (audit 2026-08-24, lỗ hổng Cao A4) — 14 route engineering ghi dữ liệu trước đây chỉ
-// kiểm đăng nhập, không kiểm quyền: giả telemetry IoT sinh cảnh báo HSE CRITICAL, thầu phụ
-// tự chấm điểm tín nhiệm của chính mình. (Hai cặp quyền BIM/God-Tier của đợt đó đã bỏ cùng
-// lúc gỡ cụm CAD/BIM khỏi sản phẩm; cặp quyền IoT — `viewEngineeringIot`/`manageEngineeringIot`
-// — đã bỏ cùng lúc xoá route/UI /engineering/iot-telemetry 2026-09-21, chỉ còn subcon-ai.)
-// Test thuần (không cần DB): (1) ma trận quyền 7 vai trò cho cặp quyền còn lại;
-// (2) mã nguồn route đại diện thật sự gọi đúng quyền; (3) bất biến "không còn route
-// engineering ghi dữ liệu nào thiếu CAN.".
-
+// V3 (audit 2026-08-24, lỗ hổng Cao A4) từng thêm bất biến này sau khi phát hiện 14 route
+// engineering ghi dữ liệu chỉ kiểm đăng nhập, không kiểm quyền (giả telemetry IoT sinh cảnh
+// báo HSE CRITICAL, thầu phụ tự chấm điểm tín nhiệm của chính mình). Các cặp quyền cụ thể
+// của đợt đó (BIM/God-Tier, IoT, SubconAi) đã bị gỡ cùng lúc xoá route/UI tương ứng — xem
+// PROGRESS.md — chỉ còn bất biến chung dưới đây, vẫn cần giữ cho mọi route engineering mới.
 const GOC = path.join(process.cwd(), "app/api/engineering");
 
-// ── (1) Ma trận quyền 7 vai trò ────────────────────────────────────────────────
-test("CAN: ma trận 7 vai trò cho cặp quyền engineering còn lại", async () => {
-  const { CAN } = await import("@/lib/bao-mat/auth");
-
-  const xem: Role[] = ["admin", "pm", "engineer", "bch"];
-  const ghiThauPhu: Role[] = ["admin", "pm"]; // ngoại lệ: engineer + subcon không được chấm
-
-  const mongDoi: Record<string, Role[]> = {
-    viewEngineeringSubconAi: xem,
-    manageEngineeringSubconAi: ghiThauPhu,
-  };
-
-  for (const [khoa, duocPhep] of Object.entries(mongDoi)) {
-    const fn = (CAN as Record<string, (r?: Role) => boolean>)[khoa];
-    assert.equal(typeof fn, "function", `thiếu quyền ${khoa} trong map CAN`);
-    for (const role of ROLES) {
-      assert.equal(fn(role), duocPhep.includes(role), `${khoa} sai với vai trò ${role}`);
-    }
-    // Chưa đăng nhập / vai trò rỗng → luôn từ chối.
-    assert.equal(fn(undefined), false, `${khoa} phải từ chối khi không có vai trò`);
-  }
-
-  // Vai trò chỉ-xem và subcon KHÔNG được ghi.
-  for (const role of ["bch", "cdt", "viewer", "subcon"] as Role[]) {
-    const fn = (CAN as Record<string, (r?: Role) => boolean>).manageEngineeringSubconAi;
-    assert.equal(fn(role), false, `manageEngineeringSubconAi không được mở cho ${role}`);
-  }
-});
-
-// ── (2) Mã nguồn route đại diện gọi đúng quyền ─────────────────────────────────
-test("route đại diện (subcon-ai) gọi đúng cặp quyền", () => {
-  const daiDien: Record<string, { view?: string; manage: string }> = {
-    "subcon-ai/evaluate/route.ts": { manage: "manageEngineeringSubconAi" },
-  };
-
-  for (const [tuongDoi, quyen] of Object.entries(daiDien)) {
-    const src = fs.readFileSync(path.join(GOC, tuongDoi), "utf8");
-    assert.ok(src.includes(`CAN.${quyen.manage}(user.role)`), `${tuongDoi} thiếu ${quyen.manage}`);
-    if (quyen.view) {
-      assert.ok(src.includes(`CAN.${quyen.view}(user.role)`), `${tuongDoi} thiếu ${quyen.view}`);
-    }
-    assert.ok(src.includes("status: 403"), `${tuongDoi} phải trả 403 khi thiếu quyền`);
-    assert.ok(src.includes("status: 401"), `${tuongDoi} phải trả 401 khi chưa đăng nhập`);
-  }
-});
-
-// ── (3) Bất biến: mọi route engineering ghi dữ liệu đều có kiểm quyền ──────────
 test("không còn route engineering POST/PATCH/DELETE nào thiếu CAN.", () => {
   const thieu: string[] = [];
   const duyet = (thuMuc: string) => {
@@ -79,15 +27,4 @@ test("không còn route engineering POST/PATCH/DELETE nào thiếu CAN.", () => 
   };
   duyet(GOC);
   assert.deepEqual(thieu, [], `route ghi dữ liệu thiếu kiểm quyền:\n${thieu.join("\n")}`);
-});
-
-// ── (4) subcon-ai/evaluate không còn nhận chỉ số từ body ──────────────────────
-test("subcon-ai/evaluate: không nhận chỉ số tự khai từ body, không có mặc định đẹp", () => {
-  const src = fs.readFileSync(path.join(GOC, "subcon-ai/evaluate/route.ts"), "utf8");
-  // Chỉ được lấy đúng profileId từ body; mọi chỉ số khác phải tính từ hệ thống.
-  assert.ok(src.includes("const { profileId } = body;"), "body chỉ được cung cấp profileId");
-  for (const xau of ["onTimeRate", "ncrCount", "hseScore", "?? 90", "?? 95"]) {
-    assert.ok(!src.includes(xau), `route vẫn còn tham chiếu chỉ số tự khai: ${xau}`);
-  }
-  assert.ok(src.includes("tinhChiSoThauPhu"), "route phải tính chỉ số từ dữ liệu hệ thống");
 });
