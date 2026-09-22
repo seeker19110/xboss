@@ -10,7 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import EditableText from "@/app/components/EditableText";
-import { Card, Section } from "@/app/components/ui";
+import { Card, Chip, Section } from "@/app/components/ui";
 
 // Cột phải trang chủ (M125): điều hướng + phân tích phụ, gom lại để cột chính chỉ còn
 // tiến độ → đường găng → bảng trễ. Không có số liệu nào tự tính ở đây — Pareto nhận
@@ -134,61 +134,6 @@ export default function HomeRail({
 
   return (
     <div className="space-y-6">
-      <Section
-        title="Trung tâm điều hành"
-        description="7 phân hệ hợp nhất — bấm để mở đúng cockpit"
-      >
-        <Card pad="sm" className="space-y-0.5">
-          {HUBS.map((hub) => {
-            const HubIcon = hub.icon;
-            return (
-              <a
-                key={hub.href}
-                href={hub.href}
-                className="group flex items-center gap-2.5 min-h-11 px-2 rounded-lg hover:bg-zinc-800/60 transition interactive-press"
-              >
-                <span
-                  className={`flex items-center justify-center w-8 h-8 shrink-0 rounded-lg ${hub.tint}`}
-                >
-                  <HubIcon className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-semibold text-zinc-100 truncate">
-                    {hub.title}
-                  </span>
-                  <span className="block text-[11px] text-zinc-400 truncate">{hub.desc}</span>
-                </span>
-                <ArrowUpRight
-                  className="w-3.5 h-3.5 shrink-0 text-zinc-600 group-hover:text-emerald-400 transition-colors"
-                  aria-hidden="true"
-                />
-              </a>
-            );
-          })}
-
-          {/* Dải 6 giai đoạn vòng đời — thuần điều hướng theo quy trình, thu gọn thành
-              lưới 2 cột cho vừa bề ngang cột phải. */}
-          <ol className="grid grid-cols-2 gap-1 pt-2 mt-1 border-t border-zinc-800">
-            {LIFECYCLE.map((stg) => (
-              <li key={stg.stage}>
-                <a
-                  href={stg.href}
-                  title={stg.desc}
-                  className="block rounded-lg border border-zinc-800 bg-zinc-950/70 px-2 py-1.5 hover:border-zinc-700 hover:bg-zinc-900/80 transition interactive-press"
-                >
-                  <span className="block text-[10px] font-mono font-bold uppercase text-zinc-400">
-                    {stg.stage}
-                  </span>
-                  <span className="block text-[11px] font-semibold text-zinc-200 truncate">
-                    {stg.title}
-                  </span>
-                </a>
-              </li>
-            ))}
-          </ol>
-        </Card>
-      </Section>
-
       {showPareto && (
         <Section
           icon={AlertTriangle}
@@ -226,6 +171,52 @@ export default function HomeRail({
           </Card>
         </Section>
       )}
+
+      <Section
+        title="Trung tâm điều hành"
+        description="7 phân hệ hợp nhất — bấm để mở đúng cockpit"
+      >
+        <Card pad="sm" className="space-y-0.5">
+          {HUBS.map((hub) => {
+            const HubIcon = hub.icon;
+            return (
+              <a
+                key={hub.href}
+                href={hub.href}
+                className="group flex items-center gap-2.5 min-h-11 px-2 rounded-lg hover:bg-zinc-800/60 transition interactive-press"
+              >
+                <span
+                  className={`flex items-center justify-center w-8 h-8 shrink-0 rounded-lg ${hub.tint}`}
+                >
+                  <HubIcon className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-semibold text-zinc-100 truncate">
+                    {hub.title}
+                  </span>
+                  <span className="block text-[11px] text-zinc-400 truncate">{hub.desc}</span>
+                </span>
+                <ArrowUpRight
+                  className="w-3.5 h-3.5 shrink-0 text-zinc-600 group-hover:text-emerald-400 transition-colors"
+                  aria-hidden="true"
+                />
+              </a>
+            );
+          })}
+        </Card>
+      </Section>
+
+      <Section title="Vòng đời" description="6 giai đoạn quy trình dự án">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1">
+          {LIFECYCLE.map((stg) => (
+            <a key={stg.stage} href={stg.href} title={stg.desc} className="shrink-0">
+              <Chip className="whitespace-nowrap">
+                <span className="font-mono font-bold">{stg.stage}</span> {stg.title}
+              </Chip>
+            </a>
+          ))}
+        </div>
+      </Section>
     </div>
   );
 }

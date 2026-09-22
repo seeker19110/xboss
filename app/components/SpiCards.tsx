@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Gauge } from "lucide-react";
+import { cardClass } from "@/app/components/ui";
 
 type Spi = {
   sheetType: string;
@@ -38,7 +39,7 @@ export default function SpiCards({ system }: { system?: string }) {
   const o = tone(data.overall.spi);
 
   return (
-    <div className="bento-card p-5 mb-6">
+    <div className={cardClass({ tone: "sunken", pad: "lg" })}>
       <div className="flex items-center justify-between mb-1">
         <h2 className="font-bold text-sm text-zinc-100 flex items-center gap-2">
           <Gauge className="w-4 h-4 text-sky-400" /> Chỉ số hiệu suất tiến độ (SPI)
@@ -51,7 +52,7 @@ export default function SpiCards({ system }: { system?: string }) {
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-        <div className={`bento-card p-4 border ${o.ring} bg-zinc-950/80`}>
+        <div className={`rounded-xl border p-4 ${o.ring} bg-zinc-950/80`}>
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
               Toàn dự án
@@ -79,7 +80,7 @@ export default function SpiCards({ system }: { system?: string }) {
           return (
             <div
               key={s.sheetType}
-              className={`bento-card p-3.5 border ${t.ring} bg-zinc-950/60 flex flex-col justify-between`}
+              className={`rounded-xl border p-3.5 ${t.ring} bg-zinc-950/60 flex flex-col justify-between`}
             >
               <p className="text-xs font-bold text-zinc-300 uppercase truncate mb-1">
                 {s.sheetType}
