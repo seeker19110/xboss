@@ -93,7 +93,7 @@ tự giải quyết**, không còn là "hai lớp song song" nữa ở tầng CO
   0114, CAD/BIM Professional Upgrade 0122, NextGen Apex 0127 trừ `engineering_fidic_tia_claims`
   vẫn sống). Đã thử viết migration DROP (PR #509, 2026-09-22) nhưng làm CI `test (Postgres)` +
   `coverage` fail ổn định không rõ nguyên nhân (nghi liên quan `UPDATE
-  engineering_smart_ipc_records` của migration 0138 chạy sau khi bảng bị DROP, nhưng chưa xác
+engineering_smart_ipc_records` của migration 0138 chạy sau khi bảng bị DROP, nhưng chưa xác
   minh được cơ chế) — RÚT migration khỏi PR, xem `PROGRESS.md` mục tương ứng. Cần điều tra kỹ
   hơn trước khi mở lại.
 

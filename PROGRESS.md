@@ -25,6 +25,7 @@ vẫn sống, dùng bởi M94 TIA Claim Engine).
   migration khi chưa hiểu rõ nguyên nhân.
 
 **Tiếp theo:**
+
 1. Điều tra lại nguyên nhân CI fail khi DROP các bảng này (có thể cần môi trường có quyền tải
    log CI thô, hoặc tái hiện cục bộ với `TEST_DATABASE_URL`) trước khi mở lại việc dọn bảng.
 2. Chạy `npm run dem:engineering` trên production để đo số dòng thật của Đấu thầu và Dòng
@@ -76,7 +77,7 @@ nextgen-apex}.test.ts`, `tests/smart-ipc-{gate4-project-scope,gating,validate-bo
 5 file test batch (`tests/route-eng-{du-bao,zero-error,quy-trinh,mepf}.test.ts`,
 `tests/engineering-graph.test.ts`) cắt bỏ đúng phần liên quan, giữ phần còn lại (cashflow/
 bidding/qs-bom-explosion/shopdrawing-lod400/pinnacle, agent-sessions/objects/workflows,
-lineage/impact/data-quality, mepf-*/logistics/ledger/closed-loop-sync).
+lineage/impact/data-quality, mepf-\*/logistics/ledger/closed-loop-sync).
 `tests/feature-flags.test.ts`: không còn module `thuNghiem` thật nào để test cơ chế chung
 (`isModuleEnabled`/`assertModuleEnabled`/`findModuleByRoute`) — `mock.module("@/lib/nen/
 modules", …)` với 1 module giả `module-thu-nghiem-gia` (pattern `tests/google-sheets.test.ts`).
@@ -1062,11 +1063,11 @@ hai **kéo ra một chuỗi lỗ hổng lớn hơn nhiều dự tính\*\* — xe
 Vá nó xong thì mỗi lượt review lại lộ ra một tầng sâu hơn:
 
 1. **W0 — 19 endpoint `workpackages/**`.** Tạo nhóm việc, tạo task, đổi thứ tự, sao chép, sửa
-   lưới dimension, tải/xoá biên bản nghiệm thu và bản vẽ của **dự án khác** bằng cách đoán id.
-   Kèm phát hiện: `workpackages/[id]/route.ts`mà chính kế hoạch của phiên chính xếp là "route
-   anh em ĐÃ lọc đúng" thực ra **không lọc** — lời gọi`getCurrentProjectId`duy nhất trong file
-   chỉ phục vụ`validateCustom`cho trường tuỳ biến, không dùng phân quyền. Phiên chính khảo sát
-   bằng`grep` tên hàm nên kết luận sai; worker đọc code mới thấy. **Bài học: grep tên hàm không
+lưới dimension, tải/xoá biên bản nghiệm thu và bản vẽ của **dự án khác** bằng cách đoán id.
+Kèm phát hiện: `workpackages/[id]/route.ts`mà chính kế hoạch của phiên chính xếp là "route
+anh em ĐÃ lọc đúng" thực ra **không lọc** — lời gọi`getCurrentProjectId`duy nhất trong file
+chỉ phục vụ`validateCustom`cho trường tuỳ biến, không dùng phân quyền. Phiên chính khảo sát
+bằng`grep` tên hàm nên kết luận sai; worker đọc code mới thấy. **Bài học: grep tên hàm không
    thay được đọc code — hàm có mặt không có nghĩa nó đang được dùng để kiểm quyền.**
 2. **Review W0 → NGUYÊN NHÂN GỐC.** `lib/bao-mat/auth.ts`: `canTouchTask`, `canTouchPackage`,
    `canTouchFloor`, `canTouchVehicle`, `canViewSubcontractor` đều mở đầu
@@ -1246,10 +1247,10 @@ hiệu đó thay vì dò từng route.
    có đường API chạm tới, đã ghi sẵn ở `tests/route-quan-tri.test.ts`) nhưng **giữ lại** làm phòng
    thủ chiều sâu — invariant "org không được mất admin cuối" không nên dựa vào suy luận liên-guard.
 3. **Tầng WBS: `towers/:id`, `sheets/:id`, `work-fronts/**`, `packages/:id/dependencies`,
-   `package-dependencies/:id`** (V9) — sửa/xoá được tháp, sheet, mặt bằng thi công và quan hệ phụ
-   thuộc của **dự án khác**. `GET /api/work-fronts`còn liệt kê toàn bộ mặt bằng **mọi dự án**.
-   Suy dự án qua`towers.project_id`(trực tiếp) hoặc chuỗi`sheet_type_id → tower_id →
-project_id`; dùng `LEFT JOIN`để dòng chưa gán tower ra`projectId = null` → 404, không bị mất
+`package-dependencies/:id`** (V9) — sửa/xoá được tháp, sheet, mặt bằng thi công và quan hệ phụ
+thuộc của **dự án khác**. `GET /api/work-fronts`còn liệt kê toàn bộ mặt bằng **mọi dự án**.
+Suy dự án qua`towers.project_id`(trực tiếp) hoặc chuỗi`sheet_type_id → tower_id →
+   project_id`; dùng `LEFT JOIN`để dòng chưa gán tower ra`projectId = null` → 404, không bị mất
    khỏi kết quả.
 4. **`/api/vo-documents/:id` GET+DELETE không so dự án** (V2) — tải/xoá được file đính kèm lệnh
    thay đổi thiết kế của dự án khác, trong khi `contract-documents/:id`, `claim-documents/:id` đã
