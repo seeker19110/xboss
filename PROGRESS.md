@@ -1,5 +1,35 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Tổng kết đợt rà soát & dọn module ít giá trị/code chết — 2026-09-22 (PR #514, #515, #516)
+
+Theo yêu cầu người dùng "rà lib/ky-thuat xem cái nào có thể loại bỏ" → mở rộng dần ra toàn repo.
+3 PR liên tiếp, mỗi PR dựng lại nhánh từ `main` mới nhất (PR trước đã merge) thay vì stack:
+
+- **PR #514** — xoá 7 phân hệ Engineering OS **đầu cơ** (có UI/route thật, chạy được, nhưng giá trị
+  nghiệp vụ không đủ rõ so với chi phí bảo trì — dữ liệu demo/hardcode hoặc tính năng thử nghiệm
+  chưa wire vào luồng nghiệp vụ thật): `engineering-zalo-copilot`, `engineering-pinnacle-synergy`,
+  `engineering-zero-error-tracker`, `engineering-pipe-stash-hunter`, `engineering-qs-omnipotent`,
+  `engineering-shopdrawing-omnipotent`, `engineering-mepf-voice`. Kèm 15 route API, 3 trang UI, 8
+  file test, dọn nav/allowlist. Chi tiết quyết định biên (giữ `/engineering-intelligence` hub, giữ
+  `lib/bao-mat/webhook-inbound.ts`, để lại bảng DB mồ côi) — xem mục PR #514 gốc (đã cuộn xuống
+  dưới trong lịch sử file này) hoặc mô tả PR trên GitHub.
+- **PR #515** — xoá tiếp 6 module **code chết đúng nghĩa** (không route/lib/UI nào gọi, chỉ có test
+  tự kiểm chính nó): `engineering-pipe-spooling-qto`, `engineering-duct-diffuser-alignment`,
+  `engineering-suite` (barrel không ai import), `contracts-fidic`, `subcon-metrics`, `bao-mat/otp`.
+  Chi tiết ở mục ngay bên dưới.
+- **PR #516** — dọn 2 khoản nợ kỹ thuật phát sinh từ 2 đợt trên: `scripts/dead-routes-allowlist.json`
+  rỗng hoá (29/29 mục đã có caller thật, không còn lý do loại trừ) và `coverage-baseline.json` cập
+  nhật mốc thật (406 file, lines 92.29%, branches 84.9%, funcs 86.39% — mốc cũ đo 2026-09-05 với 596
+  file đã lệch xa sau nhiều đợt xoá module).
+
+Sau cả 3 PR: `npm run check:dead-code` 0 unreachable, `npm run check:dead-routes` 0/386 route không
+ai gọi. Đã rà thêm `app/**/*.tsx` tìm trang demo/số liệu hardcode còn sót — không phát hiện thêm.
+Bảng DB mồ côi (`zalo_*`, `engineering_apex_*`, `engineering_pipe_spool_tracking`,
+`engineering_material_mass_balance_audits`, `engineering_qs_bom_explosions`,
+`engineering_shopdrawing_lod`, `engineering_mepf_voice_logs`, `engineering_fidic_tia_claims`,
+`engineering_subcon_profiles`) **để nguyên**, chưa DROP — migration đụng dữ liệu phải qua staging,
+tách thành việc riêng khi cần (tiền lệ `0153_drop_orphaned_pinnacle_tables.sql`).
+
 ## ✅ Xoá 6 module lib code chết (không consumer thật) — 2026-09-22
 
 Đợt dọn tiếp ngay sau đợt xoá 7 phân hệ Engineering OS bên dưới, nhưng **khác bản chất**: 7 module
