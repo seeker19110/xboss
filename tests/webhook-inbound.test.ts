@@ -4,9 +4,6 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { hashOtp, kiemOtp, sinhOtp, OTP_DO_DAI, OTP_HAN_PHUT } from "@/lib/bao-mat/otp";
 import { xacThucWebhookTelegram, xacThucWebhookZalo } from "@/lib/bao-mat/webhook-inbound";
-import { POST as postZaloWebhook } from "@/app/api/zalo/webhook/route";
-
-const HAS_DB = Boolean(process.env.TEST_DATABASE_URL);
 
 const BI_MAT_TG = "secret-telegram-cuc-ky-dai-va-ngau-nhien";
 const BI_MAT_ZALO = "secret-zalo-oa-cuc-ky-dai-va-ngau-nhien";
@@ -141,68 +138,3 @@ test("V1/Webhook: Zalo — thiếu ZALO_OA_SECRET thì throw fail-fast", async (
     );
   });
 });
-
-// ===== Route: chặn 401 TRƯỚC khi chạm DB =====
-// Không cần Postgres: tests/setup.ts đã xoá DATABASE_URL, nên nếu route lỡ chạm DB thì lời gọi
-// sẽ throw thay vì trả 401 — chính điều đó chứng minh "không ghi bất kỳ dòng DB nào".
-
-test("V1/Route: POST /api/zalo/webhook sai chữ ký → 401; body.projectId bị bỏ qua", async () => {
-  // projectId 999 do "kẻ tấn công" đưa vào — trước bản vá nó đi thẳng vào withProjectScope.
-  const body = JSON.stringify({
-    projectId: 999,
-    sender: { id: "ZID_TAN_CONG" },
-    message: { text: "tầng 5 xong 20 m2" },
-  });
-  await voiEnv({ ZALO_OA_SECRET: BI_MAT_ZALO }, async () => {
-    for (const headers of [
-      {} as Record<string, string>,
-      { "X-ZEvent-Signature": kyZalo(body, "khoa-gia") },
-    ]) {
-      const res = await postZaloWebhook(
-        new Request("http://x/api/zalo/webhook", { method: "POST", body, headers }) as never,
-      );
-      assert.equal(res.status, 401);
-    }
-  });
-
-  // Bất biến tĩnh: route Zalo không được đọc projectId từ body dưới bất kỳ hình thức nào.
-  const { readFileSync } = await import("node:fs");
-  const nguon = readFileSync(new URL("../app/api/zalo/webhook/route.ts", import.meta.url), "utf8");
-  assert.ok(
-    !/body\.projectId/.test(nguon),
-    "route Zalo không được lấy projectId từ body — phải suy từ binding đã xác thực",
-  );
-});
-
-test(
-  "V1/Route: Zalo có chữ ký hợp lệ nhưng chưa liên kết → 403, không ghi log",
-  { skip: !HAS_DB },
-  async () => {
-    const { query, withProjectScope } = await import("@/lib/db");
-    const zaloUserId = `ZID_CHUA_LIEN_KET_${Date.now()}`;
-    const body = JSON.stringify({
-      projectId: 999,
-      sender: { id: zaloUserId },
-      message: { text: "tầng 5 xong 20 m2" },
-    });
-    await voiEnv({ ZALO_OA_SECRET: BI_MAT_ZALO }, async () => {
-      const res = await postZaloWebhook(
-        new Request("http://x/api/zalo/webhook", {
-          method: "POST",
-          body,
-          headers: { "X-ZEvent-Signature": kyZalo(body) },
-        }) as never,
-      );
-      assert.equal(res.status, 403);
-    });
-
-    // Đọc trong ngữ cảnh RLS '*' để đếm được mọi dự án (nếu route lỡ ghi vào dự án 999).
-    const logs = await withProjectScope("*", async () =>
-      query<{ n: number }>(
-        `SELECT COUNT(*)::int AS n FROM zalo_site_message_logs WHERE zalo_user_id = ?`,
-        zaloUserId,
-      ),
-    );
-    assert.equal(logs[0].n, 0, "chưa liên kết thì tuyệt đối không được ghi log tin nhắn");
-  },
-);

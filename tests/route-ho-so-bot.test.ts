@@ -23,8 +23,8 @@ import { NextRequest } from "next/server";
 //   - app/api/tech-links/[id]/route.ts                      (GET/PATCH/DELETE 1 link)
 //   - app/api/tech/health-check/route.ts                    (GET kiểm tra hệ thống)
 //   - app/api/tech/system-status/route.ts                   (GET trạng thái hệ thống)
-//   - app/api/zalo/link-otp/route.ts                        (POST sinh/xác thực OTP)
-//   - app/api/zalo/simulate-action/route.ts                 (POST mô phỏng bot)
+// (app/api/zalo/link-otp + simulate-action đã bị xoá 2026-09-22 cùng module Zalo Field
+// Copilot — xem PROGRESS.md.)
 //   - app/api/saved-reports/[id]/data/route.ts              (GET chạy báo cáo đã lưu)
 //   - app/api/schedule-control/route.ts                     (GET đường găng/chậm tiến độ)
 //   - app/api/dashboard/evm/route.ts                        (GET EVM)
@@ -1558,147 +1558,6 @@ test("GET /api/tech/system-status: Admin xem thành công → 200", S, async () 
   const res = await GET();
   assert.equal(res.status, 200);
 });
-
-// ============================================================================
-// POST /api/zalo/link-otp, /api/zalo/simulate-action
-// ============================================================================
-
-test("POST /api/zalo/link-otp: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { POST } = await import("@/app/api/zalo/link-otp/route");
-  const res = await POST(jreq("/x", { action: "generate" }));
-  assert.equal(res.status, 401);
-});
-
-test("POST /api/zalo/link-otp: dự án không được phép → 403", S, async () => {
-  const projectA = await taoDuAn("zlotpA");
-  const projectB = await taoDuAn("zlotpB");
-  const eng = await taoUser("engineer", "zlotp");
-  await dangNhapDuAn(eng, projectA);
-  const { POST } = await import("@/app/api/zalo/link-otp/route");
-  const res = await POST(jreq("/x", { action: "generate", projectId: projectB }));
-  assert.equal(res.status, 403);
-});
-
-test("POST /api/zalo/link-otp: hành động không hợp lệ → 400", S, async () => {
-  const projectId = await taoDuAn("zlbadaction");
-  const eng = await taoUser("engineer", "zlbadaction");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/zalo/link-otp/route");
-  const res = await POST(jreq("/x", { action: "khong_hop_le" }));
-  assert.equal(res.status, 400);
-});
-
-test("POST /api/zalo/link-otp: verify thiếu zaloUserId/otpCode → 422", S, async () => {
-  const projectId = await taoDuAn("zlverifymissing");
-  const eng = await taoUser("engineer", "zlverifymissing");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/zalo/link-otp/route");
-  const res = await POST(jreq("/x", { action: "verify" }));
-  assert.equal(res.status, 422);
-});
-
-test("POST /api/zalo/link-otp: verify sai mã → 400", S, async () => {
-  const projectId = await taoDuAn("zlverifywrong");
-  const eng = await taoUser("engineer", "zlverifywrong");
-  await dangNhapDuAn(eng, projectId);
-  const zaloUserId = `ZID_${uniq("zlverifywrong")}`;
-  const { POST } = await import("@/app/api/zalo/link-otp/route");
-  await POST(jreq("/x", { action: "generate", zaloUserId }));
-  const res = await POST(jreq("/x", { action: "verify", zaloUserId, otpCode: "000000" }));
-  assert.equal(res.status, 400);
-});
-
-test(
-  "POST /api/zalo/link-otp: generate rồi verify đúng mã → 200 liên kết thành công",
-  S,
-  async () => {
-    const { queryOne } = await import("@/lib/db");
-    const projectId = await taoDuAn("zlok");
-    const eng = await taoUser("engineer", "zlok");
-    await dangNhapDuAn(eng, projectId);
-    const zaloUserId = `ZID_${uniq("zlok")}`;
-    const { POST } = await import("@/app/api/zalo/link-otp/route");
-    const genRes = await POST(jreq("/x", { action: "generate", zaloUserId }));
-    assert.equal(genRes.status, 200);
-    const { data } = await genRes.json();
-
-    const verifyRes = await POST(
-      jreq("/x", { action: "verify", zaloUserId, otpCode: data.otpCode }),
-    );
-    assert.equal(verifyRes.status, 200);
-    const row = await queryOne<{ is_verified: boolean }>(
-      `SELECT is_verified FROM zalo_user_bindings WHERE zalo_user_id = ?`,
-      zaloUserId,
-    );
-    assert.equal(row?.is_verified, true);
-  },
-);
-
-test("POST /api/zalo/link-otp: zaloUserId đã liên kết tài khoản khác → 409", S, async () => {
-  const projectId = await taoDuAn("zldup");
-  const eng1 = await taoUser("engineer", "zldup1");
-  const eng2 = await taoUser("engineer", "zldup2");
-  const zaloUserId = `ZID_${uniq("zldup")}`;
-  const { POST } = await import("@/app/api/zalo/link-otp/route");
-
-  await dangNhapDuAn(eng1, projectId);
-  const gen1 = await POST(jreq("/x", { action: "generate", zaloUserId }));
-  const { data: data1 } = await gen1.json();
-  await POST(jreq("/x", { action: "verify", zaloUserId, otpCode: data1.otpCode }));
-
-  await dangNhapDuAn(eng2, projectId);
-  const res = await POST(jreq("/x", { action: "generate", zaloUserId }));
-  assert.equal(res.status, 409);
-});
-
-test("POST /api/zalo/simulate-action: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { POST } = await import("@/app/api/zalo/simulate-action/route");
-  const res = await POST(jreq("/x", { text: "xin chao" }));
-  assert.equal(res.status, 401);
-});
-
-test("POST /api/zalo/simulate-action: dự án không được phép → 403", S, async () => {
-  const projectA = await taoDuAn("zlsimA");
-  const projectB = await taoDuAn("zlsimB");
-  const eng = await taoUser("engineer", "zlsim");
-  await dangNhapDuAn(eng, projectA);
-  const { POST } = await import("@/app/api/zalo/simulate-action/route");
-  const res = await POST(jreq("/x", { text: "xin chao", projectId: projectB }));
-  assert.equal(res.status, 403);
-});
-
-test("POST /api/zalo/simulate-action: nội dung rỗng → 400", S, async () => {
-  const projectId = await taoDuAn("zlsimempty");
-  const eng = await taoUser("engineer", "zlsimempty");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/zalo/simulate-action/route");
-  const res = await POST(jreq("/x", { text: "   " }));
-  assert.equal(res.status, 400);
-});
-
-test(
-  "POST /api/zalo/simulate-action: gửi lệnh giả lập thành công → 200, tự tạo binding xác thực",
-  S,
-  async () => {
-    const { queryOne } = await import("@/lib/db");
-    const projectId = await taoDuAn("zlsimok");
-    const eng = await taoUser("engineer", "zlsimok");
-    await dangNhapDuAn(eng, projectId);
-    const { POST } = await import("@/app/api/zalo/simulate-action/route");
-    const res = await POST(jreq("/x", { text: "xin chao" }));
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.success, true);
-    const row = await queryOne<{ is_verified: boolean }>(
-      `SELECT is_verified FROM zalo_user_bindings WHERE project_id = ? AND user_id = ?`,
-      projectId,
-      eng.id,
-    );
-    assert.equal(row?.is_verified, true);
-  },
-);
 
 // ============================================================================
 // GET /api/saved-reports/:id/data

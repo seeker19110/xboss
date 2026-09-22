@@ -1,5 +1,67 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Xoá 7 phân hệ Engineering OS đầu cơ — 2026-09-22
+
+Theo yêu cầu người dùng: xoá HẲN (không archive) 7 module trong `lib/ky-thuat/` — giá trị nghiệp
+vụ không đủ rõ so với độ phức tạp/chi phí bảo trì, và ngoài vài màn hình demo thì **không có luồng
+nghiệp vụ thật nào dùng tới**:
+
+1. `engineering-zalo-copilot.ts` — Zalo Field Copilot Gateway (M86).
+2. `engineering-pinnacle-synergy.ts` — "Apex Synergy Pulse" 5 trục của `/engineering`.
+3. `engineering-zero-error-tracker.ts` — Zero-Error & chống gian lận hiện trường.
+4. `engineering-pipe-stash-hunter.ts` — mass-balance ống & săn ống tồn (M95).
+5. `engineering-qs-omnipotent.ts` — 5D QS BOM explosion & FIDIC claim (M69).
+6. `engineering-shopdrawing-omnipotent.ts` — Shopdrawing LOD 400 & sleeve matrix (M69).
+7. `engineering-mepf-voice.ts` — AI Voice field logger (M68).
+
+Xoá kèm **15 route** (`/api/zalo/{webhook,link-otp,simulate-action}`,
+`/api/engineering/{pinnacle/pulse, zero-error/** (5), pipe-mass-balance, pipe-spool-tracking,
+qs-bom-explosion, shopdrawing-lod400, mepf-voice}`), **3 trang** (`/engineering/zalo-copilot`,
+`/engineering/zero-error`, `/engineering/pipe-stash-hunter`) và 8 file test chỉ phục vụ riêng
+chúng. Barrel `lib/ky-thuat/engineering-suite.ts` gỡ 3 dòng `export *` (mepf-voice,
+shopdrawing-omnipotent, qs-omnipotent), thay bằng ghi chú lịch sử đúng format các mục đã xoá
+trước đó.
+
+UI gỡ **một phần** (giữ nguyên phần còn lại của trang):
+
+- `app/engineering/page.tsx` — bỏ nguyên "Master Pulse Banner" (chỉ số Apex Index, 5 thẻ radar,
+  4 nút Cross-System Command Dispatcher): toàn bộ dữ liệu đến từ `/api/engineering/pinnacle/pulse`
+  và khi thiếu dữ liệu thì rơi về **số cắm cứng** (96.8%, 6.5 tháng runway…) — đúng lớp "số liệu
+  bịa" mà audit 2026-08-25 §3.2 đã bắt, nên xoá hẳn thay vì giữ vỏ rỗng. Bỏ cả bento card "AI
+  Copilot & Tác tử Hiện trường" (chỉ chứa 1 link Zalo). Tab duyệt đối tượng ENG-1 giữ nguyên.
+- `app/engineering/mepf-lifecycle/page.tsx` — bỏ 3/10 tab (Shopdrawing LOD 400, Giải Mã Đơn Giá &
+  BOM, Tracking Giọng Nói) cùng state/handler của chúng; 7 tab còn lại đánh số lại 1–7.
+- `app/engineering-intelligence/page.tsx` — hub này trước đó **chỉ còn đúng 1 tab** là Zalo
+  Copilot, xoá tab đi thì `HubShell` rỗng. Giữ hub (đang được `HomeRail`, `EngineeringNav`,
+  `/mepf-process` và e2e trỏ tới) và thay bằng tab "Đối Tượng & Tác Tử" dẫn sang 2 phân hệ **còn
+  sống thật** đúng với 2 số liệu hub vẫn fetch (`/engineering`, `/engineering/agent-sessions`).
+- `app/site/_components/TasksDiaryTab.tsx` — bỏ thẻ "Trợ Lý Hiện Trường NLP Copilot".
+- `EngineeringNav.tsx` (3 mục nav), `GlobalSearch.tsx` (mục `mod-zalo`).
+
+Cổng CI đi kèm: gỡ 4 mục whitelist hết lý do trong `scripts/check-route-perms.ts`, 2 mục trong
+`scripts/dead-routes-allowlist.json`, 1 mục trong `tests/org-scope-invariant.test.ts`, 3 trang
+trong `e2e/authed/luoi-quet-axe.spec.ts`. Test của route/lib **khác** nằm chung file thì chỉ xoá
+đúng block liên quan, không xoá cả file (`route-eng-mepf`, `route-eng-du-bao`, `route-ho-so-bot`,
+`webhook-inbound`, `engineering-suite`); riêng `tests/route-eng-zero-error.test.ts` **giữ lại** vì
+còn phủ `data-quality`/`esign`/`lineage`/`impact` — chỉ cắt 5 cụm `zero-error/**` (tên file cũ giữ
+nguyên để đối chiếu được với lịch sử PROGRESS.md).
+
+**Không đụng schema**: các bảng nay mồ côi vẫn còn nguyên (migration là append-only) —
+`zalo_user_bindings`, `zalo_site_message_logs`, `zalo_field_action_dispatches`,
+`engineering_apex_system_pulses`, `engineering_apex_command_actions`,
+`engineering_pipe_spool_tracking`, `engineering_material_mass_balance_audits`,
+`engineering_qs_bom_explosions`, `engineering_shopdrawing_lod`, `engineering_mepf_voice_logs`
+(riêng `engineering-zero-error-tracker.ts` là lib thuần, không chạm DB nên không để lại bảng
+nào). Việc DROP bảng mồ côi là migration **đụng dữ liệu** phải qua
+staging — tách ra việc riêng như tiền lệ `migrations/0153_drop_orphaned_pinnacle_tables.sql`. Vì
+bảng còn, entry `zalo_site_message_logs` trong `lib/ha-tang/retention.ts` và ca RLS của 3 bảng
+`zalo_*` trong `tests/rls.test.ts` **giữ nguyên**. `lib/bao-mat/webhook-inbound.ts` cũng giữ
+(cùng tiền lệ giữ lại sau khi xoá webhook Telegram 2026-09-21) — chỉ còn test thuần cho hàm ký.
+
+Đã chạy xanh: `lint`, `typecheck`, `format:check`, `build`, `npm test` (228 file, 3703 ca pass, 0
+fail — Postgres 16 ephemeral), `check:dead-code` (0 unreachable), `check:dead-routes`,
+`check:route-perms`, `check:lib-layers`, `check:project-scope`, `check:engineering-danh-tinh`.
+
 ## ✅ Nâng cấp dependency npm — 2026-09-22
 
 Cập nhật minor/patch trong range hiện có (`npm update`, ~25 gói: next 16.3.5, react/react-dom

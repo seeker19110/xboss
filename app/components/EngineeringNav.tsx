@@ -14,7 +14,6 @@ import {
   Layers,
   Route,
   QrCode,
-  Scale,
   Search,
   Sparkles,
   Coins,
@@ -108,13 +107,6 @@ const NAV_ITEMS: NavItem[] = [
 
   // ── MEPF & Không gian ──
   {
-    href: "/engineering/pipe-stash-hunter",
-    label: "Tối ưu ống tồn kho",
-    category: "spatial",
-    icon: Scale,
-    roles: ["admin", "pm", "engineer", "subcon"],
-  },
-  {
     href: "/engineering/mepf-lifecycle",
     label: "Vòng đời thiết bị MEPF",
     category: "spatial",
@@ -123,14 +115,6 @@ const NAV_ITEMS: NavItem[] = [
   },
 
   // ── AI & Copilots ──
-  {
-    href: "/engineering/zalo-copilot",
-    label: "Zalo Trợ lý Hiện trường",
-    category: "copilot",
-    icon: Bot,
-    badge: "Zalo OTP",
-    roles: ["admin", "pm", "engineer", "subcon", "bch"],
-  },
   {
     href: "/engineering/agent-sessions",
     label: "Phiên hòa giải Đa tác tử",
@@ -193,13 +177,6 @@ const NAV_ITEMS: NavItem[] = [
     label: "Quy trình Phê duyệt Gate 0",
     category: "governance",
     icon: GitBranch,
-    roles: ["admin", "pm", "engineer", "bch"],
-  },
-  {
-    href: "/engineering/zero-error",
-    label: "Kiểm soát & Chống gian lận",
-    category: "governance",
-    icon: ShieldCheck,
     roles: ["admin", "pm", "engineer", "bch"],
   },
   {

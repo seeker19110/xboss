@@ -12,9 +12,6 @@ import { NextRequest } from "next/server";
 //   - app/api/engineering/mepf-nesting/route.ts               (GET lịch sử / POST tối ưu cắt phôi)
 //   - app/api/engineering/mepf-takeoff/route.ts                (GET lịch sử / POST bóc tách KL AI)
 //   - app/api/engineering/mepf-tc/route.ts                     (GET ma trận T&C / POST tạo·log·đánh giá)
-//   - app/api/engineering/mepf-voice/route.ts                  (GET nhật ký / POST phân tích giọng nói)
-//   - app/api/engineering/pipe-mass-balance/route.ts           (GET lịch sử / POST đối soát mass-balance)
-//   - app/api/engineering/pipe-spool-tracking/route.ts         (GET danh sách / POST cập nhật Spool)
 //   - app/api/engineering/logistics/shipments/route.ts          (GET / POST lô hàng)
 //   - app/api/engineering/logistics/scan-receive/route.ts       (POST quét nhận vật tư QR)
 //   - app/api/engineering/ledger/merkle/route.ts                (GET / POST sổ cái Merkle)
@@ -23,6 +20,9 @@ import { NextRequest } from "next/server";
 //
 // (route/lib edge-vision-tracking, generative-routing — module `engineering-nextgen-apex` — đã
 // bị xoá 2026-09-22, 1/6 module `thuNghiem: true` không ai bật, xem PROGRESS.md.)
+//
+// (route mepf-voice, pipe-mass-balance, pipe-spool-tracking cùng lib nguồn của chúng đã bị xoá
+// 2026-09-22 trong đợt dọn 7 module Engineering OS đầu cơ, xem PROGRESS.md.)
 //
 // BUG THẬT lộ ra khi viết test này (đã sửa cùng nhánh):
 //   1) 9 hàm `list*` trong lib/ky-thuat/engineering-mepf-{hydraulic,nesting,predictive,takeoff,voice}.ts
@@ -333,187 +333,6 @@ test(
 
     const resInterlock = await POST(jreq("/x", { action: "evaluate_interlock", scenarios: [] }));
     assert.equal(resInterlock.status, 200);
-  },
-);
-
-// ============================================================================
-// GET/POST /api/engineering/mepf-voice
-// ============================================================================
-
-test("GET /api/engineering/mepf-voice: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/mepf-voice/route");
-  const res = await GET();
-  assert.equal(res.status, 401);
-});
-
-test("POST /api/engineering/mepf-voice: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("voice403");
-  const sub = await taoUser("subcon", "voice403");
-  await dangNhapDuAn(sub, projectId);
-  const { POST } = await import("@/app/api/engineering/mepf-voice/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
-
-test("POST /api/engineering/mepf-voice: action không hợp lệ → 400", S, async () => {
-  const projectId = await taoDuAn("voicebad");
-  const eng = await taoUser("engineer", "voicebad");
-  await dangNhapDuAn(eng, projectId);
-  const { POST } = await import("@/app/api/engineering/mepf-voice/route");
-  const res = await POST(jreq("/x", { action: "khong_ton_tai" }));
-  assert.equal(res.status, 400);
-});
-
-test(
-  "POST rồi GET /api/engineering/mepf-voice: parse_voice lưu nhật ký & tra lại danh sách; " +
-    "action=productivity tính năng suất — không gọi mạng thật (hàm phân tích văn bản thuần)",
-  S,
-  async () => {
-    const projectId = await taoDuAn("voiceok");
-    const eng = await taoUser("engineer", "voiceok");
-    await dangNhapDuAn(eng, projectId);
-    const { POST, GET } = await import("@/app/api/engineering/mepf-voice/route");
-
-    const resParse = await POST(
-      jreq("/x", { action: "parse_voice", text: "Đã lắp xong 50 mét ống DN100 tại tầng 5" }),
-    );
-    assert.equal(resParse.status, 200);
-    const bodyParse = await resParse.json();
-    assert.equal(bodyParse.success, true);
-    assert.ok(bodyParse.logId);
-
-    const resGet = await GET();
-    assert.equal(resGet.status, 200);
-    const bodyGet = await resGet.json();
-    assert.equal(bodyGet.logs.length, 1);
-
-    const resProd = await POST(
-      jreq("/x", {
-        action: "productivity",
-        actualQty: 50,
-        headcount: 4,
-        workingHours: 8,
-        normRate: 2.5,
-      }),
-    );
-    assert.equal(resProd.status, 200);
-    assert.equal((await resProd.json()).success, true);
-  },
-);
-
-// ============================================================================
-// GET/POST /api/engineering/pipe-mass-balance
-// ============================================================================
-
-test("GET /api/engineering/pipe-mass-balance: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/pipe-mass-balance/route");
-  const res = await GET();
-  assert.equal(res.status, 401);
-});
-
-test("POST /api/engineering/pipe-mass-balance: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("mba403");
-  const sub = await taoUser("subcon", "mba403");
-  await dangNhapDuAn(sub, projectId);
-  const { POST } = await import("@/app/api/engineering/pipe-mass-balance/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
-
-test(
-  "POST /api/engineering/pipe-mass-balance: check_phantom_breaker & calc_jit_reorder là " +
-    "tính toán thuần, không ghi DB",
-  S,
-  async () => {
-    const projectId = await taoDuAn("mbapure");
-    const pm = await taoUser("pm", "mbapure");
-    await dangNhapDuAn(pm, projectId);
-    const { POST } = await import("@/app/api/engineering/pipe-mass-balance/route");
-
-    const resPhantom = await POST(
-      jreq("/x", {
-        action: "check_phantom_breaker",
-        claimedInstallM: 100,
-        totalStockIssuedToSubconM: 60,
-      }),
-    );
-    assert.equal(resPhantom.status, 200);
-    assert.equal((await resPhantom.json()).success, true);
-
-    const resJit = await POST(
-      jreq("/x", { action: "calc_jit_reorder", installRateMPerDay: 20, supplierLeadDays: 10 }),
-    );
-    assert.equal(resJit.status, 200);
-    assert.equal((await resJit.json()).success, true);
-  },
-);
-
-test(
-  "POST rồi GET /api/engineering/pipe-mass-balance: đối soát mass-balance 5 chiều & tra lại lịch sử " +
-    "(BUG THẬT: GET này 500 trước khi sửa vì listMassBalanceAudits truyền mảng thay vì spread)",
-  S,
-  async () => {
-    const projectId = await taoDuAn("mbaok");
-    const pm = await taoUser("pm", "mbaok");
-    await dangNhapDuAn(pm, projectId);
-    const { POST, GET } = await import("@/app/api/engineering/pipe-mass-balance/route");
-    const auditCode = `MBA-${uniq("code")}`;
-    const res = await POST(jreq("/x", { auditCode }));
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.result.auditCode, auditCode);
-
-    const resGet = await GET();
-    assert.equal(resGet.status, 200);
-    const bodyGet = await resGet.json();
-    assert.ok(bodyGet.audits.some((a: any) => a.audit_code === auditCode));
-  },
-);
-
-// ============================================================================
-// GET/POST /api/engineering/pipe-spool-tracking
-// ============================================================================
-
-test("GET /api/engineering/pipe-spool-tracking: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/pipe-spool-tracking/route");
-  const res = await GET(jreq("/x", undefined, "GET"));
-  assert.equal(res.status, 401);
-});
-
-test("POST /api/engineering/pipe-spool-tracking: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("spool403");
-  const sub = await taoUser("subcon", "spool403");
-  await dangNhapDuAn(sub, projectId);
-  const { POST } = await import("@/app/api/engineering/pipe-spool-tracking/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
-
-test(
-  "POST rồi GET /api/engineering/pipe-spool-tracking: cập nhật trạng thái Spool & lọc theo status",
-  S,
-  async () => {
-    const projectId = await taoDuAn("spoolok");
-    const pm = await taoUser("pm", "spoolok");
-    await dangNhapDuAn(pm, projectId);
-    const { POST, GET } = await import("@/app/api/engineering/pipe-spool-tracking/route");
-    const spoolCode = `SP-${uniq("code")}`;
-    const res = await POST(jreq("/x", { spoolCode, currentStatus: "FLOOR_STAGED" }));
-    assert.equal(res.status, 200);
-    assert.ok((await res.json()).spoolId);
-
-    const resGet = await GET(jreq("/x?status=FLOOR_STAGED", undefined, "GET"));
-    assert.equal(resGet.status, 200);
-    const bodyGet = await resGet.json();
-    assert.ok(bodyGet.spools.some((s: any) => s.spool_code === spoolCode));
-
-    const resGetOther = await GET(jreq("/x?status=DELIVERED_TO_SITE", undefined, "GET"));
-    assert.equal(resGetOther.status, 200);
-    const bodyGetOther = await resGetOther.json();
-    assert.ok(!bodyGetOther.spools.some((s: any) => s.spool_code === spoolCode));
   },
 );
 
