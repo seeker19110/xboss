@@ -20,7 +20,9 @@ export async function GET(req: NextRequest) {
     );
 
   try {
-    // Lấy orgId từ user (nếu có session), hoặc từ dự án đầu tiên (nếu chỉ CRON_SECRET).
+    // orgId: có session thì dùng org người gọi. Nhánh cron (chỉ CRON_SECRET) không có user —
+    // tích hợp Google Sheet hiện là single-tenant toàn cục (1 Sheet ↔ 1 DB) nên lấy org của dự án
+    // đầu tiên; org hoá luồng đồng bộ per-org vẫn là việc giai đoạn sau (M54 GĐ2).
     let orgId = user?.orgId;
     if (!orgId) {
       const proj = await query<{ org_id: number }>(
