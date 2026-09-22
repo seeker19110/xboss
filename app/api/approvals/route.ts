@@ -22,6 +22,8 @@ export async function GET() {
     const blocked = await assertModuleEnabled("field", projectId);
     if (blocked) return blocked;
 
+    // L4 (audit 2026-09-22): lọc theo dự án hiện hành qua sheet_types → towers → projects —
+    // trước đây GET liệt kê tầng chờ/đã nghiệm thu của MỌI dự án bất kể đang chọn dự án nào.
     const groups = await query<{
       sheetTypeId: number;
       sheetType: string;
@@ -34,7 +36,8 @@ export async function GET() {
       approvedByName: string | null;
       approvedAt: string | null;
       docCount: number;
-    }>(`
+    }>(
+      `
     SELECT
       st.id AS "sheetTypeId",
       st.code AS "sheetType",
@@ -49,12 +52,15 @@ export async function GET() {
       (SELECT COUNT(*) FROM task_documents d WHERE d.floor_approval_id = fa.id)::int AS "docCount"
     FROM work_packages wp
     JOIN sheet_types st ON wp.sheet_type_id = st.id
+    JOIN towers tw ON tw.id = st.tower_id
     JOIN tasks t ON t.package_id = wp.id
     LEFT JOIN floor_approvals fa ON fa.sheet_type_id = st.id AND fa.floor_label = wp.floor_label
-    WHERE wp.floor_label IS NOT NULL AND wp.floor_label != ''
+    WHERE wp.floor_label IS NOT NULL AND wp.floor_label != '' AND tw.project_id = ?
     GROUP BY st.id, st.code, wp.floor_label, fa.id, fa.is_approved, fa.approved_by_name, fa.approved_at
     ORDER BY st.id, wp.floor_label
-  `);
+  `,
+      projectId,
+    );
 
     const pending = groups.filter((g) => !g.isApproved);
     const approved = groups.filter((g) => g.isApproved);
@@ -83,12 +89,20 @@ export async function POST(req: NextRequest) {
   if (isNaN(sheetTypeId) || !floorLabel)
     return NextResponse.json({ error: "Thiếu sheetTypeId hoặc floorLabel" }, { status: 400 });
 
-  // M46 PR3: flow chỉ dùng để CHỌN flow áp dụng (bảng floor_approvals/tasks vốn không
-  // scope theo dự án — whitelist "nhóm nghiệm thu theo sheet × tầng" trong
-  // tests/project-scope-invariant.test.ts), không dùng để lọc dữ liệu tầng.
+  // L4 (audit 2026-09-22): sheetTypeId trước đây không đối chiếu dự án đang chọn — PM gửi
+  // sheetTypeId của dự án khác vẫn nghiệm thu được cả tầng dự án đó. Sửa: bắt buộc sheet type
+  // phải thuộc đúng dự án hiện hành (qua towers.project_id), không thì 404 như tài nguyên
+  // không tồn tại (không lộ thông tin sheet đó thuộc dự án khác).
   const projectId = await getCurrentProjectId(user);
   const blocked = await assertModuleEnabled("field", projectId);
   if (blocked) return blocked;
+
+  const sheetProject = await queryOne<{ projectId: number | null }>(
+    `SELECT tw.project_id AS "projectId" FROM sheet_types st JOIN towers tw ON tw.id = st.tower_id WHERE st.id = ?`,
+    sheetTypeId,
+  );
+  if (!sheetProject || sheetProject.projectId !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy loại sheet này" }, { status: 404 });
 
   let approvalId: number;
   let taskCount: number;
