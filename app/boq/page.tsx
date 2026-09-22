@@ -1,105 +1,30 @@
 "use client";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Plus,
-  ChevronDown,
-  ChevronRight,
-  X,
-  Search,
-  Trash2,
-  AlertTriangle,
-  FileUp,
-  Download,
-  Layers,
-} from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, Search, FileUp, FileSpreadsheet } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { ErrorState } from "@/app/components/ErrorState";
 import { taiJson } from "@/app/lib/taiDuLieu";
-import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
-import { showToast } from "@/app/components/Toast";
+import { appAlert, appConfirm } from "@/app/components/dialogs";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { Button } from "@/app/components/ui";
+import { boDauThuong } from "@/lib/nen/van-ban";
+import AddBoqModal from "./_components/AddBoqModal";
+import ImportBoqModal from "./_components/ImportBoqModal";
+import BoqDetailModal from "./_components/BoqDetailModal";
 import DoPhuBoqCard from "./_components/DoPhuBoqCard";
+import {
+  fmtVND,
+  fmtQty,
+  fetchFresh,
+  NGUONG_LECH_WEIGHT,
+  VO_STATUS_LABEL,
+  type BoqItem,
+  type SystemOption,
+} from "./_components/types";
 
-type NormResourceType = "material" | "labor" | "equipment";
-const NORM_RESOURCE_TYPE_LABEL: Record<NormResourceType, string> = {
-  material: "Vật tư",
-  labor: "Nhân công",
-  equipment: "Máy",
-};
-
-type MapEntry = {
-  taskId: number;
-  taskCode: string;
-  taskName: string;
-  weight: number;
-  progressPercent: number;
-};
-type BoqItem = {
-  id: number;
-  code: string;
-  name: string;
-  unit: string;
-  systemId: number | null;
-  systemCode: string | null;
-  systemName: string | null;
-  systemColor: string | null;
-  qtyContract: number;
-  unitPrice: number;
-  qtySub: number;
-  subUnitPrice: number;
-  note: string | null;
-  sortOrder: number;
-  voId: number | null;
-  voCode: string | null;
-  voStatus: string | null;
-  qtyApproved: number | null;
-  map: MapEntry[];
-  executedQty: number;
-};
-
-const VO_STATUS_LABEL: Record<string, string> = {
-  draft: "Nháp",
-  submitted: "Đã trình",
-  approved: "Được duyệt",
-  partially_approved: "Duyệt một phần",
-  rejected: "Từ chối",
-  contract_added: "Đã vào phụ lục HĐ",
-};
-type SystemOption = { id: number; code: string; name: string };
-type TaskHit = { id: number; code: string; name: string; sheetType: string };
-// Gợi ý task theo tầng (M124 việc 1) — khớp TaskTheoTang của lib/khoi-luong/boq-map-tang.ts.
-type TaskTheoTang = {
-  id: number;
-  code: string;
-  name: string;
-  sheetName: string;
-  pkgCode: string;
-  pkgName: string;
-  progressPercent: number;
-  daMapDongKhac: boolean;
-  diemGiong: number;
-};
-/** Từ điểm này trở lên coi là "chắc chắn cùng việc" ⇒ tick sẵn hộ người dùng. */
-const NGUONG_TICK_SAN = 0.5;
-
-function fmtVND(n: number) {
-  if (!n) return "—";
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
-}
-function fmtQty(n: number) {
-  return n.toLocaleString("vi-VN", { maximumFractionDigits: 3 });
-}
-
-// sw.js áp stale-while-revalidate cho mọi GET /api/* — gọi lại đúng URL ngay sau khi
-// tự mình vừa ghi (thêm/sửa/xoá/import) có thể nhận lại bản cache cũ. Thêm nonce để
-// bỏ qua cache đúng những lần load lại này (pattern đã dùng ở app/drawings/page.tsx).
-function fetchFresh(url: string): Promise<Response> {
-  const sep = url.includes("?") ? "&" : "?";
-  return fetch(`${url}${sep}_=${Date.now()}`, { cache: "no-store" });
-}
+type LocOption = "all" | "chua-map" | "lech";
+type SapOption = "boq" | "gia-tri" | "thuc-hien";
 
 export default function BoqPage() {
   const [me, setMe] = useState<Me | null>(null);
@@ -114,6 +39,11 @@ export default function BoqPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [includeVo, setIncludeVo] = useState(true);
+
+  // Thanh công cụ tìm/lọc/sắp xếp (M124 việc 2) — đồng bộ 2 chiều với URL `?q=&loc=&sap=`.
+  const [q, setQ] = useState("");
+  const [loc, setLoc] = useState<LocOption>("all");
+  const [sap, setSap] = useState<SapOption>("boq");
 
   const canManage = me?.role === "admin" || me?.role === "pm";
 
@@ -161,6 +91,33 @@ export default function BoqPage() {
     void taiLai();
   }, [taiLai]);
 
+  // Đọc `?q=&loc=&sap=` lúc mount để link chia sẻ/quay lại trang giữ đúng bộ lọc đang xem.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const qParam = params.get("q");
+    const locParam = params.get("loc");
+    const sapParam = params.get("sap");
+    if (qParam) setQ(qParam);
+    if (locParam === "chua-map" || locParam === "lech") setLoc(locParam);
+    if (sapParam === "gia-tri" || sapParam === "thuc-hien") setSap(sapParam);
+  }, []);
+
+  // Ghi lại bộ lọc hiện tại vào URL (không reload) mỗi khi q/loc/sap đổi.
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (q.trim()) url.searchParams.set("q", q.trim());
+      else url.searchParams.delete("q");
+      if (loc !== "all") url.searchParams.set("loc", loc);
+      else url.searchParams.delete("loc");
+      if (sap !== "boq") url.searchParams.set("sap", sap);
+      else url.searchParams.delete("sap");
+      window.history.replaceState(null, "", url.toString());
+    } catch {
+      /* URL không hợp lệ — bỏ qua */
+    }
+  }, [q, loc, sap]);
+
   async function refresh() {
     const kq = await load(includeVo, true);
     if (!kq.ok) {
@@ -175,16 +132,47 @@ export default function BoqPage() {
     );
   }
 
+  // Lọc + sắp xếp client-side trên `items` đã tải (API GET không đổi, M124 việc 2).
+  const filteredSortedItems = useMemo(() => {
+    const term = boDauThuong(q);
+    let list = items;
+    if (term) {
+      list = list.filter(
+        (it) => boDauThuong(it.code).includes(term) || boDauThuong(it.name).includes(term),
+      );
+    }
+    if (loc === "chua-map") {
+      list = list.filter((it) => it.map.length === 0);
+    } else if (loc === "lech") {
+      list = list.filter((it) => {
+        const sumWeight = it.map.reduce((s, m) => s + Number(m.weight || 0), 0);
+        return Math.abs(sumWeight - 1) > NGUONG_LECH_WEIGHT;
+      });
+    }
+    const sorted = [...list];
+    if (sap === "gia-tri") {
+      sorted.sort((a, b) => b.qtyContract * b.unitPrice - a.qtyContract * a.unitPrice);
+    } else if (sap === "thuc-hien") {
+      sorted.sort((a, b) => {
+        const pa = a.qtyContract > 0 ? a.executedQty / a.qtyContract : 0;
+        const pb = b.qtyContract > 0 ? b.executedQty / b.qtyContract : 0;
+        return pb - pa;
+      });
+    }
+    // "boq" (mặc định) giữ nguyên thứ tự API đã trả (bi.sort_order, bi.id).
+    return sorted;
+  }, [items, q, loc, sap]);
+
   const groups = useMemo(() => {
     const map = new Map<string, { label: string; items: BoqItem[] }>();
-    for (const it of items) {
+    for (const it of filteredSortedItems) {
       const key = it.systemCode ?? "__none";
       const label = it.systemName ?? "Chưa gán hệ";
       if (!map.has(key)) map.set(key, { label, items: [] });
       map.get(key)!.items.push(it);
     }
     return [...map.entries()].map(([key, g]) => ({ key, ...g }));
-  }, [items]);
+  }, [filteredSortedItems]);
 
   function toggleGroup(key: string) {
     setCollapsed((prev) => {
@@ -221,25 +209,37 @@ export default function BoqPage() {
         title="BOQ"
         subtitle="Khối lượng nhận thầu · giao thầu · thực hiện"
         bottomActions={
-          canManage ? (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setImportOpen(true)}
-                aria-label="Import Excel BOQ"
-                className="flex items-center gap-2 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
-              >
-                <FileUp className="w-4 h-4" />{" "}
-                <span className="hidden sm:inline">Import Excel</span>
-              </button>
-              <button
-                onClick={() => setAddOpen(true)}
-                aria-label="Thêm dòng BOQ"
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
-              >
-                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm dòng BOQ</span>
-              </button>
-            </div>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            <a
+              href="/api/boq/export"
+              download
+              aria-label="Xuất Excel danh sách BOQ"
+              className="flex items-center gap-2 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+            >
+              <FileSpreadsheet className="w-4 h-4" />{" "}
+              <span className="hidden sm:inline">Xuất Excel</span>
+            </a>
+            {canManage && (
+              <>
+                <button
+                  onClick={() => setImportOpen(true)}
+                  aria-label="Import Excel BOQ"
+                  className="flex items-center gap-2 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                >
+                  <FileUp className="w-4 h-4" />{" "}
+                  <span className="hidden sm:inline">Import Excel</span>
+                </button>
+                <button
+                  onClick={() => setAddOpen(true)}
+                  aria-label="Thêm dòng BOQ"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                >
+                  <Plus className="w-4 h-4" />{" "}
+                  <span className="hidden sm:inline">Thêm dòng BOQ</span>
+                </button>
+              </>
+            )}
+          </div>
         }
       />
 
@@ -305,13 +305,55 @@ export default function BoqPage() {
             />
             Gồm phát sinh (VO)
           </label>
-          <span className="text-xs text-zinc-500 font-mono">{items.length} hạng mục</span>
+          <span className="text-xs text-zinc-500 font-mono">
+            {filteredSortedItems.length}/{items.length} hạng mục
+          </span>
         </div>
+
+        {items.length > 0 && (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Tìm theo mã hoặc tên (không dấu)…"
+                aria-label="Tìm dòng BOQ theo mã hoặc tên"
+                className="w-full min-h-10 bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-3 text-sm text-white placeholder:text-zinc-500"
+              />
+            </div>
+            <select
+              value={loc}
+              onChange={(e) => setLoc(e.target.value as LocOption)}
+              aria-label="Lọc dòng BOQ"
+              className="min-h-10 bg-zinc-900 border border-zinc-800 rounded-lg px-3 text-sm text-white sm:w-56"
+            >
+              <option value="all">Tất cả</option>
+              <option value="chua-map">Chưa map</option>
+              <option value="lech">Σ tỷ trọng lệch</option>
+            </select>
+            <select
+              value={sap}
+              onChange={(e) => setSap(e.target.value as SapOption)}
+              aria-label="Sắp xếp dòng BOQ"
+              className="min-h-10 bg-zinc-900 border border-zinc-800 rounded-lg px-3 text-sm text-white sm:w-56"
+            >
+              <option value="boq">Thứ tự BOQ</option>
+              <option value="gia-tri">Giá trị HĐ ↓</option>
+              <option value="thuc-hien">% thực hiện ↓</option>
+            </select>
+          </div>
+        )}
 
         {items.length === 0 ? (
           <EmptyState
             title="Chưa có dòng BOQ nào"
             message={canManage ? 'Bấm "Thêm dòng BOQ" để bắt đầu.' : "Chưa có dữ liệu khối lượng."}
+          />
+        ) : filteredSortedItems.length === 0 ? (
+          <EmptyState
+            title="Không tìm thấy dòng BOQ nào khớp"
+            message="Thử đổi từ khoá tìm hoặc bộ lọc đang chọn."
           />
         ) : (
           <div className="bento-card overflow-hidden">
@@ -463,1136 +505,5 @@ export default function BoqPage() {
         />
       )}
     </div>
-  );
-}
-
-function AddBoqModal({
-  systems,
-  onClose,
-  onCreated,
-}: {
-  systems: SystemOption[];
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
-  const [unit, setUnit] = useState("");
-  const [systemId, setSystemId] = useState<number | "">("");
-  const [qtyContract, setQtyContract] = useState("0");
-  const [unitPrice, setUnitPrice] = useState("0");
-  const [qtySub, setQtySub] = useState("0");
-  const [subUnitPrice, setSubUnitPrice] = useState("0");
-  const [err, setErr] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  async function submit() {
-    setSaving(true);
-    setErr("");
-    try {
-      const res = await fetch("/api/boq", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: code.trim(),
-          name: name.trim(),
-          unit: unit.trim(),
-          systemId: systemId || undefined,
-          qtyContract: Number(qtyContract) || 0,
-          unitPrice: Number(unitPrice) || 0,
-          qtySub: Number(qtySub) || 0,
-          subUnitPrice: Number(subUnitPrice) || 0,
-        }),
-      });
-      const j = await res.json().catch(() => null);
-      if (!res.ok) {
-        setErr(j?.error ?? "Không tạo được dòng BOQ");
-        return;
-      }
-      onCreated();
-    } catch {
-      setErr("Mất kết nối — kiểm tra mạng rồi thử lại");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal onClose={onClose}>
-      <div className="p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Thêm dòng BOQ</h2>
-          <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="text-xs text-zinc-400 col-span-1">
-            Mã BOQ
-            <input
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </label>
-          <label className="text-xs text-zinc-400 col-span-1">
-            Đơn vị tính
-            <input
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </label>
-          <label className="text-xs text-zinc-400 col-span-2">
-            Tên hạng mục
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </label>
-          <label className="text-xs text-zinc-400 col-span-2">
-            Hệ
-            <select
-              value={systemId}
-              onChange={(e) => setSystemId(e.target.value ? Number(e.target.value) : "")}
-              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-            >
-              <option value="">— Chưa gán —</option>
-              {systems.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs text-zinc-400">
-            KL nhận thầu
-            <input
-              type="number"
-              value={qtyContract}
-              onChange={(e) => setQtyContract(e.target.value)}
-              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </label>
-          <label className="text-xs text-zinc-400">
-            Đơn giá
-            <input
-              type="number"
-              value={unitPrice}
-              onChange={(e) => setUnitPrice(e.target.value)}
-              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </label>
-          <label className="text-xs text-zinc-400">
-            KL giao thầu phụ
-            <input
-              type="number"
-              value={qtySub}
-              onChange={(e) => setQtySub(e.target.value)}
-              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </label>
-          <label className="text-xs text-zinc-400">
-            Đơn giá giao thầu phụ
-            <input
-              type="number"
-              value={subUnitPrice}
-              onChange={(e) => setSubUnitPrice(e.target.value)}
-              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </label>
-        </div>
-        {err && <p className="text-sm text-rose-300">{err}</p>}
-        <button
-          onClick={submit}
-          disabled={saving || !code.trim() || !name.trim() || !unit.trim()}
-          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
-        >
-          {saving ? "Đang tạo…" : "Tạo dòng BOQ"}
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
-type BoqImportPreviewRow = {
-  rowIndex: number;
-  code: string;
-  name: string;
-  unit: string;
-  qtyContract: number;
-  unitPrice: number;
-  note: string | null;
-  action: "add" | "error";
-  reason?: string;
-};
-
-function ImportBoqModal({
-  systems,
-  onClose,
-  onImported,
-}: {
-  systems: SystemOption[];
-  onClose: () => void;
-  onImported: () => void;
-}) {
-  const [file, setFile] = useState<File | null>(null);
-  const [systemId, setSystemId] = useState<number | "">("");
-  const [preview, setPreview] = useState<BoqImportPreviewRow[] | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
-  const [skippedTowerBOnly, setSkippedTowerBOnly] = useState(0);
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{
-    inserted: number;
-    skipped: number;
-    errors: string[];
-  } | null>(null);
-
-  async function runPreview() {
-    if (!file || !systemId) return;
-    setBusy(true);
-    setErr("");
-    setPreview(null);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("systemId", String(systemId));
-      const res = await fetch("/api/boq/import", { method: "POST", body: fd });
-      const j = await res.json().catch(() => null);
-      if (!res.ok) {
-        setErr(j?.error ?? "Không đọc được file");
-        return;
-      }
-      setPreview(j.preview ?? []);
-      setWarnings(j.warnings ?? []);
-      setSkippedTowerBOnly(j.skippedTowerBOnly ?? 0);
-    } catch {
-      setErr("Mất kết nối — kiểm tra mạng rồi thử lại");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function commit() {
-    if (!file || !systemId) return;
-    setBusy(true);
-    setErr("");
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("systemId", String(systemId));
-      const res = await fetch("/api/boq/import?commit=1", { method: "POST", body: fd });
-      const j = await res.json().catch(() => null);
-      if (!res.ok) {
-        setErr(j?.error ?? "Import thất bại");
-        return;
-      }
-      setResult(j);
-    } catch {
-      setErr("Mất kết nối — kiểm tra mạng rồi thử lại");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const addCount = preview?.filter((r) => r.action === "add").length ?? 0;
-  const errorCount = preview?.filter((r) => r.action === "error").length ?? 0;
-
-  return (
-    <Modal onClose={onClose} className="max-w-2xl max-h-[85vh] flex flex-col">
-      <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between shrink-0">
-        <h2 className="font-semibold">Import Excel BOQ</h2>
-        <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      <div className="p-5 space-y-3 overflow-auto">
-        {result ? (
-          <div className="space-y-2">
-            <p className="text-sm text-emerald-300">
-              ✅ Đã thêm {result.inserted} dòng BOQ
-              {result.skipped > 0 && `, bỏ qua ${result.skipped} dòng lỗi`}.
-            </p>
-            {result.errors.length > 0 && (
-              <ul className="text-xs text-rose-300 list-sys pl-4 space-y-0.5">
-                {result.errors.map((e, i) => (
-                  <li key={i}>{e}</li>
-                ))}
-              </ul>
-            )}
-            <button
-              onClick={onImported}
-              className="w-full bg-emerald-700 hover:bg-emerald-800 text-on-accent font-semibold py-2 rounded-lg text-sm"
-            >
-              Xong
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-between bg-zinc-800/80 p-3 rounded-lg border border-zinc-700/60">
-              <div className="text-xs text-zinc-300 pr-2">
-                <p className="font-medium text-white">
-                  Biểu mẫu BOQ & Kiểm soát Đặt hàng chuẩn xBOSS
-                </p>
-                <p className="text-zinc-400 mt-0.5">
-                  Bao gồm hướng dẫn 4 nguyên tắc cốt lõi, bảng điều khiển định mức, mẫu trống và một
-                  bộ dữ liệu mẫu.
-                </p>
-              </div>
-              <a
-                href="/api/boq/template"
-                download="MAU-KHOI-LUONG-BOQ.xlsx"
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-on-accent rounded-lg text-xs font-semibold shrink-0 transition"
-              >
-                <Download className="w-4 h-4" />
-                Tải file mẫu
-              </a>
-            </div>
-
-            <p className="text-xs text-zinc-400">
-              Hỗ trợ file biểu mẫu chuẩn (tự động nhận diện Mã BOQ duy nhất, KL Hợp đồng, KL Định
-              mức bóc tách) hoặc file Bảng khối lượng thanh toán (IPC). Với các dòng chưa có mã, hệ
-              thống sẽ tự sinh BOQCODE tuần tự theo hệ đã chọn.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="text-xs text-zinc-400 col-span-2">
-                File Excel
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={(e) => {
-                    setFile(e.target.files?.[0] ?? null);
-                    setPreview(null);
-                  }}
-                  className="mt-1 w-full text-sm text-zinc-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-zinc-700 file:text-white file:text-xs"
-                />
-              </label>
-              <label className="text-xs text-zinc-400 col-span-2">
-                Hệ (dùng để sinh mã cho các dòng chưa có mã, vd ACMV-0001)
-                <select
-                  value={systemId}
-                  onChange={(e) => {
-                    setSystemId(e.target.value ? Number(e.target.value) : "");
-                    setPreview(null);
-                  }}
-                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-                >
-                  <option value="">— Chọn hệ —</option>
-                  {systems.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            {err && <p className="text-sm text-rose-300">{err}</p>}
-
-            {preview && (
-              <div className="space-y-2">
-                <p className="text-xs text-zinc-400">
-                  Tìm thấy <span className="text-emerald-300 font-medium">{addCount}</span> dòng sẽ
-                  thêm
-                  {errorCount > 0 && (
-                    <>
-                      {" "}
-                      · <span className="text-rose-300 font-medium">{errorCount}</span> dòng lỗi (mã
-                      trùng)
-                    </>
-                  )}
-                  {skippedTowerBOnly > 0 && (
-                    <> · đã bỏ qua {skippedTowerBOnly} dòng chỉ thuộc Tháp B</>
-                  )}
-                  .
-                </p>
-                {warnings.map((w, i) => (
-                  <p key={i} className="text-xs text-amber-300">
-                    ⚠ {w}
-                  </p>
-                ))}
-                <div className="border border-zinc-800 rounded-lg overflow-auto max-h-64">
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-zinc-900">
-                      <tr className="text-zinc-400 text-left border-b border-zinc-800">
-                        <th className="py-1.5 px-2">Mã</th>
-                        <th className="py-1.5 px-2">Tên</th>
-                        <th className="py-1.5 px-2 text-right">KL</th>
-                        <th className="py-1.5 px-2 text-right">Đơn giá</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {preview.slice(0, 200).map((r) => (
-                        <tr
-                          key={r.rowIndex}
-                          className={`border-b border-zinc-800/50 ${r.action === "error" ? "bg-rose-950/40" : ""}`}
-                        >
-                          <td className="py-1 px-2 font-mono text-amber-400">{r.code}</td>
-                          <td className="py-1 px-2 text-zinc-300 truncate max-w-[240px]">
-                            {r.name}
-                            {r.action === "error" && (
-                              <span className="block text-rose-300">{r.reason}</span>
-                            )}
-                          </td>
-                          <td className="py-1 px-2 text-right text-zinc-300">
-                            {fmtQty(r.qtyContract)} {r.unit}
-                          </td>
-                          <td className="py-1 px-2 text-right text-zinc-300">
-                            {fmtVND(r.unitPrice)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {preview.length > 200 && (
-                  <p className="text-xs text-zinc-400">
-                    … và {preview.length - 200} dòng khác (đã rút gọn xem trước).
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div className="flex gap-2 pt-1">
-              {!preview ? (
-                <button
-                  onClick={runPreview}
-                  disabled={busy || !file || !systemId}
-                  className="flex-1 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-white font-semibold py-2 rounded-lg text-sm"
-                >
-                  {busy ? "Đang phân tích…" : "Xem trước"}
-                </button>
-              ) : (
-                <button
-                  onClick={commit}
-                  disabled={busy || addCount === 0}
-                  className="flex-1 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-on-accent font-semibold py-2 rounded-lg text-sm"
-                >
-                  {busy ? "Đang ghi…" : `Xác nhận ghi ${addCount} dòng`}
-                </button>
-              )}
-              <button
-                onClick={onClose}
-                className="px-4 border border-zinc-700 hover:border-zinc-500 rounded-lg text-sm text-zinc-400"
-              >
-                Huỷ
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
-function BoqDetailModal({
-  item,
-  canManage,
-  onClose,
-  onSaved,
-  onDelete,
-}: {
-  item: BoqItem;
-  canManage: boolean;
-  onClose: () => void;
-  onSaved: () => void;
-  onDelete: () => void;
-}) {
-  const [qtyContract, setQtyContract] = useState(String(item.qtyContract));
-  const [unitPrice, setUnitPrice] = useState(String(item.unitPrice));
-  const [qtySub, setQtySub] = useState(String(item.qtySub));
-  const [subUnitPrice, setSubUnitPrice] = useState(String(item.subUnitPrice));
-  const [savingFields, setSavingFields] = useState(false);
-  const [fieldsErr, setFieldsErr] = useState("");
-
-  const [mapEntries, setMapEntries] = useState<
-    { taskId: number; taskCode: string; taskName: string; weight: number }[]
-  >(
-    item.map.map((m) => ({
-      taskId: m.taskId,
-      taskCode: m.taskCode,
-      taskName: m.taskName,
-      weight: m.weight,
-    })),
-  );
-  const [savingMap, setSavingMap] = useState(false);
-  const [mapMsg, setMapMsg] = useState<{ text: string; warn: boolean } | null>(null);
-  const [q, setQ] = useState("");
-  const [hits, setHits] = useState<TaskHit[]>([]);
-
-  // Panel "Thêm theo tầng" (M124 việc 1): chọn tầng ⇒ danh sách task cùng hệ, tick nhiều rồi
-  // thêm một lượt. `chonTang` rỗng nghĩa là chưa chọn tầng nào.
-  const [moTang, setMoTang] = useState(false);
-  const [dsTang, setDsTang] = useState<string[]>([]);
-  const [chonTang, setChonTang] = useState("");
-  const [dsTask, setDsTask] = useState<TaskTheoTang[]>([]);
-  const [dangTaiTang, setDangTaiTang] = useState(false);
-  const [loiTang, setLoiTang] = useState("");
-  const [tickTang, setTickTang] = useState<Set<number>>(new Set());
-
-  useEffect(() => {
-    const term = q.trim();
-    if (term.length < 2) {
-      setHits([]);
-      return;
-    }
-    const t = setTimeout(() => {
-      fetch(`/api/search?q=${encodeURIComponent(term)}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((j) => {
-          const taskHits = (j?.hits ?? []).filter((h: { kind: string }) => h.kind === "task");
-          setHits(taskHits);
-        })
-        .catch(() => setHits([]));
-    }, 250);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  const sumWeight = mapEntries.reduce((s, e) => s + (Number(e.weight) || 0), 0);
-
-  async function saveFields() {
-    setSavingFields(true);
-    setFieldsErr("");
-    try {
-      const res = await fetch(`/api/boq/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          qtyContract: Number(qtyContract) || 0,
-          unitPrice: Number(unitPrice) || 0,
-          qtySub: Number(qtySub) || 0,
-          subUnitPrice: Number(subUnitPrice) || 0,
-        }),
-      });
-      const j = await res.json().catch(() => null);
-      if (!res.ok) {
-        setFieldsErr(j?.error ?? "Lưu thất bại");
-        return;
-      }
-      onSaved();
-    } catch {
-      setFieldsErr("Mất kết nối — kiểm tra mạng rồi thử lại");
-    } finally {
-      setSavingFields(false);
-    }
-  }
-
-  function addTask(t: TaskHit) {
-    if (mapEntries.some((e) => e.taskId === t.id)) return;
-    setMapEntries((prev) => [
-      ...prev,
-      { taskId: t.id, taskCode: t.code, taskName: t.name, weight: 1 },
-    ]);
-    setQ("");
-    setHits([]);
-  }
-  function removeTask(taskId: number) {
-    setMapEntries((prev) => prev.filter((e) => e.taskId !== taskId));
-  }
-  function splitEvenly() {
-    if (mapEntries.length === 0) return;
-    const w = 1 / mapEntries.length;
-    setMapEntries((prev) => prev.map((e) => ({ ...e, weight: w })));
-  }
-
-  // Tải gợi ý theo tầng. `floor` rỗng ⇒ chỉ lấy danh sách tầng (mở panel lần đầu).
-  const taiTheoTang = useCallback(
-    async (floor: string) => {
-      setDangTaiTang(true);
-      setLoiTang("");
-      const kq = await taiJson<{ floors: string[]; tasks: TaskTheoTang[] }>(
-        `/api/boq/${item.id}/tasks-theo-tang${floor ? `?floor=${encodeURIComponent(floor)}` : ""}`,
-      );
-      setDangTaiTang(false);
-      if (!kq.ok) {
-        setLoiTang(kq.loi);
-        return;
-      }
-      setDsTang(kq.data.floors);
-      setDsTask(kq.data.tasks);
-      // Tick sẵn task giống tên rõ rệt và chưa map ở đâu — người dùng chỉ cần bỏ tick ngoại lệ.
-      setTickTang(
-        new Set(
-          kq.data.tasks
-            .filter((t) => t.diemGiong >= NGUONG_TICK_SAN && !t.daMapDongKhac)
-            .map((t) => t.id),
-        ),
-      );
-    },
-    [item.id],
-  );
-
-  function moPanelTang() {
-    setMoTang(true);
-    if (dsTang.length === 0) void taiTheoTang("");
-  }
-
-  function doiTang(floor: string) {
-    setChonTang(floor);
-    setDsTask([]);
-    setTickTang(new Set());
-    if (floor) void taiTheoTang(floor);
-  }
-
-  // Thêm các task đã tick vào map rồi CHIA ĐỀU toàn bộ map (D3 của M124): thêm cả chục task với
-  // weight = 1 sẽ làm Σ vượt 1 và bị PUT chặn, nên chia đều ngay trong cùng một lần setState —
-  // gọi splitEvenly() rời sẽ chạy trên state cũ.
-  function themTaskTheoTang() {
-    const chon = dsTask.filter((t) => tickTang.has(t.id));
-    if (chon.length === 0) return;
-    setMapEntries((prev) => {
-      const co = new Set(prev.map((e) => e.taskId));
-      const gop = [
-        ...prev,
-        ...chon
-          .filter((t) => !co.has(t.id))
-          .map((t) => ({ taskId: t.id, taskCode: t.code, taskName: t.name, weight: 1 })),
-      ];
-      const w = gop.length > 0 ? 1 / gop.length : 1;
-      return gop.map((e) => ({ ...e, weight: w }));
-    });
-    setTickTang(new Set());
-    setMapMsg({
-      text: `Đã thêm ${chon.length} task và chia đều tỷ trọng. Bấm "Lưu map" để ghi.`,
-      warn: false,
-    });
-  }
-
-  async function saveMap() {
-    setSavingMap(true);
-    setMapMsg(null);
-    try {
-      const res = await fetch(`/api/boq/${item.id}/map`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          map: mapEntries.map((e) => ({ taskId: e.taskId, weight: Number(e.weight) || 0 })),
-        }),
-      });
-      const j = await res.json().catch(() => null);
-      if (!res.ok) {
-        setMapMsg({ text: j?.error ?? "Lưu map thất bại", warn: true });
-        return;
-      }
-      setMapMsg(
-        j.warning ? { text: j.warning, warn: true } : { text: "Đã lưu map task.", warn: false },
-      );
-      onSaved();
-    } catch {
-      setMapMsg({ text: "Mất kết nối — kiểm tra mạng rồi thử lại", warn: true });
-    } finally {
-      setSavingMap(false);
-    }
-  }
-
-  return (
-    <Modal onClose={onClose} className="max-w-xl">
-      <div className="p-5 space-y-5 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold font-mono text-sm">{item.code}</h2>
-            <p className="text-sm text-zinc-300">{item.name}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {canManage && (
-              <button
-                onClick={onDelete}
-                aria-label={`Xoá dòng BOQ ${item.code}`}
-                className="text-zinc-400 hover:text-rose-300"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
-            <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {canManage && (
-          <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              Sửa nhanh
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="text-xs text-zinc-400">
-                KL nhận thầu
-                <input
-                  type="number"
-                  value={qtyContract}
-                  onChange={(e) => setQtyContract(e.target.value)}
-                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-                />
-              </label>
-              <label className="text-xs text-zinc-400">
-                Đơn giá
-                <input
-                  type="number"
-                  value={unitPrice}
-                  onChange={(e) => setUnitPrice(e.target.value)}
-                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-                />
-              </label>
-              <label className="text-xs text-zinc-400">
-                KL giao thầu phụ
-                <input
-                  type="number"
-                  value={qtySub}
-                  onChange={(e) => setQtySub(e.target.value)}
-                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-                />
-              </label>
-              <label className="text-xs text-zinc-400">
-                Đơn giá giao thầu phụ
-                <input
-                  type="number"
-                  value={subUnitPrice}
-                  onChange={(e) => setSubUnitPrice(e.target.value)}
-                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-                />
-              </label>
-            </div>
-            {fieldsErr && <p className="text-sm text-rose-300">{fieldsErr}</p>}
-            <button
-              onClick={saveFields}
-              disabled={savingFields}
-              className="bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg"
-            >
-              {savingFields ? "Đang lưu…" : "Lưu"}
-            </button>
-          </section>
-        )}
-
-        <section className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            Map task ({mapEntries.length}) — tổng weight {sumWeight.toFixed(4)}
-          </h3>
-
-          {mapEntries.length > 0 && (
-            <ul className="space-y-1.5">
-              {mapEntries.map((e) => (
-                <li key={e.taskId} className="flex items-center gap-2">
-                  <span className="flex-1 min-w-0 truncate text-sm">
-                    <span className="font-mono text-xs text-zinc-400">{e.taskCode}</span>{" "}
-                    {e.taskName}
-                  </span>
-                  {canManage ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={e.weight}
-                      onChange={(ev) =>
-                        setMapEntries((prev) =>
-                          prev.map((m) =>
-                            m.taskId === e.taskId ? { ...m, weight: Number(ev.target.value) } : m,
-                          ),
-                        )
-                      }
-                      className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1 text-xs text-white text-right"
-                    />
-                  ) : (
-                    <span className="text-xs text-zinc-400">{e.weight}</span>
-                  )}
-                  {canManage && (
-                    <button
-                      onClick={() => removeTask(e.taskId)}
-                      aria-label={`Bỏ task ${e.taskCode} khỏi map`}
-                      className="text-zinc-500 hover:text-rose-300"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {canManage && (
-            <>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-2.5" />
-                  <input
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    placeholder="Tìm task theo mã/tên để thêm vào map…"
-                    aria-label="Tìm task để thêm vào map"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-8 pr-3 py-2 text-sm text-white"
-                  />
-                </div>
-                {mapEntries.length > 1 && (
-                  <button
-                    onClick={splitEvenly}
-                    className="text-xs text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg shrink-0"
-                  >
-                    Chia đều
-                  </button>
-                )}
-                <Button
-                  size="sm"
-                  variant={moTang ? "primary" : "secondary"}
-                  icon={Layers}
-                  onClick={() => (moTang ? setMoTang(false) : moPanelTang())}
-                  aria-expanded={moTang}
-                  className="shrink-0"
-                >
-                  Thêm theo tầng
-                </Button>
-              </div>
-
-              {moTang && (
-                <div className="border border-zinc-700 rounded-xl p-3 space-y-2 bg-zinc-950/70">
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={chonTang}
-                      onChange={(e) => doiTang(e.target.value)}
-                      aria-label="Chọn tầng"
-                      className="flex-1 min-h-10 bg-zinc-800 border border-zinc-700 rounded-lg px-2 text-sm text-white"
-                    >
-                      <option value="">— Chọn tầng —</option>
-                      {dsTang.map((f) => (
-                        <option key={f} value={f}>
-                          {f}
-                        </option>
-                      ))}
-                    </select>
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      disabled={tickTang.size === 0}
-                      onClick={themTaskTheoTang}
-                    >
-                      Thêm {tickTang.size} task
-                    </Button>
-                  </div>
-
-                  {dangTaiTang && <p className="text-xs text-zinc-400">Đang tải…</p>}
-                  {loiTang && (
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm text-rose-300 flex-1">{loiTang}</p>
-                      <Button size="sm" onClick={() => void taiTheoTang(chonTang)}>
-                        Thử lại
-                      </Button>
-                    </div>
-                  )}
-                  {!dangTaiTang && !loiTang && chonTang && dsTask.length === 0 && (
-                    <p className="text-xs text-zinc-400">Tầng này chưa có task cùng hệ.</p>
-                  )}
-                  {!dangTaiTang && dsTang.length === 0 && !loiTang && (
-                    <p className="text-xs text-zinc-400">
-                      Chưa có nhóm công việc nào gắn tầng cho hệ của dòng BOQ này.
-                    </p>
-                  )}
-
-                  {dsTask.length > 0 && (
-                    <ul className="max-h-56 overflow-y-auto divide-y divide-zinc-800">
-                      {dsTask.map((t) => {
-                        const daCo = mapEntries.some((e) => e.taskId === t.id);
-                        return (
-                          <li key={t.id} className="flex items-start gap-2 py-1.5">
-                            <input
-                              type="checkbox"
-                              checked={daCo || tickTang.has(t.id)}
-                              disabled={daCo}
-                              aria-label={`Chọn task ${t.code} ${t.name}`}
-                              onChange={(ev) =>
-                                setTickTang((prev) => {
-                                  const s = new Set(prev);
-                                  if (ev.target.checked) s.add(t.id);
-                                  else s.delete(t.id);
-                                  return s;
-                                })
-                              }
-                              className="mt-1 w-4 h-4 accent-emerald-500"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm truncate">
-                                <span className="font-mono text-xs text-zinc-400">{t.code}</span>{" "}
-                                {t.name}
-                              </p>
-                              <p className="text-xs text-zinc-500 truncate">
-                                {t.sheetName} · {t.pkgCode} {t.pkgName} ·{" "}
-                                {Math.round(t.progressPercent * 100)}%
-                              </p>
-                            </div>
-                            {daCo ? (
-                              <span className="text-xs text-emerald-300 shrink-0">đã có</span>
-                            ) : (
-                              t.daMapDongKhac && (
-                                <span className="text-xs text-amber-300 shrink-0">
-                                  đã map dòng khác
-                                </span>
-                              )
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              )}
-              {hits.length > 0 && (
-                <ul className="border border-zinc-700 rounded-lg divide-y divide-zinc-800 max-h-40 overflow-y-auto">
-                  {hits.map((h) => (
-                    <li key={h.id}>
-                      <button
-                        onClick={() => addTask(h)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-800 flex items-center justify-between gap-2"
-                      >
-                        <span className="truncate">
-                          <span className="font-mono text-xs text-zinc-400">{h.code}</span> {h.name}
-                        </span>
-                        <span className="text-xs text-zinc-500 shrink-0">{h.sheetType}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {mapMsg && (
-                <p className={`text-sm ${mapMsg.warn ? "text-amber-300" : "text-emerald-300"}`}>
-                  {mapMsg.text}
-                </p>
-              )}
-              <button
-                onClick={saveMap}
-                disabled={savingMap}
-                className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-sm font-medium px-4 py-2 rounded-lg"
-              >
-                {savingMap ? "Đang lưu…" : "Lưu map"}
-              </button>
-            </>
-          )}
-        </section>
-
-        <NormsSection boqItemId={item.id} canManage={canManage} />
-      </div>
-    </Modal>
-  );
-}
-
-type NormRow = {
-  id: number;
-  resourceType: NormResourceType;
-  materialId: number | null;
-  materialName: string | null;
-  resourceName: string | null;
-  qtyPerUnit: number;
-  unitLabel: string;
-};
-type NormUsage = {
-  normId: number;
-  resourceType: NormResourceType;
-  resourceLabel: string;
-  unitLabel: string;
-  expected: number;
-  actual: number | null;
-  variancePct: number | null;
-};
-type MaterialOption = { id: number; name: string };
-
-// Tab "Định mức" (M18): định mức vật tư/nhân công/máy của dòng BOQ + đối chiếu tiêu hao
-// thực tế. Xem docs/nang-cap/M18-dinh-muc.md.
-function NormsSection({ boqItemId, canManage }: { boqItemId: number; canManage: boolean }) {
-  const [norms, setNorms] = useState<NormRow[]>([]);
-  const [usage, setUsage] = useState<NormUsage[]>([]);
-  const [materials, setMaterials] = useState<MaterialOption[]>([]);
-  const [resourceType, setResourceType] = useState<NormResourceType>("material");
-  const [materialName, setMaterialName] = useState("");
-  const [resourceName, setResourceName] = useState("");
-  const [qtyPerUnit, setQtyPerUnit] = useState("");
-  const [unitLabel, setUnitLabel] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  function load() {
-    Promise.all([
-      fetch(`/api/boq/${boqItemId}/norms`).then((r) => (r.ok ? r.json() : null)),
-      fetch(`/api/boq/${boqItemId}/norm-usage`).then((r) => (r.ok ? r.json() : null)),
-    ]).then(([n, u]) => {
-      setNorms(n?.norms ?? []);
-      setUsage(u?.usage ?? []);
-    });
-  }
-
-  useEffect(() => {
-    load();
-    if (canManage)
-      fetch("/api/materials")
-        .then((r) => (r.ok ? r.json() : null))
-        .then((j) => setMaterials(j?.materials ?? []));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boqItemId]);
-
-  function usageFor(normId: number): NormUsage | undefined {
-    return usage.find((u) => u.normId === normId);
-  }
-
-  async function addNorm() {
-    const material = materials.find((m) => m.name === materialName);
-    if (resourceType === "material" && !material) {
-      showToast("Chọn vật tư hợp lệ từ danh sách", "error");
-      return;
-    }
-    setSaving(true);
-    const res = await fetch(`/api/boq/${boqItemId}/norms`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        resourceType,
-        materialId: resourceType === "material" ? material!.id : null,
-        resourceName: resourceType === "material" ? null : resourceName.trim() || null,
-        qtyPerUnit: Number(qtyPerUnit) || 0,
-        unitLabel: unitLabel.trim(),
-      }),
-    });
-    setSaving(false);
-    if (!res.ok) {
-      showToast((await res.json().catch(() => null))?.error ?? "Thêm định mức thất bại", "error");
-      return;
-    }
-    setMaterialName("");
-    setResourceName("");
-    setQtyPerUnit("");
-    setUnitLabel("");
-    load();
-  }
-
-  async function removeNorm(id: number) {
-    if (!(await appConfirm("Xoá định mức này?", { danger: true, confirmLabel: "Xoá" }))) return;
-    const res = await fetch(`/api/boq-norms/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      showToast((await res.json().catch(() => null))?.error ?? "Xoá thất bại", "error");
-      return;
-    }
-    load();
-  }
-
-  return (
-    <section className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-        Định mức ({norms.length})
-      </h3>
-
-      {norms.length > 0 ? (
-        <ul className="space-y-1.5">
-          {norms.map((n) => {
-            const u = usageFor(n.id);
-            const over = u?.variancePct != null && u.variancePct > 20;
-            const label = n.resourceType === "material" ? n.materialName : n.resourceName;
-            return (
-              <li key={n.id} className="border-b border-zinc-800/60 last:border-0 pb-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-400 w-16 shrink-0">
-                    {NORM_RESOURCE_TYPE_LABEL[n.resourceType]}
-                  </span>
-                  <span className="flex-1 min-w-0 truncate text-sm">{label}</span>
-                  <span className="text-xs text-zinc-400 shrink-0">
-                    {n.qtyPerUnit} {n.unitLabel}/ĐVT
-                  </span>
-                  {canManage && (
-                    <button
-                      onClick={() => removeNorm(n.id)}
-                      aria-label={`Xoá định mức ${label}`}
-                      className="text-zinc-500 hover:text-rose-300 shrink-0"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-                {u && u.actual != null && (
-                  <div className="mt-1 flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${over ? "bg-rose-500" : "bg-emerald-500"}`}
-                        style={{
-                          width: `${Math.min(100, u.expected > 0 ? (u.actual / u.expected) * 100 : 0)}%`,
-                        }}
-                      />
-                    </div>
-                    <span
-                      className={`text-xs shrink-0 ${over ? "text-rose-300" : "text-zinc-400"}`}
-                    >
-                      {over && <AlertTriangle className="w-3 h-3 inline mr-1" />}
-                      {u.actual.toFixed(1)}/{u.expected.toFixed(1)} {u.unitLabel}
-                    </span>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <p className="text-xs text-zinc-400">Chưa có định mức.</p>
-      )}
-
-      {canManage && (
-        <div className="space-y-2 bg-zinc-800/60 rounded-lg p-3">
-          <select
-            value={resourceType}
-            onChange={(e) => setResourceType(e.target.value as NormResourceType)}
-            aria-label="Loại nguồn lực"
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white"
-          >
-            {(Object.keys(NORM_RESOURCE_TYPE_LABEL) as NormResourceType[]).map((t) => (
-              <option key={t} value={t}>
-                {NORM_RESOURCE_TYPE_LABEL[t]}
-              </option>
-            ))}
-          </select>
-          {resourceType === "material" ? (
-            <>
-              <input
-                value={materialName}
-                onChange={(e) => setMaterialName(e.target.value)}
-                list="norm-material-list"
-                placeholder="Chọn vật tư…"
-                aria-label="Vật tư"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white"
-              />
-              <datalist id="norm-material-list">
-                {materials.map((m) => (
-                  <option key={m.id} value={m.name} />
-                ))}
-              </datalist>
-            </>
-          ) : (
-            <input
-              value={resourceName}
-              onChange={(e) => setResourceName(e.target.value)}
-              placeholder={resourceType === "labor" ? "Thợ hàn, thợ điện…" : "Máy khoan, cẩu tháp…"}
-              aria-label="Tên nguồn lực"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white"
-            />
-          )}
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="number"
-              step="0.0001"
-              value={qtyPerUnit}
-              onChange={(e) => setQtyPerUnit(e.target.value)}
-              placeholder="Định mức/ĐVT"
-              aria-label="Định mức trên 1 đơn vị"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white"
-            />
-            <input
-              value={unitLabel}
-              onChange={(e) => setUnitLabel(e.target.value)}
-              placeholder="Đơn vị (kg, công, ca máy…)"
-              aria-label="Đơn vị định mức"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white"
-            />
-          </div>
-          <button
-            onClick={addNorm}
-            disabled={saving || !qtyPerUnit || !unitLabel.trim()}
-            className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
-          >
-            Thêm định mức
-          </button>
-        </div>
-      )}
-    </section>
   );
 }
