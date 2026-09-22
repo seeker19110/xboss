@@ -174,7 +174,6 @@ export class EsignSignError extends LoiNghiepVu {
 }
 
 // So mã OTP theo thời gian hằng số.
-// TODO: gộp về `lib/bao-mat/otp.ts` (module dùng chung do việc V1 tạo) khi V1 đã tích hợp.
 function soKhopOtp(nhap: string, luu: string): boolean {
   const a = Buffer.from(nhap, "utf8");
   const b = Buffer.from(luu, "utf8");

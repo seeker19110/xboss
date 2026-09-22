@@ -1,5 +1,50 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Xoá 6 module lib code chết (không consumer thật) — 2026-09-22
+
+Đợt dọn tiếp ngay sau đợt xoá 7 phân hệ Engineering OS bên dưới, nhưng **khác bản chất**: 7 module
+kia là tính năng đầu cơ có UI/route thật nhưng không đáng giữ; 6 file dưới đây là **code chết đúng
+nghĩa** — grep toàn repo (`app/`, `lib/`, `scripts/`, `tests/`, `e2e/`) không còn route API, lib
+nghiệp vụ hay component nào import, consumer duy nhất là file test tự kiểm chính nó:
+
+1. `lib/ky-thuat/engineering-pipe-spooling-qto.ts` (68KB) — QTO/chia đốt spool (M74/M90).
+2. `lib/ky-thuat/engineering-duct-diffuser-alignment.ts` (28KB) — căn chỉnh ống gió/miệng gió
+   (M75/M91).
+3. `lib/ky-thuat/engineering-suite.ts` — barrel `export *` của Engineering OS: **không nơi nào
+   import chính cái barrel**, mọi chỗ đều import thẳng từng module con theo đường dẫn riêng. Test
+   kèm theo chỉ `assert typeof === "function"` cho 5 hàm của các module **vẫn sống** (các module đó
+   có test riêng của mình, và `check:dead-code` sau khi xoá barrel vẫn 0 unreachable → chúng vẫn
+   được với tới trực tiếp).
+4. `lib/tai-chinh/contracts-fidic.ts` — FIDIC TIA Claim Engine (M94); route
+   `/api/engineering/fidic-tia` đã xoá từ đợt `engineering-nextgen-apex`, lớp lib còn lại mồ côi.
+5. `lib/hien-truong/subcon-metrics.ts` — chỉ số + tạo hồ sơ thầu phụ M82, không route/UI nào gọi.
+6. `lib/bao-mat/otp.ts` — consumer nghiệp vụ duy nhất (`engineering-zalo-copilot.ts`) đã xoá ở đợt
+   trước; `engineering-esignature.ts` có OTP riêng (`soKhopOtp`) chứ không dùng module này.
+
+Xoá kèm 4 file test chỉ phục vụ riêng chúng (`engineering-pipe-spooling-qto`,
+`engineering-duct-diffuser-alignment`, `engineering-suite`, `contracts-fidic`). Hai file test có
+nội dung **lẫn** thì chỉ cắt đúng phần liên quan: `tests/webhook-inbound.test.ts` bỏ 2 ca OTP, giữ
+nguyên 4 ca chữ ký webhook Telegram/Zalo (`lib/bao-mat/webhook-inbound.ts` KHÔNG xoá, theo quyết
+định đợt trước); `tests/subcon-profile-link.test.ts` bỏ ca gọi `taoHoSoThauPhu`, giữ ca kiểm bất
+biến unique (dự án, nhà cung cấp) **ở tầng DB** — bất biến này thuộc về migration 0137 chứ không
+thuộc về module vừa xoá. Dọn thêm 2 comment đã hết đúng: TODO trỏ `lib/bao-mat/otp.ts` trong
+`engineering-esignature.ts` và ghi chú "vẫn sống" của `contracts-fidic.ts` trong
+`scripts/dem-du-lieu-engineering.ts`.
+
+**Không đụng schema** (migration append-only): `engineering_fidic_tia_claims` và
+`engineering_subcon_profiles` nay mồ côi phần ghi, vẫn còn nguyên — DROP là migration đụng dữ liệu
+phải qua staging, tách thành việc riêng như tiền lệ `0153_drop_orphaned_pinnacle_tables.sql`.
+Không có biến môi trường nào thuộc riêng 6 module này nên `lib/nen/env.ts` giữ nguyên.
+
+Đã chạy xanh: `lint`, `typecheck`, `format:check`, `build`, `npm test -- --release-gate` (224 file,
+3671 ca pass, 0 fail, 1 skip trong allowlist — Postgres 16 ephemeral), `check:dead-code` (1103 file,
+0 unreachable), `check:lib-layers`, `check:dead-routes`, `check:route-perms`, `check:project-scope`,
+`check:db-params`, `check:test-fk-ids`, `check:engineering-danh-tinh`, `check:migrations`,
+`check:sw-exclude`, `check:hex-hardcode`, `check:mau-accent`, `check:contrast`. `check:coverage`
+đỏ **y hệt trên HEAD trước khi sửa** (4 file test crash ở bước in bảng coverage của Node 22 cục bộ,
+0 ca fail; CI chạy Node 24) — số đo còn nhích lên: lines 92.22→92.25%, branches 84.87→84.89%,
+funcs 86.36→86.39%.
+
 ## ✅ Xoá 7 phân hệ Engineering OS đầu cơ — 2026-09-22
 
 Theo yêu cầu người dùng: xoá HẲN (không archive) 7 module trong `lib/ky-thuat/` — giá trị nghiệp
