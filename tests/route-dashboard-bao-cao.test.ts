@@ -225,6 +225,71 @@ test(
   },
 );
 
+test(
+  "GET /api/dashboard: khối dueSoon đếm đúng task sắp đến hạn theo ngưỡng alert_rules (M127)",
+  S,
+  async () => {
+    // Ngưỡng mặc định: 3 ngày / tiến độ < 0.7 (ALERT_METRICS trong lib/van-hanh/alerts.ts).
+    const { daysFromTodayISO } = await import("@/lib/db");
+    const projectId = await taoDuAn("duesoon");
+    const pm = await taoUser("pm", "duesoon");
+    // Đếm: hạn hôm nay+2, tiến độ 0.5.
+    await dungWbs(projectId, "dsIn", { endDate: daysFromTodayISO(2), progress: 0.5 });
+    // Không đếm: tiến độ 0.9 ≥ ngưỡng 0.7.
+    await dungWbs(projectId, "dsHigh", { endDate: daysFromTodayISO(2), progress: 0.9 });
+    // Không đếm: hạn còn 10 ngày, ngoài cửa sổ 3 ngày.
+    await dungWbs(projectId, "dsFar", { endDate: daysFromTodayISO(10), progress: 0.1 });
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/dashboard/route");
+    const res = await GET(jreq("/api/dashboard"));
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.dueSoon.days, 3);
+    assert.equal(body.dueSoon.count, 1);
+    assert.equal(body.dueSoon.tasks.length, 1);
+    const t = body.dueSoon.tasks[0];
+    assert.equal(t.endDate, daysFromTodayISO(2));
+    assert.equal(Number(t.progressPercent), 0.5);
+    assert.ok("sheetSlug" in t && "floorLabel" in t && "sheetType" in t);
+    // weekDelta luôn có mặt trong payload (số hoặc null khi chưa có dữ liệu lịch sử).
+    assert.ok("weekDelta" in body);
+  },
+);
+
+test("GET /api/dashboard: dueSoon cách ly dự án khác", S, async () => {
+  const { daysFromTodayISO } = await import("@/lib/db");
+  const projectA = await taoDuAn("dsIsoA");
+  const projectB = await taoDuAn("dsIsoB");
+  const pmA = await taoUser("pm", "dsIsoA");
+  await dungWbs(projectA, "dsIsoA", { endDate: daysFromTodayISO(1), progress: 0.1 });
+  await dungWbs(projectB, "dsIsoB", { endDate: daysFromTodayISO(1), progress: 0.1 });
+  await dangNhapDuAn(pmA, projectA);
+  const { GET } = await import("@/app/api/dashboard/route");
+  const body = await (await GET(jreq("/api/dashboard"))).json();
+  assert.equal(body.dueSoon.count, 1);
+});
+
+test("GET /api/dashboard: ?system= chỉ đếm dueSoon của hệ đó (AC4)", S, async () => {
+  const { daysFromTodayISO, insertId, run } = await import("@/lib/db");
+  const projectId = await taoDuAn("dsSys");
+  const pm = await taoUser("pm", "dsSys");
+  const codeA = `DSA${uniq("s")}`.slice(0, 20);
+  const codeB = `DSB${uniq("s")}`.slice(0, 20);
+  const sysA = await insertId(`INSERT INTO systems (code, name) VALUES (?, 'Hệ A dueSoon')`, codeA);
+  const sysB = await insertId(`INSERT INTO systems (code, name) VALUES (?, 'Hệ B dueSoon')`, codeB);
+  const a = await dungWbs(projectId, "dsSysA", { endDate: daysFromTodayISO(1), progress: 0.1 });
+  const b = await dungWbs(projectId, "dsSysB", { endDate: daysFromTodayISO(1), progress: 0.1 });
+  await run(`UPDATE sheet_types SET system_id = ? WHERE id = ?`, sysA, a.sheetId);
+  await run(`UPDATE sheet_types SET system_id = ? WHERE id = ?`, sysB, b.sheetId);
+  await dangNhapDuAn(pm, projectId);
+  const { GET } = await import("@/app/api/dashboard/route");
+  const all = await (await GET(jreq("/api/dashboard"))).json();
+  assert.equal(all.dueSoon.count, 2);
+  const chiA = await (await GET(jreq(`/api/dashboard?system=${codeA}`))).json();
+  assert.equal(chiA.dueSoon.count, 1);
+  assert.equal(chiA.dueSoon.tasks[0].id, a.taskId);
+});
+
 // ============================================================================
 // GET /api/dashboard/scurve
 // ============================================================================

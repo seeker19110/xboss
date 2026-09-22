@@ -3,6 +3,7 @@ import { query, todayISO } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { isDueSoon, loadDueSoonThresholds } from "@/lib/tien-do/due-soon";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,13 @@ export async function GET() {
       t.status !== "nghiem_thu",
   ).length;
   const done = tasks.filter((t) => t.progressPercent >= 1).length;
+  // M127 — "sắp đến hạn" cho trang chủ chế độ Hiện trường: cùng ngưỡng alert_rules của dự án
+  // với thông báo `due_soon` và khối dueSoon của /api/dashboard (lib/tien-do/due-soon.ts).
+  const dueSoonTh = await loadDueSoonThresholds(projectId);
+  const dueSoon = tasks.filter((t) => isDueSoon(t, dueSoonTh)).length;
 
-  return NextResponse.json({ tasks, summary: { total: tasks.length, delayed, done } });
+  return NextResponse.json({
+    tasks,
+    summary: { total: tasks.length, delayed, done, dueSoon, dueSoonDays: dueSoonTh.days },
+  });
 }

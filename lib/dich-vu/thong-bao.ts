@@ -6,7 +6,7 @@
 //
 // Tầng dịch vụ KHÔNG biết gì về HTTP: hàm dưới trả dữ liệu THUẦN, route mới là chỗ bọc
 // NextResponse và kiểm phiên. Nhờ vậy logic này test đơn vị được mà không phải dựng request.
-import { query, queryOne, run, todayISO, daysFromTodayISO } from "@/lib/db";
+import { query, queryOne, run, todayISO } from "@/lib/db";
 import { CAN, isAdminOrPm, type User } from "@/lib/bao-mat/auth";
 import { costSummary, getCostSettings } from "@/lib/tai-chinh/cost";
 import { poLateList, vehicleLateList } from "@/lib/tai-chinh/procurement";
@@ -38,6 +38,7 @@ import { PROPOSAL_PENDING_DAYS } from "@/lib/tai-chinh/proposals";
 import { pendingDesignChanges } from "@/lib/ky-thuat/designchanges";
 import { pendingClaims } from "@/lib/tai-chinh/claims";
 import { getAlertThreshold } from "@/lib/van-hanh/alerts";
+import { DUE_SOON_COND, dueSoonParams, loadDueSoonThresholds } from "@/lib/tien-do/due-soon";
 import { overdueApprovals, NON_APPROVER_ROLES } from "@/lib/tien-do/approvals";
 import { emitWebhook } from "@/lib/bao-mat/webhooks";
 
@@ -109,11 +110,10 @@ export async function syncAndListNotifications(
   // thành trễ. Ngưỡng đọc từ alert_rules (M47 PR4, lib/alerts.ts); không có rule →
   // default cũ y hệt (3 ngày / 70%).
   // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm (lib/recompute.ts).
-  const dueSoonDays = await getAlertThreshold("due_soon_days", projectId);
-  const dueSoonProgress = await getAlertThreshold("due_soon_progress", projectId);
-  const soon = daysFromTodayISO(dueSoonDays);
-  const DUE_SOON_COND = `COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) >= ? AND COALESCE(t.end_date, wp.end_date) <= ?
-        AND t.progress_percent < ? AND t.status NOT IN ('hoan_thanh','nghiem_thu')`;
+  // Điều kiện SQL + ngưỡng tách sang lib/tien-do/due-soon.ts (M127) để /api/dashboard và
+  // /api/my-tasks dùng chung đúng một định nghĩa "sắp đến hạn".
+  const dueSoonTh = await loadDueSoonThresholds(projectId);
+  const dueSoonProgress = dueSoonTh.progress;
   const dueSoon = await query<{
     id: number;
     code: string;
@@ -126,7 +126,7 @@ export async function syncAndListNotifications(
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
       WHERE ${DUE_SOON_COND}${subconFilter}${projectFilter}`,
-    ...(isSubcon ? [today, soon, dueSoonProgress, user.id] : [today, soon, dueSoonProgress]),
+    ...(isSubcon ? [...dueSoonParams(dueSoonTh), user.id] : dueSoonParams(dueSoonTh)),
     ...projectParam,
   );
 
@@ -168,8 +168,8 @@ export async function syncAndListNotifications(
            JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
            WHERE ${DUE_SOON_COND}${subconFilter}${projectFilter})`,
     ...(isSubcon
-      ? [user.id, today, soon, dueSoonProgress, user.id]
-      : [user.id, today, soon, dueSoonProgress]),
+      ? [user.id, ...dueSoonParams(dueSoonTh), user.id]
+      : [user.id, ...dueSoonParams(dueSoonTh)]),
     ...projectParam,
   );
 
