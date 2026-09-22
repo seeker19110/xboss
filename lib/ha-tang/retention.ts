@@ -110,16 +110,8 @@ export const RETENTION_TARGETS: RetentionTarget[] = [
     reason:
       "CHỜ CHỦ SỞ HỮU CHỐT (C3 §6). Object bị từ chối vẫn là bằng chứng 'đã từng đề xuất và bị loại' — có giá trị khi tranh chấp. Chỉ xoá khi chủ sở hữu chốt thời hạn.",
   },
-  {
-    key: "zalo_site_message_logs",
-    table: "zalo_site_message_logs",
-    mode: "age",
-    column: "created_at",
-    days: 180,
-    enabled: true,
-    reason:
-      "Log webhook Zalo (migrations/0119) nhận ghi từ nguồn công khai, không có giới hạn tuổi nên phình vô hạn. Đây là nhật ký vận hành bot (raw_text/intent để debug), không phải chứng cứ nghiệm thu/hợp đồng — giữ 180 ngày đủ để tra cứu sự cố tích hợp, sau đó xoá.",
-  },
+  // (zalo_site_message_logs — bảng đã bị DROP ở migrations/0155, cùng lúc xoá module
+  // engineering-zalo-copilot.ts và route /api/zalo/* ở PR #514, 2026-09-22, xem PROGRESS.md.)
   // (telegram_bot_message_logs — bảng đã bị DROP ở migrations/0153, cùng lúc xoá route/UI
   // /engineering/site-copilot 2026-09-21, xem PROGRESS.md.)
 ];

@@ -20,9 +20,9 @@ import { query } from "@/lib/db";
  * 4 cặp còn lại của bảng gốc ADR-0011 (Claim/EOT, HSE, BIM, Rủi ro) đã tự giải quyết qua các
  * đợt audit 2026-09-21/22 (0153, 0155): route/trang `/engineering/*` tương ứng bị xoá, các
  * bảng `engineering_*` mồ côi bị DROP — không còn gì để đo/quyết, nên bỏ khỏi danh sách này.
- * `engineering_fidic_tia_claims` cũng không phải lớp song song với `claims`, nhưng lớp lib đọc
- * ghi nó (`lib/tai-chinh/contracts-fidic.ts`) đã bị xoá 2026-09-22 vì không route/UI nào gọi —
- * bảng nay mồ côi, chờ quyết DROP (xem PROGRESS.md).
+ * `engineering_fidic_tia_claims` cũng không phải lớp song song với `claims` — lớp lib đọc ghi nó
+ * (`lib/tai-chinh/contracts-fidic.ts`) đã bị xoá 2026-09-22 vì không route/UI nào gọi, và bảng đã
+ * DROP ở migrations/0155 (xem PROGRESS.md).
  */
 const CAP: { nghiepVu: string; bangGoc: string[]; engineering: string[] }[] = [
   {
