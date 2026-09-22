@@ -1,5 +1,53 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ M127 — Trang chủ theo vai trò: "Điều hành" / "Hiện trường" — 2026-09-22
+
+Đặc tả `docs/nang-cap/M127-trang-chu-theo-vai-tro.md` (Approved 2026-09-22), mockup
+`docs/nang-cap/mockup/M127-trang-chu.html`, kế hoạch `PLAN.md` (4 việc). PR #511. Xuất phát từ yêu
+cầu "thiết kế lại trang chủ" (bố cục + thẩm mỹ + số liệu + mobile, theo vai trò, được sửa API).
+Lỗ hổng thật phát hiện khi khảo sát: **thầu phụ vào `/` gặp `/api/dashboard` 403 âm thầm → trang
+gần trống** (4 StatCard = 0, bảng trễ rỗng, không thông điệp).
+
+- **Việc 1 — API:** `/api/dashboard` thêm `dueSoon {days, count, tasks≤10}` (ngưỡng
+  `alert_rules.due_soon_days/progress` của dự án, lọc project + `?system=`) và `weekDelta`
+  (pct có trọng số hôm nay − 7 ngày trước qua `progressAtDate`, `null` khi không có task);
+  `/api/my-tasks` thêm `summary.dueSoon`/`dueSoonDays`. Điều kiện "sắp đến hạn" tách ra
+  `lib/tien-do/due-soon.ts` (`DUE_SOON_COND`, `loadDueSoonThresholds`, `isDueSoon`) dùng chung
+  với `lib/dich-vu/thong-bao.ts` (hành vi y hệt). Test route thêm vào
+  `tests/route-dashboard-bao-cao.test.ts` + `tests/route-tien-do-3.test.ts`.
+- **Việc 2 — vỏ panel:** `DashboardExtCards` → 4 `StatCard` + `Card`; `SpiCards`/`ForecastCards`/
+  `BlockedPanel`/`NormsOverPanel` bỏ `bento-card` (còn duy nhất `ProgressMap`). Mới
+  `app/components/ui/Select.tsx`. `HomeRail` đổi thứ tự **Pareto → Trung tâm điều hành → Vòng
+  đời** (6 chip, **xuống dòng** — bản đầu cuộn ngang làm Chrome mobile nới layout viewport lên
+  ~984px, trang bị thu nhỏ, e2e drawer mobile bấm lệch phần tử; tái hiện + sửa cục bộ).
+- **Việc 3 — 2 chế độ:** `app/page.tsx` **769 → 75 dòng**, chỉ còn `fetchMe` +
+  `resolveHomeMode(role, saved)` (`app/lib/homeMode.ts`: subcon luôn Hiện trường kể cả
+  localStorage giả; engineer nhớ lựa chọn `xboss_home_mode`; còn lại luôn Điều hành) + 2 view nạp
+  `next/dynamic`. `app/components/home/`: `HomeDieuHanh.tsx` (+ `useDieuHanhData.ts`,
+  `DieuHanhStats.tsx` — 5 StatCard, Chip Δ tuần, thẻ "Đến hạn ≤N ngày" → `/lookahead?days=7`;
+  `DieuHanhTabs.tsx`; `DelayedSection.tsx` — 3 bộ lọc qua `ui/Select`) và `HomeHienTruong.tsx`
+  (chỉ gọi `/api/my-tasks` + `/api/notifications` + `/api/sheets` + `/api/project`; lời chào +
+  ngày VN; 3 StatCard; "Việc hôm nay" ≤8 `ProgressRow` trễ trước rồi đến hạn; 3 nút nhanh 48px
+  kiêm thanh đáy mobile; 3 thông báo chưa đọc; EmptyState chưa được giao/không việc gấp; phân hệ
+  `field` tắt → engineer rơi về Điều hành, subcon EmptyState). Fetch lỗi ≠401 → `ErrorState` +
+  thử lại thay vì nuốt như trước. Tách thêm `app/lib/trackingUrl.ts`, `app/lib/useIsCompact.ts`;
+  test thuần `tests/home-mode.test.ts`.
+- **Việc 4 — e2e + ADR:** `e2e/authed/home-hien-truong.spec.ts` (đăng nhập thật subcon/engineer,
+  không dùng storageState admin: subcon không có request `/api/dashboard`, không có nút "Xem tổng
+  quan"; engineer chuyển 2 chiều và nhớ sau reload; axe cả 2 chế độ). ADR-0009 thêm mục M127.
+
+**Lệch đặc tả có chủ đích:** (1) `weekDelta = null` → **không render** badge (đặc tả ghi "—");
+(2) `module_disabled` trong đặc tả thực tế là **HTTP 404** của `assertModuleEnabled` → xử lý theo
+status; (3) AC8 "mỗi view ≤500 dòng" chỉ đạt được khi tách thêm 4 module trong
+`app/components/home/` (PLAN chỉ liệt kê 2 view); (4) chip Δ tuần dùng icon `TrendingUp/Down`
+thay ký tự ▲/▼.
+
+**Phát sinh trong lúc CI:** `tests/boq-history.test.ts` "2 PATCH đồng thời" (M124) đỏ chập chờn
+2/4 lần — `lichSuBoq` sắp theo `changed_at` (mặc định `NOW()` = lúc **bắt đầu** transaction, nên
+transaction chờ khoá `FOR UPDATE` commit sau vẫn có mốc nhỏ hơn) → đổi sang `ORDER BY id DESC`.
+`scripts/run-tests.mjs` nay in danh sách file + tên ca fail ở cuối tổng kết (log CI chỉ xem được
+phần đuôi; lần này phải dựng Postgres cục bộ mới tìm ra ca đỏ).
+
 ## 🚧 Audit 2026-09-22 — 4/6 cặp "stack song song" đã tự giải quyết (ADR-0011); dọn bảng DB tạm hoãn
 
 Người dùng yêu cầu audit tiếp 6 cặp "stack song song cùng nghiệp vụ" (claim, đấu thầu, dòng
