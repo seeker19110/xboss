@@ -99,13 +99,32 @@ export async function PATCH(req: NextRequest) {
   }
 
   const dimIds = dims.map((d) => d.id);
-  await withTransaction(async () => {
+  const taskPlaceholders = taskIds.map(() => "?").join(", ");
+  const result = await withTransaction(async () => {
+    // Kiểm lại nghiệm thu DƯỚI KHOÁ (review): kiểm ngoài ở trên chỉ để trả 409 sớm không tốn
+    // lock, nhưng giữa lúc đó và đây có thể có POST /approve chạy song song đặt nghiem_thu —
+    // FOR UPDATE cùng row với /approve nên các request tuần tự hoá, không còn race (TOCTOU).
+    const locked = await query<{ id: number; status: string | null }>(
+      `SELECT id, status FROM tasks WHERE id IN (${taskPlaceholders}) FOR UPDATE`,
+      ...taskIds,
+    );
+    if (!installed && locked.some((t) => t.status === "nghiem_thu")) {
+      return {
+        error: "Task đã nghiệm thu — huỷ nghiệm thu (DELETE /api/tasks/:id/approve) trước khi sửa",
+        httpStatus: 409,
+      } as const;
+    }
+
     // Dữ liệu sự kiện (M120 FR2) — cùng lib dùng chung với PATCH đơn. Không truyền `note`:
     // ghi chú là việc của từng ô, gán chung cả vùng chọn sẽ ra dữ liệu vô nghĩa (ghi chú cũ
     // của các ô được giữ nguyên khi tick, và bị xoá cùng dấu vết lắp khi bỏ tick).
     await ghiDauVetTick(dimIds, !!installed, { userId: user.id });
     for (const tid of taskIds) await recomputeTask(tid, user.name);
+    return { ok: true } as const;
   });
+
+  if ("error" in result)
+    return NextResponse.json({ error: result.error }, { status: result.httpStatus });
 
   return NextResponse.json({ ok: true, updated: dimIds.length, installed: !!installed });
 }

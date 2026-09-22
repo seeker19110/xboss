@@ -138,7 +138,11 @@ async function demTick(dims: number[]): Promise<number> {
 /** Dọn sạch — `users` bị test khác DELETE toàn bộ, còn task/nhóm treo là vỡ FK. */
 async function don(c: Ctx): Promise<void> {
   const { run } = await import("@/lib/db");
-  await run(`DELETE FROM assignment_log WHERE changed_by = ? OR new_user_id = ?`, c.admin.id, c.admin.id);
+  await run(
+    `DELETE FROM assignment_log WHERE changed_by = ? OR new_user_id = ?`,
+    c.admin.id,
+    c.admin.id,
+  );
   await run(`DELETE FROM task_history WHERE task_id = ?`, c.taskId);
   await run(`DELETE FROM notifications WHERE task_id = ? OR user_id = ?`, c.taskId, c.admin.id);
   await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, c.taskId);
@@ -159,132 +163,162 @@ test.after(() => dangXuat());
 
 test("AC1: PATCH /api/tasks/:id status=hoan_thanh trên task đã nghiệm thu → 409", S, async () => {
   const c = await dungTask("ac1", "nghiem_thu");
-  const truoc = await demHistory(c.taskId);
+  try {
+    const truoc = await demHistory(c.taskId);
 
-  const { PATCH } = await import("@/app/api/tasks/[id]/route");
-  const res = await PATCH(jreq(`/api/tasks/${c.taskId}`, { status: "hoan_thanh" }), {
-    params: Promise.resolve({ id: String(c.taskId) }),
-  });
-  assert.equal(res.status, 409);
-  assert.equal((await res.json()).error, LOI);
+    const { PATCH } = await import("@/app/api/tasks/[id]/route");
+    const res = await PATCH(jreq(`/api/tasks/${c.taskId}`, { status: "hoan_thanh" }), {
+      params: Promise.resolve({ id: String(c.taskId) }),
+    });
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).error, LOI);
 
-  const t = await docTask(c.taskId);
-  assert.equal(t?.status, "nghiem_thu");
-  assert.equal(await demHistory(c.taskId), truoc, "không được thêm dòng task_history");
-
-  await don(c);
+    const t = await docTask(c.taskId);
+    assert.equal(t?.status, "nghiem_thu");
+    assert.equal(await demHistory(c.taskId), truoc, "không được thêm dòng task_history");
+  } finally {
+    await don(c);
+  }
 });
 
-test("AC2: PATCH /api/tasks/:id đổi tên task đã nghiệm thu → 200, status giữ nguyên", S, async () => {
-  const c = await dungTask("ac2", "nghiem_thu");
+test(
+  "AC2: PATCH /api/tasks/:id đổi tên task đã nghiệm thu → 200, status giữ nguyên",
+  S,
+  async () => {
+    const c = await dungTask("ac2", "nghiem_thu");
+    try {
+      const { PATCH } = await import("@/app/api/tasks/[id]/route");
+      const res = await PATCH(jreq(`/api/tasks/${c.taskId}`, { name: "Tên mới" }), {
+        params: Promise.resolve({ id: String(c.taskId) }),
+      });
+      assert.equal(res.status, 200);
 
-  const { PATCH } = await import("@/app/api/tasks/[id]/route");
-  const res = await PATCH(jreq(`/api/tasks/${c.taskId}`, { name: "Tên mới" }), {
-    params: Promise.resolve({ id: String(c.taskId) }),
-  });
-  assert.equal(res.status, 200);
-
-  const t = await docTask(c.taskId);
-  assert.equal(t?.name, "Tên mới");
-  assert.equal(t?.status, "nghiem_thu");
-
-  await don(c);
-});
+      const t = await docTask(c.taskId);
+      assert.equal(t?.name, "Tên mới");
+      assert.equal(t?.status, "nghiem_thu");
+    } finally {
+      await don(c);
+    }
+  },
+);
 
 // Batch map MỌI lỗi nghiệp vụ về 422 (regex trong catch của app/api/tasks/batch/route.ts),
 // nên ca này chốt 422 thay vì 409 — thông điệp lỗi vẫn là thông điệp chung ở trên.
-test("AC3: POST /api/tasks/batch đổi status task đã nghiệm thu → 422, DB không đổi", S, async () => {
-  const c = await dungTask("ac3", "nghiem_thu");
+test(
+  "AC3: POST /api/tasks/batch đổi status task đã nghiệm thu → 422, DB không đổi",
+  S,
+  async () => {
+    const c = await dungTask("ac3", "nghiem_thu");
+    try {
+      const { PATCH } = await import("@/app/api/tasks/batch/route");
+      const res = await PATCH(
+        jreq(`/api/tasks/batch`, {
+          updates: [{ id: c.taskId, patch: { status: "dang_thi_cong" } }],
+        }),
+      );
+      assert.equal(res.status, 422);
+      assert.match((await res.json()).error, /đã nghiệm thu/);
 
-  const { PATCH } = await import("@/app/api/tasks/batch/route");
-  const res = await PATCH(
-    jreq(`/api/tasks/batch`, {
-      updates: [{ id: c.taskId, patch: { status: "dang_thi_cong" } }],
-    }),
-  );
-  assert.equal(res.status, 422);
-  assert.match((await res.json()).error, /đã nghiệm thu/);
+      const t = await docTask(c.taskId);
+      assert.equal(t?.status, "nghiem_thu");
+    } finally {
+      await don(c);
+    }
+  },
+);
 
-  const t = await docTask(c.taskId);
-  assert.equal(t?.status, "nghiem_thu");
+test(
+  "AC4: PATCH progress 0.5 trên task đã nghiệm thu → 409, % và ngày thực tế giữ nguyên",
+  S,
+  async () => {
+    const c = await dungTask("ac4", "nghiem_thu");
+    try {
+      const truoc = await demHistory(c.taskId);
 
-  await don(c);
-});
+      const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
+      const res = await PATCH(jreq(`/api/tasks/${c.taskId}/progress`, { progress: 0.5 }), {
+        params: Promise.resolve({ id: String(c.taskId) }),
+      });
+      assert.equal(res.status, 409);
+      assert.equal((await res.json()).error, LOI);
 
-test("AC4: PATCH progress 0.5 trên task đã nghiệm thu → 409, % và ngày thực tế giữ nguyên", S, async () => {
-  const c = await dungTask("ac4", "nghiem_thu");
-  const truoc = await demHistory(c.taskId);
-
-  const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
-  const res = await PATCH(jreq(`/api/tasks/${c.taskId}/progress`, { progress: 0.5 }), {
-    params: Promise.resolve({ id: String(c.taskId) }),
-  });
-  assert.equal(res.status, 409);
-  assert.equal((await res.json()).error, LOI);
-
-  const t = await docTask(c.taskId);
-  assert.equal(t?.progress, 1);
-  assert.equal(t?.status, "nghiem_thu");
-  assert.equal(t?.actualEnd, "2026-01-01", "actual_end_date không được xoá");
-  assert.equal(await demHistory(c.taskId), truoc);
-
-  await don(c);
-});
+      const t = await docTask(c.taskId);
+      assert.equal(t?.progress, 1);
+      assert.equal(t?.status, "nghiem_thu");
+      assert.equal(t?.actualEnd, "2026-01-01", "actual_end_date không được xoá");
+      assert.equal(await demHistory(c.taskId), truoc);
+    } finally {
+      await don(c);
+    }
+  },
+);
 
 test("AC5: PATCH progress 1 trên task đã nghiệm thu → 200, idempotent", S, async () => {
   const c = await dungTask("ac5", "nghiem_thu");
-  const truoc = await demHistory(c.taskId);
+  try {
+    const truoc = await demHistory(c.taskId);
 
-  const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
-  const res = await PATCH(jreq(`/api/tasks/${c.taskId}/progress`, { progress: 1 }), {
-    params: Promise.resolve({ id: String(c.taskId) }),
-  });
-  assert.equal(res.status, 200);
+    const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
+    const res = await PATCH(jreq(`/api/tasks/${c.taskId}/progress`, { progress: 1 }), {
+      params: Promise.resolve({ id: String(c.taskId) }),
+    });
+    assert.equal(res.status, 200);
 
-  const t = await docTask(c.taskId);
-  assert.equal(t?.progress, 1);
-  assert.equal(t?.status, "nghiem_thu");
-  assert.equal(await demHistory(c.taskId), truoc, "gửi lại cùng giá trị không thêm lịch sử");
-
-  await don(c);
+    const t = await docTask(c.taskId);
+    assert.equal(t?.progress, 1);
+    assert.equal(t?.status, "nghiem_thu");
+    assert.equal(await demHistory(c.taskId), truoc, "gửi lại cùng giá trị không thêm lịch sử");
+  } finally {
+    await don(c);
+  }
 });
 
 // ============================================================================
 // L2 — bỏ tick ô dimension của task đã nghiệm thu
 // ============================================================================
 
-test("AC6: PATCH /api/dimensions/:id installed=false trên task đã nghiệm thu → 409", S, async () => {
-  const c = await dungTask("ac6", "nghiem_thu");
+test(
+  "AC6: PATCH /api/dimensions/:id installed=false trên task đã nghiệm thu → 409",
+  S,
+  async () => {
+    const c = await dungTask("ac6", "nghiem_thu");
+    try {
+      const { PATCH } = await import("@/app/api/dimensions/[id]/route");
+      const res = await PATCH(jreq(`/api/dimensions/${c.dims[0]}`, { installed: false }), {
+        params: Promise.resolve({ id: String(c.dims[0]) }),
+      });
+      assert.equal(res.status, 409);
+      assert.equal((await res.json()).error, LOI);
 
-  const { PATCH } = await import("@/app/api/dimensions/[id]/route");
-  const res = await PATCH(jreq(`/api/dimensions/${c.dims[0]}`, { installed: false }), {
-    params: Promise.resolve({ id: String(c.dims[0]) }),
-  });
-  assert.equal(res.status, 409);
-  assert.equal((await res.json()).error, LOI);
+      assert.equal(await demTick(c.dims), 2, "cả 2 ô vẫn phải còn tick");
+      const t = await docTask(c.taskId);
+      assert.equal(t?.progress, 1);
+      assert.equal(t?.status, "nghiem_thu");
+    } finally {
+      await don(c);
+    }
+  },
+);
 
-  assert.equal(await demTick(c.dims), 2, "cả 2 ô vẫn phải còn tick");
-  const t = await docTask(c.taskId);
-  assert.equal(t?.progress, 1);
-  assert.equal(t?.status, "nghiem_thu");
+test(
+  "AC7: PATCH /api/dimensions/batch installed=false chạm task đã nghiệm thu → 409 cả lô",
+  S,
+  async () => {
+    const c = await dungTask("ac7", "nghiem_thu");
+    try {
+      const { PATCH } = await import("@/app/api/dimensions/batch/route");
+      const res = await PATCH(jreq(`/api/dimensions/batch`, { ids: c.dims, installed: false }));
+      assert.equal(res.status, 409);
+      assert.equal((await res.json()).error, LOI);
 
-  await don(c);
-});
-
-test("AC7: PATCH /api/dimensions/batch installed=false chạm task đã nghiệm thu → 409 cả lô", S, async () => {
-  const c = await dungTask("ac7", "nghiem_thu");
-
-  const { PATCH } = await import("@/app/api/dimensions/batch/route");
-  const res = await PATCH(jreq(`/api/dimensions/batch`, { ids: c.dims, installed: false }));
-  assert.equal(res.status, 409);
-  assert.equal((await res.json()).error, LOI);
-
-  assert.equal(await demTick(c.dims), 2, "không ô nào được ghi");
-  const t = await docTask(c.taskId);
-  assert.equal(t?.progress, 1);
-
-  await don(c);
-});
+      assert.equal(await demTick(c.dims), 2, "không ô nào được ghi");
+      const t = await docTask(c.taskId);
+      assert.equal(t?.progress, 1);
+    } finally {
+      await don(c);
+    }
+  },
+);
 
 // ============================================================================
 // Đối chứng — không chặn nhầm task chưa/không còn nghiệm thu
@@ -292,38 +326,40 @@ test("AC7: PATCH /api/dimensions/batch installed=false chạm task đã nghiệm
 
 test("AC8: task hoan_thanh (chưa nghiệm thu) → bỏ tick ô vẫn 200 và % giảm", S, async () => {
   const c = await dungTask("ac8", "hoan_thanh");
+  try {
+    const { PATCH } = await import("@/app/api/dimensions/[id]/route");
+    const res = await PATCH(jreq(`/api/dimensions/${c.dims[0]}`, { installed: false }), {
+      params: Promise.resolve({ id: String(c.dims[0]) }),
+    });
+    assert.equal(res.status, 200);
 
-  const { PATCH } = await import("@/app/api/dimensions/[id]/route");
-  const res = await PATCH(jreq(`/api/dimensions/${c.dims[0]}`, { installed: false }), {
-    params: Promise.resolve({ id: String(c.dims[0]) }),
-  });
-  assert.equal(res.status, 200);
-
-  const t = await docTask(c.taskId);
-  assert.equal(t?.progress, 0.5);
-  assert.notEqual(t?.status, "nghiem_thu");
-
-  await don(c);
+    const t = await docTask(c.taskId);
+    assert.equal(t?.progress, 0.5);
+    assert.notEqual(t?.status, "nghiem_thu");
+  } finally {
+    await don(c);
+  }
 });
 
 test("AC9: sau DELETE /api/tasks/:id/approve → PATCH progress 0.5 được chấp nhận", S, async () => {
   const c = await dungTask("ac9", "nghiem_thu");
+  try {
+    const { DELETE } = await import("@/app/api/tasks/[id]/approve/route");
+    const huy = await DELETE(jreq(`/api/tasks/${c.taskId}/approve`, undefined, "DELETE"), {
+      params: Promise.resolve({ id: String(c.taskId) }),
+    });
+    assert.equal(huy.status, 200);
 
-  const { DELETE } = await import("@/app/api/tasks/[id]/approve/route");
-  const huy = await DELETE(jreq(`/api/tasks/${c.taskId}/approve`, undefined, "DELETE"), {
-    params: Promise.resolve({ id: String(c.taskId) }),
-  });
-  assert.equal(huy.status, 200);
+    const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
+    const res = await PATCH(jreq(`/api/tasks/${c.taskId}/progress`, { progress: 0.5 }), {
+      params: Promise.resolve({ id: String(c.taskId) }),
+    });
+    assert.equal(res.status, 200);
 
-  const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
-  const res = await PATCH(jreq(`/api/tasks/${c.taskId}/progress`, { progress: 0.5 }), {
-    params: Promise.resolve({ id: String(c.taskId) }),
-  });
-  assert.equal(res.status, 200);
-
-  const t = await docTask(c.taskId);
-  assert.equal(t?.progress, 0.5);
-  assert.notEqual(t?.status, "nghiem_thu");
-
-  await don(c);
+    const t = await docTask(c.taskId);
+    assert.equal(t?.progress, 0.5);
+    assert.notEqual(t?.status, "nghiem_thu");
+  } finally {
+    await don(c);
+  }
 });

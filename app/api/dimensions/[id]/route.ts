@@ -84,11 +84,28 @@ export async function PATCH(
   }
 
   const result = await withTransaction(async () => {
+    // Kiểm lại nghiệm thu DƯỚI KHOÁ (review): kiểm ngoài ở trên chỉ để trả 409 sớm không tốn
+    // lock, nhưng giữa lúc đó và đây có thể có POST /approve chạy song song đặt nghiem_thu —
+    // FOR UPDATE cùng row với /approve nên 2 request tuần tự hoá, không còn race (TOCTOU).
+    const locked = await queryOne<{ id: number; status: string | null }>(
+      `SELECT id, status FROM tasks WHERE id = ? FOR UPDATE`,
+      dim.task_id,
+    );
+    if (!installed && locked?.status === "nghiem_thu") {
+      return {
+        error: "Task đã nghiệm thu — huỷ nghiệm thu (DELETE /api/tasks/:id/approve) trước khi sửa",
+        httpStatus: 409,
+      } as const;
+    }
+
     // Dữ liệu sự kiện theo ô (M120 FR1) — luật ai/lúc nào/ghi chú nằm trong lib dùng chung,
     // route chỉ là ranh giới HTTP (ADR-0008). `installedAt`/`installedBy` client gửi bị bỏ qua.
     await ghiDauVetTick([id], !!installed, { userId: user.id, note });
-    return recomputeTask(dim.task_id, user.name);
+    return { task: await recomputeTask(dim.task_id, user.name) } as const;
   });
 
-  return NextResponse.json({ id, installed: !!installed, task: result });
+  if ("error" in result)
+    return NextResponse.json({ error: result.error }, { status: result.httpStatus });
+
+  return NextResponse.json({ id, installed: !!installed, task: result.task });
 }
