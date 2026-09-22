@@ -1,5 +1,30 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Audit 2026-09-22 — Dọn bảng mồ côi 4/6 cặp "stack song song" (ADR-0011)
+
+Người dùng yêu cầu audit tiếp 6 cặp "stack song song cùng nghiệp vụ" (claim, đấu thầu, dòng
+tiền, HSE, BIM, rủi ro) nêu trong ADR-0011. Kiểm lại thấy 4 cặp đã tự giải quyết qua các đợt
+xoá module `thuNghiem` trước đó (route/trang `/engineering/*` phía song song đã xoá), chỉ còn
+sót rác DB (bảng `engineering_*` mồ côi, migration tạo nhưng không code nào đọc/ghi nữa) do
+0153 (2026-09-21) bỏ sót:
+
+- Migration `0155_drop_orphaned_bim_prediction_cad_tables.sql` — DROP 15 bảng mồ côi: nhóm
+  Prediction (0096, cặp "Rủi ro"), nhóm BIM/BIM-viewer (0114, cặp "BIM"), nhóm CAD/BIM
+  Professional Upgrade (0122: pipe-nesting/hydraulic-checks/BCF/bim-routing — lib gốc đã xoá),
+  nhóm NextGen Apex (0127, trừ `engineering_fidic_tia_claims` — bảng này vẫn sống, dùng bởi
+  `lib/tai-chinh/contracts-fidic.ts` M94 TIA Claim Engine, không thuộc diện mồ côi).
+- `scripts/dem-du-lieu-engineering.ts` + ADR-0011 cập nhật: chỉ còn **2 cặp thật sự song
+  song, chưa quyết** — Đấu thầu (`tender.ts` vs `engineering-bidding-matrix.ts`) và Dòng tiền
+  (`finance.ts::cashflowActual()` vs `engineering-cashflow.ts`, engine mô phỏng độc lập).
+  Claim/EOT, HSE, BIM, Rủi ro coi như đã xong (không còn lớp `engineering` song song).
+
+**Tiếp theo:** chạy `npm run dem:engineering` trên production để đo số dòng thật của Đấu thầu
+và Dòng tiền, quyết gộp/xoá theo đúng bảng ngưỡng ADR-0011 — chưa làm vì chưa có
+`DATABASE_URL` production trong phiên này.
+
+⚠️ Migration `0155` là `DROP TABLE` (đụng dữ liệu) — phải qua staging + `--dry-run` trước khi
+lên production theo DoD.
+
 ## ✅ Audit 2026-09-22 — Xoá 6 module `thuNghiem: true` không ai bật
 
 Người dùng yêu cầu audit phân loại tính năng theo mức độ cần thiết rồi xoá nhóm rủi ro cao
