@@ -296,8 +296,7 @@ export async function weekDeltaBlock(opts: {
   const kpi = await sheetProgressKpi({ projectId, systemId });
   const total = kpi.reduce((s, k) => s + Number(k.total), 0);
   if (total === 0) return null;
-  const nowPct =
-    kpi.reduce((s, k) => s + Number(k.avgProgress ?? 0) * Number(k.total), 0) / total;
+  const nowPct = kpi.reduce((s, k) => s + Number(k.avgProgress ?? 0) * Number(k.total), 0) / total;
 
   const prevRows = await progressAtDate(daysFromTodayISO(-7), {
     ...(systemId != null ? { systemId } : {}),

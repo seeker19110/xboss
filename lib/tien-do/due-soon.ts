@@ -29,9 +29,7 @@ export type DueSoonThresholds = {
 };
 
 /** Đọc ngưỡng "sắp đến hạn" của dự án (null = mức mặc định toàn hệ thống). */
-export async function loadDueSoonThresholds(
-  projectId: number | null,
-): Promise<DueSoonThresholds> {
+export async function loadDueSoonThresholds(projectId: number | null): Promise<DueSoonThresholds> {
   const days = await getAlertThreshold("due_soon_days", projectId);
   const progress = await getAlertThreshold("due_soon_progress", projectId);
   return { days, progress, today: todayISO(), soon: daysFromTodayISO(days) };

@@ -71,11 +71,7 @@ export default function DashboardExtCards({
               ? ` · Đạt ${Math.round(quality.inspectionPassRate)}%`
               : ""
           }`}
-          badge={
-            quality.ncrOverdue > 0 && (
-              <Chip tone="danger">{quality.ncrOverdue} quá hạn</Chip>
-            )
-          }
+          badge={quality.ncrOverdue > 0 && <Chip tone="danger">{quality.ncrOverdue} quá hạn</Chip>}
         />
 
         {vo != null && (

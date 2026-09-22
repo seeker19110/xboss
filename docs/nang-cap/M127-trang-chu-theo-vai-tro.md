@@ -1,12 +1,12 @@
 # M127 — Trang chủ theo vai trò: "Điều hành" cho PM/BCH, "Hiện trường" cho kỹ sư/thầu phụ
 
-| Thuộc tính       | Giá trị                                                                                  |
-| ---------------- | ---------------------------------------------------------------------------------------- |
+| Thuộc tính       | Giá trị                                                                                       |
+| ---------------- | --------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Trang chủ `/` trả lời đúng câu hỏi của từng vai trò trong màn hình đầu, kể cả trên điện thoại |
-| Spec owner       | Phiên chính (opusplan)                                                                   |
-| State            | **Approved for implementation**                                                          |
-| Người/ngày duyệt | Người dùng · 2026-09-22 (duyệt toàn bộ, ngưỡng "Đến hạn" theo `alert_rules`)             |
-| Cập nhật         | 2026-09-22                                                                               |
+| Spec owner       | Phiên chính (opusplan)                                                                        |
+| State            | **Approved for implementation**                                                               |
+| Người/ngày duyệt | Người dùng · 2026-09-22 (duyệt toàn bộ, ngưỡng "Đến hạn" theo `alert_rules`)                  |
+| Cập nhật         | 2026-09-22                                                                                    |
 
 > Kế thừa M125 (toolbar + dải số liệu + thân 2 cột). Không code khi chưa **Approved for implementation**.
 
@@ -59,11 +59,11 @@ done}}`, sắp theo hạn.
 
 ## 4. Phương án
 
-| Phương án                                                    | Lợi ích                                               | Chi phí/rủi ro                                             | Kết luận |
-| ------------------------------------------------------------ | ----------------------------------------------------- | ---------------------------------------------------------- | -------- |
-| Không làm                                                    | 0                                                     | Subcon vẫn trang trống; kỹ sư vẫn đi vòng                  | Loại     |
-| A. Redirect kỹ sư/subcon sang `/my-tasks`                    | Rẻ                                                    | `/` mất vai trò "cửa vào" (không có tìm kiếm, hub, thông báo tổng); kỹ sư mất dashboard | Loại     |
-| **B. Một trang `/`, 2 chế độ theo vai trò, kỹ sư chuyển được** | Đúng việc từng người, subcon có trang chủ thật, giữ M125 | `page.tsx` phải tách thành 2 view + hook dữ liệu chung      | **Chọn** |
+| Phương án                                                      | Lợi ích                                                  | Chi phí/rủi ro                                                                          | Kết luận |
+| -------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------- |
+| Không làm                                                      | 0                                                        | Subcon vẫn trang trống; kỹ sư vẫn đi vòng                                               | Loại     |
+| A. Redirect kỹ sư/subcon sang `/my-tasks`                      | Rẻ                                                       | `/` mất vai trò "cửa vào" (không có tìm kiếm, hub, thông báo tổng); kỹ sư mất dashboard | Loại     |
+| **B. Một trang `/`, 2 chế độ theo vai trò, kỹ sư chuyển được** | Đúng việc từng người, subcon có trang chủ thật, giữ M125 | `page.tsx` phải tách thành 2 view + hook dữ liệu chung                                  | **Chọn** |
 
 ## 5. Scope / non-goals
 
