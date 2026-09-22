@@ -28,7 +28,7 @@ export default function NormsOverPanel() {
   if (items.length === 0) return null;
 
   return (
-    <div className="bento-card border-amber-900/60 bg-amber-950/20 p-4 mb-6">
+    <div className="rounded-xl border border-amber-900/60 bg-amber-950/20 p-4">
       <div className="flex items-center justify-between mb-1">
         <h2 className="font-bold text-sm text-zinc-100 flex items-center gap-2">
           <Gauge className="w-4 h-4 text-amber-400" /> Vật tư vượt định mức theo hạng mục (
