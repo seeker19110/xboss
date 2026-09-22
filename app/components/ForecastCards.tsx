@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { TrendingUp } from "lucide-react";
+import { cardClass } from "@/app/components/ui";
 import { formatDateVN } from "@/lib/nen/date";
 
 type Forecast = {
@@ -28,7 +29,7 @@ export default function ForecastCards({ system }: { system?: string }) {
   if (!data || data.forecast.length === 0) return null;
 
   return (
-    <div className="bento-card p-5 mb-6">
+    <div className={cardClass({ tone: "sunken", pad: "lg" })}>
       <div className="flex items-center justify-between mb-1">
         <h2 className="font-bold text-sm text-zinc-100 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-emerald-400" /> Dự báo hoàn thành tiến độ
@@ -46,7 +47,7 @@ export default function ForecastCards({ system }: { system?: string }) {
           return (
             <div
               key={f.sheetType}
-              className="bento-card p-4 bg-zinc-950/70 flex flex-col justify-between"
+              className="rounded-xl border border-zinc-800 p-4 bg-zinc-950/70 flex flex-col justify-between"
             >
               <div>
                 <p className="text-xs font-bold text-zinc-300 uppercase truncate mb-1.5">

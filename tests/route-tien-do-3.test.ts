@@ -3150,6 +3150,46 @@ test(
   },
 );
 
+test(
+  "GET /api/my-tasks: summary.dueSoon đếm task sắp đến hạn theo ngưỡng dự án (M127)",
+  S,
+  async () => {
+    // Ngưỡng mặc định alert_rules: 3 ngày / tiến độ < 0.7.
+    const { daysFromTodayISO } = await import("@/lib/db");
+    const { projectId, sheetTypeId } = await dungSheet("mytasksDue");
+    const me = await taoUser("engineer", "mytasksDue");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    // Đếm: hạn hôm nay+2, tiến độ 0.5.
+    await taoTask(pkgId, "D1", {
+      assignedTo: me.id,
+      progress: 0.5,
+      endDate: daysFromTodayISO(2),
+    });
+    // Không đếm: tiến độ 0.9 ≥ 0.7.
+    await taoTask(pkgId, "D2", {
+      assignedTo: me.id,
+      progress: 0.9,
+      endDate: daysFromTodayISO(2),
+    });
+    // Không đếm: ngoài cửa sổ 3 ngày.
+    await taoTask(pkgId, "D3", {
+      assignedTo: me.id,
+      progress: 0.1,
+      endDate: daysFromTodayISO(10),
+    });
+    // Không đếm: đã quá hạn (đó là "trễ", không phải "sắp đến hạn").
+    await taoTask(pkgId, "D4", { assignedTo: me.id, progress: 0.1, endDate: "2020-01-01" });
+    await dangNhapDuAn(me, projectId);
+    const { GET } = await import("@/app/api/my-tasks/route");
+    const res = await GET();
+    assert.equal(res.status, 200);
+    const { summary } = await res.json();
+    assert.equal(summary.dueSoonDays, 3);
+    assert.equal(summary.dueSoon, 1);
+    assert.equal(summary.delayed, 1);
+  },
+);
+
 // ============================================================================
 // PATCH/DELETE /api/towers/:id
 // ============================================================================

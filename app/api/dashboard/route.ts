@@ -13,6 +13,8 @@ import {
   voBlock,
   bySystemBlock,
   approvalsBlock,
+  dueSoonBlock,
+  weekDeltaBlock,
 } from "@/lib/tien-do/dashboardext";
 
 export const dynamic = "force-dynamic";
@@ -142,11 +144,15 @@ export async function GET(req: NextRequest) {
   // tổng quan không còn hiển thị cashflow/CPI/% ngân sách (quyết 2026-07-11) nên
   // bỏ hẳn budgetUsedPct khỏi response thay vì null theo quyền.
   const canViewFinance = CAN.viewPayments(user.role);
-  const [quality, procurement, workfront, bySystem] = await Promise.all([
+  // M127 — `dueSoon` (task sắp đến hạn theo ngưỡng alert_rules) + `weekDelta` (Δ % tổng so
+  // với 7 ngày trước) cho dải KPI trang chủ; cùng bộ lọc dự án + `?system=` như các khối khác.
+  const [quality, procurement, workfront, bySystem, dueSoon, weekDelta] = await Promise.all([
     qualityBlock(projectId),
     procurementBlock(projectId),
     workfrontBlock(projectId),
     bySystemBlock(projectId),
+    dueSoonBlock({ projectId, systemId }),
+    weekDeltaBlock({ projectId, systemId }),
   ]);
   const vo = canViewFinance ? await voBlock(projectId) : null;
 
@@ -156,6 +162,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     approvals,
     delayedTasks,
+    dueSoon,
+    weekDelta,
     groupProgress: Object.fromEntries(groupProgress),
     kpi: kpiWithDelta,
     totalDelayed: totalDelayedItems,

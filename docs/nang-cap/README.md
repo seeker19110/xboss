@@ -481,6 +481,15 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > sách hệ thi công để ngoài tab (đường vào duy nhất tới `/system/[code]`), `SpiCards`/`ForecastCards`
 > để ở cột chính (breakpoint theo viewport nên vỡ lưới trong rail 320px), tab mặc định `scurve`.
 
+> **`M127-trang-chu-theo-vai-tro.md`** — ✅ **Approved 2026-09-22 và ĐÃ TRIỂN KHAI XONG** (PR
+> #511). Trang chủ `/` tách 2 chế độ theo vai trò: **Điều hành** (admin/pm/bch/cdt/viewer; kỹ sư
+> chuyển được, nhớ `localStorage`) giữ khung M125 + 5 StatCard (Δ tuần, "Đến hạn ≤N ngày" theo
+> `alert_rules`), rail Pareto → hub → chip vòng đời; **Hiện trường** (kỹ sư mặc định, thầu phụ
+> luôn) = việc của tôi hôm nay, chỉ gọi API thầu phụ được phép — sửa lỗ hổng thầu phụ vào `/` gặp
+> 403 âm thầm. API: `/api/dashboard` + `dueSoon`/`weekDelta`, `/api/my-tasks` + `summary.dueSoon`;
+> `lib/tien-do/due-soon.ts` dùng chung với thông báo. Không migration, không đổi quyền. Vỏ 5 panel
+> `bento-card` về `Card`/`StatCard`, thêm `ui/Select`. Mockup `mockup/M127-trang-chu.html`.
+
 > **`M126-docshell-contracts-variations-claims.md`** — ✅ **Approved 2026-09-21 và ĐÃ TRIỂN KHAI
 > XONG**. Đóng nốt "Còn lại" của M124: `/claims`, `/variations`, `/contracts` chuyển sang
 > master–detail cùng khuôn `/payment-certs`, không thêm component nền mới (dùng lại

@@ -66,6 +66,9 @@ const total = { pass: 0, fail: 0, skipped: 0, todo: 0 };
 const skippedByFile = {};
 
 let failed = 0;
+/** Tên các file/nhóm có ca fail hoặc tiến trình thoát mã ≠ 0 — in lại ở cuối để không phải
+ *  lật ngược hàng nghìn dòng log CI tìm dòng `not ok` (log CI chỉ xem được phần đuôi). */
+const failedFiles = [];
 const coverageMaps = [];
 
 /** Cộng dồn kết quả 1 lần chạy vào bảng tổng. */
@@ -74,8 +77,17 @@ function thuKetQua(nhan, out, status) {
   process.stdout.write(out ?? "");
   if (status !== 0) failed++;
   const o = out ?? "";
+  const failTrongFile = tapCount(o, "fail");
+  if (status !== 0 || failTrongFile > 0) {
+    // Ghi kèm tên ca `not ok` để đuôi log CI tự nói được ca nào đỏ.
+    const ca = o
+      .split("\n")
+      .filter((l) => /^not ok /.test(l))
+      .map((l) => l.replace(/^not ok \d+ - /, ""));
+    failedFiles.push(`${nhan}${ca.length ? `: ${ca.join(" | ")}` : ` (exit ${status})`}`);
+  }
   total.pass += tapCount(o, "pass");
-  total.fail += tapCount(o, "fail");
+  total.fail += failTrongFile;
   total.todo += tapCount(o, "todo");
   const skipped = tapCount(o, "skipped");
   total.skipped += skipped;
@@ -116,6 +128,10 @@ process.stdout.write(
   `\n=== Tổng: ${files.length} file, ${failed} file fail ` +
     `· ${total.pass} ca pass, ${total.fail} ca fail, ${total.skipped} ca skip, ${total.todo} todo ===\n`,
 );
+if (failedFiles.length > 0) {
+  process.stdout.write(`\nFile có ca FAIL:\n`);
+  for (const f of failedFiles) process.stdout.write(`  - ${f}\n`);
+}
 
 // Skip không phải là pass. Ở chế độ thường chỉ nhắc; ở release gate thì chặn.
 if (total.skipped > 0) {

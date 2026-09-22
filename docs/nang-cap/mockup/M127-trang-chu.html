@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mockup M127 — Trang chủ theo vai trò</title>
+    <style>
+      :root {
+        --z950: #09090b;
+        --z900: #18181b;
+        --z800: #27272a;
+        --z700: #3f3f46;
+        --z500: #71717a;
+        --z400: #a1a1aa;
+        --z300: #d4d4d8;
+        --z100: #f4f4f5;
+        --em: #6ee7b7;
+        --em5: #10b981;
+        --am: #fcd34d;
+        --am5: #f59e0b;
+        --rd: #fca5a5;
+        --sk: #7dd3fc;
+        --vi: #c4b5fd;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--z950);
+        color: var(--z100);
+        font:
+          14px/1.45 system-ui,
+          Segoe UI,
+          Roboto,
+          sans-serif;
+      }
+      .wrap {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 24px 16px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      .sub {
+        color: var(--z400);
+        font-size: 12px;
+        margin-bottom: 20px;
+      }
+      .frame {
+        border: 1px solid var(--z800);
+        border-radius: 16px;
+        overflow: hidden;
+        background: var(--z950);
+        margin-bottom: 32px;
+      }
+      .frame > header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 14px;
+        border-bottom: 1px solid var(--z800);
+        font-size: 12px;
+        color: var(--z400);
+      }
+      .frame > header b {
+        color: var(--z100);
+      }
+      .body {
+        padding: 16px;
+        display: grid;
+        gap: 16px;
+      }
+      .toolbar {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+        font-size: 12px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 40px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid var(--z700);
+        background: var(--z900);
+        color: var(--z100);
+        font-weight: 500;
+        font-size: 13px;
+      }
+      .btn.pri {
+        background: #047857;
+        border-color: #047857;
+        color: #fff;
+      }
+      .btn.ghost {
+        border-color: transparent;
+        background: transparent;
+        color: var(--z300);
+      }
+      .btn.big {
+        min-height: 48px;
+        justify-content: center;
+      }
+      .sep {
+        width: 1px;
+        height: 20px;
+        background: var(--z800);
+        margin: 0 4px;
+      }
+      .spacer {
+        flex: 1;
+      }
+      .muted {
+        color: var(--z500);
+        font-size: 11px;
+      }
+      .stats {
+        display: grid;
+        gap: 12px;
+      }
+      .stats.c5 {
+        grid-template-columns: repeat(5, 1fr);
+      }
+      .stats.c3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .stat {
+        background: rgba(9, 9, 11, 0.7);
+        border: 1px solid var(--z800);
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 104px;
+      }
+      .stat .lb {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--z400);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .stat .v {
+        font:
+          700 24px/1 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        margin-top: 12px;
+      }
+      .stat .v small {
+        font: 500 13px system-ui;
+        color: var(--z400);
+        margin-left: 4px;
+      }
+      .stat .h {
+        font-size: 11px;
+        color: var(--z400);
+        margin-top: 6px;
+      }
+      .bar {
+        height: 6px;
+        border-radius: 99px;
+        background: var(--z800);
+        overflow: hidden;
+        margin-top: 12px;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--em5);
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border-radius: 99px;
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid;
+      }
+      .chip.ok {
+        color: var(--em);
+        border-color: rgba(16, 185, 129, 0.4);
+        background: rgba(16, 185, 129, 0.1);
+      }
+      .chip.warn {
+        color: var(--am);
+        border-color: rgba(245, 158, 11, 0.4);
+        background: rgba(245, 158, 11, 0.1);
+      }
+      .chip.bad {
+        color: var(--rd);
+        border-color: rgba(239, 68, 68, 0.4);
+        background: rgba(239, 68, 68, 0.1);
+      }
+      .chip.zn {
+        color: var(--z300);
+        border-color: var(--z700);
+        background: var(--z900);
+      }
+      .cols {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 16px;
+        align-items: start;
+      }
+      .card {
+        background: var(--z900);
+        border: 1px solid var(--z800);
+        border-radius: 12px;
+      }
+      .card.sunk {
+        background: rgba(9, 9, 11, 0.7);
+      }
+      .tabs {
+        display: flex;
+        gap: 2px;
+        border-bottom: 1px solid var(--z800);
+        padding: 0 8px;
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .tabs span {
+        padding: 0 12px;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        color: var(--z400);
+      }
+      .tabs span.on {
+        color: var(--em);
+        border-bottom: 2px solid var(--em5);
+      }
+      .panel {
+        height: 180px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--z500);
+        font-size: 12px;
+        border-radius: 0 0 12px 12px;
+        background: repeating-linear-gradient(
+          135deg,
+          transparent 0 12px,
+          rgba(255, 255, 255, 0.02) 12px 24px
+        );
+      }
+      .sec {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--z400);
+        font-weight: 600;
+        margin: 0 0 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .sec em {
+        font-style: normal;
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 400;
+        color: var(--z500);
+        margin-left: 8px;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 120px 48px auto;
+        gap: 10px;
+        align-items: center;
+        min-height: 40px;
+        padding: 0 10px;
+        border-radius: 8px;
+      }
+      .row:hover {
+        background: rgba(39, 39, 42, 0.6);
+      }
+      .row .n {
+        font-weight: 600;
+        font-size: 13px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .row .n small {
+        display: block;
+        font-weight: 400;
+        color: var(--z400);
+        font-size: 11px;
+      }
+      .row .b {
+        height: 6px;
+        border-radius: 99px;
+        background: var(--z800);
+        overflow: hidden;
+      }
+      .row .b i {
+        display: block;
+        height: 100%;
+        background: var(--em5);
+      }
+      .row .p {
+        font:
+          600 12px ui-monospace,
+          monospace;
+        text-align: right;
+        color: var(--z300);
+      }
+      .field {
+        display: flex;
+        gap: 8px;
+      }
+      .sel {
+        min-height: 40px;
+        border-radius: 8px;
+        background: var(--z800);
+        border: 1px solid var(--z700);
+        padding: 0 10px;
+        font-size: 12px;
+        color: var(--z300);
+        display: flex;
+        align-items: center;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      th {
+        font-size: 11px;
+        color: var(--z400);
+        text-align: left;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--z800);
+        position: sticky;
+        top: 0;
+        background: var(--z900);
+      }
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(39, 39, 42, 0.6);
+      }
+      td.m {
+        font-family: ui-monospace, monospace;
+      }
+      .pareto div {
+        display: grid;
+        grid-template-columns: 110px 1fr 28px;
+        gap: 8px;
+        align-items: center;
+        font-size: 12px;
+        min-height: 32px;
+      }
+      .pareto .b {
+        height: 8px;
+        border-radius: 99px;
+        background: var(--z800);
+      }
+      .pareto .b i {
+        display: block;
+        height: 100%;
+        background: rgba(245, 158, 11, 0.7);
+        border-radius: 99px;
+      }
+      .hub {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 44px;
+        padding: 0 8px;
+        border-radius: 8px;
+      }
+      .hub:hover {
+        background: rgba(39, 39, 42, 0.6);
+      }
+      .hub .ic {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .hub .t {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .hub .d {
+        font-size: 11px;
+        color: var(--z400);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .lc {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding-top: 8px;
+        margin-top: 6px;
+        border-top: 1px solid var(--z800);
+      }
+      .phone {
+        width: 390px;
+        border: 8px solid var(--z800);
+        border-radius: 36px;
+        background: var(--z950);
+        overflow: hidden;
+        margin: 0 auto;
+      }
+      .phone .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--z800);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .phone .body {
+        padding: 12px;
+        gap: 12px;
+      }
+      .phone .stat {
+        padding: 12px;
+        min-height: 88px;
+      }
+      .phone .stat .v {
+        font-size: 20px;
+      }
+      .phone .bottom {
+        position: sticky;
+        bottom: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+        padding: 8px 12px 20px;
+        border-top: 1px solid var(--z800);
+        background: rgba(9, 9, 11, 0.95);
+      }
+      .note {
+        font-size: 12px;
+        color: var(--z400);
+        border-left: 2px solid var(--em5);
+        padding-left: 10px;
+        margin: 0 0 12px;
+      }
+      .badge {
+        background: #b91c1c;
+        color: #fff;
+        border-radius: 99px;
+        font-size: 10px;
+        padding: 1px 6px;
+        margin-left: 4px;
+      }
+      ul.list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .grid3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .two {
+        display: grid;
+        grid-template-columns: 1fr 420px;
+        gap: 24px;
+        align-items: start;
+      }
+      @media (max-width: 1100px) {
+        .two {
+          grid-template-columns: 1fr;
+        }
+        .cols {
+          grid-template-columns: 1fr;
+        }
+        .stats.c5 {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Mockup M127 — Trang chủ theo vai trò</h1>
+      <div class="sub">
+        Trên: chế độ <b>Điều hành</b> (admin/pm/bch/cdt/viewer; kỹ sư chuyển được). Dưới: chế độ
+        <b>Hiện trường</b> (kỹ sư mặc định, thầu phụ luôn) trên điện thoại 390px. Đặc tả
+        <code>docs/nang-cap/M127-trang-chu-theo-vai-tro.md</code> là nguồn sự thật khi lệch mockup.
+      </div>
+
+      <!-- ĐIỀU HÀNH -->
+      <div class="frame">
+        <header>
+          <span>Desktop 1280 · vai trò <b>PM</b> · chế độ <b>Điều hành</b></span
+          ><span>Dashboard · TT AVIO Tháp A</span>
+        </header>
+        <div class="body">
+          <div class="toolbar">
+            <span class="btn pri">⬆ Import Excel</span><span class="btn">Excel</span
+            ><span class="btn">Báo cáo PDF</span> <span class="sep"></span
+            ><span class="btn">Nghiệm thu</span><span class="btn">Lookahead</span>
+            <span class="sep"></span><span class="btn">＋ Thêm trang</span>
+            <span class="spacer"></span><span class="muted">Cập nhật 07:42</span>
+          </div>
+
+          <p class="note">
+            Z1 — 5 số liệu (mới: <b>Δ tuần</b> trên Tiến độ tổng, thẻ <b>Đến hạn ≤3 ngày</b>). Chờ
+            duyệt ẩn với vai trò không duyệt → lưới 4 cột.
+          </p>
+          <div class="stats c5">
+            <div class="stat">
+              <div class="lb">
+                <span>◔ Tiến độ tổng</span><span class="chip ok">▲ +2,3% / tuần</span>
+              </div>
+              <div class="v" style="color: var(--em)">61<small>%</small></div>
+              <div class="bar"><i style="width: 61%"></i></div>
+            </div>
+            <div class="stat">
+              <div class="lb"><span>⚠ Hạng mục trễ</span></div>
+              <div class="v" style="color: var(--rd)">14</div>
+              <div class="h">37 công tác · bấm để xem bảng</div>
+            </div>
+            <div class="stat" style="border-color: rgba(245, 158, 11, 0.35)">
+              <div class="lb"><span>⏱ Đến hạn ≤3 ngày</span></div>
+              <div class="v" style="color: var(--am)">12</div>
+              <div class="h">tiến độ &lt;70% · mở Lookahead</div>
+            </div>
+            <div class="stat">
+              <div class="lb"><span>☑ Chờ duyệt</span></div>
+              <div class="v" style="color: var(--sk)">5</div>
+              <div class="h">3 đề xuất · 2 mua vật tư</div>
+            </div>
+            <div class="stat">
+              <div class="lb"><span>▤ Công tác theo dõi</span></div>
+              <div class="v">1 284</div>
+              <div class="h">5 trang tracking</div>
+            </div>
+          </div>
+
+          <div class="cols">
+            <div style="display: grid; gap: 16px">
+              <div class="card">
+                <div class="tabs">
+                  <span>Trang tracking</span><span>Bản đồ</span><span class="on">S-curve</span
+                  ><span>EVM</span><span>Biểu đồ</span>
+                </div>
+                <div class="panel">S-curve — kế hoạch vs thực tế (SCurveChart, nguyên trạng)</div>
+              </div>
+
+              <div>
+                <p class="sec">Theo hệ thi công <em>6 hệ đang theo dõi</em></p>
+                <div
+                  class="card"
+                  style="padding: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px"
+                >
+                  <div class="row">
+                    <span class="n">● ACMV<small>3 bảng</small></span
+                    ><span class="b"><i style="width: 64%"></i></span><span class="p">64%</span
+                    ><span class="chip bad">6 trễ</span>
+                  </div>
+                  <div class="row">
+                    <span class="n">● Điện<small>2 bảng</small></span
+                    ><span class="b"><i style="width: 58%"></i></span><span class="p">58%</span
+                    ><span class="chip ok">Đúng hạn</span>
+                  </div>
+                  <div class="row">
+                    <span class="n">● Cấp thoát nước<small>2 bảng</small></span
+                    ><span class="b"><i style="width: 71%"></i></span><span class="p">71%</span
+                    ><span class="chip bad">3 trễ</span>
+                  </div>
+                  <div class="row">
+                    <span class="n">● PCCC<small>1 bảng</small></span
+                    ><span class="b"><i style="width: 40%"></i></span><span class="p">40%</span
+                    ><span class="chip bad">5 trễ</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="panel" style="height: 90px; border-radius: 12px">
+                  Đường găng — ScheduleControlPanel (nguyên trạng, vỏ Card)
+                </div>
+              </div>
+
+              <div>
+                <p class="sec">
+                  <span>🕒 Danh sách hạng mục trễ <em>14 hạng mục · 37 công tác</em></span
+                  ><span class="field"
+                    ><span class="sel">Tất cả sheet ▾</span><span class="sel">Tất cả tầng ▾</span
+                    ><span class="sel">Tất cả trạng thái ▾</span></span
+                  >
+                </p>
+                <div class="card" style="overflow: hidden">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Sheet</th>
+                        <th>Tầng</th>
+                        <th>Công tác trễ</th>
+                        <th>Tiến độ TB</th>
+                        <th>Hạn</th>
+                        <th>Lý do</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>OGTĐ</td>
+                        <td class="m">T27</td>
+                        <td>4</td>
+                        <td class="m">52%</td>
+                        <td class="m">12/09</td>
+                        <td><span class="chip warn">Thiếu vật tư</span></td>
+                      </tr>
+                      <tr>
+                        <td>OGCH</td>
+                        <td class="m">T25</td>
+                        <td>2</td>
+                        <td class="m">78%</td>
+                        <td class="m">15/09</td>
+                        <td><span class="chip zn">Chưa gán</span></td>
+                      </tr>
+                      <tr>
+                        <td>ODNN1</td>
+                        <td class="m">T18</td>
+                        <td>6</td>
+                        <td class="m">31%</td>
+                        <td class="m">18/09</td>
+                        <td><span class="chip warn">Mặt bằng chưa bàn giao</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <p class="note">
+                Bên dưới: 4 StatCard chất lượng/công trường (thay
+                <code>DashboardExtCards</code> bento) → Việc bị chặn → Vượt định mức → SPI → Dự báo
+                — cùng vỏ <code>Card</code>/<code>StatCard</code>, hết <code>bento-card</code>.
+              </p>
+              <div class="stats" style="grid-template-columns: repeat(4, 1fr)">
+                <div class="stat">
+                  <div class="lb">
+                    <span>NCR chất lượng</span><span class="chip bad">2 quá hạn</span>
+                  </div>
+                  <div class="v">7</div>
+                  <div class="h">đang mở · đạt 94%</div>
+                </div>
+                <div class="stat">
+                  <div class="lb"><span>Phát sinh VO</span></div>
+                  <div class="v">3</div>
+                  <div class="h">2 đã duyệt · 1 chờ</div>
+                </div>
+                <div class="stat">
+                  <div class="lb"><span>Mặt bằng chờ</span></div>
+                  <div class="v">2<small>sàn</small></div>
+                  <div class="h">cộng dồn 9 ngày</div>
+                </div>
+                <div class="stat">
+                  <div class="lb"><span>PO trễ</span></div>
+                  <div class="v">1</div>
+                  <div class="h">xe không đến: 0 / tuần</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: grid; gap: 16px">
+              <div>
+                <p class="sec">⚠ Nguyên nhân trễ (Pareto)</p>
+                <div class="card sunk pareto" style="padding: 10px">
+                  <div>
+                    <span>Thiếu vật tư</span><span class="b"><i style="width: 90%"></i></span
+                    ><span class="p">14</span>
+                  </div>
+                  <div>
+                    <span>Mặt bằng</span><span class="b"><i style="width: 55%"></i></span
+                    ><span class="p">9</span>
+                  </div>
+                  <div>
+                    <span>Thiếu nhân lực</span><span class="b"><i style="width: 35%"></i></span
+                    ><span class="p">6</span>
+                  </div>
+                  <div>
+                    <span>Chưa gán lý do</span
+                    ><span class="b"><i style="width: 48%; background: var(--z700)"></i></span
+                    ><span class="p">8</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p class="sec">Trung tâm điều hành</p>
+                <div class="card" style="padding: 6px">
+                  <div class="hub">
+                    <span class="ic" style="background: rgba(16, 185, 129, 0.12); color: var(--em)"
+                      >1</span
+                    ><span
+                      ><span class="t">Chỉ huy hiện trường & An toàn</span><br /><span class="d"
+                        >Việc của tôi, Nhật ký TT06, Nghiệm thu…</span
+                      ></span
+                    >
+                  </div>
+                  <div class="hub">
+                    <span class="ic" style="background: rgba(14, 165, 233, 0.12); color: var(--sk)"
+                      >2</span
+                    ><span
+                      ><span class="t">Kế hoạch & Tiến độ WBS</span><br /><span class="d"
+                        >Lưới 6 hệ, CPM Gantt, Lookahead, EVM…</span
+                      ></span
+                    >
+                  </div>
+                  <div class="hub">
+                    <span class="ic" style="background: rgba(59, 130, 246, 0.12); color: #93c5fd"
+                      >3</span
+                    ><span
+                      ><span class="t">Chuỗi cung ứng & Vật tư</span><br /><span class="d"
+                        >Định mức BOQ, Đấu thầu, PO & GRN</span
+                      ></span
+                    >
+                  </div>
+                  <div class="hub">
+                    <span class="ic" style="background: rgba(139, 92, 246, 0.12); color: var(--vi)"
+                      >4</span
+                    ><span
+                      ><span class="t">Hợp đồng, Chi phí & FIDIC</span><br /><span class="d"
+                        >Hợp đồng, IPC, VO, Claims & Dòng tiền</span
+                      ></span
+                    >
+                  </div>
+                  <div class="hub">
+                    <span class="ic" style="background: rgba(244, 63, 94, 0.12); color: #fda4af"
+                      >5</span
+                    ><span
+                      ><span class="t">Trí tuệ AI & Digital Twin</span><br /><span class="d"
+                        >Copilot, Gate 0, IoT Telemetry</span
+                      ></span
+                    >
+                  </div>
+                  <div class="hub">
+                    <span class="ic" style="background: var(--z800); color: var(--z300)">6</span
+                    ><span
+                      ><span class="t">Quản trị dự án & Hệ thống</span><br /><span class="d"
+                        >Khởi công, Bàn giao, CDE, Nhân sự, Audit</span
+                      ></span
+                    >
+                  </div>
+                  <div class="lc">
+                    <span class="chip zn">GĐ0 Pháp lý</span><span class="chip zn">GĐ1 Kỹ thuật</span
+                    ><span class="chip zn">GĐ2 Vật tư</span
+                    ><span class="chip ok">GĐ3 Hiện trường</span
+                    ><span class="chip zn">GĐ4 Nghiệm thu</span
+                    ><span class="chip zn">GĐ5 Bàn giao</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HIỆN TRƯỜNG -->
+      <div class="two">
+        <div>
+          <p class="note">
+            <b>Chế độ Hiện trường</b> — chỉ gọi <code>/api/my-tasks</code> +
+            <code>/api/notifications</code> + <code>/api/sheets</code>; thầu phụ không còn gặp 403
+            âm thầm. Kỹ sư có nút "Xem tổng quan" (góc phải), thầu phụ không có. Thanh đáy = 3 hành
+            động nhanh thay Import/Excel/PDF.
+          </p>
+          <ul style="font-size: 12px; color: var(--z400); line-height: 1.7">
+            <li>Lời chào + ngày + tên dự án (từ <code>/api/project</code>).</li>
+            <li>
+              3 số liệu: Đến hạn ≤3 ngày · Trễ · Đang làm — tính từ <code>summary</code> của
+              my-tasks.
+            </li>
+            <li>
+              "Việc hôm nay": ≤8 hàng <code>ProgressRow</code>, trễ trước rồi tới gần hạn; bấm mở
+              đúng lưới + tầng.
+            </li>
+            <li>3 nút 48px: Lưới tracking · Nhật ký hôm nay · Thông báo (badge chưa đọc).</li>
+            <li>3 thông báo chưa đọc mới nhất; không có thì ẩn khối.</li>
+            <li>Chưa được giao việc → EmptyState "Bạn chưa được giao công việc — liên hệ PM".</li>
+          </ul>
+        </div>
+        <div class="phone">
+          <div class="top">
+            <span>☰ &nbsp;Dashboard</span
+            ><span
+              >🔔<span class="badge">3</span> &nbsp;<span
+                class="btn ghost"
+                style="min-height: 32px; padding: 0 8px; font-size: 12px"
+                >⊞ Xem tổng quan</span
+              ></span
+            >
+          </div>
+          <div class="body">
+            <div>
+              <div style="font-size: 17px; font-weight: 700">Xin chào, Minh</div>
+              <div class="muted">Thứ Ba, 22/09 · TT AVIO Tháp A</div>
+            </div>
+            <div class="stats c3">
+              <div class="stat" style="border-color: rgba(245, 158, 11, 0.35)">
+                <div class="lb"><span>Đến hạn ≤3 ng</span></div>
+                <div class="v" style="color: var(--am)">4</div>
+              </div>
+              <div class="stat">
+                <div class="lb"><span>Trễ</span></div>
+                <div class="v" style="color: var(--rd)">2</div>
+              </div>
+              <div class="stat">
+                <div class="lb"><span>Đang làm</span></div>
+                <div class="v" style="color: var(--sk)">9</div>
+              </div>
+            </div>
+            <div>
+              <p class="sec">Việc hôm nay <em>6</em></p>
+              <div class="card" style="padding: 6px">
+                <div class="row" style="grid-template-columns: minmax(0, 1fr) 70px 40px auto">
+                  <span class="n">A1,03 Ống gió tầng 27<small>T27 · OGTĐ</small></span
+                  ><span class="b"><i style="width: 40%"></i></span><span class="p">40%</span
+                  ><span class="chip bad">Trễ 5 ng</span>
+                </div>
+                <div class="row" style="grid-template-columns: minmax(0, 1fr) 70px 40px auto">
+                  <span class="n">A2,01 Ống nước lạnh<small>T26 · OGHL</small></span
+                  ><span class="b"><i style="width: 70%"></i></span><span class="p">70%</span
+                  ><span class="chip bad">Trễ 2 ng</span>
+                </div>
+                <div class="row" style="grid-template-columns: minmax(0, 1fr) 70px 40px auto">
+                  <span class="n">A1,04 Ống gió tầng 26<small>T26 · OGTĐ</small></span
+                  ><span class="b"><i style="width: 55%"></i></span><span class="p">55%</span
+                  ><span class="chip warn">Còn 1 ng</span>
+                </div>
+                <div class="row" style="grid-template-columns: minmax(0, 1fr) 70px 40px auto">
+                  <span class="n">B3,02 Cáp trục căn hộ<small>T25 · ODNN1</small></span
+                  ><span class="b"><i style="width: 20%"></i></span><span class="p">20%</span
+                  ><span class="chip warn">Còn 3 ng</span>
+                </div>
+                <div style="padding: 8px 6px 2px">
+                  <span
+                    class="btn ghost"
+                    style="min-height: 36px; font-size: 12px; color: var(--em)"
+                    >Tất cả việc của tôi →</span
+                  >
+                </div>
+              </div>
+            </div>
+            <div class="grid3">
+              <span class="btn big pri">▦ Lưới tracking</span
+              ><span class="btn big">✎ Nhật ký hôm nay</span
+              ><span class="btn big">🔔 Thông báo <span class="badge">3</span></span>
+            </div>
+            <div>
+              <p class="sec">Thông báo mới</p>
+              <div class="card sunk" style="padding: 8px; font-size: 12px; display: grid; gap: 6px">
+                <div>💬 PM Hùng bình luận trên A1,03 — "gửi ảnh mặt bích"</div>
+                <div>⏱ A1,04 đến hạn 23/09, tiến độ 55%</div>
+                <div>📐 Bản vẽ OGTĐ-27 rev C vừa phát hành</div>
+              </div>
+            </div>
+          </div>
+          <div class="bottom">
+            <span class="btn pri" style="justify-content: center">Lưới</span
+            ><span class="btn" style="justify-content: center">Nhật ký</span
+            ><span class="btn" style="justify-content: center">Thông báo</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -45,6 +45,11 @@ export async function ghiLichSuBoq(
 }
 
 // Đọc lịch sử 1 dòng BOQ, mới nhất trước, join tên người đổi.
+// Sắp theo `id` chứ KHÔNG theo `changed_at`: cột đó mặc định NOW() = thời điểm BẮT ĐẦU
+// transaction, nên 2 PATCH đồng thời (transaction sau bắt đầu trước nhưng chờ khoá FOR UPDATE
+// rồi commit sau) có thể mang changed_at nhỏ hơn dù ghi sau — thứ tự nhân quả bị đảo ngẫu
+// nhiên (test "2 PATCH đồng thời" đỏ chập chờn trên CI). `id` cấp lúc INSERT, tức sau khi đã
+// giữ khoá, nên luôn tăng đúng theo thứ tự commit.
 export async function lichSuBoq(boqItemId: number, limit = 100): Promise<DongLichSuBoq[]> {
   return query<DongLichSuBoq>(
     `SELECT h.field, h.old_value AS "oldValue", h.new_value AS "newValue",
@@ -53,7 +58,7 @@ export async function lichSuBoq(boqItemId: number, limit = 100): Promise<DongLic
        FROM boq_item_history h
        LEFT JOIN users u ON u.id = h.changed_by
       WHERE h.boq_item_id = ?
-      ORDER BY h.changed_at DESC
+      ORDER BY h.id DESC
       LIMIT ?`,
     boqItemId,
     limit,

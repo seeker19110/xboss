@@ -32,7 +32,7 @@ export default function BlockedPanel() {
   const byId = new Map(bars.map((b) => [b.id, b]));
 
   return (
-    <div className="bento-card border-rose-900/60 bg-rose-950/20 p-4 mb-6">
+    <div className="rounded-xl border border-rose-900/60 bg-rose-950/20 p-4">
       <div className="flex items-center justify-between mb-1">
         <h2 className="font-bold text-sm text-zinc-100 flex items-center gap-2">
           <Ban className="w-4 h-4 text-rose-400" /> Hạng mục bị chặn ({blocked.length})
