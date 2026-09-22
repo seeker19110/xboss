@@ -99,7 +99,13 @@ chính tự dispatch worker vì `coordinator` không spawn được subagent l�
   tích hợp Sheet vẫn single-tenant); 14 `text-zinc-600` → `text-zinc-500` trên lưới; `addNorm` bọc try/catch.
 - **Điều hướng:** mục sidebar "Định mức BOQ" (`/procurement?tab=boq`) đổi thành **"Khối lượng / BOQ"** trỏ
   thẳng `/boq` (sửa đồng bộ `dashboardTree` + `modules.nav` + spec e2e).
-- **Chưa làm (chờ quyết định/số đo):** cột `qty` trên ô dimension (R1), virtualization lưới.
+- **Đã đo (hậu kiểm, §19 của đặc tả):** lưới render **một `TrackingGrid` mỗi nhóm**, nhóm mặc định gập, nên
+  tệ nhất chỉ 616 ô tick/nhóm (ODNN Zone 1: 29 nhóm × 28 task × 22 cột) ⇒ **virtualization không cần làm**,
+  bỏ khỏi nợ kỹ thuật (còn phá trang in + định vị vùng chọn). Số đo lại lộ hồi quy của việc 4: lọc task tự
+  mở **mọi** nhóm khớp ⇒ 29 request song song + ~17.000 ô mount một lượt trên điện thoại. Sửa:
+  `GIOI_HAN_NHOM_TU_MO = 8` + `nhomTuMoTheoLoc()` (`app/tracking/[sheet]/locTask.ts`), nhóm khớp đã mở sẵn
+  cũng tính vào trần, phần còn lại nói rõ bằng chữ dưới thanh công cụ; effect lọc **tầng** giữ nguyên.
+- **Chưa làm (chờ số độ phủ thật từ production):** cột `qty` trên ô dimension (R1).
 - Test mới: `boq-map-tang`, `route-boq-export`, `boq-history`, `tracking-loc-task`, `tracking-dan`.
 
 ## ✅ Sửa 3 lỗi mức Cao từ đợt audit 2026-09-22 (S1, L1, L2) — 2026-09-22

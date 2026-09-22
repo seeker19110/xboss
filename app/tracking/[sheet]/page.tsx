@@ -29,7 +29,7 @@ import { sortFloorsDesc } from "@/lib/nen/floors";
 import { useTrackingData } from "./useTrackingData";
 import { TrackingToolbar } from "./TrackingToolbar";
 import { TrackingGrid } from "./TrackingGrid";
-import { locNhomTheoTask, taskKhopLoc } from "./locTask";
+import { locNhomTheoTask, nhomTuMoTheoLoc, GIOI_HAN_NHOM_TU_MO } from "./locTask";
 import type { UserItem } from "./types";
 
 // Đọc giá trị lọc ban đầu từ query string (vd mở link chia sẻ đã kèm bộ lọc). Chỉ dùng
@@ -72,6 +72,9 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
     enqueueBatch,
   } = useTrackingData(sheet);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+  // Số nhóm khớp bộ lọc task còn bị GẬP vì đã chạm trần GIOI_HAN_NHOM_TU_MO (xem effect lọc
+  // task bên dưới) — hiển thị dòng nhắc để người dùng biết còn nhóm chưa tự mở.
+  const [nhomChuaTuMo, setNhomChuaTuMo] = useState(0);
   // 4 bộ lọc đồng bộ 2 chiều với URL (?q=&floor=&status=&task=) — đọc lúc mount, ghi lại
   // bằng history.replaceState mỗi khi đổi (xem effect bên dưới), không reload trang.
   const [query, setQuery] = useState(() => initTuUrl("q"));
@@ -135,19 +138,26 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
 
   // Chọn lọc task (?task=) → tự mở các nhóm còn task khớp, cùng lý do với effect tầng ở
   // trên: người dùng lọc để TÌM đúng việc, không nên còn phải bấm mở nhóm thủ công nữa.
+  // Giới hạn số nhóm tự mở (GIOI_HAN_NHOM_TU_MO) để tránh mount cùng lúc quá nhiều lưới nặng
+  // (vd ODNN Zone 1: 28 nhóm × 616 ô tick/nhóm) — xem lý do đầy đủ trong locTask.ts.
   useEffect(() => {
-    if (!taskFilter || !data?.packages) return;
-    setExpanded((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const p of data.packages) {
-        if (!next[p.id] && p.tasks.some((t) => taskKhopLoc(t.status, taskFilter))) {
-          next[p.id] = true;
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
+    if (!taskFilter) {
+      setNhomChuaTuMo(0);
+      return;
+    }
+    if (!data?.packages) return;
+    const { moThem, boQua } = nhomTuMoTheoLoc(data.packages, taskFilter, expanded);
+    if (moThem.length > 0) {
+      setExpanded((prev) => {
+        const next = { ...prev };
+        for (const id of moThem) next[id] = true;
+        return next;
+      });
+    }
+    setNhomChuaTuMo((prev) => (prev !== boQua ? boQua : prev));
+    // Cố ý không phụ thuộc `expanded`: chỉ chạy lại khi taskFilter/data đổi, tránh vòng lặp tự
+    // mở lại nhóm người dùng vừa tự gập (đọc expanded ở trên qua closure là đủ, không cần deps).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskFilter, data]);
 
   // Ghi 4 bộ lọc vào URL (không reload) — giữ tương thích ?floor= đang được heatmap
@@ -568,6 +578,12 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
       />
 
       <main className="p-4">
+        {nhomChuaTuMo > 0 && (
+          <p className="text-xs text-zinc-500 mb-2">
+            Đang mở {GIOI_HAN_NHOM_TU_MO} nhóm khớp lọc; còn {nhomChuaTuMo} nhóm bạn tự mở khi cần —
+            giữ lưới nhẹ trên điện thoại.
+          </p>
+        )}
         {/* Vùng cuộn ngang chung — tất cả nhóm chia sẻ 1 scrollbar,
             cột căn thẳng nhau khi mở/đóng nhóm */}
         <div className="overflow-x-auto scrollbar-none">

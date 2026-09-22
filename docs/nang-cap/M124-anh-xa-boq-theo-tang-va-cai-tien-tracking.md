@@ -181,3 +181,37 @@ module lib) · `npm run build` trước khi mở PR. Test chạm DB import `test
 - D1 Ánh xạ theo **tầng** (không theo nhóm) — người dùng 2026-09-22.
 - D2 Không map tự động theo mã (bất khả thi, §1).
 - D3 Tỷ trọng sau khi thêm theo tầng = chia đều toàn bộ map; PM sửa tay sau.
+
+## 19. Hậu kiểm sau PR #505 — số đo lưới tracking (2026-09-22)
+
+Hai non-goal ở §2 đều chờ số đo. Đã đo xong phần đo được: **virtualization lưới KHÔNG cần làm.**
+
+Số đo lấy bằng `analyzeWorkbook`/`classifyRow` (`lib/tien-do/import.ts`) chạy trên file gốc
+`attachments/GIA THÀNH - TT AVIO Báo Cáo Tracking Tiến Độ Thi Công ACMV.xlsx`:
+
+| Sheet       | Nhóm | Task | Cột dim | Task/nhóm (max) | Ô tick/nhóm (max) |
+| ----------- | ---- | ---- | ------- | --------------- | ----------------- |
+| OGTĐ        | 31   | 279  | 13      | 9               | 117               |
+| OGHL        | 31   | 379  | 16      | 14              | 224               |
+| OGCH        | 29   | 261  | 38      | 9               | 342               |
+| ODNN Zone 1 | 29   | 812  | 22      | 28              | **616**           |
+| ODNN Zone 2 | 29   | 812  | 16      | 28              | 448               |
+
+Lý do con số theo **nhóm** mới là con số đúng: `app/tracking/[sheet]/page.tsx` render **một
+`TrackingGrid` cho mỗi nhóm**, mỗi lưới chỉ `fetch` và chỉ render ô khi nhóm được mở, và mọi nhóm
+mặc định gập. Lưới chưa bao giờ dựng 812 task cùng lúc — tệ nhất là 616 ô (~1.800 node DOM,
+mỗi ô `ODimension` = `td` + `label` + `input`). Ở cỡ đó virtualization chỉ thêm phức tạp mà không
+đổi gì, lại phá trang in (`print-hidden-col` cần mọi hàng có thật trong DOM) và phá định vị vùng
+chọn theo chỉ số hàng. **Chốt: bỏ mục virtualization khỏi nợ kỹ thuật** (YAGNI, ADR-0007 tinh thần
+"thay đổi tối thiểu").
+
+**Nhưng số đo lộ ra một hồi quy thật của việc 4:** effect "lọc task tự mở nhóm" mở **mọi** nhóm có
+task khớp, không trần. Trên ODNN Zone 1, lọc một trạng thái phổ biến khớp cả 29 nhóm ⇒ 29 request
+`GET /api/workpackages/:id/dimensions` song song + mount ~17.000 ô (~52.000 node DOM) một lượt,
+đúng trên điện thoại ngoài công trường. Sửa: `GIOI_HAN_NHOM_TU_MO = 8` + `nhomTuMoTheoLoc()` trong
+`app/tracking/[sheet]/locTask.ts` (nhóm khớp đã mở sẵn cũng tính vào trần), phần còn lại người dùng
+tự bấm và được nói rõ bằng chữ dưới thanh công cụ. Effect lọc **tầng** giữ nguyên: mỗi tầng chỉ có
+vài nhóm.
+
+Còn treo: cột `qty` trên ô dimension (R1) vẫn chờ số độ phủ thật từ production — không đo được từ
+file Excel gốc.
