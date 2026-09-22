@@ -1,5 +1,37 @@
 # PROGRESS.md — Trạng thái dự án
 
+## 🚧 Audit 2026-09-22 — 4/6 cặp "stack song song" đã tự giải quyết (ADR-0011); dọn bảng DB tạm hoãn
+
+Người dùng yêu cầu audit tiếp 6 cặp "stack song song cùng nghiệp vụ" (claim, đấu thầu, dòng
+tiền, HSE, BIM, rủi ro) nêu trong ADR-0011. Kiểm lại thấy 4 cặp đã tự giải quyết qua các đợt
+xoá module `thuNghiem` trước đó (route/trang `/engineering/*` phía song song đã xoá), chỉ còn
+sót rác DB (bảng `engineering_*` mồ côi, migration tạo nhưng không code nào đọc/ghi nữa) do
+0153 (2026-09-21) bỏ sót — 15 bảng thuộc nhóm Prediction (0096), BIM/BIM-viewer (0114),
+CAD/BIM Professional Upgrade (0122), NextGen Apex (0127, trừ `engineering_fidic_tia_claims`
+vẫn sống, dùng bởi M94 TIA Claim Engine).
+
+- `scripts/dem-du-lieu-engineering.ts` + ADR-0011 cập nhật: chỉ còn **2 cặp thật sự song
+  song, chưa quyết** — Đấu thầu (`tender.ts` vs `engineering-bidding-matrix.ts`) và Dòng tiền
+  (`finance.ts::cashflowActual()` vs `engineering-cashflow.ts`, engine mô phỏng độc lập).
+  Claim/EOT, HSE, BIM, Rủi ro coi như đã xong (không còn lớp `engineering` song song).
+- **Migration DROP 15 bảng mồ côi RÚT KHỎI PR này**: viết 1 file gộp rồi tách thành 4 file
+  nhỏ theo nhóm (0155-0158), nhưng cả 2 lần đều làm CI `test (Postgres)` + `coverage` fail ổn
+  định (1/3787 ca, tái hiện y hệt dù tách nhỏ — loại trừ giả thuyết khoá/thời gian). Lần theo
+  log Postgres thô thấy dấu vết `UPDATE engineering_smart_ipc_records ...` (backfill của
+  migration 0138) chạy SAU KHI bảng đã bị DROP, nhưng rà code `lib/db/migrate.ts` +
+  `scripts/run-tests-parallel.mjs` (base migrate 1 lần rồi clone template cho từng worker)
+  không tìm ra race hợp lý theo logic — chưa xác định được gốc rễ thật trong giới hạn công cụ
+  đọc log CI (log quá dài, không tải được bản thô do egress bị chặn). Không đủ tự tin push
+  migration khi chưa hiểu rõ nguyên nhân.
+
+**Tiếp theo:**
+
+1. Điều tra lại nguyên nhân CI fail khi DROP các bảng này (có thể cần môi trường có quyền tải
+   log CI thô, hoặc tái hiện cục bộ với `TEST_DATABASE_URL`) trước khi mở lại việc dọn bảng.
+2. Chạy `npm run dem:engineering` trên production để đo số dòng thật của Đấu thầu và Dòng
+   tiền, quyết gộp/xoá theo đúng bảng ngưỡng ADR-0011 — chưa làm vì chưa có `DATABASE_URL`
+   production trong phiên này.
+
 ## ✅ Audit 2026-09-22 — Xoá 6 module `thuNghiem: true` không ai bật
 
 Người dùng yêu cầu audit phân loại tính năng theo mức độ cần thiết rồi xoá nhóm rủi ro cao
@@ -45,7 +77,7 @@ nextgen-apex}.test.ts`, `tests/smart-ipc-{gate4-project-scope,gating,validate-bo
 5 file test batch (`tests/route-eng-{du-bao,zero-error,quy-trinh,mepf}.test.ts`,
 `tests/engineering-graph.test.ts`) cắt bỏ đúng phần liên quan, giữ phần còn lại (cashflow/
 bidding/qs-bom-explosion/shopdrawing-lod400/pinnacle, agent-sessions/objects/workflows,
-lineage/impact/data-quality, mepf-*/logistics/ledger/closed-loop-sync).
+lineage/impact/data-quality, mepf-\*/logistics/ledger/closed-loop-sync).
 `tests/feature-flags.test.ts`: không còn module `thuNghiem` thật nào để test cơ chế chung
 (`isModuleEnabled`/`assertModuleEnabled`/`findModuleByRoute`) — `mock.module("@/lib/nen/
 modules", …)` với 1 module giả `module-thu-nghiem-gia` (pattern `tests/google-sheets.test.ts`).

@@ -14,13 +14,16 @@
 import "./env";
 import { query } from "@/lib/db";
 
-/** 6 cặp còn treo trong ADR-0011 + cặp thầu phụ (đã nối ở 0137, để đối chiếu). */
+/**
+ * 2 cặp còn treo thật trong ADR-0011 + cặp thầu phụ (đã nối ở 0137, để đối chiếu).
+ *
+ * 4 cặp còn lại của bảng gốc ADR-0011 (Claim/EOT, HSE, BIM, Rủi ro) đã tự giải quyết qua các
+ * đợt audit 2026-09-21/22 (0153, 0155): route/trang `/engineering/*` tương ứng bị xoá, các
+ * bảng `engineering_*` mồ côi bị DROP — không còn gì để đo/quyết, nên bỏ khỏi danh sách này.
+ * `engineering_fidic_tia_claims` KHÔNG thuộc diện đó — vẫn sống (M94 TIA Claim Engine,
+ * `lib/tai-chinh/contracts-fidic.ts`), không phải lớp song song với `claims`.
+ */
 const CAP: { nghiepVu: string; bangGoc: string[]; engineering: string[] }[] = [
-  {
-    nghiepVu: "Claim / EOT",
-    bangGoc: ["claims"],
-    engineering: ["engineering_fidic_claims", "engineering_fidic_tia_claims"],
-  },
   {
     nghiepVu: "Đấu thầu",
     bangGoc: ["tender_packages", "tender_bids"],
@@ -30,16 +33,6 @@ const CAP: { nghiepVu: string; bangGoc: string[]; engineering: string[] }[] = [
     nghiepVu: "Dòng tiền",
     bangGoc: ["invoices"],
     engineering: ["engineering_cashflow_forecast_runs", "engineering_cashflow_period_projections"],
-  },
-  {
-    nghiepVu: "HSE",
-    bangGoc: ["hse_records"],
-    engineering: ["engineering_hse_vision_scans", "engineering_hse_detected_hazards"],
-  },
-  {
-    nghiepVu: "Rủi ro / dự báo",
-    bangGoc: ["risks"],
-    engineering: ["engineering_prediction_runs", "engineering_prediction_outputs"],
   },
   {
     nghiepVu: "Thầu phụ (đã nối 0137)",

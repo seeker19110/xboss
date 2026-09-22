@@ -79,10 +79,39 @@ một bảng mang cột danh tính (`company_name`, `tax_code`, `supplier_name`,
   `GET /api/engineering/iot/devices`; thêm `scripts/don-du-lieu-seed-bia.ts` để dọn phần đã
   lỡ ghi (mặc định chỉ báo cáo).
 
+## Cập nhật 2026-09-22 — 4/6 cặp đã tự giải quyết
+
+Audit "6 cặp stack song song" (yêu cầu người dùng 2026-09-22) kiểm lại bảng 6 cặp ở trên,
+đối chiếu với các đợt xoá module `thuNghiem` sau ADR này (0153 ngày 2026-09-21, đợt xoá
+`engineering-predictions`/`engineering-nextgen-apex`/`combine` ngày 2026-09-22): **4 cặp đã
+tự giải quyết**, không còn là "hai lớp song song" nữa ở tầng CODE — route/trang
+`/engineering/*` phía đó đã bị xoá:
+
+- **Claim/EOT**, **HSE**, **BIM/bản vẽ**, **Rủi ro** — lớp `engineering` không còn tồn tại ở
+  code. Không cần quyết gộp/xoá gì thêm ở tầng ứng dụng.
+- **Bảng DB mồ côi vẫn còn 15 bảng chưa dọn được** (nhóm Prediction 0096, BIM/BIM-viewer
+  0114, CAD/BIM Professional Upgrade 0122, NextGen Apex 0127 trừ `engineering_fidic_tia_claims`
+  vẫn sống). Đã thử viết migration DROP (PR #509, 2026-09-22) nhưng làm CI `test (Postgres)` +
+  `coverage` fail ổn định không rõ nguyên nhân (nghi liên quan `UPDATE
+engineering_smart_ipc_records` của migration 0138 chạy sau khi bảng bị DROP, nhưng chưa xác
+  minh được cơ chế) — RÚT migration khỏi PR, xem `PROGRESS.md` mục tương ứng. Cần điều tra kỹ
+  hơn trước khi mở lại.
+
+**Chỉ còn 2 cặp thật sự song song, chưa quyết:**
+
+- **Đấu thầu** — `tender.ts` (`tender_packages`/`tender_bids`) vs
+  `engineering-bidding-matrix.ts` (`engineering_bidding_packages`/`…_vendor_quotes`).
+- **Dòng tiền** — `finance.ts::cashflowActual()` (đọc `cash_transactions`/`invoices` thật) vs
+  `engineering-cashflow.ts` (engine mô phỏng/dự báo, `engineering_cashflow_forecast_runs`/
+  `…_projections`).
+
+`scripts/dem-du-lieu-engineering.ts` đã cập nhật, chỉ còn đo 2 cặp này + cặp thầu phụ (đối
+chiếu 0137).
+
 ## Việc CÒN LẠI — cần đo trước khi quyết
 
-Sáu cặp còn lại (claim/EOT, đấu thầu, dòng tiền, HSE, BIM, rủi ro) **chưa gộp**, và ADR này
-cố ý không quyết thay. Điều kiện để quyết:
+Hai cặp còn lại (đấu thầu, dòng tiền) **chưa gộp**, và ADR này cố ý không quyết thay. Điều
+kiện để quyết:
 
 1. Đếm số dòng thật của từng bảng `engineering_*` trên **production** (rỗng → "gộp" trở
    thành "xoá", rẻ hơn nhiều bậc).
