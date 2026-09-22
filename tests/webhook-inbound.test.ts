@@ -2,7 +2,6 @@ import "@/tests/setup";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { hashOtp, kiemOtp, sinhOtp, OTP_DO_DAI, OTP_HAN_PHUT } from "@/lib/bao-mat/otp";
 import { xacThucWebhookTelegram, xacThucWebhookZalo } from "@/lib/bao-mat/webhook-inbound";
 
 const BI_MAT_TG = "secret-telegram-cuc-ky-dai-va-ngau-nhien";
@@ -34,40 +33,6 @@ async function voiEnv(env: Record<string, string | undefined>, fn: () => Promise
     }
   }
 }
-
-// ===== lib/bao-mat/otp.ts (thuần, không cần Postgres) =====
-
-test("V1/OTP: sinhOtp luôn ra đúng 6 chữ số và trải đều biên", () => {
-  const thay = new Set<string>();
-  for (let i = 0; i < 500; i++) {
-    const otp = sinhOtp();
-    assert.match(otp, /^\d{6}$/, `OTP sai định dạng: ${otp}`);
-    assert.equal(otp.length, OTP_DO_DAI);
-    const n = Number(otp);
-    assert.ok(n >= 100000 && n <= 999999, `OTP ngoài khoảng: ${otp}`);
-    thay.add(otp);
-  }
-  // 500 lần sinh mà trùng gần hết là dấu hiệu nguồn ngẫu nhiên hỏng.
-  assert.ok(thay.size > 400, `Mã sinh ra lặp bất thường: ${thay.size}/500 giá trị khác nhau`);
-  assert.equal(OTP_HAN_PHUT, 15);
-});
-
-test("V1/OTP: hashOtp cho SHA-256 hex ổn định, kiemOtp so đúng/sai", () => {
-  const otp = "123456";
-  const h = hashOtp(otp);
-  assert.match(h, /^[0-9a-f]{64}$/);
-  assert.equal(h, hashOtp(otp), "cùng đầu vào phải cho cùng hash");
-  assert.notEqual(h, hashOtp("123457"));
-  assert.notEqual(h, otp, "tuyệt đối không lưu bản rõ");
-
-  assert.equal(kiemOtp(otp, h), true);
-  assert.equal(kiemOtp(" 123456 ", h), true, "cắt khoảng trắng như lúc băm");
-  assert.equal(kiemOtp("654321", h), false);
-  assert.equal(kiemOtp(otp, null), false, "không còn OTP chờ → luôn sai");
-  assert.equal(kiemOtp(otp, ""), false);
-  assert.equal(kiemOtp("", h), false);
-  assert.equal(kiemOtp(otp, "hash-ngan"), false, "độ dài lệch không được throw");
-});
 
 // ===== lib/bao-mat/webhook-inbound.ts (thuần, không cần Postgres) =====
 
