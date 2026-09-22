@@ -52,10 +52,7 @@ export async function PUT(req: NextRequest) {
   // không đụng vào Admin — chặn đường leo quyền qua route này (audit 2026-09-22).
   if (user.role !== "admin") {
     if (userId === user.id)
-      return NextResponse.json(
-        { error: "Không thể tự gán dự án cho chính mình" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Không thể tự gán dự án cho chính mình" }, { status: 403 });
     if (target.role === "admin")
       return NextResponse.json(
         { error: "Chỉ Admin mới gán được dự án cho Admin" },
@@ -63,10 +60,7 @@ export async function PUT(req: NextRequest) {
       );
     const visible = await visibleProjectIds(user);
     if (projectIds.some((id: number) => !visible.includes(id)))
-      return NextResponse.json(
-        { error: "Chỉ gán được dự án bạn đang được thấy" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Chỉ gán được dự án bạn đang được thấy" }, { status: 403 });
   }
 
   // Mọi projectIds phải tồn tại thật, cùng org với người gọi — kể cả Admin (chặn gán vào
