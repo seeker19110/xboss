@@ -1,6 +1,7 @@
 import { Search, Plus } from "lucide-react";
 import { STATUS_LABEL } from "@/lib/tien-do/status";
 import { Button } from "@/app/components/ui";
+import { TASK_FILTER_OPTIONS } from "./locTask";
 
 export function TrackingToolbar({
   query,
@@ -10,6 +11,8 @@ export function TrackingToolbar({
   floors,
   statusFilter,
   onStatusFilterChange,
+  taskFilter,
+  onTaskFilterChange,
   showAddPkg,
   onAddPkg,
   packagesCount,
@@ -21,11 +24,14 @@ export function TrackingToolbar({
   floors: string[];
   statusFilter: string;
   onStatusFilterChange: (v: string) => void;
+  // Lọc cấp TASK (M124 việc 4) — khác statusFilter ở trên vốn lọc theo trạng thái NHÓM.
+  taskFilter: string;
+  onTaskFilterChange: (v: string) => void;
   showAddPkg: boolean;
   onAddPkg: () => void;
   packagesCount: number;
 }) {
-  const hasFilter = query || floorFilter || statusFilter;
+  const hasFilter = query || floorFilter || statusFilter || taskFilter;
 
   return (
     <div className="sticky top-12 z-20 px-4 sm:px-6 py-3 flex flex-wrap gap-2.5 items-center border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md no-print">
@@ -69,17 +75,36 @@ export function TrackingToolbar({
           ))}
         </select>
 
+        <select
+          value={taskFilter}
+          onChange={(e) => onTaskFilterChange(e.target.value)}
+          aria-label="Lọc theo trạng thái task"
+          className="bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 text-base sm:text-sm outline-none focus:border-emerald-500 transition h-10"
+        >
+          {TASK_FILTER_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.value ? `Task: ${o.label}` : "Task: Tất cả"}
+            </option>
+          ))}
+        </select>
+
         {hasFilter && (
           <button
             onClick={() => {
               onQueryChange("");
               onFloorFilterChange("");
               onStatusFilterChange("");
+              onTaskFilterChange("");
             }}
             className="text-xs text-zinc-400 hover:text-rose-300 px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 transition"
           >
             Xóa bộ lọc
           </button>
+        )}
+
+        {/* Đang lọc task → vùng chọn tick trong lưới bị tắt (xem TrackingGrid), báo trước ở đây. */}
+        {taskFilter && (
+          <span className="text-[11px] text-zinc-500">Đã tắt chọn vùng tick khi đang lọc task</span>
         )}
       </div>
 

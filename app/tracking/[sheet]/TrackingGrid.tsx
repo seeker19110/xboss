@@ -43,6 +43,7 @@ import {
 import { useTickVung } from "./useTickVung";
 import { ThanhVungChon } from "./ThanhVungChon";
 import { ODimension } from "./ODimension";
+import { taskKhopLoc } from "./locTask";
 
 // Ngày rút gọn d/M cho dòng task (đỡ chiếm chỗ trên lưới).
 const fmtShortDate = (d: string | null) => {
@@ -107,6 +108,7 @@ export function TrackingGrid({
   sheetCols,
   pendingFront,
   qcReason,
+  taskFilter, // Lọc cấp task (M124 việc 4) — ẩn hàng task không khớp trạng thái đang lọc.
 }: {
   pkg: Pkg;
   pkgIdx: number;
@@ -125,6 +127,7 @@ export function TrackingGrid({
   sheetCols: string[];
   pendingFront: boolean;
   qcReason?: string;
+  taskFilter: string;
 }) {
   const [grid, setGrid] = useState<Grid | null>(null);
   const [editName, setEditName] = useState<string | null>(null);
@@ -183,11 +186,10 @@ export function TrackingGrid({
 
   // Chọn vùng + hoàn tác (M121). Logic nằm trong hook để file này chỉ còn dựng giao diện.
   const vungChon = useTickVung({ grid, load, onChanged, onOfflineTickBatch });
-
-  // Đóng nhóm hoặc đổi dữ liệu → bỏ vùng chọn: giữ lại sẽ trỏ tới ô đã unmount.
+  // Đóng nhóm/đổi dữ liệu hoặc bật lọc task → bỏ vùng chọn (ô đã unmount/ẩn không còn hợp lệ).
   useEffect(() => {
-    if (!expanded) vungChon.boChon();
-  }, [expanded, vungChon]);
+    if (!expanded || taskFilter) vungChon.boChon();
+  }, [expanded, taskFilter, vungChon]);
 
   // Ctrl+Z / Ctrl+Shift+Z (Cmd trên máy Mac). Bắt ở window nhưng bỏ qua khi đang gõ trong ô
   // nhập liệu — nếu không sẽ cướp mất undo của chính ô nhập đó.
@@ -698,9 +700,9 @@ export function TrackingGrid({
     onChanged();
   }
 
-  // Chiều rộng cột — định nghĩa 1 chỗ, dùng chung cho hàng nhóm lẫn bảng task
-  // ce = canEdit && editMode — dùng để gate toàn bộ nút sửa trong lưới
+  // Chiều rộng cột dùng chung cho hàng nhóm lẫn bảng task; ce gate nút sửa, anHang ẩn hàng lọc task
   const ce = canEdit && editMode;
+  const anHang = (status: string) => !taskKhopLoc(status, taskFilter);
   const hpc = (col: string) => (hiddenPrintCols.has(col) ? " print-hidden-col" : "");
   const showBoq = canEdit; // BOQ chỉ hiển thị cho Admin/PM (luôn hiện, kể cả khi chỉ xem)
   const W_BOQ = showBoq ? 110 : 0;
@@ -1385,7 +1387,7 @@ export function TrackingGrid({
           <tbody>
             {grid.tasks.map((t, ti) => (
               <Fragment key={t.id}>
-                <tr className="hover:bg-zinc-800/30 transition-colors">
+                <tr className="hover:bg-zinc-800/30 transition-colors" hidden={anHang(t.status)}>
                   {showBoq && (
                     <td
                       className={`${stkBoq} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden${hpc("BOQ")}`}
@@ -1688,12 +1690,12 @@ export function TrackingGrid({
                       }}
                       onPointerDown={(e) => {
                         // Chỉ bật chọn vùng ở chế độ sửa — lúc chỉ xem thì kéo tay phải để
-                        // cuộn trang, không được cướp thao tác cuộn của người dùng.
-                        if (!editMode || e.button === 2) return;
+                        // cuộn trang, không được cướp thao tác cuộn; đang lọc task cũng tắt.
+                        if (!editMode || e.button === 2 || taskFilter) return;
                         if (e.shiftKey) vungChon.moRongToi(ti, ci);
                         else vungChon.batDau(ti, ci);
                       }}
-                      onPointerEnter={() => editMode && vungChon.keoToi(ti, ci)}
+                      onPointerEnter={() => editMode && !taskFilter && vungChon.keoToi(ti, ci)}
                       onPointerUp={() => vungChon.ketThucKeo()}
                     />
                   ))}
