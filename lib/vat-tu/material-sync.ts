@@ -285,8 +285,14 @@ async function applyToDb(id: number, w: MaterialFields): Promise<void> {
 /**
  * Chạy 1 lần đồng bộ. Cho phép inject sheet client (phục vụ test); mặc định dùng
  * Google Sheets thật. Ném lỗi nếu thiếu cấu hình Google (fail-fast).
+ *
+ * @param orgId Tổ chức thực hiện đồng bộ (dùng khi kiểm mã BOQ bị chiếm).
+ * @param sheetClient Optional sheet client inject cho test.
  */
-export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSummary> {
+export async function runMaterialSync(
+  orgId: number,
+  sheetClient?: SheetClient,
+): Promise<SyncSummary> {
   if (!(await acquireLock()))
     throw new Error("Đang có một lần đồng bộ khác chạy — vui lòng thử lại sau.");
 
@@ -443,10 +449,8 @@ export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSu
 
       let boqCode: string | null = f.boqCode || null;
       if (boqCode) {
-        // M54 GĐ1 PR2: đồng bộ Google Sheet chạy qua cron/nút Admin, KHÔNG có session mang
-        // orgId — integration hiện là single-tenant toàn cục (1 Sheet ↔ 1 DB). Org hoá luồng
-        // đồng bộ hệ ngoài per-org là việc Giai đoạn 2, ngoài phạm vi PR2 → giữ org mặc định 1.
-        const usedBy = await boqTakenBy(boqCode, 1);
+        // Kiểm mã BOQ không bị chiếm bởi task/nhóm/vật tư khác trong tổ chức này.
+        const usedBy = await boqTakenBy(boqCode, orgId);
         if (usedBy) {
           summary.skipped.push({
             row: rowNum,

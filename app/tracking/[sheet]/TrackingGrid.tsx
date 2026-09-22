@@ -880,7 +880,7 @@ export function TrackingGrid({
                         setEditFloor(pkg.floorLabel ?? "");
                       }}
                       title="Sửa tầng"
-                      className="opacity-100 sm:opacity-0 sm:group-hover/floor:opacity-100 text-zinc-600 hover:text-emerald-400"
+                      className="opacity-100 sm:opacity-0 sm:group-hover/floor:opacity-100 text-zinc-500 hover:text-emerald-400"
                     >
                       <Pencil className="w-2.5 h-2.5" />
                     </button>
@@ -1133,14 +1133,14 @@ export function TrackingGrid({
                         <button
                           onClick={() => drawingInputRef.current?.click()}
                           title="Upload PDF bản vẽ"
-                          className="text-zinc-600 hover:text-sky-400"
+                          className="text-zinc-500 hover:text-sky-400"
                         >
                           <Upload className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => editPkgDrawingLink()}
                           title="Gán link bản vẽ"
-                          className="text-zinc-600 hover:text-sky-400"
+                          className="text-zinc-500 hover:text-sky-400"
                         >
                           <Link2 className="w-3.5 h-3.5" />
                         </button>
@@ -1197,14 +1197,14 @@ export function TrackingGrid({
                         <button
                           onClick={() => bbntInputRef.current?.click()}
                           title="Upload biên bản nghiệm thu"
-                          className="text-zinc-600 hover:text-emerald-400"
+                          className="text-zinc-500 hover:text-emerald-400"
                         >
                           <Upload className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => editBbntLink()}
                           title="Gán link biên bản"
-                          className="text-zinc-600 hover:text-emerald-400"
+                          className="text-zinc-500 hover:text-emerald-400"
                         >
                           <Link2 className="w-3.5 h-3.5" />
                         </button>
@@ -1244,14 +1244,14 @@ export function TrackingGrid({
                     <button
                       onClick={() => copyPkg()}
                       title="Sao chép nhóm này"
-                      className="p-0.5 text-zinc-600 hover:text-sky-400"
+                      className="p-0.5 text-zinc-500 hover:text-sky-400"
                     >
                       <Copy className="w-[17px] h-[17px]" />
                     </button>
                     <button
                       onClick={() => deletePkg()}
                       title="Xoá nhóm này"
-                      className="p-0.5 text-zinc-600 hover:text-red-400"
+                      className="p-0.5 text-zinc-500 hover:text-red-400"
                     >
                       <Trash2 className="w-[17px] h-[17px]" />
                     </button>
@@ -1352,7 +1352,7 @@ export function TrackingGrid({
                     <button
                       onClick={() => addColumnAfter(grid.columns[grid.columns.length - 1] ?? null)}
                       title="Thêm cột mới vào cuối"
-                      className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-emerald-200 hover:bg-emerald-950 rounded"
+                      className="w-6 h-6 flex items-center justify-center text-zinc-500 hover:text-emerald-200 hover:bg-emerald-950 rounded"
                     >
                       <Columns className="w-3 h-3" />
                     </button>
@@ -1418,7 +1418,7 @@ export function TrackingGrid({
                               <button
                                 aria-label="Sửa"
                                 onClick={() => editTaskDrawing(t)}
-                                className="text-zinc-600 hover:text-emerald-400"
+                                className="text-zinc-500 hover:text-emerald-400"
                               >
                                 <Pencil className="w-2.5 h-2.5" />
                               </button>
@@ -1514,7 +1514,7 @@ export function TrackingGrid({
                           <button
                             aria-label="Sửa"
                             onClick={() => setEditTask({ id: t.id, value: t.name })}
-                            className="shrink-0 text-zinc-600 hover:text-emerald-400"
+                            className="shrink-0 text-zinc-500 hover:text-emerald-400"
                           >
                             <Pencil className="w-3 h-3" />
                           </button>
@@ -1541,14 +1541,14 @@ export function TrackingGrid({
                       <button
                         onClick={() => setHistoryTask(t)}
                         title="Lịch sử tiến độ"
-                        className="text-zinc-600 hover:text-emerald-400"
+                        className="text-zinc-500 hover:text-emerald-400"
                       >
                         <History className="w-3 h-3" />
                       </button>
                       <button
                         onClick={() => setPhotosTask(t)}
                         title="Ảnh hiện trường"
-                        className={`flex items-center gap-0.5 ${t.photoCount > 0 ? "text-sky-400 hover:text-sky-300" : "text-zinc-600 hover:text-sky-400"}`}
+                        className={`flex items-center gap-0.5 ${t.photoCount > 0 ? "text-sky-400 hover:text-sky-300" : "text-zinc-500 hover:text-sky-400"}`}
                       >
                         <Camera className="w-3 h-3" />
                         {t.photoCount > 0 && <span className="text-[10px]">{t.photoCount}</span>}
@@ -1556,7 +1556,7 @@ export function TrackingGrid({
                       <button
                         onClick={() => setCommentsTask(t)}
                         title="Bình luận / trao đổi"
-                        className={`flex items-center gap-0.5 ${t.commentCount > 0 ? "text-violet-400 hover:text-violet-300" : "text-zinc-600 hover:text-violet-400"}`}
+                        className={`flex items-center gap-0.5 ${t.commentCount > 0 ? "text-violet-400 hover:text-violet-300" : "text-zinc-500 hover:text-violet-400"}`}
                       >
                         <MessageSquare className="w-3 h-3" />
                         {t.commentCount > 0 && (
@@ -1637,7 +1637,7 @@ export function TrackingGrid({
                         actual: { start: t.actualStartDate ?? null, end: t.actualEndDate ?? null },
                       });
                     const baseCell = `border-b border-r border-zinc-800 px-1 py-1 text-center align-middle text-[10px] whitespace-nowrap`;
-                    const dateCls = `${baseCell} ${inherited ? "text-zinc-600 italic" : "text-zinc-400"} ${ce ? "cursor-pointer hover:bg-zinc-800" : ""}`;
+                    const dateCls = `${baseCell} ${inherited ? "text-zinc-500 italic" : "text-zinc-400"} ${ce ? "cursor-pointer hover:bg-zinc-800" : ""}`;
                     return (
                       <>
                         <td

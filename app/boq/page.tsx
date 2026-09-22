@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   FileUp,
   Download,
+  Layers,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
@@ -19,6 +20,7 @@ import { taiJson } from "@/app/lib/taiDuLieu";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
+import { Button } from "@/app/components/ui";
 import DoPhuBoqCard from "./_components/DoPhuBoqCard";
 
 type NormResourceType = "material" | "labor" | "equipment";
@@ -68,6 +70,20 @@ const VO_STATUS_LABEL: Record<string, string> = {
 };
 type SystemOption = { id: number; code: string; name: string };
 type TaskHit = { id: number; code: string; name: string; sheetType: string };
+// Gợi ý task theo tầng (M124 việc 1) — khớp TaskTheoTang của lib/khoi-luong/boq-map-tang.ts.
+type TaskTheoTang = {
+  id: number;
+  code: string;
+  name: string;
+  sheetName: string;
+  pkgCode: string;
+  pkgName: string;
+  progressPercent: number;
+  daMapDongKhac: boolean;
+  diemGiong: number;
+};
+/** Từ điểm này trở lên coi là "chắc chắn cùng việc" ⇒ tick sẵn hộ người dùng. */
+const NGUONG_TICK_SAN = 0.5;
 
 function fmtVND(n: number) {
   if (!n) return "—";
@@ -907,6 +923,16 @@ function BoqDetailModal({
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<TaskHit[]>([]);
 
+  // Panel "Thêm theo tầng" (M124 việc 1): chọn tầng ⇒ danh sách task cùng hệ, tick nhiều rồi
+  // thêm một lượt. `chonTang` rỗng nghĩa là chưa chọn tầng nào.
+  const [moTang, setMoTang] = useState(false);
+  const [dsTang, setDsTang] = useState<string[]>([]);
+  const [chonTang, setChonTang] = useState("");
+  const [dsTask, setDsTask] = useState<TaskTheoTang[]>([]);
+  const [dangTaiTang, setDangTaiTang] = useState(false);
+  const [loiTang, setLoiTang] = useState("");
+  const [tickTang, setTickTang] = useState<Set<number>>(new Set());
+
   useEffect(() => {
     const term = q.trim();
     if (term.length < 2) {
@@ -970,6 +996,69 @@ function BoqDetailModal({
     if (mapEntries.length === 0) return;
     const w = 1 / mapEntries.length;
     setMapEntries((prev) => prev.map((e) => ({ ...e, weight: w })));
+  }
+
+  // Tải gợi ý theo tầng. `floor` rỗng ⇒ chỉ lấy danh sách tầng (mở panel lần đầu).
+  const taiTheoTang = useCallback(
+    async (floor: string) => {
+      setDangTaiTang(true);
+      setLoiTang("");
+      const kq = await taiJson<{ floors: string[]; tasks: TaskTheoTang[] }>(
+        `/api/boq/${item.id}/tasks-theo-tang${floor ? `?floor=${encodeURIComponent(floor)}` : ""}`,
+      );
+      setDangTaiTang(false);
+      if (!kq.ok) {
+        setLoiTang(kq.loi);
+        return;
+      }
+      setDsTang(kq.data.floors);
+      setDsTask(kq.data.tasks);
+      // Tick sẵn task giống tên rõ rệt và chưa map ở đâu — người dùng chỉ cần bỏ tick ngoại lệ.
+      setTickTang(
+        new Set(
+          kq.data.tasks
+            .filter((t) => t.diemGiong >= NGUONG_TICK_SAN && !t.daMapDongKhac)
+            .map((t) => t.id),
+        ),
+      );
+    },
+    [item.id],
+  );
+
+  function moPanelTang() {
+    setMoTang(true);
+    if (dsTang.length === 0) void taiTheoTang("");
+  }
+
+  function doiTang(floor: string) {
+    setChonTang(floor);
+    setDsTask([]);
+    setTickTang(new Set());
+    if (floor) void taiTheoTang(floor);
+  }
+
+  // Thêm các task đã tick vào map rồi CHIA ĐỀU toàn bộ map (D3 của M124): thêm cả chục task với
+  // weight = 1 sẽ làm Σ vượt 1 và bị PUT chặn, nên chia đều ngay trong cùng một lần setState —
+  // gọi splitEvenly() rời sẽ chạy trên state cũ.
+  function themTaskTheoTang() {
+    const chon = dsTask.filter((t) => tickTang.has(t.id));
+    if (chon.length === 0) return;
+    setMapEntries((prev) => {
+      const co = new Set(prev.map((e) => e.taskId));
+      const gop = [
+        ...prev,
+        ...chon
+          .filter((t) => !co.has(t.id))
+          .map((t) => ({ taskId: t.id, taskCode: t.code, taskName: t.name, weight: 1 })),
+      ];
+      const w = gop.length > 0 ? 1 / gop.length : 1;
+      return gop.map((e) => ({ ...e, weight: w }));
+    });
+    setTickTang(new Set());
+    setMapMsg({
+      text: `Đã thêm ${chon.length} task và chia đều tỷ trọng. Bấm "Lưu map" để ghi.`,
+      warn: false,
+    });
   }
 
   async function saveMap() {
@@ -1142,7 +1231,109 @@ function BoqDetailModal({
                     Chia đều
                   </button>
                 )}
+                <Button
+                  size="sm"
+                  variant={moTang ? "primary" : "secondary"}
+                  icon={Layers}
+                  onClick={() => (moTang ? setMoTang(false) : moPanelTang())}
+                  aria-expanded={moTang}
+                  className="shrink-0"
+                >
+                  Thêm theo tầng
+                </Button>
               </div>
+
+              {moTang && (
+                <div className="border border-zinc-700 rounded-xl p-3 space-y-2 bg-zinc-950/70">
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={chonTang}
+                      onChange={(e) => doiTang(e.target.value)}
+                      aria-label="Chọn tầng"
+                      className="flex-1 min-h-10 bg-zinc-800 border border-zinc-700 rounded-lg px-2 text-sm text-white"
+                    >
+                      <option value="">— Chọn tầng —</option>
+                      {dsTang.map((f) => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      disabled={tickTang.size === 0}
+                      onClick={themTaskTheoTang}
+                    >
+                      Thêm {tickTang.size} task
+                    </Button>
+                  </div>
+
+                  {dangTaiTang && <p className="text-xs text-zinc-400">Đang tải…</p>}
+                  {loiTang && (
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-rose-300 flex-1">{loiTang}</p>
+                      <Button size="sm" onClick={() => void taiTheoTang(chonTang)}>
+                        Thử lại
+                      </Button>
+                    </div>
+                  )}
+                  {!dangTaiTang && !loiTang && chonTang && dsTask.length === 0 && (
+                    <p className="text-xs text-zinc-400">Tầng này chưa có task cùng hệ.</p>
+                  )}
+                  {!dangTaiTang && dsTang.length === 0 && !loiTang && (
+                    <p className="text-xs text-zinc-400">
+                      Chưa có nhóm công việc nào gắn tầng cho hệ của dòng BOQ này.
+                    </p>
+                  )}
+
+                  {dsTask.length > 0 && (
+                    <ul className="max-h-56 overflow-y-auto divide-y divide-zinc-800">
+                      {dsTask.map((t) => {
+                        const daCo = mapEntries.some((e) => e.taskId === t.id);
+                        return (
+                          <li key={t.id} className="flex items-start gap-2 py-1.5">
+                            <input
+                              type="checkbox"
+                              checked={daCo || tickTang.has(t.id)}
+                              disabled={daCo}
+                              aria-label={`Chọn task ${t.code} ${t.name}`}
+                              onChange={(ev) =>
+                                setTickTang((prev) => {
+                                  const s = new Set(prev);
+                                  if (ev.target.checked) s.add(t.id);
+                                  else s.delete(t.id);
+                                  return s;
+                                })
+                              }
+                              className="mt-1 w-4 h-4 accent-emerald-500"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm truncate">
+                                <span className="font-mono text-xs text-zinc-400">{t.code}</span>{" "}
+                                {t.name}
+                              </p>
+                              <p className="text-xs text-zinc-500 truncate">
+                                {t.sheetName} · {t.pkgCode} {t.pkgName} ·{" "}
+                                {Math.round(t.progressPercent * 100)}%
+                              </p>
+                            </div>
+                            {daCo ? (
+                              <span className="text-xs text-emerald-300 shrink-0">đã có</span>
+                            ) : (
+                              t.daMapDongKhac && (
+                                <span className="text-xs text-amber-300 shrink-0">
+                                  đã map dòng khác
+                                </span>
+                              )
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
               {hits.length > 0 && (
                 <ul className="border border-zinc-700 rounded-lg divide-y divide-zinc-800 max-h-40 overflow-y-auto">
                   {hits.map((h) => (
