@@ -3,8 +3,11 @@
 // tính khi bảng nguồn tồn tại (module đã triển khai) → trả null để UI ẩn thẻ
 // (dashboard chạy được dù module sau chưa làm, vd work_fronts của M14).
 // Xem docs/nang-cap/M09-dashboard.md.
-import { query, queryOne, todayISO } from "@/lib/db";
+import { query, queryOne, todayISO, daysFromTodayISO } from "@/lib/db";
 import { costSummary } from "@/lib/tai-chinh/cost";
+import { DUE_SOON_COND, dueSoonParams, loadDueSoonThresholds } from "@/lib/tien-do/due-soon";
+import { sheetProgressKpi } from "@/lib/tien-do/kpi";
+import { progressAtDate } from "@/lib/tien-do/report";
 
 export async function tableExists(name: string): Promise<boolean> {
   const row = await queryOne<{ exists: boolean }>(
@@ -221,4 +224,87 @@ export async function bySystemBlock(projectId?: number | null): Promise<SystemCr
       budgetUsedPct: c && c.budget > 0 ? (c.committed / c.budget) * 100 : 0,
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// M127 — khối "Đến hạn ≤N ngày" và "Δ tuần" cho trang chủ chế độ Điều hành.
+// ---------------------------------------------------------------------------
+
+export type DueSoonTask = {
+  id: number;
+  code: string;
+  name: string;
+  endDate: string;
+  progressPercent: number;
+  floorLabel: string | null;
+  sheetType: string;
+  sheetSlug: string | null;
+};
+
+export type DueSoonBlock = {
+  /** Ngưỡng ngày từ alert_rules (mặc định 3). */
+  days: number;
+  /** Số TASK sắp đến hạn (không phải hạng mục). */
+  count: number;
+  /** Tối đa 10 task gần hạn nhất. */
+  tasks: DueSoonTask[];
+};
+
+// Task sắp đến hạn của dự án (+ lọc hệ nếu có) — cùng định nghĩa với thông báo `due_soon`
+// (lib/tien-do/due-soon.ts). Lọc dự án qua towers như bảng trễ trong /api/dashboard.
+export async function dueSoonBlock(opts: {
+  projectId?: number | null;
+  systemId?: number | null;
+}): Promise<DueSoonBlock> {
+  const projectId = opts.projectId ?? null;
+  const systemId = opts.systemId ?? null;
+  const th = await loadDueSoonThresholds(projectId);
+  const projectJoin = projectId != null ? "JOIN towers tw ON tw.id = st.tower_id" : "";
+  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
+  const systemFilter = systemId != null ? " AND st.system_id = ?" : "";
+
+  const tasks = await query<DueSoonTask>(
+    `SELECT t.id, t.code, t.name,
+            COALESCE(t.end_date, wp.end_date) AS "endDate",
+            t.progress_percent AS "progressPercent",
+            wp.floor_label AS "floorLabel",
+            st.code AS "sheetType", st.slug AS "sheetSlug"
+       FROM tasks t
+       JOIN work_packages wp ON t.package_id = wp.id
+       JOIN sheet_types st ON wp.sheet_type_id = st.id
+       ${projectJoin}
+      WHERE ${DUE_SOON_COND}${systemFilter}${projectFilter}
+      ORDER BY COALESCE(t.end_date, wp.end_date), t.id`,
+    ...dueSoonParams(th),
+    ...(systemId != null ? [systemId] : []),
+    ...(projectId != null ? [projectId] : []),
+  );
+
+  return { days: th.days, count: tasks.length, tasks: tasks.slice(0, 10) };
+}
+
+// Δ % tiến độ tổng có trọng số: hôm nay − 7 ngày trước. Hôm nay lấy từ sheetProgressKpi
+// (Σ avgProgress·total / Σ total); mốc cũ tái dựng từ task_history qua progressAtDate —
+// đúng cách nhánh `?range=week` của /api/dashboard đang làm. null khi không có task nào.
+export async function weekDeltaBlock(opts: {
+  projectId?: number | null;
+  systemId?: number | null;
+}): Promise<number | null> {
+  const projectId = opts.projectId ?? null;
+  const systemId = opts.systemId ?? null;
+
+  const kpi = await sheetProgressKpi({ projectId, systemId });
+  const total = kpi.reduce((s, k) => s + Number(k.total), 0);
+  if (total === 0) return null;
+  const nowPct =
+    kpi.reduce((s, k) => s + Number(k.avgProgress ?? 0) * Number(k.total), 0) / total;
+
+  const prevRows = await progressAtDate(daysFromTodayISO(-7), {
+    ...(systemId != null ? { systemId } : {}),
+    ...(projectId != null ? { projectId } : {}),
+  });
+  if (prevRows.length === 0) return null;
+  const prevPct = prevRows.reduce((s, r) => s + r.progress, 0) / prevRows.length;
+
+  return nowPct - prevPct;
 }
