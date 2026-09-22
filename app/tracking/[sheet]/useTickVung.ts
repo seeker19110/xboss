@@ -1,7 +1,8 @@
 "use client";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { showToast } from "@/app/components/Toast";
 import { useVungChon } from "@/app/components/grid/useVungChon";
+import { parseTSV, serializeTSV } from "@/lib/tien-do/grid";
 import {
   LICH_SU_RONG,
   ghiThaoTac,
@@ -14,20 +15,28 @@ import {
   type LichSuTick,
   type LoDao,
 } from "@/app/components/grid/lichSuTick";
+import { dungLoTuDan } from "./dan";
 import { dungLoTick, oTrongVung } from "./tick";
 import { guiLoTick } from "./tickApi";
 import type { Grid } from "./types";
 
-// Nối vùng chọn + lịch sử hoàn tác + gửi lô cho lưới tracking (M121 PR3+PR4).
+// Phần tử đang được gõ liệu — bỏ qua dán/copy vùng ở đây để không cướp thao tác của ô đó.
+function dangGoLieu(el: EventTarget | null): boolean {
+  const node = el as HTMLElement | null;
+  return !!node && (/^(INPUT|TEXTAREA|SELECT)$/.test(node.tagName) || node.isContentEditable);
+}
+
+// Nối vùng chọn + lịch sử hoàn tác + gửi lô cho lưới tracking (M121 PR3+PR4, dán/copy M124 V5).
 // Đặt riêng khỏi `TrackingGrid.tsx` để file lưới chỉ còn dựng giao diện — và để mọi quyết
-// định "gửi gì / hoàn tác thế nào" nằm cạnh nhau, không rải trong 1700 dòng JSX.
+// định "gửi gì / hoàn tác thế nào" nằm cạnh nhau, không rải trong gần 1800 dòng JSX.
 export function useTickVung(opts: {
   grid: Grid | null;
   load: () => void;
   onChanged: () => void;
   onOfflineTickBatch: (dimIds: number[], installed: boolean) => void;
+  editMode: boolean;
 }) {
-  const { grid, load, onChanged, onOfflineTickBatch } = opts;
+  const { grid, load, onChanged, onOfflineTickBatch, editMode } = opts;
   const chon = useVungChon();
   const [lichSu, setLichSu] = useState<LichSuTick>(LICH_SU_RONG);
   const [dangGui, setDangGui] = useState(false);
@@ -136,6 +145,103 @@ export function useTickVung(opts: {
     setLichSu((ls) => ghiThaoTac(ls, { dimIds, truoc, sau }));
   }, []);
 
+  // Dán ma trận TSV (từ Excel) vào vùng đang chọn — M124 việc 5. `dungLoTuDan` đã lát ma trận
+  // theo góc trên-trái của vùng nên có thể dán vùng lớn hơn ô đang chọn, giống Excel thật.
+  const dan = useCallback(
+    async (text: string) => {
+      if (!grid || !chon.vung || dangChay.current) return;
+      const matrix = parseTSV(text);
+      const kq = dungLoTuDan(matrix, chon.vung, grid);
+      if ("loi" in kq) {
+        showToast(kq.loi, "error");
+        return;
+      }
+      const { tick, boTick, boQua } = kq;
+      if (!tick.length && !boTick.length) {
+        if (boQua) showToast(`Không dán được ô nào (${boQua} ô bỏ qua)`, "error");
+        return;
+      }
+      // Giá trị TRƯỚC của từng ô — tra theo id từ lưới hiện tại trước khi gửi.
+      const truocById = new Map<number, boolean>();
+      for (const t of grid.tasks)
+        for (const col of grid.columns) {
+          const c = t.cells[col];
+          if (c) truocById.set(c.id, c.installed);
+        }
+      // Gom tối đa 2 lô (tick / bỏ tick) — mỗi lô một giá trị `installed` chung nên không gộp
+      // được thành MỘT mục lịch sử (`MucTick.sau` chỉ giữ một giá trị); ghi 2 mục liên tiếp vẫn
+      // hoàn tác được đầy đủ bằng Ctrl+Z, chỉ tốn 2 lần bấm khi lần dán trộn cả tick lẫn bỏ tick.
+      const loList: LoDao[] = [];
+      if (tick.length) loList.push({ dimIds: tick, installed: true });
+      if (boTick.length) loList.push({ dimIds: boTick, installed: false });
+      dangChay.current = true;
+      setDangGui(true);
+      try {
+        const ok = await guiCacLo(loList);
+        if (ok) {
+          for (const lo of loList) {
+            const truoc = lo.dimIds.map((id) => truocById.get(id) ?? !lo.installed);
+            setLichSu((ls) => ghiThaoTac(ls, { dimIds: lo.dimIds, truoc, sau: lo.installed }));
+          }
+          const tong = tick.length + boTick.length;
+          showToast(`Đã dán ${tong} ô${boQua ? ` (${boQua} bỏ qua)` : ""}`, "success");
+        }
+      } finally {
+        dangChay.current = false;
+        setDangGui(false);
+      }
+      load();
+      onChanged();
+    },
+    [grid, chon.vung, guiCacLo, load, onChanged],
+  );
+
+  // Sao chép vùng đang chọn ra clipboard dạng TSV "x"/"" — dán được thẳng vào Excel.
+  const saoChep = useCallback(() => {
+    if (!grid || !chon.vung) return;
+    const { r0, r1, c0, c1 } = chon.vung;
+    const matrix: string[][] = [];
+    for (let r = r0; r <= r1; r++) {
+      const task = grid.tasks[r];
+      const row: string[] = [];
+      for (let c = c0; c <= c1; c++) {
+        const col = grid.columns[c];
+        const cell = col !== undefined ? task?.cells[col] : undefined;
+        row.push(cell?.installed ? "x" : "");
+      }
+      matrix.push(row);
+    }
+    navigator.clipboard?.writeText(serializeTSV(matrix)).catch(() => {
+      /* trình duyệt từ chối quyền clipboard — bỏ qua, không có gì để báo thêm người dùng */
+    });
+  }, [grid, chon.vung]);
+
+  // Ctrl+V dán ma trận vào vùng đang chọn — chỉ khi đang sửa và có vùng chọn.
+  useEffect(() => {
+    if (!editMode) return;
+    const onPaste = (e: ClipboardEvent) => {
+      if (dangGoLieu(e.target) || !chon.vung) return;
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      if (!text) return;
+      e.preventDefault();
+      void dan(text);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [editMode, chon.vung, dan]);
+
+  // Ctrl+C sao chép vùng đang chọn — chỉ khi đang sửa và có vùng chọn.
+  useEffect(() => {
+    if (!editMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "c") return;
+      if (dangGoLieu(e.target) || !chon.vung) return;
+      saoChep();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editMode, chon.vung, saoChep]);
+
   return {
     ...chon,
     soODaChon: oDaChon.length,
@@ -145,6 +251,8 @@ export function useTickVung(opts: {
     lamLai,
     ghiTickLe,
     ghiThaoTacLo,
+    dan,
+    saoChep,
     coTheHoanTac: lichSu.hoanTac.length > 0,
     coTheLamLai: lichSu.lamLai.length > 0,
   };

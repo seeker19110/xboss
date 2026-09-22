@@ -184,8 +184,8 @@ export function TrackingGrid({
     if (expanded) load();
   }, [load, refreshKey, expanded]);
 
-  // Chọn vùng + hoàn tác (M121). Logic nằm trong hook để file này chỉ còn dựng giao diện.
-  const vungChon = useTickVung({ grid, load, onChanged, onOfflineTickBatch });
+  // Chọn vùng + hoàn tác + dán/copy Excel (M121, M124 V5) — logic nằm trong hook.
+  const vungChon = useTickVung({ grid, load, onChanged, onOfflineTickBatch, editMode });
   // Đóng nhóm/đổi dữ liệu hoặc bật lọc task → bỏ vùng chọn (ô đã unmount/ẩn không còn hợp lệ).
   useEffect(() => {
     if (!expanded || taskFilter) vungChon.boChon();
