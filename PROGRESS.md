@@ -133,6 +133,61 @@ KẾT LUẬN: Cần xử lý — S1, L1, L2 (Cao) và S2, L3–L7, U1–U7, P1�
 - **P5 [Thấp]** `MIGRATE_DATABASE_URL`, `XBOSS_PG_ALLOW_EXIT_ON_IDLE` dùng trực tiếp chưa khai trong `lib/nen/env.ts`; CSP `script-src 'unsafe-inline'` (2 inline script theme/sidebar); `@lhci/cli@0.15.x` chưa pin; mutation test chỉ chạy trên push main; CLAUDE.md ghi "3 nhánh e2e" nhưng ci.yml đã 4 shard.
 - **P6 [Thấp]** Dependency major lỗi thời: typescript 6→7, nodemailer 9→10, google-auth-library 10→11, dotenv 17→18.
 
+## ✅ Xoá 17 bảng DB mồ côi sau khi xoá 10 phân hệ Engineering Đỉnh cao — 2026-09-21
+
+Theo yêu cầu người dùng, dọn tiếp phần bảng DB mồ côi để lại sau PR #502 (mục ngay dưới).
+Migration mới `migrations/0153_drop_orphaned_pinnacle_tables.sql` — **KHÔNG đi thẳng
+production**, phải qua staging trước theo DoD (đụng `DROP TABLE`).
+
+Trước khi viết migration, rà lại TOÀN BỘ code sống (không chỉ trong phạm vi 10 tính năng) xem
+còn ai đọc/ghi các bảng này không — phát hiện 2 nhóm rủi ro không rõ ràng ngay từ đầu, đã hỏi
+người dùng chốt hướng xử lý trước khi xoá:
+
+- **`engineering_iot_devices`, `engineering_iot_telemetry_logs` — GIỮ LẠI, không xoá.** Dù
+  route/UI `/engineering/iot-telemetry` (M83) đã xoá ở PR #502, 2 bảng này vẫn bị
+  `lib/ky-thuat/engineering-smart-ipc.ts` (Gate 3 — thử áp thủy tĩnh IoT, thuộc
+  `/engineering/nextgen-apex`, KHÔNG nằm trong phạm vi xoá) đọc trực tiếp, KHÔNG có try/catch
+  — xoá sẽ làm Gate 3 lỗi 500 thật. Người dùng chọn giữ nguyên.
+- **`engineering_spatial_annotations`, `engineering_fidic_claims`
+  (+ `engineering_fidic_claim_evidences`), `engineering_hse_vision_scans`
+  (+ `engineering_hse_detected_hazards`) — XOÁ, chấp nhận đánh đổi.** Vẫn bị
+  `lib/ky-thuat/engineering-pinnacle-synergy.ts` (tính điểm "Apex Synergy Pulse" cho trang
+  `/engineering`, KHÔNG nằm trong phạm vi xoá) đọc, nhưng mỗi truy vấn có try/catch riêng nên
+  xoá bảng KHÔNG làm dashboard lỗi — 3/5 trục điểm (Spatial/Legal/Site) sẽ vĩnh viễn rơi về số
+  mặc định cứng thay vì tính từ dữ liệu thật. Người dùng chọn xoá, chấp nhận đánh đổi.
+
+**17 bảng đã DROP** (migration dùng CASCADE cho các FK con trong cùng nhóm — đã xác nhận
+bằng grep không có bảng NGOÀI danh sách này tham chiếu tới chúng):
+`engineering_prescriptive_scenarios`, `engineering_compliance_rules`,
+`engineering_compliance_audits`, `engineering_swarm_debates`, `engineering_swarm_arguments`,
+`engineering_knowledge_patterns`, `engineering_cross_project_lessons`,
+`engineering_spatial_compute_cache`, `engineering_spatial_annotations`,
+`telegram_user_bindings`, `telegram_bot_message_logs`, `engineering_fidic_claim_evidences`,
+`engineering_fidic_claims`, `engineering_iot_threshold_alerts`,
+`engineering_hse_action_tickets`, `engineering_hse_detected_hazards`,
+`engineering_hse_vision_scans`.
+
+**Dọn theo cùng lúc** (tham chiếu tới bảng đã xoá):
+
+- `lib/ha-tang/retention.ts`: xoá entry đăng ký dọn định kỳ cho `telegram_bot_message_logs`.
+- `tests/rls.test.ts`: xoá 4 entry trong `ENG_NO_RLS` (bảng không còn tồn tại) — comment ghi
+  lại bảng nào bị DROP ở migration nào.
+- `tests/lessons-rls.test.ts`: xoá cả file — test RLS chuyên biệt cho
+  `engineering_cross_project_lessons` (migration `0152_lessons_rls.sql`, mới thêm gần đây)
+  không còn ý nghĩa vì bảng bị DROP ngay migration kế tiếp.
+
+**Đã xác minh bằng Postgres 16 thật** (khởi động qua `pg_ctlcluster`, DB scratch
+`xboss_migtest`, không phải môi trường thường trực của phiên): `npm run db:migrate` áp đủ
+153 migration không lỗi, 17 bảng biến mất đúng danh sách + 3 bảng giữ lại
+(`engineering_iot_devices`/`_telemetry_logs`/`engineering_merkle_roots`) còn nguyên,
+`npm test` + `npm test -- --release-gate` chạy với `TEST_DATABASE_URL` trỏ vào DB đã áp
+migration mới: **3861 ca pass, 0 fail**. `npm run lint`/`npx tsc --noEmit`/
+`npm run check:dead-code`/`npm run check:migrations`/`npm run build` đều xanh.
+
+**Chưa làm**: chưa chạy qua staging thật (`bash deploy.sh --staging`) — migration DROP TABLE
+theo DoD bắt buộc qua staging trước khi lên production, chỉ mới xác minh trên DB scratch cục
+bộ trong phiên này.
+
 ## ✅ Xoá 10 phân hệ Engineering Đỉnh cao theo yêu cầu người dùng — 2026-09-21
 
 Theo yêu cầu người dùng, đã xoá HOÀN TOÀN 10 tính năng khỏi Apex Cockpit (`/engineering`):

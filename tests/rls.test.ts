@@ -528,19 +528,10 @@ test(
     // RLS ngây thơ trên các bảng này sẽ trả rỗng âm thầm (đúng cạm bẫy ADR-0005 cảnh báo),
     // không phải lỗ hổng cách ly dự án. Xem chi tiết trong ADR-0005 (cập nhật 2026-08-22).
     const ENG_NO_RLS = new Set([
-      // Thư viện chuẩn/quy chuẩn dùng chung mọi dự án (migration 0098) — không có cột
-      // project_id, thiết kế cố ý là dữ liệu tham chiếu toàn cục.
-      "engineering_compliance_rules",
-      // Kho pattern học máy xuyên dự án (migration 0098) — không có project_id, đúng bản
-      // chất "cross-project" theo tên bảng.
-      "engineering_knowledge_patterns",
-      // Bài học xuyên dự án (migration 0098) — source_project_id NULLABLE (SET NULL), cố ý
-      // không ràng buộc 1 dự án để tổng hợp toàn hệ thống.
-      "engineering_cross_project_lessons",
-      // Lập luận trong phiên debate đa agent (migration 0098) — không có project_id trực
-      // tiếp, chỉ scope được qua JOIN debate_id → engineering_swarm_debates.project_id
-      // (RLS USING không diễn đạt subquery kiểu này theo đúng khuyến cáo ADR-0005).
-      "engineering_swarm_arguments",
+      // (engineering_compliance_rules, engineering_knowledge_patterns,
+      // engineering_cross_project_lessons, engineering_swarm_arguments — 4 bảng từng exempt
+      // ở đây đã bị DROP ở migrations/0153 cùng lúc xoá 10 tính năng Engineering Đỉnh cao
+      // 2026-09-21, xem PROGRESS.md.)
       // Thư viện AutoLISP template chi tiết cấu tạo dùng chung (migration 0099) — không có
       // project_id, khoá duy nhất theo template_code toàn hệ thống.
       "engineering_cad_lisp_templates",
