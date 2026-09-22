@@ -56,7 +56,10 @@ export function getPool(): Pool {
       // ~127 file chạm DB là ~21 phút chờ rỗng mỗi lần chạy full suite. Production KHÔNG
       // đặt biến này: server chạy dài hạn, giữ connection rỗi lại là điều mong muốn.
       allowExitOnIdle: process.env.XBOSS_PG_ALLOW_EXIT_ON_IDLE === "1",
-      options: `-c statement_timeout=${stmtTimeoutMs} -c idle_in_transaction_session_timeout=15000`,
+      // TZ phiên = Asia/Ho_Chi_Minh — mọi CURRENT_DATE/NOW() trong SQL khớp múi giờ VN dùng
+      // trong todayISO() (lib/nen/date.ts), tránh lệch 1 ngày lúc 0h–7h sáng VN khi Postgres
+      // mặc định chạy UTC (L3, đợt audit 2026-09-22).
+      options: `-c statement_timeout=${stmtTimeoutMs} -c idle_in_transaction_session_timeout=15000 -c timezone=Asia/Ho_Chi_Minh`,
     });
   }
   return g.__xbossPool;
