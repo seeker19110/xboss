@@ -8,11 +8,18 @@ xoá module `thuNghiem` trước đó (route/trang `/engineering/*` phía song s
 sót rác DB (bảng `engineering_*` mồ côi, migration tạo nhưng không code nào đọc/ghi nữa) do
 0153 (2026-09-21) bỏ sót:
 
-- Migration `0155_drop_orphaned_bim_prediction_cad_tables.sql` — DROP 15 bảng mồ côi: nhóm
-  Prediction (0096, cặp "Rủi ro"), nhóm BIM/BIM-viewer (0114, cặp "BIM"), nhóm CAD/BIM
-  Professional Upgrade (0122: pipe-nesting/hydraulic-checks/BCF/bim-routing — lib gốc đã xoá),
-  nhóm NextGen Apex (0127, trừ `engineering_fidic_tia_claims` — bảng này vẫn sống, dùng bởi
-  `lib/tai-chinh/contracts-fidic.ts` M94 TIA Claim Engine, không thuộc diện mồ côi).
+- Migration `0155`-`0158` — DROP 15 bảng mồ côi, tách 4 file nhỏ theo nhóm (giảm thời gian giữ
+  khoá advisory mỗi lần DROP CASCADE, sau khi gộp 1 file ban đầu làm CI `test (Postgres)` +
+  `coverage` fail ổn định trên PR #509 — nghi race/timeout khoá khi test chạy song song, chưa
+  xác định được ca fail cụ thể do giới hạn công cụ đọc log CI, nên tách nhỏ để giảm rủi ro thay
+  vì đoán mò):
+  - `0155_drop_orphaned_prediction_tables.sql` — nhóm Prediction (0096, cặp "Rủi ro").
+  - `0156_drop_orphaned_bim_viewer_tables.sql` — nhóm BIM/BIM-viewer (0114, cặp "BIM").
+  - `0157_drop_orphaned_cad_upgrade_tables.sql` — nhóm CAD/BIM Professional Upgrade (0122:
+    pipe-nesting/hydraulic-checks/BCF/bim-routing — lib gốc đã xoá).
+  - `0158_drop_orphaned_nextgen_apex_tables.sql` — nhóm NextGen Apex (0127, trừ
+    `engineering_fidic_tia_claims` — bảng này vẫn sống, dùng bởi `lib/tai-chinh/contracts-fidic.ts`
+    M94 TIA Claim Engine, không thuộc diện mồ côi).
 - `scripts/dem-du-lieu-engineering.ts` + ADR-0011 cập nhật: chỉ còn **2 cặp thật sự song
   song, chưa quyết** — Đấu thầu (`tender.ts` vs `engineering-bidding-matrix.ts`) và Dòng tiền
   (`finance.ts::cashflowActual()` vs `engineering-cashflow.ts`, engine mô phỏng độc lập).
@@ -22,7 +29,7 @@ sót rác DB (bảng `engineering_*` mồ côi, migration tạo nhưng không co
 và Dòng tiền, quyết gộp/xoá theo đúng bảng ngưỡng ADR-0011 — chưa làm vì chưa có
 `DATABASE_URL` production trong phiên này.
 
-⚠️ Migration `0155` là `DROP TABLE` (đụng dữ liệu) — phải qua staging + `--dry-run` trước khi
+⚠️ Migration `0155`-`0158` là `DROP TABLE` (đụng dữ liệu) — phải qua staging + `--dry-run` trước khi
 lên production theo DoD.
 
 ## ✅ Audit 2026-09-22 — Xoá 6 module `thuNghiem: true` không ai bật

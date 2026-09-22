@@ -85,7 +85,7 @@ Audit "6 cặp stack song song" (yêu cầu người dùng 2026-09-22) kiểm l�
 đối chiếu với các đợt xoá module `thuNghiem` sau ADR này (0153 ngày 2026-09-21, đợt xoá
 `engineering-predictions`/`engineering-nextgen-apex`/`combine` ngày 2026-09-22): **4 cặp đã
 tự giải quyết**, không còn là "hai lớp song song" nữa — route/trang `/engineering/*` phía đó
-đã bị xoá, và migration 0153 + 0155 (migration này, cùng đợt) đã DROP hết các bảng
+đã bị xoá, và migration 0153 + 0155-0158 (cùng đợt) đã DROP hết các bảng
 `engineering_*` mồ côi tương ứng:
 
 - **Claim/EOT**, **HSE**, **BIM/bản vẽ**, **Rủi ro** — lớp `engineering` không còn tồn tại
