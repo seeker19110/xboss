@@ -112,7 +112,7 @@ test(
     assert.equal(preview[1].code, "ACMV-0003");
     assert.ok(preview.every((p) => p.action === "add"));
 
-    const result = await commitBoqImport(parsed.rows, systemId, "acmv", testProjectId, 1);
+    const result = await commitBoqImport(parsed.rows, systemId, "acmv", testProjectId, 1, null);
     assert.equal(result.inserted, 2);
     assert.equal(result.skipped, 0);
 

@@ -37,6 +37,30 @@ export type BoqItem = {
   executedQty: number;
 };
 
+// Lịch sử thay đổi 1 dòng BOQ (M124 việc 3) — khớp DongLichSuBoq của lib/khoi-luong/boq-history.ts.
+export type DongLichSuBoq = {
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+  changedBy: number | null;
+  changedByName: string | null;
+  changedAt: string;
+};
+
+/** Nhãn tiếng Việt cho từng field lưu trong `boq_item_history.field`. */
+export const LICH_SU_BOQ_FIELD_LABEL: Record<string, string> = {
+  code: "Mã BOQ",
+  name: "Tên",
+  unit: "Đơn vị tính",
+  system_id: "Hệ",
+  qty_contract: "KL nhận thầu",
+  unit_price: "Đơn giá",
+  qty_sub: "KL giao thầu phụ",
+  sub_unit_price: "Đơn giá giao thầu phụ",
+  note: "Ghi chú",
+  import: "Import từ Excel",
+};
+
 export const VO_STATUS_LABEL: Record<string, string> = {
   draft: "Nháp",
   submitted: "Đã trình",

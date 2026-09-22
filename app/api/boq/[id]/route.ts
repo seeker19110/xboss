@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
+import { ghiLichSuBoq, type ThayDoiBoq } from "@/lib/khoi-luong/boq-history";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,12 @@ export async function PATCH(
   const projectId = await getCurrentProjectId(user);
   const blocked = await assertModuleEnabled("materials", projectId);
   if (blocked) return blocked;
+  // Đọc nhẹ ngoài transaction chỉ để trả 404 sớm — KHÔNG dùng làm nguồn "giá trị cũ" cho
+  // lịch sử: giữa lúc đọc ở đây và lúc UPDATE thật sự chạy, 1 request PATCH khác có thể đã
+  // ghi đè dòng này, làm old_value trong boq_item_history lỗi thời (đọc cũ, ghi mới, ghi đè
+  // lên kết quả của request kia). Bản dùng để so sánh/ghi lịch sử phải đọc LẠI dưới khoá
+  // `FOR UPDATE` bên trong withTransaction (đối xứng app/api/tasks/[id]/route.ts,
+  // app/api/materials/[id]/route.ts).
   const existing =
     projectId != null
       ? await queryOne<{ id: number }>(
@@ -37,6 +44,9 @@ export async function PATCH(
   const body = await req.json().catch(() => ({}));
   const fields: string[] = [];
   const values: unknown[] = [];
+  // Giá trị MỚI cho từng field thật sự có trong body — so với bản đọc dưới khoá bên trong
+  // transaction (không so ở đây, xem ghi chú ở `existing` phía trên).
+  const pending: { field: string; newValue: string | null; numeric: boolean }[] = [];
 
   if (body.code !== undefined) {
     const code = String(body.code).trim();
@@ -49,12 +59,14 @@ export async function PATCH(
       );
     fields.push("code = ?");
     values.push(code);
+    pending.push({ field: "code", newValue: code, numeric: false });
   }
   if (body.name !== undefined) {
     const name = String(body.name).trim();
     if (!name) return NextResponse.json({ error: "Tên không được để trống" }, { status: 422 });
     fields.push("name = ?");
     values.push(name);
+    pending.push({ field: "name", newValue: name, numeric: false });
   }
   if (body.unit !== undefined) {
     const unit = String(body.unit).trim();
@@ -62,11 +74,13 @@ export async function PATCH(
       return NextResponse.json({ error: "Đơn vị tính không được để trống" }, { status: 422 });
     fields.push("unit = ?");
     values.push(unit);
+    pending.push({ field: "unit", newValue: unit, numeric: false });
   }
   if (body.systemId !== undefined) {
     if (body.systemId === null) {
       fields.push("system_id = ?");
       values.push(null);
+      pending.push({ field: "system_id", newValue: null, numeric: false });
     } else {
       const systemId = Number(body.systemId);
       if (
@@ -76,6 +90,7 @@ export async function PATCH(
         return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
       fields.push("system_id = ?");
       values.push(systemId);
+      pending.push({ field: "system_id", newValue: String(systemId), numeric: false });
     }
   }
   for (const [key, col] of [
@@ -90,11 +105,14 @@ export async function PATCH(
         return NextResponse.json({ error: `${key} phải là số không âm` }, { status: 422 });
       fields.push(`${col} = ?`);
       values.push(n);
+      pending.push({ field: col, newValue: String(n), numeric: true });
     }
   }
   if (body.note !== undefined) {
+    const note = typeof body.note === "string" ? body.note.trim() || null : null;
     fields.push("note = ?");
-    values.push(typeof body.note === "string" ? body.note.trim() || null : null);
+    values.push(note);
+    pending.push({ field: "note", newValue: note, numeric: false });
   }
   if (body.sortOrder !== undefined) {
     const n = Number(body.sortOrder);
@@ -107,7 +125,66 @@ export async function PATCH(
   if (fields.length === 0) return NextResponse.json({ ok: true });
 
   try {
-    await run(`UPDATE boq_items SET ${fields.join(", ")} WHERE id = ?`, ...values, id);
+    await withTransaction(async () => {
+      // Khoá dòng trước khi đọc "giá trị cũ" để so sánh — chống lost update / old_value lỗi
+      // thời khi 2 PATCH chạy xen kẽ (xem ghi chú ở SELECT `existing` phía trên).
+      const locked = await queryOne<{
+        code: string;
+        name: string;
+        unit: string;
+        systemId: number | null;
+        qtyContractText: string;
+        unitPriceText: string;
+        qtySubText: string | null;
+        subUnitPriceText: string | null;
+        note: string | null;
+      }>(
+        `SELECT code, name, unit, system_id AS "systemId",
+                qty_contract::text AS "qtyContractText", unit_price::text AS "unitPriceText",
+                qty_sub::text AS "qtySubText", sub_unit_price::text AS "subUnitPriceText", note
+           FROM boq_items WHERE id = ? FOR UPDATE`,
+        id,
+      );
+      if (!locked) return; // Dòng vừa bị xoá giữa lúc kiểm 404 và lúc vào transaction.
+
+      const oldValueOf = (field: string): string | null => {
+        switch (field) {
+          case "code":
+            return locked.code;
+          case "name":
+            return locked.name;
+          case "unit":
+            return locked.unit;
+          case "system_id":
+            return locked.systemId === null ? null : String(locked.systemId);
+          case "qty_contract":
+            return locked.qtyContractText;
+          case "unit_price":
+            return locked.unitPriceText;
+          case "qty_sub":
+            return locked.qtySubText;
+          case "sub_unit_price":
+            return locked.subUnitPriceText;
+          case "note":
+            return locked.note;
+          default:
+            return null;
+        }
+      };
+      // Chỉ ghi lịch sử field THẬT SỰ đổi giá trị (so chuỗi với trường text, so Number() với
+      // trường NUMERIC — để "10" và "10.000" không bị coi là đổi).
+      const changes: ThayDoiBoq[] = [];
+      for (const p of pending) {
+        const oldValue = oldValueOf(p.field);
+        const changed = p.numeric
+          ? oldValue === null || Number(oldValue) !== Number(p.newValue)
+          : oldValue !== p.newValue;
+        if (changed) changes.push({ field: p.field, oldValue, newValue: p.newValue });
+      }
+
+      await run(`UPDATE boq_items SET ${fields.join(", ")} WHERE id = ?`, ...values, id);
+      await ghiLichSuBoq(id, changes, user.id);
+    });
   } catch (err) {
     if ((err as { code?: string }).code === "23505")
       return NextResponse.json({ error: "Mã BOQ đã tồn tại" }, { status: 409 });

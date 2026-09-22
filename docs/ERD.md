@@ -688,6 +688,26 @@
 - `idx_boq_items_vo`: INDEX idx_boq_items_vo ON public.boq_items USING btree (vo_id)
 - `uniq_boq_items_code_lower`: UNIQUE INDEX uniq_boq_items_code_lower ON public.boq_items USING btree (lower(code))
 
+### boq_item_history
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('boq_item_history_id_seq'::regclass)` |
+| boq_item_id | integer |  |  |
+| field | text |  |  |
+| old_value | text | ✓ |  |
+| new_value | text | ✓ |  |
+| changed_by | integer | ✓ |  |
+| changed_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `boq_item_id` → `boq_items(id)`
+- `changed_by` → `users(id)`
+
+**Index:**
+- `boq_item_history_pkey`: UNIQUE INDEX boq_item_history_pkey ON public.boq_item_history USING btree (id)
+- `idx_boq_item_history_item`: INDEX idx_boq_item_history_item ON public.boq_item_history USING btree (boq_item_id, changed_at DESC)
+
 ### boq_norms
 
 | Cột | Kiểu | Null | Default |

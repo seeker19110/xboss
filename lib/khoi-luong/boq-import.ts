@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
+import { ghiLichSuBoq } from "@/lib/khoi-luong/boq-history";
 
 // Parser cho Bảng khối lượng BOQ dự toán & kiểm soát đặt hàng:
 // Hỗ trợ 2 định dạng:
@@ -361,13 +362,16 @@ export async function previewBoqImport(
 export type BoqImportResult = { inserted: number; skipped: number; errors: string[] };
 
 // Ghi thật vào boq_items trong 1 transaction (tất cả hoặc không gì cả — tránh import
-// dở dang khi lỗi giữa chừng). Dòng trùng mã bị bỏ qua và ghi vào errors.
+// dở dang khi lỗi giữa chừng). Dòng trùng mã bị bỏ qua và ghi vào errors. Mỗi dòng thêm mới
+// ghi kèm 1 dòng lịch sử `field='import'` (M124 việc 3) — hiện `commitBoqImport` chỉ THÊM
+// dòng mới, chưa có nhánh cập nhật dòng đã tồn tại (mã trùng bị coi là lỗi, không ghi đè).
 export async function commitBoqImport(
   rows: ParsedBoqRow[],
   systemId: number,
   systemCode: string,
   projectId: number,
   orgId: number,
+  userId: number | null,
 ): Promise<BoqImportResult> {
   const prefix = `${systemCode.toUpperCase()}-`;
   return withTransaction(async () => {
@@ -400,7 +404,7 @@ export async function commitBoqImport(
         errors.push(`Bỏ qua "${row.name}" — mã "${code}" đã được dùng bởi ${takenBy}`);
         continue;
       }
-      await insertId(
+      const newId = await insertId(
         `INSERT INTO boq_items (code, name, unit, system_id, qty_contract, unit_price, note, sort_order, project_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         code,
@@ -413,6 +417,7 @@ export async function commitBoqImport(
         row.rowIndex,
         projectId,
       );
+      await ghiLichSuBoq(newId, [{ field: "import", oldValue: null, newValue: code }], userId);
       inserted++;
     }
     return { inserted, skipped: errors.length, errors };

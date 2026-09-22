@@ -31,12 +31,13 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 422 });
   const blocked = await assertModuleEnabled("materials", projectId);
   if (blocked) return blocked;
 
   const showMoney = PAYMENT_VIEW_ROLES.includes(user.role);
 
-  const rows = await withProjectScope(projectId ?? "*", () =>
+  const rows = await withProjectScope(projectId, () =>
     query<BoqExportRow>(
       `SELECT bi.code, bi.name, bi.unit, s.name AS "systemName",
               bi.qty_contract AS "qtyContract",
@@ -52,10 +53,10 @@ export async function GET() {
          LEFT JOIN systems s ON s.id = bi.system_id
          LEFT JOIN boq_task_map m ON m.boq_item_id = bi.id
          LEFT JOIN tasks t ON t.id = m.task_id
-        WHERE ${projectId != null ? "bi.project_id = ?" : "FALSE"}
+        WHERE bi.project_id = ?
         GROUP BY bi.id, s.name
         ORDER BY bi.sort_order, bi.id`,
-      ...(projectId != null ? [projectId] : []),
+      projectId,
     ),
   );
 
@@ -100,8 +101,8 @@ export async function GET() {
       r.name,
       r.unit,
       qtyContract,
-      showMoney ? Number(r.unitPriceText) : "",
-      showMoney ? Number(r.thanhTienText) : "",
+      showMoney ? Number(r.unitPriceText) : null,
+      showMoney ? Number(r.thanhTienText) : null,
       klThucHien,
       pctThucHien,
       Number(r.soTaskMap),
@@ -113,12 +114,10 @@ export async function GET() {
   ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 11 } };
 
   const project = await queryOne<{ name: string | null }>(
-    projectId != null
-      ? `SELECT name FROM projects WHERE id = ?`
-      : `SELECT name FROM projects ORDER BY id LIMIT 1`,
-    ...(projectId != null ? [projectId] : []),
+    `SELECT name FROM projects WHERE id = ?`,
+    projectId,
   );
-  const fileTag = (project?.name ?? "XBoss").replace(/[^\wÀ-ỹ-]+/g, "-");
+  const fileTag = (project?.name ?? "XBoss").replace(/[^\wÀ-ỹ-]+/g, "-").slice(0, 60);
 
   const buf = await wb.xlsx.writeBuffer();
   return new NextResponse(new Uint8Array(buf), {

@@ -86,6 +86,13 @@ export async function POST(req: NextRequest) {
   if (projectId == null)
     return NextResponse.json({ error: "Chưa có dự án nào để import BOQ" }, { status: 422 });
 
-  const result = await commitBoqImport(parsed.rows, systemId, system.code, projectId, user.orgId);
+  const result = await commitBoqImport(
+    parsed.rows,
+    systemId,
+    system.code,
+    projectId,
+    user.orgId,
+    user.id,
+  );
   return NextResponse.json(result);
 }
