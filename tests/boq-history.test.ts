@@ -72,6 +72,54 @@ test("PATCH /api/boq/:id: đổi qtyContract 10→12 ghi đúng 1 dòng lịch s
 });
 
 test(
+  "PATCH /api/boq/:id: 2 PATCH đồng thời — old_value trong lịch sử KHÔNG được lỗi thời " +
+    "(khoá FOR UPDATE trong transaction, không dùng bản đọc trước transaction)",
+  S,
+  async () => {
+    const { insertId, queryOne } = await import("@/lib/db");
+    const ctx = await dungDuLieu("pm", `race${RUN}`);
+    const boqId = await insertId(
+      `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price, project_id) VALUES (?, 'Ống thép race', 'm', 10, 1000, ?)`,
+      `BHIST-RACE-${RUN}`,
+      ctx.projectId,
+    );
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    const { PATCH } = await import("@/app/api/boq/[id]/route");
+
+    // Bắn 2 PATCH gần như đồng thời (không await tuần tự) — mô phỏng 2 người sửa cùng lúc.
+    const p1 = PATCH(req(`http://localhost/api/boq/${boqId}`, { qtyContract: 20 }), {
+      params: Promise.resolve({ id: String(boqId) }),
+    });
+    const p2 = PATCH(req(`http://localhost/api/boq/${boqId}`, { qtyContract: 30 }), {
+      params: Promise.resolve({ id: String(boqId) }),
+    });
+    const [res1, res2] = await Promise.all([p1, p2]);
+    assert.equal(res1.status, 200);
+    assert.equal(res2.status, 200);
+
+    const { lichSuBoq } = await import("@/lib/khoi-luong/boq-history");
+    const rows = await lichSuBoq(boqId); // mới nhất trước (ORDER BY changed_at DESC)
+    assert.equal(rows.length, 2, "phải có đúng 2 dòng lịch sử — 1 cho mỗi PATCH");
+
+    // Dù thứ tự commit là 20 trước/30 sau hay ngược lại, dòng lịch sử MỚI hơn phải có
+    // old_value KHỚP ĐÚNG new_value của dòng lịch sử CŨ hơn (chuỗi nhân quả không đứt gãy).
+    // Với lỗi cũ (đọc old_value trước khi mở transaction), 2 dòng đều ghi old_value='10'
+    // — chuỗi bị đứt (dòng mới hơn không khớp dòng cũ hơn).
+    assert.equal(
+      Number(rows[0].oldValue),
+      Number(rows[1].newValue),
+      "old_value của lần PATCH commit sau phải khớp new_value của lần PATCH commit trước",
+    );
+
+    const item = await queryOne<{ qty_contract: number }>(
+      `SELECT qty_contract FROM boq_items WHERE id = ?`,
+      boqId,
+    );
+    assert.equal(Number(item!.qty_contract), Number(rows[0].newValue));
+  },
+);
+
+test(
   "PATCH /api/boq/:id: giá trị số dạng chuỗi khác nhưng cùng số (10 vs 10.000) không sinh dòng lịch sử",
   S,
   async () => {
