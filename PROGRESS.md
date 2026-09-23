@@ -10,6 +10,11 @@ Hành vi giữ nguyên (lỗi → danh sách rỗng như cũ); khác biệt nh�
 `/ban-ve` không còn promise reject chưa bắt khi mất mạng. `AppHeader` giữ fetch riêng (fire-and-forget
 có `.catch`), chỉ sửa comment trỏ về `taiJsonMoi`. `lint`, `typecheck`, `build`, `check:dead-code` xanh.
 
+Cùng PR: sửa tài liệu lệch code về webhook bot — `CLAUDE.md` và comment trong `lib/nen/env.ts` nay ghi
+rõ `TELEGRAM_WEBHOOK_SECRET`/`ZALO_OA_SECRET` **hiện chưa dùng** (route webhook Telegram/Zalo đã xoá,
+`lib/bao-mat/webhook-inbound.ts` giữ cho lúc thêm lại bot). `.env.example` còn dòng
+`TELEGRAM_WEBHOOK_SECRET=""` chưa sửa (phiên agent bị chặn quyền đọc/ghi file `.env*`) — việc tay nhỏ.
+
 ## ✅ UI xem/thêm/xoá ảnh HSE trên `/hse` — 2026-09-23
 
 Phát hiện ở đợt quét route "chỉ test gọi" (mục ngay dưới): ảnh HSE upload được lúc tạo ghi nhận
