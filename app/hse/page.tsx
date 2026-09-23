@@ -306,7 +306,7 @@ export default function HsePage() {
         ) : (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
             <div
-              className="overflow-x-auto"
+              className="relative overflow-x-auto"
               tabIndex={0}
               role="region"
               aria-label="Danh sách ghi nhận HSE"

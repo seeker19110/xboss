@@ -344,6 +344,88 @@ test(
   },
 );
 
+test(
+  "PATCH /api/advances/:id: action=settle 0,1 + 0,2 trên tạm ứng 0,3 → 'settled' (cộng tiền trong SQL, không lệch float)",
+  S,
+  async () => {
+    // Bản cũ cộng settled_amount trên float JS: 0.1 + 0.2 = 0.30000000000000004 > 0.3 → lượt
+    // hoàn thứ 2 bị từ chối 422 "vượt quá" dù đúng bằng số còn lại.
+    const projectId = await taoDuAn("advid-float");
+    const pm = await taoUser("pm", "advid-float");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/advances/route");
+    const created = await POST(
+      jreq("/api/advances", { amount: 0.3, recipient: "x", advanceDate: "2026-09-01" }),
+    );
+    const { id: advId } = await created.json();
+    const { PATCH } = await import("@/app/api/advances/[id]/route");
+    const ctx = { params: Promise.resolve({ id: String(advId) }) };
+    const a = await PATCH(jreq("/x", { action: "settle", settleAmount: 0.1 }, "PATCH"), ctx);
+    assert.equal(a.status, 200);
+    const b = await PATCH(jreq("/x", { action: "settle", settleAmount: 0.2 }, "PATCH"), {
+      params: Promise.resolve({ id: String(advId) }),
+    });
+    assert.equal(b.status, 200);
+    const body = await b.json();
+    assert.equal(body.status, "settled");
+    assert.equal(Number(body.settledAmount), 0.3);
+  },
+);
+
+test(
+  "PATCH /api/advances/:id: sửa số tiền nhỏ hơn số đã hoàn → 422; tăng số tiền của tạm ứng đã hoàn hết → trở lại 'partially_settled'",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("advid-editamt");
+    const pm = await taoUser("pm", "advid-editamt");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/advances/route");
+    const created = await POST(
+      jreq("/api/advances", { amount: 1000, recipient: "x", advanceDate: "2026-09-01" }),
+    );
+    const { id: advId } = await created.json();
+    const { PATCH } = await import("@/app/api/advances/[id]/route");
+    const ctx = () => ({ params: Promise.resolve({ id: String(advId) }) });
+    await PATCH(jreq("/x", { action: "settle", settleAmount: 1000 }, "PATCH"), ctx());
+
+    const tooLow = await PATCH(jreq("/x", { amount: 500 }, "PATCH"), ctx());
+    assert.equal(tooLow.status, 422);
+
+    const raised = await PATCH(jreq("/x", { amount: 1500 }, "PATCH"), ctx());
+    assert.equal(raised.status, 200);
+    const row = await queryOne<{ status: string; amount: number }>(
+      `SELECT status, amount FROM advances WHERE id = ?`,
+      advId,
+    );
+    assert.equal(row?.status, "partially_settled");
+    assert.equal(Number(row?.amount), 1500);
+  },
+);
+
+test(
+  "GET /api/advances: trả 'remaining' = amount − settled_amount (tính trong SQL)",
+  S,
+  async () => {
+    const projectId = await taoDuAn("adv-remaining");
+    const pm = await taoUser("pm", "adv-remaining");
+    await dangNhapDuAn(pm, projectId);
+    const { POST, GET } = await import("@/app/api/advances/route");
+    const created = await POST(
+      jreq("/api/advances", { amount: 1000, recipient: "x", advanceDate: "2026-09-01" }),
+    );
+    const { id: advId } = await created.json();
+    const { PATCH } = await import("@/app/api/advances/[id]/route");
+    await PATCH(jreq("/x", { action: "settle", settleAmount: 250 }, "PATCH"), {
+      params: Promise.resolve({ id: String(advId) }),
+    });
+    const res = await GET(jreq("/api/advances", undefined, "GET"));
+    const { advances } = await res.json();
+    const row = advances.find((a: { id: number }) => a.id === advId);
+    assert.equal(Number(row.remaining), 750);
+  },
+);
+
 test("PATCH /api/advances/:id: sửa thông tin thường (không action) → 200", S, async () => {
   const { queryOne } = await import("@/lib/db");
   const projectId = await taoDuAn("advid-edit");
@@ -420,6 +502,34 @@ test("DELETE /api/advances/:id: 'open' → xoá thành công", S, async () => {
 // ============================================================================
 // GET/POST /api/cash-transactions
 // ============================================================================
+
+test(
+  "GET /api/cash-transactions: 'totals' cộng trong SQL theo đúng tập đang lọc (thu/chi/chênh lệch)",
+  S,
+  async () => {
+    const projectId = await taoDuAn("cash-totals");
+    const pm = await taoUser("pm", "cash-totals");
+    await dangNhapDuAn(pm, projectId);
+    const { POST, GET } = await import("@/app/api/cash-transactions/route");
+    for (const [direction, amount] of [
+      ["in", 0.1],
+      ["in", 0.2],
+      ["out", 0.05],
+    ] as const)
+      await POST(jreq("/api/cash-transactions", { txDate: "2026-09-01", direction, amount }));
+
+    const all = await (await GET(jreq("/api/cash-transactions", undefined, "GET"))).json();
+    assert.equal(Number(all.totals.in), 0.3); // float JS: 0.1 + 0.2 = 0.30000000000000004
+    assert.equal(Number(all.totals.out), 0.05);
+    assert.equal(Number(all.totals.net), 0.25);
+
+    const onlyOut = await (
+      await GET(jreq("/api/cash-transactions?direction=out", undefined, "GET"))
+    ).json();
+    assert.equal(Number(onlyOut.totals.in), 0);
+    assert.equal(Number(onlyOut.totals.out), 0.05);
+  },
+);
 
 test("GET /api/cash-transactions: chưa đăng nhập → 401", S, async () => {
   dangXuat();
