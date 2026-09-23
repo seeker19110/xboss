@@ -1,5 +1,33 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ UI xem/thêm/xoá ảnh HSE trên `/hse` — 2026-09-23
+
+Phát hiện ở đợt quét route "chỉ test gọi" (mục ngay dưới): ảnh HSE upload được lúc tạo ghi nhận
+nhưng **không có chỗ nào xem lại** — `GET /api/hse/:id/photos` + `GET/DELETE /api/hse-photos/:id`
+có backend + test nhưng không UI nào gọi. Nối UI, không đổi route/schema:
+
+- **`app/hse/_components/HsePhotosModal.tsx` (mới)** — gallery ảnh của 1 ghi nhận: lưới thumbnail,
+  bấm phóng to, "Thêm ảnh" (chụp từ camera mobile), xoá (người upload hoặc admin/pm/engineer — cùng
+  luật với route; API vẫn là ranh giới thật). Bố cục bám `PhotosModal` của lưới tracking.
+- **`app/hse/page.tsx`** — nút camera kèm **số ảnh** trên mỗi dòng bảng + thẻ giấy phép; nút đóng
+  action nâng vùng chạm lên 40px.
+- **`lib/hien-truong/hse.ts`** — `listHse` trả thêm `photoCount` (subquery đếm `hse_photos`);
+  `tests/hse.test.ts` thêm ca đếm 0 → 2.
+- **`app/lib/taiDuLieu.ts`** — thêm `taiJsonMoi()` (nonce + `no-store`) cho lần tải lại ngay sau khi
+  tự ghi. **Bug thật lộ ra khi verify bằng Playwright trên `next start`:** xoá ảnh xong, danh sách
+  và số ảnh vẫn hiện bản cũ vì sw.js stale-while-revalidate trả cache của đúng URL. `refresh()` của
+  `/hse` (sau tạo ghi nhận / đóng action / thêm-xoá ảnh) cũng dính lỗi này từ trước — nay đều dùng
+  `taiJsonMoi`. (Cùng pattern `fetchFresh` đang bị chép 3 nơi: `app/boq`, `app/ban-ve`,
+  `app/design-changes` — gom về helper này là việc riêng.)
+- **`public/sw.js`** — loại `/api/hse-photos/` khỏi cache SW (như `/api/photos/`: ảnh đã có
+  `Cache-Control: private, immutable` của trình duyệt, không nhét blob vào Cache Storage), bump
+  `CACHE` → `xboss-v18`.
+
+Verify: Playwright trên `next build && next start` + Postgres 16 cục bộ — tạo ghi nhận, upload 3 ảnh
+→ nút hiện "3", mở modal thấy 3 ảnh, phóng to, xoá 1 → modal và nút cập nhật ngay; chụp màn hình
+desktop/mobile, theme tối/sáng. `lint`, `typecheck`, `tests/hse.test.ts` (3/3), `check:sw-exclude`,
+`check:hex-hardcode` xanh.
+
 ## ✅ Xoá 2 module chỉ còn test/script tự gọi — 2026-09-23
 
 Hai cổng `check:dead-code`/`check:dead-routes` coi `tests/`, `scripts/`, `e2e/` là người dùng hợp lệ,
