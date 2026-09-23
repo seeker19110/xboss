@@ -187,9 +187,8 @@ export function boDauThuong(s: string): string {
  * Độ giống hai tên = Jaccard trên tập token (0..1). Token dài ≤1 ký tự bị bỏ ("ống gió tầng 5"
  * vs "lắp ống gió T5": token "5" một ký tự gây nhiễu cao vì mọi tầng đều có số lẻ trùng nhau).
  *
- * Cố ý KHÔNG dùng `stringSimilarity` của `user-error-healer`: hàm đó trộn thêm Levenshtein trên
- * toàn chuỗi, nên tên dài (mô tả BOQ) luôn bị điểm thấp dù trùng hết từ khoá — ở đây cần đo
- * "trùng bao nhiêu từ", không đo "khác bao nhiêu ký tự".
+ * Cố ý KHÔNG trộn Levenshtein trên toàn chuỗi: làm vậy thì tên dài (mô tả BOQ) luôn bị điểm
+ * thấp dù trùng hết từ khoá — ở đây cần đo "trùng bao nhiêu từ", không đo "khác bao nhiêu ký tự".
  */
 export function diemGiongTen(a: string, b: string): number {
   const tokens = (s: string) =>
