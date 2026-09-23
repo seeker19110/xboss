@@ -1,12 +1,18 @@
 # UX01 — Tích hợp UI/UX Pro Max vào XBoss
 
-| Thuộc tính       | Giá trị |
-| ---------------- | ------- |
-| Issue / Goal     | Nâng chuẩn thiết kế và review UI/UX của XBoss |
-| Spec owner       | XBoss owner |
-| State            | **Approved for implementation** |
+| Thuộc tính       | Giá trị                                          |
+
+| ---------------- | ------------------------------------------------ |
+
+| Issue / Goal     | Nâng chuẩn thiết kế và review UI/UX của XBoss    |
+
+| Spec owner       | XBoss owner                                      |
+
+| State            | **Approved for implementation**                  |
+
 | Người/ngày duyệt | Owner — yêu cầu trực tiếp trong chat, 2026-09-23 |
-| Cập nhật         | 2026-09-23 |
+
+| Cập nhật         | 2026-09-23                                       |
 
 ## 1. Problem, vai trò và bằng chứng
 
@@ -33,11 +39,15 @@ lớn/Python engine của upstream, không phá dark-first token system, không 
 
 ## 4. Phương án
 
-| Phương án | Lợi ích | Chi phí/rủi ro | Kết luận |
-| --------- | ------- | -------------- | -------- |
-| Không làm | Không đổi repo | Mất workflow/review intelligence | Loại |
-| Vendor toàn bộ upstream | Có đủ catalog/search engine | Nặng repo, Python, trùng rule, khó đồng bộ | Loại |
-| Native hóa vào skill XBoss | Nhẹ, đúng domain, dùng gate sẵn có | Cần curate guideline | **Chọn** |
+| Phương án                  | Lợi ích                            | Chi phí/rủi ro                             | Kết luận |
+
+| -------------------------- | ---------------------------------- | ------------------------------------------ | -------- |
+
+| Không làm                  | Không đổi repo                     | Mất workflow/review intelligence           | Loại     |
+
+| Vendor toàn bộ upstream    | Có đủ catalog/search engine        | Nặng repo, Python, trùng rule, khó đồng bộ | Loại     |
+
+| Native hóa vào skill XBoss | Nhẹ, đúng domain, dùng gate sẵn có | Cần curate guideline                       | **Chọn** |
 
 ## 5. Scope / non-goals
 
@@ -108,10 +118,13 @@ Docs/tooling only; rollback bằng revert PR, không migration/data reconciliati
 
 ## 18. Risk/assumption/open decisions
 
-| Mục | Xác minh/giảm thiểu | Owner | Hạn | Quyết định |
-| --- | ------------------- | ----- | --- | ---------- |
-| Trùng/đá nhau guideline | XBoss master có precedence tuyệt đối | Owner | 2026-09-23 | Đóng |
-| Repo phình to | Không vendor catalog/Python upstream | Owner | 2026-09-23 | Đóng |
+| Mục                     | Xác minh/giảm thiểu                  | Owner | Hạn        | Quyết định |
+
+| ----------------------- | ------------------------------------ | ----- | ---------- | ---------- |
+
+| Trùng/đá nhau guideline | XBoss master có precedence tuyệt đối | Owner | 2026-09-23 | Đóng       |
+
+| Repo phình to           | Không vendor catalog/Python upstream | Owner | 2026-09-23 | Đóng       |
 
 ## 19. Approval
 
