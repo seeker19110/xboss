@@ -28,7 +28,6 @@ import { NextRequest } from "next/server";
 //   - app/api/saved-reports/[id]/data/route.ts              (GET chạy báo cáo đã lưu)
 //   - app/api/schedule-control/route.ts                     (GET đường găng/chậm tiến độ)
 //   - app/api/dashboard/evm/route.ts                        (GET EVM)
-//   - app/api/dashboard/floors/route.ts                     (GET ma trận tầng×sheet)
 //   - app/api/dashboard/forecast/route.ts                   (GET dự báo hoàn thành)
 //   - app/api/export/excel/route.ts                         (GET xuất Excel)
 //   - app/api/events/route.ts                               (GET SSE)
@@ -1670,7 +1669,7 @@ test("GET /api/saved-reports/:id/data?export=excel: trả file xlsx (magic PK)",
 });
 
 // ============================================================================
-// GET /api/schedule-control, /api/dashboard/evm, /api/dashboard/floors, /api/dashboard/forecast
+// GET /api/schedule-control, /api/dashboard/evm, /api/dashboard/forecast
 // ============================================================================
 
 test("GET /api/schedule-control: chưa đăng nhập → 401", S, async () => {
@@ -1730,33 +1729,6 @@ test("GET /api/dashboard/evm: PM xem thành công → 200", S, async () => {
   const { GET } = await import("@/app/api/dashboard/evm/route");
   const res = await GET(getReq("/api/dashboard/evm"));
   assert.equal(res.status, 200);
-});
-
-test("GET /api/dashboard/floors: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/dashboard/floors/route");
-  const res = await GET();
-  assert.equal(res.status, 401);
-});
-
-test("GET /api/dashboard/floors: subcon không có quyền xem dashboard → 403", S, async () => {
-  const projectId = await taoDuAn("flsub");
-  const sub = await taoUser("subcon", "flsub");
-  await dangNhapDuAn(sub, projectId);
-  const { GET } = await import("@/app/api/dashboard/floors/route");
-  const res = await GET();
-  assert.equal(res.status, 403);
-});
-
-test("GET /api/dashboard/floors: PM xem thành công → 200", S, async () => {
-  const projectId = await taoDuAn("flok");
-  const pm = await taoUser("pm", "flok");
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/dashboard/floors/route");
-  const res = await GET();
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.ok(Array.isArray(body.cells));
 });
 
 test("GET /api/dashboard/forecast: chưa đăng nhập → 401", S, async () => {
