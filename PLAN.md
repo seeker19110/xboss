@@ -1,6 +1,6 @@
 # PLAN.md — Đợt 2: xử lý 5 route còn lại + DROP bảng scan-to-bim (2026-09-23)
 
-**Cập nhật:** 2026-09-23 · **Nhánh làm việc:** `claude/amazing-dijkstra-la2kpd` (= `origin/main` `183ee430`, sau PR #526). **Trạng thái:** CHỜ THI HÀNH.
+**Cập nhật:** 2026-09-23 · **Nhánh làm việc:** `claude/amazing-dijkstra-la2kpd` (= `origin/main` `183ee430`, sau PR #526). **Trạng thái:** ĐÃ THI HÀNH 2026-09-23 (3 việc gộp vào nhánh làm việc).
 **Bối cảnh (worker không thấy hội thoại):** PR #526 đã nối UI cho baseline/tổ đội/mặt trận/engineering. Quét lại còn 5 route không UI nào gọi. Truy lịch sử git cho kết luận:
 
 | Route                                                                 | Kết luận                                       | Bằng chứng                                                                                                                                                                   |
