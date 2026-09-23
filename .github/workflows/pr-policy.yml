@@ -24,6 +24,13 @@ jobs:
               core.setFailed("Tiêu đề PR phải theo Conventional Commits.");
             }
             if (pr.draft) return;
+            // Dependabot chỉ tạo PR cập nhật dependency với changelog upstream; yêu cầu mẫu
+            // evidence/spec nội bộ ở đây khiến mọi bản vá dependency bị chặn vô ích. Vẫn giữ
+            // cổng tiêu đề phía trên và toàn bộ CI kỹ thuật (test, build, security scan).
+            if (pr.user.login === "dependabot[bot]") {
+              core.info("PR Dependabot: bỏ qua metadata thủ công; CI kỹ thuật vẫn bắt buộc.");
+              return;
+            }
             const headings = ["## Thay đổi gì", "## Issue / Goal", "## Research / Spec",
               "## Validation", "## Ảnh hưởng, rollout và rollback", "## Definition of Done"];
             const missing = headings.filter(h => !body.includes(h));
