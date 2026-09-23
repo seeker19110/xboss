@@ -38,18 +38,22 @@ Không chọn “glassmorphism/bento/minimal…” trước khi biết các mụ
 ## 2. Chọn archetype theo công việc
 
 ### Field / tracking
+
 Mobile-first theo nghĩa **ưu tiên tác vụ**, không chỉ breakpoint. Action chính dễ chạm, target quan
 trọng >=44px, trạng thái offline/queued rõ, feedback nhanh, không yêu cầu gesture tinh.
 
 ### Dashboard / control room
+
 Hierarchy: KPI quan trọng → trend → exception/risk → drill-down. Bento chỉ dùng khi nhóm thông tin
 thật sự độc lập; không biến mọi dashboard thành card mosaic.
 
 ### Dense data / BOQ / cost / contracts
+
 Giữ khả năng so sánh theo hàng/cột. Numeric dùng `font-mono tabular-nums text-right`.
 Sticky header/cột định danh khi có ích. Không đổi table thành card trên mobile nếu làm mất context.
 
 ### Approval / QAQC / audit
+
 Actor, trạng thái, thời điểm, reason, evidence và next action phải rõ. Destructive/reject flow có
 error prevention phù hợp business rule.
 
