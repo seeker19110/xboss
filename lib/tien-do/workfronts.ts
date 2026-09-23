@@ -2,26 +2,19 @@
 // dùng làm bằng chứng xin gia hạn (EOT) với tổng thầu/CĐT. Xem docs/nang-cap/M14-mat-bang.md.
 import { query, queryOne, run, withTransaction, todayISO, daysFromTodayISO } from "@/lib/db";
 
-export const WORK_FRONT_STATUSES = ["pending", "handed_over", "in_progress", "returned"] as const;
-export type WorkFrontStatus = (typeof WORK_FRONT_STATUSES)[number];
-export const WORK_FRONT_STATUS_LABEL: Record<WorkFrontStatus, string> = {
-  pending: "Chưa bàn giao",
-  handed_over: "Đã bàn giao",
-  in_progress: "Đang thi công",
-  returned: "Đã trả",
-};
+import {
+  WORK_FRONT_STATUSES,
+  isForwardTransition,
+  type WorkFrontStatus,
+} from "@/lib/tien-do/workfront-status";
 
-// Thứ tự tuần tự hợp lệ — chỉ Admin được nhảy ngược (sửa sai).
-const STEP_ORDER: Record<WorkFrontStatus, number> = {
-  pending: 0,
-  handed_over: 1,
-  in_progress: 2,
-  returned: 3,
-};
-
-export function isForwardTransition(from: WorkFrontStatus, to: WorkFrontStatus): boolean {
-  return STEP_ORDER[to] >= STEP_ORDER[from];
-}
+export {
+  WORK_FRONT_STATUSES,
+  WORK_FRONT_STATUS_LABEL,
+  STEP_ORDER,
+  isForwardTransition,
+  type WorkFrontStatus,
+} from "@/lib/tien-do/workfront-status";
 
 export type WorkFrontRow = {
   id: number;
