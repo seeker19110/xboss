@@ -1,5 +1,20 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Gom 3 bản chép tay `fetchFresh` về `taiJsonMoi` — 2026-09-23
+
+Dọn nợ ghi ở mục UI ảnh HSE bên dưới: helper bỏ qua cache SW (nonce + `no-store`) bị chép tay
+ở `app/boq/_components/types.ts`, `app/ban-ve/page.tsx`, `app/design-changes/page.tsx`. Nay cả 3 trang
+dùng `taiJsonMoi()` của `app/lib/taiDuLieu.ts` (lần tải thường vẫn `taiJson`), xoá 3 bản chép.
+Hành vi giữ nguyên (lỗi → danh sách rỗng như cũ); khác biệt nhỏ có chủ đích nhờ đi qua `taiJson`:
+401 tự về `/login`, BOQ báo đúng thông điệp lỗi server trả thay vì chỉ mã lỗi, và `loadRevs` của
+`/ban-ve` không còn promise reject chưa bắt khi mất mạng. `AppHeader` giữ fetch riêng (fire-and-forget
+có `.catch`), chỉ sửa comment trỏ về `taiJsonMoi`. `lint`, `typecheck`, `build`, `check:dead-code` xanh.
+
+Cùng PR: sửa tài liệu lệch code về webhook bot — `CLAUDE.md` và comment trong `lib/nen/env.ts` nay ghi
+rõ `TELEGRAM_WEBHOOK_SECRET`/`ZALO_OA_SECRET` **hiện chưa dùng** (route webhook Telegram/Zalo đã xoá,
+`lib/bao-mat/webhook-inbound.ts` giữ cho lúc thêm lại bot). `.env.example` còn dòng
+`TELEGRAM_WEBHOOK_SECRET=""` chưa sửa (phiên agent bị chặn quyền đọc/ghi file `.env*`) — việc tay nhỏ.
+
 ## ✅ UI xem/thêm/xoá ảnh HSE trên `/hse` — 2026-09-23
 
 Phát hiện ở đợt quét route "chỉ test gọi" (mục ngay dưới): ảnh HSE upload được lúc tạo ghi nhận
