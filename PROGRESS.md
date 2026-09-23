@@ -1,5 +1,41 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Trang `/finance/cash` — Sổ thu chi & Tạm ứng (UI đầy đủ) + vá hoàn ứng cộng tiền trên float — 2026-09-23
+
+Bảng `cash_transactions`/`advances` và API xem/tạo/sửa/xoá/hoàn ứng có từ M27 PR1 (`789c1039`)
+nhưng **chưa từng có UI** (khác vụ vật tư — không phải hồi quy); `/finance` chỉ hiện biểu đồ dòng
+tiền tổng hợp. Người dùng chốt: làm đầy đủ, đặt ở trang riêng `/finance/cash`.
+
+- **Mới `app/finance/cash/`** — `page.tsx` (2 tab `Tabs`/`TabPanel`, `?tab=advances` mở thẳng tab
+  tạm ứng), `_components/CashTab.tsx` (lọc Thu/Chi, 3 thẻ tổng thu/chi/chênh lệch, bảng, thêm/sửa
+  phiếu: ngày, chiều, số tiền, số phiếu, danh mục + gợi ý, hợp đồng, NCC, diễn giải, quỹ tiền mặt;
+  xoá có xác nhận), `_components/AdvancesTab.tsx` (lọc trạng thái, bảng tạm ứng/đã hoàn/còn phải
+  hoàn, trạng thái kèm icon + nhãn, thêm/sửa, hoàn ứng từng phần — mặc định bằng số còn lại, xoá
+  chỉ hiện khi chưa hoàn đồng nào như API), `_components/shared.tsx` (khung modal/ô nhập). Xem:
+  admin/pm/bch; nút ghi: admin/pm (khớp `CAN.viewPayments`/`CAN.manageFinance`). Sổ tiền **luôn
+  tải tươi** (`taiJsonMoi`) — lúc verify, mở lại trang hiện danh sách rỗng từ cache SW.
+- **`/finance`** — nút "Thu chi & Tạm ứng" trên header (mọi vai trò xem được trang) + thẻ KPI "Tồn
+  quỹ ước tính" / "Tạm ứng chưa hoàn" thành link sang trang mới.
+- **Vá lỗi tiền thật (vùng rủi ro cao `docs/audit.md`)**: `PATCH /api/advances/:id action=settle`
+  cộng `settled_amount` trên **float JS** rồi ghi đè — hoàn 0,1 + 0,2 trên tạm ứng 0,3 bị từ chối
+  422 "vượt quá" (0.30000000000000004 > 0.3), và 2 lượt hoàn song song có thể ghi đè nhau / vượt số
+  tạm ứng. Nay cộng + suy status trong **một câu `UPDATE … WHERE settled_amount + ? <= amount
+RETURNING`** (atomic). Sửa tạm ứng: chặn số tiền mới < số đã hoàn (422) và suy lại status theo
+  số tiền mới, cũng trong SQL. `GET /api/advances` trả thêm `remaining`, `GET /api/cash-transactions`
+  trả thêm `totals {in,out,net}` — đều tính trong SQL (UI không cộng/trừ tiền).
+- **Sửa tràn ngang trên mobile** (`/hse` từ #521 và 2 bảng mới): nhãn `sr-only` ở cột thao tác là
+  `position:absolute`, thoát khung cuộn không `relative` → kéo trang rộng 575–661px trên màn 390px.
+  Thêm `relative` cho khung `overflow-x-auto`.
+
+Test mới (`tests/route-tai-chinh-3a.test.ts`): hoàn 0,1+0,2 → settled; sửa số tiền < đã hoàn →
+422, tăng số tiền tạm ứng đã hoàn hết → partially_settled; `remaining`; `totals` theo bộ lọc — 2 ca
+đầu **đỏ trên code cũ**. Verify Playwright trên `next build && next start` + Postgres 16: từ
+`/finance` vào trang mới → thêm phiếu thu 1.500.000 + phiếu chi 400.000 → sửa chi thành 450.000 →
+xoá phiếu thu; tạm ứng 1.000.000 → hoàn 300.000 (còn 700.000, nút xoá ẩn) → sửa xuống 200.000 bị
+chặn → hoàn nốt → "Đã hoàn"; mobile 390px không tràn ngang. `npm test -- --release-gate` (Postgres 16
+cục bộ): 3643 pass, 1 fail `backfill-0137-0138` (đỏ sẵn trên máy cục bộ, CI xanh). `lint`,
+`typecheck`, `build`, `check:dead-code|dead-routes|route-perms|project-scope|lib-layers|hex-hardcode|mau-accent` xanh.
+
 ## ✅ Khôi phục in tem QR vật tư hàng loạt trong tab "Kho & Định Mức" — 2026-09-23
 
 Phần cuối của hồi quy `3044a12a` (mục ngay dưới): trang `/materials` cũ có nút "In tem QR" + modal

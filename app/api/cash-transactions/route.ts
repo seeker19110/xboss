@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId, query, withProjectScope } from "@/lib/db";
+import { insertId, query, queryOne, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
@@ -52,7 +52,17 @@ export async function GET(req: NextRequest) {
       ...args,
     ),
   );
-  return NextResponse.json({ transactions });
+  // Tổng thu/chi của đúng tập đang lọc — cộng trong SQL (không cộng tiền trên float JS, M45).
+  const totals = await withProjectScope(projectId, () =>
+    queryOne<{ in: number; out: number; net: number }>(
+      `SELECT COALESCE(SUM(amount) FILTER (WHERE direction = 'in'), 0) AS "in",
+              COALESCE(SUM(amount) FILTER (WHERE direction = 'out'), 0) AS "out",
+              COALESCE(SUM(CASE WHEN direction = 'in' THEN amount ELSE -amount END), 0) AS "net"
+         FROM cash_transactions ct WHERE ${conds.join(" AND ")}`,
+      ...args,
+    ),
+  );
+  return NextResponse.json({ transactions, totals: totals ?? { in: 0, out: 0, net: 0 } });
 }
 
 // POST /api/cash-transactions — ghi thu/chi quỹ (manageFinance: Admin/PM). project_id
