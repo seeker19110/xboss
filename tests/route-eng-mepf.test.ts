@@ -15,7 +15,9 @@ import { NextRequest } from "next/server";
 //   - app/api/engineering/logistics/shipments/route.ts          (GET / POST lô hàng)
 //   - app/api/engineering/logistics/scan-receive/route.ts       (POST quét nhận vật tư QR)
 //   - app/api/engineering/ledger/merkle/route.ts                (GET / POST sổ cái Merkle)
-//   - app/api/engineering/ledger/verify-proof/route.ts          (POST xác thực Merkle Proof)
+//
+// (route ledger/verify-proof đã bị xoá 2026-09-23 — không trang nào phát hành proof hay gọi
+// route này, sổ cái Merkle trên UI chỉ là 1 con số đếm; xem PROGRESS.md.)
 //
 // (route/lib edge-vision-tracking, generative-routing — module `engineering-nextgen-apex` — đã
 // bị xoá 2026-09-22, 1/6 module `thuNghiem: true` không ai bật, xem PROGRESS.md.)
@@ -594,103 +596,3 @@ test("POST /api/engineering/ledger/merkle: chưa chọn dự án → 400", S, as
   const res = await POST(jreq("/x", {}));
   assert.equal(res.status, 400);
 });
-
-// ============================================================================
-// POST /api/engineering/ledger/verify-proof
-// ============================================================================
-
-test("POST /api/engineering/ledger/verify-proof: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { POST } = await import("@/app/api/engineering/ledger/verify-proof/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 401);
-});
-
-test("POST /api/engineering/ledger/verify-proof: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("verify403");
-  const sub = await taoUser("subcon", "verify403");
-  await dangNhapDuAn(sub, projectId);
-  const { POST } = await import("@/app/api/engineering/ledger/verify-proof/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
-
-test(
-  "POST /api/engineering/ledger/verify-proof: thiếu leafHash và expectedRoot → 400",
-  S,
-  async () => {
-    const projectId = await taoDuAn("verifyval");
-    const pm = await taoUser("pm", "verifyval");
-    await dangNhapDuAn(pm, projectId);
-    const { POST } = await import("@/app/api/engineering/ledger/verify-proof/route");
-    const res = await POST(jreq("/x", {}));
-    assert.equal(res.status, 400);
-  },
-);
-
-test(
-  "POST /api/engineering/ledger/verify-proof: bằng chứng hợp lệ → isValid=true (PASS); " +
-    "sửa một byte của hash trong proof → isValid=false (FAIL) — bất biến quan trọng nhất của " +
-    "sổ cái Merkle, dùng thẳng buildMerkleTree/generateMerkleProof của chính module thật",
-  S,
-  async () => {
-    const projectId = await taoDuAn("verifyok");
-    const pm = await taoUser("pm", "verifyok");
-    await dangNhapDuAn(pm, projectId);
-    const { hashLeafRecord, buildMerkleTree, generateMerkleProof } =
-      await import("@/lib/bao-mat/merkle-audit-ledger");
-
-    const records = [
-      { event: "A", n: 1 },
-      { event: "B", n: 2 },
-      { event: "C", n: 3 },
-      { event: "D", n: 4 },
-    ];
-    const leafHashes = records.map((r) => hashLeafRecord(r));
-    const tree = buildMerkleTree(leafHashes);
-    const leafIndex = 2;
-    const proof = generateMerkleProof(leafIndex, tree.treeLevels);
-
-    const { POST } = await import("@/app/api/engineering/ledger/verify-proof/route");
-    const resValid = await POST(
-      jreq("/x", { leafHash: leafHashes[leafIndex], proof, expectedRoot: tree.root }),
-    );
-    assert.equal(resValid.status, 200);
-    const bodyValid = await resValid.json();
-    assert.equal(bodyValid.isValid, true);
-
-    // Sửa 1 byte của hash bước đầu tiên trong proof → phải FAIL.
-    const proofHong = proof.map((p: any, i: number) =>
-      i === 0 ? { ...p, hash: (p.hash[0] === "0" ? "1" : "0") + p.hash.slice(1) } : p,
-    );
-    const resInvalid = await POST(
-      jreq("/x", { leafHash: leafHashes[leafIndex], proof: proofHong, expectedRoot: tree.root }),
-    );
-    assert.equal(resInvalid.status, 200);
-    const bodyInvalid = await resInvalid.json();
-    assert.equal(bodyInvalid.isValid, false);
-  },
-);
-
-test(
-  "POST /api/engineering/ledger/verify-proof: truyền leafRecord thay vì leafHash → route tự " +
-    "băm bằng hashLeafRecord() thật",
-  S,
-  async () => {
-    const projectId = await taoDuAn("verifyrec");
-    const pm = await taoUser("pm", "verifyrec");
-    await dangNhapDuAn(pm, projectId);
-    const { hashLeafRecord, buildMerkleTree, generateMerkleProof } =
-      await import("@/lib/bao-mat/merkle-audit-ledger");
-    const records = [{ event: "X" }, { event: "Y" }];
-    const tree = buildMerkleTree(records.map((r) => hashLeafRecord(r)));
-    const proof = generateMerkleProof(0, tree.treeLevels);
-
-    const { POST } = await import("@/app/api/engineering/ledger/verify-proof/route");
-    const res = await POST(jreq("/x", { leafRecord: records[0], proof, expectedRoot: tree.root }));
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.isValid, true);
-    assert.equal(body.leafHash, hashLeafRecord(records[0]));
-  },
-);

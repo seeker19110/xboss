@@ -1,5 +1,53 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Dọn nốt route có backend nhưng UI không gọi: baseline, tổ đội, mặt trận, engineering + migration 0156 — 2026-09-23
+
+Phần còn lại của đợt quét "route chỉ test gọi" (mục "Xoá 2 module chỉ còn test/script tự gọi" bên
+dưới). Người dùng giao "làm theo hướng tốt nhất"; phiên chính viết `PLAN.md` 5 việc, dispatch 5
+worker song song trên 5 worktree (coordinator không có công cụ khởi chạy subagent nên phiên chính tự
+điều phối), mỗi nhánh qua `reviewer` trước khi gộp.
+
+- **Xoá baseline** (`app/components/SCurveChart.tsx`): nút `Trash2` hiện khi đang chọn baseline →
+  `appConfirm` → `DELETE /api/baselines/:id` (Admin/PM, route có từ trước); xoá xong S-curve tự về
+  "Kế hoạch hiện tại" (`baseline` nằm trong deps của effect fetch).
+- **Quản lý tổ đội & thành viên** — **chưa từng có UI** (không phải hồi quy; `/org` từng ghi "tạo
+  tổ đội ở trang Nhân sự" nhưng trang đó chỉ có select lọc). Mới
+  `app/personnel/_components/CrewsModal.tsx` (nút "Tổ đội" trên header `/personnel`, mọi vai trò
+  xem; Admin/PM thêm/sửa/xoá tổ + thêm/bỏ thành viên qua `/api/crews*`, `/api/personnel?crewId=`).
+- **Mặt trận thi công `work_fronts` thật** — `app/site/_components/WorkFrontsTab.tsx` trước là
+  **thẻ demo**: đọc sai khoá (`data.fronts`, API trả `workFronts`) nên luôn hiện 8 tầng hardcode;
+  từ khi ma trận `/work-fronts` chuyển sang bảng `floor_stage_fronts`, không còn UI nào đổi trạng
+  thái/xem tài liệu `work_fronts` dù lưới tracking, lookahead, thông báo `front_missing`, báo cáo
+  EOT vẫn dùng. Nay tab hiện ma trận tầng × sheet từ dữ liệu thật + 4 chip đếm; mới
+  `WorkFrontModal.tsx`: đổi trạng thái (kỹ sư/PM chỉ tiến, Admin được lùi — ngày của bước bị lùi
+  qua bị xoá theo, đúng nghĩa "sửa sai"), ngày bàn giao/trả, blocker, ghi chú (`PATCH
+/api/work-fronts/:id`); biên bản & ảnh hiện trạng (`/api/work-fronts/:id/documents`,
+  `/api/work-front-documents/:id`). Tách hằng số thuần `lib/tien-do/workfront-status.ts` (re-export
+  từ `workfronts.ts`) để client không kéo `pg`. `public/sw.js` loại `/api/work-front-documents/`
+  khỏi cache, `CACHE` → `xboss-v19`.
+- **Engineering**: `app/engineering/workflows/page.tsx` thêm khối "Chuyển trạng thái thủ công"
+  (`POST /api/engineering/workflows/:id/transition`, đích theo `ALLOWED_TRANSITIONS` trừ 2 bước đã
+  có nút riêng; đích huỷ/thất bại/hoàn tác có confirm) — trước đây workflow đã duyệt không thể đi
+  tiếp `executing → completed`. Tách `lib/ky-thuat/engineering-workflow-states.ts` (thuần).
+  `app/engineering/page.tsx` modal đối tượng thêm nút "Phả hệ"/"Tác động" gọi
+  `/api/engineering/lineage/:id`, `/api/engineering/impact/:id`. **Xoá**
+  `POST /api/engineering/ledger/verify-proof` (nhận proof do client tự gửi, không trang nào phát
+  hành proof; sổ cái Merkle trên UI chỉ là 1 con số) + 5 ca test trong `tests/route-eng-mepf.test.ts`,
+  ghi chú trong `docs/nang-cap/M73-*.md`.
+- **Migration `0156_drop_orphaned_closed_loop_sync_logs.sql`** DROP bảng mồ côi
+  `engineering_closed_loop_sync_logs`; `docs/ERD.md` sinh lại bằng `gen:erd` (diff chỉ mất đúng 1
+  block). ⚠️ **Đụng dữ liệu — phải chạy qua staging + `db:migrate -- --dry-run` trước production.**
+  Rà thêm thấy `engineering_scan_to_bim_runs` (cùng migration 0104) **cũng mồ côi** (0 tham chiếu
+  trong app/lib/scripts/tests) — chưa DROP, chờ người dùng xác nhận không cần dữ liệu quét cũ.
+
+Còn lại ngoài phạm vi (phát hiện khi quét, chưa quyết): `GET /api/dashboard/floors`,
+`PATCH /api/workpackages/:id/move`, `PATCH /api/workpackages/:id/dimensions/column/move`,
+`POST /api/workpackages/:id/tasks`, `PATCH /api/construction-stages/:id`, `GET /api/boq/:id/tasks-theo-tang`
+không thấy UI gọi (các route `cron/*`, `v1/*` là API ngoài, đúng thiết kế). `.env.example` cần sửa tay
+dòng `TELEGRAM_WEBHOOK_SECRET`/`ZALO_OA_SECRET` thành "hiện chưa dùng" (phiên không được mở `.env*`).
+
+Cổng: `lint`, `typecheck`, `build`, `check:migrations|lib-layers|dead-code|dead-routes|route-perms|project-scope|contrast|mau-accent|hex-hardcode|sw-exclude` xanh; `npm test -- --release-gate` với Postgres 16 cục bộ — xem PR.
+
 ## ✅ Trang `/finance/cash` — Sổ thu chi & Tạm ứng (UI đầy đủ) + vá hoàn ứng cộng tiền trên float — 2026-09-23
 
 Bảng `cash_transactions`/`advances` và API xem/tạo/sửa/xoá/hoàn ứng có từ M27 PR1 (`789c1039`)

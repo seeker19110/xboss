@@ -4208,29 +4208,6 @@
 - `idx_engineering_cashflow_projections_project`: INDEX idx_engineering_cashflow_projections_project ON public.engineering_cashflow_period_projections USING btree (project_id)
 - `idx_engineering_cashflow_projections_run`: INDEX idx_engineering_cashflow_projections_run ON public.engineering_cashflow_period_projections USING btree (run_id)
 
-### engineering_closed_loop_sync_logs
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | integer |  |  |
-| sync_code | text |  |  |
-| spool_id | text |  |  |
-| wbs_task_id | integer | ✓ |  |
-| synced_qty | numeric(10,3) |  |  |
-| synced_amount_vnd | numeric(15,2) |  |  |
-| provenance_token | text |  |  |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-- `wbs_task_id` → `tasks(id)`
-
-**Index:**
-- `engineering_closed_loop_sync_logs_pkey`: UNIQUE INDEX engineering_closed_loop_sync_logs_pkey ON public.engineering_closed_loop_sync_logs USING btree (id)
-- `idx_closed_loop_sync_proj`: INDEX idx_closed_loop_sync_proj ON public.engineering_closed_loop_sync_logs USING btree (project_id, spool_id)
-- `uq_closed_loop_sync_code`: UNIQUE INDEX uq_closed_loop_sync_code ON public.engineering_closed_loop_sync_logs USING btree (project_id, sync_code)
-
 ### engineering_conflicts
 
 | Cột | Kiểu | Null | Default |

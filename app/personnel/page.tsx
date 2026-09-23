@@ -10,6 +10,7 @@ import { showToast } from "@/app/components/Toast";
 import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/nen/date";
 import { trangThaiHanTheoNgay, type TrangThaiHan } from "@/lib/nen/han-hieu-luc";
+import CrewsModal from "@/app/personnel/_components/CrewsModal";
 
 type Personnel = {
   id: number;
@@ -62,6 +63,14 @@ export default function PersonnelPage() {
   const [editing, setEditing] = useState<Personnel | null>(null);
   const [detail, setDetail] = useState<Personnel | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [crewsOpen, setCrewsOpen] = useState(false);
+
+  async function loadCrews() {
+    const res = await fetch("/api/crews").catch(() => null);
+    if (!res?.ok) return;
+    const j = await res.json().catch(() => null);
+    setCrews(j?.crews ?? []);
+  }
 
   const canManage = me?.role === "admin" || me?.role === "pm";
 
@@ -127,15 +136,24 @@ export default function PersonnelPage() {
         title="Nhân sự"
         subtitle="Nhân sự công trường (khác tài khoản hệ thống) — hồ sơ, tổ đội, chứng chỉ"
         bottomActions={
-          canManage ? (
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setAddOpen(true)}
-              aria-label="Thêm nhân sự"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+              onClick={() => setCrewsOpen(true)}
+              aria-label="Quản lý tổ đội"
+              className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition shrink-0 text-zinc-100 min-h-10"
             >
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm nhân sự</span>
+              <Users className="w-4 h-4" /> <span className="hidden sm:inline">Tổ đội</span>
             </button>
-          ) : undefined
+            {canManage && (
+              <button
+                onClick={() => setAddOpen(true)}
+                aria-label="Thêm nhân sự"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent min-h-10"
+              >
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm nhân sự</span>
+              </button>
+            )}
+          </div>
         }
       />
 
@@ -273,6 +291,17 @@ export default function PersonnelPage() {
 
       {detail && (
         <DetailModal person={detail} canManage={!!canManage} onClose={() => setDetail(null)} />
+      )}
+
+      {crewsOpen && (
+        <CrewsModal
+          canManage={!!canManage}
+          onClose={() => setCrewsOpen(false)}
+          onChanged={() => {
+            loadCrews();
+            loadPersonnel();
+          }}
+        />
       )}
     </div>
   );

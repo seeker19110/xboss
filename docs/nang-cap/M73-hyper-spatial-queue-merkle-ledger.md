@@ -108,13 +108,13 @@ CREATE INDEX IF NOT EXISTS idx_spatial_cache_lookup ON engineering_spatial_compu
 
 ## 4. API Endpoints
 
-| Phương thức | Endpoint                                   | Chức năng                                      | Phân quyền        |
-| ----------- | ------------------------------------------ | ---------------------------------------------- | ----------------- |
-| `POST`      | `/api/engineering/spatial/compute`         | Thực thi thuật toán hình học & đệm kết quả     | `ENGINEER`        |
-| `GET/POST`  | `/api/engineering/queue/tasks`             | Truy vấn & Nạp tác vụ nặng vào hàng đợi nền    | `ENGINEER` / `PM` |
-| `POST`      | `/api/engineering/queue/tasks/[id]/cancel` | Hủy tác vụ đang chờ trong hàng đợi             | `PM`              |
-| `GET/POST`  | `/api/engineering/ledger/merkle`           | Đóng gói Merkle Tree cho batch sự kiện         | `PM` / `ADMIN`    |
-| `POST`      | `/api/engineering/ledger/verify-proof`     | Xác minh toán học Merkle Proof của một bản ghi | `VIEWER`          |
+| Phương thức | Endpoint                                   | Chức năng                                                                                                                                                                                                                              | Phân quyền        |
+| ----------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| `POST`      | `/api/engineering/spatial/compute`         | Thực thi thuật toán hình học & đệm kết quả                                                                                                                                                                                             | `ENGINEER`        |
+| `GET/POST`  | `/api/engineering/queue/tasks`             | Truy vấn & Nạp tác vụ nặng vào hàng đợi nền                                                                                                                                                                                            | `ENGINEER` / `PM` |
+| `POST`      | `/api/engineering/queue/tasks/[id]/cancel` | Hủy tác vụ đang chờ trong hàng đợi                                                                                                                                                                                                     | `PM`              |
+| `GET/POST`  | `/api/engineering/ledger/merkle`           | Đóng gói Merkle Tree cho batch sự kiện                                                                                                                                                                                                 | `PM` / `ADMIN`    |
+| ~~`POST`~~  | ~~`/api/engineering/ledger/verify-proof`~~ | ~~Xác minh toán học Merkle Proof~~ — **đã xoá 2026-09-23, không có UI** (không trang nào phát hành proof hay gọi route này; hàm thuần `verifyMerkleProof` vẫn giữ trong `lib/ky-thuat/engineering-merkle-ledger.ts` vì có test đơn vị) | —                 |
 
 ---
 
