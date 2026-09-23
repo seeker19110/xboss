@@ -5,7 +5,7 @@ import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { ErrorState } from "@/app/components/ErrorState";
-import { taiJson } from "@/app/lib/taiDuLieu";
+import { taiJson, taiJsonMoi } from "@/app/lib/taiDuLieu";
 import { appAlert, appConfirm } from "@/app/components/dialogs";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { boDauThuong } from "@/lib/nen/van-ban";
@@ -16,7 +16,6 @@ import DoPhuBoqCard from "./_components/DoPhuBoqCard";
 import {
   fmtVND,
   fmtQty,
-  fetchFresh,
   NGUONG_LECH_WEIGHT,
   VO_STATUS_LABEL,
   type BoqItem,
@@ -51,17 +50,8 @@ export default function BoqPage() {
 
   async function load(withVo: boolean, fresh = false) {
     const url = `/api/boq?includeVo=${withVo ? 1 : 0}`;
-    // fetchFresh bỏ qua cache của service worker (dữ liệu vừa sửa) — giữ nguyên đường cũ.
-    if (fresh) {
-      try {
-        const r = await fetchFresh(url);
-        if (!r.ok) return { ok: false as const, loi: `Không tải được BOQ (lỗi ${r.status})` };
-        return { ok: true as const, data: (await r.json()) as BoqData };
-      } catch {
-        return { ok: false as const, loi: "Mất kết nối — kiểm tra mạng rồi thử lại" };
-      }
-    }
-    const kq = await taiJson<BoqData>(url);
+    // fresh = tải lại ngay sau khi tự sửa → bỏ qua cache service worker (xem taiJsonMoi).
+    const kq = await (fresh ? taiJsonMoi : taiJson)<BoqData>(url);
     return kq.ok ? { ok: true as const, data: kq.data } : { ok: false as const, loi: kq.loi };
   }
 

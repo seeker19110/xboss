@@ -48,8 +48,8 @@ export async function taiJson<T>(url: string, init?: RequestInit): Promise<KetQu
  * Như `taiJson` nhưng bỏ qua cache của service worker — dùng cho lần tải lại NGAY SAU khi
  * trang tự ghi (thêm/sửa/xoá). sw.js áp stale-while-revalidate cho mọi GET `/api/*`, nên
  * gọi lại đúng URL sẽ nhận bản cache cũ (vd ảnh vừa xoá vẫn hiện). Nonce tạo cache key mới;
- * lần đọc thụ động vẫn dùng `taiJson` để giữ lợi ích offline. Cùng pattern `fetchFresh`
- * trong app/boq, app/ban-ve, app/design-changes.
+ * lần đọc thụ động vẫn dùng `taiJson` để giữ lợi ích offline. Dùng chung cho mọi trang
+ * (thay các bản chép tay `fetchFresh` cũ ở app/boq, app/ban-ve, app/design-changes).
  */
 export function taiJsonMoi<T>(url: string): Promise<KetQuaTai<T>> {
   const sep = url.includes("?") ? "&" : "?";
