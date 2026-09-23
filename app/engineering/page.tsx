@@ -109,9 +109,7 @@ function NodeList({ nodes }: { nodes: GraphNode[] }) {
           {n.name ?? n.externalKey} · {n.objectType}
         </li>
       ))}
-      {nodes.length > 20 && (
-        <li className="text-zinc-500">… và {nodes.length - 20} nữa</li>
-      )}
+      {nodes.length > 20 && <li className="text-zinc-500">… và {nodes.length - 20} nữa</li>}
     </ul>
   );
 }
@@ -534,10 +532,12 @@ export default function EngineeringApexCockpitPage() {
                   <div className="mb-3 rounded-lg bg-zinc-950 p-3 text-xs">
                     <div className="mb-2 flex flex-wrap gap-4">
                       <span className="text-zinc-300">
-                        Ngược dòng: <strong className="text-zinc-100">{impact.upstreamCount}</strong>
+                        Ngược dòng:{" "}
+                        <strong className="text-zinc-100">{impact.upstreamCount}</strong>
                       </span>
                       <span className="text-zinc-300">
-                        Xuôi dòng: <strong className="text-zinc-100">{impact.downstreamCount}</strong>
+                        Xuôi dòng:{" "}
+                        <strong className="text-zinc-100">{impact.downstreamCount}</strong>
                       </span>
                     </div>
                     <p className="mb-1 font-semibold text-zinc-400">Cảnh báo đường găng</p>
@@ -547,7 +547,11 @@ export default function EngineeringApexCockpitPage() {
                       <ul className="mb-2 space-y-1">
                         {impact.criticalPathAlerts.map((a, i) => (
                           <li key={i} className="flex items-start gap-1.5 text-amber-300">
-                            <AlertTriangle size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
+                            <AlertTriangle
+                              size={12}
+                              className="mt-0.5 shrink-0"
+                              aria-hidden="true"
+                            />
                             {a}
                           </li>
                         ))}
@@ -646,8 +650,9 @@ export default function EngineeringApexCockpitPage() {
                                 className="text-sky-400 hover:underline"
                               >
                                 {w.title} ·{" "}
-                                {WORKFLOW_STATE_LABELS[w.state as keyof typeof WORKFLOW_STATE_LABELS] ??
-                                  w.state}
+                                {WORKFLOW_STATE_LABELS[
+                                  w.state as keyof typeof WORKFLOW_STATE_LABELS
+                                ] ?? w.state}
                               </Link>
                             </li>
                           ))}

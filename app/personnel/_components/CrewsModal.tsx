@@ -123,7 +123,11 @@ export default function CrewsModal({
             )}
             <h2 className="font-semibold truncate">{title}</h2>
           </div>
-          <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white shrink-0">
+          <button
+            onClick={onClose}
+            aria-label="Đóng"
+            className="text-zinc-400 hover:text-white shrink-0"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -216,11 +220,7 @@ function CrewList({
           </button>
         </p>
       ) : crews.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          message='Chưa có tổ đội nào. Bấm "Thêm tổ đội" để tạo.'
-          compact
-        />
+        <EmptyState icon={Users} message='Chưa có tổ đội nào. Bấm "Thêm tổ đội" để tạo.' compact />
       ) : (
         <ul className="space-y-2">
           {crews.map((c) => (
@@ -463,7 +463,10 @@ function CrewMembers({
         body: JSON.stringify({ personnelId: addId }),
       });
       if (!res.ok) {
-        showToast((await res.json().catch(() => null))?.error ?? "Không thêm được thành viên", "error");
+        showToast(
+          (await res.json().catch(() => null))?.error ?? "Không thêm được thành viên",
+          "error",
+        );
         return;
       }
       setAddId("");
@@ -480,12 +483,14 @@ function CrewMembers({
       return;
     setBusy(true);
     try {
-      const res = await fetch(
-        `/api/crews/${crew.id}/members?personnelId=${p.id}`,
-        { method: "DELETE" },
-      );
+      const res = await fetch(`/api/crews/${crew.id}/members?personnelId=${p.id}`, {
+        method: "DELETE",
+      });
       if (!res.ok) {
-        showToast((await res.json().catch(() => null))?.error ?? "Không bỏ được thành viên", "error");
+        showToast(
+          (await res.json().catch(() => null))?.error ?? "Không bỏ được thành viên",
+          "error",
+        );
         return;
       }
       await load();
