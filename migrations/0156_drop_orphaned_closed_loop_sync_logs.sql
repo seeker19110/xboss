@@ -1,0 +1,26 @@
+-- 0156_drop_orphaned_closed_loop_sync_logs.sql — dọn bảng mồ côi sau đợt xoá module
+-- Engineering closed-loop sync bị xoá theo yêu cầu người dùng (PR #514, 2026-09-23, xem
+-- PROGRESS.md).
+--
+-- Đã rà kỹ TOÀN BỘ repo (app/, lib/, scripts/, tests/, e2e/) trước khi liệt kê bảng ở đây —
+-- không còn route/lib/component/test nào đọc/ghi bảng dưới đây:
+--
+--   engineering_closed_loop_sync_logs (M70, migration 0104) — lib
+--     `engineering-closed-loop-sync.ts` xoá ở PR #514; route /api/engineering/closed-loop-sync
+--     đã xoá từ cùng PR. Không test/script nào liệt kê hay dùng bảng này.
+--
+-- CỐ Ý KHÔNG DROP ở đợt này: engineering_scan_to_bim_runs (M70, migration 0104) — dù lib
+-- dùng bảng này đã xoá, module scan-to-bim vẫn có thể được phục hồi từ dự án; quyết định DROP
+-- bảng này được hoãn để người dùng xác nhận không cần dữ liệu lịch sử quét cũ. Bảng hiện mồ côi
+-- nhưng giữ lại để tránh xoá dữ liệu ngay (xem docs/nang-cap/M70-scan-to-bim-closed-loop.md để
+-- quyết định lâu dài).
+--
+-- Không có bảng NÀO khác trong repo REFERENCES tới bảng bị DROP ở đây (đã grep xác nhận) —
+-- không cần CASCADE để dọn FK con, nhưng vẫn giữ CASCADE cho nhất quán với tiền lệ 0155 (an
+-- toàn, không có tác dụng phụ khi không có FK con).
+--
+-- ⚠️ ĐỤNG DỮ LIỆU (DROP TABLE) — theo DoD (CLAUDE.md) phải chạy qua staging
+-- (`bash deploy.sh --staging`, xem docs/ops/staging.md) và `npm run db:migrate -- --dry-run`
+-- trước khi lên production. KHÔNG đi thẳng production.
+
+DROP TABLE IF EXISTS engineering_closed_loop_sync_logs CASCADE;

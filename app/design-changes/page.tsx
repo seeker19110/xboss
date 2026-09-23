@@ -16,16 +16,12 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appPrompt, appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
+import { taiJsonMoi } from "@/app/lib/taiDuLieu";
 
 // Chỉ 3 trường được tab này đọc (d.id/d.code/d.name) — không kéo cả DrawingRow đầy đủ.
 type DrawingRow = { id: number; code: string; name: string };
 
-// Hai helper dùng chung với trang bản vẽ cũ — chép kèm để trang này tự đứng được.
-function fetchFresh(url: string): Promise<Response> {
-  const sep = url.includes("?") ? "&" : "?";
-  return fetch(`${url}${sep}_=${Date.now()}`, { cache: "no-store" });
-}
-
+// Helper dùng chung với trang bản vẽ cũ — chép kèm để trang này tự đứng được.
 function canManageDrawings(role?: string) {
   return role === "admin" || role === "pm" || role === "engineer";
 }
@@ -144,13 +140,14 @@ function DesignChangesTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
-  // Gọi sau khi tự ghi (tạo/quyết định/đánh dấu) — dùng fetchFresh để bỏ qua cache SW
+  // Gọi sau khi tự ghi (tạo/quyết định/đánh dấu) — dùng taiJsonMoi để bỏ qua cache SW
   // (stale-while-revalidate), khác với load() ở trên chỉ dùng cho tải lần đầu/đổi filter.
   async function refresh() {
     const qs = buildQuery();
-    const res = await fetchFresh(`/api/design-changes${qs ? `?${qs}` : ""}`);
-    const d = res.ok ? await res.json() : null;
-    setItems(d?.items ?? []);
+    const kq = await taiJsonMoi<{ items?: DesignChangeRow[] }>(
+      `/api/design-changes${qs ? `?${qs}` : ""}`,
+    );
+    setItems((kq.ok ? kq.data.items : null) ?? []);
   }
 
   const selected = items.find((d) => d.id === selectedId) ?? null;

@@ -38,6 +38,8 @@ import { Skeleton } from "@/app/components/Skeleton";
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from "@/app/components/SpreadsheetGrid";
 import CustomFieldsSection from "@/app/components/CustomFieldsSection";
 import { formatDateTimeVN } from "@/lib/nen/date";
+import MaterialStockModal from "./MaterialStockModal";
+import PrintMaterialLabelsModal from "./PrintMaterialLabelsModal";
 
 export type Material = {
   id: number;
@@ -157,8 +159,11 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
       const params = new URLSearchParams();
       if (systemFilter) params.set("systemId", systemFilter);
       if (sheetFilter) params.set("sheetTypeId", sheetFilter);
+      // revalidate = tải lại ngay sau khi tự ghi → nonce + no-store để bỏ qua bản cache
+      // stale-while-revalidate của sw.js (cùng cơ chế taiJsonMoi), nếu không lưới hiện số cũ.
+      if (revalidate) params.set("_", String(Date.now()));
       const qs = params.toString() ? `?${params.toString()}` : "";
-      fetch(`/api/materials${qs}`)
+      fetch(`/api/materials${qs}`, revalidate ? { cache: "no-store" } : undefined)
         .then(async (r) => {
           if (r.status === 401) {
             await redirectToLogin();
@@ -297,6 +302,23 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
     }
   };
 
+  // PATCH /api/materials/:id/move — hoán sort_order với vật tư liền kề cùng hạng mục.
+  const moveMaterial = async (m: Material, direction: "up" | "down") => {
+    setError("");
+    const res = await fetch(`/api/materials/${m.id}/move`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ direction }),
+    }).catch(() => null);
+    const j = await res?.json().catch(() => null);
+    if (!res?.ok) {
+      setError(j?.error ?? "Không đổi được thứ tự");
+      return;
+    }
+    if (j?.ok === false) return; // đã ở đầu/cuối danh sách
+    load(true);
+  };
+
   const q = useDeferredValue(search.trim().toLowerCase());
   const filtered = useMemo(() => {
     if (!q) return materials;
@@ -421,8 +443,56 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
         toPatch: (raw) => ({ note: raw.trim() || null }),
       },
     };
-    return visibleCols.map((k) => defs[k]);
-  }, [visibleCols, colLabels, idxMap, canAdmin, canEdit, editMode]);
+    // Cột thao tác ĐẦU lưới, luôn dính (không nằm trong ColKey — không ẩn/đổi tên được): mở modal Kho (xuất/hoàn
+    // kho, điều chỉnh, lịch sử) + đổi thứ tự ↑↓ khi đang ở chế độ sửa và không lọc tìm kiếm.
+    // onMouseDown chặn lan lên ô lưới để bấm nút không kích hoạt chọn/kéo vùng của SpreadsheetGrid.
+    const stop = (e: React.MouseEvent) => e.stopPropagation();
+    const actions: GridColumn<Material> = {
+      key: "_actions",
+      label: "Kho",
+      width: canEdit && editMode && !q ? 130 : 56,
+      type: "readonly",
+      align: "center",
+      get: () => "",
+      render: (m) => (
+        <span className="inline-flex items-center gap-0.5" onMouseDown={stop}>
+          <button
+            type="button"
+            onClick={() => setHistoryMat(m)}
+            aria-label={`Kho & lịch sử: ${m.name}`}
+            title="Xuất/hoàn kho, điều chỉnh, lịch sử"
+            className="w-9 h-9 inline-flex items-center justify-center rounded-lg text-emerald-400 hover:bg-zinc-800"
+          >
+            <History className="w-4 h-4" />
+          </button>
+          {canEdit && editMode && !q && (
+            <>
+              <button
+                type="button"
+                onClick={() => void moveMaterial(m, "up")}
+                aria-label={`Chuyển lên: ${m.name}`}
+                title="Chuyển lên"
+                className="w-9 h-9 inline-flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => void moveMaterial(m, "down")}
+                aria-label={`Chuyển xuống: ${m.name}`}
+                title="Chuyển xuống"
+                className="w-9 h-9 inline-flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </button>
+            </>
+          )}
+        </span>
+      ),
+    };
+    return [actions, ...visibleCols.map((k) => defs[k])];
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- moveMaterial ổn định theo load
+  }, [visibleCols, colLabels, idxMap, canAdmin, canEdit, editMode, q]);
 
   const commitGrid = useCallback(
     async (edits: GridEdit[]) => {
@@ -594,6 +664,17 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
             </button>
           )}
 
+          {canAdmin && (
+            <button
+              onClick={() => setLabelModalOpen(true)}
+              disabled={materials.length === 0}
+              title="Chọn vật tư để in tem QR"
+              className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition shrink-0 disabled:opacity-50 h-10"
+            >
+              <QrCode className="w-4 h-4" /> In tem QR
+            </button>
+          )}
+
           <a
             href="/api/materials/template"
             download="MAU-KHOI-LUONG-BOQ.xlsx"
@@ -636,7 +717,9 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
             onCommit={commitGrid}
             readOnly={!canEdit}
             editMode={editMode}
-            stickyCols={3}
+            // +1 cho cột Kho ở đầu. Mobile chỉ dính Kho + Mã BOQ: 4 cột dính (~520px) rộng hơn
+            // màn hình điện thoại, không còn chỗ cuộn ngang xem số lượng.
+            stickyCols={typeof window !== "undefined" && window.innerWidth < 640 ? 2 : 4}
             maxBodyHeight={Math.round(
               typeof window !== "undefined" ? window.innerHeight * 0.65 : 550,
             )}
@@ -654,6 +737,17 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
             </div>
           )}
         </div>
+      )}
+      {labelModalOpen && (
+        <PrintMaterialLabelsModal materials={filtered} onClose={() => setLabelModalOpen(false)} />
+      )}
+      {historyMat && (
+        <MaterialStockModal
+          material={historyMat}
+          canEdit={canEdit}
+          onClose={() => setHistoryMat(null)}
+          onChanged={() => load(true)}
+        />
       )}
     </div>
   );

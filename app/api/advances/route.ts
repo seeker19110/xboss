@@ -15,6 +15,8 @@ export const dynamic = "force-dynamic";
 export type AdvanceRow = AdvanceInput & {
   id: number;
   settledAmount: number;
+  /** amount − settled_amount, tính trong SQL. */
+  remaining: number;
   status: AdvanceStatus;
   createdBy: number | null;
   createdByName: string | null;
@@ -45,7 +47,8 @@ export async function GET(req: NextRequest) {
   const advances = await withProjectScope(projectId, () =>
     query<AdvanceRow>(
       `SELECT a.id, a.code, a.advance_date AS "advanceDate", a.amount, a.recipient, a.reason,
-              a.settled_amount AS "settledAmount", a.status, a.proposal_id AS "proposalId",
+              a.settled_amount AS "settledAmount",
+              (a.amount - a.settled_amount) AS "remaining", a.status, a.proposal_id AS "proposalId",
               a.created_by AS "createdBy", u.name AS "createdByName", a.created_at AS "createdAt"
          FROM advances a
          LEFT JOIN users u ON u.id = a.created_by

@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   const projectParams = projectId != null ? [projectId] : [];
 
   // Tiến độ hiện tại theo tháp × tầng × hệ — trễ tính theo ngày quá hạn
-  // (giống /api/dashboard/floors, nhất quán với cách lib/status.ts suy ra "tre").
+  // (nhất quán với cách lib/status.ts suy ra "tre").
   const current = await query<{
     tower: string | null;
     floorLabel: string;
@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
   const weeksSet = new Set(history.map((h) => h.weekStart));
   const weeks = [...weeksSet].sort();
 
-  // Nhóm theo tháp — mỗi tháp có danh sách sheet + tầng riêng (giống /api/dashboard/floors).
+  // Nhóm theo tháp — mỗi tháp có danh sách sheet + tầng riêng.
   const towerNames = [...new Set(current.map((c) => c.tower ?? ""))];
   const towers = towerNames.map((name) => {
     const tc = current.filter((c) => (c.tower ?? "") === name);

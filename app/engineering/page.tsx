@@ -1,12 +1,24 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Boxes, Check, X, Scale, Activity, ArrowUpRight } from "lucide-react";
+import {
+  Boxes,
+  Check,
+  X,
+  Scale,
+  Activity,
+  ArrowUpRight,
+  GitBranch,
+  Waypoints,
+  AlertTriangle,
+} from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
-import { PageSkeleton } from "@/app/components/Skeleton";
+import { PageSkeleton, Skeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
+import { showToast } from "@/app/components/Toast";
+import { WORKFLOW_STATE_LABELS } from "@/lib/ky-thuat/engineering-workflow-states";
 
 type EngObject = {
   id: string;
@@ -38,6 +50,40 @@ type Revision = {
 
 type Detail = { object: EngObject; relations: Relation[]; revisions: Revision[] };
 
+// Tác động & phả hệ (lib/ky-thuat/engineering-graph.ts) — khai lại kiểu thuần ở đây thay vì
+// import file lib (kéo `@/lib/db` vào bundle client), theo đúng ranh giới ADR-0007.
+type GraphNode = {
+  id: string;
+  externalKey: string;
+  objectType: string;
+  name: string | null;
+  discipline: string | null;
+  status: string;
+};
+type ImpactResult = {
+  targetObject: GraphNode;
+  upstreamCount: number;
+  downstreamCount: number;
+  upstreamNodes: GraphNode[];
+  downstreamNodes: GraphNode[];
+  criticalPathAlerts: string[];
+};
+type LineageResult = {
+  object: GraphNode | null;
+  source: {
+    sourceType: string;
+    externalKey: string;
+    revisionName: string | null;
+  } | null;
+  revisions: Array<{ revisionNumber: number; changeSummary: string | null }>;
+  relations: {
+    outgoing: Array<{ relationType: string; target: GraphNode }>;
+    incoming: Array<{ relationType: string; source: GraphNode }>;
+  };
+  suggestions: Array<{ id: string; title: string; status: string; riskLevel: string }>;
+  workflows: Array<{ id: string; title: string; state: string }>;
+};
+
 const STATUS_LABEL: Record<EngObject["status"], string> = {
   pending_review: "Chờ duyệt",
   approved: "Đã duyệt",
@@ -52,6 +98,22 @@ const STATUS_CLS: Record<EngObject["status"], string> = {
   void: "bg-zinc-900 text-zinc-500 border-zinc-800",
 };
 
+// Danh sách node ngược/xuôi dòng trong khối "Tác động" — tối đa 20 dòng.
+function NodeList({ nodes }: { nodes: GraphNode[] }) {
+  if (nodes.length === 0) return <p className="text-zinc-500">—</p>;
+  const shown = nodes.slice(0, 20);
+  return (
+    <ul className="space-y-0.5 text-zinc-300">
+      {shown.map((n) => (
+        <li key={n.id}>
+          {n.name ?? n.externalKey} · {n.objectType}
+        </li>
+      ))}
+      {nodes.length > 20 && <li className="text-zinc-500">… và {nodes.length - 20} nữa</li>}
+    </ul>
+  );
+}
+
 export default function EngineeringApexCockpitPage() {
   const [objects, setObjects] = useState<EngObject[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,6 +125,10 @@ export default function EngineeringApexCockpitPage() {
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "objects">("overview");
+  const [impact, setImpact] = useState<ImpactResult | null>(null);
+  const [impactLoading, setImpactLoading] = useState(false);
+  const [lineage, setLineage] = useState<LineageResult | null>(null);
+  const [lineageLoading, setLineageLoading] = useState(false);
 
   async function loadData() {
     try {
@@ -93,6 +159,8 @@ export default function EngineeringApexCockpitPage() {
   function openDetail(id: string) {
     setSelectedId(id);
     setNote("");
+    setImpact(null);
+    setLineage(null);
     setDetailLoading(true);
     fetch(`/api/engineering/objects/${id}`)
       .then((r) => r.json())
@@ -103,6 +171,52 @@ export default function EngineeringApexCockpitPage() {
   function closeDetail() {
     setSelectedId(null);
     setDetail(null);
+    setImpact(null);
+    setLineage(null);
+  }
+
+  async function toggleImpact() {
+    if (impact) {
+      setImpact(null);
+      return;
+    }
+    if (!selectedId) return;
+    setImpactLoading(true);
+    try {
+      const res = await fetch(`/api/engineering/impact/${selectedId}`);
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast(j?.error ?? "Không tải được phân tích tác động", "error");
+        return;
+      }
+      setImpact(j);
+    } catch {
+      showToast("Mất mạng — thử lại sau", "error");
+    } finally {
+      setImpactLoading(false);
+    }
+  }
+
+  async function toggleLineage() {
+    if (lineage) {
+      setLineage(null);
+      return;
+    }
+    if (!selectedId) return;
+    setLineageLoading(true);
+    try {
+      const res = await fetch(`/api/engineering/lineage/${selectedId}`);
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast(j?.error ?? "Không tải được phả hệ đối tượng", "error");
+        return;
+      }
+      setLineage(j);
+    } catch {
+      showToast("Mất mạng — thử lại sau", "error");
+    } finally {
+      setLineageLoading(false);
+    }
   }
 
   async function review(decision: "approved" | "rejected") {
@@ -392,6 +506,160 @@ export default function EngineeringApexCockpitPage() {
                       ))}
                     </ul>
                   </>
+                )}
+
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={toggleLineage}
+                    aria-label="Xem phả hệ đối tượng"
+                    className="flex min-h-10 items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-700"
+                  >
+                    <GitBranch size={14} aria-hidden="true" /> Phả hệ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleImpact}
+                    aria-label="Xem phân tích tác động"
+                    className="flex min-h-10 items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-700"
+                  >
+                    <Waypoints size={14} aria-hidden="true" /> Tác động
+                  </button>
+                </div>
+
+                {impactLoading && <Skeleton className="mb-3 h-24 w-full" />}
+                {impact && (
+                  <div className="mb-3 rounded-lg bg-zinc-950 p-3 text-xs">
+                    <div className="mb-2 flex flex-wrap gap-4">
+                      <span className="text-zinc-300">
+                        Ngược dòng:{" "}
+                        <strong className="text-zinc-100">{impact.upstreamCount}</strong>
+                      </span>
+                      <span className="text-zinc-300">
+                        Xuôi dòng:{" "}
+                        <strong className="text-zinc-100">{impact.downstreamCount}</strong>
+                      </span>
+                    </div>
+                    <p className="mb-1 font-semibold text-zinc-400">Cảnh báo đường găng</p>
+                    {impact.criticalPathAlerts.length === 0 ? (
+                      <p className="mb-2 text-zinc-500">Không có cảnh báo đường găng</p>
+                    ) : (
+                      <ul className="mb-2 space-y-1">
+                        {impact.criticalPathAlerts.map((a, i) => (
+                          <li key={i} className="flex items-start gap-1.5 text-amber-300">
+                            <AlertTriangle
+                              size={12}
+                              className="mt-0.5 shrink-0"
+                              aria-hidden="true"
+                            />
+                            {a}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className="mb-1 font-semibold text-zinc-400">Node ngược dòng</p>
+                        <NodeList nodes={impact.upstreamNodes} />
+                      </div>
+                      <div>
+                        <p className="mb-1 font-semibold text-zinc-400">Node xuôi dòng</p>
+                        <NodeList nodes={impact.downstreamNodes} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {lineageLoading && <Skeleton className="mb-3 h-24 w-full" />}
+                {lineage && (
+                  <div className="mb-3 space-y-2 rounded-lg bg-zinc-950 p-3 text-xs">
+                    <div>
+                      <p className="mb-1 font-semibold text-zinc-400">Nguồn</p>
+                      <p className="text-zinc-300">
+                        {lineage.source
+                          ? `${lineage.source.sourceType} · ${lineage.source.externalKey} · ${lineage.source.revisionName ?? "—"}`
+                          : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="mb-1 font-semibold text-zinc-400">Phiên bản</p>
+                      {lineage.revisions.length === 0 ? (
+                        <p className="text-zinc-500">—</p>
+                      ) : (
+                        <ul className="space-y-0.5 text-zinc-300">
+                          {lineage.revisions.map((r, i) => (
+                            <li key={i}>
+                              #{r.revisionNumber} — {r.changeSummary ?? "—"}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <div>
+                      <p className="mb-1 font-semibold text-zinc-400">Quan hệ ra</p>
+                      {lineage.relations.outgoing.length === 0 ? (
+                        <p className="text-zinc-500">—</p>
+                      ) : (
+                        <ul className="space-y-0.5 text-zinc-300">
+                          {lineage.relations.outgoing.map((r, i) => (
+                            <li key={i}>
+                              {r.relationType} → {r.target.name ?? r.target.externalKey}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <div>
+                      <p className="mb-1 font-semibold text-zinc-400">Quan hệ vào</p>
+                      {lineage.relations.incoming.length === 0 ? (
+                        <p className="text-zinc-500">—</p>
+                      ) : (
+                        <ul className="space-y-0.5 text-zinc-300">
+                          {lineage.relations.incoming.map((r, i) => (
+                            <li key={i}>
+                              {r.relationType} → {r.source.name ?? r.source.externalKey}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <div>
+                      <p className="mb-1 font-semibold text-zinc-400">Đề xuất liên quan</p>
+                      {lineage.suggestions.length === 0 ? (
+                        <p className="text-zinc-500">—</p>
+                      ) : (
+                        <ul className="space-y-0.5 text-zinc-300">
+                          {lineage.suggestions.map((s) => (
+                            <li key={s.id}>
+                              {s.title} · {s.status} · {s.riskLevel}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <div>
+                      <p className="mb-1 font-semibold text-zinc-400">Workflow liên quan</p>
+                      {lineage.workflows.length === 0 ? (
+                        <p className="text-zinc-500">—</p>
+                      ) : (
+                        <ul className="space-y-0.5 text-zinc-300">
+                          {lineage.workflows.map((w) => (
+                            <li key={w.id}>
+                              <Link
+                                href="/engineering/workflows"
+                                className="text-sky-400 hover:underline"
+                              >
+                                {w.title} ·{" "}
+                                {WORKFLOW_STATE_LABELS[
+                                  w.state as keyof typeof WORKFLOW_STATE_LABELS
+                                ] ?? w.state}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
                 )}
 
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-400">

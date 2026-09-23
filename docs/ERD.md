@@ -4208,29 +4208,6 @@
 - `idx_engineering_cashflow_projections_project`: INDEX idx_engineering_cashflow_projections_project ON public.engineering_cashflow_period_projections USING btree (project_id)
 - `idx_engineering_cashflow_projections_run`: INDEX idx_engineering_cashflow_projections_run ON public.engineering_cashflow_period_projections USING btree (run_id)
 
-### engineering_closed_loop_sync_logs
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | integer |  |  |
-| sync_code | text |  |  |
-| spool_id | text |  |  |
-| wbs_task_id | integer | ✓ |  |
-| synced_qty | numeric(10,3) |  |  |
-| synced_amount_vnd | numeric(15,2) |  |  |
-| provenance_token | text |  |  |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-- `wbs_task_id` → `tasks(id)`
-
-**Index:**
-- `engineering_closed_loop_sync_logs_pkey`: UNIQUE INDEX engineering_closed_loop_sync_logs_pkey ON public.engineering_closed_loop_sync_logs USING btree (id)
-- `idx_closed_loop_sync_proj`: INDEX idx_closed_loop_sync_proj ON public.engineering_closed_loop_sync_logs USING btree (project_id, spool_id)
-- `uq_closed_loop_sync_code`: UNIQUE INDEX uq_closed_loop_sync_code ON public.engineering_closed_loop_sync_logs USING btree (project_id, sync_code)
-
 ### engineering_conflicts
 
 | Cột | Kiểu | Null | Default |
@@ -5700,30 +5677,6 @@
 - `engineering_remnant_inventory_pkey`: UNIQUE INDEX engineering_remnant_inventory_pkey ON public.engineering_remnant_inventory USING btree (id)
 - `engineering_remnant_inventory_project_id_remnant_barcode_key`: UNIQUE INDEX engineering_remnant_inventory_project_id_remnant_barcode_key ON public.engineering_remnant_inventory USING btree (project_id, remnant_barcode)
 - `idx_remnant_inv_project`: INDEX idx_remnant_inv_project ON public.engineering_remnant_inventory USING btree (project_id, material_type, status)
-
-### engineering_scan_to_bim_runs
-
-| Cột | Kiểu | Null | Default |
-| --- | --- | --- | --- |
-| id | uuid |  | `gen_random_uuid()` |
-| project_id | integer |  |  |
-| scan_code | text |  |  |
-| point_cloud_source | text |  |  |
-| total_points_scanned | integer |  | `0` |
-| spools_analyzed_count | integer |  | `0` |
-| pass_rate_percent | numeric(5,2) |  | `0` |
-| max_deviation_mm | numeric(8,2) |  | `0` |
-| defects_count | integer |  | `0` |
-| deviation_details | jsonb |  | `'[]'::jsonb` |
-| created_at | timestamptz |  | `now()` |
-
-**Khóa ngoại:**
-- `project_id` → `projects(id)`
-
-**Index:**
-- `engineering_scan_to_bim_runs_pkey`: UNIQUE INDEX engineering_scan_to_bim_runs_pkey ON public.engineering_scan_to_bim_runs USING btree (id)
-- `idx_scan_to_bim_proj`: INDEX idx_scan_to_bim_proj ON public.engineering_scan_to_bim_runs USING btree (project_id, created_at DESC)
-- `uq_scan_to_bim_code`: UNIQUE INDEX uq_scan_to_bim_code ON public.engineering_scan_to_bim_runs USING btree (project_id, scan_code)
 
 ### engineering_sleeve_schedules
 

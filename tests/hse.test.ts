@@ -134,6 +134,15 @@ test(
     const list1 = await listHse({ projectId: p1 });
     assert.ok(list1.some((h) => h.id === h1));
     assert.ok(!list1.some((h) => h.id === h2));
+    // photoCount: UI /hse dùng để hiện số ảnh trên nút mở gallery.
+    assert.equal(list1.find((h) => h.id === h1)?.photoCount, 0);
+    await run(
+      `INSERT INTO hse_photos (record_id, file_path, mime) VALUES (?, 'hse-a.jpg', 'image/jpeg'), (?, 'hse-b.jpg', 'image/jpeg')`,
+      h1,
+      h1,
+    );
+    const list1b = await listHse({ projectId: p1 });
+    assert.equal(list1b.find((h) => h.id === h1)?.photoCount, 2);
 
     assert.ok(await getHse(h1, p1));
     assert.equal(await getHse(h2, p1), null);

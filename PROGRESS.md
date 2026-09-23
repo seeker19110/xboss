@@ -1,5 +1,233 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Đợt 2 dọn route: khôi phục 3 thao tác lưới tracking, sửa công tác, xoá `/api/dashboard/floors`, migration 0157 — 2026-09-23
+
+Xử lý nốt 5 route mà đợt 1 (PR #526, mục dưới) còn để ngỏ; truy lịch sử git cho từng route:
+
+- **Hồi quy, khôi phục UI trong lưới tracking** (`app/tracking/[sheet]/TrackingGrid.tsx`, chỉ Admin/PM ở
+  chế độ sửa):
+  - Đổi thứ tự **nhóm** (`PATCH /api/workpackages/:id/move`) — refactor M52 PR5 (#228) làm rơi nút,
+    prop `pkgIdx`/`pkgCount` còn sót không dùng. Nút lên/xuống cạnh "Sao chép/Xoá nhóm".
+  - Đổi thứ tự **cột dimension** (`PATCH …/dimensions/column/move`) — `40ff7d4d` (2026-06-12) xoá
+    `moveColumn` cùng ngày nó được thêm. Nút trái/phải ở header cột.
+  - **Chèn task trống** (`POST /api/workpackages/:id/tasks`) — cùng `40ff7d4d` thay `addTaskAfter`
+    bằng "sao chép task", nên lưới chỉ thêm được task bằng cách sao chép. Nút "Chèn task trống bên
+    dưới" ở dòng task + "Thêm task vào cuối nhóm" ở tiêu đề nhóm.
+- **Sửa/ẩn công tác thi công** ở `/work-fronts` (chưa từng có UI): nút bút chì ở header cột công tác
+  → modal đổi tên, số ngày thi công, "Ẩn công tác" (`PATCH /api/construction-stages/:id`).
+- **Xoá `GET /api/dashboard/floors`** — đã bị `/api/timeline` thay thế từ #61 (2026-07-03); gỡ 3 ca test.
+- **Migration `0157_drop_orphaned_scan_to_bim_runs.sql`** DROP `engineering_scan_to_bim_runs` (0 tham
+  chiếu từ khi gỡ cụm CAD/BIM #476); ERD sinh lại. ⚠️ **Đụng dữ liệu — cùng 0156, chạy qua staging +
+  `db:migrate -- --dry-run` trước production.**
+
+Sau đợt này, quét "route có backend nhưng UI không gọi" chỉ còn các route `cron/*` và `v1/*` (API cho
+hệ ngoài, đúng thiết kế). Còn treo: `.env.example` dòng `TELEGRAM_WEBHOOK_SECRET`/`ZALO_OA_SECRET` cần
+sửa tay (phiên không được mở `.env*`).
+
+## ✅ Dọn nốt route có backend nhưng UI không gọi: baseline, tổ đội, mặt trận, engineering + migration 0156 — 2026-09-23
+
+Phần còn lại của đợt quét "route chỉ test gọi" (mục "Xoá 2 module chỉ còn test/script tự gọi" bên
+dưới). Người dùng giao "làm theo hướng tốt nhất"; phiên chính viết `PLAN.md` 5 việc, dispatch 5
+worker song song trên 5 worktree (coordinator không có công cụ khởi chạy subagent nên phiên chính tự
+điều phối), mỗi nhánh qua `reviewer` trước khi gộp.
+
+- **Xoá baseline** (`app/components/SCurveChart.tsx`): nút `Trash2` hiện khi đang chọn baseline →
+  `appConfirm` → `DELETE /api/baselines/:id` (Admin/PM, route có từ trước); xoá xong S-curve tự về
+  "Kế hoạch hiện tại" (`baseline` nằm trong deps của effect fetch).
+- **Quản lý tổ đội & thành viên** — **chưa từng có UI** (không phải hồi quy; `/org` từng ghi "tạo
+  tổ đội ở trang Nhân sự" nhưng trang đó chỉ có select lọc). Mới
+  `app/personnel/_components/CrewsModal.tsx` (nút "Tổ đội" trên header `/personnel`, mọi vai trò
+  xem; Admin/PM thêm/sửa/xoá tổ + thêm/bỏ thành viên qua `/api/crews*`, `/api/personnel?crewId=`).
+- **Mặt trận thi công `work_fronts` thật** — `app/site/_components/WorkFrontsTab.tsx` trước là
+  **thẻ demo**: đọc sai khoá (`data.fronts`, API trả `workFronts`) nên luôn hiện 8 tầng hardcode;
+  từ khi ma trận `/work-fronts` chuyển sang bảng `floor_stage_fronts`, không còn UI nào đổi trạng
+  thái/xem tài liệu `work_fronts` dù lưới tracking, lookahead, thông báo `front_missing`, báo cáo
+  EOT vẫn dùng. Nay tab hiện ma trận tầng × sheet từ dữ liệu thật + 4 chip đếm; mới
+  `WorkFrontModal.tsx`: đổi trạng thái (kỹ sư/PM chỉ tiến, Admin được lùi — ngày của bước bị lùi
+  qua bị xoá theo, đúng nghĩa "sửa sai"), ngày bàn giao/trả, blocker, ghi chú (`PATCH
+/api/work-fronts/:id`); biên bản & ảnh hiện trạng (`/api/work-fronts/:id/documents`,
+  `/api/work-front-documents/:id`). Tách hằng số thuần `lib/tien-do/workfront-status.ts` (re-export
+  từ `workfronts.ts`) để client không kéo `pg`. `public/sw.js` loại `/api/work-front-documents/`
+  khỏi cache, `CACHE` → `xboss-v19`.
+- **Engineering**: `app/engineering/workflows/page.tsx` thêm khối "Chuyển trạng thái thủ công"
+  (`POST /api/engineering/workflows/:id/transition`, đích theo `ALLOWED_TRANSITIONS` trừ 2 bước đã
+  có nút riêng; đích huỷ/thất bại/hoàn tác có confirm) — trước đây workflow đã duyệt không thể đi
+  tiếp `executing → completed`. Tách `lib/ky-thuat/engineering-workflow-states.ts` (thuần).
+  `app/engineering/page.tsx` modal đối tượng thêm nút "Phả hệ"/"Tác động" gọi
+  `/api/engineering/lineage/:id`, `/api/engineering/impact/:id`. **Xoá**
+  `POST /api/engineering/ledger/verify-proof` (nhận proof do client tự gửi, không trang nào phát
+  hành proof; sổ cái Merkle trên UI chỉ là 1 con số) + 5 ca test trong `tests/route-eng-mepf.test.ts`,
+  ghi chú trong `docs/nang-cap/M73-*.md`.
+- **Migration `0156_drop_orphaned_closed_loop_sync_logs.sql`** DROP bảng mồ côi
+  `engineering_closed_loop_sync_logs`; `docs/ERD.md` sinh lại bằng `gen:erd` (diff chỉ mất đúng 1
+  block). ⚠️ **Đụng dữ liệu — phải chạy qua staging + `db:migrate -- --dry-run` trước production.**
+  Rà thêm thấy `engineering_scan_to_bim_runs` (cùng migration 0104) **cũng mồ côi** (0 tham chiếu
+  trong app/lib/scripts/tests) — chưa DROP, chờ người dùng xác nhận không cần dữ liệu quét cũ.
+
+Còn lại ngoài phạm vi (phát hiện khi quét, chưa quyết): `GET /api/dashboard/floors`,
+`PATCH /api/workpackages/:id/move`, `PATCH /api/workpackages/:id/dimensions/column/move`,
+`POST /api/workpackages/:id/tasks`, `PATCH /api/construction-stages/:id`, `GET /api/boq/:id/tasks-theo-tang`
+không thấy UI gọi (các route `cron/*`, `v1/*` là API ngoài, đúng thiết kế). `.env.example` cần sửa tay
+dòng `TELEGRAM_WEBHOOK_SECRET`/`ZALO_OA_SECRET` thành "hiện chưa dùng" (phiên không được mở `.env*`).
+
+Cổng: `lint`, `typecheck`, `build`, `check:migrations|lib-layers|dead-code|dead-routes|route-perms|project-scope|contrast|mau-accent|hex-hardcode|sw-exclude` xanh; `npm test -- --release-gate` với Postgres 16 cục bộ — xem PR.
+
+## ✅ Trang `/finance/cash` — Sổ thu chi & Tạm ứng (UI đầy đủ) + vá hoàn ứng cộng tiền trên float — 2026-09-23
+
+Bảng `cash_transactions`/`advances` và API xem/tạo/sửa/xoá/hoàn ứng có từ M27 PR1 (`789c1039`)
+nhưng **chưa từng có UI** (khác vụ vật tư — không phải hồi quy); `/finance` chỉ hiện biểu đồ dòng
+tiền tổng hợp. Người dùng chốt: làm đầy đủ, đặt ở trang riêng `/finance/cash`.
+
+- **Mới `app/finance/cash/`** — `page.tsx` (2 tab `Tabs`/`TabPanel`, `?tab=advances` mở thẳng tab
+  tạm ứng), `_components/CashTab.tsx` (lọc Thu/Chi, 3 thẻ tổng thu/chi/chênh lệch, bảng, thêm/sửa
+  phiếu: ngày, chiều, số tiền, số phiếu, danh mục + gợi ý, hợp đồng, NCC, diễn giải, quỹ tiền mặt;
+  xoá có xác nhận), `_components/AdvancesTab.tsx` (lọc trạng thái, bảng tạm ứng/đã hoàn/còn phải
+  hoàn, trạng thái kèm icon + nhãn, thêm/sửa, hoàn ứng từng phần — mặc định bằng số còn lại, xoá
+  chỉ hiện khi chưa hoàn đồng nào như API), `_components/shared.tsx` (khung modal/ô nhập). Xem:
+  admin/pm/bch; nút ghi: admin/pm (khớp `CAN.viewPayments`/`CAN.manageFinance`). Sổ tiền **luôn
+  tải tươi** (`taiJsonMoi`) — lúc verify, mở lại trang hiện danh sách rỗng từ cache SW.
+- **`/finance`** — nút "Thu chi & Tạm ứng" trên header (mọi vai trò xem được trang) + thẻ KPI "Tồn
+  quỹ ước tính" / "Tạm ứng chưa hoàn" thành link sang trang mới.
+- **Vá lỗi tiền thật (vùng rủi ro cao `docs/audit.md`)**: `PATCH /api/advances/:id action=settle`
+  cộng `settled_amount` trên **float JS** rồi ghi đè — hoàn 0,1 + 0,2 trên tạm ứng 0,3 bị từ chối
+  422 "vượt quá" (0.30000000000000004 > 0.3), và 2 lượt hoàn song song có thể ghi đè nhau / vượt số
+  tạm ứng. Nay cộng + suy status trong **một câu `UPDATE … WHERE settled_amount + ? <= amount
+RETURNING`** (atomic). Sửa tạm ứng: chặn số tiền mới < số đã hoàn (422) và suy lại status theo
+  số tiền mới, cũng trong SQL. `GET /api/advances` trả thêm `remaining`, `GET /api/cash-transactions`
+  trả thêm `totals {in,out,net}` — đều tính trong SQL (UI không cộng/trừ tiền).
+- **Sửa tràn ngang trên mobile** (`/hse` từ #521 và 2 bảng mới): nhãn `sr-only` ở cột thao tác là
+  `position:absolute`, thoát khung cuộn không `relative` → kéo trang rộng 575–661px trên màn 390px.
+  Thêm `relative` cho khung `overflow-x-auto`.
+
+Test mới (`tests/route-tai-chinh-3a.test.ts`): hoàn 0,1+0,2 → settled; sửa số tiền < đã hoàn →
+422, tăng số tiền tạm ứng đã hoàn hết → partially_settled; `remaining`; `totals` theo bộ lọc — 2 ca
+đầu **đỏ trên code cũ**. Verify Playwright trên `next build && next start` + Postgres 16: từ
+`/finance` vào trang mới → thêm phiếu thu 1.500.000 + phiếu chi 400.000 → sửa chi thành 450.000 →
+xoá phiếu thu; tạm ứng 1.000.000 → hoàn 300.000 (còn 700.000, nút xoá ẩn) → sửa xuống 200.000 bị
+chặn → hoàn nốt → "Đã hoàn"; mobile 390px không tràn ngang. `npm test -- --release-gate` (Postgres 16
+cục bộ): 3643 pass, 1 fail `backfill-0137-0138` (đỏ sẵn trên máy cục bộ, CI xanh). `lint`,
+`typecheck`, `build`, `check:dead-code|dead-routes|route-perms|project-scope|lib-layers|hex-hardcode|mau-accent` xanh.
+
+## ✅ Khôi phục in tem QR vật tư hàng loạt trong tab "Kho & Định Mức" — 2026-09-23
+
+Phần cuối của hồi quy `3044a12a` (mục ngay dưới): trang `/materials` cũ có nút "In tem QR" + modal
+chọn vật tư mở `/api/qr/labels?kind=mt&ids=…`; khi gộp vào `/procurement` modal bị bỏ, state
+`labelModalOpen` còn sót. Route in tem vẫn nguyên (quyền `CAN.export` = Admin/PM), chỉ
+`/equipment` còn gọi nó.
+
+- **Mới `app/procurement/_components/PrintMaterialLabelsModal.tsx`** — tìm theo mã BOQ/tên, "Chọn tất
+  cả" theo đúng các dòng đang lọc (giữ lựa chọn ở dòng bị lọc khuất), đếm số đã chọn, mở trang in
+  ở tab mới. Dòng/nút cao 40px.
+- **`InventoryTab.tsx`** — nút "In tem QR" cạnh "Đồng bộ Sheet" (chỉ Admin/PM như route), truyền
+  danh sách đang lọc của lưới vào modal.
+
+Verify: Playwright trên `next build && next start` + Postgres 16 — Admin mở modal, "Chọn tất cả"
+→ "Đã chọn 2 vật tư" → trang `/api/qr/labels?kind=mt&ids=14,13` mở tab mới với 2 tem QR. `lint`,
+`typecheck`, `build` xanh.
+
+## ✅ Khôi phục UI xuất/hoàn kho, lịch sử, đổi thứ tự vật tư trong tab "Kho & Định Mức" — 2026-09-23
+
+Nhóm route vật tư có backend + test nhưng không UI nào gọi (đợt quét "route chỉ test gọi"):
+`POST /api/materials/:id/issue|return`, `GET/POST /api/materials/:id/transactions`,
+`PATCH /api/materials/:id/move`, `GET /api/materials/allocation-meta`. **Nguyên nhân: hồi quy** —
+commit `3044a12a` gộp `/materials` (1925 dòng) vào `app/procurement/_components/InventoryTab.tsx`
+(618 dòng) và đánh rơi nút xuất/hoàn kho, modal lịch sử nhập/xuất, nút ↑↓; state `historyMat` còn
+sót lại không dùng. Khôi phục theo đúng UI cũ, gọn lại cho lưới `SpreadsheetGrid` hiện tại:
+
+- **Mới `app/procurement/_components/MaterialStockModal.tsx`** — modal "Kho" của 1 vật tư: tab Xuất
+  kho (kèm tầng/tổ đội lĩnh, gợi ý datalist từ `allocation-meta`), Hoàn kho, Điều chỉnh ± số đã
+  dùng (bắt buộc ghi lý do); lịch sử giao dịch (loại, người ghi, ±, tầng/tổ đội, ghi chú); trường
+  tuỳ chỉnh (`CustomFieldsSection`). Xuất/hoàn gửi `Idempotency-Key` (giữ qua các lần bấm lại
+  cùng lượt nhập, đổi sau mỗi lần ghi thành công). Lỗi server (vd "Tồn kho không đủ (còn 95)")
+  hiện ngay trong form. Chỉ admin/pm/engineer thấy form (cùng quyền route); vai trò khác chỉ xem
+  lịch sử.
+- **`InventoryTab.tsx`** — cột "Kho" ở **đầu** lưới, luôn dính (mobile chỉ dính Kho + Mã BOQ vì 4
+  cột dính ~520px rộng hơn màn hình): nút mở modal; khi bật chế độ sửa và không lọc tìm kiếm thêm
+  ↑↓ (`/move`). `load(true)` (sau thêm dòng/đồng bộ/giao dịch/đổi thứ tự) nay thật sự bỏ qua cache
+  SW — trước đây tham số `revalidate` bị bỏ qua nên lưới có thể hiện số cũ.
+- **Sửa lộ dữ liệu chéo dự án**: `GET /api/materials/allocation-meta` quét toàn bảng
+  `material_transactions` → gợi ý lẫn tầng/tổ đội của dự án khác. Nay JOIN `materials.project_id`.
+  Test mới trong `tests/route-vat-tu-2.test.ts` (đỏ trên code cũ, xanh trên code mới); gỡ mục
+  whitelist sai lý do "không theo dự án" khỏi `tests/project-scope-invariant.test.ts`.
+
+Verify: Playwright trên `next build && next start` + Postgres 16 cục bộ — tồn 120 → xuất 30 (24F, Tổ
+cơ điện 1) → hoàn 5 → modal + lưới cùng hiện 95/25; xuất 9999 → báo "Tồn kho không đủ (còn 95)";
+mở lại modal trên mobile thấy đủ 2 giao dịch (lỗi cache SW lộ ra và đã sửa lúc verify); chế độ sửa
+→ ↑ đưa "Cáp điện" lên đầu. `lint`, `typecheck`, `build`, `tests/route-vat-tu-2.test.ts` +
+`tests/project-scope-invariant.test.ts` (123/123) xanh. Phần in tem QR vật tư bị rơi cùng đợt — xem mục ngay trên.
+
+## ✅ Gom 3 bản chép tay `fetchFresh` về `taiJsonMoi` — 2026-09-23
+
+Dọn nợ ghi ở mục UI ảnh HSE bên dưới: helper bỏ qua cache SW (nonce + `no-store`) bị chép tay
+ở `app/boq/_components/types.ts`, `app/ban-ve/page.tsx`, `app/design-changes/page.tsx`. Nay cả 3 trang
+dùng `taiJsonMoi()` của `app/lib/taiDuLieu.ts` (lần tải thường vẫn `taiJson`), xoá 3 bản chép.
+Hành vi giữ nguyên (lỗi → danh sách rỗng như cũ); khác biệt nhỏ có chủ đích nhờ đi qua `taiJson`:
+401 tự về `/login`, BOQ báo đúng thông điệp lỗi server trả thay vì chỉ mã lỗi, và `loadRevs` của
+`/ban-ve` không còn promise reject chưa bắt khi mất mạng. `AppHeader` giữ fetch riêng (fire-and-forget
+có `.catch`), chỉ sửa comment trỏ về `taiJsonMoi`. `lint`, `typecheck`, `build`, `check:dead-code` xanh.
+
+Cùng PR: sửa tài liệu lệch code về webhook bot — `CLAUDE.md` và comment trong `lib/nen/env.ts` nay ghi
+rõ `TELEGRAM_WEBHOOK_SECRET`/`ZALO_OA_SECRET` **hiện chưa dùng** (route webhook Telegram/Zalo đã xoá,
+`lib/bao-mat/webhook-inbound.ts` giữ cho lúc thêm lại bot). `.env.example` còn dòng
+`TELEGRAM_WEBHOOK_SECRET=""` chưa sửa (phiên agent bị chặn quyền đọc/ghi file `.env*`) — việc tay nhỏ.
+
+## ✅ UI xem/thêm/xoá ảnh HSE trên `/hse` — 2026-09-23
+
+Phát hiện ở đợt quét route "chỉ test gọi" (mục ngay dưới): ảnh HSE upload được lúc tạo ghi nhận
+nhưng **không có chỗ nào xem lại** — `GET /api/hse/:id/photos` + `GET/DELETE /api/hse-photos/:id`
+có backend + test nhưng không UI nào gọi. Nối UI, không đổi route/schema:
+
+- **`app/hse/_components/HsePhotosModal.tsx` (mới)** — gallery ảnh của 1 ghi nhận: lưới thumbnail,
+  bấm phóng to, "Thêm ảnh" (chụp từ camera mobile), xoá (người upload hoặc admin/pm/engineer — cùng
+  luật với route; API vẫn là ranh giới thật). Bố cục bám `PhotosModal` của lưới tracking.
+- **`app/hse/page.tsx`** — nút camera kèm **số ảnh** trên mỗi dòng bảng + thẻ giấy phép; nút đóng
+  action nâng vùng chạm lên 40px.
+- **`lib/hien-truong/hse.ts`** — `listHse` trả thêm `photoCount` (subquery đếm `hse_photos`);
+  `tests/hse.test.ts` thêm ca đếm 0 → 2.
+- **`app/lib/taiDuLieu.ts`** — thêm `taiJsonMoi()` (nonce + `no-store`) cho lần tải lại ngay sau khi
+  tự ghi. **Bug thật lộ ra khi verify bằng Playwright trên `next start`:** xoá ảnh xong, danh sách
+  và số ảnh vẫn hiện bản cũ vì sw.js stale-while-revalidate trả cache của đúng URL. `refresh()` của
+  `/hse` (sau tạo ghi nhận / đóng action / thêm-xoá ảnh) cũng dính lỗi này từ trước — nay đều dùng
+  `taiJsonMoi`. (Cùng pattern `fetchFresh` đang bị chép 3 nơi: `app/boq`, `app/ban-ve`,
+  `app/design-changes` — gom về helper này là việc riêng.)
+- **`public/sw.js`** — loại `/api/hse-photos/` khỏi cache SW (như `/api/photos/`: ảnh đã có
+  `Cache-Control: private, immutable` của trình duyệt, không nhét blob vào Cache Storage), bump
+  `CACHE` → `xboss-v18`.
+
+Verify: Playwright trên `next build && next start` + Postgres 16 cục bộ — tạo ghi nhận, upload 3 ảnh
+→ nút hiện "3", mở modal thấy 3 ảnh, phóng to, xoá 1 → modal và nút cập nhật ngay; chụp màn hình
+desktop/mobile, theme tối/sáng. `lint`, `typecheck`, `tests/hse.test.ts` (3/3), `check:sw-exclude`,
+`check:hex-hardcode` xanh.
+
+## ✅ Xoá 2 module chỉ còn test/script tự gọi — 2026-09-23
+
+Hai cổng `check:dead-code`/`check:dead-routes` coi `tests/`, `scripts/`, `e2e/` là người dùng hợp lệ,
+nên module chỉ có test tự kiểm chính nó vẫn "sống". Quét lại đồ thị import **chỉ từ entrypoint
+production** (page/route/layout + file gốc) lộ ra 3 module; người dùng chốt xoá 2:
+
+- **`lib/ky-thuat/engineering-closed-loop-sync.ts` + `app/api/engineering/closed-loop-sync`** — không
+  UI nào gọi route, lib chỉ route này dùng. Nguồn "spool" của nó (`engineering-pipe-spool-tracking`)
+  đã xoá ở PR #514 (M-03 trong `docs/ops/MAINTENANCE-PLAN.md` từng giữ lại chờ gắn UI — nay hết
+  lý do). Tệ hơn: nó `UPDATE tasks` cộng cứng +10% tiến độ, **bỏ qua `recomputeTask`** (tiến độ
+  vốn tính từ số ô tick), và tính tiền bằng float JS trái quy ước M45. Xoá kèm
+  `tests/engineering-closed-loop-sync.test.ts` + block closed-loop trong `tests/route-eng-mepf.test.ts`.
+- **`lib/nen/user-error-healer.ts`** (946 dòng) — không page/route nào import; chỉ
+  `tests/user-error-healer.test.ts`, `tests/c2-mepf-pilot.test.ts` và `scripts/run-c2-pilot.ts`
+  (không có trong `package.json`) dùng. Các hàm thật cần (`removeVietnameseAccents`,
+  `healVietnameseEncoding`) đã nằm ở `lib/nen/van-ban.ts` từ trước. Xoá cả 3 file đi kèm;
+  fixture `tests/fixtures/engineering-ingest/` giữ vì test ingest khác còn dùng.
+
+**Không đụng schema:** bảng `engineering_closed_loop_sync_logs` (migration 0104) nay mồ côi, để lại
+— DROP là migration đụng dữ liệu, tách việc riêng theo tiền lệ `0153`/`0155`.
+Module thứ 3 (`lib/bao-mat/webhook-inbound.ts`) và `ComponentErrorBoundary` giữ nguyên, chờ quyết.
+Còn ~23 route có backend nhưng UI không gọi (vật tư issue/return/move/transactions, xem/xoá ảnh
+HSE, sửa/xoá phiếu thu chi/tạm ứng…) — là tính năng thiếu UI, cần quyết từng nhóm, chưa xử lý.
+
+Đã chạy xanh: `lint`, `typecheck`, `build`, `check:dead-code`, `check:dead-routes`,
+`check:lib-layers`, `check:route-perms`, `check:project-scope`, `check:engineering-danh-tinh`;
+`npm test -- --release-gate` với Postgres 16 cục bộ: 3638 pass, 1 fail
+(`tests/backfill-0137-0138.test.ts` — **đỏ y hệt trên `main`**, không liên quan thay đổi này).
+
 ## ✅ Tổng kết đợt rà soát & dọn module ít giá trị/code chết — 2026-09-22 (PR #514, #515, #516)
 
 Theo yêu cầu người dùng "rà lib/ky-thuat xem cái nào có thể loại bỏ" → mở rộng dần ra toàn repo.

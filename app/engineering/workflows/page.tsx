@@ -6,6 +6,13 @@ import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
+import { appConfirm } from "@/app/components/dialogs";
+import { showToast } from "@/app/components/Toast";
+import {
+  WORKFLOW_STATE_LABELS as STATE_LABEL,
+  ALLOWED_TRANSITIONS,
+  type WorkflowState,
+} from "@/lib/ky-thuat/engineering-workflow-states";
 
 // ENG-3 — trang workflow kỹ thuật (docs/nang-cap/ENG-3-engineering-workflow-os.md mục 5).
 // Điểm nhấn UI: hiển thị kết quả Gate 0 dạng checklist (vì sao bị chặn) + từng gate ai ký,
@@ -48,21 +55,6 @@ type Detail = {
   events: Ev[];
 };
 
-const STATE_LABEL: Record<string, string> = {
-  draft: "Nháp",
-  validating: "Đang kiểm tự động",
-  awaiting_approval: "Chờ duyệt",
-  approved: "Đã duyệt",
-  executing: "Đang thực hiện",
-  validating_result: "Đang kiểm kết quả",
-  completed: "Hoàn thành",
-  rejected: "Bị từ chối",
-  cancelled: "Đã huỷ",
-  blocked: "Bị chặn",
-  failed: "Thất bại",
-  rolled_back: "Đã hoàn tác",
-  superseded: "Bị thay thế",
-};
 const STATE_CLS: Record<string, string> = {
   draft: "bg-zinc-800 text-zinc-300 border-zinc-700",
   validating: "bg-sky-950/40 text-sky-300 border-sky-800",
@@ -103,6 +95,13 @@ const PROFILE_HINT: Record<string, string> = {
   D: "3 cửa duyệt (có thẩm quyền phát hành)",
   E: "4 cửa duyệt (an toàn / quy chuẩn)",
 };
+// Đích "chấm dứt bất thường" — xác nhận thêm trước khi gửi, nút màu cảnh báo.
+const DANGER_TARGETS = new Set<WorkflowState>(["cancelled", "failed", "rolled_back"]);
+// Nhãn trạng thái — nhận cả string thô (vd `fromState` cũ trong lịch sử) để không vỡ nếu
+// dữ liệu chưa khớp union hiện tại.
+function stateLabel(s: string): string {
+  return STATE_LABEL[s as WorkflowState] ?? s;
+}
 
 export default function WorkflowsPage() {
   const [items, setItems] = useState<WorkflowRow[] | null>(null);
@@ -113,6 +112,8 @@ export default function WorkflowsPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [comments, setComments] = useState("");
+  const [transitionTo, setTransitionTo] = useState("");
+  const [transitionReason, setTransitionReason] = useState("");
 
   function load() {
     setLoading(true);
@@ -138,6 +139,8 @@ export default function WorkflowsPage() {
   function openDetail(id: string) {
     setSelectedId(id);
     setComments("");
+    setTransitionTo("");
+    setTransitionReason("");
     setDetailLoading(true);
     fetch(`/api/engineering/workflows/${id}`)
       .then((r) => r.json())
@@ -187,8 +190,38 @@ export default function WorkflowsPage() {
     }
   }
 
+  async function doTransition(id: string, to: WorkflowState) {
+    if (DANGER_TARGETS.has(to)) {
+      const ok = await appConfirm(
+        `Chuyển workflow sang "${STATE_LABEL[to]}"? Thao tác không hoàn tác được qua UI.`,
+        { danger: true },
+      );
+      if (!ok) return;
+    }
+    if (
+      await post(`/api/engineering/workflows/${id}/transition`, {
+        to,
+        reason: transitionReason.trim() || undefined,
+      })
+    ) {
+      setTransitionTo("");
+      setTransitionReason("");
+      showToast("Đã chuyển trạng thái workflow");
+      openDetail(id);
+      load();
+    }
+  }
+
   const wf = detail?.workflow;
   const nextGate = detail?.gates.find((g) => !g.decision);
+  const transitionTargets: WorkflowState[] = wf
+    ? (ALLOWED_TRANSITIONS[wf.state as WorkflowState] ?? []).filter((t) => {
+        if (wf.state === "draft" && t === "validating") return false;
+        if (wf.state === "awaiting_approval" && (t === "approved" || t === "rejected"))
+          return false;
+        return true;
+      })
+    : [];
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -260,7 +293,7 @@ export default function WorkflowsPage() {
                       <span
                         className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${STATE_CLS[w.state]}`}
                       >
-                        {STATE_LABEL[w.state]}
+                        {stateLabel(w.state)}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-xs text-zinc-400">
@@ -289,7 +322,7 @@ export default function WorkflowsPage() {
                   <span
                     className={`shrink-0 rounded-full border px-2 py-0.5 text-xs ${STATE_CLS[wf.state]}`}
                   >
-                    {STATE_LABEL[wf.state]}
+                    {stateLabel(wf.state)}
                   </span>
                 </div>
                 <p className="mb-3 text-xs text-zinc-400">
@@ -361,8 +394,8 @@ export default function WorkflowsPage() {
                 <ul className="mb-4 space-y-1 text-xs text-zinc-400">
                   {detail.events.map((e) => (
                     <li key={e.id}>
-                      {e.fromState ? `${STATE_LABEL[e.fromState] ?? e.fromState} → ` : ""}
-                      {STATE_LABEL[e.toState] ?? e.toState}
+                      {e.fromState ? `${stateLabel(e.fromState)} → ` : ""}
+                      {stateLabel(e.toState)}
                       {e.reason && ` — ${e.reason}`}{" "}
                       <span className="text-zinc-600">
                         ({new Date(e.createdAt).toLocaleString("vi-VN")})
@@ -426,6 +459,60 @@ export default function WorkflowsPage() {
                     )}
                   </div>
                 </div>
+
+                {transitionTargets.length > 0 && (
+                  <div className="mt-3 border-t border-zinc-800 pt-3">
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                      Chuyển trạng thái thủ công
+                    </p>
+                    <p className="mb-2 text-xs text-zinc-500">
+                      Hệ chỉ ghi nhận — việc thực thi ngoài đời do người xác nhận.
+                    </p>
+                    <label htmlFor="wf-transition-to" className="mb-1 block text-xs text-zinc-400">
+                      Trạng thái đích
+                    </label>
+                    <select
+                      id="wf-transition-to"
+                      value={transitionTo}
+                      onChange={(e) => setTransitionTo(e.target.value)}
+                      className="mb-2 min-h-10 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+                    >
+                      <option value="">— Chọn —</option>
+                      {transitionTargets.map((t) => (
+                        <option key={t} value={t}>
+                          {STATE_LABEL[t]}
+                        </option>
+                      ))}
+                    </select>
+                    <label
+                      htmlFor="wf-transition-reason"
+                      className="mb-1 block text-xs text-zinc-400"
+                    >
+                      Lý do (tuỳ chọn, tối đa 2000 ký tự)
+                    </label>
+                    <textarea
+                      id="wf-transition-reason"
+                      value={transitionReason}
+                      onChange={(e) => setTransitionReason(e.target.value.slice(0, 2000))}
+                      rows={2}
+                      className="mb-3 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        disabled={submitting || !transitionTo}
+                        onClick={() => doTransition(wf.id, transitionTo as WorkflowState)}
+                        className={`min-h-10 rounded-lg px-3 py-1.5 text-sm text-on-accent disabled:opacity-50 ${
+                          DANGER_TARGETS.has(transitionTo as WorkflowState)
+                            ? "bg-rose-700 hover:bg-rose-800"
+                            : "bg-emerald-700 hover:bg-emerald-800"
+                        }`}
+                      >
+                        {submitting ? "Đang chuyển..." : "Chuyển"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>

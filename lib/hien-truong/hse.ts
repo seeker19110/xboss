@@ -107,7 +107,7 @@ export async function listHse(filters: {
   month?: string;
   // M22: undefined = không lọc dự án (dùng nội bộ/test cũ).
   projectId?: number;
-}): Promise<HseRow[]> {
+}): Promise<(HseRow & { photoCount: number })[]> {
   const clauses: string[] = [];
   const params: unknown[] = [];
   if (filters.kind) {
@@ -122,13 +122,14 @@ export async function listHse(filters: {
     clauses.push("h.project_id = ?");
     params.push(filters.projectId);
   }
-  return query<HseRow>(
+  return query<HseRow & { photoCount: number }>(
     `SELECT h.id, h.kind, h.record_date AS "recordDate", h.floor_label AS "floorLabel",
             h.area, h.description, h.severity, h.permit_type AS "permitType",
             h.permit_from AS "permitFrom", h.permit_to AS "permitTo",
             h.action_required AS "actionRequired", h.action_assignee AS "actionAssignee",
             u.name AS "actionAssigneeName", h.action_due AS "actionDue",
-            h.action_status AS "actionStatus", h.created_by AS "createdBy", h.created_at AS "createdAt"
+            h.action_status AS "actionStatus", h.created_by AS "createdBy", h.created_at AS "createdAt",
+            (SELECT COUNT(*) FROM hse_photos p WHERE p.record_id = h.id)::int AS "photoCount"
        FROM hse_records h LEFT JOIN users u ON u.id = h.action_assignee
       ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""}
       ORDER BY h.record_date DESC, h.id DESC`,

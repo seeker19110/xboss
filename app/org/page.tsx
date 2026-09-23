@@ -101,7 +101,10 @@ export default function OrgPage() {
             <Network className="w-4 h-4" /> Sơ đồ tổ chức
           </h2>
           {crews.length === 0 ? (
-            <EmptyState icon={Users} message="Chưa có tổ đội nào — tạo tổ đội ở trang Nhân sự." />
+            <EmptyState
+              icon={Users}
+              message="Chưa có tổ đội nào — tạo tổ đội ở trang Nhân sự → nút Tổ đội."
+            />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {bySystem.map(([system, list]) => (

@@ -12,7 +12,9 @@ import {
   ExternalLink,
   CheckCircle2,
   RotateCcw,
+  Wallet,
 } from "lucide-react";
+import { ButtonLink } from "@/app/components/ui";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
@@ -230,46 +232,55 @@ export default function FinancePage() {
         title="Tài chính – Kế toán"
         subtitle="Dòng tiền, công nợ, hoá đơn & thuế VAT, lương công trường"
         bottomActions={
-          canManage ? (
-            <div className="flex items-center gap-2">
-              {tab === "invoices" && (
-                <button
-                  onClick={() => setAddInvoiceOpen(true)}
-                  aria-label="Thêm hoá đơn"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
-                >
-                  <Plus className="w-4 h-4" />{" "}
-                  <span className="hidden sm:inline">Thêm hoá đơn</span>
-                </button>
-              )}
-              {tab === "payroll" && (
-                <button
-                  onClick={() => {
-                    setPayrollPrefill(null);
-                    setAddPayrollOpen(true);
-                  }}
-                  aria-label="Thêm kỳ lương"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
-                >
-                  <Plus className="w-4 h-4" />{" "}
-                  <span className="hidden sm:inline">Thêm kỳ lương</span>
-                </button>
-              )}
-            </div>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            {/* Sổ thu chi & tạm ứng ở trang con riêng — thẻ KPI bên dưới cũng dẫn tới đó. */}
+            <ButtonLink href="/finance/cash" icon={Wallet} size="sm">
+              Thu chi & Tạm ứng
+            </ButtonLink>
+            {canManage && (
+              <>
+                {tab === "invoices" && (
+                  <button
+                    onClick={() => setAddInvoiceOpen(true)}
+                    aria-label="Thêm hoá đơn"
+                    className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  >
+                    <Plus className="w-4 h-4" />{" "}
+                    <span className="hidden sm:inline">Thêm hoá đơn</span>
+                  </button>
+                )}
+                {tab === "payroll" && (
+                  <button
+                    onClick={() => {
+                      setPayrollPrefill(null);
+                      setAddPayrollOpen(true);
+                    }}
+                    aria-label="Thêm kỳ lương"
+                    className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+                  >
+                    <Plus className="w-4 h-4" />{" "}
+                    <span className="hidden sm:inline">Thêm kỳ lương</span>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         }
       />
 
       <main className="p-4 sm:p-6 pb-24 space-y-4">
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
+          <a
+            href="/finance/cash"
+            className="bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-3 text-center transition"
+          >
             <p
               className={`text-lg sm:text-2xl font-bold ${kpi.fundBalance < 0 ? "text-rose-400" : "text-emerald-400"}`}
             >
               {fmtVND(kpi.fundBalance)}
             </p>
             <p className="text-xs text-zinc-400">Tồn quỹ ước tính</p>
-          </div>
+          </a>
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
             <p
               className={`text-lg sm:text-2xl font-bold ${kpi.netDebt < 0 ? "text-rose-400" : "text-sky-400"}`}
@@ -278,14 +289,17 @@ export default function FinancePage() {
             </p>
             <p className="text-xs text-zinc-400">Công nợ ròng (thu − trả)</p>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
+          <a
+            href="/finance/cash?tab=advances"
+            className="bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-3 text-center transition"
+          >
             <p
               className={`text-lg sm:text-2xl font-bold ${kpi.advanceOutstanding > 0 ? "text-amber-400" : ""}`}
             >
               {fmtVND(kpi.advanceOutstanding)}
             </p>
             <p className="text-xs text-zinc-400">Tạm ứng chưa hoàn</p>
-          </div>
+          </a>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 justify-between">

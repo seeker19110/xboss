@@ -1,146 +1,191 @@
 "use client";
-
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import {
-  LandPlot,
-  Layers,
-  Building2,
-  CheckCircle2,
-  AlertTriangle,
-  ArrowUpRight,
-  Sparkles,
-} from "lucide-react";
+// Tab "Mặt Bằng & Phân Khu" của /site — ma trận tầng × sheet từ dữ liệu work_fronts thật
+// (GET /api/work-fronts). Bấm ô → WorkFrontModal đổi trạng thái + biên bản/ảnh hiện trạng.
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, LandPlot } from "lucide-react";
 import { Skeleton } from "@/app/components/Skeleton";
-import { showToast } from "@/app/components/Toast";
+import EmptyState from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
+import { Chip } from "@/app/components/ui";
+import { taiJson, taiJsonMoi } from "@/app/lib/taiDuLieu";
+import { fetchMe, type Me } from "@/app/lib/me";
+import { sortFloorsDesc } from "@/lib/nen/floors";
+import { WORK_FRONT_STATUSES, WORK_FRONT_STATUS_LABEL } from "@/lib/tien-do/workfront-status";
+import WorkFrontModal, { WORK_FRONT_STATUS_UI, type WorkFront } from "./WorkFrontModal";
 
-const DEFAULT_FLOORS = [
-  {
-    floor: "B2",
-    name: "Tầng Hầm B2",
-    progress: 95,
-    status: "completed",
-    system: "Bơm & Xử Lý Nước",
-  },
-  {
-    floor: "B1",
-    name: "Tầng Hầm B1",
-    progress: 90,
-    status: "completed",
-    system: "Trạm Biến Áp & Chiller",
-  },
-  {
-    floor: "FL01",
-    name: "Tầng 1 Sảnh Chính",
-    progress: 85,
-    status: "active",
-    system: "HVAC & Chiếu Sáng",
-  },
-  {
-    floor: "FL06",
-    name: "Tầng 6 Căn Hộ",
-    progress: 80,
-    status: "active",
-    system: "Cơ Điện Trục Đứng",
-  },
-  {
-    floor: "FL07",
-    name: "Tầng 7 Căn Hộ",
-    progress: 75,
-    status: "active",
-    system: "Ống Gió & Cấp Thoát Nước",
-  },
-  { floor: "FL08", name: "Tầng 8 Căn Hộ", progress: 70, status: "active", system: "Điện & PCCC" },
-  {
-    floor: "FL09",
-    name: "Tầng 9 Căn Hộ",
-    progress: 60,
-    status: "active",
-    system: "Lắp Đặt Ống Gió",
-  },
-  {
-    floor: "FL10",
-    name: "Tầng 10 Căn Hộ",
-    progress: 45,
-    status: "pending",
-    system: "Chờ Bàn Giao Xây Tô",
-  },
-];
+type SheetInfo = { id: number; code: string; name: string };
 
 export default function WorkFrontsTab() {
-  const [workFronts, setWorkFronts] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [fronts, setFronts] = useState<WorkFront[] | null>(null);
+  const [sheets, setSheets] = useState<SheetInfo[]>([]);
+  const [me, setMe] = useState<Me | null>(null);
+  const [loi, setLoi] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
 
-  useEffect(() => {
-    setLoading(true);
-    fetch("/api/work-fronts")
-      .then((r) => (r.ok ? r.json() : { fronts: [] }))
-      .then((data) => setWorkFronts(data.fronts?.length ? data.fronts : DEFAULT_FLOORS))
-      .catch(() => setWorkFronts(DEFAULT_FLOORS))
-      .finally(() => setLoading(false));
+  // fresh = tải lại ngay sau khi tự ghi → bỏ qua cache SW (xem taiJsonMoi).
+  const load = useCallback(async (fresh = false) => {
+    const [kqFronts, kqSheets, meRes] = await Promise.all([
+      (fresh ? taiJsonMoi : taiJson)<{ workFronts?: WorkFront[] }>("/api/work-fronts"),
+      taiJson<{ sheets?: SheetInfo[] }>("/api/sheets"),
+      fetchMe(),
+    ]);
+    setMe(meRes);
+    if (kqSheets.ok) setSheets(kqSheets.data.sheets ?? []);
+    if (!kqFronts.ok) {
+      setLoi(kqFronts.loi);
+      return;
+    }
+    setLoi(null);
+    setFronts(kqFronts.data.workFronts ?? []);
   }, []);
 
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Cột = các sheet có ô mặt bằng, theo thứ tự sheet của /api/sheets (sheet lạ xếp cuối).
+  const { floors, columns, byCell, counts } = useMemo(() => {
+    const list = fronts ?? [];
+    const order = new Map(sheets.map((s, i) => [s.id, i]));
+    const colMap = new Map<number, { id: number; code: string; name: string }>();
+    const cell = new Map<string, WorkFront>();
+    const cnt = Object.fromEntries(WORK_FRONT_STATUSES.map((s) => [s, 0])) as Record<
+      WorkFront["status"],
+      number
+    >;
+    for (const f of list) {
+      if (!colMap.has(f.sheetTypeId)) {
+        const s = sheets.find((x) => x.id === f.sheetTypeId);
+        colMap.set(f.sheetTypeId, { id: f.sheetTypeId, code: f.sheetCode, name: s?.name ?? "" });
+      }
+      cell.set(`${f.floorLabel}|${f.sheetTypeId}`, f);
+      cnt[f.status] += 1;
+    }
+    const cols = [...colMap.values()].sort(
+      (a, b) => (order.get(a.id) ?? Infinity) - (order.get(b.id) ?? Infinity),
+    );
+    const fl = [...new Set(list.map((f) => f.floorLabel))].sort(sortFloorsDesc);
+    return { floors: fl, columns: cols, byCell: cell, counts: cnt };
+  }, [fronts, sheets]);
+
+  const openFront = fronts?.find((f) => f.id === openId) ?? null;
+
+  if (loi) return <ErrorState message={loi} onRetry={() => void load(true)} />;
+  if (fronts === null)
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+
   return (
-    <div className="space-y-6">
-      {/* Floor Overview Grid */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-              <LandPlot className="w-4 h-4 text-amber-400" />
-              Điều Phối Mặt Bằng Thi Công & Giải Phóng Phân Khu (Work-Fronts)
-            </h3>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              Kiểm soát giao diện bàn giao mặt bằng giữa Kết Cấu - Xây Tô - Cơ Điện MEPF theo từng
-              sàn/zone
-            </p>
-          </div>
+    <div className="space-y-4">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+            <LandPlot className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+            Mặt bằng thi công theo tầng × sheet
+          </h3>
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Trạng thái bàn giao mặt bằng từng tầng cho từng hệ — bấm ô để cập nhật và đính kèm biên
+            bản/ảnh hiện trạng.
+          </p>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-          {workFronts.map((wf, idx) => (
-            <div
-              key={wf.floor || idx}
-              className="p-4 rounded-xl bg-zinc-900/70 border border-zinc-800 space-y-2 hover:border-amber-500/40 transition"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-sm text-zinc-100">{wf.floor}</span>
-                <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                    wf.status === "completed"
-                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                      : wf.status === "active"
-                        ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                        : "bg-zinc-800 text-zinc-400"
-                  }`}
-                >
-                  {wf.status === "completed"
-                    ? "Đã Bàn Giao"
-                    : wf.status === "active"
-                      ? "Đang Thi Công"
-                      : "Chờ Bàn Giao"}
-                </span>
-              </div>
-
-              <div className="text-xs text-zinc-300 font-medium">{wf.name}</div>
-              <div className="text-[11px] text-zinc-500">{wf.system}</div>
-
-              <div className="pt-2">
-                <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400 mb-1">
-                  <span>Tiến độ hoàn thành:</span>
-                  <span className="font-bold text-zinc-200">{wf.progress}%</span>
-                </div>
-                <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${wf.progress >= 90 ? "bg-emerald-500" : "bg-amber-500"}`}
-                    style={{ width: `${wf.progress}%` }}
-                  />
-                </div>
-              </div>
-            </div>
+        <div className="flex flex-wrap gap-2">
+          {WORK_FRONT_STATUSES.map((s) => (
+            <Chip key={s} tone={WORK_FRONT_STATUS_UI[s].tone} icon={WORK_FRONT_STATUS_UI[s].icon}>
+              {WORK_FRONT_STATUS_LABEL[s]}: {counts[s]}
+            </Chip>
           ))}
         </div>
       </div>
+
+      {fronts.length === 0 ? (
+        <EmptyState
+          icon={LandPlot}
+          message="Chưa có ô mặt bằng — ô được tạo tự động từ tầng của lưới tracking"
+        />
+      ) : (
+        <div className="relative overflow-x-auto max-h-[70vh] rounded-xl border border-zinc-800 bg-zinc-950/70">
+          <table className="text-xs border-separate border-spacing-0">
+            <thead>
+              <tr>
+                <th className="sticky top-0 left-0 z-20 bg-zinc-900 px-3 py-2 text-left font-semibold text-zinc-300 border-b border-zinc-800">
+                  Tầng
+                </th>
+                {columns.map((c) => (
+                  <th
+                    key={c.id}
+                    title={c.name || undefined}
+                    className="sticky top-0 z-10 bg-zinc-900 px-2 py-2 font-mono font-semibold text-zinc-300 border-b border-zinc-800 whitespace-nowrap"
+                  >
+                    {c.code}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {floors.map((fl) => (
+                <tr key={fl}>
+                  <th className="sticky left-0 z-10 bg-zinc-900 px-3 py-1 text-left font-mono font-semibold text-zinc-200 border-b border-zinc-800 whitespace-nowrap">
+                    {fl}
+                  </th>
+                  {columns.map((c) => {
+                    const f = byCell.get(`${fl}|${c.id}`);
+                    if (!f)
+                      return (
+                        <td
+                          key={c.id}
+                          className="px-1 py-1 border-b border-zinc-800 text-center text-zinc-600"
+                        >
+                          —
+                        </td>
+                      );
+                    const ui = WORK_FRONT_STATUS_UI[f.status];
+                    const Icon = ui.icon;
+                    return (
+                      <td key={c.id} className="px-1 py-1 border-b border-zinc-800">
+                        <button
+                          type="button"
+                          onClick={() => setOpenId(f.id)}
+                          title={f.blocker ? `Vướng mắc: ${f.blocker}` : undefined}
+                          aria-label={`${c.code} tầng ${fl}: ${WORK_FRONT_STATUS_LABEL[f.status]}${
+                            f.blocker ? ` — vướng mắc: ${f.blocker}` : ""
+                          }`}
+                          className={`min-h-10 min-w-24 w-full inline-flex items-center justify-center gap-1 px-2 rounded-lg border font-medium transition hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${ui.cell}`}
+                        >
+                          <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                          <span className="whitespace-nowrap">{ui.short}</span>
+                          {f.blocker && (
+                            <AlertTriangle
+                              className="w-3.5 h-3.5 shrink-0 text-rose-400"
+                              aria-hidden="true"
+                            />
+                          )}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {openFront && (
+        <WorkFrontModal
+          key={openFront.id}
+          front={openFront}
+          me={me}
+          onClose={() => setOpenId(null)}
+          onChanged={() => {
+            setOpenId(null);
+            void load(true);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -34,6 +34,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appPrompt, appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
+import { taiJson, taiJsonMoi } from "@/app/lib/taiDuLieu";
 
 // ── TYPES & INTERFACES ──
 
@@ -142,11 +143,6 @@ export type DrawingRevisionRow = {
 const fmtSize = (b: number) =>
   b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)}MB` : `${Math.round(b / 1024)}KB`;
 
-function fetchFresh(url: string): Promise<Response> {
-  const sep = url.includes("?") ? "&" : "?";
-  return fetch(`${url}${sep}_=${Date.now()}`, { cache: "no-store" });
-}
-
 function canManageDrawings(role?: string) {
   return role === "admin" || role === "pm" || role === "engineer";
 }
@@ -245,9 +241,8 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
   }, []);
 
   async function refresh() {
-    const res = await fetchFresh(`/api/drawings`);
-    const d = res.ok ? await res.json() : null;
-    const drawings: DrawingRow[] = d?.drawings ?? [];
+    const kq = await taiJsonMoi<{ drawings?: DrawingRow[] }>(`/api/drawings`);
+    const drawings: DrawingRow[] = (kq.ok ? kq.data.drawings : null) ?? [];
     setItems(drawings);
     if (drawings.length > 0 && !drawings.some((x) => x.id === selectedId)) {
       setSelectedId(drawings[0].id);
@@ -932,11 +927,10 @@ function DrawingWorkspaceDetail({
   function loadRevs(opts?: { fresh?: boolean }) {
     setLoading(true);
     const url = `/api/drawings/${drawing.id}`;
-    const req = opts?.fresh ? fetchFresh(url) : fetch(url);
-    req
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        const revs: DrawingRevisionRow[] = j?.revisions ?? [];
+    type RevsData = { revisions?: DrawingRevisionRow[] };
+    (opts?.fresh ? taiJsonMoi : taiJson)<RevsData>(url)
+      .then((kq) => {
+        const revs: DrawingRevisionRow[] = (kq.ok ? kq.data.revisions : null) ?? [];
         setRevisions(revs);
         setNewRev(suggestNextRev(revs));
       })

@@ -3,7 +3,6 @@ import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
-  deriveAdvanceStatus,
   parseAdvanceBody,
   validateAdvanceInput,
   type AdvanceInput,
@@ -79,27 +78,41 @@ export async function PATCH(
     const settleAmount = Number(body.settleAmount);
     if (!Number.isFinite(settleAmount) || settleAmount <= 0)
       return NextResponse.json({ error: "Số tiền hoàn ứng phải > 0" }, { status: 422 });
-    if (existing.status === "settled")
-      return NextResponse.json(
-        { error: "Tạm ứng đã hoàn tất, không thể hoàn thêm" },
-        { status: 409 },
-      );
 
-    const newSettled = existing.settledAmount + settleAmount;
-    if (newSettled > existing.amount)
+    // Cộng dồn + suy status NGAY TRONG SQL, điều kiện nằm trong WHERE của cùng câu UPDATE:
+    //   - không cộng tiền trên float JS (NUMERIC → parseFloat, quy ước M45);
+    //   - atomic: 2 lượt hoàn ứng đồng thời không thể cùng vượt số tạm ứng (trước đây
+    //     đọc settled_amount ở JS rồi ghi đè → lượt sau có thể vượt hoặc ghi đè lượt trước).
+    // Luật status giữ đúng deriveAdvanceStatus (lib/tai-chinh/finance.ts).
+    const updated = await queryOne<{ settledAmount: number; status: AdvanceStatus }>(
+      `UPDATE advances
+          SET settled_amount = settled_amount + ?::numeric,
+              status = CASE WHEN settled_amount + ?::numeric >= amount THEN 'settled'
+                            ELSE 'partially_settled' END
+        WHERE id = ? AND project_id = ? AND status <> 'settled'
+          AND settled_amount + ?::numeric <= amount
+        RETURNING settled_amount AS "settledAmount", status`,
+      settleAmount,
+      settleAmount,
+      id,
+      projectId,
+      settleAmount,
+    );
+    if (!updated) {
+      // Không ghi được: đọc lại để báo đúng lý do (đã hoàn tất hay vượt số còn lại).
+      const now = await loadExisting(id, projectId);
+      if (!now) return NextResponse.json({ error: "Không tìm thấy tạm ứng" }, { status: 404 });
+      if (now.status === "settled")
+        return NextResponse.json(
+          { error: "Tạm ứng đã hoàn tất, không thể hoàn thêm" },
+          { status: 409 },
+        );
       return NextResponse.json(
         { error: "Số tiền hoàn ứng vượt quá số tiền đã tạm ứng còn lại" },
         { status: 422 },
       );
-    const newStatus = deriveAdvanceStatus(existing.amount, newSettled);
-
-    await run(
-      `UPDATE advances SET settled_amount = ?, status = ? WHERE id = ?`,
-      newSettled,
-      newStatus,
-      id,
-    );
-    return NextResponse.json({ updated: id, settledAmount: newSettled, status: newStatus });
+    }
+    return NextResponse.json({ updated: id, ...updated });
   }
 
   const merged = { ...existing, ...body };
@@ -107,18 +120,33 @@ export async function PATCH(
   const invalid = validateAdvanceInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  await run(
-    `UPDATE advances SET code = ?, advance_date = ?, amount = ?, recipient = ?, reason = ?,
-            proposal_id = ?
-      WHERE id = ?`,
+  // Số tiền mới không được nhỏ hơn số đã hoàn; status suy lại theo số tiền mới (vd tạm ứng
+  // đã hoàn hết mà tăng số tiền thì trở lại "hoàn một phần"). So sánh/suy trong SQL để không
+  // so tiền trên float JS (M45) và atomic với lượt hoàn ứng chạy song song.
+  const updated = await queryOne<{ id: number }>(
+    `UPDATE advances SET code = ?, advance_date = ?, amount = ?::numeric, recipient = ?,
+            reason = ?, proposal_id = ?,
+            status = CASE WHEN settled_amount >= ?::numeric THEN 'settled'
+                          WHEN settled_amount > 0 THEN 'partially_settled'
+                          ELSE 'open' END
+      WHERE id = ? AND project_id = ? AND settled_amount <= ?::numeric
+      RETURNING id`,
     input.code,
     input.advanceDate,
     input.amount,
     input.recipient,
     input.reason,
     input.proposalId,
+    input.amount,
     id,
+    projectId,
+    input.amount,
   );
+  if (!updated)
+    return NextResponse.json(
+      { error: "Số tiền tạm ứng không được nhỏ hơn số đã hoàn ứng" },
+      { status: 422 },
+    );
 
   return NextResponse.json({ updated: id });
 }

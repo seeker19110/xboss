@@ -100,11 +100,3 @@ export function fmtVND(n: number) {
 export function fmtQty(n: number) {
   return n.toLocaleString("vi-VN", { maximumFractionDigits: 3 });
 }
-
-// sw.js áp stale-while-revalidate cho mọi GET /api/* — gọi lại đúng URL ngay sau khi
-// tự mình vừa ghi (thêm/sửa/xoá/import) có thể nhận lại bản cache cũ. Thêm nonce để
-// bỏ qua cache đúng những lần load lại này (pattern đã dùng ở app/drawings/page.tsx).
-export function fetchFresh(url: string): Promise<Response> {
-  const sep = url.includes("?") ? "&" : "?";
-  return fetch(`${url}${sep}_=${Date.now()}`, { cache: "no-store" });
-}

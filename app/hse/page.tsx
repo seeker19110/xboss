@@ -5,10 +5,11 @@ import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { ErrorState } from "@/app/components/ErrorState";
-import { taiJson } from "@/app/lib/taiDuLieu";
+import { taiJson, taiJsonMoi } from "@/app/lib/taiDuLieu";
 import { Modal } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
+import { HsePhotosModal } from "./_components/HsePhotosModal";
 import { formatDateVN, formatDateTimeVN, todayISO } from "@/lib/nen/date";
 
 type HseKind = "inspection" | "toolbox" | "incident" | "near_miss" | "permit";
@@ -57,7 +58,29 @@ type HseRecord = {
   actionAssigneeName: string | null;
   actionDue: string | null;
   actionStatus: "none" | "open" | "closed";
+  photoCount: number;
 };
+
+// Nút mở gallery ảnh của 1 ghi nhận — kèm số ảnh để biết trước ghi nhận nào có bằng chứng.
+function PhotoButton({ record, onOpen }: { record: HseRecord; onOpen: () => void }) {
+  const n = record.photoCount;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={n > 0 ? `Xem ${n} ảnh` : "Ảnh hiện trường (chưa có)"}
+      title={n > 0 ? `Xem ${n} ảnh` : "Chưa có ảnh — bấm để thêm"}
+      className={`inline-flex items-center gap-1 h-10 min-w-10 px-2 rounded-lg text-xs font-mono transition ${
+        n > 0
+          ? "text-sky-400 hover:bg-zinc-800"
+          : "text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800"
+      }`}
+    >
+      <Camera className="w-4 h-4" />
+      {n > 0 && <span>{n}</span>}
+    </button>
+  );
+}
 
 export default function HsePage() {
   const [me, setMe] = useState<Me | null>(null);
@@ -67,12 +90,15 @@ export default function HsePage() {
   const [loi, setLoi] = useState<string | null>(null);
   const [tab, setTab] = useState<HseKind>("incident");
   const [addOpen, setAddOpen] = useState(false);
+  const [photosFor, setPhotosFor] = useState<HseRecord | null>(null);
 
   const canManage = me?.role === "admin" || me?.role === "pm" || me?.role === "engineer";
   const canCreate = me != null && me.role !== "cdt" && me.role !== "viewer" && me.role !== "bch";
 
-  const load = useCallback(async () => {
-    const kq = await taiJson<{ records?: HseRecord[] }>("/api/hse");
+  // fresh = tải lại sau khi tự ghi (tạo ghi nhận, đóng action, thêm/xoá ảnh) → bỏ qua cache
+  // SW, nếu không danh sách/số ảnh hiện bản cũ tới lần tải sau (xem taiJsonMoi).
+  const load = useCallback(async (fresh = false) => {
+    const kq = await (fresh ? taiJsonMoi : taiJson)<{ records?: HseRecord[] }>("/api/hse");
     if (!kq.ok) {
       setLoi(kq.loi);
       return false;
@@ -96,7 +122,7 @@ export default function HsePage() {
   }, [taiLai]);
 
   async function refresh() {
-    await load();
+    await load(true);
   }
 
   const filtered = useMemo(() => records.filter((r) => r.kind === tab), [records, tab]);
@@ -266,10 +292,13 @@ export default function HsePage() {
                     </span>
                   </div>
                   <p className="text-sm text-zinc-300">{r.description}</p>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    {r.floorLabel ?? "—"} · {r.permitFrom ? formatDateTimeVN(r.permitFrom) : "—"} →{" "}
-                    {r.permitTo ? formatDateTimeVN(r.permitTo) : "—"}
-                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-zinc-500 flex-1 min-w-0">
+                      {r.floorLabel ?? "—"} · {r.permitFrom ? formatDateTimeVN(r.permitFrom) : "—"}{" "}
+                      → {r.permitTo ? formatDateTimeVN(r.permitTo) : "—"}
+                    </p>
+                    <PhotoButton record={r} onOpen={() => setPhotosFor(r)} />
+                  </div>
                 </div>
               );
             })}
@@ -277,7 +306,7 @@ export default function HsePage() {
         ) : (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
             <div
-              className="overflow-x-auto"
+              className="relative overflow-x-auto"
               tabIndex={0}
               role="region"
               aria-label="Danh sách ghi nhận HSE"
@@ -291,7 +320,9 @@ export default function HsePage() {
                       <th className="text-left p-3">MỨC ĐỘ</th>
                     )}
                     <th className="text-left p-3">ACTION</th>
-                    <th className="text-left p-3 w-10"></th>
+                    <th className="text-left p-3 w-24">
+                      <span className="sr-only">Ảnh & thao tác</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -330,17 +361,20 @@ export default function HsePage() {
                             "—"
                           )}
                         </td>
-                        <td className="p-3">
-                          {canManage && r.actionStatus === "open" && (
-                            <button
-                              onClick={() => closeAction(r.id)}
-                              aria-label="Đóng action"
-                              className="text-emerald-400 hover:text-emerald-300"
-                              title="Đóng action"
-                            >
-                              <CheckCircle2 className="w-4 h-4" />
-                            </button>
-                          )}
+                        <td className="p-1.5">
+                          <div className="flex items-center gap-1">
+                            <PhotoButton record={r} onOpen={() => setPhotosFor(r)} />
+                            {canManage && r.actionStatus === "open" && (
+                              <button
+                                onClick={() => closeAction(r.id)}
+                                aria-label="Đóng action"
+                                className="w-10 h-10 flex items-center justify-center rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-zinc-800"
+                                title="Đóng action"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -351,6 +385,16 @@ export default function HsePage() {
           </div>
         )}
       </main>
+
+      {photosFor && (
+        <HsePhotosModal
+          recordId={photosFor.id}
+          title={photosFor.description}
+          me={me}
+          onClose={() => setPhotosFor(null)}
+          onChanged={() => void refresh()}
+        />
+      )}
 
       {addOpen && (
         <AddHseModal

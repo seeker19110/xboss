@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useId, useState } from "react";
-import { TrendingUp, Flag } from "lucide-react";
+import { TrendingUp, Flag, Trash2 } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -11,8 +11,9 @@ import {
   Legend,
   ReferenceLine,
 } from "recharts";
-import { appAlert, appPrompt } from "@/app/components/dialogs";
+import { appAlert, appConfirm, appPrompt } from "@/app/components/dialogs";
 import EditableText from "@/app/components/EditableText";
+import { showToast } from "@/app/components/Toast";
 import { formatDateVN } from "@/lib/nen/date";
 
 type Point = { date: string; planned: number | null; actual: number | null };
@@ -83,6 +84,7 @@ export default function SCurveChart({ system }: { system?: string }) {
   const [baselines, setBaselines] = useState<Baseline[]>([]);
   const [baseline, setBaseline] = useState(""); // id baseline | '' = kế hoạch hiện tại
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   // Id gradient duy nhất per instance (chart xuất hiện ở Dashboard, /scurve, /progress/[system]).
   const gradId = `scurve-actual-${useId().replace(/:/g, "")}`;
 
@@ -136,6 +138,35 @@ export default function SCurveChart({ system }: { system?: string }) {
     setBaseline(String(j.id));
   }
 
+  async function deleteBaseline() {
+    if (!baseline) return;
+    const bl = baselines.find((b) => String(b.id) === baseline);
+    const ok = await appConfirm(
+      `Xoá baseline "${bl?.name ?? baseline}"? Dữ liệu snapshot sẽ mất, không hoàn tác được.`,
+      { danger: true },
+    );
+    if (!ok) return;
+    setDeleting(true);
+    // try/catch: mất mạng thì nút phải mở lại, không kẹt trạng thái đang xoá.
+    let res: Response;
+    try {
+      res = await fetch(`/api/baselines/${baseline}`, { method: "DELETE" });
+    } catch {
+      appAlert("Mất kết nối — chưa xoá được baseline");
+      setDeleting(false);
+      return;
+    }
+    setDeleting(false);
+    if (!res.ok) {
+      const j = await res.json().catch(() => null);
+      appAlert(j?.error ?? "Không xoá được baseline");
+      return;
+    }
+    setBaselines((b) => b.filter((x) => String(x.id) !== baseline));
+    setBaseline("");
+    showToast("Đã xoá baseline", "success");
+  }
+
   if (!data || data.points.length < 2) return null;
 
   // Gradient tô đường thực tế theo trục ngang: mỗi ngày một stop, màu theo mức lệch
@@ -169,6 +200,17 @@ export default function SCurveChart({ system }: { system?: string }) {
               </option>
             ))}
           </select>
+          {baseline !== "" && (
+            <button
+              onClick={deleteBaseline}
+              disabled={deleting}
+              aria-label="Xoá baseline đang chọn"
+              title="Xoá baseline này (Admin/PM) — S-curve quay về kế hoạch hiện tại"
+              className="flex items-center justify-center min-h-10 min-w-10 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-2 py-1 text-xs text-zinc-300 transition"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+            </button>
+          )}
           <select
             value={sheet}
             onChange={(e) => setSheet(e.target.value)}
@@ -186,7 +228,7 @@ export default function SCurveChart({ system }: { system?: string }) {
             onClick={snapshotBaseline}
             disabled={saving}
             title="Lưu snapshot ngày BĐ/KT hiện tại làm mốc so sánh (Admin/PM)"
-            className="flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-2 py-1 text-xs text-zinc-300 transition"
+            className="flex items-center gap-1 min-h-10 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-2 py-1 text-xs text-zinc-300 transition"
           >
             <Flag className="w-3 h-3 text-amber-400" /> {saving ? "Đang chốt…" : "Chốt baseline"}
           </button>

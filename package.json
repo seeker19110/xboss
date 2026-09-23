@@ -40,7 +40,8 @@
     "check:project-scope": "tsx scripts/check-project-scope.ts",
     "check:db-params": "tsx scripts/check-db-params.ts",
     "check:test-fk-ids": "tsx scripts/check-test-fk-ids.ts",
-    "check:progress-freshness": "tsx scripts/check-progress-freshness.ts"
+    "check:progress-freshness": "tsx scripts/check-progress-freshness.ts",
+    "check:ui-ux": "tsx .agents/skills/ui-ux-craftsman/scripts/ui_ux_validator.ts && npm run check:mau-accent && npm run check:contrast && npm run check:hex-hardcode"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1106.0",

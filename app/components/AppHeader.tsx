@@ -84,7 +84,7 @@ export default function AppHeader({
     // `cache: "no-store"` chỉ chặn cache HTTP của trình duyệt — service worker
     // (stale-while-revalidate cho mọi /api/* GET, xem public/sw.js) vẫn có thể trả
     // thẳng bản cache cũ trước khi kiểm request init, nên phải bust cache bằng query
-    // param (pattern `fetchFresh` ở app/boq/page.tsx, app/drawings/page.tsx) để chắc
+    // param (cùng cơ chế `taiJsonMoi` trong app/lib/taiDuLieu.ts) để chắc
     // chắn đọc đúng nav_settings vừa ghi (vd ngay sau khi admin bật/tắt ở /admin).
     fetch(`/api/nav-settings?_=${Date.now()}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
