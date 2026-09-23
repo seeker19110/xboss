@@ -1,5 +1,22 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Khôi phục in tem QR vật tư hàng loạt trong tab "Kho & Định Mức" — 2026-09-23
+
+Phần cuối của hồi quy `3044a12a` (mục ngay dưới): trang `/materials` cũ có nút "In tem QR" + modal
+chọn vật tư mở `/api/qr/labels?kind=mt&ids=…`; khi gộp vào `/procurement` modal bị bỏ, state
+`labelModalOpen` còn sót. Route in tem vẫn nguyên (quyền `CAN.export` = Admin/PM), chỉ
+`/equipment` còn gọi nó.
+
+- **Mới `app/procurement/_components/PrintMaterialLabelsModal.tsx`** — tìm theo mã BOQ/tên, "Chọn tất
+  cả" theo đúng các dòng đang lọc (giữ lựa chọn ở dòng bị lọc khuất), đếm số đã chọn, mở trang in
+  ở tab mới. Dòng/nút cao 40px.
+- **`InventoryTab.tsx`** — nút "In tem QR" cạnh "Đồng bộ Sheet" (chỉ Admin/PM như route), truyền
+  danh sách đang lọc của lưới vào modal.
+
+Verify: Playwright trên `next build && next start` + Postgres 16 — Admin mở modal, "Chọn tất cả"
+→ "Đã chọn 2 vật tư" → trang `/api/qr/labels?kind=mt&ids=14,13` mở tab mới với 2 tem QR. `lint`,
+`typecheck`, `build` xanh.
+
 ## ✅ Khôi phục UI xuất/hoàn kho, lịch sử, đổi thứ tự vật tư trong tab "Kho & Định Mức" — 2026-09-23
 
 Nhóm route vật tư có backend + test nhưng không UI nào gọi (đợt quét "route chỉ test gọi"):
@@ -29,9 +46,7 @@ Verify: Playwright trên `next build && next start` + Postgres 16 cục bộ —
 cơ điện 1) → hoàn 5 → modal + lưới cùng hiện 95/25; xuất 9999 → báo "Tồn kho không đủ (còn 95)";
 mở lại modal trên mobile thấy đủ 2 giao dịch (lỗi cache SW lộ ra và đã sửa lúc verify); chế độ sửa
 → ↑ đưa "Cáp điện" lên đầu. `lint`, `typecheck`, `build`, `tests/route-vat-tu-2.test.ts` +
-`tests/project-scope-invariant.test.ts` (123/123) xanh. Còn một phần cũ bị rơi chưa khôi phục: in tem
-QR vật tư hàng loạt (`PrintLabelsModal` cũ; state `labelModalOpen` vẫn sót) — hiện chỉ `/equipment`
-gọi `/api/qr/labels`, chưa trang nào in tem cho vật tư.
+`tests/project-scope-invariant.test.ts` (123/123) xanh. Phần in tem QR vật tư bị rơi cùng đợt — xem mục ngay trên.
 
 ## ✅ Gom 3 bản chép tay `fetchFresh` về `taiJsonMoi` — 2026-09-23
 
