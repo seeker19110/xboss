@@ -85,13 +85,17 @@ export default function CrewsModal({
   async function deleteCrew(c: CrewRow) {
     if (!(await appConfirm(`Xoá tổ đội "${c.name}"? Không thể hoàn tác.`, { danger: true })))
       return;
-    const res = await fetch(`/api/crews/${c.id}`, { method: "DELETE" });
-    if (!res.ok) {
-      showToast((await res.json().catch(() => null))?.error ?? "Xoá thất bại", "error");
-      return;
+    try {
+      const res = await fetch(`/api/crews/${c.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        showToast((await res.json().catch(() => null))?.error ?? "Xoá thất bại", "error");
+        return;
+      }
+      showToast("Đã xoá tổ đội");
+      afterMutate();
+    } catch {
+      showToast("Mất kết nối — chưa xoá được tổ đội", "error");
     }
-    showToast("Đã xoá tổ đội");
-    afterMutate();
   }
 
   const title =
