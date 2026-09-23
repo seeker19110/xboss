@@ -37,9 +37,6 @@ const WHITELIST: Record<string, string> = {
     "cron đồng bộ Google Sheet — tích hợp single-tenant (1 Sheet ↔ 1 DB), lấy org dự án đầu tiên (M124)",
   "tech/health-check": "kiểm tra hệ thống toàn cục (DB/SMTP/Telegram/...), không scope dự án",
 
-  // --- Static/meta (không đọc dữ liệu nghiệp vụ của dự án cụ thể) ---
-  "materials/allocation-meta": "metadata cấu hình phân bổ, không theo dự án",
-
   // --- Scope qua thực thể CHA theo id (không có cột project_id trực tiếp) ---
   "tasks/[id]/comments": "scope theo task id ràng buộc ở đường dẫn",
   "tasks/[id]/dimensions": "scope theo task id",

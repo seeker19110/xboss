@@ -1,5 +1,38 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Khôi phục UI xuất/hoàn kho, lịch sử, đổi thứ tự vật tư trong tab "Kho & Định Mức" — 2026-09-23
+
+Nhóm route vật tư có backend + test nhưng không UI nào gọi (đợt quét "route chỉ test gọi"):
+`POST /api/materials/:id/issue|return`, `GET/POST /api/materials/:id/transactions`,
+`PATCH /api/materials/:id/move`, `GET /api/materials/allocation-meta`. **Nguyên nhân: hồi quy** —
+commit `3044a12a` gộp `/materials` (1925 dòng) vào `app/procurement/_components/InventoryTab.tsx`
+(618 dòng) và đánh rơi nút xuất/hoàn kho, modal lịch sử nhập/xuất, nút ↑↓; state `historyMat` còn
+sót lại không dùng. Khôi phục theo đúng UI cũ, gọn lại cho lưới `SpreadsheetGrid` hiện tại:
+
+- **Mới `app/procurement/_components/MaterialStockModal.tsx`** — modal "Kho" của 1 vật tư: tab Xuất
+  kho (kèm tầng/tổ đội lĩnh, gợi ý datalist từ `allocation-meta`), Hoàn kho, Điều chỉnh ± số đã
+  dùng (bắt buộc ghi lý do); lịch sử giao dịch (loại, người ghi, ±, tầng/tổ đội, ghi chú); trường
+  tuỳ chỉnh (`CustomFieldsSection`). Xuất/hoàn gửi `Idempotency-Key` (giữ qua các lần bấm lại
+  cùng lượt nhập, đổi sau mỗi lần ghi thành công). Lỗi server (vd "Tồn kho không đủ (còn 95)")
+  hiện ngay trong form. Chỉ admin/pm/engineer thấy form (cùng quyền route); vai trò khác chỉ xem
+  lịch sử.
+- **`InventoryTab.tsx`** — cột "Kho" ở **đầu** lưới, luôn dính (mobile chỉ dính Kho + Mã BOQ vì 4
+  cột dính ~520px rộng hơn màn hình): nút mở modal; khi bật chế độ sửa và không lọc tìm kiếm thêm
+  ↑↓ (`/move`). `load(true)` (sau thêm dòng/đồng bộ/giao dịch/đổi thứ tự) nay thật sự bỏ qua cache
+  SW — trước đây tham số `revalidate` bị bỏ qua nên lưới có thể hiện số cũ.
+- **Sửa lộ dữ liệu chéo dự án**: `GET /api/materials/allocation-meta` quét toàn bảng
+  `material_transactions` → gợi ý lẫn tầng/tổ đội của dự án khác. Nay JOIN `materials.project_id`.
+  Test mới trong `tests/route-vat-tu-2.test.ts` (đỏ trên code cũ, xanh trên code mới); gỡ mục
+  whitelist sai lý do "không theo dự án" khỏi `tests/project-scope-invariant.test.ts`.
+
+Verify: Playwright trên `next build && next start` + Postgres 16 cục bộ — tồn 120 → xuất 30 (24F, Tổ
+cơ điện 1) → hoàn 5 → modal + lưới cùng hiện 95/25; xuất 9999 → báo "Tồn kho không đủ (còn 95)";
+mở lại modal trên mobile thấy đủ 2 giao dịch (lỗi cache SW lộ ra và đã sửa lúc verify); chế độ sửa
+→ ↑ đưa "Cáp điện" lên đầu. `lint`, `typecheck`, `build`, `tests/route-vat-tu-2.test.ts` +
+`tests/project-scope-invariant.test.ts` (123/123) xanh. Còn một phần cũ bị rơi chưa khôi phục: in tem
+QR vật tư hàng loạt (`PrintLabelsModal` cũ; state `labelModalOpen` vẫn sót) — hiện chỉ `/equipment`
+gọi `/api/qr/labels`, chưa trang nào in tem cho vật tư.
+
 ## ✅ Gom 3 bản chép tay `fetchFresh` về `taiJsonMoi` — 2026-09-23
 
 Dọn nợ ghi ở mục UI ảnh HSE bên dưới: helper bỏ qua cache SW (nonce + `no-store`) bị chép tay

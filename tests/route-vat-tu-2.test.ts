@@ -947,6 +947,28 @@ test("GET /api/materials/allocation-meta: trả floors/crews đã dùng qua issu
   assert.ok(crews.includes(crew));
 });
 
+test("GET /api/materials/allocation-meta: không lẫn tầng/tổ đội của dự án khác", S, async () => {
+  const pA = await taoDuAn("allocmeta-A");
+  const pB = await taoDuAn("allocmeta-B");
+  const matB = await taoMaterial(pB, "allocmeta-B", { qtyStock: 10 });
+  const engB = await taoUser("engineer", "allocmeta-B");
+  await dangNhapDuAn(engB, pB);
+  const floorB = uniq("TB");
+  const crewB = uniq("ToB");
+  const { POST } = await import("@/app/api/materials/[id]/issue/route");
+  const resIssue = await POST(jreq("/x", { qty: 1, floorLabel: floorB, crew: crewB }), {
+    params: Promise.resolve({ id: String(matB) }),
+  });
+  assert.equal(resIssue.status, 200);
+
+  const engA = await taoUser("engineer", "allocmeta-A");
+  await dangNhapDuAn(engA, pA);
+  const { GET } = await import("@/app/api/materials/allocation-meta/route");
+  const { floors, crews } = await (await GET()).json();
+  assert.ok(!floors.includes(floorB));
+  assert.ok(!crews.includes(crewB));
+});
+
 // ============================================================================
 // PATCH /api/materials/batch
 // ============================================================================
