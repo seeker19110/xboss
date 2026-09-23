@@ -1,5 +1,29 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Đợt 2 dọn route: khôi phục 3 thao tác lưới tracking, sửa công tác, xoá `/api/dashboard/floors`, migration 0157 — 2026-09-23
+
+Xử lý nốt 5 route mà đợt 1 (PR #526, mục dưới) còn để ngỏ; truy lịch sử git cho từng route:
+
+- **Hồi quy, khôi phục UI trong lưới tracking** (`app/tracking/[sheet]/TrackingGrid.tsx`, chỉ Admin/PM ở
+  chế độ sửa):
+  - Đổi thứ tự **nhóm** (`PATCH /api/workpackages/:id/move`) — refactor M52 PR5 (#228) làm rơi nút,
+    prop `pkgIdx`/`pkgCount` còn sót không dùng. Nút lên/xuống cạnh "Sao chép/Xoá nhóm".
+  - Đổi thứ tự **cột dimension** (`PATCH …/dimensions/column/move`) — `40ff7d4d` (2026-06-12) xoá
+    `moveColumn` cùng ngày nó được thêm. Nút trái/phải ở header cột.
+  - **Chèn task trống** (`POST /api/workpackages/:id/tasks`) — cùng `40ff7d4d` thay `addTaskAfter`
+    bằng "sao chép task", nên lưới chỉ thêm được task bằng cách sao chép. Nút "Chèn task trống bên
+    dưới" ở dòng task + "Thêm task vào cuối nhóm" ở tiêu đề nhóm.
+- **Sửa/ẩn công tác thi công** ở `/work-fronts` (chưa từng có UI): nút bút chì ở header cột công tác
+  → modal đổi tên, số ngày thi công, "Ẩn công tác" (`PATCH /api/construction-stages/:id`).
+- **Xoá `GET /api/dashboard/floors`** — đã bị `/api/timeline` thay thế từ #61 (2026-07-03); gỡ 3 ca test.
+- **Migration `0157_drop_orphaned_scan_to_bim_runs.sql`** DROP `engineering_scan_to_bim_runs` (0 tham
+  chiếu từ khi gỡ cụm CAD/BIM #476); ERD sinh lại. ⚠️ **Đụng dữ liệu — cùng 0156, chạy qua staging +
+  `db:migrate -- --dry-run` trước production.**
+
+Sau đợt này, quét "route có backend nhưng UI không gọi" chỉ còn các route `cron/*` và `v1/*` (API cho
+hệ ngoài, đúng thiết kế). Còn treo: `.env.example` dòng `TELEGRAM_WEBHOOK_SECRET`/`ZALO_OA_SECRET` cần
+sửa tay (phiên không được mở `.env*`).
+
 ## ✅ Dọn nốt route có backend nhưng UI không gọi: baseline, tổ đội, mặt trận, engineering + migration 0156 — 2026-09-23
 
 Phần còn lại của đợt quét "route chỉ test gọi" (mục "Xoá 2 module chỉ còn test/script tự gọi" bên

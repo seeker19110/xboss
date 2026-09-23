@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Download } from "lucide-react";
+import { Plus, Download, Pencil } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import { appPrompt } from "@/app/components/dialogs";
+import { Modal, appPrompt, appConfirm } from "@/app/components/dialogs";
+import { Button } from "@/app/components/ui";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/nen/date";
@@ -47,12 +48,137 @@ function FrontCell({ front }: { front: Front | undefined }) {
   );
 }
 
+// Modal sửa tên/số ngày thi công hoặc ẩn hẳn 1 công tác khỏi ma trận (Admin/PM; công tác
+// dùng chung project_id NULL chỉ Admin sửa được — route trả lỗi, hiện đúng error).
+function EditStageModal({
+  stage,
+  onClose,
+  onSaved,
+}: {
+  stage: Stage;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(stage.name);
+  const [durationDays, setDurationDays] = useState(String(stage.durationDays));
+  const [err, setErr] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const trimmed = name.trim();
+    const duration = Number(durationDays);
+    if (!trimmed) {
+      setErr("Tên công tác không được để trống");
+      return;
+    }
+    if (!Number.isInteger(duration) || duration <= 0) {
+      setErr("Số ngày thi công phải là số nguyên dương");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/construction-stages/${stage.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed, durationDays: duration }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        setErr(j?.error ?? "Lưu công tác thất bại");
+        return;
+      }
+      showToast("Đã lưu công tác", "success");
+      onSaved();
+      onClose();
+    } catch {
+      setErr("Lỗi mạng — thử lại");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function hide() {
+    const ok = await appConfirm(
+      `Ẩn công tác "${stage.name}" khỏi ma trận? Dữ liệu mặt trận đã ghi vẫn giữ trong hệ thống.`,
+      { danger: true, confirmLabel: "Ẩn công tác" },
+    );
+    if (!ok) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/construction-stages/${stage.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: false }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast(j?.error ?? "Ẩn công tác thất bại", "error");
+        return;
+      }
+      showToast("Đã ẩn công tác", "success");
+      onSaved();
+      onClose();
+    } catch {
+      showToast("Lỗi mạng — thử lại", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const field =
+    "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 transition";
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="p-5">
+        <h3 className="font-semibold mb-4">Sửa công tác thi công</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1">Tên công tác</label>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={field}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1">Số ngày thi công</label>
+            <input
+              type="number"
+              min={1}
+              value={durationDays}
+              onChange={(e) => setDurationDays(e.target.value)}
+              className={field}
+            />
+          </div>
+        </div>
+        {err && <p className="text-xs text-red-400 mt-3">{err}</p>}
+        <div className="flex items-center justify-between gap-2 mt-5">
+          <Button variant="danger" onClick={hide} disabled={saving}>
+            Ẩn công tác
+          </Button>
+          <div className="flex gap-2">
+            <Button onClick={onClose} disabled={saving}>
+              Huỷ
+            </Button>
+            <Button variant="primary" onClick={save} disabled={saving || !name.trim()}>
+              Lưu
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function WorkFrontsPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [floors, setFloors] = useState<string[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
   const [fronts, setFronts] = useState<Front[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingStage, setEditingStage] = useState<Stage | null>(null);
 
   const canManage = me?.role === "admin" || me?.role === "pm";
   const canExportReport = me?.role === "admin" || me?.role === "pm";
@@ -141,7 +267,19 @@ export default function WorkFrontsPage() {
                     <th className="text-right p-2 sticky left-0 z-10 bg-zinc-900">TẦNG</th>
                     {stages.map((s) => (
                       <th key={s.id} className="text-center p-2 whitespace-nowrap">
-                        {s.name}
+                        <span className="inline-flex items-center gap-1">
+                          {s.name}
+                          {canManage && (
+                            <button
+                              onClick={() => setEditingStage(s)}
+                              aria-label={`Sửa công tác ${s.name}`}
+                              title={`Sửa công tác ${s.name}`}
+                              className="inline-flex items-center justify-center w-6 h-6 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 shrink-0"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          )}
+                        </span>
                       </th>
                     ))}
                     {canManage && (
@@ -195,6 +333,14 @@ export default function WorkFrontsPage() {
           </div>
         )}
       </main>
+
+      {editingStage && (
+        <EditStageModal
+          stage={editingStage}
+          onClose={() => setEditingStage(null)}
+          onSaved={refresh}
+        />
+      )}
     </div>
   );
 }

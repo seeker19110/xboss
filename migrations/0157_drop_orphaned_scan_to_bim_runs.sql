@@ -1,0 +1,21 @@
+-- 0157_drop_orphaned_scan_to_bim_runs.sql — dọn bảng mồ côi sau đợt xoá module
+-- Engineering scan-to-BIM bị xoá theo yêu cầu người dùng (PR #476, 2026-07-24, xem
+-- PROGRESS.md; tiếp theo PR #514 dọn module closed-loop-sync).
+--
+-- Đã rà kỹ TOÀN BỘ repo (app/, lib/, scripts/, tests/, e2e/) trước khi liệt kê bảng ở đây —
+-- không còn route/lib/component/test nào đọc/ghi bảng dưới đây:
+--
+--   engineering_scan_to_bim_runs (M70, migration 0104) — lib
+--     `engineering-scan-to-bim.ts` xoá ở PR #476; route /api/engineering/scan-to-bim/*
+--     đã xoá từ cùng PR. Không test/script nào liệt kê hay dùng bảng này. So sánh PR #514
+--     (engineering_closed_loop_sync_logs được DROP ở 0156).
+--
+-- Không có bảng NÀO khác trong repo REFERENCES tới bảng bị DROP ở đây (đã grep xác nhận) —
+-- không cần CASCADE để dọn FK con, nhưng vẫn giữ CASCADE cho nhất quán với tiền lệ 0155–0156
+-- (an toàn, không có tác dụng phụ khi không có FK con).
+--
+-- ⚠️ ĐỤNG DỮ LIỆU (DROP TABLE) — theo DoD (CLAUDE.md) phải chạy qua staging
+-- (`bash deploy.sh --staging`, xem docs/ops/staging.md) và `npm run db:migrate -- --dry-run`
+-- trước khi lên production. KHÔNG đi thẳng production.
+
+DROP TABLE IF EXISTS engineering_scan_to_bim_runs CASCADE;

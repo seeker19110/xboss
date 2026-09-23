@@ -11,6 +11,7 @@ import {
   MessageSquare,
   ChevronUp,
   ChevronDown as ChevronDownIcon,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   Columns,
@@ -20,6 +21,8 @@ import {
   FileText,
   Lock,
   ShieldAlert,
+  Plus,
+  ListPlus,
 } from "lucide-react";
 import { Modal, appAlert, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
@@ -41,6 +44,7 @@ import {
   baoLoiSuaNhom,
 } from "./tickApi";
 import { useTickVung } from "./useTickVung";
+import { useCauTrucLuoi } from "./useCauTrucLuoi";
 import { ThanhVungChon } from "./ThanhVungChon";
 import { ODimension } from "./ODimension";
 import { taskKhopLoc } from "./locTask";
@@ -348,41 +352,6 @@ export function TrackingGrid({
     return true;
   }
 
-  async function copyPkg() {
-    const code = await appPrompt("Mã nhóm mới", `${pkg.code}_copy`, { mono: true });
-    if (!code?.trim()) return;
-    const name = await appPrompt("Tên nhóm mới", `${pkg.name} (bản sao)`);
-    if (!name?.trim()) return;
-    const res = await fetch(`/api/workpackages/${pkg.id}/copy`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: code.trim(), name: name.trim(), afterId: pkg.id }),
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      appAlert(j.error ?? "Lỗi không xác định");
-      return;
-    }
-    onChanged();
-  }
-
-  async function deletePkg() {
-    if (
-      !(await appConfirm(
-        `Xoá nhóm "${pkg.code} — ${pkg.name}"?\n\nToàn bộ ${pkg.tasks.length} task và dữ liệu liên quan sẽ bị xoá vĩnh viễn.`,
-        { danger: true, confirmLabel: "Xoá nhóm" },
-      ))
-    )
-      return;
-    const res = await fetch(`/api/workpackages/${pkg.id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      appAlert(j.error ?? "Lỗi không xác định");
-      return;
-    }
-    onChanged();
-  }
-
   // ── Hàm thao tác task ────────────────────────────────────────────────────
 
   async function toggle(cell: Cell, task: GridTask, label: string) {
@@ -560,114 +529,6 @@ export function TrackingGrid({
     onChanged();
   }
 
-  async function renameColumn(oldLabel: string) {
-    const newLabel = await appPrompt("Đổi tên cột (áp dụng toàn sheet)", oldLabel);
-    if (!newLabel || newLabel === oldLabel) return;
-    await fetch("/api/dimensions/rename", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ packageId: pkg.id, oldLabel, newLabel }),
-    });
-    load();
-    onChanged();
-  }
-
-  async function addColumnAfter(afterLabel: string | null) {
-    const label = await appPrompt(
-      afterLabel ? `Tên cột mới (chèn sau "${afterLabel}")` : "Tên cột mới (thêm vào cuối)",
-    );
-    if (!label?.trim()) return;
-    const res = await fetch(`/api/workpackages/${pkg.id}/dimensions/column`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label: label.trim(), afterLabel: afterLabel ?? undefined }),
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      appAlert(j.error ?? "Lỗi không xác định");
-      return;
-    }
-    load();
-    onChanged();
-  }
-
-  async function deleteColumn(label: string) {
-    if (
-      !(await appConfirm(
-        `Xoá cột "${label}" khỏi TẤT CẢ nhóm trong trang này?\n\nToàn bộ trạng thái tick của cột này ở mọi nhóm sẽ bị xoá vĩnh viễn.`,
-        { danger: true, confirmLabel: "Xoá cột toàn trang" },
-      ))
-    )
-      return;
-    const res = await fetch(
-      `/api/workpackages/${pkg.id}/dimensions/column?label=${encodeURIComponent(label)}&allGroups=true`,
-      { method: "DELETE" },
-    );
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      appAlert(j.error ?? "Lỗi không xác định");
-      return;
-    }
-    load();
-    onChanged();
-  }
-
-  async function deleteTask(t: GridTask) {
-    if (
-      !(await appConfirm(
-        `Xoá task "${t.code} — ${t.name}"?\n\nToàn bộ ảnh, bình luận, lịch sử liên quan sẽ bị xoá vĩnh viễn.`,
-        { danger: true, confirmLabel: "Xoá task" },
-      ))
-    )
-      return;
-    const res = await fetch(`/api/tasks/${t.id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      appAlert(j.error ?? "Lỗi không xác định");
-      return;
-    }
-    load();
-    onChanged();
-  }
-
-  async function copyTask(t: GridTask) {
-    const code = await appPrompt("Mã task mới", `${t.code}_copy`, { mono: true });
-    if (!code?.trim()) return;
-    const name = await appPrompt("Tên task mới", `${t.name} (bản sao)`);
-    if (!name?.trim()) return;
-    const res = await fetch(`/api/tasks/${t.id}/copy`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: code.trim(), name: name.trim(), afterId: t.id }),
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      appAlert(j.error ?? "Lỗi không xác định");
-      return;
-    }
-    load();
-    onChanged();
-  }
-
-  async function moveTask(t: GridTask, direction: "up" | "down") {
-    await fetch(`/api/tasks/${t.id}/move`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ direction }),
-    });
-    load();
-  }
-
-  async function resetTaskDates(t: GridTask) {
-    await fetch(`/api/tasks/${t.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ startDate: null, endDate: null }),
-    });
-    load();
-    onChanged();
-  }
-
   // ── Render ───────────────────────────────────────────────────────────────
 
   // Khi chưa mở hoặc chưa tải xong lưới, chỉ hiển thị hàng tiêu đề nhóm.
@@ -678,27 +539,23 @@ export function TrackingGrid({
   // Khi chưa tải grid dùng sheetCols (từ các nhóm đã mở) để colgroup đồng nhất chiều rộng.
   const visibleColumns = grid ? grid.columns : sheetCols;
 
-  async function deleteVariantColumns() {
-    if (!grid || variantColumns.length === 0) return;
-    if (
-      !(await appConfirm(
-        `Xoá ${variantColumns.length} cột biến thể (${variantColumns
-          .slice(0, 3)
-          .map((c) => c.match(/ \((\d+)\)$/)?.[1])
-          .join(", ")}...)?` +
-          "\n\nThao tác này xoá toàn bộ dữ liệu checkbox trong các cột đó và không thể hoàn tác.",
-      ))
-    )
-      return;
-    for (const col of variantColumns) {
-      await fetch(
-        `/api/workpackages/${pkg.id}/dimensions/column?label=${encodeURIComponent(col)}&allGroups=true`,
-        { method: "DELETE" },
-      );
-    }
-    load();
-    onChanged();
-  }
+  // Thao tác đổi cấu trúc nhóm/task/cột (di chuyển, sao chép, xoá) — logic nằm trong hook riêng
+  // để file lưới chỉ còn dựng giao diện (AC13).
+  const {
+    movePkg,
+    copyPkg,
+    deletePkg,
+    renameColumn,
+    moveColumn,
+    addColumnAfter,
+    deleteColumn,
+    deleteVariantColumns,
+    deleteTask,
+    copyTask,
+    insertBlankTask,
+    moveTask,
+    resetTaskDates,
+  } = useCauTrucLuoi({ pkg, grid, variantColumns, load, onChanged, onToggle, expanded });
 
   // Chiều rộng cột dùng chung cho hàng nhóm lẫn bảng task; ce gate nút sửa, anHang ẩn hàng lọc task
   const ce = canEdit && editMode;
@@ -1242,6 +1099,32 @@ export function TrackingGrid({
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
+                      onClick={() => movePkg("up")}
+                      disabled={pkgIdx === 0}
+                      title="Chuyển nhóm lên"
+                      aria-label="Chuyển nhóm lên"
+                      className="p-0.5 text-zinc-500 hover:text-zinc-200 disabled:opacity-20"
+                    >
+                      <ChevronUp className="w-[17px] h-[17px]" />
+                    </button>
+                    <button
+                      onClick={() => movePkg("down")}
+                      disabled={pkgIdx === pkgCount - 1}
+                      title="Chuyển nhóm xuống"
+                      aria-label="Chuyển nhóm xuống"
+                      className="p-0.5 text-zinc-500 hover:text-zinc-200 disabled:opacity-20"
+                    >
+                      <ChevronDownIcon className="w-[17px] h-[17px]" />
+                    </button>
+                    <button
+                      onClick={() => insertBlankTask(null)}
+                      title="Thêm task vào cuối nhóm"
+                      aria-label="Thêm task vào cuối nhóm"
+                      className="p-0.5 text-zinc-500 hover:text-emerald-400"
+                    >
+                      <ListPlus className="w-[17px] h-[17px]" />
+                    </button>
+                    <button
                       onClick={() => copyPkg()}
                       title="Sao chép nhóm này"
                       className="p-0.5 text-zinc-500 hover:text-sky-400"
@@ -1308,7 +1191,7 @@ export function TrackingGrid({
               >
                 Ngày KT
               </th>
-              {visibleColumns.map((col) => (
+              {visibleColumns.map((col, colIdx) => (
                 <th
                   key={col}
                   className={`group/col border-b border-zinc-800 p-0 overflow-hidden align-middle${hiddenPrintCols.has(col) ? " print-hidden-col" : ""}`}
@@ -1323,13 +1206,33 @@ export function TrackingGrid({
                       {col}
                     </div>
                     {ce && (
-                      <button
-                        onClick={() => deleteColumn(col)}
-                        title={`Xoá cột "${col}"`}
-                        className="opacity-100 sm:opacity-0 sm:group-hover/col:opacity-100 text-zinc-700 hover:text-red-400 shrink-0"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          onClick={() => moveColumn(col, "left")}
+                          disabled={colIdx === 0}
+                          title="Chuyển cột sang trái"
+                          aria-label="Chuyển cột sang trái"
+                          className="opacity-100 sm:opacity-0 sm:group-hover/col:opacity-100 text-zinc-700 hover:text-zinc-300 disabled:opacity-20 shrink-0"
+                        >
+                          <ChevronLeft className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => deleteColumn(col)}
+                          title={`Xoá cột "${col}"`}
+                          className="opacity-100 sm:opacity-0 sm:group-hover/col:opacity-100 text-zinc-700 hover:text-red-400 shrink-0"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => moveColumn(col, "right")}
+                          disabled={colIdx === visibleColumns.length - 1}
+                          title="Chuyển cột sang phải"
+                          aria-label="Chuyển cột sang phải"
+                          className="opacity-100 sm:opacity-0 sm:group-hover/col:opacity-100 text-zinc-700 hover:text-zinc-300 disabled:opacity-20 shrink-0"
+                        >
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 </th>
@@ -1725,6 +1628,14 @@ export function TrackingGrid({
                             className="text-zinc-700 hover:text-sky-400"
                           >
                             <Copy className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => insertBlankTask(t.id)}
+                            title="Chèn task trống bên dưới"
+                            aria-label="Chèn task trống bên dưới"
+                            className="text-zinc-700 hover:text-emerald-400"
+                          >
+                            <Plus className="w-3 h-3" />
                           </button>
                           <button
                             onClick={() => deleteTask(t)}
