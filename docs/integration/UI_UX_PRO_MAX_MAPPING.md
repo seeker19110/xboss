@@ -10,18 +10,29 @@ UI skill và quality scripts. Tích hợp nguyên khối sẽ tạo hai nguồn 
 
 ## Phần được native hóa
 
-| Ý tưởng upstream | Cách áp dụng ở XBoss |
-| --- | --- |
-| Analyze requirement trước khi chọn style | Skill bắt buộc role/device/task/risk trước UI pattern |
-| Master + page override | `design-system/xboss/MASTER.md` + `pages/*` |
-| Query contract: một dominant intent | Review contract: một UX outcome mỗi lượt |
-| UX quick-reference | Curate thành rule về hierarchy, forms, focus, contrast, touch, wrapping, states |
-| Stack-aware guidance | Repo truth (Next/React/Tailwind/Lucide/Recharts) có precedence |
-| Motion guidance | Functional + interruptible + reduced-motion; không thêm GSAP mặc định |
-| Chart recommendations | Mapping theo câu hỏi nghiệp vụ, chống misleading chart |
-| Anti-patterns | Cấm decorative complexity, color-only meaning, raw hex, generic AI-dashboard styling |
-| Persisted design system | Master file commit trong repo, review được qua PR |
-| Verification mindset | `check:ui-ux` + lint/typecheck + E2E/axe khi cần |
+| Ý tưởng upstream                         | Cách áp dụng ở XBoss                                                                 |
+
+| ---------------------------------------- | ------------------------------------------------------------------------------------ |
+
+| Analyze requirement trước khi chọn style | Skill bắt buộc role/device/task/risk trước UI pattern                                |
+
+| Master + page override                   | `design-system/xboss/MASTER.md` + `pages/*`                                          |
+
+| Query contract: một dominant intent      | Review contract: một UX outcome mỗi lượt                                             |
+
+| UX quick-reference                       | Curate thành rule về hierarchy, forms, focus, contrast, touch, wrapping, states      |
+
+| Stack-aware guidance                     | Repo truth (Next/React/Tailwind/Lucide/Recharts) có precedence                       |
+
+| Motion guidance                          | Functional + interruptible + reduced-motion; không thêm GSAP mặc định                |
+
+| Chart recommendations                    | Mapping theo câu hỏi nghiệp vụ, chống misleading chart                               |
+
+| Anti-patterns                            | Cấm decorative complexity, color-only meaning, raw hex, generic AI-dashboard styling |
+
+| Persisted design system                  | Master file commit trong repo, review được qua PR                                    |
+
+| Verification mindset                     | `check:ui-ux` + lint/typecheck + E2E/axe khi cần                                     |
 
 ## Phần cố ý không lấy
 
