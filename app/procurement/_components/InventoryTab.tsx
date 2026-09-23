@@ -39,6 +39,7 @@ import SpreadsheetGrid, { type GridColumn, type GridEdit } from "@/app/component
 import CustomFieldsSection from "@/app/components/CustomFieldsSection";
 import { formatDateTimeVN } from "@/lib/nen/date";
 import MaterialStockModal from "./MaterialStockModal";
+import PrintMaterialLabelsModal from "./PrintMaterialLabelsModal";
 
 export type Material = {
   id: number;
@@ -663,6 +664,17 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
             </button>
           )}
 
+          {canAdmin && (
+            <button
+              onClick={() => setLabelModalOpen(true)}
+              disabled={materials.length === 0}
+              title="Chọn vật tư để in tem QR"
+              className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition shrink-0 disabled:opacity-50 h-10"
+            >
+              <QrCode className="w-4 h-4" /> In tem QR
+            </button>
+          )}
+
           <a
             href="/api/materials/template"
             download="MAU-KHOI-LUONG-BOQ.xlsx"
@@ -725,6 +737,9 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
             </div>
           )}
         </div>
+      )}
+      {labelModalOpen && (
+        <PrintMaterialLabelsModal materials={filtered} onClose={() => setLabelModalOpen(false)} />
       )}
       {historyMat && (
         <MaterialStockModal
