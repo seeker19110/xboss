@@ -16,13 +16,15 @@ import { NextRequest } from "next/server";
 //   - app/api/engineering/logistics/scan-receive/route.ts       (POST quét nhận vật tư QR)
 //   - app/api/engineering/ledger/merkle/route.ts                (GET / POST sổ cái Merkle)
 //   - app/api/engineering/ledger/verify-proof/route.ts          (POST xác thực Merkle Proof)
-//   - app/api/engineering/closed-loop-sync/route.ts               (GET / POST đồng bộ Spool→WBS→IPC)
 //
 // (route/lib edge-vision-tracking, generative-routing — module `engineering-nextgen-apex` — đã
 // bị xoá 2026-09-22, 1/6 module `thuNghiem: true` không ai bật, xem PROGRESS.md.)
 //
 // (route mepf-voice, pipe-mass-balance, pipe-spool-tracking cùng lib nguồn của chúng đã bị xoá
 // 2026-09-22 trong đợt dọn 7 module Engineering OS đầu cơ, xem PROGRESS.md.)
+//
+// (route closed-loop-sync + lib engineering-closed-loop-sync đã bị xoá 2026-09-23 — không UI
+// nào gọi, nguồn spool đã xoá, tự cộng +10% tiến độ bỏ qua recomputeTask, xem PROGRESS.md.)
 //
 // BUG THẬT lộ ra khi viết test này (đã sửa cùng nhánh):
 //   1) 9 hàm `list*` trong lib/ky-thuat/engineering-mepf-{hydraulic,nesting,predictive,takeoff,voice}.ts
@@ -690,119 +692,5 @@ test(
     const body = await res.json();
     assert.equal(body.isValid, true);
     assert.equal(body.leafHash, hashLeafRecord(records[0]));
-  },
-);
-
-// ============================================================================
-// GET/POST /api/engineering/closed-loop-sync
-// ============================================================================
-
-async function taoWbsTask(projectId: number, ten: string): Promise<number> {
-  const { insertId } = await import("@/lib/db");
-  const towerId = await insertId(
-    `INSERT INTO towers (project_id, name) VALUES (?, ?)`,
-    projectId,
-    `Tháp ${uniq(ten)}`,
-  );
-  const sheetTypeId = await insertId(
-    `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, ?, ?)`,
-    towerId,
-    `SH-${uniq(ten)}`,
-    `Sheet ${ten}`,
-  );
-  const packageId = await insertId(
-    `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, ?, ?)`,
-    sheetTypeId,
-    `WP-${uniq(ten)}`,
-    `Gói ${ten}`,
-  );
-  return insertId(
-    `INSERT INTO tasks (package_id, code, name, progress_percent, status) VALUES (?, ?, ?, 0.5, 'dang_thi_cong')`,
-    packageId,
-    `T-${uniq(ten)}`,
-    `Việc ${ten}`,
-  );
-}
-
-test("GET /api/engineering/closed-loop-sync: chưa đăng nhập → 401", S, async () => {
-  dangXuat();
-  const { GET } = await import("@/app/api/engineering/closed-loop-sync/route");
-  const res = await GET();
-  assert.equal(res.status, 401);
-});
-
-test("POST /api/engineering/closed-loop-sync: subcon không có quyền → 403", S, async () => {
-  const projectId = await taoDuAn("cls403");
-  const sub = await taoUser("subcon", "cls403");
-  await dangNhapDuAn(sub, projectId);
-  const { POST } = await import("@/app/api/engineering/closed-loop-sync/route");
-  const res = await POST(jreq("/x", {}));
-  assert.equal(res.status, 403);
-});
-
-test(
-  "POST rồi GET /api/engineering/closed-loop-sync: đồng bộ Spool→WBS→IPC, cập nhật đúng " +
-    "tiến độ task trong CÙNG dự án, provenanceToken băm SHA-256 thật (không phải test giả)",
-  S,
-  async () => {
-    const { queryOne } = await import("@/lib/db");
-    const projectId = await taoDuAn("clsok");
-    const pm = await taoUser("pm", "clsok");
-    const taskId = await taoWbsTask(projectId, "clsok");
-    await dangNhapDuAn(pm, projectId);
-    const { POST, GET } = await import("@/app/api/engineering/closed-loop-sync/route");
-    const spoolId = `SP-${uniq("code")}`;
-    const res = await POST(
-      jreq("/x", { spoolId, wbsTaskId: taskId, calculatedQty: 10, unitRateVnd: 500000 }),
-    );
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.success, true);
-    assert.equal(body.syncedAmountVnd, 5_000_000);
-    assert.match(body.provenanceToken, /^SIG-PAY-[0-9A-F]{24}$/);
-
-    const rowLog = await queryOne<{ synced_amount_vnd: number }>(
-      `SELECT synced_amount_vnd FROM engineering_closed_loop_sync_logs WHERE sync_code = ?`,
-      body.syncCode,
-    );
-    assert.equal(Number(rowLog?.synced_amount_vnd), 5_000_000);
-
-    const rowTask = await queryOne<{ progress_percent: number }>(
-      `SELECT progress_percent FROM tasks WHERE id = ?`,
-      taskId,
-    );
-    assert.ok(Number(rowTask?.progress_percent) > 0.5);
-
-    const resGet = await GET();
-    assert.equal(resGet.status, 200);
-    const bodyGet = await resGet.json();
-    assert.ok(bodyGet.logs.some((l: any) => l.sync_code === body.syncCode));
-  },
-);
-
-test(
-  "POST /api/engineering/closed-loop-sync: wbsTaskId thuộc dự án KHÁC → không cập nhật tiến độ " +
-    "task đó (JOIN lọc theo project_id chặn đúng), log vẫn ghi thành công",
-  S,
-  async () => {
-    const { queryOne } = await import("@/lib/db");
-    const projectA = await taoDuAn("clsisoA");
-    const projectB = await taoDuAn("clsisoB");
-    const pmA = await taoUser("pm", "clsisoA");
-    const taskIdB = await taoWbsTask(projectB, "clsisoB");
-
-    await dangNhapDuAn(pmA, projectA);
-    const { POST } = await import("@/app/api/engineering/closed-loop-sync/route");
-    const res = await POST(
-      jreq("/x", { spoolId: "SP-ISO", wbsTaskId: taskIdB, calculatedQty: 5, unitRateVnd: 100000 }),
-    );
-    assert.equal(res.status, 200);
-    assert.equal((await res.json()).success, true);
-
-    const rowTaskB = await queryOne<{ progress_percent: number }>(
-      `SELECT progress_percent FROM tasks WHERE id = ?`,
-      taskIdB,
-    );
-    assert.equal(Number(rowTaskB?.progress_percent), 0.5); // không đổi — vẫn là giá trị khởi tạo
   },
 );

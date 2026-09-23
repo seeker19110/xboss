@@ -1,5 +1,34 @@
 # PROGRESS.md — Trạng thái dự án
 
+## ✅ Xoá 2 module chỉ còn test/script tự gọi — 2026-09-23
+
+Hai cổng `check:dead-code`/`check:dead-routes` coi `tests/`, `scripts/`, `e2e/` là người dùng hợp lệ,
+nên module chỉ có test tự kiểm chính nó vẫn "sống". Quét lại đồ thị import **chỉ từ entrypoint
+production** (page/route/layout + file gốc) lộ ra 3 module; người dùng chốt xoá 2:
+
+- **`lib/ky-thuat/engineering-closed-loop-sync.ts` + `app/api/engineering/closed-loop-sync`** — không
+  UI nào gọi route, lib chỉ route này dùng. Nguồn "spool" của nó (`engineering-pipe-spool-tracking`)
+  đã xoá ở PR #514 (M-03 trong `docs/ops/MAINTENANCE-PLAN.md` từng giữ lại chờ gắn UI — nay hết
+  lý do). Tệ hơn: nó `UPDATE tasks` cộng cứng +10% tiến độ, **bỏ qua `recomputeTask`** (tiến độ
+  vốn tính từ số ô tick), và tính tiền bằng float JS trái quy ước M45. Xoá kèm
+  `tests/engineering-closed-loop-sync.test.ts` + block closed-loop trong `tests/route-eng-mepf.test.ts`.
+- **`lib/nen/user-error-healer.ts`** (946 dòng) — không page/route nào import; chỉ
+  `tests/user-error-healer.test.ts`, `tests/c2-mepf-pilot.test.ts` và `scripts/run-c2-pilot.ts`
+  (không có trong `package.json`) dùng. Các hàm thật cần (`removeVietnameseAccents`,
+  `healVietnameseEncoding`) đã nằm ở `lib/nen/van-ban.ts` từ trước. Xoá cả 3 file đi kèm;
+  fixture `tests/fixtures/engineering-ingest/` giữ vì test ingest khác còn dùng.
+
+**Không đụng schema:** bảng `engineering_closed_loop_sync_logs` (migration 0104) nay mồ côi, để lại
+— DROP là migration đụng dữ liệu, tách việc riêng theo tiền lệ `0153`/`0155`.
+Module thứ 3 (`lib/bao-mat/webhook-inbound.ts`) và `ComponentErrorBoundary` giữ nguyên, chờ quyết.
+Còn ~23 route có backend nhưng UI không gọi (vật tư issue/return/move/transactions, xem/xoá ảnh
+HSE, sửa/xoá phiếu thu chi/tạm ứng…) — là tính năng thiếu UI, cần quyết từng nhóm, chưa xử lý.
+
+Đã chạy xanh: `lint`, `typecheck`, `build`, `check:dead-code`, `check:dead-routes`,
+`check:lib-layers`, `check:route-perms`, `check:project-scope`, `check:engineering-danh-tinh`;
+`npm test -- --release-gate` với Postgres 16 cục bộ: 3638 pass, 1 fail
+(`tests/backfill-0137-0138.test.ts` — **đỏ y hệt trên `main`**, không liên quan thay đổi này).
+
 ## ✅ Tổng kết đợt rà soát & dọn module ít giá trị/code chết — 2026-09-22 (PR #514, #515, #516)
 
 Theo yêu cầu người dùng "rà lib/ky-thuat xem cái nào có thể loại bỏ" → mở rộng dần ra toàn repo.
