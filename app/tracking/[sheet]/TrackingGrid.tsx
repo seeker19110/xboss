@@ -11,6 +11,7 @@ import {
   MessageSquare,
   ChevronUp,
   ChevronDown as ChevronDownIcon,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   Columns,
@@ -20,6 +21,8 @@ import {
   FileText,
   Lock,
   ShieldAlert,
+  Plus,
+  ListPlus,
 } from "lucide-react";
 import { Modal, appAlert, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
@@ -348,6 +351,25 @@ export function TrackingGrid({
     return true;
   }
 
+  async function movePkg(direction: "up" | "down") {
+    try {
+      const res = await fetch(`/api/workpackages/${pkg.id}/move`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direction }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        appAlert(j.error ?? "Lỗi không xác định");
+        return;
+      }
+    } catch {
+      appAlert("Mất kết nối — chưa đổi được thứ tự nhóm, thử lại khi có mạng");
+      return;
+    }
+    onChanged();
+  }
+
   async function copyPkg() {
     const code = await appPrompt("Mã nhóm mới", `${pkg.code}_copy`, { mono: true });
     if (!code?.trim()) return;
@@ -572,6 +594,26 @@ export function TrackingGrid({
     onChanged();
   }
 
+  async function moveColumn(label: string, direction: "left" | "right") {
+    try {
+      const res = await fetch(`/api/workpackages/${pkg.id}/dimensions/column/move`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label, direction }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        appAlert(j.error ?? "Lỗi không xác định");
+        return;
+      }
+    } catch {
+      appAlert("Mất kết nối — chưa đổi được thứ tự cột, thử lại khi có mạng");
+      return;
+    }
+    load();
+    onChanged();
+  }
+
   async function addColumnAfter(afterLabel: string | null) {
     const label = await appPrompt(
       afterLabel ? `Tên cột mới (chèn sau "${afterLabel}")` : "Tên cột mới (thêm vào cuối)",
@@ -645,6 +687,38 @@ export function TrackingGrid({
       appAlert(j.error ?? "Lỗi không xác định");
       return;
     }
+    load();
+    onChanged();
+  }
+
+  async function insertBlankTask(afterId: number | null) {
+    const code = await appPrompt("Mã task mới (vd A1,10):");
+    if (!code?.trim()) return;
+    const name = await appPrompt("Tên task:");
+    if (!name?.trim()) return;
+    const boqCode = await appPrompt("Mã BOQ (bỏ trống nếu không có):");
+    let res: Response;
+    try {
+      res = await fetch(`/api/workpackages/${pkg.id}/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: code.trim(),
+          name: name.trim(),
+          boqCode: boqCode?.trim() || undefined,
+          afterId: afterId ?? undefined,
+        }),
+      });
+    } catch {
+      appAlert("Mất kết nối — chưa thêm được task, thử lại khi có mạng");
+      return;
+    }
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      appAlert(j.error ?? "Lỗi không xác định");
+      return;
+    }
+    if (afterId == null && !expanded) onToggle();
     load();
     onChanged();
   }
@@ -1242,6 +1316,32 @@ export function TrackingGrid({
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
+                      onClick={() => movePkg("up")}
+                      disabled={pkgIdx === 0}
+                      title="Chuyển nhóm lên"
+                      aria-label="Chuyển nhóm lên"
+                      className="p-0.5 text-zinc-500 hover:text-zinc-200 disabled:opacity-20"
+                    >
+                      <ChevronUp className="w-[17px] h-[17px]" />
+                    </button>
+                    <button
+                      onClick={() => movePkg("down")}
+                      disabled={pkgIdx === pkgCount - 1}
+                      title="Chuyển nhóm xuống"
+                      aria-label="Chuyển nhóm xuống"
+                      className="p-0.5 text-zinc-500 hover:text-zinc-200 disabled:opacity-20"
+                    >
+                      <ChevronDownIcon className="w-[17px] h-[17px]" />
+                    </button>
+                    <button
+                      onClick={() => insertBlankTask(null)}
+                      title="Thêm task vào cuối nhóm"
+                      aria-label="Thêm task vào cuối nhóm"
+                      className="p-0.5 text-zinc-500 hover:text-emerald-400"
+                    >
+                      <ListPlus className="w-[17px] h-[17px]" />
+                    </button>
+                    <button
                       onClick={() => copyPkg()}
                       title="Sao chép nhóm này"
                       className="p-0.5 text-zinc-500 hover:text-sky-400"
@@ -1308,7 +1408,7 @@ export function TrackingGrid({
               >
                 Ngày KT
               </th>
-              {visibleColumns.map((col) => (
+              {visibleColumns.map((col, colIdx) => (
                 <th
                   key={col}
                   className={`group/col border-b border-zinc-800 p-0 overflow-hidden align-middle${hiddenPrintCols.has(col) ? " print-hidden-col" : ""}`}
@@ -1323,13 +1423,33 @@ export function TrackingGrid({
                       {col}
                     </div>
                     {ce && (
-                      <button
-                        onClick={() => deleteColumn(col)}
-                        title={`Xoá cột "${col}"`}
-                        className="opacity-100 sm:opacity-0 sm:group-hover/col:opacity-100 text-zinc-700 hover:text-red-400 shrink-0"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          onClick={() => moveColumn(col, "left")}
+                          disabled={colIdx === 0}
+                          title="Chuyển cột sang trái"
+                          aria-label="Chuyển cột sang trái"
+                          className="opacity-100 sm:opacity-0 sm:group-hover/col:opacity-100 text-zinc-700 hover:text-zinc-300 disabled:opacity-20 shrink-0"
+                        >
+                          <ChevronLeft className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => deleteColumn(col)}
+                          title={`Xoá cột "${col}"`}
+                          className="opacity-100 sm:opacity-0 sm:group-hover/col:opacity-100 text-zinc-700 hover:text-red-400 shrink-0"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => moveColumn(col, "right")}
+                          disabled={colIdx === visibleColumns.length - 1}
+                          title="Chuyển cột sang phải"
+                          aria-label="Chuyển cột sang phải"
+                          className="opacity-100 sm:opacity-0 sm:group-hover/col:opacity-100 text-zinc-700 hover:text-zinc-300 disabled:opacity-20 shrink-0"
+                        >
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 </th>
@@ -1725,6 +1845,14 @@ export function TrackingGrid({
                             className="text-zinc-700 hover:text-sky-400"
                           >
                             <Copy className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => insertBlankTask(t.id)}
+                            title="Chèn task trống bên dưới"
+                            aria-label="Chèn task trống bên dưới"
+                            className="text-zinc-700 hover:text-emerald-400"
+                          >
+                            <Plus className="w-3 h-3" />
                           </button>
                           <button
                             onClick={() => deleteTask(t)}
