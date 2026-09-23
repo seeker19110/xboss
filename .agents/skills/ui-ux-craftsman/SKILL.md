@@ -12,6 +12,7 @@ generic hơn business/accessibility evidence của XBoss.
 ## 0. Precedence bắt buộc
 
 Đọc theo thứ tự:
+
 1. `CLAUDE.md`, `AGENTS.md`, spec/ADR liên quan và business/security constraints.
 2. `design-system/xboss/MASTER.md`.
 3. `.agents/rules/ui-ux-guidelines.md`.
@@ -24,6 +25,7 @@ Nếu mâu thuẫn, nguồn ở trên thắng. Xem mapping tại
 ## 1. Context-first — không bắt đầu bằng style
 
 Trước khi code/review, xác định ngắn gọn:
+
 - **Role:** admin / PM / engineer / subcon / BCH / CĐT / viewer.
 - **Device/context:** field-mobile, office-desktop, tablet, print/export.
 - **Primary task:** người dùng cần hoàn thành việc gì, nhanh hay chính xác quan trọng hơn ở đâu.
@@ -62,6 +64,7 @@ review. Không tạo override cho sở thích thẩm mỹ.
 ## 4. Targeted review contract
 
 Một lượt review tập trung **một outcome chính**, ví dụ:
+
 - "focus không bị sticky header che";
 - "table mobile vẫn so sánh được";
 - "validation nói rõ lỗi và cách sửa";
@@ -70,6 +73,7 @@ Một lượt review tập trung **một outcome chính**, ví dụ:
 - "offline save có trạng thái queue/retry rõ".
 
 Quy trình:
+
 1. nêu observable failure/risk;
 2. đọc master + code/pattern hiện tại;
 3. xác định rule áp dụng;
@@ -81,6 +85,7 @@ Không dùng checklist 50 mục để thay thế phân tích cụ thể.
 ## 5. Required states
 
 Với UI có dữ liệu, chủ động xét:
+
 - loading;
 - empty;
 - data/success;
@@ -114,6 +119,7 @@ State không áp dụng thì ghi nhận N/A; không tạo UI giả chỉ để �
 ## 8. Motion
 
 Motion mặc định: subtle, functional, interruptible.
+
 - ưu tiên transform/opacity;
 - không block input;
 - state cuối không phụ thuộc animationend;
@@ -142,6 +148,7 @@ Motion mặc định: subtle, functional, interruptible.
 ## 11. Charts / data visualization
 
 Chọn chart theo câu hỏi nghiệp vụ:
+
 - trend theo thời gian → line/area;
 - so sánh category → bar;
 - composition → stacked khi tổng có ý nghĩa;
@@ -162,6 +169,7 @@ mất semantic status.
 ## 13. Content
 
 Production UI dùng tiếng Việt rõ, ngắn, đúng domain xây dựng.
+
 - Action label dùng động từ cụ thể.
 - Error: điều gì xảy ra + cách tiếp tục.
 - Không lộ stack trace/secret.
@@ -170,6 +178,7 @@ Production UI dùng tiếng Việt rõ, ngắn, đúng domain xây dựng.
 ## 14. Verification
 
 Tối thiểu:
+
 ```bash
 npm run check:ui-ux
 npm run lint
@@ -182,6 +191,7 @@ table, form hoặc offline flow, thêm targeted test tương ứng thay vì ch�
 ## 15. Upstream usage boundary
 
 Các catalog/search recipe của UI/UX Pro Max là **nguồn gợi ý**, không phải source of truth. Không:
+
 - copy toàn bộ font/icon/style catalog vào XBoss;
 - chạy network query chứa dữ liệu project/private;
 - cài Python/CLI/package mới chỉ để lấy design advice;
