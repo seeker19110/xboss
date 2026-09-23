@@ -6,6 +6,7 @@ từ tool/skill bên ngoài.
 ## 1. Product context
 
 XBoss là hệ quản lý thi công/ERP xây dựng, dùng ở hai môi trường trái ngược:
+
 - **Hiện trường:** mobile, ánh sáng khó, mạng yếu, thao tác một tay, cần phản hồi nhanh.
 - **Văn phòng/PM:** desktop, dữ liệu dày, bảng/biểu đồ, so sánh tiến độ/chi phí và audit trail.
 
@@ -23,6 +24,7 @@ Thiết kế phải ưu tiên **clarity, speed, error prevention, information hi
 ## 3. Density & hierarchy
 
 Dùng density theo context thay vì một layout cho mọi màn hình:
+
 - Field/mobile: target chạm >= 44px, action quan trọng ở vùng dễ với tới, nội dung ưu tiên theo thứ tự.
 - Dashboard: medium density; KPI → trend → exception → detail.
 - Data table/BOQ/cost: dense nhưng scan được; header/cột định danh sticky khi cần; số dùng
@@ -51,6 +53,7 @@ Không hy sinh khả năng quét dữ liệu chỉ để tăng whitespace.
 ## 6. Required UI states
 
 Với data-driven UI, đánh giá tối thiểu:
+
 1. loading,
 2. empty,
 3. data/success,
@@ -74,6 +77,7 @@ Không tạo state giả nếu capability không có trạng thái đó; nhưng 
 ## 8. Motion
 
 Motion mặc định ở XBoss là **subtle, functional, interruptible**:
+
 - animate transform/opacity khi có thể;
 - state transition phải ngắn, không block input;
 - reduced-motion phải bỏ/chuyển động lớn;
@@ -85,6 +89,7 @@ Không thêm GSAP chỉ để tăng “độ đẹp”.
 ## 9. Tables & data visualization
 
 ### Tables
+
 - Header mô tả rõ đơn vị.
 - Numeric columns: tabular nums + right align.
 - Hỗ trợ scan: zebra/row hover/section grouping chỉ khi contrast vẫn đạt.
@@ -92,6 +97,7 @@ Không thêm GSAP chỉ để tăng “độ đẹp”.
 - Truncation phải có cách xem full value.
 
 ### Charts
+
 - Chọn chart theo câu hỏi: trend → line/area; comparison → bar; composition → stacked; schedule →
   timeline/Gantt phù hợp.
 - Luôn có title/context, unit, time range, legend hợp lý và textual fallback khi cần.
@@ -111,6 +117,7 @@ Nếu một page thực sự cần lệch master, tạo:
 `design-system/xboss/pages/<route-or-feature>.md`.
 
 Override phải ghi:
+
 - lý do nghiệp vụ;
 - rule nào bị override;
 - phạm vi;
@@ -122,6 +129,7 @@ Không tạo override chỉ để thay đổi thẩm mỹ cá nhân.
 ## 12. Review contract
 
 Review UI theo **một outcome cụ thể mỗi lượt**:
+
 1. xác định role + device + task chính;
 2. xác định failure/risk quan sát được;
 3. kiểm rule master + code hiện tại;
@@ -134,6 +142,7 @@ contrast, table density, chart semantics, loading/CLS, offline recovery, motion.
 ## 13. Verification
 
 Tối thiểu cho thay đổi UI:
+
 ```bash
 npm run check:ui-ux
 npm run lint
