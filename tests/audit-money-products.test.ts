@@ -24,10 +24,8 @@ for (const value of ["1", "1.0", "1.000", "01.00", "+1.00", "-0.00", " 1.00", "1
 
 test("S09: không coerce null/number, chặn scale sai và chuỗi quá dài", () => {
   for (const value of [null, undefined, 1, [], {}]) {
-    assert.throws(
-      () => parseFixedDecimalExact(value as unknown as string, 2),
-      /decimal_wire_invalid/,
-    );
+    const input = value as unknown as string;
+    assert.throws(() => parseFixedDecimalExact(input, 2), /decimal_wire_invalid/);
   }
   for (const scale of [-1, 19, 1.5, NaN, Infinity]) {
     assert.throws(() => parseFixedDecimalExact("0.00", scale), /decimal_scale_unsupported/);
@@ -42,7 +40,8 @@ test("S09: golden ipc-sum-v1 cộng trước, round tổng sau (khác round từ
     { quantity: "0.001", unitPrice: "5.00" },
   ];
   assert.equal(sumMoneyProductsExact(lines), 1n);
-  assert.equal(lines.reduce((sum, line) => sum + sumMoneyProductsExact([line]), 0n), 2n);
+  const perLineTotal = lines.reduce((sum, line) => sum + sumMoneyProductsExact([line]), 0n);
+  assert.equal(perLineTotal, 2n);
   assert.equal(sumMoneyProductsExact([{ quantity: "-0.001", unitPrice: "5.00" }]), -1n);
   assert.equal(sumMoneyProductsExact([{ quantity: "0.001", unitPrice: "4.99" }]), 0n);
 });
@@ -92,7 +91,8 @@ test("S09: mảng rỗng khác dữ liệu chưa có; lỗi không lộ amount",
   assert.throws(() => sumMoneyProductsExact(null as never), /money_lines_invalid/);
   assert.throws(() => sumMoneyProductsExact([null as never]), /money_lines_invalid/);
   assert.throws(() => sumMoneyProductsExact([{ quantity: "1.00", unitPrice: "7.00" }]));
-  assert.throws(() => parseFixedDecimalExact("private-amount-123", 2), (error: unknown) => {
+  const isRedacted = (error: unknown) => {
     return error instanceof Error && !error.message.includes("private-amount-123");
-  });
+  };
+  assert.throws(() => parseFixedDecimalExact("private-amount-123", 2), isRedacted);
 });
