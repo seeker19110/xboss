@@ -114,9 +114,10 @@ export async function runDrChecks(
       const applied = new Set(rows.map((row) => row.name));
       const expected = new Set(migrationNames);
       const missing = migrationNames.filter((name) => !applied.has(name)).length;
-      const extra = [...applied].filter(
-        (name) => typeof name !== "string" || !expected.has(name),
-      ).length;
+      const extraNames = [...applied].filter((name) => {
+        return typeof name !== "string" || !expected.has(name);
+      });
+      const extra = extraNames.length;
       const ok = !missing && !extra && applied.size === rows.length;
       return {
         status: ok ? "PASS" : "FAIL",
