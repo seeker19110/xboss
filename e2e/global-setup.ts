@@ -4,7 +4,7 @@ import { ADMIN_PW, E2E_DB } from "./constants";
 // Seed tường minh vào DB test trước E2E; HTTP login/me không được khởi tạo tài khoản.
 export default function globalSetup(): void {
   if (!E2E_DB) return;
-  const env = {
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
     DATABASE_URL: E2E_DB,
     MIGRATE_DATABASE_URL: E2E_DB,

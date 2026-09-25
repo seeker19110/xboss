@@ -12,13 +12,13 @@ Nền: `a2b9d7b9d28a839a5ee9cf2b23fc6b386ca292b3`.
 - Chọn dự án dùng chính sách đọc kiểm cả tổ chức trước khi đặt cookie.
 - Bổ sung test hồi quy route/helper và test PostgreSQL bootstrap/cách ly tổ chức.
 
-Kiểm cục bộ ban đầu: 27 test route/helper pass, 0 fail, 0 skip; kiểm cú pháp TypeScript.
-Chưa thay thế full CI: PostgreSQL, typecheck, build và E2E phải qua trên SHA mới trước merge.
-Rà diff và CI đợt đầu: khôi phục nguyên giao thức login/2FA, chỉ bỏ seed;
-reset admin giữ nguyên bộ đếm chống brute-force. Bổ sung 7 ca chống hồi quy login.
-Sửa định dạng test theo Prettier và đổi tên biến VM để không che `module` của Node;
-không thay đổi hoặc bỏ qua cấu hình CI.
-Không sửa dữ liệu, tài khoản hay cấu hình production trong đợt chỉnh sửa này.
+Kiểm cục bộ: 27 test route/helper pass, 0 fail, 0 skip; kiểm cú pháp TypeScript.
+Năm thay đổi cố ý gây lỗi đều bị test phát hiện, sau đó đã khôi phục code.
+CI tại `af7bbc8`: build, PostgreSQL, coverage và cả 4 nhóm E2E đã thành công.
+Các bản sau chỉ sửa hạ tầng test: tên biến VM theo lint và kiểu ProcessEnv trong E2E setup.
+Toàn bộ cổng phải qua trên HEAD mới trước merge; không lấy kết quả SHA cũ thay nghiệm thu HEAD.
+Giao thức login/2FA giữ nguyên như nền, chỉ bỏ seed. Reset giữ mọi bộ đếm chống brute-force.
+Không thay đổi hoặc bỏ qua cấu hình CI; không sửa dữ liệu, tài khoản hay cấu hình production.
 
 Chi tiết, giới hạn kiểm chứng và chuyển đổi vận hành:
 [Audit 2026-09-25](docs/ops/audit-2026-09-25.md).
