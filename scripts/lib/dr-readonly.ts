@@ -153,7 +153,6 @@ export async function runDrChecks(
       }
       return { status: "PASS", details: `Đối chiếu ${chain.checked} dòng audit có hash.` };
     });
-
     await check("engineering-relations", async () => {
       const { rows } = await client.query(
         `SELECT COUNT(*)::text AS cnt FROM engineering_relations r
