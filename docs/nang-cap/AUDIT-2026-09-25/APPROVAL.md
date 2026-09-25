@@ -6,7 +6,7 @@ State: **Approved for implementation — đặc tả đã chốt để thi hành
 ## 1. Căn cứ và giới hạn phê duyệt
 
 Chủ dự án yêu cầu trong hội thoại: **“chốt theo phương án chất lượng cao nhất”**, tiếp nối
- yêu cầu hoàn thiện đặc tả để chủ dự án thi hành sau. Người quyết định: chủ dự án XBoss;
+yêu cầu hoàn thiện đặc tả để chủ dự án thi hành sau. Người quyết định: chủ dự án XBoss;
 ChatGPT ghi nhận và cụ thể hóa lựa chọn kỹ thuật dưới đây. Không giả mạo chữ ký của reviewer,
 người phụ trách tài chính, kiểm toán hoặc người vận hành.
 
