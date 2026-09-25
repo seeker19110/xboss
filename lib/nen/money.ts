@@ -125,3 +125,53 @@ export function moneyToNumberSafe(minor: bigint): number {
   }
   return result;
 }
+
+/**
+ * Đọc wire decimal canonical mà KHÔNG quantize. Quantity/rate có scale riêng,
+ * không đưa qua parseMoneyExact. Giới hạn cột DB được kiểm riêng tại API.
+ */
+export function parseFixedDecimalExact(decimal: string, scale: number): bigint {
+  if (!Number.isInteger(scale) || scale < 0 || scale > 18) {
+    throw new RangeError("decimal_scale_unsupported");
+  }
+  if (typeof decimal !== "string" || decimal.length > 1024) {
+    throw new TypeError("decimal_wire_invalid");
+  }
+  const pattern =
+    scale === 0 ? /^-?(0|[1-9]\d*)$/ : new RegExp(`^-?(0|[1-9]\\d*)\\.\\d{${scale}}$`);
+  if (!pattern.test(decimal)) throw new TypeError("decimal_wire_invalid");
+  const minor = BigInt(decimal.replace(".", ""));
+  if (minor === 0n && decimal.startsWith("-")) throw new TypeError("decimal_wire_invalid");
+  return minor;
+}
+
+/**
+ * SUM(quantity × unitPrice) rồi mới round tổng: nền ipc-sum-v1, không round từng dòng.
+ * Unit price có scale 2; quantity mặc định scale 3 (BOQ/IPC), không qua số thực.
+ * Mảng rỗng là tổng 0. Caller phải phân biệt dữ liệu chưa tải/null với mảng rỗng thật.
+ */
+export function sumMoneyProductsExact(
+  lines: readonly { quantity: string; unitPrice: string }[],
+  quantityScale = 3,
+): bigint {
+  // Kiểm scale kể cả khi không có dòng, tránh cấu hình sai bị che bởi tổng 0.
+  if (!Number.isInteger(quantityScale) || quantityScale < 0 || quantityScale > 18) {
+    throw new RangeError("decimal_scale_unsupported");
+  }
+  if (!Array.isArray(lines)) throw new TypeError("money_lines_invalid");
+  let sum = 0n;
+  for (const line of lines) {
+    if (line === null || typeof line !== "object") throw new TypeError("money_lines_invalid");
+    const quantity = parseFixedDecimalExact(line.quantity, quantityScale);
+    const price = parseFixedDecimalExact(line.unitPrice, 2);
+    sum += quantity * price;
+  }
+  return mulRatio(sum, 1n, 10n ** BigInt(quantityScale));
+}
+
+/** So sánh exact phục vụ sort/filter; chuỗi phải canonical amount scale 2. */
+export function compareMoneyExact(a: bigint | string, b: bigint | string): -1 | 0 | 1 {
+  const left = typeof a === "bigint" ? a : parseFixedDecimalExact(a, 2);
+  const right = typeof b === "bigint" ? b : parseFixedDecimalExact(b, 2);
+  return left < right ? -1 : left > right ? 1 : 0;
+}
