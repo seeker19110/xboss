@@ -92,47 +92,44 @@ function fixture() {
 
 for (const operation of ["add", "update", "remove", "clear"] as const) {
   for (const abort of [false, true]) {
-    test(
-      `IDB ${operation}: success của request còn chờ ${abort ? "abort" : "commit"}`,
-      async () => {
-        const f = fixture();
-        let settled = false;
-        const promise =
-          operation === "add"
-            ? f.store.add({})
-            : operation === "update"
-              ? f.store.update({})
-              : operation === "remove"
-                ? f.store.remove(42)
-                : f.store.clear();
-        const observed = promise.then(
-          (value) => {
-            settled = true;
-            return { ok: true, value };
-          },
-          (error: unknown) => {
-            settled = true;
-            return { ok: false, error };
-          },
-        );
-        f.opens[0].onsuccess?.();
-        await setImmediate();
-        const tx = f.transactions[0];
-        tx.request.result = operation === "add" ? 42 : undefined;
-        tx.request.onsuccess?.();
-        await setImmediate();
-        assert.equal(settled, false);
-        if (abort) {
-          tx.error = new Error("quota hoặc abort sau request success");
-          tx.onabort?.();
-        } else tx.oncomplete?.();
-        const result = await observed;
-        assert.equal(result.ok, !abort);
-        if (result.ok && "value" in result) {
-          assert.equal(result.value, operation === "add" ? 42 : undefined);
-        }
-      },
-    );
+    test(`IDB ${operation}: chờ ${abort ? "abort" : "commit"}`, async () => {
+      const f = fixture();
+      let settled = false;
+      const promise =
+        operation === "add"
+          ? f.store.add({})
+          : operation === "update"
+            ? f.store.update({})
+            : operation === "remove"
+              ? f.store.remove(42)
+              : f.store.clear();
+      const observed = promise.then(
+        (value) => {
+          settled = true;
+          return { ok: true, value };
+        },
+        (error: unknown) => {
+          settled = true;
+          return { ok: false, error };
+        },
+      );
+      f.opens[0].onsuccess?.();
+      await setImmediate();
+      const tx = f.transactions[0];
+      tx.request.result = operation === "add" ? 42 : undefined;
+      tx.request.onsuccess?.();
+      await setImmediate();
+      assert.equal(settled, false);
+      if (abort) {
+        tx.error = new Error("quota hoặc abort sau request success");
+        tx.onabort?.();
+      } else tx.oncomplete?.();
+      const result = await observed;
+      assert.equal(result.ok, !abort);
+      if (result.ok && "value" in result) {
+        assert.equal(result.value, operation === "add" ? 42 : undefined);
+      }
+    });
   }
 }
 

@@ -106,9 +106,9 @@ export class IdbQueueStore implements QueueStore {
 
   async getAll(): Promise<QueuedOp[]> {
     const db = await this.getDb();
-    const all = await committedRequest(db, "readonly", (store) =>
-      store.getAll() as IDBRequest<QueuedOp[]>,
-    );
+    const all = await committedRequest(db, "readonly", (store) => {
+      return store.getAll() as IDBRequest<QueuedOp[]>;
+    });
     return all.sort((a, b) => a.id - b.id);
   }
   async add(op: QueuedOpInput): Promise<number> {
