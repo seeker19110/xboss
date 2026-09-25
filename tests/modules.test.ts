@@ -102,7 +102,8 @@ test("MODULES: mọi swExclude thực sự network-only trong public/sw.js", () 
   // Chạy cùng cổng hành vi như CI: tất cả path registry + path con/API tương lai,
   // giữ nguyên 401/lỗi mạng và không chạm Cache Storage. Không đòi denylist literal.
   // Tiến trình riêng tránh side effect process.exitCode của CLI lên các test khác.
-  const output = execFileSync(process.execPath, ["--import", "tsx", "scripts/check-sw-exclude.ts"], {
+  const args = ["--import", "tsx", "scripts/check-sw-exclude.ts"];
+  const output = execFileSync(process.execPath, args, {
     encoding: "utf8",
     timeout: 30_000,
   });
