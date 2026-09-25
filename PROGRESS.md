@@ -16,7 +16,8 @@ Kiểm cục bộ ban đầu: 27 test route/helper pass, 0 fail, 0 skip; kiểm 
 Chưa thay thế full CI: PostgreSQL, typecheck, build và E2E phải qua trên SHA mới trước merge.
 Rà diff và CI đợt đầu: khôi phục nguyên giao thức login/2FA, chỉ bỏ seed;
 reset admin giữ nguyên bộ đếm chống brute-force. Bổ sung 7 ca chống hồi quy login.
-Sửa định dạng test theo cổng Prettier; không thay đổi hoặc bỏ qua cấu hình CI.
+Sửa định dạng test theo Prettier và đổi tên biến VM để không che `module` của Node;
+không thay đổi hoặc bỏ qua cấu hình CI.
 Không sửa dữ liệu, tài khoản hay cấu hình production trong đợt chỉnh sửa này.
 
 Chi tiết, giới hạn kiểm chứng và chuyển đổi vận hành:

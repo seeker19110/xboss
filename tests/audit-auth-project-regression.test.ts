@@ -19,12 +19,12 @@ function load<T>(
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
     fileName: file,
   });
-  const module = { exports: {} };
+  const evaluatedModule = { exports: {} };
   runInNewContext(
     result.outputText,
     {
-      module,
-      exports: module.exports,
+      module: evaluatedModule,
+      exports: evaluatedModule.exports,
       process: { env },
       Buffer,
       require: (name: string) => {
@@ -34,7 +34,7 @@ function load<T>(
     },
     { filename: file },
   );
-  return module.exports as T;
+  return evaluatedModule.exports as T;
 }
 
 type Response = {
