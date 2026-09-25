@@ -71,3 +71,57 @@ export function formatVnd(v: bigint | string | number): string {
   const digits = (dong < 0n ? -dong : dong).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   return `${dong < 0n ? "-" : ""}${digits} ₫`;
 }
+
+// QUALITY-FINAL-1 / S09: đường exact mới. Chưa thay các caller legacy ở S10;
+// không đổi kiểu JSON, parser DB hoặc quy tắc làm tròn chứng từ trong slice này.
+
+/** Phân tích amount thập phân, không nhận number/locale/exponent hoặc khoảng trắng. */
+export function parseMoneyExact(decimal: string): bigint {
+  if (typeof decimal !== "string" || !/^-?\d+(\.\d+)?$/.test(decimal)) {
+    // Không đưa giá trị đầu vào (có thể là dữ liệu thương mại) vào thông báo lỗi.
+    throw new TypeError("parseMoneyExact: cần chuỗi thập phân hợp lệ");
+  }
+  return parseMoney(decimal);
+}
+
+/** bigint đồng×100 → chuỗi canonical đúng hai chữ số lẻ, kể cả 0 và số âm. */
+export function moneyToDecimal(minor: bigint): string {
+  const negative = minor < 0n;
+  const absolute = negative ? -minor : minor;
+  const cents = (absolute % 100n).toString().padStart(2, "0");
+  return `${negative ? "-" : ""}${absolute / 100n}.${cents}`;
+}
+
+/** Nhân tỷ lệ hữu tỉ exact; ties-away-from-zero, không đổi bigint qua number. */
+export function mulRatio(minor: bigint, numerator: bigint, denominator: bigint): bigint {
+  if (denominator === 0n) throw new RangeError("mulRatio: mẫu số phải khác 0");
+  return divRoundHalfUp(minor * numerator, denominator);
+}
+
+/**
+ * Hiển thị đồng nguyên không mất chữ số lớn. Chuỗi được làm tròn thẳng tới đồng,
+ * không qua cents trước (1.499 không được làm tròn hai lần thành 2 đồng).
+ */
+export function formatVndExact(value: bigint | string): string {
+  if (typeof value === "bigint") return formatVnd(value);
+  if (typeof value !== "string" || !/^-?\d+(\.\d+)?$/.test(value)) {
+    throw new TypeError("formatVndExact: cần bigint hoặc chuỗi thập phân hợp lệ");
+  }
+  const negative = value.startsWith("-");
+  const [whole, fraction = ""] = (negative ? value.slice(1) : value).split(".");
+  const rounded = BigInt(whole) + (fraction.length > 0 && fraction[0] >= "5" ? 1n : 0n);
+  return formatVnd((negative ? -rounded : rounded) * 100n);
+}
+
+/** Adapter opt-in cho caller legacy; từ chối khi JSON number không round-trip đúng minor. */
+export function moneyToNumberSafe(minor: bigint): number {
+  const max = BigInt(Number.MAX_SAFE_INTEGER);
+  if (minor < -max || minor > max) {
+    throw new RangeError("money_precision_unsupported");
+  }
+  const result = Number(minor) / 100;
+  if (parseMoneyExact(String(result)) !== minor) {
+    throw new RangeError("money_precision_unsupported");
+  }
+  return result;
+}
