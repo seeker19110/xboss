@@ -15,8 +15,12 @@ let cacheWrites = Promise.resolve();
 const isOwnedCache = (name) => /^xboss-(?:public-)?v\d+$/.test(name);
 
 function publicResponse(request, response) {
-  if (response.status !== 200 || response.redirected || response.type === "opaque") return false;
-  if (/\b(no-store|private)\b/i.test(response.headers.get("cache-control") ?? "")) return false;
+  if (response.status !== 200 || response.redirected || response.type === "opaque") {
+    return false;
+  }
+  if (/\b(no-store|private)\b/i.test(response.headers.get("cache-control") ?? "")) {
+    return false;
+  }
   if (response.url && response.url !== request.url) return false;
   const path = new URL(request.url).pathname;
   const mime = (response.headers.get("content-type") ?? "").split(";")[0].trim();
@@ -97,9 +101,9 @@ self.addEventListener("install", (e) => {
   const epoch = generation;
   e.waitUntil(
     Promise.all(
-      SHELL_URLS.map((url) =>
-        publicFetch(new Request(new URL(url, location.origin)), epoch).catch(() => {}),
-      ),
+      SHELL_URLS.map((url) => {
+        return publicFetch(new Request(new URL(url, location.origin)), epoch).catch(() => {});
+      }),
     ),
   );
 });
@@ -145,8 +149,12 @@ self.addEventListener("message", (e) => {
   if (e.data?.type !== "CLEAR_CACHE") return;
   e.waitUntil(
     purgeOwnedCaches(false).then(
-      () => e.ports?.[0]?.postMessage({ type: "CACHE_CLEARED", requestId: e.data.requestId }),
-      () => e.ports?.[0]?.postMessage({ type: "CACHE_CLEAR_FAILED", requestId: e.data.requestId }),
+      () => {
+        e.ports?.[0]?.postMessage({ type: "CACHE_CLEARED", requestId: e.data.requestId });
+      },
+      () => {
+        e.ports?.[0]?.postMessage({ type: "CACHE_CLEAR_FAILED", requestId: e.data.requestId });
+      },
     ),
   );
 });
