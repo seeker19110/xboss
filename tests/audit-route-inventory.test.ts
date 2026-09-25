@@ -15,7 +15,8 @@ throw new Error("không được chạy");
 export async function GET() { return getCurrentUser(); }
 export const POST = withScope(async () => save());
 `);
-  assert.deepEqual(rows.map((row) => row.method), ["GET", "POST"]);
+  const methods = rows.map((row) => row.method);
+  assert.deepEqual(methods, ["GET", "POST"]);
   assert.ok(rows[0].calls.includes("getCurrentUser"));
   assert.ok(rows[1].calls.includes("withScope"));
   assert.ok(rows[1].calls.includes("save"));
@@ -36,7 +37,8 @@ test("S00: re-export, wildcard và destructuring không biến mất khỏi inve
   const rows = scan(`export { get as GET } from "./handler";
 export * from "./more";
 export const { POST } = handlers;`);
-  assert.deepEqual(rows.map((row) => row.method), ["GET", "*", "POST"]);
+  const methods = rows.map((row) => row.method);
+  assert.deepEqual(methods, ["GET", "*", "POST"]);
   assert.ok(rows.every((row) => row.reviewStatus === "NOT_MAPPED"));
 });
 
