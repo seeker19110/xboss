@@ -137,7 +137,8 @@ export function parseFixedDecimalExact(decimal: string, scale: number): bigint {
   if (typeof decimal !== "string" || decimal.length > 1024) {
     throw new TypeError("decimal_wire_invalid");
   }
-  const pattern = scale === 0 ? /^-?(0|[1-9]\d*)$/ : new RegExp(`^-?(0|[1-9]\\d*)\\.\\d{${scale}}$`);
+  const pattern =
+    scale === 0 ? /^-?(0|[1-9]\d*)$/ : new RegExp(`^-?(0|[1-9]\\d*)\\.\\d{${scale}}$`);
   if (!pattern.test(decimal)) throw new TypeError("decimal_wire_invalid");
   const minor = BigInt(decimal.replace(".", ""));
   if (minor === 0n && decimal.startsWith("-")) throw new TypeError("decimal_wire_invalid");

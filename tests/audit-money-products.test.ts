@@ -24,7 +24,10 @@ for (const value of ["1", "1.0", "1.000", "01.00", "+1.00", "-0.00", " 1.00", "1
 
 test("S09: không coerce null/number, chặn scale sai và chuỗi quá dài", () => {
   for (const value of [null, undefined, 1, [], {}]) {
-    assert.throws(() => parseFixedDecimalExact(value as unknown as string, 2), /decimal_wire_invalid/);
+    assert.throws(
+      () => parseFixedDecimalExact(value as unknown as string, 2),
+      /decimal_wire_invalid/,
+    );
   }
   for (const scale of [-1, 19, 1.5, NaN, Infinity]) {
     assert.throws(() => parseFixedDecimalExact("0.00", scale), /decimal_scale_unsupported/);

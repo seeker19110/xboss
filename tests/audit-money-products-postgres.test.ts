@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { queryOne } from "@/lib/db";
 import { moneyToDecimal, sumMoneyProductsExact } from "@/lib/nen/money";
 
-test("S09: sum-products và round tổng khớp PostgreSQL numeric", { skip: !HAS_TEST_DB }, async () => {
+test("S09: sum-products, round tổng khớp PostgreSQL numeric", { skip: !HAS_TEST_DB }, async () => {
   const fixtures = [
     [],
     [
