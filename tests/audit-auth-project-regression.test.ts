@@ -240,7 +240,9 @@ for (const password of [123, true, [], {}]) {
       "@/lib/bao-mat/auth": { ensureDefaultUsers: noSeed },
       "@/lib/bao-mat/ratelimit": {},
     });
-    const res = await route.POST({ json: async () => ({ email: "test@example.invalid", password }) });
+    const res = await route.POST({
+      json: async () => ({ email: "test@example.invalid", password }),
+    });
     assert.equal(res.status, 400);
   });
 }
