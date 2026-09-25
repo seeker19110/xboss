@@ -85,7 +85,7 @@ Bằng chứng M cho iOS/Safari thật; một Chromium emulation không đại d
 - A2-AC04 — P/H/B: hai tab, lease hết, crash/mất ACK sau commit và 20 retry cùng operationId
   chỉ một business effect/receipt; payload khác cùng key conflict, không chạy mutation mới.
 - A2-AC05 — B: IDB request success rồi transaction abort không báo lưu thành công; enqueue
-  + dedup nguyên tử; form còn để người dùng xử lý, không có toast “đã lưu” sai.
+  và dedup nguyên tử; form còn để người dùng xử lý, không có toast “đã lưu” sai.
 - A2-AC06 — U/B/H: 401 paused_auth, 409/412 conflict, 429 giữ op theo Retry-After;
   403/404/422 rejected có lý do bền vững; không xóa draft chỉ vì là 4xx, không retry vô hạn.
 - A2-AC07 — B/M: migration v1/lần lặp/upgrade-blocked không nhận chủ đoán; quota đầy không

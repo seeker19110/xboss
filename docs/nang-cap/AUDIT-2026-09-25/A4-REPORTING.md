@@ -24,7 +24,7 @@ Pre-aggregate từng nguồn trước khi join các aggregate; không SUM(DISTIN
 chứng từ khác nhau có cùng amount vẫn đều phải tính.
 
 A4-FR02: giữ semantics baseline trừ khi tài chính duyệt riêng:
-ngân sách gốc qty_contract*unit_price; VO chỉ trạng thái approved/partially_approved/
+ngân sách gốc `qty_contract * unit_price`; VO chỉ trạng thái approved/partially_approved/
 contract_added và qty_approved khi includeVo=true; PO loại cancelled; cam kết gồm PO và
 giao thầu; actual gồm payment_bills mọi type, kể cả advance theo quyết định đang ghi trong
 cost.ts. Không tự đổi actual thành chỉ paid/status mới, không trừ tạm ứng hai lần.
@@ -78,7 +78,7 @@ Số truy vấn dữ liệu báo cáo không tăng theo số group/dòng; ghi qu
 không đếm auth/permission/migration warmup vào số query tài chính.
 
 A4-FR06: alerts tính từ cùng rows. budget > 0 mới tính committed/budget; budget=0 và committed
->0 là trạng thái chưa có ngân sách riêng, không Infinity/100% giả. Ratio dùng exact cross
+lớn hơn 0 là trạng thái chưa có ngân sách riêng, không Infinity/100% giả. Ratio dùng exact cross
 multiplication hoặc decimal theo A3; ngưỡng warnPct/overPct lấy settings, không hardcode mới.
 getCostSettings baseline là cấu hình toàn hệ id=1; không tự giả định cấu hình theo project.
 Muốn đổi scope settings phải có ADR/DDL và approval riêng.

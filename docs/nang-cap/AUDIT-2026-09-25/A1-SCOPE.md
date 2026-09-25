@@ -28,7 +28,7 @@ không chỉ tin org cũ trong cookie ký. Giữ hợp đồng 2FA của #529.
 
 A1-FR02: một resolver thuần về quyết định nhận actor `{id, role, orgId}`, input ID chưa tin,
 ngữ cảnh hiện tại đã kiểm, mục đích read/write và chế độ chọn. ID chỉ là số nguyên an toàn
-> 0 hoặc chuỗi chữ số thập phân canonical; từ chối boolean, object, array, hex, exponent,
+lớn hơn 0 hoặc chuỗi chữ số thập phân canonical; từ chối boolean, object, array, hex, exponent,
 NaN, Infinity và số vượt safe integer. Input tường minh sai không được fallback.
 Không dùng `|| 1`, `?? 1`, `undefined => all` hoặc `'*'` từ request client.
 
@@ -48,7 +48,7 @@ không fallback global permission để tiếp tục đọc/ghi. Memoization ch�
 khóa theo actor+org+candidate; giá trị không thể tái sử dụng cho actor khác trong test/cron.
 
 A1-FR06: transaction mang actor/org/project đã kiểm. Lồng cùng scope thì tái sử dụng;
-lồng khác scope, numeric sang '*' hoặc '*' sang numeric phải throw lỗi trước query nghiệp vụ.
+lồng khác scope, numeric sang `'*'` hoặc `'*'` sang numeric phải throw lỗi trước query nghiệp vụ.
 Đọc lồng trong transaction ghi không tự đổi cha thành read-only. Transaction đọc cha không
 được nâng thành ghi. COMMIT/ROLLBACK không để scope rò qua connection pool.
 Không sửa ngữ cảnh dùng chung trong Promise.all trên cùng transaction.
