@@ -1,81 +1,93 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne } from "@/lib/db";
 import {
   verifyPassword,
   makeToken,
-  COOKIE,
-  COOKIE_MAX_AGE,
-  isSecureCookie,
   makeTotpPendingToken,
   requiredRoles,
   computeMustSetup2fa,
+  isSecureCookie,
+  COOKIE,
+  COOKIE_MAX_AGE,
+  type Role,
 } from "@/lib/bao-mat/auth";
-import { checkLoginLimit, recordLoginAttempt, getClientIp } from "@/lib/bao-mat/login-limit";
-import type { Role } from "@/lib/nen/roles";
+import {
+  loginBlockedSeconds,
+  recordLoginFailure,
+  recordLoginSuccess,
+} from "@/lib/bao-mat/ratelimit";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
-  const { email, password } = await req.json();
-  if (!email || !password)
-    return NextResponse.json({ error: "Thiếu email hoặc mật khẩu" }, { status: 400 });
+// IP client: tin header proxy đầu tiên (Vercel/nginx đặt x-forwarded-for).
+function clientIp(req: NextRequest): string {
+  const fwd = req.headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0].trim();
+  return req.headers.get("x-real-ip") ?? "unknown";
+}
 
-  const ip = getClientIp(req.headers);
-  const em = String(email).trim().toLowerCase();
-  const limit = await checkLoginLimit(ip, em);
-  if (limit.blocked) {
+export async function POST(req: NextRequest) {
+  const { email, password } = await req.json().catch(() => ({}));
+  // Bắt buộc là chuỗi — nếu không, verifyPassword (scryptSync) sẽ throw TypeError trước khi
+  // recordLoginFailure kịp chạy, vừa lộ 500 vừa không tính vào rate-limit chống brute-force.
+  if (typeof email !== "string" || !email || typeof password !== "string" || !password)
+    return NextResponse.json({ error: "Thiếu email/mật khẩu" }, { status: 400 });
+
+  const emailNorm = String(email).toLowerCase().trim();
+  const ip = clientIp(req);
+
+  // Chống brute-force: 5 lần sai/15 phút theo IP+email (20/IP).
+  const wait = await loginBlockedSeconds(ip, emailNorm);
+  if (wait > 0) {
     return NextResponse.json(
-      {
-        error: "Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.",
-        retryAfterSec: limit.retryAfterSec,
-      },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } },
+      { error: `Sai mật khẩu quá nhiều lần — thử lại sau ${Math.ceil(wait / 60)} phút` },
+      { status: 429, headers: { "Retry-After": String(wait) } },
     );
   }
 
-  const user = await queryOne<{
+  const u = await queryOne<{
     id: number;
     name: string;
     email: string;
-    role: Role;
+    role: string;
     password_hash: string;
     totp_enabled_at: string | null;
-    org_id: number;
     session_version: number;
+    org_id: number;
   }>(
-    `SELECT id, name, email, role, password_hash, totp_enabled_at, org_id, session_version FROM users WHERE email = ?`,
-    em,
+    `SELECT id, name, email, role, password_hash, totp_enabled_at, session_version, org_id FROM users WHERE email = ?`,
+    emailNorm,
   );
-  if (!user || !verifyPassword(password, user.password_hash)) {
-    await recordLoginAttempt(ip, em, false);
-    return NextResponse.json({ error: "Sai email hoặc mật khẩu" }, { status: 401 });
+  if (!u || !verifyPassword(password, u.password_hash)) {
+    await recordLoginFailure(ip, emailNorm);
+    return NextResponse.json({ error: "Email hoặc mật khẩu không đúng" }, { status: 401 });
   }
-  await recordLoginAttempt(ip, em, true);
-  // Chỉ xoá lỗi của đúng email + IP đã xác thực, không xoá dấu vết brute-force ở IP khác.
-  await run(`DELETE FROM login_attempts WHERE email = ? AND ip = ? AND success = false`, em, ip);
 
-  if (user.totp_enabled_at) {
+  await recordLoginSuccess(ip, emailNorm);
+
+  // Đã bật 2FA: KHÔNG set cookie phiên ngay — trả token tạm 5 phút, bước 2 xác minh mã
+  // TOTP/recovery qua POST /api/auth/login/2fa.
+  if (u.totp_enabled_at) {
     return NextResponse.json({
-      requires2fa: true,
-      tempToken: makeTotpPendingToken(user.id, user.password_hash),
+      need2fa: true,
+      pending: makeTotpPendingToken(u.id, u.password_hash),
     });
   }
-
+  // M56 PR2: nhúng cờ mustSetup2fa vào token — vai trò bị bắt buộc 2FA nhưng chưa bật thì
+  // proxy.ts chặn mọi API ngoài /api/auth/* cho tới khi user bật 2FA. Tính TẠI ĐÂY (lúc phát
+  // token) — admin bật yêu cầu sau khi user đã có phiên chỉ ảnh hưởng từ lần đăng nhập kế tiếp.
   const required = await requiredRoles();
-  const mustSetup2fa = computeMustSetup2fa(user.role, user.totp_enabled_at, required);
-  const res = NextResponse.json({
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
-    ...(mustSetup2fa ? { mustSetup2fa: true } : {}),
-  });
+  const mustSetup2fa = computeMustSetup2fa(u.role as Role, u.totp_enabled_at, required);
+  const res = NextResponse.json({ user: { id: u.id, name: u.name, email: u.email, role: u.role } });
   res.cookies.set(
     COOKIE,
-    makeToken(user.id, user.password_hash, user.org_id, mustSetup2fa, user.session_version),
+    makeToken(u.id, u.password_hash, mustSetup2fa, u.session_version, u.org_id),
     {
       httpOnly: true,
-      sameSite: "lax",
-      secure: isSecureCookie(req),
       path: "/",
       maxAge: COOKIE_MAX_AGE,
+      sameSite: "lax",
+      secure: isSecureCookie(req),
     },
   );
   return res;

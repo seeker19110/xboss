@@ -12,8 +12,10 @@ Nền: `a2b9d7b9d28a839a5ee9cf2b23fc6b386ca292b3`.
 - Chọn dự án dùng chính sách đọc kiểm cả tổ chức trước khi đặt cookie.
 - Bổ sung test hồi quy route/helper và test PostgreSQL bootstrap/cách ly tổ chức.
 
-Kiểm cục bộ ban đầu: 20 test route/helper pass, 0 fail, 0 skip; kiểm cú pháp TypeScript.
+Kiểm cục bộ ban đầu: 27 test route/helper pass, 0 fail, 0 skip; kiểm cú pháp TypeScript.
 Chưa thay thế full CI: PostgreSQL, typecheck, build và E2E phải qua trên SHA mới trước merge.
+Rà diff và CI đợt đầu: khôi phục nguyên giao thức login/2FA, chỉ bỏ seed;
+reset admin giữ nguyên bộ đếm chống brute-force. Bổ sung 7 ca chống hồi quy login.
 Không sửa dữ liệu, tài khoản hay cấu hình production trong đợt chỉnh sửa này.
 
 Chi tiết, giới hạn kiểm chứng và chuyển đổi vận hành:

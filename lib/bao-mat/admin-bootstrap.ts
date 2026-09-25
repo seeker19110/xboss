@@ -45,7 +45,6 @@ export async function resetBootstrapAdminPassword(password: string): Promise<voi
       passwordHash,
       admin.id,
     );
-    // Không xoá lịch sử chống brute-force của những người dùng khác.
-    await run("DELETE FROM login_attempts WHERE email = ?", BOOTSTRAP_ADMIN_EMAIL);
+    // Giữ nguyên mọi bộ đếm chống brute-force, kể cả giới hạn theo IP dùng chung.
   });
 }

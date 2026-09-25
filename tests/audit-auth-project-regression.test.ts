@@ -102,15 +102,14 @@ test("audit: POST login trên DB chưa có user không khởi tạo tài khoản
     "next/server": next,
     "@/lib/db": { queryOne: async () => undefined },
     "@/lib/bao-mat/auth": { ensureDefaultUsers: noSeed },
-    "@/lib/bao-mat/login-limit": {
-      getClientIp: () => "test-client",
-      checkLoginLimit: async () => ({ blocked: false }),
-      recordLoginAttempt: async (_ip: string, _email: string, success: boolean) => {
-        attempts.push(success);
-      },
+    "@/lib/bao-mat/ratelimit": {
+      loginBlockedSeconds: async () => 0,
+      recordLoginFailure: async () => attempts.push(false),
+      recordLoginSuccess: async () => attempts.push(true),
     },
   });
   const res = await route.POST({
+    headers: new Headers(),
     json: async () => ({ email: "test@example.invalid", password: "x" }),
   });
   assert.equal(res.status, 401);
@@ -230,5 +229,86 @@ for (const allowed of [false, true]) {
     assert.equal(checked, true);
     assert.equal(res.status, allowed ? 200 : 403);
     assert.equal(res.cookieWrites.length, allowed ? 1 : 0);
+  });
+}
+
+for (const password of [123, true, [], {}]) {
+  test(`audit: login giữ kiểm tra kiểu mật khẩu ${JSON.stringify(password)}`, async () => {
+    const route = load<Route>("app/api/auth/login/route.ts", {
+      "next/server": next,
+      "@/lib/db": {},
+      "@/lib/bao-mat/auth": { ensureDefaultUsers: noSeed },
+      "@/lib/bao-mat/ratelimit": {},
+    });
+    const res = await route.POST({ json: async () => ({ email: "test@example.invalid", password }) });
+    assert.equal(res.status, 400);
+  });
+}
+
+test("audit: login giữ xử lý JSON lỗi thành 400, không chạm DB", async () => {
+  const route = load<Route>("app/api/auth/login/route.ts", {
+    "next/server": next,
+    "@/lib/db": {},
+    "@/lib/bao-mat/auth": { ensureDefaultUsers: noSeed },
+    "@/lib/bao-mat/ratelimit": {},
+  });
+  const res = await route.POST({ json: async () => Promise.reject(new Error("invalid JSON")) });
+  assert.equal(res.status, 400);
+});
+
+for (const enabled2fa of [false, true]) {
+  test(`audit: login giữ hợp đồng phiên/2FA, enabled=${enabled2fa}`, async () => {
+    const user = {
+      id: crypto.randomInt(1, 10000),
+      name: "Test admin",
+      email: "test@example.invalid",
+      role: "admin",
+      password_hash: "test-only-hash",
+      totp_enabled_at: enabled2fa ? "2026-09-25" : null,
+      session_version: 7,
+      org_id: 42,
+    };
+    let recordedSuccess = false;
+    let tokenArgs: unknown[] | undefined;
+    const route = load<Route>("app/api/auth/login/route.ts", {
+      "next/server": next,
+      "@/lib/db": { queryOne: async () => user },
+      "@/lib/bao-mat/auth": {
+        ensureDefaultUsers: noSeed,
+        verifyPassword: () => true,
+        requiredRoles: async () => new Set(),
+        computeMustSetup2fa: () => false,
+        isSecureCookie: () => true,
+        COOKIE: "xboss_session",
+        COOKIE_MAX_AGE: 3600,
+        makeToken: (...args: unknown[]) => {
+          tokenArgs = args;
+          return "test-session";
+        },
+        makeTotpPendingToken: () => "test-pending",
+      },
+      "@/lib/bao-mat/ratelimit": {
+        loginBlockedSeconds: async () => 0,
+        recordLoginFailure: () => assert.fail("Không được ghi nhận lỗi khi mật khẩu đúng"),
+        recordLoginSuccess: async () => {
+          recordedSuccess = true;
+        },
+      },
+    });
+    const res = await route.POST({
+      headers: new Headers(),
+      json: async () => ({ email: user.email, password: "test-password" }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal(recordedSuccess, true);
+    if (enabled2fa) {
+      assert.equal(res.body.need2fa, true);
+      assert.equal(res.body.pending, "test-pending");
+      assert.equal(res.cookieWrites.length, 0);
+      assert.equal(tokenArgs, undefined);
+    } else {
+      assert.equal(res.cookieWrites.length, 1);
+      assert.deepEqual(tokenArgs, [user.id, user.password_hash, false, 7, 42]);
+    }
   });
 }
