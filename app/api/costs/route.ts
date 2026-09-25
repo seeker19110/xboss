@@ -25,13 +25,15 @@ export async function GET(req: NextRequest) {
 
   const groupBy = req.nextUrl.searchParams.get("groupBy") === "floor" ? "floor" : "system";
   const includeVo = req.nextUrl.searchParams.get("includeVo") !== "0";
-  const [rows, totals, settings] = await withProjectScope(projectId, () =>
-    Promise.all([
-      costSummary(groupBy, includeVo, projectId),
-      costTotals(includeVo, projectId),
+  const [rows, totals, settings] = await withProjectScope(projectId, async () => {
+    const rows = await costSummary(groupBy, includeVo, projectId);
+    const [totals, settings] = await Promise.all([
+      // Nhóm hệ dùng lại đúng tập vừa đọc; nhóm tầng vẫn giữ tổng toàn dự án theo hệ.
+      costTotals(includeVo, projectId, groupBy === "system" ? rows : undefined),
       getCostSettings(),
-    ]),
-  );
+    ]);
+    return [rows, totals, settings] as const;
+  });
 
   const alerts = rows
     .filter((r) => r.budget > 0 && (r.committed / r.budget) * 100 >= settings.warnPct)

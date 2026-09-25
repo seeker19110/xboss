@@ -177,8 +177,11 @@ export async function costSummary(
 export async function costTotals(
   includeVo = true,
   projectId?: number,
+  // Chỉ truyền kết quả costSummary("system") cùng projectId/includeVo trong chính request.
+  // Không lấy dữ liệu từ client, không tái dùng rows theo tầng hoặc cache giữa các request.
+  systemRows?: readonly CostRow[],
 ): Promise<{ budget: number; committed: number; actual: number }> {
-  const rows = await costSummary("system", includeVo, projectId);
+  const rows = systemRows ?? (await costSummary("system", includeVo, projectId));
   // Mỗi r.budget/committed/actual đã là tổng SQL theo hệ (costSummary) — cộng dồn
   // NHIỀU hệ ở đây làm trên bigint đơn vị nhỏ (lib/money.ts) thay vì float JS, đúng
   // quy ước tiền tệ CLAUDE.md.
