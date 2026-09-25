@@ -144,11 +144,11 @@ for (const [mime, cacheControl] of [
 ]) {
   test(`SW: không cache chunk ${mime}/${cacheControl}`, async () => {
     const f = fixture();
-    f.setNetwork(async () =>
-      new Response("không cache", {
+    f.setNetwork(async () => {
+      return new Response("không cache", {
         headers: { "Content-Type": mime, "Cache-Control": cacheControl },
-      }),
-    );
+      });
+    });
     await f.get("/_next/static/chunks/app.js");
     assert.equal(f.writes(), 0);
   });
@@ -177,12 +177,11 @@ test("SW: response về muộn sau CLEAR_CACHE không tạo cache trở lại", 
   const pending = f.get("/_next/static/chunks/app.js");
   await new Promise<void>((resolve) => setImmediate(resolve));
   const acknowledgements: unknown[] = [];
-  await f
-    .fire("message", {
-      data: { type: "CLEAR_CACHE", requestId: "switch-1" },
-      ports: [{ postMessage: (value: unknown) => acknowledgements.push(value) }],
-    })
-    .done();
+  const clear = f.fire("message", {
+    data: { type: "CLEAR_CACHE", requestId: "switch-1" },
+    ports: [{ postMessage: (value: unknown) => acknowledgements.push(value) }],
+  });
+  await clear.done();
   release(new Response("chunk", { headers: { "Content-Type": "application/javascript" } }));
   await pending;
   assert.equal(f.writes(), 0);
