@@ -1,62 +1,76 @@
-// scripts/check-sw-exclude.ts (M52 PR3) — Cổng CI: đối chiếu `swExclude` khai báo trong
-// module registry (lib/modules.ts) với danh sách path loại trừ cache thật trong
-// public/sw.js (file tĩnh, KHÔNG sinh tự động — script này chỉ KIỂM, không sửa).
-//
-// VÌ SAO: quên loại trừ 1 route động khỏi cache SW (hoặc ngược lại, khai báo swExclude
-// mà sw.js chưa cập nhật) là lớp lỗi đã lặp lại. Gắn kiểm này vào CI để lệch là đỏ.
-//
-// Chạy: npx tsx scripts/check-sw-exclude.ts
-//  - THOÁT 1 (đỏ) nếu 1 pattern swExclude được module khai báo NHƯNG không có trong sw.js
-//    (vd: có người gỡ pattern khỏi sw.js mà quên bỏ khỏi registry → cache sai).
-//  - Chỉ CẢNH BÁO (không đỏ) nếu sw.js loại trừ 1 path mà chưa module nào "nhận" trong
-//    registry — vì registry đang phủ dần (M52 PR3), chưa liệt kê hết module.
+// Cổng CI S04: chạy handler SW thật với mọi path registry khai cần network-only.
+// Không chỉ grep literal: cache thao tác bất kỳ hoặc che lỗi mạng/401 đều làm gate đỏ.
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { runInNewContext } from "node:vm";
+import assert from "node:assert/strict";
 import { MODULES } from "@/lib/nen/modules";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const swSource = readFileSync(join(root, "public/sw.js"), "utf8");
-
-// Trích mọi path `/api/...` được loại trừ trong sw.js: các literal trong
-// `url.pathname.startsWith("/api/...")` DÀI HƠN cổng chung "/api/" (bỏ cổng gốc + asset).
-const swExcludes = new Set(
-  Array.from(swSource.matchAll(/startsWith\("(\/api\/[^"]+)"\)/g), (m) => m[1]),
-);
-
-// Path swExclude khai báo trong registry → module nào khai.
-const declared = new Map<string, string[]>();
+const paths = new Set(["/api/auth/me", "/api/costs", "/api/audit-new-module/probe"]);
 for (const mod of MODULES) {
   for (const path of mod.swExclude ?? []) {
-    declared.set(path, [...(declared.get(path) ?? []), mod.key]);
+    assert.ok(path.startsWith("/api/"), `swExclude ngoài API cần review: ${path}`);
+    paths.add(path);
+    paths.add(`${path}${path.endsWith("/") ? "" : "/"}probe`);
   }
 }
 
-const missingInSw: string[] = [];
-for (const [path, mods] of declared) {
-  if (!swExcludes.has(path)) missingInSw.push(`${path} (module: ${mods.join(", ")})`);
+type FetchEventStub = {
+  request: Request;
+  respondWith: (value: Promise<Response> | Response) => void;
+  waitUntil: (value: Promise<unknown>) => void;
+};
+
+async function check(path: string, offline: boolean): Promise<void> {
+  const handlers = new Map<string, (event: FetchEventStub) => void>();
+  let calls = 0;
+  const unavailable = new Error("mất mạng thử nghiệm");
+  const denied = new Response(null, { status: 401 });
+  const request = new Request(`https://xboss.test${path}`);
+  runInNewContext(swSource, {
+    self: {
+      addEventListener: (name: string, handler: (event: FetchEventStub) => void) => {
+        handlers.set(name, handler);
+      },
+    },
+    location: { origin: "https://xboss.test" },
+    URL,
+    Request,
+    Response,
+    caches: new Proxy({}, { get: () => assert.fail(`SW chạm cache ở ${path}`) }),
+    fetch: (input: Request, init: RequestInit) => {
+      calls++;
+      assert.equal(input, request);
+      assert.equal(init.cache, "no-store");
+      return offline ? Promise.reject(unavailable) : Promise.resolve(denied);
+    },
+  });
+  let response: Promise<Response> | undefined;
+  handlers.get("fetch")?.({
+    request,
+    respondWith: (value) => {
+      response = Promise.resolve(value);
+    },
+    waitUntil: () => assert.fail(`API không được ghi cache nền: ${path}`),
+  });
+  assert.ok(response, `SW chưa bảo vệ request ${path}`);
+  if (offline) await assert.rejects(response, (error: unknown) => error === unavailable);
+  else assert.equal(await response, denied);
+  assert.equal(calls, 1);
 }
 
-// Path sw.js loại trừ nhưng chưa module nào nhận — chỉ cảnh báo (registry phủ dần).
-const unclaimed = [...swExcludes].filter((p) => !declared.has(p));
-
-console.log("=== Kiểm swExclude (lib/modules.ts) ↔ public/sw.js ===");
-console.log(`sw.js loại trừ: ${[...swExcludes].join(", ") || "(không có)"}`);
-console.log(`registry khai báo: ${[...declared.keys()].join(", ") || "(không có)"}`);
-
-if (unclaimed.length) {
-  console.warn(
-    `\n[CẢNH BÁO] sw.js loại trừ nhưng chưa module nào nhận trong registry: ${unclaimed.join(", ")}`,
-  );
+async function main(): Promise<void> {
+  for (const path of paths) {
+    await check(path, false);
+    await check(path, true);
+  }
+  console.log(`[OK] ${paths.size} path registry/API chỉ qua mạng; giữ nguyên 401/lỗi mạng.`);
 }
 
-if (missingInSw.length) {
-  console.error(
-    `\n[LỖI] swExclude khai báo trong registry nhưng KHÔNG có trong public/sw.js:\n  - ${missingInSw.join(
-      "\n  - ",
-    )}\n\nThêm path vào khối loại trừ trong public/sw.js (nhớ tăng version CACHE) hoặc bỏ khỏi swExclude.`,
-  );
-  process.exit(1);
-}
-
-console.log("\n[OK] Mọi swExclude khai báo trong registry đều có trong public/sw.js.");
+main().catch((error: unknown) => {
+  console.error("[LỖI] Chính sách cache SW không khớp registry:", error);
+  process.exitCode = 1;
+});
