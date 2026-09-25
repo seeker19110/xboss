@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { MODULES } from "@/lib/nen/modules";
 import { isPermKey } from "@/lib/bao-mat/auth";
 
@@ -98,12 +98,15 @@ test("MODULES: nav luôn đủ group/label/icon (không rỗng)", () => {
     }
 });
 
-test("MODULES: mọi swExclude đều có thật trong public/sw.js", () => {
-  // Cùng bất biến mà scripts/check-sw-exclude.ts gác ở CI — giữ luôn trong `npm test`
-  // để lệch bị bắt ngay khi chạy test cục bộ, không phải đợi cổng CI riêng.
-  const sw = readFileSync("public/sw.js", "utf8");
-  const missing = MODULES.flatMap((m) => (m.swExclude ?? []).filter((p) => !sw.includes(p)));
-  assert.deepEqual(missing, []);
+test("MODULES: mọi swExclude thực sự network-only trong public/sw.js", () => {
+  // Chạy cùng cổng hành vi như CI: tất cả path registry + path con/API tương lai,
+  // giữ nguyên 401/lỗi mạng và không chạm Cache Storage. Không đòi denylist literal.
+  // Tiến trình riêng tránh side effect process.exitCode của CLI lên các test khác.
+  const output = execFileSync(process.execPath, ["--import", "tsx", "scripts/check-sw-exclude.ts"], {
+    encoding: "utf8",
+    timeout: 30_000,
+  });
+  assert.match(output, /\[OK\]/, "Cổng SW phải thực thi và xác nhận chính sách registry");
 });
 
 test("MODULES: notificationTypes nằm trong 4 loại thật của /api/notifications", () => {
