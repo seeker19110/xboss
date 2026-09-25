@@ -117,6 +117,7 @@ export async function runDrChecks(
       const extraNames = [...applied].filter((name) => {
         return typeof name !== "string" || !expected.has(name);
       });
+
       const extra = extraNames.length;
       const ok = !missing && !extra && applied.size === rows.length;
       return {
