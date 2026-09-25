@@ -1,143 +1,211 @@
-# Approval — Quyết định cần chốt trước thi hành
+# Approval — Chốt phương án chất lượng cao
 
-Cập nhật: 2026-09-25. State: **In review**.
-Chủ dự án đã yêu cầu hoàn thiện đặc tả để tự thi hành sau; chưa có phê duyệt implementation
-hoặc production được ghi nhận cho A1–A6. Không điền tên/ngày hoặc tick thay người có thẩm quyền.
+Phiên bản quyết định: **QUALITY-FINAL-1**. Ngày: **2026-09-25**.
+State: **Approved for implementation — đặc tả đã chốt để thi hành sau**.
 
-## 1. Ba quyền khác nhau
+## 1. Căn cứ và giới hạn phê duyệt
 
-Duyệt tài liệu: xác nhận đặc tả đủ để review; không cho chạy code.
-Approved for implementation: cho code/test trên nhánh riêng và môi trường được phép, theo
-chương/slice nêu rõ; không mặc nhiên cho merge, triển khai hay đổi dữ liệu thật.
-Approved for production: cho một release SHA, phạm vi người dùng/dự án, migration/runbook,
-thời điểm và người vận hành cụ thể. Cần cấp quyền merge riêng nếu chưa có.
+Chủ dự án yêu cầu trong hội thoại: **“chốt theo phương án chất lượng cao nhất”**, tiếp nối
+yêu cầu hoàn thiện đặc tả để chủ dự án thi hành sau. Người quyết định: chủ dự án XBoss;
+ChatGPT ghi nhận và cụ thể hóa lựa chọn kỹ thuật dưới đây. Không giả mạo chữ ký của reviewer,
+người phụ trách tài chính, kiểm toán hoặc người vận hành.
 
-Một số chương được duyệt không làm chương khác tự Approved. S00 có thể đối chiếu/hoàn thiện
-mapping trước, nhưng không áp DDL hoặc sửa code khi chưa qua gate tương ứng.
+D01–D09 đã chốt ở cấp thiết kế. Không tiếp tục hỏi chủ dự án chọn lại các phương án này.
+“Approved for implementation” là trạng thái của đặc tả; không phải lệnh bắt đầu viết application
+code trong phiên chốt tài liệu này, không tự cấp quyền merge/deploy/chạy production, mua hạ tầng,
+truy cập dữ liệu thật hoặc thay điều khoản hợp đồng. Khi chủ dự án bắt đầu thi hành sau, dùng
+đúng các lựa chọn này và gates của PLAN.md.
 
-## 2. Quyết định đề xuất để chủ dự án duyệt
+Nguyên tắc quyết định: đúng dữ liệu và bảo mật trước; không mất việc hiện trường; giữ quy tắc
+nghiệp vụ đã chốt; thay đổi nhỏ có kiểm chứng; chi phí hợp lý nhưng không hạ chất lượng để tiết kiệm.
+Không chuyển microservices/Kubernetes/ORM chỉ vì muốn hệ thống trông hiện đại hơn.
 
-### D01 — Membership và org-session, chặn S01/S02/cutover strict
+## 2. D01 — Phạm vi và quyền: chốt cách ly nghiêm ngặt theo tổ chức
 
-Đề xuất: mọi actor kể cả admin ứng dụng bị giới hạn org hiện tại; non-admin phải có gán
-user_projects cụ thể. Bỏ fallback project 1 và bảng rỗng => thấy mọi project. Đổi org/quyền
-phiên phải có cơ chế vô hiệu token cũ như A1.
-Trước production cần danh sách ảnh hưởng trước/sau, xác nhận membership đúng và admin phục
-hồi; không auto-gán mọi người vào mọi dự án. Các service account/cross-project hợp lệ có
-scope tường minh cùng org. Chưa thêm capability cross-org quản trị toàn hệ.
-Quyết định/ngoại lệ được duyệt: CHƯA CÓ. Người/ngày: CHƯA CÓ.
+Mọi actor, kể cả admin ứng dụng, chỉ có quyền trong tổ chức hiện tại được server xác minh.
+Non-admin cần membership dự án rõ ràng. Không có fallback dự án 1, bảng membership rỗng
+không mở quyền toàn hệ, input sai không được đổi thành bỏ filter. Tài nguyên con phải cùng
+phạm vi với cha. Báo cáo nhiều dự án dùng tập IDs được phép của cùng org, không nhận wildcard
+hoặc quyền toàn hệ từ client.
 
-### D02 — Offline đọc, nhiều tab và thời hạn context, chặn S05/S08
+Chốt sửa cả cache và CRUD quyền: key phải có org, project, role và permission. Cold start,
+cache chưa xác minh hoặc DB lỗi không được trả quyền mặc định như thể không có override deny.
+Permission snapshot phải nạp và await trong ngữ cảnh request đã xác thực; đường tài chính,
+nghiệm thu và quản trị kiểm quyền từ dữ liệu có hiệu lực, không lấy snapshot stale để cho ghi.
+Index/ON CONFLICT/DELETE của role_permissions phải có org_id, theo DATA-CONTRACTS.md.
 
-Đề xuất: một project hoạt động chung cho phiên browser; switch ở một tab invalidates tab khác.
-Cache nghiệp vụ theo allowlist/context; tài chính/auth/HTML cá nhân hóa network-only.
-Offline đọc chỉ trong phiên đã xác minh đang mở, lease tối đa 15 phút; restart mất context
-phải online xác minh lại. Đây là đánh đổi thiết bị dùng chung; không hứa revoke tức thời
-khi mất mạng. Timeout ACK 3 giây chuyển LOCKED/network-only, không mở cache chung.
-Quyết định/ngoại lệ được duyệt: CHƯA CÓ. Người/ngày: CHƯA CÓ.
+Giữ giao thức login/2FA của #529; dùng cơ chế 2FA hiện có cho admin/PM trước mở rộng production,
+kèm bước enrollment và recovery đã kiểm, không tự reset tài khoản đang chạy. Đổi org, mật khẩu
+hoặc session_version phải vô hiệu token không còn phù hợp. Không coi role admin là quyền
+bỏ qua RLS hoặc được nhìn mọi org.
 
-### D03 — Draft khi logout và queue legacy, chặn S06/S07/rollout client
+## 3. D02 — Cache và offline: chốt hai cấu hình có kiểm soát
 
-Đề xuất: logout còn draft cho hủy để xử lý trước hoặc xác nhận bỏ; không giữ plaintext người
-A cho người B xem, không tự xuất file dữ liệu riêng tư. Queue v1 không owner quarantine,
-không gán theo tài khoản đang mở và không flush. Thiết bị cũ đồng bộ trước upgrade; phần
-legacy tồn phải được owner xác nhận cách xử lý. Không âm thầm xóa draft để nâng schema.
-Cần ghi số thiết bị/draft còn tồn và người chịu trách nhiệm đối soát, không tự suy từ server.
-Quyết định/ngoại lệ được duyệt: CHƯA CÓ. Người/ngày: CHƯA CÓ.
+Auth, quyền, tài chính, chứng từ thanh toán, export và HTML/RSC cá nhân hóa luôn network-only.
+Offline đọc chỉ cho allowlist tracking tối thiểu, cache theo context server và generation;
+không phục vụ stale data sau lỗi 401/403/409. Một project hoạt động chung trong cùng phiên
+browser; đổi project ở một tab vô hiệu ngữ cảnh các tab khác. Expected-context được server
+kiểm, không tin cookie project mới cho request cũ.
 
-### D04 — Receipt, lease và retention, chặn S06/S07
+Mặc định **shared-safe**: lease đọc offline tối đa 15 phút từ xác minh online.
+Cấu hình **field-personal**: tối đa 8 giờ, chỉ khi thiết bị đã được admin cùng org ghi nhận
+cho đúng một chủ sử dụng, có phiên đã xác thực online và chưa logout/đổi actor. Client không
+được tự chọn profile 8 giờ bằng localStorage hoặc query. Khi browser/SW mất context hoặc app
+khởi động lạnh, phải online xác minh lại trước mở dữ liệu cũ, kể cả profile field-personal.
+Không hứa thu hồi quyền tức thời khi thiết bị hoàn toàn mất mạng; cửa sổ này là đánh đổi đã chốt.
 
-Đề xuất: operationId không đổi qua retry, backend idempotency cùng transaction business;
-IDB lease 30 giây renew 10 giây có fencing; lease không thay server dedup.
-S00 xác định tái dùng cơ chế hiện có hay DDL A2. Không xóa dedup key khi replay vẫn được
-chấp nhận; lưu tombstone tối thiểu theo A2. Thời hạn xóa dữ liệu/receipt cần policy riêng,
-không áp một TTL ngắn tùy ý gây duplicate effect. Không lưu payload ảnh/nhật ký trong receipt.
-Quyết định cơ chế/retention được duyệt: CHƯA CÓ. Người/ngày: CHƯA CÓ.
+ACK invalidation có timeout 3 giây: lỗi chuyển LOCKED/network-only, không quay lại cache chung.
+SSE/fetch cũ bị hủy hoặc bỏ kết quả theo generation. Có fallback foreground trên Safari;
+không phụ thuộc Background Sync, Web Locks hay việc mọi tab luôn chạy.
 
-### D05 — Tiền, rounding và tương thích wire, chặn S09/S10/S13 tài chính
+## 4. D03 — Bản nháp: chốt giữ an toàn, không tự xóa khi logout
 
-Đề xuất: giữ VND × 100 bigint và PostgreSQL numeric; wire opt-in decimal-string-v1;
-SQL/JSON/export không qua float ở đường exact. Chứng từ lịch sử giữ snapshot/rule tại lúc chốt.
-Quy tắc per-line/per-total, VAT, retention, recovery, negative/credit và quantity scale phải
-khớp hợp đồng hiện hữu; default kỹ thuật trong A3 không thay luật thuế/hợp đồng.
-Owner tài chính duyệt golden fixture và bảng monetary mapping trước mỗi miền cutover.
-Quyết định/ngoại lệ được duyệt: CHƯA CÓ. Người/ngày: CHƯA CÓ.
+Không tự xóa thao tác chưa ACK, không xuất dữ liệu nhạy cảm ra file ngoài yêu cầu.
+Bản nháp mới phải nằm trong vault mã hóa AES-256-GCM với ownership và associated data;
+khóa giải mã chỉ được cấp qua xác thực server đúng owner/org/project/device và giữ trong bộ
+nhớ phiên, không lưu plaintext key cạnh ciphertext. Chi tiết khóa/vault/API ở A2 và DATA-CONTRACTS.
+Logout khóa vault, xóa cache dữ liệu đọc và tham chiếu khóa trong bộ nhớ; ciphertext còn lại
+để chính chủ xác thực online rồi phục hồi. Xóa bản nháp chỉ khi người dùng xác nhận rõ hoặc
+đã có receipt thành công được đối soát. Không tuyên bố JavaScript có thể xóa vật lý mọi bản
+sao khóa khỏi RAM, hoặc mã hóa này chống được XSS đang chạy trong phiên đã mở khóa.
 
-### D06 — Nghĩa tổng chi phí và trọng số portfolio, chặn S11/S12
+Queue v1 không có owner: quarantine và dừng gửi, không tự gán cho người vừa login, không tự
+xóa. Trước rollout phải đối soát từng thiết bị còn legacy với người vận hành/chủ dữ liệu;
+không có bằng chứng xác định chủ thì giữ cách ly, không biến nó thành draft của user mới.
+IDB báo lưu chỉ sau transaction complete; quota/abort không được báo thành công.
 
-Đề xuất: selectedTotals là tổng nhóm đang xem; projectTotals là toàn project có unassigned;
-floor budget là proxy hợp đồng tầng, không giả đã phân bổ BOQ. Giữ semantics actual gồm
-advance hiện có; source-lineage thay đổi cần tài chính duyệt. Không SUM(DISTINCT amount).
-Portfolio mặc định trọng số số task; không task trả unavailable, không giả tiến độ 0%.
-Tập lọc/visibility/org phải giống nhau giữa danh sách và KPI.
-Quyết định/ngoại lệ được duyệt: CHƯA CÓ. Người/ngày: CHƯA CÓ.
+Mất thiết bị, xóa site data hoặc browser thu hồi storage vẫn có thể mất draft chưa lên server;
+UI phân biệt “đã lưu trên thiết bị” với “đã sao lưu lên máy chủ”. Không hứa bảo đảm không mất
+trong mọi trường hợp khi chưa có mạng. Không đặt TTL tự xóa cho draft chưa giải quyết.
 
-### D07 — Giới hạn nghiệm thu–IPC, adjustment và SoD, chặn S13 enforcement
+## 5. D04 — Gửi lại: chốt receipt bền vững và chống xử lý trùng tại server
 
-Đề xuất: lũy kế qty được duyệt không vượt nguồn nghiệm thu/hợp đồng/VO đủ điều kiện, kiểm
-lại khi commit; giữ exception advance và luồng thủ công đã có phê duyệt rõ nguồn.
-Thiếu mapping nghiệm thu–BOQ chỉ draft cần đối soát, không tự phát hành. Hủy upstream có
-chứng từ chốt phải qua adjustment/reversal, không sửa lịch sử; quyền ký/SoD theo policy
-đã duyệt, không tự cho admin bỏ qua các bước.
-Owner nghiệm thu/tài chính phải duyệt transition map từ schema thật và golden chain fixture.
-Quyết định/ngoại lệ được duyệt: CHƯA CÓ. Người/ngày: CHƯA CÓ.
+Mỗi thao tác có operationId không đổi qua retry. Auth/quyền/scope được kiểm trước lookup
+receipt. Cùng key/cùng payload trả ACK trước đó; cùng key/khác payload trả conflict.
+Mutation DB, audit nghiệp vụ và receipt hoàn tất cùng transaction. Với object storage dùng
+staging + commit metadata + thu gom orphan có đối soát, không giả transaction DB bao trùm file.
 
-### D08 — Recovery set, RPO/RTO và retention, chặn S14 vận hành
+Dùng bảng receipt dành cho bốn loại queue hiện có theo DATA-CONTRACTS; không tái sử dụng một
+cơ chế dedup webhook/notification chỉ vì tên tương tự. Nếu inventory phát hiện cơ chế tương
+đương đầy đủ thì thay bằng adapter cùng contract, không vận hành hai nguồn receipt độc lập.
+Lease nhiều tab 30 giây, renew 10 giây, fencing token; server dedup vẫn là hàng rào cuối.
 
-Đề xuất để duyệt: RPO <= 24 giờ, RTO <= 4 giờ, recovery set gồm DB+attachments+key references+
-app/migration manifest; đích restore cách ly không outbound. Các mục tiêu chưa phải SLA.
-Nơi lưu, retention, miền lỗi thứ hai, chi phí và người giữ key cần xác nhận riêng. Cần RPO
-ngắn hơn thì đặc tả PITR/WAL bổ sung; không gọi pg_dump là PITR.
-Cho phép dùng snapshot production hoặc chỉ dữ liệu tổng hợp: CHƯA CÓ.
-Quyết định/owner backup/ngày: CHƯA CÓ.
+Không có job TTL xóa dedup key trong chương trình này. Giữ receipt/tombstone tối thiểu cùng
+vòng đời dữ liệu tham chiếu; không lưu nguyên nội dung ảnh/nhật ký trong receipt. Thủ tục xóa
+org/dữ liệu có nghĩa vụ retention là thay đổi riêng có kiểm soát, không suy từ ngày backup.
+401 giữ draft chờ auth; 409/412 giữ conflict; 429 tôn trọng Retry-After; lỗi mạng/5xx retry có
+backoff+jitter; 403/404/422 giữ trạng thái bị từ chối, không biến mất sau một toast.
 
-### D09 — Release và phạm vi production, chặn S16
+## 6. D05 — Tiền: chốt exact, giữ quy tắc hiện có thay vì đổi âm thầm
 
-Đề xuất: pilot nhỏ trước, quan sát 24 giờ sau mở rộng; thời gian này chưa là lịch tự động.
-Mọi P0/P1 scope/money/draft/approval là no-go; migration/queue v2 có rollback tương thích.
-Cần ghi release SHA, PRs đã merge, dự án/nhóm pilot, migration IDs, checklist backup/restore,
-rollback owner, quyền deploy, cửa sổ vận hành và kênh xử lý sự cố. Không chỉ tick “CI xanh”.
-Phê duyệt production, merge và thời điểm: CHƯA CÓ.
+Giữ PostgreSQL numeric và bigint VND × 100. SQL trả tiền qua ::text; JSON exact dùng chuỗi
+canonical 2 số lẻ cho amount, quantity giữ scale riêng. API opt-in decimal-string-v1 rồi
+chuyển từng caller; không đổi toàn bộ parser NUMERIC hoặc mọi JSON number cùng lúc.
+Giá trị ngoài biên legacy phải báo lỗi, không clamp/round âm thầm. ID/count/progress không
+bị đổi kiểu như tiền. Không lấy Number làm bước trung gian trong đường exact.
 
-## 3. Vai trò phê duyệt cần điền
+Chốt **giữ cách tính IPC đang triển khai**: cộng qty nhân unit_price bằng numeric trước,
+round tổng đến 2 số lẻ; tính advance/retention theo tỷ lệ hợp đồng trên periodValue đó rồi
+round từng khoản; payable bằng các thành phần exact. Không tự chuyển IPC sang round từng
+dòng. Hợp đồng/chứng từ đã có rule khác giữ rule có version và snapshot, không bị ghi lại.
+Ties làm tròn xa 0; thuế/basis không được hardcode theo một ví dụ kỹ thuật.
 
-Chủ dự án/scope: chưa chỉ định người ký trong tài liệu này.
-Owner kỹ thuật/API/schema: chưa chỉ định.
-Reviewer bảo mật/permission/RLS: chưa chỉ định.
-Owner nghiệp vụ tài chính/nghiệm thu: chưa chỉ định.
-Reviewer UX/offline/mobile: chưa chỉ định.
-Người vận hành backup/deploy: chưa chỉ định.
-Một người có thể đảm nhiệm nhiều vai trò nếu chủ dự án xác nhận; không giả các vai trò là
-các tài khoản người thật đã sẵn sàng. Không tự thêm reviewer/assignee ngoài yêu cầu.
+Schema nguồn đã đọc: unit_price/amount numeric(15,2), qty BOQ/IPC numeric(15,3), tỷ lệ
+advance_pct/retention_pct numeric(5,2). Không cần mass ALTER để sửa lỗi parser/helper.
+Giá trị lớn trong test utility/SUM có thể vượt giới hạn từng ô; test phải phân biệt aggregate
+numeric với INSERT vào cột numeric(15,2). Xem SOURCE-MAP.md.
 
-## 4. Phiếu phê duyệt từng chương hoặc slice
+## 7. D06 — Báo cáo: chốt nguồn đúng, cùng snapshot, không cộng lặp
 
-```text
-Chương/slice và spec commit:
-State: Approved for implementation / Changes requested
-Người duyệt và thẩm quyền:
-Ngày duyệt:
-D01–D09 áp dụng và quyết định:
-Main SHA đã reconcile / evidence S00:
-Files/contract/schema được duyệt:
-Phạm vi code/test được phép:
-Môi trường dữ liệu được phép:
-Ngoại lệ và điều kiện dừng:
-Quyền merge: chưa cấp / cấp rõ PR hoặc phạm vi
-Quyền production: chưa cấp / ghi phiếu production riêng
-```
+Mỗi bản ghi nguồn tính một lần theo khóa thật; không dùng SUM(DISTINCT amount).
+selectedTotals là tổng rows đang xem; projectTotals là tổng dự án có unassigned; floor budget
+là proxy hợp đồng tầng, không giả đã phân bổ BOQ. Giữ actual gồm advance theo code hiện có.
+Báo cáo nhiều statement dùng REPEATABLE READ READ ONLY đặt ngay khi BEGIN; báo cáo một CTE
+cũng phải đặt scope và permissions đúng. Không dùng Promise.all để chứng minh snapshot.
 
-Các placeholder phải được người duyệt điền trước chuyển READY. Chấp thuận một bản spec
-không áp tự động cho thay đổi materially khác về schema, quyền, dữ liệu hoặc nghiệp vụ.
+payment_bills hiện đã có project_id, contract_id, payment_cert_id và sheet_type_id;
+không tiếp tục dựa vào comment cũ nói bảng không có project_id. Các đường liên kết có mặt
+phải cùng một project, mâu thuẫn là lỗi dữ liệu cần đối soát. Không loại tiền chỉ vì thiếu sheet.
 
-## 5. Checklist đủ để Approved for implementation
+Portfolio trọng số theo số task của đúng org/tập filter; không task trả unavailable, không
+0% giả. Hiển thị rõ đây là tiến độ theo công việc, không phải tiến độ tài chính/EVM.
+Dữ liệu lỗi/thiếu coverage không được trình bày như tổng đã được xác nhận đầy đủ.
 
-- [ ] Product/scope, non-goals và các decision liên quan đã chốt.
-- [ ] UX/a11y/offline mọi trạng thái và browser fallback được duyệt.
-- [ ] API/data/DDL/transaction đã khớp mapping main mới, không còn tên bảng/cột phỏng đoán.
-- [ ] Security/RBAC/SoD/RLS/audit không có ngoại lệ ngầm.
-- [ ] Mỗi AC có test/evidence, rollout/rollback và owner rõ.
-- [ ] Không còn blocking question cho slice; quyền test/môi trường đủ.
-- [ ] Người/ngày/spec SHA của approval đã ghi.
+## 8. D07 — Nghiệm thu và IPC: chốt kiểm soát chặt nhưng không đổi nghiệp vụ đã quyết
 
-**Kết luận hiện tại: In review. Không có slice implementation nào được tự coi Approved.**
+Đối chiếu paymentcerts.ts xác nhận quyết định người dùng 2026-09-04: **vượt khối lượng hợp
+đồng thì cảnh báo, không chặn cứng**. Vì vậy bỏ yêu cầu v1 tự động cấm mọi IPC vượt contract
+hoặc lấy tỷ lệ tiến độ làm bằng chứng khối lượng đã nghiệm thu. Giữ khả năng lập/trình/duyệt
+phát sinh theo quy trình đang có, nhưng cảnh báo phải được tính lại dưới khóa, nêu từng dòng,
+nguồn và phiên bản; khi duyệt có cảnh báo phải ghi nhận xác nhận/rationale của người có quyền.
+Nếu cảnh báo thay đổi do request đồng thời thì yêu cầu xác nhận lại, không dùng bản cảnh báo cũ.
+
+Sổ khối lượng thực hiện, nghiệm thu và được duyệt là các đại lượng khác nhau. Thiếu nguồn
+nghiệm thu không được tự gắn nhãn “đã nghiệm thu”; luồng khai báo thủ công phải có nguồn/lý do.
+Chứng từ đã chốt không tự reprice; approved không đồng nghĩa paid. Advance có semantics riêng.
+Giữ QA/hold-point/100% và approval engine hiện có; không thêm đường bypass cho admin.
+
+Chốt khóa contract trước khi tính lũy kế/duyệt các IPC cùng contract; recompute lũy kế từ
+các kỳ approved trước đó trong transaction, không tin snapshot draft. Duyệt ngược thứ tự
+period khi đã có kỳ sau approved phải yêu cầu reconciliation/adjustment, không sửa kỳ sau
+âm thầm. Không tạo một “trần 20” giả khi chính sách contract cho phép vượt có cảnh báo.
+
+SoD giữ luật/config hiện hữu; không tự tạo người duyệt hoặc giả chữ ký. Hủy upstream có
+chứng từ downstream đã chốt phải qua adjustment/reversal, không xóa history. Điều kiện thiếu
+người ký theo flow hiện hữu là blocker vận hành, không là quyền để AI bỏ bước duyệt.
+
+## 9. D08 — Phục hồi: chốt PITR, RPO 5 phút và RTO 60 phút
+
+Mục tiêu thiết kế đã chốt: **RPO không quá 5 phút; RTO không quá 60 phút** cho workload
+production được benchmark và công bố trong release manifest. Đây chưa là số đo/SLA đã đạt.
+Chọn base backup + lưu WAL liên tục, thay phương án chỉ backup mỗi ngày với RPO 24 giờ.
+Không gọi pg_dump là PITR; snapshot attachment/version/key reference cùng recovery set.
+
+Chốt cửa sổ khôi phục 35 ngày: base backup hằng ngày, giữ toàn bộ WAL cần để phục hồi mọi
+điểm trong cửa sổ; giữ thêm base backup cũ hơn mép cửa sổ nếu cần. Có ít nhất một bản mã hóa,
+chống sửa/xóa ngoài miền lỗi của ứng dụng; quyền xóa backup tách khỏi app. Key backup tách
+kho dữ liệu. Attachment critical phải đủ và mở được; không chỉ kiểm checksum DB.
+
+archive_timeout 60 giây là cấu hình khởi điểm để test, không chứng minh RPO nếu archive chậm.
+Giám sát độ trễ archive, bản ghi canary phục hồi và attachment replication; cảnh báo ở 2 phút,
+vi phạm recovery objective ở 5 phút. Phục hồi đầy đủ trên đích cách ly hằng tuần; kiểm backup
+hằng ngày; diễn tập PITR và mất máy ít nhất hằng tháng và trước thay schema rủi ro cao.
+Lịch này là yêu cầu vận hành tương lai, chưa tạo automation hoặc mua dịch vụ.
+
+Không quảng cáo RPO bằng 0 hoặc failover tự động nếu chưa có replica/quorum/fencing được
+thiết kế và diễn tập. Nếu workload không đạt RTO 60 phút, bổ sung năng lực phục hồi trước
+phát hành; không tự hạ mục tiêu đã chốt để lấy PASS.
+
+## 10. D09 — Phát hành: chốt bằng chứng trước, triển khai từng nhóm sau
+
+Dùng modular monolith hiện có. Migration production chạy bước triển khai riêng bằng role
+migration; runtime chỉ kiểm schema tương thích bằng role app, không tự DDL trong HTTP request.
+S00 catalog xác nhận các pending migration trước code; append-only và expand/contract.
+
+Mỗi slice có regression, review độc lập vùng rủi ro và CI đúng HEAD. Không hạ threshold,
+skip test mới hoặc nới quyền để làm xanh. Safari/iOS thật và Chromium desktop/mobile nằm
+trong nghiệm thu offline; axe không thay toàn bộ UAT. 54 AC của TEST-MATRIX là tối thiểu.
+
+Mục tiêu hiệu năng: p95 read/write tương tác không quá 500 ms, báo cáo chuẩn không quá
+2 giây trên fixture 10.000 task, 20 phiên đồng thời, sau warmup; không chậm hơn baseline
+quá 10% trên cùng cấu hình. Phải ghi số đo và mẫu thử; không có số đo thì NOT_RUN.
+Các ngưỡng không áp cứng cho upload file lớn/restore/job dài; chúng có timeout/quota riêng.
+
+Rollout: một dự án nội bộ pilot 48 giờ, sau đó tối đa 25% dự án 24 giờ, rồi mở rộng và quan
+sát 7 ngày. Bất kỳ rò dữ liệu, sai tiền, mất draft đã ACK hoặc bypass nghiệm thu thì dừng ngay.
+Thời gian quan sát không thay việc kiểm đủ traffic/tình huống. Không chạy pilot trên dữ liệu
+thật khi chưa có quyền riêng. Không khôi phục cache chung/fallback scope khi rollback.
+
+## 11. Việc không còn phải hỏi lại và việc vẫn phải kiểm
+
+Đã chốt: lựa chọn kiến trúc, D01–D09, các ngưỡng đích, cách xử lý xung đột với nghiệp vụ IPC.
+Không còn bảng “CHƯA CÓ quyết định” cho chín mục này.
+
+Vẫn phải kiểm trước thi hành: main SHA, catalog/schema thật, tất cả caller thuộc slice,
+dữ liệu membership/legacy queue, golden fixture của chứng từ thật, môi trường restore,
+khả năng đạt ngưỡng và quyền thao tác production. Đây là đầu vào/bằng chứng thực tế,
+không được giả thành đã có từ lời chấp thuận thiết kế. SOURCE-MAP phân biệt phần đã đọc
+với phần phải đo. Reviewer ghi kết quả của chính họ, không được AI tự ký thay.
+
+Thay đổi khác bản chốt về chính sách tiền, quyền, dữ liệu thật hoặc retention phải được
+báo rõ và duyệt delta; sửa chi tiết triển khai tương đương contract không phải hỏi lại D01–D09.

@@ -1,5 +1,36 @@
 # PROGRESS — XBoss
 
+## 2026-09-25 — chốt đặc tả chất lượng cao, thi hành sau
+
+Chủ dự án yêu cầu “chốt theo phương án chất lượng cao nhất”. Bộ đặc tả
+[QUALITY-FINAL-1](docs/nang-cap/AUDIT-2026-09-25/README.md) ghi quyết định D01–D09,
+API/DDL, đối chiếu tĩnh nguồn trọng yếu, kế hoạch S00–S16 và 54 tiêu chí nghiệm thu.
+State đặc tả: Approved for implementation; đợt này chỉ sửa tài liệu, chưa code A1–A6.
+Không tự merge, deploy, chạy DB production, đổi dữ liệu/quyền người dùng hoặc mua dịch vụ.
+
+Baseline đã xác minh: main 833691815fdc7e96bb72975d86bd6902a412b259.
+PR529 đã merge b29bb9de4b8d723b273ba790065c06cc6e3719f0;
+PR530 đã merge833691815fdc7e96bb72975d86bd6902a412b259.
+Các ghi chú chờ merge ở các mục lịch sử bên dưới không còn là trạng thái hiện tại.
+
+Chốt scope/index/cache quyền theo org; không cold-start allow. Vault draft mã hóa theo
+resource manifest, logout giữ ciphertext; shared-safe15 phút và field-personal8 giờ chỉ
+qua device approval. Money exact, quantity float có đường chuyển đổi/provenance;
+IPC giữ SUM rồi round tổng và chính sách cảnh báo vượt khối lượng, không hard-cap tự đặt.
+Snapshot/acknowledgement/concurrency theo đúng flow. Reporting dùng project_id thật của
+payment_bills và kiểm tất cả parent, không mất khoản chưa phân loại.
+
+Phục hồi thiết kế: PITR35 ngày, RPO5 phút/RTO60 phút; runtime production không DDL qua HTTP.
+Các ngưỡng mới là target cần chứng minh, không SLA đã đo. Chưa tạo lịch backup/automation.
+54 AC còn NOT_RUN cho phần chưa implementation; S00 còn inventory đầy đủ từng miền,
+catalog disposable và benchmark thật. Không gọi source mapping tĩnh là audit toàn repo xong.
+
+Chi tiết: [Approval](docs/nang-cap/AUDIT-2026-09-25/APPROVAL.md),
+[Source map](docs/nang-cap/AUDIT-2026-09-25/SOURCE-MAP.md),
+[Data contracts](docs/nang-cap/AUDIT-2026-09-25/DATA-CONTRACTS.md),
+[Goal](docs/goals/audit-2026-09-25.md).
+Kiểm CI của bản tài liệu ghi ở PR đúng HEAD; không lấy CI đợt trước thay bằng chứng bản mới.
+
 ## 2026-09-25 — audit, đợt 1: tài khoản và phạm vi dự án
 
 Trạng thái: đã triển khai code trên nhánh sửa lỗi; chưa xác nhận phát hành production.

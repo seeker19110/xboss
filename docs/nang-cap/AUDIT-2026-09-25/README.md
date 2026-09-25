@@ -1,116 +1,120 @@
-# Đặc tả thi hành audit XBoss — 2026-09-25
+# Đặc tả thi hành audit XBoss — QUALITY-FINAL-1
 
-## Trạng thái và cách dùng
+Ngày chốt: **2026-09-25**. State: **Approved for implementation — thi hành sau**.
+Chủ dự án yêu cầu: “chốt theo phương án chất lượng cao nhất”. Các lựa chọn D01–D09 được
+cụ thể hóa ở [APPROVAL](APPROVAL.md), không còn yêu cầu chủ dự án chọn lại chín phương án.
+Lần này chỉ cập nhật đặc tả; không chạy code ứng dụng, migration, merge hoặc production.
 
-**State: In review — đặc tả để chủ dự án duyệt và thi hành sau.**
-Yêu cầu hiện tại chỉ là hoàn thiện tài liệu. Không đồng nghĩa cấp quyền code, merge,
-deploy, đổi quyền truy cập, thay mật khẩu hay chạy lệnh trên production.
-Chưa có người/ngày duyệt implementation; không tự ghi Approved thay chủ dự án.
+## 1. Đọc theo thứ tự
 
-Đọc [PLAN.md](PLAN.md) để chọn đúng slice, rồi đọc chương tương ứng và
-[TEST-MATRIX.md](TEST-MATRIX.md). Dùng [APPROVAL.md](APPROVAL.md) để ghi nhận quyết định.
-Checkpoint tổng thể ở [goal](../../goals/audit-2026-09-25.md).
-Mỗi chương cùng hợp đồng chung ở đây đáp ứng các trường của SPEC-TEMPLATE.md;
-không tách một chương ra khỏi hợp đồng chung khi giao worker.
+Đọc APPROVAL → [SOURCE-MAP](SOURCE-MAP.md) → [DATA-CONTRACTS](DATA-CONTRACTS.md) →
+[PLAN](PLAN.md) → chương của slice → [TEST-MATRIX](TEST-MATRIX.md).
+[Goal](../../goals/audit-2026-09-25.md) ghi trạng thái và bằng chứng còn phải có.
+Các file này là một bộ hợp đồng; không giao riêng một đoạn cho worker thiếu context.
 
-## Phạm vi đầy đủ
+Phạm vi sáu chương giữ nguyên:
 
-- [A1 — Phạm vi người dùng, tổ chức, dự án và RLS](A1-SCOPE.md).
-- [A2 — Cache, Service Worker, offline queue và nhiều tab](A2-OFFLINE.md).
-- [A3 — Số học tiền từ SQL tới API và xuất báo cáo](A3-MONEY.md).
-- [A4 — Tổng hợp chi phí, chống lặp và KPI portfolio](A4-REPORTING.md).
-- [A5 — Chuỗi BOQ, vật tư, tiến độ, nghiệm thu và thanh toán](A5-BUSINESS-CHAIN.md).
-- [A6 — Restore, vận hành, phát hành và final audit](A6-OPERATIONS.md).
+- [A1 — Quyền, tổ chức, dự án, cache quyền và RLS](A1-SCOPE.md).
+- [A2 — Cache/offline, vault bản nháp và đồng bộ nhiều tab](A2-OFFLINE.md).
+- [A3 — Tiền exact, quy tắc IPC và DTO/export](A3-MONEY.md).
+- [A4 — Báo cáo đúng nguồn, cùng snapshot và KPI portfolio](A4-REPORTING.md).
+- [A5 — Chuỗi nghiệp vụ, cảnh báo vượt khối lượng và concurrency](A5-BUSINESS-CHAIN.md).
+- [A6 — PITR, restore có bằng chứng và phát hành](A6-OPERATIONS.md).
 
-Không mở lại các module thử nghiệm đã loại bỏ, không thêm ORM, nền tảng AI, framework
-state/query, dịch vụ trả phí hoặc thay stack chỉ để thực hiện audit này.
-Không thay điều khoản thuế/hợp đồng, không tự quyết chuyển dữ liệu thương mại lịch sử.
+QUALITY-FINAL-1 thay thế trạng thái In review và các phương án còn mở của bản ở commit
+833691815fdc7e96bb72975d86bd6902a412b259. Lịch sử bản v1 còn trong Git; không dùng các ví dụ
+hard-cap IPC, xóa draft mặc định khi logout, round từng dòng mặc định cho IPC hoặc RPO24h/RTO4h
+của v1 để ghi đè quyết định đã sửa trong bản này.
 
-## Baseline đã kiểm tra
+## 2. Baseline và mức hoàn tất
 
-Ngày đọc nguồn: 2026-09-25. Main: `a2b9d7b9d28a839a5ee9cf2b23fc6b386ca292b3`.
-PR #529: head `2641b6f733ae157a188168aba162fb8c081c3e2f`, còn mở tại lần đọc.
-CI của PR đó đã thành công; điều này không chứng minh các chương A1–A6 đã được thực hiện.
-PR tài liệu này độc lập từ main, không mang theo code của #529 và không thay HEAD đã kiểm của #529.
+Main đã kiểm: **833691815fdc7e96bb72975d86bd6902a412b259**.
+PR #529 đã merge (b29bb9d); PR #530 đã merge (8336918). Những ghi chú “đang chờ merge” trong
+checkpoint cũ là lịch sử, không còn là blocker ở baseline này. Trước code vẫn reload main
+và kiểm diff thực, không coi một SHA cũ là trạng thái hiện tại mãi mãi.
 
-Trước lần thi hành phải reload main, đọc diff kể từ baseline và xác minh các bất biến của
-#529 đã có trên main. Squash-merge có thể đổi SHA; kiểm nội dung và test, không chỉ kiểm ancestry.
-Nếu #529 chưa merge thì dừng các slice code phụ thuộc; vẫn được đọc/duyệt đặc tả.
-Không tự cherry-pick, merge #529 hoặc xây code phụ thuộc trên nhánh chưa merge.
+Đã chốt phương án thiết kế và bổ sung đối chiếu tĩnh các vùng trọng yếu ở SOURCE-MAP.
+Chưa chạy toàn bộ inventory caller/catalog sống, benchmark, browser test, restore hoặc UAT
+cho A1–A6. Không đánh dấu S00/54 AC đã hoàn tất chỉ vì tài liệu được duyệt hay CI docs xanh.
+S00 là bước kiểm thực tế bắt buộc của lần thi hành, không là vòng hỏi lại lựa chọn sản phẩm.
 
-## Hợp đồng chung áp dụng mọi chương
+## 3. Hợp đồng chung
 
-### Phân quyền và dữ liệu
+API là biên kiểm quyền; mọi request xác thực actor/org/project/permission/resource parent.
+UI/cache/IndexedDB/context header không thay kiểm server. RLS là lớp thứ hai, test bằng
+role app không owner/superuser/BYPASSRLS. Thiếu context/cấu hình bắt buộc phải fail closed.
+Không mở lại project1, wildcard từ client hoặc cache quyền chưa nạp để tránh lỗi UI.
 
-API xác thực lại actor, quyền, tổ chức, dự án và quan hệ tài nguyên; UI không là biên bảo mật.
-`401` là chưa xác thực; `403` là không được phép; ID sai cú pháp `400`;
-không tìm thấy hoặc nằm ngoài phạm vi được thấy trả `404` cho endpoint tài nguyên cụ thể.
-Không trả tên dự án/tài nguyên bị cấm trong thông báo lỗi. Lỗi chọn dự án giữ `403`.
-`409` dùng cho xung đột ngữ cảnh/phiên bản/idempotency; payload sai nghiệp vụ `422`;
-`429` giữ Retry-After; lỗi hạ tầng `503`, không trả số 0 thay lỗi.
-Giữ giao thức login/2FA và chữ ký token của #529 nếu không có đặc tả riêng được duyệt.
+Giữ giao thức login/2FA và makeToken của #529. 401 chưa auth; 403 thiếu quyền; resource không
+có trong scope trả 404; input sai 400/422; context/warning/idempotency conflict409; version
+conflict412; missing precondition428; rate limit429 có Retry-After; hạ tầng503. Không trả 0
+thay lỗi dữ liệu/DB và không lộ tên hoặc nội dung bị cấm trong error.
 
-Mọi thời điểm kiểm tra: UTC ISO cho sự kiện, ngày nghiệp vụ YYYY-MM-DD theo
-Asia/Ho_Chi_Minh; không chuyển ngày thành Date rồi làm lệch múi giờ.
-Tiền giữ quy ước hiện hữu VND × 100 trong bigint; không nhầm thành đơn vị đồng nguyên.
-Giá trị tiền, tiến độ và thống kê 0 phải phân biệt với null/không có dữ liệu/bị che quyền.
+Ngày nghiệp vụ là YYYY-MM-DD theo Asia/Ho_Chi_Minh, sự kiện UTC ISO. Tiền là bigint VND×100
+và numeric, quantity/rate/progress là kiểu khác. Null/unknown/masked khác 0.
+SQL tham số hóa qua lib/db; không nối input vào SQL. Snapshot báo cáo và quyết định nghiệp vụ
+phải nêu rõ thời điểm/phiên bản nguồn, không suy từ Promise.all.
 
-### UX, riêng tư và quan sát
+Mọi màn hình đổi có loading, empty, error, offline, forbidden, conflict và recovery.
+UI tiếng Việt, keyboard/focus/screen-reader và axe desktop/mobile; test Safari/iOS thật cho
+vault/SW/IDB. Giữ theme/token/component hiện có, không tự đổi framework hoặc hardcode màu.
+Log không cookie/token/key/password/payload/ảnh/tiền chi tiết. Metrics không dùng ID user/
+project làm nhãn cardinality cao. Audit nghiệp vụ khác log retry kỹ thuật.
 
-Mọi màn hình đổi phải có loading, empty, error, offline, forbidden, conflict và retry rõ ràng.
-Không để dữ liệu tài khoản/dự án cũ lóe lên lúc đổi ngữ cảnh. Mất quyền che nội dung ngay;
-không hiển thị thông tin thương mại đã bị cấm từ cache, toast, export hoặc bản nháp.
-Nội dung tiếng Việt; giữ theme hiện có, không hardcode hex hoặc thêm dark:.
-Keyboard/focus, nhãn screen reader, trạng thái aria-live và kiểm axe desktop/mobile là bắt buộc.
+Không thêm ORM, framework state mới, microservices hoặc dịch vụ AI/paid provider vì mục tiêu
+audit này. Hạ tầng backup chất lượng cao có thể cần chi phí, nhưng bản đặc tả không tự mua/cấp
+quyền hạ tầng; chi phí và thông tin môi trường được ghi khi lập release runbook thật.
 
-Log chỉ request-id, mã slice, loại sự kiện, mã lỗi và thời lượng; không ghi cookie/token,
-mật khẩu, ảnh, nội dung nhật ký, payload hợp đồng hoặc tiền chi tiết. ID kỹ thuật trong log
-chỉ khi cần đối soát, có kiểm soát truy cập; metrics không dùng ID làm nhãn cardinality cao.
-Mỗi slice có owner tích hợp, reviewer vùng rủi ro, log/check bằng chứng và cách quay lui.
+## 4. Ngưỡng đã chốt, chưa phải số đo đã đạt
 
-### Ngưỡng và nguyên tắc nghiệm thu
+Không rò chéo scope; không nhân đôi hiệu ứng cùng operationId; không mất draft do app tự xóa;
+sai lệch tiền exact SQL/API/export bằng 0 đơn vị nhỏ. Draft local không được quảng cáo đã
+backup server hoặc miễn nhiễm việc mất máy/xóa storage.
 
-Các ngưỡng dưới đây là **mục tiêu đề xuất để duyệt**, không phải số đo hiện tại:
-không rò chéo ngữ cảnh; không mất thao tác đã báo lưu cục bộ; không nhân đôi hiệu ứng nghiệp vụ;
-sai lệch tiền chuẩn giữa SQL/API/export = 0 đơn vị nhỏ; p95 các luồng đã đo không chậm hơn
-baseline quá 20% trên cùng fixture/máy và cùng mức đồng thời.
-RPO/RTO chỉ được đánh dấu đạt khi A6 có phép đo và người vận hành duyệt mục tiêu.
+Offline shared-safe 15 phút; field-personal 8 giờ chỉ sau đăng ký/duyệt thiết bị đúng chủ.
+RPO tối đa 5 phút, RTO tối đa 60 phút, PITR 35 ngày. p95 tương tác tối đa500ms và báo cáo
+chuẩn tối đa2s, không regression quá10% trên cùng fixture/hạ tầng; workload ở APPROVAL.
+Bất kỳ rò dữ liệu/sai tiền/mất draft đã báo lưu do lỗi app/bypass nghiệm thu là no-go.
 
-Một lỗi rò dữ liệu, sai tiền, mất dữ liệu, bỏ qua nghiệm thu hoặc ghi vào production ngoài
-phạm vi là điều kiện dừng ngay. Không dùng cờ tính năng để mở lại đường truy cập không an toàn.
-CI xanh không thay cho UAT, kiểm browser thật, restore và phê duyệt phát hành.
+CI xanh không thay UAT, reviewer độc lập, quyền production hoặc phép đo RPO/RTO.
+54 AC = 46 AC nền đã chỉnh theo quyết định đúng + 8 AC chất lượng bổ sung. Tất cả AC của
+phần mới vẫn NOT_RUN cho tới khi implementation có bằng chứng đúng SHA.
 
-### Schema và quyền thi hành
+## 5. Schema, release và worker
 
-SQL trong đặc tả là thiết kế, **không phải lệnh được phép chạy ngay**.
-Chỉ tạo migration append-only sau S00, trên main mới, lấy số kế tiếp tại lúc triển khai;
-không giữ trước số migration và không sửa file đã áp. Khác catalog thực tế thì dừng slice,
-cập nhật phụ lục mapping/ADR rồi duyệt, không đoán tên bảng/cột hoặc tự nhân đôi cơ chế đã có.
-Mọi backfill có dry-run, báo số lượng, batch/checkpoint, khả năng chạy lại và phương án đối soát.
-Những thay đổi vào auth, DB, tiền, migration, lockfile do một đầu mối tích hợp tuần tự.
+Migration append-only, số kế tiếp tại lúc code, không sửa migration đã áp. Catalog thật phải
+khớp thiết kế; object khác định nghĩa không được nuốt bằng IF NOT EXISTS. Expand/contract,
+dry-run/backfill có checkpoint và rollback tương thích; không sửa dữ liệu thật trong test.
+Runtime production chỉ kiểm schema, migration ở bước deploy riêng với role riêng.
+Auth/DB/money/schema/ERD/registry/lockfile là các file dùng chung phải có một đầu mối tích hợp.
+Tách worker chỉ khi file không chồng và contract đã ổn định. Không giả đã gọi subagent.
 
-## Nguồn và bằng chứng
+Tối đa ba repair attempts cho một failure theo AI_DELIVERY_LOOP. Không skip test/hạ threshold/
+nới quyền để lấy CI xanh. Đổi contract khác quyết định đã chốt phải báo delta; mapping thêm
+caller và xác minh môi trường không đòi hỏi chủ dự án quyết lại D01–D09.
 
-Nguồn repo là hiện trạng, không phải bằng chứng đã khai thác lỗi trên production.
-Các rủi ro từ đọc code cần tái hiện trên DB/browser disposable trước khi ghi là lỗi đã xác nhận.
+## 6. Nguồn
 
-- [S01 — quy tắc agent](https://github.com/seeker19110/xboss/blob/a2b9d7b9d28a839a5ee9cf2b23fc6b386ca292b3/AGENTS.md), CLAUDE.md, PROJECT.md, spec.md, docs/audit.md và docs/AI_DELIVERY_LOOP.md cùng SHA.
-- [S02 — helper dự án và portfolio](https://github.com/seeker19110/xboss/blob/a2b9d7b9d28a839a5ee9cf2b23fc6b386ca292b3/lib/ha-tang/projects.ts).
-- [S03 — Service Worker](https://github.com/seeker19110/xboss/blob/a2b9d7b9d28a839a5ee9cf2b23fc6b386ca292b3/public/sw.js).
-- [S04 — offline queue](https://github.com/seeker19110/xboss/tree/a2b9d7b9d28a839a5ee9cf2b23fc6b386ca292b3/app/components/offlineQueue): index.ts, logic.ts và store.ts đã đọc.
-- [S05 — tiền](https://github.com/seeker19110/xboss/blob/a2b9d7b9d28a839a5ee9cf2b23fc6b386ca292b3/lib/nen/money.ts).
-- [S06 — chi phí](https://github.com/seeker19110/xboss/blob/a2b9d7b9d28a839a5ee9cf2b23fc6b386ca292b3/lib/tai-chinh/cost.ts).
-- [S07 — DB/parser/transaction](https://github.com/seeker19110/xboss/blob/a2b9d7b9d28a839a5ee9cf2b23fc6b386ca292b3/lib/db/index.ts).
-- [S08 — kiểm restore hiện có](https://github.com/seeker19110/xboss/blob/a2b9d7b9d28a839a5ee9cf2b23fc6b386ca292b3/scripts/verify-dr-restore.ts); package.json cùng SHA xác nhận các lệnh trong PLAN.
-- [S09 — đợt 1](https://github.com/seeker19110/xboss/pull/529), [CI của HEAD đợt 1](https://github.com/seeker19110/xboss/actions/runs/36095713458).
-- [E01 — W3C Service Workers, mục Caches](https://www.w3.org/TR/service-workers/#caches): Cache API do ứng dụng quản lý; không xem Cache-Control là thay thế chính sách SW. Đây là tài liệu tiêu chuẩn đang phát triển; test tính năng thực có của browser, không giả định mọi phần đã hỗ trợ.
-- [E02 — W3C IndexedDB](https://www.w3.org/TR/IndexedDB/): phân biệt request success với transaction complete/abort; dùng làm cơ sở bảo đảm báo lưu đúng thời điểm.
-- [E03 — PostgreSQL 16 numeric](https://www.postgresql.org/docs/16/datatype-numeric.html): tính chính xác, scale và làm tròn.
-- [E04 — PostgreSQL 16 RLS](https://www.postgresql.org/docs/16/ddl-rowsecurity.html): owner/superuser/BYPASSRLS không phải role phù hợp để chứng minh cách ly ứng dụng.
-- [E05 — PostgreSQL 16 backup/PITR](https://www.postgresql.org/docs/16/continuous-archiving.html): phân biệt logical dump và base backup/WAL; cấu hình ngoài DB cần sao lưu riêng.
+S01: AGENTS.md, CLAUDE.md, PROJECT.md, spec.md, docs/audit.md, docs/AI_DELIVERY_LOOP.md.
+S02: lib/ha-tang/projects.ts. S03: public/sw.js.
+S04: app/components/offlineQueue/{index,logic,store}.ts.
+S05: lib/nen/money.ts. S06: lib/tai-chinh/cost.ts. S07: lib/db/index.ts.
+S08: scripts/verify-dr-restore.ts. S09: PR #529 và PR #530.
+S10: docs/ERD.md. S11: lib/tai-chinh/paymentcerts.ts.
+S12: lib/bao-mat/permissions.ts. SOURCE-MAP có đường dẫn cố định và phần thực tế đã đọc.
+Các đường dẫn S01–S12 được hiểu tại baseline trên, không đại diện dữ liệu production.
 
-## Điểm bắt đầu cho lần sau
+Nguồn chuẩn đã đối chiếu ngày 2026-09-25:
 
-Chỉ dẫn cho AI: đọc README này, PLAN, APPROVAL và goal; báo main SHA thật, trạng thái #529,
-các approval còn thiếu và slice đầu đủ điều kiện. Chưa Approved thì chỉ đối chiếu và báo cáo,
-không code. Khi đã Approved, thi hành đúng một slice, verify và mở PR; chưa có quyền thì không merge.
+- [PostgreSQL 16 numeric](https://www.postgresql.org/docs/16/datatype-numeric.html): numeric,
+  precision/scale và cách round ties; không dùng float làm oracle tiền.
+- [PostgreSQL 16 isolation](https://www.postgresql.org/docs/16/transaction-iso.html): snapshot
+  READ COMMITTED khác REPEATABLE READ và điều kiện retry.
+- [PostgreSQL 16 RLS](https://www.postgresql.org/docs/16/ddl-rowsecurity.html): app role khác owner.
+- [PostgreSQL 16 PITR](https://www.postgresql.org/docs/16/continuous-archiving.html): base backup+
+  WAL, archive lag và khác biệt với pg_dump. RPO/RTO là target do dự án chốt, không do tài liệu này chứng nhận.
+- [IndexedDB](https://www.w3.org/TR/IndexedDB/): transaction complete/abort khác request success.
+- [Cache API](https://developer.mozilla.org/en-US/docs/Web/API/Cache): chính sách SW phải chủ động quản lý.
+- [Web Cryptography](https://www.w3.org/TR/webcrypto/): thuật toán chuẩn, không tự chế crypto.
+- [OWASP HTML5 security](https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html):
+  local storage không là ranh giới xác thực; không coi vault là cách giải quyết XSS.

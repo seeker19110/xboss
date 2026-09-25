@@ -1,135 +1,127 @@
-# A6 — Restore có bằng chứng, phát hành an toàn và final audit
+# A6 — Khôi phục theo thời điểm và phát hành có bằng chứng
 
-State: In review. Dùng nguồn S08/E05 và hợp đồng chung README.md.
-Đọc/soạn runbook có thể đi song song; thao tác trên môi trường thật phải có quyền riêng.
-Không coi PR tài liệu hay CI ứng dụng là một lần diễn tập khôi phục.
+State: **Approved for implementation**, QUALITY-FINAL-1, 2026-09-25; thi hành sau.
+Decisions D08/D09 đã chốt: RPO tối đa5 phút, RTO tối đa60 phút, cửa sổ PITR35 ngày.
+Các số này là mục tiêu nghiệm thu, không phải khả năng đã đo hoặc SLA đã được chứng minh.
+Không có lệnh backup/restore/production hoặc lịch tự động nào được chạy bởi PR tài liệu này.
 
-## 1. Hiện trạng, mục tiêu và phương án
+## 1. Hiện trạng và lựa chọn
 
-scripts/verify-dr-restore.ts kiểm kết nối, migration name, đếm một số bảng, audit hash chain
-và quan hệ engineering khác project. Đây là verifier sau restore, không tự chứng minh backup
-khôi phục được, file upload còn đủ, migration không bị sửa hoặc dữ liệu không bị mất.
-Không thực hiện backup/restore trong phiên viết đặc tả này.
+verify-dr-restore hiện kiểm kết nối, migration names, đếm một số bảng, hash audit và một
+nhóm quan hệ engineering. Nó không chứng minh backup phục hồi đầy đủ, file/key còn đủ hay
+RPO/RTO đạt. Chọn manifest có bằng chứng, base backup+WAL liên tục, attachments có phiên bản,
+key references riêng và restore đích cách ly. Không dùng chỉ pg_dump làm PITR.
 
-Không làm: có backup nhưng không biết phục hồi được. Chỉ kiểm script exit 0: coverage hẹp.
-Chọn manifest + restore vào môi trường cách ly + đối soát dữ liệu/files/quyền + UAT.
-Default để duyệt: RPO <= 24 giờ, RTO <= 4 giờ. Đây là mục tiêu đề xuất chi phí thấp, không
-phải SLA đã đạt hoặc đã được chấp thuận. Nhu cầu mất dữ liệu ít hơn phải duyệt chiến lược
-base backup+WAL/PITR hoặc dịch vụ tương ứng; không quảng cáo pg_dump là PITR.
+Giữ modular monolith và các script có ích, mở rộng verifier thay vì mua nền tảng vận hành
+không cần thiết. Chi phí hạ tầng/key/store và quyền truy cập nguồn thật vẫn là đầu vào
+triển khai cần cấp riêng; không tự mua hoặc coi “chất lượng cao” là quyền chi tiêu không giới hạn.
 
-## 2. Phạm vi backup và manifest
+## 2. Backup, consistency và retention
 
-A6-FR01: một recovery set gồm DB snapshot nhất quán, file upload/object-storage được tham
-chiếu, phiên bản ứng dụng, migration file+checksum, cấu hình hạ tầng và danh sách secret/key
-cần phục hồi bằng secret manager. Không đưa giá trị secret/private key vào Git/artifact công khai.
-Thông tin role/grants/RLS, extension và timezone thuộc manifest. File đính kèm ngoài DB
-không được mặc định đã có trong DB backup.
+A6-FR01: recovery set gồm DB/base backup/WAL tới điểm phục hồi, object versions được DB
+tham chiếu, migration checksum, app SHA, grants/RLS/extensions/timezone và cấu hình hạ tầng.
+Secret/KEK/vault key references có quy trình phục hồi riêng, không nhét secret/raw key vào Git,
+logs hoặc manifest công khai. Ciphertext draft mất KEK không được giả khôi phục được.
 
-Manifest schema đề xuất: recoverySetId, sourceEnvironmentId, backupStartedAt/CompletedAt,
-dbSnapshotId hoặc điểm WAL, appSHA, postgresMajor, migrations[{name,sha256}], bảng rowCounts,
-canonical financial totals theo project đã phép, audit-chain watermark/coverage,
-attachment manifest key+size+hash/version, encryptionKeyReference và tool versions.
-Manifest phải được lưu chống sửa trong kho được phép; quyền đọc tương ứng dữ liệu nhạy cảm.
-Không ghi tên người/hợp đồng nếu chỉ technical ID/hash đủ đối soát.
+Manifest: recoverySetId, source identity rút gọn, started/completed timestamps, PostgreSQL
+major/tool versions, appSHA, baseBackupId, timeline/LSN/WAL coverage, migration name+SHA256,
+row counts và checksums theo snapshot, exact finance totals, audit coverage/watermark,
+attachment key/version/size/hash và encryptionKeyReference. Manifest lưu chống sửa ở nơi
+chỉ người có quyền dữ liệu được đọc. ID/hash kỹ thuật thay tên người/hợp đồng khi đủ dùng.
 
-DB và object files cần điểm nhất quán: dùng object version/immutable key, giữ versions đã được
-DB snapshot tham chiếu và manifest cùng recovery set. Không so dump ở T0 với danh sách files
-hiện tại T1 rồi báo đầy đủ. Nếu snapshot boundary không đồng bộ được thì runbook phải nêu
-cửa sổ sai lệch, cơ chế đối soát và no-go khi thiếu attachment quan trọng.
+A6-FR02: daily base backup, WAL chain liên tục cho mọi điểm trong35 ngày; giữ base backup
+trước mép cửa sổ nếu cần, không xóa WAL dựa riêng ngày tạo file khi còn dependency.
+Có bản mã hóa chống sửa/xóa ngoài miền lỗi ứng dụng; quyền app không xóa backup.
+Kế hoạch key rotation không xóa KEK/version khi recovery window hoặc draft còn cần.
+35 ngày là cửa sổ phục hồi vận hành, không tự thay retention chứng từ/audit có nghĩa vụ riêng.
 
-A6-FR02: mã hóa backup, tách quyền ứng dụng khỏi quyền xóa backup; giữ ít nhất một bản sao
-ở miền lỗi khác là đề xuất vận hành cần owner duyệt. Retention, nơi lưu và chi phí không
-được tự cấu hình. Định kỳ kiểm checksum/tải thử; kích thước file >0 không chứng minh hợp lệ.
+A6-FR03: object key immutable/versioned; không so DB snapshot ởT0 với danh sách file hiện tạiT1
+rồi báo consistency. Attachment critical phải được copy/version/hash bảo toàn theo các điểm
+PITR được hỗ trợ. Thu gom orphan hoặc xóa object chỉ khi không còn DB/recovery set tham chiếu.
+Nếu không có đủ object version cho điểm DB đã chọn thì recovery set đó FAIL, không PASS một nửa.
 
-## 3. Quy trình diễn tập không phá production
+A6-FR04: archive_timeout60 giây là điểm khởi đầu, chưa chứng minh RPO. Kiểm archive lag,
+canary transaction và object replication; cảnh báo2 phút, vi phạm target5 phút.
+Nếu không có giao dịch nguồn/canary để đối chiếu thì ghi độ phân giải bằng chứng hoặc
+NOT_RUN, không suy transaction-level RPO từ mtime backup.
+Không tuyên bố RPO0/failover tự động nếu chưa có replication/quorum/fencing riêng được kiểm.
 
-Bước 1: owner xác nhận recovery set, môi trường nguồn/đích, quyền đọc dữ liệu và mục tiêu
-RPO/RTO. Dùng dữ liệu tổng hợp trước; snapshot thật chỉ khi có phép và bảo vệ PII.
-Bước 2: dựng DB/namespace rỗng tên riêng, network egress bị chặn; tắt cron/email/Telegram/
-webhook/Sheet/provider. Credential đích khác nguồn và không có quyền tới DB production.
-Bước 3: preflight xác minh hostname/port/database/user/marker đích; nếu trùng production,
-không có marker disposable hoặc người vận hành chưa xác nhận thì dừng trước bất kỳ ghi nào.
-Không dùng NODE_ENV hay hậu tố tên DB làm bằng chứng duy nhất rằng đích an toàn.
-Bước 4: tải và kiểm checksum recovery set, giải mã trong vùng tạm hạn chế quyền; restore DB
-và attachments theo công cụ/phiên bản hỗ trợ. Không tự thêm --clean vào lệnh nguồn đang chạy.
-Bước 5: ghim app SHA tương ứng snapshot, so migration checksum. Verifier chỉ được đọc; không
-dùng helper auto-migrate để vô tình nâng schema trong phép đối soát. Mọi pending migration
-chạy ở giai đoạn nâng cấp riêng có log, không trộn với bằng chứng restore snapshot.
-Bước 6: chạy ma trận dưới với role kiểm chứng thích hợp; kiểm app bằng role NOBYPASSRLS
-khác role restore/owner. Bước 7: ghi timestamps/độ mất dữ liệu/bằng chứng UAT và kết luận.
-Bước 8: owner duyệt kết quả; chỉ sau đó hủy bản sao theo retention đã định. Không tự xóa
-môi trường diễn tập để che một lần restore thất bại.
+## 3. Runtime, verifier và diễn tập
 
-## 4. Contract verifier đích
+A6-FR05: migration production ở bước deploy riêng bằng role migration; runtime app chỉ kiểm
+schema tương thích, không DDL trong HTTP/health/diagnostics. Thiếu migration trả lỗi readiness
+có mã rõ; không tự seed hoặc sửa schema khi user gọi auth/me. DEV/test có lệnh chủ động riêng.
 
-Tái dùng `npm run audit:verify-dr` và `audit:verify-chain` sau khi sửa preflight/coverage trong
-slice S14; không suy rằng các cờ mới dưới đây đã tồn tại trong scripts hiện tại.
-Verifier đích nhận manifest path, expected target identity và evidence output path qua CLI
-được đặc tả trong slice; không nhận secret bằng command-line gây lộ process list.
-Output JSON có checkId, status PASS/FAIL/NOT_RUN, expected/actual digest hoặc count,
-startedAt/finishedAt, target identity đã rút gọn, appSHA và reason. Có exit != 0 khi FAIL hoặc
-bắt buộc NOT_RUN. “Không kiểm được” không được chuyển thành PASS. Không in raw DB URI.
+Verifier chỉ đọc và không kéo helper auto-migrate vào phép đối soát. Input contract gồm
+manifest path, expected target identity, evidence output; secret qua cơ chế an toàn không
+CLI argument. Output JSON PASS/FAIL/NOT_RUN từng check, appSHA/specVersion/env, thời điểm,
+expected/actual count/digest, reason. Mandatory FAIL/NOT_RUN exit khác0, không in raw URI.
+Các cờ mới phải được implementation/test trước khi dùng; command hiện có không tự có chúng.
 
-A6-FR03: bắt buộc kiểm:
+A6-FR06: trước restore phải xác minh host/port/database/user/marker đích disposable, nguồn
+và đích khác, quyền không có khả năng ghi production. Không dùng NODE_ENV hoặc hậu tố tên
+DB làm bằng chứng duy nhất. Target không xác định thì dừng trước ghi. Không chạy thử phá
+production để chứng minh preflight có tác dụng.
 
-- Migration cả tên và checksum khớp app snapshot, không thừa/thiếu/sửa file âm thầm.
-- Row counts và deterministic checksum/totals từ snapshot manifest; không chỉ query được bảng.
-- Foreign key orphan, constraint chưa validate và quan hệ chéo project/org trên toàn inventory
-  trọng yếu của A1/A5, không chỉ engineering_relations. Count=0 do RLS che dữ liệu không là PASS.
-- Audit hash chain đúng và coverage ký đủ theo policy; “0/0 được ký” không là bằng chứng đầy đủ.
-- Chuỗi task/BOQ/contract/IPC/payment và tổng tiền canonical theo A3/A4 khớp nguồn snapshot.
-- Attachment tồn tại, dung lượng/hash đúng và mở được qua API với quyền đúng; file bị cấm
-  không mở được bằng direct URL/role khác. Critical files phải đủ 100%, không lấy sample thay.
-- users/roles/membership/2FA/session revocation hoạt động, không sinh demo users qua HTTP.
-- Smoke login, switch project, read tracking, nghiệm thu/phát hành test trên dữ liệu tổng hợp,
-  export và logout; không gửi thông báo thật ra hệ ngoài.
+Đích restore tắt egress, cron, email, Telegram, webhook, Sheet và provider thật. Dữ liệu tổng
+hợp trước; snapshot production chỉ khi có phép với bảo vệ PII. Phục hồi app SHA tương thích
+snapshot trước khi thử upgrade; pending migration là giai đoạn riêng không trộn với restore.
 
-A6-FR04: ghi RPO thực tế từ mốc giao dịch nguồn gần nhất có thể chứng minh tới mốc giao dịch
-cuối phục hồi; chỉ có timestamp backup không được bịa RPO transaction-level. Ghi rõ độ phân
-giải của bằng chứng. RTO đo từ tuyên bố bắt đầu phục hồi tới hoàn tất readiness/UAT, gồm
-thời gian tìm backup/key/restore/files/app/check, không chỉ thời gian pg_restore.
-Không có marker nguồn phù hợp thì mục đo là NOT_RUN và chưa đạt target.
+A6-FR07: verifier kiểm tên/checksum migration, row counts/digests, FK/orphan/cross-org-project
+mọi bảng trọng yếu trong inventory, constraints/policies/grants, hash audit và coverage ký,
+exact totals/chuỗi BOQ-contract-IPC-payment, attachments100% critical, key khả dụng và access
+đúng role. Count0 vì RLS che không được coi không vi phạm; kiểm toàn vẹn bằng role được cấp
+cho audit, sau đó kiểm API bằng app role NOBYPASSRLS. Không nhầm owner query với bằng chứng RLS.
 
-## 5. Acceptance và fault injection
+A6-FR08: RTO đo từ bắt đầu sự cố/khôi phục tới app ready và smoke/UAT xong, gồm tìm key,
+backup, restore DB/files, app và validation. RPO đo theo nguồn giao dịch/canary đã chứng minh.
+Dữ liệu quá lớn khiến không đạt60 phút thì phải nâng năng lực recovery hoặc xử lý trước release,
+không tự đổi target thành4 giờ trong báo cáo PASS. Ghi rõ workload/domain đã đo.
 
-A6-AC01: restore fixture mới đủ DB+file+permission+money+audit; manifest và appSHA khớp,
-đích cách ly, không outbound side effects. Test pipeline disposable.
-A6-AC02: làm hỏng checksum backup, thiếu attachment critical, thiếu key hoặc migration
-mismatch: từng lỗi phải FAIL rõ, không báo “toàn bộ đạt”. Test không dùng secret thật.
-A6-AC03: cố cấu hình URI production/không marker: preflight chặn trước ghi; diagnostics
-không tự migrate và không lộ URI/secret.
-A6-AC04: nhập fixture cross-org/orphan/audit tamper hoặc role BYPASSRLS: verifier phát hiện;
-kiểm admin UI không thay cho truy vấn toàn vẹn bằng role kiểm toán có kiểm soát.
-A6-AC05: RPO/RTO có timestamps, manifest và nguồn đối chiếu; kết quả chưa đo không được
-đánh dấu đạt. Operator khác có thể lặp runbook mà không dựa vào lịch sử chat.
-A6-AC06: phục hồi lỗi giữ bằng chứng, không ghi đè backup tốt hoặc phá nguồn; cleanup có phê duyệt.
+## 4. Chu kỳ và kiểm thử lỗi
 
-## 6. Cổng phát hành sau A1–A5
+Yêu cầu vận hành tương lai: kiểm backup hằng ngày, full isolated restore hằng tuần,
+PITR/mất máy hằng tháng và trước thay schema rủi ro. Chưa tạo scheduler/automation ở phiên này.
+Thử điểm gần hiện tại và mép cửa sổ35 ngày; thiếu WAL/base/key/objectversion phải FAIL rõ.
+Giữ evidence của lần thất bại, không xóa đích hoặc ghi đè bản backup tốt để che lỗi.
 
-Release evidence phải có: main SHA, các PR đã merge, AC→test/artifact, output release-gate,
-PostgreSQL/RLS đúng role, E2E desktop/mobile, axe, browser offline thật, đối soát tiền/báo cáo,
-UAT đủ role và restore drill. Một test critical bị skip = chưa đạt, trừ ngoại lệ được owner
-duyệt với lý do/phạm vi/rủi ro rõ ràng; không sửa allowlist để che failure mới.
+A6-AC01: recovery set tổng hợp restore đủ DB/files/quyền/money/audit và đúng app/migrations;
+không outbound side effects.
+A6-AC02: backup checksum hỏng, thiếu attachment critical/key, migration mismatch làm verifier
+FAIL đúng hạng mục; query count thành công không che thiếu dữ liệu.
+A6-AC03: target trùng nguồn/production/không marker bị chặn trước ghi; verifier không auto-DDL
+và không lộ URI/secret.
+A6-AC04: cross-org/orphan/audit tamper hoặc role bypass sai bị phát hiện; zero do policy che
+không PASS giả.
+A6-AC05: mốc RPO/RTO, workload, LSN/timeline và độ phân giải nguồn được ghi, đạt target đã chốt
+mới PASS; thiếu phép đo là NOT_RUN. Operator khác lặp được runbook không cần chat cũ.
+A6-AC06: lỗi diễn tập không phá nguồn/backup tốt, giữ evidence và cleanup theo quyền đã cấp.
+Q-AC07 kiểm runtime/readiness không migrate; Q-AC08 kiểm PITR5m/60m và35 ngày.
 
-Đề xuất trình tự vận hành sau phê duyệt: backup xác minh → compatibility/membership/queue
-preflight → staging → canary nhóm pilot → đối soát → mở rộng → quan sát 24 giờ.
-Cửa sổ 24 giờ là đề xuất để owner duyệt, không là lịch tự động được tạo bởi tài liệu này.
-Một canary cross-project/sai tiền/mất draft/bypass nghiệm thu là stop tức thì. Performance
-regression vượt 20% cùng điều kiện phải điều tra trước mở rộng.
+## 5. Phát hành và rollback
 
-Rollback phân ba lớp: code về phiên bản tương thích schema/queue; tắt khả năng lỗi nhưng
-không mở lại cache chung/fallback scope; dữ liệu đã chốt sửa bằng forward-fix/reversal được
-duyệt. Không down-migrate kiểu phá hủy, không reset DB hoặc admin production tự động.
-Operator quyết định restore thật là sự kiện riêng, có impact/RPO chấp thuận.
+S15 chỉ CODE_COMPLETE khi54 AC và toàn bộ gates bắt buộc có evidence đúng main/release SHA,
+không critical skip mới, không P0/P1 còn mở. UAT đủ vai trò, Safari/iOS thật, desktop/mobile,
+axe, money/export, warning/IPC, encrypted queue và restore. Reviewer độc lập ghi kết quả của
+họ, không tick thay hoặc coi cùng tác giả tự review là kiểm độc lập.
 
-## 7. Ownership, quan sát và final audit
+S16 cần quyền production rõ cho release SHA, môi trường, secrets, chi phí và người vận hành.
+Backup đã thử → schema/membership/legacy queue preflight → pilot một project48h → tối đa25%
+project24h → mở rộng và quan sát7 ngày. Phải có đủ giao dịch thử/tình huống, không chỉ đợi đồng hồ.
+Rò dữ liệu, sai tiền, lost draft do app, bypass QA/approval hoặc archive lag vượt guardrail
+là dừng mở rộng. Mục tiêu performance theo D09 có phép đo, không hạ để lấy PASS.
 
-Đầu mối triển khai, chủ dữ liệu tài chính, reviewer bảo mật và người vận hành backup phải
-được điền ở APPROVAL. Alert backup_age, restore_check_failure, missing_attachment và
-reconciliation_failure không chứa PII; lịch monitor là việc vận hành cần xác nhận, chưa bật.
+Rollback ba lớp: code về bản hiểu schema/queue; đóng capability lỗi nhưng giữ fail-closed;
+dữ liệu chốt xử lý forward-fix/adjustment được duyệt. Không down-migrate phá bảng,
+không khôi phục cache chung/project1 hoặc tự reset admin. Restore production thật là hành
+động riêng có tác động dữ liệu và quyền rõ; diễn tập thành công không tự cấp quyền làm thật.
 
-Đóng goal chỉ khi mọi slice bắt buộc có evidence trên main, không còn P0/P1 liên quan,
-không còn migration/backfill/queue legacy dang dở, đã UAT và owner duyệt vận hành.
-Tách CODE_COMPLETE khỏi RELEASE_VERIFIED; docs complete hoặc CI green không đồng nghĩa
-production hoàn thiện. Báo residual risk và out-of-scope, kể cả các phiên bản browser chưa test.
-Không cần DDL cho runbook/verifier; thay schema thiếu do A1/A5 phải qua slice schema riêng.
+## 6. Ownership và Definition of Done
+
+Chủ dự án đã chốt thiết kế. Người triển khai/reviewer/người giữ key/on-call phải được ghi
+khi giao việc thực, không giả họ đã được chỉ định hoặc đã ký UAT. Metrics backup_age,
+archive_lag, missing_attachment, restore_check_failure và reconciliation_mismatch không PII.
+Bằng chứng có runbook/version/commands/target manifest/CI URL và chữ xác nhận vận hành.
+
+RELEASE_VERIFIED chỉ khi deploy được cấp quyền, recovery/UAT/observability thật và owner xác
+nhận. Docs complete, CI xanh hoặc một restore fixture không đồng nghĩa production đã hoàn thiện.

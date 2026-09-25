@@ -1,141 +1,138 @@
-# A5 — Bất biến xuyên BOQ, vật tư, thi công, nghiệm thu và thanh toán
+# A5 — Chuỗi nghiệp vụ đúng chính sách và chống duyệt sai
 
-State: In review. Phụ thuộc S00, A1, A3; tích hợp A2/A4 theo PLAN.
-Đây là đặc tả kiểm chứng và vá hẹp, không là dự án viết lại các module đã có.
-Hợp đồng chung về auth, tiền, UX, audit và quyền thi hành: README.md.
+State: **Approved for implementation**, QUALITY-FINAL-1, 2026-09-25; thi hành sau.
+Decision D05/D07. Đọc SOURCE-MAP/DATA-CONTRACTS trước khi sửa vùng nghiệm thu/tài chính.
 
-## 1. Hiện trạng và giới hạn xác minh
+## 1. Quyết định thay thế v1
 
-PROJECT.md/spec.md và docs/audit.md đã quy định chuỗi tiến độ, QA&QC, nghiệm thu, BOQ và
-thanh toán. Route nghiệm thu task có FOR UPDATE, progress đủ 1, checklist đạt, approval
-engine và approval_source. Route tạo IPC dùng CAN.manageContracts, kiểm contract/project,
-suggestQtyForContract, saveCertItems, certTotals và openApproval.
-Không biến việc có các hàm này thành khẳng định tất cả race/cross-project đã được test.
+Mã paymentcerts.ts ghi quyết định người dùng ngày 2026-09-04: vượt khối lượng hợp đồng là
+**cảnh báo, không chặn cứng**. Chương này giữ quyết định đó. Yêu cầu v1 coi accepted qty/
+contract qty là trần cứng mọi IPC và các test buộc chỉ một IPC15 thành công khi còn20 được
+thay thế. Không coi cao chất lượng đồng nghĩa khóa một quy trình phát sinh đã được cho phép.
 
-Nguồn đọc thêm cùng baseline:
-[nghiệm thu task](https://github.com/seeker19110/xboss/blob/a2b9d7b9d28a839a5ee9cf2b23fc6b386ca292b3/app/api/tasks/%5Bid%5D/approve/route.ts),
-[tạo IPC](https://github.com/seeker19110/xboss/blob/a2b9d7b9d28a839a5ee9cf2b23fc6b386ca292b3/app/api/payment-certs/route.ts).
-Toàn bộ status/column của các module chưa được đọc đầy đủ ở phiên đặc tả này; S00 phải lập
-mapping cụ thể trước slice code. Không gán status mới cho bảng thật từ sơ đồ khái niệm dưới.
+Các trạng thái IPC thật: draft, submitted, approved, rejected; không tạo cancelled giả.
+Gợi ý qty hiện từ thực hiện theo tiến độ không phải chứng cứ khối lượng nghiệm thu.
+IPC đang sum rồi round tổng; giữ ipc-sum-v1 và snapshot theo A3.
 
-Không làm: khó chứng minh chuỗi cuối. Rewrite engine: rủi ro lớn và trùng cơ chế.
-Chọn giữ engine/service hiện có, một bộ fixture liên miền, test invariants và chỉ vá failure
-đã tái hiện. Không nối vật tư nhận hàng thành tiền thực chi khi chưa có quyết định nghiệp vụ.
+Chọn hoàn thiện các engine/service hiện có bằng invariants, warning acknowledgement,
+khóa transaction và hồ sơ quyết định. Không viết engine mới, tự thay hợp đồng/thuế/SoD hoặc
+nối mọi nghiệp vụ thành một luồng bắt buộc không có ngoại lệ advance.
 
-## 2. Hợp đồng chuỗi và nguồn sự thật
+## 2. Hợp đồng chuỗi
 
-Sơ đồ nghiệp vụ tham chiếu: BOQ → hợp đồng/đơn hàng → ghi nhận thi công → QA&QC/nghiệm thu
-→ đề nghị/đợt thanh toán → phê duyệt → ghi nhận thanh toán → đối soát báo cáo.
-Đây không là luật mọi luồng phải đi đúng một đường: advance có thể đi trước nghiệm thu;
-PO nhận hàng không đồng nghĩa chi tiền; IPC được duyệt không đồng nghĩa đã thanh toán.
+BOQ/hợp đồng/mua sắm/thi công/QA/nghiệm thu/IPC/thanh toán liên kết bằng ID nguồn đúng scope.
+Thi công không đồng nghĩa nghiệm thu; approved IPC không đồng nghĩa đã chi tiền; PO nhận
+hàng không tự ghi chi tiền. Dữ liệu manual được phép phải có nguồn/lý do, không gắn nhãn giả.
 
-A5-FR01: tất cả liên kết phải cùng org/project theo A1; BOQ liên kết task/material/contract
-qua mã/ID được định nghĩa trong schema, không nối tùy theo tên gần giống.
-Import cùng dữ liệu lần hai không nhân dòng; bảo toàn cơ chế unique BOQCODE hiện hữu.
-Mã/ID sai hoặc trùng mơ hồ trả báo cáo từng dòng, không tự tạo bản ghi khác để “import thành công”.
+A5-FR01: BOQ, task, material, contract/cert/payment và supplier có quan hệ đúng org/project.
+boq_codes unique theo org như schema hiện có, không cấm hai org có cùng mã hợp lệ.
+Import rerun không nhân dòng, liên kết theo khóa rõ; mã mơ hồ trả lỗi từng dòng để xử lý,
+không tự tạo thêm bản ghi gần giống. FK có mặt chưa đủ nếu hai đầu thuộc hai project khác nhau.
 
-A5-FR02: phiếu nhận vật tư/giao nhận tính đúng nguồn, hủy/đảo giao dịch có lý do và dấu vết;
-request retry không cộng tồn hai lần. Đồng bộ Sheet chỉ cập nhật snapshot sau remote write
-thành công. Lỗi giữa remote write và local ACK cần reconcile idempotent, không đẩy bù mù.
-Không gọi provider thật hoặc có phí trong test; fault injection bằng fake adapter có hợp đồng.
+A5-FR02: giao/nhận vật tư và tồn kho không cộng hai lần khi retry. Tái dùng idempotency của
+warehouse_receipts theo po_id/idempotency_key cho miền kho, không thay bằng receipt offline
+chỉ vì cùng tên. Đồng bộ Sheet chỉ ghi snapshot khi remote write thành công; mất ACK hoặc
+lỗi giữa các bước phải reconcile, không ghi đè thay đổi người khác. Tests dùng fake provider.
 
-A5-FR03: tiến độ task đúng số ô/tổng ô theo quy tắc hiện có. Không làm tròn 99,5% lên “xong”.
-Ngăn tăng qua hold-point đang chặn trên cả tick đơn, batch, offline replay, import và đường
-bulk có khả năng đổi tiến độ. Giao nhiều task cùng package phải có thứ tự khóa nhất quán;
-không lost update khi hai request cập nhật các ô khác nhau.
+A5-FR03: tiến độ chính xác số ô trên tổng ô, không làm tròn 199/200 thành hoàn thành.
+Hold-point chặn tăng tiến độ trên single/batch/offline/import cùng semantics. Khóa task/
+package theo thứ tự ổn định; hai request cập nhật hai ô khác nhau không lost update.
 
-A5-FR04: nghiem_thu chỉ đặt khi đủ 100%, QA&QC đạt và các bước duyệt đang áp đã xong.
-Pending/rejected không đổi status thành nghiem_thu. Recompute không hạ nghiem_thu tự động.
-Duyệt lô và duyệt đơn dùng cùng invariants, assignment/permission và semantics nguyên tử
-đã công bố. Hủy duyệt tầng không hủy nhầm task có approval_source='task'.
-Không cho client PATCH status trực tiếp đi vòng gate.
+A5-FR04: nghiem_thu chỉ sau đủ 100%, QA required đạt và approval flow hoàn tất. Pending/
+rejected không tự chuyển status. Recompute không hạ nghiem_thu; hủy duyệt tầng phải giữ task
+approval_source=task được duyệt riêng. Không route PATCH status bypass gate hoặc admin bypass.
+Giữ quyền CAN.approve, assignment và SoD/flow đang có, không tự tạo người ký thay người thật.
 
-A5-FR05: phân biệt qty thực hiện, qty nghiệm thu, qty đề nghị kỳ này, qty đã duyệt lũy kế và
-qty đã thanh toán. Với thanh toán theo khối lượng nghiệm thu, hạn mức:
-qty kỳ được duyệt + qty các kỳ đã duyệt trước không vượt qty nghiệm thu hợp lệ và giới hạn
-contract/VO đã duyệt. Kiểm lại tại thời điểm approve/commit, không chỉ lúc gợi ý tạo draft.
-Không đếm draft/cancelled/rejected vào lũy kế được duyệt. Không dùng progress float × BOQ
-làm chứng cứ nghiệm thu khi contract yêu cầu qty nghiệm thu riêng.
+## 3. IPC, cảnh báo và cạnh tranh
 
-Nếu mapping nghiệm thu–BOQ hiện chưa đủ, cho lưu draft/gắn trạng thái cần đối soát;
-không tự phát hành thanh toán hoặc giả định toàn bộ qty đã được nghiệm thu. Luồng nhập
-khối lượng thủ công đã được duyệt phải được ghi rõ nguồn và approval, không âm thầm xóa.
-Điều này là thay đổi nghiệp vụ cần owner tài chính duyệt ở APPROVAL trước slice enforcement.
+A5-FR05: draft/trình IPC vẫn được ghi nhận phần vượt hợp đồng như hiện tại; server tính
+cảnh báo theo từng dòng BOQ, lũy kế và basis nguồn. Khối lượng thực hiện/nghiệm thu/đề nghị/
+được duyệt/đã thanh toán là các đại lượng riêng. Không lấy tỷ lệ progress làm nhãn đã nghiệm thu.
+Thiếu bằng chứng nguồn ghi rõ cần đối soát; luồng manual không bị xóa, nhưng không giả đủ hồ sơ.
 
-A5-FR06: advance/retention/recovery/credit note có rule riêng theo hợp đồng; không áp điều
-kiện nghiệm thu giống IPC cho advance. Không đổi thuế suất, ngày đến hạn, thứ tự bù trừ
-hoặc quyền ký. Chứng từ đã chốt có snapshot các basis/rate/rule version; sửa đơn giá BOQ
-hôm nay không đổi tiền của chứng từ đã phát hành hôm qua.
+A5-FR06: trước quyết định cuối, khóa contract rồi cert/lines theo thứ tự ổn định; tính lại
+lũy kế từ tập IPC approved có hiệu lực và dữ liệu kỳ đang duyệt, không tin cumulative draft.
+Với cùng BOQ nhiều kỳ, không SUM các cumulative snapshots rồi đếm lặp. Duy trì qty_period
+và cumulative đúng nghĩa; chứng từ reversed/adjusted theo quy trình đã chốt không bị tính hai lần.
 
-A5-FR07: hai người approve hai IPC của cùng contract đồng thời phải serialize kiểm lũy kế
-và commit theo khóa contract/nguồn nghiệm thu với thứ tự ổn định. Nếu chỉ đủ hạn mức cho
-một đợt, chỉ một thành công; đợt còn lại conflict có lý do. Audit/domain event cùng transaction
-với thay đổi DB, một transition hợp lệ tạo một event; log kỹ thuật có thể ghi mọi retry.
-Idempotency của A2 chỉ hỗ trợ bốn kind offline, không tự mở rộng receipt đó sang payment;
-tái dùng cơ chế nghiệp vụ hiện có hoặc đặc tả key cho endpoint thanh toán trong slice riêng.
+Khi có kỳ sau đã approved, không duyệt kỳ trước rồi âm thầm sửa snapshot kỳ sau.
+Trả conflict cần reconciliation/adjustment; cho lập chứng từ điều chỉnh theo quyền hiện có.
+Đây là kiểm thứ tự/toàn vẹn, không phải trần mới cấm overrun.
 
-A5-FR08: hủy nghiệm thu đã được chứng từ downstream tham chiếu không được làm mất tính
-hợp lệ im lặng. Default đề xuất: chặn 409 dependency_conflict khi downstream đã chốt;
-liệt kê chỉ các tham chiếu được phép thấy. Sửa bằng quy trình adjustment/reversal được duyệt,
-không DELETE audit hoặc giảm trực tiếp số tiền lịch sử. Với downstream draft phải đánh dấu
-cần tính/duyệt lại; không âm thầm giữ draft đủ điều kiện phát hành.
+A5-FR07: response quyết định trả warningVersion do server tạo từ phiên bản nguồn và danh sách
+cảnh báo canonical. Client hiển thị từng dòng, yêu cầu acknowledgement và reason khi có cảnh
+báo. Server tính lại dưới khóa; warningVersion cũ trả409 warning_changed để người có quyền
+xem và xác nhận lại. Xác nhận hiện tại hợp lệ thì không chặn chỉ vì vẫn vượt hợp đồng.
+Không có cảnh báo thì không đòi xác nhận cảnh báo rỗng.
 
-## 3. Contract API, trạng thái và data mapping bắt buộc
+Cảnh báo không được bỏ qua khi retry, API ngoài UI hoặc batch. UI hiện loading/conflict và
+nguồn thay đổi, không nút bấm tự gửi lại với acknowledged=true. Business audit giữ actor,
+reason, danh sách cảnh báo và version. Role không có quyền không được dùng acknowledgement
+để vượt auth. Một lỗi 409 không được hiện như “đã duyệt”.
 
-Giữ route hiện có: /api/dimensions/:id, /api/dimensions/batch, /api/tasks/:id/approve,
-/api/approvals, /api/payment-certs và các route update/approve/cancel thực tế từ inventory.
-Không tạo endpoint song song chỉ để vượt middleware. Mã lỗi/permission dùng README/A1;
-đường cũ cần adapter giữ payload/status đã có tới khi client chuyển, có contract test.
+A5-FR08: transition, business audit và immutable snapshot cùng transaction; duplicate request
+không tạo transition/snapshot/lịch sử mới. Receipt offline không tự áp vào payment;
+endpoint IPC dùng idempotency theo contract cụ thể ở DATA-CONTRACTS. Cùng operationId khác
+payload báo conflict. Chỉ COMMIT thành công mới phát sự kiện xuôi dòng; tích hợp ngoài DB
+có outbox/retry phù hợp cơ chế hiện hữu, không hứa exactly-once network delivery.
 
-S00 phải xuất bảng mapping cho từng transition gồm: entity/table, parent scope, trạng thái
-đầu/cuối thật, route+method, CAN key, assignment/SoD, lock root, quantity/amount basis,
-unique/idempotency, lịch sử/audit, file test. Trạng thái mới chỉ thêm khi có product approval.
-Permission read-only bch/cdt/viewer không được ghi dù được xem. Không tự mở rộng quyền
-engineer/subcon từ khả năng chuẩn bị dữ liệu sang quyền duyệt.
-SoD nhiều bước giữ cấu hình đã chốt; chưa có policy thì ghi decision, không tự tạo luật
-“admin được duyệt mọi bước” hoặc khóa hết quy trình một người mà không owner duyệt.
+A5-FR09: snapshot quyết định đóng băng qty, giá, rate, basis, tổng, rule version và cảnh báo.
+Đổi BOQ hoặc hợp đồng sau đó không reprice chứng từ cũ. Legacy thiếu snapshot ghi provenance,
+không tái dựng bằng giá hôm nay. Advance có điều khoản riêng; không tự yêu cầu khối lượng
+nghiệm thu giả hoặc trừ thu hồi tạm ứng hai lần.
 
-Không có DDL chung bắt buộc cho bộ test. Nếu failure chứng minh thiếu unique/FK/snapshot,
-thực hiện một migration hẹp sau S00 với tên cột thực tế, backfill có đối soát và snapshot
-history không bị ghi đè. Không thêm bảng sổ cái mới nếu bảng hiện có đã đáp ứng.
+A5-FR10: hủy upstream có downstream đã chốt bị chặn dependency_conflict và phải adjustment/
+reversal được duyệt, không DELETE history hoặc sửa trực tiếp tiền. Downstream draft cần đánh
+dấu tính/duyệt lại khi nguồn đổi. Danh sách dependency chỉ gồm tài nguyên được phép thấy.
 
-## 4. Fixture liên miền và acceptance
+## 4. Schema/API và điểm chạm
 
-Fixture dùng dữ liệu tổng hợp, ít nhất hai org, mỗi org hai project, đủ bảy role, contract
-và BOQ khác nhau nhưng cùng mã hiển thị để bắt join nhầm. Không hardcode FK=1; lấy ID insert.
+Giữ /api/dimensions/:id, /api/dimensions/batch, /api/tasks/:id/approve, /api/approvals và
+/api/payment-certs cùng các endpoint quyết định hiện hữu. Thêm warningVersion/acknowledged/
+reason và snapshot contract theo DATA-CONTRACTS, không mở route đi vòng auth/approval engine.
 
-A5-AC01: cùng import chạy hai lần cho kết quả nguồn/idempotency như nhau; lỗi partial có
-báo cáo và rerun không nhân BOQ/material/task. Fault remote Sheet write không làm snapshot
-đi trước sự thật và không rollback người dùng khác.
-A5-AC02: task có 199/200 ô không được nghiệm thu; đủ ô nhưng checklist fail vẫn bị chặn;
-flow pending/rejected giữ trạng thái cũ; tất cả step xong mới nghiem_thu và ghi history.
-A5-AC03: hai request tick/approve cùng task/package không lost update, không duplicate
-event; batch/offline không bypass gate. Hủy tầng giữ task đã duyệt riêng.
-A5-AC04: contract 100 đơn vị, nghiệm thu 60, đã duyệt kỳ trước 40: đề nghị thêm 20 đủ giới
-hạn; 21 bị chặn tại approve. Tạo draft không làm tăng số đã duyệt. VO pending không tăng trần.
-A5-AC05: hai IPC mỗi cái 15 khi còn hạn mức 20 chạy đồng thời: tổng duyệt không vượt 20.
-Không pass chỉ vì fixture gửi tuần tự hoặc DB test dùng mutex giả.
-A5-AC06: advance hợp lệ theo điều khoản vẫn làm được khi chưa nghiệm thu; không cộng vào
-qty đã nghiệm thu hoặc thu hồi hai lần. Dùng fixture hợp đồng được duyệt, không giả thuế suất.
-A5-AC07: hủy upstream có downstream chốt bị chặn; adjustment có approval và audit; chứng từ
-lịch sử không thay khi BOQ giá hiện tại thay. Resource cross-project luôn bị chặn.
-A5-AC08: báo cáo A4 đối soát các nguồn tiền A3 và trạng thái thật; approved != paid; quyền
-bị che không lộ qua export, audit-view, toast hoặc API error.
-A5-AC09: UAT desktop/mobile với engineer/subcon ghi nhận, PM duyệt, BCH xem; cdt/viewer
-không nhận dữ liệu thương mại bị cấm. Loading/error/retry không cho gửi hai transition.
+File vùng rủi ro: lib/tien-do/recompute.ts, lib/tien-do/approvals.ts,
+lib/ky-thuat/qaqc.ts, lib/khoi-luong/boq.ts, lib/vat-tu/material-sync.ts,
+lib/tai-chinh/paymentcerts.ts và route tương ứng. S00 inventory method/status/lock và callers
+trước mỗi PR; test/API names mới không chứng minh chúng đã tồn tại.
 
-## 5. Vận hành, rủi ro và triển khai
+Schema snapshot mới chỉ bổ sung nếu audit/event hiện có không đáp ứng contract bất biến;
+quyết định lựa chọn phải được ghi bằng so sánh cụ thể ở S00, không để hai snapshot là nguồn
+sự thật song song. Các DDL/constraint/RLS/grants bắt buộc theo DATA-CONTRACTS và phụ lục dữ liệu.
+Không sửa migration đã áp, không backfill thương mại production ngoài quyền được cấp.
 
-File ưu tiên: lib/tien-do/recompute.ts, lib/tien-do/approvals.ts, lib/ky-thuat/qaqc.ts,
-lib/khoi-luong/boq.ts, lib/vat-tu/material-sync.ts, lib/tai-chinh/paymentcerts.ts và routes trên.
-Các file này là điểm chạm để đọc; chỉ sửa đúng failure đã tái hiện và có file lock theo PLAN.
-Metric: business_transition_conflict, accepted_qty_limit, downstream_dependency_block,
-reconciliation_mismatch. Event có correlation ID tới nguồn, không log amount/payload.
+## 5. Acceptance
 
-Triển khai tests trước, vá một boundary/transition mỗi PR, tái kiểm chain sau từng merge.
-No-go khi gate bị bypass, mismatch tiền/qty, duplicate effect hoặc mất audit.
-Rollback bằng khóa transition lỗi và giữ dữ liệu chốt; không xóa history/reversal để trở về
-“sạch”. Sửa dữ liệu thật phải có danh sách bản ghi, phê duyệt owner và script riêng.
+A5-AC01: import/sync rerun không nhân dữ liệu; fault remote write/ACK không làm snapshot
+đi trước thành công hoặc mất thay đổi của người khác.
+A5-AC02:199/200 ô không nghiệm thu;100% nhưng QA fail vẫn chặn; flow pending/rejected giữ
+trạng thái, final mới đổi nghiem_thu và ghi history.
+A5-AC03: tick/approve/batch/offline concurrency không lost update/duplicate effect/bypass;
+hủy tầng không hủy nhầm task duyệt riêng.
+A5-AC04: contract100, approved trước90, kỳ mới20: lũy kế110 và cảnh báo đúng; draft/trình được
+phép; duyệt có xác nhận version hiện tại/lý do được phép theo policy, không hard-cap100.
+Role không quyền vẫn bị chặn; không được gắn khối lượng chưa có chứng cứ thành đã nghiệm thu.
+A5-AC05: hai kỳ20 và10 sau90 được serialize; nếu duyệt theo thứ tự hợp lệ thì cumulative110
+và120, cảnh báo thay đổi yêu cầu xác nhận lại; không lost update, không lấy cùng cumulative
+cũ và không chặn một kỳ chỉ vì vượt trần do đặc tả tự tạo. Duyệt ngược kỳ sau-approved phải
+reconcile/adjust, không sửa snapshot cũ.
+A5-AC06: advance theo điều khoản không bị ép giả nghiệm thu, không thu hồi/trừ hai lần;
+fixture dùng tỷ lệ hợp đồng, không thuế suất do AI tự đặt.
+A5-AC07: downstream chốt chặn hủy upstream; adjustment có quyền/audit; giá hiện tại đổi
+không thay hồ sơ chốt, tham chiếu cross-project không được tạo.
+A5-AC08: báo cáo exact đối soát approved khác paid; không lộ tiền qua errors/export/audit-view.
+A5-AC09: engineer/subcon ghi nhận, PM duyệt, BCH xem, cdt/viewer đúng giới hạn;
+keyboard/mobile/retry/conflict không gây hiểu nhầm đã duyệt hoặc tự xác nhận cảnh báo.
 
-DoD: map trạng thái/schema thật, tất cả AC có test/mẫu UAT, không còn P0/P1 trong chuỗi,
-review tài chính/nghiệm thu và approval trước rollout. Người/ngày duyệt: APPROVAL.md.
+## 6. Kiểm chứng và vận hành
+
+Fixture hai org, nhiều project, bảy role; dùng khóa tạo thật, không hardcode FK1.
+Unit/policy, PostgreSQL barrier concurrency, HTTP thật, E2E/UAT và fake provider fault
+injection. Không mutex ngoài DB để giả mô phỏng serialization đã đúng.
+Metrics transition_conflict, warning_changed, acknowledgement_required, dependency_block,
+reconciliation_mismatch không kèm tiền/payload. Log kỹ thuật retry khác audit business effect.
+
+S13 tách regression chain rồi vá từng boundary. No-go khi gate QA bị vượt, mất lịch sử,
+sai lũy kế/tiền, warning bị bỏ qua hoặc cross-project. Rollback khóa transition lỗi và giữ
+hồ sơ; không xóa audit/đổi giá lịch sử để trở về trạng thái có vẻ sạch. Full AC/UAT/restore
+phải có bằng chứng mới; tài liệu đã chốt không là bằng chứng code đã hoàn tất.
