@@ -1,137 +1,94 @@
-# A1 — Thống nhất phạm vi user, org, project và transaction
+# A1 — Phạm vi và quyền theo tổ chức
 
-State: In review. Owner duyệt: chủ dự án; owner kỹ thuật: đầu mối auth/DB được giao trong PLAN.
-Phụ thuộc: bất biến #529 có trên main và S00 hoàn tất. Hợp đồng chung: README.md.
+State: **Approved for implementation**, QUALITY-FINAL-1, 2026-09-25; thi hành sau.
+Decision: D01/D09 trong APPROVAL.md. Đọc cùng README, SOURCE-MAP, DATA-CONTRACTS và TEST-MATRIX.
 
-## 1. Vấn đề, bằng chứng và outcome
+## 1. Vấn đề và lựa chọn
 
-S02: `visibleProjectIds` cho admin mọi dự án; khi user_projects rỗng toàn hệ, non-admin cũng
-được danh sách mọi dự án. `chotProjectIdChoGhi` có `projectHienTai || 1`, không nhận orgId;
-helper đọc lại lọc org. `getCurrentProjectId` memoize projectId trong request.
-S07: `withProjectScope` lồng có thể đặt lại GUC project trên cùng transaction mà không phục hồi.
-Đây là các nhánh cần test tái hiện, không là kết luận toàn bộ hệ thống đã bị rò.
-Outcome: một chính sách được kiểm chứng cho mọi điểm vào, không có fallback dự án 1 hoặc
-phạm vi toàn hệ từ giá trị thiếu; không thể đổi scope âm thầm trong transaction.
+Source map xác nhận helper đọc/ghi khác nhau, fallback project1 và membership rỗng toàn hệ;
+cache quyền có key/query/upsert/delete thiếu org và cold-start fallback defaults.
+Chọn resolver trung tâm, permission snapshot hợp lệ theo request và app/RLS cùng bảo vệ.
+Vá từng route không đủ; viết lại RBAC hoặc microservices không thuộc phạm vi.
 
-## 2. Phương án và phạm vi
+Outcome: actor chỉ truy cập dữ liệu được phép trong org/project, cả read/write/export/cron;
+không bỏ filter hoặc mở quyền vì input/context/cache thiếu. Thấy dự án không thay quyền sửa
+resource; admin ứng dụng không được tự thành quản trị xuyên org.
 
-Không làm: các route tiếp tục hiểu khác nhau. Vá từng route: giảm lỗi trước mắt nhưng dễ tái phát.
-Chọn resolver trung tâm + chuyển call-site từng cụm + test app/RLS song song.
-Không viết lại toàn bộ RBAC; giữ CAN, override và canTouchTask/canTouchPackage hiện có.
-Không xóa cơ chế cross-project hợp lệ, nhưng phải đặt tên và cấp quyền tường minh.
+## 2. FR/NFR
 
-## 3. Yêu cầu chức năng
+A1-FR01: actor lấy từ session/API credential server xác thực. Đọc org/session_version hiện
+hành, giữ giao thức 2FA của #529. Token không khớp org/session bị từ chối; không dùng org cũ
+ký trong token làm quyền vĩnh viễn. Credential service/device phải có org/project thật.
 
-A1-FR01: actor lấy từ xác thực server; org hiện tại phải khớp người dùng trong DB. Khi đổi
-org hoặc thu hồi quyền phiên, tăng session_version hoặc từ chối token không còn khớp;
-không chỉ tin org cũ trong cookie ký. Giữ hợp đồng 2FA của #529.
+A1-FR02: candidate ID strict theo DATA-CONTRACTS. Input tường minh không hợp lệ không fallback.
+Ghi phải có project đã kiểm; không `|| 1`, `?? 1` hoặc undefined thành all.
+Đọc chưa chọn chỉ tự suy khi duy nhất một project hợp lệ; nhiều project yêu cầu chọn.
+UI có context đã kiểm thì dùng context đó; không âm thầm chọn project đầu thay project bị cấm.
 
-A1-FR02: một resolver thuần về quyết định nhận actor `{id, role, orgId}`, input ID chưa tin,
-ngữ cảnh hiện tại đã kiểm, mục đích read/write và chế độ chọn. ID chỉ là số nguyên an toàn
-lớn hơn 0 hoặc chuỗi chữ số thập phân canonical; từ chối boolean, object, array, hex, exponent,
-NaN, Infinity và số vượt safe integer. Input tường minh sai không được fallback.
-Không dùng `|| 1`, `?? 1`, `undefined => all` hoặc `'*'` từ request client.
+A1-FR03: non-admin cần user_projects cùng org, kể cả khi bảng rỗng. Admin chỉ các project
+cùng org. Trước cutover có membership dry-run/danh sách ảnh hưởng và admin recovery;
+không INSERT cấp quyền hàng loạt để tránh bị khóa. Global catalog thật sự dùng chung phải
+có registry/owner; không coi mọi project_id NULL là dữ liệu public.
 
-A1-FR03: admin ứng dụng vẫn chỉ thao tác trong org hiện tại. Non-admin cần membership cụ thể
-cùng org. Chế độ rỗng-bảng không được tự mở toàn hệ trong trạng thái đích. Không tự backfill
-mọi người vào mọi dự án để tránh bị khóa; thực hiện chuyển đổi membership có chủ sở hữu duyệt.
-Global catalog thật sự dùng chung phải có registry và lý do, không suy từ project_id NULL.
+A1-FR04: resolve project trước permission override. Permission key có org/role/action/project;
+await snapshot hợp lệ, cold-start/DB lỗi không được suy không có override. Các đường quyết
+định tài chính/nghiệm thu/quản trị không dùng stale permission để cho ghi.
+Giữ luật LOCKED_PERMS không mở quyền ghi cho vai trò chỉ-xem qua override.
 
-A1-FR04: thiếu ID đọc, chỉ suy ra khi có đúng một dự án hợp lệ; nhiều dự án trả
-`403 project_required` hoặc adapter contract hiện hữu cho màn chọn. Đọc trong UI có lựa chọn
-đã kiểm thì dùng lựa chọn đó. Ghi luôn cần scope đã kiểm tường minh, không tự chọn dự án đầu.
-Mọi resource ID con phải thuộc cùng scope với cha: task/package/sheet/tower; contract/PO/BOQ/
-supplier theo quan hệ nghiệp vụ đã xác minh. Thấy dự án không thay quyền sửa tài nguyên.
+A1-FR05: list/reload/upsert/delete role_permissions lọc org tường minh. Unique target mới
+uq_role_perm_org_scope theo DATA-CONTRACTS. Hai org có cùng role/perm scope null độc lập;
+xóa org A không xóa override B. Cache dùng org và phiên bản nguồn; lỗi nguồn fail closed.
 
-A1-FR05: resolve candidate scope trước CAN override theo dự án. Nếu resolve lỗi, trả lỗi;
-không fallback global permission để tiếp tục đọc/ghi. Memoization chỉ trong một request,
-khóa theo actor+org+candidate; giá trị không thể tái sử dụng cho actor khác trong test/cron.
+A1-FR06: task/package/sheet/tower, cert/contract/BOQ, payment/cert/sheet/project cùng scope
+qua mọi liên kết có mặt. Nullable legacy không suy ra được scope thì từ chối/đối soát,
+không cấp scope1. Resource ngoài scope trả404; danh sách/metadata không lộ tên bị cấm.
 
-A1-FR06: transaction mang actor/org/project đã kiểm. Lồng cùng scope thì tái sử dụng;
-lồng khác scope, numeric sang `'*'` hoặc `'*'` sang numeric phải throw lỗi trước query nghiệp vụ.
-Đọc lồng trong transaction ghi không tự đổi cha thành read-only. Transaction đọc cha không
-được nâng thành ghi. COMMIT/ROLLBACK không để scope rò qua connection pool.
-Không sửa ngữ cảnh dùng chung trong Promise.all trên cùng transaction.
+A1-FR07: transaction theo DATA-CONTRACTS; nested khác scope/actor hoặc nâng readOnly/isolation
+bị chặn. Không thay GUC trong Promise.all. Pool cleanup trên COMMIT/ROLLBACK và request
+context cache chỉ được dùng lại đúng actor/org/candidate trong một request.
 
-A1-FR07: portfolio/cron/import/export/API key/device token được kiểm kê riêng. Với báo cáo
-nhiều dự án phải tính danh sách IDs được phép trong org hiện tại từ server và lọc SQL rõ ràng.
-Không có quyền cross-org mới trong phạm vi này. Cron tích hợp phải có actor/service scope
-được cấp rõ, không dùng admin giả hoặc header user-controlled để bypass.
+A1-FR08: portfolio/cron/export toàn danh mục dùng tập IDs hữu hạn cùng org, server cấp.
+Không nhận wildcard từ client, không bỏ WHERE vì có RLS. Luồng app role đúng quyền phải
+thấy dữ liệu đúng, không chỉ test sai quyền trả rỗng. Không nhầm số liệu bị RLS che với số0.
 
-## 4. Contract API và tích hợp
+NFR: không rò chéo org/project; các giới hạn latency chung trong APPROVAL phải đo. Log
+scope_denied/context_stale/nested_scope_mismatch không kèm payload/PII. Query tham số hóa.
 
-Kết quả resolver đề xuất, không phải export đã tồn tại:
+## 3. API, schema và điểm chạm
 
-```ts
-type ScopeResult =
-  | { ok: true; scope: { userId: number; orgId: number; projectId: number } }
-  | { ok: false; code: "invalid_project" | "project_required" | "project_forbidden" };
-```
+authorizeProject/authorizePortfolio và transaction signature ở DATA-CONTRACTS; adapter cho
+getCurrentProjectId/chotProjectIdChoDoc/chotProjectIdChoGhi phải cùng resolver.
+Không shim actor thiếu org bằng default1; chuyển caller theo inventory S02.
+Giữ status/payload auth hiện có. 400/401/403/404/409/503 dùng đúng hợp đồng chung.
 
-Adapter của `getCurrentProjectId`, `chotProjectIdChoDoc`, `chotProjectIdChoGhi` cùng gọi resolver.
-Đổi chữ ký helper ghi để có orgId; chuyển tất cả caller trong inventory, không để shim thiếu
-org được mặc định. Đầu vào chưa kiểm không có quyền xây ScopeResult thành công bằng ép kiểu.
+File: lib/ha-tang/projects.ts, lib/bao-mat/auth.ts, lib/bao-mat/permissions.ts,
+lib/nen/request-context.ts, lib/db/index.ts, route project/select/costs và caller từng slice.
+DDL index quyền theo DATA-CONTRACTS; không đổi schema membership chỉ để làm test dễ hơn.
+RLS/grants theo role app không owner. ERD được sinh, không sửa tay.
 
-Response lỗi mới dạng `{error, code, requestId}` không chứa danh sách bị cấm.
-Giữ route #529 `/api/costs` và `/api/project/select` tương thích; adapter contract device-token
-hiện hữu có thể giữ lý do/danh sách chọn nhưng chỉ chứa dự án đã được phép trong org.
-Test đầy đủ auth method, không chỉ cookie-session.
+## 4. Journey và acceptance
 
-## 5. Điểm chạm code và dữ liệu
+Loading xác minh scope không hiển thị data cũ. Chưa membership hiện hướng dẫn liên hệ quản
+trị; không fallback dự án ngẫu nhiên. Mất quyền/expired session khóa data, cho đăng nhập/chọn
+lại. Keyboard/screen reader/theme/mobile theo README.
 
-File hiện có: `lib/ha-tang/projects.ts`, `lib/bao-mat/auth.ts`, `lib/nen/request-context.ts`,
-`lib/db/index.ts`, `app/api/project/select/route.ts`, `app/api/costs/route.ts`.
-S00 liệt kê toàn bộ caller và test tương ứng; mỗi PR chỉ khóa cụm được giao.
-Có thể thêm `lib/ha-tang/project-scope.ts` để tách hàm thuần; tên này là đề xuất.
+A1-AC01: hai org cùng role admin vẫn không đọc/ghi/chọn/export chéo; DB không đổi.
+A1-AC02: user_projects rỗng không mở toàn hệ; admin recovery trong org vẫn hoạt động.
+A1-AC03: input thiếu/sai và child-ID khác scope không query nghiệp vụ hoặc ghi project1.
+A1-AC04: nested A→B/wildcard lỗi và rollback; 20 request cạnh tranh qua pool không rò scope.
+A1-AC05: project/org override deny được giữ, kể cả cold-start/cache lỗi; không fallback allow.
+A1-AC06: app role NOBYPASSRLS kiểm đúng/sai/missing scope; owner chỉ dùng chuẩn bị fixture.
+A1-AC07: token cũ sau đổi org/thu hồi phiên không tiếp tục truy cập dữ liệu cũ.
+Q-AC01 bổ sung test full CRUD/index/cache quyền giữa hai org.
 
-Không bắt buộc DDL cho resolver/transaction. Membership hiện có dùng `user_projects`;
-trước áp strict phải có dry-run cho mỗi org: số user không được gán, dự án được thấy trước/sau,
-service account và tài khoản admin dự phòng. Không tự INSERT membership production.
-Unique/FK/index cần bổ sung chỉ sau catalog inventory, trong migration riêng được duyệt.
+## 5. Test, rollout và rollback
 
-Truy vấn kiểm kê read-only minh họa trên schema baseline:
+Unit resolver; PostgreSQL policies/unique/concurrency; HTTP từng method/auth mechanism;
+E2E đủ role và portfolio/export. Stub không thay DB/HTTP. S00 hoàn thiện caller inventory
+trước S01/S03/S02; không coi grep pattern xanh là coverage toàn bộ endpoint.
 
-```sql
-SELECT up.user_id, up.project_id, u.org_id AS user_org, p.org_id AS project_org
-FROM user_projects up
-JOIN users u ON u.id = up.user_id
-JOIN projects p ON p.id = up.project_id
-WHERE u.org_id IS DISTINCT FROM p.org_id;
-```
-
-Kết quả khác rỗng là dữ liệu cần owner phân loại; không DELETE hoặc sửa org tự động.
-
-## 6. Acceptance và kiểm chứng
-
-A1-AC01: Given hai org và cùng role admin, When chỉ định project org khác, Then mọi đường
-đọc/ghi/membership/export bị chặn, DB không đổi. Test PostgreSQL + HTTP thật.
-A1-AC02: Given user_projects rỗng, When non-admin truy cập, Then không tự được quyền toàn hệ;
-UI có trạng thái cần gán dự án, admin vẫn phục hồi được trong org mình.
-A1-AC03: Given current scope trống hoặc ID sai, When ghi, Then không có query nghiệp vụ hoặc
-bản ghi mới ở project 1. Chạy cả batch, import, resource child IDs.
-A1-AC04: Given scope A trong transaction, When gọi helper scope B, Then lỗi và rollback;
-request B sau đó trên cùng pool vẫn chỉ thấy B. Đồng thời tối thiểu 20 request lặp fixture.
-A1-AC05: Given role override cấm ghi trong project A, Then membership/admin visibility không
-bỏ qua override; thiếu context không rơi về global allow.
-A1-AC06: Given role app không-owner, NOBYPASSRLS, Then đọc/ghi chéo scope bị RLS chặn.
-Test bằng owner riêng chỉ để tạo fixture, không ghi nhận là bằng chứng RLS.
-A1-AC07: Given org user thay đổi/phiên bị thu hồi, Then token cũ không đọc/ghi dữ liệu org cũ.
-
-## 7. UX, observability và rollout
-
-UI: loading khi xác minh scope; empty khi chưa được gán; lỗi mất quyền yêu cầu chọn lại/đăng
-nhập, không đổi sang dự án ngẫu nhiên. AppHeader/switcher/portfolio không lộ tên org khác.
-Metric: scope_required, scope_denied, nested_scope_mismatch, context_stale theo route family.
-
-Slice theo PLAN: hợp đồng, resolver/membership, route inventory chuyển đổi, transaction/RLS.
-Trước bật strict trên production phải chốt membership dry-run và đường admin phục hồi.
-Canary staging hai org trước. Một truy vấn rò scope hoặc dữ liệu ghi sai là no-go.
-Rollback bằng hotfix/đóng route lỗi; không mở lại fallback 1 hoặc thiếu scope => all.
-Dữ liệu membership sửa có file đối soát được duyệt; không rollback bằng cấp quyền hàng loạt.
-
-## 8. Rủi ro, phê duyệt và DoD
-
-Thay đổi quyền nhìn thấy là breaking hành vi có chủ đích; owner phải duyệt kế hoạch gán dự án.
-Không coi toàn bộ caller đã chuyển khi chỉ grep xanh; inventory phải có route-test-evidence.
-Tất cả A1-AC có bằng chứng main, RLS đúng role, UAT đủ 7 vai trò, docs/ADR cập nhật mới được đóng.
-Người/ngày duyệt implementation: chưa có; ghi tại APPROVAL.md trước S01.
+Triển khai permission-schema không trộn writer cũ/mới; tạm khóa cấu hình quyền khi cần.
+Membership dry-run trước production; không tự sửa data thật. Canary hai org trên staging.
+No-go: bất kỳ dữ liệu trả/ghi sai scope hoặc cold-start cho quyền bị cấm.
+Rollback giữ fail-closed và schema/key theo org; không khôi phục fallback1/cache toàn hệ.
+Chỉ đóng khi test/review/CI trên main có bằng chứng và không còn caller chưa chuyển trong miền.
