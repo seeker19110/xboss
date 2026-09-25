@@ -84,7 +84,8 @@ function fixture() {
   };
 }
 
-for (const path of ["/api/auth/me", "/api/costs", "/api/tasks", "/api/future/private", "/api"]) {
+const privatePaths = ["/api/auth/me", "/api/costs", "/api/tasks", "/api/future/private", "/api"];
+for (const path of privatePaths) {
   test(`SW: ${path} không đọc bản riêng tư cũ trong bất kỳ cache nào`, async () => {
     const f = fixture();
     f.data.set("xboss-v19", new Map([[key(path), new Response("bí mật người A")]]));
@@ -112,9 +113,11 @@ for (const status of [401, 403, 409, 500, 503]) {
   });
 }
 
-test("SW: HTML riêng tư và RSC không được cache, chỉ navigation offline dùng shell", async () => {
+test("SW: HTML/RSC riêng tư không cache; navigation lỗi mạng dùng shell", async () => {
   const f = fixture();
-  f.setNetwork(async () => new Response("riêng tư", { headers: { "Content-Type": "text/html" } }));
+  f.setNetwork(async () => {
+    return new Response("riêng tư", { headers: { "Content-Type": "text/html" } });
+  });
   await f.get("/costs", "navigate");
   assert.equal(f.writes(), 0);
   const shell = new Response("shell vô danh", { headers: { "Content-Type": "text/html" } });
@@ -211,9 +214,7 @@ test("SW: ACK chỉ sau put đã bắt đầu hoàn tất rồi cache được x
 test("SW: không chặn request khác origin hoặc ghi dữ liệu", () => {
   const f = fixture();
   assert.equal(f.get("https://other.test/file.js"), undefined);
-  assert.equal(
-    f.fire("fetch", { request: new Request(`${ORIGIN}/api/tasks`, { method: "POST" }) }).response,
-    undefined,
-  );
+  const request = new Request(`${ORIGIN}/api/tasks`, { method: "POST" });
+  assert.equal(f.fire("fetch", { request }).response, undefined);
   assert.equal(f.calls.length, 0);
 });
