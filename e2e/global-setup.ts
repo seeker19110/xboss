@@ -1,14 +1,17 @@
 import { execSync } from "node:child_process";
-import { E2E_DB } from "./constants";
+import { ADMIN_PW, E2E_DB } from "./constants";
 
-// Seed dữ liệu mẫu vào DB test 1 lần trước toàn bộ E2E (chỉ khi E2E_DATABASE_URL được đặt).
-// Chạy script seed như tiến trình con (script gọi process.exit ở cuối — không import trực tiếp).
-// Tài khoản admin KHÔNG seed ở đây: app tự tạo khi login lần đầu (ensureDefaultUsers + XBOSS_ADMIN_PASSWORD).
+// Seed tường minh vào DB test trước E2E; HTTP login/me không được khởi tạo tài khoản.
 export default function globalSetup(): void {
   if (!E2E_DB) return;
-  console.log("[e2e] Seed dữ liệu mẫu vào DB test…");
-  execSync("npx tsx scripts/seed-sample.ts", {
-    stdio: "inherit",
-    env: { ...process.env, DATABASE_URL: E2E_DB },
-  });
+  const env = {
+    ...process.env,
+    DATABASE_URL: E2E_DB,
+    MIGRATE_DATABASE_URL: E2E_DB,
+    NODE_ENV: "test",
+    XBOSS_ADMIN_PASSWORD: ADMIN_PW,
+  };
+  console.log("[e2e] Seed dữ liệu và tài khoản vào DB test…");
+  execSync("npx tsx scripts/seed-sample.ts", { stdio: "inherit", env });
+  execSync("npx tsx scripts/seed-demo-users.ts", { stdio: "inherit", env });
 }

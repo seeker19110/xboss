@@ -30,7 +30,10 @@ cp .env.example .env.local
 # 4. (Tuỳ chọn) Seed data từ file Excel AVIO gốc (đặt trong attachments/)
 npm run db:seed
 
-# 5. Khởi động dev server
+# 5. Tạo tài khoản demo tường minh, CHỈ trên DB dev/test
+npx tsx scripts/seed-demo-users.ts
+
+# 6. Khởi động dev server
 npm run dev
 ```
 
@@ -40,7 +43,7 @@ Schema quản lý qua **hệ migrate SQL nhẹ** (`migrations/*.sql`, xem `docs/
 
 ### Tài khoản mặc định (dev)
 
-Khi DB chưa có user, môi trường **dev** tự tạo 4 tài khoản demo:
+HTTP đăng nhập/kiểm tra phiên **không tự tạo tài khoản**. Lệnh `npx tsx scripts/seed-demo-users.ts` tạo các tài khoản demo dưới đây trên DB dev/test và từ chối chạy với `NODE_ENV=production`. Tài khoản đã có không bị thay mật khẩu. Mật khẩu admin demo dùng `XBOSS_ADMIN_PASSWORD` khi biến này được đặt, nếu không mới dùng giá trị trong bảng.
 
 | Email               | Mật khẩu   | Vai trò  |
 | ------------------- | ---------- | -------- |
@@ -51,23 +54,23 @@ Khi DB chưa có user, môi trường **dev** tự tạo 4 tài khoản demo:
 
 Ngoài 4 vai trò thao tác trên, hệ thống có thêm 3 vai trò chỉ-xem: `bch`, `cdt`, `viewer` (xem `spec.md` §4).
 
-> ⚠️ **Production**: nếu DB trống, hệ thống chỉ tạo **1 admin** với mật khẩu lấy từ `XBOSS_ADMIN_PASSWORD` (không seed 4 tài khoản demo). Bắt buộc đặt `XBOSS_SECRET` để ký cookie phiên.
+> ⚠️ **Production**: cấp `XBOSS_ADMIN_PASSWORD` tường minh (16–1024 ký tự), rồi chạy `npx tsx scripts/bootstrap-admin.ts` để tạo **1 admin khi DB trống**. DB đã có người dùng thì lệnh không thay đổi tài khoản. Không có mật khẩu dự phòng và không seed qua HTTP. Bắt buộc đặt `XBOSS_SECRET` để ký cookie phiên. Chuyển đổi hệ thống đang chạy và reset admin: [hướng dẫn audit 2026-09-25](docs/ops/audit-2026-09-25.md).
 
 ---
 
 ## Biến môi trường
 
-| Biến                                                       | Bắt buộc        | Mô tả                                                                              |
-| ---------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                             | ✅ khi chạy app | Chuỗi kết nối Postgres                                                             |
-| `XBOSS_SECRET`                                             | ✅ production   | Ký cookie phiên (HMAC); thiếu → throw lúc ký/xác minh token                        |
-| `XBOSS_ADMIN_PASSWORD`                                     | production      | Mật khẩu admin khởi tạo khi DB trống                                               |
-| `CRON_SECRET`                                              | tuỳ chọn        | Bảo vệ endpoint cron, nhận qua header `Authorization: Bearer`                      |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`                  | tuỳ chọn        | Gửi báo cáo trễ hạn qua Telegram (song song email SMTP)                            |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | tuỳ chọn        | Web Push; sinh bằng `npx web-push generate-vapid-keys`. Thiếu → nút bật push tự ẩn |
-| SMTP (`SMTP_HOST`...)                                      | tuỳ chọn        | Gửi email báo cáo hằng ngày / tuần                                                 |
-| `SENTRY_DSN`                                               | tuỳ chọn        | Theo dõi lỗi production (server + browser)                                         |
-| `TEST_DATABASE_URL`                                        | tuỳ chọn        | Postgres test riêng cho test tích hợp (không có thì test tự skip)                  |
+| Biến                                                       | Bắt buộc            | Mô tả                                                                              |
+| ---------------------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                             | ✅ khi chạy app      | Chuỗi kết nối Postgres                                                             |
+| `XBOSS_SECRET`                                             | ✅ production        | Ký cookie phiên (HMAC); thiếu → throw lúc ký/xác minh token                        |
+| `XBOSS_ADMIN_PASSWORD`                                     | khi bootstrap/reset | Mật khẩu admin được cấp tường minh; production không tự tạo tài khoản qua HTTP     |
+| `CRON_SECRET`                                              | tuỳ chọn            | Bảo vệ endpoint cron, nhận qua header `Authorization: Bearer`                      |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`                  | tuỳ chọn            | Gửi báo cáo trễ hạn qua Telegram (song song email SMTP)                            |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | tuỳ chọn            | Web Push; sinh bằng `npx web-push generate-vapid-keys`. Thiếu → nút bật push tự ẩn |
+| SMTP (`SMTP_HOST`...)                                      | tuỳ chọn            | Gửi email báo cáo hằng ngày / tuần                                                 |
+| `SENTRY_DSN`                                               | tuỳ chọn            | Theo dõi lỗi production (server + browser)                                         |
+| `TEST_DATABASE_URL`                                        | tuỳ chọn            | Postgres test riêng cho test tích hợp (không có thì test tự skip)                  |
 
 Danh mục đầy đủ (kể cả biến của các module mở rộng như Google Sheet sync) → `spec.md` §8.
 
