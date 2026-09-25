@@ -4,7 +4,6 @@ import {
   verifyPassword,
   makeToken,
   makeTotpPendingToken,
-  ensureDefaultUsers,
   requiredRoles,
   computeMustSetup2fa,
   isSecureCookie,
@@ -28,7 +27,6 @@ function clientIp(req: NextRequest): string {
 }
 
 export async function POST(req: NextRequest) {
-  await ensureDefaultUsers();
   const { email, password } = await req.json().catch(() => ({}));
   // Bắt buộc là chuỗi — nếu không, verifyPassword (scryptSync) sẽ throw TypeError trước khi
   // recordLoginFailure kịp chạy, vừa lộ 500 vừa không tính vào rate-limit chống brute-force.

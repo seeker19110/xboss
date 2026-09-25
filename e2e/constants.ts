@@ -2,8 +2,7 @@
 // Cùng đọc từ process.env của RUNNER (Playwright) — playwright.config.ts chuyển tiếp
 // đúng các giá trị này vào webServer (app), nên fixture login và app luôn khớp.
 
-// Tài khoản admin: production tự tạo qua ensureDefaultUsers() khi login lần đầu
-// (lib/auth.ts) với mật khẩu = XBOSS_ADMIN_PASSWORD.
+// Tài khoản được seed tường minh bởi global-setup.ts vào DB E2E, không tạo qua HTTP.
 export const ADMIN_EMAIL = "admin@xboss.vn";
 
 // Mật khẩu admin + secret ký phiên cho môi trường E2E (DB ephemeral, không phải bí mật thật).
