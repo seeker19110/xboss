@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getCurrentUser, ensureDefaultUsers, COOKIE, parseToken } from "@/lib/bao-mat/auth";
+import { getCurrentUser, COOKIE, parseToken } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  await ensureDefaultUsers();
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ user: null }, { status: 401 });
 

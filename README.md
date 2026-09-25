@@ -30,7 +30,10 @@ cp .env.example .env.local
 # 4. (Tuỳ chọn) Seed data từ file Excel AVIO gốc (đặt trong attachments/)
 npm run db:seed
 
-# 5. Khởi động dev server
+# 5. Tạo tài khoản demo tường minh, CHỈ trên DB dev/test
+npx tsx scripts/seed-demo-users.ts
+
+# 6. Khởi động dev server
 npm run dev
 ```
 
@@ -40,34 +43,30 @@ Schema quản lý qua **hệ migrate SQL nhẹ** (`migrations/*.sql`, xem `docs/
 
 ### Tài khoản mặc định (dev)
 
-Khi DB chưa có user, môi trường **dev** tự tạo 4 tài khoản demo:
+HTTP đăng nhập/kiểm tra phiên **không tự tạo tài khoản**. Lệnh `npx tsx scripts/seed-demo-users.ts` tạo các tài khoản demo dưới đây trên DB dev/test và từ chối chạy với `NODE_ENV=production`. Tài khoản đã có không bị thay mật khẩu. Mật khẩu admin demo dùng `XBOSS_ADMIN_PASSWORD` khi biến này được đặt, nếu không mới dùng giá trị bên dưới.
 
-| Email               | Mật khẩu   | Vai trò  |
-| ------------------- | ---------- | -------- |
-| `admin@xboss.vn`    | `admin123` | Admin    |
-| `pm@xboss.vn`       | `pm123`    | PM       |
-| `engineer@xboss.vn` | `eng123`   | Kỹ sư    |
-| `subcon@xboss.vn`   | `sub123`   | Thầu phụ |
+- Admin: `admin@xboss.vn`, mật khẩu demo `admin123`.
+- PM: `pm@xboss.vn`, mật khẩu demo `pm123`.
+- Kỹ sư: `engineer@xboss.vn`, mật khẩu demo `eng123`.
+- Thầu phụ: `subcon@xboss.vn`, mật khẩu demo `sub123`.
 
 Ngoài 4 vai trò thao tác trên, hệ thống có thêm 3 vai trò chỉ-xem: `bch`, `cdt`, `viewer` (xem `spec.md` §4).
 
-> ⚠️ **Production**: nếu DB trống, hệ thống chỉ tạo **1 admin** với mật khẩu lấy từ `XBOSS_ADMIN_PASSWORD` (không seed 4 tài khoản demo). Bắt buộc đặt `XBOSS_SECRET` để ký cookie phiên.
+> ⚠️ **Production**: cấp `XBOSS_ADMIN_PASSWORD` tường minh (16–1024 ký tự), rồi chạy `npx tsx scripts/bootstrap-admin.ts` để tạo **1 admin khi DB trống**. DB đã có người dùng thì lệnh không thay đổi tài khoản. Không có mật khẩu dự phòng và không seed qua HTTP. Bắt buộc đặt `XBOSS_SECRET` để ký cookie phiên. Chuyển đổi hệ thống đang chạy và reset admin: [hướng dẫn audit 2026-09-25](docs/ops/audit-2026-09-25.md).
 
 ---
 
 ## Biến môi trường
 
-| Biến                                                       | Bắt buộc        | Mô tả                                                                              |
-| ---------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                             | ✅ khi chạy app | Chuỗi kết nối Postgres                                                             |
-| `XBOSS_SECRET`                                             | ✅ production   | Ký cookie phiên (HMAC); thiếu → throw lúc ký/xác minh token                        |
-| `XBOSS_ADMIN_PASSWORD`                                     | production      | Mật khẩu admin khởi tạo khi DB trống                                               |
-| `CRON_SECRET`                                              | tuỳ chọn        | Bảo vệ endpoint cron, nhận qua header `Authorization: Bearer`                      |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`                  | tuỳ chọn        | Gửi báo cáo trễ hạn qua Telegram (song song email SMTP)                            |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | tuỳ chọn        | Web Push; sinh bằng `npx web-push generate-vapid-keys`. Thiếu → nút bật push tự ẩn |
-| SMTP (`SMTP_HOST`...)                                      | tuỳ chọn        | Gửi email báo cáo hằng ngày / tuần                                                 |
-| `SENTRY_DSN`                                               | tuỳ chọn        | Theo dõi lỗi production (server + browser)                                         |
-| `TEST_DATABASE_URL`                                        | tuỳ chọn        | Postgres test riêng cho test tích hợp (không có thì test tự skip)                  |
+- `DATABASE_URL`: bắt buộc khi chạy app; chuỗi kết nối PostgreSQL.
+- `XBOSS_SECRET`: bắt buộc ở production; ký cookie phiên, thiếu sẽ báo lỗi lúc ký/xác minh token.
+- `XBOSS_ADMIN_PASSWORD`: bắt buộc khi bootstrap/reset admin; production không tự tạo tài khoản qua HTTP.
+- `CRON_SECRET`: tuỳ chọn; bảo vệ endpoint cron qua header `Authorization: Bearer`.
+- `TELEGRAM_BOT_TOKEN` và `TELEGRAM_CHAT_ID`: tuỳ chọn; gửi báo cáo trễ hạn qua Telegram song song email SMTP.
+- `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`: tuỳ chọn cho Web Push. Sinh bằng `npx web-push generate-vapid-keys`; thiếu thì nút bật push tự ẩn.
+- SMTP (`SMTP_HOST`...): tuỳ chọn; gửi email báo cáo hằng ngày/tuần.
+- `SENTRY_DSN`: tuỳ chọn; theo dõi lỗi production trên server và browser.
+- `TEST_DATABASE_URL`: PostgreSQL test riêng cho test tích hợp; thiếu thì các test cần DB tự skip, không được coi là đã nghiệm thu.
 
 Danh mục đầy đủ (kể cả biến của các module mở rộng như Google Sheet sync) → `spec.md` §8.
 
@@ -103,18 +102,18 @@ xboss/
 
 ## Scripts
 
-| Command                               | Mô tả                                                    |
-| ------------------------------------- | -------------------------------------------------------- |
-| `npm run dev`                         | Chạy dev server (cần `.env.local`)                       |
-| `npm run build`                       | Build production (pool kết nối lazy — không cần DB thật) |
-| `npm run lint`                        | `next lint`                                              |
-| `npm run typecheck`                   | `tsc --noEmit`                                           |
-| `npm test`                            | `node:test` qua `tsx` — toàn bộ `tests/*.test.ts`        |
-| `npx tsx --test tests/status.test.ts` | Chạy 1 file test                                         |
-| `npm run db:seed`                     | Seed từ Excel AVIO trong `attachments/`                  |
-| `npm run db:migrate`                  | Áp migration còn thiếu (chủ động, ngoài lúc boot)        |
+- `npm run dev`: chạy dev server, cần `.env.local`.
+- `npm run build`: build production; pool kết nối lazy, không cần DB thật để build.
+- `npm run lint`: chạy kiểm tra lint theo cấu hình `package.json`.
+- `npm run typecheck`: chạy `tsc --noEmit`.
+- `npm test`: chạy bộ test qua runner của dự án.
+- `npx tsx --test tests/status.test.ts`: chạy một file test.
+- `npm run db:seed`: seed từ Excel AVIO trong `attachments/`.
+- `npm run db:migrate`: chủ động áp migration còn thiếu.
+- `npx tsx scripts/bootstrap-admin.ts`: tạo admin khi DB chưa có người dùng, yêu cầu mật khẩu tường minh.
+- `npx tsx scripts/seed-demo-users.ts`: seed tài khoản chỉ trên DB dev/test.
 
-Test tích hợp (`recompute.test.ts` và nhiều file khác) chỉ chạy khi đặt `TEST_DATABASE_URL`; không có thì tự skip. CI (`.github/workflows/ci.yml`) chạy `npm audit` → lint → typecheck → test (Postgres 16 service) → build trên mỗi push/PR.
+Test tích hợp chỉ chạy khi đặt `TEST_DATABASE_URL`; không có thì tự skip. CI trong `.github/workflows/ci.yml` kiểm audit dependencies, format, lint, typecheck, test PostgreSQL và build. Các cổng E2E và kiểm chứng khác phải được xem trên đúng commit của PR trước khi phát hành.
 
 ---
 

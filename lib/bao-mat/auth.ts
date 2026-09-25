@@ -156,15 +156,14 @@ export function parseTotpPendingToken(token: string): { uid: number; pwFrag: str
   return { uid: Number(uid), pwFrag };
 }
 
-// ===== Tạo user mặc định (chạy 1 lần nếu DB chưa có user) =====
+// ===== Seed demo tường minh cho dev/test; không được chạy ở production =====
 const DEFAULTS: { name: string; email: string; pw: string; role: Role }[] = [
   { name: "Quản trị", email: "admin@xboss.vn", pw: "admin123", role: "admin" },
   { name: "Trưởng dự án", email: "pm@xboss.vn", pw: "pm123", role: "pm" },
   { name: "Kỹ sư", email: "engineer@xboss.vn", pw: "eng123", role: "engineer" },
   { name: "Thầu phụ", email: "subcon@xboss.vn", pw: "sub123", role: "subcon" },
 ];
-// Đã xác nhận DB có user trong process này → khỏi query lại (hàm được gọi trên mọi
-// request /api/auth/me, nhưng chỉ cần thật sự kiểm tra DB 1 lần lúc boot).
+// Cache chỉ phục vụ lệnh seed demo và test. HTTP login/me KHÔNG gọi hàm seed này.
 let defaultUsersEnsured = false;
 // Chỉ dùng trong test: nhiều file test chạy chung 1 process (tsx --test nhiều file) nên
 // cache này rò rỉ giữa các file — file khác lỡ tạo user trước sẽ khiến cờ bật sớm, làm
@@ -189,6 +188,9 @@ export function isSecureCookie(req?: {
 }
 
 export async function ensureDefaultUsers(): Promise<void> {
+  // Phòng vệ ngay tại helper: caller mới cũng không thể seed tài khoản demo ở production.
+  // Đặt trước cache/DB để không phụ thuộc thứ tự gọi hoặc biến XBOSS_ADMIN_PASSWORD.
+  if (process.env.NODE_ENV === "production") return;
   if (defaultUsersEnsured) return;
 
   const adminPw = process.env.XBOSS_ADMIN_PASSWORD || "admin123";
