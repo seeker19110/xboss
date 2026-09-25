@@ -174,28 +174,33 @@ class OfflineQueueManager {
 
   async flush() {
     if (this.flushing || typeof navigator === "undefined" || !navigator.onLine) return;
-    const before = await this.store.getAll();
-    if (!before.length) return;
+    // Giữ khóa trước await đầu tiên, kể cả lúc đọc storage và cập nhật thống kê.
+    // Chỉ bảo vệ trong tab hiện tại; không thay lease nhiều tab hoặc receipt server.
     this.flushing = true;
-    this.hadItems = true;
-    this.setSnap({ sending: true });
     try {
-      const { tuChoi } = await flushQueue(this.store, sendOp);
-      // Op bị server từ chối phải được BÁO, không biến mất im lặng (M121 FR8): người dùng
-      // tick cả buổi lúc mất sóng, đến khi có mạng mà hold-point chưa mở thì phải biết mà
-      // làm lại, chứ không chỉ thấy badge về 0.
-      if (tuChoi.length) {
-        const soO = tuChoi.reduce((s, t) => s + t.soO, 0);
-        const lyDo = tuChoi.find((t) => t.lyDo)?.lyDo;
-        showToast(`${soO} thao tác ngoại tuyến bị từ chối${lyDo ? `: ${lyDo}` : ""}`, "error");
+      const before = await this.store.getAll();
+      if (!before.length) return;
+      this.hadItems = true;
+      this.setSnap({ sending: true });
+      try {
+        const { tuChoi } = await flushQueue(this.store, sendOp);
+        // Giữ nguyên thông báo từ chối; chưa đổi state machine retry trong slice này.
+        if (tuChoi.length) {
+          const soO = tuChoi.reduce((s, t) => s + t.soO, 0);
+          const lyDo = tuChoi.find((t) => t.lyDo)?.lyDo;
+          showToast(`${soO} thao tác ngoại tuyến bị từ chối${lyDo ? `: ${lyDo}` : ""}`, "error");
+        }
+      } finally {
+        await this.refreshStats({ sending: false });
+        if (this.snap.total === 0 && this.hadItems) {
+          this.hadItems = false;
+          for (const l of this.flushedListeners) l();
+        }
       }
     } finally {
+      // Read/flush/refresh lỗi cũng không được kẹt cờ khóa hoặc badge "đang gửi".
       this.flushing = false;
-      await this.refreshStats({ sending: false });
-      if (this.snap.total === 0 && this.hadItems) {
-        this.hadItems = false;
-        for (const l of this.flushedListeners) l();
-      }
+      this.setSnap({ sending: false });
     }
   }
 
@@ -212,6 +217,7 @@ class OfflineQueueManager {
       tries: 0,
     });
     await this.refreshStats();
+    this.afterEnqueue();
   }
 
   // Xếp tick — mỗi dimension chỉ giữ thao tác mới nhất (dedup, hành vi cũ giữ nguyên).
