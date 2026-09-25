@@ -183,9 +183,9 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  const publicAsset =
-    !url.search &&
-    (SHELL_URLS.includes(url.pathname) || url.pathname.startsWith("/_next/static/"));
+  const isShell = SHELL_URLS.includes(url.pathname);
+  const isStatic = url.pathname.startsWith("/_next/static/");
+  const publicAsset = !url.search && (isShell || isStatic);
   if (publicAsset) {
     e.respondWith(publicCacheFirst(e.request));
     return;
