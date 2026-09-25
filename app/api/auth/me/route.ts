@@ -4,9 +4,12 @@ import { getCurrentUser, COOKIE, parseToken } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 
+// Payload danh tính/2FA không được lưu bởi HTTP cache, kể cả response 401.
+const noStoreHeaders = { "Cache-Control": "private, no-store" };
+
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ user: null }, { status: 401 });
+  if (!user) return NextResponse.json({ user: null }, { status: 401, headers: noStoreHeaders });
 
   // M56 PR2 (đóng nợ kỹ thuật ghi ở PROGRESS.md): /api/auth/me nằm TRONG whitelist
   // /api/auth/* nên proxy.ts luôn cho request này qua (200) — route tự đọc cờ mustSetup2fa
@@ -16,11 +19,14 @@ export async function GET() {
   const token = (await cookies()).get(COOKIE)?.value;
   const parsed = token ? parseToken(token) : null;
   if (parsed?.mustSetup2fa) {
-    return NextResponse.json({
-      user,
-      error: "Cần bật xác thực 2 lớp trước khi tiếp tục",
-      code: "2fa_required",
-    });
+    return NextResponse.json(
+      {
+        user,
+        error: "Cần bật xác thực 2 lớp trước khi tiếp tục",
+        code: "2fa_required",
+      },
+      { headers: noStoreHeaders },
+    );
   }
-  return NextResponse.json({ user });
+  return NextResponse.json({ user }, { headers: noStoreHeaders });
 }

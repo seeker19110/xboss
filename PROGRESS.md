@@ -1,5 +1,28 @@
 # PROGRESS — XBoss
 
+## 2026-09-25 — đưa bốn bản vá nhỏ độc lập lên PR
+
+Baseline: `381b06899b3eb5d9e1b2c99b167d51cc24419732`. Theo yêu cầu triển khai các việc
+nhỏ song song và QUALITY-FINAL-1, đã chuẩn bị bốn bản vá độc lập: kiểm ID chọn dự án trước
+ép kiểu; kiểm cấu trúc JSON login; no-store cho auth/me; khóa flush trước await và đánh thức
+batch offline. Không thay schema, money.ts, session-token.ts, sw.js hoặc store.ts.
+
+Bốn nhóm test chạy đồng thời bằng bốn process Node: 69 pass, 0 fail, 0 skip. Sáu mutation
+đều bị test phát hiện; code sau đó đã khôi phục và chạy lại. Typecheck chỉ các test mới
+với TypeScript 5.8.3 đạt; không thay cho full typecheck TypeScript của repo.
+Test chạy source thật trong VM với biên Next/React/storage được giả lập. Không có test
+PostgreSQL, browser, full formatter/lint/build/E2E hoặc CI của bản vá mới tại checkpoint này.
+Chủ dự án yêu cầu commit và tạo PR ngày 2026-09-25. Bốn nhóm được commit riêng,
+checkpoint tích hợp sau cùng trên nhánh `fix/audit-small-round2-20260925`, đích `main`.
+Đã đối chiếu lại baseline, checksum của 14 file và chạy lại đủ 69 test trước commit.
+Chưa merge/deploy; CI/review phải xác nhận đúng HEAD. Không sửa gate để lấy xanh.
+
+Không đóng toàn bộ S00/A1/A2 hoặc 54 AC. Khóa flush chỉ trong cùng tab; ownership, vault,
+receipt server, retry 4xx và xử lý logout/legacy còn thuộc các slice được đặc tả riêng.
+HTTP no-store không xóa private cache/SW cũ. Không có thay đổi dữ liệu production.
+
+Chi tiết và điều kiện tích hợp: [bàn giao bản vá nhỏ](docs/ops/audit-small-round2-2026-09-25.md).
+
 ## 2026-09-25 — chốt đặc tả chất lượng cao, thi hành sau
 
 Chủ dự án yêu cầu “chốt theo phương án chất lượng cao nhất”. Bộ đặc tả

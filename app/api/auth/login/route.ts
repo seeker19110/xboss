@@ -27,7 +27,11 @@ function clientIp(req: NextRequest): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { email, password } = await req.json().catch(() => ({}));
+  const body: unknown = await req.json().catch(() => null);
+  // JSON hợp lệ vẫn có thể là null/mảng/giá trị đơn; không destructure trước khi kiểm kiểu.
+  if (!body || typeof body !== "object" || Array.isArray(body))
+    return NextResponse.json({ error: "Thiếu email/mật khẩu" }, { status: 400 });
+  const { email, password } = body as Record<string, unknown>;
   // Bắt buộc là chuỗi — nếu không, verifyPassword (scryptSync) sẽ throw TypeError trước khi
   // recordLoginFailure kịp chạy, vừa lộ 500 vừa không tính vào rate-limit chống brute-force.
   if (typeof email !== "string" || !email || typeof password !== "string" || !password)

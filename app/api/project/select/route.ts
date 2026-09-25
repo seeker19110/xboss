@@ -11,12 +11,15 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   const rawProjectId = body?.projectId;
-  const projectId = Number(rawProjectId);
-  if (
-    (typeof rawProjectId !== "number" && typeof rawProjectId !== "string") ||
-    !Number.isSafeInteger(projectId) ||
-    projectId <= 0
-  )
+  // Kiểm kiểu trước Number(): object JSON có thể làm phép ép kiểu throw.
+  // Chuỗi ID chỉ nhận dạng thập phân canonical, không hex/exponent/dấu hoặc khoảng trắng.
+  const validEncoding =
+    typeof rawProjectId === "number" ||
+    (typeof rawProjectId === "string" &&
+      rawProjectId.length <= 16 &&
+      /^[1-9][0-9]*$/.test(rawProjectId));
+  const projectId = validEncoding ? Number(rawProjectId) : NaN;
+  if (!Number.isSafeInteger(projectId) || projectId <= 0)
     return NextResponse.json({ error: "Thiếu dự án hợp lệ" }, { status: 400 });
 
   const scope = await chotProjectIdChoDoc(user, projectId);

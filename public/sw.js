@@ -1,9 +1,6 @@
-// Service worker XBoss — network-first cho trang, stale-while-revalidate cho API GET,
-// cache-first cho asset tĩnh.
-// Mất mạng (hầm, tầng kỹ thuật) vẫn xem được dữ liệu tracking đã tải lần cuối.
-// App Shell: precache /offline + asset tĩnh cốt lõi lúc cài đặt (M0) — trang HTML chưa
-// từng ghé mà mất mạng hoàn toàn sẽ thấy /offline thay vì lỗi mạng mặc định của trình duyệt.
-const CACHE = "xboss-v19";
+// QUALITY-FINAL-1 / S04: chỉ cache shell công khai và asset tĩnh.
+// API, HTML cá nhân hóa, RSC và export luôn qua mạng; offline vault là slice riêng.
+const CACHE = "xboss-public-v20";
 const SHELL_URLS = [
   "/offline",
   "/manifest.webmanifest",
@@ -11,27 +8,111 @@ const SHELL_URLS = [
   "/icon-192.png",
   "/icon-512.png",
 ];
+let generation = 0;
+let cacheWrites = Promise.resolve();
+
+// Chỉ quản lý namespace của SW XBoss, không xóa cache ứng dụng khác cùng origin.
+const isOwnedCache = (name) => /^xboss-(?:public-)?v\d+$/.test(name);
+
+function publicResponse(request, response) {
+  if (response.status !== 200 || response.redirected || response.type === "opaque") {
+    return false;
+  }
+  if (/\b(no-store|private)\b/i.test(response.headers.get("cache-control") ?? "")) {
+    return false;
+  }
+  if (response.url && response.url !== request.url) return false;
+  const path = new URL(request.url).pathname;
+  const mime = (response.headers.get("content-type") ?? "").split(";")[0].trim();
+  if (path === "/offline") return mime === "text/html";
+  if (path === "/manifest.webmanifest") {
+    return mime === "application/manifest+json" || mime === "application/json";
+  }
+  if (path.startsWith("/icon")) return mime.startsWith("image/");
+  // Không giữ HTML lỗi hoặc trang login trả 200 thay cho chunk JS/CSS.
+  return mime !== "" && mime !== "text/html" && mime !== "text/plain";
+}
+
+function cachePublic(request, response, epoch) {
+  const write = cacheWrites.then(async () => {
+    if (epoch !== generation) return;
+    const cache = await caches.open(CACHE);
+    if (epoch !== generation) return;
+    await cache.put(request, response);
+  });
+  cacheWrites = write.catch(() => {});
+  return write;
+}
+
+function purgeOwnedCaches(keepCurrent) {
+  generation++;
+  // Chờ put đã bắt đầu; put chưa bắt đầu thuộc generation cũ sẽ bị bỏ.
+  const purge = cacheWrites.then(async () => {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter((key) => isOwnedCache(key) && (!keepCurrent || key !== CACHE))
+        .map((key) => caches.delete(key)),
+    );
+  });
+  cacheWrites = purge.catch(() => {});
+  return purge;
+}
+
+async function publicFetch(request, epoch) {
+  const response = await fetch(request, {
+    credentials: "omit",
+    cache: "no-store",
+    redirect: "error",
+  });
+  if (publicResponse(request, response)) {
+    // Cache lỗi/quota không được làm hỏng response mạng hợp lệ.
+    await cachePublic(request, response.clone(), epoch).catch(() => {});
+  }
+  return response;
+}
+
+async function publicCacheFirst(request) {
+  const epoch = generation;
+  try {
+    const cache = await caches.open(CACHE);
+    const cached = await cache.match(request);
+    if (epoch === generation && cached && publicResponse(request, cached)) return cached;
+  } catch {
+    /* Cache Storage bị chặn: vẫn thử mạng */
+  }
+  return publicFetch(request, epoch);
+}
+
+async function offlineShell() {
+  try {
+    const cache = await caches.open(CACHE);
+    const request = new Request(new URL("/offline", location.origin));
+    const cached = await cache.match(request);
+    if (cached && publicResponse(request, cached)) return cached;
+  } catch {
+    /* không có shell công khai: trả lỗi mạng, không dùng HTML riêng tư cũ */
+  }
+  return Response.error();
+}
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();
-  // Từng URL tự bắt lỗi riêng — 1 asset lỗi (vd cài đặt lần đầu cũng đang mất mạng)
-  // không được làm hỏng toàn bộ cài đặt SW (khác `cache.addAll` vốn atomic).
+  const epoch = generation;
   e.waitUntil(
-    caches
-      .open(CACHE)
-      .then((cache) => Promise.all(SHELL_URLS.map((url) => cache.add(url).catch(() => {})))),
-  );
-});
-self.addEventListener("activate", (e) => {
-  e.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
+    Promise.all(
+      SHELL_URLS.map((url) => {
+        return publicFetch(new Request(new URL(url, location.origin)), epoch).catch(() => {});
+      }),
+    ),
   );
 });
 
-// Web Push: hiện notification hệ thống khi server đẩy (kể cả khi app không mở).
+self.addEventListener("activate", (e) => {
+  e.waitUntil(purgeOwnedCaches(true).then(() => self.clients.claim()));
+});
+
+// Web Push và tín hiệu flush giữ nguyên; SW không tự gửi hàng đợi offline.
 self.addEventListener("push", (e) => {
   let data = { title: "XBoss", body: "", url: "/" };
   try {
@@ -64,31 +145,20 @@ self.addEventListener("notificationclick", (e) => {
   );
 });
 
-// Logout: xóa tất cả cache API để user khác không thấy dữ liệu của phiên cũ (tablet chia sẻ).
 self.addEventListener("message", (e) => {
-  if (e.data?.type === "CLEAR_CACHE") {
-    e.waitUntil(
-      caches
-        .open(CACHE)
-        .then((cache) =>
-          cache
-            .keys()
-            .then((keys) =>
-              Promise.all(
-                keys
-                  .filter((r) => new URL(r.url).pathname.startsWith("/api/"))
-                  .map((r) => cache.delete(r)),
-              ),
-            ),
-        ),
-    );
-  }
+  if (e.data?.type !== "CLEAR_CACHE") return;
+  e.waitUntil(
+    purgeOwnedCaches(false).then(
+      () => {
+        e.ports?.[0]?.postMessage({ type: "CACHE_CLEARED", requestId: e.data.requestId });
+      },
+      () => {
+        e.ports?.[0]?.postMessage({ type: "CACHE_CLEAR_FAILED", requestId: e.data.requestId });
+      },
+    ),
+  );
 });
 
-// Background Sync (M58 PR2): trình duyệt đánh thức khi có mạng lại (kể cả sau khi tab bị
-// treo) → báo mọi client mở để đẩy hàng đợi offline. Logic hàng đợi nằm ở phía trang
-// (offlineQueue/index.ts) nên SW chỉ chuyển tiếp tín hiệu, không tự gửi. Không client nào
-// mở thì cơ chế listener 'online' + interval lúc mở lại app vẫn gửi bù.
 self.addEventListener("sync", (e) => {
   if (e.tag === "xboss-flush") {
     e.waitUntil(
@@ -102,82 +172,27 @@ self.addEventListener("sync", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
-  // API GET → stale-while-revalidate: trả cache ngay nếu có, cập nhật ngầm từ mạng.
-  // Mất mạng hoàn toàn → trả bản cache gần nhất.
-  // Trừ: ảnh/tài liệu (cache riêng bởi browser), SSE /api/events (stream), /api/health
-  // (uptime monitor cần kết quả ping DB thật mỗi lần, không phải bản cache cũ), và
-  // /api/r/ + /api/qr/ (M58 PR1 — route điều hướng QR/tem in, luôn cần dữ liệu mới nhất,
-  // không được phục vụ bản cache cũ). U1 (audit 2026-09-22): các route xuất file
-  // (Excel/PDF/zip) cũng phải network-only — trước đây đi chung nhánh stale-while-revalidate
-  // khiến người dùng online tải lại file MB đã cache từ lần xuất trước (số liệu cũ) thay vì
-  // bản mới, và nhét blob lớn vào Cache Storage không cần thiết.
-  if (url.pathname.startsWith("/api/")) {
-    if (
-      url.pathname.startsWith("/api/photos/") ||
-      url.pathname.startsWith("/api/hse-photos/") ||
-      url.pathname.startsWith("/api/work-front-documents/") ||
-      url.pathname.startsWith("/api/documents/") ||
-      url.pathname.startsWith("/api/events") ||
-      url.pathname.startsWith("/api/tasks/version") ||
-      url.pathname.startsWith("/api/health") ||
-      url.pathname.startsWith("/api/r/") ||
-      url.pathname.startsWith("/api/qr/") ||
-      url.pathname.startsWith("/api/system-uploads/") ||
-      url.pathname.startsWith("/api/systems/") ||
-      url.pathname.startsWith("/api/export/") ||
-      url.pathname.includes("/export/") ||
-      url.pathname.endsWith("/export") ||
-      url.pathname.endsWith("/pdf") ||
-      url.pathname.endsWith("/excel")
-    )
-      return;
-    e.respondWith(
-      caches.open(CACHE).then((cache) =>
-        cache.match(e.request).then((cached) => {
-          const networkFetch = fetch(e.request)
-            .then((res) => {
-              if (res.ok) cache.put(e.request, res.clone());
-              return res;
-            })
-            .catch(() => cached ?? Response.error());
-          // Có cache → trả ngay + cập nhật ngầm; không có cache → chờ mạng
-          return cached ?? networkFetch;
-        }),
-      ),
-    );
+
+  // Bao phủ cả API tương lai: không cần nhớ thêm từng path vào denylist.
+  if (
+    url.pathname === "/api" ||
+    url.pathname.startsWith("/api/") ||
+    e.request.headers.has("authorization")
+  ) {
+    e.respondWith(fetch(e.request, { cache: "no-store" }));
     return;
   }
 
-  // Asset build của Next (immutable) → cache-first.
-  // Chỉ dùng/cache response tốt: lúc deploy chunk cũ có thể trả 404/500 (text/plain),
-  // nếu cache bản lỗi thì trang hỏng vĩnh viễn (ChunkLoadError) tới khi xoá site data.
-  if (url.pathname.startsWith("/_next/static/")) {
-    e.respondWith(
-      caches.match(e.request).then((hit) => {
-        if (hit && hit.ok) return hit;
-        return fetch(e.request).then((res) => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copy));
-          }
-          return res;
-        });
-      }),
-    );
+  const isShell = SHELL_URLS.includes(url.pathname);
+  const isStatic = url.pathname.startsWith("/_next/static/");
+  const publicAsset = !url.search && (isShell || isStatic);
+  if (publicAsset) {
+    e.respondWith(publicCacheFirst(e.request));
     return;
   }
 
-  // Trang HTML → network-first, offline thì dùng bản cache gần nhất; chưa từng ghé
-  // (không có trong cache) thì rơi về trang App Shell /offline đã precache lúc cài đặt.
-  e.respondWith(
-    fetch(e.request)
-      .then((res) => {
-        if (res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(e.request, copy));
-        }
-        return res;
-      })
-      .catch(() => caches.match(e.request).then((hit) => hit ?? caches.match("/offline"))),
-  );
+  // Không cache HTML/RSC, ảnh tối ưu động hoặc URL ký. Chỉ navigation lỗi mạng mới dùng
+  // shell vô danh; 401/403/5xx từ server được trả nguyên trạng, không thay bằng cache 200.
+  const network = fetch(e.request, { cache: "no-store" });
+  e.respondWith(e.request.mode === "navigate" ? network.catch(offlineShell) : network);
 });

@@ -1,17 +1,14 @@
 "use client";
 import { WifiOff, RefreshCw } from "lucide-react";
 
-// Trang dự phòng ngoại tuyến — service worker (public/sw.js) precache trang này lúc
-// cài đặt và trả về khi điều hướng tới 1 trang HTML chưa từng tải (không có trong cache)
-// mà đang mất mạng, thay vì để trình duyệt hiện lỗi mạng mặc định.
+// Shell vô danh: không phục vụ HTML/dữ liệu của phiên cũ khi mất mạng.
 export default function OfflinePage() {
   return (
     <main className="flex-1 flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
       <WifiOff className="w-12 h-12 text-zinc-400" strokeWidth={1.5} aria-hidden="true" />
       <h1 className="text-lg font-semibold">Mất kết nối mạng</h1>
       <p className="text-sm text-zinc-400 max-w-sm">
-        Trang này chưa được tải trước đó nên chưa xem được khi ngoại tuyến. Kết nối lại mạng rồi thử
-        lại.
+        Kết nối lại mạng để xác minh quyền truy cập và tải dữ liệu mới nhất, rồi thử lại.
       </p>
       <button
         onClick={() => window.location.reload()}

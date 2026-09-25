@@ -12,12 +12,9 @@ export const COOKIE_MAX_AGE = SESSION_DAYS * 86400;
 // để next build không cần secret.
 function getSecret(): string {
   const s = process.env.XBOSS_SECRET;
-  if (s) return s;
+  if (s && s.trim()) return s;
   if (process.env.NODE_ENV === "production") {
-    console.warn(
-      "⚠️ XBOSS_SECRET chưa được cấu hình — đang dùng secret fallback. Hãy đặt XBOSS_SECRET trong production.",
-    );
-    return "xboss-default-production-secret-min32char";
+    throw new Error("XBOSS_SECRET bắt buộc trong production; không dùng khóa ký dự phòng.");
   }
   return "xboss-dev-secret-change-me";
 }
@@ -63,16 +60,19 @@ export type ParsedToken = {
 };
 
 export function parseToken(token: string): ParsedToken | null {
+  if (typeof token !== "string" || token.length > 512) return null;
   const parts = token.split(".");
   if (parts.length !== 7) return null;
   const [uid, exp, pwFrag, flag, sv, orgId, mac] = parts;
   // Chỉ chấp nhận flag "0"/"1" — chặn nhầm token tạm "chờ 2FA" (makeTotpPendingToken 5 phần,
   // phần thứ 4 = "2fa") bị dùng làm cookie phiên.
   if (flag !== "0" && flag !== "1") return null;
-  // sv phải là số nguyên không âm hợp lệ.
-  if (!/^\d+$/.test(sv)) return null;
-  // orgId phải là số nguyên dương hợp lệ (id tổ chức — luôn ≥ 1, org mặc định là 1).
-  if (!/^[1-9]\d*$/.test(orgId)) return null;
+  // Không để NaN/Infinity, số vượt biên hoặc ép kiểu chuỗi làm lọt token đã ký sai cấu trúc.
+  const positiveInteger = (v: string) => /^[1-9]\d*$/.test(v) && Number.isSafeInteger(Number(v));
+  if (!positiveInteger(uid) || !positiveInteger(exp) || !positiveInteger(orgId)) return null;
+  if (!/^(0|[1-9]\d*)$/.test(sv) || !Number.isSafeInteger(Number(sv))) return null;
+  // Buffer.from(hex) có thể cắt bỏ hậu tố lỗi; phải kiểm toàn bộ MAC trước khi decode.
+  if (!/^[0-9a-f]{64}$/i.test(mac)) return null;
   const expected = Buffer.from(sign(`${uid}.${exp}.${pwFrag}.${flag}.${sv}.${orgId}`), "hex");
   let given: Buffer;
   try {
@@ -81,7 +81,7 @@ export function parseToken(token: string): ParsedToken | null {
     return null;
   }
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
-  if (Number(exp) < Date.now()) return null;
+  if (Number(exp) <= Date.now()) return null;
   return {
     uid: Number(uid),
     pwFrag,
