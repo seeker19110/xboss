@@ -225,6 +225,7 @@ jobs:
       # đếm SỐ FILE fail — chạy thiếu TEST_DATABASE_URL thì 358/698 ca tự skip mà bản tóm tắt
       # vẫn báo "0 file fail", trông y hệt một lần chạy xanh thật.
       - name: Test (kèm test tích hợp trên Postgres)
+        id: postgres-tests
         run: npm test -- --release-gate
         env:
           TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
@@ -240,12 +241,24 @@ jobs:
 
       # ERD sinh tự động từ schema thật (M45 PR3): Postgres CI đã có đủ schema sau
       # bước Test (ensureSchema áp mọi migration). Lệch docs/ERD.md → CI đỏ.
+      # Vẫn kiểm khi test đỏ để lấy ERD thật phục vụ chẩn đoán, không bỏ qua lỗi gate.
       - name: Kiểm ERD khớp schema
+        id: erd
+        if: always() && steps.postgres-tests.outcome != 'skipped'
         run: |
           npm run gen:erd
+          echo "generated=true" >> "$GITHUB_OUTPUT"
           git diff --exit-code docs/ERD.md
         env:
           DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
+
+      - name: Lưu ERD sinh từ Postgres khi lỗi
+        if: failure() && steps.erd.outputs.generated == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: postgres-generated-erd
+          path: docs/ERD.md
+          retention-days: 7
 
   # ── Ratchet coverage (W6.2): chặn tụt coverage âm thầm so với coverage-baseline.json ──
   #

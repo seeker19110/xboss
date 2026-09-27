@@ -1,5 +1,15 @@
 # PROGRESS — XBoss
 
+## 2026-09-27 — audit bảo mật API và cách ly tổ chức
+
+Baseline `f38a10ee949eba52bfb4895c9a1c75a302245ee8`. Đang tích hợp bản vá theo yêu cầu
+chủ dự án; chưa xác nhận phát hành production. Đã bảo vệ setup 2FA đang bật và
+transaction hóa thay đổi enrollment; traffic nội bộ dùng token HMAC riêng, đích tin
+cậy và không chuyển tiếp redirect. Có test hồi quy trước/sau với dữ liệu giả.
+Các nhóm org/dự án, API key, quyền, webhook/push và tham chiếu mua sắm đang kiểm chứng.
+PostgreSQL disposable/E2E/release gate phải qua CI trên đúng commit cuối.
+Chi tiết: [báo cáo bảo mật](docs/ops/security-audit-2026-09-27.md).
+
 ## 2026-09-27 — ghi giao dịch vật tư nhất quán khi cập nhật đồng thời
 
 Baseline `e7f4c6f7` trên `origin/main` sau PR #542. `POST /api/materials/:id/transactions`

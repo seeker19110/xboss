@@ -20,6 +20,7 @@ export function hashApiKey(raw: string): string {
 export type ApiKeyAuth = {
   keyId: number;
   projectId: number | null;
+  orgId: number;
   scopes: string[];
   // Admin đã tạo key này (api_keys.created_by) — dùng làm "actor" quy về users(id) cho
   // các bảng FK bắt buộc tới users (vd created_by/updated_by của engineering_objects,
@@ -51,10 +52,11 @@ export async function verifyApiKey(authHeader: string | null): Promise<ApiKeyAut
   const row = await queryOne<{
     id: number;
     projectId: number | null;
+    orgId: number;
     scopes: string[];
     createdBy: number;
   }>(
-    `SELECT id, project_id AS "projectId", scopes, created_by AS "createdBy"
+    `SELECT id, project_id AS "projectId", org_id AS "orgId", scopes, created_by AS "createdBy"
        FROM api_keys
       WHERE key_hash = ? AND revoked_at IS NULL
         AND (expires_at IS NULL OR expires_at > now())`,
@@ -69,6 +71,7 @@ export async function verifyApiKey(authHeader: string | null): Promise<ApiKeyAut
   return {
     keyId: row.id,
     projectId: row.projectId,
+    orgId: row.orgId,
     scopes: row.scopes ?? [],
     createdBy: row.createdBy,
   };
@@ -106,11 +109,20 @@ export async function requireApiKey(
       { status: 429, headers: { "Retry-After": "60" } },
     );
   const projectId = auth.projectId ?? Number(req.nextUrl.searchParams.get("project"));
-  if (!Number.isInteger(projectId) || projectId <= 0)
+  if (!Number.isSafeInteger(projectId) || projectId <= 0)
     return NextResponse.json(
       { error: "Key toàn cục cần chỉ định dự án qua ?project=<id>" },
       { status: 422 },
     );
+
+  // Key toàn cục chỉ có phạm vi trong tổ chức sở hữu key. Kiểm cả key gắn sẵn
+  // dự án để chặn cấu hình cũ sai tenant hoặc dự án đã chuyển tổ chức.
+  const project = await queryOne(
+    `SELECT 1 FROM projects WHERE id = ? AND org_id = ?`,
+    projectId,
+    auth.orgId,
+  );
+  if (!project) return NextResponse.json({ error: "Dự án không tồn tại" }, { status: 404 });
 
   // Đặt ngữ cảnh request cho ĐƯỜNG API KEY — đối xứng với getCurrentProjectId() ở đường
   // phiên đăng nhập (lib/projects.ts). `withTransaction` (lib/db) đọc ngữ cảnh này để
@@ -122,6 +134,6 @@ export async function requireApiKey(
   //   2) trigger audit ghi được actor thay vì để NULL.
   // actor quy về `auth.createdBy` (admin đã tạo key) — cùng quy ước mà route ingest dùng
   // làm created_by/updated_by, vì hệ ngoài không phải một user trong `users`.
-  patchRequestContext({ projectId, userId: auth.createdBy });
+  patchRequestContext({ projectId, userId: auth.createdBy, orgId: auth.orgId });
   return { auth, projectId };
 }

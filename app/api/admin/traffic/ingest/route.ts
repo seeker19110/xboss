@@ -6,8 +6,8 @@ import { TRAFFIC_TOKEN_HEADER, trafficToken } from "@/lib/bao-mat/traffic-token"
 export const dynamic = "force-dynamic";
 
 // POST /api/admin/traffic/ingest
-// Được gọi fire-and-forget từ proxy (Edge) để ghi vào ring buffer (Node.js).
-// Xác thực bằng header bí mật nội bộ (token = XBOSS_SECRET) — endpoint reachable
+// Được gọi fire-and-forget từ proxy (Node.js) để ghi vào ring buffer.
+// Xác thực bằng HMAC riêng cho traffic (không gửi XBOSS_SECRET) — endpoint reachable
 // công khai nên cần chặn POST giả bơm dữ liệu rác vào ring buffer.
 export async function POST(req: NextRequest) {
   if (!safeEqual(req.headers.get(TRAFFIC_TOKEN_HEADER) ?? "", trafficToken()))

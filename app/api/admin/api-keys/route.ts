@@ -43,12 +43,16 @@ export async function POST(req: NextRequest) {
   if (!name) return NextResponse.json({ error: "Thiếu tên key" }, { status: 400 });
 
   const projectId = body.projectId != null && body.projectId !== "" ? Number(body.projectId) : null;
-  if (projectId != null && !Number.isInteger(projectId))
+  if (projectId != null && (!Number.isSafeInteger(projectId) || projectId <= 0))
     return NextResponse.json({ error: "projectId không hợp lệ" }, { status: 400 });
 
-  // Kiểm FK projectId tồn tại
+  // Chỉ cấp key cho dự án trong cùng tổ chức; không tiết lộ dự án của tenant khác.
   if (projectId != null) {
-    const projectExists = await queryOne(`SELECT 1 FROM projects WHERE id = ?`, projectId);
+    const projectExists = await queryOne(
+      `SELECT 1 FROM projects WHERE id = ? AND org_id = ?`,
+      projectId,
+      user.orgId,
+    );
     if (!projectExists) {
       return NextResponse.json({ error: "Dự án không tồn tại" }, { status: 404 });
     }
