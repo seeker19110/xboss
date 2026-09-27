@@ -61,20 +61,28 @@ export async function PUT(
     entries.push({ taskId, weight });
   }
 
-  // Chặn TRƯỚC khi ghi (không phải sau) — nếu không, lô sai đã nằm trong DB rồi mới báo lỗi.
+  // Chặn TRƯỚC khi ghi — task phải thuộc cùng dự án với dòng BOQ, nếu không tiến độ
+  // dự án khác có thể đi vào khối lượng thực hiện và gợi ý IPC.
   const { tong: sumWeight, loi, canhBao } = kiemTraTongTyTrong(entries.map((e) => e.weight));
   if (loi) return NextResponse.json({ error: loi }, { status: 422 });
 
   if (entries.length > 0) {
     const existingTasks = await query<{ id: number }>(
-      `SELECT id FROM tasks WHERE id IN (${entries.map(() => "?").join(",")})`,
+      `SELECT t.id FROM tasks t
+         JOIN work_packages wp ON wp.id = t.package_id
+         JOIN sheet_types st ON st.id = wp.sheet_type_id
+         JOIN towers tw ON tw.id = st.tower_id
+        WHERE t.id IN (${entries.map(() => "?").join(",")}) AND tw.project_id = ?`,
       ...entries.map((e) => e.taskId),
+      projectId,
     );
     const validIds = new Set(existingTasks.map((t) => t.id));
     const missing = entries.filter((e) => !validIds.has(e.taskId));
     if (missing.length > 0)
       return NextResponse.json(
-        { error: `Task không tồn tại: ${missing.map((e) => e.taskId).join(", ")}` },
+        {
+          error: `Task không tồn tại hoặc không thuộc dự án hiện hành: ${missing.map((e) => e.taskId).join(", ")}`,
+        },
         { status: 422 },
       );
   }
