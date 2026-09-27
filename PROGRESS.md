@@ -10,7 +10,7 @@ nay khóa dòng vật tư trong transaction, lấy số dư ngay trước lần 
 Kiểm cục bộ: format, lint, typecheck, check:sw-exclude, check:migrations,
 check:project-scope, check:db-params và build đạt. Máy không có PostgreSQL disposable;
 73 ca của file test liên quan bị skip cục bộ, cần CI PostgreSQL chạy thật trên đúng HEAD.
-PR: chờ mở. Không migration hoặc thao tác production. Chưa đóng Goal DoD.
+PR #543. Không migration hoặc thao tác production. Chưa đóng Goal DoD.
 
 ## 2026-09-27 — chặn BOQ map liên kết task khác dự án
 
