@@ -6,8 +6,10 @@ import {
   CAN,
   ROLES,
   PERM_KEYS,
+  LOCKED_PERMS,
   permDefaultsMatrix,
   type PermKey,
+  type Role,
 } from "@/lib/bao-mat/auth";
 import { listPermissionOverrides } from "@/lib/bao-mat/permissions";
 
@@ -28,7 +30,7 @@ export async function GET() {
 
   const defaults = permDefaultsMatrix();
   // Toàn bộ override (toàn hệ lẫn theo dự án) trong 1 lượt — tránh N+1 query theo dự án.
-  const overrides = await listPermissionOverrides();
+  const overrides = await listPermissionOverrides(me.orgId);
   const globalMap = new Map<string, boolean>();
   const scopedByProject = new Map<number, Map<string, boolean>>();
   for (const o of overrides) {
@@ -45,7 +47,8 @@ export async function GET() {
     }
   }
   const projects = await query<{ id: number; name: string }>(
-    `SELECT id, name FROM projects ORDER BY id`,
+    `SELECT id, name FROM projects WHERE org_id = ? ORDER BY id`,
+    me.orgId,
   );
   const projectNames = new Map(projects.map((p) => [p.id, p.name]));
 
@@ -68,9 +71,11 @@ export async function GET() {
     for (const role of ROLES) {
       const key = `${role}|${permKey}`;
       const ov = globalMap.get(key);
-      const effective = ov !== undefined ? ov : (defaults[permKey]?.[role] ?? false);
-      const source = ov !== undefined ? "Override toàn hệ" : "Mặc định";
-      ws.addRow([permKey, role, "Toàn hệ thống", effective ? "Có" : "Không", source]);
+      const fallback = defaults[permKey]?.[role] ?? false;
+      const effective =
+        ov !== undefined ? ov && (!LOCKED_PERMS.includes(permKey) || fallback) : fallback;
+      const source = ov !== undefined ? "Override tổ chức" : "Mặc định";
+      ws.addRow([permKey, role, "Tổ chức hiện tại", effective ? "Có" : "Không", source]);
     }
   }
 
@@ -86,11 +91,15 @@ export async function GET() {
     for (const key of sortedKeys) {
       const allowed = scoped.get(key)!;
       const [role, permKey] = key.split("|");
+      const effective =
+        allowed &&
+        (!LOCKED_PERMS.includes(permKey as PermKey) ||
+          (defaults[permKey as PermKey]?.[role as Role] ?? false));
       ws.addRow([
         permKey,
         role,
         `Dự án: ${name}`,
-        allowed ? "Có" : "Không",
+        effective ? "Có" : "Không",
         `Override dự án ${name}`,
       ]);
     }
@@ -103,6 +112,7 @@ export async function GET() {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="permissions-snapshot-${today}.xlsx"`,
+      "Cache-Control": "private, no-store",
     },
   });
 }

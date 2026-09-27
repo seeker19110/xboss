@@ -16,7 +16,9 @@ export async function GET() {
 
   // Route chỉ đọc: dự án suy từ phiên (cookie xboss_project), không nhận từ query —
   // trước đây `?projectId=<B>` đọc chéo được dự báo dòng tiền của dự án khác (IDOR).
-  const projectId = (await getCurrentProjectId(user)) || 1;
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
 
   try {
     const forecasts = await listCashflowForecasts(projectId);

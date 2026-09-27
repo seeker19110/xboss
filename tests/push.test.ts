@@ -1,72 +1,21 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createServer, type Server } from "node:https";
-import { AddressInfo } from "node:net";
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { mock } from "node:test";
+import webpush from "web-push";
 
-// Web Push có 3 nhánh đáng khoá, và cả 3 đều dựng được BẰNG THẬT — không mock web-push:
-//   1. chưa cấu hình VAPID → mọi hàm gửi là no-op (không được throw, không được ghi DB);
-//   2. endpoint trả 404/410 (người dùng gỡ quyền / đổi trình duyệt) → subscription phải bị
-//      DỌN khỏi bảng, nếu không hàng đợi push sẽ phình mãi bằng thiết bị chết;
-//   3. endpoint lỗi khác (500) → KHÔNG được xoá subscription (lỗi tạm thời), chỉ log.
-// Dựng một HTTP server cục bộ đóng vai push service để lấy đúng 3 nhánh đó.
-
-// web-push TỪ CHỐI endpoint http:// (đúng như push service thật), nên server giả phải là
-// HTTPS. Sinh chứng chỉ tự ký lúc chạy thay vì commit khoá vào repo; thiếu openssl thì
-// `chungChi()` trả null và các ca dùng nó tự skip thay vì đỏ oan.
-let tlsCache: { key: string; cert: string } | null | undefined;
-function chungChi(): { key: string; cert: string } | null {
-  if (tlsCache !== undefined) return tlsCache;
-  const dir = mkdtempSync(join(tmpdir(), "xboss-push-"));
-  try {
-    execFileSync(
-      "openssl",
-      // prettier-ignore
-      ["req", "-x509", "-newkey", "rsa:2048", "-nodes",
-       "-keyout", join(dir, "k.pem"), "-out", join(dir, "c.pem"),
-       "-days", "1", "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1"],
-      { stdio: "ignore" },
-    );
-    tlsCache = {
-      key: readFileSync(join(dir, "k.pem"), "utf8"),
-      cert: readFileSync(join(dir, "c.pem"), "utf8"),
-    };
-  } catch {
-    tlsCache = null;
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-  return tlsCache;
-}
-
-/** Server đóng vai push service, trả về mã trạng thái đặt trước cho mọi request. */
-function moPushService(status: number): Promise<{ server: Server; url: string }> {
-  const tls = chungChi()!;
-  return new Promise((resolve) => {
-    const server = createServer(tls, (_req, res) => {
-      res.writeHead(status);
-      res.end();
-    });
-    server.listen(0, "127.0.0.1", () => {
-      const { port } = server.address() as AddressInfo;
-      resolve({ server, url: `https://127.0.0.1:${port}/push` });
-    });
+// Mock đúng biên gửi HTTP: mọi endpoint ở đây là hostname public, còn chặn địa chỉ
+// nội bộ/DNS rebinding được kiểm riêng trong audit-push-ssrf.test.ts. Giữ nguyên
+// các assertion DB cho subscription chết, lỗi tạm thời và số người nhận.
+async function moPushService(status: number) {
+  const handle = mock.method(webpush, "sendNotification", async () => {
+    if (status >= 400) throw Object.assign(new Error(`HTTP ${status}`), { statusCode: status });
+    return { statusCode: status, body: "", headers: {} };
   });
+  return { server: handle.mock, url: "https://push.example.test/push" };
 }
 
-const dongServer = (server: Server) => new Promise((r) => server.close(r));
-
-// Không cần nạp lại module giữa các ca: `pushConfigured()` đọc process.env ở MỖI lần gọi,
-// nên đổi biến môi trường là đủ. (Trạng thái module duy nhất là cờ `vapidReady` — đã set
-// rồi thì thôi, và server giả không kiểm chữ ký VAPID nên không ảnh hưởng ca nào.)
-
-// Chứng chỉ tự ký ở trên sẽ bị Node từ chối; nới đúng trong tiến trình test này (không phải
-// mã sản phẩm) để web-push nói chuyện được với server giả.
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+const dongServer = async (server: { restore(): void }) => server.restore();
 
 test("pushConfigured + gửi khi CHƯA cấu hình VAPID: no-op, trả 0", async () => {
   const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY } = process.env;
@@ -96,7 +45,7 @@ test("sendPushToUsers: danh sách người nhận rỗng là no-op ngay cả khi
 
 test(
   "sendToSubs: 410 dọn subscription chết, 500 giữ lại, 201 tính là đã gửi",
-  { skip: !HAS_TEST_DB || !chungChi() },
+  { skip: !HAS_TEST_DB },
   async () => {
     const webpush = (await import("web-push")).default;
     const keys = webpush.generateVAPIDKeys();
@@ -163,7 +112,7 @@ test(
 
 test(
   "sendPushToAll: gửi cho mọi thiết bị đã đăng ký, không lọc theo user",
-  { skip: !HAS_TEST_DB || !chungChi() },
+  { skip: !HAS_TEST_DB },
   async () => {
     const webpush = (await import("web-push")).default;
     const keys = webpush.generateVAPIDKeys();

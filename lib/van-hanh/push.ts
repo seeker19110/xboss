@@ -1,12 +1,31 @@
 // Web Push qua VAPID — gửi thông báo đẩy tới điện thoại/máy tính đã đăng ký,
 // kể cả khi không mở app. Không cấu hình VAPID key → mọi hàm gửi là no-op.
 import webpush from "web-push";
+import { Agent } from "node:https";
 import { query, run } from "@/lib/db";
 import { log } from "@/lib/nen/log";
+import { safeLookup, validateWebhookUrl } from "@/lib/bao-mat/webhooks";
 
 export type PushPayload = { title: string; body: string; url?: string };
 
 type SubRow = { id: number; endpoint: string; p256dh: string; auth: string };
+
+// Endpoint do trình duyệt gửi lên vẫn là dữ liệu không tin cậy. Kiểm cả lúc đăng ký
+// lẫn lúc gửi để subscription cũ không thể gọi tới dịch vụ nội bộ.
+export function isSafePushEndpoint(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint);
+    return (
+      url.protocol === "https:" && !url.username && !url.password && validateWebhookUrl(endpoint).ok
+    );
+  } catch {
+    return false;
+  }
+}
+
+// Ghim kiểm DNS ngay ở tầng connect, không resolve trước rồi để client resolve lại.
+// HTTPS giữ nguyên kiểm chứng chỉ/SNI; web-push không tự theo redirect.
+const pushAgent = new Agent({ lookup: safeLookup });
 
 export function pushConfigured(): boolean {
   return !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
@@ -28,10 +47,12 @@ async function sendToSubs(subs: SubRow[], payload: PushPayload): Promise<number>
   const body = JSON.stringify(payload);
   let sent = 0;
   for (const s of subs) {
+    if (!isSafePushEndpoint(s.endpoint)) continue;
     try {
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         body,
+        { agent: pushAgent, timeout: 10_000 },
       );
       sent++;
     } catch (err) {

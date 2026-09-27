@@ -16,6 +16,13 @@ type DocRow = {
   originalName: string | null;
 };
 
+// Mã task/tên gốc là dữ liệu người dùng. Entry ZIP phải phẳng: archiver chỉ bỏ
+// ../ ở đầu, vẫn giữ đường dẫn như nhom/../../tep.pdf ở giữa tên.
+function flatEntryName(raw: string): string {
+  const name = raw.replace(/[\\/:]/g, "_").replace(/\p{Cc}/gu, "_");
+  return !name || /^\.+$/.test(name) ? "tai-lieu" : name;
+}
+
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -58,7 +65,7 @@ export async function GET(req: NextRequest) {
        LEFT JOIN sheet_types st ON st.id = wp.sheet_type_id
        LEFT JOIN towers tw ON tw.id = st.tower_id
       WHERE ${conds.join(" AND ")}
-      ORDER BY t.code`,
+      ORDER BY t.code, d.id`,
     ...values,
   );
 
@@ -77,9 +84,11 @@ export async function GET(req: NextRequest) {
     // đường dẫn cục bộ, chạy được với cả backend S3.
     const buf = await storageGet(user.orgId, r.fileName);
     if (!buf) continue;
-    let entryName = `${r.taskCode}_${r.originalName || r.fileName}`;
-    // Tránh trùng tên entry trong zip (vd nhiều hồ sơ cùng task + cùng tên file gốc).
-    if (usedNames.has(entryName)) entryName = `${r.taskCode}_${r.fileName}`;
+    const baseName = flatEntryName(`${r.taskCode}_${r.originalName || r.fileName}`);
+    let entryName = baseName;
+    // Khử trùng SAU chuẩn hoá, gồm cả tên gốc vô tình khớp hậu tố của entry trước.
+    let duplicate = 2;
+    while (usedNames.has(entryName)) entryName = `${duplicate++}_${baseName}`;
     usedNames.add(entryName);
     archive.append(buf, { name: entryName });
   }

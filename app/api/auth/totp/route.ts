@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, verifyPassword } from "@/lib/bao-mat/auth";
+import { getCurrentUser, verifyPassword, COOKIE, isSecureCookie } from "@/lib/bao-mat/auth";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { decryptTotpSecret, verifyTotpCode } from "@/lib/bao-mat/totp";
+import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,12 @@ export async function DELETE(req: NextRequest) {
   if (typeof password !== "string" || !password || typeof code !== "string" || !code)
     return NextResponse.json({ error: "Thiếu password/code" }, { status: 400 });
 
+  if (await hitRateLimit(`totp-disable:${user.id}`, 10, 15))
+    return NextResponse.json(
+      { error: "Thử tắt 2FA quá nhiều lần — thử lại sau" },
+      { status: 429, headers: { "Retry-After": "900" } },
+    );
+
   return withTransaction(async () => {
     // Cùng khoá với setup/confirm; mã được kiểm và xoá trong một trạng thái nhất quán.
     const u = await queryOne<{ password_hash: string; totp_secret: string | null }>(
@@ -51,10 +58,20 @@ export async function DELETE(req: NextRequest) {
     if (!ok) return NextResponse.json({ error: "Mã không đúng" }, { status: 401 });
 
     await run(
-      `UPDATE users SET totp_secret = NULL, totp_enabled_at = NULL, totp_last_step = NULL WHERE id = ?`,
+      `UPDATE users SET totp_secret = NULL, totp_enabled_at = NULL, totp_last_step = NULL,
+                        session_version = session_version + 1 WHERE id = ?`,
       user.id,
     );
     await run(`DELETE FROM totp_recovery_codes WHERE user_id = ?`, user.id);
-    return NextResponse.json({ ok: true });
+    // Thu hồi cả phiên hiện tại: lần login tiếp theo tính lại yêu cầu 2FA theo vai trò.
+    const response = NextResponse.json({ ok: true });
+    response.cookies.set(COOKIE, "", {
+      httpOnly: true,
+      path: "/",
+      maxAge: 0,
+      sameSite: "lax",
+      secure: isSecureCookie(req),
+    });
+    return response;
   });
 }

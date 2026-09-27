@@ -17,13 +17,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     // Không tin project_id client gửi — đối chiếu với danh sách dự án user được thấy.
-    const chot = await chotProjectIdChoGhi(
-      user,
-      body.projectId,
-      (await getCurrentProjectId(user)) || 1,
-    );
+    const chot = await chotProjectIdChoGhi(user, body.projectId, await getCurrentProjectId(user));
     if (!chot.ok) {
-      return NextResponse.json({ error: "Không có quyền ghi vào dự án này" }, { status: 403 });
+      return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
     }
     const projectId = chot.projectId;
 

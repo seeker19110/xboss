@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import { query, insertId } from "@/lib/db";
+import { query, queryOne, insertId } from "@/lib/db";
 import { WEBHOOK_EVENTS, validateWebhookUrl } from "@/lib/bao-mat/webhooks";
 
 export const dynamic = "force-dynamic";
@@ -108,8 +108,16 @@ export async function POST(req: NextRequest) {
     );
 
   const projectId = body.projectId != null && body.projectId !== "" ? Number(body.projectId) : null;
-  if (projectId != null && !Number.isInteger(projectId))
+  if (projectId != null && (!Number.isInteger(projectId) || projectId <= 0))
     return NextResponse.json({ error: "projectId không hợp lệ" }, { status: 400 });
+  if (projectId != null) {
+    const project = await queryOne<{ id: number }>(
+      `SELECT id FROM projects WHERE id = ? AND org_id = ?`,
+      projectId,
+      user.orgId,
+    );
+    if (!project) return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
+  }
 
   const secret = randomBytes(32).toString("hex");
   // M54 GĐ1 PR2: webhook thuộc org người tạo (không dựa DEFAULT org_id=1).

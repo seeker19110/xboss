@@ -8,39 +8,48 @@ import type { Role } from "@/lib/nen/roles";
 
 export const PROJECT_COOKIE = "xboss_project";
 
-/** Dự án user được thấy: admin thấy mọi dự án; vai trò khác theo `user_projects`;
- *  bảng `user_projects` rỗng toàn hệ thống = mọi user thấy mọi dự án (tương thích
- *  ngược 1 dự án — chỉ khoá khi bắt đầu cấu hình gán). */
-export async function visibleProjectIds(user: { id: number; role: Role }): Promise<number[]> {
-  if (user.role === "admin") {
-    const rows = await query<{ id: number }>(`SELECT id FROM projects ORDER BY id`);
-    return rows.map((r) => r.id);
-  }
+type ProjectActor = { id: number; role: Role; orgId: number };
 
-  const [{ n }] = await query<{ n: number }>(`SELECT COUNT(*) AS n FROM user_projects`);
-  if (Number(n) === 0) {
-    const rows = await query<{ id: number }>(`SELECT id FROM projects ORDER BY id`);
+// ID từ client phải là số nguyên dương an toàn hoặc chuỗi thập phân chuẩn; không ép
+// boolean/mảng/object, ký pháp mũ/hex thành một dự án hợp lệ (QUALITY-FINAL-1 D01).
+function parseProjectId(value: unknown): number | null {
+  if (typeof value !== "number" && (typeof value !== "string" || !/^[1-9]\d*$/.test(value)))
+    return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+/** Admin chỉ thấy dự án cùng tổ chức; vai trò khác luôn cần membership tường minh.
+ *  Bảng user_projects rỗng không mở quyền. Actor thiếu org bị từ chối ngay. */
+export async function visibleProjectIds(user: ProjectActor): Promise<number[]> {
+  if (parseProjectId(user.orgId) == null) return [];
+  if (user.role === "admin") {
+    const rows = await query<{ id: number }>(
+      `SELECT id FROM projects WHERE org_id = ? ORDER BY id`,
+      user.orgId,
+    );
     return rows.map((r) => r.id);
   }
 
   const rows = await query<{ projectId: number }>(
-    `SELECT project_id AS "projectId" FROM user_projects WHERE user_id = ? ORDER BY project_id`,
+    `SELECT up.project_id AS "projectId" FROM user_projects up
+       JOIN projects p ON p.id = up.project_id
+      WHERE up.user_id = ? AND p.org_id = ? ORDER BY up.project_id`,
     user.id,
+    user.orgId,
   );
   return rows.map((r) => r.projectId);
 }
 
-/** Logic thuần (không đụng cookie/DB) — tách riêng để test được: cookie hợp lệ (nằm
- *  trong dự án user thấy) → dùng; else dự án đầu user thấy (mặc định). Không có dự án
- *  nào (DB trống) → null. Client gửi id lạ/không thấy được → bỏ, không tin. */
+/** Cookie sai/ngoài quyền không được âm thầm đổi dự án. Thiếu cookie chỉ suy dự án
+ *  khi duy nhất một dự án hợp lệ; nhiều dự án cần người dùng chọn rõ. */
 export function resolveProjectId(
   visible: number[],
   rawCookieValue: string | undefined,
 ): number | null {
-  if (visible.length === 0) return null;
-  const requested = rawCookieValue ? Number(rawCookieValue) : NaN;
-  if (Number.isFinite(requested) && visible.includes(requested)) return requested;
-  return visible[0];
+  if (rawCookieValue === undefined) return visible.length === 1 ? visible[0] : null;
+  const requested = parseProjectId(rawCookieValue);
+  return requested != null && visible.includes(requested) ? requested : null;
 }
 
 /** Dự án đang chọn của request hiện tại — đọc cookie `xboss_project` + đối chiếu quyền. */
@@ -49,19 +58,15 @@ export async function getCurrentProjectId(user: {
   role: Role;
   orgId: number;
 }): Promise<number | null> {
-  // M61: memoize trong request — projectId chỉ được patch vào request-context SAU khi đã
-  // qua resolveProjectId (đối chiếu visibleProjectIds) + đối chiếu org nên tin được trong
-  // cùng request. Route gọi cả getCurrentUser (patch sớm) lẫn getCurrentProjectId chỉ tốn 1 query.
-  const cached = getRequestContext()?.projectId;
-  if (cached != null) return cached;
-
+  // Không tái dùng projectId chỉ theo số: actor/org/cookie có thể đã đổi trong cùng
+  // context. Luôn đối chiếu danh sách hiện hành trước khi patch quyền theo dự án.
+  const context = getRequestContext();
+  if (context?.projectId != null) patchRequestContext({ projectId: undefined });
   const visible = await visibleProjectIds(user);
   const store = await cookies();
   const projectId = resolveProjectId(visible, store.get(PROJECT_COOKIE)?.value);
   if (projectId == null) return null;
-  // M54 GĐ1 PR2: chống nhảy org — project được chọn PHẢI thuộc đúng org của user. Admin thấy
-  // mọi project xuyên org (visibleProjectIds) nhưng ngữ cảnh dự án hiện tại vẫn phải cùng org
-  // (user đoán id project org khác qua cookie → coi như không có dự án, trả null, không throw).
+  // Phòng thủ thêm khi org dự án đổi giữa hai query.
   const row = await queryOne<{ orgId: number }>(
     `SELECT org_id AS "orgId" FROM projects WHERE id = ?`,
     projectId,
@@ -86,13 +91,13 @@ export type ProjectListItem = {
  *  cho project switcher lẫn trang Portfolio. `orgId` (M51 PR4): lọc theo tổ chức khi có
  *  giá trị; NULL/undefined = không lọc (mọi dự án user thấy). */
 export async function listProjects(
-  user: { id: number; role: Role },
+  user: ProjectActor,
   orgId?: number | null,
 ): Promise<ProjectListItem[]> {
+  if (orgId != null && orgId !== user.orgId) return [];
   const visible = await visibleProjectIds(user);
   if (visible.length === 0) return [];
   const placeholders = visible.map(() => "?").join(",");
-  const orgFilter = orgId != null ? ` AND p.org_id = ?` : "";
   // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm (lib/recompute.ts).
   const rows = await query<ProjectListItem>(
     `SELECT p.id, p.name, p.code, p.status, p.color, p.org_id AS "orgId",
@@ -104,12 +109,12 @@ export async function listProjects(
        LEFT JOIN sheet_types st ON st.tower_id = tw.id
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-      WHERE p.id IN (${placeholders})${orgFilter}
+      WHERE p.id IN (${placeholders}) AND p.org_id = ?
       GROUP BY p.id, p.name, p.code, p.status, p.color, p.org_id
       ORDER BY p.id`,
     todayISO(),
     ...visible,
-    ...(orgId != null ? [orgId] : []),
+    user.orgId,
   );
   return rows;
 }
@@ -119,10 +124,7 @@ export type OrganizationItem = { id: number; name: string };
 /** Tổ chức có ít nhất 1 dự án user thấy — dùng để trang Portfolio quyết định có hiện
  *  select tổ chức hay không (chỉ hiện khi >1 org). M54 GĐ1 PR1: projects.org_id nay NOT
  *  NULL DEFAULT 1 nên dự án không gán tổ chức thuộc org mặc định 1 (không còn NULL). */
-export async function listOrganizations(user: {
-  id: number;
-  role: Role;
-}): Promise<OrganizationItem[]> {
+export async function listOrganizations(user: ProjectActor): Promise<OrganizationItem[]> {
   const visible = await visibleProjectIds(user);
   if (visible.length === 0) return [];
   const placeholders = visible.map(() => "?").join(",");
@@ -130,9 +132,10 @@ export async function listOrganizations(user: {
     `SELECT DISTINCT o.id, o.name
        FROM organizations o
        JOIN projects p ON p.org_id = o.id
-      WHERE p.id IN (${placeholders})
+      WHERE p.id IN (${placeholders}) AND o.id = ?
       ORDER BY o.name`,
     ...visible,
+    user.orgId,
   );
 }
 
@@ -146,7 +149,7 @@ export type PortfolioKpi = {
 };
 
 /** KPI gộp cross-project cho trang Portfolio — không đụng cache dữ liệu 1 dự án. */
-export async function portfolioKpi(user: { id: number; role: Role }): Promise<PortfolioKpi> {
+export async function portfolioKpi(user: ProjectActor): Promise<PortfolioKpi> {
   const projects = await listProjects(user);
   const totalDelayed = projects.reduce((s, p) => s + p.delayedCount, 0);
   const avgProgress =
@@ -179,17 +182,12 @@ export async function portfolioKpi(user: { id: number; role: Role }): Promise<Po
  * phân quyền — thứ đáng test nhất ở đây — không viết test được.
  */
 export async function chotProjectIdChoGhi(
-  user: { id: number; role: Role },
+  user: ProjectActor,
   inputProjectId: unknown,
-  projectHienTai: number,
+  projectHienTai: number | null,
 ): Promise<{ ok: true; projectId: number } | { ok: false }> {
-  const hienTai = projectHienTai || 1;
-  if (inputProjectId == null || inputProjectId === "") return { ok: true, projectId: hienTai };
-
-  const muonDung = Number(inputProjectId);
-  if (!Number.isInteger(muonDung) || muonDung <= 0) return { ok: false };
-  if (muonDung === hienTai) return { ok: true, projectId: hienTai };
-
+  const muonDung = parseProjectId(inputProjectId == null ? projectHienTai : inputProjectId);
+  if (muonDung == null) return { ok: false };
   const duocPhep = await visibleProjectIds(user);
   return duocPhep.includes(muonDung) ? { ok: true, projectId: muonDung } : { ok: false };
 }
@@ -207,9 +205,8 @@ export type ChotDocKetQua =
  *      không mang cookie `xboss_project`. Không truyền `project` mà user chỉ thấy đúng 1 dự án
  *      thì suy ra dự án đó; thấy nhiều dự án thì TRẢ VỀ DANH SÁCH để người dùng chọn, chứ không
  *      tự đoán một cái (đoán = đưa nhầm khối lượng BOQ của dự án khác cho QS).
- *   2. Có kiểm ORG: `visibleProjectIds` cho admin thấy mọi dự án XUYÊN tổ chức, nhưng ngữ cảnh
- *      dự án của một request phải cùng org với user (đúng quy ước M54 GĐ1 PR2 ở
- *      `getCurrentProjectId`). Bảng đối chiếu BOQ là dữ liệu thương mại — không nới quy tắc này.
+ *   2. Có kiểm ORG ở truy vấn cuối để giữ phạm vi khi org dự án đổi sau lúc lấy danh sách
+ *      `visibleProjectIds`. Bảng đối chiếu BOQ là dữ liệu thương mại — không nới quy tắc này.
  *
  * Không đọc `cookies()` nên gọi được cả ngoài phạm vi request (test gọi thẳng route handler).
  */
@@ -228,14 +225,14 @@ export async function chotProjectIdChoDoc(
   );
   if (duAn.length === 0) return { ok: false, lyDo: "khong-thay" };
 
-  if (inputProjectId == null || inputProjectId === "") {
+  if (inputProjectId == null) {
     return duAn.length === 1
       ? { ok: true, projectId: duAn[0].id }
       : { ok: false, lyDo: "phai-chon", duAn };
   }
 
-  const muonDung = Number(inputProjectId);
-  if (!Number.isInteger(muonDung) || muonDung <= 0) return { ok: false, lyDo: "khong-thay" };
+  const muonDung = parseProjectId(inputProjectId);
+  if (muonDung == null) return { ok: false, lyDo: "khong-thay" };
   return duAn.some((d) => d.id === muonDung)
     ? { ok: true, projectId: muonDung }
     : { ok: false, lyDo: "khong-thay" };

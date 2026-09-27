@@ -22,7 +22,7 @@ test(
     );
     await run(`INSERT INTO user_projects (user_id, project_id) VALUES (?, ?)`, pmId, p1);
 
-    const visible = await visibleProjectIds({ id: pmId, role: "pm" });
+    const visible = await visibleProjectIds({ id: pmId, role: "pm", orgId: 1 });
     assert.deepEqual(visible, [p1]);
 
     const towers = await query<{ id: number }>(
@@ -53,7 +53,7 @@ test(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Admin TowerTest', 'admin-tower@xboss.vn', 'x', 'admin')`,
     );
 
-    const visible = await visibleProjectIds({ id: adminId, role: "admin" });
+    const visible = await visibleProjectIds({ id: adminId, role: "admin", orgId: 1 });
     // Cookie chọn p2 (không phải project id nhỏ nhất p1) → getCurrentProjectId phải trả p2.
     const chosenProjectId = resolveProjectId(visible, String(p2));
     assert.equal(chosenProjectId, p2);

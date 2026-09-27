@@ -1,9 +1,9 @@
 import { HAS_TEST_DB } from "./setup";
 import { dangNhap } from "./helpers/phien";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
-import { insertId, queryOne } from "@/lib/db";
+import { insertId, queryOne, run } from "@/lib/db";
 import { hashPassword } from "@/lib/bao-mat/auth";
 import { generateApiKey, hashApiKey, requireApiKey } from "@/lib/bao-mat/api-keys";
 import { getRequestContext, runWithRequestContext } from "@/lib/nen/request-context";
@@ -12,15 +12,30 @@ import { POST } from "@/app/api/admin/api-keys/route";
 const S = { skip: !HAS_TEST_DB };
 const prefix = Date.now().toString(36);
 let sequence = 0;
+const ownedOrgs: number[] = [];
+const ownedProjects: number[] = [];
+const ownedUsers: number[] = [];
+
+after(async () => {
+  if (!HAS_TEST_DB) return;
+  for (const id of ownedUsers) await run(`DELETE FROM api_keys WHERE created_by = ?`, id);
+  for (const id of ownedUsers) await run(`DELETE FROM users WHERE id = ?`, id);
+  for (const id of ownedProjects) await run(`DELETE FROM projects WHERE id = ?`, id);
+  for (const id of ownedOrgs) await run(`DELETE FROM organizations WHERE id = ?`, id);
+});
 
 async function fixture() {
   const orgA = await insertId(`INSERT INTO organizations (name) VALUES ('Key org A')`);
+  ownedOrgs.push(orgA);
   const orgB = await insertId(`INSERT INTO organizations (name) VALUES ('Key org B')`);
+  ownedOrgs.push(orgB);
   const ownProject = await insertId(`INSERT INTO projects (name, org_id) VALUES ('Own', ?)`, orgA);
+  ownedProjects.push(ownProject);
   const otherProject = await insertId(
     `INSERT INTO projects (name, org_id) VALUES ('Other', ?)`,
     orgB,
   );
+  ownedProjects.push(otherProject);
   const passwordHash = hashPassword("mat-khau-test-api-key");
   const userId = await insertId(
     `INSERT INTO users (name, email, role, password_hash, org_id) VALUES ('Admin key', ?, 'admin', ?, ?)`,
@@ -28,6 +43,7 @@ async function fixture() {
     passwordHash,
     orgA,
   );
+  ownedUsers.push(userId);
   dangNhap({ id: userId, passwordHash, orgId: orgA });
   async function key(projectId: number | null) {
     const raw = generateApiKey();

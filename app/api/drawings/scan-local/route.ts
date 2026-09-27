@@ -23,7 +23,9 @@ export async function POST(_req: NextRequest) {
     );
   }
 
-  const projectId = (await getCurrentProjectId(user)) || 1;
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
   const res = await syncDrawingsFromDisk({ projectId, userId: user.id });
 
   return NextResponse.json({

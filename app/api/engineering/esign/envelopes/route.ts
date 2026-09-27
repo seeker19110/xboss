@@ -18,7 +18,9 @@ export async function GET() {
   }
 
   // projectId lấy từ phiên, KHÔNG nhận từ query — nhận từ client là IDOR đọc chéo dự án.
-  const projectId = (await getCurrentProjectId(user)) || 1;
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
 
   try {
     const envelopes = await listEsignEnvelopes(projectId);
@@ -41,16 +43,9 @@ export async function POST(req: NextRequest) {
 
     // Chốt projectId theo phiên; chỉ chấp nhận dự án client chỉ định nếu nằm trong
     // danh sách dự án người dùng được phép thấy (chặn ghi chéo dự án).
-    const chot = await chotProjectIdChoGhi(
-      user,
-      body.projectId,
-      (await getCurrentProjectId(user)) || 1,
-    );
+    const chot = await chotProjectIdChoGhi(user, body.projectId, await getCurrentProjectId(user));
     if (!chot.ok) {
-      return NextResponse.json(
-        { error: "Không có quyền thao tác trên dự án này" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
     }
     const projectId = chot.projectId;
 

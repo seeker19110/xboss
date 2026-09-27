@@ -2,7 +2,6 @@ import { scryptSync, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { queryOne, run } from "@/lib/db";
 import { patchRequestContext, getRequestContext } from "@/lib/nen/request-context";
-import { log } from "@/lib/nen/log";
 import {
   ROLES,
   ROLE_LABELS,
@@ -10,7 +9,11 @@ import {
   PAYMENT_VIEW_ROLES,
   type Role,
 } from "@/lib/nen/roles";
-import { getPermissionOverride, hasProjectOverrides } from "@/lib/bao-mat/permissions";
+import {
+  getPermissionOverride,
+  clearPermissionSnapshot,
+  invalidatePermissionCache,
+} from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getList } from "@/lib/ha-tang/code-lists";
 // Ký/verify cookie phiên tách sang lib/session-token (thuần node:crypto) để proxy.ts import
@@ -81,6 +84,14 @@ export function computeMustSetup2fa(
 
 // ===== Người dùng hiện tại =====
 export async function getCurrentUser(): Promise<User | null> {
+  // Không tái dùng quyền/dự án của lần xác thực trước khi cookie hoặc actor đã thay đổi.
+  clearPermissionSnapshot();
+  patchRequestContext({
+    userId: undefined,
+    role: undefined,
+    orgId: undefined,
+    projectId: undefined,
+  });
   // Ghi request-id (do middleware.ts gắn) vào ngữ cảnh sớm — cả request chưa đăng nhập
   // cũng tương quan được trong log; actor bổ sung sau khi xác thực thành công.
   const requestId = (await headers()).get("x-request-id") ?? undefined;
@@ -89,10 +100,8 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!token) return null;
   const parsed = parseToken(token);
   if (!parsed) return null;
-  const u = await queryOne<
-    Omit<User, "orgId"> & { password_hash: string; session_version: number }
-  >(
-    `SELECT id, name, email, role, password_hash, session_version FROM users WHERE id = ?`,
+  const u = await queryOne<User & { password_hash: string; session_version: number }>(
+    `SELECT id, name, email, role, org_id AS "orgId", password_hash, session_version FROM users WHERE id = ?`,
     parsed.uid,
   );
   if (!u) return null;
@@ -102,26 +111,14 @@ export async function getCurrentUser(): Promise<User | null> {
   // "thu hồi phiên" cho user này (tăng bộ đếm) → mọi token phát trước đó hết hiệu lực. Dùng
   // cột đã có sẵn trong SELECT trên nên KHÔNG thêm round-trip DB nào.
   if (Number(u.session_version) !== parsed.sessionVersion) return null;
-  // M54 GĐ1 PR2: orgId lấy TỪ TOKEN (đã ký), KHÔNG đối chiếu DB mỗi request — đổi org của
-  // user là thao tác hiếm (hiếm hơn thu hồi phiên), chấp nhận độ trễ tới lần user login lại.
+  // Token ký đúng vẫn hết hiệu lực khi tài khoản đã chuyển sang tổ chức khác.
+  if (u.orgId !== parsed.orgId) return null;
   const { password_hash: _, session_version: _sv, ...rest } = u;
-  const user: User = { ...rest, orgId: parsed.orgId };
+  const user: User = rest;
   patchRequestContext({ userId: user.id, role: user.role, orgId: user.orgId });
-  // M61: chỉ giải + patch projectId khi cache có ≥1 override THEO DỰ ÁN — để giải quyền
-  // theo phạm vi dự án trong CAN.x (resolvePerm đọc projectId từ request-context). Bảng
-  // chưa có override dự án → bỏ qua hoàn toàn, chi phí = 0, hành vi = trước M61.
-  // Lỗi giải dự án (DB lỗi lúc query visibleProjectIds) KHÔNG được làm fail xác thực:
-  // nuốt lỗi + log warn, rơi về override toàn hệ/mặc định (an toàn).
-  if (hasProjectOverrides()) {
-    try {
-      await getCurrentProjectId(user);
-    } catch (e) {
-      log.warn("Không giải được projectId cho override quyền — rơi về toàn hệ", {
-        route: "getCurrentUser",
-        error: e instanceof Error ? e.message : String(e),
-      });
-    }
-  }
+  // Chốt dự án trước khi đọc quyền; lỗi nguồn không được biến thành mặc định allow.
+  await getCurrentProjectId(user);
+  await invalidatePermissionCache(user.orgId);
   return user;
 }
 
@@ -429,7 +426,7 @@ export function validatePermOverride(
   if (
     projectId !== undefined &&
     projectId !== null &&
-    (!Number.isInteger(projectId) || projectId <= 0)
+    (!Number.isSafeInteger(projectId) || projectId <= 0)
   )
     return "Mã dự án không hợp lệ";
   // Chống tự khoá hệ thống: admin không được siết quyền quản lý người dùng của chính
@@ -443,18 +440,13 @@ export function validatePermOverride(
   return null;
 }
 
-// Giải quyền hiệu lực cho 1 (role, permKey): có override trong cache → theo allowed;
-// không có → mặc định CAN_DEFAULT. Đọc override đồng bộ từ cache memory (không chạm DB).
-// M61: đọc projectId đã validate từ request-context (getCurrentUser patch sau xác thực)
-// → override theo dự án ưu tiên trước override toàn hệ (project_id NULL), rồi mới mặc định.
-// Request không có ngữ cảnh dự án (cron CRON_SECRET, API key /api/v1, test gọi CAN trực
-// tiếp) → projectId undefined → rơi về override toàn hệ ("*") rồi CAN_DEFAULT.
+// Chỉ snapshot đã nạp thành công trong request/actor/org hiện tại mới được dùng mặc định.
+// Đường service không qua getCurrentUser phải xác thực context và await snapshot trước CAN.
 function resolvePerm(role: Role | undefined, permKey: PermKey): boolean {
-  if (role) {
-    const projectId = getRequestContext()?.projectId;
-    const ov = getPermissionOverride(role, permKey, projectId);
-    if (ov !== undefined) return ov;
-  }
+  const ctx = getRequestContext();
+  if (!role || !ctx?.orgId) return false;
+  const ov = getPermissionOverride(ctx.orgId, role, permKey, ctx.projectId);
+  if (ov !== undefined) return ov && (!isWritePerm(permKey) || CAN_DEFAULT[permKey](role));
   return CAN_DEFAULT[permKey](role);
 }
 

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 import { patchRequestContext } from "@/lib/nen/request-context";
+import { parsePositiveId } from "@/lib/nen/ids";
 
 // Sinh key thô: `xbk_` + 32 byte ngẫu nhiên hex (64 ký tự). Chỉ trả về 1 lần lúc tạo.
 export function generateApiKey(): string {
@@ -108,8 +109,8 @@ export async function requireApiKey(
       { error: "Vượt giới hạn gọi API (120 request/phút)" },
       { status: 429, headers: { "Retry-After": "60" } },
     );
-  const projectId = auth.projectId ?? Number(req.nextUrl.searchParams.get("project"));
-  if (!Number.isSafeInteger(projectId) || projectId <= 0)
+  const projectId = parsePositiveId(auth.projectId ?? req.nextUrl.searchParams.get("project"));
+  if (projectId == null)
     return NextResponse.json(
       { error: "Key toàn cục cần chỉ định dự án qua ?project=<id>" },
       { status: 422 },

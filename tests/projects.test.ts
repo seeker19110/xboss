@@ -4,24 +4,20 @@ import assert from "node:assert/strict";
 
 // ===== Test thuần (không cần DB) =====
 
-test("resolveProjectId: cookie hợp lệ → dùng; cookie lạ/rỗng → mặc định dự án đầu; rỗng → null", async () => {
+test("resolveProjectId: chỉ chọn cookie hợp lệ hoặc dự án duy nhất khi thiếu cookie", async () => {
   const { resolveProjectId } = await import("@/lib/ha-tang/projects");
-
   assert.equal(resolveProjectId([1, 2, 3], "2"), 2);
-  assert.equal(
-    resolveProjectId([1, 2, 3], "99"),
-    1,
-    "id không nằm trong dự án thấy được → mặc định",
-  );
-  assert.equal(resolveProjectId([1, 2, 3], "abc"), 1, "cookie không phải số → mặc định");
-  assert.equal(resolveProjectId([1, 2, 3], undefined), 1, "không có cookie → dự án đầu");
-  assert.equal(resolveProjectId([], "1"), null, "không có dự án nào → null");
+  for (const raw of ["99", "abc", "", "0x1", "1e0", "01", " 1", "-1"])
+    assert.equal(resolveProjectId([1, 2, 3], raw), null, raw);
+  assert.equal(resolveProjectId([1, 2, 3], undefined), null);
+  assert.equal(resolveProjectId([2], undefined), 2);
+  assert.equal(resolveProjectId([], "1"), null);
 });
 
 // ===== Test tích hợp (cần Postgres riêng: đặt TEST_DATABASE_URL) =====
 
 test(
-  "visibleProjectIds: admin thấy mọi dự án; user theo user_projects; bảng rỗng = mọi user thấy hết",
+  "visibleProjectIds: admin thấy dự án cùng org; user luôn cần membership",
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
@@ -36,32 +32,16 @@ test(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('PM ProjTest', 'proj-pm@xboss.vn', 'x', 'pm')`,
     );
 
-    // `visibleProjectIds` quyết định fallback bằng `COUNT(*) FROM user_projects` TOÀN HỆ THỐNG,
-    // mà node:test chạy các file SONG SONG — nên bất kỳ file test nào khác đang giữ một dòng
-    // `user_projects` (mọi ca dùng `dangNhapDuAn` đều chèn một dòng) sẽ làm premise "bảng rỗng"
-    // của ca này sai. Trước đây ca này xanh do may mắn về thứ tự; khi bộ test thêm file mới nó
-    // đỏ ngẫu nhiên. Vì vậy ĐỌC trạng thái thật rồi khẳng định đúng luật tương ứng — cả hai
-    // nhánh đều là khẳng định thật, không nhánh nào bỏ trống.
-    const { queryOne } = await import("@/lib/db");
-    const dem = await queryOne<{ n: string }>(`SELECT COUNT(*)::text AS n FROM user_projects`);
-    const bangRong = Number(dem?.n ?? 0) === 0;
+    // Không phụ thuộc membership toàn hệ: PM chưa được gán luôn thấy rỗng.
+    assert.deepEqual(await visibleProjectIds({ id: pmId, role: "pm", orgId: 1 }), []);
 
-    const pmSeesAllInitially = await visibleProjectIds({ id: pmId, role: "pm" });
-    if (bangRong) {
-      // Bảng rỗng toàn hệ thống → mọi user (kể cả không phải admin) thấy hết.
-      assert.ok(pmSeesAllInitially.includes(p1) && pmSeesAllInitially.includes(p2));
-    } else {
-      // Bảng KHÔNG rỗng (file test khác đang giữ dòng) → PM chưa được gán dự án nào thấy rỗng.
-      assert.deepEqual(pmSeesAllInitially, []);
-    }
-
-    // Admin luôn thấy mọi dự án, bất kể user_projects.
-    const adminIds = await visibleProjectIds({ id: adminId, role: "admin" });
+    // Admin luôn thấy dự án cùng org, bất kể user_projects.
+    const adminIds = await visibleProjectIds({ id: adminId, role: "admin", orgId: 1 });
     assert.ok(adminIds.includes(p1) && adminIds.includes(p2));
 
     // Có bản ghi user_projects (cho user khác) → PM này giờ chỉ thấy đúng dự án được gán.
     await run(`INSERT INTO user_projects (user_id, project_id) VALUES (?, ?)`, pmId, p1);
-    const pmIds = await visibleProjectIds({ id: pmId, role: "pm" });
+    const pmIds = await visibleProjectIds({ id: pmId, role: "pm", orgId: 1 });
     assert.deepEqual(pmIds, [p1]);
 
     await run(`DELETE FROM user_projects WHERE user_id = ?`, pmId);
@@ -120,7 +100,7 @@ test(
       pkg2,
     );
 
-    const admin = { id: -1, role: "admin" as const };
+    const admin = { id: -1, role: "admin" as const, orgId: 1 };
     const list = await listProjects(admin);
     const l1 = list.find((p) => p.id === p1);
     const l2 = list.find((p) => p.id === p2);
@@ -169,29 +149,27 @@ test(
       `INSERT INTO projects (name, code) VALUES ('DA org mặc định', 'PJT-ORGN')`,
     );
 
-    const admin = { id: -1, role: "admin" as const };
+    const admin = { id: -1, role: "admin" as const, orgId: o1 };
 
-    // Không truyền orgId → thấy cả 3.
+    // Không truyền bộ lọc vẫn chỉ thấy tổ chức của actor.
     const all = await listProjects(admin);
-    const allIds = all.map((p) => p.id);
-    assert.ok(
-      allIds.includes(pA) && allIds.includes(pB) && allIds.includes(pDefault),
-      "không lọc → thấy hết",
-    );
-    assert.equal(all.find((p) => p.id === pA)!.orgId, o1);
-    assert.equal(all.find((p) => p.id === pDefault)!.orgId, 1);
-
-    // Lọc theo org A → chỉ dự án org A.
-    const onlyA = await listProjects(admin, o1);
     assert.deepEqual(
-      onlyA.map((p) => p.id),
+      all.map((p) => p.id),
       [pA],
     );
-
-    // listOrganizations liệt kê org có dự án user thấy — gồm cả org mặc định 1 (pDefault).
-    const orgs = await listOrganizations(admin);
-    const orgIds = orgs.map((o) => o.id);
-    assert.ok(orgIds.includes(o1) && orgIds.includes(o2) && orgIds.includes(1));
+    assert.equal(all[0].orgId, o1);
+    assert.deepEqual(await listProjects(admin, o2), []);
+    assert.deepEqual(
+      (await listProjects(admin, o1)).map((p) => p.id),
+      [pA],
+    );
+    assert.deepEqual(
+      (await listOrganizations(admin)).map((o) => o.id),
+      [o1],
+    );
+    const defaultOrg = await listProjects({ ...admin, orgId: 1 });
+    assert.equal(defaultOrg.find((p) => p.id === pDefault)?.orgId, 1);
+    assert.ok(!defaultOrg.some((p) => p.id === pA || p.id === pB));
 
     await run(`DELETE FROM projects WHERE id IN (?, ?, ?)`, pA, pB, pDefault);
     await run(`DELETE FROM organizations WHERE id IN (?, ?)`, o1, o2);

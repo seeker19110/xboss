@@ -12,6 +12,7 @@ const projects = new Map([
 const rawKey = "xbk_" + "1".repeat(64);
 let projectId: number | null = null;
 let inserted: unknown[][] = [];
+let projectReads = 0;
 
 mock.module("@/lib/bao-mat/auth", {
   namedExports: {
@@ -28,6 +29,7 @@ mock.module("@/lib/db", {
       if (sql.includes("FROM api_keys"))
         return { id: 1, projectId, orgId: 10, scopes: ["read"], createdBy: 11 };
       if (sql.includes("FROM projects")) {
+        projectReads++;
         const orgId = projects.get(Number(values[0]));
         return orgId && (values.length === 1 || orgId === values[1]) ? { exists: 1 } : null;
       }
@@ -45,6 +47,7 @@ mock.module("@/lib/db", {
 beforeEach(() => {
   projectId = null;
   inserted = [];
+  projectReads = 0;
 });
 
 function request(project: number) {
@@ -111,4 +114,60 @@ test("key toàn cục: dự án đã xoá hoặc không tồn tại trả 404", 
   const response = await requireApiKey(request(303), "read");
   assert.ok(response instanceof Response);
   assert.equal(response.status, 404);
+});
+
+test("tạo key: ID không chuẩn bị từ chối trước truy vấn dự án", async () => {
+  const { POST } = await import("@/app/api/admin/api-keys/route");
+  for (const invalid of [
+    true,
+    [101],
+    {},
+    0,
+    -1,
+    1.5,
+    "0101",
+    "1e2",
+    "0x65",
+    "101 ",
+    "101x",
+    "9007199254740992",
+  ]) {
+    const response = await POST(
+      new NextRequest("http://localhost/api/admin/api-keys", {
+        method: "POST",
+        body: JSON.stringify({ name: "Invalid ID", projectId: invalid }),
+      }),
+    );
+    assert.equal(response.status, 400, JSON.stringify(invalid));
+  }
+  assert.equal(projectReads, 0);
+  assert.equal(inserted.length, 0);
+});
+
+test("key toàn cục: query ID chỉ nhận chuỗi thập phân chuẩn", async () => {
+  const { requireApiKey } = await import("@/lib/bao-mat/api-keys");
+  for (const invalid of ["", "0101", "1e2", "0x65", "101 ", "-1", "1.5", "9007199254740992"]) {
+    const req = new NextRequest(
+      `http://localhost/api/v1/tasks?project=${encodeURIComponent(invalid)}`,
+      {
+        headers: { authorization: `Bearer ${rawKey}` },
+      },
+    );
+    const response = await requireApiKey(req, "read");
+    assert.ok(response instanceof Response);
+    assert.equal(response.status, 422, invalid);
+  }
+  assert.equal(projectReads, 0);
+});
+
+test("tạo key: chuỗi ID thập phân chuẩn vẫn hợp lệ", async () => {
+  const { POST } = await import("@/app/api/admin/api-keys/route");
+  const response = await POST(
+    new NextRequest("http://localhost/api/admin/api-keys", {
+      method: "POST",
+      body: JSON.stringify({ name: "String ID", projectId: "101" }),
+    }),
+  );
+  assert.equal(response.status, 201);
+  assert.equal(inserted[0][2], 101);
 });
