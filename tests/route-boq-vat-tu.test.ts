@@ -1497,6 +1497,57 @@ test(
 );
 
 test(
+  "POST /api/materials/:id/transactions: ghi đồng thời giữ đúng số dư và ledger",
+  S,
+  async () => {
+    const { insertId, query, queryOne } = await import("@/lib/db");
+    const ctx = await dungDuLieu("pm", `txrace${RUN}`);
+    const matId = await insertId(
+      `INSERT INTO materials (sheet_type_id, name, unit, qty_used, project_id) VALUES (?, 'A', 'kg', 10, ?)`,
+      ctx.sheetTypeId,
+      ctx.projectId,
+    );
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    const { POST } = await import("@/app/api/materials/[id]/transactions/route");
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        POST(req(`http://localhost/api/materials/${matId}/transactions`, { delta: 1 }, "POST"), {
+          params: Promise.resolve({ id: String(matId) }),
+        }),
+      ),
+    );
+    assert.deepEqual(
+      responses.map((res) => res.status),
+      Array(8).fill(201),
+    );
+    const bodies = await Promise.all(responses.map((res) => res.json()));
+    assert.deepEqual(
+      bodies.map((body) => body.delta),
+      Array(8).fill(1),
+    );
+
+    const material = await queryOne<{ qty_used: number }>(
+      `SELECT qty_used FROM materials WHERE id = ?`,
+      matId,
+    );
+    const ledger = await query<{ delta: number; qty_after: number }>(
+      `SELECT delta, qty_after FROM material_transactions WHERE material_id = ? ORDER BY id`,
+      matId,
+    );
+    assert.equal(Number(material?.qty_used), 18);
+    assert.equal(ledger.length, 8);
+    assert.equal(
+      ledger.reduce((sum, tx) => sum + Number(tx.delta), 0),
+      8,
+    );
+    assert.deepEqual(
+      ledger.map((tx) => Number(tx.qty_after)),
+      [11, 12, 13, 14, 15, 16, 17, 18],
+    );
+  },
+);
+
+test(
   "POST /api/materials/:id/transactions: delta âm vượt tồn thì bị GHÌM về 0, audit ghi actualDelta thật",
   S,
   async () => {

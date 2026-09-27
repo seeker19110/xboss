@@ -1,5 +1,17 @@
 # PROGRESS — XBoss
 
+## 2026-09-27 — ghi giao dịch vật tư nhất quán khi cập nhật đồng thời
+
+Baseline `e7f4c6f7` trên `origin/main` sau PR #542. `POST /api/materials/:id/transactions`
+nay khóa dòng vật tư trong transaction, lấy số dư ngay trước lần cập nhật, rồi ghi
+`materials.qty_used` và `material_transactions` cùng commit/rollback. Có test hồi quy
+8 request đồng thời, kiểm số dư cuối, delta mỗi giao dịch và chuỗi `qty_after`.
+
+Kiểm cục bộ: format, lint, typecheck, check:sw-exclude, check:migrations,
+check:project-scope, check:db-params và build đạt. Máy không có PostgreSQL disposable;
+73 ca của file test liên quan bị skip cục bộ, cần CI PostgreSQL chạy thật trên đúng HEAD.
+PR: chờ mở. Không migration hoặc thao tác production. Chưa đóng Goal DoD.
+
 ## 2026-09-27 — chặn BOQ map liên kết task khác dự án
 
 Baseline `0cd54980` trên `origin/main`; slice hẹp theo A1-FR06 của QUALITY-FINAL-1.
@@ -8,9 +20,8 @@ cùng `project_id` với dòng BOQ đang sửa. Trường hợp task ngoài dự
 task không tồn tại và giữ nguyên map hợp lệ trước đó. Có test hồi quy trên DB disposable.
 
 Kiểm cục bộ: format, lint, typecheck, check:sw-exclude, check:migrations và build đạt.
-Máy hiện không có PostgreSQL disposable; test tích hợp đã nạp nhưng bị skip, nên chưa
-được coi là pass. CI của PR phải chạy test DB, release gate, E2E và mọi check trên đúng
-HEAD trước khi merge. PR #542. Không migration, không thao tác production.
+CI commit `e2e43a59` đã qua test PostgreSQL, coverage, build, static và 4/4 E2E;
+PR #542 auto-merge squash vào `main` tại `e7f4c6f7`. Không migration, không thao tác production.
 Slice này không đóng toàn bộ A1–A6 hay Goal DoD; các thay đổi audit cũ chưa đối chiếu với
 `main` mới vẫn được giữ riêng để xử lý theo vòng tiếp theo.
 

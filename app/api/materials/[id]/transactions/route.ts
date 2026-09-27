@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, insertId } from "@/lib/db";
+import { query, queryOne, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
@@ -65,8 +65,8 @@ export async function POST(
   if (blocked) return blocked;
   const m =
     projectId != null
-      ? await queryOne<{ id: number; qty_used: number }>(
-          `SELECT id, qty_used FROM materials WHERE id = ? AND project_id = ?`,
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM materials WHERE id = ? AND project_id = ?`,
           id,
           projectId,
         )
@@ -91,33 +91,43 @@ export async function POST(
       .trim()
       .slice(0, 100) || null;
 
-  // Cập nhật atomic + lấy luôn số dư sau cập nhật bằng RETURNING — tránh race
-  // condition khi nhiều request đồng thời (SELECT riêng có thể đọc giá trị của
-  // request khác, làm sai qty_after/actual_delta trong audit).
-  const updated = await queryOne<{ qty_used: number }>(
-    `UPDATE materials SET qty_used = GREATEST(0, qty_used + ?), updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? RETURNING qty_used`,
-    delta,
-    id,
-  );
-  const qtyAfter = updated?.qty_used ?? 0;
-  // Khi GREATEST(0,...) clip âm về 0, actual_delta nhỏ hơn delta gốc — ghi số thực để audit đúng.
-  const actualDelta = qtyAfter - m.qty_used;
-
-  const txId = await insertId(
-    `INSERT INTO material_transactions (material_id, delta, qty_after, note, floor_label, crew, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    id,
-    actualDelta,
-    qtyAfter,
-    note,
-    floorLabel,
-    crew,
-    user.id,
-  );
+  // Đọc số dư dưới khóa và ghi vật tư + ledger trong cùng transaction. Nếu hai request
+  // cùng nhập/xuất, delta audit phải tính từ số dư ngay trước lần cập nhật của chính nó.
+  const result = await withTransaction(async () => {
+    const locked = await queryOne<{ qty_used: number }>(
+      `SELECT qty_used FROM materials WHERE id = ? AND project_id = ? FOR UPDATE`,
+      id,
+      projectId,
+    );
+    if (!locked) return null;
+    const updated = await queryOne<{ qty_used: number }>(
+      `UPDATE materials SET qty_used = GREATEST(0, qty_used + ?), updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND project_id = ? RETURNING qty_used`,
+      delta,
+      id,
+      projectId,
+    );
+    if (!updated) throw new Error("Không cập nhật được số lượng vật tư");
+    const qtyAfter = Number(updated.qty_used);
+    // Khi GREATEST(0,...) ghìm âm về 0, chỉ ghi đúng số thực đã thay đổi.
+    const actualDelta = qtyAfter - Number(locked.qty_used);
+    const txId = await insertId(
+      `INSERT INTO material_transactions (material_id, delta, qty_after, note, floor_label, crew, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      id,
+      actualDelta,
+      qtyAfter,
+      note,
+      floorLabel,
+      crew,
+      user.id,
+    );
+    return { txId, qtyAfter, actualDelta };
+  });
+  if (!result) return NextResponse.json({ error: "Không tìm thấy vật tư" }, { status: 404 });
 
   return NextResponse.json(
-    { id: txId, materialId: id, delta: actualDelta, qtyAfter },
+    { id: result.txId, materialId: id, delta: result.actualDelta, qtyAfter: result.qtyAfter },
     { status: 201 },
   );
 }
