@@ -370,3 +370,74 @@ test(
     }
   },
 );
+
+// Regression bảo mật: trần dò mã 2FA THEO TÀI KHOẢN chặn brute-force PHÂN TÁN qua nhiều IP.
+// Trần theo IP (10/15 phút) một mình không đủ: kẻ tấn công biết mật khẩu xin được pending
+// token không giới hạn rồi rải mã đoán qua nhiều IP. Mỗi lần thử ở đây dùng 1 IP KHÁC NHAU
+// nên trần theo IP không bao giờ chạm (mỗi IP chỉ 1 lần) — nếu vẫn bị 429 thì đúng là trần
+// theo tài khoản đang chặn. MAX_2FA_PER_ACCOUNT = 20 (đồng bộ với route).
+test(
+  "login 2FA: trần theo tài khoản chặn dò mã phân tán qua nhiều IP (429 dù mỗi IP chỉ thử 1 lần)",
+  S,
+  async () => {
+    const { insertId, run } = await import("@/lib/db");
+    const { hashPassword } = await import("@/lib/bao-mat/auth");
+    const { encryptTotpSecret, generateNewTotpSecret } = await import("@/lib/bao-mat/totp");
+
+    const secret = generateNewTotpSecret();
+    const suffix = Date.now().toString(36);
+    const email = `totp-acct-rl-${suffix}@x.vn`;
+    const uid = await insertId(
+      `INSERT INTO users (name, email, role, password_hash, totp_secret, totp_enabled_at)
+       VALUES ('TOTP Acct RL', ?, 'engineer', ?, ?, now())`,
+      email,
+      hashPassword("matkhau123"),
+      encryptTotpSecret(secret),
+    );
+
+    // Mã chắc chắn SAI (khác mã hợp lệ hiện tại) — để mọi lần thử đều thất bại, không set cookie.
+    const real = await generate({ secret });
+    const wrong = real === "000000" ? "111111" : "000000";
+
+    // Mỗi lần thử từ 1 IP khác nhau (x-forwarded-for) — trần theo IP (10) không bao giờ chạm.
+    const postFromIp = (ip: string, body: unknown): NextRequest =>
+      new NextRequest("http://localhost/api/auth/login/2fa", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": ip },
+        body: JSON.stringify(body),
+      });
+
+    try {
+      const { POST: loginPost } = await import("@/app/api/auth/login/route");
+      const { POST: totpPost } = await import("@/app/api/auth/login/2fa/route");
+
+      const MAX_PER_ACCOUNT = 20; // = MAX_2FA_PER_ACCOUNT trong route
+      // Lấy 1 pending token hợp lệ (tái dùng được: thử sai KHÔNG tiêu huỷ pending token).
+      const res1 = await loginPost(
+        new NextRequest("http://localhost/api/auth/login", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email, password: "matkhau123" }),
+        }),
+      );
+      const { pending } = await res1.json();
+      assert.ok(pending, "bước 1 trả pending token");
+
+      // 20 lần thử sai, mỗi lần 1 IP riêng → đều 401 (mã sai), chưa chạm trần tài khoản.
+      for (let i = 0; i < MAX_PER_ACCOUNT; i++) {
+        const res = await totpPost(postFromIp(`203.0.113.${i}`, { pending, code: wrong }));
+        assert.equal(res.status, 401, `lần thử ${i + 1} (IP riêng) phải là 401 mã sai`);
+      }
+
+      // Lần thứ 21 từ MỘT IP HOÀN TOÀN MỚI → 429 vì trần THEO TÀI KHOẢN đã chặn (không phải
+      // trần theo IP — IP này chưa từng thử lần nào). Đây là bằng chứng chặn brute-force phân tán.
+      const blocked = await totpPost(postFromIp("198.51.100.7", { pending, code: wrong }));
+      assert.equal(blocked.status, 429, "vượt trần theo tài khoản → 429 dù IP mới tinh");
+      assert.ok(blocked.headers.get("Retry-After"), "có header Retry-After");
+    } finally {
+      await run(`DELETE FROM login_rate_limits WHERE key = ?`, `totp-acct|${uid}`);
+      await run(`DELETE FROM login_rate_limits WHERE key LIKE ?`, "ip|203.0.113.%");
+      await run(`DELETE FROM users WHERE id = ?`, uid);
+    }
+  },
+);
