@@ -1,5 +1,19 @@
 # PROGRESS — XBoss
 
+## 2026-09-27 — chặn BOQ map liên kết task khác dự án
+
+Baseline `0cd54980` trên `origin/main`; slice hẹp theo A1-FR06 của QUALITY-FINAL-1.
+`PUT /api/boq/:id/map` nay chỉ nhận task có lineage task → package → sheet → tower
+cùng `project_id` với dòng BOQ đang sửa. Trường hợp task ngoài dự án trả 422 như
+task không tồn tại và giữ nguyên map hợp lệ trước đó. Có test hồi quy trên DB disposable.
+
+Kiểm cục bộ: format, lint, typecheck, check:sw-exclude, check:migrations và build đạt.
+Máy hiện không có PostgreSQL disposable; test tích hợp đã nạp nhưng bị skip, nên chưa
+được coi là pass. CI của PR phải chạy test DB, release gate, E2E và mọi check trên đúng
+HEAD trước khi merge. PR: chờ mở. Không migration, không thao tác production.
+Slice này không đóng toàn bộ A1–A6 hay Goal DoD; các thay đổi audit cũ chưa đối chiếu với
+`main` mới vẫn được giữ riêng để xử lý theo vòng tiếp theo.
+
 ## 2026-09-25 — đưa bốn bản vá nhỏ độc lập lên PR
 
 Baseline: `381b06899b3eb5d9e1b2c99b167d51cc24419732`. Theo yêu cầu triển khai các việc

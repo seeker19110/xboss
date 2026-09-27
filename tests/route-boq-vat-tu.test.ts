@@ -664,6 +664,35 @@ test("PUT /api/boq/:id/map: task không tồn tại → 422", S, async () => {
   assert.match((await res.json()).error, /không tồn tại/);
 });
 
+test("PUT /api/boq/:id/map: task thuộc dự án khác → 422 và giữ map cũ", S, async () => {
+  const { insertId, queryOne, run } = await import("@/lib/db");
+  const a = await dungDuLieu("pm", `maptaskA${RUN}`);
+  const b = await dungDuLieu("pm", `maptaskB${RUN}`);
+  const boqId = await insertId(
+    `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price, project_id) VALUES (?, 'A', 'm', 10, 1000, ?)`,
+    `MAPTASK-${RUN}`,
+    a.projectId,
+  );
+  await run(
+    `INSERT INTO boq_task_map (boq_item_id, task_id, weight) VALUES (?, ?, 1)`,
+    boqId,
+    a.taskId,
+  );
+  await dangNhapDuAn({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
+  const { PUT } = await import("@/app/api/boq/[id]/map/route");
+  const res = await PUT(
+    req(`http://localhost/api/boq/${boqId}/map`, { map: [{ taskId: b.taskId, weight: 1 }] }, "PUT"),
+    { params: Promise.resolve({ id: String(boqId) }) },
+  );
+  assert.equal(res.status, 422);
+  assert.match((await res.json()).error, /không thuộc dự án hiện hành/);
+  const map = await queryOne<{ task_id: number }>(
+    `SELECT task_id FROM boq_task_map WHERE boq_item_id = ?`,
+    boqId,
+  );
+  assert.equal(map?.task_id, a.taskId, "map hợp lệ trước đó phải được giữ nguyên");
+});
+
 test(
   "PUT /api/boq/:id/map: Σ tỷ trọng > 1 → 422, KHÔNG ghi map (chặn thanh toán vượt KL)",
   S,
