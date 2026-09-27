@@ -10,7 +10,7 @@ task không tồn tại và giữ nguyên map hợp lệ trước đó. Có test
 Kiểm cục bộ: format, lint, typecheck, check:sw-exclude, check:migrations và build đạt.
 Máy hiện không có PostgreSQL disposable; test tích hợp đã nạp nhưng bị skip, nên chưa
 được coi là pass. CI của PR phải chạy test DB, release gate, E2E và mọi check trên đúng
-HEAD trước khi merge. PR: chờ mở. Không migration, không thao tác production.
+HEAD trước khi merge. PR #542. Không migration, không thao tác production.
 Slice này không đóng toàn bộ A1–A6 hay Goal DoD; các thay đổi audit cũ chưa đối chiếu với
 `main` mới vẫn được giữ riêng để xử lý theo vòng tiếp theo.
 
