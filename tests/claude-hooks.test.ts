@@ -15,7 +15,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-// Hook Claude Code của XBoss (ADR-0012 — port từ ECC, viết lại theo luật dự án). Hook là lớp
+// Hook Claude Code của XBoss (ADR-0013 — port từ ECC, viết lại theo luật dự án). Hook là lớp
 // THI HÀNH thật cho các luật trước đây chỉ nằm trong văn bản (migration append-only, không sửa
 // tay lớp vendor, vùng rủi ro §8, PROGRESS.md trước push, cổng CI tĩnh trước khi dừng lượt) —
 // hook hỏng im lặng (thiếu jq, sai đường dẫn, sai định dạng JSON) là luật biến mất mà không ai

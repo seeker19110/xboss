@@ -10,7 +10,7 @@
 // Chạy: npx tsx scripts/check-progress-freshness.ts
 // Chỉ có ý nghĩa khi chạy trên push vào main (job CI dùng fetch-depth: 2 để có commit cha).
 //
-// Chế độ `--base <ref>` (ADR-0012): so CẢ NHÁNH với <ref> (`<ref>...HEAD`) thay vì chỉ commit
+// Chế độ `--base <ref>` (ADR-0013): so CẢ NHÁNH với <ref> (`<ref>...HEAD`) thay vì chỉ commit
 // vừa vào main — hook `.claude/hooks/pre-push-gate.sh` gọi trước mỗi `git push` để bắt lỗi
 // ngay trên nhánh, khỏi đợi tới lúc đã merge mới đỏ main. Cùng một luật với CI, không chép lại.
 import { execFileSync } from "node:child_process";

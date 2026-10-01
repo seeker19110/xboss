@@ -5,7 +5,7 @@ description: Hướng dẫn dùng lớp ECC (Everything Claude Code) đã tích 
 
 # /ecc — lớp ECC trong XBoss
 
-Quyết định & lý do: `docs/adr/0012-tich-hop-ecc.md`. Danh sách nguồn: `.claude/ecc/manifest.json`
+Quyết định & lý do: `docs/adr/0013-tich-hop-ecc.md`. Danh sách nguồn: `.claude/ecc/manifest.json`
 (ghim commit). Thứ tự ưu tiên khi mâu thuẫn: `.claude/rules/00-uu-tien-ecc.md` (XBoss thắng).
 
 ## Có gì

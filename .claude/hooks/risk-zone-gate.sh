@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # risk-zone-gate.sh — PreToolUse hook (matcher: Edit|Write|MultiEdit). Port "GateGuard
-# fact-forcing gate" của ECC (ADR-0012), thu hẹp đúng vùng rủi ro cao của XBoss.
+# fact-forcing gate" của ECC (ADR-0013), thu hẹp đúng vùng rủi ro cao của XBoss.
 #
 # VÌ SAO CẦN: CLAUDE.md bắt buộc "rà theo mục Vùng rủi ro cao (docs/audit.md §8) khi PR chạm
 # recompute/auth/material-sync/boq/route tài chính-nghiệm thu" — nhưng đó là văn bản; lỗi thật

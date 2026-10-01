@@ -26,7 +26,7 @@ thứ **mục nát theo thời gian** dù code không đổi: dependency lỗi t
    ## 🔴 Cần sửa
 
    - [ ] M-01: <mô tả> — nguồn: mục N trong báo cáo. Tiêu chí xong: <cụ thể, đo được>.
-         route: mechanical|standard|spec|complex (xem bảng route trong CLAUDE.md)
+     route: mechanical|standard|spec|complex (xem bảng route trong CLAUDE.md)
 
    ## 🟡 Dọn dẹp (không khẩn)
 

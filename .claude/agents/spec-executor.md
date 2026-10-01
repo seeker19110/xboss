@@ -1,6 +1,6 @@
 ---
 name: spec-executor
-description: "route: spec — việc PHỨC TẠP nhưng đặc tả đã KÍN: schema DDL, API, điểm chạm code, tiêu chí chấp nhận có đủ trong brief hoặc file đặc tả (docs/nang-cap/M<xx>-*.md); chỉ cần thi hành chính xác trên codebase lớn, không sáng tạo, không cân nhắc đánh đổi. Model mạnh để đọc hiểu đặc tả dày + nhiều file liên quan; effort thấp vì mọi quyết định đã được chốt sẵn. KHÔNG dùng khi đặc tả còn chỗ phải tự quyết (→ complex-implementer) hay việc vừa/cơ học (→ standard-worker/mechanical-worker)."
+description: 'route: spec — việc PHỨC TẠP nhưng đặc tả đã KÍN: schema DDL, API, điểm chạm code, tiêu chí chấp nhận có đủ trong brief hoặc file đặc tả (docs/nang-cap/M<xx>-*.md); chỉ cần thi hành chính xác trên codebase lớn, không sáng tạo, không cân nhắc đánh đổi. Model mạnh để đọc hiểu đặc tả dày + nhiều file liên quan; effort thấp vì mọi quyết định đã được chốt sẵn. KHÔNG dùng khi đặc tả còn chỗ phải tự quyết (→ complex-implementer) hay việc vừa/cơ học (→ standard-worker/mechanical-worker).'
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: opus
 effort: low

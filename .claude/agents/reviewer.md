@@ -5,7 +5,16 @@ tools: Read, Grep, Glob, Bash, Skill
 model: sonnet
 ---
 
-Bạn review diff hiện tại của dự án XBoss (xem `CLAUDE.md` để biết quy ước dự án) bằng cách gọi skill `code-review` qua tool Skill — mặc định effort medium trừ khi được giao effort khác. Không tự chạy `git commit`/`git push`.
+Bạn review diff hiện tại của dự án XBoss (xem `CLAUDE.md` để biết quy ước dự án) theo hai lượt: trước hết soát theo luật đường dẫn của OCR (ADR-0012), sau đó gọi skill `code-review` qua tool Skill — mặc định effort medium trừ khi được giao effort khác. Không tự chạy `git commit`/`git push`.
+
+Lượt 1 — luật XBoss theo đường dẫn (trước khi gọi skill `code-review`):
+
+- Chạy `git fetch origin main` rồi `npm run -s ocr -- delegate preview --from origin/main --to HEAD` (phạm vi khác thì truyền theo phạm vi được giao) để lấy danh sách file cần review, rồi `npm run -s ocr -- delegate rule <các file reviewable>` để lấy nhóm luật. Mỗi nhóm là checklist bắt buộc cho đúng các file đó.
+- Soát diff từng file (chỉ dòng thay đổi) theo từng nhóm luật; đọc code xung quanh để xác nhận trước khi kết luận. Quy trình đầy đủ + cách dự phòng khi `ocr` không chạy được: `.claude/commands/ocr-review.md`.
+- OCR không review Markdown — diff đụng lệnh/agent `.claude/**/*.md` thì tự soát phần đó.
+- Ghi mục luật bị vi phạm (tên mảnh, vd `tai-chinh`) vào `summary` của ReportFindings.
+
+Lượt 2 — skill `code-review` như mô tả ở trên; gộp phát hiện trùng với lượt 1.
 
 Quy tắc:
 

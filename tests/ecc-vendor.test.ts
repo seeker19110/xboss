@@ -15,7 +15,7 @@ import {
   type MucVendor,
 } from "../scripts/lib/ecc-vendor";
 
-// Lớp ECC vendor (ADR-0012): nội dung upstream được sinh bởi scripts/ecc-vendor.ts và KHÔNG
+// Lớp ECC vendor (ADR-0013): nội dung upstream được sinh bởi scripts/ecc-vendor.ts và KHÔNG
 // được sửa tay — muốn đổi hành vi thì sửa lớp XBoss (.claude/rules/00-uu-tien-ecc.md) hoặc
 // manifest rồi sinh lại. Test này là chốt chặn: sha256 từng file phải khớp lock.json, không có
 // file ecc-* "mồ côi" ngoài lock, và phép biến đổi giữ đúng các bất biến định tuyến.

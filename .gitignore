@@ -35,18 +35,11 @@ docs/ops/MAINTENANCE-REPORT.md
 cloudflared.exe
 cloudflared-*.txt
 
-# Claude Code — chỉ commit cấu hình DÙNG CHUNG của dự án (agent/skill/command/hook/rule/lớp ECC
-# vendor, xem .claude/README.md + ADR-0012). Phần còn lại là cục bộ: settings.local.json, worktree
-# tạm của agent (chứa build .next riêng), dữ liệu phiên...
-.claude/*
-!.claude/README.md
-!.claude/settings.json
-!.claude/agents/
-!.claude/commands/
-!.claude/skills/
-!.claude/hooks/
-!.claude/rules/
-!.claude/ecc/
+# Claude Code: chỉ bỏ phần cục bộ của từng máy. agents/commands/hooks/settings.json là cấu hình
+# dùng chung của dự án nên được track — để cả `.claude/` thì lint-staged không stage lại được file
+# đã track trong đó và OCR không thấy chúng khi review (ADR-0012).
+.claude/worktrees/
+.claude/settings.local.json
 
 # SQLite cũ (đã chuyển sang Postgres) — giữ file local làm backup
 xboss.db

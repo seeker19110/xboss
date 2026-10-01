@@ -1,8 +1,9 @@
-# ADR-0012: Tích hợp ECC (Everything Claude Code) bằng VENDOR có ghim + lớp thích nghi XBoss, không cài plugin
+# ADR-0013: Tích hợp ECC (Everything Claude Code) bằng VENDOR có ghim + lớp thích nghi XBoss, không cài plugin
 
 - **Trạng thái:** Đã chấp nhận
 - **Ngày:** 2026-10-01
-- **Nối tiếp:** cấu hình 3 tầng trong `CLAUDE.md` ("Lập kế hoạch → điều phối → thi hành"), `docs/audit.md`
+- **Nối tiếp:** cấu hình 3 tầng trong `CLAUDE.md` ("Lập kế hoạch → điều phối → thi hành"), `docs/audit.md`,
+  ADR-0012 (luật review AI theo đường dẫn — `.opencodereview/`)
 - **Nguồn upstream:** [`affaan-m/ECC`](https://github.com/affaan-m/ECC) v2.2.2 @ `c70874f`, giấy phép MIT
 
 ## Bối cảnh
@@ -79,6 +80,9 @@ Ràng buộc thực tế của XBoss:
   - `risk-zone-gate` chặn lần sửa đầu mỗi phiên ở vùng §8 — cố ý, đổi lấy việc nêu bất biến trước khi sửa.
   - Sửa file cấu hình cổng (`eslint.config.mjs`, `ci.yml`, `.claude/settings.json`, `.claude/hooks/*`…)
     nay luôn hỏi người dùng.
+- Quan hệ với ADR-0012: cả `.opencodereview/rules/*` lẫn `.claude/rules/xboss/*` đúc từ
+  `docs/audit.md`. Bên OCR là luật **lúc review**; bên này là checklist **lúc viết code**, tự nạp khi
+  Claude đọc file khớp `paths`. Đổi checklist §3–§7 thì cập nhật cả hai.
 - Việc tiếp theo: lên phiên bản ECC theo quy trình trong skill `/ecc`; cân nhắc rút gọn `CLAUDE.md`
   (tài liệu Claude Code khuyến nghị < 200 dòng) bằng cách chuyển các mục chỉ đúng cho một vùng file
   sang `.claude/rules/xboss/*` — cần người dùng duyệt, chưa làm trong đợt này.

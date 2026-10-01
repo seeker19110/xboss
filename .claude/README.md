@@ -8,7 +8,7 @@ Tài liệu này mô tả cơ chế phân việc theo tầng model đang dùng t
 
 Nguồn sự thật về CÁCH DÙNG là `CLAUDE.md` (luồng 3 tầng + bảng `route:` + "Định tuyến ECC & audit"). Các mục 1–6 bên dưới là hướng dẫn copy cấu hình phân tầng sang repo khác, viết từ thời còn 3 subagent `coder`/`reviewer`/`mechanical` — nay đã thay bằng `coordinator` + 4 worker.
 
-| Thành phần  | XBoss                                                                                                                                                      | Lớp ECC vendor (ADR-0012)                                              |
+| Thành phần  | XBoss                                                                                                                                                      | Lớp ECC vendor (ADR-0013)                                              |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | `agents/`   | `coordinator`, `complex-implementer`, `spec-executor`, `standard-worker`, `mechanical-worker`, `reviewer`, `maintainer`, `audit-{bao-mat,logic,ui}`        | 24 × `ecc-*` (chuyên gia bổ trợ)                                       |
 | `skills/`   | `gate`, `hoc`, `ecc`                                                                                                                                       | 56 × `ecc-*`                                                           |
@@ -19,18 +19,18 @@ Nguồn sự thật về CÁCH DÙNG là `CLAUDE.md` (luồng 3 tầng + bảng 
 
 - File `ecc-*` và `rules/ecc/**` **không sửa tay** (hook `protect-config.sh` chặn, `tests/ecc-vendor.test.ts` so sha256) — sửa manifest rồi `npm run ecc:vendor -- --src <checkout ECC>`, xem skill `/ecc`.
 - Hook có test tại `tests/claude-hooks.test.ts`; bỏ qua có chủ đích bằng biến env trong `.claude/settings.local.json` (`XBOSS_ALLOW_PROTECTED_EDIT`, `XBOSS_SKIP_RISK_GATE`, `SKIP_PREPUSH_GATE`, `SKIP_STOP_CHECKS`, `SKIP_PRECOMMIT_GATE`, `ALLOW_DANGEROUS_GIT`).
-- `.gitignore` chỉ cho commit các thư mục trên + `settings.json`/`README.md`; còn lại (`settings.local.json`, worktree tạm của agent) là cục bộ.
+- `.gitignore` chỉ bỏ qua phần cục bộ (`.claude/worktrees/`, `.claude/settings.local.json`); prettier bỏ qua cả `.claude/` (ADR-0012) — lớp vendor được khoá bằng sha256 thay vì format.
 
 ## 1. Ý tưởng
 
 4 tầng, phân theo độ khó của việc — mục tiêu: chỉ dùng model đắt/chậm (Opus) cho việc thật sự cần phán đoán, còn lại đẩy xuống model rẻ/nhanh hơn:
 
-| Tầng                    | Model                            | Vai trò                                                                                                                                                                               |
-| ----------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Phiên chính             | Opus (`opusplan`, effort medium) | Lập kế hoạch, thiết kế, quyết định kiến trúc, viết đặc tả chi tiết — **uỷ thác code** khi việc đủ lớn/độc lập (≥1 PR); việc nhỏ/chạm ít file/cần liền mạch ngữ cảnh thì tự code thẳng |
-| `coder` (subagent)      | Sonnet                           | Code theo đặc tả đã có, fix lỗi, viết test, script theo mẫu, refactor phạm vi rõ, verify tính năng thật, xử lý review comment cụ thể                                                  |
-| `reviewer` (subagent)   | Sonnet                           | Tự soát diff bằng skill `code-review` sau khi `coder`/`mechanical` code xong, trước khi Opus duyệt cuối                                                                               |
-| `mechanical` (subagent) | Haiku                            | Việc lặp lại, ít cần phán đoán: sửa lint/typecheck theo thông báo có sẵn, đổi tên hàng loạt, CRUD/route bám mẫu có sẵn                                                                |
+| Tầng | Model | Vai trò |
+| --- | --- | --- |
+| Phiên chính | Opus (`opusplan`, effort medium) | Lập kế hoạch, thiết kế, quyết định kiến trúc, viết đặc tả chi tiết — **uỷ thác code** khi việc đủ lớn/độc lập (≥1 PR); việc nhỏ/chạm ít file/cần liền mạch ngữ cảnh thì tự code thẳng |
+| `coder` (subagent) | Sonnet | Code theo đặc tả đã có, fix lỗi, viết test, script theo mẫu, refactor phạm vi rõ, verify tính năng thật, xử lý review comment cụ thể |
+| `reviewer` (subagent) | Sonnet | Tự soát diff bằng skill `code-review` sau khi `coder`/`mechanical` code xong, trước khi Opus duyệt cuối |
+| `mechanical` (subagent) | Haiku | Việc lặp lại, ít cần phán đoán: sửa lint/typecheck theo thông báo có sẵn, đổi tên hàng loạt, CRUD/route bám mẫu có sẵn |
 
 Phiên chính gọi các subagent qua tool `Agent` (không phải helper riêng của XBoss — đây là cơ chế chuẩn của Claude Code).
 
@@ -73,10 +73,10 @@ Cấu trúc chung mọi subagent:
 
 ```markdown
 ---
-name: <tên-subagent> # dùng làm subagent_type khi gọi tool Agent
+name: <tên-subagent>              # dùng làm subagent_type khi gọi tool Agent
 description: <khi nào dùng, khi nào KHÔNG dùng — Agent tool đọc field này để chọn agent>
-tools: Read, Edit, Write, Grep, Glob, Bash # thêm/bớt tuỳ nhu cầu; thêm "Skill" nếu subagent cần invoke skill
-model: sonnet # hoặc haiku / opus / fable
+tools: Read, Edit, Write, Grep, Glob, Bash   # thêm/bớt tuỳ nhu cầu; thêm "Skill" nếu subagent cần invoke skill
+model: sonnet   # hoặc haiku / opus / fable
 ---
 
 <system prompt của subagent — quy tắc bắt buộc riêng của repo, viết như CLAUDE.md thu nhỏ>
@@ -96,11 +96,10 @@ Nội dung 3 file hiện có trong repo này (`coder.md`, `mechanical.md`, `revi
      - `coder` (Sonnet) — code theo đặc tả, fix lỗi, viết test, script theo mẫu, refactor phạm vi rõ, verify tính năng thật.
      - `reviewer` (Sonnet) — tự soát diff bằng skill code-review trước khi Opus duyệt cuối.
      - `mechanical` (Haiku) — việc lặp lại: lint/typecheck fix, đổi tên hàng loạt, CRUD bám mẫu.
-       Việc nhỏ, chạm ít file, hoặc cần giữ liền mạch ngữ cảnh quyết định vừa chốt thì Opus tự code thẳng — không bắt buộc vòng qua subagent cho mọi việc.
+     Việc nhỏ, chạm ít file, hoặc cần giữ liền mạch ngữ cảnh quyết định vừa chốt thì Opus tự code thẳng — không bắt buộc vòng qua subagent cho mọi việc.
    ```
 
    Đây là dòng **duy nhất** khiến Opus chủ động dùng subagent thay vì tự làm hết. `.claude/agents/*.md` chỉ khai báo subagent tồn tại — không tự nhắc Opus gọi chúng; nếu quên bullet này, cấu hình `.claude/` coi như vô hiệu trên thực tế (subagent vẫn gọi thủ công được, nhưng Opus sẽ không tự làm điều đó). Ngưỡng "đủ lớn/độc lập" là hướng dẫn, không phải luật cứng — mục đích là tránh vòng uỷ thác làm chậm việc nhỏ mà chính Opus tự làm nhanh hơn, đồng thời tránh phá vỡ mạch quyết định vừa chốt trong hội thoại khi giao việc sang 1 phiên subagent mới (không có ngữ cảnh hội thoại).
-
 5. Mở phiên mới trong repo đích, thử gọi 1 task nhỏ qua từng subagent (`Agent({ subagent_type: "coder", ... })`) để xác nhận model/tool hoạt động đúng trước khi tin tưởng dùng thật.
 
 ## 6. Lưu ý / giới hạn

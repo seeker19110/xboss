@@ -1,4 +1,4 @@
-// scripts/gate.ts — `npm run gate`: chạy cục bộ ĐÚNG các cổng CI trước khi push/mở PR (ADR-0012).
+// scripts/gate.ts — `npm run gate`: chạy cục bộ ĐÚNG các cổng CI trước khi push/mở PR (ADR-0013).
 //
 // Port "verification-loop" của ECC: thay vì 6 pha chung chung, chạy chính các bước của job
 // `static` trong .github/workflows/ci.yml (đọc động, xem scripts/lib/gate-steps.ts) + cổng

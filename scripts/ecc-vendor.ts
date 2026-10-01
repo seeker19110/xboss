@@ -1,4 +1,4 @@
-// scripts/ecc-vendor.ts — Sinh lớp ECC vendor trong .claude/ từ một checkout ECC (ADR-0012).
+// scripts/ecc-vendor.ts — Sinh lớp ECC vendor trong .claude/ từ một checkout ECC (ADR-0013).
 //
 // Chạy:
 //   git clone https://github.com/affaan-m/ECC /tmp/ecc && git -C /tmp/ecc checkout <commit>

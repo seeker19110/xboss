@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # protect-config.sh — PreToolUse hook (matcher: Edit|Write|MultiEdit). Port từ "config-protection"
-# của ECC (ADR-0012), viết lại cho luật riêng XBoss.
+# của ECC (ADR-0013), viết lại cho luật riêng XBoss.
 #
 # VÌ SAO CẦN: agent hay "làm cổng xanh" bằng cách nới cấu hình (tắt rule eslint, thêm file vào
 # allowlist skip, hạ coverage-baseline, bỏ bước CI) thay vì sửa code; và luật "migration

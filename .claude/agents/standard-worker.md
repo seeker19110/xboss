@@ -1,6 +1,6 @@
 ---
 name: standard-worker
-description: "route: standard — việc VỪA đã có đặc tả cụ thể: code 1 tính năng/component/hàm rõ ràng (đặc tả do phiên chính viết trong brief hoặc có sẵn trong docs/nang-cap/M<xx>-*.md, PROJECT.md/spec.md); fix lỗi có cách tái hiện/thông báo cụ thể; viết/bổ sung test (unit, integration, Playwright e2e); script backfill/import trong scripts/ theo mẫu; refactor phạm vi rõ (không đổi hành vi/kiến trúc); verify tính năng thật qua UI/API; xử lý review comment cụ thể; cập nhật tài liệu đi kèm (PROGRESS.md, docs/ERD.md) cho phần được giao. KHÔNG dùng khi việc phức tạp (→ complex-implementer/spec-executor), cơ học thuần (→ mechanical-worker), hay đặc tả còn thiếu/mơ hồ — phiên chính phải hỏi người dùng chốt đặc tả trước khi giao."
+description: 'route: standard — việc VỪA đã có đặc tả cụ thể: code 1 tính năng/component/hàm rõ ràng (đặc tả do phiên chính viết trong brief hoặc có sẵn trong docs/nang-cap/M<xx>-*.md, PROJECT.md/spec.md); fix lỗi có cách tái hiện/thông báo cụ thể; viết/bổ sung test (unit, integration, Playwright e2e); script backfill/import trong scripts/ theo mẫu; refactor phạm vi rõ (không đổi hành vi/kiến trúc); verify tính năng thật qua UI/API; xử lý review comment cụ thể; cập nhật tài liệu đi kèm (PROGRESS.md, docs/ERD.md) cho phần được giao. KHÔNG dùng khi việc phức tạp (→ complex-implementer/spec-executor), cơ học thuần (→ mechanical-worker), hay đặc tả còn thiếu/mơ hồ — phiên chính phải hỏi người dùng chốt đặc tả trước khi giao.'
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 effort: medium

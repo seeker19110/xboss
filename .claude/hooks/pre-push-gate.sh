@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pre-push-gate.sh — PreToolUse hook (matcher: Bash). Port "git push reminder" của ECC (ADR-0012)
+# pre-push-gate.sh — PreToolUse hook (matcher: Bash). Port "git push reminder" của ECC (ADR-0013)
 # thành cổng thật cho 2 bài học lặp lại nhiều lần của XBoss:
 #
 #   1. PROGRESS.md quên cập nhật (CLAUDE.md DoD: "bài học lặp lại nhiều lần") — CI chỉ bắt được SAU khi
@@ -40,7 +40,7 @@ fi
 
 if [ "$fail" -eq 1 ]; then
   {
-    echo "[pre-push-gate] Chặn push — cổng trước-push đỏ (cùng luật với CI, xem ADR-0012):"
+    echo "[pre-push-gate] Chặn push — cổng trước-push đỏ (cùng luật với CI, xem ADR-0013):"
     printf '%s' "$out" | tail -40
     echo "Sửa rồi commit lại (thường là thêm mục vào PROGRESS.md, hoặc đổi số migration sau 'git fetch origin'), rồi push lại."
   } >&2

@@ -1,5 +1,5 @@
 {
-  "$comment": "Nguồn sự thật của lớp ECC vendor trong XBoss (ADR-0012). Sửa danh sách ở đây rồi chạy `npx tsx scripts/ecc-vendor.ts --src <checkout ECC đúng commit>` để sinh lại file — KHÔNG sửa tay file ecc-* (test tests/ecc-vendor.test.ts so sha256 với lock.json).",
+  "$comment": "Nguồn sự thật của lớp ECC vendor trong XBoss (ADR-0013). Sửa danh sách ở đây rồi chạy `npx tsx scripts/ecc-vendor.ts --src <checkout ECC đúng commit>` để sinh lại file — KHÔNG sửa tay file ecc-* (test tests/ecc-vendor.test.ts so sha256 với lock.json).",
   "upstream": {
     "repo": "https://github.com/affaan-m/ECC",
     "commit": "c70874fae9eb0e5ad0365beb7e2955899fd1d30f",

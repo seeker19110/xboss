@@ -1,6 +1,6 @@
 # Ưu tiên khi lớp ECC mâu thuẫn với XBoss
 
-Repo vendor một phần **ECC** (Everything Claude Code, `affaan-m/ECC`, MIT — xem ADR-0012): rules
+Repo vendor một phần **ECC** (Everything Claude Code, `affaan-m/ECC`, MIT — xem ADR-0013): rules
 `.claude/rules/ecc/**`, agent `ecc-*`, skill `ecc-*`, command `/ecc-*`. Đó là kho kiến thức
 **chung** viết cho mọi dự án; XBoss có quy ước riêng. Khi hai bên nói khác nhau:
 
@@ -56,9 +56,10 @@ Không hỏi lại người dùng về các điểm đã liệt kê dưới đâ
     Không tự tạo thư mục gốc mới mà ECC gợi ý (`docs/CODEMAPS/`, `.ecc/`, `openspec/`,
     `~/.claude/session-data/`) khi chưa hỏi — container cloud bị thu hồi, chỉ cái gì **commit vào
     repo** mới còn. Bài học lặp lại → skill `/hoc`.
-15. **Công cụ ngoài**: không chạy `npx <gói>` mà gói đó **không có trong `package.json`**
-    (`ecc-agentshield`, `ecc-universal`, `knip`, `depcheck`, `ts-prune`, `madge`, `lighthouse`,
-    bundle analyzer, `prisma`, `drizzle-kit`, `vitest`, `jest`…) khi chưa hỏi người dùng — tải và
-    chạy mã ngoài là bề mặt chuỗi cung ứng. Dùng tương đương sẵn có: `npm run check:dead-code`/
-    `check:dead-routes` (thay knip/ts-prune/depcheck), workflow `lighthouse-ci.yml`, `npx playwright`
-    (đã cài). Lệnh dọn kiểu `rm -rf node_modules …` bị `settings.json` chặn — dùng `npm ci`.
+15. **Công cụ ngoài**: không chạy `npx <gói>` khi gói đó **không có trong `package.json`** (là
+    dependency, hoặc script đã ghim phiên bản như `npm run ocr`) mà chưa hỏi người dùng — vd
+    `ecc-agentshield`, `ecc-universal`, `knip`, `depcheck`, `ts-prune`, `madge`, `lighthouse`, bundle
+    analyzer, `prisma`, `drizzle-kit`, `vitest`, `jest`. Tải và chạy mã ngoài là bề mặt chuỗi cung
+    ứng. Dùng tương đương sẵn có: `npm run check:dead-code`/`check:dead-routes` (thay
+    knip/ts-prune/depcheck), workflow `lighthouse-ci.yml`, `npx playwright` (đã cài). Lệnh dọn kiểu
+    `rm -rf node_modules …` bị `settings.json` chặn — dùng `npm ci`.

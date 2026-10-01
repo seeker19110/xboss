@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # stop-static-checks.sh — Stop hook. Port "stop:format-typecheck" + "check-console-log" của ECC
-# (ADR-0012), dùng CHÍNH các cổng CI tĩnh của XBoss thay vì luật tự chế.
+# (ADR-0013), dùng CHÍNH các cổng CI tĩnh của XBoss thay vì luật tự chế.
 #
 # VÌ SAO CẦN: quy ước "merge ngay khi CI xanh" dồn trách nhiệm vào phần tự kiểm trước push, nhưng
 # các cổng tĩnh (prettier, check:hex-hardcode, check:route-perms, check:db-params...) chỉ chạy ở CI

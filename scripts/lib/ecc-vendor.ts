@@ -1,4 +1,4 @@
-// scripts/lib/ecc-vendor.ts — Logic thuần của bộ vendor ECC (ADR-0012).
+// scripts/lib/ecc-vendor.ts — Logic thuần của bộ vendor ECC (ADR-0013).
 //
 // VÌ SAO TÁCH RIÊNG: CLI `scripts/ecc-vendor.ts` (ghi file từ checkout ECC) và test
 // `tests/ecc-vendor.test.ts` (kiểm lock + phép biến đổi trên fixture) DÙNG CHUNG một cài đặt —

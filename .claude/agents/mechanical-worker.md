@@ -1,6 +1,6 @@
 ---
 name: mechanical-worker
-description: "route: mechanical — việc CƠ HỌC, lặp lại, ít cần phán đoán: sửa lỗi lint/typecheck theo thông báo có sẵn, format, đổi tên biến/hàm hàng loạt, viết CRUD/route/component mới bám sát một mẫu đã có trong codebase, cập nhật test cho khớp signature đã đổi, tìm-thay thế đơn giản trên nhiều file. KHÔNG dùng cho quyết định kiến trúc, đổi schema DB, thiết kế API mới, hay bất kỳ việc nào cần cân nhắc đánh đổi (→ route standard/spec/complex)."
+description: 'route: mechanical — việc CƠ HỌC, lặp lại, ít cần phán đoán: sửa lỗi lint/typecheck theo thông báo có sẵn, format, đổi tên biến/hàm hàng loạt, viết CRUD/route/component mới bám sát một mẫu đã có trong codebase, cập nhật test cho khớp signature đã đổi, tìm-thay thế đơn giản trên nhiều file. KHÔNG dùng cho quyết định kiến trúc, đổi schema DB, thiết kế API mới, hay bất kỳ việc nào cần cân nhắc đánh đổi (→ route standard/spec/complex).'
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: haiku
 ---

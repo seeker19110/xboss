@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { docBuocCi } from "../scripts/lib/gate-steps";
 
-// `npm run gate` (ADR-0012) đọc danh sách cổng từ job `static` của ci.yml thay vì chép tay — test
+// `npm run gate` (ADR-0013) đọc danh sách cổng từ job `static` của ci.yml thay vì chép tay — test
 // chứng minh parser nhận đủ cổng thật của repo (nếu ai đổi cách viết ci.yml làm parser "mù",
 // gate sẽ báo xanh giả: đúng lớp lỗi check:db-params từng mắc, xem TRAPS.md §4).
 
