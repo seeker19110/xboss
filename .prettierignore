@@ -10,3 +10,6 @@ data/uploads
 
 # ERD sinh tự động (npm run gen:erd) — CI so khớp bằng git diff, không để prettier canh lại bảng
 docs/ERD.md
+
+# OCR rule.json sinh tự động (npm run gen:ocr-rules) — test so khớp, không để prettier canh lại
+.opencodereview/rule.json
