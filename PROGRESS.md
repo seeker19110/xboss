@@ -1,5 +1,34 @@
 # PROGRESS — XBoss
 
+## 2026-10-01 — audit lỗi logic & toàn vẹn dữ liệu
+
+Baseline `3d087ae`. Rà theo `docs/audit.md` §4 + vùng rủi ro §8 (nghiệm thu, engine phê duyệt
+M46, IPC, kho, import). Bộ test đầy đủ trên PostgreSQL thật xanh ở baseline (239 file, 3842 ca),
+nên mọi lỗi dưới đây nằm ngoài vùng test phủ; từng lỗi được tái hiện qua route handler thật
+trước khi sửa. Chi tiết, số đo và truy vấn rà dữ liệu cũ:
+[audit logic](docs/ops/audit-logic-2026-10-01.md).
+
+**Lỗi thật đã sửa:** (F1) bật flow duyệt nghiệm thu task M46 là không ai nghiệm thu được — route
+mở request với người bấm là người tạo rồi tự duyệt luôn → SoD 403 + rollback mọi lượt; vai trò
+bước kỹ sư/CĐT cũng bị `CAN.approve` chặn. Theo quyết định chủ dự án: `task_acceptance` miễn
+SoD, có request đang chờ thì engine quyết quyền. (F2) duyệt tầng ghi đè `approval_source` của
+task đã duyệt riêng → huỷ tầng hạ luôn task đó. (F5) lập được đợt IPC mới khi đợt trước còn
+nháp/trình → gợi ý KL bỏ qua đợt đó, **trả trùng tiền** (60 KL ra bill 80); nay 409, khoá hợp
+đồng. (F6) thêm/copy cột lưới vào task đã nghiệm thu → `nghiem_thu` với % < 1; nay 409. (F8)
+import Excel đè % thấp lên task đã nghiệm thu; nay giữ nguyên + cảnh báo. Kèm mức thấp: sổ kho
+`nhap_kho` ghi `qty_after` sai cột (F7), hạn bảo hành tràn cuối tháng 31/01+1 → 03/03 (F3),
+`progress: null` âm thầm thành 0% (F4).
+
+Test hồi quy mới `tests/route-nghiem-thu-flow.test.ts`, `tests/import-nghiem-thu.test.ts` + ca
+thêm ở `route-nghiem-thu-bat-bien`, `route-tai-chinh`, `route-mua-sam`, `warranty`; đã gỡ tạm
+bản vá để xác nhận các ca mới đỏ trên code cũ. Sau sửa: 241 file · 3858 ca pass · 0 fail
+(`--release-gate`, PostgreSQL sạch); lint/typecheck/build + cổng tĩnh xanh. Không migration. **[Người dùng]:** chạy 4 truy
+vấn chỉ-đọc trong tài liệu chi tiết trên production để rà dữ liệu đã hỏng trước bản vá.
+
+Nợ ghi nhận (chưa sửa): báo cáo ngày/tuần cron cộng mọi dự án nhưng mang tên dự án đầu (cần
+chốt nghiệp vụ đa dự án); deadlock hiếm ở tick lô chồng nhau; nhật ký trạng thái PO có thể ghi
+trùng khi nhập kho đồng thời.
+
 ## 2026-10-01 — đóng nợ ô nhập < 16px trên điện thoại (iOS tự phóng to)
 
 Tiếp đợt audit layout bên dưới (PR #551 đã merge). Quét tĩnh còn 444 ô `<input>/<select>/

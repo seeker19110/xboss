@@ -21,6 +21,14 @@ export const APPROVAL_ENTITY_TYPES = [
 ] as const;
 export type ApprovalEntityType = (typeof APPROVAL_ENTITY_TYPES)[number];
 
+// Loại thực thể MIỄN luật SoD "người tạo không được tự duyệt" (quyết định chủ dự án
+// 2026-10-01, audit lỗi logic). Nghiệm thu task không có bước "trình" riêng: request do
+// chính người bấm Nghiệm thu mở (POST /api/tasks/:id/approve, POST /api/approvals) rồi ghi
+// nhận luôn quyết định của họ cho bước hiện tại. Áp SoD ở đây thì lượt bấm đầu tiên LUÔN 403
+// rồi rollback cả request vừa mở — flow 'task_acceptance' không bao giờ chạy được. VO/IPC/đề
+// xuất vẫn giữ SoD: request mở lúc người lập TẠO chứng từ, người duyệt là người khác.
+export const SOD_EXEMPT_ENTITY_TYPES: readonly string[] = ["task_acceptance"];
+
 export type ApprovalStep = {
   seq: number;
   role: Role;
@@ -158,7 +166,7 @@ export async function openApproval(opts: {
 
 // Ra quyết định 1 bước. Khoá request FOR UPDATE để tuần tự hoá. Quyền: đúng vai trò bước
 // hiện tại HOẶC admin; bch/viewer luôn 403 (cdt được phép nếu là step role). SoD: người
-// tạo không tự duyệt. reject →
+// tạo không tự duyệt (trừ SOD_EXEMPT_ENTITY_TYPES). reject →
 // chốt; approve → sang bước hiệu lực kế tiếp, hết bước → approved. Ghi approval_actions
 // (UNIQUE(request_id, step_seq) → duyệt trùng bước trả 409).
 export async function advanceApproval(opts: {
@@ -203,7 +211,7 @@ export async function advanceApproval(opts: {
       throw Object.assign(new Error(`Chỉ vai trò ${step.role} được duyệt bước này`), {
         status: 403,
       });
-    if (user.id === req.createdBy)
+    if (user.id === req.createdBy && !SOD_EXEMPT_ENTITY_TYPES.includes(opts.entityType))
       throw Object.assign(new Error("Người tạo không được tự duyệt"), { status: 403 });
 
     try {
@@ -257,7 +265,8 @@ export type PendingItem = {
 };
 
 // Hộp thư "chờ tôi duyệt": request pending trong dự án mà bước hiện tại thuộc vai trò user
-// (admin thấy mọi bước), trừ request do chính user tạo (SoD — không thể tự duyệt).
+// (admin thấy mọi bước), trừ request do chính user tạo (SoD — không thể tự duyệt) — loại
+// miễn SoD (SOD_EXEMPT_ENTITY_TYPES) thì người tạo vẫn thấy, vì họ duyệt được bước kế.
 export async function pendingForUser(user: ActorUser, projectId: number): Promise<PendingItem[]> {
   if (NON_APPROVER_ROLES.includes(user.role)) return [];
   return query<PendingItem>(
@@ -269,11 +278,12 @@ export async function pendingForUser(user: ActorUser, projectId: number): Promis
        JOIN approval_flows f ON f.id = r.flow_id
       WHERE r.status = 'pending' AND r.project_id = ?
         AND (? = 'admin' OR s.role = ?)
-        AND r.created_by <> ?
+        AND (r.entity_type = ANY(?) OR r.created_by <> ?)
       ORDER BY r.created_at`,
     projectId,
     user.role,
     user.role,
+    SOD_EXEMPT_ENTITY_TYPES,
     user.id,
   );
 }

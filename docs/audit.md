@@ -54,6 +54,8 @@ Lớp lỗi nguy hiểm nhất: code biên dịch sạch, type đúng, nhưng **
 - [ ] BOQCODE duy nhất xuyên toàn hệ thống (`tasks`/`work_packages`/`materials`/`boq_items`) — có ràng buộc DB thật (`boq_codes` + trigger), không chỉ check ở tầng ứng dụng (`boqTakenBy` là lưới an toàn phụ, không phải nguồn sự thật).
 - [ ] Ngày giờ: so sánh **chuỗi** `YYYY-MM-DD`; cộng/trừ ngày qua `daysFromTodayISO`/`todayISO`; mọi mốc "hôm nay" ép múi giờ `Asia/Ho_Chi_Minh` — tránh lệch 1 ngày lúc 0h–7h sáng giờ VN do server chạy UTC.
 - [ ] `nghiem_thu` không bao giờ bị hạ cấp tự động; chỉ đặt/huỷ qua `POST/DELETE /api/tasks/:id/approve` hoặc `/api/approvals`, luôn ghi `task_history`.
+- [ ] Bất biến `nghiem_thu ⇒ progress = 1` giữ ở **mọi** đường làm giảm % — không chỉ route tiến độ/tick ô mà cả thêm/copy cột lưới, import Excel, thao tác hàng loạt (lỗi thật tái phát 2026-10-01, xem `TRAPS.md` §5). Duyệt/huỷ theo tầng không đụng task đã duyệt riêng lẻ (`approval_source`).
+- [ ] Chứng từ thanh toán theo đợt (IPC): luỹ kế/gợi ý KL chỉ đúng khi các đợt **tuần tự** — đợt mới không được lập khi đợt trước chưa quyết định (lỗi thật 2026-10-01: trả trùng tiền). Engine phê duyệt M46: test qua route thật với đúng người bấm, không chỉ gọi lib với user khác nhau (`TRAPS.md` §6).
 - [ ] Migration mới **append-only**, `IF NOT EXISTS`, chạy lại không lỗi (idempotent); nếu backfill dữ liệu cũ có khả năng đã trùng/xung đột — ghi rõ quyết định xử lý, không giả định dữ liệu cũ sạch.
 - [ ] Mọi nhánh logic phức tạp mới có ít nhất 1 test biên (rỗng/1 phần tử/nhiều phần tử, `null`/0, off-by-one).
 
