@@ -556,6 +556,17 @@ export async function importWorkbook(
               denominator,
             );
             stats.tasks++;
+          } else if (existing.status === "nghiem_thu" && progress < 1) {
+            // Bất biến nghiệm thu (cùng luật L1/L2 audit 2026-09-22): task ĐÃ nghiệm thu thì
+            // % phải = 100%. Ghi đè % thấp hơn từ file (vd import lại file cũ) mà giữ status
+            // nghiem_thu (deriveStatus giữ) là phá bất biến — và dựng lại lưới sẽ bỏ tick các ô
+            // đã nghiệm thu. Giữ NGUYÊN task này, báo rõ để người import huỷ nghiệm thu
+            // (DELETE /api/tasks/:id/approve) trước nếu thật sự muốn ghi đè.
+            stats.warnings.push(
+              `Dòng ${i + 1} (${sheetName}) ${taskCode}: đã nghiệm thu nhưng file ghi ` +
+                `${Math.round(progress * 100)}% — giữ nguyên, huỷ nghiệm thu trước nếu muốn ghi đè`,
+            );
+            continue;
           } else {
             taskId = existing.id;
             // Giữ nguyên boq_code (người dùng có thể đã sửa tay).
