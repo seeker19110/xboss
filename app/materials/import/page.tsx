@@ -185,9 +185,12 @@ export default function ImportMaterialsPage() {
         <a
           href="/api/materials/template"
           download="MAU-KHOI-LUONG-BOQ.xlsx"
-          className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white border border-zinc-700 bg-zinc-900 rounded-lg px-3 py-1.5 transition font-medium"
+          aria-label="Tải mẫu BOQ chuẩn (.xlsx)"
+          className="flex items-center justify-center gap-1.5 min-h-10 min-w-10 shrink-0 text-xs text-zinc-300 hover:text-white border border-zinc-700 bg-zinc-900 rounded-lg px-3 py-1.5 transition font-medium"
         >
-          <Download className="w-3.5 h-3.5 text-emerald-400" /> Tải mẫu BOQ chuẩn (.xlsx)
+          <Download className="w-3.5 h-3.5 text-emerald-400" />
+          {/* Chỉ icon trên điện thoại — nhãn dài đẩy chuông/tài khoản ra ngoài màn hình. */}
+          <span className="hidden sm:inline">Tải mẫu BOQ chuẩn (.xlsx)</span>
         </a>
       </AppHeader>
 
@@ -304,7 +307,7 @@ export default function ImportMaterialsPage() {
               value={systemId}
               onChange={(e) => setSystemId(e.target.value)}
               aria-label="Chọn hệ MEPF cần nhập vật tư"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm text-white focus:outline-none focus:border-emerald-500 transition"
             >
               <option value="">
                 -- Vui lòng chọn hệ MEPF (HVAC, Điện, Cấp Thoát Nước, PCCC...) --

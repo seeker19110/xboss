@@ -396,9 +396,9 @@ export default function MepfLifecyclePage() {
               <Cpu className="w-4 h-4" />
               Cognitive MEPF Super Skills OS (M65 – M68)
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight">
               Trung Tâm Điều Hành MEPF AI Toàn Năng
-            </h1>
+            </h2>
             <p className="text-sm text-neutral-400 mt-1 max-w-2xl">
               Hợp nhất Trí tuệ Nhân tạo từ Mặt bằng CAD số → AI Takeoff & QS → Thủy lực & cỡ ống →
               Xếp cắt phôi → Đối soát BOQ/VO → BBNT Nghị định 06.

@@ -30,7 +30,17 @@ export function Modal({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  // Khoá scroll nền + focus phần tử đầu tiên — CHỈ chạy 1 lần lúc mount.
+  // Phần tử đang giữ focus lúc modal MỞ (thường là nút bấm mở nó) — chụp ngay ở lần render
+  // đầu, trước khi ô `autoFocus` trong modal kịp cướp focus ở bước commit.
+  const [opener] = useState(() =>
+    typeof document !== "undefined" && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
+
+  // Khoá scroll nền + focus phần tử đầu tiên — CHỈ chạy 1 lần lúc mount. Đóng modal thì
+  // trả focus về phần tử đã mở nó — không thì focus rơi về <body>, người dùng bàn phím/
+  // trình đọc màn hình mất vị trí và phải Tab lại từ đầu trang.
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -45,8 +55,9 @@ export function Modal({
     return () => {
       document.body.style.overflow = prev;
       clearTimeout(t);
+      if (opener?.isConnected) opener.focus();
     };
-  }, []);
+  }, [opener]);
 
   // Listener Escape + Tab-trap — đăng ký 1 lần, đọc onClose qua ref.
   useEffect(() => {

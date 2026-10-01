@@ -6,9 +6,16 @@ export function Skeleton({ className = "" }: { className?: string }) {
 }
 
 // Khung trang đầy đủ: mirror cấu trúc thật Dashboard để tránh layout shift khi dữ liệu về.
+// role="status": aria-label trên <div> trơn bị cấm (axe aria-prohibited-attr — trình đọc màn
+// hình bỏ qua nhãn). Giữ nguyên aria-label="Đang tải" vì e2e dò skeleton bằng chính nhãn này.
 export function PageSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-950 text-white" aria-busy aria-label="Đang tải">
+    <div
+      className="min-h-screen bg-zinc-950 text-white"
+      role="status"
+      aria-busy
+      aria-label="Đang tải"
+    >
       {/* Header giả */}
       <div className="border-b border-zinc-800 px-4 sm:px-6 py-3 flex items-center gap-3">
         <Skeleton className="h-7 w-36" />

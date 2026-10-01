@@ -34,7 +34,7 @@ export function TrackingToolbar({
   const hasFilter = query || floorFilter || statusFilter || taskFilter;
 
   return (
-    <div className="sticky top-12 z-20 px-4 sm:px-6 py-3 flex flex-wrap gap-2.5 items-center border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md no-print">
+    <div className="sticky top-[calc(3rem+env(safe-area-inset-top,0px))] z-20 px-4 sm:px-6 py-3 flex flex-wrap gap-2.5 items-center border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md no-print">
       <div className="relative flex-1 sm:flex-initial min-w-[180px] max-w-xs">
         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
         <input

@@ -5,7 +5,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoMaterialsReports(page: Page) {
   await page.goto("/materials/reports");
-  await expect(page.getByRole("heading", { name: "Báo cáo vật tư" })).toBeVisible({
+  // level 2 = tiêu đề khối nội dung (chỉ có khi dữ liệu đã về); level 1 là tiêu đề topbar
+  // cùng chữ, render ngay từ HTML server nên không dùng để chờ nội dung.
+  await expect(page.getByRole("heading", { name: "Báo cáo vật tư", level: 2 })).toBeVisible({
     timeout: 15_000,
   });
 }

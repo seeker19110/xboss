@@ -125,7 +125,7 @@ export default function EvmChart({ system }: { system?: string }) {
             value={baseline}
             onChange={(e) => setBaseline(e.target.value)}
             aria-label="Chọn baseline cho đường kế hoạch EVM"
-            className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-xs outline-none text-zinc-300"
+            className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-base sm:text-xs outline-none text-zinc-300"
           >
             <option value="">Kế hoạch hiện tại</option>
             {baselines.map((b) => (

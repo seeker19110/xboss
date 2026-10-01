@@ -1,5 +1,6 @@
 // Ô chọn (select) dùng chung — chuẩn hoá control `<select>` đang bị chép tay ở nhiều bộ lọc
-// (bảng trễ trang chủ, các trang hub…) về cùng một kiểu (ADR-0009).
+// (bảng trễ trang chủ, các trang hub…) về cùng một kiểu (ADR-0009). Cỡ chữ 16px trên
+// điện thoại: dưới 16px iOS Safari tự phóng to trang khi chạm vào ô (cả <select>).
 export default function Select({
   value,
   onChange,
@@ -20,7 +21,7 @@ export default function Select({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       aria-label={ariaLabel}
-      className={`min-h-10 rounded-lg bg-zinc-800 border border-zinc-700 px-3 text-xs text-zinc-100 outline-none focus:border-emerald-500 transition ${className}`}
+      className={`min-h-10 rounded-lg bg-zinc-800 border border-zinc-700 px-3 text-base sm:text-xs text-zinc-100 outline-none focus:border-emerald-500 transition ${className}`}
     >
       {placeholder && <option value="">{placeholder}</option>}
       {options.map((o) => (
