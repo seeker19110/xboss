@@ -14,6 +14,7 @@ XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO T
 - `docs/audit.md` — **tiêu chuẩn audit toàn diện của XBoss** (bảo mật/phân quyền, logic nghiệp vụ & toàn vẹn dữ liệu, UI/UX & a11y) — checklist đúc kết từ các lớp lỗi thật đã lặp lại nhiều lần trong dự án. **Đọc trước khi tự audit/review diện rộng**, và bắt buộc rà theo mục "Vùng rủi ro cao" khi PR chạm `lib/tien-do/recompute.ts`, `lib/bao-mat/auth.ts`, `lib/vat-tu/material-sync.ts`, `lib/khoi-luong/boq.ts` hoặc route tài chính/nghiệm thu.
 - `docs/framework/` — bộ khung quy trình/chất lượng (tham khảo dài, đọc đúng phần cần). Áp dụng brownfield theo `AP-DUNG-vao-du-an-co-san.md`.
 - `docs/ops/` — vận hành sự cố production (`incident-response.md`).
+- `.opencodereview/` — checklist `docs/audit.md`/`TRAPS.md` đúc thành **luật review máy đọc theo đường dẫn** (ADR-0012), dùng bởi lệnh `/ocr-review`, `/review`, agent `reviewer` và CI (`OCR review`). **Sửa checklist audit thì sửa mảnh tương ứng trong `.opencodereview/rules/` + chạy `npm run gen:ocr-rules`.**
 
 ## Vai trò & nguyên tắc
 
@@ -23,7 +24,6 @@ Làm việc với vai trò **kỹ sư full-stack senior kiêm chuyên gia thiế
 - **Clean Code / KISS / DRY / YAGNI**: đơn giản, không lặp, không over-engineer; viết code bám đúng phong cách và cách đặt tên của code xung quanh.
 - **Security-first, fail-fast, idempotent**: API là ranh giới bảo mật duy nhất (xem Auth); thiếu cấu hình bắt buộc thì throw sớm; thao tác DB lặp lại không gây tác dụng phụ.
 - **Lập kế hoạch → điều phối → thi hành (3 tầng)** (quyết định 2026-07-16, thay thế "Uỷ thác theo độ khó" 2026-07-15):
-
   - **Tầng 1 — Người lập kế hoạch: phiên chính (opusplan · Fable 5).** Hiểu yêu cầu, quyết định kiến trúc, **viết đặc tả chi tiết** (schema DDL, API, điểm chạm code, tiêu chí chấp nhận — cùng khung `docs/nang-cap/M<xx>-*.md`), **định tuyến** từng việc bằng nhãn `route:` theo bảng dưới, xuất kế hoạch theo mẫu `PLAN.md`, và **duyệt kết quả cuối** khi coordinator báo xong. Không tự code, không tự babysit worker.
   - **Tầng 2 — Người điều phối: `coordinator` (Opus · low).** Nhận nguyên văn `PLAN.md` đã chốt và thi hành đúng kế hoạch: đồng bộ nhánh (`git fetch origin`), tạo nhánh/worktree cho từng việc, dispatch từng việc đến đúng agent theo nhãn `route:`, theo dõi kết quả so với tiêu chí chấp nhận, gọi `reviewer` soát diff, tích hợp (xung đột nhỏ, số migration), báo cáo tổng hợp về phiên chính. **Không đổi kế hoạch/đặc tả, không tự code** — worker vướng đặc tả sai/thiếu thì dừng việc đó và báo lại phiên chính.
   - **Tầng 3 — Workers** theo bảng định tuyến.
@@ -59,6 +59,8 @@ npm run check:contrast       # ADR-0010 — tương phản WCAG AA của bảng 
 npm run check:mau-accent     # ADR-0010 — chữ trắng trên nền accent sáng (kể cả trạng thái hover)
 npm run check:lib-layers     # ADR-0007 — ranh giới miền lib/: chặn import ngược tầng + chu trình mới
 npm run check:dead-code      # dò module không ai với tới được (đồ thị import toàn repo)
+npm run gen:ocr-rules        # ADR-0012 — ghép mảnh luật .opencodereview/rules/*.md + manifest.json thành .opencodereview/rule.json (file sinh, test so khớp)
+npm run -s ocr -- delegate preview --from origin/main --to HEAD   # ADR-0012 — liệt kê file cần review trong diff (rồi `delegate rule <file...>` lấy checklist); thường chạy qua /ocr-review
 npm run db:seed      # import Excel gốc trong attachments/ vào DB
 ```
 
@@ -228,6 +230,7 @@ Parse file tracking gốc (sheet OGTĐ/OGHL/OGCH/ODNN) thành WBS — chứa log
   - **Thử `enable_pr_auto_merge` trước; bị từ chối thì merge thẳng, KHÔNG coi là lỗi.** Repo hiện **chưa đặt required status checks** cho `main` trong branch protection, nên GitHub không mở đường auto-merge ở bất kỳ thời điểm nào: gọi lúc chưa check nào đăng ký → `clean` ("merge thẳng đi"), gọi lúc checks đang chạy → `unstable`, gọi lúc đã xanh hết → lại `clean`. Đã thử đủ 3 thời điểm ở PR #398 và #400.
   - **`unstable` KHÔNG có nghĩa là có check đỏ**, dù thông báo lỗi của công cụ ghi "required checks are failing" — nó chỉ có nghĩa "chưa xanh hết". Luôn kiểm `get_check_runs` để phân biệt _đang chạy_ với _đỏ thật_, đừng đi sửa một lỗi không tồn tại.
   - **Chờ đủ mọi check, đừng merge sớm.** `test (Postgres)` và 3 nhánh `e2e` là các job lâu nhất (~6–8 phút); rollup `ci`/`e2e` chỉ xanh sau khi các job con xong. Sự kiện webhook `check_suite.completed` có thể mang `head_sha` của **commit cũ** — đối chiếu với `git rev-parse HEAD` trước khi kết luận.
+  - **Job `OCR review (góp ý)` không chặn merge nhưng vẫn là một check** — chờ nó xong như mọi check. Phát hiện mức cao/critical phải xác minh: lỗi thật → sửa trước khi merge; báo sai → trả lời thread nêu lý do. Bật bằng secret `OCR_LLM_URL`/`OCR_LLM_AUTH_TOKEN` + biến `OCR_LLM_MODEL` (chưa cấu hình thì job tự bỏ qua, xem ADR-0012).
   - Muốn auto-merge chạy thật đúng nghĩa thì phải bật **required status checks** cho `main` (Settings → Branches). Chừng nào chưa bật, quy ước là merge tay khi CI xanh như trên.
 - **Tiền tệ (M45 PR1):** parser oid 1700 (`lib/db/index.ts`) chuyển NUMERIC → `parseFloat` nên **cấm cộng/nhân tiền trên float JS**. Mọi tổng/tích tiền (`SUM`, `* rate`) làm **trong SQL**; JS chỉ hiển thị. Khi buộc phải tính tiếp ở JS (vd tỷ lệ VAT/tạm ứng/giữ lại), cast cột tiền `::text` trong SELECT rồi đưa qua `lib/nen/money.ts` (`parseMoney`/`addMoney`/`mulRate`/`formatVnd` — làm việc trên bigint đơn vị nhỏ = đồng×100).
 
