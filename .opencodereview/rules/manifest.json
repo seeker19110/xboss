@@ -1,0 +1,148 @@
+{
+  "$comment": "Nguồn sự thật của luật review OCR. Sửa file này hoặc các mảnh *.md cạnh nó rồi chạy `npm run gen:ocr-rules` để sinh lại .opencodereview/rule.json (KHÔNG sửa tay rule.json). OCR lấy luật KHỚP ĐẦU TIÊN theo thứ tự `rules` — mục cụ thể phải đứng trước mục rộng. `path` là glob doublestar, so khớp không phân biệt hoa thường, chỉ một cặp {a,b} và KHÔNG lồng nhau. Mảnh `_boi-canh.md` tự được chèn đầu mọi luật. Xem docs/adr/0012-review-ai-theo-luat-duong-dan.md.",
+  "include": ["tests/**/*.ts", "e2e/**/*.ts"],
+  "exclude": [
+    ".opencodereview/rule.json",
+    "package-lock.json",
+    "coverage-baseline.json",
+    "scripts/*allowlist*.json",
+    "attachments/**",
+    "data/**"
+  ],
+  "rules": [
+    {
+      "id": "tien-do",
+      "path": "{lib/tien-do/recompute.ts,lib/tien-do/status.ts}",
+      "fragments": ["tien-do", "chung-ts"]
+    },
+    {
+      "id": "nghiem-thu",
+      "path": "{app/api/tasks/*/approve/**,app/api/approvals/**}",
+      "fragments": ["nghiem-thu", "route-api"]
+    },
+    {
+      "id": "tick-tien-do",
+      "path": "{app/api/tasks/*/progress/**,app/api/tasks/*/dimensions/**,app/api/dimensions/**}",
+      "fragments": ["tick-tien-do", "route-api"]
+    },
+    {
+      "id": "phien-quyen",
+      "path": "{lib/bao-mat/auth.ts,lib/bao-mat/session-token.ts,lib/nen/roles.ts,proxy.ts}",
+      "fragments": ["phien-quyen", "bao-mat", "chung-ts"]
+    },
+    {
+      "id": "bao-mat-lib",
+      "path": "lib/bao-mat/**",
+      "fragments": ["bao-mat", "chung-ts"]
+    },
+    {
+      "id": "bao-mat-route",
+      "path": "app/api/auth/**",
+      "fragments": ["bao-mat", "route-api"]
+    },
+    {
+      "id": "dong-bo-sheet-lib",
+      "path": "{lib/vat-tu/material-sync.ts,lib/vat-tu/google-sheets.ts}",
+      "fragments": ["dong-bo-sheet", "chung-ts"]
+    },
+    {
+      "id": "dong-bo-sheet-route",
+      "path": "{app/api/materials/sync/**,app/api/cron/sync-sheets/**}",
+      "fragments": ["dong-bo-sheet", "cron", "route-api"]
+    },
+    {
+      "id": "boq-lib",
+      "path": "lib/khoi-luong/**",
+      "fragments": ["boq", "chung-ts"]
+    },
+    {
+      "id": "boq-route",
+      "path": "{app/api/boq/**,app/api/boq-norms/**,app/api/norms/**}",
+      "fragments": ["boq", "route-api"]
+    },
+    {
+      "id": "cron",
+      "path": "app/api/cron/**",
+      "fragments": ["cron", "route-api"]
+    },
+    {
+      "id": "tai-chinh-lib",
+      "path": "lib/tai-chinh/**",
+      "fragments": ["tai-chinh", "chung-ts"]
+    },
+    {
+      "id": "tai-chinh-route",
+      "path": "app/api/{advances,cash-transactions,claim-documents,claims,contract-documents,contracts,costs,finance,insurance-bonds,invoices,payment-certs,payments,payroll,proposals,purchase-orders,purchase-requests,suppliers,tenders,variations,vo-documents}/**",
+      "fragments": ["tai-chinh", "route-api"]
+    },
+    {
+      "id": "thong-bao-lib",
+      "path": "{lib/dich-vu/thong-bao.ts,lib/van-hanh/**}",
+      "fragments": ["thong-bao", "chung-ts"]
+    },
+    {
+      "id": "thong-bao-route",
+      "path": "{app/api/notifications/**,app/api/push/**}",
+      "fragments": ["thong-bao", "route-api"]
+    },
+    {
+      "id": "xuat-file",
+      "path": "app/api/**/{excel,export,pdf}/**",
+      "fragments": ["xuat-file", "route-api"]
+    },
+    {
+      "id": "route-api",
+      "path": "app/api/**",
+      "fragments": ["route-api"]
+    },
+    {
+      "id": "dich-vu",
+      "path": "lib/dich-vu/**",
+      "fragments": ["dich-vu", "chung-ts"]
+    },
+    {
+      "id": "lib",
+      "path": "lib/**",
+      "fragments": ["chung-ts"]
+    },
+    {
+      "id": "scripts",
+      "path": "scripts/**",
+      "fragments": ["chung-ts"],
+      "mergeSystemRule": true
+    },
+    {
+      "id": "migration",
+      "path": "migrations/**",
+      "fragments": ["migration"]
+    },
+    {
+      "id": "offline-pwa",
+      "path": "{public/sw.js,app/components/offlineQueue/**}",
+      "fragments": ["offline-pwa"],
+      "mergeSystemRule": true
+    },
+    {
+      "id": "giao-dien",
+      "path": "{app/**/*.tsx,app/**/*.ts,app/**/*.css}",
+      "fragments": ["giao-dien"],
+      "mergeSystemRule": true
+    },
+    {
+      "id": "test",
+      "path": "tests/**",
+      "fragments": ["test"]
+    },
+    {
+      "id": "e2e",
+      "path": "{e2e/**,playwright.config.ts}",
+      "fragments": ["e2e"]
+    },
+    {
+      "id": "workflow",
+      "path": ".github/workflows/**",
+      "fragments": ["workflow"],
+      "mergeSystemRule": true
+    }
+  ]
+}

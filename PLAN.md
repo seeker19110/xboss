@@ -1,59 +1,94 @@
-# PLAN.md — Đợt 2: xử lý 5 route còn lại + DROP bảng scan-to-bim (2026-09-23)
+# PLAN.md — Tích hợp OpenCodeReview (OCR): luật review XBoss theo đường dẫn (2026-10-01)
 
-**Cập nhật:** 2026-09-23 · **Nhánh làm việc:** `claude/amazing-dijkstra-la2kpd` (= `origin/main` `183ee430`, sau PR #526). **Trạng thái:** ĐÃ THI HÀNH 2026-09-23 (3 việc gộp vào nhánh làm việc).
-**Bối cảnh (worker không thấy hội thoại):** PR #526 đã nối UI cho baseline/tổ đội/mặt trận/engineering. Quét lại còn 5 route không UI nào gọi. Truy lịch sử git cho kết luận:
+**Cập nhật:** 2026-10-01 · **Nhánh tích hợp:** `claude/elegant-carson-8jv8kz` (= `origin/main` `03d504b` + 1 commit đặc tả của phiên chính). **Trạng thái:** CHỜ THI HÀNH.
 
-| Route                                                                 | Kết luận                                       | Bằng chứng                                                                                                                                                                   |
-| --------------------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PATCH /api/workpackages/:id/move` (đổi thứ tự nhóm)                  | **Hồi quy** → khôi phục UI                     | Refactor M52 PR5 `5e4db9cf` (#228) tách `page.tsx` giữ nút di chuyển task nhưng làm rơi nút di chuyển nhóm; `TrackingGrid` vẫn nhận prop `pkgIdx`/`pkgCount` không dùng tới. |
-| `PATCH /api/workpackages/:id/dimensions/column/move` (đổi thứ tự cột) | **Hồi quy** → khôi phục UI                     | `40ff7d4d` (2026-06-12, "căn cột nhóm thẳng hàng…") xoá hàm `moveColumn` cùng ngày nó được thêm ở `ef699b47`.                                                                |
-| `POST /api/workpackages/:id/tasks` (chèn task trống)                  | **Hồi quy** → khôi phục UI                     | Cùng `40ff7d4d`: `addTaskAfter` bị thay bằng `copyTask`; nay lưới chỉ thêm task được bằng cách sao chép.                                                                     |
-| `PATCH /api/construction-stages/:id` (đổi tên/ẩn/số ngày công tác)    | Chưa từng có UI → **thêm UI** ở `/work-fronts` | `/work-fronts` có nút "+" thêm công tác nhưng không sửa được.                                                                                                                |
-| `GET /api/dashboard/floors`                                           | **Đã bị thay thế** → xoá route                 | #61 (`9df21996`, 2026-07-03) chuyển `ProgressMap` sang `/api/timeline`.                                                                                                      |
+**Bối cảnh (worker không thấy hội thoại):** Người dùng yêu cầu nghiên cứu và tích hợp sâu [alibaba/open-code-review](https://github.com/alibaba/open-code-review) — CLI review code bằng AI (`ocr`, Go, Apache-2.0). Quyết định đã chốt với người dùng: **chạy cả trong Claude Code (chế độ delegation, không cần API key) lẫn CI (mỗi PR, CHỈ GÓP Ý, không chặn merge)**. Đọc **`docs/adr/0012-review-ai-theo-luat-duong-dan.md`** trước tiên — nó ghi đủ lý do, ngữ nghĩa OCR đã kiểm chứng và các quyết định.
 
-Thêm: bảng `engineering_scan_to_bim_runs` (migration 0104) — rà `app/ lib/ scripts/ tests/`: 0 tham chiếu → DROP bằng migration `0157` theo tiền lệ `0156`.
+Phiên chính đã viết xong (commit đặc tả trên nhánh tích hợp — KHÔNG sửa nội dung trừ khi brief nói):
+
+- `.opencodereview/rules/*.md` — các mảnh checklist (tiếng Việt) đúc từ `docs/audit.md` + `TRAPS.md`; `_boi-canh.md` là phần mở đầu chung.
+- `.opencodereview/rules/manifest.json` — `include`/`exclude` + danh sách `rules` **có thứ tự** `{ id, path, fragments[], mergeSystemRule? }`.
+- `docs/adr/0012-review-ai-theo-luat-duong-dan.md`.
+
+Ngữ nghĩa OCR (đã kiểm từ mã nguồn `internal/config/rules/system_rules.go` bản 1.12.11 — test phải giả lập ĐÚNG như vầy):
+
+- Duyệt `rules` theo thứ tự, **mục đầu tiên khớp thắng**. Bỏ qua mục có `rule` rỗng và không `merge_system_rule`.
+- Với mỗi `path`: `expandBraces` chỉ tách cặp `{...}` **đầu tiên** (tìm `{` đầu tiên, rồi `}` đầu tiên sau nó, tách nội dung theo `,` → `prefix + opt + suffix`); không có `{` thì giữ nguyên. Mỗi phương án so bằng doublestar `Match(lower(pattern), lower(path))` — `*` không qua `/`, `**` khớp 0..n thư mục.
+- `include`/`exclude` cũng so chữ thường như trên.
+- Định dạng `rule.json`: `{ "include": [...], "exclude": [...], "rules": [{ "path", "rule", "merge_system_rule"? }] }`.
+
+Đã chạy thử thật bằng `ocr rules check` (bản prototype) — bảng ánh xạ ở Việc A mục 4 là KẾT QUẢ THẬT, test phải tái hiện đúng.
 
 ## Ràng buộc CỨNG (mọi việc)
 
-- Đọc `CLAUDE.md` (Auth, ADR-0007, "Thiết kế giao diện (UI/UX)", Quy ước) trước khi code. Không đọc/sửa file `.env*`.
-- **Không đổi route/API/schema** (trừ Việc C xoá route và thêm migration). Không đổi `CAN`. Không chạm `lib/bao-mat/`, `lib/tien-do/recompute.ts`.
-- UI: dark-first, không `dark:`/hex, `zinc` + nhấn `-300/-400`, `aria-label` + `title` tiếng Việt cho nút icon. **Trong lưới tracking giữ đúng cỡ/phong cách nút icon hiện có của lưới** (lưới dày, các nút Lên/Xuống/Sao chép/Xoá đang là icon `w-3 h-3`) — không tự phóng to lưới. Ngoài lưới: nút ≥40px, hover nền đậm dần. Dùng `appConfirm`/`appPrompt`/`appAlert` (`app/components/dialogs.tsx`), `showToast` (`app/components/Toast.tsx`) — không dùng `window.confirm/prompt/alert`.
-- Fetch ghi phải bọc lỗi mạng (try/catch → `appAlert`/`showToast` lỗi) và hiện `error` server khi `!res.ok`.
-- Worker làm trong worktree được giao, commit, **không push**, không sửa `PROGRESS.md`. Commit message conventional + tiếng Việt, ghi `(đợt 2 dọn route việc X)`, kết thúc bằng 2 dòng:
-  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` và `Claude-Session: https://claude.ai/code/session_01XDnf2ZeuDMERGnK58GpSB9`.
-- **Cổng bắt buộc trước khi báo xong:** `npm run format:check` (worktree không chạy lint-staged — chạy `npx prettier --write <file đổi>` trước), `npm run lint`, `npm run typecheck`, `npm run check:contrast`, `npm run check:mau-accent`, `npm run check:hex-hardcode`; việc xoá file thêm `check:dead-code`, `check:dead-routes`, `check:route-perms`, `check:project-scope`; việc migration thêm `check:migrations`.
-- Test chạm DB: `TEST_DATABASE_URL=postgres://ci:ci@127.0.0.1:5432/xboss_test node --experimental-test-module-mocks --import=./node_modules/tsx/dist/loader.mjs --test tests/<file>.test.ts` (cần cờ mock-module).
+- Đọc `CLAUDE.md` (Quy ước, Definition of Done) + ADR-0012 trước khi code. Không đọc/sửa file `.env*`.
+- Không chạm `app/`, `lib/`, `migrations/` (việc này chỉ là hạ tầng review). Không sửa nội dung mảnh luật `.opencodereview/rules/*.md`/`manifest.json` — thấy sai/thiếu thì **dừng và báo**, không tự chế.
+- Phiên bản OCR ghim: **`1.12.11`**; action ghim SHA **`a758d9cbfb689937c7857ad64b2dd66adb58c0c2`** (commit của tag `v1.12.11`).
+- Worker làm trong worktree được giao, commit, **không push**, không sửa `PROGRESS.md`. Commit message conventional + tiếng Việt, kết thúc bằng 2 dòng:
+  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` và `Claude-Session: https://claude.ai/code/session_0161WZaHT8JNxeGRaPJhiLz4`.
+- **Cổng bắt buộc trước khi báo xong:** `npx prettier --write <file đổi>` rồi `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm run check:dead-code`, và test của việc (`npx tsx --test tests/ocr-rules.test.ts`). Không cần DB.
 
-## Việc A — Khôi phục 3 thao tác cấu trúc trong lưới tracking — `route: standard`
+## Việc A — Bộ sinh `rule.json` + test canh luật + script `ocr` — `route: standard`
 
-File: `app/tracking/[sheet]/TrackingGrid.tsx` (và `app/tracking/[sheet]/page.tsx` nếu cần truyền callback). Chỉ hiện khi `ce` (= `canEdit && editMode`, Admin/PM ở chế độ sửa).
+1. **`scripts/lib/ocr-rules.ts`** (thuần, không I/O ngoài tham số; bám phong cách các file trong `scripts/lib/`, comment tiếng Việt ngắn nói _vì sao_). Export:
+   - type `OcrManifestRule = { id: string; path: string; fragments: string[]; mergeSystemRule?: boolean }`, `OcrManifest = { include: string[]; exclude: string[]; rules: OcrManifestRule[] }` (bỏ qua khoá `$comment`).
+   - `buildOcrRuleFile(manifest, readFragment: (name: string) => string)`: mỗi mục → `{ path, rule, merge_system_rule: true chỉ khi mergeSystemRule }`; `rule` = `[readFragment("_boi-canh"), ...fragments.map(readFragment)].map(s => s.trim()).join("\n\n---\n\n")`. Trả `{ include, exclude, rules }` đúng thứ tự khoá đó.
+   - `serializeOcrRuleFile(file)` = `JSON.stringify(file, null, 2) + "\n"`.
+   - `expandFirstBrace(pattern): string[]` — đúng ngữ nghĩa `expandBraces` mô tả ở trên.
+   - `matchesOcrGlob(pattern, filePath): boolean` — `expandFirstBrace(pattern).some(p => path.matchesGlob(filePath.toLowerCase(), p.toLowerCase()))` (`node:path`, Node ≥22; CI dùng Node 24).
+   - `resolveRuleId(manifest, filePath): string | null` — id mục đầu tiên khớp.
+2. **`scripts/gen-ocr-rules.ts`** — đọc `.opencodereview/rules/manifest.json` + `.opencodereview/rules/<tên>.md`, ghi `.opencodereview/rule.json` bằng 2 hàm trên; mảnh không tồn tại → throw rõ tên mảnh. In 1 dòng tóm tắt (số mục). Header comment theo mẫu `scripts/check-*.ts` (vì sao cần, cách chạy).
+3. **`package.json`** scripts (đặt cạnh `gen:erd`): `"gen:ocr-rules": "tsx scripts/gen-ocr-rules.ts"` và `"ocr": "npx --yes @alibaba-group/open-code-review@1.12.11"`. **`.prettierignore`**: thêm `.opencodereview/rule.json` kèm comment kiểu dòng `docs/ERD.md` ("sinh tự động bằng npm run gen:ocr-rules — test so khớp, không để prettier canh lại"). Chạy `npm run gen:ocr-rules` và commit `.opencodereview/rule.json` sinh ra.
+4. **`tests/ocr-rules.test.ts`** (`node:test` + `node:assert/strict`, không chạm DB → KHÔNG import `./setup`; đọc file theo đường dẫn từ gốc repo như các test khác). Các ca, thông điệp assert tiếng Việt chỉ rõ cách sửa:
+   - `rule.json` trên đĩa **bằng đúng** `serializeOcrRuleFile(buildOcrRuleFile(...))` — lệch thì báo "chạy npm run gen:ocr-rules".
+   - Mọi mảnh được tham chiếu tồn tại; mọi `*.md` trong `.opencodereview/rules/` (trừ `_boi-canh.md`) được ít nhất 1 mục dùng; `id` không trùng; không `path` nào có brace lồng (sau `{` đầu tiên không có `{` nào trước `}` tương ứng) và không có quá 1 cặp `{}`.
+   - Bảng ánh xạ (đường dẫn → id) — **mỗi đường dẫn phải tồn tại trên đĩa** (`fs.existsSync`) và `resolveRuleId` trả đúng id:
+     `lib/tien-do/recompute.ts`→`tien-do`; `lib/tien-do/status.ts`→`tien-do`; `app/api/tasks/[id]/approve/route.ts`→`nghiem-thu`; `app/api/approvals/route.ts`→`nghiem-thu`; `app/api/tasks/[id]/progress/route.ts`→`tick-tien-do`; `app/api/tasks/[id]/dimensions/route.ts`→`tick-tien-do`; `app/api/dimensions/[id]/route.ts`→`tick-tien-do`; `lib/bao-mat/auth.ts`→`phien-quyen`; `lib/bao-mat/session-token.ts`→`phien-quyen`; `lib/nen/roles.ts`→`phien-quyen`; `proxy.ts`→`phien-quyen`; `lib/bao-mat/ratelimit.ts`→`bao-mat-lib`; `app/api/auth/login/route.ts`→`bao-mat-route`; `lib/vat-tu/material-sync.ts`→`dong-bo-sheet-lib`; `app/api/materials/sync/route.ts`→`dong-bo-sheet-route`; `app/api/cron/sync-sheets/route.ts`→`dong-bo-sheet-route`; `lib/khoi-luong/boq.ts`→`boq-lib`; `app/api/boq/export/route.ts`→`boq-route`; `app/api/cron/daily-report/route.ts`→`cron`; `lib/tai-chinh/contracts.ts`→`tai-chinh-lib`; `app/api/payment-certs/[id]/excel/route.ts`→`tai-chinh-route`; `app/api/costs/route.ts`→`tai-chinh-route`; `lib/dich-vu/thong-bao.ts`→`thong-bao-lib`; `lib/van-hanh/push.ts`→`thong-bao-lib`; `app/api/notifications/route.ts`→`thong-bao-route`; `app/api/export/excel/route.ts`→`xuat-file`; `app/api/admin/audit-log/export/route.ts`→`xuat-file`; `app/api/dashboard/route.ts`→`route-api`; `app/api/v1/tasks/route.ts`→`route-api`; `lib/db/index.ts`→`lib`; `scripts/check-db-params.ts`→`scripts`; `migrations/0001_baseline.sql`→`migration`; `public/sw.js`→`offline-pwa`; `app/components/offlineQueue/index.ts`→`offline-pwa`; `app/tracking/[sheet]/TrackingGrid.tsx`→`giao-dien`; `app/globals.css`→`giao-dien`; `tests/recompute.test.ts`→`test`; `e2e/authed/approvals.spec.ts`→`e2e`; `.github/workflows/ci.yml`→`workflow`. Thêm 1 ca cho một file bất kỳ trong `lib/dich-vu/` khác `thong-bao.ts` (chọn file có thật) →`dich-vu`.
+   - Tiền tố tĩnh còn tồn tại: với mỗi phương án sau `expandFirstBrace`, lấy phần trước ký tự glob đầu tiên (`*?[{`) cắt tới `/` cuối — đường dẫn đó phải tồn tại; phương án không có ký tự glob thì file phải tồn tại (bắt việc đổi tên/xoá thư mục mà quên luật).
+   - `include` khớp `tests/recompute.test.ts` và `e2e/authed/approvals.spec.ts`; `exclude` khớp `.opencodereview/rule.json` và `package-lock.json`.
+   - Viết sẵn hàm đọc `package.json` lấy phiên bản trong script `ocr` (regex `@alibaba-group/open-code-review@(\d+\.\d+\.\d+)`) và assert là `1.12.11`-dạng semver hợp lệ — Việc B sẽ thêm ca đối chiếu với workflow.
+5. Commit: `ci(review): sinh .opencodereview/rule.json từ mảnh luật + test canh luật OCR theo đường dẫn`.
 
-1. **Đổi thứ tự nhóm** — ở cụm nút tiêu đề nhóm (cạnh "Sao chép nhóm này"/"Xoá nhóm này", ~dòng 1240), thêm 2 nút `ChevronUp`/`ChevronDown` cùng cỡ (`w-[17px] h-[17px]`, `p-0.5 text-zinc-500 hover:text-zinc-200`), `title`/`aria-label` "Chuyển nhóm lên"/"Chuyển nhóm xuống"; disable khi `pkgIdx === 0` / `pkgIdx === pkgCount - 1` (dùng prop sẵn có). Gọi `PATCH /api/workpackages/${pkg.id}/move` body `{ direction: "up" | "down" }` rồi `onChanged()` (trang tải lại danh sách nhóm). Route hoán `sort_order` với nhóm liền kề **trong cùng sheet** (Admin/PM = `CAN.editStructure`).
-2. **Đổi thứ tự cột dimension** — ở header mỗi cột (khối `visibleColumns.map`, ~dòng 1311, cạnh nút xoá cột), thêm 2 nút `ChevronLeft`/`ChevronRight` cùng kiểu nút xoá cột (`w-3 h-3`, hiện khi hover trên desktop như nút xoá, luôn hiện trên mobile), `title` "Chuyển cột sang trái/phải"; disable ở cột đầu/cuối của `grid.columns`. Gọi `PATCH /api/workpackages/${pkg.id}/dimensions/column/move` body `{ label: col, direction: "left" | "right" }` rồi `load()` và `onChanged()` (thứ tự cột dùng chung cho cả sheet qua `onColsLoaded`). Đọc route để xác nhận nó đổi cho mọi task của nhóm.
-3. **Chèn task trống** — (a) ở menu dòng task (cạnh Lên/Xuống/Sao chép/Xoá, ~dòng 1705) thêm nút `Plus` "Chèn task trống bên dưới"; (b) ở hàng tiêu đề nhóm hoặc cuối bảng nhóm thêm nút "Thêm task vào cuối nhóm" (icon `ListPlus` hoặc `Plus`, cùng cỡ nút nhóm). Cả hai: `appPrompt("Mã task mới (vd A1,10):")` → `appPrompt("Tên task:")` → (tuỳ chọn) `appPrompt("Mã BOQ (bỏ trống nếu không có):")` → `POST /api/workpackages/${pkg.id}/tasks` body `{ code, name, boqCode?, afterId? }` (`afterId` = id task hiện tại cho (a), bỏ trống cho (b)). Đọc route để biết mã lỗi (409 trùng mã/BOQ, 422) và hiện `error` server bằng `appAlert`. Thành công → `load()` + `onChanged()`. Nếu nhóm đang thu gọn thì mở nhóm (`onToggle`) sau khi thêm vào cuối — chỉ khi làm được mà không đổi props; không thì bỏ qua.
+Tiêu chí: test mới xanh; `npm run gen:ocr-rules` chạy 2 lần liên tiếp không đổi file; các cổng ở Ràng buộc xanh.
 
-Tiêu chí: 3 nhóm nút hiện đúng quyền/chế độ; typecheck/lint/format xanh; test route sẵn có xanh: `tests/route-workpackages-cach-ly.test.ts`, `tests/route-wbs-con-lai.test.ts`, `tests/route-tien-do-3.test.ts`. e2e `e2e/authed/tracking*.spec.ts` không được đổi — đọc để chắc không va selector (vd không thêm nút trùng `title` "Lên"/"Xuống" của task).
-Commit: `fix(tracking): khôi phục đổi thứ tự nhóm/cột và chèn task trống trong lưới (đợt 2 dọn route việc A)`.
+## Việc B — Workflow CI `ocr-review.yml` (chỉ góp ý) — `route: standard` — chạy SAU khi Việc A đã gộp
 
-## Việc B — Sửa/ẩn công tác thi công ở `/work-fronts` — `route: standard`
+Tạo **`.github/workflows/ocr-review.yml`**, comment đầu file tiếng Việt giải thích: review AI theo luật `.opencodereview/` (ADR-0012), chỉ góp ý, tự bỏ qua khi chưa cấu hình secret, action đọc luật từ nhánh base. Bám phong cách `pr-policy.yml`/`ci.yml` (pin SHA đầy đủ kèm `# vX`, `permissions` tường minh).
 
-File: `app/work-fronts/page.tsx`. Route có sẵn `PATCH /api/construction-stages/:id` body `{ name?, active?, durationDays? }` (Admin/PM = `CAN.editStructure`; công tác dùng chung `project_id NULL` chỉ Admin sửa được — route trả lỗi, hiện đúng `error`). Danh sách lấy từ `/api/floor-stage-fronts` chỉ gồm công tác `active = TRUE`.
+- `on: pull_request` types `[opened, synchronize, reopened, ready_for_review]`. **Không** dùng `pull_request_target`.
+- `permissions:` mức workflow `contents: read`; job khai `contents: read` + `pull-requests: write`.
+- `concurrency: { group: ocr-review-${{ github.event.pull_request.number }}, cancel-in-progress: true }`.
+- Job `ocr-review`, `name: OCR review (góp ý)`, `runs-on: ubuntu-latest`, `timeout-minutes: 30`, `if: github.event.pull_request.draft == false && github.event.pull_request.user.login != 'dependabot[bot]'`.
+- Bước 1 `id: cfg` "Kiểm cấu hình LLM": env `OCR_URL: ${{ secrets.OCR_LLM_URL }}`, `OCR_TOKEN: ${{ secrets.OCR_LLM_AUTH_TOKEN }}`, `OCR_MODEL: ${{ vars.OCR_LLM_MODEL }}`; đủ cả 3 → `enabled=true` vào `$GITHUB_OUTPUT`; thiếu → `enabled=false` + `::notice title=OCR review bỏ qua::...` nêu tên secret/biến cần thêm và trỏ ADR-0012.
+- Bước 2 `id: ocr`, `if: steps.cfg.outputs.enabled == 'true'`, `continue-on-error: true` (kèm comment: job chỉ góp ý — ngoại lệ có chủ đích so với audit §6), `uses: alibaba/open-code-review@a758d9cbfb689937c7857ad64b2dd66adb58c0c2 # v1.12.11`, `with:`
+  `llm_url: ${{ secrets.OCR_LLM_URL }}`, `llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}`, `llm_model: ${{ vars.OCR_LLM_MODEL }}`, `llm_use_anthropic: ${{ vars.OCR_LLM_USE_ANTHROPIC || 'true' }}`, `ocr_version: "1.12.11"`, `language: Vietnamese`, `effort: ${{ vars.OCR_EFFORT || 'medium' }}`, `max_tokens_budget: ${{ vars.OCR_MAX_TOKENS_BUDGET || '3000000' }}`, `review_concurrency: "4"`, `sticky_summary: "true"`, `incremental: "true"`, `checkpoint_range: "true"`, `route_severity_below: low`, `route_categories: style,documentation`, `upload_artifacts: "true"`, `stream_progress: "true"`, và `background` dạng block `|` gồm dòng `PR: ${{ github.event.pull_request.title }}`, dòng trống, `${{ github.event.pull_request.body }}` (an toàn: action truyền qua env, không nội suy vào shell của ta). Action tự checkout base + fetch head — **không** thêm bước checkout.
+- Bước 3 `if: steps.ocr.outcome == 'failure'`: `::warning title=OCR review lỗi::...` + ghi 1 dòng vào `$GITHUB_STEP_SUMMARY` (job vẫn xanh).
+- **Test:** thêm vào `tests/ocr-rules.test.ts` ca "phiên bản OCR ghim khớp nhau": phiên bản trong script `ocr` của `package.json` = `ocr_version` trong workflow = phiên bản trong comment `# vX` sau `uses: alibaba/open-code-review@<40 hex>`; SHA đúng 40 ký tự hex.
+- Kiểm cú pháp YAML bằng `node -e` + gói có sẵn trong repo nếu có (vd `yaml`/`js-yaml` trong `node_modules`), không có thì `python3 -c "import yaml"`; báo lại đã kiểm bằng gì.
+- Commit: `ci(review): workflow OCR review mỗi PR bằng luật XBoss — chỉ góp ý, tự bỏ qua khi chưa có secret`.
 
-- Header mỗi cột công tác (`stages.map`, `<th>`): khi `canManage`, bấm tên cột mở menu nhỏ hoặc hiện nút `Pencil` cạnh tên (`aria-label` "Sửa công tác <tên>") → `Modal` (dialogs.tsx) với: tên (bắt buộc), số ngày thi công (số nguyên dương), nút "Lưu" (PATCH `{ name, durationDays }`), nút "Ẩn công tác" màu rose (appConfirm "Ẩn công tác '<tên>' khỏi ma trận? Dữ liệu mặt trận đã ghi vẫn giữ trong hệ thống." → PATCH `{ active: false }`). Thành công → `refresh()` + `showToast`.
-- Header phải giữ dạng bảng hiện có, nút ≥40px vùng chạm trong modal; không làm vỡ e2e `e2e/authed/work-fronts.spec.ts` (đọc spec: columnheader name "Trắc đạc", "Xây dựng (Tô Trám)" — tên accessible của `<th>` **không được đổi**: đặt nút sửa ngoài text node hoặc dùng `aria-label` riêng cho nút; kiểm lại bằng cách đọc cấu trúc).
+Tiêu chí: YAML hợp lệ; mọi `uses:` pin SHA 40 ký tự; test xanh; cổng ở Ràng buộc xanh.
 
-Tiêu chí: typecheck/lint/format/check UI xanh; `tests/route-tien-do-3.test.ts` xanh.
-Commit: `feat(mat-bang): sửa tên/số ngày và ẩn công tác thi công ở /work-fronts (đợt 2 dọn route việc B)`.
+## Việc C — Tích hợp vào quy trình Claude Code + tài liệu — `route: standard` — song song với A
 
-## Việc C — Xoá `GET /api/dashboard/floors` + migration 0157 DROP `engineering_scan_to_bim_runs` — `route: mechanical`
+1. **Mới `.claude/commands/ocr-review.md`** (frontmatter `description:` tiếng Việt, bám kiểu `.claude/commands/review.md`). Quy trình delegation đã điều chỉnh cho XBoss:
+   - Bước 1 phạm vi: mặc định `git fetch origin main` rồi `npm run -s ocr -- delegate preview --from origin/main --to HEAD`; người dùng chỉ định `--commit`/`--from --to`/workspace thì truyền nguyên. Có thể thêm `-b "<bối cảnh yêu cầu>"`.
+   - Bước 2: `npm run -s ocr -- delegate rule <các file reviewable>` → nhóm luật. Mỗi nhóm là checklist bắt buộc cho đúng các file đó.
+   - Bước 3: diff từng file theo mode (range: `git diff <merge_base>..<to> -- <file>`; commit: `git show <hash> -- <file>`; workspace: `git diff HEAD -- <file>`, file mới chưa track thì đọc thẳng). Review **chỉ dòng thay đổi**, đối chiếu từng mục checklist, đọc code xung quanh/route anh em để xác nhận (nguyên tắc ground-truth của `docs/audit.md` §1).
+   - Bước 4 báo cáo tiếng Việt: chỉ mức **Cao** và **Trung bình**, mỗi phát hiện có `file:dòng`, kịch bản cụ thể, mục luật bị vi phạm (tên mảnh, vd `tai-chinh`); mức Thấp bỏ im lặng. Lỗi logic → đề xuất test hồi quy.
+   - **Không tự sửa** mặc định (khác lệnh gốc của OCR); chỉ sửa khi người dùng truyền `--fix` — khi đó sửa mức Cao an toàn, rõ ràng rồi chạy lại lint/typecheck/test liên quan.
+   - Dự phòng khi `npm run ocr` không chạy được (mất mạng): đọc `.opencodereview/rules/manifest.json`, tự chọn mục khớp đầu tiên theo thứ tự cho từng file và đọc các mảnh tương ứng — ghi rõ trong báo cáo là đã dùng dự phòng.
+2. **Sửa `.claude/commands/review.md`**: Bước 2 thành hai lượt bổ sung nhau — (a) lượt luật XBoss theo đường dẫn qua quy trình `/ocr-review` (delegation), (b) `Skill(code-review)` như cũ; gộp phát hiện trùng. Giữ nguyên các bước/ranh giới khác.
+3. **Sửa `.claude/agents/reviewer.md`**: trước khi gọi skill `code-review`, chạy `npm run -s ocr -- delegate preview --from origin/main --to HEAD` + `delegate rule` và soát diff theo từng nhóm luật; báo cáo cuối vẫn qua ReportFindings, ghi mục luật vào `summary`. Thêm `npm run -s ocr *` nếu cần vào phần mô tả công cụ (agent đã có Bash).
+4. **`CLAUDE.md`** (giữ văn phong, thay đổi tối thiểu):
+   - "Tài liệu dự án & khung": thêm bullet `.opencodereview/` — checklist `docs/audit.md`/`TRAPS.md` đúc thành luật review máy đọc theo đường dẫn (ADR-0012), dùng bởi `/ocr-review`, `/review`, agent `reviewer` và CI; **sửa checklist audit thì sửa mảnh tương ứng + `npm run gen:ocr-rules`**.
+   - "Lệnh thường dùng": thêm `npm run gen:ocr-rules` và `npm run -s ocr -- delegate preview --from origin/main --to HEAD` (kèm comment ngắn).
+   - "Quy ước" (cạnh mục merge khi CI xanh): job `OCR review (góp ý)` không chặn merge nhưng là một check — chờ nó xong như mọi check; phát hiện mức cao/critical phải xác minh: lỗi thật → sửa trước khi merge, báo sai → trả lời thread nêu lý do. Bật bằng secret `OCR_LLM_URL`/`OCR_LLM_AUTH_TOKEN` + biến `OCR_LLM_MODEL` (ADR-0012).
+5. **`docs/audit.md`**: cuối §8 thêm 1 đoạn: luật review máy đọc của các vùng trên nằm ở `.opencodereview/rules/` (ADR-0012) — đổi checklist §3–§7 thì đồng bộ mảnh luật; `tests/ocr-rules.test.ts` canh mỗi vùng giải đúng mục luật.
+6. Commit: `docs(review): lệnh /ocr-review + nối OCR delegation vào /review, agent reviewer, CLAUDE.md, docs/audit.md`.
 
-1. Xoá thư mục `app/api/dashboard/floors/`. Xoá các ca test của route này trong `tests/route-ho-so-bot.test.ts` (dòng liệt kê ở header ~31, comment ~1673 bỏ `/api/dashboard/floors` khỏi danh sách, các `test("GET /api/dashboard/floors…")` ~1735–1760). Grep toàn repo (`app lib scripts tests e2e docs .github`) `dashboard/floors` — sửa chỗ nào còn liệt kê như route sống trong `docs/` hiện hành (không sửa `PROGRESS.md`, không sửa migrations). Cổng xoá file ở trên phải xanh; test `tests/route-ho-so-bot.test.ts` xanh.
-2. Mới `migrations/0157_drop_orphaned_scan_to_bim_runs.sql` — header bám **đúng phong cách** `migrations/0156_drop_orphaned_closed_loop_sync_logs.sql` (lý do: module scan-to-bim/CAD-BIM gỡ khỏi sản phẩm ở #476 và các đợt sau; rà app/lib/scripts/tests/e2e 0 tham chiếu; không bảng nào REFERENCES — xác nhận bằng grep `REFERENCES engineering_scan_to_bim_runs` trong migrations; ⚠️ ĐỤNG DỮ LIỆU phải qua staging + `npm run db:migrate -- --dry-run`). Thân: `DROP TABLE IF EXISTS engineering_scan_to_bim_runs CASCADE;`.
-3. Sinh lại `docs/ERD.md` bằng công cụ: `psql -h 127.0.0.1 -U ci -d postgres -c "DROP DATABASE IF EXISTS xboss_erd" -c "CREATE DATABASE xboss_erd"`, rồi `DATABASE_URL=postgres://ci:ci@127.0.0.1:5432/xboss_erd npm run db:migrate` và `DATABASE_URL=postgres://ci:ci@127.0.0.1:5432/xboss_erd npm run gen:erd`. Diff ERD phải **chỉ** mất block `### engineering_scan_to_bim_runs`; khác → dừng, báo.
-4. `tests/rls.test.ts`, `tests/migrate.test.ts` xanh (nếu `rls.test.ts` liệt kê bảng này thì gỡ khỏi danh sách như tiền lệ 0155).
-
-Commit: `chore: xoá route /api/dashboard/floors đã bị /api/timeline thay thế + migration 0157 DROP engineering_scan_to_bim_runs (đợt 2 dọn route việc C)`.
+Tiêu chí: `npm run format:check` xanh; lệnh trong tài liệu khớp đúng tên script của Việc A (`gen:ocr-rules`, `ocr`); không đổi hành vi nào ngoài phạm vi trên.
 
 ## Thứ tự
 
-Song song A ∥ B ∥ C trên 3 worktree từ `origin/main`. Mỗi việc qua `reviewer`. Gộp C → B → A. Sau gộp: cổng đầy đủ + `npm test -- --release-gate` + `npm run build`, cập nhật `PROGRESS.md`, PR, merge khi CI xanh.
+A ∥ C trên 2 worktree từ nhánh tích hợp `claude/elegant-carson-8jv8kz`; B bắt đầu từ nhánh tích hợp **sau khi gộp A**. Mỗi việc qua `reviewer`. Gộp A → C → B vào nhánh tích hợp (không push). Sau gộp chạy: `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm run check:dead-code`, `npx tsx --test tests/ocr-rules.test.ts`, `npm test`, `npm run build`. Báo cáo về phiên chính (phiên chính cập nhật `PROGRESS.md`, kiểm thật bằng `ocr`, push, mở PR).
