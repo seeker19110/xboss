@@ -1,0 +1,83 @@
+# Review AI mỗi PR bằng bộ luật theo đường dẫn của XBoss (`.opencodereview/`, ADR-0012).
+#
+# - CHỈ GÓP Ý: comment inline + tóm tắt tiếng Việt trên PR, KHÔNG chặn merge (review LLM không
+#   tất định; phát hiện xử lý như bot review khác — xác minh rồi sửa hoặc trả lời lý do).
+# - Tự bỏ qua (job vẫn xanh) khi chưa cấu hình secret/biến LLM — xem bước "Kiểm cấu hình LLM".
+# - Action checkout nhánh BASE (đáng tin) rồi fetch head của PR, nên luật dùng để review là luật
+#   trên `main`: PR không tự nới luật của chính nó được. Vì vậy workflow KHÔNG có bước checkout
+#   và KHÔNG dùng `pull_request_target`.
+name: OCR review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# Least-privilege ở mức workflow; job tự khai thêm quyền ghi comment.
+permissions:
+  contents: read
+
+# Push mới vào cùng PR thì huỷ lượt review cũ — chỉ lượt mới nhất có giá trị.
+concurrency:
+  group: ocr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ocr-review:
+    name: OCR review (góp ý)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Bỏ qua PR nháp (đang sửa dở là nhiễu) và PR Dependabot (chỉ nâng dependency).
+    if: github.event.pull_request.draft == false && github.event.pull_request.user.login != 'dependabot[bot]'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Kiểm cấu hình LLM
+        id: cfg
+        env:
+          OCR_URL: ${{ secrets.OCR_LLM_URL }}
+          OCR_TOKEN: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
+          OCR_MODEL: ${{ vars.OCR_LLM_MODEL }}
+        run: |
+          if [ -n "$OCR_URL" ] && [ -n "$OCR_TOKEN" ] && [ -n "$OCR_MODEL" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=OCR review bỏ qua::Chưa đủ cấu hình LLM. Thêm secret OCR_LLM_URL, secret OCR_LLM_AUTH_TOKEN và biến OCR_LLM_MODEL trong Settings -> Secrets and variables -> Actions (xem docs/adr/0012-review-ai-theo-luat-duong-dan.md)."
+          fi
+
+      # Job chỉ góp ý: lỗi của bước này KHÔNG được làm đỏ PR — ngoại lệ có chủ đích so với
+      # nguyên tắc "không nuốt lỗi" ở docs/audit.md §6 (lỗi được báo ở bước kế bên).
+      - name: OCR review
+        id: ocr
+        if: steps.cfg.outputs.enabled == 'true'
+        continue-on-error: true
+        uses: alibaba/open-code-review@a758d9cbfb689937c7857ad64b2dd66adb58c0c2 # v1.12.11
+        with:
+          llm_url: ${{ secrets.OCR_LLM_URL }}
+          llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
+          llm_model: ${{ vars.OCR_LLM_MODEL }}
+          llm_use_anthropic: ${{ vars.OCR_LLM_USE_ANTHROPIC || 'true' }}
+          ocr_version: "1.12.11"
+          language: Vietnamese
+          effort: ${{ vars.OCR_EFFORT || 'medium' }}
+          max_tokens_budget: ${{ vars.OCR_MAX_TOKENS_BUDGET || '3000000' }}
+          review_concurrency: "4"
+          sticky_summary: "true"
+          incremental: "true"
+          checkpoint_range: "true"
+          route_severity_below: low
+          route_categories: style,documentation
+          upload_artifacts: "true"
+          stream_progress: "true"
+          # Action truyền `background` qua biến môi trường nên nội dung PR không bị nội suy vào shell.
+          background: |
+            PR: ${{ github.event.pull_request.title }}
+
+            ${{ github.event.pull_request.body }}
+
+      - name: Báo lỗi OCR (không chặn PR)
+        if: steps.ocr.outcome == 'failure'
+        run: |
+          echo "::warning title=OCR review lỗi::Lượt OCR review thất bại (xem log bước 'OCR review'). Job chỉ góp ý nên PR không bị chặn."
+          echo "OCR review lỗi ở lượt này — xem log bước 'OCR review'. Không chặn PR." >> "$GITHUB_STEP_SUMMARY"

@@ -191,3 +191,26 @@ test("script ocr ghim phiên bản semver hợp lệ", () => {
     'Script "ocr" trong package.json phải ghim @alibaba-group/open-code-review@<major.minor.patch>.',
   );
 });
+
+test("phiên bản OCR ghim khớp nhau: package.json = ocr_version workflow = comment # vX", () => {
+  const wf = fs.readFileSync(path.join(ROOT, ".github", "workflows", "ocr-review.yml"), "utf8");
+  const dong = /uses:\s*alibaba\/open-code-review@([0-9a-f]+)\s*#\s*v(\d+\.\d+\.\d+)/.exec(wf);
+  assert.ok(
+    dong,
+    "Workflow ocr-review.yml phải có `uses: alibaba/open-code-review@<sha> # vX.Y.Z`.",
+  );
+  assert.match(dong[1], /^[0-9a-f]{40}$/, "Action phải pin SHA đầy đủ 40 ký tự hex.");
+  const ocrVersion = /ocr_version:\s*"(\d+\.\d+\.\d+)"/.exec(wf);
+  assert.ok(ocrVersion, 'Workflow phải khai `ocr_version: "X.Y.Z"`.');
+  const pkg = layPhienBanOcr();
+  assert.equal(
+    ocrVersion[1],
+    pkg,
+    "ocr_version trong workflow lệch phiên bản script `ocr` ở package.json.",
+  );
+  assert.equal(
+    dong[2],
+    pkg,
+    "Comment `# vX` sau SHA action lệch phiên bản script `ocr` ở package.json.",
+  );
+});
