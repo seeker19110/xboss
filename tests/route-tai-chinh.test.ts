@@ -197,7 +197,7 @@ test(
 );
 
 test(
-  "POST rồi GET /api/payment-certs: PM lập được đợt 1 rồi đợt 2, period_no tăng dần",
+  "POST rồi GET /api/payment-certs: PM lập được đợt 1, quyết định xong mới lập đợt 2, period_no tăng dần",
   S,
   async () => {
     const projectId = await taoDuAn("2dot");
@@ -212,6 +212,19 @@ test(
     const j1 = await dot1.json();
     assert.match(j1.code, /^IPC-/);
 
+    // Đợt 1 còn nháp → chưa lập được đợt 2 (audit 2026-10-01, xem ca chống trả trùng bên dưới).
+    const chan = await POST(jreq("/api/payment-certs", { contractId }));
+    assert.equal(chan.status, 409);
+    assert.match((await chan.json()).error, new RegExp(`${j1.code}.*nháp`));
+
+    // Từ chối đợt 1 (trình → quyết định) thì lập tiếp được.
+    const { POST: TRINH } = await import("@/app/api/payment-certs/[id]/submit/route");
+    const { POST: QUYET } = await import("@/app/api/payment-certs/[id]/decide/route");
+    const p1 = { params: Promise.resolve({ id: String(j1.id) }) };
+    assert.equal((await TRINH(jreq("/x"), p1)).status, 200);
+    const tuChoi = await QUYET(jreq("/x", { decision: "rejected", rejectReason: "Sai KL" }), p1);
+    assert.equal(tuChoi.status, 200);
+
     const dot2 = await POST(jreq("/api/payment-certs", { contractId }));
     assert.equal(dot2.status, 201);
 
@@ -220,6 +233,94 @@ test(
     const { certs } = await ds.json();
     assert.equal(certs.length, 2);
     assert.deepEqual(certs.map((c: { periodNo: number }) => c.periodNo).sort(), [1, 2]);
+  },
+);
+
+test(
+  "POST /api/payment-certs: không lập được đợt mới khi đợt trước còn chờ duyệt — tổng thanh toán không vượt KL đã thi công",
+  S,
+  async () => {
+    // Audit 2026-10-01 (F5): KL gợi ý + luỹ kế của đợt mới tính từ đợt ĐÃ DUYỆT gần nhất. Trước
+    // đây lập được đợt 3 khi đợt 2 còn "đã trình" → đợt 3 gợi ý 60−30 = 30 (đáng ra 10), duyệt cả
+    // hai thì tổng bill 80 trên 60 KL đã thi công. Nay đợt 3 bị chặn tới khi đợt 2 được quyết định.
+    const { insertId, run, query } = await import("@/lib/db");
+    const projectId = await taoDuAn("tratrung");
+    const pm = await taoUser("pm", "tratrung");
+    const contractId = await taoHopDong(projectId, "tratrung");
+    const boqId = await taoBoqItem(contractId, "tratrung", { qtyContract: 100, unitPrice: 1000 });
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'T')`,
+      projectId,
+    );
+    const sheetId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, ?, 'S')`,
+      towerId,
+      uniq("TT"),
+    );
+    const pkgId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'P', 'P')`,
+      sheetId,
+    );
+    const taskId = await insertId(
+      `INSERT INTO tasks (package_id, code, name, progress_percent) VALUES (?, 'T', 'T', 0.3)`,
+      pkgId,
+    );
+    await run(
+      `INSERT INTO boq_task_map (boq_item_id, task_id, weight) VALUES (?, ?, 1)`,
+      boqId,
+      taskId,
+    );
+    await dangNhapDuAn(pm, projectId);
+
+    const { POST } = await import("@/app/api/payment-certs/route");
+    const { POST: TRINH } = await import("@/app/api/payment-certs/[id]/submit/route");
+    const { POST: QUYET } = await import("@/app/api/payment-certs/[id]/decide/route");
+    const p = (id: number) => ({ params: Promise.resolve({ id: String(id) }) });
+    const lap = async () => {
+      const res = await POST(jreq("/api/payment-certs", { contractId }));
+      return { status: res.status, body: await res.json() };
+    };
+
+    const d1 = await lap(); // KL thực hiện 30
+    assert.equal(d1.status, 201);
+    await TRINH(jreq("/x"), p(d1.body.id));
+    assert.equal((await QUYET(jreq("/x", { decision: "approved" }), p(d1.body.id))).status, 200);
+
+    await run(`UPDATE tasks SET progress_percent = 0.5 WHERE id = ?`, taskId);
+    const d2 = await lap(); // gợi ý 50 − 30 = 20
+    assert.equal(d2.status, 201);
+    await TRINH(jreq("/x"), p(d2.body.id));
+
+    await run(`UPDATE tasks SET progress_percent = 0.6 WHERE id = ?`, taskId);
+    const d3 = await lap();
+    assert.equal(d3.status, 409, "đợt 2 còn chờ duyệt → chưa lập được đợt 3");
+    assert.match(d3.body.error, /chờ duyệt/);
+
+    assert.equal((await QUYET(jreq("/x", { decision: "approved" }), p(d2.body.id))).status, 200);
+    const d3b = await lap(); // gợi ý 60 − 50 = 10
+    assert.equal(d3b.status, 201);
+    await TRINH(jreq("/x"), p(d3b.body.id));
+    assert.equal((await QUYET(jreq("/x", { decision: "approved" }), p(d3b.body.id))).status, 200);
+
+    const dong = await query<{ periodNo: number; qtyPeriod: number; qtyCumulative: number }>(
+      `SELECT c.period_no AS "periodNo", i.qty_period AS "qtyPeriod", i.qty_cumulative AS "qtyCumulative"
+         FROM payment_cert_items i JOIN payment_certs c ON c.id = i.cert_id
+        WHERE c.contract_id = ? ORDER BY c.period_no`,
+      contractId,
+    );
+    assert.deepEqual(
+      dong.map((d) => [d.periodNo, Number(d.qtyPeriod), Number(d.qtyCumulative)]),
+      [
+        [1, 30, 30],
+        [2, 20, 50],
+        [3, 10, 60],
+      ],
+    );
+    const bill = await query<{ tong: string }>(
+      `SELECT SUM(amount)::text AS tong FROM payment_bills WHERE contract_id = ?`,
+      contractId,
+    );
+    assert.equal(Number(bill[0].tong), 60_000, "tổng thanh toán = 60 m × 1.000đ, không trả trùng");
   },
 );
 

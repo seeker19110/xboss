@@ -614,6 +614,41 @@ test(
 );
 
 test(
+  "POST /api/purchase-orders/:id/receive: dòng sổ kho nhap_kho ghi qty_after = TỒN KHO sau nhập (như mọi giao dịch kho khác)",
+  S,
+  async () => {
+    // Audit 2026-10-01 (F7): trước đây nhap_kho ghi qty_after = qty_used (đọc ngoài transaction)
+    // trong khi xuat_cong_truong/hoan_kho/dieu_chinh_kho đều ghi tồn kho sau giao dịch — sổ kho
+    // có một loại dòng mang số dư của cột khác.
+    const { queryOne, run, query: q } = await import("@/lib/db");
+    const projectId = await taoDuAn("recvledger");
+    const pm = await taoUser("pm", "recvledger");
+    const matId = await taoVatTu("recvledger", { projectId });
+    await run(`UPDATE materials SET qty_stock = 3, qty_used = 5 WHERE id = ?`, matId);
+    const { id: poId } = await taoPO(pm, projectId, matId, { qtyOrdered: 8 });
+    const { PATCH } = await import("@/app/api/purchase-orders/[id]/route");
+    await PATCH(jreq("/x", { status: "confirmed" }, "PATCH"), {
+      params: Promise.resolve({ id: String(poId) }),
+    });
+    const items = await q<{ id: number }>(`SELECT id FROM po_items WHERE po_id = ?`, poId);
+    const { POST } = await import("@/app/api/purchase-orders/[id]/receive/route");
+    const res = await POST(
+      jreq("/x", { items: [{ poItemId: items[0].id, qtyReceived: 8 }] }, "POST"),
+      { params: Promise.resolve({ id: String(poId) }) },
+    );
+    assert.equal(res.status, 201);
+
+    const tx = await queryOne<{ delta: number; qtyAfter: number }>(
+      `SELECT delta, qty_after AS "qtyAfter" FROM material_transactions
+        WHERE material_id = ? AND type = 'nhap_kho' ORDER BY id DESC LIMIT 1`,
+      matId,
+    );
+    assert.equal(Number(tx?.delta), 8);
+    assert.equal(Number(tx?.qtyAfter), 11, "3 tồn cũ + 8 nhập — không phải qty_used (5)");
+  },
+);
+
+test(
   "POST /api/purchase-orders/:id/receive: gửi lại CÙNG Idempotency-Key → không tạo phiếu trùng, không cộng tồn kho 2 lần",
   S,
   async () => {
