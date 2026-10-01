@@ -22,6 +22,10 @@ là `<h1>` (70/85 trang trước đó không có h1).
 vào CI. Spec hồi quy mới `e2e/authed/khung-layout.spec.ts`; `input-zoom-mobile` đo thêm `<select>`
 và 5 trang; `/engineering` chuyển từ fixme sang assert thật trong `luoi-quet-axe`.
 
+**Kèm vá phụ thuộc:** CI `npm audit` đỏ do advisory critical mới GHSA-vcvr-r3jv-pc5j (RCE trong
+`next/og` ImageResponse, `next` 16.2.0–16.3.5 — không do đợt này, `main` cũng dính) → nâng `next` +
+`eslint-config-next` lên 16.3.8 (`npm audit` 0 lỗ hổng; lint/typecheck/build + E2E khói xanh).
+
 Nợ còn lại (ô nhập 14px lẻ theo trang, các trang engineering/mepf-process đã fixme, `Modal` chưa
 có `aria-labelledby`, PWA safe-area cần kiểm trên iPhone thật): xem tài liệu chi tiết. Không
 migration, không thao tác production.
