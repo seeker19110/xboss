@@ -14,13 +14,17 @@ không thay thế nhau.
 - Mặc định: diff hiện tại so với `main` (`git diff origin/main...HEAD`).
 - Nếu người dùng chỉ định PR/nhánh/đường dẫn cụ thể → dùng đúng phạm vi đó.
 
-## Bước 2 — Gọi skill `code-review`
+## Bước 2 — Review hai lượt bổ sung nhau
 
-Dùng `Skill(code-review)` ở effort phù hợp độ rủi ro của diff (mặc định `medium`; nâng `high` nếu
+**(a) Lượt luật XBoss theo đường dẫn** — chạy quy trình của `/ocr-review` (`.claude/commands/ocr-review.md`, chế độ delegation của OCR, ADR-0012): `delegate preview` → `delegate rule` lấy checklist đúng cho từng file → soát diff theo từng nhóm luật. Lượt này bắt các lớp lỗi đã lặp lại của dự án (`docs/audit.md`, `TRAPS.md`).
+
+**(b) Lượt `Skill(code-review)`** — dùng ở effort phù hợp độ rủi ro của diff (mặc định `medium`; nâng `high` nếu
 diff chạm nhiều file/luồng nghiệp vụ chính, hoặc đụng vùng rủi ro cao trong `docs/audit.md`:
 `lib/tien-do/recompute.ts`, `lib/bao-mat/auth.ts`, `lib/vat-tu/material-sync.ts`,
 `lib/khoi-luong/boq.ts`, route tài chính/nghiệm thu). Có thể giao thẳng cho subagent `reviewer`
-(`.claude/agents/reviewer.md`) nếu muốn tách khỏi ngữ cảnh phiên chính.
+(`.claude/agents/reviewer.md`) nếu muốn tách khỏi ngữ cảnh phiên chính (agent tự chạy cả hai lượt).
+
+Gộp phát hiện của hai lượt: trùng `file:dòng`/cùng nguyên nhân thì giữ một bản, ghi kèm mục luật bị vi phạm.
 
 ## Bước 3 — Gọi thêm `security-review` nếu chạm vùng nhạy cảm
 

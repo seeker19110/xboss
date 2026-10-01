@@ -1,5 +1,38 @@
 # PROGRESS — XBoss
 
+## 2026-10-01 — tích hợp OpenCodeReview: luật review AI theo đường dẫn (PR #554)
+
+Nghiên cứu [alibaba/open-code-review](https://github.com/alibaba/open-code-review) (CLI `ocr`, ghim
+`1.12.11`): OCR làm phần tất định (chọn file, gắn luật theo glob đường dẫn), LLM làm phần đọc
+hiểu. Người dùng chốt: chạy cả trong Claude Code (delegation, không API key) lẫn CI (mỗi PR, chỉ
+góp ý). Quyết định + ngữ nghĩa OCR đã kiểm từ mã nguồn (khớp-đầu-tiên-thắng, chữ thường, brace
+không lồng; mặc định bỏ qua `*.test.ts`/`*.spec.ts` và mọi file trong `.gitignore`, không review Markdown;
+trên `pull_request` action đọc luật từ merge ref của chính PR): ADR-0012.
+
+- `docs/audit.md` §3–§8 + `TRAPS.md` đúc thành 20 mảnh checklist `.opencodereview/rules/*.md` +
+  `manifest.json` 26 mục có thứ tự; `npm run gen:ocr-rules` ghép ra `.opencodereview/rule.json`
+  (một mục ghép nhiều mảnh — route tài chính nhận cả checklist tài chính lẫn route API).
+- `tests/ocr-rules.test.ts`: rule.json khớp bản sinh, 41 đường dẫn vùng rủi ro cao giải đúng
+  mục luật (giả lập ngữ nghĩa OCR; đối chiếu `ocr rules check` thật: 41/41 khớp), đường dẫn trong
+  luật còn tồn tại, phiên bản ghim khớp giữa `package.json` và workflow.
+- Claude Code: lệnh `/ocr-review`; `/review` + agent `reviewer` thêm lượt luật XBoss trước
+  `code-review`; `CLAUDE.md`/`docs/audit.md` trỏ tới `.opencodereview/`.
+- CI `ocr-review.yml`: review mỗi PR, comment tiếng Việt, luôn xanh, tự bỏ qua khi thiếu secret.
+- Review (agent `reviewer` — lần chạy thật đầu tiên của lượt luật OCR): giả lập glob khớp
+  `ocr rules check` trên toàn bộ 1590 file tracked (0 lệch). Đã sửa: tài liệu ghi nhầm "action đọc
+  luật từ nhánh base" (thật ra merge ref của PR); `timeout-minutes: 25` ở bước OCR để quá giờ không làm đỏ
+  job; `background` chỉ còn tiêu đề (body nằm trong dấu vân tay checkpoint → mỗi lần sửa body review
+  lại cả PR); `app/api/v1/payment-certs` thiếu luật tài chính + test canh mọi route import
+  `@/lib/tai-chinh/` phải nhận luật đó; chuẩn hoá CRLF khi ghép mảnh; `.gitignore` thu hẹp từ cả `.claude/`
+  còn `.claude/worktrees/` + `settings.local.json` (dòng cũ làm hook/`settings.json` vô hình với OCR
+  và lint-staged không stage lại được file đã track trong `.claude/`; `.prettierignore` thêm
+  `.claude/` để giữ hành vi định dạng cũ); `/ocr-review` + `reviewer`
+  ghi rõ OCR không review Markdown nên lệnh/agent `.claude/**/*.md` phải tự soát.
+
+**[Người dùng]** Bật CI: thêm secret `OCR_LLM_URL` (vd `https://api.anthropic.com`),
+`OCR_LLM_AUTH_TOKEN`, biến `OCR_LLM_MODEL` (Settings → Secrets and variables → Actions). Không
+migration, không đổi code ứng dụng.
+
 ## 2026-10-01 — audit lỗi logic & toàn vẹn dữ liệu
 
 Baseline `3d087ae`. Rà theo `docs/audit.md` §4 + vùng rủi ro §8 (nghiệm thu, engine phê duyệt
