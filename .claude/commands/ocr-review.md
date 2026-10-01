@@ -11,6 +11,7 @@ Review diff theo **luật review của dự án** trong `.opencodereview/` (ADR-
 - Mặc định: `git fetch origin main` rồi `npm run -s ocr -- delegate preview --from origin/main --to HEAD`.
 - Người dùng chỉ định `--commit`/`--from --to`/workspace → truyền nguyên cho `delegate preview`. Có thể thêm `-b "<bối cảnh yêu cầu>"` để OCR ghi bối cảnh vào đầu ra.
 - Đọc output: các dòng `- mode:`, `- merge_base:`, danh sách file. File bị loại hiện dạng `~~...~~ (excluded: <lý do>)` — bỏ qua, không review.
+- **OCR không review Markdown** (`excluded: unsupported_ext`) — gồm lệnh/agent `.claude/**/*.md`, vốn là chỉ dẫn thực thi cho agent. Diff có đụng chúng thì tự đọc diff và soát theo quy ước `CLAUDE.md` (brief đủ ngữ cảnh, không nới quyền/ranh giới ngoài ý định). Hook `.sh` và `settings.json` thì OCR review bình thường.
 
 ## Bước 2 — Lấy luật cho các file reviewable
 

@@ -114,6 +114,7 @@ const BANG_ANH_XA: [string, string][] = [
   ["lib/tai-chinh/contracts.ts", "tai-chinh-lib"],
   ["app/api/payment-certs/[id]/excel/route.ts", "tai-chinh-route"],
   ["app/api/costs/route.ts", "tai-chinh-route"],
+  ["app/api/v1/payment-certs/route.ts", "tai-chinh-route"],
   ["lib/dich-vu/thong-bao.ts", "thong-bao-lib"],
   ["lib/van-hanh/push.ts", "thong-bao-lib"],
   ["app/api/notifications/route.ts", "thong-bao-route"],
@@ -168,6 +169,35 @@ test("tiền tố tĩnh của mọi path trong manifest còn tồn tại", () =>
       );
     }
   }
+});
+
+// Route dùng nghiệp vụ tài chính mà không nhận luật `tai-chinh` (chỉ `route-api`) là lỗ hổng phủ
+// luật âm thầm — danh sách thư mục tài chính trong manifest liệt kê tay nên dễ sót khi thêm route.
+const KHONG_PHAI_ROUTE_TAI_CHINH: Record<string, string> = {
+  "app/api/vehicles":
+    "logistics xe — chỉ dùng helper danh sách/trạng thái xe trong lib/tai-chinh/procurement, không tính tiền",
+};
+
+test("mọi route import @/lib/tai-chinh/ đều nhận luật tai-chinh-route", () => {
+  const thieu: string[] = [];
+  const duyet = (thuMuc: string) => {
+    for (const muc of fs.readdirSync(path.join(ROOT, thuMuc), { withFileTypes: true })) {
+      const rel = `${thuMuc}/${muc.name}`;
+      if (muc.isDirectory()) duyet(rel);
+      else if (/\.tsx?$/.test(muc.name)) {
+        const src = fs.readFileSync(path.join(ROOT, rel), "utf8");
+        if (!src.includes("@/lib/tai-chinh/")) continue;
+        if (Object.keys(KHONG_PHAI_ROUTE_TAI_CHINH).some((g) => rel.startsWith(`${g}/`))) continue;
+        if (resolveRuleId(manifest, rel) !== "tai-chinh-route") thieu.push(rel);
+      }
+    }
+  };
+  duyet("app/api");
+  assert.deepEqual(
+    thieu,
+    [],
+    "Route dùng lib/tai-chinh nhưng không nhận luật tài chính — thêm thư mục vào path của mục `tai-chinh-route` trong .opencodereview/rules/manifest.json (rồi `npm run gen:ocr-rules`), hoặc vào KHONG_PHAI_ROUTE_TAI_CHINH kèm lý do nếu thật sự không phải nghiệp vụ tiền.",
+  );
 });
 
 test("include/exclude khớp đúng các file mong đợi", () => {

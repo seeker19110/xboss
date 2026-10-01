@@ -32,7 +32,8 @@ export function buildOcrRuleFile(
     exclude: manifest.exclude,
     rules: manifest.rules.map((r) => {
       const rule = [BOI_CANH, ...r.fragments]
-        .map((name) => readFragment(name).trim())
+        // Chuẩn hoá CRLF: máy Windows checkout autocrlf sẽ sinh rule.json khác bản Linux → test đỏ.
+        .map((name) => readFragment(name).replace(/\r\n/g, "\n").trim())
         .join("\n\n---\n\n");
       const entry: OcrRuleEntry = { path: r.path, rule };
       if (r.mergeSystemRule) entry.merge_system_rule = true;
@@ -63,7 +64,11 @@ export function expandFirstBrace(pattern: string): string[] {
     .map((opt) => prefix + opt + suffix);
 }
 
-/** So khớp doublestar không phân biệt hoa thường, như OCR (`Match(lower(p), lower(path))`). */
+/**
+ * So khớp doublestar không phân biệt hoa thường, như OCR (`Match(lower(p), lower(path))`).
+ * Khác biệt đã biết: `path.matchesGlob` (minimatch) không cho `*`/`**` khớp segment bắt đầu bằng
+ * `.` còn doublestar thì có — manifest hiện chỉ viết thư mục ẩn tường minh (`.github/...`).
+ */
 export function matchesOcrGlob(pattern: string, filePath: string): boolean {
   const target = filePath.toLowerCase();
   return expandFirstBrace(pattern).some((p) => path.matchesGlob(target, p.toLowerCase()));

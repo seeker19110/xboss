@@ -13,3 +13,7 @@ docs/ERD.md
 
 # OCR rule.json sinh tự động (npm run gen:ocr-rules) — test so khớp, không để prettier canh lại
 .opencodereview/rule.json
+
+# Cấu hình Claude Code (.claude/) — trước đây prettier bỏ qua nhờ .gitignore; giữ nguyên hành vi đó
+# sau khi .gitignore thu hẹp (ADR-0012), tránh định dạng lại hàng loạt agent/command không liên quan
+.claude/

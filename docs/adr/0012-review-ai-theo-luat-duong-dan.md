@@ -29,8 +29,15 @@ chạy thử trên repo:
 - Đường dẫn và glob đều hạ chữ thường trước khi so; chỉ cặp `{a,b}` **đầu tiên** được tách, nên
   brace lồng nhau sẽ hỏng.
 - Mặc định OCR **bỏ qua** `*.test.ts`/`*.spec.ts` — phải khai `include` để review được test.
-- GitHub Action của OCR checkout **nhánh base** (đáng tin), nên luật dùng khi review một PR là
-  luật trên `main`, PR không tự nới luật của chính nó được.
+- OCR tôn trọng `.gitignore` kể cả với file đã track. `.gitignore` từng bỏ cả `.claude/` khiến
+  hook/`settings.json` vô hình với OCR (và lint-staged không stage lại được file trong đó) — đã thu
+  hẹp còn `.claude/worktrees/` + `.claude/settings.local.json`.
+- OCR không review Markdown (`unsupported_ext`): lệnh/agent `.claude/**/*.md`, `docs/`, mảnh luật
+  đều bị loại — phải tự soát.
+- GitHub Action của OCR tự checkout không kèm `ref:`; với trigger `pull_request` đó là **merge
+  ref của PR**, nên `.opencodereview/rule.json` của chính PR được dùng (comment "checkout the
+  trusted base" trong `action.yml` chỉ đúng với `pull_request_target`). _Sửa 2026-10-01 sau
+  review: bản đầu của ADR này ghi nhầm là luật lấy từ `main`._
 
 ## Quyết định
 
@@ -87,7 +94,11 @@ chạy thử trên repo:
 - Đánh đổi: phải giữ mảnh luật đồng bộ với `docs/audit.md` — **sửa checklist audit thì sửa mảnh
   tương ứng** + `npm run gen:ocr-rules`. Thêm file/thư mục mới ở vùng rủi ro cao thì thêm mẫu vào
   bảng kiểm trong `tests/ocr-rules.test.ts`.
-- Đánh đổi: luật trong PR chỉ có hiệu lực ở CI sau khi merge (action đọc luật từ base).
+- Đánh đổi: PR sửa `.opencodereview/` được review bằng chính luật đã sửa (action đọc luật từ merge
+  ref của PR). Chấp nhận được vì job chỉ góp ý, không phải cổng bảo mật; không chuyển sang
+  `pull_request_target` để khỏi cấp secret LLM cho PR từ fork.
+- Đánh đổi: Markdown không được OCR review — lệnh/agent `.claude/**/*.md` (chỉ dẫn thực thi cho
+  agent) do `/ocr-review` và agent `reviewer` tự soát theo quy ước `CLAUDE.md`.
 - `ocr` cần mạng lần đầu (`npx` tải gói + binary); mất mạng thì đối chiếu thủ công
   `manifest.json` theo thứ tự (lệnh `/ocr-review` có hướng dẫn dự phòng).
 - **[Người dùng]** Bật CI: thêm secret `OCR_LLM_URL` (vd `https://api.anthropic.com`),

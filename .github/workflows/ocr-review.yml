@@ -3,9 +3,10 @@
 # - CHỈ GÓP Ý: comment inline + tóm tắt tiếng Việt trên PR, KHÔNG chặn merge (review LLM không
 #   tất định; phát hiện xử lý như bot review khác — xác minh rồi sửa hoặc trả lời lý do).
 # - Tự bỏ qua (job vẫn xanh) khi chưa cấu hình secret/biến LLM — xem bước "Kiểm cấu hình LLM".
-# - Action checkout nhánh BASE (đáng tin) rồi fetch head của PR, nên luật dùng để review là luật
-#   trên `main`: PR không tự nới luật của chính nó được. Vì vậy workflow KHÔNG có bước checkout
-#   và KHÔNG dùng `pull_request_target`.
+# - Action tự checkout (workflow KHÔNG có bước checkout riêng). Với trigger `pull_request`, bước đó
+#   lấy merge ref của PR, nên `.opencodereview/rule.json` CỦA CHÍNH PR được dùng — sửa luật trong
+#   PR có hiệu lực ngay lượt review đó. Chấp nhận được vì job chỉ góp ý, không phải cổng bảo mật.
+#   KHÔNG dùng `pull_request_target` để không cấp secret LLM cho PR từ fork.
 name: OCR review
 
 on:
@@ -48,10 +49,13 @@ jobs:
 
       # Job chỉ góp ý: lỗi của bước này KHÔNG được làm đỏ PR — ngoại lệ có chủ đích so với
       # nguyên tắc "không nuốt lỗi" ở docs/audit.md §6 (lỗi được báo ở bước kế bên).
+      # timeout-minutes ở cấp BƯỚC (< 30 của job): quá giờ thành outcome failure → bước cảnh báo,
+      # job vẫn xanh; để job tự hết 30 phút thì `continue-on-error` không cứu được, PR đỏ.
       - name: OCR review
         id: ocr
         if: steps.cfg.outputs.enabled == 'true'
         continue-on-error: true
+        timeout-minutes: 25
         uses: alibaba/open-code-review@a758d9cbfb689937c7857ad64b2dd66adb58c0c2 # v1.12.11
         with:
           llm_url: ${{ secrets.OCR_LLM_URL }}
@@ -70,11 +74,10 @@ jobs:
           route_categories: style,documentation
           upload_artifacts: "true"
           stream_progress: "true"
-          # Action truyền `background` qua biến môi trường nên nội dung PR không bị nội suy vào shell.
-          background: |
-            PR: ${{ github.event.pull_request.title }}
-
-            ${{ github.event.pull_request.body }}
+          # Chỉ tiêu đề PR, KHÔNG kèm body: `background` nằm trong dấu vân tay checkpoint của action —
+          # body hay được sửa (pr-policy đòi evidence) sẽ làm mỗi lần push review lại toàn bộ PR
+          # thay vì chỉ phần mới. Action truyền giá trị qua env nên không bị nội suy vào shell.
+          background: "PR: ${{ github.event.pull_request.title }}"
 
       - name: Báo lỗi OCR (không chặn PR)
         if: steps.ocr.outcome == 'failure'

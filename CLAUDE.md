@@ -24,6 +24,7 @@ Làm việc với vai trò **kỹ sư full-stack senior kiêm chuyên gia thiế
 - **Clean Code / KISS / DRY / YAGNI**: đơn giản, không lặp, không over-engineer; viết code bám đúng phong cách và cách đặt tên của code xung quanh.
 - **Security-first, fail-fast, idempotent**: API là ranh giới bảo mật duy nhất (xem Auth); thiếu cấu hình bắt buộc thì throw sớm; thao tác DB lặp lại không gây tác dụng phụ.
 - **Lập kế hoạch → điều phối → thi hành (3 tầng)** (quyết định 2026-07-16, thay thế "Uỷ thác theo độ khó" 2026-07-15):
+
   - **Tầng 1 — Người lập kế hoạch: phiên chính (opusplan · Fable 5).** Hiểu yêu cầu, quyết định kiến trúc, **viết đặc tả chi tiết** (schema DDL, API, điểm chạm code, tiêu chí chấp nhận — cùng khung `docs/nang-cap/M<xx>-*.md`), **định tuyến** từng việc bằng nhãn `route:` theo bảng dưới, xuất kế hoạch theo mẫu `PLAN.md`, và **duyệt kết quả cuối** khi coordinator báo xong. Không tự code, không tự babysit worker.
   - **Tầng 2 — Người điều phối: `coordinator` (Opus · low).** Nhận nguyên văn `PLAN.md` đã chốt và thi hành đúng kế hoạch: đồng bộ nhánh (`git fetch origin`), tạo nhánh/worktree cho từng việc, dispatch từng việc đến đúng agent theo nhãn `route:`, theo dõi kết quả so với tiêu chí chấp nhận, gọi `reviewer` soát diff, tích hợp (xung đột nhỏ, số migration), báo cáo tổng hợp về phiên chính. **Không đổi kế hoạch/đặc tả, không tự code** — worker vướng đặc tả sai/thiếu thì dừng việc đó và báo lại phiên chính.
   - **Tầng 3 — Workers** theo bảng định tuyến.
