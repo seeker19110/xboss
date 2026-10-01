@@ -1,6 +1,6 @@
 # PLAN.md — Tích hợp OpenCodeReview (OCR): luật review XBoss theo đường dẫn (2026-10-01)
 
-**Cập nhật:** 2026-10-01 · **Nhánh tích hợp:** `claude/elegant-carson-8jv8kz` (= `origin/main` `03d504b` + 1 commit đặc tả của phiên chính). **Trạng thái:** CHỜ THI HÀNH.
+**Cập nhật:** 2026-10-01 · **Nhánh tích hợp:** `claude/elegant-carson-8jv8kz` (= `origin/main` `03d504b` + 1 commit đặc tả của phiên chính). **Trạng thái:** ĐÃ THI HÀNH 2026-10-01 (coordinator không giao được việc — xem TRAPS.md §5 — phiên chính giao trực tiếp A ∥ C → B).
 
 **Bối cảnh (worker không thấy hội thoại):** Người dùng yêu cầu nghiên cứu và tích hợp sâu [alibaba/open-code-review](https://github.com/alibaba/open-code-review) — CLI review code bằng AI (`ocr`, Go, Apache-2.0). Quyết định đã chốt với người dùng: **chạy cả trong Claude Code (chế độ delegation, không cần API key) lẫn CI (mỗi PR, CHỈ GÓP Ý, không chặn merge)**. Đọc **`docs/adr/0012-review-ai-theo-luat-duong-dan.md`** trước tiên — nó ghi đủ lý do, ngữ nghĩa OCR đã kiểm chứng và các quyết định.
 

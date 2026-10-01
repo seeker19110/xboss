@@ -1,5 +1,27 @@
 # PROGRESS — XBoss
 
+## 2026-10-01 — tích hợp OpenCodeReview: luật review AI theo đường dẫn (PR #554)
+
+Nghiên cứu [alibaba/open-code-review](https://github.com/alibaba/open-code-review) (CLI `ocr`, ghim
+`1.12.11`): OCR làm phần tất định (chọn file, gắn luật theo glob đường dẫn), LLM làm phần đọc
+hiểu. Người dùng chốt: chạy cả trong Claude Code (delegation, không API key) lẫn CI (mỗi PR, chỉ
+góp ý). Quyết định + ngữ nghĩa OCR đã kiểm từ mã nguồn (khớp-đầu-tiên-thắng, chữ thường, brace
+không lồng; mặc định bỏ qua `*.test.ts`/`*.spec.ts`; action đọc luật từ nhánh base): ADR-0012.
+
+- `docs/audit.md` §3–§8 + `TRAPS.md` đúc thành 20 mảnh checklist `.opencodereview/rules/*.md` +
+  `manifest.json` 26 mục có thứ tự; `npm run gen:ocr-rules` ghép ra `.opencodereview/rule.json`
+  (một mục ghép nhiều mảnh — route tài chính nhận cả checklist tài chính lẫn route API).
+- `tests/ocr-rules.test.ts`: rule.json khớp bản sinh, 41 đường dẫn vùng rủi ro cao giải đúng
+  mục luật (giả lập ngữ nghĩa OCR; đối chiếu `ocr rules check` thật: 41/41 khớp), đường dẫn trong
+  luật còn tồn tại, phiên bản ghim khớp giữa `package.json` và workflow.
+- Claude Code: lệnh `/ocr-review`; `/review` + agent `reviewer` thêm lượt luật XBoss trước
+  `code-review`; `CLAUDE.md`/`docs/audit.md` trỏ tới `.opencodereview/`.
+- CI `ocr-review.yml`: review mỗi PR, comment tiếng Việt, luôn xanh, tự bỏ qua khi thiếu secret.
+
+**[Người dùng]** Bật CI: thêm secret `OCR_LLM_URL` (vd `https://api.anthropic.com`),
+`OCR_LLM_AUTH_TOKEN`, biến `OCR_LLM_MODEL` (Settings → Secrets and variables → Actions). Không
+migration, không đổi code ứng dụng.
+
 ## 2026-10-01 — đóng nợ ô nhập < 16px trên điện thoại (iOS tự phóng to)
 
 Tiếp đợt audit layout bên dưới (PR #551 đã merge). Quét tĩnh còn 444 ô `<input>/<select>/

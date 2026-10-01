@@ -52,3 +52,15 @@ biến là truyền cả mảng tham số vào một placeholder duy nhất (`qu
 
 _Cách rà_: viết SQL mới — đếm số `?` trong chuỗi phải khớp đúng số phần tử mảng tham số.
 _Chốt chặn_: `npm run check:db-params` (static, không cần DB).
+
+## 5. `coordinator` chạy như subagent không giao được việc cho worker
+
+`.claude/agents/coordinator.md` khai `tools: ... Agent ...`, nhưng khi phiên chính gọi nó bằng
+tool `Agent`, phiên coordinator **không có** tool Agent/Task (subagent không lồng subagent được) —
+nó chỉ đọc PLAN.md rồi trả về "không có công cụ để giao việc", repo không đổi gì (2026-10-01,
+đợt tích hợp OCR — PR #554). Tầng 2 của quy trình 3 tầng trong `CLAUDE.md` vì vậy không tự chạy.
+
+_Cách rà_: giao PLAN.md cho coordinator mà báo cáo về chỉ có "không giao được"/0 commit → đúng
+bẫy này. Cách đã dùng: phiên chính tự giao từng việc theo nhãn `route:` (mỗi việc
+`isolation: worktree`), tự gộp theo thứ tự trong PLAN.md và gọi `reviewer`.
+_Chốt chặn_: chưa có — việc đổi quy trình 3 tầng là quyết định của người dùng.
