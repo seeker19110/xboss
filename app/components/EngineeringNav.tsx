@@ -276,7 +276,7 @@ export default function EngineeringNav() {
   }, []);
 
   return (
-    <div className="mb-6 rounded-2xl border border-zinc-800/90 bg-zinc-950/80 p-3.5 shadow-sm backdrop-blur transition-all">
+    <div className="mb-6 rounded-2xl border border-zinc-800/90 bg-zinc-950/80 p-3.5 shadow-sm backdrop-blur transition-colors">
       {/* ── Compact Bar (When Collapsed) ── */}
       {collapsed ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -351,7 +351,7 @@ export default function EngineeringNav() {
                   <button
                     key={cat.key}
                     onClick={() => setSelectedCategory(cat.key)}
-                    className={`min-h-[36px] whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    className={`min-h-[36px] whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-medium transition flex items-center gap-1.5 ${
                       selectedCategory === cat.key
                         ? "bg-emerald-700 text-on-accent shadow-sm font-semibold"
                         : "bg-zinc-900/90 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 border border-zinc-800/80"
@@ -409,7 +409,7 @@ export default function EngineeringNav() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Tìm công cụ kỹ thuật..."
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900/90 py-1.5 pl-8 pr-3 text-xs text-zinc-200 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900/90 py-1.5 pl-8 pr-3 text-base sm:text-xs text-zinc-200 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
 

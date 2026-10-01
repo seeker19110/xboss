@@ -51,11 +51,12 @@ export default function ReportPrintable({
   range: ReportRange;
 }) {
   return (
-    <div className="sheet-stable bg-white text-zinc-900 rounded-xl shadow-2xl shadow-black/40 max-w-4xl mx-auto p-8 print:rounded-none print:shadow-none print:max-w-none print:mx-0 print:p-0">
+    <div className="sheet-stable bg-white text-zinc-900 rounded-xl shadow-2xl shadow-black/40 max-w-4xl mx-auto p-4 sm:p-8 print:rounded-none print:shadow-none print:max-w-none print:mx-0 print:p-0">
       <div className="border-b-2 border-zinc-900 pb-4 mb-6">
-        <h1 className="text-2xl font-bold">
+        {/* h2, không phải h1: trang /report đã có <h1> ở topbar AppHeader (mỗi trang một h1). */}
+        <h2 className="text-2xl font-bold">
           BÁO CÁO TIẾN ĐỘ THI CÔNG ACMV{systemName ? ` — Hệ ${systemName}` : ""}
-        </h1>
+        </h2>
         <p className="text-zinc-600">
           {projectName ?? "XBoss"} · Ngày: {formatDateVN(new Date())}
         </p>
@@ -122,83 +123,99 @@ export default function ReportPrintable({
           <h2 className="font-bold text-lg mb-3">
             3. Dự báo hoàn thành (ngoại suy từ tốc độ thực tế)
           </h2>
-          <table className="w-full text-sm border-collapse mb-6">
-            <thead>
-              <tr className="bg-zinc-100 border-y border-zinc-300 text-left">
-                <th className="p-2">Hệ</th>
-                <th className="p-2">Tiến độ</th>
-                <th className="p-2">Tốc độ/tuần</th>
-                <th className="p-2">Deadline</th>
-                <th className="p-2">Dự kiến xong</th>
-                <th className="p-2">Chênh lệch</th>
-              </tr>
-            </thead>
-            <tbody>
-              {forecast.map((f) => (
-                <tr key={f.sheetType} className="border-b border-zinc-200">
-                  <td className="p-2">{f.sheetType}</td>
-                  <td className="p-2">{Math.round(f.progress * 100)}%</td>
-                  <td className="p-2">
-                    {f.progress >= 0.999 ? "—" : `${(f.ratePerWeek * 100).toFixed(1)}%`}
-                  </td>
-                  <td className="p-2">{formatDateVN(f.deadline)}</td>
-                  <td className="p-2 font-medium">
-                    {f.progress >= 0.999 ? "Đã xong" : formatDateVN(f.eta)}
-                  </td>
-                  <td
-                    className={`p-2 ${(f.lateDays ?? 0) > 0 ? "text-red-600 font-medium" : "text-emerald-700"}`}
-                  >
-                    {f.lateDays === null || f.progress >= 0.999
-                      ? "—"
-                      : f.lateDays > 0
-                        ? `Trễ ~${f.lateDays} ngày`
-                        : `Sớm ${-f.lateDays} ngày`}
-                  </td>
+          {/* Cuộn ngang TRONG tờ giấy trên điện thoại — bảng tràn ra ngoài nền trắng thì chữ
+              đen (ghim .sheet-stable) nằm trên nền tối của theme darkblue, gần như vô hình. */}
+          <div
+            className="overflow-x-auto mb-6 print:overflow-visible"
+            tabIndex={0}
+            role="region"
+            aria-label="Bảng dự báo hoàn thành"
+          >
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-zinc-100 border-y border-zinc-300 text-left">
+                  <th className="p-2">Hệ</th>
+                  <th className="p-2">Tiến độ</th>
+                  <th className="p-2">Tốc độ/tuần</th>
+                  <th className="p-2">Deadline</th>
+                  <th className="p-2">Dự kiến xong</th>
+                  <th className="p-2">Chênh lệch</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {forecast.map((f) => (
+                  <tr key={f.sheetType} className="border-b border-zinc-200">
+                    <td className="p-2">{f.sheetType}</td>
+                    <td className="p-2">{Math.round(f.progress * 100)}%</td>
+                    <td className="p-2">
+                      {f.progress >= 0.999 ? "—" : `${(f.ratePerWeek * 100).toFixed(1)}%`}
+                    </td>
+                    <td className="p-2">{formatDateVN(f.deadline)}</td>
+                    <td className="p-2 font-medium">
+                      {f.progress >= 0.999 ? "Đã xong" : formatDateVN(f.eta)}
+                    </td>
+                    <td
+                      className={`p-2 ${(f.lateDays ?? 0) > 0 ? "text-red-600 font-medium" : "text-emerald-700"}`}
+                    >
+                      {f.lateDays === null || f.progress >= 0.999
+                        ? "—"
+                        : f.lateDays > 0
+                          ? `Trễ ~${f.lateDays} ngày`
+                          : `Sớm ${-f.lateDays} ngày`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 
       <h2 className="font-bold text-lg mb-3 page-break">
         {forecast.some((f) => f.eta) ? "4" : "3"}. Danh sách hạng mục trễ
       </h2>
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="bg-zinc-100 border-y border-zinc-300 text-left">
-            <th className="p-2">Hạng mục</th>
-            <th className="p-2">Sheet</th>
-            <th className="p-2">Tầng</th>
-            <th className="p-2">Số công tác</th>
-            <th className="p-2">Hạn sớm nhất</th>
-            <th className="p-2">Trễ (ngày)</th>
-            <th className="p-2">Tiến độ TB</th>
-          </tr>
-        </thead>
-        <tbody>
-          {groupDelayedTasks(data?.delayedTasks ?? [], {
-            groupProgress: new Map(Object.entries(data?.groupProgress ?? {})),
-          }).map((g) => (
-            <tr key={g.key} className="border-b border-zinc-200">
-              <td className="p-2">{g.name}</td>
-              <td className="p-2">{g.sheetType}</td>
-              <td className="p-2">{g.floorLabel || "—"}</td>
-              <td className="p-2">{g.count}</td>
-              <td className="p-2 text-red-600">{formatDateVN(g.earliestEndDate)}</td>
-              <td className="p-2 text-red-600">{g.maxDaysOverdue}</td>
-              <td className="p-2">{Math.round(g.avgProgress * 100)}%</td>
+      <div
+        className="overflow-x-auto print:overflow-visible"
+        tabIndex={0}
+        role="region"
+        aria-label="Bảng hạng mục trễ"
+      >
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-zinc-100 border-y border-zinc-300 text-left">
+              <th className="p-2">Hạng mục</th>
+              <th className="p-2">Sheet</th>
+              <th className="p-2">Tầng</th>
+              <th className="p-2">Số công tác</th>
+              <th className="p-2">Hạn sớm nhất</th>
+              <th className="p-2">Trễ (ngày)</th>
+              <th className="p-2">Tiến độ TB</th>
             </tr>
-          ))}
-          {!data?.delayedTasks.length && (
-            <tr>
-              <td colSpan={7} className="p-4 text-center text-zinc-600">
-                Không có công việc trễ.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {groupDelayedTasks(data?.delayedTasks ?? [], {
+              groupProgress: new Map(Object.entries(data?.groupProgress ?? {})),
+            }).map((g) => (
+              <tr key={g.key} className="border-b border-zinc-200">
+                <td className="p-2">{g.name}</td>
+                <td className="p-2">{g.sheetType}</td>
+                <td className="p-2">{g.floorLabel || "—"}</td>
+                <td className="p-2">{g.count}</td>
+                <td className="p-2 text-red-600">{formatDateVN(g.earliestEndDate)}</td>
+                <td className="p-2 text-red-600">{g.maxDaysOverdue}</td>
+                <td className="p-2">{Math.round(g.avgProgress * 100)}%</td>
+              </tr>
+            ))}
+            {!data?.delayedTasks.length && (
+              <tr>
+                <td colSpan={7} className="p-4 text-center text-zinc-600">
+                  Không có công việc trễ.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {/* Khối chữ ký — chuẩn báo cáo xây dựng VN */}
       <div className="grid grid-cols-2 gap-8 mt-12 mb-8 avoid-break">

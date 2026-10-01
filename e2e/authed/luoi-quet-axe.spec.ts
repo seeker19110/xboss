@@ -91,6 +91,9 @@ const OK_ROUTES: Route[] = [
   { path: "/engineering/agent-sessions", name: "Phiên AI Agent" },
   { path: "/engineering/data-quality", name: "Chất lượng dữ liệu" },
   { path: "/engineering/workflows", name: "Quy trình tự động (workflows)" },
+  // Audit layout 2026-10-01: quét lại trên bản production (light + darkblue, desktop + mobile)
+  // — hub /engineering đã xanh thật (card/badge riêng được sửa ở các đợt sau), bỏ fixme.
+  { path: "/engineering", name: "Hub Kỹ thuật số (engineering)" },
 ];
 
 test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)", () => {
@@ -120,12 +123,6 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
       name: "Lịch trình (schedule)",
       violations:
         "color-contrast — quan sát ĐỎ nhất quán khi chạy qua Playwright test runner song song (2 worker, 52 node vi phạm), nhưng KHÔNG tái hiện khi quét cô lập bằng script node đơn (0 vi phạm, thử lại 3 lần) hay ở project mobile. Nghi ngờ đua dữ liệu/thời điểm animate progress bar (transition-all duration-500, dòng ~240 app/schedule/page.tsx) khi nhiều worker chạy song song — CHƯA xác định được nguyên nhân gốc chắc chắn, để fixme thay vì assert có thể flaky đỏ oan trong CI.",
-    },
-    {
-      path: "/engineering",
-      name: "Hub Kỹ thuật số (engineering)",
-      violations:
-        "color-contrast x5 (đã giảm từ x6 sau khi sửa badge EngineeringNav — còn lại là card/badge riêng của trang hub, không phải EngineeringNav).",
     },
   ];
 

@@ -52,7 +52,7 @@ export default function ProgressRow({
       </span>
       <span className="hidden sm:block h-1.5 rounded-full bg-zinc-800 overflow-hidden">
         <span
-          className={`block h-full rounded-full transition-all duration-500 ${tone.bar}`}
+          className={`block h-full rounded-full transition-[width] duration-500 ${tone.bar}`}
           style={{ width: `${pct}%` }}
         />
       </span>

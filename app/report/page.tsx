@@ -108,7 +108,7 @@ export default function ReportPage() {
                 value={range}
                 onChange={(e) => updateRange(e.target.value as ReportRange)}
                 aria-label="Chọn kỳ báo cáo"
-                className="min-h-10 bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-1.5 text-sm outline-none"
+                className="min-h-10 bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-1.5 text-base sm:text-sm outline-none"
               >
                 <option value="day">Hiện tại</option>
                 <option value="week">Theo tuần</option>

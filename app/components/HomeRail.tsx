@@ -162,7 +162,7 @@ export default function HomeRail({
                 </span>
                 <span className="mt-1 block h-2 rounded-full bg-zinc-800 overflow-hidden">
                   <span
-                    className={`block h-full rounded-full transition-all ${r.bar}`}
+                    className={`block h-full rounded-full transition-[width] ${r.bar}`}
                     style={{ width: `${(r.count / pareto.max) * 100}%` }}
                   />
                 </span>

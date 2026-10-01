@@ -8,8 +8,14 @@ import { test, expect } from "@playwright/test";
 // CHÍNH LÀ phép đo đó, chạy trong project `authed-mobile` (Pixel 5) của playwright.config.
 // Đo `font-size` sau khi trình duyệt tính (getComputedStyle), không đọc class Tailwind.
 //
-// Chỉ đo ô người dùng thật sự GÕ (text/search/number/email/password/tel/date/textarea);
-// checkbox/radio/nút không kích hoạt bàn phím ảo nên không liên quan.
+// Chỉ đo ô người dùng thật sự GÕ (text/search/number/email/password/tel/date/textarea) và
+// ô chọn <select> (iOS cũng phóng to khi chạm vào select dưới 16px); checkbox/radio/nút
+// không kích hoạt bàn phím ảo hay bộ chọn nên không liên quan.
+//
+// Audit layout 2026-10-01 thêm "/", "/gantt", "/schedule", "/ban-ve", "/engineering", "/report",
+// "/payments", "/materials/import": component dùng chung ui/Select, GlobalSearch,
+// SystemFilter, SCurveChart, ô tìm bản vẽ, ô tìm EngineeringNav và vài ô chọn lẻ từng ở
+// 12–14px. "/users" đã có trong danh sách — ô chọn vai trò 12px lộ ra khi đo thêm <select>.
 
 const TRANG = [
   "/boq",
@@ -22,6 +28,14 @@ const TRANG = [
   "/procurement",
   "/quality",
   "/users",
+  "/",
+  "/gantt",
+  "/schedule",
+  "/ban-ve",
+  "/engineering",
+  "/report",
+  "/payments",
+  "/materials/import",
 ];
 
 test.describe("Cỡ chữ ô nhập trên điện thoại (chống iOS auto-zoom)", () => {
@@ -51,9 +65,11 @@ test.describe("Cỡ chữ ô nhập trên điện thoại (chống iOS auto-zoom
           "time",
         ];
         const els = Array.from(
-          document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input, textarea"),
+          document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+            "input, textarea, select",
+          ),
         ).filter((el) => {
-          if (el.tagName === "TEXTAREA") return true;
+          if (el.tagName === "TEXTAREA" || el.tagName === "SELECT") return true;
           return LOAI.includes((el as HTMLInputElement).type);
         });
         return els

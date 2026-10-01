@@ -654,7 +654,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Tìm mã, tên, hệ, tầng..."
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-8 pr-7 py-2 text-xs text-zinc-200 placeholder:text-zinc-500 outline-none focus:border-amber-500 transition min-h-[38px]"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-8 pr-7 py-2 text-base sm:text-xs text-zinc-200 placeholder:text-zinc-500 outline-none focus:border-amber-500 transition min-h-10"
                 />
                 {search && (
                   <button
@@ -758,7 +758,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
                               <button
                                 key={d.id}
                                 onClick={() => setSelectedId(d.id)}
-                                className={`w-full text-left p-2.5 rounded-lg border transition-all flex items-start gap-2.5 group min-h-[44px] ${
+                                className={`w-full text-left p-2.5 rounded-lg border transition flex items-start gap-2.5 group min-h-[44px] ${
                                   isSelected
                                     ? "bg-zinc-900 border-amber-500/80 ring-1 ring-amber-500/40 shadow-sm"
                                     : "bg-zinc-950/40 border-zinc-800/60 hover:bg-zinc-900 hover:border-zinc-700"

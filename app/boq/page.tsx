@@ -273,7 +273,7 @@ export default function BoqPage() {
               </p>
               <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden mt-2 border border-zinc-800">
                 <div
-                  className="bg-emerald-500 h-full rounded-full transition-all"
+                  className="bg-emerald-500 h-full rounded-full transition-[width]"
                   style={{
                     width: `${totals.contractValue > 0 ? Math.min(100, Math.round((totals.executedValue / totals.contractValue) * 100)) : 0}%`,
                   }}
