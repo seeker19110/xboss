@@ -36,6 +36,16 @@ const TRANG = [
   "/report",
   "/payments",
   "/materials/import",
+  // Trang nhiều form nhất theo quét tĩnh (đợt chuyển sang quy tắc toàn cục globals.css):
+  "/handover",
+  "/environment",
+  "/warranty",
+  "/monitoring",
+  "/kickoff",
+  "/finance",
+  "/personnel",
+  "/insurance",
+  "/correspondences",
 ];
 
 test.describe("Cỡ chữ ô nhập trên điện thoại (chống iOS auto-zoom)", () => {
@@ -90,4 +100,26 @@ test.describe("Cỡ chữ ô nhập trên điện thoại (chống iOS auto-zoom
       ).toEqual([]);
     });
   }
+
+  // Ô trong modal không hiện lúc tải trang nên các ca trên không thấy — đây là chỗ phần lớn
+  // trong 444 ô < 16px nằm trước khi có quy tắc toàn cục (globals.css, dưới breakpoint sm).
+  test("ô trong modal (thêm dòng BOQ) có font-size ≥ 16px", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "Chỉ áp cho viewport điện thoại");
+    await page.goto("/boq");
+    await page.getByRole("button", { name: "Thêm dòng BOQ" }).click();
+    const hop = page.getByRole("dialog");
+    await expect(hop.getByRole("heading", { name: "Thêm dòng BOQ" })).toBeVisible({
+      timeout: 15_000,
+    });
+    const coChu = await hop.evaluate((d) =>
+      Array.from(d.querySelectorAll<HTMLElement>("input, select, textarea"))
+        .filter(
+          (el) => !["checkbox", "radio", "file", "hidden"].includes(el.getAttribute("type") ?? ""),
+        )
+        .filter((el) => el.offsetParent !== null)
+        .map((el) => parseFloat(getComputedStyle(el).fontSize)),
+    );
+    expect(coChu.length).toBeGreaterThan(0);
+    expect(coChu.filter((c) => c < 16)).toEqual([]);
+  });
 });
