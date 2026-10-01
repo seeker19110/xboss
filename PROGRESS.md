@@ -1,6 +1,6 @@
 # PROGRESS — XBoss
 
-## 2026-10-01 — tích hợp ECC (Everything Claude Code) vào cấu hình agent
+## 2026-10-01 — tích hợp ECC (Everything Claude Code) vào cấu hình agent (PR #555)
 
 Nghiên cứu [ECC](https://github.com/affaan-m/ECC) v2.2.2 (harness phổ biến nhất cho Claude Code)
 và tích hợp tối đa theo yêu cầu người dùng — quyết định + lý do + đánh đổi ở
