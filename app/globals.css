@@ -294,6 +294,39 @@ body {
   border-radius: 6px;
 }
 
+/* Ô gõ/ô chọn trên điện thoại tối thiểu 16px — dưới mức đó iOS Safari tự phóng to cả trang khi
+   chạm vào ô (cả <select>). Quy tắc toàn cục thay cho mẫu `text-base sm:text-*` rải từng ô:
+   audit 2026-10-01 đếm còn 444 ô ở 76 file chưa theo mẫu (nhiều ô nằm trong modal/form ẩn), sửa
+   tay thì sót và tái phát. Ngoài @layer nên thắng class Tailwind (vốn nằm trong @layer
+   utilities); chỉ áp dưới breakpoint `sm` nên desktop giữ nguyên cỡ chữ gọn của từng ô.
+   Bỏ qua ô cố ý dùng chữ lớn hơn (text-lg trở lên) để không thu nhỏ chúng. */
+@media (max-width: 639.98px) {
+  :is(
+    input:not(
+      [type="checkbox"],
+      [type="radio"],
+      [type="range"],
+      [type="color"],
+      [type="file"],
+      [type="hidden"],
+      [type="submit"],
+      [type="button"],
+      [type="reset"],
+      [type="image"]
+    ),
+    select,
+    textarea
+  ):not(
+    [class*="text-lg"],
+    [class*="text-xl"],
+    [class*="text-2xl"],
+    [class*="text-3xl"],
+    [class*="text-4xl"]
+  ) {
+    font-size: 16px;
+  }
+}
+
 /* Tôn trọng tuỳ chọn giảm chuyển động của hệ điều hành (WCAG 2.3.3, MASTER.md §7–8):
    tắt animation/transition lớn — pulse vô hạn, skeleton, thanh tiến độ chạy dần. Dùng
    0.01ms thay vì `none` để sự kiện transitionend/animationend (nếu sau này có) vẫn bắn. */

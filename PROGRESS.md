@@ -29,6 +29,16 @@ Nợ ghi nhận (chưa sửa): báo cáo ngày/tuần cron cộng mọi dự án
 chốt nghiệp vụ đa dự án); deadlock hiếm ở tick lô chồng nhau; nhật ký trạng thái PO có thể ghi
 trùng khi nhập kho đồng thời.
 
+## 2026-10-01 — đóng nợ ô nhập < 16px trên điện thoại (iOS tự phóng to)
+
+Tiếp đợt audit layout bên dưới (PR #551 đã merge). Quét tĩnh còn 444 ô `<input>/<select>/
+<textarea>` < 16px ở 76 file — phần lớn trong modal/form ẩn nên lượt quét trình duyệt trước không
+thấy. Thay mẫu `text-base sm:text-*` sửa từng ô bằng một quy tắc toàn cục trong `app/globals.css`:
+dưới breakpoint `sm`, ô gõ/ô chọn tối thiểu 16px (ngoài `@layer` nên thắng class Tailwind; bỏ qua
+ô text-lg trở lên; desktop giữ nguyên cỡ gọn). Đo bản production: mobile 85 trang, 568 ô hiện sẵn +
+188 ô trong 34 modal → 0 ô < 16px; desktop `/users` vẫn 14px. `e2e/authed/input-zoom-mobile.spec.ts`
+thêm 9 trang nhiều form + ca đo ô trong modal (29/29 qua cục bộ). Không migration.
+
 ## 2026-10-01 — audit layout & UI/UX khung dùng chung
 
 Baseline `987d73e`. Rà theo `docs/audit.md` §5 (UI/UX & a11y) + phần layout §7 bằng
@@ -55,7 +65,7 @@ và 5 trang; `/engineering` chuyển từ fixme sang assert thật trong `luoi-q
 `next/og` ImageResponse, `next` 16.2.0–16.3.5 — không do đợt này, `main` cũng dính) → nâng `next` +
 `eslint-config-next` lên 16.3.8 (`npm audit` 0 lỗ hổng; lint/typecheck/build + E2E khói xanh).
 
-Nợ còn lại (ô nhập 14px lẻ theo trang, các trang engineering/mepf-process đã fixme, `Modal` chưa
+Nợ còn lại (các trang engineering/mepf-process đã fixme, `Modal` chưa
 có `aria-labelledby`, PWA safe-area cần kiểm trên iPhone thật): xem tài liệu chi tiết. Không
 migration, không thao tác production.
 
