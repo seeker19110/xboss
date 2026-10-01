@@ -15,6 +15,7 @@ XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO T
 - `docs/framework/` — bộ khung quy trình/chất lượng (tham khảo dài, đọc đúng phần cần). Áp dụng brownfield theo `AP-DUNG-vao-du-an-co-san.md`.
 - `docs/ops/` — vận hành sự cố production (`incident-response.md`).
 - `.opencodereview/` — checklist `docs/audit.md`/`TRAPS.md` đúc thành **luật review máy đọc theo đường dẫn** (ADR-0012), dùng bởi lệnh `/ocr-review`, `/review`, agent `reviewer` và CI (`OCR review`). **Sửa checklist audit thì sửa mảnh tương ứng trong `.opencodereview/rules/` + chạy `npm run gen:ocr-rules`.**
+- `.claude/` — cấu hình agent (xem `.claude/README.md`): agent/skill/command/hook của XBoss + **lớp ECC vendor** (`ecc-*`, ADR-0013). Rules nạp tự động: `.claude/rules/00-uu-tien-ecc.md` (**XBoss thắng khi ECC mâu thuẫn**) và `.claude/rules/xboss/*` (checklist theo đường dẫn file, chỉ nạp khi chạm file khớp).
 
 ## Vai trò & nguyên tắc
 
@@ -43,6 +44,19 @@ Làm việc với vai trò **kỹ sư full-stack senior kiêm chuyên gia thiế
   - **Brief trong PLAN.md phải đầy đủ ngữ cảnh** — đường dẫn file cụ thể, quy ước dự án liên quan, tiêu chí chấp nhận rõ ràng, và (với `complex`) ranh giới quyết định được phép. Coordinator lẫn worker KHÔNG thấy được hội thoại trước đó trong phiên, chỉ thấy đúng những gì viết trong kế hoạch/brief.
   - Phân vân giữa 2 route → chọn route **rẻ hơn** nếu đặc tả kín, route **đắt hơn** nếu việc chạm vùng rủi ro cao trong `docs/audit.md` (`lib/tien-do/recompute.ts`, `lib/bao-mat/auth.ts`, `lib/vat-tu/material-sync.ts`, `lib/khoi-luong/boq.ts`, route tài chính/nghiệm thu).
 
+  **Định tuyến ECC & audit** (ADR-0013) — chuyên gia **bổ trợ**, không thay bảng `route:` ở trên; agent review/audit chỉ báo cáo, không sửa:
+
+  | Khi                                                                       | Gọi                                                                                                                                                      |
+  | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | Review sau khi worker xong (coordinator / `/review`), song song theo file | `audit-bao-mat` (`app/api/**`, `lib/bao-mat/**`) · `audit-logic` (miền nghiệp vụ, `migrations/**`, vùng §8 — **bắt buộc**) · `audit-ui` (`app/**/*.tsx`) |
+  | Diff lớn cần thêm góc nhìn chung                                          | `ecc-typescript-reviewer`, `ecc-react-reviewer`, `ecc-database-reviewer`, `ecc-silent-failure-hunter`, `ecc-security-reviewer`, `ecc-pr-test-analyzer`   |
+  | Tầng 1 cần dữ kiện trước khi viết đặc tả                                  | `ecc-code-explorer` (lần luồng code), `ecc-architect`/`ecc-code-architect` (phương án), `ecc-spec-miner` (rút bất biến — ghi vào `docs/nang-cap/`)       |
+  | CI/build đỏ thuần lỗi build/type                                          | `ecc-build-error-resolver`, `ecc-react-build-resolver` (tương đương route `mechanical`)                                                                  |
+  | Dọn code chết / hiệu năng / a11y sâu                                      | `ecc-refactor-cleaner` (+ `check:dead-code`) / `ecc-performance-optimizer` (+ skill `ecc-benchmark`) / `ecc-a11y-architect`                              |
+  | Quyết định mơ hồ nhiều phương án                                          | skill `ecc-council` (vẫn hỏi người dùng nếu thiếu đặc tả — LUẬT CỨNG ở trên)                                                                             |
+
+  Skill XBoss: `/gate` (cổng máy = đúng các bước CI), `/review` (đọc-hiểu + audit đa góc nhìn), `/hoc` (bài học → tri thức bền trong repo), `/ecc` (cách dùng/cập nhật lớp ECC). Hook thi hành: `protect-config` (migration đã áp/vendor/cấu hình cổng), `risk-zone-gate` (vùng §8: nêu bất biến trước lần sửa đầu), `pre-push-gate` (PROGRESS.md + số migration), `stop-static-checks` (cổng CI tĩnh theo file đổi trước khi dừng lượt).
+
 - **Trước khi code (đặc biệt khi dispatch subagent/worktree song song): luôn đồng bộ nhánh trước.** `git fetch origin` + đảm bảo base (`main` cục bộ hoặc nhánh làm việc) khớp `origin/main` mới nhất trước khi tạo worktree/nhánh mới — nhánh cục bộ lỗi thời khiến agent code chồng số migration/bỏ lỡ thay đổi mới, gây conflict phải dọn tay lúc tích hợp (đã xảy ra thật ở đợt M32/M33/M34, xem `PROGRESS.md`). Mỗi việc song song code trên nhánh/worktree riêng của nó, không chia sẻ working tree, để tránh xung đột file giữa các agent.
 
 ## Lệnh thường dùng
@@ -63,6 +77,8 @@ npm run check:dead-code      # dò module không ai với tới được (đồ 
 npm run gen:ocr-rules        # ADR-0012 — ghép mảnh luật .opencodereview/rules/*.md + manifest.json thành .opencodereview/rule.json (file sinh, test so khớp)
 npm run -s ocr -- delegate preview --from origin/main --to HEAD   # ADR-0012 — liệt kê file cần review trong diff (rồi `delegate rule <file...>` lấy checklist); thường chạy qua /ocr-review
 npm run db:seed      # import Excel gốc trong attachments/ vào DB
+npm run gate         # chạy cục bộ ĐÚNG các cổng job "static" của ci.yml + PROGRESS.md (thêm -- --test --build trước khi mở PR)
+npm run ecc:vendor -- --src <checkout ECC>   # sinh lại lớp ECC vendor theo .claude/ecc/manifest.json (ADR-0013)
 ```
 
 **Test tích hợp** (`recompute.test.ts`) cần Postgres riêng qua biến `TEST_DATABASE_URL` — không có thì tự skip. `tests/setup.ts` phải được import **đầu tiên** trong mọi test chạm DB: nó xoá `DATABASE_URL` (chống ghi nhầm DB thật) hoặc thay bằng `TEST_DATABASE_URL`.
@@ -245,6 +261,6 @@ Trước khi push, đảm bảo:
 - [ ] Route handler mới gọi `getCurrentUser()` và trả 401 khi chưa đăng nhập; kiểm quyền qua `CAN` / `canTouchTask`.
 - [ ] Validate input; không lộ secret; thao tác nhạy cảm có rate-limit; endpoint cron bảo vệ bằng `CRON_SECRET` qua header Bearer.
 - [ ] File test chạm DB import `tests/setup.ts` **đầu tiên**; đã tự review diff đúng phạm vi.
-- [ ] CI (`.github/workflows/ci.yml`) xanh: `npm audit` → lint → typecheck → test (Postgres 16) → build.
+- [ ] `npm run gate` xanh cục bộ (cùng danh sách cổng với CI); CI (`.github/workflows/ci.yml`) xanh: `npm audit` → lint → typecheck → test (Postgres 16) → build.
 - [ ] **Migration đụng dữ liệu** (`UPDATE`/backfill/đổi kiểu cột `ALTER COLUMN ... TYPE`/`DROP COLUMN`) phải chạy qua staging trước (`bash deploy.sh --staging`, xem `docs/ops/staging.md`) rồi mới lên production; kiểm trước bằng `npm run db:migrate -- --dry-run`. Migration chỉ `CREATE TABLE`/`ADD COLUMN`/`CREATE INDEX` (thêm thuần tuý, không đụng dòng dữ liệu hiện có) được đi thẳng production.
 - [ ] **Mọi commit thêm tính năng/fix có ý nghĩa đã ghi vào `PROGRESS.md`** (mục "Đã làm"/"Tiếp theo" đúng chỗ, kèm số PR khi đã mở) **trước khi push** — không để tài liệu lệch code (bài học lặp lại nhiều lần: dở dang tưởng đã xong hoặc ngược lại vì tài liệu quên cập nhật). Nếu commit đóng/mở 1 mục `M<xx>` trong `docs/nang-cap/`, cập nhật luôn trạng thái trong `docs/nang-cap/README.md`.

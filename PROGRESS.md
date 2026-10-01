@@ -1,5 +1,36 @@
 # PROGRESS — XBoss
 
+## 2026-10-01 — tích hợp ECC (Everything Claude Code) vào cấu hình agent (PR #555)
+
+Nghiên cứu [ECC](https://github.com/affaan-m/ECC) v2.2.2 (harness phổ biến nhất cho Claude Code)
+và tích hợp tối đa theo yêu cầu người dùng — quyết định + lý do + đánh đổi ở
+[ADR-0013](docs/adr/0013-tich-hop-ecc.md). Điểm then chốt: phiên cloud **không nạp plugin** bật qua
+`.claude/settings.json` của repo → chọn **vendor có ghim commit** thay vì cài plugin `ecc@ecc`.
+
+- **Lớp ECC vendor** (`.claude/ecc/manifest.json` → `npm run ecc:vendor`): 24 agent, 56 skill,
+  19 command, 22 rule (`common` + `typescript`/`web`/`react` theo `paths`), tiền tố `ecc-`, khoá
+  sha256 (`.claude/ecc/lock.json`, `tests/ecc-vendor.test.ts`). Không vendor mã thực thi của ECC.
+- **Lớp thích nghi XBoss**: `.claude/rules/00-uu-tien-ecc.md` (15 điểm ECC bị ghi đè: node:test,
+  ratchet coverage, raw SQL, format API, UI token, commit tiếng Việt, cấm `npx` gói ngoài…); rules path-scoped
+  `.claude/rules/xboss/` (migrations, API, UI, test, tiến độ-nghiệm thu, tài chính).
+- **Hook mới (bash, có test `tests/claude-hooks.test.ts`)**: `protect-config` (deny sửa migration đã
+  có trên origin/main + sửa tay vendor; ask khi sửa cấu hình cổng), `risk-zone-gate` (GateGuard cho
+  vùng `docs/audit.md` §8, bản máy đọc `.claude/hooks/risk-zones.txt`), `pre-push-gate` (PROGRESS.md
+  - trùng số migration — `check-progress-freshness.ts` thêm chế độ `--base`), `stop-static-checks`
+    (prettier/eslint/cổng `check:*` theo file đổi trước khi dừng lượt).
+- **Agent/skill XBoss**: `audit-bao-mat`/`audit-logic`/`audit-ui` (3 trụ `docs/audit.md`); `/gate`
+  (`npm run gate` đọc thẳng job `static` của `ci.yml` — trước đây `/review` nhắc `/gate` nhưng chưa
+  có), `/hoc`, `/ecc`. Coordinator thêm hợp đồng hoàn tất khi uỷ thác, truy hồi lặp ≤3 vòng, review
+  đa góc nhìn song song; `/review` gọi audit theo file đổi; CLAUDE.md thêm "Định tuyến ECC & audit".
+- Gộp với PR #554 (OpenCodeReview, ra main trong lúc PR này mở): ADR đánh số **0013** vì #554 đã
+  dùng 0012; giữ cách `.gitignore`/`.prettierignore` của #554 (prettier bỏ qua `.claude/`, lớp vendor
+  khoá bằng sha256); `/review` chạy lượt OCR → `code-review` → audit đa góc nhìn. Rules
+  `.claude/rules/xboss/*` (nạp khi VIẾT code) bổ sung cho `.opencodereview/rules/*` (dùng khi REVIEW).
+
+Nợ/đề xuất: CLAUDE.md 262 dòng (Claude Code khuyến nghị < 200) — có thể chuyển các mục chỉ đúng
+cho một vùng file sang `.claude/rules/xboss/*`, cần người dùng duyệt. Theo dõi chi phí ngữ cảnh của
+lớp ECC bằng `/ecc-context-budget`; gỡ bớt qua manifest nếu cần.
+
 ## 2026-10-01 — tích hợp OpenCodeReview: luật review AI theo đường dẫn (PR #554)
 
 Nghiên cứu [alibaba/open-code-review](https://github.com/alibaba/open-code-review) (CLI `ocr`, ghim
