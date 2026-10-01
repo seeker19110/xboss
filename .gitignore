@@ -35,8 +35,18 @@ docs/ops/MAINTENANCE-REPORT.md
 cloudflared.exe
 cloudflared-*.txt
 
-# Claude settings — không đưa vào repo dự án
-.claude/
+# Claude Code — chỉ commit cấu hình DÙNG CHUNG của dự án (agent/skill/command/hook/rule/lớp ECC
+# vendor, xem .claude/README.md + ADR-0012). Phần còn lại là cục bộ: settings.local.json, worktree
+# tạm của agent (chứa build .next riêng), dữ liệu phiên...
+.claude/*
+!.claude/README.md
+!.claude/settings.json
+!.claude/agents/
+!.claude/commands/
+!.claude/skills/
+!.claude/hooks/
+!.claude/rules/
+!.claude/ecc/
 
 # SQLite cũ (đã chuyển sang Postgres) — giữ file local làm backup
 xboss.db

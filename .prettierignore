@@ -10,3 +10,12 @@ data/uploads
 
 # ERD sinh tự động (npm run gen:erd) — CI so khớp bằng git diff, không để prettier canh lại bảng
 docs/ERD.md
+
+# Lớp ECC vendor (ADR-0012) — giữ NGUYÊN VĂN upstream để diff khi lên phiên bản; chống sửa tay
+# bằng sha256 trong .claude/ecc/lock.json (tests/ecc-vendor.test.ts), không bằng prettier.
+.claude/agents/ecc-*.md
+.claude/commands/ecc-*.md
+.claude/skills/ecc-*/
+.claude/rules/ecc/
+.claude/ecc/lock.json
+.claude/ecc/LICENSE

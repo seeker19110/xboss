@@ -100,6 +100,10 @@ Kế thừa quy trình ground-truth đã chứng minh hiệu quả (xem **Phụ 
 
 `lib/tien-do/recompute.ts` · mọi route PATCH tiến độ/nghiệm thu (`tasks/:id/progress`, `dimensions/*`, `tasks/:id/approve`, `approvals`) · `lib/vat-tu/material-sync.ts` · `lib/khoi-luong/boq.ts` · `lib/bao-mat/auth.ts` (`CAN`/`canTouchTask`/`canTouchPackage`) · mọi route tài chính (`/api/costs`, `/api/payment-certs`, `/api/contracts`, `/api/purchase-orders`) · mọi route/khối notification tính theo dự án (M22) · `lib/van-hanh/push.ts` + service worker (`public/sw.js`) · mọi route xuất PDF/Excel mới · `.github/workflows/*.yml`.
 
+Bản **máy đọc** của danh sách này: `.claude/hooks/risk-zones.txt` — hook `risk-zone-gate.sh` buộc
+agent nêu nơi gọi, bất biến, test và yêu cầu gốc trước lần sửa đầu tiên mỗi phiên (ADR-0012). Đổi
+danh sách ở đây thì sửa cả file đó (`tests/claude-hooks.test.ts` kiểm mỗi mẫu còn khớp file thật).
+
 ## 9. Quy trình chạy 1 đợt audit toàn dự án
 
 1. Chia theo miền, chạy song song bằng nhiều subagent độc lập (mẫu đã dùng nhiều lần: bảo mật/phân quyền, correctness/race-condition, frontend a11y/XSS/hardcode, dependency/CI/migration/test) — mỗi agent đọc code thật, không đoán.

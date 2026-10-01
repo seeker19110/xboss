@@ -1,5 +1,5 @@
 ---
-description: Review code trước khi mở PR — gọi skill code-review (+ security-review nếu chạm vùng nhạy cảm), khác /gate là bước máy chạy lint/typecheck/test
+description: Review code trước khi mở PR — gọi skill code-review (+ security-review nếu chạm vùng nhạy cảm) + agent audit-* theo 3 trụ docs/audit.md; khác /gate (skill .claude/skills/gate) là bước máy chạy đúng các cổng CI
 ---
 
 Kích hoạt **rà soát code trước khi mở Pull Request**. Đây là bước đọc-hiểu (logic/thiết kế/tái sử
@@ -26,6 +26,21 @@ diff chạm nhiều file/luồng nghiệp vụ chính, hoặc đụng vùng rủ
 
 Diff đụng auth, thanh toán, dữ liệu người dùng thật, quyền truy cập, hoặc input từ bên ngoài chưa
 rõ đã validate → gọi thêm `Skill(security-review)`.
+
+## Bước 3b — Review đa góc nhìn theo 3 trụ `docs/audit.md` (song song)
+
+Gọi SONG SONG (một lượt nhiều tool Agent) các agent audit khớp với file trong diff — mỗi agent
+chỉ báo cáo, không sửa:
+
+| Diff chạm                                                                                                 | Agent           |
+| --------------------------------------------------------------------------------------------------------- | --------------- |
+| `app/api/**`, `lib/bao-mat/**`, migration có RLS/`project_id`                                             | `audit-bao-mat` |
+| `lib/{tien-do,tai-chinh,vat-tu,khoi-luong}/**`, `migrations/**`, mẫu trong `.claude/hooks/risk-zones.txt` | `audit-logic`   |
+| `app/**/*.tsx`, `app/globals.css`                                                                         | `audit-ui`      |
+
+Diff lớn hoặc rủi ro cao có thể thêm góc nhìn chung của ECC: `ecc-silent-failure-hunter`,
+`ecc-typescript-reviewer`, `ecc-react-reviewer`, `ecc-database-reviewer`, `ecc-pr-test-analyzer`
+(hoặc `/ecc-review-pr`). Khi phát hiện ECC trái quy ước XBoss → theo `.claude/rules/00-uu-tien-ecc.md`.
 
 ## Bước 4 — Xử lý phát hiện
 

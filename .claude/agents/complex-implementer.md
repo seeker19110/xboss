@@ -1,6 +1,6 @@
 ---
 name: complex-implementer
-description: 'route: complex — việc PHỨC TẠP (đụng kiến trúc, nhiều file/luồng đan nhau) mà trong lúc code còn phải tự cân nhắc một số đánh đổi trong ranh giới brief cho phép. Nhận brief nêu rõ mục tiêu, đặc tả nền và RANH GIỚI QUYẾT ĐỊNH được phép — không phải giấy phép tự do thiết kế. KHÔNG dùng khi đặc tả đã kín (→ spec-executor, rẻ hơn), việc vừa (→ standard-worker) hay cơ học (→ mechanical-worker). KHÔNG dùng để thay việc hỏi người dùng khi đặc tả còn thiếu — đó là việc của phiên chính (AskUserQuestion) trước khi giao.'
+description: "route: complex — việc PHỨC TẠP (đụng kiến trúc, nhiều file/luồng đan nhau) mà trong lúc code còn phải tự cân nhắc một số đánh đổi trong ranh giới brief cho phép. Nhận brief nêu rõ mục tiêu, đặc tả nền và RANH GIỚI QUYẾT ĐỊNH được phép — không phải giấy phép tự do thiết kế. KHÔNG dùng khi đặc tả đã kín (→ spec-executor, rẻ hơn), việc vừa (→ standard-worker) hay cơ học (→ mechanical-worker). KHÔNG dùng để thay việc hỏi người dùng khi đặc tả còn thiếu — đó là việc của phiên chính (AskUserQuestion) trước khi giao."
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: opus
 effort: high
