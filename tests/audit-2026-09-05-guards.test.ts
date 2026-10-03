@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { CAN } from "@/lib/bao-mat/auth";
+import { permDefaultsMatrix } from "@/lib/bao-mat/auth";
 import { VIEW_ONLY_ROLES } from "@/lib/nen/roles";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,14 +40,16 @@ function tachHandler(src: string): { method: string; than: string }[] {
 
 describe("audit 2026-09-05 — cổng quyền & cách ly dữ liệu", () => {
   it("ca 1 — quyền GHI của track engineering loại hết vai trò chỉ-xem và subcon", () => {
+    // Ma trận mặc định; CAN thật cần snapshot quyền trong request đã xác thực.
+    const m = permDefaultsMatrix();
     for (const r of [...VIEW_ONLY_ROLES, "subcon"] as const) {
-      assert.equal(CAN.manageEngineeringGraph(r), false, `${r} không được ghi`);
+      assert.equal(m.manageEngineeringGraph[r], false, `${r} không được ghi`);
     }
     for (const r of ["admin", "pm", "engineer"] as const) {
-      assert.equal(CAN.manageEngineeringGraph(r), true, `${r} phải ghi được`);
+      assert.equal(m.manageEngineeringGraph[r], true, `${r} phải ghi được`);
     }
     // Quyền XEM vẫn mở cho bch — đây là điểm khiến việc dùng nó làm cổng ghi là lỗi.
-    assert.equal(CAN.viewEngineeringGraph("bch"), true);
+    assert.equal(m.viewEngineeringGraph.bch, true);
   });
 
   it("ca 2 — không handler ghi nào còn gate bằng quyền XEM viewEngineeringGraph", () => {
@@ -81,7 +83,7 @@ describe("audit 2026-09-05 — cổng quyền & cách ly dữ liệu", () => {
     );
     // Vai trò chỉ-xem/subcon không có quyền xem tiền → API trả null cho khối tiền.
     for (const r of [...VIEW_ONLY_ROLES.filter((x) => x !== "bch"), "subcon"] as const) {
-      assert.equal(CAN.viewPayments(r), false, `${r} không được xem tiền`);
+      assert.equal(permDefaultsMatrix().viewPayments[r], false, `${r} không được xem tiền`);
     }
   });
 

@@ -147,7 +147,7 @@ test(
 );
 
 test(
-  "POST /api/engineering/cashflow/simulate: gửi projectId của dự án không thuộc quyền → 403 " +
+  "POST /api/engineering/cashflow/simulate: gửi projectId của dự án không thuộc quyền → 404 (không lộ dự án tồn tại) " +
     "(chotProjectIdChoGhi chặn IDOR)",
   S,
   async () => {
@@ -163,7 +163,7 @@ test(
         totalContractValue: 1_000_000,
       }),
     );
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
   },
 );
 
@@ -229,7 +229,7 @@ test(
 );
 
 test(
-  "POST /api/engineering/bidding/packages: gửi projectId dự án không thuộc quyền → 403",
+  "POST /api/engineering/bidding/packages: gửi projectId dự án không thuộc quyền → 404 (không lộ dự án tồn tại)",
   S,
   async () => {
     const projectA = await taoDuAn("bpidorA");
@@ -246,7 +246,7 @@ test(
         targetBudgetVnd: 1,
       }),
     );
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
   },
 );
 

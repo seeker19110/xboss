@@ -370,7 +370,7 @@ test("POST /api/engineering/logistics/shipments: thiếu trường bắt buộc 
 });
 
 test(
-  "POST /api/engineering/logistics/shipments: gửi projectId dự án khác (không được gán) → 403",
+  "POST /api/engineering/logistics/shipments: gửi projectId dự án khác (không được gán) → 404 (không lộ dự án tồn tại)",
   S,
   async () => {
     const projectA = await taoDuAn("shipisoA");
@@ -388,7 +388,7 @@ test(
         manifest: [],
       }),
     );
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
   },
 );
 

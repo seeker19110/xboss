@@ -549,16 +549,24 @@ test(
   },
 );
 
-test("GET /api/projects: lọc theo ?org=", S, async () => {
+test("GET /api/projects: lọc theo ?org= chỉ trong tổ chức của chính admin (D01)", S, async () => {
   const { insertId } = await import("@/lib/db");
   const orgD = await insertId(`INSERT INTO organizations (name) VALUES (?)`, `Org D ${RUN}`);
-  const admin = await dungUser("admin", `adminorgfilter${RUN}`);
   const projD = await dungDuAn(`orgD${RUN}`, orgD);
-  dangNhap({ id: admin.id, passwordHash: admin.pwHash });
   const { GET } = await import("@/app/api/projects/route");
-  const res = await GET(req(`http://localhost/api/projects?org=${orgD}`, "GET"));
-  const ids: number[] = (await res.json()).projects.map((p: { id: number }) => p.id);
-  assert.ok(ids.includes(projD));
+
+  const adminD = await dungUser("admin", `adminorgfilterD${RUN}`, orgD);
+  dangNhap({ id: adminD.id, passwordHash: adminD.pwHash, orgId: orgD });
+  const resD = await GET(req(`http://localhost/api/projects?org=${orgD}`, "GET"));
+  const idsD: number[] = (await resD.json()).projects.map((p: { id: number }) => p.id);
+  assert.ok(idsD.includes(projD), "admin org D thấy dự án org D");
+
+  // Admin org khác đoán ?org=D không được nhìn xuyên tổ chức.
+  const adminKhac = await dungUser("admin", `adminorgfilter${RUN}`);
+  dangNhap({ id: adminKhac.id, passwordHash: adminKhac.pwHash });
+  const resKhac = await GET(req(`http://localhost/api/projects?org=${orgD}`, "GET"));
+  const idsKhac: number[] = (await resKhac.json()).projects.map((p: { id: number }) => p.id);
+  assert.ok(!idsKhac.includes(projD), "admin org khác không thấy dự án org D");
 });
 
 test("POST /api/projects: chưa đăng nhập → 401", { ...S }, async () => {

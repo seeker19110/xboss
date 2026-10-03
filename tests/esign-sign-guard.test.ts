@@ -2,7 +2,7 @@ import "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { CAN } from "@/lib/bao-mat/auth";
+import { permDefaultsMatrix } from "@/lib/bao-mat/auth";
 import { kiemDieuKienKy } from "@/lib/ky-thuat/engineering-esignature";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -18,11 +18,13 @@ const NGUOI_KY = { userId: 7, status: "ready", otpCode: null, otpExpiresAt: null
 
 describe("e-Sign: siết quyền ký", () => {
   it("ca 1 — vai trò chỉ-xem và subcon không có quyền ký", () => {
+    // Ma trận mặc định; CAN thật cần snapshot quyền trong request đã xác thực.
+    const ky = permDefaultsMatrix().signEngineeringEsign;
     for (const r of ["bch", "cdt", "viewer", "subcon"] as const) {
-      assert.equal(CAN.signEngineeringEsign(r), false, `${r} không được phép ký`);
+      assert.equal(ky[r], false, `${r} không được phép ký`);
     }
     for (const r of ["admin", "pm", "engineer"] as const) {
-      assert.equal(CAN.signEngineeringEsign(r), true, `${r} phải được phép ký`);
+      assert.equal(ky[r], true, `${r} phải được phép ký`);
     }
   });
 
