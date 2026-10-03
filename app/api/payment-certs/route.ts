@@ -77,19 +77,41 @@ export async function POST(req: NextRequest) {
   // để dùng làm tham số bắt buộc `number` của openApproval bên dưới.
   const pid = projectId as number;
 
-  const suggested = await suggestQtyForContract(contractId);
-  if (suggested.length === 0)
-    return NextResponse.json(
-      { error: "Hợp đồng chưa có dòng BOQ nào gắn vào — gán BOQ vào hợp đồng trước" },
-      { status: 422 },
-    );
-
   const periodLabel =
     typeof body?.periodLabel === "string" ? body.periodLabel.trim() || null : null;
 
   try {
     const { id, code } = await withUniqueRetry(() =>
       withTransaction(async () => {
+        // Đợt IPC phải TUẦN TỰ: KL gợi ý + luỹ kế của đợt mới tính từ đợt ĐÃ DUYỆT gần nhất
+        // (suggestQtyForContract/saveCertItems). Còn đợt nháp/đã trình chưa quyết định mà lập
+        // tiếp thì đợt mới không trừ KL của đợt đó → duyệt cả hai là trả TRÙNG tiền (P1 duyệt
+        // 30, P2 trình 20, P3 gợi ý 60−30 = 30 thay vì 10: tổng 80 > 60 đã thi công). Quyết
+        // định chủ dự án 2026-10-01: chặn, duyệt/từ chối đợt trước rồi mới lập đợt sau. Khoá
+        // dòng hợp đồng để 2 lần lập đồng thời không cùng vượt qua kiểm tra này.
+        await queryOne(`SELECT id FROM contracts WHERE id = ? FOR UPDATE`, contractId);
+        const dangCho = await queryOne<{ code: string; status: string }>(
+          `SELECT code, status FROM payment_certs
+            WHERE contract_id = ? AND status IN ('draft', 'submitted')
+            ORDER BY period_no LIMIT 1`,
+          contractId,
+        );
+        if (dangCho)
+          throw Object.assign(
+            new Error(
+              `Đợt ${dangCho.code} đang ${dangCho.status === "draft" ? "nháp" : "chờ duyệt"} — ` +
+                "duyệt hoặc từ chối đợt đó trước khi lập đợt mới (tránh trả trùng khối lượng)",
+            ),
+            { status: 409 },
+          );
+
+        const suggested = await suggestQtyForContract(contractId);
+        if (suggested.length === 0)
+          throw Object.assign(
+            new Error("Hợp đồng chưa có dòng BOQ nào gắn vào — gán BOQ vào hợp đồng trước"),
+            { status: 422 },
+          );
+
         const periodNo = await nextPeriodNo(contractId);
         const code = await nextCertCode();
         const id = await insertId(
@@ -126,6 +148,8 @@ export async function POST(req: NextRequest) {
         { error: "Mã đợt hoặc số đợt bị trùng do tạo đồng thời — vui lòng thử lại" },
         { status: 409 },
       );
+    const status = (err as { status?: number }).status;
+    if (status) return NextResponse.json({ error: (err as Error).message }, { status });
     throw err;
   }
 }

@@ -4,6 +4,23 @@ Tài liệu này mô tả cơ chế phân việc theo tầng model đang dùng t
 
 > ⚠️ **Copy `.claude/` thôi là CHƯA ĐỦ.** Các file `.claude/agents/*.md` chỉ khai báo subagent **tồn tại** — không có gì khiến Opus **chủ động gọi** chúng. Điều khiến Opus biết "việc này nên giao cho `coder`/`reviewer`/`mechanical`" là 1 bullet nằm ở **`CLAUDE.md` gốc repo đích** (ngoài `.claude/`, dễ quên khi copy). Thiếu bullet đó, subagent vẫn gọi được thủ công nhưng Opus sẽ mặc định tự code hết như không có cấu hình này. Xem template copy-paste ở mục 5, bước 4.
 
+## 0. Bản đồ `.claude/` hiện tại (2026-10-01)
+
+Nguồn sự thật về CÁCH DÙNG là `CLAUDE.md` (luồng 3 tầng + bảng `route:` + "Định tuyến ECC & audit"). Các mục 1–6 bên dưới là hướng dẫn copy cấu hình phân tầng sang repo khác, viết từ thời còn 3 subagent `coder`/`reviewer`/`mechanical` — nay đã thay bằng `coordinator` + 4 worker.
+
+| Thành phần  | XBoss                                                                                                                                                      | Lớp ECC vendor (ADR-0013)                                              |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `agents/`   | `coordinator`, `complex-implementer`, `spec-executor`, `standard-worker`, `mechanical-worker`, `reviewer`, `maintainer`, `audit-{bao-mat,logic,ui}`        | 24 × `ecc-*` (chuyên gia bổ trợ)                                       |
+| `skills/`   | `gate`, `hoc`, `ecc`                                                                                                                                       | 56 × `ecc-*`                                                           |
+| `commands/` | `review`, `maintain`                                                                                                                                       | 19 × `ecc-*`                                                           |
+| `rules/`    | `00-uu-tien-ecc.md` (XBoss thắng khi mâu thuẫn), `xboss/*` (theo `paths`)                                                                                  | `ecc/{common,typescript,web,react}`                                    |
+| `hooks/`    | `session-resume`, `block-dangerous-git`, `pre-commit-gate`, `pre-push-gate`, `protect-config`, `risk-zone-gate` (+ `risk-zones.txt`), `stop-static-checks` | không vendor mã hook ECC — hành vi được viết lại ở cột trái            |
+| `ecc/`      | —                                                                                                                                                          | `manifest.json` (nguồn sự thật), `lock.json` (sha256), `LICENSE` (MIT) |
+
+- File `ecc-*` và `rules/ecc/**` **không sửa tay** (hook `protect-config.sh` chặn, `tests/ecc-vendor.test.ts` so sha256) — sửa manifest rồi `npm run ecc:vendor -- --src <checkout ECC>`, xem skill `/ecc`.
+- Hook có test tại `tests/claude-hooks.test.ts`; bỏ qua có chủ đích bằng biến env trong `.claude/settings.local.json` (`XBOSS_ALLOW_PROTECTED_EDIT`, `XBOSS_SKIP_RISK_GATE`, `SKIP_PREPUSH_GATE`, `SKIP_STOP_CHECKS`, `SKIP_PRECOMMIT_GATE`, `ALLOW_DANGEROUS_GIT`).
+- `.gitignore` chỉ bỏ qua phần cục bộ (`.claude/worktrees/`, `.claude/settings.local.json`); prettier bỏ qua cả `.claude/` (ADR-0012) — lớp vendor được khoá bằng sha256 thay vì format.
+
 ## 1. Ý tưởng
 
 4 tầng, phân theo độ khó của việc — mục tiêu: chỉ dùng model đắt/chậm (Opus) cho việc thật sự cần phán đoán, còn lại đẩy xuống model rẻ/nhanh hơn:

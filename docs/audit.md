@@ -54,6 +54,8 @@ Lớp lỗi nguy hiểm nhất: code biên dịch sạch, type đúng, nhưng **
 - [ ] BOQCODE duy nhất xuyên toàn hệ thống (`tasks`/`work_packages`/`materials`/`boq_items`) — có ràng buộc DB thật (`boq_codes` + trigger), không chỉ check ở tầng ứng dụng (`boqTakenBy` là lưới an toàn phụ, không phải nguồn sự thật).
 - [ ] Ngày giờ: so sánh **chuỗi** `YYYY-MM-DD`; cộng/trừ ngày qua `daysFromTodayISO`/`todayISO`; mọi mốc "hôm nay" ép múi giờ `Asia/Ho_Chi_Minh` — tránh lệch 1 ngày lúc 0h–7h sáng giờ VN do server chạy UTC.
 - [ ] `nghiem_thu` không bao giờ bị hạ cấp tự động; chỉ đặt/huỷ qua `POST/DELETE /api/tasks/:id/approve` hoặc `/api/approvals`, luôn ghi `task_history`.
+- [ ] Bất biến `nghiem_thu ⇒ progress = 1` giữ ở **mọi** đường làm giảm % — không chỉ route tiến độ/tick ô mà cả thêm/copy cột lưới, import Excel, thao tác hàng loạt (lỗi thật tái phát 2026-10-01, xem `TRAPS.md` §5). Duyệt/huỷ theo tầng không đụng task đã duyệt riêng lẻ (`approval_source`).
+- [ ] Chứng từ thanh toán theo đợt (IPC): luỹ kế/gợi ý KL chỉ đúng khi các đợt **tuần tự** — đợt mới không được lập khi đợt trước chưa quyết định (lỗi thật 2026-10-01: trả trùng tiền). Engine phê duyệt M46: test qua route thật với đúng người bấm, không chỉ gọi lib với user khác nhau (`TRAPS.md` §6).
 - [ ] Migration mới **append-only**, `IF NOT EXISTS`, chạy lại không lỗi (idempotent); nếu backfill dữ liệu cũ có khả năng đã trùng/xung đột — ghi rõ quyết định xử lý, không giả định dữ liệu cũ sạch.
 - [ ] Mọi nhánh logic phức tạp mới có ít nhất 1 test biên (rỗng/1 phần tử/nhiều phần tử, `null`/0, off-by-one).
 
@@ -97,6 +99,12 @@ Kế thừa quy trình ground-truth đã chứng minh hiệu quả (xem **Phụ 
 ## 8. Vùng rủi ro cao (audit hẹp bắt buộc khi PR chạm vào)
 
 `lib/tien-do/recompute.ts` · mọi route PATCH tiến độ/nghiệm thu (`tasks/:id/progress`, `dimensions/*`, `tasks/:id/approve`, `approvals`) · `lib/vat-tu/material-sync.ts` · `lib/khoi-luong/boq.ts` · `lib/bao-mat/auth.ts` (`CAN`/`canTouchTask`/`canTouchPackage`) · mọi route tài chính (`/api/costs`, `/api/payment-certs`, `/api/contracts`, `/api/purchase-orders`) · mọi route/khối notification tính theo dự án (M22) · `lib/van-hanh/push.ts` + service worker (`public/sw.js`) · mọi route xuất PDF/Excel mới · `.github/workflows/*.yml`.
+
+Luật review máy đọc của các vùng trên nằm ở `.opencodereview/rules/` (ADR-0012) — đổi checklist §3–§7 thì đồng bộ mảnh luật tương ứng rồi chạy `npm run gen:ocr-rules`; `tests/ocr-rules.test.ts` canh mỗi vùng giải đúng mục luật.
+
+Bản **máy đọc** của danh sách này: `.claude/hooks/risk-zones.txt` — hook `risk-zone-gate.sh` buộc
+agent nêu nơi gọi, bất biến, test và yêu cầu gốc trước lần sửa đầu tiên mỗi phiên (ADR-0013). Đổi
+danh sách ở đây thì sửa cả file đó (`tests/claude-hooks.test.ts` kiểm mỗi mẫu còn khớp file thật).
 
 ## 9. Quy trình chạy 1 đợt audit toàn dự án
 

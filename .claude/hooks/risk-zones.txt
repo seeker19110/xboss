@@ -1,0 +1,20 @@
+# Vùng rủi ro cao — bản MÁY ĐỌC của docs/audit.md §8 (dùng bởi risk-zone-gate.sh).
+# Đổi danh sách §8 thì sửa cả file này (test tests/claude-hooks.test.ts đối chiếu mỗi mẫu với file thật).
+# Mỗi dòng: 1 mẫu glob kiểu bash, tương đối gốc repo; `*` khớp cả dấu `/`.
+lib/tien-do/recompute.ts
+app/api/tasks/*/progress/*
+app/api/tasks/*/approve/*
+app/api/approvals/*
+app/api/dimensions/*
+lib/vat-tu/material-sync.ts
+lib/khoi-luong/boq.ts
+lib/bao-mat/auth.ts
+app/api/costs/*
+app/api/payment-certs/*
+app/api/contracts/*
+app/api/purchase-orders/*
+lib/dich-vu/thong-bao.ts
+app/api/notifications/*
+lib/van-hanh/push.ts
+public/sw.js
+.github/workflows/*

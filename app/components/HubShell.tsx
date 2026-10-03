@@ -88,26 +88,48 @@ export default function HubShell({
 
   const currentTabObj = tabs.find((t) => t.id === activeTab) || tabs[0];
 
+  // Điều hướng bàn phím theo khuôn WAI-ARIA "tabs, automatic activation" — cùng cách
+  // làm với ui/Tabs: ←/→ (kèm Home/End) đổi tab và dời focus; chỉ tab đang chọn nằm
+  // trong luồng Tab (roving tabindex).
+  function onTabListKeyDown(e: React.KeyboardEvent<HTMLElement>) {
+    const i = tabs.findIndex((t) => t.id === currentTabObj?.id);
+    if (i < 0) return;
+    let next: number;
+    if (e.key === "ArrowRight") next = i + 1;
+    else if (e.key === "ArrowLeft") next = i - 1;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = tabs.length - 1;
+    else return;
+    e.preventDefault();
+    const tab = tabs[(next + tabs.length) % tabs.length];
+    handleTabChange(tab.id);
+    document.getElementById(`tab-${tab.id}`)?.focus();
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <AppHeader
         title={
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-zinc-800/80 border border-zinc-700/60 text-emerald-400">
+          // min-w-0 + truncate ở từng tầng: tiêu đề hub dài ("Trung Tâm Chỉ Huy Tác Nghiệp
+          // Hiện Trường") phải co kèm dấu "…" trên điện thoại, không bị xén cụt giữa chữ.
+          // Icon trang trí và badge phụ ẩn dưới sm để nhường chỗ cho chữ (badge shrink-0 từng
+          // chiếm trọn ô tiêu đề ở màn 360px, đẩy tên hub về 0px).
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="hidden sm:block p-1.5 rounded-lg bg-zinc-800/80 border border-zinc-700/60 text-emerald-400 shrink-0">
               <HubIcon className="w-5 h-5 shrink-0" />
             </div>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold tracking-tight text-zinc-100 text-base sm:text-lg">
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-semibold tracking-tight text-zinc-100 text-base sm:text-lg truncate">
                   {title}
                 </span>
                 {badge && (
-                  <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-400 border border-emerald-500/30">
+                  <span className="hidden sm:inline-block shrink-0 rounded bg-emerald-500/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-400 border border-emerald-500/30">
                     {badge}
                   </span>
                 )}
               </div>
-              <span className="text-xs text-zinc-400 line-clamp-1">{subtitle}</span>
+              <span className="text-xs text-zinc-400 truncate">{subtitle}</span>
             </div>
           </div>
         }
@@ -134,14 +156,17 @@ export default function HubShell({
         )}
 
         {/* Tab Navigation & Search Bar */}
-        <div className="sticky top-12 z-20 bg-background/95 backdrop-blur border-b border-zinc-800/80 -mx-3 px-3 sm:-mx-6 sm:px-6 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-2.5">
+        {/* top = chiều cao topbar (h-12) + vùng an toàn trên: topbar có padding safe-top
+            (PWA standalone trên iPhone tai thỏ) nên neo đúng 3rem sẽ trượt vào dưới nó. */}
+        <div className="sticky top-[calc(3rem+env(safe-area-inset-top,0px))] z-20 bg-background/95 backdrop-blur border-b border-zinc-800/80 -mx-3 px-3 sm:-mx-6 sm:px-6 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-2.5">
           {/* Scrollable Tabs */}
           <nav
             role="tablist"
             aria-label="Các phân hệ nghiệp vụ"
+            onKeyDown={onTabListKeyDown}
             className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none touch-pan-x"
           >
-            {tabs.map((tab, idx) => {
+            {tabs.map((tab) => {
               const TabIcon = tab.icon;
               const isSelected = tab.id === activeTab;
               return (
@@ -151,9 +176,9 @@ export default function HubShell({
                   id={`tab-${tab.id}`}
                   aria-controls={`tabpanel-${tab.id}`}
                   aria-selected={isSelected}
+                  tabIndex={isSelected ? 0 : -1}
                   onClick={() => handleTabChange(tab.id)}
-                  title={`${tab.label} (Phím tắt: Alt+${idx + 1})`}
-                  className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs sm:text-sm font-medium transition-all ${
+                  className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs sm:text-sm font-medium transition ${
                     isSelected
                       ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/40 font-semibold"
                       : "bg-zinc-950/70 text-zinc-400 border border-zinc-800 hover:bg-zinc-800/70 hover:text-zinc-100 hover:border-zinc-700"
@@ -194,7 +219,7 @@ export default function HubShell({
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full min-h-[44px] rounded-xl border border-zinc-800 bg-zinc-950/90 py-2 pl-9 pr-3 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none transition-colors"
+                className="w-full min-h-[44px] rounded-xl border border-zinc-800 bg-zinc-950/90 py-2 pl-9 pr-3 text-base sm:text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none transition-colors"
               />
             </div>
           )}

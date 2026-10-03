@@ -123,11 +123,12 @@ export async function POST(req: NextRequest) {
         id: number;
         package_id: number;
         progress_percent: number;
+        status: string | null;
         code: string;
         boq_code: string | null;
         name: string;
       }>(
-        `SELECT t.id, t.package_id, t.progress_percent, t.code, t.boq_code, t.name
+        `SELECT t.id, t.package_id, t.progress_percent, t.status, t.code, t.boq_code, t.name
            FROM tasks t
            JOIN work_packages wp ON t.package_id = wp.id
           WHERE wp.sheet_type_id = ? AND wp.floor_label = ?
@@ -146,8 +147,15 @@ export async function POST(req: NextRequest) {
           { status: 422 },
         );
 
+      // Task đã nghiệm thu RIÊNG LẺ từ trước (POST /api/tasks/:id/approve) giữ nguyên: duyệt
+      // tầng chỉ đặt nghiem_thu cho phần CHƯA duyệt. Ghi đè cả những task đó thành
+      // approval_source='floor' (lỗi cũ) khiến huỷ nghiệm thu tầng sau này hạ luôn task đã
+      // duyệt riêng — đúng lỗi mà cột approval_source (0151) sinh ra để chặn — kèm 1 dòng
+      // task_history "nghiệm thu" thừa và 1 webhook task.approved trùng cho mỗi task đó.
+      const toApprove = tasks.filter((t) => t.status !== "nghiem_thu");
+
       // Gate M3: mọi task trong tầng phải qua checklist bắt buộc (nếu có) trước khi nghiệm thu lô.
-      for (const t of tasks) {
+      for (const t of toApprove) {
         if (await requiredInspectionMissing(t.id))
           throw Object.assign(
             new Error(
@@ -179,7 +187,7 @@ export async function POST(req: NextRequest) {
               status: 403,
             });
         }
-        for (const t of tasks) {
+        for (const t of toApprove) {
           const opened = await openApproval({
             entityType: "task_acceptance",
             entityId: t.id,
@@ -219,29 +227,32 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Đặt toàn bộ task thành nghiem_thu — bulk UPDATE để tránh N+1 sequential queries.
-      const taskIds = tasks.map((t) => t.id);
-      await run(
-        `UPDATE tasks SET status = 'nghiem_thu', approval_source = 'floor', updated_at = CURRENT_TIMESTAMP WHERE id = ANY(?)`,
-        taskIds,
-      );
+      // Đặt các task CHƯA nghiệm thu thành nghiem_thu — bulk UPDATE để tránh N+1 sequential
+      // queries. Tầng mà mọi task đã duyệt riêng lẻ thì không còn gì để ghi.
+      if (toApprove.length > 0) {
+        const taskIds = toApprove.map((t) => t.id);
+        await run(
+          `UPDATE tasks SET status = 'nghiem_thu', approval_source = 'floor', updated_at = CURRENT_TIMESTAMP WHERE id = ANY(?)`,
+          taskIds,
+        );
 
-      // Bulk INSERT audit history trong 1 câu lệnh.
-      const note = `Nghiệm thu tầng ${floorLabel} bởi ${user.name}`;
-      const ph = tasks.map(() => "(?, ?, ?, 'nghiem_thu', ?, ?)").join(", ");
-      const vals = tasks.flatMap((t) => [
-        t.id,
-        t.progress_percent,
-        t.progress_percent,
-        note,
-        user.name,
-      ]);
-      await run(
-        `INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by) VALUES ${ph}`,
-        ...vals,
-      );
+        // Bulk INSERT audit history trong 1 câu lệnh.
+        const note = `Nghiệm thu tầng ${floorLabel} bởi ${user.name}`;
+        const ph = toApprove.map(() => "(?, ?, ?, 'nghiem_thu', ?, ?)").join(", ");
+        const vals = toApprove.flatMap((t) => [
+          t.id,
+          t.progress_percent,
+          t.progress_percent,
+          note,
+          user.name,
+        ]);
+        await run(
+          `INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by) VALUES ${ph}`,
+          ...vals,
+        );
+      }
 
-      return { aid, tasks };
+      return { aid, tasks: toApprove };
     });
 
     approvalId = result.aid;

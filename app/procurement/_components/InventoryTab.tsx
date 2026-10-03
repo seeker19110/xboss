@@ -589,7 +589,7 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
             value={systemFilter}
             onChange={(e) => setSystemFilter(e.target.value)}
             aria-label="Lọc theo Hệ MEPF"
-            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-200 outline-none focus:border-amber-500 h-10 font-medium"
+            className="max-w-full min-w-0 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-200 outline-none focus:border-amber-500 h-10 font-medium"
           >
             <option value="">Tất cả Hệ MEPF</option>
             {systems.map((s) => (
@@ -603,7 +603,7 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
             value={sheetFilter}
             onChange={(e) => setSheetFilter(e.target.value)}
             aria-label="Lọc theo hạng mục tracking"
-            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-200 outline-none focus:border-amber-500 h-10"
+            className="max-w-full min-w-0 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-200 outline-none focus:border-amber-500 h-10"
           >
             <option value="">Tất cả hạng mục tracking</option>
             {sheets

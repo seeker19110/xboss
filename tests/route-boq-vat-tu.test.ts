@@ -664,6 +664,35 @@ test("PUT /api/boq/:id/map: task không tồn tại → 422", S, async () => {
   assert.match((await res.json()).error, /không tồn tại/);
 });
 
+test("PUT /api/boq/:id/map: task thuộc dự án khác → 422 và giữ map cũ", S, async () => {
+  const { insertId, queryOne, run } = await import("@/lib/db");
+  const a = await dungDuLieu("pm", `maptaskA${RUN}`);
+  const b = await dungDuLieu("pm", `maptaskB${RUN}`);
+  const boqId = await insertId(
+    `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price, project_id) VALUES (?, 'A', 'm', 10, 1000, ?)`,
+    `MAPTASK-${RUN}`,
+    a.projectId,
+  );
+  await run(
+    `INSERT INTO boq_task_map (boq_item_id, task_id, weight) VALUES (?, ?, 1)`,
+    boqId,
+    a.taskId,
+  );
+  await dangNhapDuAn({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
+  const { PUT } = await import("@/app/api/boq/[id]/map/route");
+  const res = await PUT(
+    req(`http://localhost/api/boq/${boqId}/map`, { map: [{ taskId: b.taskId, weight: 1 }] }, "PUT"),
+    { params: Promise.resolve({ id: String(boqId) }) },
+  );
+  assert.equal(res.status, 422);
+  assert.match((await res.json()).error, /không thuộc dự án hiện hành/);
+  const map = await queryOne<{ task_id: number }>(
+    `SELECT task_id FROM boq_task_map WHERE boq_item_id = ?`,
+    boqId,
+  );
+  assert.equal(map?.task_id, a.taskId, "map hợp lệ trước đó phải được giữ nguyên");
+});
+
 test(
   "PUT /api/boq/:id/map: Σ tỷ trọng > 1 → 422, KHÔNG ghi map (chặn thanh toán vượt KL)",
   S,
@@ -1464,6 +1493,57 @@ test(
       matId,
     );
     assert.equal(m!.qty_used, 17);
+  },
+);
+
+test(
+  "POST /api/materials/:id/transactions: ghi đồng thời giữ đúng số dư và ledger",
+  S,
+  async () => {
+    const { insertId, query, queryOne } = await import("@/lib/db");
+    const ctx = await dungDuLieu("pm", `txrace${RUN}`);
+    const matId = await insertId(
+      `INSERT INTO materials (sheet_type_id, name, unit, qty_used, project_id) VALUES (?, 'A', 'kg', 10, ?)`,
+      ctx.sheetTypeId,
+      ctx.projectId,
+    );
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    const { POST } = await import("@/app/api/materials/[id]/transactions/route");
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        POST(req(`http://localhost/api/materials/${matId}/transactions`, { delta: 1 }, "POST"), {
+          params: Promise.resolve({ id: String(matId) }),
+        }),
+      ),
+    );
+    assert.deepEqual(
+      responses.map((res) => res.status),
+      Array(8).fill(201),
+    );
+    const bodies = await Promise.all(responses.map((res) => res.json()));
+    assert.deepEqual(
+      bodies.map((body) => body.delta),
+      Array(8).fill(1),
+    );
+
+    const material = await queryOne<{ qty_used: number }>(
+      `SELECT qty_used FROM materials WHERE id = ?`,
+      matId,
+    );
+    const ledger = await query<{ delta: number; qty_after: number }>(
+      `SELECT delta, qty_after FROM material_transactions WHERE material_id = ? ORDER BY id`,
+      matId,
+    );
+    assert.equal(Number(material?.qty_used), 18);
+    assert.equal(ledger.length, 8);
+    assert.equal(
+      ledger.reduce((sum, tx) => sum + Number(tx.delta), 0),
+      8,
+    );
+    assert.deepEqual(
+      ledger.map((tx) => Number(tx.qty_after)),
+      [11, 12, 13, 14, 15, 16, 17, 18],
+    );
   },
 );
 

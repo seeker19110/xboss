@@ -82,16 +82,22 @@ export default function ScheduleControlPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white schedule-control-print">
       <AppHeader title="Đường găng & Chậm tiến độ">
-        <SystemFilter value={system} onChange={setSystem} />
+        {/* Trên điện thoại chỉ còn icon — bộ lọc hệ đã xuống hàng riêng trong <main>, không
+            nhét chung topbar (đẩy tiêu đề/chuông ra ngoài màn hình, cả trang cuộn ngang). */}
         <button
           onClick={() => window.print()}
-          className="no-print flex items-center gap-2 min-h-10 bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-lg px-3 py-1.5 text-sm transition"
+          aria-label="In báo cáo"
+          className="no-print flex items-center justify-center gap-2 min-h-10 min-w-10 bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-lg px-3 py-1.5 text-sm transition"
         >
-          <Printer className="w-4 h-4" /> In
+          <Printer className="w-4 h-4" /> <span className="hidden sm:inline">In</span>
         </button>
       </AppHeader>
 
       <main className="px-3 sm:px-6 py-4 w-full max-w-6xl mx-auto space-y-6">
+        <div className="no-print flex justify-end">
+          <SystemFilter value={system} onChange={setSystem} />
+        </div>
+
         {/* ── Đường găng (component dùng chung với Dashboard tổng) ── */}
         <ScheduleControlPanel critical={data.critical} />
 
@@ -121,7 +127,7 @@ export default function ScheduleControlPage() {
                     </span>
                     <div className="flex-1 bg-zinc-800 rounded-full h-2 overflow-hidden">
                       <div
-                        className={`h-2 rounded-full transition-all ${r.slug ? "bg-amber-500/70 group-hover:bg-amber-400" : "bg-zinc-600 group-hover:bg-zinc-500"}`}
+                        className={`h-2 rounded-full transition-[width,background-color] ${r.slug ? "bg-amber-500/70 group-hover:bg-amber-400" : "bg-zinc-600 group-hover:bg-zinc-500"}`}
                         style={{ width: `${(r.count / maxParetoCount) * 100}%` }}
                       />
                     </div>

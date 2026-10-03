@@ -1,5 +1,5 @@
 ---
-description: Review code trước khi mở PR — gọi skill code-review (+ security-review nếu chạm vùng nhạy cảm), khác /gate là bước máy chạy lint/typecheck/test
+description: Review code trước khi mở PR — lượt luật OCR theo đường dẫn + skill code-review (+ security-review nếu chạm vùng nhạy cảm) + agent audit-* theo 3 trụ docs/audit.md; khác /gate (skill .claude/skills/gate) là bước máy chạy đúng các cổng CI
 ---
 
 Kích hoạt **rà soát code trước khi mở Pull Request**. Đây là bước đọc-hiểu (logic/thiết kế/tái sử
@@ -14,18 +14,37 @@ không thay thế nhau.
 - Mặc định: diff hiện tại so với `main` (`git diff origin/main...HEAD`).
 - Nếu người dùng chỉ định PR/nhánh/đường dẫn cụ thể → dùng đúng phạm vi đó.
 
-## Bước 2 — Gọi skill `code-review`
+## Bước 2 — Review hai lượt bổ sung nhau
 
-Dùng `Skill(code-review)` ở effort phù hợp độ rủi ro của diff (mặc định `medium`; nâng `high` nếu
+**(a) Lượt luật XBoss theo đường dẫn** — chạy quy trình của `/ocr-review` (`.claude/commands/ocr-review.md`, chế độ delegation của OCR, ADR-0012): `delegate preview` → `delegate rule` lấy checklist đúng cho từng file → soát diff theo từng nhóm luật. Lượt này bắt các lớp lỗi đã lặp lại của dự án (`docs/audit.md`, `TRAPS.md`).
+
+**(b) Lượt `Skill(code-review)`** — dùng ở effort phù hợp độ rủi ro của diff (mặc định `medium`; nâng `high` nếu
 diff chạm nhiều file/luồng nghiệp vụ chính, hoặc đụng vùng rủi ro cao trong `docs/audit.md`:
 `lib/tien-do/recompute.ts`, `lib/bao-mat/auth.ts`, `lib/vat-tu/material-sync.ts`,
 `lib/khoi-luong/boq.ts`, route tài chính/nghiệm thu). Có thể giao thẳng cho subagent `reviewer`
-(`.claude/agents/reviewer.md`) nếu muốn tách khỏi ngữ cảnh phiên chính.
+(`.claude/agents/reviewer.md`) nếu muốn tách khỏi ngữ cảnh phiên chính (agent tự chạy cả hai lượt).
+
+Gộp phát hiện của hai lượt: trùng `file:dòng`/cùng nguyên nhân thì giữ một bản, ghi kèm mục luật bị vi phạm.
 
 ## Bước 3 — Gọi thêm `security-review` nếu chạm vùng nhạy cảm
 
 Diff đụng auth, thanh toán, dữ liệu người dùng thật, quyền truy cập, hoặc input từ bên ngoài chưa
 rõ đã validate → gọi thêm `Skill(security-review)`.
+
+## Bước 3b — Review đa góc nhìn theo 3 trụ `docs/audit.md` (song song)
+
+Gọi SONG SONG (một lượt nhiều tool Agent) các agent audit khớp với file trong diff — mỗi agent
+chỉ báo cáo, không sửa:
+
+| Diff chạm                                                                                                 | Agent           |
+| --------------------------------------------------------------------------------------------------------- | --------------- |
+| `app/api/**`, `lib/bao-mat/**`, migration có RLS/`project_id`                                             | `audit-bao-mat` |
+| `lib/{tien-do,tai-chinh,vat-tu,khoi-luong}/**`, `migrations/**`, mẫu trong `.claude/hooks/risk-zones.txt` | `audit-logic`   |
+| `app/**/*.tsx`, `app/globals.css`                                                                         | `audit-ui`      |
+
+Diff lớn hoặc rủi ro cao có thể thêm góc nhìn chung của ECC: `ecc-silent-failure-hunter`,
+`ecc-typescript-reviewer`, `ecc-react-reviewer`, `ecc-database-reviewer`, `ecc-pr-test-analyzer`
+(hoặc `/ecc-review-pr`). Khi phát hiện ECC trái quy ước XBoss → theo `.claude/rules/00-uu-tien-ecc.md`.
 
 ## Bước 4 — Xử lý phát hiện
 

@@ -4,7 +4,6 @@ import "./globals.css";
 import PwaRegister from "@/app/components/PwaRegister";
 import AppDialogs from "@/app/components/dialogs";
 import ToastHost from "@/app/components/Toast";
-import BottomBarSpacer from "@/app/components/BottomBarSpacer";
 
 export const metadata: Metadata = {
   title: "XBoss — ACMV Tracking",
@@ -41,19 +40,17 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <AppDialogs />
         <ToastHost />
         {children}
-        <footer className="mt-auto py-3 px-4 text-center text-[10px] text-zinc-400 border-t border-zinc-900 print:hidden">
+        <footer className="mt-auto py-3 px-4 text-center text-xs text-zinc-400 border-t border-zinc-900 print:hidden">
           © {new Date().getFullYear()} XBoss — Phát triển bởi{" "}
           <span className="text-zinc-200 font-medium">Seeker</span> ·{" "}
           <a href="mailto:liendv@live.com" className="hover:text-zinc-200 transition">
             liendv@live.com
           </a>{" "}
           ·{" "}
-          <a href="tel:+849778 19 110" className="hover:text-zinc-200 transition">
+          <a href="tel:+84977819110" className="hover:text-zinc-200 transition">
             +849 778 19 110
           </a>
         </footer>
-        {/* Chừa chỗ cho thanh cố định dưới đáy của AppHeader — chỉ ở trang chủ */}
-        <BottomBarSpacer />
       </body>
     </html>
   );

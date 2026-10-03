@@ -262,7 +262,7 @@ export default function GlobalSearch({
           // Không lặp "(Ctrl+K)" trong placeholder — đã có phím tắt hiển thị bằng <kbd>
           // bên phải ô; trên topbar (ô hẹp) lặp lại chỉ làm chữ bị cắt giữa chừng.
           placeholder="Tìm kiếm hoặc gõ lệnh..."
-          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-14 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 h-10 transition"
+          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-14 py-2.5 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 h-10 transition"
         />
         <div className="absolute right-2.5 flex items-center gap-0.5 pointer-events-none">
           <kbd className="hidden sm:inline-flex items-center rounded border border-zinc-800 bg-zinc-950 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400 shadow-sm">
@@ -280,7 +280,7 @@ export default function GlobalSearch({
           <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-950/60 text-xs text-zinc-400">
             <span className="flex items-center gap-1.5 font-medium">
               <Command size={12} className="text-emerald-400" />
-              Spotlight Command Palette
+              Tìm kiếm & lệnh nhanh
             </span>
             <span className="text-[10px] text-zinc-500">
               Dùng phím <kbd className="font-mono text-zinc-400">↑</kbd>{" "}

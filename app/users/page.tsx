@@ -245,7 +245,7 @@ export default function UsersPage() {
                       aria-label={`Vai trò của ${u.name}`}
                       value={u.role}
                       onChange={(e) => changeRole(u, e.target.value)}
-                      className="bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1 text-xs text-zinc-200 outline-none focus:border-emerald-500 transition"
+                      className="bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1 text-base sm:text-xs text-zinc-200 outline-none focus:border-emerald-500 transition"
                     >
                       {Object.entries(ROLE_LABEL).map(([k, v]) => (
                         <option key={k} value={k}>

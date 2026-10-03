@@ -13,6 +13,17 @@ import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 
 export const dynamic = "force-dynamic";
 
+// Trần dò mã 2FA THEO TÀI KHOẢN (mọi IP cộng lại) — bổ sung cho trần theo IP (`totp|${ip}`,
+// 10/15 phút) vốn chỉ chặn được từng IP riêng lẻ. Kẻ tấn công ĐÃ BIẾT mật khẩu có thể xin
+// pending token mới không giới hạn (bước 1 trả pending khi mật khẩu đúng — KHÔNG tính là
+// "đăng nhập sai" nên không chạm rate-limit login) rồi phân tán việc dò mã TOTP (window ±1
+// step ⇒ ~3/10^6 mỗi lần thử) qua nhiều IP để né trần theo IP. Trần theo tài khoản chặn TỔNG
+// số lần thử trên MỌI IP, khôi phục ý nghĩa của lớp 2FA khi mật khẩu đã lộ. Đặt cao hơn trần
+// IP để không khoá nhầm người dùng thật đổi mạng/gõ lại vài lần (mà vẫn chặn brute-force phân
+// tán: 20/15 phút ⇒ tối đa ~1920 lần/ngày/tài khoản thay vì không giới hạn).
+const MAX_2FA_PER_ACCOUNT = 20;
+const TWOFA_WINDOW_MINUTES = 15;
+
 function clientIp(req: NextRequest): string {
   const fwd = req.headers.get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0].trim();
@@ -38,6 +49,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "Phiên xác thực đã hết hạn — đăng nhập lại" },
       { status: 401 },
+    );
+
+  // Trần theo tài khoản: uid lấy TỪ pending token đã ký HMAC (parseTotpPendingToken đã verify
+  // chữ ký) nên không thể giả mạo để bơm/đặt lại bộ đếm của tài khoản khác. Chạy SAU khi parse
+  // hợp lệ, TRƯỚC khi verify mã — chặn tổng số lần thử xuyên IP. Đến được bước này đã cần mật
+  // khẩu đúng (bước 1), nên trần này không mở thêm bề mặt DoS so với trần login sẵn có.
+  if (await hitRateLimit(`totp-acct|${parsed.uid}`, MAX_2FA_PER_ACCOUNT, TWOFA_WINDOW_MINUTES))
+    return NextResponse.json(
+      { error: "Nhập sai mã quá nhiều lần — thử lại sau" },
+      { status: 429, headers: { "Retry-After": "900" } },
     );
 
   const u = await queryOne<{
