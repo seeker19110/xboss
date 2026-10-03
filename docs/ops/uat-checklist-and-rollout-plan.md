@@ -42,4 +42,7 @@ flowchart TD
 - **Rollback Plan:**
   - Mỗi migration đều có script rollback tương ứng.
   - Trước khi áp dụng migration trên production: Thực hiện snapshot DB đầy đủ (`pg_dump`).
-  - Sử dụng script `npm run audit:verify-dr` để xác nhận dữ liệu sau khi backup/restore.
+  - Sử dụng script `npm run audit:verify-dr` để xác nhận dữ liệu sau khi backup/restore — chạy
+    trên **bản sao đã restore**, cấp `DR_VERIFY_DATABASE_URL` + `DR_VERIFY_EXPECTED_DATABASE` +
+    `DR_VERIFY_EXPECTED_USER` (không dùng `DATABASE_URL`; script chỉ đọc, không tự migration và
+    chỉ là smoke — chưa thay diễn tập DR đầy đủ).
