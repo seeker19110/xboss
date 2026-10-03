@@ -19,17 +19,24 @@ function parseProjectId(value: unknown): number | null {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-/** Admin chỉ thấy dự án cùng tổ chức; vai trò khác luôn cần membership tường minh.
- *  Bảng user_projects rỗng không mở quyền. Actor thiếu org bị từ chối ngay. */
+/** Admin thấy mọi dự án cùng tổ chức; vai trò khác theo `user_projects` trong tổ chức của
+ *  mình. Bảng `user_projects` rỗng toàn hệ thống = thấy mọi dự án CÙNG TỔ CHỨC (tương thích
+ *  ngược mô hình 1 dự án — chỉ khoá khi bắt đầu cấu hình gán). Cutover "membership rỗng không
+ *  mở quyền" của D01 làm riêng, sau membership dry-run (A1-FR03) và sau khi mọi route coi
+ *  dự án null là "không lọc" đã được chuyển (S02). Actor thiếu org bị từ chối ngay. */
 export async function visibleProjectIds(user: ProjectActor): Promise<number[]> {
   if (parseProjectId(user.orgId) == null) return [];
-  if (user.role === "admin") {
+  const duAnCungOrg = async () => {
     const rows = await query<{ id: number }>(
       `SELECT id FROM projects WHERE org_id = ? ORDER BY id`,
       user.orgId,
     );
     return rows.map((r) => r.id);
-  }
+  };
+  if (user.role === "admin") return duAnCungOrg();
+
+  const [{ n }] = await query<{ n: number }>(`SELECT COUNT(*) AS n FROM user_projects`);
+  if (Number(n) === 0) return duAnCungOrg();
 
   const rows = await query<{ projectId: number }>(
     `SELECT up.project_id AS "projectId" FROM user_projects up
@@ -41,15 +48,18 @@ export async function visibleProjectIds(user: ProjectActor): Promise<number[]> {
   return rows.map((r) => r.projectId);
 }
 
-/** Cookie sai/ngoài quyền không được âm thầm đổi dự án. Thiếu cookie chỉ suy dự án
- *  khi duy nhất một dự án hợp lệ; nhiều dự án cần người dùng chọn rõ. */
+/** Logic thuần (không đụng cookie/DB) — tách riêng để test được: cookie hợp lệ (nằm trong
+ *  dự án user thấy) → dùng; else dự án đầu user thấy (mặc định, đã giới hạn trong tổ chức).
+ *  Không có dự án nào → null. Client gửi id lạ/không thấy được → bỏ, không tin.
+ *  Giữ mặc định "dự án đầu" có chủ đích: nhiều route còn coi null là "không lọc dự án", nên
+ *  trả null cho cookie sai/thiếu sẽ mở dữ liệu toàn hệ (audit PR #544). */
 export function resolveProjectId(
   visible: number[],
   rawCookieValue: string | undefined,
 ): number | null {
-  if (rawCookieValue === undefined) return visible.length === 1 ? visible[0] : null;
+  if (visible.length === 0) return null;
   const requested = parseProjectId(rawCookieValue);
-  return requested != null && visible.includes(requested) ? requested : null;
+  return requested != null && visible.includes(requested) ? requested : visible[0];
 }
 
 /** Dự án đang chọn của request hiện tại — đọc cookie `xboss_project` + đối chiếu quyền. */
@@ -186,7 +196,10 @@ export async function chotProjectIdChoGhi(
   inputProjectId: unknown,
   projectHienTai: number | null,
 ): Promise<{ ok: true; projectId: number } | { ok: false }> {
-  const muonDung = parseProjectId(inputProjectId == null ? projectHienTai : inputProjectId);
+  // Không gửi dự án = dùng dự án đang chọn; không có dự án đang chọn thì từ chối (không còn
+  // fallback dự án 1 — dự án 1 có thể thuộc tổ chức khác).
+  const khongGui = inputProjectId == null || inputProjectId === "";
+  const muonDung = khongGui ? projectHienTai : parseProjectId(inputProjectId);
   if (muonDung == null) return { ok: false };
   const duocPhep = await visibleProjectIds(user);
   return duocPhep.includes(muonDung) ? { ok: true, projectId: muonDung } : { ok: false };
@@ -225,7 +238,7 @@ export async function chotProjectIdChoDoc(
   );
   if (duAn.length === 0) return { ok: false, lyDo: "khong-thay" };
 
-  if (inputProjectId == null) {
+  if (inputProjectId == null || inputProjectId === "") {
     return duAn.length === 1
       ? { ok: true, projectId: duAn[0].id }
       : { ok: false, lyDo: "phai-chon", duAn };

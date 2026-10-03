@@ -270,6 +270,31 @@ test("POST /api/engineering/bidding/quotes: thiếu trường bắt buộc → 4
 });
 
 test(
+  "POST /api/engineering/bidding/quotes: gói thầu của dự án khác → 404, không ghi",
+  S,
+  async () => {
+    const projectA = await taoDuAn("bqcrossA");
+    const projectB = await taoDuAn("bqcrossB");
+    const pmB = await taoUser("pm", "bqcrossB");
+    await dangNhapDuAn(pmB, projectB);
+    const pkgB = await taoGoiThau(pmB, projectB, "bqcrossB");
+    const pmA = await taoUser("pm", "bqcrossA");
+    await dangNhapDuAn(pmA, projectA);
+    const { POST } = await import("@/app/api/engineering/bidding/quotes/route");
+    const res = await POST(
+      jreq("/x", { packageId: pkgB, vendorName: "NCC lạc", totalAmountVnd: 1, lineItems: [] }),
+    );
+    assert.equal(res.status, 404);
+    const { queryOne } = await import("@/lib/db");
+    const dem = await queryOne<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM engineering_bidding_vendor_quotes WHERE package_id::text = ?`,
+      pkgB,
+    );
+    assert.equal(dem?.n, 0);
+  },
+);
+
+test(
   "POST /api/engineering/bidding/quotes → analyze: xếp hạng 2 báo giá theo composite score",
   S,
   async () => {

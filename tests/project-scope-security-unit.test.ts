@@ -10,6 +10,8 @@ const projects = [
 ];
 const actor = { id: 11, role: "pm" as const, orgId: 10 };
 let assigned: number[] = [];
+// Số dòng user_projects của NGƯỜI KHÁC — >0 nghĩa là hệ thống đã bắt đầu cấu hình gán dự án.
+let otherMemberships = 1;
 let cookie: string | undefined;
 let businessReads: number[] = [];
 
@@ -22,6 +24,8 @@ mock.module("@/lib/db", {
   namedExports: {
     todayISO: () => "2026-09-27",
     query: async (sql: string, ...args: unknown[]) => {
+      if (sql.includes("COUNT(*) AS n FROM user_projects"))
+        return [{ n: assigned.length + otherMemberships }];
       if (sql.includes("FROM user_projects"))
         return projects
           .filter((p) => assigned.includes(p.id) && p.orgId === args[1])
@@ -47,6 +51,7 @@ mock.module("@/lib/ky-thuat/engineering-cashflow", {
 
 beforeEach(() => {
   assigned = [];
+  otherMemberships = 1;
   cookie = undefined;
   businessReads = [];
 });
@@ -55,6 +60,14 @@ test("phạm vi: non-admin không có membership thấy rỗng; admin chỉ th�
   const { visibleProjectIds } = await import("@/lib/ha-tang/projects");
   assert.deepEqual(await visibleProjectIds(actor), []);
   assert.deepEqual(await visibleProjectIds({ ...actor, role: "admin" }), [101, 102]);
+  assert.deepEqual(await visibleProjectIds({ ...actor, orgId: 0 }), []);
+});
+
+test("phạm vi: chưa cấu hình gán dự án nào → thấy mọi dự án CÙNG tổ chức, không xuyên org", async () => {
+  otherMemberships = 0;
+  const { visibleProjectIds } = await import("@/lib/ha-tang/projects");
+  assert.deepEqual(await visibleProjectIds(actor), [101, 102]);
+  assert.deepEqual(await visibleProjectIds({ ...actor, orgId: 20 }), [201]);
   assert.deepEqual(await visibleProjectIds({ ...actor, orgId: 0 }), []);
 });
 
@@ -72,12 +85,15 @@ test("phạm vi ghi: luôn kiểm dự án hiện tại và không tự dùng d�
   assert.deepEqual(await chotProjectIdChoGhi(actor, undefined, 101), { ok: true, projectId: 101 });
   assert.deepEqual(await chotProjectIdChoGhi(actor, "101", null), { ok: true, projectId: 101 });
   assert.deepEqual(await chotProjectIdChoGhi(actor, 201, 101), { ok: false });
+  // Chuỗi rỗng (form để trống) = dùng dự án đang chọn, vẫn qua kiểm quyền.
+  assert.deepEqual(await chotProjectIdChoGhi(actor, "", 101), { ok: true, projectId: 101 });
+  assert.deepEqual(await chotProjectIdChoGhi(actor, "", null), { ok: false });
 });
 
 test("phạm vi ghi: không ép input sai thành dự án hợp lệ", async () => {
   assigned = [101];
   const { chotProjectIdChoGhi } = await import("@/lib/ha-tang/projects");
-  for (const input of ["", true, [101], {}, "0101", "1.01e2", "0x65", " 101", -1, Infinity, 1.5])
+  for (const input of [true, [101], {}, "0101", "1.01e2", "0x65", " 101", -1, Infinity, 1.5])
     assert.deepEqual(await chotProjectIdChoGhi(actor, input, 101), { ok: false });
 });
 
@@ -93,12 +109,15 @@ test("dự án hiện tại: không tái dùng context cũ sau khi mất members
   });
 });
 
-test("dự án hiện tại: cookie sai bị từ chối; nhiều dự án cần chọn rõ", async () => {
+test("dự án hiện tại: cookie thiếu/sai/ngoài quyền → dự án đầu trong quyền, không bao giờ ngoài org", async () => {
   const { getCurrentProjectId } = await import("@/lib/ha-tang/projects");
   assigned = [101, 102];
-  assert.equal(await getCurrentProjectId(actor), null);
+  // Không trả null ở đây: nhiều route còn coi dự án null là "không lọc" (audit PR #544).
+  assert.equal(await getCurrentProjectId(actor), 101);
   cookie = "201";
-  assert.equal(await getCurrentProjectId(actor), null);
+  assert.equal(await getCurrentProjectId(actor), 101);
+  cookie = "abc";
+  assert.equal(await getCurrentProjectId(actor), 101);
   cookie = "102";
   assert.equal(await getCurrentProjectId(actor), 102);
 });

@@ -117,6 +117,8 @@ export async function getCurrentUser(): Promise<User | null> {
   const user: User = rest;
   patchRequestContext({ userId: user.id, role: user.role, orgId: user.orgId });
   // Chốt dự án trước khi đọc quyền; lỗi nguồn không được biến thành mặc định allow.
+  // Ràng buộc: KHÔNG gọi getCurrentUser() song song trong cùng request (Promise.all) — hai
+  // lượt nạp snapshot chồng nhau sẽ ném "Ngữ cảnh xác thực đã thay đổi".
   await getCurrentProjectId(user);
   await invalidatePermissionCache(user.orgId);
   return user;

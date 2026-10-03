@@ -3,6 +3,7 @@
 // KHÔNG import auth (auth import ngược module này).
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getRequestContext, type RequestContext } from "@/lib/nen/request-context";
+import { log } from "@/lib/nen/log";
 import type { Role } from "@/lib/nen/roles";
 
 export type PermOverride = {
@@ -87,8 +88,17 @@ export async function invalidatePermissionCache(orgId: number): Promise<void> {
   );
   const next = new Map<string, boolean>();
   for (const row of rows) {
-    if (row.projectId !== null && row.projectOrgId !== orgId)
-      throw new Error("Phạm vi dự án của cấu hình quyền không hợp lệ");
+    // Dòng override cũ trỏ dự án của tổ chức khác (writer trước PR #544 không kiểm org của dự
+    // án): bỏ qua, KHÔNG cấp quyền gì từ nó. Throw ở đây từng làm getCurrentUser của MỌI user
+    // trong org lỗi 500 — kể cả admin, không còn đường sửa trong app (audit logic PR #544).
+    if (row.projectId !== null && row.projectOrgId !== orgId) {
+      log.warn("Bỏ qua override quyền trỏ dự án ngoài tổ chức", {
+        orgId,
+        projectId: row.projectId,
+        permKey: row.permKey,
+      });
+      continue;
+    }
     next.set(cacheKey(orgId, row.role, row.permKey, row.projectId), row.allowed);
   }
   if (

@@ -4,20 +4,20 @@ import assert from "node:assert/strict";
 
 // ===== Test thuần (không cần DB) =====
 
-test("resolveProjectId: chỉ chọn cookie hợp lệ hoặc dự án duy nhất khi thiếu cookie", async () => {
+test("resolveProjectId: cookie hợp lệ → dùng; thiếu/sai/ngoài quyền → dự án đầu trong quyền", async () => {
   const { resolveProjectId } = await import("@/lib/ha-tang/projects");
   assert.equal(resolveProjectId([1, 2, 3], "2"), 2);
-  for (const raw of ["99", "abc", "", "0x1", "1e0", "01", " 1", "-1"])
-    assert.equal(resolveProjectId([1, 2, 3], raw), null, raw);
-  assert.equal(resolveProjectId([1, 2, 3], undefined), null);
-  assert.equal(resolveProjectId([2], undefined), 2);
+  // Chỉ nhận chuỗi thập phân chuẩn; còn lại không được ép thành id khác — rơi về mặc định.
+  for (const raw of ["99", "abc", "", "0x2", "2e0", "02", " 2", "-1"])
+    assert.equal(resolveProjectId([1, 2, 3], raw), 1, raw);
+  assert.equal(resolveProjectId([1, 2, 3], undefined), 1);
   assert.equal(resolveProjectId([], "1"), null);
 });
 
 // ===== Test tích hợp (cần Postgres riêng: đặt TEST_DATABASE_URL) =====
 
 test(
-  "visibleProjectIds: admin thấy dự án cùng org; user luôn cần membership",
+  "visibleProjectIds: admin thấy dự án cùng org; đã cấu hình gán thì user cần membership",
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
@@ -32,7 +32,11 @@ test(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('PM ProjTest', 'proj-pm@xboss.vn', 'x', 'pm')`,
     );
 
-    // Không phụ thuộc membership toàn hệ: PM chưa được gán luôn thấy rỗng.
+    const otherId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role) VALUES ('Khác ProjTest', 'proj-other@xboss.vn', 'x', 'engineer')`,
+    );
+    // Hệ thống đã bắt đầu gán dự án (có dòng của người khác) → PM chưa được gán thấy rỗng.
+    await run(`INSERT INTO user_projects (user_id, project_id) VALUES (?, ?)`, otherId, p2);
     assert.deepEqual(await visibleProjectIds({ id: pmId, role: "pm", orgId: 1 }), []);
 
     // Admin luôn thấy dự án cùng org, bất kể user_projects.
@@ -44,8 +48,8 @@ test(
     const pmIds = await visibleProjectIds({ id: pmId, role: "pm", orgId: 1 });
     assert.deepEqual(pmIds, [p1]);
 
-    await run(`DELETE FROM user_projects WHERE user_id = ?`, pmId);
-    await run(`DELETE FROM users WHERE id IN (?, ?)`, adminId, pmId);
+    await run(`DELETE FROM user_projects WHERE user_id IN (?, ?)`, pmId, otherId);
+    await run(`DELETE FROM users WHERE id IN (?, ?, ?)`, adminId, pmId, otherId);
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
   },
 );

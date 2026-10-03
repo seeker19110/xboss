@@ -1,18 +1,37 @@
 # PROGRESS — XBoss
 
-## 2026-10-03 — tích hợp PR #544: vá bảo mật xác thực và cách ly tổ chức
+## 2026-10-03 — PR #544 (thu hẹp): vá bảo mật xác thực và cách ly tổ chức
 
-Đưa PR #544 (nháp từ 27/09, baseline `f38a10e`) lên `main` mới. Nội dung bản vá: setup/
-confirm/disable 2FA chạy trong transaction + `FOR UPDATE`, setup trả 409 khi 2FA đang bật; API
-key ràng buộc org lúc cấp và lúc dùng; token traffic nội bộ là HMAC tách mục đích (không gửi
-`XBOSS_SECRET`), đích từ cấu hình tin cậy, cấm redirect; `role_permissions` theo org
-(`migrations/0158_role_permissions_org_scope.sql`), cache quyền không mặc định allow khi chưa
-nạp/lỗi; chọn dự án không fallback dự án 1; webhook/push đúng tenant + chặn SSRF; tham chiếu
-cha/con cùng org/dự án ở các route engineering bidding/esign/logistics/cashflow; tên file an
-toàn trong zip QC. Báo cáo: [audit bảo mật 27/09](docs/ops/security-audit-2026-09-27.md).
-Lúc tích hợp: xung đột `app/api/auth/login/2fa/route.ts` với #545 — giữ trần dò mã theo tài
-khoản (đặt ngoài transaction để bộ đếm không bị rollback) + thân transaction khoá dòng của #544.
-Đang review bảo mật/logic và chờ CI trên HEAD mới.
+Đưa PR #544 (nháp từ 27/09, chưa từng chạy CI) lên `main` mới. Chạy thật trên PostgreSQL thì
+23 ca test đỏ, review `audit-bao-mat` + `audit-logic` tìm thêm lỗi chặn merge (chi tiết:
+[báo cáo audit bảo mật](docs/ops/security-audit-2026-09-27.md) mục "Review tích hợp 2026-10-03").
+Theo quyết định chủ dự án 2026-10-03, **thu hẹp** PR thay vì đưa cutover membership D01 lên
+ngay (merge vào main là tự deploy production).
+
+**Giữ trong PR:** 2FA setup/confirm/disable trong transaction + `FOR UPDATE`, setup 409 khi đã bật
+(gộp với trần dò mã theo tài khoản của #545, bộ đếm ngoài transaction); API key ràng buộc org lúc
+cấp và lúc dùng; token traffic nội bộ HMAC tách mục đích, đích cấu hình tin cậy, cấm redirect;
+`role_permissions` theo org (`migrations/0158_role_permissions_org_scope.sql`, chỉ DDL) + snapshot
+quyền theo request, `CAN` từ chối khi chưa nạp snapshot; admin chỉ thấy dự án cùng tổ chức; bỏ
+fallback "dự án 1" ở đường ghi (`chotProjectIdChoGhi` → 404 thống nhất ở 9 route); webhook/push
+đúng tenant + chặn SSRF; tên file an toàn trong zip QC.
+
+**Sửa thêm lúc tích hợp:** (1) chọn dự án giữ mặc định "dự án đầu trong quyền" khi cookie
+thiếu/sai — bản gốc trả null mà ~86 route coi null là "không lọc" ⇒ lộ dữ liệu xuyên tổ chức;
+`user_projects` rỗng toàn hệ = thấy mọi dự án **cùng tổ chức**; (2) override quyền cũ trỏ dự án
+org khác bị bỏ qua + log thay vì throw (bản gốc làm mọi user của org lỗi 500); (3) ghi traffic
+ở `proxy.ts` lỗi mềm — cấu hình sai không còn làm hỏng mọi `/api`; (4) báo giá thầu kiểm gói
+thầu thuộc đúng dự án (trước gắn được vào gói của dự án khác nếu biết UUID); (5) log cho các
+nhánh bỏ im lặng ở webhook/push. Test hồi quy mới đỏ trên code cũ: override lệch org
+(`permissions-org`), gói thầu chéo dự án (`route-eng-du-bao`). Helper test
+`tests/helpers/ngu-canh-quyen.ts` dựng ngữ cảnh quyền như `getCurrentUser` cho test gọi service.
+
+**Nợ / để đợt sau (S01/S02 QUALITY-FINAL-1):** cutover "membership rỗng không mở quyền" (cần
+membership dry-run production + chuyển ~86 route coi dự án null là "không lọc" — mẫu này có
+từ trước PR, vẫn lộ dữ liệu cho non-admin chưa được gán khi hệ đã cấu hình gán); `getCurrentUser`
+thêm ~5 lượt DB mỗi request (đo trước khi lên tải lớn); `cron/sync-sheets` còn `org_id ?? 1`;
+`sendPushToAll` gửi mọi org. **[Người dùng]** trước deploy chạy 2 truy vấn chỉ-đọc trong báo cáo
+(override lệch org, webhook delivery cũ đang chờ).
 
 ## 2026-10-01 — tích hợp ECC (Everything Claude Code) vào cấu hình agent (PR #555)
 

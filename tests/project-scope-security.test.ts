@@ -30,6 +30,13 @@ test(
       orgA,
     );
     const actor = { id: userId, role: "pm" as const, orgId: orgA };
+    // Một dòng gán của người khác: hệ thống đã bắt đầu cấu hình membership.
+    const otherUser = await insertId(
+      `INSERT INTO users (name, email, role, password_hash, org_id) VALUES ('Scope khác', ?, 'engineer', 'x', ?)`,
+      `scope-other-${Date.now()}@test.local`,
+      orgB,
+    );
+    await run(`INSERT INTO user_projects (user_id, project_id) VALUES (?, ?)`, otherUser, other);
     try {
       assert.deepEqual(await visibleProjectIds(actor), []);
       assert.deepEqual(await visibleProjectIds({ ...actor, role: "admin" }), [own]);
@@ -44,17 +51,18 @@ test(
       assert.deepEqual(await chotProjectIdChoGhi(actor, other, own), { ok: false });
       assert.deepEqual(await chotProjectIdChoGhi(actor, own, null), { ok: true, projectId: own });
       dangNhap({ id: userId, passwordHash, orgId: orgA }, other);
-      await runWithRequestContext({ projectId: own }, async () => {
-        assert.equal(await getCurrentProjectId(actor), null);
-        assert.equal(getRequestContext()?.projectId, undefined);
+      await runWithRequestContext({ projectId: other }, async () => {
+        // Cookie trỏ dự án org khác → rơi về dự án trong quyền, không bao giờ dùng `other`.
+        assert.equal(await getCurrentProjectId(actor), own);
+        assert.equal(getRequestContext()?.projectId, own);
         datCookie("xboss_project", String(own));
         assert.equal(await getCurrentProjectId(actor), own);
         await run(`DELETE FROM user_projects WHERE user_id = ?`, userId);
         assert.equal(await getCurrentProjectId(actor), null);
       });
     } finally {
-      await run(`DELETE FROM user_projects WHERE user_id = ?`, userId);
-      await run(`DELETE FROM users WHERE id = ?`, userId);
+      await run(`DELETE FROM user_projects WHERE user_id IN (?, ?)`, userId, otherUser);
+      await run(`DELETE FROM users WHERE id IN (?, ?)`, userId, otherUser);
       await run(`DELETE FROM projects WHERE id IN (?, ?)`, own, other);
       await run(`DELETE FROM organizations WHERE id IN (?, ?)`, orgA, orgB);
     }

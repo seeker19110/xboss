@@ -47,7 +47,11 @@ async function sendToSubs(subs: SubRow[], payload: PushPayload): Promise<number>
   const body = JSON.stringify(payload);
   let sent = 0;
   for (const s of subs) {
-    if (!isSafePushEndpoint(s.endpoint)) continue;
+    if (!isSafePushEndpoint(s.endpoint)) {
+      // Không in endpoint đầy đủ (chứa mã subscription), chỉ id dòng để rà.
+      log.warn("Bỏ qua push tới endpoint không an toàn", { subscriptionId: s.id });
+      continue;
+    }
     try {
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },

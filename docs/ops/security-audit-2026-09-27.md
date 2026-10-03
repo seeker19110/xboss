@@ -1,6 +1,6 @@
 # Kiểm tra bảo mật XBoss — 2026-09-27
 
-Trạng thái: đang tích hợp bản vá và kiểm chứng; chưa xác nhận phát hành production.
+Trạng thái: đã tích hợp (thu hẹp) và review 2026-10-03 — xem mục cuối; chưa xác nhận phát hành production.
 Nguồn: `seeker19110/xboss`, baseline `main` tại
 `f38a10ee949eba52bfb4895c9a1c75a302245ee8`.
 Website: `https://xboss.donghanhcungban.org`.
@@ -75,3 +75,42 @@ VPS chưa được kiểm chứng.
 
 Không có kiểm tra hữu hạn nào chứng minh hết mọi điểm yếu. Chỉ đóng các bất biến
 có bằng chứng kiểm thử; các phần chưa xác minh phải giữ trạng thái mở.
+
+## Review tích hợp 2026-10-03
+
+Đưa nhánh lên `main` tại `2b57156`, chạy toàn bộ test trên PostgreSQL 16 disposable và review
+độc lập (`audit-bao-mat`, `audit-logic`). Kết quả trước khi sửa: 23 ca đỏ ở 10 file, cùng các
+phát hiện dưới đây. Chủ dự án chọn **thu hẹp** PR: giữ bản vá an toàn, hoãn cutover membership D01.
+
+| Mức          | Phát hiện                                                                                                                                                            | Xử lý                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Nghiêm trọng | `getCurrentProjectId` trả null khi cookie thiếu/sai hoặc có ≥2 dự án; ~86 route coi null là "không lọc" (`dashboard`, `gantt`, `claims`…) ⇒ lộ dữ liệu xuyên tổ chức | Giữ mặc định dự án đầu trong quyền (đã giới hạn org); cutover D01 để S01/S02 |
+| Cao          | Override `role_permissions` cũ trỏ dự án org khác ⇒ nạp snapshot throw ⇒ mọi user của org lỗi 500, admin không tự sửa được                                           | Bỏ qua dòng lệch + `log.warn`; test hồi quy đỏ trên code cũ                  |
+| Trung bình   | Cấu hình traffic sai (APP_URL/PORT/XBOSS_SECRET) throw đồng bộ trong `proxy.ts` ⇒ hỏng mọi `/api`                                                                    | Lỗi mềm + log, request gốc vẫn chạy                                          |
+| Trung bình   | `POST /api/engineering/bidding/quotes` không kiểm `packageId` thuộc dự án                                                                                            | Kiểm trong `createVendorQuote`, 404; test hồi quy đỏ trên code cũ            |
+| Trung bình   | Delivery webhook cũ đang chờ (không org/dự án) bị đánh failed; `emitWebhook`/push bỏ sự kiện không log                                                               | Thêm `log.warn`; giữ fail-closed                                             |
+| Thấp         | `getCurrentUser` gọi song song trong một request sẽ throw; thêm ~5 lượt DB mỗi request                                                                               | Ghi chú ràng buộc trong code; hiệu năng ghi nợ                               |
+
+**Truy vấn chỉ-đọc cho người vận hành, chạy trên production trước deploy** (role owner):
+
+```sql
+-- 1. Override quyền trỏ dự án ngoài tổ chức (nay bị bỏ qua, không còn hiệu lực)
+SELECT rp.id, rp.org_id, rp.role, rp.perm_key, rp.project_id, p.org_id AS project_org
+  FROM role_permissions rp LEFT JOIN projects p ON p.id = rp.project_id
+ WHERE rp.project_id IS NOT NULL AND (p.id IS NULL OR p.org_id <> rp.org_id);
+
+-- 2. Delivery webhook cũ đang chờ không mang org/dự án (sẽ bị đánh failed khi tới lượt gửi)
+SELECT count(*) FROM webhook_deliveries
+ WHERE status = 'pending' AND payload->>'orgId' IS NULL AND payload->>'projectId' IS NULL
+   AND event <> 'ping';
+
+-- 3. (cho cutover D01 sau này) non-admin chưa có membership trong tổ chức của mình
+SELECT u.id, u.email, u.role FROM users u
+ WHERE u.role <> 'admin' AND NOT EXISTS (
+   SELECT 1 FROM user_projects up JOIN projects p ON p.id = up.project_id AND p.org_id = u.org_id
+    WHERE up.user_id = u.id);
+```
+
+Migration `0158` chỉ DDL (đổi unique index sang có `org_id`) nên đi thẳng production được; writer
+phiên bản cũ đang chạy song song có thể trả 500 ở PATCH ma trận quyền trong lúc cuốn chiếu —
+tránh sửa ma trận quyền trong khung deploy.

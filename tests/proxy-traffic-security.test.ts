@@ -84,24 +84,24 @@ for (const appUrl of [
   "https://user:pass@trusted.example",
   "https://user@trusted.example",
 ]) {
-  test(`proxy: APP_URL không hợp lệ bị chặn trước fetch (${appUrl})`, (t) => {
+  test(`proxy: APP_URL không hợp lệ → bỏ gửi traffic, request gốc vẫn chạy (${appUrl})`, (t) => {
     const calls = setup(t, { APP_URL: appUrl });
-    assert.throws(() => proxy(request()), /APP_URL/);
+    assert.equal(proxy(request()).status, 200);
     assert.equal(calls.length, 0);
   });
 }
 
 for (const port of ["0", "65536", "3000@untrusted.example", "3e3"]) {
-  test(`proxy: cổng loopback không hợp lệ bị chặn trước fetch (${port})`, (t) => {
+  test(`proxy: cổng loopback không hợp lệ → bỏ gửi traffic, request gốc vẫn chạy (${port})`, (t) => {
     const calls = setup(t, { APP_URL: undefined, PORT: port });
-    assert.throws(() => proxy(request()), /PORT/);
+    assert.equal(proxy(request()).status, 200);
     assert.equal(calls.length, 0);
   });
 }
 
-test("proxy: thiếu khóa production phải từ chối trước khi gửi traffic", (t) => {
+test("proxy: thiếu khóa production → không gửi traffic, request gốc vẫn chạy", (t) => {
   const calls = setup(t, { XBOSS_SECRET: undefined });
-  assert.throws(() => proxy(request()), /XBOSS_SECRET/);
+  assert.equal(proxy(request()).status, 200);
   assert.equal(calls.length, 0);
 });
 

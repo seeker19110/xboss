@@ -221,8 +221,10 @@ export async function emitWebhook(
         (typeof context?.userId !== "number" ||
           !Number.isInteger(context.userId) ||
           context.userId <= 0))
-    )
+    ) {
+      log.warn("Bỏ sự kiện webhook: không xác định được tổ chức/actor", { event, projectId });
       return;
+    }
     const payload: WebhookPayload = {
       event,
       sentAt: new Date().toISOString(),
@@ -383,6 +385,10 @@ export async function deliverDueWebhooks(): Promise<{ sent: number; failed: numb
     let failed = 0;
     for (const d of due) {
       if (!deliveryInScope(d) || !validateWebhookUrl(d.url).ok) {
+        log.warn("Đánh dấu failed delivery webhook ngoài phạm vi/không hợp lệ", {
+          deliveryId: d.id,
+          event: d.event,
+        });
         await run(
           `UPDATE webhook_deliveries SET status = 'failed', last_error = ? WHERE id = ?`,
           "Webhook không còn hợp lệ hoặc không khớp phạm vi tổ chức/dự án",

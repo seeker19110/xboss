@@ -228,3 +228,47 @@ test("quyền org: service CRUD và snapshot chạy bằng xboss_app NOBYPASSRLS
     }
   }
 });
+
+test(
+  "quyền org: override cũ trỏ dự án org khác bị bỏ qua, không làm sập đăng nhập cả org",
+  S,
+  async () => {
+    const { insertId, run } = await import("@/lib/db");
+    const { runWithRequestContext } = await import("@/lib/nen/request-context");
+    const { getCurrentUser, CAN } = await import("@/lib/bao-mat/auth");
+    const orgA = await insertId(`INSERT INTO organizations (name) VALUES ('Quyền lệch A')`);
+    const orgB = await insertId(`INSERT INTO organizations (name) VALUES ('Quyền lệch B')`);
+    const projA = await insertId(`INSERT INTO projects (name, org_id) VALUES ('Lệch A', ?)`, orgA);
+    const projB = await insertId(`INSERT INTO projects (name, org_id) VALUES ('Lệch B', ?)`, orgB);
+    const adminA = await insertId(
+      `INSERT INTO users (name, email, role, password_hash, org_id) VALUES ('Admin lệch', ?, 'admin', 'perm-skew', ?)`,
+      `perm-skew-${orgA}@test.local`,
+      orgA,
+    );
+    try {
+      // Writer trước PR #544 lấy org của admin nhưng không kiểm org của dự án → dòng lệch này
+      // có thể đã tồn tại trên production. Ghi thẳng để mô phỏng dữ liệu cũ.
+      await run(
+        `INSERT INTO role_permissions (role, perm_key, allowed, project_id, org_id, updated_by)
+       VALUES ('admin', 'viewPayments', false, ?, ?, ?)`,
+        projB,
+        orgA,
+        adminA,
+      );
+      await dangNhapDuAn({ id: adminA, orgId: orgA, passwordHash: "perm-skew" }, projA);
+      await runWithRequestContext({}, async () => {
+        const user = await getCurrentUser();
+        assert.equal(user?.id, adminA, "đăng nhập vẫn chạy được");
+        // Dòng lệch không có hiệu lực: admin giữ quyền mặc định ở dự án của mình.
+        assert.equal(CAN.viewPayments("admin"), true);
+      });
+    } finally {
+      dangXuat();
+      await run(`DELETE FROM role_permissions WHERE org_id = ?`, orgA);
+      await run(`DELETE FROM user_projects WHERE user_id = ?`, adminA);
+      await run(`DELETE FROM users WHERE id = ?`, adminA);
+      await run(`DELETE FROM projects WHERE id IN (?, ?)`, projA, projB);
+      await run(`DELETE FROM organizations WHERE id IN (?, ?)`, orgA, orgB);
+    }
+  },
+);
