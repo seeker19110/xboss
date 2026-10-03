@@ -15,6 +15,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "sync:drawings": "tsx scripts/scan-drawings.ts",
     "gen:erd": "tsx scripts/gen-erd.ts",
+    "gen:ocr-rules": "tsx scripts/gen-ocr-rules.ts",
+    "ocr": "npx --yes @alibaba-group/open-code-review@1.12.11",
     "check:sw-exclude": "tsx scripts/check-sw-exclude.ts",
     "check:migrations": "tsx scripts/check-migration-numbers.ts",
     "format": "prettier --write .",
@@ -42,7 +44,9 @@
     "check:test-fk-ids": "tsx scripts/check-test-fk-ids.ts",
     "check:progress-freshness": "tsx scripts/check-progress-freshness.ts",
     "check:ui-ux-guard": "tsx .agents/skills/ui-ux-craftsman/scripts/ui_ux_validator.ts",
-    "check:ui-ux": "npm run check:ui-ux-guard && npm run check:mau-accent && npm run check:contrast && npm run check:hex-hardcode"
+    "check:ui-ux": "npm run check:ui-ux-guard && npm run check:mau-accent && npm run check:contrast && npm run check:hex-hardcode",
+    "gate": "tsx scripts/gate.ts",
+    "ecc:vendor": "tsx scripts/ecc-vendor.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1141.0",

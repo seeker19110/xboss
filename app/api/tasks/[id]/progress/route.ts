@@ -56,8 +56,13 @@ export async function PATCH(
   if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({}));
-  let progress = Number(body.progress);
-  if (isNaN(progress)) return NextResponse.json({ error: "Thiếu progress" }, { status: 400 });
+  // Chỉ nhận số hoặc chuỗi số: Number(null) / Number("") / Number(false) đều ra 0 — gửi thiếu
+  // giá trị (null) trước đây âm thầm hạ tiến độ task về 0% thay vì báo lỗi.
+  const raw = body?.progress;
+  let progress =
+    typeof raw === "number" || (typeof raw === "string" && raw.trim() !== "") ? Number(raw) : NaN;
+  if (!Number.isFinite(progress))
+    return NextResponse.json({ error: "Thiếu progress" }, { status: 400 });
   progress = Math.min(Math.max(progress, 0), 1);
 
   // Bọc trong transaction + FOR UPDATE: tránh 2 request PATCH progress đồng thời trên

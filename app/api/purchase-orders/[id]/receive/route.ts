@@ -66,23 +66,6 @@ export async function POST(
   }>(`SELECT id, material_id, qty_ordered, qty_received FROM po_items WHERE po_id = ?`, poId);
   const poItemMap = new Map(poItems.map((p) => [p.id, p]));
 
-  // Pre-fetch qty_used của tất cả vật tư liên quan (1 query thay vì N query trong loop)
-  const neededMatIds = [
-    ...new Set(
-      items
-        .map((i) => poItemMap.get(Number(i.poItemId))?.material_id)
-        .filter((id): id is number => id != null),
-    ),
-  ];
-  const matRows =
-    neededMatIds.length > 0
-      ? await query<{ id: number; qty_used: number }>(
-          `SELECT id, qty_used FROM materials WHERE id IN (${neededMatIds.map(() => "?").join(",")})`,
-          ...neededMatIds,
-        )
-      : [];
-  const matMap = new Map(matRows.map((m) => [m.id, m]));
-
   let receiptId: number;
   let receiptCode: string;
   try {
@@ -144,21 +127,24 @@ export async function POST(
             item.note ? String(item.note).trim() : null,
           );
 
-          // Cộng qty_stock vào materials
-          await run(
-            `UPDATE materials SET qty_stock = COALESCE(qty_stock, 0) + ?, updated_at = NOW() WHERE id = ?`,
+          // Cộng qty_stock vào materials — RETURNING lấy số dư SAU khi cộng, ngay trong
+          // transaction (khoá dòng tới COMMIT), không dùng số đọc trước đó ngoài transaction.
+          const mat = await queryOne<{ qty_stock: number }>(
+            `UPDATE materials SET qty_stock = COALESCE(qty_stock, 0) + ?, updated_at = NOW()
+              WHERE id = ? RETURNING qty_stock`,
             qty,
             poItem.material_id,
           );
 
-          // Ghi transaction loại nhap_kho — qty_after = qty_used để nhất quán với các endpoint khác.
-          const mat = matMap.get(poItem.material_id);
+          // Ghi transaction loại nhap_kho. qty_after = TỒN KHO sau giao dịch — cùng nghĩa với
+          // mọi giao dịch kho khác (xuat_cong_truong, hoan_kho, dieu_chinh_kho). Trước đây ghi
+          // qty_used (đọc ngoài transaction) nên sổ kho có 1 loại dòng mang số dư của cột khác.
           await insertId(
             `INSERT INTO material_transactions (material_id, delta, qty_after, type, receipt_item_id, note, created_by)
          VALUES (?, ?, ?, 'nhap_kho', ?, ?, ?)`,
             poItem.material_id,
             qty,
-            mat?.qty_used ?? 0,
+            mat?.qty_stock ?? qty,
             riId,
             `Nhập kho từ ${receiptCode}`,
             user.id,

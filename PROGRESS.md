@@ -1,5 +1,108 @@
 # PROGRESS — XBoss
 
+## 2026-10-01 — tích hợp ECC (Everything Claude Code) vào cấu hình agent (PR #555)
+
+Nghiên cứu [ECC](https://github.com/affaan-m/ECC) v2.2.2 (harness phổ biến nhất cho Claude Code)
+và tích hợp tối đa theo yêu cầu người dùng — quyết định + lý do + đánh đổi ở
+[ADR-0013](docs/adr/0013-tich-hop-ecc.md). Điểm then chốt: phiên cloud **không nạp plugin** bật qua
+`.claude/settings.json` của repo → chọn **vendor có ghim commit** thay vì cài plugin `ecc@ecc`.
+
+- **Lớp ECC vendor** (`.claude/ecc/manifest.json` → `npm run ecc:vendor`): 24 agent, 56 skill,
+  19 command, 22 rule (`common` + `typescript`/`web`/`react` theo `paths`), tiền tố `ecc-`, khoá
+  sha256 (`.claude/ecc/lock.json`, `tests/ecc-vendor.test.ts`). Không vendor mã thực thi của ECC.
+- **Lớp thích nghi XBoss**: `.claude/rules/00-uu-tien-ecc.md` (15 điểm ECC bị ghi đè: node:test,
+  ratchet coverage, raw SQL, format API, UI token, commit tiếng Việt, cấm `npx` gói ngoài…); rules path-scoped
+  `.claude/rules/xboss/` (migrations, API, UI, test, tiến độ-nghiệm thu, tài chính).
+- **Hook mới (bash, có test `tests/claude-hooks.test.ts`)**: `protect-config` (deny sửa migration đã
+  có trên origin/main + sửa tay vendor; ask khi sửa cấu hình cổng), `risk-zone-gate` (GateGuard cho
+  vùng `docs/audit.md` §8, bản máy đọc `.claude/hooks/risk-zones.txt`), `pre-push-gate` (PROGRESS.md
+  - trùng số migration — `check-progress-freshness.ts` thêm chế độ `--base`), `stop-static-checks`
+    (prettier/eslint/cổng `check:*` theo file đổi trước khi dừng lượt).
+- **Agent/skill XBoss**: `audit-bao-mat`/`audit-logic`/`audit-ui` (3 trụ `docs/audit.md`); `/gate`
+  (`npm run gate` đọc thẳng job `static` của `ci.yml` — trước đây `/review` nhắc `/gate` nhưng chưa
+  có), `/hoc`, `/ecc`. Coordinator thêm hợp đồng hoàn tất khi uỷ thác, truy hồi lặp ≤3 vòng, review
+  đa góc nhìn song song; `/review` gọi audit theo file đổi; CLAUDE.md thêm "Định tuyến ECC & audit".
+- Gộp với PR #554 (OpenCodeReview, ra main trong lúc PR này mở): ADR đánh số **0013** vì #554 đã
+  dùng 0012; giữ cách `.gitignore`/`.prettierignore` của #554 (prettier bỏ qua `.claude/`, lớp vendor
+  khoá bằng sha256); `/review` chạy lượt OCR → `code-review` → audit đa góc nhìn. Rules
+  `.claude/rules/xboss/*` (nạp khi VIẾT code) bổ sung cho `.opencodereview/rules/*` (dùng khi REVIEW).
+
+Nợ/đề xuất: CLAUDE.md 262 dòng (Claude Code khuyến nghị < 200) — có thể chuyển các mục chỉ đúng
+cho một vùng file sang `.claude/rules/xboss/*`, cần người dùng duyệt. Theo dõi chi phí ngữ cảnh của
+lớp ECC bằng `/ecc-context-budget`; gỡ bớt qua manifest nếu cần.
+
+## 2026-10-01 — tích hợp OpenCodeReview: luật review AI theo đường dẫn (PR #554)
+
+Nghiên cứu [alibaba/open-code-review](https://github.com/alibaba/open-code-review) (CLI `ocr`, ghim
+`1.12.11`): OCR làm phần tất định (chọn file, gắn luật theo glob đường dẫn), LLM làm phần đọc
+hiểu. Người dùng chốt: chạy cả trong Claude Code (delegation, không API key) lẫn CI (mỗi PR, chỉ
+góp ý). Quyết định + ngữ nghĩa OCR đã kiểm từ mã nguồn (khớp-đầu-tiên-thắng, chữ thường, brace
+không lồng; mặc định bỏ qua `*.test.ts`/`*.spec.ts` và mọi file trong `.gitignore`, không review Markdown;
+trên `pull_request` action đọc luật từ merge ref của chính PR): ADR-0012.
+
+- `docs/audit.md` §3–§8 + `TRAPS.md` đúc thành 20 mảnh checklist `.opencodereview/rules/*.md` +
+  `manifest.json` 26 mục có thứ tự; `npm run gen:ocr-rules` ghép ra `.opencodereview/rule.json`
+  (một mục ghép nhiều mảnh — route tài chính nhận cả checklist tài chính lẫn route API).
+- `tests/ocr-rules.test.ts`: rule.json khớp bản sinh, 41 đường dẫn vùng rủi ro cao giải đúng
+  mục luật (giả lập ngữ nghĩa OCR; đối chiếu `ocr rules check` thật: 41/41 khớp), đường dẫn trong
+  luật còn tồn tại, phiên bản ghim khớp giữa `package.json` và workflow.
+- Claude Code: lệnh `/ocr-review`; `/review` + agent `reviewer` thêm lượt luật XBoss trước
+  `code-review`; `CLAUDE.md`/`docs/audit.md` trỏ tới `.opencodereview/`.
+- CI `ocr-review.yml`: review mỗi PR, comment tiếng Việt, luôn xanh, tự bỏ qua khi thiếu secret.
+- Review (agent `reviewer` — lần chạy thật đầu tiên của lượt luật OCR): giả lập glob khớp
+  `ocr rules check` trên toàn bộ 1590 file tracked (0 lệch). Đã sửa: tài liệu ghi nhầm "action đọc
+  luật từ nhánh base" (thật ra merge ref của PR); `timeout-minutes: 25` ở bước OCR để quá giờ không làm đỏ
+  job; `background` chỉ còn tiêu đề (body nằm trong dấu vân tay checkpoint → mỗi lần sửa body review
+  lại cả PR); `app/api/v1/payment-certs` thiếu luật tài chính + test canh mọi route import
+  `@/lib/tai-chinh/` phải nhận luật đó; chuẩn hoá CRLF khi ghép mảnh; `.gitignore` thu hẹp từ cả `.claude/`
+  còn `.claude/worktrees/` + `settings.local.json` (dòng cũ làm hook/`settings.json` vô hình với OCR
+  và lint-staged không stage lại được file đã track trong `.claude/`; `.prettierignore` thêm
+  `.claude/` để giữ hành vi định dạng cũ); `/ocr-review` + `reviewer`
+  ghi rõ OCR không review Markdown nên lệnh/agent `.claude/**/*.md` phải tự soát.
+
+**[Người dùng]** Bật CI: thêm secret `OCR_LLM_URL` (vd `https://api.anthropic.com`),
+`OCR_LLM_AUTH_TOKEN`, biến `OCR_LLM_MODEL` (Settings → Secrets and variables → Actions). Không
+migration, không đổi code ứng dụng.
+
+## 2026-10-01 — audit lỗi logic & toàn vẹn dữ liệu
+
+Baseline `3d087ae`. Rà theo `docs/audit.md` §4 + vùng rủi ro §8 (nghiệm thu, engine phê duyệt
+M46, IPC, kho, import). Bộ test đầy đủ trên PostgreSQL thật xanh ở baseline (239 file, 3842 ca),
+nên mọi lỗi dưới đây nằm ngoài vùng test phủ; từng lỗi được tái hiện qua route handler thật
+trước khi sửa. Chi tiết, số đo và truy vấn rà dữ liệu cũ:
+[audit logic](docs/ops/audit-logic-2026-10-01.md).
+
+**Lỗi thật đã sửa:** (F1) bật flow duyệt nghiệm thu task M46 là không ai nghiệm thu được — route
+mở request với người bấm là người tạo rồi tự duyệt luôn → SoD 403 + rollback mọi lượt; vai trò
+bước kỹ sư/CĐT cũng bị `CAN.approve` chặn. Theo quyết định chủ dự án: `task_acceptance` miễn
+SoD, có request đang chờ thì engine quyết quyền. (F2) duyệt tầng ghi đè `approval_source` của
+task đã duyệt riêng → huỷ tầng hạ luôn task đó. (F5) lập được đợt IPC mới khi đợt trước còn
+nháp/trình → gợi ý KL bỏ qua đợt đó, **trả trùng tiền** (60 KL ra bill 80); nay 409, khoá hợp
+đồng. (F6) thêm/copy cột lưới vào task đã nghiệm thu → `nghiem_thu` với % < 1; nay 409. (F8)
+import Excel đè % thấp lên task đã nghiệm thu; nay giữ nguyên + cảnh báo. Kèm mức thấp: sổ kho
+`nhap_kho` ghi `qty_after` sai cột (F7), hạn bảo hành tràn cuối tháng 31/01+1 → 03/03 (F3),
+`progress: null` âm thầm thành 0% (F4).
+
+Test hồi quy mới `tests/route-nghiem-thu-flow.test.ts`, `tests/import-nghiem-thu.test.ts` + ca
+thêm ở `route-nghiem-thu-bat-bien`, `route-tai-chinh`, `route-mua-sam`, `warranty`; đã gỡ tạm
+bản vá để xác nhận các ca mới đỏ trên code cũ. Sau sửa: 241 file · 3858 ca pass · 0 fail
+(`--release-gate`, PostgreSQL sạch); lint/typecheck/build + cổng tĩnh xanh. Không migration. **[Người dùng]:** chạy 4 truy
+vấn chỉ-đọc trong tài liệu chi tiết trên production để rà dữ liệu đã hỏng trước bản vá.
+
+Nợ ghi nhận (chưa sửa): báo cáo ngày/tuần cron cộng mọi dự án nhưng mang tên dự án đầu (cần
+chốt nghiệp vụ đa dự án); deadlock hiếm ở tick lô chồng nhau; nhật ký trạng thái PO có thể ghi
+trùng khi nhập kho đồng thời.
+
+## 2026-10-01 — đóng nợ ô nhập < 16px trên điện thoại (iOS tự phóng to)
+
+Tiếp đợt audit layout bên dưới (PR #551 đã merge). Quét tĩnh còn 444 ô `<input>/<select>/
+<textarea>` < 16px ở 76 file — phần lớn trong modal/form ẩn nên lượt quét trình duyệt trước không
+thấy. Thay mẫu `text-base sm:text-*` sửa từng ô bằng một quy tắc toàn cục trong `app/globals.css`:
+dưới breakpoint `sm`, ô gõ/ô chọn tối thiểu 16px (ngoài `@layer` nên thắng class Tailwind; bỏ qua
+ô text-lg trở lên; desktop giữ nguyên cỡ gọn). Đo bản production: mobile 85 trang, 568 ô hiện sẵn +
+188 ô trong 34 modal → 0 ô < 16px; desktop `/users` vẫn 14px. `e2e/authed/input-zoom-mobile.spec.ts`
+thêm 9 trang nhiều form + ca đo ô trong modal (29/29 qua cục bộ). Không migration.
+
 ## 2026-10-01 — audit layout & UI/UX khung dùng chung
 
 Baseline `987d73e`. Rà theo `docs/audit.md` §5 (UI/UX & a11y) + phần layout §7 bằng
@@ -26,7 +129,7 @@ và 5 trang; `/engineering` chuyển từ fixme sang assert thật trong `luoi-q
 `next/og` ImageResponse, `next` 16.2.0–16.3.5 — không do đợt này, `main` cũng dính) → nâng `next` +
 `eslint-config-next` lên 16.3.8 (`npm audit` 0 lỗ hổng; lint/typecheck/build + E2E khói xanh).
 
-Nợ còn lại (ô nhập 14px lẻ theo trang, các trang engineering/mepf-process đã fixme, `Modal` chưa
+Nợ còn lại (các trang engineering/mepf-process đã fixme, `Modal` chưa
 có `aria-labelledby`, PWA safe-area cần kiểm trên iPhone thật): xem tài liệu chi tiết. Không
 migration, không thao tác production.
 

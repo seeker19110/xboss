@@ -27,13 +27,19 @@
       "Bash(sudo *)",
       "Read(./.env)",
       "Read(./.env.*)",
-      "Read(**/.env)"
+      "Read(**/.env)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/id_rsa*)",
+      "Read(**/id_ed25519*)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Bash(curl * | sh)",
+      "Bash(curl * | bash)",
+      "Bash(wget * | sh)",
+      "Bash(wget * | bash)"
     ],
-    "ask": [
-      "Bash(git push --force *)",
-      "Bash(git push --force-with-lease*)",
-      "Bash(git push -f *)"
-    ]
+    "ask": ["Bash(git push --force *)", "Bash(git push --force-with-lease*)", "Bash(git push -f *)"]
   },
   "hooks": {
     "SessionStart": [
@@ -57,6 +63,34 @@
           {
             "type": "command",
             "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/pre-commit-gate.sh"
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/pre-push-gate.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/protect-config.sh"
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/risk-zone-gate.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/stop-static-checks.sh",
+            "timeout": 180
           }
         ]
       }

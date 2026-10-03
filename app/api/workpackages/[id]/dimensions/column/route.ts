@@ -7,6 +7,23 @@ import { packageProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
+// Bất biến nghiệm thu (cùng luật L1/L2 audit 2026-09-22): thêm ô chưa tick vào task đã
+// nghiệm thu kéo % xuống dưới 100% trong khi status vẫn nghiem_thu (deriveStatus giữ) và xoá
+// ngày kết thúc thực tế. Khoá các task sắp nhận cột mới (FOR UPDATE — tuần tự hoá với
+// POST /api/tasks/:id/approve) rồi trả thông điệp lỗi nếu có task đã nghiệm thu, null nếu không.
+// Gọi BÊN TRONG withTransaction.
+async function taskNghiemThuTrongDanhSach(taskIds: number[]): Promise<string | null> {
+  if (taskIds.length === 0) return null;
+  const rows = await query<{ code: string; status: string | null }>(
+    `SELECT code, status FROM tasks WHERE id = ANY(?) ORDER BY id FOR UPDATE`,
+    taskIds,
+  );
+  const daNghiemThu = rows.filter((r) => r.status === "nghiem_thu").map((r) => r.code);
+  if (daNghiemThu.length === 0) return null;
+  const ds = daNghiemThu.slice(0, 5).join(", ") + (daNghiemThu.length > 5 ? ", …" : "");
+  return `Nhóm có task đã nghiệm thu (${ds}) — huỷ nghiệm thu trước khi thêm cột`;
+}
+
 // POST /api/workpackages/:id/dimensions/column
 // body: { label, afterLabel? }
 // Thêm cột dimension mới (tạo progress_dimension row cho mọi task trong package).
@@ -53,13 +70,6 @@ export async function POST(
     );
     if (!ref) return NextResponse.json({ error: "afterLabel không tồn tại" }, { status: 400 });
     sortOrder = ref.sort_order + 1;
-    // Shift các cột sau vị trí chèn.
-    await run(
-      `UPDATE progress_dimensions SET sort_order = sort_order + 1
-         WHERE task_id IN (SELECT id FROM tasks WHERE package_id = ?) AND sort_order >= ?`,
-      pkgId,
-      sortOrder,
-    );
   } else {
     // Thêm vào cuối.
     const maxRow = await queryOne<{ m: number | null }>(
@@ -88,25 +98,42 @@ export async function POST(
       { status: 409 },
     );
 
-  // Tạo progress_dimension mới cho các task còn thiếu — 1 câu multi-row INSERT thay vì N round trip.
-  // ON CONFLICT DO NOTHING: lưới an toàn ở tầng DB (uq_progress_dimensions_task_label, xem
-  // migrations/0004) chống race khi 2 request thêm cùng nhãn gần như đồng thời.
-  const ph = targetTasks.map(() => "(?, ?, 0, ?)").join(", ");
-  const vals = targetTasks.flatMap((t) => [t.id, label, sortOrder]);
-  await run(
-    `INSERT INTO progress_dimensions (task_id, dimension_label, installed, sort_order) VALUES ${ph}
-       ON CONFLICT (task_id, dimension_label) DO NOTHING`,
-    ...vals,
-  );
+  // Shift cột + tạo ô + tính lại % trong MỘT transaction, sau khi khoá các task nhận cột mới:
+  // ô mới chưa tick kéo % task xuống dưới 100%, nên task đã nghiệm thu phải chặn TRƯỚC khi ghi
+  // gì (kể cả việc dời sort_order — trước đây dời xong mới phát hiện lỗi thì cột đã lệch).
+  const loi = await withTransaction(async () => {
+    const chan = await taskNghiemThuTrongDanhSach(targetTasks.map((t) => t.id));
+    if (chan) return chan;
 
-  // Thêm cột làm tăng mẫu số mỗi task — phải tính lại % task + nhóm, nếu không %
-  // hiển thị vẫn giữ giá trị cũ (cao hơn thực tế) cho tới khi ai đó tick 1 ô.
-  // recomputeTask khoá row bằng FOR UPDATE — phải nằm trong transaction để lock có tác dụng
-  // tới lúc ghi xong (chống lost update với tick checkbox đồng thời).
-  await withTransaction(async () => {
+    if (afterLabel) {
+      // Shift các cột sau vị trí chèn.
+      await run(
+        `UPDATE progress_dimensions SET sort_order = sort_order + 1
+           WHERE task_id IN (SELECT id FROM tasks WHERE package_id = ?) AND sort_order >= ?`,
+        pkgId,
+        sortOrder,
+      );
+    }
+
+    // Tạo progress_dimension mới cho các task còn thiếu — 1 câu multi-row INSERT thay vì N round
+    // trip. ON CONFLICT DO NOTHING: lưới an toàn ở tầng DB (uq_progress_dimensions_task_label,
+    // xem migrations/0004) chống race khi 2 request thêm cùng nhãn gần như đồng thời.
+    const ph = targetTasks.map(() => "(?, ?, 0, ?)").join(", ");
+    const vals = targetTasks.flatMap((t) => [t.id, label, sortOrder]);
+    await run(
+      `INSERT INTO progress_dimensions (task_id, dimension_label, installed, sort_order) VALUES ${ph}
+         ON CONFLICT (task_id, dimension_label) DO NOTHING`,
+      ...vals,
+    );
+
+    // Thêm cột làm tăng mẫu số mỗi task — phải tính lại % task + nhóm, nếu không % hiển thị vẫn
+    // giữ giá trị cũ (cao hơn thực tế) cho tới khi ai đó tick 1 ô. recomputeTask khoá row bằng
+    // FOR UPDATE — trong transaction để lock có tác dụng tới lúc ghi xong.
     for (const t of targetTasks) await recomputeTask(t.id, user.name);
     await recomputePackage(pkgId);
+    return null;
   });
+  if (loi) return NextResponse.json({ error: loi }, { status: 409 });
 
   return NextResponse.json(
     { created: targetTasks.length, skipped: tasks.length - targetTasks.length, label, sortOrder },
@@ -247,7 +274,11 @@ export async function PATCH(
   );
   const sortOrder = (afterRef?.sort_order ?? srcRef.sort_order) + 1;
 
-  await withTransaction(async () => {
+  const loi = await withTransaction(async () => {
+    // Cột copy cũng là ô mới chưa tick — cùng luật chặn task đã nghiệm thu như POST.
+    const chan = await taskNghiemThuTrongDanhSach(targetTasks.map((t) => t.id));
+    if (chan) return chan;
+
     await run(
       `UPDATE progress_dimensions SET sort_order = sort_order + 1
          WHERE task_id IN (SELECT id FROM tasks WHERE package_id = ?) AND sort_order >= ?`,
@@ -263,14 +294,13 @@ export async function PATCH(
          ON CONFLICT (task_id, dimension_label) DO NOTHING`,
       ...vals,
     );
-  });
 
-  // Cột mới (copy) cũng tăng mẫu số mỗi task — tính lại % task + nhóm như khi thêm cột
-  // (trong transaction — xem chú thích ở POST).
-  await withTransaction(async () => {
+    // Cột mới (copy) cũng tăng mẫu số mỗi task — tính lại % task + nhóm như khi thêm cột.
     for (const t of targetTasks) await recomputeTask(t.id, user.name);
     await recomputePackage(pkgId);
+    return null;
   });
+  if (loi) return NextResponse.json({ error: loi }, { status: 409 });
 
   return NextResponse.json(
     {
