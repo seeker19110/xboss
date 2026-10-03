@@ -1,5 +1,26 @@
 # PROGRESS — XBoss
 
+## 2026-10-03 — đóng nợ logic N1–N3 của audit 2026-10-01
+
+Theo [audit logic](docs/ops/audit-logic-2026-10-01.md) mục nợ:
+
+- **N1 — báo cáo ngày/tuần đa dự án:** chủ dự án chốt 2026-10-03 "mỗi dự án một báo cáo".
+  `buildDailyReport`/`buildWeeklyReport` nhận `projectId` (lọc qua `towers.project_id`, tên dự án
+  đúng dự án); cron `daily-report`/`weekly-report` lặp các dự án đang hoạt động, Admin/PM gọi tay
+  chỉ gồm dự án mình thấy. Người nhận mặc định = Admin cùng tổ chức + PM thấy dự án (cùng luật
+  `visibleProjectIds`); Web Push chỉ tới họ — bỏ `sendPushToAll` (trước phát tới thiết bị mọi tổ
+  chức); EVM + ngưỡng cảnh báo theo dự án; chuỗi audit xác minh một lần mỗi lượt. Phản hồi route
+  đổi thành `{ projects: [...] }` (không có UI nào đọc).
+- **N2 — tick lô:** `PATCH /api/dimensions/batch` khoá task `ORDER BY id` + recompute cùng thứ tự.
+  Gia cố: không tái hiện được deadlock trên code cũ; test đồng thời 2 lô thứ tự ngược canh hồi quy.
+- **N3 — nhập kho PO:** đọc lại trạng thái PO dưới `FOR UPDATE` (sau kiểm idempotency), huỷ/đã
+  nhận đủ → 409; nhật ký đổi trạng thái không còn ghi trùng khi 2 phiếu nhập đồng thời (test đỏ
+  trên code cũ: 2 dòng).
+- Kèm: ca khoá cron trong `route-cron.test.ts` chuyển sang tất định (bản cũ đua 2 request, đỏ ngẫu
+  nhiên khi vùng giữ khoá ngắn).
+
+Không migration. Còn để S10 (QUALITY-FINAL-1): `app/payments/page.tsx` cộng/nhân tiền bằng float JS.
+
 ## 2026-10-03 — PR #544 (thu hẹp): vá bảo mật xác thực và cách ly tổ chức
 
 Đưa PR #544 (nháp từ 27/09, chưa từng chạy CI) lên `main` mới. Chạy thật trên PostgreSQL thì
