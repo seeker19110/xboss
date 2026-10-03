@@ -363,3 +363,162 @@ test("AC9: sau DELETE /api/tasks/:id/approve → PATCH progress 0.5 được ch�
     await don(c);
   }
 });
+
+// ============================================================================
+// Audit 2026-10-01 — các đường KHÁC còn phá bất biến nghiệm thu
+// ============================================================================
+
+async function demO(taskId: number): Promise<number> {
+  const { queryOne } = await import("@/lib/db");
+  const r = await queryOne<{ n: number }>(
+    `SELECT COUNT(*)::int AS n FROM progress_dimensions WHERE task_id = ?`,
+    taskId,
+  );
+  return r!.n;
+}
+
+const LOI_COT = /đã nghiệm thu.*huỷ nghiệm thu trước khi thêm cột/;
+
+test(
+  "AC10: POST /api/workpackages/:id/dimensions/column trên nhóm có task đã nghiệm thu → 409, không ghi gì",
+  S,
+  async () => {
+    // Trước đây cột mới (ô chưa tick) được thêm vào task đã nghiệm thu: % tụt về 2/3 trong khi
+    // status vẫn nghiem_thu, actual_end_date bị xoá — cùng lớp lỗi L1/L2.
+    const c = await dungTask("ac10", "nghiem_thu");
+    try {
+      const { POST } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
+      const res = await POST(jreq(`/x`, { label: "D200", afterLabel: "D100" }, "POST"), {
+        params: Promise.resolve({ id: String(c.packageId) }),
+      });
+      assert.equal(res.status, 409);
+      assert.match((await res.json()).error, LOI_COT);
+
+      assert.equal(await demO(c.taskId), 2, "không tạo ô mới");
+      const t = await docTask(c.taskId);
+      assert.equal(t?.progress, 1);
+      assert.equal(t?.status, "nghiem_thu");
+      assert.equal(t?.actualEnd, "2026-01-01");
+    } finally {
+      await don(c);
+    }
+  },
+);
+
+test(
+  "AC11: PATCH /api/workpackages/:id/dimensions/column (copy cột) trên task đã nghiệm thu → 409",
+  S,
+  async () => {
+    const c = await dungTask("ac11", "nghiem_thu");
+    try {
+      const { PATCH } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
+      const res = await PATCH(
+        jreq(`/x`, { action: "copy", label: "D100", newLabel: "D100-copy" }),
+        { params: Promise.resolve({ id: String(c.packageId) }) },
+      );
+      assert.equal(res.status, 409);
+      assert.match((await res.json()).error, LOI_COT);
+      assert.equal(await demO(c.taskId), 2);
+      assert.equal((await docTask(c.taskId))?.progress, 1);
+    } finally {
+      await don(c);
+    }
+  },
+);
+
+test(
+  "AC12: đối chứng — thêm cột vào task hoan_thanh (chưa nghiệm thu) vẫn 201, % giảm",
+  S,
+  async () => {
+    const c = await dungTask("ac12", "hoan_thanh");
+    try {
+      const { POST } = await import("@/app/api/workpackages/[id]/dimensions/column/route");
+      const res = await POST(jreq(`/x`, { label: "D200" }, "POST"), {
+        params: Promise.resolve({ id: String(c.packageId) }),
+      });
+      assert.equal(res.status, 201);
+      assert.equal(await demO(c.taskId), 3);
+      const t = await docTask(c.taskId);
+      assert.equal(t?.progress, 0.67);
+      assert.equal(t?.status, "dang_thi_cong");
+    } finally {
+      await don(c);
+    }
+  },
+);
+
+test(
+  "AC13: duyệt tầng không ghi đè task đã nghiệm thu RIÊNG LẺ — huỷ tầng không hạ task đó",
+  S,
+  async () => {
+    // Trước đây POST /api/approvals đặt approval_source='floor' cho MỌI task trong tầng, kể cả
+    // task đã duyệt riêng qua /api/tasks/:id/approve → huỷ nghiệm thu tầng hạ luôn task đó
+    // (đúng lỗi cột approval_source — migration 0151 — sinh ra để chặn), kèm 1 dòng
+    // task_history "nghiệm thu" thừa.
+    const { insertId, run, queryOne } = await import("@/lib/db");
+    const c = await dungTask("ac13", "hoan_thanh");
+    await run(`UPDATE work_packages SET floor_label = 'T13' WHERE id = ?`, c.packageId);
+    const taskTang = await insertId(
+      `INSERT INTO tasks (package_id, code, name, sort_order, progress_percent, status)
+         VALUES (?, ?, 'Task tầng', 2, 1, 'hoan_thanh')`,
+      c.packageId,
+      uniq("TK"),
+    );
+    let approvalId: number | null = null;
+    try {
+      const { POST: DUYET_TASK } = await import("@/app/api/tasks/[id]/approve/route");
+      const r1 = await DUYET_TASK(jreq(`/x`, {}, "POST"), {
+        params: Promise.resolve({ id: String(c.taskId) }),
+      });
+      assert.equal(r1.status, 200);
+      const lichSuSauDuyetRieng = await demHistory(c.taskId);
+
+      const { POST: DUYET_TANG } = await import("@/app/api/approvals/route");
+      const r2 = await DUYET_TANG(
+        jreq(`/x`, { sheetTypeId: c.sheetTypeId, floorLabel: "T13" }, "POST"),
+      );
+      assert.equal(r2.status, 200);
+      const j2 = await r2.json();
+      approvalId = j2.approvalId;
+      assert.equal(j2.taskCount, 1, "chỉ task CHƯA nghiệm thu được duyệt theo tầng");
+      assert.equal(await demHistory(c.taskId), lichSuSauDuyetRieng, "không thêm audit trùng");
+      const src = (id: number) =>
+        queryOne<{ status: string; src: string | null }>(
+          `SELECT status, approval_source AS "src" FROM tasks WHERE id = ?`,
+          id,
+        );
+      assert.equal((await src(c.taskId))?.src, "task");
+      assert.equal((await src(taskTang))?.src, "floor");
+
+      const { DELETE: HUY_TANG } = await import("@/app/api/floor-approvals/[id]/route");
+      const r3 = await HUY_TANG(jreq(`/x`, undefined, "DELETE"), {
+        params: Promise.resolve({ id: String(approvalId) }),
+      });
+      assert.equal(r3.status, 200);
+      assert.equal((await src(c.taskId))?.status, "nghiem_thu", "task duyệt riêng giữ nguyên");
+      assert.equal((await src(taskTang))?.status, "hoan_thanh", "task duyệt theo tầng bị hạ");
+    } finally {
+      await run(`DELETE FROM floor_approvals WHERE sheet_type_id = ?`, c.sheetTypeId);
+      await run(`DELETE FROM task_history WHERE task_id = ?`, taskTang);
+      await run(`DELETE FROM tasks WHERE id = ?`, taskTang);
+      await don(c);
+    }
+  },
+);
+
+test("AC14: PATCH progress null → 400, không âm thầm hạ tiến độ về 0%", S, async () => {
+  // Number(null) = 0: trước đây body { progress: null } được hiểu là "đặt 0%".
+  const c = await dungTask("ac14", "hoan_thanh");
+  try {
+    const { PATCH } = await import("@/app/api/tasks/[id]/progress/route");
+    for (const progress of [null, "", false]) {
+      const res = await PATCH(jreq(`/x`, { progress }), {
+        params: Promise.resolve({ id: String(c.taskId) }),
+      });
+      assert.equal(res.status, 400, `progress=${JSON.stringify(progress)}`);
+    }
+    assert.equal((await docTask(c.taskId))?.progress, 1);
+  } finally {
+    await don(c);
+  }
+});

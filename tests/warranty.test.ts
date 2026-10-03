@@ -17,6 +17,13 @@ test("warrantyExpiry: tính đúng from + months, đủ ca biên", async () => {
   assert.equal(warrantyExpiry({ warrantyFrom: "2026-01-01", warrantyMonths: null }), null);
   // ngày sai định dạng → null (không throw)
   assert.equal(warrantyExpiry({ warrantyFrom: "15/01/2026", warrantyMonths: 12 }), null);
+  // Cuối tháng (audit 2026-10-01): kẹp về ngày cuối tháng đích như interval của Postgres —
+  // trước đây Date.UTC tràn ngày thừa sang tháng sau (31/01 + 1 tháng → 03/03).
+  assert.equal(warrantyExpiry({ warrantyFrom: "2026-01-31", warrantyMonths: 1 }), "2026-02-28");
+  assert.equal(warrantyExpiry({ warrantyFrom: "2024-01-31", warrantyMonths: 1 }), "2024-02-29");
+  assert.equal(warrantyExpiry({ warrantyFrom: "2024-02-29", warrantyMonths: 12 }), "2025-02-28");
+  assert.equal(warrantyExpiry({ warrantyFrom: "2026-08-31", warrantyMonths: 4 }), "2026-12-31");
+  assert.equal(warrantyExpiry({ warrantyFrom: "2026-10-31", warrantyMonths: 3 }), "2027-01-31");
 });
 
 test("validateWarrantyInput/validateClaimInput: đủ ca biên", async () => {

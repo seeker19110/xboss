@@ -52,3 +52,41 @@ biến là truyền cả mảng tham số vào một placeholder duy nhất (`qu
 
 _Cách rà_: viết SQL mới — đếm số `?` trong chuỗi phải khớp đúng số phần tử mảng tham số.
 _Chốt chặn_: `npm run check:db-params` (static, không cần DB).
+
+## 5. Bất biến `nghiem_thu ⇒ progress = 1` vỡ qua đường "không phải route tiến độ"
+
+Đã vá ở các route tiến độ/tick ô (L1/L2, audit 2026-09-22) nhưng tái phát 2026-10-01 qua đường
+đổi CẤU TRÚC và nạp dữ liệu: thêm/copy cột lưới (ô mới chưa tick làm % tụt), import Excel đè %
+thấp hơn — `deriveStatus` cố ý giữ `nghiem_thu`, nên mọi đường làm GIẢM % mà không tự chặn đều
+để lại task "đã nghiệm thu" với % < 100%. Cùng đợt: duyệt tầng ghi đè `approval_source` của
+task đã duyệt riêng, làm huỷ tầng hạ nhầm task đó.
+
+_Cách rà_: thêm bất kỳ đường nào đổi mẫu số/tử số lưới hoặc ghi `progress_percent`/`status`
+hàng loạt → hỏi "task đang `nghiem_thu` thì sao?". Rà dữ liệu:
+`SELECT id FROM tasks WHERE status = 'nghiem_thu' AND progress_percent < 1` phải rỗng.
+_Chốt chặn_: `tests/route-nghiem-thu-bat-bien.test.ts` (AC1–AC14),
+`tests/import-nghiem-thu.test.ts`.
+
+## 6. Test qua lib/UPDATE tay thay vì đi đúng đường người dùng → "có test" mà vẫn lọt lỗi
+
+Engine phê duyệt M46 có test, nhưng test gọi lib với HAI user khác nhau (kỹ sư mở, PM duyệt),
+trong khi route thật cho CÙNG một người vừa mở vừa duyệt → luật SoD trả 403 mọi lượt, flow
+nghiệm thu không dùng được mà bộ test vẫn xanh. Tương tự, test huỷ nghiệm thu tầng đặt
+`approval_source` bằng `UPDATE` tay nên không thấy route duyệt tầng ghi đè nó (audit 2026-10-01).
+
+_Cách rà_: test cho luồng nhiều bước (duyệt, thanh toán theo đợt, nhập kho) phải gọi route
+handler thật theo đúng trình tự người dùng bấm (`tests/helpers/phien.ts` ký cookie phiên thật),
+không dựng trạng thái giữa chừng bằng SQL tay trừ khi đó chính là dữ liệu đầu vào.
+_Chốt chặn_: chưa có cổng tự động — rà khi review test.
+
+## 7. `coordinator` chạy như subagent không giao được việc cho worker
+
+`.claude/agents/coordinator.md` khai `tools: ... Agent ...`, nhưng khi phiên chính gọi nó bằng
+tool `Agent`, phiên coordinator **không có** tool Agent/Task (subagent không lồng subagent được) —
+nó chỉ đọc PLAN.md rồi trả về "không có công cụ để giao việc", repo không đổi gì (2026-10-01,
+đợt tích hợp OCR — PR #554). Tầng 2 của quy trình 3 tầng trong `CLAUDE.md` vì vậy không tự chạy.
+
+_Cách rà_: giao PLAN.md cho coordinator mà báo cáo về chỉ có "không giao được"/0 commit → đúng
+bẫy này. Cách đã dùng: phiên chính tự giao từng việc theo nhãn `route:` (mỗi việc
+`isolation: worktree`), tự gộp theo thứ tự trong PLAN.md và gọi `reviewer`.
+_Chốt chặn_: chưa có — việc đổi quy trình 3 tầng là quyết định của người dùng.

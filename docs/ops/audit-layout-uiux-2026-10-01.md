@@ -77,11 +77,12 @@ KẾT LUẬN: Cần xử lý tiếp phần nợ 🟡 lẻ theo trang; không cò
 
 ## Nợ còn lại (không sửa trong đợt này)
 
-- Ô nhập/ô chọn 14px lẻ theo trang (không qua component dùng chung): `/admin/code-lists`,
-  `/admin/custom-fields`, `/admin/permissions`, `/attendance`, `/approvals`, `/equipment`,
-  `/insurance`, `/notifications/all`, `/org`, `/password`, `/personnel`, `/engineering/*`
-  (cashflow, esign, bidding-matrix, data-quality, workflows). Cách sửa cơ học
-  (`text-base sm:text-*`) + thêm trang vào `e2e/authed/input-zoom-mobile.spec.ts`.
+- ~~Ô nhập/ô chọn 14px lẻ theo trang~~ — **đã đóng (đợt tiếp theo, cùng ngày)**: quét tĩnh tìm ra
+  444 ô < 16px ở 76 file (phần lớn trong modal/form ẩn mà lượt quét trình duyệt không thấy), nên
+  thay mẫu `text-base sm:text-*` rải từng ô bằng một quy tắc toàn cục trong `globals.css` (dưới
+  breakpoint `sm`, ngoài `@layer` nên thắng class Tailwind; bỏ qua ô text-lg trở lên). Đo lại bản
+  production: mobile 85 trang · 568 ô hiện sẵn + 188 ô trong 34 modal → 0 ô < 16px; desktop giữ
+  cỡ gọn cũ. `input-zoom-mobile.spec.ts` thêm 9 trang nhiều form + 1 ca đo ô trong modal.
 - Trang engineering đã `test.fixme` sẵn trong `luoi-quet-axe.spec.ts` (bidding-matrix, cashflow,
   esign: `label`/`select-name`/tương phản badge) và `/mepf-process` (badge 9px 4,31:1) — lỗi lẻ
   theo trang, ngoài phạm vi khung.
