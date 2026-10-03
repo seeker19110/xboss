@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, queryOne, insertId } from "@/lib/db";
 import { generateApiKey, hashApiKey } from "@/lib/bao-mat/api-keys";
+import { parsePositiveId } from "@/lib/nen/ids";
 
 export const dynamic = "force-dynamic";
 
@@ -42,13 +43,18 @@ export async function POST(req: NextRequest) {
   const name = String(body.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "Thiếu tên key" }, { status: 400 });
 
-  const projectId = body.projectId != null && body.projectId !== "" ? Number(body.projectId) : null;
-  if (projectId != null && !Number.isInteger(projectId))
+  const hasProject = body.projectId != null && body.projectId !== "";
+  const projectId = hasProject ? parsePositiveId(body.projectId) : null;
+  if (hasProject && projectId == null)
     return NextResponse.json({ error: "projectId không hợp lệ" }, { status: 400 });
 
-  // Kiểm FK projectId tồn tại
+  // Chỉ cấp key cho dự án trong cùng tổ chức; không tiết lộ dự án của tenant khác.
   if (projectId != null) {
-    const projectExists = await queryOne(`SELECT 1 FROM projects WHERE id = ?`, projectId);
+    const projectExists = await queryOne(
+      `SELECT 1 FROM projects WHERE id = ? AND org_id = ?`,
+      projectId,
+      user.orgId,
+    );
     if (!projectExists) {
       return NextResponse.json({ error: "Dự án không tồn tại" }, { status: 404 });
     }

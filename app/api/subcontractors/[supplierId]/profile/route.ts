@@ -48,13 +48,9 @@ export async function PATCH(
     const chotDuAn = await chotProjectIdChoGhi(
       user,
       projectIdTuBody,
-      (await getCurrentProjectId(user)) || 1,
+      await getCurrentProjectId(user),
     );
-    if (!chotDuAn.ok)
-      return NextResponse.json(
-        { error: "Không có quyền thao tác trên dự án này" },
-        { status: 403 },
-      );
+    if (!chotDuAn.ok) return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
     projectId = chotDuAn.projectId;
   }
 

@@ -13,8 +13,9 @@ import { isIP } from "node:net";
 // bản undici gói kèm trong Node — trộn 2 bản khiến mọi request lỗi "invalid onRequestStart method"
 // và mất luôn thông điệp chặn SSRF của safeLookup.
 import { Agent, fetch as undiciFetch } from "undici";
-import { query, run, withTransaction } from "@/lib/db";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { log } from "@/lib/nen/log";
+import { getRequestContext } from "@/lib/nen/request-context";
 
 // Danh sách đóng các sự kiện được phép phát (whitelist). UI chọn sự kiện từ đây.
 export const WEBHOOK_EVENTS = [
@@ -188,6 +189,8 @@ export type WebhookPayload = {
   event: WebhookEvent;
   sentAt: string;
   projectId: number | null;
+  // Dấu nguồn tenant cho delivery mới; bản cũ có dự án vẫn suy được org từ projects.
+  orgId?: number;
   data: Record<string, unknown>;
 };
 
@@ -199,22 +202,47 @@ export async function emitWebhook(
   data: Record<string, unknown>,
 ): Promise<void> {
   try {
+    const context = getRequestContext();
+    const project =
+      projectId != null
+        ? await queryOne<{ orgId: number }>(
+            `SELECT org_id AS "orgId" FROM projects WHERE id = ?`,
+            projectId,
+          )
+        : undefined;
+    const orgId = projectId != null ? project?.orgId : context?.orgId;
+    // Không còn fanout toàn hệ khi thiếu dự án/tenant. Nhánh không dự án chỉ nhận
+    // context do xác thực phía server thiết lập, không nhận org từ payload client.
+    if (
+      typeof orgId !== "number" ||
+      !Number.isInteger(orgId) ||
+      orgId <= 0 ||
+      (projectId == null &&
+        (typeof context?.userId !== "number" ||
+          !Number.isInteger(context.userId) ||
+          context.userId <= 0))
+    ) {
+      log.warn("Bỏ sự kiện webhook: không xác định được tổ chức/actor", { event, projectId });
+      return;
+    }
     const payload: WebhookPayload = {
       event,
       sentAt: new Date().toISOString(),
       projectId,
+      orgId,
       data,
     };
     // 1 câu lệnh: chèn đúng 1 delivery cho mỗi webhook khớp. next_retry_at mặc định now()
     // nên delivery đến hạn ngay, cron kế tiếp sẽ gửi. projectId NULL → chỉ khớp webhook toàn
-    // cục (project_id IS NULL) vì `project_id = NULL` luôn false.
+    // cục TRONG CÙNG ORG (project_id IS NULL) vì `project_id = NULL` luôn false.
     await run(
       `INSERT INTO webhook_deliveries (webhook_id, event, payload)
          SELECT id, ?, ?::jsonb FROM webhooks
-          WHERE active = TRUE AND ? = ANY(events)
+          WHERE active = TRUE AND org_id = ? AND ? = ANY(events)
             AND (project_id IS NULL OR project_id = ?)`,
       event,
       JSON.stringify(payload),
+      orgId,
       event,
       projectId,
     );
@@ -235,7 +263,34 @@ type DueDelivery = {
   attempts: number;
   url: string;
   secret: string;
+  orgId: number;
+  webhookProjectId: number | null;
+  webhookProjectOrgId: number | null;
+  payloadProjectOrgId: number | null;
+  active: boolean;
+  events: string[];
 };
+
+// Kiểm lại ngay trước khi gửi: cấu hình/dự án có thể đã đổi sau khi xếp hàng, và
+// delivery cũ có thể được tạo bởi phiên bản chưa cô lập tenant. Không xoá bằng chứng.
+function deliveryInScope(d: DueDelivery): boolean {
+  const payload = d.payload;
+  if (!d.active || !payload || payload.event !== d.event) return false;
+  if (d.event !== "ping" && !d.events.includes(d.event)) return false;
+  if (payload.orgId != null && payload.orgId !== d.orgId) return false;
+  if (d.webhookProjectId != null && d.webhookProjectOrgId !== d.orgId) return false;
+  if (payload.projectId != null) {
+    return (
+      Number.isInteger(payload.projectId) &&
+      payload.projectId > 0 &&
+      d.payloadProjectOrgId === d.orgId &&
+      (d.webhookProjectId == null || d.webhookProjectId === payload.projectId)
+    );
+  }
+  // Ping do route test tạo sau khi kiểm chủ webhook, không chứa dữ liệu nghiệp vụ.
+  // Event cũ không dự án và không org không đủ bằng chứng nguồn tenant → chặn.
+  return d.webhookProjectId == null && (payload.orgId === d.orgId || d.event === "ping");
+}
 
 // Agent undici pin IP qua safeLookup cho MỌI lần gửi thật (M63) — tạo 1 lần module-level để
 // tái dùng connection pool, không tạo mới mỗi lần gửi. Chỉ áp cho sendOne; validateWebhookUrl
@@ -313,9 +368,14 @@ async function sendOne(d: DueDelivery): Promise<boolean> {
 export async function deliverDueWebhooks(): Promise<{ sent: number; failed: number }> {
   return withTransaction(async () => {
     const due = await query<DueDelivery>(
-      `SELECT d.id, d.event, d.payload, d.attempts, w.url, w.secret
+      `SELECT d.id, d.event, d.payload, d.attempts, w.url, w.secret,
+              w.org_id AS "orgId", w.project_id AS "webhookProjectId",
+              wp.org_id AS "webhookProjectOrgId", pp.org_id AS "payloadProjectOrgId",
+              w.active, w.events
          FROM webhook_deliveries d
          JOIN webhooks w ON w.id = d.webhook_id
+         LEFT JOIN projects wp ON wp.id = w.project_id
+         LEFT JOIN projects pp ON pp.id::text = d.payload->>'projectId'
         WHERE d.status = 'pending' AND d.next_retry_at <= now()
         ORDER BY d.id
         LIMIT ${DELIVER_BATCH}
@@ -324,6 +384,19 @@ export async function deliverDueWebhooks(): Promise<{ sent: number; failed: numb
     let sent = 0;
     let failed = 0;
     for (const d of due) {
+      if (!deliveryInScope(d) || !validateWebhookUrl(d.url).ok) {
+        log.warn("Đánh dấu failed delivery webhook ngoài phạm vi/không hợp lệ", {
+          deliveryId: d.id,
+          event: d.event,
+        });
+        await run(
+          `UPDATE webhook_deliveries SET status = 'failed', last_error = ? WHERE id = ?`,
+          "Webhook không còn hợp lệ hoặc không khớp phạm vi tổ chức/dự án",
+          d.id,
+        );
+        failed++;
+        continue;
+      }
       if (await sendOne(d)) sent++;
       else failed++;
     }

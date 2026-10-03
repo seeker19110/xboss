@@ -2,6 +2,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  poweredByHeader: false,
   // Cho phép deploy.sh build vào thư mục tạm rồi swap atomic vào ".next" thật —
   // tránh app đang chạy (đọc ".next" hiện tại) bị vỡ chunk giữa lúc build ghi đè.
   distDir: process.env.NEXT_DIST_DIR || ".next",
@@ -65,6 +66,7 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
+              "object-src 'none'",
               "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",

@@ -14,6 +14,7 @@ import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import type { Role } from "@/lib/nen/roles";
+import { chayVoiQuyen } from "./helpers/ngu-canh-quyen";
 
 const S = { skip: !HAS_TEST_DB };
 
@@ -43,20 +44,19 @@ async function mkUser(role: Role): Promise<TestUser> {
     email,
     role,
   );
-  return { id, name: `${PFX} ${role}`, email, role, orgId: 0 };
+  // org mặc định của DB (1) — cùng org với dự án fixture, như tài khoản thật.
+  return { id, name: `${PFX} ${role}`, email, role, orgId: 1 };
 }
 
-// Gọi syncAndListNotifications bọc trong ngữ cảnh request cho giống đường chạy thật.
-// (Trước đây bọc là BẮT BUỘC: hai khối design_change_pending/claim_pending tự gọi
+// Gọi syncAndListNotifications trong ngữ cảnh quyền giống request thật đã qua getCurrentUser
+// (actor + snapshot quyền đã nạp — thiếu snapshot thì CAN từ chối mọi vai trò, xem
+// tests/helpers/ngu-canh-quyen.ts). (Trước đây bọc request là BẮT BUỘC: hai khối design_change_pending/claim_pending tự gọi
 // getCurrentProjectId(user) → đọc cookies() → throw ngoài request Next.js thật. Lỗi đó đã
 // được sửa cùng đợt này — cả hai nay dùng `projectId` nhận từ tham số — và ca cuối file
 // khoá lại điều đó bằng cách gọi KHÔNG có ngữ cảnh nào.)
 async function sync(user: TestUser, limit = 200) {
   const { syncAndListNotifications } = await import("@/lib/dich-vu/thong-bao");
-  const { runWithRequestContext } = await import("@/lib/nen/request-context");
-  return runWithRequestContext({ projectId }, () =>
-    syncAndListNotifications(user, projectId, limit),
-  );
+  return chayVoiQuyen(user, projectId, () => syncAndListNotifications(user, projectId, limit));
 }
 
 async function countNotif(userId: number, type: string, extraSql = "", extraArgs: unknown[] = []) {

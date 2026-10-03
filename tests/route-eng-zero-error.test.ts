@@ -281,7 +281,7 @@ test("POST /esign/envelopes: thiếu trường bắt buộc → 422", S, async (
 });
 
 test(
-  "POST /esign/envelopes: chỉ định dự án không được phép truy cập → 403 (chặn IDOR)",
+  "POST /esign/envelopes: chỉ định dự án không được phép truy cập → 404 (không lộ dự án tồn tại) (chặn IDOR)",
   S,
   async () => {
     const projA = await taoDuAn("eeA");
@@ -298,7 +298,7 @@ test(
         signatories: [{ signerName: "A", signerRole: "CONTRACTOR_ENGINEER" }],
       }),
     );
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
   },
 );
 

@@ -64,17 +64,16 @@ test("validatePermOverride: luật LOCKED_PERMS + chống tự khoá áp cả ph
   assert.equal(typeof validatePermOverride("pm", "approve", false, 1.5), "string");
 });
 
-// ── Lớp thuần: CAN mặc định theo vai trò (C4 §4 canh bất biến RBAC không cần DB) ──
-test("CAN: mặc định chỉ Admin và PM có quyền approve nghiệm thu (C4 §4)", async () => {
-  const { CAN } = await import("@/lib/bao-mat/auth");
-  assert.equal(CAN.approve("admin"), true, "admin phải được approve");
-  assert.equal(CAN.approve("pm"), true, "pm phải được approve");
-  assert.equal(CAN.approve("engineer"), false, "engineer không được approve");
-  assert.equal(CAN.approve("subcon"), false, "subcon không được approve");
-  assert.equal(CAN.approve("viewer"), false, "viewer không được approve");
-  assert.equal(CAN.approve("bch"), false, "bch không được approve");
-  assert.equal(CAN.approve("cdt"), false, "cdt không được approve");
-  assert.equal(CAN.approve(undefined), false, "chưa đăng nhập không được approve");
+// Mặc định là dữ liệu để vẽ ma trận; CAN yêu cầu snapshot trong request đã xác thực.
+test("ma trận mặc định: chỉ Admin và PM có quyền approve nghiệm thu (C4 §4)", async () => {
+  const { permDefaultsMatrix, CAN } = await import("@/lib/bao-mat/auth");
+  const approve = permDefaultsMatrix().approve;
+  assert.equal(approve.admin, true);
+  assert.equal(approve.pm, true);
+  for (const role of ["engineer", "subcon", "viewer", "bch", "cdt"] as const)
+    assert.equal(approve[role], false);
+  assert.equal(CAN.approve("admin"), false, "không snapshot: từ chối cả admin");
+  assert.equal(CAN.approve(undefined), false);
 });
 
 // ── Lớp tích hợp: cache + CAN + audit (cần Postgres) ─────────────────────────────
@@ -88,62 +87,67 @@ test(
     const { setPermissionOverride, invalidatePermissionCache, _resetPermissionCacheForTests } =
       await import("@/lib/bao-mat/permissions");
 
-    // Sạch bảng để test tất định (bảng cấu hình toàn hệ, không theo dự án).
-    await run(`DELETE FROM role_permissions`);
-    await invalidatePermissionCache();
+    await runWithRequestContext({ userId: 1, role: "admin", orgId: 1 }, async () => {
+      // Sạch bảng để test tất định (bảng cấu hình toàn hệ, không theo dự án).
+      await run(`DELETE FROM role_permissions`);
+      await invalidatePermissionCache(1);
 
-    // (1) Không override → CAN.x = default.
-    assert.equal(CAN.approve("pm"), true, "mặc định pm được approve");
-    assert.equal(CAN.approve("engineer"), false, "mặc định engineer không approve");
-    assert.equal(CAN.viewPayments("viewer"), false, "mặc định viewer không xem thanh toán");
+      // (1) Không override → CAN.x = default.
+      assert.equal(CAN.approve("pm"), true, "mặc định pm được approve");
+      assert.equal(CAN.approve("engineer"), false, "mặc định engineer không approve");
+      assert.equal(CAN.viewPayments("viewer"), false, "mặc định viewer không xem thanh toán");
 
-    // (2) Siết approve của pm → false thật sau khi ghi (setPermissionOverride tự invalidate).
-    await runWithRequestContext({ userId: 1, role: "admin" }, async () => {
-      await setPermissionOverride("pm", "approve", false, 1, 1);
-    });
-    assert.equal(CAN.approve("pm"), false, "sau siết: pm không còn approve");
-    assert.equal(CAN.approve("admin"), true, "siết pm không ảnh hưởng admin");
+      // (2) Siết approve của pm → false thật sau khi ghi (setPermissionOverride tự invalidate).
+      {
+        await setPermissionOverride("pm", "approve", false, 1, 1);
+      }
+      assert.equal(CAN.approve("pm"), false, "sau siết: pm không còn approve");
+      assert.equal(CAN.approve("admin"), true, "siết pm không ảnh hưởng admin");
 
-    // (6) Cache đã invalidate NGAY trong cùng process (không cần chờ TTL).
-    const { getPermissionOverride } = await import("@/lib/bao-mat/permissions");
-    assert.equal(getPermissionOverride("pm", "approve"), false);
+      // (6) Cache đã invalidate NGAY trong cùng process (không cần chờ TTL).
+      const { getPermissionOverride } = await import("@/lib/bao-mat/permissions");
+      assert.equal(getPermissionOverride(1, "pm", "approve"), false);
 
-    // (4) Mở quyền XEM viewPayments cho viewer → true.
-    await runWithRequestContext({ userId: 1, role: "admin" }, async () => {
-      await setPermissionOverride("viewer", "viewPayments", true, 1, 1);
-    });
-    assert.equal(CAN.viewPayments("viewer"), true, "sau mở: viewer xem được thanh toán");
+      // (4) Mở quyền XEM viewPayments cho viewer → true.
+      {
+        await setPermissionOverride("viewer", "viewPayments", true, 1, 1);
+      }
+      assert.equal(CAN.viewPayments("viewer"), true, "sau mở: viewer xem được thanh toán");
 
-    // Audit: mỗi thay đổi override có dòng audit_log (trigger M43). 2 INSERT ở trên.
-    const audit = await query<{ action: string; actorId: number | null }>(
-      `SELECT action, actor_id AS "actorId" FROM audit_log
+      // Audit: mỗi thay đổi override có dòng audit_log (trigger M43). 2 INSERT ở trên.
+      const audit = await query<{ action: string; actorId: number | null }>(
+        `SELECT action, actor_id AS "actorId" FROM audit_log
         WHERE entity_type = 'role_permissions' ORDER BY id`,
-    );
-    assert.ok(audit.length >= 2, "phải có ≥2 dòng audit cho role_permissions");
-    assert.ok(
-      audit.some((a) => a.actorId === 1),
-      "audit ghi được actor từ request-context",
-    );
+      );
+      assert.ok(audit.length >= 2, "phải có ≥2 dòng audit cho role_permissions");
+      assert.ok(
+        audit.some((a) => a.actorId === 1),
+        "audit ghi được actor từ request-context",
+      );
 
-    // (5) Xoá override (allowed=null) → về default.
-    await runWithRequestContext({ userId: 1, role: "admin" }, async () => {
-      await setPermissionOverride("pm", "approve", null, 1, 1);
+      // (5) Xoá override (allowed=null) → về default.
+      {
+        await setPermissionOverride("pm", "approve", null, 1, 1);
+      }
+      assert.equal(CAN.approve("pm"), true, "sau xoá override: pm approve về mặc định");
+      assert.equal(getPermissionOverride(1, "pm", "approve"), undefined);
+
+      // Dọn dẹp + reset cache để không rò rỉ sang file test khác.
+      await run(`DELETE FROM role_permissions`);
+      await invalidatePermissionCache(1);
+      _resetPermissionCacheForTests();
     });
-    assert.equal(CAN.approve("pm"), true, "sau xoá override: pm approve về mặc định");
-    assert.equal(getPermissionOverride("pm", "approve"), undefined);
-
-    // Dọn dẹp + reset cache để không rò rỉ sang file test khác.
-    await run(`DELETE FROM role_permissions`);
-    await invalidatePermissionCache();
-    _resetPermissionCacheForTests();
   },
 );
 
-// Cold start: snapshot rỗng chưa nạp → getPermissionOverride trả undefined (an toàn: default),
-// KHÔNG throw dù chưa reload lần nào.
-test("cache cold start trả undefined, không throw", async () => {
+test("cache lạnh từ chối quyền, không fallback mặc định", async () => {
+  const { CAN } = await import("@/lib/bao-mat/auth");
   const { getPermissionOverride, _resetPermissionCacheForTests } =
     await import("@/lib/bao-mat/permissions");
+  const { runWithRequestContext } = await import("@/lib/nen/request-context");
   _resetPermissionCacheForTests();
-  assert.equal(getPermissionOverride("pm", "approve"), undefined);
+  runWithRequestContext({ userId: 1, orgId: 1, role: "pm" }, () => {
+    assert.equal(getPermissionOverride(1, "pm", "approve"), false);
+    assert.equal(CAN.approve("pm"), false);
+  });
 });

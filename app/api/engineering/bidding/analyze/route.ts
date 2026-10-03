@@ -24,13 +24,10 @@ export async function POST(req: NextRequest) {
     const chotDuAn = await chotProjectIdChoGhi(
       user,
       body.projectId,
-      (await getCurrentProjectId(user)) || 1,
+      await getCurrentProjectId(user),
     );
     if (!chotDuAn.ok) {
-      return NextResponse.json(
-        { error: "Không có quyền thao tác trên dự án này" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
     }
     const projectId = chotDuAn.projectId;
 

@@ -147,7 +147,7 @@ test(
 );
 
 test(
-  "POST /api/engineering/cashflow/simulate: gửi projectId của dự án không thuộc quyền → 403 " +
+  "POST /api/engineering/cashflow/simulate: gửi projectId của dự án không thuộc quyền → 404 (không lộ dự án tồn tại) " +
     "(chotProjectIdChoGhi chặn IDOR)",
   S,
   async () => {
@@ -163,7 +163,7 @@ test(
         totalContractValue: 1_000_000,
       }),
     );
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
   },
 );
 
@@ -229,7 +229,7 @@ test(
 );
 
 test(
-  "POST /api/engineering/bidding/packages: gửi projectId dự án không thuộc quyền → 403",
+  "POST /api/engineering/bidding/packages: gửi projectId dự án không thuộc quyền → 404 (không lộ dự án tồn tại)",
   S,
   async () => {
     const projectA = await taoDuAn("bpidorA");
@@ -246,7 +246,7 @@ test(
         targetBudgetVnd: 1,
       }),
     );
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
   },
 );
 
@@ -268,6 +268,31 @@ test("POST /api/engineering/bidding/quotes: thiếu trường bắt buộc → 4
   const res = await POST(jreq("/x", { packageId: pkgId }));
   assert.equal(res.status, 422);
 });
+
+test(
+  "POST /api/engineering/bidding/quotes: gói thầu của dự án khác → 404, không ghi",
+  S,
+  async () => {
+    const projectA = await taoDuAn("bqcrossA");
+    const projectB = await taoDuAn("bqcrossB");
+    const pmB = await taoUser("pm", "bqcrossB");
+    await dangNhapDuAn(pmB, projectB);
+    const pkgB = await taoGoiThau(pmB, projectB, "bqcrossB");
+    const pmA = await taoUser("pm", "bqcrossA");
+    await dangNhapDuAn(pmA, projectA);
+    const { POST } = await import("@/app/api/engineering/bidding/quotes/route");
+    const res = await POST(
+      jreq("/x", { packageId: pkgB, vendorName: "NCC lạc", totalAmountVnd: 1, lineItems: [] }),
+    );
+    assert.equal(res.status, 404);
+    const { queryOne } = await import("@/lib/db");
+    const dem = await queryOne<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM engineering_bidding_vendor_quotes WHERE package_id::text = ?`,
+      pkgB,
+    );
+    assert.equal(dem?.n, 0);
+  },
+);
 
 test(
   "POST /api/engineering/bidding/quotes → analyze: xếp hạng 2 báo giá theo composite score",

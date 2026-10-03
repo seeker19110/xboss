@@ -16,7 +16,9 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   // Route chỉ đọc: dự án suy từ phiên (cookie xboss_project), không nhận từ query.
-  const projectId = (await getCurrentProjectId(user)) || 1;
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
   const packageId = searchParams.get("packageId");
 
   if (!packageId) {
@@ -46,13 +48,10 @@ export async function POST(req: NextRequest) {
     const chotDuAn = await chotProjectIdChoGhi(
       user,
       body.projectId,
-      (await getCurrentProjectId(user)) || 1,
+      await getCurrentProjectId(user),
     );
     if (!chotDuAn.ok) {
-      return NextResponse.json(
-        { error: "Không có quyền thao tác trên dự án này" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
     }
     const projectId = chotDuAn.projectId;
 

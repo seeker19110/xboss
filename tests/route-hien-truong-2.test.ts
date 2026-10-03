@@ -2973,7 +2973,7 @@ test("PATCH /api/subcontractors/:supplierId/profile: NCC không tồn tại → 
 });
 
 test(
-  "PATCH /api/subcontractors/:supplierId/profile: dự án gửi kèm không thuộc quyền PM → 403",
+  "PATCH /api/subcontractors/:supplierId/profile: dự án gửi kèm không thuộc quyền PM → 404 (không lộ dự án tồn tại)",
   S,
   async () => {
     const { run } = await import("@/lib/db");
@@ -2989,7 +2989,7 @@ test(
     const res = await PATCH(jreq("/x", { siteRepName: "A", projectId: projectOther }, "PATCH"), {
       params: Promise.resolve({ supplierId: String(supplierId) }),
     });
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
   },
 );
 

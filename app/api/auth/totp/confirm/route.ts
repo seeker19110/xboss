@@ -6,8 +6,9 @@ import {
   COOKIE,
   COOKIE_MAX_AGE,
 } from "@/lib/bao-mat/auth";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withTransaction } from "@/lib/db";
 import { decryptTotpSecret, verifyTotpCode } from "@/lib/bao-mat/totp";
+import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -22,41 +23,57 @@ export async function POST(req: NextRequest) {
   if (typeof code !== "string" || !code)
     return NextResponse.json({ error: "Thiếu mã xác nhận" }, { status: 400 });
 
-  const row = await queryOne<{
-    totp_secret: string | null;
-    password_hash: string;
-    session_version: number;
-    org_id: number;
-  }>(`SELECT totp_secret, password_hash, session_version, org_id FROM users WHERE id = ?`, user.id);
-  if (!row?.totp_secret)
+  if (await hitRateLimit(`totp-confirm:${user.id}`, 10, 15))
     return NextResponse.json(
-      { error: "Chưa gọi /setup — chưa có secret chờ xác nhận" },
-      { status: 400 },
+      { error: "Thử xác nhận quá nhiều lần — thử lại sau" },
+      { status: 429, headers: { "Retry-After": "900" } },
     );
 
-  const secret = decryptTotpSecret(row.totp_secret);
-  const result = await verifyTotpCode(secret, code.trim());
-  if (!result.valid) return NextResponse.json({ error: "Mã không đúng" }, { status: 401 });
+  return withTransaction(async () => {
+    // Giữ khoá tới khi bật 2FA xong để setup không đổi secret giữa kiểm mã và ghi.
+    const row = await queryOne<{
+      totp_secret: string | null;
+      totp_enabled_at: string | null;
+      password_hash: string;
+      session_version: number;
+      org_id: number;
+    }>(
+      `SELECT totp_secret, totp_enabled_at, password_hash, session_version, org_id FROM users WHERE id = ? FOR UPDATE`,
+      user.id,
+    );
+    if (!row?.totp_secret)
+      return NextResponse.json(
+        { error: "Chưa gọi /setup — chưa có secret chờ xác nhận" },
+        { status: 400 },
+      );
+    if (row.totp_enabled_at)
+      return NextResponse.json({ error: "2FA đã được bật" }, { status: 409 });
 
-  await run(
-    `UPDATE users SET totp_enabled_at = now(), totp_last_step = ? WHERE id = ?`,
-    result.step,
-    user.id,
-  );
+    const secret = decryptTotpSecret(row.totp_secret);
+    const result = await verifyTotpCode(secret, code.trim());
+    if (!result.valid) return NextResponse.json({ error: "Mã không đúng" }, { status: 401 });
 
-  // M56 PR2: vừa bật 2FA thành công → phát lại cookie phiên với mustSetup2fa=false để mở
-  // khoá NGAY (proxy hết chặn), user không phải đăng xuất/đăng nhập lại. Giữ nguyên body.
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set(
-    COOKIE,
-    makeToken(user.id, row.password_hash, false, row.session_version, row.org_id),
-    {
-      httpOnly: true,
-      path: "/",
-      maxAge: COOKIE_MAX_AGE,
-      sameSite: "lax",
-      secure: isSecureCookie(req),
-    },
-  );
-  return res;
+    await run(
+      `UPDATE users SET totp_enabled_at = now(), totp_last_step = ?,
+                        session_version = session_version + 1 WHERE id = ?`,
+      result.step,
+      user.id,
+    );
+
+    // M56 PR2: vừa bật 2FA thành công → phát lại cookie phiên với mustSetup2fa=false để mở
+    // khoá NGAY. Tăng phiên để mọi cookie phát trước lúc bật 2FA hết hiệu lực.
+    const res = NextResponse.json({ ok: true });
+    res.cookies.set(
+      COOKIE,
+      makeToken(user.id, row.password_hash, false, Number(row.session_version) + 1, row.org_id),
+      {
+        httpOnly: true,
+        path: "/",
+        maxAge: COOKIE_MAX_AGE,
+        sameSite: "lax",
+        secure: isSecureCookie(req),
+      },
+    );
+    return res;
+  });
 }

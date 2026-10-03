@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, verifyPassword } from "@/lib/bao-mat/auth";
-import { query, queryOne, run } from "@/lib/db";
+import { getCurrentUser, verifyPassword, COOKIE, isSecureCookie } from "@/lib/bao-mat/auth";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { decryptTotpSecret, verifyTotpCode } from "@/lib/bao-mat/totp";
+import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -27,31 +28,50 @@ export async function DELETE(req: NextRequest) {
   if (typeof password !== "string" || !password || typeof code !== "string" || !code)
     return NextResponse.json({ error: "Thiếu password/code" }, { status: 400 });
 
-  const u = await queryOne<{ password_hash: string; totp_secret: string | null }>(
-    `SELECT password_hash, totp_secret FROM users WHERE id = ?`,
-    user.id,
-  );
-  if (!u || !verifyPassword(password, u.password_hash) || !u.totp_secret)
-    return NextResponse.json({ error: "Mật khẩu không đúng hoặc 2FA chưa bật" }, { status: 401 });
+  if (await hitRateLimit(`totp-disable:${user.id}`, 10, 15))
+    return NextResponse.json(
+      { error: "Thử tắt 2FA quá nhiều lần — thử lại sau" },
+      { status: 429, headers: { "Retry-After": "900" } },
+    );
 
-  const codeTrim = code.trim();
-  let ok = false;
-  if (/^\d{6}$/.test(codeTrim)) {
-    const result = await verifyTotpCode(decryptTotpSecret(u.totp_secret), codeTrim);
-    ok = result.valid;
-  } else {
-    const rows = await query<{ code_hash: string }>(
-      `SELECT code_hash FROM totp_recovery_codes WHERE user_id = ? AND used_at IS NULL`,
+  return withTransaction(async () => {
+    // Cùng khoá với setup/confirm; mã được kiểm và xoá trong một trạng thái nhất quán.
+    const u = await queryOne<{ password_hash: string; totp_secret: string | null }>(
+      `SELECT password_hash, totp_secret FROM users WHERE id = ? FOR UPDATE`,
       user.id,
     );
-    ok = rows.some((r) => verifyPassword(codeTrim, r.code_hash));
-  }
-  if (!ok) return NextResponse.json({ error: "Mã không đúng" }, { status: 401 });
+    if (!u || !verifyPassword(password, u.password_hash) || !u.totp_secret)
+      return NextResponse.json({ error: "Mật khẩu không đúng hoặc 2FA chưa bật" }, { status: 401 });
 
-  await run(
-    `UPDATE users SET totp_secret = NULL, totp_enabled_at = NULL, totp_last_step = NULL WHERE id = ?`,
-    user.id,
-  );
-  await run(`DELETE FROM totp_recovery_codes WHERE user_id = ?`, user.id);
-  return NextResponse.json({ ok: true });
+    const codeTrim = code.trim();
+    let ok = false;
+    if (/^\d{6}$/.test(codeTrim)) {
+      const result = await verifyTotpCode(decryptTotpSecret(u.totp_secret), codeTrim);
+      ok = result.valid;
+    } else {
+      const rows = await query<{ code_hash: string }>(
+        `SELECT code_hash FROM totp_recovery_codes WHERE user_id = ? AND used_at IS NULL`,
+        user.id,
+      );
+      ok = rows.some((r) => verifyPassword(codeTrim, r.code_hash));
+    }
+    if (!ok) return NextResponse.json({ error: "Mã không đúng" }, { status: 401 });
+
+    await run(
+      `UPDATE users SET totp_secret = NULL, totp_enabled_at = NULL, totp_last_step = NULL,
+                        session_version = session_version + 1 WHERE id = ?`,
+      user.id,
+    );
+    await run(`DELETE FROM totp_recovery_codes WHERE user_id = ?`, user.id);
+    // Thu hồi cả phiên hiện tại: lần login tiếp theo tính lại yêu cầu 2FA theo vai trò.
+    const response = NextResponse.json({ ok: true });
+    response.cookies.set(COOKIE, "", {
+      httpOnly: true,
+      path: "/",
+      maxAge: 0,
+      sameSite: "lax",
+      secure: isSecureCookie(req),
+    });
+    return response;
+  });
 }

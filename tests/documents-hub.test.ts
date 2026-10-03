@@ -1,6 +1,15 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { chayVoiQuyen, type ActorQuyen } from "./helpers/ngu-canh-quyen";
+
+type ListAllDocuments = typeof import("@/lib/hien-truong/documents-hub").listAllDocuments;
+
+// listAllDocuments lọc nguồn theo CAN — chạy trong ngữ cảnh quyền giống request thật.
+function trongNguCanh(listAllDocuments: ListAllDocuments): ListAllDocuments {
+  return (user, projectId, filters) =>
+    chayVoiQuyen(user as ActorQuyen, projectId, () => listAllDocuments(user, projectId, filters));
+}
 
 // ===== Test tích hợp (cần Postgres riêng: đặt TEST_DATABASE_URL) =====
 
@@ -9,7 +18,9 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { listAllDocuments } = await import("@/lib/hien-truong/documents-hub");
+    const listAllDocuments = trongNguCanh(
+      (await import("@/lib/hien-truong/documents-hub")).listAllDocuments,
+    );
 
     const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien, "system 'dien' phải có sẵn từ migration 0005_boq.sql");
@@ -153,7 +164,9 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listAllDocuments } = await import("@/lib/hien-truong/documents-hub");
+    const listAllDocuments = trongNguCanh(
+      (await import("@/lib/hien-truong/documents-hub")).listAllDocuments,
+    );
 
     const drawingId = await insertId(
       `INSERT INTO drawings (code, name, kind) VALUES ('DWG-HUB-TEST', 'Bản vẽ test hub', 'shop')`,
@@ -183,7 +196,9 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { listAllDocuments } = await import("@/lib/hien-truong/documents-hub");
+    const listAllDocuments = trongNguCanh(
+      (await import("@/lib/hien-truong/documents-hub")).listAllDocuments,
+    );
 
     const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien, "system 'dien' phải có sẵn từ migration 0005_boq.sql");

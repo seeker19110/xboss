@@ -16,8 +16,12 @@ import { listPermissionOverrides, setPermissionOverride } from "@/lib/bao-mat/pe
 export const dynamic = "force-dynamic";
 
 // Kiểm id dự án có thật trong bảng projects (override theo dự án phải trỏ dự án tồn tại).
-async function projectExists(id: number): Promise<boolean> {
-  const row = await queryOne<{ id: number }>(`SELECT id FROM projects WHERE id = ?`, id);
+async function projectExists(id: number, orgId: number): Promise<boolean> {
+  const row = await queryOne<{ id: number }>(
+    `SELECT id FROM projects WHERE id = ? AND org_id = ?`,
+    id,
+    orgId,
+  );
   return !!row;
 }
 
@@ -34,25 +38,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Chỉ Admin được xem cấu hình phân quyền" }, { status: 403 });
 
   const projects = await query<{ id: number; name: string }>(
-    `SELECT id, name FROM projects ORDER BY id`,
+    `SELECT id, name FROM projects WHERE org_id = ? ORDER BY id`,
+    user.orgId,
   );
 
   const raw = req.nextUrl.searchParams.get("projectId");
   let overrides;
-  if (raw !== null && raw !== "") {
+  if (raw !== null) {
     const projectId = Number(raw);
-    if (!Number.isInteger(projectId) || projectId <= 0)
+    if (!/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(projectId))
       return NextResponse.json({ error: "Mã dự án không hợp lệ" }, { status: 422 });
-    if (!(await projectExists(projectId)))
+    if (!(await projectExists(projectId, user.orgId)))
       return NextResponse.json({ error: "Dự án không tồn tại" }, { status: 422 });
     // Override toàn hệ (kế thừa) + override riêng của dự án — UI phân biệt qua field projectId.
     const [globalOverrides, scopedOverrides] = await Promise.all([
-      listPermissionOverrides(null),
-      listPermissionOverrides(projectId),
+      listPermissionOverrides(user.orgId, null),
+      listPermissionOverrides(user.orgId, projectId),
     ]);
     overrides = [...globalOverrides, ...scopedOverrides];
   } else {
-    overrides = await listPermissionOverrides(null);
+    overrides = await listPermissionOverrides(user.orgId, null);
   }
 
   return NextResponse.json({
@@ -77,7 +82,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Chỉ Admin được cấu hình phân quyền" }, { status: 403 });
 
   const body = await req.json().catch(() => null);
-  if (!body || typeof body !== "object")
+  if (!body || typeof body !== "object" || Array.isArray(body))
     return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
   const role = String(body.role ?? "");
@@ -91,7 +96,7 @@ export async function PATCH(req: NextRequest) {
   let projectId: number | null;
   if (body.projectId === undefined || body.projectId === null) {
     projectId = null;
-  } else if (typeof body.projectId === "number" && Number.isInteger(body.projectId)) {
+  } else if (typeof body.projectId === "number" && Number.isSafeInteger(body.projectId)) {
     projectId = body.projectId;
   } else {
     return NextResponse.json({ error: "Mã dự án không hợp lệ" }, { status: 422 });
@@ -100,7 +105,7 @@ export async function PATCH(req: NextRequest) {
   const err = validatePermOverride(role, permKey, allowed, projectId);
   if (err) return NextResponse.json({ error: err }, { status: 422 });
 
-  if (projectId !== null && !(await projectExists(projectId)))
+  if (projectId !== null && !(await projectExists(projectId, user.orgId)))
     return NextResponse.json({ error: "Dự án không tồn tại" }, { status: 422 });
 
   await setPermissionOverride(

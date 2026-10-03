@@ -363,6 +363,15 @@ export async function createVendorQuote(params: {
   return withProjectScope(
     projectId,
     async () => {
+      // FK chỉ kiểm gói thầu TỒN TẠI (và đi vòng RLS) — phải tự kiểm gói thuộc đúng dự án,
+      // nếu không biết UUID gói của dự án/tổ chức khác là gắn được báo giá vào đó.
+      const goi = await queryOne<{ ok: number }>(
+        `SELECT 1 AS ok FROM engineering_bidding_packages WHERE id::text = ? AND project_id = ?`,
+        packageId,
+        projectId,
+      );
+      if (!goi) throw loiKhongTimThay("Không tìm thấy gói thầu trong dự án");
+
       const rows = await query<any>(
         `INSERT INTO engineering_bidding_vendor_quotes
          (project_id, package_id, vendor_name, vendor_type, total_amount_vnd, line_items,

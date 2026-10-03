@@ -2,6 +2,32 @@ import { type NextRequest, NextResponse } from "next/server";
 import { TRAFFIC_TOKEN_HEADER, trafficToken } from "@/lib/bao-mat/traffic-token";
 import { COOKIE, parseToken } from "@/lib/bao-mat/session-token";
 import { isSameOrigin, needsSameOriginCheck } from "@/lib/bao-mat/csrf";
+import { log } from "@/lib/nen/log";
+
+let daCanhBaoTraffic = false;
+
+function trafficIngestUrl(): URL {
+  const appUrl = process.env.APP_URL?.trim();
+  if (appUrl) {
+    let base: URL;
+    try {
+      base = new URL(appUrl);
+    } catch {
+      throw new Error("APP_URL phải là URL HTTP(S) hợp lệ, không chứa thông tin đăng nhập");
+    }
+    if (!["http:", "https:"].includes(base.protocol) || base.username || base.password) {
+      throw new Error("APP_URL phải là URL HTTP(S) hợp lệ, không chứa thông tin đăng nhập");
+    }
+    return new URL("/api/admin/traffic/ingest", base);
+  }
+
+  // APP_URL là tùy chọn: chỉ fallback về loopback, không tin URL/Host do client gửi.
+  const port = process.env.PORT ?? "3000";
+  if (!/^\d{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
+    throw new Error("PORT phải là cổng HTTP nội bộ hợp lệ (1–65535)");
+  }
+  return new URL(`http://127.0.0.1:${port}/api/admin/traffic/ingest`);
+}
 
 // Proxy (middleware) của Next 16 LUÔN chạy Node.js runtime — chỉ intercept /api/ (trừ chính
 // endpoint traffic/ingest). Fire-and-forget POST đến ingest để ghi ring buffer.
@@ -18,18 +44,37 @@ export function proxy(req: NextRequest) {
   const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
   // Bỏ qua endpoint ingest để tránh vòng lặp vô hạn và các route traffic
   if (!path.startsWith("/api/admin/traffic/")) {
-    const ingestUrl = new URL("/api/admin/traffic/ingest", req.url);
-    fetch(ingestUrl.toString(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", [TRAFFIC_TOKEN_HEADER]: trafficToken() },
-      body: JSON.stringify({
-        method: req.method,
-        path,
-        ip: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "",
-        ua: req.headers.get("user-agent") ?? "",
-        ts: Date.now(),
-      }),
-    }).catch(() => {});
+    // Ghi traffic chỉ là telemetry: cấu hình sai (APP_URL/PORT/XBOSS_SECRET) phải bỏ qua gửi
+    // và ghi log, KHÔNG được làm hỏng mọi /api (kể cả login, health) — audit PR #544.
+    let ingestUrl: URL | null = null;
+    let token = "";
+    try {
+      const url = trafficIngestUrl();
+      token = trafficToken();
+      ingestUrl = url;
+    } catch (err) {
+      // Cấu hình sai thì lỗi lặp lại ở MỌI request — chỉ cảnh báo một lần mỗi tiến trình.
+      if (!daCanhBaoTraffic) {
+        daCanhBaoTraffic = true;
+        log.warn("Bỏ qua ghi traffic do cấu hình không hợp lệ", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    if (ingestUrl) {
+      fetch(ingestUrl.toString(), {
+        method: "POST",
+        redirect: "error", // Không chuyển tiếp token nội bộ sang đích redirect.
+        headers: { "Content-Type": "application/json", [TRAFFIC_TOKEN_HEADER]: token },
+        body: JSON.stringify({
+          method: req.method,
+          path,
+          ip: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "",
+          ua: req.headers.get("user-agent") ?? "",
+          ts: Date.now(),
+        }),
+      }).catch(() => {});
+    }
   }
 
   // CSRF phòng thủ theo chiều sâu — kiểm same-origin cho MỌI request mutating tới /api/*

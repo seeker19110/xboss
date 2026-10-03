@@ -1,20 +1,38 @@
 import "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load (qua lib/auth)
-import { test } from "node:test";
+import { test, mock } from "node:test";
 import assert from "node:assert/strict";
-import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
-import { _resetPermissionCacheForTests } from "@/lib/bao-mat/permissions";
+import { runWithRequestContext } from "@/lib/nen/request-context";
 import type { Role } from "@/lib/nen/roles";
 
 // ===== M50 PR2 — Quyền theo trường (che trường tiền/đơn giá/tỷ lệ) =====
 // Thuần logic (không chạm DB): kiểm stripSensitive che ĐÚNG trường theo perm mặc định
 // (viewPayments/viewPayroll), giữ nguyên trường khác, không đụng bản gốc, mảng rỗng.
-// Reset cache override PR1 về cold start → CAN dùng MẶC ĐỊNH (đọc override là fire-and-
-// forget, không resolve trong 1 test đồng bộ → snapshot rỗng → mặc định).
+// Biên DB trả snapshot rỗng thành công; CAN vẫn dùng cùng gate request như production.
+mock.module("@/lib/db", {
+  namedExports: {
+    query: async () => [],
+    queryOne: async () => undefined,
+    run: async () => ({ changes: 0 }),
+    insertId: async () => 1,
+    todayISO: () => "2026-09-27",
+    withTransaction: async (fn: () => Promise<unknown>) => fn(),
+  },
+});
+let stripSensitive: typeof import("@/lib/bao-mat/sensitive-fields").stripSensitive;
+function testWithSnapshot(name: string, fn: () => void): void {
+  test(name, async () => {
+    ({ stripSensitive } = await import("@/lib/bao-mat/sensitive-fields"));
+    const { invalidatePermissionCache } = await import("@/lib/bao-mat/permissions");
+    await runWithRequestContext({ userId: 1, role: "admin", orgId: 1 }, async () => {
+      await invalidatePermissionCache(1);
+      fn();
+    });
+  });
+}
 
 const u = (role: Role) => ({ role });
 
-test("stripSensitive[payroll]: bch bị che số tiền, admin/pm nguyên vẹn", () => {
-  _resetPermissionCacheForTests();
+testWithSnapshot("stripSensitive[payroll]: bch bị che số tiền, admin/pm nguyên vẹn", () => {
   const rows = [
     {
       id: 1,
@@ -48,8 +66,7 @@ test("stripSensitive[payroll]: bch bị che số tiền, admin/pm nguyên vẹn"
   }
 });
 
-test("stripSensitive: KHÔNG đụng bản ghi gốc (hàm thuần)", () => {
-  _resetPermissionCacheForTests();
+testWithSnapshot("stripSensitive: KHÔNG đụng bản ghi gốc (hàm thuần)", () => {
   const rows = [{ id: 1, rate: 300000, gross: 7800000, deductions: 0, net: 7800000, workdays: 26 }];
   const out = stripSensitive("payroll", rows, u("bch"));
   assert.equal(rows[0].rate, 300000, "bản gốc không được đổi");
@@ -58,8 +75,7 @@ test("stripSensitive: KHÔNG đụng bản ghi gốc (hàm thuần)", () => {
   assert.equal(out[0].rate, null);
 });
 
-test("stripSensitive[variation]: engineer che tổng + đơn giá dòng con lồng", () => {
-  _resetPermissionCacheForTests();
+testWithSnapshot("stripSensitive[variation]: engineer che tổng + đơn giá dòng con lồng", () => {
   const rows = [
     {
       id: 1,
@@ -95,8 +111,7 @@ test("stripSensitive[variation]: engineer che tổng + đơn giá dòng con lồ
   assert.equal(adm[0].lines[0].unitPrice, 1000000);
 });
 
-test("stripSensitive[contract]: engineer che, bch (viewPayments) nguyên vẹn", () => {
-  _resetPermissionCacheForTests();
+testWithSnapshot("stripSensitive[contract]: engineer che, bch (viewPayments) nguyên vẹn", () => {
   const rows = [
     {
       id: 1,
@@ -125,8 +140,7 @@ test("stripSensitive[contract]: engineer che, bch (viewPayments) nguyên vẹn",
   assert.equal(bch[0].advancePct, 10);
 });
 
-test("stripSensitive[paymentCert + certTotals]: che đúng theo viewPayments", () => {
-  _resetPermissionCacheForTests();
+testWithSnapshot("stripSensitive[paymentCert + certTotals]: che đúng theo viewPayments", () => {
   const certs = [
     {
       id: 1,
@@ -156,8 +170,7 @@ test("stripSensitive[paymentCert + certTotals]: che đúng theo viewPayments", (
   assert.equal(admT[0].periodValue, 3000000);
 });
 
-test("stripSensitive: mảng rỗng + entity lạ → trả nguyên", () => {
-  _resetPermissionCacheForTests();
+testWithSnapshot("stripSensitive: mảng rỗng + entity lạ → trả nguyên", () => {
   const empty: unknown[] = [];
   assert.equal(stripSensitive("payroll", empty, u("bch")), empty);
   const rows = [{ id: 1, rate: 1 }];

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
-import { pushConfigured } from "@/lib/van-hanh/push";
+import { isSafePushEndpoint, pushConfigured } from "@/lib/van-hanh/push";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
   const auth = sub?.keys?.auth;
   if (typeof endpoint !== "string" || typeof p256dh !== "string" || typeof auth !== "string")
     return NextResponse.json({ error: "Subscription không hợp lệ" }, { status: 400 });
+  if (!isSafePushEndpoint(endpoint))
+    return NextResponse.json({ error: "Endpoint push không hợp lệ" }, { status: 400 });
 
   // Endpoint là duy nhất per thiết bị/trình duyệt — đăng nhập user khác thì chuyển chủ.
   await run(

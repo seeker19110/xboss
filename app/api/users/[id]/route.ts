@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN, hashPassword, ROLES, type Role } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
@@ -72,12 +72,24 @@ export async function PATCH(
   // Admin tắt 2FA hộ user khác (M56 PR1) — đường thoát khi user mất máy xác thực.
   // Ghi audit qua trigger sẵn có trên bảng users, không cần log riêng.
   if (body.disable2fa === true) {
-    await run(
-      `UPDATE users SET totp_secret = NULL, totp_enabled_at = NULL, totp_last_step = NULL WHERE id = ? AND org_id = ?`,
-      id,
-      me.orgId,
-    );
-    await run(`DELETE FROM totp_recovery_codes WHERE user_id = ?`, id);
+    const reset = await withTransaction(async () => {
+      // Cùng khoá với setup/confirm/login 2FA; thu hồi mọi phiên khi admin đặt lại MFA.
+      const current = await queryOne<{ id: number }>(
+        `SELECT id FROM users WHERE id = ? AND org_id = ? FOR UPDATE`,
+        id,
+        me.orgId,
+      );
+      if (!current) return false;
+      await run(
+        `UPDATE users SET totp_secret = NULL, totp_enabled_at = NULL, totp_last_step = NULL,
+                          session_version = session_version + 1 WHERE id = ? AND org_id = ?`,
+        id,
+        me.orgId,
+      );
+      await run(`DELETE FROM totp_recovery_codes WHERE user_id = ?`, id);
+      return true;
+    });
+    if (!reset) return NextResponse.json({ error: "Không tìm thấy người dùng" }, { status: 404 });
   }
 
   const user = await queryOne(
