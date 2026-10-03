@@ -94,6 +94,11 @@ const OK_ROUTES: Route[] = [
   // Audit layout 2026-10-01: quét lại trên bản production (light + darkblue, desktop + mobile)
   // — hub /engineering đã xanh thật (card/badge riêng được sửa ở các đợt sau), bỏ fixme.
   { path: "/engineering", name: "Hub Kỹ thuật số (engineering)" },
+  // 2026-10-03: sửa trang (label/aria-label cho input/select, badge dùng công thức Chip) → xanh thật.
+  { path: "/engineering/bidding-matrix", name: "Ma trận đấu thầu" },
+  { path: "/engineering/cashflow", name: "Dòng tiền động" },
+  { path: "/engineering/esign", name: "Chữ ký điện tử (esign)" },
+  { path: "/mepf-process", name: "Quy trình MEPF" },
 ];
 
 test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)", () => {
@@ -113,12 +118,6 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
 
   const RED_ROUTES: { path: string; name: string; violations: string }[] = [
     {
-      path: "/mepf-process",
-      name: "Quy trình MEPF",
-      violations:
-        "color-contrast x6 (đã giảm từ x8 sau khi sửa badge EngineeringNav — còn lại là badge/nút RIÊNG của trang này cùng kiểu -950/50+accent-300, không phải EngineeringNav) — vd .sm:inline, chữ #065f46 trên nền hiệu dụng #7b928d = 2.31:1 (cần 4,5:1).",
-    },
-    {
       path: "/schedule",
       name: "Lịch trình (schedule)",
       violations:
@@ -126,28 +125,7 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
     },
   ];
 
-  const ENG_FIXME: { path: string; name: string; violations: string }[] = [
-    {
-      path: "/engineering/bidding-matrix",
-      name: "Ma trận đấu thầu",
-      violations:
-        "color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav) + select-name x1 (select thiếu <label>).",
-    },
-    {
-      path: "/engineering/cashflow",
-      name: "Dòng tiền động",
-      violations:
-        "color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav) — bg-amber-950/80, chữ #92400e trên nền #694533 = 1.18:1 + label x5 (input text thiếu <label>).",
-    },
-    {
-      path: "/engineering/esign",
-      name: "Chữ ký điện tử (esign)",
-      violations:
-        "color-contrast x1 (đã giảm từ x2 sau khi sửa badge EngineeringNav) — bg-emerald-950/80, #065f46 trên #31554d = 1.07:1 + label x2 + select-name x1.",
-    },
-  ];
-
-  for (const route of [...RED_ROUTES, ...ENG_FIXME]) {
+  for (const route of RED_ROUTES) {
     test(`${route.name} (${route.path}) không có vi phạm a11y nghiêm trọng (axe)`, async ({
       page,
     }) => {
@@ -163,10 +141,6 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
   test("Mặt bằng thi công — chi tiết 1 tầng ([floor]) không có vi phạm a11y nghiêm trọng (axe)", async ({
     page,
   }) => {
-    test.fixme(
-      true,
-      "color-contrast x21-44 (dao động theo số hàng công tác của tầng) — vd .text-zinc-600 trên nền .bg-zinc-950/50, cùng lớp 'chữ xám nhạt trên nền tối nhạt' GĐ1 đã sửa ở nơi khác nhưng chưa áp dụng cho trang chi tiết tầng này.",
-    );
     await page.goto("/work-fronts");
     const region = page.getByRole("region", { name: "Ma trận mặt bằng thi công" });
     await expect(region).toBeVisible({ timeout: 15_000 });

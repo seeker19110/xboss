@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, useRef, type ReactNode } from "react";
+import { useEffect, useId, useState, useCallback, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 
 // ── Modal nền tảng: overlay + Escape để đóng + khoá scroll nền ──────────────
@@ -11,6 +11,7 @@ export function Modal({
   zIndex = "z-50",
   drawer = false,
   id,
+  ariaLabel,
 }: {
   onClose: () => void;
   children: ReactNode;
@@ -20,8 +21,30 @@ export function Modal({
   drawer?: boolean;
   /** id gắn vào panel — dùng khi cần locator/CSS trỏ thẳng tới nội dung modal (vd drawer sidebar mobile). */
   id?: string;
+  /** Tên truy cập tường minh của hộp thoại. Không truyền → lấy theo tiêu đề h1/h2/h3 (hoặc [data-modal-title]) đầu tiên trong panel. */
+  ariaLabel?: string;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const autoTitleId = useId();
+  const [labelledBy, setLabelledBy] = useState<string | undefined>(undefined);
+
+  // Không có ariaLabel → tìm tiêu đề đầu tiên trong panel làm tên truy cập (aria-labelledby).
+  // Theo dõi panel bằng MutationObserver: modal có tiêu đề chỉ hiện sau khi tải dữ liệu vẫn
+  // được gắn tên. Chỉ setState khi id đổi nên không tạo vòng render.
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (ariaLabel || !panel) return;
+    const capNhat = () => {
+      const heading = panel.querySelector<HTMLElement>("h1, h2, h3, [data-modal-title]");
+      if (heading && !heading.id) heading.id = autoTitleId;
+      const next = heading?.id || undefined;
+      setLabelledBy((cur) => (cur === next ? cur : next));
+    };
+    capNhat();
+    const observer = new MutationObserver(capNhat);
+    observer.observe(panel, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [ariaLabel, autoTitleId]);
 
   // onClose thường là hàm inline (tham chiếu đổi mỗi lần parent render).
   // Giữ trong ref để listener keydown luôn gọi bản mới mà KHÔNG phải đăng ký lại
@@ -99,13 +122,15 @@ export function Modal({
         drawer ? "items-stretch justify-start" : "items-center justify-center p-4"
       }`}
       style={{ background: "var(--overlay-scrim)" }}
-      role="dialog"
-      aria-modal="true"
       onClick={onClose}
     >
       <div
         ref={panelRef}
         id={id}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabel ? undefined : labelledBy}
         className={
           drawer
             ? `bg-zinc-950 border-r border-zinc-800 h-full overflow-y-auto safe-top shadow-2xl ${className}`

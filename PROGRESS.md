@@ -1,5 +1,17 @@
 # PROGRESS — XBoss
 
+## 2026-10-03 — a11y: Modal có tên truy cập + gỡ fixme axe 5 trang
+
+- `Modal` (`app/components/dialogs.tsx`): `role="dialog" aria-modal` chuyển từ overlay xuống panel; có
+  `aria-labelledby` tự gắn vào tiêu đề h1/h2/h3/`[data-modal-title]` đầu tiên, hoặc prop `ariaLabel`
+  tường minh (drawer sidebar mobile ở `AppHeader.tsx` dùng "Menu điều hướng"). Rà mọi nơi gọi `<Modal>`:
+  chỉ drawer này thiếu tiêu đề, còn lại đều đã có heading. Không đổi focus/Escape/Tab-trap/khoá scroll.
+- Gỡ `test.fixme` axe bằng cách sửa trang: `/engineering/{bidding-matrix,cashflow,esign}`,
+  `/mepf-process`, `/work-fronts/[floor]` (label/aria-label cho input/select, badge theo công thức Chip,
+  nút `bg-*-700 text-on-accent`, chữ phụ `text-zinc-400`). `/schedule` vẫn fixme (flaky chưa rõ gốc).
+- Test: `e2e/authed/modal-a11y.spec.ts` (2 modal thật), `luoi-quet-axe.spec.ts` (+4 trang assert thật,
+  chi tiết tầng hết fixme). Chạy desktop + mobile: 43 passed.
+
 ## 2026-10-03 — PR #544 (thu hẹp): vá bảo mật xác thực và cách ly tổ chức
 
 Đưa PR #544 (nháp từ 27/09, chưa từng chạy CI) lên `main` mới. Chạy thật trên PostgreSQL thì

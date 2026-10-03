@@ -1393,7 +1393,7 @@ export default function CleanMepfProcessPage() {
                           isApproved
                             ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
                             : isPending
-                              ? "bg-amber-500/10 border-amber-500/40 text-amber-400 animate-pulse"
+                              ? "bg-amber-500/10 border-amber-500/40 text-amber-300 animate-pulse"
                               : isRejected
                                 ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
                                 : "bg-zinc-900 border-zinc-800 text-zinc-600"
@@ -1420,7 +1420,7 @@ export default function CleanMepfProcessPage() {
                             {step.code}
                           </span>
                           {step.isHoldPoint && (
-                            <span className="text-[9px] font-mono font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.2 rounded">
+                            <span className="text-[9px] font-mono font-bold text-rose-300 border border-rose-500/30 px-1.5 py-0.2 rounded">
                               HOLD
                             </span>
                           )}
@@ -1479,7 +1479,7 @@ export default function CleanMepfProcessPage() {
                         activeStep.gateStatus === "approved"
                           ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                           : activeStep.gateStatus === "pending"
-                            ? "bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse"
+                            ? "bg-amber-500/10 text-amber-300 border-amber-500/30 animate-pulse"
                             : activeStep.gateStatus === "rejected"
                               ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
                               : "bg-zinc-800 text-zinc-400 border-zinc-700"
@@ -1575,7 +1575,7 @@ export default function CleanMepfProcessPage() {
                           {activeStep.deliverables.map((del, didx) => (
                             <span
                               key={didx}
-                              className="text-[11px] text-emerald-300 bg-emerald-950/40 border border-emerald-800/60 px-2 py-0.5 rounded font-medium"
+                              className="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded font-medium"
                             >
                               {del}
                             </span>
@@ -1623,7 +1623,7 @@ export default function CleanMepfProcessPage() {
                           type="button"
                           onClick={() => setShowRejectModal(true)}
                           disabled={isSubmitting}
-                          className="px-3.5 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 text-xs font-semibold border border-rose-800/80 transition"
+                          className="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-semibold border border-rose-500/30 transition"
                         >
                           ✕ Từ Chối / Lập NCR
                         </button>
