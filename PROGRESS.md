@@ -1,5 +1,19 @@
 # PROGRESS — XBoss
 
+## 2026-10-03 — tích hợp PR #544: vá bảo mật xác thực và cách ly tổ chức
+
+Đưa PR #544 (nháp từ 27/09, baseline `f38a10e`) lên `main` mới. Nội dung bản vá: setup/
+confirm/disable 2FA chạy trong transaction + `FOR UPDATE`, setup trả 409 khi 2FA đang bật; API
+key ràng buộc org lúc cấp và lúc dùng; token traffic nội bộ là HMAC tách mục đích (không gửi
+`XBOSS_SECRET`), đích từ cấu hình tin cậy, cấm redirect; `role_permissions` theo org
+(`migrations/0158_role_permissions_org_scope.sql`), cache quyền không mặc định allow khi chưa
+nạp/lỗi; chọn dự án không fallback dự án 1; webhook/push đúng tenant + chặn SSRF; tham chiếu
+cha/con cùng org/dự án ở các route engineering bidding/esign/logistics/cashflow; tên file an
+toàn trong zip QC. Báo cáo: [audit bảo mật 27/09](docs/ops/security-audit-2026-09-27.md).
+Lúc tích hợp: xung đột `app/api/auth/login/2fa/route.ts` với #545 — giữ trần dò mã theo tài
+khoản (đặt ngoài transaction để bộ đếm không bị rollback) + thân transaction khoá dòng của #544.
+Đang review bảo mật/logic và chờ CI trên HEAD mới.
+
 ## 2026-10-01 — tích hợp ECC (Everything Claude Code) vào cấu hình agent (PR #555)
 
 Nghiên cứu [ECC](https://github.com/affaan-m/ECC) v2.2.2 (harness phổ biến nhất cho Claude Code)
