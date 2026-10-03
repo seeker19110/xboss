@@ -75,7 +75,13 @@ export async function POST(
         // Khoá dòng PO trong transaction để serialize các lần nhập kho đồng thời
         // trên cùng PO — cần thiết để check trùng idempotency-key bên dưới không
         // bị race (2 request cùng key cùng lúc đều thấy "chưa có" rồi cùng insert).
-        await queryOne(`SELECT id FROM purchase_orders WHERE id = ? FOR UPDATE`, poId);
+        // Đọc lại trạng thái DƯỚI khoá (N3, audit logic 2026-10-01): kiểm ở trên chỉ để trả 409
+        // sớm; dùng trạng thái đọc trước khoá thì 2 phiếu nhập đồng thời đều thấy 'confirmed' và
+        // cùng ghi nhật ký 'confirmed → partial'.
+        const cur = await queryOne<{ status: string }>(
+          `SELECT status FROM purchase_orders WHERE id = ? FOR UPDATE`,
+          poId,
+        );
 
         if (idempotencyKey) {
           const dup = await queryOne<{ id: number; receipt_code: string }>(
@@ -85,6 +91,12 @@ export async function POST(
           );
           if (dup) return { receiptId: dup.id, receiptCode: dup.receipt_code };
         }
+
+        const statusHienTai = cur?.status ?? po.status;
+        // Throw (không return) để rollback — return sẽ COMMIT phiếu dở.
+        if (statusHienTai === "cancelled") throw new Error("POSTATUS:Đơn hàng đã huỷ");
+        if (statusHienTai === "received" || statusHienTai === "reconciled")
+          throw new Error("POSTATUS:Đơn hàng đã nhập đủ hàng");
 
         const receiptCode = await nextSeqCode("warehouse_receipts", "receipt_code", `WR-${ym}-`);
         const rid = await insertId(
@@ -165,10 +177,10 @@ export async function POST(
         );
         const allReceived = updatedItems.every((i) => i.qty_received >= i.qty_ordered);
         const anyReceived = updatedItems.some((i) => i.qty_received > 0);
-        const newStatus = allReceived ? "received" : anyReceived ? "partial" : po.status;
-        if (newStatus !== po.status) {
+        const newStatus = allReceived ? "received" : anyReceived ? "partial" : statusHienTai;
+        if (newStatus !== statusHienTai) {
           await run(`UPDATE purchase_orders SET status = ? WHERE id = ?`, newStatus, poId);
-          await logPoStatusChange(poId, po.status, newStatus, user.id);
+          await logPoStatusChange(poId, statusHienTai, newStatus, user.id);
         }
 
         // Cập nhật trạng thái materials: nếu qty_stock > 0 → ve_kho
@@ -188,6 +200,8 @@ export async function POST(
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.startsWith("OVERRECEIVE:"))
       return NextResponse.json({ error: msg.slice("OVERRECEIVE:".length) }, { status: 409 });
+    if (msg.startsWith("POSTATUS:"))
+      return NextResponse.json({ error: msg.slice("POSTATUS:".length) }, { status: 409 });
     log.error("POST /api/purchase-orders/:id/receive lỗi", {
       route: "POST /api/purchase-orders/:id/receive",
       err: msg,

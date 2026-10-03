@@ -68,8 +68,6 @@ const WHITELIST: Record<string, string> = {
   subcontractors: "supplier_id của chính user đăng nhập (WHERE id = user.id)",
 
   // --- Cron (xác thực CRON_SECRET, quét nội bộ; integration single-tenant Giai đoạn 1) ---
-  "cron/daily-report": "cron, quét user admin/pm nhận email",
-  "cron/weekly-report": "cron, quét user admin/pm nhận email",
   "cron/health-check": "cron, quét user admin nhận email cảnh báo hệ thống",
   "cron/sync-integrations": "cron đồng bộ tích hợp — single-tenant Giai đoạn 1 (xem material-sync)",
 

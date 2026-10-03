@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { query } from "@/lib/db";
 import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
 import {
   buildDailyReport,
+  listReportProjects,
+  reportRecipients,
   reportToHtml,
   reportToTelegramText,
   sendTelegram,
+  type ReportProject,
 } from "@/lib/tien-do/report";
-import { sendPushToAll } from "@/lib/van-hanh/push";
+import { sendPushToUsers } from "@/lib/van-hanh/push";
 import { getEvmSeries } from "@/lib/tien-do/evm";
 import { getAlertThreshold } from "@/lib/van-hanh/alerts";
 import { acquireSyncLock, releaseSyncLock } from "@/lib/ha-tang/sync-locks";
@@ -23,7 +26,8 @@ const LOCK_NAME = "cron:daily-report";
 // (Không nhận secret qua query param — URL bị ghi vào access log.)
 export async function GET(req: NextRequest) {
   const bySecret = checkCronSecret(req.headers.get("authorization"));
-  const bySession = CAN.export((await getCurrentUser())?.role ?? undefined);
+  const user = bySecret ? null : await getCurrentUser();
+  const bySession = CAN.export(user?.role ?? undefined);
   if (!bySecret && !bySession)
     return NextResponse.json(
       { error: "Không có quyền (cần CRON_SECRET hoặc đăng nhập Admin/PM)" },
@@ -40,28 +44,32 @@ export async function GET(req: NextRequest) {
     );
 
   try {
-    return await handleDailyReport();
+    // Cron (secret) gửi mọi dự án đang hoạt động; Admin/PM gọi tay chỉ dự án mình thấy.
+    const projects = await listReportProjects(user ? await visibleProjectIds(user) : undefined);
+    const results = [];
+    for (const project of projects) results.push(await handleDailyReport(project));
+    return NextResponse.json({ projects: results });
   } finally {
     await releaseSyncLock(LOCK_NAME);
   }
 }
 
-async function handleDailyReport(): Promise<NextResponse> {
-  const report = await buildDailyReport();
+// Mỗi dự án một báo cáo (chủ dự án chốt 2026-10-03): số liệu, cảnh báo EVM, người nhận và
+// Web Push đều theo đúng dự án — không còn cộng dồn mọi dự án dưới tên dự án đầu.
+async function handleDailyReport(project: ReportProject) {
+  const report = await buildDailyReport(project.id);
 
-  // Cảnh báo SPI/CPI (M47 PR4): đánh giá trên toàn hệ (projectId=null — DB hiện chưa
-  // multi-project trong ngữ cảnh cron, xem docs/nang-cap/M47-evm-bi.md mục PR4).
-  // getEvmSeries trả null khi không có task nào (DB trống) → bỏ qua an toàn.
+  // Cảnh báo SPI/CPI (M47 PR4) theo dự án; getEvmSeries trả null khi dự án chưa có task.
   const evmAlerts: string[] = [];
   const evm = await getEvmSeries({
-    projectId: null,
+    projectId: project.id,
     baselineId: null,
     systemId: null,
     source: "bills",
   });
   if (evm) {
-    const spiBelow = await getAlertThreshold("spi_below", null);
-    const cpiBelow = await getAlertThreshold("cpi_below", null);
+    const spiBelow = await getAlertThreshold("spi_below", project.id);
+    const cpiBelow = await getAlertThreshold("cpi_below", project.id);
     if (evm.summary.spi != null && evm.summary.spi < spiBelow)
       evmAlerts.push(
         `SPI = ${evm.summary.spi.toFixed(2)} (< ${spiBelow}) — tiến độ đang chậm so với kế hoạch`,
@@ -74,17 +82,13 @@ async function handleDailyReport(): Promise<NextResponse> {
 
   const html = reportToHtml(report, process.env.APP_URL, evmAlerts);
 
-  // Người nhận: REPORT_EMAIL_TO (phân tách bằng dấu phẩy) — mặc định mọi Admin + PM.
+  // Người nhận: REPORT_EMAIL_TO (phân tách bằng dấu phẩy) — mặc định Admin + PM của dự án.
+  const recipients = await reportRecipients(project.id);
   let to = (process.env.REPORT_EMAIL_TO ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (to.length === 0) {
-    const rows = await query<{ email: string }>(
-      `SELECT email FROM users WHERE role IN ('admin','pm')`,
-    );
-    to = rows.map((r) => r.email);
-  }
+  if (to.length === 0) to = recipients.map((r) => r.email);
 
   // Kênh Telegram (tuỳ chọn) — gửi song song với email, kênh nào cấu hình thì gửi kênh đó.
   const telegramError = await sendTelegram(
@@ -92,20 +96,25 @@ async function handleDailyReport(): Promise<NextResponse> {
   );
   const telegramSent = telegramError === null;
 
-  // Web Push tóm tắt tới mọi thiết bị đã đăng ký (no-op nếu chưa cấu hình VAPID).
+  // Web Push tóm tắt tới thiết bị của người nhận dự án (no-op nếu chưa cấu hình VAPID).
   let pushSent = 0;
   if (report.totalDelayed > 0) {
-    pushSent = await sendPushToAll({
-      title: `🏗️ ${report.totalDelayed} hạng mục đang trễ`,
-      body: `${report.newDelayed.length} mới quá hạn trong 24h · ${report.dueSoon.length} sắp đến hạn`,
-      url: "/",
-    }).catch(() => 0);
+    pushSent = await sendPushToUsers(
+      recipients.map((r) => r.id),
+      {
+        title: `🏗️ ${project.name}: ${report.totalDelayed} hạng mục đang trễ`,
+        body: `${report.newDelayed.length} mới quá hạn trong 24h · ${report.dueSoon.length} sắp đến hạn`,
+        url: "/",
+      },
+    ).catch(() => 0);
   }
 
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
     // Chưa cấu hình SMTP → trả về nội dung để xem trước (không gửi email).
-    return NextResponse.json({
+    return {
+      projectId: project.id,
+      projectName: project.name,
       sent: telegramSent,
       emailSent: false,
       telegramSent,
@@ -115,7 +124,7 @@ async function handleDailyReport(): Promise<NextResponse> {
       reason: "Chưa cấu hình SMTP_HOST / SMTP_USER / SMTP_PASS — trả về preview",
       wouldSendTo: to,
       report,
-    });
+    };
   }
 
   const transporter = nodemailer.createTransport({
@@ -128,11 +137,13 @@ async function handleDailyReport(): Promise<NextResponse> {
   await transporter.sendMail({
     from: process.env.SMTP_FROM ?? `"XBoss" <${SMTP_USER}>`,
     to: to.join(", "),
-    subject: `🏗️ XBoss ${report.date} — ${report.totalDelayed} hạng mục trễ (${report.newDelayed.length} việc mới)`,
+    subject: `🏗️ XBoss ${project.name} ${report.date} — ${report.totalDelayed} hạng mục trễ (${report.newDelayed.length} việc mới)`,
     html,
   });
 
-  return NextResponse.json({
+  return {
+    projectId: project.id,
+    projectName: project.name,
     sent: true,
     emailSent: true,
     to,
@@ -142,5 +153,5 @@ async function handleDailyReport(): Promise<NextResponse> {
     evmAlerts,
     totalDelayed: report.totalDelayed,
     newDelayed: report.newDelayed.length,
-  });
+  };
 }

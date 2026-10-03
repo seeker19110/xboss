@@ -174,24 +174,29 @@ test(
 );
 
 test(
-  "GET /api/cron/daily-report: 2 lần gọi gần như đồng thời — lần 2 bị khoá (429), không gửi trùng",
+  "GET /api/cron/daily-report: tiến trình khác đang giữ khoá — request sau bị khoá (429), không gửi trùng",
   S,
   async () => {
     // Khoá sync_locks chống đúng kịch bản thật: cron thật trùng lúc admin bấm "xem trước".
+    // Tất định: tiến trình A đang giữ khoá (giả lập bằng acquireSyncLock) → request B phải 429
+    // và không gửi gì; A nhả khoá → gọi lại được. (Bản cũ đua 2 request song song nên đỏ ngẫu
+    // nhiên khi request đầu xử lý xong trước khi request sau kịp xin khoá. Tính nguyên tử của
+    // acquireSyncLock được tests/sync-locks.test.ts canh riêng.)
     const restore = datCronSecret("secret-that-toi-that-dai-32-ky-tu");
     try {
       const { run } = await import("@/lib/db");
+      const { acquireSyncLock, releaseSyncLock } = await import("@/lib/ha-tang/sync-locks");
       await run(`DELETE FROM sync_locks WHERE name = 'cron:daily-report'`);
       dangXuat();
       const { GET } = await import("@/app/api/cron/daily-report/route");
       const header = { authorization: "Bearer secret-that-toi-that-dai-32-ky-tu" };
 
-      const [a, b] = await Promise.all([
-        GET(req("/api/cron/daily-report", header)),
-        GET(req("/api/cron/daily-report", header)),
-      ]);
-      const statuses = [a.status, b.status].sort();
-      assert.deepEqual(statuses, [200, 429], "một request phải qua, một request phải bị khoá");
+      assert.equal(await acquireSyncLock("cron:daily-report"), true);
+      const khiDangKhoa = await GET(req("/api/cron/daily-report", header));
+      assert.equal(khiDangKhoa.status, 429, "đang có tiến trình gửi thì request sau bị khoá");
+      await releaseSyncLock("cron:daily-report");
+      const sauKhiNha = await GET(req("/api/cron/daily-report", header));
+      assert.equal(sauKhiNha.status, 200);
     } finally {
       restore();
     }
@@ -233,6 +238,49 @@ test("GET /api/cron/daily-report: Bearer ĐÚNG secret, không cần đăng nh�
     restore();
   }
 });
+
+test(
+  "GET /api/cron/daily-report + weekly-report: Admin gọi tay chỉ nhận báo cáo dự án trong tổ chức mình, mỗi dự án một bản (N1)",
+  S,
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const orgKhac = await insertId(`INSERT INTO organizations (name) VALUES (?)`, uniq("OrgCron"));
+    const duAnMinh = await insertId(
+      `INSERT INTO projects (name, org_id) VALUES (?, 1)`,
+      uniq("DA cron mình"),
+    );
+    const duAnKhac = await insertId(
+      `INSERT INTO projects (name, org_id) VALUES (?, ?)`,
+      uniq("DA cron org khác"),
+      orgKhac,
+    );
+    const admin = await taoUser("admin", "cronscope");
+    try {
+      dangNhap(admin);
+      for (const [ten, lock, mod] of [
+        ["daily-report", "cron:daily-report", () => import("@/app/api/cron/daily-report/route")],
+        ["weekly-report", "cron:weekly-report", () => import("@/app/api/cron/weekly-report/route")],
+      ] as const) {
+        await run(`DELETE FROM sync_locks WHERE name = ?`, lock);
+        const { GET } = await mod();
+        const res = await GET(req(`/api/cron/${ten}`));
+        assert.equal(res.status, 200, ten);
+        const body = (await res.json()) as {
+          projects: { projectId: number; projectName: string }[];
+        };
+        const ids = body.projects.map((p) => p.projectId);
+        assert.ok(ids.includes(duAnMinh), `${ten}: có báo cáo dự án của tổ chức mình`);
+        assert.ok(!ids.includes(duAnKhac), `${ten}: không lộ dự án tổ chức khác`);
+        assert.equal(new Set(ids).size, ids.length, `${ten}: mỗi dự án đúng một báo cáo`);
+      }
+    } finally {
+      dangXuat();
+      await run(`DELETE FROM users WHERE id = ?`, admin.id);
+      await run(`DELETE FROM projects WHERE id IN (?, ?)`, duAnMinh, duAnKhac);
+      await run(`DELETE FROM organizations WHERE id = ?`, orgKhac);
+    }
+  },
+);
 
 test("GET /api/cron/weekly-report: Bearer đúng secret → 200", S, async () => {
   const restore = datCronSecret("secret-that-toi-that-dai-32-ky-tu");

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { query } from "@/lib/db";
 import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
 import { log } from "@/lib/nen/log";
+import { visibleProjectIds } from "@/lib/ha-tang/projects";
 import {
   buildWeeklyReport,
+  listReportProjects,
+  reportRecipients,
+  type ReportProject,
   weeklyToHtml,
   weeklyToTelegramText,
   sendTelegram,
@@ -22,7 +25,8 @@ const LOCK_NAME = "cron:weekly-report";
 // Xác thực giống daily-report: Authorization: Bearer <CRON_SECRET> | session Admin/PM.
 export async function GET(req: NextRequest) {
   const bySecret = checkCronSecret(req.headers.get("authorization"));
-  const bySession = CAN.export((await getCurrentUser())?.role ?? undefined);
+  const user = bySecret ? null : await getCurrentUser();
+  const bySession = CAN.export(user?.role ?? undefined);
   if (!bySecret && !bySession)
     return NextResponse.json(
       { error: "Không có quyền (cần CRON_SECRET hoặc đăng nhập Admin/PM)" },
@@ -38,42 +42,45 @@ export async function GET(req: NextRequest) {
     );
 
   try {
-    return await handleWeeklyReport();
+    const auditChain = await xacMinhAuditChain();
+    // Cron (secret) gửi mọi dự án đang hoạt động; Admin/PM gọi tay chỉ dự án mình thấy.
+    const projects = await listReportProjects(user ? await visibleProjectIds(user) : undefined);
+    const results = [];
+    for (const project of projects) results.push(await handleWeeklyReport(project, auditChain));
+    return NextResponse.json({ projects: results, auditChain });
   } finally {
     await releaseSyncLock(LOCK_NAME);
   }
 }
 
-async function handleWeeklyReport(): Promise<NextResponse> {
-  const report = await buildWeeklyReport();
-
-  // Xác minh chuỗi hash audit_log (M43 PR3) — chạy trong process, không spawn subprocess
-  // (route Next.js). Lỗi khi xác minh không chặn gửi báo cáo (báo cáo vẫn hữu ích dù thiếu
-  // dòng audit chain) — chỉ log, coi như "chưa xác minh được" trong nội dung gửi.
-  let auditChain: AuditChainSummary | undefined;
+// Xác minh chuỗi hash audit_log (M43 PR3) MỘT lần cho cả lượt gửi — chuỗi audit là toàn hệ,
+// không theo dự án. Lỗi khi xác minh không chặn gửi báo cáo — chỉ log, coi như "chưa xác
+// minh được" trong nội dung gửi.
+async function xacMinhAuditChain(): Promise<AuditChainSummary | undefined> {
   try {
     const chainResult = await verifyAuditChain();
-    auditChain = { checked: chainResult.checked, errorCount: chainResult.errors.length };
+    return { checked: chainResult.checked, errorCount: chainResult.errors.length };
   } catch (err) {
     log.error("weekly-report: verifyAuditChain lỗi", {
       route: "GET /api/cron/weekly-report",
       err: err instanceof Error ? err.message : String(err),
     });
+    return undefined;
   }
+}
+
+// Mỗi dự án một báo cáo (chủ dự án chốt 2026-10-03).
+async function handleWeeklyReport(project: ReportProject, auditChain?: AuditChainSummary) {
+  const report = await buildWeeklyReport(project.id);
 
   const html = weeklyToHtml(report, process.env.APP_URL, auditChain);
 
-  // Người nhận: REPORT_EMAIL_TO (phân tách bằng dấu phẩy) — mặc định mọi Admin + PM.
+  // Người nhận: REPORT_EMAIL_TO (phân tách bằng dấu phẩy) — mặc định Admin + PM của dự án.
   let to = (process.env.REPORT_EMAIL_TO ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (to.length === 0) {
-    const rows = await query<{ email: string }>(
-      `SELECT email FROM users WHERE role IN ('admin','pm')`,
-    );
-    to = rows.map((r) => r.email);
-  }
+  if (to.length === 0) to = (await reportRecipients(project.id)).map((r) => r.email);
 
   const telegramError = await sendTelegram(
     weeklyToTelegramText(report, process.env.APP_URL, auditChain),
@@ -82,7 +89,9 @@ async function handleWeeklyReport(): Promise<NextResponse> {
 
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
-    return NextResponse.json({
+    return {
+      projectId: project.id,
+      projectName: project.name,
       sent: telegramSent,
       emailSent: false,
       telegramSent,
@@ -90,8 +99,7 @@ async function handleWeeklyReport(): Promise<NextResponse> {
       reason: "Chưa cấu hình SMTP_HOST / SMTP_USER / SMTP_PASS — trả về preview",
       wouldSendTo: to,
       report,
-      auditChain,
-    });
+    };
   }
 
   const transporter = nodemailer.createTransport({
@@ -104,11 +112,13 @@ async function handleWeeklyReport(): Promise<NextResponse> {
   await transporter.sendMail({
     from: process.env.SMTP_FROM ?? `"XBoss" <${SMTP_USER}>`,
     to: to.join(", "),
-    subject: `📅 XBoss báo cáo tuần ${report.weekFrom} → ${report.date} — ${report.completed.length} hoàn thành, ${report.newDelayed.length} trễ mới`,
+    subject: `📅 XBoss ${project.name} — báo cáo tuần ${report.weekFrom} → ${report.date} — ${report.completed.length} hoàn thành, ${report.newDelayed.length} trễ mới`,
     html,
   });
 
-  return NextResponse.json({
+  return {
+    projectId: project.id,
+    projectName: project.name,
     sent: true,
     emailSent: true,
     to,
@@ -117,6 +127,5 @@ async function handleWeeklyReport(): Promise<NextResponse> {
     completed: report.completed.length,
     newDelayed: report.newDelayed.length,
     totalDelayed: report.totalDelayed,
-    auditChain,
-  });
+  };
 }

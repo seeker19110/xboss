@@ -1243,3 +1243,38 @@ test(
     assert.equal(row?.status, "draft");
   },
 );
+
+test(
+  "POST /api/purchase-orders/:id/receive: 2 phiếu nhập đồng thời — nhật ký trạng thái chỉ 1 dòng confirmed → partial (N3)",
+  S,
+  async () => {
+    const { query } = await import("@/lib/db");
+    const { runWithRequestContext } = await import("@/lib/nen/request-context");
+    const projectId = await taoDuAn("precvdup");
+    const pm = await taoUser("pm", "precvdup");
+    const matId = await taoVatTu("precvdup", { projectId });
+    const { id: poId } = await taoPO(pm, projectId, matId, { qtyOrdered: 10 });
+    const { PATCH } = await import("@/app/api/purchase-orders/[id]/route");
+    await PATCH(jreq("/x", { status: "confirmed" }, "PATCH"), {
+      params: Promise.resolve({ id: String(poId) }),
+    });
+    const items = await query<{ id: number }>(`SELECT id FROM po_items WHERE po_id = ?`, poId);
+    const { POST: receive } = await import("@/app/api/purchase-orders/[id]/receive/route");
+    // Mỗi request một ngữ cảnh riêng như production.
+    const nhap = (qty: number) =>
+      runWithRequestContext({}, () =>
+        receive(jreq("/x", { items: [{ poItemId: items[0].id, qtyReceived: qty }] }, "POST"), {
+          params: Promise.resolve({ id: String(poId) }),
+        }),
+      );
+    const [a, b] = await Promise.all([nhap(3), nhap(3)]);
+    assert.deepEqual([a.status, b.status], [201, 201]);
+
+    const history = await query<{ from_status: string; to_status: string }>(
+      `SELECT from_status, to_status FROM po_status_history WHERE po_id = ? AND to_status = 'partial'`,
+      poId,
+    );
+    assert.equal(history.length, 1, "chỉ đúng 1 lần đổi sang partial");
+    assert.equal(history[0].from_status, "confirmed");
+  },
+);
