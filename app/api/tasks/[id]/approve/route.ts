@@ -5,7 +5,12 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { deriveStatus, recomputePackage } from "@/lib/tien-do/recompute";
 import { requiredInspectionMissing } from "@/lib/ky-thuat/qaqc";
-import { getActiveFlow, openApproval, advanceApproval } from "@/lib/tien-do/approvals";
+import {
+  getActiveFlow,
+  openApproval,
+  advanceApproval,
+  NON_APPROVER_ROLES,
+} from "@/lib/tien-do/approvals";
 import { emitWebhook } from "@/lib/bao-mat/webhooks";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
 
@@ -30,11 +35,13 @@ type StepResult =
 // Workflow nghiệm thu 2 bước: thi công xong (100%) → Admin/PM duyệt nghiệm thu.
 // Trạng thái nghiem_thu chỉ đặt được qua endpoint này — có audit trong task_history.
 // M46 PR3: nếu có flow 'task_acceptance' active (Admin cấu hình — PR4) → click đầu tiên
-// mở approval_request (mỗi task 1 request, amount NULL) rồi lập tức ghi nhận quyết định
-// của người gọi làm bước hiện tại; bước sau (người khác vai trò) gọi lại CHÍNH endpoint
-// này để quyết bước tiếp (route tự thấy request đã pending, không mở request mới — idempotent
-// giống pattern VO/IPC). Chưa tới bước cuối → CHƯA đổi status/task_history, chỉ trả
-// {pending:true}. Không có flow → hành vi y hệt trước đây (CAN.approve, 1 bước).
+// (Admin/PM) mở approval_request (mỗi task 1 request, amount NULL) rồi lập tức ghi nhận quyết
+// định của người gọi làm bước hiện tại nếu họ đúng vai trò bước đó (task_acceptance miễn SoD —
+// SOD_EXEMPT_ENTITY_TYPES); khác vai trò thì chỉ mở (= trình), chờ vai trò bước 1. Bước sau
+// (người khác vai trò, kể cả kỹ sư/CĐT nếu flow cấu hình) gọi lại CHÍNH endpoint này từ hộp thư
+// "Chờ tôi duyệt" — đã có request pending thì quyền do engine quyết (advanceApproval), không
+// phải CAN.approve, giống pattern VO/IPC. Chưa tới bước cuối → CHƯA đổi status/task_history,
+// chỉ trả {pending:true}. Không có flow → hành vi y hệt trước đây (CAN.approve, 1 bước).
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -42,7 +49,10 @@ export async function POST(
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.approve(user.role))
+  // Kiểm quyền đầy đủ nằm trong transaction (cần biết task có request đang chờ hay không):
+  // chưa có request → CAN.approve (Admin/PM); đã có → engine quyết theo vai trò bước. Vai trò
+  // không bao giờ được duyệt (bch/viewer) thì chặn sớm, không tốn truy vấn.
+  if (NON_APPROVER_ROLES.includes(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được duyệt nghiệm thu" }, { status: 403 });
 
   const id = parseInt(params.id);
@@ -74,6 +84,16 @@ export async function POST(
         id,
       );
       if (!task) throw Object.assign(new Error("Không tìm thấy task"), { status: 404 });
+      // Request đang chờ của engine (M46) — quyết định AI được gọi endpoint này: chưa có →
+      // chỉ Admin/PM được mở (trình/duyệt) như cũ; đã có → quyền do engine quyết theo vai trò
+      // bước hiện tại (advanceApproval). Kiểm TRƯỚC các cổng nghiệp vụ để người không có quyền
+      // nhận 403, không lộ trạng thái task qua 409/422.
+      const liveRequest = await queryOne<{ id: number }>(
+        `SELECT id FROM approval_requests WHERE entity_type = 'task_acceptance' AND entity_id = ? AND status = 'pending'`,
+        id,
+      );
+      if (!liveRequest && !CAN.approve(user.role))
+        throw Object.assign(new Error("Chỉ Admin/PM được duyệt nghiệm thu"), { status: 403 });
       if (task.status === "nghiem_thu")
         throw Object.assign(new Error("Task đã được nghiệm thu rồi"), { status: 409 });
       if ((task.progress_percent ?? 0) < 1)
@@ -91,10 +111,6 @@ export async function POST(
         );
 
       if (projectId != null) {
-        const liveRequest = await queryOne<{ id: number }>(
-          `SELECT id FROM approval_requests WHERE entity_type = 'task_acceptance' AND entity_id = ? AND status = 'pending'`,
-          id,
-        );
         let advance: Awaited<ReturnType<typeof advanceApproval>> | undefined;
         if (liveRequest) {
           advance = await advanceApproval({
@@ -118,13 +134,23 @@ export async function POST(
               amount: null,
               user,
             });
-            if (opened && opened.status === "pending")
-              advance = await advanceApproval({
-                entityType: "task_acceptance",
-                entityId: id,
-                user,
-                decision: "approve",
-              });
+            if (opened && opened.status === "pending") {
+              const step = flow.steps.find((s) => s.seq === opened.currentSeq);
+              if (step && step.role !== user.role && user.role !== "admin") {
+                // Người mở không phải vai trò bước 1 (vd flow bắt đầu bằng kỹ sư/CĐT): chỉ
+                // trình — gọi advanceApproval sẽ 403 rồi rollback luôn request vừa mở, khiến
+                // flow kẹt vĩnh viễn (vai trò bước 1 không có nút mở ở UI). Vai trò bước 1 sẽ
+                // thấy request trong hộp thư "Chờ tôi duyệt".
+                advance = { status: "pending", currentSeq: step.seq, nextRole: step.role };
+              } else {
+                advance = await advanceApproval({
+                  entityType: "task_acceptance",
+                  entityId: id,
+                  user,
+                  decision: "approve",
+                });
+              }
+            }
             // opened.status === 'approved' (flow không có bước hiệu lực nào) → rơi thẳng
             // xuống domain logic bên dưới, coi như đã qua engine.
           } else if (decision === "reject") {

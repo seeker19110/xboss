@@ -217,8 +217,8 @@ export default function HomeHienTruong({
         }
       />
 
-      {/* pb-24 chừa chỗ cho thanh cố định dưới đáy trên mobile */}
-      <main className="px-4 sm:px-6 py-6 pb-24 space-y-6 max-w-screen-md mx-auto">
+      {/* Khoảng chừa cho thanh cố định dưới đáy do globals.css lo (body:has(.app-bottombar)). */}
+      <main className="px-4 sm:px-6 py-6 space-y-6 max-w-screen-md mx-auto">
         <Section
           title={`Xin chào, ${me.name}`}
           description={`${nhanNgayHomNay()}${tenDuAn ? ` · ${tenDuAn}` : ""}`}

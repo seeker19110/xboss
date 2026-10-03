@@ -69,7 +69,7 @@ export default function StatCard({
       {pct != null && (
         <div className="mt-3 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-500 ${BAR_TONE[tone]}`}
+            className={`h-full rounded-full transition-[width] duration-500 ${BAR_TONE[tone]}`}
             style={{ width: `${pct}%` }}
           />
         </div>

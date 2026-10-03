@@ -72,7 +72,7 @@ export default function LookaheadPage() {
 
   return (
     <div className="sheet-stable min-h-screen bg-white text-zinc-900">
-      <div className="no-print sticky top-0 bg-zinc-100 border-b border-zinc-300 px-6 py-3 flex items-center gap-3">
+      <div className="no-print sticky top-0 bg-zinc-100 border-b border-zinc-300 px-3 sm:px-6 py-3 flex flex-wrap items-center gap-3">
         <Link href="/" aria-label="Quay lại" className="text-zinc-600 hover:text-zinc-900">
           <ArrowLeft className="w-5 h-5" />
         </Link>
@@ -82,14 +82,14 @@ export default function LookaheadPage() {
         <SystemFilter
           value={system}
           onChange={setSystem}
-          labelClassName="ml-auto flex items-center gap-1.5 text-xs text-zinc-600"
-          selectClassName="min-h-10 border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
+          labelClassName="ml-auto flex items-center gap-1.5 min-w-0 max-w-full text-xs text-zinc-600"
+          selectClassName="min-h-10 min-w-0 max-w-full border border-zinc-300 rounded-lg px-3 py-2 text-base sm:text-sm bg-white"
         />
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
           aria-label="Số ngày xem trước"
-          className="border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
+          className="min-h-10 border border-zinc-300 rounded-lg px-3 py-2 text-base sm:text-sm bg-white"
         >
           <option value={7}>7 ngày</option>
           <option value={14}>14 ngày</option>

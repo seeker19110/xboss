@@ -34,7 +34,7 @@ function ChildCard({ child }: { child: DashNode }) {
   return (
     <a
       href={child.href}
-      className="flex items-center gap-3.5 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-4 hover:border-zinc-700 hover:bg-zinc-850 active:scale-[0.99] transition-all duration-150 group shadow-xs"
+      className="flex items-center gap-3.5 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-4 hover:border-zinc-700 hover:bg-zinc-850 active:scale-[0.99] transition duration-150 group shadow-xs"
     >
       <div className="w-10 h-10 rounded-xl bg-zinc-800/80 group-hover:bg-emerald-950/40 flex items-center justify-center text-emerald-400 shrink-0 transition-colors">
         <Icon className="w-5 h-5" strokeWidth={1.75} />
@@ -76,7 +76,7 @@ export default function DashboardHub({ dashId }: { dashId: string }) {
       <main className="p-4 sm:p-6 space-y-6">
         <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-5">
           <Icon className="w-6 h-6 text-emerald-400 shrink-0" strokeWidth={1.75} />
-          <h1 className="text-lg font-bold">{dashboard.label}</h1>
+          <h2 className="text-lg font-bold">{dashboard.label}</h2>
         </div>
 
         {children.length === 0 ? (

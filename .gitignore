@@ -35,8 +35,11 @@ docs/ops/MAINTENANCE-REPORT.md
 cloudflared.exe
 cloudflared-*.txt
 
-# Claude settings — không đưa vào repo dự án
-.claude/
+# Claude Code: chỉ bỏ phần cục bộ của từng máy. agents/commands/hooks/settings.json là cấu hình
+# dùng chung của dự án nên được track — để cả `.claude/` thì lint-staged không stage lại được file
+# đã track trong đó và OCR không thấy chúng khi review (ADR-0012).
+.claude/worktrees/
+.claude/settings.local.json
 
 # SQLite cũ (đã chuyển sang Postgres) — giữ file local làm backup
 xboss.db

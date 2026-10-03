@@ -43,7 +43,11 @@ export default function SystemFilter({
   }
 
   return (
-    <label className={labelClassName ?? "flex items-center gap-1.5 text-xs text-zinc-400"}>
+    <label
+      className={
+        labelClassName ?? "flex items-center gap-1.5 min-w-0 max-w-full text-xs text-zinc-400"
+      }
+    >
       <span className="shrink-0">Hệ:</span>
       <select
         value={value}
@@ -51,7 +55,7 @@ export default function SystemFilter({
         aria-label="Lọc theo hệ"
         className={
           selectClassName ??
-          "min-h-10 bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-1.5 text-sm outline-none"
+          "min-h-10 min-w-0 max-w-full bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-1.5 text-base sm:text-sm outline-none"
         }
       >
         <option value="">Tổng thể</option>

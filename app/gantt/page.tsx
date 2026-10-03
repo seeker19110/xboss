@@ -194,12 +194,17 @@ export default function GanttPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       {/* Trang đã rời cây sidebar (dashboardTree) nên topbar không tự suy ra được title — khai tĩnh. */}
-      <AppHeader title="Gantt">
+      <AppHeader title="Gantt" />
+
+      {/* Bộ lọc nằm ở hàng riêng dưới topbar (không nhét vào topbar): trên điện thoại 2 ô
+          chọn + nút khoá đẩy mất tiêu đề, chuông, tài khoản ra ngoài màn hình và làm cả
+          trang cuộn ngang. Hàng riêng tự xuống dòng được. */}
+      <div className="px-3 sm:px-6 py-2 flex flex-wrap items-center gap-2 border-b border-zinc-800/60">
         <select
           value={sheetFilter}
           onChange={(e) => updateSheetFilter(e.target.value)}
           aria-label="Lọc theo sheet"
-          className="min-h-10 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm outline-none"
+          className="min-h-10 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-base sm:text-sm outline-none"
         >
           <option value="">Tất cả hệ</option>
           {sheets.map((s) => (
@@ -216,9 +221,9 @@ export default function GanttPage() {
           }}
         />
         <EditModeToggle canEdit={canEdit} editMode={editMode} onToggle={toggleEditMode} />
-      </AppHeader>
+      </div>
 
-      <div className="px-6 py-2 flex flex-wrap gap-3 text-xs text-zinc-400 border-b border-zinc-800/60">
+      <div className="px-3 sm:px-6 py-2 flex flex-wrap gap-3 text-xs text-zinc-400 border-b border-zinc-800/60">
         {Object.entries(STATUS_LABEL).map(([k, v]) => (
           <span key={k} className="flex items-center gap-1.5">
             <span className={`w-3 h-2 rounded-sm ${STATUS_BAR[k]}`} /> {v}

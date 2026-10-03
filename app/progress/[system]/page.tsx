@@ -332,7 +332,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
                     <div className="mt-auto">
                       <div className="bg-zinc-800 rounded-full h-2 overflow-hidden">
                         <div
-                          className={`h-2 rounded-full transition-all ${spct >= 80 ? "bg-emerald-500" : spct >= 50 ? "bg-sky-500" : "bg-amber-500"}`}
+                          className={`h-2 rounded-full transition-[width] ${spct >= 80 ? "bg-emerald-500" : spct >= 50 ? "bg-sky-500" : "bg-amber-500"}`}
                           style={{ width: `${spct}%` }}
                         />
                       </div>
@@ -406,7 +406,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
                     </span>
                     <div className="flex-1 bg-zinc-800 rounded-full h-2 overflow-hidden">
                       <div
-                        className={`h-2 rounded-full transition-all ${r.slug ? "bg-amber-500/70 group-hover:bg-amber-400" : "bg-zinc-600 group-hover:bg-zinc-500"}`}
+                        className={`h-2 rounded-full transition-[width,background-color] ${r.slug ? "bg-amber-500/70 group-hover:bg-amber-400" : "bg-zinc-600 group-hover:bg-zinc-500"}`}
                         style={{ width: `${(r.count / maxParetoCount) * 100}%` }}
                       />
                     </div>

@@ -490,7 +490,7 @@ export default function PaymentsPage() {
             </div>
             <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
               <div
-                className="h-full rounded-full bg-emerald-500 transition-all"
+                className="h-full rounded-full bg-emerald-500 transition-[width]"
                 style={{ width: `${Math.min(earnedPct, 100)}%` }}
               />
             </div>
@@ -517,7 +517,7 @@ export default function PaymentsPage() {
             value={sheetFilter}
             onChange={(e) => setSheetFilter(e.target.value)}
             aria-label="Lọc theo hệ"
-            className="text-xs bg-zinc-900 border border-zinc-800 text-zinc-300 rounded-lg px-2 py-2 focus:outline-none flex-1 sm:flex-none min-w-0"
+            className="text-base sm:text-xs bg-zinc-900 border border-zinc-800 text-zinc-300 rounded-lg px-2 py-2 focus:outline-none flex-1 sm:flex-none min-w-0"
           >
             <option value="all">Tất cả hệ</option>
             {sheets.map((s) => (
@@ -1756,7 +1756,7 @@ function FloorGroup({
           <div className="flex items-center gap-2">
             <div className="flex-1 bg-zinc-800 rounded-full h-2 overflow-hidden">
               <div
-                className={`h-2 rounded-full transition-all ${avgProgress >= 1 ? "bg-emerald-500" : hasDelayed ? "bg-red-500" : avgProgress >= 0.5 ? "bg-sky-500" : "bg-amber-500"}`}
+                className={`h-2 rounded-full transition-[width] ${avgProgress >= 1 ? "bg-emerald-500" : hasDelayed ? "bg-red-500" : avgProgress >= 0.5 ? "bg-sky-500" : "bg-amber-500"}`}
                 style={{ width: `${Math.min(avgProgress * 100, 100)}%` }}
               />
             </div>

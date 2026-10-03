@@ -120,7 +120,7 @@ export default function ReportsPage() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <BookMarked size={22} className="text-sky-400" />
-            <h1 className="text-lg font-bold">Báo cáo lưu</h1>
+            <h2 className="text-lg font-bold">Báo cáo lưu</h2>
           </div>
           <button
             onClick={() => setCreating(true)}

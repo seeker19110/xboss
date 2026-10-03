@@ -23,6 +23,10 @@
      rgba đen. Dùng qua style={{ background: "var(--overlay-scrim)" }}, không dùng bg-black/*
      cho scrim. */
   --overlay-scrim: rgba(0, 0, 0, 0.7);
+  /* Viền focus bàn phím (xem :focus-visible bên dưới). emerald-400 đạt ~9:1 trên nền tối,
+     nhưng chỉ 1,8:1 trên nền trang sáng — dưới ngưỡng 3:1 của WCAG 1.4.11 (non-text
+     contrast) — nên html.light khai lại bằng emerald-700. */
+  --focus-ring: #34d399;
 }
 
 @theme inline {
@@ -71,6 +75,8 @@ html.light {
   color-scheme: light;
   --background: #f6f7f9;
   --foreground: #14171d;
+  /* emerald-700: 5,1:1 trên nền trang, 5,5:1 trên mặt thẻ trắng (≥3:1 WCAG 1.4.11). */
+  --focus-ring: #047857;
   --color-white: #14171d;
   --color-black: #ffffff;
   --color-zinc-50: #14171d;
@@ -280,13 +286,59 @@ body {
   display: none;
 }
 
-/* Focus ring bàn phím — chuẩn hoá toàn cục (M0 PR3). Màu accent cố định (không đổi theo
-   theme, giống mọi màu accent khác trong dự án — chỉ nền/chữ/viền zinc mới đảo theo theme)
-   để luôn tương phản rõ trên nền zinc-950 lẫn zinc-50. */
+/* Focus ring bàn phím — chuẩn hoá toàn cục (M0 PR3). Màu lấy từ --focus-ring (emerald,
+   đậm hơn ở theme sáng) để luôn đạt ≥3:1 với nền kề bên ở mọi theme. */
 :focus-visible {
-  outline: 2px solid #34d399; /* emerald-400 */
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+/* Ô gõ/ô chọn trên điện thoại tối thiểu 16px — dưới mức đó iOS Safari tự phóng to cả trang khi
+   chạm vào ô (cả <select>). Quy tắc toàn cục thay cho mẫu `text-base sm:text-*` rải từng ô:
+   audit 2026-10-01 đếm còn 444 ô ở 76 file chưa theo mẫu (nhiều ô nằm trong modal/form ẩn), sửa
+   tay thì sót và tái phát. Ngoài @layer nên thắng class Tailwind (vốn nằm trong @layer
+   utilities); chỉ áp dưới breakpoint `sm` nên desktop giữ nguyên cỡ chữ gọn của từng ô.
+   Bỏ qua ô cố ý dùng chữ lớn hơn (text-lg trở lên) để không thu nhỏ chúng. */
+@media (max-width: 639.98px) {
+  :is(
+    input:not(
+      [type="checkbox"],
+      [type="radio"],
+      [type="range"],
+      [type="color"],
+      [type="file"],
+      [type="hidden"],
+      [type="submit"],
+      [type="button"],
+      [type="reset"],
+      [type="image"]
+    ),
+    select,
+    textarea
+  ):not(
+    [class*="text-lg"],
+    [class*="text-xl"],
+    [class*="text-2xl"],
+    [class*="text-3xl"],
+    [class*="text-4xl"]
+  ) {
+    font-size: 16px;
+  }
+}
+
+/* Tôn trọng tuỳ chọn giảm chuyển động của hệ điều hành (WCAG 2.3.3, MASTER.md §7–8):
+   tắt animation/transition lớn — pulse vô hạn, skeleton, thanh tiến độ chạy dần. Dùng
+   0.01ms thay vì `none` để sự kiện transitionend/animationend (nếu sau này có) vẫn bắn. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ─── Modern UI/UX Utility Classes (ui-ux-craftsman) ─────────────────────── */
@@ -392,6 +444,23 @@ body {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
+/* Thanh hành động cố định dưới đáy của AppHeader (.app-bottombar — tìm kiếm ở trang chủ
+   mobile, nút Excel/PDF/Import… ở ~30 trang truyền bottomActions). Thanh `fixed` nên không
+   chiếm chỗ trong luồng: thiếu khoảng chừa này thì khi cuộn hết trang, hàng/nút cuối của
+   nội dung và cả footer nằm khuất sau thanh. Chừa bằng CSS thuần (cùng cơ chế :has() với
+   sidebar bên dưới) để có ngay từ HTML server, không giật layout lúc hydrate. 3.875rem =
+   control cao nhất trong thanh (44px) + py-2 + viền trên, cộng vùng an toàn đáy (notch). */
+body:has(.app-bottombar) {
+  padding-bottom: calc(3.875rem + env(safe-area-inset-bottom, 0px));
+}
+/* Trang chủ không có nút riêng: thanh chỉ chứa ô tìm kiếm và tự ẩn từ md (đã có ô tìm
+   kiếm trên topbar) — không còn gì để chừa chỗ. */
+@media (min-width: 768px) {
+  body:has(.app-bottombar-mobile-only) {
+    padding-bottom: 0;
+  }
+}
+
 /* Sidebar (AppShell — M0, xem docs/nang-cap/M00-khung-ui-sidebar.md).
    Thu gọn desktop điều khiển bằng class `sidebar-collapsed` trên <html> (đặt bởi
    script beforeInteractive trong layout.tsx, giống cơ chế theme) — bố cục quyết
@@ -442,5 +511,8 @@ body {
 @media print {
   body:has(#app-sidebar) {
     padding-left: 0 !important;
+  }
+  body:has(.app-bottombar) {
+    padding-bottom: 0 !important;
   }
 }

@@ -240,7 +240,7 @@ export default function EsignStudioPage() {
                     <div
                       key={env.id}
                       onClick={() => setSelectedEnv(env)}
-                      className={`cursor-pointer rounded-lg border p-3 transition-all ${
+                      className={`cursor-pointer rounded-lg border p-3 transition ${
                         selectedEnv?.id === env.id
                           ? "border-emerald-500/80 bg-emerald-950/30"
                           : "border-zinc-800 bg-zinc-800/40 hover:border-zinc-700"
@@ -343,7 +343,7 @@ export default function EsignStudioPage() {
                     {selectedEnv.signatories?.map((s, idx) => (
                       <div
                         key={s.id}
-                        className={`rounded-lg border p-4 transition-all ${
+                        className={`rounded-lg border p-4 transition ${
                           s.status === "signed"
                             ? "border-emerald-800/60 bg-emerald-950/20"
                             : s.status === "ready"

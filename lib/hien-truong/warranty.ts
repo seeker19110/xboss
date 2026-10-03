@@ -46,7 +46,10 @@ export function warrantyExpiry(item: {
   if (!item.warrantyFrom || item.warrantyMonths == null) return null;
   if (!DATE_RE.test(item.warrantyFrom)) return null;
   const [y, m, d] = item.warrantyFrom.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1 + item.warrantyMonths, d));
+  // Kẹp ngày về cuối tháng đích: Date.UTC tự tràn ngày thừa sang tháng sau (31/01 + 1 tháng →
+  // 03/03, 29/02/2024 + 12 tháng → 01/03/2025) làm hạn bảo hành dài hơn hợp đồng vài ngày.
+  const lastDay = new Date(Date.UTC(y, m + item.warrantyMonths, 0)).getUTCDate();
+  const dt = new Date(Date.UTC(y, m - 1 + item.warrantyMonths, Math.min(d, lastDay)));
   return dt.toISOString().slice(0, 10);
 }
 

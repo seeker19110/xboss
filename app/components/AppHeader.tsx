@@ -223,7 +223,7 @@ export default function AppHeader({
             onClick={() => toggleDash(id, open)}
             aria-expanded={open}
             title={cluster.label}
-            className="w-full flex items-center gap-1.5 mx-2 mb-1 px-2.5 py-1.5 rounded-lg text-left min-h-10 hover:bg-zinc-900/60 transition"
+            className="w-[calc(100%-1rem)] flex items-center gap-1.5 mx-2 mb-1 px-2.5 py-1.5 rounded-lg text-left min-h-10 hover:bg-zinc-900/60 transition"
           >
             <span className="flex-1 truncate text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
               {cluster.label}
@@ -347,7 +347,9 @@ export default function AppHeader({
                   <ChevronRight className="w-3.5 h-3.5 text-zinc-600 hidden sm:inline shrink-0" />
                 </>
               )}
-              <span className="inline-flex items-center gap-1.5 min-w-0 truncate">{pageTitle}</span>
+              {/* Tiêu đề trang là <h1> duy nhất của trang (điều hướng theo heading của trình
+                  đọc màn hình) — breadcrumb nhóm bên trên cố ý nằm ngoài heading. */}
+              <h1 className="inline-flex items-center gap-1.5 min-w-0 truncate">{pageTitle}</h1>
             </div>
             {subtitle && (
               <p className="text-[11px] text-zinc-400 truncate leading-none">{subtitle}</p>
@@ -400,8 +402,9 @@ export default function AppHeader({
         <div
           className={`app-bottombar fixed bottom-0 inset-x-0 z-30 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800 safe-bottom print:hidden ${
             // Chỉ có ô tìm kiếm (trang chủ, không nút riêng) → ẩn hẳn trên desktop vì ô
-            // tìm kiếm đã nằm trên topbar; giữ lại trên mobile.
-            bottomActions ? "" : "md:hidden"
+            // tìm kiếm đã nằm trên topbar; giữ lại trên mobile. `app-bottombar-mobile-only`
+            // báo cho globals.css bỏ khoảng chừa đáy trang từ md.
+            bottomActions ? "" : "md:hidden app-bottombar-mobile-only"
           }`}
         >
           <div className="flex items-center gap-2 px-3 sm:px-6 py-2 overflow-x-auto scrollbar-none">

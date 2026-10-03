@@ -203,15 +203,15 @@ export default function VehiclesPage() {
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <div className="flex items-center gap-3">
             <Truck className="w-6 h-6 text-blue-400" />
-            <h1 className="text-xl font-bold">Xe ra vào công trường</h1>
+            <h2 className="text-xl font-bold">Xe ra vào công trường</h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               aria-label="Chọn ngày"
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-blue-500"
+              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-base sm:text-sm text-zinc-100 outline-none focus:border-blue-500"
             />
             {canExport && (
               <button
