@@ -21,6 +21,7 @@ type PermissionSnapshot = {
 };
 
 let snapshots = new WeakMap<RequestContext, PermissionSnapshot>();
+const overrideLechDaCanhBao = new Set<string>();
 const positiveId = (id: unknown): id is number =>
   typeof id === "number" && Number.isSafeInteger(id) && id > 0;
 const cacheKey = (orgId: number, role: string, permKey: string, projectId?: number | null) =>
@@ -92,11 +93,16 @@ export async function invalidatePermissionCache(orgId: number): Promise<void> {
     // án): bỏ qua, KHÔNG cấp quyền gì từ nó. Throw ở đây từng làm getCurrentUser của MỌI user
     // trong org lỗi 500 — kể cả admin, không còn đường sửa trong app (audit logic PR #544).
     if (row.projectId !== null && row.projectOrgId !== orgId) {
-      log.warn("Bỏ qua override quyền trỏ dự án ngoài tổ chức", {
-        orgId,
-        projectId: row.projectId,
-        permKey: row.permKey,
-      });
+      // Snapshot nạp lại mỗi request — chỉ cảnh báo một lần mỗi (org, dự án) mỗi tiến trình.
+      const khoa = `${orgId}|${row.projectId}`;
+      if (!overrideLechDaCanhBao.has(khoa)) {
+        overrideLechDaCanhBao.add(khoa);
+        log.warn("Bỏ qua override quyền trỏ dự án ngoài tổ chức", {
+          orgId,
+          projectId: row.projectId,
+          permKey: row.permKey,
+        });
+      }
       continue;
     }
     next.set(cacheKey(orgId, row.role, row.permKey, row.projectId), row.allowed);

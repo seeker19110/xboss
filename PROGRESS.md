@@ -28,7 +28,8 @@ nhánh bỏ im lặng ở webhook/push. Test hồi quy mới đỏ trên code c�
 
 **Nợ / để đợt sau (S01/S02 QUALITY-FINAL-1):** cutover "membership rỗng không mở quyền" (cần
 membership dry-run production + chuyển ~86 route coi dự án null là "không lọc" — mẫu này có
-từ trước PR, vẫn lộ dữ liệu cho non-admin chưa được gán khi hệ đã cấu hình gán); `getCurrentUser`
+từ trước PR, vẫn lộ dữ liệu cho non-admin chưa được gán khi hệ đã cấu hình gán và cho admin
+của tổ chức chưa có dự án nào — cả hai có sẵn trên main); `getCurrentUser`
 thêm ~5 lượt DB mỗi request (đo trước khi lên tải lớn); `cron/sync-sheets` còn `org_id ?? 1`;
 `sendPushToAll` gửi mọi org. **[Người dùng]** trước deploy chạy 2 truy vấn chỉ-đọc trong báo cáo
 (override lệch org, webhook delivery cũ đang chờ).

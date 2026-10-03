@@ -4,6 +4,8 @@ import { COOKIE, parseToken } from "@/lib/bao-mat/session-token";
 import { isSameOrigin, needsSameOriginCheck } from "@/lib/bao-mat/csrf";
 import { log } from "@/lib/nen/log";
 
+let daCanhBaoTraffic = false;
+
 function trafficIngestUrl(): URL {
   const appUrl = process.env.APP_URL?.trim();
   if (appUrl) {
@@ -51,9 +53,13 @@ export function proxy(req: NextRequest) {
       token = trafficToken();
       ingestUrl = url;
     } catch (err) {
-      log.warn("Bỏ qua ghi traffic do cấu hình không hợp lệ", {
-        error: err instanceof Error ? err.message : String(err),
-      });
+      // Cấu hình sai thì lỗi lặp lại ở MỌI request — chỉ cảnh báo một lần mỗi tiến trình.
+      if (!daCanhBaoTraffic) {
+        daCanhBaoTraffic = true;
+        log.warn("Bỏ qua ghi traffic do cấu hình không hợp lệ", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
     if (ingestUrl) {
       fetch(ingestUrl.toString(), {
