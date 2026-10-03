@@ -30,8 +30,6 @@ const WHITELIST: Record<string, string> = {
   "notifications/prefs": "tuỳ chọn thông báo theo người dùng, không theo dự án",
 
   // --- Cron (xác thực CRON_SECRET; tự lặp theo từng dự án trong logic) ---
-  "cron/daily-report": "cron báo cáo ngày, quét mọi dự án nội bộ",
-  "cron/weekly-report": "cron báo cáo tuần, quét mọi dự án nội bộ",
   "cron/health-check": "cron kiểm tra hệ thống toàn cục (DB/SMTP/Telegram/...), không scope dự án",
   "cron/sync-sheets":
     "cron đồng bộ Google Sheet — tích hợp single-tenant (1 Sheet ↔ 1 DB), lấy org dự án đầu tiên (M124)",
