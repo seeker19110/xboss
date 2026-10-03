@@ -305,6 +305,7 @@ export default function AppHeader({
       {mobileOpen && (
         <Modal
           id="app-sidebar-mobile"
+          ariaLabel="Menu điều hướng"
           onClose={() => setMobileOpen(false)}
           drawer
           className="w-64 lg:hidden flex flex-col"

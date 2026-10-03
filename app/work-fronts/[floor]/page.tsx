@@ -526,7 +526,7 @@ function DocColumn({
           })}
         </div>
       ) : (
-        <p className="text-[11px] text-zinc-600">Chưa có file.</p>
+        <p className="text-[11px] text-zinc-400">Chưa có file.</p>
       )}
 
       {canManage && (

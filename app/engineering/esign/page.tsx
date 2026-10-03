@@ -163,7 +163,7 @@ export default function EsignStudioPage() {
               (RFA) ngay tại công trường
             </p>
           </div>
-          <span className="rounded-full bg-emerald-950/80 border border-emerald-700/50 px-3 py-1 text-xs font-semibold text-emerald-400">
+          <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-semibold text-emerald-300">
             e-Sign Legal Protocol Active
           </span>
         </div>
@@ -181,8 +181,11 @@ export default function EsignStudioPage() {
               </h2>
               <form onSubmit={handleCreateEnvelope} className="space-y-4">
                 <div>
-                  <label className="mb-1 block text-xs text-zinc-400">Tiêu đề tài liệu</label>
+                  <label htmlFor="es-f1" className="mb-1 block text-xs text-zinc-400">
+                    Tiêu đề tài liệu
+                  </label>
                   <input
+                    id="es-f1"
                     type="text"
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
@@ -192,8 +195,11 @@ export default function EsignStudioPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-zinc-400">Loại hồ sơ</label>
+                    <label htmlFor="es-f2" className="mb-1 block text-xs text-zinc-400">
+                      Loại hồ sơ
+                    </label>
                     <select
+                      id="es-f2"
                       value={newDocType}
                       onChange={(e) => setNewDocType(e.target.value)}
                       className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
@@ -205,8 +211,11 @@ export default function EsignStudioPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-zinc-400">Mã tham chiếu</label>
+                    <label htmlFor="es-f3" className="mb-1 block text-xs text-zinc-400">
+                      Mã tham chiếu
+                    </label>
                     <input
+                      id="es-f3"
                       type="text"
                       value={newRefCode}
                       onChange={(e) => setNewRefCode(e.target.value)}
@@ -394,6 +403,7 @@ export default function EsignStudioPage() {
                             <div className="grid grid-cols-2 gap-3">
                               <input
                                 type="text"
+                                aria-label="Họ tên người ký xác thực"
                                 placeholder="Họ tên người ký xác thực"
                                 value={signatureName}
                                 onChange={(e) => setSignatureName(e.target.value)}
@@ -401,6 +411,7 @@ export default function EsignStudioPage() {
                               />
                               <input
                                 type="text"
+                                aria-label="Mã OTP SMS/SmartCA"
                                 placeholder="Mã OTP SMS/SmartCA (nếu có)"
                                 value={otpInput}
                                 onChange={(e) => setOtpInput(e.target.value)}
