@@ -44,19 +44,23 @@ function delayedItemCountBySheet(rows: DelayedRow[]): Map<string, number> {
   return new Map([...bySheet.entries()].map(([sheetType, set]) => [sheetType, set.size]));
 }
 
-export async function buildDailyReport(): Promise<DailyReport> {
-  const today = todayISO();
-  const yesterday = daysFromTodayISO(-1);
-
-  const select = `SELECT t.code, t.name, t.status, COALESCE(t.end_date, wp.end_date) AS "endDate",
+// Báo cáo ngày/tuần dựng cho MỘT dự án (N1, audit logic 2026-10-01 — chủ dự án chốt
+// 2026-10-03: mỗi dự án một báo cáo). Trước đây cộng dồn mọi dự án nhưng mang tên dự án đầu.
+const TASK_SELECT = `SELECT t.code, t.name, t.status, COALESCE(t.end_date, wp.end_date) AS "endDate",
             t.progress_percent AS "progressPercent",
             wp.floor_label AS "floorLabel", st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
-       JOIN sheet_types st ON wp.sheet_type_id = st.id`;
+       JOIN sheet_types st ON wp.sheet_type_id = st.id
+       JOIN towers tw ON tw.id = st.tower_id AND tw.project_id = ?`;
+
+export async function buildDailyReport(projectId: number): Promise<DailyReport> {
+  const today = todayISO();
+  const yesterday = daysFromTodayISO(-1);
 
   const all = await query<DelayedRow>(
-    `${select} WHERE ${DELAY_COND} ORDER BY COALESCE(t.end_date, wp.end_date)`,
+    `${TASK_SELECT} WHERE ${DELAY_COND} ORDER BY COALESCE(t.end_date, wp.end_date)`,
+    projectId,
     today,
   );
 
@@ -66,9 +70,10 @@ export async function buildDailyReport(): Promise<DailyReport> {
   // Sắp đến hạn (≤3 ngày, tiến độ < 70%) — cảnh báo sớm để còn kịp xử lý.
   const soon = daysFromTodayISO(3);
   const dueSoon = await query<DelayedRow>(
-    `${select} WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) >= ? AND COALESCE(t.end_date, wp.end_date) <= ?
+    `${TASK_SELECT} WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) >= ? AND COALESCE(t.end_date, wp.end_date) <= ?
         AND t.progress_percent < 0.7 AND t.status NOT IN ('hoan_thanh','nghiem_thu')
       ORDER BY COALESCE(t.end_date, wp.end_date) LIMIT 20`,
+    projectId,
     today,
     soon,
   );
@@ -77,9 +82,11 @@ export async function buildDailyReport(): Promise<DailyReport> {
     `SELECT st.code AS "sheetType", COUNT(t.id) AS total,
             COALESCE(AVG(t.progress_percent), 0) AS "avgProgress"
        FROM sheet_types st
+       JOIN towers tw ON tw.id = st.tower_id AND tw.project_id = ?
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
       GROUP BY st.id, st.code ORDER BY st.id`,
+    projectId,
   );
   const delayedBySheet = delayedItemCountBySheet(all);
   const kpi: KpiRow[] = kpiRaw.map((k) => ({
@@ -87,7 +94,10 @@ export async function buildDailyReport(): Promise<DailyReport> {
     delayed: delayedBySheet.get(k.sheetType) ?? 0,
   }));
 
-  const project = await queryOne<{ name: string }>(`SELECT name FROM projects ORDER BY id LIMIT 1`);
+  const project = await queryOne<{ name: string }>(
+    `SELECT name FROM projects WHERE id = ?`,
+    projectId,
+  );
 
   return {
     date: today,
@@ -218,7 +228,7 @@ export type WeeklyReport = {
   totalDelayed: number;
 };
 
-export async function buildWeeklyReport(): Promise<WeeklyReport> {
+export async function buildWeeklyReport(projectId: number): Promise<WeeklyReport> {
   const today = todayISO();
   const weekFrom = daysFromTodayISO(-7);
 
@@ -227,24 +237,20 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
     `SELECT t.id, t.progress_percent AS progress, st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
-       JOIN sheet_types st ON wp.sheet_type_id = st.id`,
+       JOIN sheet_types st ON wp.sheet_type_id = st.id
+       JOIN towers tw ON tw.id = st.tower_id AND tw.project_id = ?`,
+    projectId,
   );
 
   // % của từng task tại thời điểm 7 ngày trước — tái dựng từ task_history qua hàm chung
   // `progressAtDate` (M36 PR3, dùng lại bởi `/api/dashboard?range=`).
-  const prevRows = await progressAtDate(weekFrom);
+  const prevRows = await progressAtDate(weekFrom, { projectId });
   const prevProgressByTask = new Map(prevRows.map((r) => [r.taskId, r.progress]));
   const progressAt = (t: TaskRow) => prevProgressByTask.get(t.id) ?? t.progress ?? 0;
 
-  const select = `SELECT t.code, t.name, t.status, COALESCE(t.end_date, wp.end_date) AS "endDate",
-            t.progress_percent AS "progressPercent",
-            wp.floor_label AS "floorLabel", st.code AS "sheetType"
-       FROM tasks t
-       JOIN work_packages wp ON t.package_id = wp.id
-       JOIN sheet_types st ON wp.sheet_type_id = st.id`;
-
   const allDelayed = await query<DelayedRow>(
-    `${select} WHERE ${DELAY_COND} ORDER BY COALESCE(t.end_date, wp.end_date)`,
+    `${TASK_SELECT} WHERE ${DELAY_COND} ORDER BY COALESCE(t.end_date, wp.end_date)`,
+    projectId,
     today,
   );
   const newDelayed = allDelayed.filter((r) => r.endDate >= weekFrom);
@@ -257,10 +263,12 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
        JOIN tasks t ON h.task_id = t.id
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
+       JOIN towers tw ON tw.id = st.tower_id AND tw.project_id = ?
       WHERE h.new_progress >= 1 AND t.progress_percent >= 1
       GROUP BY t.id, t.code, t.name, st.code, wp.floor_label
      HAVING MIN((h.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)::text > ?
       ORDER BY day DESC LIMIT 30`,
+    projectId,
     weekFrom,
   );
 
@@ -280,7 +288,10 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
     delayed: delayedCount.get(sheetType) ?? 0,
   }));
 
-  const project = await queryOne<{ name: string }>(`SELECT name FROM projects ORDER BY id LIMIT 1`);
+  const project = await queryOne<{ name: string }>(
+    `SELECT name FROM projects WHERE id = ?`,
+    projectId,
+  );
 
   return {
     date: today,
@@ -292,6 +303,40 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
     topDelayed: allDelayed.slice(0, 15),
     totalDelayed: countDelayedItems(allDelayed),
   };
+}
+
+// ===== Phạm vi gửi báo cáo theo dự án =====
+
+export type ReportProject = { id: number; name: string };
+
+/** Dự án đang hoạt động cần gửi báo cáo. `onlyIds` (cron gọi tay bởi Admin/PM) giới hạn
+ *  trong các dự án người gọi được thấy — không gửi báo cáo dự án của tổ chức khác. */
+export async function listReportProjects(onlyIds?: number[]): Promise<ReportProject[]> {
+  if (onlyIds && onlyIds.length === 0) return [];
+  const filter = onlyIds ? `AND id IN (${onlyIds.map(() => "?").join(",")})` : "";
+  return query<ReportProject>(
+    `SELECT id, name FROM projects WHERE COALESCE(status, 'active') = 'active' ${filter} ORDER BY id`,
+    ...(onlyIds ?? []),
+  );
+}
+
+/** Người nhận mặc định của báo cáo một dự án: Admin cùng tổ chức + PM thấy dự án đó (cùng
+ *  luật `visibleProjectIds`: chưa cấu hình `user_projects` thì mọi PM cùng tổ chức, đã cấu
+ *  hình thì chỉ PM được gán). Trả cả id để gửi Web Push đúng người, không phát mọi thiết bị. */
+export async function reportRecipients(
+  projectId: number,
+): Promise<{ id: number; email: string }[]> {
+  return query<{ id: number; email: string }>(
+    `SELECT u.id, u.email
+       FROM users u
+       JOIN projects p ON p.id = ? AND p.org_id = u.org_id
+      WHERE u.role = 'admin'
+         OR (u.role = 'pm' AND (NOT EXISTS (SELECT 1 FROM user_projects)
+              OR EXISTS (SELECT 1 FROM user_projects up
+                          WHERE up.user_id = u.id AND up.project_id = p.id)))
+      ORDER BY u.id`,
+    projectId,
+  );
 }
 
 const pct = (v: number) => `${Math.round((v ?? 0) * 100)}%`;
@@ -321,6 +366,7 @@ export function reportToTelegramText(
 ): string {
   const lines: string[] = [
     `🏗️ <b>XBoss — Báo cáo trễ hạn ${r.date}</b>`,
+    `${esc(r.projectName ?? "")}`,
     `Tổng cộng <b>${r.totalDelayed}</b> hạng mục đang trễ · <b>${r.newDelayed.length}</b> việc mới quá hạn trong 24h`,
     "",
     "📊 <b>KPI theo hệ</b>",

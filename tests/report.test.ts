@@ -155,8 +155,7 @@ test("weeklyToHtml: hiện đủ bảng tiến độ theo hệ + hoàn thành + 
 
 // ===== Test tích hợp buildDailyReport/buildWeeklyReport (cần TEST_DATABASE_URL) =====
 
-// Mã hệ duy nhất mỗi lần chạy — buildDailyReport/buildWeeklyReport truy vấn TOÀN BỘ
-// DB (không lọc theo project), gom nhóm theo st.code; nếu 2 lần chạy test (hoặc chạy
+// Mã hệ duy nhất mỗi lần chạy — KPI gom nhóm theo st.code; nếu 2 lần chạy test (hoặc chạy
 // song song) cùng dùng mã "TESTRPT" cố định, KPI của lần này có thể lẫn dữ liệu rác
 // còn sót của lần trước (đặc biệt khi 1 test trước đó assert lỗi giữa chừng, bỏ qua
 // bước dọn dẹp cuối). Sinh mã ngẫu nhiên để mỗi lần chạy luôn cô lập.
@@ -242,12 +241,10 @@ test(
       longAgo,
     );
 
-    const report = await buildDailyReport();
+    const report = await buildDailyReport(ids.projectId);
 
-    // topDelayed chỉ lấy top 15 trễ nhất TOÀN HỆ THỐNG (không lọc theo sheet) — không
-    // dùng để assert chắc chắn 1 task cụ thể có mặt (có thể bị đẩy khỏi top 15 nếu DB
-    // có nhiều task trễ khác), chỉ assert phần chắc chắn đúng trong mọi trường hợp:
-    // task đã nghiệm thu không bao giờ xuất hiện dù end_date quá khứ.
+    // Báo cáo đã lọc theo dự án: task đã nghiệm thu không bao giờ xuất hiện dù end_date
+    // quá khứ.
     assert.ok(!report.topDelayed.some((r) => r.code === "R1,04" && r.sheetType === sheetCode));
 
     // newDelayed lấy từ danh sách trễ ĐẦY ĐỦ (không cắt top-N) nên an toàn để kiểm
@@ -300,7 +297,7 @@ test(
       threeDaysAgo,
     );
 
-    const report = await buildWeeklyReport();
+    const report = await buildWeeklyReport(ids.projectId);
     const completedCodes = report.completed.map((r) => r.code);
     assert.ok(completedCodes.includes("R1,10"));
 
@@ -314,6 +311,57 @@ test(
     await run(`DELETE FROM task_history WHERE task_id = ?`, taskId);
     await run(`DELETE FROM tasks WHERE id = ?`, taskId);
     await cleanupProject(ids);
+  },
+);
+
+test(
+  "buildDailyReport/buildWeeklyReport(projectId): mỗi dự án một báo cáo — không lẫn task, KPI hay tên dự án khác (N1)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { insertId, run, daysFromTodayISO } = await import("@/lib/db");
+    const { buildDailyReport, buildWeeklyReport } = await import("@/lib/tien-do/report");
+
+    const sheetA = uniqueCode("TESTRPTNA");
+    const sheetB = uniqueCode("TESTRPTNB");
+    const idsA = await seedProject(sheetA);
+    const idsB = await seedProject(sheetB);
+    await run(`UPDATE projects SET name = ? WHERE id = ?`, `DA A ${sheetA}`, idsA.projectId);
+    await run(`UPDATE projects SET name = ? WHERE id = ?`, `DA B ${sheetB}`, idsB.projectId);
+    const yesterday = daysFromTodayISO(-1);
+    for (const ids of [idsA, idsB]) {
+      await insertId(
+        `INSERT INTO tasks (package_id, code, name, end_date, progress_percent, status)
+         VALUES (?, 'R1,01', 'Task trễ', ?, 0.2, 'tre')`,
+        ids.pkgId,
+        yesterday,
+      );
+    }
+
+    try {
+      const daily = await buildDailyReport(idsA.projectId);
+      assert.equal(daily.projectName, `DA A ${sheetA}`);
+      assert.deepEqual(
+        [...new Set(daily.newDelayed.map((r) => r.sheetType))],
+        [sheetA],
+        "chỉ task của dự án A",
+      );
+      assert.deepEqual(
+        daily.kpi.map((k) => k.sheetType),
+        [sheetA],
+      );
+      assert.equal(daily.totalDelayed, 1);
+
+      const weekly = await buildWeeklyReport(idsB.projectId);
+      assert.equal(weekly.projectName, `DA B ${sheetB}`);
+      assert.deepEqual(
+        weekly.kpi.map((k) => k.sheetType),
+        [sheetB],
+      );
+      assert.ok(weekly.newDelayed.every((r) => r.sheetType === sheetB));
+    } finally {
+      await cleanupProject(idsA);
+      await cleanupProject(idsB);
+    }
   },
 );
 
