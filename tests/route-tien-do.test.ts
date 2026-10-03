@@ -951,6 +951,47 @@ test(
   },
 );
 
+test(
+  "PATCH /api/dimensions/batch: 2 lô chồng nhau gửi song song (thứ tự id ngược nhau) — đều 200, không deadlock (N2)",
+  S,
+  async () => {
+    const { insertId, queryOne } = await import("@/lib/db");
+    const ctx = await dungDuLieu("pm", `lochong${RUN}`, { progress: 0 });
+    // Task thứ 2 ở NHÓM KHÁC cùng sheet — recompute khoá 2 work_packages khác nhau.
+    const pkg2 = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'T2', 'Nhóm TD 2')`,
+      ctx.sheetTypeId,
+    );
+    const task2 = await insertId(
+      `INSERT INTO tasks (package_id, code, name, progress_percent) VALUES (?, 'T2,01', 'Task TD 2', 0)`,
+      pkg2,
+    );
+    const d1 = await themDimensions(ctx.taskId, 2);
+    const d2 = await themDimensions(task2, 2);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    const { PATCH } = await import("@/app/api/dimensions/batch/route");
+    const { runWithRequestContext } = await import("@/lib/nen/request-context");
+    // Mỗi request một ngữ cảnh riêng như production (chung ngữ cảnh thì 2 lượt nạp quyền chồng nhau).
+    const goiRieng = (body: unknown) =>
+      runWithRequestContext({}, () => PATCH(req("/api/dimensions/batch", body)));
+    for (let vong = 0; vong < 5; vong++) {
+      const installed = vong % 2 === 0;
+      const [a, b] = await Promise.all([
+        goiRieng({ ids: [...d1, ...d2], installed }),
+        goiRieng({ ids: [...d2].reverse().concat([...d1].reverse()), installed }),
+      ]);
+      assert.deepEqual([a.status, b.status], [200, 200], `vòng ${vong}`);
+      for (const tid of [ctx.taskId, task2]) {
+        const t = await queryOne<{ p: number }>(
+          `SELECT progress_percent AS p FROM tasks WHERE id = ?`,
+          tid,
+        );
+        assert.equal(t!.p, installed ? 1 : 0, `vòng ${vong}: % task ${tid} nhất quán`);
+      }
+    }
+  },
+);
+
 test("PATCH /api/dimensions/batch: id trùng lặp trong body chỉ tính 1 lần (dedup)", S, async () => {
   const ctx = await dungDuLieu("pm", `dedupbatch${RUN}`, { progress: 0 });
   const [d1] = await themDimensions(ctx.taskId, 1);

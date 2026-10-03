@@ -55,7 +55,10 @@ export async function PATCH(req: NextRequest) {
   if (!dims.length)
     return NextResponse.json({ error: "Không tìm thấy dimension" }, { status: 404 });
 
-  const taskIds = [...new Set(dims.map((d) => d.task_id))];
+  // Sắp tăng dần: mọi lô khoá task theo CÙNG một thứ tự (N2, audit logic 2026-10-01) — hai lô
+  // chồng nhau xếp hàng ở task chung đầu tiên thay vì giữ chéo khoá rồi deadlock (Postgres huỷ 1
+  // bên → 500). Khoá work_packages trong recomputeTask đến SAU khi đã giữ đủ khoá task.
+  const taskIds = [...new Set(dims.map((d) => d.task_id))].sort((a, b) => a - b);
 
   // Cách ly dự án (vá W6, Đợt 5) — canTouchTask không so dự án (xem ghi chú ở
   // app/api/dimensions/[id]/route.ts). Kiểm TỪNG task trong vùng chọn: chỉ cần 1 ô thuộc
@@ -105,7 +108,7 @@ export async function PATCH(req: NextRequest) {
     // lock, nhưng giữa lúc đó và đây có thể có POST /approve chạy song song đặt nghiem_thu —
     // FOR UPDATE cùng row với /approve nên các request tuần tự hoá, không còn race (TOCTOU).
     const locked = await query<{ id: number; status: string | null }>(
-      `SELECT id, status FROM tasks WHERE id IN (${taskPlaceholders}) FOR UPDATE`,
+      `SELECT id, status FROM tasks WHERE id IN (${taskPlaceholders}) ORDER BY id FOR UPDATE`,
       ...taskIds,
     );
     if (!installed && locked.some((t) => t.status === "nghiem_thu")) {
