@@ -409,7 +409,7 @@
 
 **Index:**
 - `role_permissions_pkey`: UNIQUE INDEX role_permissions_pkey ON public.role_permissions USING btree (id)
-- `uq_role_perm_scope`: UNIQUE INDEX uq_role_perm_scope ON public.role_permissions USING btree (role, perm_key, COALESCE(project_id, 0))
+- `uq_role_perm_org_scope`: UNIQUE INDEX uq_role_perm_org_scope ON public.role_permissions USING btree (org_id, role, perm_key, COALESCE(project_id, 0))
 
 ## Kèm task (ảnh/bình luận/tài liệu/nghiệm thu)
 
