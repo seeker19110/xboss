@@ -33,6 +33,20 @@ thêm ~5 lượt DB mỗi request (đo trước khi lên tải lớn); `cron/syn
 `sendPushToAll` gửi mọi org. **[Người dùng]** trước deploy chạy 2 truy vấn chỉ-đọc trong báo cáo
 (override lệch org, webhook delivery cũ đang chờ).
 
+## 2026-10-03 — verifier DR chỉ-đọc, không tự migration (PR #537)
+
+Đưa PR #537 (mở từ 25/09, CI đỏ) lên `main` mới và làm xanh. `npm run audit:verify-dr` nay
+dùng connection riêng tới bản sao (`DR_VERIFY_DATABASE_URL` + `DR_VERIFY_EXPECTED_DATABASE` +
+`DR_VERIFY_EXPECTED_USER`, chặn đích trùng `DATABASE_URL`/`MIGRATE_DATABASE_URL`), mọi phép
+kiểm trong một transaction `REPEATABLE READ READ ONLY` rồi `ROLLBACK`, không đi qua `lib/db`
+nên không bao giờ kích auto-migration; kết quả PASS/FAIL/NOT_RUN (audit rỗng là NOT_RUN, exit
+≠ 0), đối chiếu migration cả thiếu lẫn thừa, output ghi rõ `completeDrVerified=false`.
+`verifyAuditChain` nhận reader tuỳ chọn, caller cũ giữ nguyên. Chi tiết:
+[đặc tả](docs/nang-cap/AUDIT-SMALL-DR-READONLY.md). Lúc tích hợp: format lại
+`scripts/lib/dr-readonly.ts` (nguyên nhân CI static đỏ), gỡ test tạm `audit-dr-format.test.ts`
+(trùng `format:check`). Không migration. **[Người dùng]:** chạy verifier cần cấp 3 biến
+`DR_VERIFY_*` trỏ bản sao đã restore; phần còn lại của S14/A6 (manifest, PITR, RPO/RTO) chưa làm.
+
 ## 2026-10-01 — tích hợp ECC (Everything Claude Code) vào cấu hình agent (PR #555)
 
 Nghiên cứu [ECC](https://github.com/affaan-m/ECC) v2.2.2 (harness phổ biến nhất cho Claude Code)

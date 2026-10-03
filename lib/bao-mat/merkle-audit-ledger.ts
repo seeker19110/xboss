@@ -144,7 +144,9 @@ export type AuditChainResult = {
   ok: boolean;
 };
 
-export async function verifyAuditChain(): Promise<AuditChainResult> {
+// DR truyền reader chỉ-đọc trên connection riêng để không gọi auto-migration của lib/db.
+// Caller cũ không truyền tham số vẫn giữ nguyên reader và thuật toán hash hiện hữu.
+export async function verifyAuditChain(readRows: typeof query = query): Promise<AuditChainResult> {
   let lastId = 0;
   let prevHash = "";
   let total = 0;
@@ -152,7 +154,7 @@ export async function verifyAuditChain(): Promise<AuditChainResult> {
   const errors: AuditChainError[] = [];
 
   for (;;) {
-    const rows = await query<AuditChainDbRow>(
+    const rows = await readRows<AuditChainDbRow>(
       `SELECT id, COALESCE(entity_key, entity_id::text) AS "entityKey", at::text AS at,
               changes::text AS "changesText", row_hash AS "rowHash"
        FROM audit_log
