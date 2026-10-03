@@ -83,11 +83,14 @@ KẾT LUẬN: Cần xử lý tiếp phần nợ 🟡 lẻ theo trang; không cò
   breakpoint `sm`, ngoài `@layer` nên thắng class Tailwind; bỏ qua ô text-lg trở lên). Đo lại bản
   production: mobile 85 trang · 568 ô hiện sẵn + 188 ô trong 34 modal → 0 ô < 16px; desktop giữ
   cỡ gọn cũ. `input-zoom-mobile.spec.ts` thêm 9 trang nhiều form + 1 ca đo ô trong modal.
-- Trang engineering đã `test.fixme` sẵn trong `luoi-quet-axe.spec.ts` (bidding-matrix, cashflow,
+- ~~Trang engineering đã `test.fixme` sẵn trong `luoi-quet-axe.spec.ts` (bidding-matrix, cashflow,
   esign: `label`/`select-name`/tương phản badge) và `/mepf-process` (badge 9px 4,31:1) — lỗi lẻ
-  theo trang, ngoài phạm vi khung.
+  theo trang, ngoài phạm vi khung.~~ — đã đóng 2026-10-03: sửa trang (label/aria-label, badge theo
+  công thức Chip, nút `-700` + `text-on-accent`), 4 trang + chi tiết tầng `/work-fronts/[floor]` đã
+  chuyển sang assert thật (desktop + mobile).
 - `/payments/print` rộng 397px trên màn 393px — trang mô phỏng đúng khổ Excel để in, cố ý.
-- `Modal` chưa có `aria-labelledby` (cần thêm prop tiêu đề cho 57 nơi gọi).
+- ~~`Modal` chưa có `aria-labelledby` (cần thêm prop tiêu đề cho 57 nơi gọi).~~ — đã đóng 2026-10-03:
+  `role="dialog"` chuyển xuống panel, tên lấy tự động từ tiêu đề h1/h2/h3 đầu tiên (hoặc prop `ariaLabel`).
 - `admin.spec.ts` › "Hiển thị AppShell" đỏ 1 lần khi chạy song song với `appshell.spec.ts`
   (race state DB toàn cục `nav_settings` mà chính spec đã ghi chú); chạy riêng 2 lần + chạy
   full suite đều xanh. Không do đợt này — ghi lại để theo dõi nếu tái diễn trên CI.

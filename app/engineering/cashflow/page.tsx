@@ -103,7 +103,7 @@ export default function CashflowCockpitPage() {
               vốn lưu động theo S-Curve tiến độ
             </p>
           </div>
-          <span className="rounded-full bg-amber-950/80 border border-amber-700/50 px-3 py-1 text-xs font-semibold text-amber-400">
+          <span className="rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-1 text-xs font-semibold text-amber-300">
             S-Curve Cash Engine Active
           </span>
         </div>
@@ -119,8 +119,11 @@ export default function CashflowCockpitPage() {
             </h2>
             <form onSubmit={handleSimulate} className="space-y-4">
               <div>
-                <label className="mb-1 block text-xs text-zinc-400">Tên kịch bản</label>
+                <label htmlFor="cf-f1" className="mb-1 block text-xs text-zinc-400">
+                  Tên kịch bản
+                </label>
                 <input
+                  id="cf-f1"
                   type="text"
                   value={runName}
                   onChange={(e) => setRunName(e.target.value)}
@@ -129,8 +132,11 @@ export default function CashflowCockpitPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs text-zinc-400">Giá trị hợp đồng (VND)</label>
+                <label htmlFor="cf-f2" className="mb-1 block text-xs text-zinc-400">
+                  Giá trị hợp đồng (VND)
+                </label>
                 <input
+                  id="cf-f2"
                   type="number"
                   value={contractValue}
                   onChange={(e) => setContractValue(Number(e.target.value))}
@@ -140,8 +146,11 @@ export default function CashflowCockpitPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-zinc-400">Tạm ứng (%)</label>
+                  <label htmlFor="cf-f3" className="mb-1 block text-xs text-zinc-400">
+                    Tạm ứng (%)
+                  </label>
                   <input
+                    id="cf-f3"
                     type="number"
                     value={advancePercent}
                     onChange={(e) => setAdvancePercent(Number(e.target.value))}
@@ -150,8 +159,11 @@ export default function CashflowCockpitPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-zinc-400">Giữ lại BH (%)</label>
+                  <label htmlFor="cf-f4" className="mb-1 block text-xs text-zinc-400">
+                    Giữ lại BH (%)
+                  </label>
                   <input
+                    id="cf-f4"
                     type="number"
                     value={retentionPercent}
                     onChange={(e) => setRetentionPercent(Number(e.target.value))}
@@ -161,10 +173,11 @@ export default function CashflowCockpitPage() {
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-zinc-400">
+                <label htmlFor="cf-f5" className="mb-1 block text-xs text-zinc-400">
                   Thời gian duyệt IPC & thanh toán (Ngày)
                 </label>
                 <input
+                  id="cf-f5"
                   type="number"
                   value={delayDays}
                   onChange={(e) => setDelayDays(Number(e.target.value))}

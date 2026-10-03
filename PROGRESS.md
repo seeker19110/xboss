@@ -1,6 +1,6 @@
 # PROGRESS — XBoss
 
-## 2026-10-03 — đóng nợ logic N1–N3 của audit 2026-10-01
+## 2026-10-03 — PR #557: đóng nợ logic N1–N3 của audit 2026-10-01
 
 Theo [audit logic](docs/ops/audit-logic-2026-10-01.md) mục nợ:
 
@@ -23,6 +23,18 @@ Theo [audit logic](docs/ops/audit-logic-2026-10-01.md) mục nợ:
   lần CI #548 đỏ hôm 29/09).
 
 Không migration. Còn để S10 (QUALITY-FINAL-1): `app/payments/page.tsx` cộng/nhân tiền bằng float JS.
+
+## 2026-10-03 — PR #556: a11y — Modal có tên truy cập + gỡ fixme axe 5 trang
+
+- `Modal` (`app/components/dialogs.tsx`): `role="dialog" aria-modal` chuyển từ overlay xuống panel; có
+  `aria-labelledby` tự gắn vào tiêu đề h1/h2/h3/`[data-modal-title]` đầu tiên, hoặc prop `ariaLabel`
+  tường minh (drawer sidebar mobile ở `AppHeader.tsx` dùng "Menu điều hướng"). Rà mọi nơi gọi `<Modal>`:
+  chỉ drawer này thiếu tiêu đề, còn lại đều đã có heading. Không đổi focus/Escape/Tab-trap/khoá scroll.
+- Gỡ `test.fixme` axe bằng cách sửa trang: `/engineering/{bidding-matrix,cashflow,esign}`,
+  `/mepf-process`, `/work-fronts/[floor]` (label/aria-label cho input/select, badge theo công thức Chip,
+  nút `bg-*-700 text-on-accent`, chữ phụ `text-zinc-400`). `/schedule` vẫn fixme (flaky chưa rõ gốc).
+- Test: `e2e/authed/modal-a11y.spec.ts` (2 modal thật), `luoi-quet-axe.spec.ts` (+4 trang assert thật,
+  chi tiết tầng hết fixme). Chạy desktop + mobile: 43 passed.
 
 ## 2026-10-03 — PR #544 (thu hẹp): vá bảo mật xác thực và cách ly tổ chức
 

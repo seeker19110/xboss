@@ -299,7 +299,7 @@ export default function BiddingMatrixPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowCreatePkg(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-violet-500"
+              className="flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-medium text-on-accent transition-colors hover:bg-violet-800"
             >
               <Plus size={14} /> Tạo Gói Thầu Mới
             </button>
@@ -312,6 +312,7 @@ export default function BiddingMatrixPage() {
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-zinc-300">Gói thầu:</span>
               <select
+                aria-label="Chọn gói thầu"
                 value={selectedPkgId}
                 onChange={(e) => setSelectedPkgId(e.target.value)}
                 className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 focus:outline-none"
@@ -379,8 +380,11 @@ export default function BiddingMatrixPage() {
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
               <div>
-                <label className="text-[11px] text-zinc-400">Mã gói thầu</label>
+                <label htmlFor="bm-f1" className="text-[11px] text-zinc-400">
+                  Mã gói thầu
+                </label>
                 <input
+                  id="bm-f1"
                   type="text"
                   required
                   value={pkgForm.packageCode}
@@ -390,8 +394,11 @@ export default function BiddingMatrixPage() {
               </div>
 
               <div className="sm:col-span-2">
-                <label className="text-[11px] text-zinc-400">Tên gói thầu</label>
+                <label htmlFor="bm-f2" className="text-[11px] text-zinc-400">
+                  Tên gói thầu
+                </label>
                 <input
+                  id="bm-f2"
                   type="text"
                   required
                   value={pkgForm.title}
@@ -401,8 +408,11 @@ export default function BiddingMatrixPage() {
               </div>
 
               <div>
-                <label className="text-[11px] text-zinc-400">Ngân sách Target (VND)</label>
+                <label htmlFor="bm-f3" className="text-[11px] text-zinc-400">
+                  Ngân sách Target (VND)
+                </label>
                 <input
+                  id="bm-f3"
                   type="number"
                   required
                   value={pkgForm.targetBudgetVnd}
@@ -417,7 +427,7 @@ export default function BiddingMatrixPage() {
             <div className="flex justify-end">
               <button
                 type="submit"
-                className="rounded-lg bg-violet-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-violet-500"
+                className="rounded-lg bg-violet-700 px-4 py-1.5 text-xs font-medium text-on-accent transition-colors hover:bg-violet-800"
               >
                 Lưu Gói Thầu
               </button>
