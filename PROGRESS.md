@@ -18,6 +18,9 @@ Theo [audit logic](docs/ops/audit-logic-2026-10-01.md) mục nợ:
   trên code cũ: 2 dòng).
 - Kèm: ca khoá cron trong `route-cron.test.ts` chuyển sang tất định (bản cũ đua 2 request, đỏ ngẫu
   nhiên khi vùng giữ khoá ngắn).
+- Kèm: `tests/recompute.test.ts` tính ngày kỳ vọng theo giờ Việt Nam như code (`todayISO`) —
+  bản cũ dùng `toISOString()` (UTC) nên đỏ mỗi ngày 17:00–24:00 UTC trên mọi nhánh (gốc của
+  lần CI #548 đỏ hôm 29/09).
 
 Không migration. Còn để S10 (QUALITY-FINAL-1): `app/payments/page.tsx` cộng/nhân tiền bằng float JS.
 
