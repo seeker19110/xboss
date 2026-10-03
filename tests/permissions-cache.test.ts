@@ -94,12 +94,14 @@ test("snapshot: hai org cùng vai trò có quyền độc lập, đổi actor/or
 test("snapshot: sai org dự án, nguồn thay đổi giữa lúc nạp và override mở quyền ghi đều không cấp quyền", async () => {
   const { CAN } = await import("@/lib/bao-mat/auth");
   const { invalidatePermissionCache } = await import("@/lib/bao-mat/permissions");
+  // Dòng trỏ dự án org khác: bỏ qua (không cấp quyền), nhưng KHÔNG throw — throw làm mọi
+  // user của org lỗi 500 ở getCurrentUser (audit PR #544).
   read = async () => [
-    { role: "pm", permKey: "approve", allowed: true, projectId: 10, projectOrgId: 2 },
+    { role: "viewer", permKey: "viewPayments", allowed: true, projectId: 10, projectOrgId: 2 },
   ];
-  await runWithRequestContext({ userId: 1, orgId: 1, role: "pm", projectId: 10 }, async () => {
-    await assert.rejects(invalidatePermissionCache(1), /Phạm vi dự án/);
-    assert.equal(CAN.approve("pm"), false);
+  await runWithRequestContext({ userId: 1, orgId: 1, role: "viewer", projectId: 10 }, async () => {
+    await invalidatePermissionCache(1);
+    assert.equal(CAN.viewPayments("viewer"), false);
   });
   let finish!: (rows: Row[]) => void;
   read = async () =>

@@ -39,7 +39,7 @@ function pushModule(subs: Subscription[] = []) {
   const push = load<Push>("lib/van-hanh/push.ts", {
     "node:https": https,
     "@/lib/db": { query: async () => subs, run: async () => ({ changes: 1 }) },
-    "@/lib/nen/log": { log: { error() {} } },
+    "@/lib/nen/log": { log: { error() {}, warn() {} } },
     "@/lib/bao-mat/webhooks": { safeLookup, validateWebhookUrl },
     "web-push": {
       setVapidDetails() {},

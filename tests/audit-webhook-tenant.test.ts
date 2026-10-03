@@ -54,7 +54,7 @@ function harness(due: Row[] = [], context?: { userId?: number; orgId?: number })
       run: async (sql: string, ...args: unknown[]) => writes.push({ sql, args }),
       withTransaction: async (fn: () => Promise<unknown>) => fn(),
     },
-    "@/lib/nen/log": { log: { error() {} } },
+    "@/lib/nen/log": { log: { error() {}, warn() {} } },
     "@/lib/nen/request-context": { getRequestContext: () => context },
   });
   return { hooks, writes, requests };
