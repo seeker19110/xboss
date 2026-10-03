@@ -7,8 +7,14 @@ import {
   statusConsistentWithProgress,
 } from "@/lib/tien-do/recompute";
 
-const YESTERDAY = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
-const TOMORROW = new Date(Date.now() + 86400_000).toISOString().slice(0, 10);
+// Ngày theo giờ Việt Nam như code sản phẩm (todayISO) — dùng toISOString() (UTC) thì test đỏ mỗi
+// ngày từ 17:00 tới 24:00 UTC, lúc ở VN đã sang ngày mới.
+const ngayVN = (lechNgay: number) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(
+    new Date(Date.now() + lechNgay * 86400_000),
+  );
+const YESTERDAY = ngayVN(-1);
+const TOMORROW = ngayVN(1);
 
 test("deriveStatus: đủ 100% → hoan_thanh", () => {
   assert.equal(deriveStatus(1, YESTERDAY), "hoan_thanh");
@@ -348,7 +354,7 @@ test(
         `SELECT actual_start_date, actual_end_date FROM tasks WHERE id = ?`,
         taskId,
       );
-    const homNay = new Date().toISOString().slice(0, 10);
+    const homNay = ngayVN(0);
 
     // Chưa tick ô nào → chưa có ngày thực tế nào.
     await recomputeTask(taskId);
@@ -418,7 +424,7 @@ test(
       `INSERT INTO tasks (package_id, code, name) VALUES (?, 'NT1,01', 'Task nhập tay')`,
       pkgId,
     );
-    const homNay = new Date().toISOString().slice(0, 10);
+    const homNay = ngayVN(0);
     const ngayThucTe = () =>
       queryOne<{ actual_start_date: string | null; actual_end_date: string | null }>(
         `SELECT actual_start_date, actual_end_date FROM tasks WHERE id = ?`,
