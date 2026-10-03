@@ -29,12 +29,21 @@ export function Modal({
   const [labelledBy, setLabelledBy] = useState<string | undefined>(undefined);
 
   // Không có ariaLabel → tìm tiêu đề đầu tiên trong panel làm tên truy cập (aria-labelledby).
+  // Theo dõi panel bằng MutationObserver: modal có tiêu đề chỉ hiện sau khi tải dữ liệu vẫn
+  // được gắn tên. Chỉ setState khi id đổi nên không tạo vòng render.
   useEffect(() => {
-    if (ariaLabel) return;
-    const heading = panelRef.current?.querySelector<HTMLElement>("h1, h2, h3, [data-modal-title]");
-    if (!heading) return;
-    setLabelledBy(heading.id || autoTitleId);
-    if (!heading.id) heading.id = autoTitleId;
+    const panel = panelRef.current;
+    if (ariaLabel || !panel) return;
+    const capNhat = () => {
+      const heading = panel.querySelector<HTMLElement>("h1, h2, h3, [data-modal-title]");
+      if (heading && !heading.id) heading.id = autoTitleId;
+      const next = heading?.id || undefined;
+      setLabelledBy((cur) => (cur === next ? cur : next));
+    };
+    capNhat();
+    const observer = new MutationObserver(capNhat);
+    observer.observe(panel, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [ariaLabel, autoTitleId]);
 
   // onClose thường là hàm inline (tham chiếu đổi mỗi lần parent render).
