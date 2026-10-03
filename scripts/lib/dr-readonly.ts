@@ -141,7 +141,10 @@ export async function runDrChecks(
     await check("audit-chain", async () => {
       const readRows = async <T>(sql: string, ...params: unknown[]): Promise<T[]> => {
         let parameter = 0;
-        const { rows } = await client.query(sql.replace(/\?/g, () => `$${++parameter}`), params);
+        const { rows } = await client.query(
+          sql.replace(/\?/g, () => `$${++parameter}`),
+          params,
+        );
         return rows as T[];
       };
       const chain = await verifyAuditChain(readRows);
