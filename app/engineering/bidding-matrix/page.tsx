@@ -287,9 +287,9 @@ export default function BiddingMatrixPage() {
         {/* Tiêu đề */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-zinc-100">
+            <h2 className="text-xl font-bold tracking-tight text-zinc-100">
               Smart Bidding & Subcon Procurement Matrix (M75)
-            </h1>
+            </h2>
             <p className="text-xs text-zinc-400">
               Chuẩn hóa hồ sơ chào thầu, phát hiện đơn giá bất thường (Price Skewing /
               Front-loading) & Tối ưu phân bổ

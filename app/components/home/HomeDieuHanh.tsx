@@ -259,8 +259,8 @@ export default function HomeDieuHanh({
         }
       />
 
-      {/* pb-24 chừa chỗ cho thanh cố định dưới đáy (tìm kiếm/Excel/PDF/Import trên mobile) */}
-      <main className="px-4 sm:px-6 py-6 pb-24 space-y-6 max-w-screen-xl mx-auto">
+      {/* Khoảng chừa cho thanh cố định dưới đáy do globals.css lo (body:has(.app-bottombar)). */}
+      <main className="px-4 sm:px-6 py-6 space-y-6 max-w-screen-xl mx-auto">
         {/* ── Z0: thanh công cụ ngữ cảnh (desktop; mobile dùng thanh đáy) ── */}
         <DocToolbar
           trailing={

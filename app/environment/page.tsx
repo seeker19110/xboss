@@ -448,7 +448,7 @@ export default function EnvironmentPage() {
                       })
                     }
                     aria-label="Lọc biểu đồ theo nhóm"
-                    className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-xs outline-none text-zinc-300"
+                    className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-base sm:text-xs outline-none text-zinc-300"
                   >
                     <option value="">Mọi nhóm</option>
                     {(Object.keys(MON_CATEGORY_LABEL) as MonCategory[]).map((c) => (
@@ -461,7 +461,7 @@ export default function EnvironmentPage() {
                     value={chartFilter.indicator}
                     onChange={(e) => setChartFilter((f) => ({ ...f, indicator: e.target.value }))}
                     aria-label="Lọc biểu đồ theo chỉ tiêu"
-                    className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-xs outline-none text-zinc-300"
+                    className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-base sm:text-xs outline-none text-zinc-300"
                   >
                     <option value="">Mọi chỉ tiêu</option>
                     {indicatorOptions.map((i) => (

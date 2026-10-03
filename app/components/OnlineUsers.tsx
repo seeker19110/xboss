@@ -37,14 +37,21 @@ export default function OnlineUsers({ isAdmin }: { isAdmin: boolean }) {
     return () => clearInterval(id);
   }, [isAdmin]);
 
-  // Đóng popover khi click ngoài
+  // Đóng popover khi click ngoài hoặc bấm Escape
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   if (!isAdmin) return null;
@@ -57,12 +64,16 @@ export default function OnlineUsers({ isAdmin }: { isAdmin: boolean }) {
         onClick={() => setOpen((o) => !o)}
         title={`${count} người đang online`}
         aria-label={`${count} người đang online`}
-        className="relative flex items-center gap-1.5 text-zinc-400 hover:text-emerald-400 transition-colors"
+        aria-haspopup="true"
+        aria-expanded={open}
+        // Cùng vùng chạm 44px với ThemeToggle/NotificationBell bên cạnh — trước đây chỉ
+        // bằng icon 20px, dưới cả mức tối thiểu 24px của WCAG 2.5.8.
+        className="relative min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-zinc-900 transition-colors"
       >
         <Wifi className="w-5 h-5" />
         {count > 0 && (
           <span
-            className="absolute -top-1 -right-2 min-w-[1.1rem] h-[1.1rem] px-0.5 flex items-center justify-center rounded-full bg-emerald-700 text-[10px] font-bold text-on-accent leading-none tabular-nums"
+            className="absolute top-1 right-0.5 min-w-[1.1rem] h-[1.1rem] px-0.5 flex items-center justify-center rounded-full bg-emerald-700 text-[10px] font-bold text-on-accent leading-none tabular-nums"
             aria-hidden
           >
             {count}
@@ -71,7 +82,7 @@ export default function OnlineUsers({ isAdmin }: { isAdmin: boolean }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-8 z-50 w-64 rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl">
+        <div className="absolute right-0 top-full mt-1 z-50 w-64 max-w-[90vw] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl">
           <div className="px-4 py-3 border-b border-zinc-800">
             <p className="text-sm font-semibold text-zinc-100">Đang online ({count})</p>
             <p className="text-xs text-zinc-500 mt-0.5">Cập nhật mỗi 30 giây</p>

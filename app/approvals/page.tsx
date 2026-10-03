@@ -457,7 +457,7 @@ function ApprovalsPageInner() {
           <div className="flex items-center gap-2">
             <div className="w-20 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all ${allDone ? "bg-emerald-500" : "bg-blue-500"}`}
+                className={`h-full rounded-full transition-[width] ${allDone ? "bg-emerald-500" : "bg-blue-500"}`}
                 style={{ width: `${pct}%` }}
               />
             </div>
@@ -569,7 +569,7 @@ function ApprovalsPageInner() {
         <div className="flex items-center gap-2">
           <div className="flex-1 h-2 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
             <div
-              className={`h-full rounded-full transition-all ${allDone ? "bg-emerald-500" : "bg-sky-500"}`}
+              className={`h-full rounded-full transition-[width] ${allDone ? "bg-emerald-500" : "bg-sky-500"}`}
               style={{ width: `${pct}%` }}
             />
           </div>

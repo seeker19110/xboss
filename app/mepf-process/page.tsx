@@ -1185,9 +1185,9 @@ export default function CleanMepfProcessPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-sm sm:text-base font-bold text-zinc-100 uppercase tracking-tight">
+                <h2 className="text-sm sm:text-base font-bold text-zinc-100 uppercase tracking-tight">
                   QUY TRÌNH THI CÔNG MEPF & CỔNG DUYỆT KỸ SƯ
-                </h1>
+                </h2>
                 <span className="text-[11px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">
                   TT AVIO — Tháp A
                 </span>
@@ -1265,7 +1265,7 @@ export default function CleanMepfProcessPage() {
                   const firstInStage = steps.find((s) => s.stageIndex === stg.index);
                   if (firstInStage) setActiveStepId(firstInStage.id);
                 }}
-                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between group ${
+                className={`p-3 rounded-xl border text-left transition flex flex-col justify-between group ${
                   isSelected
                     ? "bg-zinc-900 border-amber-500/80 ring-1 ring-amber-500/40 shadow-sm"
                     : "bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900 hover:border-zinc-700"
@@ -1306,7 +1306,7 @@ export default function CleanMepfProcessPage() {
 
                 <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden mt-2.5">
                   <div
-                    className={`h-full transition-all duration-300 ${
+                    className={`h-full transition-[width] duration-300 ${
                       stagePct >= 100
                         ? "bg-emerald-500"
                         : stagePct >= 50
@@ -1363,7 +1363,7 @@ export default function CleanMepfProcessPage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Tìm theo mã hoặc tên bước..."
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-1.5 pl-8 pr-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-500/50"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-1.5 pl-8 pr-3 text-base sm:text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-amber-500/50"
                   />
                 </div>
               </div>
@@ -1381,7 +1381,7 @@ export default function CleanMepfProcessPage() {
                     <button
                       key={step.id}
                       onClick={() => setActiveStepId(step.id)}
-                      className={`w-full text-left p-3 rounded-xl border transition-all flex items-start gap-2.5 group ${
+                      className={`w-full text-left p-3 rounded-xl border transition flex items-start gap-2.5 group ${
                         isActive
                           ? "bg-zinc-800/90 border-amber-500/60 ring-1 ring-amber-500/30 shadow-xs"
                           : "bg-zinc-950/60 border-zinc-800/80 hover:bg-zinc-800/50 hover:border-zinc-700"
@@ -1787,7 +1787,7 @@ export default function CleanMepfProcessPage() {
                   <Link
                     key={idx}
                     href={hub.href}
-                    className="p-4 rounded-xl bg-zinc-950 hover:bg-zinc-950/80 border border-zinc-800 hover:border-amber-500/50 transition-all space-y-2 flex flex-col justify-between group shadow-sm"
+                    className="p-4 rounded-xl bg-zinc-950 hover:bg-zinc-950/80 border border-zinc-800 hover:border-amber-500/50 transition space-y-2 flex flex-col justify-between group shadow-sm"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5">

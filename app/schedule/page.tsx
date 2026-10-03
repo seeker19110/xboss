@@ -232,7 +232,7 @@ function ScheduleControlContent() {
     <div className="space-y-6">
       {/* Filter toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-zinc-900/60 rounded-2xl border border-zinc-800">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
           <Filter className="w-4 h-4 text-amber-400" />
           <span className="text-xs font-semibold text-zinc-300">Lọc Theo Hệ:</span>
           <SystemFilter value={system} onChange={setSystem} />
@@ -271,7 +271,7 @@ function ScheduleControlContent() {
                   </div>
                   <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-amber-500 rounded-full transition-all duration-500"
+                      className="h-full bg-amber-500 rounded-full transition-[width] duration-500"
                       style={{ width: `${pct}%` }}
                     />
                   </div>

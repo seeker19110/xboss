@@ -181,7 +181,7 @@ function ProgressBar({ value, warn }: { value: number; warn?: boolean }) {
     <div className="flex items-center gap-2">
       <div className="flex-1 bg-zinc-800 rounded-full h-1.5 overflow-hidden">
         <div
-          className={`h-1.5 rounded-full transition-all ${cls}`}
+          className={`h-1.5 rounded-full transition-[width] ${cls}`}
           style={{ width: `${Math.min(value, 100)}%` }}
         />
       </div>
@@ -730,7 +730,7 @@ export default function MyTasksPage() {
                           <div className="flex items-center gap-3">
                             <div className="flex-1 bg-zinc-800 rounded-full h-2 overflow-hidden">
                               <div
-                                className={`h-2 rounded-full transition-all ${pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-sky-500" : "bg-amber-500"}`}
+                                className={`h-2 rounded-full transition-[width] ${pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-sky-500" : "bg-amber-500"}`}
                                 style={{ width: `${pct}%` }}
                               />
                             </div>

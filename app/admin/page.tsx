@@ -506,16 +506,18 @@ export default function AdminPage() {
         }
         search={false}
       >
+        {/* Hai lối tắt này đều có trong sidebar — ẩn dưới sm để topbar điện thoại còn chỗ cho
+            tiêu đề, chuông, tài khoản (trước đây bị đẩy ra ngoài, cả trang cuộn ngang). */}
         <a
           href="/lookahead"
-          className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-rose-400 shrink-0"
+          className="hidden sm:flex items-center gap-1.5 min-h-10 text-sm text-zinc-400 hover:text-rose-400 shrink-0"
         >
           <CalendarClock className="w-4 h-4" /> Kế hoạch 2 tuần
         </a>
         {me?.role === "admin" && (
           <a
             href="/users"
-            className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-emerald-400 shrink-0"
+            className="hidden sm:flex items-center gap-1.5 min-h-10 text-sm text-zinc-400 hover:text-emerald-400 shrink-0"
           >
             <Users className="w-4 h-4" /> Người dùng
           </a>

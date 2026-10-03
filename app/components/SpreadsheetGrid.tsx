@@ -7,7 +7,7 @@
 // copy/paste/cut TSV, fill-down (Ctrl+D), xoá, select all (Ctrl+A),
 // context menu (right-click), sort by column, search/replace (Ctrl+F/H),
 // export CSV (Ctrl+S), keyboard shortcuts guide (Ctrl+?).
-// Theme: chỉ dùng token Tailwind (zinc + nhấn -400), không hex, không `dark:`
+// Theme: chỉ dùng token Tailwind (zinc + nhấn -400), không hex, không biến thể `dark`
 // để giữ cơ chế đảo màu sáng/tối trong globals.css.
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { todayISO } from "@/lib/nen/date";
@@ -38,7 +38,7 @@ export type GridColumn<Row> = {
   // Nhãn hiển thị tuỳ biến (vd map id người → tên) — mặc định dùng get().
   render?: (row: Row) => React.ReactNode;
   // Conditional formatting: trả class Tailwind (token zinc + nhấn) tô màu ô theo
-  // điều kiện (vd vượt định mức = nền đỏ). Chỉ dùng token, không hex/`dark:`.
+  // điều kiện (vd vượt định mức = nền đỏ). Chỉ dùng token, không hex/biến thể `dark`.
   cellClass?: (row: Row) => string | undefined;
 };
 
@@ -912,7 +912,8 @@ export default function SpreadsheetGrid<Row>({
                             : { col: c, asc: true },
                         )
                       }
-                      className="inline-flex items-center gap-0.5 min-w-0 hover:text-sky-600"
+                      // min-h-6: vùng chạm ≥24px (WCAG 2.2 — 2.5.8), axe bắt ở /procurement.
+                      className="inline-flex items-center gap-0.5 min-w-0 min-h-6 hover:text-sky-600"
                       title="Bấm để sắp xếp"
                     >
                       <span className="truncate">{col.label}</span>
@@ -929,7 +930,9 @@ export default function SpreadsheetGrid<Row>({
                         e.stopPropagation();
                         setFilterMenu(filterMenu === c ? null : c);
                       }}
-                      className={`shrink-0 ${colFilters[c]?.size ? "text-sky-600" : "text-zinc-500 hover:text-zinc-800"}`}
+                      // Vùng chạm 24×24 dù icon 12px: nút sắp xếp kế bên cao 24px nên ngoại lệ
+                      // "đủ khoảng cách" của WCAG 2.5.8 không còn che cho nút nhỏ này.
+                      className={`shrink-0 inline-flex items-center justify-center min-w-6 min-h-6 ${colFilters[c]?.size ? "text-sky-600" : "text-zinc-500 hover:text-zinc-800"}`}
                       title="Lọc theo cột"
                       aria-label={`Lọc cột ${col.label}`}
                     >

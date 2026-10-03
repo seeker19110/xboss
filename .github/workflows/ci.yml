@@ -100,6 +100,13 @@ jobs:
       - name: Kiểm hardcode màu hex trong component
         run: npm run check:hex-hardcode
 
+      # Cổng UI/UX tối thiểu của design-system/xboss/MASTER.md §13: chặn biến thể `dark:`
+      # (phá cơ chế đảo màu theo token) và `transition-all` (animate cả thuộc tính layout,
+      # làm axe chụp màu giữa chừng chuyển tiếp). Trước đây chỉ chạy tay nên đã trôi đỏ
+      # 19 file trên main mà không ai biết. Static, không cần DB.
+      - name: Kiểm quy chuẩn UI/UX (dark:, transition-all)
+        run: npm run check:ui-ux-guard
+
       - name: Kiểm code chết (module không ai với tới được)
         run: npm run check:dead-code
 
