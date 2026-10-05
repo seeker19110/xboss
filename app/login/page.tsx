@@ -3,7 +3,11 @@ import { useEffect, useState } from "react";
 import { LogIn, KeyRound } from "lucide-react";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import { clearOfflineQueue } from "@/app/components/offlineQueue";
-import { clearServiceWorkerCache } from "@/app/lib/serviceWorkerCache";
+import {
+  authenticateAfterCacheClear,
+  AuthenticationPreflightError,
+  clearServiceWorkerCache,
+} from "@/app/lib/serviceWorkerCache";
 
 const DEMO = [
   { role: "Admin", email: "admin@xboss.vn", pw: "admin123" },
@@ -20,7 +24,7 @@ const OIDC_ERRORS: Record<string, string> = {
   oidc_noemail: "Tài khoản SSO không trả về email — không thể đăng nhập.",
 };
 const CACHE_PURGE_ERROR =
-  "Chưa xác nhận được việc dọn bộ nhớ đệm của XBoss. Phiên đăng nhập đã bị hủy; hãy thử lại khi service worker sẵn sàng.";
+  "Chưa xác nhận được việc dọn bộ nhớ đệm của XBoss. Yêu cầu đăng nhập chưa được gửi; hãy thử lại khi service worker sẵn sàng.";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("admin@xboss.vn");
@@ -53,13 +57,21 @@ export default function LoginPage() {
     // và người dùng phải tải lại trang mới thao tác được.
     let res: Response;
     try {
-      res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-    } catch {
-      setError("Mất kết nối — thử lại khi có mạng");
+      res = await authenticateAfterCacheClear(
+        async () => {
+          await clearOfflineQueue();
+          await clearServiceWorkerCache();
+        },
+        () =>
+          fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          }),
+      );
+    } catch (err) {
+      if (err instanceof AuthenticationPreflightError) setError(CACHE_PURGE_ERROR);
+      else setError("Mất kết nối — thử lại khi có mạng");
       setBusy(false);
       return;
     }
@@ -78,19 +90,6 @@ export default function LoginPage() {
   }
 
   async function onLoginOk() {
-    // Đăng nhập mới trên thiết bị dùng chung: dọn cache API + hàng đợi tick offline còn sót
-    // lại từ phiên trước (có thể của người khác) để không lẫn dữ liệu giữa 2 người dùng.
-    await clearOfflineQueue();
-    try {
-      await clearServiceWorkerCache();
-    } catch {
-      // Login API đã phát session cookie; thu hồi cookie khi chưa xác nhận purge để
-      // refresh không mở dữ liệu riêng tư trước khi cache cũ được dọn.
-      await fetch("/api/auth/logout", { method: "POST", cache: "no-store" }).catch(() => {});
-      setError(CACHE_PURGE_ERROR);
-      setBusy(false);
-      return;
-    }
     // M58 PR1: quay lại đúng đích sau khi quét QR gặp 401 (?next=/r/<kind>/<id>) — chỉ chấp
     // nhận đường dẫn nội bộ tuyệt đối (bắt đầu "/" và không phải "//..." — chặn open redirect
     // dạng protocol-relative URL), không tin giá trị lạ.
@@ -105,13 +104,21 @@ export default function LoginPage() {
     setError("");
     let res: Response;
     try {
-      res = await fetch("/api/auth/login/2fa", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pending, code: totpCode }),
-      });
-    } catch {
-      setError("Mất kết nối — thử lại khi có mạng");
+      res = await authenticateAfterCacheClear(
+        async () => {
+          await clearOfflineQueue();
+          await clearServiceWorkerCache();
+        },
+        () =>
+          fetch("/api/auth/login/2fa", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pending, code: totpCode }),
+          }),
+      );
+    } catch (err) {
+      if (err instanceof AuthenticationPreflightError) setError(CACHE_PURGE_ERROR);
+      else setError("Mất kết nối — thử lại khi có mạng");
       setBusy(false);
       return;
     }

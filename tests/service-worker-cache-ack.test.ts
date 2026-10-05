@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  authenticateAfterCacheClear,
+  AuthenticationPreflightError,
   clearServiceWorkerCacheWith,
   requestServiceWorkerCacheClear,
   ServiceWorkerCacheClearError,
@@ -51,7 +53,7 @@ test("resolves only after matching CACHE_CLEARED ACK", async () => {
   await requestServiceWorkerCacheClear(fixture.controller, 100, fixture.createChannel);
 });
 
-test("dev without a registration purges only XBoss-owned caches and permits login", async () => {
+test("first visit without a registration purges only XBoss-owned caches in production", async () => {
   const deleted: string[] = [];
   const cacheStorage = {
     async keys() {
@@ -65,15 +67,16 @@ test("dev without a registration purges only XBoss-owned caches and permits logi
   await clearServiceWorkerCacheWith(
     environment({
       serviceWorkerAvailable: true,
-      production: false,
+      production: true,
       getRegistration: async () => undefined,
+      ready: new Promise(() => {}),
       cacheStorage,
     }),
   );
   assert.deepEqual(deleted.sort(), ["xboss-public-v20", "xboss-v19"]);
 });
 
-test("production first visit sends the ACK request to the active worker, not only controller", async () => {
+test("production without a controller sends ACK to an active registered worker", async () => {
   const fixture = channelFixture();
   let getRegistrationCalled = false;
   await clearServiceWorkerCacheWith(
@@ -81,13 +84,45 @@ test("production first visit sends the ACK request to the active worker, not onl
       production: true,
       getRegistration: async () => {
         getRegistrationCalled = true;
-        return undefined;
+        return { active: fixture.controller };
       },
-      ready: Promise.resolve({ active: fixture.controller }),
       createChannel: fixture.createChannel,
     }),
   );
   assert.equal(getRegistrationCalled, true);
+});
+
+test("failed pre-authentication cache purge prevents issuing authentication", async (t) => {
+  await t.test("clear failure never calls the authentication request", async () => {
+    let authenticationCalled = false;
+    await assert.rejects(
+      authenticateAfterCacheClear(
+        async () => {
+          throw new Error("purge failed");
+        },
+        async () => {
+          authenticationCalled = true;
+        },
+      ),
+      AuthenticationPreflightError,
+    );
+    assert.equal(authenticationCalled, false);
+  });
+
+  await t.test("successful purge issues authentication afterward", async () => {
+    const sequence: string[] = [];
+    const result = await authenticateAfterCacheClear(
+      async () => {
+        sequence.push("purge");
+      },
+      async () => {
+        sequence.push("authenticate");
+        return "response";
+      },
+    );
+    assert.deepEqual(sequence, ["purge", "authenticate"]);
+    assert.equal(result, "response");
+  });
 });
 
 test("production with no active worker stays fail-closed after readiness timeout", async () => {
@@ -96,6 +131,7 @@ test("production with no active worker stays fail-closed after readiness timeout
       environment({
         production: true,
         timeoutMs: 5,
+        getRegistration: async () => ({ active: null }),
         ready: new Promise(() => {}),
       }),
     ),

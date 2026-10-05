@@ -33,6 +33,26 @@ export type CacheClearEnvironment = {
   createChannel?: () => MessageChannel;
 };
 
+export class AuthenticationPreflightError extends Error {
+  constructor(readonly cause: unknown) {
+    super("authentication_preflight_failed");
+    this.name = "AuthenticationPreflightError";
+  }
+}
+
+/** Runs authentication only after private-cache cleanup has completed. */
+export async function authenticateAfterCacheClear<T>(
+  clear: () => Promise<void>,
+  authenticate: () => Promise<T>,
+): Promise<T> {
+  try {
+    await clear();
+  } catch (error) {
+    throw new AuthenticationPreflightError(error);
+  }
+  return authenticate();
+}
+
 /** Chờ ACK purge của đúng request; không coi việc postMessage đã trả về là đã dọn xong. */
 export function requestServiceWorkerCacheClear(
   controller: CacheClearController | null | undefined,
@@ -157,9 +177,9 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 }
 
 /**
- * If this document is not controlled yet, use its active registration. In dev or on a
- * browser without service-worker support, clear only XBoss-owned CacheStorage entries;
- * unrelated applications' caches are never touched.
+ * If this document is not controlled yet, use its active registration. If no registration
+ * exists, clear only XBoss-owned CacheStorage entries; unrelated applications' caches are
+ * never touched.
  */
 export async function clearServiceWorkerCacheWith(
   environment: CacheClearEnvironment,
@@ -177,15 +197,11 @@ export async function clearServiceWorkerCacheWith(
     return purgeOwnedCachesWithoutWorker(environment.cacheStorage);
   }
 
-  let registration: ClearRegistration | undefined;
-  try {
-    registration = await withTimeout(environment.getRegistration(), timeoutMs);
-  } catch (err) {
-    if (!(err instanceof ServiceWorkerCacheClearError) || err.code !== "timeout") throw err;
-  }
+  let registration = await withTimeout(environment.getRegistration(), timeoutMs);
 
-  if (!registration && !environment.production) {
-    // PwaRegister intentionally skips dev; no registration means no SW can be writing here.
+  if (!registration) {
+    // No registration means there is no active worker to acknowledge. This also covers
+    // first visits in production and browsers where PwaRegister has not run yet.
     return purgeOwnedCachesWithoutWorker(environment.cacheStorage);
   }
 
