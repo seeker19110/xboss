@@ -26,11 +26,11 @@ Không backup: `node_modules/`, `.next/` (build lại được từ Git + `npm c
 
 ## Script
 
-- **`scripts/ops/backup.sh`** — `pg_dump -Fc "$DATABASE_URL"` → `backups/xboss-YYYY-MM-DD.dump` +
-  `tar czf` thư mục uploads → đẩy cả hai ra ngoài máy qua `rclone` (đích cấu hình qua biến
+- **`scripts/ops/backup.sh`** — `pg_dump -Fc "$DATABASE_URL"` + `tar czf` thư mục uploads thành
+  một recovery set có ID duy nhất → đẩy artifact và manifest ra ngoài máy qua `rclone` (đích cấu hình qua biến
   `BACKUP_REMOTE`, xem bên dưới) → dọn bản cũ (local > 30 ngày, remote > 90 ngày, đổi qua
   `LOCAL_RETENTION_DAYS`/`REMOTE_RETENTION_DAYS` nếu cần).
-- **`scripts/ops/restore-check.sh`** — lấy bản dump mới nhất và chỉ tạo DB phục hồi mới trên
+- **`scripts/ops/restore-check.sh`** — lấy recovery set mới nhất đã qua integrity check và chỉ tạo DB phục hồi mới trên
   PostgreSQL disposable đã đánh dấu. Script yêu cầu `RESTORE_SOURCE_URL` (chỉ để so danh tính),
   `RESTORE_TARGET_URL` (credentials riêng), `RESTORE_TARGET_DATABASE` (tên DB mới) và
   `RESTORE_TARGET_MARKER` khớp COMMENT đã cài trên DB điều khiển disposable. Nguồn/đích phải khác
@@ -38,6 +38,24 @@ Không backup: `node_modules/`, `.next/` (build lại được từ Git + `npm c
   nguồn, host/DB production-like, DB target đã tồn tại hoặc không kiểm được identity đều dừng
   trước `CREATE DATABASE`. DB mới chỉ bị DROP bởi trap nếu chính lần chạy hiện tại tạo thành công.
   Script không dùng `DATABASE_URL` làm target.
+
+Mỗi lần chạy `backup.sh` tạo một `recoverySetId` riêng và các file cùng ID: dump, archive uploads
+và `xboss-<id>.manifest.json`. Dump/archive được ghi qua file tạm rồi đổi tên; manifest JSON ghi
+đường dẫn tương đối, kích thước, SHA-256 của từng artifact và trạng thái `COMPLETE` hoặc `PARTIAL`,
+rồi được finalize bằng rename sau khi đã kiểm kê artifact. Thiếu `data/uploads/` tạo manifest
+`PARTIAL`; restore-check từ chối set này. Nếu tạo artifact thất bại, manifest không được phát hành,
+file backup cũ không bị xóa và file tạm của lần lỗi được dọn. Khi đẩy remote, manifest được copy sau
+các artifact.
+
+`restore-check.sh` chọn manifest mới nhất và kiểm schema, set ID, đủ hai artifact, tồn tại, size và
+SHA-256 trước khi tạo credential tạm hoặc kết nối PostgreSQL. Sai/thiếu manifest hoặc artifact thì
+dừng trước mọi lệnh `psql`/`pg_restore`. Manifest hiện nằm cạnh artifact trong backup directory;
+SHA-256 giúp phát hiện thiếu/hỏng file nhưng không chứng minh chống sửa nếu người có quyền sửa được
+cả manifest lẫn artifact.
+
+Đây là integrity gate cho cặp dump/uploads hiện tại, không phải full recovery manifest của A6,
+không xác thực WAL/PITR, object version, key reference hay migration checksum, và không chứng minh
+RPO/RTO. Kết quả restore smoke không được dùng làm PITR PASS.
 
 Cả hai là script Bash, không phải TypeScript. `restore-check.sh` cần Bash, Python 3 standard library
 để phân tích URI mà không lộ credential, và `pg_restore`/`psql` từ gói `postgresql-client`; không
