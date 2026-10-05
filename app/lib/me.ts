@@ -1,6 +1,5 @@
 // Singleton cache phía client — chỉ fetch /api/auth/me 1 lần mỗi lần load trang.
 // Các component trên cùng trang gọi fetchMe() đồng thời đều nhận cùng 1 Promise.
-import { clearOfflineQueue } from "@/app/components/offlineQueue";
 import { clearServiceWorkerCache } from "@/app/lib/serviceWorkerCache";
 
 export type Me = { id: number; name: string; email: string; role: string };
@@ -61,7 +60,6 @@ export function lockPrivatePageUntilCachePurged(): () => Promise<void> {
     retry.disabled = true;
     message.textContent = "Đang xác nhận dọn bộ nhớ đệm…";
     try {
-      await clearOfflineQueue();
       await clearServiceWorkerCache();
       window.location.replace("/login");
     } catch {
@@ -83,10 +81,8 @@ export function lockPrivatePageUntilCachePurged(): () => Promise<void> {
   return retryPurge;
 }
 
-// Dọn dữ liệu của phiên cũ (cache API trong service worker + hàng đợi tick offline) rồi
-// chuyển về /login. Dùng ở MỌI nơi phát hiện 401 (không chỉ nút "Đăng xuất") — nếu không,
-// trên tablet dùng chung, phiên hết hạn/đóng tab mà không bấm đăng xuất sẽ để lại dữ liệu
-// (thông báo, task, dashboard...) của người trước trong cache cho người đăng nhập sau thấy.
+// Khóa dữ liệu đang hiển thị và xác nhận purge cache trước khi về login. Queue không rõ owner
+// được giữ nguyên/cách ly; không xóa khi session hết hạn hoặc đổi tài khoản.
 export async function redirectToLogin() {
   if (_authRedirectStarted) return;
   _authRedirectStarted = true;

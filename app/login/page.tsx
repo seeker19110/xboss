@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { LogIn, KeyRound } from "lucide-react";
 import ThemeToggle from "@/app/components/ThemeToggle";
-import { clearOfflineQueue } from "@/app/components/offlineQueue";
 import {
   authenticateAfterCacheClear,
   AuthenticationPreflightError,
@@ -59,7 +58,6 @@ export default function LoginPage() {
     try {
       res = await authenticateAfterCacheClear(
         async () => {
-          await clearOfflineQueue();
           await clearServiceWorkerCache();
         },
         () =>
@@ -106,7 +104,6 @@ export default function LoginPage() {
     try {
       res = await authenticateAfterCacheClear(
         async () => {
-          await clearOfflineQueue();
           await clearServiceWorkerCache();
         },
         () =>

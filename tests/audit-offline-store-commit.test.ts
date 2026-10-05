@@ -197,3 +197,40 @@ test("IDB: lỗi DataCloneError đồng bộ không báo đã lưu", async () =>
   f.opens[0].onsuccess?.();
   await rejected;
 });
+
+test("localStorage migration preserves exact unknown-owner bytes", async () => {
+  const bytes = '{"legacy":[{"id":7,"payload":"keep\u0000exact"}],"extra":true}';
+  const evaluatedModule = { exports: {} };
+  let reads = 0;
+  let removals = 0;
+  const storage = new Map([["xboss-offline-ticks", bytes]]);
+  runInNewContext(
+    ts.transpileModule(readFileSync("app/components/offlineQueue/store.ts", "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText,
+    {
+      exports: evaluatedModule.exports,
+      module: evaluatedModule,
+      indexedDB: {},
+      localStorage: {
+        getItem: () => {
+          reads++;
+          return storage.get("xboss-offline-ticks") ?? null;
+        },
+        removeItem: (key: string) => {
+          removals++;
+          storage.delete(key);
+        },
+      },
+    },
+  );
+  const { migrateFromLocalStorage } = evaluatedModule.exports as {
+    migrateFromLocalStorage: (store: { add: () => Promise<number> }) => Promise<void>;
+  };
+  let adds = 0;
+  await migrateFromLocalStorage({ add: async () => ++adds });
+  assert.equal(storage.get("xboss-offline-ticks"), bytes);
+  assert.equal(reads, 0);
+  assert.equal(removals, 0);
+  assert.equal(adds, 0);
+});
