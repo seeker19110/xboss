@@ -99,7 +99,7 @@ Gợi ý gửi kết quả qua Telegram — đặt `TELEGRAM_BOT_TOKEN`/`TELEGRA
 trước cả restore-check lẫn cảnh báo):
 
 ```cron
-0 2 * * 0 /bin/bash -c 'cd /path/to/xboss && set -a && . /etc/xboss/restore-check.env && set +a && bash scripts/ops/restore-check.sh >> logs/restore-check.log 2>&1 || curl -sS --config - < <(printf "url = \"https://api.telegram.org/bot%s/sendMessage\"\ndata = \"chat_id=%s&text=⚠️ XBoss restore-check THẤT BẠI — xem logs/restore-check.log\"\n" "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID")'
+0 2 * * 0 /bin/bash -c 'cd /path/to/xboss && set -a && . /etc/xboss/restore-check.env && set +a && bash scripts/ops/restore-check.sh >> logs/restore-check.log 2>&1 || curl -sS --config - < <(printf "url = \"https://api.telegram.org/bot\%s/sendMessage\"\ndata = \"chat_id=\%s&text=⚠️ XBoss restore-check THẤT BẠI — xem logs/restore-check.log\"\n" "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID")'
 ```
 
 ## Uptime monitor (đăng ký tay, không phải script)

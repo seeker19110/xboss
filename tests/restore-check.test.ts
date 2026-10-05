@@ -17,7 +17,12 @@ const script = join(process.cwd(), "scripts/ops/restore-check.sh");
 const marker = "xboss-disposable:0123456789abcdef";
 
 function runRestoreCheck(
-  options: { marker?: string; targetUrl?: string; restoreFails?: boolean; targetExists?: boolean } = {},
+  options: {
+    marker?: string;
+    targetUrl?: string;
+    restoreFails?: boolean;
+    targetExists?: boolean;
+  } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), "xboss-restore-check-"));
   try {
@@ -74,7 +79,8 @@ exit 0
         RESTORE_LOG: join(dir, "restore.log"),
         RESTORE_SOURCE_URL: "postgresql://app_source:secret@192.0.2.10:5432/source_db",
         RESTORE_TARGET_URL:
-          options.targetUrl ?? "postgresql://restore_user:secret@127.0.0.1:5432/restore_control?application_name=restore_check",
+          options.targetUrl ??
+          "postgresql://restore_user:secret@127.0.0.1:5432/restore_control?application_name=restore_check",
         RESTORE_TARGET_DATABASE: "xboss_restore_check_test",
         RESTORE_TARGET_MARKER: marker,
         ACTUAL_MARKER: options.marker ?? marker,
