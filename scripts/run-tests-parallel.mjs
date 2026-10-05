@@ -89,7 +89,9 @@ export async function chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua, nodeA
   // nhanh nhất. Test ranh giới runtime cài pg mock nên phải chạy riêng để không làm
   // nhiễm module cache của các test thuần còn lại.
   if (!baseUrl) {
-    const isolated = files.filter((file) => file.endsWith("tests/db-runtime-migration-boundary.test.ts"));
+    const isolated = files.filter((file) =>
+      file.endsWith("tests/db-runtime-migration-boundary.test.ts"),
+    );
     const bundled = files.filter((file) => !isolated.includes(file));
     for (const file of isolated) {
       const { out, status } = chayDongBo([
@@ -109,7 +111,11 @@ export async function chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua, nodeA
         "--test",
         ...bundled,
       ]);
-      thuKetQua(`${bundled.length} file (không có TEST_DATABASE_URL — gộp 1 tiến trình)`, out, status);
+      thuKetQua(
+        `${bundled.length} file (không có TEST_DATABASE_URL — gộp 1 tiến trình)`,
+        out,
+        status,
+      );
     }
     return;
   }

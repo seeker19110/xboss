@@ -253,11 +253,11 @@ downgrade về HTTP (certbot không tự thêm header này):
 Không đặt gì thì hành vi giữ nguyên như trước (pool 10 connection, timeout 30s). Chỉ chỉnh khi
 cần scale lên nhiều instance/traffic cao:
 
-| Biến                       | Mô tả                                                                                                                                                                             | Mặc định |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `XBOSS_PG_POOL_MAX`        | Số connection tối đa trong pool Postgres của mỗi instance app (clamp 1–100).                                                                                                      | `10`     |
+| Biến                       | Mô tả                                                                                                                                                          | Mặc định |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `XBOSS_PG_POOL_MAX`        | Số connection tối đa trong pool Postgres của mỗi instance app (clamp 1–100).                                                                                   | `10`     |
 | `XBOSS_PG_STMT_TIMEOUT_MS` | Thời gian tối đa (ms) cho 1 câu query trước khi Postgres huỷ (clamp 1.000–300.000). Riêng phiên chạy migration (`npm run db:migrate`) không bị áp timeout này. | `30000`  |
-| `XBOSS_SLOW_QUERY_MS`      | Ngưỡng (ms) coi 1 query là "chậm" để ghi log cảnh báo.                                                                                                                            | `500`    |
+| `XBOSS_SLOW_QUERY_MS`      | Ngưỡng (ms) coi 1 query là "chậm" để ghi log cảnh báo.                                                                                                         | `500`    |
 
 ---
 

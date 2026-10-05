@@ -9,7 +9,10 @@ let expectedMigrations: string[] = [];
 function resultFor(sql: string) {
   sqlSeen.push(sql);
   if (/FROM schema_migrations/i.test(sql))
-    return { rows: expectedMigrations.map((name) => ({ name })), rowCount: expectedMigrations.length };
+    return {
+      rows: expectedMigrations.map((name) => ({ name })),
+      rowCount: expectedMigrations.length,
+    };
   if (/RETURNING id/i.test(sql)) return { rows: [{ id: 17 }], rowCount: 1 };
   if (/SELECT/i.test(sql)) return { rows: [{ value: 1 }], rowCount: 1 };
   return { rows: [], rowCount: 1 };
