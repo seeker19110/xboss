@@ -125,6 +125,40 @@ test("failed pre-authentication cache purge prevents issuing authentication", as
   });
 });
 
+test("SSO navigation waits for cache purge and is blocked when purge fails", async (t) => {
+  await t.test("failed purge does not navigate to the OIDC login endpoint", async () => {
+    let navigated = false;
+    await assert.rejects(
+      authenticateAfterCacheClear(
+        async () => {
+          throw new Error("purge failed");
+        },
+        async () => {
+          navigated = true;
+        },
+      ),
+      AuthenticationPreflightError,
+    );
+    assert.equal(navigated, false);
+  });
+
+  await t.test(
+    "successful purge completes before navigating to the OIDC login endpoint",
+    async () => {
+      const sequence: string[] = [];
+      await authenticateAfterCacheClear(
+        async () => {
+          sequence.push("purge-acknowledged");
+        },
+        async () => {
+          sequence.push("navigate-to-oidc");
+        },
+      );
+      assert.deepEqual(sequence, ["purge-acknowledged", "navigate-to-oidc"]);
+    },
+  );
+});
+
 test("production with no active worker stays fail-closed after readiness timeout", async () => {
   await assert.rejects(
     clearServiceWorkerCacheWith(

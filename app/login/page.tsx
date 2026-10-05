@@ -128,6 +128,23 @@ export default function LoginPage() {
     }
   }
 
+  async function startSso() {
+    setBusy(true);
+    setError("");
+    try {
+      await authenticateAfterCacheClear(
+        () => clearServiceWorkerCache(),
+        async () => {
+          window.location.assign("/api/auth/oidc/login");
+        },
+      );
+    } catch (err) {
+      if (err instanceof AuthenticationPreflightError) setError(CACHE_PURGE_ERROR);
+      else setError("Không thể bắt đầu đăng nhập SSO — vui lòng thử lại.");
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-4 relative">
       <div className="absolute top-4 right-4">
@@ -240,12 +257,15 @@ export default function LoginPage() {
               hoặc
               <span className="h-px flex-1 bg-zinc-800" />
             </div>
-            <a
-              href="/api/auth/oidc/login"
-              className="mt-4 w-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 py-2.5 rounded-xl font-medium text-sm transition text-sky-400 min-h-[44px]"
+            <button
+              type="button"
+              onClick={startSso}
+              disabled={busy}
+              className="mt-4 w-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 py-2.5 rounded-xl font-medium text-sm transition text-sky-400 min-h-[44px] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <KeyRound className="w-4 h-4" /> Đăng nhập bằng SSO công ty
-            </a>
+              <KeyRound className="w-4 h-4" />
+              {busy ? "Đang chuẩn bị SSO..." : "Đăng nhập bằng SSO công ty"}
+            </button>
           </div>
         )}
         {!pending && (
