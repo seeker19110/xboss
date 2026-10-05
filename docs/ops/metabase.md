@@ -91,10 +91,13 @@ RESET ROLE;
 
 ## 2. Chạy migration `0073` (nếu chưa áp)
 
-Đã áp production/staging ở PR1 (`npm run db:migrate` tự chạy khi app khởi động, hoặc chủ động
-`npm run db:migrate`). Nếu đang dựng staging mới từ đầu, đảm bảo đã tạo role `xboss_bi` (bước 1)
-**trước** khi chạy lệnh này lần đầu. Migration sẽ được ghi nhận trong bảng `schema_migrations` để
-đảm bảo không chạy lại trong lần sau.
+Trước khi start/cập nhật app, chạy migration bằng lệnh riêng `npm run db:migrate`; app runtime
+không tự áp DDL khi boot, khi nhận request hoặc khi health check. Đảm bảo `MIGRATE_DATABASE_URL`
+trỏ tới đúng database XBoss đích (không dùng `DATABASE_URL` thay thế) và đã tạo role `xboss_bi`
+(bước 1) **trước** lần đầu áp migration `0073`. Có thể kiểm tra trước bằng
+`npm run db:migrate -- --dry-run`; lệnh chỉ liệt kê migration còn thiếu. Sau migrate, file được
+ghi vào `schema_migrations` và các lần chạy sau sẽ bỏ qua file đã áp. Nếu quên migrate, runtime
+báo schema chưa sẵn sàng; hãy chạy migrator đúng đích rồi khởi động lại/để health check retry.
 
 ## 3. Dựng Metabase qua Docker Compose (DB nội bộ RIÊNG, không dùng chung DB `xboss`)
 

@@ -6,7 +6,7 @@ import { Pool, PoolClient, types } from "pg";
 import { getServerEnv } from "@/lib/nen/env";
 import { getRequestContext } from "@/lib/nen/request-context";
 import { log } from "@/lib/nen/log";
-import { runMigrations } from "@/lib/db/migrate";
+import { listMigrationFiles } from "@/lib/db/migrate";
 
 // DATE (oid 1082) → giữ nguyên chuỗi 'YYYY-MM-DD' (code so sánh ngày dạng chuỗi).
 types.setTypeParser(1082, (v) => v);
@@ -14,7 +14,19 @@ types.setTypeParser(1082, (v) => v);
 types.setTypeParser(20, (v) => Number(v));
 types.setTypeParser(1700, (v) => parseFloat(v));
 
-const g = globalThis as unknown as { __xbossPool?: Pool; __xbossSchemaReady?: Promise<unknown> };
+const g = globalThis as unknown as {
+  __xbossPool?: Pool;
+  __xbossSchemaCompatible?: Promise<void>;
+};
+
+export class DatabaseSchemaNotReadyError extends Error {
+  readonly code = "XBOSS_SCHEMA_NOT_READY";
+
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "DatabaseSchemaNotReadyError";
+  }
+}
 
 // Transaction context: query/run/insertId tự dùng client này nếu đang trong withTransaction.
 const txStorage = new AsyncLocalStorage<PoolClient>();
@@ -100,17 +112,43 @@ async function timedPgQuery(
   }
 }
 
-// Tự áp migration 1 lần mỗi process khi query đầu tiên chạy. runMigrations dùng
-// advisory lock nên nhiều process/instance chạy song song vẫn an toàn (không còn phải
-// bắt lỗi race 23505/42P07 như bản chạy chuỗi SCHEMA trực tiếp).
-function ensureSchema(): Promise<unknown> {
-  if (!g.__xbossSchemaReady) {
-    g.__xbossSchemaReady = runMigrations(getPool()).catch((err) => {
-      g.__xbossSchemaReady = undefined; // cho phép thử lại nếu lần đầu lỗi mạng
+// Runtime chỉ xác minh marker đã áp đủ migration cần cho checkout hiện tại. Đây là
+// SELECT thuần; schema thiếu/lỗi thời phải được xử lý bằng `npm run db:migrate` riêng.
+function ensureSchemaCompatible(): Promise<void> {
+  if (!g.__xbossSchemaCompatible) {
+    g.__xbossSchemaCompatible = (async () => {
+      let appliedNames: string[];
+      try {
+        const result = await getPool().query<{ name: string }>(
+          "SELECT name FROM schema_migrations ORDER BY name",
+        );
+        appliedNames = result.rows.map((row) => row.name);
+      } catch (err) {
+        const code = (err as { code?: string } | null)?.code;
+        if (code === "42P01" || code === "42501") {
+          throw new DatabaseSchemaNotReadyError(
+            "Database schema is missing or unreadable. Run `npm run db:migrate` with MIGRATE_DATABASE_URL before starting the app.",
+            { cause: err },
+          );
+        }
+        throw err;
+      }
+
+      const applied = new Set(appliedNames);
+      const missing = listMigrationFiles().filter((name) => !applied.has(name));
+      if (missing.length > 0) {
+        const preview = missing.slice(0, 3).join(", ");
+        const more = missing.length > 3 ? ` (+${missing.length - 3} more)` : "";
+        throw new DatabaseSchemaNotReadyError(
+          `Database schema is behind this app (${missing.length} migration(s) missing: ${preview}${more}). Run npm run db:migrate with MIGRATE_DATABASE_URL before starting the app.`,
+        );
+      }
+    })().catch((err) => {
+      g.__xbossSchemaCompatible = undefined; // cho phép thử lại sau khi schema được cập nhật
       throw err;
     });
   }
-  return g.__xbossSchemaReady;
+  return g.__xbossSchemaCompatible;
 }
 
 // Chuyển placeholder `?` → $1..$n (SQL trong codebase không chứa '?' trong literal).
@@ -123,7 +161,7 @@ export async function query<T = Record<string, unknown>>(
   sql: string,
   ...params: unknown[]
 ): Promise<T[]> {
-  await ensureSchema();
+  await ensureSchemaCompatible();
   const tx = txStorage.getStore();
   const pgSql = toPg(sql);
   const r = await timedPgQuery(
@@ -142,7 +180,7 @@ export async function queryOne<T = Record<string, unknown>>(
 }
 
 export async function run(sql: string, ...params: unknown[]): Promise<{ changes: number }> {
-  await ensureSchema();
+  await ensureSchemaCompatible();
   const tx = txStorage.getStore();
   const pgSql = toPg(sql);
   const r = await timedPgQuery(
@@ -155,7 +193,7 @@ export async function run(sql: string, ...params: unknown[]): Promise<{ changes:
 // INSERT trả về id (thay cho lastInsertRowid của SQLite).
 // Không append RETURNING id nếu SQL đã có sẵn (vd: INSERT ON CONFLICT ... RETURNING id).
 export async function insertId(sql: string, ...params: unknown[]): Promise<number> {
-  await ensureSchema();
+  await ensureSchemaCompatible();
   const pgSql = toPg(sql);
   const needsReturning = !/returning\s+id\s*$/i.test(pgSql.trim());
   const finalSql = needsReturning ? pgSql + " RETURNING id" : pgSql;
@@ -174,7 +212,7 @@ export async function insertId(sql: string, ...params: unknown[]): Promise<numbe
 // có thay vì mở connection/transaction thứ 2 — tránh treo (2 client cùng chờ khoá nhau).
 export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
   if (txStorage.getStore()) return fn();
-  await ensureSchema();
+  await ensureSchemaCompatible();
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");

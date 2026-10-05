@@ -1,7 +1,7 @@
 // Hệ migrate nhẹ, không ORM: chạy các file .sql đánh số trong migrations/ theo thứ tự,
 // ghi nhận file đã áp vào bảng schema_migrations. Bám triết lý raw SQL của XBoss
-// (xem docs/adr/0003-migrations.md). Gọi tự động lúc boot qua ensureSchema (lib/db)
-// và thủ công qua `npm run db:migrate` (scripts/migrate.ts).
+// (xem docs/adr/0003-migrations.md). Chỉ chạy tường minh qua `npm run db:migrate`;
+// runtime chỉ đọc schema_migrations để báo thiếu/lỗi thời, không gọi runner này.
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { Pool } from "pg";
@@ -13,14 +13,14 @@ export const MIGRATIONS_DIR = path.join(process.cwd(), "migrations");
 // (multi-instance production hoặc test chạy song song). Số bất kỳ, cố định.
 const MIGRATION_LOCK_KEY = 918_273_645;
 
-// Pool riêng cho lệnh `npm run db:migrate` (script scripts/migrate.ts). M51 PR1: khi bật
-// RLS, production đổi DATABASE_URL sang role ứng dụng `xboss_app` (NOBYPASSRLS, không đủ
-// quyền chạy migration/tạo role) — migration phải chạy bằng role owner qua biến riêng
-// MIGRATE_DATABASE_URL. Ưu tiên MIGRATE_DATABASE_URL, fallback DATABASE_URL (dev không đổi
-// gì). Chỉ ảnh hưởng script db:migrate — ensureSchema lúc boot app vẫn dùng getPool() (lib/db).
+// Pool riêng cho lệnh `npm run db:migrate`. Runtime role không được dùng thay credential
+// migration; thiếu MIGRATE_DATABASE_URL là lỗi rõ, tuyệt đối không fallback sang DATABASE_URL.
 export function getMigrationPool(): Pool {
-  const url = process.env.MIGRATE_DATABASE_URL || process.env.DATABASE_URL;
-  if (!url) throw new Error("Thiếu MIGRATE_DATABASE_URL/DATABASE_URL để chạy migration");
+  const url = process.env.MIGRATE_DATABASE_URL?.trim();
+  if (!url)
+    throw new Error(
+      "Thiếu MIGRATE_DATABASE_URL để chạy migration; DATABASE_URL chỉ dành cho runtime và không được dùng thay.",
+    );
   return new Pool({ connectionString: url, max: 4 });
 }
 
@@ -32,18 +32,18 @@ export function listMigrationFiles(): string[] {
     .sort();
 }
 
-// Liệt kê migration CHƯA áp mà KHÔNG chạy gì — dùng cho `npm run db:migrate -- --dry-run`
-// (M44 PR4) để kiểm tra trước deploy/staging xem sắp áp file nào. Chỉ đọc bảng
-// schema_migrations (tạo nếu chưa có) — không cần advisory lock vì không ghi dữ liệu ngoài
-// CREATE TABLE IF NOT EXISTS.
+// Liệt kê migration CHƯA áp mà không ghi gì — dùng cho `npm run db:migrate -- --dry-run`.
+// Nếu bảng tracking chưa có thì chưa migration nào được áp; dry-run không tự tạo bảng.
 export async function pendingMigrations(pool: Pool): Promise<string[]> {
   const client = await pool.connect();
   try {
-    await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
-      name TEXT PRIMARY KEY,
-      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`);
-    const appliedRows = await client.query<{ name: string }>("SELECT name FROM schema_migrations");
+    let appliedRows: { rows: { name: string }[] };
+    try {
+      appliedRows = await client.query<{ name: string }>("SELECT name FROM schema_migrations");
+    } catch (err) {
+      if ((err as { code?: string } | null)?.code === "42P01") return listMigrationFiles();
+      throw err;
+    }
     const applied = new Set(appliedRows.rows.map((r) => r.name));
     return listMigrationFiles().filter((f) => !applied.has(f));
   } finally {

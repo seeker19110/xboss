@@ -132,12 +132,20 @@ jobs:
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -e
+          # Chạy script từ đúng commit đã qua CI, không dùng bản deploy.sh còn sót ở checkout cũ.
+          # SHA chỉ nhận dạng hex trước khi đưa vào chuỗi lệnh SSH; không có secret trong lệnh.
+          if [[ ! "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "DEPLOY_SHA không hợp lệ." >&2
+            exit 1
+          fi
+          REMOTE_COMMAND="cd '$APP_DIR' && git fetch origin '$DEPLOY_SHA' && git reset --hard '$DEPLOY_SHA' && EXPECTED_DEPLOY_SHA='$DEPLOY_SHA' bash deploy.sh"
           # Không còn build trên VPS nên các bước còn lại (npm ci, migrate, swap, reload,
           # health-check) chỉ mất vài phút — 15m là dư, không cần 40m như trước.
           timeout 15m ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o ServerAliveInterval=30 \
-            "$VPS_USER@$VPS_HOST" "cd '$APP_DIR' && bash deploy.sh"
+            "$VPS_USER@$VPS_HOST" "$REMOTE_COMMAND"
 
       - name: Dọn khoá SSH
         if: always()

@@ -12,6 +12,7 @@ export type HealthResult = {
   db: boolean;
   migration: string | null;
   uptime_s: number;
+  errorCode?: "schema_not_ready" | "database_unavailable";
 };
 
 type QueryOneFn = <T = Record<string, unknown>>(
@@ -39,7 +40,14 @@ export async function checkHealth(queryOneFn: QueryOneFn = queryOne): Promise<He
       DB_PING_TIMEOUT_MS,
     );
     return { status: "ok", db: true, migration: migrationRow?.name ?? null, uptime_s };
-  } catch {
-    return { status: "degraded", db: false, migration: null, uptime_s };
+  } catch (err) {
+    const code = (err as { code?: string } | null)?.code;
+    return {
+      status: "degraded",
+      db: false,
+      migration: null,
+      uptime_s,
+      errorCode: code === "XBOSS_SCHEMA_NOT_READY" ? "schema_not_ready" : "database_unavailable",
+    };
   }
 }

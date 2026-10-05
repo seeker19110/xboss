@@ -48,6 +48,15 @@ const envFile = {
   ...docEnv(join(__dirname, ".env.local")),
 };
 
+// Migrator secret phải nằm ngoài env file/process của app. Next.js tự nạp .env.local,
+// nên dừng rõ ràng nếu bị đặt nhầm trong file runtime; không kế thừa biến từ shell deploy.
+if (Object.hasOwn(envFile, "MIGRATE_DATABASE_URL")) {
+  throw new Error(
+    "MIGRATE_DATABASE_URL phải nằm trong file riêng của bước deploy, không phải .env.local",
+  );
+}
+delete process.env.MIGRATE_DATABASE_URL;
+
 /** Lấy biến theo thứ tự ưu tiên: môi trường thật → file env → mặc định. */
 function bien(ten, macDinh) {
   return process.env[ten] ?? envFile[ten] ?? macDinh;

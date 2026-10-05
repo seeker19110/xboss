@@ -13,7 +13,17 @@ test("checkHealth: DB lỗi (queryOneFn giả lập) → status degraded, db fal
   assert.equal(result.status, "degraded");
   assert.equal(result.db, false);
   assert.equal(result.migration, null);
+  assert.equal(result.errorCode, "database_unavailable");
   assert.equal(typeof result.uptime_s, "number");
+});
+
+test("checkHealth: schema migration thiếu → mã readiness rõ ràng", async () => {
+  const { checkHealth } = await import("@/lib/van-hanh/health");
+  const result = await checkHealth(async () => {
+    throw Object.assign(new Error("schema missing"), { code: "XBOSS_SCHEMA_NOT_READY" });
+  });
+  assert.equal(result.status, "degraded");
+  assert.equal(result.errorCode, "schema_not_ready");
 });
 
 test(
