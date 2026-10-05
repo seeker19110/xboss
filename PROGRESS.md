@@ -42,18 +42,26 @@ dừng trước khi chuyển traffic. `npm run db:migrate` là bước độc l�
 thiếu. Mỗi migration giữ transaction riêng và advisory lock trong migrator.
 Credential migration phải nằm trong file riêng mode `0600` ngoài checkout hoặc env deploy tạm;
 `deploy.sh` từ chối khi thiếu/sai quyền/còn trong env file runtime, chỉ truyền cho bước migrate
-và xóa trước khi reload PM2. Cần chuyển credential hiện hữu sang file riêng trước deploy PR này;
-không được ghi URL vào `.env.local`.
+và xóa trước khi reload PM2. Người vận hành đã xác nhận file riêng được chuẩn bị và
+credential đã được gỡ khỏi `.env.local`; không đọc secret trong PR.
 Workflow deploy lấy đúng SHA đã qua CI trên VPS trước khi chạy script mới; staging bootstrap
 từ chối credential cũ trong env file. E2E chạy migrator trên DB disposable trước khi seed, vì
 runtime không còn tự tạo schema. Script ghim SHA CI và dừng trước migration nếu `main` đã tiến
-sang commit khác, tránh áp schema mới vào ứng dụng cũ. Targeted test cấu hình đạt; CI trên HEAD cuối
-vẫn là điều kiện hợp nhất.
+sang commit khác, tránh áp schema mới vào ứng dụng cũ. Targeted test và CI của PR #563 đạt;
+deploy trên VPS vẫn cần xác nhận riêng.
 
 Đã cập nhật quy trình rollout/recovery tại [ADR-0003](docs/adr/0003-migrations.md), cùng hướng
 dẫn Metabase để chạy migration `0073` bằng migrator riêng. Không chạy database hoặc production
 trong slice tài liệu này. A1-AC04/06 và Q-AC07 vẫn cần evidence PostgreSQL bằng app role phù hợp;
 đây không phải xác nhận RLS/production đã đạt.
+
+## 2026-10-05 — QUALITY-FINAL-1 S01: API quản trị dự án cùng tổ chức
+
+`POST /api/projects` lấy `org_id` từ Admin đã xác thực; `PATCH`/`DELETE` và nguồn
+`clone-config` chỉ xử lý dự án cùng tổ chức. ID không dương/không an toàn bị từ chối.
+Năm kiểm thử HTTP âm bổ sung trường hợp giả mạo org và thao tác chéo org; lint,
+typecheck và định dạng đạt, test PostgreSQL disposable còn chờ CI. Đây là ranh giới
+project-admin hẹp; resolver membership/fallback và các caller S02 vẫn chưa cutover.
 
 ## 2026-10-05 — QUALITY-FINAL-1 S14: cô lập restore-check
 
