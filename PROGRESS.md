@@ -1,5 +1,12 @@
 # PROGRESS — XBoss
 
+## 2026-10-05 — Sửa tương phản nhãn chờ duyệt MEPF
+
+Nhãn `pending` trên trang MEPF dùng nền/chữ amber đủ rõ ở cả hai giao diện và bỏ
+hiệu ứng nhấp nháy làm độ tương phản thay đổi. Sửa lỗi axe thấy trong E2E của PR #560;
+kiểm tra UI, định dạng, lint và typecheck tại worktree đạt. E2E toàn bộ chờ CI trên PR này.
+Không thay đổi trạng thái duyệt hay dữ liệu nghiệp vụ.
+
 ## 2026-10-05 — QUALITY-FINAL-1 S14: cô lập restore-check
 
 `restore-check.sh` chỉ dùng PostgreSQL disposable có marker xác thực và credentials riêng,
