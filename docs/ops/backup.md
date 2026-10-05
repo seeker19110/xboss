@@ -67,9 +67,10 @@ sau tuổi local retention. Remote cleanup chỉ xóa các set `COMPLETE` cũ th
 chứng minh retention thực tế của provider hoặc môi trường production.
 
 Đây là integrity gate cho cặp dump/uploads hiện tại, không phải full recovery manifest của A6.
-`restore-check.sh` chỉ kiểm size/hash của uploads archive; nó **không giải nén hay xác nhận archive
-có thể extract**, cũng không xác thực WAL/PITR, object version, key reference hay migration checksum,
-và không chứng minh RPO/RTO. Kết quả restore smoke không được dùng làm PITR PASS.
+`restore-check.sh` kiểm size/hash và khả năng đọc/liệt kê uploads archive bằng `tar -tzf`, nhưng
+**không giải nén hoặc xác nhận mọi attachment được khôi phục đúng**. Nó cũng không xác thực
+WAL/PITR, object version, key reference hay migration checksum, và không chứng minh RPO/RTO.
+Kết quả restore smoke không được dùng làm PITR PASS.
 
 Cả hai là script Bash, không phải TypeScript. `restore-check.sh` cần Bash, Python 3 standard library
 để phân tích URI mà không lộ credential, và `pg_restore`/`psql` từ gói `postgresql-client`; không
