@@ -15,6 +15,9 @@ riêng tư; first visit chưa có registration dọn riêng namespace XBoss, l�
 Khi gặp 401, khóa nội dung ngay và chỉ về login sau ACK. Queue v1 chưa có owner được giữ nguyên
 trong IndexedDB/localStorage, không tự đọc, xóa, nhận thêm thao tác hoặc flush dưới phiên mới,
 kể cả luồng SSO. Tracking/nhật ký báo rõ khi không thể lưu offline; badge báo trạng thái cách ly.
+Banner tracking không còn báo thao tác đã lưu khi queue đang khóa; badge dùng màu tương phản
+ổn định. Nút phục hồi ở trang lỗi chỉ purge cache XBoss theo ACK, không xóa queue, cache hoặc
+service worker khác cùng origin; thất bại giữ trang và cho thử lại.
 Các regression flush cũ vẫn được giữ trong suite riêng. Lưu offline chỉ mở lại sau S07 có
 ownership/vault và chuyển queue an toàn; browser thật + axe theo A2/S04 còn chờ CI.
 Gọi trực tiếp endpoint OIDC không đi qua client preflight; S05 cần ràng buộc context toàn cục
