@@ -1568,38 +1568,51 @@ test("PATCH /api/payments: hợp đồng liên kết phải cùng dự án và �
   assert.equal(row?.contract_id, inScopeContract);
 });
 
-test("PATCH /api/payments: duplicate key và giá trị âm reject toàn batch", S, async () => {
-  const projectId = await taoDuAn("pay-invalid-batch");
-  const pm = await taoUser("pm", "pay-invalid-batch");
-  const target = await taoTangHe(projectId, "payinvalidbatch");
-  await dangNhapDuAn(pm, projectId);
-  const { PATCH } = await import("@/app/api/payments/route");
-  const duplicate = await PATCH(
-    jreq("/api/payments", {
-      updates: [
-        { ...target, contractValue: 20 },
-        { ...target, contractValue: 30 },
-      ],
-    }),
-  );
-  const negative = await PATCH(
-    jreq("/api/payments", {
-      updates: [
-        { ...target, contractValue: 20 },
-        { ...target, floorLabel: "T-negative", contractValue: -1 },
-      ],
-    }),
-  );
-  assert.equal(duplicate.status, 400);
-  assert.equal(negative.status, 400);
-  const { queryOne } = await import("@/lib/db");
-  const row = await queryOne(
-    `SELECT id FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
-    target.sheetTypeId,
-    target.floorLabel,
-  );
-  assert.equal(row, undefined);
-});
+test(
+  "PATCH /api/payments: duplicate key và giá trị ngoài NUMERIC(15,2) reject toàn batch",
+  S,
+  async () => {
+    const projectId = await taoDuAn("pay-invalid-batch");
+    const pm = await taoUser("pm", "pay-invalid-batch");
+    const target = await taoTangHe(projectId, "payinvalidbatch");
+    await dangNhapDuAn(pm, projectId);
+    const { PATCH } = await import("@/app/api/payments/route");
+    const duplicate = await PATCH(
+      jreq("/api/payments", {
+        updates: [
+          { ...target, contractValue: 20 },
+          { ...target, contractValue: 30 },
+        ],
+      }),
+    );
+    const negative = await PATCH(
+      jreq("/api/payments", {
+        updates: [
+          { ...target, contractValue: 20 },
+          { ...target, floorLabel: "T-negative", contractValue: -1 },
+        ],
+      }),
+    );
+    const exceedsNumeric15_2 = await PATCH(
+      jreq("/api/payments", {
+        updates: [
+          { ...target, contractValue: 20 },
+          { ...target, floorLabel: "T-overflow", contractValue: 10_000_000_000_000 },
+        ],
+      }),
+    );
+    assert.equal(duplicate.status, 400);
+    assert.equal(negative.status, 400);
+    assert.equal(exceedsNumeric15_2.status, 400);
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne(
+      `SELECT id FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
+      target.sheetTypeId,
+      target.floorLabel,
+    );
+    assert.equal(row, undefined);
+  },
+);
 
 // ============================================================================
 // GET/POST /api/payments/bills
