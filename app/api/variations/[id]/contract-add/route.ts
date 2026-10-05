@@ -92,8 +92,11 @@ export async function POST(
       // than silently writing a second addendum if VO status was repaired manually.
       const sourceNote = `Từ phát sinh ${vo.code}`;
       const existingAddendum = await queryOne<{ id: number }>(
-        `SELECT id FROM contract_addenda WHERE note = ? LIMIT 1`,
+        `SELECT ca.id FROM contract_addenda ca
+          JOIN contracts c ON c.id = ca.contract_id
+          WHERE ca.note = ? AND c.project_id = ? LIMIT 1`,
         sourceNote,
+        projectId,
       );
       if (existingAddendum)
         throw new ContractAddError("Phát sinh này đã có phụ lục hợp đồng", 409);
