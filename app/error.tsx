@@ -16,6 +16,15 @@ import {
   Trash2,
   Check,
 } from "lucide-react";
+import { clearServiceWorkerCache } from "@/app/lib/serviceWorkerCache";
+
+export async function clearXBossCacheThenReload(
+  clearCache: () => Promise<void> = clearServiceWorkerCache,
+  reload: () => void = () => window.location.reload(),
+): Promise<void> {
+  await clearCache();
+  reload();
+}
 
 /**
  * Resilient Error Boundary cho Route Segment (M81)
@@ -31,6 +40,7 @@ export default function ErrorBoundary({
 }) {
   const [copied, setCopied] = useState(false);
   const [clearingCache, setClearingCache] = useState(false);
+  const [cacheClearError, setCacheClearError] = useState("");
 
   useEffect(() => {
     Sentry.captureException(error);
@@ -53,25 +63,15 @@ Stack: ${error.stack || "N/A"}`;
 
   const handleHardClearCache = async () => {
     setClearingCache(true);
+    setCacheClearError("");
     try {
-      if ("serviceWorker" in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const registration of registrations) {
-          await registration.unregister();
-        }
-      }
-      if ("caches" in window) {
-        const cacheKeys = await caches.keys();
-        for (const key of cacheKeys) {
-          await caches.delete(key);
-        }
-      }
-      localStorage.removeItem("xboss_offline_ticks");
-      sessionStorage.clear();
-      window.location.href = "/";
+      await clearXBossCacheThenReload();
     } catch (e) {
-      console.error("Lỗi xóa cache:", e);
-      window.location.reload();
+      console.error("Không xác nhận được purge cache XBoss:", e);
+      setCacheClearError(
+        "Chưa xác nhận được việc dọn cache XBoss nên chưa thể tải lại an toàn. Hãy thử lại khi ứng dụng sẵn sàng.",
+      );
+      setClearingCache(false);
     }
   };
 
@@ -172,6 +172,11 @@ Stack: ${error.stack || "N/A"}`;
             <div className="text-rose-400 break-words line-clamp-2">
               {error.message || "Lỗi giao diện không xác định"}
             </div>
+            {cacheClearError && (
+              <p role="alert" className="text-amber-300">
+                {cacheClearError}
+              </p>
+            )}
             <div className="flex items-center justify-between pt-2">
               <button
                 onClick={copyErrorReport}
@@ -188,10 +193,13 @@ Stack: ${error.stack || "N/A"}`;
               <button
                 onClick={handleHardClearCache}
                 disabled={clearingCache}
+                aria-label="Dọn cache XBoss và tải lại"
                 className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-rose-400 transition"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>{clearingCache ? "Đang xóa cache..." : "Xóa cache hỏng & Tải lại"}</span>
+                <span>
+                  {clearingCache ? "Đang xác nhận dọn cache..." : "Dọn cache XBoss & Tải lại"}
+                </span>
               </button>
             </div>
           </div>

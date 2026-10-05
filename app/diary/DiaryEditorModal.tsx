@@ -160,7 +160,12 @@ export default function DiaryEditorModal({
     };
     // Mất mạng → xếp hàng đợi offline (full-replace theo ngày), đóng modal.
     const queueOffline = async () => {
-      await enqueueDiaryNote({ date, ...body });
+      const queued = await enqueueDiaryNote({ date, ...body });
+      if (!queued.ok) {
+        showToast(queued.error, "error");
+        setSaving(false);
+        return;
+      }
       showToast("Đã lưu offline — sẽ tự gửi khi có mạng");
       setSaving(false);
       onClose();

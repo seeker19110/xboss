@@ -18,6 +18,7 @@ import {
 import { dungLoTuDan } from "./dan";
 import { dungLoTick, oTrongVung } from "./tick";
 import { guiLoTick } from "./tickApi";
+import { OFFLINE_QUEUE_QUARANTINE_ERROR } from "@/app/components/offlineQueue";
 import type { Grid } from "./types";
 
 // Phần tử đang được gõ liệu — bỏ qua dán/copy vùng ở đây để không cướp thao tác của ô đó.
@@ -33,7 +34,7 @@ export function useTickVung(opts: {
   grid: Grid | null;
   load: () => void;
   onChanged: () => void;
-  onOfflineTickBatch: (dimIds: number[], installed: boolean) => void;
+  onOfflineTickBatch: (dimIds: number[], installed: boolean) => Promise<boolean>;
   editMode: boolean;
 }) {
   const { grid, load, onChanged, onOfflineTickBatch, editMode } = opts;
@@ -65,9 +66,12 @@ export function useTickVung(opts: {
       for (const lo of loList) {
         const kq = await guiLoTick(lo.dimIds, lo.installed);
         if (kq.trangThai === "mangLoi") {
-          onOfflineTickBatch(lo.dimIds, lo.installed);
-          daGui.push(lo); // mất mạng không phải từ chối — đã xếp hàng đợi, coi như xong
-          continue;
+          if (await onOfflineTickBatch(lo.dimIds, lo.installed)) {
+            daGui.push(lo); // chỉ coi là xong nếu queue đã xác nhận lưu
+            continue;
+          }
+          showToast(OFFLINE_QUEUE_QUARANTINE_ERROR, "error");
+          break;
         }
         if (kq.trangThai === "tuChoi") {
           showToast(kq.loi, "error");

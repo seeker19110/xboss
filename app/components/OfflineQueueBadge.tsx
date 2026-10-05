@@ -5,7 +5,22 @@ import { WifiOff, CloudUpload, AlertTriangle } from "lucide-react";
 import { useOfflineQueueStatus } from "@/app/components/offlineQueue";
 
 export default function OfflineQueueBadge() {
-  const { total, failed, online, sending } = useOfflineQueueStatus();
+  const { total, failed, online, sending, quarantined } = useOfflineQueueStatus();
+  if (quarantined) {
+    const label =
+      "Lưu ngoại tuyến đang tạm khóa. Dữ liệu queue cũ được giữ nguyên và cách ly; hãy kết nối mạng để lưu trực tiếp.";
+    return (
+      <span
+        role="status"
+        aria-label={label}
+        title={label}
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-amber-800 bg-amber-950 px-2 text-xs font-medium text-amber-200"
+      >
+        <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span className="hidden lg:inline">Lưu offline tạm khóa</span>
+      </span>
+    );
+  }
   if (total === 0) return null;
 
   // 4 trạng thái, ưu tiên: mất mạng → có lỗi → đang gửi → đang chờ.

@@ -130,39 +130,8 @@ export class IdbQueueStore implements QueueStore {
   }
 }
 
-// Di trú êm: đọc key tick cũ trong localStorage 1 lần, đẩy từng phần tử thành bản ghi
-// `kind: "tick"` vào IndexedDB, rồi xoá key cũ. Vì đã xoá key, lần load sau `raw` rỗng
-// → không lặp lại di trú.
-export async function migrateFromLocalStorage(store: QueueStore): Promise<void> {
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(OLD_LS_KEY);
-  } catch {
-    return; // localStorage bị chặn — coi như không có gì để di trú
-  }
-  if (!raw) return;
-
-  let arr: { dimId?: number; installed?: boolean; queuedAt?: number }[] = [];
-  try {
-    arr = JSON.parse(raw);
-  } catch {
-    arr = [];
-  }
-  if (Array.isArray(arr)) {
-    for (const t of arr) {
-      if (typeof t?.dimId === "number" && typeof t?.installed === "boolean") {
-        await store.add({
-          kind: "tick",
-          payload: { dimId: t.dimId, installed: t.installed },
-          queuedAt: typeof t.queuedAt === "number" ? t.queuedAt : Date.now(),
-          tries: 0,
-        });
-      }
-    }
-  }
-  try {
-    localStorage.removeItem(OLD_LS_KEY);
-  } catch {
-    /* không xoá được (trường hợp cực hiếm) — di trú có thể lặp lần sau, chấp nhận được */
-  }
+// Queue cũ không có owner/org/project nên không thể gán an toàn cho actor hiện tại. Giữ nguyên
+// byte trong localStorage và không chép/đọc/xóa cho tới khi S07 có vault ownership để xử lý.
+export async function migrateFromLocalStorage(_store: QueueStore): Promise<void> {
+  // cố ý giữ nguyên legacy data chưa rõ chủ
 }

@@ -1,10 +1,11 @@
 "use client";
 // Khung hàng đợi offline tổng quát (M58 PR2) — lưu thao tác mất mạng trong IndexedDB,
 // tự gửi lại khi có mạng. Tổng quát hoá từ khung tick cũ (localStorage) sang 3 loại
-// `tick` | `photo` | `diary_note`, GIỮ NGUYÊN hành vi tick (dedup mỗi dimension, 4xx bỏ,
-// clearOfflineQueue khi logout). Logic thuần tách ở logic.ts, truy cập IndexedDB ở store.ts.
+// `tick` | `photo` | `diary_note`. Queue v1 thiếu owner/vault nên đang quarantine: không
+// đọc, ghi, gửi, chuyển owner hay xóa. Chỉ mở lại sau S07 ownership/vault cutover. Logic
+// thuần được giữ trong logic.ts để regression tests tiếp tục bảo vệ hành vi khi được bật lại.
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { IdbQueueStore, migrateFromLocalStorage, OLD_LS_KEY } from "./store";
+import { IdbQueueStore } from "./store";
 import { compressImage } from "./image";
 import { showToast } from "@/app/components/Toast";
 import {
@@ -15,7 +16,6 @@ import {
   tickBatchDedupeIds,
   diaryDedupeIds,
   wouldExceedPhotoQuota,
-  FLUSH_INTERVAL_MS,
   PHOTO_QUOTA_BYTES,
   type DiaryNotePayload,
   type QueuedOp,
@@ -24,6 +24,9 @@ import {
 } from "./logic";
 
 const SYNC_TAG = "xboss-flush";
+export const OFFLINE_QUEUE_QUARANTINED = true;
+export const OFFLINE_QUEUE_QUARANTINE_ERROR =
+  "Lưu ngoại tuyến đang tạm khóa để bảo toàn dữ liệu cũ chưa xác định được chủ sở hữu. Kết nối mạng để lưu lên máy chủ.";
 
 // Dựng request gửi theo loại thao tác. Trả outcome {status} hoặc {networkError} để
 // logic.shouldRetry quyết định giữ/bỏ. `diary_note` gửi trọn body PUT /api/diaries/:date
@@ -85,13 +88,24 @@ async function requestBackgroundSync(): Promise<void> {
   }
 }
 
-export type QueueSnapshot = QueueStats & { online: boolean; sending: boolean };
+export type QueueSnapshot = QueueStats & {
+  online: boolean;
+  sending: boolean;
+  quarantined: boolean;
+};
 
 // Quản lý hàng đợi dạng singleton — 1 vòng flush duy nhất cho toàn app (badge AppHeader
 // và hook tracking cùng subscribe), tránh nhiều vòng gửi song song.
 class OfflineQueueManager {
   private store = new IdbQueueStore();
-  private snap: QueueSnapshot = { total: 0, pending: 0, failed: 0, online: true, sending: false };
+  private snap: QueueSnapshot = {
+    total: 0,
+    pending: 0,
+    failed: 0,
+    online: true,
+    sending: false,
+    quarantined: OFFLINE_QUEUE_QUARANTINED,
+  };
   private listeners = new Set<() => void>();
   private flushedListeners = new Set<() => void>();
   private started = false;
@@ -126,7 +140,8 @@ class OfflineQueueManager {
       next.pending === this.snap.pending &&
       next.failed === this.snap.failed &&
       next.online === this.snap.online &&
-      next.sending === this.snap.sending
+      next.sending === this.snap.sending &&
+      next.quarantined === this.snap.quarantined
     )
       return; // không đổi → giữ nguyên tham chiếu để useSyncExternalStore không render thừa
     this.snap = next;
@@ -141,38 +156,18 @@ class OfflineQueueManager {
   start() {
     if (this.started || typeof window === "undefined") return;
     this.started = true;
-    this.setSnap({ online: navigator.onLine });
+    this.setSnap({ online: navigator.onLine, quarantined: OFFLINE_QUEUE_QUARANTINED });
 
     window.addEventListener("online", () => {
       this.setSnap({ online: true });
-      this.flush();
     });
     window.addEventListener("offline", () => this.setSnap({ online: false }));
-    // Một số WebView không bắn sự kiện 'online' — thử gửi định kỳ khi còn mạng.
-    setInterval(() => {
-      if (navigator.onLine) this.flush();
-    }, FLUSH_INTERVAL_MS);
-    // SW đánh thức (Background Sync) → flush.
-    navigator.serviceWorker?.addEventListener?.("message", (e) => {
-      if ((e as MessageEvent).data?.type === "FLUSH_QUEUE") this.flush();
-    });
-    // Cảnh báo đóng tab khi còn thao tác chưa gửi (tránh mất dữ liệu công trường).
-    window.addEventListener("beforeunload", (e) => {
-      if (this.snap.total > 0) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    });
-
-    // Đợi di trú dữ liệu cũ từ localStorage xong rồi mới flush lần đầu, tránh bỏ lỡ
-    // tick vừa di trú vào IndexedDB.
-    migrateFromLocalStorage(this.store)
-      .then(() => this.refreshStats())
-      .catch(() => {})
-      .finally(() => this.flush());
   }
 
   async flush() {
+    // Queue v1 không có ownership/vault context. Không đọc hay gửi nó theo session cookie
+    // hiện tại; Background Sync và online events cũng đi qua cùng cổng này.
+    if (OFFLINE_QUEUE_QUARANTINED) return;
     if (this.flushing || typeof navigator === "undefined" || !navigator.onLine) return;
     // Giữ khóa trước await đầu tiên, kể cả lúc đọc storage và cập nhật thống kê.
     // Chỉ bảo vệ trong tab hiện tại; không thay lease nhiều tab hoặc receipt server.
@@ -206,8 +201,9 @@ class OfflineQueueManager {
 
   // Xếp tick theo LÔ (M121) — cả vùng chọn / cả hàng đi trong 1 op, khi có mạng lại gửi
   // đúng 1 request `PATCH /api/dimensions/batch` thay vì N request.
-  async enqueueTickBatch(dimIds: number[], installed: boolean): Promise<void> {
-    if (!dimIds.length) return;
+  async enqueueTickBatch(dimIds: number[], installed: boolean): Promise<boolean> {
+    if (OFFLINE_QUEUE_QUARANTINED) return false;
+    if (!dimIds.length) return true;
     const ops = await this.store.getAll();
     for (const id of tickBatchDedupeIds(ops, dimIds)) await this.store.remove(id);
     await this.store.add({
@@ -218,10 +214,12 @@ class OfflineQueueManager {
     });
     await this.refreshStats();
     this.afterEnqueue();
+    return true;
   }
 
   // Xếp tick — mỗi dimension chỉ giữ thao tác mới nhất (dedup, hành vi cũ giữ nguyên).
-  async enqueueTick(dimId: number, installed: boolean): Promise<void> {
+  async enqueueTick(dimId: number, installed: boolean): Promise<boolean> {
+    if (OFFLINE_QUEUE_QUARANTINED) return false;
     const ops = await this.store.getAll();
     for (const id of tickDedupeIds(ops, dimId)) await this.store.remove(id);
     await this.store.add({
@@ -232,6 +230,7 @@ class OfflineQueueManager {
     });
     await this.refreshStats();
     this.afterEnqueue();
+    return true;
   }
 
   // Xếp ảnh (PR3 nối UI): nén client trước, chặn nếu vượt hạn mức 50MB.
@@ -240,6 +239,9 @@ class OfflineQueueManager {
     blob: Blob;
     caption?: string;
   }): Promise<{ ok: true } | { ok: false; error: string }> {
+    if (OFFLINE_QUEUE_QUARANTINED) {
+      return { ok: false, error: OFFLINE_QUEUE_QUARANTINE_ERROR };
+    }
     const { blob, mime } = await compressImage(input.blob);
     const ops = await this.store.getAll();
     if (wouldExceedPhotoQuota(ops, blob.size)) {
@@ -263,6 +265,9 @@ class OfflineQueueManager {
   async enqueueDiaryNote(
     input: DiaryNotePayload,
   ): Promise<{ ok: true } | { ok: false; error: string }> {
+    if (OFFLINE_QUEUE_QUARANTINED) {
+      return { ok: false, error: OFFLINE_QUEUE_QUARANTINE_ERROR };
+    }
     const ops = await this.store.getAll();
     for (const id of diaryDedupeIds(ops, input.date)) await this.store.remove(id);
     await this.store.add({
@@ -280,6 +285,7 @@ class OfflineQueueManager {
   async getQueuedPhotos(
     taskId: number,
   ): Promise<{ id: number; caption: string; size: number; queuedAt: number; tries: number }[]> {
+    if (OFFLINE_QUEUE_QUARANTINED) return [];
     const ops = await this.store.getAll();
     return ops
       .filter((o) => o.kind === "photo" && o.payload.taskId === taskId)
@@ -297,6 +303,7 @@ class OfflineQueueManager {
 
   // Blob ảnh đang chờ của 1 task (để preview trong PhotosModal).
   async getQueuedPhotoBlob(id: number): Promise<Blob | undefined> {
+    if (OFFLINE_QUEUE_QUARANTINED) return undefined;
     const ops = await this.store.getAll();
     const op = ops.find((o) => o.id === id && o.kind === "photo");
     return op && op.kind === "photo" ? op.payload.blob : undefined;
@@ -304,6 +311,7 @@ class OfflineQueueManager {
 
   // Bản nhật ký offline đang chờ của 1 ngày (nạp lại vào form khi mở modal).
   async getQueuedDiaryNote(date: string): Promise<QueuedOp | undefined> {
+    if (OFFLINE_QUEUE_QUARANTINED) return undefined;
     const ops = await this.store.getAll();
     return ops.find((o) => o.kind === "diary_note" && o.payload.date === date);
   }
@@ -312,6 +320,7 @@ class OfflineQueueManager {
   // trực tiếp qua PUT (có mạng) để nháp cũ không tự flush sau đó và đè (full-replace)
   // lên bản vừa lưu — chống mất dữ liệu âm thầm. Vô hại nếu không có nháp nào.
   async discardDiaryDraft(date: string): Promise<void> {
+    if (OFFLINE_QUEUE_QUARANTINED) return;
     const ops = await this.store.getAll();
     const ids = diaryDedupeIds(ops, date);
     if (!ids.length) return;
@@ -324,16 +333,9 @@ class OfflineQueueManager {
     else void requestBackgroundSync();
   }
 
-  // Xoá sạch hàng đợi (logout) — cả IndexedDB lẫn key localStorage cũ còn sót.
+  // Giữ lại queue v1 unknown-owner. S07 mới được thực hiện clear sau cutover an toàn.
   async clear(): Promise<void> {
-    try {
-      localStorage.removeItem(OLD_LS_KEY);
-    } catch {
-      /* localStorage bị chặn */
-    }
-    await this.store.clear();
-    this.hadItems = false;
-    this.setSnap({ total: 0, pending: 0, failed: 0 });
+    // Chỉ S07 sau ownership/vault cutover mới được chuyển hoặc xóa hàng đợi cách ly.
   }
 }
 
@@ -353,17 +355,9 @@ export function discardDiaryDraft(date: string) {
   return offlineQueue.discardDiaryDraft(date);
 }
 
-/** Xoá hàng đợi offline (IndexedDB + localStorage cũ) — gọi khi đăng xuất/hết phiên để
- * thao tác dở dang của người trước không bị gửi "chui" dưới tên người đăng nhập sau trên
- * thiết bị dùng chung. Bất biến bảo mật — phủ CẢ IndexedDB mới lẫn key localStorage cũ. */
+/** Tương thích chữ ký cũ; queue unknown-owner được giữ nguyên qua login, logout và 401. */
 export function clearOfflineQueue(): Promise<void> {
-  // Xoá key localStorage cũ ngay (đồng bộ) để chắc chắn sạch kể cả khi IndexedDB lỗi.
-  try {
-    localStorage.removeItem(OLD_LS_KEY);
-  } catch {
-    /* localStorage bị chặn */
-  }
-  return offlineQueue.clear().catch(() => {});
+  return Promise.resolve();
 }
 
 // Hook tick cho trang tracking — GIỮ NGUYÊN chữ ký cũ { pending, online, enqueue }.
@@ -381,11 +375,11 @@ export function useOfflineTickQueue(onFlushed?: () => void) {
     return offlineQueue.onFlushed(onFlushed);
   }, [onFlushed]);
   const enqueue = useCallback((dimId: number, installed: boolean) => {
-    void offlineQueue.enqueueTick(dimId, installed);
+    return offlineQueue.enqueueTick(dimId, installed);
   }, []);
   // Xếp cả lô (M121) — 1 op cho cả vùng chọn/cả hàng, thay vì N op tick đơn lẻ.
   const enqueueBatch = useCallback((dimIds: number[], installed: boolean) => {
-    void offlineQueue.enqueueTickBatch(dimIds, installed);
+    return offlineQueue.enqueueTickBatch(dimIds, installed);
   }, []);
   return { pending: snap.total, online: snap.online, enqueue, enqueueBatch };
 }

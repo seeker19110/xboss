@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Modal, appAlert, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
+import { OFFLINE_QUEUE_QUARANTINE_ERROR } from "@/app/components/offlineQueue";
 import { DELAY_REASON_LABEL } from "@/lib/tien-do/delay";
 import { formatDateVN } from "@/lib/nen/date";
 import { StatusBadge } from "@/app/components/StatusBadge";
@@ -124,8 +125,8 @@ export function TrackingGrid({
   refreshKey: number;
   isMobile: boolean;
   onChanged: () => void;
-  onOfflineTick: (dimId: number, installed: boolean) => void;
-  onOfflineTickBatch: (dimIds: number[], installed: boolean) => void;
+  onOfflineTick: (dimId: number, installed: boolean) => Promise<boolean>;
+  onOfflineTickBatch: (dimIds: number[], installed: boolean) => Promise<boolean>;
   hiddenPrintCols: Set<string>;
   onColsLoaded: (cols: string[]) => void;
   sheetCols: string[];
@@ -404,7 +405,18 @@ export function TrackingGrid({
             },
         );
     } catch {
-      onOfflineTick(cell.id, !cell.installed);
+      if (!(await onOfflineTick(cell.id, !cell.installed))) {
+        setGrid(
+          (g) =>
+            g && {
+              ...g,
+              tasks: g.tasks.map((t) =>
+                t.id === task.id ? { ...t, cells: { ...t.cells, [label]: cell } } : t,
+              ),
+            },
+        );
+        showToast(OFFLINE_QUEUE_QUARANTINE_ERROR, "error");
+      }
     }
     onChanged();
   }
@@ -425,8 +437,10 @@ export function TrackingGrid({
     const kq = await guiLoTick(lo.ids, value);
     // Mất mạng → xếp cả lô vào hàng đợi offline, KHÔNG báo lỗi: người dùng công trường vẫn
     // tick tiếp được, lô sẽ tự gửi khi có sóng.
-    if (kq.trangThai === "mangLoi") onOfflineTickBatch(lo.ids, value);
-    else if (kq.trangThai === "tuChoi") showToast(kq.loi, "error");
+    if (kq.trangThai === "mangLoi") {
+      if (await onOfflineTickBatch(lo.ids, value)) vungChon.ghiThaoTacLo(lo.ids, truoc, value);
+      else showToast(OFFLINE_QUEUE_QUARANTINE_ERROR, "error");
+    } else if (kq.trangThai === "tuChoi") showToast(kq.loi, "error");
     else vungChon.ghiThaoTacLo(lo.ids, truoc, value);
     load();
     onChanged();

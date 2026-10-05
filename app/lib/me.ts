@@ -1,10 +1,11 @@
 // Singleton cache phía client — chỉ fetch /api/auth/me 1 lần mỗi lần load trang.
 // Các component trên cùng trang gọi fetchMe() đồng thời đều nhận cùng 1 Promise.
-import { clearOfflineQueue } from "@/app/components/offlineQueue";
+import { clearServiceWorkerCache } from "@/app/lib/serviceWorkerCache";
 
 export type Me = { id: number; name: string; email: string; role: string };
 
 let _promise: Promise<Me | null> | null = null;
+let _authRedirectStarted = false;
 
 export function fetchMe(): Promise<Me | null> {
   if (!_promise) {
@@ -36,20 +37,59 @@ export function invalidateMe() {
   _promise = null;
 }
 
-// Dọn dữ liệu của phiên cũ (cache API trong service worker + hàng đợi tick offline) rồi
-// chuyển về /login. Dùng ở MỌI nơi phát hiện 401 (không chỉ nút "Đăng xuất") — nếu không,
-// trên tablet dùng chung, phiên hết hạn/đóng tab mà không bấm đăng xuất sẽ để lại dữ liệu
-// (thông báo, task, dashboard...) của người trước trong cache cho người đăng nhập sau thấy.
-export async function redirectToLogin() {
-  await clearOfflineQueue();
-  if (
-    typeof navigator !== "undefined" &&
-    "serviceWorker" in navigator &&
-    navigator.serviceWorker.controller
-  ) {
-    navigator.serviceWorker.controller.postMessage({ type: "CLEAR_CACHE" });
+export function lockPrivatePageUntilCachePurged(): () => Promise<void> {
+  const overlay = document.createElement("section");
+  overlay.className =
+    "fixed inset-0 z-[99999] grid content-center gap-4 overflow-auto bg-background p-6 text-foreground";
+  overlay.setAttribute("role", "alert");
+  overlay.setAttribute("aria-live", "assertive");
+  overlay.tabIndex = -1;
+
+  const heading = document.createElement("h1");
+  heading.className = "text-xl font-semibold";
+  heading.textContent = "Phiên đăng nhập đã hết hạn";
+  const message = document.createElement("p");
+  message.className = "max-w-prose";
+  message.textContent = "Đã khóa nội dung riêng tư. Đang xác nhận dọn bộ nhớ đệm XBoss…";
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.className =
+    "min-h-11 w-fit rounded-lg bg-emerald-700 px-4 py-3 font-semibold text-on-accent hover:bg-emerald-800 focus-visible:outline";
+  retry.textContent = "Thử dọn bộ nhớ đệm lại";
+  const retryPurge = async () => {
+    retry.disabled = true;
+    message.textContent = "Đang xác nhận dọn bộ nhớ đệm…";
+    try {
+      await clearServiceWorkerCache();
+      window.location.replace("/login");
+    } catch {
+      message.textContent =
+        "Chưa dọn được bộ nhớ đệm. Nội dung riêng tư vẫn đang bị khóa; hãy kiểm tra kết nối rồi thử lại.";
+      retry.disabled = false;
+    }
+  };
+  retry.addEventListener("click", () => void retryPurge());
+
+  overlay.append(heading, message, retry);
+  for (const child of Array.from(document.body.children)) {
+    if (child === overlay) continue;
+    if (child instanceof HTMLElement) child.inert = true;
+    child.setAttribute("aria-hidden", "true");
   }
-  window.location.href = "/login";
+  document.body.append(overlay);
+  overlay.focus();
+  return retryPurge;
+}
+
+// Khóa dữ liệu đang hiển thị và xác nhận purge cache trước khi về login. Queue không rõ owner
+// được giữ nguyên/cách ly; không xóa khi session hết hạn hoặc đổi tài khoản.
+export async function redirectToLogin() {
+  if (_authRedirectStarted) return;
+  _authRedirectStarted = true;
+  // Khóa view đồng bộ ngay khi nhận 401; không để nội dung riêng tư hiện trong lúc
+  // chờ IndexedDB hoặc service worker ACK.
+  const retryPurge = lockPrivatePageUntilCachePurged();
+  await retryPurge();
 }
 
 // M56 PR2: chuyển tới trang bật 2FA khi tài khoản bị bắt buộc mà chưa bật. KHÁC
