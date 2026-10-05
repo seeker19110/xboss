@@ -7,14 +7,16 @@ hiệu ứng nhấp nháy làm độ tương phản thay đổi. Sửa lỗi axe
 kiểm tra UI, định dạng, lint và typecheck tại worktree đạt. E2E toàn bộ chờ CI trên PR này.
 Không thay đổi trạng thái duyệt hay dữ liệu nghiệp vụ.
 
-## 2026-10-05 — S04: ACK purge không chặn login khi chưa có controller
+## 2026-10-05 — QUALITY-FINAL-1 S04: ACK purge và cách ly queue cũ
 
 `clearServiceWorkerCache` dùng controller hiện tại hoặc worker active của registration và chỉ
-tiếp tục sau ACK tương quan trong 3 giây. Đăng nhập và bước xác thực TOTP chỉ được gửi sau khi
-queue offline + cache riêng tư đã dọn xong; first visit chưa có registration dọn riêng cache
-namespace XBoss, còn lỗi tra cứu registration/readiness vẫn fail-closed. Khi gặp 401, khóa nội
-dung riêng tư ngay và chỉ điều hướng sang login sau khi nhận ACK. Đây là code/test cục bộ, chưa
-thay thế browser thật + axe theo A2/S04.
+tiếp tục sau ACK tương quan trong 3 giây. Đăng nhập và TOTP chỉ gửi request sau purge cache
+riêng tư; first visit chưa có registration dọn riêng namespace XBoss, lỗi worker vẫn fail-closed.
+Khi gặp 401, khóa nội dung ngay và chỉ về login sau ACK. Queue v1 chưa có owner được giữ nguyên
+trong IndexedDB/localStorage, không tự đọc, xóa, nhận thêm thao tác hoặc flush dưới phiên mới,
+kể cả luồng SSO. Tracking/nhật ký báo rõ khi không thể lưu offline; badge báo trạng thái cách ly.
+Các regression flush cũ vẫn được giữ trong suite riêng. Lưu offline chỉ mở lại sau S07 có
+ownership/vault và chuyển queue an toàn; browser thật + axe theo A2/S04 còn chờ CI.
 
 ## 2026-10-05 — QUALITY-FINAL-1 S14: cô lập restore-check
 
