@@ -68,10 +68,7 @@ export async function POST(
       );
       if (!vo) throw new ContractAddError("Không tìm thấy phát sinh", 404);
       if (vo.status === "contract_added")
-        throw new ContractAddError(
-          "Phát sinh này đã được đưa vào phụ lục hợp đồng",
-          409,
-        );
+        throw new ContractAddError("Phát sinh này đã được đưa vào phụ lục hợp đồng", 409);
       if (vo.status !== "approved" && vo.status !== "partially_approved")
         throw new ContractAddError(
           "Chỉ đưa vào phụ lục HĐ được phát sinh đã duyệt (toàn phần hoặc một phần)",
@@ -98,8 +95,7 @@ export async function POST(
         sourceNote,
         projectId,
       );
-      if (existingAddendum)
-        throw new ContractAddError("Phát sinh này đã có phụ lục hợp đồng", 409);
+      if (existingAddendum) throw new ContractAddError("Phát sinh này đã có phụ lục hợp đồng", 409);
 
       const value = await queryOne<{ approvedValue: number }>(
         `SELECT COALESCE(SUM(COALESCE(qty_approved, 0) * unit_price), 0) AS "approvedValue"
