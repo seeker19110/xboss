@@ -5,14 +5,23 @@ import assert from "node:assert/strict";
 const poolOptions: Array<{ connectionString?: string }> = [];
 const sqlSeen: string[] = [];
 let expectedMigrations: string[] = [];
+let schemaTrackingError: string | undefined;
+
+function resetSchemaCompatibility() {
+  (globalThis as unknown as { __xbossSchemaCompatible?: Promise<void> }).__xbossSchemaCompatible =
+    undefined;
+}
 
 function resultFor(sql: string) {
   sqlSeen.push(sql);
-  if (/FROM schema_migrations/i.test(sql))
+  if (/FROM schema_migrations/i.test(sql)) {
+    if (schemaTrackingError)
+      throw Object.assign(new Error("schema tracking unavailable"), { code: schemaTrackingError });
     return {
       rows: expectedMigrations.map((name) => ({ name })),
       rowCount: expectedMigrations.length,
     };
+  }
   if (/RETURNING id/i.test(sql)) return { rows: [{ id: 17 }], rowCount: 1 };
   if (/SELECT/i.test(sql)) return { rows: [{ value: 1 }], rowCount: 1 };
   return { rows: [], rowCount: 1 };
@@ -63,6 +72,35 @@ test("runtime DB helpers validate schema with reads only; explicit migration use
   const migrationPool = migration.getMigrationPool();
   assert.equal(poolOptions.at(-1)?.connectionString, process.env.MIGRATE_DATABASE_URL);
   await migrationPool.end();
+
+  schemaTrackingError = "42P01";
+  resetSchemaCompatibility();
+  await assert.rejects(
+    db.queryOne("SELECT 1 AS must_not_run_when_tracking_table_is_missing"),
+    (error: unknown) => error instanceof db.DatabaseSchemaNotReadyError,
+  );
+  assert.ok(
+    !sqlSeen.includes("SELECT 1 AS must_not_run_when_tracking_table_is_missing"),
+    "runtime must not execute business SQL if schema_migrations is absent",
+  );
+
+  schemaTrackingError = undefined;
+  expectedMigrations = expectedMigrations.slice(0, -1);
+  resetSchemaCompatibility();
+  await assert.rejects(
+    db.queryOne("SELECT 1 AS must_not_run_when_marker_is_missing"),
+    (error: unknown) =>
+      error instanceof db.DatabaseSchemaNotReadyError &&
+      /migration\(s\) missing/.test(error.message),
+  );
+  assert.ok(
+    !sqlSeen.includes("SELECT 1 AS must_not_run_when_marker_is_missing"),
+    "runtime must not execute business SQL if a migration marker is missing",
+  );
+  assert.ok(
+    sqlSeen.every((sql) => !/^\s*(CREATE|ALTER|DROP|TRUNCATE)\b/i.test(sql)),
+    `runtime path must not issue DDL: ${sqlSeen.join(" | ")}`,
+  );
 
   delete process.env.MIGRATE_DATABASE_URL;
   assert.throws(() => migration.getMigrationPool(), /MIGRATE_DATABASE_URL/);
