@@ -46,7 +46,8 @@ và xóa trước khi reload PM2. Cần chuyển credential hiện hữu sang fi
 không được ghi URL vào `.env.local`.
 Workflow deploy lấy đúng SHA đã qua CI trên VPS trước khi chạy script mới; staging bootstrap
 từ chối credential cũ trong env file. E2E chạy migrator trên DB disposable trước khi seed, vì
-runtime không còn tự tạo schema. Targeted test cấu hình đạt; CI PostgreSQL/E2E trên HEAD cuối
+runtime không còn tự tạo schema. Script ghim SHA CI và dừng trước migration nếu `main` đã tiến
+sang commit khác, tránh áp schema mới vào ứng dụng cũ. Targeted test cấu hình đạt; CI trên HEAD cuối
 vẫn là điều kiện hợp nhất.
 
 Đã cập nhật quy trình rollout/recovery tại [ADR-0003](docs/adr/0003-migrations.md), cùng hướng
