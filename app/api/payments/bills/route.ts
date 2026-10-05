@@ -20,8 +20,9 @@ async function getVerifiedProjectId(user: { id: number; role: Role; orgId: numbe
   let projectId: number | null = null;
 
   if (raw == null) {
-    // Chỉ suy ra project nếu actor có đúng một project khả kiến; nhiều project cần lựa chọn rõ.
-    if (visible.length === 1) projectId = visible[0];
+    // Giữ mặc định project khả kiến đầu tiên của app khi chưa có cookie;
+    // mọi truy vấn bên dưới vẫn khóa vào đúng project/org đã xác minh.
+    projectId = visible[0] ?? null;
   } else if (/^[1-9]\d*$/.test(raw)) {
     const parsed = Number(raw);
     if (Number.isSafeInteger(parsed) && visible.includes(parsed)) projectId = parsed;

@@ -128,12 +128,22 @@ test(
 );
 
 test(
-  "GET /api/payments/bills: cookie project sai hoặc thiếu lựa chọn khi có nhiều project → 404",
+  "GET /api/payments/bills: cookie sai bị chặn; cookie vắng chỉ đọc project khả kiến đầu",
   S,
   async () => {
     const projectA = await taoDuAn("invalid-a");
-    await taoDuAn("invalid-b");
-    const user = await taoUser("admin");
+    const projectB = await taoDuAn("invalid-b");
+    const billA = await taoBill(projectA);
+    await taoBill(projectB);
+    const user = await taoUser("pm");
+    const { run } = await import("@/lib/db");
+    await run(
+      `INSERT INTO user_projects (user_id, project_id) VALUES (?, ?), (?, ?)`,
+      user.id,
+      projectA,
+      user.id,
+      projectB,
+    );
     const { GET } = await import("@/app/api/payments/bills/route");
 
     dangNhap(user, projectA);
@@ -144,7 +154,13 @@ test(
 
     dangNhap(user);
     const absent = await GET(request());
-    assert.equal(absent.status, 404);
+    assert.equal(absent.status, 200);
+    assert.equal(absent.headers.get("cache-control"), "private, no-store");
+    const { bills } = await absent.json();
+    assert.deepEqual(
+      bills.map((bill: { id: number }) => bill.id),
+      [billA],
+    );
   },
 );
 

@@ -2,8 +2,8 @@
 
 ## 2026-10-05 — QUALITY-FINAL-1 S02a: khóa GET danh sách phiếu thanh toán
 
-`GET /api/payments/bills` yêu cầu dự án khả kiến cùng tổ chức; cookie dự án sai hoặc
-thiếu lựa chọn khi có nhiều dự án trả 404 thay vì mở rộng phạm vi. Query chỉ trả phiếu
+`GET /api/payments/bills` yêu cầu dự án khả kiến cùng tổ chức; cookie dự án sai
+trả 404, cookie vắng chọn dự án khả kiến đầu như các trang hiện hữu. Query chỉ trả phiếu
 có `project_id` đúng, kiểm mọi liên kết contract/certificate/sheet còn đủ scope và sự
 nhất quán giữa contract trực tiếp với certificate; tên người tạo chỉ join trong org.
 Phiếu chưa phân loại nhưng đã có dự án hợp lệ vẫn hiển thị. Mọi response đặt
