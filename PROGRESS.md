@@ -1,5 +1,16 @@
 # PROGRESS — XBoss
 
+## 2026-10-05 — QUALITY-FINAL-1 S02a: khóa PATCH giá trị hợp đồng tầng theo dự án
+
+`PATCH /api/payments` nay yêu cầu dự án đang chọn và org hợp lệ, kiểm toàn bộ sheet theo
+`sheet → tower → project → org`, từ chối ID/dữ liệu sai và batch trùng, đồng thời giới hạn
+kích thước batch. Hợp đồng liên kết hiện hữu phải cùng dự án; ghi một lần trong transaction
+với điều kiện scope ở SQL và trả số dòng thực ghi. Test route bổ sung batch hai dòng,
+chéo dự án, không có dự án, input sai, rollback và hợp đồng liên kết. Đây là bản vá P1
+hẹp từ kiểm kê S00 payment, chưa đóng S02a/S01/S03 toàn miền. PostgreSQL disposable trong
+CI là bằng chứng SQL; không dùng production DB. Các GET/POST/DELETE payment khác và
+money decimal-string vẫn còn trong kế hoạch.
+
 ## 2026-10-05 — QUALITY-FINAL-1 S14: manifest cho bộ backup
 
 Backup tạo manifest gắn dump và kho tệp đính kèm bằng kích thước/SHA-256; bộ thiếu tệp trả lỗi,

@@ -100,12 +100,13 @@ export async function PATCH(req: NextRequest) {
     if (typeof value !== "number" && (typeof value !== "string" || !/^[1-9]\d*$/.test(value)))
       return null;
     const id = Number(value);
-    return Number.isSafeInteger(id) && id > 0 ? id : null;
+    return Number.isSafeInteger(id) && id > 0 && id <= 2_147_483_647 ? id : null;
   };
   if (!body || typeof body !== "object" || !Array.isArray((body as { updates?: unknown }).updates))
     return invalid();
   const rawUpdates = (body as { updates: unknown[] }).updates;
   if (rawUpdates.length === 0) return NextResponse.json({ ok: true, updated: 0 });
+  if (rawUpdates.length > 1_000) return invalid();
 
   const updates: { sheetTypeId: number; floorLabel: string; contractValue: number }[] = [];
   const seen = new Set<string>();

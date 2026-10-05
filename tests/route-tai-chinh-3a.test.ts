@@ -1449,6 +1449,7 @@ test("PATCH /api/payments: ID phải canonical dương an toàn và reject cả 
     "1e2",
     "0x10",
     "12x",
+    2_147_483_648,
     Number.MAX_SAFE_INTEGER + 1,
     true,
     [],
