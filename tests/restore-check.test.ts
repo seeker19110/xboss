@@ -22,6 +22,9 @@ function runRestoreCheck(
     targetUrl?: string;
     restoreFails?: boolean;
     targetExists?: boolean;
+    serverAddr?: string;
+    superuser?: boolean;
+    canCreateDb?: boolean;
   } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), "xboss-restore-check-"));
@@ -44,7 +47,8 @@ fi
 sql=""
 while (($#)); do if [[ "$1" == "-c" || "$1" == "-tAc" ]]; then shift; sql="$1"; break; fi; shift; done
 if [[ "$sql" == *"inet_server_addr()"* ]]; then
-  printf '127.0.0.1\\t5432\\trestore_control\\trestore_user\\t%s\\tfalse\\ttrue\\n' "$ACTUAL_MARKER"
+  printf '%s\\t5432\\trestore_control\\trestore_user\\t%s\\t%s\\t%s\\n' \\
+    "$ACTUAL_SERVER_ADDR" "$ACTUAL_MARKER" "$ACTUAL_SUPERUSER" "$ACTUAL_CREATEDB"
 elif [[ "$sql" == *"FROM pg_database WHERE datname"* ]]; then printf '${options.targetExists ? "1" : "0"}\\n'
 elif [[ "$sql" == *"information_schema.tables"* ]]; then printf '5\\n'
 else printf '1\\n'; fi
@@ -84,6 +88,9 @@ exit 0
         RESTORE_TARGET_DATABASE: "xboss_restore_check_test",
         RESTORE_TARGET_MARKER: marker,
         ACTUAL_MARKER: options.marker ?? marker,
+        ACTUAL_SERVER_ADDR: options.serverAddr ?? "127.0.0.1",
+        ACTUAL_SUPERUSER: options.superuser ? "true" : "false",
+        ACTUAL_CREATEDB: options.canCreateDb === false ? "false" : "true",
       },
     });
     return {
@@ -154,6 +161,27 @@ test("restore-check refuses an existing database without trying to drop it", () 
   const result = runRestoreCheck({ targetExists: true });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Database đích đã tồn tại/);
+  assert.doesNotMatch(result.calls, /CREATE DATABASE|DROP DATABASE/);
+});
+
+test("restore-check rejects an unexpected server identity before database writes", () => {
+  const result = runRestoreCheck({ serverAddr: "127.0.0.2" });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Danh tính server\/user thực tế không khớp/);
+  assert.doesNotMatch(result.calls, /CREATE DATABASE|DROP DATABASE/);
+});
+
+test("restore-check rejects superuser credentials before database writes", () => {
+  const result = runRestoreCheck({ superuser: true });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /không được là PostgreSQL superuser/);
+  assert.doesNotMatch(result.calls, /CREATE DATABASE|DROP DATABASE/);
+});
+
+test("restore-check rejects a role without CREATEDB before database writes", () => {
+  const result = runRestoreCheck({ canCreateDb: false });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /phải có quyền CREATEDB/);
   assert.doesNotMatch(result.calls, /CREATE DATABASE|DROP DATABASE/);
 });
 
