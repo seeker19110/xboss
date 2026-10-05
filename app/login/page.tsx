@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { LogIn, KeyRound } from "lucide-react";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import { clearOfflineQueue } from "@/app/components/offlineQueue";
+import { clearServiceWorkerCache } from "@/app/lib/serviceWorkerCache";
 
 const DEMO = [
   { role: "Admin", email: "admin@xboss.vn", pw: "admin123" },
@@ -78,8 +79,14 @@ export default function LoginPage() {
     // Đăng nhập mới trên thiết bị dùng chung: dọn cache API + hàng đợi tick offline còn sót
     // lại từ phiên trước (có thể của người khác) để không lẫn dữ liệu giữa 2 người dùng.
     await clearOfflineQueue();
-    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({ type: "CLEAR_CACHE" });
+    try {
+      await clearServiceWorkerCache();
+    } catch {
+      setError(
+        "Đăng nhập đã xác thực nhưng chưa thể xác nhận dọn bộ nhớ đệm. Hãy kiểm tra kết nối, tải lại trang rồi thử lại.",
+      );
+      setBusy(false);
+      return;
     }
     // M58 PR1: quay lại đúng đích sau khi quét QR gặp 401 (?next=/r/<kind>/<id>) — chỉ chấp
     // nhận đường dẫn nội bộ tuyệt đối (bắt đầu "/" và không phải "//..." — chặn open redirect

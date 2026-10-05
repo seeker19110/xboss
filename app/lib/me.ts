@@ -1,6 +1,8 @@
 // Singleton cache phía client — chỉ fetch /api/auth/me 1 lần mỗi lần load trang.
 // Các component trên cùng trang gọi fetchMe() đồng thời đều nhận cùng 1 Promise.
 import { clearOfflineQueue } from "@/app/components/offlineQueue";
+import { showToast } from "@/app/components/Toast";
+import { clearServiceWorkerCache } from "@/app/lib/serviceWorkerCache";
 
 export type Me = { id: number; name: string; email: string; role: string };
 
@@ -42,12 +44,14 @@ export function invalidateMe() {
 // (thông báo, task, dashboard...) của người trước trong cache cho người đăng nhập sau thấy.
 export async function redirectToLogin() {
   await clearOfflineQueue();
-  if (
-    typeof navigator !== "undefined" &&
-    "serviceWorker" in navigator &&
-    navigator.serviceWorker.controller
-  ) {
-    navigator.serviceWorker.controller.postMessage({ type: "CLEAR_CACHE" });
+  try {
+    await clearServiceWorkerCache();
+  } catch {
+    showToast(
+      "Chưa xác nhận được việc dọn bộ nhớ đệm. Hãy kiểm tra kết nối, tải lại trang rồi thử lại.",
+      "error",
+    );
+    return;
   }
   window.location.href = "/login";
 }
