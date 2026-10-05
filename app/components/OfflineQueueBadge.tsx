@@ -17,7 +17,7 @@ export default function OfflineQueueBadge() {
         className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-amber-800 bg-amber-950 px-2 text-xs font-medium text-amber-200"
       >
         <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <span>Lưu offline tạm khóa</span>
+        <span className="hidden lg:inline">Lưu offline tạm khóa</span>
       </span>
     );
   }
