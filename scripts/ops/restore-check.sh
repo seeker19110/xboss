@@ -231,7 +231,7 @@ fi
 
 # Kiểm tra marker thật ở DB điều khiển, user không phải superuser, server đã trả về đúng
 # host/port cấu hình, và database sẽ tạo chưa tồn tại. Tất cả đều SELECT-only.
-META_SQL="SELECT COALESCE(inet_server_addr()::text, ''), COALESCE(inet_server_port()::text, ''),
+META_SQL="SELECT COALESCE(host(inet_server_addr()), ''), COALESCE(inet_server_port()::text, ''),
                  current_database(), current_user,
                  COALESCE(shobj_description(d.oid, 'pg_database'), ''),
                  r.rolsuper::text, r.rolcreatedb::text

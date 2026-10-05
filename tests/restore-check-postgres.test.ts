@@ -10,7 +10,6 @@ import { isIP } from "node:net";
 import { Client } from "pg";
 
 const restoreScript = join(process.cwd(), "scripts/ops/restore-check.sh");
-const disposableMarker = `xboss-disposable:${randomUUID().replaceAll("-", "")}`;
 const backupId = () => {
   const now = new Date();
   const timestamp =
@@ -44,13 +43,28 @@ function quotePassfile(value: string): string {
 async function createRestoreFixture(options: { wrongMarker?: boolean; sameServer?: boolean } = {}) {
   const rawUrl = process.env.TEST_DATABASE_URL;
   assert.ok(rawUrl, "TEST_DATABASE_URL phải trỏ PostgreSQL disposable của CI.");
+  assert.equal(
+    process.env.GITHUB_ACTIONS,
+    "true",
+    "Smoke test chỉ chạy trên CI với service riêng.",
+  );
+  const provisionedMarker = process.env.RESTORE_TEST_MARKER;
+  const provisionedServerIp = process.env.RESTORE_TEST_SERVER_IP;
+  assert.match(provisionedMarker ?? "", /^xboss-disposable:[0-9a-f]{32}$/);
+  assert.ok(isIP(provisionedServerIp ?? ""), "CI phải cấp IP container PostgreSQL disposable.");
   const adminUrl = new URL(rawUrl);
   assert.ok(
     adminUrl.hostname === "localhost" || adminUrl.hostname === "127.0.0.1",
     "Smoke test chỉ chấp nhận PostgreSQL CI qua localhost/127.0.0.1.",
   );
-  const controlDatabase = decodeURIComponent(adminUrl.pathname.slice(1));
-  assert.match(controlDatabase, /^[a-z][a-z0-9_]{2,62}$/);
+  assert.match(adminUrl.protocol, /^postgres(ql)?:$/);
+  assert.equal(adminUrl.port, "5432");
+  assert.equal(adminUrl.search, "", "Không chấp nhận URI option đổi host/connection.");
+  assert.equal(decodeURIComponent(adminUrl.username), "ci");
+  assert.equal(decodeURIComponent(adminUrl.password), "ci");
+  const workerDatabase = decodeURIComponent(adminUrl.pathname.slice(1));
+  assert.match(workerDatabase, /^xboss_test_w\d+$/);
+  const controlDatabase = "xboss_test";
   const adminUser = decodeURIComponent(adminUrl.username);
   const adminPassword = decodeURIComponent(adminUrl.password);
   const suffix = randomUUID().replaceAll("-", "").slice(0, 16);
@@ -58,7 +72,7 @@ async function createRestoreFixture(options: { wrongMarker?: boolean; sameServer
   const password = randomUUID().replaceAll("-", "");
   const targetDatabase = `xboss_restore_smoke_${suffix}`;
   const sourceDatabase = `xboss_source_smoke_${suffix}`;
-  const actualMarker = `${disposableMarker}_${suffix}`;
+  const actualMarker = provisionedMarker!;
   const tempDir = mkdtempSync(join(tmpdir(), "xboss-restore-postgres-"));
   const backups = join(tempDir, "backups");
   mkdirSync(backups);
@@ -70,8 +84,6 @@ async function createRestoreFixture(options: { wrongMarker?: boolean; sameServer
     rmSync(tempDir, { recursive: true, force: true });
     throw error;
   }
-  let previousComment: string | null = null;
-  let commentChanged = false;
   let roleCreated = false;
   let sourceCreated = false;
   try {
@@ -82,12 +94,17 @@ async function createRestoreFixture(options: { wrongMarker?: boolean; sameServer
       "Restore smoke test dùng service PostgreSQL 16 trong CI.",
     );
     const endpoint = await admin.query(
-      "SELECT inet_server_addr()::text AS host, inet_server_port()::text AS port",
+      "SELECT host(inet_server_addr()) AS host, inet_server_port()::text AS port",
     );
     const targetHost = String(endpoint.rows[0]?.host ?? "");
     const port = String(endpoint.rows[0]?.port ?? "");
-    assert.ok(isIP(targetHost), "Smoke test cần địa chỉ IP của PostgreSQL disposable CI.");
-    assert.match(port, /^\d+$/);
+    assert.equal(targetHost, provisionedServerIp, "Kết nối phải tới đúng container service CI.");
+    assert.equal(port, "5432");
+    const markerRow = await admin.query(
+      "SELECT shobj_description(oid, 'pg_database') AS marker FROM pg_database WHERE datname = $1",
+      [controlDatabase],
+    );
+    assert.equal(markerRow.rows[0]?.marker, actualMarker, "Thiếu marker được CI cấp sẵn.");
     for (const command of ["psql", "pg_dump", "pg_restore", "tar"]) {
       const result = runTool(command, ["--version"]);
       assert.equal(result.status, 0, `${command} --version thất bại: ${result.stderr}`);
@@ -97,12 +114,6 @@ async function createRestoreFixture(options: { wrongMarker?: boolean; sameServer
       }
     }
 
-    const currentComment = await admin.query(
-      "SELECT shobj_description(oid, 'pg_database') AS comment FROM pg_database WHERE datname = current_database()",
-    );
-    previousComment = currentComment.rows[0]?.comment ?? null;
-    await admin.query(`COMMENT ON DATABASE "${controlDatabase}" IS ${quoteLiteral(actualMarker)}`);
-    commentChanged = true;
     await admin.query(`CREATE ROLE ${role} LOGIN CREATEDB PASSWORD ${quoteLiteral(password)}`);
     roleCreated = true;
 
@@ -207,14 +218,20 @@ async function createRestoreFixture(options: { wrongMarker?: boolean; sameServer
       },
       cleanup: async () => {
         try {
-          await admin.query(`DROP DATABASE IF EXISTS "${targetDatabase}"`);
+          const target = await admin.query(
+            "SELECT shobj_description(oid, 'pg_database') AS marker FROM pg_database WHERE datname = $1",
+            [targetDatabase],
+          );
+          if (target.rowCount) {
+            assert.equal(
+              target.rows[0]?.marker,
+              actualMarker,
+              "Không xóa DB đích thiếu marker sở hữu của lần restore này.",
+            );
+            await admin.query(`DROP DATABASE "${targetDatabase}"`);
+          }
           if (sourceCreated) await admin.query(`DROP DATABASE IF EXISTS "${sourceDatabase}"`);
           if (roleCreated) await admin.query(`DROP ROLE IF EXISTS ${role}`);
-          if (commentChanged) {
-            await admin.query(
-              `COMMENT ON DATABASE "${controlDatabase}" IS ${previousComment === null ? "NULL" : quoteLiteral(previousComment)}`,
-            );
-          }
         } finally {
           await admin.end();
           rmSync(tempDir, { recursive: true, force: true });
@@ -225,11 +242,6 @@ async function createRestoreFixture(options: { wrongMarker?: boolean; sameServer
     try {
       if (sourceCreated) await admin.query(`DROP DATABASE IF EXISTS "${sourceDatabase}"`);
       if (roleCreated) await admin.query(`DROP ROLE IF EXISTS ${role}`);
-      if (commentChanged) {
-        await admin.query(
-          `COMMENT ON DATABASE "${controlDatabase}" IS ${previousComment === null ? "NULL" : quoteLiteral(previousComment)}`,
-        );
-      }
     } finally {
       await admin.end();
       rmSync(tempDir, { recursive: true, force: true });

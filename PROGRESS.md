@@ -4,8 +4,10 @@
 
 Thêm integration smoke tạo dump custom và recovery set tổng hợp từ PostgreSQL disposable,
 gọi `restore-check.sh` với role đích `CREATEDB` không phải superuser, kiểm bảng lõi có dữ liệu
-và database tạm được dọn. Hai ca âm xác nhận marker sai hoặc nguồn/đích cùng server bị
-chặn trước khi tạo database phục hồi. Test dùng credentials giả của CI, không đọc production.
+và database tạm được dọn. CI cấp trước marker trên đúng container PostgreSQL service;
+test đối chiếu marker, IP server và URL worker trước mọi lệnh ghi, chỉ dọn DB đích có
+marker khớp. Hai ca âm xác nhận marker sai hoặc nguồn/đích cùng server bị chặn trước
+khi tạo database phục hồi. Test dùng credentials giả của CI, không đọc production.
 Đây là bằng chứng restore đường cơ bản khi CI PostgreSQL và client đạt; chưa phải PITR,
 attachment restore đầy đủ, kiểm khóa, RPO/RTO hoặc diễn tập trên workload thực.
 
