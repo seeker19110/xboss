@@ -1,5 +1,14 @@
 # PROGRESS — XBoss
 
+## 2026-10-05 — QUALITY-FINAL-1 A5: khóa đưa VO vào phụ lục hợp đồng
+
+`POST /api/variations/:id/contract-add` nay khóa VO và hợp đồng đích, kiểm lại trạng thái và
+phụ lục đã tạo, tính giá trị BOQ rồi ghi phụ lục/chuyển trạng thái VO trong một transaction.
+Hai request đồng thời không thể đưa cùng một VO vào hai hợp đồng. Test route bổ sung trường
+hợp hai hợp đồng đích và yêu cầu đúng một kết quả thành công. Targeted lint/typecheck đạt;
+test PostgreSQL disposable còn chờ CI trên đúng HEAD. Không migration hoặc thao tác production.
+Đây là lát cắt A5-FR08/10; snapshot quyết định IPC/VO và các AC còn lại vẫn mở.
+
 ## 2026-10-03 — PR #557: đóng nợ logic N1–N3 của audit 2026-10-01
 
 Theo [audit logic](docs/ops/audit-logic-2026-10-01.md) mục nợ:
