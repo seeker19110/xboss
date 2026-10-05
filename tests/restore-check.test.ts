@@ -77,6 +77,24 @@ test("restore-check rejects a source-equivalent target before database writes", 
   assert.doesNotMatch(result.calls, /CREATE DATABASE|DROP DATABASE/);
 });
 
+test("restore-check compares decoded PostgreSQL usernames", () => {
+  const result = runRestoreCheck({
+    targetUrl: "postgresql://%61pp_source:secret@127.0.0.1:5432/restore_control",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Credentials đích phải khác user/);
+  assert.doesNotMatch(result.calls, /CREATE DATABASE|DROP DATABASE/);
+});
+
+test("restore-check accepts a percent-encoded control database identity after server validation", () => {
+  const result = runRestoreCheck({
+    targetUrl: "postgresql://restore%5Fuser:secret@127.0.0.1:5432/restore%5Fcontrol",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.calls, /CREATE DATABASE xboss_restore_check_test/);
+  assert.match(result.calls, /DROP DATABASE xboss_restore_check_test/);
+});
+
 test("restore-check rejects public target addresses before database writes", () => {
   const result = runRestoreCheck({
     targetUrl: "postgresql://restore_user:secret@8.8.8.8:5432/restore_control",

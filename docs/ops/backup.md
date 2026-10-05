@@ -69,10 +69,8 @@ không-mất-VPS) nhưng in cảnh báo rõ ràng — **không đạt RPO/RTO n�
 # Backup DB + uploads hằng đêm 01:00 (giờ ít người dùng app nhất)
 0 1 * * * cd /path/to/xboss && export $(grep -E '^(DATABASE_URL|BACKUP_REMOTE)=' .env.local | xargs) && bash scripts/ops/backup.sh >> logs/backup.log 2>&1
 
-# Kiểm chứng phục hồi Chủ nhật 02:00. Nạp RESTORE_SOURCE_URL, RESTORE_TARGET_URL,
-# RESTORE_TARGET_DATABASE và RESTORE_TARGET_MARKER từ secret store / env file riêng đã phân quyền;
-# không lấy DATABASE_URL của ứng dụng làm target.
-0 2 * * 0 cd /path/to/xboss && bash scripts/ops/restore-check.sh >> logs/restore-check.log 2>&1
+# Kiểm chứng phục hồi Chủ nhật 02:00. File env chỉ operator đọc được, không ghi secret ra log.
+0 2 * * 0 cd /path/to/xboss && set -a && . /etc/xboss/restore-check.env && set +a && bash scripts/ops/restore-check.sh >> logs/restore-check.log 2>&1
 ```
 
 ### Chuẩn bị target disposable cho `restore-check.sh`
@@ -87,7 +85,9 @@ Tạo DB điều khiển rỗng, ví dụ `restore_control`, rồi administrator
 COMMENT ON DATABASE restore_control IS 'xboss-disposable:<token-ngau-nhien-tu-32-ky-tu>';
 ```
 
-Chuyển các biến `RESTORE_*` cho cron qua secret store hoặc file env chỉ operator đọc được.
+Đặt các biến `RESTORE_*` trong `/etc/xboss/restore-check.env`, thuộc owner của user chạy cron
+và mode `0600`; cron source file trực tiếp, không dùng `export $(grep ... | xargs)` để tránh
+hiện nội dung secret trong lệnh/logs.
 `RESTORE_TARGET_DATABASE` phải là tên mới, chữ thường/số/underscore, ví dụ
 `xboss_restore_check_weekly`; script từ chối nếu tên đã tồn tại. Không đặt `RESTORE_TARGET_URL`
 trỏ vào database nguồn, production, hoặc dùng chung credentials app. Re-run sau một lần bị dừng

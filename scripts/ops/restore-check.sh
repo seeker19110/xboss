@@ -35,7 +35,7 @@ import os
 import sys
 import ipaddress
 import socket
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 def parse(raw):
     u = urlsplit(raw)
@@ -43,14 +43,14 @@ def parse(raw):
         raise SystemExit(2)
     if not u.username or not u.password:
         raise SystemExit(2)
-    return u
+    return u, unquote(u.username), unquote(u.path.strip("/"))
 
 try:
-    src, dst = parse(os.environ["RESTORE_SOURCE_URL"]), parse(os.environ["RESTORE_TARGET_URL"])
+    src, src_user, src_db = parse(os.environ["RESTORE_SOURCE_URL"])
+    dst, dst_user, dst_db = parse(os.environ["RESTORE_TARGET_URL"])
 except (ValueError, SystemExit):
     raise SystemExit("invalid")
 
-src_db, dst_db = src.path.strip("/"), dst.path.strip("/")
 src_host, dst_host = src.hostname.lower(), dst.hostname.lower()
 src_port, dst_port = src.port or 5432, dst.port or 5432
 try:
@@ -78,13 +78,13 @@ if (target_ip in source_ips and src_port == dst_port):
 if src_db.lower() == sys.argv[1].lower() or dst_db.lower() == sys.argv[1].lower():
     print("same-database")
     raise SystemExit(0)
-if src.username == dst.username:
+if src_user == dst_user:
     print("same-user")
     raise SystemExit(0)
 
 target_path = "/" + sys.argv[1]
 target_url = urlunsplit((dst.scheme, dst.netloc, target_path, dst.query, ""))
-print("\t".join((str(target_ip), str(dst_port), dst_db, dst.username, target_url)))
+print("\t".join((str(target_ip), str(dst_port), dst_db, dst_user, target_url)))
 PY
 )" || die "Không đọc được danh tính nguồn/đích."
 
