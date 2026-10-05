@@ -92,7 +92,8 @@ async function createRestoreFixture(options: { wrongMarker?: boolean; sameServer
       const result = runTool(command, ["--version"]);
       assert.equal(result.status, 0, `${command} --version thất bại: ${result.stderr}`);
       if (command !== "tar") {
-        assert.match(result.stdout, /\b16\.\d+\b/, `${command} phải là PostgreSQL client 16`);
+        const major = Number(result.stdout.match(/PostgreSQL\) (\d+)/)?.[1]);
+        assert.ok(major >= 16, `${command} cần PostgreSQL client tương thích 16 trở lên`);
       }
     }
 

@@ -1,5 +1,14 @@
 # PROGRESS — XBoss
 
+## 2026-10-05 — QUALITY-FINAL-1 S14: kiểm restore bằng PostgreSQL disposable
+
+Thêm integration smoke tạo dump custom và recovery set tổng hợp từ PostgreSQL disposable,
+gọi `restore-check.sh` với role đích `CREATEDB` không phải superuser, kiểm bảng lõi có dữ liệu
+và database tạm được dọn. Hai ca âm xác nhận marker sai hoặc nguồn/đích cùng server bị
+chặn trước khi tạo database phục hồi. Test dùng credentials giả của CI, không đọc production.
+Đây là bằng chứng restore đường cơ bản khi CI PostgreSQL và client đạt; chưa phải PITR,
+attachment restore đầy đủ, kiểm khóa, RPO/RTO hoặc diễn tập trên workload thực.
+
 ## 2026-10-05 — QUALITY-FINAL-1 S14: kiểm tra cấu trúc archive trước restore
 
 `restore-check.sh` đọc/liệt kê archive uploads bằng `tar -tzf` sau khi đối chiếu manifest,
