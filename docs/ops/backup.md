@@ -30,13 +30,18 @@ Không backup: `node_modules/`, `.next/` (build lại được từ Git + `npm c
   `tar czf` thư mục uploads → đẩy cả hai ra ngoài máy qua `rclone` (đích cấu hình qua biến
   `BACKUP_REMOTE`, xem bên dưới) → dọn bản cũ (local > 30 ngày, remote > 90 ngày, đổi qua
   `LOCAL_RETENTION_DAYS`/`REMOTE_RETENTION_DAYS` nếu cần).
-- **`scripts/ops/restore-check.sh`** — lấy bản dump mới nhất → tạo DB tạm `xboss_restore_check`
-  (cùng Postgres instance, KHÔNG đụng DB thật) → `pg_restore` vào đó → đếm tổng số bảng + số dòng
-  5 bảng lõi (`tasks`, `contracts`, `payment_certs`, `materials`, `users`) phải > 0 → DROP DB tạm
-  (kể cả khi kiểm tra fail, qua `trap ... EXIT`) → exit code khác 0 nếu có bước nào sai.
+- **`scripts/ops/restore-check.sh`** — lấy bản dump mới nhất và chỉ tạo DB phục hồi mới trên
+  PostgreSQL disposable đã đánh dấu. Script yêu cầu `RESTORE_SOURCE_URL` (chỉ để so danh tính),
+  `RESTORE_TARGET_URL` (credentials riêng), `RESTORE_TARGET_DATABASE` (tên DB mới) và
+  `RESTORE_TARGET_MARKER` khớp COMMENT đã cài trên DB điều khiển disposable. Nguồn/đích phải khác
+  host/port và user; target credentials không được là superuser. Marker thiếu/sai, host giống
+  nguồn, host/DB production-like, DB target đã tồn tại hoặc không kiểm được identity đều dừng
+  trước `CREATE DATABASE`. DB mới chỉ bị DROP bởi trap nếu chính lần chạy hiện tại tạo thành công.
+  Script không dùng `DATABASE_URL` làm target.
 
-Cả hai là **bash thuần**, không phải TypeScript — chạy trực tiếp trên VPS bằng `pg_dump`/`pg_restore`/
-`psql` có sẵn từ gói `postgresql-client`, không phụ thuộc Node/npm.
+Cả hai là script Bash, không phải TypeScript. `restore-check.sh` cần Bash, Python 3 standard library
+để phân tích URI mà không lộ credential, và `pg_restore`/`psql` từ gói `postgresql-client`; không
+phụ thuộc Node/npm.
 
 ## Cấu hình `rclone` (đẩy backup ra ngoài VPS)
 
@@ -64,9 +69,30 @@ không-mất-VPS) nhưng in cảnh báo rõ ràng — **không đạt RPO/RTO n�
 # Backup DB + uploads hằng đêm 01:00 (giờ ít người dùng app nhất)
 0 1 * * * cd /path/to/xboss && export $(grep -E '^(DATABASE_URL|BACKUP_REMOTE)=' .env.local | xargs) && bash scripts/ops/backup.sh >> logs/backup.log 2>&1
 
-# Kiểm chứng phục hồi Chủ nhật 02:00 (sau backup ~1h, không trùng giờ backup)
-0 2 * * 0 cd /path/to/xboss && export $(grep -E '^DATABASE_URL=' .env.local | xargs) && bash scripts/ops/restore-check.sh >> logs/restore-check.log 2>&1
+# Kiểm chứng phục hồi Chủ nhật 02:00. Nạp RESTORE_SOURCE_URL, RESTORE_TARGET_URL,
+# RESTORE_TARGET_DATABASE và RESTORE_TARGET_MARKER từ secret store / env file riêng đã phân quyền;
+# không lấy DATABASE_URL của ứng dụng làm target.
+0 2 * * 0 cd /path/to/xboss && bash scripts/ops/restore-check.sh >> logs/restore-check.log 2>&1
 ```
+
+### Chuẩn bị target disposable cho `restore-check.sh`
+
+Tạo riêng một PostgreSQL sandbox, khác host/port với nguồn. `RESTORE_TARGET_URL` dùng địa chỉ
+IP private/loopback cụ thể của sandbox (không dùng IP public hoặc alias DNS); script đối chiếu địa chỉ server thực tế và từ chối
+nếu IP đích trùng nguồn sau phân giải. Dùng role riêng không phải
+superuser, có quyền `CREATEDB`; role này không được dùng bởi ứng dụng và phải khác role nguồn.
+Tạo DB điều khiển rỗng, ví dụ `restore_control`, rồi administrator gắn marker không đoán được:
+
+```sql
+COMMENT ON DATABASE restore_control IS 'xboss-disposable:<token-ngau-nhien-tu-32-ky-tu>';
+```
+
+Chuyển các biến `RESTORE_*` cho cron qua secret store hoặc file env chỉ operator đọc được.
+`RESTORE_TARGET_DATABASE` phải là tên mới, chữ thường/số/underscore, ví dụ
+`xboss_restore_check_weekly`; script từ chối nếu tên đã tồn tại. Không đặt `RESTORE_TARGET_URL`
+trỏ vào database nguồn, production, hoặc dùng chung credentials app. Re-run sau một lần bị dừng
+đột ngột cần operator kiểm tra và tự xử lý DB sót lại; script chủ động không DROP DB có sẵn vì
+nó không thể chứng minh DB đó do lần chạy hiện tại tạo.
 
 Gợi ý gửi kết quả qua Telegram (tái dùng `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` đã có trong
 `.env.local` cho báo cáo ngày) — thêm dòng `curl` đơn giản vào cuối crontab entry, ví dụ:
