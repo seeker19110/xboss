@@ -107,6 +107,15 @@ test("restore-check rejects a source-equivalent target before database writes", 
   assert.doesNotMatch(result.calls, /CREATE DATABASE|DROP DATABASE/);
 });
 
+test("restore-check treats IPv4-mapped IPv6 as the same source server", () => {
+  const result = runRestoreCheck({
+    targetUrl: "postgresql://restore_user:secret@[::ffff:192.0.2.10]:5432/restore_control",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /cùng host\/port/);
+  assert.doesNotMatch(result.calls, /CREATE DATABASE|DROP DATABASE/);
+});
+
 test("restore-check compares decoded PostgreSQL usernames", () => {
   const result = runRestoreCheck({
     targetUrl: "postgresql://%61pp_source:secret@127.0.0.1:5432/restore_control",

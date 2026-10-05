@@ -82,8 +82,12 @@ except (ValueError, SystemExit):
 
 src_host, dst_host = src.hostname.lower(), dst.hostname.lower()
 src_port, dst_port = src.port or 5432, dst.port or 5432
+def normalized_ip(address):
+    parsed = ipaddress.ip_address(address)
+    return parsed.ipv4_mapped if isinstance(parsed, ipaddress.IPv6Address) and parsed.ipv4_mapped else parsed
+
 try:
-    target_ip = ipaddress.ip_address(dst_host)
+    target_ip = normalized_ip(dst_host)
 except ValueError:
     print("target-host-not-ip")
     raise SystemExit(0)
@@ -91,11 +95,11 @@ if target_ip.is_global:
     print("target-host-public")
     raise SystemExit(0)
 try:
-    source_ips = {ipaddress.ip_address(src_host)}
+    source_ips = {normalized_ip(src_host)}
 except ValueError:
     try:
         source_ips = {
-            ipaddress.ip_address(item[4][0])
+            normalized_ip(item[4][0])
             for item in socket.getaddrinfo(src_host, src_port, type=socket.SOCK_STREAM)
         }
     except OSError:
