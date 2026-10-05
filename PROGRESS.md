@@ -28,9 +28,23 @@ Banner tracking không còn báo thao tác đã lưu khi queue đang khóa; badg
 ổn định. Nút phục hồi ở trang lỗi chỉ purge cache XBoss theo ACK, không xóa queue, cache hoặc
 service worker khác cùng origin; thất bại giữ trang và cho thử lại.
 Các regression flush cũ vẫn được giữ trong suite riêng. Lưu offline chỉ mở lại sau S07 có
-ownership/vault và chuyển queue an toàn; browser thật + axe theo A2/S04 còn chờ CI.
+ownership/vault và chuyển queue an toàn; browser thật + axe trên PR #560 đã đạt CI.
 Gọi trực tiếp endpoint OIDC không đi qua client preflight; S05 cần ràng buộc context toàn cục
 trước khi hiển thị dữ liệu, không coi nút SSO là bằng chứng bảo vệ mọi đường vào.
+
+## 2026-10-05 — S03: tách migration khỏi runtime
+
+App runtime chỉ đọc `schema_migrations` để xác nhận schema khớp với
+checkout; không tạo bảng tracking hoặc tự chạy SQL migration. Thiếu/lỗi thời schema làm DB
+request fail-closed với `XBOSS_SCHEMA_NOT_READY`; `/api/health` báo `degraded` để deploy có thể
+dừng trước khi chuyển traffic. `npm run db:migrate` là bước độc lập, bắt buộc có
+`MIGRATE_DATABASE_URL` và không dùng `DATABASE_URL` làm fallback; dry-run chỉ liệt kê file còn
+thiếu. Mỗi migration giữ transaction riêng và advisory lock trong migrator.
+
+Đã cập nhật quy trình rollout/recovery tại [ADR-0003](docs/adr/0003-migrations.md), cùng hướng
+dẫn Metabase để chạy migration `0073` bằng migrator riêng. Không chạy database hoặc production
+trong slice tài liệu này. A1-AC04/06 và Q-AC07 vẫn cần evidence PostgreSQL bằng app role phù hợp;
+đây không phải xác nhận RLS/production đã đạt.
 
 ## 2026-10-05 — QUALITY-FINAL-1 S14: cô lập restore-check
 
