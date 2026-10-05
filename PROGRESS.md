@@ -1,5 +1,14 @@
 # PROGRESS — XBoss
 
+## 2026-10-05 — QUALITY-FINAL-1 S14: manifest cho bộ backup
+
+Backup tạo manifest gắn dump và kho tệp đính kèm bằng kích thước/SHA-256; bộ thiếu tệp trả lỗi,
+không đẩy ra nơi lưu ngoài máy. Dọn lưu trữ theo từng bộ, giữ ít nhất một bộ đầy đủ ở local;
+mặc định local 35 ngày. Restore-check từ chối manifest mới nhất thiếu/hỏng trước khi kết nối DB.
+Targeted test 21/21, format, lint, typecheck, kiểm migration/SW và build local đạt.
+Release gate cần PostgreSQL disposable trong CI; chưa diễn tập PITR, WAL, khóa mã hóa, RPO/RTO
+hoặc kiểm chứng backup production. Đây là bước integrity hẹp của S14, chưa hoàn tất A6.
+
 ## 2026-10-05 — Sửa tương phản nhãn chờ duyệt MEPF
 
 Nhãn `pending` trên trang MEPF dùng nền/chữ amber đủ rõ ở cả hai giao diện và bỏ

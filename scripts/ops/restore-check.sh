@@ -168,12 +168,58 @@ if [[ "$TARGET_HOST" =~ (prod|production|live) || "$CONTROL_DB" =~ (^|_)(prod|pr
 fi
 
 shopt -s nullglob
-DUMPS=("$BACKUP_DIR"/xboss-*.dump)
+MANIFESTS=("$BACKUP_DIR"/xboss-*.manifest.json)
 shopt -u nullglob
-if ((${#DUMPS[@]} == 0)); then
-  die "Không tìm thấy file backup nào trong $BACKUP_DIR — chạy backup.sh trước."
+if ((${#MANIFESTS[@]} == 0)); then
+  die "Không tìm thấy manifest recovery set trong $BACKUP_DIR — chạy backup.sh trước."
 fi
-LATEST_DUMP="$(ls -t "${DUMPS[@]}" | head -1)"
+LATEST_MANIFEST="$(ls -t "${MANIFESTS[@]}" | head -1)"
+# Verify manifest and every listed artifact before creating credentials or making any
+# PostgreSQL connection. The manifest is an integrity check, not a full PITR attestation.
+LATEST_DUMP="$(python3 - "$BACKUP_DIR" "$LATEST_MANIFEST" <<'PY'
+import hashlib
+import json
+import os
+import re
+import sys
+
+backup_dir, manifest_path = sys.argv[1:]
+try:
+    if os.path.islink(manifest_path):
+        raise ValueError("manifest symlink")
+    with open(manifest_path, encoding="utf-8") as stream:
+        manifest = json.load(stream)
+    set_id = manifest["recoverySetId"]
+    if manifest["schemaVersion"] != 1 or not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z-[0-9a-f-]{36}", set_id):
+        raise ValueError("identity")
+    if os.path.basename(manifest_path) != f"xboss-{set_id}.manifest.json":
+        raise ValueError("manifest name")
+    if manifest["status"] != "COMPLETE":
+        raise ValueError("partial")
+    if not isinstance(manifest["artifacts"], list) or len(manifest["artifacts"]) != 2:
+        raise ValueError("artifact set")
+    artifacts = {item["role"]: item for item in manifest["artifacts"]}
+    if set(artifacts) != {"database_dump", "uploads_archive"}:
+        raise ValueError("artifact roles")
+    for role, suffix in (("database_dump", ".dump"), ("uploads_archive", ".tar.gz")):
+        item = artifacts[role]
+        expected = f"xboss-{set_id}{suffix}" if role == "database_dump" else f"xboss-uploads-{set_id}{suffix}"
+        if item["status"] != "PRESENT" or item["path"] != expected:
+            raise ValueError("artifact path/status")
+        path = os.path.join(backup_dir, expected)
+        if os.path.islink(path) or not os.path.isfile(path) or os.path.getsize(path) != item["size"]:
+            raise ValueError("artifact missing/size")
+        digest = hashlib.sha256()
+        with open(path, "rb") as artifact:
+            for chunk in iter(lambda: artifact.read(1024 * 1024), b""):
+                digest.update(chunk)
+        if not re.fullmatch(r"[0-9a-f]{64}", item["sha256"]) or digest.hexdigest() != item["sha256"]:
+            raise ValueError("artifact checksum")
+    print(os.path.join(backup_dir, artifacts["database_dump"]["path"]))
+except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+    raise SystemExit("invalid")
+PY
+)" || die "Manifest recovery set mới nhất thiếu/không hợp lệ/PARTIAL hoặc artifact local thiếu/sai checksum/kích thước; từ chối restore."
 
 # Kiểm tra marker thật ở DB điều khiển, user không phải superuser, server đã trả về đúng
 # host/port cấu hình, và database sẽ tạo chưa tồn tại. Tất cả đều SELECT-only.
@@ -210,7 +256,7 @@ if [[ "$EXISTS" != "0" ]]; then
   die "Database đích đã tồn tại; sẽ không DROP database không do lần chạy này tạo."
 fi
 
-printf '==> Kiểm chứng từ backup: %s\n' "$LATEST_DUMP"
+printf '==> Kiểm chứng integrity từ recovery set: %s\n' "$(basename "$LATEST_MANIFEST")"
 printf '==> Tạo database disposable mới: %s\n' "$RESTORE_TARGET_DATABASE"
 if ! PGPASSFILE="$PGPASSFILE" PGSERVICEFILE="$PGSERVICEFILE" PGSERVICE=xboss_restore_check psql \
   -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$CONTROL_DB" \
@@ -253,4 +299,4 @@ for table in "${CORE_TABLES[@]}"; do
   printf '    ✅ %s: %s dòng\n' "$table" "$rows"
 done
 
-printf '✅ Restore check đạt; cleanup chỉ xoá database do chính lần chạy này tạo.\n'
+printf '✅ Restore smoke check đạt; integrity manifest đã kiểm. Đây không phải bằng chứng PITR/RPO/RTO; cleanup chỉ xoá database do chính lần chạy này tạo.\n'
