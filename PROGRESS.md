@@ -1,5 +1,14 @@
 # PROGRESS — XBoss
 
+## 2026-10-05 — QUALITY-FINAL-1 S14: kiểm tra cấu trúc archive trước restore
+
+`restore-check.sh` đọc/liệt kê archive uploads bằng `tar -tzf` sau khi đối chiếu manifest,
+trước mọi kết nối PostgreSQL; archive hỏng làm bước restore-check thất bại. Test dùng tar
+fixture hợp lệ và bản hỏng có checksum đúng để xác nhận không gọi DB khi cấu trúc sai.
+Targeted test 17/17 và kiểm cú pháp/định dạng đạt; CI release gate còn chờ PR này.
+Đây chỉ là kiểm tra archive có thể đọc, chưa chứng minh giải nén đầy đủ, khôi phục file,
+PITR hoặc RPO/RTO.
+
 ## 2026-10-05 — QUALITY-FINAL-1 S14: manifest cho bộ backup
 
 Backup tạo manifest gắn dump và kho tệp đính kèm bằng kích thước/SHA-256; bộ thiếu tệp trả lỗi,
