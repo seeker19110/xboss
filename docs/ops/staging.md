@@ -47,6 +47,7 @@ sudo -u postgres createdb xboss_staging
 # 3. Tạo file env staging — sao chép .env.local production làm nền, ĐỔI các giá trị sau:
 cp ~/xboss/.env.local .env.staging
 #    - DATABASE_URL: trỏ sang xboss_staging (không phải DB production!)
+#    - MIGRATE_DATABASE_URL: credential migration riêng cho DB staging, không dùng DB production
 #    - PORT: 3001 (hoặc cổng trống khác — set qua biến môi trường lúc pm2 start, xem bước 5)
 #    - XBOSS_SECRET: giá trị KHÁC production (session staging không lẫn với production)
 #    - CRON_SECRET: giá trị KHÁC production (tránh gọi nhầm cron production/staging cho nhau)
@@ -57,8 +58,8 @@ cp ~/xboss/.env.local .env.staging
 
 # 4. Cài đặt + build lần đầu (deploy.sh --staging làm việc này cho các lần sau)
 npm ci
-npm run db:migrate   # DATABASE_URL đọc từ .env.staging cần được nạp — export thủ công lần đầu:
-                      # export $(grep DATABASE_URL .env.staging | xargs) && npm run db:migrate
+set -a && . ./.env.staging && set +a
+npm run db:migrate   # chỉ dùng MIGRATE_DATABASE_URL đã trỏ tới DB staging
 npm run build
 
 # 5. Khởi động pm2 process riêng cho staging (khác tên + khác cổng)

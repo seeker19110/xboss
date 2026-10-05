@@ -86,16 +86,31 @@ export async function chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua, nodeA
   const baseUrl = process.env.TEST_DATABASE_URL;
 
   // Không có DB → mọi test tích hợp tự skip (tests/setup.ts). Gộp TẤT CẢ vào 1 tiến trình:
-  // nhanh nhất và không có rủi ro gì vì chẳng file nào chạm DB thật.
+  // nhanh nhất. Test ranh giới runtime cài pg mock nên phải chạy riêng để không làm
+  // nhiễm module cache của các test thuần còn lại.
   if (!baseUrl) {
-    const { out, status } = chayDongBo([
-      ...nodeArgs,
-      CO_MOCK_MODULE,
-      `--import=${tsxLoader}`,
-      "--test",
-      ...files,
-    ]);
-    thuKetQua(`${files.length} file (không có TEST_DATABASE_URL — gộp 1 tiến trình)`, out, status);
+    const isolated = files.filter((file) => file.endsWith("tests/db-runtime-migration-boundary.test.ts"));
+    const bundled = files.filter((file) => !isolated.includes(file));
+    for (const file of isolated) {
+      const { out, status } = chayDongBo([
+        ...nodeArgs,
+        CO_MOCK_MODULE,
+        `--import=${tsxLoader}`,
+        "--test",
+        file,
+      ]);
+      thuKetQua(file, out, status);
+    }
+    if (bundled.length) {
+      const { out, status } = chayDongBo([
+        ...nodeArgs,
+        CO_MOCK_MODULE,
+        `--import=${tsxLoader}`,
+        "--test",
+        ...bundled,
+      ]);
+      thuKetQua(`${bundled.length} file (không có TEST_DATABASE_URL — gộp 1 tiến trình)`, out, status);
+    }
     return;
   }
 
@@ -126,7 +141,7 @@ export async function chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua, nodeA
   const mig = spawnSync(process.execPath, [`--import=${tsxLoader}`, "scripts/migrate.ts"], {
     stdio: ["ignore", "pipe", "pipe"],
     encoding: "utf8",
-    env: { ...process.env, DATABASE_URL: baseUrl },
+    env: { ...process.env, DATABASE_URL: baseUrl, MIGRATE_DATABASE_URL: baseUrl },
   });
   if (mig.status !== 0) {
     process.stdout.write((mig.stdout ?? "") + (mig.stderr ?? ""));
@@ -159,6 +174,7 @@ export async function chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua, nodeA
         {
           TEST_DATABASE_URL: url,
           DATABASE_URL: url,
+          MIGRATE_DATABASE_URL: url,
           // N worker × pool mặc định 10 sẽ vượt max_connections (mặc định 100). Ghim thấp.
           XBOSS_PG_POOL_MAX: process.env.XBOSS_PG_POOL_MAX ?? "3",
         },

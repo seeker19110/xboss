@@ -1,10 +1,10 @@
 # Triển khai XBoss lên VPS/Server (production)
 
-Ứng dụng dùng **PostgreSQL** — cấu hình qua biến môi trường `DATABASE_URL`
-(Supabase free tier hoặc Postgres tự host đều được). Schema áp qua hệ migrate SQL
-(`migrations/*.sql`, xem `docs/adr/0003-migrations.md`): app **tự áp migration chưa chạy khi
-khởi động lần đầu**, hoặc chủ động chạy `npm run db:migrate` trước khi start. Đổi schema về sau
-= thêm file `migrations/000N_*.sql` mới (append-only).
+Ứng dụng dùng **PostgreSQL** — `DATABASE_URL` là credential runtime; `MIGRATE_DATABASE_URL`
+là credential riêng cho migration job/deploy. Runtime không tự chạy DDL: chạy
+`npm run db:migrate` bằng role migration trước khi start app. Nếu schema thiếu hoặc lỗi thời,
+API/health readiness báo lỗi thay vì tự migrate. Migration SQL (`migrations/*.sql`, xem
+`docs/adr/0003-migrations.md`) append-only.
 
 ---
 
@@ -104,9 +104,11 @@ cd xboss
 npm ci
 
 # Tạo file môi trường
-cp .env.example .env.local       # điền DATABASE_URL + XBOSS_SECRET
+cp .env.example .env.local       # điền DATABASE_URL + MIGRATE_DATABASE_URL + XBOSS_SECRET
 # DATABASE_URL=postgresql://xboss:mật-khẩu-mạnh@localhost:5432/xboss  (nếu tự host Postgres)
+# MIGRATE_DATABASE_URL=postgresql://xboss_migrate:mật-khẩu-mạnh@localhost:5432/xboss
 
+npm run db:migrate               # áp schema bằng credential migration
 npm run build
 npm run db:seed                  # nạp dữ liệu lần đầu từ Excel trong attachments/
 
@@ -254,7 +256,7 @@ cần scale lên nhiều instance/traffic cao:
 | Biến                       | Mô tả                                                                                                                                                                             | Mặc định |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `XBOSS_PG_POOL_MAX`        | Số connection tối đa trong pool Postgres của mỗi instance app (clamp 1–100).                                                                                                      | `10`     |
-| `XBOSS_PG_STMT_TIMEOUT_MS` | Thời gian tối đa (ms) cho 1 câu query trước khi Postgres huỷ (clamp 1.000–300.000). Riêng phiên chạy migration (`npm run db:migrate` / tự động lúc boot) không bị áp timeout này. | `30000`  |
+| `XBOSS_PG_STMT_TIMEOUT_MS` | Thời gian tối đa (ms) cho 1 câu query trước khi Postgres huỷ (clamp 1.000–300.000). Riêng phiên chạy migration (`npm run db:migrate`) không bị áp timeout này. | `30000`  |
 | `XBOSS_SLOW_QUERY_MS`      | Ngưỡng (ms) coi 1 query là "chậm" để ghi log cảnh báo.                                                                                                                            | `500`    |
 
 ---

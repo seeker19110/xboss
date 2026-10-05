@@ -1,5 +1,5 @@
-// Chạy migration thủ công: `npm run db:migrate`. App cũng tự áp lúc boot (ensureSchema),
-// nhưng lệnh này để chủ động áp khi deploy hoặc kiểm tra trạng thái schema.
+// Chạy migration tường minh: `npm run db:migrate`. Runtime app không chạy DDL;
+// lệnh này dùng riêng MIGRATE_DATABASE_URL trước khi deploy/start app.
 // `npm run db:migrate -- --dry-run` (M44 PR4): chỉ IN danh sách migration SẼ áp, không chạy
 // gì — dùng kiểm tra trước deploy/staging (xem docs/ops/staging.md, CLAUDE.md mục Quy ước).
 import "./env";

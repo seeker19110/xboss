@@ -20,6 +20,7 @@ const serverSchema = z
   .object({
     // Lõi
     DATABASE_URL: z.string().min(1, "bắt buộc — chuỗi kết nối Postgres"),
+    MIGRATE_DATABASE_URL: z.string().min(1).optional(),
     XBOSS_SECRET: z.string().min(1).optional(),
     XBOSS_ADMIN_PASSWORD: z.string().min(1).optional(),
     CRON_SECRET: z.string().min(1).optional(),
