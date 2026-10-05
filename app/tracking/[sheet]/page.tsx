@@ -25,6 +25,7 @@ import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
 import { ROLE_LABELS } from "@/lib/nen/roles";
 import { fetchMe } from "@/app/lib/me";
+import { OFFLINE_QUEUE_QUARANTINED } from "@/app/components/offlineQueue";
 import { sortFloorsDesc } from "@/lib/nen/floors";
 import { useTrackingData } from "./useTrackingData";
 import { TrackingToolbar } from "./TrackingToolbar";
@@ -644,7 +645,12 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
           }`}
           style={{ bottom: "max(4rem, env(safe-area-inset-bottom, 0px) + 3.5rem)" }}
         >
-          {online ? (
+          {OFFLINE_QUEUE_QUARANTINED ? (
+            <>
+              <WifiOff className="w-3.5 h-3.5" /> Thao tác chưa được lưu offline — kết nối mạng để
+              lưu thay đổi.
+            </>
+          ) : online ? (
             <>
               <CloudUpload className="w-3.5 h-3.5 animate-pulse" /> Đang gửi lại {offlinePending}{" "}
               thay đổi đã lưu offline...
