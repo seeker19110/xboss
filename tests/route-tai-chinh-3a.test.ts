@@ -1367,12 +1367,225 @@ test("PATCH /api/payments: upsert giá trị HĐ theo tầng × hệ thành côn
     jreq("/api/payments", { updates: [{ sheetTypeId, floorLabel, contractValue: 777_000 }] }),
   );
   assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true, updated: 1 });
   const row = await queryOne<{ contract_value: number }>(
     `SELECT contract_value FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
     sheetTypeId,
     floorLabel,
   );
   assert.equal(Number(row?.contract_value), 777_000);
+});
+
+test("PATCH /api/payments: từ chối sheet ngoài dự án và không ghi dữ liệu", S, async () => {
+  const projectA = await taoDuAn("pay-scope-a");
+  const projectB = await taoDuAn("pay-scope-b");
+  const pm = await taoUser("pm", "pay-scope");
+  const target = await taoTangHe(projectB, "payscopeb");
+  await dangNhapDuAn(pm, projectA);
+  const { PATCH } = await import("@/app/api/payments/route");
+  const res = await PATCH(
+    jreq("/api/payments", {
+      updates: [{ ...target, contractValue: 91_000 }],
+    }),
+  );
+  assert.equal(res.status, 404);
+  const { queryOne } = await import("@/lib/db");
+  const row = await queryOne(
+    `SELECT id FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
+    target.sheetTypeId,
+    target.floorLabel,
+  );
+  assert.equal(row, undefined);
+});
+
+test("PATCH /api/payments: không có dự án hiện hành thì từ chối", S, async () => {
+  const projectId = await taoDuAn("pay-no-project-membership");
+  const member = await taoUser("pm", "pay-no-project-member");
+  const pm = await taoUser("pm", "pay-no-project");
+  const target = await taoTangHe(projectId, "paynoproject");
+  const { run } = await import("@/lib/db");
+  await run(
+    `INSERT INTO user_projects (user_id, project_id) VALUES (?, ?) ON CONFLICT DO NOTHING`,
+    member.id,
+    projectId,
+  );
+  await dangNhapDuAn(pm, null);
+  const { PATCH } = await import("@/app/api/payments/route");
+  const res = await PATCH(jreq("/api/payments", { updates: [{ ...target, contractValue: 10 }] }));
+  assert.equal(res.status, 404);
+  const { queryOne } = await import("@/lib/db");
+  const row = await queryOne(
+    `SELECT id FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
+    target.sheetTypeId,
+    target.floorLabel,
+  );
+  assert.equal(row, undefined);
+});
+
+test("PATCH /api/payments: ID phải canonical dương an toàn và reject cả batch", S, async () => {
+  const projectId = await taoDuAn("pay-invalid-id");
+  const pm = await taoUser("pm", "pay-invalid-id");
+  const target = await taoTangHe(projectId, "payinvalidid");
+  await dangNhapDuAn(pm, projectId);
+  const { PATCH } = await import("@/app/api/payments/route");
+  for (const sheetTypeId of [
+    0,
+    -1,
+    1.5,
+    "01",
+    "1e2",
+    "0x10",
+    "12x",
+    Number.MAX_SAFE_INTEGER + 1,
+    true,
+    [],
+    {},
+  ]) {
+    const res = await PATCH(
+      jreq("/api/payments", {
+        updates: [
+          { ...target, contractValue: 10 },
+          {
+            ...target,
+            sheetTypeId,
+            floorLabel: `invalid-${String(sheetTypeId)}`,
+            contractValue: 20,
+          },
+        ],
+      }),
+    );
+    assert.equal(res.status, 400, `sheetTypeId=${String(sheetTypeId)}`);
+  }
+  const { queryOne } = await import("@/lib/db");
+  const row = await queryOne(
+    `SELECT id FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
+    target.sheetTypeId,
+    target.floorLabel,
+  );
+  assert.equal(row, undefined);
+});
+
+test("PATCH /api/payments: batch ngoài scope không làm đổi dòng hợp lệ trước đó", S, async () => {
+  const projectA = await taoDuAn("pay-atomic-a");
+  const projectB = await taoDuAn("pay-atomic-b");
+  const pm = await taoUser("pm", "pay-atomic");
+  const allowed = await taoTangHe(projectA, "payatomica");
+  const foreign = await taoTangHe(projectB, "payatomicb");
+  const { run, queryOne } = await import("@/lib/db");
+  await run(
+    `INSERT INTO floor_contracts (sheet_type_id, floor_label, contract_value) VALUES (?, ?, ?)`,
+    allowed.sheetTypeId,
+    allowed.floorLabel,
+    123,
+  );
+  await dangNhapDuAn(pm, projectA);
+  const { PATCH } = await import("@/app/api/payments/route");
+  const res = await PATCH(
+    jreq("/api/payments", {
+      updates: [
+        { ...allowed, contractValue: 999 },
+        { ...foreign, contractValue: 888 },
+      ],
+    }),
+  );
+  assert.equal(res.status, 404);
+  const row = await queryOne<{ contract_value: number }>(
+    `SELECT contract_value FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
+    allowed.sheetTypeId,
+    allowed.floorLabel,
+  );
+  assert.equal(Number(row?.contract_value), 123);
+  const foreignRow = await queryOne(
+    `SELECT id FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
+    foreign.sheetTypeId,
+    foreign.floorLabel,
+  );
+  assert.equal(foreignRow, undefined);
+});
+
+test("PATCH /api/payments: hợp đồng liên kết phải cùng dự án và được giữ nguyên", S, async () => {
+  const projectA = await taoDuAn("pay-contract-a");
+  const projectB = await taoDuAn("pay-contract-b");
+  const pm = await taoUser("pm", "pay-contract");
+  const target = await taoTangHe(projectA, "paycontracta");
+  const inScopeContract = await taoHopDong(projectA, "pay-contract-in-scope");
+  const foreignContract = await taoHopDong(projectB, "pay-contract-foreign");
+  const { run, queryOne } = await import("@/lib/db");
+  await run(
+    `INSERT INTO floor_contracts (sheet_type_id, floor_label, contract_value, contract_id) VALUES (?, ?, ?, ?)`,
+    target.sheetTypeId,
+    target.floorLabel,
+    123,
+    foreignContract,
+  );
+  await dangNhapDuAn(pm, projectA);
+  const { PATCH } = await import("@/app/api/payments/route");
+  const rejected = await PATCH(
+    jreq("/api/payments", { updates: [{ ...target, contractValue: 999 }] }),
+  );
+  assert.equal(rejected.status, 404);
+  let row = await queryOne<{ contract_value: number; contract_id: number }>(
+    `SELECT contract_value, contract_id FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
+    target.sheetTypeId,
+    target.floorLabel,
+  );
+  assert.equal(Number(row?.contract_value), 123);
+  assert.equal(row?.contract_id, foreignContract);
+  await run(
+    `UPDATE floor_contracts SET contract_id = NULL WHERE sheet_type_id = ? AND floor_label = ?`,
+    target.sheetTypeId,
+    target.floorLabel,
+  );
+  await run(
+    `UPDATE floor_contracts SET contract_id = ? WHERE sheet_type_id = ? AND floor_label = ?`,
+    inScopeContract,
+    target.sheetTypeId,
+    target.floorLabel,
+  );
+  const accepted = await PATCH(
+    jreq("/api/payments", { updates: [{ ...target, contractValue: 456 }] }),
+  );
+  assert.equal(accepted.status, 200);
+  row = await queryOne<{ contract_value: number; contract_id: number }>(
+    `SELECT contract_value, contract_id FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
+    target.sheetTypeId,
+    target.floorLabel,
+  );
+  assert.equal(Number(row?.contract_value), 456);
+  assert.equal(row?.contract_id, inScopeContract);
+});
+
+test("PATCH /api/payments: duplicate key và giá trị âm reject toàn batch", S, async () => {
+  const projectId = await taoDuAn("pay-invalid-batch");
+  const pm = await taoUser("pm", "pay-invalid-batch");
+  const target = await taoTangHe(projectId, "payinvalidbatch");
+  await dangNhapDuAn(pm, projectId);
+  const { PATCH } = await import("@/app/api/payments/route");
+  const duplicate = await PATCH(
+    jreq("/api/payments", {
+      updates: [
+        { ...target, contractValue: 20 },
+        { ...target, contractValue: 30 },
+      ],
+    }),
+  );
+  const negative = await PATCH(
+    jreq("/api/payments", {
+      updates: [
+        { ...target, contractValue: 20 },
+        { ...target, floorLabel: "T-negative", contractValue: -1 },
+      ],
+    }),
+  );
+  assert.equal(duplicate.status, 400);
+  assert.equal(negative.status, 400);
+  const { queryOne } = await import("@/lib/db");
+  const row = await queryOne(
+    `SELECT id FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
+    target.sheetTypeId,
+    target.floorLabel,
+  );
+  assert.equal(row, undefined);
 });
 
 // ============================================================================
