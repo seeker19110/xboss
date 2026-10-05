@@ -130,7 +130,7 @@ export async function PATCH(req: NextRequest) {
     updates.push({ sheetTypeId, floorLabel, contractValue: row.contractValue });
   }
 
-  const placeholders = updates.map(() => "(?, ?, ?)").join(", ");
+  const placeholders = updates.map(() => "(?::integer, ?::text, ?::numeric)").join(", ");
   const params = updates.flatMap((u) => [u.sheetTypeId, u.floorLabel, u.contractValue]);
   let writeResult: { ok: false } | { ok: true; count: number };
   try {

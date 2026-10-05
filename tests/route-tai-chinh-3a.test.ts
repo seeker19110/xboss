@@ -1357,23 +1357,36 @@ test(
 );
 
 test("PATCH /api/payments: upsert giá trị HĐ theo tầng × hệ thành công", S, async () => {
-  const { queryOne } = await import("@/lib/db");
+  const { query } = await import("@/lib/db");
   const projectId = await taoDuAn("pay-patchok");
   const pm = await taoUser("pm", "pay-patchok");
-  const { sheetTypeId, floorLabel } = await taoTangHe(projectId, "paypatchok");
+  const first = await taoTangHe(projectId, "paypatchok-a");
+  const second = await taoTangHe(projectId, "paypatchok-b", { floorLabel: "T2" });
   await dangNhapDuAn(pm, projectId);
   const { PATCH } = await import("@/app/api/payments/route");
   const res = await PATCH(
-    jreq("/api/payments", { updates: [{ sheetTypeId, floorLabel, contractValue: 777_000 }] }),
+    jreq("/api/payments", {
+      updates: [
+        { ...first, contractValue: 777_000 },
+        { ...second, contractValue: 888_000 },
+      ],
+    }),
   );
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { ok: true, updated: 1 });
-  const row = await queryOne<{ contract_value: number }>(
-    `SELECT contract_value FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
-    sheetTypeId,
-    floorLabel,
+  assert.deepEqual(await res.json(), { ok: true, updated: 2 });
+  const rows = await query<{ sheet_type_id: number; contract_value: number }>(
+    `SELECT sheet_type_id, contract_value FROM floor_contracts WHERE sheet_type_id IN (?, ?)`,
+    first.sheetTypeId,
+    second.sheetTypeId,
   );
-  assert.equal(Number(row?.contract_value), 777_000);
+  assert.equal(rows.length, 2);
+  assert.deepEqual(
+    rows.map((row) => [row.sheet_type_id, Number(row.contract_value)]).sort((a, b) => a[0] - b[0]),
+    [
+      [first.sheetTypeId, 777_000],
+      [second.sheetTypeId, 888_000],
+    ].sort((a, b) => a[0] - b[0]),
+  );
 });
 
 test("PATCH /api/payments: từ chối sheet ngoài dự án và không ghi dữ liệu", S, async () => {
