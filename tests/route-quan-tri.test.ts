@@ -725,27 +725,50 @@ test("PATCH /api/projects/:id: tên rỗng → 400", S, async () => {
 test("PATCH /api/projects/:id: mã trùng dự án khác → 409", S, async () => {
   const admin = await dungUser("admin", `adminpatchdup${RUN}`);
   const code = `PPX${RUN}`;
-  const { insertId } = await import("@/lib/db");
+  const { insertId, queryOne } = await import("@/lib/db");
   await insertId(`INSERT INTO projects (name, code) VALUES (?, ?)`, "Đã có mã", code);
   const proj = await dungDuAn(`patchdup${RUN}`);
+  const original = await queryOne<{ name: string; code: string | null }>(
+    `SELECT name, code FROM projects WHERE id = ?`,
+    proj,
+  );
   dangNhap({ id: admin.id, passwordHash: admin.pwHash });
   const { PATCH } = await import("@/app/api/projects/[id]/route");
-  const res = await PATCH(req(`http://localhost/api/projects/${proj}`, "PATCH", { code }), {
-    params: Promise.resolve({ id: String(proj) }),
-  });
+  const res = await PATCH(
+    req(`http://localhost/api/projects/${proj}`, "PATCH", { name: "Tên không được lưu", code }),
+    { params: Promise.resolve({ id: String(proj) }) },
+  );
   assert.equal(res.status, 409);
+  assert.deepEqual(
+    await queryOne(`SELECT name, code FROM projects WHERE id = ?`, proj),
+    original,
+    "xung đột mã không được lưu một phần trường name",
+  );
 });
 
 test("PATCH /api/projects/:id: trạng thái không hợp lệ → 422", S, async () => {
   const admin = await dungUser("admin", `adminpatchstatus${RUN}`);
   const proj = await dungDuAn(`patchstatus${RUN}`);
+  const { queryOne } = await import("@/lib/db");
+  const original = await queryOne<{ name: string; status: string }>(
+    `SELECT name, status FROM projects WHERE id = ?`,
+    proj,
+  );
   dangNhap({ id: admin.id, passwordHash: admin.pwHash });
   const { PATCH } = await import("@/app/api/projects/[id]/route");
   const res = await PATCH(
-    req(`http://localhost/api/projects/${proj}`, "PATCH", { status: "khong-hop-le" }),
+    req(`http://localhost/api/projects/${proj}`, "PATCH", {
+      name: "Tên không được lưu",
+      status: "khong-hop-le",
+    }),
     { params: Promise.resolve({ id: String(proj) }) },
   );
   assert.equal(res.status, 422);
+  assert.deepEqual(
+    await queryOne(`SELECT name, status FROM projects WHERE id = ?`, proj),
+    original,
+    "trạng thái không hợp lệ không được lưu một phần trường name",
+  );
 });
 
 test("PATCH /api/projects/:id: admin sửa đủ trường thành công", S, async () => {
@@ -868,7 +891,7 @@ test(
 );
 
 test(
-  "DELETE /api/projects/:id: dự án rỗng → xoá thành công, dọn user_projects/nav_settings",
+  "DELETE /api/projects/:id: chặn hard delete kể cả dự án trống và giữ liên kết",
   S,
   async () => {
     const admin = await dungUser("admin", `admindelok2${RUN}`);
@@ -884,11 +907,46 @@ test(
     const res = await DELETE(req(`http://localhost/api/projects/${proj}`, "DELETE"), {
       params: Promise.resolve({ id: String(proj) }),
     });
-    assert.equal(res.status, 200);
-    const gone = await queryOne(`SELECT id FROM projects WHERE id = ?`, proj);
-    assert.equal(gone, undefined);
+    assert.equal(res.status, 409);
+    assert.match((await res.json()).error, /closed/);
+    const remains = await queryOne(`SELECT id FROM projects WHERE id = ?`, proj);
+    assert.ok(remains);
     const up = await queryOne(`SELECT * FROM user_projects WHERE project_id = ?`, proj);
-    assert.equal(up, undefined);
+    assert.ok(up);
+    const nav = await queryOne(`SELECT * FROM nav_settings WHERE project_id = ?`, proj);
+    assert.ok(nav);
+  },
+);
+
+test(
+  "DELETE /api/projects/:id: chặn xoá và giữ engineering workflow dù dự án không có tower",
+  S,
+  async () => {
+    const admin = await dungUser("admin", `admindelworkflow${RUN}`);
+    const proj = await dungDuAn(`delworkflow${RUN}`);
+    const { queryOne, run } = await import("@/lib/db");
+    await run(
+      `INSERT INTO engineering_workflows
+        (project_id, title, profile, risk_class, created_by)
+       VALUES (?, 'Workflow phải giữ lại', 'A', 'low', ?)`,
+      proj,
+      admin.id,
+    );
+    const workflow = await queryOne<{ id: string }>(
+      `SELECT id FROM engineering_workflows WHERE project_id = ?`,
+      proj,
+    );
+    assert.ok(workflow);
+    dangNhap({ id: admin.id, passwordHash: admin.pwHash });
+    const { DELETE } = await import("@/app/api/projects/[id]/route");
+    const res = await DELETE(req(`http://localhost/api/projects/${proj}`, "DELETE"), {
+      params: Promise.resolve({ id: String(proj) }),
+    });
+    assert.equal(res.status, 409);
+    assert.ok(await queryOne(`SELECT id FROM projects WHERE id = ?`, proj));
+    assert.ok(await queryOne(`SELECT id FROM engineering_workflows WHERE id = ?`, workflow.id));
+    await run(`DELETE FROM engineering_workflows WHERE id = ?`, workflow.id);
+    await run(`DELETE FROM projects WHERE id = ?`, proj);
   },
 );
 
