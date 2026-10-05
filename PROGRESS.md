@@ -44,6 +44,10 @@ Credential migration phải nằm trong file riêng mode `0600` ngoài checkout 
 `deploy.sh` từ chối khi thiếu/sai quyền/còn trong env file runtime, chỉ truyền cho bước migrate
 và xóa trước khi reload PM2. Cần chuyển credential hiện hữu sang file riêng trước deploy PR này;
 không được ghi URL vào `.env.local`.
+Workflow deploy lấy đúng SHA đã qua CI trên VPS trước khi chạy script mới; staging bootstrap
+từ chối credential cũ trong env file. E2E chạy migrator trên DB disposable trước khi seed, vì
+runtime không còn tự tạo schema. Targeted test cấu hình đạt; CI PostgreSQL/E2E trên HEAD cuối
+vẫn là điều kiện hợp nhất.
 
 Đã cập nhật quy trình rollout/recovery tại [ADR-0003](docs/adr/0003-migrations.md), cùng hướng
 dẫn Metabase để chạy migration `0073` bằng migrator riêng. Không chạy database hoặc production
