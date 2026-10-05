@@ -50,9 +50,11 @@ artifact mồ côi và các set đã quá tuổi retention, giữ set `COMPLETE`
 đầy đủ mới chạy remote retention. Khi đẩy remote, manifest được copy sau các artifact.
 
 `restore-check.sh` chọn manifest mới nhất và kiểm schema, set ID, đủ hai artifact, tồn tại, size và
-SHA-256 trước mọi kết nối PostgreSQL. Script có thể tạo credential file tạm để phân tích target
-trước bước integrity check, nhưng sai/thiếu manifest hoặc artifact sẽ dừng trước mọi lệnh
-`psql`/`pg_restore`. Manifest hiện nằm cạnh artifact trong backup directory;
+SHA-256 trước mọi kết nối PostgreSQL; sau đó dùng `tar -tzf` để xác nhận archive uploads có thể
+được đọc/liệt kê, cũng trước khi kết nối. Script có thể tạo credential file tạm để phân tích target
+trước bước integrity check, nhưng manifest/artifact sai hoặc archive không đọc được sẽ dừng trước
+mọi lệnh `psql`/`pg_restore`. Kiểm tra này không giải nén archive hay xác nhận mọi attachment
+critical được khôi phục đúng. Manifest hiện nằm cạnh artifact trong backup directory;
 SHA-256 giúp phát hiện thiếu/hỏng file nhưng không chứng minh chống sửa nếu người có quyền sửa được
 cả manifest lẫn artifact.
 

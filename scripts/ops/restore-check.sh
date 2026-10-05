@@ -174,8 +174,8 @@ if ((${#MANIFESTS[@]} == 0)); then
   die "Không tìm thấy manifest recovery set trong $BACKUP_DIR — chạy backup.sh trước."
 fi
 LATEST_MANIFEST="$(ls -t "${MANIFESTS[@]}" | head -1)"
-# Verify manifest and every listed artifact before creating credentials or making any
-# PostgreSQL connection. The manifest is an integrity check, not a full PITR attestation.
+# Verify manifest and every listed artifact before any PostgreSQL connection. The manifest
+# is an integrity check, not a full PITR attestation.
 LATEST_DUMP="$(python3 - "$BACKUP_DIR" "$LATEST_MANIFEST" <<'PY'
 import hashlib
 import json
@@ -220,6 +220,14 @@ except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
     raise SystemExit("invalid")
 PY
 )" || die "Manifest recovery set mới nhất thiếu/không hợp lệ/PARTIAL hoặc artifact local thiếu/sai checksum/kích thước; từ chối restore."
+
+LATEST_DUMP_BASENAME="${LATEST_DUMP##*/}"
+LATEST_SET_ID="${LATEST_DUMP_BASENAME#xboss-}"
+LATEST_SET_ID="${LATEST_SET_ID%.dump}"
+LATEST_UPLOADS_ARCHIVE="$BACKUP_DIR/xboss-uploads-$LATEST_SET_ID.tar.gz"
+if ! tar -tzf "$LATEST_UPLOADS_ARCHIVE" >/dev/null 2>&1; then
+  die "Archive uploads trong recovery set không đọc được; từ chối restore trước khi kết nối PostgreSQL."
+fi
 
 # Kiểm tra marker thật ở DB điều khiển, user không phải superuser, server đã trả về đúng
 # host/port cấu hình, và database sẽ tạo chưa tồn tại. Tất cả đều SELECT-only.
