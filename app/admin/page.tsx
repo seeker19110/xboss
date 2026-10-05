@@ -830,7 +830,7 @@ export default function AdminPage() {
                 Danh sách dự án
               </div>
               <p className="px-4 py-2 text-xs text-zinc-400">
-                Chọn “Đã đóng” để ngừng sử dụng dự án và giữ nguyên hồ sơ, lịch sử.
+                Chọn “Đã đóng” để đánh dấu dự án đã kết thúc và giữ nguyên hồ sơ, lịch sử.
               </p>
               <div className="divide-y divide-zinc-800/60">
                 {projects.map((p) => {
