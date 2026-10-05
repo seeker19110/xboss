@@ -197,9 +197,8 @@ else
     exit 1
   fi
 
-  # Cổng 1 — ĐÚNG COMMIT: bước 2/7 vừa ép code về origin/main, nếu có push mới chen vào giữa
-  # thì gói build (của commit cũ) không còn khớp mã nguồn/migration vừa áp. Chạy lệch cặp này
-  # là kiểu lỗi rất khó truy: app phục vụ bundle của bản khác với code trên đĩa.
+  # Cổng 1 — ĐÚNG COMMIT: bước 2/7 đã ghim TARGET_SHA; gói build phải đúng SHA đó.
+  # Giữ kiểm tra phòng trường hợp gói tải lên sai hoặc bị thay thế trước lúc swap.
   CI_SHA=$(grep -E '^sha=' "$CI_INFO" | tail -n1 | cut -d= -f2-)
   HEAD_SHA=$(git rev-parse HEAD)
   if [ "$CI_SHA" != "$HEAD_SHA" ]; then
