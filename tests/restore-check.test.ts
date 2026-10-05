@@ -8,6 +8,7 @@ import {
   mkdirSync,
   readFileSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -26,7 +27,7 @@ function runRestoreCheck(
     serverAddr?: string;
     superuser?: boolean;
     canCreateDb?: boolean;
-    integrity?: "corrupt" | "wrong-size" | "missing-uploads" | "partial";
+    integrity?: "corrupt" | "wrong-size" | "missing-uploads" | "partial" | "newer-missing";
   } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), "xboss-restore-check-"));
@@ -84,6 +85,36 @@ function runRestoreCheck(
       };
       manifest.status = "PARTIAL";
       writeFileSync(manifestPath, JSON.stringify(manifest));
+    }
+    if (options.integrity === "newer-missing") {
+      const newerSetId = "20300101T000000Z-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+      const newerManifestPath = join(backups, `xboss-${newerSetId}.manifest.json`);
+      writeFileSync(
+        newerManifestPath,
+        JSON.stringify({
+          schemaVersion: 1,
+          recoverySetId: newerSetId,
+          status: "COMPLETE",
+          artifacts: [
+            {
+              role: "database_dump",
+              path: `xboss-${newerSetId}.dump`,
+              status: "PRESENT",
+              size: 7,
+              sha256: createHash("sha256").update("fixture").digest("hex"),
+            },
+            {
+              role: "uploads_archive",
+              path: `xboss-uploads-${newerSetId}.tar.gz`,
+              status: "PRESENT",
+              size: 15,
+              sha256: createHash("sha256").update("uploads fixture").digest("hex"),
+            },
+          ],
+        }),
+      );
+      const future = new Date("2030-01-01T00:00:00Z");
+      utimesSync(newerManifestPath, future, future);
     }
     const log = join(dir, "calls.log");
     const psql = `#!/usr/bin/env bash
@@ -257,27 +288,34 @@ test("restore-check only drops a target it created during this invocation", () =
 test("restore-check rejects a checksum mismatch before connecting or writing", () => {
   const result = runRestoreCheck({ integrity: "corrupt" });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Manifest thiếu, không hợp lệ, PARTIAL hoặc artifact sai checksum/);
+  assert.match(result.stderr, /Manifest recovery set mới nhất/);
   assert.equal(result.calls, "");
 });
 
 test("restore-check rejects an artifact size mismatch before connecting or writing", () => {
   const result = runRestoreCheck({ integrity: "wrong-size" });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Manifest thiếu, không hợp lệ, PARTIAL hoặc artifact sai checksum/);
+  assert.match(result.stderr, /Manifest recovery set mới nhất/);
   assert.equal(result.calls, "");
 });
 
 test("restore-check rejects a missing attachment archive before connecting or writing", () => {
   const result = runRestoreCheck({ integrity: "missing-uploads" });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Manifest thiếu, không hợp lệ, PARTIAL hoặc artifact sai checksum/);
+  assert.match(result.stderr, /Manifest recovery set mới nhất/);
   assert.equal(result.calls, "");
 });
 
 test("restore-check rejects a PARTIAL recovery set before connecting or writing", () => {
   const result = runRestoreCheck({ integrity: "partial" });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Manifest thiếu, không hợp lệ, PARTIAL hoặc artifact sai checksum/);
+  assert.match(result.stderr, /Manifest recovery set mới nhất/);
+  assert.equal(result.calls, "");
+});
+
+test("restore-check fails closed when the newest manifest has no local artifact set", () => {
+  const result = runRestoreCheck({ integrity: "newer-missing" });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /artifact local thiếu/);
   assert.equal(result.calls, "");
 });

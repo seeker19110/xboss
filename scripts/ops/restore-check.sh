@@ -219,7 +219,7 @@ try:
 except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
     raise SystemExit("invalid")
 PY
-)" || die "Manifest thiếu, không hợp lệ, PARTIAL hoặc artifact sai checksum/kích thước; từ chối restore."
+)" || die "Manifest recovery set mới nhất thiếu/không hợp lệ/PARTIAL hoặc artifact local thiếu/sai checksum/kích thước; từ chối restore."
 
 # Kiểm tra marker thật ở DB điều khiển, user không phải superuser, server đã trả về đúng
 # host/port cấu hình, và database sẽ tạo chưa tồn tại. Tất cả đều SELECT-only.
