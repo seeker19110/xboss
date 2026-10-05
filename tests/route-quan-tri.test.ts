@@ -878,15 +878,21 @@ test(
   async () => {
     const admin = await dungUser("admin", `admindelmat${RUN}`);
     const proj = await dungDuAn(`delmat${RUN}`);
-    const { insertId } = await import("@/lib/db");
-    await insertId(`INSERT INTO materials (project_id, name) VALUES (?, 'Vật tư QT')`, proj);
+    const { insertId, queryOne } = await import("@/lib/db");
+    const materialId = await insertId(
+      `INSERT INTO materials (project_id, name) VALUES (?, 'Vật tư QT')`,
+      proj,
+    );
     dangNhap({ id: admin.id, passwordHash: admin.pwHash });
     const { DELETE } = await import("@/app/api/projects/[id]/route");
     const res = await DELETE(req(`http://localhost/api/projects/${proj}`, "DELETE"), {
       params: Promise.resolve({ id: String(proj) }),
     });
     assert.equal(res.status, 409);
-    assert.match((await res.json()).error, /materials/);
+    assert.match((await res.json()).error, /closed/);
+    assert.ok(
+      await queryOne(`SELECT id FROM materials WHERE id = ? AND project_id = ?`, materialId, proj),
+    );
   },
 );
 
