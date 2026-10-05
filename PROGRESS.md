@@ -59,8 +59,11 @@ trong slice tài liệu này. A1-AC04/06 và Q-AC07 vẫn cần evidence Postgre
 
 `POST /api/projects` lấy `org_id` từ Admin đã xác thực; `PATCH`/`DELETE` và nguồn
 `clone-config` chỉ xử lý dự án cùng tổ chức. ID không dương/không an toàn bị từ chối.
-Năm kiểm thử HTTP âm bổ sung trường hợp giả mạo org và thao tác chéo org; lint,
-typecheck và định dạng đạt, test PostgreSQL disposable còn chờ CI. Đây là ranh giới
+`PATCH` kiểm hết payload trước một lệnh ghi để lỗi mã trùng/trạng thái không gây cập nhật
+một phần. `DELETE` trả 409 kể cả dự án chưa có tower vì nhiều bảng workflow/audit có FK
+xoá dây chuyền; Admin chuyển trạng thái “Đã đóng” trên UI để giữ nguyên hồ sơ. Bổ sung
+kiểm thử HTTP âm về giả mạo org, sửa lỗi một phần và bảo toàn workflow. Lint, typecheck,
+UI guard và định dạng đạt; test PostgreSQL disposable còn chờ CI. Đây là ranh giới
 project-admin hẹp; resolver membership/fallback và các caller S02 vẫn chưa cutover.
 
 ## 2026-10-05 — QUALITY-FINAL-1 S14: cô lập restore-check

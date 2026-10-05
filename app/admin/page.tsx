@@ -18,10 +18,8 @@ import {
   HardDrive,
   LayoutDashboard,
   Building2,
-  Trash2,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
-import { appConfirm } from "@/app/components/dialogs";
 import { fetchMe } from "@/app/lib/me";
 import { ROLE_LABELS } from "@/lib/nen/roles";
 import { DASHBOARD_TREE, dashboardStatus } from "@/app/lib/dashboardTree";
@@ -358,22 +356,6 @@ export default function AdminPage() {
     } catch {
       setError("Mất kết nối mạng — vui lòng thử lại");
       setProjects(prev);
-    }
-  }
-
-  async function deleteProject(id: number, name: string) {
-    if (!(await appConfirm(`Xoá dự án "${name}"? Chỉ xoá được khi dự án chưa có dữ liệu.`))) return;
-    try {
-      const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(j.error ?? "Lỗi không xác định");
-        return;
-      }
-      flash(`Đã xoá dự án "${name}"`);
-      loadProjects();
-    } catch {
-      setError("Mất kết nối mạng — vui lòng thử lại");
     }
   }
 
@@ -847,6 +829,9 @@ export default function AdminPage() {
               <div className="px-4 py-2 border-b border-zinc-800 text-xs font-semibold uppercase tracking-wider text-zinc-400">
                 Danh sách dự án
               </div>
+              <p className="px-4 py-2 text-xs text-zinc-400">
+                Chọn “Đã đóng” để ngừng sử dụng dự án và giữ nguyên hồ sơ, lịch sử.
+              </p>
               <div className="divide-y divide-zinc-800/60">
                 {projects.map((p) => {
                   const c = systemColorClasses(p.color);
@@ -885,13 +870,6 @@ export default function AdminPage() {
                           </option>
                         ))}
                       </select>
-                      <button
-                        onClick={() => deleteProject(p.id, p.name)}
-                        aria-label={`Xoá dự án ${p.name}`}
-                        className="p-1.5 rounded text-zinc-500 hover:text-red-300 hover:bg-red-950/40"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
                   );
                 })}
