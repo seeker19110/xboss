@@ -1584,6 +1584,45 @@ test(
   },
 );
 
+test(
+  "POST /api/variations/:id/contract-add: hai request đồng thời vào hai hợp đồng chỉ tạo một phụ lục",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("vcarace");
+    const pm = await taoUser("pm", "vcarace");
+    const contractA = await taoHopDong(projectId, "vcaraceA");
+    const contractB = await taoHopDong(projectId, "vcaraceB");
+    const vo = await taoVoNhap(pm, projectId, "vcarace");
+    await trinhVo(vo.id);
+    await duyetVo(vo.id);
+    await dangNhapDuAn(pm, projectId);
+
+    const { POST } = await import("@/app/api/variations/[id]/contract-add/route");
+    const params = { params: Promise.resolve({ id: String(vo.id) }) };
+    const [resA, resB] = await Promise.all([
+      POST(jreq("/x", { contractId: contractA, addendaCode: "PL-RACE-A" }), params),
+      POST(jreq("/x", { contractId: contractB, addendaCode: "PL-RACE-B" }), params),
+    ]);
+
+    const statuses = [resA.status, resB.status].sort();
+    assert.deepEqual(statuses, [201, 409]);
+    const voRow = await queryOne<{ status: string; contract_id: number }>(
+      `SELECT status, contract_id FROM variation_orders WHERE id = ?`,
+      vo.id,
+    );
+    assert.equal(voRow?.status, "contract_added");
+    assert.ok([contractA, contractB].includes(voRow!.contract_id));
+    const addenda = await queryOne<{ count: number; contract_id: number }>(
+      `SELECT COUNT(*)::int AS count, MIN(contract_id)::int AS contract_id
+         FROM contract_addenda WHERE note = ?`,
+      `Từ phát sinh ${vo.code}`,
+    );
+    assert.equal(addenda?.count, 1);
+    assert.equal(addenda?.contract_id, voRow?.contract_id);
+  },
+);
+
 // ============================================================================
 // GET/POST /api/variations/:id/documents
 // ============================================================================
