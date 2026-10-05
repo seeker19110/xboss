@@ -97,7 +97,7 @@ test("restore-check rejects a source-equivalent target before database writes", 
     targetUrl: "postgresql://restore_user:secret@192.0.2.10:5432/restore_control",
   });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /same host\/port/);
+  assert.match(result.stderr, /cùng host\/port/);
   assert.doesNotMatch(result.calls, /CREATE DATABASE|DROP DATABASE/);
 });
 
@@ -138,7 +138,7 @@ test("restore-check requires the actual disposable marker before database writes
 test("restore-check refuses an existing database without trying to drop it", () => {
   const result = runRestoreCheck({ targetExists: true });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /database đích đã tồn tại/);
+  assert.match(result.stderr, /Database đích đã tồn tại/);
   assert.doesNotMatch(result.calls, /CREATE DATABASE|DROP DATABASE/);
 });
 
