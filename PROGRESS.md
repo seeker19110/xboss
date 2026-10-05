@@ -1,5 +1,17 @@
 # PROGRESS — XBoss
 
+## 2026-10-05 — QUALITY-FINAL-1 S02a: khóa GET danh sách phiếu thanh toán
+
+`GET /api/payments/bills` yêu cầu dự án khả kiến cùng tổ chức; cookie dự án sai hoặc
+thiếu lựa chọn khi có nhiều dự án trả 404 thay vì mở rộng phạm vi. Query chỉ trả phiếu
+có `project_id` đúng, kiểm mọi liên kết contract/certificate/sheet còn đủ scope và sự
+nhất quán giữa contract trực tiếp với certificate; tên người tạo chỉ join trong org.
+Phiếu chưa phân loại nhưng đã có dự án hợp lệ vẫn hiển thị. Mọi response đặt
+`Cache-Control: private, no-store`. Test route thật bao phủ parent lệch, phiếu legacy
+`project_id NULL`, cookie sai/vắng và cache header. Đây là slice đọc hẹp, chưa đóng S02a;
+POST/PATCH/DELETE bill và các GET payment khác còn trong inventory S00. Chưa tuyên bố
+S01 membership cutover hoặc exact-money DTO hoàn thành.
+
 ## 2026-10-05 — QUALITY-FINAL-1 S14: manifest cho bộ backup
 
 Backup tạo manifest gắn dump và kho tệp đính kèm bằng kích thước/SHA-256; bộ thiếu tệp trả lỗi,

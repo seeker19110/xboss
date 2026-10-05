@@ -6,6 +6,7 @@ import { NextRequest } from "next/server";
 
 const S = { skip: !HAS_TEST_DB };
 const RUN = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+let userSequence = 0;
 
 async function taoDuAn(ten: string) {
   const { insertId } = await import("@/lib/db");
@@ -21,7 +22,7 @@ async function taoUser(role: string) {
     `INSERT INTO users (name, email, password_hash, role, org_id)
      VALUES (?, ?, 'hash-payment-read-test', ?, 1)`,
     `Payment read ${RUN}`,
-    `payment-read-${RUN}@test.local`,
+    `payment-read-${RUN}-${++userSequence}@test.local`,
     role,
   );
   const row = await queryOne<{ password_hash: string }>(
@@ -73,11 +74,23 @@ test(
       `HD-PAY-${RUN}-B`,
       projectB,
     );
+    const contractA2 = await insertId(
+      `INSERT INTO contracts (code, kind, title, party_name, value, status, project_id)
+     VALUES (?, 'nhan_thau', 'Hợp đồng A2', 'CĐT', 10000, 'active', ?)`,
+      `HD-PAY-${RUN}-A2`,
+      projectA,
+    );
     const certB = await insertId(
       `INSERT INTO payment_certs (code, contract_id, period_no, status)
      VALUES (?, ?, 1, 'draft')`,
       `IPC-PAY-${RUN}-B`,
       contractB,
+    );
+    const certAFromDifferentContract = await insertId(
+      `INSERT INTO payment_certs (code, contract_id, period_no, status)
+     VALUES (?, ?, 2, 'draft')`,
+      `IPC-PAY-${RUN}-A-MISMATCH`,
+      contractA,
     );
     const towerB = await insertId(
       `INSERT INTO towers (project_id, name) VALUES (?, ?)`,
@@ -98,6 +111,7 @@ test(
     await taoBill(projectB);
     await taoBill(projectA, { contractId: contractB });
     await taoBill(projectA, { paymentCertId: certB });
+    await taoBill(projectA, { contractId: contractA2, paymentCertId: certAFromDifferentContract });
     await taoBill(projectA, { sheetTypeId: sheetB });
 
     await dangNhapDuAn(user, projectA);

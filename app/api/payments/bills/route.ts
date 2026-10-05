@@ -95,7 +95,7 @@ export async function GET(_req: NextRequest) {
            u.name             AS "createdByName",
            pb.created_at      AS "createdAt"
       FROM payment_bills pb
-      LEFT JOIN users u ON u.id = pb.created_by
+      LEFT JOIN users u ON u.id = pb.created_by AND u.org_id = ?
       LEFT JOIN sheet_types st ON st.id = pb.sheet_type_id
       LEFT JOIN LATERAL (
         SELECT name FROM work_packages
@@ -113,6 +113,7 @@ export async function GET(_req: NextRequest) {
              JOIN contracts cc ON cc.id = pc.contract_id
              JOIN projects cp ON cp.id = cc.project_id
             WHERE pc.id = pb.payment_cert_id AND cc.project_id = ? AND cp.org_id = ?
+              AND (pb.contract_id IS NULL OR pc.contract_id = pb.contract_id)
          ))
          AND (pb.sheet_type_id IS NULL OR EXISTS (
            SELECT 1
@@ -122,6 +123,7 @@ export async function GET(_req: NextRequest) {
             WHERE pst.id = pb.sheet_type_id AND pt.project_id = ? AND pp.org_id = ?
          ))
      ORDER BY pb.paid_date ASC, pb.id ASC`,
+      user.orgId,
       projectId,
       projectId,
       user.orgId,
