@@ -1,4 +1,5 @@
 const CACHE_CLEAR_TIMEOUT_MS = 3_000;
+const OWNED_CACHE = /^xboss-(?:public-)?v\d+$/;
 
 export type CacheClearController = Pick<ServiceWorker, "postMessage">;
 
@@ -18,6 +19,19 @@ export class ServiceWorkerCacheClearError extends Error {
     this.name = "ServiceWorkerCacheClearError";
   }
 }
+
+type ClearRegistration = { active: CacheClearController | null };
+
+export type CacheClearEnvironment = {
+  controller: CacheClearController | null;
+  getRegistration: () => Promise<ClearRegistration | undefined>;
+  ready: Promise<ClearRegistration>;
+  cacheStorage?: Pick<CacheStorage, "keys" | "delete">;
+  serviceWorkerAvailable: boolean;
+  production: boolean;
+  timeoutMs?: number;
+  createChannel?: () => MessageChannel;
+};
 
 /** Chờ ACK purge của đúng request; không coi việc postMessage đã trả về là đã dọn xong. */
 export function requestServiceWorkerCacheClear(
@@ -97,9 +111,97 @@ export function requestServiceWorkerCacheClear(
   });
 }
 
-export function clearServiceWorkerCache(): Promise<void> {
-  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
-    return Promise.reject(new ServiceWorkerCacheClearError("controller_missing"));
+function browserEnvironment(): CacheClearEnvironment {
+  const hasNavigator = typeof navigator !== "undefined";
+  const hasServiceWorker = hasNavigator && "serviceWorker" in navigator;
+  return {
+    controller: hasServiceWorker ? navigator.serviceWorker.controller : null,
+    getRegistration: hasServiceWorker
+      ? () => navigator.serviceWorker.getRegistration()
+      : async () => undefined,
+    ready: hasServiceWorker ? navigator.serviceWorker.ready : Promise.resolve(undefined as never),
+    cacheStorage: typeof caches === "undefined" ? undefined : caches,
+    serviceWorkerAvailable: hasServiceWorker,
+    production: process.env.NODE_ENV === "production",
+  };
+}
+
+async function purgeOwnedCachesWithoutWorker(
+  cacheStorage?: Pick<CacheStorage, "keys" | "delete">,
+): Promise<void> {
+  if (!cacheStorage) return;
+  try {
+    const names = await cacheStorage.keys();
+    await Promise.all(
+      names.filter((name) => OWNED_CACHE.test(name)).map((name) => cacheStorage.delete(name)),
+    );
+  } catch {
+    throw new ServiceWorkerCacheClearError("clear_failed");
   }
-  return requestServiceWorkerCacheClear(navigator.serviceWorker.controller);
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new ServiceWorkerCacheClearError("timeout")), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        reject(new ServiceWorkerCacheClearError("request_failed"));
+      },
+    );
+  });
+}
+
+/**
+ * If this document is not controlled yet, use its active registration. In dev or on a
+ * browser without service-worker support, clear only XBoss-owned CacheStorage entries;
+ * unrelated applications' caches are never touched.
+ */
+export async function clearServiceWorkerCacheWith(
+  environment: CacheClearEnvironment,
+): Promise<void> {
+  const timeoutMs = environment.timeoutMs ?? CACHE_CLEAR_TIMEOUT_MS;
+  if (environment.controller) {
+    return requestServiceWorkerCacheClear(
+      environment.controller,
+      timeoutMs,
+      environment.createChannel,
+    );
+  }
+
+  if (!environment.serviceWorkerAvailable) {
+    return purgeOwnedCachesWithoutWorker(environment.cacheStorage);
+  }
+
+  let registration: ClearRegistration | undefined;
+  try {
+    registration = await withTimeout(environment.getRegistration(), timeoutMs);
+  } catch (err) {
+    if (!(err instanceof ServiceWorkerCacheClearError) || err.code !== "timeout") throw err;
+  }
+
+  if (!registration && !environment.production) {
+    // PwaRegister intentionally skips dev; no registration means no SW can be writing here.
+    return purgeOwnedCachesWithoutWorker(environment.cacheStorage);
+  }
+
+  if (!registration?.active) {
+    const ready = await withTimeout(environment.ready, timeoutMs);
+    registration = ready;
+  }
+
+  const remainingMs = timeoutMs;
+  return requestServiceWorkerCacheClear(
+    registration.active,
+    remainingMs,
+    environment.createChannel,
+  );
+}
+
+export function clearServiceWorkerCache(): Promise<void> {
+  return clearServiceWorkerCacheWith(browserEnvironment());
 }

@@ -19,6 +19,8 @@ const OIDC_ERRORS: Record<string, string> = {
   oidc_failed: "Đăng nhập SSO thất bại — vui lòng thử lại hoặc dùng mật khẩu.",
   oidc_noemail: "Tài khoản SSO không trả về email — không thể đăng nhập.",
 };
+const CACHE_PURGE_ERROR =
+  "Chưa xác nhận được việc dọn bộ nhớ đệm của XBoss. Phiên đăng nhập đã bị hủy; hãy thử lại khi service worker sẵn sàng.";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("admin@xboss.vn");
@@ -82,9 +84,10 @@ export default function LoginPage() {
     try {
       await clearServiceWorkerCache();
     } catch {
-      setError(
-        "Đăng nhập đã xác thực nhưng chưa thể xác nhận dọn bộ nhớ đệm. Hãy kiểm tra kết nối, tải lại trang rồi thử lại.",
-      );
+      // Login API đã phát session cookie; thu hồi cookie khi chưa xác nhận purge để
+      // refresh không mở dữ liệu riêng tư trước khi cache cũ được dọn.
+      await fetch("/api/auth/logout", { method: "POST", cache: "no-store" }).catch(() => {});
+      setError(CACHE_PURGE_ERROR);
       setBusy(false);
       return;
     }

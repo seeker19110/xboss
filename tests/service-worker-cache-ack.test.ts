@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  clearServiceWorkerCacheWith,
   requestServiceWorkerCacheClear,
   ServiceWorkerCacheClearError,
   type CacheClearController,
-} from "../app/lib/serviceWorkerCache";
+  type CacheClearEnvironment,
+} from "@/app/lib/serviceWorkerCache";
 
 type FakePort = {
   onmessage: ((event: MessageEvent<unknown>) => void) | null;
@@ -13,70 +15,230 @@ type FakePort = {
   close: () => void;
 };
 
-function fixture(reply?: (request: { type: string; requestId: string }, port: FakePort) => void) {
+function channelFixture() {
   const port: FakePort = {
     onmessage: null,
     onmessageerror: null,
     start() {},
     close() {},
   };
-  let sent: { type: string; requestId: string } | undefined;
-  const controller = {
-    postMessage(message: { type: string; requestId: string }) {
-      sent = message;
-      reply?.(message, port);
-    },
-  } as CacheClearController;
   const createChannel = () => ({ port1: port, port2: { close() {} } }) as unknown as MessageChannel;
-  return { controller, createChannel, port, request: () => sent };
+  const controller: CacheClearController = {
+    postMessage(message: unknown) {
+      const request = message as { requestId: string };
+      port.onmessage?.({
+        data: { type: "CACHE_CLEARED", requestId: request.requestId },
+      } as MessageEvent);
+    },
+  };
+  return { controller, createChannel };
+}
+
+function environment(overrides: Partial<CacheClearEnvironment> = {}): CacheClearEnvironment {
+  return {
+    controller: null,
+    getRegistration: async () => undefined,
+    ready: Promise.resolve({ active: null }),
+    serviceWorkerAvailable: true,
+    production: false,
+    timeoutMs: 20,
+    ...overrides,
+  };
 }
 
 test("resolves only after matching CACHE_CLEARED ACK", async () => {
-  const f = fixture((request, port) => {
-    port.onmessage?.({ data: { type: "CACHE_CLEARED", requestId: request.requestId } } as MessageEvent);
-  });
-  await requestServiceWorkerCacheClear(f.controller, 100, f.createChannel);
-  assert.deepEqual(f.request(), { type: "CLEAR_CACHE", requestId: f.request()?.requestId });
+  const fixture = channelFixture();
+  await requestServiceWorkerCacheClear(fixture.controller, 100, fixture.createChannel);
+});
+
+test("dev without a registration purges only XBoss-owned caches and permits login", async () => {
+  const deleted: string[] = [];
+  const cacheStorage = {
+    async keys() {
+      return ["xboss-public-v20", "xboss-v19", "other-app-v4"];
+    },
+    async delete(name: string) {
+      deleted.push(name);
+      return true;
+    },
+  };
+  await clearServiceWorkerCacheWith(
+    environment({
+      serviceWorkerAvailable: true,
+      production: false,
+      getRegistration: async () => undefined,
+      cacheStorage,
+    }),
+  );
+  assert.deepEqual(deleted.sort(), ["xboss-public-v20", "xboss-v19"]);
+});
+
+test("production first visit sends the ACK request to the active worker, not only controller", async () => {
+  const fixture = channelFixture();
+  let getRegistrationCalled = false;
+  await clearServiceWorkerCacheWith(
+    environment({
+      production: true,
+      getRegistration: async () => {
+        getRegistrationCalled = true;
+        return undefined;
+      },
+      ready: Promise.resolve({ active: fixture.controller }),
+      createChannel: fixture.createChannel,
+    }),
+  );
+  assert.equal(getRegistrationCalled, true);
+});
+
+test("production with no active worker stays fail-closed after readiness timeout", async () => {
+  await assert.rejects(
+    clearServiceWorkerCacheWith(
+      environment({
+        production: true,
+        timeoutMs: 5,
+        ready: new Promise(() => {}),
+      }),
+    ),
+    (error: ServiceWorkerCacheClearError) => error.code === "timeout",
+  );
 });
 
 test("rejects when controller is missing", async () => {
-  await assert.rejects(requestServiceWorkerCacheClear(null), (error: ServiceWorkerCacheClearError) =>
-    error.code === "controller_missing",
+  await assert.rejects(
+    requestServiceWorkerCacheClear(null),
+    (error: ServiceWorkerCacheClearError) => error.code === "controller_missing",
   );
 });
 
 test("fails closed for malformed and mismatched ACKs", async (t) => {
   await t.test("malformed", async () => {
-    const f = fixture((_request, port) => port.onmessage?.({ data: { type: "CACHE_CLEARED" } } as MessageEvent));
-    await assert.rejects(requestServiceWorkerCacheClear(f.controller, 100, f.createChannel), (error: ServiceWorkerCacheClearError) =>
-      error.code === "response_malformed",
+    const port: FakePort = { onmessage: null, onmessageerror: null, start() {}, close() {} };
+    const controller: CacheClearController = {
+      postMessage() {
+        port.onmessage?.({ data: { type: "CACHE_CLEARED" } } as MessageEvent);
+      },
+    };
+    const createChannel = () =>
+      ({ port1: port, port2: { close() {} } }) as unknown as MessageChannel;
+    await assert.rejects(
+      requestServiceWorkerCacheClear(controller, 100, createChannel),
+      (error: ServiceWorkerCacheClearError) => error.code === "response_malformed",
     );
   });
   await t.test("mismatched request id", async () => {
-    const f = fixture((_request, port) => port.onmessage?.({ data: { type: "CACHE_CLEARED", requestId: "other" } } as MessageEvent));
-    await assert.rejects(requestServiceWorkerCacheClear(f.controller, 100, f.createChannel), (error: ServiceWorkerCacheClearError) =>
-      error.code === "request_id_mismatch",
+    const port: FakePort = { onmessage: null, onmessageerror: null, start() {}, close() {} };
+    const controller: CacheClearController = {
+      postMessage() {
+        port.onmessage?.({ data: { type: "CACHE_CLEARED", requestId: "other" } } as MessageEvent);
+      },
+    };
+    const createChannel = () =>
+      ({ port1: port, port2: { close() {} } }) as unknown as MessageChannel;
+    await assert.rejects(
+      requestServiceWorkerCacheClear(controller, 100, createChannel),
+      (error: ServiceWorkerCacheClearError) => error.code === "request_id_mismatch",
     );
   });
 });
 
 test("rejects CACHE_CLEAR_FAILED, messageerror, and timeout", async (t) => {
   await t.test("service worker failure", async () => {
-    const f = fixture((request, port) => port.onmessage?.({ data: { type: "CACHE_CLEAR_FAILED", requestId: request.requestId } } as MessageEvent));
-    await assert.rejects(requestServiceWorkerCacheClear(f.controller, 100, f.createChannel), (error: ServiceWorkerCacheClearError) =>
-      error.code === "clear_failed",
+    const port: FakePort = { onmessage: null, onmessageerror: null, start() {}, close() {} };
+    const controller: CacheClearController = {
+      postMessage(message: unknown) {
+        port.onmessage?.({
+          data: {
+            type: "CACHE_CLEAR_FAILED",
+            requestId: (message as { requestId: string }).requestId,
+          },
+        } as MessageEvent);
+      },
+    };
+    const createChannel = () =>
+      ({ port1: port, port2: { close() {} } }) as unknown as MessageChannel;
+    await assert.rejects(
+      requestServiceWorkerCacheClear(controller, 100, createChannel),
+      (error: ServiceWorkerCacheClearError) => error.code === "clear_failed",
     );
   });
   await t.test("messageerror", async () => {
-    const f = fixture((_request, port) => port.onmessageerror?.());
-    await assert.rejects(requestServiceWorkerCacheClear(f.controller, 100, f.createChannel), (error: ServiceWorkerCacheClearError) =>
-      error.code === "message_error",
+    const port: FakePort = { onmessage: null, onmessageerror: null, start() {}, close() {} };
+    const controller: CacheClearController = {
+      postMessage() {
+        port.onmessageerror?.();
+      },
+    };
+    const createChannel = () =>
+      ({ port1: port, port2: { close() {} } }) as unknown as MessageChannel;
+    await assert.rejects(
+      requestServiceWorkerCacheClear(controller, 100, createChannel),
+      (error: ServiceWorkerCacheClearError) => error.code === "message_error",
     );
   });
   await t.test("timeout", async () => {
-    const f = fixture();
-    await assert.rejects(requestServiceWorkerCacheClear(f.controller, 5, f.createChannel), (error: ServiceWorkerCacheClearError) =>
-      error.code === "timeout",
+    const port: FakePort = { onmessage: null, onmessageerror: null, start() {}, close() {} };
+    const controller: CacheClearController = { postMessage() {} };
+    const createChannel = () =>
+      ({ port1: port, port2: { close() {} } }) as unknown as MessageChannel;
+    await assert.rejects(
+      requestServiceWorkerCacheClear(controller, 5, createChannel),
+      (error: ServiceWorkerCacheClearError) => error.code === "timeout",
     );
   });
+});
+
+test("401 lock hides and removes the prior page from interaction before cache cleanup", async () => {
+  class FakeElement {
+    attributes = new Map<string, string>();
+    children: FakeElement[] = [];
+    className = "";
+    textContent = "";
+    tabIndex = 0;
+    inert = false;
+    disabled = false;
+    type = "";
+    listener?: () => void;
+    setAttribute(name: string, value: string) {
+      this.attributes.set(name, value);
+    }
+    append(...children: FakeElement[]) {
+      this.children.push(...children);
+    }
+    addEventListener(_name: string, listener: () => void) {
+      this.listener = listener;
+    }
+    focus() {}
+  }
+
+  const privateRoot = new FakeElement();
+  const bodyChildren: FakeElement[] = [privateRoot];
+  const fakeDocument = {
+    createElement: () => new FakeElement(),
+    body: {
+      get children() {
+        return bodyChildren;
+      },
+      append(element: FakeElement) {
+        bodyChildren.push(element);
+      },
+    },
+  };
+  const previousDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+  const previousHTMLElement = Object.getOwnPropertyDescriptor(globalThis, "HTMLElement");
+  Object.defineProperty(globalThis, "document", { configurable: true, value: fakeDocument });
+  Object.defineProperty(globalThis, "HTMLElement", { configurable: true, value: FakeElement });
+  try {
+    const { lockPrivatePageUntilCachePurged } = await import("@/app/lib/me");
+    lockPrivatePageUntilCachePurged();
+    assert.equal(privateRoot.inert, true);
+    assert.equal(privateRoot.attributes.get("aria-hidden"), "true");
+    assert.equal(bodyChildren.length, 2);
+    assert.equal(bodyChildren[1]?.attributes.get("role"), "alert");
+    assert.match(bodyChildren[1]?.children[0]?.textContent ?? "", /Phiên đăng nhập đã hết hạn/);
+  } finally {
+    if (previousDocument) Object.defineProperty(globalThis, "document", previousDocument);
+    else Reflect.deleteProperty(globalThis, "document");
+    if (previousHTMLElement) Object.defineProperty(globalThis, "HTMLElement", previousHTMLElement);
+    else Reflect.deleteProperty(globalThis, "HTMLElement");
+  }
 });

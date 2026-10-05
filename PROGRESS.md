@@ -7,6 +7,14 @@ hiệu ứng nhấp nháy làm độ tương phản thay đổi. Sửa lỗi axe
 kiểm tra UI, định dạng, lint và typecheck tại worktree đạt. E2E toàn bộ chờ CI trên PR này.
 Không thay đổi trạng thái duyệt hay dữ liệu nghiệp vụ.
 
+## 2026-10-05 — S04: ACK purge không chặn login khi chưa có controller
+
+`clearServiceWorkerCache` dùng controller hiện tại hoặc worker active của registration và chỉ
+tiếp tục sau ACK tương quan trong 3 giây. Dev/first visit chưa có registration dọn riêng cache
+namespace XBoss; worker có registration nhưng chưa sẵn sàng vẫn fail-closed khi timeout. Đăng
+nhập và TOTP chỉ gửi request sau purge; khi gặp 401, khóa nội dung riêng tư ngay và chỉ điều hướng
+sang login sau khi nhận ACK. Đây là code/test cục bộ, chưa thay thế browser thật + axe theo A2/S04.
+
 ## 2026-10-05 — QUALITY-FINAL-1 S14: cô lập restore-check
 
 `restore-check.sh` chỉ dùng PostgreSQL disposable có marker xác thực và credentials riêng,
