@@ -40,6 +40,10 @@ request fail-closed với `XBOSS_SCHEMA_NOT_READY`; `/api/health` báo `degraded
 dừng trước khi chuyển traffic. `npm run db:migrate` là bước độc lập, bắt buộc có
 `MIGRATE_DATABASE_URL` và không dùng `DATABASE_URL` làm fallback; dry-run chỉ liệt kê file còn
 thiếu. Mỗi migration giữ transaction riêng và advisory lock trong migrator.
+Credential migration phải nằm trong file riêng mode `0600` ngoài checkout hoặc env deploy tạm;
+`deploy.sh` từ chối khi thiếu/sai quyền/còn trong env file runtime, chỉ truyền cho bước migrate
+và xóa trước khi reload PM2. Cần chuyển credential hiện hữu sang file riêng trước deploy PR này;
+không được ghi URL vào `.env.local`.
 
 Đã cập nhật quy trình rollout/recovery tại [ADR-0003](docs/adr/0003-migrations.md), cùng hướng
 dẫn Metabase để chạy migration `0073` bằng migrator riêng. Không chạy database hoặc production
