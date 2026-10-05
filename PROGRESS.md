@@ -1,5 +1,14 @@
 # PROGRESS — XBoss
 
+## 2026-10-05 — QUALITY-FINAL-1 S14: cô lập restore-check
+
+`restore-check.sh` chỉ dùng PostgreSQL disposable có marker xác thực và credentials riêng,
+kiểm tra danh tính server/DB trước khi ghi, không xóa DB tồn tại từ trước. URL có mật khẩu
+không đi qua argv của công cụ PostgreSQL; file tạm mode 0600 được dọn sau chạy. Bổ sung
+kiểm thử giả lập các nhánh từ chối và hướng dẫn cron báo lỗi không lộ token trong argv.
+Kiểm tra cú pháp và targeted test đạt; kiểm thử PostgreSQL release gate còn chờ CI.
+Không có migration hoặc thao tác production.
+
 ## 2026-10-05 — QUALITY-FINAL-1 A5: khóa đưa VO vào phụ lục hợp đồng
 
 `POST /api/variations/:id/contract-add` nay khóa VO và hợp đồng đích, kiểm lại trạng thái và
