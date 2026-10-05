@@ -94,11 +94,12 @@ trỏ vào database nguồn, production, hoặc dùng chung credentials app. Re-
 đột ngột cần operator kiểm tra và tự xử lý DB sót lại; script chủ động không DROP DB có sẵn vì
 nó không thể chứng minh DB đó do lần chạy hiện tại tạo.
 
-Gợi ý gửi kết quả qua Telegram (tái dùng `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` đã có trong
-`.env.local` cho báo cáo ngày) — thêm dòng `curl` đơn giản vào cuối crontab entry, ví dụ:
+Gợi ý gửi kết quả qua Telegram — đặt `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` cùng file
+`/etc/xboss/restore-check.env` đã giới hạn mode `0600`, rồi dùng entry sau (file env được source
+trước cả restore-check lẫn cảnh báo):
 
 ```cron
-0 2 * * 0 cd /path/to/xboss && bash scripts/ops/restore-check.sh >> logs/restore-check.log 2>&1 || \
+0 2 * * 0 cd /path/to/xboss && set -a && . /etc/xboss/restore-check.env && set +a && bash scripts/ops/restore-check.sh >> logs/restore-check.log 2>&1 || \
   curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
   -d chat_id="$TELEGRAM_CHAT_ID" -d text="⚠️ XBoss restore-check THẤT BẠI — xem logs/restore-check.log"
 ```

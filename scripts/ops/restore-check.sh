@@ -2,10 +2,32 @@
 # Restore check chỉ chạy trên PostgreSQL disposable đã được đánh dấu rõ ràng.
 # Không dùng DATABASE_URL của ứng dụng làm đích ghi/xoá.
 set -euo pipefail
+set +x # Secret-bearing environment values must never be expanded into shell trace logs.
 
 BACKUP_DIR="${BACKUP_DIR:-backups}"
 CORE_TABLES=(tasks contracts payment_certs materials users)
 TARGET_CREATED=0
+PGPASSFILE=""
+PGSERVICEFILE=""
+TARGET_HOST=""
+TARGET_PORT=""
+TARGET_USER=""
+CONTROL_DB=""
+
+cleanup() {
+  if ((TARGET_CREATED == 1)); then
+    PGPASSFILE="$PGPASSFILE" PGSERVICEFILE="$PGSERVICEFILE" PGSERVICE=xboss_restore_check psql -X -v ON_ERROR_STOP=1 -q \
+      -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$CONTROL_DB" \
+      -c "DROP DATABASE $RESTORE_TARGET_DATABASE;" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "$PGPASSFILE" ]]; then
+    rm -f -- "$PGPASSFILE"
+  fi
+  if [[ -n "$PGSERVICEFILE" ]]; then
+    rm -f -- "$PGSERVICEFILE"
+  fi
+}
+trap cleanup EXIT
 
 die() {
   printf '❌ %s\n' "$1" >&2
@@ -28,14 +50,18 @@ if [[ ! "$RESTORE_TARGET_MARKER" =~ ^xboss-disposable:[A-Za-z0-9_-]{16,}$ ]]; th
   die "Marker phải có dạng xboss-disposable:<token ngẫu nhiên tối thiểu 16 ký tự>."
 fi
 
-# Phân tích URI mà không in ra (URI có thể chứa password); target URI được dựng lại với
-# tên DB đã validate. Chỉ chấp nhận postgres:// hoặc postgresql:// và TCP host rõ ràng.
-IDENTITIES="$(python3 - "$RESTORE_TARGET_DATABASE" <<'PY'
+# Phân tích URI, ghi credentials target vào passfile riêng mode 0600. URL/password không
+# được đưa vào argv của psql/pg_restore hoặc output của bước phân tích.
+PGPASSFILE="$(mktemp "${TMPDIR:-/tmp}/xboss-restore-check.XXXXXX")" || die "Không tạo được passfile tạm an toàn."
+PGSERVICEFILE="$(mktemp "${TMPDIR:-/tmp}/xboss-restore-service.XXXXXX")" || die "Không tạo được service file tạm an toàn."
+chmod 600 "$PGPASSFILE"
+chmod 600 "$PGSERVICEFILE"
+IDENTITIES="$(RESTORE_PGPASSFILE="$PGPASSFILE" RESTORE_PGSERVICEFILE="$PGSERVICEFILE" python3 - "$RESTORE_TARGET_DATABASE" <<'PY'
 import os
 import sys
 import ipaddress
 import socket
-from urllib.parse import unquote, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, unquote, urlsplit
 
 def parse(raw):
     u = urlsplit(raw)
@@ -43,11 +69,14 @@ def parse(raw):
         raise SystemExit(2)
     if not u.username or not u.password:
         raise SystemExit(2)
-    return u, unquote(u.username), unquote(u.path.strip("/"))
+    user, password, database = unquote(u.username), unquote(u.password), unquote(u.path.strip("/"))
+    if any(c in value for value in (user, password, database) for c in ("\0", "\r", "\n", "\t")):
+        raise SystemExit(2)
+    return u, user, password, database
 
 try:
-    src, src_user, src_db = parse(os.environ["RESTORE_SOURCE_URL"])
-    dst, dst_user, dst_db = parse(os.environ["RESTORE_TARGET_URL"])
+    src, src_user, _src_password, src_db = parse(os.environ["RESTORE_SOURCE_URL"])
+    dst, dst_user, dst_password, dst_db = parse(os.environ["RESTORE_TARGET_URL"])
 except (ValueError, SystemExit):
     raise SystemExit("invalid")
 
@@ -72,6 +101,36 @@ except ValueError:
     except OSError:
         print("source-host-unresolved")
         raise SystemExit(0)
+
+def pgpass_escape(value):
+    return value.replace("\\", "\\\\").replace(":", "\\:")
+
+with open(os.environ["RESTORE_PGPASSFILE"], "w", encoding="utf-8") as passfile:
+    passfile.write(":".join(map(pgpass_escape, (str(target_ip), str(dst_port), "*", dst_user, dst_password))) + "\n")
+os.chmod(os.environ["RESTORE_PGPASSFILE"], 0o600)
+
+query_params = parse_qsl(dst.query, keep_blank_values=True, strict_parsing=True)
+reserved = {"host", "hostaddr", "port", "dbname", "user", "password", "passfile", "service", "servicefile"}
+seen = set()
+for key, value in query_params:
+    if not key.isascii() or not key.replace("_", "").isalnum() or key.lower() in reserved or key.lower() in seen:
+        raise SystemExit(2)
+    if any(c in value for c in ("\0", "\r", "\n")):
+        raise SystemExit(2)
+    seen.add(key.lower())
+
+def service_quote(value):
+    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+with open(os.environ["RESTORE_PGSERVICEFILE"], "w", encoding="utf-8") as servicefile:
+    servicefile.write("[xboss_restore_check]\n")
+    servicefile.write(f"host={service_quote(str(target_ip))}\n")
+    servicefile.write(f"port={service_quote(str(dst_port))}\n")
+    servicefile.write(f"user={service_quote(dst_user)}\n")
+    for key, value in query_params:
+        servicefile.write(f"{key}={service_quote(value)}\n")
+os.chmod(os.environ["RESTORE_PGSERVICEFILE"], 0o600)
+
 if (target_ip in source_ips and src_port == dst_port):
     print("same-server")
     raise SystemExit(0)
@@ -82,9 +141,7 @@ if src_user == dst_user:
     print("same-user")
     raise SystemExit(0)
 
-target_path = "/" + sys.argv[1]
-target_url = urlunsplit((dst.scheme, dst.netloc, target_path, dst.query, ""))
-print("\t".join((str(target_ip), str(dst_port), dst_db, dst_user, target_url)))
+print("\t".join((str(target_ip), str(dst_port), dst_db, dst_user)))
 PY
 )" || die "Không đọc được danh tính nguồn/đích."
 
@@ -101,7 +158,7 @@ elif [[ "$IDENTITIES" == "target-host-public" ]]; then
 elif [[ "$IDENTITIES" == "source-host-unresolved" ]]; then
   die "Không phân giải được host của RESTORE_SOURCE_URL để chứng minh đích khác nguồn."
 fi
-IFS=$'\t' read -r TARGET_HOST TARGET_PORT CONTROL_DB TARGET_USER TARGET_URL <<<"$IDENTITIES"
+IFS=$'\t' read -r TARGET_HOST TARGET_PORT CONTROL_DB TARGET_USER <<<"$IDENTITIES"
 if [[ "$TARGET_HOST" =~ (prod|production|live) || "$CONTROL_DB" =~ (^|_)(prod|production|live)(_|$) ]]; then
   die "Đích có host hoặc DB điều khiển mang tên production-like."
 fi
@@ -122,7 +179,9 @@ META_SQL="SELECT COALESCE(inet_server_addr()::text, ''), COALESCE(inet_server_po
                  r.rolsuper::text, r.rolcreatedb::text
             FROM pg_database d JOIN pg_roles r ON r.rolname = current_user
            WHERE d.datname = current_database()"
-META="$(psql "$RESTORE_TARGET_URL" -X -v ON_ERROR_STOP=1 -tA -F $'\t' -c "$META_SQL")" \
+META="$(PGPASSFILE="$PGPASSFILE" PGSERVICEFILE="$PGSERVICEFILE" PGSERVICE=xboss_restore_check psql \
+  -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$CONTROL_DB" \
+  -X -v ON_ERROR_STOP=1 -tA -F $'\t' -c "$META_SQL" 2>/dev/null)" \
   || die "Không xác thực được PostgreSQL disposable đích."
 IFS=$'\t' read -r SERVER_ADDR SERVER_PORT ACTUAL_CONTROL_DB ACTUAL_USER ACTUAL_MARKER IS_SUPERUSER CAN_CREATE_DB <<<"$META"
 if [[ "$SERVER_ADDR" != "$TARGET_HOST" || "$SERVER_PORT" != "$TARGET_PORT" || "$ACTUAL_CONTROL_DB" != "$CONTROL_DB" || "$ACTUAL_USER" != "$TARGET_USER" ]]; then
@@ -138,41 +197,51 @@ if [[ "$CAN_CREATE_DB" != "true" ]]; then
   die "Role đích phải có quyền CREATEDB để tạo database disposable mới."
 fi
 
-EXISTS="$(psql "$RESTORE_TARGET_URL" -X -v ON_ERROR_STOP=1 -tAc \
-  "SELECT count(*) FROM pg_database WHERE datname = '$RESTORE_TARGET_DATABASE'")" \
+EXISTS="$(PGPASSFILE="$PGPASSFILE" PGSERVICEFILE="$PGSERVICEFILE" PGSERVICE=xboss_restore_check psql \
+  -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$CONTROL_DB" \
+  -X -v ON_ERROR_STOP=1 -tAc \
+  "SELECT count(*) FROM pg_database WHERE datname = '$RESTORE_TARGET_DATABASE'" 2>/dev/null)" \
   || die "Không thể kiểm tra trạng thái database đích."
 if [[ "$EXISTS" != "0" ]]; then
   die "Database đích đã tồn tại; sẽ không DROP database không do lần chạy này tạo."
 fi
 
-cleanup() {
-  if ((TARGET_CREATED == 1)); then
-    psql "$RESTORE_TARGET_URL" -X -v ON_ERROR_STOP=1 -q \
-      -c "DROP DATABASE $RESTORE_TARGET_DATABASE;" >/dev/null 2>&1 || true
-  fi
-}
-trap cleanup EXIT
-
 printf '==> Kiểm chứng từ backup: %s\n' "$LATEST_DUMP"
 printf '==> Tạo database disposable mới: %s\n' "$RESTORE_TARGET_DATABASE"
-psql "$RESTORE_TARGET_URL" -X -v ON_ERROR_STOP=1 -q \
-  -c "CREATE DATABASE $RESTORE_TARGET_DATABASE;"
+if ! PGPASSFILE="$PGPASSFILE" PGSERVICEFILE="$PGSERVICEFILE" PGSERVICE=xboss_restore_check psql \
+  -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$CONTROL_DB" \
+  -X -v ON_ERROR_STOP=1 -q -c "CREATE DATABASE $RESTORE_TARGET_DATABASE;" 2>/dev/null; then
+  die "Không tạo được database disposable đích."
+fi
 TARGET_CREATED=1
-psql "$RESTORE_TARGET_URL" -X -v ON_ERROR_STOP=1 -q \
-  -c "COMMENT ON DATABASE $RESTORE_TARGET_DATABASE IS '$RESTORE_TARGET_MARKER';"
+if ! PGPASSFILE="$PGPASSFILE" PGSERVICEFILE="$PGSERVICEFILE" PGSERVICE=xboss_restore_check psql \
+  -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$CONTROL_DB" \
+  -X -v ON_ERROR_STOP=1 -q \
+  -c "COMMENT ON DATABASE $RESTORE_TARGET_DATABASE IS '$RESTORE_TARGET_MARKER';" 2>/dev/null; then
+  die "Không gắn được marker cho database disposable đích."
+fi
 
 printf '==> pg_restore vào database disposable đã xác minh\n'
-pg_restore --no-owner --no-privileges -d "$TARGET_URL" "$LATEST_DUMP"
+if ! PGPASSFILE="$PGPASSFILE" PGSERVICEFILE="$PGSERVICEFILE" PGSERVICE=xboss_restore_check pg_restore \
+  --no-owner --no-privileges -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" \
+  -d "$RESTORE_TARGET_DATABASE" "$LATEST_DUMP" >/dev/null 2>/dev/null; then
+  die "pg_restore thất bại; không giữ thông tin kết nối trong log."
+fi
 
 printf '==> Kiểm tra bảng và dữ liệu lõi\n'
-TABLE_COUNT="$(psql "$TARGET_URL" -X -v ON_ERROR_STOP=1 -tAc \
-  "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'")"
+TABLE_COUNT="$(PGPASSFILE="$PGPASSFILE" PGSERVICEFILE="$PGSERVICEFILE" PGSERVICE=xboss_restore_check psql \
+  -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$RESTORE_TARGET_DATABASE" \
+  -X -v ON_ERROR_STOP=1 -tAc \
+  "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'" 2>/dev/null)" \
+  || die "Không thể kiểm tra số bảng trong database phục hồi."
 if [[ ! "$TABLE_COUNT" =~ ^[0-9]+$ ]] || ((TABLE_COUNT < 1)); then
   die "Restore ra 0 bảng hoặc kết quả đếm không hợp lệ."
 fi
 printf '    Tổng số bảng public: %s\n' "$TABLE_COUNT"
 for table in "${CORE_TABLES[@]}"; do
-  rows="$(psql "$TARGET_URL" -X -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM $table")" \
+  rows="$(PGPASSFILE="$PGPASSFILE" PGSERVICEFILE="$PGSERVICEFILE" PGSERVICE=xboss_restore_check psql \
+    -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$RESTORE_TARGET_DATABASE" \
+    -X -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM $table" 2>/dev/null)" \
     || die "Không thể kiểm tra bảng lõi $table."
   if [[ ! "$rows" =~ ^[0-9]+$ ]] || ((rows < 1)); then
     die "Bảng lõi $table rỗng hoặc kết quả đếm không hợp lệ."

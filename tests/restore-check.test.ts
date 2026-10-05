@@ -29,6 +29,13 @@ function runRestoreCheck(
     const log = join(dir, "calls.log");
     const psql = `#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$PSQL_LOG"
+if [[ -r "\${PGPASSFILE:-}" ]] && [[ "$(stat -c '%a' "$PGPASSFILE")" == 600 ]] && grep -Fq '127.0.0.1:5432:*:restore_user:secret' "$PGPASSFILE" \\
+  && [[ -r "\${PGSERVICEFILE:-}" ]] && [[ "$(stat -c '%a' "$PGSERVICEFILE")" == 600 ]] \\
+  && grep -Fq "application_name='restore_check'" "$PGSERVICEFILE"; then
+  printf 'PASSFILE_OK\\n' >> "$PSQL_LOG"
+  printf 'PASSFILE_PATH=%s\\n' "$PGPASSFILE" >> "$PSQL_LOG"
+  printf 'SERVICEFILE_PATH=%s\\n' "$PGSERVICEFILE" >> "$PSQL_LOG"
+fi
 sql=""
 while (($#)); do if [[ "$1" == "-c" || "$1" == "-tAc" ]]; then shift; sql="$1"; break; fi; shift; done
 if [[ "$sql" == *"inet_server_addr()"* ]]; then
@@ -39,7 +46,18 @@ else printf '1\\n'; fi
 `;
     const pgRestore = `#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$RESTORE_LOG"
-[[ "${options.restoreFails ? "1" : "0"}" != 1 ]]
+if [[ -r "\${PGPASSFILE:-}" ]] && [[ "$(stat -c '%a' "$PGPASSFILE")" == 600 ]] && grep -Fq '127.0.0.1:5432:*:restore_user:secret' "$PGPASSFILE" \\
+  && [[ -r "\${PGSERVICEFILE:-}" ]] && [[ "$(stat -c '%a' "$PGSERVICEFILE")" == 600 ]] \\
+  && grep -Fq "application_name='restore_check'" "$PGSERVICEFILE"; then
+  printf 'PASSFILE_OK\\n' >> "$RESTORE_LOG"
+  printf 'PASSFILE_PATH=%s\\n' "$PGPASSFILE" >> "$RESTORE_LOG"
+  printf 'SERVICEFILE_PATH=%s\\n' "$PGSERVICEFILE" >> "$RESTORE_LOG"
+fi
+if [[ "${options.restoreFails ? "1" : "0"}" == 1 ]]; then
+  printf 'diagnostic password=secret\\n' >&2
+  exit 1
+fi
+exit 0
 `;
     writeFileSync(join(bin, "psql"), psql);
     writeFileSync(join(bin, "pg_restore"), pgRestore);
@@ -56,13 +74,19 @@ printf '%s\\n' "$*" >> "$RESTORE_LOG"
         RESTORE_LOG: join(dir, "restore.log"),
         RESTORE_SOURCE_URL: "postgresql://app_source:secret@192.0.2.10:5432/source_db",
         RESTORE_TARGET_URL:
-          options.targetUrl ?? "postgresql://restore_user:secret@127.0.0.1:5432/restore_control",
+          options.targetUrl ?? "postgresql://restore_user:secret@127.0.0.1:5432/restore_control?application_name=restore_check",
         RESTORE_TARGET_DATABASE: "xboss_restore_check_test",
         RESTORE_TARGET_MARKER: marker,
         ACTUAL_MARKER: options.marker ?? marker,
       },
     });
-    return { ...result, calls: existsSync(log) ? readFileSync(log, "utf8") : "" };
+    return {
+      ...result,
+      calls: [log, join(dir, "restore.log")]
+        .filter(existsSync)
+        .map((path) => readFileSync(path, "utf8"))
+        .join("\n"),
+    };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -123,5 +147,15 @@ test("restore-check only drops a target it created during this invocation", () =
   assert.notEqual(result.status, 0);
   assert.match(result.calls, /CREATE DATABASE xboss_restore_check_test/);
   assert.match(result.calls, /DROP DATABASE xboss_restore_check_test/);
+  assert.match(result.calls, /PASSFILE_OK/);
+  assert.doesNotMatch(result.calls, /secret|postgresql:\/\//);
+  assert.doesNotMatch(result.stdout + result.stderr, /secret|postgresql:\/\//);
+  assert.match(result.stderr, /pg_restore thất bại/);
   assert.match(result.stdout, /Tạo database disposable mới/);
+  const passfilePath = result.calls.match(/PASSFILE_PATH=([^\n]+)/)?.[1];
+  assert.ok(passfilePath);
+  assert.equal(existsSync(passfilePath), false, "temporary passfile is removed on exit");
+  const servicefilePath = result.calls.match(/SERVICEFILE_PATH=([^\n]+)/)?.[1];
+  assert.ok(servicefilePath);
+  assert.equal(existsSync(servicefilePath), false, "temporary service file is removed on exit");
 });
