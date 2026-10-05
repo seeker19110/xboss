@@ -1479,7 +1479,7 @@ export default function CleanMepfProcessPage() {
                         activeStep.gateStatus === "approved"
                           ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                           : activeStep.gateStatus === "pending"
-                            ? "bg-amber-950 text-amber-200 border-amber-800 animate-pulse"
+                            ? "bg-amber-950 text-amber-200 border-amber-800"
                             : activeStep.gateStatus === "rejected"
                               ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
                               : "bg-zinc-800 text-zinc-400 border-zinc-700"
