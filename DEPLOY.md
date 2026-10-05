@@ -1,8 +1,9 @@
 # Triển khai XBoss lên VPS/Server (production)
 
-Ứng dụng dùng **PostgreSQL** — `DATABASE_URL` là credential runtime; `MIGRATE_DATABASE_URL`
-là credential riêng cho migration job/deploy. Runtime không tự chạy DDL: chạy
-`npm run db:migrate` bằng role migration trước khi start app. Nếu schema thiếu hoặc lỗi thời,
+Ứng dụng dùng **PostgreSQL** — `DATABASE_URL` là credential runtime. Credential migration chỉ
+được cấp cho bước deploy qua biến môi trường tạm hoặc file riêng mode `0600` (mặc định
+`/etc/xboss/migrate.env`); không đặt nó trong `.env.local`, `.env` hay PM2 environment. Runtime
+không tự chạy DDL: chạy `npm run db:migrate` bằng role migration trước khi start app. Nếu schema thiếu hoặc lỗi thời,
 API/health readiness báo lỗi thay vì tự migrate. Migration SQL (`migrations/*.sql`, xem
 `docs/adr/0003-migrations.md`) append-only.
 
@@ -104,11 +105,16 @@ cd xboss
 npm ci
 
 # Tạo file môi trường
-cp .env.example .env.local       # điền DATABASE_URL + MIGRATE_DATABASE_URL + XBOSS_SECRET
+cp .env.example .env.local       # điền DATABASE_URL + XBOSS_SECRET
 # DATABASE_URL=postgresql://xboss:mật-khẩu-mạnh@localhost:5432/xboss  (nếu tự host Postgres)
-# MIGRATE_DATABASE_URL=postgresql://xboss_migrate:mật-khẩu-mạnh@localhost:5432/xboss
+# Tạo file credential riêng, chỉ người deploy đọc được:
+sudo install -d -o "$USER" -g "$(id -gn)" -m 700 /etc/xboss
+sudo install -o "$USER" -g "$(id -gn)" -m 600 /dev/null /etc/xboss/migrate.env
+# Ghi đúng một dòng vào /etc/xboss/migrate.env:
+# MIGRATE_DATABASE_URL='postgresql://xboss_migrate:mật-khẩu-mạnh@localhost:5432/xboss'
 
-npm run db:migrate               # áp schema bằng credential migration
+# Áp schema lần đầu bằng credential tạm, không ghi vào .env.local/PM2:
+MIGRATE_DATABASE_URL="$(bash -c 'set -a; . /etc/xboss/migrate.env; printf %s "$MIGRATE_DATABASE_URL"')" npm run db:migrate
 npm run build
 npm run db:seed                  # nạp dữ liệu lần đầu từ Excel trong attachments/
 
@@ -162,7 +168,8 @@ bash deploy.sh
 ```
 
 Script tự làm: `git fetch` + `reset --hard origin/main` (VPS luôn chạy nhánh
-`main`) → `npm ci` → `npm run db:migrate` (áp migration DB còn thiếu, dừng
+`main`) → `npm ci` → `npm run db:migrate` (đọc credential tạm từ biến môi trường hoặc file riêng
+`/etc/xboss/migrate.env`, áp migration DB còn thiếu, dừng
 deploy nếu lỗi) → **lấy bản build** vào thư mục tạm `.next-build` (mặc định:
 giải nén gói `.next-ci.tar.gz` do GitHub Actions gửi sang; với cờ
 `--build-local`: tự chạy `npm run build` tại chỗ như trước) → swap atomic

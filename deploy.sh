@@ -37,6 +37,47 @@
 
 set -e   # Gặp lỗi ở bất kỳ bước nào là dừng ngay, không deploy code lỗi.
 
+# Credential migration chỉ tồn tại trong bước deploy. Chụp env được truyền rõ ràng rồi bỏ
+# khỏi shell ngay, để `pm2 reload --update-env` phía sau không thể kế thừa nó.
+unset MIGRATION_URL_FROM_ENV MIGRATION_URL
+MIGRATION_URL_FROM_ENV="${MIGRATE_DATABASE_URL:-}"
+unset MIGRATE_DATABASE_URL
+MIGRATION_ENV_FILE_OVERRIDE="${MIGRATION_ENV_FILE:-}"
+unset MIGRATION_ENV_FILE
+
+lay_migration_url() {
+  if [ -n "$MIGRATION_URL_FROM_ENV" ]; then
+    MIGRATION_URL="$MIGRATION_URL_FROM_ENV"
+  else
+    if [ ! -f "$MIGRATION_ENV_FILE" ] || [ ! -r "$MIGRATION_ENV_FILE" ]; then
+      echo "❌ Thiếu file credential migration đọc được tại $MIGRATION_ENV_FILE." >&2
+      exit 1
+    fi
+    local mode
+    mode=$(stat -c '%a' "$MIGRATION_ENV_FILE")
+    if [ "$mode" != "600" ]; then
+      echo "❌ File credential migration phải có quyền 600: $MIGRATION_ENV_FILE." >&2
+      exit 1
+    fi
+    # File do quản trị viên tạo, chỉ chứa MIGRATE_DATABASE_URL=...; đọc trong subshell để
+    # không nạp biến khác vào môi trường deploy và không in nội dung bí mật.
+    MIGRATION_URL=$(bash -c 'set -a; . "$1" >/dev/null 2>&1; printf %s "${MIGRATE_DATABASE_URL:-}"' _ "$MIGRATION_ENV_FILE")
+  fi
+  if [ -z "$MIGRATION_URL" ]; then
+    echo "❌ Chưa cấu hình MIGRATE_DATABASE_URL trong env deploy hoặc file credential." >&2
+    exit 1
+  fi
+}
+
+kiem_tra_runtime_env() {
+  for file in .env .env.local .env.staging; do
+    if [ -f "$file" ] && grep -Eq '^[[:space:]]*MIGRATE_DATABASE_URL[[:space:]]*=' "$file"; then
+      echo "❌ Xóa MIGRATE_DATABASE_URL khỏi $file; file này được nạp vào app runtime." >&2
+      exit 1
+    fi
+  done
+}
+
 # VPS luôn chạy nhánh main (cả prod lẫn staging — staging tồn tại để tập dượt migration/
 # deploy, không phải nhánh tính năng riêng, xem docs/ops/staging.md).
 BRANCH="main"
@@ -76,6 +117,15 @@ else
   ENV_FILE=".env.local"
 fi
 
+if [ "$STAGING" = true ]; then
+  MIGRATION_ENV_FILE="${MIGRATION_ENV_FILE_OVERRIDE:-/etc/xboss-staging/migrate.env}"
+else
+  MIGRATION_ENV_FILE="${MIGRATION_ENV_FILE_OVERRIDE:-/etc/xboss/migrate.env}"
+fi
+
+# Fail trước fetch/reset/npm ci nếu không có secret migrator.
+lay_migration_url
+
 echo "==> 1/7 Lấy code mới từ origin/$BRANCH"
 git fetch origin
 
@@ -103,11 +153,14 @@ if [ "$STAGING" = true ]; then
   fi
 fi
 
+kiem_tra_runtime_env
+
 echo "==> 4/7 Áp migration DB còn thiếu (idempotent, dừng deploy nếu lỗi)"
 # Migration ĐỤNG DỮ LIỆU (UPDATE/backfill/đổi kiểu cột) phải đã chạy staging trước — xem
 # CLAUDE.md mục "Quy trình & Definition of Done". Kiểm nhanh trước khi áp thật:
 # npm run db:migrate -- --dry-run
-npm run db:migrate
+MIGRATE_DATABASE_URL="$MIGRATION_URL" npm run db:migrate
+unset MIGRATION_URL MIGRATION_URL_FROM_ENV
 
 if [ "$BUILD_LOCAL" = true ]; then
   echo "==> 5/7 Build app tại chỗ vào thư mục tạm ($BUILD_DIR) — không đụng \".next\" đang phục vụ"

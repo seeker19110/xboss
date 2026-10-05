@@ -44,10 +44,9 @@ cd xboss-staging
 # 2. Tạo DB staging riêng (Postgres đã cài sẵn cho production)
 sudo -u postgres createdb xboss_staging
 
-# 3. Tạo file env staging — sao chép .env.local production làm nền, ĐỔI các giá trị sau:
+# 3. Tạo file env runtime staging — sao chép .env.local production làm nền, ĐỔI các giá trị sau:
 cp ~/xboss/.env.local .env.staging
 #    - DATABASE_URL: trỏ sang xboss_staging (không phải DB production!)
-#    - MIGRATE_DATABASE_URL: credential migration riêng cho DB staging, không dùng DB production
 #    - PORT: 3001 (hoặc cổng trống khác — set qua biến môi trường lúc pm2 start, xem bước 5)
 #    - XBOSS_SECRET: giá trị KHÁC production (session staging không lẫn với production)
 #    - CRON_SECRET: giá trị KHÁC production (tránh gọi nhầm cron production/staging cho nhau)
@@ -56,10 +55,15 @@ cp ~/xboss/.env.local .env.staging
 #    - SENTRY_DSN: dùng project Sentry riêng (hoặc để trống) — không lẫn lỗi staging vào
 #      dashboard theo dõi lỗi production
 
+# Credential migration lưu riêng ngoài thư mục app, không có trong .env.staging/.env.local:
+sudo install -d -o "$USER" -g "$(id -gn)" -m 700 /etc/xboss-staging
+sudo install -o "$USER" -g "$(id -gn)" -m 600 /dev/null /etc/xboss-staging/migrate.env
+# Ghi một dòng MIGRATE_DATABASE_URL='postgresql://.../xboss_staging' vào file đó.
+
 # 4. Cài đặt + build lần đầu (deploy.sh --staging làm việc này cho các lần sau)
 npm ci
 set -a && . ./.env.staging && set +a
-npm run db:migrate   # chỉ dùng MIGRATE_DATABASE_URL đã trỏ tới DB staging
+MIGRATE_DATABASE_URL="$(bash -c 'set -a; . /etc/xboss-staging/migrate.env; printf %s "$MIGRATE_DATABASE_URL"')" npm run db:migrate
 npm run build
 
 # 5. Khởi động pm2 process riêng cho staging (khác tên + khác cổng)
@@ -78,7 +82,8 @@ bash deploy.sh --staging
 điểm: tên pm2 process (`xboss-staging`), tên thư mục build tạm (`.next-build-staging`/
 `.next-old-staging` — không đụng bản của production dù lỡ chạy chung thư mục), và copy
 `.env.staging` → `.env.local` trước khi build (Next.js chỉ tự đọc `.env.local`, không có khái
-niệm tên file `.env.staging` sẵn có).
+niệm tên file `.env.staging` sẵn có). Credential migrator đọc từ `/etc/xboss-staging/migrate.env`
+(hoặc biến `MIGRATION_ENV_FILE`) và chỉ được truyền cho tiến trình migration.
 
 ## Quy ước bắt buộc: migration đụng dữ liệu phải qua staging trước
 
@@ -92,8 +97,14 @@ Xem `CLAUDE.md` mục "Quy trình & Definition of Done" (nguồn sự thật c�
   **bắt buộc** chạy `bash deploy.sh --staging` trước, kiểm tra dữ liệu staging sau migrate đúng
   kỳ vọng, rồi mới chạy lên production.
 
-Kiểm tra trước khi áp thật (cả 2 môi trường): `npm run db:migrate -- --dry-run` in danh sách
-migration SẼ áp mà không chạy gì — dùng xác nhận đúng file trước khi deploy thật.
+Kiểm tra trước khi áp thật (cả 2 môi trường): dry-run thủ công bằng biến tạm đọc từ file riêng,
+không đưa URL vào `.env.local`/PM2:
+
+```bash
+MIGRATE_DATABASE_URL="$(bash -c 'set -a; . /etc/xboss-staging/migrate.env; printf %s "$MIGRATE_DATABASE_URL"')" npm run db:migrate -- --dry-run
+```
+
+Dry-run in danh sách migration SẼ áp mà không ghi DB.
 
 ## Giới hạn đã biết
 

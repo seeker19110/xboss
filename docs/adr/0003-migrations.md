@@ -31,7 +31,9 @@ Thêm hệ migrate SQL thuần, không phụ thuộc bên ngoài:
   ghi `schema_migrations`.
 - **Migrator riêng:** chỉ lệnh `npm run db:migrate` (scripts/migrate.ts) được áp DDL. Lệnh này
   bắt buộc dùng `MIGRATE_DATABASE_URL`; thiếu biến thì dừng và không fallback sang
-  `DATABASE_URL`. `npm run db:migrate -- --dry-run` chỉ liệt kê migration còn thiếu.
+  `DATABASE_URL`. Trong deploy, biến chỉ được cấp tạm cho process migrate từ env deploy hoặc
+  file riêng mode `0600` ngoài app checkout; không lưu trong `.env`/`.env.local`/PM2 environment.
+  `npm run db:migrate -- --dry-run` chỉ liệt kê migration còn thiếu.
 - **Runtime chỉ kiểm tra:** trước query nghiệp vụ, `lib/db/index.ts` đọc `schema_migrations` và
   so với danh sách migration của checkout. Nếu bảng tracking không tồn tại/không đọc được hoặc
   còn migration thiếu, query dừng bằng lỗi schema chưa sẵn sàng; runtime không tạo bảng, không
@@ -65,9 +67,10 @@ Thêm hệ migrate SQL thuần, không phụ thuộc bên ngoài:
 
 ## Quy trình rollout và phục hồi (cập nhật S03, 2026-10-05)
 
-1. Chuẩn bị backup/recovery theo quy trình môi trường; nạp `DATABASE_URL` và
-   `MIGRATE_DATABASE_URL` trỏ cùng database đích. Không đưa credential migrator vào cấu hình app
-   runtime nếu nền deploy cho phép tách env giữa job migrate và process ứng dụng.
+1. Chuẩn bị backup/recovery theo quy trình môi trường; nạp `DATABASE_URL` cho runtime và
+   credential migration từ file riêng mode `0600` (mặc định `/etc/xboss/migrate.env`, staging
+   `/etc/xboss-staging/migrate.env`) hoặc env tạm của lệnh deploy. Cả hai URL trỏ cùng DB đích;
+   không để credential migration trong env files hay process app.
 2. Chạy `npm run db:migrate -- --dry-run` để xem tên migration còn thiếu. Dry-run không tạo
    `schema_migrations` và không ghi database.
 3. Chạy `npm run db:migrate` trong bước deploy có quyền DDL. Advisory lock tuần tự hóa các
