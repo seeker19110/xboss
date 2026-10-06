@@ -46,8 +46,8 @@ jobs:
           const root = 'https://api.github.com/repos/seeker19110/xboss';
           const branch = 'fix/quality-runtime-guard-20261006';
           const source = process.env.SOURCE_SHA;
-          const baseSha = 'a81bbb3509f3292a3f4cdffe28e0cc44b1937f2d';
-          const expectedTree = '6d339ca375115fe305c22aeec17f18ada8967f41';
+          const baseSha = 'c838a1279359ad41e670cd33db22489858264061';
+          const expectedTree = '7748ae9e559693bd788ca97dc7273c70278869ed';
           const patchSha = 'e5781b5f1e9433e1e29df6a4b36347184a6534d5';
           const workflow = '.github/workflows/quality-runtime-prepare.yml';
           const headers = {
@@ -65,9 +65,10 @@ jobs:
             return response.json();
           }
           assert.equal(git('rev-parse', 'HEAD'), source);
-          assert.equal(git('rev-parse', 'HEAD^'), baseSha);
+          git('merge-base', '--is-ancestor', baseSha, source);
           assert.equal(git('diff', '--name-only', baseSha, source), workflow);
           assert.equal((await api(`/git/ref/heads/${branch}`)).object.sha, source);
+          assert.equal((await api('/git/ref/heads/main')).object.sha, baseSha);
           const patch = await api(`/git/blobs/${patchSha}`);
           assert.equal(patch.sha, patchSha);
           assert.equal(patch.encoding, 'base64');
@@ -79,6 +80,27 @@ jobs:
             git('rm', workflow);
             git('apply', '--index', '--check', file);
             git('apply', '--index', file);
+            assert.equal(git('write-tree'), '6d339ca375115fe305c22aeec17f18ada8967f41');
+            const title = '# PROGRESS — XBoss\n\n';
+            const progress = fs.readFileSync('PROGRESS.md', 'utf8');
+            assert.ok(progress.startsWith(title));
+            const notice = [
+              '## 2026-10-06 — Xác nhận main đã nhận PR #574', '',
+              'GitHub xác nhận PR #574 đã merge tại `c838a1279359ad41e670cd33db22489858264061`',
+              'ngày 06/10/2026 lúc 16:20:12 UTC; tree khớp bản tích hợp đã kiểm. Nhánh nguồn đã bị xóa.',
+              'Bản bổ sung credential runtime tiếp tục từ main này, không cố ghi vào nhánh đã đóng.',
+              'Chưa xác nhận deploy/production đạt chỉ từ sự kiện merge; các ghi nhận chờ nhập ở dưới là lịch sử.', '', ''
+            ].join('\n');
+            fs.writeFileSync('PROGRESS.md', title + notice + progress.slice(title.length));
+            fs.appendFileSync('docs/ops/quality-runtime-guard-2026-10-06.md', [
+              '', '## Đối chiếu main thay đổi trong phiên', '',
+              'PR #574 đã được merge tại `c838a1279359ad41e670cd33db22489858264061` lúc 16:20:12 UTC.',
+              'Tree main là `78a10708e31209f9c4b811f3a9c00dad161e34c6`, trùng snapshot nguồn của bản sửa này.',
+              'CI push main `37494895895` được ghi nhận đang chạy ở lần đối chiếu; chưa dùng làm bằng chứng PASS.',
+              'Nhánh nguồn #574 đã xóa nên PR bổ sung chuyển sang base main, không khôi phục hoặc force nhánh cũ.',
+              'Sự kiện merge không thay bằng chứng review độc lập, credential hợp lệ hoặc nghiệm thu production.', ''
+            ].join('\n'));
+            git('add', 'PROGRESS.md', 'docs/ops/quality-runtime-guard-2026-10-06.md');
             git('diff', '--cached', '--check', source);
             assert.equal(git('write-tree'), expectedTree, 'Tree lệch snapshot đã kiểm cục bộ');
             const changes = git('diff', '--cached', '--name-status', '--no-renames', source).split('\n');
