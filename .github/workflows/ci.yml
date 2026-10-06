@@ -224,6 +224,21 @@ jobs:
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
+      - name: Cài PostgreSQL client cho restore smoke
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-16
+
+      - name: Gắn marker cho PostgreSQL disposable của CI
+        run: |
+          service_id='${{ job.services.postgres.id }}'
+          marker="xboss-disposable:$(openssl rand -hex 16)"
+          docker exec "$service_id" psql -U ci -d xboss_test -v ON_ERROR_STOP=1 -q \
+            -c "COMMENT ON DATABASE xboss_test IS '$marker'"
+          server_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$service_id")"
+          test -n "$server_ip"
+          printf 'RESTORE_TEST_MARKER=%s\nRESTORE_TEST_SERVER_IP=%s\n' "$marker" "$server_ip" >> "$GITHUB_ENV"
+
       # "npm test" gọi scripts/run-tests.mjs: file KHÔNG chạm DB gộp chung 1 tiến trình,
       # file chạm DB chạy song song mỗi worker MỘT database riêng (CREATE DATABASE ...
       # TEMPLATE) nên song song mà vẫn cô lập. Cùng lệnh với chạy cục bộ (local === CI).
@@ -311,6 +326,21 @@ jobs:
       - name: Cài dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Cài PostgreSQL client cho restore smoke
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-16
+
+      - name: Gắn marker cho PostgreSQL disposable của CI
+        run: |
+          service_id='${{ job.services.postgres.id }}'
+          marker="xboss-disposable:$(openssl rand -hex 16)"
+          docker exec "$service_id" psql -U ci -d xboss_test -v ON_ERROR_STOP=1 -q \
+            -c "COMMENT ON DATABASE xboss_test IS '$marker'"
+          server_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$service_id")"
+          test -n "$server_ip"
+          printf 'RESTORE_TEST_MARKER=%s\nRESTORE_TEST_SERVER_IP=%s\n' "$marker" "$server_ip" >> "$GITHUB_ENV"
 
       - name: Kiểm coverage không tụt quá ngưỡng đệm so với mốc
         run: npm run check:coverage

@@ -1069,6 +1069,22 @@ test("POST /api/projects/:id/clone-config: ID nguồn không phải số → 400
   assert.equal(res.status, 400);
 });
 
+test(
+  "POST /api/projects/:id/clone-config: từ chối ID nguồn không dương hoặc vượt safe integer",
+  S,
+  async () => {
+    const admin = await taoUser("admin", "clone-bad-safe-id");
+    dangNhap(admin, null);
+    const { POST } = await import("@/app/api/projects/[id]/clone-config/route");
+    for (const rawId of ["0", "-1", "9007199254740992"]) {
+      const res = await POST(jreq("/x", { name: "Dự án thử" }), {
+        params: Promise.resolve({ id: rawId }),
+      });
+      assert.equal(res.status, 400, `clone-config id=${rawId}`);
+    }
+  },
+);
+
 test("POST /api/projects/:id/clone-config: dự án nguồn không tồn tại → 404", S, async () => {
   const projectId = await taoDuAn("clone-404");
   const admin = await taoUser("admin", "clone-404");
@@ -1079,6 +1095,27 @@ test("POST /api/projects/:id/clone-config: dự án nguồn không tồn tại �
   });
   assert.equal(res.status, 404);
 });
+
+test(
+  "POST /api/projects/:id/clone-config: admin org khác không thể sao chép cấu hình",
+  S,
+  async () => {
+    const orgKhac = await taoToChuc("clone-org-khac");
+    const sourceProjectId = await taoDuAn("clone-source-cross-org", orgKhac);
+    const admin = await taoUser("admin", "clone-cross-org");
+    dangNhap(admin, null);
+    const { POST } = await import("@/app/api/projects/[id]/clone-config/route");
+    const res = await POST(jreq("/x", { name: `Không được sao chép ${uniq("clonecross")}` }), {
+      params: Promise.resolve({ id: String(sourceProjectId) }),
+    });
+    assert.equal(res.status, 404);
+    const { queryOne, run } = await import("@/lib/db");
+    const source = await queryOne(`SELECT id FROM projects WHERE id = ?`, sourceProjectId);
+    assert.ok(source, "dự án nguồn org khác phải được giữ nguyên");
+    await run(`DELETE FROM projects WHERE id = ?`, sourceProjectId);
+    await run(`DELETE FROM organizations WHERE id = ?`, orgKhac);
+  },
+);
 
 test("POST /api/projects/:id/clone-config: thiếu tên dự án mới → 400", S, async () => {
   const projectId = await taoDuAn("clone-noname");

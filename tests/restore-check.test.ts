@@ -27,7 +27,8 @@ function runRestoreCheck(
     serverAddr?: string;
     superuser?: boolean;
     canCreateDb?: boolean;
-    integrity?: "corrupt" | "wrong-size" | "missing-uploads" | "partial" | "newer-missing";
+    integrity?:
+      "corrupt" | "wrong-size" | "missing-uploads" | "bad-archive" | "partial" | "newer-missing";
   } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), "xboss-restore-check-"));
@@ -40,9 +41,19 @@ function runRestoreCheck(
     const dumpName = `xboss-${setId}.dump`;
     const uploadsName = `xboss-uploads-${setId}.tar.gz`;
     const dumpData = "fixture";
-    const uploadsData = "uploads fixture";
     writeFileSync(join(backups, dumpName), dumpData);
-    writeFileSync(join(backups, uploadsName), uploadsData);
+    const uploadsFixture = join(dir, "uploads-fixture");
+    mkdirSync(uploadsFixture);
+    writeFileSync(join(uploadsFixture, "attachment.txt"), "synthetic attachment");
+    const archiveResult = spawnSync("tar", [
+      "-czf",
+      join(backups, uploadsName),
+      "-C",
+      dir,
+      "uploads-fixture",
+    ]);
+    assert.equal(archiveResult.status, 0, archiveResult.stderr?.toString());
+    const uploadsData = readFileSync(join(backups, uploadsName));
     const manifestPath = join(backups, `xboss-${setId}.manifest.json`);
     writeFileSync(
       manifestPath,
@@ -79,6 +90,17 @@ function runRestoreCheck(
       writeFileSync(manifestPath, JSON.stringify(manifest));
     }
     if (options.integrity === "missing-uploads") rmSync(join(backups, uploadsName));
+    if (options.integrity === "bad-archive") {
+      const invalidArchive = Buffer.from("not a gzip or tar archive");
+      writeFileSync(join(backups, uploadsName), invalidArchive);
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+        artifacts: Array<{ role: string; size: number; sha256: string }>;
+      };
+      const archive = manifest.artifacts.find((artifact) => artifact.role === "uploads_archive")!;
+      archive.size = invalidArchive.byteLength;
+      archive.sha256 = createHash("sha256").update(invalidArchive).digest("hex");
+      writeFileSync(manifestPath, JSON.stringify(manifest));
+    }
     if (options.integrity === "partial") {
       const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
         status: string;
@@ -296,6 +318,13 @@ test("restore-check rejects an artifact size mismatch before connecting or writi
   const result = runRestoreCheck({ integrity: "wrong-size" });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Manifest recovery set mới nhất/);
+  assert.equal(result.calls, "");
+});
+
+test("restore-check rejects a corrupt uploads archive before connecting or writing", () => {
+  const result = runRestoreCheck({ integrity: "bad-archive" });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Archive uploads .*không đọc được/);
   assert.equal(result.calls, "");
 });
 

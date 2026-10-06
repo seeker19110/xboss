@@ -619,6 +619,31 @@ test("POST /api/projects: admin tạo thành công → 201", S, async () => {
   assert.ok((await res.json()).id > 0);
 });
 
+test("POST /api/projects: bỏ qua org_id do client gửi, ghi theo tổ chức Admin", S, async () => {
+  const { insertId, queryOne, run } = await import("@/lib/db");
+  const orgKhac = await insertId(`INSERT INTO organizations (name) VALUES (?)`, `Org POST ${RUN}`);
+  const admin = await dungUser("admin", `adminpostorg${RUN}`);
+  dangNhap({ id: admin.id, passwordHash: admin.pwHash, orgId: admin.orgId });
+  const { POST } = await import("@/app/api/projects/route");
+  const res = await POST(
+    req("http://localhost/api/projects", "POST", {
+      name: `Dự án POST ${RUN}`,
+      code: `POST${RUN}`,
+      orgId: orgKhac,
+      org_id: orgKhac,
+    }),
+  );
+  assert.equal(res.status, 201);
+  const { id } = await res.json();
+  const project = await queryOne<{ orgId: number }>(
+    `SELECT org_id AS "orgId" FROM projects WHERE id = ?`,
+    id,
+  );
+  assert.equal(project?.orgId, admin.orgId);
+  await run(`DELETE FROM projects WHERE id = ?`, id);
+  await run(`DELETE FROM organizations WHERE id = ?`, orgKhac);
+});
+
 // ============================================================================
 // app/api/projects/[id]/route.ts — PATCH / DELETE
 // ============================================================================
@@ -653,6 +678,29 @@ test("PATCH /api/projects/:id: id không phải số → 400", S, async () => {
   assert.equal(res.status, 400);
 });
 
+test(
+  "PATCH/DELETE /api/projects/:id: từ chối ID không dương hoặc vượt safe integer",
+  S,
+  async () => {
+    const admin = await dungUser("admin", `adminprojectbadids${RUN}`);
+    dangNhap({ id: admin.id, passwordHash: admin.pwHash, orgId: admin.orgId });
+    const { PATCH, DELETE } = await import("@/app/api/projects/[id]/route");
+    for (const rawId of ["0", "-1", "9007199254740992"]) {
+      const patchRes = await PATCH(
+        req(`http://localhost/api/projects/${rawId}`, "PATCH", { name: "x" }),
+        {
+          params: Promise.resolve({ id: rawId }),
+        },
+      );
+      assert.equal(patchRes.status, 400, `PATCH id=${rawId}`);
+      const deleteRes = await DELETE(req(`http://localhost/api/projects/${rawId}`, "DELETE"), {
+        params: Promise.resolve({ id: rawId }),
+      });
+      assert.equal(deleteRes.status, 400, `DELETE id=${rawId}`);
+    }
+  },
+);
+
 test("PATCH /api/projects/:id: không tồn tại → 404", S, async () => {
   const admin = await dungUser("admin", `adminpatch404${RUN}`);
   dangNhap({ id: admin.id, passwordHash: admin.pwHash });
@@ -677,27 +725,50 @@ test("PATCH /api/projects/:id: tên rỗng → 400", S, async () => {
 test("PATCH /api/projects/:id: mã trùng dự án khác → 409", S, async () => {
   const admin = await dungUser("admin", `adminpatchdup${RUN}`);
   const code = `PPX${RUN}`;
-  const { insertId } = await import("@/lib/db");
+  const { insertId, queryOne } = await import("@/lib/db");
   await insertId(`INSERT INTO projects (name, code) VALUES (?, ?)`, "Đã có mã", code);
   const proj = await dungDuAn(`patchdup${RUN}`);
+  const original = await queryOne<{ name: string; code: string | null }>(
+    `SELECT name, code FROM projects WHERE id = ?`,
+    proj,
+  );
   dangNhap({ id: admin.id, passwordHash: admin.pwHash });
   const { PATCH } = await import("@/app/api/projects/[id]/route");
-  const res = await PATCH(req(`http://localhost/api/projects/${proj}`, "PATCH", { code }), {
-    params: Promise.resolve({ id: String(proj) }),
-  });
+  const res = await PATCH(
+    req(`http://localhost/api/projects/${proj}`, "PATCH", { name: "Tên không được lưu", code }),
+    { params: Promise.resolve({ id: String(proj) }) },
+  );
   assert.equal(res.status, 409);
+  assert.deepEqual(
+    await queryOne(`SELECT name, code FROM projects WHERE id = ?`, proj),
+    original,
+    "xung đột mã không được lưu một phần trường name",
+  );
 });
 
 test("PATCH /api/projects/:id: trạng thái không hợp lệ → 422", S, async () => {
   const admin = await dungUser("admin", `adminpatchstatus${RUN}`);
   const proj = await dungDuAn(`patchstatus${RUN}`);
+  const { queryOne } = await import("@/lib/db");
+  const original = await queryOne<{ name: string; status: string }>(
+    `SELECT name, status FROM projects WHERE id = ?`,
+    proj,
+  );
   dangNhap({ id: admin.id, passwordHash: admin.pwHash });
   const { PATCH } = await import("@/app/api/projects/[id]/route");
   const res = await PATCH(
-    req(`http://localhost/api/projects/${proj}`, "PATCH", { status: "khong-hop-le" }),
+    req(`http://localhost/api/projects/${proj}`, "PATCH", {
+      name: "Tên không được lưu",
+      status: "khong-hop-le",
+    }),
     { params: Promise.resolve({ id: String(proj) }) },
   );
   assert.equal(res.status, 422);
+  assert.deepEqual(
+    await queryOne(`SELECT name, status FROM projects WHERE id = ?`, proj),
+    original,
+    "trạng thái không hợp lệ không được lưu một phần trường name",
+  );
 });
 
 test("PATCH /api/projects/:id: admin sửa đủ trường thành công", S, async () => {
@@ -718,6 +789,30 @@ test("PATCH /api/projects/:id: admin sửa đủ trường thành công", S, asy
   );
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { ok: true });
+});
+
+test("PATCH /api/projects/:id: admin org khác không thể sửa dự án", S, async () => {
+  const { insertId, queryOne, run } = await import("@/lib/db");
+  const orgKhac = await insertId(`INSERT INTO organizations (name) VALUES (?)`, `Org PATCH ${RUN}`);
+  const projectId = await dungDuAn(`patchorg${RUN}`, orgKhac);
+  const admin = await dungUser("admin", `adminpatchorg${RUN}`);
+  dangNhap({ id: admin.id, passwordHash: admin.pwHash, orgId: admin.orgId });
+  const { PATCH } = await import("@/app/api/projects/[id]/route");
+  const res = await PATCH(
+    req(`http://localhost/api/projects/${projectId}`, "PATCH", { name: "Bị cấm" }),
+    {
+      params: Promise.resolve({ id: String(projectId) }),
+    },
+  );
+  assert.equal(res.status, 404);
+  const project = await queryOne<{ name: string; orgId: number }>(
+    `SELECT name, org_id AS "orgId" FROM projects WHERE id = ?`,
+    projectId,
+  );
+  assert.equal(project?.name, `QT DA patchorg${RUN}`);
+  assert.equal(project?.orgId, orgKhac);
+  await run(`DELETE FROM projects WHERE id = ?`, projectId);
+  await run(`DELETE FROM organizations WHERE id = ?`, orgKhac);
 });
 
 test("DELETE /api/projects/:id: chưa đăng nhập → 401", { ...S }, async () => {
@@ -783,20 +878,26 @@ test(
   async () => {
     const admin = await dungUser("admin", `admindelmat${RUN}`);
     const proj = await dungDuAn(`delmat${RUN}`);
-    const { insertId } = await import("@/lib/db");
-    await insertId(`INSERT INTO materials (project_id, name) VALUES (?, 'Vật tư QT')`, proj);
+    const { insertId, queryOne } = await import("@/lib/db");
+    const materialId = await insertId(
+      `INSERT INTO materials (project_id, name) VALUES (?, 'Vật tư QT')`,
+      proj,
+    );
     dangNhap({ id: admin.id, passwordHash: admin.pwHash });
     const { DELETE } = await import("@/app/api/projects/[id]/route");
     const res = await DELETE(req(`http://localhost/api/projects/${proj}`, "DELETE"), {
       params: Promise.resolve({ id: String(proj) }),
     });
     assert.equal(res.status, 409);
-    assert.match((await res.json()).error, /materials/);
+    assert.match((await res.json()).error, /closed/);
+    assert.ok(
+      await queryOne(`SELECT id FROM materials WHERE id = ? AND project_id = ?`, materialId, proj),
+    );
   },
 );
 
 test(
-  "DELETE /api/projects/:id: dự án rỗng → xoá thành công, dọn user_projects/nav_settings",
+  "DELETE /api/projects/:id: chặn hard delete kể cả dự án trống và giữ liên kết",
   S,
   async () => {
     const admin = await dungUser("admin", `admindelok2${RUN}`);
@@ -812,13 +913,68 @@ test(
     const res = await DELETE(req(`http://localhost/api/projects/${proj}`, "DELETE"), {
       params: Promise.resolve({ id: String(proj) }),
     });
-    assert.equal(res.status, 200);
-    const gone = await queryOne(`SELECT id FROM projects WHERE id = ?`, proj);
-    assert.equal(gone, undefined);
+    assert.equal(res.status, 409);
+    assert.match((await res.json()).error, /closed/);
+    const remains = await queryOne(`SELECT id FROM projects WHERE id = ?`, proj);
+    assert.ok(remains);
     const up = await queryOne(`SELECT * FROM user_projects WHERE project_id = ?`, proj);
-    assert.equal(up, undefined);
+    assert.ok(up);
+    const nav = await queryOne(`SELECT * FROM nav_settings WHERE project_id = ?`, proj);
+    assert.ok(nav);
   },
 );
+
+test(
+  "DELETE /api/projects/:id: chặn xoá và giữ engineering workflow dù dự án không có tower",
+  S,
+  async () => {
+    const admin = await dungUser("admin", `admindelworkflow${RUN}`);
+    const proj = await dungDuAn(`delworkflow${RUN}`);
+    const { queryOne, run } = await import("@/lib/db");
+    await run(
+      `INSERT INTO engineering_workflows
+        (project_id, title, profile, risk_class, created_by)
+       VALUES (?, 'Workflow phải giữ lại', 'A', 'low', ?)`,
+      proj,
+      admin.id,
+    );
+    const workflow = await queryOne<{ id: string }>(
+      `SELECT id FROM engineering_workflows WHERE project_id = ?`,
+      proj,
+    );
+    assert.ok(workflow);
+    dangNhap({ id: admin.id, passwordHash: admin.pwHash });
+    const { DELETE } = await import("@/app/api/projects/[id]/route");
+    const res = await DELETE(req(`http://localhost/api/projects/${proj}`, "DELETE"), {
+      params: Promise.resolve({ id: String(proj) }),
+    });
+    assert.equal(res.status, 409);
+    assert.ok(await queryOne(`SELECT id FROM projects WHERE id = ?`, proj));
+    assert.ok(await queryOne(`SELECT id FROM engineering_workflows WHERE id = ?`, workflow.id));
+    await run(`DELETE FROM engineering_workflows WHERE id = ?`, workflow.id);
+    await run(`DELETE FROM projects WHERE id = ?`, proj);
+  },
+);
+
+test("DELETE /api/projects/:id: admin org khác không thể xoá dự án", S, async () => {
+  const { insertId, queryOne, run } = await import("@/lib/db");
+  const orgKhac = await insertId(
+    `INSERT INTO organizations (name) VALUES (?)`,
+    `Org DELETE ${RUN}`,
+  );
+  const projectId = await dungDuAn(`deleteorg${RUN}`, orgKhac);
+  const admin = await dungUser("admin", `admindeleteorg${RUN}`);
+  dangNhap({ id: admin.id, passwordHash: admin.pwHash, orgId: admin.orgId });
+  const { DELETE } = await import("@/app/api/projects/[id]/route");
+  const res = await DELETE(req(`http://localhost/api/projects/${projectId}`, "DELETE"), {
+    params: Promise.resolve({ id: String(projectId) }),
+  });
+  assert.equal(res.status, 404);
+  const remains = await queryOne(`SELECT id FROM projects WHERE id = ?`, projectId);
+  assert.ok(remains);
+  await run(`DELETE FROM projects WHERE id = ?`, projectId);
+  await run(`DELETE FROM organizations WHERE id = ?`, orgKhac);
+});
 
 // ============================================================================
 // app/api/sheets/route.ts — GET / POST / PUT
