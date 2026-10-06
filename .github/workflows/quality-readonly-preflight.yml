@@ -1,0 +1,125 @@
+name: QUALITY readonly VPS preflight
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/quality-readonly-preflight.yml
+
+permissions: {}
+
+concurrency:
+  group: quality-readonly-vps-preflight
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'ops/quality-readonly-preflight-20261006'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Không checkout/chạy dependency hoặc code từ PR với secret SSH.
+      # Chỉ dùng credential triển khai đã có, host key phải được ghim từ trước.
+      - name: Kiểm file và phiên bản, không thay đổi VPS
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          for name in VPS_SSH_KEY VPS_HOST VPS_USER VPS_SSH_KNOWN_HOSTS; do
+            if [ -z "${!name:-}" ]; then
+              printf 'BLOCKED_REQUIRED_SECRET=%s\n' "$name"
+              exit 78
+            fi
+          done
+          [[ "$VPS_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] || exit 78
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.:-]*$ ]] || exit 78
+          scratch="$(mktemp -d "$RUNNER_TEMP/xboss-readonly.XXXXXX")"
+          trap 'rm -rf "$scratch"' EXIT
+          printf '%s\n' "$VPS_SSH_KEY" > "$scratch/key"
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > "$scratch/known_hosts"
+          chmod 600 "$scratch/key" "$scratch/known_hosts"
+          timeout 90s ssh -T -F /dev/null -i "$scratch/key" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o PasswordAuthentication=no \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$scratch/known_hosts" \
+            -o ConnectTimeout=15 -o ServerAliveInterval=15 \
+            "$VPS_USER@$VPS_HOST" 'bash --noprofile --norc -s' 2>/dev/null <<'REMOTE'
+          set -euo pipefail
+          bad=0
+          app=/var/www/xboss
+          credential=/etc/xboss/migrate.env
+          printf 'OBSERVED_AT_UTC=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          if [ -d "$app" ]; then
+            echo APP_DIRECTORY=present
+          else
+            echo APP_DIRECTORY=missing_or_not_visible
+            bad=1
+          fi
+          current="$(git -C "$app" rev-parse --verify HEAD 2>/dev/null || true)"
+          if [[ "$current" =~ ^[0-9a-f]{40}$ ]]; then
+            printf 'CHECKOUT_SHA=%s\n' "$current"
+          else
+            echo CHECKOUT_SHA=unavailable
+            bad=1
+          fi
+          version="$(node --version 2>/dev/null || true)"
+          if [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'NODE_VERSION=%s\n' "$version"
+          else
+            echo NODE_VERSION=unavailable
+            bad=1
+          fi
+          if [ -L "$credential" ]; then
+            echo MIGRATION_FILE=symlink_requires_review
+            bad=1
+          elif [ ! -f "$credential" ]; then
+            echo MIGRATION_FILE=missing_or_not_visible
+            bad=1
+          elif [ ! -r "$credential" ]; then
+            echo MIGRATION_FILE=unreadable
+            bad=1
+          else
+            mode="$(stat -c '%a' "$credential" 2>/dev/null || true)"
+            if [ "$mode" = 600 ]; then
+              echo MIGRATION_FILE=readable_mode_600
+            else
+              echo MIGRATION_FILE=wrong_mode
+              bad=1
+            fi
+          fi
+          for name in .env .env.local .env.production .env.production.local .env.staging; do
+            file="$app/$name"
+            [ -e "$file" ] || continue
+            if [ ! -f "$file" ] || [ ! -r "$file" ]; then
+              printf 'RUNTIME_ENV_%s=unreadable\n' "$name"
+              bad=1
+              continue
+            fi
+            if grep -Eq '^[[:space:]]*(export[[:space:]]+)?MIGRATE_DATABASE_URL[[:space:]]*=' "$file"; then
+              printf 'RUNTIME_ENV_%s=migrator_present\n' "$name"
+              bad=1
+            else
+              status=$?
+              if [ "$status" -eq 1 ]; then
+                printf 'RUNTIME_ENV_%s=migrator_absent\n' "$name"
+              else
+                printf 'RUNTIME_ENV_%s=inspection_error\n' "$name"
+                bad=1
+              fi
+            fi
+          done
+          echo MIGRATION_SECRET_VALUE=not_read
+          echo DATABASE_ROLE_CHECK=not_run
+          echo DEPLOY_AND_RESTART=not_run
+          echo PRODUCTION_ACCEPTANCE=not_run
+          if [ "$bad" -ne 0 ]; then
+            echo FILE_PREFLIGHT=blocked
+            exit 1
+          fi
+          echo FILE_PREFLIGHT=pass_not_release_acceptance
+          REMOTE
