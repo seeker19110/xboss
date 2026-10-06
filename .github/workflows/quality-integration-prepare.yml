@@ -46,7 +46,7 @@ jobs:
           assert.equal(git('ls-remote', 'origin', 'refs/heads/main').split('\t')[0], main);
           assert.equal(git('rev-parse', 'HEAD'), process.env.SOURCE_SHA);
           const inputs = [
-            [571, '2d9991e4a7f2ea75e279459271d2580520ed6dc3'],
+            [571, 'a1e2b8ab5d0156e10bea628434bc6db9bf500306'],
             [562, '567f0d4aa5f2031622e5d84807064445306f51d6'],
             [565, 'a04e6873858e6eb23dbdae58b8054d915bef28f5'],
             [567, '7cdfdf8caa93f09260de295aed272f432366ad09'],
@@ -157,6 +157,8 @@ jobs:
             'dòng trong mỗi vùng. Thay đổi ngoài xung đột được git merge ba chiều giữ nguyên.',
             'Run đầu dừng vì guard áp sai cả file vào cập nhật lịch sử không xung đột ở #562;',
             'bản sửa thu hẹp đúng hunk, không bỏ kiểm xung đột hoặc xóa lịch sử.',
+            'Run kế phát hiện TS2741 ở fixture #571: ProcessEnv thiếu NODE_ENV. Đã thêm',
+            'NODE_ENV=test trên chính PR nguồn, không kế thừa env/secret của tiến trình cha.',
             'Workflow tạm bị loại khỏi tree ứng viên, không sửa main/ref hoặc production.', '',
             'Kiểm formatter/lint/typecheck và regression deploy/restore trước xuất candidate.',
             'Full CI PostgreSQL/coverage/build/E2E phải chạy lại trên commit tích hợp cuối.',
@@ -172,6 +174,7 @@ jobs:
             '## 2026-10-06 — QUALITY-FINAL-1: dựng ứng viên tích hợp riêng', '',
             'Ứng viên ghép #571/#562/#565/#567/#568/#566/#569 cùng dependency #573.',
             'Chi tiết SHA tại docs/ops/quality-integration-2026-10-06.md; giữ #566 trước #569.',
+            'Đã sửa fixture #571 thiếu NODE_ENV gây TS2741, không nới kiểm tra TypeScript.',
             'Chưa nhập main hoặc phát hành. Full CI và review trên commit kết hợp vẫn bắt buộc.',
             'N05 vẫn BLOCKED_ENV: ghi nhận chuẩn bị credential ở lịch sử #562 không phải',
             'bằng chứng file đọc được, preflight hoặc deploy production thành công.',
@@ -247,6 +250,24 @@ jobs:
           }
           const base = await api(`/git/commits/${source}`);
           const result = await api('/git/trees', { base_tree: base.tree.sha, tree });
+          assert.equal(git('write-tree'), result.sha, 'Tree remote không khớp index đã test');
+          git('archive', '--format=tar.gz', '--output=/tmp/xboss-source.tar.gz', result.sha);
           console.log('INTEGRATION_CANDIDATE_TREE', result.sha, 'SOURCE', source);
           console.log('PARENTS', fs.readFileSync('/tmp/xboss-integration-inputs.json', 'utf8'));
           NODE
+      - name: Lưu snapshot mã và toolchain cho kiểm chứng cục bộ
+        run: |
+          mkdir -p /tmp/xboss-toolchain/bin
+          cp "$(command -v node)" /tmp/xboss-toolchain/bin/node
+          tar -cf /tmp/xboss-tools.tar node_modules
+          tar -rf /tmp/xboss-tools.tar -C /tmp/xboss-toolchain bin
+          gzip -1 /tmp/xboss-tools.tar
+          sha256sum /tmp/xboss-source.tar.gz /tmp/xboss-tools.tar.gz
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: quality-integration-snapshot
+          path: |
+            /tmp/xboss-source.tar.gz
+            /tmp/xboss-tools.tar.gz
+          retention-days: 1
+          compression-level: 0
