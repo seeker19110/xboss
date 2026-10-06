@@ -1,0 +1,109 @@
+name: QUALITY lock repair
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/quality-lock-repair.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-lock-repair-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'fix/quality-final-dependency-20261006'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Dựng lockfile bằng npm, không chạy lifecycle script
+        run: |
+          cp package-lock.json /tmp/xboss-lock-before.json
+          npm update source-map-js --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Chỉ chấp nhận thay đổi source-map-js đã vá
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          const before = JSON.parse(fs.readFileSync('/tmp/xboss-lock-before.json', 'utf8'));
+          const after = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const target = 'node_modules/source-map-js';
+          assert.equal(before.packages[target].version, '1.2.1');
+          assert.equal(after.packages[target].version, '1.2.2');
+          assert.equal(after.packages[target].resolved,
+            'https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.2.tgz');
+          assert.match(after.packages[target].integrity, /^sha512-[A-Za-z0-9+/]+={0,2}$/);
+          const replacement = after.packages[target];
+          after.packages[target] = before.packages[target];
+          assert.deepEqual(after, before, 'Từ chối cập nhật ngoài dependency đã duyệt');
+          console.log('LOCK_SCOPE_PASS', JSON.stringify(replacement));
+          NODE
+          git diff --check
+          git diff -- package-lock.json
+      - name: Kiểm npm ci và audit trên lockfile mới
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm audit --omit=dev --audit-level=high --fetch-timeout=30000
+      - name: Lưu blob ứng viên, không sửa branch hoặc production
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          const root = 'https://api.github.com/repos/seeker19110/xboss';
+          const headers = {
+            authorization: `Bearer ${process.env.GH_TOKEN}`,
+            accept: 'application/vnd.github+json',
+            'content-type': 'application/json',
+            'x-github-api-version': '2022-11-28'
+          };
+          const branch = 'fix/quality-final-dependency-20261006';
+          const ref = await fetch(`${root}/git/ref/heads/${branch}`, { headers });
+          assert.ok(ref.ok, 'Không đọc được HEAD');
+          assert.equal((await ref.json()).object.sha, process.env.SOURCE_SHA,
+            'HEAD đã thay đổi; không sử dụng kết quả cũ');
+          const note = [
+            '## 2026-10-06 — QUALITY-FINAL-1: vá dependency chặn CI',
+            '',
+            'Cập nhật riêng source-map-js 1.2.1 lên 1.2.2 cho GHSA-68fv-2mgg-jv7q.',
+            'Lockfile được npm dựng trên Node 24; kiểm chỉ một package thay đổi, npm ci',
+            'với ignore-scripts và audit production đạt trên ứng viên. Full CI/review',
+            'của commit tích hợp vẫn bắt buộc; kết quả này không phải nghiệm thu production.',
+            'Tiếp tục kế hoạch QUALITY-FINAL-1 và sổ nợ #572; #571 cùng credential migrator',
+            'VPS còn là điều kiện riêng. Không hạ cổng, đổi schema hoặc bật offline queue.',
+            '',
+            ''
+          ].join('\n');
+          const progress = fs.readFileSync('PROGRESS.md', 'utf8');
+          assert.ok(progress.startsWith('# PROGRESS — XBoss\n\n'));
+          const updated = progress.replace('# PROGRESS — XBoss\n\n',
+            '# PROGRESS — XBoss\n\n' + note);
+          for (const [path, content] of [
+            ['package-lock.json', fs.readFileSync('package-lock.json', 'utf8')],
+            ['PROGRESS.md', updated]
+          ]) {
+            const response = await fetch(`${root}/git/blobs`, {
+              method: 'POST', headers,
+              body: JSON.stringify({ content, encoding: 'utf-8' })
+            });
+            assert.ok(response.ok, `Không lưu được blob ${path}: ${response.status}`);
+            const result = await response.json();
+            console.log('CANDIDATE_BLOB', path, result.sha, 'SOURCE', process.env.SOURCE_SHA);
+          }
+          NODE
