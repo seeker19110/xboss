@@ -1,5 +1,68 @@
 # PROGRESS — XBoss
 
+## 2026-10-06 — QUALITY-FINAL-1: dựng ứng viên tích hợp riêng
+
+Ứng viên ghép #571/#562/#565/#567/#568/#566/#569 cùng dependency #573.
+Chi tiết SHA tại docs/ops/quality-integration-2026-10-06.md; giữ #566 trước #569.
+Đã sửa fixture #571 thiếu NODE_ENV gây TS2741, không nới kiểm tra TypeScript.
+Chưa nhập main hoặc phát hành. Full CI và review trên commit kết hợp vẫn bắt buộc.
+N05 vẫn BLOCKED_ENV: ghi nhận chuẩn bị credential ở lịch sử #562 không phải
+bằng chứng file đọc được, preflight hoặc deploy production thành công.
+Không đóng toàn bộ 54 AC, bật offline hoặc thay quy tắc tiền/IPC.
+
+## 2026-10-06 — QUALITY-FINAL-1: vá dependency chặn CI
+
+Cập nhật source-map-js lên 1.2.2 (GHSA-68fv-2mgg-jv7q) và sharp lên 0.35.5
+(GHSA-wq5f-xc86-pv6w), gồm các binary sharp/libvips đi kèm; không nâng package khác.
+Lockfile được npm dựng trên Node 24; kiểm phạm vi, npm ci với ignore-scripts,
+audit production và nạp sharp đạt trên ứng viên. Full CI/review trên commit
+tích hợp vẫn bắt buộc; không coi đây là nghiệm thu production hoặc toàn bộ 54 AC.
+Tiếp tục QUALITY-FINAL-1 và sổ nợ #572. #571 cùng credential migrator trên VPS
+còn là điều kiện riêng. Không hạ cổng, đổi schema hoặc bật offline queue.
+
+## 2026-10-05 — QUALITY-FINAL-1 S02a: khóa PATCH giá trị hợp đồng tầng theo dự án
+
+`PATCH /api/payments` nay yêu cầu dự án đang chọn và org hợp lệ, kiểm toàn bộ sheet theo
+`sheet → tower → project → org`, từ chối ID/dữ liệu sai và batch trùng, đồng thời giới hạn
+kích thước batch. Hợp đồng liên kết hiện hữu phải cùng dự án; ghi một lần trong transaction
+với điều kiện scope ở SQL và trả số dòng thực ghi. Test route bổ sung batch hai dòng,
+chéo dự án, không có dự án, input sai, rollback và hợp đồng liên kết. Đây là bản vá P1
+hẹp từ kiểm kê S00 payment, chưa đóng S02a/S01/S03 toàn miền. PostgreSQL disposable trong
+CI là bằng chứng SQL; không dùng production DB. Các GET/POST/DELETE payment khác và
+money decimal-string vẫn còn trong kế hoạch.
+
+## 2026-10-05 — QUALITY-FINAL-1 S02a: khóa GET danh sách phiếu thanh toán
+
+`GET /api/payments/bills` yêu cầu dự án khả kiến cùng tổ chức; cookie dự án sai
+trả 404, cookie vắng chọn dự án khả kiến đầu như các trang hiện hữu. Query chỉ trả phiếu
+có `project_id` đúng, kiểm mọi liên kết contract/certificate/sheet còn đủ scope và sự
+nhất quán giữa contract trực tiếp với certificate; tên người tạo chỉ join trong org.
+Phiếu chưa phân loại nhưng đã có dự án hợp lệ vẫn hiển thị. Mọi response đặt
+`Cache-Control: private, no-store`. Test route thật bao phủ parent lệch, phiếu legacy
+`project_id NULL`, cookie sai/vắng và cache header. Đây là slice đọc hẹp, chưa đóng S02a;
+POST/PATCH/DELETE bill và các GET payment khác còn trong inventory S00. Chưa tuyên bố
+S01 membership cutover hoặc exact-money DTO hoàn thành.
+
+## 2026-10-05 — QUALITY-FINAL-1 S14: kiểm restore bằng PostgreSQL disposable
+
+Thêm integration smoke tạo dump custom và recovery set tổng hợp từ PostgreSQL disposable,
+gọi `restore-check.sh` với role đích `CREATEDB` không phải superuser, kiểm bảng lõi có dữ liệu
+và database tạm được dọn. CI cấp trước marker trên đúng container PostgreSQL service;
+test đối chiếu marker, IP server và URL worker trước mọi lệnh ghi, chỉ dọn DB đích có
+marker khớp. Hai ca âm xác nhận marker sai hoặc nguồn/đích cùng server bị chặn trước
+khi tạo database phục hồi. Test dùng credentials giả của CI, không đọc production.
+Đây là bằng chứng restore đường cơ bản khi CI PostgreSQL và client đạt; chưa phải PITR,
+attachment restore đầy đủ, kiểm khóa, RPO/RTO hoặc diễn tập trên workload thực.
+
+## 2026-10-05 — QUALITY-FINAL-1 S14: kiểm tra cấu trúc archive trước restore
+
+`restore-check.sh` đọc/liệt kê archive uploads bằng `tar -tzf` sau khi đối chiếu manifest,
+trước mọi kết nối PostgreSQL; archive hỏng làm bước restore-check thất bại. Test dùng tar
+fixture hợp lệ và bản hỏng có checksum đúng để xác nhận không gọi DB khi cấu trúc sai.
+Targeted test 17/17 và kiểm cú pháp/định dạng đạt; CI release gate còn chờ PR này.
+Đây chỉ là kiểm tra archive có thể đọc, chưa chứng minh giải nén đầy đủ, khôi phục file,
+PITR hoặc RPO/RTO.
+
 ## 2026-10-05 — QUALITY-FINAL-1 S14: manifest cho bộ backup
 
 Backup tạo manifest gắn dump và kho tệp đính kèm bằng kích thước/SHA-256; bộ thiếu tệp trả lỗi,
@@ -42,18 +105,29 @@ dừng trước khi chuyển traffic. `npm run db:migrate` là bước độc l�
 thiếu. Mỗi migration giữ transaction riêng và advisory lock trong migrator.
 Credential migration phải nằm trong file riêng mode `0600` ngoài checkout hoặc env deploy tạm;
 `deploy.sh` từ chối khi thiếu/sai quyền/còn trong env file runtime, chỉ truyền cho bước migrate
-và xóa trước khi reload PM2. Cần chuyển credential hiện hữu sang file riêng trước deploy PR này;
-không được ghi URL vào `.env.local`.
+và xóa trước khi reload PM2. Người vận hành đã xác nhận file riêng được chuẩn bị và
+credential đã được gỡ khỏi `.env.local`; không đọc secret trong PR.
 Workflow deploy lấy đúng SHA đã qua CI trên VPS trước khi chạy script mới; staging bootstrap
 từ chối credential cũ trong env file. E2E chạy migrator trên DB disposable trước khi seed, vì
 runtime không còn tự tạo schema. Script ghim SHA CI và dừng trước migration nếu `main` đã tiến
-sang commit khác, tránh áp schema mới vào ứng dụng cũ. Targeted test cấu hình đạt; CI trên HEAD cuối
-vẫn là điều kiện hợp nhất.
+sang commit khác, tránh áp schema mới vào ứng dụng cũ. Targeted test và CI của PR #563 đạt;
+deploy trên VPS vẫn cần xác nhận riêng.
 
 Đã cập nhật quy trình rollout/recovery tại [ADR-0003](docs/adr/0003-migrations.md), cùng hướng
 dẫn Metabase để chạy migration `0073` bằng migrator riêng. Không chạy database hoặc production
 trong slice tài liệu này. A1-AC04/06 và Q-AC07 vẫn cần evidence PostgreSQL bằng app role phù hợp;
 đây không phải xác nhận RLS/production đã đạt.
+
+## 2026-10-05 — QUALITY-FINAL-1 S01: API quản trị dự án cùng tổ chức
+
+`POST /api/projects` lấy `org_id` từ Admin đã xác thực; `PATCH`/`DELETE` và nguồn
+`clone-config` chỉ xử lý dự án cùng tổ chức. ID không dương/không an toàn bị từ chối.
+`PATCH` kiểm hết payload trước một lệnh ghi để lỗi mã trùng/trạng thái không gây cập nhật
+một phần. `DELETE` trả 409 kể cả dự án chưa có tower vì nhiều bảng workflow/audit có FK
+xoá dây chuyền; Admin chuyển trạng thái “Đã đóng” trên UI để giữ nguyên hồ sơ. Bổ sung
+kiểm thử HTTP âm về giả mạo org, sửa lỗi một phần và bảo toàn workflow. Lint, typecheck,
+UI guard và định dạng đạt; test PostgreSQL disposable còn chờ CI. Đây là ranh giới
+project-admin hẹp; resolver membership/fallback và các caller S02 vẫn chưa cutover.
 
 ## 2026-10-05 — QUALITY-FINAL-1 S14: cô lập restore-check
 

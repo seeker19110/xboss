@@ -50,9 +50,11 @@ artifact mồ côi và các set đã quá tuổi retention, giữ set `COMPLETE`
 đầy đủ mới chạy remote retention. Khi đẩy remote, manifest được copy sau các artifact.
 
 `restore-check.sh` chọn manifest mới nhất và kiểm schema, set ID, đủ hai artifact, tồn tại, size và
-SHA-256 trước mọi kết nối PostgreSQL. Script có thể tạo credential file tạm để phân tích target
-trước bước integrity check, nhưng sai/thiếu manifest hoặc artifact sẽ dừng trước mọi lệnh
-`psql`/`pg_restore`. Manifest hiện nằm cạnh artifact trong backup directory;
+SHA-256 trước mọi kết nối PostgreSQL; sau đó dùng `tar -tzf` để xác nhận archive uploads có thể
+được đọc/liệt kê, cũng trước khi kết nối. Script có thể tạo credential file tạm để phân tích target
+trước bước integrity check, nhưng manifest/artifact sai hoặc archive không đọc được sẽ dừng trước
+mọi lệnh `psql`/`pg_restore`. Kiểm tra này không giải nén archive hay xác nhận mọi attachment
+critical được khôi phục đúng. Manifest hiện nằm cạnh artifact trong backup directory;
 SHA-256 giúp phát hiện thiếu/hỏng file nhưng không chứng minh chống sửa nếu người có quyền sửa được
 cả manifest lẫn artifact.
 
@@ -65,9 +67,10 @@ sau tuổi local retention. Remote cleanup chỉ xóa các set `COMPLETE` cũ th
 chứng minh retention thực tế của provider hoặc môi trường production.
 
 Đây là integrity gate cho cặp dump/uploads hiện tại, không phải full recovery manifest của A6.
-`restore-check.sh` chỉ kiểm size/hash của uploads archive; nó **không giải nén hay xác nhận archive
-có thể extract**, cũng không xác thực WAL/PITR, object version, key reference hay migration checksum,
-và không chứng minh RPO/RTO. Kết quả restore smoke không được dùng làm PITR PASS.
+`restore-check.sh` kiểm size/hash và khả năng đọc/liệt kê uploads archive bằng `tar -tzf`, nhưng
+**không giải nén hoặc xác nhận mọi attachment được khôi phục đúng**. Nó cũng không xác thực
+WAL/PITR, object version, key reference hay migration checksum, và không chứng minh RPO/RTO.
+Kết quả restore smoke không được dùng làm PITR PASS.
 
 Cả hai là script Bash, không phải TypeScript. `restore-check.sh` cần Bash, Python 3 standard library
 để phân tích URI mà không lộ credential, và `pg_restore`/`psql` từ gói `postgresql-client`; không

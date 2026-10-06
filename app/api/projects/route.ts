@@ -26,6 +26,8 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.manageProjects(user.role))
     return NextResponse.json({ error: "Chỉ Admin mới tạo được dự án" }, { status: 403 });
+  if (!Number.isSafeInteger(user.orgId) || user.orgId < 1)
+    return NextResponse.json({ error: "Không xác định được tổ chức của Admin" }, { status: 403 });
 
   const body = await req.json().catch(() => null);
   const name = typeof body?.name === "string" ? body.name.trim() : "";
@@ -37,16 +39,20 @@ export async function POST(req: NextRequest) {
     typeof body?.contractor === "string" && body.contractor.trim() ? body.contractor.trim() : null;
   const color = typeof body?.color === "string" && body.color.trim() ? body.color.trim() : null;
 
-  if (code && (await queryOne(`SELECT id FROM projects WHERE code = ?`, code)))
+  if (
+    code &&
+    (await queryOne(`SELECT id FROM projects WHERE code = ? AND org_id = ?`, code, user.orgId))
+  )
     return NextResponse.json({ error: `Mã dự án "${code}" đã tồn tại` }, { status: 409 });
 
   const id = await insertId(
-    `INSERT INTO projects (name, code, investor, contractor, color) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+    `INSERT INTO projects (name, code, investor, contractor, color, org_id) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
     name,
     code,
     investor,
     contractor,
     color,
+    user.orgId,
   );
   return NextResponse.json({ id }, { status: 201 });
 }

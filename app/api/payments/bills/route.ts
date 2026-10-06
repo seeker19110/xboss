@@ -1,11 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
-import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getCurrentProjectId, PROJECT_COOKIE, visibleProjectIds } from "@/lib/ha-tang/projects";
+import type { Role } from "@/lib/nen/roles";
 
 export const dynamic = "force-dynamic";
 
 export type BillType = "bill" | "advance" | "item";
+
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" };
+
+/** Không dùng fallback của resolver: cookie sai/không được cấp không được đổi thành project đầu. */
+async function getVerifiedProjectId(user: { id: number; role: Role; orgId: number }) {
+  if (!Number.isSafeInteger(user.orgId) || user.orgId <= 0) return null;
+
+  const visible = await visibleProjectIds(user);
+  const raw = (await cookies()).get(PROJECT_COOKIE)?.value;
+  let projectId: number | null = null;
+
+  if (raw == null) {
+    // Giữ mặc định project khả kiến đầu tiên của app khi chưa có cookie;
+    // mọi truy vấn bên dưới vẫn khóa vào đúng project/org đã xác minh.
+    projectId = visible[0] ?? null;
+  } else if (/^[1-9]\d*$/.test(raw)) {
+    const parsed = Number(raw);
+    if (Number.isSafeInteger(parsed) && visible.includes(parsed)) projectId = parsed;
+  }
+
+  if (projectId == null) return null;
+  const project = await queryOne<{ id: number }>(
+    `SELECT id FROM projects WHERE id = ? AND org_id = ?`,
+    projectId,
+    user.orgId,
+  );
+  return project?.id ?? null;
+}
 
 type Bill = {
   id: number;
@@ -31,22 +61,25 @@ type Bill = {
 
 export async function GET(_req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!user)
+    return NextResponse.json(
+      { error: "Chưa đăng nhập" },
+      { status: 401, headers: PRIVATE_NO_STORE },
+    );
   if (!CAN.viewPayments(user.role))
-    return NextResponse.json({ error: "Chỉ Admin/PM/BCH được xem thanh toán" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Chỉ Admin/PM/BCH được xem thanh toán" },
+      { status: 403, headers: PRIVATE_NO_STORE },
+    );
 
-  // Dự án đang chọn — lọc chéo dự án (giống pattern M22). null = DB chưa có dự án nào
-  // → giữ hành vi không lọc (tương thích ngược). payment_bills đã có project_id trực
-  // tiếp (migration 0069_rls.sql); dòng cũ chưa gán dự án (NULL) vẫn hiện.
-  const projectId = await getCurrentProjectId(user);
-  const projectFilter =
-    projectId != null ? " WHERE pb.project_id = ? OR pb.project_id IS NULL" : "";
-  const projectParams = projectId != null ? [projectId] : [];
+  const projectId = await getVerifiedProjectId(user);
+  if (projectId == null)
+    return NextResponse.json(
+      { error: "Không tìm thấy dự án đang chọn" },
+      { status: 404, headers: PRIVATE_NO_STORE },
+    );
 
-  // M62 PR1: bọc trong withProjectScope("*") — khai báo tường minh "route này cố ý đọc
-  // xuyên dự án" (UI hiển thị vậy, lọc thật đã nằm ở projectFilter phía trên). '*' giữ
-  // đúng hành vi hiện tại, chỉ để route không rơi vào nhánh thiếu-GUC sau khi khoá cửa RLS.
-  const bills = await withProjectScope("*", () =>
+  const bills = await withProjectScope(projectId, () =>
     query<Bill>(
       `
     SELECT pb.id, pb.responsible, pb.type, pb.period,
@@ -63,19 +96,46 @@ export async function GET(_req: NextRequest) {
            u.name             AS "createdByName",
            pb.created_at      AS "createdAt"
       FROM payment_bills pb
-      LEFT JOIN users u ON u.id = pb.created_by
+      LEFT JOIN users u ON u.id = pb.created_by AND u.org_id = ?
       LEFT JOIN sheet_types st ON st.id = pb.sheet_type_id
       LEFT JOIN LATERAL (
         SELECT name FROM work_packages
         WHERE sheet_type_id = pb.sheet_type_id AND floor_label = pb.floor_label
         LIMIT 1
-      ) wp ON pb.sheet_type_id IS NOT NULL AND pb.floor_label IS NOT NULL${projectFilter}
+      ) wp ON pb.sheet_type_id IS NOT NULL AND pb.floor_label IS NOT NULL
+       WHERE pb.project_id = ?
+         AND (pb.contract_id IS NULL OR EXISTS (
+           SELECT 1 FROM contracts c JOIN projects cp ON cp.id = c.project_id
+            WHERE c.id = pb.contract_id AND c.project_id = ? AND cp.org_id = ?
+         ))
+         AND (pb.payment_cert_id IS NULL OR EXISTS (
+           SELECT 1
+             FROM payment_certs pc
+             JOIN contracts cc ON cc.id = pc.contract_id
+             JOIN projects cp ON cp.id = cc.project_id
+            WHERE pc.id = pb.payment_cert_id AND cc.project_id = ? AND cp.org_id = ?
+              AND (pb.contract_id IS NULL OR pc.contract_id = pb.contract_id)
+         ))
+         AND (pb.sheet_type_id IS NULL OR EXISTS (
+           SELECT 1
+             FROM sheet_types pst
+             JOIN towers pt ON pt.id = pst.tower_id
+             JOIN projects pp ON pp.id = pt.project_id
+            WHERE pst.id = pb.sheet_type_id AND pt.project_id = ? AND pp.org_id = ?
+         ))
      ORDER BY pb.paid_date ASC, pb.id ASC`,
-      ...projectParams,
+      user.orgId,
+      projectId,
+      projectId,
+      user.orgId,
+      projectId,
+      user.orgId,
+      projectId,
+      user.orgId,
     ),
   );
 
-  return NextResponse.json({ bills });
+  return NextResponse.json({ bills }, { headers: PRIVATE_NO_STORE });
 }
 
 // POST /api/payments/bills
