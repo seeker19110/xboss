@@ -33,31 +33,40 @@ jobs:
       - name: Dựng lockfile bằng npm, không chạy lifecycle script
         run: |
           cp package-lock.json /tmp/xboss-lock-before.json
-          npm update source-map-js --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Chỉ chấp nhận thay đổi source-map-js đã vá
+          npm update source-map-js sharp --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Chỉ chấp nhận hai dependency và binary sharp liên quan
         run: |
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import fs from 'node:fs';
           const before = JSON.parse(fs.readFileSync('/tmp/xboss-lock-before.json', 'utf8'));
           const after = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
-          const target = 'node_modules/source-map-js';
-          assert.equal(before.packages[target].version, '1.2.1');
-          assert.equal(after.packages[target].version, '1.2.2');
-          assert.equal(after.packages[target].resolved,
-            'https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.2.tgz');
-          assert.match(after.packages[target].integrity, /^sha512-[A-Za-z0-9+/]+={0,2}$/);
-          const replacement = after.packages[target];
-          after.packages[target] = before.packages[target];
+          assert.equal(before.packages['node_modules/source-map-js'].version, '1.2.1');
+          assert.equal(after.packages['node_modules/source-map-js'].version, '1.2.2');
+          assert.equal(after.packages['node_modules/sharp'].version, '0.35.5');
+          const allowed = /^node_modules\/(?:source-map-js|sharp|@img\/sharp-[a-z0-9-]+)$/;
+          const paths = new Set([...Object.keys(before.packages), ...Object.keys(after.packages)]);
+          for (const path of paths) {
+            if (!allowed.test(path)) continue;
+            const replacement = after.packages[path];
+            assert.ok(replacement && before.packages[path], 'Không thêm/xóa package');
+            if (JSON.stringify(replacement) !== JSON.stringify(before.packages[path])) {
+              assert.ok(replacement.resolved.startsWith('https://registry.npmjs.org/'));
+              assert.match(replacement.integrity, /^sha512-[A-Za-z0-9+/]+={0,2}$/);
+              console.log('LOCK_CHANGE', path, before.packages[path].version, replacement.version);
+            }
+            after.packages[path] = before.packages[path];
+          }
           assert.deepEqual(after, before, 'Từ chối cập nhật ngoài dependency đã duyệt');
-          console.log('LOCK_SCOPE_PASS', JSON.stringify(replacement));
+          console.log('LOCK_SCOPE_PASS');
           NODE
           git diff --check
-          git diff -- package-lock.json
+          git diff --stat
       - name: Kiểm npm ci và audit trên lockfile mới
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm audit --omit=dev --audit-level=high --fetch-timeout=30000
+          node -e "const s=require('sharp'); console.log('SHARP_RUNTIME', JSON.stringify(s.versions))"
       - name: Lưu blob ứng viên, không sửa branch hoặc production
         env:
           GH_TOKEN: ${{ github.token }}
@@ -81,12 +90,13 @@ jobs:
           const note = [
             '## 2026-10-06 — QUALITY-FINAL-1: vá dependency chặn CI',
             '',
-            'Cập nhật riêng source-map-js 1.2.1 lên 1.2.2 cho GHSA-68fv-2mgg-jv7q.',
-            'Lockfile được npm dựng trên Node 24; kiểm chỉ một package thay đổi, npm ci',
-            'với ignore-scripts và audit production đạt trên ứng viên. Full CI/review',
-            'của commit tích hợp vẫn bắt buộc; kết quả này không phải nghiệm thu production.',
-            'Tiếp tục kế hoạch QUALITY-FINAL-1 và sổ nợ #572; #571 cùng credential migrator',
-            'VPS còn là điều kiện riêng. Không hạ cổng, đổi schema hoặc bật offline queue.',
+            'Cập nhật source-map-js lên 1.2.2 (GHSA-68fv-2mgg-jv7q) và sharp lên 0.35.5',
+            '(GHSA-wq5f-xc86-pv6w), gồm các binary sharp/libvips đi kèm; không nâng package khác.',
+            'Lockfile được npm dựng trên Node 24; kiểm phạm vi, npm ci với ignore-scripts,',
+            'audit production và nạp sharp đạt trên ứng viên. Full CI/review trên commit',
+            'tích hợp vẫn bắt buộc; không coi đây là nghiệm thu production hoặc toàn bộ 54 AC.',
+            'Tiếp tục QUALITY-FINAL-1 và sổ nợ #572. #571 cùng credential migrator trên VPS',
+            'còn là điều kiện riêng. Không hạ cổng, đổi schema hoặc bật offline queue.',
             '',
             ''
           ].join('\n');
