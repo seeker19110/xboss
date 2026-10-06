@@ -72,6 +72,7 @@ esac`,
 /bin/mktemp "$FAKE_TMP/xboss-deploy.XXXXXX"`,
   );
   const env: NodeJS.ProcessEnv = {
+    NODE_ENV: "test",
     PATH: `${bin}:/usr/bin:/bin`,
     HOME: root,
     APP_DIR: app,
