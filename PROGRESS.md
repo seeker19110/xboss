@@ -1,5 +1,15 @@
 # PROGRESS — XBoss
 
+## 2026-10-06 — QUALITY-FINAL-1: vá dependency chặn CI
+
+Cập nhật source-map-js lên 1.2.2 (GHSA-68fv-2mgg-jv7q) và sharp lên 0.35.5
+(GHSA-wq5f-xc86-pv6w), gồm các binary sharp/libvips đi kèm; không nâng package khác.
+Lockfile được npm dựng trên Node 24; kiểm phạm vi, npm ci với ignore-scripts,
+audit production và nạp sharp đạt trên ứng viên. Full CI/review trên commit
+tích hợp vẫn bắt buộc; không coi đây là nghiệm thu production hoặc toàn bộ 54 AC.
+Tiếp tục QUALITY-FINAL-1 và sổ nợ #572. #571 cùng credential migrator trên VPS
+còn là điều kiện riêng. Không hạ cổng, đổi schema hoặc bật offline queue.
+
 ## 2026-10-05 — QUALITY-FINAL-1 S14: manifest cho bộ backup
 
 Backup tạo manifest gắn dump và kho tệp đính kèm bằng kích thước/SHA-256; bộ thiếu tệp trả lỗi,
