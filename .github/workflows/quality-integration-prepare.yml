@@ -106,7 +106,9 @@ jobs:
               console.log('PROGRESS_UNION_PRESERVED', number);
             }
             assert.equal(git('diff', '--name-only', '--diff-filter=U'), '');
-            if (git('rev-parse', '--verify', '--quiet', 'MERGE_HEAD')) {
+            const pending = spawnSync('git', ['rev-parse', '--verify', '--quiet', 'MERGE_HEAD']);
+            assert.ifError(pending.error);
+            if (pending.status === 0) {
               git('commit', '-m', `Tích hợp local PR #${number} cho kiểm chứng, không push`);
             }
             console.log('INTEGRATED_LOCAL', number, sha);
@@ -141,7 +143,7 @@ jobs:
           npm run check:migrations
           npm run check:sw-exclude
           bash -n deploy.sh
-          bash -n scripts/restore-check.sh
+          bash -n scripts/ops/restore-check.sh
           npx tsx --test tests/deploy-preflight.test.ts tests/deploy-migration-credential.test.ts tests/restore-check.test.ts
       - name: Xuất tree ứng viên, không commit hoặc sửa ref GitHub
         env:
