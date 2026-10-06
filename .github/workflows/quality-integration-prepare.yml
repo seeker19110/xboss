@@ -62,11 +62,60 @@ jobs:
           ]);
           const isSubsequence = (base, other) => {
             let i = 0;
-            for (const line of other.split('\n')) {
-              if (line === base[i]) i++;
-            }
+            for (const line of other) if (line === base[i]) i++;
             return i === base.length;
           };
+          function mergeProgress() {
+            const texts = ['2', '1', '3'].map((stage) => git('show', `:${stage}:PROGRESS.md`));
+            const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xboss-progress-'));
+            try {
+              const files = ['ours', 'base', 'theirs'].map((name, i) => {
+                const file = path.join(dir, name);
+                fs.writeFileSync(file, texts[i] + '\n');
+                return file;
+              });
+              const probe = spawnSync('git', ['merge-file', '--diff3', '--marker-size=17', '-p', ...files],
+                { encoding: 'utf8' });
+              assert.ifError(probe.error);
+              assert.ok(probe.status > 0 && probe.status < 128, 'Diff3 không hợp lệ');
+              const hunks = [];
+              let current = null;
+              let part = null;
+              for (const line of probe.stdout.split('\n')) {
+                if (line.startsWith('<'.repeat(17))) {
+                  assert.equal(current, null);
+                  current = { ours: [], base: [], theirs: [] };
+                  part = 'ours';
+                } else if (line.startsWith('|'.repeat(17))) {
+                  assert.equal(part, 'ours');
+                  part = 'base';
+                } else if (line === '='.repeat(17)) {
+                  assert.equal(part, 'base');
+                  part = 'theirs';
+                } else if (line.startsWith('>'.repeat(17))) {
+                  assert.equal(part, 'theirs');
+                  assert.ok(isSubsequence(current.base, current.ours), 'Vùng xung đột ours xóa/sửa');
+                  assert.ok(isSubsequence(current.base, current.theirs), 'Vùng xung đột theirs xóa/sửa');
+                  hunks.push(current);
+                  current = null;
+                  part = null;
+                } else if (current) current[part].push(line);
+              }
+              assert.equal(current, null);
+              assert.ok(hunks.length > 0);
+              const merged = git('merge-file', '--union', '-p', ...files);
+              const lines = merged.split('\n');
+              for (const hunk of hunks) {
+                assert.ok(isSubsequence(hunk.ours, lines));
+                assert.ok(isSubsequence(hunk.theirs, lines));
+              }
+              assert.doesNotMatch(merged, /^(<{7,}|={7,}|>{7,}|\|{7,})(?: |$)/m);
+              fs.writeFileSync('PROGRESS.md', merged + '\n');
+              console.log('PROGRESS_ADDITIVE_HUNKS_PRESERVED', hunks.length);
+            } finally {
+              fs.rmSync(dir, { recursive: true, force: true });
+            }
+          }
           for (const [number, sha] of inputs) {
             assert.equal(git('ls-remote', 'origin', `refs/pull/${number}/head`).split('\t')[0], sha,
               `PR #${number} đã đổi HEAD`);
@@ -84,26 +133,8 @@ jobs:
             if (result.status !== 0) {
               const conflicts = git('diff', '--name-only', '--diff-filter=U').split('\n');
               assert.deepEqual(conflicts, ['PROGRESS.md'], 'Không tự giải quyết xung đột code');
-              const baseText = git('show', ':1:PROGRESS.md');
-              const ours = git('show', ':2:PROGRESS.md');
-              const theirs = git('show', ':3:PROGRESS.md');
-              assert.ok(isSubsequence(baseText.split('\n'), ours), 'PROGRESS phía ours sửa lịch sử');
-              assert.ok(isSubsequence(baseText.split('\n'), theirs), 'PROGRESS phía theirs sửa lịch sử');
-              const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xboss-progress-'));
-              try {
-                for (const [name, text] of [['ours', ours], ['base', baseText], ['theirs', theirs]]) {
-                  fs.writeFileSync(path.join(dir, name), text + '\n');
-                }
-                const merged = git('merge-file', '--union', '-p', path.join(dir, 'ours'),
-                  path.join(dir, 'base'), path.join(dir, 'theirs'));
-                assert.ok(isSubsequence(ours.split('\n'), merged));
-                assert.ok(isSubsequence(theirs.split('\n'), merged));
-                fs.writeFileSync('PROGRESS.md', merged + '\n');
-              } finally {
-                fs.rmSync(dir, { recursive: true, force: true });
-              }
+              mergeProgress();
               git('add', 'PROGRESS.md');
-              console.log('PROGRESS_UNION_PRESERVED', number);
             }
             assert.equal(git('diff', '--name-only', '--diff-filter=U'), '');
             const pending = spawnSync('git', ['rev-parse', '--verify', '--quiet', 'MERGE_HEAD']);
@@ -122,13 +153,31 @@ jobs:
             'Nguồn được ghim SHA và đối chiếu refs/pull trước khi merge local trên runner:', '',
             ...inputs.map(([number, sha]) => `- PR #${number}: \`${sha}\`.`), '',
             'Giữ thứ tự #566 trước #569. Xung đột code phải dừng, không chọn ours/theirs.',
-            'Chỉ PROGRESS được union nếu chứng minh hai phía chỉ thêm, giữ nguyên lịch sử.',
+            'Chỉ vùng PROGRESS xung đột có hai phía thêm nội dung được union; kiểm không mất',
+            'dòng trong mỗi vùng. Thay đổi ngoài xung đột được git merge ba chiều giữ nguyên.',
+            'Run đầu dừng vì guard áp sai cả file vào cập nhật lịch sử không xung đột ở #562;',
+            'bản sửa thu hẹp đúng hunk, không bỏ kiểm xung đột hoặc xóa lịch sử.',
             'Workflow tạm bị loại khỏi tree ứng viên, không sửa main/ref hoặc production.', '',
             'Kiểm formatter/lint/typecheck và regression deploy/restore trước xuất candidate.',
             'Full CI PostgreSQL/coverage/build/E2E phải chạy lại trên commit tích hợp cuối.',
             'Review độc lập, credential migrator VPS và các AC còn lại trong #572 vẫn mở.',
+            'Ghi nhận chuẩn bị credential trong checkpoint cũ của #562 là lịch sử báo cáo,',
+            'không thay bằng chứng preflight/deploy thành công; N05 vẫn BLOCKED_ENV.',
             'Không bật offline, đổi global money parser hoặc tuyên bố full PITR đã đạt.', ''
           ].join('\n'));
+          const progress = fs.readFileSync('PROGRESS.md', 'utf8');
+          const title = '# PROGRESS — XBoss\n\n';
+          assert.ok(progress.startsWith(title));
+          const note = [
+            '## 2026-10-06 — QUALITY-FINAL-1: dựng ứng viên tích hợp riêng', '',
+            'Ứng viên ghép #571/#562/#565/#567/#568/#566/#569 cùng dependency #573.',
+            'Chi tiết SHA tại docs/ops/quality-integration-2026-10-06.md; giữ #566 trước #569.',
+            'Chưa nhập main hoặc phát hành. Full CI và review trên commit kết hợp vẫn bắt buộc.',
+            'N05 vẫn BLOCKED_ENV: ghi nhận chuẩn bị credential ở lịch sử #562 không phải',
+            'bằng chứng file đọc được, preflight hoặc deploy production thành công.',
+            'Không đóng toàn bộ 54 AC, bật offline hoặc thay quy tắc tiền/IPC.', '', ''
+          ].join('\n');
+          fs.writeFileSync('PROGRESS.md', title + note + progress.slice(title.length));
           fs.rmSync('.github/workflows/quality-integration-prepare.yml');
           fs.writeFileSync('/tmp/xboss-integration-allowed.json', JSON.stringify([...allowed]));
           fs.writeFileSync('/tmp/xboss-integration-inputs.json', JSON.stringify(inputs));
