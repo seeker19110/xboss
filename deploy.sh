@@ -123,8 +123,9 @@ else
   MIGRATION_ENV_FILE="${MIGRATION_ENV_FILE_OVERRIDE:-/etc/xboss/migrate.env}"
 fi
 
-# Fail trước fetch/reset/npm ci nếu không có secret migrator.
+# Fail trước fetch/reset/npm ci nếu thiếu secret migrator hoặc runtime còn giữ nó.
 lay_migration_url
+kiem_tra_runtime_env
 
 echo "==> 1/7 Lấy code mới từ origin/$BRANCH"
 git fetch origin

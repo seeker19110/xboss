@@ -141,7 +141,9 @@ jobs:
             echo "DEPLOY_SHA không hợp lệ." >&2
             exit 1
           fi
-          REMOTE_COMMAND="cd '$APP_DIR' && git fetch origin '$DEPLOY_SHA' && git reset --hard '$DEPLOY_SHA' && EXPECTED_DEPLOY_SHA='$DEPLOY_SHA' bash deploy.sh"
+          # Đọc script đã ghim vào file tạm ngoài checkout; chưa reset khi preflight chưa đạt.
+          # Trap dọn cả khi git show/script lỗi; không dùng pipeline che mất exit code của git.
+          REMOTE_COMMAND="cd '$APP_DIR' && git fetch origin '$DEPLOY_SHA' && deploy_script=\$(mktemp /tmp/xboss-deploy.XXXXXX) && trap 'rm -f \"\$deploy_script\"' EXIT && git show '$DEPLOY_SHA:deploy.sh' > \"\$deploy_script\" && EXPECTED_DEPLOY_SHA='$DEPLOY_SHA' bash \"\$deploy_script\""
           # Không còn build trên VPS nên các bước còn lại (npm ci, migrate, swap, reload,
           # health-check) chỉ mất vài phút — 15m là dư, không cần 40m như trước.
           timeout 15m ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o ServerAliveInterval=30 \

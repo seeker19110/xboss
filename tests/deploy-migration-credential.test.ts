@@ -16,7 +16,9 @@ test("deploy chỉ cấp credential migration cho command migrate", () => {
     'MIGRATE_DATABASE_URL="$MIGRATION_URL" npm run db:migrate',
   );
   assert.ok(migrationPreflight >= 0 && migrationPreflight < gitFetch);
-  assert.ok(runtimeEnvCheck > gitFetch && runtimeEnvCheck < migrationCommand);
+  const runtimeEnvRecheck = deploy.indexOf("kiem_tra_runtime_env\n", gitFetch);
+  assert.ok(runtimeEnvCheck > migrationPreflight && runtimeEnvCheck < gitFetch);
+  assert.ok(runtimeEnvRecheck > gitFetch && runtimeEnvRecheck < migrationCommand);
   assert.ok(migrationCommand > gitFetch);
   assert.match(deploy, /unset MIGRATE_DATABASE_URL/);
   assert.match(deploy, /\[ "\$mode" != "600" \]/);
@@ -42,14 +44,16 @@ test("bootstrap staging từ chối URL cũ trước khi source và gỡ biến 
   assert.ok(unsetBeforePm2 > sourceRuntimeEnv && unsetBeforePm2 < startPm2);
 });
 
-test("workflow SSH checkout đúng SHA trước khi gọi deploy.sh", () => {
+test("workflow đọc script đúng SHA nhưng để preflight quyết định trước reset", () => {
   assert.match(workflow, /DEPLOY_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
   assert.match(workflow, /\[\[ ! "\$DEPLOY_SHA" =~ \^\[0-9a-f\]\{40\}\$ \]\]/);
   const fetchCommit = workflow.indexOf("git fetch origin '$DEPLOY_SHA'");
-  const resetCommit = workflow.indexOf("git reset --hard '$DEPLOY_SHA'");
-  const runScript = workflow.indexOf("bash deploy.sh", fetchCommit);
-  assert.ok(fetchCommit >= 0 && fetchCommit < resetCommit && resetCommit < runScript);
-  assert.match(workflow, /EXPECTED_DEPLOY_SHA='\$DEPLOY_SHA' bash deploy\.sh/);
+  const readScript = workflow.indexOf("git show '$DEPLOY_SHA:deploy.sh'");
+  const runScript = workflow.indexOf("EXPECTED_DEPLOY_SHA='$DEPLOY_SHA' bash", fetchCommit);
+  assert.ok(fetchCommit >= 0 && fetchCommit < readScript && readScript < runScript);
+  assert.doesNotMatch(workflow, /git reset --hard '\$DEPLOY_SHA'/);
+  assert.match(workflow, /mktemp \/tmp\/xboss-deploy\.XXXXXX/);
+  assert.match(workflow, /trap 'rm -f/);
   assert.match(readFileSync("deploy.sh", "utf8"), /CI_SHA.*HEAD_SHA|CI_SHA=\$\(grep/);
 });
 
