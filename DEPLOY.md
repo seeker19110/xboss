@@ -2,10 +2,21 @@
 
 Ứng dụng dùng **PostgreSQL** — `DATABASE_URL` là credential runtime. Credential migration chỉ
 được cấp cho bước deploy qua biến môi trường tạm hoặc file riêng mode `0600` (mặc định
-`/etc/xboss/migrate.env`); không đặt nó trong `.env.local`, `.env` hay PM2 environment. Runtime
+`/etc/xboss/migrate.env`); không đặt nó trong `.env`, `.env.local`, `.env.production`, `.env.production.local`,
+`.env.staging` hay PM2 environment; cú pháp `export`/colon cũng bị từ chối. Runtime
 không tự chạy DDL: chạy `npm run db:migrate` bằng role migration trước khi start app. Nếu schema thiếu hoặc lỗi thời,
 API/health readiness báo lỗi thay vì tự migrate. Migration SQL (`migrations/*.sql`, xem
 `docs/adr/0003-migrations.md`) append-only.
+
+Credential runtime phải dùng role bị giới hạn, không phải superuser/BYPASSRLS hoặc owner
+vô tình bỏ qua RLS. Tách role migration/owner và app theo [ADR-0005](docs/adr/0005-rls.md);
+không coi một DATABASE_URL kết nối được là đã nghiệm thu quyền. Ví dụ tạo DB phía dưới không
+thay thế bước cấu hình/kiểm role ứng dụng bằng tài khoản được cấp quyền.
+
+**Checkpoint 06/10/2026:** lần kiểm chỉ đọc #575 dừng **trước SSH** vì job không có
+`VPS_SSH_KNOWN_HOSTS`. Chưa xác nhận lại credential migrator hoặc deploy trên VPS. Cần người
+vận hành xác minh host key qua kênh tin cậy và cấu hình vào secret triển khai; không né bằng
+bỏ kiểm host key. N05/N12 vẫn mở, xem [checkpoint thực thi](docs/ops/quality-runtime-guard-2026-10-06.md).
 
 ---
 
@@ -167,7 +178,10 @@ cd xboss
 bash deploy.sh
 ```
 
-Script tự làm: `git fetch` + `reset --hard origin/main` (VPS luôn chạy nhánh
+Workflow lấy `deploy.sh` từ đúng SHA đã qua CI vào file tạm ngoài checkout. Script kiểm
+credential migrator và các file env runtime **trước** reset/clean/npm; thiếu điều kiện phải
+dừng mà không đổi checkout. Sau kiểm tra, script xác nhận main còn đúng SHA CI rồi mới làm:
+`git fetch` + `reset --hard` tới SHA đã xác nhận (VPS luôn chạy nhánh
 `main`) → `npm ci` → `npm run db:migrate` (đọc credential tạm từ biến môi trường hoặc file riêng
 `/etc/xboss/migrate.env`, áp migration DB còn thiếu, dừng
 deploy nếu lỗi) → **lấy bản build** vào thư mục tạm `.next-build` (mặc định:

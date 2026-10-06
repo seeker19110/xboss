@@ -34,7 +34,9 @@ test("PM2 từ chối migration URL trong env file và không kế thừa URL t�
 });
 
 test("bootstrap staging từ chối URL cũ trước khi source và gỡ biến trước PM2", () => {
-  const rejectOldCredential = staging.indexOf("if grep -Eq '^[[:space:]]*MIGRATE_DATABASE_URL");
+  const rejectOldCredential = staging.indexOf(
+    "if grep -Eq '^[[:space:]]*(export[[:space:]]+)?MIGRATE_DATABASE_URL",
+  );
   const sourceRuntimeEnv = staging.indexOf(". ./.env.staging");
   const unsetBeforeSource = staging.indexOf("unset MIGRATE_DATABASE_URL");
   const unsetBeforePm2 = staging.indexOf("unset MIGRATE_DATABASE_URL", sourceRuntimeEnv);

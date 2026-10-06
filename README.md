@@ -1,6 +1,6 @@
 # XBoss — Hệ thống quản lý thi công MEP/ACMV
 
-Web app quản lý tiến độ thi công MEP/ACMV cho dự án **TT AVIO Tháp A**, thay thế bộ file Excel tracking bằng giao diện realtime, đa người dùng, mobile-friendly, hoạt động được khi mạng yếu (PWA offline).
+Web app quản lý tiến độ thi công MEP/ACMV cho dự án **TT AVIO Tháp A**, thay thế bộ file Excel tracking bằng giao diện realtime, đa người dùng, mobile-friendly, có PWA và đang hoàn thiện đồng bộ an toàn khi mạng yếu. **Lưu thay đổi offline hiện tạm khóa**; xem trạng thái bên dưới.
 
 > 📄 Đặc tả kỹ thuật đầy đủ tại [`spec.md`](./spec.md) · Mục tiêu/phạm vi tại [`PROJECT.md`](./PROJECT.md) · ERD tại [`docs/ERD.md`](./docs/ERD.md) · Hướng dẫn triển khai tại [`DEPLOY.md`](./DEPLOY.md)
 
@@ -8,7 +8,7 @@ Web app quản lý tiến độ thi công MEP/ACMV cho dự án **TT AVIO Tháp 
 
 ## Yêu cầu hệ thống
 
-- Node.js **22** (xem `.nvmrc`)
+- Node.js **24** (xem `.nvmrc`)
 - PostgreSQL tự host (khuyến nghị — `DEPLOY.md`). Dùng `DATABASE_URL` chỉ cần là chuỗi kết nối Postgres hợp lệ nên Supabase Postgres cũng chạy được cho `DATABASE_URL`, nhưng dự án **không dùng SDK/RLS/Auth của Supabase** (`docs/adr/0001-postgres-raw-sql.md`).
 
 ---
@@ -21,25 +21,31 @@ git clone https://github.com/seeker19110/xboss.git
 cd xboss
 
 # 2. Cài dependencies
-npm install
+npm ci
 
 # 3. Tạo file môi trường
 cp .env.example .env.local
 # Tối thiểu: DATABASE_URL (Postgres/Supabase) + XBOSS_SECRET
 
-# 4. (Tuỳ chọn) Seed data từ file Excel AVIO gốc (đặt trong attachments/)
+# 4. Áp schema trên DB dev/test bằng credential migrator riêng cho lệnh này
+# Không ghi credential này vào .env.local hoặc các file env runtime.
+read -rsp 'MIGRATE_DATABASE_URL (DB dev/test): ' MIGRATION_URL; echo
+MIGRATE_DATABASE_URL="$MIGRATION_URL" npm run db:migrate
+unset MIGRATION_URL
+
+# 5. (Tuỳ chọn) Seed data từ file Excel AVIO gốc (đặt trong attachments/)
 npm run db:seed
 
-# 5. Tạo tài khoản demo tường minh, CHỈ trên DB dev/test
+# 6. Tạo tài khoản demo tường minh, CHỈ trên DB dev/test
 npx tsx scripts/seed-demo-users.ts
 
-# 6. Khởi động dev server
+# 7. Khởi động dev server
 npm run dev
 ```
 
 Mở trình duyệt: [http://localhost:3000](http://localhost:3000)
 
-Schema quản lý qua **hệ migrate SQL nhẹ** (`migrations/*.sql`, xem `docs/adr/0003-migrations.md`): app tự áp migration còn thiếu khi khởi động, hoặc chủ động `npm run db:migrate`. Đổi schema = thêm file `migrations/000N_*.sql` mới (append-only).
+Schema quản lý qua **hệ migrate SQL nhẹ** (`migrations/*.sql`, xem `docs/adr/0003-migrations.md`): chạy `npm run db:migrate` bằng credential migrator **trước khi khởi động**. Runtime chỉ kiểm schema và báo lỗi nếu thiếu/lỗi thời, không tự chạy DDL. Đổi schema = thêm file `migrations/000N_*.sql` mới (append-only).
 
 ### Tài khoản mặc định (dev)
 
@@ -58,7 +64,8 @@ Ngoài 4 vai trò thao tác trên, hệ thống có thêm 3 vai trò chỉ-xem: 
 
 ## Biến môi trường
 
-- `DATABASE_URL`: bắt buộc khi chạy app; chuỗi kết nối PostgreSQL.
+- `DATABASE_URL`: bắt buộc khi chạy app; credential PostgreSQL runtime.
+- `MIGRATE_DATABASE_URL`: chỉ cấp tạm cho lệnh migration hoặc đặt trong file migrator riêng ngoài checkout; không đặt trong env runtime/PM2. Xem `DEPLOY.md` để tách role và cấu hình production.
 - `XBOSS_SECRET`: bắt buộc ở production; ký cookie phiên, thiếu sẽ báo lỗi lúc ký/xác minh token.
 - `XBOSS_ADMIN_PASSWORD`: bắt buộc khi bootstrap/reset admin; production không tự tạo tài khoản qua HTTP.
 - `CRON_SECRET`: tuỳ chọn; bảo vệ endpoint cron qua header `Authorization: Bearer`.
@@ -76,6 +83,12 @@ Danh mục đầy đủ (kể cả biến của các module mở rộng như Goo
 
 Đã mở rộng từ lưới tracking MEP/ACMV gốc thành hệ thống quản lý dự án xây dựng toàn chuỗi (BOQ, chi phí, hợp đồng/VO/IPC, đấu thầu, mua sắm & vật tư, QA&QC + gate nghiệm thu, nhật ký/mặt bằng/thiết bị, bản vẽ & thay đổi thiết kế, HSE, nhân sự, môi trường & quan trắc, bảo hiểm, bàn giao & bảo hành, chuyển đổi số, tài chính & kế toán, đa dự án), cộng các đặc điểm giữ nguyên từ đầu: đồng bộ realtime đa người dùng (SSE), PWA offline queue, tìm kiếm toàn cục, Web Push, S-curve/baseline, export Excel/PDF, báo cáo ngày/tuần qua email + Telegram.
 
+**Trạng thái offline hiện tại:** service worker chỉ cache shell công khai và asset tĩnh.
+API/HTML riêng tư không được cache; queue legacy được cách ly và không tự gửi/xóa/chuyển chủ.
+Không coi PWA cài được là đã hỗ trợ ghi offline. Mở lại lưu offline cần nghiệm thu vault,
+quyền sở hữu queue, chống gửi trùng và trình duyệt theo QUALITY-FINAL-1 S05–S08.
+Kế hoạch thực thi: [`docs/ops/quality-execution-2026-10-06.md`](docs/ops/quality-execution-2026-10-06.md).
+
 **Danh mục module + màn hình đầy đủ, RBAC 7 vai trò, logic nghiệp vụ trung tâm** → xem [`spec.md`](./spec.md). Mục tiêu/phạm vi ở mức sản phẩm → [`PROJECT.md`](./PROJECT.md).
 
 ---
@@ -87,7 +100,7 @@ xboss/
 ├── app/            # Next.js App Router — mọi page 'use client', fetch từ /api/*
 │   ├── tracking/[sheet]/   # Lưới tracking động + checkbox (lõi gốc)
 │   ├── components/         # AppHeader, NotificationBell, GlobalSearch, SCurveChart...
-│   └── api/                 # ~107 nhóm route REST (đều force-dynamic + check auth)
+│   └── api/                 # Route REST; kiểm quyền và phạm vi dữ liệu tại API
 ├── lib/            # Logic nghiệp vụ dùng chung: db/, auth.ts, roles.ts, recompute.ts,
 │                   # status.ts, boq.ts, sheets.ts, + 1 file/module mở rộng (cost.ts, qaqc.ts...)
 ├── migrations/     # Hệ migrate SQL nhẹ, đánh số append-only (ADR-0003)
@@ -127,4 +140,4 @@ Trạng thái (`status`) là slug: `chuan_bi`, `dang_thi_cong`, `hoan_thanh`, `t
 
 ## Tech Stack
 
-Next.js 16.2 (App Router, React 19.2) · TypeScript strict · Tailwind 4.3 (dark-first) · PostgreSQL qua `pg` (raw SQL, hệ migrate nhẹ) · Recharts · `@tanstack/react-table` · ExcelJS/SheetJS · `@react-pdf/renderer` · Lucide · Web Push · PWA · Sentry (tuỳ chọn). Chi tiết đầy đủ → `spec.md` §9.
+Next.js App Router · React · TypeScript strict · Tailwind (dark-first) · PostgreSQL qua `pg` (raw SQL, hệ migrate nhẹ) · Recharts · `@tanstack/react-table` · ExcelJS/SheetJS · `@react-pdf/renderer` · Lucide · Web Push · PWA · Sentry (tuỳ chọn). Chi tiết đầy đủ → `spec.md` §9.

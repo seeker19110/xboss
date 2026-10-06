@@ -55,6 +55,23 @@ if (Object.hasOwn(envFile, "MIGRATE_DATABASE_URL")) {
     "MIGRATE_DATABASE_URL phải nằm trong file riêng của bước deploy, không phải .env.local",
   );
 }
+// Next.js còn nạp .env.production[.local]; chặn cả cú pháp export/colon của dotenv.
+// Chỉ kiểm tên biến, không nạp các giá trị này vào cấu hình PM2 hoặc in secret.
+for (const name of [
+  ".env",
+  ".env.local",
+  ".env.production",
+  ".env.production.local",
+  ".env.staging",
+]) {
+  const file = join(__dirname, name);
+  if (
+    existsSync(file) &&
+    /^\s*(?:export\s+)?MIGRATE_DATABASE_URL(?:\s*=|:\s+)/m.test(readFileSync(file, "utf8"))
+  ) {
+    throw new Error(`MIGRATE_DATABASE_URL phải nằm trong file migration riêng, không phải ${name}`);
+  }
+}
 delete process.env.MIGRATE_DATABASE_URL;
 
 /** Lấy biến theo thứ tự ưu tiên: môi trường thật → file env → mặc định. */

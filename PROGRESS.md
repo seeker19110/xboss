@@ -1,5 +1,31 @@
 # PROGRESS — XBoss
 
+## 2026-10-06 — Xác nhận main đã nhận PR #574
+
+GitHub xác nhận PR #574 đã merge tại `c838a1279359ad41e670cd33db22489858264061`
+ngày 06/10/2026 lúc 16:20:12 UTC; tree khớp bản tích hợp đã kiểm. Nhánh nguồn đã bị xóa.
+Bản bổ sung credential runtime tiếp tục từ main này, không cố ghi vào nhánh đã đóng.
+Chưa xác nhận deploy/production đạt chỉ từ sự kiện merge; các ghi nhận chờ nhập ở dưới là lịch sử.
+
+## 2026-10-06 — QUALITY-FINAL-1: CI tích hợp đạt, khóa thêm credential runtime
+
+- Đã tích hợp #571/#562/#565/#567/#568/#566/#569 với dependency #573 trên nhánh riêng.
+  Commit `a81bbb3509f3292a3f4cdffe28e0cc44b1937f2d`: full PR CI run `37492679580` đạt;
+  không cộng kết quả các PR khác nhau. Các cổng chỉ-main vẫn chưa chạy trên bản này.
+- Rà tiếp S03 phát hiện guard bỏ sót `.env.production[.local]` và cú pháp export/colon;
+  đã thêm chặn trước mutation deploy và trước nạp PM2, giữ credential chỉ cho migrator.
+  Kiểm local Node 24.21.0: 64 test deploy/PM2/restore đạt, 0 skip; bộ ca mới làm code cũ đỏ.
+  Full CI/review trên commit bổ sung vẫn bắt buộc, không dùng run cũ để đóng bước này.
+- Đã đồng bộ README Node24/migration riêng và trạng thái offline tạm khóa, bổ sung DEPLOY/staging.
+- #575 đã chạy nhưng dừng trước SSH: `VPS_SSH_KNOWN_HOSTS` không khả dụng. Không đọc/sửa VPS,
+  không tự xác nhận credential đã hợp lệ. Workflow chỉ đọc tạm đã dọn. N05/N12 vẫn BLOCKED_ENV.
+- OCR review của `a81bbb3` có job xanh nhưng bước LLM bị skip do cấu hình, không tính review đạt.
+  Đã gửi yêu cầu Copilot reviewer cho #573; phải có review thực trước ghi nhận, không gán nhãn agent chạy giả.
+- Có snapshot toàn mã+toolchain từ Actions được kiểm SHA-256 và tree `78a10708e31209f9c4b811f3a9c00dad161e34c6`
+  để kiểm tại chỗ. Vẫn chưa có PostgreSQL local hoặc access production; DB/E2E dựa vào CI thật.
+- Chi tiết tại `docs/ops/quality-runtime-guard-2026-10-06.md`. N06–N09/N11 chưa hoàn tất toàn bộ AC;
+  không bật queue offline, đổi parser tiền, cutover membership hoặc công bố RELEASE_VERIFIED.
+
 ## 2026-10-06 — QUALITY-FINAL-1: dựng ứng viên tích hợp riêng
 
 Ứng viên ghép #571/#562/#565/#567/#568/#566/#569 cùng dependency #573.

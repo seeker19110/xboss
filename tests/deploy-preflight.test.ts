@@ -132,7 +132,13 @@ test("bootstrap từ chối URL migration trống trước thay đổi checkout"
   f.rejected(/Chưa cấu hình MIGRATE_DATABASE_URL/);
 });
 
-for (const filename of [".env", ".env.local", ".env.staging"]) {
+for (const filename of [
+  ".env",
+  ".env.local",
+  ".env.production",
+  ".env.production.local",
+  ".env.staging",
+]) {
   test(`bootstrap chặn credential migrator trong ${filename} trước reset/npm ci`, (t) => {
     const f = fixture(t);
     f.credentials();
@@ -187,3 +193,41 @@ for (const source of ["file", "env"]) {
     assert.doesNotMatch(result.calls, /^pm2 /m);
   });
 }
+
+// Guard phải chặn trước reset/npm cả cú pháp dotenv mà parser runtime chấp nhận.
+for (const filename of [
+  ".env",
+  ".env.local",
+  ".env.production",
+  ".env.production.local",
+  ".env.staging",
+]) {
+  for (const [label, assignment] of [
+    ["export", `export MIGRATE_DATABASE_URL='${secret}'`],
+    ["colon", `MIGRATE_DATABASE_URL: '${secret}'`],
+  ]) {
+    test(`bootstrap chặn ${label} trong ${filename} trước mọi mutation`, (t) => {
+      const f = fixture(t);
+      f.credentials();
+      writeFileSync(join(f.app, filename), `${assignment}\n`, { mode: 0o600 });
+      f.rejected(/Xóa MIGRATE_DATABASE_URL/);
+    });
+  }
+}
+
+test("runtime env chỉ có comment/tên biến tương tự không bị chặn nhầm", (t) => {
+  const f = fixture(t);
+  f.credentials();
+  writeFileSync(
+    join(f.app, ".env.production.local"),
+    "# MIGRATE_DATABASE_URL=khong-nap\nMIGRATE_DATABASE_URL_BACKUP=khong-phai-secret\n",
+  );
+  assert.equal(f.run().status, 91);
+});
+
+test("bootstrap từ chối đường dẫn env là thư mục trước reset/npm", (t) => {
+  const f = fixture(t);
+  f.credentials();
+  mkdirSync(join(f.app, ".env.production.local"));
+  f.rejected(/Không kiểm tra được file env runtime/);
+});

@@ -46,7 +46,7 @@ sudo -u postgres createdb xboss_staging
 
 # 3. Tạo file env runtime staging — sao chép .env.local production làm nền, ĐỔI các giá trị sau:
 cp ~/xboss/.env.local .env.staging
-if grep -Eq '^[[:space:]]*MIGRATE_DATABASE_URL[[:space:]]*=' .env.staging; then
+if grep -Eq '^[[:space:]]*(export[[:space:]]+)?MIGRATE_DATABASE_URL([[:space:]]*=|:[[:space:]]+)' .env.staging; then
   echo "Xóa MIGRATE_DATABASE_URL khỏi .env.staging; biến này chỉ được để trong file migration riêng." >&2
   exit 1
 fi
@@ -87,7 +87,7 @@ bash deploy.sh --staging
 `deploy.sh --staging` (xem code + comment chi tiết trong file) khác `deploy.sh` mặc định ở 3
 điểm: tên pm2 process (`xboss-staging`), tên thư mục build tạm (`.next-build-staging`/
 `.next-old-staging` — không đụng bản của production dù lỡ chạy chung thư mục), và copy
-`.env.staging` → `.env.local` trước khi build (Next.js chỉ tự đọc `.env.local`, không có khái
+`.env.staging` → `.env.local` trước khi build (Next.js tự đọc các file `.env*` chuẩn, nhưng không có khái
 niệm tên file `.env.staging` sẵn có). Credential migrator đọc từ `/etc/xboss-staging/migrate.env`
 (hoặc biến `MIGRATION_ENV_FILE`) và chỉ được truyền cho tiến trình migration.
 

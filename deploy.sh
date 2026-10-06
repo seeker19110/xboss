@@ -70,10 +70,21 @@ lay_migration_url() {
 }
 
 kiem_tra_runtime_env() {
-  for file in .env .env.local .env.staging; do
-    if [ -f "$file" ] && grep -Eq '^[[:space:]]*MIGRATE_DATABASE_URL[[:space:]]*=' "$file"; then
+  for file in .env .env.local .env.production .env.production.local .env.staging; do
+    if [ ! -e "$file" ] && [ ! -L "$file" ]; then continue; fi
+    if [ ! -f "$file" ] || [ ! -r "$file" ]; then
+      echo "❌ Không kiểm tra được file env runtime: $file." >&2
+      exit 1
+    fi
+    if grep -Eq '^[[:space:]]*(export[[:space:]]+)?MIGRATE_DATABASE_URL([[:space:]]*=|:[[:space:]]+)' "$file"; then
       echo "❌ Xóa MIGRATE_DATABASE_URL khỏi $file; file này được nạp vào app runtime." >&2
       exit 1
+    else
+      local grep_status=$?
+      if [ "$grep_status" -ne 1 ]; then
+        echo "❌ Không kiểm tra được file env runtime: $file." >&2
+        exit 1
+      fi
     fi
   done
 }
