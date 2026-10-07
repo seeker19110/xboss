@@ -73,10 +73,17 @@ major và cùng `package-lock.json` (runner build từ đúng commit VPS reset v
 tại đúng đường dẫn `/var/www/xboss` vì `.next` có nhúng đường dẫn tuyệt đối lúc build).
 
 **Secrets repo mà workflow deploy cần:** `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (đã có từ
-trước), `VPS_SSH_KNOWN_HOSTS` (tuỳ chọn — ghim host key thay vì `ssh-keyscan` tin lần đầu),
+trước), `VPS_SSH_KNOWN_HOSTS` (**bắt buộc** — host key VPS đã ghim; thiếu thì deploy dừng trước mọi kết nối SSH, xem mục ngay dưới),
 và `NEXT_PUBLIC_SENTRY_DSN` (**tuỳ chọn nhưng bắt buộc nếu đang dùng Sentry phía trình
 duyệt**: biến `NEXT_PUBLIC_*` được nhúng vào bundle LÚC BUILD, trước đây lấy từ `.env.local`
 trên VPS; build ở runner mà thiếu nó thì Sentry client tự tắt, không có lỗi nào báo ra).
+
+**Lấy `VPS_SSH_KNOWN_HOSTS` qua kênh tin cậy** (không bao giờ lấy bằng `ssh-keyscan` rồi tin luôn — đó là
+tin lần đầu, dễ bị MITM): (1) vào VPS bằng console của nhà cung cấp, chạy
+`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` để lấy fingerprint; (2) trên máy bạn chạy
+`ssh-keyscan -t ed25519 <host>` rồi `ssh-keygen -lf -` để tính fingerprint và so khớp với bước 1;
+(3) chỉ khi khớp mới dán dòng known_hosts (`<host> ssh-ed25519 AAAA...`) vào secret. Workflow
+dùng `StrictHostKeyChecking=yes`, cổng SSH 22, và dừng job nếu secret thiếu/không khớp `VPS_HOST`.
 
 **Chạy nhiều instance / tách Postgres / backup:** xem mục
 ["Chạy nhiều instance"](#chạy-nhiều-instance-cluster-tuỳ-chọn--m53-pr4) bên dưới (quan hệ

@@ -1,5 +1,13 @@
 # PROGRESS — XBoss
 
+## 2026-10-07 — Deploy bắt buộc host key VPS đã ghim (QUALITY-FINAL-1 S03/N05)
+
+`deploy.yml` bỏ fallback `ssh-keyscan` (tin lần đầu, hở MITM): thiếu secret `VPS_SSH_KNOWN_HOSTS`
+hoặc secret không có dòng khớp `VPS_HOST` → job dừng trước mọi kết nối SSH; mọi lệnh `ssh`/`rsync`
+thêm `StrictHostKeyChecking=yes`. `DEPLOY.md` đổi secret thành bắt buộc + cách lấy fingerprint qua
+console nhà cung cấp. Test `tests/deploy-known-hosts.test.ts` 4 ca (1 pass/3 fail trên bản cũ).
+**[Người vận hành]:** khai `VPS_SSH_KNOWN_HOSTS` cùng lúc xử lý `/etc/xboss/migrate.env` (#570).
+
 ## 2026-10-07 — Rà nợ & lộ trình hoàn thiện (chưa code)
 
 Tổng hợp sổ nợ #572 (N01–N12), PLAN S00–S16 và trạng thái main `49283cf` thành lộ trình 5 đợt
