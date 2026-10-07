@@ -27,8 +27,12 @@ round từng dòng) đòi CẢ 3 file golden/route/DTO đỏ, tiến trình con 
 - **M3 — đối soát phiếu đã duyệt trước S10a:** phiếu `payment_bills` của đợt duyệt bằng cách
   tính float cũ có thể lệch 0,01 đ so với ipc-sum-v1. Không tự sửa; truy vấn chỉ-đọc + hướng dẫn
   ở `docs/ops/s10a-doi-soat-phieu-da-duyet.md` — cần người vận hành chạy trên staging/prod.
-- **M4, L5, L6, L7** — các phát hiện còn lại của báo cáo audit S10a (chi tiết trong báo cáo của
-  phiên chính), để đợt sau. Đã biết thêm: `items.unitPrice`/`qty*` trong `json_agg` của
+- **M4, L5, L6, L7** — các phát hiện còn lại của audit S10a, để đợt sau:
+  M4 = Excel đọc dòng KL bằng 3 câu READ COMMITTED riêng, PATCH chen giữa → 500 (cần REPEATABLE READ
+  hoặc lấy `::text` ngay trong `fetchCerts`); L5 = cột "Thành tiền" Excel trộn ô số/ô text khi vượt
+  15 chữ số có nghĩa nên `=SUM()` bỏ qua ô text không báo; L6 = người duyệt bước cuối không có
+  `viewPayments` nhận 422 "vượt giới hạn lưu trữ" nên suy ra được giá trị ≥ 10^13 đ; L7 = nhánh catch
+  của `decide` trả `e.message` ở lỗi 500 (có thể lộ message pg/mã nội bộ). Đã biết thêm: `items.unitPrice`/`qty*` trong `json_agg` của
   `fetchCerts` vẫn JSON number (kể cả khi gửi header v1); `contractCumulativeValue`/
   `overContractCerts` vẫn qua `moneyToNumber`; `approval_requests.amount` NUMERIC(15,2) tràn
   (500) khi periodValue > 10^13; Excel/PDF trả 500 nếu dòng KL bị PATCH chen giữa 2 câu SELECT.
