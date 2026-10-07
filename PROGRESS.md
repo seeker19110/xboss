@@ -1,5 +1,20 @@
 # PROGRESS — XBoss
 
+## 2026-10-07 — QUALITY-FINAL-1 S10a: IPC exact (ipc-sum-v1) + DTO tiền decimal-string-v1
+
+`certTotals` đọc `qty_period`/`unit_price`/`advance_pct`/`retention_pct` bằng `::text` và tính
+bằng `ipcSumV1`, trả MoneyMinor (bigint) — sửa 2 lệch S09 phát hiện (tạm ứng nửa xu 9,63 → 9,64;
+tổng vượt 2^53 mất xu); 2 ca golden route hết `todo`. `GET /api/payment-certs/:id`: header
+`X-XBoss-Money-Format: decimal-string-v1` → `totals` chuỗi canonical + `moneyFormat`; không
+header → number legacy qua `moneyToNumberSafe`, ngoài biên **422 `money_precision_unsupported`**;
+mọi response `private, no-store` + `Vary`. Caller: POST lập đợt (amount phê duyệt round-trip
+exact), duyệt đợt ghi `payment_bills.amount` chuỗi exact (vượt NUMERIC(15,2) → 422), Excel ô text
+khi > 15 chữ số có nghĩa + thành tiền dòng exact, PDF định dạng tổng bằng bigint. UI không đổi
+(chỉ hiển thị, không gửi header). Test `tests/payment-certs-money-dto.test.ts` (A3-AC05).
+**Còn lại cho S10 sau:** `items.unitPrice`/`qty*` trong `json_agg` của `fetchCerts` vẫn number;
+thành tiền dòng ở PDF vẫn nhân float; `contractCumulativeValue`/`overContractCerts` vẫn qua
+`moneyToNumber`; UI hiển thị lỗi 422 như "không có số liệu".
+
 ## 2026-10-07 — QUALITY-FINAL-1 S14: recovery manifest v1 + verifier PASS/FAIL/NOT_RUN
 
 Manifest khôi phục v1 (`scripts/lib/recovery-manifest*.ts`, CLI sinh cùng `pg_dump --snapshot` để
