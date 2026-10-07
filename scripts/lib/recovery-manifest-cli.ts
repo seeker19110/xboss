@@ -9,7 +9,7 @@
 // Không tạo lịch/cron, không đẩy remote, không xoá gì. Tên tệp manifest KHÔNG được kết thúc
 // bằng `.manifest.json` (đó là định dạng cũ của backup.sh mà restore-check.sh đọc).
 import { createHash, randomUUID } from "node:crypto";
-import { renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { Client } from "pg";
@@ -99,6 +99,13 @@ async function main(): Promise<void> {
   const keyId = args["--key-id"];
   if (!keyProvider !== !keyId) throw new CliError("--key-provider và --key-id phải đi cùng nhau.");
 
+  const dumpPath = args["--pg-dump"];
+  const partial = dumpPath ? `${dumpPath}.partial` : null;
+  // Không ghi đè dump/manifest đã có; chỉ dọn dump do chính lần chạy lỗi này tạo ra.
+  if ((dumpPath && existsSync(dumpPath)) || existsSync(args["--out"]!)) {
+    throw new CliError("Tệp dump hoặc manifest đích đã tồn tại; không ghi đè.");
+  }
+
   const client = new Client({
     connectionString: url,
     connectionTimeoutMillis: 10_000,
@@ -106,8 +113,7 @@ async function main(): Promise<void> {
       "-c default_transaction_read_only=on -c statement_timeout=1800000 -c timezone=Asia/Ho_Chi_Minh",
   });
   await client.connect();
-  const dumpPath = args["--pg-dump"];
-  const partial = dumpPath ? `${dumpPath}.partial` : null;
+  let dumpCreated = false;
   try {
     await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
     const who = await client.query(
@@ -137,6 +143,7 @@ async function main(): Promise<void> {
       // Không in stderr của pg_dump (có thể chứa host/user); chỉ báo thất bại chung.
       if (dump.status !== 0) throw new CliError("pg_dump theo snapshot thất bại.");
       renameSync(partial, dumpPath);
+      dumpCreated = true;
       artifacts.push(await dumpArtifact(dumpPath));
     }
 
@@ -176,6 +183,7 @@ async function main(): Promise<void> {
     );
   } catch (error) {
     if (partial) rmSync(partial, { force: true });
+    if (dumpCreated && dumpPath) rmSync(dumpPath, { force: true });
     throw error;
   } finally {
     await client.end();
