@@ -1,5 +1,33 @@
 # PROGRESS — XBoss
 
+## 2026-10-07 — QUALITY-FINAL-1 S00: inventory scope toàn bộ route API
+
+`scripts/audit-route-inventory.ts` (AST) sinh `docs/nang-cap/AUDIT-2026-09-25/S00-SCOPE-INVENTORY.md`
+(`npm run audit:route-scope`): 392 file route, 622 (file, method) — mỗi dòng có dữ kiện auth/quyền/
+resolver dự án/projectId từ client/NULL-as-wide và verdict cú pháp (SCOPED_SYNTACTIC 469,
+NOT_MAPPED 98, NULL_AS_WIDE_SUSPECT 52, NO_AUTH 3) — **không dòng nào là "đã an toàn"**. Kiểm định
+tay 15 dòng mẫu: heuristic NULL-as-wide chính xác ~20%, SCOPED_SYNTACTIC có âm tính giả qua lib.
+Phát hiện P1 đọc tay (chưa sửa, giao S01/S02): bills/[id] null-as-wide; invoices nhận contract/bill
+từ body không kiểm cùng dự án; boq/[id]/norms, hse-photos/[id], tasks GET bỏ lọc khi projectId null;
+`lib/tien-do/reports.ts` saved-reports; `sheets` PUT sắp xếp theo id client không kiểm scope.
+Test canh lệch 19 ca. Không sửa route, không migration.
+
+## 2026-10-07 — Deploy bắt buộc host key VPS đã ghim (QUALITY-FINAL-1 S03/N05)
+
+`deploy.yml` bỏ fallback `ssh-keyscan` (tin lần đầu, hở MITM): thiếu secret `VPS_SSH_KNOWN_HOSTS`
+hoặc secret không có dòng khớp `VPS_HOST` → job dừng trước mọi kết nối SSH; mọi lệnh `ssh`/`rsync`
+thêm `StrictHostKeyChecking=yes`. `DEPLOY.md` đổi secret thành bắt buộc + cách lấy fingerprint qua
+console nhà cung cấp. Test `tests/deploy-known-hosts.test.ts` 4 ca (1 pass/3 fail trên bản cũ).
+**[Người vận hành]:** khai `VPS_SSH_KNOWN_HOSTS` cùng lúc xử lý `/etc/xboss/migrate.env` (#570).
+
+## 2026-10-07 — Rà nợ & lộ trình hoàn thiện (chưa code)
+
+Tổng hợp sổ nợ #572 (N01–N12), PLAN S00–S16 và trạng thái main `49283cf` thành lộ trình 5 đợt
+tại `docs/ops/lo-trinh-hoan-thien-2026-10-07.md`. Không còn PR mở; N04 thực chất đã xong qua
+#574. Đường găng: N05 (credential migrator VPS, cần người vận hành) — production chưa nhận bản
+nào sau #560. Còn lại code: S02 caller scope, S05–S08 offline vault, S10–S13 tiền/báo cáo,
+S14 PITR. Chỉ tài liệu, không đổi code/schema, không đóng khoản nợ nào.
+
 ## 2026-10-07 — Nâng @sentry/nextjs lên 11.4.0 (PR #580)
 
 - v11 bỏ export `withSentryConfig` khỏi entry gốc (điều kiện `node` trỏ CJS) nên `next build`

@@ -103,16 +103,19 @@ jobs:
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          # Ưu tiên host key đã ghim trong secret (chống MITM thật sự). Không có thì lấy
-          # bằng ssh-keyscan như trước đây ssh-action vẫn làm ngầm — ghi rõ ra đây để biết
-          # mình đang chấp nhận TOFU, không tưởng là đã ghim.
-          if [ -n "$VPS_SSH_KNOWN_HOSTS" ]; then
-            printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          else
-            echo "⚠️  Chưa khai secret VPS_SSH_KNOWN_HOSTS — dùng ssh-keyscan (tin lần đầu)."
-            ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # Fail-closed: bắt buộc host key VPS đã ghim qua kênh tin cậy. Không ssh-keyscan
+          # (tin lần đầu) vì kẻ chặn đường giả VPS được sẽ nhận artifact + lệnh deploy.
+          if [ -z "$VPS_SSH_KNOWN_HOSTS" ]; then
+            echo "::error::Thiếu secret VPS_SSH_KNOWN_HOSTS — dừng deploy trước mọi kết nối SSH. Lấy host key qua kênh tin cậy (console nhà cung cấp VPS: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub), đối chiếu với host key quét từ máy bạn rồi dán dòng known_hosts vào secret. Xem DEPLOY.md."
+            exit 1
           fi
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+          # Secret phải chứa ít nhất một dòng khớp đúng host đang deploy (cổng SSH mặc định 22).
+          if ! ssh-keygen -F "$VPS_HOST" -f ~/.ssh/known_hosts > /dev/null; then
+            echo "::error::VPS_SSH_KNOWN_HOSTS không có dòng nào khớp host VPS_HOST — kiểm tra lại nội dung secret."
+            exit 1
+          fi
 
       - name: Gửi bản build sang VPS
         working-directory: ${{ env.APP_DIR }}
@@ -123,9 +126,9 @@ jobs:
           set -e
           # Gửi vào tên tạm rồi đổi tên trên VPS: deploy.sh chỉ thấy ".next-ci.tar.gz" khi
           # file đã sang trọn vẹn, không bao giờ đọc phải gói còn dở nếu mạng đứt giữa chừng.
-          rsync -az --timeout=120 -e "ssh -i ~/.ssh/id_deploy -o BatchMode=yes" \
+          rsync -az --timeout=120 -e "ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o StrictHostKeyChecking=yes" \
             .next-ci.tar.gz "$VPS_USER@$VPS_HOST:$APP_DIR/.next-ci.tar.gz.part"
-          ssh -i ~/.ssh/id_deploy -o BatchMode=yes "$VPS_USER@$VPS_HOST" \
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" \
             "mv '$APP_DIR/.next-ci.tar.gz.part' '$APP_DIR/.next-ci.tar.gz'"
 
       - name: Chạy deploy trên VPS
@@ -146,7 +149,7 @@ jobs:
           REMOTE_COMMAND="cd '$APP_DIR' && git fetch origin '$DEPLOY_SHA' && deploy_script=\$(mktemp /tmp/xboss-deploy.XXXXXX) && trap 'rm -f \"\$deploy_script\"' EXIT && git show '$DEPLOY_SHA:deploy.sh' > \"\$deploy_script\" && EXPECTED_DEPLOY_SHA='$DEPLOY_SHA' bash \"\$deploy_script\""
           # Không còn build trên VPS nên các bước còn lại (npm ci, migrate, swap, reload,
           # health-check) chỉ mất vài phút — 15m là dư, không cần 40m như trước.
-          timeout 15m ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o ServerAliveInterval=30 \
+          timeout 15m ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 \
             "$VPS_USER@$VPS_HOST" "$REMOTE_COMMAND"
 
       - name: Dọn khoá SSH
