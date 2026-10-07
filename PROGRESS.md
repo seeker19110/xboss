@@ -9,11 +9,36 @@ tổng vượt 2^53 mất xu); 2 ca golden route hết `todo`. `GET /api/payment
 header → number legacy qua `moneyToNumberSafe`, ngoài biên **422 `money_precision_unsupported`**;
 mọi response `private, no-store` + `Vary`. Caller: POST lập đợt (amount phê duyệt round-trip
 exact), duyệt đợt ghi `payment_bills.amount` chuỗi exact (vượt NUMERIC(15,2) → 422), Excel ô text
-khi > 15 chữ số có nghĩa + thành tiền dòng exact, PDF định dạng tổng bằng bigint. UI không đổi
-(chỉ hiển thị, không gửi header). Test `tests/payment-certs-money-dto.test.ts` (A3-AC05).
-**Còn lại cho S10 sau:** `items.unitPrice`/`qty*` trong `json_agg` của `fetchCerts` vẫn number;
-thành tiền dòng ở PDF vẫn nhân float; `contractCumulativeValue`/`overContractCerts` vẫn qua
-`moneyToNumber`; UI hiển thị lỗi 422 như "không có số liệu".
+khi > 15 chữ số có nghĩa + thành tiền dòng exact, PDF định dạng tổng + thành tiền dòng bằng bigint
+(1,005 × 100,00 → 101 đ, float cũ ra 100 đ). Test `tests/payment-certs-money-dto.test.ts` (A3-AC05).
+
+Vá theo audit S10a (cùng nhánh): **M1** PDF thành tiền dòng từ `certLinesExact` (bigint, làm tròn
+đồng ties xa 0); **M2** chứng từ IPC (`CertDocument`) gửi header decimal-string-v1, hiển thị tổng
+exact, lỗi tải hiện thông báo tiếng Việt (không còn lẫn với "•••" bị che), 422 vẫn kèm
+`vuotHopDong` (`app/payment-certs/_components/chiTietDot.ts`, test `payment-certs-money-ui`);
+**L3** `certTotals` không đọc được dòng hợp đồng (vd RLS che) → `log.error` + throw (500), không
+lặng lẽ coi tạm ứng/giữ lại 0%; **L4** `private, no-store` cho PDF, GET danh sách, PATCH;
+**L1** `scripts/mutation-check.mjs` thêm 2 mutation tiền IPC (`mulRatio` chặt cụt, ipc-sum-v1
+round từng dòng) đòi CẢ 3 file golden/route/DTO đỏ, tiến trình con nay bật cờ mock.module;
+**L2** test POST 422 (amount phê duyệt vượt biên), luỹ kế nửa xu 0,015 → 0,02, hợp đồng 0%.
+
+**Nợ kỹ thuật S10a (chưa làm trong PR này):**
+
+- **M3 — đối soát phiếu đã duyệt trước S10a:** phiếu `payment_bills` của đợt duyệt bằng cách
+  tính float cũ có thể lệch 0,01 đ so với ipc-sum-v1. Không tự sửa; truy vấn chỉ-đọc + hướng dẫn
+  ở `docs/ops/s10a-doi-soat-phieu-da-duyet.md` — cần người vận hành chạy trên staging/prod.
+- **M4, L5, L6, L7** — các phát hiện còn lại của báo cáo audit S10a (chi tiết trong báo cáo của
+  phiên chính), để đợt sau. Đã biết thêm: `items.unitPrice`/`qty*` trong `json_agg` của
+  `fetchCerts` vẫn JSON number (kể cả khi gửi header v1); `contractCumulativeValue`/
+  `overContractCerts` vẫn qua `moneyToNumber`; `approval_requests.amount` NUMERIC(15,2) tràn
+  (500) khi periodValue > 10^13; Excel/PDF trả 500 nếu dòng KL bị PATCH chen giữa 2 câu SELECT.
+- **[Có thể HIGH, ngoài phạm vi S10a] Ngưỡng phê duyệt IPC cũ:** `approval_requests.amount` chốt
+  lúc POST lập đợt (`app/api/payment-certs/route.ts:134-153`) và PATCH sửa KL KHÔNG cập nhật nó;
+  `advanceApproval` so ngưỡng bước theo `req.amount` cũ (`lib/tien-do/approvals.ts:241`) → lập
+  nháp giá trị nhỏ, sửa KL tăng rồi trình là lách được bước duyệt theo `min_amount`.
+- **PATCH `/api/payment-certs/:id`:** kiểm `status = 'draft'` không `FOR UPDATE` (trình/duyệt
+  đồng thời vẫn sửa được KL); `saveCertItems` DELETE + INSERT ngoài transaction (lỗi giữa chừng để
+  đợt mất dòng KL).
 
 ## 2026-10-07 — QUALITY-FINAL-1 S14: recovery manifest v1 + verifier PASS/FAIL/NOT_RUN
 
