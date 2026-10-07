@@ -1,5 +1,17 @@
 # PROGRESS — XBoss
 
+## 2026-10-07 — QUALITY-FINAL-1 S00: inventory scope toàn bộ route API
+
+`scripts/audit-route-inventory.ts` (AST) sinh `docs/nang-cap/AUDIT-2026-09-25/S00-SCOPE-INVENTORY.md`
+(`npm run audit:route-scope`): 392 file route, 622 (file, method) — mỗi dòng có dữ kiện auth/quyền/
+resolver dự án/projectId từ client/NULL-as-wide và verdict cú pháp (SCOPED_SYNTACTIC 469,
+NOT_MAPPED 98, NULL_AS_WIDE_SUSPECT 52, NO_AUTH 3) — **không dòng nào là "đã an toàn"**. Kiểm định
+tay 15 dòng mẫu: heuristic NULL-as-wide chính xác ~20%, SCOPED_SYNTACTIC có âm tính giả qua lib.
+Phát hiện P1 đọc tay (chưa sửa, giao S01/S02): bills/[id] null-as-wide; invoices nhận contract/bill
+từ body không kiểm cùng dự án; boq/[id]/norms, hse-photos/[id], tasks GET bỏ lọc khi projectId null;
+`lib/tien-do/reports.ts` saved-reports; `sheets` PUT sắp xếp theo id client không kiểm scope.
+Test canh lệch 19 ca. Không sửa route, không migration.
+
 ## 2026-10-07 — Deploy bắt buộc host key VPS đã ghim (QUALITY-FINAL-1 S03/N05)
 
 `deploy.yml` bỏ fallback `ssh-keyscan` (tin lần đầu, hở MITM): thiếu secret `VPS_SSH_KNOWN_HOSTS`

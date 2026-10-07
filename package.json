@@ -24,6 +24,7 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:sample": "tsx scripts/seed-sample.ts",
     "db:reset-admin": "tsx scripts/reset-admin.ts",
+    "audit:route-scope": "tsx scripts/audit-route-inventory.ts --format md --out docs/nang-cap/AUDIT-2026-09-25/S00-SCOPE-INVENTORY.md",
     "audit:verify-chain": "tsx scripts/verify-audit-chain.ts",
     "audit:verify-dr": "tsx scripts/verify-dr-restore.ts",
     "changelog": "node scripts/gen-changelog.mjs",
