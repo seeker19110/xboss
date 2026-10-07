@@ -45,7 +45,10 @@ export async function GET(req: NextRequest) {
   if (!certs) return NextResponse.json({ error: "Hợp đồng không tồn tại" }, { status: 422 });
   // M50 PR2: che đơn giá dòng KL cho user thiếu viewPayments (phòng thủ — gate route
   // hiện cũng là viewPayments).
-  return NextResponse.json({ certs: stripSensitive("paymentCert", certs, user) });
+  return NextResponse.json(
+    { certs: stripSensitive("paymentCert", certs, user) },
+    { headers: { "Cache-Control": "private, no-store" } }, // API tài chính: không cache
+  );
 }
 
 // POST /api/payment-certs { contractId } — lập đợt mới (Admin/PM), KL gợi ý tự

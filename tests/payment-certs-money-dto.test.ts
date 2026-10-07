@@ -40,8 +40,11 @@ const VUOT_BIEN: Dong[] = [
   { unitPrice: "0.03", qtyPeriod: 1 },
 ];
 
-/** Dựng dự án + PM + hợp đồng 10,25%/5% + BOQ, rồi lập đợt và nhập KL qua route thật. */
-async function dungDot(dong: Dong[]) {
+type TyLe = { advancePct: string; retentionPct: string };
+const TY_LE_MAC_DINH: TyLe = { advancePct: "10.25", retentionPct: "5.00" };
+
+/** Dựng dự án + PM (đã đăng nhập) + hợp đồng theo tỷ lệ + BOQ (qty_contract tuỳ chọn). */
+async function dungHopDong(dong: Dong[], tyLe: TyLe = TY_LE_MAC_DINH, qtyContract = 1000) {
   const { insertId, queryOne } = await import("@/lib/db");
   const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, uniq("S10a IPC "));
   const pmId = await insertId(
@@ -55,8 +58,10 @@ async function dungDot(dong: Dong[]) {
   );
   const contractId = await insertId(
     `INSERT INTO contracts (code, kind, title, party_name, value, advance_pct, retention_pct, status, project_id)
-     VALUES (?, 'nhan_thau', 'HĐ S10a', 'CĐT test', 0, 10.25, 5.00, 'active', ?)`,
+     VALUES (?, 'nhan_thau', 'HĐ S10a', 'CĐT test', 0, ?::numeric, ?::numeric, 'active', ?)`,
     `HD-${uniq("S10a")}`,
+    tyLe.advancePct,
+    tyLe.retentionPct,
     projectId,
   );
   const boqIds: number[] = [];
@@ -64,28 +69,43 @@ async function dungDot(dong: Dong[]) {
     boqIds.push(
       await insertId(
         `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price, contract_id)
-         VALUES (?, ?, 'm', 1000, ?::numeric, ?)`,
+         VALUES (?, ?, 'm', ?, ?::numeric, ?)`,
         `BOQ-${uniq("S10a")}`,
         `Dòng ${i + 1}`,
+        qtyContract,
         d.unitPrice,
         contractId,
       ),
     );
   }
   const fixture = { projectId, contractId, pmId };
+  await dangNhapDuAn({ id: pmId, passwordHash: pm!.password_hash }, projectId);
+  return { ...fixture, boqIds };
+}
+
+/** Lập đợt mới (POST) cho hợp đồng rồi nhập KL (PATCH) qua route thật; trả id đợt. */
+async function lapDot(contractId: number, items: { boqItemId: number; qtyPeriod: number }[]) {
+  const { POST } = await import("@/app/api/payment-certs/route");
+  const { PATCH } = await import("@/app/api/payment-certs/[id]/route");
+  const tao = await POST(jreq("/api/payment-certs", { contractId }));
+  assert.equal(tao.status, 201);
+  const { id } = (await tao.json()) as { id: number };
+  const sua = await PATCH(jreq(`/api/payment-certs/${id}`, { items }, "PATCH"), thamSo(id));
+  assert.equal(sua.status, 200);
+  return id;
+}
+
+/** Hợp đồng + đợt 1 với KL `dong`, qua route thật. */
+async function dungDot(dong: Dong[], tyLe: TyLe = TY_LE_MAC_DINH) {
+  const f = await dungHopDong(dong, tyLe);
   try {
-    await dangNhapDuAn({ id: pmId, passwordHash: pm!.password_hash }, projectId);
-    const { POST } = await import("@/app/api/payment-certs/route");
-    const { PATCH } = await import("@/app/api/payment-certs/[id]/route");
-    const tao = await POST(jreq("/api/payment-certs", { contractId }));
-    assert.equal(tao.status, 201);
-    const { id } = (await tao.json()) as { id: number };
-    const items = dong.map((d, i) => ({ boqItemId: boqIds[i], qtyPeriod: d.qtyPeriod }));
-    const sua = await PATCH(jreq(`/api/payment-certs/${id}`, { items }, "PATCH"), thamSo(id));
-    assert.equal(sua.status, 200);
-    return { ...fixture, certId: id };
+    const certId = await lapDot(
+      f.contractId,
+      dong.map((d, i) => ({ boqItemId: f.boqIds[i], qtyPeriod: d.qtyPeriod })),
+    );
+    return { ...f, certId };
   } catch (err) {
-    await donDep(fixture);
+    await donDep(f);
     throw err;
   }
 }
@@ -233,6 +253,7 @@ test(
       assert.equal(typeof loi.error, "string");
       assert.equal(loi.totals, undefined);
       assert.equal(loi.cert, undefined);
+      assert.ok(Array.isArray(loi.vuotHopDong), "422 vẫn kèm cảnh báo vượt KL hợp đồng");
 
       const v1 = await getChiTiet(f.certId, { [HEADER]: "decimal-string-v1" });
       assert.equal(v1.status, 200);
@@ -365,6 +386,189 @@ test(
         f.certId,
       );
       assert.equal(cert?.status, "submitted");
+    } finally {
+      await donDep(f);
+    }
+  },
+);
+
+// ---------- PDF: thành tiền dòng + tổng làm tròn đồng bằng bigint (audit S10a M1) ----------
+
+async function getPdf(id: number) {
+  const { GET } = await import("@/app/api/payment-certs/[id]/pdf/route");
+  return GET(jreq(`/api/payment-certs/${id}/pdf`, undefined, "GET"), thamSo(id));
+}
+
+/** Chuỗi hiển thị PDF dựng từ đúng nguồn route PDF dùng (certLinesExact + certTotals). */
+async function soHienThiPdf(certId: number) {
+  const { certLinesExact, certLineDong, certTotals, formatDongVi } =
+    await import("@/lib/tai-chinh/paymentcerts");
+  const { mulRatio } = await import("@/lib/nen/money");
+  const lines = await certLinesExact(certId);
+  const t = await certTotals(certId);
+  const tien = (minor: bigint) => formatDongVi(mulRatio(minor, 1n, 100n));
+  return {
+    dong: lines.map((l) => formatDongVi(certLineDong(l))),
+    period: tien(t.periodValue),
+    advance: tien(t.advanceDeduct),
+    retention: tien(t.retentionDeduct),
+    approved: tien(t.approvedValue),
+  };
+}
+
+test("PDF IPC: 1,005 × 100,00 = 100,5 → 101 đ ở dòng và tổng (float cũ ra 100 đ)", S, async () => {
+  // Đường cũ: Math.round(1.005 * 100) — float 100.49999999999999 → 100 (sai 1 đồng).
+  assert.equal(Math.round(1.005 * 100), 100);
+  const f = await dungDot([{ unitPrice: "100.00", qtyPeriod: 1.005 }]);
+  try {
+    const so = await soHienThiPdf(f.certId);
+    assert.deepEqual(so.dong, ["101 đ"]);
+    assert.equal(so.period, "101 đ");
+    const res = await getPdf(f.certId);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "application/pdf");
+    assert.equal(res.headers.get("cache-control"), "private, no-store");
+  } finally {
+    await donDep(f);
+  }
+});
+
+test(
+  "Hợp đồng 0% + đơn giá có xu (94,50): tạm ứng/giữ lại = 0, cộng exact rồi mới round tổng",
+  S,
+  async () => {
+    // 3 × 94.50 = 283.50; hai dòng 0.001 × 5.00 = 0.005 mỗi dòng → tổng 283.51 (round từng dòng
+    // sẽ ra 283.52).
+    const f = await dungDot(
+      [
+        { unitPrice: "94.50", qtyPeriod: 3 },
+        { unitPrice: "5.00", qtyPeriod: 0.001 },
+        { unitPrice: "5.00", qtyPeriod: 0.001 },
+      ],
+      { advancePct: "0.00", retentionPct: "0.00" },
+    );
+    try {
+      const v1 = await getChiTiet(f.certId, { [HEADER]: "decimal-string-v1" });
+      assert.equal(v1.status, 200);
+      assert.deepEqual(((await v1.json()) as { totals: unknown }).totals, {
+        periodValue: "283.51",
+        cumulativeValue: "283.51",
+        advanceDeduct: "0.00",
+        retentionDeduct: "0.00",
+        approvedValue: "283.51",
+      });
+      const legacy = (await (await getChiTiet(f.certId)).json()) as {
+        totals: { approvedValue: unknown };
+      };
+      assert.equal(legacy.totals.approvedValue, 283.51);
+      const so = await soHienThiPdf(f.certId);
+      assert.deepEqual(so.dong, ["284 đ", "0 đ", "0 đ"]); // 283,5 → 284 (ties xa 0)
+      assert.equal(so.advance, "0 đ");
+      assert.equal(so.approved, "284 đ");
+      assert.equal((await getPdf(f.certId)).status, 200);
+    } finally {
+      await donDep(f);
+    }
+  },
+);
+
+// ---------- Luỹ kế nửa xu qua 2 đợt (L2) ----------
+
+test("cumulativeValue: luỹ kế 0,003 × 5,00 = 0,015 → 0.02 (round tổng, ties xa 0)", S, async () => {
+  const f = await dungDot([{ unitPrice: "5.00", qtyPeriod: 0.001 }], {
+    advancePct: "0.00",
+    retentionPct: "0.00",
+  });
+  try {
+    assert.equal((await trinhVaDuyet(f.certId)).status, 200);
+    const dot2 = await lapDot(f.contractId, [{ boqItemId: f.boqIds[0], qtyPeriod: 0.002 }]);
+    const v1 = await getChiTiet(dot2, { [HEADER]: "decimal-string-v1" });
+    const { totals } = (await v1.json()) as { totals: Record<string, string> };
+    assert.equal(totals.periodValue, "0.01"); // 0.010
+    assert.equal(totals.cumulativeValue, "0.02"); // 0.015 → 0.02
+  } finally {
+    await donDep(f);
+  }
+});
+
+// ---------- POST lập đợt: amount phê duyệt ngoài biên (L2) ----------
+
+test(
+  "POST lập đợt: KL gợi ý cho tổng vượt biên JSON number → 422 money_precision_unsupported, không tạo đợt",
+  S,
+  async () => {
+    const { insertId, run, queryOne } = await import("@/lib/db");
+    // 11 × 9007199254740.99 = 99079191802150.89 → 9907919180215089 đồng×100 > 2^53.
+    const f = await dungHopDong(
+      [{ unitPrice: "9007199254740.99", qtyPeriod: 0 }],
+      TY_LE_MAC_DINH,
+      11,
+    );
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp S10a')`,
+      f.projectId,
+    );
+    const stId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, ?, 'Sheet S10a')`,
+      towerId,
+      uniq("S10A"),
+    );
+    const pkgId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'S1', 'Nhóm S10a')`,
+      stId,
+    );
+    const taskId = await insertId(
+      `INSERT INTO tasks (package_id, code, name, progress_percent) VALUES (?, 'S1,01', 'Task S10a', 1)`,
+      pkgId,
+    );
+    await run(
+      `INSERT INTO boq_task_map (boq_item_id, task_id, weight) VALUES (?, ?, 1)`,
+      f.boqIds[0],
+      taskId,
+    );
+    try {
+      const { POST } = await import("@/app/api/payment-certs/route");
+      const res = await POST(jreq("/api/payment-certs", { contractId: f.contractId }));
+      assert.equal(res.status, 422);
+      assert.equal(((await res.json()) as { code?: string }).code, "money_precision_unsupported");
+      const dot = await queryOne(
+        `SELECT id FROM payment_certs WHERE contract_id = ?`,
+        f.contractId,
+      );
+      assert.equal(dot, undefined, "422 phải rollback, không để lại đợt nháp");
+    } finally {
+      await run(`DELETE FROM boq_task_map WHERE task_id = ?`, taskId);
+      await run(`DELETE FROM tasks WHERE id = ?`, taskId);
+      await run(`DELETE FROM work_packages WHERE id = ?`, pkgId);
+      await run(`DELETE FROM sheet_types WHERE id = ?`, stId);
+      await run(`DELETE FROM towers WHERE id = ?`, towerId);
+      await donDep(f);
+    }
+  },
+);
+
+// ---------- certTotals không lặng lẽ coi 0% khi không đọc được hợp đồng (L3) ----------
+
+test(
+  "certTotals: hợp đồng bị RLS che (đọc khác dự án) → throw, không trả tạm ứng/giữ lại 0",
+  S,
+  async () => {
+    const f = await dungDot(THUONG);
+    try {
+      const { withTransaction, run } = await import("@/lib/db");
+      const { certTotals } = await import("@/lib/tai-chinh/paymentcerts");
+      // Role ứng dụng (không bypass RLS) + GUC dự án khác: contracts bị lọc, payment_certs thì không.
+      await assert.rejects(
+        withTransaction(async () => {
+          await run(`SET LOCAL ROLE xboss_app`);
+          await run(
+            `SELECT set_config('app.project_id', ?, true)`,
+            String(f.projectId + 1_000_000),
+          );
+          await certTotals(f.certId);
+        }),
+        /thiếu dòng hợp đồng/,
+      );
     } finally {
       await donDep(f);
     }

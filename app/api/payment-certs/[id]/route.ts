@@ -94,6 +94,8 @@ export async function GET(
           "Giá trị tiền vượt độ chính xác của định dạng số cũ — gửi header " +
           `${MONEY_FORMAT_HEADER}: ${MONEY_FORMAT_DECIMAL_V1} để nhận số tiền chính xác`,
         code: "money_precision_unsupported",
+        // Cảnh báo vượt KL hợp đồng là khối lượng (không phải tiền) — vẫn trả để không mất.
+        vuotHopDong,
       },
       422,
     );
@@ -162,5 +164,8 @@ export async function PATCH(
   // Lưu xong mới soát: người lập vẫn ghi được (quyết định "cảnh báo, không chặn"), nhưng
   // phải nhìn thấy ngay dòng nào đang vượt khối lượng hợp đồng trước khi trình duyệt.
   const vuotHopDong = await dongVuotHopDong(id);
-  return NextResponse.json({ updated: id, vuotHopDong });
+  return NextResponse.json(
+    { updated: id, vuotHopDong },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }

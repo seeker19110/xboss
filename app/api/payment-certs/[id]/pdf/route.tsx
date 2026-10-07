@@ -7,6 +7,9 @@ import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/nen/pdf-
 import {
   getCertForProject,
   certTotals,
+  certLinesExact,
+  certLineDong,
+  formatDongVi,
   type PaymentCertRow,
   type CertTotals,
 } from "@/lib/tai-chinh/paymentcerts";
@@ -62,7 +65,14 @@ function fmtVND(n: number) {
 // Tổng đợt là MoneyMinor (đồng×100): làm tròn tới đồng bằng bigint (ties xa 0) rồi nhóm
 // chữ số kiểu vi-VN như fmtVND — không đi qua Number nên không mất chữ số khi tổng rất lớn.
 function fmtTien(minor: bigint) {
-  return mulRatio(minor, 1n, 100n).toLocaleString("vi-VN") + " đ";
+  return formatDongVi(mulRatio(minor, 1n, 100n));
+}
+// Thành tiền dòng lấy từ ::text cùng giao dịch; thiếu (dòng đổi giữa 2 câu SELECT) → lỗi 500,
+// không in số nhân float thay thế.
+function thanhTienDong(lineDong: Map<number, bigint>, itemId: number): bigint {
+  const dong = lineDong.get(itemId);
+  if (dong === undefined) throw new Error(`Dòng KL #${itemId} không đọc được dạng chính xác`);
+  return dong;
 }
 function fmtQty(n: number) {
   return n.toLocaleString("vi-VN", { maximumFractionDigits: 3 });
@@ -71,10 +81,13 @@ function fmtQty(n: number) {
 function IpcDoc({
   cert,
   totals,
+  lineDong,
   today,
 }: {
   cert: PaymentCertRow;
   totals: CertTotals;
+  /** Thành tiền dòng (đồng nguyên, exact từ ::text) theo id dòng KL. */
+  lineDong: Map<number, bigint>;
   today: string;
 }) {
   return (
@@ -119,7 +132,7 @@ function IpcDoc({
               <Text style={styles.td}>{fmtVND(it.unitPrice)}</Text>
               <Text style={styles.td}>{fmtQty(it.qtyPeriod)}</Text>
               <Text style={styles.td}>{fmtQty(it.qtyCumulative)}</Text>
-              <Text style={styles.td}>{fmtVND(it.qtyPeriod * it.unitPrice)}</Text>
+              <Text style={styles.td}>{formatDongVi(thanhTienDong(lineDong, it.id))}</Text>
             </View>
           ))}
         </View>
@@ -185,15 +198,16 @@ export async function GET(
   const detail = await withProjectScope(projectId ?? "*", async () => {
     const cert = await getCertForProject(id, projectId);
     if (!cert) return null;
-    return { cert, totals: await certTotals(id) };
+    return { cert, totals: await certTotals(id), lines: await certLinesExact(id) };
   });
   if (!detail)
     return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
-  const { cert, totals } = detail;
+  const { cert, totals, lines } = detail;
+  const lineDong = new Map(lines.map((l) => [l.id, certLineDong(l)]));
   const today = formatDateVN(new Date());
 
   const stream = await ReactPDF.renderToStream(
-    <IpcDoc cert={cert} totals={totals} today={today} />,
+    <IpcDoc cert={cert} totals={totals} lineDong={lineDong} today={today} />,
   );
   const chunks: Buffer[] = [];
   await new Promise<void>((resolve, reject) => {
@@ -208,7 +222,7 @@ export async function GET(
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${cert.code}.pdf"`,
-      "Cache-Control": "no-store",
+      "Cache-Control": "private, no-store",
     },
   });
 }

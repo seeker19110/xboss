@@ -10,10 +10,13 @@ import {
   parseMoneyExact,
   ipcSumV1,
   moneyToWire,
+  mulRatio,
+  parseFixedDecimalExact,
   type MoneyWireFormat,
 } from "@/lib/nen/money";
 import { nextSeqCode } from "@/lib/ha-tang/seqcode";
 import { daysFromTodayISO } from "@/lib/nen/date";
+import { log } from "@/lib/nen/log";
 
 export const PAYMENT_CERT_STATUSES = ["draft", "submitted", "approved", "rejected"] as const;
 export type PaymentCertStatus = (typeof PAYMENT_CERT_STATUSES)[number];
@@ -323,6 +326,12 @@ export async function certTotals(certId: number): Promise<CertTotals> {
     certId,
   );
   if (!cert) return { ...ZERO_TOTALS };
+  // Cột tỷ lệ NOT NULL DEFAULT 0 → null CHỈ khi không đọc được dòng hợp đồng (vd RLS che,
+  // dữ liệu hỏng). Không lặng lẽ coi là 0% — tạm ứng/giữ lại sai là tiền thật: fail-fast (500).
+  if (cert.advancePct == null || cert.retentionPct == null) {
+    log.error("certTotals: không đọc được tỷ lệ hợp đồng của đợt IPC", { certId });
+    throw new Error("certTotals: thiếu dòng hợp đồng của đợt IPC");
+  }
 
   const lines = await certLinesExact(certId);
   const agg = await queryOne<{ cumulative: string }>(
@@ -330,12 +339,24 @@ export async function certTotals(certId: number): Promise<CertTotals> {
        FROM payment_cert_items WHERE cert_id = ?`,
     certId,
   );
-  // Rate null/thiếu (hợp đồng không còn) → 0%, giữ đúng hành vi cũ `?? 0`.
-  const v1 = ipcSumV1(lines, {
-    advancePct: cert.advancePct ?? "0.00",
-    retentionPct: cert.retentionPct ?? "0.00",
-  });
+  const v1 = ipcSumV1(lines, { advancePct: cert.advancePct, retentionPct: cert.retentionPct });
   return { ...v1, cumulativeValue: parseMoneyExact(agg?.cumulative ?? "0") };
+}
+
+/**
+ * Thành tiền một dòng làm tròn tới ĐỒNG nguyên (ties xa 0) — chỉ để HIỂN THỊ (PDF). qty scale 3
+ * × đơn giá scale 2 = scale 5, nhân bigint rồi chia 10^5; không nhân float (1,005 × 100,00 =
+ * 100,5 → 101 đ, float cho 100,4999… → 100 đ). Tổng đợt vẫn theo ipc-sum-v1, không cộng số này.
+ */
+export function certLineDong(line: { qtyPeriod: string; unitPrice: string }): bigint {
+  const product =
+    parseFixedDecimalExact(line.qtyPeriod, 3) * parseFixedDecimalExact(line.unitPrice, 2);
+  return mulRatio(product, 1n, 100000n);
+}
+
+/** Đồng nguyên (bigint) → "1.234.567 đ" kiểu vi-VN, không qua Number. */
+export function formatDongVi(dong: bigint): string {
+  return `${dong.toLocaleString("vi-VN")} đ`;
 }
 
 /** Tên các trường tiền của `CertTotals` — dùng chung cho adapter wire và test. */
