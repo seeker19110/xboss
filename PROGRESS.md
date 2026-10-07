@@ -1,5 +1,13 @@
 # PROGRESS — XBoss
 
+## 2026-10-07 — Rà nợ & lộ trình hoàn thiện (chưa code)
+
+Tổng hợp sổ nợ #572 (N01–N12), PLAN S00–S16 và trạng thái main `49283cf` thành lộ trình 5 đợt
+tại `docs/ops/lo-trinh-hoan-thien-2026-10-07.md`. Không còn PR mở; N04 thực chất đã xong qua
+#574. Đường găng: N05 (credential migrator VPS, cần người vận hành) — production chưa nhận bản
+nào sau #560. Còn lại code: S02 caller scope, S05–S08 offline vault, S10–S13 tiền/báo cáo,
+S14 PITR. Chỉ tài liệu, không đổi code/schema, không đóng khoản nợ nào.
+
 ## 2026-10-07 — Nâng @sentry/nextjs lên 11.4.0 (PR #580)
 
 - v11 bỏ export `withSentryConfig` khỏi entry gốc (điều kiện `node` trỏ CJS) nên `next build`
