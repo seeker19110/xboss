@@ -12,6 +12,12 @@
 | **RPO** (Recovery Point Objective) | ≤ 24 giờ | Mất nhiều nhất dữ liệu của 1 ngày làm việc — backup chạy hằng đêm.              |
 | **RTO** (Recovery Time Objective)  | ≤ 4 giờ  | Từ lúc phát hiện mất DB/VPS tới lúc app chạy lại với dữ liệu gần nhất, ≤ 4 giờ. |
 
+> **Bảng trên là năng lực của luồng `pg_dump` hằng đêm hiện có, KHÔNG phải mục tiêu nghiệm thu.**
+> Mục tiêu đã chốt ở QUALITY-FINAL-1 (D08, `docs/nang-cap/AUDIT-2026-09-25/APPROVAL.md` §9):
+> **RPO ≤ 5 phút, RTO ≤ 60 phút, cửa sổ PITR 35 ngày** (base backup + WAL liên tục). Luồng hiện
+> có chưa đạt D08; verifier ở mục [Recovery manifest v1 + verifier](#recovery-manifest-v1--verifier-s14--a6)
+> báo các hạng mục đó là `NOT_RUN` cho tới khi có số đo hạ tầng thật — không được hạ target để PASS.
+
 **Nguyên tắc cốt lõi: "Backup chưa restore được = chưa có backup."** Vì vậy có **2 script riêng biệt** —
 `backup.sh` (tạo bản sao) và `restore-check.sh` (chứng minh bản sao đó thực sự phục hồi được) — chạy
 định kỳ độc lập, không tin tưởng "chắc là backup ổn" chỉ vì `pg_dump` không báo lỗi.
@@ -197,6 +203,145 @@ trước khi đưa VPS mới lên production:
   Google Cloud Console, Sentry Settings).
 - Rà soát tài khoản user trong DB phục hồi — nếu nghi có tài khoản bị tạo trái phép trong lúc bị
   xâm nhập, khoá/xoá trước khi mở lại truy cập.
+
+## Recovery manifest v1 + verifier (S14 / A6)
+
+Bộ công cụ chỉ-đọc để **chứng minh một bản khôi phục khớp đúng recovery set** (A6-FR01/FR05/FR07),
+không chỉ "restore chạy được". Gồm 2 lệnh, chạy tay bởi operator, **không** tạo cron/lịch, không
+đẩy remote, không gọi dịch vụ ngoài, không DDL:
+
+| Lệnh                                           | Chạy trên                         | Việc                                                                 |
+| ---------------------------------------------- | --------------------------------- | -------------------------------------------------------------------- |
+| `npx tsx scripts/lib/recovery-manifest-cli.ts` | DB **nguồn** (role audit chỉ-đọc) | Chụp snapshot, (tuỳ chọn) `pg_dump` CÙNG snapshot, ghi manifest v1   |
+| `npm run audit:verify-dr -- <cờ>`              | DB **đích** đã restore, cách ly   | Đối chiếu đích với manifest, in JSON PASS/FAIL/NOT_RUN từng hạng mục |
+
+Kết quả trên đích cách ly/fixture **chưa phải** bằng chứng PITR thật, RPO/RTO production hay nghiệm
+thu phát hành (`completeDrVerified` chỉ `true` khi MỌI hạng mục, kể cả hạ tầng, đều PASS).
+
+### Bước 0 — Role audit (một lần, do DBA tạo)
+
+Verifier/bộ sinh manifest phải đọc **toàn phần** — role app (`xboss_app`, NOBYPASSRLS) bị RLS lọc nên
+không dùng được (số 0 do policy che không được coi là "không vi phạm"). Tạo role riêng, không superuser,
+chỉ đọc, trên **nguồn** và trên **server đích**:
+
+```sql
+CREATE ROLE xboss_dr_audit LOGIN NOSUPERUSER BYPASSRLS PASSWORD '<đặt qua kho secret>';
+GRANT pg_read_all_data TO xboss_dr_audit;
+```
+
+Thiếu BYPASSRLS/quyền SELECT → hạng mục `audit-role-access` và mọi hạng mục đọc bảng bị chặn ra
+`NOT_RUN` (không PASS, không FAIL giả). Mật khẩu chỉ nằm trong file env mode `0600`, không vào lệnh.
+
+### Bước 1 — Sinh manifest v1 trên nguồn
+
+```bash
+set -a && . /etc/xboss/dr-source.env && set +a   # DR_SOURCE_DATABASE_URL / _EXPECTED_DATABASE / _EXPECTED_USER
+ID="$(date -u +%Y%m%dT%H%M%SZ)-$(python3 -c 'import uuid; print(uuid.uuid4())')"
+npx tsx scripts/lib/recovery-manifest-cli.ts \
+  --recovery-set-id "$ID" \
+  --out "backups/xboss-$ID.recovery-v1.json" \
+  --pg-dump "backups/xboss-$ID.snapshot.dump" \
+  --attachments-dir data/uploads \
+  --key-provider <tên-kho-key> --key-id <tham-chiếu-key> --key-version <phiên-bản> \
+  --app-sha "$(git rev-parse HEAD)"   # [--base-backup-id <id base backup PITR nếu có>]
+```
+
+- Mở `REPEATABLE READ READ ONLY`, kiểm DB/role kỳ vọng, `pg_export_snapshot()` rồi chạy
+  `pg_dump --snapshot` → **dump và manifest mô tả cùng một thời điểm** (A6-FR03). Kết nối của
+  `pg_dump` truyền qua biến `PG*`, không có URI trong argv.
+- Manifest ghi: recoverySetId, băm danh tính nguồn (không host/user), thời điểm, phiên bản
+  PostgreSQL/công cụ, appSha, baseBackupId, LSN/timeline lúc chụp, migration name + SHA-256 tệp,
+  số dòng + digest của các bảng trọng yếu, tổng tiền exact (chuỗi), digest ràng buộc/policy/
+  trigger/hàm, watermark audit, tệp critical (key/size/SHA-256) và **tham chiếu** key mã hoá.
+- Tệp critical = `task_documents`, `contract_documents`, `vo_documents`, `claim_documents` (các
+  bảng có cột `sha256` từ migration 0050). Thiếu tệp hoặc lệch size/hash so với DB → **không phát
+  hành manifest** (exit 1). Lưu trữ S3: đồng bộ phiên bản object về một thư mục cục bộ rồi trỏ
+  `--attachments-dir` vào đó (chưa ghi `version` object — xem Giới hạn).
+- Không có `--key-provider/--key-id` → manifest ghi `encryptionKeyReference: null` và verifier sẽ
+  FAIL hạng mục key. Validator **từ chối** manifest có URI kèm mật khẩu, PEM, trường tên
+  password/secret/token…, hoặc keyId trông như key thô.
+- Đặt tên `*.recovery-v1.json` — **không** đặt `*.manifest.json` (định dạng cũ `restore-check.sh`
+  đọc). Tệp ghi mode `0600`, không ghi đè; cất ở nơi chống sửa mà chỉ người có quyền dữ liệu đọc.
+
+### Bước 2 — Restore vào đích cách ly
+
+Theo mục [Chuẩn bị target disposable](#chuẩn-bị-target-disposable-cho-restore-checksh): server
+sandbox khác host/port nguồn, tắt egress/cron/email/Telegram/webhook. Tạo DB mới,
+`pg_restore --no-owner --exit-on-error -d <db_moi> backups/xboss-$ID.snapshot.dump`, giải nén/
+sao chép tệp đính kèm sang thư mục riêng, rồi gắn marker lên DB đích (hoặc dùng DB điều khiển):
+
+```sql
+COMMENT ON DATABASE <db_moi> IS 'xboss-disposable:<token-ngau-nhien-tu-16-ky-tu>';
+```
+
+### Bước 3 — Chạy verifier
+
+```bash
+set -a && . /etc/xboss/dr-verify.env && set +a
+# DR_VERIFY_DATABASE_URL (role audit trên đích), DR_VERIFY_EXPECTED_DATABASE, DR_VERIFY_EXPECTED_USER,
+# DR_VERIFY_EXPECTED_MARKER, (tuỳ chọn) DR_VERIFY_MARKER_DATABASE nếu marker nằm ở DB điều khiển.
+npm run audit:verify-dr -- \
+  --manifest "backups/xboss-$ID.recovery-v1.json" \
+  --attachments-dir /srv/restore/uploads \
+  --artifacts-dir backups \
+  --app-sha "$(git rev-parse HEAD)" \
+  --evidence-out "logs/dr-verify-$ID.json"
+```
+
+Trước khi kết nối, verifier chặn: đích trùng `DATABASE_URL`/`MIGRATE_DATABASE_URL` (cùng
+host:port/db dù khác credential) và đích có danh tính trùng nguồn ghi trong manifest. Sau khi kết
+nối, truy vấn đầu tiên chỉ kiểm DB/role/chế độ chỉ-đọc/marker — sai bất kỳ điều nào thì dừng trước
+mọi truy vấn bảng nghiệp vụ. Mọi kiểm tra chạy trong một transaction `REPEATABLE READ READ ONLY`
+rồi `ROLLBACK`; không dùng pool/auto-migrate của app; không in URI/mật khẩu/marker.
+
+### Đọc kết quả
+
+JSON có `recoverySetId`, `appSha`, `startedAt/completedAt`, `counts`, `fixtureChecksPassed`,
+`completeDrVerified` và `results[]` (mỗi mục: `name`, `status`, `evidence` = `fixture` |
+`infrastructure`, `reason`, `expected`/`actual`). **Exit ≠ 0 khi có bất kỳ FAIL hoặc NOT_RUN.**
+`--evidence-out` không ghi đè tệp cũ — giữ bằng chứng cả lần thất bại (A6-AC06).
+
+| Hạng mục                                    | PASS khi                                                                           |
+| ------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `source-distinct`, `target`                 | Đích khác nguồn; DB/role/marker/chỉ-đọc khớp                                       |
+| `manifest`, `app-sha`                       | Manifest v1 hợp lệ; app SHA đang dùng khớp snapshot                                |
+| `audit-role-access`                         | Role đọc toàn phần mọi bảng trọng yếu (không bị RLS/quyền chặn)                    |
+| `migration-names`, `migration-checksums`    | Tên migration khớp mã nguồn; tên + SHA-256 khớp manifest                           |
+| `table-digests`, `finance-totals`           | Số dòng + digest từng bảng; tổng tiền so **chuỗi exact**                           |
+| `schema-objects`                            | Ràng buộc, policy RLS, trigger, hàm, extension khớp snapshot                       |
+| `integrity:<luật>`                          | 0 dòng mồ côi/lệch org-project (danh sách luật trong `scripts/lib/dr-snapshot.ts`) |
+| `audit-chain`, `audit-watermark`            | Hash-chain hợp lệ, phủ 100%; số dòng/id/hash cuối khớp (bắt mất đuôi)              |
+| `attachments-manifest`, `attachments-files` | Mọi tệp critical DB tham chiếu có trong manifest; tệp khôi phục đủ + hash khớp     |
+| `backup-artifacts`                          | Artifact backup (dump) còn đủ, size/SHA-256 khớp                                   |
+| `encryption-key-reference`                  | Manifest có tham chiếu key (không chứa key)                                        |
+| `encryption-key-availability`               | Luôn `NOT_RUN` — verifier không truy cập kho key                                   |
+| `wal-coverage`, `rpo`, `rto`                | Chỉ khi manifest có số đo, so với D08 (≤300s, ≤3600s, ≥35 ngày, 0 đoạn thiếu)      |
+
+Manifest cũ của `backup.sh` (`schemaVersion: 1`) vẫn đọc được: chỉ `backup-artifacts` chạy được,
+các hạng mục cần dữ liệu v1 là `NOT_RUN` (không FAIL cả bộ, không PASS giả).
+
+### Hạng mục `NOT_RUN` còn cần hạ tầng gì
+
+- **`wal-coverage` (Q-AC08):** bật `archive_mode`/`archive_command` tới kho chống sửa,
+  `pg_basebackup` hằng ngày, giữ WAL + base backup phủ đủ 35 ngày; manifest phải có `baseBackupId`
+  và khối `wal` (timeline, startLsn/endLsn, windowStart/windowEnd, `missingSegments`) **đo từ archive
+  thật**. Diễn tập phục hồi ở điểm gần hiện tại và ở mép 35 ngày.
+- **`rpo` / `rto` (A6-AC05):** RPO đo bằng giao dịch canary + độ trễ archive/replication object;
+  RTO đo từ lúc bắt đầu sự cố tới khi app sẵn sàng + smoke/UAT xong (gồm tìm key, tải backup, restore
+  DB/tệp). Ghi vào khối `measurements` (measuredAt, workload, sourceResolution, rpoSeconds,
+  rtoSeconds, recoveryTargetLsn, timeline). Thiếu số đo là `NOT_RUN`; vượt target là `FAIL`.
+- **`encryption-key-availability`:** cần quy trình mở key thật trên đích cách ly (kho key/KEK
+  tách riêng) — chưa có trong repo.
+
+### Giới hạn của bộ verifier
+
+- Digest dùng `string_agg` của SHA-256 từng dòng: tối đa ~16 triệu dòng/bảng; vượt thì truy vấn
+  lỗi và hạng mục FAIL (đóng), không PASS. So danh tính bằng host:port/db — không phát hiện alias
+  DNS; operator vẫn kiểm topology.
+- Khối `wal`/`measurements` do người vận hành ghi vào manifest từ hệ thống đo; verifier chỉ so với
+  D08, không tự chứng minh số đo.
+- Chưa ghi `version` của object S3; `backup.sh` chưa tự sinh manifest v1 (tích hợp sẽ đổi lệnh
+  `pg_dump` sang `--snapshot` — cần quyết định riêng).
 
 ## Vị trí backup
 
