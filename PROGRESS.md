@@ -1,5 +1,11 @@
 # PROGRESS — XBoss
 
+## 2026-10-07 — Nâng @sentry/nextjs lên 11.4.0 (PR #580)
+
+- v11 bỏ export `withSentryConfig` khỏi entry gốc (điều kiện `node` trỏ CJS) nên `next build`
+  đỏ "Failed to load next.config.mjs". Đổi sang `import { withSentryConfig } from "@sentry/nextjs/config"`
+  trong `next.config.mjs`. Local: build + typecheck + lint xanh; CI trên PR vẫn là cổng quyết định.
+
 ## 2026-10-06 — Xác nhận main đã nhận PR #574
 
 GitHub xác nhận PR #574 đã merge tại `c838a1279359ad41e670cd33db22489858264061`

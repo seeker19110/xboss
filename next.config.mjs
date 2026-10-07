@@ -1,4 +1,5 @@
-import { withSentryConfig } from "@sentry/nextjs";
+// @sentry/nextjs v11: withSentryConfig nằm ở subpath "/config" (entry gốc không còn export).
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
