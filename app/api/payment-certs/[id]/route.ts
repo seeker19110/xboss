@@ -9,8 +9,16 @@ import {
   checkCertLinesBelongToContract,
   saveCertItems,
   dongVuotHopDong,
+  certTotalsToWire,
   type CertLineInput,
+  type CertTotalsMasked,
 } from "@/lib/tai-chinh/paymentcerts";
+import {
+  MONEY_FORMAT_HEADER,
+  MONEY_FORMAT_DECIMAL_V1,
+  moneyWireFormat,
+  isMoneyPrecisionError,
+} from "@/lib/nen/money";
 import { getEntityApprovalStatus } from "@/lib/tien-do/approvals";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 
@@ -32,20 +40,28 @@ async function certInProject(
   );
 }
 
+// API tài chính: không cache ở bất kỳ tầng nào; nội dung đổi theo header định dạng tiền
+// (A3-FR06) nên phải khai Vary dù đã no-store.
+const HEADERS_TAI_CHINH = { "Cache-Control": "private, no-store", Vary: MONEY_FORMAT_HEADER };
+const json = (body: unknown, status = 200) =>
+  NextResponse.json(body, { status, headers: HEADERS_TAI_CHINH });
+
 // GET /api/payment-certs/:id — chi tiết đợt kèm dòng KL + tổng hợp giá trị,
-// scoped theo dự án đang chọn (M22).
+// scoped theo dự án đang chọn (M22). Header `X-XBoss-Money-Format: decimal-string-v1` →
+// `totals` là chuỗi canonical + `moneyFormat`; không gửi → JSON number legacy (422 nếu ngoài biên).
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
   const params = await paramsP;
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!user) return json({ error: "Chưa đăng nhập" }, 401);
   if (!CAN.viewPayments(user.role))
-    return NextResponse.json({ error: "Bạn không có quyền xem đợt thanh toán" }, { status: 403 });
+    return json({ error: "Bạn không có quyền xem đợt thanh toán" }, 403);
 
   const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+  if (isNaN(id)) return json({ error: "ID không hợp lệ" }, 400);
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
 
   const projectId = await getCurrentProjectId(user);
   const detail = await withProjectScope(projectId ?? "*", async () => {
@@ -61,14 +77,34 @@ export async function GET(
     const vuotHopDong = await dongVuotHopDong(id);
     return { cert, totals, approvalStatus, vuotHopDong };
   });
-  if (!detail)
-    return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
+  if (!detail) return json({ error: "Không tìm thấy đợt thanh toán" }, 404);
   const { cert, totals, approvalStatus, vuotHopDong } = detail;
   // M50 PR2: che đơn giá dòng KL + tổng tiền đợt cho user thiếu viewPayments (phòng thủ
-  // — gate route hiện cũng là viewPayments).
+  // — gate route hiện cũng là viewPayments). Che TRƯỚC khi đổi sang wire.
   const [maskedCert] = stripSensitive("paymentCert", [cert], user);
-  const [maskedTotals] = stripSensitive("certTotals", [totals], user);
-  return NextResponse.json({ cert: maskedCert, totals: maskedTotals, approvalStatus, vuotHopDong });
+  const [maskedTotals] = stripSensitive<CertTotalsMasked>("certTotals", [totals], user);
+  let wireTotals;
+  try {
+    wireTotals = certTotalsToWire(maskedTotals, format);
+  } catch (err) {
+    if (!isMoneyPrecisionError(err)) throw err;
+    return json(
+      {
+        error:
+          "Giá trị tiền vượt độ chính xác của định dạng số cũ — gửi header " +
+          `${MONEY_FORMAT_HEADER}: ${MONEY_FORMAT_DECIMAL_V1} để nhận số tiền chính xác`,
+        code: "money_precision_unsupported",
+      },
+      422,
+    );
+  }
+  return json({
+    cert: maskedCert,
+    totals: wireTotals,
+    approvalStatus,
+    vuotHopDong,
+    ...(format === MONEY_FORMAT_DECIMAL_V1 ? { moneyFormat: MONEY_FORMAT_DECIMAL_V1 } : {}),
+  });
 }
 
 // PATCH /api/payment-certs/:id { items: [{boqItemId, qtyPeriod}], periodLabel? }

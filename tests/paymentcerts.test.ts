@@ -133,10 +133,11 @@ test(
 
     const totals = await certTotals(certId);
     // periodValue = 10*1000 + 5*2000 = 20,000; advance 10% = 2,000; retention 5% = 1,000.
-    assert.equal(totals.periodValue, 20_000);
-    assert.equal(totals.advanceDeduct, 2_000);
-    assert.equal(totals.retentionDeduct, 1_000);
-    assert.equal(totals.approvedValue, 20_000 - 2_000 - 1_000);
+    // CertTotals là MoneyMinor (bigint đồng×100, ipc-sum-v1 — QUALITY-FINAL-1 S10a).
+    assert.equal(totals.periodValue, 2_000_000n);
+    assert.equal(totals.advanceDeduct, 200_000n);
+    assert.equal(totals.retentionDeduct, 100_000n);
+    assert.equal(totals.approvedValue, 2_000_000n - 200_000n - 100_000n);
 
     await run(`DELETE FROM payment_certs WHERE id = ?`, certId);
     await run(`DELETE FROM boq_items WHERE contract_id = ?`, contractId);

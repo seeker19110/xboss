@@ -11,6 +11,7 @@ import {
   type CertTotals,
 } from "@/lib/tai-chinh/paymentcerts";
 import { formatDateVN } from "@/lib/nen/date";
+import { mulRatio } from "@/lib/nen/money";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();
@@ -57,6 +58,11 @@ const styles = StyleSheet.create({
 
 function fmtVND(n: number) {
   return Math.round(n).toLocaleString("vi-VN") + " đ";
+}
+// Tổng đợt là MoneyMinor (đồng×100): làm tròn tới đồng bằng bigint (ties xa 0) rồi nhóm
+// chữ số kiểu vi-VN như fmtVND — không đi qua Number nên không mất chữ số khi tổng rất lớn.
+function fmtTien(minor: bigint) {
+  return mulRatio(minor, 1n, 100n).toLocaleString("vi-VN") + " đ";
 }
 function fmtQty(n: number) {
   return n.toLocaleString("vi-VN", { maximumFractionDigits: 3 });
@@ -121,19 +127,19 @@ function IpcDoc({
         <View style={styles.totalsBox}>
           <View style={styles.totalsRow}>
             <Text style={styles.totalsLabel}>Giá trị đợt này</Text>
-            <Text style={styles.totalsValue}>{fmtVND(totals.periodValue)}</Text>
+            <Text style={styles.totalsValue}>{fmtTien(totals.periodValue)}</Text>
           </View>
           <View style={styles.totalsRow}>
             <Text style={styles.totalsLabel}>Trừ tạm ứng</Text>
-            <Text style={styles.totalsValue}>-{fmtVND(totals.advanceDeduct)}</Text>
+            <Text style={styles.totalsValue}>-{fmtTien(totals.advanceDeduct)}</Text>
           </View>
           <View style={styles.totalsRow}>
             <Text style={styles.totalsLabel}>Trừ giữ lại bảo hành</Text>
-            <Text style={styles.totalsValue}>-{fmtVND(totals.retentionDeduct)}</Text>
+            <Text style={styles.totalsValue}>-{fmtTien(totals.retentionDeduct)}</Text>
           </View>
           <View style={styles.grandRow}>
             <Text style={styles.grandLabel}>GIÁ TRỊ ĐỀ NGHỊ THANH TOÁN</Text>
-            <Text style={styles.grandValue}>{fmtVND(totals.approvedValue)}</Text>
+            <Text style={styles.grandValue}>{fmtTien(totals.approvedValue)}</Text>
           </View>
         </View>
 

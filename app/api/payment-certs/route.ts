@@ -13,6 +13,7 @@ import {
 } from "@/lib/tai-chinh/paymentcerts";
 import { openApproval } from "@/lib/tien-do/approvals";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
+import { moneyToNumberSafe, isMoneyPrecisionError } from "@/lib/nen/money";
 
 export const dynamic = "force-dynamic";
 
@@ -131,11 +132,23 @@ export async function POST(req: NextRequest) {
         // M46 PR2: mở approval request nếu có flow cấu hình cho 'payment_cert' (PR4) —
         // không có flow thì openApproval trả null, không đổi hành vi hiện tại.
         const { periodValue } = await certTotals(id);
+        // openApproval nhận number (ngưỡng min_amount của flow): chỉ đổi khi round-trip exact,
+        // ngoài biên → 422 money_precision_unsupported (rollback cả đợt), không xấp xỉ.
+        let amount: number;
+        try {
+          amount = moneyToNumberSafe(periodValue);
+        } catch (err) {
+          if (!isMoneyPrecisionError(err)) throw err;
+          throw Object.assign(
+            new Error("Giá trị đợt vượt độ chính xác hỗ trợ của luồng phê duyệt"),
+            { status: 422, code: "money_precision_unsupported" },
+          );
+        }
         await openApproval({
           entityType: "payment_cert",
           entityId: id,
           projectId: pid,
-          amount: periodValue,
+          amount,
           user,
         });
         return { id, code };
@@ -148,8 +161,12 @@ export async function POST(req: NextRequest) {
         { error: "Mã đợt hoặc số đợt bị trùng do tạo đồng thời — vui lòng thử lại" },
         { status: 409 },
       );
-    const status = (err as { status?: number }).status;
-    if (status) return NextResponse.json({ error: (err as Error).message }, { status });
+    const { status, code } = err as { status?: number; code?: string };
+    if (status)
+      return NextResponse.json(
+        { error: (err as Error).message, ...(code ? { code } : {}) },
+        { status },
+      );
     throw err;
   }
 }

@@ -4,6 +4,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
 import { certTotals } from "@/lib/tai-chinh/paymentcerts";
+import { fitsNumeric, moneyToDecimal } from "@/lib/nen/money";
 import { advanceApproval } from "@/lib/tien-do/approvals";
 import { emitWebhook } from "@/lib/bao-mat/webhooks";
 
@@ -108,6 +109,13 @@ export async function POST(
         cert.contractId,
       );
       const totals = await certTotals(id);
+      // payment_bills.amount là NUMERIC(15,2): ghi chuỗi canonical exact (không qua float);
+      // vượt cột → 422 rõ ràng thay vì lỗi tràn số 500 của Postgres, không clamp.
+      if (!fitsNumeric(totals.approvedValue, 15))
+        throw Object.assign(
+          new Error("Giá trị đề nghị thanh toán vượt giới hạn lưu trữ của phiếu thanh toán"),
+          { status: 422 },
+        );
       const responsible = contract?.supplierName ?? contract?.partyName ?? contract?.title ?? "—";
 
       // M51 PR1: project_id của bill lấy từ hợp đồng (cert.contractId → contracts.project_id)
@@ -116,7 +124,7 @@ export async function POST(
         `INSERT INTO payment_bills (responsible, type, amount, description, paid_date, contract_id, payment_cert_id, created_by, project_id)
          VALUES (?, 'bill', ?, ?, ?, ?, ?, ?, ?)`,
         responsible,
-        totals.approvedValue,
+        moneyToDecimal(totals.approvedValue),
         `Đợt ${cert.periodNo} — ${contract?.title ?? ""}`,
         todayISO(),
         cert.contractId,
