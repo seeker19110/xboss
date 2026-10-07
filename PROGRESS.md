@@ -1,5 +1,18 @@
 # PROGRESS — XBoss
 
+## 2026-10-07 — QUALITY-FINAL-1 S14: recovery manifest v1 + verifier PASS/FAIL/NOT_RUN
+
+Manifest khôi phục v1 (`scripts/lib/recovery-manifest*.ts`, CLI sinh cùng `pg_dump --snapshot` để
+manifest khớp đúng dump; tệp `*.recovery-v1.json`, không ghi đè) + verifier `npm run audit:verify-dr
+-- --manifest` mở rộng: migration name+SHA256, digest bảng trọng yếu, tổng tiền exact (so chuỗi),
+24 luật FK/mồ côi/lệch org-project, audit chain + watermark, tệp critical (size/hash), tham chiếu
+key, schema objects; RLS che/thiếu quyền → NOT_RUN (không PASS số 0 giả). Marker disposable
+`DR_VERIFY_EXPECTED_MARKER` nay **bắt buộc**. Test PostgreSQL thật: A6-AC02/AC03/AC04 PASS, A6-AC01
+PASS lớp fixture (chưa PITR thật); WAL/RPO/RTO (A6-AC05/Q-AC08) và khả dụng key NOT_RUN → chưa thể
+`completeDrVerified=true` khi chưa có hạ tầng archive/kho key. Sửa kèm: verifier cũ truy vấn bảng
+không tồn tại `engineering_relations` nên `table-counts`/`engineering-relations` luôn FAIL trên
+schema thật. Runbook `docs/ops/backup.md`. Không sửa `backup.sh`/`restore-check.sh`.
+
 ## 2026-10-07 — QUALITY-FINAL-1 S00: inventory scope toàn bộ route API
 
 `scripts/audit-route-inventory.ts` (AST) sinh `docs/nang-cap/AUDIT-2026-09-25/S00-SCOPE-INVENTORY.md`
