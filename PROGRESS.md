@@ -1,5 +1,16 @@
 # PROGRESS — XBoss
 
+## 2026-10-07 — QUALITY-FINAL-1 S09: tiền exact + golden tests
+
+`lib/nen/money.ts` thêm (không đổi nghĩa helper cũ): `isCanonicalDecimal` (validator wire tách
+khỏi parser), `fitsNumeric` (luật tràn numeric(p,s) như PostgreSQL 22003), `ipcSumV1` (SUM exact
+rồi round tổng; tạm ứng/giữ lại tính trên periodValue rồi round từng khoản — A3-FR05).
+Golden/property test A3-AC01..AC04 (3000 mẫu seed cố định, parity PostgreSQL numeric) + golden
+route IPC thật. **Phát hiện lệch trên đường IPC hiện tại (chưa sửa, giao S10)**: `certTotals`
+dùng `mulRate` float → tạm ứng 10,25% × 94,00 ra 9,63 thay vì 9,64; tổng vượt 2^53 mất xu qua
+`moneyToNumber`. Hai ca đánh `todo` trong `tests/money-ipc-golden-route.test.ts` — S10 bỏ `todo`.
+Bẫy SQL ghi cho S10: `round(v*rate/100,2)` làm tròn kép khi v ~10^13 — dùng `*0.01`.
+
 ## 2026-10-07 — QUALITY-FINAL-1 S00: inventory scope toàn bộ route API
 
 `scripts/audit-route-inventory.ts` (AST) sinh `docs/nang-cap/AUDIT-2026-09-25/S00-SCOPE-INVENTORY.md`

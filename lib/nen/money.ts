@@ -127,22 +127,42 @@ export function moneyToNumberSafe(minor: bigint): number {
 }
 
 /**
- * Đọc wire decimal canonical mà KHÔNG quantize. Quantity/rate có scale riêng,
- * không đưa qua parseMoneyExact. Giới hạn cột DB được kiểm riêng tại API.
+ * Validator wire canonical (A3-FR01), tách khỏi parser: true khi `value` là chuỗi đúng
+ * `scale` chữ số lẻ, không số 0 thừa ở đầu, không `+`/`-0`/locale/exponent/NaN/Infinity.
+ * Không throw với dữ liệu sai để API trả 422 rõ ràng; scale sai là lỗi lập trình nên throw.
  */
-export function parseFixedDecimalExact(decimal: string, scale: number): bigint {
+export function isCanonicalDecimal(value: unknown, scale: number): value is string {
   if (!Number.isInteger(scale) || scale < 0 || scale > 18) {
     throw new RangeError("decimal_scale_unsupported");
   }
-  if (typeof decimal !== "string" || decimal.length > 1024) {
-    throw new TypeError("decimal_wire_invalid");
-  }
+  if (typeof value !== "string" || value.length > 1024) return false;
   const pattern =
     scale === 0 ? /^-?(0|[1-9]\d*)$/ : new RegExp(`^-?(0|[1-9]\\d*)\\.\\d{${scale}}$`);
-  if (!pattern.test(decimal)) throw new TypeError("decimal_wire_invalid");
-  const minor = BigInt(decimal.replace(".", ""));
-  if (minor === 0n && decimal.startsWith("-")) throw new TypeError("decimal_wire_invalid");
-  return minor;
+  if (!pattern.test(value)) return false;
+  // "-0", "-0.00": số 0 chỉ có một dạng canonical.
+  return !/^-0(\.0*)?$/.test(value);
+}
+
+/**
+ * Đọc wire decimal canonical mà KHÔNG quantize. Quantity/rate có scale riêng,
+ * không đưa qua parseMoneyExact. Giới hạn cột DB kiểm riêng bằng `fitsNumeric`.
+ */
+export function parseFixedDecimalExact(decimal: string, scale: number): bigint {
+  if (!isCanonicalDecimal(decimal, scale)) throw new TypeError("decimal_wire_invalid");
+  return BigInt(decimal.replace(".", ""));
+}
+
+/**
+ * Giá trị `unscaled` đã ở đúng scale s của cột (vd đồng×100 cho NUMERIC(15,2)) có vừa
+ * NUMERIC(precision, s) không: |unscaled| < 10^precision — cùng luật tràn của PostgreSQL. Dùng
+ * để API trả 422 trước khi ghi, không lén nới cột hay ép float (A3-FR02).
+ */
+export function fitsNumeric(unscaled: bigint, precision: number): boolean {
+  if (!Number.isInteger(precision) || precision < 1 || precision > 1000) {
+    throw new RangeError("numeric_precision_unsupported");
+  }
+  const limit = 10n ** BigInt(precision);
+  return unscaled > -limit && unscaled < limit;
 }
 
 /**
@@ -167,6 +187,50 @@ export function sumMoneyProductsExact(
     sum += quantity * price;
   }
   return mulRatio(sum, 1n, 10n ** BigInt(quantityScale));
+}
+
+/** Một dòng IPC ở dạng wire exact: qty_period NUMERIC(15,3), unit_price NUMERIC(15,2). */
+export type IpcLineV1 = { qtyPeriod: string; unitPrice: string };
+
+/** Tỷ lệ hợp đồng dạng phần trăm NUMERIC(5,2) canonical, vd "10.25" = 1025/10000. */
+export type IpcRatesV1 = { advancePct: string; retentionPct: string };
+
+/** Kết quả ipc-sum-v1, mọi khoản là bigint đồng×100. */
+export type IpcTotalsV1 = {
+  periodValue: bigint;
+  advanceDeduct: bigint;
+  retentionDeduct: bigint;
+  approvedValue: bigint;
+};
+
+const IPC_QTY_SCALE = 3;
+/** Phần trăm scale 2 → tỷ lệ: 10.25% = 1025 / 10000. */
+const PERCENT_SCALE2_DENOMINATOR = 10000n;
+
+/**
+ * Quy tắc chứng từ ipc-sum-v1 (A3-FR05): periodValue = round(SUM(qty × đơn giá), 2) — KHÔNG
+ * round từng dòng; tạm ứng/giữ lại = round(periodValue × rate, 2) từng khoản (ties xa 0);
+ * approvedValue = periodValue − tạm ứng − giữ lại, exact. Không kiểm khoảng nghiệp vụ của
+ * rate (0–100%): đó là việc của API hợp đồng, helper chỉ thi hành đúng công thức.
+ */
+export function ipcSumV1(lines: readonly IpcLineV1[], rates: IpcRatesV1): IpcTotalsV1 {
+  if (!Array.isArray(lines)) throw new TypeError("money_lines_invalid");
+  if (rates === null || typeof rates !== "object") throw new TypeError("ipc_rates_invalid");
+  const advanceRate = parseFixedDecimalExact(rates.advancePct, 2);
+  const retentionRate = parseFixedDecimalExact(rates.retentionPct, 2);
+  const products = lines.map((line) => {
+    if (line === null || typeof line !== "object") throw new TypeError("money_lines_invalid");
+    return { quantity: line.qtyPeriod, unitPrice: line.unitPrice };
+  });
+  const periodValue = sumMoneyProductsExact(products, IPC_QTY_SCALE);
+  const advanceDeduct = mulRatio(periodValue, advanceRate, PERCENT_SCALE2_DENOMINATOR);
+  const retentionDeduct = mulRatio(periodValue, retentionRate, PERCENT_SCALE2_DENOMINATOR);
+  return {
+    periodValue,
+    advanceDeduct,
+    retentionDeduct,
+    approvedValue: periodValue - advanceDeduct - retentionDeduct,
+  };
 }
 
 /** So sánh exact phục vụ sort/filter; chuỗi phải canonical amount scale 2. */
