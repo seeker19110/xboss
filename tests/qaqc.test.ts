@@ -271,6 +271,63 @@ test(
 );
 
 test(
+  "requiredInspectionMissing (S13b): checklist dự án khác không chặn; cùng dự án chặn; legacy project_id NULL vẫn chặn (fail-closed)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { requiredInspectionMissing } = await import("@/lib/ky-thuat/qaqc");
+
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test qaqc scope A')`);
+    const otherProjectId = await insertId(
+      `INSERT INTO projects (name) VALUES ('Test qaqc scope B')`,
+    );
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp scope')`,
+      projectId,
+    );
+    const stId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TESTSCOPE', 'Sheet scope')`,
+      towerId,
+    );
+    const pkgId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'S1', 'Nhóm scope')`,
+      stId,
+    );
+    const taskId = await insertId(
+      `INSERT INTO tasks (package_id, code, name, progress_percent) VALUES (?, 'S1,01', 'Task scope', 1)`,
+      pkgId,
+    );
+    const taoChecklist = (pid: number | null) =>
+      insertId(
+        `INSERT INTO qc_checklists (name, required, items, project_id)
+         VALUES ('Checklist scope', TRUE, '[]'::jsonb, ?)`,
+        pid,
+      );
+
+    const khac = await taoChecklist(otherProjectId);
+    assert.equal(await requiredInspectionMissing(taskId), false, "checklist dự án khác");
+    await run(`DELETE FROM qc_checklists WHERE id = ?`, khac);
+
+    const cung = await taoChecklist(projectId);
+    assert.equal(await requiredInspectionMissing(taskId), true, "checklist cùng dự án");
+    await run(`DELETE FROM qc_checklists WHERE id = ?`, cung);
+
+    const legacy = await taoChecklist(null);
+    assert.equal(await requiredInspectionMissing(taskId), true, "legacy NULL giữ fail-closed");
+    // Lối thoát đối soát: gán checklist legacy về đúng dự án khác → hết chặn dự án này.
+    await run(`UPDATE qc_checklists SET project_id = ? WHERE id = ?`, otherProjectId, legacy);
+    assert.equal(await requiredInspectionMissing(taskId), false);
+    await run(`DELETE FROM qc_checklists WHERE id = ?`, legacy);
+
+    await run(`DELETE FROM tasks WHERE id = ?`, taskId);
+    await run(`DELETE FROM work_packages WHERE id = ?`, pkgId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, stId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, projectId, otherProjectId);
+  },
+);
+
+test(
   "inspection_requests: mã sinh tuần tự YCNT-000N, task chưa 100% không được gắn vào phiếu",
   { skip: !HAS_TEST_DB },
   async () => {

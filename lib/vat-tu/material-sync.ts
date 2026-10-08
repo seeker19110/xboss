@@ -6,7 +6,8 @@ import { getSheetClient, type SheetClient } from "@/lib/vat-tu/google-sheets";
 //
 // Cách hoạt động:
 //  - Mỗi dòng Sheet khớp vật tư qua cột ID (= materials.id). Dòng không ID khớp
-//    theo Mã BOQ, không có thì tạo vật tư mới và ghi ID trả lại Sheet.
+//    theo Mã BOQ, rồi theo vật tư "mồ côi" trùng khớp nội dung (tạo ở lần đồng bộ trước
+//    mà ghi Sheet lỗi); không có thì tạo vật tư mới và ghi ID trả lại Sheet.
 //  - 3-way merge dựa vào snapshot lần đồng bộ trước (bảng material_sync) để biết
 //    phía nào đã đổi. Chỉ DB đổi → đẩy ra Sheet; chỉ Sheet đổi → kéo vào DB; cả
 //    hai đổi (xung đột) → DB thắng (CONFLICT_POLICY), liệt kê trong kết quả.
@@ -400,6 +401,23 @@ export async function runMaterialSync(
       maxSortByType.set(r.sheetTypeId, r.m ?? 0);
     }
 
+    // Vật tư "mồ côi" = có trong DB, CHƯA từng chốt snapshot và KHÔNG có dòng mang ID của nó
+    // trên Sheet — điển hình là vật tư bước này tạo ở lần đồng bộ trước mà bước 4 ghi Sheet
+    // lỗi (ID chưa kịp ghi ngược, snapshot chưa chốt). Không nhận lại thì dòng Sheet không ID
+    // (nhất là dòng KHÔNG có Mã BOQ — không khớp được gì) sinh thêm 1 bản sao mỗi lần chạy lại
+    // (S13b, A5-AC01). Khoá khớp = hệ + TOÀN BỘ trường SYNCED_FIELDS đã chuẩn hoá (sau khi áp
+    // mã BOQ hiệu lực): chỉ dòng trùng khớp hoàn toàn mới được nhận lại, không ghép "gần giống"
+    // (A5-FR01); mỗi vật tư mồ côi chỉ nhận cho đúng 1 dòng. Không xoá/bù trừ vật tư khi ghi
+    // Sheet lỗi: ca "mất ACK" Sheet đã giữ ID — xoá sẽ biến dòng đó thành "ID không còn trong DB".
+    const orphanKey = (sheetTypeId: number | null, f: MaterialFields) =>
+      JSON.stringify([sheetTypeId, ...SYNCED_FIELDS.map((k) => f[k])]);
+    const orphans = new Map<string, DbMaterial[]>();
+    for (const m of dbMaterials) {
+      if (snapshots.has(m.id) || sheetById.has(m.id)) continue;
+      const key = orphanKey(m.sheetTypeId, dbToFields(m));
+      orphans.set(key, [...(orphans.get(key) ?? []), m]);
+    }
+
     for (const { rowNum, row } of newSheetRows) {
       // boqCode/name là trường chuỗi thuần (không parse số/enum), lấy trực tiếp để
       // xác định "khớp với vật tư nào" trước khi biết fallback cho các trường số/status.
@@ -448,22 +466,36 @@ export async function runMaterialSync(
       }
 
       let boqCode: string | null = f.boqCode || null;
+      let takenBy: string | null = null;
       if (boqCode) {
         // Kiểm mã BOQ không bị chiếm bởi task/nhóm/vật tư khác trong tổ chức này.
-        const usedBy = await boqTakenBy(boqCode, orgId);
-        if (usedBy) {
-          summary.skipped.push({
-            row: rowNum,
-            reason: `Mã BOQ "${boqCode}" đã dùng bởi ${usedBy} — tạo vật tư không mã`,
-          });
-          boqCode = null;
-        }
+        takenBy = await boqTakenBy(boqCode, orgId);
+        if (takenBy) boqCode = null;
       }
 
       const sheetCode = String(row[11] ?? "")
         .trim()
         .toLowerCase();
       const sheetTypeId = sheetTypeMap.get(sheetCode) ?? null;
+      const effective = normalizeFields({ ...f, boqCode: boqCode ?? "" });
+
+      // Nhận lại vật tư mồ côi trùng khớp (tạo ở lần đồng bộ lỗi trước) thay vì tạo bản sao.
+      // Bước 1 đã tính nó vào `pushed` + snapshot chờ chốt (= effective vì trùng khớp).
+      const adopted = orphans.get(orphanKey(sheetTypeId, effective))?.shift();
+      if (adopted) {
+        if (takenBy)
+          summary.skipped.push({
+            row: rowNum,
+            reason: `Mã BOQ "${f.boqCode}" đã dùng bởi ${takenBy} — giữ vật tư #${adopted.id} không mã đã tạo ở lần đồng bộ trước`,
+          });
+        continue;
+      }
+      if (takenBy)
+        summary.skipped.push({
+          row: rowNum,
+          reason: `Mã BOQ "${f.boqCode}" đã dùng bởi ${takenBy} — tạo vật tư không mã`,
+        });
+
       const sortOrder = (maxSortByType.get(sheetTypeId) ?? 0) + 1;
       maxSortByType.set(sheetTypeId, sortOrder);
 
@@ -481,10 +513,7 @@ export async function runMaterialSync(
         sortOrder,
       );
 
-      pendingSnapshots.push({
-        id: newId,
-        fields: normalizeFields({ ...f, boqCode: boqCode ?? "" }),
-      });
+      pendingSnapshots.push({ id: newId, fields: effective });
       summary.created++;
     }
 

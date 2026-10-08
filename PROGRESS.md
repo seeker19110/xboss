@@ -1,5 +1,38 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S13b: vá phạm vi QA nghiệm thu + đồng bộ vật tư không nhân bản
+
+Vá 2 lỗi thật S13a đánh `todo` cho S13b; hai ca đã gỡ `todo` (nay là cổng chặn thường), đỏ trên
+code cũ → xanh. Không migration, không đổi API/route, không đụng IPC/payment-certs (S13c).
+
+- **A5-FR04 phạm vi QA** (`lib/ky-thuat/qaqc.ts` `requiredInspectionMissing`): chỉ tính checklist
+  `required` CÙNG dự án với task (task → nhóm → sheet → `towers.project_id`) — checklist dự án A
+  hết chặn vĩnh viễn nghiệm thu dự án B cùng hệ. Đã rà caller/route anh em: `tasks/:id/approve`
+  và `approvals` (tầng) đều đi qua hàm này; `qc/checklists` GET/POST/PATCH/DELETE và
+  `qc/inspections` GET/POST đã lọc dự án sẵn (không cùng lớp lỗi). **Quyết định checklist legacy
+  `project_id IS NULL`:** giữ **fail-closed** (A1-FR06 — không suy ra được scope thì không coi là
+  "không áp dụng"), vẫn chặn nghiệm thu; mỗi lần chặn ghi `log.warn` kèm `checklistIds` để vận hành
+  đối soát. Lối thoát (không cần sửa code): gán `qc_checklists.project_id` về đúng dự án sở hữu,
+  hoặc `required/active = FALSE` — sau đó dự án không sở hữu hết bị chặn. Thực tế không có dòng
+  NULL mới: mọi route tạo checklist gán `project_id` từ M22, migration 0027 đã backfill.
+- **A5-AC01 đồng bộ vật tư** (`lib/vat-tu/material-sync.ts` `runMaterialSync`): dòng Sheet không ID
+  (nhất là không Mã BOQ) giờ **nhận lại vật tư "mồ côi"** — vật tư có trong DB, chưa từng chốt
+  snapshot, không có dòng mang ID trên Sheet (tạo ở lần đồng bộ trước mà ghi Sheet lỗi) — khi
+  trùng khớp **toàn bộ** `SYNCED_FIELDS` đã chuẩn hoá (sau mã BOQ hiệu lực) + cùng hệ; mỗi vật tư
+  nhận đúng 1 dòng. Không chọn xoá/bù trừ vật tư khi ghi lỗi: ca "mất ACK" Sheet đã giữ ID, xoá
+  sẽ làm mất dòng; transaction cũng hỏng ca đó. 3-way merge, `CONFLICT_POLICY`, `sync_locks`,
+  snapshot-sau-ghi, `qty_used` chỉ DB→Sheet giữ nguyên. Giới hạn đã biết: nếu người dùng SỬA dòng
+  giữa lần lỗi và lần chạy lại thì không trùng khớp → vẫn tạo mới như trước (không ghép "gần
+  giống", A5-FR01); vật tư tạo trong app chưa từng đồng bộ mà trùng khớp hoàn toàn 1 dòng Sheet
+  không ID cũng được ghép (thay vì nhân đôi như trước).
+- **Test** (Postgres 16 cục bộ, mỗi file 1 DB): `s13a-chuoi-tien-do-nghiem-thu` 13/13,
+  `s13a-chuoi-dong-bo-vat-tu` 5/5 (+2 ca mới: 2 dòng trùng nội dung → đúng 2 vật tư; mã BOQ bị task
+  chiếm → không nhân), `qaqc` 10/10 (+1 ca: dự án khác không chặn / cùng dự án chặn / NULL vẫn chặn
+  - lối thoát đối soát); các ca mới đều đỏ trên code cũ. Hồi quy xanh: route-nghiem-thu-_,
+    route-qc-de-xuat, qc-project-scope, approvals_, route-tien-do*, material-sync, materials-*,
+    route-vat-tu-2, route-boq-vat-tu, sync-locks, google-sheets; `s13a-chuoi-ipc-thanh-toan` giữ 5
+    todo của S13c.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S13a: bộ hồi quy chuỗi nghiệp vụ A5 (chỉ test)
 
 Ba file test mới đi qua **route handler thật** với đúng người bấm (TRAPS.md §6), fixture dùng chung
@@ -23,7 +56,7 @@ Bảng map AC → ca (file `tests/s13a-chuoi-*.test.ts`, ★ = todo):
 - **A5-AC09** — kỹ sư/subcon(được giao) tick, bch/cdt/viewer không tick; chỉ Admin/PM nghiệm thu khi không có luồng; kỹ sư/subcon/cdt/viewer 403 lập/sửa/trình/duyệt/xem IPC + chi phí kể cả gửi `acknowledged`; BCH xem được, không duyệt. Phần UI (keyboard/mobile/hiển thị 409) = NOT_RUN (lớp B/M)
 - **Q-AC06 (IPC)** — golden 0.001×5.00 đã có ở `money-ipc-golden-route.test.ts` (S09/S10a); chuỗi S13a không lặp lại
 
-- **Còn mở — lỗi thật tái hiện (todo, cho S13b):** (1) `requiredInspectionMissing` không lọc
+- **~~Còn mở~~ đã vá ở S13b (mục trên) — lỗi thật tái hiện (todo, cho S13b):** (1) `requiredInspectionMissing` không lọc
   `qc_checklists.project_id` → checklist bắt buộc của dự án A chặn vĩnh viễn nghiệm thu dự án B cùng
   hệ (409, B không lập được phiếu cho checklist của A); (2) `runMaterialSync` INSERT vật tư từ dòng
   Sheet chưa có ID trước `writeRows`, không transaction/bù trừ → ghi lỗi rồi chạy lại nhân bản dòng

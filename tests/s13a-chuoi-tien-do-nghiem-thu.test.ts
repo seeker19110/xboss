@@ -12,11 +12,10 @@ import { SoFixture, jreq, P, goi, type NguoiTest } from "./helpers/chuoi-nghiep-
 // PM nghiệm thu 2 bước (POST /api/tasks/:id/approve, task phải 100%, QA bắt buộc Đạt, luồng
 // duyệt M46 nếu có). Chỉ cây WBS và phụ thuộc hold-point là dữ liệu đầu vào chèn bằng SQL.
 //
-// Ca ĐỎ trên code hiện tại (lỗi thật, sửa ở S13b) được đánh `todo` — KHÔNG skip (release-gate
-// coi skip là lỗi) — kèm mô tả lỗi; khi S13b vá xong phải gỡ `todo` để ca thành cổng chặn.
+// Ca từng ĐỎ (đánh `todo` ở S13a) đã được S13b vá — nay là cổng chặn thường: checklist QA bắt
+// buộc chỉ áp cho task cùng dự án (requiredInspectionMissing lọc qc_checklists.project_id).
 
 const S = { skip: !HAS_TEST_DB };
-const TODO = (lyDo: string) => ({ skip: !HAS_TEST_DB, todo: lyDo });
 
 test.after(() => dangXuat());
 
@@ -249,12 +248,7 @@ test(
 
 test(
   "A5-FR04 phạm vi QA: checklist bắt buộc của dự án KHÁC (cùng hệ) không được chặn nghiệm thu dự án này",
-  TODO(
-    "S13b: requiredInspectionMissing (lib/ky-thuat/qaqc.ts) không lọc qc_checklists.project_id — " +
-      "checklist required của dự án A chặn vĩnh viễn nghiệm thu mọi task cùng hệ (hoặc mọi hệ nếu " +
-      "system_id NULL) ở dự án B, mà B không thể lập phiếu cho checklist của A (POST " +
-      "/api/qc/inspections đòi checklist cùng dự án) → 409 không lối thoát",
-  ),
+  S,
   async () => {
     const f = new SoFixture();
     try {

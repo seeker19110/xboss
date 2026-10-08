@@ -2,6 +2,7 @@
 // Logic tách khỏi route để dùng chung cho POST approve/approvals + các route ghi tiến độ
 // (dimensions/:id, dimensions/batch, tasks/:id/progress) — cùng pattern lib/boq.ts/lib/cost.ts.
 import { query, queryOne } from "@/lib/db";
+import { log } from "@/lib/nen/log";
 
 export type HandoverCheck = { blocked: boolean; reason?: string };
 
@@ -69,30 +70,47 @@ export async function packagesWithQcBlock(
 // Gate nghiệm thu: task chỉ bị chặn approve nếu có ÍT NHẤT 1 checklist mẫu đang bật `required`
 // áp dụng cho hệ của task mà CHƯA có inspection `passed` gắn đúng checklist đó + đúng task.
 // (đã quyết 2026-07-05: gate theo cờ required của mẫu, không phải công tắc toàn dự án.)
+//
+// Phạm vi dự án (S13b, A5-FR04): chỉ checklist CÙNG dự án với task (task → work_package →
+// sheet_type → tower.project_id) — checklist của dự án khác không được chặn, vì dự án này
+// không lập được phiếu cho checklist đó (POST /api/qc/inspections đòi checklist cùng dự án).
+// Checklist legacy `project_id IS NULL` (mọi route đều gán project_id từ M22; migration 0027 đã
+// backfill) không suy ra được scope → giữ fail-closed (A1-FR06): vẫn chặn, kèm log cảnh báo nêu
+// id để vận hành đối soát (gán project_id hoặc tắt `required`) — không âm thầm mở gate.
 export async function requiredInspectionMissing(taskId: number): Promise<boolean> {
-  const task = await queryOne<{ systemId: number | null }>(
-    `SELECT st.system_id AS "systemId"
+  const task = await queryOne<{ systemId: number | null; projectId: number | null }>(
+    `SELECT st.system_id AS "systemId", tw.project_id AS "projectId"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
+       LEFT JOIN towers tw ON tw.id = st.tower_id
       WHERE t.id = ?`,
     taskId,
   );
   if (!task) return false;
 
-  const missing = await queryOne<{ count: number }>(
-    `SELECT COUNT(*)::int AS count
+  const missing = await query<{ id: number; legacy: boolean }>(
+    `SELECT c.id, (c.project_id IS NULL) AS legacy
        FROM qc_checklists c
       WHERE c.active = TRUE AND c.required = TRUE
         AND (c.system_id IS NULL OR c.system_id = ?)
+        AND (c.project_id = ? OR c.project_id IS NULL)
         AND NOT EXISTS (
           SELECT 1 FROM qc_inspections i
            WHERE i.checklist_id = c.id AND i.task_id = ? AND i.status = 'passed'
-        )`,
+        )
+      ORDER BY c.id`,
     task.systemId,
+    task.projectId,
     taskId,
   );
-  return (missing?.count ?? 0) > 0;
+  const legacyIds = missing.filter((c) => c.legacy).map((c) => c.id);
+  if (legacyIds.length > 0)
+    log.warn("Checklist QA bắt buộc chưa gắn dự án (legacy) đang chặn nghiệm thu — cần đối soát", {
+      taskId,
+      checklistIds: legacyIds,
+    });
+  return missing.length > 0;
 }
 
 // Gate biện pháp thi công (M8): package đánh dấu requires_method_statement chỉ tick

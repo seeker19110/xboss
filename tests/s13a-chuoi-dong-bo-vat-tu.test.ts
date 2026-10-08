@@ -2,7 +2,7 @@ import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { SheetClient } from "@/lib/vat-tu/google-sheets";
-import { uniq } from "./helpers/chuoi-nghiep-vu";
+import { SoFixture, uniq } from "./helpers/chuoi-nghiep-vu";
 
 // QUALITY-FINAL-1 S13a — hồi quy A5-AC01: đồng bộ vật tư ↔ Google Sheet chạy lại sau lỗi ghi
 // từ xa không được nhân dữ liệu, và snapshot 3-way merge không được đi trước sự thật.
@@ -13,10 +13,10 @@ import { uniq } from "./helpers/chuoi-nghiep-vu";
 //   - "từ chối": writeRows lỗi, Sheet KHÔNG đổi (mạng rớt trước khi Google nhận).
 //   - "mất ACK": Sheet ĐÃ ghi nhưng client nhận lỗi (timeout sau khi Google commit).
 //
-// Ca ĐỎ trên code hiện tại đánh `todo` (KHÔNG skip) kèm mô tả lỗi — sửa ở S13b.
+// Ca từng ĐỎ (đánh `todo` ở S13a: dòng không Mã BOQ bị nhân bản khi chạy lại) đã được S13b vá —
+// nay là cổng chặn thường.
 
 const S = { skip: !HAS_TEST_DB };
-const TODO = (lyDo: string) => ({ skip: !HAS_TEST_DB, todo: lyDo });
 
 const HEADER = [
   "ID",
@@ -36,8 +36,9 @@ const HEADER = [
 type KieuLoi = "tu-choi" | "mat-ack";
 
 /** Sheet giả trong bộ nhớ: lần ghi ĐẦU lỗi theo `kieuLoi`, các lần sau thành công. */
-function sheetGia(dongMoi: string[], kieuLoi: KieuLoi) {
-  let rows: string[][] = [HEADER, dongMoi];
+function sheetGia(dongMoi: string[] | string[][], kieuLoi: KieuLoi) {
+  const dong = (Array.isArray(dongMoi[0]) ? dongMoi : [dongMoi]) as string[][];
+  let rows: string[][] = [HEADER, ...dong];
   let lanGhi = 0;
   const client: SheetClient = {
     tab: "VatTu",
@@ -141,12 +142,7 @@ test(
 
 test(
   "A5-AC01: ghi Sheet bị từ chối → chạy lại với dòng KHÔNG có Mã BOQ không được nhân vật tư",
-  TODO(
-    "S13b: runMaterialSync (lib/vat-tu/material-sync.ts) INSERT vật tư mới từ dòng Sheet chưa có ID " +
-      "TRƯỚC khi writeRows, không bọc transaction/không bù trừ — ghi Sheet lỗi thì vật tư đã tạo " +
-      "vẫn ở DB còn dòng Sheet vẫn chưa có ID; dòng không Mã BOQ không khớp được gì nên mỗi lần " +
-      "chạy lại tạo thêm 1 bản sao",
-  ),
+  S,
   async () => {
     const ten = uniq("VT-S13A-NOCODE-");
     try {
@@ -157,6 +153,57 @@ test(
       assert.equal(sau.length, 1, `nhân bản vật tư sau khi chạy lại: ${sau.length} bản ghi`);
     } finally {
       await don(ten);
+    }
+  },
+);
+
+test(
+  "A5-AC01: hai dòng không Mã BOQ trùng nội dung → lỗi rồi chạy lại vẫn đúng 2 vật tư (mỗi bản nhận đúng 1 dòng)",
+  S,
+  async () => {
+    const ten = uniq("VT-S13B-DOI-");
+    try {
+      const client = sheetGia([dongTay(ten), dongTay(ten)], "tu-choi");
+      assert.equal(await dongBo(client), "loi");
+      assert.equal((await vatTuTheoTen(ten)).length, 2);
+      assert.equal(await dongBo(client), "ok");
+      const sau = await vatTuTheoTen(ten);
+      assert.equal(sau.length, 2, `hai dòng thật trên Sheet phải còn đúng 2 vật tư: ${sau.length}`);
+      assert.ok(sau.every((v) => v.snap));
+      assert.equal(await dongBo(client), "ok", "chạy lần 3 (Sheet đã có ID) vẫn ổn định");
+      assert.equal((await vatTuTheoTen(ten)).length, 2);
+    } finally {
+      await don(ten);
+    }
+  },
+);
+
+test(
+  "A5-AC01: dòng mang Mã BOQ đã bị task chiếm → tạo vật tư không mã; lỗi rồi chạy lại không nhân bản",
+  S,
+  async () => {
+    const f = new SoFixture();
+    const ten = uniq("VT-S13B-CHIEM-");
+    try {
+      const { run } = await import("@/lib/db");
+      const duAn = await f.duAn("vt-chiem");
+      const cay = await f.wbs(duAn, { soO: 1 });
+      const ma = uniq("BOQS13B");
+      await run(`UPDATE tasks SET boq_code = ? WHERE id = ?`, ma, cay.taskId);
+
+      const client = sheetGia(dongTay(ten, ma), "tu-choi");
+      assert.equal(await dongBo(client), "loi");
+      assert.equal(await dongBo(client), "ok");
+      const { query } = await import("@/lib/db");
+      const sau = await query<{ boqCode: string | null }>(
+        `SELECT boq_code AS "boqCode" FROM materials WHERE name = ?`,
+        ten,
+      );
+      assert.equal(sau.length, 1, `mã bị chiếm + chạy lại nhân bản vật tư: ${sau.length}`);
+      assert.equal(sau[0].boqCode, null, "vật tư không được lấy mã đã thuộc task");
+    } finally {
+      await don(ten);
+      await f.don();
     }
   },
 );
