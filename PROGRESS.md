@@ -15,6 +15,9 @@ Không migration, không đổi format `{ error: "<tiếng Việt>" }`, không t
 - **Chặn đường 500 tại chỗ:** materials/batch, tasks/batch (4xx theo regex giữ nguyên), materials/sync,
   cron/{sync-sheets,deliver-webhooks,retention}; cron/sync-integrations + cron/refresh-views không đưa message
   thô vào body kết quả.
+  Riêng lỗi thiếu/sai biến môi trường Google Sheets (lớp mới `LoiCauHinhGoogleSheets` trong
+  `lib/vat-tu/google-sheets.ts`, thông điệp chỉ nêu tên biến, không secret) vẫn trả nguyên văn ở
+  materials/sync + cron/sync-sheets để Admin/PM biết cần cấu hình gì (bắt bởi `route-vat-tu-2`).
 - **`POST /api/proposals`:** tạo đề xuất + mở approval cùng 1 transaction; amount so ngưỡng đọc lại `amount::text`
   qua `resyncApprovalAmount` (MoneyMinor exact, như S13d/S13e), tràn/mất chính xác -> 422 và rollback đề xuất.
 - **Test:** `tests/route-loi-500-khong-lo-tho.test.ts` (tenders/award + materials/sync 500 chung vs 4xx giữ,

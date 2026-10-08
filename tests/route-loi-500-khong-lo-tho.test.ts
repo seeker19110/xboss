@@ -92,8 +92,10 @@ test("S15a: materials/sync — lỗi bất ngờ ra 500 thông điệp chung; sc
       super(m);
     }
   }
+  class LoiCauHinhGoogleSheets extends Error {}
   const nap = (runMaterialSync: () => Promise<unknown>) =>
     load<{ POST(): Promise<Response> }>("app/api/materials/sync/route.ts", {
+      "@/lib/vat-tu/google-sheets": { LoiCauHinhGoogleSheets },
       "next/server": { NextResponse: { json: Response.json } },
       "@/lib/bao-mat/auth": { getCurrentUser: async () => ({ id: 1, role: "pm", orgId: 1 }) },
       "@/lib/ha-tang/projects": { getCurrentProjectIdStrict: async () => 1 },
@@ -112,6 +114,13 @@ test("S15a: materials/sync — lỗi bất ngờ ra 500 thông điệp chung; sc
   }).POST();
   assert.equal(loiScope.status, 409);
   assert.deepEqual(await loiScope.json(), { error: "Sheet gắn dự án khác" });
+
+  // Thiếu cấu hình: thông điệp chỉ nêu tên biến (không secret) → giữ nguyên văn cho Admin/PM.
+  const loiCauHinh = await nap(async () => {
+    throw new LoiCauHinhGoogleSheets("Thiếu GOOGLE_SHEET_ID — ID của Google Sheet cần đồng bộ.");
+  }).POST();
+  assert.equal(loiCauHinh.status, 500);
+  assert.match(((await loiCauHinh.json()) as { error: string }).error, /Thiếu GOOGLE_SHEET_ID/);
 });
 
 test("S15a: phanHoiLoiCoStatus — 4xx giữ thông điệp+code, còn lại 500 chung", async () => {

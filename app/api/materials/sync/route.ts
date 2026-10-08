@@ -3,6 +3,7 @@ import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
 import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { runMaterialSync, MaterialSyncScopeError } from "@/lib/vat-tu/material-sync";
+import { LoiCauHinhGoogleSheets } from "@/lib/vat-tu/google-sheets";
 import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,10 @@ export async function POST() {
   } catch (e) {
     if (e instanceof MaterialSyncScopeError)
       return NextResponse.json({ error: e.message }, { status: e.status });
+    // Thiếu/sai biến môi trường: thông điệp chỉ nêu tên biến (không secret) → trả nguyên văn để
+    // Admin/PM biết cần cấu hình gì; lỗi khác chỉ log, trả thông điệp chung.
+    if (e instanceof LoiCauHinhGoogleSheets)
+      return NextResponse.json({ error: e.message }, { status: 500 });
     const msg = e instanceof Error ? e.message : "Lỗi đồng bộ Google Sheet";
     log.error("POST /api/materials/sync lỗi", { route: "POST /api/materials/sync", err: msg });
     return NextResponse.json({ error: "Lỗi đồng bộ Google Sheet" }, { status: 500 });
