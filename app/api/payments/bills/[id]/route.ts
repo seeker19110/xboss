@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, withProjectScope } from "@/lib/db";
 import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
-import { moneyInputErrorBody, parseOptionalMoneyInput, type MoneyInput } from "@/lib/nen/money";
+import {
+  moneyInputErrorBody,
+  parseOptionalMoneyInput,
+  parseQuantityInput,
+  quantityInputErrorBody,
+  type MoneyInput,
+} from "@/lib/nen/money";
 
 export const dynamic = "force-dynamic";
 
@@ -66,9 +72,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     args.push(String(b.unit).trim() || null);
   }
   if (b.quantity !== undefined) {
-    const q = b.quantity === "" || b.quantity == null ? null : Number(b.quantity);
-    sets.push("quantity = ?");
-    args.push(q != null && Number.isFinite(q) && q >= 0 ? q : null);
+    // Rỗng/null = xoá; sai dạng/âm → 400 `quantity_invalid`, tràn NUMERIC(15,3) → 422.
+    let q: string | null;
+    try {
+      q = parseQuantityInput(b.quantity);
+    } catch (err) {
+      const loi = quantityInputErrorBody(err);
+      if (loi) return NextResponse.json(loi.body, { status: loi.status });
+      throw err;
+    }
+    sets.push("quantity = ?::numeric");
+    args.push(q);
   }
   if (b.labor !== undefined) {
     // S10 (A3-FR01/FR02): rỗng/null = xoá; "1.234" kiểu vi-VN → 400; vượt NUMERIC(15,2) → 422

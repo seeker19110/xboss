@@ -423,3 +423,73 @@ export function parseOptionalMoneyInput(
   if (typeof value === "string" && value.trim() === "") return null;
   return parseMoneyInput(value, opts);
 }
+
+// ===== S10 — ĐẦU VÀO khối lượng (NUMERIC(15,3), không phải tiền) =====
+
+export type QuantityInputErrorCode =
+  "quantity_invalid" | "quantity_locale_format" | "quantity_scale" | "quantity_overflow";
+
+/** Lỗi đọc khối lượng nhập: 400 = sai dạng/quá số lẻ/âm; 422 = vượt NUMERIC(15,3) (≥ 10^12). */
+export class QuantityInputError extends Error {
+  readonly status: 400 | 422;
+  readonly code: QuantityInputErrorCode;
+  constructor(code: QuantityInputErrorCode, message: string) {
+    super(message);
+    this.name = "QuantityInputError";
+    this.code = code;
+    this.status = code === "quantity_overflow" ? 422 : 400;
+  }
+}
+
+/** Thân + mã HTTP khi `err` là lỗi nhập khối lượng; lỗi khác → null (route ném tiếp). */
+export function quantityInputErrorBody(
+  err: unknown,
+): { status: 400 | 422; body: { error: string; code: QuantityInputErrorCode } } | null {
+  if (!(err instanceof QuantityInputError)) return null;
+  return { status: err.status, body: { error: err.message, code: err.code } };
+}
+
+/**
+ * Đọc khối lượng tuỳ chọn cho cột NUMERIC(15,3): rỗng (undefined/null/"") → null; trả chuỗi
+ * canonical 3 số lẻ, không qua float. Cùng luật chuỗi với `parseMoneyInput`: dấu phẩy, nhiều dấu
+ * chấm và dạng nhóm nghìn vi-VN ("1.500" — mơ hồ 1500 hay 1,5) → 400 `quantity_locale_format`;
+ * sai dạng/NaN/âm → 400 `quantity_invalid`; quá 3 số lẻ → 400 `quantity_scale`; vượt cột →
+ * 422 `quantity_overflow`.
+ */
+export function parseQuantityInput(value: unknown, label = "Khối lượng"): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  const loi = (code: QuantityInputErrorCode, msg: string) => new QuantityInputError(code, msg);
+  let raw: string;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw loi("quantity_invalid", `${label} không hợp lệ`);
+    raw = String(value);
+    if (/e/i.test(raw)) {
+      throw Math.abs(value) >= 1
+        ? loi("quantity_overflow", `${label} vượt giới hạn lưu trữ`)
+        : loi("quantity_scale", `${label} chỉ được tối đa 3 chữ số thập phân`);
+    }
+  } else if (typeof value === "string") {
+    raw = value.trim();
+    if (raw.includes(",") || raw.indexOf(".") !== raw.lastIndexOf(".") || NHOM_NGHIN_VI.test(raw)) {
+      throw loi(
+        "quantity_locale_format",
+        `${label} không được dùng dấu phẩy hay dấu chấm nhóm nghìn — gửi số thuần, vd 1234.5`,
+      );
+    }
+  } else {
+    throw loi("quantity_invalid", `${label} không hợp lệ`);
+  }
+  const m = THAP_PHAN_NHAP.exec(raw);
+  if (!m) throw loi("quantity_invalid", `${label} không hợp lệ — nhập số thuần, vd 12.5`);
+  const [, dau, nguyen, le = ""] = m;
+  if (/[1-9]/.test(le.slice(3))) {
+    throw loi("quantity_scale", `${label} chỉ được tối đa 3 chữ số thập phân`);
+  }
+  const unscaled = BigInt(nguyen + le.slice(0, 3).padEnd(3, "0"));
+  if (dau && unscaled !== 0n) throw loi("quantity_invalid", `${label} phải ≥ 0`);
+  if (!fitsNumeric(unscaled, 15)) {
+    throw loi("quantity_overflow", `${label} vượt giới hạn lưu trữ (tối đa 12 chữ số phần nguyên)`);
+  }
+  return decimalFromUnscaled(unscaled, 3);
+}

@@ -15,6 +15,13 @@ const API_BASE = "https://sheets.googleapis.com/v4/spreadsheets";
 
 export type SheetCredentials = { email: string; privateKey: string };
 
+/**
+ * Lỗi THIẾU/SAI cấu hình Google Sheets (biến môi trường). Thông điệp chỉ nêu tên biến cần đặt,
+ * không chứa giá trị secret — route được phép trả nguyên văn cho Admin/PM để biết phải cấu hình
+ * gì (khác lỗi hệ thống/HTTP của Google, vốn chỉ log và trả thông điệp chung).
+ */
+export class LoiCauHinhGoogleSheets extends Error {}
+
 // Đọc + kiểm cấu hình; thiếu là ném lỗi tiếng Việt rõ ràng (chủ đích fail-fast).
 function readCredentials(): SheetCredentials {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim();
@@ -23,17 +30,19 @@ function readCredentials(): SheetCredentials {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON không phải JSON hợp lệ.");
+      throw new LoiCauHinhGoogleSheets("GOOGLE_SERVICE_ACCOUNT_JSON không phải JSON hợp lệ.");
     }
     if (!parsed.client_email || !parsed.private_key)
-      throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON thiếu client_email hoặc private_key.");
+      throw new LoiCauHinhGoogleSheets(
+        "GOOGLE_SERVICE_ACCOUNT_JSON thiếu client_email hoặc private_key.",
+      );
     return { email: parsed.client_email, privateKey: normalizeKey(parsed.private_key) };
   }
 
   const email = process.env.GOOGLE_SA_EMAIL?.trim();
   const privateKey = process.env.GOOGLE_SA_PRIVATE_KEY?.trim();
   if (!email || !privateKey)
-    throw new Error(
+    throw new LoiCauHinhGoogleSheets(
       "Thiếu cấu hình Google Sheets — cần GOOGLE_SERVICE_ACCOUNT_JSON hoặc cặp GOOGLE_SA_EMAIL + GOOGLE_SA_PRIVATE_KEY.",
     );
   return { email, privateKey: normalizeKey(privateKey) };
@@ -44,7 +53,8 @@ const normalizeKey = (k: string) => k.replace(/\\n/g, "\n");
 
 function readSheetId(): string {
   const id = process.env.GOOGLE_SHEET_ID?.trim();
-  if (!id) throw new Error("Thiếu GOOGLE_SHEET_ID — ID của Google Sheet cần đồng bộ.");
+  if (!id)
+    throw new LoiCauHinhGoogleSheets("Thiếu GOOGLE_SHEET_ID — ID của Google Sheet cần đồng bộ.");
   return id;
 }
 

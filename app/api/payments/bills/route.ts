@@ -10,6 +10,8 @@ import {
   parseMoneyExact,
   parseMoneyInput,
   parseOptionalMoneyInput,
+  parseQuantityInput,
+  quantityInputErrorBody,
   type MoneyInput,
 } from "@/lib/nen/money";
 import {
@@ -193,8 +195,15 @@ export async function POST(req: NextRequest) {
   if (progress > 1) progress = 1;
 
   const unit = (b?.unit ?? "").trim() || (type === "bill" ? "LS" : type === "item" ? "Lô" : null);
-  let quantity = b?.quantity != null && b.quantity !== "" ? Number(b.quantity) : null;
-  if (quantity != null && (!Number.isFinite(quantity) || quantity < 0)) quantity = null;
+  // Khối lượng NUMERIC(15,3): rỗng → null; sai dạng/âm → 400, tràn ≥ 10^12 → 422 (trước đây 500).
+  let quantity: string | null;
+  try {
+    quantity = parseQuantityInput(b?.quantity);
+  } catch (err) {
+    const loi = quantityInputErrorBody(err);
+    if (loi) return NextResponse.json(loi.body, { status: loi.status });
+    throw err;
+  }
   // Bill theo tầng: amount = contractValue × pct tính TRONG SQL (S10c) — amount client gửi bị bỏ
   // qua. Loại khác (phát sinh/tạm ứng, bill không gắn tầng): amount nhập tay.
   const theoTang = type === "bill" && sheetTypeId != null && !!floorLabel && pctThisPeriod > 0;
@@ -287,7 +296,7 @@ export async function POST(req: NextRequest) {
            (responsible, type, period, amount, description, paid_date,
             progress_snapshot, note, unit, quantity, labor,
             sheet_type_id, floor_label, pct_this_period, created_by, project_id)
-    VALUES (?, ?, ?, ?::numeric, ?, ?, ?, ?, ?, ?, ?::numeric, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?::numeric, ?, ?, ?, ?, ?, ?::numeric, ?::numeric, ?, ?, ?, ?, ?)
     RETURNING id, amount::text AS amount`,
         responsible,
         type,

@@ -1,5 +1,41 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S15a: route không lộ lỗi thô ở 500
+
+Không migration, không đổi format `{ error: "<tiếng Việt>" }`, không thêm dependency.
+
+- **Gốc lỗi:** `phanHoiLoi` (lib/nen/loi.ts) trả nguyên `err.message` ở nhánh 500, và ~20 route tự viết
+  `{ error: e.message ?? String(err) }, { status: e.status ?? 500 }` -> thông điệp pg/nội bộ ra client.
+  Nay `phanHoiLoi` log (`lib/nen/log.ts`) + trả 500 thông điệp chung ("Lỗi hệ thống" hoặc tham số route);
+  thêm `phanHoiLoiCoStatus` cho lỗi kiểu cũ `Object.assign(new Error, { status 4xx, code? })` (giữ thông điệp + code
+  ở 4xx, mọi thứ khác -> 500 chung; không tin status >= 500).
+- **Route đổi sang helper:** qc/inspections/[id], inspection-requests/[id], handover-items/[id], tasks/[id]/approve
+  (2 chỗ), diaries/[date], diaries/[date]/lock (2 chỗ), variations/[id]/submit, commissioning/[id],
+  tenders/[id]/award (giữ `code`), approvals (POST).
+- **Chặn đường 500 tại chỗ:** materials/batch, tasks/batch (4xx theo regex giữ nguyên), materials/sync,
+  cron/{sync-sheets,deliver-webhooks,retention}; cron/sync-integrations + cron/refresh-views không đưa message
+  thô vào body kết quả.
+  Riêng lỗi thiếu/sai biến môi trường Google Sheets (lớp mới `LoiCauHinhGoogleSheets` trong
+  `lib/vat-tu/google-sheets.ts`, thông điệp chỉ nêu tên biến, không secret) vẫn trả nguyên văn ở
+  materials/sync + cron/sync-sheets để Admin/PM biết cần cấu hình gì (bắt bởi `route-vat-tu-2`).
+- **`POST /api/proposals`:** tạo đề xuất + mở approval cùng 1 transaction; amount so ngưỡng đọc lại `amount::text`
+  qua `resyncApprovalAmount` (MoneyMinor exact, như S13d/S13e), tràn/mất chính xác -> 422 và rollback đề xuất.
+- **Test:** `tests/route-loi-500-khong-lo-tho.test.ts` (tenders/award + materials/sync 500 chung vs 4xx giữ,
+  `phanHoiLoiCoStatus`, proposals exact — ca DB cần TEST_DATABASE_URL); cập nhật `tests/loi.test.ts`.
+
+## 2026-10-08 — QUALITY-FINAL-1 S10: parser khối lượng bill (đóng "Còn mở" đầu vào tiền)
+
+Rà lại danh sách "Còn mở (chưa chuyển parser)" của S10 đầu vào: claims, bảo lãnh, gói thầu, BOQ,
+báo giá kỹ thuật đã chuyển ở mục "phần 2" bên dưới (cùng ngày, đã nằm trong nhánh gốc); proposals/VO
+cũng đã có. Còn lại duy nhất `quantity` của bill (NUMERIC(15,3), không phải tiền): thêm
+`parseQuantityInput`/`QuantityInputError`/`quantityInputErrorBody` (`lib/nen/money.ts`) — rỗng → null;
+dấu phẩy/nhiều dấu chấm/"1.500" → 400 `quantity_locale_format`; sai dạng/âm → 400
+`quantity_invalid`; quá 3 số lẻ → 400 `quantity_scale`; ≥ 10^12 → **422 `quantity_overflow`**
+(trước đây PG tràn → 500; số âm/chữ rác trước đây lặng lẽ thành null). Áp cho `POST
+/api/payments/bills` và `PATCH /api/payments/bills/:id`; ghi chuỗi canonical, `?::numeric`. Test:
+ca mới trong `tests/s10-tien-dau-vao-route.test.ts` (route thật). `pctThisPeriod` vẫn kẹp 0..1 bằng
+number (không phải tiền, ngoài phạm vi).
+
 ## 2026-10-08 — QUALITY-FINAL-1 S13e: đề xuất + VO dùng engine phê duyệt như IPC
 
 Đóng phần "Còn mở" của S13d (spec cha `docs/nang-cap/AUDIT-2026-09-25/` A4/A5). Không migration, không
@@ -395,12 +431,7 @@ Không migration, không đổi kiểu cột, không reprice lịch sử.
   Gỡ `FOR UPDATE` → ca đồng thời đỏ 2/3 lần; có khoá xanh 5/5. Cập nhật test theo hợp đồng mới:
   `s10c-thanh-toan-money`, `finance`, `contracts`, `route-tai-chinh` (ca "lỗi DB khác 23505" đổi sang
   ngày 2026-02-30), `route-tai-chinh-3a`/`3b`. Bộ liên quan 34 file chạy tuần tự: 759 pass / 0 fail.
-- **Còn mở (chưa chuyển parser):** claims (`lib/tai-chinh/claims.ts` amountRequested,
-  `app/api/claims/[id]/settle` amountSettled), proposals (`lib/tai-chinh/proposals.ts` amount),
-  bảo lãnh (`lib/tai-chinh/insurance.ts` value), VO (`lib/tai-chinh/vo.ts` dòng unitPrice), gói thầu
-  (`app/api/tenders/[id]/bids/**` unitPrice), BOQ (`app/api/boq/route.ts` unitPrice/subUnitPrice — còn
-  `|| 0`), engineering bidding quotes (`totalAmountVnd`); `quantity` bill (NUMERIC(15,3)) vẫn
-  `Number()` — tràn ≥ 10^12 vẫn 500; `pctThisPeriod` vẫn kẹp 0..1 bằng number (không phải tiền).
+- ~~Còn mở (chưa chuyển parser)~~ đã đóng: phần 2 (claims/bảo lãnh/thầu/BOQ/báo giá) + parser khối lượng bill (mục đầu file).
 
 ## 2026-10-08 — QUALITY-FINAL-1 S02d: nhà thầu phụ (công nợ) + EVM fail-closed
 

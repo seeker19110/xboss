@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchTask, canTouchPackage } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -97,8 +98,7 @@ export async function PATCH(
       await run(`UPDATE qc_inspections SET ${sets.join(", ")} WHERE id = ?`, ...values, id);
     });
   } catch (err: unknown) {
-    const e = err as { message?: string; status?: number };
-    return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
+    return phanHoiLoiCoStatus(err);
   }
 
   return NextResponse.json({ ok: true });

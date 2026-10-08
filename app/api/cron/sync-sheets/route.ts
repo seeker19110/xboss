@@ -8,6 +8,7 @@ import {
   MaterialSyncScopeError,
   type MaterialSyncScope,
 } from "@/lib/vat-tu/material-sync";
+import { LoiCauHinhGoogleSheets } from "@/lib/vat-tu/google-sheets";
 import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
@@ -52,8 +53,12 @@ export async function GET(req: NextRequest) {
       });
       return NextResponse.json({ error: e.message }, { status: e.status });
     }
+    // Thiếu/sai biến môi trường: thông điệp chỉ nêu tên biến (không secret) → trả nguyên văn để
+    // Admin/PM biết cần cấu hình gì; lỗi khác chỉ log, trả thông điệp chung.
+    if (e instanceof LoiCauHinhGoogleSheets)
+      return NextResponse.json({ error: e.message }, { status: 500 });
     const msg = e instanceof Error ? e.message : "Lỗi đồng bộ Google Sheet";
     log.error("GET /api/cron/sync-sheets lỗi", { route: "GET /api/cron/sync-sheets", err: msg });
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: "Lỗi đồng bộ Google Sheet" }, { status: 500 });
   }
 }

@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       results[view] = "ok";
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Lỗi không rõ";
-      results[view] = `error: ${msg}`;
+      results[view] = "error: lỗi làm mới view (xem log)";
       log.error("GET /api/cron/refresh-views lỗi", {
         route: "GET /api/cron/refresh-views",
         view,

@@ -27,6 +27,7 @@
 // ĐẶT TÊN: tiếng Việt, bám `lib/nen/date.ts`/`money.ts` (tên hàm mô tả nghiệp vụ bằng tiếng
 // Việt khi khái niệm là của nghiệp vụ, tiếng Anh khi là thuật ngữ kỹ thuật phổ thông).
 import { NextResponse } from "next/server";
+import { log } from "@/lib/nen/log";
 
 /**
  * Lỗi nghiệp vụ: đầu vào/trạng thái/quyền của NGƯỜI DÙNG sai, không phải server hỏng.
@@ -68,22 +69,44 @@ export const loiKhongXuLyDuoc = (message: string) => new LoiNghiepVu(message, 42
  * Ánh xạ lỗi bắt được trong route → `NextResponse`.
  *
  * - `LoiNghiepVu` (kể cả lớp con) → đúng `status` của nó, thân `{ error: <thông điệp> }`.
- * - Mọi lỗi khác → **500** với thông điệp gốc (giữ nguyên hình dạng cũ `{ error: msg }`
- *   để không hồi quy các test/màn hình đang đọc thông điệp).
+ * - Mọi lỗi khác → **500** với thông điệp CHUNG tiếng Việt (không lộ thông điệp pg/nội bộ ra
+ *   client); chi tiết lỗi đi vào `log.error` (đã lọc secret).
  *
  * CỐ Ý chỉ nhận `instanceof` chứ không dò cấu trúc (kiểu "có thuộc tính `status` là số thì
  * coi là lỗi nghiệp vụ"): lỗi của thư viện ngoài đôi khi cũng mang `status`, dò cấu trúc sẽ
- * âm thầm hạ lỗi hệ thống xuống 4xx — đúng thứ hàm này sinh ra để ngăn.
+ * âm thầm hạ lỗi hệ thống xuống 4xx — đúng thứ hàm này sinh ra để ngăn. Route cũ còn ném
+ * `Object.assign(new Error(..), { status })` dùng `phanHoiLoiCoStatus` bên dưới.
  *
- * @param thongDiepMacDinh thông điệp thay thế khi lỗi hệ thống không có `message`
- *        (giữ nguyên hành vi `error.message || "Lỗi ..."` của vài route cũ).
+ * @param thongDiepMacDinh thông điệp chung cho lỗi hệ thống của route này (mặc định
+ *        "Lỗi hệ thống").
  */
 export function phanHoiLoi(err: unknown, thongDiepMacDinh?: string): NextResponse {
   if (err instanceof LoiNghiepVu) {
     return NextResponse.json({ error: err.message }, { status: err.status });
   }
-  const msg = err instanceof Error ? err.message : String(err);
-  return NextResponse.json({ error: msg || thongDiepMacDinh || "Lỗi hệ thống" }, { status: 500 });
+  log.error("Lỗi không lường trước trong route", {
+    err: err instanceof Error ? err.message : String(err),
+  });
+  return NextResponse.json({ error: thongDiepMacDinh || "Lỗi hệ thống" }, { status: 500 });
+}
+
+/**
+ * Như `phanHoiLoi` nhưng còn nhận lỗi "kiểu cũ" do route/lib tự ném bằng
+ * `Object.assign(new Error(msg), { status: 4xx, code? })`: status 4xx → giữ thông điệp + mã
+ * (`code` nếu có); mọi trường hợp khác (không có status, 5xx, lỗi pg…) → đường 500 chung của
+ * `phanHoiLoi`. CHỈ dùng ở route mà chính nó/lib của nó ném lỗi theo kiểu đó.
+ */
+export function phanHoiLoiCoStatus(err: unknown, thongDiepMacDinh?: string): NextResponse {
+  if (err instanceof Error && !(err instanceof LoiNghiepVu)) {
+    const { status, code } = err as Error & { status?: unknown; code?: unknown };
+    if (typeof status === "number" && status >= 400 && status < 500) {
+      return NextResponse.json(
+        { error: err.message, ...(typeof code === "string" && code ? { code } : {}) },
+        { status },
+      );
+    }
+  }
+  return phanHoiLoi(err, thongDiepMacDinh);
 }
 
 /** Postgres 23503 (foreign_key_violation): bản ghi còn được bảng khác tham chiếu. */

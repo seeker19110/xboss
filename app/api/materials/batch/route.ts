@@ -137,6 +137,10 @@ export async function PATCH(req: NextRequest) {
         route: "PATCH /api/materials/batch",
         err: msg,
       });
-    return NextResponse.json({ error: msg }, { status });
+    // Lỗi 500 không lộ thông điệp thô (pg/nội bộ) — chi tiết đã nằm trong log.
+    return NextResponse.json(
+      { error: status === 500 ? "Lỗi máy chủ khi cập nhật vật tư" : msg },
+      { status },
+    );
   }
 }
