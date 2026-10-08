@@ -26,6 +26,33 @@
   (5 ca qua route thật; ca lách ngưỡng đỏ trên code cũ).
 - **Còn mở (S10a):** M3 đối soát phiếu đã duyệt (cần người vận hành), M4, L5, L6 — xem mục dưới.
 
+## 2026-10-08 — QUALITY-FINAL-1 S11: báo cáo chi phí canonical (getCostReport)
+
+`lib/tai-chinh/cost.ts` thay bộ `costSummary`/`costTotals` gọi lặp bằng **một** dịch vụ
+`getCostReport(projectId, { groupBy, includeVo })`: mọi nguồn (BOQ/VO, PO, HĐ giao thầu tầng,
+phiếu thanh toán), rows hệ + tầng, ngưỡng và coverage đọc trong **1 câu SQL** (1 snapshot MVCC,
+A4-FR06 — không đổi isolation ở `lib/db`). Scope trực tiếp `payment_bills.project_id` (trước đây
+suy qua sheet → tháp: phiếu duyệt IPC không có sheet bị rơi khỏi thực chi, phiếu gắn sheet dự án
+khác rò sang báo cáo dự án đó). Lineage cha (hợp đồng, đợt IPC, VO, sheet/tháp, vật tư) khác dự án
+— hoặc bị RLS che — là **mâu thuẫn**: không cộng vào tổng nào, đếm ở `coverage.conflicts`,
+`coverage.reconciled=false`, UI `/costs` hiện cảnh báo đối soát (không sửa DB để ép tổng). Đúng dự
+án nhưng chưa phân hệ/tầng → dòng `unassigned` (systemId null), vẫn trong `projectTotals`. Tầng nhóm
+theo `(sheet_type_id, floor_label)` (khoá cũ theo mã sheet trùng giữa 2 tháp), giữ phiếu không có
+HĐ tầng. Response thêm `selectedTotals` (= tổng rows đang xem), `projectTotals` (`totals` legacy =
+tổng dự án), `metadata` (reportVersion `cost-report-v1`, budgetBasis `boq`/`floor-contract-proxy`,
+computedAt, moneyFormat), `coverage`. Consumer `cost_over`, dashboard `bySystem`, `systemBudget` dùng
+cùng báo cáo; không có dự án → không số liệu chi phí (trước: tổng toàn hệ). Test
+`cost-report-canonical` (A4-AC01..AC04, Q-AC05, role `xboss_app` NOBYPASSRLS; 5/6 ca đỏ trên code
+S10), viết lại `cost`/`vo`/`audit-cost-query-reuse`. Không migration, không đổi schema.
+
+**Nợ/giới hạn S11:** PO `qty_ordered` vẫn float8 — đọc `::text::numeric` (biểu diễn đã lưu); cột
+exact/provenance theo DATA-MIGRATIONS §6 cần writer PO/kho chuyển cùng (ngoài phạm vi). Đếm phiếu
+thiếu `project_id` (`missingDirectScope`) là cận dưới dưới role ứng dụng (RLS che dòng NULL).
+`cost_settings` vẫn toàn hệ (id 1). Chưa có benchmark p95 (A4-AC08 NOT_RUN), chưa có export
+Excel/PDF chi phí. Dữ liệu cũ: migration 0069 gán `payment_bills.project_id = MIN(projects.id)` cho
+mọi phiếu cũ → ở DB nhiều dự án, phiếu cũ của dự án khác sẽ hiện là mâu thuẫn ở dự án nhỏ nhất —
+cần đối soát vận hành, không tự sửa.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S10 (miền chi phí): tiền exact + DTO decimal-string-v1 cho /api/costs
 
 `lib/tai-chinh/cost.ts`: mọi tổng tiền cộng/nhân trong SQL rồi `round(…, 2)::text`, về JS là

@@ -4,7 +4,7 @@
 // (dashboard chạy được dù module sau chưa làm, vd work_fronts của M14).
 // Xem docs/nang-cap/M09-dashboard.md.
 import { query, queryOne, todayISO, daysFromTodayISO } from "@/lib/db";
-import { costSummary, usagePct } from "@/lib/tai-chinh/cost";
+import { getCostReport, usagePct } from "@/lib/tai-chinh/cost";
 import { DUE_SOON_COND, dueSoonParams, loadDueSoonThresholds } from "@/lib/tien-do/due-soon";
 import { sheetProgressKpi } from "@/lib/tien-do/kpi";
 import { progressAtDate } from "@/lib/tien-do/report";
@@ -201,7 +201,11 @@ export async function bySystemBlock(projectId?: number | null): Promise<SystemCr
       GROUP BY st.system_id`,
     ...(projectId != null ? [projectId] : []),
   );
-  const cost = await costSummary("system", true, projectId ?? undefined);
+  // Báo cáo chi phí canonical (S11); không có dự án → không có số chi phí (không mở toàn hệ).
+  const cost =
+    projectId != null
+      ? (await getCostReport(projectId, { groupBy: "system", includeVo: true })).rows
+      : [];
 
   const progressMap = new Map(progress.map((r) => [r.systemId, r]));
   const ncrMap = new Map(ncrOpen.map((r) => [r.systemId, Number(r.n)]));

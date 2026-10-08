@@ -8,7 +8,7 @@
 // NextResponse và kiểm phiên. Nhờ vậy logic này test đơn vị được mà không phải dựng request.
 import { query, queryOne, run, todayISO } from "@/lib/db";
 import { CAN, isAdminOrPm, type User } from "@/lib/bao-mat/auth";
-import { costSummary, getCostSettings, reachesPct, usagePct } from "@/lib/tai-chinh/cost";
+import { getCostReport } from "@/lib/tai-chinh/cost";
 import { poLateList, vehicleLateList } from "@/lib/tai-chinh/procurement";
 import { missingDiaryDates } from "@/lib/hien-truong/diary";
 import { expiringContracts } from "@/lib/tai-chinh/contracts";
@@ -291,15 +291,17 @@ export async function syncAndListNotifications(
 
   // Vượt ngân sách theo hệ → cảnh báo Admin/PM/BCH (subcon/cdt/viewer/engineer không xem chi phí).
   if (CAN.viewPayments(user.role)) {
-    const settings = await getCostSettings();
-    const rows = await costSummary("system", true, projectId ?? undefined);
-    // So ngưỡng exact trên bigint (A4-FR07); % chỉ để hiển thị trong câu thông báo.
-    const over = rows.filter((r) => reachesPct(r.committed, r.budget, settings.warnPct));
+    // Cảnh báo lấy từ báo cáo chi phí canonical (S11, cùng nguồn với /api/costs; so ngưỡng exact
+    // trên bigint). Không có dự án → không cảnh báo (không mở báo cáo toàn hệ).
+    const over =
+      projectId != null
+        ? (await getCostReport(projectId, { groupBy: "system", includeVo: true })).alerts
+        : [];
 
     if (over.length > 0) {
       const values = over.map(() => `(?, ?, 'cost_over', ?)`).join(", ");
       const params = over.flatMap((r) => {
-        const pct = Math.round(usagePct(r.committed, r.budget) ?? 0);
+        const pct = Math.round(r.pct ?? 0);
         return [user.id, r.key, `💰 Hệ "${r.label}" cam kết đạt ${pct}% ngân sách`];
       });
       await run(

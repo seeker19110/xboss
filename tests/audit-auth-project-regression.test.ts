@@ -7,7 +7,7 @@ import { runInNewContext } from "node:vm";
 import * as crypto from "node:crypto";
 import ts from "typescript";
 import * as money from "../lib/nen/money";
-import { reachesPct, usagePct, costAmountsToWire } from "../lib/tai-chinh/cost";
+import { costAmountsToWire, costRowToWire } from "../lib/tai-chinh/cost";
 
 // Chạy CHÍNH code route/helper, chỉ thay các biên Next/DB bằng stub kiểm soát được.
 // Không thay thế test Postgres/RLS: phần đó nằm trong admin-bootstrap.test.ts/rls.test.ts.
@@ -180,22 +180,32 @@ test("audit: costs giải quyền sau dự án và đọc mọi số liệu tron
     },
     "@/lib/nen/money": money,
     "@/lib/tai-chinh/cost": {
-      reachesPct,
-      usagePct,
       costAmountsToWire,
-      costSummary: async (_group: string, _vo: boolean, id: number) => {
+      costRowToWire,
+      getCostReport: async (id: number) => {
         checkScope();
         assert.equal(id, projectId);
-        return [{ key: "MEP", label: "MEP", budget: 10000n, committed: 9500n, actual: 5000n }];
-      },
-      costTotals: async (_vo: boolean, id: number) => {
-        checkScope();
-        assert.equal(id, projectId);
-        return { budget: 10000n, committed: 9500n, actual: 5000n };
-      },
-      getCostSettings: async () => {
-        checkScope();
-        return { warnPct: 90, overPct: 100 };
+        const row = {
+          key: "MEP",
+          label: "MEP",
+          systemId: 1,
+          sheetTypeId: null,
+          floorLabel: null,
+          unassigned: false,
+          budget: 10000n,
+          committed: 9500n,
+          actual: 5000n,
+        };
+        const totals = { budget: 10000n, committed: 9500n, actual: 5000n };
+        return {
+          rows: [row],
+          selectedTotals: totals,
+          projectTotals: totals,
+          settings: { warnPct: 90, overPct: 100 },
+          alerts: [{ key: "MEP", label: "MEP", pct: 95, over: false }],
+          metadata: { projectId },
+          coverage: { reconciled: true },
+        };
       },
     },
   });
@@ -204,7 +214,7 @@ test("audit: costs giải quyền sau dự án và đọc mọi số liệu tron
     headers: new Headers(),
   });
   assert.equal(res.status, 200);
-  assert.equal(reads, 3);
+  assert.equal(reads, 1, "một lần đọc báo cáo canonical trong scope");
   assert.equal((res.body.alerts as unknown[]).length, 1);
 });
 

@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import {
-  costSummary,
-  costTotals,
-  getCostSettings,
-  reachesPct,
-  usagePct,
-  costAmountsToWire,
-} from "@/lib/tai-chinh/cost";
+import { getCostReport, costAmountsToWire, costRowToWire } from "@/lib/tai-chinh/cost";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { withProjectScope } from "@/lib/db";
 import {
@@ -25,8 +18,11 @@ const HEADERS_TAI_CHINH = { "Cache-Control": "private, no-store", Vary: MONEY_FO
 const json = (body: unknown, status = 200) =>
   NextResponse.json(body, { status, headers: HEADERS_TAI_CHINH });
 
-// GET /api/costs?groupBy=system|floor&includeVo=0 — bảng ngân sách/cam kết/thực chi.
-// Đây là API MỘT dự án; thiếu phạm vi hợp lệ không được hiểu thành báo cáo toàn hệ.
+// GET /api/costs?groupBy=system|floor&includeVo=0 — báo cáo ngân sách/cam kết/thực chi canonical
+// (QUALITY-FINAL-1 S11, lib/tai-chinh/cost.ts getCostReport). Đây là API MỘT dự án; thiếu phạm
+// vi hợp lệ không được hiểu thành báo cáo toàn hệ.
+// Response: rows, selectedTotals (= tổng rows đang xem), projectTotals (tổng dự án, cơ sở BOQ),
+// totals (legacy = projectTotals), settings, alerts, metadata, coverage (đối soát nguồn).
 // Header `X-XBoss-Money-Format: decimal-string-v1` → tiền là chuỗi canonical + `moneyFormat`;
 // không gửi → JSON number legacy (422 money_precision_unsupported nếu ngoài biên an toàn).
 export async function GET(req: NextRequest) {
@@ -44,33 +40,23 @@ export async function GET(req: NextRequest) {
   const groupBy = req.nextUrl.searchParams.get("groupBy") === "floor" ? "floor" : "system";
   const includeVo = req.nextUrl.searchParams.get("includeVo") !== "0";
   const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
-  const [rows, totals, settings] = await withProjectScope(projectId, async () => {
-    const rows = await costSummary(groupBy, includeVo, projectId);
-    const [totals, settings] = await Promise.all([
-      // Nhóm hệ dùng lại đúng tập vừa đọc; nhóm tầng vẫn giữ tổng toàn dự án theo hệ.
-      costTotals(includeVo, projectId, groupBy === "system" ? rows : undefined),
-      getCostSettings(),
-    ]);
-    return [rows, totals, settings] as const;
-  });
-
-  // So ngưỡng bằng nhân chéo bigint; pct chỉ để hiển thị.
-  const alerts = rows
-    .filter((r) => reachesPct(r.committed, r.budget, settings.warnPct))
-    .map((r) => ({
-      key: r.key,
-      label: r.label,
-      pct: usagePct(r.committed, r.budget),
-      over: reachesPct(r.committed, r.budget, settings.overPct),
-    }));
+  const report = await withProjectScope(projectId, () =>
+    getCostReport(projectId, { groupBy, includeVo }),
+  );
 
   try {
+    const projectTotals = costAmountsToWire(report.projectTotals, format);
     return json({
-      rows: rows.map((r) => ({ key: r.key, label: r.label, ...costAmountsToWire(r, format) })),
-      totals: costAmountsToWire(totals, format),
-      settings,
-      alerts,
+      rows: report.rows.map((r) => costRowToWire(r, format)),
+      selectedTotals: costAmountsToWire(report.selectedTotals, format),
+      projectTotals,
+      // Legacy: `totals` luôn là tổng dự án (không đổi theo tab) trong cửa sổ chuyển đổi.
+      totals: projectTotals,
+      settings: report.settings,
+      alerts: report.alerts,
       groupBy,
+      metadata: { ...report.metadata, moneyFormat: format },
+      coverage: report.coverage,
       ...(format === MONEY_FORMAT_DECIMAL_V1 ? { moneyFormat: MONEY_FORMAT_DECIMAL_V1 } : {}),
     });
   } catch (err) {

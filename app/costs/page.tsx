@@ -16,12 +16,22 @@ import {
 } from "./_components/chiPhi";
 
 // Tiền là chuỗi canonical decimal-string-v1 (S10) — không cộng/chia trên number.
-type CostRow = { key: string; label: string } & CostAmountsView;
+type CostRow = { key: string; label: string; unassigned?: boolean } & CostAmountsView;
 type Alert = { key: string; label: string; pct: number | null; over: boolean };
 type Settings = { warnPct: number; overPct: number };
+type Coverage = {
+  reconciled: boolean;
+  conflicts: { boq: number; purchaseOrders: number; floorContracts: number; payments: number };
+  missingDirectScope: { payments: number };
+  poQuantityNonFinite: number;
+};
 type Data = {
   rows: CostRow[];
-  totals: CostAmountsView;
+  /** Tổng dự án (cơ sở BOQ, gồm chưa phân hệ) — KPI luôn dùng số này, không đổi theo tab. */
+  projectTotals: CostAmountsView;
+  /** Tổng đúng các dòng đang xem (tab tầng: proxy HĐ giao thầu tầng). */
+  selectedTotals: CostAmountsView;
+  coverage: Coverage;
   settings: Settings;
   alerts: Alert[];
   groupBy: "system" | "floor";
@@ -30,6 +40,17 @@ type Data = {
 /** % hiển thị; ngân sách 0 → null. */
 function usagePct(committed: string, budget: string) {
   return phanTramSuDung(committed, budget);
+}
+function soChungTuLoi(c: Coverage) {
+  const k = c.conflicts;
+  return (
+    k.boq +
+    k.purchaseOrders +
+    k.floorContracts +
+    k.payments +
+    c.missingDirectScope.payments +
+    c.poQuantityNonFinite
+  );
 }
 function fmtPct(pct: number | null) {
   return pct == null ? "—" : `${Math.round(pct)}%`;
@@ -131,13 +152,13 @@ export default function CostsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bento-card p-4 flex flex-col justify-between">
             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              Tổng ngân sách
+              Tổng ngân sách dự án
             </span>
             <p
               className="text-2xl font-bold font-mono tabular-nums text-zinc-100 mt-2"
-              title={fmtFull(data.totals.budget)}
+              title={fmtFull(data.projectTotals.budget)}
             >
-              {fmtVND(data.totals.budget)}
+              {fmtVND(data.projectTotals.budget)}
             </p>
             <p className="text-[11px] text-zinc-500 mt-1">Định mức BOQ + VO được duyệt</p>
           </div>
@@ -148,14 +169,14 @@ export default function CostsPage() {
                 Giá trị cam kết
               </span>
               <span className="text-xs font-bold font-mono text-sky-400">
-                {fmtPct(usagePct(data.totals.committed, data.totals.budget))}
+                {fmtPct(usagePct(data.projectTotals.committed, data.projectTotals.budget))}
               </span>
             </div>
             <p
               className="text-2xl font-bold font-mono tabular-nums text-sky-400 mt-2"
-              title={fmtFull(data.totals.committed)}
+              title={fmtFull(data.projectTotals.committed)}
             >
-              {fmtVND(data.totals.committed)}
+              {fmtVND(data.projectTotals.committed)}
             </p>
             <p className="text-[11px] text-zinc-500 mt-1">Hợp đồng giao thầu + Đơn đặt hàng</p>
           </div>
@@ -166,25 +187,42 @@ export default function CostsPage() {
                 Thực chi tích lũy
               </span>
               <span className="text-xs font-bold font-mono text-emerald-400">
-                {fmtPct(usagePct(data.totals.actual, data.totals.budget))}
+                {fmtPct(usagePct(data.projectTotals.actual, data.projectTotals.budget))}
               </span>
             </div>
             <p
               className="text-2xl font-bold font-mono tabular-nums text-emerald-400 mt-2"
-              title={fmtFull(data.totals.actual)}
+              title={fmtFull(data.projectTotals.actual)}
             >
-              {fmtVND(data.totals.actual)}
+              {fmtVND(data.projectTotals.actual)}
             </p>
             <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden mt-2 border border-zinc-800">
               <div
                 className="bg-emerald-500 h-full rounded-full transition-[width]"
                 style={{
-                  width: `${Math.min(100, Math.round(usagePct(data.totals.actual, data.totals.budget) ?? 0))}%`,
+                  width: `${Math.min(100, Math.round(usagePct(data.projectTotals.actual, data.projectTotals.budget) ?? 0))}%`,
                 }}
               />
             </div>
           </div>
         </div>
+
+        {/* Báo cáo chưa đủ điều kiện đối soát: chứng từ mâu thuẫn phạm vi KHÔNG được cộng vào tổng */}
+        {!data.coverage.reconciled && (
+          <div
+            role="alert"
+            className="bento-card p-4 border-rose-900/60 bg-rose-950/20 text-xs text-rose-200 space-y-1"
+          >
+            <p className="flex items-center gap-2 font-bold uppercase tracking-wide text-rose-300">
+              <TriangleAlert className="w-4 h-4" aria-hidden="true" />
+              Báo cáo chưa đủ điều kiện đối soát
+            </p>
+            <p>
+              {soChungTuLoi(data.coverage)} chứng từ có dự án/hợp đồng/sheet mâu thuẫn hoặc số liệu
+              không hợp lệ — chưa được cộng vào các tổng dưới đây. Cần đối soát dữ liệu nguồn.
+            </p>
+          </div>
+        )}
 
         {/* Cảnh báo đang active */}
         {data.alerts.length > 0 && (
@@ -250,7 +288,11 @@ export default function CostsPage() {
         {groupBy === "floor" && (
           <p className="text-[11px] text-zinc-400">
             BOQ chưa có chiều tầng — ở chế độ này, ngân sách và cam kết dùng chung giá trị hợp đồng
-            giao thầu theo tầng.
+            giao thầu theo tầng. Tổng các dòng đang xem: ngân sách{" "}
+            <span className="font-mono text-zinc-300">{fmtFull(data.selectedTotals.budget)}</span>,
+            thực chi{" "}
+            <span className="font-mono text-zinc-300">{fmtFull(data.selectedTotals.actual)}</span>{" "}
+            (thẻ tổng phía trên là tổng dự án theo BOQ).
           </p>
         )}
 
@@ -389,7 +431,7 @@ function DrillDown({
         >
           → Xem đơn đặt hàng / thanh toán chi tiết
         </a>
-        {groupBy === "system" && (
+        {groupBy === "system" && !row.unassigned && (
           <a href={`/system/${row.key}`} className="block text-xs text-emerald-400 hover:underline">
             → Xem trang hệ {row.label}
           </a>

@@ -11,6 +11,9 @@ type Costs = typeof import("../lib/tai-chinh/cost");
 type Response = { body: Record<string, unknown>; status: number; headers: unknown };
 type Route = { GET: (req: { nextUrl: URL; headers: Headers }) => Promise<Response> };
 
+// Object tạo trong VM context khác prototype → so sau khi về JSON thuần.
+const plain = (v: unknown) => JSON.parse(JSON.stringify(v)) as unknown;
+
 function load<T>(path: string, mocks: Record<string, unknown>): T {
   const js = ts.transpileModule(readFileSync(resolve(path), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -29,32 +32,73 @@ function load<T>(path: string, mocks: Record<string, unknown>): T {
 
 function fixture(options: { projectId?: number | null; auth?: boolean; allow?: boolean } = {}) {
   const projectId = options.projectId === undefined ? 42 : options.projectId;
-  let scoped = false;
+  let depth = 0;
   const queries: { sql: string; args: unknown[] }[] = [];
+  // S11: toàn bộ báo cáo là MỘT câu SQL trả 1 dòng (rows hệ/tầng + settings + coverage dạng JSON,
+  // tiền là chuỗi). Fixture trả đúng hình dạng đó.
+  const so0 = { boq: 0, purchaseOrders: 0, floorContracts: 0, payments: 0 };
   const query = async (sql: string, ...args: unknown[]) => {
-    assert.equal(scoped, true, "Mọi query báo cáo phải chạy trong scope đã kiểm");
+    assert.ok(depth > 0, "Mọi query báo cáo phải chạy trong scope đã kiểm");
     queries.push({ sql, args });
-    if (sql.includes("FROM systems")) return [{ id: 7, code: "dien", name: "Điện" }];
-    if (sql.includes("fc.floor_label AS")) {
-      return [{ sheetType: "T", floorLabel: "F1", contractValue: "30.00", actual: "4.00" }];
+    if (sql.includes("WITH prm AS")) {
+      return [
+        {
+          systemRows: [
+            {
+              systemId: 7,
+              code: "dien",
+              name: "Điện",
+              budget: "100.00",
+              committed: "95.00",
+              actual: "10.00",
+            },
+            {
+              systemId: 8,
+              code: "nuoc",
+              name: "Nước",
+              budget: "0.00",
+              committed: "5.00",
+              actual: "0.00",
+            },
+          ],
+          systemUnassigned: { budget: "1.00", committed: "0.00", actual: "2.00" },
+          floorRows: [
+            {
+              sheetTypeId: 17,
+              sheetCode: "T",
+              towerName: "A",
+              floorLabel: "F1",
+              budget: "30.00",
+              actual: "4.00",
+            },
+          ],
+          floorUnassignedActual: "8.00",
+          settings: { warnPct: "90.00", overPct: "100.00" },
+          coverage: {
+            conflicts: so0,
+            missingDirectScope: { payments: 0 },
+            unassigned: so0,
+            unassignedFloorPayments: 1,
+            poQuantityNonFinite: 0,
+            floorContractsWithoutValue: 0,
+          },
+          computedAt: "2026-10-08T00:00:00.000Z",
+        },
+      ];
     }
-    if (sql.includes("FROM boq_items")) return [{ systemId: 7, budget: "100.00" }];
-    // PO + giao thầu gộp 1 câu UNION ALL (S10).
-    if (sql.includes("FROM po_items")) return [{ systemId: 7, committed: "50.00" }];
-    if (sql.includes("FROM payment_bills")) return [{ systemId: 7, actual: "10.00" }];
-    if (sql.includes("FROM cost_settings")) return [{ warnPct: 90, overPct: 100 }];
     assert.fail(`Query ngoài fixture: ${sql}`);
   };
   const db = {
     query,
     queryOne: async (sql: string, ...args: unknown[]) => (await query(sql, ...args))[0],
+    run: async () => assert.fail("Báo cáo không được ghi"),
     withProjectScope: async (id: number, fn: () => Promise<unknown>) => {
       assert.equal(id, projectId);
-      scoped = true;
+      depth++;
       try {
         return await fn();
       } finally {
-        scoped = false;
+        depth--;
       }
     },
   };
@@ -85,55 +129,57 @@ function fixture(options: { projectId?: number | null; auth?: boolean; allow?: b
   return { costs, route, queries, db };
 }
 
-test("chi phí: nhóm hệ chỉ đọc một bộ tổng hợp, vẫn giữ scope và response", async () => {
+test("chi phí: nhóm hệ đọc đúng 1 câu SQL, giữ scope, totals = projectTotals gồm unassigned", async () => {
   const { route, queries } = fixture();
   const result = await route.GET({
     nextUrl: new URL("https://test.invalid/api/costs"),
     headers: new Headers(),
   });
   assert.equal(result.status, 200);
-  assert.equal(queries.length, 5, "4 query dữ liệu hệ + 1 settings, không chạy lại bộ hệ");
-  assert.equal(queries.filter((q) => q.sql.includes("FROM systems")).length, 1);
+  assert.equal(queries.length, 1, "rows + totals + settings + coverage trong 1 câu (A4-FR06)");
+  assert.deepEqual(Array.from(queries[0].args), [42, true]);
   const totals = result.body.totals as Record<string, unknown>;
-  assert.equal(totals.budget, 100);
-  assert.equal(totals.committed, 50);
-  assert.equal(totals.actual, 10);
+  assert.deepEqual(plain(totals), { budget: 101, committed: 100, actual: 12 });
+  assert.deepEqual(plain(result.body.selectedTotals), plain(totals));
+  const rows = result.body.rows as Record<string, unknown>[];
+  assert.equal(rows.length, 3);
+  assert.equal(rows[2].unassigned, true);
+  assert.equal(rows[2].systemId, null);
+  // Ngân sách 0 + cam kết dương (nước) không cảnh báo; điện 95% ≥ 90% cảnh báo, chưa vượt.
+  assert.deepEqual(plain(result.body.alerts), [
+    { key: "dien", label: "Điện", pct: 95, over: false },
+  ]);
   assert.equal((result.headers as Record<string, string>)["Cache-Control"], "private, no-store");
 });
 
-test("chi phí: nhóm tầng vẫn lấy tổng dự án theo hệ, không dùng tổng proxy tầng", async () => {
+test("chi phí: nhóm tầng — selectedTotals theo rows proxy, totals/projectTotals giữ tổng dự án", async () => {
   const { route, queries } = fixture();
   const result = await route.GET({
     nextUrl: new URL("https://test.invalid/api/costs?groupBy=floor&includeVo=0"),
     headers: new Headers(),
   });
   const rows = result.body.rows as Record<string, unknown>[];
-  const totals = result.body.totals as Record<string, unknown>;
+  assert.equal(rows[0].key, "17:F1");
   assert.equal(rows[0].budget, 30);
-  assert.equal(totals.budget, 100);
-  assert.equal(totals.actual, 10);
-  assert.equal(queries.length, 6);
-  const budget = queries.find((q) => q.sql.includes("FROM boq_items"));
-  assert.ok(budget);
-  assert.deepEqual(Array.from(budget.args), [false, 42]);
+  assert.equal(rows[1].unassigned, true);
+  assert.deepEqual(plain(result.body.selectedTotals), { budget: 30, committed: 30, actual: 12 });
+  assert.deepEqual(plain(result.body.totals), { budget: 101, committed: 100, actual: 12 });
+  assert.equal(queries.length, 1);
+  assert.deepEqual(Array.from(queries[0].args), [42, false]);
+  const metadata = result.body.metadata as Record<string, unknown>;
+  assert.equal(metadata.budgetBasis, "floor-contract-proxy");
+  assert.equal(metadata.moneyFormat, "legacy-number");
 });
 
-test("chi phí: danh sách hệ rỗng đã đọc không kích hoạt truy vấn lại", async () => {
+test("chi phí: sumCostAmounts cộng bigint, không sửa input", async () => {
   const { costs, queries } = fixture();
-  const totals = await costs.costTotals(true, 42, Object.freeze([]));
-  assert.equal(queries.length, 0);
-  assert.equal(totals.budget, 0n);
-  assert.equal(totals.committed, 0n);
-  assert.equal(totals.actual, 0n);
-});
-
-test("chi phí: cộng rows đã đọc không sửa input và giữ cách cộng đơn vị nhỏ", async () => {
-  const { costs, queries } = fixture();
+  const rong = costs.sumCostAmounts([]);
+  assert.equal(rong.budget + rong.committed + rong.actual, 0n);
   const rows = Object.freeze([
-    Object.freeze({ key: "a", label: "A", budget: 10n, committed: 100n, actual: 0n }),
-    Object.freeze({ key: "b", label: "B", budget: 20n, committed: 200n, actual: 0n }),
+    Object.freeze({ budget: 10n, committed: 100n, actual: 0n }),
+    Object.freeze({ budget: 20n, committed: 200n, actual: 0n }),
   ]);
-  const totals = await costs.costTotals(false, 42, rows);
+  const totals = costs.sumCostAmounts(rows);
   assert.equal(totals.budget, 30n);
   assert.equal(totals.committed, 300n);
   assert.equal(rows[0].budget, 10n);
@@ -157,9 +203,10 @@ for (const scenario of [
   });
 }
 
-test("chi phí: caller cũ không truyền rows vẫn truy vấn và trả cùng tổng", async () => {
-  const { costs, queries, db } = fixture();
-  const totals = await db.withProjectScope(42, () => costs.costTotals(true, 42));
-  assert.equal((totals as { budget: bigint }).budget, 10000n);
-  assert.equal(queries.length, 4);
+test("chi phí: getCostReport từ chối projectId không hợp lệ trước mọi query", async () => {
+  const { costs, queries } = fixture();
+  for (const bad of [0, -1, 1.5, Number.NaN]) {
+    await assert.rejects(costs.getCostReport(bad, { groupBy: "system", includeVo: true }));
+  }
+  assert.equal(queries.length, 0);
 });
