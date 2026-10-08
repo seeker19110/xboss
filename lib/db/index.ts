@@ -210,12 +210,26 @@ export async function insertId(sql: string, ...params: unknown[]): Promise<numbe
 // Reentrant: gọi lồng bên trong 1 withTransaction khác (vd recomputePackage tự bọc
 // nhưng được recomputeTask gọi từ trong transaction của route) tái dùng luôn client hiện
 // có thay vì mở connection/transaction thứ 2 — tránh treo (2 client cùng chờ khoá nhau).
-export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
-  if (txStorage.getStore()) return fn();
+// opts.isolation = "repeatable_read": mở transaction MỚI bằng BEGIN ISOLATION LEVEL REPEATABLE
+// READ (phải nằm ngay trong BEGIN — set_config chạy sau BEGIN khiến SET TRANSACTION ISOLATION
+// lỗi) để mọi câu đọc trong fn thấy cùng 1 snapshot. Lồng trong transaction có sẵn mà đòi
+// repeatable_read → throw (fail-fast, không lặng lẽ mất đảm bảo nhất quán).
+export async function withTransaction<T>(
+  fn: () => Promise<T>,
+  opts?: { isolation?: "repeatable_read" },
+): Promise<T> {
+  const repeatableRead = opts?.isolation === "repeatable_read";
+  if (txStorage.getStore()) {
+    if (repeatableRead)
+      throw new Error(
+        "withTransaction: không thể yêu cầu REPEATABLE READ khi đang lồng trong transaction có sẵn",
+      );
+    return fn();
+  }
   await ensureSchemaCompatible();
   const client = await getPool().connect();
   try {
-    await client.query("BEGIN");
+    await client.query(repeatableRead ? "BEGIN ISOLATION LEVEL REPEATABLE READ" : "BEGIN");
     // Truyền ngữ cảnh actor xuống Postgres qua SET LOCAL (set_config ..., true) để trigger
     // audit (migration 0049) ghi được ai/vai trò/dự án/request-id. Tự hết hạn khi COMMIT/
     // ROLLBACK; giá trị thiếu truyền '' (trigger dùng NULLIF để chuyển về NULL).
@@ -257,7 +271,7 @@ export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
 export async function withProjectScope<T>(
   projectId: number | "*",
   fn: () => Promise<T>,
-  opts?: { readOnly?: boolean },
+  opts?: { readOnly?: boolean; isolation?: "repeatable_read" },
 ): Promise<T> {
   const readOnly = opts?.readOnly ?? true;
   // Lồng bên trong 1 withProjectScope/withTransaction khác (vd hàm đọc gọi lại chính nó,
@@ -268,13 +282,16 @@ export async function withProjectScope<T>(
   // câu lệnh ghi sau đó trong transaction cha sẽ lỗi "cannot execute ... in a read-only
   // transaction" dù bản thân transaction cha gọi với readOnly:false.
   const alreadyInTransaction = !!txStorage.getStore();
-  return withTransaction(async () => {
-    const client = txStorage.getStore();
-    if (!client) throw new Error("withProjectScope: thiếu transaction client (không thể xảy ra)");
-    if (readOnly && !alreadyInTransaction) await client.query("SET TRANSACTION READ ONLY");
-    await client.query(`SELECT set_config('app.project_id', $1, true)`, [String(projectId)]);
-    return fn();
-  });
+  return withTransaction(
+    async () => {
+      const client = txStorage.getStore();
+      if (!client) throw new Error("withProjectScope: thiếu transaction client (không thể xảy ra)");
+      if (readOnly && !alreadyInTransaction) await client.query("SET TRANSACTION READ ONLY");
+      await client.query(`SELECT set_config('app.project_id', $1, true)`, [String(projectId)]);
+      return fn();
+    },
+    opts?.isolation ? { isolation: opts.isolation } : undefined,
+  );
 }
 
 // todayISO/daysFromTodayISO chuyển sang lib/date.ts (thuần, không phụ thuộc pg)
