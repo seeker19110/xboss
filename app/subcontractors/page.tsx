@@ -8,11 +8,11 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
+import { HEADER_TIEN_V1, fmtDongMinor, minorTuWire } from "@/lib/nen/money-dto";
 
-function fmtVND(n: number) {
-  if (!n) return "0 đ";
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
-}
+// S10c: số tiền nhận dạng decimal-string-v1 rồi giữ bigint đồng×100 — cộng/trừ exact, hiển thị
+// đồng nguyên (không qua float).
+const fmtVND = fmtDongMinor;
 
 // ===== Kiểu dữ liệu (client) — mirror lib/subcontractors.ts =====
 
@@ -37,7 +37,7 @@ type SubcontractorListItem = {
   capabilitySummary: string | null;
   avgScore: number | null;
   latestPeriod: string | null;
-  outstanding: number;
+  outstanding: bigint;
 };
 
 type SubconDoc = {
@@ -69,9 +69,9 @@ type ContractDebt = {
   id: number;
   code: string;
   title: string;
-  value: number;
-  addendaTotal: number;
-  paid: number;
+  value: bigint;
+  addendaTotal: bigint;
+  paid: bigint;
   status: string;
 };
 
@@ -93,8 +93,34 @@ type SubcontractorDetail = {
   documents: SubconDoc[];
   evaluations: Evaluation[];
   evaluationAverage: { latestPeriod: string | null; avgScore: number | null; trend: number | null };
-  debt: { contractValue: number; paid: number; outstanding: number; contracts: ContractDebt[] };
+  debt: { contractValue: bigint; paid: bigint; outstanding: bigint; contracts: ContractDebt[] };
 };
+
+type ContractDebtWire = Omit<ContractDebt, "value" | "addendaTotal" | "paid"> & {
+  value: string;
+  addendaTotal: string;
+  paid: string;
+};
+type SubcontractorDetailWire = Omit<SubcontractorDetail, "debt"> & {
+  debt: { contractValue: string; paid: string; outstanding: string; contracts: ContractDebtWire[] };
+};
+
+function docChiTietNtp(w: SubcontractorDetailWire): SubcontractorDetail {
+  return {
+    ...w,
+    debt: {
+      contractValue: minorTuWire(w.debt.contractValue),
+      paid: minorTuWire(w.debt.paid),
+      outstanding: minorTuWire(w.debt.outstanding),
+      contracts: w.debt.contracts.map((c) => ({
+        ...c,
+        value: minorTuWire(c.value),
+        addendaTotal: minorTuWire(c.addendaTotal),
+        paid: minorTuWire(c.paid),
+      })),
+    },
+  };
+}
 
 function scoreColor(score: number | null): string {
   if (score == null) return "text-zinc-500";
@@ -113,7 +139,18 @@ export default function SubcontractorsPage() {
   const canEvaluate = me?.role === "admin" || me?.role === "pm" || me?.role === "engineer";
 
   function load() {
-    return fetch("/api/subcontractors").then((r) => (r.ok ? r.json() : null));
+    return fetch("/api/subcontractors", { headers: HEADER_TIEN_V1 })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(
+        (
+          j: {
+            items: (Omit<SubcontractorListItem, "outstanding"> & { outstanding: string })[];
+          } | null,
+        ) =>
+          j
+            ? { items: j.items.map((i) => ({ ...i, outstanding: minorTuWire(i.outstanding) })) }
+            : null,
+      );
   }
 
   useEffect(() => {
@@ -134,7 +171,7 @@ export default function SubcontractorsPage() {
   if (loading) return <PageSkeleton />;
 
   const kpiCount = items.length;
-  const kpiOutstanding = items.reduce((s, i) => s + i.outstanding, 0);
+  const kpiOutstanding = items.reduce((s, i) => s + i.outstanding, 0n);
   const kpiLowScore = items.filter((i) => i.avgScore != null && i.avgScore < 3).length;
 
   return (
@@ -219,7 +256,7 @@ export default function SubcontractorsPage() {
                         )}
                       </td>
                       <td className="p-3 text-xs">
-                        <span className={it.outstanding > 0 ? "text-amber-400" : "text-zinc-400"}>
+                        <span className={it.outstanding > 0n ? "text-amber-400" : "text-zinc-400"}>
                           {fmtVND(it.outstanding)}
                         </span>
                       </td>
@@ -276,9 +313,11 @@ function SubcontractorDetailModal({
   const [tab, setTab] = useState<DetailTab>("profile");
 
   function load() {
-    return fetch(`/api/subcontractors/${supplierId}`)
+    return fetch(`/api/subcontractors/${supplierId}`, { headers: HEADER_TIEN_V1 })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setDetail(j?.item ?? null));
+      .then((j: { item?: SubcontractorDetailWire } | null) =>
+        setDetail(j?.item ? docChiTietNtp(j.item) : null),
+      );
   }
 
   useEffect(() => {
@@ -952,7 +991,7 @@ function DebtTab({ detail }: { detail: SubcontractorDetail }) {
           <p className="text-[11px] text-zinc-500">Đã thanh toán</p>
         </div>
         <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-2">
-          <p className={`text-sm font-semibold ${debt.outstanding > 0 ? "text-amber-400" : ""}`}>
+          <p className={`text-sm font-semibold ${debt.outstanding > 0n ? "text-amber-400" : ""}`}>
             {fmtVND(debt.outstanding)}
           </p>
           <p className="text-[11px] text-zinc-500">Còn lại</p>

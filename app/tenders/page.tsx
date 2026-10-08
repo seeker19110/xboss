@@ -8,6 +8,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
+import { HEADER_TIEN_V1, fmtDongMinor, minorTuWire } from "@/lib/nen/money-dto";
 
 type TenderStatus = "draft" | "open" | "closed" | "awarded" | "cancelled";
 const STATUS_LABEL: Record<TenderStatus, string> = {
@@ -39,9 +40,11 @@ type Tender = {
 type BoqItem = { id: number; code: string; name: string; unit: string };
 type Supplier = { id: number; name: string };
 
-function fmtVND(n: number) {
-  if (!n) return "—";
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
+// S10c: giá chào/tổng nhận dạng decimal-string-v1 — hiển thị exact bằng bigint, không qua float.
+function fmtVND(s: string) {
+  const minor = minorTuWire(s);
+  if (minor === 0n) return "—";
+  return fmtDongMinor(minor);
 }
 
 export default function TendersPage() {
@@ -346,14 +349,15 @@ type BidData = {
   bidId: number;
   supplierId: number;
   supplierName: string;
-  lumpSum: number | null;
+  // decimal-string-v1: chuỗi canonical 2 số lẻ (S10c).
+  lumpSum: string | null;
   note: string | null;
   fileName: string | null;
   originalName: string | null;
   quotedLines: number;
   totalLines: number;
-  total: number;
-  prices: Record<number, number>;
+  total: string;
+  prices: Record<number, string>;
 };
 type ItemData = { boqItemId: number; code: string; name: string; unit: string; qty: number };
 
@@ -378,7 +382,7 @@ function TenderDetailModal({
   const [busy, setBusy] = useState(false);
 
   function loadDetail() {
-    fetch(`/api/tenders/${tender.id}`)
+    fetch(`/api/tenders/${tender.id}`, { headers: HEADER_TIEN_V1 })
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         setItems(j?.items ?? []);
@@ -391,13 +395,16 @@ function TenderDetailModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tender.id]);
 
+  // Giá thấp nhất mỗi dòng — so sánh exact bằng bigint (S10c), không so float.
   const lowestByLine = useMemo(() => {
-    const map = new Map<number, number>();
+    const map = new Map<number, bigint>();
     for (const it of items) {
-      let lowest: number | null = null;
+      let lowest: bigint | null = null;
       for (const b of bids) {
         const p = b.prices[it.boqItemId];
-        if (p != null && (lowest == null || p < lowest)) lowest = p;
+        if (p == null) continue;
+        const minor = minorTuWire(p);
+        if (lowest == null || minor < lowest) lowest = minor;
       }
       if (lowest != null) map.set(it.boqItemId, lowest);
     }
@@ -428,7 +435,7 @@ function TenderDetailModal({
     loadDetail();
   }
 
-  async function award(bidId: number, supplierName: string, total: number) {
+  async function award(bidId: number, supplierName: string, total: string) {
     if (
       !(await appConfirm(
         `Trao thầu cho ${supplierName} — giá trị ${fmtVND(total)}? Sẽ tự tạo hợp đồng giao thầu.`,
@@ -527,7 +534,8 @@ function TenderDetailModal({
                     </td>
                     {bids.map((b) => {
                       const p = b.prices[it.boqItemId];
-                      const isLowest = p != null && lowestByLine.get(it.boqItemId) === p;
+                      const isLowest =
+                        p != null && lowestByLine.get(it.boqItemId) === minorTuWire(p);
                       return (
                         <td
                           key={b.bidId}

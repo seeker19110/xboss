@@ -2,7 +2,7 @@
 // cảnh báo PO trễ giao + xe NCC quá giờ. Logic tách khỏi route để test tích hợp trực tiếp
 // (cùng pattern lib/cost.ts, lib/qaqc.ts). Xem docs/nang-cap/M04-ncc-don-hang.md.
 import { query, queryOne, run, todayISO } from "@/lib/db";
-import { parseMoney, moneyToNumber } from "@/lib/nen/money";
+import { parseMoney } from "@/lib/nen/money";
 
 // Trạng thái PO là cột TEXT không CHECK constraint (giữ tương thích dữ liệu cũ) — thứ tự
 // tiến (không nhảy cóc) validate ở đây. "partial"/"received" do route /receive tự set theo
@@ -232,10 +232,11 @@ export type SupplierSummary = {
   avgQuality: number | null;
   avgDelivery: number | null;
   avgPrice: number | null;
-  // null = người xem không có quyền xem tiền (CAN.viewPayments)
-  totalOrdered: number | null;
-  totalPaid: number | null;
-  debt: number | null;
+  // null = người xem không có quyền xem tiền (CAN.viewPayments) hoặc không có dự án.
+  // S10c: MoneyMinor (bigint đồng×100) tới biên DTO — route đổi sang wire (decimal-string-v1/legacy).
+  totalOrdered: bigint | null;
+  totalPaid: bigint | null;
+  debt: bigint | null;
   ratings: {
     id: number;
     poId: number | null;
@@ -276,8 +277,10 @@ export async function supplierSummary(
 
   // ::text — NUMERIC qua parser oid 1700 thành float JS, cấm cộng/trừ tiền trên float
   // (M45 PR1). Tổng làm trong SQL, hiệu `debt` làm trên bigint của lib/nen/money.ts.
+  // S10c: `qty_ordered` float8 legacy → ép `::numeric` TRƯỚC khi nhân (float8 × numeric ra float8:
+  // SUM mất xu, tổng lớn in dạng mũ làm parseMoney throw). Giữ biểu diễn legacy, không suy ngược.
   const ordered = await queryOne<{ total: string }>(
-    `SELECT COALESCE(SUM(poi.qty_ordered * COALESCE(poi.unit_price, 0)), 0)::text AS total
+    `SELECT COALESCE(SUM(poi.qty_ordered::numeric * COALESCE(poi.unit_price, 0)), 0)::text AS total
        FROM po_items poi
        JOIN purchase_orders po ON po.id = poi.po_id
       WHERE po.supplier_id = ? AND po.status <> 'cancelled' AND po.project_id = ?`,
@@ -310,9 +313,9 @@ export async function supplierSummary(
     avgQuality: agg?.avgQuality != null ? Number(agg.avgQuality) : null,
     avgDelivery: agg?.avgDelivery != null ? Number(agg.avgDelivery) : null,
     avgPrice: agg?.avgPrice != null ? Number(agg.avgPrice) : null,
-    totalOrdered: boTien ? null : moneyToNumber(orderedMoney),
-    totalPaid: boTien ? null : moneyToNumber(paidMoney),
-    debt: boTien ? null : moneyToNumber(orderedMoney - paidMoney),
+    totalOrdered: boTien ? null : orderedMoney,
+    totalPaid: boTien ? null : paidMoney,
+    debt: boTien ? null : orderedMoney - paidMoney,
     ratings,
   };
 }

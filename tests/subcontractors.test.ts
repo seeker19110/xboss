@@ -183,9 +183,9 @@ test(
 
     const detail = await getSubcontractor(supplierId, 1);
     assert.ok(detail);
-    assert.equal(detail!.debt.contractValue, 1000000);
-    assert.equal(detail!.debt.paid, 300000);
-    assert.equal(detail!.debt.outstanding, 700000);
+    assert.equal(detail!.debt.contractValue, 1000000_00n); // S10c: MoneyMinor
+    assert.equal(detail!.debt.paid, 300000_00n);
+    assert.equal(detail!.debt.outstanding, 700000_00n);
     assert.equal(detail!.debt.contracts.length, 1);
     assert.equal(detail!.debt.contracts[0].code, "HD-NTP-TEST");
 

@@ -72,7 +72,7 @@ const jreq = (url: string, body?: unknown, method = "POST") =>
 test("GET /api/subcontractors: chưa đăng nhập → 401", S, async () => {
   dangXuat();
   const { GET } = await import("@/app/api/subcontractors/route");
-  const res = await GET();
+  const res = await GET(new NextRequest("http://localhost/api/subcontractors"));
   assert.equal(res.status, 401);
 });
 
@@ -101,7 +101,7 @@ test(
     const sub = await taoUser("subcon", "subc-list", { supplierId: supplierMine });
     await dangNhapDuAn(sub, projectId);
     const { GET } = await import("@/app/api/subcontractors/route");
-    const res = await GET();
+    const res = await GET(new NextRequest("http://localhost/api/subcontractors"));
     assert.equal(res.status, 200);
     const { items } = await res.json();
     assert.equal(items.length, 1);
@@ -114,7 +114,7 @@ test("GET /api/subcontractors: subcon chưa gán supplier_id → danh sách rỗ
   const sub = await taoUser("subcon", "subc-norsupp", { supplierId: null });
   await dangNhapDuAn(sub, projectId);
   const { GET } = await import("@/app/api/subcontractors/route");
-  const res = await GET();
+  const res = await GET(new NextRequest("http://localhost/api/subcontractors"));
   assert.equal(res.status, 200);
   assert.deepEqual((await res.json()).items, []);
 });
@@ -138,7 +138,7 @@ test("GET /api/subcontractors: PM/Admin thấy toàn bộ NTP (không bị lọc
   const pm = await taoUser("pm", "subc-pm");
   await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/subcontractors/route");
-  const res = await GET();
+  const res = await GET(new NextRequest("http://localhost/api/subcontractors"));
   assert.equal(res.status, 200);
   const { items } = await res.json();
   const ids = items.map((i: { id: number }) => i.id).sort((a: number, b: number) => a - b);
