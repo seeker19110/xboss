@@ -32,6 +32,16 @@ Idempotency-Key cố định/op, `X-XBoss-Context`, `If-Match`/`If-None-Match` t
   `offline-queue.test.ts`, `audit-offline-store-commit.test.ts`, `audit-s07-offline-flush-regressions.test.ts`,
   `audit-small-offline-flush.test.ts`. Test mới đỏ trên code cũ. `test:mutation`: thay mutation
   "nhật ký 428/412" (hàm cũ không còn) bằng 10 mutation S07 — cả 10 bị bắt. E2E trình duyệt NOT_RUN.
+- **Sau audit 3 trụ** (bảo mật/logic/UI — không CRITICAL): (1) lưu nhật ký online chỉ bỏ **đúng** các
+  bản nháp form đã nạp (`getQueuedDiaryNote` trả `operationIds`, `discardDiaryDraft(date, ids)`) — trước
+  đó xoá cả bản nháp/conflict form chưa từng thấy khi vault mở muộn; (2) 409 `context_*` khoá vault + xoá
+  cache để lần sau xác minh lại từ đầu, không dùng context/DEK cũ tới hết lease; (3) `chu()`/`coKhoa()`
+  kiểm lease nên hết lease khi đang mất mạng cũng chặn đường **đọc** (ảnh chờ gửi); (4) gia hạn lease
+  theo nhịp trong lúc chờ mạng (upload dài hơn TTL không bị tab khác gửi lại song song); (5) vault khoá
+  vẫn báo `total/locked` theo số op của user trên thiết bị (không hiện "0 chờ"), `paused_auth` được mở
+  lại ở mọi lần vault ACTIVE; (6) modal nhật ký chờ mở vault tối đa 3 s (mạng treo không kẹt
+  Skeleton), thông điệp lỗi lưu offline ngắn gọn, chip trạng thái `role="status"`. +6 ca test (đỏ trên
+  code cũ), +3 mutation (đều bị bắt).
 - **Cần quyết/còn mở:** server đối chiếu op với manifest khoá (contract chưa có trường keyId); kiểm
   context cho request online; thứ tự FIFO khi op cũ không giải mã được; UI conflict/rejected/legacy +
   đối soát legacy theo thiết bị (S08/D03); `XBOSS_OFFLINE_KEK` cho job e2e CI.

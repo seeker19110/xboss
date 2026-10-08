@@ -664,6 +664,8 @@ export async function flushQueue(d: {
   cache?: BoNhoGiaiMa;
   /** Trần số op mỗi vòng (chống vòng lặp vô hạn nếu store lỗi). */
   maxOps?: number;
+  /** Nhịp gia hạn lease trong lúc chờ mạng (mặc định LEASE_RENEW_MS; test rút ngắn). */
+  nhipGiaHanMs?: number;
 }): Promise<KetQuaFlush> {
   const now = d.now ?? Date.now;
   const rand = d.rand ?? Math.random;
@@ -725,10 +727,17 @@ export async function flushQueue(d: {
         if (kq.matLease) break;
         continue; // op vừa đổi trạng thái ở tab khác (xoá/dedup) — chọn lại
       }
+      // Giữ lease trong lúc chờ mạng: ảnh lớn trên 3G có thể lâu hơn TTL — không gia hạn thì tab
+      // khác giành lease và gửi lại song song cùng key (A2-AC04). Gia hạn hỏng → fencing ở
+      // apKetQua bắt, không áp kết quả.
+      const nhip = setInterval(() => {
+        d.store.giaHanLease(chu, d.holder, lease.token, now()).catch(() => false);
+      }, d.nhipGiaHanMs ?? LEASE_RENEW_MS);
       // Lỗi bất ngờ của lớp gửi = không biết server đã nhận chưa → như lỗi mạng (giữ, thử lại).
       const outcome = await d
         .send(dungYeuCau(dangGui, body, contextId))
-        .catch((): SendOutcome => ({ networkError: true }));
+        .catch((): SendOutcome => ({ networkError: true }))
+        .finally(() => clearInterval(nhip));
       const pl = phanLoaiKetQua(dangGui, outcome, now(), rand());
       const lastResult: KetQuaGanNhat | undefined = outcome.status
         ? { status: outcome.status, code: outcome.code, at: now() }
@@ -745,7 +754,6 @@ export async function flushQueue(d: {
         kq.matLease = true;
         break;
       }
-      giaHanLuc = now();
       const ketThuc: OpKetThuc = {
         operationId: chon.operationId,
         kind: chon.kind,

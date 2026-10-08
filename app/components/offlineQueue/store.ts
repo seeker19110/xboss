@@ -490,6 +490,13 @@ export class QueueDb implements QueueStore {
     return this.db.tx([STORE_OPS], "readonly", (t) => t.count(STORE_OPS));
   }
 
+  /** Số op v2 của user này trên thiết bị (đếm qua index, không giải mã — dùng khi vault khoá). */
+  async demOpCuaUser(userId: number): Promise<number> {
+    return this.db.tx([STORE_OPS], "readonly", (t) =>
+      t.count(STORE_OPS, { name: "ownerUserId", key: userId }),
+    );
+  }
+
   /** Có op v2 nào của owner này trên thiết bị không (quyết định có cần mở vault để gửi). */
   async coOpCuaUser(userId: number): Promise<boolean> {
     return this.db.tx(

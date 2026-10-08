@@ -233,6 +233,30 @@ const MUTATIONS = [
   },
   // QUALITY-FINAL-1 S07: hàng đợi offline v2 (vault + IndexedDB nguyên tử).
   {
+    key: "hàng đợi: lưu nhật ký online chỉ bỏ bản nháp form đã nạp",
+    file: "app/components/offlineQueue/index.ts",
+    find: "          chon.has(o.rec.operationId) &&",
+    replace: "          true &&",
+    tests: ["tests/offline-queue-vault.test.ts"],
+    why: "Lưu online xoá cả bản nháp offline (kể cả conflict) mà form chưa từng nạp — mất nhật ký người dùng không hề thấy.",
+  },
+  {
+    key: "hàng đợi: gia hạn lease trong lúc chờ mạng",
+    file: "app/components/offlineQueue/logic.ts",
+    find: "        d.store.giaHanLease(chu, d.holder, lease.token, now()).catch(() => false);",
+    replace: "        void 0;",
+    tests: ["tests/offline-queue-vault.test.ts"],
+    why: "Upload lâu hơn TTL → tab khác giành lease và gửi lại song song cùng key (A2-AC04).",
+  },
+  {
+    key: "hàng đợi: 409 context_* khoá vault",
+    file: "app/components/offlineQueue/index.ts",
+    find: "        if (kq.loiContext) {",
+    replace: "        if (false) {",
+    tests: ["tests/offline-queue-vault.test.ts"],
+    why: "Quyền/thiết bị đã đổi mà tab vẫn dùng context + DEK cũ tới hết lease (tới 8 giờ).",
+  },
+  {
     key: "hàng đợi: 409/412/428 phải giữ op ở trạng thái conflict",
     file: "app/components/offlineQueue/logic.ts",
     find: '  if (s === 409 || s === 412 || s === 428) return { loai: "conflict" };',

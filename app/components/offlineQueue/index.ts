@@ -129,6 +129,8 @@ export class OfflineQueueManager {
   private flushing = false;
   // Tab khác đổi dự án/đăng xuất/đổi tài khoản → khoá vault tab này, dừng gửi (KHÔNG xoá).
   private tamDungNguCanh = false;
+  /** User chủ lần cuối vault ACTIVE — khi vault khoá vẫn đếm được op của họ để không báo "0 chờ". */
+  private userCuoi: number | null = null;
   /** dimId → taskId của lưới đang hiển thị (để kiểm manifest khi tick offline). */
   private oCuaTask = new Map<number, number>();
   private daChuanBi = new Set<string>();
@@ -173,9 +175,14 @@ export class OfflineQueueManager {
   private async refreshStats(extra: Partial<QueueSnapshot> = {}) {
     const chu = this.vault.chu();
     if (!chu) {
-      this.setSnap({ ...THONG_KE_RONG, ...extra });
+      // Vault khoá (hết lease/401/đổi ngữ cảnh) nhưng op vẫn nằm trên thiết bị: báo `locked` để
+      // badge/banner không hiện "0 chờ" (người dùng tưởng đã đồng bộ xong) và poll vẫn kích mở lại.
+      const n =
+        this.userCuoi === null ? 0 : await this.store.demOpCuaUser(this.userCuoi).catch(() => 0);
+      this.setSnap({ ...THONG_KE_RONG, total: n, locked: n, ...extra });
       return;
     }
+    this.userCuoi = chu.ownerUserId;
     const { ops } = await this.store.docChu(khoaChu(chu));
     this.setSnap({ ...computeStats(ops, chu, (k) => this.vault.coKhoa(k)), ...extra });
   }
@@ -241,12 +248,14 @@ export class OfflineQueueManager {
   /** Mở vault (online) nếu chưa mở; đúng chủ thì đưa op paused_auth về pending. */
   private async damBaoVault(): Promise<boolean> {
     if (this.tamDungNguCanh) return false;
-    if (this.vault.chu() && this.vault.conHieuLuc()) return true;
-    if (!this.dangOnline()) return false;
-    const ok = await this.vault.moKhoa();
+    if (!this.vault.chu() || !this.vault.conHieuLuc()) {
+      if (!this.dangOnline() || !(await this.vault.moKhoa())) return false;
+    }
+    // paused_auth chỉ sinh kèm khoá vault, nên vault ACTIVE = actor đã xác minh lại → đưa về
+    // pending. Gọi ở MỌI lần (không chỉ lúc vừa mở) để lỗi IDB một lần không làm op kẹt mãi.
     const chu = this.vault.chu();
-    if (ok && chu) await this.store.moLaiPausedAuth(chu, Date.now()).catch(() => 0);
-    return ok;
+    if (chu) await this.store.moLaiPausedAuth(chu, Date.now()).catch(() => 0);
+    return true;
   }
 
   // ── Chuẩn bị khoá (online, TRƯỚC khi mất mạng) ─────────────────────────────────────────
@@ -485,16 +494,27 @@ export class OfflineQueueManager {
   }
 
   /** Bản nháp nhật ký MỚI NHẤT của ngày (mọi trạng thái — kể cả conflict) để nạp lại form. */
-  async getQueuedDiaryNote(
-    date: string,
-  ): Promise<{ kind: "diary_note"; payload: DiaryNotePayload; state: QueueState } | undefined> {
+  async getQueuedDiaryNote(date: string): Promise<
+    | {
+        kind: "diary_note";
+        payload: DiaryNotePayload;
+        state: QueueState;
+        /** Mọi bản nháp của ngày đã đọc lúc nạp — chỉ những id này được bỏ khi lưu online. */
+        operationIds: string[];
+      }
+    | undefined
+  > {
     if (!this.vault.chu()) return undefined;
     const ds = await docOpDaGiai(this.store, this.vault, this.cache).catch(() => []);
-    const cuoi = ds
-      .filter((o) => o.body.kind === "diary_note" && o.body.payload.date === date)
-      .pop();
+    const cungNgay = ds.filter((o) => o.body.kind === "diary_note" && o.body.payload.date === date);
+    const cuoi = cungNgay.at(-1);
     if (!cuoi || cuoi.body.kind !== "diary_note") return undefined;
-    return { kind: "diary_note", payload: cuoi.body.payload, state: cuoi.rec.state };
+    return {
+      kind: "diary_note",
+      payload: cuoi.body.payload,
+      state: cuoi.rec.state,
+      operationIds: cungNgay.map((o) => o.rec.operationId),
+    };
   }
 
   /**
@@ -502,12 +522,20 @@ export class OfflineQueueManager {
    * — xoá các bản nháp offline của ngày để chúng không gửi sau và bị 412/đè. Đây là quyết định rõ
    * của người dùng, không phải dọn âm thầm; op đang gửi ở tab khác vẫn bị precondition chặn.
    */
-  async discardDiaryDraft(date: string): Promise<void> {
+  async discardDiaryDraft(date: string, operationIds: readonly string[]): Promise<void> {
     const chu = this.vault.chu();
-    if (!chu) return;
+    if (!chu || operationIds.length === 0) return;
+    // Chỉ xoá ĐÚNG các bản nháp form đã nạp (người dùng đã thấy, đã gộp vào bản vừa lưu). Bản nháp
+    // của ngày mà form chưa từng nạp (vault mở muộn, tab khác vừa thêm) phải giữ để xem lại.
     const ds = await docOpDaGiai(this.store, this.vault, this.cache);
+    const chon = new Set(operationIds);
     const ids = ds
-      .filter((o) => o.body.kind === "diary_note" && o.body.payload.date === date)
+      .filter(
+        (o) =>
+          chon.has(o.rec.operationId) &&
+          o.body.kind === "diary_note" &&
+          o.body.payload.date === date,
+      )
       .map((o) => o.rec.operationId);
     await this.store.xoaTheoYeuCau(khoaChu(chu), ids);
     for (const id of ids) this.cache.delete(id);
@@ -549,8 +577,8 @@ export function enqueueDiaryNote(input: DiaryNotePayload, etag: string | null) {
 export function getQueuedDiaryNote(date: string) {
   return offlineQueue.getQueuedDiaryNote(date);
 }
-export function discardDiaryDraft(date: string) {
-  return offlineQueue.discardDiaryDraft(date);
+export function discardDiaryDraft(date: string, operationIds: readonly string[]) {
+  return offlineQueue.discardDiaryDraft(date, operationIds);
 }
 export function chuanBiOfflineNhatKy(date: string) {
   return offlineQueue.chuanBiNhatKy(date);

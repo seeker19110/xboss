@@ -670,7 +670,7 @@ test("legacy v1 không chủ: giữ nguyên byte, chỉ báo có; không đọc/
   await m.moTracking();
   await m.q.flush();
   await m.q.clear();
-  await m.q.discardDiaryDraft("2026-10-05");
+  await m.q.discardDiaryDraft("2026-10-05", ["41", "42"]);
   assert.equal(await m.q.getQueuedDiaryNote("2026-10-05"), undefined);
   assert.equal(m.gui.length, 0);
   assert.deepEqual([...db.data.get(LEGACY_STORE)!], truoc);
@@ -724,13 +724,116 @@ test("nhật ký: bản nháp mới nhất nạp lại form (kể cả conflict)
   assert.equal(m.ops().length, 2, "bản conflict không bị bản mới thay");
   const nap = await m.q.getQueuedDiaryNote("2026-10-08");
   assert.equal(nap?.payload.workDone, "bản 2");
-  // B (chủ khác) bỏ nháp cùng ngày không đụng nháp của A.
+  assert.equal(nap?.operationIds.length, 2);
+  // B (chủ khác) bỏ nháp cùng ngày — kể cả đưa đúng id của A — không đụng nháp của A.
   may.dangNhap(B);
   const b = moiTruong({ db, may });
   await b.moTracking();
-  await b.q.discardDiaryDraft("2026-10-08");
+  await b.q.discardDiaryDraft("2026-10-08", nap!.operationIds);
   assert.equal(m.ops().length, 2);
-  await m.q.discardDiaryDraft("2026-10-08");
+  await m.q.discardDiaryDraft("2026-10-08", nap!.operationIds);
+  assert.equal(m.ops().length, 0);
+});
+
+test("nhật ký: lưu online chỉ bỏ ĐÚNG bản nháp form đã nạp — bản form chưa từng thấy được giữ", async () => {
+  const m = moiTruong();
+  m.may.dangNhap(A);
+  await m.moTracking();
+  await m.q.chuanBiNhatKy("2026-10-08");
+  const body = (w: string) => ({
+    date: "2026-10-08",
+    weatherAm: null,
+    weatherPm: null,
+    workDone: w,
+    obstacles: null,
+    safetyNote: null,
+    manpower: [],
+    photoIds: [],
+  });
+  m.datPhan(() => ({ status: 412, code: "version_mismatch" }));
+  await m.q.enqueueDiaryNote(body("đã thấy"), '"1-1"');
+  await denLuc(() => m.ops()[0]?.state === "conflict");
+  const nap = await m.q.getQueuedDiaryNote("2026-10-08");
+  // Sau lúc form nạp: một bản nháp khác của cùng ngày xuất hiện (vault mở muộn / tab khác).
+  datOnline(false);
+  try {
+    await m.q.enqueueDiaryNote(body("chưa thấy"), '"1-1"');
+  } finally {
+    datOnline(true);
+  }
+  assert.equal(m.ops().length, 2);
+  await m.q.discardDiaryDraft("2026-10-08", nap!.operationIds);
+  assert.equal(m.ops().length, 1, "không xoá bản nháp người dùng chưa từng thấy");
+  assert.equal((await m.q.getQueuedDiaryNote("2026-10-08"))?.payload.workDone, "chưa thấy");
+  // Form không nạp nháp nào → không xoá gì.
+  await m.q.discardDiaryDraft("2026-10-08", []);
+  assert.equal(m.ops().length, 1);
+});
+
+test("vault khoá (401) nhưng op còn trên thiết bị → thống kê báo locked, không báo 0 chờ", async () => {
+  const m = moiTruong();
+  m.may.dangNhap(A);
+  await m.moTracking();
+  datOnline(false);
+  try {
+    await m.q.enqueueTick(DIM[0], true);
+  } finally {
+    datOnline(true);
+  }
+  m.datPhan(() => ({ status: 401 }));
+  await m.q.flush();
+  assert.equal(m.vault.trangThai, "locked");
+  const snap = m.q.getSnapshot();
+  assert.equal(snap.total, 1);
+  assert.equal(snap.locked, 1);
+});
+
+test("lease được gia hạn trong lúc chờ mạng lâu → tab khác không giành lease, op gửi đúng 1 lần", async () => {
+  const may = taoMayChuGia();
+  const db = new MemoryTxDb();
+  may.dangNhap(A);
+  const m = moiTruong({ db, may });
+  await m.moTracking();
+  datOnline(false);
+  try {
+    await m.q.enqueueTick(DIM[0], true);
+  } finally {
+    datOnline(true);
+  }
+  let gio = Date.now();
+  const now = () => gio;
+  let dangCho!: () => void;
+  const daVaoSend = new Promise<void>((r) => (dangCho = r));
+  let tha!: () => void;
+  const cho = new Promise<void>((r) => (tha = r));
+  const p1 = flushQueue({
+    store: m.store,
+    vault: m.vault,
+    holder: "tab-1",
+    now,
+    nhipGiaHanMs: 2,
+    send: async (req) => {
+      dangCho();
+      await cho;
+      return { status: 200, receiptOperationId: req.headers["Idempotency-Key"] };
+    },
+  });
+  await daVaoSend;
+  let laiLease: unknown;
+  try {
+    // Upload chậm: đồng hồ trôi quá TTL ban đầu, nhưng nhịp gia hạn chạy trong lúc chờ.
+    for (let i = 0; i < 4; i++) {
+      gio += LEASE_TTL_MS / 2;
+      await new Promise((r) => setTimeout(r, 15));
+    }
+    laiLease = await m.store.xinLease(m.vault.chu()!, "tab-2", now());
+  } finally {
+    tha(); // luôn thả send — tránh treo tiến trình test khi assert đỏ
+  }
+  const k1 = await p1;
+  assert.equal(laiLease, null, "tab khác không được giành lease đang gia hạn");
+  assert.equal(k1.matLease, false);
+  assert.equal(k1.daGui, 1);
   assert.equal(m.ops().length, 0);
 });
 

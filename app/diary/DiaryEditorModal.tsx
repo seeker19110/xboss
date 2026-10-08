@@ -81,6 +81,8 @@ export default function DiaryEditorModal({
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
   const [hasOfflineDraft, setHasOfflineDraft] = useState(false);
+  // Id các bản nháp offline form ĐÃ nạp — lưu online thành công chỉ bỏ đúng những bản này.
+  const [nhapDaNap, setNhapDaNap] = useState<string[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   // Phiên bản mạnh của nhật ký trên server (S06): PUT full-replace gửi lại qua If-Match để không
   // đè bản người khác vừa lưu; null = ngày chưa có nhật ký → tạo mới bằng If-None-Match: *.
@@ -133,6 +135,7 @@ export default function DiaryEditorModal({
       if (queued && queued.kind === "diary_note") {
         const p = queued.payload;
         setHasOfflineDraft(true);
+        setNhapDaNap(queued.operationIds);
         setWeatherAm(p.weatherAm ?? "");
         setWeatherPm(p.weatherPm ?? "");
         setWorkDone(p.workDone ?? "");
@@ -148,6 +151,7 @@ export default function DiaryEditorModal({
         setSelectedPhotoIds(new Set<number>(p.photoIds));
       } else {
         setHasOfflineDraft(false);
+        setNhapDaNap([]);
         setWeatherAm(j.diary?.weatherAm ?? "");
         setWeatherPm(j.diary?.weatherPm ?? "");
         setWorkDone(j.diary?.workDone ?? j.prefill?.workDone ?? "");
@@ -235,7 +239,8 @@ export default function DiaryEditorModal({
         setEtag(typeof j.etag === "string" ? j.etag : null);
         // Đã lưu trực tiếp thành công → xoá nháp offline cũ của ngày này (nếu có) để nó
         // không tự flush sau đó và đè (full-replace) lên bản vừa lưu, gây mất dữ liệu.
-        await discardDiaryDraft(date);
+        await discardDiaryDraft(date, nhapDaNap);
+        setNhapDaNap([]);
         setHasOfflineDraft(false);
         setXungDot(false);
         setBanServer(null);
