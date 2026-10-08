@@ -89,7 +89,13 @@ export function useTrackingData(sheet: string) {
   }, [data?.sheet.id]);
 
   // Hàng đợi offline: tick khi mất mạng được gửi lại tự động lúc có mạng.
-  const { pending: offlinePending, online, enqueue, enqueueBatch } = useOfflineTickQueue(load);
+  const {
+    pending: offlinePending,
+    online,
+    ready: offlineReady,
+    enqueue,
+    enqueueBatch,
+  } = useOfflineTickQueue(load);
 
   // Đồng bộ đa người dùng: SSE (/api/events, độ trễ ~3s) — lỗi/timeout thì
   // fallback về poll watermark 10s như trước. Người khác sửa → tự reload + toast.
@@ -192,6 +198,7 @@ export function useTrackingData(sheet: string) {
     qcBlocked,
     offlinePending,
     online,
+    offlineReady,
     enqueue,
     enqueueBatch,
   };

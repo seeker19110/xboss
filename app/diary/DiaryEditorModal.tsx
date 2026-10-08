@@ -18,6 +18,7 @@ import { Button } from "@/app/components/ui";
 import EmptyState from "@/app/components/EmptyState";
 import { showToast } from "@/app/components/Toast";
 import {
+  chuanBiOfflineNhatKy,
   enqueueDiaryNote,
   getQueuedDiaryNote,
   discardDiaryDraft,
@@ -97,6 +98,9 @@ export default function DiaryEditorModal({
     let cancelled = false;
     setLoading(true);
     (async () => {
+      // S07: có mạng → mở vault + xin khoá nhật ký cho tháng này (để lưu offline được, và để
+      // đọc bản nháp mã hoá của chính mình). Lỗi không chặn mở form.
+      if (canEdit) await chuanBiOfflineNhatKy(date).catch(() => undefined);
       // Có bản nháp offline chưa gửi của ngày này → ưu tiên nạp form từ đó (không phải từ
       // server), nhưng vẫn lấy trạng thái khoá + danh sách ảnh prefill từ server.
       const queued = await getQueuedDiaryNote(date);
@@ -154,7 +158,7 @@ export default function DiaryEditorModal({
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [date, canEdit]);
 
   const totalHeadcount = manpower.reduce((s, m) => s + (parseInt(m.headcount) || 0), 0);
 
@@ -194,13 +198,14 @@ export default function DiaryEditorModal({
     };
     // Mất mạng → xếp hàng đợi offline (full-replace theo ngày), đóng modal.
     const queueOffline = async () => {
-      const queued = await enqueueDiaryNote({ date, ...body });
+      // Precondition lấy từ etag form đang dựa vào, CỐ ĐỊNH theo thao tác (S06/S07).
+      const queued = await enqueueDiaryNote({ date, ...body }, etagGui);
       if (!queued.ok) {
         showToast(queued.error, "error");
         setSaving(false);
         return;
       }
-      showToast("Đã lưu offline — sẽ tự gửi khi có mạng");
+      showToast("Đã lưu trên thiết bị (chưa lên máy chủ) — sẽ tự gửi khi có mạng");
       setSaving(false);
       onClose();
     };

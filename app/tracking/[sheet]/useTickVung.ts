@@ -18,7 +18,7 @@ import {
 import { dungLoTuDan } from "./dan";
 import { dungLoTick, oTrongVung } from "./tick";
 import { guiLoTick } from "./tickApi";
-import { OFFLINE_QUEUE_QUARANTINE_ERROR } from "@/app/components/offlineQueue";
+import { OFFLINE_SAVE_ERROR } from "@/app/components/offlineQueue";
 import type { Grid } from "./types";
 
 // Phần tử đang được gõ liệu — bỏ qua dán/copy vùng ở đây để không cướp thao tác của ô đó.
@@ -70,7 +70,7 @@ export function useTickVung(opts: {
             daGui.push(lo); // chỉ coi là xong nếu queue đã xác nhận lưu
             continue;
           }
-          showToast(OFFLINE_QUEUE_QUARANTINE_ERROR, "error");
+          showToast(OFFLINE_SAVE_ERROR, "error");
           break;
         }
         if (kq.trangThai === "tuChoi") {

@@ -73,9 +73,9 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
   const [viewer, setViewer] = useState<Photo | null>(null);
   // Ảnh chụp offline đang chờ gửi — hiển thị cùng lưới ảnh thật với badge "Chờ gửi".
   const [pendingPhotos, setPendingPhotos] = useState<
-    { id: number; caption: string; size: number; queuedAt: number; tries: number }[]
+    { id: string; caption: string; size: number; queuedAt: number; tries: number }[]
   >([]);
-  const urlMapRef = useRef<Map<number, string>>(new Map());
+  const urlMapRef = useRef<Map<string, string>>(new Map());
 
   const load = useCallback(() => {
     fetch(`/api/tasks/${task.id}/photos`)
@@ -146,7 +146,7 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
         setError(r.error);
         return false;
       }
-      showToast("Đã xếp vào hàng đợi offline — tự gửi khi có mạng");
+      showToast("Đã lưu ảnh trên thiết bị (chưa lên máy chủ) — tự gửi khi có mạng");
       await refreshPending();
       return true;
     };

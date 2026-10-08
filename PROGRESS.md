@@ -1,5 +1,41 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S07: queue vault và IndexedDB nguyên tử
+
+Đặc tả lát cắt `docs/nang-cap/AUDIT-S07-OFFLINE-QUEUE-VAULT.md` (spec cha A2-FR05/FR09..FR12,
+DATA-MIGRATIONS §5, PLAN §S07). Chỉ client `app/components/offlineQueue/*` + điểm gọi tối thiểu; **UI
+phục hồi đầy đủ (S08) chưa làm**. Không thêm dependency, không migration. **Gỡ quarantine**
+(`OFFLINE_QUEUE_QUARANTINED = false`, giữ làm công tắc dừng khẩn cấp) vì đã đủ điều kiện chặn của S06:
+Idempotency-Key cố định/op, `X-XBoss-Context`, `If-Match`/`If-None-Match` từ etag lúc enqueue.
+
+- **Vault client** `vault.ts` (mới): ACTIVE chỉ sau xác minh online (`/api/auth/me` → context S05, tự đăng
+  ký thiết bị khi 403 `device_unregistered` → unlock → `/api/auth/me` lại, actor phải trùng); DEK
+  non-extractable chỉ trong bộ nhớ; lease context đo bằng đồng hồ đơn điệu + tường (đồng hồ lùi/hết
+  lease → khoá); đổi ngữ cảnh → khoá + dừng gửi. Khoá xin trước khi mất mạng: lưới tracking (manifest
+  ≤500 task, subcon chỉ task được giao), modal nhật ký (cửa sổ tháng).
+- **Envelope v2 mã hoá** (AES-GCM, AAD `aadPayload` gắn key/manifest/owner/org/project/device/op/kind/
+  sequence): payload (kể cả byte ảnh, ngày nhật ký, etag) chỉ nằm trong ciphertext; giải mã sai chủ bị
+  từ chối trước crypto.
+- **IndexedDB `xboss-offline` v2**: thêm `ops2` + `meta`, store v1 `ops` giữ nguyên (chỉ đếm → trạng thái
+  `legacy`, không tự nhận chủ/không xoá); kiểm catalog khi nâng cấp; blocked/VersionError/quota/abort →
+  không báo lưu. Dedup+enqueue nguyên tử bằng OCC `meta.rev` (mã hoá ngoài transaction, ghi + kiểm
+  trong một transaction), chỉ gộp op chưa từng gửi.
+- **Lease/fencing** trong `meta` (TTL 30 s, token tăng mỗi kỳ mới, op `sending` mồ côi về `pending` cùng
+  key); **FIFO theo tài nguyên**; phân loại kết quả theo A2-FR10 — `conflict`/`rejected`/`paused_auth`
+  bền, không TTL, không xoá âm thầm; 2xx thiếu receipt đúng op → `conflict`.
+- Sửa lỗi phát hiện khi viết test: cùng một tab gửi lỗi (throw) để op kẹt `sending` vĩnh viễn → kỳ
+  lease mới đổi token + lỗi sender coi như lỗi mạng.
+- **Test**: `tests/offline-queue-vault.test.ts` (18 ca: mã hoá/AAD sai chủ, quota/abort, dedup nguyên
+  tử, OCC, 2 tab lease/fencing, FIFO, 401/409/412/428/429/5xx/rejected bền, legacy, đổi dự án, đồng hồ
+  lùi), `tests/offline-queue-route.test.ts` (4 ca **route thật bằng `xboss_app`**: mất ACK replay một
+  hiệu ứng, lô + FIFO, nhật ký 412 giữ `conflict`, đổi dự án không gửi), viết lại
+  `offline-queue.test.ts`, `audit-offline-store-commit.test.ts`, `audit-s07-offline-flush-regressions.test.ts`,
+  `audit-small-offline-flush.test.ts`. Test mới đỏ trên code cũ. `test:mutation`: thay mutation
+  "nhật ký 428/412" (hàm cũ không còn) bằng 10 mutation S07 — cả 10 bị bắt. E2E trình duyệt NOT_RUN.
+- **Cần quyết/còn mở:** server đối chiếu op với manifest khoá (contract chưa có trường keyId); kiểm
+  context cho request online; thứ tự FIFO khi op cũ không giải mã được; UI conflict/rejected/legacy +
+  đối soát legacy theo thiết bị (S08/D03); `XBOSS_OFFLINE_KEK` cho job e2e CI.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S06: receipt và precondition ở endpoint queue thật
 
 Đặc tả lát cắt `docs/nang-cap/AUDIT-S06-OFFLINE-RECEIPT.md` (spec cha A2-FR09..FR11, DATA-CONTRACTS

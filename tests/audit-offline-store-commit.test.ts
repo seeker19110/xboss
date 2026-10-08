@@ -1,236 +1,276 @@
-// Kiểm đúng source store.ts bằng sự kiện IndexedDB điều khiển được; không giả là browser E2E.
+// Adapter IndexedDB THẬT của hàng đợi offline v2 (app/components/offlineQueue/store.ts) chạy với
+// sự kiện IDB điều khiển được — không giả là browser E2E. Kiểm: chỉ resolve khi transaction
+// complete; request success rồi abort (quota) → reject; nâng cấp v1→v2 chỉ THÊM store (legacy `ops`
+// giữ nguyên), catalog sai → huỷ nâng cấp/không mở; blocked/versionchange/VersionError → lỗi rõ.
+// Map AC: A2-AC05, A2-AC07.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { runInNewContext } from "node:vm";
 import { setImmediate } from "node:timers/promises";
-import ts from "typescript";
+import {
+  DB_NAME,
+  DB_VERSION,
+  IdbTxDb,
+  LEGACY_STORE,
+  moCsdl,
+  STORE_META,
+  STORE_OPS,
+} from "@/app/components/offlineQueue/store";
 
-type RequestStub = {
+type Req = {
   result?: unknown;
-  error?: Error;
+  error?: Error | null;
+  transaction?: FakeTx | null;
   onsuccess?: () => void;
   onerror?: () => void;
   onblocked?: () => void;
+  onupgradeneeded?: () => void;
 };
-type TransactionStub = {
-  request: RequestStub;
-  error?: Error;
+type FakeStore = {
+  keyPath: string;
+  indexNames: Set<string>;
+  createIndex: (name: string) => void;
+};
+type FakeTx = {
+  error: Error | null;
   oncomplete?: () => void;
   onabort?: () => void;
-  onerror?: () => void;
+  aborted: boolean;
+  requests: Req[];
   abort: () => void;
-  objectStore: () => Record<string, () => RequestStub>;
-};
-type Store = {
-  add: (value: unknown) => Promise<number>;
-  update: (value: unknown) => Promise<void>;
-  remove: (id: number) => Promise<void>;
-  clear: () => Promise<void>;
-  getAll: () => Promise<{ id: number }[]>;
+  objectStore: (name: string) => unknown;
 };
 
-function fixture() {
-  const opens: RequestStub[] = [];
-  const transactions: TransactionStub[] = [];
+const names = (s: Set<string>) => ({
+  contains: (n: string) => s.has(n),
+  [Symbol.iterator]: () => s.values(),
+});
+
+function fakeDb(stores: Record<string, FakeStore>) {
+  const txs: FakeTx[] = [];
   let closes = 0;
-  let syncError: Error | undefined;
-  const db: {
-    close: () => void;
-    transaction: () => TransactionStub;
-    onversionchange?: () => void;
-    onclose?: () => void;
-  } = {
+  const storeSet = new Set(Object.keys(stores));
+  let syncError: Error | null = null;
+  const db = {
+    get objectStoreNames() {
+      return names(storeSet);
+    },
+    onversionchange: undefined as undefined | (() => void),
+    onclose: undefined as undefined | (() => void),
     close: () => closes++,
+    createObjectStore: (n: string, o: { keyPath: string }) => {
+      storeSet.add(n);
+      const s: FakeStore = {
+        keyPath: o.keyPath,
+        indexNames: new Set(),
+        createIndex: (i: string) => s.indexNames.add(i),
+      };
+      stores[n] = s;
+      return s;
+    },
     transaction: () => {
-      const request: RequestStub = {};
-      const tx: TransactionStub = {
-        request,
-        abort: () => tx.onabort?.(),
+      const tx: FakeTx = {
+        error: null,
+        aborted: false,
+        requests: [],
+        abort: () => {
+          tx.aborted = true;
+          tx.onabort?.();
+        },
         objectStore: () => {
-          const issue = () => {
+          const issue = (result?: unknown) => {
             if (syncError) throw syncError;
-            return request;
+            const r: Req = { result };
+            tx.requests.push(r);
+            return r;
           };
-          return { add: issue, put: issue, delete: issue, clear: issue, getAll: issue };
+          return {
+            get: () => issue(undefined),
+            put: () => issue("k"),
+            delete: () => issue(undefined),
+            count: () => issue(0),
+            index: () => ({ getAll: () => issue([]), count: () => issue(0) }),
+          };
         },
       };
-      transactions.push(tx);
+      txs.push(tx);
       return tx;
     },
   };
-  const evaluatedModule = { exports: {} };
-  const source = readFileSync("app/components/offlineQueue/store.ts", "utf8");
-  runInNewContext(
-    ts.transpileModule(source, {
-      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-    }).outputText,
-    {
-      exports: evaluatedModule.exports,
-      module: evaluatedModule,
-      indexedDB: {
-        open: () => {
-          const req: RequestStub = { result: db };
-          opens.push(req);
-          return req;
-        },
-      },
-    },
-  );
-  const { IdbQueueStore } = evaluatedModule.exports as { IdbQueueStore: new () => Store };
   return {
-    store: new IdbQueueStore(),
-    opens,
-    transactions,
     db,
+    txs,
+    stores,
     closes: () => closes,
-    throwOnRequest: (error: Error) => {
-      syncError = error;
+    throwSync: (e: Error) => {
+      syncError = e;
     },
   };
 }
 
-for (const operation of ["add", "update", "remove", "clear"] as const) {
-  for (const abort of [false, true]) {
-    test(`IDB ${operation}: chờ ${abort ? "abort" : "commit"}`, async () => {
-      const f = fixture();
-      let settled = false;
-      const promise =
-        operation === "add"
-          ? f.store.add({})
-          : operation === "update"
-            ? f.store.update({})
-            : operation === "remove"
-              ? f.store.remove(42)
-              : f.store.clear();
-      const observed = promise.then(
-        (value) => {
-          settled = true;
-          return { ok: true, value };
-        },
-        (error: unknown) => {
-          settled = true;
-          return { ok: false, error };
-        },
-      );
-      f.opens[0].onsuccess?.();
-      await setImmediate();
-      const tx = f.transactions[0];
-      tx.request.result = operation === "add" ? 42 : undefined;
-      tx.request.onsuccess?.();
-      await setImmediate();
-      assert.equal(settled, false);
-      if (abort) {
-        tx.error = new Error("quota hoặc abort sau request success");
-        tx.onabort?.();
-      } else tx.oncomplete?.();
-      const result = await observed;
-      assert.equal(result.ok, !abort);
-      if (result.ok && "value" in result) {
-        assert.equal(result.value, operation === "add" ? 42 : undefined);
-      }
-    });
-  }
+async function chayTx(abort: boolean) {
+  const f = fakeDb({});
+  const idb = new IdbTxDb(async () => f.db as unknown as IDBDatabase);
+  let xong = false;
+  const p = idb
+    .tx([STORE_OPS], "readwrite", async (t) => {
+      await t.put(STORE_OPS, { operationId: "a" });
+      return "đã ghi";
+    })
+    .then(
+      (v) => ((xong = true), { ok: true as const, v }),
+      (e: unknown) => ((xong = true), { ok: false as const, e }),
+    );
+  await setImmediate();
+  const tx = f.txs[0];
+  tx.requests[0].onsuccess?.();
+  await setImmediate();
+  assert.equal(xong, false, "request success chưa phải COMMIT");
+  if (abort) {
+    tx.error = new Error("QuotaExceededError");
+    tx.onabort?.();
+  } else tx.oncomplete?.();
+  return p;
 }
 
-test("IDB: lỗi mở không cache promise bị reject, lần sau mở lại được", async () => {
-  const f = fixture();
-  const first = assert.rejects(f.store.getAll(), /open failed/);
-  f.opens[0].error = new Error("open failed");
-  f.opens[0].onerror?.();
-  await first;
-  const second = f.store.getAll();
-  assert.equal(f.opens.length, 2);
-  f.opens[1].onsuccess?.();
-  await setImmediate();
-  const tx = f.transactions[0];
-  tx.request.result = [{ id: 2 }, { id: 1 }];
-  tx.request.onsuccess?.();
-  tx.oncomplete?.();
-  assert.deepEqual(await second, [{ id: 1 }, { id: 2 }]);
+test("IDB tx: chỉ resolve khi complete", async () => {
+  const kq = await chayTx(false);
+  assert.deepEqual(kq, { ok: true, v: "đã ghi" });
 });
 
-test("IDB: versionchange đóng connection và thao tác kế tiếp mở lại", async () => {
-  const f = fixture();
-  const first = f.store.clear();
-  f.opens[0].onsuccess?.();
-  await setImmediate();
-  f.transactions[0].request.onsuccess?.();
-  f.transactions[0].oncomplete?.();
-  await first;
+test("IDB tx: request success rồi abort (quota) → reject, KHÔNG báo đã lưu (A2-AC05)", async () => {
+  const kq = await chayTx(true);
+  assert.equal(kq.ok, false);
+  assert.match(String((kq as { e: Error }).e.message), /Quota/);
+});
+
+test("IDB tx: callback ném lỗi → abort transaction + reject đúng lỗi đó", async () => {
+  const f = fakeDb({});
+  const idb = new IdbTxDb(async () => f.db as unknown as IDBDatabase);
+  const p = idb.tx([STORE_OPS], "readwrite", async () => {
+    throw new Error("vượt hạn mức ảnh");
+  });
+  await assert.rejects(p, /hạn mức/);
+  assert.equal(f.txs[0].aborted, true);
+});
+
+test("IDB tx: lỗi đồng bộ khi tạo request (DataCloneError) → reject, không ghi tiếp", async () => {
+  const f = fakeDb({});
+  f.throwSync(new Error("DataCloneError"));
+  const idb = new IdbTxDb(async () => f.db as unknown as IDBDatabase);
+  await assert.rejects(
+    idb.tx([STORE_OPS], "readwrite", async (t) => {
+      await t.put(STORE_OPS, {});
+      return 1;
+    }),
+    /DataCloneError/,
+  );
+  assert.equal(f.txs[0].aborted, true);
+});
+
+test("IDB: versionchange đóng connection, thao tác kế tiếp mở lại", async () => {
+  const f = fakeDb({});
+  let mo = 0;
+  const idb = new IdbTxDb(async () => (mo++, f.db as unknown as IDBDatabase));
+  await idb.storeNames();
   f.db.onversionchange?.();
   assert.equal(f.closes(), 1);
-  const second = f.store.clear();
-  assert.equal(f.opens.length, 2);
-  f.opens[1].onsuccess?.();
-  await setImmediate();
-  f.transactions[1].request.onsuccess?.();
-  f.transactions[1].oncomplete?.();
-  await second;
+  await idb.storeNames();
+  assert.equal(mo, 2);
 });
 
-test("IDB: open bị blocked trả lỗi và đóng connection đến muộn", async () => {
-  const f = fixture();
-  const rejected = assert.rejects(f.store.clear(), /tab khác/);
-  f.opens[0].onblocked?.();
-  await rejected;
-  f.opens[0].onsuccess?.();
+function fakeFactory(dbFake: ReturnType<typeof fakeDb>) {
+  const opens: Req[] = [];
+  const calls: [string, number][] = [];
+  return {
+    opens,
+    calls,
+    factory: {
+      open: (name: string, v: number) => {
+        calls.push([name, v]);
+        const req: Req = { result: dbFake.db, transaction: null };
+        opens.push(req);
+        return req;
+      },
+    } as unknown as IDBFactory,
+  };
+}
+
+test("nâng cấp v1→v2 chỉ THÊM ops2/meta, store legacy `ops` giữ nguyên (không drop) (A2-AC07)", async () => {
+  const legacy: FakeStore = { keyPath: "id", indexNames: new Set(), createIndex: () => {} };
+  const f = fakeDb({ [LEGACY_STORE]: legacy });
+  const ff = fakeFactory(f);
+  const p = moCsdl(ff.factory);
+  assert.deepEqual(ff.calls, [[DB_NAME, DB_VERSION]]);
+  const upTx = f.db.transaction() as FakeTx;
+  ff.opens[0].transaction = upTx;
+  ff.opens[0].onupgradeneeded?.();
+  ff.opens[0].onsuccess?.();
+  await p;
+  assert.ok(f.stores[LEGACY_STORE] === legacy, "store legacy còn nguyên");
+  assert.equal(f.stores[STORE_OPS].keyPath, "operationId");
+  assert.deepEqual([...f.stores[STORE_OPS].indexNames].sort(), ["owner", "ownerUserId"]);
+  assert.equal(f.stores[STORE_META].keyPath, "k");
+  assert.equal(upTx.aborted, false);
+});
+
+test("catalog local sai (ops2 có keyPath khác) → huỷ nâng cấp, không sửa/xoá gì", async () => {
+  const sai: FakeStore = { keyPath: "id", indexNames: new Set(["owner"]), createIndex: () => {} };
+  const f = fakeDb({ [STORE_OPS]: sai });
+  const ff = fakeFactory(f);
+  const p = moCsdl(ff.factory);
+  const upTx: FakeTx = {
+    ...(f.db.transaction() as FakeTx),
+    objectStore: (n: string) => f.stores[n],
+  };
+  upTx.abort = () => {
+    upTx.aborted = true;
+  };
+  ff.opens[0].transaction = upTx;
+  ff.opens[0].onupgradeneeded?.();
+  assert.equal(upTx.aborted, true);
+  ff.opens[0].error = new Error("AbortError");
+  ff.opens[0].onerror?.();
+  await assert.rejects(p, /AbortError/);
+  assert.equal(f.stores[STORE_OPS], sai);
+});
+
+test("mở thành công nhưng thiếu store v2 → reject + đóng connection (không dùng catalog lạ)", async () => {
+  const f = fakeDb({
+    [LEGACY_STORE]: { keyPath: "id", indexNames: new Set(), createIndex: () => {} },
+  });
+  const ff = fakeFactory(f);
+  const p = moCsdl(ff.factory);
+  ff.opens[0].onsuccess?.();
+  await assert.rejects(p, /Catalog/);
   assert.equal(f.closes(), 1);
 });
 
-test("IDB: lỗi request được giữ qua transaction abort", async () => {
-  const f = fixture();
-  const rejected = assert.rejects(f.store.add({}), /quota/);
-  f.opens[0].onsuccess?.();
-  await setImmediate();
-  const tx = f.transactions[0];
-  tx.request.error = new Error("quota");
-  tx.request.onerror?.();
-  tx.onabort?.();
-  await rejected;
+test("upgrade bị tab cũ chặn → lỗi rõ (không lưu), connection đến muộn bị đóng", async () => {
+  const f = fakeDb({});
+  const ff = fakeFactory(f);
+  const p = moCsdl(ff.factory);
+  ff.opens[0].onblocked?.();
+  await assert.rejects(p, /tab cũ/);
+  ff.opens[0].onsuccess?.();
+  assert.equal(f.closes(), 1);
 });
 
-test("IDB: lỗi DataCloneError đồng bộ không báo đã lưu", async () => {
-  const f = fixture();
-  f.throwOnRequest(new Error("không clone được"));
-  const rejected = assert.rejects(f.store.add({}));
-  f.opens[0].onsuccess?.();
-  await rejected;
+test("CSDL đã ở version cao hơn (VersionError) → reject, không hạ cấp/xoá", async () => {
+  const f = fakeDb({});
+  const ff = fakeFactory(f);
+  const p = moCsdl(ff.factory);
+  ff.opens[0].error = Object.assign(new Error("VersionError"), { name: "VersionError" });
+  ff.opens[0].onerror?.();
+  await assert.rejects(p, /VersionError/);
 });
 
-test("localStorage migration preserves exact unknown-owner bytes", async () => {
-  const bytes = '{"legacy":[{"id":7,"payload":"keep\u0000exact"}],"extra":true}';
-  const evaluatedModule = { exports: {} };
-  let reads = 0;
-  let removals = 0;
-  const storage = new Map([["xboss-offline-ticks", bytes]]);
-  runInNewContext(
-    ts.transpileModule(readFileSync("app/components/offlineQueue/store.ts", "utf8"), {
-      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-    }).outputText,
-    {
-      exports: evaluatedModule.exports,
-      module: evaluatedModule,
-      indexedDB: {},
-      localStorage: {
-        getItem: () => {
-          reads++;
-          return storage.get("xboss-offline-ticks") ?? null;
-        },
-        removeItem: (key: string) => {
-          removals++;
-          storage.delete(key);
-        },
-      },
-    },
-  );
-  const { migrateFromLocalStorage } = evaluatedModule.exports as {
-    migrateFromLocalStorage: (store: { add: () => Promise<number> }) => Promise<void>;
-  };
-  let adds = 0;
-  await migrateFromLocalStorage({ add: async () => ++adds });
-  assert.equal(storage.get("xboss-offline-ticks"), bytes);
-  assert.equal(reads, 0);
-  assert.equal(removals, 0);
-  assert.equal(adds, 0);
+test("IdbTxDb: mở lỗi không cache promise bị reject, lần sau mở lại được", async () => {
+  const f = fakeDb({});
+  let lan = 0;
+  const idb = new IdbTxDb(async () => {
+    if (++lan === 1) throw new Error("open failed");
+    return f.db as unknown as IDBDatabase;
+  });
+  await assert.rejects(idb.storeNames(), /open failed/);
+  assert.deepEqual(await idb.storeNames(), []);
 });
