@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangNhapDuAn, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangNhapDuAn, dangXuat, requestRieng } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -87,12 +87,16 @@ test(
     const { PATCH } = await import("@/app/api/boq/[id]/route");
 
     // Bắn 2 PATCH gần như đồng thời (không await tuần tự) — mô phỏng 2 người sửa cùng lúc.
-    const p1 = PATCH(req(`http://localhost/api/boq/${boqId}`, { qtyContract: 20 }), {
-      params: Promise.resolve({ id: String(boqId) }),
-    });
-    const p2 = PATCH(req(`http://localhost/api/boq/${boqId}`, { qtyContract: 30 }), {
-      params: Promise.resolve({ id: String(boqId) }),
-    });
+    const p1 = requestRieng(() =>
+      PATCH(req(`http://localhost/api/boq/${boqId}`, { qtyContract: 20 }), {
+        params: Promise.resolve({ id: String(boqId) }),
+      }),
+    );
+    const p2 = requestRieng(() =>
+      PATCH(req(`http://localhost/api/boq/${boqId}`, { qtyContract: 30 }), {
+        params: Promise.resolve({ id: String(boqId) }),
+      }),
+    );
     const [res1, res2] = await Promise.all([p1, p2]);
     assert.equal(res1.status, 200);
     assert.equal(res2.status, 200);

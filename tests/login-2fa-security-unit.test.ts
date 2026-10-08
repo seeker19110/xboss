@@ -5,6 +5,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { NextRequest } from "next/server";
 import { generate } from "otplib";
 import { encryptTotpSecret, generateNewTotpSecret } from "@/lib/bao-mat/totp";
+import { requestRieng } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { makeToken, COOKIE, COOKIE_MAX_AGE } from "@/lib/bao-mat/session-token";
 
 // Biên DB mô phỏng khoá row theo transaction; handler thật vẫn kiểm/tiêu thụ mã.
@@ -97,14 +98,20 @@ function request(code: string) {
 test("hai lần xác nhận đồng thời chỉ tiêu thụ TOTP một lần", async () => {
   const { POST } = await import("@/app/api/auth/login/2fa/route");
   const code = await generate({ secret: plainSecret, digits: 6, period: 30 });
-  const responses = await Promise.all([POST(request(code)), POST(request(code))]);
+  const responses = await Promise.all([
+    requestRieng(() => POST(request(code))),
+    requestRieng(() => POST(request(code))),
+  ]);
   assert.deepEqual(responses.map((r) => r.status).sort(), [200, 401]);
   assert.equal(responses.filter((r) => r.cookies.get(COOKIE)).length, 1);
 });
 
 test("hai lần xác nhận đồng thời chỉ tiêu thụ mã dự phòng một lần", async () => {
   const { POST } = await import("@/app/api/auth/login/2fa/route");
-  const responses = await Promise.all([POST(request("abcde-12345")), POST(request("abcde-12345"))]);
+  const responses = await Promise.all([
+    requestRieng(() => POST(request("abcde-12345"))),
+    requestRieng(() => POST(request("abcde-12345"))),
+  ]);
   assert.deepEqual(responses.map((r) => r.status).sort(), [200, 401]);
   assert.equal(responses.filter((r) => r.cookies.get(COOKIE)).length, 1);
   assert.equal(usedRecovery, true);

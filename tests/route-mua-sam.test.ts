@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangNhap, dangNhapDuAn, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangNhap, dangNhapDuAn, dangXuat, requestRieng } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -1251,7 +1251,6 @@ test(
   S,
   async () => {
     const { query } = await import("@/lib/db");
-    const { runWithRequestContext } = await import("@/lib/nen/request-context");
     const projectId = await taoDuAn("precvdup");
     const pm = await taoUser("pm", "precvdup");
     const matId = await taoVatTu("precvdup", { projectId });
@@ -1264,7 +1263,7 @@ test(
     const { POST: receive } = await import("@/app/api/purchase-orders/[id]/receive/route");
     // Mỗi request một ngữ cảnh riêng như production.
     const nhap = (qty: number) =>
-      runWithRequestContext({}, () =>
+      requestRieng(() =>
         receive(jreq("/x", { items: [{ poItemId: items[0].id, qtyReceived: qty }] }, "POST"), {
           params: Promise.resolve({ id: String(poId) }),
         }),

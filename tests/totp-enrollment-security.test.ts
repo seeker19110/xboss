@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup";
-import { dangNhap, datCookie } from "./helpers/phien";
+import { dangNhap, datCookie, requestRieng } from "./helpers/phien";
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -126,7 +126,10 @@ test("confirm: hoàn tất cấu hình chờ, phát cookie rồi bảo vệ cấ
 test("setup và confirm đồng thời: chỉ trạng thái tuần tự hợp lệ được lưu", S, async () => {
   const u = await taoTaiKhoan(false);
   const code = await generate({ secret: u.secret, digits: 6, period: 30 });
-  const [confirmation, replacement] = await Promise.all([confirm(yeuCau(code)), setup()]);
+  const [confirmation, replacement] = await Promise.all([
+    requestRieng(() => confirm(yeuCau(code))),
+    requestRieng(() => setup()),
+  ]);
   const after = await trangThai(u.id);
   if (confirmation.status === 200) {
     assert.ok([401, 409].includes(replacement.status));

@@ -15,7 +15,7 @@ import {
   type CertLineInput,
   type CertTotalsMasked,
 } from "@/lib/tai-chinh/paymentcerts";
-import { canhBaoDot } from "@/lib/tai-chinh/ipc-quyet-dinh";
+import { canhBaoDot, khoaHopDongVaDot } from "@/lib/tai-chinh/ipc-quyet-dinh";
 import {
   MONEY_FORMAT_HEADER,
   MONEY_FORMAT_DECIMAL_V1,
@@ -28,18 +28,17 @@ import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 
-// Xác nhận đợt thuộc hợp đồng của dự án đang chọn (M22) — chặn xem/sửa đợt của
-// hợp đồng thuộc dự án khác qua đoán/liệt kê id.
+// Xác nhận đợt thuộc hợp đồng của dự án đang chọn (M22) — chặn xem đợt của hợp đồng thuộc dự
+// án khác qua đoán/liệt kê id. Đường GHI (PATCH) khoá qua `khoaHopDongVaDot` (S13d).
 async function certInProject(
   id: number,
   projectId: number | null,
-  lock = false,
 ): Promise<{ status: string; contractId: number } | undefined> {
   if (projectId == null) return undefined;
   return queryOne<{ status: string; contractId: number }>(
     `SELECT c.status, c.contract_id AS "contractId"
        FROM payment_certs c JOIN contracts ct ON ct.id = c.contract_id
-      WHERE c.id = ? AND ct.project_id = ?${lock ? " FOR UPDATE OF c" : ""}`,
+      WHERE c.id = ? AND ct.project_id = ?`,
     id,
     projectId,
   );
@@ -168,11 +167,13 @@ export async function PATCH(
 
   const projectId = await getCurrentProjectId(user);
   try {
-    // Khoá đợt FOR UPDATE rồi kiểm nháp + ghi trong CÙNG transaction: trình/duyệt đồng thời
-    // không còn chen vào sau lúc kiểm trạng thái, và DELETE + INSERT dòng KL là atomic (lỗi giữa
-    // chừng rollback, đợt không mất dòng).
+    // Khoá HỢP ĐỒNG → ĐỢT (S13d — cùng thứ tự với lập đợt/trình/quyết định, `khoaHopDongVaDot`)
+    // rồi kiểm nháp + ghi dòng KL + header trong CÙNG transaction: trình/duyệt đồng thời không
+    // chen vào sau lúc kiểm trạng thái, luỹ kế kỳ trước đọc khi ghi dòng không đổi giữa chừng
+    // (quyết định kỳ trước cùng HĐ phải chờ), và lỗi giữa chừng rollback cả đợt.
     await withTransaction(async () => {
-      const existing = await certInProject(id, projectId, true);
+      const existing =
+        projectId != null ? await khoaHopDongVaDot(id, projectId, user.orgId) : undefined;
       if (!existing)
         throw Object.assign(new Error("Không tìm thấy đợt thanh toán"), { status: 404 });
       if (existing.status !== "draft")

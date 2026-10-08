@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangNhapDuAn, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangNhapDuAn, dangXuat, requestRieng } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -1603,8 +1603,12 @@ test(
     const { POST } = await import("@/app/api/variations/[id]/contract-add/route");
     const params = { params: Promise.resolve({ id: String(vo.id) }) };
     const [resA, resB] = await Promise.all([
-      POST(jreq("/x", { contractId: contractA, addendaCode: "PL-RACE-A" }), params),
-      POST(jreq("/x", { contractId: contractB, addendaCode: "PL-RACE-B" }), params),
+      requestRieng(() =>
+        POST(jreq("/x", { contractId: contractA, addendaCode: "PL-RACE-A" }), params),
+      ),
+      requestRieng(() =>
+        POST(jreq("/x", { contractId: contractB, addendaCode: "PL-RACE-B" }), params),
+      ),
     ]);
 
     const statuses = [resA.status, resB.status].sort();

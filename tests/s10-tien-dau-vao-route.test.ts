@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangNhapDuAn, dangXuat } from "./helpers/phien"; // mock next/headers — trước mọi import route
+import { dangNhapDuAn, dangXuat, requestRieng } from "./helpers/phien"; // mock next/headers — trước mọi import route
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -290,10 +290,9 @@ test(
     await taoPm(projectId);
     const { POST } = await import("@/app/api/payments/bills/route");
     const { queryOne } = await import("@/lib/db");
-    const { runWithRequestContext } = await import("@/lib/nen/request-context");
     // Mỗi lượt một ngữ cảnh request riêng — như hai request HTTP thật chạy song song.
     const bill = () =>
-      runWithRequestContext({}, () =>
+      requestRieng(() =>
         POST(
           jreq("/api/payments/bills", {
             ...billCoBan,

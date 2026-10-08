@@ -382,3 +382,15 @@ snapshot. Đối chiếu với `POST /api/payment-certs/:id/decide`:
 → Thêm `payment_cert_decision_snapshots` (migration `0160`, DDL theo DATA-MIGRATIONS §7) làm nguồn
 duy nhất của hồ sơ quyết định; `audit_log` vẫn giữ vết kỹ thuật thay đổi dòng, `approval_actions`
 vẫn là sổ bước của engine — không trùng nghĩa, không hai nguồn sự thật cho cùng dữ liệu.
+
+## Cập nhật S13d (2026-10-08) — writer `approval_requests.amount` + DTO danh sách IPC
+
+- Writer `approval_requests.amount`: `openApproval` (lập đợt IPC / VO / đề xuất — nay 422
+  `amount_overflow` khi tràn NUMERIC(15,2)), `resyncApprovalAmount` (trình đợt IPC; **mới**: trình
+  đề xuất), `kiemAmountTruocKhiDuyet` (**mới**: quyết định đợt IPC, chốt lại amount lệch giá trị
+  đợt hoặc 409 `approval_amount_changed`). Không còn đường trình/duyệt IPC/đề xuất nào so ngưỡng
+  bằng amount lúc lập nháp.
+- `PATCH /api/payment-certs/:id` khoá hợp đồng → đợt (`khoaHopDongVaDot`), cùng thứ tự với lập
+  đợt/trình/quyết định.
+- Mục 6 (DTO tiền) cho `GET /api/payment-certs?contractId=`: opt-in decimal-string-v1 cho dòng KL
+  (cùng adapter với chi tiết), `private, no-store` + `Vary`.

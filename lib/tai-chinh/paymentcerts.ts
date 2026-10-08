@@ -2,11 +2,9 @@
 // validate thuần, gợi ý KL từ tiến độ thực tế (trừ luỹ kế đợt trước), tổng hợp
 // giá trị đợt (tạm ứng/giữ lại/đề nghị) và cảnh báo luỹ kế vượt giá trị hợp đồng.
 // Xem docs/nang-cap/M17-thanh-toan-kl.md.
-import { query, queryOne, run } from "@/lib/db";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { boqExecutedQty } from "@/lib/khoi-luong/boq";
 import {
-  parseMoney,
-  moneyToNumber,
   parseMoneyExact,
   ipcSumV1,
   moneyToWire,
@@ -213,7 +211,18 @@ export async function checkCertLinesBelongToContract(
 // Xoá dòng cũ + ghi lại toàn bộ dòng KL của đợt (dùng cho tạo mới và PATCH khi
 // draft) — snapshot lại unit_price từ boq_items hiện tại + tự tính qty_cumulative
 // = luỹ kế đợt 'approved' gần nhất cùng dòng (chưa tính đợt draft/rejected khác) + qty_period.
+// S13d: tự bọc `withTransaction` — DELETE + INSERT luôn atomic kể cả khi caller quên mở
+// transaction (lỗi giữa chừng không để đợt mất dòng KL); trong transaction của caller (PATCH/POST,
+// cùng khoá HĐ → đợt + cập nhật header) thì dùng lại chính transaction đó.
 export async function saveCertItems(
+  certId: number,
+  contractId: number,
+  lines: CertLineInput[],
+): Promise<void> {
+  await withTransaction(() => ghiDongKlDot(certId, contractId, lines));
+}
+
+async function ghiDongKlDot(
   certId: number,
   contractId: number,
   lines: CertLineInput[],
@@ -481,6 +490,28 @@ export async function certItemsExact(certId: number): Promise<CertItemExact[]> {
   );
 }
 
+/**
+ * Dòng KL exact của MỌI đợt thuộc một hợp đồng, gom theo `certId` — nguồn cho DTO danh sách
+ * `GET /api/payment-certs?contractId=` (S13d, cùng adapter `certItemsToWire` với chi tiết).
+ */
+export async function certItemsExactByContract(
+  contractId: number,
+): Promise<Map<number, CertItemExact[]>> {
+  const rows = await query<CertItemExact & { certId: number }>(
+    `SELECT i.cert_id AS "certId", i.id, i.qty_period::text AS "qtyPeriod",
+            i.qty_cumulative::text AS "qtyCumulative", i.unit_price::text AS "unitPrice",
+            bi.qty_contract::text AS "boqQtyContract"
+       FROM payment_cert_items i
+       JOIN payment_certs c ON c.id = i.cert_id
+       JOIN boq_items bi ON bi.id = i.boq_item_id
+      WHERE c.contract_id = ? ORDER BY i.id`,
+    contractId,
+  );
+  const out = new Map<number, CertItemExact[]>();
+  for (const { certId, ...dong } of rows) out.set(certId, [...(out.get(certId) ?? []), dong]);
+  return out;
+}
+
 /** Scale nguồn: qty NUMERIC(15,3) (cả boq_items.qty_contract), unit_price NUMERIC(15,2). */
 const CERT_ITEM_DECIMAL_SCALE = {
   unitPrice: 2,
@@ -540,33 +571,45 @@ export function certItemsToWire(
   });
 }
 
-// Giá trị luỹ kế đã nghiệm thu của 1 hợp đồng = Σ cumulativeValue của đợt
-// 'approved' mới nhất mỗi dòng BOQ — so với giá trị HĐ (gồm phụ lục) để tính %.
-export async function contractCumulativeValue(contractId: number): Promise<number> {
-  // Cộng trong SQL (M45 PR1): bọc DISTINCT ON trong subquery rồi SUM.
+// Giá trị luỹ kế đã nghiệm thu của 1 hợp đồng (biểu thức SQL theo `contractIdExpr` — hằng `?`
+// hoặc cột `c.id`, không bao giờ là giá trị người dùng) = Σ qty_cumulative × unit_price của đợt
+// 'approved' mới nhất mỗi dòng BOQ, cộng NUMERIC trong SQL rồi làm tròn 2 số lẻ SAU khi cộng (như
+// ipc-sum-v1) — không qua float JS (S13d, M45).
+function luyKeHopDongSql(contractIdExpr: string): string {
+  return `ROUND(COALESCE((
+       SELECT SUM(v) FROM (
+         SELECT DISTINCT ON (i.boq_item_id) i.qty_cumulative * i.unit_price AS v
+           FROM payment_cert_items i
+           JOIN payment_certs pc ON pc.id = i.cert_id
+          WHERE pc.contract_id = ${contractIdExpr} AND pc.status = 'approved'
+          ORDER BY i.boq_item_id, pc.period_no DESC
+       ) t), 0), 2)`;
+}
+
+/** Luỹ kế nghiệm thu của 1 hợp đồng — MoneyMinor (bigint đồng×100), đọc `::text`. */
+export async function contractCumulativeValue(contractId: number): Promise<bigint> {
   const row = await queryOne<{ total: string }>(
-    `SELECT COALESCE(SUM(v), 0)::text AS total FROM (
-       SELECT DISTINCT ON (i.boq_item_id) i.qty_cumulative * i.unit_price AS v
-         FROM payment_cert_items i
-         JOIN payment_certs c ON c.id = i.cert_id
-        WHERE c.contract_id = ? AND c.status = 'approved'
-        ORDER BY i.boq_item_id, c.period_no DESC
-     ) t`,
+    `SELECT ${luyKeHopDongSql("?")}::text AS total`,
     contractId,
   );
-  return moneyToNumber(parseMoney(row?.total ?? "0"));
+  return parseMoneyExact(row?.total ?? "0");
 }
 
 export type OverContractCert = {
   contractId: number;
   contractCode: string;
   contractTitle: string;
-  cumulativeValue: number;
-  contractValue: number;
+  /** MoneyMinor (bigint đồng×100). */
+  cumulativeValue: bigint;
+  /** Giá trị HĐ gồm phụ lục — MoneyMinor. */
+  contractValue: bigint;
+  /** % luỹ kế / giá trị HĐ làm tròn tới số nguyên (ties xa 0); null khi giá trị HĐ ≤ 0. */
+  percent: bigint | null;
 };
 
 // HĐ có đợt đã duyệt mà luỹ kế nghiệm thu vượt giá trị HĐ (gồm phụ lục) — nguồn
 // notification cert_over_contract (dedup theo contract_id, cùng cơ chế cost_over).
+// So sánh NUMERIC exact ngay trong SQL (một câu, không N+1); số trả về đọc `::text` → bigint.
 // projectId (M22): undefined = không lọc.
 export async function overContractCerts(projectId?: number): Promise<OverContractCert[]> {
   const conds = [
@@ -577,33 +620,37 @@ export async function overContractCerts(projectId?: number): Promise<OverContrac
     conds.push("c.project_id = ?");
     args.push(projectId);
   }
-  const contracts = await query<{
-    id: number;
-    code: string;
-    title: string;
-    contractValue: number;
+  const rows = await query<{
+    contractId: number;
+    contractCode: string;
+    contractTitle: string;
+    cumulativeValue: string;
+    contractValue: string;
   }>(
-    `SELECT c.id, c.code, c.title,
-            c.value + COALESCE((SELECT SUM(value_delta) FROM contract_addenda WHERE contract_id = c.id), 0) AS "contractValue"
+    `SELECT c.id AS "contractId", c.code AS "contractCode", c.title AS "contractTitle",
+            lk.cum::text AS "cumulativeValue", gt.v::text AS "contractValue"
        FROM contracts c
-      WHERE ${conds.join(" AND ")}`,
+       CROSS JOIN LATERAL (
+         SELECT c.value + COALESCE(
+                  (SELECT SUM(value_delta) FROM contract_addenda WHERE contract_id = c.id), 0) AS v
+       ) gt
+       CROSS JOIN LATERAL (SELECT ${luyKeHopDongSql("c.id")} AS cum) lk
+      WHERE ${conds.join(" AND ")} AND lk.cum > gt.v
+      ORDER BY c.id`,
     ...args,
   );
-
-  const result: OverContractCert[] = [];
-  for (const c of contracts) {
-    const cumulativeValue = await contractCumulativeValue(c.id);
-    const contractValue = c.contractValue;
-    if (cumulativeValue > contractValue)
-      result.push({
-        contractId: c.id,
-        contractCode: c.code,
-        contractTitle: c.title,
-        cumulativeValue,
-        contractValue,
-      });
-  }
-  return result;
+  return rows.map((r) => {
+    const cumulativeValue = parseMoneyExact(r.cumulativeValue);
+    const contractValue = parseMoneyExact(r.contractValue);
+    return {
+      contractId: r.contractId,
+      contractCode: r.contractCode,
+      contractTitle: r.contractTitle,
+      cumulativeValue,
+      contractValue,
+      percent: contractValue > 0n ? mulRatio(cumulativeValue, 100n, contractValue) : null,
+    };
+  });
 }
 
 // Đợt 'submitted' quá CERT_PENDING_DAYS ngày chưa được quyết định → nhắc Admin/PM.

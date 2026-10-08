@@ -7,7 +7,14 @@
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { isUniqueViolation } from "@/lib/ha-tang/seqcode";
 import { ROLES, VIEW_ONLY_ROLES, type Role } from "@/lib/nen/roles";
-import { moneyToNumberSafe, isMoneyPrecisionError, fitsNumeric } from "@/lib/nen/money";
+import {
+  moneyToNumberSafe,
+  isMoneyPrecisionError,
+  fitsNumeric,
+  parseMoney,
+  parseMoneyExact,
+} from "@/lib/nen/money";
+import { log } from "@/lib/nen/log";
 
 // Vai trò chỉ-xem KHÔNG bao giờ được làm bước duyệt — trừ `cdt` (CĐT được phép là bước
 // duyệt cuối, theo M46 PR4). bch/viewer luôn 403 dù có bị cấu hình nhầm làm step role.
@@ -135,6 +142,10 @@ export async function openApproval(opts: {
     const flow = await getActiveFlow(opts.entityType, opts.projectId);
     if (!flow) return null;
 
+    // approval_requests.amount là NUMERIC(15,2): tràn cột → 422 rõ ràng thay vì lỗi pg 22003
+    // thành 500 (S13d — mọi caller: lập đợt IPC, lập VO, đề xuất). Chỉ kiểm khi có flow (không
+    // flow thì không ghi amount nào).
+    if (amount != null && !fitsNumeric(parseMoney(amount), 15)) throw loiTranAmount();
     const first = decideNext(flow.steps, amount, 0);
     const status = first ? "pending" : "approved";
     const currentSeq = first?.seq ?? 1;
@@ -165,6 +176,33 @@ export async function openApproval(opts: {
   });
 }
 
+function loiTranAmount(): Error {
+  return Object.assign(new Error("Giá trị vượt giới hạn lưu trữ của luồng phê duyệt"), {
+    status: 422,
+    code: "amount_overflow",
+  });
+}
+
+// MoneyMinor (bigint đồng×100) → number cho engine so ngưỡng: chỉ khi round-trip exact và vừa
+// cột approval_requests.amount NUMERIC(15,2); ngược lại 422 `money_precision_unsupported`/
+// `amount_overflow` (không xấp xỉ, không để pg tràn số thành 500).
+// null = thực thể không có giá trị (vd đề xuất không ghi số tiền) → engine nhận null như openApproval.
+function amountChoEngine(amountMinor: bigint | null): number | null {
+  if (amountMinor == null) return null;
+  let amount: number;
+  try {
+    amount = moneyToNumberSafe(amountMinor);
+  } catch (err) {
+    if (!isMoneyPrecisionError(err)) throw err;
+    throw Object.assign(new Error("Giá trị vượt độ chính xác hỗ trợ của luồng phê duyệt"), {
+      status: 422,
+      code: "money_precision_unsupported",
+    });
+  }
+  if (!fitsNumeric(amountMinor, 15)) throw loiTranAmount();
+  return amount;
+}
+
 // Chốt lại giá trị (amount) của request CHƯA ai quyết định khi thực thể đổi giá trị sau lúc mở
 // (vd đợt IPC nháp sửa khối lượng rồi mới trình) — nếu không, ngưỡng min_amount của bước duyệt
 // so với giá trị cũ: lập nháp nhỏ, sửa tăng rồi trình là lách được bước duyệt cấp cao. Cập
@@ -175,34 +213,17 @@ export async function openApproval(opts: {
 // Chưa từng có request nào cho thực thể: có `openAs` thì mở mới nếu hiện có flow active (đợt lập
 // TRƯỚC khi Admin bật flow vẫn phải qua flow khi trình, không rơi về đường CAN.approve không SoD);
 // không có flow → no-op. Trả true khi có tạo/cập nhật.
-// `amountMinor` là MoneyMinor (bigint đồng×100): chỉ ép sang number của engine KHI cần so ngưỡng;
-// không round-trip exact hoặc tràn NUMERIC(15,2) → 422 `money_precision_unsupported`/`amount_overflow`.
+// `amountMinor` là MoneyMinor (bigint đồng×100, null = không có giá trị): chỉ ép sang number của
+// engine KHI cần so ngưỡng; không round-trip exact hoặc tràn NUMERIC(15,2) → 422
+// `money_precision_unsupported`/`amount_overflow`.
 export async function resyncApprovalAmount(opts: {
   entityType: string;
   entityId: number;
   projectId: number;
-  amountMinor: bigint;
+  amountMinor: bigint | null;
   openAs?: ActorUser;
 }): Promise<boolean> {
-  const amountForEngine = (): number => {
-    let amount: number;
-    try {
-      amount = moneyToNumberSafe(opts.amountMinor);
-    } catch (err) {
-      if (!isMoneyPrecisionError(err)) throw err;
-      throw Object.assign(new Error("Giá trị vượt độ chính xác hỗ trợ của luồng phê duyệt"), {
-        status: 422,
-        code: "money_precision_unsupported",
-      });
-    }
-    // approval_requests.amount là NUMERIC(15,2): tràn cột thì 422 rõ ràng thay vì 500 của pg.
-    if (!fitsNumeric(opts.amountMinor, 15))
-      throw Object.assign(new Error("Giá trị vượt giới hạn lưu trữ của luồng phê duyệt"), {
-        status: 422,
-        code: "amount_overflow",
-      });
-    return amount;
-  };
+  const amountForEngine = (): number | null => amountChoEngine(opts.amountMinor);
 
   return withTransaction(async () => {
     // Request MỚI NHẤT trước, rồi mới xét trạng thái (không "nhặt" request cũ khi bản mới đã chốt).
@@ -264,6 +285,91 @@ export async function resyncApprovalAmount(opts: {
     }
     return true;
   });
+}
+
+/**
+ * S13d — kiểm lần cuối NGAY TRƯỚC KHI duyệt một bước (gọi trong transaction của quyết định, dưới
+ * khoá thực thể): `amount` của request đang chờ phải bằng giá trị HIỆN TẠI của thực thể (so exact
+ * bigint, không float). Submit đã chốt lại amount (S10a), nhưng request mở/trình TRƯỚC bản vá đó
+ * (hoặc bất kỳ đường ghi lệch nào về sau) vẫn mang amount cũ → `advanceApproval` chọn sai cấp
+ * duyệt theo `min_amount`. Lệch thì:
+ * - chưa ai duyệt bước nào → chốt amount đúng + bước hiện tại = bước hiệu lực đầu tiên theo amount
+ *   mới (không còn bước hiệu lực → GIỮ bước hiện tại: thừa một người duyệt an toàn hơn bỏ bước);
+ * - đã có bước được duyệt → nếu amount đúng làm một bước hiệu lực CÓ SEQ NHỎ HƠN bước hiện tại
+ *   bị bỏ qua (chưa ai duyệt) → 409 `approval_amount_changed` (không âm thầm hợp thức hoá chuỗi
+ *   duyệt sai cấp; từ chối luôn được phép vì caller không gọi hàm này khi từ chối); không bị bỏ
+ *   bước nào → chỉ chốt amount để các bước còn lại so đúng ngưỡng.
+ * Không có request đang chờ → không làm gì (caller tự xử lý như cũ). Trả true khi đã chốt lại.
+ */
+export async function kiemAmountTruocKhiDuyet(opts: {
+  entityType: string;
+  entityId: number;
+  projectId: number;
+  /** Giá trị hiện tại của thực thể (MoneyMinor); null = thực thể không có số tiền. */
+  amountMinor: bigint | null;
+}): Promise<boolean> {
+  const req = await queryOne<{
+    id: number;
+    flowId: number;
+    amount: string | null;
+    currentSeq: number;
+  }>(
+    `SELECT id, flow_id AS "flowId", amount::text AS amount, current_seq AS "currentSeq"
+       FROM approval_requests
+      WHERE entity_type = ? AND entity_id = ? AND project_id = ? AND status = 'pending'
+        FOR UPDATE`,
+    opts.entityType,
+    opts.entityId,
+    opts.projectId,
+  );
+  if (!req) return false;
+  const amountCu = req.amount == null ? null : parseMoneyExact(req.amount);
+  if (amountCu === opts.amountMinor) return false;
+
+  const amount = amountChoEngine(opts.amountMinor);
+  const steps = await query<ApprovalStep>(
+    `SELECT seq, role, min_amount AS "minAmount", sla_days AS "slaDays"
+       FROM approval_steps WHERE flow_id = ? ORDER BY seq`,
+    req.flowId,
+  );
+  const daDuyet = new Set(
+    (
+      await query<{ seq: number }>(
+        `SELECT step_seq AS seq FROM approval_actions WHERE request_id = ?`,
+        req.id,
+      )
+    ).map((a) => a.seq),
+  );
+  let buocHienTai = req.currentSeq;
+  if (daDuyet.size === 0) {
+    buocHienTai = decideNext(steps, amount, 0)?.seq ?? req.currentSeq;
+  } else {
+    const hieuLuc = (s: ApprovalStep) =>
+      s.minAmount == null || (amount != null && amount >= s.minAmount);
+    const boQua = steps.filter((s) => s.seq < req.currentSeq && hieuLuc(s) && !daDuyet.has(s.seq));
+    if (boQua.length > 0)
+      throw Object.assign(
+        new Error(
+          "Giá trị chứng từ khác giá trị lúc mở luồng duyệt và đã có bước được duyệt theo ngưỡng cũ — " +
+            "không duyệt tiếp được; từ chối chứng từ này rồi lập lại để duyệt đúng cấp",
+        ),
+        { status: 409, code: "approval_amount_changed" },
+      );
+  }
+  await run(
+    `UPDATE approval_requests SET amount = ?, current_seq = ? WHERE id = ?`,
+    amount,
+    buocHienTai,
+    req.id,
+  );
+  log.warn("approvals: amount của request lệch giá trị chứng từ — đã chốt lại trước khi duyệt", {
+    requestId: req.id,
+    entityType: opts.entityType,
+    entityId: opts.entityId,
+    tuBuoc: req.currentSeq,
+    sangBuoc: buocHienTai,
+  });
+  return true;
 }
 
 // Ra quyết định 1 bước. Khoá request FOR UPDATE để tuần tự hoá. Quyền: đúng vai trò bước

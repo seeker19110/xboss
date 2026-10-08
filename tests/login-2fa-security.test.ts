@@ -1,4 +1,5 @@
 import { HAS_TEST_DB } from "./setup";
+import { requestRieng } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -53,7 +54,10 @@ async function fixture(enabled = true) {
 test("login 2FA: mã TOTP chỉ cấp một cookie khi xác nhận đồng thời", S, async () => {
   const f = await fixture();
   const code = await generate({ secret: f.secret, digits: 6, period: 30 });
-  const responses = await Promise.all([POST(f.request(code)), POST(f.request(code))]);
+  const responses = await Promise.all([
+    requestRieng(() => POST(f.request(code))),
+    requestRieng(() => POST(f.request(code))),
+  ]);
   assert.deepEqual(responses.map((r) => r.status).sort(), [200, 401]);
   assert.equal(responses.filter((r) => r.cookies.get(COOKIE)).length, 1);
 });
@@ -61,8 +65,8 @@ test("login 2FA: mã TOTP chỉ cấp một cookie khi xác nhận đồng thờ
 test("login 2FA: mã dự phòng chỉ cấp một cookie khi xác nhận đồng thời", S, async () => {
   const f = await fixture();
   const responses = await Promise.all([
-    POST(f.request("abcde-12345")),
-    POST(f.request("abcde-12345")),
+    requestRieng(() => POST(f.request("abcde-12345"))),
+    requestRieng(() => POST(f.request("abcde-12345"))),
   ]);
   assert.deepEqual(responses.map((r) => r.status).sort(), [200, 401]);
   assert.equal(responses.filter((r) => r.cookies.get(COOKIE)).length, 1);

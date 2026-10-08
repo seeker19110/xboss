@@ -1,5 +1,60 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S13c: DELETE users/bills còn tham chiếu -> 409
+
+`DELETE /api/users/:id` và `DELETE /api/payments/bills/:id` bắt pg 23503 -> 409
+`{ error, code: "dependency_conflict" }` thay vì 500 (user còn được hoá đơn/hợp đồng/nhật ký tham chiếu;
+bill còn hoá đơn `payment_bill_id`). Users: gỡ giao việc + xoá thông báo + xoá user gói chung 1
+transaction nên 409 không để lại việc đã gỡ giao. Giữ nguyên kiểm phiên/quyền/org/dự án. Test
+`tests/route-xoa-xung-dot-phu-thuoc.test.ts` (route thật, đỏ 2/3 trên code cũ).
+**Nợ (ghi nhận, chưa sửa):** hơn 80 route DELETE khác chưa bắt 23503 (vd `tasks`, `projects`,
+`towers`, `sheets`, `workpackages`, `materials`, `purchase-orders`, `invoices`, `claims`, `payroll`,
+`personnel`, `crews`, `risks`…) — cần rà từng route xem FK nào còn chặn rồi áp cùng mẫu.
+
+## 2026-10-08 — QUALITY-FINAL-1 S13d: dọn phần còn lại của IPC/payment-certs
+
+Spec cha `docs/nang-cap/AUDIT-2026-09-25/` (A4 tiền exact, A5 chuỗi IPC) + `S00-PAYMENT-SCOPE-INVENTORY.md`.
+Không migration, không đổi enum `payment_certs`, không đổi format phản hồi mặc định, không thêm
+dependency. Rà lại 6 mục nợ ghi từ S10a trên code hiện tại: phần chính của mục 1/2/3/6 đã vá ở S10a
+(submit `resyncApprovalAmount`, PATCH `FOR UPDATE OF c` + `withTransaction`, submit 422
+`amount_overflow`) — S13d đóng phần CÒN LẠI có lỗi tái hiện được:
+
+- **[HIGH] Ngưỡng duyệt theo amount cũ:** request trình TRƯỚC bản vá S10a (hoặc mọi đường ghi lệch)
+  vẫn mang amount lúc lập nháp → engine bỏ bước `min_amount`. `decide` (approved, có request đang
+  chờ) gọi `kiemAmountTruocKhiDuyet` (`lib/tien-do/approvals.ts`) dưới khoá HĐ → đợt: so exact
+  `amount::text` với `periodValue`; lệch + chưa ai duyệt → chốt amount + bước hiệu lực đầu tiên;
+  đã có bước duyệt mà amount đúng làm một bước seq nhỏ hơn bị bỏ qua → **409
+  `approval_amount_changed`** (từ chối vẫn được). Chọn "tính lại tại điểm quyết định" thay vì
+  thêm chặn sửa (PATCH đã chỉ cho nháp từ S10a). Đợt tràn NUMERIC(15,2) không qua bước so này
+  (tránh lộ độ lớn cho người thiếu `viewPayments`); `kiemTranGiaTri` của decide nay kiểm cả
+  `periodValue` như submit → vẫn 422 `cert_invalid`/`amount_overflow`, không duyệt được.
+- **Cùng lớp, anh em — đề xuất (proposal):** sửa số tiền lúc nháp rồi trình → bước duyệt chọn theo
+  số tiền lúc tạo. `POST /api/proposals/:id/submit` nay khoá dòng đề xuất + `resyncApprovalAmount`
+  (amount null giữ null) cùng transaction với chuyển `submitted`.
+- **PATCH `/api/payment-certs/:id`:** khoá **HĐ → đợt** qua `khoaHopDongVaDot` (cùng thứ tự lập
+  đợt/trình/quyết định; kiểm cả chuỗi dự án → tổ chức) thay vì chỉ khoá đợt.
+- **`saveCertItems`:** tự bọc `withTransaction` (dùng lại transaction của caller) — gọi trần mà lỗi
+  giữa chừng không còn để đợt mất dòng KL.
+- **`contractCumulativeValue`/`overContractCerts`:** tổng + so sánh NUMERIC trong SQL (một câu,
+  bỏ N+1), trả MoneyMinor bigint + `percent` bigint; thông báo `cert_over_contract` không còn
+  `Infinity%` khi HĐ giá trị 0. Float cũ báo vượt SAI khi luỹ kế đúng bằng HĐ ~10^14.
+- **`GET /api/payment-certs?contractId=`:** opt-in `X-XBoss-Money-Format: decimal-string-v1` →
+  `items[].unitPrice/qtyPeriod/qtyCumulative/boqQtyContract` chuỗi canonical (`::text`, adapter
+  `certItemsToWire`) + `moneyFormat`; legacy number qua round-trip an toàn, ngoài biên 422
+  `money_precision_unsupported`; một snapshot REPEATABLE READ; `HEADERS_API_TIEN` (thêm `Vary`).
+- **`approval_requests.amount` tràn:** `openApproval` kiểm NUMERIC(15,2) khi có flow → **422
+  `amount_overflow`** (lập đợt IPC trước đây 500; route anh em `POST /api/variations` cũng 500 →
+  nay map lỗi có `status`).
+- **Test** `tests/s13d-ipc-con-lai.test.ts` (9 ca, route thật trừ 2 ca lib): **9/9 đỏ trên code cũ**
+  (đã gỡ bản vá chạy lại) → xanh. Mutation mới "IPC: decide chốt lại amount cũ…" trong
+  `scripts/mutation-check.mjs`.
+- **Còn mở (ngoài phạm vi, phát hiện khi rà):** `POST /api/proposals/:id/decide` không bọc
+  transaction và không bắt lỗi có `status` của `advanceApproval` (403/409 engine thành 500), chưa có
+  kiểm amount lúc quyết định như IPC — đề xuất trình trước S13d còn amount cũ chỉ đối soát tay
+  (truy vấn kiểu `docs/ops/s10a-doi-soat-phieu-da-duyet.md`); `POST /api/variations` tính amount VO
+  bằng `SUM` đọc float (ngưỡng so trên number xấp xỉ); hộp thư duyệt vẫn hiện request IPC của đợt
+  còn nháp với amount lúc lập (chỉ hiển thị — quyết định bị chặn tới khi trình).
+
 ## 2026-10-08 — QUALITY-FINAL-1: EVM/S-curve — baseline phải thuộc dự án đang chọn (A1-FR06)
 
 `GET /api/dashboard/evm?baseline=` và `/api/dashboard/scurve?baseline=` nhận id do client gửi mà không
@@ -9,6 +64,10 @@ miền mới `lib/tien-do/baseline-scope.ts` (`parseBaselineParam`, `kiemBaselin
 thầm); thiếu tham số -> như cũ. Rà route anh em: chỉ 2 route này đọc `?baseline=`; `/api/baselines*` đã
 lọc theo `project_id`, `daily-report` truyền `baselineId: null`, các mục khác chỉ xoá `baseline_tasks`
 theo task. Test `tests/route-evm-scurve-baseline-scope.test.ts` (route thật, đỏ 6/8 trên code cũ).
+
+- Test hạ tầng: các lời gọi route đồng thời (`Promise.all`) trong `tests/route-boq-vat-tu`, `route-mua-sam`,
+  `s10-tien-dau-vao-route`, `boq-history`, `route-tai-chinh-3b`, `totp-enrollment-security`, `route-tien-do`,
+  `login-2fa-security*` nay bọc bằng `requestRieng` (`tests/helpers/phien.ts`) để mỗi lời gọi có ngữ cảnh request riêng.
 
 ## 2026-10-08 — QUALITY-FINAL-1 S02e: cấu hình theo org
 
