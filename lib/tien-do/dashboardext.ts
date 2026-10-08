@@ -4,7 +4,7 @@
 // (dashboard chạy được dù module sau chưa làm, vd work_fronts của M14).
 // Xem docs/nang-cap/M09-dashboard.md.
 import { query, queryOne, todayISO, daysFromTodayISO } from "@/lib/db";
-import { costSummary } from "@/lib/tai-chinh/cost";
+import { costSummary, usagePct } from "@/lib/tai-chinh/cost";
 import { DUE_SOON_COND, dueSoonParams, loadDueSoonThresholds } from "@/lib/tien-do/due-soon";
 import { sheetProgressKpi } from "@/lib/tien-do/kpi";
 import { progressAtDate } from "@/lib/tien-do/report";
@@ -221,7 +221,7 @@ export async function bySystemBlock(projectId?: number | null): Promise<SystemCr
       progressPct: Number(p?.progressPct ?? 0),
       delayedCount: Number(p?.delayedCount ?? 0),
       ncrOpen: ncrMap.get(d.id) ?? 0,
-      budgetUsedPct: c && c.budget > 0 ? (c.committed / c.budget) * 100 : 0,
+      budgetUsedPct: (c ? usagePct(c.committed, c.budget) : null) ?? 0,
     };
   });
 }

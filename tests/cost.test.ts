@@ -78,9 +78,9 @@ test(
     const rows = await costSummary("system");
     const row = rows.find((r) => r.key === "dien");
     assert.ok(row, "phải có dòng cho hệ điện");
-    assert.equal(row!.budget, 100_000);
-    assert.equal(row!.committed, 5_000 + 20_000); // PO huỷ không tính
-    assert.equal(row!.actual, 3_000 + 1_000); // advance tính vào thực chi
+    assert.equal(row!.budget, 100_000_00n);
+    assert.equal(row!.committed, (5_000n + 20_000n) * 100n); // PO huỷ không tính
+    assert.equal(row!.actual, (3_000n + 1_000n) * 100n); // advance tính vào thực chi
 
     assert.equal(await systemBudget(dien!.id), 100_000);
 
@@ -200,16 +200,16 @@ test(
     const rowsA = await costSummary("system", true, projA);
     const rowA = rowsA.find((r) => r.key === "dien");
     assert.ok(rowA, "phải có dòng cho hệ điện ở dự án A");
-    assert.equal(rowA!.budget, 100_000); // 100 x 1000, không lẫn BOQ B
-    assert.equal(rowA!.committed, 5_000 + 20_000); // PO A + giao thầu A
-    assert.equal(rowA!.actual, 3_000); // bill A
+    assert.equal(rowA!.budget, 100_000_00n); // 100 x 1000, không lẫn BOQ B
+    assert.equal(rowA!.committed, 25_000_00n); // PO A + giao thầu A
+    assert.equal(rowA!.actual, 3_000_00n); // bill A
 
     const rowsB = await costSummary("system", true, projB);
     const rowB = rowsB.find((r) => r.key === "dien");
     assert.ok(rowB, "phải có dòng cho hệ điện ở dự án B");
-    assert.equal(rowB!.budget, 200_000); // 200 x 1000, không lẫn BOQ A
-    assert.equal(rowB!.committed, 7_000 + 30_000); // PO B + giao thầu B
-    assert.equal(rowB!.actual, 4_000); // bill B
+    assert.equal(rowB!.budget, 200_000_00n); // 200 x 1000, không lẫn BOQ A
+    assert.equal(rowB!.committed, 37_000_00n); // PO B + giao thầu B
+    assert.equal(rowB!.actual, 4_000_00n); // bill B
 
     // costTotals cộng dồn NHIỀU hệ (lib/money.ts, không phải float JS — đợt audit
     // 2026-07-19) — dự án A/B chỉ có dữ liệu ở hệ "dien" nên tổng phải khớp đúng

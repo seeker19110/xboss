@@ -8,7 +8,7 @@
 // NextResponse và kiểm phiên. Nhờ vậy logic này test đơn vị được mà không phải dựng request.
 import { query, queryOne, run, todayISO } from "@/lib/db";
 import { CAN, isAdminOrPm, type User } from "@/lib/bao-mat/auth";
-import { costSummary, getCostSettings } from "@/lib/tai-chinh/cost";
+import { costSummary, getCostSettings, reachesPct, usagePct } from "@/lib/tai-chinh/cost";
 import { poLateList, vehicleLateList } from "@/lib/tai-chinh/procurement";
 import { missingDiaryDates } from "@/lib/hien-truong/diary";
 import { expiringContracts } from "@/lib/tai-chinh/contracts";
@@ -293,14 +293,13 @@ export async function syncAndListNotifications(
   if (CAN.viewPayments(user.role)) {
     const settings = await getCostSettings();
     const rows = await costSummary("system", true, projectId ?? undefined);
-    const over = rows.filter(
-      (r) => r.budget > 0 && (r.committed / r.budget) * 100 >= settings.warnPct,
-    );
+    // So ngưỡng exact trên bigint (A4-FR07); % chỉ để hiển thị trong câu thông báo.
+    const over = rows.filter((r) => reachesPct(r.committed, r.budget, settings.warnPct));
 
     if (over.length > 0) {
       const values = over.map(() => `(?, ?, 'cost_over', ?)`).join(", ");
       const params = over.flatMap((r) => {
-        const pct = Math.round((r.committed / r.budget) * 100);
+        const pct = Math.round(usagePct(r.committed, r.budget) ?? 0);
         return [user.id, r.key, `💰 Hệ "${r.label}" cam kết đạt ${pct}% ngân sách`];
       });
       await run(

@@ -7,34 +7,37 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
+import {
+  HEADER_TIEN_CHI_PHI,
+  fmtTienRutGon as fmtVND,
+  fmtTienDayDu as fmtFull,
+  phanTramSuDung,
+  type CostAmountsView,
+} from "./_components/chiPhi";
 
-type CostRow = { key: string; label: string; budget: number; committed: number; actual: number };
-type Alert = { key: string; label: string; pct: number; over: boolean };
+// Tiền là chuỗi canonical decimal-string-v1 (S10) — không cộng/chia trên number.
+type CostRow = { key: string; label: string } & CostAmountsView;
+type Alert = { key: string; label: string; pct: number | null; over: boolean };
 type Settings = { warnPct: number; overPct: number };
 type Data = {
   rows: CostRow[];
-  totals: { budget: number; committed: number; actual: number };
+  totals: CostAmountsView;
   settings: Settings;
   alerts: Alert[];
   groupBy: "system" | "floor";
 };
 
-function fmtVND(n: number) {
-  if (!n) return "—";
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)} tỷ`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} tr`;
-  return n.toLocaleString("vi-VN") + " đ";
+/** % hiển thị; ngân sách 0 → null. */
+function usagePct(committed: string, budget: string) {
+  return phanTramSuDung(committed, budget);
 }
-function fmtFull(n: number) {
-  return n.toLocaleString("vi-VN") + " đ";
+function fmtPct(pct: number | null) {
+  return pct == null ? "—" : `${Math.round(pct)}%`;
 }
-
-function usagePct(committed: number, budget: number) {
-  return budget > 0 ? (committed / budget) * 100 : 0;
-}
-function usageBadgeClass(pct: number, warnPct: number, overPct: number) {
-  if (pct >= overPct) return "bg-rose-950 text-rose-200 border-rose-800";
-  if (pct >= warnPct) return "bg-amber-950 text-amber-200 border-amber-800";
+// Mức cảnh báo lấy từ `alerts` server (so ngưỡng exact bằng bigint), không so lại trên float.
+function usageBadgeClass(alert: Alert | undefined) {
+  if (alert?.over) return "bg-rose-950 text-rose-200 border-rose-800";
+  if (alert) return "bg-amber-950 text-amber-200 border-amber-800";
   return "bg-zinc-800 text-zinc-300 border-zinc-700";
 }
 
@@ -49,7 +52,9 @@ export default function CostsPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   async function load(gb: "system" | "floor", withVo = includeVo) {
-    const res = await fetch(`/api/costs?groupBy=${gb}&includeVo=${withVo ? 1 : 0}`);
+    const res = await fetch(`/api/costs?groupBy=${gb}&includeVo=${withVo ? 1 : 0}`, {
+      headers: HEADER_TIEN_CHI_PHI,
+    });
     if (res.status === 401) {
       redirectToLogin();
       return;
@@ -143,9 +148,7 @@ export default function CostsPage() {
                 Giá trị cam kết
               </span>
               <span className="text-xs font-bold font-mono text-sky-400">
-                {data.totals.budget > 0
-                  ? `${Math.round((data.totals.committed / data.totals.budget) * 100)}%`
-                  : "0%"}
+                {fmtPct(usagePct(data.totals.committed, data.totals.budget))}
               </span>
             </div>
             <p
@@ -163,9 +166,7 @@ export default function CostsPage() {
                 Thực chi tích lũy
               </span>
               <span className="text-xs font-bold font-mono text-emerald-400">
-                {data.totals.budget > 0
-                  ? `${Math.round((data.totals.actual / data.totals.budget) * 100)}%`
-                  : "0%"}
+                {fmtPct(usagePct(data.totals.actual, data.totals.budget))}
               </span>
             </div>
             <p
@@ -178,7 +179,7 @@ export default function CostsPage() {
               <div
                 className="bg-emerald-500 h-full rounded-full transition-[width]"
                 style={{
-                  width: `${data.totals.budget > 0 ? Math.min(100, Math.round((data.totals.actual / data.totals.budget) * 100)) : 0}%`,
+                  width: `${Math.min(100, Math.round(usagePct(data.totals.actual, data.totals.budget) ?? 0))}%`,
                 }}
               />
             </div>
@@ -202,7 +203,7 @@ export default function CostsPage() {
                   <span
                     className={`font-mono font-bold ${a.over ? "text-rose-400" : "text-amber-400"}`}
                   >
-                    {a.pct.toFixed(0)}% {a.over ? "(Đã vượt)" : ""}
+                    {fmtPct(a.pct)} {a.over ? "(Đã vượt)" : ""}
                   </span>
                 </div>
               ))}
@@ -277,8 +278,9 @@ export default function CostsPage() {
                 <tbody>
                   {data.rows.map((r) => {
                     const pct = usagePct(r.committed, r.budget);
-                    const actualPct = r.budget > 0 ? Math.min((r.actual / r.budget) * 100, 100) : 0;
-                    const committedPct = r.budget > 0 ? Math.min(pct, 100) : 0;
+                    const actualPct = Math.min(usagePct(r.actual, r.budget) ?? 0, 100);
+                    const committedPct = Math.min(pct ?? 0, 100);
+                    const alert = data.alerts.find((a) => a.key === r.key);
                     return (
                       <tr
                         key={r.key}
@@ -318,12 +320,10 @@ export default function CostsPage() {
                         </td>
                         <td className="p-3 text-right">
                           <span
-                            className={`inline-flex items-center gap-1 text-[11px] font-semibold border rounded-full px-2 py-0.5 ${usageBadgeClass(pct, data.settings.warnPct, data.settings.overPct)}`}
+                            className={`inline-flex items-center gap-1 text-[11px] font-semibold border rounded-full px-2 py-0.5 ${usageBadgeClass(alert)}`}
                           >
-                            {pct >= data.settings.warnPct && (
-                              <TriangleAlert className="w-3 h-3" aria-hidden="true" />
-                            )}
-                            {r.budget > 0 ? `${pct.toFixed(0)}%` : "—"}
+                            {alert && <TriangleAlert className="w-3 h-3" aria-hidden="true" />}
+                            {pct == null ? "—" : fmtPct(pct)}
                           </span>
                         </td>
                       </tr>

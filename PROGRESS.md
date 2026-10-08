@@ -26,6 +26,21 @@
   (5 ca qua route thật; ca lách ngưỡng đỏ trên code cũ).
 - **Còn mở (S10a):** M3 đối soát phiếu đã duyệt (cần người vận hành), M4, L5, L6 — xem mục dưới.
 
+## 2026-10-08 — QUALITY-FINAL-1 S10 (miền chi phí): tiền exact + DTO decimal-string-v1 cho /api/costs
+
+`lib/tai-chinh/cost.ts`: mọi tổng tiền cộng/nhân trong SQL rồi `round(…, 2)::text`, về JS là
+MoneyMinor (bigint) — hết đi qua parser NUMERIC→float; số lượng PO (float8) đọc biểu diễn đã lưu
+`qty_ordered::text::numeric` trước khi nhân đơn giá (float8 × numeric trong PostgreSQL ra float:
+0,3 × 0,05 thành 0,01 thay vì 0,02). Cam kết PO + giao thầu gộp 1 câu `UNION ALL`. So ngưỡng cảnh
+báo bằng nhân chéo bigint (`reachesPct`), % chỉ để hiển thị (`usagePct`, ngân sách 0 → null).
+`GET /api/costs`: header `X-XBoss-Money-Format: decimal-string-v1` → tiền chuỗi canonical +
+`moneyFormat`; không header → number legacy qua `moneyToNumberSafe`, ngoài biên **422
+`money_precision_unsupported`**; mọi response `private, no-store` + `Vary`. Consumer: trang
+`/costs` + tab chi phí `/commercial` gửi header, hiển thị bằng bigint (`app/costs/_components/
+chiPhi.ts`); thông báo `cost_over` và `bySystem` dashboard so/hiển thị qua helper exact;
+`systemBudget` trả number qua adapter có biên. Test `costs-money-dto` (route + PG thật, đỏ trên code
+cũ), `costs-money-ui`. Không đổi parser NUMERIC, không migration.
+
 ## 2026-10-07 — QUALITY-FINAL-1 S10a: IPC exact (ipc-sum-v1) + DTO tiền decimal-string-v1
 
 `certTotals` đọc `qty_period`/`unit_price`/`advance_pct`/`retention_pct` bằng `::text` và tính

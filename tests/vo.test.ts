@@ -148,13 +148,13 @@ test(
     // includeVo=true (mặc định): 100,000 (gốc) + 5,000 (VO đã duyệt) = 105,000.
     const rowsWithVo = await costSummary("system", true);
     const rowWithVo = rowsWithVo.find((r) => r.key === "dien");
-    assert.equal(Number(rowWithVo!.budget), 100_000 + 5_000);
+    assert.equal(rowWithVo!.budget, 105_000_00n);
     assert.equal(await systemBudget(dien!.id, true), 100_000 + 5_000);
 
     // includeVo=false: chỉ dòng gốc.
     const rowsNoVo = await costSummary("system", false);
     const rowNoVo = rowsNoVo.find((r) => r.key === "dien");
-    assert.equal(Number(rowNoVo!.budget), 100_000);
+    assert.equal(rowNoVo!.budget, 100_000_00n);
     assert.equal(await systemBudget(dien!.id, false), 100_000);
 
     await run(`DELETE FROM variation_orders WHERE id = ?`, voId); // cascade xoá dòng KL của VO

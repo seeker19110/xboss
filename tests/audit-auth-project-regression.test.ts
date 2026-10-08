@@ -6,6 +6,8 @@ import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import * as crypto from "node:crypto";
 import ts from "typescript";
+import * as money from "../lib/nen/money";
+import { reachesPct, usagePct, costAmountsToWire } from "../lib/tai-chinh/cost";
 
 // Chạy CHÍNH code route/helper, chỉ thay các biên Next/DB bằng stub kiểm soát được.
 // Không thay thế test Postgres/RLS: phần đó nằm trong admin-bootstrap.test.ts/rls.test.ts.
@@ -127,9 +129,13 @@ for (const projectId of [null, undefined, 0, -1, 1.5]) {
       },
       "@/lib/ha-tang/projects": { getCurrentProjectId: async () => projectId },
       "@/lib/tai-chinh/cost": {},
+      "@/lib/nen/money": money,
       "@/lib/db": { withProjectScope: () => assert.fail("Không được mở scope không hợp lệ") },
     });
-    const res = await route.GET({ nextUrl: new URL("https://test.invalid/api/costs") });
+    const res = await route.GET({
+      nextUrl: new URL("https://test.invalid/api/costs"),
+      headers: new Headers(),
+    });
     assert.equal(res.status, 403);
     assert.equal(res.body.code, "project_required");
   });
@@ -172,16 +178,20 @@ test("audit: costs giải quyền sau dự án và đọc mọi số liệu tron
         }
       },
     },
+    "@/lib/nen/money": money,
     "@/lib/tai-chinh/cost": {
+      reachesPct,
+      usagePct,
+      costAmountsToWire,
       costSummary: async (_group: string, _vo: boolean, id: number) => {
         checkScope();
         assert.equal(id, projectId);
-        return [{ key: "MEP", label: "MEP", budget: 100, committed: 95, actual: 50 }];
+        return [{ key: "MEP", label: "MEP", budget: 10000n, committed: 9500n, actual: 5000n }];
       },
       costTotals: async (_vo: boolean, id: number) => {
         checkScope();
         assert.equal(id, projectId);
-        return { budget: 100, committed: 95, actual: 50 };
+        return { budget: 10000n, committed: 9500n, actual: 5000n };
       },
       getCostSettings: async () => {
         checkScope();
@@ -189,7 +199,10 @@ test("audit: costs giải quyền sau dự án và đọc mọi số liệu tron
       },
     },
   });
-  const res = await route.GET({ nextUrl: new URL("https://test.invalid/api/costs") });
+  const res = await route.GET({
+    nextUrl: new URL("https://test.invalid/api/costs"),
+    headers: new Headers(),
+  });
   assert.equal(res.status, 200);
   assert.equal(reads, 3);
   assert.equal((res.body.alerts as unknown[]).length, 1);

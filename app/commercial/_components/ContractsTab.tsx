@@ -19,6 +19,7 @@ import {
 import { Skeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { formatDateVN } from "@/lib/nen/date";
+import { HEADER_TIEN_CHI_PHI, fmtTienRutGon, phanTramSuDung } from "@/app/costs/_components/chiPhi";
 
 type SubSection = "contracts" | "costs" | "insurance";
 
@@ -43,7 +44,10 @@ export default function ContractsTab() {
     setLoading(true);
     Promise.all([
       fetch("/api/contracts").then((r) => (r.ok ? r.json() : { contracts: [] })),
-      fetch("/api/costs?groupBy=system&includeVo=1").then((r) => (r.ok ? r.json() : null)),
+      // Tiền chi phí về dạng chuỗi exact decimal-string-v1 (S10) — hiển thị bằng bigint.
+      fetch("/api/costs?groupBy=system&includeVo=1", { headers: HEADER_TIEN_CHI_PHI }).then((r) =>
+        r.ok ? r.json() : null,
+      ),
       fetch("/api/insurance-bonds").then((r) => (r.ok ? r.json() : { items: [] })),
     ])
       .then(([cData, costData, insData]) => {
@@ -230,18 +234,18 @@ export default function ContractsTab() {
                   </thead>
                   <tbody className="divide-y divide-zinc-800/60">
                     {costsData.rows.map((r: any) => {
-                      const pct = r.budget > 0 ? Math.round((r.committed / r.budget) * 100) : 0;
+                      const pct = Math.round(phanTramSuDung(r.committed, r.budget) ?? 0);
                       return (
                         <tr key={r.key} className="hover:bg-zinc-900/40 transition">
                           <td className="py-3 px-3 font-semibold text-zinc-200">{r.label}</td>
                           <td className="py-3 px-3 text-right font-mono text-zinc-300">
-                            {fmtVND(r.budget)}
+                            {fmtTienRutGon(r.budget)}
                           </td>
                           <td className="py-3 px-3 text-right font-mono text-amber-400 font-semibold">
-                            {fmtVND(r.committed)}
+                            {fmtTienRutGon(r.committed)}
                           </td>
                           <td className="py-3 px-3 text-right font-mono text-emerald-400">
-                            {fmtVND(r.actual)}
+                            {fmtTienRutGon(r.actual)}
                           </td>
                           <td className="py-3 px-3 text-right font-mono">
                             <span
