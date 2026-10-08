@@ -4,7 +4,7 @@
 // (dashboard chạy được dù module sau chưa làm, vd work_fronts của M14).
 // Xem docs/nang-cap/M09-dashboard.md.
 import { query, queryOne, todayISO, daysFromTodayISO } from "@/lib/db";
-import { costSummary } from "@/lib/tai-chinh/cost";
+import { getCostReport } from "@/lib/tai-chinh/cost";
 import { DUE_SOON_COND, dueSoonParams, loadDueSoonThresholds } from "@/lib/tien-do/due-soon";
 import { sheetProgressKpi } from "@/lib/tien-do/kpi";
 import { progressAtDate } from "@/lib/tien-do/report";
@@ -201,11 +201,20 @@ export async function bySystemBlock(projectId?: number | null): Promise<SystemCr
       GROUP BY st.system_id`,
     ...(projectId != null ? [projectId] : []),
   );
-  const cost = await costSummary("system", true, projectId ?? undefined);
+  // Một báo cáo exact cho dự án (không N+1); thiếu dự án → không số liệu chi phí (fail-closed).
+  const cost =
+    projectId != null
+      ? (
+          await getCostReport(
+            { kind: "project", projectId },
+            { groupBy: "system", includeVo: true },
+          )
+        ).rows
+      : [];
 
   const progressMap = new Map(progress.map((r) => [r.systemId, r]));
   const ncrMap = new Map(ncrOpen.map((r) => [r.systemId, Number(r.n)]));
-  const costMap = new Map(cost.map((r) => [r.key, r]));
+  const costMap = new Map(cost.filter((r) => !r.unassigned).map((r) => [r.systemCode ?? r.key, r]));
 
   const systems = await query<{ id: number; code: string; name: string; color: string | null }>(
     `SELECT id, code, name, color FROM systems ORDER BY id`,
@@ -221,7 +230,7 @@ export async function bySystemBlock(projectId?: number | null): Promise<SystemCr
       progressPct: Number(p?.progressPct ?? 0),
       delayedCount: Number(p?.delayedCount ?? 0),
       ncrOpen: ncrMap.get(d.id) ?? 0,
-      budgetUsedPct: c && c.budget > 0 ? (c.committed / c.budget) * 100 : 0,
+      budgetUsedPct: c?.usageBasisPoints != null ? Number(c.usageBasisPoints) / 100 : 0,
     };
   });
 }

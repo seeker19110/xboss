@@ -483,6 +483,88 @@ test(
 );
 
 test(
+  "cost_over: ngưỡng so exact với số lớn (~10^13) — dưới ngưỡng 0,01 KHÔNG cảnh báo, đúng ngưỡng thì có",
+  S,
+  async () => {
+    const { insertId, run } = await import("@/lib/db");
+    const boqId = await insertId(
+      `INSERT INTO boq_items (code, name, unit, system_id, project_id, qty_contract, unit_price)
+       VALUES (?, 'BOQ lớn', 'm', ?, ?, 1, 9000000000000)`,
+      `${PFX}-BOQ-BIG`,
+      systemId,
+      projectId,
+    );
+    const poId = await insertId(
+      `INSERT INTO purchase_orders (po_code, status, project_id) VALUES (?, 'confirmed', ?)`,
+      `${PFX}-PO-BIG`,
+      projectId,
+    );
+    const matId = await insertId(
+      `INSERT INTO materials (sheet_type_id, project_id, name, unit) VALUES (?, ?, 'VT lớn', 'm')`,
+      sheetTypeId,
+      projectId,
+    );
+    const itemId = await insertId(
+      `INSERT INTO po_items (po_id, material_id, qty_ordered, unit_price)
+       VALUES (?, ?, 1, 8099999999999.99)`,
+      poId,
+      matId,
+    );
+    const count = () => countNotif(users.pm.id, "cost_over", " AND cost_group = ?", [`${PFX}SYS`]);
+
+    // Float: 8099999999999.99/1e15*100 làm tròn thành đúng 90 → sẽ báo sai; exact thì không.
+    await sync(users.pm);
+    assert.equal(await count(), 0, "thiếu 0,01 so với ngưỡng 90% → chưa cảnh báo");
+
+    await run(`UPDATE po_items SET unit_price = 8100000000000 WHERE id = ?`, itemId);
+    await sync(users.pm);
+    assert.equal(await count(), 1, "đúng ngưỡng 90% → cảnh báo");
+
+    await run(`DELETE FROM notifications WHERE type = 'cost_over' AND cost_group = ?`, `${PFX}SYS`);
+    await run(`DELETE FROM po_items WHERE po_id = ?`, poId);
+    await run(`DELETE FROM purchase_orders WHERE id = ?`, poId);
+    await run(`DELETE FROM materials WHERE id = ?`, matId);
+    await run(`DELETE FROM boq_items WHERE id = ?`, boqId);
+  },
+);
+
+test(
+  "cost_over: ngân sách 0 mà đã có cam kết (no_budget) → vẫn cảnh báo, không chia 0",
+  S,
+  async () => {
+    const { insertId, run, queryOne } = await import("@/lib/db");
+    const poId = await insertId(
+      `INSERT INTO purchase_orders (po_code, status, project_id) VALUES (?, 'confirmed', ?)`,
+      `${PFX}-PO-NOBUD`,
+      projectId,
+    );
+    const matId = await insertId(
+      `INSERT INTO materials (sheet_type_id, project_id, name, unit) VALUES (?, ?, 'VT no budget', 'm')`,
+      sheetTypeId,
+      projectId,
+    );
+    await run(
+      `INSERT INTO po_items (po_id, material_id, qty_ordered, unit_price) VALUES (?, ?, 1, 50)`,
+      poId,
+      matId,
+    );
+    await sync(users.pm);
+    const n = await queryOne<{ message: string }>(
+      `SELECT message FROM notifications WHERE user_id = ? AND type = 'cost_over' AND cost_group = ?`,
+      users.pm.id,
+      `${PFX}SYS`,
+    );
+    assert.ok(n, "no_budget có cam kết dương phải cảnh báo");
+    assert.match(n!.message, /chưa có ngân sách/);
+
+    await run(`DELETE FROM notifications WHERE type = 'cost_over' AND cost_group = ?`, `${PFX}SYS`);
+    await run(`DELETE FROM po_items WHERE po_id = ?`, poId);
+    await run(`DELETE FROM purchase_orders WHERE id = ?`, poId);
+    await run(`DELETE FROM materials WHERE id = ?`, matId);
+  },
+);
+
+test(
   "contract_expiry: hợp đồng sắp/đã hết hiệu lực → nhắc (message khác nhau tuỳ đã quá hạn hay chưa); hết điều kiện thì tự dọn",
   S,
   async () => {
