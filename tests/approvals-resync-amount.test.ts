@@ -79,6 +79,7 @@ test(
       const changed = await resyncApprovalAmount({
         entityType: "payment_cert",
         entityId,
+        projectId: ctx.projectId,
         amountMinor: 500000n,
       });
       assert.equal(changed, true);
@@ -123,7 +124,12 @@ test(
       assert.equal(req?.status, "approved"); // không bước nào hiệu lực
 
       assert.equal(
-        await resyncApprovalAmount({ entityType: "payment_cert", entityId, amountMinor: 500000n }),
+        await resyncApprovalAmount({
+          entityType: "payment_cert",
+          entityId,
+          projectId: ctx.projectId,
+          amountMinor: 500000n,
+        }),
         true,
       );
       const row = await queryOne<{ currentSeq: number; status: string; decidedAt: string | null }>(
@@ -150,7 +156,12 @@ test(
     const entityId = 930_000 + (Date.now() % 1000);
     try {
       assert.equal(
-        await resyncApprovalAmount({ entityType: "payment_cert", entityId, amountMinor: 100n }),
+        await resyncApprovalAmount({
+          entityType: "payment_cert",
+          entityId,
+          projectId: ctx.projectId,
+          amountMinor: 100n,
+        }),
         false,
       );
       const req = await openApproval({
@@ -162,7 +173,12 @@ test(
       });
       assert.equal(req?.status, "pending");
       assert.equal(
-        await resyncApprovalAmount({ entityType: "payment_cert", entityId, amountMinor: 1000n }),
+        await resyncApprovalAmount({
+          entityType: "payment_cert",
+          entityId,
+          projectId: ctx.projectId,
+          amountMinor: 1000n,
+        }),
         true,
       );
       const row = await queryOne<{ status: string }>(
@@ -203,7 +219,12 @@ test(
         decision: "approve",
       });
       assert.equal(
-        await resyncApprovalAmount({ entityType: "payment_cert", entityId, amountMinor: 999900n }),
+        await resyncApprovalAmount({
+          entityType: "payment_cert",
+          entityId,
+          projectId: ctx.projectId,
+          amountMinor: 999900n,
+        }),
         false,
       );
       const row = await queryOne<{ amount: number; currentSeq: number }>(
@@ -231,6 +252,7 @@ test(
         await resyncApprovalAmount({
           entityType: "payment_cert",
           entityId,
+          projectId: ctx.projectId,
           amountMinor: lonHon2Mu53,
         }),
         false,
@@ -243,9 +265,61 @@ test(
         user: { id: ctx.creator, role: "engineer" },
       });
       await assert.rejects(
-        resyncApprovalAmount({ entityType: "payment_cert", entityId, amountMinor: lonHon2Mu53 }),
+        resyncApprovalAmount({
+          entityType: "payment_cert",
+          entityId,
+          projectId: ctx.projectId,
+          amountMinor: lonHon2Mu53,
+        }),
         (e: { status?: number; code?: string }) =>
           e.status === 422 && e.code === "money_precision_unsupported",
+      );
+    } finally {
+      await cleanup(ctx);
+    }
+  },
+);
+
+test(
+  "resync: projectId khác dự án của request → false, request giữ nguyên; tràn NUMERIC(15,2) → 422",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const { openApproval, resyncApprovalAmount } = await import("@/lib/tien-do/approvals");
+    const ctx = await setup([{ role: "cdt", minAmount: 1000 }]);
+    const entityId = 960_000 + (Date.now() % 1000);
+    try {
+      const req = await openApproval({
+        entityType: "payment_cert",
+        entityId,
+        projectId: ctx.projectId,
+        amount: 5000,
+        user: { id: ctx.creator, role: "engineer" },
+      });
+      assert.equal(
+        await resyncApprovalAmount({
+          entityType: "payment_cert",
+          entityId,
+          projectId: ctx.projectId + 999_999,
+          amountMinor: 100n,
+        }),
+        false,
+      );
+      const row = await queryOne<{ amount: number; status: string }>(
+        `SELECT amount, status FROM approval_requests WHERE id = ?`,
+        req!.id,
+      );
+      assert.equal(Number(row!.amount), 5000);
+      assert.equal(row!.status, "pending");
+      // 10^13 đồng (> NUMERIC(15,2)) nhưng còn trong biên số an toàn → 422, không 500 của pg.
+      await assert.rejects(
+        resyncApprovalAmount({
+          entityType: "payment_cert",
+          entityId,
+          projectId: ctx.projectId,
+          amountMinor: 10n ** 15n,
+        }),
+        (e: { status?: number }) => e.status === 422,
       );
     } finally {
       await cleanup(ctx);

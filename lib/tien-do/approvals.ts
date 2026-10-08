@@ -7,7 +7,7 @@
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { isUniqueViolation } from "@/lib/ha-tang/seqcode";
 import { ROLES, VIEW_ONLY_ROLES, type Role } from "@/lib/nen/roles";
-import { moneyToNumberSafe, isMoneyPrecisionError } from "@/lib/nen/money";
+import { moneyToNumberSafe, isMoneyPrecisionError, fitsNumeric } from "@/lib/nen/money";
 
 // Vai trò chỉ-xem KHÔNG bao giờ được làm bước duyệt — trừ `cdt` (CĐT được phép là bước
 // duyệt cuối, theo M46 PR4). bch/viewer luôn 403 dù có bị cấu hình nhầm làm step role.
@@ -177,17 +177,20 @@ export async function openApproval(opts: {
 export async function resyncApprovalAmount(opts: {
   entityType: string;
   entityId: number;
+  projectId: number;
   amountMinor: bigint;
 }): Promise<boolean> {
   return withTransaction(async () => {
     const req = await queryOne<{ id: number; flowId: number }>(
       `SELECT r.id, r.flow_id AS "flowId"
          FROM approval_requests r
-        WHERE r.entity_type = ? AND r.entity_id = ? AND r.status IN ('pending', 'approved')
+        WHERE r.entity_type = ? AND r.entity_id = ? AND r.project_id = ?
+          AND r.status IN ('pending', 'approved')
           AND NOT EXISTS (SELECT 1 FROM approval_actions a WHERE a.request_id = r.id)
         ORDER BY r.id DESC LIMIT 1 FOR UPDATE OF r`,
       opts.entityType,
       opts.entityId,
+      opts.projectId,
     );
     if (!req) return false;
     let amount: number;
@@ -200,6 +203,12 @@ export async function resyncApprovalAmount(opts: {
         code: "money_precision_unsupported",
       });
     }
+    // approval_requests.amount là NUMERIC(15,2): tràn cột thì 422 rõ ràng thay vì 500 của pg.
+    if (!fitsNumeric(opts.amountMinor, 15))
+      throw Object.assign(new Error("Giá trị vượt giới hạn lưu trữ của luồng phê duyệt"), {
+        status: 422,
+        code: "money_precision_unsupported",
+      });
     const steps = await query<ApprovalStep>(
       `SELECT seq, role, min_amount AS "minAmount", sla_days AS "slaDays"
          FROM approval_steps WHERE flow_id = ? ORDER BY seq`,

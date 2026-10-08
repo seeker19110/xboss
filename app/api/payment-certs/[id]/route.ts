@@ -174,9 +174,16 @@ export async function PATCH(
       }
     });
   } catch (err: unknown) {
-    const e = err as { message?: string; status?: number };
-    if (e.status) return NextResponse.json({ error: e.message }, { status: e.status });
-    log.error("payment-certs PATCH: lỗi không lường trước", { certId: id, err });
+    const e = err as { message?: string; status?: number; code?: string };
+    if (e.status)
+      return NextResponse.json(
+        { error: e.message, ...(e.code ? { code: e.code } : {}) },
+        { status: e.status },
+      );
+    log.error("payment-certs PATCH: lỗi không lường trước", {
+      certId: id,
+      err: err instanceof Error ? err.message : String(err),
+    });
     return NextResponse.json({ error: "Lỗi máy chủ khi sửa đợt thanh toán" }, { status: 500 });
   }
 
