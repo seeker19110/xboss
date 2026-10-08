@@ -43,7 +43,10 @@ export default function ContractsTab() {
     setLoading(true);
     Promise.all([
       fetch("/api/contracts").then((r) => (r.ok ? r.json() : { contracts: [] })),
-      fetch("/api/costs?groupBy=system&includeVo=1").then((r) => (r.ok ? r.json() : null)),
+      // decimal-string-v1 (S11): tiền là chuỗi exact, không dính 422 của định dạng number cũ.
+      fetch("/api/costs?groupBy=system&includeVo=1", {
+        headers: { "X-XBoss-Money-Format": "decimal-string-v1" },
+      }).then((r) => (r.ok ? r.json() : null)),
       fetch("/api/insurance-bonds").then((r) => (r.ok ? r.json() : { items: [] })),
     ])
       .then(([cData, costData, insData]) => {
@@ -230,28 +233,35 @@ export default function ContractsTab() {
                   </thead>
                   <tbody className="divide-y divide-zinc-800/60">
                     {costsData.rows.map((r: any) => {
-                      const pct = r.budget > 0 ? Math.round((r.committed / r.budget) * 100) : 0;
+                      // % do server tính exact (null = chưa có ngân sách); số tiền rút gọn
+                      // chỉ là hiển thị xấp xỉ từ chuỗi exact.
+                      const pct: number | null = r.usagePct;
+                      const vuot = r.level === "over" || r.level === "no_budget";
                       return (
                         <tr key={r.key} className="hover:bg-zinc-900/40 transition">
                           <td className="py-3 px-3 font-semibold text-zinc-200">{r.label}</td>
                           <td className="py-3 px-3 text-right font-mono text-zinc-300">
-                            {fmtVND(r.budget)}
+                            {fmtVND(Number(r.budget))}
                           </td>
                           <td className="py-3 px-3 text-right font-mono text-amber-400 font-semibold">
-                            {fmtVND(r.committed)}
+                            {fmtVND(Number(r.committed))}
                           </td>
                           <td className="py-3 px-3 text-right font-mono text-emerald-400">
-                            {fmtVND(r.actual)}
+                            {fmtVND(Number(r.actual))}
                           </td>
                           <td className="py-3 px-3 text-right font-mono">
                             <span
                               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                pct > 100
+                                vuot
                                   ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                                   : "bg-zinc-800 text-zinc-300"
                               }`}
                             >
-                              {pct}%
+                              {pct == null
+                                ? r.level === "no_budget"
+                                  ? "Chưa có NS"
+                                  : "—"
+                                : `${Math.round(pct)}%`}
                             </span>
                           </td>
                         </tr>

@@ -126,24 +126,24 @@ for (const projectId of [null, undefined, 0, -1, 1.5]) {
         CAN: { viewPayments: () => true },
       },
       "@/lib/ha-tang/projects": { getCurrentProjectId: async () => projectId },
-      "@/lib/tai-chinh/cost": {},
-      "@/lib/db": { withProjectScope: () => assert.fail("Không được mở scope không hợp lệ") },
+      "@/lib/nen/money": {},
+      "@/lib/tai-chinh/cost": {
+        getCostReport: () => assert.fail("Không được đọc báo cáo khi phạm vi không hợp lệ"),
+      },
     });
-    const res = await route.GET({ nextUrl: new URL("https://test.invalid/api/costs") });
+    const res = await route.GET({
+      nextUrl: new URL("https://test.invalid/api/costs"),
+      headers: new Headers(),
+    });
     assert.equal(res.status, 403);
     assert.equal(res.body.code, "project_required");
   });
 }
 
-test("audit: costs giải quyền sau dự án và đọc mọi số liệu trong scope đã kiểm", async () => {
+test("audit: costs giải quyền sau dự án và đọc báo cáo đúng phạm vi đã kiểm", async () => {
   let projectResolved = false;
-  let scoped = false;
   let reads = 0;
   const projectId = 42;
-  const checkScope = () => {
-    assert.equal(scoped, true);
-    reads++;
-  };
   const route = load<Route>("app/api/costs/route.ts", {
     "next/server": next,
     "@/lib/bao-mat/auth": {
@@ -161,37 +161,32 @@ test("audit: costs giải quyền sau dự án và đọc mọi số liệu tron
         return projectId;
       },
     },
-    "@/lib/db": {
-      withProjectScope: async (id: number, fn: () => Promise<unknown>) => {
-        assert.equal(id, projectId);
-        scoped = true;
-        try {
-          return await fn();
-        } finally {
-          scoped = false;
-        }
-      },
+    "@/lib/nen/money": {
+      MONEY_FORMAT_HEADER: "X-XBoss-Money-Format",
+      MONEY_FORMAT_DECIMAL_V1: "decimal-string-v1",
+      moneyWireFormat: () => "legacy-number",
+      isMoneyPrecisionError: () => false,
     },
     "@/lib/tai-chinh/cost": {
-      costSummary: async (_group: string, _vo: boolean, id: number) => {
-        checkScope();
-        assert.equal(id, projectId);
-        return [{ key: "MEP", label: "MEP", budget: 100, committed: 95, actual: 50 }];
+      getCostReport: async (scope: { kind: string; projectId: number }) => {
+        reads++;
+        // Object từ vm context khác realm → so theo giá trị JSON.
+        assert.equal(JSON.stringify(scope), JSON.stringify({ kind: "project", projectId }));
+        return { report: true };
       },
-      costTotals: async (_vo: boolean, id: number) => {
-        checkScope();
-        assert.equal(id, projectId);
-        return { budget: 100, committed: 95, actual: 50 };
-      },
-      getCostSettings: async () => {
-        checkScope();
-        return { warnPct: 90, overPct: 100 };
+      costReportToWire: (report: unknown, format: string) => {
+        assert.deepEqual(report, { report: true });
+        assert.equal(format, "legacy-number");
+        return { rows: [], alerts: [{ key: "MEP" }] };
       },
     },
   });
-  const res = await route.GET({ nextUrl: new URL("https://test.invalid/api/costs") });
+  const res = await route.GET({
+    nextUrl: new URL("https://test.invalid/api/costs"),
+    headers: new Headers(),
+  });
   assert.equal(res.status, 200);
-  assert.equal(reads, 3);
+  assert.equal(reads, 1);
   assert.equal((res.body.alerts as unknown[]).length, 1);
 });
 
