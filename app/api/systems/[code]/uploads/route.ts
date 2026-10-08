@@ -24,14 +24,10 @@ export async function GET(
     return NextResponse.json({ error: "Tham số kind không hợp lệ" }, { status: 400 });
   }
 
+  // A1-AC02: không có dự án khả kiến → 404, không query lịch sử upload toàn hệ. Bản ghi
+  // project_id NULL là lịch sử cũ trước khi có đa dự án — vẫn hiện như trước.
   const projectId = await getCurrentProjectId(user);
-  // `?` đứng riêng chỉ so `IS NULL` khiến Postgres không suy được kiểu tham số ("could
-  // not determine data type of parameter") khi projectId = null (trường hợp mặc định,
-  // DB chưa chọn dự án) — bỏ hẳn nhánh so sánh đó, chỉ thêm điều kiện lọc khi có
-  // projectId thật (đúng convention project-scope đã dùng ở lib/system-upload.ts).
-  const projectFilter =
-    projectId != null ? " AND (su.project_id = ? OR su.project_id IS NULL)" : "";
-  const projectParams = projectId != null ? [projectId] : [];
+  if (projectId == null) return NextResponse.json({ error: "Không tìm thấy hệ" }, { status: 404 });
 
   const list = await query<{
     id: number;
@@ -52,12 +48,12 @@ export async function GET(
             su.created_at AS "createdAt"
        FROM system_uploads su
        LEFT JOIN users u ON su.uploaded_by = u.id
-      WHERE su.system_id = ? AND su.kind = ?${projectFilter}
+      WHERE su.system_id = ? AND su.kind = ? AND (su.project_id = ? OR su.project_id IS NULL)
       ORDER BY su.created_at DESC
       LIMIT 20`,
     systemId,
     kind,
-    ...projectParams,
+    projectId,
   );
 
   const formatted = list.map((item) => ({

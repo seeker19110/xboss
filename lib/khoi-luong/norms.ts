@@ -83,8 +83,8 @@ export async function listNormsForBoqItem(boqItemId: number): Promise<NormRow[]>
 
 // projectId (M22): boq_norms không có cột project_id riêng — suy qua boq_items.project_id
 // (join thêm khi truyền projectId); undefined = không lọc.
-export async function getNorm(id: number, projectId?: number): Promise<NormRow | null> {
-  const projectFilter = projectId != null ? " AND bi.project_id = ?" : "";
+// projectId bắt buộc (fail-closed): không còn nghĩa "không truyền = không lọc dự án".
+export async function getNorm(id: number, projectId: number): Promise<NormRow | null> {
   const row = await queryOne<NormRow>(
     `SELECT n.id, n.boq_item_id AS "boqItemId", n.resource_type AS "resourceType",
             n.material_id AS "materialId", m.name AS "materialName",
@@ -93,9 +93,9 @@ export async function getNorm(id: number, projectId?: number): Promise<NormRow |
        FROM boq_norms n
        JOIN boq_items bi ON bi.id = n.boq_item_id
        LEFT JOIN materials m ON m.id = n.material_id
-      WHERE n.id = ?${projectFilter}`,
+      WHERE n.id = ? AND bi.project_id = ?`,
     id,
-    ...(projectId != null ? [projectId] : []),
+    projectId,
   );
   return row ?? null;
 }

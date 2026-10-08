@@ -28,16 +28,18 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // A1-AC02: không có dự án khả kiến → 404, không query nghiệp vụ (không còn nhánh bỏ lọc).
   const projectId = await getCurrentProjectId(user);
-  const projectFilter = projectId != null ? " AND bi.project_id = ?" : "";
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy định mức" }, { status: 404 });
   const existing = await queryOne<Record<string, unknown>>(
     `SELECT bn.resource_type AS "resourceType", bn.material_id AS "materialId",
             bn.resource_name AS "resourceName", bn.qty_per_unit AS "qtyPerUnit",
             bn.unit_label AS "unitLabel", bn.note
        FROM boq_norms bn JOIN boq_items bi ON bi.id = bn.boq_item_id
-      WHERE bn.id = ?${projectFilter}`,
+      WHERE bn.id = ? AND bi.project_id = ?`,
     id,
-    ...(projectId != null ? [projectId] : []),
+    projectId,
   );
   if (!existing) return NextResponse.json({ error: "Không tìm thấy định mức" }, { status: 404 });
 
@@ -88,7 +90,9 @@ export async function DELETE(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const norm = await getNorm(id, projectId ?? undefined);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy định mức" }, { status: 404 });
+  const norm = await getNorm(id, projectId);
   if (!norm) return NextResponse.json({ error: "Không tìm thấy định mức" }, { status: 404 });
 
   await run(`DELETE FROM boq_norms WHERE id = ?`, id);
