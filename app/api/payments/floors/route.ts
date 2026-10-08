@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, withProjectScope } from "@/lib/db";
 import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
+import { MONEY_FORMAT_HEADER, moneyWireFormat } from "@/lib/nen/money";
+import { HEADERS_API_TIEN, nhanDinhDangTien, tienTextToWire } from "@/lib/nen/money-dto";
 
 export const dynamic = "force-dynamic";
 
@@ -11,19 +13,22 @@ type FloorBase = {
   sheetTypeId: number;
   sheetType: string;
   floorLabel: string;
-  contractValue: number;
+  // S10c: tiền đọc `::text` (exact) → wire ở biên DTO.
+  contractValue: string;
 };
 type BillHistory = {
   sheetTypeId: number;
   floorLabel: string;
   period: string | null;
   pctThisPeriod: number;
-  amount: number;
+  amount: string;
   paidDate: string;
 };
 
 // GET /api/payments/floors?person=X
-// Trả danh sách tầng × hệ cho người phụ trách, kèm lịch sử thanh toán.
+// Trả danh sách tầng × hệ cho người phụ trách, kèm lịch sử thanh toán. S10c (A3-FR06): header
+// decimal-string-v1 → contractValue/history.amount là chuỗi canonical + `moneyFormat`; legacy
+// number (mỗi giá trị là một ô NUMERIC(15,2), luôn trong biên round-trip — không có tổng tiền).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -49,7 +54,7 @@ export async function GET(req: NextRequest) {
         `
       SELECT st.id AS "sheetTypeId", st.code AS "sheetType",
              wp.floor_label AS "floorLabel",
-             COALESCE(fc.contract_value, 0) AS "contractValue"
+             COALESCE(fc.contract_value, 0)::text AS "contractValue"
         FROM work_packages wp
         JOIN sheet_types st ON wp.sheet_type_id = st.id
         JOIN towers tw ON tw.id = st.tower_id
@@ -68,7 +73,7 @@ export async function GET(req: NextRequest) {
         `
       SELECT sheet_type_id AS "sheetTypeId", floor_label AS "floorLabel",
              period, pct_this_period AS "pctThisPeriod",
-             amount, paid_date AS "paidDate"
+             amount::text AS amount, paid_date AS "paidDate"
         FROM payment_bills
        WHERE responsible = ? AND type = 'bill'
          AND sheet_type_id IS NOT NULL AND floor_label IS NOT NULL
@@ -89,11 +94,17 @@ export async function GET(req: NextRequest) {
     histMap.set(k, list);
   }
 
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
   const floors = floorRows.map((f) => {
     const history = histMap.get(`${f.sheetTypeId}__${f.floorLabel}`) ?? [];
     const pctPaid = history.reduce((s, h) => s + (h.pctThisPeriod ?? 0), 0);
-    return { ...f, pctPaid, history };
+    return {
+      ...f,
+      contractValue: tienTextToWire(f.contractValue, format),
+      pctPaid,
+      history: history.map((h) => ({ ...h, amount: tienTextToWire(h.amount, format) })),
+    };
   });
 
-  return NextResponse.json({ floors }, { headers: PRIVATE_NO_STORE });
+  return NextResponse.json({ floors, ...nhanDinhDangTien(format) }, { headers: HEADERS_API_TIEN });
 }

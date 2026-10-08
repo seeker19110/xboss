@@ -1,5 +1,46 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S10c: tiền exact hợp đồng/thanh toán/mua sắm/EVM…
+
+Phần "monetary inventory còn lại, ngoài costs/IPC" của S10 (A3-FR03/FR04/FR06, A3-AC01/AC03/
+AC05, Q-AC04), cùng mẫu S10a (`paymentcerts.ts`): lib trả `MoneyMinor` (bigint đồng×100) tới
+biên DTO; route opt-in `X-XBoss-Money-Format: decimal-string-v1` → chuỗi canonical +
+`moneyFormat`, legacy number qua `moneyToNumberSafe`, ngoài biên → **422
+`money_precision_unsupported`**; `private, no-store` + `Vary`. Adapter dùng chung
+`lib/nen/money-dto.ts` (thuần, client import được). Không migration, không đổi parser DB.
+
+- **Tài chính/quỹ/VAT** (`lib/tai-chinh/finance.ts`, `/api/finance/summary`, `/finance`): dòng tiền,
+  công nợ phải thu/trả, tạm ứng, VAT là bigint; KPI trang cộng trừ bigint (biểu đồ dùng số xấp xỉ,
+  tooltip exact).
+- **NCC/thầu/NTP**: `supplierSummary`, `comparisonTable`/`awardTender` (giá trị HĐ ghi chuỗi exact;
+  vượt NUMERIC(15,2) → 422 `amount_overflow`), `subcontractorDebt` + route/UI tương ứng.
+- **EVM + báo cáo lưu**: `evmSummary` tính bằng bigint (tỷ lệ kế hoạch hữu tỉ, % đọc
+  `progress_percent::numeric::text`, EAC = AC + (BAC−EV)×AC/EV exact, SPI/CPI chia bigint);
+  `cost_by_month` giữ chuỗi canonical, sort `compareMoneyExact`, Excel chọn kiểu ô theo cột.
+- **Hợp đồng**: `/api/contracts`, `/api/contracts/:id` (kể cả phụ lục/phiếu TT/giao thầu tầng);
+  `poCommittedText` mới (khai trong `SENSITIVE.contract`); UI `/contracts`, tab HĐ `/commercial`
+  cộng bằng bigint (`mSumTien`/`mSubTien`).
+- **Thanh toán tiến độ** (`/api/payments`, `/bills`, `/floors`, `/payments`, `/payments/print`):
+  `earned` (HĐ × tiến độ) tính trong SQL theo từng ô tầng × hệ, làm tròn tới xu RỒI mới cộng →
+  tổng server = Σ dòng ở mọi cách lọc phía client; POST bill theo tầng tính
+  `ROUND(contract_value × ROUND(pct,4), 2)` trong SQL thay cho nhân float JS (lệch 1 xu ở
+  1.234.567.890.123,45 × 70%); ô nhập điền sẵn số thuần (bản `toLocaleString` cũ "1.234.567" bị
+  đọc lại thành 1,234 đ khi sửa ô); bản in cộng/trừ bigint, lỗi tải → báo lỗi thay vì in số rỗng.
+- **float8 × tiền**: `po_items.qty_ordered`, `tasks.progress_percent` ép `::numeric` TRƯỚC khi
+  nhân — SUM float8 cũ mất xu và tổng lớn in dạng mũ (`1.999999999999998e+16`) làm `parseMoney`
+  throw → 500.
+- **Test** (route thật, đỏ trên code cũ → xanh): `tests/s10c-finance-money.test.ts` (2/2),
+  `s10c-mua-sam-thau-money.test.ts` (4/6; 2 ca canh), `s10c-evm-bao-cao-money.test.ts` (3/3),
+  `s10c-hop-dong-money.test.ts` (4/5 ca DB), `s10c-thanh-toan-money.test.ts` (4/4 ca route),
+  `s10c-money-dto.test.ts` (thuần). Bộ liên quan 912 pass / 0 fail.
+- **Còn mở:** `mv_cost_by_month.committed` là float8 (cần migration riêng); `/api/subcontractors`
+  lộ `outstanding`/`debt` cho mọi vai trò + `subcontractorDebt`/`listSubcontractors` không lọc
+  dự án/org (phát hiện, ngoài phạm vi S10c); `/api/dashboard/evm` projectId null = toàn hệ;
+  parse ô nhập tiền (`Number(body.amount)`, `parseFloat` bỏ dấu chấm) chưa đổi; `mMul`/`mSumBy`
+  float còn ở claims/variations/payment-certs page; `IpcPaymentsTab` gọi nhầm `/api/payments`
+  (không có `bills`); nút "Excel" ở `/payments` gọi `export/excel?type=payments` nhưng route bỏ
+  qua `type`; `payrollTotals` không còn caller.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S14: verifier PITR (base backup + WAL) và diễn tập disposable
 
 `scripts/verify-pitr.ts` (+ `scripts/lib/pitr-archive.ts`/`pitr-checks.ts` thuần, `pitr-io.ts`, `pitr-drill.ts`):

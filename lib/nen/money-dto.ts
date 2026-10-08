@@ -8,9 +8,11 @@
 import {
   MONEY_FORMAT_DECIMAL_V1,
   MONEY_FORMAT_HEADER,
+  moneyToDecimal,
   moneyToWire,
   mulRatio,
   parseFixedDecimalExact,
+  parseMoneyExact,
   type MoneyWireFormat,
 } from "@/lib/nen/money";
 
@@ -73,6 +75,17 @@ export function moneyFieldsToWire<T extends object, K extends keyof T>(
   return out as MoneyFieldsWire<T, K>;
 }
 
+/**
+ * Bản `::text` của một cột/tổng NUMERIC → wire, không qua parser float; null (bị che/không có)
+ * giữ null. Chuỗi không phải thập phân thuần (vd dạng mũ của float8) → throw, không đoán.
+ */
+export function tienTextToWire(
+  text: string | null | undefined,
+  format: MoneyWireFormat,
+): MoneyWire | null {
+  return text == null ? null : moneyToWire(parseMoneyExact(text), format);
+}
+
 // ===== Phía client (đã opt-in v1 nên mọi amount là chuỗi canonical) =====
 
 /** Chuỗi canonical 2 số lẻ từ API v1 → bigint đồng×100; sai dạng → throw (không đoán). */
@@ -112,4 +125,18 @@ export function fmtDongGonMinor(minor: bigint): string {
   if (abs >= 100_000_000_000n) return `${thapPhanVi(mulRatio(minor, 1n, 10n ** 9n), 2)} tỷ`;
   if (abs >= 100_000_000n) return `${thapPhanVi(mulRatio(minor, 1n, 10n ** 7n), 1)} tr`;
   return mulRatio(minor, 1n, 100n).toLocaleString("vi-VN");
+}
+
+/** Đồng đầy đủ kiểu vi-VN, giữ xu khi khác 0: 123456789n → "1.234.567,89"; 100n → "1". */
+export function fmtDongDayDuMinor(minor: bigint): string {
+  return thapPhanVi(minor, 2);
+}
+
+/**
+ * Giá trị điền sẵn cho ô nhập tiền: số thuần không nhóm hàng nghìn ("1234567", "1234567.5") —
+ * đọc lại được đúng bằng bộ parse ô nhập hiện có (bỏ ký tự ngoài [0-9.]); bản "1.234.567" kiểu
+ * vi-VN cũ bị đọc thành 1,234 đồng khi người dùng sửa ô.
+ */
+export function soTienNhapThuan(minor: bigint): string {
+  return moneyToDecimal(minor).replace(/\.?0+$/, "");
 }

@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, queryOne, withTransaction } from "@/lib/db";
 import { getCurrentProjectId, getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
+import { MONEY_FORMAT_HEADER, isMoneyPrecisionError, moneyWireFormat } from "@/lib/nen/money";
+import {
+  HEADERS_API_TIEN,
+  LOI_TIEN_VUOT_DINH_DANG_CU,
+  nhanDinhDangTien,
+  tienTextToWire,
+} from "@/lib/nen/money-dto";
 
 export const dynamic = "force-dynamic";
 
@@ -16,11 +23,18 @@ type FloorRow = {
   progress: number;
   taskCount: number;
   delayed: number;
-  contractValue: number;
+  // S10c: tiền đọc `::text` (exact) rồi mới đổi sang wire ở biên DTO.
+  contractValue: string;
+  earned: string;
 };
 
 // GET /api/payments — giá trị hợp đồng + tiến độ theo tầng × hệ.
-export async function GET(_req: NextRequest) {
+// S10c (A3-FR06): header decimal-string-v1 → contractValue/earned/tổng là chuỗi canonical +
+// `moneyFormat`; legacy number, ngoài biên round-trip → 422. `earned` (giá trị tương ứng tiến
+// độ) tính trong SQL theo từng ô tầng × hệ, làm tròn tới xu (ties xa 0) RỒI mới cộng — tổng
+// toàn dự án và mọi tổng lọc phía client (Σ earned từng dòng) cùng một kết quả, không trôi xu
+// theo cách gộp (A3-AC03).
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.viewPayments(user.role))
@@ -46,7 +60,9 @@ export async function GET(_req: NextRequest) {
            COALESCE(AVG(t.progress_percent), 0) AS progress,
            COUNT(DISTINCT t.id)::int AS "taskCount",
            COALESCE(SUM(CASE WHEN t.status = 'tre' THEN 1 ELSE 0 END), 0)::int AS delayed,
-           COALESCE(fc.contract_value, 0) AS "contractValue"
+           COALESCE(fc.contract_value, 0)::text AS "contractValue",
+           ROUND(COALESCE(fc.contract_value, 0)
+                 * COALESCE(AVG(t.progress_percent::numeric), 0), 2)::text AS earned
       FROM work_packages wp
       JOIN sheet_types st ON wp.sheet_type_id = st.id${towerJoin}
       LEFT JOIN tasks t ON t.package_id = wp.id
@@ -60,12 +76,14 @@ export async function GET(_req: NextRequest) {
 
   // Tổng hợp làm trong SQL (không cộng/nhân tiền trên số JS parse từ NUMERIC —
   // xem CLAUDE.md mục Quy ước / lib/money.ts) — cùng điều kiện lọc/nhóm với câu trên.
-  const totals = await queryOne<{ totalContract: number; totalEarned: number }>(
+  // progress_percent float8 ép ::numeric TRƯỚC khi nhân tiền (A3-FR04) — tích float8 cũ mất xu.
+  const totals = await queryOne<{ totalContract: string; totalEarned: string }>(
     `
     WITH floor_data AS (
       SELECT st.id, wp.floor_label,
-             COALESCE(AVG(t.progress_percent), 0) AS progress,
-             COALESCE(fc.contract_value, 0) AS contract_value
+             COALESCE(fc.contract_value, 0) AS contract_value,
+             ROUND(COALESCE(fc.contract_value, 0)
+                   * COALESCE(AVG(t.progress_percent::numeric), 0), 2) AS earned
         FROM work_packages wp
         JOIN sheet_types st ON wp.sheet_type_id = st.id${towerJoin}
         LEFT JOIN tasks t ON t.package_id = wp.id
@@ -74,20 +92,34 @@ export async function GET(_req: NextRequest) {
        WHERE wp.floor_label IS NOT NULL AND wp.floor_label != ''${towerFilter}
        GROUP BY st.id, wp.floor_label, fc.contract_value
     )
-    SELECT COALESCE(SUM(contract_value), 0) AS "totalContract",
-           COALESCE(SUM(contract_value * progress), 0) AS "totalEarned"
+    SELECT COALESCE(SUM(contract_value), 0)::text AS "totalContract",
+           COALESCE(SUM(earned), 0)::text AS "totalEarned"
       FROM floor_data`,
     projectId,
   );
 
-  return NextResponse.json(
-    {
-      rows,
-      totalContract: totals?.totalContract ?? 0,
-      totalEarned: totals?.totalEarned ?? 0,
-    },
-    { headers: PRIVATE_NO_STORE },
-  );
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
+  try {
+    return NextResponse.json(
+      {
+        rows: rows.map((r) => ({
+          ...r,
+          contractValue: tienTextToWire(r.contractValue, format),
+          earned: tienTextToWire(r.earned, format),
+        })),
+        totalContract: tienTextToWire(totals?.totalContract ?? "0.00", format),
+        totalEarned: tienTextToWire(totals?.totalEarned ?? "0.00", format),
+        ...nhanDinhDangTien(format),
+      },
+      { headers: HEADERS_API_TIEN },
+    );
+  } catch (err) {
+    if (!isMoneyPrecisionError(err)) throw err;
+    return NextResponse.json(LOI_TIEN_VUOT_DINH_DANG_CU, {
+      status: 422,
+      headers: HEADERS_API_TIEN,
+    });
+  }
 }
 
 // PATCH /api/payments — cập nhật giá trị HĐ theo tầng × hệ (upsert).
