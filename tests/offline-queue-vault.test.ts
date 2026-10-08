@@ -567,6 +567,66 @@ test("hết lease context (shared-safe 15 phút) hoặc đồng hồ lùi → va
   }
 });
 
+test("409 context_changed → khoá vault, op giữ pending; lần sau xác minh context lại từ đầu", async () => {
+  const m = moiTruong();
+  m.may.dangNhap(A);
+  await m.moTracking();
+  datOnline(false);
+  try {
+    assert.equal(await m.q.enqueueTick(DIM[0], true), true);
+  } finally {
+    datOnline(true);
+  }
+  m.datPhan(() => ({ status: 409, code: "context_changed" }));
+  await m.q.flush();
+  assert.equal(m.gui.length, 1);
+  assert.equal(m.vault.trangThai, "locked", "không dùng tiếp context/DEK cũ tới hết lease");
+  assert.deepEqual(
+    m.ops().map((r) => r.state),
+    ["pending"],
+  );
+  const contextTruoc = m.may.goi.filter((g) => g.endsWith("/api/offline/context")).length;
+  m.datPhan((req) => ({ status: 200, receiptOperationId: req.headers["Idempotency-Key"] }));
+  for (const [k, v] of m.db.data.get(STORE_OPS)!)
+    m.db.data.get(STORE_OPS)!.set(k, { ...(v as QueueRecord), nextAttemptAt: 0 });
+  await m.q.flush();
+  assert.ok(
+    m.may.goi.filter((g) => g.endsWith("/api/offline/context")).length > contextTruoc,
+    "phải xin context mới",
+  );
+  assert.equal(m.ops().length, 0);
+  assert.equal(m.gui[0].headers["Idempotency-Key"], m.gui[1].headers["Idempotency-Key"]);
+});
+
+test("hết lease khi đang mất mạng → đường đọc (giải mã) cũng khoá, không chỉ đường ghi", async () => {
+  const may = taoMayChuGia();
+  const db = new MemoryTxDb();
+  let tuong = 1_000_000;
+  let donDieu = 0;
+  const vault = new VaultSession(may.fetch, { tuong: () => tuong, donDieu: () => donDieu });
+  const q = new OfflineQueueManager({
+    store: new QueueDb(db),
+    vault,
+    send: async () => ({ networkError: true }),
+  });
+  may.dangNhap(A);
+  q.dangKyLuoi([{ id: TASK, cells: { a: { id: DIM[0] } } }]);
+  await q.chuanBiTracking([{ id: TASK }]);
+  datOnline(false);
+  try {
+    assert.equal(await q.enqueueTick(DIM[0], true), true);
+    const rec = [...db.data.get(STORE_OPS)!.values()][0] as QueueRecord;
+    assert.ok((await vault.giaiMa(rec)).byteLength > 0);
+    donDieu += 15 * 60_000;
+    tuong += 15 * 60_000;
+    await assert.rejects(vault.giaiMa(rec), { loai: "locked" });
+    assert.equal(vault.trangThai, "locked");
+    assert.deepEqual(await q.getQueuedPhotos(TASK), []);
+  } finally {
+    datOnline(true);
+  }
+});
+
 test("khoá vault bị thu hồi (manifest có tài nguyên mất quyền) → op giữ nguyên, bị khoá, không gửi/không xoá", async () => {
   const may = taoMayChuGia();
   const db = new MemoryTxDb();

@@ -646,6 +646,8 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
 
       {(!online || offlinePending > 0) && (
         <div
+          role="status"
+          aria-live="polite"
           className={`app-toast-center fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-xl border ${
             online
               ? "bg-sky-900 border-sky-700 text-sky-200"

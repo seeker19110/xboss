@@ -111,16 +111,18 @@ export class VaultSession implements VaultMoKhoa {
     for (const fn of this.langNghe) fn();
   }
 
+  // Mọi đường đọc/ghi đi qua chu()/coKhoa() nên kiểm lease tại đây: hết lease khi đang mất mạng
+  // (không có flush nào gọi conHieuLuc) vẫn khoá vault trước khi giải mã/mã hoá (A2-FR04).
   chu(): ChuSoHuu | null {
-    return this.trangThai === "active" ? this.chuHienHanh : null;
+    return this.conHieuLuc() ? this.chuHienHanh : null;
   }
 
   vaiTro(): string | null {
-    return this.trangThai === "active" ? this.role : null;
+    return this.conHieuLuc() ? this.role : null;
   }
 
   coKhoa(keyId: string): boolean {
-    return this.trangThai === "active" && this.keys.has(keyId);
+    return this.conHieuLuc() && this.keys.has(keyId);
   }
 
   /** Đóng vault: bỏ mọi tham chiếu khoá/context trong bộ nhớ (ciphertext trên thiết bị giữ nguyên). */

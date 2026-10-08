@@ -34,8 +34,7 @@ import {
 const SYNC_TAG = "xboss-flush";
 export const OFFLINE_QUEUE_QUARANTINED = false;
 /** Thông điệp khi KHÔNG lưu được trên thiết bị — form/ô giữ nguyên để người dùng xử lý. */
-export const OFFLINE_SAVE_ERROR =
-  "Chưa lưu được trên thiết bị: lưu ngoại tuyến chưa sẵn sàng (cần mở khoá khi có mạng) hoặc bộ nhớ không ghi được. Kết nối mạng để lưu lên máy chủ.";
+export const OFFLINE_SAVE_ERROR = "Chưa lưu được trên thiết bị. Hãy kết nối mạng rồi thử lại.";
 /** Trần số task mỗi khoá vault (khớp MAX_MANIFEST_TASKS phía server). */
 const TASK_MOI_KHOA = 500;
 
@@ -319,7 +318,14 @@ export class OfflineQueueManager {
           send: this.send,
           cache: this.cache,
         });
+        if (kq.loiContext) {
+          // 409 context_*: quyền/thiết bị/dự án đã đổi — khoá vault để lần sau xác minh lại từ đầu
+          // (/auth/me → context → unlock), không tiếp tục dùng context/DEK cũ tới hết lease.
+          this.cache.clear();
+          this.vault.khoa();
+        }
         if (kq.pausedAuth) {
+          this.cache.clear();
           this.vault.khoa();
           showToast(
             "Phiên đăng nhập đã hết hạn — thao tác ngoại tuyến vẫn giữ trên thiết bị, đăng nhập lại để gửi",

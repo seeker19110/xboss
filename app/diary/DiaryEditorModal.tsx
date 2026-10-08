@@ -44,6 +44,8 @@ type Prefill = {
 };
 
 const WEATHER_CHIPS = ["Nắng", "Mưa", "Âm u"];
+/** Trần chờ mở vault offline trước khi nạp form (mạng yếu không được kẹt Skeleton). */
+const CHO_VAULT_MS = 3000;
 
 // Bản nhật ký hiện hành trên server khi PUT nhận 412 (S06) — chỉ để người dùng SO SÁNH với nội
 // dung đang nhập; không bao giờ tự nạp đè lên form.
@@ -99,8 +101,14 @@ export default function DiaryEditorModal({
     setLoading(true);
     (async () => {
       // S07: có mạng → mở vault + xin khoá nhật ký cho tháng này (để lưu offline được, và để
-      // đọc bản nháp mã hoá của chính mình). Lỗi không chặn mở form.
-      if (canEdit) await chuanBiOfflineNhatKy(date).catch(() => undefined);
+      // đọc bản nháp mã hoá của chính mình). Lỗi không chặn mở form; mạng yếu làm request treo thì
+      // chỉ chờ tối đa CHO_VAULT_MS rồi nạp form tiếp (không kẹt Skeleton).
+      if (canEdit) {
+        await Promise.race([
+          chuanBiOfflineNhatKy(date).catch(() => undefined),
+          new Promise((r) => setTimeout(r, CHO_VAULT_MS)),
+        ]);
+      }
       // Có bản nháp offline chưa gửi của ngày này → ưu tiên nạp form từ đó (không phải từ
       // server), nhưng vẫn lấy trạng thái khoá + danh sách ảnh prefill từ server.
       const queued = await getQueuedDiaryNote(date);
