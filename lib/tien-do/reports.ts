@@ -12,10 +12,19 @@
 // trang) để mọi cột đều sort được đồng nhất. Tiền: SUM trong SQL, cast ::text →
 // lib/money.ts (không cộng tiền trên float JS).
 import { query } from "@/lib/db";
-import { moneyToNumber, parseMoney } from "@/lib/nen/money";
+import {
+  compareMoneyExact,
+  moneyToDecimal,
+  moneyToWire,
+  parseFixedDecimalExact,
+  parseMoney,
+  type MoneyWireFormat,
+} from "@/lib/nen/money";
 import { resolveSystemId } from "@/lib/tien-do/systems";
 import { PAYMENT_VIEW_ROLES, type Role } from "@/lib/nen/roles";
 
+// S10c: ô kiểu "money" giữ CHUỖI canonical 2 số lẻ (exact, sort bằng compareMoneyExact) — route đổi
+// sang wire (`reportRowsToWire`) hoặc ô Excel theo cột; không qua float.
 export type ReportColumnKind = "text" | "number" | "money" | "percent" | "date";
 export type ReportColumn = { key: string; label: string; kind: ReportColumnKind };
 export type ReportCell = string | number | null;
@@ -142,22 +151,25 @@ const SOURCES: Record<string, ReportSource> = {
     // luôn đúng, không lặng lẽ trả thiếu dữ liệu).
     async run(projectId) {
       const mvRows = await query<{ month: string; committed: string; actual: string }>(
-        `SELECT month, committed::text AS committed, actual::text AS actual
+        // S10c: `committed` của MV là float8 legacy (migration 0083) — `::numeric` trước `::text`
+        // để không gặp dạng mũ "1.2e+16" (parseMoney throw → 500); giữ biểu diễn legacy 15 chữ số
+        // (A3-FR04), cột exact là việc migration riêng. `actual` là NUMERIC nên exact.
+        `SELECT month, committed::numeric::text AS committed, actual::text AS actual
            FROM mv_cost_by_month WHERE project_id = ? ORDER BY month`,
         projectId,
       );
       if (mvRows.length > 0) {
         return mvRows.map((r) => ({
           month: r.month,
-          committed: moneyToNumber(parseMoney(r.committed)),
-          actual: moneyToNumber(parseMoney(r.actual)),
+          committed: moneyToDecimal(parseMoney(r.committed)),
+          actual: moneyToDecimal(parseMoney(r.actual)),
         }));
       }
 
       const rows = await query<{ month: string; committed: string; actual: string }>(
         `WITH committed_po AS (
            SELECT to_char(po.created_at, 'YYYY-MM') AS month,
-                  SUM(poi.qty_ordered * COALESCE(poi.unit_price, 0)) AS amount
+                  SUM(poi.qty_ordered::numeric * COALESCE(poi.unit_price, 0)) AS amount
              FROM po_items poi
              JOIN purchase_orders po ON po.id = poi.po_id
             WHERE po.status <> 'cancelled' AND po.project_id = ?
@@ -195,8 +207,8 @@ const SOURCES: Record<string, ReportSource> = {
       );
       return rows.map((r) => ({
         month: r.month,
-        committed: moneyToNumber(parseMoney(r.committed)),
-        actual: moneyToNumber(parseMoney(r.actual)),
+        committed: moneyToDecimal(parseMoney(r.committed)),
+        actual: moneyToDecimal(parseMoney(r.actual)),
       }));
     },
   },
@@ -323,5 +335,29 @@ function compareCells(a: ReportCell, b: ReportCell, kind: ReportColumnKind): num
   if (a == null) return -1;
   if (b == null) return 1;
   if (kind === "text" || kind === "date") return String(a).localeCompare(String(b), "vi");
-  return Number(a) - Number(b); // number/money/percent
+  // S10c: tiền so exact trên chuỗi canonical (không Number(a) − Number(b) mất phân biệt khi lớn).
+  if (kind === "money") return compareMoneyExact(String(a), String(b));
+  return Number(a) - Number(b); // number/percent
+}
+
+/**
+ * Adapter DTO (A3-FR06) cho kết quả báo cáo: cột "money" (chuỗi canonical) → v1 giữ chuỗi,
+ * legacy → number qua `moneyToWire` (ngoài biên round-trip throw → route 422). Cột khác giữ nguyên.
+ */
+export function reportRowsToWire(
+  columns: readonly ReportColumn[],
+  rows: readonly ReportRow[],
+  format: MoneyWireFormat,
+): ReportRow[] {
+  const cotTien = columns.filter((c) => c.kind === "money").map((c) => c.key);
+  if (cotTien.length === 0) return [...rows];
+  return rows.map((row) => {
+    const out: ReportRow = { ...row };
+    for (const key of cotTien) {
+      const v = row[key];
+      if (v == null) continue;
+      out[key] = moneyToWire(parseFixedDecimalExact(String(v), 2), format);
+    }
+    return out;
+  });
 }

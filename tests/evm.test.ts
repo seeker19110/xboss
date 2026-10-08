@@ -90,18 +90,18 @@ test(
       assert.equal(s.hasValues, true);
       assert.equal(s.valuedTasks, 1);
       assert.equal(s.totalTasks, 2);
-      assert.equal(s.bac, 20_000_000);
-      assert.equal(s.pv, 10_000_000);
-      assert.equal(s.ev, 5_000_000);
-      assert.equal(s.ac, 2_000_000);
+      assert.equal(s.bac, 20_000_000_00n); // S10c: MoneyMinor (đồng×100)
+      assert.equal(s.pv, 10_000_000_00n);
+      assert.equal(s.ev, 5_000_000_00n);
+      assert.equal(s.ac, 2_000_000_00n);
       assert.equal(s.spi, 0.5); // 5tr / 10tr
       assert.equal(s.cpi, 2.5); // 5tr / 2tr
-      assert.equal(s.sv, -5_000_000);
-      assert.equal(s.cv, 3_000_000);
+      assert.equal(s.sv, -5_000_000_00n);
+      assert.equal(s.cv, 3_000_000_00n);
       // EAC = AC + (BAC−EV)/CPI = 2tr + 15tr/2.5 = 8tr; ETC = 6tr; VAC = 12tr
-      assert.equal(s.eac, 8_000_000);
-      assert.equal(s.etc, 6_000_000);
-      assert.equal(s.vac, 12_000_000);
+      assert.equal(s.eac, 8_000_000_00n);
+      assert.equal(s.etc, 6_000_000_00n);
+      assert.equal(s.vac, 12_000_000_00n);
 
       // Chuỗi điểm: tại hôm nay PV/EV/AC khớp summary (range 20 ngày → step 1, có đúng điểm hôm nay)
       const todayPt = data!.series.find((p) => p.date === data!.today);
@@ -129,7 +129,7 @@ test(
         daysFromTodayISO(-5),
       );
       const dataBl = await getEvmSeries({ projectId, baselineId: blId });
-      assert.equal(dataBl!.summary.pv, 20_000_000);
+      assert.equal(dataBl!.summary.pv, 20_000_000_00n);
       assert.equal(dataBl!.summary.spi, 0.25);
 
       // Nguồn cash: chỉ tính cash_transactions chi của dự án
@@ -139,7 +139,7 @@ test(
         daysFromTodayISO(-2),
       );
       const dataCash = await getEvmSeries({ projectId, source: "cash" });
-      assert.equal(dataCash!.summary.ac, 3_000_000);
+      assert.equal(dataCash!.summary.ac, 3_000_000_00n);
       // cash + lọc hệ → phải từ chối (tiền mặt không gắn hệ)
       await assert.rejects(() => getEvmSeries({ projectId, source: "cash", systemId: 1 }));
     } finally {
@@ -205,7 +205,7 @@ test(
       assert.equal(s.ev, null);
       assert.equal(s.cpi, null);
       assert.equal(s.eac, null);
-      assert.equal(s.ac, 0); // chưa chi gì trong dự án này
+      assert.equal(s.ac, 0n); // chưa chi gì trong dự án này
       assert.equal(s.spi, 0.5); // ratio 1, tiến độ 0.5 — trọng số đều vẫn đo được
       assert.deepEqual(data!.series, []);
 

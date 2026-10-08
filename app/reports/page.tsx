@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { BookMarked, Play, Download, Trash2, Plus, Share2, Lock, X, RefreshCw } from "lucide-react";
-import { formatVnd } from "@/lib/nen/money";
+import { formatVndExact } from "@/lib/nen/money";
+import { HEADER_TIEN_V1 } from "@/lib/nen/money-dto";
 import { formatDateVN } from "@/lib/nen/date";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import AppHeader from "@/app/components/AppHeader";
@@ -38,7 +39,8 @@ const btn =
 
 function fmtCell(v: string | number | null, kind: ColumnKind): string {
   if (v == null || v === "") return "—";
-  if (kind === "money") return formatVnd(Number(v));
+  // S10c: tiền nhận dạng decimal-string-v1 (chuỗi canonical) — hiển thị exact, không qua float.
+  if (kind === "money") return formatVndExact(String(v));
   if (kind === "percent") return `${v}%`;
   if (kind === "date") return formatDateVN(String(v));
   return String(v);
@@ -71,7 +73,7 @@ export default function ReportsPage() {
   const runReport = useCallback(async (id: number) => {
     setRunning(true);
     setRun(null);
-    const res = await fetch(`/api/saved-reports/${id}/data`);
+    const res = await fetch(`/api/saved-reports/${id}/data`, { headers: HEADER_TIEN_V1 });
     setRunning(false);
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));

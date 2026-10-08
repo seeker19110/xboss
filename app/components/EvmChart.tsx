@@ -13,24 +13,27 @@ import {
 } from "recharts";
 import EditableText from "@/app/components/EditableText";
 import { formatVnd } from "@/lib/nen/money";
+import { HEADER_TIEN_V1, fmtDongGonMinor, minorTuWire } from "@/lib/nen/money-dto";
 import { formatDateVN } from "@/lib/nen/date";
 
 type Point = { date: string; pv: number | null; ev: number | null; ac: number | null };
+// S10c: tiền trong summary nhận dạng decimal-string-v1 (chuỗi canonical exact); `series` là
+// điểm vẽ (đồng nguyên, số xấp xỉ cho hình học) — tooltip điểm là giá trị vẽ, thẻ chỉ số exact.
 type Summary = {
   hasValues: boolean;
   valuedTasks: number;
   totalTasks: number;
-  bac: number | null;
-  pv: number | null;
-  ev: number | null;
-  ac: number;
-  sv: number | null;
-  cv: number | null;
+  bac: string | null;
+  pv: string | null;
+  ev: string | null;
+  ac: string;
+  sv: string | null;
+  cv: string | null;
   spi: number | null;
   cpi: number | null;
-  eac: number | null;
-  etc: number | null;
-  vac: number | null;
+  eac: string | null;
+  etc: string | null;
+  vac: string | null;
 };
 type Data = { series: Point[]; summary: Summary | null; today?: string };
 type Baseline = { id: number; name: string };
@@ -45,7 +48,11 @@ function tone(v: number | null, goodLabel: string, warnLabel: string, badLabel: 
   return { text: "text-rose-400", ring: "border-rose-500/30", label: badLabel };
 }
 
-// Trục tiền gọn: 1.234.000.000 → "1,23 tỷ", 5.600.000 → "5,6 tr".
+// Thẻ chỉ số: chuỗi tiền exact → dạng gọn tính bằng bigint (không qua float).
+const fmtTien = (v: string) => fmtDongGonMinor(minorTuWire(v));
+const am = (v: string) => minorTuWire(v) < 0n;
+
+// Trục tiền gọn (điểm vẽ xấp xỉ): 1.234.000.000 → "1,23 tỷ", 5.600.000 → "5,6 tr".
 function fmtShortVnd(n: number): string {
   const abs = Math.abs(n);
   if (abs >= 1e9) return `${(n / 1e9).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} tỷ`;
@@ -83,7 +90,7 @@ export default function EvmChart({ system }: { system?: string }) {
     if (baseline) qs.set("baseline", baseline);
     if (system) qs.set("system", system);
     const s = qs.toString();
-    fetch(`/api/dashboard/evm${s ? `?${s}` : ""}`).then(async (r) => {
+    fetch(`/api/dashboard/evm${s ? `?${s}` : ""}`, { headers: HEADER_TIEN_V1 }).then(async (r) => {
       if (!r.ok) {
         setVisible(false); // 401/403 — role không xem được chỉ số tiền
         return;
@@ -168,27 +175,27 @@ export default function EvmChart({ system }: { system?: string }) {
         <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-3">
           <p className="text-xs text-zinc-400 uppercase mb-1">EAC (dự báo tổng chi)</p>
           <p className="text-2xl font-bold text-zinc-200">
-            {s.eac === null ? "—" : fmtShortVnd(s.eac)}
+            {s.eac === null ? "—" : fmtTien(s.eac)}
           </p>
           <p className="text-[11px] text-zinc-400 mt-1">
-            Ngân sách (BAC) {s.bac === null ? "—" : fmtShortVnd(s.bac)}
+            Ngân sách (BAC) {s.bac === null ? "—" : fmtTien(s.bac)}
             {s.vac !== null && (
-              <span className={s.vac < 0 ? " text-rose-400 font-medium" : " text-emerald-400"}>
+              <span className={am(s.vac) ? " text-rose-400 font-medium" : " text-emerald-400"}>
                 {" "}
-                · lệch {fmtShortVnd(s.vac)}
+                · lệch {fmtTien(s.vac)}
               </span>
             )}
           </p>
         </div>
         <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-3">
           <p className="text-xs text-zinc-400 uppercase mb-1">Đã chi (AC)</p>
-          <p className="text-2xl font-bold text-zinc-200">{fmtShortVnd(s.ac)}</p>
+          <p className="text-2xl font-bold text-zinc-200">{fmtTien(s.ac)}</p>
           <p className="text-[11px] text-zinc-400 mt-1">
-            EV {s.ev === null ? "—" : fmtShortVnd(s.ev)}
+            EV {s.ev === null ? "—" : fmtTien(s.ev)}
             {s.cv !== null && (
-              <span className={s.cv < 0 ? " text-rose-400 font-medium" : " text-emerald-400"}>
+              <span className={am(s.cv) ? " text-rose-400 font-medium" : " text-emerald-400"}>
                 {" "}
-                · CV {fmtShortVnd(s.cv)}
+                · CV {fmtTien(s.cv)}
               </span>
             )}
           </p>
