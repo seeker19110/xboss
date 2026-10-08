@@ -240,3 +240,39 @@ test(
     assert.equal(await queryOne(`SELECT id FROM contract_documents WHERE id = ?`, docA), undefined);
   },
 );
+
+test(
+  "POST /api/claims/:id/settle|reject: không dự án khả kiến / dự án khác → 404, claim không đổi",
+  S,
+  async () => {
+    const { POST: SETTLE } = await import("@/app/api/claims/[id]/settle/route");
+    const { POST: REJECT } = await import("@/app/api/claims/[id]/reject/route");
+    const { queryOne } = await import("@/lib/db");
+    const claimB = await taoClaim(ctx.pB, "settle-B");
+    const goi = (fn: typeof SETTLE, duoi: string) =>
+      fn(
+        new NextRequest(`http://localhost/api/claims/${claimB}/${duoi}`, {
+          method: "POST",
+          body: JSON.stringify({ amountSettled: 1, settlementNote: "x" }),
+          headers: { "content-type": "application/json" },
+        }),
+        p(claimB),
+      );
+    for (const dangNhap of [asNone, asA]) {
+      await dangNhap();
+      assert.equal((await goi(SETTLE, "settle")).status, 404);
+      assert.equal((await goi(REJECT, "reject")).status, 404);
+    }
+    const row = await queryOne<{ status: string }>(
+      `SELECT status FROM claims WHERE id = ?`,
+      claimB,
+    );
+    assert.equal(row?.status, "notice");
+  },
+);
+
+test("getClaim: projectId null luôn undefined (không bỏ lọc dự án)", S, async () => {
+  const { getClaim } = await import("@/lib/tai-chinh/claims");
+  assert.equal(await getClaim(ctx.claimA, null), undefined);
+  assert.equal((await getClaim(ctx.claimA, ctx.pA))?.id, ctx.claimA);
+});
