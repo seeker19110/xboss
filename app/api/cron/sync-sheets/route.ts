@@ -54,6 +54,6 @@ export async function GET(req: NextRequest) {
     }
     const msg = e instanceof Error ? e.message : "Lỗi đồng bộ Google Sheet";
     log.error("GET /api/cron/sync-sheets lỗi", { route: "GET /api/cron/sync-sheets", err: msg });
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: "Lỗi đồng bộ Google Sheet" }, { status: 500 });
   }
 }

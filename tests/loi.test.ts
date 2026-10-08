@@ -63,16 +63,15 @@ test("phanHoiLoi: LỖI HỆ THỐNG vẫn ra 500, không bị hạ xuống 4xx"
   });
   const res = phanHoiLoi(loiDb);
   assert.equal(res.status, 500);
-  assert.deepEqual(await res.json(), { error: "invalid input syntax for type uuid" });
+  assert.deepEqual(await res.json(), { error: "Lỗi hệ thống" }); // không lộ thông điệp pg
 
   // Giá trị ném ra không phải Error.
   const res2 = phanHoiLoi("hỏng nặng");
   assert.equal(res2.status, 500);
-  assert.deepEqual(await res2.json(), { error: "hỏng nặng" });
+  assert.deepEqual(await res2.json(), { error: "Lỗi hệ thống" });
 
-  // Không có thông điệp → dùng thông điệp mặc định của route (giữ hành vi cũ
-  // `error.message || "Lỗi tải thiết bị IoT"`), vẫn là 500.
-  const res3 = phanHoiLoi(new Error(""), "Lỗi tải thiết bị IoT");
+  // Thông điệp chung theo route (tham số thứ 2), vẫn là 500.
+  const res3 = phanHoiLoi(new Error("rò rỉ nội bộ"), "Lỗi tải thiết bị IoT");
   assert.equal(res3.status, 500);
   assert.deepEqual(await res3.json(), { error: "Lỗi tải thiết bị IoT" });
 });

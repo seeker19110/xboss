@@ -32,6 +32,6 @@ export async function POST() {
       return NextResponse.json({ error: e.message }, { status: e.status });
     const msg = e instanceof Error ? e.message : "Lỗi đồng bộ Google Sheet";
     log.error("POST /api/materials/sync lỗi", { route: "POST /api/materials/sync", err: msg });
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: "Lỗi đồng bộ Google Sheet" }, { status: 500 });
   }
 }

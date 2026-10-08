@@ -1,5 +1,25 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S15a: route không lộ lỗi thô ở 500
+
+Không migration, không đổi format `{ error: "<tiếng Việt>" }`, không thêm dependency.
+
+- **Gốc lỗi:** `phanHoiLoi` (lib/nen/loi.ts) trả nguyên `err.message` ở nhánh 500, và ~20 route tự viết
+  `{ error: e.message ?? String(err) }, { status: e.status ?? 500 }` -> thông điệp pg/nội bộ ra client.
+  Nay `phanHoiLoi` log (`lib/nen/log.ts`) + trả 500 thông điệp chung ("Lỗi hệ thống" hoặc tham số route);
+  thêm `phanHoiLoiCoStatus` cho lỗi kiểu cũ `Object.assign(new Error, { status 4xx, code? })` (giữ thông điệp + code
+  ở 4xx, mọi thứ khác -> 500 chung; không tin status >= 500).
+- **Route đổi sang helper:** qc/inspections/[id], inspection-requests/[id], handover-items/[id], tasks/[id]/approve
+  (2 chỗ), diaries/[date], diaries/[date]/lock (2 chỗ), variations/[id]/submit, commissioning/[id],
+  tenders/[id]/award (giữ `code`), approvals (POST).
+- **Chặn đường 500 tại chỗ:** materials/batch, tasks/batch (4xx theo regex giữ nguyên), materials/sync,
+  cron/{sync-sheets,deliver-webhooks,retention}; cron/sync-integrations + cron/refresh-views không đưa message
+  thô vào body kết quả.
+- **`POST /api/proposals`:** tạo đề xuất + mở approval cùng 1 transaction; amount so ngưỡng đọc lại `amount::text`
+  qua `resyncApprovalAmount` (MoneyMinor exact, như S13d/S13e), tràn/mất chính xác -> 422 và rollback đề xuất.
+- **Test:** `tests/route-loi-500-khong-lo-tho.test.ts` (tenders/award + materials/sync 500 chung vs 4xx giữ,
+  `phanHoiLoiCoStatus`, proposals exact — ca DB cần TEST_DATABASE_URL); cập nhật `tests/loi.test.ts`.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S10: parser khối lượng bill (đóng "Còn mở" đầu vào tiền)
 
 Rà lại danh sách "Còn mở (chưa chuyển parser)" của S10 đầu vào: claims, bảo lãnh, gói thầu, BOQ,

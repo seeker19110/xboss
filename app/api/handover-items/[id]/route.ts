@@ -1,4 +1,4 @@
-import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
+import { laLoiKhoaNgoai, phanHoiLoiCoStatus, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { storagePut, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run, withTransaction } from "@/lib/db";
@@ -181,8 +181,7 @@ export async function PATCH(
       );
     });
   } catch (err: unknown) {
-    const e = err as { message?: string; status?: number };
-    return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
+    return phanHoiLoiCoStatus(err);
   }
 
   return NextResponse.json({ updated: id });

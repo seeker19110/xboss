@@ -48,6 +48,6 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Lỗi dọn dữ liệu hết hạn";
     log.error("GET /api/cron/retention lỗi", { route: "GET /api/cron/retention", err: msg });
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: "Lỗi dọn dữ liệu hết hạn" }, { status: 500 });
   }
 }

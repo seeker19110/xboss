@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -281,9 +282,7 @@ export async function POST(req: NextRequest) {
         { error: "Tầng này vừa được nghiệm thu bởi người khác" },
         { status: 409 },
       );
-    const e = err as { message?: string; status?: number };
-    const status = e.status ?? 500;
-    return NextResponse.json({ error: e.message ?? "Lỗi duyệt nghiệm thu" }, { status });
+    return phanHoiLoiCoStatus(err, "Lỗi duyệt nghiệm thu");
   }
 
   return NextResponse.json({ approvalId, taskCount });

@@ -1,3 +1,4 @@
+import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -34,10 +35,6 @@ export async function POST(
     const { contractId } = await awardTender(id, bidId, user.id, projectId);
     return NextResponse.json({ awarded: id, contractId });
   } catch (err: unknown) {
-    const e = err as { message?: string; status?: number; code?: string };
-    return NextResponse.json(
-      { error: e.message ?? String(err), ...(e.code ? { code: e.code } : {}) },
-      { status: e.status ?? 500 },
-    );
+    return phanHoiLoiCoStatus(err);
   }
 }

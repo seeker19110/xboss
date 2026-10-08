@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { moneyInputErrorBody } from "@/lib/nen/money";
-import { insertId } from "@/lib/db";
+import { moneyInputErrorBody, parseMoneyExact } from "@/lib/nen/money";
+import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
+import { insertId, queryOne, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { withUniqueRetry } from "@/lib/ha-tang/seqcode";
-import { openApproval } from "@/lib/tien-do/approvals";
+import { resyncApprovalAmount } from "@/lib/tien-do/approvals";
 import {
   PROPOSAL_KINDS,
   PROPOSAL_STATUSES,
@@ -75,31 +76,43 @@ export async function POST(req: NextRequest) {
   const refErr = await checkProposalRefs(input, projectId);
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
 
-  const { id, code } = await withUniqueRetry(async () => {
-    const code = await nextProposalCode();
-    const id = await insertId(
-      `INSERT INTO proposals (code, kind, title, amount, contract_id, material_id, reason, requested_by, project_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      code,
-      input.kind,
-      input.title,
-      input.amount,
-      input.contractId,
-      input.materialId,
-      input.reason,
-      user.id,
-      projectId,
+  // S15a: tạo đề xuất + mở approval cùng 1 transaction. Giá trị so ngưỡng bước duyệt đọc lại
+  // `amount::text` từ DB và đi qua resyncApprovalAmount (MoneyMinor exact, giống S13d/S13e):
+  // không `Number(string)` xấp xỉ; tràn NUMERIC(15,2)/mất chính xác → 422 và rollback cả đề xuất.
+  // M46 PR3: không có flow cấu hình cho 'proposal' thì không mở request (giữ hành vi cũ).
+  try {
+    const { id, code } = await withUniqueRetry(() =>
+      withTransaction(async () => {
+        const code = await nextProposalCode();
+        const id = await insertId(
+          `INSERT INTO proposals (code, kind, title, amount, contract_id, material_id, reason, requested_by, project_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          code,
+          input.kind,
+          input.title,
+          input.amount,
+          input.contractId,
+          input.materialId,
+          input.reason,
+          user.id,
+          projectId,
+        );
+        const dx = await queryOne<{ amount: string | null }>(
+          `SELECT amount::text AS amount FROM proposals WHERE id = ?`,
+          id,
+        );
+        await resyncApprovalAmount({
+          entityType: "proposal",
+          entityId: id,
+          projectId,
+          amountMinor: dx?.amount == null ? null : parseMoneyExact(dx.amount),
+          openAs: user,
+        });
+        return { id, code };
+      }),
     );
-    return { id, code };
-  });
-  // M46 PR3: mở approval request nếu có flow cấu hình cho 'proposal' (PR4) — không có
-  // flow thì openApproval trả null, không đổi hành vi hiện tại (giữ y hệt submit/decide cũ).
-  await openApproval({
-    entityType: "proposal",
-    entityId: id,
-    projectId,
-    amount: input.amount == null ? null : Number(input.amount), // chỉ so ngưỡng bước duyệt
-    user,
-  });
-  return NextResponse.json({ id, code }, { status: 201 });
+    return NextResponse.json({ id, code }, { status: 201 });
+  } catch (err) {
+    return phanHoiLoiCoStatus(err);
+  }
 }

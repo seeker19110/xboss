@@ -175,6 +175,10 @@ export async function PATCH(req: NextRequest) {
     const status = /BOQ|hợp lệ|tìm thấy|nghiệm thu|100%|Chờ/i.test(msg) ? 422 : 500;
     if (status === 500)
       log.error("PATCH /api/tasks/batch lỗi", { route: "PATCH /api/tasks/batch", err: msg });
-    return NextResponse.json({ error: msg }, { status });
+    // Lỗi 500 không lộ thông điệp thô (pg/nội bộ) — chi tiết đã nằm trong log.
+    return NextResponse.json(
+      { error: status === 500 ? "Lỗi máy chủ khi cập nhật task" : msg },
+      { status },
+    );
   }
 }

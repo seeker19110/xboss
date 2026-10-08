@@ -1,3 +1,4 @@
+import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
@@ -153,7 +154,7 @@ export async function PUT(
     const diary = await getDiaryByDate(date, projectId);
     return NextResponse.json({ id: diaryId, diary });
   } catch (err: unknown) {
-    const e = err as { message?: string; status?: number; code?: string };
+    const e = err as { code?: string };
     // Vi phạm khoá ngoại (23503) = client gửi id không tồn tại, vd `photoIds` trỏ tới ảnh đã bị
     // xoá. Đó là lỗi ĐẦU VÀO chứ không phải sự cố máy chủ: để nguyên sẽ trả 500 kèm thông báo
     // thô của Postgres — vừa không giúp người dùng sửa được gì, vừa lộ tên bảng/ràng buộc ra
@@ -163,6 +164,6 @@ export async function PUT(
         { error: "Dữ liệu tham chiếu không tồn tại (ảnh hoặc tổ đội đã bị xoá) — tải lại trang" },
         { status: 422 },
       );
-    return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
+    return phanHoiLoiCoStatus(err);
   }
 }

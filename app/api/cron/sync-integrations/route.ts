@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
       results.push({
         provider: it.provider,
         projectId: it.projectId,
-        summary: { ok: false, stats: {}, error: msg },
+        summary: { ok: false, stats: {}, error: "Lỗi đồng bộ tích hợp" },
       });
     }
   }

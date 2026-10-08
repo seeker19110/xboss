@@ -27,6 +27,6 @@ export async function GET(req: NextRequest) {
       route: "GET /api/cron/deliver-webhooks",
       err: msg,
     });
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: "Lỗi gửi webhook" }, { status: 500 });
   }
 }

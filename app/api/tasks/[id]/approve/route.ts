@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -198,8 +199,7 @@ export async function POST(
       };
     });
   } catch (err: unknown) {
-    const e = err as { message?: string; status?: number };
-    return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
+    return phanHoiLoiCoStatus(err);
   }
 
   if (result.kind === "pending")
@@ -281,8 +281,7 @@ export async function DELETE(
       return { packageId: task.package_id, status: newStatus };
     }));
   } catch (err: unknown) {
-    const e = err as { message?: string; status?: number };
-    return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
+    return phanHoiLoiCoStatus(err);
   }
 
   return NextResponse.json({ id, status });
