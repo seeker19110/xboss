@@ -11,6 +11,7 @@ import {
   type KeyReference,
   type MigrationFact,
   type RecoveryManifestV1,
+  type WalCoverage,
 } from "./recovery-manifest";
 import {
   collectAttachmentRefs,
@@ -38,6 +39,8 @@ export type BuildManifestOptions = {
   artifacts: readonly ArtifactFact[];
   encryptionKeyReference: KeyReference | null;
   tools: Record<string, string>;
+  /** Phủ WAL đo từ archive thật (pitr-archive.ts); không truyền = null, không tự điền. */
+  wal?: WalCoverage | null;
 };
 
 async function optional<T>(
@@ -143,8 +146,8 @@ export async function buildRecoveryManifest(
     appSha: options.appSha,
     baseBackupId: options.baseBackupId,
     snapshot: { capturedAt, walLsn, timeline },
-    // WAL coverage + số đo RPO/RTO cần hạ tầng archive/diễn tập thật — không tự điền.
-    wal: null,
+    // WAL coverage chỉ có khi caller đo từ archive thật; số đo RPO/RTO cần diễn tập — không tự điền.
+    wal: options.wal ?? null,
     digestAlgorithm: DIGEST_ALGORITHM,
     migrations,
     tables,

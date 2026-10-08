@@ -1,5 +1,27 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S14: verifier PITR (base backup + WAL) và diễn tập disposable
+
+`scripts/verify-pitr.ts` (+ `scripts/lib/pitr-archive.ts`/`pitr-checks.ts` thuần, `pitr-io.ts`, `pitr-drill.ts`):
+quét kho archive WAL + base backup (pg_basebackup -Fp/-Ft) → `wal-segments` (đoạn cụt), `wal-continuity`
+(gap theo đường timeline `.history`), `pitr-window` (≥ 35 ngày, mép = STOP TIME tệp `.backup`),
+`archive-lag` (≤120s PASS, 120–300s cảnh báo, >300s FAIL), `base-backup-manifests` (Manifest-Checksum),
+`base-backup-integrity` (`pg_verifybackup -w <archive>`), `pitr-target` (đích tương lai/trước base/sau
+WAL cuối → FAIL trước khi ghi), `recovery-set-*` (manifest v1 gắn base backup còn dùng được, WAL phủ
+LSN snapshot, có key ref). `--drill-dir`: preflight marker `XBOSS_DISPOSABLE`/0700/không chồng lấn
+kho/không root → chép base, kiểm bản chép, khởi động `postgres` cách ly qua argv (không TCP,
+archive off, `archive_cleanup_command=''`, `primary_conninfo=''`, không preload; đích thời điểm pause,
+`latest` standby — không promote), đo RPO qua `pg_last_xact_replay_timestamp`, RTO chỉ phần DB (không
+bao giờ PASS). Mã thoát 0/1/2 (PASS/có FAIL/còn NOT_RUN). `recovery-manifest-cli` thêm
+`--wal-archive-dir`/`--base-backups-dir`: khối `wal` + `baseBackupId` đo từ archive thật.
+Test: `tests/pitr-archive.test.ts` (15 ca fixture tổng hợp: gap, đoạn cụt, archive lag, đích sai,
+manifest bị sửa, timeline, RPO/RTO, mã thoát) + `tests/pitr-drill.test.ts` (9 ca trên cluster
+PostgreSQL 16 tự dựng: khôi phục tới thời điểm/latest PASS, base hỏng/thiếu tệp FAIL, WAL gap FAIL có
+lý do, marker sai/chồng lấn chặn trước ghi, kho không đổi byte nào; thiếu binary → ca NOT_RUN, không
+skip). E2E tay trên schema XBoss đủ 158 migration: `drill-migrations` PASS, RPO 2s. Runbook mục PITR
+trong `docs/ops/backup.md`. **[Người vận hành]:** bật `archive_mode`/base backup hằng ngày/canary trên
+VPS rồi diễn tập theo runbook — tới lúc đó `pitr-window`/RTO đầy đủ chưa có bằng chứng.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S10b/S11: báo cáo chi phí chuẩn `getCostReport` + tiền exact
 
 `lib/tai-chinh/cost.ts` viết lại quanh service `getCostReport(scope, {groupBy, includeVo})`

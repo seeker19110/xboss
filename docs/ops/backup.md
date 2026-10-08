@@ -243,7 +243,9 @@ npx tsx scripts/lib/recovery-manifest-cli.ts \
   --pg-dump "backups/xboss-$ID.snapshot.dump" \
   --attachments-dir data/uploads \
   --key-provider <tên-kho-key> --key-id <tham-chiếu-key> --key-version <phiên-bản> \
-  --app-sha "$(git rev-parse HEAD)"   # [--base-backup-id <id base backup PITR nếu có>]
+  --app-sha "$(git rev-parse HEAD)" \
+  --wal-archive-dir /srv/xboss-wal --base-backups-dir /srv/xboss-base   # khi đã bật PITR (mục dưới)
+  # [--base-backup-id <id>] — mặc định base backup mới nhất còn WAL liên tục tới cuối archive
 ```
 
 - Mở `REPEATABLE READ READ ONLY`, kiểm DB/role kỳ vọng, `pg_export_snapshot()` rồi chạy
@@ -322,14 +324,12 @@ các hạng mục cần dữ liệu v1 là `NOT_RUN` (không FAIL cả bộ, kh�
 
 ### Hạng mục `NOT_RUN` còn cần hạ tầng gì
 
-- **`wal-coverage` (Q-AC08):** bật `archive_mode`/`archive_command` tới kho chống sửa,
-  `pg_basebackup` hằng ngày, giữ WAL + base backup phủ đủ 35 ngày; manifest phải có `baseBackupId`
-  và khối `wal` (timeline, startLsn/endLsn, windowStart/windowEnd, `missingSegments`) **đo từ archive
-  thật**. Diễn tập phục hồi ở điểm gần hiện tại và ở mép 35 ngày.
-- **`rpo` / `rto` (A6-AC05):** RPO đo bằng giao dịch canary + độ trễ archive/replication object;
-  RTO đo từ lúc bắt đầu sự cố tới khi app sẵn sàng + smoke/UAT xong (gồm tìm key, tải backup, restore
-  DB/tệp). Ghi vào khối `measurements` (measuredAt, workload, sourceResolution, rpoSeconds,
-  rtoSeconds, recoveryTargetLsn, timeline). Thiếu số đo là `NOT_RUN`; vượt target là `FAIL`.
+- **`wal-coverage` (Q-AC08):** cần hạ tầng ở mục [PITR](#pitr-base-backup--wal-verifier-và-diễn-tập-s14--a6).
+  Sinh manifest với `--wal-archive-dir`/`--base-backups-dir` thì `baseBackupId` + khối `wal` được
+  **đo từ archive thật** (không gõ tay). PASS khi cửa sổ liên tục ≥ 35 ngày.
+- **`rpo` / `rto` (A6-AC05):** đo bằng `scripts/verify-pitr.ts` (diễn tập thật, mục PITR). Khối
+  `measurements` của manifest vẫn `null` khi sinh; số đo nằm trong evidence của `verify-pitr` (RPO)
+  và biên bản diễn tập (RTO đầy đủ). Thiếu số đo là `NOT_RUN`; vượt target là `FAIL`.
 - **`encryption-key-availability`:** cần quy trình mở key thật trên đích cách ly (kho key/KEK
   tách riêng) — chưa có trong repo.
 
@@ -338,10 +338,112 @@ các hạng mục cần dữ liệu v1 là `NOT_RUN` (không FAIL cả bộ, kh�
 - Digest dùng `string_agg` của SHA-256 từng dòng: tối đa ~16 triệu dòng/bảng; vượt thì truy vấn
   lỗi và hạng mục FAIL (đóng), không PASS. So danh tính bằng host:port/db — không phát hiện alias
   DNS; operator vẫn kiểm topology.
-- Khối `wal`/`measurements` do người vận hành ghi vào manifest từ hệ thống đo; verifier chỉ so với
-  D08, không tự chứng minh số đo.
+- `verify-dr` chỉ so khối `wal`/`measurements` với D08; bằng chứng hạ tầng thật là evidence của
+  `verify-pitr` (quét archive + diễn tập), không phải con số trong manifest.
 - Chưa ghi `version` của object S3; `backup.sh` chưa tự sinh manifest v1 (tích hợp sẽ đổi lệnh
   `pg_dump` sang `--snapshot` — cần quyết định riêng).
+
+## PITR: base backup + WAL, verifier và diễn tập (S14 / A6)
+
+Mục tiêu D08: **RPO ≤ 5 phút, RTO ≤ 60 phút, cửa sổ PITR 35 ngày**. Repo có công cụ kiểm; **hạ tầng
+PITR trên VPS chưa bật** — phần "Chuẩn bị" dưới đây là việc của người vận hành được cấp quyền, không
+có trong `deploy.sh`/cron của repo. Khi chưa làm, mọi hạng mục PITR ra `FAIL`/`NOT_RUN`.
+
+### Chuẩn bị (một lần, người vận hành)
+
+1. **Archive WAL** (`postgresql.conf` của nguồn, cần restart): `wal_level = replica`,
+   `archive_mode = on`, `archive_timeout = 60`,
+   `archive_command = 'test ! -f /srv/xboss-wal/%f && cp %p /srv/xboss-wal/%f'`. Verifier chỉ đọc đoạn
+   **chưa nén** (archive nén → `wal-segments` `NOT_RUN`). Đường dẫn archive chỉ gồm `/A-Za-z0-9._-`.
+   Đặt `log_timezone = 'UTC'` (hoặc múi giờ có lệch số như `Asia/Ho_Chi_Minh`) để `STOP TIME` trong tệp
+   `.backup` đọc được — viết tắt kiểu `EDT` bị coi là không biết, base backup đó không được tính cửa sổ.
+2. **Base backup hằng ngày** (user `postgres`, mỗi lần một thư mục con, tên = `baseBackupId`):
+   ```bash
+   pg_basebackup -D /srv/xboss-base/$(date -u +%Y%m%dT%H%M%SZ) -Fp -X none -c fast --manifest-checksums=SHA256
+   ```
+   `-Ft` cũng được (diễn tập sẽ giải nén). Không dùng tablespace riêng (diễn tập chưa hỗ trợ). Chạy trên
+   primary để PostgreSQL ghi tệp `<đoạn>.<offset>.backup` (có `STOP TIME`) vào archive.
+3. **Giữ 35 ngày theo phụ thuộc, không theo tuổi tệp** (A6-FR02): giữ base backup cũ nhất có
+   `STOP TIME` ≤ (hôm nay − 35 ngày) và **mọi** WAL sau nó; chỉ dọn bằng
+   `pg_archivecleanup /srv/xboss-wal <tệp .backup của base backup cũ nhất còn giữ>`. Bản sao ngoài máy
+   chống sửa/xoá (object lock/versioning) — quyền app không xoá được.
+4. **Canary RPO**: cron mỗi phút `psql -Atqc 'SELECT txid_current()'` bằng role riêng trên nguồn (chỉ
+   sinh bản ghi commit trong WAL, không ghi bảng). Thiếu canary thì nguồn rảnh làm số đo RPO/archive lag
+   lớn hơn thực (bảo thủ → có thể `FAIL`, không bao giờ `PASS` giả).
+
+### Kiểm tĩnh hằng ngày (chỉ đọc kho)
+
+```bash
+npx tsx scripts/verify-pitr.ts --archive-dir /srv/xboss-wal --base-backups-dir /srv/xboss-base \
+  --target latest --recovery-manifest backups/xboss-<id>.recovery-v1.json \
+  --evidence-out logs/pitr-static-$(date -u +%Y%m%d).json
+```
+
+Kiểm: đoạn WAL đúng kích thước, `backup_manifest` nguyên vẹn (Manifest-Checksum), chuỗi WAL liên tục
+theo timeline (`.history`), cửa sổ ≥ 35 ngày, archive lag (≤ 120s PASS, 120–300s PASS kèm cảnh báo,
+trên 300s FAIL), `pg_verifybackup` trên base backup plain mới nhất, recovery set gắn base backup còn
+dùng được + WAL phủ LSN snapshot + có tham chiếu key. Các mục diễn tập/RPO/RTO là `NOT_RUN`.
+
+### Diễn tập khôi phục (hằng tháng + trước thay schema rủi ro)
+
+Chạy trên **máy/bản sao cách ly**, đọc bản sao chỉ-đọc (hoặc snapshot) của kho archive + base backup.
+Snapshot production chỉ dùng khi có phép và bảo vệ PII (đĩa mã hoá, quyền hẹp). **Không chạy bằng
+root** (PostgreSQL từ chối) — dùng user `postgres` hoặc user riêng, cùng major với base backup
+(`PITR_PG_BIN_DIR=/usr/lib/postgresql/16/bin` nếu không ở PATH).
+
+```bash
+install -d -m 0700 /srv/pitr-drill
+TOKEN="xboss-disposable:$(openssl rand -hex 16)"
+printf '%s\n' "$TOKEN" > /srv/pitr-drill/XBOSS_DISPOSABLE && chmod 600 /srv/pitr-drill/XBOSS_DISPOSABLE
+export PITR_DRILL_MARKER="$TOKEN"      # qua env, không qua argv
+# (a) Điểm gần hiện tại, rồi lặp lại ở mép cửa sổ (--target "<hôm nay − 34 ngày, ISO 8601 có múi giờ>")
+npx tsx scripts/verify-pitr.ts --archive-dir /mnt/ro/xboss-wal --base-backups-dir /mnt/ro/xboss-base \
+  --target 2026-10-08T09:30:00+07:00 --drill-dir /srv/pitr-drill \
+  --drill-database xboss --drill-user postgres --evidence-out logs/pitr-drill-time-<id>.json
+# (b) Đo RPO: khôi phục tới cuối archive; --incident-at = lúc "mất nguồn" (lúc chụp bản sao kho).
+npx tsx scripts/verify-pitr.ts --archive-dir /mnt/ro/xboss-wal --base-backups-dir /mnt/ro/xboss-base \
+  --target latest --incident-at 2026-10-08T09:45:00+07:00 --drill-dir /srv/pitr-drill \
+  --drill-database xboss --drill-user postgres --evidence-out logs/pitr-drill-latest-<id>.json
+```
+
+Preflight dừng **trước mọi thao tác ghi** khi: thiếu/sai marker, thư mục diễn tập không 0700 hoặc
+không thuộc user chạy, thư mục là data dir của một cluster, chồng lấn kho archive/base backup, điểm
+đích trong tương lai/trước base backup/sau đoạn WAL cuối. Diễn tập tạo `run-<thời điểm>-<ngẫu
+nhiên>/` mới, chép base backup, chạy `pg_verifybackup` trên bản chép, rồi khởi động `postgres` với
+cấu hình cách ly qua argv: không TCP (`listen_addresses=''`, socket trong thư mục 0700),
+`archive_mode=off`, `archive_cleanup_command=''` (không xoá WAL ở kho), `primary_conninfo=''`,
+`shared_preload_libraries=''`, `ssl=off`, `restore_command` chỉ `cp` **từ** archive. Đích thời điểm
+dùng `recovery_target_action=pause`; `latest` dùng `standby.signal` — **không promote**, không app,
+không cron/email/Telegram/webhook. `--drill-user` cần đọc được `primary_conninfo` (superuser của bản
+sao hoặc role có `pg_monitor`), thiếu thì `drill-isolation` là `NOT_RUN`.
+
+| Hạng mục                                         | PASS khi                                                                           |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `wal-segments`, `wal-continuity`                 | Đoạn đúng kích thước; ≥1 base backup có WAL liên tục tới cuối archive              |
+| `pitr-window`                                    | Cửa sổ liên tục (STOP TIME base cũ nhất dùng được → đoạn cuối) ≥ 35 ngày           |
+| `archive-lag`                                    | Đoạn cuối archive ≤ 300s trước (cảnh báo > 120s); đo mtime, **không** phải RPO     |
+| `base-backup-manifests`, `base-backup-integrity` | Mọi `backup_manifest` nguyên vẹn; `pg_verifybackup` đạt (manifest có checksum)     |
+| `pitr-target`                                    | Đích nằm trong cửa sổ, chọn được base backup                                       |
+| `recovery-set-*`                                 | Manifest v1 gắn base backup còn dùng được, WAL phủ LSN snapshot, có tham chiếu key |
+| `drill-preflight` … `drill-migrations`           | Khôi phục tới đích, cách ly, commit cuối không vượt đích, migration khớp mã nguồn  |
+| `rpo`                                            | (`latest`) `incident-at − commit cuối được replay` ≤ 300s                          |
+| `rto`                                            | Không bao giờ PASS từ công cụ: chỉ đo phần DB; trên 3600s là FAIL                  |
+
+**Mã thoát:** `0` mọi mục PASS · `1` có FAIL (hoặc tham số sai) · `2` không FAIL nhưng còn `NOT_RUN`.
+`--evidence-out` không ghi đè (giữ evidence lần thất bại). Thất bại → **giữ** `run-*` (gồm
+`postgres.log`, data) làm bằng chứng; PASS → tự xoá `run-*` của lần đó (thêm `--keep` để giữ). Thư mục
+giữ lại chứa dữ liệu thật: xem xong evidence thì người vận hành tự `rm -rf /srv/pitr-drill/run-*`.
+Công cụ không bao giờ ghi/xoá trong kho archive/base backup.
+
+**Biên bản diễn tập (bắt buộc cho A6-AC05/Q-AC08):** release SHA, recoverySetId, đường dẫn evidence
+JSON, người chạy/người xác nhận, workload (`workload` trong JSON: dung lượng base backup, số đoạn WAL
+replay), LSN/timeline (`replay`), và **mốc RTO đầy đủ**: bắt đầu sự cố → tìm key → tải backup → DB
+sẵn sàng (`rto.actual.dbReadySeconds`) → app sẵn sàng → smoke/UAT xong. RTO trên 60 phút là FAIL —
+nâng năng lực recovery, không đổi target. Diễn tập thành công không tự cấp quyền khôi phục production.
+
+**Giới hạn:** chưa hỗ trợ archive nén, tablespace riêng, base backup khác major với binary; đích
+`latest` coi là đuổi kịp khi replay ở đoạn cuối và đứng yên ≥ 3s (đứng yên ≥ 20s trước đoạn cuối là
+FAIL "WAL đứt/hỏng"); khả dụng key (`encryption-key-availability` của `verify-dr`) vẫn `NOT_RUN`.
 
 ## Vị trí backup
 
@@ -351,8 +453,8 @@ các hạng mục cần dữ liệu v1 là `NOT_RUN` (không FAIL cả bộ, kh�
 
 ## Giới hạn đã biết
 
-- Chưa có PITR (point-in-time recovery qua WAL archiving) — RPO thực tế = khoảng cách giữa 2 lần
-  backup (mục tiêu hằng đêm = tối đa ~24h dữ liệu mất, đúng SLA đã đặt). Nếu cần RPO chặt hơn sau
-  này, cân nhắc bật `wal_archive`/`pg_basebackup` liên tục — ngoài phạm vi M44.
+- PITR mới có **công cụ** (verifier + diễn tập ở mục PITR), **chưa bật hạ tầng** archive WAL/base
+  backup trên VPS — tới khi người vận hành bật, RPO thực tế vẫn = khoảng cách giữa 2 lần `pg_dump`
+  (tối đa ~24h) và D08 chưa đạt.
 - `restore-check.sh` kiểm tra schema restore được + có dữ liệu, **không** kiểm tra business logic
   đúng đắn (ví dụ tổng tiến độ tính đúng) — coi là smoke test tối thiểu, không thay thế test tích hợp.
