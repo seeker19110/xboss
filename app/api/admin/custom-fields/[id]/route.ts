@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { queryOne, run } from "@/lib/db";
@@ -111,18 +112,27 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageCustomFields(user.role))
-    return NextResponse.json({ error: "Chỉ Admin được xoá trường tuỳ biến" }, { status: 403 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.manageCustomFields(user.role))
+      return NextResponse.json({ error: "Chỉ Admin được xoá trường tuỳ biến" }, { status: 403 });
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  // M54 GĐ1 PR2 (đồng bộ GET): cô lập tenant — chỉ xoá định nghĩa thuộc org người gọi.
-  const r = await run(`DELETE FROM custom_field_defs WHERE id = ? AND org_id = ?`, id, user.orgId);
-  if (r.changes === 0)
-    return NextResponse.json({ error: "Không tìm thấy định nghĩa" }, { status: 404 });
-  return NextResponse.json({ deleted: id });
+    // M54 GĐ1 PR2 (đồng bộ GET): cô lập tenant — chỉ xoá định nghĩa thuộc org người gọi.
+    const r = await run(
+      `DELETE FROM custom_field_defs WHERE id = ? AND org_id = ?`,
+      id,
+      user.orgId,
+    );
+    if (r.changes === 0)
+      return NextResponse.json({ error: "Không tìm thấy định nghĩa" }, { status: 404 });
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

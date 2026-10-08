@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
@@ -162,26 +163,31 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  // Tách 401 khỏi 403 như mọi route khác của dự án (kể cả DELETE /api/boq/:id ngay cạnh):
-  // gộp chung thành 403 khiến client không phân biệt được "phiên hết hạn, đăng nhập lại"
-  // với "tài khoản này không đủ quyền" — hai tình huống cần hai cách xử lý khác hẳn.
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (user.role !== "admin")
-    return NextResponse.json({ error: "Chỉ Admin được xoá vật tư" }, { status: 403 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    // Tách 401 khỏi 403 như mọi route khác của dự án (kể cả DELETE /api/boq/:id ngay cạnh):
+    // gộp chung thành 403 khiến client không phân biệt được "phiên hết hạn, đăng nhập lại"
+    // với "tài khoản này không đủ quyền" — hai tình huống cần hai cách xử lý khác hẳn.
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (user.role !== "admin")
+      return NextResponse.json({ error: "Chỉ Admin được xoá vật tư" }, { status: 403 });
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const blocked = await assertModuleEnabled("materials", projectId);
-  if (blocked) return blocked;
-  const r =
-    projectId != null
-      ? await run(`DELETE FROM materials WHERE id = ? AND project_id = ?`, id, projectId)
-      : { changes: 0 };
-  if (r.changes === 0)
-    return NextResponse.json({ error: "Không tìm thấy vật tư" }, { status: 404 });
-  return NextResponse.json({ ok: true });
+    const projectId = await getCurrentProjectId(user);
+    const blocked = await assertModuleEnabled("materials", projectId);
+    if (blocked) return blocked;
+    const r =
+      projectId != null
+        ? await run(`DELETE FROM materials WHERE id = ? AND project_id = ?`, id, projectId)
+        : { changes: 0 };
+    if (r.changes === 0)
+      return NextResponse.json({ error: "Không tìm thấy vật tư" }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

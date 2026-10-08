@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { queryOne, run } from "@/lib/db";
@@ -77,23 +78,28 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageIntegrations(user.role))
-    return NextResponse.json({ error: "Chỉ Admin được quản lý webhook" }, { status: 403 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.manageIntegrations(user.role))
+      return NextResponse.json({ error: "Chỉ Admin được quản lý webhook" }, { status: 403 });
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  // M54 GĐ1 PR2 (đồng bộ GET/POST): cô lập tenant — chỉ xoá webhook thuộc org người gọi.
-  const existing = await queryOne<{ id: number }>(
-    `SELECT id FROM webhooks WHERE id = ? AND org_id = ?`,
-    id,
-    user.orgId,
-  );
-  if (!existing) return NextResponse.json({ error: "Không tìm thấy webhook" }, { status: 404 });
+    // M54 GĐ1 PR2 (đồng bộ GET/POST): cô lập tenant — chỉ xoá webhook thuộc org người gọi.
+    const existing = await queryOne<{ id: number }>(
+      `SELECT id FROM webhooks WHERE id = ? AND org_id = ?`,
+      id,
+      user.orgId,
+    );
+    if (!existing) return NextResponse.json({ error: "Không tìm thấy webhook" }, { status: 404 });
 
-  await run(`DELETE FROM webhooks WHERE id = ? AND org_id = ?`, id, user.orgId);
-  return NextResponse.json({ ok: true });
+    await run(`DELETE FROM webhooks WHERE id = ? AND org_id = ?`, id, user.orgId);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

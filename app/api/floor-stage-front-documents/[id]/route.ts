@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { storageGet, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run, withProjectScope } from "@/lib/db";
@@ -61,26 +62,31 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
-  const doc = await docTrongDuAn(id, projectId);
-  if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+    const projectId = await getCurrentProjectId(user);
+    if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+    const doc = await docTrongDuAn(id, projectId);
+    if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
-  if (doc.uploaded_by !== user.id && !CAN.manageWorkFronts(user.role))
-    return NextResponse.json(
-      { error: "Chỉ người upload hoặc Admin/PM/kỹ sư được xoá tài liệu" },
-      { status: 403 },
-    );
+    if (doc.uploaded_by !== user.id && !CAN.manageWorkFronts(user.role))
+      return NextResponse.json(
+        { error: "Chỉ người upload hoặc Admin/PM/kỹ sư được xoá tài liệu" },
+        { status: 403 },
+      );
 
-  await run(`DELETE FROM floor_stage_front_documents WHERE id = ?`, id);
-  await storageDelete(user.orgId, doc.file_name);
+    await run(`DELETE FROM floor_stage_front_documents WHERE id = ?`, id);
+    await storageDelete(user.orgId, doc.file_name);
 
-  return NextResponse.json({ deleted: id });
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

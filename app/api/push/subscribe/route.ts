@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
@@ -41,17 +42,22 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/push/subscribe  body: { endpoint } → huỷ đăng ký thiết bị này.
 export async function DELETE(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const body = await req.json().catch(() => ({}));
-  if (typeof body.endpoint !== "string")
-    return NextResponse.json({ error: "Thiếu endpoint" }, { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    if (typeof body.endpoint !== "string")
+      return NextResponse.json({ error: "Thiếu endpoint" }, { status: 400 });
 
-  await run(
-    `DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?`,
-    body.endpoint,
-    user.id,
-  );
-  return NextResponse.json({ ok: true });
+    await run(
+      `DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?`,
+      body.endpoint,
+      user.id,
+    );
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

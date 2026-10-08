@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
@@ -138,69 +139,74 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.editStructure(user.role))
-    return NextResponse.json({ error: "Chỉ Admin/PM được xoá sheet" }, { status: 403 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.editStructure(user.role))
+      return NextResponse.json({ error: "Chỉ Admin/PM được xoá sheet" }, { status: 403 });
 
-  const id = Number(params.id);
-  if (Number.isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
-  const st = await queryOne(`SELECT id FROM sheet_types WHERE id = ?`, id);
-  if (!st) return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
+    const id = Number(params.id);
+    if (Number.isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const st = await queryOne(`SELECT id FROM sheet_types WHERE id = ?`, id);
+    if (!st) return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
 
-  // Chống xoá xuyên dự án: suy dự án qua sheet_types.tower_id → towers.project_id (vá V9).
-  // P1-6: chỉ sheet thuộc DỰ ÁN ĐANG CHỌN (+ org), không phải mọi dự án nhìn thấy được.
-  const projectId = await getCurrentProjectId(user);
-  if (projectId == null)
-    return NextResponse.json({ error: "Không tìm thấy dự án đang chọn" }, { status: 404 });
-  const proj = await queryOne<{ id: number }>(
-    `SELECT st.id FROM sheet_types st JOIN towers t ON t.id = st.tower_id
+    // Chống xoá xuyên dự án: suy dự án qua sheet_types.tower_id → towers.project_id (vá V9).
+    // P1-6: chỉ sheet thuộc DỰ ÁN ĐANG CHỌN (+ org), không phải mọi dự án nhìn thấy được.
+    const projectId = await getCurrentProjectId(user);
+    if (projectId == null)
+      return NextResponse.json({ error: "Không tìm thấy dự án đang chọn" }, { status: 404 });
+    const proj = await queryOne<{ id: number }>(
+      `SELECT st.id FROM sheet_types st JOIN towers t ON t.id = st.tower_id
        JOIN projects p ON p.id = t.project_id
       WHERE st.id = ? AND t.project_id = ? AND p.org_id = ?`,
-    id,
-    projectId,
-    user.orgId,
-  );
-  if (!proj) return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
-
-  // FK không có ON DELETE CASCADE — xoá thủ công theo thứ tự phụ thuộc.
-  // Tên bảng lấy từ danh sách cố định; id luôn truyền qua placeholder ?.
-  // Bọc transaction: xoá nhiều bảng phụ thuộc, lỗi giữa chừng phải rollback
-  // toàn bộ để không để lại dữ liệu mồ côi (orphan).
-  const taskIdsSql = `SELECT t.id FROM tasks t JOIN work_packages wp ON t.package_id = wp.id WHERE wp.sheet_type_id = ?`;
-  await withTransaction(async () => {
-    for (const tbl of [
-      "progress_dimensions",
-      "task_history",
-      "task_photos",
-      "task_comments",
-      "task_documents",
-      "baseline_tasks",
-    ]) {
-      await run(`DELETE FROM ${tbl} WHERE task_id IN (${taskIdsSql})`, id);
-    }
-    await run(`DELETE FROM notifications WHERE task_id IN (${taskIdsSql})`, id);
-    await run(
-      `DELETE FROM notifications WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`,
-      id,
-    );
-    await run(
-      `DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`,
-      id,
-    );
-    await run(`DELETE FROM materials WHERE sheet_type_id = ?`, id);
-    await run(
-      `DELETE FROM tasks WHERE package_id IN (SELECT id FROM work_packages WHERE sheet_type_id = ?)`,
-      id,
-    );
-    await run(`DELETE FROM work_packages WHERE sheet_type_id = ?`, id);
-    // Phòng thủ nhiều lớp: chỉ xoá nếu tower vẫn thuộc dự án đang chọn lúc kiểm ở trên.
-    await run(
-      `DELETE FROM sheet_types WHERE id = ? AND tower_id IN (SELECT id FROM towers WHERE project_id = ?)`,
       id,
       projectId,
+      user.orgId,
     );
-  });
-  return NextResponse.json({ ok: true });
+    if (!proj) return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
+
+    // FK không có ON DELETE CASCADE — xoá thủ công theo thứ tự phụ thuộc.
+    // Tên bảng lấy từ danh sách cố định; id luôn truyền qua placeholder ?.
+    // Bọc transaction: xoá nhiều bảng phụ thuộc, lỗi giữa chừng phải rollback
+    // toàn bộ để không để lại dữ liệu mồ côi (orphan).
+    const taskIdsSql = `SELECT t.id FROM tasks t JOIN work_packages wp ON t.package_id = wp.id WHERE wp.sheet_type_id = ?`;
+    await withTransaction(async () => {
+      for (const tbl of [
+        "progress_dimensions",
+        "task_history",
+        "task_photos",
+        "task_comments",
+        "task_documents",
+        "baseline_tasks",
+      ]) {
+        await run(`DELETE FROM ${tbl} WHERE task_id IN (${taskIdsSql})`, id);
+      }
+      await run(`DELETE FROM notifications WHERE task_id IN (${taskIdsSql})`, id);
+      await run(
+        `DELETE FROM notifications WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`,
+        id,
+      );
+      await run(
+        `DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`,
+        id,
+      );
+      await run(`DELETE FROM materials WHERE sheet_type_id = ?`, id);
+      await run(
+        `DELETE FROM tasks WHERE package_id IN (SELECT id FROM work_packages WHERE sheet_type_id = ?)`,
+        id,
+      );
+      await run(`DELETE FROM work_packages WHERE sheet_type_id = ?`, id);
+      // Phòng thủ nhiều lớp: chỉ xoá nếu tower vẫn thuộc dự án đang chọn lúc kiểm ở trên.
+      await run(
+        `DELETE FROM sheet_types WHERE id = ? AND tower_id IN (SELECT id FROM towers WHERE project_id = ?)`,
+        id,
+        projectId,
+      );
+    });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

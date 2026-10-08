@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { ROLES } from "@/lib/nen/roles";
@@ -99,24 +100,29 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE /api/admin/code-lists?id= — xoá mục; chặn 409 khi đang được tham chiếu.
 export async function DELETE(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!requireAdmin(user.role))
-    return NextResponse.json({ error: "Chỉ Admin được quản lý danh mục" }, { status: 403 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!requireAdmin(user.role))
+      return NextResponse.json({ error: "Chỉ Admin được quản lý danh mục" }, { status: 403 });
 
-  const id = Number(req.nextUrl.searchParams.get("id"));
-  if (!Number.isInteger(id)) return NextResponse.json({ error: "Thiếu id" }, { status: 400 });
+    const id = Number(req.nextUrl.searchParams.get("id"));
+    if (!Number.isInteger(id)) return NextResponse.json({ error: "Thiếu id" }, { status: 400 });
 
-  const current = await getById(id, user.orgId);
-  if (!current) return NextResponse.json({ error: "Không tìm thấy mục" }, { status: 404 });
+    const current = await getById(id, user.orgId);
+    if (!current) return NextResponse.json({ error: "Không tìm thấy mục" }, { status: 404 });
 
-  const refs = await countReferences(current.domain, current.code, user.orgId);
-  if (refs > 0)
-    return NextResponse.json(
-      { error: `Mã đang được ${refs} bản ghi tham chiếu, không thể xoá`, references: refs },
-      { status: 409 },
-    );
+    const refs = await countReferences(current.domain, current.code, user.orgId);
+    if (refs > 0)
+      return NextResponse.json(
+        { error: `Mã đang được ${refs} bản ghi tham chiếu, không thể xoá`, references: refs },
+        { status: 409 },
+      );
 
-  await deleteItem(id, user.orgId);
-  return NextResponse.json({ ok: true });
+    await deleteItem(id, user.orgId);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

@@ -1,5 +1,17 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 DATA-CONTRACTS: mọi DELETE còn tham chiếu -> 409 dependency_conflict
+
+Đóng nợ của S13c: helper chung `laLoiKhoaNgoai` / `phanHoiXungDotPhuThuoc`
+trong `lib/nen/loi.ts`; 64 route `DELETE` còn lại (`app/api/**`) bọc thân trong `try/catch` dùng helper -> pg 23503 thành 409 `{ error, code: "dependency_conflict" }`, lỗi khác
+giữ nguyên. 12 route không xoá cứng (soft-delete/UPDATE/luôn 409) nằm trong allowlist có lý do. Gom
+`withTransaction` cho 3 route xoá nhiều bước ngoài transaction: `purchase-orders/[id]`,
+`progress-albums/[id]`, `workpackages/[id]` (file vật lý xoá SAU khi DB commit). Test:
+`tests/delete-route-fk-guard.test.ts` (bất biến tĩnh, route DELETE mới quên bắt 23503 sẽ đỏ) +
+3 ca route thật (`materials`, `purchase-orders`, `workpackages`) trong
+`tests/route-xoa-xung-dot-phu-thuoc.test.ts` (đỏ trên code cũ). Không migration, không đổi
+phiên/quyền/phạm vi.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S13c: DELETE users/bills còn tham chiếu -> 409
 
 `DELETE /api/users/:id` và `DELETE /api/payments/bills/:id` bắt pg 23503 -> 409

@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
@@ -71,20 +72,25 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  const id = parseInt((await paramsP).id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    const id = parseInt((await paramsP).id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const r = await queryOne<{ ownerId: number }>(
-    `SELECT owner_id AS "ownerId" FROM saved_reports WHERE id = ? AND org_id = ?`,
-    id,
-    user.orgId,
-  );
-  if (!r) return NextResponse.json({ error: "Không tìm thấy báo cáo" }, { status: 404 });
-  if (r.ownerId !== user.id && user.role !== "admin")
-    return NextResponse.json({ error: "Chỉ chủ sở hữu hoặc admin được xoá" }, { status: 403 });
+    const r = await queryOne<{ ownerId: number }>(
+      `SELECT owner_id AS "ownerId" FROM saved_reports WHERE id = ? AND org_id = ?`,
+      id,
+      user.orgId,
+    );
+    if (!r) return NextResponse.json({ error: "Không tìm thấy báo cáo" }, { status: 404 });
+    if (r.ownerId !== user.id && user.role !== "admin")
+      return NextResponse.json({ error: "Chỉ chủ sở hữu hoặc admin được xoá" }, { status: 403 });
 
-  await run(`DELETE FROM saved_reports WHERE id = ? AND org_id = ?`, id, user.orgId);
-  return NextResponse.json({ ok: true });
+    await run(`DELETE FROM saved_reports WHERE id = ? AND org_id = ?`, id, user.orgId);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

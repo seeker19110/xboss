@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
@@ -92,28 +93,33 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string; aid: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!isAdminOrPm(user.role))
-    return NextResponse.json({ error: "Chỉ Admin/PM được xoá việc sau họp" }, { status: 403 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!isAdminOrPm(user.role))
+      return NextResponse.json({ error: "Chỉ Admin/PM được xoá việc sau họp" }, { status: 403 });
 
-  const meetingId = parseInt(params.id);
-  const aid = parseInt(params.aid);
-  if (isNaN(meetingId) || isNaN(aid))
-    return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const meetingId = parseInt(params.id);
+    const aid = parseInt(params.aid);
+    if (isNaN(meetingId) || isNaN(aid))
+      return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const action = await getMeetingAction(aid);
-  if (!action || action.meetingId !== meetingId || action.projectId !== projectId)
-    return NextResponse.json({ error: "Không tìm thấy việc sau họp" }, { status: 404 });
+    const projectId = await getCurrentProjectId(user);
+    const action = await getMeetingAction(aid);
+    if (!action || action.meetingId !== meetingId || action.projectId !== projectId)
+      return NextResponse.json({ error: "Không tìm thấy việc sau họp" }, { status: 404 });
 
-  const r = await run(
-    `DELETE FROM meeting_actions WHERE id = ? AND meeting_id = ?`,
-    aid,
-    meetingId,
-  );
-  if (r.changes === 0)
-    return NextResponse.json({ error: "Không tìm thấy việc sau họp" }, { status: 404 });
-  return NextResponse.json({ deleted: aid });
+    const r = await run(
+      `DELETE FROM meeting_actions WHERE id = ? AND meeting_id = ?`,
+      aid,
+      meetingId,
+    );
+    if (r.changes === 0)
+      return NextResponse.json({ error: "Không tìm thấy việc sau họp" }, { status: 404 });
+    return NextResponse.json({ deleted: aid });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

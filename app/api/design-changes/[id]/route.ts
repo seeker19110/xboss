@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
@@ -118,27 +119,32 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageDesignChanges(user.role))
-    return NextResponse.json(
-      { error: "Bạn không có quyền xoá thay đổi thiết kế (Admin/PM/Kỹ sư)" },
-      { status: 403 },
-    );
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.manageDesignChanges(user.role))
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá thay đổi thiết kế (Admin/PM/Kỹ sư)" },
+        { status: 403 },
+      );
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const existing = await getDesignChange(id, projectId);
-  if (!existing)
-    return NextResponse.json({ error: "Không tìm thấy thay đổi thiết kế" }, { status: 404 });
+    const projectId = await getCurrentProjectId(user);
+    const existing = await getDesignChange(id, projectId);
+    if (!existing)
+      return NextResponse.json({ error: "Không tìm thấy thay đổi thiết kế" }, { status: 404 });
 
-  const isPending = existing.status === "submitted" || existing.status === "assessing";
-  if (!isPending && user.role !== "admin")
-    return NextResponse.json({ error: "Đã có quyết định — chỉ Admin xoá được" }, { status: 403 });
+    const isPending = existing.status === "submitted" || existing.status === "assessing";
+    if (!isPending && user.role !== "admin")
+      return NextResponse.json({ error: "Đã có quyết định — chỉ Admin xoá được" }, { status: 403 });
 
-  await run(`DELETE FROM design_changes WHERE id = ?`, id);
-  return NextResponse.json({ deleted: id });
+    await run(`DELETE FROM design_changes WHERE id = ?`, id);
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

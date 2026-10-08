@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction, withProjectScope } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
@@ -155,33 +156,41 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user || user.role !== "admin")
-    return NextResponse.json({ error: "Chỉ Admin được xoá đơn hàng" }, { status: 403 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user || user.role !== "admin")
+      return NextResponse.json({ error: "Chỉ Admin được xoá đơn hàng" }, { status: 403 });
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const blocked = await assertModuleEnabled("materials", projectId);
-  if (blocked) return blocked;
-  const po = projectId != null ? await getPurchaseOrder(id, projectId) : undefined;
-  if (!po) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
+    const projectId = await getCurrentProjectId(user);
+    const blocked = await assertModuleEnabled("materials", projectId);
+    if (blocked) return blocked;
+    const po = projectId != null ? await getPurchaseOrder(id, projectId) : undefined;
+    if (!po) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
 
-  // Đã nhập kho (một phần/đủ) thì tồn kho đã cộng vào vật tư + có phiếu nhập gắn kèm —
-  // xoá sẽ tạo tồn ảo và phiếu nhập mồ côi. Phải huỷ đơn thay vì xoá.
-  const received = await queryOne<{ id: number }>(
-    `SELECT id FROM po_items WHERE po_id = ? AND qty_received > 0 LIMIT 1`,
-    id,
-  );
-  if (received || po.status === "partial" || po.status === "received")
-    return NextResponse.json(
-      { error: "Đơn hàng đã nhập kho, không thể xoá — hãy huỷ đơn" },
-      { status: 409 },
+    // Đã nhập kho (một phần/đủ) thì tồn kho đã cộng vào vật tư + có phiếu nhập gắn kèm —
+    // xoá sẽ tạo tồn ảo và phiếu nhập mồ côi. Phải huỷ đơn thay vì xoá.
+    const received = await queryOne<{ id: number }>(
+      `SELECT id FROM po_items WHERE po_id = ? AND qty_received > 0 LIMIT 1`,
+      id,
     );
+    if (received || po.status === "partial" || po.status === "received")
+      return NextResponse.json(
+        { error: "Đơn hàng đã nhập kho, không thể xoá — hãy huỷ đơn" },
+        { status: 409 },
+      );
 
-  await run(`DELETE FROM po_items WHERE po_id = ?`, id);
-  await run(`DELETE FROM purchase_orders WHERE id = ?`, id);
-  return NextResponse.json({ ok: true });
+    // Hai bước trong MỘT transaction: 23503 ở bước sau không để mất dòng hàng đã xoá ở bước trước.
+    await withTransaction(async () => {
+      await run(`DELETE FROM po_items WHERE po_id = ?`, id);
+      await run(`DELETE FROM purchase_orders WHERE id = ?`, id);
+    });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

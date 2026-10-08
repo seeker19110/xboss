@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, isAdminOrPm } from "@/lib/bao-mat/auth";
@@ -80,31 +81,39 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const blocked = await assertModuleEnabled("materials", projectId);
-  if (blocked) return blocked;
-  const pr =
-    projectId != null
-      ? await queryOne<{ requested_by: number; status: string }>(
-          `SELECT requested_by, status FROM purchase_requests WHERE id = ? AND project_id = ?`,
-          id,
-          projectId,
-        )
-      : undefined;
-  if (!pr) return NextResponse.json({ error: "Không tìm thấy yêu cầu" }, { status: 404 });
+    const projectId = await getCurrentProjectId(user);
+    const blocked = await assertModuleEnabled("materials", projectId);
+    if (blocked) return blocked;
+    const pr =
+      projectId != null
+        ? await queryOne<{ requested_by: number; status: string }>(
+            `SELECT requested_by, status FROM purchase_requests WHERE id = ? AND project_id = ?`,
+            id,
+            projectId,
+          )
+        : undefined;
+    if (!pr) return NextResponse.json({ error: "Không tìm thấy yêu cầu" }, { status: 404 });
 
-  if (pr.requested_by !== user.id && !isAdminOrPm(user.role))
-    return NextResponse.json({ error: "Không có quyền xoá yêu cầu này" }, { status: 403 });
-  if (pr.status === "ordered")
-    return NextResponse.json({ error: "Yêu cầu đã được đặt hàng, không thể xoá" }, { status: 409 });
+    if (pr.requested_by !== user.id && !isAdminOrPm(user.role))
+      return NextResponse.json({ error: "Không có quyền xoá yêu cầu này" }, { status: 403 });
+    if (pr.status === "ordered")
+      return NextResponse.json(
+        { error: "Yêu cầu đã được đặt hàng, không thể xoá" },
+        { status: 409 },
+      );
 
-  await run(`DELETE FROM purchase_requests WHERE id = ?`, id);
-  return NextResponse.json({ ok: true });
+    await run(`DELETE FROM purchase_requests WHERE id = ?`, id);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

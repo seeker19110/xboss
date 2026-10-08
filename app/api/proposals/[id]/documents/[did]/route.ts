@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { storageGet, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
@@ -60,29 +61,34 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string; did: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const proposalId = parseInt(params.id);
-  const did = parseInt(params.did);
-  if (isNaN(proposalId) || isNaN(did))
-    return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const proposalId = parseInt(params.id);
+    const did = parseInt(params.did);
+    if (isNaN(proposalId) || isNaN(did))
+      return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const proposal = projectId != null ? await getProposal(proposalId, projectId) : undefined;
-  if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
-  const editErr = canEditProposal(proposal, user);
-  if (editErr) return NextResponse.json({ error: editErr }, { status: 403 });
+    const projectId = await getCurrentProjectId(user);
+    const proposal = projectId != null ? await getProposal(proposalId, projectId) : undefined;
+    if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
+    const editErr = canEditProposal(proposal, user);
+    if (editErr) return NextResponse.json({ error: editErr }, { status: 403 });
 
-  const doc = await queryOne<ProposalDocRow>(
-    `SELECT id, file_name, mime_type, original_name FROM proposal_documents WHERE id = ? AND proposal_id = ?`,
-    did,
-    proposalId,
-  );
-  if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+    const doc = await queryOne<ProposalDocRow>(
+      `SELECT id, file_name, mime_type, original_name FROM proposal_documents WHERE id = ? AND proposal_id = ?`,
+      did,
+      proposalId,
+    );
+    if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
-  await run(`DELETE FROM proposal_documents WHERE id = ?`, did);
-  await storageDelete(user.orgId, doc.file_name);
-  return NextResponse.json({ deleted: did });
+    await run(`DELETE FROM proposal_documents WHERE id = ?`, did);
+    await storageDelete(user.orgId, doc.file_name);
+    return NextResponse.json({ deleted: did });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

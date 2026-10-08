@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
@@ -148,63 +149,68 @@ export async function DELETE(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.editStructure(user.role))
-    return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được cột" }, { status: 403 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.editStructure(user.role))
+      return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được cột" }, { status: 403 });
 
-  const pkgId = parseInt(params.id);
-  if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const pkgId = parseInt(params.id);
+    if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  // Chống xoá cột xuyên dự án (vá W0). allGroups vẫn an toàn vì chỉ mở rộng tới các nhóm
-  // cùng sheet_type_id với pkgId (đã được kiểm nằm trong dự án nhìn thấy được).
-  const visibleDel = await visibleProjectIds(user);
-  const pidDel = await packageProjectId(pkgId);
-  if (pidDel == null || !visibleDel.includes(pidDel))
-    return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
+    // Chống xoá cột xuyên dự án (vá W0). allGroups vẫn an toàn vì chỉ mở rộng tới các nhóm
+    // cùng sheet_type_id với pkgId (đã được kiểm nằm trong dự án nhìn thấy được).
+    const visibleDel = await visibleProjectIds(user);
+    const pidDel = await packageProjectId(pkgId);
+    if (pidDel == null || !visibleDel.includes(pidDel))
+      return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
 
-  const label = req.nextUrl.searchParams.get("label");
-  if (!label) return NextResponse.json({ error: "Thiếu tham số label" }, { status: 400 });
+    const label = req.nextUrl.searchParams.get("label");
+    if (!label) return NextResponse.json({ error: "Thiếu tham số label" }, { status: 400 });
 
-  const allGroups = req.nextUrl.searchParams.get("allGroups") === "true";
+    const allGroups = req.nextUrl.searchParams.get("allGroups") === "true";
 
-  let affectedPkgIds: number[];
-  if (allGroups) {
-    // Lấy sheet_type_id của nhóm hiện tại rồi tìm mọi nhóm cùng sheet.
-    const pkg = await queryOne<{ sheet_type_id: number }>(
-      `SELECT sheet_type_id FROM work_packages WHERE id = ?`,
-      pkgId,
-    );
-    if (!pkg) return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
-    const siblings = await query<{ id: number }>(
-      `SELECT id FROM work_packages WHERE sheet_type_id = ?`,
-      pkg.sheet_type_id,
-    );
-    affectedPkgIds = siblings.map((r) => r.id);
-  } else {
-    affectedPkgIds = [pkgId];
-  }
+    let affectedPkgIds: number[];
+    if (allGroups) {
+      // Lấy sheet_type_id của nhóm hiện tại rồi tìm mọi nhóm cùng sheet.
+      const pkg = await queryOne<{ sheet_type_id: number }>(
+        `SELECT sheet_type_id FROM work_packages WHERE id = ?`,
+        pkgId,
+      );
+      if (!pkg) return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
+      const siblings = await query<{ id: number }>(
+        `SELECT id FROM work_packages WHERE sheet_type_id = ?`,
+        pkg.sheet_type_id,
+      );
+      affectedPkgIds = siblings.map((r) => r.id);
+    } else {
+      affectedPkgIds = [pkgId];
+    }
 
-  let totalDeleted = 0;
-  for (const pid of affectedPkgIds) {
-    const { changes } = await run(
-      `DELETE FROM progress_dimensions WHERE dimension_label = ?
+    let totalDeleted = 0;
+    for (const pid of affectedPkgIds) {
+      const { changes } = await run(
+        `DELETE FROM progress_dimensions WHERE dimension_label = ?
          AND task_id IN (SELECT id FROM tasks WHERE package_id = ?)`,
-      label,
-      pid,
-    );
-    totalDeleted += changes;
+        label,
+        pid,
+      );
+      totalDeleted += changes;
 
-    // Tính lại % cho mọi task + nhóm bị ảnh hưởng (trong transaction — xem chú thích ở POST).
-    const tasks = await query<{ id: number }>(`SELECT id FROM tasks WHERE package_id = ?`, pid);
-    await withTransaction(async () => {
-      for (const t of tasks) await recomputeTask(t.id, user.name);
-      await recomputePackage(pid);
-    });
+      // Tính lại % cho mọi task + nhóm bị ảnh hưởng (trong transaction — xem chú thích ở POST).
+      const tasks = await query<{ id: number }>(`SELECT id FROM tasks WHERE package_id = ?`, pid);
+      await withTransaction(async () => {
+        for (const t of tasks) await recomputeTask(t.id, user.name);
+        await recomputePackage(pid);
+      });
+    }
+
+    return NextResponse.json({ deleted: totalDeleted, groups: affectedPkgIds.length });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
   }
-
-  return NextResponse.json({ deleted: totalDeleted, groups: affectedPkgIds.length });
 }
 
 // PATCH /api/workpackages/:id/dimensions/column

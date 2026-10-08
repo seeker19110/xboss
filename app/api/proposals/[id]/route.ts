@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { moneyInputErrorBody } from "@/lib/nen/money";
 import { run } from "@/lib/db";
@@ -95,24 +96,29 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const proposal = projectId != null ? await getProposal(id, projectId) : undefined;
-  if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
+    const projectId = await getCurrentProjectId(user);
+    const proposal = projectId != null ? await getProposal(id, projectId) : undefined;
+    if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
 
-  const isOwnDraft = proposal.requestedBy === user.id && proposal.status === "draft";
-  if (!isOwnDraft && user.role !== "admin")
-    return NextResponse.json(
-      { error: "Chỉ người tạo xoá được đề xuất nháp của mình (Admin xoá được mọi đề xuất)" },
-      { status: 403 },
-    );
+    const isOwnDraft = proposal.requestedBy === user.id && proposal.status === "draft";
+    if (!isOwnDraft && user.role !== "admin")
+      return NextResponse.json(
+        { error: "Chỉ người tạo xoá được đề xuất nháp của mình (Admin xoá được mọi đề xuất)" },
+        { status: 403 },
+      );
 
-  await run(`DELETE FROM proposals WHERE id = ?`, id);
-  return NextResponse.json({ deleted: id });
+    await run(`DELETE FROM proposals WHERE id = ?`, id);
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

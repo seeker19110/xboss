@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { storageGet, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
@@ -57,27 +58,33 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  // A1-AC02: không có dự án khả kiến → 404, không đọc/xoá toàn hệ.
-  const projectId = await getCurrentProjectId(user);
-  if (projectId == null) return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
-  const photo = await getPhotoInProject(id, projectId);
-  if (!photo) return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
+    // A1-AC02: không có dự án khả kiến → 404, không đọc/xoá toàn hệ.
+    const projectId = await getCurrentProjectId(user);
+    if (projectId == null)
+      return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
+    const photo = await getPhotoInProject(id, projectId);
+    if (!photo) return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
 
-  if (photo.uploaded_by !== user.id && !CAN.manageHse(user.role))
-    return NextResponse.json(
-      { error: "Chỉ người upload hoặc Admin/PM/kỹ sư được xoá ảnh" },
-      { status: 403 },
-    );
+    if (photo.uploaded_by !== user.id && !CAN.manageHse(user.role))
+      return NextResponse.json(
+        { error: "Chỉ người upload hoặc Admin/PM/kỹ sư được xoá ảnh" },
+        { status: 403 },
+      );
 
-  await run(`DELETE FROM hse_photos WHERE id = ?`, id);
-  await storageDelete(user.orgId, photo.file_path);
+    await run(`DELETE FROM hse_photos WHERE id = ?`, id);
+    await storageDelete(user.orgId, photo.file_path);
 
-  return NextResponse.json({ deleted: id });
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

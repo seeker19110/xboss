@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
@@ -204,65 +205,70 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.editStructure(user.role))
-    return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được task" }, { status: 403 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.editStructure(user.role))
+      return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được task" }, { status: 403 });
 
-  const projectId = await getCurrentProjectId(user);
-  const blocked = await assertModuleEnabled("tracking", projectId);
-  if (blocked) return blocked;
+    const projectId = await getCurrentProjectId(user);
+    const blocked = await assertModuleEnabled("tracking", projectId);
+    if (blocked) return blocked;
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  // Cách ly dự án (vá W7, Đợt 5) — id đoán được; kiểm TRƯỚC bất kỳ đọc/xoá dữ liệu con nào
-  // (cascade xoá photos/documents/comments/history/materials/dimensions rồi file vật lý) để
-  // không lỡ xoá dữ liệu dự án khác rồi mới phát hiện sai dự án. 404, không phải 403.
-  if (projectId == null || (await taskProjectId(id)) !== projectId)
-    return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
+    // Cách ly dự án (vá W7, Đợt 5) — id đoán được; kiểm TRƯỚC bất kỳ đọc/xoá dữ liệu con nào
+    // (cascade xoá photos/documents/comments/history/materials/dimensions rồi file vật lý) để
+    // không lỡ xoá dữ liệu dự án khác rồi mới phát hiện sai dự án. 404, không phải 403.
+    if (projectId == null || (await taskProjectId(id)) !== projectId)
+      return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
 
-  const task = await queryOne<{ id: number; package_id: number }>(
-    `SELECT id, package_id FROM tasks WHERE id = ?`,
-    id,
-  );
-  if (!task) return NextResponse.json({ error: "Task không tồn tại" }, { status: 404 });
-
-  // Đọc file trước khi xoá DB — tên file do server sinh nên không cần kiểm tra traversal.
-  const photos = await query<{ file_name: string }>(
-    `SELECT file_name FROM task_photos WHERE task_id = ?`,
-    id,
-  );
-  const docs = await query<{ file_name: string }>(
-    `SELECT file_name FROM task_documents WHERE task_id = ?`,
-    id,
-  );
-
-  // Xoá toàn bộ dữ liệu liên quan trong 1 transaction — không để lại trạng thái nửa chừng.
-  await withTransaction(async () => {
-    await run(`DELETE FROM notifications WHERE task_id = ?`, id);
-    await run(`DELETE FROM baseline_tasks WHERE task_id = ?`, id);
-    await run(`DELETE FROM task_photos WHERE task_id = ?`, id);
-    await run(`DELETE FROM task_documents WHERE task_id = ?`, id);
-    await run(`DELETE FROM task_comments WHERE task_id = ?`, id);
-    await run(`DELETE FROM task_history WHERE task_id = ?`, id);
-    // material_transactions trước materials (FK: material_transactions.material_id → materials.id).
-    await run(
-      `DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE task_id = ?)`,
+    const task = await queryOne<{ id: number; package_id: number }>(
+      `SELECT id, package_id FROM tasks WHERE id = ?`,
       id,
     );
-    await run(`DELETE FROM materials WHERE task_id = ?`, id);
-    await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, id);
-    await run(`DELETE FROM tasks WHERE id = ?`, id);
-  });
+    if (!task) return NextResponse.json({ error: "Task không tồn tại" }, { status: 404 });
 
-  // Xoá file sau khi DB commit thành công — file mồ côi trên disk ít hại hơn row mồ côi trong DB.
-  for (const f of [...photos, ...docs]) {
-    await storageDelete(user.orgId, f.file_name);
+    // Đọc file trước khi xoá DB — tên file do server sinh nên không cần kiểm tra traversal.
+    const photos = await query<{ file_name: string }>(
+      `SELECT file_name FROM task_photos WHERE task_id = ?`,
+      id,
+    );
+    const docs = await query<{ file_name: string }>(
+      `SELECT file_name FROM task_documents WHERE task_id = ?`,
+      id,
+    );
+
+    // Xoá toàn bộ dữ liệu liên quan trong 1 transaction — không để lại trạng thái nửa chừng.
+    await withTransaction(async () => {
+      await run(`DELETE FROM notifications WHERE task_id = ?`, id);
+      await run(`DELETE FROM baseline_tasks WHERE task_id = ?`, id);
+      await run(`DELETE FROM task_photos WHERE task_id = ?`, id);
+      await run(`DELETE FROM task_documents WHERE task_id = ?`, id);
+      await run(`DELETE FROM task_comments WHERE task_id = ?`, id);
+      await run(`DELETE FROM task_history WHERE task_id = ?`, id);
+      // material_transactions trước materials (FK: material_transactions.material_id → materials.id).
+      await run(
+        `DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE task_id = ?)`,
+        id,
+      );
+      await run(`DELETE FROM materials WHERE task_id = ?`, id);
+      await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, id);
+      await run(`DELETE FROM tasks WHERE id = ?`, id);
+    });
+
+    // Xoá file sau khi DB commit thành công — file mồ côi trên disk ít hại hơn row mồ côi trong DB.
+    for (const f of [...photos, ...docs]) {
+      await storageDelete(user.orgId, f.file_name);
+    }
+
+    await recomputePackage(task.package_id);
+
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
   }
-
-  await recomputePackage(task.package_id);
-
-  return NextResponse.json({ deleted: id });
 }
