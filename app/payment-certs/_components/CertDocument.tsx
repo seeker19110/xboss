@@ -32,6 +32,13 @@ import {
 } from "@/app/components/ui";
 import type { ChipTone } from "@/app/components/ui/Chip";
 import type { EntityApprovalStatus } from "@/lib/tien-do/approvals";
+import {
+  HEADER_DINH_DANG_TIEN,
+  docChiTietDot,
+  fmtVNDExact,
+  type CertTotalsView,
+  type DongVuot,
+} from "./chiTietDot";
 
 // Khối "chứng từ" của một đợt thanh toán (IPC) — M124. Tách ra từ hộp thoại chi tiết đợt
 // cũ trong `app/payment-certs/page.tsx`: cùng dữ liệu, cùng các hàm gọi API, nhưng hiển thị
@@ -83,24 +90,9 @@ export type Cert = {
   items: CertItem[];
 };
 
-/** Dòng IPC có khối lượng luỹ kế vượt khối lượng hợp đồng (route trả kèm, chỉ để cảnh báo). */
-export type DongVuot = {
-  boqItemId: number;
-  code: string;
-  name: string;
-  unit: string;
-  qtyContract: number;
-  qtyCumulative: number;
-};
-
-/** Tổng hợp tiền do API tính (SQL) — từng ô có thể bị che (null) khi thiếu viewPayments. */
-export type CertTotalsView = {
-  periodValue: number | null;
-  cumulativeValue: number | null;
-  advanceDeduct: number | null;
-  retentionDeduct: number | null;
-  approvedValue: number | null;
-};
+// DongVuot (dòng vượt KL hợp đồng) + CertTotalsView (tổng tiền dạng chuỗi exact, null = bị che)
+// khai ở chiTietDot.ts cùng hàm đọc response.
+export type { CertTotalsView, DongVuot };
 
 export function fmtVND(n: number) {
   if (!n) return "—";
@@ -135,6 +127,8 @@ export type CertDocumentCtrl = {
   approvalStatus: EntityApprovalStatus | null;
   vuotHopDong: DongVuot[];
   totals: CertTotalsView | null;
+  /** Lỗi tải tổng hợp giá trị (tiếng Việt) — khác "•••" (bị che quyền). */
+  loiChiTiet: string | null;
   /** Tạm tính theo KL đang nhập (chưa lưu) — chỉ để đối chiếu, không thay số của API. */
   tamTinh: number | null;
   saveItems: () => Promise<void>;
@@ -173,6 +167,7 @@ export function useCertDocument({
   // thấy — trước đợt này không có lớp nào so khối lượng với hợp đồng, nhập gấp 10 lần vẫn lưu.
   const [vuotHopDong, setVuotHopDong] = useState<DongVuot[]>([]);
   const [totals, setTotals] = useState<CertTotalsView | null>(null);
+  const [loiChiTiet, setLoiChiTiet] = useState<string | null>(null);
 
   // Đổi đợt (hoặc tải lại danh sách sau khi lưu) → nạp lại ô nhập theo số của server.
   useEffect(() => {
@@ -189,17 +184,26 @@ export function useCertDocument({
       setApprovalStatus(null);
       setVuotHopDong([]);
       setTotals(null);
+      setLoiChiTiet(null);
       return;
     }
     let huy = false;
     setDangTaiChiTiet(true);
-    fetch(`/api/payment-certs/${id}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
+    // decimal-string-v1: tổng tiền exact dạng chuỗi; lỗi HTTP/mạng hiện thông báo, không "•••".
+    fetch(`/api/payment-certs/${id}`, { headers: HEADER_DINH_DANG_TIEN })
+      .then(docChiTietDot)
+      .catch(() => ({
+        approvalStatus: null,
+        vuotHopDong: [],
+        totals: null,
+        loi: "Không tải được tổng hợp giá trị đợt — kiểm tra kết nối mạng rồi mở lại đợt",
+      }))
+      .then((ct) => {
         if (huy) return;
-        setApprovalStatus(j?.approvalStatus ?? null);
-        setVuotHopDong(j?.vuotHopDong ?? []);
-        setTotals(j?.totals ?? null);
+        setApprovalStatus(ct.approvalStatus);
+        setVuotHopDong(ct.vuotHopDong);
+        setTotals(ct.totals);
+        setLoiChiTiet(ct.loi);
       })
       .finally(() => {
         if (!huy) setDangTaiChiTiet(false);
@@ -393,6 +397,7 @@ export function useCertDocument({
     approvalStatus,
     vuotHopDong,
     totals,
+    loiChiTiet,
     tamTinh,
     saveItems,
     submitCert,
@@ -507,6 +512,12 @@ export type CertNav = {
   onBackToList: () => void;
 };
 
+/** Ô tiền đợt: null/thiếu = API che quyền → "•••" (MaskedValue); chuỗi exact → "x đ". */
+function TienDot({ value, am = false }: { value: string | null | undefined; am?: boolean }) {
+  if (value == null) return <MaskedValue value={null} format={fmtVND} />;
+  return <>{fmtVNDExact(value, am)}</>;
+}
+
 export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; nav: CertNav }) {
   const {
     cert,
@@ -518,6 +529,7 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
     approvalStatus,
     vuotHopDong,
     totals,
+    loiChiTiet,
     tamTinh,
     dangTaiChiTiet,
   } = ctrl;
@@ -526,24 +538,22 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
   const totalRows: DocTotalRow[] = [
     {
       label: "Giá trị đợt này",
-      value: <MaskedValue value={totals?.periodValue ?? null} format={fmtVND} />,
+      value: <TienDot value={totals?.periodValue} />,
     },
     {
       label: "Luỹ kế tới hết đợt",
-      value: <MaskedValue value={totals?.cumulativeValue ?? null} format={fmtVND} />,
+      value: <TienDot value={totals?.cumulativeValue} />,
     },
     {
-      // Dấu "−" gắn trong `format` của MaskedValue (chỉ gọi khi giá trị không bị che) —
+      // Dấu "−" gắn trong TienDot (chỉ khi giá trị không bị che) —
       // không đặt `negative: true` để DocTotals không tự thêm một dấu "−" nữa, tránh
       // hiện "−••• đ" khi người xem không có quyền (giá trị bị che vẫn phải là "••• đ" sạch).
       label: "Khấu trừ tạm ứng",
-      value: <MaskedValue value={totals?.advanceDeduct ?? null} format={(n) => `−${fmtVND(n)}`} />,
+      value: <TienDot value={totals?.advanceDeduct} am />,
     },
     {
       label: "Giữ lại bảo hành",
-      value: (
-        <MaskedValue value={totals?.retentionDeduct ?? null} format={(n) => `−${fmtVND(n)}`} />
-      ),
+      value: <TienDot value={totals?.retentionDeduct} am />,
     },
   ];
 
@@ -805,7 +815,11 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
           <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
             Tổng hợp giá trị
           </h3>
-          {dangTaiChiTiet && !totals ? (
+          {loiChiTiet ? (
+            <p role="alert" className="text-xs text-rose-300">
+              {loiChiTiet}
+            </p>
+          ) : dangTaiChiTiet && !totals ? (
             <div className="space-y-2">
               <Skeleton className="h-5 w-full" />
               <Skeleton className="h-5 w-full" />
@@ -817,7 +831,7 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
               rows={totalRows}
               total={{
                 label: "Đề nghị thanh toán",
-                value: <MaskedValue value={totals?.approvedValue ?? null} format={fmtVND} />,
+                value: <TienDot value={totals?.approvedValue} />,
               }}
             />
           )}

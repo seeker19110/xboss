@@ -22,6 +22,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
+import { CO_MOCK_MODULE } from "./test-flags.mjs";
 
 const tsxLoader = "./" + join("node_modules", "tsx", "dist", "loader.mjs");
 
@@ -107,21 +108,58 @@ const MUTATIONS = [
     tests: ["tests/money.test.ts"],
     why: "Đổi cách làm tròn tiền → lệch từng đồng dồn lại trên hoá đơn/IPC, sai lệch tài chính.",
   },
+  // QUALITY-FINAL-1 S10a: đường IPC exact. `moiFile` = MỖI file test phải đỏ (không chỉ 1) — mỗi
+  // lớp (utility golden, route golden, DTO/export) canh bất biến độc lập, lớp nào im là có lỗ.
+  {
+    key: "money: mulRatio làm tròn nửa xa 0 (tạm ứng IPC)",
+    file: "lib/nen/money.ts",
+    find: "return divRoundHalfUp(minor * numerator, denominator);",
+    replace: "return (minor * numerator) / denominator;",
+    tests: [
+      "tests/money-exact-golden.test.ts",
+      "tests/money-ipc-golden-route.test.ts",
+      "tests/payment-certs-money-dto.test.ts",
+    ],
+    moiFile: true,
+    why: "Chặt cụt thay vì làm tròn → tạm ứng 10,25% × 94,00 ra 9,63 thay 9,64; lệch xu trên IPC/phiếu thanh toán.",
+  },
+  {
+    key: "money: ipc-sum-v1 cộng rồi mới round tổng",
+    file: "lib/nen/money.ts",
+    find: "const periodValue = sumMoneyProductsExact(products, IPC_QTY_SCALE);",
+    replace:
+      "const periodValue = products.reduce((s, p) => s + sumMoneyProductsExact([p], IPC_QTY_SCALE), 0n);",
+    tests: [
+      "tests/money-exact-golden.test.ts",
+      "tests/money-ipc-golden-route.test.ts",
+      "tests/payment-certs-money-dto.test.ts",
+    ],
+    moiFile: true,
+    why: "Round từng dòng trước khi cộng (trái A3-FR05) → 2 dòng 0,005 thành 0,02 thay 0,01; giá trị đợt sai.",
+  },
 ];
 
 const only = process.argv.find((a) => a.startsWith("--only="))?.slice("--only=".length);
 const list = only ? MUTATIONS.filter((m) => m.key.includes(only)) : MUTATIONS;
 
+/** Chạy 1 file test (cùng cờ mock.module như runner chính); true nếu file ĐỎ. */
+function fileFails(f) {
+  const res = spawnSync(process.execPath, [CO_MOCK_MODULE, `--import=${tsxLoader}`, "--test", f], {
+    stdio: ["inherit", "pipe", "pipe"],
+    encoding: "utf8",
+  });
+  return res.status !== 0;
+}
+
 /** Chạy các file test; trả true nếu CÓ ÍT NHẤT MỘT file đỏ. */
 function testsFail(files) {
-  for (const f of files) {
-    const res = spawnSync(process.execPath, [`--import=${tsxLoader}`, "--test", f], {
-      stdio: ["inherit", "pipe", "pipe"],
-      encoding: "utf8",
-    });
-    if (res.status !== 0) return true;
-  }
-  return false;
+  return files.some(fileFails);
+}
+
+/** Sau mutation: `moiFile` đòi MỌI file đỏ; còn lại chỉ cần 1. Trả danh sách file vẫn xanh. */
+function filesStillGreen(m) {
+  if (!m.moiFile) return testsFail(m.tests) ? [] : [...m.tests];
+  return m.tests.filter((f) => !fileFails(f));
 }
 
 let songSot = 0;
@@ -162,13 +200,13 @@ for (const m of list) {
   daChay++;
   try {
     writeFileSync(m.file, src.replace(m.find, m.replace));
-    const doRoi = testsFail(m.tests);
-    if (doRoi) {
+    const conXanh = filesStillGreen(m);
+    if (conXanh.length === 0) {
       process.stdout.write(`   ✅ test ĐỎ như mong đợi — bất biến này thật sự được canh\n`);
     } else {
       songSot++;
       process.stdout.write(
-        `   ❌ MUTATION SỐNG SÓT — test vẫn XANH dù code đã bị phá.\n` +
+        `   ❌ MUTATION SỐNG SÓT — test vẫn XANH dù code đã bị phá: ${conXanh.join(", ")}\n` +
           `      Hậu quả nếu lọt thật: ${m.why}\n` +
           `      => Bộ test chưa canh bất biến này. Bổ sung assert, đừng sửa mutation cho qua.\n`,
       );

@@ -4,9 +4,19 @@
 // Xem docs/nang-cap/M17-thanh-toan-kl.md.
 import { query, queryOne, run } from "@/lib/db";
 import { boqExecutedQty } from "@/lib/khoi-luong/boq";
-import { parseMoney, mulRate, moneyToNumber } from "@/lib/nen/money";
+import {
+  parseMoney,
+  moneyToNumber,
+  parseMoneyExact,
+  ipcSumV1,
+  moneyToWire,
+  mulRatio,
+  parseFixedDecimalExact,
+  type MoneyWireFormat,
+} from "@/lib/nen/money";
 import { nextSeqCode } from "@/lib/ha-tang/seqcode";
 import { daysFromTodayISO } from "@/lib/nen/date";
+import { log } from "@/lib/nen/log";
 
 export const PAYMENT_CERT_STATUSES = ["draft", "submitted", "approved", "rejected"] as const;
 export type PaymentCertStatus = (typeof PAYMENT_CERT_STATUSES)[number];
@@ -269,55 +279,115 @@ export async function dongVuotHopDong(certId: number): Promise<DongVuotHopDong[]
   );
 }
 
+/** Tổng giá trị một đợt IPC — mọi khoản là MoneyMinor (bigint đồng×100), không qua float. */
 export type CertTotals = {
-  periodValue: number;
-  cumulativeValue: number;
-  advanceDeduct: number;
-  retentionDeduct: number;
-  approvedValue: number;
+  periodValue: bigint;
+  cumulativeValue: bigint;
+  advanceDeduct: bigint;
+  retentionDeduct: bigint;
+  approvedValue: bigint;
 };
 
-// Giá trị đợt: periodValue = Σ qty_period×unit_price; cumulativeValue tương tự
-// với qty_cumulative; trừ tạm ứng/giữ lại theo % của hợp đồng → giá trị đề nghị.
-export async function certTotals(certId: number): Promise<CertTotals> {
-  const cert = await queryOne<{ contractId: number }>(
-    `SELECT contract_id AS "contractId" FROM payment_certs WHERE id = ?`,
+const ZERO_TOTALS: CertTotals = {
+  periodValue: 0n,
+  cumulativeValue: 0n,
+  advanceDeduct: 0n,
+  retentionDeduct: 0n,
+  approvedValue: 0n,
+};
+
+/** Dòng KL của đợt ở dạng exact (`::text` ngay trong SQL) — nguồn cho tính tiền và export. */
+export type CertLineExact = {
+  id: number;
+  qtyPeriod: string;
+  qtyCumulative: string;
+  unitPrice: string;
+};
+
+export async function certLinesExact(certId: number): Promise<CertLineExact[]> {
+  return query<CertLineExact>(
+    `SELECT id, qty_period::text AS "qtyPeriod", qty_cumulative::text AS "qtyCumulative",
+            unit_price::text AS "unitPrice"
+       FROM payment_cert_items WHERE cert_id = ? ORDER BY id`,
     certId,
   );
-  if (!cert)
-    return {
-      periodValue: 0,
-      cumulativeValue: 0,
-      advanceDeduct: 0,
-      retentionDeduct: 0,
-      approvedValue: 0,
-    };
+}
 
-  const contract = await queryOne<{ advancePct: number; retentionPct: number }>(
-    `SELECT advance_pct AS "advancePct", retention_pct AS "retentionPct" FROM contracts WHERE id = ?`,
-    cert.contractId,
+// Giá trị đợt theo quy tắc chứng từ ipc-sum-v1 (A3-FR05, `ipcSumV1`): periodValue =
+// round(Σ qty_period×unit_price, 2) — không round từng dòng; tạm ứng/giữ lại = round(periodValue
+// × % hợp đồng) từng khoản, tỷ lệ là phân số exact (10,25% = 1025/10000), không nhân float;
+// approvedValue = periodValue − tạm ứng − giữ lại. cumulativeValue = round(Σ qty_cumulative ×
+// unit_price, 2) cộng trong SQL. Mọi số đọc về bằng `::text` (parser NUMERIC toàn cục là float).
+export async function certTotals(certId: number): Promise<CertTotals> {
+  const cert = await queryOne<{ advancePct: string | null; retentionPct: string | null }>(
+    `SELECT ct.advance_pct::text AS "advancePct", ct.retention_pct::text AS "retentionPct"
+       FROM payment_certs c LEFT JOIN contracts ct ON ct.id = c.contract_id
+      WHERE c.id = ?`,
+    certId,
   );
-  // Cộng/nhân tiền trong SQL (không cộng dồn float ở JS — M45 PR1); lấy về dạng
-  // text rồi qua lib/money để tính tỷ lệ tạm ứng/giữ lại chính xác.
-  const agg = await queryOne<{ period: string; cumulative: string }>(
-    `SELECT COALESCE(SUM(qty_period * unit_price), 0)::text AS period,
-            COALESCE(SUM(qty_cumulative * unit_price), 0)::text AS cumulative
+  if (!cert) return { ...ZERO_TOTALS };
+  // Cột tỷ lệ NOT NULL DEFAULT 0 → null CHỈ khi không đọc được dòng hợp đồng (vd RLS che,
+  // dữ liệu hỏng). Không lặng lẽ coi là 0% — tạm ứng/giữ lại sai là tiền thật: fail-fast (500).
+  if (cert.advancePct == null || cert.retentionPct == null) {
+    log.error("certTotals: không đọc được tỷ lệ hợp đồng của đợt IPC", { certId });
+    throw new Error("certTotals: thiếu dòng hợp đồng của đợt IPC");
+  }
+
+  const lines = await certLinesExact(certId);
+  const agg = await queryOne<{ cumulative: string }>(
+    `SELECT COALESCE(SUM(qty_cumulative * unit_price), 0)::text AS cumulative
        FROM payment_cert_items WHERE cert_id = ?`,
     certId,
   );
-  const periodMinor = parseMoney(agg?.period ?? "0");
-  const cumulativeMinor = parseMoney(agg?.cumulative ?? "0");
-  const advanceMinor = mulRate(periodMinor, (contract?.advancePct ?? 0) / 100);
-  const retentionMinor = mulRate(periodMinor, (contract?.retentionPct ?? 0) / 100);
-  const approvedMinor = periodMinor - advanceMinor - retentionMinor;
+  const v1 = ipcSumV1(lines, { advancePct: cert.advancePct, retentionPct: cert.retentionPct });
+  return { ...v1, cumulativeValue: parseMoneyExact(agg?.cumulative ?? "0") };
+}
 
-  return {
-    periodValue: moneyToNumber(periodMinor),
-    cumulativeValue: moneyToNumber(cumulativeMinor),
-    advanceDeduct: moneyToNumber(advanceMinor),
-    retentionDeduct: moneyToNumber(retentionMinor),
-    approvedValue: moneyToNumber(approvedMinor),
-  };
+/**
+ * Thành tiền một dòng làm tròn tới ĐỒNG nguyên (ties xa 0) — chỉ để HIỂN THỊ (PDF). qty scale 3
+ * × đơn giá scale 2 = scale 5, nhân bigint rồi chia 10^5; không nhân float (1,005 × 100,00 =
+ * 100,5 → 101 đ, float cho 100,4999… → 100 đ). Tổng đợt vẫn theo ipc-sum-v1, không cộng số này.
+ */
+export function certLineDong(line: { qtyPeriod: string; unitPrice: string }): bigint {
+  const product =
+    parseFixedDecimalExact(line.qtyPeriod, 3) * parseFixedDecimalExact(line.unitPrice, 2);
+  return mulRatio(product, 1n, 100000n);
+}
+
+/** Đồng nguyên (bigint) → "1.234.567 đ" kiểu vi-VN, không qua Number. */
+export function formatDongVi(dong: bigint): string {
+  return `${dong.toLocaleString("vi-VN")} đ`;
+}
+
+/** Tên các trường tiền của `CertTotals` — dùng chung cho adapter wire và test. */
+export const CERT_TOTALS_FIELDS = [
+  "periodValue",
+  "cumulativeValue",
+  "advanceDeduct",
+  "retentionDeduct",
+  "approvedValue",
+] as const satisfies readonly (keyof CertTotals)[];
+
+/** `CertTotals` sau khi che quyền: trường bị che là null (không bao giờ thành 0). */
+export type CertTotalsMasked = { [K in keyof CertTotals]: bigint | null };
+export type CertTotalsWire = { [K in keyof CertTotals]: string | number | null };
+
+/**
+ * Adapter DTO (A3-FR06): decimal-string-v1 → chuỗi canonical 2 số lẻ; legacy → JSON number qua
+ * `moneyToNumberSafe` (ngoài biên throw RangeError "money_precision_unsupported" — route trả 422,
+ * không clamp). Trường đã che (null) giữ null. Gọi SAU khi che để lỗi 422 không lộ độ lớn số
+ * tiền cho người thiếu quyền xem.
+ */
+export function certTotalsToWire(
+  totals: CertTotalsMasked,
+  format: MoneyWireFormat,
+): CertTotalsWire {
+  const out = {} as CertTotalsWire;
+  for (const field of CERT_TOTALS_FIELDS) {
+    const minor = totals[field];
+    out[field] = minor == null ? null : moneyToWire(minor, format);
+  }
+  return out;
 }
 
 // Giá trị luỹ kế đã nghiệm thu của 1 hợp đồng = Σ cumulativeValue của đợt

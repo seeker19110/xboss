@@ -11,8 +11,10 @@ import { ipcSumV1, moneyToDecimal, parseMoneyExact, type IpcLineV1 } from "@/lib
 // dựng bằng SQL vì đó là dữ liệu đầu vào. Kỳ vọng = golden viết tay VÀ ipcSumV1 trên chính dữ
 // liệu DB (::text) — hai nguồn phải khớp nhau trước, rồi route mới được so.
 //
-// Ca route còn lệch ipc-sum-v1 được đánh dấu `todo` kèm số liệu: sửa certTotals là việc của
-// S10/S13 (ngoài phạm vi S09), không sửa ở đây. Khi S10 xong, bỏ `todo` để ca thành cổng chặn.
+// S09 đánh `todo` 2 ca route lệch (tạm ứng nửa xu nhân float; tổng vượt 2^53 mất xu khi ra JSON
+// number). S10a chuyển certTotals sang ipcSumV1 + DTO decimal-string-v1 → mọi ca là cổng chặn.
+// Mỗi ca so CẢ HAI định dạng: header decimal-string-v1 (chuỗi, so thẳng golden) và legacy number
+// (ca vượt biên round-trip an toàn phải 422 money_precision_unsupported, không xấp xỉ).
 
 const S = { skip: !HAS_TEST_DB };
 const RUN = Date.now().toString(36);
@@ -33,8 +35,8 @@ type Ca = {
   dong: { unitPrice: string; qtyPeriod: number }[];
   /** Golden ipc-sum-v1: [periodValue, advanceDeduct, retentionDeduct, approvedValue]. */
   golden: [string, string, string, string];
-  /** Lý do route còn lệch (todo) — undefined = route phải khớp ngay. */
-  lech?: string;
+  /** Tổng vượt biên JSON number an toàn: legacy (không header) phải trả 422. */
+  vuotBienLegacy?: true;
 };
 
 const CAC_CA: Ca[] = [
@@ -70,10 +72,8 @@ const CAC_CA: Ca[] = [
     advancePct: "10.25",
     retentionPct: "5.00",
     dong: [{ unitPrice: "94.00", qtyPeriod: 1 }],
+    // Trước S10a: route trả 9.63/79.67 (mulRate float: 9400 × 0.1025 = 963.4999…).
     golden: ["94.00", "9.64", "4.70", "79.66"],
-    lech:
-      "certTotals nhân tỷ lệ bằng float (mulRate(period, 10.25/100)): 9400 × 0.1025 = 963.4999… " +
-      "→ advanceDeduct 9.63 (đúng 9.64), approvedValue 79.67 (đúng 79.66). Sửa ở S10/S13.",
   },
   {
     ten: "tổng vượt 2^53 đồng×100 (A3-AC01 qua route)",
@@ -83,10 +83,9 @@ const CAC_CA: Ca[] = [
       { unitPrice: "9007199254740.99", qtyPeriod: 10 },
       { unitPrice: "0.03", qtyPeriod: 1 },
     ],
+    // Trước S10a: route trả …409.92/…929.90 (moneyToNumber = Number(bigint)/100 mất xu).
     golden: ["90071992547409.93", "9232379236109.52", "4503599627370.50", "76336013683929.91"],
-    lech:
-      "certTotals đổi bigint đúng sang JSON number (moneyToNumber = Number(bigint)/100): periodValue " +
-      "90071992547409.92 (đúng .93), approvedValue 76336013683929.90 (đúng .91). Sửa ở S10.",
+    vuotBienLegacy: true,
   },
 ];
 
@@ -141,54 +140,79 @@ async function donDep(f: { projectId: number; contractId: number; pmId: number }
 }
 
 for (const ca of CAC_CA) {
-  test(
-    `ipc-sum-v1 golden qua route GET /api/payment-certs/:id — ${ca.ten}`,
-    { ...S, todo: ca.lech },
-    async () => {
-      const { query, queryOne } = await import("@/lib/db");
-      const { projectId, contractId, boqIds, pm } = await dungHopDong(ca);
-      try {
-        await dangNhapDuAn(pm, projectId);
+  test(`ipc-sum-v1 golden qua route GET /api/payment-certs/:id — ${ca.ten}`, S, async () => {
+    const { query, queryOne } = await import("@/lib/db");
+    const { projectId, contractId, boqIds, pm } = await dungHopDong(ca);
+    try {
+      await dangNhapDuAn(pm, projectId);
 
-        const { POST } = await import("@/app/api/payment-certs/route");
-        const { GET, PATCH } = await import("@/app/api/payment-certs/[id]/route");
-        const tao = await POST(jreq("/api/payment-certs", { contractId }));
-        assert.equal(tao.status, 201);
-        const { id } = (await tao.json()) as { id: number };
-        const p = { params: Promise.resolve({ id: String(id) }) };
+      const { POST } = await import("@/app/api/payment-certs/route");
+      const { GET, PATCH } = await import("@/app/api/payment-certs/[id]/route");
+      const tao = await POST(jreq("/api/payment-certs", { contractId }));
+      assert.equal(tao.status, 201);
+      const { id } = (await tao.json()) as { id: number };
+      const p = { params: Promise.resolve({ id: String(id) }) };
 
-        const items = ca.dong.map((d, i) => ({ boqItemId: boqIds[i], qtyPeriod: d.qtyPeriod }));
-        const sua = await PATCH(jreq(`/api/payment-certs/${id}`, { items }, "PATCH"), p);
-        assert.equal(sua.status, 200);
+      const items = ca.dong.map((d, i) => ({ boqItemId: boqIds[i], qtyPeriod: d.qtyPeriod }));
+      const sua = await PATCH(jreq(`/api/payment-certs/${id}`, { items }, "PATCH"), p);
+      assert.equal(sua.status, 200);
 
-        // Kỳ vọng: ipcSumV1 trên đúng dữ liệu đã lưu (::text exact) phải bằng golden viết tay.
-        const lines = await query<IpcLineV1>(
-          `SELECT qty_period::text AS "qtyPeriod", unit_price::text AS "unitPrice"
+      // Kỳ vọng: ipcSumV1 trên đúng dữ liệu đã lưu (::text exact) phải bằng golden viết tay.
+      const lines = await query<IpcLineV1>(
+        `SELECT qty_period::text AS "qtyPeriod", unit_price::text AS "unitPrice"
            FROM payment_cert_items WHERE cert_id = ? ORDER BY id`,
-          id,
-        );
-        const rates = await queryOne<{ advancePct: string; retentionPct: string }>(
-          `SELECT advance_pct::text AS "advancePct", retention_pct::text AS "retentionPct"
+        id,
+      );
+      const rates = await queryOne<{ advancePct: string; retentionPct: string }>(
+        `SELECT advance_pct::text AS "advancePct", retention_pct::text AS "retentionPct"
            FROM contracts WHERE id = ?`,
-          contractId,
-        );
-        const v1 = ipcSumV1(lines, rates!);
-        const kyVong = [v1.periodValue, v1.advanceDeduct, v1.retentionDeduct, v1.approvedValue].map(
-          moneyToDecimal,
-        );
-        assert.deepEqual(kyVong, ca.golden, "ipcSumV1 trên dữ liệu DB lệch golden viết tay");
+        contractId,
+      );
+      const v1 = ipcSumV1(lines, rates!);
+      const kyVong = [v1.periodValue, v1.advanceDeduct, v1.retentionDeduct, v1.approvedValue].map(
+        moneyToDecimal,
+      );
+      assert.deepEqual(kyVong, ca.golden, "ipcSumV1 trên dữ liệu DB lệch golden viết tay");
 
-        // Thực tế: totals của route người dùng xem (JSON number hiện tại → canonical để so).
-        const res = await GET(jreq(`/api/payment-certs/${id}`, undefined, "GET"), p);
-        assert.equal(res.status, 200);
-        const { totals } = (await res.json()) as { totals: Record<string, number> };
-        const thucTe = ["periodValue", "advanceDeduct", "retentionDeduct", "approvedValue"].map(
-          (k) => moneyToDecimal(parseMoneyExact(String(totals[k]))),
-        );
-        assert.deepEqual(thucTe, ca.golden, `route lệch ipc-sum-v1: ${JSON.stringify(totals)}`);
-      } finally {
-        await donDep({ projectId, contractId, pmId: pm.id });
+      const truong = ["periodValue", "advanceDeduct", "retentionDeduct", "approvedValue"];
+
+      // decimal-string-v1: chuỗi canonical so thẳng với golden, không qua number.
+      const exact = await GET(
+        new NextRequest(`http://localhost/api/payment-certs/${id}`, {
+          headers: { "X-XBoss-Money-Format": "decimal-string-v1" },
+        }),
+        p,
+      );
+      assert.equal(exact.status, 200);
+      const v1Body = (await exact.json()) as {
+        totals: Record<string, unknown>;
+        moneyFormat?: string;
+      };
+      assert.equal(v1Body.moneyFormat, "decimal-string-v1");
+      assert.deepEqual(
+        truong.map((k) => v1Body.totals[k]),
+        ca.golden,
+        `route (decimal-string-v1) lệch ipc-sum-v1: ${JSON.stringify(v1Body.totals)}`,
+      );
+
+      // Legacy (không header): number round-trip đúng golden, hoặc 422 khi vượt biên an toàn.
+      const res = await GET(jreq(`/api/payment-certs/${id}`, undefined, "GET"), p);
+      if (ca.vuotBienLegacy) {
+        assert.equal(res.status, 422);
+        const loi = (await res.json()) as { code?: string; totals?: unknown };
+        assert.equal(loi.code, "money_precision_unsupported");
+        assert.equal(loi.totals, undefined, "422 không được kèm số tiền xấp xỉ");
+        return;
       }
-    },
-  );
+      assert.equal(res.status, 200);
+      const { totals } = (await res.json()) as { totals: Record<string, number> };
+      const thucTe = truong.map((k) => {
+        assert.equal(typeof totals[k], "number", `legacy ${k} phải là JSON number`);
+        return moneyToDecimal(parseMoneyExact(String(totals[k])));
+      });
+      assert.deepEqual(thucTe, ca.golden, `route lệch ipc-sum-v1: ${JSON.stringify(totals)}`);
+    } finally {
+      await donDep({ projectId, contractId, pmId: pm.id });
+    }
+  });
 }

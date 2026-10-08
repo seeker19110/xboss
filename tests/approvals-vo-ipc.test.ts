@@ -1,6 +1,7 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { moneyToNumberSafe } from "@/lib/nen/money";
 
 // Integration test M46 PR2 — engine phê duyệt gắn vào VO ('variation') + IPC
 // ('payment_cert') qua đúng entity_type/amount mà app/api/variations|payment-certs dùng
@@ -182,13 +183,13 @@ test(
 
     try {
       const totals = await certTotals(certId);
-      assert.equal(totals.periodValue, 6000);
+      assert.equal(totals.periodValue, 600_000n); // MoneyMinor đồng×100
 
       const req = await openApproval({
         entityType: "payment_cert",
         entityId: certId,
         projectId,
-        amount: totals.periodValue,
+        amount: moneyToNumberSafe(totals.periodValue),
         user: { id: creator, role: "pm" },
       });
       assert.equal(req!.status, "pending");

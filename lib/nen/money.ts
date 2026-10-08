@@ -239,3 +239,50 @@ export function compareMoneyExact(a: bigint | string, b: bigint | string): -1 | 
   const right = typeof b === "bigint" ? b : parseFixedDecimalExact(b, 2);
   return left < right ? -1 : left > right ? 1 : 0;
 }
+
+/**
+ * Nghịch đảo của `parseFixedDecimalExact`: số nguyên đã nhân 10^scale → chuỗi canonical đúng
+ * `scale` chữ số lẻ (scale 2 cho cùng kết quả `moneyToDecimal`). Không qua number.
+ */
+export function decimalFromUnscaled(unscaled: bigint, scale: number): string {
+  if (!Number.isInteger(scale) || scale < 0 || scale > 18) {
+    throw new RangeError("decimal_scale_unsupported");
+  }
+  const negative = unscaled < 0n;
+  const digits = (negative ? -unscaled : unscaled).toString().padStart(scale + 1, "0");
+  const whole = digits.slice(0, digits.length - scale);
+  const fraction = scale === 0 ? "" : `.${digits.slice(digits.length - scale)}`;
+  return `${negative ? "-" : ""}${whole}${fraction}`;
+}
+
+// A3-FR06 — định dạng tiền trên wire do client CHỌN THAM GIA (opt-in) qua header. Không gửi
+// header = giữ JSON number legacy (chỉ trong biên round-trip an toàn, ngoài biên báo lỗi).
+
+/** Tên header opt-in định dạng tiền. */
+export const MONEY_FORMAT_HEADER = "X-XBoss-Money-Format";
+/** Giá trị header duy nhất được hỗ trợ: tiền là chuỗi canonical đúng 2 chữ số lẻ. */
+export const MONEY_FORMAT_DECIMAL_V1 = "decimal-string-v1";
+export type MoneyWireFormat = typeof MONEY_FORMAT_DECIMAL_V1 | "legacy-number";
+
+/**
+ * Đọc giá trị header thành định dạng wire. Chỉ đúng `decimal-string-v1` (bỏ khoảng trắng hai
+ * đầu) mới opt-in; thiếu/giá trị lạ = legacy — response legacy KHÔNG có `moneyFormat`, nên
+ * client yêu cầu định dạng chưa hỗ trợ tự nhận ra mình không được phục vụ định dạng đó.
+ */
+export function moneyWireFormat(header: string | null | undefined): MoneyWireFormat {
+  return header?.trim() === MONEY_FORMAT_DECIMAL_V1 ? MONEY_FORMAT_DECIMAL_V1 : "legacy-number";
+}
+
+/**
+ * Một amount (đồng×100) ra wire: chuỗi canonical (v1) hoặc number legacy qua
+ * `moneyToNumberSafe` — ngoài biên round-trip throw RangeError("money_precision_unsupported"),
+ * không clamp/xấp xỉ. Bắt lỗi đó bằng `isMoneyPrecisionError`.
+ */
+export function moneyToWire(minor: bigint, format: MoneyWireFormat): string | number {
+  return format === MONEY_FORMAT_DECIMAL_V1 ? moneyToDecimal(minor) : moneyToNumberSafe(minor);
+}
+
+/** Lỗi do adapter legacy không biểu diễn đúng amount bằng JSON number (→ HTTP 422). */
+export function isMoneyPrecisionError(err: unknown): boolean {
+  return err instanceof RangeError && err.message === "money_precision_unsupported";
+}
