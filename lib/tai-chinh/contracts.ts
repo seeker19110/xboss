@@ -3,6 +3,7 @@
 // (nguồn cho notification contract_expiry ở PR 3). Xem docs/nang-cap/M16-hop-dong.md.
 import { query, queryOne } from "@/lib/db";
 import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
+import { moneyToWire, parseMoney, type MoneyWireFormat } from "@/lib/nen/money";
 
 export const CONTRACT_KINDS = ["nhan_thau", "giao_thau", "ncc"] as const;
 export type ContractKind = (typeof CONTRACT_KINDS)[number];
@@ -147,6 +148,9 @@ export type ContractRow = {
   valueText: string;
   addendaTotalText: string;
   paidText: string;
+  // S10c: bản `::text` của poCommitted (qty float8 ép ::numeric trước khi nhân) — nguồn exact
+  // cho DTO decimal-string-v1; khai trong SENSITIVE.contract như các bản Text khác.
+  poCommittedText: string;
   custom: Record<string, unknown>;
   deletedAt: string | null;
 };
@@ -191,6 +195,7 @@ export async function listContracts(
             c.value::text AS "valueText",
             COALESCE(a.total, 0)::text AS "addendaTotalText",
             COALESCE(p.total, 0)::text AS "paidText",
+            COALESCE(po.total, 0)::text AS "poCommittedText",
             c.custom,
             c.deleted_at AS "deletedAt"
        FROM contracts c
@@ -201,7 +206,8 @@ export async function listContracts(
        LEFT JOIN (SELECT contract_id, SUM(amount) AS total
                     FROM payment_bills WHERE contract_id IS NOT NULL
                    GROUP BY contract_id) p ON p.contract_id = c.id
-       LEFT JOIN (SELECT po.contract_id, SUM(poi.qty_ordered * COALESCE(poi.unit_price, 0)) AS total
+       LEFT JOIN (SELECT po.contract_id,
+                         SUM(poi.qty_ordered::numeric * COALESCE(poi.unit_price, 0)) AS total
                     FROM purchase_orders po
                     JOIN po_items poi ON poi.po_id = po.id
                    WHERE po.contract_id IS NOT NULL AND po.status <> 'cancelled'
@@ -210,6 +216,39 @@ export async function listContracts(
       ORDER BY c.kind, c.code`,
     ...args,
   );
+}
+
+// S10c (A3-FR06): trường tiền của HĐ → nguồn `::text` tương ứng (exact, không qua parser float).
+const CONTRACT_MONEY_TEXT = {
+  value: "valueText",
+  addendaTotal: "addendaTotalText",
+  paid: "paidText",
+  poCommitted: "poCommittedText",
+} as const;
+
+/** HĐ trên wire: 4 trường tiền là chuỗi canonical (v1) hoặc number (legacy); bị che giữ null. */
+export type ContractRowWire = Omit<ContractRow, keyof typeof CONTRACT_MONEY_TEXT> & {
+  [K in keyof typeof CONTRACT_MONEY_TEXT]: string | number | null;
+};
+
+/**
+ * Adapter DTO: gọi SAU `stripSensitive` — trường đã che (null) giữ null ở cả hai định dạng.
+ * Giá trị lấy từ bản `::text` (không từ number float). Legacy ngoài biên round-trip throw
+ * RangeError("money_precision_unsupported") → route 422.
+ */
+export function contractsToWire(
+  rows: readonly ContractRow[],
+  format: MoneyWireFormat,
+): ContractRowWire[] {
+  return rows.map((row) => {
+    const out: Record<string, unknown> = { ...row };
+    for (const [field, textField] of Object.entries(CONTRACT_MONEY_TEXT)) {
+      const text = (row as Record<string, unknown>)[textField] as string | null | undefined;
+      const masked = (row as Record<string, unknown>)[field] == null || text == null;
+      out[field] = masked ? null : moneyToWire(parseMoney(text), format);
+    }
+    return out as ContractRowWire;
+  });
 }
 
 export type ExpiringContract = {

@@ -8,6 +8,8 @@
 // sẽ hiện "•••" thay vì 0. KHÔNG cộng/nhân tiền ở JS cho mục đích lưu trữ (M45) — đây chỉ
 // là gộp để HIỂN THỊ, đầu vào đã là number do SQL tính.
 
+import { minorTuWire } from "@/lib/nen/money-dto";
+
 type MNum = number | null | undefined;
 
 const isMasked = (v: MNum): boolean => v == null || !Number.isFinite(v);
@@ -46,4 +48,30 @@ export function mSumBy<T>(items: T[], term: (it: T) => MNum): number | null {
     s += t as number;
   }
   return s;
+}
+
+// ===== S10c — bản exact cho tiền dạng decimal-string-v1 (chuỗi canonical 2 số lẻ) =====
+// Cùng quy tắc lan truyền che, nhưng cộng/trừ bằng bigint đồng×100 (không qua float).
+
+type MTien = string | bigint | null | undefined;
+
+const minorOf = (v: MTien): bigint | null =>
+  v == null ? null : typeof v === "bigint" ? v : minorTuWire(v);
+
+/** Tổng tiền exact; null nếu bất kỳ toán hạng nào bị che. */
+export function mSumTien(...vals: MTien[]): bigint | null {
+  let s = 0n;
+  for (const v of vals) {
+    const m = minorOf(v);
+    if (m == null) return null;
+    s += m;
+  }
+  return s;
+}
+
+/** Hiệu tiền exact a − b; null nếu a hoặc b bị che. */
+export function mSubTien(a: MTien, b: MTien): bigint | null {
+  const ma = minorOf(a);
+  const mb = minorOf(b);
+  return ma == null || mb == null ? null : ma - mb;
 }

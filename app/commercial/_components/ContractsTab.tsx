@@ -19,6 +19,8 @@ import {
 import { Skeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { formatDateVN } from "@/lib/nen/date";
+import { HEADER_TIEN_V1, fmtDongGonMinor, minorTuWire } from "@/lib/nen/money-dto";
+import { mSumTien } from "@/app/lib/masked";
 
 type SubSection = "contracts" | "costs" | "insurance";
 
@@ -42,11 +44,14 @@ export default function ContractsTab() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetch("/api/contracts").then((r) => (r.ok ? r.json() : { contracts: [] })),
+      // S10c: tiền HĐ dạng chuỗi exact (decimal-string-v1) — tổng cộng bằng bigint, không float.
+      fetch("/api/contracts", { headers: HEADER_TIEN_V1 }).then((r) =>
+        r.ok ? r.json() : { contracts: [] },
+      ),
       // decimal-string-v1 (S11): tiền là chuỗi exact, không dính 422 của định dạng number cũ.
-      fetch("/api/costs?groupBy=system&includeVo=1", {
-        headers: { "X-XBoss-Money-Format": "decimal-string-v1" },
-      }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/costs?groupBy=system&includeVo=1", { headers: HEADER_TIEN_V1 }).then((r) =>
+        r.ok ? r.json() : null,
+      ),
       fetch("/api/insurance-bonds").then((r) => (r.ok ? r.json() : { items: [] })),
     ])
       .then(([cData, costData, insData]) => {
@@ -65,8 +70,17 @@ export default function ContractsTab() {
     return Math.round(n).toLocaleString("vi-VN") + " đ";
   }
 
-  const totalContractVal = contracts.reduce((acc, c) => acc + (Number(c.value) || 0), 0);
-  const totalPaid = contracts.reduce((acc, c) => acc + (Number(c.paid) || 0), 0);
+  // Tiền HĐ (chuỗi canonical v1) → hiển thị gọn, làm tròn bằng bigint; bị che → "—".
+  function fmtTienHd(v: string | bigint | null | undefined) {
+    if (v == null) return "—";
+    const minor = typeof v === "bigint" ? v : minorTuWire(v);
+    const gon = fmtDongGonMinor(minor);
+    // fmtDongGonMinor chỉ gắn đơn vị "tỷ"/"tr" từ 1 triệu đồng trở lên; dưới mức đó thêm " đ".
+    return /tỷ|tr$/.test(gon) ? gon : `${gon} đ`;
+  }
+
+  const totalContractVal = mSumTien(...contracts.map((c) => c.value));
+  const totalPaid = mSumTien(...contracts.map((c) => c.paid));
 
   return (
     <div className="space-y-6">
@@ -110,11 +124,11 @@ export default function ContractsTab() {
 
         <div className="flex items-center gap-2 text-xs">
           <span className="font-mono text-zinc-400">
-            Tổng HĐ: <strong className="text-zinc-100">{fmtVND(totalContractVal)}</strong>
+            Tổng HĐ: <strong className="text-zinc-100">{fmtTienHd(totalContractVal)}</strong>
           </span>
           <span className="text-zinc-600">•</span>
           <span className="font-mono text-emerald-400">
-            Đã thanh toán: <strong>{fmtVND(totalPaid)}</strong>
+            Đã thanh toán: <strong>{fmtTienHd(totalPaid)}</strong>
           </span>
         </div>
       </div>
@@ -173,10 +187,10 @@ export default function ContractsTab() {
                               : "Nhà cung cấp"}
                         </td>
                         <td className="py-3 px-3 text-right font-mono font-semibold text-zinc-200">
-                          {fmtVND(c.value)}
+                          {fmtTienHd(c.value)}
                         </td>
                         <td className="py-3 px-3 text-right font-mono font-semibold text-emerald-400">
-                          {fmtVND(c.paid)}
+                          {fmtTienHd(c.paid)}
                         </td>
                         <td className="py-3 px-3 text-center">
                           <span

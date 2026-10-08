@@ -26,8 +26,8 @@
 //   addendaTotal       Σ phụ lục (SQL tính)
 //   paid               đã thanh toán (SQL tính)
 //   poCommitted        giá trị PO gắn HĐ (SQL tính)
-//   valueText / addendaTotalText / paidText   bản ::text của 3 trường tiền ở trên
-//                      (lib/contracts.ts, dùng cho số học tiền qua lib/money)
+//   valueText / addendaTotalText / paidText / poCommittedText   bản ::text của các trường tiền
+//                      ở trên (lib/contracts.ts, dùng cho số học tiền qua lib/money / DTO S10c)
 //   → Gate route ĐÃ là viewPayments == perm che → phòng thủ/nhất quán (không đổi ai
 //     hiện tại; giữ đúng khi gate được nới về sau).
 //
@@ -89,6 +89,7 @@ export const SENSITIVE: Record<string, SensitiveRule[]> = {
         "valueText",
         "addendaTotalText",
         "paidText",
+        "poCommittedText",
       ],
       perm: "viewPayments",
     },

@@ -5,7 +5,9 @@ import { ChevronDown, ChevronRight, FileSignature, Plus, RotateCcw } from "lucid
 import { todayISO } from "@/lib/nen/date";
 import AppHeader from "@/app/components/AppHeader";
 import MaskedValue from "@/app/components/MaskedValue";
-import { mSum } from "@/app/lib/masked";
+import { mSumTien } from "@/app/lib/masked";
+import { mulRatio } from "@/lib/nen/money";
+import { HEADER_TIEN_V1 } from "@/lib/nen/money-dto";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
@@ -30,9 +32,10 @@ import ContractDocument, {
 const KIND_ORDER: ContractKind[] = ["nhan_thau", "giao_thau", "ncc"];
 
 function taiDanhSach(deleted: boolean) {
-  return fetch(`/api/contracts${deleted ? "?includeDeleted=1" : ""}`).then((r) =>
-    r.ok ? r.json() : null,
-  );
+  // S10c: decimal-string-v1 — tiền HĐ là chuỗi exact, tổng nhóm cộng bằng bigint.
+  return fetch(`/api/contracts${deleted ? "?includeDeleted=1" : ""}`, {
+    headers: HEADER_TIEN_V1,
+  }).then((r) => (r.ok ? r.json() : null));
 }
 
 export default function ContractsPage() {
@@ -151,16 +154,16 @@ function ContractsInner() {
   );
 
   // M50 PR2: value/addendaTotal/paid có thể bị che (null) với user thiếu viewPayments —
-  // dùng mSum để tổng nhóm cũng "bị che" (null) thay vì ngầm thành 0 (Number(null)===0).
+  // dùng mSumTien để tổng nhóm cũng "bị che" (null) thay vì ngầm thành 0; cộng bằng bigint (S10c).
   const kindTotals = useMemo(() => {
-    const map: Record<ContractKind, { total: number | null; paid: number | null }> = {
-      nhan_thau: { total: 0, paid: 0 },
-      giao_thau: { total: 0, paid: 0 },
-      ncc: { total: 0, paid: 0 },
+    const map: Record<ContractKind, { total: bigint | null; paid: bigint | null }> = {
+      nhan_thau: { total: 0n, paid: 0n },
+      giao_thau: { total: 0n, paid: 0n },
+      ncc: { total: 0n, paid: 0n },
     };
     for (const c of contracts) {
-      map[c.kind].total = mSum(map[c.kind].total, c.value, c.addendaTotal);
-      map[c.kind].paid = mSum(map[c.kind].paid, c.paid);
+      map[c.kind].total = mSumTien(map[c.kind].total, c.value, c.addendaTotal);
+      map[c.kind].paid = mSumTien(map[c.kind].paid, c.paid);
     }
     return map;
   }, [contracts]);
@@ -213,7 +216,8 @@ function ContractsInner() {
           {KIND_ORDER.map((kind) => {
             const tot = kindTotals[kind].total;
             const pd = kindTotals[kind].paid;
-            const pct = tot != null && tot > 0 && pd != null ? Math.round((pd / tot) * 100) : null;
+            const pct =
+              tot != null && tot > 0n && pd != null ? Number(mulRatio(pd, 100n, tot)) : null;
             return (
               <StatCard
                 key={kind}

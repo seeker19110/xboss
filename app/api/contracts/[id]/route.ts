@@ -5,6 +5,7 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   checkContractRefs,
   contractLinkCounts,
+  contractsToWire,
   listContracts,
   parseContractBody,
   validateContractInput,
@@ -12,13 +13,39 @@ import {
 } from "@/lib/tai-chinh/contracts";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 import { validateCustom } from "@/lib/ha-tang/custom-fields";
+import {
+  MONEY_FORMAT_HEADER,
+  isMoneyPrecisionError,
+  moneyToWire,
+  moneyWireFormat,
+  parseMoney,
+  type MoneyWireFormat,
+} from "@/lib/nen/money";
+import {
+  HEADERS_API_TIEN,
+  LOI_TIEN_VUOT_DINH_DANG_CU,
+  nhanDinhDangTien,
+} from "@/lib/nen/money-dto";
 
 export const dynamic = "force-dynamic";
 
+/** Trường tiền đọc `::text` của mảng con → wire; đã che (null) giữ null (S10c). */
+function tienConToWire<T extends Record<string, unknown>>(
+  rows: T[],
+  field: keyof T & string,
+  format: MoneyWireFormat,
+): T[] {
+  return rows.map((r) => {
+    const v = r[field];
+    return { ...r, [field]: v == null ? null : moneyToWire(parseMoney(String(v)), format) };
+  });
+}
+
 // GET /api/contracts/:id — chi tiết HĐ + phụ lục + file + các dòng tiền đã gắn,
-// scoped theo dự án đang chọn (M22).
+// scoped theo dự án đang chọn (M22). S10c (A3-FR06): header decimal-string-v1 → mọi số tiền
+// (HĐ, phụ lục, phiếu, giao thầu tầng) là chuỗi canonical đọc `::text`; legacy ngoài biên → 422.
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
   const params = await paramsP;
@@ -41,7 +68,7 @@ export async function GET(
           if (!contract) return null;
           const [addenda, documents, bills, purchaseOrders, floorContracts] = await Promise.all([
             query(
-              `SELECT a.id, a.code, a.title, a.value_delta AS "valueDelta", a.signed_date AS "signedDate",
+              `SELECT a.id, a.code, a.title, a.value_delta::text AS "valueDelta", a.signed_date AS "signedDate",
                       a.note, a.created_at AS "createdAt", u.name AS "createdByName"
                  FROM contract_addenda a LEFT JOIN users u ON u.id = a.created_by
                 WHERE a.contract_id = ? ORDER BY a.id`,
@@ -56,7 +83,7 @@ export async function GET(
               id,
             ),
             query(
-              `SELECT id, responsible, type, amount, paid_date AS "paidDate", description
+              `SELECT id, responsible, type, amount::text AS amount, paid_date AS "paidDate", description
                  FROM payment_bills WHERE contract_id = ? ORDER BY paid_date DESC, id DESC`,
               id,
             ),
@@ -68,7 +95,7 @@ export async function GET(
               id,
             ),
             query(
-              `SELECT fc.id, fc.floor_label AS "floorLabel", fc.contract_value AS "contractValue",
+              `SELECT fc.id, fc.floor_label AS "floorLabel", fc.contract_value::text AS "contractValue",
                       st.name AS "sheetName", st.slug AS "sheetSlug"
                  FROM floor_contracts fc JOIN sheet_types st ON st.id = fc.sheet_type_id
                 WHERE fc.contract_id = ? ORDER BY st.id, fc.floor_label`,
@@ -84,14 +111,35 @@ export async function GET(
   // M50 PR2: che tiền/tỷ lệ cho user thiếu viewPayments — HĐ + phụ lục + dòng thanh
   // toán + giao thầu tầng (phòng thủ — gate route hiện cũng là viewPayments).
   const [maskedContract] = stripSensitive("contract", [contract], user);
-  return NextResponse.json({
-    contract: maskedContract,
-    addenda: stripSensitive("contractAddendum", addenda, user),
-    documents,
-    bills: stripSensitive("paymentBill", bills, user),
-    purchaseOrders,
-    floorContracts: stripSensitive("floorContract", floorContracts, user),
-  });
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
+  try {
+    return NextResponse.json(
+      {
+        contract: contractsToWire([maskedContract], format)[0],
+        addenda: tienConToWire(
+          stripSensitive("contractAddendum", addenda, user),
+          "valueDelta",
+          format,
+        ),
+        documents,
+        bills: tienConToWire(stripSensitive("paymentBill", bills, user), "amount", format),
+        purchaseOrders,
+        floorContracts: tienConToWire(
+          stripSensitive("floorContract", floorContracts, user),
+          "contractValue",
+          format,
+        ),
+        ...nhanDinhDangTien(format),
+      },
+      { headers: HEADERS_API_TIEN },
+    );
+  } catch (err) {
+    if (!isMoneyPrecisionError(err)) throw err;
+    return NextResponse.json(LOI_TIEN_VUOT_DINH_DANG_CU, {
+      status: 422,
+      headers: HEADERS_API_TIEN,
+    });
+  }
 }
 
 // PATCH /api/contracts/:id — sửa HĐ (Admin/PM). Body gửi field nào sửa field đó
