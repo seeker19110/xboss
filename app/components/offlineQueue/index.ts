@@ -1,90 +1,74 @@
 "use client";
-// Khung hàng đợi offline tổng quát (M58 PR2) — lưu thao tác mất mạng trong IndexedDB,
-// tự gửi lại khi có mạng. Tổng quát hoá từ khung tick cũ (localStorage) sang 3 loại
-// `tick` | `photo` | `diary_note`. Queue v1 thiếu owner/vault nên đang quarantine: không
-// đọc, ghi, gửi, chuyển owner hay xóa. Chỉ mở lại sau S07 ownership/vault cutover. Logic
-// thuần được giữ trong logic.ts để regression tests tiếp tục bảo vệ hành vi khi được bật lại.
+// Hàng đợi offline v2 (QUALITY-FINAL-1 S07): thao tác mất mạng được mã hoá trong vault IndexedDB
+// theo chủ sở hữu (user/org/dự án/thiết bị), gửi lại khi có mạng với Idempotency-Key cố định,
+// X-XBoss-Context và precondition nhật ký lúc enqueue. Logic thuần ở logic.ts, lưu trữ ở
+// store.ts, khoá vault ở vault.ts — file này chỉ nối dây với trình duyệt/React.
+//
+// Queue v1 (không chủ) vẫn QUARANTINE trong store `ops` cũ: không đọc/gửi/gán chủ/xoá.
+// `OFFLINE_QUEUE_QUARANTINED` là công tắc dừng khẩn cấp (rollback = bật lại → không ghi, không gửi,
+// giữ nguyên vault) — mặc định TẮT từ S07.
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { IdbQueueStore } from "./store";
+import { IdbTxDb, LoiHanMucAnh, QueueDb } from "./store";
 import { compressImage } from "./image";
+import { VaultSession, type VaultTrangThai } from "./vault";
 import { showToast } from "@/app/components/Toast";
 import { ngheDoiNguCanh } from "@/app/lib/contextEpoch";
 import {
   computeStats,
+  docOpDaGiai,
   flushQueue,
-  opEndpoint,
-  tickDedupeIds,
-  tickBatchDedupeIds,
-  diaryDedupeIds,
-  wouldExceedPhotoQuota,
-  PHOTO_QUOTA_BYTES,
+  FLUSH_INTERVAL_MS,
+  khoaChu,
+  themOp,
+  THONG_KE_RONG,
+  type BoNhoGiaiMa,
   type DiaryNotePayload,
-  type QueuedOp,
+  type OpBody,
+  type QueueKind,
+  type QueueState,
   type QueueStats,
   type SendOutcome,
+  type YeuCauGui,
 } from "./logic";
 
 const SYNC_TAG = "xboss-flush";
-export const OFFLINE_QUEUE_QUARANTINED = true;
-export const OFFLINE_QUEUE_QUARANTINE_ERROR =
-  "Lưu ngoại tuyến đang tạm khóa để bảo toàn dữ liệu cũ chưa xác định được chủ sở hữu. Kết nối mạng để lưu lên máy chủ.";
+export const OFFLINE_QUEUE_QUARANTINED = false;
+/** Thông điệp khi KHÔNG lưu được trên thiết bị — form/ô giữ nguyên để người dùng xử lý. */
+export const OFFLINE_SAVE_ERROR = "Chưa lưu được trên thiết bị. Hãy kết nối mạng rồi thử lại.";
+/** Trần số task mỗi khoá vault (khớp MAX_MANIFEST_TASKS phía server). */
+const TASK_MOI_KHOA = 500;
 
-// Dựng request gửi theo loại thao tác. Trả outcome {status} hoặc {networkError} để
-// logic.shouldRetry quyết định giữ/bỏ. `diary_note` gửi trọn body PUT /api/diaries/:date
-// (full-replace) trừ `date` đã ở URL.
-async function sendOp(op: QueuedOp): Promise<SendOutcome> {
-  const { url, method } = opEndpoint(op);
+// Gửi một request hàng đợi. Chỉ đọc body để lấy receipt (2xx) hoặc mã lỗi (4xx/5xx).
+async function guiYeuCau(req: YeuCauGui): Promise<SendOutcome> {
+  let res: Response;
   try {
-    let res: Response;
-    if (op.kind === "photo") {
-      const fd = new FormData();
-      fd.append("file", op.payload.blob, `offline-${op.payload.taskId}.jpg`);
-      if (op.payload.caption) fd.append("caption", op.payload.caption);
-      res = await fetch(url, { method, body: fd });
-    } else if (op.kind === "tick") {
-      res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ installed: op.payload.installed }),
-      });
-    } else if (op.kind === "tick_batch") {
-      res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: op.payload.dimIds, installed: op.payload.installed }),
-      });
-    } else {
-      // Nhật ký: gửi TOÀN BỘ payload trừ `date` (đã nằm trên URL) — PUT full-replace.
-      const { date: _d, ...body } = op.payload;
-      void _d;
-      res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-    }
-    // Đọc kèm lý do khi server TỪ CHỐI (4xx) để báo lại cho người dùng (M121 FR8) — không
-    // đọc body ở ca thành công/5xx: 2xx không có gì để nói, 5xx sẽ được thử lại.
-    if (res.status >= 400 && res.status < 500) {
-      const body = await res.json().catch(() => null);
-      const error = body?.error;
-      const code = body?.code;
-      return {
-        status: res.status,
-        error: typeof error === "string" ? error : undefined,
-        // S06: phân biệt "cần xác minh" (context_*/idempotency_conflict) với từ chối nghiệp vụ.
-        code: typeof code === "string" ? code : undefined,
-      };
-    }
-    return { status: res.status };
+    res = await fetch(req.url, {
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
+      cache: "no-store",
+      credentials: "same-origin",
+    });
   } catch {
     return { networkError: true };
   }
+  const body = (await res.json().catch(() => null)) as {
+    error?: unknown;
+    code?: unknown;
+    receipt?: { operationId?: unknown };
+  } | null;
+  return {
+    status: res.status,
+    error: typeof body?.error === "string" ? body.error : undefined,
+    code: typeof body?.code === "string" ? body.code : undefined,
+    retryAfter: res.headers.get("Retry-After"),
+    receiptOperationId:
+      typeof body?.receipt?.operationId === "string" ? body.receipt.operationId : null,
+  };
 }
 
-// Đăng ký Background Sync (feature-detect) để trình duyệt đánh thức gửi lại kể cả khi
-// tab đóng — SW nhận `sync` rồi postMessage cho client flush (xem public/sw.js).
-// iOS Safari không hỗ trợ → bỏ qua êm, đã có listener `online` + interval làm nền.
+// Đánh thức gửi lại qua Background Sync nếu trình duyệt có (best-effort; KHÔNG dựa vào nó —
+// online/visibility/poll foreground mới là đường chính, Safari không có Background Sync).
 async function requestBackgroundSync(): Promise<void> {
   try {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
@@ -92,7 +76,7 @@ async function requestBackgroundSync(): Promise<void> {
     const sync = (reg as unknown as { sync?: { register(tag: string): Promise<void> } }).sync;
     if (sync) await sync.register(SYNC_TAG);
   } catch {
-    /* không hỗ trợ / bị chặn — không sao, cơ chế online + interval vẫn chạy */
+    /* không hỗ trợ / bị chặn */
   }
 }
 
@@ -100,28 +84,68 @@ export type QueueSnapshot = QueueStats & {
   online: boolean;
   sending: boolean;
   quarantined: boolean;
+  /** Còn hàng đợi v1 không chủ trên thiết bị (cách ly, chờ đối soát thủ công — D03). */
+  legacy: boolean;
+  vault: VaultTrangThai;
 };
 
-// Quản lý hàng đợi dạng singleton — 1 vòng flush duy nhất cho toàn app (badge AppHeader
-// và hook tracking cùng subscribe), tránh nhiều vòng gửi song song.
-class OfflineQueueManager {
-  private store = new IdbQueueStore();
+/** Trạng thái một thao tác (đọc qua API, không mang payload) — S08 dựng UI phục hồi trên đây. */
+export type ThaoTacHangDoi = {
+  operationId: string;
+  kind: QueueKind;
+  state: QueueState;
+  queuedAt: number;
+  tries: number;
+  nextAttemptAt: number;
+  lastResult?: { status: number; code?: string; at: number };
+};
+
+type ManagerDeps = {
+  store?: QueueDb;
+  vault?: VaultSession;
+  send?: (req: YeuCauGui) => Promise<SendOutcome>;
+};
+
+const taoId = (): string =>
+  globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+export class OfflineQueueManager {
+  private storeLazy: QueueDb | null;
+  readonly vault: VaultSession;
+  private send: (req: YeuCauGui) => Promise<SendOutcome>;
+  private readonly holder = taoId();
+  private cache: BoNhoGiaiMa = new Map();
   private snap: QueueSnapshot = {
-    total: 0,
-    pending: 0,
-    failed: 0,
+    ...THONG_KE_RONG,
     online: true,
     sending: false,
     quarantined: OFFLINE_QUEUE_QUARANTINED,
+    legacy: false,
+    vault: "unknown",
   };
   private listeners = new Set<() => void>();
   private flushedListeners = new Set<() => void>();
   private started = false;
   private flushing = false;
-  private hadItems = false;
-  // S05: tab khác đổi dự án/đăng xuất/đổi tài khoản → tab này dừng gửi hàng đợi (KHÔNG xoá dữ
-  // liệu) cho tới khi tải lại; S07 thay bằng kiểm owner/context đầy đủ.
+  // Tab khác đổi dự án/đăng xuất/đổi tài khoản → khoá vault tab này, dừng gửi (KHÔNG xoá).
   private tamDungNguCanh = false;
+  /** User chủ lần cuối vault ACTIVE — khi vault khoá vẫn đếm được op của họ để không báo "0 chờ". */
+  private userCuoi: number | null = null;
+  /** dimId → taskId của lưới đang hiển thị (để kiểm manifest khi tick offline). */
+  private oCuaTask = new Map<number, number>();
+  private daChuanBi = new Set<string>();
+
+  constructor(deps: ManagerDeps = {}) {
+    this.storeLazy = deps.store ?? null;
+    this.vault = deps.vault ?? new VaultSession();
+    this.send = deps.send ?? guiYeuCau;
+    this.vault.onDoi(() => this.setSnap({ vault: this.vault.trangThai }));
+  }
+
+  private get store(): QueueDb {
+    if (!this.storeLazy) this.storeLazy = new QueueDb(new IdbTxDb());
+    return this.storeLazy;
+  }
 
   subscribe = (fn: () => void): (() => void) => {
     this.listeners.add(fn);
@@ -132,7 +156,7 @@ class OfflineQueueManager {
 
   getSnapshot = (): QueueSnapshot => this.snap;
 
-  // Đăng ký callback chạy khi hàng đợi vừa được gửi hết (tracking dùng để reload dữ liệu).
+  /** Callback khi có thao tác vừa lên máy chủ (tracking dùng để tải lại dữ liệu). */
   onFlushed(fn: () => void): () => void {
     this.flushedListeners.add(fn);
     return () => {
@@ -140,249 +164,432 @@ class OfflineQueueManager {
     };
   }
 
-  private emit() {
+  private setSnap(patch: Partial<QueueSnapshot>) {
+    const next = { ...this.snap, ...patch };
+    const keys = Object.keys(next) as (keyof QueueSnapshot)[];
+    if (keys.every((k) => next[k] === this.snap[k])) return;
+    this.snap = next;
     for (const l of this.listeners) l();
   }
 
-  private setSnap(patch: Partial<QueueSnapshot>) {
-    const next = { ...this.snap, ...patch };
-    if (
-      next.total === this.snap.total &&
-      next.pending === this.snap.pending &&
-      next.failed === this.snap.failed &&
-      next.online === this.snap.online &&
-      next.sending === this.snap.sending &&
-      next.quarantined === this.snap.quarantined
-    )
-      return; // không đổi → giữ nguyên tham chiếu để useSyncExternalStore không render thừa
-    this.snap = next;
-    this.emit();
+  private async refreshStats(extra: Partial<QueueSnapshot> = {}) {
+    const chu = this.vault.chu();
+    if (!chu) {
+      // Vault khoá (hết lease/401/đổi ngữ cảnh) nhưng op vẫn nằm trên thiết bị: báo `locked` để
+      // badge/banner không hiện "0 chờ" (người dùng tưởng đã đồng bộ xong) và poll vẫn kích mở lại.
+      const n =
+        this.userCuoi === null ? 0 : await this.store.demOpCuaUser(this.userCuoi).catch(() => 0);
+      this.setSnap({ ...THONG_KE_RONG, total: n, locked: n, ...extra });
+      return;
+    }
+    this.userCuoi = chu.ownerUserId;
+    const { ops } = await this.store.docChu(khoaChu(chu));
+    this.setSnap({ ...computeStats(ops, chu, (k) => this.vault.coKhoa(k)), ...extra });
   }
 
-  private async refreshStats(extra: Partial<QueueSnapshot> = {}) {
-    const ops = await this.store.getAll();
-    this.setSnap({ ...computeStats(ops), ...extra });
+  /** Kích gửi nền — lỗi IDB/mạng đã được giữ nguyên trạng thái, chỉ chờ lần kích sau. */
+  private kichFlush(): void {
+    this.flush().catch(() => undefined);
+  }
+
+  private dangOnline(): boolean {
+    return typeof navigator !== "undefined" && navigator.onLine;
   }
 
   start() {
     if (this.started || typeof window === "undefined") return;
     this.started = true;
     this.setSnap({ online: navigator.onLine, quarantined: OFFLINE_QUEUE_QUARANTINED });
-
+    if (OFFLINE_QUEUE_QUARANTINED) return;
     window.addEventListener("online", () => {
       this.setSnap({ online: true });
+      this.kichFlush();
     });
     window.addEventListener("offline", () => this.setSnap({ online: false }));
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") this.kichFlush();
+    });
+    navigator.serviceWorker?.addEventListener?.("message", (e: MessageEvent) => {
+      if ((e.data as { type?: unknown } | null)?.type === "FLUSH_QUEUE") this.kichFlush();
+    });
     ngheDoiNguCanh(() => {
       this.tamDungNguCanh = true;
+      this.cache.clear();
+      this.vault.khoa();
+      void this.refreshStats();
     });
+    // Poll foreground: không phụ thuộc Background Sync/Web Locks (D02, A2-FR12).
+    setInterval(() => {
+      if (this.snap.total > 0) this.kichFlush();
+    }, FLUSH_INTERVAL_MS);
+    void this.khoiDong();
   }
 
+  /** Lần đầu: báo legacy; nếu chính user hiện tại còn op chờ trên thiết bị → mở vault rồi gửi. */
+  private async khoiDong() {
+    try {
+      this.setSnap({ legacy: await this.store.coLegacy() });
+    } catch {
+      /* không mở được CSDL — các thao tác sau sẽ báo lỗi rõ */
+    }
+    if (!this.dangOnline()) return;
+    try {
+      if ((await this.store.demOp()) === 0) return;
+      const r = await fetch("/api/auth/me", { cache: "no-store" });
+      const j = (await r.json().catch(() => null)) as { user?: { id?: unknown } } | null;
+      const id = j?.user?.id;
+      if (!r.ok || typeof id !== "number") return;
+      if (await this.store.coOpCuaUser(id)) this.kichFlush();
+    } catch {
+      /* mất mạng/lỗi DB — thử lại ở lần online/poll kế tiếp */
+    }
+  }
+
+  /** Mở vault (online) nếu chưa mở; đúng chủ thì đưa op paused_auth về pending. */
+  private async damBaoVault(): Promise<boolean> {
+    if (this.tamDungNguCanh) return false;
+    if (!this.vault.chu() || !this.vault.conHieuLuc()) {
+      if (!this.dangOnline() || !(await this.vault.moKhoa())) return false;
+    }
+    // paused_auth chỉ sinh kèm khoá vault, nên vault ACTIVE = actor đã xác minh lại → đưa về
+    // pending. Gọi ở MỌI lần (không chỉ lúc vừa mở) để lỗi IDB một lần không làm op kẹt mãi.
+    const chu = this.vault.chu();
+    if (chu) await this.store.moLaiPausedAuth(chu, Date.now()).catch(() => 0);
+    return true;
+  }
+
+  // ── Chuẩn bị khoá (online, TRƯỚC khi mất mạng) ─────────────────────────────────────────
+
+  /**
+   * Trang tracking (người có quyền sửa) gọi sau khi tải dữ liệu: xin khoá vault cho manifest các
+   * task đang hiển thị (chia khối ≤500 task, sắp xếp cố định → cùng tập task dùng lại khoá cũ).
+   * Subcon chỉ xin cho task được giao chính mình (server kiểm lại toàn bộ manifest).
+   */
+  async chuanBiTracking(tasks: { id: number; assignedTo?: number | null }[]): Promise<void> {
+    if (OFFLINE_QUEUE_QUARANTINED || !(await this.damBaoVault())) return;
+    const chu = this.vault.chu();
+    if (!chu) return;
+    const ids = [
+      ...new Set(
+        tasks
+          .filter((t) => this.vault.vaiTro() !== "subcon" || t.assignedTo === chu.ownerUserId)
+          .map((t) => t.id),
+      ),
+    ].sort((a, b) => a - b);
+    for (let i = 0; i < ids.length; i += TASK_MOI_KHOA) {
+      const khoi = ids.slice(i, i + TASK_MOI_KHOA);
+      const dau = `t:${chu.projectId}:${khoi.join(",")}`;
+      if (this.daChuanBi.has(dau)) continue;
+      if (
+        await this.vault
+          .damBaoKhoa({ tasks: khoi, taskActions: ["photo", "tick"] })
+          .catch(() => false)
+      )
+        this.daChuanBi.add(dau);
+    }
+    await this.refreshStats().catch(() => undefined);
+  }
+
+  /** Lưới một nhóm vừa tải: ghi nhận ô → task (không gọi mạng). */
+  dangKyLuoi(tasks: { id: number; cells: Record<string, { id: number }> }[]): void {
+    for (const t of tasks) for (const c of Object.values(t.cells)) this.oCuaTask.set(c.id, t.id);
+  }
+
+  /** Modal nhật ký (người lập nhật ký) mở khi có mạng: khoá cho tháng chứa ngày đó (≤31 ngày). */
+  async chuanBiNhatKy(date: string): Promise<void> {
+    if (OFFLINE_QUEUE_QUARANTINED || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    if (!(await this.damBaoVault())) return;
+    const [y, m] = date.split("-").map(Number);
+    const cuoi = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const thang = `${date.slice(0, 7)}`;
+    await this.vault
+      .damBaoKhoa({
+        diary: { from: `${thang}-01`, to: `${thang}-${String(cuoi).padStart(2, "0")}` },
+      })
+      .catch(() => false);
+  }
+
+  // ── Gửi ────────────────────────────────────────────────────────────────────────────────
+
   async flush() {
-    // Queue v1 không có ownership/vault context. Không đọc hay gửi nó theo session cookie
-    // hiện tại; Background Sync và online events cũng đi qua cùng cổng này.
-    if (OFFLINE_QUEUE_QUARANTINED) return;
-    if (this.tamDungNguCanh) return;
-    if (this.flushing || typeof navigator === "undefined" || !navigator.onLine) return;
-    // Giữ khóa trước await đầu tiên, kể cả lúc đọc storage và cập nhật thống kê.
-    // Chỉ bảo vệ trong tab hiện tại; không thay lease nhiều tab hoặc receipt server.
+    if (OFFLINE_QUEUE_QUARANTINED || this.tamDungNguCanh) return;
+    if (this.flushing || !this.dangOnline()) return;
+    // Khoá trong tab trước await đầu tiên; giữa các tab là lease IDB + fencing (logic.flushQueue).
     this.flushing = true;
     try {
-      const before = await this.store.getAll();
-      if (!before.length) return;
-      this.hadItems = true;
+      if (!(await this.damBaoVault())) return;
       this.setSnap({ sending: true });
       try {
-        const { tuChoi, canXacMinh } = await flushQueue(this.store, sendOp);
-        // S06: op được giữ lại chờ xác minh — báo để người dùng biết dữ liệu vẫn còn, chưa lên.
-        if (canXacMinh.length) {
+        const kq = await flushQueue({
+          store: this.store,
+          vault: this.vault,
+          holder: this.holder,
+          send: this.send,
+          cache: this.cache,
+        });
+        if (kq.loiContext) {
+          // 409 context_*: quyền/thiết bị/dự án đã đổi — khoá vault để lần sau xác minh lại từ đầu
+          // (/auth/me → context → unlock), không tiếp tục dùng context/DEK cũ tới hết lease.
+          this.cache.clear();
+          this.vault.khoa();
+        }
+        if (kq.pausedAuth) {
+          this.cache.clear();
+          this.vault.khoa();
           showToast(
-            `${canXacMinh.length} thao tác ngoại tuyến cần xác minh trước khi gửi (dữ liệu vẫn được giữ trên máy)`,
+            "Phiên đăng nhập đã hết hạn — thao tác ngoại tuyến vẫn giữ trên thiết bị, đăng nhập lại để gửi",
             "error",
           );
         }
-        // Giữ nguyên thông báo từ chối; chưa đổi state machine retry trong slice này.
-        if (tuChoi.length) {
-          const soO = tuChoi.reduce((s, t) => s + t.soO, 0);
-          const lyDo = tuChoi.find((t) => t.lyDo)?.lyDo;
-          showToast(`${soO} thao tác ngoại tuyến bị từ chối${lyDo ? `: ${lyDo}` : ""}`, "error");
+        if (kq.conflict.length)
+          showToast(
+            `${kq.conflict.length} thao tác ngoại tuyến bị xung đột với dữ liệu trên máy chủ — vẫn giữ trên thiết bị, chưa ghi đè`,
+            "error",
+          );
+        if (kq.rejected.length) {
+          const lyDo = kq.rejected.find((r) => r.error)?.error;
+          showToast(
+            `${kq.rejected.length} thao tác ngoại tuyến bị máy chủ từ chối${lyDo ? `: ${lyDo}` : ""} — vẫn giữ trên thiết bị để xem lại`,
+            "error",
+          );
         }
+        if (kq.daGui > 0) for (const l of this.flushedListeners) l();
       } finally {
-        await this.refreshStats({ sending: false });
-        if (this.snap.total === 0 && this.hadItems) {
-          this.hadItems = false;
-          for (const l of this.flushedListeners) l();
-        }
+        await this.refreshStats({ sending: false }).catch(() => this.setSnap({ sending: false }));
       }
     } finally {
-      // Read/flush/refresh lỗi cũng không được kẹt cờ khóa hoặc badge "đang gửi".
       this.flushing = false;
       this.setSnap({ sending: false });
     }
   }
 
-  // Xếp tick theo LÔ (M121) — cả vùng chọn / cả hàng đi trong 1 op, khi có mạng lại gửi
-  // đúng 1 request `PATCH /api/dimensions/batch` thay vì N request.
+  private afterEnqueue() {
+    if (this.dangOnline()) this.kichFlush();
+    else void requestBackgroundSync();
+  }
+
+  // ── Enqueue (chỉ báo thành công sau khi transaction IDB COMMIT) ───────────────────────
+
+  private async them(body: OpBody, keyId: string | null): Promise<boolean> {
+    if (OFFLINE_QUEUE_QUARANTINED || this.tamDungNguCanh || !keyId) return false;
+    await themOp({
+      store: this.store,
+      vault: this.vault,
+      keyId,
+      body,
+      now: Date.now,
+      uuid: taoId,
+      cache: this.cache,
+    });
+    await this.refreshStats().catch(() => undefined);
+    this.afterEnqueue();
+    return true;
+  }
+
+  /** Tick một ô. false = KHÔNG lưu được (caller hoàn tác ô + báo lỗi). */
+  async enqueueTick(dimId: number, installed: boolean): Promise<boolean> {
+    if (OFFLINE_QUEUE_QUARANTINED) return false;
+    const taskId = this.oCuaTask.get(dimId);
+    if (taskId == null) return false;
+    try {
+      return await this.them(
+        { kind: "tick", payload: { dimId, installed } },
+        this.vault.timKhoa("tick", { taskIds: [taskId] }),
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /** Tick theo lô (M121) — 1 op cho cả vùng chọn; mọi ô phải thuộc cùng một khoá vault. */
   async enqueueTickBatch(dimIds: number[], installed: boolean): Promise<boolean> {
     if (OFFLINE_QUEUE_QUARANTINED) return false;
     if (!dimIds.length) return true;
-    const ops = await this.store.getAll();
-    for (const id of tickBatchDedupeIds(ops, dimIds)) await this.store.remove(id);
-    await this.store.add({
-      kind: "tick_batch",
-      payload: { dimIds, installed },
-      queuedAt: Date.now(),
-      tries: 0,
-    });
-    await this.refreshStats();
-    this.afterEnqueue();
-    return true;
+    const taskIds = dimIds.map((id) => this.oCuaTask.get(id));
+    if (taskIds.some((t) => t == null)) return false;
+    try {
+      return await this.them(
+        { kind: "tick_batch", payload: { dimIds: [...dimIds], installed } },
+        this.vault.timKhoa("tick", { taskIds: [...new Set(taskIds as number[])] }),
+      );
+    } catch {
+      return false;
+    }
   }
 
-  // Xếp tick — mỗi dimension chỉ giữ thao tác mới nhất (dedup, hành vi cũ giữ nguyên).
-  async enqueueTick(dimId: number, installed: boolean): Promise<boolean> {
-    if (OFFLINE_QUEUE_QUARANTINED) return false;
-    const ops = await this.store.getAll();
-    for (const id of tickDedupeIds(ops, dimId)) await this.store.remove(id);
-    await this.store.add({
-      kind: "tick",
-      payload: { dimId, installed },
-      queuedAt: Date.now(),
-      tries: 0,
-    });
-    await this.refreshStats();
-    this.afterEnqueue();
-    return true;
-  }
-
-  // Xếp ảnh (PR3 nối UI): nén client trước, chặn nếu vượt hạn mức 50MB.
   async enqueuePhoto(input: {
     taskId: number;
     blob: Blob;
     caption?: string;
   }): Promise<{ ok: true } | { ok: false; error: string }> {
-    if (OFFLINE_QUEUE_QUARANTINED) {
-      return { ok: false, error: OFFLINE_QUEUE_QUARANTINE_ERROR };
+    if (OFFLINE_QUEUE_QUARANTINED) return { ok: false, error: OFFLINE_SAVE_ERROR };
+    try {
+      const { blob, mime } = await compressImage(input.blob);
+      const ok = await this.them(
+        {
+          kind: "photo",
+          payload: {
+            taskId: input.taskId,
+            caption: input.caption ?? "",
+            blob,
+            size: blob.size,
+            mime,
+          },
+        },
+        this.vault.timKhoa("photo", { taskIds: [input.taskId] }),
+      );
+      return ok ? { ok: true } : { ok: false, error: OFFLINE_SAVE_ERROR };
+    } catch (e) {
+      return { ok: false, error: e instanceof LoiHanMucAnh ? e.message : OFFLINE_SAVE_ERROR };
     }
-    const { blob, mime } = await compressImage(input.blob);
-    const ops = await this.store.getAll();
-    if (wouldExceedPhotoQuota(ops, blob.size)) {
-      return {
-        ok: false,
-        error: `Hàng đợi ảnh offline đã đầy (tối đa ${PHOTO_QUOTA_BYTES / 1024 / 1024}MB). Hãy kết nối mạng để gửi bớt ảnh đang chờ rồi thử lại.`,
-      };
-    }
-    await this.store.add({
-      kind: "photo",
-      payload: { taskId: input.taskId, caption: input.caption ?? "", blob, size: blob.size, mime },
-      queuedAt: Date.now(),
-      tries: 0,
-    });
-    await this.refreshStats();
-    this.afterEnqueue();
-    return { ok: true };
   }
 
-  // Xếp nhật ký ngày — full-replace, mỗi ngày chỉ giữ bản mới nhất (dedup theo date).
+  /**
+   * Nhật ký ngày (full-replace). `etag` = phiên bản server form đang dựa vào (null = chưa có bản
+   * server/không tải được → gửi If-None-Match: *, server 412 nếu đã có — không đè).
+   */
   async enqueueDiaryNote(
     input: DiaryNotePayload,
+    etag: string | null,
   ): Promise<{ ok: true } | { ok: false; error: string }> {
-    if (OFFLINE_QUEUE_QUARANTINED) {
-      return { ok: false, error: OFFLINE_QUEUE_QUARANTINE_ERROR };
+    if (OFFLINE_QUEUE_QUARANTINED) return { ok: false, error: OFFLINE_SAVE_ERROR };
+    try {
+      const ok = await this.them(
+        { kind: "diary_note", payload: input, baseVersion: etag },
+        this.vault.timKhoa("diary_note", { date: input.date }),
+      );
+      return ok ? { ok: true } : { ok: false, error: OFFLINE_SAVE_ERROR };
+    } catch {
+      return { ok: false, error: OFFLINE_SAVE_ERROR };
     }
-    const ops = await this.store.getAll();
-    for (const id of diaryDedupeIds(ops, input.date)) await this.store.remove(id);
-    await this.store.add({
-      kind: "diary_note",
-      payload: input,
-      queuedAt: Date.now(),
-      tries: 0,
-    });
-    await this.refreshStats();
-    this.afterEnqueue();
-    return { ok: true };
   }
 
-  // Ảnh đang chờ gửi của 1 task (PhotosModal hiện badge "Chờ gửi").
+  // ── Đọc (chỉ khi vault đang mở, chỉ op của chính chủ ở dự án hiện hành) ───────────────
+
   async getQueuedPhotos(
     taskId: number,
-  ): Promise<{ id: number; caption: string; size: number; queuedAt: number; tries: number }[]> {
-    if (OFFLINE_QUEUE_QUARANTINED) return [];
-    const ops = await this.store.getAll();
+  ): Promise<{ id: string; caption: string; size: number; queuedAt: number; tries: number }[]> {
+    if (!this.vault.chu()) return [];
+    const ds = await docOpDaGiai(this.store, this.vault).catch(() => []);
+    return ds.flatMap(({ rec, body }) =>
+      body.kind === "photo" && body.payload.taskId === taskId
+        ? [
+            {
+              id: rec.operationId,
+              caption: body.payload.caption,
+              size: body.payload.size,
+              queuedAt: rec.queuedAt,
+              tries: rec.tries,
+            },
+          ]
+        : [],
+    );
+  }
+
+  async getQueuedPhotoBlob(id: string): Promise<Blob | undefined> {
+    if (!this.vault.chu()) return undefined;
+    const ds = await docOpDaGiai(this.store, this.vault).catch(() => []);
+    const op = ds.find((o) => o.rec.operationId === id);
+    return op?.body.kind === "photo" ? op.body.payload.blob : undefined;
+  }
+
+  /** Bản nháp nhật ký MỚI NHẤT của ngày (mọi trạng thái — kể cả conflict) để nạp lại form. */
+  async getQueuedDiaryNote(date: string): Promise<
+    | {
+        kind: "diary_note";
+        payload: DiaryNotePayload;
+        state: QueueState;
+        /** Mọi bản nháp của ngày đã đọc lúc nạp — chỉ những id này được bỏ khi lưu online. */
+        operationIds: string[];
+      }
+    | undefined
+  > {
+    if (!this.vault.chu()) return undefined;
+    const ds = await docOpDaGiai(this.store, this.vault, this.cache).catch(() => []);
+    const cungNgay = ds.filter((o) => o.body.kind === "diary_note" && o.body.payload.date === date);
+    const cuoi = cungNgay.at(-1);
+    if (!cuoi || cuoi.body.kind !== "diary_note") return undefined;
+    return {
+      kind: "diary_note",
+      payload: cuoi.body.payload,
+      state: cuoi.rec.state,
+      operationIds: cungNgay.map((o) => o.rec.operationId),
+    };
+  }
+
+  /**
+   * Gọi SAU khi người dùng đã lưu trực tiếp thành công nhật ký ngày đó (nội dung form gồm bản nháp)
+   * — xoá các bản nháp offline của ngày để chúng không gửi sau và bị 412/đè. Đây là quyết định rõ
+   * của người dùng, không phải dọn âm thầm; op đang gửi ở tab khác vẫn bị precondition chặn.
+   */
+  async discardDiaryDraft(date: string, operationIds: readonly string[]): Promise<void> {
+    const chu = this.vault.chu();
+    if (!chu || operationIds.length === 0) return;
+    // Chỉ xoá ĐÚNG các bản nháp form đã nạp (người dùng đã thấy, đã gộp vào bản vừa lưu). Bản nháp
+    // của ngày mà form chưa từng nạp (vault mở muộn, tab khác vừa thêm) phải giữ để xem lại.
+    const ds = await docOpDaGiai(this.store, this.vault, this.cache);
+    const chon = new Set(operationIds);
+    const ids = ds
+      .filter(
+        (o) =>
+          chon.has(o.rec.operationId) &&
+          o.body.kind === "diary_note" &&
+          o.body.payload.date === date,
+      )
+      .map((o) => o.rec.operationId);
+    await this.store.xoaTheoYeuCau(khoaChu(chu), ids);
+    for (const id of ids) this.cache.delete(id);
+    await this.refreshStats().catch(() => undefined);
+  }
+
+  /** Danh sách trạng thái thao tác của chủ hiện hành (không payload) — nền cho UI phục hồi S08. */
+  async danhSachThaoTac(): Promise<ThaoTacHangDoi[]> {
+    const chu = this.vault.chu();
+    if (!chu) return [];
+    const { ops } = await this.store.docChu(khoaChu(chu));
     return ops
-      .filter((o) => o.kind === "photo" && o.payload.taskId === taskId)
-      .map((o) => {
-        const p = o as Extract<QueuedOp, { kind: "photo" }>;
-        return {
-          id: p.id,
-          caption: p.payload.caption,
-          size: p.payload.size,
-          queuedAt: p.queuedAt,
-          tries: p.tries,
-        };
-      });
+      .filter((r) => r.projectId === chu.projectId)
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((r) => ({
+        operationId: r.operationId,
+        kind: r.kind,
+        state: r.state,
+        queuedAt: r.queuedAt,
+        tries: r.tries,
+        nextAttemptAt: r.nextAttemptAt,
+        lastResult: r.lastResult,
+      }));
   }
 
-  // Blob ảnh đang chờ của 1 task (để preview trong PhotosModal).
-  async getQueuedPhotoBlob(id: number): Promise<Blob | undefined> {
-    if (OFFLINE_QUEUE_QUARANTINED) return undefined;
-    const ops = await this.store.getAll();
-    const op = ops.find((o) => o.id === id && o.kind === "photo");
-    return op && op.kind === "photo" ? op.payload.blob : undefined;
-  }
-
-  // Bản nhật ký offline đang chờ của 1 ngày (nạp lại vào form khi mở modal).
-  async getQueuedDiaryNote(date: string): Promise<QueuedOp | undefined> {
-    if (OFFLINE_QUEUE_QUARANTINED) return undefined;
-    const ops = await this.store.getAll();
-    return ops.find((o) => o.kind === "diary_note" && o.payload.date === date);
-  }
-
-  // Xoá mọi nháp nhật ký offline của 1 ngày khỏi hàng đợi. Gọi khi đã lưu THÀNH CÔNG
-  // trực tiếp qua PUT (có mạng) để nháp cũ không tự flush sau đó và đè (full-replace)
-  // lên bản vừa lưu — chống mất dữ liệu âm thầm. Vô hại nếu không có nháp nào.
-  async discardDiaryDraft(date: string): Promise<void> {
-    if (OFFLINE_QUEUE_QUARANTINED) return;
-    const ops = await this.store.getAll();
-    const ids = diaryDedupeIds(ops, date);
-    if (!ids.length) return;
-    for (const id of ids) await this.store.remove(id);
-    await this.refreshStats();
-  }
-
-  private afterEnqueue() {
-    if (typeof navigator !== "undefined" && navigator.onLine) this.flush();
-    else void requestBackgroundSync();
-  }
-
-  // Giữ lại queue v1 unknown-owner. S07 mới được thực hiện clear sau cutover an toàn.
-  async clear(): Promise<void> {
-    // Chỉ S07 sau ownership/vault cutover mới được chuyển hoặc xóa hàng đợi cách ly.
-  }
+  /** Không bao giờ xoá hàng loạt (legacy lẫn vault): chỉ xoá theo quyết định rõ từng thao tác. */
+  async clear(): Promise<void> {}
 }
 
 export const offlineQueue = new OfflineQueueManager();
 
-// ── API enqueue công khai (PR3 nối vào) ──────────────────────────────────────────
+// ── API công khai ────────────────────────────────────────────────────────────────────────
 export function enqueuePhoto(input: { taskId: number; blob: Blob; caption?: string }) {
   return offlineQueue.enqueuePhoto(input);
 }
-export function enqueueDiaryNote(input: DiaryNotePayload) {
-  return offlineQueue.enqueueDiaryNote(input);
+export function enqueueDiaryNote(input: DiaryNotePayload, etag: string | null) {
+  return offlineQueue.enqueueDiaryNote(input, etag);
 }
 export function getQueuedDiaryNote(date: string) {
   return offlineQueue.getQueuedDiaryNote(date);
 }
-export function discardDiaryDraft(date: string) {
-  return offlineQueue.discardDiaryDraft(date);
+export function discardDiaryDraft(date: string, operationIds: readonly string[]) {
+  return offlineQueue.discardDiaryDraft(date, operationIds);
+}
+export function chuanBiOfflineNhatKy(date: string) {
+  return offlineQueue.chuanBiNhatKy(date);
 }
 
-/** Tương thích chữ ký cũ; queue unknown-owner được giữ nguyên qua login, logout và 401. */
+/** Tương thích chữ ký cũ: logout/401 KHÔNG xoá bản nháp (D03) — vault khoá theo bộ nhớ tab. */
 export function clearOfflineQueue(): Promise<void> {
   return Promise.resolve();
 }
 
-// Hook tick cho trang tracking — GIỮ NGUYÊN chữ ký cũ { pending, online, enqueue }.
+// Hook tick cho trang tracking — giữ chữ ký { pending, online, enqueue, enqueueBatch } + `ready`.
 export function useOfflineTickQueue(onFlushed?: () => void) {
   const snap = useSyncExternalStore(
     offlineQueue.subscribe,
@@ -399,11 +606,16 @@ export function useOfflineTickQueue(onFlushed?: () => void) {
   const enqueue = useCallback((dimId: number, installed: boolean) => {
     return offlineQueue.enqueueTick(dimId, installed);
   }, []);
-  // Xếp cả lô (M121) — 1 op cho cả vùng chọn/cả hàng, thay vì N op tick đơn lẻ.
   const enqueueBatch = useCallback((dimIds: number[], installed: boolean) => {
     return offlineQueue.enqueueTickBatch(dimIds, installed);
   }, []);
-  return { pending: snap.total, online: snap.online, enqueue, enqueueBatch };
+  return {
+    pending: snap.total,
+    online: snap.online,
+    ready: !OFFLINE_QUEUE_QUARANTINED && snap.vault === "active",
+    enqueue,
+    enqueueBatch,
+  };
 }
 
 // Hook trạng thái hàng đợi cho badge AppHeader (mọi trang).

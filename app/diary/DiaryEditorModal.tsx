@@ -18,6 +18,7 @@ import { Button } from "@/app/components/ui";
 import EmptyState from "@/app/components/EmptyState";
 import { showToast } from "@/app/components/Toast";
 import {
+  chuanBiOfflineNhatKy,
   enqueueDiaryNote,
   getQueuedDiaryNote,
   discardDiaryDraft,
@@ -43,6 +44,8 @@ type Prefill = {
 };
 
 const WEATHER_CHIPS = ["Nắng", "Mưa", "Âm u"];
+/** Trần chờ mở vault offline trước khi nạp form (mạng yếu không được kẹt Skeleton). */
+const CHO_VAULT_MS = 3000;
 
 // Bản nhật ký hiện hành trên server khi PUT nhận 412 (S06) — chỉ để người dùng SO SÁNH với nội
 // dung đang nhập; không bao giờ tự nạp đè lên form.
@@ -78,6 +81,8 @@ export default function DiaryEditorModal({
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
   const [hasOfflineDraft, setHasOfflineDraft] = useState(false);
+  // Id các bản nháp offline form ĐÃ nạp — lưu online thành công chỉ bỏ đúng những bản này.
+  const [nhapDaNap, setNhapDaNap] = useState<string[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   // Phiên bản mạnh của nhật ký trên server (S06): PUT full-replace gửi lại qua If-Match để không
   // đè bản người khác vừa lưu; null = ngày chưa có nhật ký → tạo mới bằng If-None-Match: *.
@@ -97,6 +102,15 @@ export default function DiaryEditorModal({
     let cancelled = false;
     setLoading(true);
     (async () => {
+      // S07: có mạng → mở vault + xin khoá nhật ký cho tháng này (để lưu offline được, và để
+      // đọc bản nháp mã hoá của chính mình). Lỗi không chặn mở form; mạng yếu làm request treo thì
+      // chỉ chờ tối đa CHO_VAULT_MS rồi nạp form tiếp (không kẹt Skeleton).
+      if (canEdit) {
+        await Promise.race([
+          chuanBiOfflineNhatKy(date).catch(() => undefined),
+          new Promise((r) => setTimeout(r, CHO_VAULT_MS)),
+        ]);
+      }
       // Có bản nháp offline chưa gửi của ngày này → ưu tiên nạp form từ đó (không phải từ
       // server), nhưng vẫn lấy trạng thái khoá + danh sách ảnh prefill từ server.
       const queued = await getQueuedDiaryNote(date);
@@ -121,6 +135,7 @@ export default function DiaryEditorModal({
       if (queued && queued.kind === "diary_note") {
         const p = queued.payload;
         setHasOfflineDraft(true);
+        setNhapDaNap(queued.operationIds);
         setWeatherAm(p.weatherAm ?? "");
         setWeatherPm(p.weatherPm ?? "");
         setWorkDone(p.workDone ?? "");
@@ -136,6 +151,7 @@ export default function DiaryEditorModal({
         setSelectedPhotoIds(new Set<number>(p.photoIds));
       } else {
         setHasOfflineDraft(false);
+        setNhapDaNap([]);
         setWeatherAm(j.diary?.weatherAm ?? "");
         setWeatherPm(j.diary?.weatherPm ?? "");
         setWorkDone(j.diary?.workDone ?? j.prefill?.workDone ?? "");
@@ -154,7 +170,7 @@ export default function DiaryEditorModal({
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [date, canEdit]);
 
   const totalHeadcount = manpower.reduce((s, m) => s + (parseInt(m.headcount) || 0), 0);
 
@@ -194,13 +210,14 @@ export default function DiaryEditorModal({
     };
     // Mất mạng → xếp hàng đợi offline (full-replace theo ngày), đóng modal.
     const queueOffline = async () => {
-      const queued = await enqueueDiaryNote({ date, ...body });
+      // Precondition lấy từ etag form đang dựa vào, CỐ ĐỊNH theo thao tác (S06/S07).
+      const queued = await enqueueDiaryNote({ date, ...body }, etagGui);
       if (!queued.ok) {
         showToast(queued.error, "error");
         setSaving(false);
         return;
       }
-      showToast("Đã lưu offline — sẽ tự gửi khi có mạng");
+      showToast("Đã lưu trên thiết bị (chưa lên máy chủ) — sẽ tự gửi khi có mạng");
       setSaving(false);
       onClose();
     };
@@ -222,7 +239,8 @@ export default function DiaryEditorModal({
         setEtag(typeof j.etag === "string" ? j.etag : null);
         // Đã lưu trực tiếp thành công → xoá nháp offline cũ của ngày này (nếu có) để nó
         // không tự flush sau đó và đè (full-replace) lên bản vừa lưu, gây mất dữ liệu.
-        await discardDiaryDraft(date);
+        await discardDiaryDraft(date, nhapDaNap);
+        setNhapDaNap([]);
         setHasOfflineDraft(false);
         setXungDot(false);
         setBanServer(null);

@@ -1,461 +1,293 @@
-// Unit test logic THUẦN của hàng đợi offline (M58 PR2) — không chạm IndexedDB/DB thật,
-// dùng MemoryQueueStore + hàm gửi giả để kiểm dedup tick, backoff, 4xx bị loại, hạn mức ảnh.
+// Logic THUẦN của hàng đợi offline v2 (QUALITY-FINAL-1 S07): gói thân op, dedup chỉ trên op chưa
+// từng gửi, FIFO theo tài nguyên, phân loại kết quả server thành trạng thái bền (A2-FR06/FR10),
+// header cố định (Idempotency-Key/X-XBoss-Context/If-Match). Map AC: A2-AC03, A2-AC06, A2-AC10.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  MemoryQueueStore,
   backoffMs,
-  shouldAttempt,
-  shouldRetry,
-  tickDedupeIds,
-  tickBatchDedupeIds,
-  biTuChoi,
-  diaryDedupeIds,
-  wouldExceedPhotoQuota,
-  photoQueueBytes,
+  BACKOFF_MAX_MS,
+  chonOpGuiDuoc,
+  chonOpThay,
   computeStats,
+  docRetryAfter,
+  dongGoiThanOp,
+  dungYeuCau,
+  moGoiThanOp,
   opEndpoint,
-  flushQueue,
-  PHOTO_QUOTA_BYTES,
-  type DiaryNotePayload,
-  type QueuedOp,
-  type SendOutcome,
+  phanLoaiKetQua,
+  taiNguyenCuaOp,
+  type ChuSoHuu,
+  type OpBody,
+  type QueueRecord,
+  type QueueState,
 } from "@/app/components/offlineQueue/logic";
 
-// Payload nhật ký hợp lệ (full-replace body PUT /api/diaries/:date) cho test.
-function diaryPayload(date: string, workDone: string | null = null): DiaryNotePayload {
+const CHU: ChuSoHuu = {
+  ownerUserId: 7,
+  orgId: 1,
+  projectId: 3,
+  deviceId: "11111111-1111-4111-8111-111111111111",
+};
+let seq = 0;
+function rec(p: Partial<QueueRecord> = {}): QueueRecord {
+  seq++;
   return {
+    schemaVersion: 2,
+    operationId: `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`,
+    vaultKeyId: "22222222-2222-4222-8222-222222222222",
+    ownerUserId: CHU.ownerUserId,
+    orgId: CHU.orgId,
+    projectId: CHU.projectId,
+    deviceId: CHU.deviceId,
+    sequence: seq,
+    queuedAt: 0,
+    tries: 0,
+    nextAttemptAt: 0,
+    state: "pending",
+    iv: "",
+    ciphertext: "",
+    owner: `${CHU.ownerUserId}|${CHU.orgId}|${CHU.deviceId}`,
+    kind: "tick",
+    bytes: 0,
+    ...p,
+  };
+}
+const tick = (dimId: number, installed = true): OpBody => ({
+  kind: "tick",
+  payload: { dimId, installed },
+});
+const lo = (dimIds: number[], installed = true): OpBody => ({
+  kind: "tick_batch",
+  payload: { dimIds, installed },
+});
+const nhatKy = (date: string, baseVersion: string | null = null): OpBody => ({
+  kind: "diary_note",
+  baseVersion,
+  payload: {
     date,
-    weatherAm: null,
+    weatherAm: "nắng",
     weatherPm: null,
-    workDone,
+    workDone: "đổ bê tông",
     obstacles: null,
     safetyNote: null,
-    manpower: [],
-    photoIds: [],
-  };
-}
-
-// Nhái enqueueTick của manager: dedup theo dimId rồi thêm bản mới nhất.
-async function enqueueTick(store: MemoryQueueStore, dimId: number, installed: boolean) {
-  const ops = await store.getAll();
-  for (const id of tickDedupeIds(ops, dimId)) await store.remove(id);
-  await store.add({ kind: "tick", payload: { dimId, installed }, queuedAt: Date.now(), tries: 0 });
-}
-
-test("dedup tick: mỗi dimension chỉ giữ thao tác mới nhất", async () => {
-  const store = new MemoryQueueStore();
-  await enqueueTick(store, 5, true);
-  await enqueueTick(store, 5, false); // ghi đè dim 5
-  await enqueueTick(store, 6, true);
-  const ops = await store.getAll();
-  assert.equal(ops.length, 2);
-  const dim5 = ops.find((o) => o.kind === "tick" && o.payload.dimId === 5);
-  assert.ok(dim5 && dim5.kind === "tick");
-  assert.equal(dim5.payload.installed, false); // giữ giá trị mới nhất
+    manpower: [{ crew: "Tổ A", headcount: 5, note: null }],
+    photoIds: [9],
+  },
 });
 
-test("backoff tăng dần theo tries, chặn trần", () => {
-  assert.equal(backoffMs(0), 0); // lần đầu gửi ngay
-  assert.ok(backoffMs(1) < backoffMs(2));
-  assert.ok(backoffMs(2) < backoffMs(3));
-  assert.ok(backoffMs(3) < backoffMs(4));
-  // đơn điệu không giảm + có trần
-  for (let t = 1; t < 20; t++) assert.ok(backoffMs(t) <= backoffMs(t + 1));
-  assert.equal(backoffMs(100), backoffMs(1000)); // đã đụng trần
-});
-
-test("shouldAttempt tôn trọng backoff", () => {
-  assert.equal(shouldAttempt({ tries: 0 }, 1_000_000), true); // chưa thử → gửi ngay
-  const op = { tries: 2, lastTriedAt: 1_000_000 };
-  assert.equal(shouldAttempt(op, 1_000_000 + backoffMs(2) - 1), false);
-  assert.equal(shouldAttempt(op, 1_000_000 + backoffMs(2)), true);
-});
-
-test("shouldRetry: 4xx bỏ, 5xx và mất mạng giữ", () => {
-  assert.equal(shouldRetry({ status: 200 }), false);
-  assert.equal(shouldRetry({ status: 201 }), false);
-  assert.equal(shouldRetry({ status: 400 }), false);
-  assert.equal(shouldRetry({ status: 403 }), false);
-  assert.equal(shouldRetry({ status: 404 }), false);
-  assert.equal(shouldRetry({ status: 500 }), true);
-  assert.equal(shouldRetry({ status: 503 }), true);
-  assert.equal(shouldRetry({ networkError: true }), true);
-});
-
-test("flushQueue: 4xx bị loại khỏi hàng đợi không retry, 5xx giữ + tăng tries", async () => {
-  const store = new MemoryQueueStore();
-  await store.add({ kind: "tick", payload: { dimId: 1, installed: true }, queuedAt: 1, tries: 0 });
-  await store.add({ kind: "tick", payload: { dimId: 2, installed: true }, queuedAt: 2, tries: 0 });
-  await store.add({ kind: "tick", payload: { dimId: 3, installed: true }, queuedAt: 3, tries: 0 });
-
-  // dim1 → 403 (bỏ), dim2 → 500 (giữ), dim3 → 200 (gửi xong, bỏ)
-  const send = async (op: QueuedOp): Promise<SendOutcome> => {
-    if (op.kind !== "tick") return { status: 200 };
-    if (op.payload.dimId === 1) return { status: 403 };
-    if (op.payload.dimId === 2) return { status: 500 };
-    return { status: 200 };
-  };
-  const r = await flushQueue(store, send, () => 1000);
-  assert.equal(r.removed, 2); // dim1 (4xx) + dim3 (ok)
-  assert.equal(r.retried, 1); // dim2 (5xx)
-  const ops = await store.getAll();
-  assert.equal(ops.length, 1);
-  assert.equal(ops[0].kind === "tick" && ops[0].payload.dimId, 2);
-  assert.equal(ops[0].tries, 1); // đã tăng tries
-  assert.equal(ops[0].lastTriedAt, 1000);
-});
-
-test("flushQueue giữ thứ tự FIFO 3 loại thao tác", async () => {
-  const store = new MemoryQueueStore();
-  await store.add({ kind: "tick", payload: { dimId: 9, installed: true }, queuedAt: 1, tries: 0 });
-  await store.add({
-    kind: "photo",
-    payload: { taskId: 7, caption: "", blob: new Blob([]), size: 10, mime: "image/jpeg" },
-    queuedAt: 2,
-    tries: 0,
-  });
-  await store.add({
-    kind: "diary_note",
-    payload: diaryPayload("2026-07-18", "x"),
-    queuedAt: 3,
-    tries: 0,
-  });
-
-  const sent: string[] = [];
-  const send = async (op: QueuedOp): Promise<SendOutcome> => {
-    sent.push(op.kind);
-    return { status: 200 };
-  };
-  const r = await flushQueue(store, send, () => 1000);
-  assert.deepEqual(sent, ["tick", "photo", "diary_note"]); // đúng thứ tự nạp
-  assert.equal(r.remaining, 0);
-});
-
-test("hạn mức ảnh 50MB chặn đúng", () => {
-  const mb = 1024 * 1024;
-  const mkPhoto = (size: number): QueuedOp => ({
-    id: 1,
-    kind: "photo",
-    payload: { taskId: 1, caption: "", blob: new Blob([]), size, mime: "image/jpeg" },
-    queuedAt: 0,
-    tries: 0,
-  });
-  assert.equal(photoQueueBytes([mkPhoto(10 * mb), mkPhoto(20 * mb)]), 30 * mb);
-  // 30MB đang chờ + 25MB mới = 55MB > 50MB → chặn
-  assert.equal(wouldExceedPhotoQuota([mkPhoto(30 * mb)], 25 * mb), true);
-  // 30MB + 15MB = 45MB ≤ 50MB → cho
-  assert.equal(wouldExceedPhotoQuota([mkPhoto(30 * mb)], 15 * mb), false);
-  // đúng hằng số
-  assert.equal(PHOTO_QUOTA_BYTES, 50 * mb);
-});
-
-test("computeStats: pending vs failed theo tries", () => {
-  const ops: QueuedOp[] = [
-    { id: 1, kind: "tick", payload: { dimId: 1, installed: true }, queuedAt: 0, tries: 0 },
-    { id: 2, kind: "tick", payload: { dimId: 2, installed: true }, queuedAt: 0, tries: 2 },
-  ];
-  assert.deepEqual(computeStats(ops), { total: 2, pending: 1, failed: 1 });
-  assert.deepEqual(computeStats([]), { total: 0, pending: 0, failed: 0 });
-});
-
-test("opEndpoint ánh xạ URL đúng theo loại", () => {
-  assert.deepEqual(
-    opEndpoint({
-      id: 1,
-      kind: "tick",
-      payload: { dimId: 42, installed: true },
-      queuedAt: 0,
-      tries: 0,
-    }),
-    { url: "/api/dimensions/42", method: "PATCH" },
-  );
-  assert.deepEqual(
-    opEndpoint({
-      id: 1,
-      kind: "photo",
-      payload: { taskId: 8, caption: "", blob: new Blob([]), size: 1, mime: "image/jpeg" },
-      queuedAt: 0,
-      tries: 0,
-    }),
-    { url: "/api/tasks/8/photos", method: "POST" },
-  );
-  assert.deepEqual(
-    opEndpoint({
-      id: 1,
-      kind: "diary_note",
-      payload: diaryPayload("2026-07-18", "x"),
-      queuedAt: 0,
-      tries: 0,
-    }),
-    { url: "/api/diaries/2026-07-18", method: "PUT" },
-  );
-});
-
-test("diaryDedupeIds: mỗi ngày chỉ giữ 1 bản nhật ký mới nhất", async () => {
-  const store = new MemoryQueueStore();
-  // Nhái enqueueDiaryNote: dedup theo date rồi thêm bản mới.
-  const enqueue = async (date: string, workDone: string) => {
-    const ops = await store.getAll();
-    for (const id of diaryDedupeIds(ops, date)) await store.remove(id);
-    await store.add({
-      kind: "diary_note",
-      payload: diaryPayload(date, workDone),
-      queuedAt: 0,
-      tries: 0,
-    });
-  };
-  await enqueue("2026-07-18", "bản 1");
-  await enqueue("2026-07-18", "bản 2"); // ghi đè cùng ngày
-  await enqueue("2026-07-19", "ngày khác");
-  const ops = await store.getAll();
-  assert.equal(ops.length, 2);
-  const d18 = ops.find((o) => o.kind === "diary_note" && o.payload.date === "2026-07-18");
-  assert.ok(d18 && d18.kind === "diary_note");
-  assert.equal(d18.payload.workDone, "bản 2"); // giữ bản mới nhất
-});
-
-test("discardDiaryDraft: xoá nháp nhật ký của 1 ngày, giữ nguyên ngày khác", async () => {
-  const store = new MemoryQueueStore();
-  const enqueue = async (date: string, workDone: string) => {
-    const ops = await store.getAll();
-    for (const id of diaryDedupeIds(ops, date)) await store.remove(id);
-    await store.add({
-      kind: "diary_note",
-      payload: diaryPayload(date, workDone),
-      queuedAt: 0,
-      tries: 0,
-    });
-  };
-  // Nhái discardDiaryDraft của manager: lấy id op diary_note cùng ngày rồi xoá.
-  const discard = async (date: string) => {
-    const ops = await store.getAll();
-    for (const id of diaryDedupeIds(ops, date)) await store.remove(id);
-  };
-
-  await enqueue("2026-07-18", "nháp X");
-  await enqueue("2026-07-19", "nháp Y");
-  await store.add({ kind: "tick", payload: { dimId: 3, installed: true }, queuedAt: 0, tries: 0 });
-
-  await discard("2026-07-18"); // đã lưu trực tiếp thành công ngày 18 → xoá nháp cũ
-  const ops = await store.getAll();
-  // Không còn op diary_note ngày 18…
-  assert.equal(
-    ops.some((o) => o.kind === "diary_note" && o.payload.date === "2026-07-18"),
-    false,
-  );
-  // …nhưng nháp ngày 19 và tick vẫn còn.
-  assert.ok(ops.some((o) => o.kind === "diary_note" && o.payload.date === "2026-07-19"));
-  assert.ok(ops.some((o) => o.kind === "tick"));
-
-  // Discard ngày không có nháp → vô hại, không đổi hàng đợi.
-  const before = (await store.getAll()).length;
-  await discard("2026-07-20");
-  assert.equal((await store.getAll()).length, before);
-});
-
-test("payload diary_note là full-replace body — không còn field text", () => {
-  const p = diaryPayload("2026-07-18", "làm việc");
-  // Đủ trường của body PUT /api/diaries/:date (thiếu → server ghi NULL, xoá dữ liệu ngày).
-  assert.deepEqual(Object.keys(p).sort(), [
-    "date",
-    "manpower",
-    "obstacles",
-    "photoIds",
-    "safetyNote",
-    "weatherAm",
-    "weatherPm",
-    "workDone",
-  ]);
-  assert.equal("text" in p, false); // không còn placeholder text của PR2
-});
-
-test("clear làm rỗng hàng đợi (bất biến bảo mật logout)", async () => {
-  const store = new MemoryQueueStore();
-  await store.add({ kind: "tick", payload: { dimId: 1, installed: true }, queuedAt: 0, tries: 0 });
-  await store.add({
-    kind: "diary_note",
-    payload: diaryPayload("2026-07-18", "y"),
-    queuedAt: 0,
-    tries: 0,
-  });
-  assert.equal((await store.getAll()).length, 2);
-  await store.clear();
-  assert.deepEqual(await store.getAll(), []);
-});
-
-// ===== M121: tick theo LÔ (tick_batch) =====
-// Cả vùng chọn / cả hàng đi trong MỘT op — nếu tách thành N op `tick` thì khi có mạng lại sẽ
-// bắn N request, đúng cái M121 đang bỏ đi, và mất tính nguyên tử của lô.
-
-async function enqueueTickBatch(store: MemoryQueueStore, dimIds: number[], installed: boolean) {
-  const ops = await store.getAll();
-  for (const id of tickBatchDedupeIds(ops, dimIds)) await store.remove(id);
-  await store.add({ kind: "tick_batch", payload: { dimIds, installed }, queuedAt: 0, tries: 0 });
-}
-
-test("AC7: tick vùng 9 ô khi mất mạng → đúng 1 op trong hàng đợi, không phải 9", async () => {
-  const store = new MemoryQueueStore();
-  const ids = [11, 12, 13, 21, 22, 23, 31, 32, 33];
-  await enqueueTickBatch(store, ids, true);
-
-  const ops = await store.getAll();
-  assert.equal(ops.length, 1);
-  assert.equal(ops[0].kind, "tick_batch");
-  assert.deepEqual(ops[0].kind === "tick_batch" ? ops[0].payload.dimIds : [], ids);
-});
-
-test("tick_batch: gửi tới /api/dimensions/batch, không phải route ô đơn lẻ", async () => {
-  const store = new MemoryQueueStore();
-  await enqueueTickBatch(store, [7, 8], false);
-  const [op] = await store.getAll();
-  assert.deepEqual(opEndpoint(op), { url: "/api/dimensions/batch", method: "PATCH" });
-});
-
-test("AC8: lô mới nuốt các op tick đơn lẻ trùng ô — không gửi 2 giá trị mâu thuẫn", async () => {
-  const store = new MemoryQueueStore();
-  await enqueueTick(store, 5, true); // tick lẻ ô 5
-  await enqueueTick(store, 99, true); // ô ngoài lô — phải GIỮ
-  await enqueueTickBatch(store, [5, 6], false); // lô sau phủ ô 5
-
-  const ops = await store.getAll();
-  assert.equal(ops.length, 2, "op tick ô 5 phải bị thay, op ô 99 giữ nguyên");
-  assert.ok(
-    ops.some((o) => o.kind === "tick" && o.payload.dimId === 99),
-    "ô ngoài lô không được xoá lây",
-  );
-  assert.ok(ops.some((o) => o.kind === "tick_batch"));
-});
-
-test("AC8: lô trùng HOÀN TOÀN bị thay; lô trùng MỘT PHẦN thì giữ (không mất ô ngoài phần giao)", async () => {
-  const store = new MemoryQueueStore();
-  await enqueueTickBatch(store, [1, 2], true);
-  await enqueueTickBatch(store, [2, 1], false); // cùng tập ô (khác thứ tự) → thay
-  let ops = await store.getAll();
-  assert.equal(ops.length, 1);
-  assert.equal(ops[0].kind === "tick_batch" && ops[0].payload.installed, false);
-
-  // Lô mới chỉ giao một phần: giữ cả hai, FIFO đảm bảo lô sau thắng ở ô giao.
-  await enqueueTickBatch(store, [2, 3], true);
-  ops = await store.getAll();
-  assert.equal(ops.length, 2, "xoá lô cũ sẽ mất ô 1 mà người dùng đã tick");
-});
-
-test("tick lẻ sau lô 1 ô: thao tác sau thắng, không để lại lô cũ mâu thuẫn", async () => {
-  const store = new MemoryQueueStore();
-  await enqueueTickBatch(store, [42], true);
-  await enqueueTick(store, 42, false);
-  const ops = await store.getAll();
-  assert.equal(ops.length, 1);
-  assert.equal(ops[0].kind, "tick");
-});
-
-test("AC9: op bị server từ chối (4xx) trả về kèm lý do — không biến mất im lặng", async () => {
-  const store = new MemoryQueueStore();
-  await enqueueTickBatch(store, [1, 2, 3], true);
-  await enqueueTick(store, 9, true);
-
-  const r = await flushQueue(store, async (op) =>
-    op.kind === "tick_batch"
-      ? { status: 409, error: "Chờ biên bản chuyển bước: T5 — Lắp đặt ống" }
-      : { status: 200 },
-  );
-
-  assert.equal(r.remaining, 0, "vẫn xoá khỏi hàng đợi để không kẹt retry vô hạn");
-  assert.equal(r.tuChoi.length, 1, "chỉ op bị từ chối mới được báo, op thành công thì không");
-  assert.equal(r.tuChoi[0].soO, 3, "đếm theo SỐ Ô để nói đúng '3 thao tác bị từ chối'");
-  assert.match(r.tuChoi[0].lyDo ?? "", /chuyển bước/);
-});
-
-test("AC9: lỗi 5xx/mất mạng KHÔNG bị coi là từ chối — giữ lại thử tiếp, không báo nhầm", async () => {
-  const store = new MemoryQueueStore();
-  await enqueueTickBatch(store, [1], true);
-
-  const r = await flushQueue(store, async () => ({ status: 503 }));
-  assert.equal(r.tuChoi.length, 0);
-  assert.equal(r.retried, 1);
-  assert.equal(r.remaining, 1);
-
-  const r2 = await flushQueue(
-    store,
-    async () => ({ networkError: true }),
-    () => 10 ** 9,
-  );
-  assert.equal(r2.tuChoi.length, 0);
-  assert.equal(r2.remaining, 1);
-});
-
-test("biTuChoi: chỉ 4xx là từ chối; 2xx/5xx/mất mạng thì không", () => {
-  assert.equal(biTuChoi({ status: 403 }), true);
-  assert.equal(biTuChoi({ status: 409 }), true);
-  assert.equal(biTuChoi({ status: 422 }), true);
-  assert.equal(biTuChoi({ status: 200 }), false);
-  assert.equal(biTuChoi({ status: 500 }), false);
-  assert.equal(biTuChoi({ networkError: true }), false);
-});
-
-// S06 (điều kiện trước khi gỡ quarantine): nhật ký nhận 428/412, hoặc mọi op nhận 409
-// context_* / idempotency_conflict, là kết quả "cần xác minh" — không phải từ chối nghiệp vụ.
-// Xoá op ở đây = mất nội dung người dùng đã nhập offline. Phải GIỮ trong hàng đợi, đánh dấu, và
-// KHÔNG gửi lại vòng lặp (gửi lại y nguyên vẫn nhận đúng mã đó).
-test("S06: diary_note nhận 428/412 → giữ lại, đánh dấu cần xác minh, không gửi lại", async () => {
-  for (const [status, code] of [
-    [428, "precondition_required"],
-    [412, "version_mismatch"],
-  ] as const) {
-    const store = new MemoryQueueStore();
-    await store.add({
-      kind: "diary_note",
-      payload: diaryPayload("2026-06-10", "Nội dung nhập offline"),
-      queuedAt: 1,
-      tries: 0,
-    });
-    let soLanGui = 0;
-    const send = async (): Promise<SendOutcome> => {
-      soLanGui++;
-      return { status, code, error: "Nhật ký đã đổi" };
-    };
-    const r = await flushQueue(store, send, () => 1000);
-    assert.equal(r.remaining, 1, `${status}: op nhật ký không được xoá`);
-    assert.equal(r.removed, 0);
-    assert.equal(r.tuChoi.length, 0, `${status}: không báo như bị từ chối rồi bỏ`);
-    assert.equal(r.canXacMinh.length, 1);
-    const [op] = await store.getAll();
-    assert.equal(op.kind === "diary_note" && op.payload.workDone, "Nội dung nhập offline");
-    assert.equal(op.canXacMinh?.status, status);
-    assert.equal(op.canXacMinh?.code, code);
-    // Lần flush sau (kể cả rất lâu sau) không gửi lại op đang chờ xác minh.
-    const r2 = await flushQueue(store, send, () => 10 ** 12);
-    assert.equal(soLanGui, 1, `${status}: không retry vòng lặp`);
-    assert.equal(r2.remaining, 1);
-    assert.deepEqual(computeStats(await store.getAll()), { total: 1, pending: 0, failed: 1 });
+test("gói thân op: 4 loại đi-về nguyên vẹn, ảnh giữ đúng byte; thân hỏng/sai loại bị từ chối", async () => {
+  for (const b of [
+    tick(5, false),
+    lo([1, 2, 3]),
+    nhatKy("2026-10-08", '"4-2"'),
+    nhatKy("2026-10-09"),
+  ]) {
+    const ve = moGoiThanOp(b.kind, await dongGoiThanOp(b));
+    assert.deepEqual(ve, b);
   }
+  const anh = new Uint8Array([1, 2, 3, 250, 0, 7]);
+  const photo: OpBody = {
+    kind: "photo",
+    payload: {
+      taskId: 4,
+      caption: "chú thích",
+      mime: "image/jpeg",
+      size: 6,
+      blob: new Blob([anh]),
+    },
+  };
+  const goi = await dongGoiThanOp(photo);
+  const ve = moGoiThanOp("photo", goi);
+  assert.equal(ve.kind, "photo");
+  if (ve.kind === "photo") {
+    assert.deepEqual(new Uint8Array(await ve.payload.blob.arrayBuffer()), anh);
+    assert.equal(ve.payload.caption, "chú thích");
+  }
+  assert.throws(() => moGoiThanOp("tick", goi), /hỏng/, "loại trong AAD khác loại trong thân");
+  assert.throws(() => moGoiThanOp("photo", goi.slice(0, goi.length - 1)), /hỏng/);
+  assert.throws(() => moGoiThanOp("tick", new Uint8Array([0, 0, 0, 99, 1])), /hỏng/);
 });
 
-test("S06: op nhận 409 context_*/idempotency_conflict → giữ lại; 409 nghiệp vụ khác vẫn bỏ", async () => {
-  const store = new MemoryQueueStore();
-  await store.add({ kind: "tick", payload: { dimId: 1, installed: true }, queuedAt: 1, tries: 0 });
-  await store.add({
-    kind: "tick_batch",
-    payload: { dimIds: [2, 3], installed: true },
-    queuedAt: 2,
-    tries: 0,
-  });
-  await store.add({ kind: "tick", payload: { dimId: 4, installed: true }, queuedAt: 3, tries: 0 });
-  await store.add({ kind: "tick", payload: { dimId: 5, installed: true }, queuedAt: 4, tries: 0 });
-  const send = async (op: QueuedOp): Promise<SendOutcome> => {
-    if (op.kind === "tick_batch") return { status: 409, code: "idempotency_conflict" };
-    if (op.kind === "tick" && op.payload.dimId === 1)
-      return { status: 409, code: "context_changed" };
-    if (op.kind === "tick" && op.payload.dimId === 4) return { status: 409, error: "Hold-point" };
-    return { status: 200 };
-  };
-  const r = await flushQueue(store, send, () => 1000);
+test("dedup: chỉ thay op CHƯA từng gửi; op đã gửi/không rõ ACK/conflict giữ nguyên (A2-FR06)", () => {
+  const chuaGui = { rec: rec(), body: tick(5) };
+  const daThu = { rec: rec({ tries: 1 }), body: tick(5) };
+  const dangGui = { rec: rec({ state: "sending", tries: 1 }), body: tick(5) };
+  const xungDot = { rec: rec({ state: "conflict", tries: 1 }), body: tick(5) };
+  const khacO = { rec: rec(), body: tick(6) };
+  assert.deepEqual(chonOpThay(tick(5, false), [chuaGui, daThu, dangGui, xungDot, khacO]), [
+    chuaGui.rec.operationId,
+  ]);
+});
+
+test("dedup lô: nuốt tick lẻ trong lô + lô trùng hoàn toàn; GIỮ lô trùng một phần (A2-AC03)", () => {
+  const le = { rec: rec(), body: tick(2) };
+  const loDu = { rec: rec({ kind: "tick_batch" }), body: lo([3, 2, 1]) };
+  const loMotPhan = { rec: rec({ kind: "tick_batch" }), body: lo([3, 4]) };
+  const loMotO = { rec: rec({ kind: "tick_batch" }), body: lo([9]) };
   assert.deepEqual(
-    (await store.getAll()).map((o) => o.id),
-    [1, 2],
-    "context/idempotency giữ lại; hold-point (409 không code) và 200 bị xoá như cũ",
+    chonOpThay(lo([1, 2, 3]), [le, loDu, loMotPhan, loMotO]).sort(),
+    [le.rec.operationId, loDu.rec.operationId].sort(),
   );
-  assert.equal(r.canXacMinh.length, 2);
-  assert.equal(r.tuChoi.length, 1);
+  // Tick lẻ sau lô 1 ô: thao tác sau thắng.
+  assert.deepEqual(chonOpThay(tick(9), [loMotO, loMotPhan]), [loMotO.rec.operationId]);
+});
+
+test("dedup nhật ký theo ngày; ảnh không bao giờ bị dedup", () => {
+  const a = { rec: rec({ kind: "diary_note" }), body: nhatKy("2026-10-08") };
+  const b = { rec: rec({ kind: "diary_note" }), body: nhatKy("2026-10-09") };
+  assert.deepEqual(chonOpThay(nhatKy("2026-10-08"), [a, b]), [a.rec.operationId]);
+  const anh: OpBody = {
+    kind: "photo",
+    payload: { taskId: 1, caption: "", mime: "image/jpeg", size: 1, blob: new Blob(["x"]) },
+  };
+  assert.deepEqual(chonOpThay(anh, [a, b]), []);
+});
+
+test("FIFO theo tài nguyên: conflict/chờ retry/đang gửi chặn op sau CÙNG tài nguyên, không chặn tài nguyên khác", () => {
+  const now = 1000;
+  const items = (states: [QueueState, number[], number?][]) =>
+    states.map(([state, dims, next]) => ({
+      rec: rec({ state, nextAttemptAt: next ?? 0 }),
+      taiNguyen: dims.map((d) => `dim:${d}`),
+    }));
+  // conflict trên ô 1 chặn op sau ô 1 lẫn lô chứa ô 1, nhưng ô 2 được gửi.
+  const a = items([
+    ["conflict", [1]],
+    ["pending", [1]],
+    ["pending", [1, 5]],
+    ["pending", [2]],
+  ]);
+  assert.equal(chonOpGuiDuoc(a, now), a[3].rec);
+  // Lô bị chặn kéo theo ô 5 cũng bị chặn cho op sau (giữ thứ tự sau lô).
+  const b = items([
+    ["paused_auth", [1]],
+    ["pending", [1, 5]],
+    ["pending", [5]],
+  ]);
+  assert.equal(chonOpGuiDuoc(b, now), null);
+  // Op chờ backoff chặn op sau cùng tài nguyên.
+  const c = items([
+    ["pending", [1], now + 5000],
+    ["pending", [1]],
+  ]);
+  assert.equal(chonOpGuiDuoc(c, now), null);
+  // rejected là kết thúc phía server → không chặn; op khoá (không có tài nguyên) bỏ qua.
+  const d = items([
+    ["rejected", [1]],
+    ["pending", [1]],
+  ]);
+  assert.equal(chonOpGuiDuoc(d, now), d[1].rec);
+  const khoa = { rec: rec(), taiNguyen: null };
+  const sau = { rec: rec(), taiNguyen: ["dim:1"] };
+  assert.equal(chonOpGuiDuoc([khoa, sau], now), sau.rec);
+  // Thứ tự theo sequence, không theo vị trí mảng.
+  const x = items([
+    ["pending", [1]],
+    ["pending", [1]],
+  ]);
+  assert.equal(chonOpGuiDuoc([x[1], x[0]], now), x[0].rec);
+});
+
+test("tài nguyên: ảnh độc lập theo operationId; nhật ký theo ngày", () => {
+  const anh: OpBody = {
+    kind: "photo",
+    payload: { taskId: 1, caption: "", mime: "image/jpeg", size: 1, blob: new Blob(["x"]) },
+  };
+  assert.deepEqual(taiNguyenCuaOp("op-a", anh), ["photo:op-a"]);
+  assert.deepEqual(taiNguyenCuaOp("x", nhatKy("2026-01-02")), ["diary:2026-01-02"]);
+  assert.deepEqual(taiNguyenCuaOp("x", lo([4, 2])), ["dim:4", "dim:2"]);
+});
+
+test("phân loại kết quả → trạng thái bền (A2-FR10, A2-AC06)", () => {
+  const r = { operationId: "op-1", tries: 1 };
+  const now = 1_000_000;
+  const loai = (o: Parameters<typeof phanLoaiKetQua>[1]) => phanLoaiKetQua(r, o, now, 0.5).loai;
+  assert.equal(loai({ status: 200, receiptOperationId: "op-1" }), "xong");
+  assert.equal(loai({ status: 200 }), "conflict", "2xx thiếu receipt KHÔNG được xoá op");
+  assert.equal(loai({ status: 200, receiptOperationId: "op-2" }), "conflict");
+  assert.equal(loai({ status: 401 }), "paused_auth");
+  assert.equal(loai({ status: 409, code: "context_expired" }), "context");
+  for (const s of [409, 412, 428]) assert.equal(loai({ status: s }), "conflict", `HTTP ${s}`);
+  assert.equal(loai({ status: 409, code: "idempotency_conflict" }), "conflict");
+  for (const s of [400, 403, 404, 413, 422])
+    assert.equal(loai({ status: s }), "rejected", `HTTP ${s}`);
+  for (const s of [408, 500, 502, 504]) assert.equal(loai({ status: s }), "retry", `HTTP ${s}`);
+  assert.equal(loai({ networkError: true }), "retry");
+  const q = phanLoaiKetQua(r, { status: 429, retryAfter: "120" }, now, 0.5);
+  assert.deepEqual(q, { loai: "retry", nextAttemptAt: now + 120_000 });
+  const ngay = new Date(now + 3_600_000).toUTCString();
+  const q2 = phanLoaiKetQua(r, { status: 429, retryAfter: ngay }, now, 0.5);
+  assert.equal(q2.loai === "retry" && q2.nextAttemptAt, Date.parse(ngay));
+});
+
+test("backoff luỹ thừa có jitter, trần 5 phút; Retry-After sai định dạng → null", () => {
+  assert.equal(backoffMs(0, 0.3), 0);
+  for (let t = 1; t < 40; t++) {
+    const lo0 = backoffMs(t, 0);
+    const hi = backoffMs(t, 0.999999);
+    assert.ok(lo0 <= hi && hi <= BACKOFF_MAX_MS, `tries=${t}`);
+    assert.ok(lo0 >= Math.min(BACKOFF_MAX_MS, 2000 * 2 ** (t - 1)) / 2 - 1);
+  }
+  assert.ok(backoffMs(3, 0.5) > backoffMs(2, 0.5));
+  assert.equal(backoffMs(30, 0.999999) <= BACKOFF_MAX_MS, true);
+  assert.equal(docRetryAfter("abc", 0), null);
+  assert.equal(docRetryAfter(null, 0), null);
+  assert.equal(docRetryAfter(" 5 ", 10), 5010);
+});
+
+test("request: Idempotency-Key = operationId, X-XBoss-Context, precondition nhật ký từ baseVersion lúc enqueue", async () => {
+  const r = rec({ kind: "diary_note" });
+  const coBan = dungYeuCau(r, nhatKy("2026-10-08", '"12-4"'), "ctx-1");
+  assert.equal(coBan.url, "/api/diaries/2026-10-08");
+  assert.equal(coBan.method, "PUT");
+  assert.equal(coBan.headers["Idempotency-Key"], r.operationId);
+  assert.equal(coBan.headers["X-XBoss-Context"], "ctx-1");
+  assert.equal(coBan.headers["If-Match"], '"12-4"');
+  assert.equal(coBan.headers["If-None-Match"], undefined);
+  const body = JSON.parse(String(coBan.body));
+  assert.equal(body.date, undefined, "ngày nằm trên URL, body PUT full-replace");
+  assert.equal(body.workDone, "đổ bê tông");
+  const moi = dungYeuCau(r, nhatKy("2026-10-08", null), "ctx-1");
+  assert.equal(moi.headers["If-None-Match"], "*");
+  assert.equal(moi.headers["If-Match"], undefined);
+
+  const t = dungYeuCau(rec(), lo([3, 4], false), "ctx-2");
+  assert.deepEqual(JSON.parse(String(t.body)), { ids: [3, 4], installed: false });
+  assert.equal(t.url, "/api/dimensions/batch");
+  const anh = dungYeuCau(
+    rec({ kind: "photo" }),
+    {
+      kind: "photo",
+      payload: { taskId: 8, caption: "c", mime: "image/jpeg", size: 1, blob: new Blob(["x"]) },
+    },
+    "ctx-3",
+  );
+  assert.ok(anh.body instanceof FormData);
+  const file = (anh.body as FormData).get("file") as File;
+  assert.equal(file.name, "offline-8.jpg", "tên file cố định → hash receipt không đổi khi thử lại");
+  assert.equal(anh.headers["Content-Type"], undefined, "multipart để fetch tự đặt boundary");
+  assert.deepEqual(opEndpoint(tick(5)), { url: "/api/dimensions/5", method: "PATCH" });
+});
+
+test("thống kê: chỉ op của chính chủ; khác dự án/khoá chưa mở là locked; conflict/rejected/paused tính vào cần chú ý", () => {
+  const ops = [
+    rec(),
+    rec({ tries: 2 }),
+    rec({ state: "conflict" }),
+    rec({ state: "rejected" }),
+    rec({ state: "paused_auth" }),
+    rec({ projectId: 99 }),
+    rec({ vaultKeyId: "33333333-3333-4333-8333-333333333333" }),
+    rec({ ownerUserId: 8, owner: `8|1|${CHU.deviceId}` }),
+  ];
+  const st = computeStats(ops, CHU, (k) => k === "22222222-2222-4222-8222-222222222222");
+  assert.deepEqual(st, {
+    total: 7,
+    pending: 1,
+    failed: 4,
+    conflict: 1,
+    rejected: 1,
+    pausedAuth: 1,
+    locked: 2,
+  });
 });

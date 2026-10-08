@@ -25,7 +25,7 @@ import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
 import { ROLE_LABELS } from "@/lib/nen/roles";
 import { fetchMe } from "@/app/lib/me";
-import { OFFLINE_QUEUE_QUARANTINED } from "@/app/components/offlineQueue";
+import { offlineQueue } from "@/app/components/offlineQueue";
 import { sortFloorsDesc } from "@/lib/nen/floors";
 import { useTrackingData } from "./useTrackingData";
 import { TrackingToolbar } from "./TrackingToolbar";
@@ -69,6 +69,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
     qcBlocked,
     offlinePending,
     online,
+    offlineReady,
     enqueue,
     enqueueBatch,
   } = useTrackingData(sheet);
@@ -119,6 +120,13 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   const isMobile = useIsMobile();
   // canProgress = bất kỳ role nào không phải xem thuần (engineer, subcon, pm, admin)
   const { editMode, toggle: toggleEditMode } = useEditMode(canProgress || canEdit);
+
+  // S07: khi có mạng, xin sẵn khoá vault cho các task đang hiển thị để tick/ảnh lúc mất mạng
+  // được lưu mã hoá trên thiết bị (không có khoá → không lưu offline, báo lỗi rõ).
+  useEffect(() => {
+    if (!data || !(canProgress || canEdit)) return;
+    void offlineQueue.chuanBiTracking(data.packages.flatMap((p) => p.tasks));
+  }, [data, canProgress, canEdit]);
 
   // Chọn 1 tầng (dropdown hoặc ?floor= từ link timeline) → tự mở các nhóm thuộc
   // tầng đó thay vì để đóng như mặc định, để không phải bấm mở lại thủ công.
@@ -638,6 +646,8 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
 
       {(!online || offlinePending > 0) && (
         <div
+          role="status"
+          aria-live="polite"
           className={`app-toast-center fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-xl border ${
             online
               ? "bg-sky-900 border-sky-700 text-sky-200"
@@ -645,20 +655,21 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
           }`}
           style={{ bottom: "max(4rem, env(safe-area-inset-bottom, 0px) + 3.5rem)" }}
         >
-          {OFFLINE_QUEUE_QUARANTINED ? (
+          {!offlineReady && offlinePending === 0 ? (
             <>
               <WifiOff className="w-3.5 h-3.5" /> Thao tác chưa được lưu offline — kết nối mạng để
               lưu thay đổi.
             </>
           ) : online ? (
             <>
-              <CloudUpload className="w-3.5 h-3.5 animate-pulse" /> Đang gửi lại {offlinePending}{" "}
-              thay đổi đã lưu offline...
+              <CloudUpload className="w-3.5 h-3.5 animate-pulse" /> {offlinePending} thay đổi đang
+              lưu trên thiết bị, chờ gửi lên máy chủ...
             </>
           ) : (
             <>
-              <WifiOff className="w-3.5 h-3.5" /> Mất mạng — thao tác vẫn được lưu
-              {offlinePending > 0 ? ` (${offlinePending} chờ gửi)` : ""}, tự đồng bộ khi có mạng
+              <WifiOff className="w-3.5 h-3.5" /> Mất mạng — thao tác được lưu trên thiết bị
+              {offlinePending > 0 ? ` (${offlinePending} chờ gửi)` : ""}, chưa lên máy chủ; tự gửi
+              khi có mạng
             </>
           )}
         </div>

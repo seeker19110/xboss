@@ -1,12 +1,17 @@
 import "./setup";
+// Công tắc dừng khẩn cấp OFFLINE_QUEUE_QUARANTINED (rollback S07: "dừng sender, giữ vault") —
+// chạy source THẬT của index.ts trong VM, chỉ giả lập biên React/Toast/IndexedDB/vault. Bật công
+// tắc thì manager KHÔNG đọc/ghi/xoá storage, KHÔNG mở vault, KHÔNG gửi; enqueue báo thất bại rõ.
+// Mặc định từ S07 công tắc TẮT (queue v2 hoạt động) — test thứ hai canh điều đó.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import * as logic from "@/app/components/offlineQueue/logic";
+import { OFFLINE_QUEUE_QUARANTINED } from "@/app/components/offlineQueue";
 
-// Chạy source thật; chỉ giả lập biên React và storage để kiểm queue v1 bị cách ly.
 function load<T>(path: string, mocks: Record<string, unknown>, globals = {}): T {
   const filename = resolve(path);
   const { outputText } = ts.transpileModule(readFileSync(filename, "utf8"), {
@@ -19,7 +24,6 @@ function load<T>(path: string, mocks: Record<string, unknown>, globals = {}): T 
     {
       module: evaluatedModule,
       exports: evaluatedModule.exports,
-      Buffer,
       require: (name: string) => {
         if (Object.hasOwn(mocks, name)) return mocks[name];
         throw new Error(`Dependency chưa được giả lập: ${name}`);
@@ -31,181 +35,96 @@ function load<T>(path: string, mocks: Record<string, unknown>, globals = {}): T 
   return evaluatedModule.exports as T;
 }
 
-type Op = { id: number; kind: string; payload: unknown; queuedAt: number; tries: number };
-type Queue = {
+type Manager = {
   start(): void;
   flush(): Promise<void>;
   enqueueTick(dimId: number, installed: boolean): Promise<boolean>;
   enqueueTickBatch(dimIds: number[], installed: boolean): Promise<boolean>;
   enqueuePhoto(input: { taskId: number; blob: Blob }): Promise<{ ok: boolean; error?: string }>;
-  enqueueDiaryNote(input: { date: string }): Promise<{ ok: boolean; error?: string }>;
-  getQueuedPhotos(taskId: number): Promise<unknown[]>;
-  getQueuedPhotoBlob(id: number): Promise<Blob | undefined>;
-  getQueuedDiaryNote(date: string): Promise<unknown>;
-  discardDiaryDraft(date: string): Promise<void>;
-  clear(): Promise<void>;
-  getSnapshot(): { total: number; sending: boolean; quarantined: boolean };
+  enqueueDiaryNote(input: { date: string }, etag: string | null): Promise<{ ok: boolean }>;
+  chuanBiTracking(tasks: { id: number }[]): Promise<void>;
+  chuanBiNhatKy(date: string): Promise<void>;
+  dangKyLuoi(tasks: { id: number; cells: Record<string, { id: number }> }[]): void;
+  getSnapshot(): { quarantined: boolean };
 };
 
-function fixture() {
-  const privatePhoto = new Blob(["owner A photo payload"]);
-  const legacy: Op[] = [
+test("công tắc dừng khẩn cấp bật: không đụng storage/vault/mạng, enqueue thất bại rõ", async () => {
+  const dem = { store: 0, vault: 0, send: 0 };
+  const storeProxy = new Proxy(
+    {},
     {
-      id: 41,
-      kind: "photo",
-      payload: { taskId: 7, caption: "private A caption", blob: privatePhoto },
-      queuedAt: 11,
-      tries: 2,
+      get: () => () => {
+        dem.store++;
+        return Promise.resolve({ rev: 0, lastSeq: 0, ops: [] });
+      },
     },
-    {
-      id: 42,
-      kind: "diary_note",
-      payload: { date: "2026-10-05", workDone: "private A diary" },
-      queuedAt: 12,
-      tries: 0,
-    },
-  ];
-  const state = { reads: 0, writes: 0, removes: 0, clears: 0, sends: 0, syncs: 0 };
-  const listeners = new Map<string, (() => void)[]>();
-  const serviceWorkerListeners: ((event: unknown) => void)[] = [];
-  const storage = new Map<string, string>([["xboss-offline-ticks", '[{"dimId":7}]']]);
-  let intervals = 0;
-
-  class Store {
-    async getAll() {
-      state.reads++;
-      return legacy.slice();
+  );
+  class VaultGia {
+    trangThai = "unknown";
+    onDoi() {
+      return () => {};
     }
-    async add() {
-      state.writes++;
-      return 100;
+    chu() {
+      dem.vault++;
+      return { ownerUserId: 1, orgId: 1, projectId: 1, deviceId: "x" };
     }
-    async remove() {
-      state.removes++;
+    conHieuLuc() {
+      dem.vault++;
+      return true;
     }
-    async clear() {
-      state.clears++;
+    moKhoa() {
+      dem.vault++;
+      return Promise.resolve(true);
     }
+    timKhoa() {
+      dem.vault++;
+      return "key";
+    }
+    damBaoKhoa() {
+      dem.vault++;
+      return Promise.resolve(true);
+    }
+    coKhoa() {
+      return true;
+    }
+    khoa() {}
   }
-  const react = {
-    useCallback: (fn: unknown) => fn,
-    useEffect() {},
-    useSyncExternalStore: () => ({ total: 0, pending: 0, failed: 0 }),
-  };
-  const source = load<{
-    offlineQueue: Queue;
-    clearOfflineQueue: () => Promise<void>;
+  const src = load<{
+    OfflineQueueManager: new (d: unknown) => Manager;
     OFFLINE_QUEUE_QUARANTINED: boolean;
-    OFFLINE_QUEUE_QUARANTINE_ERROR: string;
   }>(
     "app/components/offlineQueue/index.ts",
     {
-      react,
-      "./store": { IdbQueueStore: Store },
+      react: { useCallback: (f: unknown) => f, useEffect() {}, useSyncExternalStore: () => ({}) },
+      "./store": { IdbTxDb: class {}, QueueDb: class {}, LoiHanMucAnh: class extends Error {} },
       "./image": { compressImage: async (blob: Blob) => ({ blob, mime: "image/jpeg" }) },
+      "./vault": { VaultSession: VaultGia },
       "@/app/components/Toast": { showToast() {} },
       "@/app/lib/contextEpoch": { ngheDoiNguCanh: () => () => {} },
-      "./logic": {
-        computeStats: () => ({ total: 0, pending: 0, failed: 0 }),
-        flushQueue: async () => {
-          state.sends++;
-          return { tuChoi: [] };
-        },
-        opEndpoint: () => ({ url: "/api/example", method: "POST" }),
-        tickDedupeIds: () => [],
-        tickBatchDedupeIds: () => [],
-        diaryDedupeIds: () => [],
-        wouldExceedPhotoQuota: () => false,
-        PHOTO_QUOTA_BYTES: 100,
-        type: {},
-      },
+      "./logic": logic,
     },
-    {
-      window: {
-        addEventListener(name: string, listener: () => void) {
-          listeners.set(name, [...(listeners.get(name) ?? []), listener]);
-        },
-      },
-      navigator: {
-        onLine: true,
-        serviceWorker: {
-          addEventListener(_name: string, listener: (event: unknown) => void) {
-            serviceWorkerListeners.push(listener);
-          },
-          ready: Promise.resolve({ sync: { register: async () => state.syncs++ } }),
-        },
-      },
-      localStorage: {
-        getItem(key: string) {
-          return storage.get(key) ?? null;
-        },
-        removeItem(key: string) {
-          storage.delete(key);
-        },
-      },
-      setInterval: () => ++intervals,
-    },
+    { navigator: { onLine: true }, crypto: globalThis.crypto, Date },
   );
-  return {
-    ...source,
-    state,
-    legacy,
-    storage,
-    listeners,
-    serviceWorkerListeners,
-    intervals: () => intervals,
-  };
-}
-
-test("queue v1 stays byte-for-byte quarantined across login/logout and 401 cleanup", async () => {
-  const f = fixture();
-  const before = structuredClone(f.legacy);
-  const localStorageBefore = [...f.storage.entries()];
-
-  f.offlineQueue.start();
-  await f.offlineQueue.flush();
-  await f.clearOfflineQueue();
-  await f.offlineQueue.clear();
-  await f.offlineQueue.discardDiaryDraft("2026-10-05");
-
-  assert.deepEqual(f.legacy, before);
-  assert.deepEqual([...f.storage.entries()], localStorageBefore);
-  assert.equal(f.state.reads, 0);
-  assert.equal(f.state.writes, 0);
-  assert.equal(f.state.removes, 0);
-  assert.equal(f.state.clears, 0);
-  assert.equal(f.state.sends, 0);
-  assert.equal(f.offlineQueue.getSnapshot().quarantined, true);
+  src.OFFLINE_QUEUE_QUARANTINED = true; // mô phỏng rollback bằng công tắc
+  const q = new src.OfflineQueueManager({
+    store: storeProxy,
+    vault: new VaultGia(),
+    send: async () => {
+      dem.send++;
+      return { status: 200 };
+    },
+  });
+  q.dangKyLuoi([{ id: 1, cells: { a: { id: 7 } } }]);
+  await q.chuanBiTracking([{ id: 1 }]);
+  await q.chuanBiNhatKy("2026-10-05");
+  await q.flush();
+  assert.equal(await q.enqueueTick(7, true), false);
+  assert.equal(await q.enqueueTickBatch([7], true), false);
+  assert.equal((await q.enqueuePhoto({ taskId: 1, blob: new Blob(["x"]) })).ok, false);
+  assert.equal((await q.enqueueDiaryNote({ date: "2026-10-05" }, null)).ok, false);
+  assert.deepEqual(dem, { store: 0, vault: 0, send: 0 }, "không storage, không vault, không gửi");
 });
 
-test("online, Background Sync, and an account switch cannot send or expose unknown-owner ops", async () => {
-  const f = fixture();
-  f.offlineQueue.start();
-  for (const listener of f.listeners.get("online") ?? []) listener();
-  for (const listener of f.serviceWorkerListeners) listener({ data: { type: "FLUSH_QUEUE" } });
-  await f.offlineQueue.flush();
-
-  assert.equal((await f.offlineQueue.getQueuedPhotos(7)).length, 0);
-  assert.equal(await f.offlineQueue.getQueuedPhotoBlob(41), undefined);
-  assert.equal(await f.offlineQueue.getQueuedDiaryNote("2026-10-05"), undefined);
-  assert.equal(f.state.reads, 0);
-  assert.equal(f.state.sends, 0);
-  assert.equal(f.state.syncs, 0);
-  assert.equal(f.intervals(), 0);
-});
-
-test("new offline writes fail clearly instead of joining unknown-owner queue", async () => {
-  const f = fixture();
-  assert.equal(await f.offlineQueue.enqueueTick(7, true), false);
-  assert.equal(await f.offlineQueue.enqueueTickBatch([7, 8], true), false);
-  const photo = await f.offlineQueue.enqueuePhoto({ taskId: 7, blob: new Blob(["new photo"]) });
-  const diary = await f.offlineQueue.enqueueDiaryNote({ date: "2026-10-05" });
-
-  assert.equal(photo.ok, false);
-  assert.equal(photo.error, f.OFFLINE_QUEUE_QUARANTINE_ERROR);
-  assert.equal(diary.ok, false);
-  assert.equal(diary.error, f.OFFLINE_QUEUE_QUARANTINE_ERROR);
-  assert.equal(f.state.reads, 0);
-  assert.equal(f.state.writes, 0);
-  assert.equal(f.state.sends, 0);
+test("mặc định từ S07: hàng đợi v2 hoạt động (công tắc dừng khẩn cấp TẮT)", () => {
+  assert.equal(OFFLINE_QUEUE_QUARANTINED, false);
 });

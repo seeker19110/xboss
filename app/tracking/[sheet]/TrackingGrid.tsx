@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { Modal, appAlert, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
-import { OFFLINE_QUEUE_QUARANTINE_ERROR } from "@/app/components/offlineQueue";
+import { OFFLINE_SAVE_ERROR, offlineQueue } from "@/app/components/offlineQueue";
 import { DELAY_REASON_LABEL } from "@/lib/tien-do/delay";
 import { formatDateVN } from "@/lib/nen/date";
 import { StatusBadge } from "@/app/components/StatusBadge";
@@ -188,6 +188,10 @@ export function TrackingGrid({
   useEffect(() => {
     if (expanded) load();
   }, [load, refreshKey, expanded]);
+  // S07: ghi nhận ô → task để tick offline kiểm được khoá vault (manifest theo task).
+  useEffect(() => {
+    if (grid) offlineQueue.dangKyLuoi(grid.tasks);
+  }, [grid]);
 
   // Chọn vùng + hoàn tác + dán/copy Excel (M121, M124 V5) — logic nằm trong hook.
   const vungChon = useTickVung({ grid, load, onChanged, onOfflineTickBatch, editMode });
@@ -415,7 +419,7 @@ export function TrackingGrid({
               ),
             },
         );
-        showToast(OFFLINE_QUEUE_QUARANTINE_ERROR, "error");
+        showToast(OFFLINE_SAVE_ERROR, "error");
       }
     }
     onChanged();
@@ -439,7 +443,7 @@ export function TrackingGrid({
     // tick tiếp được, lô sẽ tự gửi khi có sóng.
     if (kq.trangThai === "mangLoi") {
       if (await onOfflineTickBatch(lo.ids, value)) vungChon.ghiThaoTacLo(lo.ids, truoc, value);
-      else showToast(OFFLINE_QUEUE_QUARANTINE_ERROR, "error");
+      else showToast(OFFLINE_SAVE_ERROR, "error");
     } else if (kq.trangThai === "tuChoi") showToast(kq.loi, "error");
     else vungChon.ghiThaoTacLo(lo.ids, truoc, value);
     load();

@@ -1,308 +1,171 @@
 import "./setup"; // Không cho test đọc cấu hình DB production.
+// Regression của manager hàng đợi offline v2 (app/components/offlineQueue/index.ts) — khoá trong
+// tab trước await đầu tiên, lỗi lưu trữ không kẹt cờ "đang gửi", mất mạng/SSR không đọc storage,
+// enqueue khi online kích gửi ngay, lỗi ghi không kích gửi/không báo lưu. Chạy manager THẬT với
+// QueueDb trên MemoryTxDb + VaultSession thật + máy chủ giả.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { runInNewContext } from "node:vm";
-import { randomInt } from "node:crypto";
-import ts from "typescript";
+import { OfflineQueueManager } from "@/app/components/offlineQueue";
+import { MemoryTxDb, QueueDb, STORE_OPS } from "@/app/components/offlineQueue/store";
+import { VaultSession } from "@/app/components/offlineQueue/vault";
+import type { SendOutcome, YeuCauGui } from "@/app/components/offlineQueue/logic";
+import { taoMayChuGia } from "./helpers/offline-may-chu-gia";
 
-// Regression suite cho manager flush/enqueue trước khi queue v1 bị quarantine. Fixture mở gate
-// riêng trong VM để tiếp tục bảo vệ lock/retry logic; production export luôn giữ true đến S07.
-function load<T>(path: string, mocks: Record<string, unknown>, globals = {}): T {
-  const filename = resolve(path);
-  const { outputText } = ts.transpileModule(readFileSync(filename, "utf8"), {
-    fileName: filename,
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-  });
-  const evaluatedModule = { exports: {} };
-  runInNewContext(
-    outputText,
-    {
-      module: evaluatedModule,
-      exports: evaluatedModule.exports,
-      Buffer,
-      require: (name: string) => {
-        if (Object.hasOwn(mocks, name)) return mocks[name];
-        throw new Error(`Dependency chưa được giả lập: ${name}`);
-      },
-      ...globals,
-    },
-    { filename, timeout: 1000 },
-  );
-  return evaluatedModule.exports as T;
-}
-
-type Op = { id: number; kind: string; payload: unknown; queuedAt: number; tries: number };
-type Result = { tuChoi: { soO: number; lyDo?: string }[]; canXacMinh: { id: number }[] };
-type Manager = {
-  start(): void;
-  flush(): Promise<void>;
-  enqueueTick(dimId: number, installed: boolean): Promise<void>;
-  enqueueTickBatch(dimIds: number[], installed: boolean): Promise<void>;
-  onFlushed(callback: () => void): () => void;
-  getSnapshot(): { total: number; sending: boolean };
+Object.defineProperty(globalThis.navigator, "onLine", {
+  value: true,
+  configurable: true,
+  writable: true,
+});
+const datOnline = (v: boolean) => {
+  (globalThis.navigator as { onLine: boolean }).onLine = v;
 };
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
-const tick = () => new Promise<void>((done) => setImmediate(done));
-function fixture(
-  opts: {
-    online?: boolean;
-    hasNavigator?: boolean;
-    withWindow?: boolean;
-    getAll?: (call: number, items: Op[]) => Promise<Op[]>;
-    flush?: () => Promise<Result>;
-    addFails?: boolean;
-  } = {},
-) {
-  let items: Op[] = [];
-  const state = { reads: 0, flushes: 0, adds: 0, syncs: 0 };
-  const notices: string[] = [];
-  const epochListeners: (() => void)[] = [];
-  const nav = {
-    onLine: opts.online ?? true,
-    serviceWorker: {
-      ready: Promise.resolve({
-        sync: {
-          register: async (tag: string) => {
-            assert.equal(tag, "xboss-flush");
-            state.syncs++;
-          },
-        },
-      }),
-    },
-  };
-  class Store {
-    async getAll() {
-      state.reads++;
-      return opts.getAll ? opts.getAll(state.reads, items) : [...items];
+
+class StoreDem extends QueueDb {
+  doc = 0;
+  hongDoc = 0;
+  async docChu(owner: string) {
+    this.doc++;
+    if (this.hongDoc > 0) {
+      this.hongDoc--;
+      throw new Error("read failed");
     }
-    async add(input: Omit<Op, "id">) {
-      if (opts.addFails) throw new Error("store add failed");
-      state.adds++;
-      const id = randomInt(100, 10000);
-      items.push({ ...input, id });
-      return id;
-    }
-    async remove(id: number) {
-      items = items.filter((op) => op.id !== id);
-    }
+    return super.docChu(owner);
   }
-  const source = load<{ offlineQueue: Manager; OFFLINE_QUEUE_QUARANTINED: boolean }>(
-    "app/components/offlineQueue/index.ts",
-    {
-      react: {},
-      "./store": { IdbQueueStore: Store },
-      "./image": {},
-      "@/app/components/Toast": { showToast: (message: string) => notices.push(message) },
-      "@/app/lib/contextEpoch": {
-        ngheDoiNguCanh: (cb: () => void) => {
-          epochListeners.push(cb);
-          return () => {};
-        },
-      },
-      "./logic": {
-        computeStats: (ops: Op[]) => ({ total: ops.length, pending: ops.length, failed: 0 }),
-        tickDedupeIds: () => [],
-        tickBatchDedupeIds: () => [],
-        flushQueue: async () => {
-          state.flushes++;
-          if (opts.flush) return opts.flush();
-          items = [];
-          return { tuChoi: [], canXacMinh: [] };
-        },
-      },
+}
+
+async function fixture(opts: { send?: (r: YeuCauGui) => Promise<SendOutcome> } = {}) {
+  const may = taoMayChuGia();
+  may.dangNhap({ id: 5, orgId: 1, role: "engineer" });
+  const db = new MemoryTxDb();
+  const store = new StoreDem(db);
+  const gui: YeuCauGui[] = [];
+  const q = new OfflineQueueManager({
+    store,
+    vault: new VaultSession(may.fetch),
+    send: async (r) => {
+      gui.push(r);
+      return opts.send
+        ? opts.send(r)
+        : { status: 200, receiptOperationId: r.headers["Idempotency-Key"] };
     },
-    {
-      ...(opts.hasNavigator === false ? {} : { navigator: nav }),
-      ...(opts.withWindow ? { window: { addEventListener() {} } } : {}),
+  });
+  q.dangKyLuoi([{ id: 3, cells: { a: { id: 30 }, b: { id: 31 } } }]);
+  await q.chuanBiTracking([{ id: 3 }]);
+  const soOp = () => db.data.get(STORE_OPS)!.size;
+  return { q, store, gui, soOp, may };
+}
+
+const cho = () => new Promise<void>((r) => setImmediate(r));
+
+test("khoá trong tab có trước await đầu tiên: 2 lần flush đồng thời chỉ gửi mỗi op 1 lần", async () => {
+  let mo!: () => void;
+  const cong = new Promise<void>((r) => (mo = r));
+  const f = await fixture({
+    send: async (r) => {
+      await cong;
+      return { status: 200, receiptOperationId: r.headers["Idempotency-Key"] };
     },
-  );
-  source.OFFLINE_QUEUE_QUARANTINED = false; // test-only: exercise retained S07 manager regressions
-  const queue = source.offlineQueue;
-  const op: Op = { id: randomInt(100, 10000), kind: "tick", payload: {}, queuedAt: 0, tries: 0 };
-  return {
-    queue,
-    state,
-    nav,
-    op,
-    notices,
-    doiNguCanh: () => epochListeners.forEach((cb) => cb()),
-    seed: () => {
-      items = [op];
+  });
+  datOnline(false);
+  await f.q.enqueueTick(30, true);
+  datOnline(true);
+  const a = f.q.flush();
+  const b = f.q.flush();
+  await cho();
+  mo();
+  await Promise.all([a, b]);
+  assert.equal(f.gui.length, 1);
+  assert.equal(f.soOp(), 0);
+  assert.equal(f.q.getSnapshot().sending, false);
+});
+
+test("đọc storage lỗi không giữ cờ khoá vĩnh viễn; lần sau gửi được", async () => {
+  const f = await fixture();
+  datOnline(false);
+  await f.q.enqueueTick(30, true);
+  datOnline(true);
+  f.store.hongDoc = 1;
+  await assert.rejects(f.q.flush(), /read failed/);
+  assert.equal(f.q.getSnapshot().sending, false);
+  await f.q.flush();
+  assert.equal(f.gui.length, 1);
+  assert.equal(f.soOp(), 0);
+});
+
+test("lỗi sender (throw) = không rõ server đã nhận: giữ op, không báo đã gửi, lần sau gửi lại CÙNG key", async () => {
+  let lan = 0;
+  const f = await fixture({
+    send: async (r) => {
+      if (++lan === 1) throw new Error("send failed");
+      return { status: 200, receiptOperationId: r.headers["Idempotency-Key"] };
     },
+  });
+  let xong = 0;
+  f.q.onFlushed(() => xong++);
+  datOnline(false);
+  await f.q.enqueueTick(30, true);
+  datOnline(true);
+  await f.q.flush();
+  assert.equal(f.q.getSnapshot().sending, false);
+  assert.equal(xong, 0);
+  assert.equal(f.soOp(), 1);
+  assert.equal(f.q.getSnapshot().failed, 1);
+  const db = (f.store as unknown as { db: MemoryTxDb }).db;
+  for (const [k, v] of db.data.get(STORE_OPS)!)
+    db.data.get(STORE_OPS)!.set(k, { ...(v as object), nextAttemptAt: 0 });
+  await f.q.flush();
+  assert.equal(f.soOp(), 0);
+  assert.equal(xong, 1);
+  assert.equal(f.gui[0].headers["Idempotency-Key"], f.gui[1].headers["Idempotency-Key"]);
+});
+
+test("op kẹt `sending` (tab chết giữa chừng) được đưa về pending ở kỳ lease mới của CHÍNH tab", async () => {
+  const f = await fixture();
+  datOnline(false);
+  await f.q.enqueueTick(30, true);
+  datOnline(true);
+  const chu = f.q.vault.chu()!;
+  const l = await f.store.xinLease(chu, "tab-chet", Date.now());
+  const id = [
+    ...(f.store as unknown as { db: MemoryTxDb }).db.data.get(STORE_OPS)!.values(),
+  ][0] as {
+    operationId: string;
   };
-}
-
-test("queue: khóa phải có trước lần đọc storage đầu tiên", async () => {
-  const gate = deferred<Op[]>();
-  const f = fixture({ getAll: async (n, items) => (n === 1 ? gate.promise : [...items]) });
-  f.seed();
-  const first = f.queue.flush();
-  await tick();
-  const second = f.queue.flush();
-  gate.resolve([f.op]);
-  await Promise.all([first, second]);
-  assert.equal(f.state.flushes, 1);
-  assert.equal(f.queue.getSnapshot().sending, false);
+  await f.store.batDauGui(chu, id.operationId, "tab-chet", l!.token, Date.now());
+  await f.store.traLease(chu, "tab-chet", l!.token);
+  await f.q.flush();
+  assert.equal(f.soOp(), 0, "gửi lại cùng operationId — server dedup bằng receipt");
 });
 
-test("queue: giữ khóa trong lúc refreshStats đang chờ", async () => {
-  const cleanup = deferred<Op[]>();
-  const entered = deferred<void>();
-  const f = fixture({
-    getAll: async (n, items) => {
-      if (n === 2) {
-        entered.resolve();
-        return cleanup.promise;
-      }
-      return [...items];
-    },
-  });
-  f.seed();
-  const first = f.queue.flush();
-  await entered.promise;
-  const second = f.queue.flush();
-  await tick();
-  const readCountWhileLocked = f.state.reads;
-  cleanup.resolve([]);
-  await Promise.all([first, second]);
-  assert.equal(readCountWhileLocked, 2);
+test("mất mạng: flush không đọc storage, không gửi", async () => {
+  const f = await fixture();
+  datOnline(false);
+  await f.q.enqueueTick(30, true);
+  const truoc = f.store.doc;
+  await f.q.flush();
+  datOnline(true);
+  assert.equal(f.store.doc, truoc);
+  assert.equal(f.gui.length, 0);
 });
 
-test("queue: storage read lỗi không giữ cờ khóa vĩnh viễn", async () => {
-  const f = fixture({
-    getAll: async (n, items) => {
-      if (n === 1) throw new Error("read failed");
-      return [...items];
-    },
-  });
-  f.seed();
-  await assert.rejects(f.queue.flush(), /read failed/);
-  assert.equal(f.queue.getSnapshot().sending, false);
-  await f.queue.flush();
-  assert.equal(f.state.flushes, 1);
+test("enqueue khi online kích gửi ngay; gửi xong phát callback một lần", async () => {
+  const f = await fixture();
+  let xong = 0;
+  f.q.onFlushed(() => xong++);
+  assert.equal(await f.q.enqueueTickBatch([30, 31], true), true);
+  // WebCrypto chạy trên threadpool — chờ theo hạn thời gian, không theo số vòng setImmediate.
+  for (const het = Date.now() + 5000; xong === 0 && Date.now() < het;)
+    await new Promise((r) => setTimeout(r, 5));
+  assert.equal(f.gui.length, 1);
+  assert.equal(f.gui[0].url, "/api/dimensions/batch");
+  assert.equal(xong, 1);
 });
 
-test("queue: refreshStats lỗi vẫn tắt trạng thái sending và mở khóa", async () => {
-  const f = fixture({
-    getAll: async (n, items) => {
-      if (n === 2) throw new Error("stats failed");
-      return [...items];
-    },
-  });
-  f.seed();
-  await assert.rejects(f.queue.flush(), /stats failed/);
-  assert.equal(f.queue.getSnapshot().sending, false);
-  f.seed();
-  await f.queue.flush();
-  assert.equal(f.state.flushes, 2);
-});
-
-test("queue: lỗi sender giữ queue, không báo đã gửi hết", async () => {
-  let attempts = 0;
-  const f = fixture({
-    flush: async () => {
-      if (++attempts === 1) throw new Error("send failed");
-      return { tuChoi: [], canXacMinh: [] };
-    },
-  });
-  let flushed = 0;
-  f.queue.onFlushed(() => flushed++);
-  f.seed();
-  await assert.rejects(f.queue.flush(), /send failed/);
-  assert.equal(f.queue.getSnapshot().sending, false);
-  assert.equal(f.queue.getSnapshot().total, 1);
-  assert.equal(flushed, 0);
-  await f.queue.flush();
-  assert.equal(attempts, 2);
-});
-
-test("queue: rỗng không gọi sender hoặc callback hoàn tất giả", async () => {
-  const f = fixture();
-  f.queue.onFlushed(() => assert.fail("Queue ban đầu rỗng"));
-  await f.queue.flush();
-  await f.queue.flush();
-  assert.equal(f.state.flushes, 0);
-  assert.equal(f.queue.getSnapshot().sending, false);
-});
-
-for (const hasNavigator of [false, true]) {
-  test(`queue: offline/SSR không đọc storage, navigator=${hasNavigator}`, async () => {
-    const f = fixture({ hasNavigator, online: false });
-    f.seed();
-    await f.queue.flush();
-    assert.equal(f.state.reads, 0);
-    assert.equal(f.state.flushes, 0);
-  });
-}
-
-test("queue: hoàn tất chỉ phát callback một lần", async () => {
-  const f = fixture();
-  let completions = 0;
-  f.queue.onFlushed(() => completions++);
-  f.seed();
-  await f.queue.flush();
-  await f.queue.flush();
-  assert.equal(completions, 1);
-  assert.equal(f.queue.getSnapshot().total, 0);
-});
-
-test("queue: batch online gọi sender sau khi lưu, không đợi interval", async () => {
-  const f = fixture();
-  await f.queue.enqueueTickBatch([randomInt(100, 10000)], true);
-  await tick();
-  assert.equal(f.state.adds, 1);
-  assert.equal(f.state.flushes, 1);
-});
-
-test("queue: batch offline đăng ký sync khi được hỗ trợ", async () => {
-  const f = fixture({ online: false });
-  await f.queue.enqueueTickBatch([randomInt(100, 10000)], true);
-  await tick();
-  assert.equal(f.state.syncs, 1);
-  assert.equal(f.state.flushes, 0);
-  assert.equal(f.queue.getSnapshot().total, 1);
-});
-
-test("queue: batch rỗng không ghi hoặc đánh thức sender", async () => {
-  const f = fixture();
-  await f.queue.enqueueTickBatch([], true);
-  await tick();
-  assert.equal(f.state.adds, 0);
-  assert.equal(f.state.flushes, 0);
-  assert.equal(f.state.syncs, 0);
-});
-
-test("queue: add batch thất bại không gửi hoặc báo đồng bộ", async () => {
-  const f = fixture({ addFails: true });
-  await assert.rejects(f.queue.enqueueTickBatch([randomInt(100, 10000)], true), /add failed/);
-  assert.equal(f.state.flushes, 0);
-  assert.equal(f.state.syncs, 0);
-});
-
-test("queue: tick đơn vẫn đánh thức sender như trước", async () => {
-  const f = fixture();
-  await f.queue.enqueueTick(randomInt(100, 10000), true);
-  await tick();
-  assert.equal(f.state.adds, 1);
-  assert.equal(f.state.flushes, 1);
-});
-
-test("queue: tab khác đổi ngữ cảnh → dừng flush ở tab này, không xoá hàng đợi (S05)", async () => {
-  const f = fixture({ withWindow: true });
-  f.queue.start();
-  f.seed();
-  f.doiNguCanh();
-  await f.queue.flush();
-  assert.equal(f.state.reads, 0, "không đọc/gửi hàng đợi sau khi ngữ cảnh đổi");
-  assert.equal(f.state.flushes, 0);
+test("lô rỗng không ghi/không kích gửi; ô chưa thuộc lưới đã đăng ký → không lưu", async () => {
+  const f = await fixture();
+  assert.equal(await f.q.enqueueTickBatch([], true), true);
+  assert.equal(await f.q.enqueueTick(999, true), false);
+  assert.equal(await f.q.enqueueTickBatch([30, 999], true), false);
+  assert.equal(f.soOp(), 0);
+  assert.equal(f.gui.length, 0);
 });

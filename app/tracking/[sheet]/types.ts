@@ -5,6 +5,8 @@ export type Task = {
   status: string;
   endDate: string | null;
   progressPercent: number;
+  /** Người được giao (API trả kèm) — dùng chọn task cho khoá vault offline của subcon. */
+  assignedTo?: number | null;
 };
 export type Pkg = {
   id: number;
