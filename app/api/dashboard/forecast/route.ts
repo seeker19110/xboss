@@ -21,11 +21,12 @@ export async function GET(req: NextRequest) {
   const systemFilter = systemId !== null ? "AND st.system_id = ?" : "";
   const systemParams = systemId !== null ? [systemId] : [];
   // Dự án đang chọn — lọc theo dự án để tránh rò rỉ chéo dự án (đa dự án, M22+).
-  // null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
+  // A1-AC02: không có dự án khả kiến → trả rỗng đúng shape, KHÔNG mở toàn hệ.
   const projectId = await getCurrentProjectId(user);
-  const projectJoin = projectId != null ? "JOIN towers tw ON tw.id = st.tower_id" : "";
-  const projectFilter = projectId != null ? "AND tw.project_id = ?" : "";
-  const projectParams = projectId != null ? [projectId] : [];
+  if (projectId == null) return NextResponse.json({ forecast: [], windowDays: WINDOW_DAYS });
+  const projectJoin = "JOIN towers tw ON tw.id = st.tower_id";
+  const projectFilter = "AND tw.project_id = ?";
+  const projectParams = [projectId];
 
   const rows = await query<{
     sheetType: string;

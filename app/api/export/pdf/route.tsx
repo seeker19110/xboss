@@ -212,11 +212,14 @@ export async function GET(_req: NextRequest) {
   if (!CAN.export(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được xuất báo cáo" }, { status: 403 });
 
-  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc.
+  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+).
+  // A1-AC02: không có dự án khả kiến → 404, không sinh file toàn hệ.
   const projectId = await getCurrentProjectId(user);
-  const projectJoin = projectId != null ? "JOIN towers tw ON tw.id = st.tower_id" : "";
-  const projectFilterAnd = projectId != null ? "AND tw.project_id = ?" : "";
-  const projectParams = projectId != null ? [projectId] : [];
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án đang chọn" }, { status: 404 });
+  const projectJoin = "JOIN towers tw ON tw.id = st.tower_id";
+  const projectFilterAnd = "AND tw.project_id = ?";
+  const projectParams = [projectId];
 
   // Lấy dữ liệu
   const [kpiRows, delayedRows, project, groupProgress] = await Promise.all([
@@ -247,11 +250,9 @@ export async function GET(_req: NextRequest) {
        WHERE t.status = 'tre' ${projectFilterAnd} ORDER BY t.end_date NULLS LAST LIMIT 200`,
       ...projectParams,
     ),
-    projectId != null
-      ? queryOne<{ name: string }>(`SELECT name FROM projects WHERE id = ?`, projectId).catch(
-          () => null,
-        )
-      : queryOne<{ name: string }>(`SELECT name FROM projects LIMIT 1`).catch(() => null),
+    queryOne<{ name: string }>(`SELECT name FROM projects WHERE id = ?`, projectId).catch(
+      () => null,
+    ),
     getGroupProgressMap({ projectId }),
   ]);
 
