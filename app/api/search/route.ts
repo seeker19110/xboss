@@ -42,12 +42,13 @@ export async function GET(req: NextRequest) {
   // plainto_tsquery chấp nhận chuỗi tự do; bỏ ký tự đặc biệt để không sinh token rác.
   const ftsQuery = q.replace(/[^\p{L}\p{N}\s]/gu, " ").trim() || q;
 
-  // Dự án đang chọn — lọc kết quả để tránh rò rỉ chéo dự án (M22+). null = DB chưa có
-  // project nào → giữ hành vi không lọc (tương thích ngược).
+  // Dự án đang chọn — lọc kết quả vô điều kiện để tránh rò rỉ chéo dự án (M22+). Không có
+  // dự án khả kiến (A1-AC02) → không có kết quả, không query nghiệp vụ.
   const projectId = await getCurrentProjectId(user);
-  const projectJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
-  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
-  const projectParam = projectId != null ? [projectId] : [];
+  if (projectId == null) return NextResponse.json({ hits: [] });
+  const projectJoin = " JOIN towers tw ON tw.id = st.tower_id";
+  const projectFilter = " AND tw.project_id = ?";
+  const projectParam = [projectId];
 
   const taskFts = ftsExpr(["t.code", "t.boq_code", "t.name"]);
   const wpFts = ftsExpr(["wp.code", "wp.boq_code", "wp.name"]);

@@ -47,18 +47,20 @@ export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get("sheet");
   if (!slug) return NextResponse.json({ error: "Thiếu tham số sheet" }, { status: 400 });
 
-  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc. Sheet
-  // thuộc dự án khác → trả 404 "Sheet không hợp lệ" (không lộ sự tồn tại ở dự án khác).
+  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+), vô điều kiện. Sheet thuộc
+  // dự án khác hoặc user không có dự án khả kiến (A1-AC02) → 404 "Sheet không hợp lệ"
+  // (không lộ sự tồn tại ở dự án khác; shape cần object `sheet` nên không trả rỗng 200).
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ error: "Sheet không hợp lệ" }, { status: 404 });
   const blocked = await assertModuleEnabled("tracking", projectId);
   if (blocked) return blocked;
   const st = await queryOne<Sheet>(
     `SELECT st.id, st.code, st.name, st.responsible, st.slug
        FROM sheet_types st
        LEFT JOIN towers tw ON st.tower_id = tw.id
-      WHERE st.slug = ?${projectId != null ? " AND tw.project_id = ?" : ""}`,
+      WHERE st.slug = ? AND tw.project_id = ?`,
     slug,
-    ...(projectId != null ? [projectId] : []),
+    projectId,
   );
   if (!st) return NextResponse.json({ error: "Sheet không hợp lệ" }, { status: 404 });
 

@@ -14,14 +14,25 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
+  // A1-AC02: không có dự án khả kiến → dữ liệu rỗng đúng shape, không query nghiệp vụ.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({
+      towers: [],
+      current: [],
+      history: [],
+      weeks: [],
+      floors: [],
+      sheets: [],
+    });
+
   const today = todayISO();
   const systemId = await resolveSystemId(req.nextUrl.searchParams.get("system"));
   const systemFilter = systemId !== null ? "AND st.system_id = ?" : "";
   const systemParams = systemId !== null ? [systemId] : [];
-  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc.
-  const projectId = await getCurrentProjectId(user);
-  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
-  const projectParams = projectId != null ? [projectId] : [];
+  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+), vô điều kiện.
+  const projectFilter = " AND tw.project_id = ?";
+  const projectParams = [projectId];
 
   // Tiến độ hiện tại theo tháp × tầng × hệ — trễ tính theo ngày quá hạn
   // (nhất quán với cách lib/status.ts suy ra "tre").

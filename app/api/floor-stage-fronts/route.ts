@@ -135,7 +135,18 @@ export async function PUT(req: NextRequest) {
     const n = Number(value);
     if (!Number.isInteger(n))
       return NextResponse.json({ error: `${label} không hợp lệ` }, { status: 422 });
-    const row = await queryOne<{ id: number }>(`SELECT id FROM ${table} WHERE id = ?`, n);
+    // Công tác chuyển bước: chỉ nhận công tác dùng chung hoặc của dự án đang chọn — không
+    // cho tham chiếu công tác riêng của dự án khác (A1-AC03). Nhà thầu là danh mục dùng chung.
+    const row =
+      table === "construction_stages"
+        ? await withProjectScope(projectId!, () =>
+            queryOne<{ id: number }>(
+              `SELECT id FROM construction_stages WHERE id = ? AND (project_id IS NULL OR project_id = ?)`,
+              n,
+              projectId,
+            ),
+          )
+        : await queryOne<{ id: number }>(`SELECT id FROM suppliers WHERE id = ?`, n);
     if (!row)
       return NextResponse.json({ error: `Không tìm thấy ${label.toLowerCase()}` }, { status: 404 });
     return n;

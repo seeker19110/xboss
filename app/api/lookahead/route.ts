@@ -32,19 +32,22 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
+  // A1-AC02: không có dự án khả kiến → kế hoạch rỗng đúng shape, không query nghiệp vụ.
+  const projectId = await getCurrentProjectId(user);
   const days = Math.min(
     60,
     Math.max(1, parseInt(req.nextUrl.searchParams.get("days") ?? "14") || 14),
   );
   const today = todayISO();
   const until = daysFromTodayISO(days);
+  if (projectId == null)
+    return NextResponse.json({ days, from: today, until, starting: [], due: [] });
   const systemId = await resolveSystemId(req.nextUrl.searchParams.get("system"));
   const systemFilter = systemId !== null ? "AND st.system_id = ?" : "";
   const systemParams = systemId !== null ? [systemId] : [];
-  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc.
-  const projectId = await getCurrentProjectId(user);
-  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
-  const projectParams = projectId != null ? [projectId] : [];
+  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+), vô điều kiện.
+  const projectFilter = " AND tw.project_id = ?";
+  const projectParams = [projectId];
 
   // COALESCE(t.start_date/end_date, wp....): task NULL = kế thừa ngày nhóm (lib/recompute.ts).
   const select = `SELECT t.id, t.code, t.name, t.status,
@@ -88,7 +91,7 @@ export async function GET(req: NextRequest) {
   // Task thuộc tầng chưa sẵn sàng mặt bằng (công tác cuối trong chuỗi thi công chưa bàn
   // giao — model tầng×công tác của M46, thay cho model tầng×sheet cũ của M14) → cờ
   // waitingFront cho báo cáo EOT.
-  const pendingFronts = await pendingStageFloors(projectId ?? undefined);
+  const pendingFronts = await pendingStageFloors(projectId);
   const flag = (t: LookaheadTask) => ({
     ...t,
     waitingFront: t.floorLabel != null && pendingFronts.has(t.floorLabel) ? true : undefined,

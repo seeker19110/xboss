@@ -49,6 +49,12 @@ export async function GET(req: NextRequest) {
   const system = req.nextUrl.searchParams.get("system")?.trim() || null;
   const includeVo = req.nextUrl.searchParams.get("includeVo") !== "0";
   const projectId = await getCurrentProjectId(user);
+  // A1-AC02: không có dự án khả kiến → danh sách rỗng đúng shape, không query nghiệp vụ.
+  if (projectId == null)
+    return NextResponse.json({
+      items: [],
+      totals: { contractValue: 0, subValue: 0, executedValue: 0 },
+    });
   const blocked = await assertModuleEnabled("materials", projectId);
   if (blocked) return blocked;
 
@@ -59,15 +65,11 @@ export async function GET(req: NextRequest) {
     args.push(system);
   }
   if (!includeVo) conds.push("bi.vo_id IS NULL");
-  if (projectId != null) {
-    conds.push("bi.project_id = ?");
-    args.push(projectId);
-  } else {
-    conds.push("FALSE");
-  }
-  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+  conds.push("bi.project_id = ?");
+  args.push(projectId);
+  const where = `WHERE ${conds.join(" AND ")}`;
 
-  const rows = await withProjectScope(projectId ?? "*", () =>
+  const rows = await withProjectScope(projectId, () =>
     query<BoqRow>(
       `SELECT bi.id, bi.code, bi.name, bi.unit,
               bi.system_id AS "systemId", d.code AS "systemCode",
