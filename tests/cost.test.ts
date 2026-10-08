@@ -27,9 +27,10 @@ test(
 
     // Ngân sách: 1 dòng BOQ 100 x 1000 = 100,000.
     const boqId = await insertId(
-      `INSERT INTO boq_items (code, name, unit, system_id, qty_contract, unit_price)
-       VALUES ('TESTBOQ-COST', 'Ống gió test', 'm', ?, 100, 1000)`,
+      `INSERT INTO boq_items (code, name, unit, system_id, qty_contract, unit_price, project_id)
+       VALUES ('TESTBOQ-COST', 'Ống gió test', 'm', ?, 100, 1000, ?)`,
       dien!.id,
+      projectId,
     );
 
     // Cam kết: PO còn hiệu lực 10 x 500 = 5,000 (tính); PO đã huỷ 10 x 999 = 9,990 (KHÔNG tính).
@@ -39,8 +40,9 @@ test(
       stId,
     );
     const poOkId = await insertId(
-      `INSERT INTO purchase_orders (supplier_id, status) VALUES (?, 'confirmed')`,
+      `INSERT INTO purchase_orders (supplier_id, status, project_id) VALUES (?, 'confirmed', ?)`,
       supplierId,
+      projectId,
     );
     await run(
       `INSERT INTO po_items (po_id, material_id, qty_ordered, unit_price) VALUES (?, ?, 10, 500)`,
@@ -48,8 +50,9 @@ test(
       matId,
     );
     const poCancelledId = await insertId(
-      `INSERT INTO purchase_orders (supplier_id, status) VALUES (?, 'cancelled')`,
+      `INSERT INTO purchase_orders (supplier_id, status, project_id) VALUES (?, 'cancelled', ?)`,
       supplierId,
+      projectId,
     );
     await run(
       `INSERT INTO po_items (po_id, material_id, qty_ordered, unit_price) VALUES (?, ?, 10, 999)`,
@@ -64,25 +67,32 @@ test(
     );
 
     // Thực chi: bill 3,000 + advance 1,000 (advance TÍNH vào thực chi — đã quyết 2026-07-04).
+    // payment_bills.project_id là phạm vi trực tiếp (S11/A4-FR03) — writer thật luôn ghi cột này.
     await run(
-      `INSERT INTO payment_bills (responsible, type, amount, paid_date, sheet_type_id, floor_label)
-       VALUES ('Test', 'bill', 3000, CURRENT_DATE, ?, 'T1')`,
+      `INSERT INTO payment_bills (responsible, type, amount, paid_date, sheet_type_id, floor_label, project_id)
+       VALUES ('Test', 'bill', 3000, CURRENT_DATE, ?, 'T1', ?)`,
       stId,
+      projectId,
     );
     await run(
-      `INSERT INTO payment_bills (responsible, type, amount, paid_date, sheet_type_id, floor_label)
-       VALUES ('Test', 'advance', 1000, CURRENT_DATE, ?, 'T1')`,
+      `INSERT INTO payment_bills (responsible, type, amount, paid_date, sheet_type_id, floor_label, project_id)
+       VALUES ('Test', 'advance', 1000, CURRENT_DATE, ?, 'T1', ?)`,
       stId,
+      projectId,
     );
 
-    const rows = await costSummary("system");
+    // Không có dự án → fail-closed: không còn chế độ "toàn hệ" cộng chéo dự án/tổ chức.
+    assert.deepEqual(await costSummary("system"), []);
+    assert.equal(await systemBudget(dien!.id), null);
+
+    const rows = await costSummary("system", true, projectId);
     const row = rows.find((r) => r.key === "dien");
     assert.ok(row, "phải có dòng cho hệ điện");
     assert.equal(row!.budget, 100_000);
     assert.equal(row!.committed, 5_000 + 20_000); // PO huỷ không tính
     assert.equal(row!.actual, 3_000 + 1_000); // advance tính vào thực chi
 
-    assert.equal(await systemBudget(dien!.id), 100_000);
+    assert.equal(await systemBudget(dien!.id, true, projectId), 100_000);
 
     // Dọn dữ liệu test.
     await run(`DELETE FROM payment_bills WHERE sheet_type_id = ?`, stId);
@@ -103,7 +113,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { costSummary, costTotals } = await import("@/lib/tai-chinh/cost");
+    const { costSummary, getCostReport } = await import("@/lib/tai-chinh/cost");
 
     const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien);
@@ -185,16 +195,18 @@ test(
       stB,
     );
 
-    // Thực chi (payment_bills không có project_id riêng, suy qua tower).
+    // Thực chi: payment_bills có project_id trực tiếp (0069) — sheet phải cùng dự án.
     await run(
-      `INSERT INTO payment_bills (responsible, type, amount, paid_date, sheet_type_id, floor_label)
-       VALUES ('Test', 'bill', 3000, CURRENT_DATE, ?, 'T1')`,
+      `INSERT INTO payment_bills (responsible, type, amount, paid_date, sheet_type_id, floor_label, project_id)
+       VALUES ('Test', 'bill', 3000, CURRENT_DATE, ?, 'T1', ?)`,
       stA,
+      projA,
     );
     await run(
-      `INSERT INTO payment_bills (responsible, type, amount, paid_date, sheet_type_id, floor_label)
-       VALUES ('Test', 'bill', 4000, CURRENT_DATE, ?, 'T1')`,
+      `INSERT INTO payment_bills (responsible, type, amount, paid_date, sheet_type_id, floor_label, project_id)
+       VALUES ('Test', 'bill', 4000, CURRENT_DATE, ?, 'T1', ?)`,
       stB,
+      projB,
     );
 
     const rowsA = await costSummary("system", true, projA);
@@ -211,18 +223,15 @@ test(
     assert.equal(rowB!.committed, 7_000 + 30_000); // PO B + giao thầu B
     assert.equal(rowB!.actual, 4_000); // bill B
 
-    // costTotals cộng dồn NHIỀU hệ (lib/money.ts, không phải float JS — đợt audit
-    // 2026-07-19) — dự án A/B chỉ có dữ liệu ở hệ "dien" nên tổng phải khớp đúng
-    // rowA/rowB (các hệ khác toàn 0, không lệch do cộng dồn).
-    const totalsA = await costTotals(true, projA);
-    assert.equal(totalsA.budget, rowA!.budget);
-    assert.equal(totalsA.committed, rowA!.committed);
-    assert.equal(totalsA.actual, rowA!.actual);
-
-    const totalsB = await costTotals(true, projB);
-    assert.equal(totalsB.budget, rowB!.budget);
-    assert.equal(totalsB.committed, rowB!.committed);
-    assert.equal(totalsB.actual, rowB!.actual);
+    // projectTotals của báo cáo chuẩn (S11) cộng NHIỀU hệ trên bigint — dự án A/B chỉ có dữ
+    // liệu ở hệ "dien" nên tổng phải khớp đúng rowA/rowB, không lẫn dự án kia.
+    const opts = { groupBy: "system", includeVo: true } as const;
+    const totalsA = (await getCostReport({ kind: "project", projectId: projA }, opts))
+      .projectTotals;
+    assert.deepEqual(totalsA, { budget: 10_000_000n, committed: 2_500_000n, actual: 300_000n });
+    const totalsB = (await getCostReport({ kind: "project", projectId: projB }, opts))
+      .projectTotals;
+    assert.deepEqual(totalsB, { budget: 20_000_000n, committed: 3_700_000n, actual: 400_000n });
 
     // Dọn dữ liệu test.
     await run(`DELETE FROM payment_bills WHERE sheet_type_id IN (?, ?)`, stA, stB);

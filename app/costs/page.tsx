@@ -7,35 +7,63 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
+import {
+  HEADER_DINH_DANG_TIEN,
+  doRongThanh,
+  phanTram,
+  tienDayDu,
+  tienRutGon,
+} from "./_components/dinhDangChiPhi";
 
-type CostRow = { key: string; label: string; budget: number; committed: number; actual: number };
-type Alert = { key: string; label: string; pct: number; over: boolean };
+// Tiền là chuỗi canonical decimal-string-v1 (cost-report-v1, S11) — không qua number.
+type Tien = string;
+type MucCanhBao = "none" | "warn" | "over" | "no_budget";
+type CostRow = {
+  key: string;
+  label: string;
+  systemCode: string | null;
+  unassigned: boolean;
+  level: MucCanhBao;
+  usagePct: number | null;
+  budget: Tien;
+  committed: Tien;
+  actual: Tien;
+};
+type Alert = { key: string; label: string; level: Exclude<MucCanhBao, "none">; pct: number | null };
 type Settings = { warnPct: number; overPct: number };
+type Totals = { budget: Tien; committed: Tien; actual: Tien };
+type DemNguon = { boqItems: number; poItems: number; floorContracts: number; payments: number };
 type Data = {
   rows: CostRow[];
-  totals: { budget: number; committed: number; actual: number };
+  selectedTotals: Totals;
+  projectTotals: Totals;
   settings: Settings;
   alerts: Alert[];
   groupBy: "system" | "floor";
+  metadata: {
+    coverage: { reconciled: boolean; invalidScope: DemNguon; invalidQuantity: { poItems: number } };
+  };
 };
 
-function fmtVND(n: number) {
-  if (!n) return "—";
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)} tỷ`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} tr`;
-  return n.toLocaleString("vi-VN") + " đ";
-}
-function fmtFull(n: number) {
-  return n.toLocaleString("vi-VN") + " đ";
-}
-
-function usagePct(committed: number, budget: number) {
-  return budget > 0 ? (committed / budget) * 100 : 0;
-}
-function usageBadgeClass(pct: number, warnPct: number, overPct: number) {
-  if (pct >= overPct) return "bg-rose-950 text-rose-200 border-rose-800";
-  if (pct >= warnPct) return "bg-amber-950 text-amber-200 border-amber-800";
+function usageBadgeClass(level: MucCanhBao) {
+  if (level === "over" || level === "no_budget") return "bg-rose-950 text-rose-200 border-rose-800";
+  if (level === "warn") return "bg-amber-950 text-amber-200 border-amber-800";
   return "bg-zinc-800 text-zinc-300 border-zinc-700";
+}
+function nhanMucDung(r: Pick<CostRow, "level" | "usagePct">) {
+  if (r.level === "no_budget") return "Chưa có NS";
+  return r.usagePct == null ? "—" : `${r.usagePct.toFixed(0)}%`;
+}
+function phanTramText(a: Tien, b: Tien) {
+  const pct = phanTram(a, b);
+  return pct == null ? "—" : `${pct}%`;
+}
+function moTaDoiSoat(c: Data["metadata"]["coverage"]) {
+  const s = c.invalidScope;
+  const lech = s.boqItems + s.poItems + s.floorContracts + s.payments;
+  const loiKl = c.invalidQuantity.poItems;
+  const phanKl = loiKl > 0 ? `, ${loiKl} dòng PO có khối lượng không hợp lệ` : "";
+  return `${lech} dòng nguồn có liên kết lệch dự án${phanKl} — chưa được cộng vào các tổng bên dưới.`;
 }
 
 export default function CostsPage() {
@@ -49,7 +77,9 @@ export default function CostsPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   async function load(gb: "system" | "floor", withVo = includeVo) {
-    const res = await fetch(`/api/costs?groupBy=${gb}&includeVo=${withVo ? 1 : 0}`);
+    const res = await fetch(`/api/costs?groupBy=${gb}&includeVo=${withVo ? 1 : 0}`, {
+      headers: HEADER_DINH_DANG_TIEN,
+    });
     if (res.status === 401) {
       redirectToLogin();
       return;
@@ -126,13 +156,13 @@ export default function CostsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bento-card p-4 flex flex-col justify-between">
             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              Tổng ngân sách
+              Tổng ngân sách dự án
             </span>
             <p
               className="text-2xl font-bold font-mono tabular-nums text-zinc-100 mt-2"
-              title={fmtFull(data.totals.budget)}
+              title={tienDayDu(data.projectTotals.budget)}
             >
-              {fmtVND(data.totals.budget)}
+              {tienRutGon(data.projectTotals.budget)}
             </p>
             <p className="text-[11px] text-zinc-500 mt-1">Định mức BOQ + VO được duyệt</p>
           </div>
@@ -140,19 +170,17 @@ export default function CostsPage() {
           <div className="bento-card p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                Giá trị cam kết
+                Cam kết dự án
               </span>
               <span className="text-xs font-bold font-mono text-sky-400">
-                {data.totals.budget > 0
-                  ? `${Math.round((data.totals.committed / data.totals.budget) * 100)}%`
-                  : "0%"}
+                {phanTramText(data.projectTotals.committed, data.projectTotals.budget)}
               </span>
             </div>
             <p
               className="text-2xl font-bold font-mono tabular-nums text-sky-400 mt-2"
-              title={fmtFull(data.totals.committed)}
+              title={tienDayDu(data.projectTotals.committed)}
             >
-              {fmtVND(data.totals.committed)}
+              {tienRutGon(data.projectTotals.committed)}
             </p>
             <p className="text-[11px] text-zinc-500 mt-1">Hợp đồng giao thầu + Đơn đặt hàng</p>
           </div>
@@ -160,30 +188,42 @@ export default function CostsPage() {
           <div className="bento-card p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                Thực chi tích lũy
+                Thực chi dự án
               </span>
               <span className="text-xs font-bold font-mono text-emerald-400">
-                {data.totals.budget > 0
-                  ? `${Math.round((data.totals.actual / data.totals.budget) * 100)}%`
-                  : "0%"}
+                {phanTramText(data.projectTotals.actual, data.projectTotals.budget)}
               </span>
             </div>
             <p
               className="text-2xl font-bold font-mono tabular-nums text-emerald-400 mt-2"
-              title={fmtFull(data.totals.actual)}
+              title={tienDayDu(data.projectTotals.actual)}
             >
-              {fmtVND(data.totals.actual)}
+              {tienRutGon(data.projectTotals.actual)}
             </p>
             <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden mt-2 border border-zinc-800">
               <div
                 className="bg-emerald-500 h-full rounded-full transition-[width]"
                 style={{
-                  width: `${data.totals.budget > 0 ? Math.min(100, Math.round((data.totals.actual / data.totals.budget) * 100)) : 0}%`,
+                  width: `${doRongThanh(data.projectTotals.actual, data.projectTotals.budget)}%`,
                 }}
               />
             </div>
           </div>
         </div>
+
+        {/* Báo cáo chưa đủ điều kiện đối soát: nguồn lệch phạm vi KHÔNG được cộng vào tổng */}
+        {!data.metadata.coverage.reconciled && (
+          <div
+            role="alert"
+            className="bento-card p-4 border-rose-900/60 bg-rose-950/20 text-xs text-zinc-300 space-y-1"
+          >
+            <p className="flex items-center gap-2 font-bold text-rose-300 uppercase tracking-wide">
+              <TriangleAlert className="w-4 h-4 text-rose-400" aria-hidden="true" />
+              Báo cáo cần đối soát
+            </p>
+            <p>{moTaDoiSoat(data.metadata.coverage)}</p>
+          </div>
+        )}
 
         {/* Cảnh báo đang active */}
         {data.alerts.length > 0 && (
@@ -200,9 +240,11 @@ export default function CostsPage() {
                 >
                   <span className="font-semibold text-zinc-200">{a.label}</span>
                   <span
-                    className={`font-mono font-bold ${a.over ? "text-rose-400" : "text-amber-400"}`}
+                    className={`font-mono font-bold ${a.level === "warn" ? "text-amber-400" : "text-rose-400"}`}
                   >
-                    {a.pct.toFixed(0)}% {a.over ? "(Đã vượt)" : ""}
+                    {a.level === "no_budget"
+                      ? "Chưa có ngân sách"
+                      : `${(a.pct ?? 0).toFixed(0)}% ${a.level === "over" ? "(Đã vượt)" : ""}`}
                   </span>
                 </div>
               ))}
@@ -276,9 +318,8 @@ export default function CostsPage() {
                 </thead>
                 <tbody>
                   {data.rows.map((r) => {
-                    const pct = usagePct(r.committed, r.budget);
-                    const actualPct = r.budget > 0 ? Math.min((r.actual / r.budget) * 100, 100) : 0;
-                    const committedPct = r.budget > 0 ? Math.min(pct, 100) : 0;
+                    const actualPct = doRongThanh(r.actual, r.budget);
+                    const committedPct = doRongThanh(r.committed, r.budget);
                     return (
                       <tr
                         key={r.key}
@@ -288,21 +329,21 @@ export default function CostsPage() {
                         <td className="p-3 font-medium">{r.label}</td>
                         <td
                           className="p-3 text-right tabular-nums text-zinc-300"
-                          title={fmtFull(r.budget)}
+                          title={tienDayDu(r.budget)}
                         >
-                          {fmtVND(r.budget)}
+                          {tienRutGon(r.budget)}
                         </td>
                         <td
                           className="p-3 text-right tabular-nums text-sky-300"
-                          title={fmtFull(r.committed)}
+                          title={tienDayDu(r.committed)}
                         >
-                          {fmtVND(r.committed)}
+                          {tienRutGon(r.committed)}
                         </td>
                         <td
                           className="p-3 text-right tabular-nums text-emerald-300"
-                          title={fmtFull(r.actual)}
+                          title={tienDayDu(r.actual)}
                         >
-                          {fmtVND(r.actual)}
+                          {tienRutGon(r.actual)}
                         </td>
                         <td className="p-3">
                           <div className="h-2 bg-zinc-800 rounded-full overflow-hidden relative">
@@ -318,18 +359,42 @@ export default function CostsPage() {
                         </td>
                         <td className="p-3 text-right">
                           <span
-                            className={`inline-flex items-center gap-1 text-[11px] font-semibold border rounded-full px-2 py-0.5 ${usageBadgeClass(pct, data.settings.warnPct, data.settings.overPct)}`}
+                            className={`inline-flex items-center gap-1 text-[11px] font-semibold border rounded-full px-2 py-0.5 ${usageBadgeClass(r.level)}`}
                           >
-                            {pct >= data.settings.warnPct && (
+                            {r.level !== "none" && (
                               <TriangleAlert className="w-3 h-3" aria-hidden="true" />
                             )}
-                            {r.budget > 0 ? `${pct.toFixed(0)}%` : "—"}
+                            {nhanMucDung(r)}
                           </span>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
+                <tfoot>
+                  <tr className="border-t border-zinc-700 text-xs font-semibold text-zinc-300">
+                    <td className="p-3">Tổng các dòng đang hiển thị</td>
+                    <td
+                      className="p-3 text-right tabular-nums"
+                      title={tienDayDu(data.selectedTotals.budget)}
+                    >
+                      {tienRutGon(data.selectedTotals.budget)}
+                    </td>
+                    <td
+                      className="p-3 text-right tabular-nums text-sky-300"
+                      title={tienDayDu(data.selectedTotals.committed)}
+                    >
+                      {tienRutGon(data.selectedTotals.committed)}
+                    </td>
+                    <td
+                      className="p-3 text-right tabular-nums text-emerald-300"
+                      title={tienDayDu(data.selectedTotals.actual)}
+                    >
+                      {tienRutGon(data.selectedTotals.actual)}
+                    </td>
+                    <td className="p-3" colSpan={2} />
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
@@ -344,6 +409,8 @@ export default function CostsPage() {
           onSaved={(s) => {
             setData((prev) => (prev ? { ...prev, settings: s } : prev));
             setSettingsOpen(false);
+            // Mức cảnh báo do server tính exact theo ngưỡng → tải lại để badge/cảnh báo khớp.
+            void load(groupBy);
           }}
         />
       )}
@@ -371,15 +438,15 @@ function DrillDown({
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-zinc-400">Ngân sách</span>
-          <span className="tabular-nums">{fmtFull(row.budget)}</span>
+          <span className="tabular-nums">{tienDayDu(row.budget)}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-zinc-400">Cam kết</span>
-          <span className="tabular-nums text-sky-300">{fmtFull(row.committed)}</span>
+          <span className="tabular-nums text-sky-300">{tienDayDu(row.committed)}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-zinc-400">Thực chi</span>
-          <span className="tabular-nums text-emerald-300">{fmtFull(row.actual)}</span>
+          <span className="tabular-nums text-emerald-300">{tienDayDu(row.actual)}</span>
         </div>
       </div>
       <div className="mt-4 pt-3 border-t border-zinc-800 space-y-2">
@@ -389,8 +456,11 @@ function DrillDown({
         >
           → Xem đơn đặt hàng / thanh toán chi tiết
         </a>
-        {groupBy === "system" && (
-          <a href={`/system/${row.key}`} className="block text-xs text-emerald-400 hover:underline">
+        {groupBy === "system" && row.systemCode && (
+          <a
+            href={`/system/${row.systemCode}`}
+            className="block text-xs text-emerald-400 hover:underline"
+          >
             → Xem trang hệ {row.label}
           </a>
         )}

@@ -1,5 +1,50 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S10b/S11: báo cáo chi phí chuẩn `getCostReport` + tiền exact
+
+`lib/tai-chinh/cost.ts` viết lại quanh service `getCostReport(scope, {groupBy, includeVo})`
+(cost-report-v1, A4 §2–§3, A3); `GET /api/costs` gọi đúng service này (bỏ việc gọi lặp
+`costSummary`/`costTotals` — `costTotals` đã xoá).
+
+- **Tiền exact (S10b):** mọi tổng/tích trong SQL rồi `ROUND(…, 2)::text`, JS chỉ cộng bigint
+  (`parseFixedDecimalExact`). BOQ qty(15,3)×đơn giá(15,2) cộng rồi mới làm tròn theo nhóm hệ.
+  PO `qty_ordered` float8 nhân bằng `qty_ordered::text::numeric` (biểu diễn legacy_float_text) —
+  bản cũ để Postgres ép đơn giá sang float8 rồi SUM float (0.1×3.00 ×3 = 0.9000000000000001);
+  NaN/±Infinity loại khỏi tổng và đếm vào coverage. DTO opt-in header
+  `X-XBoss-Money-Format: decimal-string-v1` (mẫu S10a), legacy number ngoài biên → 422
+  `money_precision_unsupported`; `private, no-store` + `Vary`.
+- **Nguồn/phạm vi (A4-FR01..FR04, Q-AC05):** pre-aggregate từng nguồn theo khoá thật (không JOIN
+  chéo nguồn, không SUM DISTINCT), ghép theo system ID / (sheet_type_id, floor_label). Thanh toán
+  dùng `payment_bills.project_id` trực tiếp + mọi cha (hợp đồng, đợt IPC→hợp đồng, sheet→tháp)
+  cùng dự án; BOQ (hợp đồng, VO), PO (hợp đồng, vật tư, sheet), HĐ tầng (sheet, hợp đồng) cùng
+  luật. Lệch lineage = invalid-scope: KHÔNG vào tổng nào, chỉ đếm `metadata.coverage`
+  (`reconciled=false`, UI hiện "Báo cáo cần đối soát"). Đúng dự án nhưng chưa gán hệ/tầng =
+  dòng "Chưa gán hệ"/"Chưa gán tầng", vẫn trong `projectTotals`. Thanh toán ở tầng chưa có HĐ
+  tầng nay thành dòng riêng (bản cũ rơi mất).
+- **API:** `rows`, `selectedTotals` (= Σ rows), `projectTotals` (cơ sở BOQ, gồm chưa gán hệ),
+  `totals` legacy = `projectTotals`, `settings`, `alerts`, `metadata` (projectId, groupBy,
+  includeVo, reportVersion, computedAt, currency, moneyFormat, budgetBasis `boq` |
+  `floor-contract-proxy`, coverage). Một snapshot `withProjectScope` REPEATABLE READ READ ONLY,
+  6 query (5 khi nhóm tầng) cố định, không N+1.
+- **Cảnh báo (A4-FR07):** mức `warn/over` so bằng nhân chéo exact với `cost_settings` (vẫn cấu hình
+  toàn hệ id 1, không đổi schema); ngân sách ≤ 0 + cam kết dương = `no_budget` (`pct: null`, không
+  Infinity/100% giả). Legacy giữ hợp đồng cũ: không trả `no_budget` trong `alerts`.
+- **Caller cũ:** `costSummary`/`systemBudget` (thông báo `cost_over`, dashboard theo hệ, tóm tắt
+  hệ) dùng chung nguồn exact; thiếu dự án → `[]`/`null` (fail-closed, bỏ chế độ "toàn hệ" cộng
+  chéo dự án/tổ chức). UI `/costs` + tab hạn mức `ContractsTab` opt-in v1, số đầy đủ/% bằng
+  bigint (`app/costs/_components/dinhDangChiPhi.ts`), nhãn tổng "dự án" + dòng "Tổng các dòng
+  đang hiển thị".
+- **Bằng chứng đỏ trên code cũ** (`tests/cost-report.test.ts`, route thật): AC02 budget 1000 ≠
+  1500 (BOQ chưa gán hệ rơi mất); Q-AC05 actual 1066 ≠ 1000 (cộng thanh toán lệch lineage);
+  AC03 committed 0.9000000000000001 ≠ 0.9; AC04 actual 7010 ≠ 10 (hai snapshot — cũng đỏ khi chỉ
+  gỡ `isolation` khỏi service mới); FR07/§3/A3-AC01 đỏ vì thiếu trường/định dạng. Xanh sau vá;
+  `cost.test.ts`/`vo.test.ts`/`audit-cost-query-reuse.test.ts`/`audit-auth-project-regression`
+  cập nhật theo shape mới (fixture thanh toán có `project_id` như writer thật).
+- **Còn mở:** số coverage invalid-scope phụ thuộc RLS (role app không thấy dòng project khác —
+  tổng giống hệt, chỉ số đếm ít hơn); chưa benchmark p95 (A4-AC08 = NOT_RUN); PO vẫn đọc float
+  legacy (chờ cột exact/provenance của DATA-MIGRATIONS §6); `cost_over` (`thong-bao.ts`) và
+  `bySystemBlock` vẫn so tỷ lệ trên number của adapter legacy; `reports.ts cost_by_month` thuộc S10c.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S12: portfolio trọng số theo task
 
 A4-FR08/AC05–AC07: `portfolioKpi` (`lib/ha-tang/projects.ts`) tính `avgProgress` = tổng
