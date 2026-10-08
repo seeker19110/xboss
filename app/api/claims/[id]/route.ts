@@ -27,7 +27,9 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const claim = await withProjectScope(projectId ?? "*", () => getClaim(id, projectId));
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
+  const claim = await withProjectScope(projectId, () => getClaim(id, projectId));
   if (!claim) return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
   return NextResponse.json({ claim });
 }
@@ -48,6 +50,8 @@ export async function PATCH(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
   const claim = await getClaim(id, projectId);
   if (!claim) return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
   const editErr = canEditClaim(claim, user);
@@ -121,6 +125,8 @@ export async function DELETE(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
   const claim = await getClaim(id, projectId);
   if (!claim) return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
   const editErr = canEditClaim(claim, user);
