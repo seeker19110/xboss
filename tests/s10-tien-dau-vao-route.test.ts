@@ -531,3 +531,84 @@ test("POST /api/purchase-orders: đơn giá '1.500' → 400, không tạo đơn 
   );
   assert.equal(gia?.v, "1234567.89");
 });
+
+// ===== Khối lượng bill (NUMERIC(15,3), không phải tiền) =====
+
+test(
+  "POST/PATCH /api/payments/bills: khối lượng '1.500' → 400, quá 3 số lẻ → 400, tràn → 422, hợp lệ ghi exact",
+  S,
+  async () => {
+    const { projectId } = await dungDuAn();
+    await taoPm(projectId);
+    const { POST } = await import("@/app/api/payments/bills/route");
+    const { PATCH } = await import("@/app/api/payments/bills/[id]/route");
+    const { queryOne } = await import("@/lib/db");
+    const goi = (quantity: unknown) =>
+      POST(
+        jreq("/api/payments/bills", {
+          ...billCoBan,
+          type: "item",
+          description: "KL",
+          amount: 1000,
+          quantity,
+        }),
+      );
+
+    const vi = await goi("1.500");
+    assert.equal(vi.status, 400);
+    assert.equal((await docLoi(vi)).code, "quantity_locale_format");
+    const le = await goi("1.2345");
+    assert.equal(le.status, 400);
+    assert.equal((await docLoi(le)).code, "quantity_scale");
+    const sai = await goi("abc");
+    assert.equal(sai.status, 400);
+    assert.equal((await docLoi(sai)).code, "quantity_invalid");
+    const am = await goi(-1);
+    assert.equal(am.status, 400);
+    const tran = await goi("1000000000000");
+    assert.equal(tran.status, 422);
+    assert.equal((await docLoi(tran)).code, "quantity_overflow");
+    const n = await queryOne<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM payment_bills WHERE project_id = ?`,
+      projectId,
+    );
+    assert.equal(n?.n, 0, "không được ghi bill nào");
+
+    const ok = await goi("999999999999.125");
+    assert.equal(ok.status, 200);
+    const { id } = (await ok.json()) as { id: number };
+    const luu = await queryOne<{ q: string }>(
+      `SELECT quantity::text AS q FROM payment_bills WHERE id = ?`,
+      id,
+    );
+    assert.equal(luu?.q, "999999999999.125");
+
+    const pTran = await PATCH(
+      jreq(`/api/payments/bills/${id}`, { quantity: "1000000000000" }, "PATCH"),
+      ctx(id),
+    );
+    assert.equal(pTran.status, 422);
+    const pVi = await PATCH(
+      jreq(`/api/payments/bills/${id}`, { quantity: "1,5" }, "PATCH"),
+      ctx(id),
+    );
+    assert.equal(pVi.status, 400);
+    const pOk = await PATCH(
+      jreq(`/api/payments/bills/${id}`, { quantity: 12.5 }, "PATCH"),
+      ctx(id),
+    );
+    assert.equal(pOk.status, 200);
+    const sau = await queryOne<{ q: string }>(
+      `SELECT quantity::text AS q FROM payment_bills WHERE id = ?`,
+      id,
+    );
+    assert.equal(sau?.q, "12.500");
+    const xoa = await PATCH(jreq(`/api/payments/bills/${id}`, { quantity: "" }, "PATCH"), ctx(id));
+    assert.equal(xoa.status, 200);
+    const rong = await queryOne<{ q: string | null }>(
+      `SELECT quantity::text AS q FROM payment_bills WHERE id = ?`,
+      id,
+    );
+    assert.equal(rong?.q, null);
+  },
+);

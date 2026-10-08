@@ -1,5 +1,18 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S10: parser khối lượng bill (đóng "Còn mở" đầu vào tiền)
+
+Rà lại danh sách "Còn mở (chưa chuyển parser)" của S10 đầu vào: claims, bảo lãnh, gói thầu, BOQ,
+báo giá kỹ thuật đã chuyển ở mục "phần 2" bên dưới (cùng ngày, đã nằm trong nhánh gốc); proposals/VO
+cũng đã có. Còn lại duy nhất `quantity` của bill (NUMERIC(15,3), không phải tiền): thêm
+`parseQuantityInput`/`QuantityInputError`/`quantityInputErrorBody` (`lib/nen/money.ts`) — rỗng → null;
+dấu phẩy/nhiều dấu chấm/"1.500" → 400 `quantity_locale_format`; sai dạng/âm → 400
+`quantity_invalid`; quá 3 số lẻ → 400 `quantity_scale`; ≥ 10^12 → **422 `quantity_overflow`**
+(trước đây PG tràn → 500; số âm/chữ rác trước đây lặng lẽ thành null). Áp cho `POST
+/api/payments/bills` và `PATCH /api/payments/bills/:id`; ghi chuỗi canonical, `?::numeric`. Test:
+ca mới trong `tests/s10-tien-dau-vao-route.test.ts` (route thật). `pctThisPeriod` vẫn kẹp 0..1 bằng
+number (không phải tiền, ngoài phạm vi).
+
 ## 2026-10-08 — QUALITY-FINAL-1 S13e: đề xuất + VO dùng engine phê duyệt như IPC
 
 Đóng phần "Còn mở" của S13d (spec cha `docs/nang-cap/AUDIT-2026-09-25/` A4/A5). Không migration, không
@@ -395,12 +408,7 @@ Không migration, không đổi kiểu cột, không reprice lịch sử.
   Gỡ `FOR UPDATE` → ca đồng thời đỏ 2/3 lần; có khoá xanh 5/5. Cập nhật test theo hợp đồng mới:
   `s10c-thanh-toan-money`, `finance`, `contracts`, `route-tai-chinh` (ca "lỗi DB khác 23505" đổi sang
   ngày 2026-02-30), `route-tai-chinh-3a`/`3b`. Bộ liên quan 34 file chạy tuần tự: 759 pass / 0 fail.
-- **Còn mở (chưa chuyển parser):** claims (`lib/tai-chinh/claims.ts` amountRequested,
-  `app/api/claims/[id]/settle` amountSettled), proposals (`lib/tai-chinh/proposals.ts` amount),
-  bảo lãnh (`lib/tai-chinh/insurance.ts` value), VO (`lib/tai-chinh/vo.ts` dòng unitPrice), gói thầu
-  (`app/api/tenders/[id]/bids/**` unitPrice), BOQ (`app/api/boq/route.ts` unitPrice/subUnitPrice — còn
-  `|| 0`), engineering bidding quotes (`totalAmountVnd`); `quantity` bill (NUMERIC(15,3)) vẫn
-  `Number()` — tràn ≥ 10^12 vẫn 500; `pctThisPeriod` vẫn kẹp 0..1 bằng number (không phải tiền).
+- ~~Còn mở (chưa chuyển parser)~~ đã đóng: phần 2 (claims/bảo lãnh/thầu/BOQ/báo giá) + parser khối lượng bill (mục đầu file).
 
 ## 2026-10-08 — QUALITY-FINAL-1 S02d: nhà thầu phụ (công nợ) + EVM fail-closed
 
