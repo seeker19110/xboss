@@ -20,6 +20,14 @@ export function isSameOrigin(req: NextRequest): boolean {
   }
 }
 
+// Bản CHẶT cho route cấp khoá/thiết bị offline (QUALITY-FINAL-1 S05): BẮT BUỘC có Origin cùng
+// host; thiếu Origin chỉ nhận khi trình duyệt báo `Sec-Fetch-Site: same-origin`. Không có ngoại
+// lệ "client cũ không gửi Origin" như isSameOrigin — route này chỉ phục vụ chính app.
+export function isStrictSameOrigin(req: NextRequest): boolean {
+  if (!req.headers.get("origin")) return req.headers.get("sec-fetch-site") === "same-origin";
+  return isSameOrigin(req);
+}
+
 // Các method không đổi trạng thái — không cần kiểm same-origin.
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 

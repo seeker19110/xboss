@@ -23,6 +23,12 @@ const serverSchema = z
     MIGRATE_DATABASE_URL: z.string().min(1).optional(),
     XBOSS_SECRET: z.string().min(1).optional(),
     XBOSS_ADMIN_PASSWORD: z.string().min(1).optional(),
+    // Keyring KEK của vault offline (QUALITY-FINAL-1 S05): "<version>:<secret>[,<version>:<secret>]",
+    // mục đầu dùng để bọc khoá mới, các mục sau chỉ để mở khoá cũ (xoay KEK không mất bản nháp).
+    // Secret ≥32 ký tự, KHÔNG được trùng XBOSS_SECRET. Thiếu → tính năng vault offline TẮT
+    // (route /api/offline/* trả 503, fail-closed); có mà sai định dạng → lib/bao-mat/offline-devices.ts
+    // throw fail-fast khi dùng. Không validate ở đây để giá trị sai không kéo sập cả app.
+    XBOSS_OFFLINE_KEK: z.string().optional(),
     CRON_SECRET: z.string().min(1).optional(),
     APP_URL: z.string().min(1).optional(),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),

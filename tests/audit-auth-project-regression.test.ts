@@ -92,6 +92,7 @@ test("audit: GET auth/me chưa đăng nhập không khởi tạo tài khoản", 
     "next/server": next,
     "next/headers": {},
     "@/lib/bao-mat/auth": { getCurrentUser: async () => null, ensureDefaultUsers: noSeed },
+    "@/lib/bao-mat/session-token": { dauRangBuocPhien: () => null },
   });
   assert.equal((await route.GET()).status, 401);
 });

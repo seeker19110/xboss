@@ -56,6 +56,8 @@ const next = {
   },
 };
 
+const BINDING = "b".repeat(32);
+
 for (const state of ["anonymous", "valid", "must-setup-2fa", "missing-token", "invalid-token"]) {
   test(`auth/me: no-store và giữ hợp đồng response (${state})`, async () => {
     const actor = { id: randomInt(100, 10000), role: "pm", orgId: randomInt(100, 10000) };
@@ -78,6 +80,8 @@ for (const state of ["anonymous", "valid", "must-setup-2fa", "missing-token", "i
         },
         ensureDefaultUsers: () => assert.fail("GET auth/me không được seed user"),
       },
+      // S05: dấu ràng buộc actor mờ — chỉ có khi token parse được.
+      "@/lib/bao-mat/session-token": { dauRangBuocPhien: () => BINDING },
     });
     const res = await route.GET();
     assert.equal(res.headers.get("Cache-Control"), "private, no-store");
@@ -90,13 +94,15 @@ for (const state of ["anonymous", "valid", "must-setup-2fa", "missing-token", "i
       assert.equal(res.status, 200);
       assert.equal(cookieReads, 1);
       assert.equal(parses, state === "missing-token" ? 0 : 1);
+      const binding = state === "missing-token" || state === "invalid-token" ? null : BINDING;
       if (state === "must-setup-2fa") {
         assert.deepEqual(res.body, {
           user: actor,
+          binding,
           error: "Cần bật xác thực 2 lớp trước khi tiếp tục",
           code: "2fa_required",
         });
-      } else assert.deepEqual(res.body, { user: actor });
+      } else assert.deepEqual(res.body, { user: actor, binding });
     }
   });
 }

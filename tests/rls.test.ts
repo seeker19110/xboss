@@ -509,6 +509,12 @@ test(
     // Hành vi kiểm riêng ở tests/s13c-ipc-quyet-dinh.test.ts bằng role xboss_app.
     const IPC_SNAPSHOT = ["payment_cert_decision_snapshots"];
 
+    // Thiết bị + khoá vault offline (QUALITY-FINAL-1 S05, migration 0163): policy nghiêm ngặt theo
+    // app.user_id/org_id (+ app.role admin cho đọc/duyệt thiết bị cùng org, + app.project_id cho
+    // khoá), không nhánh '*'/GUC rỗng; xboss_app không DELETE, chỉ UPDATE 4 cột duyệt/thu hồi thiết
+    // bị, không UPDATE khoá. Hành vi kiểm bằng role xboss_app ở tests/offline-vault-route.test.ts.
+    const OFFLINE = ["offline_devices", "offline_vault_keys"];
+
     // Nhóm engineering: khai theo TIỀN TỐ chứ không liệt kê tay — thêm bảng engineering_* mới
     // mà quên bật RLS thì bị bắt ở assert bên dưới, không phải ở đây.
     const eng = thucTe.filter((t) => t.startsWith("engineering_"));
@@ -519,6 +525,7 @@ test(
       ...CAD,
       ...KE_HOACH,
       ...IPC_SNAPSHOT,
+      ...OFFLINE,
       ...eng,
     ]);
 
@@ -529,9 +536,15 @@ test(
       "Có bảng BẬT RLS nhưng chưa khai trong test/tài liệu — bổ sung vào danh sách trên và cập nhật PROJECT.md + ADR-0005",
     );
 
-    const matRls = [...TAI_CHINH, ...TO_CHUC, ...ZALO, ...CAD, ...KE_HOACH, ...IPC_SNAPSHOT].filter(
-      (t) => !thucTe.includes(t),
-    );
+    const matRls = [
+      ...TAI_CHINH,
+      ...TO_CHUC,
+      ...ZALO,
+      ...CAD,
+      ...KE_HOACH,
+      ...IPC_SNAPSHOT,
+      ...OFFLINE,
+    ].filter((t) => !thucTe.includes(t));
     assert.deepEqual(
       matRls,
       [],

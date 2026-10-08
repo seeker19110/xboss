@@ -24,6 +24,7 @@ import { fetchMe } from "@/app/lib/me";
 import { ROLE_LABELS } from "@/lib/nen/roles";
 import { DASHBOARD_TREE, dashboardStatus } from "@/app/lib/dashboardTree";
 import { systemColorClasses } from "@/lib/nen/systemColors";
+import { dangKyKetNoiSong } from "@/app/lib/contextEpoch";
 
 type User = { id: number; name: string; role: string };
 type Sheet = {
@@ -229,7 +230,10 @@ export default function AdminPage() {
       }
     };
     es.onerror = () => setTrafficLive(false);
+    // S05: tab khác đổi ngữ cảnh → đóng SSE ngay (trang sẽ bị khoá chờ tải lại).
+    const goDangKy = dangKyKetNoiSong(() => es.close());
     return () => {
+      goDangKy();
       es.close();
       setTrafficLive(false);
     };

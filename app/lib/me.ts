@@ -1,6 +1,7 @@
 // Singleton cache phía client — chỉ fetch /api/auth/me 1 lần mỗi lần load trang.
 // Các component trên cùng trang gọi fetchMe() đồng thời đều nhận cùng 1 Promise.
 import { clearServiceWorkerCache } from "@/app/lib/serviceWorkerCache";
+import { ghiNhanRangBuoc, phatDoiNguCanh } from "@/app/lib/contextEpoch";
 
 export type Me = { id: number; name: string; email: string; role: string };
 
@@ -21,6 +22,18 @@ export function fetchMe(): Promise<Me | null> {
         // thay vì đăng xuất (phiên vẫn hợp lệ). VẪN trả `user` thật (không phải null) —
         // redirectTo2faSetup() có guard chống lặp khi đã ở /account?require2fa=1, nên trang
         // đó phải nhận được user thật để render (banner + khối 2FA), không phải màn trắng.
+        // S05: actor đổi so với lần trước trên trình duyệt này (kể cả vào qua SSO/OIDC, không đi
+        // qua preflight purge của trang đăng nhập) → khoá các tab khác + dọn cache SW riêng tư
+        // TRƯỚC khi trả user cho trang. Dọn lỗi → khoá trang này (fail-closed).
+        if (r.ok && ghiNhanRangBuoc(j?.binding)) {
+          phatDoiNguCanh("actor");
+          try {
+            await clearServiceWorkerCache();
+          } catch {
+            lockPrivatePageUntilCachePurged();
+            return null;
+          }
+        }
         if (j?.code === "2fa_required") {
           redirectTo2faSetup();
           return j.user as Me;
@@ -37,7 +50,10 @@ export function invalidateMe() {
   _promise = null;
 }
 
-export function lockPrivatePageUntilCachePurged(): () => Promise<void> {
+type LopKhoa = { tieuDe: string; thongDiep: string; nhanNut: string };
+
+/** Phủ lớp khoá toàn trang (role=alert, nội dung phía sau inert + aria-hidden), trả các nút để gắn hành động. */
+function phuLopKhoa(noiDung: LopKhoa): { message: HTMLParagraphElement; retry: HTMLButtonElement } {
   const overlay = document.createElement("section");
   overlay.className =
     "fixed inset-0 z-[99999] grid content-center gap-4 overflow-auto bg-background p-6 text-foreground";
@@ -47,15 +63,50 @@ export function lockPrivatePageUntilCachePurged(): () => Promise<void> {
 
   const heading = document.createElement("h1");
   heading.className = "text-xl font-semibold";
-  heading.textContent = "Phiên đăng nhập đã hết hạn";
+  heading.textContent = noiDung.tieuDe;
   const message = document.createElement("p");
   message.className = "max-w-prose";
-  message.textContent = "Đã khóa nội dung riêng tư. Đang xác nhận dọn bộ nhớ đệm XBoss…";
+  message.textContent = noiDung.thongDiep;
   const retry = document.createElement("button");
   retry.type = "button";
   retry.className =
     "min-h-11 w-fit rounded-lg bg-emerald-700 px-4 py-3 font-semibold text-on-accent hover:bg-emerald-800 focus-visible:outline";
-  retry.textContent = "Thử dọn bộ nhớ đệm lại";
+  retry.textContent = noiDung.nhanNut;
+
+  overlay.append(heading, message, retry);
+  for (const child of Array.from(document.body.children)) {
+    if (child === overlay) continue;
+    if (child instanceof HTMLElement) child.inert = true;
+    child.setAttribute("aria-hidden", "true");
+  }
+  document.body.append(overlay);
+  overlay.focus();
+  return { message, retry };
+}
+
+/**
+ * S05 (A2-FR03): tab KHÁC vừa đổi dự án/đăng xuất/đổi tài khoản. Khoá ngay dữ liệu đang hiển
+ * thị (ngữ cảnh cũ) — kết nối SSE/poll đã được đóng trước đó. Chỉ tải lại khi người dùng bấm:
+ * tải lại = xác minh online với server theo cookie mới, không tự áp dữ liệu cũ.
+ */
+export function khoaTrangDoiNguCanh(): void {
+  if (document.querySelector("[data-xboss-ngu-canh-khoa]")) return;
+  const { retry } = phuLopKhoa({
+    tieuDe: "Ngữ cảnh đã thay đổi ở tab khác",
+    thongDiep:
+      "Dự án hoặc tài khoản vừa đổi ở một tab khác. Dữ liệu trên trang này đã bị khoá để tránh xem hoặc ghi nhầm ngữ cảnh.",
+    nhanNut: "Tải lại theo ngữ cảnh mới",
+  });
+  retry.parentElement?.setAttribute("data-xboss-ngu-canh-khoa", "1");
+  retry.addEventListener("click", () => window.location.reload());
+}
+
+export function lockPrivatePageUntilCachePurged(): () => Promise<void> {
+  const { message, retry } = phuLopKhoa({
+    tieuDe: "Phiên đăng nhập đã hết hạn",
+    thongDiep: "Đã khóa nội dung riêng tư. Đang xác nhận dọn bộ nhớ đệm XBoss…",
+    nhanNut: "Thử dọn bộ nhớ đệm lại",
+  });
   const retryPurge = async () => {
     retry.disabled = true;
     message.textContent = "Đang xác nhận dọn bộ nhớ đệm…";
@@ -69,15 +120,6 @@ export function lockPrivatePageUntilCachePurged(): () => Promise<void> {
     }
   };
   retry.addEventListener("click", () => void retryPurge());
-
-  overlay.append(heading, message, retry);
-  for (const child of Array.from(document.body.children)) {
-    if (child === overlay) continue;
-    if (child instanceof HTMLElement) child.inert = true;
-    child.setAttribute("aria-hidden", "true");
-  }
-  document.body.append(overlay);
-  overlay.focus();
   return retryPurge;
 }
 

@@ -331,6 +331,10 @@ mục Nợ kỹ thuật nếu cần nâng cấp):**
 ## ✅ Checklist trước khi chạy thật
 
 - [ ] Đổi `XBOSS_SECRET` thành chuỗi ngẫu nhiên dài (bảo mật cookie đăng nhập).
+- [ ] (Tuỳ chọn, QUALITY-FINAL-1 S05) Vault offline: đặt `XBOSS_OFFLINE_KEK="v1:<secret ≥32 ký tự>"`
+      — secret RIÊNG, khác `XBOSS_SECRET`, sao lưu cùng bộ khoá khôi phục (mất KEK = không mở được
+      bản nháp offline đã bọc). Xoay KEK: thêm version mới ở ĐẦU (`"v2:<mới>,v1:<cũ>"`), giữ version
+      cũ tới khi không còn khoá phụ thuộc. Để trống = tính năng tắt (`/api/offline/*` trả 503).
 - [ ] Đổi mật khẩu 4 tài khoản demo (admin/pm/engineer/subcon).
 - [ ] Đổi mật khẩu role Postgres `xboss` khỏi giá trị mẫu nếu tự host DB.
 - [ ] Sao lưu định kỳ DB (Supabase tự backup; Postgres tự host: `pg_dump`).

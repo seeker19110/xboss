@@ -90,3 +90,11 @@ export function parseToken(token: string): ParsedToken | null {
     orgId: Number(orgId),
   };
 }
+
+// Dấu ràng buộc actor của phiên cho client (QUALITY-FINAL-1 S05, A2-FR03): HMAC rút gọn của
+// user/org/session_version — mờ (không lộ id), đổi khi đổi tài khoản, đổi tổ chức hoặc thu hồi
+// phiên. Client so với lần trước để phát hiện đổi actor kể cả khi vào qua SSO/OIDC (không qua
+// preflight purge của trang đăng nhập) rồi dọn cache + khoá các tab khác.
+export function dauRangBuocPhien(p: ParsedToken): string {
+  return sign(`xboss-ctx-binding-v1.${p.uid}.${p.orgId}.${p.sessionVersion}`).slice(0, 32);
+}

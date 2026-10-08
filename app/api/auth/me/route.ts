@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getCurrentUser, COOKIE, parseToken } from "@/lib/bao-mat/auth";
+import { dauRangBuocPhien } from "@/lib/bao-mat/session-token";
 
 export const dynamic = "force-dynamic";
 
@@ -18,15 +19,18 @@ export async function GET() {
   // user hiện tại) tự redirect NGAY ở lần gọi đầu tiên thay vì phải đợi 1 API khác bị 403.
   const token = (await cookies()).get(COOKIE)?.value;
   const parsed = token ? parseToken(token) : null;
+  // S05: dấu ràng buộc actor mờ — client phát hiện đổi tài khoản (kể cả SSO) để dọn cache/khoá tab.
+  const binding = parsed ? dauRangBuocPhien(parsed) : null;
   if (parsed?.mustSetup2fa) {
     return NextResponse.json(
       {
         user,
+        binding,
         error: "Cần bật xác thực 2 lớp trước khi tiếp tục",
         code: "2fa_required",
       },
       { headers: noStoreHeaders },
     );
   }
-  return NextResponse.json({ user }, { headers: noStoreHeaders });
+  return NextResponse.json({ user, binding }, { headers: noStoreHeaders });
 }

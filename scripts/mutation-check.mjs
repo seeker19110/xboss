@@ -189,6 +189,15 @@ const MUTATIONS = [
     tests: ["tests/s13e-de-xuat-vo-quyet-dinh.test.ts"],
     why: "VO lập trước S13e mang amount từ SUM float → engine chọn cấp duyệt theo số xấp xỉ/cũ.",
   },
+  // QUALITY-FINAL-1 S05: mở khoá vault phải kiểm lại TOÀN BỘ manifest với quyền hiện hành.
+  {
+    key: "vault: unlock trả khoá dù tài nguyên trong manifest đã bị thu hồi",
+    file: "lib/bao-mat/offline-vault.ts",
+    find: "  if (!(await manifestConHieuLuc(b.user, m))) return null;",
+    replace: "  void manifestConHieuLuc;",
+    tests: ["tests/offline-vault-route.test.ts"],
+    why: "Thu hồi phân công/quyền một task vẫn mở được DEK của manifest chứa task đó (Q-AC02, A2-AC09).",
+  },
 ];
 
 const only = process.argv.find((a) => a.startsWith("--only="))?.slice("--only=".length);
