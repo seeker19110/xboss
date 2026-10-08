@@ -8,7 +8,7 @@
 // NextResponse và kiểm phiên. Nhờ vậy logic này test đơn vị được mà không phải dựng request.
 import { query, queryOne, run, todayISO } from "@/lib/db";
 import { CAN, isAdminOrPm, type User } from "@/lib/bao-mat/auth";
-import { costSummary, getCostSettings } from "@/lib/tai-chinh/cost";
+import { getCostReport, type CostReport } from "@/lib/tai-chinh/cost";
 import { poLateList, vehicleLateList } from "@/lib/tai-chinh/procurement";
 import { missingDiaryDates } from "@/lib/hien-truong/diary";
 import { expiringContracts } from "@/lib/tai-chinh/contracts";
@@ -52,10 +52,25 @@ const APPROVAL_ENTITY_COLUMN: Record<string, string> = {
   task_acceptance: "task_id",
 };
 
+/**
+ * Báo cáo chi phí cho khối `cost_over` — null khi user không xem được chi phí hoặc thiếu dự án.
+ * `getCostReport` tự mở transaction REPEATABLE READ READ ONLY (A4-FR06) nên KHÔNG gọi được
+ * lồng trong `withProjectScope` của route: route gọi hàm này TRƯỚC khi mở scope rồi truyền vào
+ * `syncAndListNotifications` qua `opts.costReport`.
+ */
+export async function loadCostAlertReport(
+  user: User,
+  projectId: number | null,
+): Promise<CostReport | null> {
+  if (!CAN.viewPayments(user.role) || projectId == null) return null;
+  return getCostReport({ kind: "project", projectId }, { groupBy: "system", includeVo: true });
+}
+
 export async function syncAndListNotifications(
   user: User,
   projectId: number | null,
   limit: number,
+  opts: { costReport?: CostReport | null } = {},
 ) {
   // MỌI khối bên dưới phải lọc theo `projectId` NHẬN TỪ THAM SỐ. Trước đây hai khối
   // (`design_change_pending`, `claim_pending`) tự gọi `getCurrentProjectId(user)` và khai
@@ -291,17 +306,27 @@ export async function syncAndListNotifications(
 
   // Vượt ngân sách theo hệ → cảnh báo Admin/PM/BCH (subcon/cdt/viewer/engineer không xem chi phí).
   if (CAN.viewPayments(user.role)) {
-    const settings = await getCostSettings();
-    const rows = await costSummary("system", true, projectId ?? undefined);
-    const over = rows.filter(
-      (r) => r.budget > 0 && (r.committed / r.budget) * 100 >= settings.warnPct,
-    );
+    // Một báo cáo exact cho một dự án (không N+1); thiếu dự án → không cảnh báo toàn hệ (fail-closed).
+    // Mức cảnh báo so bằng nhân chéo bigint (costAlertLevel) — không chia/float. `no_budget` (cam
+    // kết dương, ngân sách ≤ 0) CŨNG cảnh báo: không bỏ sót hệ chi tiền mà chưa có ngân sách.
+    // Gọi trong transaction có sẵn (route) thì báo cáo phải đọc trước, truyền qua opts.
+    const report =
+      opts.costReport !== undefined ? opts.costReport : await loadCostAlertReport(user, projectId);
+    const over = (report?.rows ?? [])
+      .filter((r) => !r.unassigned && r.level !== "none")
+      .map((r) => ({
+        key: r.systemCode ?? r.key,
+        label: r.label,
+        message:
+          r.usageBasisPoints == null
+            ? `💰 Hệ "${r.label}" đã có cam kết nhưng chưa có ngân sách`
+            : `💰 Hệ "${r.label}" cam kết đạt ${Math.round(Number(r.usageBasisPoints) / 100)}% ngân sách`,
+      }));
 
     if (over.length > 0) {
       const values = over.map(() => `(?, ?, 'cost_over', ?)`).join(", ");
       const params = over.flatMap((r) => {
-        const pct = Math.round((r.committed / r.budget) * 100);
-        return [user.id, r.key, `💰 Hệ "${r.label}" cam kết đạt ${pct}% ngân sách`];
+        return [user.id, r.key, r.message];
       });
       await run(
         `INSERT INTO notifications (user_id, cost_group, type, message) VALUES ${values}

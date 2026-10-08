@@ -168,6 +168,77 @@ test(
   },
 );
 
+test(
+  "bySystemBlock(projectId): budgetUsedPct khớp getCostReport (exact), ngân sách 0 → 0 không chia 0",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { bySystemBlock } = await import("@/lib/tien-do/dashboardext");
+    const { getCostReport } = await import("@/lib/tai-chinh/cost");
+
+    const pId = await insertId(`INSERT INTO projects (name) VALUES ('Test BSB Cost')`);
+    const sysId = await insertId(
+      `INSERT INTO systems (code, name) VALUES ('BSBC', 'Hệ test BSB cost')`,
+    );
+    const boqId = await insertId(
+      `INSERT INTO boq_items (code, name, unit, system_id, project_id, qty_contract, unit_price)
+       VALUES ('BSBC-BOQ', 'BOQ', 'm', ?, ?, 1, 800)`,
+      sysId,
+      pId,
+    );
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp BSBC')`,
+      pId,
+    );
+    const sheetId = await insertId(
+      `INSERT INTO sheet_types (code, name, slug, system_id, tower_id)
+       VALUES ('BSBC', 'Sheet BSBC', 'bsbc', ?, ?)`,
+      sysId,
+      towerId,
+    );
+    const poId = await insertId(
+      `INSERT INTO purchase_orders (po_code, status, project_id) VALUES ('BSBC-PO', 'confirmed', ?)`,
+      pId,
+    );
+    const matId = await insertId(
+      `INSERT INTO materials (sheet_type_id, project_id, name, unit) VALUES (?, ?, 'VT', 'm')`,
+      sheetId,
+      pId,
+    );
+    await run(
+      `INSERT INTO po_items (po_id, material_id, qty_ordered, unit_price) VALUES (?, ?, 1, 200)`,
+      poId,
+      matId,
+    );
+    try {
+      const rows = await bySystemBlock(pId);
+      const row = rows.find((r) => r.code === "BSBC");
+      assert.ok(row);
+      assert.equal(row!.budgetUsedPct, 25); // 200/800
+      const report = await getCostReport(
+        { kind: "project", projectId: pId },
+        { groupBy: "system", includeVo: true },
+      );
+      const rep = report.rows.find((r) => r.systemCode === "BSBC");
+      assert.equal(row!.budgetUsedPct, Number(rep!.usageBasisPoints) / 100);
+      for (const r of rows.filter((x) => x.code !== "BSBC")) {
+        assert.equal(r.budgetUsedPct, 0); // ngân sách 0 → 0, không NaN/Infinity
+      }
+      // Không dự án → không số liệu chi phí (fail-closed).
+      assert.ok((await bySystemBlock()).every((r) => r.budgetUsedPct === 0));
+    } finally {
+      await run(`DELETE FROM po_items WHERE po_id = ?`, poId);
+      await run(`DELETE FROM purchase_orders WHERE id = ?`, poId);
+      await run(`DELETE FROM materials WHERE id = ?`, matId);
+      await run(`DELETE FROM boq_items WHERE id = ?`, boqId);
+      await run(`DELETE FROM sheet_types WHERE id = ?`, sheetId);
+      await run(`DELETE FROM towers WHERE id = ?`, towerId);
+      await run(`DELETE FROM systems WHERE id = ?`, sysId);
+      await run(`DELETE FROM projects WHERE id = ?`, pId);
+    }
+  },
+);
+
 // ===== Test tích hợp: lọc theo projectId (chống rò rỉ chéo dự án, M22 PR — audit) =====
 // 2 dự án riêng biệt, mỗi dự án 1 NCR + 1 PO + 1 VO gắn project_id khác nhau. Truyền
 // projectId của dự án B phải KHÔNG thấy dữ liệu của dự án A (và ngược lại).

@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { run, withProjectScope } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { listNotifications, syncAndListNotifications } from "@/lib/dich-vu/thong-bao";
+import {
+  listNotifications,
+  loadCostAlertReport,
+  syncAndListNotifications,
+} from "@/lib/dich-vu/thong-bao";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +30,12 @@ export async function GET(req: Request) {
   // Bọc toàn bộ phần đọc-ghi trong 1 transaction có GUC app.project_id đúng (M62 PR1) —
   // policy RLS trên 11 bảng tài chính chỉ lọc đúng khi có GUC. readOnly:false vì route này
   // xen kẽ INSERT/DELETE trên notifications (bảng không-RLS) sau mỗi khối đọc.
+  // Báo cáo chi phí (cost_over) tự mở snapshot REPEATABLE READ riêng — đọc TRƯỚC khi vào
+  // scope, vì withTransaction không cho yêu cầu REPEATABLE READ lồng trong transaction có sẵn.
+  const costReport = await loadCostAlertReport(user, projectId);
   const data = await withProjectScope(
     projectId,
-    () => syncAndListNotifications(user, projectId, limit),
+    () => syncAndListNotifications(user, projectId, limit, { costReport }),
     { readOnly: false },
   );
   return NextResponse.json(data);

@@ -1,5 +1,22 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S11 (đuôi): thông báo `cost_over` + dashboard theo hệ dùng mức cảnh báo exact
+
+`lib/dich-vu/thong-bao.ts` (cost_over) và `bySystemBlock` (`lib/tien-do/dashboardext.ts`) chuyển từ
+adapter legacy `costSummary` (so tỷ lệ trên number) sang `getCostReport` — MỘT báo cáo cho một dự án
+(không N+1), mức `warn/over/no_budget` do `costAlertLevel` (nhân chéo bigint, không chia 0/float);
+`budgetUsedPct` lấy từ `usageBasisPoints/100` (ngân sách ≤ 0 → 0). Thiếu dự án → không cảnh báo/số
+liệu chi phí toàn hệ (fail-closed như S11). **Quyết định:** hệ `no_budget` (cam kết dương, ngân sách 0) NAY ĐƯỢC cảnh báo `cost_over` với nội dung "đã có cam kết nhưng chưa có ngân sách" (trước đây bị
+`budget > 0` loại im lặng). `systemBudget` còn caller (`lib/tien-do/systems.ts`) nên giữ; `costSummary`
+không còn caller production, chỉ còn test legacy (`cost.test`/`vo.test`/`audit-cost-query-reuse`) nên
+giữ làm adapter. Test: 2 ca `cost_over` (số lớn sát ngưỡng, no_budget) trong `tests/thong-bao.test.ts`,
+1 ca `bySystemBlock` khớp `getCostReport` trong `tests/dashboardext.test.ts`.
+**Vá CI #598:** `getCostReport` tự mở REPEATABLE READ nên không gọi lồng được trong
+`withProjectScope` của `GET /api/notifications` (500 — `tests/s02b-files-scope` bắt được): route
+đọc báo cáo TRƯỚC khi mở scope qua `loadCostAlertReport` rồi truyền `opts.costReport` vào
+`syncAndListNotifications`. `route-tai-chinh-3a` (PATCH settings 85/105) không trả lại ngưỡng →
+test `cost_over` file sau trên cùng DB worker đỏ; nay trả lại bằng `t.after`, 2 ca mới tự chốt 90/100.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S10c: tiền exact hợp đồng/thanh toán/mua sắm/EVM…
 
 Phần "monetary inventory còn lại, ngoài costs/IPC" của S10 (A3-FR03/FR04/FR06, A3-AC01/AC03/
