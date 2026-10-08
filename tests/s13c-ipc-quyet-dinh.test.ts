@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangXuat, requestRieng } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -208,14 +208,16 @@ async function xemDot(certId: number) {
 async function quyetDinh(certId: number, body: Record<string, unknown>, key?: string) {
   const { POST } = await import("@/app/api/payment-certs/[id]/decide/route");
   return goi(
-    POST(
-      jreq(
-        `/api/payment-certs/${certId}/decide`,
-        body,
-        "POST",
-        key ? { "Idempotency-Key": key } : undefined,
+    requestRieng(() =>
+      POST(
+        jreq(
+          `/api/payment-certs/${certId}/decide`,
+          body,
+          "POST",
+          key ? { "Idempotency-Key": key } : undefined,
+        ),
+        P(certId),
       ),
-      P(certId),
     ),
   );
 }

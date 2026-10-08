@@ -77,6 +77,14 @@ warningVersion` — có cảnh báo mà thiếu → **409 `acknowledgement_requi
   ở chứng từ `/payment-certs` và hộp thư `/approvals` (CĐT không xem được đợt vẫn nhận cảnh báo từ
   409); 409 mở lại hộp (bỏ tick), không tự gửi lại, không hiện như "đã duyệt"; chứng từ gửi
   `Idempotency-Key`, mất mạng bấm lại dùng đúng key.
+- **Vá test chập chờn A5-AC06 (duyệt trùng [200, 403] thay vì [200, 409]) — lỗi harness, không
+  phải route:** test gọi handler thẳng nên hai request `Promise.all` dùng CHUNG ngữ cảnh
+  AsyncLocalStorage của thân test (lời gọi route trước đã `enterWith` vào đó); `getCurrentUser()`
+  của request sau xoá/nạp lại snapshot quyền của request trước → `CAN.approve` đọc snapshot đang nạp
+  dở = false (403 giả) hoặc ném "Ngữ cảnh xác thực đã thay đổi". Thêm `requestRieng()` vào
+  `tests/helpers/phien.ts` (mỗi lời gọi một ngữ cảnh riêng như Next) và dùng cho các helper gọi đồng
+  thời ở `s13a-chuoi-ipc-thanh-toan`, `s13a-chuoi-tien-do-nghiem-thu`, `s13c-ipc-quyet-dinh`; vòng
+  ép 40 lần duyệt trùng: trước 3/50 đúng, sau 80/80 `[200, 409]`; cả file xanh 20/20 lần.
 - **Test**: `tests/s13c-ipc-quyet-dinh.test.ts` (11 ca: thuần, snapshot, idempotency, bước engine,
   luỹ kế dưới khoá tất định + đồng thời, RLS bằng `xboss_app`, xoá upstream); 3 mutation mới
   (`npm run test:mutation -- --only=IPC` 4/4 bị bắt). Bộ liên quan (s13a ×3, payment-certs-_,

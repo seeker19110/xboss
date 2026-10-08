@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangXuat, requestRieng } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -98,7 +98,7 @@ async function tick(dimId: number) {
 
 async function lapDot(contractId: number) {
   const { POST } = await import("@/app/api/payment-certs/route");
-  return goi(POST(jreq(`/api/payment-certs`, { contractId })));
+  return goi(requestRieng(() => POST(jreq(`/api/payment-certs`, { contractId }))));
 }
 
 async function suaDot(certId: number, items: { boqItemId: number; qtyPeriod: number }[]) {
@@ -113,7 +113,9 @@ async function trinh(certId: number) {
 
 async function quyetDinh(certId: number, body: Record<string, unknown>) {
   const { POST } = await import("@/app/api/payment-certs/[id]/decide/route");
-  return goi(POST(jreq(`/api/payment-certs/${certId}/decide`, body), P(certId)));
+  return goi(
+    requestRieng(() => POST(jreq(`/api/payment-certs/${certId}/decide`, body), P(certId))),
+  );
 }
 
 async function xemDot(certId: number) {
