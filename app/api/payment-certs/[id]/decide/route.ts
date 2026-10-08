@@ -112,11 +112,25 @@ export async function POST(
       const totals = await certTotals(id);
       // payment_bills.amount là NUMERIC(15,2): ghi chuỗi canonical exact (không qua float);
       // vượt cột → 422 rõ ràng thay vì lỗi tràn số 500 của Postgres, không clamp.
-      if (!fitsNumeric(totals.approvedValue, 15))
+      // S10a L6: người duyệt bước cuối có thể không có viewPayments → thông điệp cụ thể làm lộ
+      // độ lớn giá trị (≥ 10^13 đ). Không có quyền xem tiền → thông điệp chung; lý do thật log server.
+      if (!fitsNumeric(totals.approvedValue, 15)) {
+        log.warn("payment-certs/decide: giá trị đề nghị vượt NUMERIC(15,2)", {
+          certId: id,
+          reason: "approved_value_overflow",
+        });
+        if (CAN.viewPayments(user.role))
+          throw Object.assign(
+            new Error("Giá trị đề nghị thanh toán vượt giới hạn lưu trữ của phiếu thanh toán"),
+            { status: 422, code: "amount_overflow" },
+          );
         throw Object.assign(
-          new Error("Giá trị đề nghị thanh toán vượt giới hạn lưu trữ của phiếu thanh toán"),
-          { status: 422 },
+          new Error(
+            "Không thể duyệt đợt này do dữ liệu đợt không hợp lệ — liên hệ Admin/PM kiểm tra lại đợt",
+          ),
+          { status: 422, code: "cert_invalid" },
         );
+      }
       const responsible = contract?.supplierName ?? contract?.partyName ?? contract?.title ?? "—";
 
       // M51 PR1: project_id của bill lấy từ hợp đồng (cert.contractId → contracts.project_id)
