@@ -141,10 +141,26 @@ export async function DELETE(
       return NextResponse.json({ error: "Không thể xoá Admin cuối cùng" }, { status: 400 });
   }
 
-  // Gỡ liên kết trước khi xoá (giữ lịch sử/thông báo sạch FK).
-  await run(`UPDATE tasks SET assigned_to = NULL WHERE assigned_to = ?`, id);
-  await run(`DELETE FROM notifications WHERE user_id = ?`, id);
-  await run(`DELETE FROM users WHERE id = ? AND org_id = ?`, id, me.orgId);
+  // Gỡ liên kết trước khi xoá (giữ lịch sử/thông báo sạch FK). Cùng 1 transaction: nếu user còn
+  // được tham chiếu (người tạo/duyệt hợp đồng, nhật ký, chứng từ…) thì 23503 → rollback hết,
+  // không để lại việc đã gỡ giao; trả 409 dependency_conflict thay vì 500 (S13c).
+  try {
+    await withTransaction(async () => {
+      await run(`UPDATE tasks SET assigned_to = NULL WHERE assigned_to = ?`, id);
+      await run(`DELETE FROM notifications WHERE user_id = ?`, id);
+      await run(`DELETE FROM users WHERE id = ? AND org_id = ?`, id, me.orgId);
+    });
+  } catch (err) {
+    if ((err as { code?: string }).code !== "23503") throw err;
+    return NextResponse.json(
+      {
+        error:
+          "Người dùng đang được tham chiếu trong dữ liệu khác (hợp đồng, nhật ký, chứng từ…) — không xoá được, hãy đổi vai trò hoặc thu hồi phiên thay vì xoá",
+        code: "dependency_conflict",
+      },
+      { status: 409 },
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

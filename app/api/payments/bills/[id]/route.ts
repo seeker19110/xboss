@@ -120,15 +120,28 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const projectId = await getCurrentProjectIdStrict(user);
   if (projectId == null) return notFound();
 
-  const deleted = await withProjectScope(
-    projectId,
-    () =>
-      query<{ id: number }>(
-        `DELETE FROM payment_bills WHERE ${BILL_SCOPE} RETURNING id`,
-        ...billScopeParams(id, projectId, user.orgId),
-      ),
-    { readOnly: false },
-  );
+  // S13c: bill còn được hoá đơn (invoices.payment_bill_id) tham chiếu → 23503 → 409, không 500.
+  let deleted: { id: number }[];
+  try {
+    deleted = await withProjectScope(
+      projectId,
+      () =>
+        query<{ id: number }>(
+          `DELETE FROM payment_bills WHERE ${BILL_SCOPE} RETURNING id`,
+          ...billScopeParams(id, projectId, user.orgId),
+        ),
+      { readOnly: false },
+    );
+  } catch (err) {
+    if ((err as { code?: string }).code !== "23503") throw err;
+    return NextResponse.json(
+      {
+        error: "Bill thanh toán đang được hoá đơn tham chiếu — xoá/gỡ hoá đơn trước khi xoá bill",
+        code: "dependency_conflict",
+      },
+      { status: 409, headers: PRIVATE_NO_STORE },
+    );
+  }
   if (deleted.length === 0) return notFound();
   return NextResponse.json({ ok: true }, { headers: PRIVATE_NO_STORE });
 }

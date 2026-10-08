@@ -1,5 +1,16 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S13c: DELETE users/bills còn tham chiếu -> 409
+
+`DELETE /api/users/:id` và `DELETE /api/payments/bills/:id` bắt pg 23503 -> 409
+`{ error, code: "dependency_conflict" }` thay vì 500 (user còn được hoá đơn/hợp đồng/nhật ký tham chiếu;
+bill còn hoá đơn `payment_bill_id`). Users: gỡ giao việc + xoá thông báo + xoá user gói chung 1
+transaction nên 409 không để lại việc đã gỡ giao. Giữ nguyên kiểm phiên/quyền/org/dự án. Test
+`tests/route-xoa-xung-dot-phu-thuoc.test.ts` (route thật, đỏ 2/3 trên code cũ).
+**Nợ (ghi nhận, chưa sửa):** hơn 80 route DELETE khác chưa bắt 23503 (vd `tasks`, `projects`,
+`towers`, `sheets`, `workpackages`, `materials`, `purchase-orders`, `invoices`, `claims`, `payroll`,
+`personnel`, `crews`, `risks`…) — cần rà từng route xem FK nào còn chặn rồi áp cùng mẫu.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S13d: dọn phần còn lại của IPC/payment-certs
 
 Spec cha `docs/nang-cap/AUDIT-2026-09-25/` (A4 tiền exact, A5 chuỗi IPC) + `S00-PAYMENT-SCOPE-INVENTORY.md`.
