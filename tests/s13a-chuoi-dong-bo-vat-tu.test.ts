@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import type { SheetClient } from "@/lib/vat-tu/google-sheets";
 import { SoFixture, uniq } from "./helpers/chuoi-nghiep-vu";
@@ -17,6 +17,18 @@ import { SoFixture, uniq } from "./helpers/chuoi-nghiep-vu";
 // nay là cổng chặn thường.
 
 const S = { skip: !HAS_TEST_DB };
+
+// Từ A1 (QUALITY-FINAL-1) mỗi lần đồng bộ chỉ cho đúng một dự án — các ca dùng chung một dự án
+// riêng của file (org 1), vật tư tạo từ Sheet mang project_id của dự án này.
+const fChung = new SoFixture();
+let duAnChung: number | null = null;
+async function phamVi() {
+  duAnChung ??= await fChung.duAn("vt-sync");
+  return { orgId: 1, projectId: duAnChung };
+}
+after(async () => {
+  if (duAnChung != null) await fChung.don();
+});
 
 const HEADER = [
   "ID",
@@ -92,7 +104,7 @@ async function don(ten: string): Promise<void> {
 async function dongBo(client: SheetClient): Promise<"ok" | "loi"> {
   const { runMaterialSync } = await import("@/lib/vat-tu/material-sync");
   try {
-    await runMaterialSync(1, client);
+    await runMaterialSync(await phamVi(), client);
     return "ok";
   } catch {
     return "loi";

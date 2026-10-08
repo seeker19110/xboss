@@ -8,6 +8,7 @@ import { JWT } from "google-auth-library";
 //   GOOGLE_SA_EMAIL + GOOGLE_SA_PRIVATE_KEY  — cặp email + private key.
 //   GOOGLE_SHEET_ID   — ID spreadsheet (chia sẻ quyền Editor cho email SA).
 //   GOOGLE_SHEET_TAB  — (tuỳ chọn) tên tab, mặc định "VatTu".
+//   GOOGLE_SHEET_PROJECT_ID — (tuỳ chọn) ID dự án gắn với Sheet; bắt buộc để cron chạy.
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 const API_BASE = "https://sheets.googleapis.com/v4/spreadsheets";
@@ -48,6 +49,25 @@ function readSheetId(): string {
 }
 
 const readTabName = () => process.env.GOOGLE_SHEET_TAB?.trim() || "VatTu";
+
+/**
+ * Dự án gắn với Sheet đã cấu hình (`GOOGLE_SHEET_PROJECT_ID`, tuỳ chọn — QUALITY-FINAL-1 A1).
+ * `unset` = chưa gắn (đồng bộ tay theo dự án đang chọn; cron từ chối chạy). `invalid` = có đặt
+ * nhưng không phải số nguyên dương chuẩn → nơi gọi phải từ chối (fail-closed, không đoán).
+ */
+export type SheetProjectBinding =
+  { kind: "unset" } | { kind: "invalid" } | { kind: "bound"; projectId: number };
+
+export function readSheetProjectBinding(): SheetProjectBinding {
+  const raw = process.env.GOOGLE_SHEET_PROJECT_ID?.trim();
+  if (!raw) return { kind: "unset" };
+  if (!/^[1-9]\d*$/.test(raw)) return { kind: "invalid" };
+  const id = Number(raw);
+  // Cột projects.id là INTEGER — ngoài biên int4 thì không thể là dự án thật.
+  return Number.isSafeInteger(id) && id <= 2147483647
+    ? { kind: "bound", projectId: id }
+    : { kind: "invalid" };
+}
 
 export type SheetClient = {
   /** Đọc toàn bộ vùng dữ liệu của tab (mảng hàng × ô, chuỗi). */

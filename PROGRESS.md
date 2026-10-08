@@ -1,5 +1,52 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 A1: phạm vi dự án cho đồng bộ vật tư ↔ Sheet
+
+Đóng quan sát "Cần quyết" của S13a/S13b: `runMaterialSync` đọc/ghi mọi vật tư toàn hệ, cron lấy org
+của "dự án đầu tiên". Không migration, không thêm dependency, không biến môi trường bắt buộc.
+
+- **Lõi** (`lib/vat-tu/material-sync.ts`): `runMaterialSync({ orgId, projectId }, client?)` — kiểm
+  lại dự án thuộc tổ chức (sai → `MaterialSyncScopeError` 404) trước khi lấy khoá; mọi đọc/ghi
+  `materials`/`material_sync`/`sheet_types` (qua `towers.project_id`)/`MAX(sort_order)` lọc theo dự
+  án; `applyToDb` thêm `AND project_id = ?`; vật tư tạo từ Sheet mang `project_id` của phạm vi (bản
+  cũ để NULL → vô hình trong app và mã BOQ rơi về org 1). Dòng Sheet mang ID vật tư **dự án/tổ chức
+  khác** → bỏ qua, không ghi DB, **giữ nguyên nội dung dòng trên Sheet** (xếp cuối, không ghi đè bằng
+  dữ liệu DB, không xoá), báo `skipped` không kèm tên/dữ liệu DB; ID không còn trong DB → như cũ.
+  Vật tư ngoài phạm vi không bao giờ lên Sheet. Giữ nguyên 3-way merge, `CONFLICT_POLICY`,
+  `SYNCED_FIELDS`, cột chỉ DB→Sheet, snapshot-sau-ghi, nhận lại vật tư mồ côi (S13b, nay trong dự
+  án). Khoá `sync_locks` giữ tên chung `materials` (một Sheet cho cả hệ — hai dự án ghi đè cùng tab
+  đồng thời sẽ mất dòng của nhau).
+- **Quyết định cron (ranh giới được giao):** thêm biến **tuỳ chọn** `GOOGLE_SHEET_PROJECT_ID`
+  (khai `lib/nen/env.ts`, đọc + fail-closed ở `readSheetProjectBinding` trong `google-sheets.ts`,
+  không validate trong schema env để giá trị sai không làm hỏng cả app). Cron chỉ `CRON_SECRET` →
+  đồng bộ đúng dự án này, org suy từ dự án; thiếu/sai/dự án không tồn tại → **503 kèm lý do, không
+  chạy** (bỏ fallback "dự án đầu tiên"/org 1). Lý do: Sheet là cấu hình toàn hệ nên chỉ người vận
+  hành mới biết Sheet thuộc dự án nào; biến môi trường đặt cạnh `GOOGLE_SHEET_ID` (cùng vòng đời), không
+  cần bảng/migration. Đã đặt biến thì **cả nút thủ công** cũng chỉ cho dự án đó (dự án khác → 409) —
+  tránh đẩy vật tư dự án B lên Sheet của dự án A. Chưa đặt → nút thủ công vẫn chạy theo dự án đang
+  chọn (giữ tương thích, không làm hỏng triển khai hiện có). Đã cân nhắc: (a) cron lặp mọi dự án
+  → các dự án ghi đè lẫn nhau trên cùng tab; (b) bảng cấu hình trong DB → cần migration + UI quản
+  trị, ngoài phạm vi; (c) bắt buộc biến cho cả nút thủ công → vỡ triển khai hiện có.
+- **Route:** `POST /api/materials/sync` dùng `getCurrentProjectIdStrict` (cookie sai/không có dự án
+  → 404 trước mọi query nghiệp vụ, không fallback); `GET /api/cron/sync-sheets` phiên Admin/PM →
+  dự án đang chọn (strict), chỉ secret → dự án cấu hình; cả hai kiểm cờ module `materials` của dự án
+  phạm vi; lỗi phạm vi trả đúng 404/409/503, lỗi khác vẫn 500. Gỡ `cron/sync-sheets` khỏi whitelist
+  `project-scope-invariant`. Tài liệu: `DEPLOY.md` (biến mới + hành vi phạm vi).
+- **Test** (Postgres 16 cục bộ, mỗi file 1 DB): mới `route-vat-tu-sync-pham-vi` 4/4 qua route thật
+  (Sheet giả thay đúng `getSheetClient`) — **cả 4 đỏ trên code cũ** (PM dự án A sửa được tên vật tư
+  dự án B + đẩy vật tư B lên Sheet; cookie dự án không được gán/dự án org khác → 200 thay vì 404;
+  Sheet gắn B vẫn chạy cho A; cron thiếu cấu hình vẫn đồng bộ toàn hệ). `google-sheets` +1 ca
+  (`readSheetProjectBinding`: unset/bound/invalid gồm `1e3`, `042`, ngoài int4). `s13a-chuoi-dong-bo-
+vat-tu` chuyển sang phạm vi 1 dự án fixture, 5/5. Hồi quy xanh: material-sync, materials-*,
+  route-vat-tu-2, route-boq-vat-tu, route-cron, sync-locks, env, ocr-rules, project-scope-invariant,
+  audit-route-inventory; inventory S00 sinh lại.
+- **Còn lại / cho phiên chính:** (1) `scripts/audit-route-inventory.ts` chưa nhận
+  `getCurrentProjectIdStrict` là resolver nên `materials/sync` POST (cùng `import/excel`) hiện
+  `NOT_MAPPED` trong inventory dù đã scope strict — sửa bộ phân loại là việc riêng; (2) chưa đặt
+  `GOOGLE_SHEET_PROJECT_ID` thì hai dự án cùng dùng một Sheet vẫn "giành" dòng mới chưa có ID (dòng
+  không ID được tạo vào dự án bấm đồng bộ trước) — vận hành nên đặt biến khi có >1 dự án; (3)
+  `.env.example` chưa thêm dòng biến mới (file bị chặn đọc trong phiên agent).
+
 ## 2026-10-08 — QUALITY-FINAL-1 S10 (đuôi): tổng BOQ + mv_cost_by_month exact
 
 - `GET /api/boq`: `totals.contractValue/subValue/executedValue` tính trong SQL (NUMERIC, SUM rồi mới ROUND 2 số lẻ; `progress_percent` float8 đi qua `::text::numeric`), không còn cộng float JS. Header `X-XBoss-Money-Format: decimal-string-v1` → chuỗi canonical + `moneyFormat`; legacy → number qua `moneyToNumberSafe`, ngoài biên → 422 `money_precision_unsupported`; thêm `HEADERS_API_TIEN`. Trang `/boq` opt-in v1, giữ tổng bằng bigint (% thực hiện tính trên bigint); `/tenders` + `/variations` (chỉ đọc `items`) gửi header v1 để không dính 422 vì totals.
@@ -76,8 +123,8 @@ Bảng map AC → ca (file `tests/s13a-chuoi-*.test.ts`, ★ = todo):
   `paid_date` = ngày duyệt nên "approved" và "đã chi" trùng nhau trong báo cáo (A5 §2 nói khác,
   A4-FR02 lại chốt actual = mọi payment_bills); IPC chạy cho mọi loại HĐ và phiếu của HĐ nhận thầu
   vẫn cộng vào "thực chi"; `POST /api/payment-certs` với HĐ dự án khác trả 422 (giống id không tồn
-  tại, không lộ) thay vì 404 như DATA-CONTRACTS §7; `runMaterialSync` đọc/ghi snapshot mọi vật tư
-  không lọc tổ chức/dự án; `tests/qaqc.test.ts` chèn checklist bắt buộc toàn cục (system/project
+  tại, không lộ) thay vì 404 như DATA-CONTRACTS §7; ~~`runMaterialSync` đọc/ghi snapshot mọi vật tư
+  không lọc tổ chức/dự án~~ (đã vá ở A1, mục đầu); `tests/qaqc.test.ts` chèn checklist bắt buộc toàn cục (system/project
   NULL) — vô hại vì mỗi worker test có DB riêng và file chạy tuần tự.
 
 ## 2026-10-08 — QUALITY-FINAL-1 S10 đầu vào tiền (phần 2): claims, đề xuất, bảo lãnh, VO, thầu, BOQ, báo giá kỹ thuật

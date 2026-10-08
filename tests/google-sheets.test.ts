@@ -18,6 +18,7 @@ const ENV_KEYS = [
   "GOOGLE_SA_PRIVATE_KEY",
   "GOOGLE_SHEET_ID",
   "GOOGLE_SHEET_TAB",
+  "GOOGLE_SHEET_PROJECT_ID",
 ] as const;
 
 /** Đặt môi trường sạch rồi áp đúng các biến của ca test — tránh rò cấu hình giữa các ca. */
@@ -282,4 +283,19 @@ test("Phản hồi 200 nhưng thân không phải JSON → coi như rỗng, khô
   } finally {
     globalThis.fetch = fetchGoc;
   }
+});
+
+test("GOOGLE_SHEET_PROJECT_ID: thiếu → unset; số nguyên dương chuẩn → bound; còn lại → invalid (fail-closed)", async () => {
+  const { readSheetProjectBinding } = await napClient();
+  datEnv({});
+  assert.deepEqual(readSheetProjectBinding(), { kind: "unset" });
+  datEnv({ GOOGLE_SHEET_PROJECT_ID: "   " });
+  assert.deepEqual(readSheetProjectBinding(), { kind: "unset" });
+  datEnv({ GOOGLE_SHEET_PROJECT_ID: " 42 " });
+  assert.deepEqual(readSheetProjectBinding(), { kind: "bound", projectId: 42 });
+  for (const sai of ["0", "-3", "1e3", "0x10", "12abc", "042", "2147483648"]) {
+    datEnv({ GOOGLE_SHEET_PROJECT_ID: sai });
+    assert.deepEqual(readSheetProjectBinding(), { kind: "invalid" }, sai);
+  }
+  datEnv({});
 });

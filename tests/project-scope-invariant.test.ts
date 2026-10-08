@@ -31,8 +31,6 @@ const WHITELIST: Record<string, string> = {
 
   // --- Cron (xác thực CRON_SECRET; tự lặp theo từng dự án trong logic) ---
   "cron/health-check": "cron kiểm tra hệ thống toàn cục (DB/SMTP/Telegram/...), không scope dự án",
-  "cron/sync-sheets":
-    "cron đồng bộ Google Sheet — tích hợp single-tenant (1 Sheet ↔ 1 DB), lấy org dự án đầu tiên (M124)",
   "tech/health-check": "kiểm tra hệ thống toàn cục (DB/SMTP/Telegram/...), không scope dự án",
 
   // --- Scope qua thực thể CHA theo id (không có cột project_id trực tiếp) ---
