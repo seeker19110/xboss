@@ -11,7 +11,8 @@ import {
   isMoneyPrecisionError,
   parseFixedDecimalExact,
 } from "@/lib/nen/money";
-import { certTotalsToWire } from "@/lib/tai-chinh/paymentcerts";
+import { certTotalsToWire, certItemsToWire } from "@/lib/tai-chinh/paymentcerts";
+import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 
 // QUALITY-FINAL-1 / S10a — DTO tiền opt-in decimal-string-v1 (A3-FR06, A3-AC05) cho
 // /api/payment-certs/**: header → chuỗi canonical + moneyFormat; không header → JSON number
@@ -148,6 +149,57 @@ test("decimalFromUnscaled: nghịch đảo parseFixedDecimalExact, giữ số 0 
   assert.throws(() => decimalFromUnscaled(1n, 19), RangeError);
 });
 
+const DONG_MAU = {
+  id: 7,
+  boqItemId: 3,
+  boqCode: "B1",
+  boqName: "Ống",
+  boqUnit: "m",
+  boqQtyContract: 100,
+  qtyPeriod: 0.005,
+  qtyCumulative: 1.25,
+  unitPrice: 12345.67,
+};
+const EXACT_MAU = {
+  id: 7,
+  unitPrice: "12345.67",
+  qtyPeriod: "0.005",
+  qtyCumulative: "1.250",
+  boqQtyContract: "100.000",
+};
+
+test("certItemsToWire: v1 chuỗi canonical, legacy number, ngoài biên lỗi precision, thiếu dòng exact throw", () => {
+  const [v1] = certItemsToWire([DONG_MAU], [EXACT_MAU], "decimal-string-v1");
+  assert.deepEqual(
+    [v1.unitPrice, v1.qtyPeriod, v1.qtyCumulative, v1.boqQtyContract, v1.id],
+    ["12345.67", "0.005", "1.250", "100.000", 7],
+  );
+  const [lg] = certItemsToWire([DONG_MAU], [EXACT_MAU], "legacy-number");
+  assert.deepEqual(
+    [lg.unitPrice, lg.qtyPeriod, lg.qtyCumulative, lg.boqQtyContract],
+    [12345.67, 0.005, 1.25, 100],
+  );
+
+  // 9007199254740993 đồng×100 > 2^53 — v1 giữ exact, legacy từ chối (không xấp xỉ).
+  const lon = [{ ...EXACT_MAU, unitPrice: "90071992547409.93" }];
+  assert.equal(
+    certItemsToWire([DONG_MAU], lon, "decimal-string-v1")[0].unitPrice,
+    "90071992547409.93",
+  );
+  assert.throws(() => certItemsToWire([DONG_MAU], lon, "legacy-number"), isMoneyPrecisionError);
+  assert.throws(() => certItemsToWire([DONG_MAU], [], "decimal-string-v1"), /thiếu dòng exact/);
+});
+
+test("certItemsToWire sau stripSensitive: user thiếu viewPayments bị che đơn giá ở cả 2 định dạng", () => {
+  const cert = { items: [DONG_MAU] };
+  const [masked] = stripSensitive("paymentCert", [cert], { role: "engineer" });
+  for (const fmt of ["decimal-string-v1", "legacy-number"] as const) {
+    const [it] = certItemsToWire(masked.items, [EXACT_MAU], fmt);
+    assert.equal(it.unitPrice, null, `${fmt}: đơn giá phải bị che`);
+    assert.notEqual(it.qtyPeriod, null, `${fmt}: KL không bị che`);
+  }
+});
+
 test("moneyWireFormat: chỉ đúng decimal-string-v1 mới opt-in, giá trị lạ/thiếu = legacy", () => {
   assert.equal(moneyWireFormat("decimal-string-v1"), "decimal-string-v1");
   assert.equal(moneyWireFormat(" decimal-string-v1 "), "decimal-string-v1");
@@ -225,13 +277,23 @@ test(
         retentionDeduct: "4.70",
         approvedValue: "79.66",
       });
-      // A3-AC05: chỉ tiền của certTotals đổi kiểu; ID/số đợt/KL/đếm giữ number.
+      // A3-AC05: ID/số đợt/đếm giữ number; S10a: dòng KL (đơn giá + KL) là chuỗi canonical.
       assert.equal(vb.cert.id, f.certId);
       assert.equal(vb.cert.contractId, f.contractId);
       assert.equal(typeof vb.cert.periodNo, "number");
       assert.equal(vb.cert.items.length, 1);
-      for (const k of ["id", "boqItemId", "qtyPeriod", "qtyCumulative", "boqQtyContract"])
+      for (const k of ["id", "boqItemId"])
         assert.equal(typeof vb.cert.items[0][k], "number", `items[].${k} phải giữ number`);
+      assert.equal(vb.cert.items[0].unitPrice, "94.00");
+      assert.equal(vb.cert.items[0].qtyPeriod, "1.000");
+      assert.equal(vb.cert.items[0].qtyCumulative, "1.000");
+      assert.equal(vb.cert.items[0].boqQtyContract, "1000.000");
+      const li = (lb as unknown as { cert: { items: Record<string, unknown>[] } }).cert.items[0];
+      assert.deepEqual(
+        [li.unitPrice, li.qtyPeriod, li.qtyCumulative, li.boqQtyContract],
+        [94, 1, 1, 1000],
+        "legacy: dòng KL giữ JSON number như cũ",
+      );
       assert.ok(Array.isArray(vb.vuotHopDong));
     } finally {
       await donDep(f);
@@ -257,8 +319,13 @@ test(
 
       const v1 = await getChiTiet(f.certId, { [HEADER]: "decimal-string-v1" });
       assert.equal(v1.status, 200);
-      const { totals } = (await v1.json()) as { totals: Record<string, string> };
+      const { totals, cert } = (await v1.json()) as {
+        totals: Record<string, string>;
+        cert: { items: Record<string, unknown>[] };
+      };
       assert.equal(totals.periodValue, "90071992547409.93");
+      // S10a: đơn giá có xu lẻ, số lớn — chuỗi exact, không bị float làm tròn.
+      assert.deepEqual(cert.items.map((it) => it.unitPrice).sort(), ["0.03", "9007199254740.99"]);
       assert.equal(totals.approvedValue, "76336013683929.91");
     } finally {
       await donDep(f);

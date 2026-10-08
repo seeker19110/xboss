@@ -12,6 +12,8 @@ import {
   moneyToWire,
   mulRatio,
   parseFixedDecimalExact,
+  decimalFromUnscaled,
+  MONEY_FORMAT_DECIMAL_V1,
   type MoneyWireFormat,
 } from "@/lib/nen/money";
 import { nextSeqCode } from "@/lib/ha-tang/seqcode";
@@ -392,6 +394,78 @@ export function certTotalsToWire(
     out[field] = minor == null ? null : moneyToWire(minor, format);
   }
   return out;
+}
+
+/** Dòng KL của đợt cho DTO chi tiết (S10a): mọi cột NUMERIC đọc `::text` ngay trong SQL. */
+export type CertItemExact = CertLineExact & { boqQtyContract: string };
+
+export async function certItemsExact(certId: number): Promise<CertItemExact[]> {
+  return query<CertItemExact>(
+    `SELECT i.id, i.qty_period::text AS "qtyPeriod", i.qty_cumulative::text AS "qtyCumulative",
+            i.unit_price::text AS "unitPrice", bi.qty_contract::text AS "boqQtyContract"
+       FROM payment_cert_items i JOIN boq_items bi ON bi.id = i.boq_item_id
+      WHERE i.cert_id = ? ORDER BY i.id`,
+    certId,
+  );
+}
+
+/** Scale nguồn: qty NUMERIC(15,3) (cả boq_items.qty_contract), unit_price NUMERIC(15,2). */
+const CERT_ITEM_DECIMAL_SCALE = {
+  unitPrice: 2,
+  qtyPeriod: 3,
+  qtyCumulative: 3,
+  boqQtyContract: 3,
+} as const;
+type CertItemDecimalField = keyof typeof CERT_ITEM_DECIMAL_SCALE;
+
+/** Dòng KL trên wire: v1 → chuỗi canonical; legacy → number; trường đã che giữ null. */
+export type CertItemWire = Omit<CertItemRow, CertItemDecimalField> & {
+  [K in CertItemDecimalField]: string | number | null;
+};
+
+/** Text NUMERIC của Postgres → chuỗi canonical đúng scale (fail-fast nếu sai dạng). */
+function canonicalDecimal(text: string, scale: number): string {
+  return decimalFromUnscaled(parseFixedDecimalExact(text, scale), scale);
+}
+
+/** Legacy: chuỗi canonical → number CHỈ khi round-trip đúng; không thì lỗi precision (→ 422). */
+function decimalToNumberSafe(canonical: string, scale: number): number {
+  const unscaled = parseFixedDecimalExact(canonical, scale);
+  const max = BigInt(Number.MAX_SAFE_INTEGER);
+  const n = Number(canonical);
+  if (unscaled < -max || unscaled > max || n.toFixed(scale) !== canonical) {
+    throw new RangeError("money_precision_unsupported");
+  }
+  return n;
+}
+
+/**
+ * Adapter DTO dòng KL (S10a, A3-FR06): giá trị lấy từ `exact` (`certItemsExact`, `::text`) theo
+ * id dòng, KHÔNG từ số float của `json_agg`. Gọi SAU `stripSensitive` — trường đã che (null)
+ * giữ null ở cả hai định dạng. Thiếu dòng exact → throw (không fallback float im lặng).
+ */
+export function certItemsToWire(
+  items: readonly CertItemRow[],
+  exact: readonly CertItemExact[],
+  format: MoneyWireFormat,
+): CertItemWire[] {
+  const byId = new Map(exact.map((e) => [e.id, e]));
+  return items.map((item) => {
+    const src = byId.get(item.id);
+    if (!src) throw new Error(`certItemsToWire: thiếu dòng exact cho dòng KL ${item.id}`);
+    const out: CertItemWire = { ...item };
+    for (const field of Object.keys(CERT_ITEM_DECIMAL_SCALE) as CertItemDecimalField[]) {
+      if (item[field] == null) {
+        out[field] = null;
+        continue;
+      }
+      const scale = CERT_ITEM_DECIMAL_SCALE[field];
+      const canonical = canonicalDecimal(src[field], scale);
+      out[field] =
+        format === MONEY_FORMAT_DECIMAL_V1 ? canonical : decimalToNumberSafe(canonical, scale);
+    }
+    return out;
+  });
 }
 
 // Giá trị luỹ kế đã nghiệm thu của 1 hợp đồng = Σ cumulativeValue của đợt
