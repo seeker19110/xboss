@@ -11,7 +11,8 @@ import {
   isMoneyPrecisionError,
   parseFixedDecimalExact,
 } from "@/lib/nen/money";
-import { certTotalsToWire } from "@/lib/tai-chinh/paymentcerts";
+import { certTotalsToWire, certItemsToWire } from "@/lib/tai-chinh/paymentcerts";
+import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 
 // QUALITY-FINAL-1 / S10a — DTO tiền opt-in decimal-string-v1 (A3-FR06, A3-AC05) cho
 // /api/payment-certs/**: header → chuỗi canonical + moneyFormat; không header → JSON number
@@ -148,6 +149,57 @@ test("decimalFromUnscaled: nghịch đảo parseFixedDecimalExact, giữ số 0 
   assert.throws(() => decimalFromUnscaled(1n, 19), RangeError);
 });
 
+const DONG_MAU = {
+  id: 7,
+  boqItemId: 3,
+  boqCode: "B1",
+  boqName: "Ống",
+  boqUnit: "m",
+  boqQtyContract: 100,
+  qtyPeriod: 0.005,
+  qtyCumulative: 1.25,
+  unitPrice: 12345.67,
+};
+const EXACT_MAU = {
+  id: 7,
+  unitPrice: "12345.67",
+  qtyPeriod: "0.005",
+  qtyCumulative: "1.250",
+  boqQtyContract: "100.000",
+};
+
+test("certItemsToWire: v1 chuỗi canonical, legacy number, ngoài biên lỗi precision, thiếu dòng exact throw", () => {
+  const [v1] = certItemsToWire([DONG_MAU], [EXACT_MAU], "decimal-string-v1");
+  assert.deepEqual(
+    [v1.unitPrice, v1.qtyPeriod, v1.qtyCumulative, v1.boqQtyContract, v1.id],
+    ["12345.67", "0.005", "1.250", "100.000", 7],
+  );
+  const [lg] = certItemsToWire([DONG_MAU], [EXACT_MAU], "legacy-number");
+  assert.deepEqual(
+    [lg.unitPrice, lg.qtyPeriod, lg.qtyCumulative, lg.boqQtyContract],
+    [12345.67, 0.005, 1.25, 100],
+  );
+
+  // 9007199254740993 đồng×100 > 2^53 — v1 giữ exact, legacy từ chối (không xấp xỉ).
+  const lon = [{ ...EXACT_MAU, unitPrice: "90071992547409.93" }];
+  assert.equal(
+    certItemsToWire([DONG_MAU], lon, "decimal-string-v1")[0].unitPrice,
+    "90071992547409.93",
+  );
+  assert.throws(() => certItemsToWire([DONG_MAU], lon, "legacy-number"), isMoneyPrecisionError);
+  assert.throws(() => certItemsToWire([DONG_MAU], [], "decimal-string-v1"), /thiếu dòng exact/);
+});
+
+test("certItemsToWire sau stripSensitive: user thiếu viewPayments bị che đơn giá ở cả 2 định dạng", () => {
+  const cert = { items: [DONG_MAU] };
+  const [masked] = stripSensitive("paymentCert", [cert], { role: "engineer" });
+  for (const fmt of ["decimal-string-v1", "legacy-number"] as const) {
+    const [it] = certItemsToWire(masked.items, [EXACT_MAU], fmt);
+    assert.equal(it.unitPrice, null, `${fmt}: đơn giá phải bị che`);
+    assert.notEqual(it.qtyPeriod, null, `${fmt}: KL không bị che`);
+  }
+});
+
 test("moneyWireFormat: chỉ đúng decimal-string-v1 mới opt-in, giá trị lạ/thiếu = legacy", () => {
   assert.equal(moneyWireFormat("decimal-string-v1"), "decimal-string-v1");
   assert.equal(moneyWireFormat(" decimal-string-v1 "), "decimal-string-v1");
@@ -225,13 +277,23 @@ test(
         retentionDeduct: "4.70",
         approvedValue: "79.66",
       });
-      // A3-AC05: chỉ tiền của certTotals đổi kiểu; ID/số đợt/KL/đếm giữ number.
+      // A3-AC05: ID/số đợt/đếm giữ number; S10a: dòng KL (đơn giá + KL) là chuỗi canonical.
       assert.equal(vb.cert.id, f.certId);
       assert.equal(vb.cert.contractId, f.contractId);
       assert.equal(typeof vb.cert.periodNo, "number");
       assert.equal(vb.cert.items.length, 1);
-      for (const k of ["id", "boqItemId", "qtyPeriod", "qtyCumulative", "boqQtyContract"])
+      for (const k of ["id", "boqItemId"])
         assert.equal(typeof vb.cert.items[0][k], "number", `items[].${k} phải giữ number`);
+      assert.equal(vb.cert.items[0].unitPrice, "94.00");
+      assert.equal(vb.cert.items[0].qtyPeriod, "1.000");
+      assert.equal(vb.cert.items[0].qtyCumulative, "1.000");
+      assert.equal(vb.cert.items[0].boqQtyContract, "1000.000");
+      const li = (lb as unknown as { cert: { items: Record<string, unknown>[] } }).cert.items[0];
+      assert.deepEqual(
+        [li.unitPrice, li.qtyPeriod, li.qtyCumulative, li.boqQtyContract],
+        [94, 1, 1, 1000],
+        "legacy: dòng KL giữ JSON number như cũ",
+      );
       assert.ok(Array.isArray(vb.vuotHopDong));
     } finally {
       await donDep(f);
@@ -257,8 +319,13 @@ test(
 
       const v1 = await getChiTiet(f.certId, { [HEADER]: "decimal-string-v1" });
       assert.equal(v1.status, 200);
-      const { totals } = (await v1.json()) as { totals: Record<string, string> };
+      const { totals, cert } = (await v1.json()) as {
+        totals: Record<string, string>;
+        cert: { items: Record<string, unknown>[] };
+      };
       assert.equal(totals.periodValue, "90071992547409.93");
+      // S10a: đơn giá có xu lẻ, số lớn — chuỗi exact, không bị float làm tròn.
+      assert.deepEqual(cert.items.map((it) => it.unitPrice).sort(), ["0.03", "9007199254740.99"]);
       assert.equal(totals.approvedValue, "76336013683929.91");
     } finally {
       await donDep(f);
@@ -312,8 +379,9 @@ test(
     try {
       const { ws, theoNhan } = await docExcel(f.certId);
       assert.equal(theoNhan.get("Giá trị đợt này"), "90071992547409.93");
-      // 15 chữ số có nghĩa vẫn round-trip qua double → ô số đúng nguyên giá trị.
-      assert.equal(theoNhan.get("Trừ tạm ứng"), -9232379236109.52);
+      // L5 (S10a): khối tổng là MỘT nhóm — có giá trị vượt 15 chữ số nên cả nhóm ghi text,
+      // kể cả "Trừ tạm ứng" (tự nó vừa 15 chữ số), để =SUM() không lặng lẽ bỏ ô text.
+      assert.equal(theoNhan.get("Trừ tạm ứng"), "-9232379236109.52");
       assert.equal(theoNhan.get("GIÁ TRỊ ĐỀ NGHỊ THANH TOÁN"), "76336013683929.91");
       // Thành tiền dòng 10 × 9007199254740.99 = 90071992547409.9 (đúng 15 chữ số có nghĩa) và
       // 1 × 0.03 vẫn là ô số exact; đơn giá NUMERIC(15,2) luôn ≤ 15 chữ số → ô số.
@@ -331,6 +399,15 @@ test(
       assert.deepEqual(donGia.sort(), [0.03, 9007199254740.99].sort());
       assert.ok(thanhTien.includes(90071992547409.9));
       assert.ok(thanhTien.includes(0.03));
+      // Có nhóm ghi text → kèm dòng ghi chú cảnh báo không SUM trực tiếp.
+      const ghiChu: string[] = [];
+      ws.eachRow((row) => {
+        const v = row.getCell(1).value;
+        if (typeof v === "string" && v.startsWith("Lưu ý:")) ghiChu.push(v);
+      });
+      assert.equal(ghiChu.length, 1);
+      assert.match(ghiChu[0], /Giá trị đợt/);
+      assert.doesNotMatch(ghiChu[0], /Thành tiền đợt/);
     } finally {
       await donDep(f);
     }
@@ -368,13 +445,17 @@ test(
 );
 
 test(
-  "Duyệt đợt IPC: approvedValue vượt NUMERIC(15,2) → 422, không ghi phiếu, đợt vẫn chờ duyệt",
+  "Trình đợt IPC: giá trị vượt NUMERIC(15,2) → 422 amount_overflow ngay lúc trình, không ghi phiếu, đợt vẫn nháp",
   S,
   async () => {
+    // S10a L6: chặn tràn tại nguồn (lúc trình) — nhánh phòng thủ của decide có test riêng ở
+    // tests/payment-certs-amount-overflow.test.ts.
     const f = await dungDot(VUOT_BIEN);
     try {
-      const res = await trinhVaDuyet(f.certId);
+      const { POST: TRINH } = await import("@/app/api/payment-certs/[id]/submit/route");
+      const res = await TRINH(jreq(`/api/payment-certs/${f.certId}/submit`, {}), thamSo(f.certId));
       assert.equal(res.status, 422);
+      assert.equal((await res.json()).code, "amount_overflow");
       const { queryOne } = await import("@/lib/db");
       const bill = await queryOne(
         `SELECT id FROM payment_bills WHERE payment_cert_id = ?`,
@@ -385,7 +466,7 @@ test(
         `SELECT status FROM payment_certs WHERE id = ?`,
         f.certId,
       );
-      assert.equal(cert?.status, "submitted");
+      assert.equal(cert?.status, "draft");
     } finally {
       await donDep(f);
     }

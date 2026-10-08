@@ -10,6 +10,8 @@ import {
   saveCertItems,
   dongVuotHopDong,
   certTotalsToWire,
+  certItemsExact,
+  certItemsToWire,
   type CertLineInput,
   type CertTotalsMasked,
 } from "@/lib/tai-chinh/paymentcerts";
@@ -50,7 +52,10 @@ const json = (body: unknown, status = 200) =>
 
 // GET /api/payment-certs/:id — chi tiết đợt kèm dòng KL + tổng hợp giá trị,
 // scoped theo dự án đang chọn (M22). Header `X-XBoss-Money-Format: decimal-string-v1` →
-// `totals` là chuỗi canonical + `moneyFormat`; không gửi → JSON number legacy (422 nếu ngoài biên).
+// `totals` VÀ `cert.items[].unitPrice/qtyPeriod/qtyCumulative/boqQtyContract` là chuỗi canonical
+// (đọc `::text` trong SQL, không qua float) + `moneyFormat`; không gửi → JSON number legacy (422
+// `money_precision_unsupported` nếu một giá trị không round-trip được qua number). Che đơn giá
+// (stripSensitive) TRƯỚC khi đổi wire — đơn giá bị che là null ở cả hai định dạng.
 export async function GET(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -66,28 +71,37 @@ export async function GET(
   const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
 
   const projectId = await getCurrentProjectId(user);
-  const detail = await withProjectScope(projectId ?? "*", async () => {
-    const scoped = await certInProject(id, projectId);
-    if (!scoped) return null;
-    const cert = await getCert(id);
-    if (!cert) return null;
-    const totals = await certTotals(id);
-    // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho loại
-    // "payment_cert" (hành xử dormant, không đổi UI cũ).
-    const approvalStatus = await getEntityApprovalStatus("payment_cert", id);
-    // Dòng vượt khối lượng hợp đồng — CẢNH BÁO, không chặn (xem dongVuotHopDong).
-    const vuotHopDong = await dongVuotHopDong(id);
-    return { cert, totals, approvalStatus, vuotHopDong };
-  });
+  // REPEATABLE READ (S10a M4): đợt/tổng/dòng exact đọc bằng nhiều câu riêng — cùng một snapshot
+  // để PATCH chen giữa không làm dòng exact lệch json_agg (throw 500) hay tổng lệch dòng.
+  const detail = await withProjectScope(
+    projectId ?? "*",
+    async () => {
+      const scoped = await certInProject(id, projectId);
+      if (!scoped) return null;
+      const cert = await getCert(id);
+      if (!cert) return null;
+      const totals = await certTotals(id);
+      const itemsExact = await certItemsExact(id);
+      // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho loại
+      // "payment_cert" (hành xử dormant, không đổi UI cũ).
+      const approvalStatus = await getEntityApprovalStatus("payment_cert", id);
+      // Dòng vượt khối lượng hợp đồng — CẢNH BÁO, không chặn (xem dongVuotHopDong).
+      const vuotHopDong = await dongVuotHopDong(id);
+      return { cert, totals, itemsExact, approvalStatus, vuotHopDong };
+    },
+    { isolation: "repeatable_read" },
+  );
   if (!detail) return json({ error: "Không tìm thấy đợt thanh toán" }, 404);
-  const { cert, totals, approvalStatus, vuotHopDong } = detail;
+  const { cert, totals, itemsExact, approvalStatus, vuotHopDong } = detail;
   // M50 PR2: che đơn giá dòng KL + tổng tiền đợt cho user thiếu viewPayments (phòng thủ
   // — gate route hiện cũng là viewPayments). Che TRƯỚC khi đổi sang wire.
   const [maskedCert] = stripSensitive("paymentCert", [cert], user);
   const [maskedTotals] = stripSensitive<CertTotalsMasked>("certTotals", [totals], user);
   let wireTotals;
+  let wireItems;
   try {
     wireTotals = certTotalsToWire(maskedTotals, format);
+    wireItems = certItemsToWire(maskedCert.items, itemsExact, format);
   } catch (err) {
     if (!isMoneyPrecisionError(err)) throw err;
     return json(
@@ -103,7 +117,7 @@ export async function GET(
     );
   }
   return json({
-    cert: maskedCert,
+    cert: { ...maskedCert, items: wireItems },
     totals: wireTotals,
     approvalStatus,
     vuotHopDong,

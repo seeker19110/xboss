@@ -195,11 +195,17 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const detail = await withProjectScope(projectId ?? "*", async () => {
-    const cert = await getCertForProject(id, projectId);
-    if (!cert) return null;
-    return { cert, totals: await certTotals(id), lines: await certLinesExact(id) };
-  });
+  // REPEATABLE READ (S10a M4): 3 câu đọc cùng một snapshot — PATCH KL chen giữa không làm
+  // dòng exact lệch json_agg (throw 500) hay tổng lệch dòng.
+  const detail = await withProjectScope(
+    projectId ?? "*",
+    async () => {
+      const cert = await getCertForProject(id, projectId);
+      if (!cert) return null;
+      return { cert, totals: await certTotals(id), lines: await certLinesExact(id) };
+    },
+    { isolation: "repeatable_read" },
+  );
   if (!detail)
     return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
   const { cert, totals, lines } = detail;

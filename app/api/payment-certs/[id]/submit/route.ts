@@ -5,6 +5,7 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
 import { log } from "@/lib/nen/log";
 import { certTotals } from "@/lib/tai-chinh/paymentcerts";
+import { fitsNumeric } from "@/lib/nen/money";
 import { resyncApprovalAmount } from "@/lib/tien-do/approvals";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +47,18 @@ export async function POST(
       // Giá trị đợt chốt tại lúc TRÌNH: request duyệt mở lúc lập nháp mang amount cũ, mà nháp
       // còn sửa KL được — chưa chốt lại thì ngưỡng min_amount của bước duyệt bị lách. Đã khoá
       // đợt FOR UPDATE nên PATCH KL không chen vào giữa.
-      const { periodValue } = await certTotals(id);
+      const { periodValue, approvedValue } = await certTotals(id);
+      // S10a L6: chặn đợt tràn NUMERIC(15,2) ngay tại lúc TRÌNH (vô điều kiện, có hay không có
+      // luồng duyệt) — không để đợt tràn tới bước duyệt, nơi người duyệt có thể không được xem
+      // tiền. Kiểm cả approvedValue (phòng tỷ lệ âm/dữ liệu lạ). Người trình là Admin/PM (có
+      // viewPayments) nên thông điệp cụ thể được phép.
+      if (!fitsNumeric(periodValue, 15) || !fitsNumeric(approvedValue, 15))
+        throw Object.assign(
+          new Error(
+            "Giá trị đợt vượt giới hạn lưu trữ (tối đa 13 chữ số phần nguyên) — giảm khối lượng đợt trước khi trình",
+          ),
+          { status: 422, code: "amount_overflow" },
+        );
       await resyncApprovalAmount({
         entityType: "payment_cert",
         entityId: id,
