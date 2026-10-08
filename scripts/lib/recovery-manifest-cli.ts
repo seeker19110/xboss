@@ -2,6 +2,9 @@
 //   npx tsx scripts/lib/recovery-manifest-cli.ts --out backups/xboss-<id>.recovery-v1.json \
 //     --pg-dump backups/xboss-<id>.snapshot.dump --attachments-dir data/uploads \
 //     --key-provider <kho> --key-id <tham-chieu> [--key-version v] [--base-backup-id id] [--app-sha sha]
+//     [--wal-archive-dir <kho WAL> --base-backups-dir <kho base backup> [--wal-segment-mb 16]]
+// Có 2 cờ kho PITR: khối `wal` + `baseBackupId` được ĐO từ archive thật (pitr-archive.ts) thay vì
+// để null; base backup chỉ định phải còn chuỗi WAL liên tục tới cuối archive.
 // Secret chỉ qua env (không qua CLI):
 //   DR_SOURCE_DATABASE_URL, DR_SOURCE_EXPECTED_DATABASE, DR_SOURCE_EXPECTED_USER
 // Role nguồn: chỉ đọc, BYPASSRLS + pg_read_all_data (không phải role app NOBYPASSRLS).
@@ -16,7 +19,9 @@ import { Client } from "pg";
 import { identityHash } from "./dr-readonly";
 import { directoryHasher, readRepoMigrations } from "./dr-files";
 import { ManifestBuildError, buildRecoveryManifest } from "./recovery-manifest-build";
-import { ManifestError, type ArtifactFact } from "./recovery-manifest";
+import { ManifestError, type ArtifactFact, type WalCoverage } from "./recovery-manifest";
+import { analyzePitr, walCoverageFromAnalysis } from "./pitr-archive";
+import { readBaseBackups, scanArchiveDir } from "./pitr-io";
 
 // Lỗi do chính CLI ném — thông điệp tự viết, an toàn để in. Lỗi khác (pg/hệ thống) có thể
 // chứa host/user nên chỉ in thông báo chung.
@@ -32,6 +37,9 @@ const FLAGS = [
   "--key-provider",
   "--key-id",
   "--key-version",
+  "--wal-archive-dir",
+  "--base-backups-dir",
+  "--wal-segment-mb",
 ] as const;
 type Flag = (typeof FLAGS)[number];
 
@@ -83,6 +91,41 @@ async function dumpArtifact(path: string): Promise<ArtifactFact> {
   return { role: "database_dump", path: basename(path), ...digest };
 }
 
+/** Đo phủ WAL + chọn base backup từ kho PITR thật; thiếu cửa sổ đo được → dừng, không ghi null. */
+function pitrCoverage(args: Partial<Record<Flag, string>>): {
+  wal: WalCoverage | null;
+  baseBackupId: string | null;
+} {
+  const archiveDir = args["--wal-archive-dir"];
+  const basesDir = args["--base-backups-dir"];
+  if (!archiveDir !== !basesDir) {
+    throw new CliError("--wal-archive-dir và --base-backups-dir phải đi cùng nhau.");
+  }
+  if (!archiveDir || !basesDir)
+    return { wal: null, baseBackupId: args["--base-backup-id"] ?? null };
+  const mb = args["--wal-segment-mb"] ?? "16";
+  if (!/^\d{1,4}$/.test(mb)) throw new CliError("--wal-segment-mb phải là số nguyên.");
+  let analysis;
+  try {
+    analysis = analyzePitr(
+      scanArchiveDir(archiveDir, Number(mb) * 1024 * 1024),
+      readBaseBackups(basesDir),
+    );
+  } catch {
+    throw new CliError("Không đọc được kho WAL/base backup.");
+  }
+  const usable = analysis.bases.filter((base) => base.usable);
+  const chosen = args["--base-backup-id"]
+    ? usable.find((base) => base.id === args["--base-backup-id"])
+    : usable.sort((a, b) => b.startSeg! - a.startSeg!)[0];
+  if (!chosen) {
+    throw new CliError("Không có base backup (đúng id) còn chuỗi WAL liên tục tới cuối archive.");
+  }
+  const wal = walCoverageFromAnalysis(analysis);
+  if (!wal) throw new CliError("Không đo được cửa sổ WAL (thiếu tệp .backup có STOP TIME?).");
+  return { wal, baseBackupId: chosen.id };
+}
+
 async function main(): Promise<void> {
   const startedAt = new Date().toISOString();
   const args = parseArgs(process.argv.slice(2));
@@ -99,6 +142,7 @@ async function main(): Promise<void> {
   const keyId = args["--key-id"];
   if (!keyProvider !== !keyId) throw new CliError("--key-provider và --key-id phải đi cùng nhau.");
 
+  const pitr = pitrCoverage(args);
   const dumpPath = args["--pg-dump"];
   const partial = dumpPath ? `${dumpPath}.partial` : null;
   // Không ghi đè dump/manifest đã có; chỉ dọn dump do chính lần chạy lỗi này tạo ra.
@@ -152,7 +196,8 @@ async function main(): Promise<void> {
       startedAt,
       sourceIdentityHash: identityHash(url),
       appSha: args["--app-sha"] ?? null,
-      baseBackupId: args["--base-backup-id"] ?? null,
+      baseBackupId: pitr.baseBackupId,
+      wal: pitr.wal,
       repoMigrations: readRepoMigrations(),
       attachments: args["--attachments-dir"] ? directoryHasher(args["--attachments-dir"]) : null,
       artifacts,
