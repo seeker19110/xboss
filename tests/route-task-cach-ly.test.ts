@@ -646,13 +646,24 @@ function dangNhapOrg(user: { id: number; passwordHash: string; orgId: number }):
 }
 
 // ----- GET /api/subcontractors/:supplierId -----
+// S02: route chi tiết trả 404 khi user không có dự án khả kiến — mỗi user được gán 1 dự án
+// của CHÍNH org mình để 404 ở các ca dưới đến từ lớp org, không phải từ thiếu dự án.
+async function dangNhapOrgDuAn(user: { id: number; passwordHash: string; orgId: number }) {
+  const { insertId } = await import("@/lib/db");
+  const projectId = await insertId(
+    `INSERT INTO projects (name, org_id) VALUES (?, ?)`,
+    `SUBISO ${uniq("duan")}`,
+    user.orgId,
+  );
+  await dangNhapDuAn(user, projectId);
+}
 
 test("GET /api/subcontractors/:id: NTP thuộc tổ chức khác (pm) → 404", S, async () => {
   const orgA = await taoOrg("subGetA");
   const orgB = await taoOrg("subGetB");
   const supplierB = await taoSupplier("subGetB", orgB);
   const pmA = await taoUserOrg("pm", "subGetA", orgA);
-  dangNhapOrg(pmA);
+  await dangNhapOrgDuAn(pmA);
 
   const { GET } = await import("@/app/api/subcontractors/[supplierId]/route");
   const res = await GET(jreq("/x", undefined, "GET"), {
@@ -666,7 +677,7 @@ test("GET /api/subcontractors/:id: NTP thuộc tổ chức khác (admin) → 404
   const orgB = await taoOrg("subGetAdmB");
   const supplierB = await taoSupplier("subGetAdmB", orgB);
   const admin = await taoUserOrg("admin", "subGetAdmA", orgA);
-  dangNhapOrg(admin);
+  await dangNhapOrgDuAn(admin);
 
   const { GET } = await import("@/app/api/subcontractors/[supplierId]/route");
   const res = await GET(jreq("/x", undefined, "GET"), {
@@ -679,7 +690,7 @@ test("GET /api/subcontractors/:id: NTP đúng tổ chức của mình (pm) → 2
   const orgA = await taoOrg("subGetOk");
   const supplierA = await taoSupplier("subGetOk", orgA);
   const pmA = await taoUserOrg("pm", "subGetOk", orgA);
-  dangNhapOrg(pmA);
+  await dangNhapOrgDuAn(pmA);
 
   const { GET } = await import("@/app/api/subcontractors/[supplierId]/route");
   const res = await GET(jreq("/x", undefined, "GET"), {
@@ -713,7 +724,7 @@ test(
       `SELECT password_hash FROM users WHERE id = ?`,
       subId,
     );
-    dangNhap({ id: subId, passwordHash: u!.password_hash, orgId: orgA });
+    await dangNhapOrgDuAn({ id: subId, passwordHash: u!.password_hash, orgId: orgA });
 
     const { GET } = await import("@/app/api/subcontractors/[supplierId]/route");
     const res = await GET(jreq("/x", undefined, "GET"), {
@@ -740,7 +751,7 @@ test("GET /api/subcontractors/:id: subcon đúng NTP + đúng tổ chức → 20
     `SELECT password_hash FROM users WHERE id = ?`,
     subId,
   );
-  dangNhap({ id: subId, passwordHash: u!.password_hash, orgId: orgA });
+  await dangNhapOrgDuAn({ id: subId, passwordHash: u!.password_hash, orgId: orgA });
 
   const { GET } = await import("@/app/api/subcontractors/[supplierId]/route");
   const res = await GET(jreq("/x", undefined, "GET"), {

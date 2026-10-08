@@ -67,6 +67,16 @@
 //   unitPrice          đơn giá đặt hàng (po_items.unit_price)
 //   → Gate route là canView (admin/pm/engineer — engineer cần thấy PO để nhập kho); perm
 //     che là viewPayments (loại engineer) → engineer XEM được PO nhưng KHÔNG thấy đơn giá.
+//
+// [subcontractor] — perm: viewPayments — route: GET /api/subcontractors (mảng items),
+//   GET /api/subcontractors/[supplierId] (item)
+//   outstanding        công nợ còn lại (Σ giá trị HĐ + phụ lục − đã thanh toán)
+//   debt               CẢ khối công nợ của chi tiết (giá trị HĐ/đã TT/còn lại + danh sách
+//                      HĐ kèm giá trị) — che nguyên khối thành null vì mảng HĐ lồng 2 cấp
+//                      và chính danh sách HĐ cũng chỉ viewPayments xem được (/api/contracts).
+//   → Gate route là "mọi vai trò đăng nhập" (subcon chỉ NTP của mình); perm che là
+//     viewPayments (admin/pm/bch) → engineer/subcon/cdt/viewer XEM được hồ sơ, đánh giá
+//     nhưng KHÔNG thấy tiền công nợ. (Ca có hiệu lực — QUALITY-FINAL-1 S02.)
 import { CAN, type PermKey, type Role } from "@/lib/bao-mat/auth";
 
 export type SensitiveRule = { fields: string[]; perm: PermKey };
@@ -112,6 +122,7 @@ export const SENSITIVE: Record<string, SensitiveRule[]> = {
   ],
   payroll: [{ fields: ["rate", "gross", "deductions", "net"], perm: "viewPayroll" }],
   poItem: [{ fields: ["unitPrice"], perm: "viewPayments" }],
+  subcontractor: [{ fields: ["outstanding", "debt"], perm: "viewPayments" }],
 };
 
 // Che 1 bản ghi: trả BẢN SAO với các trường liệt kê được đặt null (không đụng bản gốc,

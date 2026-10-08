@@ -4,6 +4,7 @@ import { HardHat, X, Star, Upload, Paperclip, Trash2, Plus, FileText, Wallet } f
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
+import MaskedValue from "@/app/components/MaskedValue";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
@@ -37,7 +38,7 @@ type SubcontractorListItem = {
   capabilitySummary: string | null;
   avgScore: number | null;
   latestPeriod: string | null;
-  outstanding: bigint;
+  outstanding: bigint | null; // null = API che vì thiếu quyền xem tiền (viewPayments)
 };
 
 type SubconDoc = {
@@ -93,7 +94,13 @@ type SubcontractorDetail = {
   documents: SubconDoc[];
   evaluations: Evaluation[];
   evaluationAverage: { latestPeriod: string | null; avgScore: number | null; trend: number | null };
-  debt: { contractValue: bigint; paid: bigint; outstanding: bigint; contracts: ContractDebt[] };
+  // null = API che cả khối công nợ vì thiếu quyền xem tiền (viewPayments).
+  debt: {
+    contractValue: bigint;
+    paid: bigint;
+    outstanding: bigint;
+    contracts: ContractDebt[];
+  } | null;
 };
 
 type ContractDebtWire = Omit<ContractDebt, "value" | "addendaTotal" | "paid"> & {
@@ -102,23 +109,31 @@ type ContractDebtWire = Omit<ContractDebt, "value" | "addendaTotal" | "paid"> & 
   paid: string;
 };
 type SubcontractorDetailWire = Omit<SubcontractorDetail, "debt"> & {
-  debt: { contractValue: string; paid: string; outstanding: string; contracts: ContractDebtWire[] };
+  debt: {
+    contractValue: string;
+    paid: string;
+    outstanding: string;
+    contracts: ContractDebtWire[];
+  } | null;
 };
 
 function docChiTietNtp(w: SubcontractorDetailWire): SubcontractorDetail {
   return {
     ...w,
-    debt: {
-      contractValue: minorTuWire(w.debt.contractValue),
-      paid: minorTuWire(w.debt.paid),
-      outstanding: minorTuWire(w.debt.outstanding),
-      contracts: w.debt.contracts.map((c) => ({
-        ...c,
-        value: minorTuWire(c.value),
-        addendaTotal: minorTuWire(c.addendaTotal),
-        paid: minorTuWire(c.paid),
-      })),
-    },
+    debt:
+      w.debt == null
+        ? null
+        : {
+            contractValue: minorTuWire(w.debt.contractValue),
+            paid: minorTuWire(w.debt.paid),
+            outstanding: minorTuWire(w.debt.outstanding),
+            contracts: w.debt.contracts.map((c) => ({
+              ...c,
+              value: minorTuWire(c.value),
+              addendaTotal: minorTuWire(c.addendaTotal),
+              paid: minorTuWire(c.paid),
+            })),
+          },
   };
 }
 
@@ -144,11 +159,17 @@ export default function SubcontractorsPage() {
       .then(
         (
           j: {
-            items: (Omit<SubcontractorListItem, "outstanding"> & { outstanding: string })[];
+            items: (Omit<SubcontractorListItem, "outstanding"> & { outstanding: string | null })[];
           } | null,
         ) =>
           j
-            ? { items: j.items.map((i) => ({ ...i, outstanding: minorTuWire(i.outstanding) })) }
+            ? {
+                items: j.items.map((i) => ({
+                  ...i,
+                  // null = bị che (thiếu quyền xem tiền) — giữ null, không thành 0.
+                  outstanding: i.outstanding == null ? null : minorTuWire(i.outstanding),
+                })),
+              }
             : null,
       );
   }
@@ -171,7 +192,10 @@ export default function SubcontractorsPage() {
   if (loading) return <PageSkeleton />;
 
   const kpiCount = items.length;
-  const kpiOutstanding = items.reduce((s, i) => s + i.outstanding, 0n);
+  // Có dòng bị che (thiếu quyền xem tiền) → KPI cũng che, không cộng thành số sai.
+  const kpiOutstanding = items.some((i) => i.outstanding == null)
+    ? null
+    : items.reduce((s, i) => s + (i.outstanding ?? 0n), 0n);
   const kpiLowScore = items.filter((i) => i.avgScore != null && i.avgScore < 3).length;
 
   return (
@@ -188,8 +212,10 @@ export default function SubcontractorsPage() {
             <p className="text-xs text-zinc-400">Nhà thầu phụ</p>
           </div>
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
-            <p className={`text-2xl font-bold ${kpiOutstanding > 0 ? "text-amber-400" : ""}`}>
-              {fmtVND(kpiOutstanding)}
+            <p
+              className={`text-2xl font-bold ${kpiOutstanding != null && kpiOutstanding > 0n ? "text-amber-400" : ""}`}
+            >
+              <MaskedValue value={kpiOutstanding} format={fmtVND} />
             </p>
             <p className="text-xs text-zinc-400">Tổng công nợ còn lại</p>
           </div>
@@ -256,8 +282,14 @@ export default function SubcontractorsPage() {
                         )}
                       </td>
                       <td className="p-3 text-xs">
-                        <span className={it.outstanding > 0n ? "text-amber-400" : "text-zinc-400"}>
-                          {fmtVND(it.outstanding)}
+                        <span
+                          className={
+                            it.outstanding != null && it.outstanding > 0n
+                              ? "text-amber-400"
+                              : "text-zinc-400"
+                          }
+                        >
+                          <MaskedValue value={it.outstanding} format={fmtVND} />
                         </span>
                       </td>
                       <td className="p-3">
@@ -970,6 +1002,14 @@ function AddEvaluationModal({
 
 function DebtTab({ detail }: { detail: SubcontractorDetail }) {
   const { debt } = detail;
+  if (debt == null)
+    return (
+      <EmptyState
+        compact
+        icon={Wallet}
+        message="Bạn không có quyền xem công nợ & hợp đồng của nhà thầu phụ này."
+      />
+    );
   if (debt.contracts.length === 0)
     return (
       <EmptyState

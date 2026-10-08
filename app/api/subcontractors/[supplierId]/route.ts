@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, canViewSubcontractor } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getSubcontractor, subcontractorDebtToWire } from "@/lib/hien-truong/subcontractors";
+import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 import { MONEY_FORMAT_HEADER, isMoneyPrecisionError, moneyWireFormat } from "@/lib/nen/money";
 import {
   HEADERS_API_TIEN,
@@ -11,8 +13,11 @@ import {
 export const dynamic = "force-dynamic";
 
 // GET /api/subcontractors/:supplierId — hồ sơ đầy đủ + công nợ + đánh giá. Mọi vai trò
-// đăng nhập xem được; subcon chỉ xem đúng NTP của mình (403 nếu khác). S10c (A3-FR06): header
-// decimal-string-v1 → `item.debt.*` là chuỗi canonical + `moneyFormat`; legacy ngoài biên → 422.
+// đăng nhập xem được; subcon chỉ xem đúng NTP của mình (403 nếu khác).
+// QUALITY-FINAL-1 S02 (A1-AC01/AC02): không có dự án khả kiến → 404 trước mọi query nghiệp
+// vụ; công nợ chỉ HĐ dự án đang chọn, khối `debt` che (null) khi thiếu CAN.viewPayments.
+// S10c (A3-FR06): header decimal-string-v1 → `item.debt.*` là chuỗi canonical + `moneyFormat`;
+// legacy ngoài biên → 422. Che TRƯỚC rồi mới đổi wire: `debt` bị che giữ null.
 export async function GET(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ supplierId: string }> },
@@ -24,20 +29,28 @@ export async function GET(
   const supplierId = parseInt(params.supplierId);
   if (isNaN(supplierId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy nhà thầu phụ" }, { status: 404 });
+
   if (!(await canViewSubcontractor(user, supplierId)))
     return NextResponse.json(
       { error: "Bạn chỉ được xem hồ sơ nhà thầu phụ của mình" },
       { status: 403 },
     );
 
-  const detail = await getSubcontractor(supplierId, user.orgId);
+  const detail = await getSubcontractor(supplierId, user.orgId, projectId);
   if (!detail) return NextResponse.json({ error: "Không tìm thấy nhà thầu phụ" }, { status: 404 });
 
+  const [masked] = stripSensitive("subcontractor", [detail], user);
   const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
   try {
     return NextResponse.json(
       {
-        item: { ...detail, debt: subcontractorDebtToWire(detail.debt, format) },
+        item: {
+          ...masked,
+          debt: masked.debt == null ? null : subcontractorDebtToWire(masked.debt, format),
+        },
         ...nhanDinhDangTien(format),
       },
       { headers: HEADERS_API_TIEN },

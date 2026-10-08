@@ -196,7 +196,9 @@ test("GET /api/subcontractors/:id: subcon xem đúng NTP của mình → 200", S
   assert.equal(res.status, 200);
   const { item } = await res.json();
   assert.equal(item.id, supplierMine);
-  assert.ok(item.debt);
+  // S02: subcon thiếu CAN.viewPayments → khối công nợ (tiền) bị che, giữ trường với null.
+  assert.ok("debt" in item);
+  assert.equal(item.debt, null);
 });
 
 test("GET /api/subcontractors/:id: không tồn tại → 404", S, async () => {

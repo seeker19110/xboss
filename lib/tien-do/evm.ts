@@ -124,8 +124,10 @@ type TaskRow = {
 // Trần số điểm của chuỗi — cùng cơ chế bước nhảy với S-curve.
 const MAX_POINTS = 1000;
 
+// projectId BẮT BUỘC (QUALITY-FINAL-1 S02, A1-AC02): trước đây null/undefined = bỏ lọc dự
+// án → tính EVM gộp mọi dự án/tổ chức. Caller không có dự án khả kiến phải tự trả rỗng.
 export async function getEvmSeries(opts: {
-  projectId?: number | null;
+  projectId: number;
   baselineId?: number | null;
   systemId?: number | null;
   source?: EvmSource;
@@ -140,18 +142,15 @@ export async function getEvmSeries(opts: {
   if (source === "cash" && opts.systemId != null)
     throw new Error("Nguồn quỹ tiền mặt không gắn với hệ — bỏ lọc hệ hoặc dùng nguồn thực chi");
 
-  const conds: string[] = [];
-  const args: unknown[] = [];
+  // Lọc dự án VÔ ĐIỀU KIỆN qua tháp của sheet (fail-closed, không còn nhánh toàn hệ).
+  const conds: string[] = ["tw.project_id = ?"];
+  const args: unknown[] = [opts.projectId];
   if (opts.systemId != null) {
     conds.push("st.system_id = ?");
     args.push(opts.systemId);
   }
-  const projectJoin = opts.projectId != null ? "JOIN towers tw ON tw.id = st.tower_id" : "";
-  if (opts.projectId != null) {
-    conds.push("tw.project_id = ?");
-    args.push(opts.projectId);
-  }
-  const where = conds.length > 0 ? `WHERE ${conds.join(" AND ")}` : "";
+  const projectJoin = "JOIN towers tw ON tw.id = st.tower_id";
+  const where = `WHERE ${conds.join(" AND ")}`;
 
   // Giá trị task tổng trong SQL (M45): dòng VO chỉ tính khi đã duyệt, lấy qty_approved.
   // COALESCE(t.start_date/end_date, wp....): task NULL = kế thừa ngày nhóm (lib/recompute.ts)
@@ -247,17 +246,17 @@ export async function getEvmSeries(opts: {
           `SELECT ct.tx_date AS day,
                   SUM(SUM(ct.amount)) OVER (ORDER BY ct.tx_date)::text AS cum
              FROM cash_transactions ct
-            WHERE ct.direction = 'out'${opts.projectId != null ? " AND ct.project_id = ?" : ""}
+            WHERE ct.direction = 'out' AND ct.project_id = ?
             GROUP BY ct.tx_date ORDER BY ct.tx_date`,
-          ...(opts.projectId != null ? [opts.projectId] : []),
+          opts.projectId,
         )
       : await query<{ day: string; cum: string }>(
-          // Quy hệ/dự án qua sheet_types như lib/cost.ts — bill chưa gắn sheet chỉ vào
-          // được khi không lọc gì (cùng giới hạn đã chấp nhận ở M2).
+          // Quy hệ/dự án qua sheet_types như lib/cost.ts — bill chưa gắn sheet không vào
+          // được AC dự án nào (cùng giới hạn đã chấp nhận ở M2; không còn nhánh toàn hệ).
           `SELECT pb.paid_date AS day,
                   SUM(SUM(pb.amount)) OVER (ORDER BY pb.paid_date)::text AS cum
              FROM payment_bills pb
-             ${conds.length > 0 ? "JOIN sheet_types st ON st.id = pb.sheet_type_id" : ""}
+             JOIN sheet_types st ON st.id = pb.sheet_type_id
              ${projectJoin}
              ${where}
             GROUP BY pb.paid_date ORDER BY pb.paid_date`,
