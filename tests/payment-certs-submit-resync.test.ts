@@ -82,6 +82,8 @@ async function donDep(f: Awaited<ReturnType<typeof dungHienTruong>>) {
     await run(`DELETE FROM approval_flows WHERE id = ?`, f.flowId);
   }
   await run(`DELETE FROM payment_bills WHERE contract_id = ?`, f.contractId);
+  // Snapshot quyết định IPC (S13c) tham chiếu đợt — dọn trước (chỉ fixture owner được xoá).
+  await run(`DELETE FROM payment_cert_decision_snapshots WHERE contract_id = ?`, f.contractId);
   await run(`DELETE FROM payment_certs WHERE contract_id = ?`, f.contractId);
   await run(`DELETE FROM boq_items WHERE contract_id = ?`, f.contractId);
   await run(`DELETE FROM contracts WHERE id = ?`, f.contractId);

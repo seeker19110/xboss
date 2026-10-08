@@ -15,6 +15,7 @@ import {
   type CertLineInput,
   type CertTotalsMasked,
 } from "@/lib/tai-chinh/paymentcerts";
+import { canhBaoDot } from "@/lib/tai-chinh/ipc-quyet-dinh";
 import {
   MONEY_FORMAT_HEADER,
   MONEY_FORMAT_DECIMAL_V1,
@@ -87,14 +88,16 @@ export async function GET(
       // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho loại
       // "payment_cert" (hành xử dormant, không đổi UI cũ).
       const approvalStatus = await getEntityApprovalStatus("payment_cert", id);
-      // Dòng vượt khối lượng hợp đồng — CẢNH BÁO, không chặn (xem dongVuotHopDong).
-      const vuotHopDong = await dongVuotHopDong(id);
-      return { cert, totals, itemsExact, approvalStatus, vuotHopDong };
+      // Dòng vượt khối lượng hợp đồng — CẢNH BÁO, không chặn (xem dongVuotHopDong). Đợt còn mở:
+      // luỹ kế HIỆU LỰC (đúng số quyết định sẽ chốt) + warningVersion để người duyệt xác nhận
+      // đúng bản đang xem (S13c, A5-FR07).
+      const { vuotHopDong, warningVersion } = await canhBaoDot(id);
+      return { cert, totals, itemsExact, approvalStatus, vuotHopDong, warningVersion };
     },
     { isolation: "repeatable_read" },
   );
   if (!detail) return json({ error: "Không tìm thấy đợt thanh toán" }, 404);
-  const { cert, totals, itemsExact, approvalStatus, vuotHopDong } = detail;
+  const { cert, totals, itemsExact, approvalStatus, vuotHopDong, warningVersion } = detail;
   // M50 PR2: che đơn giá dòng KL + tổng tiền đợt cho user thiếu viewPayments (phòng thủ
   // — gate route hiện cũng là viewPayments). Che TRƯỚC khi đổi sang wire.
   const [maskedCert] = stripSensitive("paymentCert", [cert], user);
@@ -114,6 +117,7 @@ export async function GET(
         code: "money_precision_unsupported",
         // Cảnh báo vượt KL hợp đồng là khối lượng (không phải tiền) — vẫn trả để không mất.
         vuotHopDong,
+        warningVersion,
       },
       422,
     );
@@ -123,6 +127,7 @@ export async function GET(
     totals: wireTotals,
     approvalStatus,
     vuotHopDong,
+    warningVersion,
     ...(format === MONEY_FORMAT_DECIMAL_V1 ? { moneyFormat: MONEY_FORMAT_DECIMAL_V1 } : {}),
   });
 }

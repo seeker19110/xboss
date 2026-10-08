@@ -116,6 +116,8 @@ const thamSo = (id: number) => ({ params: Promise.resolve({ id: String(id) }) })
 async function donDep(f: { projectId: number; contractId: number; pmId: number }) {
   const { run } = await import("@/lib/db");
   await run(`DELETE FROM payment_bills WHERE contract_id = ?`, f.contractId);
+  // Snapshot quyết định IPC (S13c) tham chiếu đợt — dọn trước (chỉ fixture owner được xoá).
+  await run(`DELETE FROM payment_cert_decision_snapshots WHERE contract_id = ?`, f.contractId);
   await run(`DELETE FROM payment_certs WHERE contract_id = ?`, f.contractId); // cascade dòng KL
   await run(`DELETE FROM boq_items WHERE contract_id = ?`, f.contractId);
   await run(`DELETE FROM contracts WHERE id = ?`, f.contractId);

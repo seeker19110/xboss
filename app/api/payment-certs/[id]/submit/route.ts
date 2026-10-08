@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run, withTransaction } from "@/lib/db";
+import { run, withTransaction } from "@/lib/db";
 import { getCurrentUser, isAdminOrPm } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
 import { log } from "@/lib/nen/log";
-import { certTotals } from "@/lib/tai-chinh/paymentcerts";
+import { certTotals, tinhLaiLuyKeDot } from "@/lib/tai-chinh/paymentcerts";
+import { khoaHopDongVaDot } from "@/lib/tai-chinh/ipc-quyet-dinh";
 import { fitsNumeric } from "@/lib/nen/money";
 import { resyncApprovalAmount } from "@/lib/tien-do/approvals";
 
@@ -29,21 +30,17 @@ export async function POST(
 
   try {
     await withTransaction(async () => {
+      // S13c: khoá hợp đồng → đợt (cùng thứ tự với decide/lập đợt) rồi mới tính lại luỹ kế.
       const cert =
-        projectId != null
-          ? await queryOne<{ status: string }>(
-              `SELECT c.status
-                 FROM payment_certs c JOIN contracts ct ON ct.id = c.contract_id
-                WHERE c.id = ? AND ct.project_id = ? FOR UPDATE OF c`,
-              id,
-              projectId,
-            )
-          : undefined;
+        projectId != null ? await khoaHopDongVaDot(id, projectId, user.orgId) : undefined;
       if (!cert) throw Object.assign(new Error("Không tìm thấy đợt thanh toán"), { status: 404 });
       if (cert.status !== "draft")
         throw Object.assign(new Error("Chỉ trình được đợt đang ở trạng thái nháp"), {
           status: 409,
         });
+      // Luỹ kế lưu lúc nháp có thể đã cũ (kỳ trước vừa được duyệt, hoặc đợt legacy mở song
+      // song) — tính lại dưới khoá từ tập đợt approved kỳ trước trước khi chốt giá trị trình.
+      await tinhLaiLuyKeDot(id);
       // Giá trị đợt chốt tại lúc TRÌNH: request duyệt mở lúc lập nháp mang amount cũ, mà nháp
       // còn sửa KL được — chưa chốt lại thì ngưỡng min_amount của bước duyệt bị lách. Đã khoá
       // đợt FOR UPDATE nên PATCH KL không chen vào giữa.

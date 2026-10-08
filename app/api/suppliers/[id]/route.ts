@@ -107,6 +107,20 @@ export async function DELETE(
       { status: 409 },
     );
 
-  await run(`DELETE FROM suppliers WHERE id = ?`, id);
+  // S13c (A5-FR10): còn hợp đồng/phiếu thanh toán/thu chi/hồ sơ thầu… tham chiếu (FK không
+  // cascade) → 409 dependency_conflict có thông điệp, không để lỗi 23503 thành 500.
+  try {
+    await run(`DELETE FROM suppliers WHERE id = ?`, id);
+  } catch (err) {
+    if ((err as { code?: string }).code !== "23503") throw err;
+    return NextResponse.json(
+      {
+        error:
+          "Nhà cung cấp đang được dùng trong hợp đồng, thanh toán hoặc hồ sơ khác — không xoá được",
+        code: "dependency_conflict",
+      },
+      { status: 409 },
+    );
+  }
   return NextResponse.json({ ok: true });
 }

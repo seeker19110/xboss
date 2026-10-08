@@ -1,5 +1,53 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S13c: quyết định IPC tuần tự hoá, xác nhận cảnh báo, snapshot bất biến, dependency_conflict
+
+Vá 5 lỗi thật S13a (A5-FR06..FR10, DATA-CONTRACTS §6–§7, DATA-MIGRATIONS §7); 5 ca `todo` trong
+`tests/s13a-chuoi-ipc-thanh-toan.test.ts` đã gỡ và **xanh thật** (đỏ trên code cũ). Vượt KL hợp
+đồng **vẫn là cảnh báo** (quyết định 2026-09-04), không hard-cap; enum `payment_certs` không đổi.
+
+- **Khoá + luỹ kế** (`lib/tai-chinh/ipc-quyet-dinh.ts`, `paymentcerts.ts`): submit/decide khoá
+  **hợp đồng → đợt** (cùng thứ tự với lập đợt) rồi `tinhLaiLuyKeDot` — luỹ kế = luỹ kế đợt approved
+  gần nhất có **kỳ nhỏ hơn** + KL kỳ, không tin luỹ kế lưu lúc nháp (legacy 100 → 120). GET/PATCH
+  báo cảnh báo theo luỹ kế **hiệu lực** (đợt mở) hoặc snapshot (đợt đã chốt).
+- **Xác nhận cảnh báo** (A5-FR07): GET trả `warningVersion` (SHA-256 nguồn: KL kỳ/luỹ kế/KL HĐ/đơn
+  giá/tỷ lệ HĐ + danh sách cảnh báo, rule `ipc-warn-v1`); decide nhận `acknowledged/reason/
+warningVersion` — có cảnh báo mà thiếu → **409 `acknowledgement_required`**, version cũ → **409
+  `warning_changed`** (kèm cảnh báo hiện hành, khối lượng — không tiền), không cảnh báo thì không đòi.
+  Áp cho **mọi bước** engine (bước giữa cũng phải xác nhận; 409 rollback cả bước vừa ghi).
+- **Thứ tự kỳ**: kỳ sau đã approved → duyệt kỳ trước **409 `reconciliation_required`**, snapshot kỳ
+  sau không đổi; từ chối vẫn được (đường điều chỉnh).
+- **Snapshot + idempotency** (migration `0160_payment_cert_decision_snapshots.sql`, chỉ thêm thuần
+  tuý → đi thẳng production): mỗi bước quyết định ghi 1 dòng cùng transaction với chuyển trạng thái
+  - phiếu + audit trigger (KL/giá/tỷ lệ/tổng exact, cảnh báo, version, xác nhận + lý do, rule
+    `ipc-sum-v1`). Header `Idempotency-Key` (UUID, tuỳ chọn): retry cùng key + payload → phát lại kết
+    quả bước cũ (`replayed: true`, vẫn kiểm actor/vai trò hiện tại), khác payload/người → 409
+    `idempotency_conflict`, sai dạng → 422. RLS org + dự án (+ actor khi ghi), `xboss_app` chỉ
+    SELECT/INSERT. So sánh với `audit_log`/`approval_actions` ghi ở `S00-PAYMENT-SCOPE-INVENTORY.md`.
+- **dependency_conflict** (A5-FR10): `DELETE /api/boq/:id` còn dòng IPC/gói thầu → 409 có thông
+  điệp (khoá dòng + kiểm + xoá trong 1 transaction, FK 23503 chen giữa cũng thành 409);
+  `DELETE /api/suppliers/:id` còn HĐ/thanh toán… tham chiếu → 409 (trước: 500); xoá HĐ (đã 409)
+  thêm `code: "dependency_conflict"`.
+- **UI**: hộp `XacNhanCanhBaoDialog` (tick đã xem từng dòng + lý do bắt buộc, gửi `warningVersion`)
+  ở chứng từ `/payment-certs` và hộp thư `/approvals` (CĐT không xem được đợt vẫn nhận cảnh báo từ
+  409); 409 mở lại hộp (bỏ tick), không tự gửi lại, không hiện như "đã duyệt"; chứng từ gửi
+  `Idempotency-Key`, mất mạng bấm lại dùng đúng key.
+- **Test**: `tests/s13c-ipc-quyet-dinh.test.ts` (11 ca: thuần, snapshot, idempotency, bước engine,
+  luỹ kế dưới khoá tất định + đồng thời, RLS bằng `xboss_app`, xoá upstream); 3 mutation mới
+  (`npm run test:mutation -- --only=IPC` 4/4 bị bắt). Bộ liên quan (s13a ×3, payment-certs-_,
+  money-ipc-golden-route, route-tai-chinh-_, s10c-_, boq_, rls, thong-bao, approvals-vo-ipc…) xanh.
+- **Cần quyết (phiên chính — không tự quyết):** (1) decide vẫn ghi `payment_bills` với `paid_date`
+  = ngày duyệt nên "approved" ≡ "đã chi" trong báo cáo (A5 §2 nói khác, A4-FR02 chốt actual = mọi
+  payment_bills) — giữ nguyên hành vi; (2) hiện **cho phép duyệt kỳ sau khi kỳ trước còn mở**
+  (đặc tả chỉ cấm chiều ngược) → kỳ trước sau đó bị 409, phải từ chối + lập đợt điều chỉnh; có nên
+  chặn luôn "duyệt kỳ sau khi kỳ trước chưa chốt"? (3) chưa có loại "chứng từ điều chỉnh" IPC riêng —
+  thông điệp 409 hướng dẫn từ chối + lập đợt mới.
+- **Còn mở (ngoài phạm vi, phát hiện khi rà)**: `DELETE /api/users/:id` với người từng duyệt IPC
+  (`payment_certs.decided_by`, nay thêm `payment_cert_decision_snapshots.actor_id`) → FK 23503 →
+  500 (lớp lỗi có từ trước); `DELETE /api/payments/bills/:id` xoá được phiếu sinh từ IPC đã duyệt
+  (hạ nguồn, không phải lỗi FK — cần quyết chính sách); GET đợt mở legacy hiển thị luỹ kế dòng đã
+  lưu, còn cảnh báo/version theo luỹ kế hiệu lực (khớp ngay khi trình/duyệt).
+
 ## 2026-10-08 — QUALITY-FINAL-1 A1: phạm vi dự án cho đồng bộ vật tư ↔ Sheet
 
 Đóng quan sát "Cần quyết" của S13a/S13b: `runMaterialSync` đọc/ghi mọi vật tư toàn hệ, cron lấy org

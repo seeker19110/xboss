@@ -26,6 +26,8 @@ import TableToolbar, {
   type ToolbarFilter,
 } from "@/app/components/TableToolbar";
 import { Inbox, ThumbsUp, ThumbsDown } from "lucide-react";
+import XacNhanCanhBaoDialog from "@/app/payment-certs/_components/XacNhanCanhBaoDialog";
+import { docYeuCauXacNhan, type YeuCauXacNhan } from "@/app/payment-certs/_components/chiTietDot";
 
 type FloorGroup = {
   sheetTypeId: number;
@@ -136,6 +138,12 @@ function ApprovalsPageInner() {
   const [busy, setBusy] = useState<string | null>(null);
   const [inbox, setInbox] = useState<PendingApproval[]>([]);
   const [inboxBusy, setInboxBusy] = useState<number | null>(null);
+  // S13c (A5-FR07): đợt IPC có cảnh báo vượt KL hợp đồng → server trả 409 kèm danh sách cảnh
+  // báo + warningVersion; mở hộp xác nhận (tick đã xem + lý do) rồi mới gửi lại.
+  const [xacNhanIpc, setXacNhanIpc] = useState<{
+    item: PendingApproval;
+    yeuCau: YeuCauXacNhan;
+  } | null>(null);
   const [openDocs, setOpenDocs] = useState<{ approvalId: number; label: string } | null>(null);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [linkInput, setLinkInput] = useState("");
@@ -187,18 +195,35 @@ function ApprovalsPageInner() {
       }))
     )
       return;
+    await guiQuyetDinhInbox(item, decideBody(item.entityType, approve, note));
+  }
+
+  async function guiQuyetDinhInbox(item: PendingApproval, body: Record<string, unknown>) {
     setInboxBusy(item.id);
-    const r = await fetch(decideUrl(item), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(decideBody(item.entityType, approve, note)),
-    });
+    let r: Response;
+    try {
+      r = await fetch(decideUrl(item), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      setInboxBusy(null);
+      appAlert("Mất kết nối — chưa gửi được quyết định, thử lại khi có mạng");
+      return;
+    }
     const j = await r.json().catch(() => ({}));
     setInboxBusy(null);
     if (!r.ok) {
+      const yeuCau = item.entityType === "payment_cert" ? docYeuCauXacNhan(r.status, j) : null;
+      if (yeuCau) {
+        setXacNhanIpc({ item, yeuCau });
+        return;
+      }
       appAlert(j.error ?? "Quyết định thất bại");
       return;
     }
+    setXacNhanIpc(null);
     loadInbox();
     load();
   }
@@ -903,6 +928,23 @@ function ApprovalsPageInner() {
       </main>
 
       {/* Modal danh sách biên bản */}
+      {xacNhanIpc && (
+        <XacNhanCanhBaoDialog
+          key={xacNhanIpc.yeuCau.warningVersion}
+          yeuCau={xacNhanIpc.yeuCau}
+          maDot={xacNhanIpc.item.label}
+          busy={inboxBusy === xacNhanIpc.item.id}
+          onHuy={() => setXacNhanIpc(null)}
+          onXacNhan={(lyDo) =>
+            void guiQuyetDinhInbox(xacNhanIpc.item, {
+              ...decideBody("payment_cert", true, ""),
+              acknowledged: true,
+              reason: lyDo,
+              warningVersion: xacNhanIpc.yeuCau.warningVersion,
+            })
+          }
+        />
+      )}
       {openDocs && (
         <Modal onClose={() => setOpenDocs(null)} className="max-w-lg max-h-[80vh] overflow-auto">
           <div className="p-4 border-b border-zinc-800 flex items-center justify-between">

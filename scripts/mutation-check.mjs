@@ -137,6 +137,32 @@ const MUTATIONS = [
     moiFile: true,
     why: "Round từng dòng trước khi cộng (trái A3-FR05) → 2 dòng 0,005 thành 0,02 thay 0,01; giá trị đợt sai.",
   },
+  // QUALITY-FINAL-1 S13c: quyết định IPC (A5-FR06/FR07).
+  {
+    key: "IPC: cảnh báo vượt HĐ phải được xác nhận đúng bản hiện tại",
+    file: "lib/tai-chinh/ipc-quyet-dinh.ts",
+    find: "if (!xn.acknowledged || !xn.reason || xn.warningVersion == null)",
+    replace: "if (false)",
+    tests: ["tests/s13a-chuoi-ipc-thanh-toan.test.ts", "tests/s13c-ipc-quyet-dinh.test.ts"],
+    moiFile: true,
+    why: "Duyệt đợt luỹ kế vượt khối lượng hợp đồng mà không ai xác nhận cảnh báo — sinh phiếu thanh toán tiền thật.",
+  },
+  {
+    key: "IPC: decide tính lại luỹ kế dưới khoá",
+    file: "app/api/payment-certs/[id]/decide/route.ts",
+    find: "      await tinhLaiLuyKeDot(id);",
+    replace: "",
+    tests: ["tests/s13c-ipc-quyet-dinh.test.ts"],
+    why: "Duyệt bằng luỹ kế lưu lúc trình/nháp (đã cũ) → luỹ kế chốt sai và mất cảnh báo vượt HĐ (A5-FR06).",
+  },
+  {
+    key: "IPC: không duyệt kỳ trước khi kỳ sau đã duyệt",
+    file: "app/api/payment-certs/[id]/decide/route.ts",
+    find: "        if (sau)",
+    replace: "        if (sau && false)",
+    tests: ["tests/s13a-chuoi-ipc-thanh-toan.test.ts"],
+    why: "Duyệt ngược kỳ → lịch sử luỹ kế lệch, không đối soát (A5-FR06).",
+  },
 ];
 
 const only = process.argv.find((a) => a.startsWith("--only="))?.slice("--only=".length);

@@ -6319,6 +6319,33 @@
 - `organizations_pkey`: UNIQUE INDEX organizations_pkey ON public.organizations USING btree (id)
 - `organizations_slug_key`: UNIQUE INDEX organizations_slug_key ON public.organizations USING btree (slug)
 
+### payment_cert_decision_snapshots
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  |  |
+| cert_id | integer |  |  |
+| contract_id | integer |  |  |
+| project_id | integer |  |  |
+| org_id | integer |  |  |
+| actor_id | integer |  |  |
+| operation_id | uuid |  |  |
+| request_hash | text |  |  |
+| result_status | text |  |  |
+| snapshot | jsonb |  |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `actor_id` → `users(id)`
+- `cert_id` → `payment_certs(id)`
+- `contract_id` → `contracts(id)`
+- `org_id` → `organizations(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `payment_cert_decision_snapshots_cert_id_operation_id_key`: UNIQUE INDEX payment_cert_decision_snapshots_cert_id_operation_id_key ON public.payment_cert_decision_snapshots USING btree (cert_id, operation_id)
+- `payment_cert_decision_snapshots_pkey`: UNIQUE INDEX payment_cert_decision_snapshots_pkey ON public.payment_cert_decision_snapshots USING btree (id)
+
 ### saved_reports
 
 | Cột | Kiểu | Null | Default |

@@ -366,3 +366,19 @@ no-store` on every sensitive financial response. Current SW network-only rule is
   án/org, `RETURNING` rỗng → 404. Dòng legacy NULL không sửa/xoá được qua dự án nào.
 - Còn mở: mục 4 (đối soát/phân loại dòng lineage sai), 5 (snapshot REPEATABLE READ), 6 (DTO tiền
   chính xác), 7. Test: `tests/s02a-cum3-payments-scope.test.ts`.
+
+## Cập nhật S13c (2026-10-08) — snapshot quyết định IPC: so sánh cơ chế có sẵn
+
+A5 §4 / DATA-MIGRATIONS §7 đòi chứng minh cơ chế hiện có KHÔNG đáp ứng trước khi thêm bảng
+snapshot. Đối chiếu với `POST /api/payment-certs/:id/decide`:
+
+| Yêu cầu contract                                          | `audit_log` (trigger 0049)   | `approval_actions` (M46)     |
+| --------------------------------------------------------- | ---------------------------- | ---------------------------- |
+| KL/đơn giá/tỷ lệ/tổng exact + rule tại lúc quyết định     | Không (chỉ old/new dòng đợt) | Không                        |
+| Cảnh báo canonical + warningVersion + xác nhận + lý do    | Không                        | Chỉ `note` tự do             |
+| Khoá idempotency `(cert_id, operation_id)` + request hash | Không                        | Không (unique theo bước)     |
+| Bước `pending` không đổi enum `payment_certs`             | Không                        | Có (bước), thiếu snapshot số |
+
+→ Thêm `payment_cert_decision_snapshots` (migration `0160`, DDL theo DATA-MIGRATIONS §7) làm nguồn
+duy nhất của hồ sơ quyết định; `audit_log` vẫn giữ vết kỹ thuật thay đổi dòng, `approval_actions`
+vẫn là sổ bước của engine — không trùng nghĩa, không hai nguồn sự thật cho cùng dữ liệu.

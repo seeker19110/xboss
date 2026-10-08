@@ -274,13 +274,85 @@ export type DongVuotHopDong = {
  * được, không một dấu hiệu nào.
  */
 export async function dongVuotHopDong(certId: number): Promise<DongVuotHopDong[]> {
-  return query<DongVuotHopDong>(
+  return dongVuotTu(await dongLuyKeHieuLuc(certId));
+}
+
+/** Lọc dòng vượt HĐ từ luỹ kế hiệu lực → dạng cảnh báo trả API (dùng chung GET/PATCH/decide). */
+export function dongVuotTu(dong: readonly DongLuyKe[]): DongVuotHopDong[] {
+  return dong
+    .filter((d) => d.vuot)
+    .map((d) => ({
+      boqItemId: d.boqItemId,
+      code: d.code,
+      name: d.name,
+      unit: d.unit,
+      // Khối lượng (không phải tiền) — giữ kiểu number như API cũ; nguồn exact ở dongLuyKeHieuLuc.
+      qtyContract: Number(d.qtyContract),
+      qtyCumulative: Number(d.qtyCumulative),
+    }));
+}
+
+/** Một dòng KL của đợt kèm luỹ kế HIỆU LỰC — mọi số là chuỗi NUMERIC exact (`::text`). */
+export type DongLuyKe = {
+  boqItemId: number;
+  code: string;
+  name: string;
+  unit: string;
+  qtyContract: string;
+  qtyPeriod: string;
+  qtyCumulative: string;
+  unitPrice: string;
+  vuot: boolean;
+};
+
+// Luỹ kế của một dòng tính lại từ tập đợt ĐÃ DUYỆT có kỳ NHỎ HƠN kỳ đang xét (A5-FR06): luỹ kế
+// của đợt approved gần nhất có dòng BOQ đó + KL kỳ này. Không SUM các luỹ kế snapshot (đếm lặp),
+// không tin luỹ kế lưu từ lúc nháp (đợt legacy mở song song từng lưu 90 + 10 = 100 thay vì 120).
+const LUY_KE_KY_TRUOC_SQL = `COALESCE((
+       SELECT pi.qty_cumulative
+         FROM payment_cert_items pi
+         JOIN payment_certs pc ON pc.id = pi.cert_id
+        WHERE pc.contract_id = c.contract_id AND pc.status = 'approved'
+          AND pc.period_no < c.period_no AND pi.boq_item_id = i.boq_item_id
+        ORDER BY pc.period_no DESC
+        LIMIT 1), 0)`;
+
+/**
+ * Dòng KL + luỹ kế hiệu lực của một đợt. Đợt còn mở (nháp/đã trình) → luỹ kế tính lại theo
+ * `LUY_KE_KY_TRUOC_SQL` (đúng con số mà quyết định sẽ chốt); đợt đã duyệt/từ chối → snapshot đã
+ * lưu, không tính lại bằng dữ liệu hôm nay. Cảnh báo vượt HĐ (`vuot`) so trong SQL bằng NUMERIC.
+ */
+export async function dongLuyKeHieuLuc(certId: number): Promise<DongLuyKe[]> {
+  return query<DongLuyKe>(
     `SELECT i.boq_item_id AS "boqItemId", b.code, b.name, b.unit,
-            b.qty_contract AS "qtyContract", i.qty_cumulative AS "qtyCumulative"
+            b.qty_contract::text AS "qtyContract", i.qty_period::text AS "qtyPeriod",
+            lk.cum::text AS "qtyCumulative", i.unit_price::text AS "unitPrice",
+            lk.cum > b.qty_contract AS vuot
        FROM payment_cert_items i
+       JOIN payment_certs c ON c.id = i.cert_id
        JOIN boq_items b ON b.id = i.boq_item_id
-      WHERE i.cert_id = ? AND i.qty_cumulative > b.qty_contract
-      ORDER BY b.code`,
+       CROSS JOIN LATERAL (
+         SELECT CASE WHEN c.status IN ('draft', 'submitted')
+                     THEN i.qty_period + ${LUY_KE_KY_TRUOC_SQL}
+                     ELSE i.qty_cumulative END AS cum
+       ) lk
+      WHERE i.cert_id = ?
+      ORDER BY b.code, i.boq_item_id`,
+    certId,
+  );
+}
+
+/**
+ * Ghi lại `qty_cumulative` của một đợt CÒN MỞ theo luỹ kế hiệu lực (A5-FR06). Gọi DƯỚI khoá
+ * hợp đồng → đợt (submit/decide) để không lấy luỹ kế cũ khi kỳ trước vừa được duyệt. Đợt đã
+ * duyệt/từ chối không bao giờ bị sửa (điều kiện status trong chính câu UPDATE).
+ */
+export async function tinhLaiLuyKeDot(certId: number): Promise<void> {
+  await run(
+    `UPDATE payment_cert_items i
+        SET qty_cumulative = i.qty_period + ${LUY_KE_KY_TRUOC_SQL}
+       FROM payment_certs c
+      WHERE c.id = i.cert_id AND i.cert_id = ? AND c.status IN ('draft', 'submitted')`,
     certId,
   );
 }

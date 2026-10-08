@@ -4,7 +4,7 @@ import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
-import { boqTakenBy } from "@/lib/khoi-luong/boq";
+import { boqTakenBy, phuThuocDongBoq } from "@/lib/khoi-luong/boq";
 import { ghiLichSuBoq, type ThayDoiBoq } from "@/lib/khoi-luong/boq-history";
 
 export const dynamic = "force-dynamic";
@@ -228,11 +228,46 @@ export async function DELETE(
   const projectId = await getCurrentProjectId(user);
   const blocked = await assertModuleEnabled("materials", projectId);
   if (blocked) return blocked;
-  const result =
-    projectId != null
-      ? await run(`DELETE FROM boq_items WHERE id = ? AND project_id = ?`, id, projectId)
-      : { changes: 0 };
-  if (result.changes === 0)
+  if (projectId == null)
     return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
+
+  // S13c (A5-FR10): dòng BOQ còn chứng từ hạ nguồn (đợt IPC, gói thầu) → 409 dependency_conflict
+  // có thông điệp, không DELETE lịch sử. Khoá dòng rồi kiểm + xoá trong cùng transaction; chứng
+  // từ chen vào giữa vẫn bị FK chặn (23503) và cũng được trả 409 thay vì 500.
+  const xungDot = (dotThanhToan: number, goiThau: number) => {
+    const phan = [
+      dotThanhToan > 0 ? `${dotThanhToan} đợt thanh toán (IPC)` : null,
+      goiThau > 0 ? `${goiThau} gói thầu` : null,
+    ].filter(Boolean);
+    return NextResponse.json(
+      {
+        error:
+          `Dòng BOQ đang được dùng trong ${phan.join(" và ") || "chứng từ khác"} — không xoá được. ` +
+          "Điều chỉnh/huỷ chứng từ đó theo quy trình trước",
+        code: "dependency_conflict",
+      },
+      { status: 409 },
+    );
+  };
+  try {
+    const kq = await withTransaction(async () => {
+      const dong = await queryOne<{ id: number }>(
+        `SELECT id FROM boq_items WHERE id = ? AND project_id = ? FOR UPDATE`,
+        id,
+        projectId,
+      );
+      if (!dong) return "khong_thay" as const;
+      const pt = await phuThuocDongBoq(id);
+      if (pt.dotThanhToan > 0 || pt.goiThau > 0) return pt;
+      await run(`DELETE FROM boq_items WHERE id = ? AND project_id = ?`, id, projectId);
+      return "da_xoa" as const;
+    });
+    if (kq === "khong_thay")
+      return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
+    if (kq !== "da_xoa") return xungDot(kq.dotThanhToan, kq.goiThau);
+  } catch (err) {
+    if ((err as { code?: string }).code === "23503") return xungDot(0, 0);
+    throw err;
+  }
   return NextResponse.json({ ok: true });
 }
