@@ -30,6 +30,7 @@ export default function ContractsTab() {
   // Data states
   const [contracts, setContracts] = useState<any[]>([]);
   const [costsData, setCostsData] = useState<any | null>(null);
+  const [costsLoi, setCostsLoi] = useState(false);
   const [insuranceData, setInsuranceData] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -46,13 +47,14 @@ export default function ContractsTab() {
       fetch("/api/contracts").then((r) => (r.ok ? r.json() : { contracts: [] })),
       // Tiền chi phí về dạng chuỗi exact decimal-string-v1 (S10) — hiển thị bằng bigint.
       fetch("/api/costs?groupBy=system&includeVo=1", { headers: HEADER_TIEN_CHI_PHI }).then((r) =>
-        r.ok ? r.json() : null,
+        r.ok ? r.json() : { loiTai: true },
       ),
       fetch("/api/insurance-bonds").then((r) => (r.ok ? r.json() : { items: [] })),
     ])
       .then(([cData, costData, insData]) => {
         setContracts(cData.contracts || []);
-        setCostsData(costData);
+        setCostsData(costData?.loiTai ? null : costData);
+        setCostsLoi(!!costData?.loiTai);
         setInsuranceData(insData.items || []);
       })
       .catch(() => showToast("Không tải được dữ liệu hợp đồng/chi phí", "error"))
@@ -220,6 +222,19 @@ export default function ContractsTab() {
               </div>
             </div>
 
+            {costsData && costsData.coverage?.reconciled === false && (
+              <p
+                role="alert"
+                className="mb-3 px-3 py-2 rounded-lg border border-rose-900/60 bg-rose-500/10 text-xs text-rose-300"
+              >
+                Báo cáo chi phí chưa đủ điều kiện đối soát — có chứng từ mâu thuẫn phạm vi chưa được
+                cộng vào tổng.{" "}
+                <a href="/costs" className="underline font-semibold">
+                  Xem chi tiết ở trang Chi phí
+                </a>
+              </p>
+            )}
+
             {costsData?.rows?.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
@@ -234,7 +249,8 @@ export default function ContractsTab() {
                   </thead>
                   <tbody className="divide-y divide-zinc-800/60">
                     {costsData.rows.map((r: any) => {
-                      const pct = Math.round(phanTramSuDung(r.committed, r.budget) ?? 0);
+                      const pctRaw = phanTramSuDung(r.committed, r.budget);
+                      const pct = pctRaw == null ? null : Math.round(pctRaw);
                       return (
                         <tr key={r.key} className="hover:bg-zinc-900/40 transition">
                           <td className="py-3 px-3 font-semibold text-zinc-200">{r.label}</td>
@@ -250,12 +266,13 @@ export default function ContractsTab() {
                           <td className="py-3 px-3 text-right font-mono">
                             <span
                               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                pct > 100
+                                pct != null && pct > 100
                                   ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                                   : "bg-zinc-800 text-zinc-300"
                               }`}
                             >
-                              {pct}%
+                              {pct == null ? "—" : `${pct}%`}
+                              {pct != null && pct > 100 ? " · Vượt" : ""}
                             </span>
                           </td>
                         </tr>
@@ -266,7 +283,9 @@ export default function ContractsTab() {
               </div>
             ) : (
               <div className="text-center py-12 text-zinc-500 text-xs">
-                Chưa có dữ liệu hạn mức chi phí.
+                {costsLoi
+                  ? "Không tải được dữ liệu chi phí — tải lại trang để thử lại hoặc kiểm tra quyền xem."
+                  : "Chưa có dữ liệu hạn mức chi phí."}
               </div>
             )}
           </div>

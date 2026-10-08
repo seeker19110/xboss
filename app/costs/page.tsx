@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DollarSign, TriangleAlert, Settings2, X } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
@@ -67,31 +68,55 @@ export default function CostsPage() {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<"system" | "floor">("system");
   const [includeVo, setIncludeVo] = useState(true);
   const [selected, setSelected] = useState<CostRow | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // Chỉ phản hồi của lần gọi MỚI NHẤT được áp dụng (bấm chuyển tab nhanh không để phản hồi cũ
+  // ghi đè phản hồi mới).
+  const lastRequest = useRef(0);
+
   async function load(gb: "system" | "floor", withVo = includeVo) {
-    const res = await fetch(`/api/costs?groupBy=${gb}&includeVo=${withVo ? 1 : 0}`, {
-      headers: HEADER_TIEN_CHI_PHI,
-    });
-    if (res.status === 401) {
-      redirectToLogin();
-      return;
+    const requestId = ++lastRequest.current;
+    setLoadError(null);
+    try {
+      const res = await fetch(`/api/costs?groupBy=${gb}&includeVo=${withVo ? 1 : 0}`, {
+        headers: HEADER_TIEN_CHI_PHI,
+      });
+      if (requestId !== lastRequest.current) return;
+      if (res.status === 401) {
+        redirectToLogin();
+        return;
+      }
+      if (res.status === 403) {
+        setForbidden(true);
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setLoadError(
+          body?.code === "money_precision_unsupported"
+            ? "Số tiền vượt giới hạn hiển thị của hệ thống — vui lòng liên hệ quản trị viên."
+            : "Không tải được dữ liệu chi phí — kiểm tra kết nối mạng rồi thử lại.",
+        );
+        return;
+      }
+      const json = (await res.json()) as Data;
+      if (requestId !== lastRequest.current) return;
+      setData(json);
+    } catch {
+      if (requestId === lastRequest.current)
+        setLoadError("Không tải được dữ liệu chi phí — kiểm tra kết nối mạng rồi thử lại.");
+    } finally {
+      if (requestId === lastRequest.current) setLoading(false);
     }
-    if (res.status === 403) {
-      setForbidden(true);
-      setLoading(false);
-      return;
-    }
-    if (!res.ok) {
-      showToast("Không tải được dữ liệu chi phí", "error");
-      setLoading(false);
-      return;
-    }
-    setData(await res.json());
-    setLoading(false);
+  }
+
+  function retry() {
+    setLoading(true);
+    load(groupBy);
   }
 
   useEffect(() => {
@@ -127,7 +152,13 @@ export default function CostsPage() {
         </main>
       </div>
     );
-  if (!data) return null;
+  if (loadError || !data)
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white">
+        <AppHeader title="Chi phí" />
+        <ErrorState message={loadError ?? "Không có dữ liệu chi phí."} onRetry={retry} />
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -148,6 +179,23 @@ export default function CostsPage() {
       />
 
       <main className="max-w-5xl mx-auto px-3 sm:px-6 py-6 pb-24 space-y-6">
+        {/* Báo cáo chưa đủ điều kiện đối soát: chứng từ mâu thuẫn phạm vi KHÔNG được cộng vào tổng */}
+        {!data.coverage.reconciled && (
+          <div
+            role="alert"
+            className="bento-card p-4 border-rose-900/60 bg-rose-500/10 text-xs text-rose-300 space-y-1"
+          >
+            <p className="flex items-center gap-2 font-bold uppercase tracking-wide text-rose-300">
+              <TriangleAlert className="w-4 h-4" aria-hidden="true" />
+              Báo cáo chưa đủ điều kiện đối soát
+            </p>
+            <p>
+              {soChungTuLoi(data.coverage)} chứng từ có dự án/hợp đồng/sheet mâu thuẫn hoặc số liệu
+              không hợp lệ — chưa được cộng vào các tổng dưới đây. Cần đối soát dữ liệu nguồn.
+            </p>
+          </div>
+        )}
+
         {/* KPI Bento Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bento-card p-4 flex flex-col justify-between">
@@ -207,23 +255,6 @@ export default function CostsPage() {
           </div>
         </div>
 
-        {/* Báo cáo chưa đủ điều kiện đối soát: chứng từ mâu thuẫn phạm vi KHÔNG được cộng vào tổng */}
-        {!data.coverage.reconciled && (
-          <div
-            role="alert"
-            className="bento-card p-4 border-rose-900/60 bg-rose-950/20 text-xs text-rose-200 space-y-1"
-          >
-            <p className="flex items-center gap-2 font-bold uppercase tracking-wide text-rose-300">
-              <TriangleAlert className="w-4 h-4" aria-hidden="true" />
-              Báo cáo chưa đủ điều kiện đối soát
-            </p>
-            <p>
-              {soChungTuLoi(data.coverage)} chứng từ có dự án/hợp đồng/sheet mâu thuẫn hoặc số liệu
-              không hợp lệ — chưa được cộng vào các tổng dưới đây. Cần đối soát dữ liệu nguồn.
-            </p>
-          </div>
-        )}
-
         {/* Cảnh báo đang active */}
         {data.alerts.length > 0 && (
           <div className="bento-card p-4 border-amber-900/60 bg-amber-950/20 space-y-2">
@@ -254,7 +285,8 @@ export default function CostsPage() {
           <div className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl">
             <button
               onClick={() => switchGroup("system")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+              aria-pressed={groupBy === "system"}
+              className={`px-3.5 min-h-[40px] rounded-lg text-xs font-semibold transition ${
                 groupBy === "system"
                   ? "bg-zinc-800 text-white shadow-xs"
                   : "text-zinc-400 hover:text-zinc-200"
@@ -264,7 +296,8 @@ export default function CostsPage() {
             </button>
             <button
               onClick={() => switchGroup("floor")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+              aria-pressed={groupBy === "floor"}
+              className={`px-3.5 min-h-[40px] rounded-lg text-xs font-semibold transition ${
                 groupBy === "floor"
                   ? "bg-zinc-800 text-white shadow-xs"
                   : "text-zinc-400 hover:text-zinc-200"
@@ -274,7 +307,7 @@ export default function CostsPage() {
             </button>
           </div>
 
-          <label className="inline-flex items-center gap-2 text-xs font-medium text-zinc-300 cursor-pointer select-none">
+          <label className="inline-flex items-center gap-2 min-h-[40px] text-xs font-medium text-zinc-300 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={includeVo}
@@ -327,7 +360,15 @@ export default function CostsPage() {
                       <tr
                         key={r.key}
                         onClick={() => setSelected(r)}
-                        className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/30 cursor-pointer transition"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelected(r);
+                          }
+                        }}
+                        tabIndex={0}
+                        aria-label={`Xem chi tiết ${r.label}`}
+                        className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/30 cursor-pointer transition focus-visible:outline-2 focus-visible:outline-emerald-500"
                       >
                         <td className="p-3 font-medium">{r.label}</td>
                         <td
@@ -487,7 +528,8 @@ function SettingsModal({
             type="number"
             value={warnPct}
             onChange={(e) => setWarnPct(e.target.value)}
-            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-600"
+            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm focus:outline-none focus:border-emerald-600"
+            inputMode="decimal"
           />
         </label>
         <label className="block">
@@ -496,7 +538,8 @@ function SettingsModal({
             type="number"
             value={overPct}
             onChange={(e) => setOverPct(e.target.value)}
-            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-600"
+            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm focus:outline-none focus:border-emerald-600"
+            inputMode="decimal"
           />
         </label>
       </div>
