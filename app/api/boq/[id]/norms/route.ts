@@ -76,7 +76,7 @@ export async function POST(
   const input = parseNormBody(body);
   const invalid = validateNormInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
-  const matErr = await checkNormMaterial(input);
+  const matErr = await checkNormMaterial(input, projectId);
   if (matErr) return NextResponse.json({ error: matErr }, { status: 422 });
 
   const id = await insertId(

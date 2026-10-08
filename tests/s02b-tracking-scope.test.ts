@@ -240,6 +240,34 @@ test(
 );
 
 test(
+  "POST /api/boq/:id/norms: vật tư thuộc dự án khác → 422 như không tồn tại; cùng dự án → 201",
+  S,
+  async () => {
+    const { POST } = await import("@/app/api/boq/[id]/norms/route");
+    const { insertId } = await import("@/lib/db");
+    const taoVatTu = (projectId: number, tag: string) =>
+      insertId(
+        `INSERT INTO materials (project_id, name, qty_planned, qty_used) VALUES (?, ?, 0, 0)`,
+        projectId,
+        `Vật tư S02b ${RUN} ${tag}`,
+      );
+    const vtA = await taoVatTu(ctx.pA, "A");
+    const vtB = await taoVatTu(ctx.pB, "B");
+    const body = (materialId: number) => ({
+      resourceType: "material",
+      materialId,
+      qtyPerUnit: 1,
+      unitLabel: "kg",
+    });
+    await asA();
+    const sai = await POST(req("/x", "POST", body(vtB)), p(ctx.boqA));
+    assert.equal(sai.status, 422);
+    assert.equal((await sai.json()).error, "Vật tư không tồn tại");
+    assert.equal((await POST(req("/x", "POST", body(vtA)), p(ctx.boqA))).status, 201);
+  },
+);
+
+test(
   "GET /api/boq (B — chốt hồi quy): không dự án → 200 rỗng đúng shape; đúng dự án chỉ thấy A",
   S,
   async () => {

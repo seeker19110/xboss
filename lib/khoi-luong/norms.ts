@@ -49,9 +49,18 @@ export function validateNormInput(input: NormInput): string | null {
   return null;
 }
 
-export async function checkNormMaterial(input: NormInput): Promise<string | null> {
+/** Vật tư của định mức phải thuộc CÙNG dự án với dòng BOQ (S02b) — vật tư dự án khác báo như
+ *  không tồn tại (không lộ id tồn tại ở dự án khác). */
+export async function checkNormMaterial(
+  input: NormInput,
+  projectId: number,
+): Promise<string | null> {
   if (input.materialId == null) return null;
-  const m = await queryOne(`SELECT id FROM materials WHERE id = ?`, input.materialId);
+  const m = await queryOne(
+    `SELECT id FROM materials WHERE id = ? AND project_id = ?`,
+    input.materialId,
+    projectId,
+  );
   if (!m) return "Vật tư không tồn tại";
   return null;
 }
