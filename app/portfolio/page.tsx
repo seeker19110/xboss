@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
-import { PageSkeleton } from "@/app/components/Skeleton";
+import { PageSkeleton, MetricsRowSkeleton } from "@/app/components/Skeleton";
 import { systemColorClasses } from "@/lib/nen/systemColors";
 import type { ProjectListItem, PortfolioKpi, OrganizationItem } from "@/lib/ha-tang/projects";
 
@@ -17,13 +17,28 @@ const STATUS_BADGE: Record<string, string> = {
   closed: "bg-zinc-800 text-zinc-400 border-zinc-700",
 };
 
-function KpiTile({ label, value }: { label: string; value: string }) {
+function KpiTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
       <p className="text-[11px] text-zinc-400">{label}</p>
       <p className="text-xl font-bold text-white">{value}</p>
+      {hint && <p className="mt-0.5 text-[11px] text-zinc-400">{hint}</p>}
     </div>
   );
+}
+
+/** % tiến độ theo công việc — làm tròn XUỐNG để 99,6% không hiện thành 100% (chưa xong thật). */
+function phanTramTienDo(kpi: PortfolioKpi): string {
+  if (!kpi.progressAvailable || kpi.avgProgress == null) return "Chưa có dữ liệu";
+  return `${Math.floor(kpi.avgProgress * 100 + 1e-9)}%`;
+}
+
+function ghiChuTienDo(kpi: PortfolioKpi): string | undefined {
+  if (!kpi.progressAvailable) return undefined;
+  const { validTasks, excludedTasks } = kpi.coverage;
+  return excludedTasks > 0
+    ? `${validTasks} việc hợp lệ, loại ${excludedTasks} việc lỗi dữ liệu`
+    : `${validTasks} việc`;
 }
 
 async function selectProject(id: number) {
@@ -76,7 +91,8 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
 
 export default function PortfolioPage() {
   const [projects, setProjects] = useState<ProjectListItem[] | null>(null);
-  const [kpi, setKpi] = useState<PortfolioKpi | null>(null);
+  // undefined = đang tải, null = lỗi tải.
+  const [kpi, setKpi] = useState<PortfolioKpi | null | undefined>(undefined);
   const [orgs, setOrgs] = useState<OrganizationItem[]>([]);
   const [orgId, setOrgId] = useState<number | null>(null);
 
@@ -90,11 +106,15 @@ export default function PortfolioPage() {
       });
   }, [orgId]);
 
+  // Cùng filter tổ chức với danh sách để KPI và list luôn khớp phạm vi.
   useEffect(() => {
-    fetch("/api/portfolio/kpi")
+    const qs = orgId != null ? `?org=${orgId}` : "";
+    setKpi(undefined);
+    fetch(`/api/portfolio/kpi${qs}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setKpi(d ?? null));
-  }, []);
+      .then((d) => setKpi(d ?? null))
+      .catch(() => setKpi(null));
+  }, [orgId]);
 
   if (projects === null) return <PageSkeleton />;
 
@@ -102,11 +122,21 @@ export default function PortfolioPage() {
     <div className="min-h-screen bg-zinc-950 text-white">
       <AppHeader title="Portfolio" subtitle="Tổng quan tất cả dự án" />
       <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-5 space-y-6">
-        {kpi && (
+        {kpi === undefined ? (
+          <MetricsRowSkeleton count={4} />
+        ) : kpi === null ? (
+          <p role="alert" className="text-sm text-amber-300">
+            Không tải được chỉ số tổng hợp. Vui lòng thử lại sau.
+          </p>
+        ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <KpiTile label="Số dự án" value={String(kpi.totalProjects)} />
             <KpiTile label="Đang thi công" value={String(kpi.activeCount)} />
-            <KpiTile label="Tiến độ TB" value={`${Math.round(kpi.avgProgress * 100)}%`} />
+            <KpiTile
+              label="Tiến độ theo công việc"
+              value={phanTramTienDo(kpi)}
+              hint={ghiChuTienDo(kpi)}
+            />
             <KpiTile label="Tổng việc trễ" value={String(kpi.totalDelayed)} />
           </div>
         )}

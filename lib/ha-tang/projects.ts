@@ -119,28 +119,42 @@ export type ProjectListItem = {
   delayedCount: number;
 };
 
-/** Danh sách dự án user thấy + % tiến độ (TB task qua tower) + số việc trễ — dùng chung
+/** Task có progress hợp lệ (A4-FR08): NULL/ngoài [0,1] là lỗi dữ liệu — loại khỏi mẫu số,
+ *  báo qua coverage, không sửa dữ liệu nguồn. */
+const TASK_HOP_LE = `t.progress_percent IS NOT NULL AND t.progress_percent BETWEEN 0 AND 1`;
+/** Việc trễ: ngày VN (todayISO), task thiếu ngày kế thừa ngày KT nhóm, chưa xong/nghiệm thu. */
+const TASK_TRE = `COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
+                  AND t.status NOT IN ('hoan_thanh','nghiem_thu')`;
+/** Nguồn dự án + task dùng CHUNG cho list và KPI (cùng org/visibility). Không join
+ *  progress_dimensions nên mỗi task đúng 1 dòng; đếm vẫn theo t.id cho chắc. */
+const NGUON_DU_AN_TASK = `FROM projects p
+       LEFT JOIN towers tw ON tw.project_id = p.id
+       LEFT JOIN sheet_types st ON st.tower_id = tw.id
+       LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
+       LEFT JOIN tasks t ON t.package_id = wp.id`;
+
+/** Dự án actor thấy, đã áp filter org — `null` = không có dự án nào trong phạm vi. */
+async function phamViDuAn(user: ProjectActor, orgId?: number | null): Promise<number[] | null> {
+  if (orgId != null && orgId !== user.orgId) return null;
+  const visible = await visibleProjectIds(user);
+  return visible.length === 0 ? null : visible;
+}
+
+/** Danh sách dự án user thấy + % tiến độ (TB task hợp lệ) + số việc trễ — dùng chung
  *  cho project switcher lẫn trang Portfolio. `orgId` (M51 PR4): lọc theo tổ chức khi có
  *  giá trị; NULL/undefined = không lọc (mọi dự án user thấy). */
 export async function listProjects(
   user: ProjectActor,
   orgId?: number | null,
 ): Promise<ProjectListItem[]> {
-  if (orgId != null && orgId !== user.orgId) return [];
-  const visible = await visibleProjectIds(user);
-  if (visible.length === 0) return [];
+  const visible = await phamViDuAn(user, orgId);
+  if (!visible) return [];
   const placeholders = visible.map(() => "?").join(",");
-  // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm (lib/recompute.ts).
-  const rows = await query<ProjectListItem>(
+  return query<ProjectListItem>(
     `SELECT p.id, p.name, p.code, p.status, p.color, p.org_id AS "orgId",
-            COALESCE(AVG(t.progress_percent), 0) AS "progressPercent",
-            COALESCE(SUM(CASE WHEN COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
-                              AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END), 0) AS "delayedCount"
-       FROM projects p
-       LEFT JOIN towers tw ON tw.project_id = p.id
-       LEFT JOIN sheet_types st ON st.tower_id = tw.id
-       LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
-       LEFT JOIN tasks t ON t.package_id = wp.id
+            COALESCE(AVG(t.progress_percent) FILTER (WHERE ${TASK_HOP_LE}), 0) AS "progressPercent",
+            COUNT(DISTINCT t.id) FILTER (WHERE ${TASK_TRE}) AS "delayedCount"
+       ${NGUON_DU_AN_TASK}
       WHERE p.id IN (${placeholders}) AND p.org_id = ?
       GROUP BY p.id, p.name, p.code, p.status, p.color, p.org_id
       ORDER BY p.id`,
@@ -148,7 +162,6 @@ export async function listProjects(
     ...visible,
     user.orgId,
   );
-  return rows;
 }
 
 export type OrganizationItem = { id: number; name: string };
@@ -177,24 +190,73 @@ export type PortfolioKpi = {
   handoverCount: number;
   closedCount: number;
   totalDelayed: number;
-  avgProgress: number; // trung bình có trọng số theo số task mỗi dự án
+  /** Tiến độ theo công việc (A4-FR08): tổng progress task / số task hợp lệ của mọi dự án
+   *  trong phạm vi — KHÔNG trung bình theo dự án, không phải tiến độ tiền/EVM. Không có task
+   *  hợp lệ nào → null. */
+  avgProgress: number | null;
+  progressAvailable: boolean;
+  /** Số task hợp lệ (= mẫu số). */
+  taskCount: number;
+  coverage: { validTasks: number; excludedTasks: number };
 };
 
-/** KPI gộp cross-project cho trang Portfolio — không đụng cache dữ liệu 1 dự án. */
-export async function portfolioKpi(user: ProjectActor): Promise<PortfolioKpi> {
-  const projects = await listProjects(user);
-  const totalDelayed = projects.reduce((s, p) => s + p.delayedCount, 0);
-  const avgProgress =
-    projects.length === 0
-      ? 0
-      : projects.reduce((s, p) => s + p.progressPercent, 0) / projects.length;
+/** KPI gộp cross-project cho trang Portfolio — cùng phạm vi/filter với listProjects,
+ *  tổng hợp trong 1 câu SQL (không lặp theo số dự án). */
+export async function portfolioKpi(
+  user: ProjectActor,
+  orgId?: number | null,
+): Promise<PortfolioKpi> {
+  const visible = await phamViDuAn(user, orgId);
+  const rong: PortfolioKpi = {
+    totalProjects: 0,
+    activeCount: 0,
+    handoverCount: 0,
+    closedCount: 0,
+    totalDelayed: 0,
+    avgProgress: null,
+    progressAvailable: false,
+    taskCount: 0,
+    coverage: { validTasks: 0, excludedTasks: 0 },
+  };
+  if (!visible) return rong;
+  const placeholders = visible.map(() => "?").join(",");
+  const row = await queryOne<{
+    totalProjects: number;
+    activeCount: number;
+    handoverCount: number;
+    closedCount: number;
+    totalDelayed: number;
+    avgProgress: number | null;
+    validTasks: number;
+    excludedTasks: number;
+  }>(
+    `SELECT COUNT(DISTINCT p.id) AS "totalProjects",
+            COUNT(DISTINCT p.id) FILTER (WHERE p.status = 'active') AS "activeCount",
+            COUNT(DISTINCT p.id) FILTER (WHERE p.status = 'handover') AS "handoverCount",
+            COUNT(DISTINCT p.id) FILTER (WHERE p.status = 'closed') AS "closedCount",
+            COUNT(DISTINCT t.id) FILTER (WHERE ${TASK_TRE}) AS "totalDelayed",
+            SUM(t.progress_percent) FILTER (WHERE ${TASK_HOP_LE})
+              / NULLIF(COUNT(DISTINCT t.id) FILTER (WHERE ${TASK_HOP_LE}), 0) AS "avgProgress",
+            COUNT(DISTINCT t.id) FILTER (WHERE ${TASK_HOP_LE}) AS "validTasks",
+            COUNT(DISTINCT t.id) FILTER (WHERE t.id IS NOT NULL AND NOT (${TASK_HOP_LE})) AS "excludedTasks"
+       ${NGUON_DU_AN_TASK}
+      WHERE p.id IN (${placeholders}) AND p.org_id = ?`,
+    todayISO(),
+    ...visible,
+    user.orgId,
+  );
+  if (!row) return rong;
+  const validTasks = Number(row.validTasks);
   return {
-    totalProjects: projects.length,
-    activeCount: projects.filter((p) => p.status === "active").length,
-    handoverCount: projects.filter((p) => p.status === "handover").length,
-    closedCount: projects.filter((p) => p.status === "closed").length,
-    totalDelayed,
-    avgProgress,
+    totalProjects: Number(row.totalProjects),
+    activeCount: Number(row.activeCount),
+    handoverCount: Number(row.handoverCount),
+    closedCount: Number(row.closedCount),
+    totalDelayed: Number(row.totalDelayed),
+    avgProgress: validTasks > 0 && row.avgProgress != null ? Number(row.avgProgress) : null,
+    progressAvailable: validTasks > 0,
+    taskCount: validTasks,
+    coverage: { validTasks, excludedTasks: Number(row.excludedTasks) },
   };
 }
 

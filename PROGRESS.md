@@ -1,5 +1,16 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S12: portfolio trọng số theo task
+
+A4-FR08/AC05–AC07: `portfolioKpi` (`lib/ha-tang/projects.ts`) tính `avgProgress` = tổng
+`tasks.progress_percent` / số task hợp lệ trong 1 câu SQL (không còn TB theo dự án); dự án
+không task không thêm mẫu số; không task → `avgProgress: null`, `progressAvailable: false`,
+`taskCount: 0`; progress NULL/ngoài [0,1] bị loại và báo `coverage {validTasks, excludedTasks}`.
+List và KPI dùng chung nguồn/phạm vi org + visibility; `GET /api/portfolio/kpi` nhận `?org=` như
+`/api/projects`. Trễ theo ngày VN, kế thừa ngày KT nhóm. UI: nhãn "Tiến độ theo công việc",
+"Chưa có dữ liệu", làm tròn xuống, tách loading/lỗi. Test `tests/portfolio-kpi.test.ts` (4 ca đỏ
+trên code cũ, ca trễ VN đã xanh từ trước).
+
 ## 2026-10-08 — QUALITY-FINAL-1 S02b/S02c: tracking, file/QC/HSE, dashboard/export fail-closed
 
 Cùng mẫu S02a (#591): `getCurrentProjectId` null → **404** cho chi tiết/ghi/tải file/export,

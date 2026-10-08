@@ -1861,7 +1861,7 @@ test("GET /api/system-uploads/:id/file: file tồn tại → trả đúng byte �
 test("GET /api/portfolio/kpi: chưa đăng nhập → 401", S, async () => {
   dangXuat();
   const { GET } = await import("@/app/api/portfolio/kpi/route");
-  const res = await GET();
+  const res = await GET(getreq("/api/portfolio/kpi"));
   assert.equal(res.status, 401);
 });
 
@@ -1870,7 +1870,7 @@ test("GET /api/portfolio/kpi: trả tổng hợp KPI theo user_projects hiện t
   const pm = await taoUser("pm", "pfkpi-ok");
   await dangNhapDuAn(pm, projectId);
   const { GET } = await import("@/app/api/portfolio/kpi/route");
-  const res = await GET();
+  const res = await GET(getreq("/api/portfolio/kpi"));
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.ok(body.totalProjects >= 1);
