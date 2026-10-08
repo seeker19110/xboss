@@ -1,41 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
-import { getCurrentProjectId, PROJECT_COOKIE, visibleProjectIds } from "@/lib/ha-tang/projects";
-import type { Role } from "@/lib/nen/roles";
+import { getCurrentProjectId, getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 
 export type BillType = "bill" | "advance" | "item";
 
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" };
-
-/** Không dùng fallback của resolver: cookie sai/không được cấp không được đổi thành project đầu. */
-async function getVerifiedProjectId(user: { id: number; role: Role; orgId: number }) {
-  if (!Number.isSafeInteger(user.orgId) || user.orgId <= 0) return null;
-
-  const visible = await visibleProjectIds(user);
-  const raw = (await cookies()).get(PROJECT_COOKIE)?.value;
-  let projectId: number | null = null;
-
-  if (raw == null) {
-    // Giữ mặc định project khả kiến đầu tiên của app khi chưa có cookie;
-    // mọi truy vấn bên dưới vẫn khóa vào đúng project/org đã xác minh.
-    projectId = visible[0] ?? null;
-  } else if (/^[1-9]\d*$/.test(raw)) {
-    const parsed = Number(raw);
-    if (Number.isSafeInteger(parsed) && visible.includes(parsed)) projectId = parsed;
-  }
-
-  if (projectId == null) return null;
-  const project = await queryOne<{ id: number }>(
-    `SELECT id FROM projects WHERE id = ? AND org_id = ?`,
-    projectId,
-    user.orgId,
-  );
-  return project?.id ?? null;
-}
 
 type Bill = {
   id: number;
@@ -72,7 +44,7 @@ export async function GET(_req: NextRequest) {
       { status: 403, headers: PRIVATE_NO_STORE },
     );
 
-  const projectId = await getVerifiedProjectId(user);
+  const projectId = await getCurrentProjectIdStrict(user);
   if (projectId == null)
     return NextResponse.json(
       { error: "Không tìm thấy dự án đang chọn" },

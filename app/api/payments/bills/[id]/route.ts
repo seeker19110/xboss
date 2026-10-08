@@ -1,21 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import { queryOne, run } from "@/lib/db";
-import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { query, withProjectScope } from "@/lib/db";
+import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 
-// Xác nhận bill thuộc dự án đang chọn trước khi PATCH/DELETE (chống sửa/xoá chéo dự
-// án) — cùng quy tắc project_id NULL = dòng cũ chưa gán dự án như GET /api/payments/bills.
-async function billBelongsToProject(id: number, projectId: number | null): Promise<boolean> {
-  if (projectId == null) return true;
-  const row = await queryOne<{ id: number }>(
-    `SELECT id FROM payment_bills WHERE id = ? AND (project_id = ? OR project_id IS NULL)`,
-    id,
-    projectId,
-  );
-  return row != null;
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" };
+
+// Phạm vi bill (S02a cụm 3, P1-1): đúng project_id của dự án đã xác minh — dòng legacy
+// project_id NULL KHÔNG sửa/xoá được qua dự án nào — và mọi liên kết cha (hợp đồng/IPC/sheet)
+// cùng dự án + org, giống điều kiện GET /api/payments/bills. Ghép thẳng vào câu UPDATE/DELETE
+// (một câu, không kiểm-rồi-ghi) nên không có cửa sổ race. Tham số: id, projectId, projectId,
+// orgId, projectId, orgId, projectId, orgId.
+const BILL_SCOPE = `id = ? AND project_id = ?
+   AND (contract_id IS NULL OR EXISTS (
+     SELECT 1 FROM contracts c JOIN projects cp ON cp.id = c.project_id
+      WHERE c.id = payment_bills.contract_id AND c.project_id = ? AND cp.org_id = ?
+   ))
+   AND (payment_cert_id IS NULL OR EXISTS (
+     SELECT 1 FROM payment_certs pc
+       JOIN contracts cc ON cc.id = pc.contract_id
+       JOIN projects cp ON cp.id = cc.project_id
+      WHERE pc.id = payment_bills.payment_cert_id AND cc.project_id = ? AND cp.org_id = ?
+        AND (payment_bills.contract_id IS NULL OR pc.contract_id = payment_bills.contract_id)
+   ))
+   AND (sheet_type_id IS NULL OR EXISTS (
+     SELECT 1 FROM sheet_types pst
+       JOIN towers pt ON pt.id = pst.tower_id
+       JOIN projects pp ON pp.id = pt.project_id
+      WHERE pst.id = payment_bills.sheet_type_id AND pt.project_id = ? AND pp.org_id = ?
+   ))`;
+
+function billScopeParams(id: number, projectId: number, orgId: number) {
+  return [id, projectId, projectId, orgId, projectId, orgId, projectId, orgId];
 }
+
+const notFound = () =>
+  NextResponse.json(
+    { error: "Không tìm thấy bill thanh toán" },
+    { status: 404, headers: PRIVATE_NO_STORE },
+  );
 
 // PATCH /api/payments/bills/:id — sửa ĐVT / khối lượng / nhân công / ghi chú.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -28,9 +52,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const id = parseInt(idStr, 10);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  if (!(await billBelongsToProject(id, projectId)))
-    return NextResponse.json({ error: "Không tìm thấy bill thanh toán" }, { status: 404 });
+  const projectId = await getCurrentProjectIdStrict(user);
+  if (projectId == null) return notFound();
 
   const b = await req.json().catch(() => null);
   if (!b) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
@@ -57,9 +80,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if (!sets.length) return NextResponse.json({ error: "Không có gì để sửa" }, { status: 400 });
 
-  args.push(id);
-  await run(`UPDATE payment_bills SET ${sets.join(", ")} WHERE id = ?`, ...args);
-  return NextResponse.json({ ok: true });
+  const updated = await withProjectScope(
+    projectId,
+    () =>
+      query<{ id: number }>(
+        `UPDATE payment_bills SET ${sets.join(", ")} WHERE ${BILL_SCOPE} RETURNING id`,
+        ...args,
+        ...billScopeParams(id, projectId, user.orgId),
+      ),
+    { readOnly: false },
+  );
+  if (updated.length === 0) return notFound();
+  return NextResponse.json({ ok: true }, { headers: PRIVATE_NO_STORE });
 }
 
 // DELETE /api/payments/bills/:id — xoá bill thanh toán.
@@ -73,10 +105,18 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const id = parseInt(idStr, 10);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  if (!(await billBelongsToProject(id, projectId)))
-    return NextResponse.json({ error: "Không tìm thấy bill thanh toán" }, { status: 404 });
+  const projectId = await getCurrentProjectIdStrict(user);
+  if (projectId == null) return notFound();
 
-  await run(`DELETE FROM payment_bills WHERE id = ?`, id);
-  return NextResponse.json({ ok: true });
+  const deleted = await withProjectScope(
+    projectId,
+    () =>
+      query<{ id: number }>(
+        `DELETE FROM payment_bills WHERE ${BILL_SCOPE} RETURNING id`,
+        ...billScopeParams(id, projectId, user.orgId),
+      ),
+    { readOnly: false },
+  );
+  if (deleted.length === 0) return notFound();
+  return NextResponse.json({ ok: true }, { headers: PRIVATE_NO_STORE });
 }
