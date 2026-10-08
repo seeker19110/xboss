@@ -11,6 +11,11 @@ liệu chi phí toàn hệ (fail-closed như S11). **Quyết định:** hệ `no
 không còn caller production, chỉ còn test legacy (`cost.test`/`vo.test`/`audit-cost-query-reuse`) nên
 giữ làm adapter. Test: 2 ca `cost_over` (số lớn sát ngưỡng, no_budget) trong `tests/thong-bao.test.ts`,
 1 ca `bySystemBlock` khớp `getCostReport` trong `tests/dashboardext.test.ts`.
+**Vá CI #598:** `getCostReport` tự mở REPEATABLE READ nên không gọi lồng được trong
+`withProjectScope` của `GET /api/notifications` (500 — `tests/s02b-files-scope` bắt được): route
+đọc báo cáo TRƯỚC khi mở scope qua `loadCostAlertReport` rồi truyền `opts.costReport` vào
+`syncAndListNotifications`. `route-tai-chinh-3a` (PATCH settings 85/105) không trả lại ngưỡng →
+test `cost_over` file sau trên cùng DB worker đỏ; nay trả lại bằng `t.after`, 2 ca mới tự chốt 90/100.
 
 ## 2026-10-08 — QUALITY-FINAL-1 S10c: tiền exact hợp đồng/thanh toán/mua sắm/EVM…
 

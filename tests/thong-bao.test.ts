@@ -485,7 +485,13 @@ test(
 test(
   "cost_over: ngưỡng so exact với số lớn (~10^13) — dưới ngưỡng 0,01 KHÔNG cảnh báo, đúng ngưỡng thì có",
   S,
-  async () => {
+  async (t) => {
+    // cost_settings là cấu hình toàn hệ (id 1) mà file khác có thể đã đổi trên cùng DB worker —
+    // chốt ngưỡng của ca này rồi trả lại như cũ.
+    const { getCostSettings, updateCostSettings } = await import("@/lib/tai-chinh/cost");
+    const truoc = await getCostSettings();
+    await updateCostSettings({ warnPct: 90, overPct: 100 });
+    t.after(() => updateCostSettings(truoc));
     const { insertId, run } = await import("@/lib/db");
     const boqId = await insertId(
       `INSERT INTO boq_items (code, name, unit, system_id, project_id, qty_contract, unit_price)
@@ -531,7 +537,13 @@ test(
 test(
   "cost_over: ngân sách 0 mà đã có cam kết (no_budget) → vẫn cảnh báo, không chia 0",
   S,
-  async () => {
+  async (t) => {
+    // cost_settings là cấu hình toàn hệ (id 1) mà file khác có thể đã đổi trên cùng DB worker —
+    // chốt ngưỡng của ca này rồi trả lại như cũ.
+    const { getCostSettings, updateCostSettings } = await import("@/lib/tai-chinh/cost");
+    const truoc = await getCostSettings();
+    await updateCostSettings({ warnPct: 90, overPct: 100 });
+    t.after(() => updateCostSettings(truoc));
     const { insertId, run, queryOne } = await import("@/lib/db");
     const poId = await insertId(
       `INSERT INTO purchase_orders (po_code, status, project_id) VALUES (?, 'confirmed', ?)`,

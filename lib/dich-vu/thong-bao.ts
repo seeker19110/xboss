@@ -8,7 +8,7 @@
 // NextResponse và kiểm phiên. Nhờ vậy logic này test đơn vị được mà không phải dựng request.
 import { query, queryOne, run, todayISO } from "@/lib/db";
 import { CAN, isAdminOrPm, type User } from "@/lib/bao-mat/auth";
-import { getCostReport } from "@/lib/tai-chinh/cost";
+import { getCostReport, type CostReport } from "@/lib/tai-chinh/cost";
 import { poLateList, vehicleLateList } from "@/lib/tai-chinh/procurement";
 import { missingDiaryDates } from "@/lib/hien-truong/diary";
 import { expiringContracts } from "@/lib/tai-chinh/contracts";
@@ -52,10 +52,25 @@ const APPROVAL_ENTITY_COLUMN: Record<string, string> = {
   task_acceptance: "task_id",
 };
 
+/**
+ * Báo cáo chi phí cho khối `cost_over` — null khi user không xem được chi phí hoặc thiếu dự án.
+ * `getCostReport` tự mở transaction REPEATABLE READ READ ONLY (A4-FR06) nên KHÔNG gọi được
+ * lồng trong `withProjectScope` của route: route gọi hàm này TRƯỚC khi mở scope rồi truyền vào
+ * `syncAndListNotifications` qua `opts.costReport`.
+ */
+export async function loadCostAlertReport(
+  user: User,
+  projectId: number | null,
+): Promise<CostReport | null> {
+  if (!CAN.viewPayments(user.role) || projectId == null) return null;
+  return getCostReport({ kind: "project", projectId }, { groupBy: "system", includeVo: true });
+}
+
 export async function syncAndListNotifications(
   user: User,
   projectId: number | null,
   limit: number,
+  opts: { costReport?: CostReport | null } = {},
 ) {
   // MỌI khối bên dưới phải lọc theo `projectId` NHẬN TỪ THAM SỐ. Trước đây hai khối
   // (`design_change_pending`, `claim_pending`) tự gọi `getCurrentProjectId(user)` và khai
@@ -294,13 +309,9 @@ export async function syncAndListNotifications(
     // Một báo cáo exact cho một dự án (không N+1); thiếu dự án → không cảnh báo toàn hệ (fail-closed).
     // Mức cảnh báo so bằng nhân chéo bigint (costAlertLevel) — không chia/float. `no_budget` (cam
     // kết dương, ngân sách ≤ 0) CŨNG cảnh báo: không bỏ sót hệ chi tiền mà chưa có ngân sách.
+    // Gọi trong transaction có sẵn (route) thì báo cáo phải đọc trước, truyền qua opts.
     const report =
-      projectId != null
-        ? await getCostReport(
-            { kind: "project", projectId },
-            { groupBy: "system", includeVo: true },
-          )
-        : null;
+      opts.costReport !== undefined ? opts.costReport : await loadCostAlertReport(user, projectId);
     const over = (report?.rows ?? [])
       .filter((r) => !r.unassigned && r.level !== "none")
       .map((r) => ({
