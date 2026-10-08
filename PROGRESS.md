@@ -1,5 +1,23 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 A4-AC08: đối chiếu báo cáo, query count và benchmark p95
+
+Đặc tả `docs/nang-cap/AUDIT-A4-AC08-BENCHMARK.md` (spec cha A4-AC08, APPROVAL §D09). Không đổi logic
+báo cáo, không migration (đo không thấy cần index), không thêm dependency.
+
+- **Test** `tests/bao-cao-a4-ac08.test.ts`: `getCostReport` (theo hệ + theo tầng) == `GET /api/costs`
+  == oracle SQL; `portfolioKpi` == `GET /api/portfolio/kpi` == oracle SQL; số query không đổi khi số
+  nhóm tăng 4 lần (floor 21→81 nhóm: 8=8 query; system: 9=9) và khi số dự án 1→4. Export Excel/PDF
+  không đọc nguồn chi phí → N/A (ghi trong spec con).
+- **Benchmark** `scripts/bench-reports.ts` + `npm run bench:reports` (không vào CI): seed 10.000 task,
+  đo p50/p95/max tuần tự + 20 phiên đồng thời qua route handler thật, so ngưỡng D09 (p95 ≤ 2 s),
+  fail-fast nếu không phải DB `bench_*` disposable có marker; `BENCH_APP_DATABASE_URL` để đo bằng role
+  `xboss_app` (RLS). Fixture dùng chung `scripts/lib/bao-cao-fixture.ts`.
+- **Kết quả** (sandbox 4 vCPU, Postgres 16 local, 5 dự án × 2.000 task, role app): p95 20 phiên —
+  costs/system 167 ms, costs/floor 113 ms, portfolio/kpi 64 ms, dashboard 273 ms → **PASS** D09 (≤ 2 s).
+  **NOT_RUN còn lại:** so baseline ±10% (chưa có baseline trước đó) và production-size thật (cấm chạm
+  production, chưa có snapshot được phép).
+
 ## 2026-10-08 — QUALITY-FINAL-1 S07: queue vault và IndexedDB nguyên tử
 
 Đặc tả lát cắt `docs/nang-cap/AUDIT-S07-OFFLINE-QUEUE-VAULT.md` (spec cha A2-FR05/FR09..FR12,
