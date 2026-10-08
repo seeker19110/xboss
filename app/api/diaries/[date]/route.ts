@@ -6,6 +6,7 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   buildDiaryPrefill,
   getDiaryByDate,
+  anhNgoaiDuAn,
   assertDiaryUnlocked,
   baseVersionNhatKy,
   dieuKienThoa,
@@ -119,6 +120,13 @@ export async function PUT(
   const photoIds: number[] = Array.isArray(body.photoIds)
     ? body.photoIds.map(Number).filter((n: number) => Number.isInteger(n))
     : [];
+  // Ảnh phải thuộc dự án đang chọn: id ảnh đoán được, gắn ảnh dự án khác vào nhật ký là lộ ảnh
+  // xuyên dự án (GET/PDF nhật ký). Ảnh vừa bị xoá giữa lúc này và lúc ghi → FK 23503 → 422 bên dưới.
+  if ((await anhNgoaiDuAn(photoIds, projectId)).length)
+    return NextResponse.json(
+      { error: "Có ảnh không tồn tại hoặc không thuộc dự án đang chọn — tải lại trang" },
+      { status: 422 },
+    );
   // Lỗi đầu vào (422) báo trước, precondition (428/400) sau — sửa form không cần tải lại phiên bản.
   const dk = docDieuKienNhatKy(req.headers.get("if-match"), req.headers.get("if-none-match"));
   if (!dk.ok) return NextResponse.json({ error: dk.error, code: dk.code }, { status: dk.status });

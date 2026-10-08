@@ -8,6 +8,7 @@ import { validateCustom } from "@/lib/ha-tang/custom-fields";
 import { recomputePackage, recomputeTasksInheritingDates } from "@/lib/tien-do/recompute";
 import { packageProjectId } from "@/lib/tien-do/workpackages";
 import { storageDelete } from "@/lib/nen/storage";
+import { khoaNhatKyCuaAnhTask } from "@/lib/hien-truong/diary";
 
 export const dynamic = "force-dynamic";
 
@@ -173,6 +174,8 @@ export async function DELETE(
     // rollback cả các bước trước, không để nhóm mất task/ảnh/lịch sử một nửa.
     await withTransaction(async () => {
       if (taskIds.length > 0) {
+        // Khoá nhật ký gắn ảnh của các task TRƯỚC mọi DELETE (thứ tự "nhật ký → ảnh", S06).
+        await khoaNhatKyCuaAnhTask(taskIds);
         await run(`DELETE FROM notifications WHERE task_id = ANY(?)`, taskIds);
         await run(`DELETE FROM baseline_tasks WHERE task_id = ANY(?)`, taskIds);
         await run(`DELETE FROM task_photos WHERE task_id = ANY(?)`, taskIds);

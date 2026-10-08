@@ -193,6 +193,7 @@ const r = {
   batch: () => import("@/app/api/dimensions/batch/route"),
   photos: () => import("@/app/api/tasks/[id]/photos/route"),
   diary: () => import("@/app/api/diaries/[date]/route"),
+  photo: () => import("@/app/api/photos/[id]/route"),
 };
 
 /** Đăng ký trình duyệt + lấy context offline cho (user, dự án) qua route S05 thật. */
@@ -692,6 +693,119 @@ test(
     assert.deepEqual(g.photoIds, []);
     assert.notEqual(g.etag, e1, "biểu diễn đổi (mất ảnh) thì phiên bản phải đổi");
     assert.equal((await putNhatKy(date, {}, { "if-match": e1 })).status, 412);
+  },
+);
+
+test(
+  "xoá ảnh đồng thời với PUT nhật ký gắn ảnh đó → cả hai hoàn tất, không deadlock/500",
+  S,
+  async () => {
+    // Trigger version 0164: xoá task_photos cascade diary_photos → UPDATE site_diaries; PUT nhật ký
+    // khoá site_diaries trước rồi mới xoá/chèn diary_photos. Ngược chiều = deadlock. Tái hiện CHẮC
+    // CHẮN: phiên `chan` giữ khoá dòng nhân lực để PUT dừng SAU khi đã khoá nhật ký, rồi mới phát
+    // lệnh xoá ảnh, chờ nó cũng kẹt khoá, rồi nhả `chan`.
+    const date = "2026-06-13";
+    await dangNhapDuAn(F.u.eng, F.p1);
+    const anh = await (await guiAnh(F.t2, anhMoi(), "Xoá đồng thời")).json();
+    const tao = await putNhatKy(
+      date,
+      { photoIds: [anh.id], manpower: [{ crew: "Tổ khoá", headcount: 1 }] },
+      { "if-none-match": "*" },
+    );
+    assert.equal(tao.status, 200);
+    const { id: diaryId, etag } = await tao.json();
+
+    const choKhoa = async (n: number) => {
+      for (let i = 0; i < 400; i++) {
+        const c = await own.query<{ n: number }>(
+          `SELECT count(*)::int AS n FROM pg_stat_activity
+            WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+        );
+        if (c.rows[0].n >= n) return;
+        await new Promise((ok) => setTimeout(ok, 25));
+      }
+      assert.fail(`không thấy ${n} phiên đang chờ khoá`);
+    };
+    const ketQua = (p: Promise<Response>) =>
+      p.then(
+        (res) => ({ status: res.status }),
+        (e: unknown) => ({ status: 0, loi: String((e as Error)?.message ?? e) }),
+      );
+
+    const chan = await own.connect();
+    try {
+      await chan.query("BEGIN");
+      await chan.query(`SELECT id FROM diary_manpower WHERE diary_id = $1 FOR UPDATE`, [diaryId]);
+      const put = ketQua(
+        requestRieng(() =>
+          putNhatKy(
+            date,
+            { photoIds: [anh.id], workDone: "Sửa", manpower: [{ crew: "Tổ khoá", headcount: 2 }] },
+            { "if-match": etag },
+          ),
+        ),
+      );
+      await choKhoa(1);
+      const xoa = ketQua(
+        requestRieng(async () =>
+          (await r.photo()).DELETE(req("DELETE", `/api/photos/${anh.id}`), {
+            params: Promise.resolve({ id: String(anh.id) }),
+          }),
+        ),
+      );
+      await choKhoa(2);
+      await chan.query("COMMIT");
+      const [kp, kx] = await Promise.all([put, xoa]);
+      assert.deepEqual(kp, { status: 200 }, "PUT nhật ký hoàn tất");
+      assert.deepEqual(kx, { status: 200 }, "xoá ảnh hoàn tất");
+    } finally {
+      await chan.query("ROLLBACK").catch(() => {});
+      chan.release();
+    }
+    const g = await getNhatKy(date);
+    assert.deepEqual(g.photoIds, [], "ảnh đã xoá thì nhật ký không còn gắn");
+    assert.match(g.diary.workDone, /Sửa/);
+  },
+);
+
+test(
+  "PUT nhật ký: photoIds trỏ tới ảnh của dự án khác → 422, không gắn ảnh xuyên dự án",
+  S,
+  async () => {
+    await dangNhapDuAn(F.u.eng, F.p2);
+    const anhP2 = await (await guiAnh(F.t3, anhMoi(), "Ảnh dự án P2")).json();
+    assert.ok(anhP2.id);
+    await dangNhapDuAn(F.u.eng, F.p1);
+    const anhP1 = await (await guiAnh(F.t2, anhMoi(), "Ảnh dự án P1")).json();
+    const date = "2026-06-14";
+    const sai = await putNhatKy(date, { photoIds: [anhP1.id, anhP2.id] }, { "if-none-match": "*" });
+    assert.equal(sai.status, 422);
+    assert.match((await sai.json()).error, /không thuộc dự án/);
+    assert.equal((await getNhatKy(date)).diary, null, "bị từ chối thì không tạo nhật ký");
+    const dung = await putNhatKy(date, { photoIds: [anhP1.id] }, { "if-none-match": "*" });
+    assert.equal(dung.status, 200);
+    assert.deepEqual((await getNhatKy(date)).photoIds, [anhP1.id]);
+  },
+);
+
+test(
+  "user B cùng dự án dùng lại đúng Idempotency-Key của A → B thực thi bình thường, 2 receipt",
+  S,
+  async () => {
+    const k = randomUUID();
+    const ctxA = await layContext(F.u.eng, F.p1);
+    const a = await tick(F.d[4], true, ctxA, k);
+    assert.equal(a.status, 200);
+    const ctxB = await layContext(F.u.eng2, F.p1);
+    await own.query(`UPDATE progress_dimensions SET installed = 0 WHERE id = $1`, [F.d[5]]);
+    const b = await tick(F.d[5], true, ctxB, k);
+    assert.equal(b.status, 200, "khoá receipt theo (org, dự án, user, op) — không 409 chéo người");
+    const jb = await b.json();
+    assert.equal(jb.receipt.replayed, false, "không nhận ACK của A");
+    assert.equal(jb.receipt.resourceId, String(F.d[5]));
+    assert.equal(jb.installed, true);
+    assert.equal(await daLap(F.d[5]), 1);
+    assert.equal(await demReceipt(k), 2);
   },
 );
 

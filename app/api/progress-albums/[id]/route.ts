@@ -10,6 +10,7 @@ import {
   type AlbumInput,
 } from "@/lib/ky-thuat/tech";
 import { storageDelete } from "@/lib/nen/storage";
+import { khoaNhatKyCuaAnh } from "@/lib/hien-truong/diary";
 
 export const dynamic = "force-dynamic";
 
@@ -111,11 +112,13 @@ export async function DELETE(
     if (!existing) return NextResponse.json({ error: "Không tìm thấy album" }, { status: 404 });
 
     // Lấy tên file trước khi xoá bản ghi để dọn file trên đĩa (tránh mồ côi).
-    const fileRows = await query<{ fileName: string }>(
-      `SELECT file_name AS "fileName" FROM task_photos WHERE album_id = ?`,
+    const fileRows = await query<{ id: number; fileName: string }>(
+      `SELECT id, file_name AS "fileName" FROM task_photos WHERE album_id = ?`,
       id,
     );
     await withTransaction(async () => {
+      // Khoá nhật ký gắn ảnh album TRƯỚC khi xoá (thứ tự "nhật ký → ảnh" như PUT nhật ký, S06).
+      await khoaNhatKyCuaAnh(fileRows.map((f) => f.id));
       await run(`DELETE FROM task_photos WHERE album_id = ?`, id);
       await run(`DELETE FROM progress_albums WHERE id = ?`, id);
     });

@@ -53,19 +53,36 @@ S04/S05 nên chưa client nào gửi `Idempotency-Key`. Không thêm dependency.
   `test:mutation` (hash 409, replay không chạy lại, If-Match 412, dọn file) — cả 4 đều bị bắt. e2e
   `diary.spec.ts`: project mobile dùng ngày khác desktop (chạy song song cùng DB, precondition làm bên
   sau nhận 412 đúng thiết kế).
-- **Cần quyết (phiên chính — không tự quyết):** (1) Brief ghi "diary version cũ → 409" nhưng
-  DATA-CONTRACTS §7 chốt **412** cho version (409 cho context/idempotency) — đã theo contract.
-  (2) Precondition nhật ký áp cho **mọi** caller PUT (contract "missing precondition 428"), kể cả UI
-  online — xác nhận đây là ý định (đã sửa modal); script/tích hợp ngoài nào PUT nhật ký không kèm
-  If-Match sẽ nhận 428. (3) Đối soát staging chỉ chạy theo chính actor ở lần upload sau; người không bao
-  giờ upload lại để lại file mồ côi — cần job bảo trì role owner (cross-org) hay chấp nhận? (4) Receipt
-  có FK `users`/`projects` không ON DELETE: xoá user/dự án đã có receipt → 409/lỗi FK (route xoá user đã
-  map 409 `dependency_conflict`) — đúng tinh thần "giữ receipt cùng vòng đời dữ liệu" của D04, cần thủ tục
-  retention riêng. (5) Server chưa kiểm thao tác hàng đợi thuộc manifest khoá vault (DATA-MIGRATIONS §2
-  "tick batch phải thuộc tập manifest") — request không mang keyId; S07 cần quyết có gửi keyId để server
-  đối chiếu hay chỉ dựa quyền hiện hành từng task (đang làm). (6) Request online (không header) chưa kiểm
-  `X-XBoss-Context` — tab cũ sau đổi dự án vẫn được chặn bởi khoá epoch client S05, server-side cho UI
-  online cần context từ S07/S08.
+- **Sửa sau audit bảo mật + logic (cùng nhánh):**
+  - **Hàng đợi không xoá op "cần xác minh"** (`app/components/offlineQueue/logic.ts` +
+    `index.ts`): `diary_note` nhận 428/412, hoặc mọi op nhận 409 `context_*`/`idempotency_conflict`
+    → GIỮ trong IndexedDB, đánh dấu `canXacMinh` (status/code/lý do), không gửi lại vòng lặp, badge
+    tính vào "lỗi" + toast "dữ liệu vẫn được giữ trên máy"; 409 nghiệp vụ khác (hold-point, khoá sổ)
+    vẫn bỏ + báo như cũ. Đang bị che bởi `OFFLINE_QUEUE_QUARANTINED` nhưng phải đúng trước khi gỡ.
+    **Điều kiện chặn trước khi gỡ quarantine (S07): queue gửi Idempotency-Key cố định/op,
+    X-XBoss-Context, If-Match/If-None-Match từ etag lúc enqueue.**
+  - **Deadlock xoá ảnh ↔ lưu nhật ký** (trigger version 0164: xoá `task_photos` cascade
+    `diary_photos` → UPDATE `site_diaries`, ngược chiều với PUT nhật ký): mọi đường xoá ảnh khoá trước
+    các nhật ký đang gắn ảnh (`khoaNhatKyCuaAnh`/`khoaNhatKyCuaAnhTask` trong `lib/hien-truong/diary.ts`,
+    `FOR UPDATE` theo id tăng dần, cùng transaction với DELETE) — `DELETE /api/photos/:id` (nay bọc
+    transaction), `/api/tasks/:id`, `/api/workpackages/:id`, `/api/progress-albums/:id`, `/api/sheets/:id`.
+  - **Modal nhật ký 412**: không nạp đè form; khung cảnh báo "Nhật ký vừa được người khác cập nhật…
+    nội dung bạn đang nhập vẫn được giữ", nút "Tải bản mới để so sánh" (vùng so sánh chỉ đọc) và "Ghi
+    đè bằng bản của tôi" (xác nhận, gửi If-Match bằng etag MỚI — vẫn 412 nếu lại có người lưu tiếp).
+  - **PUT nhật ký: `photoIds` phải thuộc dự án đang chọn** (`anhNgoaiDuAn`, cùng luật suy dự án với
+    `/api/photos/:id`) → 422; trước đây gắn được id ảnh dự án khác vào nhật ký. Không thêm
+    `assertModuleEnabled`: GET/lock/pdf của nhật ký đều không có (đối xứng giữ nguyên).
+  - Test: 2 ca hàng đợi (428/412 giữ op, 409 context/idempotency giữ — **đỏ trên code cũ**), deadlock
+    tái hiện chắc chắn bằng khoá dòng nhân lực (**đỏ trên code cũ: `deadlock detected`**), ảnh dự án
+    khác → 422 (**đỏ trên code cũ**), user B dùng lại key của A → thực thi bình thường, 2 receipt. Thêm 2
+    mutation (giữ op 428/412, khoá nhật ký trước xoá ảnh) — đều bị bắt.
+- **Quyết định phiên chính cho 6 điểm "Cần quyết":** (1) giữ **412** theo DATA-CONTRACTS §7 cho lệch
+  phiên bản nhật ký; (2) giữ **428** khi thiếu precondition cho **mọi** caller PUT nhật ký; (3) chấp
+  nhận đối soát staging theo chính người upload.
+- **Còn mở:** (3) job bảo trì role owner dọn staging mồ côi của người không upload lại; (4) receipt có FK
+  `users`/`projects` không ON DELETE — xoá user/dự án đã có receipt bị chặn, cần thủ tục retention
+  riêng; (5) server chưa đối chiếu thao tác hàng đợi với manifest khoá vault (keyId) — S07; (6) request
+  online (không header) chưa kiểm `X-XBoss-Context` server-side — S07/S08.
 
 ## 2026-10-08 — QUALITY-FINAL-1 S05: thiết bị, context và dịch vụ khoá vault offline
 

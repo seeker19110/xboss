@@ -34,7 +34,7 @@ function load<T>(path: string, mocks: Record<string, unknown>, globals = {}): T 
 }
 
 type Op = { id: number; kind: string; payload: unknown; queuedAt: number; tries: number };
-type Result = { tuChoi: { soO: number; lyDo?: string }[] };
+type Result = { tuChoi: { soO: number; lyDo?: string }[]; canXacMinh: { id: number }[] };
 type Manager = {
   start(): void;
   flush(): Promise<void>;
@@ -117,7 +117,7 @@ function fixture(
           state.flushes++;
           if (opts.flush) return opts.flush();
           items = [];
-          return { tuChoi: [] };
+          return { tuChoi: [], canXacMinh: [] };
         },
       },
     },
@@ -212,7 +212,7 @@ test("queue: lỗi sender giữ queue, không báo đã gửi hết", async () =
   const f = fixture({
     flush: async () => {
       if (++attempts === 1) throw new Error("send failed");
-      return { tuChoi: [] };
+      return { tuChoi: [], canXacMinh: [] };
     },
   });
   let flushed = 0;

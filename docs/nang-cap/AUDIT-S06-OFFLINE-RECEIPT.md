@@ -38,5 +38,26 @@ APPROVAL D04, PLAN §S06, TEST-MATRIX A2-AC04/06/10. Đây là phạm vi con, kh
   án (không để lại receipt), 409 context/idempotency, 412 phiên bản, 428 thiếu precondition.
 - A2-AC10: If-Match cũ/If-None-Match khi đã có → 412 không đè; tạo đồng thời → 1 thành công + 412;
   replay sau mất ACK không 412 giả; ghi metadata ảnh lỗi → file được dọn; staging mồ côi được đối soát.
-- Route chạy bằng role `xboss_app`; mutation `test:mutation` cho hash 409, replay, If-Match, dọn file.
+- Route chạy bằng role `xboss_app`; mutation `test:mutation` cho hash 409, replay, If-Match, dọn file,
+  giữ op nhật ký 428/412, khoá nhật ký trước khi xoá ảnh.
+- Receipt khoá theo (org, dự án, user, operationId): user khác dùng lại đúng key vẫn thực thi bình
+  thường (2 receipt), không 409 chéo người, không nhận ACK của người khác.
 - Ngoài phạm vi (S07/S08): queue IndexedDB mới gửi header/baseVersion, lease/fencing, UI xung đột.
+
+## Bổ sung sau audit
+
+- Hàng đợi v1 (`app/components/offlineQueue/logic.ts`): `diary_note` nhận 428/412, hoặc mọi op nhận
+  409 `context_*`/`idempotency_conflict` → giữ trong IndexedDB, đánh dấu `canXacMinh`, không gửi lại
+  vòng lặp; 409 nghiệp vụ khác vẫn bỏ + báo như cũ.
+- **Điều kiện chặn trước khi gỡ quarantine (S07): queue gửi Idempotency-Key cố định/op,
+  X-XBoss-Context, If-Match/If-None-Match từ etag lúc enqueue.**
+- Thứ tự khoá "nhật ký → ảnh": mọi đường xoá `task_photos` (ảnh, task, nhóm, sheet, album) khoá trước
+  các `site_diaries` đang gắn ảnh (`FOR UPDATE`, id tăng dần, cùng transaction) — cùng chiều với PUT
+  nhật ký, tránh deadlock do trigger version.
+- PUT nhật ký: `photoIds` ngoài dự án đang chọn (hoặc không tồn tại) → 422.
+- Modal nhật ký: 412 không nạp đè form; tải bản server vào vùng so sánh chỉ đọc; "Ghi đè bằng bản
+  của tôi" gửi If-Match bằng etag mới.
+- Quyết định: giữ 412 (lệch phiên bản) và 428 (thiếu precondition, mọi caller); chấp nhận đối soát
+  staging theo người upload. Còn mở: job bảo trì staging mồ côi (role owner), retention receipt khi
+  xoá user/dự án, đối chiếu manifest khoá vault (S07), context server-side cho request online
+  (S07/S08).

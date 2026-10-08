@@ -2,7 +2,7 @@
 // task_history/task_photos trong ngày + cảnh báo thiếu nhật ký. Tách khỏi route để test tích
 // hợp trực tiếp qua DB (cùng pattern lib/cost.ts, lib/procurement.ts, lib/qaqc.ts).
 // Xem docs/nang-cap/M05-nhat-ky.md.
-import { query, queryOne, todayISO, daysFromTodayISO } from "@/lib/db";
+import { dangTrongGiaoDich, query, queryOne, todayISO, daysFromTodayISO } from "@/lib/db";
 import type { Role } from "@/lib/nen/roles";
 
 // Khoá sổ (giá trị pháp lý — NĐ 06/2021): chỉ Admin/PM khoá, chỉ Admin mở khoá.
@@ -86,6 +86,69 @@ export function dieuKienThoa(
 /** Phiên bản gốc đưa vào hash receipt — đổi base dưới cùng Idempotency-Key là thao tác khác. */
 export function baseVersionNhatKy(dk: DieuKienNhatKy): string {
   return dk.loai === "tao_moi" ? "*" : [...dk.etags].sort().join(",");
+}
+
+// ── Thứ tự khoá khi xoá ảnh (S06 — trigger version 0164) ────────────────────────────────────
+// Xoá task_photos cascade xoá diary_photos → trigger tăng version → UPDATE site_diaries. PUT nhật
+// ký đi chiều ngược: khoá site_diaries trước rồi mới xoá/chèn diary_photos (chèn = KEY SHARE dòng
+// task_photos). Hai chiều ngược nhau = deadlock. Mọi đường xoá ảnh phải khoá các nhật ký đang gắn
+// ảnh đó TRƯỚC khi DELETE, theo id tăng dần — cùng thứ tự "nhật ký → ảnh" với PUT.
+
+function batBuocGiaoDichXoaAnh(): void {
+  if (!dangTrongGiaoDich())
+    throw new Error("Khoá nhật ký trước khi xoá ảnh phải chạy CÙNG transaction với lệnh DELETE");
+}
+
+/** Khoá (FOR UPDATE, id tăng dần) các nhật ký đang gắn một trong các ảnh sắp xoá. */
+export async function khoaNhatKyCuaAnh(photoIds: number[]): Promise<void> {
+  batBuocGiaoDichXoaAnh();
+  if (!photoIds.length) return;
+  await query(
+    `SELECT sd.id FROM site_diaries sd
+      WHERE sd.id IN (SELECT dp.diary_id FROM diary_photos dp WHERE dp.photo_id = ANY(?::int[]))
+      ORDER BY sd.id FOR UPDATE`,
+    photoIds,
+  );
+}
+
+/** Như `khoaNhatKyCuaAnh` nhưng cho mọi ảnh của các task sắp bị xoá (xoá task/nhóm/sheet). */
+export async function khoaNhatKyCuaAnhTask(taskIds: number[]): Promise<void> {
+  batBuocGiaoDichXoaAnh();
+  if (!taskIds.length) return;
+  await query(
+    `SELECT sd.id FROM site_diaries sd
+      WHERE sd.id IN (SELECT dp.diary_id FROM diary_photos dp
+                        JOIN task_photos tp ON tp.id = dp.photo_id
+                       WHERE tp.task_id = ANY(?::int[]))
+      ORDER BY sd.id FOR UPDATE`,
+    taskIds,
+  );
+}
+
+/**
+ * Id ảnh trong danh sách KHÔNG thuộc dự án `projectId` (hoặc không tồn tại) — PUT nhật ký từ chối
+ * 422 thay vì gắn ảnh dự án khác vào nhật ký (lộ ảnh xuyên dự án qua nhật ký/PDF). Cùng luật suy
+ * dự án với `/api/photos/:id`: ảnh album → progress_albums.project_id; ảnh task → task → nhóm →
+ * sheet → tháp; không gắn gì → không thuộc dự án nào.
+ */
+export async function anhNgoaiDuAn(photoIds: number[], projectId: number): Promise<number[]> {
+  if (!photoIds.length) return [];
+  const hopLe = await query<{ id: number }>(
+    `SELECT tp.id FROM task_photos tp
+       LEFT JOIN progress_albums pa ON pa.id = tp.album_id
+       LEFT JOIN tasks t ON t.id = tp.task_id
+       LEFT JOIN work_packages wp ON wp.id = t.package_id
+       LEFT JOIN sheet_types st ON st.id = wp.sheet_type_id
+       LEFT JOIN towers tw ON tw.id = st.tower_id
+      WHERE tp.id = ANY(?::int[])
+        AND CASE WHEN tp.album_id IS NOT NULL THEN pa.project_id = ?
+                 ELSE tw.project_id = ? END`,
+    photoIds,
+    projectId,
+    projectId,
+  );
+  const thuoc = new Set(hopLe.map((r) => r.id));
+  return photoIds.filter((id) => !thuoc.has(id));
 }
 
 export type DiaryPhotoPrefill = {

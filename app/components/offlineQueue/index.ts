@@ -66,8 +66,15 @@ async function sendOp(op: QueuedOp): Promise<SendOutcome> {
     // Đọc kèm lý do khi server TỪ CHỐI (4xx) để báo lại cho người dùng (M121 FR8) — không
     // đọc body ở ca thành công/5xx: 2xx không có gì để nói, 5xx sẽ được thử lại.
     if (res.status >= 400 && res.status < 500) {
-      const error = (await res.json().catch(() => null))?.error;
-      return { status: res.status, error: typeof error === "string" ? error : undefined };
+      const body = await res.json().catch(() => null);
+      const error = body?.error;
+      const code = body?.code;
+      return {
+        status: res.status,
+        error: typeof error === "string" ? error : undefined,
+        // S06: phân biệt "cần xác minh" (context_*/idempotency_conflict) với từ chối nghiệp vụ.
+        code: typeof code === "string" ? code : undefined,
+      };
     }
     return { status: res.status };
   } catch {
@@ -186,7 +193,14 @@ class OfflineQueueManager {
       this.hadItems = true;
       this.setSnap({ sending: true });
       try {
-        const { tuChoi } = await flushQueue(this.store, sendOp);
+        const { tuChoi, canXacMinh } = await flushQueue(this.store, sendOp);
+        // S06: op được giữ lại chờ xác minh — báo để người dùng biết dữ liệu vẫn còn, chưa lên.
+        if (canXacMinh.length) {
+          showToast(
+            `${canXacMinh.length} thao tác ngoại tuyến cần xác minh trước khi gửi (dữ liệu vẫn được giữ trên máy)`,
+            "error",
+          );
+        }
         // Giữ nguyên thông báo từ chối; chưa đổi state machine retry trong slice này.
         if (tuChoi.length) {
           const soO = tuChoi.reduce((s, t) => s + t.soO, 0);

@@ -393,3 +393,69 @@ test("biTuChoi: chỉ 4xx là từ chối; 2xx/5xx/mất mạng thì không", ()
   assert.equal(biTuChoi({ status: 500 }), false);
   assert.equal(biTuChoi({ networkError: true }), false);
 });
+
+// S06 (điều kiện trước khi gỡ quarantine): nhật ký nhận 428/412, hoặc mọi op nhận 409
+// context_* / idempotency_conflict, là kết quả "cần xác minh" — không phải từ chối nghiệp vụ.
+// Xoá op ở đây = mất nội dung người dùng đã nhập offline. Phải GIỮ trong hàng đợi, đánh dấu, và
+// KHÔNG gửi lại vòng lặp (gửi lại y nguyên vẫn nhận đúng mã đó).
+test("S06: diary_note nhận 428/412 → giữ lại, đánh dấu cần xác minh, không gửi lại", async () => {
+  for (const [status, code] of [
+    [428, "precondition_required"],
+    [412, "version_mismatch"],
+  ] as const) {
+    const store = new MemoryQueueStore();
+    await store.add({
+      kind: "diary_note",
+      payload: diaryPayload("2026-06-10", "Nội dung nhập offline"),
+      queuedAt: 1,
+      tries: 0,
+    });
+    let soLanGui = 0;
+    const send = async (): Promise<SendOutcome> => {
+      soLanGui++;
+      return { status, code, error: "Nhật ký đã đổi" };
+    };
+    const r = await flushQueue(store, send, () => 1000);
+    assert.equal(r.remaining, 1, `${status}: op nhật ký không được xoá`);
+    assert.equal(r.removed, 0);
+    assert.equal(r.tuChoi.length, 0, `${status}: không báo như bị từ chối rồi bỏ`);
+    assert.equal(r.canXacMinh.length, 1);
+    const [op] = await store.getAll();
+    assert.equal(op.kind === "diary_note" && op.payload.workDone, "Nội dung nhập offline");
+    assert.equal(op.canXacMinh?.status, status);
+    assert.equal(op.canXacMinh?.code, code);
+    // Lần flush sau (kể cả rất lâu sau) không gửi lại op đang chờ xác minh.
+    const r2 = await flushQueue(store, send, () => 10 ** 12);
+    assert.equal(soLanGui, 1, `${status}: không retry vòng lặp`);
+    assert.equal(r2.remaining, 1);
+    assert.deepEqual(computeStats(await store.getAll()), { total: 1, pending: 0, failed: 1 });
+  }
+});
+
+test("S06: op nhận 409 context_*/idempotency_conflict → giữ lại; 409 nghiệp vụ khác vẫn bỏ", async () => {
+  const store = new MemoryQueueStore();
+  await store.add({ kind: "tick", payload: { dimId: 1, installed: true }, queuedAt: 1, tries: 0 });
+  await store.add({
+    kind: "tick_batch",
+    payload: { dimIds: [2, 3], installed: true },
+    queuedAt: 2,
+    tries: 0,
+  });
+  await store.add({ kind: "tick", payload: { dimId: 4, installed: true }, queuedAt: 3, tries: 0 });
+  await store.add({ kind: "tick", payload: { dimId: 5, installed: true }, queuedAt: 4, tries: 0 });
+  const send = async (op: QueuedOp): Promise<SendOutcome> => {
+    if (op.kind === "tick_batch") return { status: 409, code: "idempotency_conflict" };
+    if (op.kind === "tick" && op.payload.dimId === 1)
+      return { status: 409, code: "context_changed" };
+    if (op.kind === "tick" && op.payload.dimId === 4) return { status: 409, error: "Hold-point" };
+    return { status: 200 };
+  };
+  const r = await flushQueue(store, send, () => 1000);
+  assert.deepEqual(
+    (await store.getAll()).map((o) => o.id),
+    [1, 2],
+    "context/idempotency giữ lại; hold-point (409 không code) và 200 bị xoá như cũ",
+  );
+  assert.equal(r.canXacMinh.length, 2);
+  assert.equal(r.tuChoi.length, 1);
+});

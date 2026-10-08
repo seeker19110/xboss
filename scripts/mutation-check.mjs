@@ -231,6 +231,22 @@ const MUTATIONS = [
     tests: ["tests/offline-receipt-route.test.ts"],
     why: "File ảnh nằm lại trên storage không ai tham chiếu, không đối soát được (A2-AC10).",
   },
+  {
+    key: "hàng đợi: nhật ký 428/412 phải giữ op chờ xác minh",
+    file: "app/components/offlineQueue/logic.ts",
+    find: '  if (op.kind === "diary_note" && (s === 428 || s === 412)) return true;',
+    replace: "  void op;",
+    tests: ["tests/offline-queue.test.ts"],
+    why: "Flush hàng đợi xoá bản nhật ký nhập offline khi server báo phiên bản lệch — mất dữ liệu người dùng.",
+  },
+  {
+    key: "xoá ảnh: khoá nhật ký trước khi DELETE task_photos",
+    file: "app/api/photos/[id]/route.ts",
+    find: "      await khoaNhatKyCuaAnh([id]);",
+    replace: "      void khoaNhatKyCuaAnh;",
+    tests: ["tests/offline-receipt-route.test.ts"],
+    why: "Xoá ảnh đồng thời với lưu nhật ký gắn ảnh đó → deadlock (trigger version 0164), một bên 500.",
+  },
 ];
 
 const only = process.argv.find((a) => a.startsWith("--only="))?.slice("--only=".length);
