@@ -1778,14 +1778,18 @@ test("GET /api/export/excel: engineer không có quyền export → 403", S, asy
   assert.equal(res.status, 403);
 });
 
-test("GET /api/export/excel: sheet không tồn tại → 400", S, async () => {
-  const projectId = await taoDuAn("exbadsheet");
-  const pm = await taoUser("pm", "exbadsheet");
-  await dangNhapDuAn(pm, projectId);
-  const { GET } = await import("@/app/api/export/excel/route");
-  const res = await GET(getReq("/api/export/excel?sheet=khong-ton-tai"));
-  assert.equal(res.status, 400);
-});
+test(
+  "GET /api/export/excel: sheet không tồn tại (hoặc ngoài dự án đang chọn) → 404",
+  S,
+  async () => {
+    const projectId = await taoDuAn("exbadsheet");
+    const pm = await taoUser("pm", "exbadsheet");
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/export/excel/route");
+    const res = await GET(getReq("/api/export/excel?sheet=khong-ton-tai"));
+    assert.equal(res.status, 404);
+  },
+);
 
 test("GET /api/export/excel: xuất thành công → xlsx (magic PK)", S, async () => {
   const projectId = await taoDuAn("exok");

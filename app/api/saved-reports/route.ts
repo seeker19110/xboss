@@ -14,7 +14,8 @@ export async function GET() {
 
   const projectId = await getCurrentProjectId(user);
   // Lọc theo dự án đang chọn để không lẫn báo cáo giữa các dự án; báo cáo project_id NULL
-  // (danh mục chung) luôn hiện. Chỉ chủ sở hữu thấy báo cáo riêng của mình; shared → mọi ai.
+  // (danh mục chung cấp org) luôn hiện. A1-AC02: không có dự án khả kiến → projectId = null nên
+  // `r.project_id = NULL` không khớp → chỉ còn báo cáo cấp org của org người gọi. Chỉ chủ sở hữu thấy báo cáo riêng của mình; shared → mọi ai.
   const reports = await query(
     `SELECT r.id, r.name, r.source, r.config, r.shared,
             r.owner_id AS "ownerId", u.name AS "ownerName", r.created_at AS "createdAt",

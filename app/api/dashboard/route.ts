@@ -6,6 +6,7 @@ import { progressAtDate } from "@/lib/tien-do/report";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getGroupProgressMap } from "@/lib/tien-do/group-progress";
 import { sheetProgressKpi } from "@/lib/tien-do/kpi";
+import { loadDueSoonThresholds } from "@/lib/tien-do/due-soon";
 import {
   qualityBlock,
   procurementBlock,
@@ -31,10 +32,29 @@ export async function GET(req: NextRequest) {
   const today = todayISO();
   const systemId = await resolveSystemId(req.nextUrl.searchParams.get("system"));
   // Dự án đang chọn — lọc mọi khối theo dự án để tránh rò rỉ chéo dự án (đa dự án, M22+).
-  // null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
+  // A1-AC02: không có dự án khả kiến → trả dashboard rỗng đúng shape, KHÔNG mở toàn hệ.
   const projectId = await getCurrentProjectId(user);
-  const projectFilterAnd = projectId != null ? "AND tw.project_id = ?" : "";
-  const projectParams = projectId != null ? [projectId] : [];
+  if (projectId == null) {
+    const th = await loadDueSoonThresholds(null); // chỉ đọc ngưỡng mặc định, không dữ liệu dự án
+    return NextResponse.json({
+      approvals: CAN.approve(user.role)
+        ? { pendingProposals: 0, pendingPurchaseRequests: 0 }
+        : null,
+      delayedTasks: [],
+      dueSoon: { days: th.days, count: 0, tasks: [] },
+      weekDelta: null,
+      groupProgress: {},
+      kpi: [],
+      totalDelayed: 0,
+      quality: { ncrOpen: 0, ncrOverdue: 0, ncrClosed30d: 0, inspectionPassRate: null },
+      procurement: { poLate: 0, vehicleNoShowWeek: 0 },
+      workfront: null,
+      vo: CAN.viewPayments(user.role) ? { draft: 0, submitted: 0, approved: 0, rejected: 0 } : null,
+      bySystem: [],
+    });
+  }
+  const projectFilterAnd = "AND tw.project_id = ?";
+  const projectParams = [projectId];
   const systemFilterAnd = systemId !== null ? "AND st.system_id = ?" : "";
   const systemParams = systemId !== null ? [systemId] : [];
   const range = req.nextUrl.searchParams.get("range"); // "week" | "month" | null
@@ -73,7 +93,7 @@ export async function GET(req: NextRequest) {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
        LEFT JOIN users u ON t.assigned_to = u.id
-       ${projectId != null ? "JOIN towers tw ON tw.id = st.tower_id" : ""}
+       JOIN towers tw ON tw.id = st.tower_id
       WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ?
         AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')
@@ -117,7 +137,7 @@ export async function GET(req: NextRequest) {
           const pastDate = range === "week" ? daysFromTodayISO(-7) : daysFromTodayISO(-30);
           const prevRows = await progressAtDate(pastDate, {
             ...(systemId !== null ? { systemId } : {}),
-            projectId: projectId ?? undefined,
+            projectId,
           });
           const prevBySheet = new Map<number, number[]>();
           for (const r of prevRows) {
