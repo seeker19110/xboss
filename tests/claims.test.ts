@@ -14,7 +14,7 @@ test("validateClaimInput: kind='cost' bắt buộc amountRequested, kind='eot' b
     voId: null,
     noticeDate: "2026-07-01",
     cause: "Chậm bàn giao mặt bằng do CĐT",
-    amountRequested: 50_000_000,
+    amountRequested: "50000000.00",
     daysRequested: null,
   };
 
@@ -24,7 +24,7 @@ test("validateClaimInput: kind='cost' bắt buộc amountRequested, kind='eot' b
   assert.match(validateClaimInput({ ...base, noticeDate: "" })!, /ngày thông báo/i);
   assert.match(validateClaimInput({ ...base, cause: "" })!, /nguyên nhân/i);
   assert.match(validateClaimInput({ ...base, amountRequested: null })!, /giá trị đề xuất/i);
-  assert.match(validateClaimInput({ ...base, amountRequested: 0 })!, /giá trị đề xuất/i);
+  assert.match(validateClaimInput({ ...base, amountRequested: "0.00" })!, /giá trị đề xuất/i);
 
   const eotBase = { ...base, kind: "eot" as const, amountRequested: null, daysRequested: 10 };
   assert.equal(validateClaimInput(eotBase), null);
@@ -126,7 +126,7 @@ test(
 
     const settled = await settleClaim({
       claimId,
-      amountSettled: 15_000_000,
+      amountSettled: "15000000.00",
       daysSettled: null,
       settlementNote: "Thoả thuận 15tr sau đàm phán",
       settledBy: pmId,
@@ -144,7 +144,7 @@ test(
     // Không chốt/từ chối lại được sau khi đã có quyết định.
     const settleAgain = await settleClaim({
       claimId,
-      amountSettled: 10_000_000,
+      amountSettled: "10000000.00",
       daysSettled: null,
       settlementNote: null,
       settledBy: pmId,

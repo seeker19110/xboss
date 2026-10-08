@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { createVendorQuote, listVendorQuotes } from "@/lib/ky-thuat/engineering-bidding-matrix";
+import { moneyInputErrorBody, parseMoneyInput } from "@/lib/nen/money";
 import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
@@ -67,12 +68,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // S10: BIGINT đồng (scale 0, ≤ 18 chữ số) — "1.500" → 400, vượt cột → 422.
+    let totalAmountVnd: string;
+    try {
+      totalAmountVnd = parseMoneyInput(body.totalAmountVnd, {
+        label: "Tổng giá chào",
+        precision: 18,
+        scale: 0,
+      }).text;
+    } catch (e) {
+      const loi = moneyInputErrorBody(e);
+      if (!loi) throw e;
+      return NextResponse.json(loi.body, { status: loi.status });
+    }
+    if (totalAmountVnd.startsWith("-"))
+      return NextResponse.json({ error: "Tổng giá chào phải là số không âm" }, { status: 422 });
+
     const quote = await createVendorQuote({
       projectId,
       packageId: body.packageId,
       vendorName: body.vendorName,
       vendorType: body.vendorType,
-      totalAmountVnd: Number(body.totalAmountVnd),
+      totalAmountVnd,
       lineItems: body.lineItems,
       capacityScore: body.capacityScore != null ? Number(body.capacityScore) : 80,
       safetyScore: body.safetyScore != null ? Number(body.safetyScore) : 85,

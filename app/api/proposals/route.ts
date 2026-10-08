@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { moneyInputErrorBody } from "@/lib/nen/money";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -61,7 +62,14 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
-  const input = parseProposalBody(body);
+  let input: ReturnType<typeof parseProposalBody>;
+  try {
+    input = parseProposalBody(body);
+  } catch (e) {
+    const loi = moneyInputErrorBody(e);
+    if (!loi) throw e;
+    return NextResponse.json(loi.body, { status: loi.status });
+  }
   const invalid = validateProposalInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
   const refErr = await checkProposalRefs(input, projectId);
@@ -90,7 +98,7 @@ export async function POST(req: NextRequest) {
     entityType: "proposal",
     entityId: id,
     projectId,
-    amount: input.amount,
+    amount: input.amount == null ? null : Number(input.amount), // chỉ so ngưỡng bước duyệt
     user,
   });
   return NextResponse.json({ id, code }, { status: 201 });

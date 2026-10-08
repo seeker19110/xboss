@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { moneyInputErrorBody, parseOptionalMoneyInput } from "@/lib/nen/money";
 import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -163,9 +164,21 @@ export async function POST(req: NextRequest) {
   }
 
   const qtyContract = Number(body?.qtyContract) || 0;
-  const unitPrice = Number(body?.unitPrice) || 0;
   const qtySub = Number(body?.qtySub) || 0;
-  const subUnitPrice = Number(body?.subUnitPrice) || 0;
+  // S10: đơn giá qua parser tiền (trước đây `Number(..) || 0` nuốt cả "1.500" lẫn chữ rác).
+  let unitPrice: string;
+  let subUnitPrice: string;
+  try {
+    unitPrice = parseOptionalMoneyInput(body?.unitPrice, { label: "Đơn giá" })?.text ?? "0.00";
+    subUnitPrice =
+      parseOptionalMoneyInput(body?.subUnitPrice, { label: "Đơn giá thầu phụ" })?.text ?? "0.00";
+  } catch (e) {
+    const loi = moneyInputErrorBody(e);
+    if (!loi) throw e;
+    return NextResponse.json(loi.body, { status: loi.status });
+  }
+  if (unitPrice.startsWith("-") || subUnitPrice.startsWith("-"))
+    return NextResponse.json({ error: "Đơn giá phải là số không âm" }, { status: 422 });
   const note = typeof body?.note === "string" ? body.note.trim() || null : null;
   const sortOrder = Number.isInteger(body?.sortOrder) ? Number(body.sortOrder) : 0;
 

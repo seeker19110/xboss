@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { moneyInputErrorBody, parseMoneyInput } from "@/lib/nen/money";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -100,9 +101,26 @@ export async function PATCH(
     ["subUnitPrice", "sub_unit_price"],
   ] as const) {
     if (body[key] !== undefined) {
-      const n = Number(body[key]);
-      if (!Number.isFinite(n) || n < 0)
-        return NextResponse.json({ error: `${key} phải là số không âm` }, { status: 422 });
+      const laGia = key === "unitPrice" || key === "subUnitPrice";
+      let n: number | string;
+      if (laGia) {
+        // S10: đơn giá đi qua parser tiền — "1.500" → 400, tràn NUMERIC(15,2) → 422.
+        try {
+          n = parseMoneyInput(body[key], {
+            label: key === "unitPrice" ? "Đơn giá" : "Đơn giá thầu phụ",
+          }).text;
+        } catch (e) {
+          const loi = moneyInputErrorBody(e);
+          if (!loi) throw e;
+          return NextResponse.json(loi.body, { status: loi.status });
+        }
+        if (n.startsWith("-"))
+          return NextResponse.json({ error: `${key} phải là số không âm` }, { status: 422 });
+      } else {
+        n = Number(body[key]);
+        if (!Number.isFinite(n) || n < 0)
+          return NextResponse.json({ error: `${key} phải là số không âm` }, { status: 422 });
+      }
       fields.push(`${col} = ?`);
       values.push(n);
       pending.push({ field: col, newValue: String(n), numeric: true });

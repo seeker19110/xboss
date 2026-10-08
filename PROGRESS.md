@@ -1,5 +1,29 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S10 đầu vào tiền (phần 2): claims, đề xuất, bảo lãnh, VO, thầu, BOQ, báo giá kỹ thuật
+
+Nối phần 1 (parser chung `parseMoneyInput`/`parseOptionalMoneyInput` trong `lib/nen/money.ts`) sang
+các route ghi tiền còn lại. Không migration, không đổi kiểu cột, không đổi format phản hồi GET.
+
+- **Route/lib đã chuyển** (lib giữ tiền dạng chuỗi canonical, ghi thẳng NUMERIC, không `Number()`):
+  `POST/PATCH /api/claims` (`amountRequested`) + `POST /api/claims/:id/settle` (`amountSettled`);
+  `POST/PATCH /api/proposals` (`amount`; chỉ chỗ so ngưỡng bước duyệt `openApproval` còn `Number`);
+  `POST/PATCH /api/insurance-bonds` (`value`, cả multipart); `POST /api/variations` (`unitPrice` từng
+  dòng, nhãn "Đơn giá dòng N"); `POST/PATCH /api/tenders/:id/bids` (`unitPrice` từng dòng qua
+  `parseBidPrices` + `lumpSum`); `POST /api/boq` + `PATCH /api/boq/:id` (`unitPrice`/`subUnitPrice`,
+  trước đây `Number(..) || 0` nuốt chữ rác và "1.500"; số âm vẫn 422); `POST
+  /api/engineering/bidding/quotes` (`totalAmountVnd` là BIGINT đồng → parser `precision 18, scale 0`,
+  số lẻ → 400 `amount_scale`, `createVendorQuote` nhận `number | string`).
+- **Hợp đồng lỗi**: "1.500"/"1234,5" → 400 `amount_locale_format`; sai dạng → 400 `amount_invalid`;
+  quá scale → 400 `amount_scale`; vượt cột → 422 `amount_overflow` (trước đây PG "numeric field
+  overflow" → 500). Đổi mã lỗi có chủ đích: giá trị tiền sai dạng ở các route trên 422 → 400.
+- **UI**: không đổi — các form này dùng `<input type="number">` nên đã gửi số thuần.
+- **Test**: `tests/s10-tien-dau-vao-route-2.test.ts` (8 ca route thật, mỗi nhóm có ca "1.500" → 400
+  và ca tràn → 422 — **8/8 đỏ trên code cũ**). Cập nhật theo kiểu mới (chuỗi canonical): `claims`,
+  `proposals`, `insurance`, `vo`, `tender`; `route-tai-chinh` ca "lỗi DB không phải trùng mã" đổi từ
+  đơn giá tràn (nay 422 ở parser) sang khối lượng tràn NUMERIC(15,3) để vẫn canh nhánh `throw err`.
+  Bộ liên quan 736 ca chạy tuần tự: 736 pass / 0 fail.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S10: ĐẦU VÀO tiền exact (parser chung, tràn → 422, % tầng khoá dòng)
 
 Phần "đầu vào" của S10 (A3-FR01/FR02, A3 §4) — đóng điểm mở của S10c về parse ô nhập tiền.

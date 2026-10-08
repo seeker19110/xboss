@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { validateBidPrices, type BidPriceInput } from "@/lib/tai-chinh/tender";
+import { moneyInputErrorBody, parseOptionalMoneyInput } from "@/lib/nen/money";
+import { parseBidPrices, validateBidPrices, type BidPriceInput } from "@/lib/tai-chinh/tender";
 
 export const dynamic = "force-dynamic";
 
@@ -60,14 +61,17 @@ export async function POST(
   );
   if (!supplier) return NextResponse.json({ error: "Nhà thầu không tồn tại" }, { status: 422 });
 
-  const lumpSum = body.lumpSum != null ? Number(body.lumpSum) : null;
   const note = typeof body.note === "string" ? body.note.trim() || null : null;
-  const prices: BidPriceInput[] = Array.isArray(body.prices)
-    ? body.prices.map((p: Record<string, unknown>) => ({
-        boqItemId: Number(p?.boqItemId),
-        unitPrice: Number(p?.unitPrice),
-      }))
-    : [];
+  let lumpSum: string | null;
+  let prices: BidPriceInput[];
+  try {
+    lumpSum = parseOptionalMoneyInput(body.lumpSum, { label: "Giá chào trọn gói" })?.text ?? null;
+    prices = parseBidPrices(Array.isArray(body.prices) ? body.prices : []);
+  } catch (e) {
+    const loi = moneyInputErrorBody(e);
+    if (!loi) throw e;
+    return NextResponse.json(loi.body, { status: loi.status });
+  }
 
   if (lumpSum == null && prices.length === 0)
     return NextResponse.json(

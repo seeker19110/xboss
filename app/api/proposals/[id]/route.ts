@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { moneyInputErrorBody } from "@/lib/nen/money";
 import { run } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -63,7 +64,14 @@ export async function PATCH(
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
-  const input = parseProposalBody(body);
+  let input: ReturnType<typeof parseProposalBody>;
+  try {
+    input = parseProposalBody(body);
+  } catch (e) {
+    const loi = moneyInputErrorBody(e);
+    if (!loi) throw e;
+    return NextResponse.json(loi.body, { status: loi.status });
+  }
   const invalid = validateProposalInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
   const refErr = await checkProposalRefs(input, projectId ?? undefined);

@@ -12,7 +12,7 @@ test("validateVoInput: đủ ca hợp lệ/không hợp lệ", async () => {
     reason: "design_change" as const,
     description: null,
     systemId: null,
-    lines: [{ code: "VO-L1", name: "Ống gió D200", unit: "m", qty: 10, unitPrice: 500 }],
+    lines: [{ code: "VO-L1", name: "Ống gió D200", unit: "m", qty: 10, unitPrice: "500.00" }],
   };
 
   assert.equal(validateVoInput(base), null);
@@ -25,7 +25,7 @@ test("validateVoInput: đủ ca hợp lệ/không hợp lệ", async () => {
     /khối lượng phải > 0/i,
   );
   assert.match(
-    validateVoInput({ ...base, lines: [{ ...base.lines[0], unitPrice: -1 }] })!,
+    validateVoInput({ ...base, lines: [{ ...base.lines[0], unitPrice: "-1.00" }] })!,
     /đơn giá phải/i,
   );
   assert.match(

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { moneyInputErrorBody } from "@/lib/nen/money";
 import { queryOne, insertId, withTransaction, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -62,7 +63,14 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 422 });
 
-  const input = parseVoBody(body);
+  let input: ReturnType<typeof parseVoBody>;
+  try {
+    input = parseVoBody(body);
+  } catch (e) {
+    const loi = moneyInputErrorBody(e);
+    if (!loi) throw e;
+    return NextResponse.json(loi.body, { status: loi.status });
+  }
   const validationErr = validateVoInput(input);
   if (validationErr) return NextResponse.json({ error: validationErr }, { status: 422 });
 

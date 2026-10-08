@@ -2,6 +2,7 @@
 // thái, validate thuần, và các query tổng hợp (danh sách VO + dòng KL, VO quá hạn
 // chưa quyết). Dòng KL của VO dùng chung bảng boq_items (vo_id, qty_approved) —
 // xem docs/nang-cap/M06-phat-sinh-vo.md.
+import { parseMoneyInput } from "@/lib/nen/money";
 import { query } from "@/lib/db";
 import { daysFromTodayISO } from "@/lib/nen/date";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
@@ -51,7 +52,8 @@ export type VoLineInput = {
   name: string;
   unit: string;
   qty: number;
-  unitPrice: number;
+  /** Chuỗi canonical 2 số lẻ (S10). */
+  unitPrice: string;
 };
 
 export type VoInput = {
@@ -76,8 +78,7 @@ export function validateVoInput(input: VoInput): string | null {
     if (!line.name?.trim()) return `Dòng ${n}: thiếu tên`;
     if (!line.unit?.trim()) return `Dòng ${n}: thiếu đơn vị tính`;
     if (!Number.isFinite(line.qty) || line.qty <= 0) return `Dòng ${n}: khối lượng phải > 0`;
-    if (!Number.isFinite(line.unitPrice) || line.unitPrice < 0)
-      return `Dòng ${n}: đơn giá phải ≥ 0`;
+    if (line.unitPrice.startsWith("-")) return `Dòng ${n}: đơn giá phải ≥ 0`;
     const key = line.code.trim().toLowerCase();
     if (seen.has(key))
       return `Dòng ${n}: mã "${line.code}" trùng với dòng khác trong cùng phát sinh`;
@@ -95,14 +96,15 @@ export function parseVoBody(body: Record<string, unknown>): VoInput {
     reason: str(body.reason) as VoReason,
     description: strOrNull(body.description),
     systemId: body.systemId != null ? Number(body.systemId) : null,
-    lines: lines.map((l) => {
+    lines: lines.map((l, i) => {
       const line = (l ?? {}) as Record<string, unknown>;
       return {
         code: str(line.code),
         name: str(line.name),
         unit: str(line.unit),
         qty: line.qty != null ? Number(line.qty) : NaN,
-        unitPrice: line.unitPrice != null ? Number(line.unitPrice) : NaN,
+        // Ném MoneyInputError (400/422) — route đổi qua moneyInputErrorBody.
+        unitPrice: parseMoneyInput(line.unitPrice, { label: `Đơn giá dòng ${i + 1}` }).text,
       };
     }),
   };

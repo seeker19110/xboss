@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, withProjectScope, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { moneyInputErrorBody } from "@/lib/nen/money";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { withUniqueRetry } from "@/lib/ha-tang/seqcode";
 import {
@@ -67,7 +68,14 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 422 });
 
-  const input = parseClaimBody(body);
+  let input: ReturnType<typeof parseClaimBody>;
+  try {
+    input = parseClaimBody(body);
+  } catch (e) {
+    const loi = moneyInputErrorBody(e);
+    if (!loi) throw e;
+    return NextResponse.json(loi.body, { status: loi.status });
+  }
   const validationErr = validateClaimInput(input);
   if (validationErr) return NextResponse.json({ error: validationErr }, { status: 422 });
   const projectId = await getCurrentProjectId(user);

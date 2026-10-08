@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { validateBidPrices, type BidPriceInput } from "@/lib/tai-chinh/tender";
+import { moneyInputErrorBody, parseOptionalMoneyInput } from "@/lib/nen/money";
+import { parseBidPrices, validateBidPrices, type BidPriceInput } from "@/lib/tai-chinh/tender";
 
 export const dynamic = "force-dynamic";
 
@@ -50,16 +51,21 @@ export async function PATCH(
   if (!body || typeof body !== "object")
     return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
-  const lumpSum =
-    "lumpSum" in body ? (body.lumpSum != null ? Number(body.lumpSum) : null) : undefined;
   const note =
     "note" in body ? (typeof body.note === "string" ? body.note.trim() || null : null) : undefined;
-  const prices: BidPriceInput[] | undefined = Array.isArray(body.prices)
-    ? body.prices.map((p: Record<string, unknown>) => ({
-        boqItemId: Number(p?.boqItemId),
-        unitPrice: Number(p?.unitPrice),
-      }))
-    : undefined;
+  let lumpSum: string | null | undefined;
+  let prices: BidPriceInput[] | undefined;
+  try {
+    lumpSum =
+      "lumpSum" in body
+        ? (parseOptionalMoneyInput(body.lumpSum, { label: "Giá chào trọn gói" })?.text ?? null)
+        : undefined;
+    prices = Array.isArray(body.prices) ? parseBidPrices(body.prices) : undefined;
+  } catch (e) {
+    const loi = moneyInputErrorBody(e);
+    if (!loi) throw e;
+    return NextResponse.json(loi.body, { status: loi.status });
+  }
 
   if (prices) {
     const validationErr = validateBidPrices(prices);

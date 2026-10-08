@@ -10,7 +10,7 @@ test("validateProposalInput: kind hợp lệ, title bắt buộc, amount ≥ 0",
   const base = {
     kind: "advance" as const,
     title: "Tạm ứng đợt 2 thầu phụ điện",
-    amount: 50_000_000,
+    amount: "50000000.00",
     contractId: null,
     materialId: null,
     reason: null,
@@ -21,8 +21,7 @@ test("validateProposalInput: kind hợp lệ, title bắt buộc, amount ≥ 0",
   assert.equal(validateProposalInput({ ...base, kind: "other", amount: null }), null);
   assert.match(validateProposalInput({ ...base, kind: "xxx" as never })!, /loại đề xuất/i);
   assert.match(validateProposalInput({ ...base, title: "" })!, /tiêu đề/i);
-  assert.match(validateProposalInput({ ...base, amount: -1 })!, /giá trị/i);
-  assert.match(validateProposalInput({ ...base, amount: NaN })!, /giá trị/i);
+  assert.match(validateProposalInput({ ...base, amount: "-1.00" })!, /giá trị/i);
 });
 
 // ===== Test tích hợp (cần Postgres riêng: đặt TEST_DATABASE_URL) =====

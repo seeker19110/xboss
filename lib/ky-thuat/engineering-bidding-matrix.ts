@@ -340,7 +340,8 @@ export async function createVendorQuote(params: {
   packageId: string;
   vendorName: string;
   vendorType?: string;
-  totalAmountVnd: number;
+  /** Số nguyên đồng; route truyền chuỗi canonical (S10) để không qua float. */
+  totalAmountVnd: number | string;
   lineItems: BiddingLineItem[];
   capacityScore?: number;
   safetyScore?: number;

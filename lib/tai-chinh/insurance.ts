@@ -1,6 +1,7 @@
 // M28 — Bảo hiểm & Bảo lãnh: sổ theo dõi bảo hiểm (công trình CAR, trách nhiệm bên thứ
 // ba, tai nạn LĐ) + bảo lãnh (thực hiện HĐ, tạm ứng, bảo hành), gắn hợp đồng (nullable)
 // + cảnh báo sắp hết hiệu lực. Xem docs/nang-cap/M28-bao-hiem-bao-lanh.md.
+import { parseOptionalMoneyInput } from "@/lib/nen/money";
 import { query, queryOne } from "@/lib/db";
 import { todayISO, daysFromTodayISO, isValidDateISO } from "@/lib/nen/date";
 
@@ -151,7 +152,8 @@ export type InsuranceInput = {
   title: string;
   provider: string | null;
   code: string | null;
-  value: number | null;
+  /** Chuỗi canonical 2 số lẻ (S10). */
+  value: string | null;
   issuedDate: string | null;
   expiryDate: string | null;
   status: InsuranceStatus;
@@ -173,8 +175,7 @@ export function validateInsuranceInput(input: InsuranceInput): string | null {
   }
   if (input.issuedDate && input.expiryDate && input.issuedDate > input.expiryDate)
     return "Ngày cấp phải trước hoặc bằng ngày hết hạn";
-  if (input.value != null && (!Number.isFinite(input.value) || input.value < 0))
-    return "Giá trị phải là số không âm";
+  if (input.value != null && input.value.startsWith("-")) return "Giá trị phải là số không âm";
   return null;
 }
 
@@ -198,18 +199,14 @@ export async function checkInsuranceContractRef(
 export function parseInsuranceBody(body: Record<string, unknown>): InsuranceInput {
   const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
   const strOrNull = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
-  const numOrNull = (v: unknown) => {
-    if (v == null || v === "") return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : NaN; // NaN → validate bắt lỗi rõ ràng
-  };
   return {
     contractId: body.contractId != null && body.contractId !== "" ? Number(body.contractId) : null,
     kind: str(body.kind) as InsuranceKind,
     title: str(body.title),
     provider: strOrNull(body.provider),
     code: strOrNull(body.code),
-    value: numOrNull(body.value),
+    // Ném MoneyInputError (400/422) khi sai dạng/tràn — route đổi qua moneyInputErrorBody.
+    value: parseOptionalMoneyInput(body.value, { label: "Giá trị" })?.text ?? null,
     issuedDate: strOrNull(body.issuedDate),
     expiryDate: strOrNull(body.expiryDate),
     status: (str(body.status) || "valid") as InsuranceStatus,

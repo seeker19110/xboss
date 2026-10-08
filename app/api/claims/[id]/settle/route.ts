@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { moneyInputErrorBody, parseOptionalMoneyInput } from "@/lib/nen/money";
 import { getClaim, settleClaim } from "@/lib/tai-chinh/claims";
 
 export const dynamic = "force-dynamic";
@@ -28,8 +29,15 @@ export async function POST(
   if (!claim) return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
-  const amountSettled =
-    body.amountSettled != null && body.amountSettled !== "" ? Number(body.amountSettled) : null;
+  let amountSettled: string | null;
+  try {
+    amountSettled =
+      parseOptionalMoneyInput(body.amountSettled, { label: "Giá trị chốt" })?.text ?? null;
+  } catch (e) {
+    const loi = moneyInputErrorBody(e);
+    if (!loi) throw e;
+    return NextResponse.json(loi.body, { status: loi.status });
+  }
   const daysSettled =
     body.daysSettled != null && body.daysSettled !== "" ? Number(body.daysSettled) : null;
   const settlementNote =

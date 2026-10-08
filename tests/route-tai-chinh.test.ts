@@ -1327,12 +1327,13 @@ test(
 );
 
 test(
-  "POST /api/variations: lỗi DB KHÔNG PHẢI trùng mã (tràn NUMERIC đơn giá) được ném lại nguyên vẹn",
+  "POST /api/variations: lỗi DB KHÔNG PHẢI trùng mã (tràn NUMERIC khối lượng) được ném lại nguyên vẹn",
   S,
   async () => {
-    // Nhánh `throw err` (không phải 23505) của catch trong POST — đơn giá vượt
-    // NUMERIC(15,2) gây lỗi Postgres khác hẳn unique violation; route không được nuốt
-    // nhầm thành 409 "trùng mã do tạo đồng thời".
+    // Nhánh `throw err` (không phải 23505) của catch trong POST — khối lượng vượt
+    // NUMERIC(15,3) gây lỗi Postgres khác hẳn unique violation; route không được nuốt
+    // nhầm thành 409 "trùng mã do tạo đồng thời". (S10: đơn giá tràn nay bị parser chặn 422
+    // trước khi chạm DB — canh ở s10-tien-dau-vao-route-2.test.ts.)
     const projectId = await taoDuAn("voverr");
     const pm = await taoUser("pm", "voverr");
     await dangNhapDuAn(pm, projectId);
@@ -1342,7 +1343,9 @@ test(
         jreq("/api/variations", {
           title: "Tràn đơn giá",
           reason: "other",
-          lines: [{ code: `VOE-${uniq("voverr")}`, name: "D", unit: "m", qty: 1, unitPrice: 1e20 }],
+          lines: [
+            { code: `VOE-${uniq("voverr")}`, name: "D", unit: "m", qty: 1e20, unitPrice: 100 },
+          ],
         }),
       ),
     );
