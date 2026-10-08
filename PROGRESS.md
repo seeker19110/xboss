@@ -1,5 +1,9 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — S03/A4-FR06: READ ONLY đặt tại BEGIN
+
+- `withTransaction` nhận thêm `opts.readOnly`; `withProjectScope` không còn `SET TRANSACTION READ ONLY` sau BEGIN mà mở thẳng `BEGIN [ISOLATION LEVEL REPEATABLE READ] [READ ONLY]` (đúng chữ spec A4-FR06: snapshot/đọc-chỉ có hiệu lực trước mọi SELECT/set_config). Giữ nguyên: lồng trong transaction có sẵn không ép READ ONLY, từ chối repeatable_read lồng, GUC `app.project_id`, ROLLBACK khi lỗi. Test: `tests/db-begin-read-only.test.ts` (thứ tự câu BEGIN đỏ trên code cũ).
+
 ## 2026-10-08 — QUALITY-FINAL-1 S11 (đuôi): thông báo `cost_over` + dashboard theo hệ dùng mức cảnh báo exact
 
 `lib/dich-vu/thong-bao.ts` (cost_over) và `bySystemBlock` (`lib/tien-do/dashboardext.ts`) chuyển từ
