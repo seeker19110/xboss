@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { deleteAlertRule } from "@/lib/van-hanh/alerts";
+import { queryOne } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,14 @@ export async function DELETE(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  // S02: chỉ xoá rule thuộc tổ chức người gọi; id của org khác → 404.
+  const rule = await queryOne(
+    `SELECT 1 FROM alert_rules WHERE id = ? AND org_id = ?`,
+    id,
+    user.orgId,
+  );
+  if (!rule) return NextResponse.json({ error: "Không tìm thấy ngưỡng cảnh báo" }, { status: 404 });
 
   await deleteAlertRule(id);
   return NextResponse.json({ deleted: id });

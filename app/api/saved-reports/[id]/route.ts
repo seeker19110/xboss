@@ -25,8 +25,11 @@ export async function PATCH(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const r = await queryOne<ReportRow>(
-    `SELECT id, owner_id AS "ownerId", name, source, config, shared FROM saved_reports WHERE id = ?`,
+    // S02: báo cáo của tổ chức khác coi như không tồn tại (admin org khác không sửa được).
+    `SELECT id, owner_id AS "ownerId", name, source, config, shared FROM saved_reports
+      WHERE id = ? AND org_id = ?`,
     id,
+    user.orgId,
   );
   if (!r) return NextResponse.json({ error: "Không tìm thấy báo cáo" }, { status: 404 });
   if (r.ownerId !== user.id && user.role !== "admin")
@@ -58,8 +61,8 @@ export async function PATCH(
   if (sets.length === 0)
     return NextResponse.json({ error: "Không có gì để cập nhật" }, { status: 422 });
 
-  args.push(id);
-  await run(`UPDATE saved_reports SET ${sets.join(", ")} WHERE id = ?`, ...args);
+  args.push(id, user.orgId);
+  await run(`UPDATE saved_reports SET ${sets.join(", ")} WHERE id = ? AND org_id = ?`, ...args);
   return NextResponse.json({ ok: true });
 }
 
@@ -74,13 +77,14 @@ export async function DELETE(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const r = await queryOne<{ ownerId: number }>(
-    `SELECT owner_id AS "ownerId" FROM saved_reports WHERE id = ?`,
+    `SELECT owner_id AS "ownerId" FROM saved_reports WHERE id = ? AND org_id = ?`,
     id,
+    user.orgId,
   );
   if (!r) return NextResponse.json({ error: "Không tìm thấy báo cáo" }, { status: 404 });
   if (r.ownerId !== user.id && user.role !== "admin")
     return NextResponse.json({ error: "Chỉ chủ sở hữu hoặc admin được xoá" }, { status: 403 });
 
-  await run(`DELETE FROM saved_reports WHERE id = ?`, id);
+  await run(`DELETE FROM saved_reports WHERE id = ? AND org_id = ?`, id, user.orgId);
   return NextResponse.json({ ok: true });
 }

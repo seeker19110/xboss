@@ -207,6 +207,64 @@ export function parseInvoiceBody(body: Record<string, unknown>): InvoiceInput {
   };
 }
 
+// A1-AC03 (P1-2): hợp đồng/phiếu thanh toán gắn vào hoá đơn phải thuộc CÙNG dự án; nếu có
+// cả hai thì phiếu phải không gắn hợp đồng hoặc gắn đúng hợp đồng đó. Khoá cha FOR SHARE —
+// gọi trong cùng withTransaction với câu ghi để không có cửa sổ race (cha bị chuyển/xoá
+// giữa lúc kiểm và lúc ghi). Sai → thông điệp chung "không tồn tại" (không lộ dự án khác).
+export async function checkInvoiceParents(
+  input: Pick<InvoiceInput, "contractId" | "paymentBillId">,
+  projectId: number,
+): Promise<string | null> {
+  if (input.contractId != null) {
+    const c = await queryOne(
+      `SELECT id FROM contracts WHERE id = ? AND project_id = ? FOR SHARE`,
+      input.contractId,
+      projectId,
+    );
+    if (!c) return "Hợp đồng không tồn tại";
+  }
+  if (input.paymentBillId != null) {
+    const b = await queryOne<{ contractId: number | null }>(
+      `SELECT contract_id AS "contractId" FROM payment_bills
+        WHERE id = ? AND project_id = ? FOR SHARE`,
+      input.paymentBillId,
+      projectId,
+    );
+    if (!b) return "Phiếu thanh toán không tồn tại";
+    if (input.contractId != null && b.contractId != null && b.contractId !== input.contractId)
+      return "Phiếu thanh toán không tồn tại";
+  }
+  return null;
+}
+
+// A1-AC03 (P1-2b): giao dịch quỹ chỉ được gắn hợp đồng CÙNG dự án và nhà cung cấp CÙNG tổ
+// chức (suppliers.org_id). Gọi trong cùng withTransaction với câu ghi, cha khoá FOR SHARE.
+export async function checkCashTransactionParents(
+  input: Pick<CashTransactionInput, "contractId" | "supplierId">,
+  projectId: number,
+  orgId: number,
+): Promise<string | null> {
+  if (input.contractId != null) {
+    if (!Number.isInteger(input.contractId)) return "Hợp đồng không tồn tại";
+    const c = await queryOne(
+      `SELECT id FROM contracts WHERE id = ? AND project_id = ? FOR SHARE`,
+      input.contractId,
+      projectId,
+    );
+    if (!c) return "Hợp đồng không tồn tại";
+  }
+  if (input.supplierId != null) {
+    if (!Number.isInteger(input.supplierId)) return "Nhà cung cấp không tồn tại";
+    const s = await queryOne(
+      `SELECT id FROM suppliers WHERE id = ? AND org_id = ? FOR SHARE`,
+      input.supplierId,
+      orgId,
+    );
+    if (!s) return "Nhà cung cấp không tồn tại";
+  }
+  return null;
+}
+
 export type VatSummary = { vatIn: number; vatOut: number; netVat: number };
 
 // VAT vào (đầu vào, được khấu trừ) / ra (đầu ra, phải nộp) / ròng = vatOut − vatIn,

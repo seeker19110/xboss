@@ -37,7 +37,7 @@ type ReportSource = {
   canView: (role: Role) => boolean;
   columns: ReportColumn[];
   filters: FilterDef[];
-  run: (projectId: number | null, filters: Record<string, ReportCell>) => Promise<ReportRow[]>;
+  run: (projectId: number, filters: Record<string, ReportCell>) => Promise<ReportRow[]>;
 };
 
 const MATERIAL_STATUS: { value: string; label: string }[] = [
@@ -46,15 +46,14 @@ const MATERIAL_STATUS: { value: string; label: string }[] = [
   { value: "da_dung", label: "Đã dùng" },
 ];
 
-// Điều kiện + tham số lọc dự án dùng chung — projectId null (DB chưa có dự án) → không lọc.
-function projectScope(projectId: number | null, alias: string) {
-  return projectId != null
-    ? {
-        join: `JOIN towers tw ON tw.id = ${alias}.tower_id`,
-        cond: "AND tw.project_id = ?",
-        args: [projectId],
-      }
-    : { join: "", cond: "", args: [] as number[] };
+// Điều kiện + tham số lọc dự án dùng chung — P1-5 (A1-AC02): luôn lọc dự án; người gọi
+// không có dự án khả kiến phải tự trả rỗng, không được gọi xuống đây để chạy toàn hệ.
+function projectScope(projectId: number, alias: string) {
+  return {
+    join: `JOIN towers tw ON tw.id = ${alias}.tower_id`,
+    cond: "AND tw.project_id = ?",
+    args: [projectId],
+  };
 }
 
 const SOURCES: Record<string, ReportSource> = {
@@ -80,10 +79,10 @@ const SOURCES: Record<string, ReportSource> = {
            JOIN sheet_types st ON wp.sheet_type_id = st.id
            JOIN towers tw ON tw.id = st.tower_id
            LEFT JOIN systems sy ON sy.id = st.system_id
-          WHERE 1=1 ${projectId != null ? "AND tw.project_id = ?" : ""}
+          WHERE tw.project_id = ?
           GROUP BY sy.id, sy.name
           ORDER BY system`,
-        ...(projectId != null ? [projectId] : []),
+        projectId,
       ).then((rows) =>
         // AVG trả 0..1 → phần trăm 1 chữ số thập phân cho hiển thị.
         rows.map((r) => ({ ...r, avgProgress: Math.round(Number(r.avgProgress) * 1000) / 10 })),
@@ -138,16 +137,14 @@ const SOURCES: Record<string, ReportSource> = {
       { key: "actual", label: "Thực chi", kind: "money" },
     ],
     filters: [],
-    // M47 PR2: đọc từ mv_cost_by_month (migrations/0055_matviews.sql) trước — MV dùng
-    // sentinel 0 cho project_id NULL. MV rỗng cho dự án này (DB mới/cron chưa refresh
+    // M47 PR2: đọc từ mv_cost_by_month (migrations/0055_matviews.sql) trước. MV rỗng cho dự án này (DB mới/cron chưa refresh
     // lần nào) → tính trực tiếp bằng lại đúng logic trong migration (chậm hơn nhưng
     // luôn đúng, không lặng lẽ trả thiếu dữ liệu).
     async run(projectId) {
-      const scopeProjectId = projectId ?? 0;
       const mvRows = await query<{ month: string; committed: string; actual: string }>(
         `SELECT month, committed::text AS committed, actual::text AS actual
            FROM mv_cost_by_month WHERE project_id = ? ORDER BY month`,
-        scopeProjectId,
+        projectId,
       );
       if (mvRows.length > 0) {
         return mvRows.map((r) => ({
@@ -157,16 +154,13 @@ const SOURCES: Record<string, ReportSource> = {
         }));
       }
 
-      const projectFilterPo = projectId != null ? "AND po.project_id = ?" : "";
-      const projectFilterFc = projectId != null ? "AND c.project_id = ?" : "";
-      const projectFilterActual = projectId != null ? "AND tw.project_id = ?" : "";
       const rows = await query<{ month: string; committed: string; actual: string }>(
         `WITH committed_po AS (
            SELECT to_char(po.created_at, 'YYYY-MM') AS month,
                   SUM(poi.qty_ordered * COALESCE(poi.unit_price, 0)) AS amount
              FROM po_items poi
              JOIN purchase_orders po ON po.id = poi.po_id
-            WHERE po.status <> 'cancelled' ${projectFilterPo}
+            WHERE po.status <> 'cancelled' AND po.project_id = ?
             GROUP BY month
          ),
          committed_fc AS (
@@ -174,7 +168,7 @@ const SOURCES: Record<string, ReportSource> = {
                   SUM(fc.contract_value) AS amount
              FROM floor_contracts fc
              JOIN contracts c ON c.id = fc.contract_id
-            WHERE 1=1 ${projectFilterFc}
+            WHERE c.project_id = ?
             GROUP BY month
          ),
          committed AS (
@@ -185,8 +179,9 @@ const SOURCES: Record<string, ReportSource> = {
          actual AS (
            SELECT to_char(pb.paid_date, 'YYYY-MM') AS month, SUM(pb.amount) AS actual
              FROM payment_bills pb
-             ${projectId != null ? "JOIN sheet_types st ON st.id = pb.sheet_type_id JOIN towers tw ON tw.id = st.tower_id" : ""}
-            WHERE pb.paid_date IS NOT NULL ${projectFilterActual}
+             JOIN sheet_types st ON st.id = pb.sheet_type_id
+             JOIN towers tw ON tw.id = st.tower_id
+            WHERE pb.paid_date IS NOT NULL AND tw.project_id = ?
             GROUP BY month
          )
          SELECT COALESCE(c.month, a.month) AS month,
@@ -194,7 +189,9 @@ const SOURCES: Record<string, ReportSource> = {
                 COALESCE(a.actual, 0)::text AS actual
            FROM committed c FULL OUTER JOIN actual a ON a.month = c.month
           ORDER BY month`,
-        ...(projectId != null ? [projectId, projectId, projectId] : []),
+        projectId,
+        projectId,
+        projectId,
       );
       return rows.map((r) => ({
         month: r.month,
@@ -224,11 +221,10 @@ const SOURCES: Record<string, ReportSource> = {
                 m.qty_boq AS "qtyBoq", m.qty_used AS "qtyUsed",
                 COALESCE(m.status, 'dat_hang') AS status
            FROM materials m
-          WHERE 1=1
-            ${projectId != null ? "AND m.project_id = ?" : ""}
+          WHERE m.project_id = ?
             ${status != null ? "AND COALESCE(m.status, 'dat_hang') = ?" : ""}
           ORDER BY m.boq_code`,
-        ...(projectId != null ? [projectId] : []),
+        projectId,
         ...(status != null ? [status] : []),
       );
       // Nhãn trạng thái tiếng Việt cho hiển thị/xuất.
@@ -305,7 +301,7 @@ export function validateConfig(sourceKey: string, config: unknown): ReportConfig
 export async function runReport(
   sourceKey: string,
   config: unknown,
-  projectId: number | null,
+  projectId: number,
 ): Promise<ReportResult> {
   const src = SOURCES[sourceKey];
   if (!src) throw new Error(`Nguồn báo cáo không hợp lệ: ${sourceKey}`);

@@ -20,6 +20,6 @@ export async function GET(req: NextRequest) {
   const raw = parseInt(req.nextUrl.searchParams.get("days") ?? "90", 10);
   const days = ALLOWED_DAYS.includes(raw) ? raw : 90;
 
-  const report = await buildSodReport(days);
+  const report = await buildSodReport(days, me.orgId);
   return NextResponse.json(report);
 }

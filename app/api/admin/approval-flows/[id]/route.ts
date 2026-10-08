@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { deleteApprovalFlow, updateApprovalFlow } from "@/lib/tien-do/approvals";
+import { queryOne } from "@/lib/db";
+
+// S02: flow phải thuộc tổ chức người gọi — id của org khác coi như không tồn tại (404).
+async function flowCuaToChuc(id: number, orgId: number): Promise<boolean> {
+  const row = await queryOne(`SELECT 1 FROM approval_flows WHERE id = ? AND org_id = ?`, id, orgId);
+  return !!row;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +45,8 @@ export async function PATCH(
       slaDays: s.slaDays != null && s.slaDays !== "" ? Number(s.slaDays) : null,
     }));
 
+  if (!(await flowCuaToChuc(id, user.orgId)))
+    return NextResponse.json({ error: "Không tìm thấy flow" }, { status: 404 });
   const result = await updateApprovalFlow(id, patch);
   if (typeof result === "string") {
     const status = result === "Không tìm thấy flow" ? 404 : 409;
@@ -61,6 +70,8 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  if (!(await flowCuaToChuc(id, user.orgId)))
+    return NextResponse.json({ error: "Không tìm thấy flow" }, { status: 404 });
   const result = await deleteApprovalFlow(id);
   if (typeof result === "string") {
     const status = result === "Không tìm thấy flow" ? 404 : 409;

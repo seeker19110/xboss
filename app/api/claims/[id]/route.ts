@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { run, withProjectScope } from "@/lib/db";
+import { run, withProjectScope, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
@@ -73,8 +73,6 @@ export async function PATCH(
   });
   const validationErr = validateClaimInput(input);
   if (validationErr) return NextResponse.json({ error: validationErr }, { status: 422 });
-  const refErr = await checkClaimRefs(input);
-  if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
 
   // status: chỉ cho phép trong nhóm "đang mở" (notice/quantified/negotiating) — chốt/từ
   // chối bắt buộc đi qua /settle /reject (kiểm tra CAN.approve + ghi audit riêng).
@@ -91,22 +89,29 @@ export async function PATCH(
     status = nextStatus as typeof claim.status;
   }
 
-  await run(
-    `UPDATE claims
+  // A1-AC03: kiểm cặp hợp đồng/VO SAU khi merge với giá trị đang lưu, cùng transaction.
+  const refErr = await withTransaction(async () => {
+    const err = await checkClaimRefs(input, projectId);
+    if (err) return err;
+    await run(
+      `UPDATE claims
         SET kind = ?, title = ?, contract_id = ?, vo_id = ?, notice_date = ?, cause = ?,
             amount_requested = ?, days_requested = ?, status = ?
       WHERE id = ?`,
-    input.kind,
-    input.title,
-    input.contractId,
-    input.voId,
-    input.noticeDate,
-    input.cause,
-    input.amountRequested,
-    input.daysRequested,
-    status,
-    id,
-  );
+      input.kind,
+      input.title,
+      input.contractId,
+      input.voId,
+      input.noticeDate,
+      input.cause,
+      input.amountRequested,
+      input.daysRequested,
+      status,
+      id,
+    );
+    return null;
+  });
+  if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
   return NextResponse.json({ ok: true });
 }
 

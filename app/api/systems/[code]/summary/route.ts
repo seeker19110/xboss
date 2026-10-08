@@ -18,11 +18,12 @@ export async function GET(
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const { code } = await paramsP;
-  // Dự án đang chọn — lọc ngân sách theo dự án (đa dự án, M22+). null = không lọc.
+  // Dự án đang chọn — mọi số liệu lọc theo dự án (P1-2b). Không có dự án khả kiến → 404
+  // (fail-closed, không gộp toàn hệ).
   const projectId = await getCurrentProjectId(user);
-  const summary = await getSystemSummary(code, {
+  if (projectId == null) return NextResponse.json({ error: "Không tìm thấy hệ" }, { status: 404 });
+  const summary = await getSystemSummary(code, projectId, {
     withCost: CAN.viewPayments(user.role),
-    projectId: projectId ?? undefined,
   });
   if (!summary) return NextResponse.json({ error: "Không tìm thấy hệ" }, { status: 404 });
 

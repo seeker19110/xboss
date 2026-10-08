@@ -228,10 +228,12 @@ test(
     const pm = await taoUser("pm", "ppr");
     const matId = await taoVatTu("ppr", { projectId });
     const prId = await insertId(
-      `INSERT INTO purchase_requests (material_id, qty_requested, requested_by) VALUES (?, ?, ?)`,
+      `INSERT INTO purchase_requests (material_id, qty_requested, requested_by, project_id)
+       VALUES (?, ?, ?, ?)`,
       matId,
       10,
       pm.id,
+      projectId,
     );
     await dangNhapDuAn(pm, projectId);
     const { POST } = await import("@/app/api/purchase-orders/route");

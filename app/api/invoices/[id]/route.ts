@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run, withProjectScope } from "@/lib/db";
+import { queryOne, run, withProjectScope, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { parseInvoiceBody, validateInvoiceInput, type InvoiceInput } from "@/lib/tai-chinh/finance";
+import {
+  checkInvoiceParents,
+  parseInvoiceBody,
+  validateInvoiceInput,
+  type InvoiceInput,
+} from "@/lib/tai-chinh/finance";
 
 export const dynamic = "force-dynamic";
 
@@ -74,21 +79,32 @@ export async function PATCH(
   const invalid = validateInvoiceInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  await run(
-    `UPDATE invoices SET invoice_no = ?, invoice_date = ?, direction = ?, net_amount = ?,
+  // A1-AC03: chỉ kiểm khi body đổi contractId/paymentBillId; kiểm cả cặp sau merge để
+  // nhất quán với giá trị còn lại đang lưu. Kiểm + ghi trong 1 transaction (cha FOR SHARE).
+  const touchesParents = "contractId" in body || "paymentBillId" in body;
+  const parentErr = await withTransaction(async () => {
+    if (touchesParents) {
+      const err = await checkInvoiceParents(input, projectId as number);
+      if (err) return err;
+    }
+    await run(
+      `UPDATE invoices SET invoice_no = ?, invoice_date = ?, direction = ?, net_amount = ?,
             vat_amount = ?, vat_rate = ?, counterparty = ?, contract_id = ?, payment_bill_id = ?
       WHERE id = ?`,
-    input.invoiceNo,
-    input.invoiceDate,
-    input.direction,
-    input.netAmount,
-    input.vatAmount,
-    input.vatRate,
-    input.counterparty,
-    input.contractId,
-    input.paymentBillId,
-    id,
-  );
+      input.invoiceNo,
+      input.invoiceDate,
+      input.direction,
+      input.netAmount,
+      input.vatAmount,
+      input.vatRate,
+      input.counterparty,
+      input.contractId,
+      input.paymentBillId,
+      id,
+    );
+    return null;
+  });
+  if (parentErr) return NextResponse.json({ error: parentErr }, { status: 422 });
 
   return NextResponse.json({ updated: id });
 }

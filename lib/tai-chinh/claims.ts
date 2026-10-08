@@ -83,21 +83,38 @@ export function validateClaimInput(input: ClaimInput): string | null {
   return null;
 }
 
-// Kiểm FK tồn tại (hợp đồng/VO nối kèm) — trả thông điệp lỗi hoặc null.
-export async function checkClaimRefs(input: ClaimInput): Promise<string | null> {
+// Kiểm FK hợp đồng/VO nối kèm — phải thuộc CÙNG dự án (A1-AC03, P1-2b); có cả hai thì VO
+// phải chưa gắn hợp đồng hoặc gắn đúng hợp đồng đó. Khoá cha FOR SHARE — gọi trong cùng
+// withTransaction với câu ghi. Sai → thông điệp chung "không tồn tại" (không lộ dự án khác).
+export async function checkClaimRefs(
+  input: Pick<ClaimInput, "contractId" | "voId">,
+  projectId: number | null,
+): Promise<string | null> {
   if (input.contractId != null) {
     if (
+      projectId == null ||
       !Number.isInteger(input.contractId) ||
-      !(await queryOne(`SELECT id FROM contracts WHERE id = ?`, input.contractId))
+      !(await queryOne(
+        `SELECT id FROM contracts WHERE id = ? AND project_id = ? FOR SHARE`,
+        input.contractId,
+        projectId,
+      ))
     )
-      return "Hợp đồng gắn kèm không tồn tại";
+      return "Hợp đồng không tồn tại";
   }
   if (input.voId != null) {
-    if (
-      !Number.isInteger(input.voId) ||
-      !(await queryOne(`SELECT id FROM variation_orders WHERE id = ?`, input.voId))
-    )
-      return "Phát sinh/VO gắn kèm không tồn tại";
+    const vo =
+      projectId != null && Number.isInteger(input.voId)
+        ? await queryOne<{ contractId: number | null }>(
+            `SELECT contract_id AS "contractId" FROM variation_orders
+              WHERE id = ? AND project_id = ? FOR SHARE`,
+            input.voId,
+            projectId,
+          )
+        : undefined;
+    if (!vo) return "Phát sinh (VO) không tồn tại";
+    if (input.contractId != null && vo.contractId != null && vo.contractId !== input.contractId)
+      return "Phát sinh (VO) không tồn tại";
   }
   return null;
 }

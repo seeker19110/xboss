@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import * as XLSX from "xlsx";
 import { importWorkbook, analyzeWorkbook } from "@/lib/tien-do/import";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 import { log } from "@/lib/nen/log";
 import { isContentTooLarge } from "@/lib/nen/photos";
 
@@ -57,12 +58,19 @@ export async function POST(request: NextRequest) {
     // Mẫu số quy lưới checkbox → % (xem ImportOptions trong lib/import.ts). Mặc định
     // "columns" = hành vi cũ; chỉ đổi khi người dùng chủ động chọn, vì chọn sai chiều nào
     // cũng làm lệch % theo chiều ngược lại.
+    // S02: ghi vào dự án đang chọn đã đối chiếu quyền + tổ chức — không còn tìm dự án gốc
+    // theo tên (có thể thuộc tổ chức khác).
+    const projectId = await getCurrentProjectIdStrict(user);
+    if (projectId == null)
+      return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
+
     const denominator = formData.get("denominator");
     const dimDenominator = denominator === "row-nonempty" ? "row-nonempty" : "columns";
     // Ghi sổ import (C3 §5): băm NỘI DUNG file để nhiều năm sau còn đối chiếu được đúng
     // file gốc, kể cả khi tên file đã đổi.
     const stats = await importWorkbook(workbook, {
       dimDenominator,
+      projectId,
       source: {
         name: file.name,
         sha256: createHash("sha256").update(Buffer.from(buffer)).digest("hex"),

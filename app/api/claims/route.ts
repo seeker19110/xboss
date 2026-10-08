@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId, withProjectScope } from "@/lib/db";
+import { insertId, withProjectScope, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { withUniqueRetry } from "@/lib/ha-tang/seqcode";
@@ -70,30 +70,33 @@ export async function POST(req: NextRequest) {
   const input = parseClaimBody(body);
   const validationErr = validateClaimInput(input);
   if (validationErr) return NextResponse.json({ error: validationErr }, { status: 422 });
-  const refErr = await checkClaimRefs(input);
-  if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
-
   const projectId = await getCurrentProjectId(user);
 
-  const { id, code } = await withUniqueRetry(async () => {
-    const code = await nextClaimCode();
-    const id = await insertId(
-      `INSERT INTO claims (project_id, code, kind, title, contract_id, vo_id, notice_date, cause,
+  // A1-AC03: hợp đồng/VO cùng dự án — kiểm + ghi trong 1 transaction (cha khoá FOR SHARE).
+  const result = await withUniqueRetry(() =>
+    withTransaction(async () => {
+      const refErr = await checkClaimRefs(input, projectId);
+      if (refErr) return { error: refErr };
+      const code = await nextClaimCode();
+      const id = await insertId(
+        `INSERT INTO claims (project_id, code, kind, title, contract_id, vo_id, notice_date, cause,
                             amount_requested, days_requested, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      projectId,
-      code,
-      input.kind,
-      input.title,
-      input.contractId,
-      input.voId,
-      input.noticeDate,
-      input.cause,
-      input.amountRequested,
-      input.daysRequested,
-      user.id,
-    );
-    return { id, code };
-  });
-  return NextResponse.json({ id, code }, { status: 201 });
+        projectId,
+        code,
+        input.kind,
+        input.title,
+        input.contractId,
+        input.voId,
+        input.noticeDate,
+        input.cause,
+        input.amountRequested,
+        input.daysRequested,
+        user.id,
+      );
+      return { id, code };
+    }),
+  );
+  if ("error" in result) return NextResponse.json({ error: result.error }, { status: 422 });
+  return NextResponse.json({ id: result.id, code: result.code }, { status: 201 });
 }

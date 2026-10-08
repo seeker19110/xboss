@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import { query, insertId } from "@/lib/db";
+import { query, queryOne, insertId } from "@/lib/db";
 import { CUSTOM_KEY_RE, isCustomEntityType, isCustomFieldType } from "@/lib/ha-tang/custom-fields";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +73,15 @@ export async function POST(req: NextRequest) {
   const required = !!body.required;
   const sort = Number.isFinite(Number(body.sort)) ? Number(body.sort) : 0;
   const active = body.active === undefined ? true : !!body.active;
+  // S02: định nghĩa trường gắn dự án thì dự án phải thuộc tổ chức người gọi.
+  if (projectId != null) {
+    const project = await queryOne(
+      `SELECT 1 FROM projects WHERE id = ? AND org_id = ?`,
+      projectId,
+      user.orgId,
+    );
+    if (!project) return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
+  }
 
   try {
     // M54 GĐ1 PR2: định nghĩa trường tuỳ biến thuộc org người tạo (không dựa DEFAULT org_id=1).

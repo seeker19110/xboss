@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { listAlertRules, upsertAlertRule } from "@/lib/van-hanh/alerts";
+import { queryOne } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,16 @@ export async function POST(req: NextRequest) {
   const metric = String(body.metric ?? "");
   const threshold = Number(body.threshold);
   const active = typeof body.active === "boolean" ? body.active : undefined;
+
+  // S02: rule gắn dự án thì dự án phải thuộc tổ chức người gọi (không lộ dự án org khác).
+  if (projectId != null && Number.isInteger(projectId) && projectId > 0) {
+    const project = await queryOne(
+      `SELECT 1 FROM projects WHERE id = ? AND org_id = ?`,
+      projectId,
+      user.orgId,
+    );
+    if (!project) return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
+  }
 
   const result = await upsertAlertRule({
     projectId,

@@ -3,6 +3,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { listProjects } from "@/lib/ha-tang/projects";
 import { MODULES } from "@/lib/nen/modules";
 import { getModuleFlags, setFlag } from "@/lib/ha-tang/feature-flags";
+import { queryOne } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "projectId không hợp lệ" }, { status: 422 });
   if (typeof enabled !== "boolean")
     return NextResponse.json({ error: "enabled phải là boolean" }, { status: 422 });
+
+  // S02: chỉ bật/tắt module cho dự án thuộc tổ chức người gọi.
+  const project = await queryOne(
+    `SELECT 1 FROM projects WHERE id = ? AND org_id = ?`,
+    projectId,
+    user.orgId,
+  );
+  if (!project) return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
 
   await setFlag(moduleKey, projectId, enabled, user.id, user.orgId);
   return NextResponse.json({ moduleKey, projectId, enabled });

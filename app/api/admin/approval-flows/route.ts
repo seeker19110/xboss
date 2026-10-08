@@ -6,6 +6,7 @@ import {
   createApprovalFlow,
   listApprovalFlows,
 } from "@/lib/tien-do/approvals";
+import { queryOne } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,15 @@ export async function POST(req: NextRequest) {
   const projectId = body.projectId != null && body.projectId !== "" ? Number(body.projectId) : null;
   if (projectId != null && !Number.isInteger(projectId))
     return NextResponse.json({ error: "projectId không hợp lệ" }, { status: 422 });
+  // S02: flow gắn dự án thì dự án phải thuộc tổ chức người gọi.
+  if (projectId != null) {
+    const project = await queryOne(
+      `SELECT 1 FROM projects WHERE id = ? AND org_id = ?`,
+      projectId,
+      user.orgId,
+    );
+    if (!project) return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
+  }
   const steps = Array.isArray(body.steps)
     ? body.steps.map((s: Record<string, unknown>) => ({
         seq: Number(s.seq),

@@ -20,7 +20,7 @@ export type SodRuleResult = {
 type SodRule = {
   key: string;
   description: string;
-  run: (days: number) => Promise<SodViolation[]>;
+  run: (days: number, orgId: number) => Promise<SodViolation[]>;
 };
 
 const RULES: SodRule[] = [
@@ -30,7 +30,7 @@ const RULES: SodRule[] = [
       "Cùng một người vừa tạo vừa duyệt cùng 1 hồ sơ: qua Approval Engine (M46, " +
       "approval_requests.created_by = approval_actions.actor_id khi decision='approve') " +
       "hoặc dữ liệu thanh toán khối lượng (IPC) từ trước M46 (payment_certs.created_by = decided_by).",
-    run: async (days) => {
+    run: async (days, orgId) => {
       const [engineRows, ipcRows] = await Promise.all([
         query<SodViolation>(
           `SELECT 'approval_engine' AS source, ar.entity_type AS "entityType",
@@ -39,9 +39,11 @@ const RULES: SodRule[] = [
              FROM approval_requests ar
              JOIN approval_actions aa ON aa.request_id = ar.id AND aa.decision = 'approve'
              JOIN users u ON u.id = ar.created_by
+             JOIN projects p ON p.id = ar.project_id AND p.org_id = ?
             WHERE aa.actor_id = ar.created_by
               AND ar.created_at >= now() - make_interval(days => ?)
             ORDER BY aa.at DESC`,
+          orgId,
           days,
         ),
         query<SodViolation>(
@@ -50,10 +52,13 @@ const RULES: SodRule[] = [
                   pc.decided_at AS "at"
              FROM payment_certs pc
              JOIN users u ON u.id = pc.created_by
+             JOIN contracts c ON c.id = pc.contract_id
+             JOIN projects p ON p.id = c.project_id AND p.org_id = ?
             WHERE pc.decided_by IS NOT NULL
               AND pc.decided_by = pc.created_by
               AND pc.created_at >= now() - make_interval(days => ?)
             ORDER BY pc.decided_at DESC`,
+          orgId,
           days,
         ),
       ]);
@@ -65,7 +70,7 @@ const RULES: SodRule[] = [
     description:
       "Cùng một người vừa lập đơn mua hàng (purchase_orders.created_by) vừa ghi nhận " +
       "phiếu nhập kho nhận hàng cho chính đơn đó (warehouse_receipts.received_by).",
-    run: (days) =>
+    run: (days, orgId) =>
       query<SodViolation>(
         `SELECT po.id AS "poId", po.po_code AS "poCode", po.created_by AS "userId",
                 u.name AS "userName", wr.id AS "receiptId",
@@ -73,10 +78,12 @@ const RULES: SodRule[] = [
            FROM purchase_orders po
            JOIN warehouse_receipts wr ON wr.po_id = po.id
            JOIN users u ON u.id = po.created_by
+           JOIN projects p ON p.id = po.project_id AND p.org_id = ?
           WHERE po.created_by IS NOT NULL
             AND po.created_by = wr.received_by
             AND po.created_at >= now() - make_interval(days => ?)
           ORDER BY wr.received_at DESC`,
+        orgId,
         days,
       ),
   },
@@ -89,11 +96,13 @@ const RULES: SodRule[] = [
   // approved_by, bổ sung rule tại đây qua migration mới.
 ];
 
-// Chạy toàn bộ rule SoD, giới hạn theo `days` (created_at gần đây).
-export async function buildSodReport(days: number): Promise<SodRuleResult[]> {
+// Chạy toàn bộ rule SoD, giới hạn theo `days` (created_at gần đây) và CHỈ trong tổ chức
+// `orgId` (S02 — cô lập tenant: hồ sơ suy org qua dự án; admin org khác không thấy vi phạm
+// của org mình).
+export async function buildSodReport(days: number, orgId: number): Promise<SodRuleResult[]> {
   const out: SodRuleResult[] = [];
   for (const r of RULES) {
-    const violations = await r.run(days);
+    const violations = await r.run(days, orgId);
     out.push({ rule: r.key, description: r.description, violations });
   }
   return out;

@@ -46,7 +46,10 @@ export async function resolveSystemId(code: string | null): Promise<number | nul
   return d?.id ?? -1;
 }
 
-export async function listSystems() {
+// projectId (S02): số sheet/% tiến độ/số trễ chỉ tính trên sheet thuộc tower của dự án này —
+// danh mục hệ là chung toàn hệ thống (bảng systems không có org/project), nhưng số liệu tổng
+// hợp thì không được gộp chéo dự án/tổ chức.
+export async function listSystems(projectId: number) {
   const today = todayISO();
   // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT của nhóm
   // (xem lib/recompute.ts) — phải dùng ngày HIỆU LỰC để đếm trễ đúng, không phải cột thô.
@@ -57,18 +60,24 @@ export async function listSystems() {
             COALESCE(SUM(CASE WHEN COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END), 0) AS delayed
        FROM systems d
-       LEFT JOIN sheet_types st ON st.system_id = d.id
+       LEFT JOIN sheet_types st
+              ON st.system_id = d.id
+             AND st.tower_id IN (SELECT tw.id FROM towers tw WHERE tw.project_id = ?)
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
       GROUP BY d.id, d.code, d.name, d.color
       ORDER BY d.id`,
     today,
+    projectId,
   );
 }
 
+// projectId (P1-2b): sheet/task/NCR/ngân sách chỉ tính trên sheet thuộc tower của dự án này —
+// danh mục hệ dùng chung toàn hệ thống nhưng số liệu tổng hợp không được gộp chéo dự án.
 export async function getSystemSummary(
   code: string,
-  opts: { withCost?: boolean; projectId?: number } = {},
+  projectId: number,
+  opts: { withCost?: boolean } = {},
 ): Promise<SystemSummary | null> {
   const system = await queryOne<{
     id: number;
@@ -98,10 +107,12 @@ export async function getSystemSummary(
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
       WHERE st.system_id = ?
+        AND st.tower_id IN (SELECT tw.id FROM towers tw WHERE tw.project_id = ?)
       GROUP BY st.id, st.code, st.name, st.slug
       ORDER BY st.sort_order, st.id`,
     today,
     system.id,
+    projectId,
   );
 
   const overall = await queryOne<{
@@ -118,9 +129,11 @@ export async function getSystemSummary(
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-      WHERE st.system_id = ?`,
+      WHERE st.system_id = ?
+        AND st.tower_id IN (SELECT tw.id FROM towers tw WHERE tw.project_id = ?)`,
     today,
     system.id,
+    projectId,
   );
 
   const ncrOpen = await queryOne<{ count: number }>(
@@ -129,8 +142,10 @@ export async function getSystemSummary(
        JOIN tasks t ON t.id = n.task_id
        JOIN work_packages wp ON wp.id = t.package_id
        JOIN sheet_types st ON st.id = wp.sheet_type_id
-      WHERE st.system_id = ? AND n.status <> 'closed'`,
+      WHERE st.system_id = ? AND n.status <> 'closed'
+        AND st.tower_id IN (SELECT tw.id FROM towers tw WHERE tw.project_id = ?)`,
     system.id,
+    projectId,
   );
 
   const contractors = await query<{
@@ -146,9 +161,12 @@ export async function getSystemSummary(
             dc.floor_labels AS "floorLabels", dc.zone, dc.is_primary AS "isPrimary", dc.note
        FROM system_contractors dc
        JOIN suppliers s ON s.id = dc.supplier_id
-      WHERE dc.system_id = ?
+      -- system_contractors không có project_id; suppliers là bảng gốc org → chỉ nhà thầu cùng
+      -- org với dự án đang xem (A1-AC01), không lộ tên nhà thầu org khác.
+      WHERE dc.system_id = ? AND s.org_id = (SELECT org_id FROM projects WHERE id = ?)
       ORDER BY dc.is_primary DESC, s.name`,
     system.id,
+    projectId,
   );
 
   return {
@@ -160,7 +178,7 @@ export async function getSystemSummary(
     waitingApprovalCount: overall?.waitingApproval ?? 0,
     contractors,
     ncrOpen: ncrOpen?.count ?? 0,
-    budget: opts.withCost ? await systemBudget(system.id, true, opts.projectId) : null,
+    budget: opts.withCost ? await systemBudget(system.id, true, projectId) : null,
     drawingsPending: null,
     floorsPending: null,
   };

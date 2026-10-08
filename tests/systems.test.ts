@@ -68,7 +68,7 @@ test(
       supplierId,
     );
 
-    const summaryDien = await getSystemSummary("dien");
+    const summaryDien = await getSystemSummary("dien", projectId);
     assert.ok(summaryDien);
     assert.equal(summaryDien!.totalTasks, 2);
     assert.equal(summaryDien!.progressPercent, 0.5);
@@ -85,7 +85,7 @@ test(
     assert.equal(summaryDien!.ncrOpen, 0);
     assert.equal(summaryDien!.budget, null);
 
-    const summaryNuoc = await getSystemSummary("nuoc");
+    const summaryNuoc = await getSystemSummary("nuoc", projectId);
     assert.ok(summaryNuoc);
     assert.equal(summaryNuoc!.totalTasks, 1);
     assert.equal(summaryNuoc!.progressPercent, 0.3);
@@ -93,7 +93,7 @@ test(
     assert.equal(summaryNuoc!.sheets.length, 1);
     assert.equal(summaryNuoc!.contractors.length, 0);
 
-    assert.equal(await getSystemSummary("khong-ton-tai"), null);
+    assert.equal(await getSystemSummary("khong-ton-tai", projectId), null);
 
     // Dọn dữ liệu test.
     await run(`DELETE FROM system_contractors WHERE id = ?`, contractorId);
@@ -135,7 +135,7 @@ test(
       pkgId,
     );
 
-    const summary = await getSystemSummary("pccc");
+    const summary = await getSystemSummary("pccc", projectId);
     assert.equal(summary!.waitingApprovalCount, 1);
 
     await run(`DELETE FROM tasks WHERE package_id = ?`, pkgId);

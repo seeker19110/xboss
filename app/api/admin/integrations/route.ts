@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { query } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
 import { getAdapter } from "@/lib/ha-tang/integrations/core";
 
 export const dynamic = "force-dynamic";
@@ -109,6 +109,15 @@ export async function POST(req: NextRequest) {
   const projectId = body.projectId != null && body.projectId !== "" ? Number(body.projectId) : null;
   if (projectId != null && !Number.isInteger(projectId))
     return NextResponse.json({ error: "projectId không hợp lệ" }, { status: 400 });
+  // S02: tích hợp gắn dự án thì dự án phải thuộc tổ chức người gọi.
+  if (projectId != null) {
+    const project = await queryOne(
+      `SELECT 1 FROM projects WHERE id = ? AND org_id = ?`,
+      projectId,
+      user.orgId,
+    );
+    if (!project) return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
+  }
 
   const config = body.config != null && typeof body.config === "object" ? body.config : {};
   const active = typeof body.active === "boolean" ? body.active : false;
@@ -121,6 +130,7 @@ export async function POST(req: NextRequest) {
     `INSERT INTO integrations (provider, project_id, config, active, org_id) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT (provider, project_id)
      DO UPDATE SET config = EXCLUDED.config, active = EXCLUDED.active
+       WHERE integrations.org_id = EXCLUDED.org_id
      RETURNING id`,
     provider,
     projectId,
@@ -128,5 +138,8 @@ export async function POST(req: NextRequest) {
     active,
     user.orgId,
   );
+  // Trùng (provider, project_id) với tích hợp của tổ chức khác → không ghi đè, không lộ.
+  if (rows.length === 0)
+    return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
   return NextResponse.json({ id: rows[0].id }, { status: 201 });
 }

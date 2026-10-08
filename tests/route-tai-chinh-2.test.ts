@@ -201,7 +201,7 @@ test("POST /api/claims: hợp đồng gắn kèm không tồn tại → 422 (che
     }),
   );
   assert.equal(res.status, 422);
-  assert.match((await res.json()).error, /Hợp đồng gắn kèm không tồn tại/);
+  assert.match((await res.json()).error, /Hợp đồng không tồn tại/);
 });
 
 test(

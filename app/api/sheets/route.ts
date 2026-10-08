@@ -2,14 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, insertId, withTransaction, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { toSlug, SLUG_RE } from "@/lib/nen/sheets";
-import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { visibleProjectIds, getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 
-// Danh sách sheet type + KPI tổng hợp.
+/** Giới hạn số sheet trong một lần sắp xếp — chặn payload phình to. */
+const MAX_REORDER_IDS = 200;
+
+// Danh sách sheet type + KPI tổng hợp — chỉ sheet của dự án đang chọn (P1-6).
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+
+  // Cách ly dự án: sheet_types suy dự án qua tower_id → towers.project_id (+ org).
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ sheets: [] });
 
   const today = todayISO();
   const sheets = await query(
@@ -20,12 +27,17 @@ export async function GET() {
             COALESCE(SUM(CASE WHEN COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END), 0) AS delayed
        FROM sheet_types st
+       JOIN towers tw ON tw.id = st.tower_id
+       JOIN projects p ON p.id = tw.project_id
        LEFT JOIN systems sys ON sys.id = st.system_id
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
+      WHERE tw.project_id = ? AND p.org_id = ?
       GROUP BY st.id, st.code, st.name, st.responsible, st.slug, st.system_id, sys.code, sys.name, sys.color
       ORDER BY st.sort_order, st.id`,
     today,
+    projectId,
+    user.orgId,
   );
   return NextResponse.json({ sheets });
 }
@@ -232,19 +244,46 @@ export async function PUT(req: NextRequest) {
   if (!CAN.editStructure(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được sắp xếp thứ tự" }, { status: 403 });
 
+  // Cách ly dự án (P1-6): chỉ sắp xếp sheet của dự án đang chọn.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án đang chọn" }, { status: 404 });
+
   const body = await req.json().catch(() => ({}));
-  const rawIds: unknown[] = Array.isArray(body.ids) ? body.ids : [];
+  const rawIds: unknown[] = Array.isArray(body?.ids) ? body.ids : [];
   if (rawIds.length === 0) return NextResponse.json({ error: "ids rỗng" }, { status: 400 });
+  if (rawIds.length > MAX_REORDER_IDS)
+    return NextResponse.json(
+      { error: `Tối đa ${MAX_REORDER_IDS} sheet mỗi lần sắp xếp` },
+      { status: 422 },
+    );
 
   const ids = rawIds.map((v) => Number(v));
-  if (ids.some((n) => !Number.isInteger(n)))
-    return NextResponse.json({ error: "ids phải là số nguyên" }, { status: 422 });
+  if (ids.some((n) => !Number.isInteger(n) || n <= 0))
+    return NextResponse.json({ error: "ids phải là số nguyên dương" }, { status: 422 });
+  if (new Set(ids).size !== ids.length)
+    return NextResponse.json({ error: "ids bị trùng" }, { status: 422 });
 
-  // 1 transaction: id lạ giữa chừng không được để lại thứ tự nửa vời.
-  await withTransaction(async () => {
-    for (let i = 0; i < ids.length; i++) {
-      await run(`UPDATE sheet_types SET sort_order = ? WHERE id = ?`, i + 1, ids[i]);
-    }
-  });
+  // 1 transaction: chỉ cập nhật sheet thuộc dự án đang chọn (+ org); số dòng cập nhật phải
+  // bằng số id — lệch (có id ngoài scope/không tồn tại) thì rollback toàn bộ và trả 404.
+  const NGOAI_SCOPE = "SHEET_NGOAI_SCOPE";
+  try {
+    await withTransaction(async () => {
+      const { changes } = await run(
+        `UPDATE sheet_types st SET sort_order = v.ord
+           FROM unnest(?::int[]) WITH ORDINALITY AS v(id, ord), towers tw, projects p
+          WHERE st.id = v.id AND tw.id = st.tower_id AND p.id = tw.project_id
+            AND tw.project_id = ? AND p.org_id = ?`,
+        ids,
+        projectId,
+        user.orgId,
+      );
+      if (changes !== ids.length) throw new Error(NGOAI_SCOPE);
+    });
+  } catch (err) {
+    if ((err as Error).message === NGOAI_SCOPE)
+      return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
+    throw err;
+  }
   return NextResponse.json({ ok: true });
 }
