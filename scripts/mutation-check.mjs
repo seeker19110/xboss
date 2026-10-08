@@ -193,8 +193,8 @@ const MUTATIONS = [
   {
     key: "vault: unlock trả khoá dù tài nguyên trong manifest đã bị thu hồi",
     file: "lib/bao-mat/offline-vault.ts",
-    find: "  if (!(await manifestConHieuLuc(b.user, m))) return null;",
-    replace: "  void manifestConHieuLuc;",
+    find: "  if (!duocPhep(m)) return null;",
+    replace: "  void duocPhep;",
     tests: ["tests/offline-vault-route.test.ts"],
     why: "Thu hồi phân công/quyền một task vẫn mở được DEK của manifest chứa task đó (Q-AC02, A2-AC09).",
   },

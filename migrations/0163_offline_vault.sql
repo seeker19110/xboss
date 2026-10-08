@@ -109,8 +109,8 @@ BEGIN
   END IF;
 END $$;
 
--- Kiểm "đúng một chủ sử dụng" khi Admin duyệt field-personal: tìm bản ghi khác cùng proof.
-CREATE INDEX IF NOT EXISTS idx_offline_devices_proof ON offline_devices (org_id, proof_hash);
+-- Kiểm "đúng một chủ sử dụng" (hàm offline_proof_nguoi_khac bên dưới, xuyên org): tìm theo proof.
+CREATE INDEX IF NOT EXISTS idx_offline_devices_proof ON offline_devices (proof_hash);
 
 CREATE SEQUENCE IF NOT EXISTS offline_context_generation_seq AS bigint;
 
@@ -175,6 +175,48 @@ GRANT UPDATE (profile, approved_by, approved_at, revoked_at) ON offline_devices 
 GRANT SELECT, INSERT ON offline_vault_keys TO xboss_app;
 REVOKE ALL ON SEQUENCE offline_context_generation_seq FROM xboss_app;
 GRANT USAGE ON SEQUENCE offline_context_generation_seq TO xboss_app;
+
+-- "Đúng một chủ sử dụng" (D02) XUYÊN ORG: RLS chỉ cho actor thấy bản ghi cùng org, nên kiểm proof
+-- có đang được người KHÁC dùng hay không phải qua hàm SECURITY DEFINER. Hàm chỉ trả boolean (không
+-- lộ id/org/user nào), đầu vào là SHA-256 của proof 32 byte ngẫu nhiên (không dò được), search_path
+-- cố định + tên bảng có schema. `p_chi_field_personal` = chỉ tính bản ghi field-personal.
+--
+-- Bảng có FORCE ROW LEVEL SECURITY nên chính owner (người tạo hàm, chạy hàm) cũng bị policy lọc
+-- theo GUC actor → thêm policy SELECT dành riêng cho role owner (TO CURRENT_USER lúc migrate) để
+-- hàm thấy mọi org. xboss_app KHÔNG khớp policy này (chặn chạy migration bằng xboss_app bên dưới).
+DO $$
+BEGIN
+  IF current_user = 'xboss_app' THEN
+    RAISE EXCEPTION 'Không chạy migration offline bằng role ứng dụng xboss_app (cần role owner)';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_class
+     WHERE oid = 'offline_devices'::regclass AND relowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+  ) AND NOT (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) THEN
+    RAISE EXCEPTION 'Role chạy migration phải là owner của offline_devices';
+  END IF;
+END $$;
+
+DROP POLICY IF EXISTS offline_device_owner_proof_check ON offline_devices;
+CREATE POLICY offline_device_owner_proof_check ON offline_devices FOR SELECT TO CURRENT_USER
+  USING (true);
+
+CREATE OR REPLACE FUNCTION offline_proof_nguoi_khac(
+  p_proof_hash bytea, p_user_id integer, p_chi_field_personal boolean
+) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $fn$
+  SELECT EXISTS (
+    SELECT 1 FROM public.offline_devices o
+     WHERE o.proof_hash = p_proof_hash
+       AND o.user_id <> p_user_id
+       AND o.revoked_at IS NULL
+       AND (NOT p_chi_field_personal OR o.profile = 'field-personal')
+  )
+$fn$;
+REVOKE ALL ON FUNCTION offline_proof_nguoi_khac(bytea, integer, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION offline_proof_nguoi_khac(bytea, integer, boolean) TO xboss_app;
 
 -- Audit duyệt/thu hồi thiết bị (Admin) qua trigger chung 0049 — CHỈ UPDATE: bản ghi INSERT sẽ chép
 -- cả proof_hash vào audit_log, còn UPDATE chỉ ghi các cột đổi (profile/approved_*/revoked_at).

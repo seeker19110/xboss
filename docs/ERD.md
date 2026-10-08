@@ -6348,7 +6348,7 @@
 - `user_id` → `users(id)`
 
 **Index:**
-- `idx_offline_devices_proof`: INDEX idx_offline_devices_proof ON public.offline_devices USING btree (org_id, proof_hash)
+- `idx_offline_devices_proof`: INDEX idx_offline_devices_proof ON public.offline_devices USING btree (proof_hash)
 - `offline_devices_id_user_id_org_id_key`: UNIQUE INDEX offline_devices_id_user_id_org_id_key ON public.offline_devices USING btree (id, user_id, org_id)
 - `offline_devices_pkey`: UNIQUE INDEX offline_devices_pkey ON public.offline_devices USING btree (id)
 - `offline_devices_user_id_org_id_proof_hash_key`: UNIQUE INDEX offline_devices_user_id_org_id_proof_hash_key ON public.offline_devices USING btree (user_id, org_id, proof_hash)

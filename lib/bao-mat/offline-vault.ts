@@ -13,6 +13,7 @@
 import { randomUUID } from "node:crypto";
 import { query, queryOne, withTransaction } from "@/lib/db";
 import { CAN, type User } from "@/lib/bao-mat/auth";
+import { log } from "@/lib/nen/log";
 import { damBaoNguCanhActor, LoiOffline, type ThietBiOffline } from "@/lib/bao-mat/offline-devices";
 import { vanTayQuyen } from "@/lib/bao-mat/offline-context";
 import {
@@ -21,6 +22,7 @@ import {
   bocDek,
   danXuatKek,
   moDek,
+  OfflineCryptoError,
   taoDek,
   type KekKeyring,
 } from "@/lib/nen/offline-crypto";
@@ -63,30 +65,55 @@ const COT_KHOA = `id, key_version AS "keyVersion", resource_manifest AS manifest
   manifest_hash AS "manifestHash", wrapped_key AS "wrappedKey", kek_version AS "kekVersion",
   created_at AS "createdAt", retired_at AS "retiredAt"`;
 
+/** Kiểm quyền hiện hành cho một hoặc nhiều manifest (cùng dự án) bằng MỘT truy vấn task. */
+type KiemManifest = (m: OfflineManifest) => boolean;
+
 /**
  * Manifest còn được phép TOÀN BỘ với quyền hiện hành? Task: CAN.editProgress + mọi task thuộc
  * đúng dự án/org (+ subcon: mọi task được giao cho chính mình). Nhật ký: vai trò lập nhật ký.
+ * Nạp gộp mọi task của các manifest trong 1 truy vấn (mở nhiều khoá không N+1).
  */
-export async function manifestConHieuLuc(user: User, m: OfflineManifest): Promise<boolean> {
-  if (m.taskActions.length > 0) {
-    if (!CAN.editProgress(user.role)) return false;
-    const rows = await query<{ id: number; assignedTo: number | null }>(
-      `SELECT t.id, t.assigned_to AS "assignedTo"
-         FROM tasks t
-         JOIN work_packages wp ON wp.id = t.package_id
-         JOIN sheet_types st ON st.id = wp.sheet_type_id
-         JOIN towers tw ON tw.id = st.tower_id
-         JOIN projects p ON p.id = tw.project_id
-        WHERE t.id = ANY(?::int[]) AND tw.project_id = ? AND p.org_id = ?`,
-      m.tasks,
-      m.projectId,
-      user.orgId,
-    );
-    if (rows.length !== m.tasks.length) return false;
-    if (user.role === "subcon" && rows.some((r) => r.assignedTo !== user.id)) return false;
+async function boKiemManifest(user: User, manifests: OfflineManifest[]): Promise<KiemManifest> {
+  const ids = [...new Set(manifests.flatMap((m) => m.tasks))];
+  const giao = new Map<number, number | null>();
+  const coQuyenTask = CAN.editProgress(user.role);
+  if (ids.length > 0 && coQuyenTask) {
+    const theoDuAn = new Map<number, number[]>();
+    for (const m of manifests) {
+      const ds = theoDuAn.get(m.projectId) ?? [];
+      theoDuAn.set(m.projectId, ds.concat(m.tasks));
+    }
+    for (const [projectId, ds] of theoDuAn) {
+      const rows = await query<{ id: number; assignedTo: number | null }>(
+        `SELECT t.id, t.assigned_to AS "assignedTo"
+           FROM tasks t
+           JOIN work_packages wp ON wp.id = t.package_id
+           JOIN sheet_types st ON st.id = wp.sheet_type_id
+           JOIN towers tw ON tw.id = st.tower_id
+           JOIN projects p ON p.id = tw.project_id
+          WHERE t.id = ANY(?::int[]) AND tw.project_id = ? AND p.org_id = ?`,
+        [...new Set(ds)],
+        projectId,
+        user.orgId,
+      );
+      for (const r of rows) giao.set(r.id, r.assignedTo);
+    }
   }
-  if (m.diary && !VAI_TRO_NHAT_KY.has(user.role)) return false;
-  return true;
+  return (m) => {
+    if (m.taskActions.length > 0) {
+      if (!coQuyenTask) return false;
+      for (const id of m.tasks) {
+        if (!giao.has(id)) return false;
+        if (user.role === "subcon" && giao.get(id) !== user.id) return false;
+      }
+    }
+    if (m.diary && !VAI_TRO_NHAT_KY.has(user.role)) return false;
+    return true;
+  };
+}
+
+export async function manifestConHieuLuc(user: User, m: OfflineManifest): Promise<boolean> {
+  return (await boKiemManifest(user, [m]))(m);
 }
 
 function kekCua(keyring: KekKeyring, version: string): Promise<CryptoKey> | null {
@@ -108,17 +135,35 @@ const aadCua = (b: BoiCanh, keyId: string, hash: string, keyVersion: number, kek
     kekVersion,
   });
 
-/** Mở 1 dòng khoá: manifest chuẩn + hash khớp + quyền hiện hành + KEK có trong keyring + AAD. */
+/** Manifest đã lưu của 1 dòng khoá: dạng chuẩn + hash khớp, sai → null (khoá bị sửa trong DB). */
+async function manifestCuaDong(b: BoiCanh, row: DongKhoa): Promise<OfflineManifest | null> {
+  const m = docManifestDaLuu(row.manifest, b.projectId);
+  return m && (await bamManifest(m)) === row.manifestHash ? m : null;
+}
+
+/**
+ * Mở 1 dòng khoá: manifest (đã đọc bởi `manifestCuaDong`) + quyền hiện hành + KEK có trong keyring
+ * + AAD. Thiếu version KEK / giải bọc lỗi → log.warn (chỉ keyId, kekVersion, loại lỗi — không khoá)
+ * để vận hành thấy; client chỉ thấy `locked`.
+ */
 async function moMotKhoa(
   b: BoiCanh,
   keyring: KekKeyring,
   row: DongKhoa,
+  m: OfflineManifest | null,
+  duocPhep: KiemManifest,
 ): Promise<KhoaVaultMo | null> {
-  const m = docManifestDaLuu(row.manifest, b.projectId);
-  if (!m || (await bamManifest(m)) !== row.manifestHash) return null;
-  if (!(await manifestConHieuLuc(b.user, m))) return null;
+  if (!m) return null;
+  if (!duocPhep(m)) return null;
   const kek = kekCua(keyring, row.kekVersion);
-  if (!kek) return null;
+  if (!kek) {
+    log.warn("Vault offline: thiếu version KEK trong keyring — khoá bị locked", {
+      keyId: row.id,
+      kekVersion: row.kekVersion,
+      loai: "kek_version_missing",
+    });
+    return null;
+  }
   try {
     const dek = await moDek(
       new Uint8Array(row.wrappedKey),
@@ -134,8 +179,14 @@ async function moMotKhoa(
       retired: row.retiredAt != null,
       createdAt: new Date(row.createdAt).toISOString(),
     };
-  } catch {
-    return null; // AAD/ciphertext/KEK sai — không fallback, khoá bị coi là không mở được
+  } catch (e) {
+    // AAD/ciphertext/KEK sai — không fallback, khoá bị coi là không mở được.
+    log.warn("Vault offline: giải bọc khoá thất bại — khoá bị locked", {
+      keyId: row.id,
+      kekVersion: row.kekVersion,
+      loai: e instanceof OfflineCryptoError ? `crypto_${e.code}` : "unwrap_error",
+    });
+    return null;
   }
 }
 
@@ -180,7 +231,7 @@ export async function capKhoaVault(
       hash,
     );
     if (daCo) {
-      const mo = await moMotKhoa(b, keyring, daCo);
+      const mo = await moMotKhoa(b, keyring, daCo, await manifestCuaDong(b, daCo), () => true);
       if (mo) return { khoa: mo, moi: false };
       // Khoá cũ không mở được (vd KEK cũ đã gỡ) → cấp khoá mới, giữ nguyên khoá cũ.
     }
@@ -233,15 +284,17 @@ export async function capKhoaVault(
 }
 
 /**
- * Mở khoá vault của chính actor trên thiết bị + dự án này. `keyIds` null → mọi khoá. Khoá không
- * mở được (manifest có tài nguyên bị thu hồi, KEK đã gỡ, dữ liệu bị sửa, không tồn tại/không phải
- * của mình) đều chỉ báo `locked` theo keyId — không nêu lý do để không lộ tài nguyên bị cấm.
+ * Mở khoá vault của chính actor trên thiết bị + dự án này. `keyIds` null → các khoá MỚI NHẤT
+ * (key_version giảm dần) tối đa MAX_KHOA_MOI_LAN, `truncated: true` khi còn khoá cũ hơn chưa trả.
+ * Khoá không mở được (manifest có tài nguyên bị thu hồi, KEK đã gỡ, dữ liệu bị sửa, không tồn
+ * tại/không phải của mình) đều chỉ báo `locked` theo keyId — không nêu lý do để không lộ tài
+ * nguyên bị cấm.
  */
 export async function moKhoaVault(
   b: BoiCanh,
   keyring: KekKeyring,
   keyIds: string[] | null,
-): Promise<{ keys: KhoaVaultMo[]; locked: { keyId: string }[] }> {
+): Promise<{ keys: KhoaVaultMo[]; locked: { keyId: string }[]; truncated: boolean }> {
   damBaoNguCanhActor(b.user, b.projectId);
   const rows = await withTransaction(
     () =>
@@ -249,8 +302,8 @@ export async function moKhoaVault(
         `SELECT ${COT_KHOA} FROM offline_vault_keys
           WHERE device_id = ?::uuid AND user_id = ? AND org_id = ? AND project_id = ?
             AND (?::uuid[] IS NULL OR id = ANY(?::uuid[]))
-          ORDER BY key_version
-          LIMIT ${MAX_KHOA_MOI_LAN}`,
+          ORDER BY key_version DESC
+          LIMIT ${MAX_KHOA_MOI_LAN + 1}`,
         b.thietBi.id,
         b.user.id,
         b.user.orgId,
@@ -260,14 +313,21 @@ export async function moKhoaVault(
       ),
     { readOnly: true },
   );
+  const truncated = rows.length > MAX_KHOA_MOI_LAN;
+  const trang = truncated ? rows.slice(0, MAX_KHOA_MOI_LAN) : rows;
+  const manifests = await Promise.all(trang.map((r) => manifestCuaDong(b, r)));
+  const duocPhep = await boKiemManifest(
+    b.user,
+    manifests.filter((m): m is OfflineManifest => m != null),
+  );
   const keys: KhoaVaultMo[] = [];
   const locked: { keyId: string }[] = [];
-  for (const row of rows) {
-    const mo = await moMotKhoa(b, keyring, row);
+  for (const [i, row] of trang.entries()) {
+    const mo = await moMotKhoa(b, keyring, row, manifests[i], duocPhep);
     if (mo) keys.push(mo);
     else locked.push({ keyId: row.id });
   }
-  const thay = new Set(rows.map((r) => r.id));
+  const thay = new Set(trang.map((r) => r.id));
   for (const id of keyIds ?? []) if (!thay.has(id)) locked.push({ keyId: id });
-  return { keys, locked };
+  return { keys, locked, truncated };
 }

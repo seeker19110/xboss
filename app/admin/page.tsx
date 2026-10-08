@@ -231,7 +231,10 @@ export default function AdminPage() {
     };
     es.onerror = () => setTrafficLive(false);
     // S05: tab khác đổi ngữ cảnh → đóng SSE ngay (trang sẽ bị khoá chờ tải lại).
-    const goDangKy = dangKyKetNoiSong(() => es.close());
+    const goDangKy = dangKyKetNoiSong(() => {
+      es.close();
+      setTrafficLive(false);
+    });
     return () => {
       goDangKy();
       es.close();

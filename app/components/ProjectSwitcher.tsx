@@ -4,6 +4,7 @@ import { ChevronDown, Star, LayoutGrid, Search } from "lucide-react";
 import { systemColorClasses } from "@/lib/nen/systemColors";
 import type { ProjectListItem } from "@/lib/ha-tang/projects";
 import { phatDoiNguCanh } from "@/app/lib/contextEpoch";
+import { showToast } from "@/app/components/Toast";
 
 const PINNED_KEY = "xboss_pinned";
 const FILTER_THRESHOLD = 7;
@@ -115,7 +116,11 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
         // S05: cookie dự án dùng chung mọi tab — báo các tab khác khoá ngữ cảnh cũ trước khi tải lại.
         phatDoiNguCanh("switch");
         window.location.reload();
+      } else {
+        showToast("Không chuyển được dự án — vui lòng thử lại", "error");
       }
+    } catch {
+      showToast("Mất kết nối — chưa chuyển được dự án", "error");
     } finally {
       setBusy(false);
       setOpen(false);

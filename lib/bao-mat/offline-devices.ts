@@ -10,7 +10,7 @@
 // - Mọi truy vấn chạy trong withTransaction để GUC actor (app.user_id/org_id/role) có mặt cho RLS
 //   của 0163; thiếu/lệch ngữ cảnh actor → throw (fail-closed) thay vì chạy không GUC.
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { query, queryOne, withTransaction } from "@/lib/db";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getRequestContext } from "@/lib/nen/request-context";
 import { log } from "@/lib/nen/log";
 import { docKeyringKek, OfflineKekConfigError, type KekKeyring } from "@/lib/nen/offline-crypto";
@@ -91,6 +91,8 @@ export type ThietBiOffline = {
   approvedAt: string | null;
   revokedAt: string | null;
   createdAt: string;
+  /** Proof này còn bản ghi CHƯA thu hồi của người khác (xuyên org) → không "đúng một chủ". */
+  dungChung: boolean;
 };
 
 type DongThietBi = {
@@ -101,10 +103,13 @@ type DongThietBi = {
   approvedAt: Date | null;
   revokedAt: Date | null;
   createdAt: Date;
+  dungChung: boolean;
 };
 
+// dungChung: hàm SECURITY DEFINER của 0163 (xuyên org, chỉ trả boolean) — RLS chỉ thấy cùng org.
 const COT = `id, user_id AS "userId", profile, approved_by AS "approvedBy",
-  approved_at AS "approvedAt", revoked_at AS "revokedAt", created_at AS "createdAt"`;
+  approved_at AS "approvedAt", revoked_at AS "revokedAt", created_at AS "createdAt",
+  offline_proof_nguoi_khac(proof_hash, user_id, false) AS "dungChung"`;
 
 const iso = (d: Date | null) => (d ? new Date(d).toISOString() : null);
 
@@ -117,12 +122,20 @@ function ra(d: DongThietBi): ThietBiOffline {
     approvedAt: iso(d.approvedAt),
     revokedAt: iso(d.revokedAt),
     createdAt: iso(d.createdAt) as string,
+    dungChung: d.dungChung === true,
   };
 }
 
-/** Profile THỰC THI: field-personal chỉ khi đã được duyệt và chưa thu hồi; còn lại shared-safe. */
+/**
+ * Profile THỰC THI: field-personal chỉ khi đã được duyệt, chưa thu hồi VÀ trình duyệt không đang
+ * được người khác dùng (xuyên org — đua giữa duyệt và đăng ký vẫn hạ về lease shared-safe).
+ */
 export function hoSoHieuLuc(t: ThietBiOffline): HoSoOffline {
-  return t.profile === "field-personal" && t.approvedBy != null && t.approvedAt && !t.revokedAt
+  return t.profile === "field-personal" &&
+    t.approvedBy != null &&
+    t.approvedAt &&
+    !t.revokedAt &&
+    !t.dungChung
     ? "field-personal"
     : "shared-safe";
 }
@@ -143,7 +156,11 @@ export async function timThietBi(user: Actor, proofHash: Buffer): Promise<ThietB
   return row ? ra(row) : null;
 }
 
-/** Đăng ký idempotent: cùng actor + cùng proof → trả bản ghi cũ; bản ghi đã thu hồi → 403. */
+/**
+ * Đăng ký idempotent: cùng actor + cùng proof → trả bản ghi cũ; bản ghi đã thu hồi → 403.
+ * Bản ghi MỚI trên trình duyệt đang là field-personal (chưa thu hồi) của người khác, kể cả khác
+ * org → 409 shared_browser (thiết bị cá nhân đã duyệt không được dùng chung).
+ */
 export async function dangKyThietBi(
   user: Actor,
   proofHash: Buffer,
@@ -163,6 +180,17 @@ export async function dangKyThietBi(
         throw new LoiOffline(403, "device_revoked", "Thiết bị này đã bị thu hồi quyền offline");
       return { thietBi: ra(co), moi: false };
     }
+    const caNhanNguoiKhac = await queryOne<{ co: boolean }>(
+      `SELECT offline_proof_nguoi_khac(?::bytea, ?, true) AS co`,
+      proofHash,
+      user.id,
+    );
+    if (caNhanNguoiKhac?.co)
+      throw new LoiOffline(
+        409,
+        "shared_browser",
+        "Trình duyệt này là thiết bị cá nhân đã duyệt của tài khoản khác — không đăng ký offline được",
+      );
     const dem = await queryOne<{ n: number }>(
       `SELECT COUNT(*)::int AS n FROM offline_devices
         WHERE user_id = ? AND org_id = ? AND revoked_at IS NULL`,
@@ -210,6 +238,7 @@ export async function danhSachThietBi(
         `SELECT d.id, d.user_id AS "userId", d.profile, d.approved_by AS "approvedBy",
                 d.approved_at AS "approvedAt", d.revoked_at AS "revokedAt",
                 d.created_at AS "createdAt", u.name AS "userName",
+                offline_proof_nguoi_khac(d.proof_hash, d.user_id, false) AS "dungChung",
                 (d.user_id = ? AND d.proof_hash = ?::bytea) AS "thisBrowser"
            FROM offline_devices d JOIN users u ON u.id = d.user_id
           WHERE d.org_id = ? AND (?::boolean OR d.user_id = ?)
@@ -231,8 +260,11 @@ export type ThayDoiThietBi = { profile: HoSoOffline } | { revoke: true };
 /**
  * Admin đổi profile / thu hồi thiết bị cùng org (route đã kiểm CAN.manageUsers + 2FA).
  * field-personal: ghi người duyệt + thời điểm; từ chối nếu proof đang có bản ghi CHƯA thu hồi của
- * người khác trong org (thiết bị dùng chung → không phải "đúng một chủ sử dụng", D02).
+ * người khác, xuyên org (thiết bị dùng chung → không phải "đúng một chủ sử dụng", D02).
  * shared-safe: xoá thông tin duyệt. Đã thu hồi → 409 (không mở lại).
+ * Thu hồi = buộc chủ thiết bị đăng nhập lại: tăng users.session_version CÙNG transaction (mọi
+ * phiên cũ, kể cả phiên trên trình duyệt bị thu hồi, hết hiệu lực — không dùng phiên đó đăng ký
+ * lại bằng proof mới).
  */
 export async function capNhatThietBi(
   admin: Actor,
@@ -253,20 +285,17 @@ export async function capNhatThietBi(
     let sql: string;
     let params: unknown[];
     if ("revoke" in thayDoi) {
+      const tang = await run(
+        `UPDATE users SET session_version = session_version + 1 WHERE id = ? AND org_id = ?`,
+        hienTai.userId,
+        admin.orgId,
+      );
+      if (tang.changes !== 1) throw new Error("Không thu hồi được phiên của chủ thiết bị");
       sql = `UPDATE offline_devices SET revoked_at = now() WHERE id = ?::uuid RETURNING ${COT}`;
       params = [id];
     } else if (thayDoi.profile === "field-personal") {
       if (hienTai.profile === "field-personal") return ra(hienTai);
-      const dungChung = await queryOne<{ id: string }>(
-        `SELECT o.id FROM offline_devices o
-           JOIN offline_devices d ON d.id = ?::uuid
-          WHERE o.org_id = ? AND o.proof_hash = d.proof_hash
-            AND o.user_id <> d.user_id AND o.revoked_at IS NULL
-          LIMIT 1`,
-        id,
-        admin.orgId,
-      );
-      if (dungChung)
+      if (hienTai.dungChung)
         throw new LoiOffline(
           409,
           "shared_browser",

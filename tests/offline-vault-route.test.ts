@@ -1,6 +1,6 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
 import { dangNhapDuAn, dangXuat } from "./helpers/phien"; // mock next/headers — trước mọi import route
-import { test, before, after } from "node:test";
+import { test, before, after, mock } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { NextRequest } from "next/server";
@@ -588,7 +588,19 @@ test(
     ]);
     const hong = Buffer.from(g.w);
     hong[30] ^= 0xff;
-    await thu(`UPDATE offline_vault_keys SET wrapped_key = $2 WHERE id = $1`, [id, hong]);
+    const canhBao = mock.method(console, "warn", () => {});
+    try {
+      await thu(`UPDATE offline_vault_keys SET wrapped_key = $2 WHERE id = $1`, [id, hong]);
+    } finally {
+      canhBao.mock.restore();
+    }
+    assert.ok(
+      canhBao.mock.calls.some((c) => {
+        const l = c.arguments.join(" ");
+        return l.includes(id) && l.includes("crypto_auth");
+      }),
+      "giải bọc lỗi có log.warn kèm keyId + loại lỗi",
+    );
     await vao(a, F.p1);
     assert.equal((await moKhoa(a.proof, ctx, [id])).j.keys.length, 1, "khôi phục đúng → mở lại");
   },
@@ -637,8 +649,24 @@ test(
 
     batKek(KEK_V2);
     await vao(a, F.p1);
-    const goV1 = await moKhoa(a.proof, ctx, [a.k1, moi.j.key.keyId]);
+    const canhBao = mock.method(console, "warn", () => {});
+    let goV1: Awaited<ReturnType<typeof moKhoa>>;
+    try {
+      goV1 = await moKhoa(a.proof, ctx, [a.k1, moi.j.key.keyId]);
+    } finally {
+      canhBao.mock.restore();
+    }
     assert.deepEqual(goV1.j.locked, [{ keyId: a.k1 }]);
+    // Vận hành thấy lý do (keyId + kekVersion + loại lỗi), không có khoá; client chỉ thấy locked.
+    const dongLog = canhBao.mock.calls.map((c) => c.arguments.join(" "));
+    assert.ok(
+      dongLog.some(
+        (l) => l.includes(a.k1) && l.includes("kek_version_missing") && l.includes("v1"),
+      ),
+      dongLog.join("\n"),
+    );
+    assert.ok(!dongLog.some((l) => l.includes(a.dek1)), "log không chứa DEK");
+    assert.ok(!JSON.stringify(goV1.j.locked).includes("kek"), "client không thấy lý do");
     assert.equal(goV1.j.keys[0].keyId, moi.j.key.keyId);
     batKek(`${KEK_V2},${KEK_V1}`);
     await vao(a, F.p1);
@@ -746,6 +774,123 @@ test(
   },
 );
 
+async function patchThietBi(u: U, projectId: number, devId: string, body: unknown) {
+  await vao(u, projectId);
+  const res = await (
+    await r.device()
+  ).PATCH(req("PATCH", `/api/offline/devices/${devId}`, { body }), PID(devId));
+  return { res, j: await res.json() };
+}
+
+const bamProofTest = (proof: string) =>
+  createHash("sha256").update(Buffer.from(proof, "base64url")).digest();
+
+test(
+  "một chủ field-personal XUYÊN ORG: đã duyệt A thì B (cùng/khác org) đăng ký cùng proof → 409; org khác đang dùng → không duyệt được; đua → lease 15 phút",
+  S,
+  async () => {
+    batKek();
+    const c1 = await taoUser("fp-c1", "engineer", 1);
+    const c2 = await taoUser("fp-c2", "engineer", 1);
+    const c3 = await taoUser("fp-c3", "engineer", 1);
+    const c4 = await taoUser("fp-c4", "engineer", 1);
+    const cx = await taoUser("fp-cx", "engineer", F.org2);
+
+    // (i) Duyệt c1 field-personal → c2 (cùng org) và cx (khác org) không đăng ký được proof đó.
+    const d1 = await dangKy(c1, F.p1);
+    assert.equal(d1.j.device.dungChung, false);
+    const duyet = await patchThietBi(F.u.admin, F.p1, d1.j.device.id, {
+      profile: "field-personal",
+    });
+    assert.equal(duyet.res.status, 200);
+    const b = await dangKy(c2, F.p1, d1.proof);
+    assert.equal(b.res.status, 409);
+    assert.equal(b.j.code, "shared_browser");
+    const x = await dangKy(cx, F.p3, d1.proof);
+    assert.equal(
+      x.res.status,
+      409,
+      "khác org cũng bị chặn (RLS không thấy, hàm SECURITY DEFINER thấy)",
+    );
+    assert.equal(x.j.code, "shared_browser");
+    const n = await own.query(`SELECT 1 FROM offline_devices WHERE proof_hash = $1`, [
+      bamProofTest(d1.proof),
+    ]);
+    assert.equal(n.rows.length, 1, "không tạo bản ghi cho người thứ hai");
+    assert.equal((await layContext(c1, F.p1, d1.proof)).j.context.profile, "field-personal");
+
+    // (iii) Trình duyệt đang được tài khoản ORG KHÁC dùng → Admin không duyệt field-personal.
+    const d3 = await dangKy(c3, F.p1);
+    assert.equal((await dangKy(cx, F.p3, d3.proof)).res.status, 201);
+    const tuChoi = await patchThietBi(F.u.admin, F.p1, d3.j.device.id, {
+      profile: "field-personal",
+    });
+    assert.equal(tuChoi.res.status, 409);
+    assert.equal(tuChoi.j.code, "shared_browser");
+
+    // (ii) Đua giữa duyệt và đăng ký (mô phỏng: bản ghi org khác chèn thẳng sau khi duyệt) →
+    // profile thực thi hạ về shared-safe, lease 15 phút, context 8h cũ → context_changed.
+    const d4 = await dangKy(c4, F.p1);
+    await patchThietBi(F.u.admin, F.p1, d4.j.device.id, { profile: "field-personal" });
+    const c8h = await layContext(c4, F.p1, d4.proof);
+    assert.equal(c8h.j.context.profile, "field-personal");
+    await own.query(
+      `INSERT INTO offline_devices (id, user_id, org_id, proof_hash)
+       VALUES (gen_random_uuid(), $1, $2, $3)`,
+      [cx.id, F.org2, bamProofTest(d4.proof)],
+    );
+    await vao(c4, F.p1);
+    assert.equal((await moKhoa(d4.proof, c8h.j.context.contextId)).j.code, "context_changed");
+    const c15 = await layContext(c4, F.p1, d4.proof);
+    assert.equal(c15.j.context.profile, "shared-safe");
+    assert.equal(
+      Date.parse(c15.j.context.expiresAt) - Date.parse(c15.j.context.issuedAt),
+      15 * 60_000,
+    );
+  },
+);
+
+test(
+  "mở tất cả khoá: tối đa 500 khoá MỚI NHẤT + truncated; keyIds cụ thể không truncated",
+  S,
+  async () => {
+    batKek();
+    const u = await taoUser("nhieu-khoa", "engineer", 1);
+    const d = await dangKy(u, F.p1);
+    const devId = d.j.device.id as string;
+    // 501 khoá cũ hỏng (manifest không hợp lệ → locked, không giải bọc) chèn thẳng bằng owner.
+    await own.query(
+      `INSERT INTO offline_vault_keys (id, device_id, user_id, org_id, project_id, key_version,
+         resource_manifest, manifest_hash, permission_fingerprint, wrapped_key, kek_version)
+       SELECT gen_random_uuid(), $1, $2, 1, $3, v, '{"v":0}'::jsonb, repeat('0', 64),
+              repeat('0', 64), decode('00', 'hex'), 'v1'
+         FROM generate_series(1, 501) v`,
+      [devId, u.id, F.p1],
+    );
+    const { j } = await layContext(u, F.p1, d.proof);
+    const ctx = j.context.contextId as string;
+    const k = await capKhoa(d.proof, ctx, { tasks: [F.t2], taskActions: ["tick"] });
+    assert.equal(k.res.status, 201);
+    assert.equal(k.j.key.keyVersion, 502);
+    const tatCa = await moKhoa(d.proof, ctx);
+    assert.equal(tatCa.res.status, 200);
+    assert.equal(tatCa.j.truncated, true);
+    assert.equal(tatCa.j.keys.length + tatCa.j.locked.length, 500);
+    assert.equal(tatCa.j.keys[0]?.keyId, k.j.key.keyId, "khoá mới nhất luôn có mặt");
+    const cuNhat = await own.query<{ id: string }>(
+      `SELECT id FROM offline_vault_keys WHERE device_id = $1 AND key_version <= 2
+        ORDER BY key_version`,
+      [devId],
+    );
+    const traVe = new Set(tatCa.j.locked.map((x: { keyId: string }) => x.keyId));
+    for (const r0 of cuNhat.rows) assert.ok(!traVe.has(r0.id), "khoá cũ nhất bị cắt");
+    const cuThe = await moKhoa(d.proof, ctx, [k.j.key.keyId, cuNhat.rows[0].id]);
+    assert.equal(cuThe.j.truncated, false);
+    assert.equal(cuThe.j.keys.length, 1);
+    assert.deepEqual(cuThe.j.locked, [{ keyId: cuNhat.rows[0].id }]);
+  },
+);
+
 test(
   "thu hồi thiết bị: context/khoá → 403 device_revoked, không mở lại, không xoá khoá",
   S,
@@ -776,6 +921,20 @@ test(
     );
     assert.equal(lai.status, 409);
 
+    // Thu hồi thiết bị = buộc chủ thiết bị đăng nhập lại: session_version tăng cùng transaction.
+    const sv = await own.query<{ sv: number }>(
+      `SELECT session_version AS sv FROM users WHERE id = $1`,
+      [pm.id],
+    );
+    assert.equal(sv.rows[0].sv, pm.sessionVersion + 1);
+    const cuPhien = await layContext(pm, F.p1, pm.proof);
+    assert.equal(cuPhien.res.status, 401, "phiên cũ của chủ thiết bị hết hiệu lực");
+    const dkMoiPhienCu = await dangKy(pm, F.p1);
+    assert.equal(dkMoiPhienCu.res.status, 401, "phiên cũ không đăng ký lại được bằng proof mới");
+    assert.equal(dkMoiPhienCu.cookie, undefined);
+    pm.sessionVersion += 1;
+    F.u.pm = pm;
+
     const c = await layContext(pm, F.p1, pm.proof);
     assert.equal(c.res.status, 403);
     assert.equal(c.j.code, "device_revoked");
@@ -801,9 +960,18 @@ test("rate limit mở khoá: quá 30 lần/15 phút → 429 + Retry-After", S, a
   batKek();
   const d = await dangKy(F.u.rl, F.p1);
   const { j } = await layContext(F.u.rl, F.p1, d.proof);
+  // 30 lần đầu không bị chặn; lần chặn đầu tiên là 429 + Retry-After. Lặp tới 90 lần vì file
+  // test khác chạy song song (route-auth) có thể `DELETE FROM login_rate_limits` giữa chừng —
+  // bộ đếm về 0 chỉ làm 429 đến muộn hơn, không bao giờ sớm hơn lần thứ 31.
   let cuoi: Response | null = null;
-  for (let i = 0; i < 31; i++) cuoi = (await moKhoa(d.proof, j.context.contextId)).res;
+  let lan = 0;
+  while (lan < 90) {
+    lan++;
+    cuoi = (await moKhoa(d.proof, j.context.contextId)).res;
+    if (cuoi.status === 429) break;
+  }
   assert.equal(cuoi?.status, 429);
+  assert.ok(lan >= 31, `bị chặn quá sớm ở lần ${lan}`);
   assert.equal(cuoi?.headers.get("retry-after"), "900");
 });
 
