@@ -172,6 +172,23 @@ const MUTATIONS = [
     tests: ["tests/s13d-ipc-con-lai.test.ts"],
     why: "Request trình trước bản vá S10a mang amount lúc lập nháp → engine bỏ qua bước duyệt cấp cao theo min_amount.",
   },
+  // QUALITY-FINAL-1 S13e: cùng bất biến cho đề xuất + phát sinh (VO).
+  {
+    key: "Đề xuất: decide chốt lại amount cũ trước khi engine chọn bước",
+    file: "app/api/proposals/[id]/decide/route.ts",
+    find: "          await kiemAmountTruocKhiDuyet({",
+    replace: "          void ({",
+    tests: ["tests/s13e-de-xuat-vo-quyet-dinh.test.ts"],
+    why: "Đề xuất trình trước S13d mang số tiền lúc lập → engine bỏ qua bước duyệt cấp cao theo min_amount.",
+  },
+  {
+    key: "VO: decide chốt lại amount cũ trước khi engine chọn bước",
+    file: "app/api/variations/[id]/decide/route.ts",
+    find: "          await kiemAmountTruocKhiDuyet({",
+    replace: "          void ({",
+    tests: ["tests/s13e-de-xuat-vo-quyet-dinh.test.ts"],
+    why: "VO lập trước S13e mang amount từ SUM float → engine chọn cấp duyệt theo số xấp xỉ/cũ.",
+  },
 ];
 
 const only = process.argv.find((a) => a.startsWith("--only="))?.slice("--only=".length);

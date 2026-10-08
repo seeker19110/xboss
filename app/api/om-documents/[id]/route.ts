@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { storageGet, storageDelete } from "@/lib/nen/storage";
 import { run } from "@/lib/db";
@@ -43,26 +44,31 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageWarranty(user.role))
-    return NextResponse.json(
-      { error: "Bạn không có quyền xoá tài liệu O&M (Admin/PM/kỹ sư)" },
-      { status: 403 },
-    );
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.manageWarranty(user.role))
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá tài liệu O&M (Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const existing = projectId != null ? await getOmDoc(id, projectId) : null;
-  if (!existing) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+    const projectId = await getCurrentProjectId(user);
+    const existing = projectId != null ? await getOmDoc(id, projectId) : null;
+    if (!existing) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
-  await run(`DELETE FROM om_documents WHERE id = ?`, id);
-  if (existing.fileName) {
-    await storageDelete(user.orgId, existing.fileName);
+    await run(`DELETE FROM om_documents WHERE id = ?`, id);
+    if (existing.fileName) {
+      await storageDelete(user.orgId, existing.fileName);
+    }
+
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
   }
-
-  return NextResponse.json({ deleted: id });
 }

@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
@@ -134,59 +135,73 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.editStructure(user.role))
-    return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được nhóm" }, { status: 403 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.editStructure(user.role))
+      return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được nhóm" }, { status: 403 });
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const pkg = await queryOne<{ id: number }>(`SELECT id FROM work_packages WHERE id = ?`, id);
-  if (!pkg) return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
+    const pkg = await queryOne<{ id: number }>(`SELECT id FROM work_packages WHERE id = ?`, id);
+    if (!pkg) return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
 
-  // Chống xoá xuyên dự án (vá W0) — id đoán được, tương tự PATCH.
-  const visible = await visibleProjectIds(user);
-  const pid = await packageProjectId(id);
-  if (pid == null || !visible.includes(pid))
-    return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
+    // Chống xoá xuyên dự án (vá W0) — id đoán được, tương tự PATCH.
+    const visible = await visibleProjectIds(user);
+    const pid = await packageProjectId(id);
+    if (pid == null || !visible.includes(pid))
+      return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
 
-  const tasks = await query<{ id: number }>(`SELECT id FROM tasks WHERE package_id = ?`, id);
-  if (tasks.length > 0) {
+    const tasks = await query<{ id: number }>(`SELECT id FROM tasks WHERE package_id = ?`, id);
     const taskIds = tasks.map((t) => t.id);
-    const photos = await query<{ file_name: string }>(
-      `SELECT file_name FROM task_photos WHERE task_id = ANY(?)`,
-      taskIds,
-    );
-    const docs = await query<{ file_name: string }>(
-      `SELECT file_name FROM task_documents WHERE task_id = ANY(?)`,
-      taskIds,
-    );
-    for (const f of [...photos, ...docs]) {
-      await storageDelete(user.orgId, f.file_name);
+    const filesToDelete: string[] = [];
+    if (taskIds.length > 0) {
+      const photos = await query<{ file_name: string }>(
+        `SELECT file_name FROM task_photos WHERE task_id = ANY(?)`,
+        taskIds,
+      );
+      const docs = await query<{ file_name: string }>(
+        `SELECT file_name FROM task_documents WHERE task_id = ANY(?)`,
+        taskIds,
+      );
+      for (const f of [...photos, ...docs]) filesToDelete.push(f.file_name);
     }
-    await run(`DELETE FROM notifications WHERE task_id = ANY(?)`, taskIds);
-    await run(`DELETE FROM baseline_tasks WHERE task_id = ANY(?)`, taskIds);
-    await run(`DELETE FROM task_photos WHERE task_id = ANY(?)`, taskIds);
-    await run(`DELETE FROM task_documents WHERE task_id = ANY(?)`, taskIds);
-    await run(`DELETE FROM task_comments WHERE task_id = ANY(?)`, taskIds);
-    await run(`DELETE FROM task_history WHERE task_id = ANY(?)`, taskIds);
-    await run(`DELETE FROM materials WHERE task_id = ANY(?)`, taskIds);
-    await run(`DELETE FROM progress_dimensions WHERE task_id = ANY(?)`, taskIds);
-    await run(`DELETE FROM tasks WHERE package_id = ?`, id);
-  }
 
-  // Lớp phòng thủ thứ hai (vá W0): dù đã kiểm dự án ở trên, câu DELETE tự nó cũng ràng buộc
-  // lại — nhóm phải nằm trong 1 sheet của đúng dự án `pid` mới bị xoá.
-  await run(
-    `DELETE FROM work_packages
-      WHERE id = ? AND sheet_type_id IN (
-        SELECT st.id FROM sheet_types st LEFT JOIN towers tw ON tw.id = st.tower_id
-         WHERE tw.project_id = ?
-      )`,
-    id,
-    pid,
-  );
-  return NextResponse.json({ deleted: id });
+    // Toàn bộ chuỗi xoá trong MỘT transaction: 23503 (còn bảng khác tham chiếu) ở bước sau
+    // rollback cả các bước trước, không để nhóm mất task/ảnh/lịch sử một nửa.
+    await withTransaction(async () => {
+      if (taskIds.length > 0) {
+        await run(`DELETE FROM notifications WHERE task_id = ANY(?)`, taskIds);
+        await run(`DELETE FROM baseline_tasks WHERE task_id = ANY(?)`, taskIds);
+        await run(`DELETE FROM task_photos WHERE task_id = ANY(?)`, taskIds);
+        await run(`DELETE FROM task_documents WHERE task_id = ANY(?)`, taskIds);
+        await run(`DELETE FROM task_comments WHERE task_id = ANY(?)`, taskIds);
+        await run(`DELETE FROM task_history WHERE task_id = ANY(?)`, taskIds);
+        await run(`DELETE FROM materials WHERE task_id = ANY(?)`, taskIds);
+        await run(`DELETE FROM progress_dimensions WHERE task_id = ANY(?)`, taskIds);
+        await run(`DELETE FROM tasks WHERE package_id = ?`, id);
+      }
+
+      // Lớp phòng thủ thứ hai (vá W0): dù đã kiểm dự án ở trên, câu DELETE tự nó cũng ràng buộc
+      // lại — nhóm phải nằm trong 1 sheet của đúng dự án `pid` mới bị xoá.
+      await run(
+        `DELETE FROM work_packages
+        WHERE id = ? AND sheet_type_id IN (
+          SELECT st.id FROM sheet_types st LEFT JOIN towers tw ON tw.id = st.tower_id
+           WHERE tw.project_id = ?
+        )`,
+        id,
+        pid,
+      );
+    });
+
+    // Xoá file vật lý SAU khi DB commit — file mồ côi ít hại hơn bản ghi mất file.
+    for (const name of filesToDelete) await storageDelete(user.orgId, name);
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

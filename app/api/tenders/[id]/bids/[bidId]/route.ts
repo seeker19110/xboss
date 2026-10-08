@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
@@ -97,26 +98,31 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string; bidId: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageTenders(user.role))
-    return NextResponse.json(
-      { error: "Bạn không có quyền xoá báo giá (chỉ Admin/PM)" },
-      { status: 403 },
-    );
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.manageTenders(user.role))
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá báo giá (chỉ Admin/PM)" },
+        { status: 403 },
+      );
 
-  const tenderId = parseInt(params.id);
-  const bidId = parseInt(params.bidId);
-  if (isNaN(tenderId) || isNaN(bidId))
-    return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const tenderId = parseInt(params.id);
+    const bidId = parseInt(params.bidId);
+    if (isNaN(tenderId) || isNaN(bidId))
+      return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const found = await loadBidAndTender(tenderId, bidId, projectId);
-  if (!found) return NextResponse.json({ error: "Không tìm thấy báo giá" }, { status: 404 });
-  if (found.tenderStatus === "awarded")
-    return NextResponse.json({ error: "Gói thầu đã trao thầu — khoá sửa" }, { status: 409 });
+    const projectId = await getCurrentProjectId(user);
+    const found = await loadBidAndTender(tenderId, bidId, projectId);
+    if (!found) return NextResponse.json({ error: "Không tìm thấy báo giá" }, { status: 404 });
+    if (found.tenderStatus === "awarded")
+      return NextResponse.json({ error: "Gói thầu đã trao thầu — khoá sửa" }, { status: 409 });
 
-  await run(`DELETE FROM tender_bids WHERE id = ?`, bidId);
-  return NextResponse.json({ deleted: bidId });
+    await run(`DELETE FROM tender_bids WHERE id = ?`, bidId);
+    return NextResponse.json({ deleted: bidId });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

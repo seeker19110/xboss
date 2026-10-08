@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { moneyInputErrorBody } from "@/lib/nen/money";
 import { run } from "@/lib/db";
@@ -77,8 +78,12 @@ export async function PATCH(
   const refErr = await checkProposalRefs(input, projectId ?? undefined);
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
 
-  await run(
-    `UPDATE proposals SET kind = ?, title = ?, amount = ?, contract_id = ?, material_id = ?, reason = ? WHERE id = ?`,
+  // S13e: điều kiện `status = 'draft'` ngay trong UPDATE — kiểm "còn nháp" ở trên đọc không khoá,
+  // trình (submit, khoá dòng) chen giữa thì UPDATE chờ khoá rồi không khớp → 409, không sửa được
+  // số tiền của đề xuất ĐÃ trình (amount của luồng duyệt đã chốt lúc trình).
+  const { changes } = await run(
+    `UPDATE proposals SET kind = ?, title = ?, amount = ?, contract_id = ?, material_id = ?, reason = ?
+      WHERE id = ? AND status = 'draft'`,
     input.kind,
     input.title,
     input.amount,
@@ -87,6 +92,11 @@ export async function PATCH(
     input.reason,
     id,
   );
+  if (changes === 0)
+    return NextResponse.json(
+      { error: "Đề xuất đã trình/đã quyết — không thể sửa" },
+      { status: 409 },
+    );
   return NextResponse.json({ ok: true });
 }
 
@@ -95,24 +105,29 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const proposal = projectId != null ? await getProposal(id, projectId) : undefined;
-  if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
+    const projectId = await getCurrentProjectId(user);
+    const proposal = projectId != null ? await getProposal(id, projectId) : undefined;
+    if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
 
-  const isOwnDraft = proposal.requestedBy === user.id && proposal.status === "draft";
-  if (!isOwnDraft && user.role !== "admin")
-    return NextResponse.json(
-      { error: "Chỉ người tạo xoá được đề xuất nháp của mình (Admin xoá được mọi đề xuất)" },
-      { status: 403 },
-    );
+    const isOwnDraft = proposal.requestedBy === user.id && proposal.status === "draft";
+    if (!isOwnDraft && user.role !== "admin")
+      return NextResponse.json(
+        { error: "Chỉ người tạo xoá được đề xuất nháp của mình (Admin xoá được mọi đề xuất)" },
+        { status: 403 },
+      );
 
-  await run(`DELETE FROM proposals WHERE id = ?`, id);
-  return NextResponse.json({ deleted: id });
+    await run(`DELETE FROM proposals WHERE id = ?`, id);
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

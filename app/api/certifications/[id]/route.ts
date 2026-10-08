@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { storagePut, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
@@ -196,24 +197,29 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageHr(user.role))
-    return NextResponse.json(
-      { error: "Bạn không có quyền xoá chứng chỉ (chỉ Admin/PM)" },
-      { status: 403 },
-    );
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.manageHr(user.role))
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá chứng chỉ (chỉ Admin/PM)" },
+        { status: 403 },
+      );
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const existing = await loadExisting(id, projectId);
-  if (!existing) return NextResponse.json({ error: "Không tìm thấy chứng chỉ" }, { status: 404 });
+    const projectId = await getCurrentProjectId(user);
+    const existing = await loadExisting(id, projectId);
+    if (!existing) return NextResponse.json({ error: "Không tìm thấy chứng chỉ" }, { status: 404 });
 
-  await run(`DELETE FROM certifications WHERE id = ?`, id);
-  if (existing.fileName) await storageDelete(user.orgId, existing.fileName);
+    await run(`DELETE FROM certifications WHERE id = ?`, id);
+    if (existing.fileName) await storageDelete(user.orgId, existing.fileName);
 
-  return NextResponse.json({ deleted: id });
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

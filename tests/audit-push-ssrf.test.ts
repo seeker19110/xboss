@@ -8,6 +8,7 @@ import * as https from "node:https";
 import dns from "node:dns";
 import ts from "typescript";
 import { safeLookup, validateWebhookUrl } from "@/lib/bao-mat/webhooks";
+import * as loi from "@/lib/nen/loi";
 
 // Chạy code thật, chỉ mock biên DB/HTTP; không dùng DB, secret hay mạng production.
 function load<T>(path: string, mocks: Record<string, unknown>): T {
@@ -81,6 +82,8 @@ test("push: đăng ký endpoint nội bộ/scheme sai bị chặn trước khi g
       getCurrentUser: async () => ({ id: 77, role: "engineer", orgId: 1 }),
     },
     "@/lib/van-hanh/push": push,
+    // Tiện ích thuần (DELETE bắt 23503 → 409) — dùng module thật, không cần stub.
+    "@/lib/nen/loi": loi,
   });
   for (const endpoint of forbidden) {
     const response = await route.POST({

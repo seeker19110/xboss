@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
@@ -46,31 +47,36 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.editStructure(user.role))
-    return NextResponse.json({ error: "Chỉ Admin/PM" }, { status: 403 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.editStructure(user.role))
+      return NextResponse.json({ error: "Chỉ Admin/PM" }, { status: 403 });
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  // Chống xoá xuyên dự án: tháp phải thuộc 1 dự án user thấy được (vá V9, cùng khuôn GET /api/towers).
-  const visible = await visibleProjectIds(user);
-  const tower0 = await queryOne<{ projectId: number | null }>(
-    `SELECT project_id AS "projectId" FROM towers WHERE id = ?`,
-    id,
-  );
-  if (!tower0 || !visible.includes(tower0.projectId as number))
-    return NextResponse.json({ error: "Không tìm thấy tháp" }, { status: 404 });
+    // Chống xoá xuyên dự án: tháp phải thuộc 1 dự án user thấy được (vá V9, cùng khuôn GET /api/towers).
+    const visible = await visibleProjectIds(user);
+    const tower0 = await queryOne<{ projectId: number | null }>(
+      `SELECT project_id AS "projectId" FROM towers WHERE id = ?`,
+      id,
+    );
+    if (!tower0 || !visible.includes(tower0.projectId as number))
+      return NextResponse.json({ error: "Không tìm thấy tháp" }, { status: 404 });
 
-  const hasSheets = await queryOne<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM sheet_types WHERE tower_id = ?`,
-    id,
-  );
-  if ((hasSheets?.n ?? 0) > 0)
-    return NextResponse.json({ error: "Tháp còn sheet — xoá hết sheet trước" }, { status: 409 });
+    const hasSheets = await queryOne<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM sheet_types WHERE tower_id = ?`,
+      id,
+    );
+    if ((hasSheets?.n ?? 0) > 0)
+      return NextResponse.json({ error: "Tháp còn sheet — xoá hết sheet trước" }, { status: 409 });
 
-  await run(`DELETE FROM towers WHERE id = ? AND project_id = ANY(?)`, id, visible);
-  return NextResponse.json({ deleted: id });
+    await run(`DELETE FROM towers WHERE id = ? AND project_id = ANY(?)`, id, visible);
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

@@ -1,5 +1,51 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S13e: đề xuất + VO dùng engine phê duyệt như IPC
+
+Đóng phần "Còn mở" của S13d (spec cha `docs/nang-cap/AUDIT-2026-09-25/` A4/A5). Không migration, không
+đổi enum trạng thái, không đổi format phản hồi thành công, không thêm dependency.
+
+- **`POST /api/proposals/:id/decide`:** toàn bộ trong MỘT transaction — khoá dòng đề xuất `FOR UPDATE`
+  trước mọi lookup (thứ tự khoá **đề xuất → approval_requests**, trùng submit S13d), chốt lại amount bằng
+  `kiemAmountTruocKhiDuyet` (khi duyệt, có request đang chờ) rồi `advanceApproval` rồi `decideProposal`.
+  Lỗi có `status` (engine 403 SoD/vai trò, 404, 409, 422) trả đúng mã + `{ error }` thay vì 500. Trước
+  đây bước engine commit riêng: từ chối thiếu lý do vẫn chốt reject của engine → request mất, PM duyệt
+  tiếp qua đường cũ không qua flow; hai PM duyệt đồng thời sinh **2 phiếu thanh toán**. Nay 1 thành
+  công + 409. `decideProposal` tự khoá (`FOR UPDATE`, reentrant), đọc `amount::text`, ghi phiếu bằng
+  chuỗi exact.
+- **PATCH `/api/proposals/:id`:** `UPDATE … AND status = 'draft'` → 409 khi trình chen giữa (trước đây sửa
+  được số tiền của đề xuất đã trình).
+- **VO:** `POST /api/variations` tính giá trị `ROUND(SUM(qty × đơn giá), 2)::text` trong SQL → MoneyMinor →
+  `resyncApprovalAmount({ openAs })` (mở request khi có flow, ép number exact, tràn → 422; không flow
+  → no-op). Trước đây SUM đọc float nên ngưỡng `min_amount` so trên số xấp xỉ (vd 9 999 999 999.99999 <
+  10^10 → bỏ bước dù amount lưu = 10^10). `decide` VO gọi `kiemAmountTruocKhiDuyet` theo giá trị đề
+  xuất hiện tại (duyệt toàn phần/một phần); lỗi bất ngờ chỉ log + 500 chung (không lộ thông điệp pg).
+  `contract-add` tính `value_delta` exact `::text`, tràn NUMERIC(15,2) → 422 (trước 500).
+- **Rà route anh em** (`advanceApproval`/`openApproval`/`resyncApprovalAmount` trong `app/api`):
+  `tasks/[id]/approve` + `approvals` (task_acceptance, không có tiền) đã trong transaction + `FOR UPDATE`
+  - map `status`; `payment-certs/*` đã vá S13c/S13d; `proposals/[id]/submit` đã vá S13d.
+- **Test** `tests/s13e-de-xuat-vo-quyet-dinh.test.ts` (9 ca, route thật, lời gọi đồng thời bọc
+  `requestRieng` + giữ khoá dòng để tái hiện chắc chắn cửa sổ đua): **9/9 đỏ trên code cũ** → xanh.
+  Mutation mới trong `scripts/mutation-check.mjs`: "Đề xuất/VO: decide chốt lại amount cũ…".
+- **Còn mở (ngoài phạm vi):** `POST /api/proposals` vẫn đưa `Number(amount)` (chuỗi canonical ≤
+  NUMERIC(15,2), không cộng/nhân float; submit đã chốt lại exact). VO lập TRƯỚC khi Admin bật flow
+  `variation` vẫn duyệt qua đường cũ `CAN.approve` (submit VO không mở request như đề xuất/IPC — mở lúc
+  trình sẽ đổi người tạo request/SoD, cần quyết định nghiệp vụ). Các route `tasks/[id]/approve`,
+  `approvals`, `variations/[id]/submit` (và nhiều route ngoài engine) còn trả `e.message` thô cho lỗi
+  không có `status` (500) — lộ thông điệp pg, chưa sửa ở đây.
+
+## 2026-10-08 — QUALITY-FINAL-1 DATA-CONTRACTS: mọi DELETE còn tham chiếu -> 409 dependency_conflict
+
+Đóng nợ của S13c: helper chung `laLoiKhoaNgoai` / `phanHoiXungDotPhuThuoc`
+trong `lib/nen/loi.ts`; 64 route `DELETE` còn lại (`app/api/**`) bọc thân trong `try/catch` dùng helper -> pg 23503 thành 409 `{ error, code: "dependency_conflict" }`, lỗi khác
+giữ nguyên. 12 route không xoá cứng (soft-delete/UPDATE/luôn 409) nằm trong allowlist có lý do. Gom
+`withTransaction` cho 3 route xoá nhiều bước ngoài transaction: `purchase-orders/[id]`,
+`progress-albums/[id]`, `workpackages/[id]` (file vật lý xoá SAU khi DB commit). Test:
+`tests/delete-route-fk-guard.test.ts` (bất biến tĩnh, route DELETE mới quên bắt 23503 sẽ đỏ) +
+3 ca route thật (`materials`, `purchase-orders`, `workpackages`) trong
+`tests/route-xoa-xung-dot-phu-thuoc.test.ts` (đỏ trên code cũ). Không migration, không đổi
+phiên/quyền/phạm vi.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S13c: DELETE users/bills còn tham chiếu -> 409
 
 `DELETE /api/users/:id` và `DELETE /api/payments/bills/:id` bắt pg 23503 -> 409

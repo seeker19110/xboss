@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
@@ -62,26 +63,35 @@ export async function DELETE(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageHr(user.role))
-    return NextResponse.json(
-      { error: "Bạn không có quyền sửa thành viên tổ đội (chỉ Admin/PM)" },
-      { status: 403 },
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.manageHr(user.role))
+      return NextResponse.json(
+        { error: "Bạn không có quyền sửa thành viên tổ đội (chỉ Admin/PM)" },
+        { status: 403 },
+      );
+
+    const crewId = parseInt(params.id);
+    if (isNaN(crewId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+    const projectId = await getCurrentProjectId(user);
+    const crew = await loadCrew(crewId, projectId);
+    if (!crew) return NextResponse.json({ error: "Không tìm thấy tổ đội" }, { status: 404 });
+
+    const personnelId = Number(req.nextUrl.searchParams.get("personnelId"));
+    if (!Number.isInteger(personnelId))
+      return NextResponse.json({ error: "Thiếu personnelId hợp lệ" }, { status: 422 });
+
+    await run(
+      `DELETE FROM crew_members WHERE crew_id = ? AND personnel_id = ?`,
+      crewId,
+      personnelId,
     );
-
-  const crewId = parseInt(params.id);
-  if (isNaN(crewId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
-
-  const projectId = await getCurrentProjectId(user);
-  const crew = await loadCrew(crewId, projectId);
-  if (!crew) return NextResponse.json({ error: "Không tìm thấy tổ đội" }, { status: 404 });
-
-  const personnelId = Number(req.nextUrl.searchParams.get("personnelId"));
-  if (!Number.isInteger(personnelId))
-    return NextResponse.json({ error: "Thiếu personnelId hợp lệ" }, { status: 422 });
-
-  await run(`DELETE FROM crew_members WHERE crew_id = ? AND personnel_id = ?`, crewId, personnelId);
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

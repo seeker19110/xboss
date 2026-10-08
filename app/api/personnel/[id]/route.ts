@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
@@ -100,22 +101,27 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageHr(user.role))
-    return NextResponse.json(
-      { error: "Bạn không có quyền xoá nhân sự (chỉ Admin/PM)" },
-      { status: 403 },
-    );
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.manageHr(user.role))
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá nhân sự (chỉ Admin/PM)" },
+        { status: 403 },
+      );
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const existing = await findPersonnelById(id, projectId);
-  if (!existing) return NextResponse.json({ error: "Không tìm thấy nhân sự" }, { status: 404 });
+    const projectId = await getCurrentProjectId(user);
+    const existing = await findPersonnelById(id, projectId);
+    if (!existing) return NextResponse.json({ error: "Không tìm thấy nhân sự" }, { status: 404 });
 
-  await run(`DELETE FROM personnel WHERE id = ?`, id);
-  return NextResponse.json({ deleted: id });
+    await run(`DELETE FROM personnel WHERE id = ?`, id);
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

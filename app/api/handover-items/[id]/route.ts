@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { storagePut, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run, withTransaction } from "@/lib/db";
@@ -193,24 +194,29 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageHandover(user.role))
-    return NextResponse.json(
-      { error: "Bạn không có quyền xoá hạng mục bàn giao (Admin/PM/kỹ sư)" },
-      { status: 403 },
-    );
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.manageHandover(user.role))
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá hạng mục bàn giao (Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const existing = await loadExisting(id, projectId);
-  if (!existing) return NextResponse.json({ error: "Không tìm thấy hạng mục" }, { status: 404 });
+    const projectId = await getCurrentProjectId(user);
+    const existing = await loadExisting(id, projectId);
+    if (!existing) return NextResponse.json({ error: "Không tìm thấy hạng mục" }, { status: 404 });
 
-  await run(`DELETE FROM handover_items WHERE id = ?`, id);
-  if (existing.minutesFile) await storageDelete(user.orgId, existing.minutesFile);
+    await run(`DELETE FROM handover_items WHERE id = ?`, id);
+    if (existing.minutesFile) await storageDelete(user.orgId, existing.minutesFile);
 
-  return NextResponse.json({ deleted: id });
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }

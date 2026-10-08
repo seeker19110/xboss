@@ -1,5 +1,6 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, run } from "@/lib/db";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
@@ -92,33 +93,40 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageTech(user.role))
-    return NextResponse.json(
-      { error: "Bạn không có quyền xoá album (chỉ Admin/PM)" },
-      { status: 403 },
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.manageTech(user.role))
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá album (chỉ Admin/PM)" },
+        { status: 403 },
+      );
+
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+    const projectId = await getCurrentProjectId(user);
+    const existing = await loadExisting(id, projectId);
+    if (!existing) return NextResponse.json({ error: "Không tìm thấy album" }, { status: 404 });
+
+    // Lấy tên file trước khi xoá bản ghi để dọn file trên đĩa (tránh mồ côi).
+    const fileRows = await query<{ fileName: string }>(
+      `SELECT file_name AS "fileName" FROM task_photos WHERE album_id = ?`,
+      id,
     );
+    await withTransaction(async () => {
+      await run(`DELETE FROM task_photos WHERE album_id = ?`, id);
+      await run(`DELETE FROM progress_albums WHERE id = ?`, id);
+    });
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    for (const f of fileRows) {
+      await storageDelete(user.orgId, f.fileName);
+    }
 
-  const projectId = await getCurrentProjectId(user);
-  const existing = await loadExisting(id, projectId);
-  if (!existing) return NextResponse.json({ error: "Không tìm thấy album" }, { status: 404 });
-
-  // Lấy tên file trước khi xoá bản ghi để dọn file trên đĩa (tránh mồ côi).
-  const fileRows = await query<{ fileName: string }>(
-    `SELECT file_name AS "fileName" FROM task_photos WHERE album_id = ?`,
-    id,
-  );
-  await run(`DELETE FROM task_photos WHERE album_id = ?`, id);
-  await run(`DELETE FROM progress_albums WHERE id = ?`, id);
-
-  for (const f of fileRows) {
-    await storageDelete(user.orgId, f.fileName);
+    return NextResponse.json({ deleted: id, photosDeleted: fileRows.length });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
   }
-
-  return NextResponse.json({ deleted: id, photosDeleted: fileRows.length });
 }

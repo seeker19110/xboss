@@ -85,3 +85,23 @@ export function phanHoiLoi(err: unknown, thongDiepMacDinh?: string): NextRespons
   const msg = err instanceof Error ? err.message : String(err);
   return NextResponse.json({ error: msg || thongDiepMacDinh || "Lỗi hệ thống" }, { status: 500 });
 }
+
+/** Postgres 23503 (foreign_key_violation): bản ghi còn được bảng khác tham chiếu. */
+export function laLoiKhoaNgoai(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: unknown }).code === "23503";
+}
+
+/**
+ * 409 `dependency_conflict` chuẩn (QUALITY-FINAL-1, DATA-CONTRACTS) cho thao tác xoá bản ghi
+ * còn được dữ liệu khác tham chiếu — thay cho 500 do Postgres ném 23503.
+ *
+ * Mẫu dùng trong route DELETE (giữ `export async function DELETE` để các cổng quét tĩnh
+ * như `check:route-perms` vẫn thấy handler):
+ *   try { …xoá… } catch (err) { if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc(); throw err; }
+ * Phần ghi nhiều bước phải nằm trong `withTransaction` để 23503 ở bước sau rollback bước trước.
+ */
+export function phanHoiXungDotPhuThuoc(
+  thongDiep = "Bản ghi đang được dữ liệu khác tham chiếu — không xoá được",
+): NextResponse {
+  return NextResponse.json({ error: thongDiep, code: "dependency_conflict" }, { status: 409 });
+}

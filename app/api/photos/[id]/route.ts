@@ -1,3 +1,4 @@
+import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { storageGet, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
@@ -91,36 +92,41 @@ export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
-  const params = await paramsP;
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  try {
+    const params = await paramsP;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const projectId = await getCurrentProjectId(user);
-  const blocked = await assertModuleEnabled("field", projectId);
-  if (blocked) return blocked;
+    const projectId = await getCurrentProjectId(user);
+    const blocked = await assertModuleEnabled("field", projectId);
+    if (blocked) return blocked;
 
-  const id = parseInt(params.id);
-  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const photo = await queryOne<PhotoRow>(
-    `SELECT id, file_name, mime_type, uploaded_by, task_id, album_id FROM task_photos WHERE id = ?`,
-    id,
-  );
-  if (!photo) return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
-
-  // Cách ly dự án (vá W6, Đợt 5) — xem ghi chú `thuocDuAnDangChon` ở trên; DELETE trước đây
-  // lỏng hơn GET (không kiểm gì ngoài uploaded_by/editStructure).
-  if (projectId == null || !(await thuocDuAnDangChon(photo, projectId)))
-    return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
-
-  if (photo.uploaded_by !== user.id && !CAN.editStructure(user.role))
-    return NextResponse.json(
-      { error: "Chỉ người upload hoặc Admin/PM được xoá ảnh" },
-      { status: 403 },
+    const photo = await queryOne<PhotoRow>(
+      `SELECT id, file_name, mime_type, uploaded_by, task_id, album_id FROM task_photos WHERE id = ?`,
+      id,
     );
+    if (!photo) return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
 
-  await run(`DELETE FROM task_photos WHERE id = ?`, id);
-  await storageDelete(user.orgId, photo.file_name);
+    // Cách ly dự án (vá W6, Đợt 5) — xem ghi chú `thuocDuAnDangChon` ở trên; DELETE trước đây
+    // lỏng hơn GET (không kiểm gì ngoài uploaded_by/editStructure).
+    if (projectId == null || !(await thuocDuAnDangChon(photo, projectId)))
+      return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
 
-  return NextResponse.json({ deleted: id });
+    if (photo.uploaded_by !== user.id && !CAN.editStructure(user.role))
+      return NextResponse.json(
+        { error: "Chỉ người upload hoặc Admin/PM được xoá ảnh" },
+        { status: 403 },
+      );
+
+    await run(`DELETE FROM task_photos WHERE id = ?`, id);
+    await storageDelete(user.orgId, photo.file_name);
+
+    return NextResponse.json({ deleted: id });
+  } catch (err) {
+    if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
+    throw err;
+  }
 }
