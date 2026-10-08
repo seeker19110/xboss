@@ -183,6 +183,7 @@ export async function PATCH(
     log.error("payment-certs PATCH: lỗi không lường trước", {
       certId: id,
       err: err instanceof Error ? err.message : String(err),
+      pgCode: e.code,
     });
     return NextResponse.json({ error: "Lỗi máy chủ khi sửa đợt thanh toán" }, { status: 500 });
   }

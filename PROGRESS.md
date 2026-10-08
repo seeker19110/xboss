@@ -14,8 +14,16 @@
   chừng rollback (đợt không mất dòng KL).
 - **L7:** nhánh catch của `submit`/`decide`/PATCH chỉ trả thông điệp khi lỗi có chủ đích (`status`);
   lỗi bất ngờ → `log.error` + thông báo chung tiếng Việt (không lộ message pg/mã nội bộ).
-- Test: `tests/approvals-resync-amount.test.ts` (5 ca, lib) + `tests/payment-certs-submit-resync.test.ts`
-  (3 ca qua route thật; ca lách ngưỡng đỏ trên code cũ).
+- **Vá theo audit (cùng nhánh):** `resyncApprovalAmount` lọc theo `project_id`, lấy request MỚI NHẤT
+  trước rồi mới xét trạng thái, đặt lại `created_at` (SLA tính từ lúc trình), giá trị tràn
+  NUMERIC(15,2) → 422 `amount_overflow` (không 500); **đợt lập TRƯỚC khi Admin bật flow** nay được
+  mở request lúc trình (`openAs`) nên không còn rơi về đường `CAN.approve` không SoD; khối lượng
+  đợt ≥ 1e11 → 422 (trước đây tràn INSERT sau khi đã DELETE → 500); log 500 ghi message + `pgCode`.
+- **[Người vận hành] Rà đợt đã trình/duyệt trước bản vá** (có thể đã lách ngưỡng): truy vấn chỉ-đọc
+  `period_value` vs `approval_requests.amount` vs `approval_steps.min_amount` — xem
+  `docs/ops/s10a-doi-soat-phieu-da-duyet.md` (đã bổ sung truy vấn).
+- Test: `tests/approvals-resync-amount.test.ts` (7 ca, lib) + `tests/payment-certs-submit-resync.test.ts`
+  (5 ca qua route thật; ca lách ngưỡng đỏ trên code cũ).
 - **Còn mở (S10a):** M3 đối soát phiếu đã duyệt (cần người vận hành), M4, L5, L6 — xem mục dưới.
 
 ## 2026-10-07 — QUALITY-FINAL-1 S10a: IPC exact (ipc-sum-v1) + DTO tiền decimal-string-v1

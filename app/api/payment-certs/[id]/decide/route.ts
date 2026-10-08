@@ -152,6 +152,7 @@ export async function POST(
     log.error("payment-certs/decide: lỗi không lường trước", {
       certId: id,
       err: err instanceof Error ? err.message : String(err),
+      pgCode: e.code,
     });
     return NextResponse.json(
       { error: "Lỗi máy chủ khi quyết định đợt thanh toán" },

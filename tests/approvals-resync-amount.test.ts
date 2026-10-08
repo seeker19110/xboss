@@ -326,3 +326,60 @@ test(
     }
   },
 );
+
+test(
+  "resync: đặt lại created_at (SLA tính từ lúc chốt); chưa có request + openAs + có flow → mở mới",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { queryOne, run } = await import("@/lib/db");
+    const { openApproval, resyncApprovalAmount } = await import("@/lib/tien-do/approvals");
+    const ctx = await setup([{ role: "cdt", minAmount: 1000 }]);
+    const eid1 = 970_000 + (Date.now() % 1000);
+    const eid2 = eid1 + 1;
+    try {
+      const req = await openApproval({
+        entityType: "payment_cert",
+        entityId: eid1,
+        projectId: ctx.projectId,
+        amount: 5000,
+        user: { id: ctx.creator, role: "engineer" },
+      });
+      await run(
+        `UPDATE approval_requests SET created_at = now() - interval '10 days' WHERE id = ?`,
+        req!.id,
+      );
+      await resyncApprovalAmount({
+        entityType: "payment_cert",
+        entityId: eid1,
+        projectId: ctx.projectId,
+        amountMinor: 600000n,
+      });
+      const row = await queryOne<{ tuoi: number }>(
+        `SELECT extract(epoch FROM now() - created_at)::float AS tuoi FROM approval_requests WHERE id = ?`,
+        req!.id,
+      );
+      assert.ok(row!.tuoi < 60);
+
+      // Chưa từng có request: không openAs → false; có openAs → mở pending theo amount.
+      const base = {
+        entityType: "payment_cert",
+        entityId: eid2,
+        projectId: ctx.projectId,
+        amountMinor: 500000n,
+      };
+      assert.equal(await resyncApprovalAmount(base), false);
+      assert.equal(
+        await resyncApprovalAmount({ ...base, openAs: { id: ctx.creator, role: "engineer" } }),
+        true,
+      );
+      const moi = await queryOne<{ status: string; amount: number }>(
+        `SELECT status, amount FROM approval_requests WHERE entity_type = 'payment_cert' AND entity_id = ?`,
+        eid2,
+      );
+      assert.equal(moi!.status, "pending");
+      assert.equal(Number(moi!.amount), 5000);
+    } finally {
+      await cleanup(ctx);
+    }
+  },
+);

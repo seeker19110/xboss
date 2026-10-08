@@ -51,6 +51,7 @@ export async function POST(
         entityType: "payment_cert",
         entityId: id,
         projectId: projectId as number,
+        openAs: user,
         amountMinor: periodValue,
       });
       await run(
@@ -71,6 +72,7 @@ export async function POST(
     log.error("payment-certs/submit: lỗi không lường trước", {
       certId: id,
       err: err instanceof Error ? err.message : String(err),
+      pgCode: e.code,
     });
     return NextResponse.json({ error: "Lỗi máy chủ khi trình đợt thanh toán" }, { status: 500 });
   }

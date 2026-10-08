@@ -48,3 +48,27 @@ Kết quả rỗng = mọi phiếu khớp ipc-sum-v1. Mỗi dòng trả về là
   không phải do làm tròn — chưa có snapshot tỷ lệ tại thời điểm duyệt (DATA-CONTRACTS §6).
 - Không sửa `payment_bills` dựa trên kết quả này khi chưa có quyết định nghiệp vụ + provenance
   (A3 §3: không "backfill" bằng dữ liệu hôm nay rồi coi là gốc).
+
+## Bổ sung 2026-10-08 — đợt IPC có thể đã lách bước duyệt theo ngưỡng
+
+`approval_requests.amount` từng chốt lúc lập nháp và không cập nhật khi sửa khối lượng. Truy vấn
+chỉ-đọc dưới liệt kê đợt đã trình/duyệt có giá trị hiện tại vượt `min_amount` của bước mà amount cũ
+không kéo vào (`buoc_co_the_bi_lach` khác NULL → cần đối soát; ngưỡng có thể đã đổi sau đó nên chỉ
+là xấp xỉ):
+
+```sql
+SELECT c.id, c.code, c.status, r.id AS req_id, r.status AS req_status, r.amount AS amount_luc_lap,
+       pv.period_value,
+       (SELECT string_agg(s.seq || ':' || s.role || '>=' || s.min_amount, ', ' ORDER BY s.seq)
+          FROM approval_steps s
+         WHERE s.flow_id = r.flow_id AND s.min_amount IS NOT NULL
+           AND s.min_amount >  COALESCE(r.amount, 0)
+           AND s.min_amount <= pv.period_value) AS buoc_co_the_bi_lach
+  FROM payment_certs c
+  JOIN approval_requests r ON r.entity_type = 'payment_cert' AND r.entity_id = c.id
+  CROSS JOIN LATERAL (SELECT ROUND(COALESCE(SUM(i.qty_period * i.unit_price), 0), 2) AS period_value
+                        FROM payment_cert_items i WHERE i.cert_id = c.id) pv
+ WHERE c.status IN ('submitted', 'approved')
+   AND pv.period_value > COALESCE(r.amount, 0)
+ ORDER BY c.id;
+```

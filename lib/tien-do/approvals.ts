@@ -169,30 +169,22 @@ export async function openApproval(opts: {
 // (vd đợt IPC nháp sửa khối lượng rồi mới trình) — nếu không, ngưỡng min_amount của bước duyệt
 // so với giá trị cũ: lập nháp nhỏ, sửa tăng rồi trình là lách được bước duyệt cấp cao. Cập
 // nhật amount + chọn lại bước hiệu lực đầu tiên theo amount mới (request đã tự `approved` vì
-// khi đó không bước nào hiệu lực thì mở lại `pending` nếu amount mới kéo bước vào). Request đã
-// có approval_actions (đã có người quyết định) giữ nguyên — không đổi luật giữa chừng.
-// Không có request (không flow / đã chốt rejected-cancelled) → no-op. Trả true khi có cập nhật.
-// `amountMinor` là MoneyMinor (bigint đồng×100): chỉ ép sang number của engine KHI có request cần
-// so ngưỡng; giá trị không round-trip exact → 422 `money_precision_unsupported`, không xấp xỉ.
+// khi đó không bước nào hiệu lực thì mở lại `pending` nếu amount mới kéo bước vào) và đặt lại
+// `created_at` = lúc chốt (đồng hồ SLA tính từ lúc trình, không từ lúc lập nháp). Request mới
+// nhất đã có approval_actions / đã rejected-cancelled → giữ nguyên, trả false.
+// Chưa từng có request nào cho thực thể: có `openAs` thì mở mới nếu hiện có flow active (đợt lập
+// TRƯỚC khi Admin bật flow vẫn phải qua flow khi trình, không rơi về đường CAN.approve không SoD);
+// không có flow → no-op. Trả true khi có tạo/cập nhật.
+// `amountMinor` là MoneyMinor (bigint đồng×100): chỉ ép sang number của engine KHI cần so ngưỡng;
+// không round-trip exact hoặc tràn NUMERIC(15,2) → 422 `money_precision_unsupported`/`amount_overflow`.
 export async function resyncApprovalAmount(opts: {
   entityType: string;
   entityId: number;
   projectId: number;
   amountMinor: bigint;
+  openAs?: ActorUser;
 }): Promise<boolean> {
-  return withTransaction(async () => {
-    const req = await queryOne<{ id: number; flowId: number }>(
-      `SELECT r.id, r.flow_id AS "flowId"
-         FROM approval_requests r
-        WHERE r.entity_type = ? AND r.entity_id = ? AND r.project_id = ?
-          AND r.status IN ('pending', 'approved')
-          AND NOT EXISTS (SELECT 1 FROM approval_actions a WHERE a.request_id = r.id)
-        ORDER BY r.id DESC LIMIT 1 FOR UPDATE OF r`,
-      opts.entityType,
-      opts.entityId,
-      opts.projectId,
-    );
-    if (!req) return false;
+  const amountForEngine = (): number => {
     let amount: number;
     try {
       amount = moneyToNumberSafe(opts.amountMinor);
@@ -207,8 +199,43 @@ export async function resyncApprovalAmount(opts: {
     if (!fitsNumeric(opts.amountMinor, 15))
       throw Object.assign(new Error("Giá trị vượt giới hạn lưu trữ của luồng phê duyệt"), {
         status: 422,
-        code: "money_precision_unsupported",
+        code: "amount_overflow",
       });
+    return amount;
+  };
+
+  return withTransaction(async () => {
+    // Request MỚI NHẤT trước, rồi mới xét trạng thái (không "nhặt" request cũ khi bản mới đã chốt).
+    const req = await queryOne<{
+      id: number;
+      flowId: number;
+      status: string;
+      daQuyetDinh: boolean;
+    }>(
+      `SELECT r.id, r.flow_id AS "flowId", r.status,
+              EXISTS (SELECT 1 FROM approval_actions a WHERE a.request_id = r.id) AS "daQuyetDinh"
+         FROM approval_requests r
+        WHERE r.entity_type = ? AND r.entity_id = ? AND r.project_id = ?
+        ORDER BY r.id DESC LIMIT 1 FOR UPDATE OF r`,
+      opts.entityType,
+      opts.entityId,
+      opts.projectId,
+    );
+    if (!req) {
+      if (!opts.openAs) return false;
+      // Không flow → không cần so ngưỡng nên cũng không ép tiền (đợt giá trị lớn vẫn trình được).
+      if (!(await getActiveFlow(opts.entityType, opts.projectId))) return false;
+      const opened = await openApproval({
+        entityType: opts.entityType,
+        entityId: opts.entityId,
+        projectId: opts.projectId,
+        amount: amountForEngine(),
+        user: opts.openAs,
+      });
+      return opened != null;
+    }
+    if (req.daQuyetDinh || (req.status !== "pending" && req.status !== "approved")) return false;
+    const amount = amountForEngine();
     const steps = await query<ApprovalStep>(
       `SELECT seq, role, min_amount AS "minAmount", sla_days AS "slaDays"
          FROM approval_steps WHERE flow_id = ? ORDER BY seq`,
@@ -218,7 +245,8 @@ export async function resyncApprovalAmount(opts: {
     if (first) {
       await run(
         `UPDATE approval_requests
-            SET amount = ?, current_seq = ?, status = 'pending', decided_at = NULL
+            SET amount = ?, current_seq = ?, status = 'pending', decided_at = NULL,
+                created_at = now()
           WHERE id = ?`,
         amount,
         first.seq,
@@ -227,7 +255,8 @@ export async function resyncApprovalAmount(opts: {
     } else {
       await run(
         `UPDATE approval_requests
-            SET amount = ?, status = 'approved', decided_at = COALESCE(decided_at, now())
+            SET amount = ?, status = 'approved', decided_at = COALESCE(decided_at, now()),
+                created_at = now()
           WHERE id = ?`,
         amount,
         req.id,

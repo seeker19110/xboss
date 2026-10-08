@@ -36,7 +36,25 @@ async function dungNguoi(role: string): Promise<Nguoi> {
 }
 
 /** Dự án + HĐ (1 dòng BOQ đơn giá 500) + flow IPC: bước 1 pm (mọi giá trị), bước 2 cdt (≥ 1000). */
-async function dungHienTruong() {
+async function taoFlow(projectId: number): Promise<number> {
+  const { insertId } = await import("@/lib/db");
+  const flowId = await insertId(
+    `INSERT INTO approval_flows (project_id, entity_type, name) VALUES (?, 'payment_cert', ?)`,
+    projectId,
+    uniq("IPC flow "),
+  );
+  await insertId(
+    `INSERT INTO approval_steps (flow_id, seq, role, min_amount) VALUES (?, 1, 'pm', NULL)`,
+    flowId,
+  );
+  await insertId(
+    `INSERT INTO approval_steps (flow_id, seq, role, min_amount) VALUES (?, 2, 'cdt', 1000)`,
+    flowId,
+  );
+  return flowId;
+}
+
+async function dungHienTruong(tao_flow = true) {
   const { insertId } = await import("@/lib/db");
   const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, uniq("S10a resync "));
   const nguoiLap = await dungNguoi("pm");
@@ -53,26 +71,16 @@ async function dungHienTruong() {
     `BOQ-${uniq("RS")}`,
     contractId,
   );
-  const flowId = await insertId(
-    `INSERT INTO approval_flows (project_id, entity_type, name) VALUES (?, 'payment_cert', ?)`,
-    projectId,
-    uniq("IPC flow "),
-  );
-  await insertId(
-    `INSERT INTO approval_steps (flow_id, seq, role, min_amount) VALUES (?, 1, 'pm', NULL)`,
-    flowId,
-  );
-  await insertId(
-    `INSERT INTO approval_steps (flow_id, seq, role, min_amount) VALUES (?, 2, 'cdt', 1000)`,
-    flowId,
-  );
+  const flowId = tao_flow ? await taoFlow(projectId) : null;
   return { projectId, nguoiLap, nguoiDuyet, contractId, boqId, flowId };
 }
 
 async function donDep(f: Awaited<ReturnType<typeof dungHienTruong>>) {
   const { run } = await import("@/lib/db");
-  await run(`DELETE FROM approval_requests WHERE flow_id = ?`, f.flowId);
-  await run(`DELETE FROM approval_flows WHERE id = ?`, f.flowId);
+  if (f.flowId != null) {
+    await run(`DELETE FROM approval_requests WHERE flow_id = ?`, f.flowId);
+    await run(`DELETE FROM approval_flows WHERE id = ?`, f.flowId);
+  }
   await run(`DELETE FROM payment_bills WHERE contract_id = ?`, f.contractId);
   await run(`DELETE FROM payment_certs WHERE contract_id = ?`, f.contractId);
   await run(`DELETE FROM boq_items WHERE contract_id = ?`, f.contractId);
@@ -221,6 +229,106 @@ test(
       );
       assert.equal(sau!.n, truoc!.n);
       assert.ok(sau!.n > 0);
+    } finally {
+      dangXuat();
+      await donDep(f);
+    }
+  },
+);
+
+test(
+  "IPC: đợt lập TRƯỚC khi bật flow → trình vẫn mở request, người lập không tự duyệt (403), bước cdt được áp",
+  S,
+  async () => {
+    const f = await dungHienTruong(false);
+    let flowId: number | null = null;
+    try {
+      const { POST } = await import("@/app/api/payment-certs/route");
+      const { PATCH } = await import("@/app/api/payment-certs/[id]/route");
+      const { POST: submit } = await import("@/app/api/payment-certs/[id]/submit/route");
+      const { POST: decide } = await import("@/app/api/payment-certs/[id]/decide/route");
+      const { queryOne } = await import("@/lib/db");
+
+      await dangNhapDuAn(f.nguoiLap, f.projectId);
+      const { id } = (await (
+        await POST(jreq("/api/payment-certs", { contractId: f.contractId }))
+      ).json()) as { id: number };
+      const chua = await queryOne(
+        `SELECT id FROM approval_requests WHERE entity_type = 'payment_cert' AND entity_id = ?`,
+        id,
+      );
+      assert.equal(chua, undefined); // lúc lập chưa có flow → chưa có request
+
+      flowId = await taoFlow(f.projectId); // Admin bật flow SAU khi đã lập nháp
+      await PATCH(
+        jreq(
+          `/api/payment-certs/${id}`,
+          { items: [{ boqItemId: f.boqId, qtyPeriod: 10 }] },
+          "PATCH",
+        ),
+        thamSo(id),
+      );
+      assert.equal((await submit(jreq(`/api/payment-certs/${id}/submit`), thamSo(id))).status, 200);
+      const sau = await queryOne<{ amount: number; status: string }>(
+        `SELECT amount, status FROM approval_requests WHERE entity_type = 'payment_cert' AND entity_id = ?`,
+        id,
+      );
+      assert.equal(Number(sau!.amount), 5000);
+      assert.equal(sau!.status, "pending");
+
+      const tuDuyet = await decide(
+        jreq(`/api/payment-certs/${id}/decide`, { decision: "approved" }),
+        thamSo(id),
+      );
+      assert.equal(tuDuyet.status, 403); // SoD: người tạo request không tự duyệt
+
+      await dangNhapDuAn(f.nguoiDuyet, f.projectId);
+      const qd = await decide(
+        jreq(`/api/payment-certs/${id}/decide`, { decision: "approved" }),
+        thamSo(id),
+      );
+      const kq = (await qd.json()) as { pending?: boolean; nextRole?: string };
+      assert.equal(kq.pending, true);
+      assert.equal(kq.nextRole, "cdt");
+    } finally {
+      dangXuat();
+      if (flowId != null) {
+        const { run } = await import("@/lib/db");
+        await run(`DELETE FROM approval_requests WHERE flow_id = ?`, flowId);
+        await run(`DELETE FROM approval_flows WHERE id = ?`, flowId);
+      }
+      await donDep(f);
+    }
+  },
+);
+
+test(
+  "IPC: PATCH khối lượng vượt cận NUMERIC → 422, dòng KL cũ giữ nguyên (không 500 sau DELETE)",
+  S,
+  async () => {
+    const f = await dungHienTruong();
+    try {
+      const { POST } = await import("@/app/api/payment-certs/route");
+      const { PATCH } = await import("@/app/api/payment-certs/[id]/route");
+      const { queryOne } = await import("@/lib/db");
+      await dangNhapDuAn(f.nguoiLap, f.projectId);
+      const { id } = (await (
+        await POST(jreq("/api/payment-certs", { contractId: f.contractId }))
+      ).json()) as { id: number };
+      const res = await PATCH(
+        jreq(
+          `/api/payment-certs/${id}`,
+          { items: [{ boqItemId: f.boqId, qtyPeriod: 1e13 }] },
+          "PATCH",
+        ),
+        thamSo(id),
+      );
+      assert.equal(res.status, 422);
+      const n = await queryOne<{ n: number }>(
+        `SELECT count(*)::int AS n FROM payment_cert_items WHERE cert_id = ?`,
+        id,
+      );
+      assert.ok(n!.n > 0);
     } finally {
       dangXuat();
       await donDep(f);
