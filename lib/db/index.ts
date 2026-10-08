@@ -216,7 +216,7 @@ export async function insertId(sql: string, ...params: unknown[]): Promise<numbe
 // repeatable_read → throw (fail-fast, không lặng lẽ mất đảm bảo nhất quán).
 export async function withTransaction<T>(
   fn: () => Promise<T>,
-  opts?: { isolation?: "repeatable_read" },
+  opts?: { isolation?: "repeatable_read"; readOnly?: boolean },
 ): Promise<T> {
   const repeatableRead = opts?.isolation === "repeatable_read";
   if (txStorage.getStore()) {
@@ -229,7 +229,13 @@ export async function withTransaction<T>(
   await ensureSchemaCompatible();
   const client = await getPool().connect();
   try {
-    await client.query(repeatableRead ? "BEGIN ISOLATION LEVEL REPEATABLE READ" : "BEGIN");
+    // Mọi tuỳ chọn (isolation/READ ONLY) nằm ngay trong câu BEGIN — không SET TRANSACTION
+    // sau đó, để chế độ đọc-chỉ có hiệu lực từ câu lệnh đầu tiên (A4-FR06).
+    await client.query(
+      "BEGIN" +
+        (repeatableRead ? " ISOLATION LEVEL REPEATABLE READ" : "") +
+        (opts?.readOnly ? " READ ONLY" : ""),
+    );
     // Truyền ngữ cảnh actor xuống Postgres qua SET LOCAL (set_config ..., true) để trigger
     // audit (migration 0049) ghi được ai/vai trò/dự án/request-id. Tự hết hạn khi COMMIT/
     // ROLLBACK; giá trị thiếu truyền '' (trigger dùng NULLIF để chuyển về NULL).
@@ -263,10 +269,9 @@ export async function withTransaction<T>(
 // app.project_id — lưới an toàn RLS (migration 0069) chỉ áp được khi GUC tồn tại; đọc
 // ngoài transaction (như trước PR2) không có GUC nên rơi vào nhánh "chuyển tiếp" của
 // policy. Tái dùng nguyên `withTransaction` (không viết cơ chế set GUC mới): mở transaction,
-// set_config LOCAL rồi chạy fn, COMMIT khi xong (SET TRANSACTION READ ONLY vì chỉ đọc).
+// set_config LOCAL rồi chạy fn, COMMIT khi xong (BEGIN ... READ ONLY vì chỉ đọc).
 // projectId = '*' cho ngữ cảnh cross-project hợp lệ (portfolio/cron/export toàn cục).
-// opts.readOnly (mặc định true — giữ nguyên hành vi cũ) chỉ chặn ghi bằng SET TRANSACTION
-// READ ONLY; đặt false cho route đọc-xen-ghi (vd notifications: đọc bảng phạm vi RLS rồi
+// opts.readOnly (mặc định true — giữ nguyên hành vi cũ) chỉ chặn ghi bằng BEGIN ... READ ONLY; đặt false cho route đọc-xen-ghi (vd notifications: đọc bảng phạm vi RLS rồi
 // INSERT/DELETE bảng notifications không-RLS trong cùng 1 transaction).
 export async function withProjectScope<T>(
   projectId: number | "*",
@@ -276,7 +281,7 @@ export async function withProjectScope<T>(
   const readOnly = opts?.readOnly ?? true;
   // Lồng bên trong 1 withProjectScope/withTransaction khác (vd hàm đọc gọi lại chính nó,
   // hoặc 1 hàm ghi gọi 1 hàm đọc nội bộ trước khi ghi) tái dùng transaction hiện có — CHỈ
-  // set TRANSACTION READ ONLY khi ĐANG MỞ transaction mới (client này thật sự chạy BEGIN).
+  // đặt READ ONLY (trong BEGIN) khi ĐANG MỞ transaction mới (client này thật sự chạy BEGIN).
   // Postgres không cho hạ READ ONLY về READ WRITE giữa chừng: nếu lời gọi lồng bên trong
   // (mặc định readOnly=true vì là đọc) tự đặt READ ONLY trên transaction cha ĐANG GHI, mọi
   // câu lệnh ghi sau đó trong transaction cha sẽ lỗi "cannot execute ... in a read-only
@@ -286,11 +291,10 @@ export async function withProjectScope<T>(
     async () => {
       const client = txStorage.getStore();
       if (!client) throw new Error("withProjectScope: thiếu transaction client (không thể xảy ra)");
-      if (readOnly && !alreadyInTransaction) await client.query("SET TRANSACTION READ ONLY");
       await client.query(`SELECT set_config('app.project_id', $1, true)`, [String(projectId)]);
       return fn();
     },
-    opts?.isolation ? { isolation: opts.isolation } : undefined,
+    { isolation: opts?.isolation, readOnly: readOnly && !alreadyInTransaction },
   );
 }
 
