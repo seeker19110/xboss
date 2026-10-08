@@ -3,6 +3,7 @@ import { queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
+import { log } from "@/lib/nen/log";
 import { certTotals } from "@/lib/tai-chinh/paymentcerts";
 import { fitsNumeric, moneyToDecimal } from "@/lib/nen/money";
 import { advanceApproval } from "@/lib/tien-do/approvals";
@@ -142,7 +143,13 @@ export async function POST(
     });
   } catch (err: unknown) {
     const e = err as { message?: string; status?: number };
-    return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
+    // Chỉ lỗi có chủ đích (status) trả thông điệp; lỗi bất ngờ (pg/mã nội bộ) chỉ log.
+    if (e.status) return NextResponse.json({ error: e.message }, { status: e.status });
+    log.error("payment-certs/decide: lỗi không lường trước", { certId: id, err });
+    return NextResponse.json(
+      { error: "Lỗi máy chủ khi quyết định đợt thanh toán" },
+      { status: 500 },
+    );
   }
 
   if (pendingStep)

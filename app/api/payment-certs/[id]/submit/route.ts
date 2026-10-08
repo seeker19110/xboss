@@ -3,6 +3,9 @@ import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, isAdminOrPm } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
+import { log } from "@/lib/nen/log";
+import { certTotals } from "@/lib/tai-chinh/paymentcerts";
+import { resyncApprovalAmount } from "@/lib/tien-do/approvals";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +43,15 @@ export async function POST(
         throw Object.assign(new Error("Chỉ trình được đợt đang ở trạng thái nháp"), {
           status: 409,
         });
+      // Giá trị đợt chốt tại lúc TRÌNH: request duyệt mở lúc lập nháp mang amount cũ, mà nháp
+      // còn sửa KL được — chưa chốt lại thì ngưỡng min_amount của bước duyệt bị lách. Đã khoá
+      // đợt FOR UPDATE nên PATCH KL không chen vào giữa.
+      const { periodValue } = await certTotals(id);
+      await resyncApprovalAmount({
+        entityType: "payment_cert",
+        entityId: id,
+        amountMinor: periodValue,
+      });
       await run(
         `UPDATE payment_certs SET status = 'submitted', submitted_at = ? WHERE id = ?`,
         todayISO(),
@@ -48,7 +60,11 @@ export async function POST(
     });
   } catch (err: unknown) {
     const e = err as { message?: string; status?: number };
-    return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
+    // Lỗi có chủ đích (status) trả nguyên thông điệp tiếng Việt; lỗi bất ngờ (pg/mã nội bộ)
+    // chỉ log, không lộ ra client.
+    if (e.status) return NextResponse.json({ error: e.message }, { status: e.status });
+    log.error("payment-certs/submit: lỗi không lường trước", { certId: id, err });
+    return NextResponse.json({ error: "Lỗi máy chủ khi trình đợt thanh toán" }, { status: 500 });
   }
 
   return NextResponse.json({ submitted: id });

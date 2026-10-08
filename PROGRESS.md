@@ -1,5 +1,23 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — S10a đóng nợ: ngưỡng duyệt IPC + PATCH atomic + lỗi 500 không lộ message
+
+- **[HIGH, đã đóng] Lách ngưỡng duyệt IPC:** `approval_requests.amount` chốt lúc lập đợt nháp và
+  PATCH sửa KL không cập nhật → `advanceApproval` so `min_amount` theo giá trị cũ. Nay
+  `POST /payment-certs/:id/submit` (đã khoá đợt `FOR UPDATE`) tính lại `periodValue` và gọi
+  `resyncApprovalAmount` (`lib/tien-do/approvals.ts`): cập nhật amount + chọn lại bước hiệu lực
+  đầu tiên cho request CHƯA có `approval_actions` (kể cả mở lại request đã tự `approved` khi amount
+  mới kéo bước vào); giá trị không round-trip exact → 422 `money_precision_unsupported` chỉ khi
+  thật sự có request; không có luồng duyệt → no-op như cũ.
+- **PATCH `/api/payment-certs/:id`:** khoá đợt `FOR UPDATE OF c` + kiểm `draft` + `saveCertItems`
+  (DELETE + INSERT) cùng một `withTransaction` → trình/duyệt đồng thời không chen được, lỗi giữa
+  chừng rollback (đợt không mất dòng KL).
+- **L7:** nhánh catch của `submit`/`decide`/PATCH chỉ trả thông điệp khi lỗi có chủ đích (`status`);
+  lỗi bất ngờ → `log.error` + thông báo chung tiếng Việt (không lộ message pg/mã nội bộ).
+- Test: `tests/approvals-resync-amount.test.ts` (5 ca, lib) + `tests/payment-certs-submit-resync.test.ts`
+  (3 ca qua route thật; ca lách ngưỡng đỏ trên code cũ).
+- **Còn mở (S10a):** M3 đối soát phiếu đã duyệt (cần người vận hành), M4, L5, L6 — xem mục dưới.
+
 ## 2026-10-07 — QUALITY-FINAL-1 S10a: IPC exact (ipc-sum-v1) + DTO tiền decimal-string-v1
 
 `certTotals` đọc `qty_period`/`unit_price`/`advance_pct`/`retention_pct` bằng `::text` và tính
