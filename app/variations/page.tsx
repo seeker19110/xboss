@@ -1,4 +1,5 @@
 "use client";
+import { HEADER_TIEN_V1 } from "@/lib/nen/money-dto";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FilePlus2, Plus } from "lucide-react";
@@ -68,7 +69,7 @@ function VariationsInner() {
             .then((r) => (r.ok ? r.json() : null))
             .then((c) => setContracts(c?.contracts ?? []));
         }
-        fetch("/api/boq?includeVo=0")
+        fetch("/api/boq?includeVo=0", { headers: HEADER_TIEN_V1 })
           .then((r) => (r.ok ? r.json() : null))
           .then((b) => {
             const idx = new Map<string, number>();

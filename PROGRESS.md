@@ -1,5 +1,11 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S10 (đuôi): tổng BOQ + mv_cost_by_month exact
+
+- `GET /api/boq`: `totals.contractValue/subValue/executedValue` tính trong SQL (NUMERIC, SUM rồi mới ROUND 2 số lẻ; `progress_percent` float8 đi qua `::text::numeric`), không còn cộng float JS. Header `X-XBoss-Money-Format: decimal-string-v1` → chuỗi canonical + `moneyFormat`; legacy → number qua `moneyToNumberSafe`, ngoài biên → 422 `money_precision_unsupported`; thêm `HEADERS_API_TIEN`. Trang `/boq` opt-in v1, giữ tổng bằng bigint (% thực hiện tính trên bigint); `/tenders` + `/variations` (chỉ đọc `items`) gửi header v1 để không dính 422 vì totals.
+- Migration `0159_mv_cost_by_month_committed_numeric.sql`: dựng lại `mv_cost_by_month` với `committed` NUMERIC exact (`qty_ordered::text::numeric * unit_price`), giữ tên cột + `ux_mv_cost_by_month`, dựng lại `bi.cost_by_month_fin` + GRANT `xboss_bi`. Consumer `cost_by_month` (`lib/tien-do/reports.ts`) đọc `committed::text` thẳng.
+- Test: `tests/s10-boq-totals-exact.test.ts` (đỏ trên code cũ), `tests/matviews.test.ts` (committed chuỗi exact + ca số lớn 10^16).
+
 ## 2026-10-08 — QUALITY-FINAL-1 S13b: vá phạm vi QA nghiệm thu + đồng bộ vật tư không nhân bản
 
 Vá 2 lỗi thật S13a đánh `todo` cho S13b; hai ca đã gỡ `todo` (nay là cổng chặn thường), đỏ trên

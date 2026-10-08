@@ -66,7 +66,9 @@ export default function TendersPage() {
     Promise.all([
       fetchMe(),
       load(),
-      fetch("/api/boq?includeVo=0").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/boq?includeVo=0", { headers: HEADER_TIEN_V1 }).then((r) =>
+        r.ok ? r.json() : null,
+      ),
       fetch("/api/suppliers").then((r) => (r.ok ? r.json() : null)),
     ])
       .then(([meData, t, boq, s]) => {

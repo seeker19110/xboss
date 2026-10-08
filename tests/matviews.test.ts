@@ -158,7 +158,7 @@ test(
         projectId,
       );
       assert.equal(row.length, 1);
-      assert.equal(Number(row[0].committed), 100 * 50000);
+      assert.equal(row[0].committed, "5000000.00"); // NUMERIC exact (migration 0159), không còn float8
       assert.equal(Number(row[0].actual), 2000000);
     } finally {
       if (sheetId) await run(`DELETE FROM payment_bills WHERE sheet_type_id = ?`, sheetId);
@@ -231,6 +231,75 @@ test(
       assert.deepEqual(cached.rows, fallback.rows);
     } finally {
       if (sheetId) await run(`DELETE FROM payment_bills WHERE sheet_type_id = ?`, sheetId);
+      if (poId) await run(`DELETE FROM po_items WHERE po_id = ?`, poId);
+      if (poId) await run(`DELETE FROM purchase_orders WHERE id = ?`, poId);
+      if (matId) await run(`DELETE FROM materials WHERE id = ?`, matId);
+      if (supId) await run(`DELETE FROM suppliers WHERE id = ?`, supId);
+      if (sheetId) await run(`DELETE FROM sheet_types WHERE id = ?`, sheetId);
+      if (towerId) await run(`DELETE FROM towers WHERE id = ?`, towerId);
+      if (projectId) await run(`DELETE FROM projects WHERE id = ?`, projectId);
+    }
+  },
+);
+
+test(
+  "mv_cost_by_month: committed exact — số lớn lệch xu + tổng nhiều dòng lẻ không trôi (migration 0159)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { insertId, run, query } = await import("@/lib/db");
+    let projectId = 0;
+    let supId = 0;
+    let poId = 0;
+    let matId = 0;
+    let towerId = 0;
+    let sheetId = 0;
+    try {
+      projectId = await insertId(`INSERT INTO projects (name) VALUES ('M47 MV Exact ${RUN}')`);
+      towerId = await insertId(
+        `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp MV Exact')`,
+        projectId,
+      );
+      sheetId = await insertId(
+        `INSERT INTO sheet_types (tower_id, code, name, slug) VALUES (?, 'MVE-SH-${RUN}', 'Sheet MV Exact', 'm47-mvexact-${RUN}')`,
+        towerId,
+      );
+      supId = await insertId(`INSERT INTO suppliers (name) VALUES ('NCC MVE ${RUN}')`);
+      poId = await insertId(
+        `INSERT INTO purchase_orders (supplier_id, project_id, status, created_at)
+         VALUES (?, ?, 'issued', '2026-07-15T00:00:00Z')`,
+        supId,
+        projectId,
+      );
+      matId = await insertId(
+        `INSERT INTO materials (sheet_type_id, name, unit) VALUES (?, 'Ống MVE', 'm')`,
+        sheetId,
+      );
+      // 1000 × 9999999999999.99 = 9999999999999990.00 (> 2^53 đơn vị nhỏ) + 1 × 0.01 → ...990.01.
+      // Ba dòng 0.1 × 0.10 → 0.03 (float cộng 0.1*0.1 lệch xu).
+      for (const [q, pr] of [
+        [1000, "9999999999999.99"],
+        [1, "0.01"],
+        [0.1, "0.10"],
+        [0.1, "0.10"],
+        [0.1, "0.10"],
+      ] as const) {
+        await run(
+          `INSERT INTO po_items (po_id, material_id, qty_ordered, unit_price) VALUES (?, ?, ?, ?)`,
+          poId,
+          matId,
+          q,
+          pr,
+        );
+      }
+      await run(`REFRESH MATERIALIZED VIEW CONCURRENTLY mv_cost_by_month`);
+      const row = await query<{ committed: string; tipo: string }>(
+        `SELECT committed::text AS committed, pg_typeof(committed)::text AS tipo
+           FROM mv_cost_by_month WHERE project_id = ? AND month = '2026-07'`,
+        projectId,
+      );
+      assert.equal(row[0].tipo, "numeric");
+      assert.equal(row[0].committed, "9999999999999990.04");
+    } finally {
       if (poId) await run(`DELETE FROM po_items WHERE po_id = ?`, poId);
       if (poId) await run(`DELETE FROM purchase_orders WHERE id = ?`, poId);
       if (matId) await run(`DELETE FROM materials WHERE id = ?`, matId);

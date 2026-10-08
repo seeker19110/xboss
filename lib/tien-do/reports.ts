@@ -151,10 +151,8 @@ const SOURCES: Record<string, ReportSource> = {
     // luôn đúng, không lặng lẽ trả thiếu dữ liệu).
     async run(projectId) {
       const mvRows = await query<{ month: string; committed: string; actual: string }>(
-        // S10c: `committed` của MV là float8 legacy (migration 0083) — `::numeric` trước `::text`
-        // để không gặp dạng mũ "1.2e+16" (parseMoney throw → 500); giữ biểu diễn legacy 15 chữ số
-        // (A3-FR04), cột exact là việc migration riêng. `actual` là NUMERIC nên exact.
-        `SELECT month, committed::numeric::text AS committed, actual::text AS actual
+        // S10 đuôi: `committed` của MV là NUMERIC exact (migration 0159) nên `::text` thẳng.
+        `SELECT month, committed::text AS committed, actual::text AS actual
            FROM mv_cost_by_month WHERE project_id = ? ORDER BY month`,
         projectId,
       );
