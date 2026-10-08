@@ -16,6 +16,7 @@ import { validateCustom } from "@/lib/ha-tang/custom-fields";
 import {
   MONEY_FORMAT_HEADER,
   isMoneyPrecisionError,
+  moneyInputErrorBody,
   moneyToWire,
   moneyWireFormat,
   parseMoney,
@@ -165,7 +166,7 @@ export async function PATCH(
     projectId != null
       ? await queryOne<Record<string, unknown>>(
           `SELECT code, kind, title, party_supplier_id AS "partySupplierId", party_name AS "partyName",
-                  system_id AS "systemId", value, advance_pct AS "advancePct",
+                  system_id AS "systemId", value::text AS value, advance_pct AS "advancePct",
                   retention_pct AS "retentionPct", signed_date AS "signedDate",
                   valid_from AS "validFrom", valid_to AS "validTo", status, note
              FROM contracts WHERE id = ? AND project_id = ?`,
@@ -190,7 +191,15 @@ export async function PATCH(
   // Field không gửi giữ giá trị cũ; field gửi null để xoá (partyName/ngày/note...).
   const merged: Record<string, unknown> = { ...existing };
   for (const key of Object.keys(existing)) if (key in body) merged[key] = body[key];
-  const input: ContractInput = parseContractBody(merged);
+  // S10: giá trị HĐ đọc exact — "1.234.567" kiểu vi-VN → 400, vượt NUMERIC(15,2) → 422.
+  let input: ContractInput;
+  try {
+    input = parseContractBody(merged);
+  } catch (err) {
+    const loi = moneyInputErrorBody(err);
+    if (loi) return NextResponse.json(loi.body, { status: loi.status });
+    throw err;
+  }
 
   const invalid = validateContractInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });

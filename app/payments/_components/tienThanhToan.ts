@@ -2,8 +2,13 @@
 // in (/payments/print). Mọi fetch gửi header decimal-string-v1; amount trên wire là chuỗi canonical
 // → đổi NGAY sang bigint đồng×100 tại đây, sau đó cộng/trừ/tỷ lệ đều bằng bigint (không float).
 // Thuần, không React — test được trực tiếp (tests/s10c-thanh-toan-money.test.ts).
-import { mulRatio, parseMoney } from "@/lib/nen/money";
-import { fmtDongDayDuMinor, fmtDongGonMinor, minorTuWire } from "@/lib/nen/money-dto";
+import { mulRatio } from "@/lib/nen/money";
+import {
+  chuanHoaTienNhap,
+  fmtDongDayDuMinor,
+  fmtDongGonMinor,
+  minorTuWire,
+} from "@/lib/nen/money-dto";
 
 export type FloorRow = {
   sheetTypeId: number;
@@ -123,14 +128,22 @@ export function phanTram(tu: bigint, mau: bigint): number {
 }
 
 /**
- * Ô nhập tiền → bigint, CÙNG cách đọc với số gửi lên server (bỏ ký tự ngoài [0-9.], lấy tiền tố
- * thập phân hợp lệ như parseFloat) nhưng làm tròn xu trên chuỗi (half-up chữ số lẻ thứ 3 — khớp
- * NUMERIC(15,2) làm tròn khi ghi), không qua `* 100` float. Rỗng/không hợp lệ → 0n.
+ * Ô nhập tiền → bigint, CÙNG quy tắc với số gửi lên server (`chuanHoaTienNhap`: "1.234.567" là
+ * 1.234.567 đồng, không còn bị parseFloat đọc thành 1,23 đ). Rỗng/không hợp lệ → 0n — nơi gửi
+ * server phải tự chặn ô không hợp lệ (xem `tienNhapGuiServer`), không gửi 0.
  */
 export function tienNhapSangMinor(s: string): bigint {
-  const tienTo = s.replace(/[^\d.]/g, "").match(/^\d*(\.\d+)?/)?.[0] ?? "";
-  if (tienTo === "" || tienTo === ".") return 0n;
-  return parseMoney(tienTo.startsWith(".") ? `0${tienTo}` : tienTo);
+  const chuan = chuanHoaTienNhap(s);
+  return chuan == null ? 0n : minorTuWire(chuan);
+}
+
+/**
+ * Ô nhập tiền → giá trị gửi server: rỗng → null; hợp lệ → chuỗi canonical 2 số lẻ; sai dạng →
+ * undefined (caller báo lỗi, không gửi).
+ */
+export function tienNhapGuiServer(s: string): string | null | undefined {
+  if (s.trim() === "") return null;
+  return chuanHoaTienNhap(s) ?? undefined;
 }
 
 /**

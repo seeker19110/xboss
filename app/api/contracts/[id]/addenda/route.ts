@@ -3,6 +3,7 @@ import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { isValidDateISO } from "@/lib/nen/date";
+import { moneyInputErrorBody, parseOptionalMoneyInput } from "@/lib/nen/money";
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +40,16 @@ export async function POST(
   const body = await req.json().catch(() => null);
   const code = typeof body?.code === "string" ? body.code.trim() : "";
   if (!code) return NextResponse.json({ error: "Thiếu số phụ lục" }, { status: 422 });
-  const valueDelta = body?.valueDelta != null ? Number(body.valueDelta) : 0;
-  if (!Number.isFinite(valueDelta))
-    return NextResponse.json({ error: "Giá trị phụ lục không hợp lệ" }, { status: 422 });
+  // S10: đọc exact (được âm) — "1.500" kiểu vi-VN → 400, vượt NUMERIC(15,2) → 422.
+  let valueDelta: string;
+  try {
+    valueDelta =
+      parseOptionalMoneyInput(body?.valueDelta, { label: "Giá trị phụ lục" })?.text ?? "0.00";
+  } catch (err) {
+    const loi = moneyInputErrorBody(err);
+    if (loi) return NextResponse.json(loi.body, { status: loi.status });
+    throw err;
+  }
   const signedDate =
     typeof body?.signedDate === "string" && body.signedDate.trim() ? body.signedDate.trim() : null;
   if (signedDate && !isValidDateISO(signedDate))

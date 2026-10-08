@@ -1,5 +1,50 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S10: ĐẦU VÀO tiền exact (parser chung, tràn → 422, % tầng khoá dòng)
+
+Phần "đầu vào" của S10 (A3-FR01/FR02, A3 §4) — đóng điểm mở của S10c về parse ô nhập tiền.
+Không migration, không đổi kiểu cột, không reprice lịch sử.
+
+- **Parser chung** `parseMoneyInput`/`parseOptionalMoneyInput` (`lib/nen/money.ts`): nhận JSON
+  number hữu hạn hoặc chuỗi thập phân thuần ("1234567.5"); chuỗi có dấu phẩy/nhiều dấu chấm/nhóm
+  nghìn vi-VN ("1.234.567", "1.500" — mơ hồ 1.500 đ hay 1,5 đ, không đoán) → **400
+  `amount_locale_format`**; sai dạng/NaN/Infinity/số mũ → 400 `amount_invalid`; quá 2 số lẻ khác 0 →
+  400 `amount_scale`; vượt NUMERIC(15,2) (`fitsNumeric`) → **422 `amount_overflow`**. Chuỗi không qua
+  float; number dùng `String(n)` (exact với ≤ 15 chữ số có nghĩa — mọi giá trị vừa cột). Lỗi là
+  `MoneyInputError`, route đổi qua `moneyInputErrorBody` → `{ error, code }`; thông điệp tiếng Việt
+  không chứa giá trị nhập.
+- **Route đã chuyển** (ghi chuỗi canonical, không `Number()`/`parseFloat`): `POST /api/payments/bills`
+  (amount, labor), `PATCH /api/payments/bills/:id` (labor — tràn trước đây 500, số âm trước đây lặng
+  lẽ thành null nay 400), `PATCH /api/payments` (contractValue nhận cả chuỗi), `POST/PATCH
+/api/contracts` (value; PATCH đọc giá trị cũ `::text`), `POST /api/contracts/:id/addenda`
+  (valueDelta, được âm), `POST/PATCH /api/advances` (amount) + hoàn ứng `settleAmount`, `POST/PATCH
+/api/cash-transactions` (amount), `POST/PATCH /api/invoices` (netAmount/vatAmount), `POST
+/api/purchase-orders` (unitPrice từng dòng). Input type `AdvanceInput`/`CashTransactionInput`/
+  `InvoiceInput`/`ContractInput` giữ tiền dạng chuỗi canonical. Đổi mã lỗi có chủ đích: valueDelta/
+  value sai dạng 422 → 400; contractValue tràn ở `PATCH /api/payments` 400 → 422.
+- **Bill theo tầng** (`POST /api/payments/bills`): sheet phải thuộc dự án đang chọn (404, trước đây
+  đọc được HĐ tầng của dự án khác); chạy trong `withProjectScope` (dự án `getCurrentProjectIdStrict`,
+  không ghi bill project_id NULL); khoá dòng `floor_contracts` `FOR UPDATE` rồi mới cộng Σ % kỳ bằng
+  NUMERIC (`Σ + ROUND(pct,4) > 1`, chỉ bill cùng dự án — khớp `pctPaid` của `/floors`). Trước đây so
+  float có dung sai 0,0001 (cho 100,01%) và 2 lượt đồng thời 60% + 60% cùng được ghi.
+- **Client** `/payments`: `chuanHoaTienNhap` (`lib/nen/money-dto.ts`, có test) đọc ô nhập vi-VN
+  ("1.234.567" = 1.234.567 đ, "1.234,5", hoặc số thuần điền sẵn) → chuỗi canonical gửi server;
+  `tienNhapSangMinor` dùng cùng quy tắc (bản cũ đọc "1.234.567" thành 1,23 đ). Ô nhân công/giá trị
+  HĐ tầng/phát sinh/tạm ứng sai dạng → báo lỗi, không gửi; PATCH bill thất bại → trả giá trị cũ + báo.
+  Các form khác (hợp đồng, quỹ, hoá đơn, PO, phụ lục) dùng `<input type="number">` nên đã gửi số thuần.
+- **Test**: `tests/s10-tien-dau-vao.test.ts` (thuần: parser + chuẩn hoá vi-VN),
+  `tests/s10-tien-dau-vao-route.test.ts` (10 ca route thật — **10/10 đỏ trên code cũ**: "1.500" ghi
+  1,5 đ; tràn → `numeric field overflow` 500; 100,01% lọt; đồng thời ghi 120%; sheet dự án khác 200).
+  Gỡ `FOR UPDATE` → ca đồng thời đỏ 2/3 lần; có khoá xanh 5/5. Cập nhật test theo hợp đồng mới:
+  `s10c-thanh-toan-money`, `finance`, `contracts`, `route-tai-chinh` (ca "lỗi DB khác 23505" đổi sang
+  ngày 2026-02-30), `route-tai-chinh-3a`/`3b`. Bộ liên quan 34 file chạy tuần tự: 759 pass / 0 fail.
+- **Còn mở (chưa chuyển parser):** claims (`lib/tai-chinh/claims.ts` amountRequested,
+  `app/api/claims/[id]/settle` amountSettled), proposals (`lib/tai-chinh/proposals.ts` amount),
+  bảo lãnh (`lib/tai-chinh/insurance.ts` value), VO (`lib/tai-chinh/vo.ts` dòng unitPrice), gói thầu
+  (`app/api/tenders/[id]/bids/**` unitPrice), BOQ (`app/api/boq/route.ts` unitPrice/subUnitPrice — còn
+  `|| 0`), engineering bidding quotes (`totalAmountVnd`); `quantity` bill (NUMERIC(15,3)) vẫn
+  `Number()` — tràn ≥ 10^12 vẫn 500; `pctThisPeriod` vẫn kẹp 0..1 bằng number (không phải tiền).
+
 ## 2026-10-08 — QUALITY-FINAL-1 S02d: nhà thầu phụ (công nợ) + EVM fail-closed
 
 Cùng lớp S02 (A1-AC01/AC02), gọi route thật — 8/8 ca đỏ trên code cũ, xanh sau vá

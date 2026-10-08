@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, withProjectScope } from "@/lib/db";
 import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
+import { moneyInputErrorBody, parseOptionalMoneyInput, type MoneyInput } from "@/lib/nen/money";
 
 export const dynamic = "force-dynamic";
 
@@ -70,9 +71,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     args.push(q != null && Number.isFinite(q) && q >= 0 ? q : null);
   }
   if (b.labor !== undefined) {
-    const l = b.labor === "" || b.labor == null ? null : Number(b.labor);
-    sets.push("labor = ?");
-    args.push(l != null && Number.isFinite(l) && l >= 0 ? l : null);
+    // S10 (A3-FR01/FR02): rỗng/null = xoá; "1.234" kiểu vi-VN → 400; vượt NUMERIC(15,2) → 422
+    // (trước đây lỗi tràn 500); số âm → 400 thay vì lặng lẽ ghi null.
+    let labor: MoneyInput | null;
+    try {
+      labor = parseOptionalMoneyInput(b.labor, { label: "Nhân công" });
+    } catch (err) {
+      const loi = moneyInputErrorBody(err);
+      if (loi) return NextResponse.json(loi.body, { status: loi.status });
+      throw err;
+    }
+    if (labor && labor.unscaled < 0n)
+      return NextResponse.json({ error: "Nhân công phải ≥ 0" }, { status: 400 });
+    sets.push("labor = ?::numeric");
+    args.push(labor?.text ?? null);
   }
   if (b.note !== undefined) {
     sets.push("note = ?");

@@ -3,7 +3,13 @@
 // (nguồn cho notification contract_expiry ở PR 3). Xem docs/nang-cap/M16-hop-dong.md.
 import { query, queryOne } from "@/lib/db";
 import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
-import { moneyToWire, parseMoney, type MoneyWireFormat } from "@/lib/nen/money";
+import {
+  moneyToWire,
+  parseFixedDecimalExact,
+  parseMoney,
+  parseOptionalMoneyInput,
+  type MoneyWireFormat,
+} from "@/lib/nen/money";
 
 export const CONTRACT_KINDS = ["nhan_thau", "giao_thau", "ncc"] as const;
 export type ContractKind = (typeof CONTRACT_KINDS)[number];
@@ -32,7 +38,8 @@ export type ContractInput = {
   partySupplierId: number | null;
   partyName: string | null;
   systemId: number | null;
-  value: number;
+  /** S10: chuỗi canonical 2 số lẻ (ghi thẳng NUMERIC(15,2), không qua float). */
+  value: string;
   advancePct: number;
   retentionPct: number;
   signedDate: string | null;
@@ -51,7 +58,7 @@ export function validateContractInput(input: ContractInput): string | null {
   if (!input.title.trim()) return "Thiếu tên hợp đồng";
   if (!CONTRACT_KINDS.includes(input.kind)) return "Loại hợp đồng không hợp lệ";
   if (!CONTRACT_STATUSES.includes(input.status)) return "Trạng thái không hợp lệ";
-  if (!Number.isFinite(input.value) || input.value < 0) return "Giá trị hợp đồng phải ≥ 0";
+  if (parseFixedDecimalExact(input.value, 2) < 0n) return "Giá trị hợp đồng phải ≥ 0";
   for (const [label, pct] of [
     ["% tạm ứng", input.advancePct],
     ["% giữ lại bảo hành", input.retentionPct],
@@ -76,6 +83,8 @@ export function validateContractInput(input: ContractInput): string | null {
 
 // Đọc body JSON thành ContractInput (POST dùng nguyên, PATCH merge với bản ghi cũ).
 // Đặt ở lib (không phải route) vì route file App Router chỉ được export handler.
+// S10 (A3-FR01/FR02): `value` đọc qua `parseOptionalMoneyInput` — "1.234.567" kiểu vi-VN/sai dạng
+// ném MoneyInputError (route trả 400), vượt NUMERIC(15,2) → 422 `amount_overflow`; vắng → "0.00".
 export function parseContractBody(body: Record<string, unknown>): ContractInput {
   const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
   const strOrNull = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
@@ -86,7 +95,7 @@ export function parseContractBody(body: Record<string, unknown>): ContractInput 
     partySupplierId: body.partySupplierId != null ? Number(body.partySupplierId) : null,
     partyName: strOrNull(body.partyName),
     systemId: body.systemId != null ? Number(body.systemId) : null,
-    value: body.value != null ? Number(body.value) : 0,
+    value: parseOptionalMoneyInput(body.value, { label: "Giá trị hợp đồng" })?.text ?? "0.00",
     advancePct: body.advancePct != null ? Number(body.advancePct) : 0,
     retentionPct: body.retentionPct != null ? Number(body.retentionPct) : 0,
     signedDate: strOrNull(body.signedDate),

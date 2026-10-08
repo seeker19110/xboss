@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, queryOne, withTransaction } from "@/lib/db";
 import { getCurrentProjectId, getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
-import { MONEY_FORMAT_HEADER, isMoneyPrecisionError, moneyWireFormat } from "@/lib/nen/money";
+import {
+  MONEY_FORMAT_HEADER,
+  isMoneyPrecisionError,
+  moneyInputErrorBody,
+  moneyWireFormat,
+  parseMoneyInput,
+} from "@/lib/nen/money";
 import {
   HEADERS_API_TIEN,
   LOI_TIEN_VUOT_DINH_DANG_CU,
@@ -149,27 +155,32 @@ export async function PATCH(req: NextRequest) {
   if (rawUpdates.length === 0) return NextResponse.json({ ok: true, updated: 0 });
   if (rawUpdates.length > 1_000) return invalid();
 
-  const updates: { sheetTypeId: number; floorLabel: string; contractValue: number }[] = [];
+  // S10 (A3-FR01/FR02): contractValue là số JSON hoặc chuỗi thập phân thuần, đọc exact qua
+  // `parseMoneyInput` ("1.234.567" kiểu vi-VN → 400 amount_locale_format, vượt NUMERIC(15,2) →
+  // 422 amount_overflow) — ghi chuỗi canonical, không qua float.
+  const updates: { sheetTypeId: number; floorLabel: string; contractValue: string }[] = [];
   const seen = new Set<string>();
   for (const raw of rawUpdates) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return invalid();
     const row = raw as Record<string, unknown>;
     const sheetTypeId = parseId(row.sheetTypeId);
-    if (
-      sheetTypeId == null ||
-      typeof row.floorLabel !== "string" ||
-      row.floorLabel.trim() === "" ||
-      typeof row.contractValue !== "number" ||
-      !Number.isFinite(row.contractValue) ||
-      row.contractValue < 0 ||
-      row.contractValue > 9_999_999_999_999.99
-    )
+    if (sheetTypeId == null || typeof row.floorLabel !== "string" || row.floorLabel.trim() === "")
       return invalid();
+    let contractValue: string;
+    try {
+      const v = parseMoneyInput(row.contractValue, { label: "Giá trị hợp đồng tầng" });
+      if (v.unscaled < 0n) return invalid();
+      contractValue = v.text;
+    } catch (err) {
+      const loi = moneyInputErrorBody(err);
+      if (loi) return NextResponse.json(loi.body, { status: loi.status });
+      throw err;
+    }
     const floorLabel = row.floorLabel.trim();
     const key = `${sheetTypeId}\0${floorLabel}`;
     if (seen.has(key)) return invalid();
     seen.add(key);
-    updates.push({ sheetTypeId, floorLabel, contractValue: row.contractValue });
+    updates.push({ sheetTypeId, floorLabel, contractValue });
   }
 
   const placeholders = updates.map(() => "(?::integer, ?::text, ?::numeric)").join(", ");

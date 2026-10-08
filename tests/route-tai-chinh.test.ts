@@ -825,12 +825,13 @@ test("POST /api/contracts: trùng số hợp đồng → 409", S, async () => {
 });
 
 test(
-  "POST /api/contracts: lỗi DB KHÔNG PHẢI trùng mã (tràn NUMERIC) được ném lại nguyên vẹn, không nuốt lỗi",
+  "POST /api/contracts: lỗi DB KHÔNG PHẢI trùng mã (ngày không tồn tại) được ném lại nguyên vẹn, không nuốt lỗi",
   S,
   async () => {
-    // Nhánh `throw err` (không phải 23505) — value vượt NUMERIC(15,2) (tối đa ~10^13)
-    // gây lỗi Postgres khác hẳn unique violation; route không được biến nó thành 409
-    // giả trùng mã mà phải để lỗi lộ ra (nuốt nhầm lỗi sẽ che mất sự cố thật ở DB).
+    // Nhánh `throw err` (không phải 23505) — ngày 2026-02-30 qua được regex YYYY-MM-DD nhưng
+    // Postgres từ chối (lỗi khác hẳn unique violation); route không được biến nó thành 409 giả
+    // trùng mã mà phải để lỗi lộ ra (nuốt nhầm lỗi sẽ che mất sự cố thật ở DB). Trước S10 ca này
+    // dùng value 1e20 — nay tràn NUMERIC(15,2) bị chặn sớm thành 422 `amount_overflow`.
     const projectId = await taoDuAn("coverr");
     const pm = await taoUser("pm", "coverr");
     await dangNhapDuAn(pm, projectId);
@@ -840,12 +841,23 @@ test(
         jreq("/api/contracts", {
           code: `HD-${uniq("coverr")}`,
           kind: "nhan_thau",
-          title: "Tràn số",
+          title: "Ngày sai",
           partyName: "CĐT",
-          value: 1e20,
+          signedDate: "2026-02-30",
         }),
       ),
     );
+    const tran = await POST(
+      jreq("/api/contracts", {
+        code: `HD-${uniq("coverr")}`,
+        kind: "nhan_thau",
+        title: "Tràn số",
+        partyName: "CĐT",
+        value: 1e20,
+      }),
+    );
+    assert.equal(tran.status, 422);
+    assert.equal(((await tran.json()) as { code?: string }).code, "amount_overflow");
   },
 );
 

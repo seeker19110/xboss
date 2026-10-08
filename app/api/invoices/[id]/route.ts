@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { moneyInputErrorBody } from "@/lib/nen/money";
 import { queryOne, run, withProjectScope, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -11,12 +12,19 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// Dòng DB (GET trả nguyên dạng number legacy); PATCH merge rồi đọc lại qua parseInvoiceBody —
+// number của cột NUMERIC(15,2) (≤ 15 chữ số có nghĩa) đọc lại exact.
+type ExistingRow = Omit<InvoiceInput, "netAmount" | "vatAmount"> & {
+  netAmount: number | null;
+  vatAmount: number | null;
+};
+
 async function loadExisting(
   id: number,
   projectId: number | null,
-): Promise<InvoiceInput | undefined> {
+): Promise<ExistingRow | undefined> {
   if (projectId == null) return undefined;
-  return queryOne<InvoiceInput>(
+  return queryOne<ExistingRow>(
     `SELECT invoice_no AS "invoiceNo", invoice_date AS "invoiceDate", direction,
             net_amount AS "netAmount", vat_amount AS "vatAmount", vat_rate AS "vatRate",
             counterparty, contract_id AS "contractId", payment_bill_id AS "paymentBillId"
@@ -75,7 +83,15 @@ export async function PATCH(
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
   const merged = { ...existing, ...body };
-  const input = parseInvoiceBody(merged);
+  // S10: tiền đọc exact — "1.234.567" kiểu vi-VN → 400, vượt NUMERIC(15,2) → 422.
+  let input: InvoiceInput;
+  try {
+    input = parseInvoiceBody(merged);
+  } catch (err) {
+    const loi = moneyInputErrorBody(err);
+    if (loi) return NextResponse.json(loi.body, { status: loi.status });
+    throw err;
+  }
   const invalid = validateInvoiceInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 

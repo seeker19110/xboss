@@ -1604,7 +1604,9 @@ test(
     );
     assert.equal(duplicate.status, 400);
     assert.equal(negative.status, 400);
-    assert.equal(exceedsNumeric15_2.status, 400);
+    // S10: tràn NUMERIC(15,2) → 422 `amount_overflow` (parser tiền chung), vẫn reject cả batch.
+    assert.equal(exceedsNumeric15_2.status, 422);
+    assert.equal(((await exceedsNumeric15_2.json()) as { code?: string }).code, "amount_overflow");
     const { queryOne } = await import("@/lib/db");
     const row = await queryOne(
       `SELECT id FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,

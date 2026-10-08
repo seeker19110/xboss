@@ -5,6 +5,7 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { nextSeqCode, withUniqueRetry } from "@/lib/ha-tang/seqcode";
 import { checkPurchaseOrderParents, listPurchaseOrders } from "@/lib/tai-chinh/procurement";
+import { moneyInputErrorBody, parseOptionalMoneyInput } from "@/lib/nen/money";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
     materialId: number;
     prId?: number;
     qtyOrdered: number;
-    unitPrice?: number;
+    unitPrice?: unknown;
     note?: string;
   }[] = Array.isArray(body.items) ? body.items : [];
   if (!items.length)
@@ -59,6 +60,22 @@ export async function POST(req: NextRequest) {
   // Ngày phải đúng dạng YYYY-MM-DD — chuỗi sai để Postgres từ chối sẽ thành lỗi 500.
   if (body.expectedDate && !/^\d{4}-\d{2}-\d{2}$/.test(String(body.expectedDate)))
     return NextResponse.json({ error: "Ngày dự kiến phải có dạng YYYY-MM-DD" }, { status: 422 });
+
+  // S10 (A3-FR01/FR02): đơn giá đọc exact TRƯỚC khi mở transaction — "1.500" kiểu vi-VN → 400
+  // (trước đây ghi 1,5 đ), vượt NUMERIC(15,2) → 422; rỗng/0 → null (chưa có giá) như cũ.
+  let donGia: (string | null)[];
+  try {
+    donGia = items.map((i) => {
+      const v = parseOptionalMoneyInput(i.unitPrice, { label: "Đơn giá" });
+      return v == null || v.unscaled === 0n ? null : v.text;
+    });
+  } catch (err) {
+    const loi = moneyInputErrorBody(err);
+    if (loi) return NextResponse.json(loi.body, { status: loi.status });
+    throw err;
+  }
+  if (donGia.some((g) => g != null && g.startsWith("-")))
+    return NextResponse.json({ error: "Đơn giá phải ≥ 0" }, { status: 400 });
 
   const supplierId = body.supplierId ? Number(body.supplierId) : null;
   const contractId = body.contractId ? Number(body.contractId) : null;
@@ -94,7 +111,7 @@ export async function POST(req: NextRequest) {
         projectId,
       );
 
-      for (const item of items) {
+      for (const [i, item] of items.entries()) {
         await insertId(
           `INSERT INTO po_items (po_id, material_id, pr_id, qty_ordered, qty_received, unit_price, note)
          VALUES (?, ?, ?, ?, 0, ?, ?)`,
@@ -102,7 +119,7 @@ export async function POST(req: NextRequest) {
           Number(item.materialId),
           item.prId ? Number(item.prId) : null,
           Number(item.qtyOrdered),
-          item.unitPrice ? Number(item.unitPrice) : null,
+          donGia[i],
           item.note ? String(item.note).trim() : null,
         );
       }

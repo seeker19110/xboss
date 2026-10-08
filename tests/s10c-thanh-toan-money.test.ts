@@ -272,13 +272,14 @@ test(
 // ===== Thuần (client) =====
 
 test("tienThanhToan: nhập/hiển thị/tỷ lệ bằng bigint, không trôi xu", () => {
-  // Ô nhập: cùng cách đọc với số gửi server (tiền tố như parseFloat), làm tròn xu trên chuỗi.
-  assert.equal(tienNhapSangMinor("1234567.555"), 123456756n);
+  // Ô nhập (S10 đầu vào): cùng quy tắc vi-VN với số gửi server (`chuanHoaTienNhap`) — không đoán
+  // tiền tố kiểu parseFloat, không lén làm tròn số lẻ thứ 3; sai dạng → 0n (nơi gửi tự chặn).
+  assert.equal(tienNhapSangMinor("1234567.555"), 0n);
   assert.equal(tienNhapSangMinor("abc"), 0n);
-  assert.equal(tienNhapSangMinor(".5"), 50n);
-  assert.equal(tienNhapSangMinor("1.2.3"), 120n); // parseFloat("1.2.3") = 1.2
+  assert.equal(tienNhapSangMinor("1.2.3"), 0n); // parseFloat cũ đọc thành 1,2 đ
+  assert.equal(tienNhapSangMinor("1.234.567"), 123456700n);
   // Giá trị điền sẵn ô nhập đọc lại đúng (bản "1.234.567" vi-VN cũ bị đọc thành 1,234 đ).
-  for (const v of [123456789n, 123456700n, 9999999999999999n, 5n])
+  for (const v of [123456789n, 123456700n, 999999999999999n, 5n])
     assert.equal(tienNhapSangMinor(soTienNhapThuan(v)), v);
   assert.equal(soTienNhapThuan(123456700n), "1234567");
   assert.equal(soTienNhapThuan(123456750n), "1234567.5");

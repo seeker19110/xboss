@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { moneyInputErrorBody, parseMoneyInput } from "@/lib/nen/money";
 import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -11,7 +12,13 @@ import {
 
 export const dynamic = "force-dynamic";
 
-type ExistingRow = AdvanceInput & { settledAmount: number; status: AdvanceStatus };
+// Dòng DB (GET trả nguyên dạng number legacy); PATCH merge rồi đọc lại qua parseAdvanceBody —
+// number của cột NUMERIC(15,2) (≤ 15 chữ số có nghĩa) đọc lại exact.
+type ExistingRow = Omit<AdvanceInput, "amount"> & {
+  amount: number;
+  settledAmount: number;
+  status: AdvanceStatus;
+};
 
 async function loadExisting(
   id: number,
@@ -78,9 +85,18 @@ export async function PATCH(
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
   if (body.action === "settle") {
-    const settleAmount = Number(body.settleAmount);
-    if (!Number.isFinite(settleAmount) || settleAmount <= 0)
-      return NextResponse.json({ error: "Số tiền hoàn ứng phải > 0" }, { status: 422 });
+    // S10: đọc exact ("1.000" kiểu vi-VN → 400 thay vì hoàn 1 đồng; tràn → 422).
+    let settleAmount: string;
+    try {
+      const v = parseMoneyInput(body.settleAmount, { label: "Số tiền hoàn ứng" });
+      if (v.unscaled <= 0n)
+        return NextResponse.json({ error: "Số tiền hoàn ứng phải > 0" }, { status: 422 });
+      settleAmount = v.text;
+    } catch (err) {
+      const loi = moneyInputErrorBody(err);
+      if (loi) return NextResponse.json(loi.body, { status: loi.status });
+      throw err;
+    }
 
     // Cộng dồn + suy status NGAY TRONG SQL, điều kiện nằm trong WHERE của cùng câu UPDATE:
     //   - không cộng tiền trên float JS (NUMERIC → parseFloat, quy ước M45);
@@ -119,7 +135,15 @@ export async function PATCH(
   }
 
   const merged = { ...existing, ...body };
-  const input = parseAdvanceBody(merged);
+  // S10: tiền đọc exact — "1.234.567" kiểu vi-VN → 400, vượt NUMERIC(15,2) → 422.
+  let input: AdvanceInput;
+  try {
+    input = parseAdvanceBody(merged);
+  } catch (err) {
+    const loi = moneyInputErrorBody(err);
+    if (loi) return NextResponse.json(loi.body, { status: loi.status });
+    throw err;
+  }
   const invalid = validateAdvanceInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 

@@ -25,7 +25,7 @@ import EditModeToggle from "@/app/components/EditModeToggle";
 import { appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { formatDateDMY, todayISO } from "@/lib/nen/date";
-import { HEADER_TIEN_V1, soTienNhapThuan } from "@/lib/nen/money-dto";
+import { HEADER_TIEN_V1, chuanHoaTienNhap, soTienNhapThuan } from "@/lib/nen/money-dto";
 import {
   docBills,
   docDuLieuThanhToan,
@@ -34,6 +34,7 @@ import {
   fmtVND,
   phanTram,
   thanhTienTheoPct,
+  tienNhapGuiServer,
   tienNhapSangMinor,
   tongTien,
   type Bill,
@@ -48,7 +49,8 @@ import {
 type AddInput = {
   responsible: string;
   type: BillType;
-  amount: number;
+  // S10: tiền gửi server là chuỗi canonical (chuanHoaTienNhap) — bill theo tầng gửi 0, server tự tính.
+  amount: number | string;
   paidDate: string;
   period: string | null;
   description: string | null;
@@ -56,7 +58,7 @@ type AddInput = {
   note: string | null;
   unit?: string | null;
   quantity?: number | null;
-  labor?: number | null;
+  labor?: string | null;
   sheetTypeId?: number | null;
   floorLabel?: string | null;
   pctThisPeriod?: number;
@@ -226,7 +228,7 @@ export default function PaymentsPage() {
         note: input.note,
         unit: input.unit ?? null,
         quantity: input.quantity ?? null,
-        labor: input.labor == null ? null : tienNhapSangMinor(String(input.labor)),
+        labor: input.labor == null ? null : tienNhapSangMinor(input.labor),
         sheetTypeId: input.sheetTypeId ?? null,
         floorLabel: input.floorLabel ?? null,
         pctThisPeriod: input.pctThisPeriod ?? 0,
@@ -247,8 +249,9 @@ export default function PaymentsPage() {
 
   async function patchBill(
     id: number,
-    patch: { unit?: string | null; quantity?: number | null; labor?: number | null },
+    patch: { unit?: string | null; quantity?: number | null; labor?: string | null },
   ) {
+    const truoc = bills.find((b) => b.id === id);
     setBills((prev) =>
       prev.map((b) =>
         b.id === id
@@ -260,16 +263,23 @@ export default function PaymentsPage() {
                   ? b.labor
                   : patch.labor == null
                     ? null
-                    : tienNhapSangMinor(String(patch.labor)),
+                    : tienNhapSangMinor(patch.labor),
             }
           : b,
       ),
     );
-    await fetch(`/api/payments/bills/${id}`, {
+    // S10: server từ chối (sai dạng/tràn/quyền) hay mất mạng → trả lại giá trị cũ + báo lý do,
+    // không để màn hình hiện số chưa được lưu.
+    const res = await fetch(`/api/payments/bills/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
-    });
+    }).catch(() => null);
+    if (!res?.ok) {
+      const loi = res ? (await res.json().catch(() => null))?.error : null;
+      showToast(typeof loi === "string" ? loi : "Không lưu được thay đổi bill", "error");
+      if (truoc) setBills((prev) => prev.map((b) => (b.id === id ? truoc : b)));
+    }
   }
 
   async function saveEdits(pending: Record<EditKey, string>, rows: FloorRow[]) {
@@ -278,11 +288,21 @@ export default function PaymentsPage() {
       .map(([k, v]) => {
         const row = rowMap.get(k);
         if (!row) return null;
-        const contractValue = parseFloat(v.replace(/[^\d.]/g, "")) || 0;
+        // S10: chuẩn hoá ô nhập vi-VN ("1.234.567" = 1.234.567 đ) → chuỗi canonical; rỗng = 0.
+        const contractValue = v.trim() === "" ? "0.00" : chuanHoaTienNhap(v);
         return { sheetTypeId: row.sheetTypeId, floorLabel: row.floorLabel, contractValue };
       })
-      .filter(Boolean) as { sheetTypeId: number; floorLabel: string; contractValue: number }[];
+      .filter(Boolean) as {
+      sheetTypeId: number;
+      floorLabel: string;
+      contractValue: string | null;
+    }[];
     if (!updates.length) return;
+    const sai = updates.find((u) => u.contractValue == null || u.contractValue.startsWith("-"));
+    if (sai) {
+      appAlert(`Giá trị hợp đồng tầng ${sai.floorLabel} không hợp lệ — nhập số, vd 1.234.567`);
+      return;
+    }
     setSaving(true);
     // Dữ liệu TIỀN: chỉ cập nhật màn hình khi server đã nhận thật. Trước đây bỏ qua kết quả
     // PATCH nên server từ chối (quyền/validate) hay mất mạng vẫn hiện số mới như đã lưu.
@@ -699,7 +719,7 @@ function BillsSection({
   onDelete: (id: number) => void;
   onPatch: (
     id: number,
-    patch: { unit?: string | null; quantity?: number | null; labor?: number | null },
+    patch: { unit?: string | null; quantity?: number | null; labor?: string | null },
   ) => void;
 }) {
   const [open, setOpen] = useState(true);
@@ -766,6 +786,12 @@ function BillsSection({
         setBusy(false);
         return;
       }
+      const labor = tienNhapGuiServer(d.labor);
+      if (labor === undefined) {
+        showToast(`Nhân công tầng ${d.floorLabel} không hợp lệ — nhập số, vd 1.234.567`, "error");
+        setBusy(false);
+        return;
+      }
       const { ok } = await onAdd({
         responsible: person,
         type: "bill",
@@ -777,7 +803,7 @@ function BillsSection({
         note: null,
         unit: d.unit.trim() || "LS",
         quantity: d.quantity.trim() ? parseFloat(d.quantity.replace(/[^\d.]/g, "")) : null,
-        labor: d.labor.trim() ? parseFloat(d.labor.replace(/[^\d.]/g, "")) : null,
+        labor,
         sheetTypeId: d.sheetTypeId,
         floorLabel: d.floorLabel,
         pctThisPeriod: pct,
@@ -789,9 +815,9 @@ function BillsSection({
     }
     for (const d of draftB) {
       if (!d.description.trim()) continue;
-      const amt = parseFloat(d.amount.replace(/[^\d.]/g, "")) || 0;
-      if (amt <= 0) {
-        showToast(`"${d.description}" chưa có giá trị`, "error");
+      const amt = chuanHoaTienNhap(d.amount);
+      if (amt == null || tienNhapSangMinor(d.amount) <= 0n) {
+        showToast(`"${d.description}" chưa có giá trị hợp lệ`, "error");
         setBusy(false);
         return;
       }
@@ -811,8 +837,13 @@ function BillsSection({
       }
     }
     for (const d of draftTU) {
-      const amt = parseFloat(d.amount.replace(/[^\d.]/g, "")) || 0;
-      if (amt <= 0) continue;
+      if (!d.amount.trim()) continue;
+      const amt = chuanHoaTienNhap(d.amount);
+      if (amt == null || tienNhapSangMinor(d.amount) <= 0n) {
+        showToast("Số tiền tạm ứng không hợp lệ — nhập số, vd 1.234.567", "error");
+        setBusy(false);
+        return;
+      }
       await onAdd({
         responsible: person,
         type: "advance",
@@ -996,8 +1027,14 @@ function BillsSection({
                                 defaultValue={b.labor != null ? soTienNhapThuan(b.labor) : ""}
                                 placeholder="—"
                                 onBlur={(e) => {
-                                  const t = e.target.value.trim();
-                                  const v = t ? parseFloat(t.replace(/[^\d.]/g, "")) : null;
+                                  const v = tienNhapGuiServer(e.target.value);
+                                  if (v === undefined) {
+                                    showToast(
+                                      "Nhân công không hợp lệ — nhập số, vd 1.234.567",
+                                      "error",
+                                    );
+                                    return;
+                                  }
                                   onPatch(b.id, { labor: v });
                                 }}
                                 className={`${inputCls} w-full text-right tabular-nums`}

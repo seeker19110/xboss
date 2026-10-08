@@ -8,11 +8,13 @@
 import {
   MONEY_FORMAT_DECIMAL_V1,
   MONEY_FORMAT_HEADER,
+  MoneyInputError,
   moneyToDecimal,
   moneyToWire,
   mulRatio,
   parseFixedDecimalExact,
   parseMoneyExact,
+  parseMoneyInput,
   type MoneyWireFormat,
 } from "@/lib/nen/money";
 
@@ -139,4 +141,39 @@ export function fmtDongDayDuMinor(minor: bigint): string {
  */
 export function soTienNhapThuan(minor: bigint): string {
   return moneyToDecimal(minor).replace(/\.?0+$/, "");
+}
+
+/**
+ * S10 (A3 §4) — ô nhập tiền gõ tay → chuỗi canonical 2 số lẻ để GỬI server (server không đoán
+ * dấu chấm/phẩy, xem `parseMoneyInput`). Quy tắc vi-VN, có test:
+ *   - có dấu phẩy: phẩy là dấu thập phân, dấu chấm (nếu có) phải nhóm đúng 3 chữ số
+ *     ("1.234.567,5" → "1234567.50", "1234,5" → "1234.50");
+ *   - không phẩy, dấu chấm nhóm đúng 3 chữ số → phân cách nghìn ("1.234.567" → "1234567.00",
+ *     "1.500" → "1500.00");
+ *   - còn lại một dấu chấm → dấu thập phân ("1234567.5" — dạng `soTienNhapThuan` điền sẵn, không
+ *     bao giờ có đúng 3 số lẻ nên không lẫn với nhóm nghìn).
+ * Bỏ khoảng trắng và hậu tố "đ"/"₫"/"VND". Rỗng, sai dạng, quá 2 số lẻ hoặc vượt NUMERIC(15,2)
+ * → null (UI báo lỗi, không gửi). Dấu "-" đầu được giữ; caller tự chặn số âm nếu cần.
+ */
+export function chuanHoaTienNhap(s: string): string | null {
+  const gon = s.replace(/[\s  ]/g, "").replace(/(đ|₫|vnd)$/i, "");
+  const m = /^(-?)(.+)$/.exec(gon);
+  if (!m) return null;
+  const [, dau, than] = m;
+  let thuan: string;
+  if (/^\d{1,3}(\.\d{3})*,\d+$/.test(than) || /^\d+,\d+$/.test(than)) {
+    thuan = than.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(than)) {
+    thuan = than.replace(/\./g, "");
+  } else if (/^\d+(\.\d+)?$/.test(than)) {
+    thuan = than;
+  } else {
+    return null;
+  }
+  try {
+    return parseMoneyInput(`${dau}${thuan}`).text;
+  } catch (err) {
+    if (err instanceof MoneyInputError) return null;
+    throw err;
+  }
 }

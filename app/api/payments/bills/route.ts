@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, queryOne, withProjectScope } from "@/lib/db";
-import { getCurrentProjectId, getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
+import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 import {
   MONEY_FORMAT_HEADER,
   isMoneyPrecisionError,
+  moneyInputErrorBody,
   moneyWireFormat,
   parseMoneyExact,
+  parseMoneyInput,
+  parseOptionalMoneyInput,
+  type MoneyInput,
 } from "@/lib/nen/money";
 import {
   HEADERS_API_TIEN,
@@ -144,9 +148,21 @@ export async function GET(req: NextRequest) {
   }
 }
 
+/** Tỷ lệ NUMERIC dạng chuỗi ("0.9999") → "99.99" — CHỈ để hiển thị trong thông điệp lỗi. */
+function phanTramHienThi(tyLe: string | number): string {
+  return String(Number((Number(tyLe) * 100).toFixed(2)));
+}
+
+type KetQuaGhiBill =
+  { ok: true; id: number; amount: string } | { ok: false; status: 400 | 404; error: string };
+
 // POST /api/payments/bills
 // Body: { responsible, type, amount, paidDate, period?, description?, note?,
-//         sheetTypeId?, floorLabel?, pctThisPeriod?, progressSnapshot? }
+//         sheetTypeId?, floorLabel?, pctThisPeriod?, progressSnapshot?, unit?, quantity?, labor? }
+// S10 (A3-FR01/FR02): amount/labor đọc qua `parseMoneyInput` (số JSON hoặc chuỗi thập phân thuần;
+// "1.234.567" kiểu vi-VN → 400, vượt NUMERIC(15,2) → 422 `amount_overflow`). Bill theo tầng:
+// sheet phải thuộc dự án đang chọn; dòng HĐ tầng khoá FOR UPDATE rồi mới cộng Σ % kỳ (NUMERIC,
+// cùng dự án) — lượt ghi đồng thời cùng tầng xếp hàng, không cùng lọt qua mốc 100%.
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -166,6 +182,8 @@ export async function POST(req: NextRequest) {
   const description = (b?.description ?? "").trim() || null;
   const note = (b?.note ?? "").trim() || null;
   const sheetTypeId = b?.sheetTypeId ? Number(b.sheetTypeId) : null;
+  if (sheetTypeId != null && (!Number.isSafeInteger(sheetTypeId) || sheetTypeId <= 0))
+    return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 400 });
   const floorLabel = b?.floorLabel ? String(b.floorLabel).trim() : null;
   let pctThisPeriod = Number(b?.pctThisPeriod ?? 0);
   if (!Number.isFinite(pctThisPeriod) || pctThisPeriod < 0) pctThisPeriod = 0;
@@ -177,86 +195,129 @@ export async function POST(req: NextRequest) {
   const unit = (b?.unit ?? "").trim() || (type === "bill" ? "LS" : type === "item" ? "Lô" : null);
   let quantity = b?.quantity != null && b.quantity !== "" ? Number(b.quantity) : null;
   if (quantity != null && (!Number.isFinite(quantity) || quantity < 0)) quantity = null;
-  let labor = b?.labor != null && b.labor !== "" ? Number(b.labor) : null;
-  if (labor != null && (!Number.isFinite(labor) || labor < 0)) labor = null;
-
-  // Tính amount: nếu type=bill + có floor → amount = contractValue × pct — S10c: tích làm TRONG
-  // SQL trên NUMERIC (không nhân float JS rồi ghi DB), pct dùng đúng giá trị được lưu
-  // (NUMERIC(5,4)) để amount đối soát được với pct_this_period; làm tròn tới xu ties xa 0.
-  // Loại khác (phát sinh/tạm ứng): amount nhập tay, giữ cách đọc cũ.
-  let amount: number | string = Number(b?.amount);
-  if (type === "bill" && sheetTypeId && floorLabel && pctThisPeriod > 0) {
-    // Kiểm tra tổng % đã thanh toán (không vượt 100%)
-    const sumRow = await queryOne<{ total: number }>(
-      `
-      SELECT COALESCE(SUM(pct_this_period), 0) AS total
-        FROM payment_bills
-       WHERE type = 'bill' AND sheet_type_id = ? AND floor_label = ?`,
-      sheetTypeId,
-      floorLabel,
-    );
-    const pctPaid = sumRow?.total ?? 0;
-    if (pctPaid + pctThisPeriod > 1.0001)
-      return NextResponse.json(
-        {
-          error: `Tầng ${floorLabel} đã thanh toán ${Math.round(pctPaid * 100)}%, không thể thêm ${Math.round(pctThisPeriod * 100)}% (vượt 100%)`,
-        },
-        { status: 400 },
-      );
-
-    // Lấy contract_value × pct (đã làm tròn như cột pct_this_period) — exact trong SQL.
-    const fc = await queryOne<{ amount: string }>(
-      `
-      SELECT ROUND(COALESCE(MAX(contract_value), 0) * ROUND(?::numeric, 4), 2)::text AS amount
-        FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
-      pctThisPeriod,
-      sheetTypeId,
-      floorLabel,
-    );
-    amount = fc?.amount ?? "0";
+  // Bill theo tầng: amount = contractValue × pct tính TRONG SQL (S10c) — amount client gửi bị bỏ
+  // qua. Loại khác (phát sinh/tạm ứng, bill không gắn tầng): amount nhập tay.
+  const theoTang = type === "bill" && sheetTypeId != null && !!floorLabel && pctThisPeriod > 0;
+  let labor: MoneyInput | null;
+  let amountNhap: MoneyInput | null = null;
+  try {
+    labor = parseOptionalMoneyInput(b?.labor, { label: "Nhân công" });
+    if (!theoTang) amountNhap = parseMoneyInput(b?.amount, { label: "Số tiền" });
+  } catch (err) {
+    const loi = moneyInputErrorBody(err);
+    if (loi) return NextResponse.json(loi.body, { status: loi.status });
+    throw err;
   }
-
-  const amountHopLe =
-    typeof amount === "string"
-      ? parseMoneyExact(amount) > 0n
-      : Number.isFinite(amount) && amount > 0;
-  if (!amountHopLe) return NextResponse.json({ error: "Số tiền không hợp lệ" }, { status: 400 });
+  if (labor && labor.unscaled < 0n)
+    return NextResponse.json({ error: "Nhân công phải ≥ 0" }, { status: 400 });
+  if (amountNhap && amountNhap.unscaled <= 0n)
+    return NextResponse.json({ error: "Số tiền không hợp lệ" }, { status: 400 });
 
   // M51 PR1: gắn project_id để RLS lọc đúng dự án (suy từ dự án đang chọn, không tin client).
-  const projectId = await getCurrentProjectId(user);
+  // Không có dự án khả kiến → 404 như GET/PATCH, không ghi bill project_id NULL.
+  const projectId = await getCurrentProjectIdStrict(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án đang chọn" }, { status: 404 });
 
-  const saved = await queryOne<{ id: number; amount: string }>(
-    `
+  const kq = await withProjectScope(
+    projectId,
+    async (): Promise<KetQuaGhiBill> => {
+      if (sheetTypeId != null) {
+        // Sheet phải thuộc dự án đang chọn (cùng org) — không đọc HĐ tầng / ghi bill trỏ dự án khác.
+        const sheet = await queryOne<{ id: number }>(
+          `SELECT st.id
+             FROM sheet_types st
+             JOIN towers tw ON tw.id = st.tower_id
+             JOIN projects p ON p.id = tw.project_id
+            WHERE st.id = ? AND tw.project_id = ? AND p.org_id = ?
+              FOR SHARE OF st`,
+          sheetTypeId,
+          projectId,
+          user.orgId,
+        );
+        if (!sheet) return { ok: false, status: 404, error: "Không tìm thấy hệ trong dự án" };
+      }
+
+      let amount = amountNhap?.text ?? "0";
+      if (theoTang) {
+        // Khoá dòng HĐ tầng TRƯỚC khi cộng Σ %: lượt ghi đồng thời cùng tầng chờ nhau, lượt sau
+        // (READ COMMITTED, câu lệnh mới) thấy bill lượt trước đã commit. pct làm tròn như cột
+        // pct_this_period NUMERIC(5,4) để amount đối soát được với % đã lưu (ties xa 0).
+        const fc = await queryOne<{ amount: string }>(
+          `SELECT ROUND(COALESCE(contract_value, 0) * ROUND(?::numeric, 4), 2)::text AS amount
+             FROM floor_contracts
+            WHERE sheet_type_id = ? AND floor_label = ?
+              FOR UPDATE`,
+          pctThisPeriod,
+          sheetTypeId,
+          floorLabel,
+        );
+        if (!fc)
+          return {
+            ok: false,
+            status: 400,
+            error: `Tầng ${floorLabel} chưa có giá trị hợp đồng — không tính được số tiền`,
+          };
+        // Σ % so bằng NUMERIC (không dung sai float); chỉ bill của dự án đang chọn — khớp
+        // pctPaid mà GET /api/payments/floors hiển thị.
+        const da = await queryOne<{ daTra: string; vuot: boolean }>(
+          `SELECT COALESCE(SUM(pct_this_period), 0)::text AS "daTra",
+                  COALESCE(SUM(pct_this_period), 0) + ROUND(?::numeric, 4) > 1 AS vuot
+             FROM payment_bills
+            WHERE type = 'bill' AND sheet_type_id = ? AND floor_label = ? AND project_id = ?`,
+          pctThisPeriod,
+          sheetTypeId,
+          floorLabel,
+          projectId,
+        );
+        if (da?.vuot)
+          return {
+            ok: false,
+            status: 400,
+            error: `Tầng ${floorLabel} đã thanh toán ${phanTramHienThi(da.daTra)}%, không thể thêm ${phanTramHienThi(pctThisPeriod)}% (vượt 100%)`,
+          };
+        amount = fc.amount;
+      }
+      if (parseMoneyExact(amount) <= 0n)
+        return { ok: false, status: 400, error: "Số tiền không hợp lệ" };
+
+      const saved = await queryOne<{ id: number; amount: string }>(
+        `
     INSERT INTO payment_bills
            (responsible, type, period, amount, description, paid_date,
             progress_snapshot, note, unit, quantity, labor,
             sheet_type_id, floor_label, pct_this_period, created_by, project_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?::numeric, ?, ?, ?, ?, ?, ?, ?::numeric, ?, ?, ?, ?, ?)
     RETURNING id, amount::text AS amount`,
-    responsible,
-    type,
-    period,
-    amount,
-    description,
-    paidDate,
-    progress,
-    note,
-    unit,
-    quantity,
-    labor,
-    sheetTypeId,
-    floorLabel,
-    pctThisPeriod,
-    user.id,
-    projectId,
+        responsible,
+        type,
+        period,
+        amount,
+        description,
+        paidDate,
+        progress,
+        note,
+        unit,
+        quantity,
+        labor?.text ?? null,
+        sheetTypeId,
+        floorLabel,
+        pctThisPeriod,
+        user.id,
+        projectId,
+      );
+      return { ok: true, id: saved!.id, amount: saved!.amount };
+    },
+    { readOnly: false },
   );
+  if (!kq.ok) return NextResponse.json({ error: kq.error }, { status: kq.status });
 
   // Trả amount đã lưu (exact, theo định dạng client chọn) để UI hiển thị đúng số server ghi.
   const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
   return NextResponse.json({
     ok: true,
-    id: saved!.id,
-    amount: tienTextToWire(saved!.amount, format),
+    id: kq.id,
+    amount: tienTextToWire(kq.amount, format),
     ...nhanDinhDangTien(format),
   });
 }
