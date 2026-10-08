@@ -14,8 +14,15 @@ mọi query nghiệp vụ**, bỏ `withProjectScope(projectId ?? "*")` (GUC RLS 
   `cash-transactions`, `invoices`, `payroll`, `purchase-orders`, `tenders`, `payment-certs` (+ Excel/PDF).
 - Test: `tests/s02a-cum1-detail-scope.test.ts`, `tests/s02a-cum2-claims-scope.test.ts`,
   `tests/s02a-payment-certs-null-scope.test.ts` (route thật; ca không dự án/dự án khác/đúng dự án).
-- Sinh lại `S00-SCOPE-INVENTORY.md`. Đang làm cùng nhánh: cụm payment (`payments/bills/[id]`,
-  `payments/floors`, `payments` GET).
+- **Payment (lỗ hổng thật, 6/9 ca đỏ trên code cũ):** `GET /api/payments`, `GET /api/payments/floors`
+  (trước bỏ lọc dự án khi rỗng + `OR project_id IS NULL`), `PATCH/DELETE /api/payments/bills/:id`
+  (bỏ `billBelongsToProject` — cho qua khi null và dòng legacy NULL, P1-1; nay MỘT câu
+  `UPDATE/DELETE … WHERE <scope dự án + cha cùng org> RETURNING id`, không kiểm-rồi-ghi). Dòng legacy
+  `project_id IS NULL` không hiện/không sửa/xoá qua dự án nào. `getCurrentProjectIdStrict` (lib/ha-tang)
+  tách từ tiền lệ GET bills: cookie sai → null (404), không fallback dự án đầu. Thêm `private, no-store`.
+  Test `tests/s02a-cum3-payments-scope.test.ts`; cập nhật `S00-PAYMENT-SCOPE-INVENTORY.md` (mục 2, 3 ĐÓNG).
+- Sinh lại `S00-SCOPE-INVENTORY.md`. Còn mở S02a: các route tài chính khác chưa có trong danh sách
+  nghi vấn của inventory; S02b/S02c.
 
 ## 2026-10-08 — S10a đóng nợ M4/L5/L6 + dòng KL exact trong DTO v1
 
