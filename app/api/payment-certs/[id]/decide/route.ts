@@ -19,7 +19,11 @@ import {
   type KetQuaQuyetDinh,
 } from "@/lib/tai-chinh/ipc-quyet-dinh";
 import { fitsNumeric, moneyToDecimal } from "@/lib/nen/money";
-import { advanceApproval, NON_APPROVER_ROLES } from "@/lib/tien-do/approvals";
+import {
+  advanceApproval,
+  kiemAmountTruocKhiDuyet,
+  NON_APPROVER_ROLES,
+} from "@/lib/tien-do/approvals";
 import { emitWebhook } from "@/lib/bao-mat/webhooks";
 import type { Role } from "@/lib/nen/roles";
 
@@ -111,6 +115,21 @@ export async function POST(
       );
       let buocKetQua: KetQuaQuyetDinh;
       if (liveRequest) {
+        // S13d: ngưỡng bước duyệt so theo approval_requests.amount — chốt lại theo giá trị đợt
+        // HIỆN TẠI (dưới khoá HĐ → đợt) trước khi engine chọn bước, kể cả request mở/trình trước
+        // bản vá S10a còn mang amount lúc lập nháp. Từ chối không phụ thuộc ngưỡng → bỏ qua. Giá
+        // trị đợt tràn NUMERIC(15,2) không so ở đây (thông điệp tràn lộ độ lớn cho người thiếu
+        // viewPayments): `kiemTranGiaTri` phía dưới chặn 422 và rollback cả bước, không duyệt được.
+        if (decision === "approved") {
+          const { periodValue } = await certTotals(id);
+          if (fitsNumeric(periodValue, 15))
+            await kiemAmountTruocKhiDuyet({
+              entityType: "payment_cert",
+              entityId: id,
+              projectId: goc.projectId,
+              amountMinor: periodValue,
+            });
+        }
         // Kiểm quyền/SoD + ghi bước TRƯỚC các kiểm nghiệp vụ dưới: người không có quyền nhận 403,
         // không thấy cảnh báo. Lỗi 409 phía sau throw → rollback cả bước vừa ghi.
         const result = await advanceApproval({
@@ -245,8 +264,14 @@ export async function POST(
  * không có viewPayments → thông điệp cụ thể làm lộ độ lớn giá trị (≥ 10^13 đ). Không có quyền
  * xem tiền → thông điệp chung; lý do thật log server.
  */
-function kiemTranGiaTri(id: number, totals: { approvedValue: bigint }, role: Role): void {
-  if (fitsNumeric(totals.approvedValue, 15)) return;
+function kiemTranGiaTri(
+  id: number,
+  totals: { approvedValue: bigint; periodValue: bigint },
+  role: Role,
+): void {
+  // S13d: kiểm cả giá trị đợt (như submit) — đợt tràn bỏ qua bước chốt lại amount ở trên nên
+  // không bao giờ được duyệt với ngưỡng cũ.
+  if (fitsNumeric(totals.approvedValue, 15) && fitsNumeric(totals.periodValue, 15)) return;
   log.warn("payment-certs/decide: giá trị đề nghị vượt NUMERIC(15,2)", {
     certId: id,
     reason: "approved_value_overflow",

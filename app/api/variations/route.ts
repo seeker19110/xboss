@@ -130,6 +130,14 @@ export async function POST(req: NextRequest) {
         { error: "Mã dòng KL hoặc mã VO bị trùng do tạo đồng thời — vui lòng thử lại" },
         { status: 409 },
       );
+    // S13d: lỗi có chủ đích của engine duyệt (vd tổng VO tràn approval_requests.amount →
+    // 422 amount_overflow) trả đúng mã thay vì 500; transaction đã rollback cả VO.
+    const { status, code } = err as { status?: number; code?: string };
+    if (status)
+      return NextResponse.json(
+        { error: (err as Error).message, ...(code ? { code } : {}) },
+        { status },
+      );
     throw err;
   }
 }

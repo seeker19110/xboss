@@ -376,7 +376,8 @@ export async function syncAndListNotifications(
       const params = overCerts.flatMap((c) => [
         user.id,
         c.contractId,
-        `📈 Hợp đồng ${c.contractCode} — ${c.contractTitle} luỹ kế nghiệm thu vượt giá trị HĐ (${Math.round((c.cumulativeValue / c.contractValue) * 100)}%)`,
+        // % tính bằng bigint ở lib (S13d) — HĐ giá trị 0 không còn in "Infinity%".
+        `📈 Hợp đồng ${c.contractCode} — ${c.contractTitle} luỹ kế nghiệm thu vượt giá trị HĐ${c.percent != null ? ` (${c.percent}%)` : ""}`,
       ]);
       await run(
         `INSERT INTO notifications (user_id, contract_id, type, message) VALUES ${values}

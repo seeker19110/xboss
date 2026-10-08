@@ -10,15 +10,32 @@ import {
   suggestQtyForContract,
   saveCertItems,
   certTotals,
+  certItemsExactByContract,
+  certItemsToWire,
 } from "@/lib/tai-chinh/paymentcerts";
 import { openApproval } from "@/lib/tien-do/approvals";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
-import { moneyToNumberSafe, isMoneyPrecisionError } from "@/lib/nen/money";
+import {
+  moneyToNumberSafe,
+  isMoneyPrecisionError,
+  moneyWireFormat,
+  MONEY_FORMAT_HEADER,
+} from "@/lib/nen/money";
+import {
+  HEADERS_API_TIEN,
+  LOI_TIEN_VUOT_DINH_DANG_CU,
+  nhanDinhDangTien,
+} from "@/lib/nen/money-dto";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/payment-certs?contractId= — danh sách đợt IPC theo hợp đồng, scoped
 // theo dự án đang chọn (M22) — chặn xem đợt của hợp đồng thuộc dự án khác.
+// S13d (A3-FR06): header `X-XBoss-Money-Format: decimal-string-v1` → `certs[].items[].unitPrice/
+// qtyPeriod/qtyCumulative/boqQtyContract` là chuỗi canonical (đọc `::text` trong SQL, không qua số
+// float của json_agg) + `moneyFormat`; không gửi → JSON number legacy, giá trị không round-trip
+// được → 422 `money_precision_unsupported`. Đợt + dòng exact đọc trong MỘT snapshot REPEATABLE
+// READ (PATCH chen giữa không làm lệch hai nguồn). Che đơn giá TRƯỚC khi đổi wire.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -29,26 +46,49 @@ export async function GET(req: NextRequest) {
   if (!Number.isInteger(contractId))
     return NextResponse.json({ error: "Thiếu contractId" }, { status: 422 });
 
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
+
   const projectId = await getCurrentProjectId(user);
-  const certs =
+  const data =
     projectId != null
-      ? await withProjectScope(projectId, async () => {
-          const contract = await queryOne<{ id: number }>(
-            `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
-            contractId,
-            projectId,
-          );
-          if (!contract) return null;
-          return listCertsByContract(contractId);
-        })
+      ? await withProjectScope(
+          projectId,
+          async () => {
+            const contract = await queryOne<{ id: number }>(
+              `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
+              contractId,
+              projectId,
+            );
+            if (!contract) return null;
+            const certs = await listCertsByContract(contractId);
+            return { certs, exact: await certItemsExactByContract(contractId) };
+          },
+          { isolation: "repeatable_read" },
+        )
       : null;
-  if (!certs) return NextResponse.json({ error: "Hợp đồng không tồn tại" }, { status: 422 });
+  if (!data)
+    return NextResponse.json(
+      { error: "Hợp đồng không tồn tại" },
+      { status: 422, headers: HEADERS_API_TIEN },
+    );
   // M50 PR2: che đơn giá dòng KL cho user thiếu viewPayments (phòng thủ — gate route
   // hiện cũng là viewPayments).
-  return NextResponse.json(
-    { certs: stripSensitive("paymentCert", certs, user) },
-    { headers: { "Cache-Control": "private, no-store" } }, // API tài chính: không cache
-  );
+  const masked = stripSensitive("paymentCert", data.certs, user);
+  let certs;
+  try {
+    certs = masked.map((c) => ({
+      ...c,
+      items: certItemsToWire(c.items, data.exact.get(c.id) ?? [], format),
+    }));
+  } catch (err) {
+    if (!isMoneyPrecisionError(err)) throw err;
+    return NextResponse.json(LOI_TIEN_VUOT_DINH_DANG_CU, {
+      status: 422,
+      headers: HEADERS_API_TIEN,
+    });
+  }
+  // API tài chính: không cache ở tầng nào + Vary theo header định dạng tiền.
+  return NextResponse.json({ certs, ...nhanDinhDangTien(format) }, { headers: HEADERS_API_TIEN });
 }
 
 // POST /api/payment-certs { contractId } — lập đợt mới (Admin/PM), KL gợi ý tự
@@ -136,7 +176,9 @@ export async function POST(req: NextRequest) {
         // không có flow thì openApproval trả null, không đổi hành vi hiện tại.
         const { periodValue } = await certTotals(id);
         // openApproval nhận number (ngưỡng min_amount của flow): chỉ đổi khi round-trip exact,
-        // ngoài biên → 422 money_precision_unsupported (rollback cả đợt), không xấp xỉ.
+        // ngoài biên → 422 money_precision_unsupported (rollback cả đợt), không xấp xỉ. Có flow mà
+        // giá trị tràn approval_requests.amount NUMERIC(15,2) → openApproval ném 422
+        // amount_overflow (S13d; trước đây lỗi pg 22003 thành 500).
         let amount: number;
         try {
           amount = moneyToNumberSafe(periodValue);

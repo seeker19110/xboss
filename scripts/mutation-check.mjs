@@ -163,6 +163,15 @@ const MUTATIONS = [
     tests: ["tests/s13a-chuoi-ipc-thanh-toan.test.ts"],
     why: "Duyệt ngược kỳ → lịch sử luỹ kế lệch, không đối soát (A5-FR06).",
   },
+  // QUALITY-FINAL-1 S13d: ngưỡng duyệt IPC theo giá trị đợt HIỆN TẠI.
+  {
+    key: "IPC: decide chốt lại amount cũ trước khi engine chọn bước",
+    file: "app/api/payment-certs/[id]/decide/route.ts",
+    find: "            await kiemAmountTruocKhiDuyet({",
+    replace: "            void ({",
+    tests: ["tests/s13d-ipc-con-lai.test.ts"],
+    why: "Request trình trước bản vá S10a mang amount lúc lập nháp → engine bỏ qua bước duyệt cấp cao theo min_amount.",
+  },
 ];
 
 const only = process.argv.find((a) => a.startsWith("--only="))?.slice("--only=".length);
