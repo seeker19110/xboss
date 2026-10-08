@@ -28,6 +28,10 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
+  // A1-AC02: không có dự án khả kiến → danh sách rỗng, không đọc toàn hệ.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ documents: [] });
+
   const sheetTypeId = req.nextUrl.searchParams.get("sheetTypeId");
   const floor = req.nextUrl.searchParams.get("floor");
   const category = req.nextUrl.searchParams.get("category");
@@ -50,11 +54,8 @@ export async function GET(req: NextRequest) {
   }
 
   // task_documents không có project_id riêng — suy qua task/work_package (M22).
-  const projectId = await getCurrentProjectId(user);
-  if (projectId != null) {
-    conds.push("tw.project_id = ?");
-    values.push(projectId);
-  }
+  conds.push("tw.project_id = ?");
+  values.push(projectId);
 
   const rows = await query<DocRow>(
     `SELECT d.id, d.task_id AS "taskId", t.code AS "taskCode", t.name AS "taskName",
