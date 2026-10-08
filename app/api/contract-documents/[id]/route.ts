@@ -17,22 +17,14 @@ type ContractDocRow = {
 };
 
 // Lấy tài liệu hợp đồng, lọc theo dự án đang chọn (M22) — chặn xem/xoá tài liệu
-// của hợp đồng thuộc dự án khác qua đoán/liệt kê id.
-async function getDocInProject(
-  id: number,
-  projectId: number | null,
-): Promise<ContractDocRow | undefined> {
-  const conds = ["cd.id = ?"];
-  const args: unknown[] = [id];
-  if (projectId != null) {
-    conds.push("c.project_id = ?");
-    args.push(projectId);
-  }
+// của hợp đồng thuộc dự án khác qua đoán/liệt kê id. Lọc project_id vô điều kiện (A1-AC03).
+async function getDocInProject(id: number, projectId: number): Promise<ContractDocRow | undefined> {
   return queryOne<ContractDocRow>(
     `SELECT cd.id, cd.file_name, cd.mime_type, cd.original_name, cd.uploaded_by, cd.sha256
        FROM contract_documents cd JOIN contracts c ON c.id = cd.contract_id
-      WHERE ${conds.join(" AND ")}`,
-    ...args,
+      WHERE cd.id = ? AND c.project_id = ?`,
+    id,
+    projectId,
   );
 }
 
@@ -51,7 +43,9 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const doc = await withProjectScope(projectId ?? "*", () => getDocInProject(id, projectId));
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+  const doc = await withProjectScope(projectId, () => getDocInProject(id, projectId));
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   const buf = await storageGet(user.orgId, doc.file_name);
@@ -87,6 +81,8 @@ export async function DELETE(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
   const doc = await getDocInProject(id, projectId);
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 

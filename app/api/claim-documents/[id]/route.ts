@@ -32,14 +32,18 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // A1-AC02: không có dự án khả kiến → 404, không đọc toàn hệ.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+
   const doc = await queryOne<ClaimDocRow>(
     `SELECT id, file_name, mime_type, original_name, uploaded_by, claim_id, sha256 FROM claim_documents WHERE id = ?`,
     id,
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
-  const projectId = await getCurrentProjectId(user);
-  const claim = await withProjectScope(projectId ?? "*", () => getClaim(doc.claim_id, projectId));
+  const claim = await withProjectScope(projectId, () => getClaim(doc.claim_id, projectId));
   if (!claim) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   const buf = await storageGet(user.orgId, doc.file_name);
@@ -74,13 +78,17 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // A1-AC02: không có dự án khả kiến → 404, không đọc toàn hệ.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+
   const doc = await queryOne<ClaimDocRow>(
     `SELECT id, file_name, mime_type, original_name, uploaded_by, claim_id FROM claim_documents WHERE id = ?`,
     id,
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
-  const projectId = await getCurrentProjectId(user);
   const claim = await getClaim(doc.claim_id, projectId);
   if (!claim) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
