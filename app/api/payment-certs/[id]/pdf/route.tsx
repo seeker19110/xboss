@@ -195,10 +195,13 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  // S02a (A1-AC02): không có dự án khả kiến → 404, không mở GUC RLS "*" toàn hệ.
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
   // REPEATABLE READ (S10a M4): 3 câu đọc cùng một snapshot — PATCH KL chen giữa không làm
   // dòng exact lệch json_agg (throw 500) hay tổng lệch dòng.
   const detail = await withProjectScope(
-    projectId ?? "*",
+    projectId,
     async () => {
       const cert = await getCertForProject(id, projectId);
       if (!cert) return null;

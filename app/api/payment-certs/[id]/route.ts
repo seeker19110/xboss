@@ -71,10 +71,12 @@ export async function GET(
   const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
 
   const projectId = await getCurrentProjectId(user);
+  // S02a (A1-AC02): không có dự án khả kiến → 404, không mở GUC RLS "*" toàn hệ.
+  if (projectId == null) return json({ error: "Không tìm thấy đợt thanh toán" }, 404);
   // REPEATABLE READ (S10a M4): đợt/tổng/dòng exact đọc bằng nhiều câu riêng — cùng một snapshot
   // để PATCH chen giữa không làm dòng exact lệch json_agg (throw 500) hay tổng lệch dòng.
   const detail = await withProjectScope(
-    projectId ?? "*",
+    projectId,
     async () => {
       const scoped = await certInProject(id, projectId);
       if (!scoped) return null;
