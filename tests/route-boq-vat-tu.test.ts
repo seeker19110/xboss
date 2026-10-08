@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangNhap, dangNhapDuAn, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangNhap, dangNhapDuAn, dangXuat, requestRieng } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -1511,9 +1511,11 @@ test(
     const { POST } = await import("@/app/api/materials/[id]/transactions/route");
     const responses = await Promise.all(
       Array.from({ length: 8 }, () =>
-        POST(req(`http://localhost/api/materials/${matId}/transactions`, { delta: 1 }, "POST"), {
-          params: Promise.resolve({ id: String(matId) }),
-        }),
+        requestRieng(() =>
+          POST(req(`http://localhost/api/materials/${matId}/transactions`, { delta: 1 }, "POST"), {
+            params: Promise.resolve({ id: String(matId) }),
+          }),
+        ),
       ),
     );
     assert.deepEqual(

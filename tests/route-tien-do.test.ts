@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangNhap, dangNhapDuAn, dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangNhap, dangNhapDuAn, dangXuat, requestRieng } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -970,15 +970,18 @@ test(
     const d2 = await themDimensions(task2, 2);
     await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
     const { PATCH } = await import("@/app/api/dimensions/batch/route");
-    const { runWithRequestContext } = await import("@/lib/nen/request-context");
-    // Mỗi request một ngữ cảnh riêng như production (chung ngữ cảnh thì 2 lượt nạp quyền chồng nhau).
-    const goiRieng = (body: unknown) =>
-      runWithRequestContext({}, () => PATCH(req("/api/dimensions/batch", body)));
     for (let vong = 0; vong < 5; vong++) {
       const installed = vong % 2 === 0;
       const [a, b] = await Promise.all([
-        goiRieng({ ids: [...d1, ...d2], installed }),
-        goiRieng({ ids: [...d2].reverse().concat([...d1].reverse()), installed }),
+        requestRieng(() => PATCH(req("/api/dimensions/batch", { ids: [...d1, ...d2], installed }))),
+        requestRieng(() =>
+          PATCH(
+            req("/api/dimensions/batch", {
+              ids: [...d2].reverse().concat([...d1].reverse()),
+              installed,
+            }),
+          ),
+        ),
       ]);
       assert.deepEqual([a.status, b.status], [200, 200], `vòng ${vong}`);
       for (const tid of [ctx.taskId, task2]) {

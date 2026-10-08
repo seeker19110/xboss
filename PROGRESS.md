@@ -54,6 +54,10 @@ thầm); thiếu tham số -> như cũ. Rà route anh em: chỉ 2 route này đ�
 lọc theo `project_id`, `daily-report` truyền `baselineId: null`, các mục khác chỉ xoá `baseline_tasks`
 theo task. Test `tests/route-evm-scurve-baseline-scope.test.ts` (route thật, đỏ 6/8 trên code cũ).
 
+- Test hạ tầng: các lời gọi route đồng thời (`Promise.all`) trong `tests/route-boq-vat-tu`, `route-mua-sam`,
+  `s10-tien-dau-vao-route`, `boq-history`, `route-tai-chinh-3b`, `totp-enrollment-security`, `route-tien-do`,
+  `login-2fa-security*` nay bọc bằng `requestRieng` (`tests/helpers/phien.ts`) để mỗi lời gọi có ngữ cảnh request riêng.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S02e: cấu hình theo org
 
 Đặc tả `docs/nang-cap/AUDIT-S02E-ORG-CONFIG.md` (spec cha A1-SCOPE). Đóng nhóm "Còn mở, cần đặc tả
