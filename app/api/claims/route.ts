@@ -39,7 +39,10 @@ export async function GET(req: NextRequest) {
   const deletedView =
     user.role === "admin" && sp.get("includeDeleted") === "1" ? "deleted" : "alive";
   const projectId = await getCurrentProjectId(user);
-  const items = await withProjectScope(projectId ?? "*", () =>
+  // A1-AC02: không có dự án khả kiến → không mở toàn hệ (bám tiền lệ payments/bills).
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án đang chọn" }, { status: 404 });
+  const items = await withProjectScope(projectId, () =>
     listClaims(projectId, {
       kind: kindRaw as ClaimKind | undefined,
       status: statusRaw as ClaimStatus | undefined,

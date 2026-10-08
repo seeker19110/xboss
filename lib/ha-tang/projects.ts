@@ -86,6 +86,28 @@ export async function getCurrentProjectId(user: {
   return projectId;
 }
 
+/** Dự án đang chọn, KHÔNG fallback khi cookie sai: cookie không hợp lệ/không được cấp → null
+ *  (route trả 404), chỉ khi chưa có cookie mới lấy dự án khả kiến đầu tiên. Luôn đối chiếu org.
+ *  Dùng cho route tài chính đã chuyển sang fail-closed (S02a — tiền lệ GET /api/payments/bills). */
+export async function getCurrentProjectIdStrict(user: ProjectActor): Promise<number | null> {
+  if (parseProjectId(user.orgId) == null) return null;
+  const visible = await visibleProjectIds(user);
+  const raw = (await cookies()).get(PROJECT_COOKIE)?.value;
+  let projectId: number | null = null;
+  if (raw == null) projectId = visible[0] ?? null;
+  else {
+    const parsed = parseProjectId(raw);
+    if (parsed != null && visible.includes(parsed)) projectId = parsed;
+  }
+  if (projectId == null) return null;
+  const project = await queryOne<{ id: number }>(
+    `SELECT id FROM projects WHERE id = ? AND org_id = ?`,
+    projectId,
+    user.orgId,
+  );
+  return project?.id ?? null;
+}
+
 export type ProjectListItem = {
   id: number;
   name: string;

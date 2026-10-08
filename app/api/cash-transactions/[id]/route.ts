@@ -40,7 +40,10 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const transaction = await withProjectScope(projectId ?? "*", () => loadExisting(id, projectId));
+  // Fail-closed (A1-AC02): không có dự án khả kiến → 404, không mở scope toàn hệ "*".
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy giao dịch" }, { status: 404 });
+  const transaction = await withProjectScope(projectId, () => loadExisting(id, projectId));
   if (!transaction)
     return NextResponse.json({ error: "Không tìm thấy giao dịch" }, { status: 404 });
 

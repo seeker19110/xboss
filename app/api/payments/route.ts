@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, queryOne, withTransaction } from "@/lib/db";
-import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getCurrentProjectId, getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
+
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" };
 
 type FloorRow = {
   sheetTypeId: number;
@@ -24,13 +26,17 @@ export async function GET(_req: NextRequest) {
   if (!CAN.viewPayments(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM/BCH được xem thanh toán" }, { status: 403 });
 
-  // Dự án đang chọn — lọc chéo dự án (giống pattern app/api/payments/floors/route.ts).
-  // sheet_types không có project_id trực tiếp (suy qua tower_id). null = DB chưa có
-  // dự án nào → giữ hành vi không lọc (tương thích ngược).
-  const projectId = await getCurrentProjectId(user);
-  const towerJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
-  const towerFilter = projectId != null ? " AND tw.project_id = ?" : "";
-  const towerParam = projectId != null ? [projectId] : [];
+  // S02a cụm 3: dự án đã xác minh (cookie sai/không có dự án khả kiến → 404, không query
+  // nghiệp vụ) — tiền lệ GET /api/payments/bills. sheet_types suy dự án qua tower_id;
+  // lọc vô điều kiện, không còn nhánh "null = không lọc".
+  const projectId = await getCurrentProjectIdStrict(user);
+  if (projectId == null)
+    return NextResponse.json(
+      { error: "Không tìm thấy dự án đang chọn" },
+      { status: 404, headers: PRIVATE_NO_STORE },
+    );
+  const towerJoin = " JOIN towers tw ON tw.id = st.tower_id";
+  const towerFilter = " AND tw.project_id = ?";
 
   const rows = await query<FloorRow>(
     `
@@ -49,7 +55,7 @@ export async function GET(_req: NextRequest) {
      WHERE wp.floor_label IS NOT NULL AND wp.floor_label != ''${towerFilter}
      GROUP BY st.id, st.code, st.slug, st.responsible, wp.floor_label, fc.contract_value
      ORDER BY st.id, wp.floor_label`,
-    ...towerParam,
+    projectId,
   );
 
   // Tổng hợp làm trong SQL (không cộng/nhân tiền trên số JS parse từ NUMERIC —
@@ -71,14 +77,17 @@ export async function GET(_req: NextRequest) {
     SELECT COALESCE(SUM(contract_value), 0) AS "totalContract",
            COALESCE(SUM(contract_value * progress), 0) AS "totalEarned"
       FROM floor_data`,
-    ...towerParam,
+    projectId,
   );
 
-  return NextResponse.json({
-    rows,
-    totalContract: totals?.totalContract ?? 0,
-    totalEarned: totals?.totalEarned ?? 0,
-  });
+  return NextResponse.json(
+    {
+      rows,
+      totalContract: totals?.totalContract ?? 0,
+      totalEarned: totals?.totalEarned ?? 0,
+    },
+    { headers: PRIVATE_NO_STORE },
+  );
 }
 
 // PATCH /api/payments — cập nhật giá trị HĐ theo tầng × hệ (upsert).

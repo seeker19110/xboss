@@ -189,10 +189,13 @@ export async function listClaims(
   );
 }
 
+/** Đọc 1 claim trong đúng dự án; projectId null (user không có dự án khả kiến) luôn fail-closed
+ *  — KHÔNG rơi về listClaims(null) vốn bỏ lọc dự án (S02a, A1-AC02). */
 export async function getClaim(
   id: number,
-  projectId?: number | null,
+  projectId: number | null,
 ): Promise<ClaimRow | undefined> {
+  if (projectId == null) return undefined;
   const rows = await listClaims(projectId, { id });
   return rows[0];
 }

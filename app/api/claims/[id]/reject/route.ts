@@ -20,6 +20,9 @@ export async function POST(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  // S02a (A1-AC02): không có dự án khả kiến → 404, không đọc/ghi claim của dự án nào.
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
   const claim = await getClaim(id, projectId);
   if (!claim) return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
 

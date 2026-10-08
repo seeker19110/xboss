@@ -23,7 +23,9 @@ export async function GET(
   if (isNaN(claimId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const documents = await withProjectScope(projectId ?? "*", async () => {
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
+  const documents = await withProjectScope(projectId, async () => {
     const claim = await getClaim(claimId, projectId);
     if (!claim) return null;
     return query(
@@ -55,6 +57,8 @@ export async function POST(
   if (isNaN(claimId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
   const claim = await getClaim(claimId, projectId);
   if (!claim) return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
 

@@ -354,3 +354,15 @@ no-store` on every sensitive financial response. Current SW network-only rule is
    nested parent joins; inspect live disposable DB catalog under the permitted app role; add
    route negative tests and reconcile all `NOT_MAPPED` rows. Do not globally flip resolver
    semantics until all remaining nullable callers are dispositioned under the plan.
+
+## Cập nhật S02a cụm 3 (2026-10-08)
+
+- **Mục 2 — ĐÓNG** cho `GET /api/payments` và `GET /api/payments/floors` (`GET /api/payments/bills`
+  đã đóng trước đó): dự án qua `getCurrentProjectIdStrict` (cookie sai/không dự án khả kiến → 404,
+  không query nghiệp vụ), lọc `tw.project_id = ?` / `payment_bills.project_id = ?` vô điều kiện,
+  dòng legacy `project_id IS NULL` không còn hiện ở dự án nào; `Cache-Control: private, no-store`.
+- **Mục 3 (P1-1) — ĐÓNG**: bỏ `billBelongsToProject`; PATCH/DELETE `/api/payments/bills/:id` là
+  một câu UPDATE/DELETE có điều kiện `project_id = ?` + liên kết cha (hợp đồng/IPC/sheet) cùng dự
+  án/org, `RETURNING` rỗng → 404. Dòng legacy NULL không sửa/xoá được qua dự án nào.
+- Còn mở: mục 4 (đối soát/phân loại dòng lineage sai), 5 (snapshot REPEATABLE READ), 6 (DTO tiền
+  chính xác), 7. Test: `tests/s02a-cum3-payments-scope.test.ts`.
