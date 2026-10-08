@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { moneyInputErrorBody } from "@/lib/nen/money";
 import { insertId, query, withProjectScope, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -79,7 +80,15 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
-  const input = parseInvoiceBody(body);
+  // S10: tiền đọc exact — "1.234.567" kiểu vi-VN → 400, vượt NUMERIC(15,2) → 422.
+  let input: InvoiceInput;
+  try {
+    input = parseInvoiceBody(body);
+  } catch (err) {
+    const loi = moneyInputErrorBody(err);
+    if (loi) return NextResponse.json(loi.body, { status: loi.status });
+    throw err;
+  }
   const invalid = validateInvoiceInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 

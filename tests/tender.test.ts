@@ -32,13 +32,13 @@ test("validateTenderInput: đủ ca hợp lệ/không hợp lệ", async () => {
 test("validateBidPrices: đủ ca hợp lệ/không hợp lệ", async () => {
   const { validateBidPrices } = await import("@/lib/tai-chinh/tender");
 
-  assert.equal(validateBidPrices([{ boqItemId: 1, unitPrice: 1000 }]), null);
+  assert.equal(validateBidPrices([{ boqItemId: 1, unitPrice: "1000.00" }]), null);
   assert.equal(validateBidPrices([]), null); // cho phép chào rỗng (chỉ lump sum)
-  assert.match(validateBidPrices([{ boqItemId: 1, unitPrice: -1 }])!, /phải ≥ 0/i);
+  assert.match(validateBidPrices([{ boqItemId: 1, unitPrice: "-1.00" }])!, /phải ≥ 0/i);
   assert.match(
     validateBidPrices([
-      { boqItemId: 1, unitPrice: 1000 },
-      { boqItemId: 1, unitPrice: 2000 },
+      { boqItemId: 1, unitPrice: "1000.00" },
+      { boqItemId: 1, unitPrice: "2000.00" },
     ])!,
     /trùng lặp/i,
   );

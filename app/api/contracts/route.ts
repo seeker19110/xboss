@@ -9,10 +9,16 @@ import {
   listContracts,
   parseContractBody,
   validateContractInput,
+  type ContractInput,
   type ContractKind,
 } from "@/lib/tai-chinh/contracts";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
-import { MONEY_FORMAT_HEADER, isMoneyPrecisionError, moneyWireFormat } from "@/lib/nen/money";
+import {
+  MONEY_FORMAT_HEADER,
+  isMoneyPrecisionError,
+  moneyInputErrorBody,
+  moneyWireFormat,
+} from "@/lib/nen/money";
 import {
   HEADERS_API_TIEN,
   LOI_TIEN_VUOT_DINH_DANG_CU,
@@ -85,7 +91,15 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
-  const input = parseContractBody(body);
+  // S10: giá trị HĐ đọc exact — "1.234.567" kiểu vi-VN → 400, vượt NUMERIC(15,2) → 422.
+  let input: ContractInput;
+  try {
+    input = parseContractBody(body);
+  } catch (err) {
+    const loi = moneyInputErrorBody(err);
+    if (loi) return NextResponse.json(loi.body, { status: loi.status });
+    throw err;
+  }
   const invalid = validateContractInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
   const refErr = await checkContractRefs(input);

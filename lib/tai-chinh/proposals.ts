@@ -3,6 +3,7 @@
 // nghiệm thu 2 bước), đề xuất trình lâu chưa quyết (nguồn notification proposal_pending),
 // cảnh báo cấp phát vượt định mức (M18). KHÔNG thay thế purchase_requests — luồng mua
 // vật tư hiện có giữ nguyên. Xem docs/nang-cap/M19-de-xuat-phe-duyet.md.
+import { parseOptionalMoneyInput } from "@/lib/nen/money";
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
 import { nextSeqCode } from "@/lib/ha-tang/seqcode";
@@ -33,7 +34,8 @@ export const PROPOSAL_PENDING_DAYS = 5;
 export type ProposalInput = {
   kind: ProposalKind;
   title: string;
-  amount: number | null;
+  /** Chuỗi canonical 2 số lẻ (S10). */
+  amount: string | null;
   contractId: number | null;
   materialId: number | null;
   reason: string | null;
@@ -44,7 +46,8 @@ export function parseProposalBody(body: Record<string, unknown>): ProposalInput 
   return {
     kind: (typeof body.kind === "string" ? body.kind : "") as ProposalKind,
     title: typeof body.title === "string" ? body.title.trim() : "",
-    amount: body.amount != null && body.amount !== "" ? Number(body.amount) : null,
+    // Ném MoneyInputError (400/422) khi sai dạng/tràn — route đổi qua moneyInputErrorBody.
+    amount: parseOptionalMoneyInput(body.amount, { label: "Giá trị đề xuất" })?.text ?? null,
     contractId: body.contractId != null ? Number(body.contractId) : null,
     materialId: body.materialId != null ? Number(body.materialId) : null,
     reason: strOrNull(body.reason),
@@ -56,8 +59,7 @@ export function parseProposalBody(body: Record<string, unknown>): ProposalInput 
 export function validateProposalInput(input: ProposalInput): string | null {
   if (!PROPOSAL_KINDS.includes(input.kind)) return "Loại đề xuất không hợp lệ";
   if (!input.title) return "Thiếu tiêu đề đề xuất";
-  if (input.amount != null && (!Number.isFinite(input.amount) || input.amount < 0))
-    return "Giá trị đề xuất phải ≥ 0";
+  if (input.amount != null && input.amount.startsWith("-")) return "Giá trị đề xuất phải ≥ 0";
   return null;
 }
 

@@ -13,7 +13,7 @@ test("validateInsuranceInput: đủ ca hợp lệ/không hợp lệ", async () =
     title: "Bảo hiểm công trình test",
     provider: "Bảo Việt",
     code: "BH-001",
-    value: 1_000_000_000,
+    value: "1000000000.00",
     issuedDate: "2026-01-01",
     expiryDate: "2026-12-31",
     status: "valid" as const,
@@ -30,7 +30,7 @@ test("validateInsuranceInput: đủ ca hợp lệ/không hợp lệ", async () =
     validateInsuranceInput({ ...base, issuedDate: "2026-12-31", expiryDate: "2026-01-01" })!,
     /ngày cấp phải trước/i,
   );
-  assert.match(validateInsuranceInput({ ...base, value: -100 })!, /giá trị/i);
+  assert.match(validateInsuranceInput({ ...base, value: "-100" })!, /giá trị/i);
   assert.match(validateInsuranceInput({ ...base, contractId: NaN })!, /hợp đồng gắn/i);
   // expiryDate null (không hạn), value null hợp lệ.
   assert.equal(validateInsuranceInput({ ...base, expiryDate: null, value: null }), null);

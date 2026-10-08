@@ -187,7 +187,8 @@ test("POST /api/contracts/:id/addenda: thiếu số phụ lục → 422", S, asy
   assert.equal(res.status, 422);
 });
 
-test("POST /api/contracts/:id/addenda: valueDelta không phải số → 422", S, async () => {
+// S10: parser tiền chung — sai dạng là 400 `amount_invalid` (trước S10: 422 từ Number() = NaN).
+test("POST /api/contracts/:id/addenda: valueDelta không phải số → 400", S, async () => {
   const projectId = await taoDuAn("addnnum");
   const pm = await taoUser("pm", "addnnum");
   const contractId = await taoHopDong(projectId, "addnnum");
@@ -196,7 +197,8 @@ test("POST /api/contracts/:id/addenda: valueDelta không phải số → 422", S
   const res = await POST(jreq("/x", { code: "PL01", valueDelta: "abc" }), {
     params: Promise.resolve({ id: String(contractId) }),
   });
-  assert.equal(res.status, 422);
+  assert.equal(res.status, 400);
+  assert.equal(((await res.json()) as { code?: string }).code, "amount_invalid");
 });
 
 test(

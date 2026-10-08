@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run, withProjectScope, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { moneyInputErrorBody } from "@/lib/nen/money";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   canEditClaim,
@@ -60,17 +61,24 @@ export async function PATCH(
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 422 });
 
-  const input = parseClaimBody({
-    kind: body.kind ?? claim.kind,
-    title: body.title ?? claim.title,
-    contractId: body.contractId !== undefined ? body.contractId : claim.contractId,
-    voId: body.voId !== undefined ? body.voId : claim.voId,
-    noticeDate: body.noticeDate ?? claim.noticeDate,
-    cause: body.cause ?? claim.cause,
-    amountRequested:
-      body.amountRequested !== undefined ? body.amountRequested : claim.amountRequested,
-    daysRequested: body.daysRequested !== undefined ? body.daysRequested : claim.daysRequested,
-  });
+  let input: ReturnType<typeof parseClaimBody>;
+  try {
+    input = parseClaimBody({
+      kind: body.kind ?? claim.kind,
+      title: body.title ?? claim.title,
+      contractId: body.contractId !== undefined ? body.contractId : claim.contractId,
+      voId: body.voId !== undefined ? body.voId : claim.voId,
+      noticeDate: body.noticeDate ?? claim.noticeDate,
+      cause: body.cause ?? claim.cause,
+      amountRequested:
+        body.amountRequested !== undefined ? body.amountRequested : claim.amountRequested,
+      daysRequested: body.daysRequested !== undefined ? body.daysRequested : claim.daysRequested,
+    });
+  } catch (e) {
+    const loi = moneyInputErrorBody(e);
+    if (!loi) throw e;
+    return NextResponse.json(loi.body, { status: loi.status });
+  }
   const validationErr = validateClaimInput(input);
   if (validationErr) return NextResponse.json({ error: validationErr }, { status: 422 });
 

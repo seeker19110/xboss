@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { moneyInputErrorBody } from "@/lib/nen/money";
 import { storagePut, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
@@ -145,7 +146,14 @@ export async function PATCH(
   // Field không gửi giữ giá trị cũ; field gửi rỗng/null để xoá (code/note/ngày...).
   const merged: Record<string, unknown> = { ...existing };
   for (const key of Object.keys(existing)) if (key in bodyFields) merged[key] = bodyFields[key];
-  const input = parseInsuranceBody(merged);
+  let input: ReturnType<typeof parseInsuranceBody>;
+  try {
+    input = parseInsuranceBody(merged);
+  } catch (e) {
+    const loi = moneyInputErrorBody(e);
+    if (!loi) throw e;
+    return NextResponse.json(loi.body, { status: loi.status });
+  }
 
   const invalid = validateInsuranceInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });

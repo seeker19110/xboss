@@ -12,7 +12,7 @@ test("validateCashTransactionInput: đủ ca hợp lệ/không hợp lệ", asyn
       txDate: "2026-07-09",
       direction: "in",
       category: "tạm ứng",
-      amount: 1_000_000,
+      amount: "1000000.00",
       isPettyCash: false,
       contractId: null,
       supplierId: null,
@@ -26,7 +26,7 @@ test("validateCashTransactionInput: đủ ca hợp lệ/không hợp lệ", asyn
       txDate: "09/07/2026",
       direction: "in",
       category: null,
-      amount: 1,
+      amount: "1.00",
       isPettyCash: false,
       contractId: null,
       supplierId: null,
@@ -40,7 +40,7 @@ test("validateCashTransactionInput: đủ ca hợp lệ/không hợp lệ", asyn
       txDate: "2026-07-09",
       direction: "xxx" as never,
       category: null,
-      amount: 1,
+      amount: "1.00",
       isPettyCash: false,
       contractId: null,
       supplierId: null,
@@ -54,7 +54,7 @@ test("validateCashTransactionInput: đủ ca hợp lệ/không hợp lệ", asyn
       txDate: "2026-07-09",
       direction: "out",
       category: null,
-      amount: 0,
+      amount: "0.00",
       isPettyCash: false,
       contractId: null,
       supplierId: null,
@@ -72,7 +72,7 @@ test("validateAdvanceInput: đủ ca hợp lệ/không hợp lệ", async () => 
     validateAdvanceInput({
       code: "TU-001",
       advanceDate: "2026-07-01",
-      amount: 5_000_000,
+      amount: "5000000.00",
       recipient: "Nguyễn Văn A",
       reason: "Mua vật tư",
       proposalId: null,
@@ -83,7 +83,7 @@ test("validateAdvanceInput: đủ ca hợp lệ/không hợp lệ", async () => 
     validateAdvanceInput({
       code: null,
       advanceDate: null,
-      amount: 0,
+      amount: "0.00",
       recipient: "A",
       reason: null,
       proposalId: null,
@@ -94,7 +94,7 @@ test("validateAdvanceInput: đủ ca hợp lệ/không hợp lệ", async () => 
     validateAdvanceInput({
       code: null,
       advanceDate: null,
-      amount: 100,
+      amount: "100.00",
       recipient: null,
       reason: null,
       proposalId: null,
@@ -105,7 +105,7 @@ test("validateAdvanceInput: đủ ca hợp lệ/không hợp lệ", async () => 
     validateAdvanceInput({
       code: null,
       advanceDate: "01/07/2026",
-      amount: 100,
+      amount: "100.00",
       recipient: "A",
       reason: null,
       proposalId: null,
@@ -131,8 +131,8 @@ test("validateInvoiceInput: đủ ca hợp lệ/không hợp lệ", async () => 
       invoiceNo: "HD001",
       invoiceDate: "2026-07-01",
       direction: "out",
-      netAmount: 1_000_000,
-      vatAmount: 100_000,
+      netAmount: "1000000.00",
+      vatAmount: "100000.00",
       vatRate: 10,
       counterparty: "Công ty A",
       contractId: null,
@@ -145,8 +145,8 @@ test("validateInvoiceInput: đủ ca hợp lệ/không hợp lệ", async () => 
       invoiceNo: null,
       invoiceDate: null,
       direction: "xxx" as never,
-      netAmount: 1,
-      vatAmount: 1,
+      netAmount: "1.00",
+      vatAmount: "1.00",
       vatRate: 10,
       counterparty: null,
       contractId: null,
@@ -159,8 +159,8 @@ test("validateInvoiceInput: đủ ca hợp lệ/không hợp lệ", async () => 
       invoiceNo: null,
       invoiceDate: null,
       direction: "in",
-      netAmount: -1,
-      vatAmount: 1,
+      netAmount: "-1.00",
+      vatAmount: "1.00",
       vatRate: 10,
       counterparty: null,
       contractId: null,
@@ -173,8 +173,8 @@ test("validateInvoiceInput: đủ ca hợp lệ/không hợp lệ", async () => 
       invoiceNo: null,
       invoiceDate: null,
       direction: "in",
-      netAmount: 1,
-      vatAmount: 1,
+      netAmount: "1.00",
+      vatAmount: "1.00",
       vatRate: 150,
       counterparty: null,
       contractId: null,
@@ -450,15 +450,15 @@ test("parseInvoiceBody: đọc body JSON thành InvoiceInput", async () => {
   });
   assert.equal(input.invoiceNo, "HD001");
   assert.equal(input.direction, "out");
-  assert.equal(input.netAmount, 1000000);
-  assert.equal(input.vatAmount, 100000);
+  assert.equal(input.netAmount, "1000000.00");
+  assert.equal(input.vatAmount, "100000.00");
   assert.equal(input.vatRate, 10);
   assert.equal(input.counterparty, "Công ty A");
   assert.equal(input.contractId, null);
 
   const empty = parseInvoiceBody({});
   assert.equal(empty.invoiceNo, null);
-  assert.equal(empty.netAmount, 0);
+  assert.equal(empty.netAmount, "0.00");
   assert.equal(empty.vatRate, null);
 });
 

@@ -4,6 +4,7 @@
 // negotiating→settled/rejected. Xem docs/nang-cap/M34-claim.md.
 import { query, queryOne, run, withTransaction, daysFromTodayISO } from "@/lib/db";
 import { nextSeqCode } from "@/lib/ha-tang/seqcode";
+import { parseOptionalMoneyInput } from "@/lib/nen/money";
 
 export const CLAIM_KINDS = ["cost", "eot"] as const;
 export type ClaimKind = (typeof CLAIM_KINDS)[number];
@@ -43,7 +44,8 @@ export type ClaimInput = {
   voId: number | null;
   noticeDate: string;
   cause: string;
-  amountRequested: number | null;
+  /** Chuỗi canonical 2 số lẻ (S10) — ghi thẳng vào NUMERIC, không qua float. */
+  amountRequested: string | null;
   daysRequested: number | null;
 };
 
@@ -56,10 +58,9 @@ export function parseClaimBody(body: Record<string, unknown>): ClaimInput {
     voId: body.voId != null && body.voId !== "" ? Number(body.voId) : null,
     noticeDate: str(body.noticeDate),
     cause: str(body.cause),
+    // Ném MoneyInputError (400/422) khi sai dạng/tràn — route đổi qua moneyInputErrorBody.
     amountRequested:
-      body.amountRequested != null && body.amountRequested !== ""
-        ? Number(body.amountRequested)
-        : null,
+      parseOptionalMoneyInput(body.amountRequested, { label: "Giá trị đề xuất" })?.text ?? null,
     daysRequested:
       body.daysRequested != null && body.daysRequested !== "" ? Number(body.daysRequested) : null,
   };
@@ -73,7 +74,11 @@ export function validateClaimInput(input: ClaimInput): string | null {
   if (!input.noticeDate.trim()) return "Thiếu ngày thông báo";
   if (!input.cause.trim()) return "Thiếu nguyên nhân";
   if (input.kind === "cost") {
-    if (!Number.isFinite(input.amountRequested) || (input.amountRequested ?? 0) <= 0)
+    if (
+      input.amountRequested == null ||
+      !/[1-9]/.test(input.amountRequested) ||
+      input.amountRequested.startsWith("-")
+    )
       return "Claim chi phí cần giá trị đề xuất > 0";
   }
   if (input.kind === "eot") {
@@ -280,7 +285,7 @@ export function canEditClaim(
 // status='settled'. CAN.approve (Admin/PM), trong 1 transaction.
 export async function settleClaim(opts: {
   claimId: number;
-  amountSettled: number | null;
+  amountSettled: string | null;
   daysSettled: number | null;
   settlementNote: string | null;
   settledBy: number;

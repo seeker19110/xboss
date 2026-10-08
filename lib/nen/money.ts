@@ -286,3 +286,140 @@ export function moneyToWire(minor: bigint, format: MoneyWireFormat): string | nu
 export function isMoneyPrecisionError(err: unknown): boolean {
   return err instanceof RangeError && err.message === "money_precision_unsupported";
 }
+
+// ===== QUALITY-FINAL-1 / S10 — ĐẦU VÀO tiền phía server (A3-FR01/FR02) =====
+// Một parser duy nhất cho mọi body JSON ghi tiền, thay `Number(body.x)`/`parseFloat` — bản cũ đọc
+// "1.500" kiểu vi-VN thành 1,5 đồng và để giá trị vượt cột thành lỗi tràn 500 của Postgres.
+
+/** Mã lỗi nhập tiền. 400 = sai dạng; 422 = đúng dạng nhưng vượt cột / không giữ được chính xác. */
+export type MoneyInputErrorCode =
+  | "amount_invalid"
+  | "amount_locale_format"
+  | "amount_scale"
+  | "amount_overflow"
+  | "amount_precision_unsupported";
+
+/**
+ * Lỗi đọc một số tiền nhập. Thông điệp tiếng Việt KHÔNG chứa giá trị nhập (dữ liệu thương mại);
+ * route đổi sang `{ error, code }` + mã HTTP qua `moneyInputErrorBody`.
+ */
+export class MoneyInputError extends Error {
+  readonly status: 400 | 422;
+  readonly code: MoneyInputErrorCode;
+  constructor(code: MoneyInputErrorCode, message: string) {
+    super(message);
+    this.name = "MoneyInputError";
+    this.code = code;
+    this.status = code === "amount_overflow" || code === "amount_precision_unsupported" ? 422 : 400;
+  }
+}
+
+/** Thân + mã HTTP khi `err` là lỗi nhập tiền; lỗi khác → null (route ném tiếp). */
+export function moneyInputErrorBody(
+  err: unknown,
+): { status: 400 | 422; body: { error: string; code: MoneyInputErrorCode } } | null {
+  if (!(err instanceof MoneyInputError)) return null;
+  return { status: err.status, body: { error: err.message, code: err.code } };
+}
+
+export type MoneyInputOptions = {
+  /** Tên trường trong thông điệp lỗi, vd "Giá trị hợp đồng". Mặc định "Số tiền". */
+  label?: string;
+  /** NUMERIC(precision, scale) của cột đích — mặc định (15,2) như mọi cột tiền chính. */
+  precision?: number;
+  scale?: number;
+};
+
+/** Số nguyên đã nhân 10^scale + chuỗi canonical đúng `scale` chữ số lẻ (ghi thẳng vào DB). */
+export type MoneyInput = { unscaled: bigint; text: string };
+
+/** "1.234" / "1.234.567" — dấu chấm phân cách hàng nghìn kiểu vi-VN. */
+const NHOM_NGHIN_VI = /^-?\d{1,3}(\.\d{3})+$/;
+const THAP_PHAN_NHAP = /^(-?)(\d+)(?:\.(\d+))?$/;
+
+function thongDiepNhapTien(
+  code: MoneyInputErrorCode,
+  label: string,
+  precision: number,
+  scale: number,
+): string {
+  switch (code) {
+    case "amount_invalid":
+      return `${label} không hợp lệ — nhập số thuần, vd 1234567 hoặc 1234567.5`;
+    case "amount_locale_format":
+      return (
+        `${label} không được dùng dấu chấm phân cách hàng nghìn hay dấu phẩy thập phân ` +
+        `(vd "1.234.567", "1234,5") — gửi số thuần, vd 1234567 hoặc 1234567.5`
+      );
+    case "amount_scale":
+      return `${label} chỉ được tối đa ${scale} chữ số thập phân`;
+    case "amount_overflow":
+      return `${label} vượt giới hạn lưu trữ (tối đa ${precision - scale} chữ số phần nguyên)`;
+    case "amount_precision_unsupported":
+      return `${label} có quá nhiều chữ số để gửi dạng số — gửi dạng chuỗi thập phân`;
+  }
+}
+
+/**
+ * Đọc một số tiền từ body JSON — không qua float khi input là chuỗi.
+ *
+ * Nhận: JSON number hữu hạn, hoặc chuỗi thập phân thuần ("1234567", "1234567.5", "-1500.25";
+ * bỏ khoảng trắng hai đầu). Chữ số lẻ vượt `scale` được bỏ nếu toàn là 0.
+ * Từ chối 400: chuỗi có dấu phẩy, nhiều dấu chấm, hoặc đúng dạng nhóm nghìn vi-VN khi scale < 3
+ * ("1.500" mơ hồ giữa 1.500 đồng và 1,5 đồng — KHÔNG đoán); số mũ; NaN/Infinity; kiểu khác;
+ * quá `scale` chữ số lẻ khác 0. Từ chối 422: vượt NUMERIC(precision, scale) (`fitsNumeric`).
+ *
+ * JSON number: `String(n)` là biểu diễn ngắn nhất round-trip của double — trùng chuỗi người
+ * dùng gõ khi có ≤ 15 chữ số có nghĩa (mọi giá trị vừa NUMERIC(15,2)). Number cần > 15 chữ số
+ * có nghĩa (cột precision lớn hơn) không đảm bảo exact → 422, client phải gửi chuỗi.
+ * Không kiểm dấu/khoảng nghiệp vụ (> 0, ≥ 0) — việc của caller.
+ */
+export function parseMoneyInput(value: unknown, opts: MoneyInputOptions = {}): MoneyInput {
+  const label = opts.label ?? "Số tiền";
+  const precision = opts.precision ?? 15;
+  const scale = opts.scale ?? 2;
+  if (!Number.isInteger(scale) || scale < 0 || scale > 18 || scale > precision) {
+    throw new RangeError("decimal_scale_unsupported");
+  }
+  const loi = (code: MoneyInputErrorCode) =>
+    new MoneyInputError(code, thongDiepNhapTien(code, label, precision, scale));
+
+  let raw: string;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw loi("amount_invalid");
+    raw = String(value);
+    // Dạng mũ chỉ có khi |n| ≥ 1e21 (chắc chắn tràn) hoặc |n| < 1e-6 (quá số lẻ).
+    if (/e/i.test(raw)) throw loi(Math.abs(value) >= 1 ? "amount_overflow" : "amount_scale");
+  } else if (typeof value === "string") {
+    raw = value.trim();
+    if (raw.includes(",") || raw.indexOf(".") !== raw.lastIndexOf(".")) {
+      throw loi("amount_locale_format");
+    }
+    if (scale < 3 && NHOM_NGHIN_VI.test(raw)) throw loi("amount_locale_format");
+  } else {
+    throw loi("amount_invalid");
+  }
+
+  const m = THAP_PHAN_NHAP.exec(raw);
+  if (!m) throw loi("amount_invalid");
+  const [, dau, nguyen, le = ""] = m;
+  if (/[1-9]/.test(le.slice(scale))) throw loi("amount_scale");
+  const tuyetDoi = BigInt(nguyen + le.slice(0, scale).padEnd(scale, "0"));
+  const unscaled = dau ? -tuyetDoi : tuyetDoi; // "-0" → 0n
+  if (!fitsNumeric(unscaled, precision)) throw loi("amount_overflow");
+  if (typeof value === "number") {
+    const coNghia = (nguyen + le).replace(/^0+/, "").replace(/0+$/, "");
+    if (coNghia.length > 15) throw loi("amount_precision_unsupported");
+  }
+  return { unscaled, text: decimalFromUnscaled(unscaled, scale) };
+}
+
+/** Như `parseMoneyInput` nhưng rỗng (undefined/null/"") → null — cho trường tiền tuỳ chọn. */
+export function parseOptionalMoneyInput(
+  value: unknown,
+  opts: MoneyInputOptions = {},
+): MoneyInput | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  return parseMoneyInput(value, opts);
+}

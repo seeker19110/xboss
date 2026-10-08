@@ -14,7 +14,7 @@ test("validateContractInput: đủ ca hợp lệ/không hợp lệ", async () =>
     partySupplierId: 1,
     partyName: null,
     systemId: null,
-    value: 1000,
+    value: "1000.00",
     advancePct: 10,
     retentionPct: 5,
     signedDate: "2026-01-01",
@@ -28,7 +28,7 @@ test("validateContractInput: đủ ca hợp lệ/không hợp lệ", async () =>
   assert.match(validateContractInput({ ...base, code: "" })!, /số hợp đồng/i);
   assert.match(validateContractInput({ ...base, title: "" })!, /tên hợp đồng/i);
   assert.match(validateContractInput({ ...base, kind: "xxx" as never })!, /loại hợp đồng/i);
-  assert.match(validateContractInput({ ...base, value: -1 })!, /giá trị hợp đồng/i);
+  assert.match(validateContractInput({ ...base, value: "-1.00" })!, /giá trị hợp đồng/i);
   assert.match(validateContractInput({ ...base, advancePct: 150 })!, /tạm ứng/i);
   assert.match(validateContractInput({ ...base, retentionPct: -1 })!, /giữ lại bảo hành/i);
   assert.match(validateContractInput({ ...base, signedDate: "01/01/2026" })!, /ngày ký/i);

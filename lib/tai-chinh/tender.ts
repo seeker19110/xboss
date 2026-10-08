@@ -1,6 +1,7 @@
 // M7 — Đấu thầu / so sánh báo giá gói giao thầu phụ: danh mục trạng thái, validate
 // thuần, bảng so sánh giá theo dòng BOQ × nhà thầu, và trao thầu (sinh hợp đồng
 // giao thầu — contracts, M16). Xem docs/nang-cap/M07-dau-thau.md.
+import { parseMoneyInput } from "@/lib/nen/money";
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { nextSeqCode } from "@/lib/ha-tang/seqcode";
 import {
@@ -42,7 +43,19 @@ export function validateTenderInput(input: {
   return null;
 }
 
-export type BidPriceInput = { boqItemId: number; unitPrice: number };
+/** unitPrice là chuỗi canonical 2 số lẻ (S10) — ghi thẳng vào NUMERIC(15,2), không qua float. */
+export type BidPriceInput = { boqItemId: number; unitPrice: string };
+
+/** Đọc mảng dòng giá từ body; ném MoneyInputError (400/422) khi một đơn giá sai dạng/tràn. */
+export function parseBidPrices(raw: unknown[]): BidPriceInput[] {
+  return raw.map((r, i) => {
+    const p = (r ?? {}) as Record<string, unknown>;
+    return {
+      boqItemId: Number(p.boqItemId),
+      unitPrice: parseMoneyInput(p.unitPrice, { label: `Đơn giá dòng ${i + 1}` }).text,
+    };
+  });
+}
 
 // Chấp nhận chào thiếu dòng (không bắt buộc đủ 100% dòng mời) — spec §"Điểm cần
 // quyết": hiện "—" cho dòng thiếu, tổng ghi chú "chào N/M dòng" (không cộng 0 gây
@@ -52,7 +65,7 @@ export function validateBidPrices(prices: BidPriceInput[]): string | null {
   for (const [i, p] of prices.entries()) {
     const n = i + 1;
     if (!Number.isInteger(p.boqItemId)) return `Dòng ${n}: thiếu dòng BOQ`;
-    if (!Number.isFinite(p.unitPrice) || p.unitPrice < 0) return `Dòng ${n}: đơn giá phải ≥ 0`;
+    if (p.unitPrice.startsWith("-")) return `Dòng ${n}: đơn giá phải ≥ 0`;
     if (seen.has(p.boqItemId)) return `Dòng ${n}: dòng BOQ trùng lặp trong cùng báo giá`;
     seen.add(p.boqItemId);
   }

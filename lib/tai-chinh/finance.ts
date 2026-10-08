@@ -6,7 +6,7 @@
 import { query, queryOne } from "@/lib/db";
 import { listContracts } from "@/lib/tai-chinh/contracts";
 import { daysFromTodayISO } from "@/lib/nen/date";
-import { parseMoney } from "@/lib/nen/money";
+import { parseFixedDecimalExact, parseMoney, parseOptionalMoneyInput } from "@/lib/nen/money";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Định dạng kỳ lương "YYYY-MM" — export để lib/dich-vu/luong.ts dùng chung một luật.
@@ -98,10 +98,20 @@ export async function advanceOutstanding(projectId: number): Promise<bigint> {
 export const ADVANCE_STATUSES = ["open", "partially_settled", "settled"] as const;
 export type AdvanceStatus = (typeof ADVANCE_STATUSES)[number];
 
+// S10 (A3-FR01/FR02): trường tiền của input là chuỗi canonical 2 số lẻ (ghi thẳng NUMERIC, không
+// qua float). parse*Body đọc qua `parseOptionalMoneyInput` — sai dạng/vi-VN ném MoneyInputError
+// (route trả 400/422 qua `moneyInputErrorBody`); vắng/rỗng → "0.00" để validate báo thiếu.
+function tienBody(v: unknown, label: string): string {
+  return parseOptionalMoneyInput(v, { label })?.text ?? "0.00";
+}
+
+/** Chuỗi canonical 2 số lẻ → bigint đồng×100 (so sánh dấu không qua float). */
+const minor = (text: string) => parseFixedDecimalExact(text, 2);
+
 export type AdvanceInput = {
   code: string | null;
   advanceDate: string | null;
-  amount: number;
+  amount: string;
   recipient: string | null;
   reason: string | null;
   proposalId: number | null;
@@ -109,7 +119,7 @@ export type AdvanceInput = {
 
 // Validate thuần — không chạm DB.
 export function validateAdvanceInput(input: AdvanceInput): string | null {
-  if (!Number.isFinite(input.amount) || input.amount <= 0) return "Số tiền tạm ứng phải > 0";
+  if (minor(input.amount) <= 0n) return "Số tiền tạm ứng phải > 0";
   if (input.advanceDate != null && !DATE_RE.test(input.advanceDate))
     return "Ngày tạm ứng không đúng định dạng YYYY-MM-DD";
   if (!input.recipient?.trim()) return "Thiếu người nhận tạm ứng";
@@ -121,7 +131,7 @@ export function parseAdvanceBody(body: Record<string, unknown>): AdvanceInput {
   return {
     code: strOrNull(body.code),
     advanceDate: strOrNull(body.advanceDate),
-    amount: body.amount != null ? Number(body.amount) : 0,
+    amount: tienBody(body.amount, "Số tiền tạm ứng"),
     recipient: strOrNull(body.recipient),
     reason: strOrNull(body.reason),
     proposalId: body.proposalId != null ? Number(body.proposalId) : null,
@@ -141,7 +151,7 @@ export type CashTransactionInput = {
   txDate: string;
   direction: "in" | "out";
   category: string | null;
-  amount: number;
+  amount: string;
   isPettyCash: boolean;
   contractId: number | null;
   supplierId: number | null;
@@ -153,7 +163,7 @@ export function validateCashTransactionInput(input: CashTransactionInput): strin
   if (!DATE_RE.test(input.txDate)) return "Ngày giao dịch không đúng định dạng YYYY-MM-DD";
   if (input.direction !== "in" && input.direction !== "out")
     return "Chiều giao dịch phải là 'in' hoặc 'out'";
-  if (!Number.isFinite(input.amount) || input.amount <= 0) return "Số tiền phải > 0";
+  if (minor(input.amount) <= 0n) return "Số tiền phải > 0";
   return null;
 }
 
@@ -163,7 +173,7 @@ export function parseCashTransactionBody(body: Record<string, unknown>): CashTra
     txDate: typeof body.txDate === "string" ? body.txDate.trim() : "",
     direction: (typeof body.direction === "string" ? body.direction : "") as "in" | "out",
     category: strOrNull(body.category),
-    amount: body.amount != null ? Number(body.amount) : 0,
+    amount: tienBody(body.amount, "Số tiền"),
     isPettyCash: !!body.isPettyCash,
     contractId: body.contractId != null ? Number(body.contractId) : null,
     supplierId: body.supplierId != null ? Number(body.supplierId) : null,
@@ -178,8 +188,8 @@ export type InvoiceInput = {
   invoiceNo: string | null;
   invoiceDate: string | null;
   direction: "in" | "out";
-  netAmount: number;
-  vatAmount: number;
+  netAmount: string;
+  vatAmount: string;
   vatRate: number | null;
   counterparty: string | null;
   contractId: number | null;
@@ -190,9 +200,8 @@ export type InvoiceInput = {
 export function validateInvoiceInput(input: InvoiceInput): string | null {
   if (input.direction !== "in" && input.direction !== "out")
     return "Chiều hoá đơn phải là 'in' (đầu vào) hoặc 'out' (đầu ra)";
-  if (!Number.isFinite(input.netAmount) || input.netAmount < 0)
-    return "Giá trị trước thuế phải ≥ 0";
-  if (!Number.isFinite(input.vatAmount) || input.vatAmount < 0) return "Tiền thuế VAT phải ≥ 0";
+  if (minor(input.netAmount) < 0n) return "Giá trị trước thuế phải ≥ 0";
+  if (minor(input.vatAmount) < 0n) return "Tiền thuế VAT phải ≥ 0";
   if (input.vatRate != null && (input.vatRate < 0 || input.vatRate > 100))
     return "Thuế suất VAT phải trong khoảng 0–100";
   if (input.invoiceDate != null && !DATE_RE.test(input.invoiceDate))
@@ -206,8 +215,8 @@ export function parseInvoiceBody(body: Record<string, unknown>): InvoiceInput {
     invoiceNo: strOrNull(body.invoiceNo),
     invoiceDate: strOrNull(body.invoiceDate),
     direction: (typeof body.direction === "string" ? body.direction : "") as "in" | "out",
-    netAmount: body.netAmount != null ? Number(body.netAmount) : 0,
-    vatAmount: body.vatAmount != null ? Number(body.vatAmount) : 0,
+    netAmount: tienBody(body.netAmount, "Giá trị trước thuế"),
+    vatAmount: tienBody(body.vatAmount, "Tiền thuế VAT"),
     vatRate: body.vatRate != null && body.vatRate !== "" ? Number(body.vatRate) : null,
     counterparty: strOrNull(body.counterparty),
     contractId: body.contractId != null ? Number(body.contractId) : null,
