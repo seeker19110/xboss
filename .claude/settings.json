@@ -2,14 +2,17 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "model": "opusplan",
   "effortLevel": "medium",
-  "fallbackModel": ["opus"],
+  "fallbackModel": [
+    "opus"
+  ],
   "permissions": {
     "allow": [
       "Bash(npm run lint)",
       "Bash(npm run typecheck)",
       "Bash(npm test)",
       "Bash(npm run build)",
-      "Bash(npx tsx --test *)"
+      "Bash(npx tsx --test *)",
+      "Bash(git:*)"
     ],
     "deny": [
       "Bash(git push --force * main*)",
@@ -39,7 +42,11 @@
       "Bash(wget * | sh)",
       "Bash(wget * | bash)"
     ],
-    "ask": ["Bash(git push --force *)", "Bash(git push --force-with-lease*)", "Bash(git push -f *)"]
+    "ask": [
+      "Bash(git push --force *)",
+      "Bash(git push --force-with-lease*)",
+      "Bash(git push -f *)"
+    ]
   },
   "hooks": {
     "SessionStart": [
