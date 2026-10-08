@@ -27,8 +27,11 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const result = await withProjectScope(projectId ?? "*", async () => {
-    const tender = projectId != null ? await getTender(id, projectId) : undefined;
+  // Fail-closed (A1-AC02): không có dự án khả kiến → 404, không mở scope toàn hệ "*".
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy gói thầu" }, { status: 404 });
+  const result = await withProjectScope(projectId, async () => {
+    const tender = await getTender(id, projectId);
     if (!tender) return null;
     const { items, bids } = await comparisonTable(id);
     return { tender, items, bids };
