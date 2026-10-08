@@ -1,5 +1,79 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S13b: vá phạm vi QA nghiệm thu + đồng bộ vật tư không nhân bản
+
+Vá 2 lỗi thật S13a đánh `todo` cho S13b; hai ca đã gỡ `todo` (nay là cổng chặn thường), đỏ trên
+code cũ → xanh. Không migration, không đổi API/route, không đụng IPC/payment-certs (S13c).
+
+- **A5-FR04 phạm vi QA** (`lib/ky-thuat/qaqc.ts` `requiredInspectionMissing`): chỉ tính checklist
+  `required` CÙNG dự án với task (task → nhóm → sheet → `towers.project_id`) — checklist dự án A
+  hết chặn vĩnh viễn nghiệm thu dự án B cùng hệ. Đã rà caller/route anh em: `tasks/:id/approve`
+  và `approvals` (tầng) đều đi qua hàm này; `qc/checklists` GET/POST/PATCH/DELETE và
+  `qc/inspections` GET/POST đã lọc dự án sẵn (không cùng lớp lỗi). **Quyết định checklist legacy
+  `project_id IS NULL`:** giữ **fail-closed** (A1-FR06 — không suy ra được scope thì không coi là
+  "không áp dụng"), vẫn chặn nghiệm thu; mỗi lần chặn ghi `log.warn` kèm `checklistIds` để vận hành
+  đối soát. Lối thoát (không cần sửa code): gán `qc_checklists.project_id` về đúng dự án sở hữu,
+  hoặc `required/active = FALSE` — sau đó dự án không sở hữu hết bị chặn. Thực tế không có dòng
+  NULL mới: mọi route tạo checklist gán `project_id` từ M22, migration 0027 đã backfill.
+- **A5-AC01 đồng bộ vật tư** (`lib/vat-tu/material-sync.ts` `runMaterialSync`): dòng Sheet không ID
+  (nhất là không Mã BOQ) giờ **nhận lại vật tư "mồ côi"** — vật tư có trong DB, chưa từng chốt
+  snapshot, không có dòng mang ID trên Sheet (tạo ở lần đồng bộ trước mà ghi Sheet lỗi) — khi
+  trùng khớp **toàn bộ** `SYNCED_FIELDS` đã chuẩn hoá (sau mã BOQ hiệu lực) + cùng hệ; mỗi vật tư
+  nhận đúng 1 dòng. Không chọn xoá/bù trừ vật tư khi ghi lỗi: ca "mất ACK" Sheet đã giữ ID, xoá
+  sẽ làm mất dòng; transaction cũng hỏng ca đó. 3-way merge, `CONFLICT_POLICY`, `sync_locks`,
+  snapshot-sau-ghi, `qty_used` chỉ DB→Sheet giữ nguyên. Giới hạn đã biết: nếu người dùng SỬA dòng
+  giữa lần lỗi và lần chạy lại thì không trùng khớp → vẫn tạo mới như trước (không ghép "gần
+  giống", A5-FR01); vật tư tạo trong app chưa từng đồng bộ mà trùng khớp hoàn toàn 1 dòng Sheet
+  không ID cũng được ghép (thay vì nhân đôi như trước).
+- **Test** (Postgres 16 cục bộ, mỗi file 1 DB): `s13a-chuoi-tien-do-nghiem-thu` 13/13,
+  `s13a-chuoi-dong-bo-vat-tu` 5/5 (+2 ca mới: 2 dòng trùng nội dung → đúng 2 vật tư; mã BOQ bị task
+  chiếm → không nhân), `qaqc` 10/10 (+1 ca: dự án khác không chặn / cùng dự án chặn / NULL vẫn chặn
+  - lối thoát đối soát); các ca mới đều đỏ trên code cũ. Hồi quy xanh: route-nghiem-thu-_,
+    route-qc-de-xuat, qc-project-scope, approvals_, route-tien-do*, material-sync, materials-*,
+    route-vat-tu-2, route-boq-vat-tu, sync-locks, google-sheets; `s13a-chuoi-ipc-thanh-toan` giữ 5
+    todo của S13c.
+
+## 2026-10-08 — QUALITY-FINAL-1 S13a: bộ hồi quy chuỗi nghiệp vụ A5 (chỉ test)
+
+Ba file test mới đi qua **route handler thật** với đúng người bấm (TRAPS.md §6), fixture dùng chung
+`tests/helpers/chuoi-nghiep-vu.ts` (`SoFixture`: user thật, cây WBS/hệ chèn SQL tối thiểu, dọn theo
+thứ tự FK; liên kết `boq_items.contract_id` là đầu vào SQL vì không route nào ghi cột này). Tiền so
+chuỗi exact (`decimal-string-v1`, `::text`) với golden viết tay; tỷ lệ tạm ứng/giữ lại lấy từ hợp
+đồng fixture. Không sửa `lib/**`/`app/**`/migration. Ca ĐỎ trên code hiện tại = lỗi thật → đánh
+`{ todo }` (không skip; `run-tests.mjs` đếm todo riêng, không fail) — S13b/S13c vá xong phải gỡ
+`todo`. Kết quả cục bộ (Postgres 16 disposable): 24 pass, 7 todo, 0 fail; không còn dữ liệu sót.
+
+Bảng map AC → ca (file `tests/s13a-chuoi-*.test.ts`, ★ = todo):
+
+- **A5-AC01** — `dong-bo-vat-tu`: ghi Sheet bị từ chối → snapshot không chốt, chạy lại dòng có Mã BOQ không nhân; mất ACK → không nhân, snapshot chốt ở lần thành công; ★ dòng không Mã BOQ nhân bản
+- **A5-AC02** — `tien-do-nghiem-thu`: chuỗi tick→%→status→PM nghiệm thu; 199/200 (tick lô) → 0.99 + 422; QA bắt buộc Trượt → 409, Đạt → 200; luồng pm→cdt pending/rejected giữ status, bước cuối mới nghiem_thu + 1 dòng lịch sử; PATCH `status=nghiem_thu` → 422 kể cả Admin; quá hạn/tick lại giữ nghiem_thu, bỏ tick 409; ★ checklist QA dự án khác chặn nghiệm thu
+- **A5-AC03** — 4 tick đồng thời cùng task → 100% không lost update; 2 lượt nghiệm thu đồng thời → 1 chuyển + 1 audit; replay tick (đơn/lô) idempotent; hold-point chặn tick đơn và lô cùng ngữ nghĩa. Huỷ tầng giữ task duyệt riêng: `route-nghiem-thu-bat-bien` AC13 + `route-tien-do-3` (đã có, route thật)
+- **A5-AC04** — `ipc-thanh-toan`: HĐ 100/duyệt 90/kỳ 20 → luỹ kế 110 + cảnh báo, nháp/trình/duyệt không hard-cap; không cảnh báo → duyệt không cần xác nhận; ★ duyệt bỏ qua cảnh báo (thiếu `acknowledgement_required`)
+- **A5-AC05** — lập kỳ khi kỳ trước nháp/trình → 409, đúng thứ tự → 110 rồi 120, snapshot kỳ cũ giữ; 2 lần lập đồng thời → 201+409; ★ `warning_changed`; ★ luỹ kế nháp cũ (legacy 2 đợt mở) bị dùng lại; ★ duyệt kỳ trước sau kỳ sau không conflict
+- **A5-AC06** — tạm ứng (`payments/bills` type advance) theo % HĐ không cần nghiệm thu; IPC trừ tạm ứng theo KỲ, duyệt trùng đồng thời → 1 phiếu; báo cáo actual = tạm ứng + đề nghị
+- **A5-AC07** — đổi đơn giá BOQ không reprice đợt/phiếu đã chốt (ngân sách theo giá mới, đợt mới chụp giá mới); xoá HĐ có đợt duyệt → 409, xoá BOQ có dòng IPC không mất lịch sử; tham chiếu chéo dự án (HĐ/BOQ/task/đợt) bị chặn, không ghi; ★ xoá BOQ thiếu `dependency_conflict`
+- **A5-AC08** — chuỗi đầy đủ: phiếu = `approvedValue` exact đúng 1 lần, `/api/costs` actual/budget khớp golden, `coverage.reconciled`; lỗi 403 không lộ số tiền
+- **A5-AC09** — kỹ sư/subcon(được giao) tick, bch/cdt/viewer không tick; chỉ Admin/PM nghiệm thu khi không có luồng; kỹ sư/subcon/cdt/viewer 403 lập/sửa/trình/duyệt/xem IPC + chi phí kể cả gửi `acknowledged`; BCH xem được, không duyệt. Phần UI (keyboard/mobile/hiển thị 409) = NOT_RUN (lớp B/M)
+- **Q-AC06 (IPC)** — golden 0.001×5.00 đã có ở `money-ipc-golden-route.test.ts` (S09/S10a); chuỗi S13a không lặp lại
+
+- **~~Còn mở~~ đã vá ở S13b (mục trên) — lỗi thật tái hiện (todo, cho S13b):** (1) `requiredInspectionMissing` không lọc
+  `qc_checklists.project_id` → checklist bắt buộc của dự án A chặn vĩnh viễn nghiệm thu dự án B cùng
+  hệ (409, B không lập được phiếu cho checklist của A); (2) `runMaterialSync` INSERT vật tư từ dòng
+  Sheet chưa có ID trước `writeRows`, không transaction/bù trừ → ghi lỗi rồi chạy lại nhân bản dòng
+  không Mã BOQ.
+- **Còn mở — lỗi thật tái hiện (todo, cho S13c):** (3) decide chưa có warningVersion/acknowledged/
+  reason — duyệt luỹ kế 110/100 không ai xác nhận; (4) chưa có `warning_changed`; (5) submit/decide
+  không tính lại `qty_cumulative` dưới khoá — đợt nháp legacy chốt 100 thay vì 120 và mất cảnh báo
+  vượt HĐ; (6) không kiểm thứ tự kỳ — duyệt kỳ trước sau kỳ sau vẫn 200; (7) `DELETE /api/boq/:id`
+  để lỗi FK 23503 thoát handler (500) thay vì 409 `dependency_conflict` (dữ liệu vẫn an toàn).
+- **Quan sát cần phiên chính quyết (không đánh todo):** decide IPC tự ghi `payment_bills` với
+  `paid_date` = ngày duyệt nên "approved" và "đã chi" trùng nhau trong báo cáo (A5 §2 nói khác,
+  A4-FR02 lại chốt actual = mọi payment_bills); IPC chạy cho mọi loại HĐ và phiếu của HĐ nhận thầu
+  vẫn cộng vào "thực chi"; `POST /api/payment-certs` với HĐ dự án khác trả 422 (giống id không tồn
+  tại, không lộ) thay vì 404 như DATA-CONTRACTS §7; `runMaterialSync` đọc/ghi snapshot mọi vật tư
+  không lọc tổ chức/dự án; `tests/qaqc.test.ts` chèn checklist bắt buộc toàn cục (system/project
+  NULL) — vô hại vì mỗi worker test có DB riêng và file chạy tuần tự.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S10 đầu vào tiền (phần 2): claims, đề xuất, bảo lãnh, VO, thầu, BOQ, báo giá kỹ thuật
 
 Nối phần 1 (parser chung `parseMoneyInput`/`parseOptionalMoneyInput` trong `lib/nen/money.ts`) sang
