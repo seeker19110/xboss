@@ -25,7 +25,7 @@ test.describe("Portfolio — tổng quan đa dự án (sau đăng nhập)", () =
     await expect(
       main.locator("p").getByText("Đang thi công", { exact: true }).first(),
     ).toBeVisible();
-    await expect(main.getByText("Tiến độ TB", { exact: false })).toBeVisible();
+    await expect(main.getByText("Tiến độ theo công việc", { exact: false })).toBeVisible();
     await expect(main.getByText("Tổng việc trễ", { exact: false })).toBeVisible();
 
     const card = main.getByRole("button", { name: /TT AVIO Tháp A/ });
