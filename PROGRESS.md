@@ -1,5 +1,22 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S02a: fail-closed khi không có dự án khả kiến (miền tài chính)
+
+Mẫu chung: `getCurrentProjectId` trả null (user không có dự án khả kiến) → route trả **404 trước
+mọi query nghiệp vụ**, bỏ `withProjectScope(projectId ?? "*")` (GUC RLS toàn hệ) — A1-AC02/AC03.
+
+- **Lỗ hổng thật (test đỏ trên code cũ):** `claims` GET danh sách, `claims/[id]` GET/PATCH/DELETE,
+  `claims/[id]/documents` GET/POST, `claim-documents/[id]` GET/DELETE, `contract-documents/[id]`
+  GET/DELETE (trước đây `if (projectId)` mới lọc — DELETE xoá được tài liệu dự án khác),
+  `claims/[id]/settle|reject` (ghi được claim dự án khác). Gốc: `getClaim(id, null)` bỏ lọc dự án →
+  nay fail-closed khi null.
+- **Làm chặt (đã fail-closed qua helper, test là chốt hồi quy):** GET chi tiết `advances`,
+  `cash-transactions`, `invoices`, `payroll`, `purchase-orders`, `tenders`, `payment-certs` (+ Excel/PDF).
+- Test: `tests/s02a-cum1-detail-scope.test.ts`, `tests/s02a-cum2-claims-scope.test.ts`,
+  `tests/s02a-payment-certs-null-scope.test.ts` (route thật; ca không dự án/dự án khác/đúng dự án).
+- Sinh lại `S00-SCOPE-INVENTORY.md`. Đang làm cùng nhánh: cụm payment (`payments/bills/[id]`,
+  `payments/floors`, `payments` GET).
+
 ## 2026-10-08 — S10a đóng nợ M4/L5/L6 + dòng KL exact trong DTO v1
 
 - **M4:** `withTransaction`/`withProjectScope` nhận `isolation: "repeatable_read"` (`BEGIN ISOLATION
