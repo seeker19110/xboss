@@ -475,9 +475,25 @@ test("GET /api/admin/audit: PM thấy lịch sử phân công vừa ghi", S, asy
   const projectId = await taoDuAn("asglog-ok");
   const pm = await taoUser("pm", "asglog-ok");
   const target = await taoUser("engineer", "asglog-okTarget");
+  // S02: route chỉ trả log của đối tượng thuộc dự án người gọi thấy — tạo task thật trong dự án.
+  const tw = await insertId(`INSERT INTO towers (project_id, name) VALUES (?, 'T')`, projectId);
+  const st = await insertId(
+    `INSERT INTO sheet_types (tower_id, code, name, slug) VALUES (?, 'ASG', 'S', ?)`,
+    tw,
+    `asglog-${projectId}`,
+  );
+  const wp = await insertId(
+    `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'A1', 'N')`,
+    st,
+  );
+  const taskId = await insertId(
+    `INSERT INTO tasks (package_id, code, name) VALUES (?, 'A1,01', 'T')`,
+    wp,
+  );
   const logId = await insertId(
     `INSERT INTO assignment_log (level, target_id, target_label, new_user_id, changed_by, is_manual)
-     VALUES ('task', 1, 'Task test', ?, ?, true)`,
+     VALUES ('task', ?, 'Task test', ?, ?, true)`,
+    taskId,
     target.id,
     pm.id,
   );

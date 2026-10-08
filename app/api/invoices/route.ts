@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId, query, withProjectScope } from "@/lib/db";
+import { insertId, query, withProjectScope, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { parseInvoiceBody, validateInvoiceInput, type InvoiceInput } from "@/lib/tai-chinh/finance";
+import {
+  checkInvoiceParents,
+  parseInvoiceBody,
+  validateInvoiceInput,
+  type InvoiceInput,
+} from "@/lib/tai-chinh/finance";
 
 export const dynamic = "force-dynamic";
 
@@ -78,23 +83,30 @@ export async function POST(req: NextRequest) {
   const invalid = validateInvoiceInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  const id = await insertId(
-    `INSERT INTO invoices (project_id, invoice_no, invoice_date, direction, net_amount,
+  // A1-AC03: kiểm cha cùng dự án + ghi trong 1 transaction (cha khoá FOR SHARE).
+  const result = await withTransaction(async () => {
+    const parentErr = await checkInvoiceParents(input, projectId);
+    if (parentErr) return { error: parentErr };
+    const id = await insertId(
+      `INSERT INTO invoices (project_id, invoice_no, invoice_date, direction, net_amount,
                             vat_amount, vat_rate, counterparty, contract_id, payment_bill_id,
                             created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.invoiceNo,
-    input.invoiceDate,
-    input.direction,
-    input.netAmount,
-    input.vatAmount,
-    input.vatRate,
-    input.counterparty,
-    input.contractId,
-    input.paymentBillId,
-    user.id,
-  );
+      projectId,
+      input.invoiceNo,
+      input.invoiceDate,
+      input.direction,
+      input.netAmount,
+      input.vatAmount,
+      input.vatRate,
+      input.counterparty,
+      input.contractId,
+      input.paymentBillId,
+      user.id,
+    );
+    return { id };
+  });
+  if ("error" in result) return NextResponse.json({ error: result.error }, { status: 422 });
 
-  return NextResponse.json({ id }, { status: 201 });
+  return NextResponse.json({ id: result.id }, { status: 201 });
 }

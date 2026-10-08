@@ -73,7 +73,7 @@ const WHITELIST: Record<string, string> = {
 
   // --- Cấu hình dự án singleton (1-org meta, đọc LIMIT 1) ---
   project: "meta dự án singleton (LIMIT 1), public fallback khi DB trống",
-  "ui-texts": "nhãn UI cấu hình singleton (LIMIT 1)",
+  "ui-texts": "đã lọc dự án đang chọn + org_id (S02); giữ mục vì route đọc FROM projects",
   "materials/columns": "nhãn cột vật tư singleton của dự án (LIMIT 1)",
 
   // --- Ma trận quyền admin liệt kê dự án (org hoá ma trận là việc theo sau PR2) ---

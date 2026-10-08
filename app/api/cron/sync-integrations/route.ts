@@ -11,16 +11,23 @@ export const dynamic = "force-dynamic";
 // Xác thực: Authorization: Bearer <CRON_SECRET> | session Admin/PM (không nhận secret qua query param).
 export async function GET(req: NextRequest) {
   const bySecret = checkCronSecret(req.headers.get("authorization"));
-  const bySession = CAN.export((await getCurrentUser())?.role ?? undefined);
+  const user = await getCurrentUser();
+  const bySession = CAN.export(user?.role ?? undefined);
   if (!bySecret && !bySession)
     return NextResponse.json(
       { error: "Không có quyền (cần CRON_SECRET hoặc đăng nhập Admin/PM)" },
       { status: 401 },
     );
 
+  // Cron secret = tác vụ hệ thống, chạy mọi tổ chức. Gọi tay bằng phiên (S02) → chỉ tích
+  // hợp của tổ chức người gọi, không chạy/không trả kết quả đồng bộ của tenant khác.
+  const orgId = bySecret ? null : (user?.orgId ?? null);
   const integrations = await query<{ id: number; provider: string; projectId: number }>(
     `SELECT id, provider, project_id AS "projectId"
-       FROM integrations WHERE active = true AND project_id IS NOT NULL`,
+       FROM integrations
+      WHERE active = true AND project_id IS NOT NULL AND (?::int IS NULL OR org_id = ?::int)`,
+    orgId,
+    orgId,
   );
 
   // Chạy TUẦN TỰ (không Promise.all) — tránh nhiều tiến trình cùng tranh sync_locks/quá tải DB.

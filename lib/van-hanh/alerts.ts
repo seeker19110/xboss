@@ -126,11 +126,13 @@ export async function upsertAlertRule(input: {
   const operator = ALERT_METRICS[input.metric].operator;
   const active = input.active ?? true;
 
+  // S02: chỉ cập nhật rule của CHÍNH tổ chức — không ghi đè ngưỡng của org khác.
   const existing = await queryOne<{ id: number }>(
     `SELECT id FROM alert_rules
-      WHERE metric = ? AND COALESCE(project_id, 0) = COALESCE(?, 0) AND active`,
+      WHERE metric = ? AND COALESCE(project_id, 0) = COALESCE(?, 0) AND active AND org_id = ?`,
     input.metric,
     input.projectId,
+    input.orgId,
   );
   if (existing) {
     await run(

@@ -85,7 +85,7 @@ test(
     );
 
     try {
-      const report = await buildSodReport(90);
+      const report = await buildSodReport(90, 1); // dự án test mặc định org 1
       const rule = report.find((r) => r.rule === "create_and_approve");
       assert.ok(rule, "phải có rule create_and_approve");
 

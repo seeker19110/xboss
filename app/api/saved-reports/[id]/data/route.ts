@@ -3,13 +3,14 @@ import ExcelJS from "exceljs";
 import { queryOne } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { getSource, runReport, type ReportColumn } from "@/lib/tien-do/reports";
+import { getSource, runReport, type ReportColumn, type ReportResult } from "@/lib/tien-do/reports";
 
 export const dynamic = "force-dynamic";
 
 type Row = {
   id: number;
   ownerId: number;
+  projectId: number | null;
   name: string;
   source: string;
   config: unknown;
@@ -29,7 +30,7 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const r = await queryOne<Row>(
-    `SELECT id, owner_id AS "ownerId", name, source, config, shared
+    `SELECT id, owner_id AS "ownerId", project_id AS "projectId", name, source, config, shared
        FROM saved_reports WHERE id = ? AND org_id = ?`,
     id,
     user.orgId,
@@ -46,12 +47,21 @@ export async function GET(
       { status: 403 },
     );
 
+  // P1-5 (A1-AC01/AC02): không có dự án khả kiến → kết quả rỗng đúng shape, không chạy query
+  // nguồn (trước đây projectId null làm báo cáo chạy toàn hệ, vượt cả ranh giới org). Báo cáo
+  // gắn dự án khác dự án đang chọn → 404 như không tồn tại.
   const projectId = await getCurrentProjectId(user);
-  let result;
-  try {
-    result = await runReport(r.source, r.config, projectId);
-  } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 422 });
+  if (projectId != null && r.projectId != null && r.projectId !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy báo cáo" }, { status: 404 });
+  let result: ReportResult;
+  if (projectId == null) {
+    result = { columns: src.columns, rows: [] };
+  } else {
+    try {
+      result = await runReport(r.source, r.config, projectId);
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 422 });
+    }
   }
 
   if (req.nextUrl.searchParams.get("export") === "excel") {

@@ -4,7 +4,7 @@ import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { nextSeqCode, withUniqueRetry } from "@/lib/ha-tang/seqcode";
-import { listPurchaseOrders } from "@/lib/tai-chinh/procurement";
+import { checkPurchaseOrderParents, listPurchaseOrders } from "@/lib/tai-chinh/procurement";
 
 export const dynamic = "force-dynamic";
 
@@ -60,20 +60,37 @@ export async function POST(req: NextRequest) {
   if (body.expectedDate && !/^\d{4}-\d{2}-\d{2}$/.test(String(body.expectedDate)))
     return NextResponse.json({ error: "Ngày dự kiến phải có dạng YYYY-MM-DD" }, { status: 422 });
 
+  const supplierId = body.supplierId ? Number(body.supplierId) : null;
+  const contractId = body.contractId ? Number(body.contractId) : null;
+
   // Sinh mã PO: PO-YYYYMM-NNN — retry toàn bộ (gen + transaction) nếu đụng mã.
   const ym = todayISO().slice(0, 7).replace("-", "");
-  const { poId, poCode } = await withUniqueRetry(() =>
+  const result = await withUniqueRetry(() =>
     withTransaction(async () => {
+      // A1-AC03: NCC cùng tổ chức; hợp đồng/vật tư/PR cùng dự án — kiểm trong transaction ghi.
+      const parentErr = await checkPurchaseOrderParents(
+        {
+          supplierId,
+          contractId,
+          items: items.map((i) => ({
+            materialId: Number(i.materialId),
+            prId: i.prId ? Number(i.prId) : null,
+          })),
+        },
+        projectId,
+        user.orgId,
+      );
+      if (parentErr) return { error: parentErr };
       const poCode = await nextSeqCode("purchase_orders", "po_code", `PO-${ym}-`);
       const id = await insertId(
         `INSERT INTO purchase_orders (po_code, supplier_id, expected_date, note, created_by, contract_id, project_id)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
         poCode,
-        body.supplierId ? Number(body.supplierId) : null,
+        supplierId,
         body.expectedDate ? String(body.expectedDate) : null,
         body.note ? String(body.note).trim() : null,
         user.id,
-        body.contractId ? Number(body.contractId) : null,
+        contractId,
         projectId,
       );
 
@@ -100,5 +117,6 @@ export async function POST(req: NextRequest) {
     }),
   );
 
-  return NextResponse.json({ id: poId, poCode }, { status: 201 });
+  if ("error" in result) return NextResponse.json({ error: result.error }, { status: 422 });
+  return NextResponse.json({ id: result.poId, poCode: result.poCode }, { status: 201 });
 }

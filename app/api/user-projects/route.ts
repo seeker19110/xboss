@@ -13,8 +13,17 @@ export async function GET() {
   if (!CAN.assign(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM mới xem được gán dự án" }, { status: 403 });
 
+  // S02: chỉ gán dự án thuộc các dự án người gọi thấy được (đã giới hạn trong tổ chức) và
+  // của user cùng tổ chức — không lộ phân công của tenant khác.
+  const visible = await visibleProjectIds(user);
   const rows = await query<{ userId: number; projectId: number }>(
-    `SELECT user_id AS "userId", project_id AS "projectId" FROM user_projects ORDER BY user_id, project_id`,
+    `SELECT up.user_id AS "userId", up.project_id AS "projectId"
+       FROM user_projects up
+       JOIN users u ON u.id = up.user_id AND u.org_id = ?
+      WHERE up.project_id = ANY(?)
+      ORDER BY up.user_id, up.project_id`,
+    user.orgId,
+    visible,
   );
   return NextResponse.json({ assignments: rows });
 }

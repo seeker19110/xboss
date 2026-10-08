@@ -1140,7 +1140,8 @@ test("PUT /api/sheets: engineer không được sắp xếp → 403", S, async (
 
 test("PUT /api/sheets: ids rỗng → 400", S, async () => {
   const pm = await dungUser("pm", `pmputempty${RUN}`);
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  // P1-6: PUT cần dự án đang chọn (null → 404) trước khi validate body.
+  await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, await dungDuAn(`pmputempty${RUN}`));
   const { PUT } = await import("@/app/api/sheets/route");
   const res = await PUT(req("http://localhost/api/sheets", "PUT", { ids: [] }));
   assert.equal(res.status, 400);
@@ -1148,7 +1149,8 @@ test("PUT /api/sheets: ids rỗng → 400", S, async () => {
 
 test("PUT /api/sheets: ids không phải số nguyên → 422", S, async () => {
   const pm = await dungUser("pm", `pmputnan${RUN}`);
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  // P1-6: PUT cần dự án đang chọn (null → 404) trước khi validate body.
+  await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, await dungDuAn(`pmputnan${RUN}`));
   const { PUT } = await import("@/app/api/sheets/route");
   const res = await PUT(req("http://localhost/api/sheets", "PUT", { ids: ["a", "b"] }));
   assert.equal(res.status, 422);
@@ -1157,8 +1159,9 @@ test("PUT /api/sheets: ids không phải số nguyên → 422", S, async () => {
 test("PUT /api/sheets: sắp xếp lại thành công", S, async () => {
   const pm = await dungUser("pm", `pmputok${RUN}`);
   const s1 = await dungSheetDayDu(`put1-${RUN}`);
-  const s2 = await dungSheetDayDu(`put2-${RUN}`);
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  const s2 = await dungSheetDayDu(`put2-${RUN}`, s1.projectId);
+  // P1-6: chỉ sắp xếp được sheet thuộc dự án đang chọn.
+  await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, s1.projectId);
   const { PUT } = await import("@/app/api/sheets/route");
   const res = await PUT(
     req("http://localhost/api/sheets", "PUT", { ids: [s2.sheetId, s1.sheetId] }),

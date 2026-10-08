@@ -22,9 +22,41 @@ Cùng mẫu S02a (#591): `getCurrentProjectId` null → **404** cho chi tiết/g
   `admin/integrations` (null chỉ còn tích hợp cấp org). `saved-reports` GET là dương tính giả.
 - Test: `tests/s02b-tracking-scope.test.ts`, `tests/s02b-files-scope.test.ts`,
   `tests/s02c-dashboard-scope.test.ts`. Inventory S00 sinh lại + khối tay ghi trạng thái.
-- **Còn mở:** P1-2 (invoice nhận `contract_id`/`payment_bill_id` từ body), P1-5
-  (`saved-reports/[id]/data` → `runReport` null = toàn hệ), P1-6 (`sheets` PUT đổi thứ tự sheet
-  dự án khác) — đang làm cùng nhánh.
+- **P1-2 đóng:** `invoices` POST/PATCH kiểm `contract_id`/`payment_bill_id` cùng dự án (và bill
+  thuộc đúng hợp đồng) bằng `checkInvoiceParents` — kiểm + ghi cùng transaction, khoá cha `FOR SHARE`.
+- **P1-5 đóng:** `runReport` nhận `projectId: number`, lọc dự án vô điều kiện (bỏ sentinel `?? 0`
+  toàn hệ ở `cost_by_month`); `saved-reports/[id]/data` không dự án → rỗng đúng shape, báo cáo gắn
+  dự án khác → 404. Hệ quả: phiếu thanh toán không có `sheet_type_id` không còn được tính.
+- **P1-6 đóng:** `sheets` PUT kiểm mọi id thuộc dự án đang chọn + org trong 1 câu UPDATE atomic
+  (sai → 404, không đổi dòng nào; validate ≤ 200 id, không trùng); `sheets` GET chỉ liệt kê sheet dự
+  án đang chọn; `sheets/[id]` PATCH/DELETE theo dự án đang chọn (trước: mọi dự án khả kiến).
+- **Cùng lớp P1-2 (id cha từ body) — đã vá (4/4 ca đỏ trên code cũ):** `cash-transactions` POST/PATCH
+  (hợp đồng cùng dự án, NCC cùng org — `checkCashTransactionParents`), `purchase-orders` POST
+  (`checkPurchaseOrderParents`: NCC cùng org, hợp đồng/vật tư/PR từng dòng cùng dự án — trước đó còn
+  đổi được trạng thái PR dự án khác sang `ordered`), `claims` POST/PATCH (`checkClaimRefs(input,
+projectId)`: hợp đồng + VO cùng dự án, VO đúng hợp đồng). `getSystemSummary(code, projectId)`:
+  sheet/task/NCR/ngân sách theo dự án đang chọn, danh sách nhà thầu chỉ NCC cùng org.
+- **Rà NOT_MAPPED cụm 1 (org/dự án/user):** vá `comments/[id]` DELETE (admin org khác xoá được bình
+  luận), `systems` GET (tổng hợp gộp mọi org — `listSystems(projectId)`), `ui-texts` (đọc/ghi "dự án
+  đầu" toàn hệ → nay theo dự án đang chọn + org; nhãn đã sửa trước đây chỉ còn ở dự án id nhỏ nhất).
+  Các route suppliers/subcontractors/notifications/push/users đã đúng.
+- **Rà NOT_MAPPED cụm 2 (quản trị/API/cron) — 14 chỗ rò chéo org đã vá (14/14 ca đỏ trên code cũ):**
+  `admin/alert-rules` POST + `[id]` DELETE (`upsertAlertRule` ghi đè ngưỡng org khác), `admin/approval-flows`
+  POST/PATCH/DELETE, `admin/audit` (trả `assignment_log` mọi org → nay theo dự án khả kiến),
+  `admin/code-lists` GET/PATCH/DELETE (`getListOfOrg`, `getById(id, orgId)`), `admin/custom-fields` POST,
+  `admin/feature-flags` PATCH (bật/tắt module dự án org khác), `admin/integrations` POST (upsert ghi đè
+  config org khác), `admin/sod-report` (`buildSodReport(days, orgId)`), `saved-reports/[id]` PATCH/DELETE,
+  `user-projects` GET, `import/excel` (trước ghi vào dự án tìm theo TÊN thuộc org 1 → nay dự án đang
+  chọn, `getCurrentProjectIdStrict`), `cron/sync-integrations` nhánh phiên lọc org. API `v1/*`, api-keys,
+  webhooks, projects, portfolio đã đúng (test sẵn có).
+- **Còn mở, cần đặc tả schema:** `cost_settings` (bảng 1 dòng toàn hệ — admin org B đổi ngưỡng của
+  org A) và `code_lists` (`UNIQUE(domain, code)` toàn hệ, `getList` không lọc org) — cần migration
+  khoá theo org + backfill, đi qua staging. Cùng loại: `alert_rules` (index unique
+  `(metric, COALESCE(project_id,0))` toàn hệ → org B tạo rule toàn cục khi org A đã có thì 500;
+  `getAlertThreshold`/`listAlertRules` đọc rule toàn cục org khác), `admin/traffic/events` (nhật ký
+  traffic in-memory không gắn org, admin org nào cũng xem), `sheet_types.slug` unique toàn hệ (import
+  sang dự án thứ 2 lỗi trùng slug); chính sách nhánh phiên của `cron/retention`/`deliver-webhooks`
+  (admin một org kích hoạt tác vụ toàn hệ, chỉ trả số đếm).
 
 ## 2026-10-08 — QUALITY-FINAL-1 S02a: fail-closed khi không có dự án khả kiến (miền tài chính)
 

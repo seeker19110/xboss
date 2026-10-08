@@ -57,10 +57,23 @@ export async function getList(
   return opts?.includeInactive ? rows : rows.filter((r) => r.active);
 }
 
-export async function getById(id: number): Promise<CodeListItem | undefined> {
+// Trang quản trị (S02 — cô lập tenant): chỉ mục thuộc tổ chức `orgId`, kể cả mục đã tắt.
+// Không qua cache (cache theo domain là toàn hệ, phục vụ đường đọc của getList).
+export async function getListOfOrg(domain: string, orgId: number): Promise<CodeListItem[]> {
+  return query<CodeListItem>(
+    `SELECT id, domain, code, label, sort, active, meta
+       FROM code_lists WHERE domain = ? AND org_id = ? ORDER BY sort, code`,
+    domain,
+    orgId,
+  );
+}
+
+// Mục theo id, chỉ khi thuộc tổ chức `orgId` — id của org khác coi như không tồn tại.
+export async function getById(id: number, orgId: number): Promise<CodeListItem | undefined> {
   return queryOne<CodeListItem>(
-    `SELECT id, domain, code, label, sort, active, meta FROM code_lists WHERE id = ?`,
+    `SELECT id, domain, code, label, sort, active, meta FROM code_lists WHERE id = ? AND org_id = ?`,
     id,
+    orgId,
   );
 }
 

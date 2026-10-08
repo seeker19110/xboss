@@ -158,6 +158,11 @@ export type ImportStats = {
 export type ImportOptions = {
   dimDenominator?: "columns" | "row-nonempty";
   /**
+   * Dự án đích (S02 — cô lập tenant): route upload truyền dự án đang chọn ĐÃ KIỂM quyền.
+   * Thiếu thì giữ đường cũ (`npm run db:seed`, test): tìm/tạo dự án gốc theo tên.
+   */
+  projectId?: number;
+  /**
    * Nguồn của lần import này, để ghi sổ `import_batches` (C3 §5 — xem migrations/0093).
    * Thiếu thì KHÔNG ghi sổ và task không bị đóng dấu: giữ nguyên đường gọi cũ
    * (`npm run db:seed`, test) chạy được như trước, không bịa ra batch giả.
@@ -375,7 +380,7 @@ export async function importWorkbook(
     dimDenominator: denominator,
   };
 
-  const projectId = await getOrCreateProject();
+  const projectId = options.projectId ?? (await getOrCreateProject());
   const towerId = await getOrCreateTower(projectId);
   const acmvSystemId = await getAcmvSystemId();
   const touchedPkgs = new Set<number>();

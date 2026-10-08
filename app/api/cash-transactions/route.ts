@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId, query, queryOne, withProjectScope } from "@/lib/db";
+import { insertId, query, queryOne, withProjectScope, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
+  checkCashTransactionParents,
   parseCashTransactionBody,
   validateCashTransactionInput,
   type CashTransactionInput,
@@ -87,23 +88,30 @@ export async function POST(req: NextRequest) {
   const invalid = validateCashTransactionInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  const id = await insertId(
-    `INSERT INTO cash_transactions (project_id, tx_date, direction, category, amount,
-                                     is_petty_cash, contract_id, supplier_id, voucher_code,
-                                     description, recorded_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.txDate,
-    input.direction,
-    input.category,
-    input.amount,
-    input.isPettyCash,
-    input.contractId,
-    input.supplierId,
-    input.voucherCode,
-    input.description,
-    user.id,
-  );
+  // A1-AC03: hợp đồng cùng dự án, NCC cùng tổ chức — kiểm + ghi trong 1 transaction.
+  const result = await withTransaction(async () => {
+    const parentErr = await checkCashTransactionParents(input, projectId, user.orgId);
+    if (parentErr) return { error: parentErr };
+    const id = await insertId(
+      `INSERT INTO cash_transactions (project_id, tx_date, direction, category, amount,
+                                       is_petty_cash, contract_id, supplier_id, voucher_code,
+                                       description, recorded_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      projectId,
+      input.txDate,
+      input.direction,
+      input.category,
+      input.amount,
+      input.isPettyCash,
+      input.contractId,
+      input.supplierId,
+      input.voucherCode,
+      input.description,
+      user.id,
+    );
+    return { id };
+  });
+  if ("error" in result) return NextResponse.json({ error: result.error }, { status: 422 });
 
-  return NextResponse.json({ id }, { status: 201 });
+  return NextResponse.json({ id: result.id }, { status: 201 });
 }

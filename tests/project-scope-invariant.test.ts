@@ -26,7 +26,7 @@ const WHITELIST: Record<string, string> = {
   users: "danh bạ người dùng dùng chung mọi dự án",
   "auth/totp": "trạng thái 2FA của user hiện tại (theo user_id, không theo dự án)",
   suppliers: "danh mục NCC dùng chung mọi dự án",
-  "ui-texts": "nhãn UI cấu hình toàn hệ",
+  "ui-texts": "nhãn UI theo dự án đang chọn (S02 — đã dùng getCurrentProjectId)",
   "notifications/prefs": "tuỳ chọn thông báo theo người dùng, không theo dự án",
 
   // --- Cron (xác thực CRON_SECRET; tự lặp theo từng dự án trong logic) ---

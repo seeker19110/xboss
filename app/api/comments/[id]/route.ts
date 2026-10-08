@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { taskProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
 
@@ -16,11 +18,18 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const comment = await queryOne<{ id: number; user_id: number | null }>(
-    `SELECT id, user_id FROM task_comments WHERE id = ?`,
+  const comment = await queryOne<{ id: number; user_id: number | null; task_id: number }>(
+    `SELECT id, user_id, task_id FROM task_comments WHERE id = ?`,
     id,
   );
   if (!comment) return NextResponse.json({ error: "Không tìm thấy bình luận" }, { status: 404 });
+
+  // Cách ly dự án/tổ chức (S02): bình luận phải thuộc task trong dự án đang chọn (khả kiến,
+  // cùng org) — khớp GET/POST /api/tasks/:id/comments. Thiếu kiểm này thì Admin/PM tổ chức
+  // khác xoá được bình luận bằng id đoán được. Khác scope → 404 như không tồn tại.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null || (await taskProjectId(comment.task_id)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy bình luận" }, { status: 404 });
 
   if (comment.user_id !== user.id && !CAN.editStructure(user.role))
     return NextResponse.json(

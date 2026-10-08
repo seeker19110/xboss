@@ -357,3 +357,58 @@ export async function logPoStatusChange(
     changedBy,
   );
 }
+
+// A1-AC03 (P1-2b): đơn hàng chỉ được gắn hợp đồng/vật tư/PR CÙNG dự án và nhà cung cấp CÙNG
+// tổ chức (suppliers.org_id). Gọi trong cùng withTransaction với câu ghi, cha khoá FOR SHARE.
+// Sai → thông điệp chung "không tồn tại" (không lộ dữ liệu dự án/tổ chức khác).
+export async function checkPurchaseOrderParents(
+  input: {
+    supplierId: number | null;
+    contractId: number | null;
+    items: { materialId: number; prId: number | null }[];
+  },
+  projectId: number,
+  orgId: number,
+): Promise<string | null> {
+  if (input.supplierId != null) {
+    const s = Number.isInteger(input.supplierId)
+      ? await queryOne(
+          `SELECT id FROM suppliers WHERE id = ? AND org_id = ? FOR SHARE`,
+          input.supplierId,
+          orgId,
+        )
+      : undefined;
+    if (!s) return "Nhà cung cấp không tồn tại";
+  }
+  if (input.contractId != null) {
+    const c = Number.isInteger(input.contractId)
+      ? await queryOne(
+          `SELECT id FROM contracts WHERE id = ? AND project_id = ? FOR SHARE`,
+          input.contractId,
+          projectId,
+        )
+      : undefined;
+    if (!c) return "Hợp đồng không tồn tại";
+  }
+  for (const item of input.items) {
+    const m = Number.isInteger(item.materialId)
+      ? await queryOne(
+          `SELECT id FROM materials WHERE id = ? AND project_id = ? FOR SHARE`,
+          item.materialId,
+          projectId,
+        )
+      : undefined;
+    if (!m) return "Vật tư không tồn tại";
+    if (item.prId != null) {
+      const pr = Number.isInteger(item.prId)
+        ? await queryOne(
+            `SELECT id FROM purchase_requests WHERE id = ? AND project_id = ? FOR SHARE`,
+            item.prId,
+            projectId,
+          )
+        : undefined;
+      if (!pr) return "Đề xuất mua hàng không tồn tại";
+    }
+  }
+  return null;
+}

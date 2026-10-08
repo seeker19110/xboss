@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { SLUG_RE } from "@/lib/nen/sheets";
-import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -37,13 +37,19 @@ export async function PATCH(
   if (!st) return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
 
   // Chống ghi xuyên dự án: suy dự án qua sheet_types.tower_id → towers.project_id (vá V9).
-  const visible = await visibleProjectIds(user);
-  const proj = await queryOne<{ projectId: number | null }>(
-    `SELECT t.project_id AS "projectId" FROM sheet_types st JOIN towers t ON t.id = st.tower_id WHERE st.id = ?`,
+  // P1-6: chỉ sheet thuộc DỰ ÁN ĐANG CHỌN (+ org), không phải mọi dự án nhìn thấy được.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án đang chọn" }, { status: 404 });
+  const proj = await queryOne<{ id: number }>(
+    `SELECT st.id FROM sheet_types st JOIN towers t ON t.id = st.tower_id
+       JOIN projects p ON p.id = t.project_id
+      WHERE st.id = ? AND t.project_id = ? AND p.org_id = ?`,
     id,
+    projectId,
+    user.orgId,
   );
-  if (!proj || !visible.includes(proj.projectId as number))
-    return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
+  if (!proj) return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
@@ -102,12 +108,12 @@ export async function PATCH(
   }
   if (!sets.length) return NextResponse.json({ error: "Không có gì để cập nhật" }, { status: 400 });
 
-  // Phòng thủ nhiều lớp: thêm điều kiện tower thuộc dự án nhìn thấy được vào câu UPDATE.
+  // Phòng thủ nhiều lớp: thêm điều kiện tower thuộc dự án đang chọn vào câu UPDATE.
   await run(
-    `UPDATE sheet_types SET ${sets.join(", ")} WHERE id = ? AND tower_id IN (SELECT id FROM towers WHERE project_id = ANY(?))`,
+    `UPDATE sheet_types SET ${sets.join(", ")} WHERE id = ? AND tower_id IN (SELECT id FROM towers WHERE project_id = ?)`,
     ...vals,
     id,
-    visible,
+    projectId,
   );
   const updated = await queryOne<Sheet>(
     `SELECT id, code, name, responsible, slug, manager_id AS "managerId" FROM sheet_types WHERE id = ?`,
@@ -133,13 +139,19 @@ export async function DELETE(
   if (!st) return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
 
   // Chống xoá xuyên dự án: suy dự án qua sheet_types.tower_id → towers.project_id (vá V9).
-  const visible = await visibleProjectIds(user);
-  const proj = await queryOne<{ projectId: number | null }>(
-    `SELECT t.project_id AS "projectId" FROM sheet_types st JOIN towers t ON t.id = st.tower_id WHERE st.id = ?`,
+  // P1-6: chỉ sheet thuộc DỰ ÁN ĐANG CHỌN (+ org), không phải mọi dự án nhìn thấy được.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án đang chọn" }, { status: 404 });
+  const proj = await queryOne<{ id: number }>(
+    `SELECT st.id FROM sheet_types st JOIN towers t ON t.id = st.tower_id
+       JOIN projects p ON p.id = t.project_id
+      WHERE st.id = ? AND t.project_id = ? AND p.org_id = ?`,
     id,
+    projectId,
+    user.orgId,
   );
-  if (!proj || !visible.includes(proj.projectId as number))
-    return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
+  if (!proj) return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
 
   // FK không có ON DELETE CASCADE — xoá thủ công theo thứ tự phụ thuộc.
   // Tên bảng lấy từ danh sách cố định; id luôn truyền qua placeholder ?.
@@ -172,11 +184,11 @@ export async function DELETE(
       id,
     );
     await run(`DELETE FROM work_packages WHERE sheet_type_id = ?`, id);
-    // Phòng thủ nhiều lớp: chỉ xoá nếu tower vẫn thuộc dự án nhìn thấy được lúc kiểm ở trên.
+    // Phòng thủ nhiều lớp: chỉ xoá nếu tower vẫn thuộc dự án đang chọn lúc kiểm ở trên.
     await run(
-      `DELETE FROM sheet_types WHERE id = ? AND tower_id IN (SELECT id FROM towers WHERE project_id = ANY(?))`,
+      `DELETE FROM sheet_types WHERE id = ? AND tower_id IN (SELECT id FROM towers WHERE project_id = ?)`,
       id,
-      visible,
+      projectId,
     );
   });
   return NextResponse.json({ ok: true });

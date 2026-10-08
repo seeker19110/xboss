@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run, withProjectScope } from "@/lib/db";
+import { queryOne, run, withProjectScope, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
+  checkCashTransactionParents,
   parseCashTransactionBody,
   validateCashTransactionInput,
   type CashTransactionInput,
@@ -79,21 +80,28 @@ export async function PATCH(
   const invalid = validateCashTransactionInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  await run(
-    `UPDATE cash_transactions SET tx_date = ?, direction = ?, category = ?, amount = ?,
-            is_petty_cash = ?, contract_id = ?, supplier_id = ?, voucher_code = ?, description = ?
-      WHERE id = ?`,
-    input.txDate,
-    input.direction,
-    input.category,
-    input.amount,
-    input.isPettyCash,
-    input.contractId,
-    input.supplierId,
-    input.voucherCode,
-    input.description,
-    id,
-  );
+  // A1-AC03: kiểm cha SAU khi merge với giá trị đang lưu, cùng transaction với UPDATE.
+  const parentErr = await withTransaction(async () => {
+    const err = await checkCashTransactionParents(input, projectId!, user.orgId);
+    if (err) return err;
+    await run(
+      `UPDATE cash_transactions SET tx_date = ?, direction = ?, category = ?, amount = ?,
+              is_petty_cash = ?, contract_id = ?, supplier_id = ?, voucher_code = ?, description = ?
+        WHERE id = ?`,
+      input.txDate,
+      input.direction,
+      input.category,
+      input.amount,
+      input.isPettyCash,
+      input.contractId,
+      input.supplierId,
+      input.voucherCode,
+      input.description,
+      id,
+    );
+    return null;
+  });
+  if (parentErr) return NextResponse.json({ error: parentErr }, { status: 422 });
 
   return NextResponse.json({ updated: id });
 }

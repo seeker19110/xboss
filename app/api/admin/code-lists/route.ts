@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { ROLES } from "@/lib/nen/roles";
 import {
-  getList,
+  getListOfOrg,
   getById,
   createItem,
   updateItem,
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const domain = req.nextUrl.searchParams.get("domain");
   if (!domain) return NextResponse.json({ error: "Thiếu tham số domain" }, { status: 400 });
 
-  const items = await getList(domain, { includeInactive: true });
+  const items = await getListOfOrg(domain, user.orgId);
   return NextResponse.json({ items });
 }
 
@@ -78,7 +78,7 @@ export async function PATCH(req: NextRequest) {
   const id = Number(body.id);
   if (!Number.isInteger(id)) return NextResponse.json({ error: "Thiếu id" }, { status: 400 });
 
-  const current = await getById(id);
+  const current = await getById(id, user.orgId);
   if (!current) return NextResponse.json({ error: "Không tìm thấy mục" }, { status: 404 });
 
   const patch: {
@@ -107,7 +107,7 @@ export async function DELETE(req: NextRequest) {
   const id = Number(req.nextUrl.searchParams.get("id"));
   if (!Number.isInteger(id)) return NextResponse.json({ error: "Thiếu id" }, { status: 400 });
 
-  const current = await getById(id);
+  const current = await getById(id, user.orgId);
   if (!current) return NextResponse.json({ error: "Không tìm thấy mục" }, { status: 404 });
 
   const refs = await countReferences(current.domain, current.code);
