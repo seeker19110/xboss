@@ -1,5 +1,25 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — S10a đóng nợ M4/L5/L6 + dòng KL exact trong DTO v1
+
+- **M4:** `withTransaction`/`withProjectScope` nhận `isolation: "repeatable_read"` (`BEGIN ISOLATION
+LEVEL REPEATABLE READ`; lồng trong transaction có sẵn → throw, không lặng lẽ mất đảm bảo). Excel,
+  PDF và `GET /api/payment-certs/:id` đọc đợt/tổng/dòng exact trong MỘT snapshot → PATCH KL chen
+  giữa không còn gây 500 hay tổng lệch dòng.
+- **L5:** `lib/tai-chinh/excel-exact.ts` chọn kiểu ô Excel THEO CỘT (một giá trị vượt 15 chữ số có
+  nghĩa → cả cột text canonical; khối 4 dòng tổng là một nhóm) + dòng ghi chú "không dùng SUM".
+- **L6:** `POST /payment-certs/:id/submit` chặn vô điều kiện giá trị đợt/đề nghị vượt NUMERIC(15,2)
+  (422 `amount_overflow`, kể cả khi không có luồng duyệt); `decide` giữ kiểm phòng thủ, người không
+  có `viewPayments` nhận 422 `cert_invalid` chung (không lộ độ lớn giá trị), `log.warn` phía server.
+- **DTO:** header `decimal-string-v1` → `cert.items[].unitPrice/qtyPeriod/qtyCumulative/boqQtyContract`
+  là chuỗi canonical đọc `::text` (`certItemsExact` + `certItemsToWire`); legacy giữ number, không
+  round-trip được → 422 `money_precision_unsupported` như totals; che đơn giá trước khi đổi wire.
+  Client hiện không đọc `items` từ response v1 (chứng từ lấy từ GET danh sách) nên chưa đổi UI.
+- Test: `tests/payment-certs-excel-exact.test.ts`, `tests/payment-certs-amount-overflow.test.ts`
+  (ca L6 đỏ trên code cũ, đã kiểm), mở rộng `tests/payment-certs-money-dto.test.ts`. Chạy thật trên
+  Postgres 16 cục bộ: toàn bộ test xanh trừ 2 file phụ thuộc môi trường CI (cũng đỏ trên main sạch).
+- Sinh lại `S00-SCOPE-INVENTORY.md`.
+
 ## 2026-10-08 — S10a đóng nợ: ngưỡng duyệt IPC + PATCH atomic + lỗi 500 không lộ message
 
 - **[HIGH, đã đóng] Lách ngưỡng duyệt IPC:** `approval_requests.amount` chốt lúc lập đợt nháp và
@@ -24,7 +44,7 @@
   `docs/ops/s10a-doi-soat-phieu-da-duyet.md` (đã bổ sung truy vấn).
 - Test: `tests/approvals-resync-amount.test.ts` (7 ca, lib) + `tests/payment-certs-submit-resync.test.ts`
   (5 ca qua route thật; ca lách ngưỡng đỏ trên code cũ).
-- **Còn mở (S10a):** M3 đối soát phiếu đã duyệt (cần người vận hành), M4, L5, L6 — xem mục dưới.
+- **Còn mở (S10a):** M3 đối soát phiếu đã duyệt (cần người vận hành); M4/L5/L6 đã đóng ở mục trên.
 
 ## 2026-10-07 — QUALITY-FINAL-1 S10a: IPC exact (ipc-sum-v1) + DTO tiền decimal-string-v1
 

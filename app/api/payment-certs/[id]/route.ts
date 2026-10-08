@@ -71,20 +71,26 @@ export async function GET(
   const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
 
   const projectId = await getCurrentProjectId(user);
-  const detail = await withProjectScope(projectId ?? "*", async () => {
-    const scoped = await certInProject(id, projectId);
-    if (!scoped) return null;
-    const cert = await getCert(id);
-    if (!cert) return null;
-    const totals = await certTotals(id);
-    const itemsExact = await certItemsExact(id);
-    // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho loại
-    // "payment_cert" (hành xử dormant, không đổi UI cũ).
-    const approvalStatus = await getEntityApprovalStatus("payment_cert", id);
-    // Dòng vượt khối lượng hợp đồng — CẢNH BÁO, không chặn (xem dongVuotHopDong).
-    const vuotHopDong = await dongVuotHopDong(id);
-    return { cert, totals, itemsExact, approvalStatus, vuotHopDong };
-  });
+  // REPEATABLE READ (S10a M4): đợt/tổng/dòng exact đọc bằng nhiều câu riêng — cùng một snapshot
+  // để PATCH chen giữa không làm dòng exact lệch json_agg (throw 500) hay tổng lệch dòng.
+  const detail = await withProjectScope(
+    projectId ?? "*",
+    async () => {
+      const scoped = await certInProject(id, projectId);
+      if (!scoped) return null;
+      const cert = await getCert(id);
+      if (!cert) return null;
+      const totals = await certTotals(id);
+      const itemsExact = await certItemsExact(id);
+      // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho loại
+      // "payment_cert" (hành xử dormant, không đổi UI cũ).
+      const approvalStatus = await getEntityApprovalStatus("payment_cert", id);
+      // Dòng vượt khối lượng hợp đồng — CẢNH BÁO, không chặn (xem dongVuotHopDong).
+      const vuotHopDong = await dongVuotHopDong(id);
+      return { cert, totals, itemsExact, approvalStatus, vuotHopDong };
+    },
+    { isolation: "repeatable_read" },
+  );
   if (!detail) return json({ error: "Không tìm thấy đợt thanh toán" }, 404);
   const { cert, totals, itemsExact, approvalStatus, vuotHopDong } = detail;
   // M50 PR2: che đơn giá dòng KL + tổng tiền đợt cho user thiếu viewPayments (phòng thủ
