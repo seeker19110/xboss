@@ -1,5 +1,30 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 DATA-MIGRATIONS §6: khối lượng PO/PR/phiếu nhận exact (expand)
+
+Đặc tả: `docs/nang-cap/AUDIT-2026-09-25/DATA-MIGRATIONS.md` §6 (A3-FR04).
+
+- **Migration `0162_po_qty_exact.sql`** — chỉ thêm cột `*_exact numeric` + `*_provenance text`
+  (theo từng cột) cho `purchase_requests.qty_requested`, `po_items.qty_ordered/qty_received`,
+  `receipt_items.qty_received` + 12 CHECK đúng đặc tả (qua khối DO kiểm `pg_constraint`).
+  Không UPDATE/backfill/NOT NULL/DROP → **thêm thuần, đi thẳng production**. Quyền mức bảng
+  (default privileges 0069) đã phủ cột mới cho `xboss_app`.
+- **Writer**: POST `/api/purchase-requests`, `/api/purchase-orders`,
+  `/api/purchase-orders/:id/receive` đọc khối lượng qua `parsePoQuantity`
+  (`lib/tai-chinh/procurement.ts` → `parseQuantityInput` mở rộng tham số
+  `scale/maxIntDigits/trimZeros`, mặc định giữ nguyên hành vi bill): ≤18 nguyên/6 lẻ, không
+  exponent, cắt đuôi 0; lỗi 400 `quantity_*` / 422 `quantity_overflow`. Ghi đồng thời cột exact
+  (`exact_input_v1`) và cột float cũ. Nhận hàng cộng `po_items.qty_received_exact` (NULL giữ NULL),
+  không đổi provenance nào, không chạm `qty_ordered_*`.
+- **Backfill `scripts/backfill-po-qty-exact.ts`** (`--dry-run`, `--batch`, `--from-id`):
+  `qty::text::numeric` + `legacy_float_text` dưới `FOR UPDATE`, so old-value trong UPDATE, chỉ chạm
+  provenance NULL (không đè `exact_input_v1`); null giữ null; NaN/Infinity/âm in danh sách đối
+  soát, không ghi 0. **Đụng dữ liệu → chạy staging trước rồi production.**
+- Kiểm sẵn sàng: `poQtyExactReadiness()` (procurement.ts) đếm dòng thiếu exact/provenance.
+- Test: `tests/po-qty-exact.test.ts` (parser, route thật, backfill).
+- **Còn mở**: chạy backfill staging → production; cutover reader exact (chưa mở, không fallback
+  float) + NOT NULL provenance/qty nguồn bắt buộc khi readiness = 0 và đối soát xong.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S15a: route không lộ lỗi thô ở 500
 
 Không migration, không đổi format `{ error: "<tiếng Việt>" }`, không thêm dependency.

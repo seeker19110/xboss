@@ -449,14 +449,31 @@ export function quantityInputErrorBody(
   return { status: err.status, body: { error: err.message, code: err.code } };
 }
 
+/** Tuỳ chọn cột khối lượng: mặc định NUMERIC(15,3) của bill (3 số lẻ, 12 chữ số nguyên, giữ đuôi 0). */
+export type QuantityInputOptions = {
+  /** Số chữ số thập phân tối đa (mặc định 3). */
+  scale?: number;
+  /** Số chữ số phần nguyên tối đa (mặc định 12). */
+  maxIntDigits?: number;
+  /** Cắt số 0 thừa ở đuôi phần lẻ ("1.500000" → "1.5", "2.0" → "2") — dạng canonical PO/PR. */
+  trimZeros?: boolean;
+};
+
 /**
  * Đọc khối lượng tuỳ chọn cho cột NUMERIC(15,3): rỗng (undefined/null/"") → null; trả chuỗi
  * canonical 3 số lẻ, không qua float. Cùng luật chuỗi với `parseMoneyInput`: dấu phẩy, nhiều dấu
  * chấm và dạng nhóm nghìn vi-VN ("1.500" — mơ hồ 1500 hay 1,5) → 400 `quantity_locale_format`;
- * sai dạng/NaN/âm → 400 `quantity_invalid`; quá 3 số lẻ → 400 `quantity_scale`; vượt cột →
- * 422 `quantity_overflow`.
+ * sai dạng/NaN/âm/exponent → 400 `quantity_invalid`; quá số lẻ → 400 `quantity_scale`; vượt cột →
+ * 422 `quantity_overflow`. `opts` đổi scale/số chữ số nguyên (vd khối lượng PO: 6 lẻ, 18 nguyên,
+ * cắt đuôi 0 — DATA-MIGRATIONS §6); mặc định giữ nguyên hành vi bill.
  */
-export function parseQuantityInput(value: unknown, label = "Khối lượng"): string | null {
+export function parseQuantityInput(
+  value: unknown,
+  label = "Khối lượng",
+  opts: QuantityInputOptions = {},
+): string | null {
+  const scale = opts.scale ?? 3;
+  const maxIntDigits = opts.maxIntDigits ?? 12;
   if (value === undefined || value === null) return null;
   if (typeof value === "string" && value.trim() === "") return null;
   const loi = (code: QuantityInputErrorCode, msg: string) => new QuantityInputError(code, msg);
@@ -467,7 +484,7 @@ export function parseQuantityInput(value: unknown, label = "Khối lượng"): s
     if (/e/i.test(raw)) {
       throw Math.abs(value) >= 1
         ? loi("quantity_overflow", `${label} vượt giới hạn lưu trữ`)
-        : loi("quantity_scale", `${label} chỉ được tối đa 3 chữ số thập phân`);
+        : loi("quantity_scale", `${label} chỉ được tối đa ${scale} chữ số thập phân`);
     }
   } else if (typeof value === "string") {
     raw = value.trim();
@@ -483,13 +500,17 @@ export function parseQuantityInput(value: unknown, label = "Khối lượng"): s
   const m = THAP_PHAN_NHAP.exec(raw);
   if (!m) throw loi("quantity_invalid", `${label} không hợp lệ — nhập số thuần, vd 12.5`);
   const [, dau, nguyen, le = ""] = m;
-  if (/[1-9]/.test(le.slice(3))) {
-    throw loi("quantity_scale", `${label} chỉ được tối đa 3 chữ số thập phân`);
+  if (/[1-9]/.test(le.slice(scale))) {
+    throw loi("quantity_scale", `${label} chỉ được tối đa ${scale} chữ số thập phân`);
   }
-  const unscaled = BigInt(nguyen + le.slice(0, 3).padEnd(3, "0"));
+  const unscaled = BigInt(nguyen + le.slice(0, scale).padEnd(scale, "0"));
   if (dau && unscaled !== 0n) throw loi("quantity_invalid", `${label} phải ≥ 0`);
-  if (!fitsNumeric(unscaled, 15)) {
-    throw loi("quantity_overflow", `${label} vượt giới hạn lưu trữ (tối đa 12 chữ số phần nguyên)`);
+  if (!fitsNumeric(unscaled, maxIntDigits + scale)) {
+    throw loi(
+      "quantity_overflow",
+      `${label} vượt giới hạn lưu trữ (tối đa ${maxIntDigits} chữ số phần nguyên)`,
+    );
   }
-  return decimalFromUnscaled(unscaled, 3);
+  const text = decimalFromUnscaled(unscaled, scale);
+  return opts.trimZeros && text.includes(".") ? text.replace(/\.?0+$/, "") : text;
 }

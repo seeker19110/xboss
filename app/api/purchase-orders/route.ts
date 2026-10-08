@@ -4,8 +4,17 @@ import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { nextSeqCode, withUniqueRetry } from "@/lib/ha-tang/seqcode";
-import { checkPurchaseOrderParents, listPurchaseOrders } from "@/lib/tai-chinh/procurement";
-import { moneyInputErrorBody, parseOptionalMoneyInput } from "@/lib/nen/money";
+import {
+  checkPurchaseOrderParents,
+  listPurchaseOrders,
+  parsePoQuantity,
+} from "@/lib/tai-chinh/procurement";
+import {
+  moneyInputErrorBody,
+  parseOptionalMoneyInput,
+  QuantityInputError,
+  quantityInputErrorBody,
+} from "@/lib/nen/money";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +60,7 @@ export async function POST(req: NextRequest) {
   const items: {
     materialId: number;
     prId?: number;
-    qtyOrdered: number;
+    qtyOrdered: unknown;
     unitPrice?: unknown;
     note?: string;
   }[] = Array.isArray(body.items) ? body.items : [];
@@ -71,6 +80,20 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     const loi = moneyInputErrorBody(err);
+    if (loi) return NextResponse.json(loi.body, { status: loi.status });
+    throw err;
+  }
+  // DATA-MIGRATIONS §6: số lượng đặt đọc exact (≤18 nguyên/6 lẻ, không exponent, cắt đuôi 0) —
+  // ghi cả qty_ordered_exact ('exact_input_v1') lẫn cột float cũ cho reader legacy.
+  let soLuong: string[];
+  try {
+    soLuong = items.map((i) => {
+      const q = parsePoQuantity(i.qtyOrdered, "Số lượng đặt");
+      if (q == null) throw new QuantityInputError("quantity_invalid", "Thiếu số lượng đặt");
+      return q;
+    });
+  } catch (err) {
+    const loi = quantityInputErrorBody(err);
     if (loi) return NextResponse.json(loi.body, { status: loi.status });
     throw err;
   }
@@ -113,12 +136,15 @@ export async function POST(req: NextRequest) {
 
       for (const [i, item] of items.entries()) {
         await insertId(
-          `INSERT INTO po_items (po_id, material_id, pr_id, qty_ordered, qty_received, unit_price, note)
-         VALUES (?, ?, ?, ?, 0, ?, ?)`,
+          `INSERT INTO po_items (po_id, material_id, pr_id, qty_ordered, qty_ordered_exact,
+           qty_ordered_provenance, qty_received, qty_received_exact, qty_received_provenance,
+           unit_price, note)
+         VALUES (?, ?, ?, ?, ?::numeric, 'exact_input_v1', 0, 0, 'exact_input_v1', ?, ?)`,
           id,
           Number(item.materialId),
           item.prId ? Number(item.prId) : null,
-          Number(item.qtyOrdered),
+          Number(soLuong[i]),
+          soLuong[i],
           donGia[i],
           item.note ? String(item.note).trim() : null,
         );
