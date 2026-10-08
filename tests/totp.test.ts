@@ -366,7 +366,7 @@ test(
       );
     } finally {
       await run(`DELETE FROM users WHERE id IN (?, ?)`, engId, admId);
-      if (codeItemId) await deleteItem(codeItemId);
+      if (codeItemId) await deleteItem(codeItemId, 1);
     }
   },
 );

@@ -39,7 +39,7 @@ export type CloneResult = {
 // work_packages/materials/boq_items — migrations/0029). sheet_types.code chỉ unique theo
 // tower (UNIQUE(tower_id, code)) nên tower mới → không đụng mã; clone-config không thể gây
 // trùng BOQCODE toàn hệ.
-// Sinh slug UNIQUE toàn hệ cho 1 sheet clone. Base ưu tiên slug nguồn (đã hợp lệ), rồi
+// Sinh slug duy nhất toàn hệ (chặt hơn ràng buộc theo dự án của S02e) cho 1 sheet clone. Base ưu tiên slug nguồn (đã hợp lệ), rồi
 // toSlug(code)/toSlug(name); trùng (trong DB hoặc trong lượt clone này) thì thêm suffix
 // "-N". Cắt còn ≤50 ký tự chừa chỗ suffix để luôn khớp SLUG_RE.
 async function pickUniqueSlug(
@@ -99,7 +99,8 @@ export async function cloneProjectConfig(
     }
 
     // 3) sheet_types của các tower nguồn — giữ hệ (system_id), code, name, responsible.
-    //    slug là khoá routing UNIQUE toàn hệ (uniq_sheet_slug), KHÔNG chép nguyên: sinh
+    //    slug là khoá routing (unique theo dự án từ S02e — uq_sheet_types_project_slug); vẫn
+    //    giữ cách làm CHẶT HƠN cũ là duy nhất toàn hệ, KHÔNG chép nguyên: sinh
     //    slug MỚI cho từng sheet clone (base = slug nguồn / toSlug(name)), thêm suffix -N
     //    khi trùng — cùng cơ chế đảm bảo unique như POST /api/sheets, nhưng không 409 mà
     //    tự đổi để clone luôn ra dự án dùng được. Set cục bộ chặn trùng giữa các sheet

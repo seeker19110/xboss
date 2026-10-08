@@ -85,11 +85,11 @@ test(
       taskId,
     );
 
-    const before = await sheetVersion(s.slug);
+    const before = await sheetVersion(s.slug, s.projectId);
     // Tick ô → installed = 1 → recomputeTask cập nhật tiến độ task (UPDATE tasks → trigger bump).
     await run(`UPDATE progress_dimensions SET installed = 1 WHERE task_id = ?`, taskId);
     await recomputeTask(taskId, "tester");
-    const after = await sheetVersion(s.slug);
+    const after = await sheetVersion(s.slug, s.projectId);
 
     assert.notEqual(after, before, "tick dimension phải làm version đổi");
     await cleanup(s);
@@ -101,17 +101,17 @@ test("sheetVersion: tạo task rồi xoá task đều bump", { skip: !HAS_TEST_D
   const { sheetVersion } = await import("@/lib/ha-tang/version");
 
   const s = await seedSheet("crud");
-  const v0 = await sheetVersion(s.slug);
+  const v0 = await sheetVersion(s.slug, s.projectId);
 
   const taskId = await insertId(
     `INSERT INTO tasks (package_id, code, name) VALUES (?, 'C,01', 'Task crud')`,
     s.pkgId,
   );
-  const v1 = await sheetVersion(s.slug);
+  const v1 = await sheetVersion(s.slug, s.projectId);
   assert.notEqual(v1, v0, "tạo task phải bump");
 
   await run(`DELETE FROM tasks WHERE id = ?`, taskId);
-  const v2 = await sheetVersion(s.slug);
+  const v2 = await sheetVersion(s.slug, s.projectId);
   assert.notEqual(v2, v1, "xoá task phải bump");
 
   await cleanup(s);
@@ -141,14 +141,14 @@ test(
       a.pkgId,
     );
 
-    const aBefore = await sheetVersion(a.slug);
-    const bBefore = await sheetVersion(bSlug);
+    const aBefore = await sheetVersion(a.slug, a.projectId);
+    const bBefore = await sheetVersion(bSlug, a.projectId);
 
     // Move task từ package sheet A sang package sheet B (đổi package_id → sheet cũ + mới bump).
     await run(`UPDATE tasks SET package_id = ? WHERE id = ?`, bPkgId, taskId);
 
-    const aAfter = await sheetVersion(a.slug);
-    const bAfter = await sheetVersion(bSlug);
+    const aAfter = await sheetVersion(a.slug, a.projectId);
+    const bAfter = await sheetVersion(bSlug, a.projectId);
     assert.notEqual(aAfter, aBefore, "sheet nguồn (A) phải bump khi task rời đi");
     assert.notEqual(bAfter, bBefore, "sheet đích (B) phải bump khi task chuyển đến");
 
@@ -170,14 +170,14 @@ test(
     );
     const bSlug = "sv-mvwp-b";
 
-    const aBefore = await sheetVersion(a.slug);
-    const bBefore = await sheetVersion(bSlug);
+    const aBefore = await sheetVersion(a.slug, a.projectId);
+    const bBefore = await sheetVersion(bSlug, a.projectId);
 
     // Chuyển nhóm từ sheet A sang sheet B (route workpackages/:id/move đổi sheet_type_id).
     await run(`UPDATE work_packages SET sheet_type_id = ? WHERE id = ?`, bStId, a.pkgId);
 
-    const aAfter = await sheetVersion(a.slug);
-    const bAfter = await sheetVersion(bSlug);
+    const aAfter = await sheetVersion(a.slug, a.projectId);
+    const bAfter = await sheetVersion(bSlug, a.projectId);
     assert.notEqual(aAfter, aBefore, "sheet nguồn (A) phải bump khi nhóm rời đi");
     assert.notEqual(bAfter, bBefore, "sheet đích (B) phải bump khi nhóm chuyển đến");
 
@@ -198,12 +198,12 @@ test(
       s.pkgId,
     );
 
-    const before = await sheetVersion(s.slug);
+    const before = await sheetVersion(s.slug, s.projectId);
     // Chỉ đổi ghi chú, không đụng tiến độ — trigger vẫn bump. Đây là false-positive CHẤP NHẬN
     // ĐƯỢC theo đặc tả: chỉ khiến client refresh thừa 1 lần, không sai dữ liệu; đổi lại là
     // trigger đơn giản (không phải soi từng cột) và không bao giờ bỏ sót thay đổi thật.
     await run(`UPDATE tasks SET note = 'ghi chú mới' WHERE id = ?`, taskId);
-    const after = await sheetVersion(s.slug);
+    const after = await sheetVersion(s.slug, s.projectId);
 
     assert.notEqual(after, before, "sửa task (dù không đổi tiến độ) vẫn bump — chấp nhận được");
     await cleanup(s);

@@ -5,10 +5,12 @@ import assert from "node:assert/strict";
 // Test danh mục mềm code_lists (M52 PR1). Tích hợp thật với TEST_DATABASE_URL, tự skip nếu
 // không có (giống recompute.test.ts). Kiểm: CRUD, cache version invalidate khi ghi, và số
 // bản ghi tham chiếu (đầu vào của guard 409 ở route DELETE /api/admin/code-lists).
+// Từ S02e mọi hàm nhận orgId — các ca dưới chạy trên tổ chức mặc định 1 (dự án test không
+// truyền org_id → DEFAULT 1).
 
 test("code_lists: seed migration đúng 6 nguyên nhân trễ", { skip: !HAS_TEST_DB }, async () => {
   const { getList } = await import("@/lib/ha-tang/code-lists");
-  const items = await getList("delay_reason", { includeInactive: true });
+  const items = await getList("delay_reason", 1, { includeInactive: true });
   assert.equal(items.length, 6);
   const codes = items.map((i) => i.code).sort();
   assert.deepEqual(codes, [
@@ -26,7 +28,7 @@ test("code_lists: CRUD + cache version invalidate khi ghi", { skip: !HAS_TEST_DB
   const domain = "test_cache";
 
   // Đọc lần đầu (rỗng) → nạp cache.
-  const before = await cl.getList(domain, { includeInactive: true });
+  const before = await cl.getList(domain, 1, { includeInactive: true });
   assert.equal(before.length, 0);
   const v0 = cl.codeListVersion();
 
@@ -34,7 +36,7 @@ test("code_lists: CRUD + cache version invalidate khi ghi", { skip: !HAS_TEST_DB
   const created = await cl.createItem({ domain, code: "aaa", label: "Nhãn A", sort: 0, orgId: 1 });
   assert.ok(typeof created !== "string", "tạo phải thành công");
   assert.ok(cl.codeListVersion() > v0, "ghi phải tăng version");
-  const afterCreate = await cl.getList(domain, { includeInactive: true });
+  const afterCreate = await cl.getList(domain, 1, { includeInactive: true });
   assert.equal(afterCreate.length, 1);
   assert.equal(afterCreate[0].label, "Nhãn A");
   const id = (created as { id: number }).id;
@@ -44,16 +46,16 @@ test("code_lists: CRUD + cache version invalidate khi ghi", { skip: !HAS_TEST_DB
   assert.equal(typeof dup, "string");
 
   // Sửa nhãn + tắt active → getList mặc định (chỉ active) không còn thấy.
-  await cl.updateItem(id, { label: "Nhãn A2", active: false });
-  const activeOnly = await cl.getList(domain);
+  await cl.updateItem(id, 1, { label: "Nhãn A2", active: false });
+  const activeOnly = await cl.getList(domain, 1);
   assert.equal(activeOnly.length, 0);
-  const all = await cl.getList(domain, { includeInactive: true });
+  const all = await cl.getList(domain, 1, { includeInactive: true });
   assert.equal(all[0].label, "Nhãn A2");
   assert.equal(all[0].active, false);
 
   // Xoá → biến mất.
-  await cl.deleteItem(id);
-  const gone = await cl.getList(domain, { includeInactive: true });
+  await cl.deleteItem(id, 1);
+  const gone = await cl.getList(domain, 1, { includeInactive: true });
   assert.equal(gone.length, 0);
 });
 
@@ -74,7 +76,7 @@ test(
     });
     assert.ok(typeof r !== "string");
     const refId = (r as { id: number }).id;
-    assert.equal(await cl.countReferences("delay_reason", "test_ref_reason"), 0);
+    assert.equal(await cl.countReferences("delay_reason", "test_ref_reason", 1), 0);
 
     // Dựng chuỗi WBS tối thiểu rồi gán delay_reason cho 1 task.
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test code_lists')`);
@@ -96,11 +98,11 @@ test(
     );
 
     // Còn 1 task tham chiếu → guard route sẽ trả 409.
-    assert.equal(await cl.countReferences("delay_reason", "test_ref_reason"), 1);
+    assert.equal(await cl.countReferences("delay_reason", "test_ref_reason", 1), 1);
 
     // Gỡ tham chiếu → xoá được lại.
     await run(`UPDATE tasks SET delay_reason = NULL WHERE id = ?`, taskId);
-    assert.equal(await cl.countReferences("delay_reason", "test_ref_reason"), 0);
-    assert.equal(await cl.deleteItem(refId), true);
+    assert.equal(await cl.countReferences("delay_reason", "test_ref_reason", 1), 0);
+    assert.equal(await cl.deleteItem(refId, 1), true);
   },
 );

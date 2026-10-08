@@ -66,15 +66,27 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
 
-  if (await queryOne(`SELECT id FROM sheet_types WHERE slug = ?`, slug))
+  // S02e: sheet thuộc DỰ ÁN ĐANG CHỌN — slug/mã chỉ cần duy nhất trong dự án đó
+  // (uq_sheet_types_project_slug). Trước đây gắn vào "tháp đầu tiên toàn hệ" (có thể là dự án/
+  // tổ chức khác) và kiểm trùng toàn hệ (lộ sự tồn tại slug của org khác). Không có dự án → 404.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án đang chọn" }, { status: 404 });
+  if (
+    await queryOne(`SELECT id FROM sheet_types WHERE slug = ? AND project_id = ?`, slug, projectId)
+  )
     return NextResponse.json({ error: `Đường dẫn "${slug}" đã được dùng` }, { status: 409 });
-  if (await queryOne(`SELECT id FROM sheet_types WHERE code = ?`, code))
+  if (
+    await queryOne(`SELECT id FROM sheet_types WHERE code = ? AND project_id = ?`, code, projectId)
+  )
     return NextResponse.json({ error: `Mã sheet "${code}" đã tồn tại` }, { status: 409 });
 
-  // Gắn vào tower đầu tiên — DB trống thì tạo project/tower mặc định.
-  let tower = await queryOne<{ id: number }>(`SELECT id FROM towers ORDER BY id LIMIT 1`);
+  // Gắn vào tháp đầu tiên của dự án đang chọn — dự án chưa có tháp thì tạo "Tháp A".
+  let tower = await queryOne<{ id: number }>(
+    `SELECT id FROM towers WHERE project_id = ? ORDER BY id LIMIT 1`,
+    projectId,
+  );
   if (!tower) {
-    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Dự án mới')`);
     tower = {
       id: await insertId(`INSERT INTO towers (project_id, name) VALUES (?, 'Tháp A')`, projectId),
     };

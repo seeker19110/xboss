@@ -72,6 +72,7 @@ const MODULES: { title: string; tables: string[] }[] = [
     title: "Chi phí & mua sắm",
     tables: [
       "cost_settings",
+      "org_cost_settings",
       "purchase_requests",
       "purchase_orders",
       "po_items",

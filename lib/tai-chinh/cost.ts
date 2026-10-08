@@ -578,11 +578,14 @@ export async function getCostReport(
   const data = await withProjectScope(
     projectId,
     async () => {
-      // Câu đầu tiên: ngưỡng + thời điểm snapshot (cost_settings là cấu hình toàn hệ id 1).
+      // Câu đầu tiên: ngưỡng + thời điểm snapshot. Ngưỡng theo TỔ CHỨC của dự án (S02e,
+      // org_cost_settings); org chưa cấu hình → không có dòng → DEFAULT_SETTINGS (90/100).
       const head = await queryOne<SettingsSnapshot>(
-        `SELECT now() AS "computedAt",
-                (SELECT warn_pct::text FROM cost_settings WHERE id = 1) AS "warnPct",
-                (SELECT over_pct::text FROM cost_settings WHERE id = 1) AS "overPct"`,
+        `SELECT now() AS "computedAt", s.warn_pct::text AS "warnPct", s.over_pct::text AS "overPct"
+           FROM (SELECT 1) AS one
+           LEFT JOIN projects p ON p.id = ?
+           LEFT JOIN org_cost_settings s ON s.org_id = p.org_id`,
+        projectId,
       );
       const systems = options.groupBy === "system" ? await loadSystems() : [];
       const sources = await loadSources(projectId, options.includeVo);
@@ -749,16 +752,22 @@ export async function systemBudget(
   return moneyToNumber(total);
 }
 
-export async function getCostSettings(): Promise<CostSettings> {
+/** Ngưỡng cảnh báo chi phí của MỘT tổ chức (S02e); org chưa cấu hình → mặc định 90/100. */
+export async function getCostSettings(orgId: number): Promise<CostSettings> {
   const row = await queryOne<{ warnPct: number; overPct: number }>(
-    `SELECT warn_pct AS "warnPct", over_pct AS "overPct" FROM cost_settings WHERE id = 1`,
+    `SELECT warn_pct AS "warnPct", over_pct AS "overPct" FROM org_cost_settings WHERE org_id = ?`,
+    orgId,
   );
   return row ?? { warnPct: 90, overPct: 100 };
 }
 
-export async function updateCostSettings(settings: CostSettings): Promise<void> {
+/** Ghi ngưỡng cho đúng tổ chức `orgId` — không bao giờ chạm cấu hình org khác. */
+export async function updateCostSettings(orgId: number, settings: CostSettings): Promise<void> {
   await run(
-    `UPDATE cost_settings SET warn_pct = ?, over_pct = ? WHERE id = 1`,
+    `INSERT INTO org_cost_settings (org_id, warn_pct, over_pct) VALUES (?, ?, ?)
+     ON CONFLICT (org_id) DO UPDATE
+       SET warn_pct = EXCLUDED.warn_pct, over_pct = EXCLUDED.over_pct, updated_at = now()`,
+    orgId,
     settings.warnPct,
     settings.overPct,
   );

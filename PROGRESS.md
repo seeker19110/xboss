@@ -1,5 +1,40 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S02e: cấu hình theo org
+
+Đặc tả `docs/nang-cap/AUDIT-S02E-ORG-CONFIG.md` (spec cha A1-SCOPE). Đóng nhóm "Còn mở, cần đặc tả
+schema" của S02 (trừ chính sách nhánh phiên `cron/retention`/`deliver-webhooks`, chưa thuộc S02e).
+Migration `0161_org_config_scope.sql` **đụng dữ liệu** (backfill + UPDATE) → **bắt buộc qua staging** +
+`npm run db:migrate -- --dry-run`; idempotent, đã chạy 2 lần trên DB có dữ liệu cũ.
+
+- **Ngưỡng chi phí:** bảng mới `org_cost_settings` (1 dòng/org, RLS 3 nhánh `app.org_id` như 0080);
+  backfill chép `cost_settings` id 1 sang mọi org (giữ hành vi lúc deploy). `getCostSettings(orgId)`/
+  `updateCostSettings(orgId, …)` (upsert); `getCostReport` đọc ngưỡng theo org của dự án trong cùng
+  snapshot; org chưa cấu hình → 90/100. Bảng cũ giữ để rollback code.
+- **Danh mục mềm:** unique `(org_id, domain, code)` (bỏ `UNIQUE(domain, code)`); `getList(domain,
+orgId)` cache theo org; `createItem` `ON CONFLICT` theo org; sửa/xoá kèm `org_id`; `countReferences`
+  chỉ đếm task trong org; `requiredRoles(orgId)` — 2FA bắt buộc org A không áp cho org B. Backfill:
+  org khác nhận bản sao mục `(domain, code)` của org 1 còn thiếu (giữ danh mục nguyên nhân trễ/2FA).
+- **Ngưỡng cảnh báo:** unique `(org_id, metric, dự án) WHERE active`; `getAlertThreshold` chỉ đọc rule
+  toàn cục của org sở hữu dự án (không dự án → mặc định); `listAlertRules(orgId, projectId)` (null →
+  chỉ rule toàn cục của org); `deleteAlertRule(id, orgId)`. Backfill căn `org_id` rule gắn dự án.
+- **Slug sheet unique theo dự án:** cột suy diễn `sheet_types.project_id` (trigger từ tháp) + unique
+  `(COALESCE(project_id,0), slug)`; `sheetVersion(slug, projectId)`. `POST /api/sheets` gắn vào tháp
+  của **dự án đang chọn** (trước: tháp đầu toàn hệ — ghi chéo dự án/org; null → 404, bỏ nhánh tự tạo
+  "Dự án mới"); kiểm trùng slug/mã trong dự án (POST + PATCH).
+- **Traffic:** entry gắn `orgId` (proxy `parseToken` cookie đã ký); SSE admin chỉ trả traffic org mình,
+  ẩn danh không hiện cho ai.
+- **Test (đỏ 10/10 trên code cũ → xanh):** `tests/s02e-org-config.test.ts` (route thật: costs/settings,
+  code-lists, alert-rules, import + tasks/version, sheets POST, traffic SSE, proxy). RLS
+  `org_cost_settings` bằng `xboss_app` (`org-rls.test.ts`), khai TO_CHUC (`rls.test.ts`). Cập nhật theo
+  chữ ký mới: `alerts`, `code-lists`, `cost`, `cost-report`, `thong-bao`, `route-tai-chinh-3a`,
+  `audit-cost-query-reuse`, `sheet-versions`, `totp`, `traffic`, `route-quan-tri` (POST sheets cần dự án).
+  ERD sinh lại, ADR-0005 cập nhật, S00 inventory sinh lại + khối tay.
+- **Còn mở / phát hiện ngoài phạm vi:** link `/tracking/<slug>` lưu trong thông báo không mang dự án
+  (giải theo dự án đang chọn); `clone-config` vẫn sinh slug duy nhất toàn hệ (chặt hơn cần); org tạo
+  sau 0161 bắt đầu danh mục rỗng (chưa có luồng seed khi tạo org); `cost_settings` cũ chờ dọn sau một
+  chu kỳ rollback.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S13c: quyết định IPC tuần tự hoá, xác nhận cảnh báo, snapshot bất biến, dependency_conflict
 
 Vá 5 lỗi thật S13a (A5-FR06..FR10, DATA-CONTRACTS §6–§7, DATA-MIGRATIONS §7); 5 ca `todo` trong

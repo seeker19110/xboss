@@ -68,7 +68,12 @@ export async function PATCH(
     if (!code) return NextResponse.json({ error: "Mã sheet không được rỗng" }, { status: 400 });
     if (
       code !== st.code &&
-      (await queryOne(`SELECT id FROM sheet_types WHERE code = ? AND id <> ?`, code, id))
+      (await queryOne(
+        `SELECT id FROM sheet_types WHERE code = ? AND project_id = ? AND id <> ?`,
+        code,
+        projectId,
+        id,
+      ))
     )
       return NextResponse.json({ error: `Mã sheet "${code}" đã tồn tại` }, { status: 409 });
     sets.push("code = ?");
@@ -82,8 +87,14 @@ export async function PATCH(
         { status: 400 },
       );
     if (
+      // S02e: slug chỉ cần duy nhất trong dự án đang chọn (uq_sheet_types_project_slug).
       slug !== st.slug &&
-      (await queryOne(`SELECT id FROM sheet_types WHERE slug = ? AND id <> ?`, slug, id))
+      (await queryOne(
+        `SELECT id FROM sheet_types WHERE slug = ? AND project_id = ? AND id <> ?`,
+        slug,
+        projectId,
+        id,
+      ))
     )
       return NextResponse.json({ error: `Đường dẫn "${slug}" đã được dùng` }, { status: 409 });
     sets.push("slug = ?");

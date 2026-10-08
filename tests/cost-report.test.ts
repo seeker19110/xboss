@@ -470,11 +470,12 @@ test(
   "A4-FR07: ngân sách 0 + cam kết dương = chưa có ngân sách; ngưỡng so bằng nhân chéo exact",
   S,
   async (t) => {
-    // cost_settings là cấu hình toàn hệ (id 1) — chốt ngưỡng của ca này rồi trả lại như cũ.
+    // Ngưỡng theo tổ chức (S02e); dự án test thuộc tổ chức mặc định 1 — chốt ngưỡng của ca này
+    // rồi trả lại như cũ.
     const { getCostSettings, updateCostSettings } = await import("@/lib/tai-chinh/cost");
-    const truoc = await getCostSettings();
-    await updateCostSettings({ warnPct: 90, overPct: 100 });
-    t.after(() => updateCostSettings(truoc));
+    const truoc = await getCostSettings(1);
+    await updateCostSettings(1, { warnPct: 90, overPct: 100 });
+    t.after(() => updateCostSettings(1, truoc));
     const dien = await systemId("dien");
     const nuoc = await systemId("nuoc");
     const acmv = await systemId("acmv");

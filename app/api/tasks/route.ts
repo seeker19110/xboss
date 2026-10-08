@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
         ORDER BY t.sort_order, t.id`,
       st.id,
     ),
-    sheetVersion(slug),
+    sheetVersion(slug, projectId),
   ]);
 
   const byPkg = new Map<number, Task[]>();

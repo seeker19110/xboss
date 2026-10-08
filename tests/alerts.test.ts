@@ -68,14 +68,14 @@ test(
     assert.equal(await getAlertThreshold("due_soon_days", p2), 5);
 
     // Dọn dẹp.
-    if (typeof ownRule === "object") await deleteAlertRule(ownRule.id);
-    if (typeof globalRule === "object") await deleteAlertRule(globalRule.id);
+    if (typeof ownRule === "object") await deleteAlertRule(ownRule.id, 1);
+    if (typeof globalRule === "object") await deleteAlertRule(globalRule.id, 1);
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
   },
 );
 
 test(
-  "listAlertRules(projectId): chỉ trả rule của dự án đó + rule toàn cục (project_id NULL); null → trả hết",
+  "listAlertRules(orgId, projectId): rule dự án đó + rule toàn cục của org; null → chỉ rule toàn cục của org",
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
@@ -109,23 +109,31 @@ test(
     const id2 = (r2 as { id: number }).id;
 
     // Scope theo p1: thấy rule p1 + rule toàn cục, KHÔNG thấy rule p2.
-    const forP1 = await listAlertRules(p1);
+    const forP1 = await listAlertRules(1, p1);
     const idsP1 = forP1.map((r) => r.id);
     assert.ok(idsP1.includes(id1), "phải thấy rule dự án p1");
     assert.ok(idsP1.includes(idG), "phải thấy rule toàn cục");
     assert.ok(!idsP1.includes(id2), "KHÔNG được thấy rule dự án p2");
 
-    // null → không lọc, thấy cả 3.
-    const all = await listAlertRules(null);
-    const idsAll = all.map((r) => r.id);
+    // null (chưa có dự án khả kiến, S02e) → chỉ rule toàn cục của org, không lộ rule riêng dự án.
+    const noProject = await listAlertRules(1, null);
+    const idsNull = noProject.map((r) => r.id);
+    assert.ok(idsNull.includes(idG), "null vẫn thấy rule toàn cục của org");
+    assert.ok(!idsNull.includes(id1) && !idsNull.includes(id2), "null không thấy rule riêng dự án");
+
+    // Org khác không thấy rule nào của org 1.
+    const orgKhac = await insertId(
+      `INSERT INTO organizations (name) VALUES ('M52 Alerts org khác')`,
+    );
+    const ofOther = (await listAlertRules(orgKhac, p1)).map((r) => r.id);
     assert.ok(
-      [idG, id1, id2].every((id) => idsAll.includes(id)),
-      "null phải trả hết",
+      ![idG, id1, id2].some((id) => ofOther.includes(id)),
+      "org khác không thấy rule org 1",
     );
 
-    await deleteAlertRule(idG);
-    await deleteAlertRule(id1);
-    await deleteAlertRule(id2);
+    await deleteAlertRule(idG, 1);
+    await deleteAlertRule(id1, 1);
+    await deleteAlertRule(id2, 1);
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
   },
 );
@@ -167,7 +175,7 @@ test(
     assert.equal(count?.n, 1);
 
     // Xoá xong → quay lại default.
-    await deleteAlertRule(id1);
+    await deleteAlertRule(id1, 1);
     assert.equal(await getAlertThreshold("material_over_pct", p), 0);
 
     await run(`DELETE FROM projects WHERE id = ?`, p);

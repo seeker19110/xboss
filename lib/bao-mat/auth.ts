@@ -58,12 +58,12 @@ export function verifyPassword(pw: string, stored: string): boolean {
 }
 
 // ===== Bắt buộc 2FA theo vai trò (M56 PR2) =====
-// requiredRoles: đọc danh mục mềm code_lists domain `require_2fa_roles` (cache theo
-// watermark trong lib/code-lists) — mỗi dòng active có code = 1 vai trò bị bắt buộc bật
-// 2FA. Domain rỗng (mặc định, chưa admin nào thêm dòng) → Set rỗng → không ai bị bắt buộc,
-// hành vi y hệt trước PR2.
-export async function requiredRoles(): Promise<Set<Role>> {
-  const items = await getList("require_2fa_roles");
+// requiredRoles: đọc danh mục mềm code_lists domain `require_2fa_roles` CỦA TỔ CHỨC `orgId`
+// (S02e — cấu hình org A không áp cho org B; cache theo watermark trong lib/code-lists) — mỗi
+// dòng active có code = 1 vai trò bị bắt buộc bật 2FA. Domain rỗng (mặc định, chưa admin nào
+// thêm dòng) → Set rỗng → không ai bị bắt buộc, hành vi y hệt trước PR2.
+export async function requiredRoles(orgId: number): Promise<Set<Role>> {
+  const items = await getList("require_2fa_roles", orgId);
   const roles = new Set<Role>();
   for (const it of items) {
     if ((ROLES as string[]).includes(it.code)) roles.add(it.code as Role);

@@ -27,6 +27,6 @@ export async function DELETE(
   );
   if (!rule) return NextResponse.json({ error: "Không tìm thấy ngưỡng cảnh báo" }, { status: 404 });
 
-  await deleteAlertRule(id);
+  await deleteAlertRule(id, user.orgId);
   return NextResponse.json({ deleted: id });
 }

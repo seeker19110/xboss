@@ -48,9 +48,14 @@ export function proxy(req: NextRequest) {
     // và ghi log, KHÔNG được làm hỏng mọi /api (kể cả login, health) — audit PR #544.
     let ingestUrl: URL | null = null;
     let token = "";
+    // S02e: gắn traffic vào tổ chức của phiên ĐÃ KÝ (parseToken kiểm HMAC + hạn) để màn admin
+    // chỉ hiện traffic của org mình; không có/không hợp lệ → null (ẩn danh, không ai xem).
+    let orgId: number | null = null;
     try {
       const url = trafficIngestUrl();
       token = trafficToken();
+      const session = req.cookies.get(COOKIE)?.value;
+      orgId = (session ? parseToken(session)?.orgId : null) ?? null;
       ingestUrl = url;
     } catch (err) {
       // Cấu hình sai thì lỗi lặp lại ở MỌI request — chỉ cảnh báo một lần mỗi tiến trình.
@@ -72,6 +77,7 @@ export function proxy(req: NextRequest) {
           ip: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "",
           ua: req.headers.get("user-agent") ?? "",
           ts: Date.now(),
+          orgId,
         }),
       }).catch(() => {});
     }

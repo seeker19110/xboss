@@ -466,6 +466,8 @@ test(
       "custom_field_defs",
       "feature_flags",
       "integrations",
+      // S02e (migration 0161): ngưỡng cảnh báo chi phí theo tổ chức — khuôn 3 nhánh của 0080.
+      "org_cost_settings",
       "projects",
       "role_permissions",
       "saved_reports",

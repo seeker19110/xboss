@@ -57,7 +57,7 @@ project_id ON towers`. Không phải trục RLS. Code tạo sheet không cần t
 - **Ngưỡng cảnh báo:** rule riêng dự án vẫn ưu tiên; rule toàn cục chỉ của org sở hữu dự án.
   `listAlertRules(orgId, projectId)`; `projectId` null → chỉ rule toàn cục của org (fail-closed).
 
-## DDL — migration `0159_org_config_scope.sql`
+## DDL — migration `0161_org_config_scope.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS org_cost_settings (
@@ -146,7 +146,7 @@ orgId)`, `requiredRoles(orgId)`, `listAlertRules(orgId, projectId)`, `deleteAler
 
 1. Staging: `npm run db:migrate -- --dry-run` → `npm run db:migrate` → kiểm `org_cost_settings` có
    đủ mỗi org một dòng, `code_lists` mỗi org có danh mục nguyên nhân trễ, không lỗi unique.
-2. Production sau staging xanh; deploy code cùng lúc (code mới cần bảng/cột của 0159).
+2. Production sau staging xanh; deploy code cùng lúc (code mới cần bảng/cột của 0161).
 3. **Rollback code** (giữ schema): code cũ đọc lại `cost_settings` id 1 (đã giữ nguyên, nhưng không
    thấy thay đổi ngưỡng làm sau khi lên bản mới); code cũ `createItem` kiểm trùng toàn hệ (chặt hơn,
    không lỗi); `upsertAlertRule` cũ vẫn chạy với index mới; `sheetVersion(slug)` cũ có thể chọn nhầm

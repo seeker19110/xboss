@@ -93,7 +93,7 @@ export async function PATCH(req: NextRequest) {
   if (body.meta !== undefined && body.meta && typeof body.meta === "object")
     patch.meta = body.meta as Record<string, unknown>;
 
-  await updateItem(id, patch);
+  await updateItem(id, user.orgId, patch);
   return NextResponse.json({ ok: true });
 }
 
@@ -110,13 +110,13 @@ export async function DELETE(req: NextRequest) {
   const current = await getById(id, user.orgId);
   if (!current) return NextResponse.json({ error: "Không tìm thấy mục" }, { status: 404 });
 
-  const refs = await countReferences(current.domain, current.code);
+  const refs = await countReferences(current.domain, current.code, user.orgId);
   if (refs > 0)
     return NextResponse.json(
       { error: `Mã đang được ${refs} bản ghi tham chiếu, không thể xoá`, references: refs },
       { status: 409 },
     );
 
-  await deleteItem(id);
+  await deleteItem(id, user.orgId);
   return NextResponse.json({ ok: true });
 }

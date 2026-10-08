@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
-import { getRecent, subscribeTraffic, latestId } from "@/lib/bao-mat/traffic";
+import { getRecentOfOrg, subscribeTrafficOfOrg, latestId } from "@/lib/bao-mat/traffic";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/admin/traffic/events  — SSE stream, chỉ Admin.
-// Gửi snapshot ban đầu rồi đẩy từng entry mới khi chúng đến.
+// Gửi snapshot ban đầu rồi đẩy từng entry mới khi chúng đến — CHỈ traffic của tổ chức admin
+// (S02e); traffic org khác và ẩn danh không bao giờ được gửi.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return new Response("Chưa đăng nhập", { status: 401 });
@@ -41,11 +42,13 @@ export async function GET(req: NextRequest) {
       };
 
       // Gửi ngay các entry đã có (nếu client reconnect với ?since=)
-      const initial = getRecent(since);
+      const initial = getRecentOfOrg(user.orgId, since);
       if (initial.length) send({ entries: initial, latestId: latestId() });
 
       // Đẩy từng entry mới khi có
-      unsub = subscribeTraffic((entry) => send({ entries: [entry], latestId: entry.id }));
+      unsub = subscribeTrafficOfOrg(user.orgId, (entry) =>
+        send({ entries: [entry], latestId: entry.id }),
+      );
 
       // Ping giữ kết nối mỗi 20s
       const ping = setInterval(() => {
