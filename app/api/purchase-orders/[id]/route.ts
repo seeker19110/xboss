@@ -33,10 +33,13 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  // Fail-closed (A1-AC02): không có dự án khả kiến → 404, không mở scope toàn hệ "*".
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
   const blocked = await assertModuleEnabled("materials", projectId);
   if (blocked) return blocked;
-  const result = await withProjectScope(projectId ?? "*", async () => {
-    const exists = projectId != null ? await getPurchaseOrder(id, projectId) : undefined;
+  const result = await withProjectScope(projectId, async () => {
+    const exists = await getPurchaseOrder(id, projectId);
     if (!exists) return null;
 
     const po = await queryOne(
