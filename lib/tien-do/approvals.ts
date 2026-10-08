@@ -7,6 +7,7 @@
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { isUniqueViolation } from "@/lib/ha-tang/seqcode";
 import { ROLES, VIEW_ONLY_ROLES, type Role } from "@/lib/nen/roles";
+import { moneyToNumberSafe, isMoneyPrecisionError, fitsNumeric } from "@/lib/nen/money";
 
 // Vai trò chỉ-xem KHÔNG bao giờ được làm bước duyệt — trừ `cdt` (CĐT được phép là bước
 // duyệt cuối, theo M46 PR4). bch/viewer luôn 403 dù có bị cấu hình nhầm làm step role.
@@ -161,6 +162,107 @@ export async function openApproval(opts: {
       status: status as ApprovalRequest["status"],
       createdBy: opts.user.id,
     };
+  });
+}
+
+// Chốt lại giá trị (amount) của request CHƯA ai quyết định khi thực thể đổi giá trị sau lúc mở
+// (vd đợt IPC nháp sửa khối lượng rồi mới trình) — nếu không, ngưỡng min_amount của bước duyệt
+// so với giá trị cũ: lập nháp nhỏ, sửa tăng rồi trình là lách được bước duyệt cấp cao. Cập
+// nhật amount + chọn lại bước hiệu lực đầu tiên theo amount mới (request đã tự `approved` vì
+// khi đó không bước nào hiệu lực thì mở lại `pending` nếu amount mới kéo bước vào) và đặt lại
+// `created_at` = lúc chốt (đồng hồ SLA tính từ lúc trình, không từ lúc lập nháp). Request mới
+// nhất đã có approval_actions / đã rejected-cancelled → giữ nguyên, trả false.
+// Chưa từng có request nào cho thực thể: có `openAs` thì mở mới nếu hiện có flow active (đợt lập
+// TRƯỚC khi Admin bật flow vẫn phải qua flow khi trình, không rơi về đường CAN.approve không SoD);
+// không có flow → no-op. Trả true khi có tạo/cập nhật.
+// `amountMinor` là MoneyMinor (bigint đồng×100): chỉ ép sang number của engine KHI cần so ngưỡng;
+// không round-trip exact hoặc tràn NUMERIC(15,2) → 422 `money_precision_unsupported`/`amount_overflow`.
+export async function resyncApprovalAmount(opts: {
+  entityType: string;
+  entityId: number;
+  projectId: number;
+  amountMinor: bigint;
+  openAs?: ActorUser;
+}): Promise<boolean> {
+  const amountForEngine = (): number => {
+    let amount: number;
+    try {
+      amount = moneyToNumberSafe(opts.amountMinor);
+    } catch (err) {
+      if (!isMoneyPrecisionError(err)) throw err;
+      throw Object.assign(new Error("Giá trị vượt độ chính xác hỗ trợ của luồng phê duyệt"), {
+        status: 422,
+        code: "money_precision_unsupported",
+      });
+    }
+    // approval_requests.amount là NUMERIC(15,2): tràn cột thì 422 rõ ràng thay vì 500 của pg.
+    if (!fitsNumeric(opts.amountMinor, 15))
+      throw Object.assign(new Error("Giá trị vượt giới hạn lưu trữ của luồng phê duyệt"), {
+        status: 422,
+        code: "amount_overflow",
+      });
+    return amount;
+  };
+
+  return withTransaction(async () => {
+    // Request MỚI NHẤT trước, rồi mới xét trạng thái (không "nhặt" request cũ khi bản mới đã chốt).
+    const req = await queryOne<{
+      id: number;
+      flowId: number;
+      status: string;
+      daQuyetDinh: boolean;
+    }>(
+      `SELECT r.id, r.flow_id AS "flowId", r.status,
+              EXISTS (SELECT 1 FROM approval_actions a WHERE a.request_id = r.id) AS "daQuyetDinh"
+         FROM approval_requests r
+        WHERE r.entity_type = ? AND r.entity_id = ? AND r.project_id = ?
+        ORDER BY r.id DESC LIMIT 1 FOR UPDATE OF r`,
+      opts.entityType,
+      opts.entityId,
+      opts.projectId,
+    );
+    if (!req) {
+      if (!opts.openAs) return false;
+      // Không flow → không cần so ngưỡng nên cũng không ép tiền (đợt giá trị lớn vẫn trình được).
+      if (!(await getActiveFlow(opts.entityType, opts.projectId))) return false;
+      const opened = await openApproval({
+        entityType: opts.entityType,
+        entityId: opts.entityId,
+        projectId: opts.projectId,
+        amount: amountForEngine(),
+        user: opts.openAs,
+      });
+      return opened != null;
+    }
+    if (req.daQuyetDinh || (req.status !== "pending" && req.status !== "approved")) return false;
+    const amount = amountForEngine();
+    const steps = await query<ApprovalStep>(
+      `SELECT seq, role, min_amount AS "minAmount", sla_days AS "slaDays"
+         FROM approval_steps WHERE flow_id = ? ORDER BY seq`,
+      req.flowId,
+    );
+    const first = decideNext(steps, amount, 0);
+    if (first) {
+      await run(
+        `UPDATE approval_requests
+            SET amount = ?, current_seq = ?, status = 'pending', decided_at = NULL,
+                created_at = now()
+          WHERE id = ?`,
+        amount,
+        first.seq,
+        req.id,
+      );
+    } else {
+      await run(
+        `UPDATE approval_requests
+            SET amount = ?, status = 'approved', decided_at = COALESCE(decided_at, now()),
+                created_at = now()
+          WHERE id = ?`,
+        amount,
+        req.id,
+      );
+    }
+    return true;
   });
 }
 

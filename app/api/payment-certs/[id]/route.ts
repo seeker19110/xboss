@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run, withProjectScope } from "@/lib/db";
+import { queryOne, run, withProjectScope, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
@@ -21,6 +21,7 @@ import {
 } from "@/lib/nen/money";
 import { getEntityApprovalStatus } from "@/lib/tien-do/approvals";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +30,13 @@ export const dynamic = "force-dynamic";
 async function certInProject(
   id: number,
   projectId: number | null,
+  lock = false,
 ): Promise<{ status: string; contractId: number } | undefined> {
   if (projectId == null) return undefined;
   return queryOne<{ status: string; contractId: number }>(
     `SELECT c.status, c.contract_id AS "contractId"
        FROM payment_certs c JOIN contracts ct ON ct.id = c.contract_id
-      WHERE c.id = ? AND ct.project_id = ?`,
+      WHERE c.id = ? AND ct.project_id = ?${lock ? " FOR UPDATE OF c" : ""}`,
     id,
     projectId,
   );
@@ -127,17 +129,11 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const projectId = await getCurrentProjectId(user);
-  const existing = await certInProject(id, projectId);
-  if (!existing)
-    return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
-  if (existing.status !== "draft")
-    return NextResponse.json({ error: "Chỉ sửa được đợt đang ở trạng thái nháp" }, { status: 409 });
-
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object")
     return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
+  let parsedItems: CertLineInput[] | null = null;
   if (Array.isArray(body.items)) {
     const items: CertLineInput[] = body.items.map((it: Record<string, unknown>) => ({
       boqItemId: Number(it?.boqItemId),
@@ -145,20 +141,51 @@ export async function PATCH(
     }));
     const validationErr = validateCertItems(items);
     if (validationErr) return NextResponse.json({ error: validationErr }, { status: 422 });
-    const refErr = await checkCertLinesBelongToContract(
-      existing.contractId,
-      items.map((i) => i.boqItemId),
-    );
-    if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
-
-    await saveCertItems(id, existing.contractId, items);
+    parsedItems = items;
   }
-  if (typeof body.periodLabel === "string" || body.periodLabel === null) {
-    await run(
-      `UPDATE payment_certs SET period_label = ? WHERE id = ?`,
-      typeof body.periodLabel === "string" ? body.periodLabel.trim() || null : null,
-      id,
-    );
+  const items = parsedItems;
+
+  const projectId = await getCurrentProjectId(user);
+  try {
+    // Khoá đợt FOR UPDATE rồi kiểm nháp + ghi trong CÙNG transaction: trình/duyệt đồng thời
+    // không còn chen vào sau lúc kiểm trạng thái, và DELETE + INSERT dòng KL là atomic (lỗi giữa
+    // chừng rollback, đợt không mất dòng).
+    await withTransaction(async () => {
+      const existing = await certInProject(id, projectId, true);
+      if (!existing)
+        throw Object.assign(new Error("Không tìm thấy đợt thanh toán"), { status: 404 });
+      if (existing.status !== "draft")
+        throw Object.assign(new Error("Chỉ sửa được đợt đang ở trạng thái nháp"), { status: 409 });
+
+      if (items) {
+        const refErr = await checkCertLinesBelongToContract(
+          existing.contractId,
+          items.map((i) => i.boqItemId),
+        );
+        if (refErr) throw Object.assign(new Error(refErr), { status: 422 });
+        await saveCertItems(id, existing.contractId, items);
+      }
+      if (typeof body.periodLabel === "string" || body.periodLabel === null) {
+        await run(
+          `UPDATE payment_certs SET period_label = ? WHERE id = ?`,
+          typeof body.periodLabel === "string" ? body.periodLabel.trim() || null : null,
+          id,
+        );
+      }
+    });
+  } catch (err: unknown) {
+    const e = err as { message?: string; status?: number; code?: string };
+    if (e.status)
+      return NextResponse.json(
+        { error: e.message, ...(e.code ? { code: e.code } : {}) },
+        { status: e.status },
+      );
+    log.error("payment-certs PATCH: lỗi không lường trước", {
+      certId: id,
+      err: err instanceof Error ? err.message : String(err),
+      pgCode: e.code,
+    });
+    return NextResponse.json({ error: "Lỗi máy chủ khi sửa đợt thanh toán" }, { status: 500 });
   }
 
   // Lưu xong mới soát: người lập vẫn ghi được (quyết định "cảnh báo, không chặn"), nhưng

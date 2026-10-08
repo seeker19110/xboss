@@ -30,6 +30,8 @@ export const PAYMENT_CERT_STATUS_LABEL: Record<PaymentCertStatus, string> = {
 // Notification cert_pending: đợt 'submitted' quá N ngày chưa được quyết định.
 export const CERT_PENDING_DAYS = 5;
 
+const MAX_QTY_PERIOD = 1e11; // chừa chỗ cho qty_cumulative cộng dồn trong NUMERIC(15,3) (< 1e12)
+
 export type CertLineInput = { boqItemId: number; qtyPeriod: number };
 
 // Validate thuần (không chạm DB) — trả thông điệp lỗi tiếng Việt hoặc null.
@@ -41,6 +43,8 @@ export function validateCertItems(items: CertLineInput[]): string | null {
     if (!Number.isInteger(it.boqItemId)) return `Dòng ${n}: thiếu dòng BOQ`;
     if (!Number.isFinite(it.qtyPeriod) || it.qtyPeriod < 0)
       return `Dòng ${n}: khối lượng đợt này phải ≥ 0`;
+    // qty_period NUMERIC(15,3): vượt cận → INSERT tràn sau khi đã DELETE dòng cũ (500).
+    if (it.qtyPeriod >= MAX_QTY_PERIOD) return `Dòng ${n}: khối lượng đợt này quá lớn`;
     if (seen.has(it.boqItemId)) return `Dòng ${n}: dòng BOQ trùng lặp trong cùng đợt`;
     seen.add(it.boqItemId);
   }
