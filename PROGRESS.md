@@ -12,7 +12,7 @@ các route ghi tiền còn lại. Không migration, không đổi kiểu cột, 
   dòng, nhãn "Đơn giá dòng N"); `POST/PATCH /api/tenders/:id/bids` (`unitPrice` từng dòng qua
   `parseBidPrices` + `lumpSum`); `POST /api/boq` + `PATCH /api/boq/:id` (`unitPrice`/`subUnitPrice`,
   trước đây `Number(..) || 0` nuốt chữ rác và "1.500"; số âm vẫn 422); `POST
-  /api/engineering/bidding/quotes` (`totalAmountVnd` là BIGINT đồng → parser `precision 18, scale 0`,
+/api/engineering/bidding/quotes` (`totalAmountVnd` là BIGINT đồng → parser `precision 18, scale 0`,
   số lẻ → 400 `amount_scale`, `createVendorQuote` nhận `number | string`).
 - **Hợp đồng lỗi**: "1.500"/"1234,5" → 400 `amount_locale_format`; sai dạng → 400 `amount_invalid`;
   quá scale → 400 `amount_scale`; vượt cột → 422 `amount_overflow` (trước đây PG "numeric field
