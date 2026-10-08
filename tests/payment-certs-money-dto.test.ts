@@ -312,8 +312,9 @@ test(
     try {
       const { ws, theoNhan } = await docExcel(f.certId);
       assert.equal(theoNhan.get("Giá trị đợt này"), "90071992547409.93");
-      // 15 chữ số có nghĩa vẫn round-trip qua double → ô số đúng nguyên giá trị.
-      assert.equal(theoNhan.get("Trừ tạm ứng"), -9232379236109.52);
+      // L5 (S10a): khối tổng là MỘT nhóm — có giá trị vượt 15 chữ số nên cả nhóm ghi text,
+      // kể cả "Trừ tạm ứng" (tự nó vừa 15 chữ số), để =SUM() không lặng lẽ bỏ ô text.
+      assert.equal(theoNhan.get("Trừ tạm ứng"), "-9232379236109.52");
       assert.equal(theoNhan.get("GIÁ TRỊ ĐỀ NGHỊ THANH TOÁN"), "76336013683929.91");
       // Thành tiền dòng 10 × 9007199254740.99 = 90071992547409.9 (đúng 15 chữ số có nghĩa) và
       // 1 × 0.03 vẫn là ô số exact; đơn giá NUMERIC(15,2) luôn ≤ 15 chữ số → ô số.
@@ -331,6 +332,15 @@ test(
       assert.deepEqual(donGia.sort(), [0.03, 9007199254740.99].sort());
       assert.ok(thanhTien.includes(90071992547409.9));
       assert.ok(thanhTien.includes(0.03));
+      // Có nhóm ghi text → kèm dòng ghi chú cảnh báo không SUM trực tiếp.
+      const ghiChu: string[] = [];
+      ws.eachRow((row) => {
+        const v = row.getCell(1).value;
+        if (typeof v === "string" && v.startsWith("Lưu ý:")) ghiChu.push(v);
+      });
+      assert.equal(ghiChu.length, 1);
+      assert.match(ghiChu[0], /Giá trị đợt/);
+      assert.doesNotMatch(ghiChu[0], /Thành tiền đợt/);
     } finally {
       await donDep(f);
     }
@@ -368,13 +378,17 @@ test(
 );
 
 test(
-  "Duyệt đợt IPC: approvedValue vượt NUMERIC(15,2) → 422, không ghi phiếu, đợt vẫn chờ duyệt",
+  "Trình đợt IPC: giá trị vượt NUMERIC(15,2) → 422 amount_overflow ngay lúc trình, không ghi phiếu, đợt vẫn nháp",
   S,
   async () => {
+    // S10a L6: chặn tràn tại nguồn (lúc trình) — nhánh phòng thủ của decide có test riêng ở
+    // tests/payment-certs-amount-overflow.test.ts.
     const f = await dungDot(VUOT_BIEN);
     try {
-      const res = await trinhVaDuyet(f.certId);
+      const { POST: TRINH } = await import("@/app/api/payment-certs/[id]/submit/route");
+      const res = await TRINH(jreq(`/api/payment-certs/${f.certId}/submit`, {}), thamSo(f.certId));
       assert.equal(res.status, 422);
+      assert.equal((await res.json()).code, "amount_overflow");
       const { queryOne } = await import("@/lib/db");
       const bill = await queryOne(
         `SELECT id FROM payment_bills WHERE payment_cert_id = ?`,
@@ -385,7 +399,7 @@ test(
         `SELECT status FROM payment_certs WHERE id = ?`,
         f.certId,
       );
-      assert.equal(cert?.status, "submitted");
+      assert.equal(cert?.status, "draft");
     } finally {
       await donDep(f);
     }
