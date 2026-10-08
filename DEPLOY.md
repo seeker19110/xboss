@@ -375,8 +375,14 @@ liệt kê trong kết quả). Cột `Đã dùng`/`Tồn kho`/`Ngưỡng tối t
    - `GOOGLE_SERVICE_ACCOUNT_JSON` = nguyên nội dung file JSON (1 dòng).
    - `GOOGLE_SHEET_ID` = đoạn giữa `/d/` và `/edit` trong URL Sheet.
    - `GOOGLE_SHEET_TAB` = tên tab (mặc định `VatTu`).
+   - `GOOGLE_SHEET_PROJECT_ID` = ID dự án mà Sheet này thuộc về (khuyến nghị; **bắt buộc để cron
+     chạy**). Đặt rồi thì chỉ dự án đó đồng bộ được (dự án khác bấm nút → 409).
 
 > Thiếu cấu hình → nút/cron báo lỗi rõ ràng, không ảnh hưởng phần còn lại của app.
+>
+> Mỗi lần đồng bộ chỉ cho **một dự án**: nút thủ công dùng dự án đang chọn, cron dùng
+> `GOOGLE_SHEET_PROJECT_ID` (thiếu → cron trả 503, không chạy). Vật tư dự án khác không bao giờ
+> được ghi lên Sheet; dòng Sheet mang ID vật tư của dự án khác được giữ nguyên, không ghi vào DB.
 
 **Chạy đồng bộ:**
 

@@ -6,8 +6,8 @@ import { queryOne } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/admin/alert-rules — danh sách mọi rule (xuyên dự án). Admin/PM xem được
-// (CAN.viewAlertRules); tạo/sửa/xoá chỉ Admin.
+// GET /api/admin/alert-rules — rule của tổ chức người gọi (dự án đang chọn + rule toàn cục
+// của org; S02e). Admin/PM xem được (CAN.viewAlertRules); tạo/sửa/xoá chỉ Admin.
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -15,7 +15,7 @@ export async function GET() {
     return NextResponse.json({ error: "Không có quyền xem ngưỡng cảnh báo" }, { status: 403 });
 
   const projectId = await getCurrentProjectId(user);
-  const rules = await listAlertRules(projectId);
+  const rules = await listAlertRules(user.orgId, projectId);
   return NextResponse.json({ rules });
 }
 

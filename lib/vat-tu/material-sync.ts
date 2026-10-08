@@ -1,6 +1,10 @@
 import { query, queryOne, run, insertId } from "@/lib/db";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
-import { getSheetClient, type SheetClient } from "@/lib/vat-tu/google-sheets";
+import {
+  getSheetClient,
+  readSheetProjectBinding,
+  type SheetClient,
+} from "@/lib/vat-tu/google-sheets";
 
 // Đồng bộ HAI CHIỀU bảng `materials` ↔ Google Sheet.
 //
@@ -16,6 +20,11 @@ import { getSheetClient, type SheetClient } from "@/lib/vat-tu/google-sheets";
 //
 // Lưu ý: qty_used / qty_stock / min_stock_level chỉ DB→Sheet (phái sinh từ audit
 // material_transactions) — sửa ở Sheet sẽ bị ghi đè ở lần đồng bộ kế tiếp.
+//
+// Phạm vi (QUALITY-FINAL-1 A1): mỗi lần đồng bộ chỉ cho ĐÚNG MỘT dự án (đã kiểm cùng tổ chức).
+// Mọi đọc/ghi materials/material_sync/sheet_types lọc theo dự án đó; vật tư dự án khác không bao
+// giờ được ghi lên Sheet. Dòng Sheet mang ID vật tư ngoài phạm vi → bỏ qua (không ghi DB), giữ
+// nguyên nội dung dòng trên Sheet (không xoá) và báo trong `skipped`.
 
 // Các trường định nghĩa vật tư được đồng bộ HAI CHIỀU.
 export const SYNCED_FIELDS = [
@@ -85,6 +94,79 @@ export function decideMerge(
   if (!dbChanged && sheetChanged) return { decision: "pull", winner: sheet };
   // Cả hai đổi (đã khác nhau ở trên) → xung đột.
   return { decision: "conflict", winner: CONFLICT_POLICY === "db" ? db : sheet };
+}
+
+// ── Phạm vi đồng bộ ─────────────────────────────────────────────────────────
+
+export type MaterialSyncScope = { orgId: number; projectId: number };
+
+/** Lỗi phạm vi/cấu hình — route trả đúng `status` kèm `message` (không phải lỗi 500). */
+export class MaterialSyncScopeError extends Error {
+  constructor(
+    message: string,
+    readonly status: 404 | 409 | 503,
+  ) {
+    super(message);
+    this.name = "MaterialSyncScopeError";
+  }
+}
+
+const SHEET_PROJECT_INVALID =
+  "GOOGLE_SHEET_PROJECT_ID không hợp lệ (phải là ID dự án) — không đồng bộ khi chưa rõ Sheet thuộc dự án nào.";
+
+/** Sheet đã gắn với 1 dự án (GOOGLE_SHEET_PROJECT_ID) thì chỉ dự án đó được đồng bộ; cấu hình
+ *  sai → từ chối. Chưa gắn → không chặn (đồng bộ tay theo dự án đang chọn). */
+function assertSheetBinding(projectId: number): void {
+  const binding = readSheetProjectBinding();
+  if (binding.kind === "invalid") throw new MaterialSyncScopeError(SHEET_PROJECT_INVALID, 503);
+  if (binding.kind === "bound" && binding.projectId !== projectId)
+    throw new MaterialSyncScopeError(
+      "Google Sheet vật tư đang gắn với dự án khác — chọn đúng dự án để đồng bộ.",
+      409,
+    );
+}
+
+/**
+ * Phạm vi cho lần đồng bộ do CRON gọi (không có phiên người dùng): đúng dự án cấu hình ở
+ * GOOGLE_SHEET_PROJECT_ID, tổ chức lấy từ chính dự án đó. Thiếu/sai cấu hình hoặc dự án không
+ * tồn tại → ném MaterialSyncScopeError 503 (cron không chạy), không đoán "dự án đầu tiên".
+ */
+export async function resolveCronSyncScope(): Promise<MaterialSyncScope> {
+  const binding = readSheetProjectBinding();
+  if (binding.kind === "unset")
+    throw new MaterialSyncScopeError(
+      "Chưa cấu hình GOOGLE_SHEET_PROJECT_ID — cron không biết Sheet thuộc dự án nào nên không đồng bộ.",
+      503,
+    );
+  if (binding.kind === "invalid") throw new MaterialSyncScopeError(SHEET_PROJECT_INVALID, 503);
+  const project = await queryOne<{ orgId: number | null }>(
+    `SELECT org_id AS "orgId" FROM projects WHERE id = ?`,
+    binding.projectId,
+  );
+  if (!project || project.orgId == null)
+    throw new MaterialSyncScopeError(
+      "GOOGLE_SHEET_PROJECT_ID trỏ tới dự án không tồn tại — không đồng bộ.",
+      503,
+    );
+  return { orgId: project.orgId, projectId: binding.projectId };
+}
+
+const isPositiveInt = (v: unknown): v is number =>
+  typeof v === "number" && Number.isSafeInteger(v) && v > 0;
+
+// Phòng thủ chiều sâu: dự án phải thuộc đúng tổ chức (nơi gọi đã kiểm, kiểm lại ở đây để
+// không caller nào lỡ truyền phạm vi chưa xác minh). Sai → 404 như resource ngoài scope.
+async function assertScope(scope: MaterialSyncScope): Promise<void> {
+  const ok =
+    isPositiveInt(scope.orgId) &&
+    isPositiveInt(scope.projectId) &&
+    (await queryOne<{ id: number }>(
+      `SELECT id FROM projects WHERE id = ? AND org_id = ?`,
+      scope.projectId,
+      scope.orgId,
+    ));
+  if (!ok) throw new MaterialSyncScopeError("Không tìm thấy dự án cần đồng bộ", 404);
+  assertSheetBinding(scope.projectId);
 }
 
 // ── Khoá chống chạy chồng ───────────────────────────────────────────────────
@@ -229,7 +311,7 @@ export type SyncSummary = {
 
 // ── Orchestration ───────────────────────────────────────────────────────────
 
-async function loadDbMaterials(): Promise<DbMaterial[]> {
+async function loadDbMaterials(projectId: number): Promise<DbMaterial[]> {
   return query<DbMaterial>(
     `SELECT m.id, m.sheet_type_id AS "sheetTypeId", st.code AS "sheetCode",
             m.boq_code AS "boqCode", m.name, m.unit,
@@ -239,13 +321,18 @@ async function loadDbMaterials(): Promise<DbMaterial[]> {
             COALESCE(m.status, 'dat_hang') AS status, m.note
        FROM materials m
        LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
+      WHERE m.project_id = ?
       ORDER BY m.sort_order, m.id`,
+    projectId,
   );
 }
 
-async function loadSnapshots(): Promise<Map<number, MaterialFields>> {
+async function loadSnapshots(projectId: number): Promise<Map<number, MaterialFields>> {
   const rows = await query<{ material_id: number; synced_fields: string | null }>(
-    `SELECT material_id, synced_fields FROM material_sync`,
+    `SELECT s.material_id, s.synced_fields
+       FROM material_sync s JOIN materials m ON m.id = s.material_id
+      WHERE m.project_id = ?`,
+    projectId,
   );
   const map = new Map<number, MaterialFields>();
   for (const r of rows) {
@@ -267,11 +354,27 @@ const saveSnapshot = (materialId: number, fields: MaterialFields) =>
     JSON.stringify(fields),
   );
 
+// Trong số `ids` (ID đọc từ Sheet), ID nào là vật tư còn tồn tại — chỉ lấy ID, không đọc dữ
+// liệu vật tư ngoài phạm vi. ID ngoài biên int4 không thể là vật tư thật nên lọc trước.
+async function existingMaterialIds(ids: number[]): Promise<Set<number>> {
+  const valid = ids.filter((id) => Number.isSafeInteger(id) && id > 0 && id <= 2147483647);
+  const found = new Set<number>();
+  for (let i = 0; i < valid.length; i += 1000) {
+    const chunk = valid.slice(i, i + 1000);
+    const rows = await query<{ id: number }>(
+      `SELECT id FROM materials WHERE id IN (${chunk.map(() => "?").join(",")})`,
+      ...chunk,
+    );
+    for (const r of rows) found.add(r.id);
+  }
+  return found;
+}
+
 // Cập nhật các trường merge của 1 vật tư từ giá trị "winner" (Sheet→DB).
-async function applyToDb(id: number, w: MaterialFields): Promise<void> {
+async function applyToDb(id: number, projectId: number, w: MaterialFields): Promise<void> {
   await run(
     `UPDATE materials SET boq_code = ?, name = ?, unit = ?, qty_boq = ?, qty_planned = ?,
-            status = ?, note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            status = ?, note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND project_id = ?`,
     w.boqCode || null,
     w.name,
     w.unit || null,
@@ -280,6 +383,7 @@ async function applyToDb(id: number, w: MaterialFields): Promise<void> {
     w.status,
     w.note || null,
     id,
+    projectId,
   );
 }
 
@@ -287,13 +391,18 @@ async function applyToDb(id: number, w: MaterialFields): Promise<void> {
  * Chạy 1 lần đồng bộ. Cho phép inject sheet client (phục vụ test); mặc định dùng
  * Google Sheets thật. Ném lỗi nếu thiếu cấu hình Google (fail-fast).
  *
- * @param orgId Tổ chức thực hiện đồng bộ (dùng khi kiểm mã BOQ bị chiếm).
+ * @param scope Dự án + tổ chức đồng bộ — nơi gọi phải lấy từ phiên/cấu hình server đã kiểm;
+ *   ở đây kiểm lại dự án thuộc tổ chức và khớp GOOGLE_SHEET_PROJECT_ID (sai → MaterialSyncScopeError).
  * @param sheetClient Optional sheet client inject cho test.
  */
 export async function runMaterialSync(
-  orgId: number,
+  scope: MaterialSyncScope,
   sheetClient?: SheetClient,
 ): Promise<SyncSummary> {
+  await assertScope(scope);
+  const { orgId, projectId } = scope;
+  // Khoá giữ tên chung "materials" (không theo dự án): cả hệ chỉ có MỘT Sheet, hai dự án ghi
+  // đè cùng tab đồng thời sẽ làm mất dòng của nhau.
   if (!(await acquireLock()))
     throw new Error("Đang có một lần đồng bộ khác chạy — vui lòng thử lại sau.");
 
@@ -309,8 +418,8 @@ export async function runMaterialSync(
     };
 
     const sheetRows = await client.readRows();
-    const dbMaterials = await loadDbMaterials();
-    const snapshots = await loadSnapshots();
+    const dbMaterials = await loadDbMaterials(projectId);
+    const snapshots = await loadSnapshots(projectId);
 
     // Map dòng Sheet theo ID (bỏ header dòng 0) — giữ cả số dòng để log lỗi rõ ràng.
     const sheetById = new Map<number, { rowNum: number; row: string[] }>();
@@ -354,13 +463,13 @@ export async function runMaterialSync(
       const { decision, winner } = decideMerge(dbF, sheetF, snap);
 
       if (decision === "pull") {
-        await applyToDb(m.id, winner);
+        await applyToDb(m.id, projectId, winner);
         summary.pulled++;
       } else if (decision === "push") {
         summary.pushed++;
       } else if (decision === "conflict") {
         if (CONFLICT_POLICY === "sheet") {
-          await applyToDb(m.id, winner);
+          await applyToDb(m.id, projectId, winner);
           summary.pulled++;
         } else summary.pushed++;
         summary.conflicts.push({ id: m.id, name: m.name, winner: CONFLICT_POLICY });
@@ -371,9 +480,22 @@ export async function runMaterialSync(
       }
     }
 
-    // 2) Dòng Sheet có ID nhưng không còn trong DB → bỏ qua (không tự xoá DB).
-    for (const [id, { rowNum, row }] of sheetById) {
-      if (!dbIds.has(id)) {
+    // 2) Dòng Sheet có ID nằm ngoài phạm vi dự án → bỏ qua (không ghi/không xoá DB):
+    //    - ID vẫn tồn tại (vật tư dự án/tổ chức khác — vd Sheet từng đồng bộ toàn hệ): GIỮ NGUYÊN
+    //      nội dung dòng đó trên Sheet ở bước 4 (không ghi đè bằng dữ liệu DB, không xoá dòng);
+    //    - ID không còn trong DB: như cũ, dòng rơi khỏi Sheet khi ghi lại.
+    //    Không nêu tên/dữ liệu DB của vật tư ngoài phạm vi trong kết quả.
+    const outOfScope = [...sheetById].filter(([id]) => !dbIds.has(id));
+    const existingElsewhere = await existingMaterialIds(outOfScope.map(([id]) => id));
+    const keptRows: string[][] = [];
+    for (const [id, { rowNum, row }] of outOfScope) {
+      if (existingElsewhere.has(id)) {
+        keptRows.push(HEADER.map((_, i) => String(row[i] ?? "")));
+        summary.skipped.push({
+          row: rowNum,
+          reason: `ID ${id} không thuộc dự án đang đồng bộ — bỏ qua, giữ nguyên dòng trên Sheet`,
+        });
+      } else {
         summary.skipped.push({
           row: rowNum,
           reason: `ID ${id} không còn trong DB — bỏ qua (không xoá), tên "${row[2] ?? ""}"`,
@@ -387,8 +509,12 @@ export async function runMaterialSync(
     const dbByBoqCode = new Map(
       dbMaterials.filter((m) => m.boqCode).map((m) => [m.boqCode as string, m]),
     );
+    // Chỉ hệ (sheet) thuộc tháp của dự án — không gắn vật tư vào sheet dự án khác (A1-FR06).
     const sheetTypes = await query<{ id: number; code: string }>(
-      `SELECT id, code FROM sheet_types`,
+      `SELECT st.id, st.code FROM sheet_types st
+         JOIN towers tw ON tw.id = st.tower_id
+        WHERE tw.project_id = ?`,
+      projectId,
     );
     const sheetTypeMap = new Map(sheetTypes.map((s) => [s.code.trim().toLowerCase(), s.id]));
 
@@ -396,7 +522,9 @@ export async function runMaterialSync(
     // thay vì query MAX() riêng cho mỗi dòng mới, tăng dần trong bộ nhớ khi gán.
     const maxSortByType = new Map<number | null, number>();
     for (const r of await query<{ sheetTypeId: number | null; m: number | null }>(
-      `SELECT sheet_type_id AS "sheetTypeId", MAX(sort_order) AS m FROM materials GROUP BY sheet_type_id`,
+      `SELECT sheet_type_id AS "sheetTypeId", MAX(sort_order) AS m FROM materials
+        WHERE project_id = ? GROUP BY sheet_type_id`,
+      projectId,
     )) {
       maxSortByType.set(r.sheetTypeId, r.m ?? 0);
     }
@@ -449,11 +577,11 @@ export async function runMaterialSync(
         const snap = snapshots.get(matched.id) ?? null;
         const { decision, winner } = decideMerge(dbF, f, snap);
         if (decision === "pull") {
-          await applyToDb(matched.id, winner);
+          await applyToDb(matched.id, projectId, winner);
           summary.pulled++;
         } else if (decision === "conflict") {
           if (CONFLICT_POLICY === "sheet") {
-            await applyToDb(matched.id, winner);
+            await applyToDb(matched.id, projectId, winner);
             summary.pulled++;
           } else summary.pushed++;
           summary.conflicts.push({ id: matched.id, name: matched.name, winner: CONFLICT_POLICY });
@@ -500,8 +628,8 @@ export async function runMaterialSync(
       maxSortByType.set(sheetTypeId, sortOrder);
 
       const newId = await insertId(
-        `INSERT INTO materials (sheet_type_id, boq_code, name, unit, qty_boq, qty_planned, qty_used, status, note, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+        `INSERT INTO materials (sheet_type_id, boq_code, name, unit, qty_boq, qty_planned, qty_used, status, note, sort_order, project_id)
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
         sheetTypeId,
         boqCode,
         f.name,
@@ -511,18 +639,20 @@ export async function runMaterialSync(
         f.status,
         f.note || null,
         sortOrder,
+        projectId,
       );
 
       pendingSnapshots.push({ id: newId, fields: effective });
       summary.created++;
     }
 
-    // 4) Ghi đè toàn bộ tab bằng dữ liệu DB đã gộp (header + mọi vật tư) — MỘT lệnh
+    // 4) Ghi đè toàn bộ tab bằng dữ liệu DB đã gộp (header + mọi vật tư CỦA DỰ ÁN, rồi các dòng
+    // ngoài phạm vi giữ nguyên ở bước 2) — MỘT lệnh
     // ghi duy nhất (không clear() trước) để tránh cửa sổ Sheet trống nếu lỗi mạng giữa
     // chừng (trước đây clear() thành công nhưng writeRows() lỗi sẽ xoá trắng cả tab).
     // Đệm dòng rỗng nếu dữ liệu mới ít dòng hơn Sheet cũ để vẫn "xoá" phần dư thừa.
-    const finalMaterials = await loadDbMaterials();
-    const out: (string | number)[][] = [HEADER, ...finalMaterials.map(dbToSheetRow)];
+    const finalMaterials = await loadDbMaterials(projectId);
+    const out: (string | number)[][] = [HEADER, ...finalMaterials.map(dbToSheetRow), ...keptRows];
     const emptyRow: string[] = new Array(HEADER.length).fill("");
     while (out.length < sheetRows.length) out.push(emptyRow);
     await client.writeRows("A1", out);

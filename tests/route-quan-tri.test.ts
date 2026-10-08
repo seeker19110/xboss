@@ -1031,7 +1031,11 @@ test("POST /api/sheets: slug không hợp lệ → 400", S, async () => {
 
 test("POST /api/sheets: slug đã dùng → 409", S, async () => {
   const pm = await dungUser("pm", `pmsheetslugdup${RUN}`);
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  // S02e: sheet mới gắn vào dự án đang chọn (null → 404) — đăng nhập kèm dự án.
+  await dangNhapDuAn(
+    { id: pm.id, passwordHash: pm.pwHash },
+    await dungDuAn(`pmsheetslugdup${RUN}`),
+  );
   const { POST } = await import("@/app/api/sheets/route");
   const slug = `slugdup-${RUN}`;
   const first = await POST(
@@ -1046,7 +1050,11 @@ test("POST /api/sheets: slug đã dùng → 409", S, async () => {
 
 test("POST /api/sheets: mã sheet đã tồn tại → 409", S, async () => {
   const pm = await dungUser("pm", `pmsheetcodedup${RUN}`);
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  // S02e: sheet mới gắn vào dự án đang chọn (null → 404) — đăng nhập kèm dự án.
+  await dangNhapDuAn(
+    { id: pm.id, passwordHash: pm.pwHash },
+    await dungDuAn(`pmsheetcodedup${RUN}`),
+  );
   const { POST } = await import("@/app/api/sheets/route");
   const code = `SHCODE${RUN}`;
   const first = await POST(
@@ -1061,7 +1069,11 @@ test("POST /api/sheets: mã sheet đã tồn tại → 409", S, async () => {
 
 test("POST /api/sheets: copyFromId không tồn tại → 400", S, async () => {
   const pm = await dungUser("pm", `pmsheetcopybad${RUN}`);
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  // S02e: sheet mới gắn vào dự án đang chọn (null → 404) — đăng nhập kèm dự án.
+  await dangNhapDuAn(
+    { id: pm.id, passwordHash: pm.pwHash },
+    await dungDuAn(`pmsheetcopybad${RUN}`),
+  );
   const { POST } = await import("@/app/api/sheets/route");
   const res = await POST(
     req("http://localhost/api/sheets", "POST", { name: "Sheet D", copyFromId: 999999995 }),
@@ -1071,7 +1083,8 @@ test("POST /api/sheets: copyFromId không tồn tại → 400", S, async () => {
 
 test("POST /api/sheets: systemId không hợp lệ → 422", S, async () => {
   const pm = await dungUser("pm", `pmsheetsysbad${RUN}`);
-  dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+  // S02e: sheet mới gắn vào dự án đang chọn (null → 404) — đăng nhập kèm dự án.
+  await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, await dungDuAn(`pmsheetsysbad${RUN}`));
   const { POST } = await import("@/app/api/sheets/route");
   const res = await POST(
     req("http://localhost/api/sheets", "POST", { name: "Sheet E", systemId: 999999994 }),
@@ -1080,16 +1093,41 @@ test("POST /api/sheets: systemId không hợp lệ → 422", S, async () => {
 });
 
 test(
-  "POST /api/sheets: tạo mới thành công (không copy) — tự tạo tower nếu DB trống",
+  "POST /api/sheets: tạo mới thành công (không copy) — dự án chưa có tháp thì tạo tháp TRONG dự án đang chọn",
   S,
   async () => {
     const pm = await dungUser("pm", `pmsheetok${RUN}`);
-    dangNhap({ id: pm.id, passwordHash: pm.pwHash });
+    const projectId = await dungDuAn(`pmsheetok${RUN}`);
+    await dangNhapDuAn({ id: pm.id, passwordHash: pm.pwHash }, projectId);
     const { POST } = await import("@/app/api/sheets/route");
     const res = await POST(req("http://localhost/api/sheets", "POST", { name: `Sheet OK ${RUN}` }));
     assert.equal(res.status, 201);
     const json = await res.json();
     assert.equal(json.copiedTasks, 0);
+    const { queryOne } = await import("@/lib/db");
+    const owner = await queryOne<{ projectId: number }>(
+      `SELECT tw.project_id AS "projectId" FROM sheet_types st JOIN towers tw ON tw.id = st.tower_id
+        WHERE st.id = ?`,
+      json.sheet.id,
+    );
+    assert.equal(owner?.projectId, projectId);
+  },
+);
+
+test(
+  "POST /api/sheets: không có dự án đang chọn → 404, không tạo dự án/tháp/sheet",
+  S,
+  async () => {
+    // Tổ chức mới chưa có dự án nào → user không có dự án khả kiến.
+    const { insertId, queryOne } = await import("@/lib/db");
+    const orgId = await insertId(`INSERT INTO organizations (name) VALUES (?)`, `QT org ${RUN}`);
+    const pm = await dungUser("pm", `pmsheetnoproj${RUN}`, orgId);
+    dangNhap({ id: pm.id, passwordHash: pm.pwHash, orgId });
+    const { POST } = await import("@/app/api/sheets/route");
+    const name = `Sheet không dự án ${RUN}`;
+    const res = await POST(req("http://localhost/api/sheets", "POST", { name }));
+    assert.equal(res.status, 404);
+    assert.equal(await queryOne(`SELECT 1 FROM sheet_types WHERE name = ?`, name), undefined);
   },
 );
 

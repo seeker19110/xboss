@@ -60,16 +60,18 @@
 | manager_id | integer | ✓ |  |
 | sort_order | integer |  | `0` |
 | system_id | integer | ✓ |  |
+| project_id | integer | ✓ |  |
 
 **Khóa ngoại:**
 - `manager_id` → `users(id)`
+- `project_id` → `projects(id)`
 - `system_id` → `systems(id)`
 - `tower_id` → `towers(id)`
 
 **Index:**
 - `sheet_types_pkey`: UNIQUE INDEX sheet_types_pkey ON public.sheet_types USING btree (id)
 - `sheet_types_tower_id_code_key`: UNIQUE INDEX sheet_types_tower_id_code_key ON public.sheet_types USING btree (tower_id, code)
-- `uniq_sheet_slug`: UNIQUE INDEX uniq_sheet_slug ON public.sheet_types USING btree (slug)
+- `uq_sheet_types_project_slug`: UNIQUE INDEX uq_sheet_types_project_slug ON public.sheet_types USING btree (COALESCE(project_id, 0), slug)
 
 ### work_packages
 
@@ -1238,6 +1240,21 @@
 
 **Index:**
 - `cost_settings_pkey`: UNIQUE INDEX cost_settings_pkey ON public.cost_settings USING btree (id)
+
+### org_cost_settings
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| org_id | integer |  |  |
+| warn_pct | numeric(5,2) |  | `90` |
+| over_pct | numeric(5,2) |  | `100` |
+| updated_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `org_id` → `organizations(id)`
+
+**Index:**
+- `org_cost_settings_pkey`: UNIQUE INDEX org_cost_settings_pkey ON public.org_cost_settings USING btree (org_id)
 
 ### purchase_requests
 
@@ -3274,8 +3291,8 @@
 - `org_id` → `organizations(id)`
 
 **Index:**
-- `code_lists_domain_code_key`: UNIQUE INDEX code_lists_domain_code_key ON public.code_lists USING btree (domain, code)
 - `code_lists_pkey`: UNIQUE INDEX code_lists_pkey ON public.code_lists USING btree (id)
+- `uq_code_lists_org_domain_code`: UNIQUE INDEX uq_code_lists_org_domain_code ON public.code_lists USING btree (org_id, domain, code)
 
 ## Khác (chưa gán module)
 
@@ -3301,7 +3318,7 @@
 
 **Index:**
 - `alert_rules_pkey`: UNIQUE INDEX alert_rules_pkey ON public.alert_rules USING btree (id)
-- `ux_alert_rule_active`: UNIQUE INDEX ux_alert_rule_active ON public.alert_rules USING btree (metric, COALESCE(project_id, 0)) WHERE active
+- `ux_alert_rule_org_active`: UNIQUE INDEX ux_alert_rule_org_active ON public.alert_rules USING btree (org_id, metric, COALESCE(project_id, 0)) WHERE active
 
 ### api_keys
 
@@ -6318,6 +6335,33 @@
 **Index:**
 - `organizations_pkey`: UNIQUE INDEX organizations_pkey ON public.organizations USING btree (id)
 - `organizations_slug_key`: UNIQUE INDEX organizations_slug_key ON public.organizations USING btree (slug)
+
+### payment_cert_decision_snapshots
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  |  |
+| cert_id | integer |  |  |
+| contract_id | integer |  |  |
+| project_id | integer |  |  |
+| org_id | integer |  |  |
+| actor_id | integer |  |  |
+| operation_id | uuid |  |  |
+| request_hash | text |  |  |
+| result_status | text |  |  |
+| snapshot | jsonb |  |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `actor_id` → `users(id)`
+- `cert_id` → `payment_certs(id)`
+- `contract_id` → `contracts(id)`
+- `org_id` → `organizations(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `payment_cert_decision_snapshots_cert_id_operation_id_key`: UNIQUE INDEX payment_cert_decision_snapshots_cert_id_operation_id_key ON public.payment_cert_decision_snapshots USING btree (cert_id, operation_id)
+- `payment_cert_decision_snapshots_pkey`: UNIQUE INDEX payment_cert_decision_snapshots_pkey ON public.payment_cert_decision_snapshots USING btree (id)
 
 ### saved_reports
 

@@ -466,6 +466,8 @@ test(
       "custom_field_defs",
       "feature_flags",
       "integrations",
+      // S02e (migration 0161): ngưỡng cảnh báo chi phí theo tổ chức — khuôn 3 nhánh của 0080.
+      "org_cost_settings",
       "projects",
       "role_permissions",
       "saved_reports",
@@ -502,10 +504,23 @@ test(
     // mọi dự án (7 công tác seed của 0046 giữ nguyên nghĩa — D1 của M123).
     const KE_HOACH = ["baselines", "construction_stages", "floor_stage_fronts"];
 
+    // Snapshot quyết định IPC bất biến (QUALITY-FINAL-1 S13c, migration 0160): policy theo
+    // org + dự án (đọc) và + actor (ghi), không nhánh '*'/GUC rỗng; xboss_app chỉ SELECT/INSERT.
+    // Hành vi kiểm riêng ở tests/s13c-ipc-quyet-dinh.test.ts bằng role xboss_app.
+    const IPC_SNAPSHOT = ["payment_cert_decision_snapshots"];
+
     // Nhóm engineering: khai theo TIỀN TỐ chứ không liệt kê tay — thêm bảng engineering_* mới
     // mà quên bật RLS thì bị bắt ở assert bên dưới, không phải ở đây.
     const eng = thucTe.filter((t) => t.startsWith("engineering_"));
-    const khai = new Set([...TAI_CHINH, ...TO_CHUC, ...ZALO, ...CAD, ...KE_HOACH, ...eng]);
+    const khai = new Set([
+      ...TAI_CHINH,
+      ...TO_CHUC,
+      ...ZALO,
+      ...CAD,
+      ...KE_HOACH,
+      ...IPC_SNAPSHOT,
+      ...eng,
+    ]);
 
     const laKhaiThieu = thucTe.filter((t) => !khai.has(t));
     assert.deepEqual(
@@ -514,7 +529,7 @@ test(
       "Có bảng BẬT RLS nhưng chưa khai trong test/tài liệu — bổ sung vào danh sách trên và cập nhật PROJECT.md + ADR-0005",
     );
 
-    const matRls = [...TAI_CHINH, ...TO_CHUC, ...ZALO, ...CAD, ...KE_HOACH].filter(
+    const matRls = [...TAI_CHINH, ...TO_CHUC, ...ZALO, ...CAD, ...KE_HOACH, ...IPC_SNAPSHOT].filter(
       (t) => !thucTe.includes(t),
     );
     assert.deepEqual(

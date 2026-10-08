@@ -252,17 +252,20 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { getCostSettings, updateCostSettings } = await import("@/lib/tai-chinh/cost");
+    const { insertId } = await import("@/lib/db");
+    // Ngưỡng theo tổ chức (S02e): tổ chức riêng của ca này — không đụng cấu hình org khác.
+    const orgId = await insertId(
+      `INSERT INTO organizations (name) VALUES (?)`,
+      `Org cost settings ${Date.now()}`,
+    );
 
-    const before = await getCostSettings();
+    const before = await getCostSettings(orgId);
     assert.equal(before.warnPct, 90);
     assert.equal(before.overPct, 100);
 
-    await updateCostSettings({ warnPct: 80, overPct: 110 });
-    const after = await getCostSettings();
+    await updateCostSettings(orgId, { warnPct: 80, overPct: 110 });
+    const after = await getCostSettings(orgId);
     assert.equal(after.warnPct, 80);
     assert.equal(after.overPct, 110);
-
-    // Khôi phục mặc định để không ảnh hưởng test khác.
-    await updateCostSettings({ warnPct: 90, overPct: 100 });
   },
 );

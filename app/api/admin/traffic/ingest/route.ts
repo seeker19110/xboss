@@ -14,12 +14,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 401 });
   try {
     const body = await req.json();
-    const { method, path, ip, ua, ts } = body as {
+    const { method, path, ip, ua, ts, orgId } = body as {
       method?: string;
       path?: string;
       ip?: string;
       ua?: string;
       ts?: number;
+      orgId?: unknown;
     };
     if (!method || !path) return NextResponse.json({ ok: false }, { status: 400 });
     recordTraffic({
@@ -28,6 +29,8 @@ export async function POST(req: NextRequest) {
       ip: String(ip ?? ""),
       ua: String(ua ?? ""),
       ts: Number(ts ?? Date.now()),
+      // S02e: org do proxy suy từ cookie phiên đã ký; giá trị lạ → ẩn danh (không hiện cho ai).
+      orgId: Number.isSafeInteger(orgId) && (orgId as number) > 0 ? (orgId as number) : null,
     });
     return NextResponse.json({ ok: true });
   } catch {

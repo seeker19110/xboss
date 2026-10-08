@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest) {
   // (các phiên khác trên thiết bị khác vẫn bị huỷ — đúng ý đồ bảo mật).
   // M56 PR2: giữ nguyên trạng thái mustSetup2fa của phiên (đọc lại từ user hiện tại) —
   // đổi mật khẩu không mở khoá 2FA (chỉ bật 2FA thật mới mở, qua /api/auth/totp/confirm).
-  const required = await requiredRoles();
+  const required = await requiredRoles(u.org_id);
   const mustSetup2fa = computeMustSetup2fa(me.role, u.totp_enabled_at, required);
   const res = NextResponse.json({ ok: true });
   res.cookies.set(COOKIE, makeToken(me.id, newHash, mustSetup2fa, u.session_version, u.org_id), {

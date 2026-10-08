@@ -279,6 +279,8 @@ export async function DELETE(
     return NextResponse.json(
       {
         error: `Hợp đồng còn ${linked} bản ghi gắn vào (thanh toán/PO/giao thầu tầng/BOQ) — gỡ liên kết trước khi xoá`,
+        // S13c (A5-FR10): cùng mã máy đọc với DELETE /api/boq/:id.
+        code: "dependency_conflict",
       },
       { status: 409 },
     );

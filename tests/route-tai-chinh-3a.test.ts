@@ -2831,11 +2831,11 @@ test(
 );
 
 test("PATCH /api/costs/settings: cập nhật thành công", S, async (t) => {
-  // cost_settings là cấu hình toàn hệ: trả lại ngưỡng cũ để không lệch test file khác chạy sau
-  // trên cùng DB worker (thong-bao cost_over từng đỏ vì ngưỡng 85% còn sót lại).
+  // Ngưỡng theo tổ chức (S02e) — PM test thuộc tổ chức mặc định 1, dùng chung với file khác trên
+  // cùng DB worker: trả lại ngưỡng cũ (thong-bao cost_over từng đỏ vì ngưỡng 85% còn sót lại).
   const { getCostSettings, updateCostSettings } = await import("@/lib/tai-chinh/cost");
-  const truoc = await getCostSettings();
-  t.after(() => updateCostSettings(truoc));
+  const truoc = await getCostSettings(1);
+  t.after(() => updateCostSettings(1, truoc));
   const projectId = await taoDuAn("costset-ok");
   const pm = await taoUser("pm", "costset-ok");
   await dangNhapDuAn(pm, projectId);

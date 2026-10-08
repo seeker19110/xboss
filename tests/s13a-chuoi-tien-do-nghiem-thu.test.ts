@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangXuat, requestRieng } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SoFixture, jreq, P, goi, type NguoiTest } from "./helpers/chuoi-nghiep-vu";
@@ -23,7 +23,9 @@ test.after(() => dangXuat());
 
 async function tick(dimId: number, installed = true) {
   const { PATCH } = await import("@/app/api/dimensions/[id]/route");
-  return goi(PATCH(jreq(`/api/dimensions/${dimId}`, { installed }, "PATCH"), P(dimId)));
+  return goi(
+    requestRieng(() => PATCH(jreq(`/api/dimensions/${dimId}`, { installed }, "PATCH"), P(dimId))),
+  );
 }
 
 async function tickLo(ids: number[], installed = true) {
@@ -33,7 +35,7 @@ async function tickLo(ids: number[], installed = true) {
 
 async function nghiemThu(taskId: number, body: Record<string, unknown> = {}) {
   const { POST } = await import("@/app/api/tasks/[id]/approve/route");
-  return goi(POST(jreq(`/api/tasks/${taskId}/approve`, body), P(taskId)));
+  return goi(requestRieng(() => POST(jreq(`/api/tasks/${taskId}/approve`, body), P(taskId))));
 }
 
 async function huyNghiemThu(taskId: number) {

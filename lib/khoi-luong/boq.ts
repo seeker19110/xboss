@@ -82,6 +82,32 @@ export async function boqExecutedQty(boqItemId: number): Promise<number> {
   return row?.executed ?? 0;
 }
 
+/**
+ * Chứng từ hạ nguồn tham chiếu một dòng BOQ mà FK KHÔNG cascade (S13c, A5-FR10): dòng KL đợt IPC
+ * (`payment_cert_items`), phạm vi gói thầu (`tender_items`), giá chào theo dòng
+ * (`tender_bid_prices`). Còn bất kỳ → xoá dòng BOQ phải trả 409 `dependency_conflict` (điều
+ * chỉnh/huỷ chứng từ hạ nguồn trước), không để Postgres ném 23503 thành 500. Chỉ trả SỐ LƯỢNG
+ * theo loại — không id/tiền của chứng từ.
+ */
+export async function phuThuocDongBoq(
+  boqItemId: number,
+): Promise<{ dotThanhToan: number; goiThau: number }> {
+  const row = await queryOne<{ dotThanhToan: number; goiThau: number }>(
+    `SELECT (SELECT COUNT(DISTINCT cert_id)::int FROM payment_cert_items WHERE boq_item_id = ?)
+              AS "dotThanhToan",
+            (SELECT COUNT(*)::int FROM (
+               SELECT tender_id FROM tender_items WHERE boq_item_id = ?
+               UNION
+               SELECT b.tender_id FROM tender_bid_prices p JOIN tender_bids b ON b.id = p.bid_id
+                WHERE p.boq_item_id = ?
+             ) t) AS "goiThau"`,
+    boqItemId,
+    boqItemId,
+    boqItemId,
+  );
+  return { dotThanhToan: row?.dotThanhToan ?? 0, goiThau: row?.goiThau ?? 0 };
+}
+
 /** Một dòng trong danh mục BOQ của dự án — CHỈ phần mô tả, không có cột tiền nào. */
 export type DongDanhMucBoq = { code: string; name: string; unit: string };
 

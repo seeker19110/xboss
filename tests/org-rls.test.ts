@@ -119,3 +119,55 @@ test(
     }
   },
 );
+
+test(
+  "RLS org (S02e, 0161): org_cost_settings lọc theo GUC app.org_id + WITH CHECK chặn ghi org khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const orgA = await insertId(`INSERT INTO organizations (name) VALUES ('Org RLS cost A')`);
+    const orgB = await insertId(`INSERT INTO organizations (name) VALUES ('Org RLS cost B')`);
+    const orgC = await insertId(`INSERT INTO organizations (name) VALUES ('Org RLS cost C')`);
+    await run(
+      `INSERT INTO org_cost_settings (org_id, warn_pct, over_pct) VALUES (?, 80, 95), (?, 50, 60)`,
+      orgA,
+      orgB,
+    );
+    const appPool = new Pool({ connectionString: appConnString(), max: 2 });
+    try {
+      const c = await appPool.connect();
+      try {
+        await c.query("BEGIN");
+        await c.query(`SELECT set_config('app.org_id', $1, true)`, [String(orgA)]);
+        const rows = await c.query<{ org_id: number }>(
+          `SELECT org_id FROM org_cost_settings WHERE org_id IN ($1, $2)`,
+          [orgA, orgB],
+        );
+        assert.deepEqual(
+          rows.rows.map((r) => r.org_id),
+          [orgA],
+          "GUC org A không được thấy ngưỡng chi phí org B",
+        );
+        // Dòng org B vô hình → UPDATE không chạm được; INSERT cho org khác (C) bị WITH CHECK chặn.
+        const upd = await c.query(`UPDATE org_cost_settings SET warn_pct = 1 WHERE org_id = $1`, [
+          orgB,
+        ]);
+        assert.equal(upd.rowCount, 0, "không sửa được ngưỡng org B");
+        await assert.rejects(
+          c.query(`INSERT INTO org_cost_settings (org_id, warn_pct, over_pct) VALUES ($1, 1, 2)`, [
+            orgC,
+          ]),
+          /row-level security|row level security|policy/i,
+          "WITH CHECK phải chặn ghi ngưỡng của org khác",
+        );
+        await c.query("ROLLBACK");
+      } finally {
+        c.release();
+      }
+    } finally {
+      await appPool.end();
+      await run(`DELETE FROM org_cost_settings WHERE org_id IN (?, ?, ?)`, orgA, orgB, orgC);
+      await run(`DELETE FROM organizations WHERE id IN (?, ?, ?)`, orgA, orgB, orgC);
+    }
+  },
+);

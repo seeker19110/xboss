@@ -37,10 +37,23 @@ test("docChiTietDot: 200 → totals chuỗi + cảnh báo vượt KL, không l�
   const vuot = [
     { boqItemId: 1, code: "B1", name: "Ống", unit: "m", qtyContract: 1, qtyCumulative: 2 },
   ];
+  const warningVersion = "c".repeat(64); // S13c: phiên bản cảnh báo để xác nhận khi duyệt
   const ct = await docChiTietDot(
-    json({ totals, vuotHopDong: vuot, approvalStatus: null, moneyFormat: "decimal-string-v1" }),
+    json({
+      totals,
+      vuotHopDong: vuot,
+      warningVersion,
+      approvalStatus: null,
+      moneyFormat: "decimal-string-v1",
+    }),
   );
-  assert.deepEqual(ct, { approvalStatus: null, vuotHopDong: vuot, totals, loi: null });
+  assert.deepEqual(ct, {
+    approvalStatus: null,
+    vuotHopDong: vuot,
+    warningVersion,
+    totals,
+    loi: null,
+  });
 });
 
 test("docChiTietDot: 422 money_precision_unsupported → thông báo lỗi, KHÔNG thành totals null-bị-che im lặng", async () => {

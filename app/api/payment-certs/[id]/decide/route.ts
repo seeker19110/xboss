@@ -4,23 +4,47 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
 import { log } from "@/lib/nen/log";
-import { certTotals } from "@/lib/tai-chinh/paymentcerts";
+import { certTotals, tinhLaiLuyKeDot } from "@/lib/tai-chinh/paymentcerts";
+import {
+  bamYeuCauQuyetDinh,
+  canhBaoDot,
+  docIdempotencyKey,
+  docXacNhanCanhBao,
+  ghiSnapshotQuyetDinh,
+  khoaHopDongVaDot,
+  kiemXacNhanCanhBao,
+  kySauDaDuyet,
+  taoOperationId,
+  timQuyetDinhDaGhi,
+  type KetQuaQuyetDinh,
+} from "@/lib/tai-chinh/ipc-quyet-dinh";
 import { fitsNumeric, moneyToDecimal } from "@/lib/nen/money";
-import { advanceApproval } from "@/lib/tien-do/approvals";
+import { advanceApproval, NON_APPROVER_ROLES } from "@/lib/tien-do/approvals";
 import { emitWebhook } from "@/lib/bao-mat/webhooks";
+import type { Role } from "@/lib/nen/roles";
 
 export const dynamic = "force-dynamic";
 
 type Decision = "approved" | "rejected";
 
+/** Lỗi có chủ đích: status HTTP + mã máy đọc + dữ liệu kèm (vd cảnh báo hiện hành khi 409). */
+function loi(status: number, message: string, code?: string, extra?: Record<string, unknown>) {
+  return Object.assign(new Error(message), { status, code, extra });
+}
+
 // POST /api/payment-certs/:id/decide — CĐT/TVGS quyết định.
-// body: { decision: 'approved'|'rejected', rejectReason? } — approved sinh 1 dòng
-// payment_bills (amount = giá trị đề nghị sau trừ tạm ứng/giữ lại); rejected bắt
-// buộc rejectReason. Scoped theo dự án đang chọn (M22).
-// M46 PR2: có approval_request đang pending cho IPC này (openApproval mở lúc tạo, chỉ có
-// khi Admin cấu hình flow — PR4) → quyền/SoD do advanceApproval quyết định thay CAN.approve;
-// approve ở bước CHƯA CUỐI chỉ ghi nhận bước, chưa sinh payment_bills/đổi status. reject ở
-// bất kỳ bước nào chốt ngay. Không có flow/request pending → hành vi y hệt trước đây.
+// body: { decision: 'approved'|'rejected', rejectReason?, acknowledged?, reason?, warningVersion? }
+// header (tuỳ chọn): Idempotency-Key: <uuid> — retry cùng key + cùng payload trả kết quả bước
+// cũ (`replayed: true`), không chạy bước kế; cùng key khác payload → 409 idempotency_conflict.
+// approved sinh 1 dòng payment_bills (amount = giá trị đề nghị sau trừ tạm ứng/giữ lại);
+// rejected bắt buộc rejectReason. Scoped theo dự án đang chọn (M22).
+// M46 PR2: có approval_request đang pending cho IPC này → quyền/SoD do advanceApproval quyết
+// định thay CAN.approve; approve ở bước CHƯA CUỐI chỉ ghi nhận bước (snapshot 'pending'), chưa
+// sinh payment_bills/đổi status. reject ở bất kỳ bước nào chốt ngay.
+// S13c (A5-FR06..FR09): khoá HĐ → đợt trước mọi lookup; luỹ kế tính lại dưới khoá; kỳ sau đã
+// duyệt → 409 reconciliation_required; có cảnh báo vượt HĐ → phải xác nhận đúng warningVersion
+// hiện tại + lý do (409 acknowledgement_required / warning_changed) — cảnh báo, không hard-cap.
+// Chuyển trạng thái + phiếu + snapshot quyết định + audit trigger trong CÙNG một transaction.
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -39,54 +63,97 @@ export async function POST(
   const rejectReason = typeof body?.rejectReason === "string" ? body.rejectReason.trim() : "";
   if (decision === "rejected" && !rejectReason)
     return NextResponse.json({ error: "Cần nhập lý do từ chối" }, { status: 422 });
+  const xacNhan = docXacNhanCanhBao(body as Record<string, unknown>);
+  if (typeof xacNhan === "string") return NextResponse.json({ error: xacNhan }, { status: 422 });
+  const key = docIdempotencyKey(req.headers.get("Idempotency-Key"));
+  if (key === "invalid")
+    return NextResponse.json(
+      { error: "Idempotency-Key phải là UUID", code: "idempotency_key_invalid" },
+      { status: 422 },
+    );
+  const operationId = key ?? taoOperationId();
+  const requestHash = bamYeuCauQuyetDinh({ certId: id, decision, rejectReason, xacNhan });
 
   const projectId = await getCurrentProjectId(user);
-  // withTransaction trả trực tiếp trạng thái "chưa tới bước cuối" thay vì gán qua biến
-  // ngoài trong closure — gán qua closure khiến TS CFA narrow biến top-level về `never`
-  // ở nhánh `if` bên dưới (không track được nhánh gán bên trong async callback).
-  let pendingStep: { currentSeq: number; nextRole: string } | undefined;
 
+  let ketQua: KetQuaQuyetDinh & { replayed?: boolean };
   try {
-    pendingStep = await withTransaction(async () => {
-      const cert =
-        projectId != null
-          ? await queryOne<{ status: string; contractId: number; periodNo: number }>(
-              `SELECT c.status, c.contract_id AS "contractId", c.period_no AS "periodNo"
-                 FROM payment_certs c JOIN contracts ct ON ct.id = c.contract_id
-                WHERE c.id = ? AND ct.project_id = ? FOR UPDATE OF c`,
-              id,
-              projectId,
-            )
-          : undefined;
-      if (!cert) throw Object.assign(new Error("Không tìm thấy đợt thanh toán"), { status: 404 });
-      if (cert.status !== "submitted")
-        throw Object.assign(
-          new Error("Chỉ quyết định được đợt đã trình (đã được trình CĐT/TVGS)"),
-          { status: 409 },
-        );
+    ketQua = await withTransaction(async () => {
+      const goc = projectId != null ? await khoaHopDongVaDot(id, projectId, user.orgId) : undefined;
+      if (!goc) throw loi(404, "Không tìm thấy đợt thanh toán");
+
+      // Retry cùng Idempotency-Key: phát lại kết quả bước đã ghi — vẫn kiểm người gọi hiện tại
+      // (cùng actor, vai trò chưa đổi, còn quyền duyệt), không cho key bỏ qua quyền vừa bị thu.
+      if (key) {
+        const cu = await timQuyetDinhDaGhi(id, key);
+        if (cu) {
+          if (cu.actorId !== user.id || cu.requestHash !== requestHash)
+            throw loi(
+              409,
+              "Idempotency-Key đã dùng cho một quyết định khác — tạo key mới cho quyết định mới",
+              "idempotency_conflict",
+            );
+          const conQuyen =
+            cu.actorRole === user.role &&
+            !NON_APPROVER_ROLES.includes(user.role as Role) &&
+            (cu.buoc === "engine" || CAN.approve(user.role));
+          if (!conQuyen) throw loi(403, "Bạn không còn quyền duyệt đợt thanh toán này");
+          return { ...cu.ketQua, replayed: true };
+        }
+      }
+
+      if (goc.status !== "submitted")
+        throw loi(409, "Chỉ quyết định được đợt đã trình (đã được trình CĐT/TVGS)");
 
       const liveRequest = await queryOne<{ id: number }>(
         `SELECT id FROM approval_requests WHERE entity_type = 'payment_cert' AND entity_id = ? AND status = 'pending'`,
         id,
       );
+      let buocKetQua: KetQuaQuyetDinh;
       if (liveRequest) {
+        // Kiểm quyền/SoD + ghi bước TRƯỚC các kiểm nghiệp vụ dưới: người không có quyền nhận 403,
+        // không thấy cảnh báo. Lỗi 409 phía sau throw → rollback cả bước vừa ghi.
         const result = await advanceApproval({
           entityType: "payment_cert",
           entityId: id,
           user,
           decision: decision === "rejected" ? "reject" : "approve",
-          note: decision === "rejected" ? rejectReason : null,
+          note: decision === "rejected" ? rejectReason : (xacNhan.reason ?? null),
         });
-        if (result.status === "pending") {
-          // chưa tới bước cuối — không đụng payment_bills/status, dừng ở đây.
-          return { currentSeq: result.currentSeq, nextRole: result.nextRole };
-        }
-        // Bước cuối (approved) hoặc reject → áp domain logic bên dưới như cũ.
-      } else if (!CAN.approve(user.role)) {
-        throw Object.assign(new Error("Chỉ Admin/PM được duyệt đợt thanh toán"), { status: 403 });
+        buocKetQua =
+          result.status === "pending"
+            ? { result: "pending", currentSeq: result.currentSeq, nextRole: result.nextRole }
+            : { result: decision };
+      } else {
+        if (!CAN.approve(user.role)) throw loi(403, "Chỉ Admin/PM được duyệt đợt thanh toán");
+        buocKetQua = { result: decision };
       }
 
-      if (decision === "rejected") {
+      // Luỹ kế tính lại dưới khoá HĐ → đợt từ tập đợt approved kỳ trước (A5-FR06) — không dùng
+      // luỹ kế lưu từ lúc nháp. Cảnh báo dựng trên đúng số này.
+      await tinhLaiLuyKeDot(id);
+      const canh = await canhBaoDot(id);
+      if (decision === "approved") {
+        const sau = await kySauDaDuyet(goc.contractId, goc.periodNo);
+        if (sau)
+          throw loi(
+            409,
+            `Đợt ${sau.code} (kỳ ${sau.periodNo}) của hợp đồng này đã được duyệt — không duyệt kỳ trước sau kỳ sau. ` +
+              "Cần đối soát: từ chối đợt này và lập chứng từ điều chỉnh",
+            "reconciliation_required",
+          );
+        // Dữ liệu đợt không lưu được (tràn NUMERIC) là lỗi 422 TRƯỚC chuyện xác nhận cảnh báo.
+        kiemTranGiaTri(id, await certTotals(id), user.role);
+        const loiXacNhan = kiemXacNhanCanhBao(canh, xacNhan);
+        if (loiXacNhan)
+          throw loi(409, loiXacNhan.message, loiXacNhan.code, {
+            vuotHopDong: canh.vuotHopDong,
+            warningVersion: canh.warningVersion,
+          });
+      }
+
+      let paymentBillId: number | null = null;
+      if (buocKetQua.result === "rejected") {
         await run(
           `UPDATE payment_certs SET status = 'rejected', decided_at = ?, decided_by = ?, reject_reason = ? WHERE id = ?`,
           todayISO(),
@@ -94,75 +161,45 @@ export async function POST(
           rejectReason,
           id,
         );
-        return undefined;
+      } else if (buocKetQua.result === "approved") {
+        paymentBillId = await sinhPhieuVaDuyet(id, goc, user);
       }
+      // Bước 'pending' của engine: không đụng payment_bills/status — chỉ ghi snapshot bước.
 
-      const contract = await queryOne<{
-        title: string;
-        partyName: string | null;
-        supplierName: string | null;
-        projectId: number | null;
-      }>(
-        `SELECT ct.title, ct.party_name AS "partyName", s.name AS "supplierName",
-                ct.project_id AS "projectId"
-           FROM contracts ct LEFT JOIN suppliers s ON s.id = ct.party_supplier_id
-          WHERE ct.id = ?`,
-        cert.contractId,
-      );
-      const totals = await certTotals(id);
-      // payment_bills.amount là NUMERIC(15,2): ghi chuỗi canonical exact (không qua float);
-      // vượt cột → 422 rõ ràng thay vì lỗi tràn số 500 của Postgres, không clamp.
-      // S10a L6: người duyệt bước cuối có thể không có viewPayments → thông điệp cụ thể làm lộ
-      // độ lớn giá trị (≥ 10^13 đ). Không có quyền xem tiền → thông điệp chung; lý do thật log server.
-      if (!fitsNumeric(totals.approvedValue, 15)) {
-        log.warn("payment-certs/decide: giá trị đề nghị vượt NUMERIC(15,2)", {
-          certId: id,
-          reason: "approved_value_overflow",
-        });
-        if (CAN.viewPayments(user.role))
-          throw Object.assign(
-            new Error("Giá trị đề nghị thanh toán vượt giới hạn lưu trữ của phiếu thanh toán"),
-            { status: 422, code: "amount_overflow" },
-          );
-        throw Object.assign(
-          new Error(
-            "Không thể duyệt đợt này do dữ liệu đợt không hợp lệ — liên hệ Admin/PM kiểm tra lại đợt",
-          ),
-          { status: 422, code: "cert_invalid" },
-        );
-      }
-      const responsible = contract?.supplierName ?? contract?.partyName ?? contract?.title ?? "—";
-
-      // M51 PR1: project_id của bill lấy từ hợp đồng (cert.contractId → contracts.project_id)
-      // để RLS lọc đúng dự án.
-      await insertId(
-        `INSERT INTO payment_bills (responsible, type, amount, description, paid_date, contract_id, payment_cert_id, created_by, project_id)
-         VALUES (?, 'bill', ?, ?, ?, ?, ?, ?, ?)`,
-        responsible,
-        moneyToDecimal(totals.approvedValue),
-        `Đợt ${cert.periodNo} — ${contract?.title ?? ""}`,
-        todayISO(),
-        cert.contractId,
-        id,
-        user.id,
-        contract?.projectId ?? null,
-      );
-      await run(
-        `UPDATE payment_certs SET status = 'approved', decided_at = ?, decided_by = ? WHERE id = ?`,
-        todayISO(),
-        user.id,
-        id,
-      );
-      return undefined;
+      await ghiSnapshotQuyetDinh({
+        certId: id,
+        goc,
+        actor: user,
+        operationId,
+        requestHash,
+        buoc: liveRequest ? "engine" : "legacy",
+        ketQua: buocKetQua,
+        canh,
+        xacNhan,
+        rejectReason: decision === "rejected" ? rejectReason : null,
+        paymentBillId,
+      });
+      return buocKetQua;
     });
   } catch (err: unknown) {
-    const e = err as { message?: string; status?: number; code?: string };
+    const e = err as {
+      message?: string;
+      status?: number;
+      code?: string;
+      extra?: Record<string, unknown>;
+    };
     // Chỉ lỗi có chủ đích (status) trả thông điệp; lỗi bất ngờ (pg/mã nội bộ) chỉ log.
-    if (e.status)
+    if (e.status) {
+      if (e.code === "warning_changed" || e.code === "acknowledgement_required")
+        log.info("payment-certs/decide: chặn duyệt chờ xác nhận cảnh báo", {
+          certId: id,
+          reason: e.code,
+        });
       return NextResponse.json(
-        { error: e.message, ...(e.code ? { code: e.code } : {}) },
-        { status: e.status },
+        { error: e.message, ...(e.code ? { code: e.code } : {}), ...(e.extra ?? {}) },
+        { status: e.status, headers: { "Cache-Control": "private, no-store" } },
       );
+    }
     log.error("payment-certs/decide: lỗi không lường trước", {
       certId: id,
       err: err instanceof Error ? err.message : String(err),
@@ -174,18 +211,20 @@ export async function POST(
     );
   }
 
-  if (pendingStep)
+  const phatLai = ketQua.replayed === true ? { replayed: true } : {};
+  if (ketQua.result === "pending")
     return NextResponse.json({
       decided: id,
       pending: true,
-      currentSeq: pendingStep.currentSeq,
-      nextRole: pendingStep.nextRole,
+      currentSeq: ketQua.currentSeq,
+      nextRole: ketQua.nextRole,
+      operationId,
+      ...phatLai,
     });
 
-  // IPC vừa CHUYỂN sang approved THẬT (pendingStep undefined + decision approved = domain
-  // logic đã chạy, đã sinh payment_bills + set status='approved'; gồm cả nhánh legacy lẫn
-  // bước cuối engine). Không phát khi reject hay bước giữa. Re-fetch sau commit để tránh CFA.
-  if (decision === "approved") {
+  // IPC vừa CHUYỂN sang approved THẬT (gồm cả nhánh legacy lẫn bước cuối engine) — phát sau
+  // COMMIT; không phát khi reject, bước giữa hay phát lại idempotent.
+  if (ketQua.result === "approved" && !ketQua.replayed) {
     const c = await queryOne<{ code: string; contractId: number; periodNo: number }>(
       `SELECT code, contract_id AS "contractId", period_no AS "periodNo" FROM payment_certs WHERE id = ?`,
       id,
@@ -197,5 +236,75 @@ export async function POST(
       periodNo: c?.periodNo ?? null,
     });
   }
-  return NextResponse.json({ decided: id, decision });
+  return NextResponse.json({ decided: id, decision: ketQua.result, operationId, ...phatLai });
+}
+
+/**
+ * payment_bills.amount là NUMERIC(15,2): ghi chuỗi canonical exact (không qua float); vượt cột →
+ * 422 rõ ràng thay vì lỗi tràn số 500 của Postgres, không clamp. S10a L6: người duyệt có thể
+ * không có viewPayments → thông điệp cụ thể làm lộ độ lớn giá trị (≥ 10^13 đ). Không có quyền
+ * xem tiền → thông điệp chung; lý do thật log server.
+ */
+function kiemTranGiaTri(id: number, totals: { approvedValue: bigint }, role: Role): void {
+  if (fitsNumeric(totals.approvedValue, 15)) return;
+  log.warn("payment-certs/decide: giá trị đề nghị vượt NUMERIC(15,2)", {
+    certId: id,
+    reason: "approved_value_overflow",
+  });
+  if (CAN.viewPayments(role))
+    throw loi(
+      422,
+      "Giá trị đề nghị thanh toán vượt giới hạn lưu trữ của phiếu thanh toán",
+      "amount_overflow",
+    );
+  throw loi(
+    422,
+    "Không thể duyệt đợt này do dữ liệu đợt không hợp lệ — liên hệ Admin/PM kiểm tra lại đợt",
+    "cert_invalid",
+  );
+}
+
+/** Bước cuối approved: sinh payment_bills (giá trị đề nghị exact) + chuyển đợt sang approved. */
+async function sinhPhieuVaDuyet(
+  id: number,
+  goc: { contractId: number; periodNo: number },
+  user: { id: number; role: Role },
+): Promise<number> {
+  const contract = await queryOne<{
+    title: string;
+    partyName: string | null;
+    supplierName: string | null;
+    projectId: number | null;
+  }>(
+    `SELECT ct.title, ct.party_name AS "partyName", s.name AS "supplierName",
+            ct.project_id AS "projectId"
+       FROM contracts ct LEFT JOIN suppliers s ON s.id = ct.party_supplier_id
+      WHERE ct.id = ?`,
+    goc.contractId,
+  );
+  const totals = await certTotals(id);
+  kiemTranGiaTri(id, totals, user.role);
+  const responsible = contract?.supplierName ?? contract?.partyName ?? contract?.title ?? "—";
+
+  // M51 PR1: project_id của bill lấy từ hợp đồng (cert.contractId → contracts.project_id)
+  // để RLS lọc đúng dự án.
+  const billId = await insertId(
+    `INSERT INTO payment_bills (responsible, type, amount, description, paid_date, contract_id, payment_cert_id, created_by, project_id)
+     VALUES (?, 'bill', ?, ?, ?, ?, ?, ?, ?)`,
+    responsible,
+    moneyToDecimal(totals.approvedValue),
+    `Đợt ${goc.periodNo} — ${contract?.title ?? ""}`,
+    todayISO(),
+    goc.contractId,
+    id,
+    user.id,
+    contract?.projectId ?? null,
+  );
+  await run(
+    `UPDATE payment_certs SET status = 'approved', decided_at = ?, decided_by = ? WHERE id = ?`,
+    todayISO(),
+    user.id,
+    id,
+  );
+  return billId;
 }

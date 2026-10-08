@@ -15,6 +15,7 @@
 // Cờ `--experimental-test-module-mocks` đã bật sẵn cho mọi tiến trình test (scripts/test-flags.mjs).
 import { mock } from "node:test";
 import { COOKIE, makeToken } from "@/lib/bao-mat/session-token";
+import { runWithRequestContext } from "@/lib/nen/request-context";
 
 /** Cookie chọn dự án — khớp PROJECT_COOKIE của lib/ha-tang/projects.ts. */
 export const COOKIE_DU_AN = "xboss_project";
@@ -79,6 +80,18 @@ export function dangXuat(): void {
 /** Đặt một cookie tuỳ ý (vd token hỏng để kiểm nhánh từ chối). */
 export function datCookie(ten: string, gia: string): void {
   kho.set(ten, gia);
+}
+
+/**
+ * Gọi handler trong một ngữ cảnh request (AsyncLocalStorage) RIÊNG, như Next cấp cho mỗi request
+ * thật. Bắt buộc với lời gọi route ĐỒNG THỜI (Promise.all): `getCurrentUser()` ghi actor + snapshot
+ * quyền vào ngữ cảnh hiện tại, mà test gọi handler thẳng thì mọi lời gọi dùng CHUNG ngữ cảnh của
+ * thân test (lời gọi route trước đó đã `enterWith` vào đó). Hai request chung ngữ cảnh xoá/nạp
+ * snapshot quyền của nhau → `CAN.x()` của request kia đọc snapshot đang nạp dở, trả false (403
+ * giả) hoặc ném "Ngữ cảnh xác thực đã thay đổi" — lỗi của harness, production không có.
+ */
+export function requestRieng<T>(goiHandler: () => T): T {
+  return runWithRequestContext({}, goiHandler);
 }
 
 /** Đặt header cho lời gọi kế tiếp (vd x-request-id). */

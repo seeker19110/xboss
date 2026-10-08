@@ -4,7 +4,8 @@ import { getList } from "@/lib/ha-tang/code-lists";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/code-lists?domain=delay_reason — đọc danh mục mềm (mọi vai trò đã đăng nhập).
+// GET /api/code-lists?domain=delay_reason — đọc danh mục mềm CỦA TỔ CHỨC người gọi (S02e;
+// mọi vai trò đã đăng nhập).
 // Mặc định chỉ trả mục đang bật; thêm &all=1 để lấy cả mục đã tắt.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -14,6 +15,6 @@ export async function GET(req: NextRequest) {
   if (!domain) return NextResponse.json({ error: "Thiếu tham số domain" }, { status: 400 });
 
   const includeInactive = req.nextUrl.searchParams.get("all") === "1";
-  const items = await getList(domain, { includeInactive });
+  const items = await getList(domain, user.orgId, { includeInactive });
   return NextResponse.json({ items });
 }

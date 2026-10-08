@@ -4,17 +4,17 @@ import { getCostSettings, updateCostSettings } from "@/lib/tai-chinh/cost";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/costs/settings — ngưỡng cảnh báo (Admin/PM/BCH xem).
+// GET /api/costs/settings — ngưỡng cảnh báo của TỔ CHỨC người gọi (Admin/PM/BCH xem; S02e).
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.viewPayments(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM/BCH được xem chi phí" }, { status: 403 });
 
-  return NextResponse.json(await getCostSettings());
+  return NextResponse.json(await getCostSettings(user.orgId));
 }
 
-// PATCH /api/costs/settings — đổi ngưỡng cảnh báo (chỉ Admin/PM).
+// PATCH /api/costs/settings — đổi ngưỡng cảnh báo của tổ chức người gọi (chỉ Admin/PM).
 export async function PATCH(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -36,6 +36,6 @@ export async function PATCH(req: NextRequest) {
       { status: 422 },
     );
 
-  await updateCostSettings({ warnPct, overPct });
+  await updateCostSettings(user.orgId, { warnPct, overPct });
   return NextResponse.json({ ok: true });
 }

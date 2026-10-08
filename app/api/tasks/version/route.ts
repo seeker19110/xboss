@@ -18,5 +18,5 @@ export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get("sheet");
   if (!slug) return NextResponse.json({ error: "Sheet không hợp lệ" }, { status: 400 });
 
-  return NextResponse.json({ v: await sheetVersion(slug) });
+  return NextResponse.json({ v: await sheetVersion(slug, projectId) });
 }

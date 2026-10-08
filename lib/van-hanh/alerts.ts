@@ -64,18 +64,23 @@ export type AlertRuleRow = {
 };
 
 // Ngưỡng hiệu lực cho 1 metric + dự án: ưu tiên rule riêng dự án (active), rồi rule
-// project_id NULL (áp mọi dự án, active), không có gì → defaultThreshold (hành vi cũ).
-// 1 query duy nhất (không lệ thuộc project_id có null hay không) — điều kiện SQL khớp
-// cả rule riêng lẫn rule chung cùng lúc, chọn ưu tiên ở JS.
+// project_id NULL của CHÍNH tổ chức sở hữu dự án (S02e — áp mọi dự án của org đó, active),
+// không có gì → defaultThreshold (hành vi cũ). Không có dự án → không suy được org → luôn
+// defaultThreshold (không đọc rule toàn cục của bất kỳ org nào). 1 query duy nhất — điều
+// kiện SQL khớp cả rule riêng lẫn rule chung cùng lúc, chọn ưu tiên ở JS.
 export async function getAlertThreshold(
   metric: AlertMetric,
   projectId: number | null,
 ): Promise<number> {
+  if (projectId == null) return ALERT_METRICS[metric].defaultThreshold;
   const rows = await query<{ projectId: number | null; threshold: number }>(
-    `SELECT project_id AS "projectId", threshold FROM alert_rules
-      WHERE metric = ? AND active AND (project_id = ? OR project_id IS NULL)`,
-    metric,
+    `SELECT ar.project_id AS "projectId", ar.threshold
+       FROM alert_rules ar
+       JOIN projects p ON p.id = ?
+      WHERE ar.metric = ? AND ar.active AND ar.org_id = p.org_id
+        AND (ar.project_id = p.id OR ar.project_id IS NULL)`,
     projectId,
+    metric,
   );
   const own = projectId != null ? rows.find((r) => r.projectId === projectId) : undefined;
   const global = rows.find((r) => r.projectId === null);
@@ -83,13 +88,19 @@ export async function getAlertThreshold(
   return rule ? Number(rule.threshold) : ALERT_METRICS[metric].defaultThreshold;
 }
 
-// Danh sách mọi rule (xuyên dự án) cho trang admin — kèm tên dự án để hiển thị.
-// projectId != null → chỉ trả rule của dự án đó + rule toàn cục (project_id IS NULL),
-// nhất quán với cách scope theo dự án của M22. projectId = null (DB chưa có dự án/chưa
-// chọn) → không lọc, trả hết (tương thích ngược).
-export async function listAlertRules(projectId?: number | null): Promise<AlertRuleRow[]> {
-  const where = projectId != null ? `WHERE (ar.project_id = ? OR ar.project_id IS NULL)` : "";
-  const params = projectId != null ? [projectId] : [];
+// Danh sách rule cho trang admin của tổ chức `orgId` — kèm tên dự án để hiển thị.
+// projectId != null → rule của dự án đó + rule toàn cục CỦA ORG (project_id IS NULL), nhất
+// quán với cách scope theo dự án của M22. projectId = null (chưa có dự án khả kiến) → chỉ rule
+// toàn cục của org (fail-closed: không liệt kê rule riêng của dự án người gọi không thấy).
+export async function listAlertRules(
+  orgId: number,
+  projectId: number | null,
+): Promise<AlertRuleRow[]> {
+  const where =
+    projectId != null
+      ? `WHERE ar.org_id = ? AND (ar.project_id = ? OR ar.project_id IS NULL)`
+      : `WHERE ar.org_id = ? AND ar.project_id IS NULL`;
+  const params = projectId != null ? [orgId, projectId] : [orgId];
   return query<AlertRuleRow>(
     `SELECT ar.id, ar.project_id AS "projectId", p.name AS "projectName", ar.metric,
             ar.operator, ar.threshold, ar.channel, ar.active,
@@ -159,7 +170,7 @@ export async function upsertAlertRule(input: {
   return { id };
 }
 
-// Xoá 1 rule — quay lại default cho (metric, dự án) đó.
-export async function deleteAlertRule(id: number): Promise<void> {
-  await run(`DELETE FROM alert_rules WHERE id = ?`, id);
+// Xoá 1 rule của tổ chức `orgId` — quay lại default cho (metric, dự án) đó.
+export async function deleteAlertRule(id: number, orgId: number): Promise<void> {
+  await run(`DELETE FROM alert_rules WHERE id = ? AND org_id = ?`, id, orgId);
 }

@@ -1,5 +1,153 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1: EVM/S-curve — baseline phải thuộc dự án đang chọn (A1-FR06)
+
+`GET /api/dashboard/evm?baseline=` và `/api/dashboard/scurve?baseline=` nhận id do client gửi mà không
+kiểm dự án -> đọc được ngày kế hoạch (`baseline_tasks`) của dự án/tổ chức khác. Sửa tận gốc bằng module
+miền mới `lib/tien-do/baseline-scope.ts` (`parseBaselineParam`, `kiemBaselineThuocDuAn`): sai định dạng
+(`1e3`, `abc`, `-1`, `0`, vượt int4) -> 400; không tồn tại/thuộc dự án khác -> 404 (không fallback âm
+thầm); thiếu tham số -> như cũ. Rà route anh em: chỉ 2 route này đọc `?baseline=`; `/api/baselines*` đã
+lọc theo `project_id`, `daily-report` truyền `baselineId: null`, các mục khác chỉ xoá `baseline_tasks`
+theo task. Test `tests/route-evm-scurve-baseline-scope.test.ts` (route thật, đỏ 6/8 trên code cũ).
+
+## 2026-10-08 — QUALITY-FINAL-1 S02e: cấu hình theo org
+
+Đặc tả `docs/nang-cap/AUDIT-S02E-ORG-CONFIG.md` (spec cha A1-SCOPE). Đóng nhóm "Còn mở, cần đặc tả
+schema" của S02 (trừ chính sách nhánh phiên `cron/retention`/`deliver-webhooks`, chưa thuộc S02e).
+Migration `0161_org_config_scope.sql` **đụng dữ liệu** (backfill + UPDATE) → **bắt buộc qua staging** +
+`npm run db:migrate -- --dry-run`; idempotent, đã chạy 2 lần trên DB có dữ liệu cũ.
+
+- **Ngưỡng chi phí:** bảng mới `org_cost_settings` (1 dòng/org, RLS 3 nhánh `app.org_id` như 0080);
+  backfill chép `cost_settings` id 1 sang mọi org (giữ hành vi lúc deploy). `getCostSettings(orgId)`/
+  `updateCostSettings(orgId, …)` (upsert); `getCostReport` đọc ngưỡng theo org của dự án trong cùng
+  snapshot; org chưa cấu hình → 90/100. Bảng cũ giữ để rollback code.
+- **Danh mục mềm:** unique `(org_id, domain, code)` (bỏ `UNIQUE(domain, code)`); `getList(domain,
+orgId)` cache theo org; `createItem` `ON CONFLICT` theo org; sửa/xoá kèm `org_id`; `countReferences`
+  chỉ đếm task trong org; `requiredRoles(orgId)` — 2FA bắt buộc org A không áp cho org B. Backfill:
+  org khác nhận bản sao mục `(domain, code)` của org 1 còn thiếu (giữ danh mục nguyên nhân trễ/2FA).
+- **Ngưỡng cảnh báo:** unique `(org_id, metric, dự án) WHERE active`; `getAlertThreshold` chỉ đọc rule
+  toàn cục của org sở hữu dự án (không dự án → mặc định); `listAlertRules(orgId, projectId)` (null →
+  chỉ rule toàn cục của org); `deleteAlertRule(id, orgId)`. Backfill căn `org_id` rule gắn dự án.
+- **Slug sheet unique theo dự án:** cột suy diễn `sheet_types.project_id` (trigger từ tháp) + unique
+  `(COALESCE(project_id,0), slug)`; `sheetVersion(slug, projectId)`. `POST /api/sheets` gắn vào tháp
+  của **dự án đang chọn** (trước: tháp đầu toàn hệ — ghi chéo dự án/org; null → 404, bỏ nhánh tự tạo
+  "Dự án mới"); kiểm trùng slug/mã trong dự án (POST + PATCH).
+- **Traffic:** entry gắn `orgId` (proxy `parseToken` cookie đã ký); SSE admin chỉ trả traffic org mình,
+  ẩn danh không hiện cho ai.
+- **Test (đỏ 10/10 trên code cũ → xanh):** `tests/s02e-org-config.test.ts` (route thật: costs/settings,
+  code-lists, alert-rules, import + tasks/version, sheets POST, traffic SSE, proxy). RLS
+  `org_cost_settings` bằng `xboss_app` (`org-rls.test.ts`), khai TO_CHUC (`rls.test.ts`). Cập nhật theo
+  chữ ký mới: `alerts`, `code-lists`, `cost`, `cost-report`, `thong-bao`, `route-tai-chinh-3a`,
+  `audit-cost-query-reuse`, `sheet-versions`, `totp`, `traffic`, `route-quan-tri` (POST sheets cần dự án).
+  ERD sinh lại, ADR-0005 cập nhật, S00 inventory sinh lại + khối tay.
+- **Còn mở / phát hiện ngoài phạm vi:** link `/tracking/<slug>` lưu trong thông báo không mang dự án
+  (giải theo dự án đang chọn); `clone-config` vẫn sinh slug duy nhất toàn hệ (chặt hơn cần); org tạo
+  sau 0161 bắt đầu danh mục rỗng (chưa có luồng seed khi tạo org); `cost_settings` cũ chờ dọn sau một
+  chu kỳ rollback.
+
+## 2026-10-08 — QUALITY-FINAL-1 S13c: quyết định IPC tuần tự hoá, xác nhận cảnh báo, snapshot bất biến, dependency_conflict
+
+Vá 5 lỗi thật S13a (A5-FR06..FR10, DATA-CONTRACTS §6–§7, DATA-MIGRATIONS §7); 5 ca `todo` trong
+`tests/s13a-chuoi-ipc-thanh-toan.test.ts` đã gỡ và **xanh thật** (đỏ trên code cũ). Vượt KL hợp
+đồng **vẫn là cảnh báo** (quyết định 2026-09-04), không hard-cap; enum `payment_certs` không đổi.
+
+- **Khoá + luỹ kế** (`lib/tai-chinh/ipc-quyet-dinh.ts`, `paymentcerts.ts`): submit/decide khoá
+  **hợp đồng → đợt** (cùng thứ tự với lập đợt) rồi `tinhLaiLuyKeDot` — luỹ kế = luỹ kế đợt approved
+  gần nhất có **kỳ nhỏ hơn** + KL kỳ, không tin luỹ kế lưu lúc nháp (legacy 100 → 120). GET/PATCH
+  báo cảnh báo theo luỹ kế **hiệu lực** (đợt mở) hoặc snapshot (đợt đã chốt).
+- **Xác nhận cảnh báo** (A5-FR07): GET trả `warningVersion` (SHA-256 nguồn: KL kỳ/luỹ kế/KL HĐ/đơn
+  giá/tỷ lệ HĐ + danh sách cảnh báo, rule `ipc-warn-v1`); decide nhận `acknowledged/reason/
+warningVersion` — có cảnh báo mà thiếu → **409 `acknowledgement_required`**, version cũ → **409
+  `warning_changed`** (kèm cảnh báo hiện hành, khối lượng — không tiền), không cảnh báo thì không đòi.
+  Áp cho **mọi bước** engine (bước giữa cũng phải xác nhận; 409 rollback cả bước vừa ghi).
+- **Thứ tự kỳ**: kỳ sau đã approved → duyệt kỳ trước **409 `reconciliation_required`**, snapshot kỳ
+  sau không đổi; từ chối vẫn được (đường điều chỉnh).
+- **Snapshot + idempotency** (migration `0160_payment_cert_decision_snapshots.sql`, chỉ thêm thuần
+  tuý → đi thẳng production): mỗi bước quyết định ghi 1 dòng cùng transaction với chuyển trạng thái
+  - phiếu + audit trigger (KL/giá/tỷ lệ/tổng exact, cảnh báo, version, xác nhận + lý do, rule
+    `ipc-sum-v1`). Header `Idempotency-Key` (UUID, tuỳ chọn): retry cùng key + payload → phát lại kết
+    quả bước cũ (`replayed: true`, vẫn kiểm actor/vai trò hiện tại), khác payload/người → 409
+    `idempotency_conflict`, sai dạng → 422. RLS org + dự án (+ actor khi ghi), `xboss_app` chỉ
+    SELECT/INSERT. So sánh với `audit_log`/`approval_actions` ghi ở `S00-PAYMENT-SCOPE-INVENTORY.md`.
+- **dependency_conflict** (A5-FR10): `DELETE /api/boq/:id` còn dòng IPC/gói thầu → 409 có thông
+  điệp (khoá dòng + kiểm + xoá trong 1 transaction, FK 23503 chen giữa cũng thành 409);
+  `DELETE /api/suppliers/:id` còn HĐ/thanh toán… tham chiếu → 409 (trước: 500); xoá HĐ (đã 409)
+  thêm `code: "dependency_conflict"`.
+- **UI**: hộp `XacNhanCanhBaoDialog` (tick đã xem từng dòng + lý do bắt buộc, gửi `warningVersion`)
+  ở chứng từ `/payment-certs` và hộp thư `/approvals` (CĐT không xem được đợt vẫn nhận cảnh báo từ
+  409); 409 mở lại hộp (bỏ tick), không tự gửi lại, không hiện như "đã duyệt"; chứng từ gửi
+  `Idempotency-Key`, mất mạng bấm lại dùng đúng key.
+- **Vá test chập chờn A5-AC06 (duyệt trùng [200, 403] thay vì [200, 409]) — lỗi harness, không
+  phải route:** test gọi handler thẳng nên hai request `Promise.all` dùng CHUNG ngữ cảnh
+  AsyncLocalStorage của thân test (lời gọi route trước đã `enterWith` vào đó); `getCurrentUser()`
+  của request sau xoá/nạp lại snapshot quyền của request trước → `CAN.approve` đọc snapshot đang nạp
+  dở = false (403 giả) hoặc ném "Ngữ cảnh xác thực đã thay đổi". Thêm `requestRieng()` vào
+  `tests/helpers/phien.ts` (mỗi lời gọi một ngữ cảnh riêng như Next) và dùng cho các helper gọi đồng
+  thời ở `s13a-chuoi-ipc-thanh-toan`, `s13a-chuoi-tien-do-nghiem-thu`, `s13c-ipc-quyet-dinh`; vòng
+  ép 40 lần duyệt trùng: trước 3/50 đúng, sau 80/80 `[200, 409]`; cả file xanh 20/20 lần.
+- **Test**: `tests/s13c-ipc-quyet-dinh.test.ts` (11 ca: thuần, snapshot, idempotency, bước engine,
+  luỹ kế dưới khoá tất định + đồng thời, RLS bằng `xboss_app`, xoá upstream); 3 mutation mới
+  (`npm run test:mutation -- --only=IPC` 4/4 bị bắt). Bộ liên quan (s13a ×3, payment-certs-_,
+  money-ipc-golden-route, route-tai-chinh-_, s10c-_, boq_, rls, thong-bao, approvals-vo-ipc…) xanh.
+- **Cần quyết (phiên chính — không tự quyết):** (1) decide vẫn ghi `payment_bills` với `paid_date`
+  = ngày duyệt nên "approved" ≡ "đã chi" trong báo cáo (A5 §2 nói khác, A4-FR02 chốt actual = mọi
+  payment_bills) — giữ nguyên hành vi; (2) hiện **cho phép duyệt kỳ sau khi kỳ trước còn mở**
+  (đặc tả chỉ cấm chiều ngược) → kỳ trước sau đó bị 409, phải từ chối + lập đợt điều chỉnh; có nên
+  chặn luôn "duyệt kỳ sau khi kỳ trước chưa chốt"? (3) chưa có loại "chứng từ điều chỉnh" IPC riêng —
+  thông điệp 409 hướng dẫn từ chối + lập đợt mới.
+- **Còn mở (ngoài phạm vi, phát hiện khi rà)**: `DELETE /api/users/:id` với người từng duyệt IPC
+  (`payment_certs.decided_by`, nay thêm `payment_cert_decision_snapshots.actor_id`) → FK 23503 →
+  500 (lớp lỗi có từ trước); `DELETE /api/payments/bills/:id` xoá được phiếu sinh từ IPC đã duyệt
+  (hạ nguồn, không phải lỗi FK — cần quyết chính sách); GET đợt mở legacy hiển thị luỹ kế dòng đã
+  lưu, còn cảnh báo/version theo luỹ kế hiệu lực (khớp ngay khi trình/duyệt).
+
+## 2026-10-08 — QUALITY-FINAL-1 A1: phạm vi dự án cho đồng bộ vật tư ↔ Sheet
+
+Đóng quan sát "Cần quyết" của S13a/S13b: `runMaterialSync` đọc/ghi mọi vật tư toàn hệ, cron lấy org
+của "dự án đầu tiên". Không migration, không thêm dependency, không biến môi trường bắt buộc.
+
+- **Lõi** (`lib/vat-tu/material-sync.ts`): `runMaterialSync({ orgId, projectId }, client?)` — kiểm
+  lại dự án thuộc tổ chức (sai → `MaterialSyncScopeError` 404) trước khi lấy khoá; mọi đọc/ghi
+  `materials`/`material_sync`/`sheet_types` (qua `towers.project_id`)/`MAX(sort_order)` lọc theo dự
+  án; `applyToDb` thêm `AND project_id = ?`; vật tư tạo từ Sheet mang `project_id` của phạm vi (bản
+  cũ để NULL → vô hình trong app và mã BOQ rơi về org 1). Dòng Sheet mang ID vật tư **dự án/tổ chức
+  khác** → bỏ qua, không ghi DB, **giữ nguyên nội dung dòng trên Sheet** (xếp cuối, không ghi đè bằng
+  dữ liệu DB, không xoá), báo `skipped` không kèm tên/dữ liệu DB; ID không còn trong DB → như cũ.
+  Vật tư ngoài phạm vi không bao giờ lên Sheet. Giữ nguyên 3-way merge, `CONFLICT_POLICY`,
+  `SYNCED_FIELDS`, cột chỉ DB→Sheet, snapshot-sau-ghi, nhận lại vật tư mồ côi (S13b, nay trong dự
+  án). Khoá `sync_locks` giữ tên chung `materials` (một Sheet cho cả hệ — hai dự án ghi đè cùng tab
+  đồng thời sẽ mất dòng của nhau).
+- **Quyết định cron (ranh giới được giao):** thêm biến **tuỳ chọn** `GOOGLE_SHEET_PROJECT_ID`
+  (khai `lib/nen/env.ts`, đọc + fail-closed ở `readSheetProjectBinding` trong `google-sheets.ts`,
+  không validate trong schema env để giá trị sai không làm hỏng cả app). Cron chỉ `CRON_SECRET` →
+  đồng bộ đúng dự án này, org suy từ dự án; thiếu/sai/dự án không tồn tại → **503 kèm lý do, không
+  chạy** (bỏ fallback "dự án đầu tiên"/org 1). Lý do: Sheet là cấu hình toàn hệ nên chỉ người vận
+  hành mới biết Sheet thuộc dự án nào; biến môi trường đặt cạnh `GOOGLE_SHEET_ID` (cùng vòng đời), không
+  cần bảng/migration. Đã đặt biến thì **cả nút thủ công** cũng chỉ cho dự án đó (dự án khác → 409) —
+  tránh đẩy vật tư dự án B lên Sheet của dự án A. Chưa đặt → nút thủ công vẫn chạy theo dự án đang
+  chọn (giữ tương thích, không làm hỏng triển khai hiện có). Đã cân nhắc: (a) cron lặp mọi dự án
+  → các dự án ghi đè lẫn nhau trên cùng tab; (b) bảng cấu hình trong DB → cần migration + UI quản
+  trị, ngoài phạm vi; (c) bắt buộc biến cho cả nút thủ công → vỡ triển khai hiện có.
+- **Route:** `POST /api/materials/sync` dùng `getCurrentProjectIdStrict` (cookie sai/không có dự án
+  → 404 trước mọi query nghiệp vụ, không fallback); `GET /api/cron/sync-sheets` phiên Admin/PM →
+  dự án đang chọn (strict), chỉ secret → dự án cấu hình; cả hai kiểm cờ module `materials` của dự án
+  phạm vi; lỗi phạm vi trả đúng 404/409/503, lỗi khác vẫn 500. Gỡ `cron/sync-sheets` khỏi whitelist
+  `project-scope-invariant`. Tài liệu: `DEPLOY.md` (biến mới + hành vi phạm vi).
+- **Test** (Postgres 16 cục bộ, mỗi file 1 DB): mới `route-vat-tu-sync-pham-vi` 4/4 qua route thật
+  (Sheet giả thay đúng `getSheetClient`) — **cả 4 đỏ trên code cũ** (PM dự án A sửa được tên vật tư
+  dự án B + đẩy vật tư B lên Sheet; cookie dự án không được gán/dự án org khác → 200 thay vì 404;
+  Sheet gắn B vẫn chạy cho A; cron thiếu cấu hình vẫn đồng bộ toàn hệ). `google-sheets` +1 ca
+  (`readSheetProjectBinding`: unset/bound/invalid gồm `1e3`, `042`, ngoài int4). `s13a-chuoi-dong-bo-
+vat-tu` chuyển sang phạm vi 1 dự án fixture, 5/5. Hồi quy xanh: material-sync, materials-*,
+  route-vat-tu-2, route-boq-vat-tu, route-cron, sync-locks, env, ocr-rules, project-scope-invariant,
+  audit-route-inventory; inventory S00 sinh lại.
+- **Còn lại / cho phiên chính:** (1) `scripts/audit-route-inventory.ts` chưa nhận
+  `getCurrentProjectIdStrict` là resolver nên `materials/sync` POST (cùng `import/excel`) hiện
+  `NOT_MAPPED` trong inventory dù đã scope strict — sửa bộ phân loại là việc riêng; (2) chưa đặt
+  `GOOGLE_SHEET_PROJECT_ID` thì hai dự án cùng dùng một Sheet vẫn "giành" dòng mới chưa có ID (dòng
+  không ID được tạo vào dự án bấm đồng bộ trước) — vận hành nên đặt biến khi có >1 dự án; (3)
+  `.env.example` chưa thêm dòng biến mới (file bị chặn đọc trong phiên agent).
+
 ## 2026-10-08 — QUALITY-FINAL-1 S10 (đuôi): tổng BOQ + mv_cost_by_month exact
 
 - `GET /api/boq`: `totals.contractValue/subValue/executedValue` tính trong SQL (NUMERIC, SUM rồi mới ROUND 2 số lẻ; `progress_percent` float8 đi qua `::text::numeric`), không còn cộng float JS. Header `X-XBoss-Money-Format: decimal-string-v1` → chuỗi canonical + `moneyFormat`; legacy → number qua `moneyToNumberSafe`, ngoài biên → 422 `money_precision_unsupported`; thêm `HEADERS_API_TIEN`. Trang `/boq` opt-in v1, giữ tổng bằng bigint (% thực hiện tính trên bigint); `/tenders` + `/variations` (chỉ đọc `items`) gửi header v1 để không dính 422 vì totals.
@@ -76,8 +224,8 @@ Bảng map AC → ca (file `tests/s13a-chuoi-*.test.ts`, ★ = todo):
   `paid_date` = ngày duyệt nên "approved" và "đã chi" trùng nhau trong báo cáo (A5 §2 nói khác,
   A4-FR02 lại chốt actual = mọi payment_bills); IPC chạy cho mọi loại HĐ và phiếu của HĐ nhận thầu
   vẫn cộng vào "thực chi"; `POST /api/payment-certs` với HĐ dự án khác trả 422 (giống id không tồn
-  tại, không lộ) thay vì 404 như DATA-CONTRACTS §7; `runMaterialSync` đọc/ghi snapshot mọi vật tư
-  không lọc tổ chức/dự án; `tests/qaqc.test.ts` chèn checklist bắt buộc toàn cục (system/project
+  tại, không lộ) thay vì 404 như DATA-CONTRACTS §7; ~~`runMaterialSync` đọc/ghi snapshot mọi vật tư
+  không lọc tổ chức/dự án~~ (đã vá ở A1, mục đầu); `tests/qaqc.test.ts` chèn checklist bắt buộc toàn cục (system/project
   NULL) — vô hại vì mỗi worker test có DB riêng và file chạy tuần tự.
 
 ## 2026-10-08 — QUALITY-FINAL-1 S10 đầu vào tiền (phần 2): claims, đề xuất, bảo lãnh, VO, thầu, BOQ, báo giá kỹ thuật

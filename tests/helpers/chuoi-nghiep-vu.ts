@@ -166,6 +166,12 @@ export class SoFixture {
         contracts,
         contracts,
       );
+      // Snapshot quyết định IPC (S13c) bất biến ở tầng app — chỉ fixture (owner) được dọn.
+      await run(
+        `DELETE FROM payment_cert_decision_snapshots WHERE project_id = ? OR contract_id = ANY(?::int[])`,
+        pid,
+        contracts,
+      );
       await run(`DELETE FROM approval_requests WHERE project_id = ?`, pid);
       await run(`DELETE FROM approval_flows WHERE project_id = ?`, pid);
       await run(`DELETE FROM payment_certs WHERE contract_id = ANY(?::int[])`, contracts);

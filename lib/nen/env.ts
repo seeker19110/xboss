@@ -59,6 +59,10 @@ const serverSchema = z
     GOOGLE_SA_PRIVATE_KEY: z.string().optional(),
     GOOGLE_SHEET_ID: z.string().optional(),
     GOOGLE_SHEET_TAB: z.string().optional(),
+    // Dự án gắn với Sheet (A1). Đặt → mọi lần đồng bộ (tay/cron) chỉ cho đúng dự án này; thiếu →
+    // đồng bộ tay theo dự án đang chọn, cron từ chối chạy. Không validate ở đây để giá trị sai
+    // không làm hỏng cả app — lib/vat-tu/google-sheets.ts tự đọc và fail-closed khi dùng.
+    GOOGLE_SHEET_PROJECT_ID: z.string().optional(),
 
     // SSO OIDC (M49 PR3) — thiếu bất kỳ biến bắt buộc (OIDC_ISSUER/CLIENT_ID/CLIENT_SECRET +
     // APP_URL) → nút SSO tự ẩn, đăng nhập mật khẩu như cũ. lib/oidc.ts đọc trực tiếp

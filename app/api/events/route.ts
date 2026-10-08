@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
         if (closed) return;
         tick++;
         try {
-          const v = await sheetVersion(sheet);
+          const v = await sheetVersion(sheet, projectId);
           if (v !== last || tick % REFRESH_EVERY === 0) {
             last = v;
             send(`event: version\ndata: ${JSON.stringify({ v })}\n\n`);

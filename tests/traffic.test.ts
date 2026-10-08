@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { recordTraffic, getRecent, subscribeTraffic, latestId } from "@/lib/bao-mat/traffic";
+import {
+  recordTraffic,
+  getRecent,
+  getRecentOfOrg,
+  subscribeTraffic,
+  subscribeTrafficOfOrg,
+  latestId,
+} from "@/lib/bao-mat/traffic";
 
 // Lưu ý: `lib/traffic.ts` giữ state ở cấp module (seq/buf/listeners) — tồn tại
 // xuyên suốt mọi test TRONG file này (cùng 1 process). Không giả định buffer
@@ -13,6 +20,7 @@ function makeEntry(overrides: Partial<Parameters<typeof recordTraffic>[0]> = {})
     path: "/api/test",
     ip: "127.0.0.1",
     ua: "node-test",
+    orgId: null,
     ...overrides,
   };
 }
@@ -122,4 +130,20 @@ test("subscribeTraffic: listener lỗi không làm hỏng luồng chính hay cá
 
   unsub1();
   unsub2();
+});
+
+test("S02e: getRecentOfOrg/subscribeTrafficOfOrg chỉ trả entry đúng org, bỏ entry ẩn danh", () => {
+  const moc = latestId();
+  const nhan: string[] = [];
+  const unsub = subscribeTrafficOfOrg(7, (e) => nhan.push(e.path));
+  recordTraffic(makeEntry({ path: "/org7", orgId: 7 }));
+  recordTraffic(makeEntry({ path: "/org8", orgId: 8 }));
+  recordTraffic(makeEntry({ path: "/an-danh", orgId: null }));
+  unsub();
+  assert.deepEqual(
+    getRecentOfOrg(7, moc).map((e) => e.path),
+    ["/org7"],
+  );
+  assert.deepEqual(nhan, ["/org7"]);
+  assert.equal(getRecent(moc).length, 3, "buffer vẫn giữ đủ, chỉ lớp đọc theo org lọc");
 });

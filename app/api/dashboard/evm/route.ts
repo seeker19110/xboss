@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { resolveSystemId } from "@/lib/tien-do/systems";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { kiemBaselineThuocDuAn, parseBaselineParam } from "@/lib/tien-do/baseline-scope";
 import { EVM_MONEY_FIELDS, getEvmSeries, type EvmSource } from "@/lib/tien-do/evm";
 import { MONEY_FORMAT_HEADER, isMoneyPrecisionError, moneyWireFormat } from "@/lib/nen/money";
 import {
@@ -37,9 +38,17 @@ export async function GET(req: NextRequest) {
       { status: 422 },
     );
 
-  const baselineRaw = parseInt(req.nextUrl.searchParams.get("baseline") ?? "");
-  const baselineId = Number.isNaN(baselineRaw) ? null : baselineRaw;
+  const baselineRaw = req.nextUrl.searchParams.get("baseline");
+  if (parseBaselineParam(baselineRaw) === undefined)
+    return NextResponse.json({ error: "baseline phải là số nguyên dương hợp lệ" }, { status: 400 });
   const projectId = await getCurrentProjectId(user);
+  // A1-FR06: baseline phải thuộc dự án đang chọn, không thì 404 (không fallback về không-baseline).
+  let baselineId: number | null = null;
+  if (projectId != null) {
+    const kq = await kiemBaselineThuocDuAn(baselineRaw, projectId);
+    if (!kq.ok) return NextResponse.json({ error: kq.error }, { status: kq.status });
+    baselineId = kq.baselineId;
+  }
 
   const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
   // QUALITY-FINAL-1 S02 (A1-AC02): không có dự án khả kiến → rỗng đúng shape (như dự án chưa

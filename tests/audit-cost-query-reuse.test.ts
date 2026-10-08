@@ -48,7 +48,7 @@ function fixture(
     assert.equal(scoped, true, "Mọi query báo cáo phải chạy trong scope đã kiểm");
     queries.push({ sql, args });
     if (sql.includes("FROM systems")) return systems;
-    if (sql.includes("FROM cost_settings"))
+    if (sql.includes("JOIN org_cost_settings"))
       return [{ computedAt: new Date(0), warnPct: "90.00", overPct: "100.00" }];
     if (sql.includes("boq_items bi"))
       return systems.map((s) => ({ systemId: s.id, state: "ok", n: 3, amount: "100.00" }));
@@ -132,7 +132,11 @@ test("chi phí: nhóm hệ = 6 query trong MỘT snapshot REPEATABLE READ READ O
     JSON.stringify(scopeCalls),
     JSON.stringify([{ readOnly: true, isolation: "repeatable_read" }]),
   );
-  assert.match(queries[0].sql, /cost_settings/, "câu đầu đọc ngưỡng + thời điểm snapshot");
+  assert.match(
+    queries[0].sql,
+    /org_cost_settings/,
+    "câu đầu đọc ngưỡng (theo org) + thời điểm snapshot",
+  );
   const j = (v: unknown) => JSON.stringify(v);
   const totals = result.body.totals;
   assert.equal(j(totals), j({ budget: 100, committed: 50, actual: 10 }));

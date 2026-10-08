@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangXuat } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
+import { dangXuat, requestRieng } from "./helpers/phien"; // mock next/headers — phải trước mọi import route
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -26,13 +26,12 @@ import {
 //
 // Chính sách giữ nguyên (quyết định 2026-09-04): vượt khối lượng hợp đồng là CẢNH BÁO, không
 // chặn cứng — không ca nào ở đây đòi hard-cap. Các ca duyệt có cảnh báo gửi kèm
-// acknowledged/reason/warningVersion (DATA-CONTRACTS §6) để vẫn đúng sau khi S13c bổ sung
-// xác nhận cảnh báo; code hiện tại bỏ qua các trường đó.
+// acknowledged/reason/warningVersion (DATA-CONTRACTS §6) — S13c bắt buộc xác nhận đúng bản
+// cảnh báo hiện tại (409 acknowledgement_required / warning_changed).
 //
-// Ca ĐỎ trên code hiện tại (lỗi thật, sửa ở S13c) đánh `todo` — KHÔNG skip — kèm mô tả lỗi.
+// 5 ca từng là `todo` (lỗi thật S13a tái hiện) đã được S13c vá và chạy xanh thật.
 
 const S = { skip: !HAS_TEST_DB };
-const TODO = (lyDo: string) => ({ skip: !HAS_TEST_DB, todo: lyDo });
 const LY_DO_VUOT = "Phụ lục VO bổ sung khối lượng đang chờ ký";
 
 test.after(() => dangXuat());
@@ -99,7 +98,7 @@ async function tick(dimId: number) {
 
 async function lapDot(contractId: number) {
   const { POST } = await import("@/app/api/payment-certs/route");
-  return goi(POST(jreq(`/api/payment-certs`, { contractId })));
+  return goi(requestRieng(() => POST(jreq(`/api/payment-certs`, { contractId }))));
 }
 
 async function suaDot(certId: number, items: { boqItemId: number; qtyPeriod: number }[]) {
@@ -114,7 +113,9 @@ async function trinh(certId: number) {
 
 async function quyetDinh(certId: number, body: Record<string, unknown>) {
   const { POST } = await import("@/app/api/payment-certs/[id]/decide/route");
-  return goi(POST(jreq(`/api/payment-certs/${certId}/decide`, body), P(certId)));
+  return goi(
+    requestRieng(() => POST(jreq(`/api/payment-certs/${certId}/decide`, body), P(certId))),
+  );
 }
 
 async function xemDot(certId: number) {
@@ -424,11 +425,7 @@ test(
 
 test(
   "A5-AC04/FR07: có cảnh báo vượt HĐ mà duyệt KHÔNG xác nhận → 409 acknowledgement_required, đợt giữ 'submitted', không sinh phiếu",
-  TODO(
-    "S13c: POST /api/payment-certs/:id/decide chưa có warningVersion/acknowledged/reason " +
-      "(DATA-CONTRACTS §6) — đợt luỹ kế 110/100 được duyệt 200 và sinh phiếu thanh toán mà không " +
-      "ai xác nhận cảnh báo; API ngoài UI/batch/retry bỏ qua cảnh báo hoàn toàn",
-  ),
+  S,
   async () => {
     const f = new SoFixture();
     try {
@@ -455,10 +452,7 @@ test(
 
 test(
   "A5-AC05/FR07: cảnh báo đổi sau khi người duyệt xem (warningVersion cũ) → 409 warning_changed; xác nhận bản hiện tại → duyệt được",
-  TODO(
-    "S13c: GET /api/payment-certs/:id chưa trả warningVersion và decide không so phiên bản cảnh " +
-      "báo — người duyệt xác nhận cảnh báo 110 nhưng thực tế duyệt luỹ kế 115 mà không bị hỏi lại",
-  ),
+  S,
   async () => {
     const f = new SoFixture();
     try {
@@ -604,11 +598,7 @@ async function haiDotCungMo(f: SoFixture) {
 
 test(
   "A5-FR06: hai đợt cùng mở (dữ liệu legacy) duyệt đúng thứ tự → luỹ kế kỳ sau tính lại dưới khoá = 120, không dùng luỹ kế nháp cũ 100",
-  TODO(
-    "S13c: decide (và submit) không tính lại qty_cumulative — đợt 3 lưu luỹ kế 100 từ lúc nháp " +
-      "(90 + 10) nên sau khi duyệt đợt 2 (110) vẫn chốt 100 thay vì 120; dongVuotHopDong so 100 > 100 " +
-      "= false nên MẤT cảnh báo vượt HĐ dù luỹ kế thật 120",
-  ),
+  S,
   async () => {
     const f = new SoFixture();
     try {
@@ -627,11 +617,7 @@ test(
 
 test(
   "A5-FR06: kỳ SAU đã duyệt thì duyệt kỳ TRƯỚC phải trả conflict (cần đối soát/điều chỉnh), không chốt im lặng",
-  TODO(
-    "S13c: decide không kiểm thứ tự kỳ — duyệt đợt 3 (legacy) rồi duyệt đợt 2 đều 200; đợt 3 " +
-      "giữ luỹ kế 100 trong khi luỹ kế thật sau đợt 2 là 120 (lịch sử lệch, không có conflict/" +
-      "reconciliation)",
-  ),
+  S,
   async () => {
     const f = new SoFixture();
     try {
@@ -647,6 +633,7 @@ test(
       );
       if (r3.status === 200) {
         assert.equal(r2.status, 409);
+        assert.equal(r2.body?.code, "reconciliation_required");
         assert.equal(await trangThaiDot(c.dot2), "submitted");
         assert.deepEqual(await phieuCuaDot(c.dot2), []);
       }
@@ -724,7 +711,7 @@ test(
       try {
         st = (await goi(XOA_BOQ(jreq(`/x`, undefined, "DELETE"), P(c.boqId)))).status;
       } catch {
-        st = 500; // lỗi FK ném ra ngoài handler (xem ca todo dependency_conflict bên dưới)
+        st = 500; // phòng thủ: trước S13c lỗi FK 23503 ném ra ngoài handler
       }
       assert.notEqual(st, 200);
 
@@ -747,10 +734,7 @@ test(
 
 test(
   "A5-FR10: xoá dòng BOQ có dòng IPC đã chốt trả 409 dependency_conflict có kiểm soát",
-  TODO(
-    "S13c: DELETE /api/boq/:id không kiểm phụ thuộc — xoá dòng có payment_cert_items để Postgres " +
-      "ném lỗi FK 23503 ra khỏi handler (500, không thông điệp/mã dependency_conflict)",
-  ),
+  S,
   async () => {
     const f = new SoFixture();
     try {

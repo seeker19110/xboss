@@ -35,10 +35,14 @@ import type { EntityApprovalStatus } from "@/lib/tien-do/approvals";
 import {
   HEADER_DINH_DANG_TIEN,
   docChiTietDot,
+  docYeuCauXacNhan,
   fmtVNDExact,
+  taoIdempotencyKey,
   type CertTotalsView,
   type DongVuot,
+  type YeuCauXacNhan,
 } from "./chiTietDot";
+import XacNhanCanhBaoDialog from "./XacNhanCanhBaoDialog";
 
 // Khối "chứng từ" của một đợt thanh toán (IPC) — M124. Tách ra từ hộp thoại chi tiết đợt
 // cũ trong `app/payment-certs/page.tsx`: cùng dữ liệu, cùng các hàm gọi API, nhưng hiển thị
@@ -134,6 +138,11 @@ export type CertDocumentCtrl = {
   saveItems: () => Promise<void>;
   submitCert: () => Promise<void>;
   decide: (decision: "approved" | "rejected") => Promise<void>;
+  /** Hộp xác nhận cảnh báo vượt HĐ đang mở (S13c) — null = đóng. */
+  xacNhan: YeuCauXacNhan | null;
+  huyXacNhan: () => void;
+  /** Gửi duyệt kèm acknowledged + lý do + warningVersion của đúng bản đang hiển thị. */
+  xacNhanDuyet: (lyDo: string) => Promise<void>;
   close: () => void;
 };
 
@@ -166,6 +175,13 @@ export function useCertDocument({
   // trong khi VO/phụ lục còn chờ duyệt là tình huống thật), nhưng người ký duyệt phải nhìn
   // thấy — trước đợt này không có lớp nào so khối lượng với hợp đồng, nhập gấp 10 lần vẫn lưu.
   const [vuotHopDong, setVuotHopDong] = useState<DongVuot[]>([]);
+  // S13c (A5-FR07): phiên bản cảnh báo server dựng — duyệt phải gửi kèm để server biết người
+  // duyệt đã xem ĐÚNG bản cảnh báo hiện hành (đổi → 409 warning_changed, hộp mở lại).
+  const [warningVersion, setWarningVersion] = useState<string | null>(null);
+  const [xacNhan, setXacNhan] = useState<YeuCauXacNhan | null>(null);
+  // Idempotency-Key của lượt quyết định đang gửi: mất mạng giữa chừng thì bấm lại dùng đúng
+  // key cũ → server phát lại kết quả cũ thay vì duyệt/sinh phiếu lần hai.
+  const keyQuyetDinh = useRef<string | null>(null);
   const [totals, setTotals] = useState<CertTotalsView | null>(null);
   const [loiChiTiet, setLoiChiTiet] = useState<string | null>(null);
 
@@ -180,9 +196,12 @@ export function useCertDocument({
   // tổng cũng được lấy lại, không hiển thị số cũ.
   useEffect(() => {
     const id = cert?.id;
+    setXacNhan(null);
+    keyQuyetDinh.current = null;
     if (id == null) {
       setApprovalStatus(null);
       setVuotHopDong([]);
+      setWarningVersion(null);
       setTotals(null);
       setLoiChiTiet(null);
       return;
@@ -195,6 +214,7 @@ export function useCertDocument({
       .catch(() => ({
         approvalStatus: null,
         vuotHopDong: [],
+        warningVersion: null,
         totals: null,
         loi: "Không tải được tổng hợp giá trị đợt — kiểm tra kết nối mạng rồi mở lại đợt",
       }))
@@ -202,6 +222,7 @@ export function useCertDocument({
         if (huy) return;
         setApprovalStatus(ct.approvalStatus);
         setVuotHopDong(ct.vuotHopDong);
+        setWarningVersion(ct.warningVersion);
         setTotals(ct.totals);
         setLoiChiTiet(ct.loi);
       })
@@ -285,54 +306,108 @@ export function useCertDocument({
     await onSaved();
   }, [cert, onSaved]);
 
-  const decide = useCallback(
-    async (decision: "approved" | "rejected") => {
+  // Gửi quyết định. 409 cần (lại) xác nhận cảnh báo → mở hộp xác nhận với danh sách server trả
+  // về (không bao giờ tự gửi lại acknowledged=true, không hiểu 409 là "đã duyệt").
+  const guiQuyetDinh = useCallback(
+    async (body: Record<string, unknown>) => {
       if (!cert) return;
-      let rejectReason: string | null = null;
-      if (decision === "rejected") {
-        rejectReason = await appPrompt("Lý do từ chối:");
-        if (!rejectReason?.trim()) return;
-      } else {
-        // qty_cumulative của mỗi dòng trong đợt này đã là luỹ kế tính tới hết đợt này —
-        // nếu duyệt, đây sẽ là luỹ kế mới của hợp đồng (thay cho luỹ kế đợt duyệt trước đó).
-        const projectedCumulative = mSumBy(cert.items, (it) =>
-          mMul(Number(it.qtyCumulative), it.unitPrice),
-        );
-        // Chỉ cảnh báo vượt khi cả hai vế xác định (không bị che) — duyệt là quyền admin/pm
-        // (có viewPayments) nên thực tế luôn xác định; guard để đúng kiểu + phòng thủ.
-        const wouldBeOver =
-          contractValue != null &&
-          projectedCumulative != null &&
-          contractValue > 0 &&
-          projectedCumulative > contractValue;
-        const label = wouldBeOver
-          ? `Duyệt đợt ${cert.code}? CẢNH BÁO: luỹ kế sẽ vượt giá trị hợp đồng.`
-          : `Duyệt đợt ${cert.code}?`;
-        if (!(await appConfirm(label, { danger: wouldBeOver }))) return;
-      }
       setBusy(true);
+      keyQuyetDinh.current ??= taoIdempotencyKey();
+      const key = keyQuyetDinh.current;
       // try/catch/finally: mất sóng ngoài công trường không được để nút kẹt
       // "Đang lưu..." mà không báo gì (audit 2026-09-05).
       let res: Response;
       try {
         res = await fetch(`/api/payment-certs/${cert.id}/decide`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ decision, rejectReason }),
+          headers: {
+            "Content-Type": "application/json",
+            ...(key ? { "Idempotency-Key": key } : {}),
+          },
+          body: JSON.stringify(body),
         });
       } catch {
-        appAlert("Mất kết nối — chưa lưu được, thử lại khi có mạng");
+        // Giữ key: lần bấm lại phát lại đúng lượt này nếu server đã kịp ghi.
+        appAlert(
+          "Mất kết nối — chưa rõ đợt đã được ghi nhận hay chưa. Có mạng lại thì bấm lại, đợt không bị duyệt hai lần",
+        );
         return;
       } finally {
         setBusy(false);
       }
+      keyQuyetDinh.current = null;
+      const j = (await res.json().catch(() => null)) as Record<string, unknown> | null;
       if (!res.ok) {
-        showToast((await res.json().catch(() => null))?.error ?? "Quyết định thất bại", "error");
+        const yeuCau = docYeuCauXacNhan(res.status, j);
+        if (yeuCau) {
+          setVuotHopDong(yeuCau.vuotHopDong);
+          setWarningVersion(yeuCau.warningVersion);
+          setXacNhan(yeuCau);
+          return;
+        }
+        if (j?.code === "idempotency_conflict") {
+          showToast("Đợt đã được xử lý ở lần gửi trước — đang tải lại trạng thái", "warning");
+          await onSaved();
+          return;
+        }
+        showToast(typeof j?.error === "string" ? j.error : "Quyết định thất bại", "error");
         return;
       }
+      setXacNhan(null);
       await onSaved();
     },
-    [cert, contractValue, onSaved],
+    [cert, onSaved],
+  );
+
+  const decide = useCallback(
+    async (decision: "approved" | "rejected") => {
+      if (!cert) return;
+      if (decision === "rejected") {
+        const rejectReason = await appPrompt("Lý do từ chối:");
+        if (!rejectReason?.trim()) return;
+        await guiQuyetDinh({ decision, rejectReason });
+        return;
+      }
+      // Có dòng vượt khối lượng HĐ → hộp xác nhận (tick đã xem + lý do), không confirm 1 bấm.
+      if (vuotHopDong.length > 0 && warningVersion) {
+        setXacNhan({ vuotHopDong, warningVersion, doiNguon: false });
+        return;
+      }
+      // qty_cumulative của mỗi dòng trong đợt này đã là luỹ kế tính tới hết đợt này —
+      // nếu duyệt, đây sẽ là luỹ kế mới của hợp đồng (thay cho luỹ kế đợt duyệt trước đó).
+      const projectedCumulative = mSumBy(cert.items, (it) =>
+        mMul(Number(it.qtyCumulative), it.unitPrice),
+      );
+      // Chỉ cảnh báo vượt khi cả hai vế xác định (không bị che) — duyệt là quyền admin/pm
+      // (có viewPayments) nên thực tế luôn xác định; guard để đúng kiểu + phòng thủ.
+      const wouldBeOver =
+        contractValue != null &&
+        projectedCumulative != null &&
+        contractValue > 0 &&
+        projectedCumulative > contractValue;
+      const label = wouldBeOver
+        ? `Duyệt đợt ${cert.code}? CẢNH BÁO: luỹ kế sẽ vượt giá trị hợp đồng.`
+        : `Duyệt đợt ${cert.code}?`;
+      if (!(await appConfirm(label, { danger: wouldBeOver }))) return;
+      // Gửi kèm phiên bản đang xem: nguồn đổi trong lúc chờ (kỳ trước vừa duyệt…) → 409 thay vì
+      // duyệt một bản khác bản người dùng đã nhìn.
+      await guiQuyetDinh({ decision, ...(warningVersion ? { warningVersion } : {}) });
+    },
+    [cert, contractValue, vuotHopDong, warningVersion, guiQuyetDinh],
+  );
+
+  const huyXacNhan = useCallback(() => setXacNhan(null), []);
+  const xacNhanDuyet = useCallback(
+    async (lyDo: string) => {
+      if (!xacNhan) return;
+      await guiQuyetDinh({
+        decision: "approved",
+        acknowledged: true,
+        reason: lyDo,
+        warningVersion: xacNhan.warningVersion,
+      });
+    },
+    [xacNhan, guiQuyetDinh],
   );
 
   // Phím tắt (FR7): Ctrl/⌘+S lưu KL, Esc đóng chứng từ. Bỏ qua khi đang mở hộp thoại
@@ -402,6 +477,9 @@ export function useCertDocument({
     saveItems,
     submitCert,
     decide,
+    xacNhan,
+    huyXacNhan,
+    xacNhanDuyet,
     close: onClose,
   };
 }
@@ -559,6 +637,17 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
 
   return (
     <div className="space-y-4">
+      {ctrl.xacNhan && (
+        <XacNhanCanhBaoDialog
+          // Đổi phiên bản cảnh báo → dựng lại hộp: ô "đã xem" bỏ tick, phải xác nhận lại.
+          key={ctrl.xacNhan.warningVersion}
+          yeuCau={ctrl.xacNhan}
+          maDot={cert.code}
+          busy={ctrl.busy}
+          onHuy={ctrl.huyXacNhan}
+          onXacNhan={(lyDo) => void ctrl.xacNhanDuyet(lyDo)}
+        />
+      )}
       <DocToolbar
         trailing={
           nav.total > 1 ? (

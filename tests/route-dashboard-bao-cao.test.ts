@@ -363,8 +363,9 @@ test(
     // Chốt baseline với ngày BĐ/KT đã QUA — baseline_tasks lưu ngày độc lập với tasks.
     const { insertId } = await import("@/lib/db");
     const baselineId = await insertId(
-      `INSERT INTO baselines (name) VALUES (?)`,
+      `INSERT INTO baselines (name, project_id) VALUES (?, ?)`,
       `BL ${uniq("scbl")}`,
+      projectId,
     );
     await insertId(
       `INSERT INTO baseline_tasks (baseline_id, task_id, start_date, end_date, progress_percent)
