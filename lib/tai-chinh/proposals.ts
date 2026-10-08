@@ -3,7 +3,7 @@
 // nghiệm thu 2 bước), đề xuất trình lâu chưa quyết (nguồn notification proposal_pending),
 // cảnh báo cấp phát vượt định mức (M18). KHÔNG thay thế purchase_requests — luồng mua
 // vật tư hiện có giữ nguyên. Xem docs/nang-cap/M19-de-xuat-phe-duyet.md.
-import { parseOptionalMoneyInput } from "@/lib/nen/money";
+import { parseMoneyExact, parseOptionalMoneyInput } from "@/lib/nen/money";
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
 import { nextSeqCode } from "@/lib/ha-tang/seqcode";
@@ -216,6 +216,10 @@ export async function pendingProposalsOver(
 // Quyết đề xuất đã trình: cập nhật trạng thái + (tuỳ chọn, khi duyệt tạm ứng/thanh toán
 // có gắn HĐ và giá trị) tạo phiếu payment_bills tương ứng — không tự động ép, chỉ khi
 // người duyệt tick chọn (spec M19). Trả lỗi dạng chuỗi khi trạng thái không hợp lệ.
+// S13e: đọc-kiểm-ghi dưới khoá dòng đề xuất (FOR UPDATE) trong MỘT transaction — reentrant, nên
+// route decide gọi bên trong transaction của nó (đã khoá trước) thì dùng chung; hai lượt duyệt
+// đồng thời không cùng qua kiểm "đã trình" rồi cùng sinh phiếu. Tiền đọc `::text`, ghi phiếu
+// bằng chuỗi canonical (không qua float).
 export async function decideProposal(opts: {
   proposalId: number;
   decision: "approved" | "rejected";
@@ -231,24 +235,25 @@ export async function decideProposal(opts: {
     conds.push("project_id = ?");
     args.push(opts.projectId);
   }
-  const p = await queryOne<{
-    id: number;
-    code: string;
-    kind: ProposalKind;
-    title: string;
-    amount: number | null;
-    contractId: number | null;
-    status: string;
-  }>(
-    `SELECT id, code, kind, title, amount, contract_id AS "contractId", status
-       FROM proposals WHERE ${conds.join(" AND ")}`,
-    ...args,
-  );
-  if (!p) return "Không tìm thấy đề xuất";
-  if (p.status !== "submitted") return "Đề xuất không ở trạng thái đã trình";
-  if (opts.decision === "rejected" && !opts.rejectReason?.trim()) return "Từ chối cần ghi rõ lý do";
-
   return withTransaction(async () => {
+    const p = await queryOne<{
+      id: number;
+      code: string;
+      kind: ProposalKind;
+      title: string;
+      amount: string | null;
+      contractId: number | null;
+      status: string;
+    }>(
+      `SELECT id, code, kind, title, amount::text AS amount, contract_id AS "contractId", status
+         FROM proposals WHERE ${conds.join(" AND ")} FOR UPDATE`,
+      ...args,
+    );
+    if (!p) return "Không tìm thấy đề xuất";
+    if (p.status !== "submitted") return "Đề xuất không ở trạng thái đã trình";
+    if (opts.decision === "rejected" && !opts.rejectReason?.trim())
+      return "Từ chối cần ghi rõ lý do";
+
     await run(
       `UPDATE proposals SET status = ?, decided_at = ?, decided_by = ?, reject_reason = ? WHERE id = ?`,
       opts.decision,
@@ -265,7 +270,7 @@ export async function decideProposal(opts: {
       (p.kind === "advance" || p.kind === "payment") &&
       p.contractId != null &&
       p.amount != null &&
-      p.amount > 0;
+      parseMoneyExact(p.amount) > 0n;
     if (billable) {
       const contract = await queryOne<{
         code: string;

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { moneyInputErrorBody } from "@/lib/nen/money";
+import { moneyInputErrorBody, parseMoneyExact } from "@/lib/nen/money";
 import { queryOne, insertId, withTransaction, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -13,7 +13,7 @@ import {
   VO_STATUSES,
   type VoStatus,
 } from "@/lib/tai-chinh/vo";
-import { openApproval } from "@/lib/tien-do/approvals";
+import { resyncApprovalAmount } from "@/lib/tien-do/approvals";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 
 export const dynamic = "force-dynamic";
@@ -114,12 +114,24 @@ export async function POST(req: NextRequest) {
           );
         }
         // M46 PR2: mở approval request nếu có flow cấu hình cho 'variation' (PR4) —
-        // không có flow thì openApproval trả null, không đổi hành vi hiện tại.
-        const { amount } = (await queryOne<{ amount: number }>(
-          `SELECT COALESCE(SUM(qty_contract * unit_price), 0) AS amount FROM boq_items WHERE vo_id = ?`,
+        // không có flow thì không mở gì, không đổi hành vi hiện tại.
+        // S13e: giá trị VO tính exact trong SQL (ROUND 2 như cột approval_requests.amount) rồi
+        // đi qua MoneyMinor — trước đây SUM đọc ra float nên ngưỡng min_amount so trên số xấp xỉ,
+        // lệch với amount lưu trong DB. resyncApprovalAmount với `openAs`: VO mới chưa có request
+        // → mở qua openApproval khi có flow (ép number exact, tràn/không exact → 422), không flow
+        // → no-op (không ép tiền, VO giá trị lớn vẫn lập được như cũ).
+        const { amount } = (await queryOne<{ amount: string }>(
+          `SELECT ROUND(COALESCE(SUM(qty_contract * unit_price), 0), 2)::text AS amount
+             FROM boq_items WHERE vo_id = ?`,
           id,
         ))!;
-        await openApproval({ entityType: "variation", entityId: id, projectId, amount, user });
+        await resyncApprovalAmount({
+          entityType: "variation",
+          entityId: id,
+          projectId,
+          amountMinor: parseMoneyExact(amount),
+          openAs: user,
+        });
         return { id, code };
       }),
     );

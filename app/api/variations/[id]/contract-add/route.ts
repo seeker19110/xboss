@@ -3,6 +3,7 @@ import { insertId, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { isValidDateISO } from "@/lib/nen/date";
+import { fitsNumeric, parseMoneyExact } from "@/lib/nen/money";
 
 export const dynamic = "force-dynamic";
 
@@ -97,18 +98,27 @@ export async function POST(
       );
       if (existingAddendum) throw new ContractAddError("Phát sinh này đã có phụ lục hợp đồng", 409);
 
-      const value = await queryOne<{ approvedValue: number }>(
-        `SELECT COALESCE(SUM(COALESCE(qty_approved, 0) * unit_price), 0) AS "approvedValue"
+      // S13e: giá trị đã duyệt tính exact trong SQL (ROUND 2 như cột value_delta) và ghi bằng
+      // chuỗi — trước đây SUM đọc ra float rồi ghi lại; tràn NUMERIC(15,2) → 422 thay vì lỗi
+      // pg 22003 thành 500.
+      const value = await queryOne<{ approvedValue: string }>(
+        `SELECT ROUND(COALESCE(SUM(COALESCE(qty_approved, 0) * unit_price), 0), 2)::text AS "approvedValue"
            FROM boq_items WHERE vo_id = ?`,
         id,
       );
+      const approvedValue = value?.approvedValue ?? "0.00";
+      if (!fitsNumeric(parseMoneyExact(approvedValue), 15))
+        throw new ContractAddError(
+          "Giá trị đã duyệt của phát sinh vượt giới hạn lưu trữ của phụ lục hợp đồng",
+          422,
+        );
       const addendaId = await insertId(
         `INSERT INTO contract_addenda (contract_id, code, title, value_delta, signed_date, note, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         contractId,
         addendaCode,
         vo.title,
-        value?.approvedValue ?? 0,
+        approvedValue,
         signedDate,
         sourceNote,
         user.id,

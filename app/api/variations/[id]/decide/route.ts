@@ -3,7 +3,9 @@ import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
-import { advanceApproval } from "@/lib/tien-do/approvals";
+import { advanceApproval, kiemAmountTruocKhiDuyet } from "@/lib/tien-do/approvals";
+import { parseMoneyExact } from "@/lib/nen/money";
+import { log } from "@/lib/nen/log";
 import { emitWebhook } from "@/lib/bao-mat/webhooks";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +80,23 @@ export async function POST(
         id,
       );
       if (liveRequest) {
+        // S13e (như IPC S13d): ngưỡng bước duyệt so theo approval_requests.amount — chốt lại theo
+        // giá trị đề xuất HIỆN TẠI của VO (exact trong SQL, dưới khoá VO) trước khi engine chọn
+        // bước; request lập trước S13e mang amount từ SUM float. Duyệt một phần vẫn so theo giá
+        // trị đề xuất (cấp duyệt chọn theo quy mô VO trình lên). Từ chối không phụ thuộc ngưỡng.
+        if (decision !== "rejected") {
+          const giaTri = await queryOne<{ amount: string }>(
+            `SELECT ROUND(COALESCE(SUM(qty_contract * unit_price), 0), 2)::text AS amount
+               FROM boq_items WHERE vo_id = ?`,
+            id,
+          );
+          await kiemAmountTruocKhiDuyet({
+            entityType: "variation",
+            entityId: id,
+            projectId: projectId as number,
+            amountMinor: parseMoneyExact(giaTri!.amount),
+          });
+        }
         const result = await advanceApproval({
           entityType: "variation",
           entityId: id,
@@ -146,8 +165,20 @@ export async function POST(
       return undefined;
     });
   } catch (err: unknown) {
-    const e = err as { message?: string; status?: number };
-    return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
+    // Chỉ lỗi có chủ đích (status — của route hoặc engine phê duyệt) trả thông điệp; lỗi bất ngờ
+    // (pg/mã nội bộ) chỉ log, không lộ thông điệp thô ra client (S13e).
+    const e = err as { message?: string; status?: number; code?: string };
+    if (e.status)
+      return NextResponse.json(
+        { error: e.message, ...(e.code ? { code: e.code } : {}) },
+        { status: e.status },
+      );
+    log.error("variations/decide: lỗi không lường trước", {
+      voId: id,
+      err: err instanceof Error ? err.message : String(err),
+      pgCode: e.code,
+    });
+    return NextResponse.json({ error: "Lỗi máy chủ khi quyết định phát sinh" }, { status: 500 });
   }
 
   if (pendingStep)

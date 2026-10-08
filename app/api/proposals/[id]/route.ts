@@ -78,8 +78,12 @@ export async function PATCH(
   const refErr = await checkProposalRefs(input, projectId ?? undefined);
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
 
-  await run(
-    `UPDATE proposals SET kind = ?, title = ?, amount = ?, contract_id = ?, material_id = ?, reason = ? WHERE id = ?`,
+  // S13e: điều kiện `status = 'draft'` ngay trong UPDATE — kiểm "còn nháp" ở trên đọc không khoá,
+  // trình (submit, khoá dòng) chen giữa thì UPDATE chờ khoá rồi không khớp → 409, không sửa được
+  // số tiền của đề xuất ĐÃ trình (amount của luồng duyệt đã chốt lúc trình).
+  const { changes } = await run(
+    `UPDATE proposals SET kind = ?, title = ?, amount = ?, contract_id = ?, material_id = ?, reason = ?
+      WHERE id = ? AND status = 'draft'`,
     input.kind,
     input.title,
     input.amount,
@@ -88,6 +92,11 @@ export async function PATCH(
     input.reason,
     id,
   );
+  if (changes === 0)
+    return NextResponse.json(
+      { error: "Đề xuất đã trình/đã quyết — không thể sửa" },
+      { status: 409 },
+    );
   return NextResponse.json({ ok: true });
 }
 
