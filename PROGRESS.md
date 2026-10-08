@@ -1,5 +1,33 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S02d: nhà thầu phụ (công nợ) + EVM fail-closed
+
+Cùng lớp S02 (A1-AC01/AC02), gọi route thật — 8/8 ca đỏ trên code cũ, xanh sau vá
+(`tests/s02d-subcon-evm-scope.test.ts`).
+
+- **`GET /api/subcontractors`:** trước trả `outstanding` (tiền công nợ) cho MỌI vai trò, cộng HĐ
+  của mọi dự án (`subcontractorDebt` gọi `listContracts()` không lọc) và liệt kê NCC mọi tổ chức
+  (`listSubcontractors` không lọc `org_id`). Nay `listSubcontractors(orgId, projectId)` +
+  `subcontractorDebt(supplierId, projectId)` bắt buộc tham số; không dự án khả kiến → `{items: []}`;
+  `outstanding` che (null) qua `stripSensitive("subcontractor")` khi thiếu `CAN.viewPayments`.
+  Gộp với S10c: che TRƯỚC rồi mới đổi wire (`moneyOrNullToWire`/`subcontractorDebtToWire`) — giá
+  trị bị che giữ null ở cả legacy lẫn `decimal-string-v1`.
+- **`GET /api/subcontractors/:id`:** không dự án → 404 trước query nghiệp vụ; công nợ chỉ HĐ dự án
+  đang chọn; hồ sơ gắn riêng dự án khác → 404 (cùng luật hiển thị với danh sách); cả khối `debt`
+  che thành null khi thiếu `viewPayments` (mảng HĐ lồng 2 cấp, và danh sách HĐ vốn chỉ
+  viewPayments xem được). Entity mới `subcontractor` khai trong `lib/bao-mat/sensitive-fields.ts`.
+- **`GET /api/dashboard/evm`:** `projectId` null → `{series: [], summary: null}` thay vì tính EVM
+  gộp toàn hệ; `getEvmSeries` nhận `projectId: number` bắt buộc, lọc dự án vô điều kiện (cả AC
+  nguồn bills/cash).
+- UI `/subcontractors`: ô công nợ + KPI "Tổng công nợ còn lại" hiện `MaskedValue` khi bị che, tab
+  "Công nợ & Hợp đồng" báo không có quyền. Test cũ cập nhật theo luật mới
+  (`subcontractors`, `route-to-chuc-thau-phu`: subcon không còn thấy `debt`; `route-task-cach-ly`:
+  user được gán dự án cùng org để 404 đến từ lớp org).
+- **Còn mở:** `?baseline=` của EVM/S-curve không kiểm `baselines.project_id` (không rò số liệu —
+  chỉ áp ngày cho task của dự án đang chọn); subcon không còn thấy công nợ của chính mình (đúng
+  luật `viewPayments`, cần chủ dự án xác nhận nếu muốn mở riêng); `subcontractorDebt` vẫn N+1
+  (mỗi NTP 1 lần `listContracts` của dự án).
+
 ## 2026-10-08 — S03/A4-FR06: READ ONLY đặt tại BEGIN
 
 - `withTransaction` nhận thêm `opts.readOnly`; `withProjectScope` không còn `SET TRANSACTION READ ONLY` sau BEGIN mà mở thẳng `BEGIN [ISOLATION LEVEL REPEATABLE READ] [READ ONLY]` (đúng chữ spec A4-FR06: snapshot/đọc-chỉ có hiệu lực trước mọi SELECT/set_config). Giữ nguyên: lồng trong transaction có sẵn không ép READ ONLY, từ chối repeatable_read lồng, GUC `app.project_id`, ROLLBACK khi lỗi. Test: `tests/db-begin-read-only.test.ts` (thứ tự câu BEGIN đỏ trên code cũ).

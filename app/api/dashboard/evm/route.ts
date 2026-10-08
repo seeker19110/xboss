@@ -42,7 +42,10 @@ export async function GET(req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
 
   const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
-  const data = await getEvmSeries({ projectId, baselineId, systemId, source });
+  // QUALITY-FINAL-1 S02 (A1-AC02): không có dự án khả kiến → rỗng đúng shape (như dự án chưa
+  // có task), KHÔNG tính EVM gộp mọi dự án/tổ chức như trước (mẫu S02c dashboard/scurve…).
+  const data =
+    projectId == null ? null : await getEvmSeries({ projectId, baselineId, systemId, source });
   if (data == null)
     return NextResponse.json(
       { series: [], summary: null, ...nhanDinhDangTien(format) },

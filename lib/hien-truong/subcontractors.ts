@@ -33,16 +33,17 @@ export type SubcontractorListRow = {
   capabilitySummary: string | null;
 };
 
-// projectId (M22 pattern): undefined = không lọc; có giá trị → chỉ ẩn NTP đã gắn hồ sơ
-// (subcontractor_profiles.project_id) cho MỘT dự án khác — hồ sơ chưa gán dự án nào
-// vẫn hiện ở mọi dự án (system_contractors/suppliers chưa có cột project_id).
-export async function listSubcontractors(projectId?: number): Promise<SubcontractorListRow[]> {
-  const conds = ["dc.supplier_id IS NOT NULL"];
-  const args: unknown[] = [];
-  if (projectId != null) {
-    conds.push("(p.project_id IS NULL OR p.project_id = ?)");
-    args.push(projectId);
-  }
+// orgId + projectId BẮT BUỘC (QUALITY-FINAL-1 S02, A1-AC01/AC02): suppliers là bảng gốc
+// org (0078) → chỉ NCC cùng tổ chức; ẩn NTP đã gắn hồ sơ (subcontractor_profiles.project_id)
+// cho MỘT dự án khác — hồ sơ chưa gán dự án nào vẫn hiện ở mọi dự án của org
+// (system_contractors/suppliers chưa có cột project_id). Trước đây projectId undefined = bỏ
+// lọc và không lọc org → liệt kê NCC mọi tổ chức.
+export async function listSubcontractors(
+  orgId: number,
+  projectId: number,
+): Promise<SubcontractorListRow[]> {
+  const conds = ["s.org_id = ?", "(p.project_id IS NULL OR p.project_id = ?)"];
+  const args: unknown[] = [orgId, projectId];
   return query<SubcontractorListRow>(
     `SELECT s.id, s.name, s.phone, s.email,
             COALESCE(disc.systems, '[]') AS systems,
@@ -239,8 +240,13 @@ export function subcontractorDebtToWire(
 
 // Công nợ = Σ (value + addendaTotal) các HĐ gắn party_supplier_id=supplierId, trừ Σ paid
 // (đã tổng hợp sẵn trong listContracts qua payment_bills) — KHÔNG viết lại công thức.
-export async function subcontractorDebt(supplierId: number): Promise<SubcontractorDebt> {
-  const all = await listContracts();
+// projectId BẮT BUỘC (QUALITY-FINAL-1 S02): chỉ HĐ của dự án đang chọn — trước đây
+// listContracts() không lọc → cộng gộp HĐ mọi dự án/tổ chức gắn cùng NCC.
+export async function subcontractorDebt(
+  supplierId: number,
+  projectId: number,
+): Promise<SubcontractorDebt> {
+  const all = await listContracts(undefined, projectId);
   const mine = all.filter((c) => c.partySupplierId === supplierId);
   // Mỗi c.value/addendaTotal/paid đã là tổng SQL (per-contract) từ listContracts —
   // cộng dồn NHIỀU hợp đồng ở đây làm trên bigint đơn vị nhỏ (lib/money.ts) thay vì
@@ -316,9 +322,12 @@ export type SubcontractorDetail = {
 // anh em GET /api/suppliers đã lọc org_id nhưng getSubcontractor() thì không, để lộ hồ sơ
 // (công nợ/đánh giá/hồ sơ năng lực) của NCC tổ chức khác qua đoán supplierId. Cùng ranh
 // giới đã áp cho suppliers/:id/ratings + suppliers/:id/summary.
+// projectId (QUALITY-FINAL-1 S02): công nợ chỉ HĐ dự án đang chọn; hồ sơ gắn riêng dự án
+// KHÁC → null (404) — cùng luật hiển thị với listSubcontractors.
 export async function getSubcontractor(
   supplierId: number,
   orgId: number,
+  projectId: number,
 ): Promise<SubcontractorDetail | null> {
   const supplier = await queryOne<{
     id: number;
@@ -334,16 +343,6 @@ export async function getSubcontractor(
   );
   if (!supplier) return null;
 
-  const systemRows = await query<SubcontractorSystem>(
-    `SELECT dc.system_id AS "systemId", d.code AS "systemCode", d.name AS "systemName",
-            dc.zone, dc.floor_labels AS "floorLabels", dc.is_primary AS "isPrimary"
-       FROM system_contractors dc
-       JOIN systems d ON d.id = dc.system_id
-      WHERE dc.supplier_id = ?
-      ORDER BY d.code`,
-    supplierId,
-  );
-
   const profileRow = await queryOne<{
     projectId: number | null;
     orgChartNote: string | null;
@@ -357,12 +356,23 @@ export async function getSubcontractor(
        FROM subcontractor_profiles WHERE supplier_id = ?`,
     supplierId,
   );
+  if (profileRow?.projectId != null && profileRow.projectId !== projectId) return null;
+
+  const systemRows = await query<SubcontractorSystem>(
+    `SELECT dc.system_id AS "systemId", d.code AS "systemCode", d.name AS "systemName",
+            dc.zone, dc.floor_labels AS "floorLabels", dc.is_primary AS "isPrimary"
+       FROM system_contractors dc
+       JOIN systems d ON d.id = dc.system_id
+      WHERE dc.supplier_id = ?
+      ORDER BY d.code`,
+    supplierId,
+  );
 
   const [documents, evaluations, evaluationAverage, debt] = await Promise.all([
     listSubconDocuments(supplierId),
     listEvaluations(supplierId),
     avgEvaluationScore(supplierId),
-    subcontractorDebt(supplierId),
+    subcontractorDebt(supplierId, projectId),
   ]);
 
   return {

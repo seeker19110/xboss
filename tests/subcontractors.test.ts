@@ -130,7 +130,9 @@ test(
       capabilitySummary: "20 thợ điện",
     });
 
-    const list = await listSubcontractors();
+    // S02: orgId + projectId bắt buộc (hồ sơ project_id NULL hiện ở mọi dự án của org).
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Dự án NTP list Test')`);
+    const list = await listSubcontractors(1, projectId);
     const ids = list.map((s) => s.id);
     assert.ok(ids.includes(withProfileId));
     assert.ok(ids.includes(noProfileId));
@@ -170,10 +172,13 @@ test(
     const { getSubcontractor } = await import("@/lib/hien-truong/subcontractors");
 
     const supplierId = await insertId(`INSERT INTO suppliers (name) VALUES ('NTP Công Nợ Test')`);
+    // S02: công nợ chỉ tính HĐ của dự án được truyền vào.
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Dự án NTP nợ Test')`);
     const contractId = await insertId(
-      `INSERT INTO contracts (code, kind, title, party_supplier_id, value, status)
-       VALUES ('HD-NTP-TEST', 'giao_thau', 'HĐ giao thầu test', ?, 1000000, 'active')`,
+      `INSERT INTO contracts (code, kind, title, party_supplier_id, value, status, project_id)
+       VALUES ('HD-NTP-TEST', 'giao_thau', 'HĐ giao thầu test', ?, 1000000, 'active', ?)`,
       supplierId,
+      projectId,
     );
     await insertId(
       `INSERT INTO payment_bills (responsible, type, amount, paid_date, contract_id)
@@ -181,7 +186,7 @@ test(
       contractId,
     );
 
-    const detail = await getSubcontractor(supplierId, 1);
+    const detail = await getSubcontractor(supplierId, 1, projectId);
     assert.ok(detail);
     assert.equal(detail!.debt.contractValue, 1000000_00n); // S10c: MoneyMinor
     assert.equal(detail!.debt.paid, 300000_00n);
@@ -201,7 +206,7 @@ test(
       ),
     );
 
-    const detail2 = await getSubcontractor(supplierId, 1);
+    const detail2 = await getSubcontractor(supplierId, 1, projectId);
     assert.equal(detail2!.evaluations.length, 1);
     assert.equal(detail2!.evaluationAverage.latestPeriod, "2026-Q3");
     assert.equal(detail2!.evaluationAverage.avgScore, 5);
