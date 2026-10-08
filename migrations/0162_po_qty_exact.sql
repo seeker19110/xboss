@@ -1,4 +1,4 @@
--- 0163_po_qty_exact.sql — QUALITY-FINAL-1 DATA-MIGRATIONS §6 (A3-FR04): khối lượng PO/PR/phiếu
+-- 0162_po_qty_exact.sql — QUALITY-FINAL-1 DATA-MIGRATIONS §6 (A3-FR04): khối lượng PO/PR/phiếu
 -- nhận exact — bước EXPAND. Đặc tả: docs/nang-cap/AUDIT-2026-09-25/DATA-MIGRATIONS.md §6.
 --
 -- Chỉ THÊM cột/constraint (cột mới NULL hết → mọi CHECK đúng với dữ liệu cũ) — không UPDATE/

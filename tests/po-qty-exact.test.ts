@@ -6,7 +6,7 @@ import { NextRequest } from "next/server";
 import { parseQuantityInput, QuantityInputError } from "@/lib/nen/money";
 import { parsePoQuantity } from "@/lib/tai-chinh/procurement";
 
-// QUALITY-FINAL-1 DATA-MIGRATIONS §6 — khối lượng PR/PO/phiếu nhận exact (migration 0163):
+// QUALITY-FINAL-1 DATA-MIGRATIONS §6 — khối lượng PR/PO/phiếu nhận exact (migration 0162):
 // parser canonical (≤18 nguyên/6 lẻ, không exponent, cắt đuôi 0), route thật ghi `*_exact` +
 // provenance 'exact_input_v1', nhận hàng không đổi ordered_provenance, script backfill
 // dry-run/legacy_float_text/idempotent/không đè exact_input_v1.

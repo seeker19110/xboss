@@ -1,4 +1,4 @@
-// Backfill khối lượng exact cho PR/PO/phiếu nhận — DATA-MIGRATIONS §6 (bước sau migration 0163).
+// Backfill khối lượng exact cho PR/PO/phiếu nhận — DATA-MIGRATIONS §6 (bước sau migration 0162).
 // Mỗi cột float cũ → `*_exact = qty::text::numeric` (chuỗi shortest-roundtrip của float8 — biểu
 // diễn float ĐÃ LƯU, không chứng minh số decimal người dùng nhập gốc, không round thêm), đánh dấu
 // `*_provenance = 'legacy_float_text'`. Provenance theo TỪNG CỘT.

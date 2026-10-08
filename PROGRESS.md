@@ -4,7 +4,7 @@
 
 Đặc tả: `docs/nang-cap/AUDIT-2026-09-25/DATA-MIGRATIONS.md` §6 (A3-FR04).
 
-- **Migration `0163_po_qty_exact.sql`** — chỉ thêm cột `*_exact numeric` + `*_provenance text`
+- **Migration `0162_po_qty_exact.sql`** — chỉ thêm cột `*_exact numeric` + `*_provenance text`
   (theo từng cột) cho `purchase_requests.qty_requested`, `po_items.qty_ordered/qty_received`,
   `receipt_items.qty_received` + 12 CHECK đúng đặc tả (qua khối DO kiểm `pg_constraint`).
   Không UPDATE/backfill/NOT NULL/DROP → **thêm thuần, đi thẳng production**. Quyền mức bảng

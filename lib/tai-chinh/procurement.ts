@@ -416,7 +416,7 @@ export async function checkPurchaseOrderParents(
   return null;
 }
 
-// ===== DATA-MIGRATIONS §6 — khối lượng PR/PO/phiếu nhận exact (bước expand, 0163) =====
+// ===== DATA-MIGRATIONS §6 — khối lượng PR/PO/phiếu nhận exact (bước expand, 0162) =====
 
 /** Khối lượng PR/PO/phiếu nhận: decimal không âm, ≤ 18 chữ số nguyên / 6 số lẻ, cắt đuôi 0. */
 export const PO_QTY_OPTS: QuantityInputOptions = { scale: 6, maxIntDigits: 18, trimZeros: true };
