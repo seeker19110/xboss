@@ -456,5 +456,36 @@ test(
       (await PUT(req("/x", "PUT", { floorLabel, stageId: chung, note: "ok" }))).status,
       200,
     );
+    // NCC bàn giao thuộc org khác → 404 như không tồn tại (suppliers là bảng gốc org, A1-AC01).
+    const orgKhac = await insertId(
+      `INSERT INTO organizations (name) VALUES (?)`,
+      `Org khác ${RUN}`,
+    );
+    const nccKhac = await insertId(
+      `INSERT INTO suppliers (name, org_id) VALUES (?, ?)`,
+      `NCC org khác ${RUN}`,
+      orgKhac,
+    );
+    const nccCung = await insertId(
+      `INSERT INTO suppliers (name, org_id) VALUES (?, 1)`,
+      `NCC cùng org ${RUN}`,
+    );
+    const label2 = `FS2${RUN}`;
+    assert.equal(
+      (
+        await PUT(
+          req("/x", "PUT", { floorLabel: label2, stageId: chung, outgoingSupplierId: nccKhac }),
+        )
+      ).status,
+      404,
+    );
+    assert.equal(
+      (
+        await PUT(
+          req("/x", "PUT", { floorLabel: label2, stageId: chung, outgoingSupplierId: nccCung }),
+        )
+      ).status,
+      200,
+    );
   },
 );

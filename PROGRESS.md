@@ -9,7 +9,7 @@ Cùng mẫu S02a (#591): `getCurrentProjectId` null → **404** cho chi tiết/g
 - **S02b tracking/BOQ** (10/12 ca đỏ trên code cũ): `boq-norms/[id]` PATCH/DELETE (sửa được định mức
   dự án khác), `boq/[id]/norms` GET/POST, `boq/[id]/norm-usage`, `lookahead`, `my-tasks`, `timeline`,
   `search` (+ `searchSources` FTS), `tasks` GET (null → 404 vì shape bắt buộc có `sheet`),
-  `systems/[code]/uploads`; `floor-stage-fronts` PUT chặn transition stage riêng của dự án khác.
+  `systems/[code]/uploads`; `floor-stage-fronts` PUT chặn transition stage riêng của dự án khác và NCC của org khác.
   Helper fail-closed: `getNorm`, `pendingStageFloors`, `searchSources`. Định mức chỉ nhận vật tư
   cùng dự án (`checkNormMaterial`).
 - **S02b file/QC/HSE/thông báo** (9/10 ca đỏ): `correspondence-files/[id]` + `hse-photos/[id]`
