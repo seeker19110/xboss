@@ -9,6 +9,7 @@ import { taiJson, taiJsonMoi } from "@/app/lib/taiDuLieu";
 import { appAlert, appConfirm } from "@/app/components/dialogs";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { boDauThuong } from "@/lib/nen/van-ban";
+import { HEADER_TIEN_V1, fmtDongMinor, minorTuWire } from "@/lib/nen/money-dto";
 import AddBoqModal from "./_components/AddBoqModal";
 import ImportBoqModal from "./_components/ImportBoqModal";
 import BoqDetailModal from "./_components/BoqDetailModal";
@@ -22,13 +23,36 @@ import {
   type SystemOption,
 } from "./_components/types";
 
+type TotalsWire = { contractValue: string; subValue: string; executedValue: string };
+type Totals = { contractValue: bigint; subValue: bigint; executedValue: bigint };
+const TOTALS_RONG: Totals = { contractValue: 0n, subValue: 0n, executedValue: 0n };
+
+// Tổng tiền từ API v1 (chuỗi canonical) → bigint đồng×100; không cộng/chia float.
+function totalsTuWire(t: TotalsWire | undefined): Totals {
+  if (!t) return TOTALS_RONG;
+  return {
+    contractValue: minorTuWire(t.contractValue),
+    subValue: minorTuWire(t.subValue),
+    executedValue: minorTuWire(t.executedValue),
+  };
+}
+
+// % thực hiện / hợp đồng, làm tròn nguyên, tính trên bigint (không float cho tiền).
+function phanTramThucHien(t: Totals): number {
+  if (t.contractValue <= 0n) return 0;
+  return Number((t.executedValue * 100n + t.contractValue / 2n) / t.contractValue);
+}
+
+// Giữ quy ước fmtVND: 0 → "—".
+const fmtTong = (m: bigint) => (m === 0n ? "—" : fmtDongMinor(m));
+
 type LocOption = "all" | "chua-map" | "lech";
 type SapOption = "boq" | "gia-tri" | "thuc-hien";
 
 export default function BoqPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [items, setItems] = useState<BoqItem[]>([]);
-  const [totals, setTotals] = useState({ contractValue: 0, subValue: 0, executedValue: 0 });
+  const [totals, setTotals] = useState<Totals>(TOTALS_RONG);
   const [systems, setSystems] = useState<SystemOption[]>([]);
   const [loading, setLoading] = useState(true);
   // Lỗi tải ≠ rỗng (audit 2026-09-05).
@@ -46,12 +70,12 @@ export default function BoqPage() {
 
   const canManage = me?.role === "admin" || me?.role === "pm";
 
-  type BoqData = { items?: BoqItem[]; totals?: typeof totals };
+  type BoqData = { items?: BoqItem[]; totals?: TotalsWire };
 
   async function load(withVo: boolean, fresh = false) {
     const url = `/api/boq?includeVo=${withVo ? 1 : 0}`;
     // fresh = tải lại ngay sau khi tự sửa → bỏ qua cache service worker (xem taiJsonMoi).
-    const kq = await (fresh ? taiJsonMoi : taiJson)<BoqData>(url);
+    const kq = await (fresh ? taiJsonMoi : taiJson)<BoqData>(url, { headers: HEADER_TIEN_V1 });
     return kq.ok ? { ok: true as const, data: kq.data } : { ok: false as const, loi: kq.loi };
   }
 
@@ -70,7 +94,7 @@ export default function BoqPage() {
       return;
     }
     setItems(boq.data.items ?? []);
-    setTotals(boq.data.totals ?? { contractValue: 0, subValue: 0, executedValue: 0 });
+    setTotals(totalsTuWire(boq.data.totals));
     // Danh sách hệ chỉ để lọc — hỏng thì vẫn xem được BOQ, không chặn cả trang.
     if (sys.ok) setSystems(sys.data.systems ?? []);
     setLoading(false);
@@ -116,7 +140,7 @@ export default function BoqPage() {
     }
     const boq = kq.data;
     setItems(boq?.items ?? []);
-    setTotals(boq?.totals ?? { contractValue: 0, subValue: 0, executedValue: 0 });
+    setTotals(totalsTuWire(boq?.totals));
     setSelected((sel) =>
       sel ? ((boq?.items ?? []).find((i: BoqItem) => i.id === sel.id) ?? null) : null,
     );
@@ -242,7 +266,7 @@ export default function BoqPage() {
                 Giá trị hợp đồng nhận thầu
               </span>
               <p className="text-2xl font-bold font-mono tabular-nums text-zinc-100 mt-2">
-                {fmtVND(totals.contractValue)}
+                {fmtTong(totals.contractValue)}
               </p>
               <p className="text-[11px] text-zinc-500 mt-1">Khối lượng BOQ gốc + VO duyệt</p>
             </div>
@@ -252,7 +276,7 @@ export default function BoqPage() {
                 Giá trị giao thầu phụ
               </span>
               <p className="text-2xl font-bold font-mono tabular-nums text-sky-400 mt-2">
-                {fmtVND(totals.subValue)}
+                {fmtTong(totals.subValue)}
               </p>
               <p className="text-[11px] text-zinc-500 mt-1">Phân bổ tổ đội thi công</p>
             </div>
@@ -263,19 +287,17 @@ export default function BoqPage() {
                   Giá trị thực hiện lũy kế
                 </span>
                 <span className="text-xs font-bold font-mono text-emerald-400">
-                  {totals.contractValue > 0
-                    ? `${Math.round((totals.executedValue / totals.contractValue) * 100)}%`
-                    : "0%"}
+                  {phanTramThucHien(totals)}%
                 </span>
               </div>
               <p className="text-2xl font-bold font-mono tabular-nums text-emerald-400 mt-2">
-                {fmtVND(totals.executedValue)}
+                {fmtTong(totals.executedValue)}
               </p>
               <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden mt-2 border border-zinc-800">
                 <div
                   className="bg-emerald-500 h-full rounded-full transition-[width]"
                   style={{
-                    width: `${totals.contractValue > 0 ? Math.min(100, Math.round((totals.executedValue / totals.contractValue) * 100)) : 0}%`,
+                    width: `${Math.min(100, phanTramThucHien(totals))}%`,
                   }}
                 />
               </div>
@@ -452,10 +474,10 @@ export default function BoqPage() {
                       Tổng
                     </td>
                     <td className="p-3 hidden sm:table-cell text-right">
-                      {fmtVND(totals.contractValue)}
+                      {fmtTong(totals.contractValue)}
                     </td>
                     <td className="p-3 hidden sm:table-cell"></td>
-                    <td className="p-3">{fmtVND(totals.executedValue)}</td>
+                    <td className="p-3">{fmtTong(totals.executedValue)}</td>
                     <td className="p-3 hidden sm:table-cell"></td>
                   </tr>
                 </tfoot>

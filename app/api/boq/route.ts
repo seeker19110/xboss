@@ -5,6 +5,18 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
+import {
+  MONEY_FORMAT_HEADER,
+  isMoneyPrecisionError,
+  moneyWireFormat,
+  parseMoneyExact,
+} from "@/lib/nen/money";
+import {
+  HEADERS_API_TIEN,
+  LOI_TIEN_VUOT_DINH_DANG_CU,
+  moneyFieldsToWire,
+  nhanDinhDangTien,
+} from "@/lib/nen/money-dto";
 
 export const dynamic = "force-dynamic";
 
@@ -37,12 +49,17 @@ type BoqRow = {
 };
 
 // Trạng thái VO tính vào ngân sách/KL nhận thầu (đồng bộ lib/cost.ts + lib/vo.ts).
-const VO_APPROVED_STATUSES = new Set(["approved", "partially_approved", "contract_added"]);
+const VO_APPROVED_STATUSES = ["approved", "partially_approved", "contract_added"];
+
+type TotalsRow = { contractValue: string; subValue: string; executedValue: string };
 
 // GET /api/boq?system=<code>&includeVo=0 — danh sách dòng BOQ + tổng hợp KL 3
 // lớp (nhận thầu / giao thầu / thực hiện). KL thực hiện tính động từ boq_task_map.
 // includeVo mặc định true: hiện cả dòng phát sinh (VO, M6, badge "VO" ở UI) — dòng
 // VO chưa duyệt vẫn hiện để theo dõi nhưng không cộng vào contractValue.
+// S10 đuôi (A3): totals tính exact trong SQL (NUMERIC, SUM rồi mới ROUND 2 số lẻ) — không cộng
+// float JS. Header decimal-string-v1 → totals là chuỗi canonical + `moneyFormat`; legacy → number,
+// ngoài biên → 422 `money_precision_unsupported`.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -51,11 +68,20 @@ export async function GET(req: NextRequest) {
   const includeVo = req.nextUrl.searchParams.get("includeVo") !== "0";
   const projectId = await getCurrentProjectId(user);
   // A1-AC02: không có dự án khả kiến → danh sách rỗng đúng shape, không query nghiệp vụ.
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
   if (projectId == null)
-    return NextResponse.json({
-      items: [],
-      totals: { contractValue: 0, subValue: 0, executedValue: 0 },
-    });
+    return NextResponse.json(
+      {
+        items: [],
+        totals: moneyFieldsToWire(
+          { contractValue: 0n, subValue: 0n, executedValue: 0n },
+          ["contractValue", "subValue", "executedValue"],
+          format,
+        ),
+        ...nhanDinhDangTien(format),
+      },
+      { headers: HEADERS_API_TIEN },
+    );
   const blocked = await assertModuleEnabled("materials", projectId);
   if (blocked) return blocked;
 
@@ -70,9 +96,11 @@ export async function GET(req: NextRequest) {
   args.push(projectId);
   const where = `WHERE ${conds.join(" AND ")}`;
 
-  const rows = await withProjectScope(projectId, () =>
-    query<BoqRow>(
-      `SELECT bi.id, bi.code, bi.name, bi.unit,
+  const statusIn = VO_APPROVED_STATUSES.map(() => "?").join(",");
+  const [rows, totalsRows] = await withProjectScope(projectId, () =>
+    Promise.all([
+      query<BoqRow>(
+        `SELECT bi.id, bi.code, bi.name, bi.unit,
               bi.system_id AS "systemId", d.code AS "systemCode",
               d.name AS "systemName", d.color AS "systemColor",
               bi.qty_contract AS "qtyContract", bi.unit_price AS "unitPrice",
@@ -97,30 +125,62 @@ export async function GET(req: NextRequest) {
         ${where}
         GROUP BY bi.id, d.code, d.name, d.color, vo.code, vo.status
         ORDER BY bi.sort_order, bi.id`,
-      ...args,
-    ),
+        ...args,
+      ),
+      query<TotalsRow>(
+        `SELECT ROUND(COALESCE(SUM(
+                CASE WHEN bi.vo_id IS NULL OR vo.status IN (${statusIn})
+                     THEN (CASE WHEN bi.vo_id IS NULL THEN bi.qty_contract
+                                ELSE COALESCE(bi.qty_approved, 0) END) * bi.unit_price
+                     ELSE 0 END), 0), 2)::text AS "contractValue",
+              ROUND(COALESCE(SUM(
+                COALESCE(bi.qty_sub, 0) * COALESCE(bi.sub_unit_price, 0)), 0), 2)::text AS "subValue",
+              ROUND(COALESCE(SUM(
+                bi.qty_contract * bi.unit_price * COALESCE((
+                  SELECT SUM(m.weight * COALESCE(t.progress_percent, 0)::text::numeric)
+                    FROM boq_task_map m JOIN tasks t ON t.id = m.task_id
+                   WHERE m.boq_item_id = bi.id), 0)), 0), 2)::text AS "executedValue"
+         FROM boq_items bi
+         LEFT JOIN systems d ON d.id = bi.system_id
+         LEFT JOIN variation_orders vo ON vo.id = bi.vo_id
+        ${where}`,
+        ...VO_APPROVED_STATUSES,
+        ...args,
+      ),
+    ]),
   );
 
-  let contractValue = 0;
-  let subValue = 0;
-  let executedValue = 0;
   const items = rows.map((r) => {
     const executedFraction = r.map.reduce(
       (sum, m) => sum + Number(m.weight) * Number(m.progressPercent ?? 0),
       0,
     );
     const executedQty = Number(r.qtyContract) * executedFraction;
-    const isVo = r.voId != null;
-    const countsTowardBudget =
-      !isVo || (r.voStatus != null && VO_APPROVED_STATUSES.has(r.voStatus));
-    const budgetQty = isVo ? Number(r.qtyApproved ?? 0) : Number(r.qtyContract);
-    if (countsTowardBudget) contractValue += budgetQty * Number(r.unitPrice);
-    subValue += Number(r.qtySub) * Number(r.subUnitPrice);
-    executedValue += executedQty * Number(r.unitPrice);
     return { ...r, executedQty };
   });
 
-  return NextResponse.json({ items, totals: { contractValue, subValue, executedValue } });
+  const t = totalsRows[0];
+  try {
+    const totals = moneyFieldsToWire(
+      {
+        contractValue: parseMoneyExact(t.contractValue),
+        subValue: parseMoneyExact(t.subValue),
+        executedValue: parseMoneyExact(t.executedValue),
+      },
+      ["contractValue", "subValue", "executedValue"],
+      format,
+    );
+    return NextResponse.json(
+      { items, totals, ...nhanDinhDangTien(format) },
+      { headers: HEADERS_API_TIEN },
+    );
+  } catch (err) {
+    if (!isMoneyPrecisionError(err)) throw err;
+    return NextResponse.json(LOI_TIEN_VUOT_DINH_DANG_CU, {
+      status: 422,
+      headers: HEADERS_API_TIEN,
+    });
+  }
 }
 
 // POST /api/boq — tạo dòng BOQ mới (Admin/PM). Check trùng BOQCODE xuyên toàn hệ thống.
