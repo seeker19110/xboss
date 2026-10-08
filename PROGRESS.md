@@ -1,5 +1,15 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1: EVM/S-curve — baseline phải thuộc dự án đang chọn (A1-FR06)
+
+`GET /api/dashboard/evm?baseline=` và `/api/dashboard/scurve?baseline=` nhận id do client gửi mà không
+kiểm dự án -> đọc được ngày kế hoạch (`baseline_tasks`) của dự án/tổ chức khác. Sửa tận gốc bằng module
+miền mới `lib/tien-do/baseline-scope.ts` (`parseBaselineParam`, `kiemBaselineThuocDuAn`): sai định dạng
+(`1e3`, `abc`, `-1`, `0`, vượt int4) -> 400; không tồn tại/thuộc dự án khác -> 404 (không fallback âm
+thầm); thiếu tham số -> như cũ. Rà route anh em: chỉ 2 route này đọc `?baseline=`; `/api/baselines*` đã
+lọc theo `project_id`, `daily-report` truyền `baselineId: null`, các mục khác chỉ xoá `baseline_tasks`
+theo task. Test `tests/route-evm-scurve-baseline-scope.test.ts` (route thật, đỏ 6/8 trên code cũ).
+
 ## 2026-10-08 — QUALITY-FINAL-1 S02e: cấu hình theo org
 
 Đặc tả `docs/nang-cap/AUDIT-S02E-ORG-CONFIG.md` (spec cha A1-SCOPE). Đóng nhóm "Còn mở, cần đặc tả

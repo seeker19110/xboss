@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { resolveSystemId } from "@/lib/tien-do/systems";
+import { kiemBaselineThuocDuAn, parseBaselineParam } from "@/lib/tien-do/baseline-scope";
 import { plannedRatio } from "@/lib/tien-do/evm";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
@@ -77,7 +78,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
   const sheet = req.nextUrl.searchParams.get("sheet");
-  const baselineId = parseInt(req.nextUrl.searchParams.get("baseline") ?? "");
+  const baselineRaw = req.nextUrl.searchParams.get("baseline");
+  if (parseBaselineParam(baselineRaw) === undefined)
+    return NextResponse.json({ error: "baseline phải là số nguyên dương hợp lệ" }, { status: 400 });
   const systemId = sheet ? null : await resolveSystemId(req.nextUrl.searchParams.get("system"));
   const sheetFilter = sheet ? `AND st.code = ?` : systemId !== null ? `AND st.system_id = ?` : "";
   const params = sheet ? [sheet] : systemId !== null ? [systemId] : [];
@@ -85,6 +88,11 @@ export async function GET(req: NextRequest) {
   // A1-AC02: không có dự án khả kiến → trả rỗng đúng shape, KHÔNG mở toàn hệ.
   const projectId = await getCurrentProjectId(user);
   if (projectId == null) return NextResponse.json({ points: [], sheets: [] });
+  // A1-FR06: baseline phải thuộc dự án đang chọn, không thì 404 (không fallback về không-baseline).
+  const kqBaseline = await kiemBaselineThuocDuAn(baselineRaw, projectId);
+  if (!kqBaseline.ok)
+    return NextResponse.json({ error: kqBaseline.error }, { status: kqBaseline.status });
+  const baselineId = kqBaseline.baselineId;
   const projectJoin = "JOIN towers tw ON tw.id = st.tower_id";
   const projectFilter = "AND tw.project_id = ?";
   const projectParams = [projectId];
@@ -105,7 +113,7 @@ export async function GET(req: NextRequest) {
   if (tasks.length === 0) return NextResponse.json({ points: [], sheets: [] });
 
   // Ngày kế hoạch lấy từ baseline đã chốt (nếu chọn) — task tạo sau baseline giữ ngày hiện tại.
-  if (!isNaN(baselineId)) {
+  if (baselineId != null) {
     const blDates = await query<{
       taskId: number;
       startDate: string | null;
