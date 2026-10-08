@@ -27,22 +27,30 @@ export async function GET(req: NextRequest) {
       { status: 403 },
     );
 
+  // Dự án đang chọn — lọc mọi tab theo dự án để tránh rò rỉ chéo dự án (đa dự án, M22+).
+  // A1-AC02: không có dự án khả kiến → 404, không sinh file toàn hệ.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án đang chọn" }, { status: 404 });
+  const projectJoin = " JOIN towers tw ON tw.id = st.tower_id";
+  const projectFilter = " AND tw.project_id = ?";
+  const projectParam = [projectId];
+
+  // `?sheet=<slug>` phải thuộc dự án đang chọn (sheet → tower → project) — sheet dự án khác = 404.
   const slug = req.nextUrl.searchParams.get("sheet");
   const onlySheet = slug
-    ? ((await queryOne<{ code: string }>(`SELECT code FROM sheet_types WHERE slug = ?`, slug))
-        ?.code ?? null)
+    ? ((
+        await queryOne<{ code: string }>(
+          `SELECT st.code FROM sheet_types st${projectJoin} WHERE st.slug = ?${projectFilter}`,
+          slug,
+          projectId,
+        )
+      )?.code ?? null)
     : null;
   if (slug && !onlySheet)
-    return NextResponse.json({ error: `Sheet không hợp lệ: ${slug}` }, { status: 400 });
+    return NextResponse.json({ error: `Không tìm thấy sheet: ${slug}` }, { status: 404 });
 
   const today = todayISO();
-
-  // Dự án đang chọn — lọc mọi tab theo dự án để tránh rò rỉ chéo dự án (đa dự án, M22+).
-  // null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
-  const projectId = await getCurrentProjectId(user);
-  const projectJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
-  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
-  const projectParam = projectId != null ? [projectId] : [];
 
   const delayed = await query<{
     boqCode: string | null;
@@ -78,7 +86,7 @@ export async function GET(req: NextRequest) {
             COALESCE(AVG(t.progress_percent),0) AS "avgProgress",
             COALESCE(SUM(CASE WHEN COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1 AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END),0) AS delayed
        FROM sheet_types st
-       ${projectId != null ? "JOIN towers tw ON tw.id = st.tower_id AND tw.project_id = ?" : ""}
+       JOIN towers tw ON tw.id = st.tower_id AND tw.project_id = ?
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
       GROUP BY st.id, st.code ORDER BY st.id`,

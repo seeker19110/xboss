@@ -49,9 +49,18 @@ export function validateNormInput(input: NormInput): string | null {
   return null;
 }
 
-export async function checkNormMaterial(input: NormInput): Promise<string | null> {
+/** Vật tư của định mức phải thuộc CÙNG dự án với dòng BOQ (S02b) — vật tư dự án khác báo như
+ *  không tồn tại (không lộ id tồn tại ở dự án khác). */
+export async function checkNormMaterial(
+  input: NormInput,
+  projectId: number,
+): Promise<string | null> {
   if (input.materialId == null) return null;
-  const m = await queryOne(`SELECT id FROM materials WHERE id = ?`, input.materialId);
+  const m = await queryOne(
+    `SELECT id FROM materials WHERE id = ? AND project_id = ?`,
+    input.materialId,
+    projectId,
+  );
   if (!m) return "Vật tư không tồn tại";
   return null;
 }
@@ -83,8 +92,8 @@ export async function listNormsForBoqItem(boqItemId: number): Promise<NormRow[]>
 
 // projectId (M22): boq_norms không có cột project_id riêng — suy qua boq_items.project_id
 // (join thêm khi truyền projectId); undefined = không lọc.
-export async function getNorm(id: number, projectId?: number): Promise<NormRow | null> {
-  const projectFilter = projectId != null ? " AND bi.project_id = ?" : "";
+// projectId bắt buộc (fail-closed): không còn nghĩa "không truyền = không lọc dự án".
+export async function getNorm(id: number, projectId: number): Promise<NormRow | null> {
   const row = await queryOne<NormRow>(
     `SELECT n.id, n.boq_item_id AS "boqItemId", n.resource_type AS "resourceType",
             n.material_id AS "materialId", m.name AS "materialName",
@@ -93,9 +102,9 @@ export async function getNorm(id: number, projectId?: number): Promise<NormRow |
        FROM boq_norms n
        JOIN boq_items bi ON bi.id = n.boq_item_id
        LEFT JOIN materials m ON m.id = n.material_id
-      WHERE n.id = ?${projectFilter}`,
+      WHERE n.id = ? AND bi.project_id = ?`,
     id,
-    ...(projectId != null ? [projectId] : []),
+    projectId,
   );
   return row ?? null;
 }

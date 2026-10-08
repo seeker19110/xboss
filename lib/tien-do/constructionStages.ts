@@ -284,18 +284,16 @@ export type StageMissingItem = {
 // tầng đó còn handed_over_at NULL — áp dụng chung mọi hệ (khác model cũ tách theo sheet).
 // projectId lọc thẳng theo cột fsf.project_id (M123 · F6 — trước đây phải suy dự án qua
 // chuỗi wp.floor_label = fsf.floor_label vì bảng chưa có cột dự án).
-export async function pendingStageFloors(projectId?: number): Promise<Set<string>> {
+// projectId bắt buộc (fail-closed, A1-AC02): không còn nhánh "không truyền = toàn hệ".
+export async function pendingStageFloors(projectId: number): Promise<Set<string>> {
   const conds = [
     "cs.active = TRUE",
     "fsf.handed_over_at IS NULL",
     "cs.sort_order = (SELECT MAX(sort_order) FROM construction_stages WHERE active = TRUE)",
+    "fsf.project_id = ?",
   ];
-  const args: unknown[] = [];
-  if (projectId != null) {
-    conds.push("fsf.project_id = ?");
-    args.push(projectId);
-  }
-  const rows = await withProjectScope(projectId ?? "*", () =>
+  const args: unknown[] = [projectId];
+  const rows = await withProjectScope(projectId, () =>
     query<{ floorLabel: string }>(
       `SELECT fsf.floor_label AS "floorLabel"
        FROM floor_stage_fronts fsf

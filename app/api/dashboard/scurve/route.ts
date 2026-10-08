@@ -29,21 +29,21 @@ const toISO = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 // vì tái dựng từ task_history mỗi request — chỉ khi MV phủ đủ [from, toCap]. Trả null (DB
 // mới/cron chưa refresh lần nào → MV rỗng, hoặc phủ chưa đủ) để route tự fallback tái dựng
 // như trước, KHÔNG đổi kết quả trong mọi trường hợp (đã verify khớp tuyệt đối bằng dữ liệu
-// thật, xem PROGRESS.md mục M47 PR2). MV dùng sentinel 0 cho project/system NULL.
+// thật, xem PROGRESS.md mục M47 PR2). Route luôn truyền dự án cụ thể (A1-AC02) — không đọc
+// dòng sentinel 0 (gộp toàn hệ) của MV.
 async function readMvActual(
-  projectId: number | null,
+  projectId: number,
   systemId: number | null,
   from: string,
   toCap: string,
 ): Promise<Map<string, number> | null> {
-  const scopeProjectId = projectId ?? 0;
   const systemFilter = systemId !== null ? "AND system_id = ?" : "";
   const systemParams = systemId !== null ? [systemId] : [];
 
   const coverage = await queryOne<{ minD: string | null; maxD: string | null }>(
     `SELECT MIN(date) AS "minD", MAX(date) AS "maxD" FROM mv_progress_daily
       WHERE project_id = ? ${systemFilter}`,
-    scopeProjectId,
+    projectId,
     ...systemParams,
   );
   if (!coverage?.minD || !coverage.maxD || coverage.minD > from || coverage.maxD < toCap)
@@ -54,7 +54,7 @@ async function readMvActual(
        FROM mv_progress_daily
       WHERE project_id = ? ${systemFilter} AND date BETWEEN ? AND ?
       GROUP BY date`,
-    scopeProjectId,
+    projectId,
     ...systemParams,
     from,
     toCap,
@@ -82,11 +82,12 @@ export async function GET(req: NextRequest) {
   const sheetFilter = sheet ? `AND st.code = ?` : systemId !== null ? `AND st.system_id = ?` : "";
   const params = sheet ? [sheet] : systemId !== null ? [systemId] : [];
   // Dự án đang chọn — lọc theo dự án để tránh rò rỉ chéo dự án (đa dự án, M22+).
-  // null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
+  // A1-AC02: không có dự án khả kiến → trả rỗng đúng shape, KHÔNG mở toàn hệ.
   const projectId = await getCurrentProjectId(user);
-  const projectJoin = projectId != null ? "JOIN towers tw ON tw.id = st.tower_id" : "";
-  const projectFilter = projectId != null ? "AND tw.project_id = ?" : "";
-  const projectParams = projectId != null ? [projectId] : [];
+  if (projectId == null) return NextResponse.json({ points: [], sheets: [] });
+  const projectJoin = "JOIN towers tw ON tw.id = st.tower_id";
+  const projectFilter = "AND tw.project_id = ?";
+  const projectParams = [projectId];
 
   // COALESCE(t.start_date/end_date, wp....): task NULL = kế thừa ngày nhóm (lib/recompute.ts).
   const tasks = await query<TaskRow>(

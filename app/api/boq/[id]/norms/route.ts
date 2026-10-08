@@ -25,12 +25,15 @@ export async function GET(
   if (isNaN(boqItemId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  // A1-AC02: không có dự án khả kiến → 404 trước mọi query nghiệp vụ.
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
   const blocked = await assertModuleEnabled("materials", projectId);
   if (blocked) return blocked;
   const boqItem = await queryOne<{ id: number }>(
-    `SELECT id FROM boq_items WHERE id = ?${projectId != null ? " AND project_id = ?" : ""}`,
+    `SELECT id FROM boq_items WHERE id = ? AND project_id = ?`,
     boqItemId,
-    ...(projectId != null ? [projectId] : []),
+    projectId,
   );
   if (!boqItem) return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
 
@@ -55,12 +58,15 @@ export async function POST(
   const boqItemId = parseInt(params.id);
   if (isNaN(boqItemId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
   const projectId = await getCurrentProjectId(user);
+  // A1-AC02: không có dự án khả kiến → 404 trước mọi query nghiệp vụ.
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
   const blocked = await assertModuleEnabled("materials", projectId);
   if (blocked) return blocked;
   const boqItem = await queryOne<{ id: number }>(
-    `SELECT id FROM boq_items WHERE id = ?${projectId != null ? " AND project_id = ?" : ""}`,
+    `SELECT id FROM boq_items WHERE id = ? AND project_id = ?`,
     boqItemId,
-    ...(projectId != null ? [projectId] : []),
+    projectId,
   );
   if (!boqItem) return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
 
@@ -70,7 +76,7 @@ export async function POST(
   const input = parseNormBody(body);
   const invalid = validateNormInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
-  const matErr = await checkNormMaterial(input);
+  const matErr = await checkNormMaterial(input, projectId);
   if (matErr) return NextResponse.json({ error: matErr }, { status: 422 });
 
   const id = await insertId(

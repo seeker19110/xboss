@@ -3,6 +3,7 @@ import { query, todayISO } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { ALERT_METRICS } from "@/lib/van-hanh/alerts";
 import { isDueSoon, loadDueSoonThresholds } from "@/lib/tien-do/due-soon";
 
 export const dynamic = "force-dynamic";
@@ -27,13 +28,22 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc.
+  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+), vô điều kiện. Không có dự
+  // án khả kiến (A1-AC02) → danh sách rỗng đúng shape, không query nghiệp vụ.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({
+      tasks: [],
+      summary: {
+        total: 0,
+        delayed: 0,
+        done: 0,
+        dueSoon: 0,
+        dueSoonDays: ALERT_METRICS.due_soon_days.defaultThreshold,
+      },
+    });
   const blocked = await assertModuleEnabled("field", projectId);
   if (blocked) return blocked;
-
-  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
-  const projectParams = projectId != null ? [projectId] : [];
 
   // COALESCE(t.start_date/end_date, wp....): task NULL = kế thừa ngày nhóm (lib/recompute.ts).
   const tasks = await query<MyTask>(
@@ -48,10 +58,10 @@ export async function GET() {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
        LEFT JOIN towers tw ON st.tower_id = tw.id
-      WHERE t.assigned_to = ?${projectFilter}
+      WHERE t.assigned_to = ? AND tw.project_id = ?
       ORDER BY (COALESCE(t.end_date, wp.end_date) IS NULL), COALESCE(t.end_date, wp.end_date), t.id`,
     user.id,
-    ...projectParams,
+    projectId,
   );
 
   const today = todayISO();

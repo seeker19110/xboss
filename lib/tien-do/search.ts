@@ -225,7 +225,7 @@ const SOURCES: SearchSource[] = [
 // trong registry (không phải input người dùng) nên nội suy an toàn.
 async function runSource(
   src: SearchSource,
-  projectId: number | null,
+  projectId: number,
   ftsQuery: string,
   prefix: string,
 ): Promise<DocHit[]> {
@@ -241,10 +241,8 @@ async function runSource(
 
   const conds = [match];
   if (src.softDelete) conds.push(`${src.alias}.deleted_at IS NULL`);
-  if (projectId != null) {
-    conds.push(`${src.projectCol} = ?`);
-    params.push(projectId);
-  }
+  conds.push(`${src.projectCol} = ?`);
+  params.push(projectId);
 
   const order: string[] = [];
   if (src.codeCol) {
@@ -278,9 +276,10 @@ async function runSource(
 
 // Tìm trên mọi nguồn user được xem, song song. Trả DocHit[] đã gộp (giữ thứ tự nhóm
 // theo registry — client hiển thị nhóm theo kind).
+// projectId bắt buộc (fail-closed, A1-AC02): không còn nghĩa null = không lọc dự án.
 export async function searchSources(
   role: Role,
-  projectId: number | null,
+  projectId: number,
   ftsQuery: string,
   prefix: string,
 ): Promise<DocHit[]> {

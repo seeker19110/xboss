@@ -1099,6 +1099,15 @@ export async function syncAndListNotifications(
     );
   }
 
+  return listNotifications(user, limit);
+}
+
+/**
+ * Chỉ liệt kê thông báo CỦA CHÍNH user (lọc `user_id`) + số chưa đọc — không đồng bộ gì.
+ * Route dùng trực tiếp khi user không có dự án khả kiến (A1-AC02): không sinh/dọn cảnh báo
+ * theo dữ liệu nghiệp vụ toàn hệ, nhưng chuông vẫn hiện thông báo đã gửi riêng cho user.
+ */
+export async function listNotifications(user: User, limit: number) {
   // JOIN thêm sheet slug + tầng của task liên quan (khi có task_id) để chuông thông báo/
   // trang thông báo dựng được link click-through đúng `/tracking/<slug>?floor=<floorLabel>`
   // (cùng pattern GlobalSearch). LEFT JOIN vì phần lớn loại thông báo không gắn với task

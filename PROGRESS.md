@@ -1,5 +1,31 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S02b/S02c: tracking, file/QC/HSE, dashboard/export fail-closed
+
+Cùng mẫu S02a (#591): `getCurrentProjectId` null → **404** cho chi tiết/ghi/tải file/export,
+**200 rỗng đúng shape** cho danh sách/tổng hợp màn hình chính (UI không vỡ); bỏ `?? "*"`, bỏ
+`if (projectId)`/bỏ-lọc-khi-rỗng; lọc dự án vô điều kiện. Ca âm đỏ trên code cũ, xanh sau.
+
+- **S02b tracking/BOQ** (10/12 ca đỏ trên code cũ): `boq-norms/[id]` PATCH/DELETE (sửa được định mức
+  dự án khác), `boq/[id]/norms` GET/POST, `boq/[id]/norm-usage`, `lookahead`, `my-tasks`, `timeline`,
+  `search` (+ `searchSources` FTS), `tasks` GET (null → 404 vì shape bắt buộc có `sheet`),
+  `systems/[code]/uploads`; `floor-stage-fronts` PUT chặn transition stage riêng của dự án khác và NCC của org khác.
+  Helper fail-closed: `getNorm`, `pendingStageFloors`, `searchSources`. Định mức chỉ nhận vật tư
+  cùng dự án (`checkNormMaterial`).
+- **S02b file/QC/HSE/thông báo** (9/10 ca đỏ): `correspondence-files/[id]` + `hse-photos/[id]`
+  GET/DELETE (xem/xoá file dự án khác), `inspection-requests` GET/POST, `qc/documents` (+ zip),
+  `qc/inspections`, `notifications/feed`; `notifications` GET khi null KHÔNG chạy đồng bộ cảnh báo
+  toàn hệ, chỉ trả thông báo riêng của user (`listNotifications`).
+- **S02c dashboard/export** (7/8 ca đỏ): `dashboard`, `dashboard/forecast|spi|scurve` (scurve bỏ
+  dòng sentinel `project_id=0` toàn hệ của matview), `export/excel` (slug sheet theo dự án đang
+  chọn; slug lạ 400 → 404 không lộ tồn tại), `export/pdf` (bỏ fallback `projects LIMIT 1`),
+  `admin/integrations` (null chỉ còn tích hợp cấp org). `saved-reports` GET là dương tính giả.
+- Test: `tests/s02b-tracking-scope.test.ts`, `tests/s02b-files-scope.test.ts`,
+  `tests/s02c-dashboard-scope.test.ts`. Inventory S00 sinh lại + khối tay ghi trạng thái.
+- **Còn mở:** P1-2 (invoice nhận `contract_id`/`payment_bill_id` từ body), P1-5
+  (`saved-reports/[id]/data` → `runReport` null = toàn hệ), P1-6 (`sheets` PUT đổi thứ tự sheet
+  dự án khác) — đang làm cùng nhánh.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S02a: fail-closed khi không có dự án khả kiến (miền tài chính)
 
 Mẫu chung: `getCurrentProjectId` trả null (user không có dự án khả kiến) → route trả **404 trước
