@@ -37,4 +37,7 @@ regexes = [
   '''mat-khau-moi-123''',
   '''matkhaumoi''',
   '''matkhau123''',
+  # tests/route-vat-tu-sync-pham-vi.test.ts — CRON_SECRET giả cho route cron đồng bộ Sheet
+  # (A1), chỉ dùng trong test; rule generic-api-key báo nhầm vì tên biến chứa "SECRET".
+  '''secret-cron-a1-dai-hon-32-ky-tu-xx''',
 ]
