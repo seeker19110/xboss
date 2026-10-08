@@ -1,7 +1,20 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Lock, Unlock, Download, RotateCcw, X, WifiOff } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Lock,
+  Unlock,
+  Download,
+  RotateCcw,
+  X,
+  WifiOff,
+  AlertTriangle,
+  RefreshCw,
+  Save,
+} from "lucide-react";
 import { Modal, appConfirm } from "@/app/components/dialogs";
+import { Button } from "@/app/components/ui";
 import EmptyState from "@/app/components/EmptyState";
 import { showToast } from "@/app/components/Toast";
 import {
@@ -31,6 +44,15 @@ type Prefill = {
 
 const WEATHER_CHIPS = ["Nắng", "Mưa", "Âm u"];
 
+// Bản nhật ký hiện hành trên server khi PUT nhận 412 (S06) — chỉ để người dùng SO SÁNH với nội
+// dung đang nhập; không bao giờ tự nạp đè lên form.
+type BanServer = {
+  etag: string | null;
+  diary: Diary;
+  manpower: { crew: string; headcount: number; note: string | null }[];
+  photoCount: number;
+};
+
 export default function DiaryEditorModal({
   date,
   role,
@@ -57,6 +79,14 @@ export default function DiaryEditorModal({
   const [saving, setSaving] = useState(false);
   const [hasOfflineDraft, setHasOfflineDraft] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Phiên bản mạnh của nhật ký trên server (S06): PUT full-replace gửi lại qua If-Match để không
+  // đè bản người khác vừa lưu; null = ngày chưa có nhật ký → tạo mới bằng If-None-Match: *.
+  const [etag, setEtag] = useState<string | null>(null);
+  // PUT nhận 412: bản server đã đổi sau lúc mở form. Giữ nguyên nội dung đang nhập; `banServer`
+  // = bản mới tải về để so sánh (null = chưa tải).
+  const [xungDot, setXungDot] = useState(false);
+  const [banServer, setBanServer] = useState<BanServer | null>(null);
+  const [taiBanMoi, setTaiBanMoi] = useState(false);
 
   const canEdit = role === "admin" || role === "pm" || role === "engineer";
   const canLock = role === "admin" || role === "pm";
@@ -86,6 +116,7 @@ export default function DiaryEditorModal({
         });
       if (cancelled) return;
       setDiary(j.diary ?? null);
+      setEtag(typeof j.etag === "string" ? j.etag : null);
       setPrefill(j.prefill ?? { workDone: "", updatedBy: [], photos: [] });
       if (queued && queued.kind === "diary_note") {
         const p = queued.payload;
@@ -140,7 +171,10 @@ export default function DiaryEditorModal({
       return next;
     });
 
-  const save = async () => {
+  // `etagGhiDe`: lưu đè lên bản server vừa tải về để so sánh (sau 412) — gửi If-Match bằng etag
+  // MỚI đó, nên vẫn chặn nếu trong lúc so sánh lại có người khác lưu nữa.
+  const save = async (etagGhiDe?: string | null) => {
+    const etagGui = etagGhiDe !== undefined ? etagGhiDe : etag;
     setSaving(true);
     // Body PUT = toàn bộ trạng thái form (full-replace); dùng chung cho gửi online lẫn xếp offline.
     const body = {
@@ -177,20 +211,32 @@ export default function DiaryEditorModal({
     try {
       const r = await fetch(`/api/diaries/${date}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(etagGui ? { "If-Match": etagGui } : { "If-None-Match": "*" }),
+        },
         body: JSON.stringify(body),
       });
       const j = await r.json().catch(() => ({}));
       if (r.ok) {
+        setEtag(typeof j.etag === "string" ? j.etag : null);
         // Đã lưu trực tiếp thành công → xoá nháp offline cũ của ngày này (nếu có) để nó
         // không tự flush sau đó và đè (full-replace) lên bản vừa lưu, gây mất dữ liệu.
         await discardDiaryDraft(date);
         setHasOfflineDraft(false);
+        setXungDot(false);
+        setBanServer(null);
         showToast("Đã lưu nhật ký");
         setDiary(j.diary ?? diary);
         onChanged();
+      } else if (r.status === 412) {
+        // Bản server đã đổi (người khác vừa lưu): KHÔNG nạp đè form, KHÔNG tự ghi đè — hiện khung
+        // xung đột để người dùng tải bản mới so sánh rồi tự quyết ghi đè (S06).
+        setXungDot(true);
+        setBanServer(null);
       } else {
-        // Lỗi nghiệp vụ thật (409 khoá sổ, 422 hợp lệ…) — giữ nguyên lỗi cũ, KHÔNG xếp offline.
+        // Lỗi nghiệp vụ thật (409 khoá sổ, 422 hợp lệ…) — giữ nguyên dữ liệu trên form, KHÔNG xếp
+        // offline, KHÔNG tự đè.
         showToast(j.error ?? "Lỗi lưu nhật ký", "error");
       }
       setSaving(false);
@@ -198,6 +244,41 @@ export default function DiaryEditorModal({
       // Mất mạng giữa chừng → fallback xếp hàng đợi offline.
       await queueOffline();
     }
+  };
+
+  // Tải bản hiện hành của server vào vùng so sánh — chỉ đọc, form giữ nguyên.
+  const taiBanServer = async () => {
+    setTaiBanMoi(true);
+    try {
+      const r = await fetch(`/api/diaries/${date}`);
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j) {
+        showToast(j?.error ?? `Không tải được bản mới (${r.status})`, "error");
+        return;
+      }
+      setBanServer({
+        etag: typeof j.etag === "string" ? j.etag : null,
+        diary: j.diary ?? null,
+        manpower: j.manpower ?? [],
+        photoCount: Array.isArray(j.photoIds) ? j.photoIds.length : 0,
+      });
+      setDiary(j.diary ?? null);
+    } catch {
+      showToast("Mất kết nối mạng — không tải được bản mới", "error");
+    } finally {
+      setTaiBanMoi(false);
+    }
+  };
+
+  const ghiDeBanCuaToi = async () => {
+    if (!banServer) return;
+    if (
+      !(await appConfirm(
+        "Ghi đè bản trên máy chủ bằng nội dung bạn đang nhập? Thay đổi của người khác ở bản đó sẽ bị thay thế.",
+      ))
+    )
+      return;
+    await save(banServer.etag);
   };
 
   const lock = async () => {
@@ -221,6 +302,11 @@ export default function DiaryEditorModal({
     if (r.ok) {
       showToast("Đã mở khoá");
       setDiary((d) => (d ? { ...d, status: "draft" } : d));
+      // Mở khoá đổi phiên bản trên server — lấy lại etag để lần lưu kế tiếp không bị 412 oan.
+      const moi = await fetch(`/api/diaries/${date}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null);
+      if (moi) setEtag(typeof moi.etag === "string" ? moi.etag : null);
       onChanged();
     } else {
       showToast(j.error ?? "Lỗi mở khoá", "error");
@@ -264,6 +350,66 @@ export default function DiaryEditorModal({
               <Lock className="w-4 h-4 shrink-0" />
               Đã khoá bởi {diary?.lockedByName ?? "—"} lúc{" "}
               {diary?.lockedAt ? formatDateTimeVN(diary.lockedAt) : "—"}
+            </div>
+          )}
+
+          {xungDot && (
+            <div
+              role="alert"
+              className="bg-amber-950 border border-amber-800 rounded-lg px-3 py-3 text-sm text-amber-200 space-y-3"
+            >
+              <p className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                Nhật ký vừa được người khác cập nhật — tải bản mới để xem thay đổi; nội dung bạn
+                đang nhập vẫn được giữ.
+              </p>
+              {banServer && (
+                <dl className="bg-zinc-950/70 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-300 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                  <dt className="text-zinc-400">Thời tiết</dt>
+                  <dd>
+                    {banServer.diary?.weatherAm || "—"} / {banServer.diary?.weatherPm || "—"}
+                  </dd>
+                  <dt className="text-zinc-400">Công việc</dt>
+                  <dd className="whitespace-pre-wrap">{banServer.diary?.workDone || "—"}</dd>
+                  <dt className="text-zinc-400">Nhân lực</dt>
+                  <dd>
+                    {banServer.manpower.length
+                      ? banServer.manpower.map((m) => `${m.crew}: ${m.headcount}`).join(", ")
+                      : "—"}
+                  </dd>
+                  <dt className="text-zinc-400">Ảnh</dt>
+                  <dd>{banServer.photoCount}</dd>
+                  <dt className="text-zinc-400">Vướng mắc</dt>
+                  <dd className="whitespace-pre-wrap">{banServer.diary?.obstacles || "—"}</dd>
+                  <dt className="text-zinc-400">An toàn</dt>
+                  <dd className="whitespace-pre-wrap">{banServer.diary?.safetyNote || "—"}</dd>
+                </dl>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  icon={RefreshCw}
+                  onClick={taiBanServer}
+                  disabled={taiBanMoi || saving}
+                >
+                  {taiBanMoi
+                    ? "Đang tải…"
+                    : banServer
+                      ? "Tải lại bản mới"
+                      : "Tải bản mới để so sánh"}
+                </Button>
+                {banServer && !isLocked && canEdit && (
+                  <Button
+                    size="sm"
+                    variant="warning"
+                    icon={Save}
+                    onClick={ghiDeBanCuaToi}
+                    disabled={saving || taiBanMoi}
+                  >
+                    Ghi đè bằng bản của tôi
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 
@@ -464,7 +610,7 @@ export default function DiaryEditorModal({
           <div className="flex flex-wrap gap-2 pt-2 border-t border-zinc-800">
             {!isLocked && canEdit && (
               <button
-                onClick={save}
+                onClick={() => save()}
                 disabled={saving}
                 className="flex-1 min-w-[120px] bg-sky-700 hover:bg-sky-800 disabled:opacity-50 py-2.5 rounded-lg text-sm font-medium text-on-accent"
               >

@@ -23,3 +23,7 @@ export const VIEW_ONLY_ROLES: Role[] = ["bch", "cdt", "viewer"];
 // Vai trò được xem trang Thanh toán (Admin, PM và BCH — ban chỉ huy/site manager).
 // Dùng chung cho server (API 403) lẫn client (ẩn/hiện link).
 export const PAYMENT_VIEW_ROLES: Role[] = ["admin", "pm", "bch"];
+
+// Vai trò lập/sửa nhật ký thi công (PUT /api/diaries/:date) — nguồn chung cho route và kiểm
+// manifest khoá vault offline (lib/bao-mat/offline-vault.ts), không lặp quy tắc ở hai nơi.
+export const DIARY_EDIT_ROLES: Role[] = ["admin", "pm", "engineer"];

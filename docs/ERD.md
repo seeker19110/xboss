@@ -2188,6 +2188,7 @@
 | locked_at | timestamptz | ✓ |  |
 | created_at | timestamptz | ✓ | `now()` |
 | project_id | integer | ✓ |  |
+| version | integer |  | `1` |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
@@ -3353,6 +3354,29 @@
 **Index:**
 - `api_keys_key_hash_key`: UNIQUE INDEX api_keys_key_hash_key ON public.api_keys USING btree (key_hash)
 - `api_keys_pkey`: UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)
+
+### audit_operation_receipts
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| operation_id | uuid |  |  |
+| user_id | integer |  |  |
+| org_id | integer |  |  |
+| project_id | integer |  |  |
+| operation_kind | text |  |  |
+| request_hash | text |  |  |
+| resource_type | text |  |  |
+| resource_id | text |  |  |
+| result_version | text | ✓ |  |
+| completed_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `org_id` → `organizations(id)`
+- `project_id` → `projects(id)`
+- `user_id` → `users(id)`
+
+**Index:**
+- `audit_operation_receipts_pkey`: UNIQUE INDEX audit_operation_receipts_pkey ON public.audit_operation_receipts USING btree (org_id, project_id, user_id, operation_id)
 
 ### cad_block_batch_items
 
@@ -6423,6 +6447,24 @@
 **Index:**
 - `payment_cert_decision_snapshots_cert_id_operation_id_key`: UNIQUE INDEX payment_cert_decision_snapshots_cert_id_operation_id_key ON public.payment_cert_decision_snapshots USING btree (cert_id, operation_id)
 - `payment_cert_decision_snapshots_pkey`: UNIQUE INDEX payment_cert_decision_snapshots_pkey ON public.payment_cert_decision_snapshots USING btree (id)
+
+### photo_upload_staging
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| file_name | text |  |  |
+| org_id | integer |  |  |
+| user_id | integer |  |  |
+| task_id | integer |  |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `org_id` → `organizations(id)`
+- `user_id` → `users(id)`
+
+**Index:**
+- `idx_photo_upload_staging_owner`: INDEX idx_photo_upload_staging_owner ON public.photo_upload_staging USING btree (org_id, user_id, created_at)
+- `photo_upload_staging_pkey`: UNIQUE INDEX photo_upload_staging_pkey ON public.photo_upload_staging USING btree (file_name)
 
 ### saved_reports
 

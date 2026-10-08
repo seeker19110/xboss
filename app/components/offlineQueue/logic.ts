@@ -47,7 +47,12 @@ export type QueuedOp = OpBody & {
   queuedAt: number;
   tries: number; // số lần đã thử gửi và thất bại (giữ lại), 0 = chưa thử
   lastTriedAt?: number; // mốc thử gần nhất — dùng cho backoff
+  // S06: server trả kết quả "cần xác minh" (nhật ký 428/412, 409 context_*/idempotency_conflict).
+  // Op được GIỮ trong hàng đợi và KHÔNG gửi lại cho tới khi người dùng xử lý (S08) — gửi lại y
+  // nguyên chỉ nhận đúng mã đó, còn xoá thì mất nội dung đã nhập offline.
+  canXacMinh?: CanXacMinh;
 };
+export type CanXacMinh = { status: number; code?: string; lyDo?: string; luc: number };
 // Bản ghi trước khi thêm vào store (chưa có `id`).
 export type QueuedOpInput = OpBody & {
   queuedAt: number;
@@ -163,25 +168,52 @@ export function opEndpoint(op: QueuedOp): { url: string; method: string } {
 
 export type QueueStats = { total: number; pending: number; failed: number };
 
-// Thống kê để hiện badge: pending = chưa từng lỗi, failed = đã thử ≥1 lần mà chưa gửi được.
+// Thống kê để hiện badge: pending = chưa từng lỗi, failed = đã thử ≥1 lần mà chưa gửi được
+// (gồm cả op đang chờ xác minh).
 export function computeStats(ops: QueuedOp[]): QueueStats {
-  const failed = ops.filter((o) => o.tries > 0).length;
+  const failed = ops.filter((o) => o.tries > 0 || o.canXacMinh).length;
   return { total: ops.length, pending: ops.length - failed, failed };
 }
 
 // `error`: thông điệp server trả kèm khi từ chối (4xx) — dùng để nói cho người dùng biết vì
 // sao thao tác offline của họ không vào được, thay vì xoá im lặng (M121 FR8).
-export type SendOutcome = { networkError?: boolean; status?: number; error?: string };
+// `code`: mã máy đọc server trả kèm (`{ error, code }`) — phân biệt "cần xác minh" với từ chối.
+export type SendOutcome = {
+  networkError?: boolean;
+  status?: number;
+  error?: string;
+  code?: string;
+};
 export type SendFn = (op: QueuedOp) => Promise<SendOutcome>;
+
+// S06 — kết quả KHÔNG được xoá op: nhật ký thiếu/lệch precondition (428/412: bản server đã đổi,
+// nội dung offline của người dùng chưa vào), hoặc 409 về context/idempotency (thao tác có thể đã
+// được ghi, hoặc ngữ cảnh đã đổi — cần đối chiếu chứ không phải lỗi nghiệp vụ). 409 khác (hold-point,
+// sổ đã khoá…) vẫn là từ chối như cũ.
+export function canXacMinhKetQua(op: QueuedOp, outcome: SendOutcome): boolean {
+  const s = outcome.status ?? 0;
+  if (op.kind === "diary_note" && (s === 428 || s === 412)) return true;
+  if (s !== 409 || !outcome.code) return false;
+  return outcome.code.startsWith("context_") || outcome.code === "idempotency_conflict";
+}
+
+export type OpCanXacMinh = { id: number; kind: QueueKind; status: number; lyDo?: string };
 
 // Vòng gửi hàng đợi — THUẦN (chỉ phụ thuộc store + hàm gửi + đồng hồ). Duyệt FIFO,
 // gửi từng bản ghi đến hạn thử: thành công/4xx → xoá; mất mạng/5xx → tăng `tries`,
-// ghi mốc thử, giữ lại. Thứ tự bảo toàn vì retry KHÔNG xoá bản ghi.
+// ghi mốc thử, giữ lại; "cần xác minh" (S06) → đánh dấu, giữ lại, không gửi lại nữa.
+// Thứ tự bảo toàn vì retry KHÔNG xoá bản ghi.
 export async function flushQueue(
   store: QueueStore,
   send: SendFn,
   now: () => number = Date.now,
-): Promise<{ removed: number; retried: number; remaining: number; tuChoi: OpTuChoi[] }> {
+): Promise<{
+  removed: number;
+  retried: number;
+  remaining: number;
+  tuChoi: OpTuChoi[];
+  canXacMinh: OpCanXacMinh[];
+}> {
   const ops = await store.getAll();
   let removed = 0;
   let retried = 0;
@@ -189,10 +221,19 @@ export async function flushQueue(
   // không biết mình vừa mất thao tác nào (M121 FR8). Vẫn xoá khỏi hàng đợi để không kẹt retry
   // vô hạn, nhưng trả lý do lên để lớp UI báo cho người dùng biết mà làm lại.
   const tuChoi: OpTuChoi[] = [];
+  const canXacMinh: OpCanXacMinh[] = [];
   for (const op of ops) {
+    if (op.canXacMinh) continue; // đang chờ người dùng xác minh — không gửi lại vòng lặp
     if (!shouldAttempt(op, now())) continue;
     const outcome = await send(op);
-    if (shouldRetry(outcome)) {
+    if (canXacMinhKetQua(op, outcome)) {
+      const status = outcome.status ?? 0;
+      await store.update({
+        ...op,
+        canXacMinh: { status, code: outcome.code, lyDo: outcome.error, luc: now() },
+      });
+      canXacMinh.push({ id: op.id, kind: op.kind, status, lyDo: outcome.error });
+    } else if (shouldRetry(outcome)) {
       await store.update({ ...op, tries: op.tries + 1, lastTriedAt: now() });
       retried++;
     } else {
@@ -202,7 +243,7 @@ export async function flushQueue(
     }
   }
   const remaining = (await store.getAll()).length;
-  return { removed, retried, remaining, tuChoi };
+  return { removed, retried, remaining, tuChoi, canXacMinh };
 }
 
 export type OpTuChoi = { kind: QueueKind; soO: number; lyDo?: string };

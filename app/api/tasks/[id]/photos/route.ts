@@ -1,11 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/nen/storage";
-import { query, queryOne, insertId } from "@/lib/db";
+import { query, queryOne, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { newPhotoFileName, MAX_PHOTO_BYTES, sha256Hex, parseUploadedFile } from "@/lib/nen/photos";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
+import {
+  chotStaging,
+  datFileStaging,
+  doiSoatAnhMoCoi,
+  donFileStaging,
+} from "@/lib/tien-do/anh-staging";
+import {
+  bamYeuCau,
+  docThaoTacHangDoi,
+  ghiBienNhan,
+  khoaVaTraBienNhan,
+  type PhamViBienNhan,
+} from "@/lib/bao-mat/offline-receipt";
+import { chotNguCanhHangDoi, traLoiOfflineHoacNem } from "@/lib/bao-mat/offline-http";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +63,9 @@ export async function GET(
 
 // POST /api/tasks/:id/photos → upload ảnh (multipart: file, caption?).
 // Mọi vai trò được cập nhật tiến độ đều được upload; subcon chỉ cho task được giao.
+// Hàng đợi offline (S06, kind `photo`): Idempotency-Key + X-XBoss-Context → receipt; cùng key một
+// dòng task_photos, replay trả `{ receipt }`. File đi qua staging (lib/tien-do/anh-staging.ts): ghi
+// metadata lỗi/huỷ thì file được dọn, không để file mồ côi.
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -66,6 +83,15 @@ export async function POST(
   const taskId = parseInt(params.id);
   if (isNaN(taskId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // Context kiểm TRƯỚC phạm vi tài nguyên (xem app/api/dimensions/[id]/route.ts).
+  let op: ReturnType<typeof docThaoTacHangDoi>;
+  try {
+    op = docThaoTacHangDoi(req.headers);
+    if (op) await chotNguCanhHangDoi(op.context, user, projectId);
+  } catch (e) {
+    return traLoiOfflineHoacNem(e);
+  }
+
   const task = await queryOne<{ id: number }>(`SELECT id FROM tasks WHERE id = ?`, taskId);
   if (!task) return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
 
@@ -82,45 +108,130 @@ export async function POST(
   if (!up.ok) return NextResponse.json({ error: up.error }, { status: up.status });
   const { form, file, buf: fileBuf } = up;
 
-  // Chống trùng khi hàng đợi offline (offlineQueue) gửi lại cùng ảnh: cùng task +
-  // cùng hash nội dung trong 24h gần nhất → trả về ảnh đã có, không ghi file/dòng mới.
   const hash = sha256Hex(fileBuf);
-  const existing = await queryOne<{ id: number; caption: string | null; sizeBytes: number }>(
-    `SELECT id, caption, size_bytes AS "sizeBytes"
-       FROM task_photos
-      WHERE task_id = ? AND sha256 = ? AND created_at > now() - interval '24 hours'
-      ORDER BY id DESC LIMIT 1`,
-    taskId,
-    hash,
+  const caption = String(form.get("caption") ?? "").trim() || null;
+  const originalName = file.name || null;
+
+  // Receipt (S06): digest BYTE ảnh + metadata sẽ ghi (không dính boundary multipart).
+  const bn: PhamViBienNhan | null = op
+    ? {
+        user,
+        projectId,
+        operationId: op.operationId,
+        kind: "photo",
+        hash: bamYeuCau({
+          kind: "photo",
+          orgId: user.orgId,
+          projectId,
+          userId: user.id,
+          target: { taskId },
+          payload: { sha256: hash, size: file.size, mime: file.type, caption, originalName },
+          baseVersion: null,
+        }),
+      }
+    : null;
+
+  // Đối soát file mồ côi cũ của chính người này (best-effort, không chặn upload).
+  await doiSoatAnhMoCoi(user).catch((e) =>
+    log.warn("Đối soát ảnh mồ côi lỗi", { loi: e instanceof Error ? e.message : String(e) }),
   );
-  if (existing)
+
+  // Bước 1 — trước khi ghi file: replay theo receipt, hoặc chống trùng nội dung cũ (offlineQueue v1
+  // gửi lại cùng ảnh: cùng task + cùng hash trong 24h → trả ảnh đã có, không ghi file/dòng mới).
+  let truoc;
+  try {
+    truoc = await withTransaction(async () => {
+      if (bn) {
+        const replay = await khoaVaTraBienNhan(bn);
+        if (replay) return { replay } as const;
+      }
+      const existing = await queryOne<{ id: number; caption: string | null; sizeBytes: number }>(
+        `SELECT id, caption, size_bytes AS "sizeBytes"
+           FROM task_photos
+          WHERE task_id = ? AND sha256 = ? AND created_at > now() - interval '24 hours'
+          ORDER BY id DESC LIMIT 1`,
+        taskId,
+        hash,
+      );
+      if (!existing) return null;
+      const receipt = bn
+        ? await ghiBienNhan(bn, {
+            resourceType: "task_photo",
+            resourceId: String(existing.id),
+            version: null,
+          })
+        : undefined;
+      return { existing, receipt } as const;
+    });
+  } catch (e) {
+    return traLoiOfflineHoacNem(e);
+  }
+  if (truoc && "replay" in truoc) return NextResponse.json({ receipt: truoc.replay });
+  if (truoc)
     return NextResponse.json(
       {
-        id: existing.id,
+        id: truoc.existing.id,
         taskId,
-        caption: existing.caption,
-        sizeBytes: existing.sizeBytes,
+        caption: truoc.existing.caption,
+        sizeBytes: truoc.existing.sizeBytes,
         deduped: true,
+        ...(truoc.receipt ? { receipt: truoc.receipt } : {}),
       },
       { status: 200 },
     );
 
-  const caption = String(form.get("caption") ?? "").trim() || null;
+  // Bước 2 — metadata staging (đã COMMIT) rồi mới đặt file.
   const fileName = newPhotoFileName(taskId, file.type);
-  await storagePut(user.orgId, fileName, fileBuf);
+  await datFileStaging(user, taskId, fileName, fileBuf);
 
-  const id = await insertId(
-    `INSERT INTO task_photos (task_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by, sha256)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    taskId,
-    fileName,
-    file.name || null,
-    file.type,
-    file.size,
-    caption,
-    user.id,
-    hash,
+  // Bước 3 — metadata + receipt + chốt staging cùng MỘT transaction. Tra receipt lại dưới khoá:
+  // request đồng thời cùng key đã thắng ở đây thì file vừa đặt là thừa → dọn.
+  let kq;
+  try {
+    kq = await withTransaction(async () => {
+      if (bn) {
+        const replay = await khoaVaTraBienNhan(bn);
+        if (replay) return { replay } as const;
+      }
+      const id = await insertId(
+        `INSERT INTO task_photos (task_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by, sha256)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        taskId,
+        fileName,
+        originalName,
+        file.type,
+        file.size,
+        caption,
+        user.id,
+        hash,
+      );
+      const receipt = bn
+        ? await ghiBienNhan(bn, {
+            resourceType: "task_photo",
+            resourceId: String(id),
+            version: null,
+          })
+        : undefined;
+      await chotStaging(fileName);
+      return { id, receipt } as const;
+    });
+  } catch (e) {
+    await donFileStaging(user, fileName);
+    return traLoiOfflineHoacNem(e);
+  }
+  if ("replay" in kq) {
+    await donFileStaging(user, fileName);
+    return NextResponse.json({ receipt: kq.replay });
+  }
+
+  return NextResponse.json(
+    {
+      id: kq.id,
+      taskId,
+      caption,
+      sizeBytes: file.size,
+      ...(kq.receipt ? { receipt: kq.receipt } : {}),
+    },
+    { status: 201 },
   );
-
-  return NextResponse.json({ id, taskId, caption, sizeBytes: file.size }, { status: 201 });
 }

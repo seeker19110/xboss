@@ -7,6 +7,14 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { handoverBlocked, methodStatementBlocked } from "@/lib/ky-thuat/qaqc";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
+import {
+  bamYeuCau,
+  docThaoTacHangDoi,
+  ghiBienNhan,
+  khoaVaTraBienNhan,
+  type PhamViBienNhan,
+} from "@/lib/bao-mat/offline-receipt";
+import { chotNguCanhHangDoi, traLoiOfflineHoacNem } from "@/lib/bao-mat/offline-http";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +23,8 @@ const MAX_IDS = 1000;
 // PATCH /api/dimensions/batch  body: { ids: number[], installed: boolean }
 // Tick/bỏ-tick nhiều ô dimension theo vùng chọn trên lưới tracking. recompute
 // gộp một lần mỗi task (tránh tính lại trùng khi cả vùng cùng task). Atomic.
+// Hàng đợi offline (S06, kind `tick_batch`): Idempotency-Key + X-XBoss-Context → receipt cho CẢ
+// lô (lô atomic: một receipt, một hiệu ứng); replay trả `{ receipt }`.
 export async function PATCH(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -25,6 +35,15 @@ export async function PATCH(req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
   const blocked = await assertModuleEnabled("tracking", projectId);
   if (blocked) return blocked;
+
+  // Context kiểm TRƯỚC phạm vi tài nguyên (xem app/api/dimensions/[id]/route.ts).
+  let op: ReturnType<typeof docThaoTacHangDoi>;
+  try {
+    op = docThaoTacHangDoi(req.headers);
+    if (op) await chotNguCanhHangDoi(op.context, user, projectId);
+  } catch (e) {
+    return traLoiOfflineHoacNem(e);
+  }
 
   const body = await req.json().catch(() => ({}));
   const ids = Array.isArray(body.ids)
@@ -77,57 +96,96 @@ export async function PATCH(req: NextRequest) {
       );
   }
 
-  // Bất biến nghiệm thu (L2, audit 2026-09-22): bỏ tick ô của task đã nghiệm thu kéo % xuống
-  // dưới 1 trong khi status vẫn nghiem_thu — phá bất biến "nghiem_thu ⇒ progress = 1". Chỉ cần
-  // MỘT task trong vùng chọn đã nghiệm thu là chặn nguyên lô (lô atomic, không ghi gì).
-  if (!installed && dims.some((d) => d.status === "nghiem_thu"))
-    return NextResponse.json(
-      {
-        error: "Task đã nghiệm thu — huỷ nghiệm thu (DELETE /api/tasks/:id/approve) trước khi sửa",
-      },
-      { status: 409 },
-    );
-
-  // Hold point chuyển bước (M3) + gate biện pháp thi công (M8): chỉ chặn khi TICK —
-  // kiểm từng package liên quan (dedup).
-  if (installed) {
-    const packageIds = [...new Set(dims.map((d) => d.package_id))];
-    for (const pid of packageIds) {
-      const gate = await handoverBlocked(pid);
-      if (gate.blocked) return NextResponse.json({ error: gate.reason }, { status: 409 });
-      const methodGate = await methodStatementBlocked(pid);
-      if (methodGate.blocked)
-        return NextResponse.json({ error: methodGate.reason }, { status: 409 });
-    }
-  }
-
   const dimIds = dims.map((d) => d.id);
   const taskPlaceholders = taskIds.map(() => "?").join(", ");
-  const result = await withTransaction(async () => {
-    // Kiểm lại nghiệm thu DƯỚI KHOÁ (review): kiểm ngoài ở trên chỉ để trả 409 sớm không tốn
-    // lock, nhưng giữa lúc đó và đây có thể có POST /approve chạy song song đặt nghiem_thu —
-    // FOR UPDATE cùng row với /approve nên các request tuần tự hoá, không còn race (TOCTOU).
-    const locked = await query<{ id: number; status: string | null }>(
-      `SELECT id, status FROM tasks WHERE id IN (${taskPlaceholders}) ORDER BY id FOR UPDATE`,
-      ...taskIds,
-    );
-    if (!installed && locked.some((t) => t.status === "nghiem_thu")) {
-      return {
-        error: "Task đã nghiệm thu — huỷ nghiệm thu (DELETE /api/tasks/:id/approve) trước khi sửa",
-        httpStatus: 409,
-      } as const;
-    }
 
-    // Dữ liệu sự kiện (M120 FR2) — cùng lib dùng chung với PATCH đơn. Không truyền `note`:
-    // ghi chú là việc của từng ô, gán chung cả vùng chọn sẽ ra dữ liệu vô nghĩa (ghi chú cũ
-    // của các ô được giữ nguyên khi tick, và bị xoá cùng dấu vết lắp khi bỏ tick).
-    await ghiDauVetTick(dimIds, !!installed, { userId: user.id });
-    for (const tid of taskIds) await recomputeTask(tid, user.name);
-    return { ok: true } as const;
-  });
+  // Receipt (S06): hash theo TẬP ô client yêu cầu (đã khử trùng, sắp tăng) + trạng thái — gửi lại
+  // cùng lô theo thứ tự khác vẫn là cùng thao tác; đổi tập ô/trạng thái dưới cùng key → 409.
+  const bn: PhamViBienNhan | null =
+    op && projectId != null
+      ? {
+          user,
+          projectId,
+          operationId: op.operationId,
+          kind: "tick_batch",
+          hash: bamYeuCau({
+            kind: "tick_batch",
+            orgId: user.orgId,
+            projectId,
+            userId: user.id,
+            target: { dimIds: (ids as number[]).slice().sort((a, b) => a - b) },
+            payload: { installed: !!installed },
+            baseVersion: null,
+          }),
+        }
+      : null;
 
+  let result;
+  try {
+    result = await withTransaction(async () => {
+      // Receipt tra TRƯỚC gate (xem PATCH đơn): khoá advisory receipt lấy trước khoá dòng task.
+      if (bn) {
+        const replay = await khoaVaTraBienNhan(bn);
+        if (replay) return { replay } as const;
+      }
+
+      // Bất biến nghiệm thu (L2, audit 2026-09-22): bỏ tick ô của task đã nghiệm thu kéo % xuống
+      // dưới 1 trong khi status vẫn nghiem_thu — phá bất biến "nghiem_thu ⇒ progress = 1". Chỉ cần
+      // MỘT task trong vùng chọn đã nghiệm thu là chặn nguyên lô (lô atomic, không ghi gì).
+      if (!installed && dims.some((d) => d.status === "nghiem_thu")) return NGHIEM_THU_409;
+
+      // Hold point chuyển bước (M3) + gate biện pháp thi công (M8): chỉ chặn khi TICK —
+      // kiểm từng package liên quan (dedup).
+      if (installed) {
+        const packageIds = [...new Set(dims.map((d) => d.package_id))];
+        for (const pid of packageIds) {
+          const gate = await handoverBlocked(pid);
+          if (gate.blocked) return { error: gate.reason, httpStatus: 409 } as const;
+          const methodGate = await methodStatementBlocked(pid);
+          if (methodGate.blocked) return { error: methodGate.reason, httpStatus: 409 } as const;
+        }
+      }
+
+      // Kiểm lại nghiệm thu DƯỚI KHOÁ (review): kiểm ở trên chưa khoá, giữa lúc đó và đây có thể
+      // có POST /approve chạy song song đặt nghiem_thu — FOR UPDATE cùng row với /approve nên các
+      // request tuần tự hoá, không còn race (TOCTOU).
+      const locked = await query<{ id: number; status: string | null }>(
+        `SELECT id, status FROM tasks WHERE id IN (${taskPlaceholders}) ORDER BY id FOR UPDATE`,
+        ...taskIds,
+      );
+      if (!installed && locked.some((t) => t.status === "nghiem_thu")) return NGHIEM_THU_409;
+
+      // Dữ liệu sự kiện (M120 FR2) — cùng lib dùng chung với PATCH đơn. Không truyền `note`:
+      // ghi chú là việc của từng ô, gán chung cả vùng chọn sẽ ra dữ liệu vô nghĩa (ghi chú cũ
+      // của các ô được giữ nguyên khi tick, và bị xoá cùng dấu vết lắp khi bỏ tick).
+      await ghiDauVetTick(dimIds, !!installed, { userId: user.id });
+      for (const tid of taskIds) await recomputeTask(tid, user.name);
+      const receipt = bn
+        ? await ghiBienNhan(bn, {
+            resourceType: "progress_dimension_batch",
+            resourceId: [...dimIds].sort((a, b) => a - b).join(","),
+            version: null,
+          })
+        : undefined;
+      return { receipt } as const;
+    });
+  } catch (e) {
+    return traLoiOfflineHoacNem(e);
+  }
+
+  if ("replay" in result) return NextResponse.json({ receipt: result.replay });
   if ("error" in result)
     return NextResponse.json({ error: result.error }, { status: result.httpStatus });
 
-  return NextResponse.json({ ok: true, updated: dimIds.length, installed: !!installed });
+  return NextResponse.json({
+    ok: true,
+    updated: dimIds.length,
+    installed: !!installed,
+    ...(result.receipt ? { receipt: result.receipt } : {}),
+  });
 }
+
+const NGHIEM_THU_409 = {
+  error: "Task đã nghiệm thu — huỷ nghiệm thu (DELETE /api/tasks/:id/approve) trước khi sửa",
+  httpStatus: 409,
+} as const;

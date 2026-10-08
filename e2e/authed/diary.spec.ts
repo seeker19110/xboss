@@ -11,13 +11,16 @@ async function gotoDiary(page: Page) {
 }
 
 test.describe("Nhật ký (sau đăng nhập)", () => {
-  test("render lịch tháng + mở editor 1 ngày + lưu nháp", async ({ page }) => {
+  test("render lịch tháng + mở editor 1 ngày + lưu nháp", async ({ page }, testInfo) => {
     await gotoDiary(page);
     await expect(page.getByRole("tab", { name: "Lịch" })).toBeVisible();
 
-    // Bấm ô "hôm nay" (viền sky) để mở editor.
-    const today = new Date();
-    const dayCell = page.getByRole("button", { name: String(today.getDate()), exact: true });
+    // Bấm ô "hôm nay" (viền sky) để mở editor. Dự án mobile chạy SONG SONG với desktop trên cùng
+    // DB: lưu nhật ký có precondition (S06 — If-None-Match/If-Match), hai project cùng mở rồi cùng
+    // lưu một ngày thì bên sau nhận 412 đúng thiết kế → mobile dùng một ngày khác trong tháng.
+    const today = new Date().getDate();
+    const ngay = testInfo.project.name.includes("mobile") ? (today === 1 ? 2 : 1) : today;
+    const dayCell = page.getByRole("button", { name: String(ngay), exact: true });
     await dayCell.first().click();
 
     await expect(page.getByRole("heading", { name: /Nhật ký ngày/ })).toBeVisible();

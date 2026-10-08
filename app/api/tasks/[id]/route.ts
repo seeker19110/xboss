@@ -14,6 +14,7 @@ import { assignTask } from "@/lib/tien-do/assignments";
 import { validateCustom } from "@/lib/ha-tang/custom-fields";
 import { storageDelete } from "@/lib/nen/storage";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
+import { khoaNhatKyCuaAnhTask } from "@/lib/hien-truong/diary";
 
 export const dynamic = "force-dynamic";
 
@@ -243,6 +244,8 @@ export async function DELETE(
 
     // Xoá toàn bộ dữ liệu liên quan trong 1 transaction — không để lại trạng thái nửa chừng.
     await withTransaction(async () => {
+      // Khoá nhật ký gắn ảnh của task TRƯỚC mọi DELETE (thứ tự "nhật ký → ảnh" như PUT nhật ký, S06).
+      await khoaNhatKyCuaAnhTask([id]);
       await run(`DELETE FROM notifications WHERE task_id = ?`, id);
       await run(`DELETE FROM baseline_tasks WHERE task_id = ?`, id);
       await run(`DELETE FROM task_photos WHERE task_id = ?`, id);

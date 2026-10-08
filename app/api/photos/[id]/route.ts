@@ -1,7 +1,8 @@
 import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { storageGet, storageDelete } from "@/lib/nen/storage";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withTransaction } from "@/lib/db";
+import { khoaNhatKyCuaAnh } from "@/lib/hien-truong/diary";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
@@ -121,7 +122,12 @@ export async function DELETE(
         { status: 403 },
       );
 
-    await run(`DELETE FROM task_photos WHERE id = ?`, id);
+    // Khoá nhật ký đang gắn ảnh TRƯỚC khi xoá (cùng thứ tự "nhật ký → ảnh" với PUT nhật ký) —
+    // cascade diary_photos tăng version nhật ký, khoá ngược chiều sẽ deadlock (S06).
+    await withTransaction(async () => {
+      await khoaNhatKyCuaAnh([id]);
+      await run(`DELETE FROM task_photos WHERE id = ?`, id);
+    });
     await storageDelete(user.orgId, photo.file_name);
 
     return NextResponse.json({ deleted: id });

@@ -1,5 +1,89 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S06: receipt và precondition ở endpoint queue thật
+
+Đặc tả lát cắt `docs/nang-cap/AUDIT-S06-OFFLINE-RECEIPT.md` (spec cha A2-FR09..FR11, DATA-CONTRACTS
+§5/§7, APPROVAL D04, PLAN §S06). Chỉ phía server + chỉnh client tối thiểu cho precondition nhật ký;
+**queue IndexedDB mới (S07) và UI xung đột/phục hồi (S08) chưa đụng** — hàng đợi v1 vẫn quarantine như
+S04/S05 nên chưa client nào gửi `Idempotency-Key`. Không thêm dependency.
+
+- **Endpoint thật** (đúng `opEndpoint`): `PATCH /api/dimensions/:id` (`tick`), `PATCH /api/dimensions/batch`
+  (`tick_batch`), `POST /api/tasks/:id/photos` (`photo`), `PUT /api/diaries/:date` (`diary_note`).
+  Request hàng đợi = có `Idempotency-Key` (UUID) + `X-XBoss-Context`; thiếu key mà có context → 400,
+  key sai dạng → 400, có key mà thiếu/sai context → 409 `context_invalid|expired|changed`. Context
+  kiểm **trước** phạm vi tài nguyên (tab cũ sau khi đổi dự án nhận 409, không 404 rồi bị bỏ). Thiết bị
+  lấy theo id **ký trong context** vì cookie proof S05 chỉ đi `/api/offline/*` (`kiemNguCanhHangDoi`,
+  `chotNguCanhHangDoi`). Không header = caller online cũ, giữ hành vi (trừ precondition nhật ký).
+- **Receipt** `lib/bao-mat/offline-receipt.ts`: quyền/phạm vi kiểm TRƯỚC khi tra receipt (replay vẫn bị
+  403 khi vừa mất phân công/vai trò); trong `withTransaction`: khoá advisory (org, dự án, user, op) →
+  tra receipt (cùng hash → `{ receipt: { …, replayed: true } }` 200, khác hash/loại → 409
+  `idempotency_conflict`) → gate/precondition → mutation + receipt cùng transaction. Không placeholder
+  pending, không TTL. Hash SHA-256 `receipt-v1` của JSON khoá sắp xếp gồm kind/scope/target/payload đã
+  chuẩn hoá/baseVersion; ảnh băm digest byte + size/mime/caption/tên gốc. Thành công lần đầu giữ body
+  cũ + thêm `receipt`. Gate hold-point/biện pháp/nghiệm thu của 2 route tick chuyển vào trong
+  transaction, sau bước tra receipt (thao tác đã COMMIT mà mất ACK không thất bại giả vì gate đóng sau).
+- **Ảnh không mồ côi** `lib/tien-do/anh-staging.ts`: dòng `photo_upload_staging` COMMIT trước khi đặt
+  file; `task_photos` + receipt + xoá staging cùng một transaction; lỗi/huỷ/thua đồng thời → xoá file
+  chỉ khi dòng staging còn (COMMIT mất phản hồi không xoá nhầm file đang dùng); dòng quá 60 phút được
+  đối soát đầu mỗi lần upload của chính người đó. Áp cho cả đường online. Chống trùng 24h theo hash cũ
+  giữ nguyên.
+- **Nhật ký phiên bản mạnh**: `site_diaries.version` (trigger tăng ở mọi UPDATE dòng nhật ký và mọi đổi
+  dòng con nhân lực/ảnh, kể cả ảnh bị xoá cascade). GET trả `etag` + header ETag `"<id>-<version>"`
+  (+ `Cache-Control: private, no-store`); PUT **bắt buộc** `If-Match: <etag>` hoặc `If-None-Match: *`
+  (tạo mới) — thiếu → 428, lệch → 412 `version_mismatch`, so dưới khoá advisory (dự án, ngày) +
+  `FOR UPDATE`; replay receipt hợp lệ trả trước khi so If-Match. `DiaryEditorModal` gửi If-Match/
+  If-None-Match, cập nhật etag sau lưu/mở khoá, 412 giữ nguyên form + báo tải lại. Vai trò lập nhật ký
+  gom về `DIARY_EDIT_ROLES` (`lib/nen/roles.ts`) dùng chung route + manifest vault (đóng "Cần quyết
+  (5)" của S05).
+- **Migration `0164_offline_receipts.sql`** (thêm thuần tuý: CREATE TABLE/INDEX/POLICY/TRIGGER/GRANT +
+  `ADD COLUMN version integer NOT NULL DEFAULT 1` — default hằng, không viết lại dòng có sẵn → đi thẳng
+  production): `audit_operation_receipts` đúng DDL contract (policy so TEXT như 0160/0163, `xboss_app`
+  chỉ SELECT/INSERT), `photo_upload_staging` (RLS user/org, SELECT/INSERT/DELETE), trigger version nhật
+  ký; đối chiếu catalog khi bảng đã tồn tại. Chạy 2 lần idempotent; ERD sinh lại; ADR-0005 cập nhật;
+  nhóm `OFFLINE` của `tests/rls.test.ts`. `lib/db`: thêm `dangTrongGiaoDich()` (helper receipt throw khi
+  gọi ngoài transaction).
+- **Test** `tests/offline-receipt-route.test.ts` (13 ca, **route chạy bằng `xboss_app`**, context qua route
+  S05 thật, đồng thời bằng `requestRieng`): mất ACK không hồi sinh ô đã bỏ tick, 20 request đồng thời cùng
+  key → 1 lần thực thi (tick/batch/ảnh), payload/loại khác → 409, quyền thu hồi → 403 kể cả có receipt,
+  context dự án cũ → 409 ở cả 4 endpoint, tài nguyên dự án khác → 404 không để receipt, lỗi ghi metadata
+  ảnh → file được dọn (cả đường online), staging mồ côi được đối soát, nhật ký 428/412/replay sau mất ACK,
+  tạo đồng thời → 200 + 412, version đổi khi ảnh bị xoá cascade, RLS/GRANT receipt. **12/13 ca ĐỎ trên
+  route cũ** (ca còn lại là canh 403 vốn đã đúng). `tests/offline-receipt.test.ts` (thuần: hash, header,
+  precondition). `route-hien-truong.test.ts` gửi precondition theo hợp đồng mới. Thêm 4 mutation vào
+  `test:mutation` (hash 409, replay không chạy lại, If-Match 412, dọn file) — cả 4 đều bị bắt. e2e
+  `diary.spec.ts`: project mobile dùng ngày khác desktop (chạy song song cùng DB, precondition làm bên
+  sau nhận 412 đúng thiết kế).
+- **Sửa sau audit bảo mật + logic (cùng nhánh):**
+  - **Hàng đợi không xoá op "cần xác minh"** (`app/components/offlineQueue/logic.ts` +
+    `index.ts`): `diary_note` nhận 428/412, hoặc mọi op nhận 409 `context_*`/`idempotency_conflict`
+    → GIỮ trong IndexedDB, đánh dấu `canXacMinh` (status/code/lý do), không gửi lại vòng lặp, badge
+    tính vào "lỗi" + toast "dữ liệu vẫn được giữ trên máy"; 409 nghiệp vụ khác (hold-point, khoá sổ)
+    vẫn bỏ + báo như cũ. Đang bị che bởi `OFFLINE_QUEUE_QUARANTINED` nhưng phải đúng trước khi gỡ.
+    **Điều kiện chặn trước khi gỡ quarantine (S07): queue gửi Idempotency-Key cố định/op,
+    X-XBoss-Context, If-Match/If-None-Match từ etag lúc enqueue.**
+  - **Deadlock xoá ảnh ↔ lưu nhật ký** (trigger version 0164: xoá `task_photos` cascade
+    `diary_photos` → UPDATE `site_diaries`, ngược chiều với PUT nhật ký): mọi đường xoá ảnh khoá trước
+    các nhật ký đang gắn ảnh (`khoaNhatKyCuaAnh`/`khoaNhatKyCuaAnhTask` trong `lib/hien-truong/diary.ts`,
+    `FOR UPDATE` theo id tăng dần, cùng transaction với DELETE) — `DELETE /api/photos/:id` (nay bọc
+    transaction), `/api/tasks/:id`, `/api/workpackages/:id`, `/api/progress-albums/:id`, `/api/sheets/:id`.
+  - **Modal nhật ký 412**: không nạp đè form; khung cảnh báo "Nhật ký vừa được người khác cập nhật…
+    nội dung bạn đang nhập vẫn được giữ", nút "Tải bản mới để so sánh" (vùng so sánh chỉ đọc) và "Ghi
+    đè bằng bản của tôi" (xác nhận, gửi If-Match bằng etag MỚI — vẫn 412 nếu lại có người lưu tiếp).
+  - **PUT nhật ký: `photoIds` phải thuộc dự án đang chọn** (`anhNgoaiDuAn`, cùng luật suy dự án với
+    `/api/photos/:id`) → 422; trước đây gắn được id ảnh dự án khác vào nhật ký. Không thêm
+    `assertModuleEnabled`: GET/lock/pdf của nhật ký đều không có (đối xứng giữ nguyên).
+  - Test: 2 ca hàng đợi (428/412 giữ op, 409 context/idempotency giữ — **đỏ trên code cũ**), deadlock
+    tái hiện chắc chắn bằng khoá dòng nhân lực (**đỏ trên code cũ: `deadlock detected`**), ảnh dự án
+    khác → 422 (**đỏ trên code cũ**), user B dùng lại key của A → thực thi bình thường, 2 receipt. Thêm 2
+    mutation (giữ op 428/412, khoá nhật ký trước xoá ảnh) — đều bị bắt.
+- **Quyết định phiên chính cho 6 điểm "Cần quyết":** (1) giữ **412** theo DATA-CONTRACTS §7 cho lệch
+  phiên bản nhật ký; (2) giữ **428** khi thiếu precondition cho **mọi** caller PUT nhật ký; (3) chấp
+  nhận đối soát staging theo chính người upload.
+- **Còn mở:** (3) job bảo trì role owner dọn staging mồ côi của người không upload lại; (4) receipt có FK
+  `users`/`projects` không ON DELETE — xoá user/dự án đã có receipt bị chặn, cần thủ tục retention
+  riêng; (5) server chưa đối chiếu thao tác hàng đợi với manifest khoá vault (keyId) — S07; (6) request
+  online (không header) chưa kiểm `X-XBoss-Context` server-side — S07/S08.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S05: thiết bị, context và dịch vụ khoá vault offline
 
 Spec `docs/nang-cap/AUDIT-2026-09-25/` (PLAN §S05, A2-OFFLINE, DATA-CONTRACTS §3–§4, DATA-MIGRATIONS

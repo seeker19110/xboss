@@ -1,6 +1,7 @@
 import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run, withTransaction } from "@/lib/db";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { khoaNhatKyCuaAnhTask } from "@/lib/hien-truong/diary";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { SLUG_RE } from "@/lib/nen/sheets";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -172,6 +173,9 @@ export async function DELETE(
     // toàn bộ để không để lại dữ liệu mồ côi (orphan).
     const taskIdsSql = `SELECT t.id FROM tasks t JOIN work_packages wp ON t.package_id = wp.id WHERE wp.sheet_type_id = ?`;
     await withTransaction(async () => {
+      // Khoá nhật ký gắn ảnh của các task sắp xoá TRƯỚC mọi DELETE (thứ tự "nhật ký → ảnh", S06).
+      const taskIds = (await query<{ id: number }>(taskIdsSql, id)).map((t) => t.id);
+      await khoaNhatKyCuaAnhTask(taskIds);
       for (const tbl of [
         "progress_dimensions",
         "task_history",

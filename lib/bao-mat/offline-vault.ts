@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 import { query, queryOne, withTransaction } from "@/lib/db";
 import { CAN, type User } from "@/lib/bao-mat/auth";
 import { log } from "@/lib/nen/log";
+import { DIARY_EDIT_ROLES } from "@/lib/nen/roles";
 import { damBaoNguCanhActor, LoiOffline, type ThietBiOffline } from "@/lib/bao-mat/offline-devices";
 import { vanTayQuyen } from "@/lib/bao-mat/offline-context";
 import {
@@ -34,8 +35,8 @@ import {
   type OfflineManifest,
 } from "@/lib/nen/offline-manifest";
 
-/** Vai trò lập/sửa nhật ký — khớp `canEdit` của app/api/diaries/[date]/route.ts (PUT). */
-const VAI_TRO_NHAT_KY = new Set(["admin", "pm", "engineer"]);
+/** Vai trò lập/sửa nhật ký — cùng nguồn với PUT /api/diaries/:date (lib/nen/roles.ts). */
+const VAI_TRO_NHAT_KY = new Set<string>(DIARY_EDIT_ROLES);
 /** Trần số khoá trả trong 1 lần mở. */
 const MAX_KHOA_MOI_LAN = 500;
 

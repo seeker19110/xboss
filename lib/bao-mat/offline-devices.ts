@@ -156,6 +156,29 @@ export async function timThietBi(user: Actor, proofHash: Buffer): Promise<ThietB
   return row ? ra(row) : null;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Bản ghi thiết bị của CHÍNH actor theo id (S06 — endpoint hàng đợi). Cookie proof chỉ đi kèm
+ * /api/offline/*, nên endpoint ghi nghiệp vụ nhận diện thiết bị qua id nằm trong context ĐÃ KÝ
+ * (proof đã được kiểm lúc cấp context); vẫn lọc theo user/org của phiên. Id sai dạng → null.
+ */
+export async function timThietBiTheoId(user: Actor, id: string): Promise<ThietBiOffline | null> {
+  damBaoNguCanhActor(user);
+  if (!UUID_RE.test(id)) return null;
+  const row = await withTransaction(
+    () =>
+      queryOne<DongThietBi>(
+        `SELECT ${COT} FROM offline_devices WHERE id = ?::uuid AND user_id = ? AND org_id = ?`,
+        id,
+        user.id,
+        user.orgId,
+      ),
+    { readOnly: true },
+  );
+  return row ? ra(row) : null;
+}
+
 /**
  * Đăng ký idempotent: cùng actor + cùng proof → trả bản ghi cũ; bản ghi đã thu hồi → 403.
  * Bản ghi MỚI trên trình duyệt đang là field-personal (chưa thu hồi) của người khác, kể cả khác
