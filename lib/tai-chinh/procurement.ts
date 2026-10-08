@@ -2,7 +2,7 @@
 // cảnh báo PO trễ giao + xe NCC quá giờ. Logic tách khỏi route để test tích hợp trực tiếp
 // (cùng pattern lib/cost.ts, lib/qaqc.ts). Xem docs/nang-cap/M04-ncc-don-hang.md.
 import { query, queryOne, run, todayISO } from "@/lib/db";
-import { parseMoney } from "@/lib/nen/money";
+import { parseMoney, parseQuantityInput, type QuantityInputOptions } from "@/lib/nen/money";
 
 // Trạng thái PO là cột TEXT không CHECK constraint (giữ tương thích dữ liệu cũ) — thứ tự
 // tiến (không nhảy cóc) validate ở đây. "partial"/"received" do route /receive tự set theo
@@ -414,4 +414,42 @@ export async function checkPurchaseOrderParents(
     }
   }
   return null;
+}
+
+// ===== DATA-MIGRATIONS §6 — khối lượng PR/PO/phiếu nhận exact (bước expand, 0163) =====
+
+/** Khối lượng PR/PO/phiếu nhận: decimal không âm, ≤ 18 chữ số nguyên / 6 số lẻ, cắt đuôi 0. */
+export const PO_QTY_OPTS: QuantityInputOptions = { scale: 6, maxIntDigits: 18, trimZeros: true };
+
+/** Đọc khối lượng PR/PO/phiếu nhận → chuỗi canonical (ghi cột `*_exact`) hoặc null nếu rỗng.
+ *  Lỗi → `QuantityInputError` (400 quantity_* / 422 quantity_overflow, qua `quantityInputErrorBody`). */
+export function parsePoQuantity(value: unknown, label = "Số lượng"): string | null {
+  return parseQuantityInput(value, label, PO_QTY_OPTS);
+}
+
+export type PoQtyReadiness = { table: string; column: string; missing: number };
+
+/**
+ * Kiểm sẵn sàng cutover reader exact: đếm dòng có khối lượng nguồn (float) nhưng thiếu
+ * `*_exact`/`*_provenance`. Tất cả = 0 mới được mở reader exact + thêm NOT NULL (chưa làm).
+ */
+export async function poQtyExactReadiness(): Promise<PoQtyReadiness[]> {
+  return query<PoQtyReadiness>(
+    `SELECT 'purchase_requests' AS "table", 'qty_requested' AS "column", COUNT(*)::int AS missing
+       FROM purchase_requests
+      WHERE qty_requested IS NOT NULL
+        AND (qty_requested_exact IS NULL OR qty_requested_provenance IS NULL)
+     UNION ALL
+     SELECT 'po_items', 'qty_ordered', COUNT(*)::int FROM po_items
+      WHERE qty_ordered IS NOT NULL
+        AND (qty_ordered_exact IS NULL OR qty_ordered_provenance IS NULL)
+     UNION ALL
+     SELECT 'po_items', 'qty_received', COUNT(*)::int FROM po_items
+      WHERE qty_received IS NOT NULL
+        AND (qty_received_exact IS NULL OR qty_received_provenance IS NULL)
+     UNION ALL
+     SELECT 'receipt_items', 'qty_received', COUNT(*)::int FROM receipt_items
+      WHERE qty_received IS NOT NULL
+        AND (qty_received_exact IS NULL OR qty_received_provenance IS NULL)`,
+  );
 }

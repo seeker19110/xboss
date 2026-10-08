@@ -4,6 +4,8 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { nextSeqCode, withUniqueRetry } from "@/lib/ha-tang/seqcode";
+import { parsePoQuantity } from "@/lib/tai-chinh/procurement";
+import { quantityInputErrorBody } from "@/lib/nen/money";
 
 export const dynamic = "force-dynamic";
 
@@ -72,10 +74,19 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const materialId = Number(body.materialId);
-  const qtyRequested = Number(body.qtyRequested);
   if (!materialId || isNaN(materialId))
     return NextResponse.json({ error: "Thiếu vật tư" }, { status: 400 });
-  if (!qtyRequested || qtyRequested <= 0)
+  // DATA-MIGRATIONS §6: đọc exact (≤18 nguyên/6 lẻ, không exponent) — ghi cả cột exact lẫn float cũ.
+  let qtyExact: string | null;
+  try {
+    qtyExact = parsePoQuantity(body.qtyRequested, "Số lượng yêu cầu");
+  } catch (err) {
+    const loi = quantityInputErrorBody(err);
+    if (loi) return NextResponse.json(loi.body, { status: loi.status });
+    throw err;
+  }
+  const qtyRequested = Number(qtyExact);
+  if (qtyExact == null || !(qtyRequested > 0))
     return NextResponse.json({ error: "Số lượng không hợp lệ" }, { status: 400 });
 
   // Cách ly dự án (Đợt 6, Việc G): materials.project_id (migrations/0027) — thiếu lọc thì yêu
@@ -93,11 +104,13 @@ export async function POST(req: NextRequest) {
   const { id, prCode } = await withUniqueRetry(async () => {
     const prCode = await nextSeqCode("purchase_requests", "pr_code", `PR-${ym}-`);
     const id = await insertId(
-      `INSERT INTO purchase_requests (pr_code, material_id, qty_requested, note, requested_by, project_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO purchase_requests (pr_code, material_id, qty_requested, qty_requested_exact,
+         qty_requested_provenance, note, requested_by, project_id)
+       VALUES (?, ?, ?, ?::numeric, 'exact_input_v1', ?, ?, ?)`,
       prCode,
       materialId,
       qtyRequested,
+      qtyExact,
       body.note ? String(body.note).trim() : null,
       user.id,
       projectId,

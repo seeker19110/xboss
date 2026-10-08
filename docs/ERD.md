@@ -1272,6 +1272,8 @@
 | review_note | text | ✓ |  |
 | created_at | timestamptz | ✓ | `now()` |
 | project_id | integer | ✓ |  |
+| qty_requested_exact | numeric | ✓ |  |
+| qty_requested_provenance | text | ✓ |  |
 
 **Khóa ngoại:**
 - `material_id` → `materials(id)`
@@ -1326,6 +1328,10 @@
 | qty_received | float8 | ✓ | `0` |
 | unit_price | numeric(15,2) | ✓ |  |
 | note | text | ✓ |  |
+| qty_ordered_exact | numeric | ✓ |  |
+| qty_ordered_provenance | text | ✓ |  |
+| qty_received_exact | numeric | ✓ |  |
+| qty_received_provenance | text | ✓ |  |
 
 **Khóa ngoại:**
 - `material_id` → `materials(id)`
@@ -1388,6 +1394,8 @@
 | po_item_id | integer | ✓ |  |
 | qty_received | float8 |  |  |
 | note | text | ✓ |  |
+| qty_received_exact | numeric | ✓ |  |
+| qty_received_provenance | text | ✓ |  |
 
 **Khóa ngoại:**
 - `material_id` → `materials(id)`

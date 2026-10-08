@@ -4,7 +4,8 @@ import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { nextSeqCode, withUniqueRetry } from "@/lib/ha-tang/seqcode";
-import { getPurchaseOrder, logPoStatusChange } from "@/lib/tai-chinh/procurement";
+import { getPurchaseOrder, logPoStatusChange, parsePoQuantity } from "@/lib/tai-chinh/procurement";
+import { quantityInputErrorBody } from "@/lib/nen/money";
 import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
@@ -43,11 +44,29 @@ export async function POST(
     return NextResponse.json({ error: "Đơn hàng đã nhập đủ hàng" }, { status: 409 });
 
   const body = await req.json().catch(() => ({}));
-  const items: { poItemId: number; qtyReceived: number; note?: string }[] = Array.isArray(
+  // DATA-MIGRATIONS §6: số lượng nhận đọc exact (≤18 nguyên/6 lẻ, không exponent, cắt đuôi 0) —
+  // ghi receipt_items.qty_received_exact ('exact_input_v1') + cộng po_items.qty_received_exact,
+  // song song cột float cũ. Dòng rỗng/0 bỏ qua như trước.
+  const raw: { poItemId: number; qtyReceived?: unknown; note?: string }[] = Array.isArray(
     body.items,
   )
-    ? body.items.filter((i: { poItemId: number; qtyReceived: number }) => Number(i.qtyReceived) > 0)
+    ? body.items
     : [];
+  type DongNhan = { poItemId: number; qtyExact: string; note?: string };
+  let items: DongNhan[];
+  try {
+    items = raw
+      .map((i): Omit<DongNhan, "qtyExact"> & { qtyExact: string | null } => ({
+        poItemId: i.poItemId,
+        note: i.note,
+        qtyExact: parsePoQuantity(i.qtyReceived, "Số lượng nhận"),
+      }))
+      .filter((i): i is DongNhan => i.qtyExact != null && Number(i.qtyExact) > 0);
+  } catch (err) {
+    const loi = quantityInputErrorBody(err);
+    if (loi) return NextResponse.json(loi.body, { status: loi.status });
+    throw err;
+  }
   if (!items.length)
     return NextResponse.json({ error: "Không có dòng nào có số lượng nhập" }, { status: 400 });
 
@@ -112,8 +131,7 @@ export async function POST(
         for (const item of items) {
           const poItem = poItemMap.get(Number(item.poItemId));
           if (!poItem) continue;
-          const qty = Math.max(0, Number(item.qtyReceived));
-          if (qty === 0) continue;
+          const qty = Number(item.qtyExact);
 
           // Khoá dòng po_item trong transaction để đọc qty_received hiện tại chính xác
           // (chống race khi 2 phiếu nhập đồng thời cùng vượt số đã đặt).
@@ -130,12 +148,14 @@ export async function POST(
 
           // Tạo receipt_item
           const riId = await insertId(
-            `INSERT INTO receipt_items (receipt_id, material_id, po_item_id, qty_received, note)
-         VALUES (?, ?, ?, ?, ?)`,
+            `INSERT INTO receipt_items (receipt_id, material_id, po_item_id, qty_received,
+           qty_received_exact, qty_received_provenance, note)
+         VALUES (?, ?, ?, ?, ?::numeric, 'exact_input_v1', ?)`,
             rid,
             poItem.material_id,
             poItem.id,
             qty,
+            item.qtyExact,
             item.note ? String(item.note).trim() : null,
           );
 
@@ -162,10 +182,15 @@ export async function POST(
             user.id,
           );
 
-          // Cập nhật qty_received trong po_items
+          // Cập nhật qty_received trong po_items. Cột exact chỉ cộng khi đã có (NULL = dòng cũ
+          // chưa backfill → giữ NULL, script backfill đọc lại float); provenance KHÔNG đổi —
+          // dòng 'legacy_float_text' cộng thêm số exact vẫn là legacy. Không chạm qty_ordered_*.
           await run(
-            `UPDATE po_items SET qty_received = qty_received + ? WHERE id = ?`,
+            `UPDATE po_items SET qty_received = qty_received + ?,
+                    qty_received_exact = qty_received_exact + ?::numeric
+              WHERE id = ?`,
             qty,
+            item.qtyExact,
             poItem.id,
           );
         }
