@@ -205,6 +205,12 @@ export async function insertId(sql: string, ...params: unknown[]): Promise<numbe
   return Number(r.rows[0].id);
 }
 
+/** Đang chạy bên trong withTransaction? Dùng cho helper BẮT BUỘC chung transaction với caller
+ *  (vd khoá advisory xact của receipt offline — ngoài transaction khoá nhả ngay sau câu lệnh). */
+export function dangTrongGiaoDich(): boolean {
+  return txStorage.getStore() != null;
+}
+
 // Bọc nhiều thao tác ghi vào 1 transaction — COMMIT khi fn thành công, ROLLBACK khi throw.
 // Mọi query/run/insertId bên trong fn tự dùng cùng client (qua AsyncLocalStorage).
 // Reentrant: gọi lồng bên trong 1 withTransaction khác (vd recomputePackage tự bọc

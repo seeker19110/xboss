@@ -16,7 +16,7 @@ import {
   trangThaiVault,
   type ThietBiOffline,
 } from "@/lib/bao-mat/offline-devices";
-import { CONTEXT_HEADER, kiemNguCanh } from "@/lib/bao-mat/offline-context";
+import { CONTEXT_HEADER, kiemNguCanh, kiemNguCanhHangDoi } from "@/lib/bao-mat/offline-context";
 import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 import type { KekKeyring } from "@/lib/nen/offline-crypto";
 import { log } from "@/lib/nen/log";
@@ -118,4 +118,26 @@ export async function chotBoiCanhVault(
   const kq = await kiemNguCanh(req.headers.get(CONTEXT_HEADER), user, thietBi, projectId);
   if (!kq.ok) throw new LoiOffline(409, kq.code, THONG_DIEP_NGU_CANH[kq.code]);
   return { user, thietBi, projectId };
+}
+
+/**
+ * Chốt context cho request HÀNG ĐỢI trên endpoint nghiệp vụ (S06, A2-FR03): header
+ * X-XBoss-Context phải còn khớp actor/org/dự án hiện hành/sessionVersion/vân tay quyền/thiết bị —
+ * lệch → 409 để client xác minh lại, KHÔNG ghi request cũ sang dự án của cookie mới.
+ */
+export async function chotNguCanhHangDoi(
+  raw: string | null,
+  user: User,
+  projectId: number | null,
+): Promise<void> {
+  if (projectId == null)
+    throw new LoiOffline(409, "context_changed", THONG_DIEP_NGU_CANH.context_changed);
+  const kq = await kiemNguCanhHangDoi(raw, user, projectId);
+  if (!kq.ok) throw new LoiOffline(409, kq.code, THONG_DIEP_NGU_CANH[kq.code]);
+}
+
+/** Route nghiệp vụ (S06): LoiOffline → `{ error, code }` đúng mã; lỗi khác ném tiếp cho đường cũ. */
+export function traLoiOfflineHoacNem(e: unknown): NextResponse {
+  if (e instanceof LoiOffline) return loiOffline(e.status, e.code, e.message);
+  throw e;
 }

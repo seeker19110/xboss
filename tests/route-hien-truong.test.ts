@@ -49,11 +49,16 @@ async function taoUser(
   return { id, passwordHash: u!.password_hash };
 }
 
-const jreq = (url: string, body?: unknown, method = "POST") =>
+const jreq = (url: string, body?: unknown, method = "POST", headers?: Record<string, string>) =>
   new NextRequest(`http://localhost${url}`, {
     method,
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+
+// PUT nhật ký là full-replace có precondition (S06): tạo mới If-None-Match: *, sửa If-Match: <etag>.
+const TAO_MOI = { "if-none-match": "*" };
+const khop = (etag: string) => ({ "if-match": etag });
 
 // ============================================================================
 // GET/PUT /api/diaries/[date]
@@ -176,13 +181,14 @@ test(
         "/x",
         { workDone: "Đổ bê tông tầng A", manpower: [{ crew: "Tổ A", headcount: 4 }] },
         "PUT",
+        TAO_MOI,
       ),
       { params: Promise.resolve({ date }) },
     );
     assert.equal(createdA.status, 200);
 
     await dangNhapDuAn(pmB, projectB);
-    const createdB = await PUT(jreq("/x", { workDone: "Lắp ống tầng B" }, "PUT"), {
+    const createdB = await PUT(jreq("/x", { workDone: "Lắp ống tầng B" }, "PUT", TAO_MOI), {
       params: Promise.resolve({ date }),
     });
     assert.equal(createdB.status, 200, "cùng ngày nhưng khác dự án — không được xung đột UNIQUE");
@@ -213,12 +219,17 @@ test(
     await dangNhapDuAn(pm, projectId);
     const { PUT } = await import("@/app/api/diaries/[date]/route");
     const first = await PUT(
-      jreq("/x", { workDone: "Bản ghi lần 1", manpower: [{ crew: "Tổ A", headcount: 2 }] }, "PUT"),
+      jreq(
+        "/x",
+        { workDone: "Bản ghi lần 1", manpower: [{ crew: "Tổ A", headcount: 2 }] },
+        "PUT",
+        TAO_MOI,
+      ),
       { params: Promise.resolve({ date }) },
     );
-    const { id: id1 } = await first.json();
+    const { id: id1, etag } = await first.json();
 
-    const second = await PUT(jreq("/x", { workDone: "Bản ghi lần 2 (sửa)" }, "PUT"), {
+    const second = await PUT(jreq("/x", { workDone: "Bản ghi lần 2 (sửa)" }, "PUT", khop(etag)), {
       params: Promise.resolve({ date }),
     });
     assert.equal(second.status, 200);
@@ -240,7 +251,7 @@ test("PUT /api/diaries/:date: sổ đã khoá → 409, không cho sửa (bất b
   const date = "2026-04-01";
   await dangNhapDuAn(pm, projectId);
   const { PUT } = await import("@/app/api/diaries/[date]/route");
-  const created = await PUT(jreq("/x", { workDone: "Khởi tạo" }, "PUT"), {
+  const created = await PUT(jreq("/x", { workDone: "Khởi tạo" }, "PUT", TAO_MOI), {
     params: Promise.resolve({ date }),
   });
   assert.equal(created.status, 200);
@@ -249,8 +260,13 @@ test("PUT /api/diaries/:date: sổ đã khoá → 409, không cho sửa (bất b
     date,
     projectId,
   );
+  // Khoá sổ cũng đổi phiên bản — lấy etag hiện hành để chắc 409 là do khoá, không phải 412.
+  const { GET } = await import("@/app/api/diaries/[date]/route");
+  const { etag } = await (
+    await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ date }) })
+  ).json();
 
-  const res = await PUT(jreq("/x", { workDone: "Sửa sau khoá" }, "PUT"), {
+  const res = await PUT(jreq("/x", { workDone: "Sửa sau khoá" }, "PUT", khop(etag)), {
     params: Promise.resolve({ date }),
   });
   assert.equal(res.status, 409);
@@ -1105,7 +1121,7 @@ test(
     await dangNhapDuAn(pm, projectId);
     const { PUT } = await import("@/app/api/diaries/[date]/route");
     const res = await PUT(
-      jreq("/api/diaries/2026-03-03", { photoIds: [999999999], manpower: [] }, "PUT"),
+      jreq("/api/diaries/2026-03-03", { photoIds: [999999999], manpower: [] }, "PUT", TAO_MOI),
       { params: Promise.resolve({ date: "2026-03-03" }) },
     );
     assert.equal(res.status, 422, "lỗi đầu vào phải là 422");

@@ -15,6 +15,7 @@ import { CAN, PERM_KEYS, type User } from "@/lib/bao-mat/auth";
 import {
   damBaoNguCanhActor,
   hoSoHieuLuc,
+  timThietBiTheoId,
   type HoSoOffline,
   type ThietBiOffline,
 } from "@/lib/bao-mat/offline-devices";
@@ -176,4 +177,22 @@ export async function kiemNguCanh(
   )
     return { ok: false, code: "context_changed" };
   return { ok: true, generation: p.g, expiresAt: p.x };
+}
+
+/**
+ * Kiểm context của request HÀNG ĐỢI (S06) trên endpoint nghiệp vụ, nơi trình duyệt không gửi cookie
+ * proof: thiết bị lấy theo id ký trong context, của chính actor (RLS + WHERE user/org). Thiết bị
+ * không còn/đã thu hồi → context_changed (client xác minh lại qua /api/offline/context, nơi kiểm
+ * proof và trả lỗi thiết bị cụ thể). Phần còn lại y hệt kiemNguCanh.
+ */
+export async function kiemNguCanhHangDoi(
+  raw: string | null | undefined,
+  user: User,
+  projectId: number,
+): Promise<KetQuaKiemNguCanh> {
+  const p = docPayload(raw);
+  if (!p) return { ok: false, code: "context_invalid" };
+  const thietBi = await timThietBiTheoId(user, p.d);
+  if (!thietBi || thietBi.revokedAt) return { ok: false, code: "context_changed" };
+  return kiemNguCanh(raw, user, thietBi, projectId);
 }

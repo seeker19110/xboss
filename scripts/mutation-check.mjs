@@ -198,6 +198,39 @@ const MUTATIONS = [
     tests: ["tests/offline-vault-route.test.ts"],
     why: "Thu hồi phân công/quyền một task vẫn mở được DEK của manifest chứa task đó (Q-AC02, A2-AC09).",
   },
+  // QUALITY-FINAL-1 S06: receipt + precondition ở endpoint hàng đợi offline thật.
+  {
+    key: "receipt: cùng Idempotency-Key mà payload khác phải 409",
+    file: "lib/bao-mat/offline-receipt.ts",
+    find: "  if (r.kind !== pv.kind || r.hash !== pv.hash)",
+    replace: "  if (false)",
+    tests: ["tests/offline-receipt-route.test.ts"],
+    why: "Gửi lại key cũ với nội dung đã sửa được ACK như thao tác cũ — client tưởng đã lưu bản mới (A2-AC04).",
+  },
+  {
+    key: "receipt: replay không được chạy lại mutation",
+    file: "app/api/dimensions/[id]/route.ts",
+    find: "        if (replay) return { replay } as const;",
+    replace: "        void replay;",
+    tests: ["tests/offline-receipt-route.test.ts"],
+    why: "Mất ACK rồi gửi lại tick cũ hồi sinh ô người dùng đã bỏ tick sau đó (A2-AC04).",
+  },
+  {
+    key: "nhật ký: If-Match lệch phiên bản phải 412",
+    file: "app/api/diaries/[date]/route.ts",
+    find: "      if (!dieuKienThoa(dk.dieuKien, existing)) return { lechPhienBan: true } as const;",
+    replace: "      void dieuKienThoa;",
+    tests: ["tests/offline-receipt-route.test.ts"],
+    why: "PUT full-replace dựa trên bản cũ đè mất nhật ký người khác vừa lưu (A2-FR11, A2-AC10).",
+  },
+  {
+    key: "ảnh: ghi metadata lỗi phải dọn file đã đặt",
+    file: "app/api/tasks/[id]/photos/route.ts",
+    find: "    await donFileStaging(user, fileName);\n    return traLoiOfflineHoacNem(e);",
+    replace: "    return traLoiOfflineHoacNem(e);",
+    tests: ["tests/offline-receipt-route.test.ts"],
+    why: "File ảnh nằm lại trên storage không ai tham chiếu, không đối soát được (A2-AC10).",
+  },
 ];
 
 const only = process.argv.find((a) => a.startsWith("--only="))?.slice("--only=".length);

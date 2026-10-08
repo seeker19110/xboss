@@ -57,6 +57,9 @@ export default function DiaryEditorModal({
   const [saving, setSaving] = useState(false);
   const [hasOfflineDraft, setHasOfflineDraft] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Phiên bản mạnh của nhật ký trên server (S06): PUT full-replace gửi lại qua If-Match để không
+  // đè bản người khác vừa lưu; null = ngày chưa có nhật ký → tạo mới bằng If-None-Match: *.
+  const [etag, setEtag] = useState<string | null>(null);
 
   const canEdit = role === "admin" || role === "pm" || role === "engineer";
   const canLock = role === "admin" || role === "pm";
@@ -86,6 +89,7 @@ export default function DiaryEditorModal({
         });
       if (cancelled) return;
       setDiary(j.diary ?? null);
+      setEtag(typeof j.etag === "string" ? j.etag : null);
       setPrefill(j.prefill ?? { workDone: "", updatedBy: [], photos: [] });
       if (queued && queued.kind === "diary_note") {
         const p = queued.payload;
@@ -177,11 +181,15 @@ export default function DiaryEditorModal({
     try {
       const r = await fetch(`/api/diaries/${date}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(etag ? { "If-Match": etag } : { "If-None-Match": "*" }),
+        },
         body: JSON.stringify(body),
       });
       const j = await r.json().catch(() => ({}));
       if (r.ok) {
+        setEtag(typeof j.etag === "string" ? j.etag : null);
         // Đã lưu trực tiếp thành công → xoá nháp offline cũ của ngày này (nếu có) để nó
         // không tự flush sau đó và đè (full-replace) lên bản vừa lưu, gây mất dữ liệu.
         await discardDiaryDraft(date);
@@ -190,7 +198,8 @@ export default function DiaryEditorModal({
         setDiary(j.diary ?? diary);
         onChanged();
       } else {
-        // Lỗi nghiệp vụ thật (409 khoá sổ, 422 hợp lệ…) — giữ nguyên lỗi cũ, KHÔNG xếp offline.
+        // Lỗi nghiệp vụ thật (409 khoá sổ, 412 bản server đã đổi, 422 hợp lệ…) — giữ nguyên dữ
+        // liệu trên form, KHÔNG xếp offline, KHÔNG tự đè: người dùng tải lại để xem bản mới nhất.
         showToast(j.error ?? "Lỗi lưu nhật ký", "error");
       }
       setSaving(false);
@@ -221,6 +230,11 @@ export default function DiaryEditorModal({
     if (r.ok) {
       showToast("Đã mở khoá");
       setDiary((d) => (d ? { ...d, status: "draft" } : d));
+      // Mở khoá đổi phiên bản trên server — lấy lại etag để lần lưu kế tiếp không bị 412 oan.
+      const moi = await fetch(`/api/diaries/${date}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null);
+      if (moi) setEtag(typeof moi.etag === "string" ? moi.etag : null);
       onChanged();
     } else {
       showToast(j.error ?? "Lỗi mở khoá", "error");

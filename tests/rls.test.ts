@@ -513,7 +513,15 @@ test(
     // app.user_id/org_id (+ app.role admin cho đọc/duyệt thiết bị cùng org, + app.project_id cho
     // khoá), không nhánh '*'/GUC rỗng; xboss_app không DELETE, chỉ UPDATE 4 cột duyệt/thu hồi thiết
     // bị, không UPDATE khoá. Hành vi kiểm bằng role xboss_app ở tests/offline-vault-route.test.ts.
-    const OFFLINE = ["offline_devices", "offline_vault_keys"];
+    // Receipt hàng đợi offline + staging file ảnh (S06, migration 0164): nghiêm ngặt theo
+    // app.user_id/org_id (+ app.project_id cho receipt); receipt chỉ SELECT/INSERT, staging thêm
+    // DELETE. Hành vi kiểm bằng role xboss_app ở tests/offline-receipt-route.test.ts.
+    const OFFLINE = [
+      "offline_devices",
+      "offline_vault_keys",
+      "audit_operation_receipts",
+      "photo_upload_staging",
+    ];
 
     // Nhóm engineering: khai theo TIỀN TỐ chứ không liệt kê tay — thêm bảng engineering_* mới
     // mà quên bật RLS thì bị bắt ở assert bên dưới, không phải ở đây.

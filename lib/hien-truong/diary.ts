@@ -15,6 +15,79 @@ export function assertDiaryUnlocked(status: string | undefined): void {
     throw Object.assign(new Error("Nhật ký đã khoá — không thể sửa"), { status: 409 });
 }
 
+// ── Precondition PUT full-replace (QUALITY-FINAL-1 S06 — A2-FR11, DATA-CONTRACTS §5) ─────────
+
+/** ETag MẠNH của nhật ký: id + version server cấp (không timestamp, không do client đặt). */
+export function etagNhatKy(d: { id: number; version: number }): string {
+  return `"${d.id}-${d.version}"`;
+}
+
+export type DieuKienNhatKy =
+  | { loai: "tao_moi" } // If-None-Match: * — chỉ tạo khi ngày đó CHƯA có nhật ký
+  | { loai: "khop"; etags: string[] }; // If-Match: "<etag>" — chỉ ghi đè đúng phiên bản đã đọc
+
+export type KetQuaDieuKien =
+  | { ok: true; dieuKien: DieuKienNhatKy }
+  | { ok: false; status: 400 | 428; code: string; error: string };
+
+/**
+ * Đọc precondition của PUT. Thiếu cả hai → 428 (full-replace mù sẽ đè bản người khác vừa lưu).
+ * `If-Match: *` không phải phiên bản cụ thể → 428. Có cả hai, hoặc If-None-Match khác `*` → 400.
+ * ETag yếu (`W/`) được giữ nhưng không bao giờ khớp (so sánh mạnh) → 412 ở bước kiểm.
+ */
+export function docDieuKienNhatKy(
+  ifMatch: string | null,
+  ifNoneMatch: string | null,
+): KetQuaDieuKien {
+  const im = ifMatch?.trim() || null;
+  const inm = ifNoneMatch?.trim() || null;
+  const thieu = {
+    ok: false,
+    status: 428,
+    code: "precondition_required",
+    error:
+      "Thiếu phiên bản nhật ký (If-Match) hoặc If-None-Match: * khi tạo mới — tải lại nhật ký rồi lưu",
+  } as const;
+  if (im && inm)
+    return {
+      ok: false,
+      status: 400,
+      code: "precondition_invalid",
+      error: "Chỉ gửi một trong If-Match hoặc If-None-Match",
+    };
+  if (inm) {
+    if (inm !== "*")
+      return {
+        ok: false,
+        status: 400,
+        code: "precondition_invalid",
+        error: "If-None-Match chỉ nhận * (tạo mới)",
+      };
+    return { ok: true, dieuKien: { loai: "tao_moi" } };
+  }
+  if (!im || im === "*") return thieu;
+  const etags = im
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (!etags.length) return thieu;
+  return { ok: true, dieuKien: { loai: "khop", etags } };
+}
+
+/** Precondition có thoả với nhật ký HIỆN HÀNH (đọc dưới khoá) không — false → 412. */
+export function dieuKienThoa(
+  dk: DieuKienNhatKy,
+  hienTai: { id: number; version: number } | undefined,
+): boolean {
+  if (dk.loai === "tao_moi") return !hienTai;
+  return !!hienTai && dk.etags.includes(etagNhatKy(hienTai));
+}
+
+/** Phiên bản gốc đưa vào hash receipt — đổi base dưới cùng Idempotency-Key là thao tác khác. */
+export function baseVersionNhatKy(dk: DieuKienNhatKy): string {
+  return dk.loai === "tao_moi" ? "*" : [...dk.etags].sort().join(",");
+}
+
 export type DiaryPhotoPrefill = {
   id: number;
   taskId: number;
@@ -112,13 +185,16 @@ export type DiaryRow = {
   lockedBy: number | null;
   lockedByName: string | null;
   lockedAt: string | null;
+  /** Phiên bản mạnh do trigger 0164 tăng ở mọi thay đổi (dòng nhật ký + nhân lực + ảnh). */
+  version: number;
 };
 
 const SELECT_DIARY = `
   SELECT sd.id, sd.diary_date AS "diaryDate", sd.project_id AS "projectId",
          sd.weather_am AS "weatherAm", sd.weather_pm AS "weatherPm", sd.work_done AS "workDone",
          sd.obstacles, sd.safety_note AS "safetyNote", sd.status, sd.created_by AS "createdBy",
-         sd.locked_by AS "lockedBy", u.name AS "lockedByName", sd.locked_at AS "lockedAt"
+         sd.locked_by AS "lockedBy", u.name AS "lockedByName", sd.locked_at AS "lockedAt",
+         sd.version
     FROM site_diaries sd
     LEFT JOIN users u ON u.id = sd.locked_by`;
 

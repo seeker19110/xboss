@@ -1,5 +1,72 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S06: receipt và precondition ở endpoint queue thật
+
+Đặc tả lát cắt `docs/nang-cap/AUDIT-S06-OFFLINE-RECEIPT.md` (spec cha A2-FR09..FR11, DATA-CONTRACTS
+§5/§7, APPROVAL D04, PLAN §S06). Chỉ phía server + chỉnh client tối thiểu cho precondition nhật ký;
+**queue IndexedDB mới (S07) và UI xung đột/phục hồi (S08) chưa đụng** — hàng đợi v1 vẫn quarantine như
+S04/S05 nên chưa client nào gửi `Idempotency-Key`. Không thêm dependency.
+
+- **Endpoint thật** (đúng `opEndpoint`): `PATCH /api/dimensions/:id` (`tick`), `PATCH /api/dimensions/batch`
+  (`tick_batch`), `POST /api/tasks/:id/photos` (`photo`), `PUT /api/diaries/:date` (`diary_note`).
+  Request hàng đợi = có `Idempotency-Key` (UUID) + `X-XBoss-Context`; thiếu key mà có context → 400,
+  key sai dạng → 400, có key mà thiếu/sai context → 409 `context_invalid|expired|changed`. Context
+  kiểm **trước** phạm vi tài nguyên (tab cũ sau khi đổi dự án nhận 409, không 404 rồi bị bỏ). Thiết bị
+  lấy theo id **ký trong context** vì cookie proof S05 chỉ đi `/api/offline/*` (`kiemNguCanhHangDoi`,
+  `chotNguCanhHangDoi`). Không header = caller online cũ, giữ hành vi (trừ precondition nhật ký).
+- **Receipt** `lib/bao-mat/offline-receipt.ts`: quyền/phạm vi kiểm TRƯỚC khi tra receipt (replay vẫn bị
+  403 khi vừa mất phân công/vai trò); trong `withTransaction`: khoá advisory (org, dự án, user, op) →
+  tra receipt (cùng hash → `{ receipt: { …, replayed: true } }` 200, khác hash/loại → 409
+  `idempotency_conflict`) → gate/precondition → mutation + receipt cùng transaction. Không placeholder
+  pending, không TTL. Hash SHA-256 `receipt-v1` của JSON khoá sắp xếp gồm kind/scope/target/payload đã
+  chuẩn hoá/baseVersion; ảnh băm digest byte + size/mime/caption/tên gốc. Thành công lần đầu giữ body
+  cũ + thêm `receipt`. Gate hold-point/biện pháp/nghiệm thu của 2 route tick chuyển vào trong
+  transaction, sau bước tra receipt (thao tác đã COMMIT mà mất ACK không thất bại giả vì gate đóng sau).
+- **Ảnh không mồ côi** `lib/tien-do/anh-staging.ts`: dòng `photo_upload_staging` COMMIT trước khi đặt
+  file; `task_photos` + receipt + xoá staging cùng một transaction; lỗi/huỷ/thua đồng thời → xoá file
+  chỉ khi dòng staging còn (COMMIT mất phản hồi không xoá nhầm file đang dùng); dòng quá 60 phút được
+  đối soát đầu mỗi lần upload của chính người đó. Áp cho cả đường online. Chống trùng 24h theo hash cũ
+  giữ nguyên.
+- **Nhật ký phiên bản mạnh**: `site_diaries.version` (trigger tăng ở mọi UPDATE dòng nhật ký và mọi đổi
+  dòng con nhân lực/ảnh, kể cả ảnh bị xoá cascade). GET trả `etag` + header ETag `"<id>-<version>"`
+  (+ `Cache-Control: private, no-store`); PUT **bắt buộc** `If-Match: <etag>` hoặc `If-None-Match: *`
+  (tạo mới) — thiếu → 428, lệch → 412 `version_mismatch`, so dưới khoá advisory (dự án, ngày) +
+  `FOR UPDATE`; replay receipt hợp lệ trả trước khi so If-Match. `DiaryEditorModal` gửi If-Match/
+  If-None-Match, cập nhật etag sau lưu/mở khoá, 412 giữ nguyên form + báo tải lại. Vai trò lập nhật ký
+  gom về `DIARY_EDIT_ROLES` (`lib/nen/roles.ts`) dùng chung route + manifest vault (đóng "Cần quyết
+  (5)" của S05).
+- **Migration `0164_offline_receipts.sql`** (thêm thuần tuý: CREATE TABLE/INDEX/POLICY/TRIGGER/GRANT +
+  `ADD COLUMN version integer NOT NULL DEFAULT 1` — default hằng, không viết lại dòng có sẵn → đi thẳng
+  production): `audit_operation_receipts` đúng DDL contract (policy so TEXT như 0160/0163, `xboss_app`
+  chỉ SELECT/INSERT), `photo_upload_staging` (RLS user/org, SELECT/INSERT/DELETE), trigger version nhật
+  ký; đối chiếu catalog khi bảng đã tồn tại. Chạy 2 lần idempotent; ERD sinh lại; ADR-0005 cập nhật;
+  nhóm `OFFLINE` của `tests/rls.test.ts`. `lib/db`: thêm `dangTrongGiaoDich()` (helper receipt throw khi
+  gọi ngoài transaction).
+- **Test** `tests/offline-receipt-route.test.ts` (13 ca, **route chạy bằng `xboss_app`**, context qua route
+  S05 thật, đồng thời bằng `requestRieng`): mất ACK không hồi sinh ô đã bỏ tick, 20 request đồng thời cùng
+  key → 1 lần thực thi (tick/batch/ảnh), payload/loại khác → 409, quyền thu hồi → 403 kể cả có receipt,
+  context dự án cũ → 409 ở cả 4 endpoint, tài nguyên dự án khác → 404 không để receipt, lỗi ghi metadata
+  ảnh → file được dọn (cả đường online), staging mồ côi được đối soát, nhật ký 428/412/replay sau mất ACK,
+  tạo đồng thời → 200 + 412, version đổi khi ảnh bị xoá cascade, RLS/GRANT receipt. **12/13 ca ĐỎ trên
+  route cũ** (ca còn lại là canh 403 vốn đã đúng). `tests/offline-receipt.test.ts` (thuần: hash, header,
+  precondition). `route-hien-truong.test.ts` gửi precondition theo hợp đồng mới. Thêm 4 mutation vào
+  `test:mutation` (hash 409, replay không chạy lại, If-Match 412, dọn file) — cả 4 đều bị bắt. e2e
+  `diary.spec.ts`: project mobile dùng ngày khác desktop (chạy song song cùng DB, precondition làm bên
+  sau nhận 412 đúng thiết kế).
+- **Cần quyết (phiên chính — không tự quyết):** (1) Brief ghi "diary version cũ → 409" nhưng
+  DATA-CONTRACTS §7 chốt **412** cho version (409 cho context/idempotency) — đã theo contract.
+  (2) Precondition nhật ký áp cho **mọi** caller PUT (contract "missing precondition 428"), kể cả UI
+  online — xác nhận đây là ý định (đã sửa modal); script/tích hợp ngoài nào PUT nhật ký không kèm
+  If-Match sẽ nhận 428. (3) Đối soát staging chỉ chạy theo chính actor ở lần upload sau; người không bao
+  giờ upload lại để lại file mồ côi — cần job bảo trì role owner (cross-org) hay chấp nhận? (4) Receipt
+  có FK `users`/`projects` không ON DELETE: xoá user/dự án đã có receipt → 409/lỗi FK (route xoá user đã
+  map 409 `dependency_conflict`) — đúng tinh thần "giữ receipt cùng vòng đời dữ liệu" của D04, cần thủ tục
+  retention riêng. (5) Server chưa kiểm thao tác hàng đợi thuộc manifest khoá vault (DATA-MIGRATIONS §2
+  "tick batch phải thuộc tập manifest") — request không mang keyId; S07 cần quyết có gửi keyId để server
+  đối chiếu hay chỉ dựa quyền hiện hành từng task (đang làm). (6) Request online (không header) chưa kiểm
+  `X-XBoss-Context` — tab cũ sau đổi dự án vẫn được chặn bởi khoá epoch client S05, server-side cho UI
+  online cần context từ S07/S08.
+
 ## 2026-10-08 — QUALITY-FINAL-1 S05: thiết bị, context và dịch vụ khoá vault offline
 
 Spec `docs/nang-cap/AUDIT-2026-09-25/` (PLAN §S05, A2-OFFLINE, DATA-CONTRACTS §3–§4, DATA-MIGRATIONS
