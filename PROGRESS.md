@@ -1,5 +1,79 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S05: thiết bị, context và dịch vụ khoá vault offline
+
+Spec `docs/nang-cap/AUDIT-2026-09-25/` (PLAN §S05, A2-OFFLINE, DATA-CONTRACTS §3–§4, DATA-MIGRATIONS
+§2–§5). Chỉ phần server + khoá ngữ cảnh client tối thiểu; **queue IndexedDB (S07), receipt (S06), UI
+phục hồi (S08) chưa đụng** — lưu offline vẫn khoá như S04. Không thêm dependency.
+
+- **Migration `0163_offline_vault.sql`** (thêm thuần tuý, đi thẳng production được): `offline_devices`,
+  `offline_vault_keys` đúng DDL thiết kế + đối chiếu catalog khi bảng đã tồn tại; RLS ENABLE+FORCE,
+  policy nghiêm ngặt so TEXT với GUC (không nhánh `'*'`/rỗng); `xboss_app` chỉ SELECT/INSERT +
+  UPDATE cấp cột duyệt/thu hồi thiết bị, không DELETE, không UPDATE khoá; sequence
+  `offline_context_generation_seq` (generation do server cấp); audit trigger 0049 chỉ cho UPDATE thiết
+  bị (INSERT sẽ chép proof_hash). Hàm `offline_proof_nguoi_khac(proof_hash, user_id, chi_field_personal)`
+  SECURITY DEFINER (search_path cố định, chỉ trả boolean, EXECUTE chỉ cho `xboss_app`) cho biết proof có
+  bản ghi chưa thu hồi của người KHÁC **xuyên org**; vì FORCE RLS áp cả owner, kèm policy SELECT
+  `TO CURRENT_USER` (role owner lúc migrate; migration từ chối chạy bằng `xboss_app`). Chạy 2 lần
+  idempotent; ERD sinh lại; ADR-0005 cập nhật.
+- **Mật mã** `lib/nen/offline-crypto.ts` (WebCrypto, dùng chung server/client): DEK 256 bit CSPRNG,
+  AES-256-GCM IV 96 bit mới mỗi lần, tag 128; KEK có version **dẫn xuất HKDF-SHA256** từ biến mới
+  tuỳ chọn `XBOSS_OFFLINE_KEK="v2:<secret>,v1:<secret>"` (mục đầu bọc khoá mới, mục sau chỉ mở khoá
+  cũ; secret ≥32 ký tự, **trùng XBOSS_SECRET bị từ chối**). Thiếu → `/api/offline/*` 503
+  `offline_vault_disabled`; sai → 503 `offline_vault_misconfigured` + log (fail-closed, không kéo sập
+  app). AAD bọc khoá gắn key/manifestHash/owner/org/project/device/keyVersion/kekVersion; AAD payload
+  (schemaVersion 2, cho S07) gắn thêm operation/kind/sequence. `lib/nen/offline-manifest.ts`: manifest
+  chuẩn (task + hành động tick/photo, nhật ký ≤31 ngày) + SHA-256.
+- **Dịch vụ** `lib/bao-mat/offline-{devices,context,vault,http}.ts` + route: `GET/POST /api/offline/devices` (proof 32 byte cookie HttpOnly/Lax path `/api/offline`, DB chỉ SHA-256;
+  idempotent; luôn shared-safe; tối đa 20 thiết bị chưa thu hồi/người; cùng trình duyệt A/B mỗi người
+  một bản ghi chung proof), `PATCH /api/offline/devices/:id` (Admin cùng org + `CAN.manageUsers` + đã
+  bật 2FA; field-personal từ chối khi proof đang có bản ghi chưa thu hồi của người khác, **xuyên org**;
+  thu hồi một chiều **và tăng `users.session_version` của chủ thiết bị cùng transaction** — buộc đăng
+  nhập lại, phiên cũ không đăng ký lại được bằng proof mới), đăng ký bản ghi mới trên trình duyệt đang là
+  field-personal của người khác (kể cả org khác) → 409 `shared_browser`; proof đang dùng chung với người
+  khác thì context cấp/kiểm theo lease shared-safe 15 phút dù cột profile là field-personal (đua giữa
+  duyệt và đăng ký vẫn an toàn),
+  `POST /api/offline/context` (resolver A1 strict, context ký HMAC tách miền gắn
+  actor/org/dự án/sessionVersion/vân tay quyền/thiết bị/profile, lease 15 phút hoặc 8 giờ),
+  `POST /api/offline/vault/keys` + `/unlock` (header `X-XBoss-Context`, lệch → 409
+  `context_changed`/`context_expired`/`context_invalid`; kiểm **toàn bộ manifest** với quyền + phân
+  công hiện hành mỗi lần cấp/mở — nạp task gộp 1 truy vấn, không N+1; khoá không mở được chỉ báo `locked`
+  theo keyId, server `log.warn` keyId/kekVersion/loại lỗi khi thiếu version KEK hoặc giải bọc lỗi;
+  mở tất cả = tối đa 500 khoá **mới nhất** + `truncated: true` khi còn khoá cũ hơn; dedupe theo manifest;
+  rate limit 30 lần mở/15 phút). Mọi phản hồi `private, no-store`; Origin bắt buộc (`isStrictSameOrigin`).
+- **Client (khoá ngữ cảnh toàn cục)** `app/lib/contextEpoch.ts` + `NguCanhGuard` ở layout gốc: đổi
+  dự án (`ProjectSwitcher`, thẻ dự án ở `/portfolio` — chỉ khi `res.ok`, lỗi → toast), đăng xuất
+  (`/account`, chỉ khi logout `res.ok`) hoặc đổi actor phát epoch qua BroadcastChannel +
+  dự phòng `storage` (chỉ epoch/lý do, không PII); tab khác đóng ngay SSE/poll đã đăng ký
+  (`useTrackingData`, traffic admin) rồi khoá trang, chỉ tải lại khi người dùng bấm; hàng đợi offline
+  của tab đó dừng flush (không xoá dữ liệu — S07 làm đầy đủ). Lớp khoá là `role="alertdialog"` +
+  `aria-modal` + `aria-labelledby/describedby`, focus vào nút hành động, không bao giờ 2 lớp chồng (lớp
+  khoá phiên hết hạn thay lớp cũ; lớp đổi ngữ cảnh không mở khi đã có lớp). `/api/auth/me`
+  trả thêm `binding` (HMAC rút gọn user/org/sessionVersion); `fetchMe` thấy binding khác lần trước (kể
+  cả vào qua SSO/OIDC) → khoá tab khác + purge cache SW theo ACK trước khi trả user, purge lỗi → khoá.
+- **Test:** `offline-vault-route.test.ts` (20 ca, thêm: một chủ field-personal xuyên org/đua → 15 phút,
+  thu hồi thiết bị → phiên cũ 401, 501 khoá → 500 mới nhất + `truncated`, `log.warn` không chứa khoá; **route chạy bằng role `xboss_app`** — bỏ policy
+  `offline_vault_read` thì 9 ca đỏ; bỏ kiểm lại manifest khi mở thì 2 ca đỏ, đã thêm vào
+  `test:mutation`), `offline-crypto.test.ts` (8), `context-epoch.test.ts` (4); `rls.test.ts` nhóm
+  `OFFLINE`; `audit-small-me-no-store.test.ts` theo hợp đồng `/api/auth/me` mới;
+  `project-select-phat-epoch.test.ts` (quét tĩnh `app/**`: mọi chỗ gọi `/api/project/select` phải
+  `phatDoiNguCanh("switch")` — đỏ trên `/portfolio` cũ); `audit-s07-offline-flush-regressions` thêm ca
+  dừng flush khi đổi ngữ cảnh; e2e `e2e/authed/ngu-canh-khoa.spec.ts` (2 tab, desktop + mobile, axe +
+  focus + Tải lại). Inventory route sinh lại kèm khối tay S05.
+- **Cần quyết (phiên chính — không tự quyết):** (1) **Rewrap KEK** (UPDATE `wrapped_key` bằng role bảo
+  trì riêng + audit, DATA-CONTRACTS §4) chưa làm: cần quyết tạo role DB mới ở migration (role migrate
+  production cần CREATEROLE) và quy trình vận hành; hiện xoay KEK bằng keyring nhiều version — không mất
+  khoá, chỉ chưa gỡ được version cũ. (2) **`retired_at`**: DDL không cấp UPDATE cho `xboss_app` nên
+  runtime không retire khoá — ai/khi nào retire (vòng đời S07)? (3) **Phục hồi khi mất proof** ("xác
+  minh riêng") chưa có đặc tả phương thức xác minh — hiện proof mới = thiết bị mới, khoá cũ không mở được
+  (đúng fail-closed, có thể mất nháp chưa đồng bộ). (4) _(đã chốt: hàm SECURITY DEFINER xuyên org — xem
+  trên)_. (5) Vai trò nhật ký trong manifest lặp quy tắc `canEdit` của
+  `/api/diaries/[date]` — gom khi S06 sửa route nhật ký. (6) Kiểm `X-XBoss-Context` trên 4 endpoint
+  queue thật thuộc S06 (đã có `chotBoiCanhVault`/`kiemNguCanh`). (7) Tab bị khoá không tự tải lại (người
+  dùng bấm) để không mất form đang nhập — xác nhận UX ở S08. (8) `.env.example` chưa thêm
+  `XBOSS_OFFLINE_KEK` (phiên worker bị chặn đọc `.env*`) — đã ghi ở `DEPLOY.md`. (9) `DELETE /api/users/:id` với user có thiết bị offline → 409 `dependency_conflict` (FK, giữ nháp) — có muốn luồng
+  thu hồi + lưu trữ trước khi xoá user?
+
 ## 2026-10-08 — QUALITY-FINAL-1 DATA-MIGRATIONS §6: khối lượng PO/PR/phiếu nhận exact (expand)
 
 Đặc tả: `docs/nang-cap/AUDIT-2026-09-25/DATA-MIGRATIONS.md` §6 (A3-FR04).

@@ -6328,6 +6328,59 @@
 - `idx_import_batches_sha256`: INDEX idx_import_batches_sha256 ON public.import_batches USING btree (source_sha256)
 - `import_batches_pkey`: UNIQUE INDEX import_batches_pkey ON public.import_batches USING btree (id)
 
+### offline_devices
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  |  |
+| user_id | integer |  |  |
+| org_id | integer |  |  |
+| proof_hash | bytea |  |  |
+| profile | text |  | `'shared-safe'::text` |
+| approved_by | integer | ✓ |  |
+| approved_at | timestamptz | ✓ |  |
+| revoked_at | timestamptz | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `approved_by` → `users(id)`
+- `org_id` → `organizations(id)`
+- `user_id` → `users(id)`
+
+**Index:**
+- `idx_offline_devices_proof`: INDEX idx_offline_devices_proof ON public.offline_devices USING btree (proof_hash)
+- `offline_devices_id_user_id_org_id_key`: UNIQUE INDEX offline_devices_id_user_id_org_id_key ON public.offline_devices USING btree (id, user_id, org_id)
+- `offline_devices_pkey`: UNIQUE INDEX offline_devices_pkey ON public.offline_devices USING btree (id)
+- `offline_devices_user_id_org_id_proof_hash_key`: UNIQUE INDEX offline_devices_user_id_org_id_proof_hash_key ON public.offline_devices USING btree (user_id, org_id, proof_hash)
+
+### offline_vault_keys
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  |  |
+| device_id | uuid |  |  |
+| user_id | integer |  |  |
+| org_id | integer |  |  |
+| project_id | integer |  |  |
+| key_version | integer |  |  |
+| resource_manifest | jsonb |  |  |
+| manifest_hash | text |  |  |
+| permission_fingerprint | text |  |  |
+| wrapped_key | bytea |  |  |
+| kek_version | text |  |  |
+| created_at | timestamptz |  | `now()` |
+| retired_at | timestamptz | ✓ |  |
+
+**Khóa ngoại:**
+- `device_id` → `offline_devices(id)`
+- `org_id` → `offline_devices(org_id)`
+- `project_id` → `projects(id)`
+- `user_id` → `offline_devices(user_id)`
+
+**Index:**
+- `offline_vault_keys_device_id_user_id_org_id_project_id_key__key`: UNIQUE INDEX offline_vault_keys_device_id_user_id_org_id_project_id_key__key ON public.offline_vault_keys USING btree (device_id, user_id, org_id, project_id, key_version)
+- `offline_vault_keys_pkey`: UNIQUE INDEX offline_vault_keys_pkey ON public.offline_vault_keys USING btree (id)
+
 ### organizations
 
 | Cột | Kiểu | Null | Default |

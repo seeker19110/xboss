@@ -36,6 +36,7 @@ function load<T>(path: string, mocks: Record<string, unknown>, globals = {}): T 
 type Op = { id: number; kind: string; payload: unknown; queuedAt: number; tries: number };
 type Result = { tuChoi: { soO: number; lyDo?: string }[] };
 type Manager = {
+  start(): void;
   flush(): Promise<void>;
   enqueueTick(dimId: number, installed: boolean): Promise<void>;
   enqueueTickBatch(dimIds: number[], installed: boolean): Promise<void>;
@@ -56,6 +57,7 @@ function fixture(
   opts: {
     online?: boolean;
     hasNavigator?: boolean;
+    withWindow?: boolean;
     getAll?: (call: number, items: Op[]) => Promise<Op[]>;
     flush?: () => Promise<Result>;
     addFails?: boolean;
@@ -64,6 +66,7 @@ function fixture(
   let items: Op[] = [];
   const state = { reads: 0, flushes: 0, adds: 0, syncs: 0 };
   const notices: string[] = [];
+  const epochListeners: (() => void)[] = [];
   const nav = {
     onLine: opts.online ?? true,
     serviceWorker: {
@@ -100,6 +103,12 @@ function fixture(
       "./store": { IdbQueueStore: Store },
       "./image": {},
       "@/app/components/Toast": { showToast: (message: string) => notices.push(message) },
+      "@/app/lib/contextEpoch": {
+        ngheDoiNguCanh: (cb: () => void) => {
+          epochListeners.push(cb);
+          return () => {};
+        },
+      },
       "./logic": {
         computeStats: (ops: Op[]) => ({ total: ops.length, pending: ops.length, failed: 0 }),
         tickDedupeIds: () => [],
@@ -112,7 +121,10 @@ function fixture(
         },
       },
     },
-    opts.hasNavigator === false ? {} : { navigator: nav },
+    {
+      ...(opts.hasNavigator === false ? {} : { navigator: nav }),
+      ...(opts.withWindow ? { window: { addEventListener() {} } } : {}),
+    },
   );
   source.OFFLINE_QUEUE_QUARANTINED = false; // test-only: exercise retained S07 manager regressions
   const queue = source.offlineQueue;
@@ -123,6 +135,7 @@ function fixture(
     nav,
     op,
     notices,
+    doiNguCanh: () => epochListeners.forEach((cb) => cb()),
     seed: () => {
       items = [op];
     },
@@ -282,4 +295,14 @@ test("queue: tick đơn vẫn đánh thức sender như trước", async () => {
   await tick();
   assert.equal(f.state.adds, 1);
   assert.equal(f.state.flushes, 1);
+});
+
+test("queue: tab khác đổi ngữ cảnh → dừng flush ở tab này, không xoá hàng đợi (S05)", async () => {
+  const f = fixture({ withWindow: true });
+  f.queue.start();
+  f.seed();
+  f.doiNguCanh();
+  await f.queue.flush();
+  assert.equal(f.state.reads, 0, "không đọc/gửi hàng đợi sau khi ngữ cảnh đổi");
+  assert.equal(f.state.flushes, 0);
 });

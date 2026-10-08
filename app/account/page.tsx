@@ -13,6 +13,8 @@ import {
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { fetchMe, invalidateMe, redirectToLogin } from "@/app/lib/me";
+import { phatDoiNguCanh } from "@/app/lib/contextEpoch";
+import { showToast } from "@/app/components/Toast";
 import { ROLE_LABELS } from "@/lib/nen/roles";
 import TwoFactorSection from "@/app/components/TwoFactorSection";
 
@@ -37,7 +39,20 @@ export default function AccountPage() {
 
   async function logout() {
     invalidateMe();
-    await fetch("/api/auth/logout", { method: "POST" });
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      showToast("Mất kết nối — chưa đăng xuất được, vui lòng thử lại", "error");
+      return;
+    }
+    if (!res.ok) {
+      showToast("Đăng xuất chưa thành công — vui lòng thử lại", "error");
+      return;
+    }
+    // S05: khoá các tab khác đang mở dữ liệu của phiên vừa đăng xuất (đăng xuất cục bộ — không
+    // phải bằng chứng server đã thu hồi token ở thiết bị khác).
+    phatDoiNguCanh("logout");
     redirectToLogin();
   }
 

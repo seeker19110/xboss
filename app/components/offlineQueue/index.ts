@@ -8,6 +8,7 @@ import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { IdbQueueStore } from "./store";
 import { compressImage } from "./image";
 import { showToast } from "@/app/components/Toast";
+import { ngheDoiNguCanh } from "@/app/lib/contextEpoch";
 import {
   computeStats,
   flushQueue,
@@ -111,6 +112,9 @@ class OfflineQueueManager {
   private started = false;
   private flushing = false;
   private hadItems = false;
+  // S05: tab khác đổi dự án/đăng xuất/đổi tài khoản → tab này dừng gửi hàng đợi (KHÔNG xoá dữ
+  // liệu) cho tới khi tải lại; S07 thay bằng kiểm owner/context đầy đủ.
+  private tamDungNguCanh = false;
 
   subscribe = (fn: () => void): (() => void) => {
     this.listeners.add(fn);
@@ -162,12 +166,16 @@ class OfflineQueueManager {
       this.setSnap({ online: true });
     });
     window.addEventListener("offline", () => this.setSnap({ online: false }));
+    ngheDoiNguCanh(() => {
+      this.tamDungNguCanh = true;
+    });
   }
 
   async flush() {
     // Queue v1 không có ownership/vault context. Không đọc hay gửi nó theo session cookie
     // hiện tại; Background Sync và online events cũng đi qua cùng cổng này.
     if (OFFLINE_QUEUE_QUARANTINED) return;
+    if (this.tamDungNguCanh) return;
     if (this.flushing || typeof navigator === "undefined" || !navigator.onLine) return;
     // Giữ khóa trước await đầu tiên, kể cả lúc đọc storage và cập nhật thống kê.
     // Chỉ bảo vệ trong tab hiện tại; không thay lease nhiều tab hoặc receipt server.

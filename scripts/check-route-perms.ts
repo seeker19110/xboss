@@ -38,6 +38,21 @@ const WHITELIST: Record<string, string> = {
   "notifications/prefs:PATCH": "Sửa tuỳ chọn thông báo của chính mình (khoá theo user_id).",
   "notifications:POST": "markAllRead — chỉ UPDATE thông báo WHERE user_id = ? của chính mình.",
   "presence:POST": "Heartbeat của chính user đang mở app, không ghi dữ liệu người khác.",
+  // QUALITY-FINAL-1 S05 — vault offline: mỗi route chỉ đọc/ghi thiết bị/context/khoá của CHÍNH
+  // actor (RLS 0163 theo app.user_id/org_id), Origin chặt + rate limit; quyền tài nguyên được kiểm
+  // trong lib/bao-mat/offline-vault.ts (CAN.editProgress + canTouchTask-tương đương cho subcon).
+  "offline/devices:POST":
+    "Đăng ký trình duyệt cho chính mình — luôn shared-safe (RLS WITH CHECK chặn tự nâng " +
+    "field-personal), khoá theo user_id/org_id của phiên.",
+  "offline/context:POST":
+    "Cấp context offline cho chính actor trên thiết bị của mình + dự án đã chốt bởi resolver A1 " +
+    "(getCurrentProjectIdStrict); vân tay quyền CAN được ký vào context.",
+  "offline/vault/keys:POST":
+    "Cấp khoá vault của chính actor; manifestConHieuLuc kiểm CAN.editProgress, task cùng dự án/" +
+    "org và phân công subcon cho TOÀN BỘ manifest trước khi cấp.",
+  "offline/vault/unlock:POST":
+    "Mở khoá vault của chính actor (RLS theo user/org/dự án); kiểm lại TOÀN BỘ manifest với " +
+    "quyền hiện hành trước khi trả từng khoá.",
   "push/subscribe:POST": "Đăng ký thiết bị nhận push của chính mình (upsert theo user.id).",
   "push/subscribe:DELETE":
     "Huỷ đăng ký — DELETE có WHERE endpoint = ? AND user_id = ?, chỉ thiết bị của chính mình.",

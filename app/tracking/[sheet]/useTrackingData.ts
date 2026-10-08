@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOfflineTickQueue } from "@/app/components/offlineQueue";
 import { redirectToLogin } from "@/app/lib/me";
+import { dangKyKetNoiSong } from "@/app/lib/contextEpoch";
 import type { Data } from "./types";
 
 // Thử mở lại SSE sau khi rớt (fallback poll vẫn chạy trong lúc chờ).
@@ -160,13 +161,22 @@ export function useTrackingData(sheet: string) {
       };
     };
 
+    const dungHan = () => {
+      stopped = true;
+      es?.close();
+      es = null;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
+    };
+    // S05: tab khác đổi ngữ cảnh → đóng SSE/poll NGAY, không áp version của dự án cũ nữa.
+    const goDangKy = dangKyKetNoiSong(dungHan);
+
     moKetNoi();
 
     return () => {
-      stopped = true;
-      es?.close();
-      if (retryTimer) clearTimeout(retryTimer);
-      if (pollTimer) clearInterval(pollTimer);
+      goDangKy();
+      dungHan();
     };
   }, [sheet, load]);
 

@@ -104,6 +104,7 @@ function fixture() {
       "./store": { IdbQueueStore: Store },
       "./image": { compressImage: async (blob: Blob) => ({ blob, mime: "image/jpeg" }) },
       "@/app/components/Toast": { showToast() {} },
+      "@/app/lib/contextEpoch": { ngheDoiNguCanh: () => () => {} },
       "./logic": {
         computeStats: () => ({ total: 0, pending: 0, failed: 0 }),
         flushQueue: async () => {

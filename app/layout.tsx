@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import PwaRegister from "@/app/components/PwaRegister";
+import NguCanhGuard from "@/app/components/NguCanhGuard";
 import AppDialogs from "@/app/components/dialogs";
 import ToastHost from "@/app/components/Toast";
 
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className="min-h-full flex flex-col">
         <PwaRegister />
+        <NguCanhGuard />
         <AppDialogs />
         <ToastHost />
         {children}

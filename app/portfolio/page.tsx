@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
+import { showToast } from "@/app/components/Toast";
+import { phatDoiNguCanh } from "@/app/lib/contextEpoch";
 import { PageSkeleton, MetricsRowSkeleton } from "@/app/components/Skeleton";
 import { systemColorClasses } from "@/lib/nen/systemColors";
 import type { ProjectListItem, PortfolioKpi, OrganizationItem } from "@/lib/ha-tang/projects";
@@ -42,16 +44,27 @@ function ghiChuTienDo(kpi: PortfolioKpi): string | undefined {
 }
 
 async function selectProject(id: number) {
-  await fetch("/api/project/select", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ projectId: id }),
-  });
+  try {
+    const res = await fetch("/api/project/select", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId: id }),
+    });
+    if (!res.ok) {
+      showToast("Không chuyển được dự án — vui lòng thử lại", "error");
+      return;
+    }
+  } catch {
+    showToast("Mất kết nối — chưa chuyển được dự án", "error");
+    return;
+  }
   try {
     localStorage.setItem("xboss_project", String(id));
   } catch {
     /* private mode */
   }
+  // S05: cookie dự án dùng chung mọi tab — báo các tab khác khoá ngữ cảnh cũ trước khi điều hướng.
+  phatDoiNguCanh("switch");
   window.location.href = "/";
 }
 

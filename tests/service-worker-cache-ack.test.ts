@@ -268,8 +268,13 @@ test("401 lock hides and removes the prior page from interaction before cache cl
     disabled = false;
     type = "";
     listener?: () => void;
+    id = "";
+    focused = false;
     setAttribute(name: string, value: string) {
       this.attributes.set(name, value);
+    }
+    hasAttribute(name: string) {
+      return this.attributes.has(name);
     }
     append(...children: FakeElement[]) {
       this.children.push(...children);
@@ -277,13 +282,16 @@ test("401 lock hides and removes the prior page from interaction before cache cl
     addEventListener(_name: string, listener: () => void) {
       this.listener = listener;
     }
-    focus() {}
+    focus() {
+      this.focused = true;
+    }
   }
 
   const privateRoot = new FakeElement();
   const bodyChildren: FakeElement[] = [privateRoot];
   const fakeDocument = {
     createElement: () => new FakeElement(),
+    querySelectorAll: () => bodyChildren.filter((c) => c.hasAttribute("data-xboss-lop-khoa")),
     body: {
       get children() {
         return bodyChildren;
@@ -303,8 +311,16 @@ test("401 lock hides and removes the prior page from interaction before cache cl
     assert.equal(privateRoot.inert, true);
     assert.equal(privateRoot.attributes.get("aria-hidden"), "true");
     assert.equal(bodyChildren.length, 2);
-    assert.equal(bodyChildren[1]?.attributes.get("role"), "alert");
-    assert.match(bodyChildren[1]?.children[0]?.textContent ?? "", /Phiên đăng nhập đã hết hạn/);
+    const lop = bodyChildren[1];
+    assert.equal(lop?.attributes.get("role"), "alertdialog");
+    assert.equal(lop?.attributes.get("aria-modal"), "true");
+    const tieuDe = lop?.children[0];
+    assert.ok(tieuDe?.id);
+    assert.equal(lop?.attributes.get("aria-labelledby"), tieuDe?.id);
+    assert.equal(lop?.attributes.get("aria-describedby"), lop?.children[1]?.id);
+    assert.match(tieuDe?.textContent ?? "", /Phiên đăng nhập đã hết hạn/);
+    assert.equal(lop?.children[2]?.focused, true, "focus vào nút hành động");
+    assert.equal(lop?.inert, false, "lớp khoá không tự inert chính nó");
   } finally {
     if (previousDocument) Object.defineProperty(globalThis, "document", previousDocument);
     else Reflect.deleteProperty(globalThis, "document");
