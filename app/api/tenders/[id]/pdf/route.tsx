@@ -10,6 +10,7 @@ import {
   type BidRow,
 } from "@/lib/tai-chinh/tender";
 import { formatDateVN } from "@/lib/nen/date";
+import { fmtDongMinor } from "@/lib/nen/money-dto";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();
@@ -28,9 +29,8 @@ const styles = StyleSheet.create({
   totalVal: { flex: 1, fontFamily: FONT_BOLD, fontSize: 7, textAlign: "right" },
 });
 
-function fmtVND(n: number) {
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
-}
+// S10c: giá chào/tổng là bigint đồng×100 — định dạng đồng nguyên exact, không qua float.
+const fmtVND = fmtDongMinor;
 
 function TenderCompareDoc({
   tenderCode,
@@ -127,7 +127,7 @@ export async function GET(
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${tender.code}-so-sanh.pdf"`,
-      "Cache-Control": "no-store",
+      "Cache-Control": "private, no-store",
     },
   });
 }

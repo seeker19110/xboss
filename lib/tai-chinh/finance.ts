@@ -6,7 +6,7 @@
 import { query, queryOne } from "@/lib/db";
 import { listContracts } from "@/lib/tai-chinh/contracts";
 import { daysFromTodayISO } from "@/lib/nen/date";
-import { parseMoney, moneyToNumber } from "@/lib/nen/money";
+import { parseMoney } from "@/lib/nen/money";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Định dạng kỳ lương "YYYY-MM" — export để lib/dich-vu/luong.ts dùng chung một luật.
@@ -14,13 +14,15 @@ export const PERIOD_RE = /^\d{4}-\d{2}$/;
 
 // --- Dòng tiền thực tế (quỹ tiền mặt + petty cash) ---------------------------------
 
-export type CashflowMonth = { month: string; in: number; out: number };
+// S10c: in/out là MoneyMinor (bigint đồng×100) — SUM tháng có thể vượt 2^53 xu nên đọc `::text`,
+// không qua parser float; route đổi sang wire theo định dạng client chọn (lib/nen/money-dto).
+export type CashflowMonth = { month: string; in: bigint; out: bigint };
 
 // Dòng tiền thực tế `months` tháng gần nhất từ cash_transactions — thay cashflowSeries
 // (M9, tái dựng gần đúng từ payment_bills) khi đã có dữ liệu ghi quỹ thật.
 export async function cashflowActual(projectId: number, months = 12): Promise<CashflowMonth[]> {
-  const rows = await query<{ month: string; direction: "in" | "out"; total: number }>(
-    `SELECT to_char(tx_date, 'YYYY-MM') AS month, direction, SUM(amount) AS total
+  const rows = await query<{ month: string; direction: "in" | "out"; total: string }>(
+    `SELECT to_char(tx_date, 'YYYY-MM') AS month, direction, SUM(amount)::text AS total
        FROM cash_transactions
       WHERE project_id = ? AND tx_date >= (CURRENT_DATE - (INTERVAL '1 month' * ?))
       GROUP BY month, direction
@@ -30,8 +32,8 @@ export async function cashflowActual(projectId: number, months = 12): Promise<Ca
   );
   const map = new Map<string, CashflowMonth>();
   for (const r of rows) {
-    const entry = map.get(r.month) ?? { month: r.month, in: 0, out: 0 };
-    entry[r.direction] = Number(r.total);
+    const entry = map.get(r.month) ?? { month: r.month, in: 0n, out: 0n };
+    entry[r.direction] = parseMoney(r.total);
     map.set(r.month, entry);
   }
   return [...map.values()].sort((a, b) => a.month.localeCompare(b.month));
@@ -41,7 +43,8 @@ export async function cashflowActual(projectId: number, months = 12): Promise<Ca
 
 // Phải thu CĐT = Σ (giá trị gốc + phụ lục) − Σ đã thanh toán của các HĐ nhận thầu.
 // Tái dùng listContracts (lib/contracts.ts) đã tổng hợp addendaTotal/paid theo HĐ.
-export async function receivables(projectId: number): Promise<number> {
+// S10c: trả MoneyMinor (bigint) tới biên DTO — không còn moneyToNumber (mất xu khi > 2^53).
+export async function receivables(projectId: number): Promise<bigint> {
   const contracts = await listContracts("nhan_thau", projectId);
   // Mỗi c.value/addendaTotal/paid đã là tổng SQL (per-contract) từ listContracts —
   // cộng dồn NHIỀU hợp đồng ở đây làm trên bigint đơn vị nhỏ (lib/money.ts) thay vì
@@ -51,13 +54,17 @@ export async function receivables(projectId: number): Promise<number> {
       sum + parseMoney(c.valueText) + parseMoney(c.addendaTotalText) - parseMoney(c.paidText),
     0n,
   );
-  return moneyToNumber(total);
+  return total;
 }
 
 // Phải trả NCC/NTP = Σ (giá trị gốc + phụ lục − đã thanh toán) của các HĐ giao
 // thầu/NCC, cộng PO chưa gắn hợp đồng (cam kết mua hàng chưa có HĐ nhưng vẫn là công
 // nợ phải trả) — không tính PO đã huỷ.
-export async function payables(projectId: number): Promise<number> {
+// S10c: `qty_ordered` là float8 legacy — nhân float8 × numeric trong PG ra float8 (SUM mất xu,
+// tổng lớn in dạng mũ "1.99e+16" làm parseMoney throw → 500). Ép `::numeric` TRƯỚC khi nhân:
+// giữ biểu diễn legacy 15 chữ số của float (không suy ngược input gốc — A3-FR04), phép nhân/
+// cộng tiền sau đó exact. Cột exact + provenance là việc migration riêng (DATA-MIGRATIONS).
+export async function payables(projectId: number): Promise<bigint> {
   const contracts = await listContracts(undefined, projectId);
   let total = 0n;
   for (const c of contracts) {
@@ -65,26 +72,27 @@ export async function payables(projectId: number): Promise<number> {
       total += parseMoney(c.valueText) + parseMoney(c.addendaTotalText) - parseMoney(c.paidText);
   }
   const poRow = await queryOne<{ total: string }>(
-    `SELECT COALESCE(SUM(poi.qty_ordered * COALESCE(poi.unit_price, 0)), 0)::text AS total
+    `SELECT COALESCE(SUM(poi.qty_ordered::numeric * COALESCE(poi.unit_price, 0)), 0)::text AS total
        FROM purchase_orders po
        JOIN po_items poi ON poi.po_id = po.id
       WHERE po.project_id = ? AND po.contract_id IS NULL AND po.status <> 'cancelled'`,
     projectId,
   );
   total += parseMoney(poRow?.total ?? "0");
-  return moneyToNumber(total);
+  return total;
 }
 
 // --- Tạm ứng & hoàn ứng -------------------------------------------------------------
 
 // Tổng tạm ứng chưa hoàn (amount − settled_amount) của các advance chưa 'settled'.
-export async function advanceOutstanding(projectId: number): Promise<number> {
-  const row = await queryOne<{ total: number }>(
-    `SELECT COALESCE(SUM(amount - settled_amount), 0) AS total
+// S10c: SUM trong SQL, `::text` → bigint (không qua parser float).
+export async function advanceOutstanding(projectId: number): Promise<bigint> {
+  const row = await queryOne<{ total: string }>(
+    `SELECT COALESCE(SUM(amount - settled_amount), 0)::text AS total
        FROM advances WHERE project_id = ? AND status <> 'settled'`,
     projectId,
   );
-  return Number(row?.total ?? 0);
+  return parseMoney(row?.total ?? "0");
 }
 
 export const ADVANCE_STATUSES = ["open", "partially_settled", "settled"] as const;
@@ -265,7 +273,8 @@ export async function checkCashTransactionParents(
   return null;
 }
 
-export type VatSummary = { vatIn: number; vatOut: number; netVat: number };
+// S10c: MoneyMinor (bigint đồng×100); route đổi sang wire.
+export type VatSummary = { vatIn: bigint; vatOut: bigint; netVat: bigint };
 
 // VAT vào (đầu vào, được khấu trừ) / ra (đầu ra, phải nộp) / ròng = vatOut − vatIn,
 // gộp theo kỳ 'YYYY-MM'. projectId tuỳ chọn (undefined = toàn hệ thống, dùng nội bộ).
@@ -277,7 +286,7 @@ export async function vatSummary(period: string, projectId?: number): Promise<Va
     args.push(projectId);
   }
   // ::text + bigint của lib/nen/money.ts — hiệu 2 khoản tiền không tính trên float JS
-  // (M45 PR1); JS chỉ đổi về number ở bước hiển thị cuối.
+  // (M45 PR1); giữ bigint tới biên DTO (S10c).
   const rows = await query<{ direction: "in" | "out"; total: string }>(
     `SELECT direction, COALESCE(SUM(vat_amount), 0)::text AS total
        FROM invoices WHERE ${conds.join(" AND ")}
@@ -290,11 +299,7 @@ export async function vatSummary(period: string, projectId?: number): Promise<Va
     if (r.direction === "in") vatIn = parseMoney(r.total);
     else vatOut = parseMoney(r.total);
   }
-  return {
-    vatIn: moneyToNumber(vatIn),
-    vatOut: moneyToNumber(vatOut),
-    netVat: moneyToNumber(vatOut - vatIn),
-  };
+  return { vatIn, vatOut, netVat: vatOut - vatIn };
 }
 
 // --- Lương (bảng có từ PR1, gắn attendance M24 + API ở PR3) -------------------------

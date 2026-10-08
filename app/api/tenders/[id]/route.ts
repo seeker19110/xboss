@@ -5,16 +5,24 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   getTender,
   comparisonTable,
+  bidsToWire,
   TENDER_STATUSES,
   type TenderStatus,
 } from "@/lib/tai-chinh/tender";
+import { MONEY_FORMAT_HEADER, isMoneyPrecisionError, moneyWireFormat } from "@/lib/nen/money";
+import {
+  HEADERS_API_TIEN,
+  LOI_TIEN_VUOT_DINH_DANG_CU,
+  nhanDinhDangTien,
+} from "@/lib/nen/money-dto";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/tenders/:id — chi tiết gói thầu + bảng so sánh giá theo dòng BOQ × NCC,
-// scoped theo dự án đang chọn (M22).
+// scoped theo dự án đang chọn (M22). S10c (A3-FR06): header decimal-string-v1 → giá chào/
+// lumpSum/tổng là chuỗi canonical + `moneyFormat`; legacy → number, ngoài biên → 422.
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
   const params = await paramsP;
@@ -37,7 +45,19 @@ export async function GET(
     return { tender, items, bids };
   });
   if (!result) return NextResponse.json({ error: "Không tìm thấy gói thầu" }, { status: 404 });
-  return NextResponse.json(result);
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
+  try {
+    return NextResponse.json(
+      { ...result, bids: bidsToWire(result.bids, format), ...nhanDinhDangTien(format) },
+      { headers: HEADERS_API_TIEN },
+    );
+  } catch (err) {
+    if (!isMoneyPrecisionError(err)) throw err;
+    return NextResponse.json(LOI_TIEN_VUOT_DINH_DANG_CU, {
+      status: 422,
+      headers: HEADERS_API_TIEN,
+    });
+  }
 }
 
 // PATCH /api/tenders/:id — sửa thông tin chung/chuyển trạng thái (draft→open→closed,

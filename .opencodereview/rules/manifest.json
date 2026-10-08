@@ -72,7 +72,7 @@
     },
     {
       "id": "tai-chinh-route",
-      "path": "app/api/{v1/payment-certs,advances,cash-transactions,claim-documents,claims,contract-documents,contracts,costs,finance,insurance-bonds,invoices,payment-certs,payments,payroll,proposals,purchase-orders,purchase-requests,suppliers,tenders,variations,vo-documents}/**",
+      "path": "app/api/{v1/payment-certs,advances,cash-transactions,claim-documents,claims,contract-documents,contracts,costs,finance,insurance-bonds,invoices,payment-certs,payments,payroll,proposals,purchase-orders,purchase-requests,saved-reports,suppliers,tenders,variations,vo-documents}/**",
       "fragments": ["tai-chinh", "route-api"]
     },
     {

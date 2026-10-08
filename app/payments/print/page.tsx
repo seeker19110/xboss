@@ -4,26 +4,12 @@ import { Printer } from "lucide-react";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { formatDateDMY, todayISO } from "@/lib/nen/date";
 import { showToast } from "@/app/components/Toast";
+import { HEADER_TIEN_V1, fmtDongDayDuMinor } from "@/lib/nen/money-dto";
+import { docBills, tongTien, type Bill, type BillType } from "../_components/tienThanhToan";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type BillType = "bill" | "advance" | "item";
-type Bill = {
-  id: number;
-  responsible: string;
-  type: BillType;
-  period: string | null;
-  amount: number;
-  description: string | null;
-  paidDate: string;
-  note: string | null;
-  unit: string | null;
-  quantity: number | null;
-  labor: number | null;
-  floorLabel: string | null;
-  sheetCode: string | null;
-  workPackageName: string | null;
-};
+// S10c: Bill/BillType (tiền bigint đồng×100) dùng chung với trang /payments.
 type ProjectInfo = {
   name: string | null;
   code: string | null;
@@ -35,9 +21,10 @@ type ProjectInfo = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function fmtVND(n: number) {
-  if (n === 0) return "—";
-  return n.toLocaleString("vi-VN");
+// Chứng từ in: đồng đầy đủ (giữ xu khi khác 0), định dạng bằng bigint — không qua float.
+function fmtVND(minor: bigint) {
+  if (minor === 0n) return "—";
+  return fmtDongDayDuMinor(minor);
 }
 
 // ── Print Page ─────────────────────────────────────────────────────────────────
@@ -53,6 +40,7 @@ export default function PrintPage() {
     logo: null,
   });
   const [loading, setLoading] = useState(true);
+  const [loi, setLoi] = useState(false);
   const [periodLabel, setPeriodLabel] = useState("");
   const [canEdit, setCanEdit] = useState(false);
   const [logo, setLogo] = useState<string | null>(null);
@@ -69,7 +57,7 @@ export default function PrintPage() {
   useEffect(() => {
     async function load() {
       const [br, pr, me] = await Promise.all([
-        fetch("/api/payments/bills"),
+        fetch("/api/payments/bills", { headers: HEADER_TIEN_V1 }),
         fetch("/api/project"),
         fetchMe(),
       ]);
@@ -77,7 +65,14 @@ export default function PrintPage() {
         redirectToLogin();
         return;
       }
-      const { bills: all }: { bills: Bill[] } = await br.json();
+      const all = br.ok ? docBills(await br.json().catch(() => null)) : null;
+      if (!all) {
+        // Không in chứng từ với số liệu rỗng/sai định dạng như thể là số thật.
+        showToast("Không tải được dữ liệu thanh toán", "error");
+        setLoi(true);
+        setLoading(false);
+        return;
+      }
       const proj: ProjectInfo = pr.ok ? await pr.json() : {};
       setCanEdit(me?.role === "admin" || me?.role === "pm");
       setLogo(proj.logo ?? null);
@@ -102,6 +97,12 @@ export default function PrintPage() {
         Đang tải...
       </div>
     );
+  if (loi)
+    return (
+      <div className="min-h-screen flex items-center justify-center text-zinc-400 text-sm">
+        Không tải được dữ liệu thanh toán — thử tải lại trang.
+      </div>
+    );
 
   const billRows = bills.filter((b) => b.type === "bill");
   const itemRows = bills.filter((b) => b.type === "item");
@@ -111,10 +112,11 @@ export default function PrintPage() {
   const billDate = bills[0]?.paidDate ?? todayISO();
 
   // Tính toán
-  const sumA = billRows.reduce((s, b) => s + b.amount, 0); // Section A
-  const sumB = itemRows.reduce((s, b) => s + b.amount, 0); // Section B (khấu trừ)
+  // S10c: cộng/trừ bằng bigint đồng×100 (exact), không float.
+  const sumA = tongTien(billRows, (b) => b.amount); // Section A
+  const sumB = tongTien(itemRows, (b) => b.amount); // Section B (khấu trừ)
   const gtthtc = sumA; // Tổng GT công việc hoàn thành
-  const tuAmount = advances.reduce((s, b) => s + b.amount, 0); // Tạm ứng
+  const tuAmount = tongTien(advances, (b) => b.amount); // Tạm ứng
   const gtttk = gtthtc - sumB - tuAmount; // Được TT kỳ này
 
   async function uploadLogo(file: File) {
@@ -294,7 +296,7 @@ export default function PrintPage() {
                     {b.quantity != null ? b.quantity.toLocaleString("vi-VN") : "—"}
                   </td>
                   <td className="border border-black px-2 py-1.5 text-right">
-                    {b.labor != null && b.labor > 0 ? fmtVND(b.labor) : "—"}
+                    {b.labor != null && b.labor > 0n ? fmtVND(b.labor) : "—"}
                   </td>
                   <td className="border border-black px-2 py-1.5 text-right font-medium">
                     {fmtVND(b.amount)}
@@ -319,7 +321,7 @@ export default function PrintPage() {
                     {b.quantity != null ? b.quantity.toLocaleString("vi-VN") : "—"}
                   </td>
                   <td className="border border-black px-2 py-1.5 text-right">
-                    {b.labor != null && b.labor > 0 ? fmtVND(b.labor) : fmtVND(b.amount)}
+                    {b.labor != null && b.labor > 0n ? fmtVND(b.labor) : fmtVND(b.amount)}
                   </td>
                   <td className="border border-black px-2 py-1.5 text-right text-red-700">
                     ({fmtVND(b.amount)})
@@ -339,7 +341,7 @@ export default function PrintPage() {
             />
 
             {/* ── Tiền giữ lại ── */}
-            <SummaryRow code="(GL)" label="TIỀN GIỮ LẠI (NẾU CÓ)" unit="0%" value={0} />
+            <SummaryRow code="(GL)" label="TIỀN GIỮ LẠI (NẾU CÓ)" unit="0%" value={0n} />
 
             {/* ── Tạm ứng ── */}
             {advances.map((b, i) => (
@@ -361,7 +363,7 @@ export default function PrintPage() {
                 <td className="border border-black px-2 py-1.5 text-[11px]">{b.note ?? ""}</td>
               </tr>
             ))}
-            {advances.length === 0 && <SummaryRow code="(TU)" label="TẠM ỨNG" value={0} />}
+            {advances.length === 0 && <SummaryRow code="(TU)" label="TẠM ỨNG" value={0n} />}
 
             {/* ── Khấu trừ tạm ứng ── */}
             <SummaryRow code="(HU)" label="KHẤU TRỪ TẠM ỨNG" unit="0%" value={tuAmount} />
@@ -378,7 +380,7 @@ export default function PrintPage() {
             <SummaryRow
               code="(GTTTKT)"
               label="TỔNG GIÁ TRỊ ĐÃ THANH TOÁN ĐẾN KỲ TRƯỚC (GỒM TẠM ỨNG)"
-              value={0}
+              value={0n}
             />
 
             {/* ── Đề nghị TT ── */}
@@ -438,7 +440,7 @@ function SummaryRow({
   code: string;
   label: string;
   unit?: string;
-  value: number;
+  value: bigint;
   bold?: boolean;
   highlight?: boolean;
 }) {

@@ -18,10 +18,19 @@
 // Quy ước tiền (M45 PR1): tổng/tích tiền làm trong SQL, cast ::text → lib/money.ts
 // (bigint đồng×100) khi buộc tính tiếp ở JS. Riêng CHUỖI điểm vẽ chart: mỗi điểm là
 // tích giá-trị-đã-tổng-từ-SQL × tỷ lệ, tính độc lập từng điểm (không cộng dồn qua
-// nhiều bước nên không tích luỹ sai số float) — chỉ để hiển thị, mọi con số tóm tắt
-// (summary) đều đi qua money.ts.
+// nhiều bước nên không tích luỹ sai số float) — chỉ để VẼ (hình học xấp xỉ, A3-FR06 cho
+// phép), mọi con số tóm tắt (summary) đều exact.
+//
+// QUALITY-FINAL-1 S10c — summary exact hoàn toàn bằng bigint:
+//   - tiền trong summary là MoneyMinor (bigint đồng×100) tới biên DTO (route đổi wire);
+//   - tỷ lệ kế hoạch = số ngày đã trôi / số ngày kế hoạch (hữu tỉ exact, `mulRatio`);
+//   - % thực tế `progress_percent` là float8 legacy → đọc `::numeric::text` (15 chữ số có nghĩa,
+//     cùng quy ước float8→numeric của PostgreSQL) rồi nhân hữu tỉ exact — không còn
+//     `mulRate(Number(v) × rate)` (mất xu khi giá trị lớn);
+//   - SPI/CPI = phép chia bigint làm tròn 3 chữ số (ties xa 0) rồi mới ra number;
+//     EAC = AC + (BAC − EV) × AC / EV exact (không qua 1/CPI float).
 import { query, todayISO } from "@/lib/db";
-import { addMoney, moneyToNumber, mulRate, parseMoney } from "@/lib/nen/money";
+import { addMoney, mulRatio, parseMoney } from "@/lib/nen/money";
 
 export type EvmSource = "bills" | "cash";
 
@@ -32,22 +41,36 @@ export type EvmPoint = {
   ac: number | null; // đồng — null sau hôm nay
 };
 
+// Tiền: MoneyMinor (bigint đồng×100) — route đổi wire qua `EVM_MONEY_FIELDS` (S10c).
 export type EvmSummary = {
   hasValues: boolean; // có ít nhất 1 task gắn giá trị BOQ — false thì mọi chỉ số tiền null
   valuedTasks: number;
   totalTasks: number;
-  bac: number | null; // Budget At Completion = Σ giá trị task (đồng)
-  pv: number | null;
-  ev: number | null;
-  ac: number; // tiền thật đã chi — luôn có kể cả khi chưa map BOQ
-  sv: number | null; // EV − PV
-  cv: number | null; // EV − AC
+  bac: bigint | null; // Budget At Completion = Σ giá trị task
+  pv: bigint | null;
+  ev: bigint | null;
+  ac: bigint; // tiền thật đã chi — luôn có kể cả khi chưa map BOQ
+  sv: bigint | null; // EV − PV
+  cv: bigint | null; // EV − AC
   spi: number | null; // EV / PV — tính được cả khi chưa map BOQ (trọng số đều)
   cpi: number | null; // EV / AC
-  eac: number | null; // AC + (BAC − EV) / CPI
-  etc: number | null; // EAC − AC
-  vac: number | null; // BAC − EAC
+  eac: bigint | null; // AC + (BAC − EV) / CPI
+  etc: bigint | null; // EAC − AC
+  vac: bigint | null; // BAC − EAC
 };
+
+/** Các trường tiền của summary — route đổi sang wire, SPI/CPI/đếm giữ number. */
+export const EVM_MONEY_FIELDS = [
+  "bac",
+  "pv",
+  "ev",
+  "ac",
+  "sv",
+  "cv",
+  "eac",
+  "etc",
+  "vac",
+] as const satisfies readonly (keyof EvmSummary)[];
 
 const DAY_MS = 86400_000;
 const toMs = (iso: string) => new Date(iso + "T00:00:00Z").getTime();
@@ -62,11 +85,39 @@ export function plannedRatio(startISO: string, endISO: string, atMs: number): nu
   return Math.min(1, Math.max(0, (atMs - s) / (e - s)));
 }
 
+/** Tỷ lệ hữu tỉ exact num/den (den > 0). */
+type TyLe = { num: bigint; den: bigint };
+
+/** Cùng công thức `plannedRatio` nhưng exact: số ngày đã trôi / số ngày kế hoạch, clamp 0..1. */
+export function plannedRatioExact(startISO: string, endISO: string, atMs: number): TyLe {
+  const s = toMs(startISO),
+    e = toMs(endISO);
+  if (e <= s) return { num: atMs >= e ? 1n : 0n, den: 1n };
+  const troi = Math.min(e - s, Math.max(0, atMs - s));
+  return { num: BigInt(troi), den: BigInt(e - s) };
+}
+
+/** Chuỗi thập phân (vd `progress_percent::numeric::text`) → tỷ lệ hữu tỉ exact; null → 0. */
+export function tyLeTuThapPhan(text: string | null): TyLe {
+  if (text == null) return { num: 0n, den: 1n };
+  const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(text);
+  if (!m) throw new TypeError("evm: tỷ lệ thập phân không hợp lệ");
+  const frac = m[3] ?? "";
+  const num = BigInt(m[2] + frac);
+  return { num: m[1] === "-" ? -num : num, den: 10n ** BigInt(frac.length) };
+}
+
+/** a/b làm tròn 3 chữ số (ties xa 0) bằng bigint rồi mới ra number — cho SPI/CPI. */
+function tySo3(a: bigint, b: bigint): number {
+  return Number(mulRatio(a, 1000n, b)) / 1000;
+}
+
 type TaskRow = {
   id: number;
   startDate: string | null;
   endDate: string | null;
   progress: number | null;
+  progressText: string | null; // progress_percent::numeric::text — tỷ lệ exact cho summary
   valueText: string | null; // Σ(weight × thành tiền BOQ) từ SQL, ::text để parseMoney
 };
 
@@ -108,7 +159,8 @@ export async function getEvmSeries(opts: {
   const tasks = await query<TaskRow>(
     `SELECT t.id, COALESCE(t.start_date, wp.start_date) AS "startDate",
             COALESCE(t.end_date, wp.end_date) AS "endDate",
-            t.progress_percent AS progress, v.value_text AS "valueText"
+            t.progress_percent AS progress,
+            t.progress_percent::numeric::text AS "progressText", v.value_text AS "valueText"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
@@ -213,42 +265,45 @@ export async function getEvmSeries(opts: {
         );
   const acTotal = acRows.length > 0 ? parseMoney(acRows[acRows.length - 1].cum) : 0n;
 
-  // ===== Summary tại hôm nay (mọi phép tiền qua lib/money.ts) =====
+  // ===== Summary tại hôm nay (exact bằng bigint — S10c) =====
   const today = todayISO();
   const todayMs = toMs(today);
   const planned = tasks.filter((t) => t.startDate && t.endDate);
+  const nhanTyLe = (v: bigint, r: TyLe) => mulRatio(v, r.num, r.den);
   const pvSum = addMoney(
     ...planned.map((t) =>
-      mulRate(valueOf.get(t.id)!, plannedRatio(t.startDate!, t.endDate!, todayMs)),
+      nhanTyLe(valueOf.get(t.id)!, plannedRatioExact(t.startDate!, t.endDate!, todayMs)),
     ),
   );
-  const evSum = addMoney(...tasks.map((t) => mulRate(valueOf.get(t.id)!, t.progress ?? 0)));
+  const evSum = addMoney(
+    ...tasks.map((t) => nhanTyLe(valueOf.get(t.id)!, tyLeTuThapPhan(t.progressText))),
+  );
   const bac = addMoney(...tasks.map((t) => valueOf.get(t.id)!));
 
-  const round3 = (n: number) => Math.round(n * 1000) / 1000;
-  const spi = planned.length > 0 && pvSum > 0n ? round3(Number(evSum) / Number(pvSum)) : null;
-  // CPI chưa làm tròn dùng cho EAC (tránh cộng sai số làm tròn vào con số tiền).
-  const cpiRaw = hasValues && acTotal > 0n ? Number(evSum) / Number(acTotal) : null;
-  const cpi = cpiRaw != null ? round3(cpiRaw) : null;
-  // EAC = AC + (BAC − EV) / CPI — phần chia hệ số làm qua mulRate (bigint half-up).
+  const spi = planned.length > 0 && pvSum > 0n ? tySo3(evSum, pvSum) : null;
+  const cpi = hasValues && acTotal > 0n ? tySo3(evSum, acTotal) : null;
+  // EAC = AC + (BAC − EV) / CPI với CPI = EV / AC chưa làm tròn ⇒ AC + (BAC − EV) × AC / EV —
+  // một phép nhân-chia hữu tỉ exact (không tích luỹ sai số làm tròn của CPI vào tiền).
   const eac =
-    cpiRaw != null && cpiRaw > 0 ? addMoney(acTotal, mulRate(bac - evSum, 1 / cpiRaw)) : null;
+    hasValues && acTotal > 0n && evSum > 0n
+      ? addMoney(acTotal, mulRatio(bac - evSum, acTotal, evSum))
+      : null;
 
   const summary: EvmSummary = {
     hasValues,
     valuedTasks: valued.length,
     totalTasks: tasks.length,
-    bac: hasValues ? moneyToNumber(bac) : null,
-    pv: hasValues ? moneyToNumber(pvSum) : null,
-    ev: hasValues ? moneyToNumber(evSum) : null,
-    ac: moneyToNumber(acTotal),
-    sv: hasValues ? moneyToNumber(evSum - pvSum) : null,
-    cv: hasValues ? moneyToNumber(evSum - acTotal) : null,
+    bac: hasValues ? bac : null,
+    pv: hasValues ? pvSum : null,
+    ev: hasValues ? evSum : null,
+    ac: acTotal,
+    sv: hasValues ? evSum - pvSum : null,
+    cv: hasValues ? evSum - acTotal : null,
     spi,
     cpi,
-    eac: eac != null ? moneyToNumber(eac) : null,
-    etc: eac != null ? moneyToNumber(eac - acTotal) : null,
-    vac: eac != null ? moneyToNumber(bac - eac) : null,
+    eac,
+    etc: eac != null ? eac - acTotal : null,
+    vac: eac != null ? bac - eac : null,
   };
 
   // ===== Chuỗi điểm vẽ chart (chỉ khi có giá trị BOQ — không thì chart tiền vô nghĩa) =====
@@ -280,7 +335,7 @@ export async function getEvmSeries(opts: {
     for (const t of tasks)
       evCur.set(t.id, eventsByTask.has(t.id) ? (baseProgress.get(t.id) ?? 0) : (t.progress ?? 0));
     let acPtr = 0;
-    let acCur: number | null = null;
+    let acCur = 0n; // AC luỹ kế exact (bigint đồng×100) tới điểm đang xét
 
     for (let ms = toMs(from); ; ms += step * DAY_MS) {
       if (ms > toMs(to)) ms = toMs(to);
@@ -313,10 +368,11 @@ export async function getEvmSeries(opts: {
         ev = Math.round(sum / 100);
 
         while (acPtr < acRows.length && acRows[acPtr].day <= d) {
-          acCur = moneyToNumber(parseMoney(acRows[acPtr].cum));
+          acCur = parseMoney(acRows[acPtr].cum);
           acPtr++;
         }
-        ac = Math.round(acCur ?? 0);
+        // Làm tròn tới đồng bằng bigint rồi mới ra number (điểm vẽ, đồng nguyên).
+        ac = Number(mulRatio(acCur, 1n, 100n));
       }
 
       series.push({ date: d, pv, ev, ac });

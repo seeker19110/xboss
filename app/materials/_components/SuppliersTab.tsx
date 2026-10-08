@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { appConfirm, appAlert } from "@/app/components/dialogs";
 import { formatDateVN } from "@/lib/nen/date";
+import { formatVndExact } from "@/lib/nen/money";
+import { HEADER_TIEN_V1, minorTuWire } from "@/lib/nen/money-dto";
 
 export type Supplier = {
   id: number;
@@ -285,9 +287,10 @@ type SupplierSummary = {
   avgQuality: number | null;
   avgDelivery: number | null;
   avgPrice: number | null;
-  totalOrdered: number | null;
-  totalPaid: number | null;
-  debt: number | null;
+  // S10c: decimal-string-v1 — chuỗi canonical 2 số lẻ; null = không có quyền xem tiền.
+  totalOrdered: string | null;
+  totalPaid: string | null;
+  debt: string | null;
   ratings: SupplierRatingItem[];
 };
 
@@ -307,7 +310,7 @@ function SupplierSummaryPanel({ supplierId }: { supplierId: number }) {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/suppliers/${supplierId}/summary`)
+    fetch(`/api/suppliers/${supplierId}/summary`, { headers: HEADER_TIEN_V1 })
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then(setSummary)
       .catch(() => setLoadError("Không tải được thống kê NCC"));
@@ -343,9 +346,9 @@ function SupplierSummaryPanel({ supplierId }: { supplierId: number }) {
         {/* debt = null: vai trò không có quyền xem tiền (API không trả về) → ẩn hẳn */}
         {summary.debt != null && (
           <span
-            className={`ml-auto font-medium ${summary.debt > 0 ? "text-rose-400" : "text-zinc-400"}`}
+            className={`ml-auto font-medium ${minorTuWire(summary.debt) > 0n ? "text-rose-400" : "text-zinc-400"}`}
           >
-            Công nợ: {summary.debt.toLocaleString("vi-VN")} ₫
+            Công nợ: {formatVndExact(summary.debt)}
           </span>
         )}
       </button>

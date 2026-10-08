@@ -24,6 +24,15 @@ import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { formatDateVN, todayISO } from "@/lib/nen/date";
+import { HEADER_TIEN_V1, fmtDongMinor, soXapXiChoBieuDo } from "@/lib/nen/money-dto";
+import {
+  VAT_RONG,
+  docTongHopTaiChinh,
+  kpiTaiChinh,
+  type CashflowMonthExact,
+  type FinanceSummaryExact,
+  type VatSummaryExact,
+} from "./_components/tongHopTien";
 
 function fmtVND(n: number) {
   if (!n) return "0 đ";
@@ -32,18 +41,7 @@ function fmtVND(n: number) {
 
 // ===== Kiểu dữ liệu (client) — mirror lib/finance.ts =====
 
-type CashflowMonth = { month: string; in: number; out: number };
-
-type VatSummary = { vatIn: number; vatOut: number; netVat: number };
-
-type FinanceSummary = {
-  period: string;
-  cashflow: CashflowMonth[];
-  receivables: number;
-  payables: number;
-  advanceOutstanding: number;
-  vat: VatSummary;
-};
+// Tổng hợp dòng tiền/công nợ/VAT: bigint đồng×100 (S10c) — xem ./_components/tongHopTien.ts.
 
 type InvoiceDirection = "in" | "out";
 
@@ -102,7 +100,7 @@ const TABS: { key: Tab; label: string; icon: typeof Banknote }[] = [
 export default function FinancePage() {
   const [me, setMe] = useState<Me | null>(null);
   const [period, setPeriod] = useState(todayISO().slice(0, 7));
-  const [summary, setSummary] = useState<FinanceSummary | null>(null);
+  const [summary, setSummary] = useState<FinanceSummaryExact | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payroll, setPayroll] = useState<PayrollRow[]>([]);
   const [suggestions, setSuggestions] = useState<PayrollSuggestion[]>([]);
@@ -124,7 +122,10 @@ export default function FinancePage() {
 
   function load(p: string, deletedInvoices = showDeletedInvoices) {
     return Promise.all([
-      fetch(`/api/finance/summary?period=${p}`).then((r) => (r.ok ? r.json() : null)),
+      // S10c: chọn decimal-string-v1 → tổng tiền exact (bigint), không dính 422 định dạng cũ.
+      fetch(`/api/finance/summary?period=${p}`, { headers: HEADER_TIEN_V1 })
+        .then((r) => (r.ok ? r.json() : null))
+        .then(docTongHopTaiChinh),
       fetch(`/api/invoices${deletedInvoices ? "?includeDeleted=1" : ""}`).then((r) =>
         r.ok ? r.json() : null,
       ),
@@ -187,17 +188,8 @@ export default function FinancePage() {
   }
 
   // KPI strip: tồn quỹ ước tính = Σin − Σout (toàn bộ cashflow trả về), công nợ ròng =
-  // phải thu − phải trả, tạm ứng chưa hoàn — tính từ /api/finance/summary (đã gộp sẵn).
-  const kpi = useMemo(() => {
-    const cash = summary?.cashflow ?? [];
-    const totalIn = cash.reduce((s, m) => s + m.in, 0);
-    const totalOut = cash.reduce((s, m) => s + m.out, 0);
-    return {
-      fundBalance: totalIn - totalOut,
-      netDebt: (summary?.receivables ?? 0) - (summary?.payables ?? 0),
-      advanceOutstanding: summary?.advanceOutstanding ?? 0,
-    };
-  }, [summary]);
+  // phải thu − phải trả, tạm ứng chưa hoàn — bigint từ /api/finance/summary (S10c, không float).
+  const kpi = useMemo(() => kpiTaiChinh(summary), [summary]);
 
   async function deleteEntity(url: string, label: string) {
     if (!(await appConfirm(`Xoá ${label} này? Không thể hoàn tác.`, { danger: true }))) return;
@@ -275,17 +267,17 @@ export default function FinancePage() {
             className="bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-3 text-center transition"
           >
             <p
-              className={`text-lg sm:text-2xl font-bold ${kpi.fundBalance < 0 ? "text-rose-400" : "text-emerald-400"}`}
+              className={`text-lg sm:text-2xl font-bold ${kpi.fundBalance < 0n ? "text-rose-400" : "text-emerald-400"}`}
             >
-              {fmtVND(kpi.fundBalance)}
+              {fmtDongMinor(kpi.fundBalance)}
             </p>
             <p className="text-xs text-zinc-400">Tồn quỹ ước tính</p>
           </a>
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
             <p
-              className={`text-lg sm:text-2xl font-bold ${kpi.netDebt < 0 ? "text-rose-400" : "text-sky-400"}`}
+              className={`text-lg sm:text-2xl font-bold ${kpi.netDebt < 0n ? "text-rose-400" : "text-sky-400"}`}
             >
-              {fmtVND(kpi.netDebt)}
+              {fmtDongMinor(kpi.netDebt)}
             </p>
             <p className="text-xs text-zinc-400">Công nợ ròng (thu − trả)</p>
           </div>
@@ -294,9 +286,9 @@ export default function FinancePage() {
             className="bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-3 text-center transition"
           >
             <p
-              className={`text-lg sm:text-2xl font-bold ${kpi.advanceOutstanding > 0 ? "text-amber-400" : ""}`}
+              className={`text-lg sm:text-2xl font-bold ${kpi.advanceOutstanding > 0n ? "text-amber-400" : ""}`}
             >
-              {fmtVND(kpi.advanceOutstanding)}
+              {fmtDongMinor(kpi.advanceOutstanding)}
             </p>
             <p className="text-xs text-zinc-400">Tạm ứng chưa hoàn</p>
           </a>
@@ -335,13 +327,13 @@ export default function FinancePage() {
         {tab === "cashflow" && <CashflowTab cashflow={summary?.cashflow ?? []} />}
 
         {tab === "debt" && (
-          <DebtTab receivables={summary?.receivables ?? 0} payables={summary?.payables ?? 0} />
+          <DebtTab receivables={summary?.receivables ?? 0n} payables={summary?.payables ?? 0n} />
         )}
 
         {tab === "invoices" && (
           <InvoicesTab
             items={invoices}
-            vat={summary?.vat ?? { vatIn: 0, vatOut: 0, netVat: 0 }}
+            vat={summary?.vat ?? VAT_RONG}
             canManage={canManage}
             isAdmin={isAdmin}
             onEdit={setEditInvoice}
@@ -410,7 +402,14 @@ export default function FinancePage() {
 
 // ===== Tab Dòng tiền =====
 
-function CashflowTab({ cashflow }: { cashflow: CashflowMonth[] }) {
+function CashflowTab({ cashflow }: { cashflow: CashflowMonthExact[] }) {
+  // Cột biểu đồ dùng số xấp xỉ (chỉ hình học); tooltip hiển thị giá trị exact của tháng.
+  const exactTheoThang = new Map(cashflow.map((m) => [m.month, m]));
+  const duLieuBieuDo = cashflow.map((m) => ({
+    month: m.month,
+    in: soXapXiChoBieuDo(m.in),
+    out: soXapXiChoBieuDo(m.out),
+  }));
   if (cashflow.length === 0)
     return (
       <EmptyState
@@ -424,7 +423,7 @@ function CashflowTab({ cashflow }: { cashflow: CashflowMonth[] }) {
       <h2 className="text-sm font-semibold text-zinc-300 mb-3">Thu/chi theo tháng (thực tế)</h2>
       <div style={{ width: "100%", height: 280 }}>
         <ResponsiveContainer>
-          <BarChart data={cashflow} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
+          <BarChart data={duLieuBieuDo} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
             <XAxis dataKey="month" stroke="var(--color-zinc-500)" fontSize={11} />
             <YAxis stroke="var(--color-zinc-500)" fontSize={11} />
             <Tooltip
@@ -435,7 +434,11 @@ function CashflowTab({ cashflow }: { cashflow: CashflowMonth[] }) {
                 borderRadius: 8,
                 fontSize: 12,
               }}
-              formatter={(v, name) => [fmtVND(Number(v)), name === "in" ? "Thu" : "Chi"]}
+              formatter={(_v, name, item) => {
+                const exact = exactTheoThang.get((item.payload as { month: string }).month);
+                const minor = exact ? (name === "in" ? exact.in : exact.out) : 0n;
+                return [fmtDongMinor(minor), name === "in" ? "Thu" : "Chi"];
+              }}
             />
             <Legend
               formatter={(v) => (v === "in" ? "Thu" : "Chi")}
@@ -452,12 +455,12 @@ function CashflowTab({ cashflow }: { cashflow: CashflowMonth[] }) {
 
 // ===== Tab Công nợ =====
 
-function DebtTab({ receivables, payables }: { receivables: number; payables: number }) {
+function DebtTab({ receivables, payables }: { receivables: bigint; payables: bigint }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
         <p className="text-xs text-zinc-400 mb-1">Phải thu (Chủ đầu tư)</p>
-        <p className="text-2xl font-bold text-sky-400">{fmtVND(receivables)}</p>
+        <p className="text-2xl font-bold text-sky-400">{fmtDongMinor(receivables)}</p>
         <p className="text-xs text-zinc-500 mt-1">
           Suy từ giá trị hợp đồng nhận thầu (gồm phụ lục) trừ đã thanh toán.
         </p>
@@ -470,7 +473,7 @@ function DebtTab({ receivables, payables }: { receivables: number; payables: num
       </div>
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
         <p className="text-xs text-zinc-400 mb-1">Phải trả (NCC/NTP)</p>
-        <p className="text-2xl font-bold text-amber-400">{fmtVND(payables)}</p>
+        <p className="text-2xl font-bold text-amber-400">{fmtDongMinor(payables)}</p>
         <p className="text-xs text-zinc-500 mt-1">
           Suy từ hợp đồng giao thầu/NCC + đơn đặt hàng chưa gắn hợp đồng, trừ đã trả.
         </p>
@@ -508,7 +511,7 @@ function InvoicesTab({
   onRestore,
 }: {
   items: Invoice[];
-  vat: VatSummary;
+  vat: VatSummaryExact;
   canManage: boolean;
   isAdmin: boolean;
   onEdit: (item: Invoice) => void;
@@ -522,21 +525,21 @@ function InvoicesTab({
     <div className="space-y-3">
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
-          <p className="text-lg font-bold text-sky-400">{fmtVND(vat.vatIn)}</p>
+          <p className="text-lg font-bold text-sky-400">{fmtDongMinor(vat.vatIn)}</p>
           <p className="text-xs text-zinc-400">VAT đầu vào (được khấu trừ)</p>
         </div>
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
-          <p className="text-lg font-bold text-amber-400">{fmtVND(vat.vatOut)}</p>
+          <p className="text-lg font-bold text-amber-400">{fmtDongMinor(vat.vatOut)}</p>
           <p className="text-xs text-zinc-400">VAT đầu ra (phải nộp)</p>
         </div>
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
           <p
-            className={`text-lg font-bold ${vat.netVat >= 0 ? "text-rose-400" : "text-emerald-400"}`}
+            className={`text-lg font-bold ${vat.netVat >= 0n ? "text-rose-400" : "text-emerald-400"}`}
           >
-            {fmtVND(Math.abs(vat.netVat))}
+            {fmtDongMinor(vat.netVat < 0n ? -vat.netVat : vat.netVat)}
           </p>
           <p className="text-xs text-zinc-400">
-            VAT ròng {vat.netVat >= 0 ? "phải nộp" : "được hoàn"} (kỳ)
+            VAT ròng {vat.netVat >= 0n ? "phải nộp" : "được hoàn"} (kỳ)
           </p>
         </div>
       </div>

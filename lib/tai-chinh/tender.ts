@@ -3,7 +3,13 @@
 // giao thầu — contracts, M16). Xem docs/nang-cap/M07-dau-thau.md.
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { nextSeqCode } from "@/lib/ha-tang/seqcode";
-import { parseMoney, moneyToNumber } from "@/lib/nen/money";
+import {
+  fitsNumeric,
+  moneyToDecimal,
+  moneyToWire,
+  parseMoney,
+  type MoneyWireFormat,
+} from "@/lib/nen/money";
 
 export const TENDER_STATUSES = ["draft", "open", "closed", "awarded", "cancelled"] as const;
 export type TenderStatus = (typeof TENDER_STATUSES)[number];
@@ -115,19 +121,39 @@ export async function getTenderItems(tenderId: number): Promise<TenderItemRow[]>
   );
 }
 
+// S10c: mọi số tiền là MoneyMinor (bigint đồng×100), đọc `::text` — route đổi sang wire bằng
+// `bidsToWire`. `total` dùng XẾP HẠNG và làm giá trị hợp đồng khi trao thầu nên phải exact.
 export type BidRow = {
   bidId: number;
   supplierId: number;
   supplierName: string;
-  lumpSum: number | null;
+  lumpSum: bigint | null;
   note: string | null;
   fileName: string | null;
   originalName: string | null;
   quotedLines: number;
   totalLines: number;
-  total: number; // tổng theo dòng đã chào (KHÔNG gồm dòng thiếu) — nếu có lumpSum thì lấy lumpSum
-  prices: Record<number, number>; // boqItemId -> unitPrice (chỉ dòng đã chào)
+  total: bigint; // tổng theo dòng đã chào (KHÔNG gồm dòng thiếu) — nếu có lumpSum thì lấy lumpSum
+  prices: Record<number, bigint>; // boqItemId -> unitPrice (chỉ dòng đã chào)
 };
+
+/** Báo giá trên wire: v1 → chuỗi canonical; legacy → number (ngoài biên throw → 422). */
+export type BidRowWire = Omit<BidRow, "lumpSum" | "total" | "prices"> & {
+  lumpSum: string | number | null;
+  total: string | number;
+  prices: Record<number, string | number>;
+};
+
+export function bidsToWire(bids: readonly BidRow[], format: MoneyWireFormat): BidRowWire[] {
+  return bids.map((b) => ({
+    ...b,
+    lumpSum: b.lumpSum == null ? null : moneyToWire(b.lumpSum, format),
+    total: moneyToWire(b.total, format),
+    prices: Object.fromEntries(
+      Object.entries(b.prices).map(([id, p]) => [id, moneyToWire(p, format)]),
+    ),
+  }));
+}
 
 // Bảng so sánh: dòng BOQ mời thầu × nhà thầu đã chào. Dòng NCC chào thiếu vẫn
 // hiện trong bảng (giá "—" ở UI) — total chỉ cộng dòng đã chào, kèm quotedLines/
@@ -140,13 +166,13 @@ export async function comparisonTable(
     bidId: number;
     supplierId: number;
     supplierName: string;
-    lumpSum: number | null;
+    lumpSum: string | null;
     note: string | null;
     fileName: string | null;
     originalName: string | null;
   }>(
     `SELECT tb.id AS "bidId", tb.supplier_id AS "supplierId", s.name AS "supplierName",
-            tb.lump_sum AS "lumpSum", tb.note, tb.file_name AS "fileName", tb.original_name AS "originalName"
+            tb.lump_sum::text AS "lumpSum", tb.note, tb.file_name AS "fileName", tb.original_name AS "originalName"
        FROM tender_bids tb JOIN suppliers s ON s.id = tb.supplier_id
       WHERE tb.tender_id = ?
       ORDER BY tb.id`,
@@ -155,12 +181,12 @@ export async function comparisonTable(
 
   const result: BidRow[] = [];
   for (const b of bids) {
-    const priceRows = await query<{ boqItemId: number; unitPrice: number }>(
-      `SELECT boq_item_id AS "boqItemId", unit_price AS "unitPrice" FROM tender_bid_prices WHERE bid_id = ?`,
+    const priceRows = await query<{ boqItemId: number; unitPrice: string }>(
+      `SELECT boq_item_id AS "boqItemId", unit_price::text AS "unitPrice" FROM tender_bid_prices WHERE bid_id = ?`,
       b.bidId,
     );
-    const prices: Record<number, number> = {};
-    for (const p of priceRows) prices[p.boqItemId] = Number(p.unitPrice);
+    const prices: Record<number, bigint> = {};
+    for (const p of priceRows) prices[p.boqItemId] = parseMoney(p.unitPrice);
 
     // Tổng tiền chào tính TRONG SQL (M45 PR1: NUMERIC về JS là float, cấm nhân/cộng tiền
     // trên float). Con số này dùng để XẾP HẠNG nhà thầu — sai lệch nhỏ đủ đảo thứ hạng khi
@@ -174,13 +200,15 @@ export async function comparisonTable(
       tenderId,
       b.bidId,
     );
-    const lineTotal = moneyToNumber(parseMoney(lineTotalRow?.total ?? 0));
+    // SUM(đơn giá × KL) có 5 chữ số lẻ → làm tròn tới xu bằng parseMoney (exact, half-up).
+    const lineTotal = parseMoney(lineTotalRow?.total ?? "0");
+    const lumpSum = b.lumpSum != null ? parseMoney(b.lumpSum) : null;
     result.push({
       ...b,
-      lumpSum: b.lumpSum != null ? Number(b.lumpSum) : null,
+      lumpSum,
       quotedLines: priceRows.length,
       totalLines: items.length,
-      total: b.lumpSum != null ? Number(b.lumpSum) : lineTotal,
+      total: lumpSum ?? lineTotal,
       prices,
     });
   }
@@ -224,6 +252,15 @@ export async function awardTender(
     const { bids } = await comparisonTable(tenderId);
     const chosen = bids.find((b) => b.bidId === bidId);
     if (!chosen) throw Object.assign(new Error("Không tìm thấy báo giá"), { status: 404 });
+    // S10c: giá trị HĐ ghi chuỗi exact (không qua float). Tổng chào vượt NUMERIC(15,2) của
+    // contracts.value → 422 có chủ đích (trước đây lỗi tràn của PG thành 500 sau khi đã khoá gói).
+    if (!fitsNumeric(chosen.total, 15))
+      throw Object.assign(
+        new Error(
+          "Giá trị báo giá vượt giới hạn lưu trữ hợp đồng (tối đa 13 chữ số phần nguyên) — không thể trao thầu",
+        ),
+        { status: 422, code: "amount_overflow" },
+      );
 
     const contractCode = await nextSeqCode(
       "contracts",
@@ -233,11 +270,11 @@ export async function awardTender(
     );
     const contractId = await insertId(
       `INSERT INTO contracts (code, kind, title, party_supplier_id, value, status, created_by, project_id)
-       VALUES (?, 'giao_thau', ?, ?, ?, 'active', ?, ?)`,
+       VALUES (?, 'giao_thau', ?, ?, ?::numeric, 'active', ?, ?)`,
       contractCode,
       `Trúng thầu — ${tender.name}`,
       chosen.supplierId,
-      chosen.total,
+      moneyToDecimal(chosen.total),
       userId,
       projectId ?? null,
     );

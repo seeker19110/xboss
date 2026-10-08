@@ -14,7 +14,8 @@ import {
   X,
 } from "lucide-react";
 import MaskedValue from "@/app/components/MaskedValue";
-import { mSum, mSub } from "@/app/lib/masked";
+import { mSubTien, mSumTien } from "@/app/lib/masked";
+import { HEADER_TIEN_V1, fmtDongMinor, minorTuWire } from "@/lib/nen/money-dto";
 import EmptyState from "@/app/components/EmptyState";
 import { appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
@@ -76,7 +77,8 @@ export type Contract = {
   systemCode: string | null;
   systemName: string | null;
   systemColor: string | null;
-  value: number;
+  // S10c: tiền nhận dạng decimal-string-v1 (chuỗi canonical exact); null = bị che quyền.
+  value: string | null;
   advancePct: number;
   retentionPct: number;
   signedDate: string | null;
@@ -84,9 +86,9 @@ export type Contract = {
   validTo: string | null;
   status: ContractStatus;
   note: string | null;
-  addendaTotal: number;
-  paid: number;
-  poCommitted: number;
+  addendaTotal: string | null;
+  paid: string | null;
+  poCommitted: string | null;
   custom: Record<string, unknown>;
   deletedAt: string | null;
 };
@@ -99,7 +101,7 @@ export type ContractDetail = {
     id: number;
     code: string;
     title: string | null;
-    valueDelta: number;
+    valueDelta: string | null;
     signedDate: string | null;
     note: string | null;
     createdByName: string | null;
@@ -114,7 +116,13 @@ export type ContractDetail = {
     uploaderName: string | null;
     sha256: string | null;
   }[];
-  bills: { id: number; responsible: string; type: string; amount: number; paidDate: string }[];
+  bills: {
+    id: number;
+    responsible: string;
+    type: string;
+    amount: string | null;
+    paidDate: string;
+  }[];
   purchaseOrders: {
     id: number;
     poCode: string;
@@ -125,7 +133,7 @@ export type ContractDetail = {
   floorContracts: {
     id: number;
     floorLabel: string;
-    contractValue: number;
+    contractValue: string | null;
     sheetName: string;
     sheetSlug: string | null;
   }[];
@@ -146,9 +154,11 @@ const IPC_STATUS_TONE: Record<string, ChipTone> = {
   rejected: "danger",
 };
 
-export function fmtVND(n: number) {
-  if (!n) return "—";
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
+// S10c: tiền exact (chuỗi canonical v1 hoặc bigint đồng×100) → đồng nguyên, 0 → "—" như cũ.
+export function fmtVND(v: string | bigint) {
+  const minor = typeof v === "bigint" ? v : minorTuWire(v);
+  if (minor === 0n) return "—";
+  return fmtDongMinor(minor);
 }
 
 export const CONTRACT_TABS: TabItem[] = [
@@ -258,7 +268,7 @@ export function useContractDocument({
       setDetail(null);
       return;
     }
-    fetch(`/api/contracts/${contractId}`)
+    fetch(`/api/contracts/${contractId}`, { headers: HEADER_TIEN_V1 })
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setDetail(j));
   }, [contractId]);
@@ -595,8 +605,8 @@ export default function ContractDocument({
 
   // M50 PR2: che (null) lan truyền — tổng/còn lại "bị che" khi value/addendaTotal/paid
   // bị che, không ngầm thành 0.
-  const tong = mSum(contract.value, contract.addendaTotal);
-  const conLai = mSub(tong, contract.paid);
+  const tong = mSumTien(contract.value, contract.addendaTotal);
+  const conLai = mSubTien(tong, contract.paid);
   const totalRows: DocTotalRow[] = [
     { label: "Giá trị hợp đồng", value: <MaskedValue value={contract.value} format={fmtVND} /> },
     { label: "Phụ lục", value: <MaskedValue value={contract.addendaTotal} format={fmtVND} /> },
@@ -930,12 +940,12 @@ function AddendaTab({ ctrl }: { ctrl: ContractDocumentCtrl }) {
                     className={`p-2 text-right font-mono tabular-nums ${
                       a.valueDelta == null
                         ? ""
-                        : a.valueDelta >= 0
+                        : minorTuWire(a.valueDelta) >= 0n
                           ? "text-emerald-300"
                           : "text-rose-300"
                     }`}
                   >
-                    {a.valueDelta != null && a.valueDelta >= 0 ? "+" : ""}
+                    {a.valueDelta != null && minorTuWire(a.valueDelta) >= 0n ? "+" : ""}
                     <MaskedValue value={a.valueDelta} format={fmtVND} />
                   </td>
                   <td className="p-2 text-zinc-300">{a.signedDate ?? "—"}</td>

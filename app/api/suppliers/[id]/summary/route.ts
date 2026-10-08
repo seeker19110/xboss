@@ -3,6 +3,13 @@ import { queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { supplierSummary } from "@/lib/tai-chinh/procurement";
+import { MONEY_FORMAT_HEADER, isMoneyPrecisionError, moneyWireFormat } from "@/lib/nen/money";
+import {
+  HEADERS_API_TIEN,
+  LOI_TIEN_VUOT_DINH_DANG_CU,
+  moneyFieldsToWire,
+  nhanDinhDangTien,
+} from "@/lib/nen/money-dto";
 
 export const dynamic = "force-dynamic";
 
@@ -10,8 +17,11 @@ export const dynamic = "force-dynamic";
 // Điểm đánh giá cùng ranh giới với GET /api/suppliers (chỉ cần đăng nhập), nhưng khối
 // TIỀN (totalOrdered/totalPaid/debt) gate riêng bằng CAN.viewPayments — trước đây subcon/
 // viewer/cdt đọc được công nợ NCC (audit 2026-09-05). Công nợ cũng lọc theo dự án đang chọn.
+// S10c (A3-FR06): header decimal-string-v1 → khối tiền là chuỗi canonical + `moneyFormat`;
+// legacy → number, ngoài biên round-trip → 422 `money_precision_unsupported`. Khối tiền bị
+// bỏ (null) giữ null ở cả hai định dạng — người thiếu quyền không bao giờ nhận 422 do độ lớn.
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
   const params = await paramsP;
@@ -36,5 +46,18 @@ export async function GET(
   // còn hơn cộng gộp công nợ của dự án người xem không thuộc.
   const projectId = await getCurrentProjectId(user);
   const summary = await supplierSummary(id, projectId, !CAN.viewPayments(user.role));
-  return NextResponse.json(summary);
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
+  try {
+    const wire = moneyFieldsToWire(summary, ["totalOrdered", "totalPaid", "debt"], format);
+    return NextResponse.json(
+      { ...wire, ...nhanDinhDangTien(format) },
+      { headers: HEADERS_API_TIEN },
+    );
+  } catch (err) {
+    if (!isMoneyPrecisionError(err)) throw err;
+    return NextResponse.json(LOI_TIEN_VUOT_DINH_DANG_CU, {
+      status: 422,
+      headers: HEADERS_API_TIEN,
+    });
+  }
 }

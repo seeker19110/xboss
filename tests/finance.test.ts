@@ -280,13 +280,13 @@ test(
     const rows1 = await cashflowActual(p1, 12);
     const month = rows1.find((r) => r.month === "2026-07");
     assert.ok(month);
-    assert.equal(month!.in, 5000000);
-    assert.equal(month!.out, 2000000);
+    assert.equal(month!.in, 5000000_00n); // S10c: MoneyMinor đồng×100
+    assert.equal(month!.out, 2000000_00n);
 
     const rows2 = await cashflowActual(p2, 12);
     const month2 = rows2.find((r) => r.month === "2026-07");
-    assert.equal(month2!.in, 999999999);
-    assert.equal(month2!.out, 0);
+    assert.equal(month2!.in, 999999999_00n);
+    assert.equal(month2!.out, 0n);
 
     await run(`DELETE FROM cash_transactions WHERE id = ANY(?)`, ids);
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
@@ -348,15 +348,15 @@ test(
     );
 
     const rcv1 = await receivables(p1);
-    assert.equal(rcv1, 100000000 - 30000000);
+    assert.equal(rcv1, (100000000n - 30000000n) * 100n); // S10c: MoneyMinor
 
     const pay1 = await payables(p1);
-    assert.equal(pay1, 50000000 - 10000000 + 5 * 200000);
+    assert.equal(pay1, (50000000n - 10000000n + 5n * 200000n) * 100n);
 
     const rcv2 = await receivables(p2);
-    assert.equal(rcv2, 999999999);
+    assert.equal(rcv2, 999999999_00n);
     const pay2 = await payables(p2);
-    assert.equal(pay2, 0);
+    assert.equal(pay2, 0n);
 
     await run(`DELETE FROM po_items WHERE id = ?`, poItemId);
     await run(`DELETE FROM purchase_orders WHERE id = ?`, poId);
@@ -428,8 +428,8 @@ test(
     assert.equal(Number(row?.settledAmount), 1000000);
 
     // Scoping: DA1 đã settled hết → outstanding = 0; DA2 vẫn còn nguyên 500,000.
-    assert.equal(await advanceOutstanding(p1), 0);
-    assert.equal(await advanceOutstanding(p2), 500000);
+    assert.equal(await advanceOutstanding(p1), 0n); // S10c: MoneyMinor
+    assert.equal(await advanceOutstanding(p2), 500000_00n);
 
     await run(`DELETE FROM advances WHERE id IN (?, ?)`, advId, advP2Id);
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
@@ -520,13 +520,13 @@ test(
     );
 
     const vat1 = await vatSummary("2026-07", p1);
-    assert.equal(vat1.vatOut, 1000000);
-    assert.equal(vat1.vatIn, 400000);
-    assert.equal(vat1.netVat, 600000);
+    assert.equal(vat1.vatOut, 1000000_00n); // S10c: MoneyMinor
+    assert.equal(vat1.vatIn, 400000_00n);
+    assert.equal(vat1.netVat, 600000_00n);
 
     const vat2 = await vatSummary("2026-07", p2);
-    assert.equal(vat2.vatOut, 99999999);
-    assert.equal(vat2.vatIn, 0);
+    assert.equal(vat2.vatOut, 99999999_00n);
+    assert.equal(vat2.vatIn, 0n);
 
     await run(`DELETE FROM invoices WHERE id = ANY(?)`, ids);
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);

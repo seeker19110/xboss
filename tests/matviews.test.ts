@@ -219,9 +219,11 @@ test(
         sheetId,
       );
 
-      // MV chưa refresh cho dự án này → fallback trực tiếp.
+      // MV chưa refresh cho dự án này → fallback trực tiếp. S10c: tiền là chuỗi canonical exact.
       const fallback = await runReport("cost_by_month", {}, projectId);
-      assert.deepEqual(fallback.rows, [{ month: "2026-07", committed: 600000, actual: 300000 }]);
+      assert.deepEqual(fallback.rows, [
+        { month: "2026-07", committed: "600000.00", actual: "300000.00" },
+      ]);
 
       // Refresh MV rồi gọi lại → phải ra cùng kết quả (MV path).
       await run(`REFRESH MATERIALIZED VIEW CONCURRENTLY mv_cost_by_month`);

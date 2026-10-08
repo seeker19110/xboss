@@ -25,51 +25,26 @@ import EditModeToggle from "@/app/components/EditModeToggle";
 import { appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { formatDateDMY, todayISO } from "@/lib/nen/date";
+import { HEADER_TIEN_V1, soTienNhapThuan } from "@/lib/nen/money-dto";
+import {
+  docBills,
+  docDuLieuThanhToan,
+  docFloors,
+  fmtFull,
+  fmtVND,
+  phanTram,
+  thanhTienTheoPct,
+  tienNhapSangMinor,
+  tongTien,
+  type Bill,
+  type BillType,
+  type DuLieuThanhToan as Data,
+  type FloorData,
+  type FloorRow,
+} from "./_components/tienThanhToan";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-
-type FloorRow = {
-  sheetTypeId: number;
-  sheetType: string;
-  sheetSlug: string | null;
-  responsible: string | null;
-  floorLabel: string;
-  progress: number;
-  taskCount: number;
-  delayed: number;
-  contractValue: number;
-};
-type Data = { rows: FloorRow[]; totalContract: number; totalEarned: number };
-
-type BillType = "bill" | "advance" | "item";
-type Bill = {
-  id: number;
-  responsible: string;
-  type: BillType;
-  period: string | null;
-  amount: number;
-  description: string | null;
-  paidDate: string;
-  progressSnapshot: number;
-  note: string | null;
-  unit: string | null;
-  quantity: number | null;
-  labor: number | null;
-  sheetTypeId: number | null;
-  floorLabel: string | null;
-  pctThisPeriod: number;
-  createdBy: number | null;
-  createdByName: string | null;
-  createdAt: string;
-};
-type FloorData = {
-  sheetTypeId: number;
-  sheetType: string;
-  floorLabel: string;
-  contractValue: number;
-  pctPaid: number;
-  history: { period: string | null; pctThisPeriod: number; amount: number; paidDate: string }[];
-};
+// S10c: kiểu tiền là bigint đồng×100 — xem ./_components/tienThanhToan.ts.
 type AddInput = {
   responsible: string;
   type: BillType;
@@ -102,15 +77,6 @@ type DraftLineRow = { key: number; description: string; amount: string };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function fmtVND(n: number) {
-  if (n === 0) return "—";
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)} tỷ`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} tr`;
-  return n.toLocaleString("vi-VN") + " đ";
-}
-function fmtFull(n: number) {
-  return n.toLocaleString("vi-VN") + " đ";
-}
 function editKey(r: FloorRow) {
   return `${r.sheetTypeId}__${r.floorLabel}`;
 }
@@ -171,9 +137,9 @@ export default function PaymentsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const [dr, me, br] = await Promise.all([
-      fetch("/api/payments"),
+      fetch("/api/payments", { headers: HEADER_TIEN_V1 }),
       fetchMe(),
-      fetch("/api/payments/bills"),
+      fetch("/api/payments/bills", { headers: HEADER_TIEN_V1 }),
     ]);
     if (dr.status === 401) {
       redirectToLogin();
@@ -184,12 +150,16 @@ export default function PaymentsPage() {
       setLoading(false);
       return;
     }
-    const d: Data = await dr.json();
-    setBills(br.ok ? ((await br.json())?.bills ?? []) : []);
+    const d = dr.ok ? docDuLieuThanhToan(await dr.json().catch(() => null)) : null;
+    const bl = br.ok ? docBills(await br.json().catch(() => null)) : null;
+    if (!d) showToast("Không tải được dữ liệu thanh toán", "error");
+    else if (!bl) showToast("Không tải được danh sách thanh toán", "error");
+    setBills(bl ?? []);
     const editor = me?.role === "admin" || me?.role === "pm";
     setData(d);
     setCanEdit(editor);
     setLoading(false);
+    if (!d) return;
     // Gợi ý: tên người dùng (Admin/PM mới có quyền đọc) + tên đã nhập sẵn.
     if (editor) {
       const ur = await fetch("/api/users");
@@ -225,10 +195,10 @@ export default function PaymentsPage() {
     if (responsible) setPeople((p) => (p.includes(responsible) ? p : [...p, responsible].sort()));
   }
 
-  async function addBill(input: AddInput): Promise<{ ok: boolean; amount?: number }> {
+  async function addBill(input: AddInput): Promise<{ ok: boolean; amount?: bigint }> {
     const res = await fetch("/api/payments/bills", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...HEADER_TIEN_V1 },
       body: JSON.stringify(input),
     });
     if (!res.ok) {
@@ -236,8 +206,12 @@ export default function PaymentsPage() {
       showToast(e?.error ?? "Không lưu được mục thanh toán", "error");
       return { ok: false };
     }
+    // Server trả amount ĐÃ LƯU (chuỗi exact v1) — hiển thị đúng số server ghi, không tự tính.
     const { id, amount: savedAmount } = await res.json();
-    const amount = savedAmount ?? input.amount;
+    const amount =
+      typeof savedAmount === "string"
+        ? tienNhapSangMinor(savedAmount)
+        : tienNhapSangMinor(String(input.amount));
     setBills((prev) => [
       ...prev,
       {
@@ -252,7 +226,7 @@ export default function PaymentsPage() {
         note: input.note,
         unit: input.unit ?? null,
         quantity: input.quantity ?? null,
-        labor: input.labor ?? null,
+        labor: input.labor == null ? null : tienNhapSangMinor(String(input.labor)),
         sheetTypeId: input.sheetTypeId ?? null,
         floorLabel: input.floorLabel ?? null,
         pctThisPeriod: input.pctThisPeriod ?? 0,
@@ -275,7 +249,22 @@ export default function PaymentsPage() {
     id: number,
     patch: { unit?: string | null; quantity?: number | null; labor?: number | null },
   ) {
-    setBills((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+    setBills((prev) =>
+      prev.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              ...patch,
+              labor:
+                patch.labor === undefined
+                  ? b.labor
+                  : patch.labor == null
+                    ? null
+                    : tienNhapSangMinor(String(patch.labor)),
+            }
+          : b,
+      ),
+    );
     await fetch(`/api/payments/bills/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -314,21 +303,14 @@ export default function PaymentsPage() {
     } finally {
       setSaving(false);
     }
-    setData((prev) => {
-      if (!prev) return prev;
-      const valMap = new Map(
-        updates.map((u) => [`${u.sheetTypeId}__${u.floorLabel}`, u.contractValue]),
-      );
-      const rows = prev.rows.map((r) => {
-        const v = valMap.get(editKey(r));
-        return v !== undefined ? { ...r, contractValue: v } : r;
-      });
-      return {
-        rows,
-        totalContract: rows.reduce((s, r) => s + r.contractValue, 0),
-        totalEarned: rows.reduce((s, r) => s + r.contractValue * r.progress, 0),
-      };
-    });
+    // S10c: giá trị nghiệm thu (HĐ × tiến độ) và tổng do server tính trong SQL — tải lại thay vì
+    // nhân float ở client. Lỗi tải lại: giữ số cũ + báo, không hiện số tự chế.
+    const fresh = await fetch("/api/payments", { headers: HEADER_TIEN_V1 })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(docDuLieuThanhToan)
+      .catch(() => null);
+    if (fresh) setData(fresh);
+    else showToast("Đã lưu — chưa tải lại được số liệu, hãy làm mới trang", "error");
     setEdits({});
   }
 
@@ -362,9 +344,9 @@ export default function PaymentsPage() {
   const filtered =
     sheetFilter === "all" ? data.rows : data.rows.filter((r) => r.sheetType === sheetFilter);
 
-  const filteredContract = filtered.reduce((s, r) => s + r.contractValue, 0);
-  const filteredEarned = filtered.reduce((s, r) => s + r.contractValue * r.progress, 0);
-  const earnedPct = filteredContract > 0 ? (filteredEarned / filteredContract) * 100 : 0;
+  const filteredContract = tongTien(filtered, (r) => r.contractValue);
+  const filteredEarned = tongTien(filtered, (r) => r.earned);
+  const earnedPct = phanTram(filteredEarned, filteredContract);
 
   // Nhóm theo tầng (gom tất cả hệ lại)
   const byFloor = new Map<string, FloorRow[]>();
@@ -404,7 +386,10 @@ export default function PaymentsPage() {
     billsByPerson.set(b.responsible, list);
   }
   // KPI toàn dự án: chỉ tính type='bill' (tạm ứng & phát sinh là nội bộ từng đợt).
-  const totalPaid = bills.filter((b) => b.type === "bill").reduce((s, b) => s + b.amount, 0);
+  const totalPaid = tongTien(
+    bills.filter((b) => b.type === "bill"),
+    (b) => b.amount,
+  );
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -448,39 +433,39 @@ export default function PaymentsPage() {
           <KpiCard
             label="Tổng giá trị HĐ"
             value={fmtVND(filteredContract)}
-            sub={filteredContract > 0 ? fmtFull(filteredContract) : "Chưa nhập đơn giá"}
+            sub={filteredContract > 0n ? fmtFull(filteredContract) : "Chưa nhập đơn giá"}
           />
           <KpiCard
             label="Nghiệm thu được"
             value={fmtVND(filteredEarned)}
             accent="text-emerald-300"
-            sub={filteredContract > 0 ? `${earnedPct.toFixed(1)}% giá trị HĐ` : undefined}
+            sub={filteredContract > 0n ? `${earnedPct.toFixed(1)}% giá trị HĐ` : undefined}
           />
           <KpiCard
             label="Đã thanh toán"
             value={fmtVND(totalPaid)}
             accent="text-sky-300"
             sub={
-              data.totalEarned > 0
-                ? `${((totalPaid / data.totalEarned) * 100).toFixed(1)}% nghiệm thu`
+              data.totalEarned > 0n
+                ? `${phanTram(totalPaid, data.totalEarned).toFixed(1)}% nghiệm thu`
                 : "Toàn bộ kỳ"
             }
           />
           <KpiCard
             label="Chờ thanh toán"
-            value={fmtVND(Math.max(data.totalEarned - totalPaid, 0))}
+            value={fmtVND(data.totalEarned > totalPaid ? data.totalEarned - totalPaid : 0n)}
             accent="text-amber-300"
             sub="Nghiệm thu − đã TT"
           />
           <KpiCard
             label="Số tầng"
             value={byFloor.size.toString()}
-            sub={`${filtered.filter((r) => r.contractValue > 0).length} ô có giá trị`}
+            sub={`${filtered.filter((r) => r.contractValue > 0n).length} ô có giá trị`}
           />
         </div>
 
         {/* Thanh giải ngân */}
-        {filteredContract > 0 && (
+        {filteredContract > 0n && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-zinc-400">Tiến độ giải ngân</span>
@@ -572,9 +557,9 @@ export default function PaymentsPage() {
           <div className="space-y-3">
             {personEntries.map(([person, sheetsMap]) => {
               const allRows = [...sheetsMap.values()].flat();
-              const pContract = allRows.reduce((s, r) => s + r.contractValue, 0);
-              const pEarned = allRows.reduce((s, r) => s + r.contractValue * r.progress, 0);
-              const pPct = pContract > 0 ? (pEarned / pContract) * 100 : 0;
+              const pContract = tongTien(allRows, (r) => r.contractValue);
+              const pEarned = tongTien(allRows, (r) => r.earned);
+              const pPct = phanTram(pEarned, pContract);
               const pAvg = allRows.length
                 ? allRows.reduce((s, r) => s + r.progress, 0) / allRows.length
                 : 0;
@@ -582,9 +567,10 @@ export default function PaymentsPage() {
               const isNone = person === NONE;
               const personBills = isNone ? [] : (billsByPerson.get(person) ?? []);
               // Chỉ tính bills thực để hiển thị đã TT trên header.
-              const paid = personBills
-                .filter((b) => b.type === "bill")
-                .reduce((s, b) => s + b.amount, 0);
+              const paid = tongTien(
+                personBills.filter((b) => b.type === "bill"),
+                (b) => b.amount,
+              );
               return (
                 <div
                   key={person}
@@ -608,12 +594,12 @@ export default function PaymentsPage() {
                           {sheetList.length} hệ · TB {Math.round(pAvg * 100)}%
                         </span>
                         <span className="text-[11px] text-zinc-400">HĐ: {fmtVND(pContract)}</span>
-                        {pContract > 0 && (
+                        {pContract > 0n && (
                           <span className="text-[11px] text-emerald-500">
                             Nghiệm thu: {fmtVND(pEarned)} ({pPct.toFixed(1)}%)
                           </span>
                         )}
-                        {paid > 0 && (
+                        {paid > 0n && (
                           <span className="text-[11px] text-sky-400">Đã TT: {fmtVND(paid)}</span>
                         )}
                       </div>
@@ -706,10 +692,10 @@ function BillsSection({
 }: {
   person: string;
   bills: Bill[];
-  earned: number;
+  earned: bigint;
   progress: number;
   canEdit: boolean;
-  onAdd: (input: AddInput) => Promise<{ ok: boolean; amount?: number }>;
+  onAdd: (input: AddInput) => Promise<{ ok: boolean; amount?: bigint }>;
   onDelete: (id: number) => void;
   onPatch: (
     id: number,
@@ -727,33 +713,28 @@ function BillsSection({
   const [expandHist, setExpandHist] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch(`/api/payments/floors?person=${encodeURIComponent(person)}`)
-      .then((r) => r.json())
-      .then((d) => setFloors(d.floors ?? []));
+    fetch(`/api/payments/floors?person=${encodeURIComponent(person)}`, { headers: HEADER_TIEN_V1 })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setFloors(docFloors(d) ?? []))
+      .catch(() => setFloors([]));
   }, [person, bills]); // reload khi bills thay đổi
 
   const billRows = bills.filter((b) => b.type === "bill");
   const itemRows = bills.filter((b) => b.type === "item");
   const advRows = bills.filter((b) => b.type === "advance");
-  const sumBills = billRows.reduce((s, b) => s + b.amount, 0);
-  const sumItems = itemRows.reduce((s, b) => s + b.amount, 0);
-  const sumAdvs = advRows.reduce((s, b) => s + b.amount, 0);
+  const sumBills = tongTien(billRows, (b) => b.amount);
+  const sumItems = tongTien(itemRows, (b) => b.amount);
+  const sumAdvs = tongTien(advRows, (b) => b.amount);
 
-  // Tính draft A amounts
+  // Tính draft A amounts — xem trước bằng bigint, cùng công thức server (thanhTienTheoPct).
   function draftAmount(d: DraftBillRow) {
     const fl = floors.find((f) => f.sheetTypeId === d.sheetTypeId && f.floorLabel === d.floorLabel);
     const pct = parseFloat(d.pct) / 100 || 0;
-    return (fl?.contractValue ?? 0) * pct;
+    return thanhTienTheoPct(fl?.contractValue ?? 0n, pct);
   }
-  const sumDraftA = draftA.reduce((s, d) => s + draftAmount(d), 0);
-  const sumDraftB = draftB.reduce(
-    (s, d) => s + (parseFloat(d.amount.replace(/[^\d.]/g, "")) || 0),
-    0,
-  );
-  const sumDraftTU = draftTU.reduce(
-    (s, d) => s + (parseFloat(d.amount.replace(/[^\d.]/g, "")) || 0),
-    0,
-  );
+  const sumDraftA = tongTien(draftA, draftAmount);
+  const sumDraftB = tongTien(draftB, (d) => tienNhapSangMinor(d.amount));
+  const sumDraftTU = tongTien(draftTU, (d) => tienNhapSangMinor(d.amount));
   const hasDrafts = draftA.length > 0 || draftB.length > 0 || draftTU.length > 0;
 
   const totalBills = sumBills + sumDraftA;
@@ -869,25 +850,25 @@ function BillsSection({
             <ChevronRight className="w-3.5 h-3.5" />
           )}
         </button>
-        {sumBills > 0 && (
+        {sumBills > 0n && (
           <span className="text-[11px] text-sky-400 tabular-nums">TT: {fmtVND(sumBills)}</span>
         )}
-        {sumAdvs > 0 && (
+        {sumAdvs > 0n && (
           <span className="text-[11px] text-violet-400 tabular-nums">TU: −{fmtVND(sumAdvs)}</span>
         )}
-        {sumItems > 0 && (
+        {sumItems > 0n && (
           <span className="text-[11px] text-amber-400 tabular-nums">PS: {fmtVND(sumItems)}</span>
         )}
-        {sumBills + sumAdvs + sumItems > 0 && (
+        {sumBills + sumAdvs + sumItems > 0n && (
           <span className="text-[11px] font-bold text-emerald-400 tabular-nums">
             = {fmtVND(sumBills - sumAdvs + sumItems)}
           </span>
         )}
-        {earned > 0 && sumBills > 0 && (
+        {earned > 0n && sumBills > 0n && (
           <span
-            className={`text-[11px] ml-auto shrink-0 ${remain > 0 ? "text-amber-500" : "text-emerald-500"}`}
+            className={`text-[11px] ml-auto shrink-0 ${remain > 0n ? "text-amber-500" : "text-emerald-500"}`}
           >
-            {remain > 0 ? `Còn chờ TT: ${fmtVND(remain)}` : "Nghiệm thu đủ ✓"}
+            {remain > 0n ? `Còn chờ TT: ${fmtVND(remain)}` : "Nghiệm thu đủ ✓"}
           </span>
         )}
       </div>
@@ -1012,9 +993,7 @@ function BillsSection({
                               <input
                                 type="text"
                                 inputMode="numeric"
-                                defaultValue={
-                                  b.labor != null ? b.labor.toLocaleString("vi-VN") : ""
-                                }
+                                defaultValue={b.labor != null ? soTienNhapThuan(b.labor) : ""}
                                 placeholder="—"
                                 onBlur={(e) => {
                                   const t = e.target.value.trim();
@@ -1034,7 +1013,7 @@ function BillsSection({
                               {b.quantity != null ? b.quantity.toLocaleString("vi-VN") : "—"}
                             </td>
                             <td className="px-2 py-1.5 text-right text-zinc-400 tabular-nums">
-                              {b.labor != null && b.labor > 0 ? fmtVND(b.labor) : "—"}
+                              {b.labor != null && b.labor > 0n ? fmtVND(b.labor) : "—"}
                             </td>
                           </>
                         )}
@@ -1214,7 +1193,7 @@ function BillsSection({
                         />
                       </td>
                       <td className="px-2 py-1 text-right text-sky-400 font-medium tabular-nums">
-                        {amt > 0 ? fmtVND(amt) : "—"}
+                        {amt > 0n ? fmtVND(amt) : "—"}
                       </td>
                       <td className="px-2 py-1">
                         {pctAfter > 0 && (
@@ -1278,7 +1257,7 @@ function BillsSection({
                     className="px-2 py-1.5 text-right text-zinc-600 tabular-nums"
                     colSpan={canEdit ? 3 : 2}
                   >
-                    {fmtVND(0)}
+                    {fmtVND(0n)}
                   </td>
                 </tr>
 
@@ -1392,7 +1371,7 @@ function BillsSection({
                     className="px-2 py-1.5 text-right text-violet-300 tabular-nums"
                     colSpan={canEdit ? 3 : 2}
                   >
-                    {totalAdvs > 0 ? `(${fmtVND(totalAdvs)})` : fmtVND(0)}
+                    {totalAdvs > 0n ? `(${fmtVND(totalAdvs)})` : fmtVND(0n)}
                   </td>
                 </tr>
 
@@ -1522,7 +1501,7 @@ function BillsSection({
                     className="px-2 py-1.5 text-right text-zinc-500 tabular-nums"
                     colSpan={canEdit ? 3 : 2}
                   >
-                    {fmtVND(0)}
+                    {fmtVND(0n)}
                   </td>
                 </tr>
 
@@ -1572,8 +1551,8 @@ function PersonSheetRow({
 }) {
   const [open, setOpen] = useState(false);
 
-  const sContract = rows.reduce((s, r) => s + r.contractValue, 0);
-  const sEarned = rows.reduce((s, r) => s + r.contractValue * r.progress, 0);
+  const sContract = tongTien(rows, (r) => r.contractValue);
+  const sEarned = tongTien(rows, (r) => r.earned);
   const sAvg = rows.length ? rows.reduce((s, r) => s + r.progress, 0) / rows.length : 0;
   const sDelayed = rows.reduce((s, r) => s + r.delayed, 0);
   const slug = rows[0]?.sheetSlug;
@@ -1616,7 +1595,7 @@ function PersonSheetRow({
         </div>
         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
           <span className="text-[11px] text-zinc-400">HĐ: {fmtVND(sContract)}</span>
-          {sEarned > 0 && (
+          {sEarned > 0n && (
             <span className="text-[11px] text-emerald-400">Xong: {fmtVND(sEarned)}</span>
           )}
           {sDelayed > 0 && <span className="text-[11px] text-red-400">{sDelayed} trễ</span>}
@@ -1654,10 +1633,10 @@ function PersonSheetRow({
             const displayVal =
               edits[key] !== undefined
                 ? edits[key]
-                : r.contractValue > 0
-                  ? r.contractValue.toLocaleString("vi-VN")
+                : r.contractValue > 0n
+                  ? soTienNhapThuan(r.contractValue)
                   : "";
-            const earned = r.contractValue * r.progress;
+            const earned = r.earned;
             const href = r.sheetSlug
               ? `/tracking/${r.sheetSlug}?floor=${encodeURIComponent(r.floorLabel)}`
               : "#";
@@ -1700,10 +1679,10 @@ function PersonSheetRow({
                     />
                   ) : (
                     <span className="text-xs text-zinc-400 tabular-nums">
-                      {r.contractValue > 0 ? fmtFull(r.contractValue) : "—"}
+                      {r.contractValue > 0n ? fmtFull(r.contractValue) : "—"}
                     </span>
                   )}
-                  {earned > 0 && (
+                  {earned > 0n && (
                     <span className="text-xs text-emerald-300 tabular-nums ml-auto shrink-0">
                       = {fmtVND(earned)}
                     </span>
@@ -1735,10 +1714,10 @@ function FloorGroup({
 }) {
   const [open, setOpen] = useState(false);
 
-  const totalContract = rows.reduce((s, r) => s + r.contractValue, 0);
-  const totalEarned = rows.reduce((s, r) => s + r.contractValue * r.progress, 0);
+  const totalContract = tongTien(rows, (r) => r.contractValue);
+  const totalEarned = tongTien(rows, (r) => r.earned);
   const avgProgress = rows.reduce((s, r) => s + r.progress, 0) / rows.length;
-  const pct = totalContract > 0 ? (totalEarned / totalContract) * 100 : 0;
+  const pct = phanTram(totalEarned, totalContract);
   const hasDelayed = rows.some((r) => r.delayed > 0);
 
   return (
@@ -1766,9 +1745,9 @@ function FloorGroup({
           </div>
           <div className="flex items-center gap-3 mt-0.5 flex-wrap">
             <span className="text-[11px] text-zinc-400">
-              HĐ: {totalContract > 0 ? fmtVND(totalContract) : "—"}
+              HĐ: {totalContract > 0n ? fmtVND(totalContract) : "—"}
             </span>
-            {totalContract > 0 && (
+            {totalContract > 0n && (
               <span className="text-[11px] text-emerald-500">
                 Xong: {fmtVND(totalEarned)} ({pct.toFixed(1)}%)
               </span>
@@ -1790,10 +1769,10 @@ function FloorGroup({
             const displayVal =
               edits[key] !== undefined
                 ? edits[key]
-                : r.contractValue > 0
-                  ? r.contractValue.toLocaleString("vi-VN")
+                : r.contractValue > 0n
+                  ? soTienNhapThuan(r.contractValue)
                   : "";
-            const earned = r.contractValue * r.progress;
+            const earned = r.earned;
             const href = r.sheetSlug
               ? `/tracking/${r.sheetSlug}?floor=${encodeURIComponent(floor)}`
               : "#";
@@ -1841,10 +1820,10 @@ function FloorGroup({
                     />
                   ) : (
                     <span className="text-xs text-zinc-400 tabular-nums">
-                      {r.contractValue > 0 ? fmtFull(r.contractValue) : "—"}
+                      {r.contractValue > 0n ? fmtFull(r.contractValue) : "—"}
                     </span>
                   )}
-                  {earned > 0 && (
+                  {earned > 0n && (
                     <span className="text-xs text-emerald-300 tabular-nums ml-auto shrink-0">
                       = {fmtVND(earned)}
                     </span>

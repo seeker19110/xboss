@@ -206,9 +206,9 @@ test(
     assert.equal(summary.avgQuality, 4);
     assert.equal(summary.avgDelivery, 5);
     assert.equal(summary.avgPrice, 3);
-    assert.equal(summary.totalOrdered, 10_000); // PO huỷ (100 x 999) không tính
-    assert.equal(summary.totalPaid, 4_000);
-    assert.equal(summary.debt, 6_000);
+    assert.equal(summary.totalOrdered, 10_000_00n); // PO huỷ (100 x 999) không tính; S10c: MoneyMinor
+    assert.equal(summary.totalPaid, 4_000_00n);
+    assert.equal(summary.debt, 6_000_00n);
 
     // Vai trò không có CAN.viewPayments (subcon/viewer/cdt): API truyền keemTien=true —
     // khối tiền phải là null, điểm đánh giá vẫn xem được (audit 2026-09-05).

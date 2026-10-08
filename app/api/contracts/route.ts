@@ -5,18 +5,26 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   CONTRACT_KINDS,
   checkContractRefs,
+  contractsToWire,
   listContracts,
   parseContractBody,
   validateContractInput,
   type ContractKind,
 } from "@/lib/tai-chinh/contracts";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
+import { MONEY_FORMAT_HEADER, isMoneyPrecisionError, moneyWireFormat } from "@/lib/nen/money";
+import {
+  HEADERS_API_TIEN,
+  LOI_TIEN_VUOT_DINH_DANG_CU,
+  nhanDinhDangTien,
+} from "@/lib/nen/money-dto";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/contracts?kind= — danh sách HĐ kèm tổng hợp (phụ lục/đã thanh toán/PO),
 // scoped theo dự án đang chọn (M22). Giá trị tiền → chỉ vai trò xem thanh toán
-// (admin/pm/bch), như /costs.
+// (admin/pm/bch), như /costs. S10c (A3-FR06): header decimal-string-v1 → value/addendaTotal/
+// paid/poCommitted là chuỗi canonical exact + `moneyFormat`; legacy → number, ngoài biên → 422.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -41,7 +49,22 @@ export async function GET(req: NextRequest) {
       : [];
   // M50 PR2: che giá trị/tỷ lệ HĐ cho user thiếu viewPayments (phòng thủ — gate route
   // hiện cũng là viewPayments nên không đổi ai hiện tại).
-  return NextResponse.json({ contracts: stripSensitive("contract", contracts, user) });
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
+  try {
+    return NextResponse.json(
+      {
+        contracts: contractsToWire(stripSensitive("contract", contracts, user), format),
+        ...nhanDinhDangTien(format),
+      },
+      { headers: HEADERS_API_TIEN },
+    );
+  } catch (err) {
+    if (!isMoneyPrecisionError(err)) throw err;
+    return NextResponse.json(LOI_TIEN_VUOT_DINH_DANG_CU, {
+      status: 422,
+      headers: HEADERS_API_TIEN,
+    });
+  }
 }
 
 // POST /api/contracts — tạo HĐ (Admin/PM). Số HĐ nhập tay, UNIQUE chống trùng.

@@ -6,7 +6,7 @@
 // Xem docs/nang-cap/M33-nha-thau-phu.md.
 import { query, queryOne, run } from "@/lib/db";
 import { listContracts } from "@/lib/tai-chinh/contracts";
-import { parseMoney, moneyToNumber } from "@/lib/nen/money";
+import { moneyToWire, parseMoney, type MoneyWireFormat } from "@/lib/nen/money";
 
 const PERIOD_RE = /^\d{4}-(Q[1-4]|\d{2})$/;
 
@@ -191,20 +191,51 @@ export async function avgEvaluationScore(supplierId: number): Promise<Evaluation
 
 // ===== Công nợ (view — không lưu, tái dùng lib/contracts.ts) =====
 
+// S10c: mọi số tiền là MoneyMinor (bigint đồng×100) từ bản `::text` của listContracts — tổng
+// nhiều HĐ có thể vượt 2^53 xu; route đổi sang wire bằng `subcontractorDebtToWire`.
 export type SubcontractorDebt = {
-  contractValue: number;
-  paid: number;
-  outstanding: number;
+  contractValue: bigint;
+  paid: bigint;
+  outstanding: bigint;
   contracts: {
     id: number;
     code: string;
     title: string;
-    value: number;
-    addendaTotal: number;
-    paid: number;
+    value: bigint;
+    addendaTotal: bigint;
+    paid: bigint;
     status: string;
   }[];
 };
+
+export type SubcontractorDebtWire = {
+  contractValue: string | number;
+  paid: string | number;
+  outstanding: string | number;
+  contracts: (Omit<SubcontractorDebt["contracts"][number], "value" | "addendaTotal" | "paid"> & {
+    value: string | number;
+    addendaTotal: string | number;
+    paid: string | number;
+  })[];
+};
+
+/** Adapter DTO (A3-FR06): v1 → chuỗi canonical; legacy → number, ngoài biên throw (→ 422). */
+export function subcontractorDebtToWire(
+  d: SubcontractorDebt,
+  format: MoneyWireFormat,
+): SubcontractorDebtWire {
+  return {
+    contractValue: moneyToWire(d.contractValue, format),
+    paid: moneyToWire(d.paid, format),
+    outstanding: moneyToWire(d.outstanding, format),
+    contracts: d.contracts.map((c) => ({
+      ...c,
+      value: moneyToWire(c.value, format),
+      addendaTotal: moneyToWire(c.addendaTotal, format),
+      paid: moneyToWire(c.paid, format),
+    })),
+  };
+}
 
 // Công nợ = Σ (value + addendaTotal) các HĐ gắn party_supplier_id=supplierId, trừ Σ paid
 // (đã tổng hợp sẵn trong listContracts qua payment_bills) — KHÔNG viết lại công thức.
@@ -219,19 +250,17 @@ export async function subcontractorDebt(supplierId: number): Promise<Subcontract
     0n,
   );
   const paidMinor = mine.reduce((s, c) => s + parseMoney(c.paidText), 0n);
-  const contractValue = moneyToNumber(contractValueMinor);
-  const paid = moneyToNumber(paidMinor);
   return {
-    contractValue,
-    paid,
-    outstanding: moneyToNumber(contractValueMinor - paidMinor),
+    contractValue: contractValueMinor,
+    paid: paidMinor,
+    outstanding: contractValueMinor - paidMinor,
     contracts: mine.map((c) => ({
       id: c.id,
       code: c.code,
       title: c.title,
-      value: c.value,
-      addendaTotal: c.addendaTotal,
-      paid: c.paid,
+      value: parseMoney(c.valueText),
+      addendaTotal: parseMoney(c.addendaTotalText),
+      paid: parseMoney(c.paidText),
       status: c.status,
     })),
   };

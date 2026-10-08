@@ -108,9 +108,9 @@ test(
     assert.equal(items.length, 2);
     const a = bids.find((b) => b.bidId === bidA)!;
     const b = bids.find((b) => b.bidId === bidB)!;
-    assert.equal(a.total, 200_000);
+    assert.equal(a.total, 200_000_00n); // S10c: MoneyMinor
     assert.equal(a.quotedLines, 2);
-    assert.equal(b.total, 90_000); // không cộng 0 cho dòng thiếu
+    assert.equal(b.total, 90_000_00n); // không cộng 0 cho dòng thiếu
     assert.equal(b.quotedLines, 1);
     assert.equal(b.totalLines, 2);
     assert.equal(b.prices[boqId2], undefined); // dòng thiếu không có giá (UI hiện "—")

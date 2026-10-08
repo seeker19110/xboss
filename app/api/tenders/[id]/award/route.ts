@@ -34,7 +34,10 @@ export async function POST(
     const { contractId } = await awardTender(id, bidId, user.id, projectId);
     return NextResponse.json({ awarded: id, contractId });
   } catch (err: unknown) {
-    const e = err as { message?: string; status?: number };
-    return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
+    const e = err as { message?: string; status?: number; code?: string };
+    return NextResponse.json(
+      { error: e.message ?? String(err), ...(e.code ? { code: e.code } : {}) },
+      { status: e.status ?? 500 },
+    );
   }
 }

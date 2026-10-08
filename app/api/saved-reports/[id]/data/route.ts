@@ -3,7 +3,26 @@ import ExcelJS from "exceljs";
 import { queryOne } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { getSource, runReport, type ReportColumn, type ReportResult } from "@/lib/tien-do/reports";
+import {
+  getSource,
+  reportRowsToWire,
+  runReport,
+  type ReportColumn,
+  type ReportResult,
+  type ReportRow,
+} from "@/lib/tien-do/reports";
+import {
+  MONEY_FORMAT_HEADER,
+  isMoneyPrecisionError,
+  moneyWireFormat,
+  parseFixedDecimalExact,
+} from "@/lib/nen/money";
+import {
+  HEADERS_API_TIEN,
+  LOI_TIEN_VUOT_DINH_DANG_CU,
+  nhanDinhDangTien,
+} from "@/lib/nen/money-dto";
+import { ghiChuCotText, oExcelTheoCot } from "@/lib/tai-chinh/excel-exact";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +39,8 @@ type Row = {
 // GET /api/saved-reports/:id/data[?export=excel] — chạy báo cáo, trả bảng (JSON) hoặc file Excel.
 // Quyền: xem được báo cáo (chủ sở hữu / shared / admin) VÀ có quyền xem nguồn (nguồn tiền
 // vẫn giới hạn theo vai trò kể cả khi báo cáo được chia sẻ — bảo vệ dữ liệu tài chính).
+// S10c (A3-FR06): cột tiền — header decimal-string-v1 → chuỗi canonical + `moneyFormat`; legacy →
+// number, ngoài biên → 422. Excel: cột tiền ghi số khi ≤ 15 chữ số có nghĩa, không thì CẢ cột text.
 export async function GET(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -70,19 +91,60 @@ export async function GET(
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="bao-cao-${id}.xlsx"`,
+        "Cache-Control": "private, no-store",
       },
     });
   }
 
-  return NextResponse.json({ name: r.name, source: r.source, ...result });
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
+  try {
+    return NextResponse.json(
+      {
+        name: r.name,
+        source: r.source,
+        columns: result.columns,
+        rows: reportRowsToWire(result.columns, result.rows, format),
+        ...nhanDinhDangTien(format),
+      },
+      { headers: HEADERS_API_TIEN },
+    );
+  } catch (err) {
+    if (!isMoneyPrecisionError(err)) throw err;
+    return NextResponse.json(LOI_TIEN_VUOT_DINH_DANG_CU, {
+      status: 422,
+      headers: HEADERS_API_TIEN,
+    });
+  }
 }
 
-async function buildExcel(name: string, columns: ReportColumn[], rows: Record<string, unknown>[]) {
+async function buildExcel(name: string, columns: ReportColumn[], rows: ReportRow[]) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(name.slice(0, 31) || "Báo cáo");
   ws.columns = columns.map((c) => ({ header: c.label, key: c.key, width: 20 }));
   ws.getRow(1).font = { bold: true };
-  for (const row of rows) ws.addRow(columns.map((c) => row[c.key] ?? ""));
+  // Cột tiền (chuỗi canonical exact): chọn kiểu ô THEO CỘT (excel-exact, S10a L5) — ô trống giữ "".
+  const oTien = new Map<string, (number | string)[]>();
+  const cotText: string[] = [];
+  for (const c of columns.filter((col) => col.kind === "money")) {
+    const coGiaTri = rows.filter((row) => row[c.key] != null);
+    const { cells, laText } = oExcelTheoCot(
+      coGiaTri.map((row) => ({
+        unscaled: parseFixedDecimalExact(String(row[c.key]), 2),
+        scale: 2,
+      })),
+    );
+    let i = 0;
+    oTien.set(
+      c.key,
+      rows.map((row) => (row[c.key] != null ? cells[i++] : "")),
+    );
+    if (laText) cotText.push(c.label);
+  }
+  rows.forEach((row, idx) =>
+    ws.addRow(columns.map((c) => oTien.get(c.key)?.[idx] ?? row[c.key] ?? "")),
+  );
+  const ghiChu = ghiChuCotText(cotText);
+  if (ghiChu) ws.addRow([ghiChu]);
   const buf = await wb.xlsx.writeBuffer();
   return Buffer.from(buf);
 }

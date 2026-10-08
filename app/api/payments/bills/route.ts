@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
+import { query, queryOne, withProjectScope } from "@/lib/db";
 import { getCurrentProjectId, getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
+import {
+  MONEY_FORMAT_HEADER,
+  isMoneyPrecisionError,
+  moneyWireFormat,
+  parseMoneyExact,
+} from "@/lib/nen/money";
+import {
+  HEADERS_API_TIEN,
+  LOI_TIEN_VUOT_DINH_DANG_CU,
+  nhanDinhDangTien,
+  tienTextToWire,
+} from "@/lib/nen/money-dto";
 
 export const dynamic = "force-dynamic";
 
@@ -14,14 +26,15 @@ type Bill = {
   responsible: string;
   type: BillType;
   period: string | null;
-  amount: number;
+  // S10c: tiền đọc `::text` (exact) → wire ở biên DTO.
+  amount: string;
   description: string | null;
   paidDate: string;
   progressSnapshot: number;
   note: string | null;
   unit: string | null;
   quantity: number | null;
-  labor: number | null;
+  labor: string | null;
   sheetTypeId: number | null;
   floorLabel: string | null;
   pctThisPeriod: number;
@@ -31,7 +44,9 @@ type Bill = {
   createdAt: string;
 };
 
-export async function GET(_req: NextRequest) {
+// GET /api/payments/bills — S10c (A3-FR06): header decimal-string-v1 → amount/labor là chuỗi
+// canonical + `moneyFormat`; legacy number (mỗi dòng NUMERIC(15,2) luôn trong biên round-trip).
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user)
     return NextResponse.json(
@@ -55,10 +70,10 @@ export async function GET(_req: NextRequest) {
     query<Bill>(
       `
     SELECT pb.id, pb.responsible, pb.type, pb.period,
-           pb.amount, pb.description,
+           pb.amount::text AS amount, pb.description,
            pb.paid_date        AS "paidDate",
            pb.progress_snapshot AS "progressSnapshot",
-           pb.note, pb.unit, pb.quantity, pb.labor,
+           pb.note, pb.unit, pb.quantity, pb.labor::text AS labor,
            pb.sheet_type_id   AS "sheetTypeId",
            pb.floor_label     AS "floorLabel",
            st.code            AS "sheetCode",
@@ -107,7 +122,26 @@ export async function GET(_req: NextRequest) {
     ),
   );
 
-  return NextResponse.json({ bills }, { headers: PRIVATE_NO_STORE });
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
+  try {
+    return NextResponse.json(
+      {
+        bills: bills.map((b) => ({
+          ...b,
+          amount: tienTextToWire(b.amount, format),
+          labor: tienTextToWire(b.labor, format),
+        })),
+        ...nhanDinhDangTien(format),
+      },
+      { headers: HEADERS_API_TIEN },
+    );
+  } catch (err) {
+    if (!isMoneyPrecisionError(err)) throw err;
+    return NextResponse.json(LOI_TIEN_VUOT_DINH_DANG_CU, {
+      status: 422,
+      headers: HEADERS_API_TIEN,
+    });
+  }
 }
 
 // POST /api/payments/bills
@@ -146,8 +180,11 @@ export async function POST(req: NextRequest) {
   let labor = b?.labor != null && b.labor !== "" ? Number(b.labor) : null;
   if (labor != null && (!Number.isFinite(labor) || labor < 0)) labor = null;
 
-  // Tính amount: nếu type=bill + có floor → amount = contractValue × pct
-  let amount = Number(b?.amount);
+  // Tính amount: nếu type=bill + có floor → amount = contractValue × pct — S10c: tích làm TRONG
+  // SQL trên NUMERIC (không nhân float JS rồi ghi DB), pct dùng đúng giá trị được lưu
+  // (NUMERIC(5,4)) để amount đối soát được với pct_this_period; làm tròn tới xu ties xa 0.
+  // Loại khác (phát sinh/tạm ứng): amount nhập tay, giữ cách đọc cũ.
+  let amount: number | string = Number(b?.amount);
   if (type === "bill" && sheetTypeId && floorLabel && pctThisPeriod > 0) {
     // Kiểm tra tổng % đã thanh toán (không vượt 100%)
     const sumRow = await queryOne<{ total: number }>(
@@ -167,30 +204,35 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
 
-    // Lấy contract_value
-    const fc = await queryOne<{ contractValue: number }>(
+    // Lấy contract_value × pct (đã làm tròn như cột pct_this_period) — exact trong SQL.
+    const fc = await queryOne<{ amount: string }>(
       `
-      SELECT COALESCE(contract_value, 0) AS "contractValue"
+      SELECT ROUND(COALESCE(MAX(contract_value), 0) * ROUND(?::numeric, 4), 2)::text AS amount
         FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
+      pctThisPeriod,
       sheetTypeId,
       floorLabel,
     );
-    amount = (fc?.contractValue ?? 0) * pctThisPeriod;
+    amount = fc?.amount ?? "0";
   }
 
-  if (!Number.isFinite(amount) || amount <= 0)
-    return NextResponse.json({ error: "Số tiền không hợp lệ" }, { status: 400 });
+  const amountHopLe =
+    typeof amount === "string"
+      ? parseMoneyExact(amount) > 0n
+      : Number.isFinite(amount) && amount > 0;
+  if (!amountHopLe) return NextResponse.json({ error: "Số tiền không hợp lệ" }, { status: 400 });
 
   // M51 PR1: gắn project_id để RLS lọc đúng dự án (suy từ dự án đang chọn, không tin client).
   const projectId = await getCurrentProjectId(user);
 
-  const id = await insertId(
+  const saved = await queryOne<{ id: number; amount: string }>(
     `
     INSERT INTO payment_bills
            (responsible, type, period, amount, description, paid_date,
             progress_snapshot, note, unit, quantity, labor,
             sheet_type_id, floor_label, pct_this_period, created_by, project_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    RETURNING id, amount::text AS amount`,
     responsible,
     type,
     period,
@@ -209,5 +251,12 @@ export async function POST(req: NextRequest) {
     projectId,
   );
 
-  return NextResponse.json({ ok: true, id, amount });
+  // Trả amount đã lưu (exact, theo định dạng client chọn) để UI hiển thị đúng số server ghi.
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
+  return NextResponse.json({
+    ok: true,
+    id: saved!.id,
+    amount: tienTextToWire(saved!.amount, format),
+    ...nhanDinhDangTien(format),
+  });
 }

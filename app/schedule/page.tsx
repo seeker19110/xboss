@@ -30,6 +30,8 @@ import ProgressMap from "@/app/components/ProgressMap";
 import { LookaheadTable } from "@/app/components/LookaheadTable";
 import SystemFilter from "@/app/components/SystemFilter";
 import { formatDateVN, todayISO } from "@/lib/nen/date";
+import { mulRatio } from "@/lib/nen/money";
+import { HEADER_TIEN_V1, minorTuWire } from "@/lib/nen/money-dto";
 import type { CriticalRow } from "@/lib/tien-do/schedule-control";
 
 export default function ScheduleControlHubPage() {
@@ -165,13 +167,15 @@ function ScheduleControlContent() {
         }
       })
       .catch(() => {});
-    fetch("/api/dashboard/evm")
+    // S10c: decimal-string-v1 — PV/BAC chuỗi exact; % kế hoạch chia bằng bigint (1 số lẻ).
+    fetch("/api/dashboard/evm", { headers: HEADER_TIEN_V1 })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (typeof data?.summary?.spi === "number") setSpi(data.summary.spi);
         const { pv, bac } = data?.summary ?? {};
-        if (typeof pv === "number" && typeof bac === "number" && bac > 0) {
-          setPlannedPct(Math.round((pv / bac) * 1000) / 10);
+        if (typeof pv === "string" && typeof bac === "string") {
+          const bacMinor = minorTuWire(bac);
+          if (bacMinor > 0n) setPlannedPct(Number(mulRatio(minorTuWire(pv), 1000n, bacMinor)) / 10);
         }
       })
       .catch(() => {});
