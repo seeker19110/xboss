@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { run, withProjectScope } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { syncAndListNotifications } from "@/lib/dich-vu/thong-bao";
+import { listNotifications, syncAndListNotifications } from "@/lib/dich-vu/thong-bao";
 
 export const dynamic = "force-dynamic";
 
@@ -18,15 +18,16 @@ export async function GET(req: Request) {
   const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 1000) : 50;
 
   // Dự án đang chọn — lọc mọi cảnh báo theo dự án để tránh rò rỉ chéo dự án (đa dự án, M22+).
-  // null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
+  // A1-AC02: null (không có dự án khả kiến) → KHÔNG đồng bộ toàn hệ; chỉ trả thông báo đã
+  // gửi riêng cho user (bảng notifications thuộc user_id, không có cột dự án).
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json(await listNotifications(user, limit));
 
   // Bọc toàn bộ phần đọc-ghi trong 1 transaction có GUC app.project_id đúng (M62 PR1) —
   // policy RLS trên 11 bảng tài chính chỉ lọc đúng khi có GUC. readOnly:false vì route này
-  // xen kẽ INSERT/DELETE trên notifications (bảng không-RLS) sau mỗi khối đọc. projectId
-  // null (DB chưa có project) → GUC '*' (hành vi y hệt trước — không lọc gì).
+  // xen kẽ INSERT/DELETE trên notifications (bảng không-RLS) sau mỗi khối đọc.
   const data = await withProjectScope(
-    projectId ?? "*",
+    projectId,
     () => syncAndListNotifications(user, projectId, limit),
     { readOnly: false },
   );

@@ -23,14 +23,13 @@ export async function GET() {
 
   // Lọc assigned cho subcon/viewer
   const assignedFilter = fullAccess ? "" : " AND t.assigned_to = ?";
-  // Dự án đang chọn — cộng thêm lọc theo dự án để tránh rò rỉ chéo dự án (đa dự án,
-  // M22+). null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
+  // Dự án đang chọn — lọc vô điều kiện theo dự án để tránh rò rỉ chéo dự án (M22+).
   const projectId = await getCurrentProjectId(user);
-  const projectJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
-  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
+  const projectJoin = " JOIN towers tw ON tw.id = st.tower_id";
+  const projectFilter = " AND tw.project_id = ?";
   const args = (base: unknown[]) => {
     const withAssigned = fullAccess ? base : [...base, user.id];
-    return projectId != null ? [...withAssigned, projectId] : withAssigned;
+    return [...withAssigned, projectId];
   };
 
   const due5 = daysFromTodayISO(5);
@@ -50,6 +49,19 @@ export async function GET() {
   }
   // Nếu key chưa có trong prefs → mặc định bật (true khi undefined)
   const pref = (key: keyof Prefs) => prefs[key] !== false;
+
+  // A1-AC02: không có dự án khả kiến → feed rỗng đúng shape, không đọc dữ liệu nghiệp vụ toàn hệ.
+  if (projectId == null)
+    return NextResponse.json({
+      overdue: [],
+      dueSoon: [],
+      upcomingStart: [],
+      recentActivity: [],
+      materialOver: [],
+      fullAccess,
+      role: user.role,
+      prefs,
+    });
 
   // ── OVERDUE ────────────────────────────────────────────────────────────────
   const overdue = pref("delayed")
@@ -345,7 +357,6 @@ export async function GET() {
 
   // Vật tư vượt định mức — chỉ fullAccess. materials có project_id trực tiếp (M22+) —
   // lọc thẳng theo dự án đang chọn, không cần join tower.
-  const matProjectFilter = projectId != null ? " AND m.project_id = ?" : "";
   const materialOver =
     fullAccess && pref("material_over")
       ? await query<{
@@ -358,9 +369,9 @@ export async function GET() {
         }>(
           `SELECT m.id, m.name, m.unit, m.qty_planned AS "qtyPlanned", m.qty_used AS "qtyUsed", st.code AS "sheetCode"
        FROM materials m LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
-      WHERE m.qty_planned > 0 AND m.qty_used > m.qty_planned${matProjectFilter}
+      WHERE m.qty_planned > 0 AND m.qty_used > m.qty_planned AND m.project_id = ?
       ORDER BY (m.qty_used - m.qty_planned) DESC`,
-          ...(projectId != null ? [projectId] : []),
+          projectId,
         )
       : [];
 

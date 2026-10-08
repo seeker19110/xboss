@@ -22,10 +22,11 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // A1-AC02: không có dự án khả kiến → 404 (không mở GUC toàn hệ '*').
   const projectId = await getCurrentProjectId(user);
-  const item = await withProjectScope(projectId ?? "*", () =>
-    projectId != null ? getWarrantyItem(id, projectId) : Promise.resolve(null),
-  );
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy hạng mục bảo hành" }, { status: 404 });
+  const item = await withProjectScope(projectId, () => getWarrantyItem(id, projectId));
   if (!item)
     return NextResponse.json({ error: "Không tìm thấy hạng mục bảo hành" }, { status: 404 });
 

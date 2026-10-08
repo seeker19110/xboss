@@ -35,6 +35,11 @@ export async function GET(req: NextRequest) {
   if (category && !DOC_CATEGORIES.includes(category as DocCategory))
     return NextResponse.json({ error: "Loại hồ sơ không hợp lệ" }, { status: 422 });
 
+  // A1-AC02: không có dự án khả kiến → 404, không nén file toàn hệ.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy hồ sơ" }, { status: 404 });
+
   const conds: string[] = ["d.task_id IS NOT NULL"];
   const values: unknown[] = [];
   if (sheetTypeId) {
@@ -51,11 +56,8 @@ export async function GET(req: NextRequest) {
   }
 
   // task_documents không có project_id riêng — suy qua task/work_package (M22).
-  const projectId = await getCurrentProjectId(user);
-  if (projectId != null) {
-    conds.push("tw.project_id = ?");
-    values.push(projectId);
-  }
+  conds.push("tw.project_id = ?");
+  values.push(projectId);
 
   const rows = await query<DocRow>(
     `SELECT t.code AS "taskCode", d.file_name AS "fileName", d.original_name AS "originalName"

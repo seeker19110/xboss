@@ -30,6 +30,10 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
+  // A1-AC02: không có dự án khả kiến → danh sách rỗng, không đọc toàn hệ.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ inspections: [] });
+
   const status = req.nextUrl.searchParams.get("status");
   const taskId = req.nextUrl.searchParams.get("taskId");
   const workPackageId = req.nextUrl.searchParams.get("workPackageId");
@@ -51,11 +55,8 @@ export async function GET(req: NextRequest) {
 
   // qc_inspections không có project_id riêng (ADR-0004) — suy qua task/work_package
   // để chặn rò rỉ dữ liệu xuyên dự án (M22).
-  const projectId = await getCurrentProjectId(user);
-  if (projectId != null) {
-    conds.push("tw.project_id = ?");
-    values.push(projectId);
-  }
+  conds.push("tw.project_id = ?");
+  values.push(projectId);
 
   const rows = await query<InspectionRow>(
     `SELECT i.id, i.checklist_id AS "checklistId", c.name AS "checklistName",
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
        LEFT JOIN towers tw ON tw.id = st.tower_id
        LEFT JOIN users iu ON iu.id = i.inspected_by
        LEFT JOIN users au ON au.id = i.approved_by
-      ${conds.length ? `WHERE ${conds.join(" AND ")}` : ""}
+      WHERE ${conds.join(" AND ")}
       ORDER BY i.inspected_at DESC, i.id DESC`,
     ...values,
   );

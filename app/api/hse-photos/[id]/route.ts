@@ -10,16 +10,10 @@ type PhotoRow = { id: number; file_path: string; mime: string; uploaded_by: numb
 
 // Lấy ảnh HSE, lọc theo dự án đang chọn (M22) — chặn xem/xoá ảnh của biên bản
 // thuộc dự án khác qua đoán/liệt kê id.
-async function getPhotoInProject(
-  id: number,
-  projectId: number | null,
-): Promise<PhotoRow | undefined> {
-  const conds = ["p.id = ?"];
-  const args: unknown[] = [id];
-  if (projectId != null) {
-    conds.push("r.project_id = ?");
-    args.push(projectId);
-  }
+async function getPhotoInProject(id: number, projectId: number): Promise<PhotoRow | undefined> {
+  // A1-AC03: lọc dự án vô điều kiện (cột project_id của bản ghi cha).
+  const conds = ["p.id = ?", "r.project_id = ?"];
+  const args: unknown[] = [id, projectId];
   return queryOne<PhotoRow>(
     `SELECT p.id, p.file_path, p.mime, p.uploaded_by
        FROM hse_photos p JOIN hse_records r ON r.id = p.record_id
@@ -40,7 +34,9 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // A1-AC02: không có dự án khả kiến → 404, không đọc/xoá toàn hệ.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
   const photo = await getPhotoInProject(id, projectId);
   if (!photo) return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
 
@@ -68,7 +64,9 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // A1-AC02: không có dự án khả kiến → 404, không đọc/xoá toàn hệ.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
   const photo = await getPhotoInProject(id, projectId);
   if (!photo) return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
 

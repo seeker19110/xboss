@@ -23,6 +23,10 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
+  // A1-AC02: không có dự án khả kiến → danh sách rỗng, không đọc toàn hệ.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ requests: [] });
+
   const status = req.nextUrl.searchParams.get("status");
   const conds: string[] = [];
   const values: unknown[] = [];
@@ -33,18 +37,15 @@ export async function GET(req: NextRequest) {
 
   // inspection_requests không có project_id riêng — suy qua các task gắn phiếu
   // (mỗi phiếu luôn có ≥1 task) để chặn rò rỉ dữ liệu xuyên dự án (M22).
-  const projectId = await getCurrentProjectId(user);
-  if (projectId != null) {
-    conds.push(
-      `EXISTS (SELECT 1 FROM inspection_request_tasks rt2
-                 JOIN tasks t2 ON t2.id = rt2.task_id
-                 JOIN work_packages wp2 ON wp2.id = t2.package_id
-                 JOIN sheet_types st2 ON st2.id = wp2.sheet_type_id
-                 JOIN towers tw2 ON tw2.id = st2.tower_id
-                WHERE rt2.request_id = r.id AND tw2.project_id = ?)`,
-    );
-    values.push(projectId);
-  }
+  conds.push(
+    `EXISTS (SELECT 1 FROM inspection_request_tasks rt2
+               JOIN tasks t2 ON t2.id = rt2.task_id
+               JOIN work_packages wp2 ON wp2.id = t2.package_id
+               JOIN sheet_types st2 ON st2.id = wp2.sheet_type_id
+               JOIN towers tw2 ON tw2.id = st2.tower_id
+              WHERE rt2.request_id = r.id AND tw2.project_id = ?)`,
+  );
+  values.push(projectId);
 
   const rows = await query<RequestRow>(
     `SELECT r.id, r.code, r.scheduled_at AS "scheduledAt", r.status, r.note,
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
        FROM inspection_requests r
        LEFT JOIN users cu ON cu.id = r.created_by
        LEFT JOIN inspection_request_tasks rt ON rt.request_id = r.id
-      ${conds.length ? `WHERE ${conds.join(" AND ")}` : ""}
+      WHERE ${conds.join(" AND ")}
       GROUP BY r.id, cu.name
       ORDER BY r.scheduled_at DESC, r.id DESC`,
     ...values,
@@ -83,19 +84,16 @@ export async function POST(req: NextRequest) {
 
   // Dự án của phiếu suy từ dự án đang chọn của người tạo (cùng helper getCurrentProjectId các
   // route khác dùng, không suy lại từ nội bộ thực thể) — để lọc webhook theo dự án.
+  // A1-AC02: không có dự án khả kiến → 404, không tạo phiếu với task toàn hệ.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Có task không tồn tại" }, { status: 404 });
 
   // Lọc task theo dự án đang chọn (suy qua work_packages → sheet_types → towers, cùng chuỗi
   // join GET đang dùng) để chặn gắn task dự án khác vào phiếu YCNT dự án này (M22). Task
   // không thuộc dự án rơi vào đúng nhánh "task không tồn tại" bên dưới — không lộ tồn tại.
-  // Không dùng "? IS NULL OR tw.project_id = ?" — Postgres không suy được kiểu tham số đứng
-  // riêng — nên dựng điều kiện động như GET ở trên.
-  const taskConds = ["t.id = ANY(?)"];
-  const taskValues: unknown[] = [taskIds];
-  if (projectId != null) {
-    taskConds.push("tw.project_id = ?");
-    taskValues.push(projectId);
-  }
+  const taskConds = ["t.id = ANY(?)", "tw.project_id = ?"];
+  const taskValues: unknown[] = [taskIds, projectId];
   const tasks = await query<{ id: number; progressPercent: number }>(
     `SELECT t.id, t.progress_percent AS "progressPercent"
        FROM tasks t

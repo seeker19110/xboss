@@ -18,14 +18,11 @@ type CorrespondenceFileRow = {
 // công văn thuộc dự án khác qua đoán/liệt kê id.
 async function getFileInProject(
   id: number,
-  projectId: number | null,
+  projectId: number,
 ): Promise<CorrespondenceFileRow | undefined> {
-  const conds = ["cf.id = ?"];
-  const args: unknown[] = [id];
-  if (projectId != null) {
-    conds.push("c.project_id = ?");
-    args.push(projectId);
-  }
+  // A1-AC03: lọc dự án vô điều kiện (cột project_id của bản ghi cha).
+  const conds = ["cf.id = ?", "c.project_id = ?"];
+  const args: unknown[] = [id, projectId];
   return queryOne<CorrespondenceFileRow>(
     `SELECT cf.id, cf.file_name, cf.mime_type, cf.original_name, cf.uploaded_by
        FROM correspondence_files cf JOIN correspondences c ON c.id = cf.correspondence_id
@@ -48,7 +45,10 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // A1-AC02: không có dự án khả kiến → 404, không đọc/xoá toàn hệ.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
   const doc = await getFileInProject(id, projectId);
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
@@ -77,7 +77,10 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // A1-AC02: không có dự án khả kiến → 404, không đọc/xoá toàn hệ.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
   const doc = await getFileInProject(id, projectId);
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
