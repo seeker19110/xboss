@@ -53,6 +53,14 @@ const WHITELIST: Record<string, string> = {
   "offline/vault/unlock:POST":
     "Mở khoá vault của chính actor (RLS theo user/org/dự án); kiểm lại TOÀN BỘ manifest với " +
     "quyền hiện hành trước khi trả từng khoá.",
+  // M131 §3 — khôi phục khi mất proof: chủ dữ liệu chỉ tạo/hoàn tất yêu cầu của CHÍNH mình (RLS 0170
+  // theo app.user_id/org_id); bước quyết định là PATCH recovery/:id (CAN.manageUsers + 2FA).
+  "offline/recovery:POST":
+    "Tạo yêu cầu khôi phục cho chính mình: thiết bị mới = proof hiện tại, thiết bị cũ lọc theo " +
+    "user_id/org_id của phiên; RLS INSERT chỉ cho status pending, không tự duyệt.",
+  "offline/recovery/[id]/complete:POST":
+    "Hoàn tất yêu cầu ĐÃ được Admin duyệt của chính mình trên đúng thiết bị mới; quyền tài nguyên " +
+    "kiểm lại bằng boKiemManifest (CAN.editProgress + phân công subcon) + visibleProjectIds.",
   "push/subscribe:POST": "Đăng ký thiết bị nhận push của chính mình (upsert theo user.id).",
   "push/subscribe:DELETE":
     "Huỷ đăng ký — DELETE có WHERE endpoint = ? AND user_id = ?, chỉ thiết bị của chính mình.",

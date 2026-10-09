@@ -76,6 +76,7 @@ import {
   ToggleRight,
   LayoutGrid,
   QrCode,
+  Smartphone,
 } from "lucide-react";
 import type { Role } from "@/lib/nen/roles";
 
@@ -449,6 +450,14 @@ export const DASHBOARD_TREE: DashCluster[] = [
         href: "/admin/permissions",
         label: "Phân quyền",
         icon: KeyRound,
+        roles: ["admin"],
+      },
+      {
+        // M131 §3 — thiết bị offline + yêu cầu khôi phục vault khi mất proof (chỉ Admin).
+        id: "dash.thiet-bi-offline",
+        href: "/admin/thiet-bi-offline",
+        label: "Thiết bị offline",
+        icon: Smartphone,
         roles: ["admin"],
       },
       {

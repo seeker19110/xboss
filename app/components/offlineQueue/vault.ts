@@ -26,6 +26,7 @@ import {
 } from "@/lib/nen/offline-manifest";
 import {
   cungChu,
+  khoaChu,
   type ChuSoHuu,
   type QueueKind,
   type QueueRecord,
@@ -438,6 +439,65 @@ export class VaultSession implements VaultMoKhoa {
     const k = this.keys.get(meta.vaultKeyId);
     if (!chu || !k) throw new LoiVault("locked");
     return maHoaPayload(k.key, banRo, this.aad(meta, chu, k));
+  }
+
+  /**
+   * Khôi phục khi mất proof (M131 §3): mã hoá lại MỘT bản ghi của THIẾT BỊ CŨ của chính chủ (cùng
+   * org + dự án hiện hành) bằng khoá `newKeyId` — khoá máy chủ đã bọc lại CÙNG DEK cho thiết bị
+   * này. Giải mã bằng AAD cũ (keyId/thiết bị/keyVersion cũ, cùng manifestHash), mã hoá lại bằng AAD
+   * mới (khoá/thiết bị/keyVersion hiện tại); operationId/kind/sequence giữ nguyên. Sai bất kỳ
+   * trường AAD nào → null (không ghi gì). Bản rõ chỉ nằm trong bộ nhớ và bị ghi đè 0 ngay sau đó.
+   */
+  async maHoaLaiTuThietBiCu(
+    rec: QueueRecord,
+    newKeyId: string,
+    oldKeyVersion: number,
+  ): Promise<QueueRecord | null> {
+    const chu = this.chu();
+    const k = this.keys.get(newKeyId);
+    if (!chu || !k) return null;
+    if (
+      rec.ownerUserId !== chu.ownerUserId ||
+      rec.orgId !== chu.orgId ||
+      rec.projectId !== chu.projectId ||
+      rec.deviceId === chu.deviceId
+    )
+      return null;
+    let banRo: Uint8Array<ArrayBuffer> | null = null;
+    try {
+      banRo = await giaiMaPayload(
+        k.key,
+        { iv: rec.iv, ciphertext: rec.ciphertext },
+        aadPayload({
+          keyId: rec.vaultKeyId,
+          manifestHash: k.manifestHash,
+          ownerUserId: rec.ownerUserId,
+          orgId: rec.orgId,
+          projectId: rec.projectId,
+          deviceId: rec.deviceId,
+          keyVersion: oldKeyVersion,
+          operationId: rec.operationId,
+          kind: rec.kind,
+          sequence: rec.sequence,
+        }),
+      );
+      const moi: QueueRecord = {
+        ...rec,
+        vaultKeyId: k.keyId,
+        deviceId: chu.deviceId,
+        owner: khoaChu(chu),
+        // Lease/fencing của thiết bị cũ không bao giờ trả kết quả nữa → gửi lại (dedup theo receipt).
+        ...(rec.state === "sending"
+          ? { state: "pending" as const, sendingToken: undefined, nextAttemptAt: Date.now() }
+          : {}),
+      };
+      const env = await maHoaPayload(k.key, banRo, this.aad(moi, chu, k));
+      return { ...moi, iv: env.iv, ciphertext: env.ciphertext };
+    } catch {
+      return null;
+    } finally {
+      banRo?.fill(0);
+    }
   }
 
   /** Giải mã bản ghi của CHÍNH chủ hiện hành; chủ khác/khoá chưa mở → LoiVault, không thử. */

@@ -290,6 +290,12 @@ export class MemoryTxDb implements TxDb {
 type MetaHangDoi = { k: "queue"; rev: number; lastSeq: number; photoBytes: number };
 type MetaLease = { k: string; holder: string; token: number; expiresAt: number };
 
+/** Một khoá được máy chủ bọc lại sang thiết bị mới (M131) — id + version cũ để dựng AAD cũ. */
+export type MucKhoiPhuc = { oldKeyId: string; newKeyId: string; oldKeyVersion: number };
+type MetaKhoiPhuc = { k: string; ds: MucKhoiPhuc[] };
+const khoaBanDo = (c: Pick<ChuSoHuu, "ownerUserId" | "orgId">) =>
+  `khoi-phuc|${c.ownerUserId}|${c.orgId}`;
+
 const META_KEY = "queue";
 const khoaLease = (c: ChuSoHuu) => `lease|${khoaPhamVi(c)}`;
 
@@ -513,6 +519,71 @@ export class QueueDb implements QueueStore {
         await t.put(STORE_META, { ...meta, rev: meta.rev + 1 });
       }
       return n;
+    });
+  }
+
+  // ── Khôi phục khi mất proof (M131 §3) ─────────────────────────────────────────────────
+
+  /**
+   * Op của CHÍNH user + org nhưng thuộc thiết bị KHÁC thiết bị hiện tại (proof cũ đã mất) — chỉ
+   * metadata định tuyến, không giải mã. Dùng để biết thiết bị cũ nào cần xin khôi phục.
+   */
+  async docOpThietBiKhac(
+    phamVi: Pick<ChuSoHuu, "ownerUserId" | "orgId" | "deviceId">,
+  ): Promise<QueueRecord[]> {
+    return this.db.tx([STORE_OPS], "readonly", async (t) =>
+      (await t.getAllByIndex<QueueRecord>(STORE_OPS, "ownerUserId", phamVi.ownerUserId)).filter(
+        (r) => r.orgId === phamVi.orgId && r.deviceId !== phamVi.deviceId,
+      ),
+    );
+  }
+
+  /**
+   * Thay nguyên tử các op của thiết bị cũ bằng bản đã mã hoá lại cho thiết bị hiện tại. Chỉ thay
+   * khi bản ghi TRONG transaction còn đúng như lúc đọc (owner/khoá/iv) — tab khác đã gắn lại/bỏ thì
+   * bỏ qua, không ghi đè. Không đổi operationId/sequence (gửi lại vẫn dedup theo receipt).
+   */
+  async ganLaiThietBi(ds: { cu: QueueRecord; moi: QueueRecord }[]): Promise<number> {
+    if (!ds.length) return 0;
+    return this.db.tx([STORE_OPS, STORE_META], "readwrite", async (t) => {
+      let n = 0;
+      for (const { cu, moi } of ds) {
+        const r = await t.get<QueueRecord>(STORE_OPS, cu.operationId);
+        if (
+          !r ||
+          moi.operationId !== cu.operationId ||
+          r.owner !== cu.owner ||
+          r.vaultKeyId !== cu.vaultKeyId ||
+          r.iv !== cu.iv
+        )
+          continue;
+        await t.put(STORE_OPS, moi);
+        n++;
+      }
+      if (n) {
+        const meta = await docMeta(t);
+        await t.put(STORE_META, { ...meta, rev: meta.rev + 1 });
+      }
+      return n;
+    });
+  }
+
+  /** Bản đồ khoá khôi phục (chỉ id + version cũ — KHÔNG khoá) của một chủ, để gắn lại dần. */
+  async docBanDoKhoiPhuc(chu: Pick<ChuSoHuu, "ownerUserId" | "orgId">): Promise<MucKhoiPhuc[]> {
+    return this.db.tx([STORE_META], "readonly", async (t) => {
+      const m = await t.get<MetaKhoiPhuc>(STORE_META, khoaBanDo(chu));
+      return m?.ds ?? [];
+    });
+  }
+
+  /** Ghi đè bản đồ khôi phục của chủ (rỗng → xoá bản ghi). */
+  async luuBanDoKhoiPhuc(
+    chu: Pick<ChuSoHuu, "ownerUserId" | "orgId">,
+    ds: MucKhoiPhuc[],
+  ): Promise<void> {
+    await this.db.tx([STORE_META], "readwrite", async (t) => {
+      if (ds.length) await t.put(STORE_META, { k: khoaBanDo(chu), ds } satisfies MetaKhoiPhuc);
+      else await t.delete(STORE_META, khoaBanDo(chu));
     });
   }
 

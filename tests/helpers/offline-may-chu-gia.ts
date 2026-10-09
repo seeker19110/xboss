@@ -27,6 +27,16 @@ export type MayChuGia = {
   /** Thu hồi quyền trên khoá (unlock không trả nữa) — mô phỏng manifest có tài nguyên bị thu hồi. */
   thuHoi(keyId: string): void;
   tatVault(): void;
+  /** Mất proof (xoá dữ liệu trình duyệt): user nhận thiết bị MỚI; trả id thiết bị cũ. */
+  doiThietBi(userId: number): string | undefined;
+  /**
+   * Mô phỏng hoàn tất khôi phục (M131): bọc lại khoá chưa thu hồi của thiết bị cũ sang thiết bị
+   * hiện tại — id/version mới, CÙNG DEK/manifest. Trả mapping như route thật.
+   */
+  khoiPhuc(
+    userId: number,
+    thietBiCu: string,
+  ): { oldKeyId: string; newKeyId: string; oldKeyVersion: number }[];
   khoa: Khoa[];
   thoiHanMs: number;
 };
@@ -135,6 +145,26 @@ export function taoMayChuGia(opts: { now?: () => number } = {}): MayChuGia {
     },
     tatVault: () => {
       tat = true;
+    },
+    doiThietBi: (userId) => {
+      const cu = thietBi.get(userId);
+      thietBi.set(userId, randomUUID());
+      return cu;
+    },
+    khoiPhuc: (userId, thietBiCu) => {
+      const moi = thietBi.get(userId) as string;
+      return khoa
+        .filter((k) => k.userId === userId && k.deviceId === thietBiCu && !k.biThuHoi)
+        .map((k) => {
+          const n: Khoa = {
+            ...k,
+            keyId: randomUUID(),
+            keyVersion: khoa.filter((x) => x.userId === userId).length + 1,
+            deviceId: moi,
+          };
+          khoa.push(n);
+          return { oldKeyId: k.keyId, newKeyId: n.keyId, oldKeyVersion: k.keyVersion };
+        });
     },
     get thoiHanMs() {
       return state.thoiHanMs;
