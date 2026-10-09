@@ -95,8 +95,11 @@ const MUTATIONS = [
   {
     key: "RLS: withProjectScope mặc định CHỈ ĐỌC",
     file: "lib/db/index.ts",
-    find: "const readOnly = opts?.readOnly ?? true;",
-    replace: "const readOnly = opts?.readOnly ?? false;",
+    // Chuỗi gồm cả dòng chữ ký `): Promise<T> {` của withProjectScope để không trượt sang withOrgScope
+    // (S16 — cùng mặc định chỉ đọc). Hai hàm nằm cách nhau bởi validate orgId nên mỏ neo này là duy nhất.
+    find: '  opts?: { readOnly?: boolean; isolation?: "repeatable_read" },\n): Promise<T> {\n  const readOnly = opts?.readOnly ?? true;',
+    replace:
+      '  opts?: { readOnly?: boolean; isolation?: "repeatable_read" },\n): Promise<T> {\n  const readOnly = opts?.readOnly ?? false;',
     tests: ["tests/rls.test.ts"],
     why: "Mặc định thành ghi được → mọi đường đọc bọc scope bỗng có quyền ghi ngoài ý muốn.",
   },
