@@ -255,6 +255,38 @@ export function decimalFromUnscaled(unscaled: bigint, scale: number): string {
   return `${negative ? "-" : ""}${whole}${fraction}`;
 }
 
+/**
+ * Số JS → chuỗi canonical đúng `scale` chữ số lẻ, làm tròn GIỐNG PostgreSQL khi ghi tham số số
+ * vào NUMERIC(p, scale): node-postgres gửi `String(n)`, PG làm tròn chuỗi thập phân đó ties xa 0.
+ * Vì vậy làm việc trên chữ số của `String(n)` (kể cả dạng mũ "1e-7"), KHÔNG qua `toFixed` nhị
+ * phân (1.0005.toFixed(3) = "1.000" nhưng PG ghi 1.001). Không hữu hạn → throw.
+ */
+export function decimalTuSoJs(n: number, scale: number): string {
+  if (!Number.isInteger(scale) || scale < 0 || scale > 18) {
+    throw new RangeError("decimal_scale_unsupported");
+  }
+  if (typeof n !== "number" || !Number.isFinite(n)) throw new TypeError("decimal_number_invalid");
+  const m = /^(-?)(\d+)(?:\.(\d+))?(?:e([+-]\d+))?$/i.exec(String(n));
+  if (!m) throw new TypeError("decimal_number_invalid");
+  const [, sign, whole, fraction = "", exp = "0"] = m;
+  const digits = BigInt(whole + fraction);
+  const shift = Number(exp) - fraction.length + scale;
+  const abs =
+    shift >= 0 ? digits * 10n ** BigInt(shift) : divRoundHalfUp(digits, 10n ** BigInt(-shift));
+  return decimalFromUnscaled(sign === "-" ? -abs : abs, scale);
+}
+
+/**
+ * Thành tiền MỘT dòng tròn tới ĐỒNG nguyên (ties xa 0): khối lượng scale `quantityScale` × đơn giá
+ * scale 2, nhân bigint rồi chia một lần — không round qua cents trước. Chỉ để HIỂN THỊ dòng; tổng
+ * đợt theo ipc-sum-v1 (`sumMoneyProductsExact`), không cộng số này.
+ */
+export function thanhTienDongExact(quantity: string, unitPrice: string, quantityScale = 3): bigint {
+  const product =
+    parseFixedDecimalExact(quantity, quantityScale) * parseFixedDecimalExact(unitPrice, 2);
+  return mulRatio(product, 1n, 10n ** BigInt(quantityScale + 2));
+}
+
 // A3-FR06 — định dạng tiền trên wire do client CHỌN THAM GIA (opt-in) qua header. Không gửi
 // header = giữ JSON number legacy (chỉ trong biên round-trip an toàn, ngoài biên báo lỗi).
 

@@ -4,7 +4,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Receipt } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import MaskedValue from "@/app/components/MaskedValue";
-import { mSum, mMul, mSumBy } from "@/app/lib/masked";
+import { mSumTien, mTongTichTien } from "@/app/lib/masked";
+import { MONEY_FORMAT_DECIMAL_V1, mulRatio } from "@/lib/nen/money";
+import { HEADER_TIEN_V1 } from "@/lib/nen/money-dto";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
@@ -13,20 +15,21 @@ import { Button, Card, Chip, StatCard } from "@/app/components/ui";
 import CertDocument, {
   CertBottomActions,
   useCertDocument,
-  fmtVND,
   STATUS_LABEL,
   STATUS_TONE,
   type Cert,
 } from "@/app/payment-certs/_components/CertDocument";
+import { fmtVNDMinor } from "@/app/payment-certs/_components/chiTietDot";
 
 type Contract = {
   id: number;
   code: string;
   title: string;
   kind: string;
-  value: number;
-  addendaTotal: number;
-  paid: number;
+  // decimal-string-v1 (HEADER_TIEN_V1): tiền là chuỗi canonical 2 số lẻ; null = bị che.
+  value: string | null;
+  addendaTotal: string | null;
+  paid: string | null;
 };
 
 export default function PaymentCertsPage() {
@@ -56,11 +59,16 @@ function PaymentCertsInner() {
   const canManage = me?.role === "admin" || me?.role === "pm";
 
   useEffect(() => {
-    Promise.all([fetchMe(), fetch("/api/contracts").then((r) => (r.ok ? r.json() : null))])
+    Promise.all([
+      fetchMe(),
+      fetch("/api/contracts", { headers: HEADER_TIEN_V1 }).then((r) => (r.ok ? r.json() : null)),
+    ])
       .then(([meData, c]) => {
         if (!meData) return;
         setMe(meData);
-        const list: Contract[] = c?.contracts ?? [];
+        // Tiền phải là chuỗi v1 (tính bigint) — server không nhận header thì không dùng số liệu,
+        // tránh trang sập khi parse number như chuỗi canonical.
+        const list: Contract[] = c?.moneyFormat === MONEY_FORMAT_DECIMAL_V1 ? c.contracts : [];
         setContracts(list);
         if (preselectContractId && list.some((x) => x.id === preselectContractId))
           setContractId(preselectContractId);
@@ -71,9 +79,9 @@ function PaymentCertsInner() {
   }, []);
 
   const loadCerts = useCallback((cid: number) => {
-    return fetch(`/api/payment-certs?contractId=${cid}`)
+    return fetch(`/api/payment-certs?contractId=${cid}`, { headers: HEADER_TIEN_V1 })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setCerts(j?.certs ?? []));
+      .then((j) => setCerts(j?.moneyFormat === MONEY_FORMAT_DECIMAL_V1 ? j.certs : []));
   }, []);
 
   useEffect(() => {
@@ -107,16 +115,19 @@ function PaymentCertsInner() {
 
   const contract = contracts.find((c) => c.id === contractId) ?? null;
   // M50 PR2: value/addendaTotal/unitPrice có thể bị che (null) với user thiếu viewPayments
-  // — dùng mSum/mMul để giá trị dẫn xuất cũng "bị che" (null), không ngầm thành 0.
-  const contractValue = contract ? mSum(contract.value, contract.addendaTotal) : null;
+  // — giá trị dẫn xuất cũng "bị che" (null), không ngầm thành 0. Tiền exact bigint đồng×100.
+  const contractValue = contract ? mSumTien(contract.value, contract.addendaTotal) : null;
 
   // Luỹ kế HĐ = luỹ kế HIỆU LỰC của đợt đã duyệt mới nhất — qtyCumulative server trả đã gồm chứng
   // từ điều chỉnh đã duyệt kỳ ≤ đợt (M128 §6), không tự cộng lại ở client.
-  const approvedCumulative = useMemo((): number | null => {
+  const approvedCumulative = useMemo((): bigint | null => {
     const approved = certs.filter((c) => c.status === "approved");
-    if (approved.length === 0) return 0;
+    // Chưa có đợt duyệt → tổng rỗng = 0 (mTongTichTien([]) = 0n).
+    if (approved.length === 0) return mTongTichTien([]);
     const latest = approved.reduce((a, b) => (a.periodNo > b.periodNo ? a : b));
-    return mSumBy(latest.items, (it) => mMul(Number(it.qtyCumulative), it.unitPrice));
+    return mTongTichTien(
+      latest.items.map((it) => ({ quantity: it.qtyCumulative, unitPrice: it.unitPrice })),
+    );
   }, [certs]);
 
   // Cảnh báo vượt giá trị HĐ: chỉ xác định được khi CẢ HAI vế không bị che — tránh vừa
@@ -124,13 +135,13 @@ function PaymentCertsInner() {
   const overContract =
     contractValue != null &&
     approvedCumulative != null &&
-    contractValue > 0 &&
+    contractValue > 0n &&
     approvedCumulative > contractValue;
   const pctUsed =
     contractValue == null || approvedCumulative == null
       ? null
-      : contractValue > 0
-        ? Math.round((approvedCumulative / contractValue) * 100)
+      : contractValue > 0n
+        ? Number(mulRatio(approvedCumulative, 100n, contractValue))
         : 0;
 
   async function createCert() {
@@ -223,12 +234,12 @@ function PaymentCertsInner() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <StatCard
                   label="Giá trị hợp đồng"
-                  value={<MaskedValue value={contractValue} format={fmtVND} />}
+                  value={<MaskedValue value={contractValue} format={fmtVNDMinor} />}
                   hint="Bao gồm phụ lục bổ sung"
                 />
                 <StatCard
                   label="Luỹ kế đã duyệt"
-                  value={<MaskedValue value={approvedCumulative} format={fmtVND} />}
+                  value={<MaskedValue value={approvedCumulative} format={fmtVNDMinor} />}
                   tone={overContract ? "danger" : "success"}
                   progress={pctUsed == null ? undefined : Math.min(100, pctUsed) / 100}
                   badge={pctUsed != null ? <Chip tone="neutral">{pctUsed}%</Chip> : undefined}

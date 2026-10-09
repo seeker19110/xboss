@@ -8,6 +8,7 @@
 // sẽ hiện "•••" thay vì 0. KHÔNG cộng/nhân tiền ở JS cho mục đích lưu trữ (M45) — đây chỉ
 // là gộp để HIỂN THỊ, đầu vào đã là number do SQL tính.
 
+import { sumMoneyProductsExact, thanhTienDongExact } from "@/lib/nen/money";
 import { minorTuWire } from "@/lib/nen/money-dto";
 
 type MNum = number | null | undefined;
@@ -74,4 +75,24 @@ export function mSubTien(a: MTien, b: MTien): bigint | null {
   const ma = minorOf(a);
   const mb = minorOf(b);
   return ma == null || mb == null ? null : ma - mb;
+}
+
+// ===== Thành tiền IPC exact: khối lượng (chuỗi scale 3) × đơn giá (chuỗi canonical scale 2) =====
+// Cùng quy tắc server (ipc-sum-v1: round(Σ qty×đơn giá, 2), không round từng dòng) nên số tạm tính
+// trên màn hình khớp TỪNG ĐỒNG với số server ghi. Đơn giá bị che (null) → kết quả bị che.
+
+type DongTich = { quantity: string; unitPrice: string | null | undefined };
+
+/** round(Σ khối lượng × đơn giá, 2) — bigint đồng×100; null nếu bất kỳ đơn giá nào bị che. */
+export function mTongTichTien(lines: readonly DongTich[]): bigint | null {
+  if (lines.some((l) => l.unitPrice == null)) return null;
+  return sumMoneyProductsExact(
+    lines.map((l) => ({ quantity: l.quantity, unitPrice: l.unitPrice as string })),
+    3,
+  );
+}
+
+/** Thành tiền một dòng tròn tới đồng (khớp PDF `certLineDong`); null nếu đơn giá bị che. */
+export function mThanhTienDong(line: DongTich): bigint | null {
+  return line.unitPrice == null ? null : thanhTienDongExact(line.quantity, line.unitPrice, 3);
 }

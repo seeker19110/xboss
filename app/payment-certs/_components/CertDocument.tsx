@@ -15,7 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import MaskedValue from "@/app/components/MaskedValue";
-import { mMul, mSumBy } from "@/app/lib/masked";
+import { mThanhTienDong, mTongTichTien } from "@/app/lib/masked";
 import { appAlert, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { Skeleton } from "@/app/components/Skeleton";
@@ -38,8 +38,11 @@ import {
   HEADER_DINH_DANG_TIEN,
   docChiTietDot,
   docYeuCauXacNhan,
+  fmtVNDDong,
   fmtVNDExact,
+  fmtVNDMinor,
   giaTriHieuLucDot,
+  khoiLuongNhapScale3,
   taoIdempotencyKey,
   type CertTotalsView,
   type DongVuot,
@@ -77,10 +80,12 @@ export type CertItem = {
   boqCode: string;
   boqName: string;
   boqUnit: string;
-  boqQtyContract: number;
-  qtyPeriod: number;
-  qtyCumulative: number;
-  unitPrice: number;
+  // decimal-string-v1 (trang gửi HEADER_TIEN_V1): khối lượng là chuỗi canonical scale 3, đơn giá
+  // chuỗi scale 2 — tính tiền bằng bigint, không qua float; đơn giá bị che → null.
+  boqQtyContract: string;
+  qtyPeriod: string;
+  qtyCumulative: string;
+  unitPrice: string | null;
 };
 
 /** M129: phiếu thanh toán sinh từ đợt đã duyệt (null = chưa có phiếu). */
@@ -158,8 +163,11 @@ export type CertDocumentCtrl = {
   totals: CertTotalsView | null;
   /** Lỗi tải tổng hợp giá trị (tiếng Việt) — khác "•••" (bị che quyền). */
   loiChiTiet: string | null;
-  /** Tạm tính theo KL đang nhập (chưa lưu) — chỉ để đối chiếu, không thay số của API. */
-  tamTinh: number | null;
+  /**
+   * Tạm tính theo KL đang nhập (chưa lưu) — chỉ để đối chiếu, không thay số của API. bigint
+   * đồng×100 theo ipc-sum-v1; null = đơn giá bị che.
+   */
+  tamTinh: bigint | null;
   saveItems: () => Promise<void>;
   submitCert: () => Promise<void>;
   decide: (decision: "approved" | "rejected") => Promise<void>;
@@ -187,8 +195,8 @@ export function useCertDocument({
   canDecide: boolean;
   /** Id người đang đăng nhập — ẩn nút đánh dấu chi với chính người duyệt đợt. */
   meId?: number | null;
-  /** null = bị che (thiếu viewPayments) */
-  contractValue: number | null;
+  /** Giá trị HĐ (gồm phụ lục) bigint đồng×100; null = bị che (thiếu viewPayments) */
+  contractValue: bigint | null;
   onSaved: () => void | Promise<void>;
   onClose: () => void;
 }): CertDocumentCtrl {
@@ -216,7 +224,9 @@ export function useCertDocument({
 
   // Đổi đợt (hoặc tải lại danh sách sau khi lưu) → nạp lại ô nhập theo số của server.
   useEffect(() => {
-    setQtys(Object.fromEntries((cert?.items ?? []).map((it) => [it.id, String(it.qtyPeriod)])));
+    setQtys(
+      Object.fromEntries((cert?.items ?? []).map((it) => [it.id, String(Number(it.qtyPeriod))])),
+    );
     setPeriodLabel(cert?.periodLabel ?? "");
   }, [cert]);
 
@@ -274,10 +284,18 @@ export function useCertDocument({
     return cert.items.some((it) => (Number(qtys[it.id]) || 0) !== Number(it.qtyPeriod));
   }, [cert, qtys, periodLabel]);
 
-  // M50 PR2: unitPrice có thể bị che (null) — dùng mMul/mSumBy để tổng tạm tính cũng
-  // "bị che" (null) thay vì ngầm thành 0.
+  // Tạm tính exact như server (ipc-sum-v1): KL đang nhập quy về đúng số server sẽ ghi (scale 3)
+  // × đơn giá bằng bigint, round tổng một lần. Đơn giá bị che (M50 PR2) → tổng bị che, không 0.
   const tamTinh = useMemo(
-    () => (cert ? mSumBy(cert.items, (it) => mMul(Number(qtys[it.id]) || 0, it.unitPrice)) : null),
+    () =>
+      cert
+        ? mTongTichTien(
+            cert.items.map((it) => ({
+              quantity: khoiLuongNhapScale3(qtys[it.id] ?? ""),
+              unitPrice: it.unitPrice,
+            })),
+          )
+        : null,
     [cert, qtys],
   );
 
@@ -407,15 +425,15 @@ export function useCertDocument({
       }
       // qtyCumulative server trả là luỹ kế HIỆU LỰC tới hết đợt này (gồm chứng từ điều chỉnh đã
       // duyệt của các kỳ ≤ đợt, M128 §6) — nếu duyệt, đây sẽ là luỹ kế mới của hợp đồng.
-      const projectedCumulative = mSumBy(cert.items, (it) =>
-        mMul(Number(it.qtyCumulative), it.unitPrice),
+      const projectedCumulative = mTongTichTien(
+        cert.items.map((it) => ({ quantity: it.qtyCumulative, unitPrice: it.unitPrice })),
       );
       // Chỉ cảnh báo vượt khi cả hai vế xác định (không bị che) — duyệt là quyền admin/pm
       // (có viewPayments) nên thực tế luôn xác định; guard để đúng kiểu + phòng thủ.
       const wouldBeOver =
         contractValue != null &&
         projectedCumulative != null &&
-        contractValue > 0 &&
+        contractValue > 0n &&
         projectedCumulative > contractValue;
       const label = wouldBeOver
         ? `Duyệt đợt ${cert.code}? CẢNH BÁO: luỹ kế sẽ vượt giá trị hợp đồng.`
@@ -918,9 +936,11 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
                   <td className="p-2">
                     {it.boqName} <span className="text-zinc-400">({it.boqUnit})</span>
                   </td>
-                  <td className="p-2 text-right tabular-nums text-zinc-400">{it.boqQtyContract}</td>
+                  <td className="p-2 text-right tabular-nums text-zinc-400">
+                    {Number(it.boqQtyContract)}
+                  </td>
                   <td className="p-2 text-right tabular-nums">
-                    <MaskedValue value={it.unitPrice} format={fmtVND} />
+                    <MaskedValue value={it.unitPrice} format={(v) => fmtVNDExact(v)} />
                   </td>
                   <td className="p-2 text-right">
                     {canEdit ? (
@@ -933,14 +953,17 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
                         className="w-24 min-h-10 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1 text-base sm:text-sm text-zinc-100 text-right tabular-nums outline-none focus:border-emerald-500 transition"
                       />
                     ) : (
-                      <span className="tabular-nums">{it.qtyPeriod}</span>
+                      <span className="tabular-nums">{Number(it.qtyPeriod)}</span>
                     )}
                   </td>
-                  <td className="p-2 text-right tabular-nums">{it.qtyCumulative}</td>
+                  <td className="p-2 text-right tabular-nums">{Number(it.qtyCumulative)}</td>
                   <td className="p-2 text-right tabular-nums">
                     <MaskedValue
-                      value={mMul(Number(qtys[it.id]) || 0, it.unitPrice)}
-                      format={fmtVND}
+                      value={mThanhTienDong({
+                        quantity: khoiLuongNhapScale3(qtys[it.id] ?? ""),
+                        unitPrice: it.unitPrice,
+                      })}
+                      format={fmtVNDDong}
                     />
                   </td>
                 </tr>
@@ -1029,8 +1052,8 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
           )}
           {ctrl.dirty && (
             <p className="text-[11px] text-zinc-400 border-t border-zinc-800 pt-2">
-              Tạm tính theo KL đang nhập: <MaskedValue value={tamTinh} format={fmtVND} /> — số trên
-              là của lần lưu gần nhất, bấm Lưu KL để cập nhật.
+              Tạm tính theo KL đang nhập: <MaskedValue value={tamTinh} format={fmtVNDMinor} /> — số
+              trên là của lần lưu gần nhất, bấm Lưu KL để cập nhật.
             </p>
           )}
         </Card>
