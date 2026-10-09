@@ -196,3 +196,26 @@ test(
     assert.ok((dem?.n ?? 0) <= 1, "viewer chỉ tốn tối đa 1 lượt quota, không 429");
   },
 );
+
+test(
+  "hitRateLimit dọn dòng hết hạn từ lâu (lấy mẫu) — không chỉ khi đăng nhập sai",
+  S,
+  async () => {
+    const { run, queryOne } = await import("@/lib/db");
+    const { gioiHanGhiTaiChinh } = await import("@/lib/bao-mat/ratelimit");
+    const cu = `tai-chinh:rac-${sfx}:0`;
+    await run(
+      `INSERT INTO login_rate_limits (key, count, reset_at) VALUES (?, 1, NOW() - interval '2 days')`,
+      cu,
+    );
+    const a = await taoAdmin();
+    const random = Math.random;
+    Math.random = () => 0; // ép nhánh lấy mẫu
+    try {
+      assert.equal(await gioiHanGhiTaiChinh("ipc-lap", a.id), null);
+    } finally {
+      Math.random = random;
+    }
+    assert.equal(await queryOne(`SELECT 1 FROM login_rate_limits WHERE key = ?`, cu), undefined);
+  },
+);

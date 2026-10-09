@@ -11,6 +11,9 @@
 - Test `tests/rate-limit-tai-chinh.test.ts` (15 ca: từng handler quota đầy → 429, người khác vẫn qua; lượt
   61 bị chặn, loại khác đếm riêng) — 14 ca đỏ trước khi gắn vào route. 52 file test chạm các route này
   chạy tuần tự trên DB sạch: 0 fail (không file nào vượt 60 lượt/loại/người).
+- Dọn dòng `login_rate_limits` hết hạn > 1 ngày (lấy mẫu 1%) chuyển vào `hitRateLimit` dùng chung — trước chỉ
+  dọn khi đăng nhập sai, khoá API/tài chính (người × loại) làm bảng phình → health-check >5000 dòng báo giả
+  (LOW từ audit). +1 ca test ép nhánh lấy mẫu.
 
 ## 2026-10-09 — `DEPLOY.md`: yêu cầu PostgreSQL ≥ 15
 

@@ -53,6 +53,12 @@ export async function hitRateLimit(
     windowMinutes,
     windowMinutes,
   );
+  // Dọn rác entry hết hạn từ lâu — lấy mẫu xác suất thấp để không thêm round-trip mỗi lượt. Đặt ở đây
+  // (không chỉ ở đăng nhập sai) vì khoá API/tài chính sinh dòng theo người × loại thao tác: chỉ dọn khi
+  // có đăng nhập sai thì bảng phình, health-check (>5000 dòng) báo động giả.
+  if (Math.random() < 0.01) {
+    await run(`DELETE FROM login_rate_limits WHERE reset_at < NOW() - INTERVAL '1 day'`);
+  }
   return (rows[0]?.count ?? 1) > max;
 }
 
@@ -66,10 +72,6 @@ async function bump(key: string): Promise<void> {
 export async function recordLoginFailure(ip: string, email: string): Promise<void> {
   await bump(pairKey(ip, email));
   await bump(ipKey(ip));
-  // Dọn rác entry hết hạn từ lâu — lấy mẫu xác suất thấp để không thêm round-trip mỗi lần đăng nhập.
-  if (Math.random() < 0.01) {
-    await run(`DELETE FROM login_rate_limits WHERE reset_at < NOW() - INTERVAL '1 day'`);
-  }
 }
 
 // Đăng nhập đúng → xoá đếm của cặp IP+email (không xoá đếm theo IP).
