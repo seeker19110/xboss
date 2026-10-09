@@ -6,6 +6,7 @@
 // mỗi vòng chỉ thấy đúng dữ liệu một tổ chức (D01: không có ngữ cảnh "nhìn mọi org").
 // Bảng `organizations` không bật RLS nên liệt kê được khi chưa có ngữ cảnh.
 import { query } from "@/lib/db";
+import { log } from "@/lib/nen/log";
 import { getRequestContext, runWithRequestContext } from "@/lib/nen/request-context";
 
 /** Id mọi tổ chức, tăng dần. */
@@ -19,10 +20,33 @@ export function trongToChuc<T>(orgId: number, fn: () => Promise<T>): Promise<T> 
   return runWithRequestContext({ requestId: getRequestContext()?.requestId, orgId }, fn);
 }
 
-/** Chạy fn lần lượt cho từng tổ chức (tuần tự — job cron không cần song song), gom kết quả. */
+/**
+ * Chạy fn lần lượt cho từng tổ chức (tuần tự — job cron không cần song song), gom kết quả.
+ * Cách ly lỗi giữa tenant: một tổ chức ném lỗi thì ghi log kèm orgId và CHẠY TIẾP các tổ chức
+ * sau (báo cáo/webhook của tenant khác không bị một tenant hỏng kéo theo); chạy xong mới ném
+ * một lỗi tổng hợp liệt kê các tổ chức lỗi — không nuốt lỗi im lặng, caller vẫn trả 500.
+ */
 export async function theoTungToChuc<T>(fn: (orgId: number) => Promise<T>): Promise<T[]> {
   const ketQua: T[] = [];
-  for (const orgId of await danhSachToChuc())
-    ketQua.push(await trongToChuc(orgId, () => fn(orgId)));
+  const loi: { orgId: number; error: unknown }[] = [];
+  for (const orgId of await danhSachToChuc()) {
+    try {
+      ketQua.push(await trongToChuc(orgId, () => fn(orgId)));
+    } catch (error) {
+      log.error("Job theo tổ chức lỗi — bỏ qua tổ chức này, chạy tiếp", {
+        orgId,
+        err: error instanceof Error ? error.message : String(error),
+      });
+      loi.push({ orgId, error });
+    }
+  }
+  if (loi.length > 0)
+    throw Object.assign(
+      new Error(
+        `Job theo tổ chức lỗi ở ${loi.length}/${loi.length + ketQua.length} tổ chức: ` +
+          loi.map((l) => l.orgId).join(", "),
+      ),
+      { loi },
+    );
   return ketQua;
 }

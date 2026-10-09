@@ -461,6 +461,14 @@ export async function withOrgScope<T>(
     await datPhamVi(frameNgoai);
     return fn();
   }
+  // Ngoài transaction nhưng request đã xác thực (ngữ cảnh có orgId): chỉ được dùng đúng org đó —
+  // không nâng lên '*' hay đổi org (cùng bất biến với nhánh lồng ở trên; '*' chỉ dành cho đường
+  // CHƯA có actor: đăng nhập, cron bằng secret, script).
+  const orgNguCanh = getRequestContext()?.orgId;
+  if (orgNguCanh != null && String(orgNguCanh) !== scope)
+    throw new Error(
+      `withOrgScope: request đã thuộc tổ chức '${String(orgNguCanh)}' không được đổi phạm vi sang '${scope}'`,
+    );
   return withTransaction(
     async () => {
       const frame = txStorage.getStore();

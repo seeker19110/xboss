@@ -21,6 +21,13 @@
 -- app.org_id cho câu lệnh ngoài transaction của request đã xác thực + withOrgScope ở đường chưa
 -- có actor) PHẢI lên cùng/trước migration này.
 --
+-- MIGRATION DỮ LIỆU SAU NÀY trên 18 bảng này (UPDATE/INSERT/DELETE backfill): role migration ở
+-- production KHÔNG phải superuser và bảng FORCE RLS → thiếu GUC thì câu ghi thấy 0 dòng và LẶNG LẼ
+-- không làm gì (CI không bắt được vì role ci là superuser). Migration như vậy phải tự mở phạm vi
+-- trong cùng transaction: `SELECT set_config('app.org_id', '*', true);` (và/hoặc
+-- `set_config('app.project_id', '*', true)` cho 3 bảng theo dự án) TRƯỚC câu ghi —
+-- tests/migrations-rls-scope.test.ts quét và đòi điều này cho mọi file sau 0165.
+--
 -- ROLLBACK (không có down-migration tự động): tạo lại policy 3 nhánh bằng cách chạy lại thủ công
 -- (psql, role owner) khối DO của migrations/0080_org_rls.sql (14 bảng), câu CREATE POLICY
 -- p_org_cost_settings_org của migrations/0161_org_config_scope.sql, và khối DO + câu CREATE

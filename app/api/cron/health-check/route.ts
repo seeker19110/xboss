@@ -56,11 +56,13 @@ async function handleHealthCheck(): Promise<NextResponse> {
         .map((s) => s.trim())
         .filter(Boolean);
       if (to.length === 0) {
-        // Cảnh báo sức khoẻ là của CẢ HỆ THỐNG (không thuộc org nào) nên giữ hành vi gửi mọi
-        // Admin: phạm vi '*' do server đặt, chỉ lấy cột email (S16, RLS 0165).
-        const rows = await withOrgScope("*", () =>
-          query<{ email: string }>(`SELECT email FROM users WHERE role = 'admin'`),
-        );
+        // Cảnh báo sức khoẻ là của CẢ HỆ THỐNG: cron bằng CRON_SECRET (chưa có actor) gửi mọi
+        // Admin với phạm vi '*' do server đặt; Admin/PM bấm tay bằng phiên thì request đã thuộc
+        // một tổ chức → chỉ Admin của tổ chức đó (withOrgScope từ chối nâng lên '*' — D01, S16).
+        const sqlAdmin = `SELECT email FROM users WHERE role = 'admin'`;
+        const rows = bySecret
+          ? await withOrgScope("*", () => query<{ email: string }>(sqlAdmin))
+          : await query<{ email: string }>(sqlAdmin);
         to = rows.map((r) => r.email);
       }
       if (to.length > 0) {

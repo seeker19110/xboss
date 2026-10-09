@@ -303,6 +303,49 @@ test("A1-AC06: GUC rỗng → INSERT bị WITH CHECK chặn (suppliers, baseline
   );
 });
 
+test("A1-AC06: GUC = A → INSERT/UPDATE dòng sang org/dự án B bị WITH CHECK chặn", S, async () => {
+  const [supA] = dong.get("suppliers")!;
+  const [blA] = dong.get("baselines")!;
+  await assert.rejects(
+    voiGuc({ org: String(A.org) }, (c) =>
+      c.query(`INSERT INTO suppliers (name, org_id) VALUES ('S16 chéo', $1)`, [B.org]),
+    ),
+    /row-level security/,
+  );
+  await assert.rejects(
+    voiGuc({ org: String(A.org) }, (c) =>
+      c.query(`UPDATE suppliers SET org_id = $1 WHERE id = $2`, [B.org, supA]),
+    ),
+    /row-level security/,
+  );
+  await assert.rejects(
+    voiGuc({ project: String(A.proj) }, (c) =>
+      c.query(`UPDATE baselines SET project_id = $1 WHERE id = $2`, [B.proj, blA]),
+    ),
+    /row-level security/,
+  );
+});
+
+test(
+  "S16: theoTungToChuc — tổ chức lỗi không chặn tổ chức sau; ném lỗi tổng hợp sau khi chạy hết",
+  S,
+  async () => {
+    const { theoTungToChuc } = await import("@/lib/ha-tang/to-chuc");
+    const daChay: number[] = [];
+    await assert.rejects(
+      theoTungToChuc(async (orgId) => {
+        daChay.push(orgId);
+        if (orgId === A.org) throw new Error("boom");
+        return orgId;
+      }),
+      (e: Error & { loi?: { orgId: number }[] }) =>
+        /lỗi ở 1\//.test(e.message) && e.loi?.length === 1 && e.loi[0].orgId === A.org,
+    );
+    assert.ok(daChay.includes(A.org) && daChay.includes(B.org), String(daChay));
+    assert.ok(daChay.indexOf(B.org) > daChay.indexOf(A.org));
+  },
+);
+
 test("A1-AC01: GUC = org/dự án A → chỉ thấy dòng của A; '*' thấy cả hai", S, async () => {
   for (const bang of BANG_TO_CHUC) {
     const [a, b] = dong.get(bang)!;
@@ -509,6 +552,8 @@ test(
           (x) => x.projectId,
         );
         assert.ok(duAn.includes(A.proj) && duAn.includes(B.proj), `cron thiếu dự án: ${duAn}`);
+        // Mỗi dự án đúng 1 lần — chạy theo từng org, không phải '*' lặp n lần.
+        assert.equal(new Set(duAn).size, duAn.length, `cron đếm lặp dự án: ${duAn}`);
         // Không secret, không phiên → 401.
         assert.equal(
           (await dailyReport(new NextRequest("http://localhost/api/cron/daily-report"))).status,
@@ -533,5 +578,42 @@ test(
     const kq = await voiPoolApp(() => thuThapMembershipDryRun());
     const orgIds = kq.orgs.map((o) => Number(o.id));
     assert.ok(orgIds.includes(A.org) && orgIds.includes(B.org), JSON.stringify(orgIds));
+  },
+);
+
+test(
+  "A1-AC04: withOrgScope NGOÀI transaction trong request đã có org không được nâng lên '*' hay đổi org",
+  S,
+  async () => {
+    const { query, withOrgScope } = await import("@/lib/db");
+    const { runWithRequestContext } = await import("@/lib/nen/request-context");
+    const [supA, supB] = dong.get("suppliers")!;
+    const sql = `SELECT id FROM suppliers WHERE id = ANY(?::int[]) ORDER BY id`;
+    await voiPoolApp(async () => {
+      await assert.rejects(
+        runWithRequestContext({ orgId: A.org }, () =>
+          withOrgScope("*", () => query(sql, [supA, supB])),
+        ),
+        /không được đổi phạm vi/,
+      );
+      await assert.rejects(
+        runWithRequestContext({ orgId: A.org }, () =>
+          withOrgScope(B.org, () => query(sql, [supA, supB])),
+        ),
+        /không được đổi phạm vi/,
+      );
+      // Cùng org thì vẫn chạy; không ngữ cảnh thì '*' hợp lệ (đường chưa có actor).
+      const cungOrg = await runWithRequestContext({ orgId: A.org }, () =>
+        withOrgScope(A.org, () => query<{ id: number }>(sql, [supA, supB])),
+      );
+      assert.deepEqual(
+        cungOrg.map((r) => Number(r.id)),
+        [supA],
+      );
+      const khongNguCanh = await runWithRequestContext({}, () =>
+        withOrgScope("*", () => query<{ id: number }>(sql, [supA, supB])),
+      );
+      assert.equal(khongNguCanh.length, 2);
+    });
   },
 );
