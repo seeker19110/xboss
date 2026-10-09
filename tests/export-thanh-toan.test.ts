@@ -1,6 +1,6 @@
 import { HAS_TEST_DB } from "./setup";
 import { dangNhap, dangNhapDuAn, dangXuat } from "./helpers/phien";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
@@ -87,6 +87,19 @@ const ctx = (async () => {
   await taoTangHe(b, "b", "999.00", ["T9"]);
   return { a, b };
 })();
+
+// Dọn floor_contracts của các dự án test: test khác (vd import-real) xoá toàn bộ sheet_types, dòng
+// floor_contracts sót lại làm vỡ khoá ngoại floor_contracts_sheet_type_id_fkey của chúng.
+after(async () => {
+  if (!HAS_TEST_DB) return;
+  const { run } = await import("@/lib/db");
+  await run(
+    `DELETE FROM floor_contracts WHERE sheet_type_id IN (
+       SELECT st.id FROM sheet_types st JOIN towers t ON t.id = st.tower_id
+        JOIN projects p ON p.id = t.project_id WHERE p.name LIKE ?)`,
+    `XTT ${RUN} %`,
+  );
+});
 
 async function docWb(res: Response) {
   const wb = new ExcelJS.Workbook();
