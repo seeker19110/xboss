@@ -2,7 +2,8 @@
 // thái, validate thuần, và các query tổng hợp (danh sách VO + dòng KL, VO quá hạn
 // chưa quyết). Dòng KL của VO dùng chung bảng boq_items (vo_id, qty_approved) —
 // xem docs/nang-cap/M06-phat-sinh-vo.md.
-import { parseMoneyInput } from "@/lib/nen/money";
+import { parseMoneyExact, parseMoneyInput, type MoneyWireFormat } from "@/lib/nen/money";
+import { moneyOrNullToWire, thapPhanTextToWire, type MoneyWire } from "@/lib/nen/money-dto";
 import { query } from "@/lib/db";
 import { daysFromTodayISO } from "@/lib/nen/date";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
@@ -124,14 +125,20 @@ export async function checkVoLinesTaken(
   return null;
 }
 
+// S15 (Q-AC04, A3-FR06): mọi số NUMERIC của VO đọc `::text` ngay trong SQL — kể cả bên trong
+// json_build_object/json_agg (parser NUMERIC toàn cục là float, json_agg cũng ra JSON number) —
+// rồi mới đổi sang wire ở biên DTO (`variationsToWire`), không qua float JS.
 export type VoLineRow = {
   id: number;
   code: string;
   name: string;
   unit: string;
-  qtyProposed: number;
-  qtyApproved: number | null;
-  unitPrice: number;
+  /** boq_items.qty_contract NUMERIC(15,3) — chuỗi canonical 3 số lẻ. */
+  qtyProposed: string;
+  /** boq_items.qty_approved NUMERIC(15,3) — chuỗi canonical 3 số lẻ; null = chưa duyệt. */
+  qtyApproved: string | null;
+  /** boq_items.unit_price NUMERIC(15,2) — chuỗi canonical 2 số lẻ. */
+  unitPrice: string;
 };
 
 export type VoRow = {
@@ -152,13 +159,17 @@ export type VoRow = {
   createdBy: number | null;
   createdByName: string | null;
   createdAt: string;
-  proposedValue: number;
-  approvedValue: number;
+  /** MoneyMinor (đồng×100) = ROUND(Σ qty_contract×unit_price, 2), cộng NUMERIC trong SQL. */
+  proposedValue: bigint;
+  /** MoneyMinor = ROUND(Σ qty_approved×unit_price, 2) khi VO đã duyệt, ngược lại 0. */
+  approvedValue: bigint;
   lines: VoLineRow[];
 };
 
 // Danh sách VO kèm dòng KL con + tổng giá trị đề xuất (Σ qty_contract×unit_price)
-// và giá trị được duyệt (Σ qty_approved×unit_price, chỉ tính khi status đã duyệt).
+// và giá trị được duyệt (Σ qty_approved×unit_price, chỉ tính khi status đã duyệt). Tổng cộng
+// NUMERIC trong SQL rồi ROUND 2 số lẻ SAU khi cộng (cùng quy tắc `approval_requests.amount` ở
+// POST /api/variations và contract-add), đọc `::text` → bigint, không qua float.
 // Lọc theo status hoặc id (getVariation dùng id để lấy đúng 1 VO không quét cả bảng).
 // projectId (M22): undefined = không lọc dự án (dùng nội bộ/test cũ).
 export async function listVariations(filter?: {
@@ -181,24 +192,24 @@ export async function listVariations(filter?: {
     args.push(filter.projectId);
   }
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
-  const rows = await query<VoRow>(
+  const rows = await query<Omit<VoRow, "proposedValue" | "approvedValue"> & VoTotalsText>(
     `SELECT v.id, v.code, v.title, v.reason, v.description,
             v.system_id AS "systemId", d.code AS "systemCode",
             d.name AS "systemName", d.color AS "systemColor",
             v.contract_id AS "contractId", c.code AS "contractCode",
             v.status, v.submitted_at AS "submittedAt", v.decided_at AS "decidedAt",
             v.created_by AS "createdBy", u.name AS "createdByName", v.created_at AS "createdAt",
-            COALESCE(SUM(bi.qty_contract * bi.unit_price), 0) AS "proposedValue",
-            COALESCE(SUM(
+            ROUND(COALESCE(SUM(bi.qty_contract * bi.unit_price), 0), 2)::text AS "proposedValue",
+            ROUND(COALESCE(SUM(
               CASE WHEN v.status IN ('approved','partially_approved','contract_added')
                    THEN COALESCE(bi.qty_approved, 0) * bi.unit_price ELSE 0 END
-            ), 0) AS "approvedValue",
+            ), 0), 2)::text AS "approvedValue",
             COALESCE(
               json_agg(
                 json_build_object(
                   'id', bi.id, 'code', bi.code, 'name', bi.name, 'unit', bi.unit,
-                  'qtyProposed', bi.qty_contract, 'qtyApproved', bi.qty_approved,
-                  'unitPrice', bi.unit_price
+                  'qtyProposed', bi.qty_contract::text, 'qtyApproved', bi.qty_approved::text,
+                  'unitPrice', bi.unit_price::text
                 ) ORDER BY bi.id
               ) FILTER (WHERE bi.id IS NOT NULL),
               '[]'
@@ -213,7 +224,56 @@ export async function listVariations(filter?: {
       ORDER BY v.created_at DESC, v.id DESC`,
     ...args,
   );
-  return rows;
+  return rows.map((r) => ({
+    ...r,
+    proposedValue: parseMoneyExact(r.proposedValue),
+    approvedValue: parseMoneyExact(r.approvedValue),
+  }));
+}
+
+type VoTotalsText = { proposedValue: string; approvedValue: string };
+
+/** VO sau `stripSensitive("variation")`: trường tiền bị che là null (không bao giờ thành 0). */
+export type VoRowMasked = Omit<VoRow, "proposedValue" | "approvedValue" | "lines"> & {
+  proposedValue: bigint | null;
+  approvedValue: bigint | null;
+  lines: (Omit<VoLineRow, "unitPrice"> & { unitPrice: string | null })[];
+};
+
+export type VoLineWire = Omit<VoLineRow, "qtyProposed" | "qtyApproved" | "unitPrice"> & {
+  qtyProposed: MoneyWire;
+  qtyApproved: MoneyWire | null;
+  unitPrice: MoneyWire | null;
+};
+
+export type VoRowWire = Omit<VoRowMasked, "proposedValue" | "approvedValue" | "lines"> & {
+  proposedValue: MoneyWire | null;
+  approvedValue: MoneyWire | null;
+  lines: VoLineWire[];
+};
+
+/**
+ * Adapter DTO (A3-FR06): decimal-string-v1 → tiền là chuỗi canonical 2 số lẻ, khối lượng chuỗi
+ * canonical 3 số lẻ (scale riêng); legacy → JSON number chỉ khi round-trip đúng, ngoài biên throw
+ * RangeError("money_precision_unsupported") (route trả 422). Gọi SAU `stripSensitive` — trường đã
+ * che giữ null ở cả hai định dạng, nên 422 không bao giờ lộ độ lớn số tiền cho người bị che.
+ */
+export function variationsToWire(
+  rows: readonly VoRowMasked[],
+  format: MoneyWireFormat,
+): VoRowWire[] {
+  return rows.map((row) => ({
+    ...row,
+    proposedValue: moneyOrNullToWire(row.proposedValue, format),
+    approvedValue: moneyOrNullToWire(row.approvedValue, format),
+    lines: row.lines.map((line) => ({
+      ...line,
+      qtyProposed: thapPhanTextToWire(line.qtyProposed, 3, format),
+      qtyApproved:
+        line.qtyApproved == null ? null : thapPhanTextToWire(line.qtyApproved, 3, format),
+      unitPrice: line.unitPrice == null ? null : thapPhanTextToWire(line.unitPrice, 2, format),
+    })),
+  }));
 }
 
 // projectId khi truyền → trả undefined nếu VO không thuộc dự án đang chọn (chặn

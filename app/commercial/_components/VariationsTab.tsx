@@ -13,30 +13,48 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
-import { formatDateVN } from "@/lib/nen/date";
+import MaskedValue from "@/app/components/MaskedValue";
+import { mSumTien } from "@/app/lib/masked";
+import { HEADER_TIEN_V1, fmtDongGonMinor, minorTuWire } from "@/lib/nen/money-dto";
+
+/** Dòng VO đọc ở decimal-string-v1 (S15): tiền là chuỗi canonical; null = API che. */
+type VoTomTat = {
+  id: number;
+  code: string;
+  title: string;
+  reason: string;
+  systemCode: string | null;
+  status: string;
+  proposedValue: string | null;
+  approvedValue: string | null;
+};
+
+/** Tiền gọn (tỷ/tr/đồng) từ đồng×100 — bigint, không qua float. */
+function fmtVND(v: string | bigint): string {
+  const minor = typeof v === "bigint" ? v : minorTuWire(v);
+  const abs = minor < 0n ? -minor : minor;
+  if (minor === 0n) return "0 đ";
+  return abs >= 100_000_000n ? fmtDongGonMinor(minor) : `${fmtDongGonMinor(minor)} đ`;
+}
 
 export default function VariationsTab() {
-  const [variations, setVariations] = useState<any[]>([]);
+  const [variations, setVariations] = useState<VoTomTat[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     setLoading(true);
-    fetch("/api/variations")
-      .then((r) => (r.ok ? r.json() : { variations: [] }))
-      .then((data) => setVariations(data.variations || []))
+    // API trả khoá `items` (trước đây đọc nhầm `variations` → bảng luôn rỗng). S15: chọn
+    // decimal-string-v1 để tổng VO lớn không dính 422 của định dạng number cũ.
+    fetch("/api/variations", { headers: HEADER_TIEN_V1 })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((data) => setVariations(data.items || []))
       .catch(() => showToast("Không tải được sổ phát sinh VO", "error"))
       .finally(() => setLoading(false));
   }, []);
 
-  function fmtVND(n: number) {
-    if (!n) return "0 đ";
-    if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)} tỷ`;
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} tr`;
-    return Math.round(n).toLocaleString("vi-VN") + " đ";
-  }
-
-  const totalVoProposed = variations.reduce((acc, v) => acc + (Number(v.totalProposed) || 0), 0);
-  const totalVoApproved = variations.reduce((acc, v) => acc + (Number(v.totalApproved) || 0), 0);
+  // Cộng bigint; một giá trị bị che → tổng cũng che ("•••"), không ngầm thành 0 (M50 PR2).
+  const totalVoProposed = mSumTien(0n, ...variations.map((v) => v.proposedValue));
+  const totalVoApproved = mSumTien(0n, ...variations.map((v) => v.approvedValue));
 
   return (
     <div className="space-y-6">
@@ -86,11 +104,17 @@ export default function VariationsTab() {
 
           <div className="flex items-center gap-2 text-xs font-mono">
             <span className="text-zinc-400">
-              Đề xuất: <strong className="text-zinc-200">{fmtVND(totalVoProposed)}</strong>
+              Đề xuất:{" "}
+              <strong className="text-zinc-200">
+                <MaskedValue value={totalVoProposed} format={fmtVND} />
+              </strong>
             </span>
             <span className="text-zinc-600">•</span>
             <span className="text-emerald-400">
-              Đã duyệt: <strong>{fmtVND(totalVoApproved)}</strong>
+              Đã duyệt:{" "}
+              <strong>
+                <MaskedValue value={totalVoApproved} format={fmtVND} />
+              </strong>
             </span>
           </div>
         </div>
@@ -120,14 +144,14 @@ export default function VariationsTab() {
                     <td className="py-3 px-3">
                       <div className="font-semibold text-zinc-200">{vo.title}</div>
                       <div className="text-[11px] text-zinc-500">
-                        {vo.reasonLabel || vo.reason} • Hệ: {vo.systemCode || "Chung"}
+                        {vo.reason} • Hệ: {vo.systemCode || "Chung"}
                       </div>
                     </td>
                     <td className="py-3 px-3 text-right font-mono text-zinc-300">
-                      {fmtVND(vo.totalProposed)}
+                      <MaskedValue value={vo.proposedValue} format={fmtVND} />
                     </td>
                     <td className="py-3 px-3 text-right font-mono font-semibold text-emerald-400">
-                      {fmtVND(vo.totalApproved)}
+                      <MaskedValue value={vo.approvedValue} format={fmtVND} />
                     </td>
                     <td className="py-3 px-3 text-center">
                       <span

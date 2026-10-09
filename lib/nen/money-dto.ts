@@ -9,6 +9,7 @@ import {
   MONEY_FORMAT_DECIMAL_V1,
   MONEY_FORMAT_HEADER,
   MoneyInputError,
+  decimalFromUnscaled,
   moneyToDecimal,
   moneyToWire,
   mulRatio,
@@ -86,6 +87,28 @@ export function tienTextToWire(
   format: MoneyWireFormat,
 ): MoneyWire | null {
   return text == null ? null : moneyToWire(parseMoneyExact(text), format);
+}
+
+/**
+ * Bản `::text` của một cột NUMERIC có scale riêng (khối lượng NUMERIC(15,3), đơn giá (15,2)…) →
+ * wire: v1 = chuỗi canonical đúng `scale` (không quantize, giữ đuôi 0); legacy = JSON number CHỈ
+ * khi round-trip đúng, ngoài biên throw RangeError("money_precision_unsupported") (→ 422). Text
+ * không đúng scale/sai dạng → throw (không đoán). Dùng chung cho dòng KL IPC (S10a) và VO (S15).
+ */
+export function thapPhanTextToWire(
+  text: string,
+  scale: number,
+  format: MoneyWireFormat,
+): MoneyWire {
+  const unscaled = parseFixedDecimalExact(text, scale);
+  const canonical = decimalFromUnscaled(unscaled, scale);
+  if (format === MONEY_FORMAT_DECIMAL_V1) return canonical;
+  const max = BigInt(Number.MAX_SAFE_INTEGER);
+  const n = Number(canonical);
+  if (unscaled < -max || unscaled > max || n.toFixed(scale) !== canonical) {
+    throw new RangeError("money_precision_unsupported");
+  }
+  return n;
 }
 
 // ===== Phía client (đã opt-in v1 nên mọi amount là chuỗi canonical) =====

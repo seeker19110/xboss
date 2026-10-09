@@ -10,10 +10,9 @@ import {
   moneyToWire,
   mulRatio,
   parseFixedDecimalExact,
-  decimalFromUnscaled,
-  MONEY_FORMAT_DECIMAL_V1,
   type MoneyWireFormat,
 } from "@/lib/nen/money";
+import { thapPhanTextToWire } from "@/lib/nen/money-dto";
 import { nextSeqCode } from "@/lib/ha-tang/seqcode";
 import { daysFromTodayISO } from "@/lib/nen/date";
 import { log } from "@/lib/nen/log";
@@ -526,22 +525,6 @@ export type CertItemWire = Omit<CertItemRow, CertItemDecimalField> & {
   [K in CertItemDecimalField]: string | number | null;
 };
 
-/** Text NUMERIC của Postgres → chuỗi canonical đúng scale (fail-fast nếu sai dạng). */
-function canonicalDecimal(text: string, scale: number): string {
-  return decimalFromUnscaled(parseFixedDecimalExact(text, scale), scale);
-}
-
-/** Legacy: chuỗi canonical → number CHỈ khi round-trip đúng; không thì lỗi precision (→ 422). */
-function decimalToNumberSafe(canonical: string, scale: number): number {
-  const unscaled = parseFixedDecimalExact(canonical, scale);
-  const max = BigInt(Number.MAX_SAFE_INTEGER);
-  const n = Number(canonical);
-  if (unscaled < -max || unscaled > max || n.toFixed(scale) !== canonical) {
-    throw new RangeError("money_precision_unsupported");
-  }
-  return n;
-}
-
 /**
  * Adapter DTO dòng KL (S10a, A3-FR06): giá trị lấy từ `exact` (`certItemsExact`, `::text`) theo
  * id dòng, KHÔNG từ số float của `json_agg`. Gọi SAU `stripSensitive` — trường đã che (null)
@@ -562,10 +545,7 @@ export function certItemsToWire(
         out[field] = null;
         continue;
       }
-      const scale = CERT_ITEM_DECIMAL_SCALE[field];
-      const canonical = canonicalDecimal(src[field], scale);
-      out[field] =
-        format === MONEY_FORMAT_DECIMAL_V1 ? canonical : decimalToNumberSafe(canonical, scale);
+      out[field] = thapPhanTextToWire(src[field], CERT_ITEM_DECIMAL_SCALE[field], format);
     }
     return out;
   });

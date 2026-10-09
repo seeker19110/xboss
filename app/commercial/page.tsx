@@ -5,6 +5,7 @@ import { Coins, FileSignature, Receipt, Scale, TrendingUp, FilePlus2 } from "luc
 import HubShell, { type HubTab, type HubStat } from "@/app/components/HubShell";
 import { Skeleton } from "@/app/components/Skeleton";
 import { addMoney, formatVnd, parseMoney } from "@/lib/nen/money";
+import { HEADER_TIEN_V1 } from "@/lib/nen/money-dto";
 import ContractsTab from "./_components/ContractsTab";
 import IpcPaymentsTab from "./_components/IpcPaymentsTab";
 import VariationsTab from "./_components/VariationsTab";
@@ -49,15 +50,17 @@ function CommercialContent() {
   ]);
 
   useEffect(() => {
-    const get = (url: string) =>
-      fetch(url)
+    const get = (url: string, init?: RequestInit) =>
+      fetch(url, init)
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null);
 
     Promise.all([
       get("/api/contracts"),
       get("/api/payment-certs"),
-      get("/api/variations"),
+      // Chỉ đếm theo trạng thái, nhưng chọn decimal-string-v1 để VO giá trị lớn không làm cả ô
+      // thành "—" vì 422 của định dạng number cũ (S15).
+      get("/api/variations", { headers: HEADER_TIEN_V1 }),
       get("/api/claims"),
     ]).then(([cData, certData, voData, clmData]) => {
       const cList: { valueText?: string }[] | null = cData?.contracts ?? null;

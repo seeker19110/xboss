@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { moneyInputErrorBody, parseMoneyExact } from "@/lib/nen/money";
+import {
+  MONEY_FORMAT_HEADER,
+  isMoneyPrecisionError,
+  moneyInputErrorBody,
+  moneyWireFormat,
+  parseMoneyExact,
+} from "@/lib/nen/money";
+import {
+  HEADERS_API_TIEN,
+  LOI_TIEN_VUOT_DINH_DANG_CU,
+  nhanDinhDangTien,
+} from "@/lib/nen/money-dto";
 import { queryOne, insertId, withTransaction, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { isUniqueViolation, withUniqueRetry } from "@/lib/ha-tang/seqcode";
 import {
   listVariations,
+  variationsToWire,
+  type VoRowMasked,
   parseVoBody,
   validateVoInput,
   checkVoLinesTaken,
@@ -20,7 +33,10 @@ export const dynamic = "force-dynamic";
 
 // GET /api/variations?status= — danh sách phát sinh/VO kèm dòng KL con + tổng giá
 // trị đề xuất/được duyệt, scoped theo dự án đang chọn (M22). Ẩn với cdt/subcon/viewer
-// (không thấy giá trị VO).
+// (không thấy giá trị VO). S15 (A3-FR06): header `X-XBoss-Money-Format: decimal-string-v1` →
+// proposedValue/approvedValue/lines[].unitPrice là chuỗi canonical 2 số lẻ, lines[].qty* chuỗi
+// 3 số lẻ + `moneyFormat`; không header → JSON number legacy, ngoài biên → 422
+// `money_precision_unsupported` (không xấp xỉ).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -39,8 +55,21 @@ export async function GET(req: NextRequest) {
       ? await withProjectScope(projectId, () => listVariations({ status, projectId }))
       : [];
   // M50 PR2: che giá trị/đơn giá VO cho user thiếu viewPayments (vd engineer xem được
-  // VO nhưng không thấy tiền) — che tại API trước khi trả.
-  return NextResponse.json({ items: stripSensitive("variation", items, user) });
+  // VO nhưng không thấy tiền) — che tại API TRƯỚC khi đổi wire (422 không lộ độ lớn).
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
+  const masked = stripSensitive<VoRowMasked>("variation", items, user);
+  try {
+    return NextResponse.json(
+      { items: variationsToWire(masked, format), ...nhanDinhDangTien(format) },
+      { headers: HEADERS_API_TIEN },
+    );
+  } catch (err) {
+    if (!isMoneyPrecisionError(err)) throw err;
+    return NextResponse.json(LOI_TIEN_VUOT_DINH_DANG_CU, {
+      status: 422,
+      headers: HEADERS_API_TIEN,
+    });
+  }
 }
 
 // POST /api/variations — tạo VO mới (Nháp) kèm dòng KL con (Admin/PM/Kỹ sư — ghi

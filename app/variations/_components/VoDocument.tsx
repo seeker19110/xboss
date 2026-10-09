@@ -13,7 +13,17 @@ import {
   XCircle,
 } from "lucide-react";
 import MaskedValue from "@/app/components/MaskedValue";
-import { mMul, mSumBy } from "@/app/lib/masked";
+import { HEADER_TIEN_V1 } from "@/lib/nen/money-dto";
+import {
+  fmtDong,
+  fmtVND,
+  fmtVNDText,
+  klGon,
+  klMilli,
+  klMilliTuNhap,
+  tongGiaTriMinor,
+  thanhTienDong,
+} from "@/app/variations/_components/tienVo";
 import { appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import EmptyState from "@/app/components/EmptyState";
@@ -68,14 +78,16 @@ export const STATUS_TONE: Record<VoStatus, ChipTone> = {
   contract_added: "success",
 };
 
+// S15: trang đọc API ở decimal-string-v1 — tiền là chuỗi canonical 2 số lẻ, khối lượng chuỗi
+// canonical 3 số lẻ; null = API che (thiếu viewPayments). Tính toán qua `tienVo.ts` (bigint).
 export type VoLine = {
   id: number;
   code: string;
   name: string;
   unit: string;
-  qtyProposed: number;
-  qtyApproved: number | null;
-  unitPrice: number;
+  qtyProposed: string;
+  qtyApproved: string | null;
+  unitPrice: string | null;
 };
 
 export type Vo = {
@@ -96,8 +108,8 @@ export type Vo = {
   createdBy: number | null;
   createdByName: string | null;
   createdAt: string;
-  proposedValue: number;
-  approvedValue: number;
+  proposedValue: string | null;
+  approvedValue: string | null;
   lines: VoLine[];
 };
 
@@ -111,16 +123,6 @@ export type VoDocument = {
   uploadedBy: number | null;
   sha256: string | null;
 };
-
-export function fmtVND(n: number) {
-  if (!n) return "—";
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
-}
-
-/** Tiền cho chuỗi thuần (hộp thoại xác nhận) — giá trị bị che hiện "•••" như MaskedValue. */
-function fmtVNDText(n: number | null) {
-  return n == null || !Number.isFinite(n) ? "•••" : fmtVND(n);
-}
 
 // Cột DATE của Postgres về đây vẫn là chuỗi 'YYYY-MM-DD' (parser riêng trong lib/db) —
 // `submittedAt`/`decidedAt` thuộc loại này, không được gắn thêm giờ 00:00 giả.
@@ -154,10 +156,16 @@ export type VoDocumentCtrl = {
   canSubmit: boolean;
   canDecide: boolean;
   canContractAdd: boolean;
-  /** KL duyệt đang hiển thị của 1 dòng (ô nhập khi đang quyết định, số đã chốt khi đã xong). */
-  klDuyet: (line: VoLine) => number;
-  /** Giá trị duyệt hiển thị — tạm tính theo ô nhập khi đang quyết định, số của API khi đã chốt. */
-  giaTriDuyet: number | null;
+  /**
+   * KL duyệt đang hiển thị của 1 dòng, bigint ×1000 (ô nhập khi đang quyết định, số đã chốt khi
+   * đã xong).
+   */
+  klDuyet: (line: VoLine) => bigint;
+  /**
+   * Giá trị duyệt hiển thị (chuỗi tiền của API hoặc đồng×100 tạm tính theo ô nhập khi đang quyết
+   * định); null = bị che.
+   */
+  giaTriDuyet: string | bigint | null;
   addendaCode: string;
   setAddendaCode: (value: string) => void;
   addendaContractId: number | "";
@@ -215,10 +223,12 @@ export function useVoDocument({
       setApprovalStatus(null);
       return;
     }
-    setApprovals(Object.fromEntries(vo.lines.map((l) => [l.id, String(l.qtyProposed)])));
+    setApprovals(Object.fromEntries(vo.lines.map((l) => [l.id, klGon(l.qtyProposed)])));
     loadDocs();
     let huy = false;
-    fetch(`/api/variations/${vo.id}`)
+    // Chỉ cần approvalStatus, nhưng vẫn chọn decimal-string-v1 để VO giá trị lớn không dính 422
+    // của định dạng number cũ (mất luôn trạng thái duyệt).
+    fetch(`/api/variations/${vo.id}`, { headers: HEADER_TIEN_V1 })
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         if (!huy) setApprovalStatus(j?.approvalStatus ?? null);
@@ -247,22 +257,22 @@ export function useVoDocument({
     () =>
       !!vo &&
       canDecide &&
-      vo.lines.some((l) => (Number(approvals[l.id]) || 0) !== Number(l.qtyProposed)),
+      vo.lines.some((l) => klMilliTuNhap(approvals[l.id]) !== klMilli(l.qtyProposed)),
     [vo, canDecide, approvals],
   );
 
   const klDuyet = useCallback(
     (line: VoLine) =>
-      canDecide ? Number(approvals[line.id]) || 0 : (line.qtyApproved ?? line.qtyProposed),
+      canDecide ? klMilliTuNhap(approvals[line.id]) : klMilli(line.qtyApproved ?? line.qtyProposed),
     [canDecide, approvals],
   );
 
-  // M50 PR2: unitPrice/approvedValue có thể bị che (null) — dùng mMul/mSumBy để tổng tạm
-  // tính cũng "bị che" (null) thay vì ngầm thành 0.
+  // M50 PR2: unitPrice/approvedValue có thể bị che (null) — tổng tạm tính cũng "bị che" (null)
+  // thay vì ngầm thành 0. S15: cộng tích bigint rồi mới làm tròn (như server), không float.
   const giaTriDuyet = useMemo(() => {
     if (!vo) return null;
     if (!canDecide) return vo.approvedValue;
-    return mSumBy(vo.lines, (l) => mMul(Number(approvals[l.id]) || 0, l.unitPrice));
+    return tongGiaTriMinor(vo.lines, (l) => klMilliTuNhap(approvals[l.id]));
   }, [vo, canDecide, approvals]);
 
   const setApproval = useCallback((lineId: number, value: string) => {
@@ -300,14 +310,14 @@ export function useVoDocument({
       // Chặn gọi lặp khi cùng action render ở nhiều vị trí (toolbar/khối inline/thanh đáy)
       // và bị bấm rất nhanh 2 nơi trước khi React kịp re-render `disabled={busy}`.
       if (busy) return;
-      // Tiền: mMul/mSumBy để giá trị dẫn xuất từ đơn giá bị che cũng "bị che", không ngầm
-      // thành 0 trong câu hỏi xác nhận (M50 PR2).
+      // Tiền: giá trị dẫn xuất từ đơn giá bị che cũng "bị che", không ngầm thành 0 trong câu
+      // hỏi xác nhận (M50 PR2); tính exact bằng bigint (S15).
       const value =
         decision === "rejected"
-          ? 0
+          ? 0n
           : decision === "approved"
-            ? mSumBy(vo.lines, (l) => mMul(l.qtyProposed, l.unitPrice))
-            : mSumBy(vo.lines, (l) => mMul(Number(approvals[l.id]) || 0, l.unitPrice));
+            ? tongGiaTriMinor(vo.lines, (l) => klMilli(l.qtyProposed))
+            : tongGiaTriMinor(vo.lines, (l) => klMilliTuNhap(approvals[l.id]));
       const label =
         decision === "rejected"
           ? `Từ chối phát sinh ${vo.code}?`
@@ -739,7 +749,7 @@ export default function VoDocumentView({ ctrl, nav }: { ctrl: VoDocumentCtrl; na
                   </td>
                   <td className="p-2">{l.name}</td>
                   <td className="p-2 text-zinc-400">{l.unit}</td>
-                  <td className="p-2 text-right tabular-nums">{l.qtyProposed}</td>
+                  <td className="p-2 text-right tabular-nums">{klGon(l.qtyProposed)}</td>
                   <td className="p-2 text-right">
                     {canDecide ? (
                       <input
@@ -748,24 +758,32 @@ export default function VoDocumentView({ ctrl, nav }: { ctrl: VoDocumentCtrl; na
                         onChange={(e) => setApproval(l.id, e.target.value)}
                         aria-label={`Khối lượng duyệt dòng ${l.code}`}
                         min={0}
-                        max={l.qtyProposed}
+                        max={klGon(l.qtyProposed)}
                         className={`w-24 min-h-10 text-right tabular-nums ${INPUT_CLS}`}
                       />
                     ) : (
-                      <span className="tabular-nums">{l.qtyApproved ?? "—"}</span>
+                      <span className="tabular-nums">
+                        {l.qtyApproved != null ? klGon(l.qtyApproved) : "—"}
+                      </span>
                     )}
                   </td>
                   <td className="p-2 text-right tabular-nums">
                     <MaskedValue value={l.unitPrice} format={fmtVND} />
                   </td>
                   <td className="p-2 text-right tabular-nums text-zinc-400">
-                    <MaskedValue value={mMul(l.qtyProposed, l.unitPrice)} format={fmtVND} />
+                    <MaskedValue
+                      value={thanhTienDong(klMilli(l.qtyProposed), l.unitPrice)}
+                      format={fmtDong}
+                    />
                   </td>
                   <td className="p-2 text-right tabular-nums">
                     {/* Chưa quyết định và không phải người duyệt → "—" cho khớp cột KL
                         duyệt, không hiện thành tiền suy từ khối lượng đề xuất. */}
                     {canDecide || l.qtyApproved != null ? (
-                      <MaskedValue value={mMul(klDuyet(l), l.unitPrice)} format={fmtVND} />
+                      <MaskedValue
+                        value={thanhTienDong(klDuyet(l), l.unitPrice)}
+                        format={fmtDong}
+                      />
                     ) : (
                       <span className="text-zinc-500">—</span>
                     )}

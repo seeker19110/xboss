@@ -61,10 +61,10 @@ test(
       voId,
     );
 
-    // Nháp: proposedValue tính đủ, approvedValue = 0 (chưa duyệt).
+    // Nháp: proposedValue tính đủ, approvedValue = 0 (chưa duyệt). S15: MoneyMinor (đồng×100).
     let vo = await getVariation(voId);
-    assert.equal(Number(vo!.proposedValue), 10 * 100 + 20 * 200);
-    assert.equal(Number(vo!.approvedValue), 0);
+    assert.equal(vo!.proposedValue, BigInt(10 * 100 + 20 * 200) * 100n);
+    assert.equal(vo!.approvedValue, 0n);
 
     // Duyệt một phần: dòng 1 duyệt đủ, dòng 2 duyệt phân nửa.
     await run(`UPDATE boq_items SET qty_approved = 10 WHERE id = ?`, line1);
@@ -72,7 +72,7 @@ test(
     await run(`UPDATE variation_orders SET status = 'partially_approved' WHERE id = ?`, voId);
 
     vo = await getVariation(voId);
-    assert.equal(Number(vo!.approvedValue), 10 * 100 + 10 * 200);
+    assert.equal(vo!.approvedValue, BigInt(10 * 100 + 10 * 200) * 100n);
 
     const rows = await listVariations({ status: "partially_approved" });
     assert.ok(rows.some((r) => r.id === voId));

@@ -6,7 +6,7 @@ import { FilePlus2, Plus } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import MaskedValue from "@/app/components/MaskedValue";
-import { mSum } from "@/app/lib/masked";
+import { mSumTien } from "@/app/lib/masked";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { Button, Card, Chip, StatCard } from "@/app/components/ui";
@@ -14,7 +14,6 @@ import AddVoModal from "@/app/variations/_components/AddVoModal";
 import VoDocumentView, {
   VoBottomActions,
   useVoDocument,
-  fmtVND,
   REASON_LABEL,
   STATUS_LABEL,
   STATUS_TONE,
@@ -22,6 +21,7 @@ import VoDocumentView, {
   type SystemOption,
   type Vo,
 } from "@/app/variations/_components/VoDocument";
+import { fmtVND } from "@/app/variations/_components/tienVo";
 
 type BoqItem = { code: string; unitPrice: number; voId: number | null };
 
@@ -54,7 +54,11 @@ function VariationsInner() {
   const isAdminOrPm = me?.role === "admin" || me?.role === "pm";
 
   function load() {
-    return fetch("/api/variations").then((r) => (r.ok ? r.json() : null));
+    // S15: chọn decimal-string-v1 — tiền/khối lượng về dạng chuỗi exact, không dính 422 của
+    // định dạng number cũ khi tổng VO vượt biên số an toàn.
+    return fetch("/api/variations", { headers: HEADER_TIEN_V1 }).then((r) =>
+      r.ok ? r.json() : null,
+    );
   }
 
   useEffect(() => {
@@ -101,20 +105,21 @@ function VariationsInner() {
   const dongVo = useCallback(() => chonVo(null), [chonVo]);
 
   // M50 PR2: giá trị VO có thể bị che (null) với user thiếu viewPayments (vd engineer) —
-  // dùng mSum để tổng cũng "bị che" (null) thay vì ngầm thành 0, để MaskedValue hiện "•••".
+  // dùng mSumTien để tổng cũng "bị che" (null) thay vì ngầm thành 0, để MaskedValue hiện "•••".
+  // S15: cộng bigint đồng×100 từ chuỗi canonical, không cộng float.
   const totals = useMemo(() => {
-    const map: Record<"draft" | "submitted" | "approved" | "rejected", number | null> = {
-      draft: 0,
-      submitted: 0,
-      approved: 0,
-      rejected: 0,
+    const map: Record<"draft" | "submitted" | "approved" | "rejected", bigint | null> = {
+      draft: 0n,
+      submitted: 0n,
+      approved: 0n,
+      rejected: 0n,
     };
     for (const v of items) {
-      if (v.status === "draft") map.draft = mSum(map.draft, v.proposedValue);
-      else if (v.status === "submitted") map.submitted = mSum(map.submitted, v.proposedValue);
-      else if (v.status === "rejected") map.rejected = mSum(map.rejected, v.proposedValue);
+      if (v.status === "draft") map.draft = mSumTien(map.draft, v.proposedValue);
+      else if (v.status === "submitted") map.submitted = mSumTien(map.submitted, v.proposedValue);
+      else if (v.status === "rejected") map.rejected = mSumTien(map.rejected, v.proposedValue);
       // approved/partially_approved/contract_added
-      else map.approved = mSum(map.approved, v.approvedValue);
+      else map.approved = mSumTien(map.approved, v.approvedValue);
     }
     return map;
   }, [items]);
