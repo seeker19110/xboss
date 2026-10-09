@@ -243,6 +243,64 @@ test(
 );
 
 test(
+  "mv_cost_by_month M129 (0167): actual chỉ gồm phiếu paid theo ngày chi; khớp fallback reports.ts",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { insertId, run, query } = await import("@/lib/db");
+    const { runReport } = await import("@/lib/tien-do/reports");
+
+    let projectId = 0;
+    let towerId = 0;
+    let sheetId = 0;
+    try {
+      projectId = await insertId(`INSERT INTO projects (name) VALUES ('M129 MV Paid ${RUN}')`);
+      towerId = await insertId(
+        `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp M129 MV')`,
+        projectId,
+      );
+      sheetId = await insertId(
+        `INSERT INTO sheet_types (tower_id, code, name, slug) VALUES (?, 'M129-SH-${RUN}', 'Sheet M129', 'm129-mv-${RUN}')`,
+        towerId,
+      );
+      // Cùng tháng 2026-08: 1 phiếu đã chi + 1 phiếu đã duyệt chưa chi.
+      await run(
+        `INSERT INTO payment_bills (sheet_type_id, project_id, paid_date, amount, responsible,
+                                    pay_status, paid_at)
+         VALUES (?, ?, '2026-08-05', 1234567.89, 'PM', 'paid', '2026-08-06')`,
+        sheetId,
+        projectId,
+      );
+      await run(
+        `INSERT INTO payment_bills (sheet_type_id, project_id, paid_date, amount, responsible,
+                                    pay_status)
+         VALUES (?, ?, '2026-08-10', 999.99, 'PM', 'committed')`,
+        sheetId,
+        projectId,
+      );
+
+      const fallback = await runReport("cost_by_month", {}, projectId);
+      assert.deepEqual(fallback.rows, [
+        { month: "2026-08", committed: "0.00", actual: "1234567.89" },
+      ]);
+
+      await run(`REFRESH MATERIALIZED VIEW CONCURRENTLY mv_cost_by_month`);
+      const row = await query<{ actual: string }>(
+        `SELECT actual::text AS actual FROM mv_cost_by_month WHERE project_id = ? AND month = '2026-08'`,
+        projectId,
+      );
+      assert.deepEqual(row, [{ actual: "1234567.89" }]);
+      const cached = await runReport("cost_by_month", {}, projectId);
+      assert.deepEqual(cached.rows, fallback.rows);
+    } finally {
+      if (sheetId) await run(`DELETE FROM payment_bills WHERE sheet_type_id = ?`, sheetId);
+      if (sheetId) await run(`DELETE FROM sheet_types WHERE id = ?`, sheetId);
+      if (towerId) await run(`DELETE FROM towers WHERE id = ?`, towerId);
+      if (projectId) await run(`DELETE FROM projects WHERE id = ?`, projectId);
+    }
+  },
+);
+
+test(
   "mv_cost_by_month: committed exact — số lớn lệch xu + tổng nhiều dòng lẻ không trôi (migration 0159)",
   { skip: !HAS_TEST_DB },
   async () => {

@@ -161,6 +161,7 @@ function PaymentCertsInner() {
     cert: selected,
     canManage,
     canDecide: canManage,
+    meId: me?.id ?? null,
     contractValue,
     onSaved: refresh,
     onClose: dongDot,

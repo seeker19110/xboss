@@ -19,6 +19,8 @@ export const AUDIT_ENTITY_TYPES = [
   "baselines",
   "insurance_bonds",
   "claims",
+  // M129 (migrations/0166): phiếu thanh toán — vết đánh dấu đã chi.
+  "payment_bills",
 ] as const;
 
 export type AuditFilter = { where: string; params: unknown[] };

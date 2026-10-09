@@ -168,7 +168,8 @@ export type ContractRow = {
 export type DeletedView = "alive" | "deleted" | "all";
 
 // Danh sách HĐ kèm tổng hợp: tổng giá trị (gốc + phụ lục), đã thanh toán
-// (Σ payment_bills mọi type kể cả advance — nhất quán quyết định M2), giá trị PO
+// (Σ payment_bills ĐÃ CHI mọi type kể cả advance — nhất quán quyết định M2; M129: phiếu IPC đã
+// duyệt chưa chi không tính là đã thanh toán, nên công nợ phải thu/phải trả vẫn còn), giá trị PO
 // gắn HĐ (loại đơn huỷ). Còn lại = value + addendaTotal − paid (tính phía gọi).
 // projectId (M22): undefined = không lọc dự án (dùng nội bộ/test cũ).
 export async function listContracts(
@@ -213,7 +214,7 @@ export async function listContracts(
        LEFT JOIN (SELECT contract_id, SUM(value_delta) AS total
                     FROM contract_addenda GROUP BY contract_id) a ON a.contract_id = c.id
        LEFT JOIN (SELECT contract_id, SUM(amount) AS total
-                    FROM payment_bills WHERE contract_id IS NOT NULL
+                    FROM payment_bills WHERE contract_id IS NOT NULL AND pay_status = 'paid'
                    GROUP BY contract_id) p ON p.contract_id = c.id
        LEFT JOIN (SELECT po.contract_id,
                          SUM(poi.qty_ordered::numeric * COALESCE(poi.unit_price, 0)) AS total

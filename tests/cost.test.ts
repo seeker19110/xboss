@@ -228,10 +228,21 @@ test(
     const opts = { groupBy: "system", includeVo: true } as const;
     const totalsA = (await getCostReport({ kind: "project", projectId: projA }, opts))
       .projectTotals;
-    assert.deepEqual(totalsA, { budget: 10_000_000n, committed: 2_500_000n, actual: 300_000n });
+    // M129: phiếu chèn kiểu cũ mặc định 'paid' → thực chi; approvedUnpaid (cam kết chưa chi) = 0.
+    assert.deepEqual(totalsA, {
+      budget: 10_000_000n,
+      committed: 2_500_000n,
+      actual: 300_000n,
+      approvedUnpaid: 0n,
+    });
     const totalsB = (await getCostReport({ kind: "project", projectId: projB }, opts))
       .projectTotals;
-    assert.deepEqual(totalsB, { budget: 20_000_000n, committed: 3_700_000n, actual: 400_000n });
+    assert.deepEqual(totalsB, {
+      budget: 20_000_000n,
+      committed: 3_700_000n,
+      actual: 400_000n,
+      approvedUnpaid: 0n,
+    });
 
     // Dọn dữ liệu test.
     await run(`DELETE FROM payment_bills WHERE sheet_type_id IN (?, ?)`, stA, stB);

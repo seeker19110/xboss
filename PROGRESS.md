@@ -1,5 +1,49 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — M129: IPC "đã duyệt" ≠ "đã chi" (migration 0166 có backfill → QUA STAGING)
+
+Đóng mục 6(e) của `AUDIT-S15-RELEASE-CANDIDATE.md` (A5-AC08, D07) theo `docs/nang-cap/M129-ipc-da-chi-tach-cam-ket-thuc-chi.md`.
+
+- **Schema `0166_payment_bills_paid_state.sql`:** `payment_bills.pay_status (committed|paid|void)` +
+  `paid_at/paid_by/paid_ref/paid_note`, backfill `paid_at = paid_date` cho phiếu cũ (`pay_status='paid'`
+  mặc định → số liệu báo cáo không đổi lúc deploy), trigger `audit_row_change` gắn SAU backfill, cột
+  `notifications.payment_bill_id` (FK CASCADE + unique một phần). Migration tự `set_config('app.project_id','*')`
+  trước UPDATE (FORCE RLS — thiếu GUC thì backfill 0 dòng, đã thử bằng role `xboss_app`). **Có UPDATE →
+  staging trước production.**
+- **Luồng:** duyệt IPC bước cuối sinh phiếu `committed` (không còn coi là thực chi). Mới
+  `POST /api/payments/bills/:id/pay` `{ paidAt, paidRef?, paidNote? }` (Admin/PM, `kiemQuyenTaiLucGhi`,
+  SoD người chi ≠ `payment_certs.decided_by` → 403 `sod_same_actor`; 409 `already_paid`/`bill_void`;
+  422 `paid_at_invalid` khi trước ngày duyệt/sau hôm nay; idempotent bằng `FOR UPDATE` + UPDATE điều kiện
+  `pay_status='committed'`). Không `/unpay` (quay lại = M128). Phiếu `paid` có IPC: không xoá/sửa amount
+  (409). `POST /api/payments/bills` nhận `payStatus:'committed'`, mặc định `paid`. Logic ở
+  `lib/tai-chinh/payment-bills.ts`.
+- **Báo cáo (SQL exact):** `actual` chỉ phiếu `paid`; thêm `approvedUnpaid` (Σ `committed`) ở
+  `/api/costs` (totals/rows), `/api/finance/summary` (+ `approvedUnpaidMonths`); EVM AC/báo cáo tháng/công nợ
+  NCC/`listContracts.paid` cùng lọc `paid` và lấy ngày `COALESCE(paid_at, paid_date)`. `GET /api/payment-certs`
+  (+`[id]`) trả `bill {id, payStatus, paidAt, paidRef}` + `decidedBy`.
+- **Thông báo** `bill_unpaid` (Admin/PM, phiếu `committed` quá N ngày; metric `bill_unpaid_days` trong
+  `alert_rules`, mặc định 30). **UI:** `CertDocument` chip "Đã duyệt · chưa chi"/"Đã chi dd/mm/yyyy" + hộp
+  "Đánh dấu đã chi" (`DanhDauDaChiDialog`, ẩn với chính người duyệt); `/payments` chip + bộ lọc Tất cả/Chưa
+  chi/Đã chi; KPI "Đã duyệt chưa chi" cạnh "Thực chi" ở `/costs`; e2e `payment-certs-canh-bao` thêm ca M129.
+- **Hậu audit (bao-mat/logic/ui):** xoá phiếu gắn IPC → 409 `bill_ipc_locked` kể cả `committed` (HIGH:
+  người duyệt xoá phiếu rồi nhập tay phiếu `paid` để lách SoD); POST phiếu `paid` ngày tương lai → 422;
+  migration `0167` dựng lại `mv_cost_by_month` + `bi.cost_by_month_fin` (chỉ `paid`, tháng theo
+  `COALESCE(paid_at, paid_date)`) và `bi.cash_fin` thêm `pay_status`/`paid_at`; `approvedUnpaid` dùng chung
+  phạm vi `PB_TONG_HOP_OK` với cost; `unpaidBillsOverdue` đúng "quá N ngày"; phiếu từ đề xuất ghi `paid_by`;
+  `/payments` KPI "Đã thanh toán" chỉ phiếu đã chi (HIGH: trước cộng cả `committed`), tổng tính trước bộ
+  lọc, KPI "Đã duyệt chưa chi"; chi tiết HĐ + tab IPC `/commercial` (nay đọc `/api/payments/bills`) hiện
+  trạng thái chi; dialog `min` = ngày duyệt, 409 `already_paid` coi là xong; +3 mutation M129.
+- **Test:** `tests/m129-ipc-da-chi.test.ts` 11 ca (8 ca §4 spec + thông báo + khoá xoá committed + ngày
+  phiếu nhập tay; oracle SQL đối chiếu `actual`), ca (1)(2) đỏ trên code cũ; `matviews` thêm ca paid+committed;
+  cập nhật kỳ vọng `s13a-chuoi-ipc-thanh-toan`, `cost`, `audit-cost-query-reuse`, `alerts`.
+- **Lệch spec (ghi nhận):** route đặt ở `/api/payments/bills/:id/pay` (bám cây route sẵn có); `/finance` không
+  có "tab thanh toán"/KPI "Thực chi" nên KPI chưa chi đặt ở `/costs` và tổng theo tháng ở
+  `/api/finance/summary` (dòng tiền `finance.ts` đọc `cash_transactions`, không đọc `payment_bills`);
+  phiếu sinh từ đề xuất (proposals) giữ `paid`.
+- **Nợ:** dashboard Metabase "thực chi" phải tự lọc `bi.cash_fin.pay_status='paid'`; SoD chỉ so với người
+  quyết định bước cuối (flow nhiều bước M46: người duyệt bước trước vẫn đánh dấu chi được — theo spec);
+  `audit_log.project_id` NULL khi ghi ở phạm vi `'*'` là khuôn có từ trước (admin audit-log chưa lọc org).
+
 ## 2026-10-09 — PR-B 6(b): RLS nghiêm ngặt 18 bảng tổ chức/dự án (migration 0165, QUA STAGING)
 
 Đóng mục 6(b) của `AUDIT-S15-RELEASE-CANDIDATE.md` (A1-AC06): bỏ nhánh "GUC rỗng → cho qua" khỏi 15

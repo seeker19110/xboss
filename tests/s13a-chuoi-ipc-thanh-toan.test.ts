@@ -30,6 +30,9 @@ import {
 // cảnh báo hiện tại (409 acknowledgement_required / warning_changed).
 //
 // 5 ca từng là `todo` (lỗi thật S13a tái hiện) đã được S13c vá và chạy xanh thật.
+//
+// M129 (approved ≠ paid): duyệt IPC sinh phiếu 'committed' → báo cáo tách `approvedUnpaid`; thực
+// chi (`actual`) chỉ tăng khi một Admin KHÁC người duyệt đánh dấu đã chi (POST …/bills/:id/pay).
 
 const S = { skip: !HAS_TEST_DB };
 const LY_DO_VUOT = "Phụ lục VO bổ sung khối lượng đang chờ ký";
@@ -123,6 +126,31 @@ async function xemDot(certId: number) {
   return goi(GET(jreq(`/api/payment-certs/${certId}`, undefined, "GET", TIEN_EXACT), P(certId)));
 }
 
+/**
+ * M129: duyệt IPC chỉ sinh phiếu 'committed' (đã duyệt, chưa chi). Đánh dấu đã chi bằng một Admin
+ * KHÁC người duyệt (SoD) qua route thật; trả lại phiên cho `quayVe` (người đang thao tác chuỗi).
+ */
+async function chiPhieuCuaDot(
+  f: SoFixture,
+  certId: number,
+  projectId: number,
+  quayVe: NguoiTest,
+): Promise<void> {
+  const { queryOne } = await import("@/lib/db");
+  const bill = await queryOne<{ id: number }>(
+    `SELECT id FROM payment_bills WHERE payment_cert_id = ?`,
+    certId,
+  );
+  assert.ok(bill, "đợt đã duyệt phải có phiếu");
+  const keToan = await f.user("admin");
+  await f.vao(keToan, projectId);
+  const { POST } = await import("@/app/api/payments/bills/[id]/pay/route");
+  const { todayISO } = await import("@/lib/nen/date");
+  const r = await goi(requestRieng(() => POST(jreq(`/x`, { paidAt: todayISO() }), P(bill.id))));
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  await f.vao(quayVe, projectId);
+}
+
 async function baoCaoChiPhi() {
   const { GET } = await import("@/app/api/costs/route");
   return goi(GET(jreq(`/api/costs?groupBy=system`, undefined, "GET", TIEN_EXACT)));
@@ -198,7 +226,12 @@ function dongDau(body: Body) {
 
 function tongDuAn(body: Body) {
   const t = body?.projectTotals as Record<string, string>;
-  return { budget: t.budget, committed: t.committed, actual: t.actual };
+  return {
+    budget: t.budget,
+    committed: t.committed,
+    actual: t.actual,
+    approvedUnpaid: t.approvedUnpaid,
+  };
 }
 
 /** Dự án + PM (đăng nhập) + HĐ + 1 dòng BOQ gắn HĐ. */
@@ -257,12 +290,21 @@ test(
       assert.equal(await trangThaiDot(dot1), "approved");
       assert.deepEqual(await phieuCuaDot(dot1), ["425000.00"], "đúng 1 phiếu = giá trị đề nghị");
 
+      // M129: duyệt ≠ đã chi — phiếu mới là cam kết (approvedUnpaid), thực chi chưa tăng.
       const cp1 = await baoCaoChiPhi();
       assert.equal(cp1.status, 200, JSON.stringify(cp1.body));
       assert.deepEqual(tongDuAn(cp1.body), {
         budget: "1000000.00",
         committed: "0.00",
+        actual: "0.00",
+        approvedUnpaid: "425000.00",
+      });
+      await chiPhieuCuaDot(f, dot1, c.projectId, c.pm);
+      assert.deepEqual(tongDuAn((await baoCaoChiPhi()).body), {
+        budget: "1000000.00",
+        committed: "0.00",
         actual: "425000.00",
+        approvedUnpaid: "0.00",
       });
       const meta = cp1.body?.metadata as { coverage: { reconciled: boolean } };
       assert.equal(meta.coverage.reconciled, true);
@@ -292,7 +334,15 @@ test(
       assert.deepEqual(tongDuAn(cp2.body), {
         budget: "1000000.00",
         committed: "0.00",
+        actual: "425000.00",
+        approvedUnpaid: "425000.00",
+      });
+      await chiPhieuCuaDot(f, dot2, c.projectId, c.pm);
+      assert.deepEqual(tongDuAn((await baoCaoChiPhi()).body), {
+        budget: "1000000.00",
+        committed: "0.00",
         actual: "850000.00",
+        approvedUnpaid: "0.00",
       });
     } finally {
       await f.don();
@@ -351,7 +401,15 @@ test(
 
       const cp = await baoCaoChiPhi();
       assert.equal(cp.status, 200);
-      assert.equal(tongDuAn(cp.body).actual, "355000.00", "100000.00 tạm ứng + 255000.00 đề nghị");
+      // M129: tạm ứng nhập tay = đã chi; phiếu IPC vừa duyệt là cam kết chưa chi.
+      assert.equal(tongDuAn(cp.body).actual, "100000.00", "tạm ứng đã chi");
+      assert.equal(tongDuAn(cp.body).approvedUnpaid, "255000.00", "đề nghị đã duyệt chưa chi");
+      await chiPhieuCuaDot(f, dot, c.projectId, c.pm);
+      assert.equal(
+        tongDuAn((await baoCaoChiPhi()).body).actual,
+        "355000.00",
+        "100000.00 tạm ứng + 255000.00 đề nghị",
+      );
     } finally {
       await f.don();
     }
@@ -673,7 +731,8 @@ test(
       assert.deepEqual(tongDuAn(cp.body), {
         budget: "200000.00",
         committed: "0.00",
-        actual: "40000.00",
+        actual: "0.00",
+        approvedUnpaid: "40000.00",
       });
 
       // Đợt MỚI chụp giá hiện hành.
@@ -916,9 +975,13 @@ test(
       assert.equal(await actual(), "0.00", "đợt rejected không vào thực chi");
       assert.deepEqual(await phieuCuaDot(dot1), []);
 
-      // Đợt mới được duyệt → đúng 1 phiếu, thực chi = phiếu = nguồn.
+      // Đợt mới được duyệt → đúng 1 phiếu ở trạng thái cam kết: thực chi CHƯA tăng (M129,
+      // approved ≠ paid); đánh dấu đã chi (người khác người duyệt) → thực chi = phiếu = nguồn.
       const dot2 = await dotDuyet(c.contractId, c.boqId, 10);
       assert.deepEqual(await phieuCuaDot(dot2), ["10000.00"]);
+      assert.equal(await actual(), "0.00", "đợt approved chưa chi không phải thực chi");
+      assert.equal(tongDuAn((await baoCaoChiPhi()).body).approvedUnpaid, "10000.00");
+      await chiPhieuCuaDot(f, dot2, c.projectId, c.pm);
       assert.equal(await actual(), "10000.00");
       assert.equal(await actual(), await tongPhieu(), "báo cáo khớp Σ payment_bills");
       const meta = (await baoCaoChiPhi()).body?.metadata as { coverage: { reconciled: boolean } };

@@ -18,6 +18,7 @@ import {
   Printer,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import { Chip } from "@/app/components/ui";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { useEditMode } from "@/app/components/useEditMode";
@@ -43,6 +44,11 @@ import {
   type FloorData,
   type FloorRow,
 } from "./_components/tienThanhToan";
+
+// Phiếu đã chi thật: paid, hoặc thiếu payStatus (API/phiếu cũ). committed/void bị loại.
+function daChi(b: Bill): boolean {
+  return b.payStatus === "paid" || b.payStatus == null;
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 // S10c: kiểu tiền là bigint đồng×100 — xem ./_components/tienThanhToan.ts.
@@ -406,8 +412,13 @@ export default function PaymentsPage() {
     billsByPerson.set(b.responsible, list);
   }
   // KPI toàn dự án: chỉ tính type='bill' (tạm ứng & phát sinh là nội bộ từng đợt).
+  // Chỉ phiếu ĐÃ CHI (paid hoặc payStatus thiếu = phiếu/API cũ); committed/void không tính.
   const totalPaid = tongTien(
-    bills.filter((b) => b.type === "bill"),
+    bills.filter((b) => b.type === "bill" && daChi(b)),
+    (b) => b.amount,
+  );
+  const totalCommitted = tongTien(
+    bills.filter((b) => b.type === "bill" && b.payStatus === "committed"),
     (b) => b.amount,
   );
 
@@ -449,7 +460,7 @@ export default function PaymentsPage() {
         </datalist>
 
         {/* KPI */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
           <KpiCard
             label="Tổng giá trị HĐ"
             value={fmtVND(filteredContract)}
@@ -470,6 +481,12 @@ export default function PaymentsPage() {
                 ? `${phanTram(totalPaid, data.totalEarned).toFixed(1)}% nghiệm thu`
                 : "Toàn bộ kỳ"
             }
+          />
+          <KpiCard
+            label="Đã duyệt chưa chi"
+            value={fmtVND(totalCommitted)}
+            accent="text-amber-300"
+            sub="Phiếu đã duyệt, chờ chi"
           />
           <KpiCard
             label="Chờ thanh toán"
@@ -588,7 +605,7 @@ export default function PaymentsPage() {
               const personBills = isNone ? [] : (billsByPerson.get(person) ?? []);
               // Chỉ tính bills thực để hiển thị đã TT trên header.
               const paid = tongTien(
-                personBills.filter((b) => b.type === "bill"),
+                personBills.filter((b) => b.type === "bill" && daChi(b)),
                 (b) => b.amount,
               );
               return (
@@ -739,10 +756,22 @@ function BillsSection({
       .catch(() => setFloors([]));
   }, [person, bills]); // reload khi bills thay đổi
 
-  const billRows = bills.filter((b) => b.type === "bill");
+  const [locChi, setLocChi] = useState<"all" | "committed" | "paid">("all");
+  const billRows = bills.filter(
+    (b) =>
+      b.type === "bill" &&
+      (locChi === "all" ||
+        (locChi === "committed"
+          ? b.payStatus === "committed"
+          : b.payStatus === "paid" || b.payStatus == null)),
+  );
   const itemRows = bills.filter((b) => b.type === "item");
   const advRows = bills.filter((b) => b.type === "advance");
-  const sumBills = tongTien(billRows, (b) => b.amount);
+  // Tổng trên TOÀN BỘ bills (không theo bộ lọc hiển thị), chỉ phiếu đã chi.
+  const sumBills = tongTien(
+    bills.filter((b) => b.type === "bill" && daChi(b)),
+    (b) => b.amount,
+  );
   const sumItems = tongTien(itemRows, (b) => b.amount);
   const sumAdvs = tongTien(advRows, (b) => b.amount);
 
@@ -881,6 +910,11 @@ function BillsSection({
             <ChevronRight className="w-3.5 h-3.5" />
           )}
         </button>
+        {locChi !== "all" && (
+          <span className="text-[11px] text-zinc-300">
+            Đang lọc: {locChi === "committed" ? "Chưa chi" : "Đã chi"}
+          </span>
+        )}
         {sumBills > 0n && (
           <span className="text-[11px] text-sky-400 tabular-nums">TT: {fmtVND(sumBills)}</span>
         )}
@@ -942,6 +976,35 @@ function BillsSection({
             </div>
           )}
 
+          {/* ── Lọc theo trạng thái chi (M129) ── */}
+          <div
+            className="flex flex-wrap items-center gap-2 px-4 pb-2"
+            role="group"
+            aria-label="Lọc theo trạng thái chi"
+          >
+            {(
+              [
+                ["all", "Tất cả"],
+                ["committed", "Chưa chi"],
+                ["paid", "Đã chi"],
+              ] as const
+            ).map(([k, nhan]) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={locChi === k}
+                onClick={() => setLocChi(k)}
+                className={`min-h-10 px-3 rounded-lg border text-xs transition ${
+                  locChi === k
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-300"
+                    : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                }`}
+              >
+                {nhan}
+              </button>
+            ))}
+          </div>
+
           {/* ── Bảng chính ── */}
           <div className="overflow-x-auto">
             <table className="w-full text-[11px] min-w-[820px] border-collapse">
@@ -956,7 +1019,7 @@ function BillsSection({
                   <th className="px-1 py-1.5 w-14 text-center">KL</th>
                   <th className="px-2 py-1.5 w-24 text-right">Nhân công</th>
                   <th className="px-2 py-1.5 w-28 text-right">Thành tiền</th>
-                  <th className="px-2 py-1.5 w-28">Lũy kế</th>
+                  <th className="px-2 py-1.5 w-28">Lũy kế / Trạng thái chi</th>
                   {canEdit && <th className="w-7" />}
                 </tr>
               </thead>
@@ -969,6 +1032,13 @@ function BillsSection({
                   </td>
                 </tr>
 
+                {billRows.length === 0 && locChi !== "all" && (
+                  <tr>
+                    <td colSpan={COL} className="px-2 py-3 text-center text-zinc-400">
+                      Không có phiếu phù hợp bộ lọc
+                    </td>
+                  </tr>
+                )}
                 {billRows.map((b, i) => {
                   const fl = floors.find(
                     (f) => f.sheetTypeId === b.sheetTypeId && f.floorLabel === b.floorLabel,
@@ -1077,6 +1147,21 @@ function BillsSection({
                                 <ChevronRight className="w-3 h-3" />
                               )}
                             </button>
+                          )}
+                          {b.payStatus === "committed" && (
+                            <Chip tone="warning" className="mt-1">
+                              Chưa chi
+                            </Chip>
+                          )}
+                          {b.payStatus === "void" && (
+                            <Chip tone="neutral" className="mt-1">
+                              Đã huỷ
+                            </Chip>
+                          )}
+                          {b.payStatus === "paid" && (
+                            <Chip tone="success" className="mt-1">
+                              Đã chi{b.paidAt ? ` ${formatDateDMY(b.paidAt)}` : ""}
+                            </Chip>
                           )}
                         </td>
                         {canEdit && (

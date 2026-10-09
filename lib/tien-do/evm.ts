@@ -5,9 +5,9 @@
 //     S-curve /api/dashboard/scurve) × giá trị task; có baseline → dùng ngày đã chốt.
 //   - EV (Earned Value): % thực tế của task (hiện tại từ tasks.progress_percent,
 //     chuỗi ngày tái dựng từ task_history) × giá trị task.
-//   - AC (Actual Cost): cộng dồn payment_bills theo paid_date (mặc định — "thực chi"
-//     nhất quán lib/cost.ts, MỌI type kể cả advance) hoặc cash_transactions chi
-//     (source="cash").
+//   - AC (Actual Cost): cộng dồn payment_bills ĐÃ CHI (pay_status='paid', M129) theo ngày
+//     chi paid_at (mặc định — "thực chi" nhất quán lib/cost.ts, MỌI type kể cả advance)
+//     hoặc cash_transactions chi (source="cash"). Phiếu đã duyệt chưa chi không vào AC.
 //
 // Giá trị task = Σ(weight × thành tiền dòng BOQ) qua boq_task_map (dòng VO chỉ tính
 // khi đã duyệt, lấy qty_approved — nhất quán budgetBySystem lib/cost.ts). Task chưa
@@ -253,13 +253,13 @@ export async function getEvmSeries(opts: {
       : await query<{ day: string; cum: string }>(
           // Quy hệ/dự án qua sheet_types như lib/cost.ts — bill chưa gắn sheet không vào
           // được AC dự án nào (cùng giới hạn đã chấp nhận ở M2; không còn nhánh toàn hệ).
-          `SELECT pb.paid_date AS day,
-                  SUM(SUM(pb.amount)) OVER (ORDER BY pb.paid_date)::text AS cum
+          `SELECT COALESCE(pb.paid_at, pb.paid_date) AS day,
+                  SUM(SUM(pb.amount)) OVER (ORDER BY COALESCE(pb.paid_at, pb.paid_date))::text AS cum
              FROM payment_bills pb
              JOIN sheet_types st ON st.id = pb.sheet_type_id
              ${projectJoin}
-             ${where}
-            GROUP BY pb.paid_date ORDER BY pb.paid_date`,
+             ${where} AND pb.pay_status = 'paid'
+            GROUP BY 1 ORDER BY 1`,
           ...args,
         );
   const acTotal = acRows.length > 0 ? parseMoney(acRows[acRows.length - 1].cum) : 0n;

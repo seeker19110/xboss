@@ -5,6 +5,7 @@
 // lib/contracts.ts, KHÔNG lặp công thức). Xem docs/nang-cap/M27-tai-chinh-ke-toan.md.
 import { query, queryOne } from "@/lib/db";
 import { listContracts } from "@/lib/tai-chinh/contracts";
+import { PB_TONG_HOP_JOINS, PB_TONG_HOP_OK } from "@/lib/tai-chinh/payment-bills";
 import { daysFromTodayISO } from "@/lib/nen/date";
 import { parseFixedDecimalExact, parseMoney, parseOptionalMoneyInput } from "@/lib/nen/money";
 
@@ -39,7 +40,31 @@ export async function cashflowActual(projectId: number, months = 12): Promise<Ca
   return [...map.values()].sort((a, b) => a.month.localeCompare(b.month));
 }
 
+// --- Cam kết chưa chi (M129) ------------------------------------------------------------
+
+export type UnpaidMonth = { month: string; amount: bigint };
+
+// Phiếu đã duyệt (IPC) chưa chi — pay_status='committed', gom theo tháng của ngày lập phiếu
+// (paid_date = ngày duyệt / ngày dự kiến chi). Dòng tiền thực tế KHÔNG gồm các phiếu này; đây là
+// "cam kết chưa chi" hiển thị cạnh thực chi. Cùng điều kiện phạm vi với cost.ts loadPayments
+// (PB_TONG_HOP_OK): dòng cha khác dự án (invalid_scope) không vào tổng. SUM trong SQL `::text` → bigint (không qua float).
+export async function approvedUnpaidByMonth(projectId: number): Promise<UnpaidMonth[]> {
+  const rows = await query<{ month: string; total: string }>(
+    `SELECT to_char(pb.paid_date, 'YYYY-MM') AS month, SUM(pb.amount)::text AS total
+       FROM (SELECT ?::int AS id) p
+       CROSS JOIN payment_bills pb
+       ${PB_TONG_HOP_JOINS}
+      WHERE pb.project_id = p.id AND pb.pay_status = 'committed' AND ${PB_TONG_HOP_OK}
+      GROUP BY month
+      ORDER BY month`,
+    projectId,
+  );
+  return rows.map((r) => ({ month: r.month, amount: parseMoney(r.total) }));
+}
+
 // --- Công nợ (view, suy từ HĐ/IPC/PO/bill — M16/M17/M04, không lưu) ----------------
+// M129: "đã thanh toán" của HĐ (listContracts.paid) chỉ gồm phiếu ĐÃ CHI — phiếu IPC đã duyệt
+// chưa chi vẫn nằm trong phải thu/phải trả.
 
 // Phải thu CĐT = Σ (giá trị gốc + phụ lục) − Σ đã thanh toán của các HĐ nhận thầu.
 // Tái dùng listContracts (lib/contracts.ts) đã tổng hợp addendaTotal/paid theo HĐ.

@@ -187,11 +187,13 @@ const SOURCES: Record<string, ReportSource> = {
             GROUP BY month
          ),
          actual AS (
-           SELECT to_char(pb.paid_date, 'YYYY-MM') AS month, SUM(pb.amount) AS actual
+           -- M129: thực chi = phiếu đã chi, theo ngày chi thật (paid_at; dòng cũ = paid_date).
+           SELECT to_char(COALESCE(pb.paid_at, pb.paid_date), 'YYYY-MM') AS month,
+                  SUM(pb.amount) AS actual
              FROM payment_bills pb
              JOIN sheet_types st ON st.id = pb.sheet_type_id
              JOIN towers tw ON tw.id = st.tower_id
-            WHERE pb.paid_date IS NOT NULL AND tw.project_id = ?
+            WHERE pb.pay_status = 'paid' AND tw.project_id = ?
             GROUP BY month
          )
          SELECT COALESCE(c.month, a.month) AS month,

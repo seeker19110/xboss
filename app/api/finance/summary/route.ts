@@ -7,8 +7,10 @@ import {
   receivables,
   payables,
   advanceOutstanding,
+  approvedUnpaidByMonth,
   vatSummary,
   type CashflowMonth,
+  type UnpaidMonth,
   type VatSummary,
 } from "@/lib/tai-chinh/finance";
 import {
@@ -38,6 +40,8 @@ type TongHopTien = {
   payables: bigint;
   advanceOutstanding: bigint;
   vat: VatSummary;
+  /** M129: phiếu đã duyệt chưa chi theo tháng lập phiếu (không nằm trong dòng tiền thực tế). */
+  approvedUnpaidMonths: UnpaidMonth[];
 };
 
 // Đổi mọi số tiền (bigint) sang wire theo định dạng client chọn — legacy ngoài biên throw.
@@ -48,11 +52,20 @@ function tongHopToWire(t: TongHopTien, format: MoneyWireFormat) {
     payables: moneyToWire(t.payables, format),
     advanceOutstanding: moneyToWire(t.advanceOutstanding, format),
     vat: moneyFieldsToWire(t.vat, ["vatIn", "vatOut", "netVat"], format),
+    approvedUnpaid: moneyToWire(
+      t.approvedUnpaidMonths.reduce((s, m) => s + m.amount, 0n),
+      format,
+    ),
+    approvedUnpaidMonths: t.approvedUnpaidMonths.map((m) =>
+      moneyFieldsToWire(m, ["amount"], format),
+    ),
   };
 }
 
 // GET /api/finance/summary?period=YYYY-MM — gộp dòng tiền/công nợ/tạm ứng/VAT cho trang
 // dashboard tài chính (tránh N request rời rạc ở client). Xem: CAN.viewPayments.
+// M129: thêm `approvedUnpaid` (Σ phiếu IPC đã duyệt chưa chi) + `approvedUnpaidMonths`
+// [{ month, amount }] theo tháng lập phiếu — cam kết chưa chi, KHÔNG nằm trong `cashflow`.
 // S10c (A3-FR06): header `X-XBoss-Money-Format: decimal-string-v1` → mọi số tiền là chuỗi
 // canonical 2 số lẻ + `moneyFormat`; không header → number legacy, ngoài biên round-trip → 422
 // `money_precision_unsupported`. Response `private, no-store` + `Vary`.
@@ -74,16 +87,25 @@ export async function GET(req: NextRequest) {
       payables: 0n,
       advanceOutstanding: 0n,
       vat: { vatIn: 0n, vatOut: 0n, netVat: 0n },
+      approvedUnpaidMonths: [],
     };
   } else {
-    const [cashflow, rcv, pay, adv, vat] = await Promise.all([
+    const [cashflow, rcv, pay, adv, vat, unpaid] = await Promise.all([
       cashflowActual(projectId),
       receivables(projectId),
       payables(projectId),
       advanceOutstanding(projectId),
       vatSummary(period, projectId),
+      approvedUnpaidByMonth(projectId),
     ]);
-    tong = { cashflow, receivables: rcv, payables: pay, advanceOutstanding: adv, vat };
+    tong = {
+      cashflow,
+      receivables: rcv,
+      payables: pay,
+      advanceOutstanding: adv,
+      vat,
+      approvedUnpaidMonths: unpaid,
+    };
   }
 
   try {

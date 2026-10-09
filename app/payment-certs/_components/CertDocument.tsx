@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Banknote,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -43,6 +44,7 @@ import {
   type YeuCauXacNhan,
 } from "./chiTietDot";
 import XacNhanCanhBaoDialog from "./XacNhanCanhBaoDialog";
+import DanhDauDaChiDialog from "./DanhDauDaChiDialog";
 
 // Khối "chứng từ" của một đợt thanh toán (IPC) — M124. Tách ra từ hộp thoại chi tiết đợt
 // cũ trong `app/payment-certs/page.tsx`: cùng dữ liệu, cùng các hàm gọi API, nhưng hiển thị
@@ -77,6 +79,14 @@ export type CertItem = {
   unitPrice: number;
 };
 
+/** M129: phiếu thanh toán sinh từ đợt đã duyệt (null = chưa có phiếu). */
+export type CertBill = {
+  id: number;
+  payStatus: "committed" | "paid" | "void";
+  paidAt: string | null;
+  paidRef: string | null;
+};
+
 export type Cert = {
   id: number;
   code: string;
@@ -88,6 +98,9 @@ export type Cert = {
   status: CertStatus;
   submittedAt: string | null;
   decidedAt: string | null;
+  /** Người duyệt đợt — API chưa trả thì undefined (server vẫn chặn SoD bằng 403). */
+  decidedBy?: number | null;
+  bill?: CertBill | null;
   rejectReason: string | null;
   createdByName: string | null;
   createdAt: string | null;
@@ -120,6 +133,10 @@ export type CertDocumentCtrl = {
   canManage: boolean;
   canDecide: boolean;
   canEdit: boolean;
+  /** Admin/PM, không phải người đã duyệt đợt — được đánh dấu phiếu đã chi (M129). */
+  canMarkPaid: boolean;
+  /** Nạp lại danh sách/đợt sau khi đổi dữ liệu. */
+  refresh: () => void | Promise<void>;
   busy: boolean;
   /** Còn thay đổi chưa lưu (KL hoặc nhãn kỳ). */
   dirty: boolean;
@@ -152,6 +169,7 @@ export function useCertDocument({
   cert,
   canManage,
   canDecide,
+  meId = null,
   contractValue,
   onSaved,
   onClose,
@@ -159,6 +177,8 @@ export function useCertDocument({
   cert: Cert | null;
   canManage: boolean;
   canDecide: boolean;
+  /** Id người đang đăng nhập — ẩn nút đánh dấu chi với chính người duyệt đợt. */
+  meId?: number | null;
   /** null = bị che (thiếu viewPayments) */
   contractValue: number | null;
   onSaved: () => void | Promise<void>;
@@ -464,6 +484,12 @@ export function useCertDocument({
     canManage,
     canDecide,
     canEdit: !!canEdit,
+    canMarkPaid:
+      canManage &&
+      cert?.status === "approved" &&
+      cert.bill?.payStatus === "committed" &&
+      !(meId != null && cert.decidedBy != null && cert.decidedBy === meId),
+    refresh: onSaved,
     busy,
     dirty,
     dangTaiChiTiet,
@@ -487,6 +513,52 @@ export function useCertDocument({
 }
 
 /** Bộ nút hành động của chứng từ — dùng chung cho thanh công cụ trên và thanh đáy. */
+function NutDanhDauDaChi({
+  billId,
+  maDot,
+  ngayDuyet,
+  busy,
+  onXong,
+}: {
+  billId: number;
+  maDot: string;
+  /** Ngày duyệt đợt (DATE 'YYYY-MM-DD') — làm `min` của ô ngày chi; server vẫn chặn 422. */
+  ngayDuyet: string | null;
+  busy: boolean;
+  onXong: () => void | Promise<void>;
+}) {
+  const [mo, setMo] = useState(false);
+  return (
+    <>
+      <Button
+        icon={Banknote}
+        variant="primary"
+        disabled={busy}
+        aria-label={`Đánh dấu đã chi đợt ${maDot}`}
+        onClick={() => setMo(true)}
+      >
+        Đánh dấu đã chi
+      </Button>
+      {mo && (
+        <DanhDauDaChiDialog
+          billId={billId}
+          maDot={maDot}
+          ngayDuyet={ngayDuyet}
+          onDong={() => setMo(false)}
+          onXong={onXong}
+        />
+      )}
+    </>
+  );
+}
+
+/** Badge trạng thái chi của đợt đã duyệt (kèm chữ, không chỉ màu). */
+function ChipTrangThaiChi({ bill }: { bill: CertBill | null | undefined }) {
+  if (!bill || bill.payStatus === "void") return null;
+  if (bill.payStatus === "paid") return <Chip tone="success">Đã chi {fmtLuc(bill.paidAt)}</Chip>;
+  return <Chip tone="warning">Đã duyệt · chưa chi</Chip>;
+}
+
 function CertActions({ ctrl }: { ctrl: CertDocumentCtrl }) {
   const { cert, canManage, canDecide, canEdit, busy, dirty } = ctrl;
   if (!cert) return null;
@@ -537,6 +609,15 @@ function CertActions({ ctrl }: { ctrl: CertDocumentCtrl }) {
             Từ chối
           </Button>
         </>
+      )}
+      {ctrl.canMarkPaid && cert.bill && (
+        <NutDanhDauDaChi
+          billId={cert.bill.id}
+          maDot={cert.code}
+          ngayDuyet={cert.decidedAt}
+          busy={busy}
+          onXong={ctrl.refresh}
+        />
       )}
       {cert.status === "approved" && (
         <>
@@ -690,6 +771,7 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="font-mono text-lg font-semibold text-zinc-100">{cert.code}</h2>
           <Chip tone={STATUS_TONE[cert.status]}>{STATUS_LABEL[cert.status]}</Chip>
+          {cert.status === "approved" && <ChipTrangThaiChi bill={cert.bill} />}
           {approvalStatus?.status === "pending" && (
             <Chip tone="warning">
               Chờ duyệt (bước {approvalStatus.currentSeq}/{approvalStatus.totalSteps})

@@ -504,10 +504,10 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > S15). `scripts/retention-cleanup.ts` dry-run mặc định, chính sách evidence PASS 35 / FAIL 365 ngày,
 > `run-*` 7/35 ngày; chỉ xoá evidence nhận diện được, từ chối thư mục backup/WAL và thư mục cha.
 
-> **`M129-ipc-da-chi-tach-cam-ket-thuc-chi.md`** — ✅ **Approved 2026-10-09, CHƯA triển khai.**
-> `payment_bills.pay_status (committed|paid|void)` + `paid_at/paid_by/paid_ref`, `POST /api/payments/:id/pay`
-> (SoD người chi ≠ người duyệt), cost report tách `actual` (đã chi) / `approvedUnpaid`. Migration 0166
-> có UPDATE backfill → **qua staging**. Làm TRƯỚC M128.
+> **`M129-ipc-da-chi-tach-cam-ket-thuc-chi.md`** — ✅ **Approved 2026-10-09 và ĐÃ TRIỂN KHAI XONG** (PR
+> M129). `payment_bills.pay_status (committed|paid|void)` + `paid_at/paid_by/paid_ref`,
+> `POST /api/payments/bills/:id/pay` (SoD người chi ≠ người duyệt), cost report tách `actual` (đã chi) /
+> `approvedUnpaid`. Migration 0166 có UPDATE backfill → **qua staging**. Lệch spec/nợ ghi ở `PROGRESS.md`.
 
 > **`M128-chung-tu-dieu-chinh-ipc.md`** — ✅ **Approved 2026-10-09, CHƯA triển khai** (sau M129).
 > Bảng `payment_cert_adjustments(+_items)`, `kind adjustment|reversal`, luồng nháp→trình→duyệt (SoD),

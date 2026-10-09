@@ -482,3 +482,50 @@ test.describe("Hồi quy UI đã sửa (tương phản theme sáng, Esc hộp x�
     expect(rong.cuon, JSON.stringify(tran, null, 1)).toBeLessThanOrEqual(rong.hienThi + 1);
   });
 });
+
+// M129 — IPC đã duyệt chỉ là CAM KẾT; "đã chi" là bước riêng, người chi ≠ người duyệt (SoD).
+test.describe("IPC đã duyệt — đánh dấu đã chi (M129, lớp B)", () => {
+  test("M129: badge 'chưa chi' → dialog đánh dấu chi (tài khoản khác người duyệt) → badge 'Đã chi'; axe sạch", async ({
+    page,
+  }) => {
+    await theme(page, "darkblue");
+    const co = await dungToChucCoLap(["pm", "admin"]);
+    // pm lập + trình + duyệt đợt (luỹ kế 90 ≤ 100 nên không cần xác nhận cảnh báo).
+    await dangNhapCoLap(page, co.nguoi.pm.email);
+    const hd = await dungHopDong(page, { value: 100000, qtyContract: 100, unitPrice: 1000 });
+    const d = await lapDot(page, hd.contractId, hd.boqId, 90);
+    await trinh(page, d.id);
+    await ok(
+      goiApi(page, "POST", `/api/payment-certs/${d.id}/decide`, { decision: "approved" }),
+      200,
+      "duyệt đợt",
+    );
+
+    // Đổi sang admin (người khác) để đánh dấu chi.
+    await page.context().clearCookies();
+    await dangNhapCoLap(page, co.nguoi.admin.email);
+    await moDot(page, d);
+    await daDuocDuyet(page);
+    await expect(tieuDeDot(page)).toContainText("Đã duyệt · chưa chi", { timeout: 20_000 });
+
+    // Hành động đợt hiện ở cả thanh trên lẫn thanh đáy (CertBottomActions) — lấy nút đầu như nutDuyet.
+    await bam(page.getByRole("button", { name: /Đánh dấu đã chi đợt/ }).first());
+    const dlg = hop(page);
+    await expect(dlg.getByRole("heading", { name: /Đánh dấu đã chi/ })).toBeVisible();
+    const axeDlg = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+    const nangDlg = axeDlg.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    );
+    expect(nangDlg, JSON.stringify(nangDlg, null, 2)).toEqual([]);
+
+    await dlg.getByLabel("Số chứng từ chi (tuỳ chọn)").fill("UNC-E2E-01");
+    await bam(dlg.getByRole("button", { name: "Xác nhận đã chi" }));
+    await expect(dlg).toHaveCount(0, { timeout: 20_000 });
+    await expect(tieuDeDot(page)).toContainText("Đã chi", { timeout: 20_000 });
+    await expect(tieuDeDot(page)).not.toContainText("chưa chi");
+
+    const axe = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+    const nang = axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(nang, JSON.stringify(nang, null, 2)).toEqual([]);
+  });
+});

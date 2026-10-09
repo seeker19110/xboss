@@ -15,6 +15,7 @@ import {
   Banknote,
   Percent,
 } from "lucide-react";
+import Chip from "@/app/components/ui/Chip";
 import { Skeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { formatDateVN } from "@/lib/nen/date";
@@ -42,12 +43,13 @@ export default function IpcPaymentsTab() {
     setLoading(true);
     Promise.all([
       fetch("/api/payment-certs").then((r) => (r.ok ? r.json() : { certs: [] })),
-      fetch("/api/payments").then((r) => (r.ok ? r.json() : { bills: [] })),
+      // Danh sách PHIẾU (từng phiếu, có payStatus/paidAt — M129); /api/payments chỉ trả tổng theo tầng.
+      fetch("/api/payments/bills").then((r) => (r.ok ? r.json() : { bills: [] })),
       fetch("/api/proposals").then((r) => (r.ok ? r.json() : { proposals: [] })),
     ])
       .then(([certData, payData, propData]) => {
         setCerts(certData.certs || []);
-        setPayments(payData.bills || payData.rows || []);
+        setPayments(payData.bills || []);
         setProposals(propData.proposals || []);
       })
       .catch(() => showToast("Không tải được dữ liệu thanh toán/IPC", "error"))
@@ -246,7 +248,7 @@ export default function IpcPaymentsTab() {
                   {payments.slice(0, 15).map((p, idx) => (
                     <tr key={p.id || idx} className="hover:bg-zinc-900/40 transition">
                       <td className="py-3 px-3 font-semibold text-zinc-200">
-                        {p.responsible || p.sheetType || "Đơn vị thực hiện"}
+                        {p.responsible || p.sheetCode || "Đơn vị thực hiện"}
                       </td>
                       <td className="py-3 px-3 text-zinc-400">
                         {p.type === "advance" ? "Tạm ứng" : "Thanh toán kỳ"}
@@ -255,7 +257,22 @@ export default function IpcPaymentsTab() {
                         {fmtVND(p.amount)}
                       </td>
                       <td className="py-3 px-3 font-mono text-zinc-400">
-                        {p.paidDate ? formatDateVN(p.paidDate) : "—"}
+                        {p.paidAt || p.paidDate ? formatDateVN(p.paidAt || p.paidDate) : "—"}
+                        {p.payStatus === "committed" && (
+                          <Chip tone="warning" className="ml-2">
+                            Chưa chi
+                          </Chip>
+                        )}
+                        {p.payStatus === "void" && (
+                          <Chip tone="neutral" className="ml-2">
+                            Đã huỷ
+                          </Chip>
+                        )}
+                        {(p.payStatus === "paid" || p.payStatus == null) && (
+                          <Chip tone="success" className="ml-2">
+                            Đã chi
+                          </Chip>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-zinc-500 truncate max-w-xs">
                         {p.description || p.note || "—"}
