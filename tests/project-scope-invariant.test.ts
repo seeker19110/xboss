@@ -22,6 +22,7 @@ const WHITELIST: Record<string, string> = {
   "admin/audit": "audit assignment_log — admin xem toàn hệ",
   "admin/audit-log/export": "xuất audit trail toàn hệ (chỉ admin)",
   project: "thông tin dự án hiện hành (public, tự trả dự án mặc định)",
+  ready: "readiness công khai (Q-AC07) — chỉ SELECT schema_migrations, không dữ liệu dự án",
   projects: "danh sách dự án — bản thân là nguồn của project_id",
   users: "danh bạ người dùng dùng chung mọi dự án",
   "auth/totp": "trạng thái 2FA của user hiện tại (theo user_id, không theo dự án)",

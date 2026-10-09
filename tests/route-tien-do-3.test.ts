@@ -2261,6 +2261,29 @@ test("POST /api/dimensions/rename: nhóm không tồn tại → 404", S, async (
   assert.equal(res.status, 404);
 });
 
+test(
+  "POST /api/dimensions/rename: nhóm thuộc dự án khác → 404, cột không đổi (S16 xuyên dự án)",
+  S,
+  async () => {
+    const { projectId } = await dungSheet("drnxp1");
+    const khac = await dungSheet("drnxp2");
+    const pm = await taoUser("pm", "drnxp");
+    const pkgKhac = await taoNhom(khac.sheetTypeId, "PX");
+    const t = await taoTask(pkgKhac, "TX");
+    await taoDim(t, "Ø100");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/dimensions/rename/route");
+    const res = await POST(jreq("/x", { packageId: pkgKhac, oldLabel: "Ø100", newLabel: "Ø150" }));
+    assert.equal(res.status, 404);
+    const { queryOne } = await import("@/lib/db");
+    const row = await queryOne<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM progress_dimensions WHERE task_id = ? AND dimension_label = 'Ø100'`,
+      t,
+    );
+    assert.equal(row?.n, 1);
+  },
+);
+
 test("POST /api/dimensions/rename: tên cột mới rỗng → 400", S, async () => {
   const { projectId, sheetTypeId } = await dungSheet("drnempty");
   const pm = await taoUser("pm", "drnempty");

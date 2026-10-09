@@ -25,11 +25,19 @@ export async function POST(req: NextRequest) {
   if (!packageId || !oldLabel || !newLabel)
     return NextResponse.json({ error: "Thiếu tham số" }, { status: 400 });
 
+  // packageId là input client — nhóm phải thuộc ĐÚNG dự án hiện hành (S16: trước đây không
+  // kiểm, đổi tên cột được của sheet bất kỳ, kể cả org khác). Null dự án ⇒ fail-closed 404.
   const sheet = await queryOne<{ sheet_type_id: number }>(
-    `SELECT sheet_type_id FROM work_packages WHERE id = ?`,
+    `SELECT wp.sheet_type_id
+       FROM work_packages wp
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       JOIN towers tw ON tw.id = st.tower_id
+      WHERE wp.id = ? AND tw.project_id = ?`,
     packageId,
+    projectId,
   );
-  if (!sheet) return NextResponse.json({ error: "Không tìm thấy nhóm" }, { status: 404 });
+  if (projectId == null || !sheet)
+    return NextResponse.json({ error: "Không tìm thấy nhóm" }, { status: 404 });
 
   const trimmedNewLabel = String(newLabel).trim();
   if (!trimmedNewLabel) return NextResponse.json({ error: "Tên cột mới rỗng" }, { status: 400 });
