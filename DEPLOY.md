@@ -92,7 +92,7 @@ không lặp lại nội dung ở đây.
 
 ---
 
-## Cài đặt lần đầu (Node ≥ 24 + PM2 + Postgres tự host hoặc Supabase)
+## Cài đặt lần đầu (Node ≥ 24 + PM2 + Postgres ≥ 15 tự host hoặc Supabase)
 
 > **XBoss chạy bằng PM2, không dùng Docker.** Trước đây tài liệu này có song song hai đường
 > (Docker Compose và PM2); nay chỉ còn PM2 — bớt một bộ artefact phải bảo trì và bớt một lớp
@@ -108,6 +108,22 @@ sudo apt update && sudo apt install -y postgresql postgresql-contrib
 sudo -u postgres psql -c "CREATE USER xboss WITH PASSWORD 'mật-khẩu-mạnh';"
 sudo -u postgres psql -c "CREATE DATABASE xboss OWNER xboss;"
 ```
+
+**Phiên bản: PostgreSQL ≥ 15** (CI chạy 16). Từ 15, role thường mặc định **không** còn quyền `CREATE`
+trên schema `public`; bản 14 trở xuống (vd `apt install postgresql` trên Ubuntu 22.04 ra bản 14) cho mọi
+role tạo bảng/hàm trong `public` → role app `xboss_app` có thể tạo hàm/toán tử trùng tên để chen vào
+`search_path` của trigger/hàm do role chủ bảng chạy. Kiểm bằng `psql -c "SHOW server_version;"`; buộc
+phải dùng ≤14 thì chạy một lần (user `postgres`, trong DB `xboss`) trước khi deploy — trao schema `public`
+cho chủ DB trước (bản ≤14 schema này thuộc `postgres`; thiếu bước này thì role chạy migration mất quyền tạo
+bảng, `npm run db:migrate` lỗi `permission denied for schema public`), giống mặc định `pg_database_owner` từ 15:
+
+```bash
+sudo -u postgres psql -d xboss -c "ALTER SCHEMA public OWNER TO xboss;"
+sudo -u postgres psql -d xboss -c "REVOKE CREATE ON SCHEMA public FROM PUBLIC;"
+```
+
+Dùng role migration riêng (`xboss_migrate`, xem `MIGRATE_DATABASE_URL` bên dưới) thì trao `public` cho role
+đó thay vì `xboss`.
 
 Để Postgres chỉ nghe `localhost` (không sửa `listen_addresses` ra `*`) — app và DB cùng máy
 nên không cần mở cổng 5432 ra ngoài, bớt một bề mặt tấn công.

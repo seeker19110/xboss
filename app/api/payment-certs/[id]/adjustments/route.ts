@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { gioiHanGhiTaiChinh } from "@/lib/bao-mat/ratelimit";
 import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
 import { isMoneyPrecisionError, moneyWireFormat, MONEY_FORMAT_HEADER } from "@/lib/nen/money";
@@ -65,6 +66,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id: idStr } = await params;
   const user = await getCurrentUser();
   if (!user) return json({ error: "Chưa đăng nhập" }, 401);
+  const gioiHan = await gioiHanGhiTaiChinh("dc-lap", user.id);
+  if (gioiHan)
+    return NextResponse.json(
+      { error: gioiHan.error },
+      { status: 429, headers: { "Retry-After": gioiHan.retryAfter } },
+    );
   if (!CAN.manageContracts(user.role))
     return json({ error: "Chỉ Admin/PM được lập chứng từ điều chỉnh" }, 403);
   const certId = parseInt(idStr, 10);

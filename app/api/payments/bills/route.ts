@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { gioiHanGhiTaiChinh } from "@/lib/bao-mat/ratelimit";
 import { query, queryOne, withProjectScope } from "@/lib/db";
 import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 import {
@@ -192,6 +193,12 @@ type KetQuaGhiBill =
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  const gioiHan = await gioiHanGhiTaiChinh("phieu-lap", user.id);
+  if (gioiHan)
+    return NextResponse.json(
+      { error: gioiHan.error },
+      { status: 429, headers: { "Retry-After": gioiHan.retryAfter } },
+    );
   if (!CAN.editStructure(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được tạo mục thanh toán" }, { status: 403 });
 

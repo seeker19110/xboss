@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { gioiHanGhiTaiChinh } from "@/lib/bao-mat/ratelimit";
 import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
@@ -58,6 +59,12 @@ export async function POST(
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  const gioiHan = await gioiHanGhiTaiChinh("ipc-duyet", user.id);
+  if (gioiHan)
+    return NextResponse.json(
+      { error: gioiHan.error },
+      { status: 429, headers: { "Retry-After": gioiHan.retryAfter } },
+    );
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });

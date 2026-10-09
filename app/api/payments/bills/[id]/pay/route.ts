@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { gioiHanGhiTaiChinh } from "@/lib/bao-mat/ratelimit";
 import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { withProjectScope } from "@/lib/db";
 import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
@@ -23,6 +24,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id: idStr } = await params;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  const gioiHan = await gioiHanGhiTaiChinh("phieu-chi", user.id);
+  if (gioiHan)
+    return NextResponse.json(
+      { error: gioiHan.error },
+      { status: 429, headers: { "Retry-After": gioiHan.retryAfter } },
+    );
   if (!CAN.approve(user.role)) return NextResponse.json({ error: LOI_QUYEN }, { status: 403 });
 
   const id = parseInt(idStr, 10);
