@@ -5,6 +5,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { query, queryOne, run } from "@/lib/db";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import type { DrawingKind } from "@/lib/ky-thuat/drawings";
 
 export const DRAWINGS_DIR = join(process.cwd(), "data", "uploads", "drawings");
@@ -168,6 +169,10 @@ export type ScanSyncResult = {
   newlySyncedRevisions: number;
   /** Tên tệp bị lỗi khi đồng bộ — đã bỏ qua để không chặn các tệp còn lại. */
   failedFiles: string[];
+  /** S16: dừng vòng quét vì tái kiểm quyền lúc ghi từ chối (chỉ khi truyền `kiemQuyen`). */
+  stoppedByPermission?: true;
+  /** Số tệp CHƯA xử lý khi dừng vì mất quyền (kể cả tệp đang xét lúc bị từ chối). */
+  remaining?: number;
 };
 
 export type ScanSyncOptions = {
@@ -176,6 +181,12 @@ export type ScanSyncOptions = {
   userId: number | null;
   /** Nhận log tiến trình (script CLI truyền `console.log`). */
   onProgress?: (message: string) => void;
+  /**
+   * S16 (D01): tái kiểm quyền lúc ghi cho TỪNG tệp — mỗi tệp ghi trong transaction riêng qua
+   * `ghiNeuConQuyen`. Bị từ chối ⇒ dừng vòng lặp, giữ các tệp đã ghi. Không truyền (cron/CLI)
+   * ⇒ hành vi cũ, không transaction theo tệp.
+   */
+  kiemQuyen?: () => boolean;
 };
 
 /**
@@ -189,76 +200,94 @@ export async function syncDrawingsFromDisk(opts: ScanSyncOptions): Promise<ScanS
   const failedFiles: string[] = [];
   let synced = 0;
 
-  for (const item of files) {
+  for (const [idx, item] of files.entries()) {
+    let tiepTuc = true;
     try {
-      const stat = statSync(item.fullPath);
-      const info = parseDrawingInfo(item.fileName);
-
-      let drawing = await queryOne<{ id: number }>(
-        `SELECT id FROM drawings WHERE code = ? AND project_id = ?`,
-        info.code,
-        projectId,
-      );
-
-      if (!drawing) {
-        // BOQCODE/`code` là duy nhất toàn hệ thống — bám vào bản ghi sẵn có nếu
-        // mã đã thuộc dự án khác thay vì INSERT gây vi phạm ràng buộc unique.
-        const existingByCode = await queryOne<{ id: number }>(
-          `SELECT id FROM drawings WHERE code = ?`,
-          info.code,
-        );
-        if (existingByCode) {
-          drawing = existingByCode;
-        } else {
-          const res = await query<{ id: number }>(
-            `INSERT INTO drawings (project_id, code, name, kind, system_group, floor_label, created_by, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-             RETURNING id`,
-            projectId,
-            info.code,
-            info.name,
-            info.kind,
-            info.systemGroup,
-            info.floorLabel,
-            userId,
-          );
-          drawing = res[0];
-          onProgress?.(
-            `  + Đã tạo bản vẽ mới: [${info.code}] ${info.name} (${info.systemGroup}, ${info.floorLabel})`,
-          );
-        }
-      }
-      if (!drawing) continue;
-
-      const existingRev = await queryOne<{ id: number }>(
-        `SELECT id FROM drawing_revisions WHERE drawing_id = ? AND rev = ?`,
-        drawing.id,
-        info.rev,
-      );
-      if (existingRev) continue;
-
-      await run(
-        `INSERT INTO drawing_revisions (
-           drawing_id, rev, status, file_name, original_name, mime_type, size_bytes,
-           submitted_at, decided_at, decision_note, uploaded_by, created_at
-         ) VALUES (?, ?, 'approved', ?, ?, ?, ?, CURRENT_DATE, CURRENT_DATE, 'Đồng bộ tự động từ thư mục dự án', ?, NOW())`,
-        drawing.id,
-        info.rev,
-        `drawings/${item.relativePath.replace(/\\/g, "/")}`,
-        item.fileName,
-        mimeFromExt(info.ext),
-        stat.size,
-        userId,
-      );
-      synced++;
-      onProgress?.(
-        `    -> Đã đăng ký phiên bản ${info.rev} (File: ${item.fileName}, Size: ${(stat.size / 1024).toFixed(1)} KB)`,
-      );
+      if (opts.kiemQuyen) {
+        const kq = await ghiNeuConQuyen(opts.kiemQuyen, () => dongBoMotTep(item));
+        if (!kq.ok) tiepTuc = false;
+        else if (kq.value) synced++;
+      } else if (await dongBoMotTep(item)) synced++;
     } catch (fileErr) {
       failedFiles.push(item.fileName);
       console.error(`Lỗi đồng bộ tệp ${item.fileName}:`, fileErr);
     }
+    if (!tiepTuc)
+      return {
+        totalFilesOnDisk: files.length,
+        newlySyncedRevisions: synced,
+        failedFiles,
+        stoppedByPermission: true,
+        remaining: files.length - idx,
+      };
   }
 
   return { totalFilesOnDisk: files.length, newlySyncedRevisions: synced, failedFiles };
+
+  /** Ghi DB cho 1 tệp; trả true khi đăng ký thêm 1 revision mới. */
+  async function dongBoMotTep(item: ScannedDrawingFile): Promise<boolean> {
+    const stat = statSync(item.fullPath);
+    const info = parseDrawingInfo(item.fileName);
+
+    let drawing = await queryOne<{ id: number }>(
+      `SELECT id FROM drawings WHERE code = ? AND project_id = ?`,
+      info.code,
+      projectId,
+    );
+
+    if (!drawing) {
+      // BOQCODE/`code` là duy nhất toàn hệ thống — bám vào bản ghi sẵn có nếu
+      // mã đã thuộc dự án khác thay vì INSERT gây vi phạm ràng buộc unique.
+      const existingByCode = await queryOne<{ id: number }>(
+        `SELECT id FROM drawings WHERE code = ?`,
+        info.code,
+      );
+      if (existingByCode) {
+        drawing = existingByCode;
+      } else {
+        const res = await query<{ id: number }>(
+          `INSERT INTO drawings (project_id, code, name, kind, system_group, floor_label, created_by, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+             RETURNING id`,
+          projectId,
+          info.code,
+          info.name,
+          info.kind,
+          info.systemGroup,
+          info.floorLabel,
+          userId,
+        );
+        drawing = res[0];
+        onProgress?.(
+          `  + Đã tạo bản vẽ mới: [${info.code}] ${info.name} (${info.systemGroup}, ${info.floorLabel})`,
+        );
+      }
+    }
+    if (!drawing) return false;
+
+    const existingRev = await queryOne<{ id: number }>(
+      `SELECT id FROM drawing_revisions WHERE drawing_id = ? AND rev = ?`,
+      drawing.id,
+      info.rev,
+    );
+    if (existingRev) return false;
+
+    await run(
+      `INSERT INTO drawing_revisions (
+           drawing_id, rev, status, file_name, original_name, mime_type, size_bytes,
+           submitted_at, decided_at, decision_note, uploaded_by, created_at
+         ) VALUES (?, ?, 'approved', ?, ?, ?, ?, CURRENT_DATE, CURRENT_DATE, 'Đồng bộ tự động từ thư mục dự án', ?, NOW())`,
+      drawing.id,
+      info.rev,
+      `drawings/${item.relativePath.replace(/\\/g, "/")}`,
+      item.fileName,
+      mimeFromExt(info.ext),
+      stat.size,
+      userId,
+    );
+    onProgress?.(
+      `    -> Đã đăng ký phiên bản ${info.rev} (File: ${item.fileName}, Size: ${(stat.size / 1024).toFixed(1)} KB)`,
+    );
+    return true;
+  }
 }

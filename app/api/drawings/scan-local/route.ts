@@ -12,9 +12,10 @@ export const dynamic = "force-dynamic";
 export async function POST(_req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageDrawings(user.role) && !CAN.manageEngineeringGraph(user.role)) {
-    return NextResponse.json({ error: "Bạn không có quyền đồng bộ bản vẽ" }, { status: 403 });
-  }
+  const coQuyen = () => CAN.manageDrawings(user.role) || CAN.manageEngineeringGraph(user.role);
+  const khongCoQuyen = () =>
+    NextResponse.json({ error: "Bạn không có quyền đồng bộ bản vẽ" }, { status: 403 });
+  if (!coQuyen()) return khongCoQuyen();
 
   if (!existsSync(DRAWINGS_DIR)) {
     return NextResponse.json(
@@ -26,7 +27,19 @@ export async function POST(_req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
   if (projectId == null)
     return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
-  const res = await syncDrawingsFromDisk({ projectId, userId: user.id });
+  // S16 (D01): tái kiểm quyền lúc ghi cho TỪNG tệp — mất quyền giữa chừng thì dừng, giữ tệp đã ghi.
+  const res = await syncDrawingsFromDisk({ projectId, userId: user.id, kiemQuyen: coQuyen });
+  if (res.stoppedByPermission) {
+    if (res.newlySyncedRevisions === 0) return khongCoQuyen();
+    return NextResponse.json({
+      ok: true,
+      totalFilesOnDisk: res.totalFilesOnDisk,
+      newlySyncedRevisions: res.newlySyncedRevisions,
+      stoppedByPermission: true,
+      remaining: res.remaining,
+      message: `Đã đồng bộ ${res.newlySyncedRevisions} bản vẽ mới rồi dừng vì quyền đồng bộ bản vẽ vừa bị thu hồi (còn ${res.remaining} tệp chưa xử lý).`,
+    });
+  }
 
   return NextResponse.json({
     ok: true,
