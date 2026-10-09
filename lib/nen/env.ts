@@ -29,6 +29,9 @@ const serverSchema = z
     // (route /api/offline/* trả 503, fail-closed); có mà sai định dạng → lib/bao-mat/offline-devices.ts
     // throw fail-fast khi dùng. Không validate ở đây để giá trị sai không kéo sập cả app.
     XBOSS_OFFLINE_KEK: z.string().optional(),
+    // "1" CHỈ trong server e2e (playwright.config.ts): cho phép KEK giá trị TEST của e2e/constants.ts.
+    // Production không đặt — KEK test bị từ chối (vault offline misconfigured, fail-closed).
+    XBOSS_E2E: z.string().optional(),
     CRON_SECRET: z.string().min(1).optional(),
     APP_URL: z.string().min(1).optional(),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),

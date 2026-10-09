@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { ADMIN_PW, AUTH_FILE, E2E_DB, E2E_SECRET, HAS_DB } from "./e2e/constants";
+import { ADMIN_PW, AUTH_FILE, E2E_DB, E2E_OFFLINE_KEK, E2E_SECRET, HAS_DB } from "./e2e/constants";
 
 // Cổng webServer — cho phép override qua PW_PORT để tránh nhiều subagent chạy
 // e2e song song trên cùng máy cướp nhầm server :3000 của nhau.
@@ -78,6 +78,10 @@ export default defineConfig({
       DATABASE_URL: E2E_DB ?? process.env.DATABASE_URL ?? "postgres://x:x@127.0.0.1:5432/x",
       XBOSS_SECRET: E2E_SECRET,
       XBOSS_ADMIN_PASSWORD: ADMIN_PW,
+      // S08: bật vault offline (thiếu KEK → 503 fail-closed, hàng đợi không lưu được).
+      XBOSS_OFFLINE_KEK: E2E_OFFLINE_KEK,
+      // Cờ tường minh cho phép KEK giá trị TEST ở trên (lib/nen/offline-crypto.ts từ chối nếu thiếu).
+      XBOSS_E2E: "1",
       PORT: port,
     },
   },

@@ -80,6 +80,20 @@ test("keyring: sai định dạng/ngắn/lặp/trùng XBOSS_SECRET → fail-fast
   }
 });
 
+test("keyring: KEK giá trị TEST của e2e bị từ chối trừ khi có cờ tường minh (XBOSS_E2E=1)", () => {
+  // Đúng giá trị mặc định trong e2e/constants.ts (công khai trong repo — không phải bí mật).
+  const kekE2E = "e2e1:e2e-offline-kek-khong-bi-mat-du-32-ky-tu";
+  for (const raw of [kekE2E, `v2:${S1},${kekE2E}`, `v2:${S1},v1:xx-e2e-offline-kek-${S2}`])
+    assert.throws(
+      () => docKeyringKek(raw, XS),
+      (e: unknown) => e instanceof OfflineKekConfigError && !e.message.includes("e2e-offline"),
+      raw,
+    );
+  assert.throws(() => docKeyringKek(kekE2E, XS, { choPhepKekE2E: false }), OfflineKekConfigError);
+  const k = docKeyringKek(kekE2E, XS, { choPhepKekE2E: true });
+  assert.equal(k?.active, "e2e1");
+});
+
 test("bọc/mở DEK: khứ hồi đúng; wrapped không chứa DEK; mỗi lần bọc IV khác nhau", async () => {
   const kek = await danXuatKek(S1, "v1");
   const dek = taoDek();

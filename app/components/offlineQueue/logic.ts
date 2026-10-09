@@ -479,6 +479,9 @@ export type Lease = { token: number };
 export type ThayDoiSauGui =
   { xoa: true } | { state: QueueState; nextAttemptAt?: number; lastResult?: KetQuaGanNhat };
 
+/** Điều kiện xoá theo yêu cầu: op phải thuộc đúng dự án và đang ở một trong các trạng thái này. */
+export type DieuKienXoa = { projectId: number; states: readonly QueueState[] };
+
 /**
  * Mọi phương thức chỉ resolve khi transaction IndexedDB đã COMMIT (complete); abort/quota/
  * blocked → reject. `themNguyenTu` trả "stale" khi hàng đợi đã đổi kể từ lúc đọc (OCC theo rev).
@@ -507,8 +510,12 @@ export interface QueueStore {
     token: number,
     thayDoi: ThayDoiSauGui,
   ): Promise<boolean>;
-  /** Người dùng đã lưu trực tiếp nội dung này (hoặc xác nhận bỏ) — xoá đúng các op chỉ định. */
-  xoaTheoYeuCau(owner: string, ids: string[]): Promise<void>;
+  /**
+   * Người dùng đã lưu trực tiếp nội dung này (hoặc xác nhận bỏ) — xoá đúng các op chỉ định.
+   * `dieuKien` kiểm TRONG transaction xoá (dự án + trạng thái tại thời điểm commit, không phải
+   * snapshot đọc trước đó). Trả số op đã xoá; 0 → không đổi gì (không tăng rev).
+   */
+  xoaTheoYeuCau(owner: string, ids: string[], dieuKien?: DieuKienXoa): Promise<number>;
   /** Phiên đã xác thực lại (unlock thành công): paused_auth → pending. */
   moLaiPausedAuth(phamVi: ChuSoHuu, now: number): Promise<number>;
 }
@@ -535,12 +542,24 @@ export class LoiHangDoiBan extends Error {
   }
 }
 
+/** Điều kiện của người gọi `themOp` không còn đúng trên snapshot sẽ commit — không ghi/xoá gì. */
+export class LoiDieuKienThem extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LoiDieuKienThem";
+  }
+}
+
+/** Một op trong snapshot đang xét (body = null: ảnh, hoặc không giải mã được). */
+export type OpTrongBanChup = { rec: QueueRecord; body: OpBody | null };
+
 const MAX_THU_OCC = 6;
 
 /** Cache giải mã theo operationId (ciphertext bất biến theo operationId). */
 export type BoNhoGiaiMa = Map<string, OpBody>;
 
-async function giaiMaCo(
+/** Giải mã một op (dùng cache nếu có); không giải được (khoá thiếu/sai chủ/hỏng) → null. */
+export async function giaiMaCo(
   vault: VaultMoKhoa,
   rec: QueueRecord,
   cache?: BoNhoGiaiMa,
@@ -561,6 +580,10 @@ async function giaiMaCo(
  * Thêm op: đọc hàng đợi của chủ → giải mã ứng viên dedup trong bộ nhớ → mã hoá op mới với
  * sequence = lastSeq + 1 → MỘT transaction kiểm rev chưa đổi rồi xoá dedup + ghi op + tăng
  * sequence. Rev đổi (tab khác ghi/flush xen giữa) → làm lại từ đầu. Chỉ resolve khi COMMIT.
+ *
+ * `dieuKien` chạy ở MỖI vòng trên đúng snapshot vòng đó đọc; vòng commit được chỉ khi rev chưa
+ * đổi, nên điều kiện đúng trên chính trạng thái được ghi (không TOCTOU giữa kiểm và ghi). Trả
+ * thông điệp → throw LoiDieuKienThem, không ghi/xoá gì. `thayOpCu: false` = chỉ THÊM, không dedup.
  */
 export async function themOp(d: {
   store: QueueStore;
@@ -570,21 +593,28 @@ export async function themOp(d: {
   now: () => number;
   uuid: () => string;
   cache?: BoNhoGiaiMa;
+  dieuKien?: (banChup: OpTrongBanChup[]) => string | null;
+  thayOpCu?: boolean;
 }): Promise<{ operationId: string }> {
   const chu = d.vault.chu();
   if (!chu) throw new Error("Vault chưa mở");
   const banRo = await dongGoiThanOp(d.body);
+  const thay = d.thayOpCu !== false && d.body.kind !== "photo";
   for (let lan = 0; lan < MAX_THU_OCC; lan++) {
     const { rev, lastSeq, ops } = await d.store.docChu(khoaChu(chu));
     const ungVien: OpDaGiai[] = [];
-    if (d.body.kind !== "photo") {
-      for (const rec of ops) {
-        if (!cungChu(rec, chu) || !chuaTungGui(rec) || rec.kind === "photo") continue;
-        const body = await giaiMaCo(d.vault, rec, d.cache);
-        if (body) ungVien.push({ rec, body });
-      }
+    const banChup: OpTrongBanChup[] = [];
+    for (const rec of ops) {
+      if (!cungChu(rec, chu)) continue;
+      const choDedup = thay && chuaTungGui(rec) && rec.kind !== "photo";
+      const choDieuKien = !!d.dieuKien && rec.kind !== "photo";
+      const body = choDedup || choDieuKien ? await giaiMaCo(d.vault, rec, d.cache) : null;
+      if (choDedup && body) ungVien.push({ rec, body });
+      if (d.dieuKien) banChup.push({ rec, body });
     }
-    const xoa = chonOpThay(d.body, ungVien);
+    const loi = d.dieuKien?.(banChup) ?? null;
+    if (loi) throw new LoiDieuKienThem(loi);
+    const xoa = thay ? chonOpThay(d.body, ungVien) : [];
     const meta = {
       vaultKeyId: d.keyId,
       operationId: d.uuid(),

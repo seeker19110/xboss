@@ -321,6 +321,17 @@ test("401 lock hides and removes the prior page from interaction before cache cl
     assert.match(tieuDe?.textContent ?? "", /Phiên đăng nhập đã hết hạn/);
     assert.equal(lop?.children[2]?.focused, true, "focus vào nút hành động");
     assert.equal(lop?.inert, false, "lớp khoá không tự inert chính nó");
+
+    // S08: tự đăng xuất → nói đúng là đăng xuất CỤC BỘ, thao tác chưa gửi vẫn giữ trên thiết bị;
+    // không mô tả như máy chủ đã thu hồi/hết hạn phiên.
+    bodyChildren.splice(1);
+    lockPrivatePageUntilCachePurged("logout");
+    const lopDx = bodyChildren.at(-1);
+    assert.equal(lopDx?.attributes.get("role"), "alertdialog");
+    assert.match(lopDx?.children[0]?.textContent ?? "", /^Đã đăng xuất trên thiết bị này$/);
+    const moTa = lopDx?.children[1]?.textContent ?? "";
+    assert.match(moTa, /vẫn được giữ \(mã hoá\) trên thiết bị/);
+    assert.doesNotMatch(moTa, /thu hồi|hết hạn/);
   } finally {
     if (previousDocument) Object.defineProperty(globalThis, "document", previousDocument);
     else Reflect.deleteProperty(globalThis, "document");

@@ -1,5 +1,5 @@
 const CACHE_CLEAR_TIMEOUT_MS = 3_000;
-const OWNED_CACHE = /^xboss-(?:public-)?v\d+$/;
+const OWNED_CACHE = /^xboss-(?:public-|api-)?v\d+$/;
 
 export type CacheClearController = Pick<ServiceWorker, "postMessage">;
 

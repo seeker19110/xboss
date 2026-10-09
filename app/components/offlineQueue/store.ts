@@ -18,6 +18,7 @@ import {
   LEASE_TTL_MS,
   PHOTO_QUOTA_BYTES,
   type ChuSoHuu,
+  type DieuKienXoa,
   type Lease,
   type QueueRecord,
   type QueueStore,
@@ -453,18 +454,25 @@ export class QueueDb implements QueueStore {
     });
   }
 
-  async xoaTheoYeuCau(owner: string, ids: string[]) {
-    if (!ids.length) return;
-    await this.db.tx([STORE_OPS, STORE_META], "readwrite", async (t) => {
+  async xoaTheoYeuCau(owner: string, ids: string[], dieuKien?: DieuKienXoa): Promise<number> {
+    if (!ids.length) return 0;
+    return this.db.tx([STORE_OPS, STORE_META], "readwrite", async (t) => {
       const meta = await docMeta(t);
       let photoBytes = meta.photoBytes;
+      let n = 0;
       for (const id of ids) {
         const r = await t.get<QueueRecord>(STORE_OPS, id);
         if (!r || r.owner !== owner) continue; // không bao giờ xoá op của chủ khác
+        // Điều kiện kiểm trên bản ghi ĐANG có trong transaction (không tin snapshot đọc trước).
+        if (dieuKien && r.projectId !== dieuKien.projectId) continue;
+        if (dieuKien && !dieuKien.states.includes(r.state)) continue;
         if (r.kind === "photo") photoBytes -= r.bytes;
         await t.delete(STORE_OPS, id);
+        n++;
       }
-      await t.put(STORE_META, { ...meta, rev: meta.rev + 1, photoBytes });
+      // Không xoá gì → không tăng rev (không làm enqueue/flush tab khác phải đọc lại vô ích).
+      if (n) await t.put(STORE_META, { ...meta, rev: meta.rev + 1, photoBytes });
+      return n;
     });
   }
 
@@ -475,6 +483,29 @@ export class QueueDb implements QueueStore {
       for (const r of ops) {
         if (!cungPhamVi(r, phamVi) || r.state !== "paused_auth") continue;
         await t.put(STORE_OPS, { ...r, state: "pending", nextAttemptAt: now });
+        n++;
+      }
+      if (n) {
+        const meta = await docMeta(t);
+        await t.put(STORE_META, { ...meta, rev: meta.rev + 1 });
+      }
+      return n;
+    });
+  }
+
+  /**
+   * "Gửi lại ngay" (người dùng bấm, S08): op `pending` đang chờ backoff được đưa về hạn gửi ngay.
+   * GIỮ hạn của op vừa nhận 429/503 — Retry-After là yêu cầu của máy chủ, không retry mù (D04).
+   */
+  async datLaiHanGui(phamVi: ChuSoHuu, now: number) {
+    return this.db.tx([STORE_OPS, STORE_META], "readwrite", async (t) => {
+      const ops = await t.getAllByIndex<QueueRecord>(STORE_OPS, "owner", khoaChu(phamVi));
+      let n = 0;
+      for (const r of ops) {
+        if (!cungPhamVi(r, phamVi) || r.state !== "pending" || r.nextAttemptAt <= now) continue;
+        const s = r.lastResult?.status;
+        if (s === 429 || s === 503) continue;
+        await t.put(STORE_OPS, { ...r, nextAttemptAt: now });
         n++;
       }
       if (n) {
@@ -511,9 +542,14 @@ export class QueueDb implements QueueStore {
    * blocker đối soát legacy (D03), không bao giờ tự nhận chủ.
    */
   async coLegacy(): Promise<boolean> {
+    return (await this.demLegacy()) > 0;
+  }
+
+  /** Số bản ghi queue v1 không chủ (CHỈ đếm — màn phục hồi S08 giải thích, không hiện nội dung). */
+  async demLegacy(): Promise<number> {
     const names = await this.db.storeNames();
-    if (!names.includes(LEGACY_STORE)) return false;
-    return this.db.tx([LEGACY_STORE], "readonly", async (t) => (await t.count(LEGACY_STORE)) > 0);
+    if (!names.includes(LEGACY_STORE)) return 0;
+    return this.db.tx([LEGACY_STORE], "readonly", (t) => t.count(LEGACY_STORE));
   }
 }
 

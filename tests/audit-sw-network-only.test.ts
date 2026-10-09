@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 
 const ORIGIN = "https://xboss.test";
-const PUBLIC_CACHE = "xboss-public-v20";
+const PUBLIC_CACHE = "xboss-public-v21";
 const source = readFileSync("public/sw.js", "utf8");
 const key = (request: Request | string) =>
   typeof request === "string" ? new URL(request, ORIGIN).href : request.url;
@@ -166,7 +166,13 @@ test("SW: query URL hoặc Authorization không đi vào cache công khai", asyn
 
 test("SW: activate chỉ dọn namespace XBoss cũ, giữ cache ứng dụng khác", async () => {
   const f = fixture();
-  for (const name of ["xboss-v19", "xboss-public-v18", PUBLIC_CACHE, "another-app-v1"]) {
+  for (const name of [
+    "xboss-v19",
+    "xboss-public-v18",
+    "xboss-api-v21",
+    PUBLIC_CACHE,
+    "another-app-v1",
+  ]) {
     f.data.set(name, new Map());
   }
   await f.fire("activate", {}).done();

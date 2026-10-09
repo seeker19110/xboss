@@ -328,14 +328,20 @@ test("lease + fencing: 2 tab flush đồng thời → mỗi op gửi đúng 1 l�
   t1.datPhan(cham);
   t2.datPhan(cham);
   const p1 = t1.q.flush();
-  // Tab 2 flush khi tab 1 ĐANG gửi (op đã `sending`, chờ mạng) — lease tab 1 còn hạn nên tab 2
-  // không được giành lease/đưa op về pending/gửi lại.
-  await denLuc(() => t1.gui.length >= 1);
-  const p2 = t2.q.flush();
-  await new Promise((r) => setTimeout(r, 20));
-  assert.equal(t2.gui.length, 0, "tab 2 không gửi khi tab 1 giữ lease");
-  assert.equal(await t2.store.xinLease(t2.q.vault.chu()!, "tab-thu-3", Date.now()), null);
-  mo();
+  let p2: Promise<void> = Promise.resolve();
+  try {
+    // Tab 2 flush khi tab 1 ĐANG gửi (op đã `sending`, chờ mạng) — lease tab 1 còn hạn nên tab 2
+    // không được giành lease/đưa op về pending/gửi lại.
+    await denLuc(() => t1.gui.length >= 1);
+    p2 = t2.q.flush();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(t2.gui.length, 0, "tab 2 không gửi khi tab 1 giữ lease");
+    assert.equal(await t2.store.xinLease(t2.q.vault.chu()!, "tab-thu-3", Date.now()), null);
+  } finally {
+    // Luôn thả request đang chờ: assert hỏng mà không thả thì nhịp gia hạn lease (setInterval)
+    // giữ tiến trình test sống mãi — test:mutation treo thay vì báo đỏ.
+    mo();
+  }
   await Promise.all([p1, p2]);
   // tab bỏ qua do không giành được lease → flush lại cho chắc phần còn lại
   await t1.q.flush();
@@ -374,20 +380,32 @@ test("fencing: lease hết hạn giữa chừng → tab mới gửi lại CÙNG 
       return { status: 200, receiptOperationId: req.headers["Idempotency-Key"] };
     },
   });
-  await denLuc(() => gui.length === 1);
-  gio += LEASE_TTL_MS + 1; // tab-1 treo quá TTL, không gia hạn
-  const k2 = await flushQueue({
-    store: m.store,
-    vault: m.vault,
-    holder: "tab-2",
-    now,
-    send: async (req) => {
-      gui.push({ tab: "tab-2", key: req.headers["Idempotency-Key"] });
-      return { status: 200, receiptOperationId: req.headers["Idempotency-Key"] };
-    },
-  });
+  let k2: Awaited<ReturnType<typeof flushQueue>>;
+  try {
+    await denLuc(() => gui.length === 1);
+    gio += LEASE_TTL_MS + 1; // tab-1 treo quá TTL, không gia hạn
+    k2 = await flushQueue({
+      store: m.store,
+      vault: m.vault,
+      holder: "tab-2",
+      now,
+      send: async (req) => {
+        gui.push({ tab: "tab-2", key: req.headers["Idempotency-Key"] });
+        return { status: 200, receiptOperationId: req.headers["Idempotency-Key"] };
+      },
+    });
+  } finally {
+    thaTab1(); // không để tab-1 treo (nhịp gia hạn lease giữ tiến trình sống) khi assert hỏng
+  }
   assert.equal(k2.daGui, 1);
-  thaTab1();
+  // Fencing trực tiếp: tab-1 (token cũ) áp kết quả → phải bị từ chối dù op còn hay đã xoá.
+  // (Kiểm riêng vì vòng flush của tab-1 cũng tự dừng qua gia hạn lease hỏng, che mất lỗi fencing.)
+  const chu = m.vault.chu()!;
+  assert.equal(
+    await m.store.apKetQua(chu, "op-bat-ky", "tab-1", 1, { state: "rejected" }),
+    false,
+    "tab mất lease không được ghi kết quả",
+  );
   const k1 = await p1;
   assert.equal(k1.matLease, true, "token cũ → không áp kết quả");
   assert.equal(gui[0].key, gui[1].key, "gửi lại đúng operationId (server dedup bằng receipt)");

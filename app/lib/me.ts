@@ -122,10 +122,18 @@ export function khoaTrangDoiNguCanh(): void {
   retry.addEventListener("click", () => window.location.reload());
 }
 
-export function lockPrivatePageUntilCachePurged(): () => Promise<void> {
+/**
+ * `lyDo = "logout"` (S08): người dùng tự đăng xuất trên thiết bị này — nói đúng là đăng xuất cục
+ * bộ, KHÔNG nói như máy chủ đã thu hồi phiên ở thiết bị khác; thao tác ngoại tuyến chưa gửi vẫn
+ * giữ (mã hoá) trên thiết bị cho chính chủ đăng nhập lại.
+ */
+export function lockPrivatePageUntilCachePurged(lyDo?: "logout"): () => Promise<void> {
   const { message, retry } = phuLopKhoa({
-    tieuDe: "Phiên đăng nhập đã hết hạn",
-    thongDiep: "Đã khóa nội dung riêng tư. Đang xác nhận dọn bộ nhớ đệm XBoss…",
+    tieuDe: lyDo === "logout" ? "Đã đăng xuất trên thiết bị này" : "Phiên đăng nhập đã hết hạn",
+    thongDiep:
+      lyDo === "logout"
+        ? "Đã khóa nội dung riêng tư và kho ngoại tuyến. Thao tác chưa gửi vẫn được giữ (mã hoá) trên thiết bị — đăng nhập lại đúng tài khoản để gửi. Đang xác nhận dọn bộ nhớ đệm XBoss…"
+        : "Đã khóa nội dung riêng tư. Đang xác nhận dọn bộ nhớ đệm XBoss…",
     nhanNut: "Thử dọn bộ nhớ đệm lại",
   });
   const retryPurge = async () => {
@@ -146,12 +154,12 @@ export function lockPrivatePageUntilCachePurged(): () => Promise<void> {
 
 // Khóa dữ liệu đang hiển thị và xác nhận purge cache trước khi về login. Queue không rõ owner
 // được giữ nguyên/cách ly; không xóa khi session hết hạn hoặc đổi tài khoản.
-export async function redirectToLogin() {
+export async function redirectToLogin(lyDo?: "logout") {
   if (_authRedirectStarted) return;
   _authRedirectStarted = true;
   // Khóa view đồng bộ ngay khi nhận 401; không để nội dung riêng tư hiện trong lúc
   // chờ IndexedDB hoặc service worker ACK.
-  const retryPurge = lockPrivatePageUntilCachePurged();
+  const retryPurge = lockPrivatePageUntilCachePurged(lyDo);
   await retryPurge();
 }
 
