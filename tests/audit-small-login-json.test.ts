@@ -72,6 +72,7 @@ function fixture(opts: { user?: TestUser; wait?: number; setup2fa?: boolean } = 
   let receivedPassword: unknown;
   const route = load<{ POST(req: unknown): Promise<Reply> }>("app/api/auth/login/route.ts", {
     "next/server": next,
+    "@/lib/nen/loi": LOI_STUB,
     "@/lib/db": {
       queryOne: async (_sql: string, email: unknown) => {
         events.push(`query:${email}`);
@@ -135,6 +136,14 @@ for (const [index, body] of invalidBodies.entries()) {
   });
 }
 
+// Route login/me import `@/lib/nen/loi` (503 schema_not_ready, S16); ca này không dựng tình huống
+// schema thiếu nên chỉ cần stub "không phải lỗi schema".
+const LOI_STUB = {
+  laLoiSchemaChuaSan: () => false,
+  phanHoiSchemaChuaSan: () => {
+    throw new Error("không dùng trong ca này");
+  },
+};
 test("login: malformed JSON giữ 400 thay vì ngoại lệ", async () => {
   const f = fixture();
   const res = await f.route.POST({

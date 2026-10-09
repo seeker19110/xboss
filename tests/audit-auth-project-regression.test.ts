@@ -64,6 +64,14 @@ const noSeed = () => {
   throw new Error("HTTP không được seed tài khoản");
 };
 
+// Route login/me import `@/lib/nen/loi` (503 schema_not_ready, S16); ca này không dựng tình huống
+// schema thiếu nên chỉ cần stub "không phải lỗi schema".
+const LOI_STUB = {
+  laLoiSchemaChuaSan: () => false,
+  phanHoiSchemaChuaSan: () => {
+    throw new Error("không dùng trong ca này");
+  },
+};
 test("audit: helper demo không chạm DB ở production dù có mật khẩu admin", async () => {
   let writes = 0;
   const auth = load<{ ensureDefaultUsers: () => Promise<void> }>(
@@ -90,6 +98,7 @@ test("audit: helper demo không chạm DB ở production dù có mật khẩu ad
 test("audit: GET auth/me chưa đăng nhập không khởi tạo tài khoản", async () => {
   const route = load<Route>("app/api/auth/me/route.ts", {
     "next/server": next,
+    "@/lib/nen/loi": LOI_STUB,
     "next/headers": {},
     "@/lib/bao-mat/auth": { getCurrentUser: async () => null, ensureDefaultUsers: noSeed },
     "@/lib/bao-mat/session-token": { dauRangBuocPhien: () => null },
@@ -101,6 +110,7 @@ test("audit: POST login trên DB chưa có user không khởi tạo tài khoản
   const attempts: boolean[] = [];
   const route = load<Route>("app/api/auth/login/route.ts", {
     "next/server": next,
+    "@/lib/nen/loi": LOI_STUB,
     "@/lib/db": { queryOne: async () => undefined },
     "@/lib/bao-mat/auth": { ensureDefaultUsers: noSeed },
     "@/lib/bao-mat/ratelimit": {
@@ -232,6 +242,7 @@ for (const password of [123, true, [], {}]) {
   test(`audit: login giữ kiểm tra kiểu mật khẩu ${JSON.stringify(password)}`, async () => {
     const route = load<Route>("app/api/auth/login/route.ts", {
       "next/server": next,
+      "@/lib/nen/loi": LOI_STUB,
       "@/lib/db": {},
       "@/lib/bao-mat/auth": { ensureDefaultUsers: noSeed },
       "@/lib/bao-mat/ratelimit": {},
@@ -246,6 +257,7 @@ for (const password of [123, true, [], {}]) {
 test("audit: login giữ xử lý JSON lỗi thành 400, không chạm DB", async () => {
   const route = load<Route>("app/api/auth/login/route.ts", {
     "next/server": next,
+    "@/lib/nen/loi": LOI_STUB,
     "@/lib/db": {},
     "@/lib/bao-mat/auth": { ensureDefaultUsers: noSeed },
     "@/lib/bao-mat/ratelimit": {},
@@ -270,6 +282,7 @@ for (const enabled2fa of [false, true]) {
     let tokenArgs: unknown[] | undefined;
     const route = load<Route>("app/api/auth/login/route.ts", {
       "next/server": next,
+      "@/lib/nen/loi": LOI_STUB,
       "@/lib/db": { queryOne: async () => user },
       "@/lib/bao-mat/auth": {
         ensureDefaultUsers: noSeed,
