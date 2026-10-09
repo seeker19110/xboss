@@ -1,5 +1,13 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — Thẻ dự án không còn hiện "0%" cho dự án chưa có việc
+
+- `listProjects` (`lib/ha-tang/projects.ts`) trả thêm `progressAvailable` (có ≥1 việc hợp lệ, cùng
+  quy tắc A4-FR08 của KPI Portfolio). Thẻ dự án `/portfolio`, ô chọn dự án (`ProjectSwitcher`) và
+  danh sách dự án trang Admin hiện "Chưa có dữ liệu tiến độ" / "—" / "Chưa có tiến độ" thay vì "0%".
+- % làm tròn XUỐNG qua `lib/nen/phan-tram.ts` (`phanTramTienDo`) — 99,6% không còn hiện thành 100%.
+- Test: `tests/phan-tram.test.ts`, bổ sung `tests/portfolio-kpi.test.ts` (2 ca đỏ trên query cũ).
+
 ## 2026-10-09 — S16/D01: tái kiểm quyền lúc ghi cho import Excel và quét bản vẽ (đóng 2 mục HOÃN)
 
 - `POST /api/import/excel`: cả lần `importWorkbook` chạy trong MỘT `ghiNeuConQuyen` — thu hồi quyền ⇒
