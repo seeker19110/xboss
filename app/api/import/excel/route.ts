@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import * as XLSX from "xlsx";
 import { importWorkbook, analyzeWorkbook } from "@/lib/tien-do/import";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 import { log } from "@/lib/nen/log";
 import { isContentTooLarge } from "@/lib/nen/photos";
@@ -17,11 +18,9 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-    if (!CAN.import(user.role))
-      return NextResponse.json(
-        { error: "Bạn không có quyền import (chỉ Admin/PM)" },
-        { status: 403 },
-      );
+    const khongCoQuyen = () =>
+      NextResponse.json({ error: "Bạn không có quyền import (chỉ Admin/PM)" }, { status: 403 });
+    if (!CAN.import(user.role)) return khongCoQuyen();
 
     if (isContentTooLarge(request.headers.get("content-length"), MAX_BYTES))
       return NextResponse.json(
@@ -68,16 +67,24 @@ export async function POST(request: NextRequest) {
     const dimDenominator = denominator === "row-nonempty" ? "row-nonempty" : "columns";
     // Ghi sổ import (C3 §5): băm NỘI DUNG file để nhiều năm sau còn đối chiếu được đúng
     // file gốc, kể cả khi tên file đã đổi.
-    const stats = await importWorkbook(workbook, {
-      dimDenominator,
-      projectId,
-      source: {
-        name: file.name,
-        sha256: createHash("sha256").update(Buffer.from(buffer)).digest("hex"),
-        bytes: file.size,
-        importedBy: user.id,
-      },
-    });
+    // S16 (D01): toàn bộ lần import chạy trong MỘT transaction, tái kiểm quyền ngay đầu —
+    // bị thu hồi quyền ⇒ 403, không ghi gì; lỗi giữa chừng ⇒ ROLLBACK cả lần (all-or-nothing).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.import(user.role),
+      () =>
+        importWorkbook(workbook, {
+          dimDenominator,
+          projectId,
+          source: {
+            name: file.name,
+            sha256: createHash("sha256").update(Buffer.from(buffer)).digest("hex"),
+            bytes: file.size,
+            importedBy: user.id,
+          },
+        }),
+    );
+    if (!kq.ok) return khongCoQuyen();
+    const stats = kq.value;
 
     return NextResponse.json({
       ...stats,

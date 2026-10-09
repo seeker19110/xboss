@@ -1,5 +1,17 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — S16/D01: tái kiểm quyền lúc ghi cho import Excel và quét bản vẽ (đóng 2 mục HOÃN)
+
+- `POST /api/import/excel`: cả lần `importWorkbook` chạy trong MỘT `ghiNeuConQuyen` — thu hồi quyền ⇒
+  403, không ghi gì; lỗi DB giữa chừng ⇒ ROLLBACK toàn bộ (trước đây ghi dở dang). Nhánh preview giữ nguyên.
+- `POST /api/drawings/scan-local`: `syncDrawingsFromDisk` thêm tuỳ chọn `kiemQuyen` — mỗi tệp ghi trong
+  transaction riêng có tái kiểm; mất quyền ⇒ dừng, giữ tệp đã ghi, trả `stoppedByPermission`/`remaining`
+  (chưa ghi tệp nào ⇒ 403). Script CLI không truyền ⇒ như cũ.
+- Test `tests/s16-quyen-luc-ghi-import-quet.test.ts`; cập nhật §2.1/§2.2/§4 `AUDIT-S16-QUYEN-LUC-GHI.md`.
+- Ổn định test S16 khi CI chạy song song (`XBOSS_PG_POOL_MAX=3`): ca quét giữa chừng hỏi khoá qua
+  client đang giữ thay vì xin kết nối pool thứ 4; kiểm "file vừa lưu được dọn" của test tiến độ và
+  vật tư/kỹ thuật lọc theo tiền tố tên file của chính ca (trước đây đếm nhầm file test khác).
+
 ## 2026-10-09 — S16/D01: tái kiểm quyền lúc ghi cho route miền vật tư/kỹ thuật
 
 - Kiểm kê toàn bộ route ghi của `materials`, `equipment`, `vehicles`, `engineering`, `drawings`,
