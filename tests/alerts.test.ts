@@ -4,10 +4,11 @@ import assert from "node:assert/strict";
 
 // ===== M47 PR4 — Cảnh báo cấu hình được (alert_rules), lib/alerts.ts =====
 
-test("ALERT_METRICS: đủ 5 khoá, mỗi khoá có label/operator/defaultThreshold hợp lệ", async () => {
+test("ALERT_METRICS: đủ 6 khoá, mỗi khoá có label/operator/defaultThreshold hợp lệ", async () => {
   const { ALERT_METRICS } = await import("@/lib/van-hanh/alerts");
   const keys = Object.keys(ALERT_METRICS).sort();
   assert.deepEqual(keys, [
+    "bill_unpaid_days",
     "cpi_below",
     "due_soon_days",
     "due_soon_progress",

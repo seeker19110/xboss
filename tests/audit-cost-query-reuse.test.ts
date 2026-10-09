@@ -75,6 +75,7 @@ function fixture(
           state: "ok",
           n: 2,
           amount: "10.00",
+          unpaid: "7.00",
         },
       ];
     assert.fail(`Query ngoài fixture: ${sql}`);
@@ -139,7 +140,8 @@ test("chi phí: nhóm hệ = 6 query trong MỘT snapshot REPEATABLE READ READ O
   );
   const j = (v: unknown) => JSON.stringify(v);
   const totals = result.body.totals;
-  assert.equal(j(totals), j({ budget: 100, committed: 50, actual: 10 }));
+  // M129: phiếu đã duyệt chưa chi là cột riêng, không cộng vào actual/committed.
+  assert.equal(j(totals), j({ budget: 100, committed: 50, actual: 10, approvedUnpaid: 7 }));
   assert.equal(j(result.body.projectTotals), j(totals));
   assert.equal(j(result.body.selectedTotals), j(totals));
   const headers = result.headers as Record<string, string>;

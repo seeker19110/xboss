@@ -21,6 +21,7 @@ import {
   nhanDinhDangTien,
   tienTextToWire,
 } from "@/lib/nen/money-dto";
+import type { PayStatus } from "@/lib/tai-chinh/payment-bills";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,14 @@ type Bill = {
   createdBy: number | null;
   createdByName: string | null;
   createdAt: string;
+  // M129: trạng thái chi — committed (đã duyệt, chưa chi) | paid (đã chi) | void.
+  payStatus: PayStatus;
+  paidAt: string | null;
+  paidBy: number | null;
+  paidByName: string | null;
+  paidRef: string | null;
+  paidNote: string | null;
+  paymentCertId: number | null;
 };
 
 // GET /api/payments/bills — S10c (A3-FR06): header decimal-string-v1 → amount/labor là chuỗi
@@ -88,9 +97,17 @@ export async function GET(req: NextRequest) {
            wp.name            AS "workPackageName",
            pb.created_by      AS "createdBy",
            u.name             AS "createdByName",
-           pb.created_at      AS "createdAt"
+           pb.created_at      AS "createdAt",
+           pb.pay_status      AS "payStatus",
+           pb.paid_at         AS "paidAt",
+           pb.paid_by         AS "paidBy",
+           pu.name            AS "paidByName",
+           pb.paid_ref        AS "paidRef",
+           pb.paid_note       AS "paidNote",
+           pb.payment_cert_id AS "paymentCertId"
       FROM payment_bills pb
       LEFT JOIN users u ON u.id = pb.created_by AND u.org_id = ?
+      LEFT JOIN users pu ON pu.id = pb.paid_by AND pu.org_id = ?
       LEFT JOIN sheet_types st ON st.id = pb.sheet_type_id
       LEFT JOIN LATERAL (
         SELECT name FROM work_packages
@@ -118,6 +135,7 @@ export async function GET(req: NextRequest) {
             WHERE pst.id = pb.sheet_type_id AND pt.project_id = ? AND pp.org_id = ?
          ))
      ORDER BY pb.paid_date ASC, pb.id ASC`,
+      user.orgId,
       user.orgId,
       projectId,
       projectId,
@@ -161,7 +179,10 @@ type KetQuaGhiBill =
 
 // POST /api/payments/bills
 // Body: { responsible, type, amount, paidDate, period?, description?, note?,
-//         sheetTypeId?, floorLabel?, pctThisPeriod?, progressSnapshot?, unit?, quantity?, labor? }
+//         sheetTypeId?, floorLabel?, pctThisPeriod?, progressSnapshot?, unit?, quantity?, labor?,
+//         payStatus? }
+// M129: payStatus mặc định 'paid' (giữ hành vi cũ: phiếu nhập tay = đã chi tại paidDate, ghi
+// paid_at/paid_by); 'committed' = cam kết chưa chi (đánh dấu chi sau qua …/:id/pay).
 // S10 (A3-FR01/FR02): amount/labor đọc qua `parseMoneyInput` (số JSON hoặc chuỗi thập phân thuần;
 // "1.234.567" kiểu vi-VN → 400, vượt NUMERIC(15,2) → 422 `amount_overflow`). Bill theo tầng:
 // sheet phải thuộc dự án đang chọn; dòng HĐ tầng khoá FOR UPDATE rồi mới cộng Σ % kỳ (NUMERIC,
@@ -180,6 +201,9 @@ export async function POST(req: NextRequest) {
   if (!responsible) return NextResponse.json({ error: "Thiếu người phụ trách" }, { status: 400 });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(paidDate))
     return NextResponse.json({ error: "Ngày không hợp lệ (YYYY-MM-DD)" }, { status: 400 });
+  if (b?.payStatus != null && b.payStatus !== "paid" && b.payStatus !== "committed")
+    return NextResponse.json({ error: "Trạng thái chi chỉ nhận paid/committed" }, { status: 400 });
+  const daChi = b?.payStatus !== "committed";
 
   const period = (b?.period ?? "").trim() || null;
   const description = (b?.description ?? "").trim() || null;
@@ -300,8 +324,9 @@ export async function POST(req: NextRequest) {
     INSERT INTO payment_bills
            (responsible, type, period, amount, description, paid_date,
             progress_snapshot, note, unit, quantity, labor,
-            sheet_type_id, floor_label, pct_this_period, created_by, project_id)
-    VALUES (?, ?, ?, ?::numeric, ?, ?, ?, ?, ?, ?::numeric, ?::numeric, ?, ?, ?, ?, ?)
+            sheet_type_id, floor_label, pct_this_period, created_by, project_id,
+            pay_status, paid_at, paid_by)
+    VALUES (?, ?, ?, ?::numeric, ?, ?, ?, ?, ?, ?::numeric, ?::numeric, ?, ?, ?, ?, ?, ?, ?, ?)
     RETURNING id, amount::text AS amount`,
         responsible,
         type,
@@ -319,6 +344,9 @@ export async function POST(req: NextRequest) {
         pctThisPeriod,
         user.id,
         projectId,
+        daChi ? "paid" : "committed",
+        daChi ? paidDate : null,
+        daChi ? user.id : null,
       );
       return { ok: true, id: saved!.id, amount: saved!.amount };
     },

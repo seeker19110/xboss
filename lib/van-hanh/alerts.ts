@@ -7,7 +7,12 @@
 import { query, queryOne, run, insertId } from "@/lib/db";
 
 export type AlertMetric =
-  "due_soon_days" | "due_soon_progress" | "material_over_pct" | "spi_below" | "cpi_below";
+  | "due_soon_days"
+  | "due_soon_progress"
+  | "material_over_pct"
+  | "spi_below"
+  | "cpi_below"
+  | "bill_unpaid_days";
 
 export const ALERT_METRICS: Record<
   AlertMetric,
@@ -42,6 +47,13 @@ export const ALERT_METRICS: Record<
     operator: "lt",
     defaultThreshold: 1,
     unit: "",
+  },
+  // M129: phiếu IPC đã duyệt nhưng chưa đánh dấu chi quá N ngày → thông báo bill_unpaid.
+  bill_unpaid_days: {
+    label: "Phiếu đã duyệt chưa chi quá số ngày thì cảnh báo",
+    operator: "gt",
+    defaultThreshold: 30,
+    unit: "ngày",
   },
 };
 
@@ -127,7 +139,9 @@ export async function upsertAlertRule(input: {
   if (!isAlertMetric(input.metric)) return "Metric không hợp lệ";
   if (!Number.isFinite(input.threshold)) return "Ngưỡng phải là số hữu hạn";
   if (
-    (input.metric === "material_over_pct" || input.metric === "due_soon_progress") &&
+    (input.metric === "material_over_pct" ||
+      input.metric === "due_soon_progress" ||
+      input.metric === "bill_unpaid_days") &&
     input.threshold < 0
   )
     return "Ngưỡng không được âm";

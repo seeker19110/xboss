@@ -553,6 +553,7 @@
 | design_change_id | integer | ✓ |  |
 | claim_id | integer | ✓ |  |
 | floor_stage_front_id | integer | ✓ |  |
+| payment_bill_id | integer | ✓ |  |
 
 **Khóa ngoại:**
 - `advance_id` → `advances(id)`
@@ -574,6 +575,7 @@
 - `meeting_action_id` → `meeting_actions(id)`
 - `monitoring_point_id` → `monitoring_points(id)`
 - `ncr_id` → `ncrs(id)`
+- `payment_bill_id` → `payment_bills(id)`
 - `payment_cert_id` → `payment_certs(id)`
 - `po_id` → `purchase_orders(id)`
 - `proposal_id` → `proposals(id)`
@@ -614,6 +616,7 @@
 - `uq_notif_nav`: UNIQUE INDEX uq_notif_nav ON public.notifications USING btree (user_id, type, nav_node_key) WHERE (nav_node_key IS NOT NULL)
 - `uq_notif_ncr`: UNIQUE INDEX uq_notif_ncr ON public.notifications USING btree (user_id, ncr_id, type) WHERE (ncr_id IS NOT NULL)
 - `uq_notif_norm`: UNIQUE INDEX uq_notif_norm ON public.notifications USING btree (user_id, type, boq_norm_id) WHERE (boq_norm_id IS NOT NULL)
+- `uq_notif_payment_bill`: UNIQUE INDEX uq_notif_payment_bill ON public.notifications USING btree (user_id, type, payment_bill_id) WHERE (payment_bill_id IS NOT NULL)
 - `uq_notif_po`: UNIQUE INDEX uq_notif_po ON public.notifications USING btree (user_id, po_id, type) WHERE (po_id IS NOT NULL)
 - `uq_notif_proposal`: UNIQUE INDEX uq_notif_proposal ON public.notifications USING btree (user_id, type, proposal_id) WHERE (proposal_id IS NOT NULL)
 - `uq_notif_punch`: UNIQUE INDEX uq_notif_punch ON public.notifications USING btree (user_id, type, punch_item_id) WHERE (punch_item_id IS NOT NULL)
@@ -979,10 +982,16 @@
 | contract_id | integer | ✓ |  |
 | payment_cert_id | integer | ✓ |  |
 | project_id | integer | ✓ |  |
+| pay_status | text |  | `'paid'::text` |
+| paid_at | date | ✓ |  |
+| paid_by | integer | ✓ |  |
+| paid_ref | text | ✓ |  |
+| paid_note | text | ✓ |  |
 
 **Khóa ngoại:**
 - `contract_id` → `contracts(id)`
 - `created_by` → `users(id)`
+- `paid_by` → `users(id)`
 - `payment_cert_id` → `payment_certs(id)`
 - `project_id` → `projects(id)`
 - `responsible_supplier_id` → `suppliers(id)`
@@ -990,6 +999,7 @@
 
 **Index:**
 - `idx_payment_bills_contract`: INDEX idx_payment_bills_contract ON public.payment_bills USING btree (contract_id)
+- `idx_payment_bills_pay_status`: INDEX idx_payment_bills_pay_status ON public.payment_bills USING btree (project_id, pay_status)
 - `idx_payment_bills_project`: INDEX idx_payment_bills_project ON public.payment_bills USING btree (project_id)
 - `idx_payment_bills_resp`: INDEX idx_payment_bills_resp ON public.payment_bills USING btree (responsible)
 - `idx_payment_bills_resp_supplier`: INDEX idx_payment_bills_resp_supplier ON public.payment_bills USING btree (responsible_supplier_id)

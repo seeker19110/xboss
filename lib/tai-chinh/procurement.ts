@@ -250,7 +250,7 @@ export type SupplierSummary = {
   }[];
 };
 
-// Điểm TB 3 tiêu chí + công nợ (Σ giá trị PO chưa huỷ − Σ payment_bills đã trả cho NCC đó,
+// Điểm TB 3 tiêu chí + công nợ (Σ giá trị PO chưa huỷ − Σ payment_bills ĐÃ CHI cho NCC đó,
 // khớp qua payment_bills.responsible_supplier_id — backfill ở M2).
 // `projectId`: lọc công nợ theo dự án đang chọn — thiếu thì cộng gộp PO/bill của MỌI dự án
 // trong tổ chức, kể cả dự án người xem không thuộc (audit 2026-09-05). `projectId = null`
@@ -289,7 +289,8 @@ export async function supplierSummary(
   );
   const paid = await queryOne<{ total: string }>(
     `SELECT COALESCE(SUM(amount), 0)::text AS total
-       FROM payment_bills WHERE responsible_supplier_id = ? AND project_id = ?`,
+       FROM payment_bills
+      WHERE responsible_supplier_id = ? AND project_id = ? AND pay_status = 'paid'`,
     supplierId,
     projectId ?? 0,
   );

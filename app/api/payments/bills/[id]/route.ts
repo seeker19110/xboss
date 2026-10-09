@@ -10,38 +10,17 @@ import {
   type MoneyInput,
 } from "@/lib/nen/money";
 import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
+import {
+  BILL_SCOPE,
+  LOI_PHIEU_DA_CHOT,
+  billScopeParams,
+  khoaPhieu,
+  phieuDaChot,
+} from "@/lib/tai-chinh/payment-bills";
 
 export const dynamic = "force-dynamic";
 
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" };
-
-// Phạm vi bill (S02a cụm 3, P1-1): đúng project_id của dự án đã xác minh — dòng legacy
-// project_id NULL KHÔNG sửa/xoá được qua dự án nào — và mọi liên kết cha (hợp đồng/IPC/sheet)
-// cùng dự án + org, giống điều kiện GET /api/payments/bills. Ghép thẳng vào câu UPDATE/DELETE
-// (một câu, không kiểm-rồi-ghi) nên không có cửa sổ race. Tham số: id, projectId, projectId,
-// orgId, projectId, orgId, projectId, orgId.
-const BILL_SCOPE = `id = ? AND project_id = ?
-   AND (contract_id IS NULL OR EXISTS (
-     SELECT 1 FROM contracts c JOIN projects cp ON cp.id = c.project_id
-      WHERE c.id = payment_bills.contract_id AND c.project_id = ? AND cp.org_id = ?
-   ))
-   AND (payment_cert_id IS NULL OR EXISTS (
-     SELECT 1 FROM payment_certs pc
-       JOIN contracts cc ON cc.id = pc.contract_id
-       JOIN projects cp ON cp.id = cc.project_id
-      WHERE pc.id = payment_bills.payment_cert_id AND cc.project_id = ? AND cp.org_id = ?
-        AND (payment_bills.contract_id IS NULL OR pc.contract_id = payment_bills.contract_id)
-   ))
-   AND (sheet_type_id IS NULL OR EXISTS (
-     SELECT 1 FROM sheet_types pst
-       JOIN towers pt ON pt.id = pst.tower_id
-       JOIN projects pp ON pp.id = pt.project_id
-      WHERE pst.id = payment_bills.sheet_type_id AND pt.project_id = ? AND pp.org_id = ?
-   ))`;
-
-function billScopeParams(id: number, projectId: number, orgId: number) {
-  return [id, projectId, projectId, orgId, projectId, orgId, projectId, orgId];
-}
 
 const notFound = () =>
   NextResponse.json(
@@ -49,7 +28,9 @@ const notFound = () =>
     { status: 404, headers: PRIVATE_NO_STORE },
   );
 
-// PATCH /api/payments/bills/:id — sửa ĐVT / khối lượng / nhân công / ghi chú.
+// PATCH /api/payments/bills/:id — sửa ĐVT / khối lượng / nhân công / ghi chú. Số tiền không sửa
+// qua route này; M129: body có `amount` trên phiếu đã chi gắn IPC → 409 `bill_paid_locked` (điều
+// chỉnh phải qua chứng từ M128), phiếu khác giữ hành vi cũ (bỏ qua `amount`).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = await params;
   const user = await getCurrentUser();
@@ -105,7 +86,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     sets.push("note = ?");
     args.push(String(b.note).trim() || null);
   }
-  if (!sets.length) return NextResponse.json({ error: "Không có gì để sửa" }, { status: 400 });
+  const doiSoTien = b.amount !== undefined;
+  if (!sets.length && !doiSoTien)
+    return NextResponse.json({ error: "Không có gì để sửa" }, { status: 400 });
 
   // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
   const kq = await withProjectScope(
@@ -113,23 +96,38 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     () =>
       ghiNeuConQuyen(
         () => CAN.editStructure(user.role),
-        () =>
-          query<{ id: number }>(
+        async (): Promise<"not_found" | "locked" | "empty" | "ok"> => {
+          if (doiSoTien) {
+            const phieu = await khoaPhieu(id, projectId, user.orgId);
+            if (!phieu) return "not_found";
+            if (phieuDaChot(phieu)) return "locked";
+          }
+          if (!sets.length) return "empty";
+          const rows = await query<{ id: number }>(
             `UPDATE payment_bills SET ${sets.join(", ")} WHERE ${BILL_SCOPE} RETURNING id`,
             ...args,
             ...billScopeParams(id, projectId, user.orgId),
-          ),
+          );
+          return rows.length ? "ok" : "not_found";
+        },
       ),
     { readOnly: false },
   );
   if (!kq.ok)
     return NextResponse.json({ error: "Chỉ Admin/PM được sửa bill thanh toán" }, { status: 403 });
-  const updated = kq.value;
-  if (updated.length === 0) return notFound();
+  if (kq.value === "not_found") return notFound();
+  if (kq.value === "locked")
+    return NextResponse.json(
+      { error: LOI_PHIEU_DA_CHOT, code: "bill_paid_locked" },
+      { status: 409, headers: PRIVATE_NO_STORE },
+    );
+  if (kq.value === "empty")
+    return NextResponse.json({ error: "Không có gì để sửa" }, { status: 400 });
   return NextResponse.json({ ok: true }, { headers: PRIVATE_NO_STORE });
 }
 
-// DELETE /api/payments/bills/:id — xoá bill thanh toán.
+// DELETE /api/payments/bills/:id — xoá bill thanh toán. M129: phiếu đã chi gắn IPC → 409
+// `bill_paid_locked` (phải qua chứng từ điều chỉnh M128).
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = await params;
   const user = await getCurrentUser();
@@ -145,18 +143,21 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   // S13c: bill còn được hoá đơn (invoices.payment_bill_id) tham chiếu → 23503 → 409, không 500.
   // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
-  let deleted: { id: number }[];
+  let deleted: { id: number }[] | "locked";
   try {
     const kq = await withProjectScope(
       projectId,
       () =>
         ghiNeuConQuyen(
           () => CAN.editStructure(user.role),
-          () =>
-            query<{ id: number }>(
+          async () => {
+            const phieu = await khoaPhieu(id, projectId, user.orgId);
+            if (phieu && phieuDaChot(phieu)) return "locked" as const;
+            return query<{ id: number }>(
               `DELETE FROM payment_bills WHERE ${BILL_SCOPE} RETURNING id`,
               ...billScopeParams(id, projectId, user.orgId),
-            ),
+            );
+          },
         ),
       { readOnly: false },
     );
@@ -173,6 +174,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
       { status: 409, headers: PRIVATE_NO_STORE },
     );
   }
+  if (deleted === "locked")
+    return NextResponse.json(
+      { error: LOI_PHIEU_DA_CHOT, code: "bill_paid_locked" },
+      { status: 409, headers: PRIVATE_NO_STORE },
+    );
   if (deleted.length === 0) return notFound();
   return NextResponse.json({ ok: true }, { headers: PRIVATE_NO_STORE });
 }

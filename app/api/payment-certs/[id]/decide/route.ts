@@ -41,7 +41,8 @@ function loi(status: number, message: string, code?: string, extra?: Record<stri
 // body: { decision: 'approved'|'rejected', rejectReason?, acknowledged?, reason?, warningVersion? }
 // header (tuỳ chọn): Idempotency-Key: <uuid> — retry cùng key + cùng payload trả kết quả bước
 // cũ (`replayed: true`), không chạy bước kế; cùng key khác payload → 409 idempotency_conflict.
-// approved sinh 1 dòng payment_bills (amount = giá trị đề nghị sau trừ tạm ứng/giữ lại);
+// approved sinh 1 dòng payment_bills (amount = giá trị đề nghị sau trừ tạm ứng/giữ lại) ở trạng
+// thái 'committed' — M129: đã duyệt ≠ đã chi, đánh dấu chi qua POST /api/payments/bills/:id/pay;
 // rejected bắt buộc rejectReason. Scoped theo dự án đang chọn (M22).
 // M46 PR2: có approval_request đang pending cho IPC này → quyền/SoD do advanceApproval quyết
 // định thay CAN.approve; approve ở bước CHƯA CUỐI chỉ ghi nhận bước (snapshot 'pending'), chưa
@@ -293,7 +294,11 @@ function kiemTranGiaTri(
   );
 }
 
-/** Bước cuối approved: sinh payment_bills (giá trị đề nghị exact) + chuyển đợt sang approved. */
+/**
+ * Bước cuối approved: sinh payment_bills (giá trị đề nghị exact) + chuyển đợt sang approved.
+ * M129: phiếu ở trạng thái 'committed' (cam kết, chưa chi — paid_at NULL); paid_date = ngày lập
+ * phiếu (ngày duyệt). Chỉ khi đánh dấu chi (…/pay, người khác người duyệt) mới thành thực chi.
+ */
 async function sinhPhieuVaDuyet(
   id: number,
   goc: { contractId: number; periodNo: number },
@@ -318,8 +323,8 @@ async function sinhPhieuVaDuyet(
   // M51 PR1: project_id của bill lấy từ hợp đồng (cert.contractId → contracts.project_id)
   // để RLS lọc đúng dự án.
   const billId = await insertId(
-    `INSERT INTO payment_bills (responsible, type, amount, description, paid_date, contract_id, payment_cert_id, created_by, project_id)
-     VALUES (?, 'bill', ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO payment_bills (responsible, type, amount, description, paid_date, contract_id, payment_cert_id, created_by, project_id, pay_status)
+     VALUES (?, 'bill', ?, ?, ?, ?, ?, ?, ?, 'committed')`,
     responsible,
     moneyToDecimal(totals.approvedValue),
     `Đợt ${goc.periodNo} — ${contract?.title ?? ""}`,

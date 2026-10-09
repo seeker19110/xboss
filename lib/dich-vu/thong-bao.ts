@@ -30,6 +30,7 @@ import { alarmingPoints } from "@/lib/hien-truong/monitoring";
 import { overduePunch } from "@/lib/hien-truong/handover";
 import { expiringWarranties, overdueClaims } from "@/lib/hien-truong/warranty";
 import { advanceOverdueList, ADVANCE_OVERDUE_DAYS } from "@/lib/tai-chinh/finance";
+import { unpaidBillsOverdue } from "@/lib/tai-chinh/payment-bills";
 import { EXPIRY_WARN_DAYS } from "@/lib/tai-chinh/contracts";
 import { CERT_PENDING_DAYS } from "@/lib/tai-chinh/paymentcerts";
 import { VO_PENDING_DAYS } from "@/lib/tai-chinh/vo";
@@ -1128,6 +1129,33 @@ export async function syncAndListNotifications(
         WHERE user_id = ? AND type = 'advance_overdue' AND is_read = 0 AND advance_id <> ALL(?)`,
       user.id,
       overdueAdvanceIds,
+    );
+  }
+
+  // M129: phiếu IPC đã duyệt (committed) quá N ngày chưa đánh dấu chi → nhắc Admin/PM. N đọc
+  // từ alert_rules (`bill_unpaid_days`, mặc định 30). Dedup theo payment_bill_id; đã chi/huỷ/xoá
+  // → dọn thông báo chưa đọc. Thông điệp không chứa số tiền.
+  if (isAdminOrPm(user.role)) {
+    const soNgay = await getAlertThreshold("bill_unpaid_days", projectId);
+    const unpaidBills = await unpaidBillsOverdue(soNgay, projectId);
+    if (unpaidBills.length > 0) {
+      const values = unpaidBills.map(() => `(?, ?, 'bill_unpaid', ?)`).join(", ");
+      const params = unpaidBills.flatMap((b) => [
+        user.id,
+        b.id,
+        `💳 Phiếu thanh toán #${b.id}${b.certCode ? ` (đợt ${b.certCode})` : ""} — ${b.responsible} đã duyệt từ ${b.paidDate}, chưa chi quá ${soNgay} ngày`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, payment_bill_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, payment_bill_id) WHERE payment_bill_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'bill_unpaid' AND is_read = 0 AND payment_bill_id <> ALL(?)`,
+      user.id,
+      unpaidBills.map((b) => b.id),
     );
   }
 

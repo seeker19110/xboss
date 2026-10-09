@@ -39,7 +39,28 @@ export async function cashflowActual(projectId: number, months = 12): Promise<Ca
   return [...map.values()].sort((a, b) => a.month.localeCompare(b.month));
 }
 
+// --- Cam kết chưa chi (M129) ------------------------------------------------------------
+
+export type UnpaidMonth = { month: string; amount: bigint };
+
+// Phiếu đã duyệt (IPC) chưa chi — pay_status='committed', gom theo tháng của ngày lập phiếu
+// (paid_date = ngày duyệt / ngày dự kiến chi). Dòng tiền thực tế KHÔNG gồm các phiếu này; đây là
+// "cam kết chưa chi" hiển thị cạnh thực chi. SUM trong SQL `::text` → bigint (không qua float).
+export async function approvedUnpaidByMonth(projectId: number): Promise<UnpaidMonth[]> {
+  const rows = await query<{ month: string; total: string }>(
+    `SELECT to_char(paid_date, 'YYYY-MM') AS month, SUM(amount)::text AS total
+       FROM payment_bills
+      WHERE project_id = ? AND pay_status = 'committed'
+      GROUP BY month
+      ORDER BY month`,
+    projectId,
+  );
+  return rows.map((r) => ({ month: r.month, amount: parseMoney(r.total) }));
+}
+
 // --- Công nợ (view, suy từ HĐ/IPC/PO/bill — M16/M17/M04, không lưu) ----------------
+// M129: "đã thanh toán" của HĐ (listContracts.paid) chỉ gồm phiếu ĐÃ CHI — phiếu IPC đã duyệt
+// chưa chi vẫn nằm trong phải thu/phải trả.
 
 // Phải thu CĐT = Σ (giá trị gốc + phụ lục) − Σ đã thanh toán của các HĐ nhận thầu.
 // Tái dùng listContracts (lib/contracts.ts) đã tổng hợp addendaTotal/paid theo HĐ.

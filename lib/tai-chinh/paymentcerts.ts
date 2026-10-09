@@ -73,11 +73,22 @@ export type PaymentCertRow = {
   status: PaymentCertStatus;
   submittedAt: string | null;
   decidedAt: string | null;
+  /** Người quyết định bước cuối (SoD M129: người này không được tự đánh dấu đã chi). */
+  decidedBy: number | null;
   rejectReason: string | null;
   createdBy: number | null;
   createdByName: string | null;
   createdAt: string;
   items: CertItemRow[];
+  /** M129: phiếu thanh toán sinh khi duyệt (type='bill') + trạng thái chi; null khi chưa duyệt. */
+  bill: CertBill | null;
+};
+
+export type CertBill = {
+  id: number;
+  payStatus: "committed" | "paid" | "void";
+  paidAt: string | null;
+  paidRef: string | null;
 };
 
 async function fetchCerts(where: string, ...params: unknown[]): Promise<PaymentCertRow[]> {
@@ -85,7 +96,7 @@ async function fetchCerts(where: string, ...params: unknown[]): Promise<PaymentC
     `SELECT c.id, c.code, c.contract_id AS "contractId", ct.code AS "contractCode",
             ct.title AS "contractTitle", c.period_no AS "periodNo", c.period_label AS "periodLabel",
             c.status, c.submitted_at AS "submittedAt", c.decided_at AS "decidedAt",
-            c.reject_reason AS "rejectReason",
+            c.decided_by AS "decidedBy", c.reject_reason AS "rejectReason",
             c.created_by AS "createdBy", u.name AS "createdByName", c.created_at AS "createdAt",
             COALESCE(
               json_agg(
@@ -97,7 +108,12 @@ async function fetchCerts(where: string, ...params: unknown[]): Promise<PaymentC
                 ) ORDER BY bi.code
               ) FILTER (WHERE i.id IS NOT NULL),
               '[]'
-            ) AS items
+            ) AS items,
+            (SELECT json_build_object('id', pb.id, 'payStatus', pb.pay_status,
+                                      'paidAt', pb.paid_at, 'paidRef', pb.paid_ref)
+               FROM payment_bills pb
+              WHERE pb.payment_cert_id = c.id AND pb.type = 'bill'
+              ORDER BY pb.id DESC LIMIT 1) AS bill
        FROM payment_certs c
        JOIN contracts ct ON ct.id = c.contract_id
        LEFT JOIN users u ON u.id = c.created_by

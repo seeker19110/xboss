@@ -285,8 +285,8 @@ export async function decideProposal(opts: {
       // M51 PR1: project_id của bill lấy từ hợp đồng (p.contractId → contracts.project_id)
       // để RLS lọc đúng dự án.
       billId = await insertId(
-        `INSERT INTO payment_bills (responsible, type, amount, description, paid_date, contract_id, created_by, project_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO payment_bills (responsible, type, amount, description, paid_date, contract_id, created_by, project_id, paid_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         contract?.partyName ?? contract?.code ?? "—",
         p.kind === "advance" ? "advance" : "bill",
         p.amount,
@@ -295,6 +295,9 @@ export async function decideProposal(opts: {
         p.contractId,
         opts.decidedBy,
         contract?.projectId ?? null,
+        // M129: phiếu theo đề xuất giữ hành vi cũ = đã chi tại ngày lập (pay_status mặc định
+        // 'paid'); ghi paid_at để bất biến "paid ⇒ có ngày chi" đúng cho dòng mới.
+        todayISO(),
       );
     }
     return { billId };

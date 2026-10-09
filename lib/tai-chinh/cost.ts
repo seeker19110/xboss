@@ -13,6 +13,9 @@
 //     KHÔNG cộng vào tổng nào, chỉ đếm vào coverage (không lộ số tiền) → báo cáo "cần đối soát".
 //     Dòng đúng dự án nhưng chưa gán hệ/tầng = unassigned: vẫn vào projectTotals + dòng riêng.
 //   - Một snapshot: toàn bộ nguồn + ngưỡng đọc trong MỘT transaction REPEATABLE READ READ ONLY.
+//   - M129: thực chi (`actual`) = Σ phiếu `pay_status='paid'`; phiếu đã duyệt chưa chi
+//     (`committed`) là cột riêng `approvedUnpaid` — KHÔNG cộng vào `committed` (PO + giao thầu)
+//     để không đếm lặp; phiếu `void` không vào tổng nào.
 import { query, queryOne, run, withProjectScope } from "@/lib/db";
 import {
   moneyToNumber,
@@ -59,7 +62,10 @@ type PaymentAgg = {
   systemId: number | null;
   state: SourceState;
   n: number;
+  /** Σ phiếu đã chi (pay_status='paid'). */
   amount: string;
+  /** M129: Σ phiếu đã duyệt chưa chi (pay_status='committed'). */
+  unpaid: string;
 };
 type SystemRef = { id: number; code: string; name: string };
 
@@ -163,8 +169,8 @@ async function loadFloorContracts(projectId: number): Promise<FloorContractSrc[]
   );
 }
 
-// Thực chi = Σ amount của payment_bills MỌI type (kể cả advance — đã quyết 2026-07-04), gom theo
-// (sheet, tầng, hệ). Phạm vi trực tiếp project_id; contract/đợt IPC/sheet nếu có phải cùng dự án
+// Thực chi = Σ amount của payment_bills ĐÃ CHI (pay_status='paid', M129) MỌI type (kể cả advance —
+// đã quyết 2026-07-04), gom theo (sheet, tầng, hệ); phiếu committed cộng riêng vào `unpaid`. Phạm vi trực tiếp project_id; contract/đợt IPC/sheet nếu có phải cùng dự án
 // (Q-AC05) — hợp đồng dự án khác bị RLS che thì LEFT JOIN ra NULL nên tự rơi vào invalid_scope.
 // Dòng legacy project_id NULL không thuộc dự án nào (khớp S02a), chỉ được đếm nếu cha trỏ về đây.
 async function loadPayments(projectId: number): Promise<PaymentAgg[]> {
@@ -176,7 +182,10 @@ async function loadPayments(projectId: number): Promise<PaymentAgg[]> {
                                AND (pb.payment_cert_id IS NULL OR pcc.project_id = p.id)
                                AND (pb.sheet_type_id IS NULL OR tw.project_id = p.id), false)
                  THEN 'ok' ELSE 'invalid_scope' END AS state,
-            COUNT(*) AS n, ROUND(COALESCE(SUM(pb.amount), 0), 2)::text AS amount
+            COUNT(*) AS n,
+            ROUND(COALESCE(SUM(pb.amount) FILTER (WHERE pb.pay_status = 'paid'), 0), 2)::text AS amount,
+            ROUND(COALESCE(SUM(pb.amount) FILTER (WHERE pb.pay_status = 'committed'), 0), 2)::text
+              AS unpaid
        FROM (SELECT ?::int AS id) p
        CROSS JOIN payment_bills pb
        LEFT JOIN sheet_types st ON st.id = pb.sheet_type_id
@@ -209,7 +218,13 @@ async function loadSystems(): Promise<SystemRef[]> {
 // Ghép nguồn → dòng báo cáo (thuần, bigint).
 // ---------------------------------------------------------------------------
 
-export type CostAmounts = { budget: bigint; committed: bigint; actual: bigint };
+export type CostAmounts = {
+  budget: bigint;
+  committed: bigint;
+  actual: bigint;
+  /** M129: phiếu đã duyệt (IPC) chưa chi — tách khỏi thực chi `actual`. */
+  approvedUnpaid: bigint;
+};
 
 /** Mức cảnh báo một dòng: `no_budget` = cam kết dương nhưng ngân sách ≤ 0 (không chia). */
 export type CostAlertLevel = "none" | "warn" | "over" | "no_budget";
@@ -274,7 +289,7 @@ export type CostReport = {
   };
 };
 
-const ZERO: CostAmounts = { budget: 0n, committed: 0n, actual: 0n };
+const ZERO: CostAmounts = { budget: 0n, committed: 0n, actual: 0n, approvedUnpaid: 0n };
 const BASIS_POINTS = 10000n;
 const UNASSIGNED_SYSTEM_LABEL = "Chưa gán hệ";
 const UNASSIGNED_FLOOR_LABEL = "Chưa gán tầng";
@@ -289,6 +304,7 @@ function addAmounts(a: CostAmounts, b: Partial<CostAmounts>): CostAmounts {
     budget: a.budget + (b.budget ?? 0n),
     committed: a.committed + (b.committed ?? 0n),
     actual: a.actual + (b.actual ?? 0n),
+    approvedUnpaid: a.approvedUnpaid + (b.approvedUnpaid ?? 0n),
   };
 }
 
@@ -337,7 +353,8 @@ function amountsBySystem(src: CostSources): Map<number | null, CostAmounts> {
   for (const r of src.floorContracts)
     if (r.state === "ok") add(r.systemId, { committed: sqlMoney(r.amount) });
   for (const r of src.payments)
-    if (r.state === "ok") add(r.systemId, { actual: sqlMoney(r.amount) });
+    if (r.state === "ok")
+      add(r.systemId, { actual: sqlMoney(r.amount), approvedUnpaid: sqlMoney(r.unpaid) });
   return map;
 }
 
@@ -442,15 +459,15 @@ function floorRows(src: CostSources, settings: CostSettingsExact): CostReportRow
       sheetTypeId: fc.sheetTypeId,
       sheetCode: fc.sheetCode,
       floorLabel: fc.floorLabel,
-      amounts: { budget: v, committed: v, actual: 0n },
+      amounts: { budget: v, committed: v, actual: 0n, approvedUnpaid: 0n },
     });
   }
-  let unassignedActual: bigint | null = null;
+  let chuaGanTang: CostAmounts | null = null;
   for (const p of src.payments) {
     if (p.state !== "ok") continue;
-    const v = sqlMoney(p.amount);
+    const v = { actual: sqlMoney(p.amount), approvedUnpaid: sqlMoney(p.unpaid) };
     if (!isFloorGrain(p)) {
-      unassignedActual = (unassignedActual ?? 0n) + v;
+      chuaGanTang = addAmounts(chuaGanTang ?? ZERO, v);
       continue;
     }
     const k = keyOf(p.sheetTypeId, p.floorLabel);
@@ -460,7 +477,7 @@ function floorRows(src: CostSources, settings: CostSettingsExact): CostReportRow
       floorLabel: p.floorLabel,
       amounts: ZERO,
     };
-    grains.set(k, { ...g, amounts: addAmounts(g.amounts, { actual: v }) });
+    grains.set(k, { ...g, amounts: addAmounts(g.amounts, v) });
   }
   const ordered = [...grains.values()].sort((a, b) =>
     a.sheetTypeId !== b.sheetTypeId
@@ -486,7 +503,7 @@ function floorRows(src: CostSources, settings: CostSettingsExact): CostReportRow
       settings,
     ),
   );
-  if (unassignedActual != null) {
+  if (chuaGanTang != null) {
     rows.push(
       finishRow(
         {
@@ -497,9 +514,7 @@ function floorRows(src: CostSources, settings: CostSettingsExact): CostReportRow
           sheetTypeId: null,
           floorLabel: null,
           unassigned: true,
-          budget: 0n,
-          committed: 0n,
-          actual: unassignedActual,
+          ...chuaGanTang,
         },
         settings,
       ),
@@ -610,7 +625,12 @@ export async function getCostReport(
 // DTO wire (A3-FR06): decimal-string-v1 opt-in, legacy number trong biên an toàn.
 // ---------------------------------------------------------------------------
 
-type AmountsWire = { budget: string | number; committed: string | number; actual: string | number };
+type AmountsWire = {
+  budget: string | number;
+  committed: string | number;
+  actual: string | number;
+  approvedUnpaid: string | number;
+};
 
 export type CostReportRowWire = AmountsWire & {
   key: string;
@@ -650,6 +670,7 @@ function amountsToWire(a: CostAmounts, format: MoneyWireFormat): AmountsWire {
     budget: moneyToWire(a.budget, format),
     committed: moneyToWire(a.committed, format),
     actual: moneyToWire(a.actual, format),
+    approvedUnpaid: moneyToWire(a.approvedUnpaid, format),
   };
 }
 
