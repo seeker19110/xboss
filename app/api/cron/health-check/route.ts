@@ -31,13 +31,14 @@ export async function GET(req: NextRequest) {
     );
 
   try {
-    return await handleHealthCheck();
+    return await handleHealthCheck(bySecret);
   } finally {
     await releaseSyncLock(LOCK_NAME);
   }
 }
 
-async function handleHealthCheck(): Promise<NextResponse> {
+// `bySecret`: gọi bằng CRON_SECRET (chưa có actor) → được tra admin mọi tổ chức với phạm vi '*'.
+async function handleHealthCheck(bySecret: boolean): Promise<NextResponse> {
   const report = await runHealthChecks();
 
   let emailSent = false;
