@@ -33,6 +33,15 @@ const serverSchema = z
     // (route /api/offline/* trả 503, fail-closed); có mà sai định dạng → lib/bao-mat/offline-devices.ts
     // throw fail-fast khi dùng. Không validate ở đây để giá trị sai không kéo sập cả app.
     XBOSS_OFFLINE_KEK: z.string().optional(),
+    // Bảo trì vault offline (M131 §2, `npm run vault:maint`): chuỗi kết nối role xboss_vault_maint —
+    // CHỈ script dùng, không thuộc runtime app; thiếu → script throw fail-fast.
+    XBOSS_VAULT_MAINT_DATABASE_URL: z.string().min(1).optional(),
+    // Cửa sổ khôi phục (ngày, nguyên ≥1, mặc định 30): khoá của thiết bị thu hồi quá cửa sổ mới bị
+    // retire, yêu cầu khôi phục pending quá cửa sổ → expired (lib/bao-mat/offline-vault-bao-tri.ts).
+    XBOSS_VAULT_RECOVERY_DAYS: z
+      .string()
+      .regex(/^[1-9][0-9]{0,4}$/, "số nguyên ≥ 1")
+      .optional(),
     // "1" CHỈ trong server e2e (playwright.config.ts): cho phép KEK giá trị TEST của e2e/constants.ts.
     // Production không đặt — KEK test bị từ chối (vault offline misconfigured, fail-closed).
     XBOSS_E2E: z.string().optional(),

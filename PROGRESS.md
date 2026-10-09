@@ -1,5 +1,64 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — M131 phần 2: khôi phục vault khi mất proof (Admin duyệt) + trang Thiết bị offline
+
+- Đóng "Cần quyết (3)" S05/S07 theo `docs/nang-cap/M131-vault-offline-bao-tri-va-khoi-phuc.md` §3.
+  Không migration mới (dùng bảng/RLS/grant của 0170). Dịch vụ `lib/bao-mat/offline-recovery.ts`;
+  bọc lại khoá ở `chuyenKhoaDuAn` (`lib/bao-mat/offline-vault.ts`).
+- `POST/GET /api/offline/recovery`: chủ dữ liệu trên thiết bị MỚI (proof hiện tại) xin khôi phục
+  thiết bị CŨ của chính mình (khác user/org → 404, trùng thiết bị → 422, đang mở → 409
+  `recovery_exists`, 5 lần/ngày); báo Admin cùng org (thông báo `offline_recovery_pending` +
+  push).
+- `PATCH /api/offline/recovery/:id`: Admin + `CAN.manageUsers` + 2FA, không tự quyết yêu cầu của
+  mình (403 `self_decision_forbidden`), chỉ từ `pending`; duyệt = thu hồi thiết bị cũ cùng
+  transaction (tái dùng `capNhatThietBi` revoke → chủ phải đăng nhập lại).
+- `POST /api/offline/recovery/:id/complete`: chỉ trên đúng thiết bị mới (khác → 403
+  `wrong_device`), mỗi dự án một transaction riêng (GUC dự án + cùng advisory lock `capKhoaVault`):
+  khoá chưa retire của thiết bị cũ → dòng khoá MỚI (id mới, key_version MAX+1, cùng manifest/hash/
+  vân tay, KEK active, AAD mới, cùng DEK); mất membership/manifest mất quyền/thiếu KEK → bỏ qua +
+  đếm. Trả `{ mapping: [{ oldKeyId, newKeyId, oldKeyVersion }], skipped }` — chỉ id/version.
+  `oldKeyVersion` thêm so với đặc tả: client cần để dựng AAD payload cũ khi mã hoá lại bản nháp.
+- UI: trang Admin `/admin/thiet-bi-offline` (tab Thiết bị: đổi hồ sơ/thu hồi; tab Yêu cầu khôi
+  phục: duyệt/từ chối) + mục nav "Thiết bị offline"; khối "Thao tác của trình duyệt cũ" trong
+  `OfflineRecoveryPanel` (gửi yêu cầu → hoàn tất → gắn lại bản nháp sang thiết bị mới qua
+  `offlineQueue.ganLaiTheoKhoiPhuc`, mã hoá lại trong bộ nhớ; dự án khác gắn khi mở dự án đó).
+- Test: `offline-recovery-route.test.ts` (13 ca, route thật bằng role `xboss_app`; bỏ kiểm
+  `wrong_device` → 2 ca đỏ), `offline-queue-khoi-phuc.test.ts` (4 ca client). e2e
+  `e2e/authed/thiet-bi-offline-admin.spec.ts` (axe 2 tab × 2 theme, desktop + mobile) — **chưa chạy
+  cục bộ** (thiếu chỗ đĩa cho `npm run build`), chờ CI. CI bắt lỗi tương phản có sẵn ở `AppHeader`: nhãn vai trò
+  dưới tên người dùng `text-zinc-500` trên `zinc-950` (4,12:1) → `text-zinc-400`. Spec đổi tên `…-admin.spec.ts`: tên cũ khớp
+  `/(login|offline)\.spec\.ts$/` của project public nên bị chạy khi chưa đăng nhập.
+- Đánh đổi đã ghi: complete không nguyên tử xuyên dự án (GUC dự án không đổi giữa transaction) —
+  lỗi giữa chừng để `approved`, gọi lại tạo khoá trùng CÙNG DEK (vô hại).
+
+## 2026-10-09 — M131 phần 1: role bảo trì vault offline, rewrap KEK, retire khoá tự động
+
+- Đặc tả `docs/nang-cap/M131-vault-offline-bao-tri-va-khoi-phuc.md` §0–§2 (đóng "Cần quyết" (1)(2) của
+  S05/S07). Migration **0170**: role `xboss_vault_maint` (LOGIN, NOBYPASSRLS) chỉ `UPDATE (wrapped_key,
+kek_version, retired_at)` khoá + `UPDATE (status)` yêu cầu khôi phục; policy `TO xboss_vault_maint`;
+  index khoá còn dùng; bảng `offline_vault_recovery_requests` (RLS + grant cho §3); trigger
+  `audit_offline_vault_key_change()` chỉ ghi `kek_version`/`retired_at`. **Thêm thuần tuý** (tạo
+  role + grant, không UPDATE dòng nào) → đi thẳng production; role migrate cần CREATEROLE (thiếu → hướng
+  dẫn tạo tay trong DEPLOY.md). `xboss_app` vẫn không sửa/xoá khoá.
+- `npm run vault:maint -- [--rewrap] [--retire] [--apply]` (`scripts/vault-maint.ts` +
+  `lib/bao-mat/offline-vault-bao-tri.ts`): dry-run mặc định; rewrap tại chỗ sang KEK active theo lô 200
+  dưới cùng advisory lock với `capKhoaVault`, dòng thiếu KEK cũ/giải bọc lỗi bị bỏ qua + đếm; retire
+  khoá thiết bị thu hồi quá `XBOSS_VAULT_RECOVERY_DAYS` (mặc định 30) không còn yêu cầu mở; pending quá
+  hạn → expired. Biến `XBOSS_VAULT_MAINT_DATABASE_URL` riêng cho script. DEPLOY.md: role, biến, crontab.
+- Test `tests/offline-vault-bao-tri.test.ts` (grant thật bằng 2 role, rewrap → unlock route chỉ với KEK
+  mới ra đúng DEK, audit không có `wrapped_key`, retire/expired); nhóm `OFFLINE` của `rls.test.ts`.
+- Còn lại: §3 route + UI khôi phục khi mất proof (admin duyệt) — phần 2.
+
+## 2026-10-09 — IPC duyệt tuần tự: chặn duyệt kỳ sau khi kỳ trước còn mở
+
+- Quyết định chủ dự án 2026-10-09 (đóng "Cần quyết (2)" của S13c): `POST /api/payment-certs/:id/decide`
+  duyệt đợt kỳ N khi cùng hợp đồng còn đợt kỳ < N ở trạng thái nháp/chờ duyệt → **409
+  `previous_period_open`** (thông điệp nêu mã + kỳ đợt đang mở). Kiểm dưới khoá HĐ → đợt nên hai quyết
+  định đồng thời không cùng lọt; từ chối vẫn được. Lập đợt mới vốn đã bị chặn khi còn đợt mở — lỗ còn lại
+  là dữ liệu legacy/đợt cùng mở. `reconciliation_required` (kỳ sau đã duyệt) giữ cho dữ liệu legacy.
+- Test: ca mới trong `s13a-chuoi-ipc-thanh-toan` (**đỏ trên code cũ**); ca FR06 legacy dựng kỳ sau
+  approved bằng SQL; ca đồng thời `s13c` cập nhật nhánh "đợt 3 lấy khoá trước" → 409.
+
 ## 2026-10-09 — Đóng nốt nợ S16: phạm vi tổ chức cho thông báo menu, audit log, flow duyệt, upload
 
 Đóng các mục còn mở trong `docs/nang-cap/AUDIT-S16-NULL-SCOPE.md` §"Phát hiện ngoài phạm vi":
@@ -647,13 +706,14 @@ phục hồi (S08) chưa đụng** — lưu offline vẫn khoá như S04. Không
   `phatDoiNguCanh("switch")` — đỏ trên `/portfolio` cũ); `audit-s07-offline-flush-regressions` thêm ca
   dừng flush khi đổi ngữ cảnh; e2e `e2e/authed/ngu-canh-khoa.spec.ts` (2 tab, desktop + mobile, axe +
   focus + Tải lại). Inventory route sinh lại kèm khối tay S05.
-- **Cần quyết (phiên chính — không tự quyết):** (1) **Rewrap KEK** (UPDATE `wrapped_key` bằng role bảo
+- **Cần quyết (phiên chính — không tự quyết):** ~~(1) **Rewrap KEK** (UPDATE `wrapped_key` bằng role bảo
   trì riêng + audit, DATA-CONTRACTS §4) chưa làm: cần quyết tạo role DB mới ở migration (role migrate
   production cần CREATEROLE) và quy trình vận hành; hiện xoay KEK bằng keyring nhiều version — không mất
-  khoá, chỉ chưa gỡ được version cũ. (2) **`retired_at`**: DDL không cấp UPDATE cho `xboss_app` nên
-  runtime không retire khoá — ai/khi nào retire (vòng đời S07)? (3) **Phục hồi khi mất proof** ("xác
+  khoá, chỉ chưa gỡ được version cũ.~~ (đã chốt 2026-10-09 — M131) ~~(2) **`retired_at`**: DDL không cấp
+  UPDATE cho `xboss_app` nên runtime không retire khoá — ai/khi nào retire (vòng đời S07)?~~ (đã chốt
+  2026-10-09 — M131) ~~(3) **Phục hồi khi mất proof** ("xác
   minh riêng") chưa có đặc tả phương thức xác minh — hiện proof mới = thiết bị mới, khoá cũ không mở được
-  (đúng fail-closed, có thể mất nháp chưa đồng bộ). (4) _(đã chốt: hàm SECURITY DEFINER xuyên org — xem
+  (đúng fail-closed, có thể mất nháp chưa đồng bộ).~~ (đã chốt 2026-10-09 — M131) (4) _(đã chốt: hàm SECURITY DEFINER xuyên org — xem
   trên)_. (5) Vai trò nhật ký trong manifest lặp quy tắc `canEdit` của
   `/api/diaries/[date]` — gom khi S06 sửa route nhật ký. (6) Kiểm `X-XBoss-Context` trên 4 endpoint
   queue thật thuộc S06 (đã có `chotBoiCanhVault`/`kiemNguCanh`). (7) Tab bị khoá không tự tải lại (người
@@ -919,7 +979,7 @@ warningVersion` — có cảnh báo mà thiếu → **409 `acknowledgement_requi
   money-ipc-golden-route, route-tai-chinh-_, s10c-_, boq_, rls, thong-bao, approvals-vo-ipc…) xanh.
 - **Cần quyết (phiên chính — không tự quyết):** (1) decide vẫn ghi `payment_bills` với `paid_date`
   = ngày duyệt nên "approved" ≡ "đã chi" trong báo cáo (A5 §2 nói khác, A4-FR02 chốt actual = mọi
-  payment_bills) — giữ nguyên hành vi; (2) hiện **cho phép duyệt kỳ sau khi kỳ trước còn mở**
+  payment_bills) — giữ nguyên hành vi; (2) ~~hiện **cho phép duyệt kỳ sau khi kỳ trước còn mở**~~ (đã chốt 2026-10-09: chặn 409)
   (đặc tả chỉ cấm chiều ngược) → kỳ trước sau đó bị 409, phải từ chối + lập đợt điều chỉnh; có nên
   chặn luôn "duyệt kỳ sau khi kỳ trước chưa chốt"? (3) chưa có loại "chứng từ điều chỉnh" IPC riêng —
   thông điệp 409 hướng dẫn từ chối + lập đợt mới.

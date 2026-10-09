@@ -11,7 +11,7 @@
 //   (xoay KEK/đổi mật khẩu/thu hồi phiên KHÔNG làm mất bản nháp). Version cũ bị gỡ khỏi keyring →
 //   khoá đó "locked" (giữ nguyên ciphertext + wrapped_key, gắn lại version là mở được).
 import { randomUUID } from "node:crypto";
-import { query, queryOne, withTransaction } from "@/lib/db";
+import { query, queryOne, withProjectScope, withTransaction } from "@/lib/db";
 import { CAN, type User } from "@/lib/bao-mat/auth";
 import { log } from "@/lib/nen/log";
 import { DIARY_EDIT_ROLES } from "@/lib/nen/roles";
@@ -124,17 +124,28 @@ function kekCua(keyring: KekKeyring, version: string): Promise<CryptoKey> | null
 
 type BoiCanh = { user: User; thietBi: ThietBiOffline; projectId: number };
 
-const aadCua = (b: BoiCanh, keyId: string, hash: string, keyVersion: number, kekVersion: string) =>
+/** AAD bọc khoá gắn đúng thiết bị `deviceId` (khôi phục M131 dùng AAD của thiết bị CŨ để mở). */
+const aadThietBi = (
+  b: BoiCanh,
+  deviceId: string,
+  keyId: string,
+  hash: string,
+  keyVersion: number,
+  kekVersion: string,
+) =>
   aadBocKhoa({
     keyId,
     manifestHash: hash,
     userId: b.user.id,
     orgId: b.user.orgId,
     projectId: b.projectId,
-    deviceId: b.thietBi.id,
+    deviceId,
     keyVersion,
     kekVersion,
   });
+
+const aadCua = (b: BoiCanh, keyId: string, hash: string, keyVersion: number, kekVersion: string) =>
+  aadThietBi(b, b.thietBi.id, keyId, hash, keyVersion, kekVersion);
 
 /** Manifest đã lưu của 1 dòng khoá: dạng chuẩn + hash khớp, sai → null (khoá bị sửa trong DB). */
 async function manifestCuaDong(b: BoiCanh, row: DongKhoa): Promise<OfflineManifest | null> {
@@ -331,4 +342,150 @@ export async function moKhoaVault(
   const thay = new Set(trang.map((r) => r.id));
   for (const id of keyIds ?? []) if (!thay.has(id)) locked.push({ keyId: id });
   return { keys, locked, truncated };
+}
+
+export type KhoaChuyen = { oldKeyId: string; newKeyId: string; oldKeyVersion: number };
+
+/**
+ * Khôi phục khi mất proof (M131 §3): bọc lại mọi khoá CHƯA retire của thiết bị cũ trong MỘT dự án
+ * thành dòng khoá MỚI của thiết bị mới (cùng actor/org). Transaction riêng gắn `app.project_id` =
+ * dự án đó (RLS 0163 chỉ cho đọc/chèn khoá đúng dự án của GUC) + cùng khoá advisory với
+ * `capKhoaVault` nên key_version MAX+1 của thiết bị mới không đua với lần cấp khoá thường.
+ *
+ * - Chỉ chuyển khoá có manifest hợp lệ (hash khớp) VÀ còn qua `boKiemManifest` với quyền hiện hành;
+ *   thiếu quyền / KEK cũ đã gỡ / giải bọc lỗi → bỏ qua, đếm `skipped` (log.warn không có khoá).
+ * - Khoá mới: id mới, key_version kế tiếp, CÙNG manifest/hash/permission_fingerprint, bọc bằng KEK
+ *   active với AAD của thiết bị mới. DEK giữ nguyên (bản nháp mã hoá bằng DEK cũ vẫn giải được).
+ * - Không trả vật liệu khoá: kết quả chỉ có id + key_version cũ; DEK thô bị ghi đè 0 sau khi bọc.
+ *   Khoá cũ giữ nguyên (xboss_app không UPDATE/DELETE) — script bảo trì retire theo vòng đời.
+ */
+export async function chuyenKhoaDuAn(
+  user: User,
+  thietBiCuId: string,
+  thietBiMoi: ThietBiOffline,
+  projectId: number,
+  keyring: KekKeyring,
+): Promise<{ mapping: KhoaChuyen[]; skipped: number }> {
+  damBaoNguCanhActor(user);
+  const b: BoiCanh = { user, thietBi: thietBiMoi, projectId };
+  return withProjectScope(
+    projectId,
+    async () => {
+      await queryOne(
+        `SELECT pg_advisory_xact_lock(hashtextextended(?, 0))`,
+        `offline-vault|${thietBiMoi.id}|${projectId}`,
+      );
+      const rows = await query<DongKhoa & { vanTay: string }>(
+        `SELECT ${COT_KHOA}, permission_fingerprint AS "vanTay" FROM offline_vault_keys
+          WHERE device_id = ?::uuid AND user_id = ? AND org_id = ? AND project_id = ?
+            AND retired_at IS NULL
+          ORDER BY key_version`,
+        thietBiCuId,
+        user.id,
+        user.orgId,
+        projectId,
+      );
+      if (rows.length === 0) return { mapping: [], skipped: 0 };
+      const manifests = await Promise.all(rows.map((r) => manifestCuaDong(b, r)));
+      const duocPhep = await boKiemManifest(
+        user,
+        manifests.filter((m): m is OfflineManifest => m != null),
+      );
+      const ke = await queryOne<{ v: number }>(
+        `SELECT COALESCE(MAX(key_version), 0) + 1 AS v FROM offline_vault_keys
+          WHERE device_id = ?::uuid AND user_id = ? AND org_id = ? AND project_id = ?`,
+        thietBiMoi.id,
+        user.id,
+        user.orgId,
+        projectId,
+      );
+      let keyVersion = Number(ke?.v ?? 1);
+      const kekVersion = keyring.active;
+      const kekMoi = await (kekCua(keyring, kekVersion) as Promise<CryptoKey>);
+      const mapping: KhoaChuyen[] = [];
+      let skipped = 0;
+      for (const [i, row] of rows.entries()) {
+        const m = manifests[i];
+        const kekCu = kekCua(keyring, row.kekVersion);
+        if (!m || !duocPhep(m) || !kekCu) {
+          skipped++;
+          continue;
+        }
+        let dek: Uint8Array<ArrayBuffer>;
+        try {
+          dek = await moDek(
+            new Uint8Array(row.wrappedKey),
+            await kekCu,
+            aadThietBi(b, thietBiCuId, row.id, row.manifestHash, row.keyVersion, row.kekVersion),
+          );
+        } catch (e) {
+          log.warn("Vault offline: khôi phục bỏ qua khoá giải bọc thất bại", {
+            keyId: row.id,
+            kekVersion: row.kekVersion,
+            loai: e instanceof OfflineCryptoError ? `crypto_${e.code}` : "unwrap_error",
+          });
+          skipped++;
+          continue;
+        }
+        const keyId = randomUUID();
+        let wrapped: Uint8Array<ArrayBuffer>;
+        try {
+          wrapped = await bocDek(
+            dek,
+            kekMoi,
+            aadCua(b, keyId, row.manifestHash, keyVersion, kekVersion),
+          );
+        } finally {
+          dek.fill(0);
+        }
+        await queryOne(
+          `INSERT INTO offline_vault_keys
+             (id, device_id, user_id, org_id, project_id, key_version, resource_manifest,
+              manifest_hash, permission_fingerprint, wrapped_key, kek_version)
+           VALUES (?::uuid, ?::uuid, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?)
+           RETURNING id`,
+          keyId,
+          thietBiMoi.id,
+          user.id,
+          user.orgId,
+          projectId,
+          keyVersion,
+          chuoiManifest(m),
+          row.manifestHash,
+          row.vanTay,
+          Buffer.from(wrapped),
+          kekVersion,
+        );
+        mapping.push({ oldKeyId: row.id, newKeyId: keyId, oldKeyVersion: row.keyVersion });
+        keyVersion++;
+      }
+      return { mapping, skipped };
+    },
+    { readOnly: false },
+  );
+}
+
+/**
+ * Số khoá CHƯA retire của thiết bị cũ trong một dự án actor KHÔNG còn thấy (mất membership) —
+ * khôi phục bỏ qua, chỉ đếm vào `keys_skipped`. Đọc trong transaction chỉ-đọc gắn dự án đó (RLS
+ * vẫn chỉ cho thấy khoá của chính actor), không đọc cột khoá.
+ */
+export async function demKhoaDuAnMatQuyen(
+  user: User,
+  thietBiCuId: string,
+  projectId: number,
+): Promise<number> {
+  damBaoNguCanhActor(user);
+  const r = await withProjectScope(projectId, () =>
+    queryOne<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM offline_vault_keys
+        WHERE device_id = ?::uuid AND user_id = ? AND org_id = ? AND project_id = ?
+          AND retired_at IS NULL`,
+      thietBiCuId,
+      user.id,
+      user.orgId,
+      projectId,
+    ),
+  );
+  return r?.n ?? 0;
 }

@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { queryOne } from "@/lib/db";
-import { CAN, getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { capNhatThietBi, type ThayDoiThietBi } from "@/lib/bao-mat/offline-devices";
 import {
+  requireAdminOffline2FA,
   jsonOffline,
   loiOffline,
   moDauOffline,
@@ -22,18 +22,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!user) return loiOffline(401, "unauthenticated", "Chưa đăng nhập");
   const md = await moDauOffline(req, user, { kiemOrigin: true, canVault: false });
   if (!md.ok) return md.res;
-  if (user.role !== "admin" || !CAN.manageUsers(user.role))
-    return loiOffline(403, "forbidden", "Chỉ Admin được duyệt/thu hồi thiết bị offline");
-  const tfa = await queryOne<{ on: boolean }>(
-    `SELECT totp_enabled_at IS NOT NULL AS on FROM users WHERE id = ?`,
-    user.id,
-  );
-  if (!tfa?.on)
-    return loiOffline(
-      403,
-      "two_factor_required",
-      "Cần bật xác thực 2 lớp trước khi duyệt/thu hồi thiết bị",
-    );
+  const chan = await requireAdminOffline2FA(user, "Chỉ Admin được duyệt/thu hồi thiết bị offline");
+  if (chan) return chan;
 
   const { id } = await params;
   if (!UUID_RE.test(id)) return loiOffline(404, "device_not_found", "Không tìm thấy thiết bị");

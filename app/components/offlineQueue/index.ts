@@ -8,7 +8,7 @@
 // `OFFLINE_QUEUE_QUARANTINED` là công tắc dừng khẩn cấp (rollback = bật lại → không ghi, không gửi,
 // giữ nguyên vault) — mặc định TẮT từ S07.
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { IdbTxDb, LoiHanMucAnh, QueueDb } from "./store";
+import { IdbTxDb, LoiHanMucAnh, QueueDb, type MucKhoiPhuc } from "./store";
 import { compressImage } from "./image";
 import { VaultSession, type VaultTrangThai } from "./vault";
 import { showToast } from "@/app/components/Toast";
@@ -28,6 +28,7 @@ import {
   type DiaryNotePayload,
   type OpBody,
   type QueueKind,
+  type QueueRecord,
   type QueueState,
   type QueueStats,
   type SendOutcome,
@@ -787,6 +788,78 @@ export class OfflineQueueManager {
     return canhBao ? { ok: true, canhBao } : { ok: true };
   }
 
+  // ── Khôi phục khi mất proof (M131 §3) ─────────────────────────────────────────────────
+
+  /**
+   * Thiết bị CŨ (proof đã mất) còn thao tác của chính chủ trên trình duyệt này — mỗi thiết bị kèm
+   * số thao tác. Cần vault đang mở (biết thiết bị hiện tại); khoá → rỗng. Không giải mã gì.
+   */
+  async thietBiCuConThaoTac(): Promise<{ deviceId: string; soThaoTac: number }[]> {
+    const chu = this.vault.chu();
+    if (!chu) return [];
+    const dem = new Map<string, number>();
+    for (const r of await this.store.docOpThietBiKhac(chu))
+      dem.set(r.deviceId, (dem.get(r.deviceId) ?? 0) + 1);
+    return [...dem].map(([deviceId, soThaoTac]) => ({ deviceId, soThaoTac }));
+  }
+
+  /**
+   * Gắn lại thao tác của thiết bị cũ sang thiết bị hiện tại sau khi máy chủ hoàn tất khôi phục.
+   * `mapping` (từ POST /api/offline/recovery/:id/complete — chỉ id + version cũ) được lưu kèm hàng
+   * đợi; mỗi lần gọi chỉ gắn được op của DỰ ÁN ĐANG MỞ (vault chỉ nạp khoá dự án hiện hành) — op dự
+   * án khác ở lại chờ lần gọi sau (không mapping) khi người dùng mở đúng dự án. `conLai` = op thiết
+   * bị cũ còn trong bản đồ nhưng chưa gắn được.
+   */
+  async ganLaiTheoKhoiPhuc(mapping?: MucKhoiPhuc[]): Promise<{ daGan: number; conLai: number }> {
+    if (OFFLINE_QUEUE_QUARANTINED || this.tamDungNguCanh) return { daGan: 0, conLai: 0 };
+    if (!(await this.damBaoVault())) return { daGan: 0, conLai: 0 };
+    let chu = this.vault.chu();
+    if (!chu) return { daGan: 0, conLai: 0 };
+    if (mapping?.length) {
+      const cu = await this.store.docBanDoKhoiPhuc(chu);
+      const moi = new Map(cu.map((m) => [m.oldKeyId, m]));
+      for (const m of mapping) moi.set(m.oldKeyId, m);
+      await this.store.luuBanDoKhoiPhuc(chu, [...moi.values()]);
+    }
+    const banDo = new Map((await this.store.docBanDoKhoiPhuc(chu)).map((m) => [m.oldKeyId, m]));
+    if (banDo.size === 0) return { daGan: 0, conLai: 0 };
+    const docCanGan = async () =>
+      (await this.store.docOpThietBiKhac(chu!)).filter((r) => banDo.has(r.vaultKeyId));
+    const canGan = (await docCanGan()).filter((r) => r.projectId === chu!.projectId);
+    // Vừa hoàn tất (có `mapping`) mà khoá bọc lại chưa nạp (vault mở trước khi hoàn tất) → mở lại
+    // vault MỘT lần để unlock trả khoá mới. Lời gọi thụ động (không mapping) không mở lại: vault mở
+    // sau khi hoàn tất đã có khoá mới; khoá vẫn thiếu = bị khoá (mất quyền) — mở lại chỉ lặp vô ích.
+    if (
+      mapping?.length &&
+      canGan.some((r) => !this.vault.coKhoa(banDo.get(r.vaultKeyId)!.newKeyId))
+    ) {
+      this.vault.khoa();
+      if (!(await this.damBaoVault())) return { daGan: 0, conLai: canGan.length };
+      const lai = this.vault.chu();
+      if (!lai || lai.ownerUserId !== chu.ownerUserId || lai.orgId !== chu.orgId)
+        return { daGan: 0, conLai: canGan.length };
+      chu = lai;
+    }
+    const doi: { cu: QueueRecord; moi: QueueRecord }[] = [];
+    for (const r of canGan) {
+      const m = banDo.get(r.vaultKeyId)!;
+      const moi = await this.vault.maHoaLaiTuThietBiCu(r, m.newKeyId, m.oldKeyVersion);
+      if (moi) doi.push({ cu: r, moi });
+    }
+    const daGan = await this.store.ganLaiThietBi(doi);
+    for (const { cu } of doi) this.cache.delete(cu.operationId);
+    // Dọn bản đồ: chỉ giữ mục còn op thiết bị cũ tham chiếu.
+    const conLaiDs = await docCanGan();
+    const conDung = new Set(conLaiDs.map((r) => r.vaultKeyId));
+    await this.store.luuBanDoKhoiPhuc(
+      chu,
+      [...banDo.values()].filter((m) => conDung.has(m.oldKeyId)),
+    );
+    await this.refreshStats();
+    if (daGan > 0) this.kichFlush();
+    return { daGan, conLai: conLaiDs.length };
+  }
+
   /**
    * "Gửi lại ngay": bỏ chờ backoff (giữ Retry-After của 429/503) rồi kích gửi. false = không gửi
    * được lúc này (mất mạng / kho khoá); lỗi đọc-ghi thiết bị → reject để UI báo lỗi thật.
@@ -845,6 +918,7 @@ export function getQueuedDiaryNote(date: string) {
 export function discardDiaryDraft(date: string, operationIds: readonly string[]) {
   return offlineQueue.discardDiaryDraft(date, operationIds);
 }
+export type { MucKhoiPhuc };
 export function chuanBiOfflineNhatKy(date: string) {
   return offlineQueue.chuanBiNhatKy(date);
 }

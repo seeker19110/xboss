@@ -94,6 +94,7 @@ const TYPE_LABEL: Record<string, string> = {
   warranty_expiry: "bảo hành sắp/đã hết hạn",
   warranty_claim_overdue: "claim bảo hành quá hạn xử lý",
   advance_overdue: "tạm ứng quá hạn hoàn ứng",
+  offline_recovery_pending: "yêu cầu khôi phục dữ liệu ngoại tuyến",
 };
 function typeLabel(t: string): string {
   return TYPE_LABEL[t] ?? t.replace(/_/g, " ");
@@ -163,6 +164,7 @@ function dayBucket(createdAt: string): DayBucket {
 // `/tracking/<slug>?floor=<floorLabel>`. null khi thông báo không gắn task hoặc chưa
 // suy ra được sheet (vd task đã bị xoá).
 function notifUrl(n: Notif): string | null {
+  if (n.type === "offline_recovery_pending") return "/admin/thiet-bi-offline?tab=khoi-phuc";
   if (!n.taskId || !n.sheetSlug) return null;
   return `/tracking/${n.sheetSlug}${n.floorLabel ? `?floor=${encodeURIComponent(n.floorLabel)}` : ""}`;
 }

@@ -500,6 +500,12 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 
 ## Đặc tả ĐÃ DUYỆT — sau S15 (viết + duyệt 2026-10-09)
 
+> **`M131-vault-offline-bao-tri-va-khoi-phuc.md`** — ✅ **XONG 2026-10-09 (2 phần)**. Phần 1:
+> migration `0170` (role `xboss_vault_maint`, bảng `offline_vault_recovery_requests`, audit khoá không
+> lộ `wrapped_key`) + `npm run vault:maint` (rewrap KEK, retire tự động). Phần 2 (§3): route
+> `/api/offline/recovery` (+ `/:id` duyệt, `/:id/complete`), trang Admin `/admin/thiet-bi-offline`,
+> khối "Thao tác của trình duyệt cũ" trong màn phục hồi ngoại tuyến (gắn lại bản nháp theo mapping).
+
 > **`M130-retention-cleanup-evidence.md`** — ✅ **Approved 2026-10-09 và ĐÃ TRIỂN KHAI XONG** (PR-A sau
 > S15). `scripts/retention-cleanup.ts` dry-run mặc định, chính sách evidence PASS 35 / FAIL 365 ngày,
 > `run-*` 7/35 ngày; chỉ xoá evidence nhận diện được, từ chối thư mục backup/WAL và thư mục cha.

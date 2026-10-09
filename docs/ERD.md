@@ -6412,8 +6412,44 @@
 - `user_id` → `offline_devices(user_id)`
 
 **Index:**
+- `idx_offline_vault_keys_device`: INDEX idx_offline_vault_keys_device ON public.offline_vault_keys USING btree (device_id) WHERE (retired_at IS NULL)
+- `idx_offline_vault_keys_kek_live`: INDEX idx_offline_vault_keys_kek_live ON public.offline_vault_keys USING btree (kek_version) WHERE (retired_at IS NULL)
 - `offline_vault_keys_device_id_user_id_org_id_project_id_key__key`: UNIQUE INDEX offline_vault_keys_device_id_user_id_org_id_project_id_key__key ON public.offline_vault_keys USING btree (device_id, user_id, org_id, project_id, key_version)
 - `offline_vault_keys_pkey`: UNIQUE INDEX offline_vault_keys_pkey ON public.offline_vault_keys USING btree (id)
+
+### offline_vault_recovery_requests
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| org_id | integer |  |  |
+| user_id | integer |  |  |
+| old_device_id | uuid |  |  |
+| new_device_id | uuid |  |  |
+| status | text |  | `'pending'::text` |
+| reason | text | ✓ |  |
+| decided_by | integer | ✓ |  |
+| decided_at | timestamptz | ✓ |  |
+| decide_note | text | ✓ |  |
+| completed_at | timestamptz | ✓ |  |
+| keys_recovered | integer | ✓ |  |
+| keys_skipped | integer | ✓ |  |
+| requested_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `decided_by` → `users(id)`
+- `new_device_id` → `offline_devices(id)`
+- `old_device_id` → `offline_devices(id)`
+- `org_id` → `offline_devices(org_id)`
+- `org_id` → `offline_devices(org_id)`
+- `org_id` → `organizations(id)`
+- `user_id` → `offline_devices(user_id)`
+- `user_id` → `offline_devices(user_id)`
+- `user_id` → `users(id)`
+
+**Index:**
+- `offline_vault_recovery_requests_pkey`: UNIQUE INDEX offline_vault_recovery_requests_pkey ON public.offline_vault_recovery_requests USING btree (id)
+- `uq_offline_vault_recovery_open`: UNIQUE INDEX uq_offline_vault_recovery_open ON public.offline_vault_recovery_requests USING btree (old_device_id) WHERE (status = ANY (ARRAY['pending'::text, 'approved'::text]))
 
 ### organizations
 

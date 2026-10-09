@@ -543,12 +543,12 @@ test(
         assert.equal(await luyKe(c.dot2), "110.000");
         assert.equal(await luyKe(c.dot3), "120.000", "không chốt luỹ kế nháp cũ 100");
       } else {
-        // Đợt 3 chốt trước (luỹ kế 100 từ đợt 1) → đợt 2 duyệt sau là kỳ trước → cần đối soát.
-        assert.equal(r3.status, 200, JSON.stringify(r3.body));
-        assert.equal(r2.status, 409, JSON.stringify(r2.body));
-        assert.equal(r2.body?.code, "reconciliation_required");
-        assert.equal(await luyKe(c.dot3), "100.000");
-        assert.equal(await soPhieu(c.dot2), 0);
+        // Đợt 3 lấy khoá trước khi đợt 2 chốt → kỳ trước còn chờ duyệt → 409 (IPC tuần tự,
+        // quyết định 2026-10-09); đợt 2 vẫn duyệt bình thường, đợt 3 không chốt/không phiếu.
+        assert.equal(r2.status, 200, JSON.stringify(r2.body));
+        assert.equal(r3.status, 409, JSON.stringify(r3.body));
+        assert.equal(r3.body?.code, "previous_period_open");
+        assert.equal(await soPhieu(c.dot3), 0);
       }
     } finally {
       await f.don();

@@ -16,6 +16,7 @@ import {
   khoaHopDongVaDot,
   kiemXacNhanCanhBao,
   kySauDaDuyet,
+  kyTruocConMo,
   taoOperationId,
   timQuyetDinhDaGhi,
   type KetQuaQuyetDinh,
@@ -165,6 +166,14 @@ export async function POST(
       await tinhLaiLuyKeDot(id);
       const canh = await canhBaoDot(id);
       if (decision === "approved") {
+        const truoc = await kyTruocConMo(goc.contractId, goc.periodNo);
+        if (truoc)
+          throw loi(
+            409,
+            `Đợt ${truoc.code} (kỳ ${truoc.periodNo}) của hợp đồng này đang ` +
+              `${truoc.status === "draft" ? "nháp" : "chờ duyệt"} — duyệt hoặc từ chối kỳ trước rồi mới duyệt kỳ này`,
+            "previous_period_open",
+          );
         const sau = await kySauDaDuyet(goc.contractId, goc.periodNo);
         if (sau)
           throw loi(

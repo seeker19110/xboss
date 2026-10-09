@@ -20,6 +20,7 @@ import {
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { Button, Chip } from "@/app/components/ui";
 import { Skeleton } from "@/app/components/Skeleton";
+import OfflineKhoiPhucThietBi from "@/app/components/OfflineKhoiPhucThietBi";
 import {
   offlineQueue,
   useOfflineQueueStatus,
@@ -174,6 +175,8 @@ export default function OfflineRecoveryPanel({ onClose }: { onClose: () => void 
   const [xungDot, setXungDot] = useState<string | null>(null);
   /** Lần đọc danh sách gần nhất lỗi (IndexedDB) — KHÔNG được hiển thị như "không còn gì". */
   const [loiDoc, setLoiDoc] = useState(false);
+  /** Thao tác của chính chủ thuộc THIẾT BỊ CŨ (mất proof, M131) — chưa lên máy chủ. */
+  const [soThietBiCu, setSoThietBiCu] = useState(0);
   const tieuDeRef = useRef<HTMLHeadingElement>(null);
 
   const taiLai = useCallback(async () => {
@@ -268,7 +271,8 @@ export default function OfflineRecoveryPanel({ onClose }: { onClose: () => void 
   // Mọi op của tài khoản này mà phiên hiện tại không đọc được (khoá chưa mở/hết hạn/khác dự án).
   const soKhoa = Math.max(0, snap.total - soMo);
   // Chỉ khẳng định "đã lên máy chủ" khi ĐỌC ĐƯỢC thiết bị và thật sự không còn gì.
-  const rong = ds !== null && !khongDocDuoc && snap.total === 0 && legacy === 0;
+  const rong =
+    ds !== null && !khongDocDuoc && snap.total === 0 && legacy === 0 && soThietBiCu === 0;
   const tomTat = snap.quarantined
     ? "Lưu ngoại tuyến đang tạm khoá."
     : khongDocDuoc
@@ -350,6 +354,8 @@ export default function OfflineRecoveryPanel({ onClose }: { onClose: () => void 
               </Button>
             )}
           </div>
+
+          <OfflineKhoiPhucThietBi vaultMo={vaultMo} onDem={setSoThietBiCu} />
 
           {khongDocDuoc && (
             <div

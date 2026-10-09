@@ -264,6 +264,43 @@ khai trong tài liệu (hàng giờ/5 phút/...).
 
 ---
 
+## Bảo trì vault offline: rewrap KEK + retire khoá (M131)
+
+Migration `0170` tạo role **`xboss_vault_maint`** (LOGIN, NOBYPASSRLS, mật khẩu mẫu
+`CHANGE_ME_ON_DEPLOY`) — chỉ được UPDATE 3 cột `wrapped_key`/`kek_version`/`retired_at` của
+`offline_vault_keys` và cột `status` của `offline_vault_recovery_requests`; runtime app (`xboss_app`)
+vẫn không sửa được khoá. Role migrate không có `CREATEROLE` thì migration dừng với hướng dẫn — tạo tay
+bằng superuser rồi chạy lại `npm run db:migrate`:
+
+```bash
+sudo -u postgres psql -d xboss -c "CREATE ROLE xboss_vault_maint LOGIN NOBYPASSRLS PASSWORD 'tạm';"
+# BẮT BUỘC đổi mật khẩu mẫu sau khi migrate:
+sudo -u postgres psql -d xboss -c "ALTER ROLE xboss_vault_maint PASSWORD '<mật khẩu mạnh>';"
+```
+
+Biến môi trường (chỉ cho script, **không** thêm vào runtime app):
+
+- `XBOSS_VAULT_MAINT_DATABASE_URL=postgres://xboss_vault_maint:<mật khẩu>@localhost/xboss` — thiếu thì
+  `npm run vault:maint` throw ngay.
+- `XBOSS_VAULT_RECOVERY_DAYS` (tuỳ chọn, số nguyên ≥1, mặc định 30) — cửa sổ khôi phục: khoá của thiết
+  bị bị thu hồi quá số ngày này (và không còn yêu cầu khôi phục `pending`/`approved`) bị đánh dấu
+  `retired_at`; yêu cầu `pending` quá cửa sổ → `expired`. Không xoá khoá nào.
+- Script cần cùng `XBOSS_OFFLINE_KEK` với app để rewrap.
+
+Lệnh: `npm run vault:maint -- [--rewrap] [--retire] [--apply]` — không có `--apply` là **dry-run** (chỉ
+in số liệu). Cuối mỗi lần chạy in bảng số khoá theo `kek_version` (còn dùng / đã retire). Crontab hệ
+thống hằng ngày (3h30 sáng, trong thư mục app):
+
+```
+30 3 * * *  cd /opt/xboss && npm run -s vault:maint -- --rewrap --retire --apply >> logs/vault-maint.log 2>&1
+```
+
+**Xoay KEK:** (1) thêm version mới ở ĐẦU `XBOSS_OFFLINE_KEK` (`"v2:<mới>,v1:<cũ>"`) cho cả app và
+script, restart app; (2) chạy `npm run vault:maint -- --rewrap --apply` (hoặc đợi cron) — mọi khoá còn
+dùng được bọc lại tại chỗ sang `v2` (cùng DEK, client không mất nháp); (3) khi bảng báo cáo cho thấy
+version cũ còn **0** khoá còn dùng (dòng bị "bỏ qua" phải xử lý trước), gỡ version cũ khỏi keyring. Khoá
+đã retire vẫn giữ version cũ — đó là khoá của thiết bị đã thu hồi, không mở được nữa.
+
 ## Di trú từ bản SQLite cũ
 
 Nếu trước đây chạy bản SQLite (file `xboss.db`), chuyển toàn bộ dữ liệu sang Postgres:
@@ -353,6 +390,7 @@ mục Nợ kỹ thuật nếu cần nâng cấp):**
       cũ tới khi không còn khoá phụ thuộc. Để trống = tính năng tắt (`/api/offline/*` trả 503).
       KHÔNG chép KEK test của e2e (`e2e/constants.ts`) — server từ chối (misconfigured) trừ khi
       có `XBOSS_E2E=1`, cờ chỉ dành cho server e2e; production không bao giờ đặt `XBOSS_E2E`.
+- [ ] (Tuỳ chọn, M131) Bảo trì vault offline — xem [mục riêng](#bảo-trì-vault-offline-rewrap-kek--retire-khoá-m131).
 - [ ] Đổi mật khẩu 4 tài khoản demo (admin/pm/engineer/subcon).
 - [ ] Đổi mật khẩu role Postgres `xboss` khỏi giá trị mẫu nếu tự host DB.
 - [ ] Sao lưu định kỳ DB (Supabase tự backup; Postgres tự host: `pg_dump`).

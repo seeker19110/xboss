@@ -4,7 +4,8 @@
 // (503) → rate limit (429).
 // Mọi phản hồi `private, no-store` — thiết bị/context/khoá không bao giờ vào cache HTTP/SW.
 import { NextRequest, NextResponse } from "next/server";
-import type { User } from "@/lib/bao-mat/auth";
+import { CAN, type User } from "@/lib/bao-mat/auth";
+import { queryOne } from "@/lib/db";
 import { isStrictSameOrigin } from "@/lib/bao-mat/csrf";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 import {
@@ -55,7 +56,12 @@ type MoDau =
 export async function moDauOffline(
   req: NextRequest,
   user: User,
-  opts: { kiemOrigin: boolean; canVault: boolean; gioiHan?: { ten: string; max: number } },
+  opts: {
+    kiemOrigin: boolean;
+    canVault: boolean;
+    /** `phut` = cửa sổ đếm (mặc định 15 phút). */
+    gioiHan?: { ten: string; max: number; phut?: number };
+  },
 ): Promise<MoDau> {
   if (opts.kiemOrigin && !isStrictSameOrigin(req))
     return {
@@ -73,7 +79,7 @@ export async function moDauOffline(
     keyring = st.keyring;
   }
   if (opts.gioiHan) {
-    const CUA_SO_PHUT = 15;
+    const CUA_SO_PHUT = opts.gioiHan.phut ?? 15;
     if (await hitRateLimit(`offline-${opts.gioiHan.ten}:${user.id}`, opts.gioiHan.max, CUA_SO_PHUT))
       return {
         ok: false,
@@ -84,6 +90,29 @@ export async function moDauOffline(
   }
   const proof = docProof(req.cookies.get(PROOF_COOKIE)?.value);
   return { ok: true, keyring, proofHash: proof ? bamProof(proof) : null };
+}
+
+/**
+ * Thao tác quản trị thiết bị/khôi phục offline (DATA-CONTRACTS §3, M131 §3): chỉ Admin có
+ * CAN.manageUsers VÀ đã bật 2FA. Trả phản hồi lỗi (403) hoặc null khi được phép.
+ */
+export async function requireAdminOffline2FA(
+  user: User,
+  thongDiep: string,
+): Promise<NextResponse | null> {
+  if (user.role !== "admin" || !CAN.manageUsers(user.role))
+    return loiOffline(403, "forbidden", thongDiep);
+  const tfa = await queryOne<{ on: boolean }>(
+    `SELECT totp_enabled_at IS NOT NULL AS on FROM users WHERE id = ?`,
+    user.id,
+  );
+  if (!tfa?.on)
+    return loiOffline(
+      403,
+      "two_factor_required",
+      "Cần bật xác thực 2 lớp trước khi duyệt/thu hồi thiết bị",
+    );
+  return null;
 }
 
 /** Thiết bị của chính actor trên trình duyệt này — chưa đăng ký/đã thu hồi → LoiOffline 403. */

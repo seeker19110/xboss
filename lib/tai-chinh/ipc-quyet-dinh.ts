@@ -189,6 +189,24 @@ export async function khoaHopDongVaDot(
   return { ...dot, projectId, orgId };
 }
 
+/**
+ * Kỳ TRƯỚC còn mở (nháp/chờ duyệt) của cùng HĐ (nếu có). Quyết định chủ dự án 2026-10-09: duyệt kỳ
+ * sau khi kỳ trước chưa chốt bị chặn 409 `previous_period_open` — IPC duyệt tuần tự theo kỳ. Gọi DƯỚI
+ * khoá HĐ (`khoaHopDongVaDot`) nên hai quyết định đồng thời không cùng vượt qua.
+ */
+export async function kyTruocConMo(
+  contractId: number,
+  periodNo: number,
+): Promise<{ code: string; periodNo: number; status: string } | undefined> {
+  return queryOne<{ code: string; periodNo: number; status: string }>(
+    `SELECT code, period_no AS "periodNo", status FROM payment_certs
+      WHERE contract_id = ? AND status IN ('draft', 'submitted') AND period_no < ?
+      ORDER BY period_no LIMIT 1`,
+    contractId,
+    periodNo,
+  );
+}
+
 /** Kỳ SAU đã duyệt của cùng HĐ (nếu có) — duyệt kỳ trước lúc này phải đối soát, không chốt. */
 export async function kySauDaDuyet(
   contractId: number,
