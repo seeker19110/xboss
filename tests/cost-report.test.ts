@@ -405,6 +405,42 @@ test(
   },
 );
 
+test(
+  "Q-AC06/A4-AC03: PO qty NaN/±Infinity không thành 0 — loại khỏi tổng, đếm đối soát, không 500",
+  S,
+  async () => {
+    const dien = await systemId("dien");
+    const p = await taoDuAn("qac06");
+    const st = await taoSheet(p, dien, "qac06");
+    await taoPoItem(p, st, 2, "1000.00"); // hợp lệ: 2000
+    await taoPoItem(p, st, Number.NaN, "999.00");
+    await taoPoItem(p, st, Number.POSITIVE_INFINITY, "999.00");
+    await taoPoItem(p, st, Number.NEGATIVE_INFINITY, "999.00");
+    await dangNhapPm(p);
+
+    for (const headers of [{}, V1]) {
+      const res = await goiCosts("", headers);
+      assert.equal(res.status, 200);
+      const row = rowOfSystem(res.body, dien)!;
+      const totals = res.body.totals as Totals;
+      if (headers === V1) {
+        assert.equal(row.committed, "2000.00");
+        assert.equal(totals.committed, "2000.00");
+      } else {
+        assert.equal(row.committed, 2000, "chỉ PO hợp lệ — NaN không làm tổng thành NaN/0");
+        assert.equal(totals.committed, 2000);
+      }
+      const cov = (res.body.metadata as { coverage: Record<string, unknown> }).coverage as {
+        reconciled: boolean;
+        invalidQuantity: { poItems: number };
+      };
+      assert.equal(cov.invalidQuantity.poItems, 3, "đếm đủ 3 dòng nonfinite để đối soát");
+      assert.equal(cov.reconciled, false);
+      assert.doesNotMatch(JSON.stringify(res.body), /NaN|Infinity/);
+    }
+  },
+);
+
 // ─────────────────────────────── A4-AC04 ───────────────────────────────
 
 test(
