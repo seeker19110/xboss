@@ -1,5 +1,23 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — M131 phần 1: role bảo trì vault offline, rewrap KEK, retire khoá tự động
+
+- Đặc tả `docs/nang-cap/M131-vault-offline-bao-tri-va-khoi-phuc.md` §0–§2 (đóng "Cần quyết" (1)(2) của
+  S05/S07). Migration **0170**: role `xboss_vault_maint` (LOGIN, NOBYPASSRLS) chỉ `UPDATE (wrapped_key,
+kek_version, retired_at)` khoá + `UPDATE (status)` yêu cầu khôi phục; policy `TO xboss_vault_maint`;
+  index khoá còn dùng; bảng `offline_vault_recovery_requests` (RLS + grant cho §3); trigger
+  `audit_offline_vault_key_change()` chỉ ghi `kek_version`/`retired_at`. **Thêm thuần tuý** (tạo
+  role + grant, không UPDATE dòng nào) → đi thẳng production; role migrate cần CREATEROLE (thiếu → hướng
+  dẫn tạo tay trong DEPLOY.md). `xboss_app` vẫn không sửa/xoá khoá.
+- `npm run vault:maint -- [--rewrap] [--retire] [--apply]` (`scripts/vault-maint.ts` +
+  `lib/bao-mat/offline-vault-bao-tri.ts`): dry-run mặc định; rewrap tại chỗ sang KEK active theo lô 200
+  dưới cùng advisory lock với `capKhoaVault`, dòng thiếu KEK cũ/giải bọc lỗi bị bỏ qua + đếm; retire
+  khoá thiết bị thu hồi quá `XBOSS_VAULT_RECOVERY_DAYS` (mặc định 30) không còn yêu cầu mở; pending quá
+  hạn → expired. Biến `XBOSS_VAULT_MAINT_DATABASE_URL` riêng cho script. DEPLOY.md: role, biến, crontab.
+- Test `tests/offline-vault-bao-tri.test.ts` (grant thật bằng 2 role, rewrap → unlock route chỉ với KEK
+  mới ra đúng DEK, audit không có `wrapped_key`, retire/expired); nhóm `OFFLINE` của `rls.test.ts`.
+- Còn lại: §3 route + UI khôi phục khi mất proof (admin duyệt) — phần 2.
+
 ## 2026-10-09 — IPC duyệt tuần tự: chặn duyệt kỳ sau khi kỳ trước còn mở
 
 - Quyết định chủ dự án 2026-10-09 (đóng "Cần quyết (2)" của S13c): `POST /api/payment-certs/:id/decide`
@@ -657,11 +675,12 @@ phục hồi (S08) chưa đụng** — lưu offline vẫn khoá như S04. Không
   `phatDoiNguCanh("switch")` — đỏ trên `/portfolio` cũ); `audit-s07-offline-flush-regressions` thêm ca
   dừng flush khi đổi ngữ cảnh; e2e `e2e/authed/ngu-canh-khoa.spec.ts` (2 tab, desktop + mobile, axe +
   focus + Tải lại). Inventory route sinh lại kèm khối tay S05.
-- **Cần quyết (phiên chính — không tự quyết):** (1) **Rewrap KEK** (UPDATE `wrapped_key` bằng role bảo
+- **Cần quyết (phiên chính — không tự quyết):** ~~(1) **Rewrap KEK** (UPDATE `wrapped_key` bằng role bảo
   trì riêng + audit, DATA-CONTRACTS §4) chưa làm: cần quyết tạo role DB mới ở migration (role migrate
   production cần CREATEROLE) và quy trình vận hành; hiện xoay KEK bằng keyring nhiều version — không mất
-  khoá, chỉ chưa gỡ được version cũ. (2) **`retired_at`**: DDL không cấp UPDATE cho `xboss_app` nên
-  runtime không retire khoá — ai/khi nào retire (vòng đời S07)? (3) **Phục hồi khi mất proof** ("xác
+  khoá, chỉ chưa gỡ được version cũ.~~ (đã chốt 2026-10-09 — M131) ~~(2) **`retired_at`**: DDL không cấp
+  UPDATE cho `xboss_app` nên runtime không retire khoá — ai/khi nào retire (vòng đời S07)?~~ (đã chốt
+  2026-10-09 — M131) (3) **Phục hồi khi mất proof** ("xác
   minh riêng") chưa có đặc tả phương thức xác minh — hiện proof mới = thiết bị mới, khoá cũ không mở được
   (đúng fail-closed, có thể mất nháp chưa đồng bộ). (4) _(đã chốt: hàm SECURITY DEFINER xuyên org — xem
   trên)_. (5) Vai trò nhật ký trong manifest lặp quy tắc `canEdit` của

@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
     "db:migrate": "tsx scripts/migrate.ts",
+    "vault:maint": "tsx scripts/vault-maint.ts",
     "sync:drawings": "tsx scripts/scan-drawings.ts",
     "gen:erd": "tsx scripts/gen-erd.ts",
     "gen:ocr-rules": "tsx scripts/gen-ocr-rules.ts",

@@ -2,7 +2,7 @@
 
 > FILE SINH TỰ ĐỘNG phần ngoài khối `TAY:BEGIN/END`. Không sửa tay phần còn lại.
 
-- Source SHA: `104ac35e3618dd4685f5ef566569d7af9b12fcb6`
+- Source SHA: `fe0b83560de59e332029ccdde72eb078a742f899`
 - Sinh lại: `npm run audit:route-scope`
 - Phạm vi: 403 file `route.*` được git theo dõi dưới `app/api` (383 `route.ts` + 9 `route.tsx` PDF), 636 (file, method) export tường minh; 636 dòng.
 

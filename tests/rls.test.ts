@@ -526,11 +526,14 @@ test(
     // Receipt hàng đợi offline + staging file ảnh (S06, migration 0164): nghiêm ngặt theo
     // app.user_id/org_id (+ app.project_id cho receipt); receipt chỉ SELECT/INSERT, staging thêm
     // DELETE. Hành vi kiểm bằng role xboss_app ở tests/offline-receipt-route.test.ts.
+    // Yêu cầu khôi phục vault (M131, migration 0170): chủ/admin cùng org theo GUC; role bảo trì
+    // xboss_vault_maint có policy riêng. Grant/hành vi kiểm ở tests/offline-vault-bao-tri.test.ts.
     const OFFLINE = [
       "offline_devices",
       "offline_vault_keys",
       "audit_operation_receipts",
       "photo_upload_staging",
+      "offline_vault_recovery_requests",
     ];
 
     // Nhóm engineering: khai theo TIỀN TỐ chứ không liệt kê tay — thêm bảng engineering_* mới
